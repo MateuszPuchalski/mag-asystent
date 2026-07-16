@@ -1,0 +1,14 @@
+{
+  "name": "WERTIS Kolektor magazynowy",
+  "short_name": "WERTIS Mag",
+  "description": "Asystent magazyniera — podgląd stanów, lokalizacje, przesunięcia MM (Subiekt GT)",
+  "lang": "pl",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#2A2A2C",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

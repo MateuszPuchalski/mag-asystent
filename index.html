@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2A2A2C">
+<title>WERTIS · Kolektor magazynowy</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="stage">
+  <div id="device">
+    <div class="dev-btn dev-btn-l"></div>
+    <div class="dev-btn dev-btn-r"></div>
+    <div class="dev-speaker"><div></div></div>
+    <div id="app">
+
+      <!-- SPLASH -->
+      <div id="splash" class="screen-abs">
+        <div class="wertis-logo" aria-label="WERTIS — sklep z częściami">
+          <svg viewBox="0 0 230 74" width="230" height="74">
+            <rect x="6" y="10" width="14" height="34" rx="3" fill="#F7A600"/>
+            <text x="28" y="42" font-family="Barlow Condensed, sans-serif" font-weight="800" font-size="42" letter-spacing="2" fill="#3B3B3D">WERTIS</text>
+            <text x="29" y="62" font-family="Barlow, sans-serif" font-weight="600" font-size="13" letter-spacing="3.5" fill="#8A8A8E">SKLEP Z CZĘŚCIAMI</text>
+          </svg>
+        </div>
+        <div id="splash-rope" role="button" tabindex="0" aria-label="Uruchom aplikację">
+          <div class="rope-line" id="splash-rope-line"></div>
+          <svg viewBox="0 0 64 32" width="62" height="31">
+            <path d="M28 0 h8 l4 11 h-16 z" fill="#3B3B3D"/>
+            <rect x="4" y="11" width="56" height="18" rx="9" fill="#3B3B3D"/>
+            <rect x="16" y="16" width="32" height="8" rx="4" fill="#F7A600"/>
+          </svg>
+        </div>
+        <div id="splash-caption">POCIĄGNIJ, ABY URUCHOMIĆ</div>
+        <div class="splash-foot">Kolektor magazynowy · prototyp v0.1</div>
+      </div>
+
+      <!-- APP CHROME -->
+      <div id="chrome" class="hidden">
+        <header id="topbar">
+          <button id="btn-back" class="icon-btn hidden" aria-label="Wstecz">
+            <svg viewBox="0 0 16 16" width="16" height="16"><path d="M10.5 2 L4.5 8 L10.5 14" fill="none" stroke="#3B3B3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div id="topbar-logo">
+            <svg viewBox="0 0 120 26" width="98" height="24">
+              <rect x="2" y="3" width="6" height="14" rx="1.5" fill="#F7A600"/>
+              <text x="12" y="17" font-family="Barlow Condensed, sans-serif" font-weight="800" font-size="18" letter-spacing="1" fill="#3B3B3D">WERTIS</text>
+            </svg>
+          </div>
+          <div id="topbar-title"></div>
+          <div class="sfera-dot"><i></i>Sfera</div>
+        </header>
+
+        <main id="view"></main>
+
+        <nav id="tabbar">
+          <button id="tab-home" class="tab" data-nav="home">
+            <svg viewBox="0 0 24 16" width="22" height="14"><g class="tab-ico"><rect x="0" y="0" width="2" height="16"/><rect x="4" y="0" width="1" height="16"/><rect x="7" y="0" width="3" height="16"/><rect x="12" y="0" width="1" height="16"/><rect x="15" y="0" width="2" height="16"/><rect x="19" y="0" width="1" height="16"/><rect x="22" y="0" width="2" height="16"/></g></svg>
+            <span>SKAN</span>
+          </button>
+          <button id="tab-queue" class="tab" data-nav="queue">
+            <svg viewBox="0 0 24 24" width="17" height="17"><g class="tab-ico"><rect x="10.6" y="0.5" width="2.8" height="5" rx="1.2"/><rect x="10.6" y="18.5" width="2.8" height="5" rx="1.2"/><rect x="0.5" y="10.6" width="5" height="2.8" rx="1.2"/><rect x="18.5" y="10.6" width="5" height="2.8" rx="1.2"/><rect x="10.6" y="0.5" width="2.8" height="5" rx="1.2" transform="rotate(45 12 12)"/><rect x="10.6" y="18.5" width="2.8" height="5" rx="1.2" transform="rotate(45 12 12)"/><rect x="0.5" y="10.6" width="5" height="2.8" rx="1.2" transform="rotate(45 12 12)"/><rect x="18.5" y="10.6" width="5" height="2.8" rx="1.2" transform="rotate(45 12 12)"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3" fill="#fff"/></g></svg>
+            <span>KOLEJKA</span>
+            <em id="queue-badge" class="badge hidden"></em>
+          </button>
+        </nav>
+      </div>
+
+      <!-- OVERLAYS -->
+      <div id="overlay-dialog" class="hidden"></div>
+      <div id="overlay-success" class="hidden"></div>
+      <div id="toast" class="hidden"></div>
+    </div>
+  </div>
+</div>
+<script src="js/app.js"></script>
+</body>
+</html>
