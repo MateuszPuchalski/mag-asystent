@@ -1,0 +1,10 @@
+# Cloudflare Pages — hostuje WYŁĄCZNIE statyczny frontend (web/dist).
+# Backend (Fastify + SQLite + worker + integracja MSSQL/Sfera) NIE działa na
+# Pages/Workers — musi stać na serwerze LAN blisko Subiekta (patrz DEPLOY.md).
+name = "wertis-kolektor"
+pages_build_output_dir = "web/dist"
+compatibility_date = "2025-01-01"
+
+# Adres API ustaw jako zmienną build-time w panelu Pages (Settings → Variables):
+#   VITE_API_BASE = https://mag-api.twojafirma.pl
+# (zmienne VITE_* są wstrzykiwane przy budowaniu, nie w runtime).
