@@ -2,6 +2,7 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
+import { pendingMmByTw } from "./stock.js";
 import { logEvent } from "./events.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type { PutawayDocument, PutawayItemView } from "../types.js";
@@ -66,6 +67,11 @@ export function createSession(
     sourceDocNumber = doc.nr_pelny;
     positions = subiekt.getDocumentPositions(opts.docId);
   } else {
+    // wznowienie istniejącej otwartej sesji „całe MGP" — bez duplikatów pozycji
+    const open = db()
+      .prepare("SELECT id FROM putaway_sessions WHERE source_doc_id IS NULL AND status='open' ORDER BY id DESC LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (open) return open.id;
     positions = subiekt.listMgpStockProducts();
   }
 
@@ -145,12 +151,31 @@ export function getSession(sessionId: number) {
   const doneCount = items.filter((i) => i.status === "done" || i.status === "skipped").length;
   const onCart = items.filter((i) => i.status === "on_cart").length;
 
+  // zadania kolejki tej sesji: błędy jako alerty (MM/lokalizacja nie weszły do
+  // Subiekta mimo odhaczonych pozycji) + licznik „w drodze"
+  const queueAlerts = db()
+    .prepare(
+      `SELECT id, type, label, detail, error_msg AS errorMsg FROM sfera_queue
+       WHERE session_id = ? AND status = 'error' ORDER BY id`
+    )
+    .all(sessionId) as Array<{ id: number; type: string; label: string; detail: string; errorMsg: string | null }>;
+  const inFlight = (
+    db()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM sfera_queue
+         WHERE session_id = ? AND status IN ('pending','processing','waiting_for_doc')`
+      )
+      .get(sessionId) as { n: number }
+  ).n;
+
   return {
     id: session.id,
     sourceDocId: session.source_doc_id,
     sourceDocNumber: session.source_doc_number,
     status: session.status,
     progress: { total, done: doneCount, remaining: total - doneCount, onCart },
+    queueAlerts,
+    inFlight,
     items,
   };
 }
@@ -158,6 +183,12 @@ export function getSession(sessionId: number) {
 function freshLock(lockedBy: string | null, lockedAt: string | null): string | null {
   if (!lockedBy || !lockedAt) return null;
   return Date.now() - Date.parse(lockedAt) < LOCK_TTL_MS ? lockedBy : null;
+}
+
+/** Dostępny stan MGP = stan magazynowy minus MM „w drodze" (kolejka Sfery). */
+function availableMgp(twId: number): number {
+  const stan = subiekt.getStock(twId, config.magId.MGP).stan;
+  return stan - (pendingMmByTw().get(twId) ?? 0);
 }
 
 /** Skan towaru na wózek (spec §5.4 pkt 1). Zwraca pozycję lub info „spoza dok.". */
@@ -175,9 +206,12 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
   const lock = freshLock(item.locked_by, item.locked_at);
   if (lock && lock !== user) return { locked: true, lockedBy: lock };
 
+  // bez fizycznego stanu na MGP (po odjęciu MM „w drodze") nie ma czego rozkładać
+  const avail = availableMgp(twId);
+  if (avail <= 0) return { error: "Brak stanu na MGP (lub całość już w drodze na MAG)" };
+
   const remaining = item.qty_expected - item.qty_done;
-  const mgp = subiekt.getStock(twId, config.magId.MGP);
-  const defaultQty = Math.max(0, Math.min(remaining, mgp.stan));
+  const defaultQty = Math.min(Math.max(remaining, 1), avail);
   const targetLoc = t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean)[0] ?? null : null;
 
   db()
@@ -195,7 +229,8 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
 export function addOffDocument(sessionId: number, twId: number, user: string) {
   const t = subiekt.getProductById(twId);
   if (!t) return { error: "Nieznany towar" };
-  const mgp = subiekt.getStock(twId, config.magId.MGP);
+  const avail = availableMgp(twId);
+  if (avail <= 0) return { error: "Brak stanu na MGP (lub całość już w drodze na MAG)" };
   const targetLoc = t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean)[0] ?? null : null;
   const id = Number(
     db()
@@ -203,7 +238,7 @@ export function addOffDocument(sessionId: number, twId: number, user: string) {
         `INSERT INTO putaway_items(session_id, tw_id, target_loc, qty_expected, qty_done, status, off_document, stage_qty, stage_loc, locked_by, locked_at)
          VALUES (?,?,?,?,0,'on_cart',1,?,?,?,?)`
       )
-      .run(sessionId, twId, targetLoc, Math.max(0, mgp.stan), Math.max(0, mgp.stan), targetLoc, user, new Date().toISOString())
+      .run(sessionId, twId, targetLoc, avail, avail, targetLoc, user, new Date().toISOString())
       .lastInsertRowid
   );
   logEvent("putaway_confirm", user, twId, { sessionId, offDocument: true });
@@ -221,6 +256,9 @@ export function confirmItem(
   const item = db().prepare("SELECT * FROM putaway_items WHERE id=?").get(itemId) as any;
   if (!item) return { error: "Brak pozycji" };
   if (/\s/.test(location)) return { error: "Kod lokalizacji nie może zawierać spacji" };
+  if (!Number.isFinite(qty) || qty <= 0) return { error: "Ilość musi być większa od zera" };
+  const avail = availableMgp(item.tw_id);
+  if (qty > avail) return { error: `Na MGP dostępne tylko ${avail} szt`, status: 409 };
   db()
     .prepare("UPDATE putaway_items SET status='on_cart', stage_qty=?, stage_loc=?, stage_update_loc=? WHERE id=?")
     .run(qty, location.toUpperCase(), updateLoc ? 1 : 0, itemId);
@@ -270,12 +308,28 @@ export function commitCart(sessionId: number, user: string) {
     .filter((i) => i.stage_qty > 0)
     .map((i) => ({ twId: i.tw_id, qty: i.stage_qty }));
 
+  // walidacja przed kolejką: suma z wózka per towar vs stan MGP minus MM „w drodze"
+  // (inaczej MM padłby dopiero w workerze, a pozycje byłyby już odhaczone)
+  const staged = new Map<number, number>();
+  for (const i of mmItems) staged.set(i.twId, (staged.get(i.twId) ?? 0) + i.qty);
+  for (const [twId, qty] of staged) {
+    const avail = availableMgp(twId);
+    if (qty > avail) {
+      const t = subiekt.getProductById(twId);
+      return {
+        error: `${t?.symbol ?? twId}: na MGP dostępne tylko ${avail} szt (na wózku ${qty})`,
+        status: 409,
+      };
+    }
+  }
+
   const queueIds: number[] = [];
   if (mmItems.length) {
     const qid = enqueueMM(config.magId.MGP, config.magId.MAG, mmItems, {
       createdBy: user,
       twId: null,
       sourceDocId: session.source_doc_id,
+      sessionId,
       label: `MM wózek · ${mmItems.length} poz.`,
       detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt MGP→MAG (rozkładanie)`,
     });
@@ -293,6 +347,7 @@ export function commitCart(sessionId: number, user: string) {
         const qid = enqueueSetLocation(i.tw_id, joined, {
           createdBy: user,
           twId: i.tw_id,
+          sessionId,
           label: "Lokalizacja · " + (t?.symbol ?? i.tw_id),
           detail: `${i.stage_loc} (rozkładanie)`,
         });

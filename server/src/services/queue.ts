@@ -5,6 +5,7 @@ export interface EnqueueBase {
   createdBy: string;
   twId?: number | null;
   sourceDocId?: number | null;
+  sessionId?: number | null;
   label: string;
   detail: string;
 }
@@ -16,8 +17,8 @@ function insert(
 ): number {
   const res = db()
     .prepare(
-      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, created_by)
-       VALUES (?,?, 'pending', ?,?,?,?,?)`
+      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by)
+       VALUES (?,?, 'pending', ?,?,?,?,?,?)`
     )
     .run(
       type,
@@ -26,6 +27,7 @@ function insert(
       base.detail,
       base.twId ?? null,
       base.sourceDocId ?? null,
+      base.sessionId ?? null,
       base.createdBy
     );
   return Number(res.lastInsertRowid);
