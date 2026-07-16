@@ -73,12 +73,21 @@ export interface PutawayItem {
   stageQty: number | null;
   stageLoc: string | null;
 }
+export interface PutawayQueueAlert {
+  id: number;
+  type: "set_location" | "mm" | "combo";
+  label: string;
+  detail: string;
+  errorMsg: string | null;
+}
 export interface PutawaySession {
   id: number;
   sourceDocId: number | null;
   sourceDocNumber: string | null;
   status: string;
   progress: { total: number; done: number; remaining: number; onCart: number };
+  queueAlerts: PutawayQueueAlert[];
+  inFlight: number;
   items: PutawayItem[];
 }
 

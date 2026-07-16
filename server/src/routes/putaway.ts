@@ -59,7 +59,7 @@ export async function putawayRoutes(app: FastifyInstance) {
   }>("/api/putaway/sessions/:id/confirm", async (req, reply) => {
     const { itemId, qty, location, updateLoc = true } = req.body;
     const r = confirmItem(itemId, qty, location, updateLoc, userOf(req));
-    if ("error" in r) return reply.code(400).send(r);
+    if ("error" in r) return reply.code(("status" in r && r.status) || 400).send({ error: r.error });
     return r;
   });
 
@@ -73,7 +73,7 @@ export async function putawayRoutes(app: FastifyInstance) {
     "/api/putaway/sessions/:id/commit-cart",
     async (req, reply) => {
       const r = commitCart(Number(req.params.id), userOf(req));
-      if ("error" in r) return reply.code(400).send(r);
+      if ("error" in r) return reply.code(("status" in r && r.status) || 400).send({ error: r.error });
       return r;
     }
   );

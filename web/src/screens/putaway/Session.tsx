@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Minus, Plus, Check, SkipForward, MapPin, Undo2, PackageCheck } from "lucide-react";
+import { Minus, Plus, Check, SkipForward, MapPin, Undo2, PackageCheck, AlertTriangle, RotateCcw } from "lucide-react";
 import { Cog, Barcode } from "@/components/glyphs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +25,9 @@ export function PutawaySession() {
   const sid = sess.id;
   const refresh = () => inv.session(sid);
   const cart = sess.items.filter((i) => i.status === "on_cart");
-  const pending = sess.items.filter((i) => i.status === "pending");
-  const doneItems = sess.items.filter((i) => i.status === "done" || i.status === "partial" || i.status === "skipped");
+  // częściowo rozłożone wracają do „Do rozłożenia" — delta czeka na kolejną rundę wózka
+  const pending = sess.items.filter((i) => i.status === "pending" || i.status === "partial");
+  const doneItems = sess.items.filter((i) => i.status === "done" || i.status === "skipped");
 
   async function putOnCart(twId: number) {
     try {
@@ -68,8 +69,9 @@ export function PutawaySession() {
           <div className="font-cond text-[15px] font-bold tracking-wide">
             {sess.sourceDocNumber ?? "Całe MGP"}
           </div>
-          <div className="text-xs font-semibold text-ink-soft">
-            zostało {sess.progress.remaining}/{sess.progress.total} poz.
+          <div className="flex items-center gap-2 text-xs font-semibold text-ink-soft">
+            {sess.inFlight > 0 && <span title="Zapisy w drodze do Subiekta">⏳ {sess.inFlight}</span>}
+            <span>zostało {sess.progress.remaining}/{sess.progress.total} poz.</span>
           </div>
         </div>
         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
@@ -81,6 +83,39 @@ export function PutawaySession() {
       </div>
 
       <div className="no-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+        {/* BŁĘDY KOLEJKI — MM/lokalizacja nie weszły do Subiekta mimo odhaczenia */}
+        {sess.queueAlerts?.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-destructive bg-destructive/10 p-2.5">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+              <AlertTriangle className="h-4 w-4" /> Nie zapisano w Subiekcie ({sess.queueAlerts.length})
+            </div>
+            {sess.queueAlerts.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-cond text-sm font-bold tracking-wide">{a.label}</div>
+                  <div className="truncate text-[11px] text-ink-soft">{a.errorMsg ?? a.detail}</div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-cond"
+                  onClick={async () => {
+                    try {
+                      await api.retry(a.id);
+                      inv.queue();
+                      refresh();
+                    } catch (e) {
+                      toast(e instanceof Error ? e.message : "Błąd");
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" /> PONÓW
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* WÓZEK */}
         {cart.length > 0 && (
           <div className="flex flex-col gap-2 rounded-xl border-2 border-amber bg-amber-bg-soft p-2.5">
@@ -118,7 +153,9 @@ export function PutawaySession() {
                   ) : (
                     <Badge variant="destructive" className="font-cond">BRAK LOK</Badge>
                   )}
-                  <div className="mt-0.5 text-[11px] text-ink-mute">{it.qtyExpected} szt</div>
+                  <div className="mt-0.5 text-[11px] text-ink-mute">
+                    {it.status === "partial" ? `zostało ${it.delta} z ${it.qtyExpected}` : `${it.qtyExpected} szt`}
+                  </div>
                 </div>
               </button>
             ))}

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
   detail         TEXT,                          -- opis dla kolektora
   tw_id          INTEGER,                       -- powiązany towar (dla korekty stanów)
   source_doc_id  INTEGER,                       -- dok. źródłowy (waiting_for_doc)
+  session_id     INTEGER,                       -- sesja rozkładania (alerty błędów w sesji)
   created_by     TEXT NOT NULL,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   next_attempt_at TEXT,                         -- backoff / waiting_for_doc

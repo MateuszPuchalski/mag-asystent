@@ -16,8 +16,17 @@ export function db(): Database.Database {
   database.pragma("foreign_keys = ON");
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   database.exec(schema);
+  migrate(database);
   _db = database;
   return database;
+}
+
+/** Dostawki do istniejących baz (CREATE TABLE IF NOT EXISTS nie dodaje kolumn). */
+function migrate(database: Database.Database) {
+  const cols = database.prepare("PRAGMA table_info(sfera_queue)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "session_id")) {
+    database.exec("ALTER TABLE sfera_queue ADD COLUMN session_id INTEGER");
+  }
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */
