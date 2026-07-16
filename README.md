@@ -57,11 +57,6 @@ npm run build    # web → web/dist, server → server/dist
 npm start        # Fastify serwuje web/dist + API (worker: npm -w server run start:worker)
 ```
 
-**Wdrożenie (Cloudflare Pages + serwer LAN):** frontend jako statyczna PWA na
-Cloudflare Pages, backend (Node/SQLite/worker) na serwerze LAN blisko Subiekta —
-pełna instrukcja w [`DEPLOY.md`](DEPLOY.md). Adres API konfiguruje zmienna
-`VITE_API_BASE` (build-time frontu).
-
 Parametry (env, dev):
 
 | Zmienna | Znaczenie |

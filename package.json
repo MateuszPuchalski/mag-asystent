@@ -11,9 +11,6 @@
     "dev:web": "npm -w web run dev",
     "seed": "npm -w server run seed",
     "build": "npm -w web run build && npm -w server run build",
-    "build:web": "npm -w web run build",
-    "build:server": "npm -w server run build",
-    "deploy:pages": "npm run build:web && npx wrangler pages deploy web/dist --project-name wertis-kolektor",
     "start": "npm -w server run start"
   },
   "devDependencies": {

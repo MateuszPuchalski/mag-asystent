@@ -82,14 +82,6 @@ export interface PutawaySession {
   items: PutawayItem[];
 }
 
-/**
- * Bazowy adres API. Puste = ten sam origin (dev z proxy Vite, lub deploy gdzie
- * front i API są pod jednym hostem). Na Cloudflare Pages ustaw `VITE_API_BASE`
- * na absolutny URL serwera Fastify (np. https://mag-api.twojafirma.pl), bo API
- * nie działa na Pages — musi stać na LAN blisko Subiekta.
- */
-const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
-
 export function getUser(): string {
   return localStorage.getItem("wertis_user") || "magazynier";
 }
@@ -106,7 +98,7 @@ export class ApiError extends Error {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetch(path, {
     ...init,
     headers: {
       // content-type tylko gdy wysyłamy ciało (Fastify odrzuca puste JSON body)
