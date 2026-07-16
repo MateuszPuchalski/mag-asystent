@@ -110,4 +110,43 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       )
       .all(config.magId.MGP) as RawPosition[];
   }
+
+  listLocations(): string[] {
+    const rows = db()
+      .prepare("SELECT lokalizacja FROM sgt_towar WHERE lokalizacja <> ''")
+      .all() as Array<{ lokalizacja: string }>;
+    const set = new Set<string>();
+    for (const r of rows) {
+      for (const c of r.lokalizacja.split(" ").filter(Boolean)) set.add(c);
+    }
+    return [...set].sort();
+  }
+
+  getProductsByLocation(code: string): ProductRow[] {
+    // dopasowanie po całym kodzie w spacja-separated polu (granice słowa)
+    const rows = db()
+      .prepare(
+        `SELECT t.tw_id AS id, t.symbol AS sym, t.nazwa AS name, t.ean AS ean,
+                t.lokalizacja AS lok,
+                COALESCE(mag.stan,0) AS mag, COALESCE(mgp.stan,0) AS mgp
+         FROM sgt_towar t
+         LEFT JOIN sgt_stan mag ON mag.tw_id = t.tw_id AND mag.mag_id = ?
+         LEFT JOIN sgt_stan mgp ON mgp.tw_id = t.tw_id AND mgp.mag_id = ?
+         WHERE ' ' || t.lokalizacja || ' ' LIKE '% ' || ? || ' %'
+         ORDER BY t.symbol
+         LIMIT 200`
+      )
+      .all(config.magId.MAG, config.magId.MGP, code) as Array<{
+      id: number; sym: string; name: string; ean: string; lok: string; mag: number; mgp: number;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      sym: r.sym,
+      name: r.name,
+      ean: r.ean ?? "",
+      mag: r.mag,
+      mgp: r.mgp,
+      locs: r.lok ? r.lok.split(" ").filter(Boolean) : [],
+    }));
+  }
 }

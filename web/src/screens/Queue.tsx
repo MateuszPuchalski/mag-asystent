@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { MapPin, ArrowLeftRight, Zap, Check, AlertCircle } from "lucide-react";
+import { MapPin, ArrowLeftRight, Zap, Check, AlertCircle, Ban } from "lucide-react";
 import { Cog } from "@/components/glyphs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useQueue, useRetry } from "@/lib/hooks";
+import { useCancel, useQueue, useRetry } from "@/lib/hooks";
 import type { QueueItem } from "@/lib/api";
 
 function TypeIcon({ type }: { type: QueueItem["type"] }) {
@@ -15,6 +15,7 @@ function TypeIcon({ type }: { type: QueueItem["type"] }) {
 export function Queue() {
   const { data, refetch, isRefetching } = useQueue();
   const retry = useRetry();
+  const cancel = useCancel();
   const [pull, setPull] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const pullY = useRef<number | null>(null);
@@ -79,7 +80,22 @@ export function Queue() {
             </div>
             <div className="flex flex-none flex-col items-end gap-1">
               <div className="text-[10px] text-ink-faint">{t.time}</div>
-              {t.status === "pending" && <div className="anim-pulse text-[11px] font-bold text-ink-mute">⏳ w kolejce</div>}
+              {t.status === "pending" && (
+                <div className="flex items-center gap-1.5">
+                  <span className="anim-pulse text-[11px] font-bold text-ink-mute">⏳ w kolejce</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-1.5 py-0.5 font-cond text-ink-mute"
+                    disabled={cancel.isPending}
+                    onClick={() => cancel.mutate(t.id)}
+                    title="Anuluj"
+                  >
+                    <Ban className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+              {t.status === "cancelled" && <div className="text-[11px] font-bold text-ink-mute">anulowano</div>}
               {t.status === "waiting_for_doc" && (
                 <div className="flex items-center gap-1 text-[11px] font-bold text-ink-mute">
                   <AlertCircle className="h-3 w-3" /> czeka na dok.

@@ -1,0 +1,110 @@
+import { useSyncExternalStore } from "react";
+import { api, ApiError } from "./api";
+import { toast } from "./store";
+
+/* ── Bufor operacji zapisu na czas braku sieci ──────────────────────────────
+   Kolektor gubi Wi-Fi przy metalowych regałach. Zamiast tracić skan, zapisujemy
+   operację (zmiana lokalizacji / MM) w localStorage i wysyłamy po odzyskaniu
+   połączenia (zdarzenie `online` + okresowy flush). Serwer i tak kolejkuje przez
+   worker Sfery, więc bufor to tylko warstwa transportu.                        */
+
+type SetLocationBody = Parameters<typeof api.setLocation>[1];
+type MmBody = Parameters<typeof api.mm>[0];
+
+type Op =
+  | { id: string; kind: "setLocation"; productId: number; body: SetLocationBody; at: number }
+  | { id: string; kind: "mm"; body: MmBody; at: number };
+
+const KEY = "wertis_offline";
+let buffer: Op[] = load();
+const listeners = new Set<() => void>();
+let flushing = false;
+let counter = 0;
+
+function load(): Op[] {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+function persist() {
+  localStorage.setItem(KEY, JSON.stringify(buffer));
+  listeners.forEach((l) => l());
+}
+function nextId() {
+  // brak Date.now-only losowości — wystarczy monotoniczny licznik + czas
+  counter += 1;
+  return `${Date.now()}-${counter}`;
+}
+
+export const offline = {
+  count: () => buffer.length,
+  subscribe(l: () => void) {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
+};
+export function useOfflineCount(): number {
+  return useSyncExternalStore(offline.subscribe, offline.count);
+}
+
+/** Czy błąd to awaria sieci (a nie odpowiedź serwera 4xx/5xx). */
+function isNetworkError(e: unknown): boolean {
+  return !(e instanceof ApiError);
+}
+
+async function send(op: Op): Promise<void> {
+  if (op.kind === "setLocation") await api.setLocation(op.productId, op.body);
+  else await api.mm(op.body);
+}
+
+/** Spróbuj wysłać całą kolejkę. Przy awarii sieci — przerwij i zostaw resztę. */
+export async function flush(): Promise<void> {
+  if (flushing || !navigator.onLine || buffer.length === 0) return;
+  flushing = true;
+  try {
+    while (buffer.length) {
+      const op = buffer[0];
+      try {
+        await send(op);
+        buffer = buffer.slice(1);
+        persist();
+      } catch (e) {
+        if (isNetworkError(e)) break; // nadal offline — spróbujemy później
+        // serwer odrzucił (np. zła ilość) — usuń i zgłoś, nie blokuj kolejki
+        buffer = buffer.slice(1);
+        persist();
+        toast(`Operacja z bufora odrzucona: ${e instanceof Error ? e.message : "błąd"}`);
+      }
+    }
+  } finally {
+    flushing = false;
+  }
+}
+
+/**
+ * Wykonaj operację online; przy braku sieci — zbuforuj i zwróć znacznik offline.
+ * Błędy serwera (ApiError) NIE są buforowane — propagują do UI (np. walidacja).
+ */
+export async function runOrBuffer(
+  op: Omit<Extract<Op, { kind: "setLocation" }>, "id" | "at"> | Omit<Extract<Op, { kind: "mm" }>, "id" | "at">
+): Promise<{ offline: boolean }> {
+  if (navigator.onLine) {
+    try {
+      await send({ ...op, id: "tmp", at: 0 } as Op);
+      return { offline: false };
+    } catch (e) {
+      if (!isNetworkError(e)) throw e; // realny błąd serwera → do UI
+    }
+  }
+  buffer = [...buffer, { ...op, id: nextId(), at: Date.now() } as Op];
+  persist();
+  return { offline: true };
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => void flush());
+  setInterval(() => void flush(), 15000);
+  void flush(); // próba na starcie
+}

@@ -49,6 +49,7 @@ export interface PutawayItemView {
   qtyExpected: number;
   qtyDone: number;
   delta: number;
+  mgpStan: number;
   status: string;
   skipReason: string | null;
   lockedBy: string | null;

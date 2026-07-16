@@ -61,4 +61,19 @@ export async function queueRoutes(app: FastifyInstance) {
       .run(id);
     return { ok: true };
   });
+
+  // anulowanie zadania oczekującego (pomyłka przy skanie) — tylko zanim worker je weźmie
+  app.post<{ Params: { id: string } }>("/api/queue/:id/cancel", async (req, reply) => {
+    const id = Number(req.params.id);
+    const r = db().prepare("SELECT status FROM sfera_queue WHERE id = ?").get(id) as
+      | { status: string }
+      | undefined;
+    if (!r) return reply.code(404).send({ error: "Brak zadania" });
+    if (r.status !== "pending")
+      return reply.code(409).send({ error: "Można anulować tylko zadanie oczekujące (nie w trakcie zapisu)" });
+    db()
+      .prepare("UPDATE sfera_queue SET status='cancelled', processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?")
+      .run(id);
+    return { ok: true };
+  });
 }
