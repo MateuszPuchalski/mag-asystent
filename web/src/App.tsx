@@ -38,7 +38,7 @@ function TopBar() {
           <ChevronLeft className="h-5 w-5" />
         </button>
       ) : (
-        <img src="assets/wertis-logo-compact.svg" alt="WERTIS" className="h-6" />
+        <img src="assets/wertis-logo-compact.svg" alt="WERTIS" className="h-7" />
       )}
       <div className={cn("flex-1 truncate font-cond text-[17px] font-bold uppercase tracking-wide", hasBack && "text-center")}>
         {title}
