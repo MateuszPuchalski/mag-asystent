@@ -29,6 +29,7 @@ interface UiState {
   manualOpen: boolean;
   recent: RecentEntry[];
   sessionId: number | null;
+  queueReturn: Screen | null; // ekran, z którego otwarto kolejkę (powrót)
   toast: string | null;
   success: string | null;
 }
@@ -43,6 +44,7 @@ let state: UiState = {
   manualOpen: false,
   recent: initialRecent,
   sessionId: null,
+  queueReturn: null,
   toast: null,
   success: null,
 };
@@ -74,12 +76,19 @@ const BACK: Partial<Record<Screen, Screen>> = {
   mm: "product",
   putawaySession: "putawayDocs",
 };
-export const backTarget = (s: Screen) => BACK[s];
+export const backTarget = (s: Screen): Screen | undefined =>
+  s === "queue" ? state.queueReturn ?? "home" : BACK[s];
 export function go(screen: Screen) {
   set({ screen });
 }
 export function goBack() {
-  set({ screen: BACK[state.screen] || "home", chipMenu: null, manualOpen: false });
+  set({ screen: backTarget(state.screen) || "home", chipMenu: null, manualOpen: false });
+}
+
+/** Otwarcie kolejki Sfery z zapamiętaniem ekranu powrotu (pastylka statusu). */
+export function openQueue() {
+  if (state.screen === "queue") return;
+  set({ screen: "queue", queueReturn: state.screen, chipMenu: null, manualOpen: false });
 }
 
 export function openProduct(id: number, meta?: { sym: string; loc: string }) {

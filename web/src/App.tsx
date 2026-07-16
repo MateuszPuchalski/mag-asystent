@@ -1,5 +1,6 @@
 import { ChevronLeft, PackageOpen } from "lucide-react";
-import { Barcode, Cog } from "@/components/glyphs";
+import { Barcode } from "@/components/glyphs";
+import { SferaStatus } from "@/components/SferaStatus";
 import { SuccessOverlay, Toast } from "@/components/Overlays";
 import { Splash } from "@/screens/Splash";
 import { Home } from "@/screens/Home";
@@ -39,12 +40,10 @@ function TopBar() {
       ) : (
         <img src="assets/wertis-logo-compact.svg" alt="WERTIS" className="h-6" />
       )}
-      <div className={cn("flex-1 font-cond text-[17px] font-bold uppercase tracking-wide", hasBack && "text-center")}>
+      <div className={cn("flex-1 truncate font-cond text-[17px] font-bold uppercase tracking-wide", hasBack && "text-center")}>
         {title}
       </div>
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-soft">
-        <span className="h-2 w-2 rounded-full bg-success" /> Sfera
-      </div>
+      <SferaStatus />
     </header>
   );
 }
@@ -54,13 +53,11 @@ function Tab({
   onClick,
   label,
   children,
-  badge,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   children: React.ReactNode;
-  badge?: number;
 }) {
   return (
     <button
@@ -69,31 +66,24 @@ function Tab({
     >
       {children}
       <span className={cn("font-cond text-[11px] font-bold tracking-[0.08em]", active ? "text-ink" : "text-ink-mute")}>{label}</span>
-      {badge != null && badge > 0 && (
-        <span className="absolute right-[calc(50%-22px)] top-1 grid h-4 min-w-4 place-items-center rounded-lg bg-amber px-1 text-[10px] font-extrabold text-ink">
-          {badge}
-        </span>
-      )}
     </button>
   );
 }
 
 function TabBar() {
   const screen = useUi((s) => s.screen);
-  const onQueue = screen === "queue";
   const onPutaway = screen === "putawayDocs" || screen === "putawaySession";
-  const onScan = !onQueue && !onPutaway;
+  // ekran kolejki jest pod-widokiem otwieranym z pastylki statusu Sfery —
+  // wtedy żadna zakładka nie jest podświetlona (stan sygnalizuje pastylka)
+  const onScan = !onPutaway && screen !== "queue";
 
   return (
-    <nav className="grid h-[54px] flex-none grid-cols-3 border-t bg-card">
+    <nav className="grid h-[54px] flex-none grid-cols-2 border-t bg-card">
       <Tab active={onScan} onClick={() => go("home")} label="SKAN">
         <Barcode className={cn("h-3.5 w-[22px]", onScan ? "text-ink" : "text-ink-mute")} />
       </Tab>
       <Tab active={onPutaway} onClick={() => go("putawayDocs")} label="ROZKŁADANIE">
         <PackageOpen className={cn("h-[18px] w-[18px]", onPutaway ? "text-ink" : "text-ink-mute")} />
-      </Tab>
-      <Tab active={onQueue} onClick={() => go("queue")} label="KOLEJKA">
-        <Cog className="h-[17px] w-[17px]" spinning={false} color={onQueue ? "#2A2A2C" : "#9A9A9E"} hole="#fff" />
       </Tab>
     </nav>
   );

@@ -77,9 +77,11 @@ Parametry (env, dev):
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
 - MM MGP→MAG i ⚡ zasilenie (kombo: MM całości + lokalizacja jednym zadaniem).
 - Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
-  PONÓW, polling, pull-to-refresh.
+  PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
+  prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
+  błąd) — jest jednocześnie wskaźnikiem stanu; dolny pasek ma 2 zakładki.
 
-**Rozkładanie dostaw (put-away, spec §5.4)** — trzecia zakładka
+**Rozkładanie dostaw (put-away, spec §5.4)** — druga zakładka
 - Lista dokumentów FZ/PZ na MGP (14 dni) z postępem sesji; tryb zapasowy
   „Rozkładaj całe MGP".
 - Sesja: pozycje **sortowane po lokalizacji docelowej**, `BRAK LOK` na końcu,
