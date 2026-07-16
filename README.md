@@ -57,6 +57,10 @@ npm run build    # web → web/dist, server → server/dist
 npm start        # Fastify serwuje web/dist + API (worker: npm -w server run start:worker)
 ```
 
+**Wdrożenie w firmie (on-premise):** kompletna instrukcja — maszyna z Subiektem,
+usługi Windows (NSSM), DNS/zapora, HTTPS przez Caddy, tryb kiosku na
+kolektorach, etapy przejścia na MSSQL/Sferę i backup — w [`DEPLOY.md`](DEPLOY.md).
+
 Parametry (env, dev):
 
 | Zmienna | Znaczenie |
