@@ -1,94 +1,129 @@
-# WERTIS · Asystent magazyniera (kolektor)
+# WERTIS · Asystent magazyniera (kolektor) — aplikacja full-stack
 
-Prototyp PWA na kolektor (Honeywell / Android, skaner emulujący klawiaturę) dla
-magazynu części ogrodniczych pracującego na **Subiekcie GT**. Implementacja
-zgodna ze specyfikacją `SPEC magazyn kolektor` oraz projektem UI
-`Kolektor_WERTIS` — z **prawdziwymi danymi testowymi**: 3423 kartoteki
-z eksportu `mag.xlsx`.
+Aplikacja PWA na kolektor (Honeywell / Android, skaner emulujący klawiaturę)
+dla magazynu części ogrodniczych pracującego na **Subiekcie GT**. Implementacja
+zgodna ze specyfikacją (`SPEC magazyn kolektor`) i projektem UI
+`Kolektor_WERTIS`, z **prawdziwymi danymi** (3423 kartoteki z eksportu
+`mag.xlsx`).
 
-Stack: **React 19 + Vite 6 + Tailwind CSS v4 + shadcn/ui**. Motyw shadcn jest
-dostrojony do kolorystyki logo WERTIS (amber `#F7A600`, grafit `#2A2A2C`,
-papier `#F6F5F2`). Strefa przyjęć nazywa się **MGP**.
+To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
+(spec §3, §7, §8). Granica do Subiekta/Sfery jest za adapterami: w tym
+środowisku (Linux, bez Subiekta) zasilana z `mag.xlsx`, a adaptery produkcyjne
+(MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
+
+## Stack
+
+| Warstwa | Technologia |
+|---|---|
+| Frontend (`web/`) | React 19 · Vite 6 · Tailwind CSS v4 · shadcn/ui · TanStack Query · PWA |
+| Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
+| Baza aplikacji | SQLite (better-sqlite3) — kolejka, sesje, events, locki (spec §7) |
+| Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
+
+Motyw shadcn dostrojony do kolorystyki logo WERTIS (amber `#F7A600`, grafit
+`#2A2A2C`, papier `#F6F5F2`). Strefa przyjęć nazywa się **MGP**.
+
+## Architektura (spec §3)
+
+```
+Kolektor (PWA React)  ──REST/JSON──►  Serwer Fastify
+                                        │  SQLite: sfera_queue, putaway_*, events
+                                        │  SubiektAdapter (odczyt)  → enqueue
+                                        ▼
+                                      Worker (poll 1–2 s, sekwencyjnie)
+                                        │  SferaAdapter (zapis)
+                                        ▼
+                          DEV: tabele sgt_* (SQLite, seed z mag.xlsx)
+                          PROD: MSSQL SELECT (read-only) + Sfera COM (Windows)
+```
+
+Twarde zasady (spec §12) egzekwowane na serwerze: zero zapisu do „SGT" poza
+kolejką; stany na ekranie skorygowane o oczekujące MM; walidacja długości
+`tw_Lokalizacja` (twardy błąd, nie ucięcie); kody lokalizacji bez spacji;
+każda operacja w `events`.
 
 ## Uruchomienie
 
 ```bash
 npm install
-npm run dev        # serwer deweloperski (HMR)
-# lub produkcyjnie:
-npm run build      # -> dist/
-npm run preview    # serwuje dist/ na :8080
+npm run seed     # zasila SQLite z web/public/data/products.json (raz; FORCE_SEED=1 nadpisuje)
+npm run dev      # api :3001 + worker + web :5173 (proxy /api → :3001)
 ```
 
-Parametry symulacji workera Sfery (query string):
+Produkcyjnie:
 
-| Parametr | Działanie |
+```bash
+npm run build    # web → web/dist, server → server/dist
+npm start        # Fastify serwuje web/dist + API (worker: npm -w server run start:worker)
+```
+
+Parametry (env, dev):
+
+| Zmienna | Znaczenie |
 |---|---|
-| `?delay=3` | czas zapisu przez workera Sfery w sekundach (domyślnie 1.8) |
-| `?errors=1` | losowe błędy zapisu („kartoteka otwarta w edycji") — test przycisku PONÓW |
+| `WORKER_DELAY_MS` | czas „zapisu Sfery" (domyślnie 1500) |
+| `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
+| `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (produkcja) |
+| `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 
-Na desktopie aplikacja renderuje się w ramce kolektora (podgląd); na małym
-ekranie zajmuje cały ekran. Instaluje się jako PWA (manifest + service worker
-przez `vite-plugin-pwa`, działa offline po pierwszym załadowaniu).
+## Funkcje
 
-## Zakres prototypu (Faza 1–3 frontendu wg spec §10)
+**Podgląd i operacje ad-hoc**
+- Skan (EAN 8/12/13/14, rozpoznanie po tempie <50 ms) / wyszukiwarka (symbol,
+  nazwa, końcówka EAN) — logika `SELECT` na serwerze (spec §5.1).
+- Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
+  (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
+- Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
+  bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
+- MM MGP→MAG i ⚡ zasilenie (kombo: MM całości + lokalizacja jednym zadaniem).
+- Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
+  PONÓW, polling, pull-to-refresh.
 
-- **Splash** — samo logo WERTIS (bez animacji linki), dotknięcie startuje.
-- **Skanowanie / wyszukiwarka** — jedno pole z focusem: skan EAN
-  (8/12/13/14 cyfr, rozpoznanie po tempie znaków <50 ms), symbol, nazwa,
-  końcówka EAN; wyniki z linią stanów MAG/MGP; ostatnio skanowane
-  (localStorage); kafle symulacji skanera.
-- **Karta towaru** — stany MAG (dostępne / rez. / razem) i **MGP** (strefa
-  przyjęć), opis, jednostka, zamówione u dostawcy; chipy lokalizacji
-  (pierwsza = pickingowa), licznik znaków pola `tw_Lokalizacja` (limit 50),
-  usuwanie lokalizacji, banner oczekujących zapisów w kolejce.
-- **Zmiana lokalizacji** — skan towaru → skan lokalizacji; przy ≥2
-  lokalizacjach bottom-sheet (shadcn/vaul): zastąp wszystkie / dodaj /
-  zastąp jedną z…; walidacje: brak spacji, limit długości pola (twardy błąd).
-- **MM MGP → MAG** — cała ilość lub korekta ±, clamp do stanu MGP.
-- **⚡ Zasilenie (kombo)** — jedno zadanie: MM całości + nadanie lokalizacji.
-- **Kolejka Sfery** — optymistyczne potwierdzenia ⏳ → ✓ / ✗ + PONÓW,
-  symulowany worker (pending / processing / done / error),
-  pull-to-refresh, badge na zakładce.
-- Beep + wibracja przy potwierdzeniach (WebAudio + `navigator.vibrate`).
+**Rozkładanie dostaw (put-away, spec §5.4)** — trzecia zakładka
+- Lista dokumentów FZ/PZ na MGP (14 dni) z postępem sesji; tryb zapasowy
+  „Rozkładaj całe MGP".
+- Sesja: pozycje **sortowane po lokalizacji docelowej**, `BRAK LOK` na końcu,
+  agregacja tego samego towaru, licznik `zostało N/M poz.`.
+- Tryb wózka: skan towaru na wózek (domyślna ilość = min(pozostało, stan MGP)),
+  potwierdzenie ze skanem lokalizacji, częściowe rozłożenie, pomiń, dodanie
+  spoza dokumentu, rozjazd lokalizacji.
+- **Zatwierdź wózek → jeden dokument MM + zadania `set_location`** z tej rundy.
+- Locki multi-user (TTL 30 min), `waiting_for_doc` gdy dokument w buforze,
+  zamknięcie sesji z rozliczeniem (`closed` / `closed_with_deviations`).
 
-## Czego prototyp NIE zawiera (backend — kolejne etapy)
+## Struktura repo
 
-Zapis jest symulowany w przeglądarce. Docelowa architektura (spec §3):
-serwer API (odczyt SELECT z MSSQL read-only) + kolejka zadań + **worker
-Sfery** (COM, Windows) do faktycznych zapisów `set_location` / dokumentów MM.
-Moduł rozkładania dostaw (put-away, sesje z FZ/PZ, tryb wózka) — Faza 3/4.
+```
+web/                       frontend (React/Vite/Tailwind/shadcn)
+  src/lib/api.ts           klient REST
+  src/lib/hooks.ts         TanStack Query (dane + mutacje)
+  src/lib/store.ts         stan UI (nawigacja, feedback)
+  src/screens/             Home, Product, ScanLoc, MM, Queue
+  src/screens/putaway/     Documents, Session (wózek)
+  public/data/products.json  3423 kartoteki z mag.xlsx
+server/                    backend (Fastify + SQLite + worker)
+  src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
+  src/db/seed.ts           seed z products.json + syntetyczne FZ/PZ
+  src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+com (prod, szkielet)
+  src/services/            stock (korekta o kolejkę), putaway, queue, events
+  src/routes/              products, mm, queue, putaway (§8)
+  src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
+tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
+```
 
 ## Dane testowe
 
-`public/data/products.json` — wygenerowane z `mag.xlsx` skryptem
-`tools/convert_xlsx.py`:
+`web/public/data/products.json` z `mag.xlsx` (`tools/convert_xlsx.py`). Eksport
+ma jeden stan łączny, więc konwersja deterministycznie (hash symbolu) rozdziela:
+~55% towarów z `Zamówione > 0` dostaje stan na MGP (dostawa do rozłożenia),
+~40% — rezerwacje. Seed syntetyzuje 4 dokumenty FZ/PZ (jeden w buforze — test
+`waiting_for_doc`), bo w eksporcie nie ma kontrahentów. W produkcji stany i
+dokumenty pochodzą z `tw_Stan` / `dok__Dokument` przez adapter MSSQL.
 
-```bash
-pip install openpyxl
-python3 tools/convert_xlsx.py mag.xlsx public/data/products.json
-```
+## Czego nie da się uruchomić w tym środowisku
 
-Eksport zawiera jeden stan łączny, więc skrypt deterministycznie
-(hash symbolu) rozdziela dane na potrzeby testów: ~55% towarów
-z `Zamówione > 0` dostaje stan na MGP (symulacja dostawy do rozłożenia),
-~40% — rezerwacje. W produkcji te liczby pochodzą z `tw_Stan`
-(`st_Stan`, `st_StanRez`) dla magazynów MAG i MGP.
-
-## Struktura
-
-```
-index.html               entry Vite
-vite.config.ts           Vite + React + Tailwind v4 + PWA
-src/
-  index.css              Tailwind v4 + motyw shadcn (paleta WERTIS)
-  main.tsx / App.tsx     powłoka: rama kolektora, topbar, tabbar, ekrany
-  components/ui/         komponenty shadcn (button, card, badge, input, drawer)
-  components/            glyphs, LocationDialog, Overlays
-  screens/               Splash, Home, Product, ScanLoc, MM, Queue
-  lib/                   store (stan + symulacja workera), types, feedback, utils
-public/
-  data/products.json     3423 kartoteki z mag.xlsx
-  assets/                logo WERTIS (pełne + kompaktowe), ikona PWA
-tools/convert_xlsx.py    konwersja eksportu Subiekta → JSON
-```
+Prawdziwy Subiekt GT / MSSQL / Sfera (COM, Windows) — chmura Linux ich nie ma.
+Dlatego `server/src/adapters/subiekt.mssql.ts` i `sfera.com.ts` to gotowe do
+podpięcia szkielety (env `SGT_MODE=mssql`) z zapytaniami/kontraktem COM w
+komentarzach. Cała reszta — API, kolejka, worker, rozkładanie — działa realnie
+na SQLite zasilonym danymi z Subiekta.

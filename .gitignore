@@ -4,3 +4,9 @@ dev-dist/
 *.local
 .DS_Store
 node_modules/.tmp/
+
+# baza aplikacji (SQLite) — generowana z seedu
+server/data/*.db
+server/data/*.db-*
+*.sqlite
+*.sqlite-*

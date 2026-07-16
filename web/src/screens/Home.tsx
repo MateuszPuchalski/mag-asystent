@@ -1,33 +1,54 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { Barcode, Cog } from "@/components/glyphs";
+import { Barcode } from "@/components/glyphs";
 import { Badge } from "@/components/ui/badge";
 import { beep } from "@/lib/feedback";
-import {
-  interpretScan,
-  openProduct,
-  searchProducts,
-  setQuery,
-  useStore,
-} from "@/lib/store";
+import { api, type ProductRow } from "@/lib/api";
+import { useSearch } from "@/lib/hooks";
+import { openProduct, toast, useUi } from "@/lib/store";
 
-const SCAN_CHAR_MS = 50; // skaner wrzuca znaki szybciej niż człowiek
+const SCAN_CHAR_MS = 50;
+
+const DEMO_TILES = [
+  { ean: "5905947596270", name: "Worek do odkurzacza MV 3 WD3 200 SE 4001" },
+  { ean: "5905947595303", name: "Filtr paliwa uniwersalny 6mm Skuter Motocykl Atv" },
+  { ean: "5907580103419", name: "Łożysko koła kosiarki uniwersalne 12.7mm x 28.6mm" },
+];
+
+function openRow(x: ProductRow) {
+  openProduct(x.id, { sym: x.sym, loc: x.locs[0] || "brak lokalizacji" });
+}
 
 export function Home() {
-  const loading = useStore((s) => s.loading);
-  const query = useStore((s) => s.query);
-  const products = useStore((s) => s.products);
-  const recent = useStore((s) => s.recent);
+  const [query, setQuery] = useState("");
+  const recent = useUi((s) => s.recent);
   const inputRef = useRef<HTMLInputElement>(null);
   const fast = useRef({ last: 0, count: 0 });
+
+  const q = query.trim();
+  const { data: results = [], isFetching } = useSearch(q);
 
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, []);
 
-  const q = query.trim();
-  const results = q ? searchProducts(q) : [];
+  async function handleScan(code: string) {
+    try {
+      const r = await api.scan(code);
+      if (r.type === "product") {
+        beep(true);
+        openProduct(r.card.id, { sym: r.card.sym, loc: r.card.locs[0] || "brak lokalizacji" });
+      } else if (r.type === "search") {
+        setQuery(code);
+      } else {
+        beep(false);
+        toast("Nieznany kod: " + code);
+      }
+    } catch {
+      toast("Błąd połączenia z serwerem");
+    }
+  }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     const t = performance.now();
@@ -40,23 +61,13 @@ export function Home() {
       if (!val) return;
       const isScan = fast.current.count >= 3 || /^\d{8}$|^\d{12,14}$/.test(val);
       fast.current.count = 0;
-      if (isScan) return interpretScan(val);
-      if (results.length) openProduct(results[0].id);
+      if (isScan) return void handleScan(val);
+      if (results.length) openRow(results[0]);
     }
   }
 
-  const demoSyms = ["W80-2005", "W07-0101", "FTC201"];
-  let tiles = demoSyms.map((s) => products.find((x) => x.sym === s)).filter(Boolean) as typeof products;
-  if (!tiles.length) tiles = products.slice(0, 3);
-
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-3.5 overflow-y-auto p-3">
-      {loading && (
-        <div className="flex items-center justify-center gap-2.5 py-5 text-sm font-semibold text-ink-mute">
-          <Cog className="h-[18px] w-[18px]" hole="#F6F5F2" /> Ładowanie bazy towarów…
-        </div>
-      )}
-
       <div className="flex items-center gap-2.5 rounded-lg border-2 border-ink bg-card px-3 py-2.5">
         <Barcode className="h-4 w-6 text-ink" />
         <input
@@ -81,12 +92,12 @@ export function Home() {
         results.length ? (
           <div className="flex flex-col gap-1.5">
             <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
-              Wyniki ({results.length})
+              Wyniki ({results.length}){isFetching ? " …" : ""}
             </div>
             {results.map((x) => (
               <button
                 key={x.id}
-                onClick={() => openProduct(x.id)}
+                onClick={() => openRow(x)}
                 className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 text-left transition-colors hover:border-amber hover:bg-amber-bg-soft"
               >
                 <div className="min-w-0 flex-1">
@@ -104,28 +115,26 @@ export function Home() {
           </div>
         ) : (
           <div className="py-4 text-center text-sm text-ink-mute">
-            Brak wyników dla „{q}”
+            {isFetching ? "Szukam…" : `Brak wyników dla „${q}”`}
           </div>
         )
       ) : (
         <div className="flex flex-col gap-1.5">
           <div className="-mt-1.5 text-[11px] text-ink-mute">
-            Baza: {products.length} kartotek z Subiekta (odczyt SQL)
+            Dane na żywo z serwera (odczyt SQL z Subiekta)
           </div>
           <div className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
             Symulacja skanera — dotknij kod
           </div>
-          {tiles.map((x) => (
+          {DEMO_TILES.map((x) => (
             <button
-              key={x.id}
-              onClick={() => { beep(true); openProduct(x.id); }}
+              key={x.ean}
+              onClick={() => handleScan(x.ean)}
               className="flex items-center gap-3 rounded-lg border border-dashed border-[#C9C5BB] bg-card px-3 py-2 text-left transition-colors hover:border-amber"
             >
               <Barcode className="h-[17px] w-[26px] text-ink-soft" />
               <div className="min-w-0">
-                <div className="text-xs font-semibold tabular-nums tracking-wide">
-                  {x.ean || x.sym}
-                </div>
+                <div className="text-xs font-semibold tabular-nums tracking-wide">{x.ean}</div>
                 <div className="truncate text-[11px] text-ink-mute">{x.name}</div>
               </div>
             </button>
@@ -136,21 +145,16 @@ export function Home() {
               <div className="mt-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
                 Ostatnio skanowane
               </div>
-              {recent
-                .map((id) => products.find((x) => x.id === id))
-                .filter(Boolean)
-                .map((x) => (
-                  <button
-                    key={x!.id}
-                    onClick={() => openProduct(x!.id)}
-                    className="flex items-center justify-between gap-2.5 rounded-lg border bg-card px-3 py-2 transition-colors hover:border-amber"
-                  >
-                    <span className="font-cond text-sm font-bold">{x!.sym}</span>
-                    <Badge variant="secondary" className="font-normal">
-                      {x!.locs[0] || "brak lokalizacji"}
-                    </Badge>
-                  </button>
-                ))}
+              {recent.map((x) => (
+                <button
+                  key={x.id}
+                  onClick={() => openProduct(x.id, { sym: x.sym, loc: x.loc })}
+                  className="flex items-center justify-between gap-2.5 rounded-lg border bg-card px-3 py-2 transition-colors hover:border-amber"
+                >
+                  <span className="font-cond text-sm font-bold">{x.sym}</span>
+                  <Badge variant="secondary" className="font-normal">{x.loc}</Badge>
+                </button>
+              ))}
             </>
           )}
         </div>

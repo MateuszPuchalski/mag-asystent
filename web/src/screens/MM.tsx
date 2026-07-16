@@ -1,11 +1,22 @@
+import { useEffect, useState } from "react";
 import { Minus, Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createMM, cur, setQty, useStore } from "@/lib/store";
+import { useMM, useProduct } from "@/lib/hooks";
+import { flashSuccess, go, toast, useUi } from "@/lib/store";
 
 export function MM() {
-  const p = useStore(cur);
-  const qty = useStore((s) => s.qty);
+  const curId = useUi((s) => s.curId);
+  const { data: p } = useProduct(curId);
+  const mm = useMM(curId ?? 0);
+  const max = p ? p.mgp.effective : 1;
+  const [qty, setQty] = useState(max);
+
+  useEffect(() => {
+    setQty(max);
+  }, [max]);
+
   if (!p) return null;
+  const clamp = (q: number) => setQty(Math.max(1, Math.min(max, q)));
 
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-3.5 overflow-y-auto p-3">
@@ -21,14 +32,14 @@ export function MM() {
       </div>
 
       <div className="flex items-center justify-center gap-3.5">
-        <Button variant="outline" className="h-[52px] w-[52px] rounded-xl text-2xl" onClick={() => setQty(qty - 1)}>
+        <Button variant="outline" className="h-[52px] w-[52px] rounded-xl text-2xl" onClick={() => clamp(qty - 1)}>
           <Minus className="h-6 w-6" />
         </Button>
         <div className="min-w-[90px] text-center">
           <div className="font-cond text-[46px] font-extrabold leading-none">{qty}</div>
-          <div className="text-[11px] text-ink-mute">z {p.mgp} szt na MGP</div>
+          <div className="text-[11px] text-ink-mute">z {p.mgp.effective} szt na MGP</div>
         </div>
-        <Button variant="outline" className="h-[52px] w-[52px] rounded-xl text-2xl" onClick={() => setQty(qty + 1)}>
+        <Button variant="outline" className="h-[52px] w-[52px] rounded-xl text-2xl" onClick={() => clamp(qty + 1)}>
           <Plus className="h-6 w-6" />
         </Button>
       </div>
@@ -36,12 +47,28 @@ export function MM() {
       <Button
         variant="outline"
         className="border-amber py-3 font-cond text-[15px] tracking-wide text-amber-ink hover:bg-amber-bg-soft"
-        onClick={() => setQty(p.mgp)}
+        onClick={() => setQty(max)}
       >
-        CAŁA ILOŚĆ — {p.mgp} SZT
+        CAŁA ILOŚĆ — {max} SZT
       </Button>
 
-      <Button size="tall" className="mt-auto py-4 font-cond text-[17px] font-extrabold tracking-wide" onClick={() => createMM(qty)}>
+      <Button
+        size="tall"
+        disabled={mm.isPending}
+        className="mt-auto py-4 font-cond text-[17px] font-extrabold tracking-wide"
+        onClick={() =>
+          mm.mutate(
+            { items: [{ twId: p.id, qty }] },
+            {
+              onSuccess: () => {
+                flashSuccess("MM w kolejce");
+                go("product");
+              },
+              onError: (e) => toast(e instanceof Error ? e.message : "Błąd MM"),
+            }
+          )
+        }
+      >
         UTWÓRZ MM ({qty} SZT)
       </Button>
       <div className="-mt-1.5 text-center text-[11px] text-ink-mute">

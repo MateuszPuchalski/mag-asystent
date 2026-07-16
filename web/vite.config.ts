@@ -10,6 +10,11 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "./src") },
   },
   build: { target: "es2019" },
+  server: {
+    proxy: {
+      "/api": { target: "http://localhost:3001", changeOrigin: true },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -31,11 +36,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.endsWith("/data/products.json"),
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
-            options: { cacheName: "wertis-data" },
+            options: { cacheName: "wertis-api" },
           },
         ],
       },

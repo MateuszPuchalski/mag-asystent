@@ -1,8 +1,8 @@
 import { Check } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { useUi } from "@/lib/store";
 
 export function SuccessOverlay() {
-  const success = useStore((s) => s.success);
+  const success = useUi((s) => s.success);
   if (!success) return null;
   return (
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/95">
@@ -20,7 +20,7 @@ export function SuccessOverlay() {
 }
 
 export function Toast() {
-  const toast = useStore((s) => s.toast);
+  const toast = useUi((s) => s.toast);
   if (!toast) return null;
   return (
     <div className="anim-fadeUp absolute inset-x-3 bottom-[66px] z-40 rounded-lg bg-ink px-3.5 py-2.5 text-[13px] font-semibold text-white">
