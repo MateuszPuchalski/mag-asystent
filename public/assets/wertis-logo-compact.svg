@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 172 44" fill="none">
+  <!-- zębatka -->
+  <g>
+    <g fill="#F7A600">
+      <circle cx="20" cy="22" r="12"/>
+      <g>
+        <rect x="17" y="4" width="6" height="9" rx="1.5"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(45 20 22)"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(90 20 22)"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(135 20 22)"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(180 20 22)"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(225 20 22)"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(270 20 22)"/>
+        <rect x="17" y="4" width="6" height="9" rx="1.5" transform="rotate(315 20 22)"/>
+      </g>
+    </g>
+    <circle cx="20" cy="22" r="5.4" fill="#FFFFFF"/>
+    <circle cx="20" cy="22" r="2.1" fill="#F7A600"/>
+  </g>
+  <text x="42" y="31" font-family="'Barlow Condensed',sans-serif" font-weight="800" font-size="27" letter-spacing="1" fill="#2A2A2C" font-style="italic">WERTIS</text>
+</svg>

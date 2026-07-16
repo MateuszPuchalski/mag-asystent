@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Motyw shadcn dostrojony do kolorystyki logo WERTIS ──────────────────
+   amber #F7A600 · grafit #2A2A2C · papier #F6F5F2 · linia #E7E4DC        */
+:root {
+  --radius: 0.75rem;
+
+  --background: #f6f5f2;      /* papier */
+  --foreground: #2a2a2c;      /* grafit */
+
+  --card: #ffffff;
+  --card-foreground: #2a2a2c;
+  --popover: #ffffff;
+  --popover-foreground: #2a2a2c;
+
+  --primary: #f7a600;         /* amber logo */
+  --primary-foreground: #2a2a2c;
+
+  --secondary: #edebe4;
+  --secondary-foreground: #3b3b3d;
+
+  --muted: #efede7;
+  --muted-foreground: #6e6e73;
+
+  --accent: #fff3d6;          /* amber tint */
+  --accent-foreground: #8a6300;
+
+  --destructive: #b33a3a;
+  --destructive-foreground: #ffffff;
+
+  --success: #4c9a52;         /* dioda Sfera */
+
+  --border: #e7e4dc;
+  --input: #e7e4dc;
+  --ring: #f7a600;
+
+  /* własne akcenty WERTIS */
+  --amber: #f7a600;
+  --amber-dark: #d98e00;
+  --amber-ink: #b87c00;
+  --amber-bg: #fff3d6;
+  --amber-bg-soft: #fff6e3;
+  --amber-line: #f0d9a6;
+  --ink: #2a2a2c;
+  --ink-soft: #6e6e73;
+  --ink-mute: #8a8a8e;
+  --ink-faint: #b7b4ac;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-amber: var(--amber);
+  --color-amber-dark: var(--amber-dark);
+  --color-amber-ink: var(--amber-ink);
+  --color-amber-bg: var(--amber-bg);
+  --color-amber-bg-soft: var(--amber-bg-soft);
+  --color-amber-line: var(--amber-line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-ink-faint: var(--ink-faint);
+
+  --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-cond: "Barlow Condensed", "Barlow", sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: #dad7cf;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+}
+
+/* ── animacje z prototypu ────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes softPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.anim-spin { animation: spin 1.1s linear infinite; }
+.anim-fadeUp { animation: fadeUp 0.3s ease both; }
+.anim-popIn { animation: popIn 0.15s ease; }
+.anim-pulse { animation: softPulse 1.5s ease infinite; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 344 96" fill="none">
+  <!-- zębatka -->
+  <g>
+    <g fill="#F7A600">
+      <circle cx="52" cy="40" r="19"/>
+      <g>
+        <rect x="47.5" y="12" width="9" height="14" rx="2"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(45 52 40)"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(90 52 40)"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(135 52 40)"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(180 52 40)"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(225 52 40)"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(270 52 40)"/>
+        <rect x="47.5" y="12" width="9" height="14" rx="2" transform="rotate(315 52 40)"/>
+      </g>
+    </g>
+    <circle cx="52" cy="40" r="8.5" fill="#FFFFFF"/>
+    <circle cx="52" cy="40" r="3.4" fill="#F7A600"/>
+  </g>
+  <!-- wordmark -->
+  <text x="92" y="55" font-family="'Barlow Condensed',sans-serif" font-weight="800" font-size="50" letter-spacing="1.5" fill="#2A2A2C" font-style="italic">WERTIS</text>
+  <!-- tagline -->
+  <g>
+    <rect x="93" y="72" width="26" height="3" rx="1.5" fill="#F7A600"/>
+    <text x="172" y="80" text-anchor="middle" font-family="'Barlow',sans-serif" font-weight="700" font-size="15" letter-spacing="4" fill="#2A2A2C">SKLEP Z CZĘŚCIAMI</text>
+    <rect x="286" y="72" width="26" height="3" rx="1.5" fill="#F7A600"/>
+  </g>
+</svg>
