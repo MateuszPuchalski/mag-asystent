@@ -5,15 +5,22 @@
  * (magazyn on-premise nie ma dostępu do huggingface.co). Aplikacja ładuje
  * wagi najpierw z własnego serwera (env.localModelPath = "models/").
  *
- *   node tools/fetch-asr-model.mjs [id-modelu]     (domyślnie onnx-community/whisper-tiny)
+ *   node tools/fetch-asr-model.mjs [id-modelu] [decoder-dtype]
+ *      id-modelu     : domyślnie onnx-community/whisper-tiny
+ *      decoder-dtype : fp32 (domyślnie, pewny na WASM) lub q8 (lżejszy —
+ *                      tylko z modelem Xenova/*, standardowy int8)
+ *
+ *   Enkoder zawsze fp32 (kwantyzowany nie działa w ORT-web). Musi być zgodne
+ *   z VITE_ASR_DECODER_DTYPE w web/src/lib/asr.ts.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MODEL = process.argv[2] ?? "onnx-community/whisper-tiny";
-// Enkoder Whispera musi być fp32 (kwantyzowany wywala ORT-web), dekoder q8 →
-// *_quantized. Zgodne z dtype w web/src/lib/asr.ts.
+const DECODER_DTYPE = process.argv[3] ?? "fp32";
+const decoderFile =
+  DECODER_DTYPE === "q8" ? "onnx/decoder_model_merged_quantized.onnx" : "onnx/decoder_model_merged.onnx";
 const FILES = [
   "config.json",
   "generation_config.json",
@@ -21,7 +28,7 @@ const FILES = [
   "tokenizer.json",
   "tokenizer_config.json",
   "onnx/encoder_model.onnx",
-  "onnx/decoder_model_merged_quantized.onnx",
+  decoderFile,
 ];
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

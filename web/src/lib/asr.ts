@@ -9,6 +9,11 @@ import { getSettings } from "./settings";
    Po pierwszym załadowaniu wagi siedzą w cache przeglądarki → offline.       */
 
 const ASR_MODEL = (import.meta.env.VITE_ASR_MODEL ?? "onnx-community/whisper-tiny") as string;
+// Enkoder Whispera MUSI być fp32 (kwantyzowany wywala ORT-web). Dekoder domyślnie
+// też fp32 — to jedyny pewny układ na WASM: kwantyzowany dekoder onnx-community
+// używa MatMulNBits (4-bit), którego ORT-web nie zdejmuje z QDQ. Lżejszy wariant
+// (mniejszy download): VITE_ASR_DECODER_DTYPE=q8 + model Xenova/* (standardowy int8).
+const DECODER_DTYPE = (import.meta.env.VITE_ASR_DECODER_DTYPE ?? "fp32") as "fp32" | "q8";
 const SAMPLE_RATE = 16000;
 const MAX_RECORD_MS = 5000;
 
@@ -58,10 +63,7 @@ export function ensureAsr(): void {
       env.localModelPath = "models/";
       env.allowRemoteModels = true; // fallback: HF (dev z internetem)
       const pipe: any = await pipeline("automatic-speech-recognition", ASR_MODEL, {
-        // enkoder Whispera jest wrażliwy na kwantyzację — kwantyzowany (q8)
-        // wywala ORT-web (qdq_actions.cc TransposeDQWeight). Enkoder fp32,
-        // dekoder q8 to kombinacja zalecana dla WASM (docs transformers.js).
-        dtype: { encoder_model: "fp32", decoder_model_merged: "q8" },
+        dtype: { encoder_model: "fp32", decoder_model_merged: DECODER_DTYPE },
         progress_callback: (p: { status?: string; loaded?: number; total?: number }) => {
           if (p.status === "progress" && p.total) {
             progress = Math.round((100 * (p.loaded ?? 0)) / p.total);
