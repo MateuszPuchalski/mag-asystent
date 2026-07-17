@@ -8,6 +8,7 @@ import { useSession, useInvalidate } from "@/lib/hooks";
 import { flashSuccess, go, toast, useUi } from "@/lib/store";
 import { getSettings } from "@/lib/settings";
 import { speak, spellLoc } from "@/lib/voice";
+import { useCommandHandler } from "@/lib/commands";
 
 const DEMO_LOCS = ["A05-01-01", "B11-02-01", "E08-03-01", "PALETA48"];
 const IS_DEV = import.meta.env.DEV;
@@ -18,6 +19,18 @@ export function PutawaySession() {
   const inv = useInvalidate();
   // tryb marszu: po zatwierdzeniu wózka wielka karta z następnym celem trasy
   const [walkTarget, setWalkTarget] = useState<{ loc: string; sym: string; qty: number } | null>(null);
+
+  // komenda głosowa „pomiń" — pomija pierwszą pozycję na wózku
+  useCommandHandler((cmd) => {
+    if (cmd.kind !== "skip" || !sess) return false;
+    const first = sess.items.find((i) => i.status === "on_cart");
+    if (!first) return false;
+    void api.skip(sess.id, { itemId: first.id }).then(() => {
+      speak(`Pominięto ${first.sym}`);
+      inv.session(sess.id);
+    });
+    return true;
+  });
 
   if (isLoading || !sess) {
     return (

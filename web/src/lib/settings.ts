@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 
 export interface Settings {
   voice: boolean; // głosowe prowadzenie (TTS)
+  voiceCommands: boolean; // komendy głosowe (ASR offline, Whisper on-device)
   wakeLock: boolean; // ekran nie gaśnie podczas pracy
   shakeUndo: boolean; // potrząśnięcie = COFNIJ (w oknie karencji)
   dropLog: boolean; // log upadków urządzenia do audytu
@@ -17,6 +18,7 @@ export interface Settings {
 const KEY = "wertis_settings";
 const DEFAULTS: Settings = {
   voice: true,
+  voiceCommands: false, // opt-in: pierwsze użycie pobiera ~40 MB modelu
   wakeLock: true,
   shakeUndo: true,
   dropLog: true,

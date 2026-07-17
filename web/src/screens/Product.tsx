@@ -17,6 +17,7 @@ import {
 import { isKnownLoc, validateLoc } from "@/lib/locval";
 import { speak, spellLoc } from "@/lib/voice";
 import { classify, dispatchScan, useScanHandler } from "@/lib/scanner";
+import { useCommandHandler } from "@/lib/commands";
 import { LocChoiceDrawer, type LocChoice } from "@/components/LocChoiceDrawer";
 import type { RunResult } from "@/lib/offline";
 
@@ -51,6 +52,16 @@ export function Product() {
       onError: (e) => toast(e instanceof Error ? e.message : "Błąd zapisu"),
     });
   }
+
+  // komenda głosowa „stan" — odczytaj stany bieżącego towaru
+  useCommandHandler((cmd) => {
+    if (cmd.kind !== "stock" || !p) return false;
+    speak(
+      `${p.sym}. Dostępne ${p.mag.avail} na magazynie, ${p.mgp.stan} na strefie przyjęć` +
+        (p.locs[0] ? `. Lokalizacja ${spellLoc(p.locs[0])}` : "")
+    );
+    return true;
+  });
 
   // Intencja z kolejności skanów: na karcie towaru skan etykiety regału =
   // przenieś TEN towar TAM. Skan EAN → fallback (karta kolejnego towaru).

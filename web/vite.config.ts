@@ -37,11 +37,19 @@ export default defineConfig({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/api/],
+        // WASM ONNX Runtime (ASR) jest za duży na precache — ładowany leniwie
+        // tylko przy włączonych komendach głosowych i cache'owany w runtime
+        globIgnores: ["**/ort-*.wasm"],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: { cacheName: "wertis-api" },
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith(".wasm"),
+            handler: "CacheFirst",
+            options: { cacheName: "wertis-wasm" },
           },
         ],
       },
