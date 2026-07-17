@@ -20,7 +20,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["assets/*.svg"],
+      includeAssets: ["assets/*"],
       manifest: {
         name: "WERTIS Kolektor magazynowy",
         short_name: "WERTIS Mag",
