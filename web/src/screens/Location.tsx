@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
 import { MapPin, PackageSearch } from "lucide-react";
 import { Barcode } from "@/components/glyphs";
 import { useLocationProducts, useLocations } from "@/lib/hooks";
 import { openLocation, openProduct, toast, useUi } from "@/lib/store";
 import { beep } from "@/lib/feedback";
-import { normalizeLoc, validateLoc } from "@/lib/locval";
+import { validateLoc } from "@/lib/locval";
+import { classify, dispatchScan, useScanHandler } from "@/lib/scanner";
 
 const DEMO_LOCS = ["E08-03-01", "H04-05-02", "A05-01-01", "PALETA48"];
 const IS_DEV = import.meta.env.DEV;
@@ -13,38 +13,23 @@ export function LocationView() {
   const code = useUi((s) => s.locCode);
   const { data: info } = useLocations();
   const { data: products, isFetching } = useLocationProducts(code || null);
-  const hiddenRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => hiddenRef.current?.focus({ preventScroll: true }), 50);
-    return () => clearTimeout(t);
-  }, [code]);
-
-  function handleCode(raw: string) {
-    const c = normalizeLoc(raw);
-    const err = validateLoc(c, info);
+  // Kolejna etykieta → przełącz podgląd; EAN → fallback otworzy kartę towaru.
+  useScanHandler((scan) => {
+    if (scan.kind !== "loc") return false;
+    const err = validateLoc(scan.code, info);
     if (err) {
       toast(err);
       beep(false);
-      return;
+      return true;
     }
     beep(true);
-    openLocation(c);
-  }
+    openLocation(scan.code);
+    return true;
+  });
 
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <input
-        ref={hiddenRef}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.currentTarget.value.trim()) {
-            handleCode(e.currentTarget.value);
-            e.currentTarget.value = "";
-          }
-        }}
-        className="pointer-events-none absolute left-[-999px] opacity-0"
-      />
-
       {!code ? (
         <div className="flex flex-col items-center gap-2.5 rounded-xl border-2 border-dashed border-amber bg-amber-bg-soft px-3 py-6">
           <Barcode className="h-7 w-[42px] text-ink" />
@@ -89,6 +74,11 @@ export function LocationView() {
               </button>
             ))}
           </div>
+
+          <div className="flex items-center justify-center gap-2 text-[11px] text-ink-mute">
+            <Barcode className="h-3 w-5 text-ink-soft" />
+            skan kolejnej etykiety = inne miejsce · skan towaru = jego karta
+          </div>
         </>
       )}
 
@@ -101,7 +91,7 @@ export function LocationView() {
             {DEMO_LOCS.map((c) => (
               <button
                 key={c}
-                onClick={() => handleCode(c)}
+                onClick={() => dispatchScan(classify(c))}
                 className="flex items-center justify-center gap-1.5 rounded-lg border bg-card p-2 font-cond text-[15px] font-bold tracking-[0.06em] transition-colors hover:border-amber"
               >
                 <Barcode className="h-3.5 w-6 text-ink-soft" /> {c}

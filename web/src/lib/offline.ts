@@ -54,9 +54,17 @@ function isNetworkError(e: unknown): boolean {
   return !(e instanceof ApiError);
 }
 
-async function send(op: Op): Promise<void> {
-  if (op.kind === "setLocation") await api.setLocation(op.productId, op.body);
-  else await api.mm(op.body);
+async function send(op: Op): Promise<{ queueId?: number }> {
+  if (op.kind === "setLocation") return api.setLocation(op.productId, op.body);
+  return api.mm(op.body);
+}
+
+/** Usuń operację z bufora (COFNIJ przed wysłaniem). Zwraca czy istniała. */
+export function remove(bufferId: string): boolean {
+  const before = buffer.length;
+  buffer = buffer.filter((o) => o.id !== bufferId);
+  if (buffer.length !== before) persist();
+  return buffer.length !== before;
 }
 
 /** Spróbuj wysłać całą kolejkę. Przy awarii sieci — przerwij i zostaw resztę. */
@@ -83,24 +91,31 @@ export async function flush(): Promise<void> {
   }
 }
 
+export interface RunResult {
+  offline: boolean;
+  queueId?: number; // id zadania w kolejce Sfery (online) — do COFNIJ
+  bufferId?: string; // id operacji w buforze (offline) — do COFNIJ
+}
+
 /**
  * Wykonaj operację online; przy braku sieci — zbuforuj i zwróć znacznik offline.
  * Błędy serwera (ApiError) NIE są buforowane — propagują do UI (np. walidacja).
  */
 export async function runOrBuffer(
   op: Omit<Extract<Op, { kind: "setLocation" }>, "id" | "at"> | Omit<Extract<Op, { kind: "mm" }>, "id" | "at">
-): Promise<{ offline: boolean }> {
+): Promise<RunResult> {
   if (navigator.onLine) {
     try {
-      await send({ ...op, id: "tmp", at: 0 } as Op);
-      return { offline: false };
+      const r = await send({ ...op, id: "tmp", at: 0 } as Op);
+      return { offline: false, queueId: r.queueId };
     } catch (e) {
       if (!isNetworkError(e)) throw e; // realny błąd serwera → do UI
     }
   }
-  buffer = [...buffer, { ...op, id: nextId(), at: Date.now() } as Op];
+  const bufferId = nextId();
+  buffer = [...buffer, { ...op, id: bufferId, at: Date.now() } as Op];
   persist();
-  return { offline: true };
+  return { offline: true, bufferId };
 }
 
 if (typeof window !== "undefined") {

@@ -1,25 +1,76 @@
-import { ArrowLeftRight, Zap, Trash2, X, History } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeftRight, Trash2, X, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Cog } from "@/components/glyphs";
+import { Barcode, Cog } from "@/components/glyphs";
 import { cn } from "@/lib/utils";
-import { useHistory, useProduct, useSetLocation } from "@/lib/hooks";
+import { beep } from "@/lib/feedback";
+import { useHistory, useLocations, useProduct, useSetLocation } from "@/lib/hooks";
 import {
   flashSuccess,
   openMM,
   openScanLoc,
   setChipMenu,
+  showUndo,
   toast,
   useUi,
 } from "@/lib/store";
+import { isKnownLoc, validateLoc } from "@/lib/locval";
+import { classify, dispatchScan, useScanHandler } from "@/lib/scanner";
+import { LocChoiceDrawer, type LocChoice } from "@/components/LocChoiceDrawer";
+import type { RunResult } from "@/lib/offline";
 
 const LOC_LIMIT = 50;
+const DEMO_SCANS = ["E08-03-01", "PALETA48", "5905947595303"];
+const IS_DEV = import.meta.env.DEV;
 
 export function Product() {
   const curId = useUi((s) => s.curId);
   const chipMenu = useUi((s) => s.chipMenu);
+  const [pending, setPending] = useState<string | null>(null); // skan lok. przy wielu lokalizacjach
   const { data: p, isLoading } = useProduct(curId);
   const { data: history } = useHistory(curId);
+  const { data: locInfo } = useLocations();
   const setLoc = useSetLocation(curId ?? 0);
+
+  /** Zapis relokacji ze skanu + pasek COFNIJ. */
+  function saveLoc(choice: LocChoice, successMsg: string) {
+    const warn = !isKnownLoc(choice.value, locInfo) ? "Lokalizacja spoza wykazu — sprawdź etykietę" : undefined;
+    setLoc.mutate(choice, {
+      onSuccess: (res: RunResult) => {
+        beep(true);
+        setPending(null);
+        showUndo({
+          msg: res.offline ? `Zapisano lokalnie · ${choice.value}` : `${successMsg} · ${choice.value}`,
+          queueId: res.queueId,
+          bufferId: res.bufferId,
+          warn,
+        });
+      },
+      onError: (e) => toast(e instanceof Error ? e.message : "Błąd zapisu"),
+    });
+  }
+
+  // Intencja z kolejności skanów: na karcie towaru skan etykiety regału =
+  // przenieś TEN towar TAM. Skan EAN → fallback (karta kolejnego towaru).
+  useScanHandler((scan) => {
+    if (!p || scan.kind !== "loc") return false;
+    const err = validateLoc(scan.code, locInfo);
+    if (err) {
+      toast(err);
+      beep(false);
+      return true;
+    }
+    if (p.locs.includes(scan.code)) {
+      toast(`Towar już ma lokalizację ${scan.code}`);
+      return true;
+    }
+    if (p.locs.length > 1) {
+      setPending(scan.code);
+      return true;
+    }
+    saveLoc({ action: "replace", value: scan.code }, "Lokalizacja zapisana");
+    return true;
+  });
 
   if (isLoading || !p) {
     return (
@@ -143,26 +194,42 @@ export function Product() {
         </div>
       )}
 
-      <div className="mt-auto grid grid-cols-2 gap-2">
-        <Button variant="outline" size="tall" className="font-cond text-[15px] tracking-wide" onClick={() => openScanLoc("loc")}>
-          ZMIEŃ LOKALIZACJĘ
-        </Button>
-        <Button
-          variant="outline"
-          size="tall"
-          className={cn("font-cond text-[15px] tracking-wide", noMgp && "opacity-40")}
-          onClick={() => (noMgp ? toast("Brak stanu na MGP") : openMM())}
-        >
-          <ArrowLeftRight className="h-4 w-4" /> MM MGP → MAG
-        </Button>
-        <Button
-          size="tall"
-          className={cn("col-span-2 font-cond text-base font-extrabold tracking-wide", noMgp && "opacity-40")}
-          onClick={() => (noMgp ? toast("Brak stanu na MGP") : openScanLoc("combo"))}
-        >
-          <Zap className="h-4 w-4 fill-current" /> ZASILENIE — MM CAŁOŚĆ + LOKALIZACJA
-        </Button>
+      <div className="mt-auto flex flex-col gap-2">
+        <div className="flex items-center justify-center gap-2 text-[11px] text-ink-mute">
+          <Barcode className="h-3 w-5 text-ink-soft" />
+          skan etykiety regału = przenieś tutaj · skan towaru = następna karta
+        </div>
+
+        {IS_DEV && (
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {DEMO_SCANS.map((c) => (
+              <button
+                key={c}
+                onClick={() => dispatchScan(classify(c))}
+                className="rounded-full border border-dashed border-[#C9C5BB] bg-card px-2.5 py-1 font-cond text-xs font-bold tracking-wide hover:border-amber"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" size="tall" className="font-cond text-[15px] tracking-wide" onClick={() => openScanLoc()}>
+            ZMIEŃ LOKALIZACJĘ
+          </Button>
+          <Button
+            variant="outline"
+            size="tall"
+            className={cn("font-cond text-[15px] tracking-wide", noMgp && "opacity-40")}
+            onClick={() => (noMgp ? toast("Brak stanu na MGP") : openMM())}
+          >
+            <ArrowLeftRight className="h-4 w-4" /> MM MGP → MAG
+          </Button>
+        </div>
       </div>
+
+      {p && <LocChoiceDrawer product={p} code={pending} onClose={() => setPending(null)} onPick={saveLoc} />}
     </div>
   );
 }

@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { X, MapPin, ClipboardCheck } from "lucide-react";
+import { X, MapPin } from "lucide-react";
 import { Barcode } from "@/components/glyphs";
 import { Badge } from "@/components/ui/badge";
 import { beep } from "@/lib/feedback";
 import { api, type ProductRow } from "@/lib/api";
 import { useSearch } from "@/lib/hooks";
-import { openInventory, openLocation, openProduct, toast, useUi } from "@/lib/store";
+import { openLocation, openProduct, toast, useUi } from "@/lib/store";
 import { normalizeLoc } from "@/lib/locval";
+import { LOC_PREFIX } from "@/lib/scanner";
 
 const SCAN_CHAR_MS = 50;
-// Prefiks skanera dla etykiet lokalizacji (konfigurowalny — pewniejszy niż heurystyka czasu).
-const LOC_PREFIX = (import.meta.env.VITE_SCAN_LOC_PREFIX ?? "LOC:") as string;
 const IS_DEV = import.meta.env.DEV;
 
 /** Kod „wygląda jak lokalizacja": ma literę, nie jest czystym ciągiem cyfr (EAN). */
@@ -145,27 +144,12 @@ export function Home() {
             Dane na żywo z serwera (odczyt SQL z Subiekta)
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => openLocation("")}
-              className="flex items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2.5 font-cond text-[13px] font-bold tracking-wide transition-colors hover:border-amber"
-            >
-              <MapPin className="h-4 w-4 text-ink-soft" /> SKANUJ LOKALIZACJĘ
-            </button>
-            <button
-              onClick={async () => {
-                try {
-                  const { sessionId } = await api.invCreate();
-                  openInventory(sessionId);
-                } catch {
-                  toast("Nie udało się otworzyć inwentaryzacji");
-                }
-              }}
-              className="flex items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2.5 font-cond text-[13px] font-bold tracking-wide transition-colors hover:border-amber"
-            >
-              <ClipboardCheck className="h-4 w-4 text-ink-soft" /> INWENTARYZACJA
-            </button>
-          </div>
+          <button
+            onClick={() => openLocation("")}
+            className="flex items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2.5 font-cond text-[13px] font-bold tracking-wide transition-colors hover:border-amber"
+          >
+            <MapPin className="h-4 w-4 text-ink-soft" /> SKANUJ LOKALIZACJĘ
+          </button>
 
           {IS_DEV && (
             <>

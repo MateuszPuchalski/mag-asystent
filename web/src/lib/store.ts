@@ -13,9 +13,7 @@ export type Screen =
   | "queue"
   | "putawayDocs"
   | "putawaySession"
-  | "location"
-  | "inventory";
-export type LocMode = "loc" | "combo";
+  | "location";
 
 export interface RecentEntry {
   id: number;
@@ -23,19 +21,26 @@ export interface RecentEntry {
   loc: string;
 }
 
+/** Pasek COFNIJ po auto-zapisie: queueId (online) lub bufferId (offline). */
+export interface UndoInfo {
+  msg: string;
+  queueId?: number;
+  bufferId?: string;
+  warn?: string;
+}
+
 interface UiState {
   screen: Screen;
   curId: number | null;
-  mode: LocMode;
   chipMenu: string | null;
   manualOpen: boolean;
   recent: RecentEntry[];
   sessionId: number | null;
-  invSessionId: number | null;
   locCode: string | null; // podgląd zawartości lokalizacji
   queueReturn: Screen | null; // ekran, z którego otwarto kolejkę (powrót)
   toast: string | null;
   success: string | null;
+  undo: UndoInfo | null;
 }
 
 const initialRecent: RecentEntry[] = JSON.parse(localStorage.getItem("wertis_recent") || "[]");
@@ -43,16 +48,15 @@ const initialRecent: RecentEntry[] = JSON.parse(localStorage.getItem("wertis_rec
 let state: UiState = {
   screen: "splash",
   curId: null,
-  mode: "loc",
   chipMenu: null,
   manualOpen: false,
   recent: initialRecent,
   sessionId: null,
-  invSessionId: null,
   locCode: null,
   queueReturn: null,
   toast: null,
   success: null,
+  undo: null,
 };
 
 const listeners = new Set<() => void>();
@@ -82,7 +86,6 @@ const BACK: Partial<Record<Screen, Screen>> = {
   mm: "product",
   putawaySession: "putawayDocs",
   location: "home",
-  inventory: "home",
 };
 export const backTarget = (s: Screen): Screen | undefined =>
   s === "queue" ? state.queueReturn ?? "home" : BACK[s];
@@ -107,8 +110,8 @@ export function openProduct(id: number, meta?: { sym: string; loc: string }) {
   }
   set({ screen: "product", curId: id, chipMenu: null, recent });
 }
-export function openScanLoc(mode: LocMode) {
-  set({ screen: "scanLoc", mode, manualOpen: false, chipMenu: null });
+export function openScanLoc() {
+  set({ screen: "scanLoc", manualOpen: false, chipMenu: null });
 }
 export function openMM() {
   set({ screen: "mm", chipMenu: null });
@@ -119,9 +122,6 @@ export function openSession(sessionId: number) {
 export function openLocation(code: string) {
   set({ screen: "location", locCode: code.trim().toUpperCase(), chipMenu: null });
 }
-export function openInventory(sessionId: number) {
-  set({ screen: "inventory", invSessionId: sessionId });
-}
 export function setChipMenu(code: string | null) {
   set({ chipMenu: state.chipMenu === code ? null : code });
 }
@@ -129,9 +129,10 @@ export function setManualOpen(v: boolean) {
   set({ manualOpen: v });
 }
 
-/* ── feedback (toast / sukces) ───────────────────────────────────────── */
+/* ── feedback (toast / sukces / undo) ────────────────────────────────── */
 let toastT: ReturnType<typeof setTimeout>;
 let succT: ReturnType<typeof setTimeout>;
+let undoT: ReturnType<typeof setTimeout>;
 export function toast(msg: string) {
   clearTimeout(toastT);
   set({ toast: msg });
@@ -141,4 +142,14 @@ export function flashSuccess(msg: string) {
   clearTimeout(succT);
   set({ success: msg });
   succT = setTimeout(() => set({ success: null }), 1500);
+}
+/** Auto-zapis z możliwością cofnięcia — pasek znika po oknie karencji. */
+export function showUndo(info: UndoInfo) {
+  clearTimeout(undoT);
+  set({ undo: info });
+  undoT = setTimeout(() => set({ undo: null }), 6000);
+}
+export function hideUndo() {
+  clearTimeout(undoT);
+  set({ undo: null });
 }

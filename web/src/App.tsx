@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { ChevronLeft, PackageOpen } from "lucide-react";
 import { Barcode } from "@/components/glyphs";
 import { SferaStatus } from "@/components/SferaStatus";
-import { SuccessOverlay, Toast } from "@/components/Overlays";
+import { SuccessOverlay, Toast, UndoBar } from "@/components/Overlays";
 import { Splash } from "@/screens/Splash";
 import { Home } from "@/screens/Home";
 import { Product } from "@/screens/Product";
@@ -11,10 +12,12 @@ import { Queue } from "@/screens/Queue";
 import { PutawayDocuments } from "@/screens/putaway/Documents";
 import { PutawaySession } from "@/screens/putaway/Session";
 import { LocationView } from "@/screens/Location";
-import { Inventory } from "@/screens/Inventory";
 import { OfflineBanner } from "@/components/OfflineBanner";
-import { backTarget, go, goBack, useUi, type Screen as ScreenName } from "@/lib/store";
+import { backTarget, go, goBack, openLocation, openProduct, toast, useUi, type Screen as ScreenName } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { beep } from "@/lib/feedback";
+import { installScanListener, setFallbackScanHandler } from "@/lib/scanner";
 
 const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
   home: "Magazyn",
@@ -25,16 +28,13 @@ const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
   putawayDocs: "Rozkładanie dostaw",
   putawaySession: "Sesja rozkładania",
   location: "Zawartość lokalizacji",
-  inventory: "Inwentaryzacja",
 };
 
 function TopBar() {
   const screen = useUi((s) => s.screen);
-  const mode = useUi((s) => s.mode);
   if (screen === "splash") return null;
   const hasBack = !!backTarget(screen);
-  const title =
-    screen === "scanLoc" && mode === "combo" ? "Zasilenie — cel" : TITLE[screen as Exclude<ScreenName, "splash">];
+  const title = TITLE[screen as Exclude<ScreenName, "splash">];
 
   return (
     <header className="flex h-[46px] flex-none items-center gap-2 border-b bg-card px-3">
@@ -105,13 +105,38 @@ function CurrentScreen() {
     case "putawayDocs": return <PutawayDocuments />;
     case "putawaySession": return <PutawaySession />;
     case "location": return <LocationView />;
-    case "inventory": return <Inventory />;
     default: return null;
   }
 }
 
 export default function App() {
   const isSplash = useUi((s) => s.screen === "splash");
+
+  // Globalny router skanów: gdy żaden ekran nie obsłuży skanu — EAN otwiera
+  // kartę towaru, etykieta regału otwiera podgląd zawartości lokalizacji.
+  useEffect(() => {
+    installScanListener();
+    setFallbackScanHandler((scan) => {
+      if (scan.kind === "loc") {
+        beep(true);
+        openLocation(scan.code);
+        return true;
+      }
+      void api
+        .scan(scan.code)
+        .then((r) => {
+          if (r.type === "product") {
+            beep(true);
+            openProduct(r.card.id, { sym: r.card.sym, loc: r.card.locs[0] || "brak lokalizacji" });
+          } else {
+            beep(false);
+            toast("Nieznany kod: " + scan.code);
+          }
+        })
+        .catch(() => toast("Błąd połączenia z serwerem"));
+      return true;
+    });
+  }, []);
 
   return (
     <div id="stage" className="grid min-h-screen place-items-center p-9 max-[480px]:p-0 max-[760px]:p-0">
@@ -132,6 +157,7 @@ export default function App() {
                 <CurrentScreen />
                 <SuccessOverlay />
                 <Toast />
+                <UndoBar />
               </main>
               <TabBar />
             </>

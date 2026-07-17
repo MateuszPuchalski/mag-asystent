@@ -8,6 +8,8 @@ export interface EnqueueBase {
   sessionId?: number | null;
   label: string;
   detail: string;
+  /** Okno COFNIJ [ms]: worker nie weźmie zadania przed upływem karencji. */
+  graceMs?: number;
 }
 
 function insert(
@@ -15,10 +17,13 @@ function insert(
   payload: unknown,
   base: EnqueueBase
 ): number {
+  const nextAttemptAt = base.graceMs
+    ? new Date(Date.now() + base.graceMs).toISOString()
+    : null;
   const res = db()
     .prepare(
-      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by)
-       VALUES (?,?, 'pending', ?,?,?,?,?,?)`
+      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by, next_attempt_at)
+       VALUES (?,?, 'pending', ?,?,?,?,?,?,?)`
     )
     .run(
       type,
@@ -28,7 +33,8 @@ function insert(
       base.twId ?? null,
       base.sourceDocId ?? null,
       base.sessionId ?? null,
-      base.createdBy
+      base.createdBy,
+      nextAttemptAt
     );
   return Number(res.lastInsertRowid);
 }
@@ -50,18 +56,4 @@ export function enqueueMM(
   base: EnqueueBase
 ): number {
   return insert("mm", { magFrom, magTo, items }, base);
-}
-
-/**
- * Zadanie „zasilenie" (kombo): MM całości + ustawienie lokalizacji jednym
- * zadaniem (spec §5.3). Worker wykonuje MM, potem set_location.
- */
-export function enqueueCombo(
-  magFrom: number,
-  magTo: number,
-  items: MmItem[],
-  location: string,
-  base: EnqueueBase
-): number {
-  return insert("combo", { magFrom, magTo, items, location }, base);
 }
