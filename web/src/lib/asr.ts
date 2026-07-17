@@ -3,9 +3,10 @@ import { getSettings } from "./settings";
 
 /* ── ASR offline (Whisper on-device przez transformers.js) ──────────────────
    Push-to-talk: nagranie z mikrofonu (16 kHz mono) → transkrypcja małym
-   Whisperem w przeglądarce (wagi ~40 MB ONNX q8, cache po pierwszym pobraniu
-   → potem offline). Brak modelu/mikrofonu → status "unavailable" i funkcja
-   znika z UI (poza ścieżką DEV z wpisywaniem komendy).                        */
+   Whisperem w przeglądarce. Wagi ładowane NAJPIERW z własnego serwera
+   (web/public/models/<id>/ — patrz DEPLOY.md i tools/fetch-asr-model.mjs;
+   magazyn on-premise nie ma internetu), z fallbackiem do huggingface.co.
+   Po pierwszym załadowaniu wagi siedzą w cache przeglądarki → offline.       */
 
 const ASR_MODEL = (import.meta.env.VITE_ASR_MODEL ?? "onnx-community/whisper-tiny") as string;
 const SAMPLE_RATE = 16000;
@@ -14,22 +15,31 @@ const MAX_RECORD_MS = 5000;
 export type AsrStatus = "off" | "loading" | "ready" | "recording" | "busy" | "unavailable";
 
 let status: AsrStatus = "off";
+let progress = 0; // % pobierania wag (0 gdy nie dotyczy)
+let lastError = "";
 let transcriber: ((audio: Float32Array) => Promise<string>) | null = null;
 let initPromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
-function setStatus(s: AsrStatus) {
-  status = s;
+function emit() {
   listeners.forEach((l) => l());
 }
+function setStatus(s: AsrStatus) {
+  status = s;
+  emit();
+}
+const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
 export function getAsrStatus(): AsrStatus {
   return status;
 }
 export function useAsrStatus(): AsrStatus {
-  return useSyncExternalStore(
-    (l) => (listeners.add(l), () => void listeners.delete(l)),
-    () => status
-  );
+  return useSyncExternalStore(subscribe, () => status);
+}
+export function useAsrProgress(): number {
+  return useSyncExternalStore(subscribe, () => progress);
+}
+export function getAsrError(): string {
+  return lastError;
 }
 
 export const micAvailable =
@@ -42,17 +52,43 @@ export function ensureAsr(): void {
   initPromise = (async () => {
     try {
       // dynamiczny import — transformers.js nie może wejść do głównego bundla
-      const { pipeline } = await import("@huggingface/transformers");
-      const pipe: any = await pipeline("automatic-speech-recognition", ASR_MODEL, { dtype: "q8" });
+      const { pipeline, env } = await import("@huggingface/transformers");
+      // wagi self-hosted mają pierwszeństwo (on-premise bez internetu)
+      env.allowLocalModels = true;
+      env.localModelPath = "models/";
+      env.allowRemoteModels = true; // fallback: HF (dev z internetem)
+      const pipe: any = await pipeline("automatic-speech-recognition", ASR_MODEL, {
+        dtype: "q8",
+        progress_callback: (p: { status?: string; loaded?: number; total?: number }) => {
+          if (p.status === "progress" && p.total) {
+            progress = Math.round((100 * (p.loaded ?? 0)) / p.total);
+            emit();
+          }
+        },
+      });
       transcriber = async (audio: Float32Array) => {
         const out = await pipe(audio, { language: "pl", task: "transcribe" });
         return (out?.text as string) ?? "";
       };
+      progress = 0;
       setStatus("ready");
-    } catch {
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      console.error("[asr] ładowanie modelu nieudane:", e);
       setStatus("unavailable");
     }
   })();
+}
+
+/** Ponów próbę załadowania (np. po podłączeniu sieci / wgraniu wag na serwer). */
+export function retryAsr(): void {
+  if (status === "loading" || status === "recording" || status === "busy") return;
+  initPromise = null;
+  transcriber = null;
+  lastError = "";
+  progress = 0;
+  setStatus("off");
+  ensureAsr();
 }
 
 /* nagrywanie: surowe próbki przez AudioContext (Whisper chce 16 kHz Float32) */

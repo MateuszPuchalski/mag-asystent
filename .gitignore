@@ -10,3 +10,6 @@ server/data/*.db
 server/data/*.db-*
 *.sqlite
 *.sqlite-*
+
+# wagi modeli ASR (pobierane przez tools/fetch-asr-model.mjs)
+web/public/models/
