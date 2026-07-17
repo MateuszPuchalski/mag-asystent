@@ -1,8 +1,6 @@
 import { Check, Undo2 } from "lucide-react";
-import { ApiError, api } from "@/lib/api";
-import { useInvalidate } from "@/lib/hooks";
-import { remove as removeBuffered } from "@/lib/offline";
-import { hideUndo, toast, useUi } from "@/lib/store";
+import { performUndo } from "@/lib/undo";
+import { useUi } from "@/lib/store";
 
 export function SuccessOverlay() {
   const success = useUi((s) => s.success);
@@ -32,35 +30,12 @@ export function Toast() {
   );
 }
 
-/** Pasek po auto-zapisie: potwierdzenie + COFNIJ w oknie karencji kolejki. */
+/** Pasek po auto-zapisie: potwierdzenie + COFNIJ (przycisk lub potrząśnięcie). */
 export function UndoBar() {
   const undo = useUi((s) => s.undo);
-  const curId = useUi((s) => s.curId);
-  const inv = useInvalidate();
   if (!undo) return null;
 
-  async function cancel() {
-    const u = undo!;
-    hideUndo();
-    if (u.queueId != null) {
-      try {
-        await api.cancel(u.queueId);
-        inv.queue();
-        if (curId) inv.product(curId);
-        toast("Cofnięto");
-      } catch (e) {
-        toast(
-          e instanceof ApiError && e.status === 409
-            ? "Już zapisane — zeskanuj ponownie, aby poprawić"
-            : e instanceof Error
-              ? e.message
-              : "Nie udało się cofnąć"
-        );
-      }
-    } else if (u.bufferId) {
-      toast(removeBuffered(u.bufferId) ? "Cofnięto (z bufora)" : "Operacja już wysłana");
-    }
-  }
+  const cancel = () => void performUndo();
 
   return (
     <div className="anim-fadeUp absolute inset-x-3 bottom-[8px] z-40 flex items-center gap-2.5 rounded-lg bg-ink px-3.5 py-2.5 text-white shadow-lg">

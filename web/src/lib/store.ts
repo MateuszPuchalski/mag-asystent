@@ -13,7 +13,8 @@ export type Screen =
   | "queue"
   | "putawayDocs"
   | "putawaySession"
-  | "location";
+  | "location"
+  | "settings";
 
 export interface RecentEntry {
   id: number;
@@ -86,6 +87,7 @@ const BACK: Partial<Record<Screen, Screen>> = {
   mm: "product",
   putawaySession: "putawayDocs",
   location: "home",
+  settings: "home",
 };
 export const backTarget = (s: Screen): Screen | undefined =>
   s === "queue" ? state.queueReturn ?? "home" : BACK[s];
@@ -121,6 +123,9 @@ export function openSession(sessionId: number) {
 }
 export function openLocation(code: string) {
   set({ screen: "location", locCode: code.trim().toUpperCase(), chipMenu: null });
+}
+export function openSettings() {
+  set({ screen: "settings", chipMenu: null, manualOpen: false });
 }
 export function setChipMenu(code: string | null) {
   set({ chipMenu: state.chipMenu === code ? null : code });

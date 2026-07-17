@@ -160,6 +160,9 @@ export const api = {
   locationProducts: (code: string) =>
     req<{ code: string; products: ProductRow[] }>(`/api/locations/${encodeURIComponent(code)}/products`),
 
+  deviceEvent: (body: { type: "device_drop" | "battery_low"; [k: string]: unknown }) =>
+    req<{ ok: true }>(`/api/device/event`, { method: "POST", body: JSON.stringify(body) }),
+
   queue: () => req<QueueResponse>(`/api/queue`),
   retry: (id: number) => req<{ ok: true }>(`/api/queue/${id}/retry`, { method: "POST" }),
   cancel: (id: number) => req<{ ok: true }>(`/api/queue/${id}/cancel`, { method: "POST" }),
