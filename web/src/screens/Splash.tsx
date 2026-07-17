@@ -23,7 +23,7 @@ export function Splash() {
       className="absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-white"
     >
       <img
-        src="assets/wertis-logo.svg"
+        src="assets/wertis-logo.jpg"
         alt="WERTIS — sklep z częściami"
         className="anim-fadeUp w-[248px] max-w-[70%]"
       />
