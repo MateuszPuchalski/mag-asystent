@@ -15,11 +15,14 @@ import { LocationView } from "@/screens/Location";
 import { Settings } from "@/screens/Settings";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { CameraScan, cameraScanAvailable } from "@/components/CameraScan";
-import { backTarget, go, goBack, openLocation, openProduct, openSettings, toast, useUi, type Screen as ScreenName } from "@/lib/store";
+import { MicButton } from "@/components/MicButton";
+import { backTarget, go, goBack, openLocation, openProduct, openQueue, openSettings, toast, useUi, type Screen as ScreenName } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { beep } from "@/lib/feedback";
 import { installScanListener, setFallbackScanHandler } from "@/lib/scanner";
+import { setFallbackCommandHandler } from "@/lib/commands";
+import { performUndo } from "@/lib/undo";
 import { installWakeLock } from "@/lib/wakelock";
 import { installMotion } from "@/lib/motion";
 import { flush } from "@/lib/offline";
@@ -167,6 +170,13 @@ export default function App() {
     installWakeLock();
     installMotion();
     installBatteryAssist();
+    // komendy głosowe działające z każdego ekranu
+    setFallbackCommandHandler((cmd) => {
+      if (cmd.kind === "undo") return (void performUndo(), true);
+      if (cmd.kind === "back") return (goBack(), true);
+      if (cmd.kind === "queue") return (openQueue(), true);
+      return false;
+    });
     setFallbackScanHandler((scan) => {
       if (scan.kind === "loc") {
         beep(true);
@@ -215,6 +225,7 @@ export default function App() {
                 <SuccessOverlay />
                 <Toast />
                 <UndoBar />
+                <MicButton />
               </main>
               <TabBar />
               <CameraScan open={cameraOpen} onClose={() => setCameraOpen(false)} />

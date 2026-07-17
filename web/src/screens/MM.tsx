@@ -3,6 +3,8 @@ import { Minus, Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMM, useProduct } from "@/lib/hooks";
 import { flashSuccess, go, toast, useUi } from "@/lib/store";
+import { useCommandHandler } from "@/lib/commands";
+import { speak } from "@/lib/voice";
 
 export function MM() {
   const curId = useUi((s) => s.curId);
@@ -14,6 +16,15 @@ export function MM() {
   useEffect(() => {
     setQty(max);
   }, [max]);
+
+  // komenda głosowa: liczba = ustaw ilość MM
+  useCommandHandler((cmd) => {
+    if (cmd.kind !== "qty" || cmd.value == null) return false;
+    const q = Math.max(1, Math.min(max, cmd.value));
+    setQty(q);
+    speak(`${q} sztuk`);
+    return true;
+  });
 
   if (!p) return null;
   const clamp = (q: number) => setQty(Math.max(1, Math.min(max, q)));

@@ -1,8 +1,9 @@
-import { Volume2, MonitorSmartphone, Vibrate, AlertTriangle, Footprints, BatteryLow, Camera } from "lucide-react";
+import { Volume2, Mic, MonitorSmartphone, Vibrate, AlertTriangle, Footprints, BatteryLow, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings, setSetting, type Settings as SettingsModel } from "@/lib/settings";
 import { speak, spellLoc, voiceAvailable } from "@/lib/voice";
 import { wakeLockAvailable } from "@/lib/wakelock";
+import { micAvailable, useAsrStatus } from "@/lib/asr";
 import { cameraScanAvailable } from "@/components/CameraScan";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +25,13 @@ const ROWS: Row[] = [
     name: "Głosowe prowadzenie",
     desc: "Kolektor mówi lokalizację po skanie i potwierdza zapisy",
     available: voiceAvailable,
+  },
+  {
+    key: "voiceCommands",
+    icon: <Mic className="h-4 w-4" />,
+    name: "Komendy głosowe (offline)",
+    desc: "Przytrzymaj mikrofon i powiedz: cofnij / stan / pomiń / ilość. Pierwsze użycie pobiera ~40 MB",
+    available: micAvailable,
   },
   {
     key: "wakeLock",
@@ -93,6 +101,7 @@ function Toggle({ on, disabled, onClick }: { on: boolean; disabled: boolean; onC
 
 export function Settings() {
   const s = useSettings();
+  const asr = useAsrStatus();
 
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-2 overflow-y-auto p-3">
@@ -111,6 +120,11 @@ export function Settings() {
             <div className="text-[11px] leading-snug text-ink-soft">
               {r.available ? r.desc : "Niedostępne na tym urządzeniu"}
             </div>
+            {r.key === "voiceCommands" && s.voiceCommands && asr !== "off" && (
+              <div className="mt-0.5 text-[10px] font-semibold text-amber-ink">
+                {asr === "loading" ? "pobieranie modelu…" : asr === "unavailable" ? "model niedostępny — sprawdź sieć" : "model gotowy"}
+              </div>
+            )}
           </div>
           <Toggle on={r.available && s[r.key]} disabled={!r.available} onClick={() => setSetting(r.key, !s[r.key])} />
         </div>
