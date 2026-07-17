@@ -2,17 +2,16 @@ import type { FastifyInstance } from "fastify";
 import { subiekt, userOf } from "../context.js";
 import { config } from "../config.js";
 import { pendingMmByTw } from "../services/stock.js";
-import { enqueueCombo, enqueueMM } from "../services/queue.js";
+import { enqueueMM } from "../services/queue.js";
 import { logEvent } from "../services/events.js";
 
 interface MmBody {
   items: Array<{ twId: number; qty: number }>;
-  targetLocation?: string; // kombo „zasilenie": MM + set_location
 }
 
 export async function mmRoutes(app: FastifyInstance) {
   app.post<{ Body: MmBody }>("/api/mm", async (req, reply) => {
-    const { items, targetLocation } = req.body;
+    const { items } = req.body;
     if (!items?.length) return reply.code(400).send({ error: "Brak pozycji MM" });
 
     const pending = pendingMmByTw();
@@ -33,20 +32,6 @@ export async function mmRoutes(app: FastifyInstance) {
 
     const user = userOf(req);
     const first = subiekt.getProductById(items[0].twId)!;
-
-    if (targetLocation && items.length === 1) {
-      const loc = targetLocation.trim().toUpperCase();
-      if (/\s/.test(loc)) return reply.code(400).send({ error: "Kod lokalizacji nie może zawierać spacji" });
-      const qty = items[0].qty;
-      const queueId = enqueueCombo(config.magId.MGP, config.magId.MAG, items, loc, {
-        createdBy: user,
-        twId: items[0].twId,
-        label: "Zasilenie · " + first.symbol,
-        detail: `${qty} szt → MAG · lok. ${loc}`,
-      });
-      logEvent("mm_queued", user, items[0].twId, { combo: true, qty, location: loc });
-      return { queueId, kind: "combo" };
-    }
 
     const totalQty = items.reduce((s, it) => s + it.qty, 0);
     const label =

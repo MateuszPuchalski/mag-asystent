@@ -1,87 +1,75 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Barcode } from "@/components/glyphs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 import { beep } from "@/lib/feedback";
-import { useLocations, useMM, useProduct, useSetLocation } from "@/lib/hooks";
-import { flashSuccess, go, setManualOpen, toast, useUi } from "@/lib/store";
+import { useLocations, useProduct, useSetLocation } from "@/lib/hooks";
+import { go, setManualOpen, showUndo, toast, useUi } from "@/lib/store";
 import { isKnownLoc, normalizeLoc, validateLoc } from "@/lib/locval";
+import { dispatchScan, classify, useScanHandler } from "@/lib/scanner";
+import { LocChoiceDrawer, type LocChoice } from "@/components/LocChoiceDrawer";
+import type { RunResult } from "@/lib/offline";
 
 const DEMO_LOCS = ["E08-03-01", "D01-02-02", "H04-05-02", "PALETA48"];
 const IS_DEV = import.meta.env.DEV;
 
 export function ScanLoc() {
   const curId = useUi((s) => s.curId);
-  const mode = useUi((s) => s.mode);
   const manualOpen = useUi((s) => s.manualOpen);
   const [manual, setManual] = useState("");
   const [pending, setPending] = useState<string | null>(null); // kod do dialogu wielolokalizacji
-  const [pickOne, setPickOne] = useState(false);
-  const [confirm, setConfirm] = useState<string | null>(null); // kod do potwierdzenia (1 lok / combo)
-  const hiddenRef = useRef<HTMLInputElement>(null);
 
   const { data: p } = useProduct(curId);
   const { data: locInfo } = useLocations();
   const setLoc = useSetLocation(curId ?? 0);
-  const mm = useMM(curId ?? 0);
 
-  useEffect(() => {
-    const t = setTimeout(() => hiddenRef.current?.focus({ preventScroll: true }), 50);
-    return () => clearTimeout(t);
-  }, []);
+  useScanHandler((scan) => {
+    if (scan.kind === "ean") return false; // EAN → fallback (karta innego towaru)
+    handleCode(scan.code);
+    return true;
+  });
 
   if (!p) return null;
 
   const onErr = (e: unknown) => toast(e instanceof Error ? e.message : "Błąd zapisu");
-  const done = (msg: string) => (res?: { offline?: boolean }) => {
-    flashSuccess(res?.offline ? "Zapisano lokalnie — wyśle się po połączeniu" : msg);
-    setPending(null);
-    setPickOne(false);
-    setConfirm(null);
-    go("product");
-  };
 
-  function accept(raw: string): string | null {
+  /** Auto-zapis + pasek COFNIJ (bez tapa potwierdzenia). */
+  function save(choice: LocChoice, successMsg: string) {
+    const warn = !isKnownLoc(choice.value, locInfo) ? "Lokalizacja spoza wykazu — sprawdź etykietę" : undefined;
+    setLoc.mutate(choice, {
+      onSuccess: (res: RunResult) => {
+        beep(true);
+        setPending(null);
+        showUndo({
+          msg: res.offline ? `Zapisano lokalnie · ${choice.value}` : `${successMsg} · ${choice.value}`,
+          queueId: res.queueId,
+          bufferId: res.bufferId,
+          warn,
+        });
+        go("product");
+      },
+      onError: onErr,
+    });
+  }
+
+  function handleCode(raw: string) {
     const code = normalizeLoc(raw);
     const err = validateLoc(code, locInfo);
     if (err) {
       toast(err);
       beep(false);
-      return null;
-    }
-    return code;
-  }
-
-  /** Skan/wejście z pola — waliduje i kieruje do właściwego potwierdzenia. */
-  function handleCode(raw: string) {
-    const code = accept(raw);
-    if (!code) return;
-    if (mode === "combo") return void setConfirm(code);
-    if (p!.locs.length > 1) {
-      setPending(code);
-      setPickOne(false);
       return;
     }
-    setConfirm(code); // 1 lokalizacja (lub brak) → potwierdzenie zastąpienia
+    if (p!.locs.length > 1) {
+      setPending(code); // realna decyzja — drawer zostaje
+      return;
+    }
+    save({ action: "replace", value: code }, "Lokalizacja zapisana");
   }
-
-  const unknown = confirm ? !isKnownLoc(confirm, locInfo) : false;
 
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <input
-        ref={hiddenRef}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.currentTarget.value.trim()) {
-            handleCode(e.currentTarget.value);
-            e.currentTarget.value = "";
-          }
-        }}
-        className="pointer-events-none absolute left-[-999px] opacity-0"
-      />
-
       {/* Tożsamość towaru — magazynier musi wiedzieć CO przenosi (analiza) */}
       <div className="rounded-lg border bg-card px-3 py-2.5">
         <div className="text-sm font-bold leading-snug text-pretty">{p.name}</div>
@@ -111,9 +99,7 @@ export function ScanLoc() {
       </div>
 
       <div className="text-[13px] text-ink-soft">
-        {mode === "combo"
-          ? `MM ${p.mgp.effective} szt MGP→MAG + nowa lokalizacja — zeskanuj miejsce docelowe.`
-          : "Podejdź do miejsca docelowego i zeskanuj jego etykietę."}
+        Podejdź do miejsca docelowego i zeskanuj jego etykietę — zapis nastąpi od razu (z opcją COFNIJ).
       </div>
 
       <div className="flex flex-col items-center gap-2.5 rounded-xl border-2 border-dashed border-amber bg-amber-bg-soft px-3 py-6">
@@ -131,7 +117,7 @@ export function ScanLoc() {
             {DEMO_LOCS.map((c) => (
               <button
                 key={c}
-                onClick={() => handleCode(c)}
+                onClick={() => dispatchScan(classify(c))}
                 className="flex flex-col items-center gap-1.5 rounded-lg border bg-card p-2.5 transition-colors hover:border-amber"
               >
                 <Barcode className="h-3.5 w-6 text-ink-soft" />
@@ -167,108 +153,7 @@ export function ScanLoc() {
           </div>
         ))}
 
-      {/* Potwierdzenie zapisu (1 lokalizacja / combo) — „było → nowa" */}
-      <Drawer open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
-        <DrawerContent>
-          {confirm && (
-            <>
-              <DrawerTitle>
-                {mode === "combo" ? "Potwierdź zasilenie" : "Potwierdź zmianę lokalizacji"}
-              </DrawerTitle>
-              <div className="flex flex-col items-center gap-1 py-1">
-                <div className="font-cond text-[15px] font-bold">{p.sym}</div>
-                <div className="flex items-center gap-2 text-[15px]">
-                  <span className="text-ink-mute line-through">{p.locs[0] ?? "brak"}</span>
-                  <span className="text-ink-mute">→</span>
-                  <span className="font-cond text-lg font-extrabold text-amber-ink">{confirm}</span>
-                </div>
-                {mode === "combo" && (
-                  <div className="text-[12px] text-ink-soft">+ MM {p.mgp.effective} szt MGP→MAG</div>
-                )}
-                {unknown && (
-                  <div className="mt-1 rounded-md bg-amber-bg px-2.5 py-1 text-[11px] font-semibold text-[#8A6300]">
-                    Nowa lokalizacja spoza wykazu — sprawdź, czy dobrze zeskanowano
-                  </div>
-                )}
-              </div>
-              <Button
-                size="tall"
-                className="font-cond text-base font-extrabold tracking-wide"
-                disabled={setLoc.isPending || mm.isPending}
-                onClick={() => {
-                  if (mode === "combo") {
-                    mm.mutate(
-                      { items: [{ twId: p!.id, qty: p!.mgp.effective }], targetLocation: confirm },
-                      { onSuccess: done("Zasilenie w kolejce"), onError: onErr }
-                    );
-                  } else {
-                    setLoc.mutate(
-                      { action: "replace", value: confirm },
-                      { onSuccess: done("Lokalizacja zapisana"), onError: onErr }
-                    );
-                  }
-                }}
-              >
-                POTWIERDŹ
-              </Button>
-              <button onClick={() => setConfirm(null)} className="p-1.5 text-center text-[13px] font-semibold text-ink-mute">
-                Anuluj
-              </button>
-            </>
-          )}
-        </DrawerContent>
-      </Drawer>
-
-      {/* Wybór przy wielu lokalizacjach */}
-      <Drawer open={!!pending} onOpenChange={(o) => !o && (setPending(null), setPickOne(false))}>
-        <DrawerContent>
-          {pending && (
-            <>
-              <DrawerTitle>
-                Towar ma {p.locs.length} lokalizacje — co z <span className="text-amber-ink">{pending}</span>?
-              </DrawerTitle>
-              <Button
-                size="tall"
-                className="flex-col gap-0.5 font-cond text-base font-extrabold tracking-wide"
-                onClick={() => setLoc.mutate({ action: "replace", value: pending }, { onSuccess: done("Lokalizacja zapisana"), onError: onErr })}
-              >
-                ZASTĄP WSZYSTKIE
-                <span className="text-[10px] font-semibold normal-case tracking-normal opacity-90">
-                  usuniesz: {p.locs.join(", ")} · zostanie: {pending}
-                </span>
-              </Button>
-              <Button
-                variant="outline"
-                size="tall"
-                className="font-cond text-[15px] tracking-wide"
-                onClick={() => setLoc.mutate({ action: "add", value: pending }, { onSuccess: done("Lokalizacja dodana"), onError: onErr })}
-              >
-                DODAJ JAKO KOLEJNĄ
-              </Button>
-              {!pickOne ? (
-                <Button variant="outline" size="tall" className="font-cond text-[15px] tracking-wide" onClick={() => setPickOne(true)}>
-                  ZASTĄP JEDNĄ Z… ▾
-                </Button>
-              ) : (
-                <div className="flex flex-wrap justify-center gap-1.5 py-0.5">
-                  {p.locs.map((old) => (
-                    <button
-                      key={old}
-                      onClick={() => setLoc.mutate({ action: "replace_one", value: pending, replaced: old }, { onSuccess: done("Lokalizacja zapisana"), onError: onErr })}
-                      className="rounded-full border-[1.5px] border-ink bg-card px-3.5 py-2 font-cond text-[15px] font-bold transition-colors hover:bg-amber-bg"
-                    >
-                      {old} → {pending}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button onClick={() => (setPending(null), setPickOne(false))} className="p-1.5 text-center text-[13px] font-semibold text-ink-mute">
-                Anuluj
-              </button>
-            </>
-          )}
-        </DrawerContent>
-      </Drawer>
+      <LocChoiceDrawer product={p} code={pending} onClose={() => setPending(null)} onPick={save} />
     </div>
   );
 }

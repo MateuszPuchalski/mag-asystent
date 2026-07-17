@@ -152,7 +152,7 @@ export const api = {
     id: number,
     body: { action: "replace" | "add" | "remove" | "replace_one"; value?: string; replaced?: string }
   ) => req<{ queueId: number }>(`/api/products/${id}/location`, { method: "POST", body: JSON.stringify(body) }),
-  mm: (body: { items: { twId: number; qty: number }[]; targetLocation?: string }) =>
+  mm: (body: { items: { twId: number; qty: number }[] }) =>
     req<{ queueId: number; kind: string }>(`/api/mm`, { method: "POST", body: JSON.stringify(body) }),
   history: (id: number) => req<{ entries: MovementEntry[] }>(`/api/products/${id}/history`),
 

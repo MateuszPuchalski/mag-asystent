@@ -97,6 +97,8 @@ export async function productRoutes(app: FastifyInstance) {
         twId,
         label: "Lokalizacja · " + p.symbol,
         detail: desc,
+        // okno COFNIJ na kolektorze — worker odczeka karencję (next_attempt_at)
+        graceMs: config.undoGraceMs,
       });
       logEvent(
         body.action === "remove" ? "location_removed" : "location_set",

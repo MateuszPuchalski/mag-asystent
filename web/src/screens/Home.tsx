@@ -7,10 +7,9 @@ import { api, type ProductRow } from "@/lib/api";
 import { useSearch } from "@/lib/hooks";
 import { openLocation, openProduct, toast, useUi } from "@/lib/store";
 import { normalizeLoc } from "@/lib/locval";
+import { LOC_PREFIX } from "@/lib/scanner";
 
 const SCAN_CHAR_MS = 50;
-// Prefiks skanera dla etykiet lokalizacji (konfigurowalny — pewniejszy niż heurystyka czasu).
-const LOC_PREFIX = (import.meta.env.VITE_SCAN_LOC_PREFIX ?? "LOC:") as string;
 const IS_DEV = import.meta.env.DEV;
 
 /** Kod „wygląda jak lokalizacja": ma literę, nie jest czystym ciągiem cyfr (EAN). */
