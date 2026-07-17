@@ -12,14 +12,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MODEL = process.argv[2] ?? "onnx-community/whisper-tiny";
-// dtype "q8" w transformers.js → pliki *_quantized.onnx
+// Enkoder Whispera musi być fp32 (kwantyzowany wywala ORT-web), dekoder q8 →
+// *_quantized. Zgodne z dtype w web/src/lib/asr.ts.
 const FILES = [
   "config.json",
   "generation_config.json",
   "preprocessor_config.json",
   "tokenizer.json",
   "tokenizer_config.json",
-  "onnx/encoder_model_quantized.onnx",
+  "onnx/encoder_model.onnx",
   "onnx/decoder_model_merged_quantized.onnx",
 ];
 
