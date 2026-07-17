@@ -30,7 +30,7 @@ const ROWS: Row[] = [
     key: "voiceCommands",
     icon: <Mic className="h-4 w-4" />,
     name: "Komendy głosowe (offline)",
-    desc: "Przytrzymaj mikrofon i powiedz: cofnij / stan / pomiń / ilość. Pierwsze użycie pobiera ~60 MB",
+    desc: "Przytrzymaj mikrofon i powiedz: cofnij / stan / pomiń / ilość. Pierwsze użycie pobiera model (kilkadziesiąt–150 MB)",
     available: micAvailable,
   },
   {

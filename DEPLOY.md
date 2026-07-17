@@ -132,16 +132,17 @@ certyfikat CA). Od tej pory kolektory używają `https://mag.wertis.local`.
 
 ### 6a. Komendy głosowe — wagi modelu ASR (offline)
 
-Rozpoznawanie mowy działa w całości na kolektorze (Whisper ONNX; enkoder fp32
-+ dekoder q8, razem ~60 MB — enkoder musi być fp32, bo kwantyzowany nie działa
-w ONNX Runtime Web).
+Rozpoznawanie mowy działa w całości na kolektorze (Whisper ONNX). Backendem jest
+ONNX Runtime **WASM** (pewny na każdym kolektorze), a ten obsługuje bez problemu
+tylko wagi **fp32** — kwantyzowany enkoder oraz kwantyzowany (4-bit/MatMulNBits)
+dekoder modeli `onnx-community/*` nie tworzą sesji. Dlatego domyślnie pobieramy
+enkoder i dekoder w fp32 (whisper-tiny ≈ 150 MB — jednorazowo, potem z cache).
 Magazyn nie ma internetu, więc wagi trzeba wgrać na serwer WERTIS:
 
 ```bash
 # na dowolnej maszynie Z INTERNETEM (w repo):
-node tools/fetch-asr-model.mjs            # domyślnie onnx-community/whisper-tiny
-# lepsza jakość PL (większy, ~80 MB):
-node tools/fetch-asr-model.mjs onnx-community/whisper-base
+node tools/fetch-asr-model.mjs                       # domyślnie whisper-tiny, fp32
+node tools/fetch-asr-model.mjs onnx-community/whisper-base   # lepsza polszczyzna, większy
 ```
 
 Powstaje katalog `web/public/models/<id-modelu>/…` — skopiuj go na serwer
@@ -152,6 +153,14 @@ Po pierwszym załadowaniu przeglądarka trzyma wagi w cache (offline).
 Przy zmianie modelu ustaw `VITE_ASR_MODEL=<id>` podczas builda frontu.
 W Ustawieniach kolektora wiersz „Komendy głosowe" pokazuje postęp pobierania,
 a przy błędzie — przyczynę i przycisk PONÓW PRÓBĘ.
+
+**Wariant lżejszy (mniejszy download, ~60 MB):** dekoder w int8 (q8) — działa
+na WASM tylko z **modelami Xenova** (standardowy int8, bez MatMulNBits):
+
+```bash
+node tools/fetch-asr-model.mjs Xenova/whisper-tiny q8
+# oraz build frontu z:  VITE_ASR_MODEL=Xenova/whisper-tiny  VITE_ASR_DECODER_DTYPE=q8
+```
 
 ## 7. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
