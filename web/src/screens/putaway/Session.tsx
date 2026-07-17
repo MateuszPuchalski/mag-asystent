@@ -8,6 +8,7 @@ import { useSession, useInvalidate } from "@/lib/hooks";
 import { flashSuccess, go, toast, useUi } from "@/lib/store";
 
 const DEMO_LOCS = ["A05-01-01", "B11-02-01", "E08-03-01", "PALETA48"];
+const IS_DEV = import.meta.env.DEV;
 
 export function PutawaySession() {
   const sessionId = useUi((s) => s.sessionId);
@@ -244,7 +245,7 @@ function CartRow({ sid, it, onChange }: { sid: number; it: PutawayItem; onChange
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setQty(Math.min(it.qtyExpected || qty + 1, qty + 1))}>
           <Plus className="h-4 w-4" />
         </Button>
-        <div className="text-[11px] text-ink-mute">z {it.qtyExpected || "—"}</div>
+        <div className="text-[11px] text-ink-mute">z {it.qtyExpected || "—"} · MGP {it.mgpStan}</div>
         <div className="ml-auto flex gap-1.5">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-ink-mute" onClick={skip} title="Pomiń">
             <SkipForward className="h-4 w-4" />
@@ -258,19 +259,21 @@ function CartRow({ sid, it, onChange }: { sid: number; it: PutawayItem; onChange
       {picking ? (
         <div className="mt-2 flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-mute">
-            <Barcode className="h-3 w-5 text-ink-soft" /> Zeskanuj lokalizację (symulacja — dotknij)
+            <Barcode className="h-3 w-5 text-ink-soft" /> Zeskanuj lokalizację docelową
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {DEMO_LOCS.map((c) => (
-              <button
-                key={c}
-                onClick={() => confirm(c)}
-                className="rounded-full border-[1.5px] border-ink bg-card px-3 py-1.5 font-cond text-sm font-bold transition-colors hover:bg-amber-bg"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          {IS_DEV && (
+            <div className="flex flex-wrap gap-1.5">
+              {DEMO_LOCS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => confirm(c)}
+                  className="rounded-full border-[1.5px] border-ink bg-card px-3 py-1.5 font-cond text-sm font-bold transition-colors hover:bg-amber-bg"
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-2 flex gap-2">

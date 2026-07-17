@@ -45,4 +45,8 @@ export interface SubiektAdapter {
   getDocumentPositions(docId: number): RawPosition[];
   /** Towary o stanie MGP > 0 (tryb „całe MGP"). */
   listMgpStockProducts(): RawPosition[];
+  /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */
+  listLocations(): string[];
+  /** Towary, których pole lokalizacji zawiera dany kod (reverse lookup). */
+  getProductsByLocation(code: string): ProductRow[];
 }

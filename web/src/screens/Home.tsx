@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, MapPin, ClipboardCheck } from "lucide-react";
 import { Barcode } from "@/components/glyphs";
 import { Badge } from "@/components/ui/badge";
 import { beep } from "@/lib/feedback";
 import { api, type ProductRow } from "@/lib/api";
 import { useSearch } from "@/lib/hooks";
-import { openProduct, toast, useUi } from "@/lib/store";
+import { openInventory, openLocation, openProduct, toast, useUi } from "@/lib/store";
+import { normalizeLoc } from "@/lib/locval";
 
 const SCAN_CHAR_MS = 50;
+// Prefiks skanera dla etykiet lokalizacji (konfigurowalny — pewniejszy niż heurystyka czasu).
+const LOC_PREFIX = (import.meta.env.VITE_SCAN_LOC_PREFIX ?? "LOC:") as string;
+const IS_DEV = import.meta.env.DEV;
+
+/** Kod „wygląda jak lokalizacja": ma literę, nie jest czystym ciągiem cyfr (EAN). */
+function looksLikeLocation(code: string): boolean {
+  return /[A-Za-z]/.test(code) && !/^\d+$/.test(code) && !/\s/.test(code);
+}
 
 const DEMO_TILES = [
   { ean: "5905947596270", name: "Worek do odkurzacza MV 3 WD3 200 SE 4001" },
@@ -42,8 +51,14 @@ export function Home() {
       } else if (r.type === "search") {
         setQuery(code);
       } else {
-        beep(false);
-        toast("Nieznany kod: " + code);
+        // nieznany towar — jeśli kod wygląda jak lokalizacja, pokaż jej zawartość
+        if (looksLikeLocation(code)) {
+          beep(true);
+          openLocation(code);
+        } else {
+          beep(false);
+          toast("Nieznany kod: " + code);
+        }
       }
     } catch {
       toast("Błąd połączenia z serwerem");
@@ -59,6 +74,12 @@ export function Home() {
     if (e.key === "Enter") {
       const val = query.trim();
       if (!val) return;
+      // prefiks skanera dla lokalizacji → od razu podgląd zawartości
+      if (LOC_PREFIX && val.toUpperCase().startsWith(LOC_PREFIX.toUpperCase())) {
+        fast.current.count = 0;
+        setQuery("");
+        return void openLocation(normalizeLoc(val));
+      }
       const isScan = fast.current.count >= 3 || /^\d{8}$|^\d{12,14}$/.test(val);
       fast.current.count = 0;
       if (isScan) return void handleScan(val);
@@ -123,22 +144,49 @@ export function Home() {
           <div className="-mt-1.5 text-[11px] text-ink-mute">
             Dane na żywo z serwera (odczyt SQL z Subiekta)
           </div>
-          <div className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
-            Symulacja skanera — dotknij kod
-          </div>
-          {DEMO_TILES.map((x) => (
+
+          <div className="grid grid-cols-2 gap-2">
             <button
-              key={x.ean}
-              onClick={() => handleScan(x.ean)}
-              className="flex items-center gap-3 rounded-lg border border-dashed border-[#C9C5BB] bg-card px-3 py-2 text-left transition-colors hover:border-amber"
+              onClick={() => openLocation("")}
+              className="flex items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2.5 font-cond text-[13px] font-bold tracking-wide transition-colors hover:border-amber"
             >
-              <Barcode className="h-[17px] w-[26px] text-ink-soft" />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold tabular-nums tracking-wide">{x.ean}</div>
-                <div className="truncate text-[11px] text-ink-mute">{x.name}</div>
-              </div>
+              <MapPin className="h-4 w-4 text-ink-soft" /> SKANUJ LOKALIZACJĘ
             </button>
-          ))}
+            <button
+              onClick={async () => {
+                try {
+                  const { sessionId } = await api.invCreate();
+                  openInventory(sessionId);
+                } catch {
+                  toast("Nie udało się otworzyć inwentaryzacji");
+                }
+              }}
+              className="flex items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2.5 font-cond text-[13px] font-bold tracking-wide transition-colors hover:border-amber"
+            >
+              <ClipboardCheck className="h-4 w-4 text-ink-soft" /> INWENTARYZACJA
+            </button>
+          </div>
+
+          {IS_DEV && (
+            <>
+              <div className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
+                Symulacja skanera (DEV) — dotknij kod
+              </div>
+              {DEMO_TILES.map((x) => (
+                <button
+                  key={x.ean}
+                  onClick={() => handleScan(x.ean)}
+                  className="flex items-center gap-3 rounded-lg border border-dashed border-[#C9C5BB] bg-card px-3 py-2 text-left transition-colors hover:border-amber"
+                >
+                  <Barcode className="h-[17px] w-[26px] text-ink-soft" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold tabular-nums tracking-wide">{x.ean}</div>
+                    <div className="truncate text-[11px] text-ink-mute">{x.name}</div>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
 
           {recent.length > 0 && (
             <>

@@ -10,6 +10,9 @@ import { MM } from "@/screens/MM";
 import { Queue } from "@/screens/Queue";
 import { PutawayDocuments } from "@/screens/putaway/Documents";
 import { PutawaySession } from "@/screens/putaway/Session";
+import { LocationView } from "@/screens/Location";
+import { Inventory } from "@/screens/Inventory";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { backTarget, go, goBack, useUi, type Screen as ScreenName } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +24,8 @@ const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
   queue: "Kolejka Sfery",
   putawayDocs: "Rozkładanie dostaw",
   putawaySession: "Sesja rozkładania",
+  location: "Zawartość lokalizacji",
+  inventory: "Inwentaryzacja",
 };
 
 function TopBar() {
@@ -99,6 +104,8 @@ function CurrentScreen() {
     case "queue": return <Queue />;
     case "putawayDocs": return <PutawayDocuments />;
     case "putawaySession": return <PutawaySession />;
+    case "location": return <LocationView />;
+    case "inventory": return <Inventory />;
     default: return null;
   }
 }
@@ -120,6 +127,7 @@ export default function App() {
           ) : (
             <>
               <TopBar />
+              <OfflineBanner />
               <main className="relative flex flex-1 flex-col overflow-hidden">
                 <CurrentScreen />
                 <SuccessOverlay />

@@ -1,8 +1,8 @@
-import { ArrowLeftRight, Zap, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, Zap, Trash2, X, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Cog } from "@/components/glyphs";
 import { cn } from "@/lib/utils";
-import { useProduct, useSetLocation } from "@/lib/hooks";
+import { useHistory, useProduct, useSetLocation } from "@/lib/hooks";
 import {
   flashSuccess,
   openMM,
@@ -18,6 +18,7 @@ export function Product() {
   const curId = useUi((s) => s.curId);
   const chipMenu = useUi((s) => s.chipMenu);
   const { data: p, isLoading } = useProduct(curId);
+  const { data: history } = useHistory(curId);
   const setLoc = useSetLocation(curId ?? 0);
 
   if (isLoading || !p) {
@@ -123,6 +124,24 @@ export function Product() {
           </div>
         )}
       </div>
+
+      {history && history.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
+            <History className="h-3.5 w-3.5" /> Historia
+          </div>
+          <div className="flex flex-col gap-1 rounded-lg border bg-card px-2.5 py-2">
+            {history.slice(0, 4).map((h, i) => (
+              <div key={i} className="flex items-baseline gap-2 text-[11.5px]">
+                <span className="flex-1 truncate text-ink-soft">{h.detail || h.type}</span>
+                <span className="flex-none text-ink-mute">
+                  {h.user} · {h.at.slice(5, 10)} {h.at.slice(11, 16)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-auto grid grid-cols-2 gap-2">
         <Button variant="outline" size="tall" className="font-cond text-[15px] tracking-wide" onClick={() => openScanLoc("loc")}>

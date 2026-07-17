@@ -4,6 +4,9 @@
   "version": "0.3.0",
   "description": "WERTIS — asystent magazyniera na kolektor (Subiekt GT). Monorepo: web (React/Vite/Tailwind/shadcn) + server (Fastify/SQLite/worker).",
   "workspaces": ["web", "server"],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -n api,worker,web -c green,magenta,blue \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:web\"",
     "dev:api": "npm -w server run dev",

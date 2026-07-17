@@ -78,4 +78,14 @@ export class MssqlSubiektAdapter implements SubiektAdapter {
   listMgpStockProducts(): RawPosition[] {
     throw new Error("not implemented");
   }
+  // -- słownik lokalizacji: SELECT DISTINCT tw_Lokalizacja FROM tw__Towar WHERE tw_Lokalizacja <> ''
+  //    (rozbić po spacji po stronie serwera)
+  listLocations(): string[] {
+    throw new Error("not implemented");
+  }
+  // -- reverse lookup: SELECT tw_Id, tw_Symbol, ... FROM tw__Towar
+  //    WHERE ' ' + tw_Lokalizacja + ' ' LIKE '% ' + @code + ' %'
+  getProductsByLocation(_code: string): ProductRow[] {
+    throw new Error("not implemented");
+  }
 }

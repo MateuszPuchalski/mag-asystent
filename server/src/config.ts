@@ -31,6 +31,18 @@ export const config = {
   /** Limit długości pola tw_Lokalizacja (spec §5.2, COL_LENGTH; [WERYFIKUJ]). */
   locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50),
 
+  /**
+   * Format kodu lokalizacji (regex). Domyślnie wzorzec regału „E08-03-01"
+   * (litera + 3 grupy po 2 cyfry) — 96% realnych kodów w mag.xlsx. Egzekwowany
+   * jako twardy błąd tylko przy `locStrict=1`; inaczej służy tylko do
+   * podpowiedzi. Walidacja bazowa (bez EAN, ze spacją, z literą) działa zawsze.
+   */
+  locFormat: process.env.LOC_FORMAT ?? "^[A-Z]\\d{2}-\\d{2}-\\d{2}$",
+  /** Twarde egzekwowanie `locFormat` (odrzuca kody spoza wzorca). */
+  locStrict: process.env.LOC_STRICT === "1",
+  /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
+  allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
+
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
     pollMs: num(process.env.WORKER_POLL_MS, 1200),

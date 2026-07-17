@@ -4,6 +4,7 @@ import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import { pendingMmByTw } from "./stock.js";
 import { logEvent } from "./events.js";
+import { validateLocationCode } from "./locations.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type { PutawayDocument, PutawayItemView } from "../types.js";
 
@@ -116,8 +117,9 @@ export function getSession(sessionId: number) {
 
   const rows = db()
     .prepare(
-      `SELECT i.*, t.symbol AS sym, t.nazwa AS name
+      `SELECT i.*, t.symbol AS sym, t.nazwa AS name, COALESCE(s.stan,0) AS mgp_stan
        FROM putaway_items i JOIN sgt_towar t ON t.tw_id = i.tw_id
+       LEFT JOIN sgt_stan s ON s.tw_id = i.tw_id AND s.mag_id = ${config.magId.MGP}
        WHERE i.session_id = ?`
     )
     .all(sessionId) as Array<any>;
@@ -132,6 +134,7 @@ export function getSession(sessionId: number) {
       qtyExpected: r.qty_expected,
       qtyDone: r.qty_done,
       delta: r.qty_expected - r.qty_done,
+      mgpStan: r.mgp_stan,
       status: r.status,
       skipReason: r.skip_reason,
       lockedBy: freshLock(r.locked_by, r.locked_at),
@@ -255,7 +258,8 @@ export function confirmItem(
 ) {
   const item = db().prepare("SELECT * FROM putaway_items WHERE id=?").get(itemId) as any;
   if (!item) return { error: "Brak pozycji" };
-  if (/\s/.test(location)) return { error: "Kod lokalizacji nie może zawierać spacji" };
+  const locErr = validateLocationCode(location);
+  if (locErr) return { error: locErr };
   if (!Number.isFinite(qty) || qty <= 0) return { error: "Ilość musi być większa od zera" };
   const avail = availableMgp(item.tw_id);
   if (qty > avail) return { error: `Na MGP dostępne tylko ${avail} szt`, status: 409 };

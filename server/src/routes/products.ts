@@ -3,7 +3,8 @@ import { subiekt, userOf } from "../context.js";
 import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
 import { enqueueSetLocation } from "../services/queue.js";
-import { logEvent } from "../services/events.js";
+import { logEvent, productHistory } from "../services/events.js";
+import { validateLocationCode } from "../services/locations.js";
 
 type LocAction = "replace" | "add" | "remove" | "replace_one";
 
@@ -11,13 +12,6 @@ interface LocBody {
   action: LocAction;
   value?: string;
   replaced?: string;
-}
-
-/** Walidacja kodu lokalizacji: bez spacji (spec §4, §12). */
-function validCode(code: string): string | null {
-  if (!code) return "Pusty kod lokalizacji";
-  if (/\s/.test(code)) return "Kod lokalizacji nie może zawierać spacji";
-  return null;
 }
 
 function computeNewLocs(current: string[], body: LocBody): string[] {
@@ -68,6 +62,11 @@ export async function productRoutes(app: FastifyInstance) {
     return card;
   });
 
+  // historia ruchów lokalizacji/MM towaru (analiza — „kto/kiedy")
+  app.get<{ Params: { twId: string } }>("/api/products/:twId/history", async (req) => {
+    return { entries: productHistory(Number(req.params.twId)) };
+  });
+
   // zmiana lokalizacji → zadanie set_location (spec §5.2)
   app.post<{ Params: { twId: string }; Body: LocBody }>(
     "/api/products/:twId/location",
@@ -78,7 +77,7 @@ export async function productRoutes(app: FastifyInstance) {
 
       const body = req.body;
       if (body.action !== "remove") {
-        const err = validCode((body.value ?? "").trim().toUpperCase());
+        const err = validateLocationCode(body.value ?? "");
         if (err) return reply.code(400).send({ error: err });
       }
       const current = p.lokalizacja ? p.lokalizacja.split(" ").filter(Boolean) : [];
