@@ -37,9 +37,9 @@ export default defineConfig({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/api/],
-        // WASM ONNX Runtime (ASR) jest za duży na precache — ładowany leniwie
-        // tylko przy włączonych komendach głosowych i cache'owany w runtime
-        globIgnores: ["**/ort-*.wasm"],
+        // WASM ONNX Runtime i wagi modeli (ASR) są za duże na precache —
+        // ładowane leniwie przy włączonych komendach i cache'owane w runtime
+        globIgnores: ["**/ort-*.wasm", "**/models/**"],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
@@ -50,6 +50,11 @@ export default defineConfig({
             urlPattern: ({ url }) => url.pathname.endsWith(".wasm"),
             handler: "CacheFirst",
             options: { cacheName: "wertis-wasm" },
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.includes("/models/"),
+            handler: "CacheFirst",
+            options: { cacheName: "wertis-models" },
           },
         ],
       },

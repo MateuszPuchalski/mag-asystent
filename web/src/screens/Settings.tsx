@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { useSettings, setSetting, type Settings as SettingsModel } from "@/lib/settings";
 import { speak, spellLoc, voiceAvailable } from "@/lib/voice";
 import { wakeLockAvailable } from "@/lib/wakelock";
-import { micAvailable, useAsrStatus } from "@/lib/asr";
+import { getAsrError, micAvailable, retryAsr, useAsrProgress, useAsrStatus } from "@/lib/asr";
 import { cameraScanAvailable } from "@/components/CameraScan";
 import { Button } from "@/components/ui/button";
 
@@ -102,6 +102,7 @@ function Toggle({ on, disabled, onClick }: { on: boolean; disabled: boolean; onC
 export function Settings() {
   const s = useSettings();
   const asr = useAsrStatus();
+  const asrProgress = useAsrProgress();
 
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-2 overflow-y-auto p-3">
@@ -122,8 +123,23 @@ export function Settings() {
             </div>
             {r.key === "voiceCommands" && s.voiceCommands && asr !== "off" && (
               <div className="mt-0.5 text-[10px] font-semibold text-amber-ink">
-                {asr === "loading" ? "pobieranie modelu…" : asr === "unavailable" ? "model niedostępny — sprawdź sieć" : "model gotowy"}
+                {asr === "loading" && (asrProgress > 0 ? `pobieranie modelu… ${asrProgress}%` : "ładowanie modelu…")}
+                {asr === "unavailable" && (
+                  <span className="text-destructive">
+                    model niedostępny — wgraj wagi na serwer (DEPLOY.md) lub sprawdź sieć
+                    {getAsrError() && <span className="font-normal"> · {getAsrError().slice(0, 90)}</span>}
+                  </span>
+                )}
+                {(asr === "ready" || asr === "recording" || asr === "busy") && "model gotowy"}
               </div>
+            )}
+            {r.key === "voiceCommands" && s.voiceCommands && asr === "unavailable" && (
+              <button
+                onClick={retryAsr}
+                className="mt-1 rounded-md border border-amber px-2 py-0.5 font-cond text-[11px] font-bold tracking-wide text-amber-ink"
+              >
+                PONÓW PRÓBĘ
+              </button>
             )}
           </div>
           <Toggle on={r.available && s[r.key]} disabled={!r.available} onClick={() => setSetting(r.key, !s[r.key])} />

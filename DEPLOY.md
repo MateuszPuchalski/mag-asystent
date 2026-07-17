@@ -130,6 +130,27 @@ certyfikat CA). Od tej pory kolektory używają `https://mag.wertis.local`.
   tego oczekuje; nic nie trzeba konfigurować w samej appce.
 - WiFi: kolektory i serwer w tym samym VLAN/podsieci.
 
+### 6a. Komendy głosowe — wagi modelu ASR (offline)
+
+Rozpoznawanie mowy działa w całości na kolektorze (Whisper, ONNX ~40 MB).
+Magazyn nie ma internetu, więc wagi trzeba wgrać na serwer WERTIS:
+
+```bash
+# na dowolnej maszynie Z INTERNETEM (w repo):
+node tools/fetch-asr-model.mjs            # domyślnie onnx-community/whisper-tiny
+# lepsza jakość PL (większy, ~80 MB):
+node tools/fetch-asr-model.mjs onnx-community/whisper-base
+```
+
+Powstaje katalog `web/public/models/<id-modelu>/…` — skopiuj go na serwer
+przed `npm run build` (trafi do `web/dist/models/`) albo bezpośrednio do
+`web/dist/models/` na działającej instalacji. Aplikacja ładuje wagi najpierw
+z własnego serwera (`models/…`), a huggingface.co jest tylko fallbackiem.
+Po pierwszym załadowaniu przeglądarka trzyma wagi w cache (offline).
+Przy zmianie modelu ustaw `VITE_ASR_MODEL=<id>` podczas builda frontu.
+W Ustawieniach kolektora wiersz „Komendy głosowe" pokazuje postęp pobierania,
+a przy błędzie — przyczynę i przycisk PONÓW PRÓBĘ.
+
 ## 7. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
 **Etap 0 — pilot (tryb `seeded`, bez dotykania SGT):**
