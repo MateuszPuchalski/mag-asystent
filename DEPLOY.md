@@ -132,7 +132,9 @@ certyfikat CA). Od tej pory kolektory używają `https://mag.wertis.local`.
 
 ### 6a. Komendy głosowe — wagi modelu ASR (offline)
 
-Rozpoznawanie mowy działa w całości na kolektorze (Whisper, ONNX ~40 MB).
+Rozpoznawanie mowy działa w całości na kolektorze (Whisper ONNX; enkoder fp32
++ dekoder q8, razem ~60 MB — enkoder musi być fp32, bo kwantyzowany nie działa
+w ONNX Runtime Web).
 Magazyn nie ma internetu, więc wagi trzeba wgrać na serwer WERTIS:
 
 ```bash

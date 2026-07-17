@@ -58,7 +58,10 @@ export function ensureAsr(): void {
       env.localModelPath = "models/";
       env.allowRemoteModels = true; // fallback: HF (dev z internetem)
       const pipe: any = await pipeline("automatic-speech-recognition", ASR_MODEL, {
-        dtype: "q8",
+        // enkoder Whispera jest wrażliwy na kwantyzację — kwantyzowany (q8)
+        // wywala ORT-web (qdq_actions.cc TransposeDQWeight). Enkoder fp32,
+        // dekoder q8 to kombinacja zalecana dla WASM (docs transformers.js).
+        dtype: { encoder_model: "fp32", decoder_model_merged: "q8" },
         progress_callback: (p: { status?: string; loaded?: number; total?: number }) => {
           if (p.status === "progress" && p.total) {
             progress = Math.round((100 * (p.loaded ?? 0)) / p.total);
