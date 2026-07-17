@@ -11,7 +11,6 @@ export const keys = {
   locationProducts: (code: string) => ["location", code] as const,
   putawayDocs: ["putaway", "documents"] as const,
   session: (id: number) => ["putaway", "session", id] as const,
-  invSession: (id: number) => ["inventory", "session", id] as const,
 };
 
 /* ── odczyt ──────────────────────────────────────────────────────────── */
@@ -60,13 +59,6 @@ export function useLocationProducts(code: string | null) {
     enabled: !!code,
   });
 }
-export function useInventorySession(id: number | null) {
-  return useQuery({
-    queryKey: keys.invSession(id ?? 0),
-    queryFn: () => api.invSession(id!),
-    enabled: id != null,
-  });
-}
 export function usePutawayDocuments() {
   return useQuery({ queryKey: keys.putawayDocs, queryFn: () => api.putawayDocuments().then((r) => r.documents) });
 }
@@ -87,7 +79,6 @@ export function useInvalidate() {
     queue: () => qc.invalidateQueries({ queryKey: keys.queue }),
     docs: () => qc.invalidateQueries({ queryKey: keys.putawayDocs }),
     session: (id: number) => qc.invalidateQueries({ queryKey: keys.session(id) }),
-    invSession: (id: number) => qc.invalidateQueries({ queryKey: keys.invSession(id) }),
   };
 }
 

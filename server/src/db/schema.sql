@@ -57,26 +57,6 @@ CREATE TABLE IF NOT EXISTS putaway_items (
 );
 CREATE INDEX IF NOT EXISTS ix_items_session ON putaway_items(session_id);
 
--- ── Inwentaryzacja / kontrola lokalizacji (analiza) ───────────────────────
-CREATE TABLE IF NOT EXISTS inventory_sessions (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  status     TEXT NOT NULL DEFAULT 'open',   -- open | closed
-  created_by TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  closed_at  TEXT
-);
-
-CREATE TABLE IF NOT EXISTS inventory_items (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id INTEGER NOT NULL REFERENCES inventory_sessions(id),
-  location   TEXT NOT NULL,                  -- skanowana lokalizacja
-  tw_id      INTEGER NOT NULL,
-  expected   INTEGER NOT NULL DEFAULT 1,     -- 1 = wg kartoteki tu być powinno; 0 = nadmiar
-  counted    INTEGER,                        -- NULL = niesprawdzone; 1 = obecny; 0 = brak
-  note       TEXT
-);
-CREATE INDEX IF NOT EXISTS ix_inv_session ON inventory_items(session_id);
-
 -- ── Log zdarzeń (audyt — spec §7, §12) ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS events (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,

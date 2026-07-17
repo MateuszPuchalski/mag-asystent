@@ -13,8 +13,7 @@ export type Screen =
   | "queue"
   | "putawayDocs"
   | "putawaySession"
-  | "location"
-  | "inventory";
+  | "location";
 export type LocMode = "loc" | "combo";
 
 export interface RecentEntry {
@@ -31,7 +30,6 @@ interface UiState {
   manualOpen: boolean;
   recent: RecentEntry[];
   sessionId: number | null;
-  invSessionId: number | null;
   locCode: string | null; // podgląd zawartości lokalizacji
   queueReturn: Screen | null; // ekran, z którego otwarto kolejkę (powrót)
   toast: string | null;
@@ -48,7 +46,6 @@ let state: UiState = {
   manualOpen: false,
   recent: initialRecent,
   sessionId: null,
-  invSessionId: null,
   locCode: null,
   queueReturn: null,
   toast: null,
@@ -82,7 +79,6 @@ const BACK: Partial<Record<Screen, Screen>> = {
   mm: "product",
   putawaySession: "putawayDocs",
   location: "home",
-  inventory: "home",
 };
 export const backTarget = (s: Screen): Screen | undefined =>
   s === "queue" ? state.queueReturn ?? "home" : BACK[s];
@@ -118,9 +114,6 @@ export function openSession(sessionId: number) {
 }
 export function openLocation(code: string) {
   set({ screen: "location", locCode: code.trim().toUpperCase(), chipMenu: null });
-}
-export function openInventory(sessionId: number) {
-  set({ screen: "inventory", invSessionId: sessionId });
 }
 export function setChipMenu(code: string | null) {
   set({ chipMenu: state.chipMenu === code ? null : code });

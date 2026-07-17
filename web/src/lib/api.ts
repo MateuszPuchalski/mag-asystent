@@ -48,24 +48,6 @@ export interface LocationsInfo {
   allowManual: boolean;
 }
 
-export interface InventoryItem {
-  id: number;
-  location: string;
-  twId: number;
-  sym: string;
-  name: string;
-  expected: boolean;
-  counted: boolean | null;
-  note: string | null;
-}
-export interface InventorySession {
-  id: number;
-  status: string;
-  createdBy: string;
-  items: InventoryItem[];
-  summary: { total: number; ok: number; missing: number; extra: number; unchecked: number };
-}
-
 export interface QueueItem {
   id: number;
   type: "set_location" | "mm" | "combo";
@@ -181,25 +163,6 @@ export const api = {
   queue: () => req<QueueResponse>(`/api/queue`),
   retry: (id: number) => req<{ ok: true }>(`/api/queue/${id}/retry`, { method: "POST" }),
   cancel: (id: number) => req<{ ok: true }>(`/api/queue/${id}/cancel`, { method: "POST" }),
-
-  invCreate: () => req<{ sessionId: number }>(`/api/inventory/sessions`, { method: "POST" }),
-  invSession: (id: number) => req<InventorySession>(`/api/inventory/sessions/${id}`),
-  invScan: (id: number, location: string) =>
-    req<{ location: string; expected: number }>(`/api/inventory/sessions/${id}/scan`, {
-      method: "POST",
-      body: JSON.stringify({ location }),
-    }),
-  invMark: (id: number, body: { itemId: number; present: boolean; note?: string }) =>
-    req<{ ok: true }>(`/api/inventory/sessions/${id}/mark`, { method: "POST", body: JSON.stringify(body) }),
-  invExtra: (id: number, body: { location: string; twId: number }) =>
-    req<{ itemId: number; sym: string; name: string }>(`/api/inventory/sessions/${id}/extra`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  invClose: (id: number) =>
-    req<{ status: string; summary: Record<string, number> }>(`/api/inventory/sessions/${id}/close`, {
-      method: "POST",
-    }),
 
   putawayDocuments: () => req<{ documents: PutawayDocument[] }>(`/api/putaway/documents`),
   createSession: (body: { docId?: number; mode?: "all_mgp" }) =>
