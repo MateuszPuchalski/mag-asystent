@@ -9,6 +9,7 @@ import { mmRoutes } from "./routes/mm.js";
 import { queueRoutes } from "./routes/queue.js";
 import { putawayRoutes } from "./routes/putaway.js";
 import { locationRoutes } from "./routes/locations.js";
+import { deviceRoutes } from "./routes/device.js";
 
 async function main() {
   db(); // migracja schematu przy starcie
@@ -22,6 +23,7 @@ async function main() {
   await app.register(queueRoutes);
   await app.register(putawayRoutes);
   await app.register(locationRoutes);
+  await app.register(deviceRoutes);
 
   // serwowanie zbudowanego frontendu (prod)
   if (fs.existsSync(config.webDist)) {

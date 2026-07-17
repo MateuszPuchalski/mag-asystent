@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { ChevronLeft, PackageOpen } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, PackageOpen, Camera, Settings as SettingsIcon } from "lucide-react";
 import { Barcode } from "@/components/glyphs";
 import { SferaStatus } from "@/components/SferaStatus";
 import { SuccessOverlay, Toast, UndoBar } from "@/components/Overlays";
@@ -12,12 +12,19 @@ import { Queue } from "@/screens/Queue";
 import { PutawayDocuments } from "@/screens/putaway/Documents";
 import { PutawaySession } from "@/screens/putaway/Session";
 import { LocationView } from "@/screens/Location";
+import { Settings } from "@/screens/Settings";
 import { OfflineBanner } from "@/components/OfflineBanner";
-import { backTarget, go, goBack, openLocation, openProduct, toast, useUi, type Screen as ScreenName } from "@/lib/store";
+import { CameraScan, cameraScanAvailable } from "@/components/CameraScan";
+import { backTarget, go, goBack, openLocation, openProduct, openSettings, toast, useUi, type Screen as ScreenName } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { beep } from "@/lib/feedback";
 import { installScanListener, setFallbackScanHandler } from "@/lib/scanner";
+import { installWakeLock } from "@/lib/wakelock";
+import { installMotion } from "@/lib/motion";
+import { flush } from "@/lib/offline";
+import { speak, spellLoc } from "@/lib/voice";
+import { getSettings, useSettings } from "@/lib/settings";
 
 const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
   home: "Magazyn",
@@ -28,16 +35,18 @@ const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
   putawayDocs: "Rozkładanie dostaw",
   putawaySession: "Sesja rozkładania",
   location: "Zawartość lokalizacji",
+  settings: "Ustawienia",
 };
 
-function TopBar() {
+function TopBar({ onCamera }: { onCamera: () => void }) {
   const screen = useUi((s) => s.screen);
+  const settings = useSettings();
   if (screen === "splash") return null;
   const hasBack = !!backTarget(screen);
   const title = TITLE[screen as Exclude<ScreenName, "splash">];
 
   return (
-    <header className="flex h-[46px] flex-none items-center gap-2 border-b bg-card px-3">
+    <header className="flex h-[46px] flex-none items-center gap-1.5 border-b bg-card px-3">
       {hasBack ? (
         <button onClick={goBack} className="-ml-1.5 grid h-8 w-8 place-items-center rounded-lg hover:bg-secondary">
           <ChevronLeft className="h-5 w-5" />
@@ -48,6 +57,14 @@ function TopBar() {
       <div className={cn("flex-1 truncate font-cond text-[17px] font-bold uppercase tracking-wide", hasBack && "text-center")}>
         {title}
       </div>
+      {cameraScanAvailable && settings.cameraScan && (
+        <button onClick={onCamera} className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-secondary" title="Skaner awaryjny (aparat)">
+          <Camera className="h-[18px] w-[18px]" />
+        </button>
+      )}
+      <button onClick={openSettings} className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-secondary" title="Ustawienia">
+        <SettingsIcon className="h-[18px] w-[18px]" />
+      </button>
       <SferaStatus />
     </header>
   );
@@ -105,17 +122,51 @@ function CurrentScreen() {
     case "putawayDocs": return <PutawayDocuments />;
     case "putawaySession": return <PutawaySession />;
     case "location": return <LocationView />;
+    case "settings": return <Settings />;
     default: return null;
   }
 }
 
+/** Asystent hot-swap: przy niskiej baterii dosłanie bufora + podpowiedź wymiany. */
+function installBatteryAssist() {
+  const nav = navigator as Navigator & {
+    getBattery?: () => Promise<{
+      level: number;
+      charging: boolean;
+      addEventListener(type: string, cb: () => void): void;
+    }>;
+  };
+  if (!nav.getBattery) return;
+  let warned = false;
+  void nav.getBattery().then((b) => {
+    const check = () => {
+      if (!getSettings().batteryAssist) return;
+      if (b.level < 0.15 && !b.charging && !warned) {
+        warned = true;
+        void flush();
+        toast("Niski poziom baterii — wymień na zapasową (hot-swap). Bufor wysłany.");
+        speak("Niski poziom baterii. Wymień na zapasową.");
+        void api.deviceEvent({ type: "battery_low", level: Math.round(b.level * 100) }).catch(() => {});
+      }
+      if (b.level > 0.3) warned = false;
+    };
+    b.addEventListener("levelchange", check);
+    b.addEventListener("chargingchange", check);
+    check();
+  });
+}
+
 export default function App() {
   const isSplash = useUi((s) => s.screen === "splash");
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   // Globalny router skanów: gdy żaden ekran nie obsłuży skanu — EAN otwiera
   // kartę towaru, etykieta regału otwiera podgląd zawartości lokalizacji.
   useEffect(() => {
     installScanListener();
+    installWakeLock();
+    installMotion();
+    installBatteryAssist();
     setFallbackScanHandler((scan) => {
       if (scan.kind === "loc") {
         beep(true);
@@ -128,6 +179,12 @@ export default function App() {
           if (r.type === "product") {
             beep(true);
             openProduct(r.card.id, { sym: r.card.sym, loc: r.card.locs[0] || "brak lokalizacji" });
+            // hands-free: magazynier słyszy dokąd iść, bez patrzenia w ekran
+            speak(
+              r.card.locs[0]
+                ? `${r.card.sym}. Lokalizacja: ${spellLoc(r.card.locs[0])}`
+                : `${r.card.sym}. Brak lokalizacji`
+            );
           } else {
             beep(false);
             toast("Nieznany kod: " + scan.code);
@@ -151,7 +208,7 @@ export default function App() {
             <Splash />
           ) : (
             <>
-              <TopBar />
+              <TopBar onCamera={() => setCameraOpen(true)} />
               <OfflineBanner />
               <main className="relative flex flex-1 flex-col overflow-hidden">
                 <CurrentScreen />
@@ -160,6 +217,7 @@ export default function App() {
                 <UndoBar />
               </main>
               <TabBar />
+              <CameraScan open={cameraOpen} onClose={() => setCameraOpen(false)} />
             </>
           )}
         </div>

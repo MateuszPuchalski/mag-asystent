@@ -15,6 +15,7 @@ import {
   useUi,
 } from "@/lib/store";
 import { isKnownLoc, validateLoc } from "@/lib/locval";
+import { speak, spellLoc } from "@/lib/voice";
 import { classify, dispatchScan, useScanHandler } from "@/lib/scanner";
 import { LocChoiceDrawer, type LocChoice } from "@/components/LocChoiceDrawer";
 import type { RunResult } from "@/lib/offline";
@@ -39,6 +40,7 @@ export function Product() {
       onSuccess: (res: RunResult) => {
         beep(true);
         setPending(null);
+        speak(`Zapisano, ${spellLoc(choice.value)}`);
         showUndo({
           msg: res.offline ? `Zapisano lokalnie · ${choice.value}` : `${successMsg} · ${choice.value}`,
           queueId: res.queueId,
@@ -58,6 +60,7 @@ export function Product() {
     if (err) {
       toast(err);
       beep(false);
+      speak(err);
       return true;
     }
     if (p.locs.includes(scan.code)) {

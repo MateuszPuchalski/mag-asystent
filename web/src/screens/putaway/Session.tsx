@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { api, type PutawayItem } from "@/lib/api";
 import { useSession, useInvalidate } from "@/lib/hooks";
 import { flashSuccess, go, toast, useUi } from "@/lib/store";
+import { getSettings } from "@/lib/settings";
+import { speak, spellLoc } from "@/lib/voice";
 
 const DEMO_LOCS = ["A05-01-01", "B11-02-01", "E08-03-01", "PALETA48"];
 const IS_DEV = import.meta.env.DEV;
@@ -14,6 +16,8 @@ export function PutawaySession() {
   const sessionId = useUi((s) => s.sessionId);
   const { data: sess, isLoading } = useSession(sessionId);
   const inv = useInvalidate();
+  // tryb marszu: po zatwierdzeniu wózka wielka karta z następnym celem trasy
+  const [walkTarget, setWalkTarget] = useState<{ loc: string; sym: string; qty: number } | null>(null);
 
   if (isLoading || !sess) {
     return (
@@ -47,6 +51,12 @@ export function PutawaySession() {
       inv.queue();
       refresh();
       flashSuccess(`Wózek zatwierdzony (${r.committed})`);
+      // następny cel = pierwsza nierozpoczęta pozycja wg trasy (lista już posortowana)
+      const next = sess!.items.find((i) => i.status === "pending" && i.targetLoc);
+      if (next && getSettings().walkMode) {
+        setWalkTarget({ loc: next.targetLoc!, sym: next.sym, qty: next.delta || next.qtyExpected });
+        speak(`Następne: ${spellLoc(next.targetLoc!)}. ${next.sym}`);
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Nie udało się zatwierdzić");
     }
@@ -65,6 +75,26 @@ export function PutawaySession() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Tryb marszu: wielka karta celu — czytelna w ruchu, znika po dotknięciu */}
+      {walkTarget && (
+        <button
+          onClick={() => setWalkTarget(null)}
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-background/97 p-6"
+        >
+          <div className="text-[12px] font-bold uppercase tracking-[0.18em] text-ink-mute">Następne</div>
+          <div className="flex items-center gap-2 text-amber-ink">
+            <MapPin className="h-8 w-8" />
+            <span className="font-cond text-[52px] font-extrabold leading-none tracking-[0.04em]">
+              {walkTarget.loc}
+            </span>
+          </div>
+          <div className="text-center">
+            <div className="font-cond text-xl font-bold">{walkTarget.sym}</div>
+            <div className="text-sm text-ink-soft">{walkTarget.qty} szt</div>
+          </div>
+          <div className="mt-2 text-[11px] text-ink-mute">dotknij, aby wrócić do listy</div>
+        </button>
+      )}
       <div className="flex-none border-b bg-card px-3 py-2">
         <div className="flex items-center justify-between">
           <div className="font-cond text-[15px] font-bold tracking-wide">
