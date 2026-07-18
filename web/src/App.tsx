@@ -103,7 +103,7 @@ function TabBar() {
   const onScan = !onPutaway && screen !== "queue";
 
   return (
-    <nav className="grid h-[54px] flex-none grid-cols-2 border-t bg-card">
+    <nav className="grid min-h-[54px] flex-none grid-cols-2 border-t bg-card pb-[env(safe-area-inset-bottom)]">
       <Tab active={onScan} onClick={() => go("home")} label="SKAN">
         <Barcode className={cn("h-3.5 w-[22px]", onScan ? "text-ink" : "text-ink-mute")} />
       </Tab>
@@ -206,14 +206,14 @@ export default function App() {
   }, []);
 
   return (
-    <div id="stage" className="grid min-h-screen place-items-center p-9 max-[480px]:p-0 max-[760px]:p-0">
+    <div id="stage" className="grid min-h-dvh place-items-center p-9 max-[480px]:p-0 max-[760px]:p-0">
       <div id="device" className="relative rounded-[30px] bg-[#2A2A2C] px-3.5 pb-5 pt-4 shadow-2xl max-[760px]:rounded-none max-[760px]:p-0">
         <div className="pointer-events-none absolute left-[-5px] top-[170px] h-[74px] w-[7px] rounded bg-amber max-[760px]:hidden" />
         <div className="pointer-events-none absolute right-[-5px] top-[170px] h-[74px] w-[7px] rounded bg-amber max-[760px]:hidden" />
         <div className="flex justify-center pb-2.5 max-[760px]:hidden">
           <div className="h-[5px] w-[54px] rounded bg-[#48484B]" />
         </div>
-        <div className="relative flex h-[648px] w-[376px] flex-col overflow-hidden rounded-[10px] bg-background max-[480px]:h-screen max-[480px]:w-screen max-[760px]:h-screen max-[760px]:w-screen max-[760px]:rounded-none">
+        <div className="relative flex h-[648px] w-[376px] flex-col overflow-hidden rounded-[10px] bg-background max-[480px]:h-dvh max-[480px]:w-screen max-[760px]:h-dvh max-[760px]:w-screen max-[760px]:rounded-none">
           {isSplash ? (
             <Splash />
           ) : (
