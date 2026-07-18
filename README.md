@@ -3,13 +3,13 @@
 Aplikacja PWA na kolektor (Honeywell / Android, skaner emulujący klawiaturę)
 dla magazynu części ogrodniczych pracującego na **Subiekcie GT**. Implementacja
 zgodna ze specyfikacją (`SPEC magazyn kolektor`) i projektem UI
-`Kolektor_WERTIS`, z **prawdziwymi danymi** (3423 kartoteki z eksportu
-`mag.xlsx`).
+`Kolektor_WERTIS`, z **prawdziwymi danymi** (3415 kartotek z eksportu
+`magmat.xlsx`).
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta/Sfery jest za adapterami: w tym
-środowisku (Linux, bez Subiekta) zasilana z `mag.xlsx`, a adaptery produkcyjne
-(MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
+środowisku (Linux, bez Subiekta) zasilana z eksportu `magmat.xlsx`, a adaptery
+produkcyjne (MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
 
 ## Stack
 
@@ -107,10 +107,10 @@ web/                       frontend (React/Vite/Tailwind/shadcn)
   src/lib/store.ts         stan UI (nawigacja, feedback)
   src/screens/             Home, Product, ScanLoc, MM, Queue
   src/screens/putaway/     Documents, Session (wózek)
-  public/data/products.json  3423 kartoteki z mag.xlsx
+  public/data/products.json  3415 kartotek z magmat.xlsx
 server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
-  src/db/seed.ts           seed z products.json + syntetyczne FZ/PZ
+  src/db/seed.ts           seed z products.json + dokumenty FZ/PZ per dostawca
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+com (prod, szkielet)
   src/services/            stock (korekta o kolejkę), putaway, queue, events
   src/routes/              products, mm, queue, putaway (§8)
@@ -120,12 +120,15 @@ tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 
 ## Dane testowe
 
-`web/public/data/products.json` z `mag.xlsx` (`tools/convert_xlsx.py`). Eksport
-ma jeden stan łączny, więc konwersja deterministycznie (hash symbolu) rozdziela:
-~55% towarów z `Zamówione > 0` dostaje stan na MGP (dostawa do rozłożenia),
-~40% — rezerwacje. Seed syntetyzuje 4 dokumenty FZ/PZ (jeden w buforze — test
-`waiting_for_doc`), bo w eksporcie nie ma kontrahentów. W produkcji stany i
-dokumenty pochodzą z `tw_Stan` / `dok__Dokument` przez adapter MSSQL.
+`web/public/data/products.json` z eksportu `magmat.xlsx` (`tools/convert_xlsx.py`,
+rozpoznaje kolumny po nazwie). Eksport zawiera **prawdziwe** kolumny `Stan`
+(MAG), `Rezerwacja`, `MGP` (strefa przyjęć) i `Dostawca`, więc konwerter bierze
+je wprost — bez syntetyki (dla starszego, płaskiego eksportu bez tych kolumn
+konwerter nadal rozdziela stany deterministycznie hashem). 94 towary mają stan
+na MGP. Seed buduje z nich dokumenty FZ/PZ **pogrupowane po realnym dostawcy**
+(duże paczki dzielone po ≤20 pozycji, jeden dokument w buforze — test
+`waiting_for_doc`). W produkcji stany i dokumenty pochodzą z `tw_Stan` /
+`dok__Dokument` przez adapter MSSQL (patrz [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md)).
 
 ## Praca z prawdziwym Subiektem GT
 

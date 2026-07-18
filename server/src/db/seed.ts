@@ -4,22 +4,23 @@ import { config } from "../config.js";
 
 /**
  * Zasila read-model sgt_* prawdziwymi danymi z web/public/data/products.json
- * (eksport mag.xlsx: [symbol,nazwa,ean,mag,rez,mgp,unit,ordered,lokalizacja,opis]).
+ * (eksport magmat.xlsx:
+ *  [symbol,nazwa,ean,mag,rez,mgp,unit,ordered,lokalizacja,opis,dostawca]).
  *
- * Dodatkowo syntetyzuje dokumenty FZ/PZ na magazyn MGP (w mag.xlsx nie ma
- * kontrahentów), aby moduł rozkładania miał realną zawartość: pozycjami są
- * towary z bieżącym stanem na MGP (te fizycznie czekają na rozłożenie), plus
- * kilka pozycji spoza tej puli (nowe SKU bez lokalizacji → ścieżka BRAK LOK).
+ * Dodatkowo syntetyzuje dokumenty FZ/PZ na magazyn MGP (eksport to płaski
+ * stan, bez dokumentów przyjęć), aby moduł rozkładania miał realną zawartość:
+ * pozycjami są towary z bieżącym stanem na MGP (fizycznie czekają na
+ * rozłożenie), POGRUPOWANE po prawdziwym dostawcy z eksportu — jeden dostawca
+ * = jeden dokument dostawy. Dodatkowo kilka pozycji bez lokalizacji trafia do
+ * dokumentów (ścieżka BRAK LOK).
  */
 
-type Row = [string, string, string, number, number, number, string, number, string, string];
-
-const DOSTAWCY = [
-  "AGRO-TECH Sp. z o.o.",
-  "GardenParts Distribution",
-  "Falon-Tech S.A.",
-  "Import Ogród Wrocław",
+type Row = [
+  string, string, string, number, number, number,
+  string, number, string, string, string,
 ];
+
+const DOSTAWCA_FALLBACK = "Dostawca nieznany";
 
 function seed() {
   const d = db();
@@ -50,20 +51,20 @@ function seed() {
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
   );
 
-  const mgpProducts: Array<{ tw_id: number; mgp: number }> = [];
+  const mgpProducts: Array<{ tw_id: number; mgp: number; dostawca: string }> = [];
   const noLocProducts: number[] = [];
 
   const insertAll = d.transaction((data: Row[]) => {
     data.forEach((r, i) => {
       const tw_id = i + 1;
-      const [symbol, nazwa, ean, mag, rez, mgp, unit, ordered, lokalizacja, opis] = r;
+      const [symbol, nazwa, ean, mag, rez, mgp, unit, ordered, lokalizacja, opis, dostawca] = r;
       insTowar.run({
         tw_id, symbol, nazwa, ean: ean || "", unit: unit || "szt.",
         ordered: ordered || 0, opis: opis || "", lokalizacja: lokalizacja || "",
       });
       insStan.run(tw_id, config.magId.MAG, mag || 0, rez || 0);
       insStan.run(tw_id, config.magId.MGP, mgp || 0, 0);
-      if (mgp > 0) mgpProducts.push({ tw_id, mgp });
+      if (mgp > 0) mgpProducts.push({ tw_id, mgp, dostawca: dostawca || DOSTAWCA_FALLBACK });
       else if (!lokalizacja) noLocProducts.push(tw_id);
     });
   });
@@ -77,29 +78,43 @@ function seed() {
   );
   const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
 
-  const DOC_COUNT = 4;
-  const perDoc = Math.ceil(mgpProducts.length / DOC_COUNT);
+  // grupowanie towarów z MGP po prawdziwym dostawcy; duże grupy (np. własne
+  // przyjęcia WERTIS) dzielimy na kilka mniejszych, dających się rozłożyć
+  // dokumentów — jak realne, rozłożone w czasie dostawy (spec §5.4).
+  const MAX_POZ = 20; // maks. pozycji na dokument
+  const byDostawca = new Map<string, Array<{ tw_id: number; mgp: number }>>();
+  for (const p of mgpProducts) {
+    const g = byDostawca.get(p.dostawca) ?? [];
+    g.push({ tw_id: p.tw_id, mgp: p.mgp });
+    byDostawca.set(p.dostawca, g);
+  }
+  // paczki (dostawca, pozycje) — deterministycznie: dostawcy alfabetycznie
+  const paczki: Array<{ dostawca: string; items: Array<{ tw_id: number; mgp: number }> }> = [];
+  for (const dostawca of [...byDostawca.keys()].sort()) {
+    const items = byDostawca.get(dostawca)!;
+    for (let i = 0; i < items.length; i += MAX_POZ) {
+      paczki.push({ dostawca, items: items.slice(i, i + MAX_POZ) });
+    }
+  }
   const baseDate = new Date("2026-07-16T00:00:00Z");
 
   const buildDocs = d.transaction(() => {
-    for (let k = 0; k < DOC_COUNT; k++) {
+    paczki.forEach((paczka, k) => {
       const dok_id = k + 1;
       const typ = k % 2 === 0 ? "FZ" : "PZ";
       const nr = `${typ} ${120 + k}/07/2026`;
-      const date = new Date(baseDate.getTime() - (k * 3 + 1) * 86400_000)
-        .toISOString()
-        .slice(0, 10);
-      const wBuforze = k === DOC_COUNT - 1 ? 1 : 0; // ostatni w buforze → test waiting_for_doc
-      insDok.run(dok_id, typ, nr, date, config.magId.MGP, DOSTAWCY[k % DOSTAWCY.length], wBuforze);
+      const date = new Date(baseDate.getTime() - k * 86400_000).toISOString().slice(0, 10);
+      // ostatni dokument w buforze → test ścieżki waiting_for_doc (spec §8 D8)
+      const wBuforze = k === paczki.length - 1 ? 1 : 0;
+      insDok.run(dok_id, typ, nr, date, config.magId.MGP, paczka.dostawca, wBuforze);
 
-      const slice = mgpProducts.slice(k * perDoc, (k + 1) * perDoc);
-      for (const p of slice) insPoz.run(dok_id, p.tw_id, p.mgp);
+      for (const p of paczka.items) insPoz.run(dok_id, p.tw_id, p.mgp);
 
       // dorzuć 2 nowe SKU bez lokalizacji (ścieżka BRAK LOK, §5.4 pkt 4)
       for (const twId of noLocProducts.slice(k * 2, k * 2 + 2)) {
         insPoz.run(dok_id, twId, 12);
       }
-    }
+    });
   });
   buildDocs();
 
