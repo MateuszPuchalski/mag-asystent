@@ -34,8 +34,10 @@ export function Splash() {
       >
         {starting ? "Uruchamianie…" : "Dotknij, aby rozpocząć"}
       </div>
-      <div className="absolute bottom-4 text-[11px] text-ink-faint">
-        Kolektor magazynowy · prototyp v0.2
+      <div className="absolute bottom-4 text-center text-[11px] leading-tight text-ink-faint">
+        Kolektor magazynowy · v{__APP_VERSION__}
+        <br />
+        build {__BUILD_TIME__}
       </div>
     </div>
   );
