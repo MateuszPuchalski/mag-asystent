@@ -51,6 +51,15 @@ export const config = {
     /** Kody dok_Typ dla FZ/PZ ([WERYFIKUJ] na własnej bazie). */
     dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
     dokTypPZ: num(process.env.DOK_TYP_PZ, 5),
+    /**
+     * Kolumna lokalizacji na tw__Towar. Nowsze wersje SGT (KSeF i późniejsze)
+     * NIE mają natywnego pola „lokalizacja" — trzeba użyć jednego z ośmiu
+     * generycznych pól dodatkowych (tw_Pole1..tw_Pole8, varchar(50) każde).
+     * Domyślnie tw_Pole1 — [WERYFIKUJ]/wybierz sam, patrz
+     * docs/subiekt-gt-edu-setup.md. Walidowana jako bezpieczny identyfikator
+     * SQL (białe znaki/średniki odrzucane) przed wstrzyknięciem do zapytania.
+     */
+    locColumn: process.env.MSSQL_LOC_COLUMN ?? "tw_Pole1",
     /** Wyrażenie SQL 0/1: dokument w buforze ([WERYFIKUJ], np. inna kolumna/status). */
     bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */

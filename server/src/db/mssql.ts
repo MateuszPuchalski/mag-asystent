@@ -5,8 +5,9 @@ import { config } from "../config.js";
  * Pule połączeń do bazy MSSQL Subiekta GT (SGT_MODE=mssql).
  *  • pula ODCZYTU — login read-only (GRANT SELECT na tw__Towar, tw_Stan,
  *    dok__Dokument, dok_Pozycja, kh__Kontrahent), używana przez importer,
- *  • pula ZAPISU — osobny login z GRANT UPDATE wyłącznie na
- *    tw__Towar(tw_Lokalizacja) (plan B ze spec §9), używana przez workera.
+ *  • pula ZAPISU — osobny login z GRANT UPDATE wyłącznie na kolumnę
+ *    lokalizacji (config.mssql.locColumn, plan B ze spec §9), używana przez
+ *    workera.
  * Gdy MSSQL_WRITE_USER nie jest ustawiony, obie pule dzielą login odczytu.
  */
 function poolConfig(user: string, password: string): sql.config {
@@ -44,4 +45,16 @@ export async function mssqlWrite(): Promise<sql.ConnectionPool> {
   if (_write?.connected) return _write;
   _write = await new sql.ConnectionPool(poolConfig(c.writeUser, c.writePassword)).connect();
   return _write;
+}
+
+/**
+ * Nazwa kolumny wstrzykiwana do zapytania (SELECT/UPDATE) nie da się
+ * sparametryzować jak wartość — waliduj jako bezpieczny identyfikator SQL
+ * (litery/cyfry/podkreślnik, nie zaczyna się cyfrą), zanim trafi do query.
+ */
+export function assertSafeColumn(name: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(`Niebezpieczna/nieprawidłowa nazwa kolumny: "${name}"`);
+  }
+  return name;
 }

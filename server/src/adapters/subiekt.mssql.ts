@@ -1,6 +1,6 @@
 import sql from "mssql";
 import { db, nowIso } from "../db/db.js";
-import { mssqlRead } from "../db/mssql.js";
+import { mssqlRead, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 
 /**
@@ -16,7 +16,15 @@ import { config } from "../config.js";
  *
  * Login: read-only, GRANT SELECT wyłącznie na tw__Towar, tw_Stan,
  * dok__Dokument, dok_Pozycja, kh__Kontrahent. Wartości [WERYFIKUJ]
- * (dok_Typ FZ/PZ, mag_Id, flaga bufora) — env, patrz docs/subiekt-gt-edu-setup.md.
+ * (dok_Typ FZ/PZ, mag_Id, flaga bufora, kolumna lokalizacji) — env, patrz
+ * docs/subiekt-gt-edu-setup.md.
+ *
+ * UWAGA: nowsze wersje SGT (z polami KSeF) NIE MAJĄ natywnej kolumny
+ * tw_Lokalizacja na tw__Towar — zweryfikowane empirycznie (INFORMATION_SCHEMA
+ * na instalacji edu). Lokalizację trzeba trzymać w jednym z generycznych pól
+ * dodatkowych tw_Pole1..tw_Pole8 (varchar(50) każde) — który konkretnie,
+ * ustala się przy zakładaniu kartotek (env MSSQL_LOC_COLUMN, domyślnie
+ * tw_Pole1).
  */
 
 /** Okno importu dokumentów FZ/PZ [dni] — szersze niż 14 dni widoku (spec §5.4). */
@@ -66,11 +74,14 @@ export let lastImport: ImportStats | null = null;
 export async function importFromMssql(): Promise<ImportStats> {
   const pool = await mssqlRead();
   const c = config.mssql;
+  // nowsze SGT nie mają natywnego tw_Lokalizacja — alias na skonfigurowane
+  // pole dodatkowe (domyślnie tw_Pole1), żeby reszta kodu widziała stałą nazwę
+  const locCol = assertSafeColumn(c.locColumn);
 
   const towary = (
     await pool.request().query<TowarRow>(
       `SELECT tw_Id, tw_Symbol, tw_Nazwa, tw_PodstKodKresk, tw_JednMiary,
-              tw_Opis, tw_Lokalizacja
+              tw_Opis, ${locCol} AS tw_Lokalizacja
        FROM tw__Towar
        WHERE tw_Zablokowany = 0`
     )
