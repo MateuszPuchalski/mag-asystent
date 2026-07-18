@@ -28,6 +28,7 @@ import { installMotion } from "@/lib/motion";
 import { flush } from "@/lib/offline";
 import { speak, spellLoc } from "@/lib/voice";
 import { getSettings, useSettings } from "@/lib/settings";
+import { userInitials, useUsers } from "@/lib/users";
 
 const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
   home: "Magazyn",
@@ -44,6 +45,7 @@ const TITLE: Record<Exclude<ScreenName, "splash">, string> = {
 function TopBar({ onCamera }: { onCamera: () => void }) {
   const screen = useUi((s) => s.screen);
   const settings = useSettings();
+  const { current: user } = useUsers();
   if (screen === "splash") return null;
   const hasBack = !!backTarget(screen);
   const title = TITLE[screen as Exclude<ScreenName, "splash">];
@@ -65,6 +67,13 @@ function TopBar({ onCamera }: { onCamera: () => void }) {
           <Camera className="h-[18px] w-[18px]" />
         </button>
       )}
+      <button
+        onClick={openSettings}
+        className="grid h-6 w-6 flex-none place-items-center rounded-full bg-secondary text-[10px] font-bold text-ink"
+        title={`Użytkownik: ${user} — zmiana w Ustawieniach`}
+      >
+        {userInitials(user)}
+      </button>
       <button onClick={openSettings} className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-secondary" title="Ustawienia">
         <SettingsIcon className="h-[18px] w-[18px]" />
       </button>

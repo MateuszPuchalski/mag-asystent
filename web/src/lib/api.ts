@@ -150,10 +150,20 @@ export const api = {
   product: (id: number) => req<ProductCard>(`/api/products/${id}`),
   setLocation: (
     id: number,
-    body: { action: "replace" | "add" | "remove" | "replace_one"; value?: string; replaced?: string }
-  ) => req<{ queueId: number }>(`/api/products/${id}/location`, { method: "POST", body: JSON.stringify(body) }),
-  mm: (body: { items: { twId: number; qty: number }[] }) =>
-    req<{ queueId: number; kind: string }>(`/api/mm`, { method: "POST", body: JSON.stringify(body) }),
+    body: { action: "replace" | "add" | "remove" | "replace_one"; value?: string; replaced?: string },
+    asUser?: string // operacja z bufora offline — przypisz do autora, nie bieżącego
+  ) =>
+    req<{ queueId: number }>(`/api/products/${id}/location`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      ...(asUser ? { headers: { "x-user": asUser } } : {}),
+    }),
+  mm: (body: { items: { twId: number; qty: number }[] }, asUser?: string) =>
+    req<{ queueId: number; kind: string }>(`/api/mm`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      ...(asUser ? { headers: { "x-user": asUser } } : {}),
+    }),
   history: (id: number) => req<{ entries: MovementEntry[] }>(`/api/products/${id}/history`),
 
   locations: () => req<LocationsInfo>(`/api/locations`),
