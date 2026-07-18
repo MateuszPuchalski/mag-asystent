@@ -10,13 +10,40 @@ import { queueRoutes } from "./routes/queue.js";
 import { putawayRoutes } from "./routes/putaway.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
+import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
 
 async function main() {
   db(); // migracja schematu przy starcie
+
+  // SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
+  // starcie (twardy błąd, gdy baza nieosiągalna), potem co MSSQL_SYNC_MS.
+  if (config.sgtMode === "mssql") {
+    await importFromMssql();
+    setInterval(() => {
+      importFromMssql().catch((e) =>
+        console.error("[mssql] odświeżenie nieudane:", e instanceof Error ? e.message : e)
+      );
+    }, config.mssql.syncMs);
+  }
+
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
   await app.register(cors, { origin: true });
 
-  app.get("/api/health", async () => ({ ok: true, mode: config.sgtMode }));
+  app.get("/api/health", async () => ({
+    ok: true,
+    mode: config.sgtMode,
+    sferaMode: config.sferaMode,
+    ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
+  }));
+
+  // wymuszenie odświeżenia read-modelu (mssql): np. po przyjęciu dostawy w Subiekcie
+  app.post("/api/admin/resync", async (_req, reply) => {
+    if (config.sgtMode !== "mssql") {
+      return reply.code(400).send({ error: "resync dostępny tylko w SGT_MODE=mssql" });
+    }
+    const stats = await importFromMssql();
+    return { ok: true, stats };
+  });
 
   await app.register(productRoutes);
   await app.register(mmRoutes);

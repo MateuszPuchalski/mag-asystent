@@ -13,10 +13,10 @@ export interface MmItem {
 
 export interface SferaAdapter {
   /** Ustaw pole lokalizacji na kartotece towaru (spec §5.2). */
-  applySetLocation(twId: number, newValue: string): void;
+  applySetLocation(twId: number, newValue: string): Promise<void>;
   /**
    * Utwórz dokument MM (magazyn źródłowy → docelowy), przesuń pozycje,
    * zwróć numer dokumentu MM (spec §5.3 / §9).
    */
-  createMM(magFrom: number, magTo: number, items: MmItem[]): string;
+  createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string>;
 }

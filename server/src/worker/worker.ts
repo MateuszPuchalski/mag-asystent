@@ -86,19 +86,21 @@ function process(task: Task) {
   db().prepare("UPDATE sfera_queue SET status='processing' WHERE id=?").run(task.id);
 
   busy = true; // slot zajęty tylko na czas realnego zapisu (COM/Sfera)
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
       if (config.worker.simErrors && Math.random() < 0.45) {
         throw new Error("Zapis Sfery nieudany — kartoteka w edycji (Subiekt)");
       }
       let docNo: string | null = null;
       if (task.type === "set_location") {
-        sfera.applySetLocation(payload.twId, payload.newValue);
+        await sfera.applySetLocation(payload.twId, payload.newValue);
       } else if (task.type === "mm") {
-        docNo = sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
+        docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
       } else if (task.type === "combo") {
-        docNo = sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
-        for (const it of payload.items as MmItem[]) sfera.applySetLocation(it.twId, payload.location);
+        docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
+        for (const it of payload.items as MmItem[]) {
+          await sfera.applySetLocation(it.twId, payload.location);
+        }
       } else {
         throw new Error("Nieznany typ zadania: " + task.type);
       }
@@ -127,5 +129,5 @@ function tick() {
   }
 }
 
-console.log(`[worker] start · poll ${config.worker.pollMs}ms · delay ${config.worker.delayMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode}`);
+console.log(`[worker] start · poll ${config.worker.pollMs}ms · delay ${config.worker.delayMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · SFERA_MODE=${config.sferaMode}`);
 setInterval(tick, config.worker.pollMs);

@@ -20,13 +20,53 @@ export const config = {
   /** Źródło danych Subiekta: 'seeded' (SQLite z mag.xlsx) lub 'mssql' (produkcja). */
   sgtMode: (process.env.SGT_MODE ?? "seeded") as "seeded" | "mssql",
 
+  /**
+   * Adapter zapisu (worker): 'dev' (mutacja sgt_*), 'sql' (UPDATE tw_Lokalizacja
+   * bezpośrednio w MSSQL — plan B ze spec §9; MM niedostępne, wersja edu bez
+   * Sfery), 'com' (Sfera COM — wymaga licencji). Domyślnie: 'sql' gdy
+   * SGT_MODE=mssql, inaczej 'dev'.
+   */
+  sferaMode: (process.env.SFERA_MODE ??
+    (process.env.SGT_MODE === "mssql" ? "sql" : "dev")) as "dev" | "sql" | "com",
+
+  /**
+   * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql). Wartości [WERYFIKUJ]
+   * (dok_Typ, mag_Id, flaga bufora) ustala się na własnej bazie — zapytania
+   * pomocnicze w docs/subiekt-gt-edu-setup.md.
+   */
+  mssql: {
+    server: process.env.MSSQL_SERVER ?? "localhost",
+    /** Instancja nazwana (instalator InsERT tworzy zwykle INSERTGT). */
+    instance: process.env.MSSQL_INSTANCE ?? "INSERTGT",
+    /** Port TCP — gdy ustawiony, ma pierwszeństwo przed instancją nazwaną. */
+    port: process.env.MSSQL_PORT ? num(process.env.MSSQL_PORT, 1433) : undefined,
+    database: process.env.MSSQL_DATABASE ?? "",
+    user: process.env.MSSQL_USER ?? "",
+    password: process.env.MSSQL_PASSWORD ?? "",
+    encrypt: process.env.MSSQL_ENCRYPT === "1",
+    trustServerCertificate: process.env.MSSQL_TRUST_CERT !== "0",
+    /** Login zapisu (GRANT UPDATE tylko na tw__Towar.tw_Lokalizacja); domyślnie login odczytu. */
+    writeUser: process.env.MSSQL_WRITE_USER ?? process.env.MSSQL_USER ?? "",
+    writePassword: process.env.MSSQL_WRITE_PASSWORD ?? process.env.MSSQL_PASSWORD ?? "",
+    /** Kody dok_Typ dla FZ/PZ ([WERYFIKUJ] na własnej bazie). */
+    dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
+    dokTypPZ: num(process.env.DOK_TYP_PZ, 5),
+    /** Wyrażenie SQL 0/1: dokument w buforze ([WERYFIKUJ], np. inna kolumna/status). */
+    bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END",
+    /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
+    syncMs: num(process.env.MSSQL_SYNC_MS, 60000),
+  },
+
   /** Katalog seedu (products.json z web/public/data). */
   seedProducts:
     process.env.SEED_PRODUCTS ??
     path.resolve(__dirname, "../../web/public/data/products.json"),
 
-  /** Identyfikatory magazynów w SGT (spec §11 pkt 5). */
-  magId: { MAG: 1, MGP: 2 },
+  /** Identyfikatory magazynów w SGT (spec §11 pkt 5; [WERYFIKUJ] na własnej bazie). */
+  magId: {
+    MAG: num(process.env.MAG_ID_MAG, 1),
+    MGP: num(process.env.MAG_ID_MGP, 2),
+  },
 
   /** Limit długości pola tw_Lokalizacja (spec §5.2, COL_LENGTH; [WERYFIKUJ]). */
   locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50),

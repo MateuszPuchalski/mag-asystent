@@ -35,10 +35,10 @@ export class ComSferaAdapter implements SferaAdapter {
         "Nieuruchamialny w środowisku chmurowym."
     );
   }
-  applySetLocation(_twId: number, _newValue: string): void {
+  applySetLocation(_twId: number, _newValue: string): Promise<void> {
     throw new Error("not implemented");
   }
-  createMM(_magFrom: number, _magTo: number, _items: MmItem[]): string {
+  createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {
     throw new Error("not implemented");
   }
 }
