@@ -90,14 +90,19 @@ wystarczą, żeby end-to-end zweryfikować połączenie.
 
 ## 2. Utwórz loginy SQL (najmniejsze uprawnienia)
 
-W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasła):
+W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasła). Skrypt jest
+idempotentny — bezpiecznie uruchomić go ponownie (np. po zmianie
+`MSSQL_LOC_COLUMN`), `CREATE LOGIN`/`CREATE USER` nie wysypią się błędem
+„already exists", jeśli loginy już są:
 
 ```sql
 USE [NAZWA_BAZY];
 
 -- login ODCZYTU: wyłącznie SELECT na tabelach potrzebnych aplikacji
-CREATE LOGIN wertis_read WITH PASSWORD = 'silne-haslo-1', CHECK_POLICY = ON;
-CREATE USER wertis_read FOR LOGIN wertis_read;
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis_read')
+    CREATE LOGIN wertis_read WITH PASSWORD = 'silne-haslo-1', CHECK_POLICY = ON;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'wertis_read')
+    CREATE USER wertis_read FOR LOGIN wertis_read;
 GRANT SELECT ON dbo.tw__Towar      TO wertis_read;
 GRANT SELECT ON dbo.tw_Stan        TO wertis_read;
 GRANT SELECT ON dbo.dok__Dokument  TO wertis_read;
@@ -107,10 +112,28 @@ GRANT SELECT ON dbo.kh__Kontrahent TO wertis_read;
 -- login ZAPISU: UPDATE wyłącznie na jednej kolumnie (plan B, spec §9).
 -- Podmień tw_Pole1 na pole, które wybrałeś w §1a (MSSQL_LOC_COLUMN musi się
 -- z tym zgadzać!).
-CREATE LOGIN wertis_write WITH PASSWORD = 'silne-haslo-2', CHECK_POLICY = ON;
-CREATE USER wertis_write FOR LOGIN wertis_write;
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis_write')
+    CREATE LOGIN wertis_write WITH PASSWORD = 'silne-haslo-2', CHECK_POLICY = ON;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'wertis_write')
+    CREATE USER wertis_write FOR LOGIN wertis_write;
 GRANT SELECT ON dbo.tw__Towar TO wertis_write;                 -- WHERE tw_Id=…
 GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis_write;
+```
+
+Weryfikacja, że uprawnienia faktycznie się nadały (przydaje się też po każdym
+`GRANT`, bo błąd na `CREATE LOGIN`/`CREATE USER` nie przerywa reszty skryptu —
+kolejne `GRANT`-y w SSMS i tak się wykonują):
+
+```sql
+SELECT dp.permission_name, dp.state_desc,
+       OBJECT_NAME(dp.major_id) AS obiekt,
+       c.name AS kolumna,
+       pr.name AS login
+FROM sys.database_permissions dp
+LEFT JOIN sys.columns c ON c.object_id = dp.major_id AND c.column_id = dp.minor_id
+JOIN sys.database_principals pr ON pr.principal_id = dp.grantee_principal_id
+WHERE pr.name IN ('wertis_read','wertis_write')
+ORDER BY pr.name, dp.permission_name;
 ```
 
 ## 3. Checklist `[WERYFIKUJ]` — ustal wartości dla SWOJEJ bazy
