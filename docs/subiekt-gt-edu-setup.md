@@ -11,7 +11,7 @@ z `mag.xlsx`.
 | Skan / wyszukiwarka / karta towaru | ✅ | odczyt z bazy MSSQL Subiekta (import do read-modelu) |
 | Stany MAG / MGP, lokalizacje | ✅ | jw. |
 | Lista dokumentów FZ/PZ do rozłożenia | ✅ | jw. |
-| Zmiana lokalizacji (`set_location`) | ✅ | bezpośredni `UPDATE tw__Towar.tw_Lokalizacja` (plan B ze spec §9) |
+| Zmiana lokalizacji (`set_location`) | ✅ | bezpośredni `UPDATE` na wybranym polu dodatkowym `tw__Towar` (plan B ze spec §9 — patrz §1a niżej) |
 | Dokumenty MM (MGP→MAG, zatwierdź wózek) | ❌ | wymaga **Sfery** (COM) — brak w edu; zadanie w kolejce dostanie status `error` z komunikatem |
 
 Dwie twarde zasady środowiska:
@@ -48,6 +48,46 @@ Domyślnie instancja Subiekta przyjmuje tylko lokalne połączenia Windows.
 > Nazwę bazy znajdziesz w Subiekcie (pasek tytułu / wybór podmiotu) albo
 > w SSMS — baza podmiotu utworzona przy zakładaniu firmy testowej edu.
 
+## 1a. Lokalizacja: nie ma kolumny `tw_Lokalizacja` — wybierz pole dodatkowe
+
+Zweryfikowane empirycznie (na edu): nowsze wersje Subiekta GT (z polami KSeF)
+**nie mają natywnej kolumny lokalizacji** na `tw__Towar`. Zamiast tego są
+generyczne pola dodatkowe **`tw_Pole1` … `tw_Pole8`** (każde `varchar(50)`) —
+InsERT zostawia użytkownikowi decyzję, do czego ich użyć.
+
+Skoro budujesz dane testowe w edu **od zera**, to Ty decydujesz. Domyślnie
+aplikacja używa **`tw_Pole1`** jako lokalizacji (`MSSQL_LOC_COLUMN=tw_Pole1`,
+patrz §4) — możesz to zmienić na inne pole, jeśli wolisz. Jedyna zasada: pole
+dodatkowe, które wybierzesz, wpisujesz w Subiekcie na karcie towaru (zakładka
+**Pola dodatkowe**) — tam, gdzie normalnie magazynier wpisywałby kod regału.
+
+> Jeśli kiedyś dostaniesz dostęp do prawdziwej, produkcyjnej bazy WERTIS —
+> **nie zakładaj**, że tam też jest `tw_Pole1`. To osobna instalacja z osobną
+> konfiguracją; ktoś z dostępem do niej musi sprawdzić, którego pola
+> faktycznie używają (ten sam sposób co niżej — `INFORMATION_SCHEMA.COLUMNS`
+> + porównanie wartości ze znanym rekordem), i ustawić `MSSQL_LOC_COLUMN`
+> odpowiednio.
+
+## 1b. Zbuduj dane testowe w edu
+
+Baza edu jest pusta/demo — nie ma w niej danych z Twojego `magmat.xlsx`
+(to osobny, niepowiązany system, do którego nie masz dostępu). Żeby przetestować
+połączenie appki z Subiektem, dopisz w samym Subiekcie kilka rzeczy:
+
+1. **Magazyn MGP** (jeśli go nie masz): *Ustawienia → Słowniki → Magazyny* →
+   dodaj drugi magazyn obok domyślnego (np. kod `MGP`, nazwa „Strefa przyjęć").
+2. **Kilka kartotek towaru** (*Towary → Dodaj*): wypełnij Symbol, Nazwę, Kod
+   kreskowy (EAN), stan na obu magazynach, a w zakładce **Pola dodatkowe**
+   wpisz kod lokalizacji w polu, które wybrałeś w §1a (np. `tw_Pole1` →
+   `H04-05-02`). Dla części towarów zostaw to pole puste — to przetestuje
+   ścieżkę „BRAK LOK".
+3. **Jeden dokument PZ/FZ** na magazyn MGP (*Dokumenty → Nowy → PZ*), z kilkoma
+   pozycjami z kroku 2 — to da Ci dane do checklisty §3 (a) i (c) oraz coś do
+   rozłożenia w module put-away.
+
+Nie musisz wpisywać setek rekordów — kilkanaście kartotek i jeden dokument
+wystarczą, żeby end-to-end zweryfikować połączenie.
+
 ## 2. Utwórz loginy SQL (najmniejsze uprawnienia)
 
 W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasła):
@@ -64,26 +104,34 @@ GRANT SELECT ON dbo.dok__Dokument  TO wertis_read;
 GRANT SELECT ON dbo.dok_Pozycja    TO wertis_read;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis_read;
 
--- login ZAPISU: UPDATE wyłącznie na jednej kolumnie (plan B, spec §9)
+-- login ZAPISU: UPDATE wyłącznie na jednej kolumnie (plan B, spec §9).
+-- Podmień tw_Pole1 na pole, które wybrałeś w §1a (MSSQL_LOC_COLUMN musi się
+-- z tym zgadzać!).
 CREATE LOGIN wertis_write WITH PASSWORD = 'silne-haslo-2', CHECK_POLICY = ON;
 CREATE USER wertis_write FOR LOGIN wertis_write;
 GRANT SELECT ON dbo.tw__Towar TO wertis_write;                 -- WHERE tw_Id=…
-GRANT UPDATE ON dbo.tw__Towar (tw_Lokalizacja) TO wertis_write;
+GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis_write;
 ```
 
 ## 3. Checklist `[WERYFIKUJ]` — ustal wartości dla SWOJEJ bazy
 
-Nazwy/kody różnią się między wersjami SGT (spec §6, §11). Uruchom w SSMS
+Nazwy/kody różnią się między wersjami SGT (spec §6, §11) — a jak się
+przekonaliśmy na tw_Lokalizacja, czasem różnią się też same kolumny. Nie
+zgaduj — uruchom w SSMS na kartotece/dokumencie, które utworzyłeś w §1b,
 i zanotuj wyniki:
 
 ```sql
--- a) kody dok_Typ dla FZ i PZ: wystaw w Subiekcie po jednym FZ i PZ,
---    potem sprawdź po numerze:
+-- 0) potwierdź, że wybrane pole dodatkowe faktycznie trzyma to, co wpisałeś
+--    na karcie towaru (podmień symbol i tw_Pole1 na swój wybór z §1a):
+SELECT tw_Symbol, tw_Pole1 FROM tw__Towar WHERE tw_Symbol = 'TWOJ-SYMBOL';
+--    → jeśli wartość się zgadza z tym, co wpisałeś w Subiekcie: env
+--      MSSQL_LOC_COLUMN=tw_Pole1 (albo inne pole, jeśli wybrałeś inne)
+
+-- a) kody dok_Typ dla FZ i PZ (na dokumencie utworzonym w §1b):
 SELECT dok_Id, dok_Typ, dok_NrPelny, dok_MagId, dok_Status
 FROM dok__Dokument ORDER BY dok_Id DESC;   -- → env DOK_TYP_FZ / DOK_TYP_PZ
 
--- b) mag_Id magazynów (głównego i strefy przyjęć — MGP utwórz w Subiekcie,
---    jeśli nie istnieje: Podmiot → Magazyny):
+-- b) mag_Id magazynów (głównego i strefy przyjęć MGP z §1b):
 SELECT * FROM sl_Magazyn;                  -- → env MAG_ID_MAG / MAG_ID_MGP
 -- (jeśli SELECT nie przejdzie na loginie wertis_read, wykonaj jako sa —
 --  tabela słownikowa nie jest potrzebna aplikacji w runtime)
@@ -93,8 +141,9 @@ SELECT * FROM sl_Magazyn;                  -- → env MAG_ID_MAG / MAG_ID_MGP
 SELECT dok_Id, dok_NrPelny, dok_Status FROM dok__Dokument ORDER BY dok_Id DESC;
 --    → env MSSQL_BUFFER_EXPR, np. 'CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END'
 
--- d) limit pola lokalizacji:
-SELECT COL_LENGTH('tw__Towar','tw_Lokalizacja');   -- → env LOC_FIELD_LIMIT
+-- d) limit wybranego pola lokalizacji (tw_Pole1..8 to zawsze varchar(50),
+--    ale podmień nazwę, jeśli wybrałeś inne pole):
+SELECT COL_LENGTH('tw__Towar','tw_Pole1');   -- → env LOC_FIELD_LIMIT
 ```
 
 Uwaga do (a): interesuje Cię typ, który **niesie skutek magazynowy** na MGP —
@@ -120,6 +169,7 @@ $env:MSSQL_WRITE_USER     = "wertis_write"
 $env:MSSQL_WRITE_PASSWORD = "silne-haslo-2"
 
 # wartości z checklisty [WERYFIKUJ]:
+$env:MSSQL_LOC_COLUMN  = "tw_Pole1"   # pole dodatkowe wybrane w §1a
 $env:DOK_TYP_FZ   = "1"
 $env:DOK_TYP_PZ   = "5"
 $env:MAG_ID_MAG   = "1"
@@ -149,8 +199,9 @@ Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
    porównaj stany MAG/MGP i lokalizację z kartoteką.
 2. **Zapis lokalizacji:** zmień lokalizację testowej kartoteki w aplikacji;
    po przejściu zadania w kolejce na `done` sprawdź w Subiekcie (karta
-   towaru → Lokalizacja) lub w SSMS:
-   `SELECT tw_Lokalizacja FROM tw__Towar WHERE tw_Id = …`.
+   towaru → Pola dodatkowe) lub w SSMS:
+   `SELECT tw_Pole1 FROM tw__Towar WHERE tw_Id = …` (nazwa pola jak w
+   `MSSQL_LOC_COLUMN`).
 3. **MM (oczekiwany błąd):** zatwierdź MM/wózek — zadanie po 3 próbach
    dostanie `error` z komunikatem „Dokument MM wymaga Sfery…". To poprawne
    zachowanie na edu.
@@ -159,6 +210,11 @@ Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
 
 - **edu** ma limity ilości zapisów/dokumentów i jest wyłącznie do nauki/testów
   — idealne do tego scenariusza, nie do produkcji.
+- **edu to osobna instalacja, niepowiązana z prawdziwą bazą produkcyjną**
+  (skąd np. pochodzi eksport `magmat.xlsx`). Wartości ustalone tu (kolumna
+  lokalizacji, kody `dok_Typ`, `mag_Id`) dotyczą TYLKO tej instalacji edu —
+  przy podłączaniu do prawdziwego Subiekta trzeba je ustalić od nowa, na tamtej
+  bazie (ktoś z dostępem do niej powtarza checklistę §3).
 - Kolumna „Zamówione" w karcie towaru pokazuje 0 w trybie mssql (w bazie SGT
   nie ma prostej kolumny; wartość pochodzi z dokumentów ZK/ZD) — do
   ewentualnej rozbudowy importera.
