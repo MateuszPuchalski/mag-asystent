@@ -32,6 +32,11 @@ export default defineConfig({
         background_color: "#ffffff",
         theme_color: "#2A2A2C",
         icons: [
+          // PNG 192 i 512 są wymagane przez Chrome do prawdziwej instalacji PWA
+          // (WebAPK) — bez nich instalacja spada do „skrótu" ze znaczkiem Chrome.
+          { src: "assets/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "assets/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "assets/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
           { src: "assets/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
         ],
       },
