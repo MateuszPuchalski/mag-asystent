@@ -9,14 +9,14 @@ import type { MmItem, SferaAdapter } from "./sfera.js";
  * Dzięki temu cały przepływ jest realny end-to-end w tym środowisku.
  */
 export class DevSferaAdapter implements SferaAdapter {
-  applySetLocation(twId: number, newValue: string): void {
+  async applySetLocation(twId: number, newValue: string): Promise<void> {
     const res = db()
       .prepare("UPDATE sgt_towar SET lokalizacja = ? WHERE tw_id = ?")
       .run(newValue, twId);
     if (res.changes === 0) throw new Error(`Nie znaleziono towaru tw_id=${twId}`);
   }
 
-  createMM(magFrom: number, magTo: number, items: MmItem[]): string {
+  async createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string> {
     const d = db();
     const tx = d.transaction(() => {
       for (const it of items) {

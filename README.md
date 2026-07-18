@@ -67,7 +67,8 @@ Parametry (env, dev):
 |---|---|
 | `WORKER_DELAY_MS` | czas „zapisu Sfery" (domyślnie 1500) |
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
-| `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (produkcja) |
+| `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
+| `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 
 ## Funkcje
@@ -126,10 +127,15 @@ ma jeden stan łączny, więc konwersja deterministycznie (hash symbolu) rozdzie
 `waiting_for_doc`), bo w eksporcie nie ma kontrahentów. W produkcji stany i
 dokumenty pochodzą z `tw_Stan` / `dok__Dokument` przez adapter MSSQL.
 
-## Czego nie da się uruchomić w tym środowisku
+## Praca z prawdziwym Subiektem GT
 
-Prawdziwy Subiekt GT / MSSQL / Sfera (COM, Windows) — chmura Linux ich nie ma.
-Dlatego `server/src/adapters/subiekt.mssql.ts` i `sfera.com.ts` to gotowe do
-podpięcia szkielety (env `SGT_MODE=mssql`) z zapytaniami/kontraktem COM w
-komentarzach. Cała reszta — API, kolejka, worker, rozkładanie — działa realnie
-na SQLite zasilonym danymi z Subiekta.
+Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**): importer
+`server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto z bazy
+MSSQL Subiekta (przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`),
+a worker w `SFERA_MODE=sql` zapisuje lokalizacje bezpośrednim UPDATE
+(plan B ze spec §9; MM wymaga licencji Sfery — `sfera.com.ts` pozostaje
+szkieletem). Instrukcja krok po kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
+
+W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —
+API, kolejka, worker i rozkładanie realnie na SQLite zasilonym danymi
+z eksportu Subiekta.

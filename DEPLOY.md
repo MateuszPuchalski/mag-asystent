@@ -164,6 +164,11 @@ node tools/fetch-asr-model.mjs Xenova/whisper-tiny q8
 
 ## 7. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
+> **Test na wersji edu (bez Sfery):** kompletna instrukcja krok po kroku —
+> konfiguracja SQL Servera, loginy, checklist `[WERYFIKUJ]`, env i test
+> end-to-end — w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
+> Etap 1 poniżej i zapis lokalizacji (plan B) są już **zaimplementowane**.
+
 **Etap 0 — pilot (tryb `seeded`, bez dotykania SGT):**
 działa od razu po instalacji; dane z eksportu `mag.xlsx`. Magazynier testuje
 wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
@@ -173,14 +178,22 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    `tw_Stan`, `dok__Dokument`, `dok_Pozycja`, `kh__Kontrahent`).
 2. Przejdź checklistę `[WERYFIKUJ]` ze spec §11 — na własnej bazie sprawdź:
    - wartości `dok_Typ` dla FZ i PZ (po znanym numerze dokumentu) i który typ
-     niesie skutek magazynowy,
-   - kolumnę/flagę bufora w `dok__Dokument`,
-   - `mag_Id` magazynów MAG i MGP,
+     niesie skutek magazynowy (→ env `DOK_TYP_FZ` / `DOK_TYP_PZ`),
+   - kolumnę/flagę bufora w `dok__Dokument` (→ env `MSSQL_BUFFER_EXPR`),
+   - `mag_Id` magazynów MAG i MGP (→ env `MAG_ID_MAG` / `MAG_ID_MGP`),
    - `SELECT COL_LENGTH('tw__Towar','tw_Lokalizacja')` (ustaw `LOC_FIELD_LIMIT`),
    - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`.
-3. Zaimplementuj `server/src/adapters/subiekt.mssql.ts` (szkielet z gotowymi
-   zapytaniami jest w pliku; pakiet `mssql` do `server/package.json`).
-4. `nssm set wertis-api AppEnvironmentExtra SGT_MODE=mssql` + restart.
+3. Ustaw env połączenia `MSSQL_*` (patrz `docs/subiekt-gt-edu-setup.md` §4);
+   importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
+   przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.
+4. `nssm set wertis-api AppEnvironmentExtra SGT_MODE=mssql MSSQL_SERVER=… …`
+   + restart.
+
+**Etap 1a — zapis lokalizacji bez Sfery (`SFERA_MODE=sql`, plan B ze spec §9):**
+login z `GRANT UPDATE` wyłącznie na kolumnę `tw__Towar(tw_Lokalizacja)`
+(env `MSSQL_WRITE_USER` / `MSSQL_WRITE_PASSWORD`); worker wykonuje
+`set_location` bezpośrednio po SQL, a zadania MM zgłaszają czytelny błąd.
+Domyślne przy `SGT_MODE=mssql`.
 
 **Etap 2 — zapis przez Sferę:**
 1. Test 10-linijkowym skryptem, czy Sfera eksponuje pole lokalizacji na
