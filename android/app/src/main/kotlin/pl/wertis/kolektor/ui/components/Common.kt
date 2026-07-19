@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -140,7 +141,7 @@ fun OutlineButton(
 }
 
 @Composable
-fun SectionCard(modifier: Modifier = Modifier, content: @Composable Column.() -> Unit) {
+fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -148,7 +149,7 @@ fun SectionCard(modifier: Modifier = Modifier, content: @Composable Column.() ->
             .border(1.dp, BorderCol, RoundedCornerShape(10.dp))
             .background(CardWhite)
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        content = { content() },
+        content = content,
     )
 }
 
