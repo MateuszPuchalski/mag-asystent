@@ -121,7 +121,15 @@ Certyfikat root Caddy (`%AppData%\Caddy\pki\authorities\local\root.crt`)
 zainstaluj raz na każdym kolektorze (Ustawienia → Zabezpieczenia → Zainstaluj
 certyfikat CA). Od tej pory kolektory używają `https://mag.wertis.local`.
 
-## 6. Kolektory Honeywell
+## 6. Kolektory (Honeywell / Zebra)
+
+Dwie ścieżki instalacji na kolektorze — serwer (sekcje 1–5) jest **wspólny**:
+- **6a. PWA w przeglądarce kiosku** — bez instalacji APK, wymaga HTTPS (sekcja 5)
+  do trybu „jak aplikacji" i offline; obejmuje komendy głosowe.
+- **6b. Natywna aplikacja Android (APK)** — skan przez SDK producenta, trwały
+  offline i kiosk bez przeglądarki i lokalnego CA; **bez** funkcji głosowych.
+
+### 6a. PWA w przeglądarce kiosku
 
 - Zainstaluj **Fully Kiosk Browser** (lub tryb kiosku Honeywell Enterprise
   Browser): Start URL = adres aplikacji, pełny ekran, bez paska adresu,
@@ -130,7 +138,7 @@ certyfikat CA). Od tej pory kolektory używają `https://mag.wertis.local`.
   tego oczekuje; nic nie trzeba konfigurować w samej appce.
 - WiFi: kolektory i serwer w tym samym VLAN/podsieci.
 
-### 6a. Komendy głosowe — wagi modelu ASR (offline)
+#### Komendy głosowe — wagi modelu ASR (offline, tylko PWA)
 
 Rozpoznawanie mowy działa w całości na kolektorze (Whisper ONNX). Backendem jest
 ONNX Runtime **WASM** (pewny na każdym kolektorze), a ten obsługuje bez problemu
@@ -161,6 +169,43 @@ na WASM tylko z **modelami Xenova** (standardowy int8, bez MatMulNBits):
 node tools/fetch-asr-model.mjs Xenova/whisper-tiny q8
 # oraz build frontu z:  VITE_ASR_MODEL=Xenova/whisper-tiny  VITE_ASR_DECODER_DTYPE=q8
 ```
+
+### 6b. Natywna aplikacja Android (APK)
+
+Alternatywa dla PWA — natywny klient z [`android/`](android/README.md).
+**Serwer bez zmian** (sekcje 1–4); aplikacja to czysty klient REST. Zalety na
+kolektorze: skan przez SDK producenta zamiast heurystyki wedge, trwały offline
+bez service workera, kiosk przez Android lock-task/MDM — **HTTPS/Caddy (sekcja 5)
+nie jest wymagane** (brak service workera, więc cleartext HTTP w LAN wystarcza).
+**Bez** komend głosowych i skanu kamerą.
+
+**1. Zbuduj APK** (maszyna z Android SDK / Android Studio albo artefakt z CI
+`.github/workflows/android.yml` — job „build" wystawia `wertis-kolektor-debug-apk`):
+
+```bash
+cd android
+./gradlew :app:assembleDebug        # → app/build/outputs/apk/debug/app-debug.apk
+```
+
+Do produkcji podpisz release (`./gradlew :app:assembleRelease` z własnym
+keystore) — instrukcja podpisu jak w standardowym projekcie Android.
+
+**2. Skaner sprzętowy** (bez konfiguracji w aplikacji — wybór wg producenta):
+- **Zebra (DataWedge):** aplikacja sama tworzy profil `WERTIS` przy starcie
+  (BARCODE→INTENT broadcast, wyjście klawiaturowe wyłączone). Gdy MDM blokuje
+  zdalną konfigurację — profil ręcznie wg `android/README.md`.
+- **Honeywell (DataCollection SDK):** wrzuć `DataCollection.aar` z portalu
+  Honeywell do `android/app/libs/honeywell-datacollection.aar` **przed** buildem.
+  Bez AAR-a aplikacja działa na skanerze klawiaturowym (wedge).
+
+**3. Instalacja i konfiguracja na kolektorze:**
+- Wgraj APK przez MDM (SOTI / Honeywell / Zebra) lub `adb install app-debug.apk`.
+- Kiosk: przypnij aplikację przez Android lock-task / device owner (MDM) —
+  Fully Kiosk Browser nie jest potrzebny.
+- Przy pierwszym starcie: **Ustawienia → Serwer WERTIS** → adres API w LAN
+  (`http://mag.wertis.local:3001` lub `http://<IP-serwera>:3001`).
+
+Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
 ## 7. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
@@ -231,6 +276,9 @@ Domyślne przy `SGT_MODE=mssql`.
   nssm restart wertis-worker
   ```
 
+  Aktualizacja PWA idzie z buildem serwera (kolektory dostają nowy frontend po
+  odświeżeniu). **Klient natywny (APK)** aktualizuje się osobno — nowy build
+  z CI/`./gradlew :app:assembleRelease` i rozesłanie przez MDM (sekcja 6b).
 - **Diagnoza:** `http://mag.wertis.local:3001/api/health` → `{ ok: true, mode: ... }`;
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.
 
