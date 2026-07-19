@@ -6,6 +6,12 @@ zgodna ze specyfikacją (`SPEC magazyn kolektor`) i projektem UI
 `Kolektor_WERTIS`, z **prawdziwymi danymi** (3415 kartotek z eksportu
 `magmat.xlsx`).
 
+> **Klient natywny (Android):** oprócz PWA dostępny jest natywny klient
+> Kotlin/Compose w [`android/`](android/README.md) — ten sam serwer, skan
+> sprzętowy (Honeywell DataCollection + Zebra DataWedge), trwały offline bez
+> service workera i kiosk przez Android lock-task/MDM. Bez funkcji głosowych
+> (ASR/komendy) i skanu kamerą. Szczegóły wdrożenia: [`DEPLOY.md`](DEPLOY.md) §6b.
+
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta/Sfery jest za adapterami: w tym
 środowisku (Linux, bez Subiekta) zasilana z eksportu `magmat.xlsx`, a adaptery
@@ -16,6 +22,7 @@ produkcyjne (MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
 | Warstwa | Technologia |
 |---|---|
 | Frontend (`web/`) | React 19 · Vite 6 · Tailwind CSS v4 · shadcn/ui · TanStack Query · PWA |
+| Klient natywny (`android/`) | Kotlin · Jetpack Compose · Retrofit — ten sam serwer, skan sprzętowy, bez AI ([README](android/README.md)) |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
 | Baza aplikacji | SQLite (better-sqlite3) — kolejka, sesje, events, locki (spec §7) |
 | Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
@@ -115,6 +122,9 @@ server/                    backend (Fastify + SQLite + worker)
   src/services/            stock (korekta o kolejkę), putaway, queue, events
   src/routes/              products, mm, queue, putaway (§8)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
+android/                   natywny klient Android (Kotlin/Compose) — patrz android/README.md
+  core/                    czysta logika JVM (skan, DTO, offline) + testy jednostkowe
+  app/                     aplikacja Compose: 10 ekranów, skanery, czujniki
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 ```
 
