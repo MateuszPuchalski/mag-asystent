@@ -14,7 +14,7 @@ export async function mmRoutes(app: FastifyInstance) {
     const { items } = req.body;
     if (!items?.length) return reply.code(400).send({ error: "Brak pozycji MM" });
 
-    const pending = pendingMmByTw();
+    const pending = pendingMmByTw(config.magId.MGP);
     // walidacja ilości: min(żądane, stan_MGP − Σ oczekujących MM) — ostrzeżenie, nie clamp
     for (const it of items) {
       const p = subiekt.getProductById(it.twId);

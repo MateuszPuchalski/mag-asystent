@@ -14,7 +14,7 @@ import {
 } from "../services/putaway.js";
 
 export async function putawayRoutes(app: FastifyInstance) {
-  // lista dokumentów FZ/PZ na MGP, 14 dni, z postępem sesji (spec §5.4)
+  // lista dokumentów do rozłożenia (FZ/PZ na MGP + zwroty), 14 dni, z postępem sesji (spec §5.4)
   app.get("/api/putaway/documents", async () => ({ documents: listDocuments(14) }));
 
   // start/wznowienie sesji: { docId } | { mode: "all_mgp" }

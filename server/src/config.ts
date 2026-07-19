@@ -52,6 +52,15 @@ export const config = {
     dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
     dokTypPZ: num(process.env.DOK_TYP_PZ, 5),
     /**
+     * Kody dok_Typ dokumentów zwrotów listowanych na magazynie Zwroty
+     * (CSV, np. "14,7"). Puste = każdy dokument na tym magazynie — biuro
+     * wystawia różne typy ([WERYFIKUJ] na własnej bazie).
+     */
+    dokTypyZwroty: (process.env.DOK_TYP_ZWROTY ?? "")
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0),
+    /**
      * Kolumna lokalizacji na tw__Towar. Nowsze wersje SGT (KSeF i późniejsze)
      * NIE mają natywnego pola „lokalizacja" — trzeba użyć jednego z ośmiu
      * generycznych pól dodatkowych (tw_Pole1..tw_Pole8, varchar(50) każde).
@@ -75,6 +84,8 @@ export const config = {
   magId: {
     MAG: num(process.env.MAG_ID_MAG, 1),
     MGP: num(process.env.MAG_ID_MGP, 2),
+    /** Magazyn zwrotów od klientów (biuro kompletuje kartony i wystawia dokument). */
+    ZWROTY: num(process.env.MAG_ID_ZWROTY, 3),
   },
 
   /** Limit długości pola tw_Lokalizacja (spec §5.2, COL_LENGTH; [WERYFIKUJ]). */

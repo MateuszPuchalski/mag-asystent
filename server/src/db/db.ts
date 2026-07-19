@@ -27,6 +27,10 @@ function migrate(database: Database.Database) {
   if (!cols.some((c) => c.name === "session_id")) {
     database.exec("ALTER TABLE sfera_queue ADD COLUMN session_id INTEGER");
   }
+  const sessCols = database.prepare("PRAGMA table_info(putaway_sessions)").all() as Array<{ name: string }>;
+  if (!sessCols.some((c) => c.name === "source_mag_id")) {
+    database.exec("ALTER TABLE putaway_sessions ADD COLUMN source_mag_id INTEGER");
+  }
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */

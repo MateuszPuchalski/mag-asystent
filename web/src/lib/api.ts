@@ -19,6 +19,8 @@ export interface ProductCard {
   locs: string[];
   mag: StockView;
   mgp: StockView;
+  /** Strefa zwrotów od klientów (magazyn Zwroty). */
+  zwroty?: StockView;
 }
 export interface ProductRow {
   id: number;
@@ -69,6 +71,8 @@ export interface PutawayDocument {
   dataWyst: string;
   dostawca: string;
   positions: number;
+  /** Strefa źródłowa: dostawy (MGP) lub zwroty od klientów. */
+  zone: "mgp" | "zwroty";
   session?: { id: number; status: string; progressPct: number };
 }
 export interface PutawayItem {
@@ -99,6 +103,7 @@ export interface PutawaySession {
   id: number;
   sourceDocId: number | null;
   sourceDocNumber: string | null;
+  zone: "mgp" | "zwroty";
   status: string;
   progress: { total: number; done: number; remaining: number; onCart: number };
   queueAlerts: PutawayQueueAlert[];

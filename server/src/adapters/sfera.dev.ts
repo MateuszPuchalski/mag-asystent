@@ -25,7 +25,7 @@ export class DevSferaAdapter implements SferaAdapter {
           .get(it.twId, magFrom) as { stan: number } | undefined;
         if (!from) throw new Error(`Brak stanu źródłowego tw_id=${it.twId}`);
         if (from.stan < it.qty) {
-          throw new Error(`Za mało na MGP dla tw_id=${it.twId}: ${from.stan} < ${it.qty}`);
+          throw new Error(`Za mało w magazynie źródłowym dla tw_id=${it.twId}: ${from.stan} < ${it.qty}`);
         }
         d.prepare("UPDATE sgt_stan SET stan = stan - ? WHERE tw_id = ? AND mag_id = ?")
           .run(it.qty, it.twId, magFrom);

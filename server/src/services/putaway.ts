@@ -10,7 +10,20 @@ import type { PutawayDocument, PutawayItemView } from "../types.js";
 
 const LOCK_TTL_MS = 30 * 60 * 1000;
 
-/** Lista dokumentów FZ/PZ na MGP (14 dni) z postępem sesji (spec §5.4). */
+/** Strefa (etykieta) magazynu źródłowego sesji/dokumentu. */
+function zoneOf(magId: number | null | undefined): "mgp" | "zwroty" {
+  return magId === config.magId.ZWROTY ? "zwroty" : "mgp";
+}
+/** Kod magazynu do komunikatów dla magazyniera. */
+function magKod(magId: number): string {
+  return magId === config.magId.ZWROTY ? "ZWROTY" : "MGP";
+}
+/** Magazyn źródłowy sesji (starsze sesje bez kolumny = MGP). */
+function sessionMagId(session: { source_mag_id?: number | null }): number {
+  return session.source_mag_id ?? config.magId.MGP;
+}
+
+/** Lista dokumentów do rozłożenia: FZ/PZ na MGP + zwroty (14 dni), z postępem sesji (spec §5.4). */
 export function listDocuments(days = 14): PutawayDocument[] {
   const docs = subiekt.listPutawayDocuments(days);
   return docs.map((d) => {
@@ -42,6 +55,7 @@ export function listDocuments(days = 14): PutawayDocument[] {
       dataWyst: d.data_wyst,
       dostawca: d.dostawca ?? "",
       positions,
+      zone: zoneOf(d.mag_id),
       session,
     };
   });
@@ -54,6 +68,7 @@ export function createSession(
 ): number {
   let sourceDocId: number | null = null;
   let sourceDocNumber: string | null = null;
+  let sourceMagId = config.magId.MGP;
   let positions: Array<{ tw_id: number; ilosc: number }>;
 
   if (opts.docId) {
@@ -66,6 +81,7 @@ export function createSession(
     if (open) return open.id;
     sourceDocId = doc.dok_id;
     sourceDocNumber = doc.nr_pelny;
+    sourceMagId = doc.mag_id ?? config.magId.MGP;
     positions = subiekt.getDocumentPositions(opts.docId);
   } else {
     // wznowienie istniejącej otwartej sesji „całe MGP" — bez duplikatów pozycji
@@ -83,10 +99,10 @@ export function createSession(
   const sessionId = Number(
     db()
       .prepare(
-        `INSERT INTO putaway_sessions(source_doc_id, source_doc_number, status, created_by)
-         VALUES (?,?, 'open', ?)`
+        `INSERT INTO putaway_sessions(source_doc_id, source_doc_number, source_mag_id, status, created_by)
+         VALUES (?,?,?, 'open', ?)`
       )
-      .run(sourceDocId, sourceDocNumber, user).lastInsertRowid
+      .run(sourceDocId, sourceDocNumber, sourceMagId, user).lastInsertRowid
   );
 
   const insItem = db().prepare(
@@ -111,18 +127,25 @@ export function getSession(sessionId: number) {
   const session = db()
     .prepare("SELECT * FROM putaway_sessions WHERE id = ?")
     .get(sessionId) as
-    | { id: number; source_doc_id: number | null; source_doc_number: string | null; status: string }
+    | {
+        id: number;
+        source_doc_id: number | null;
+        source_doc_number: string | null;
+        source_mag_id: number | null;
+        status: string;
+      }
     | undefined;
   if (!session) return undefined;
+  const srcMag = sessionMagId(session);
 
   const rows = db()
     .prepare(
       `SELECT i.*, t.symbol AS sym, t.nazwa AS name, COALESCE(s.stan,0) AS mgp_stan
        FROM putaway_items i JOIN sgt_towar t ON t.tw_id = i.tw_id
-       LEFT JOIN sgt_stan s ON s.tw_id = i.tw_id AND s.mag_id = ${config.magId.MGP}
+       LEFT JOIN sgt_stan s ON s.tw_id = i.tw_id AND s.mag_id = ?
        WHERE i.session_id = ?`
     )
-    .all(sessionId) as Array<any>;
+    .all(srcMag, sessionId) as Array<any>;
 
   const items: PutawayItemView[] = rows
     .map((r) => ({
@@ -175,6 +198,7 @@ export function getSession(sessionId: number) {
     id: session.id,
     sourceDocId: session.source_doc_id,
     sourceDocNumber: session.source_doc_number,
+    zone: zoneOf(srcMag),
     status: session.status,
     progress: { total, done: doneCount, remaining: total - doneCount, onCart },
     queueAlerts,
@@ -188,10 +212,18 @@ function freshLock(lockedBy: string | null, lockedAt: string | null): string | n
   return Date.now() - Date.parse(lockedAt) < LOCK_TTL_MS ? lockedBy : null;
 }
 
-/** Dostępny stan MGP = stan magazynowy minus MM „w drodze" (kolejka Sfery). */
-function availableMgp(twId: number): number {
-  const stan = subiekt.getStock(twId, config.magId.MGP).stan;
-  return stan - (pendingMmByTw().get(twId) ?? 0);
+/** Dostępny stan strefy źródłowej = stan magazynowy minus MM „w drodze" z tej strefy. */
+function availableIn(magId: number, twId: number): number {
+  const stan = subiekt.getStock(twId, magId).stan;
+  return stan - (pendingMmByTw(magId).get(twId) ?? 0);
+}
+
+/** Magazyn źródłowy sesji po jej id (dla operacji na pozycjach). */
+function magOfSession(sessionId: number): number {
+  const s = db()
+    .prepare("SELECT source_mag_id FROM putaway_sessions WHERE id=?")
+    .get(sessionId) as { source_mag_id: number | null } | undefined;
+  return sessionMagId(s ?? {});
 }
 
 /** Skan towaru na wózek (spec §5.4 pkt 1). Zwraca pozycję lub info „spoza dok.". */
@@ -209,9 +241,10 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
   const lock = freshLock(item.locked_by, item.locked_at);
   if (lock && lock !== user) return { locked: true, lockedBy: lock };
 
-  // bez fizycznego stanu na MGP (po odjęciu MM „w drodze") nie ma czego rozkładać
-  const avail = availableMgp(twId);
-  if (avail <= 0) return { error: "Brak stanu na MGP (lub całość już w drodze na MAG)" };
+  // bez fizycznego stanu w strefie źródłowej (po odjęciu MM „w drodze") nie ma czego rozkładać
+  const srcMag = magOfSession(sessionId);
+  const avail = availableIn(srcMag, twId);
+  if (avail <= 0) return { error: `Brak stanu na ${magKod(srcMag)} (lub całość już w drodze na MAG)` };
 
   const remaining = item.qty_expected - item.qty_done;
   const defaultQty = Math.min(Math.max(remaining, 1), avail);
@@ -232,8 +265,9 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
 export function addOffDocument(sessionId: number, twId: number, user: string) {
   const t = subiekt.getProductById(twId);
   if (!t) return { error: "Nieznany towar" };
-  const avail = availableMgp(twId);
-  if (avail <= 0) return { error: "Brak stanu na MGP (lub całość już w drodze na MAG)" };
+  const srcMag = magOfSession(sessionId);
+  const avail = availableIn(srcMag, twId);
+  if (avail <= 0) return { error: `Brak stanu na ${magKod(srcMag)} (lub całość już w drodze na MAG)` };
   const targetLoc = t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean)[0] ?? null : null;
   const id = Number(
     db()
@@ -261,8 +295,9 @@ export function confirmItem(
   const locErr = validateLocationCode(location);
   if (locErr) return { error: locErr };
   if (!Number.isFinite(qty) || qty <= 0) return { error: "Ilość musi być większa od zera" };
-  const avail = availableMgp(item.tw_id);
-  if (qty > avail) return { error: `Na MGP dostępne tylko ${avail} szt`, status: 409 };
+  const srcMag = magOfSession(item.session_id);
+  const avail = availableIn(srcMag, item.tw_id);
+  if (qty > avail) return { error: `Na ${magKod(srcMag)} dostępne tylko ${avail} szt`, status: 409 };
   db()
     .prepare("UPDATE putaway_items SET status='on_cart', stage_qty=?, stage_loc=?, stage_update_loc=? WHERE id=?")
     .run(qty, location.toUpperCase(), updateLoc ? 1 : 0, itemId);
@@ -312,16 +347,18 @@ export function commitCart(sessionId: number, user: string) {
     .filter((i) => i.stage_qty > 0)
     .map((i) => ({ twId: i.tw_id, qty: i.stage_qty }));
 
-  // walidacja przed kolejką: suma z wózka per towar vs stan MGP minus MM „w drodze"
-  // (inaczej MM padłby dopiero w workerze, a pozycje byłyby już odhaczone)
+  // walidacja przed kolejką: suma z wózka per towar vs stan strefy źródłowej
+  // minus MM „w drodze" (inaczej MM padłby dopiero w workerze, a pozycje
+  // byłyby już odhaczone)
+  const srcMag = sessionMagId(session);
   const staged = new Map<number, number>();
   for (const i of mmItems) staged.set(i.twId, (staged.get(i.twId) ?? 0) + i.qty);
   for (const [twId, qty] of staged) {
-    const avail = availableMgp(twId);
+    const avail = availableIn(srcMag, twId);
     if (qty > avail) {
       const t = subiekt.getProductById(twId);
       return {
-        error: `${t?.symbol ?? twId}: na MGP dostępne tylko ${avail} szt (na wózku ${qty})`,
+        error: `${t?.symbol ?? twId}: na ${magKod(srcMag)} dostępne tylko ${avail} szt (na wózku ${qty})`,
         status: 409,
       };
     }
@@ -329,13 +366,13 @@ export function commitCart(sessionId: number, user: string) {
 
   const queueIds: number[] = [];
   if (mmItems.length) {
-    const qid = enqueueMM(config.magId.MGP, config.magId.MAG, mmItems, {
+    const qid = enqueueMM(srcMag, config.magId.MAG, mmItems, {
       createdBy: user,
       twId: null,
       sourceDocId: session.source_doc_id,
       sessionId,
       label: `MM wózek · ${mmItems.length} poz.`,
-      detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt MGP→MAG (rozkładanie)`,
+      detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt ${magKod(srcMag)}→MAG (rozkładanie)`,
     });
     queueIds.push(qid);
   }
@@ -368,7 +405,7 @@ export function commitCart(sessionId: number, user: string) {
   });
   tx();
 
-  logEvent("putaway_commit_cart", user, null, { sessionId, items: cart.length, queueIds });
+  logEvent("putaway_commit_cart", user, null, { sessionId, items: cart.length, queueIds, magFrom: srcMag });
   return { queueIds, committed: cart.length };
 }
 

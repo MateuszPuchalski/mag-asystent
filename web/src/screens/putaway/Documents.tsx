@@ -1,4 +1,4 @@
-import { PackageOpen, ChevronRight, Boxes } from "lucide-react";
+import { PackageOpen, ChevronRight, Boxes, Undo2 } from "lucide-react";
 import { Cog } from "@/components/glyphs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,37 +28,59 @@ export function PutawayDocuments() {
     );
   }
 
+  const deliveries = docs.filter((d: PutawayDocument) => d.zone !== "zwroty");
+  const returns = docs.filter((d: PutawayDocument) => d.zone === "zwroty");
+
+  const DocRow = ({ d }: { d: PutawayDocument }) => (
+    <button
+      key={d.docId}
+      onClick={() => open(d.docId)}
+      className="flex items-center gap-3 rounded-lg border bg-card px-3 py-3 text-left transition-colors hover:border-amber hover:bg-amber-bg-soft"
+    >
+      <div className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-secondary">
+        {d.zone === "zwroty" ? (
+          <Undo2 className="h-5 w-5 text-amber-ink" />
+        ) : (
+          <PackageOpen className="h-5 w-5 text-ink" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-cond text-[15px] font-bold tracking-wide">{d.nrPelny}</span>
+          {d.session && (
+            <Badge variant={d.session.progressPct === 100 ? "success" : "amber"}>
+              {d.session.progressPct}%
+            </Badge>
+          )}
+        </div>
+        <div className="truncate text-xs text-ink-soft">{d.dostawca}</div>
+        <div className="text-[11px] text-ink-mute">
+          {d.dataWyst} · {d.positions} poz.
+        </div>
+      </div>
+      <ChevronRight className="h-5 w-5 flex-none text-ink-mute" />
+    </button>
+  );
+
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+      {returns.length > 0 && (
+        <>
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-ink">
+            Zwroty od klientów · kartony do rozłożenia
+          </div>
+          {returns.map((d: PutawayDocument) => (
+            <DocRow key={d.docId} d={d} />
+          ))}
+        </>
+      )}
+
       <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
         Dostawy FZ/PZ na MGP · ostatnie 14 dni
       </div>
 
-      {docs.map((d: PutawayDocument) => (
-        <button
-          key={d.docId}
-          onClick={() => open(d.docId)}
-          className="flex items-center gap-3 rounded-lg border bg-card px-3 py-3 text-left transition-colors hover:border-amber hover:bg-amber-bg-soft"
-        >
-          <div className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-secondary">
-            <PackageOpen className="h-5 w-5 text-ink" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-cond text-[15px] font-bold tracking-wide">{d.nrPelny}</span>
-              {d.session && (
-                <Badge variant={d.session.progressPct === 100 ? "success" : "amber"}>
-                  {d.session.progressPct}%
-                </Badge>
-              )}
-            </div>
-            <div className="truncate text-xs text-ink-soft">{d.dostawca}</div>
-            <div className="text-[11px] text-ink-mute">
-              {d.dataWyst} · {d.positions} poz.
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 flex-none text-ink-mute" />
-        </button>
+      {deliveries.map((d: PutawayDocument) => (
+        <DocRow key={d.docId} d={d} />
       ))}
 
       <Button

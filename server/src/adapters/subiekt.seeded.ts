@@ -85,10 +85,10 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE mag_id = ? AND data_wyst >= ?
+         WHERE mag_id IN (?, ?) AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(config.magId.MGP, cutoff) as RawDocument[];
+      .all(config.magId.MGP, config.magId.ZWROTY, cutoff) as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
