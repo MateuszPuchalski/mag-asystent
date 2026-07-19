@@ -4,11 +4,12 @@ import type { SubiektAdapter } from "../adapters/subiekt.js";
 import type { ProductCard, StockView } from "../types.js";
 
 /**
- * Suma oczekujących przesunięć MM (MGP→MAG) per towar, z kolejki Sfery.
+ * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
  * Uwzględnia zadania typu mm/combo w statusach pending/processing/waiting_for_doc
- * (spec §5.1 — „korekta o kolejkę").
+ * (spec §5.1 — „korekta o kolejkę"). `magFrom` zawęża do MM z danego magazynu
+ * źródłowego (MGP lub Zwroty); bez argumentu — wszystkie MM w drodze na MAG.
  */
-export function pendingMmByTw(): Map<number, number> {
+export function pendingMmByTw(magFrom?: number): Map<number, number> {
   const rows = db()
     .prepare(
       `SELECT payload FROM sfera_queue
@@ -19,7 +20,12 @@ export function pendingMmByTw(): Map<number, number> {
   const map = new Map<number, number>();
   for (const r of rows) {
     try {
-      const p = JSON.parse(r.payload) as { items?: Array<{ twId: number; qty: number }> };
+      const p = JSON.parse(r.payload) as {
+        magFrom?: number;
+        items?: Array<{ twId: number; qty: number }>;
+      };
+      // starsze zadania bez magFrom traktujemy jak MGP (jedyne dawne źródło)
+      if (magFrom != null && (p.magFrom ?? config.magId.MGP) !== magFrom) continue;
       for (const it of p.items ?? []) {
         map.set(it.twId, (map.get(it.twId) ?? 0) + it.qty);
       }
@@ -50,7 +56,9 @@ export function buildProductCard(
   if (!t) return undefined;
   const magRaw = adapter.getStock(twId, config.magId.MAG);
   const mgpRaw = adapter.getStock(twId, config.magId.MGP);
-  const pendingOut = pendingMmByTw().get(twId) ?? 0;
+  const zwRaw = adapter.getStock(twId, config.magId.ZWROTY);
+  const pendingMgp = pendingMmByTw(config.magId.MGP).get(twId) ?? 0;
+  const pendingZw = pendingMmByTw(config.magId.ZWROTY).get(twId) ?? 0;
 
   return {
     id: t.tw_id,
@@ -61,8 +69,9 @@ export function buildProductCard(
     ordered: t.ordered,
     desc: t.opis ?? "",
     locs: t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean) : [],
-    // MGP traci to, co w kolejce do przeniesienia; MAG zyskuje (⏳ w drodze)
-    mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, pendingOut, 0),
-    mag: stockView(magRaw.stan, magRaw.stan_rez, 0, pendingOut),
+    // strefy źródłowe tracą to, co w kolejce do przeniesienia; MAG zyskuje (⏳ w drodze)
+    mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, pendingMgp, 0),
+    zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, pendingZw, 0),
+    mag: stockView(magRaw.stan, magRaw.stan_rez, 0, pendingMgp + pendingZw),
   };
 }

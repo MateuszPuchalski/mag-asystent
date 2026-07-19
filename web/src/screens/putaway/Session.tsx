@@ -110,8 +110,9 @@ export function PutawaySession() {
       )}
       <div className="flex-none border-b bg-card px-3 py-2">
         <div className="flex items-center justify-between">
-          <div className="font-cond text-[15px] font-bold tracking-wide">
+          <div className="flex items-center gap-2 font-cond text-[15px] font-bold tracking-wide">
             {sess.sourceDocNumber ?? "Całe MGP"}
+            {sess.zone === "zwroty" && <Badge variant="amber">ZWROTY</Badge>}
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-ink-soft">
             {sess.inFlight > 0 && <span title="Zapisy w drodze do Subiekta">⏳ {sess.inFlight}</span>}
@@ -167,7 +168,7 @@ export function PutawaySession() {
               <PackageCheck className="h-4 w-4" /> Na wózku ({cart.length})
             </div>
             {cart.map((it) => (
-              <CartRow key={it.id} sid={sid} it={it} onChange={refresh} />
+              <CartRow key={it.id} sid={sid} it={it} zone={sess.zone} onChange={refresh} />
             ))}
             <Button size="tall" className="font-cond text-[15px] font-extrabold tracking-wide" onClick={commit}>
               ZATWIERDŹ WÓZEK ({cart.length}) → MM + LOKALIZACJE
@@ -240,7 +241,17 @@ export function PutawaySession() {
   );
 }
 
-function CartRow({ sid, it, onChange }: { sid: number; it: PutawayItem; onChange: () => void }) {
+function CartRow({
+  sid,
+  it,
+  zone,
+  onChange,
+}: {
+  sid: number;
+  it: PutawayItem;
+  zone?: "mgp" | "zwroty";
+  onChange: () => void;
+}) {
   const [qty, setQty] = useState(it.stageQty ?? 0);
   const [loc, setLoc] = useState(it.stageLoc ?? "");
   const [picking, setPicking] = useState(!it.stageLoc);
@@ -288,7 +299,9 @@ function CartRow({ sid, it, onChange }: { sid: number; it: PutawayItem; onChange
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setQty(Math.min(it.qtyExpected || qty + 1, qty + 1))}>
           <Plus className="h-4 w-4" />
         </Button>
-        <div className="text-[11px] text-ink-mute">z {it.qtyExpected || "—"} · MGP {it.mgpStan}</div>
+        <div className="text-[11px] text-ink-mute">
+          z {it.qtyExpected || "—"} · {zone === "zwroty" ? "ZWROTY" : "MGP"} {it.mgpStan}
+        </div>
         <div className="ml-auto flex gap-1.5">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-ink-mute" onClick={skip} title="Pomiń">
             <SkipForward className="h-4 w-4" />

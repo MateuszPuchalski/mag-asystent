@@ -42,6 +42,7 @@ function seed() {
 
   d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MAG, "MAG");
   d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MGP, "MGP");
+  d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.ZWROTY, "ZWROTY");
 
   const insTowar = d.prepare(
     `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, ordered, opis, lokalizacja)
@@ -117,6 +118,36 @@ function seed() {
     });
   });
   buildDocs();
+
+  // ── syntetyczny karton zwrotów od klientów (magazyn Zwroty) ──────────────
+  // Biuro kompletuje zwroty w kartony (~20 szt.) i wystawia dokument; kolektor
+  // otwiera go w rozkładaniu i robi MM Zwroty→MAG. Pozycje: towary z MAG
+  // z lokalizacją (wróciły od klientów) + jeden bez lokalizacji (BRAK LOK).
+  const zwrotItems: Array<{ tw_id: number; qty: number }> = [];
+  rows.forEach((r, i) => {
+    const mag = r[3];
+    const lokalizacja = r[8];
+    if (zwrotItems.length < 7 && mag > 0 && lokalizacja) {
+      zwrotItems.push({ tw_id: i + 1, qty: (zwrotItems.length % 3) + 1 });
+    }
+  });
+  if (noLocProducts.length) zwrotItems.push({ tw_id: noLocProducts[0], qty: 2 });
+
+  if (zwrotItems.length) {
+    const zwDokId = paczki.length + 1;
+    const buildZwrot = d.transaction(() => {
+      insDok.run(zwDokId, "ZW", `ZW 7/07/2026`, baseDate.toISOString().slice(0, 10), config.magId.ZWROTY, "Zwroty klienckie", 0);
+      const insZwStan = d.prepare(
+        "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,0) ON CONFLICT(tw_id, mag_id) DO UPDATE SET stan = stan + excluded.stan"
+      );
+      for (const it of zwrotItems) {
+        insPoz.run(zwDokId, it.tw_id, it.qty);
+        insZwStan.run(it.tw_id, config.magId.ZWROTY, it.qty);
+      }
+    });
+    buildZwrot();
+    console.log(`[seed] karton zwrotów: ZW 7/07/2026, pozycji=${zwrotItems.length}`);
+  }
 
   const docs = d.prepare("SELECT dok_id, nr_pelny, w_buforze FROM sgt_dokument").all();
   console.log(`[seed] dokumenty FZ/PZ:`, docs);

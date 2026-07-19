@@ -1,6 +1,9 @@
-import { Volume2, Mic, MonitorSmartphone, Vibrate, AlertTriangle, Footprints, BatteryLow, Camera } from "lucide-react";
+import { useState } from "react";
+import { Volume2, Mic, MonitorSmartphone, Vibrate, AlertTriangle, Footprints, BatteryLow, Camera, Check, Plus, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings, setSetting, type Settings as SettingsModel } from "@/lib/settings";
+import { addUser, removeUser, selectUser, useUsers, MAX_USER_LEN } from "@/lib/users";
+import { toast } from "@/lib/store";
 import { speak, spellLoc, voiceAvailable } from "@/lib/voice";
 import { wakeLockAvailable } from "@/lib/wakelock";
 import { getAsrError, micAvailable, retryAsr, useAsrProgress, useAsrStatus } from "@/lib/asr";
@@ -99,6 +102,98 @@ function Toggle({ on, disabled, onClick }: { on: boolean; disabled: boolean; onC
   );
 }
 
+function UsersSection() {
+  const { list, current } = useUsers();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+
+  function submitNew() {
+    const added = addUser(name);
+    if (!added) return;
+    setName("");
+    setAdding(false);
+    toast(`Pracuje: ${added}`);
+  }
+
+  return (
+    <>
+      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
+        Użytkownik — kto pracuje
+      </div>
+
+      {list.map((u) => (
+        <div key={u} className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              if (u === current) return;
+              selectUser(u);
+              toast(`Pracuje: ${u}`);
+            }}
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-left transition-colors",
+              u === current ? "border-amber bg-amber-bg-soft" : "hover:border-amber"
+            )}
+          >
+            <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-secondary text-ink">
+              <UserRound className="h-4 w-4" />
+            </div>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{u}</span>
+            {u === current && <Check className="h-4 w-4 flex-none text-amber-ink" />}
+          </button>
+          {list.length > 1 && (
+            <button
+              onClick={() => {
+                removeUser(u);
+                toast(`Usunięto: ${u}`);
+              }}
+              className="grid h-9 w-9 flex-none place-items-center rounded-lg border text-ink-mute hover:border-destructive hover:text-destructive"
+              title={`Usuń użytkownika ${u}`}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      ))}
+
+      {adding ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitNew();
+          }}
+          className="flex items-center gap-1.5"
+        >
+          <input
+            autoFocus
+            value={name}
+            maxLength={MAX_USER_LEN}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Imię lub inicjały…"
+            autoCapitalize="words"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-[42px] min-w-0 flex-1 rounded-lg border-2 border-ink bg-card px-3 text-[15px] font-medium outline-none placeholder:text-ink-mute"
+          />
+          <button
+            type="submit"
+            disabled={!name.trim()}
+            className="h-[42px] flex-none rounded-lg bg-amber px-3.5 font-cond text-[13px] font-bold tracking-wide disabled:opacity-40"
+          >
+            DODAJ
+          </button>
+        </form>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#C9C5BB] px-3 py-2.5 font-cond text-[13px] font-bold tracking-wide text-ink-soft transition-colors hover:border-amber"
+        >
+          <Plus className="h-4 w-4" /> NOWY UŻYTKOWNIK
+        </button>
+      )}
+    </>
+  );
+}
+
 export function Settings() {
   const s = useSettings();
   const asr = useAsrStatus();
@@ -106,7 +201,9 @@ export function Settings() {
 
   return (
     <div className="no-scrollbar flex flex-1 flex-col gap-2 overflow-y-auto p-3">
-      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
+      <UsersSection />
+
+      <div className="mt-2 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-mute">
         Funkcje urządzenia
       </div>
 

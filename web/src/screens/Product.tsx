@@ -139,6 +139,13 @@ export function Product() {
             {p.mgp.stan > 0 ? "do zasilenia MAG" : p.ordered > 0 ? "zam. u dostawcy: " + p.ordered : "strefa przyjęć pusta"}
           </div>
         </div>
+        {(p.zwroty?.stan ?? 0) > 0 && (
+          <div className="col-span-2 rounded-lg border border-amber-line bg-amber-bg p-3">
+            <div className="text-[10px] font-bold tracking-[0.12em] text-ink-mute">ZWROTY OD KLIENTÓW</div>
+            <div className="font-cond text-3xl font-extrabold leading-tight text-amber-ink">{p.zwroty!.stan}</div>
+            <div className="text-[11px] text-ink-soft">czeka na rozłożenie (karton zwrotów)</div>
+          </div>
+        )}
       </div>
 
       {hasPendingMM && (

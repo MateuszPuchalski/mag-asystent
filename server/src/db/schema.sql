@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS putaway_sessions (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   source_doc_id     INTEGER,                    -- dok_Id z SGT; NULL = tryb "całe MGP"
   source_doc_number TEXT,
+  source_mag_id     INTEGER,                    -- magazyn źródłowy (NULL = MGP; zwroty = mag Zwroty)
   status            TEXT NOT NULL DEFAULT 'open', -- open|closed|closed_with_deviations
   created_by        TEXT NOT NULL,
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),

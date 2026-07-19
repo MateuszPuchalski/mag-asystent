@@ -20,6 +20,7 @@ export interface RawDocument {
   typ: string;
   nr_pelny: string;
   data_wyst: string;
+  mag_id: number;
   dostawca: string;
   w_buforze: number;
 }
@@ -39,7 +40,7 @@ export interface SubiektAdapter {
   getProductBySymbol(symbol: string): RawProduct | undefined;
   search(q: string, limit: number): ProductRow[];
   getStock(twId: number, magId: number): RawStock;
-  /** Dokumenty FZ/PZ na magazyn MGP z ostatnich N dni (spec §5.4). */
+  /** Dokumenty do rozłożenia z ostatnich N dni: FZ/PZ na MGP + zwroty na mag. Zwroty (spec §5.4). */
   listPutawayDocuments(days: number): RawDocument[];
   getDocument(docId: number): RawDocument | undefined;
   getDocumentPositions(docId: number): RawPosition[];

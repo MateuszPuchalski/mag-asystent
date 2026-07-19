@@ -19,6 +19,8 @@ export interface ProductCard {
   locs: string[];
   mag: StockView;
   mgp: StockView;
+  /** Strefa zwrotów od klientów (magazyn Zwroty). */
+  zwroty?: StockView;
 }
 export interface ProductRow {
   id: number;
@@ -69,6 +71,8 @@ export interface PutawayDocument {
   dataWyst: string;
   dostawca: string;
   positions: number;
+  /** Strefa źródłowa: dostawy (MGP) lub zwroty od klientów. */
+  zone: "mgp" | "zwroty";
   session?: { id: number; status: string; progressPct: number };
 }
 export interface PutawayItem {
@@ -99,6 +103,7 @@ export interface PutawaySession {
   id: number;
   sourceDocId: number | null;
   sourceDocNumber: string | null;
+  zone: "mgp" | "zwroty";
   status: string;
   progress: { total: number; done: number; remaining: number; onCart: number };
   queueAlerts: PutawayQueueAlert[];
@@ -150,10 +155,20 @@ export const api = {
   product: (id: number) => req<ProductCard>(`/api/products/${id}`),
   setLocation: (
     id: number,
-    body: { action: "replace" | "add" | "remove" | "replace_one"; value?: string; replaced?: string }
-  ) => req<{ queueId: number }>(`/api/products/${id}/location`, { method: "POST", body: JSON.stringify(body) }),
-  mm: (body: { items: { twId: number; qty: number }[] }) =>
-    req<{ queueId: number; kind: string }>(`/api/mm`, { method: "POST", body: JSON.stringify(body) }),
+    body: { action: "replace" | "add" | "remove" | "replace_one"; value?: string; replaced?: string },
+    asUser?: string // operacja z bufora offline — przypisz do autora, nie bieżącego
+  ) =>
+    req<{ queueId: number }>(`/api/products/${id}/location`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      ...(asUser ? { headers: { "x-user": asUser } } : {}),
+    }),
+  mm: (body: { items: { twId: number; qty: number }[] }, asUser?: string) =>
+    req<{ queueId: number; kind: string }>(`/api/mm`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      ...(asUser ? { headers: { "x-user": asUser } } : {}),
+    }),
   history: (id: number) => req<{ entries: MovementEntry[] }>(`/api/products/${id}/history`),
 
   locations: () => req<LocationsInfo>(`/api/locations`),

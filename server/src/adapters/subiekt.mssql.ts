@@ -92,18 +92,24 @@ export async function importFromMssql(): Promise<ImportStats> {
       .request()
       .input("mag", sql.Int, config.magId.MAG)
       .input("mgp", sql.Int, config.magId.MGP)
+      .input("zw", sql.Int, config.magId.ZWROTY)
       .query<StanRow>(
         `SELECT st_TowId, st_MagId, st_Stan, st_StanRez
-         FROM tw_Stan WHERE st_MagId IN (@mag, @mgp)`
+         FROM tw_Stan WHERE st_MagId IN (@mag, @mgp, @zw)`
       )
   ).recordset;
 
   // dostawca: kh_Symbol jest pewny w każdej wersji SGT; pełna nazwa siedzi w
   // adr__Ekran (adr_NazwaPelna) — podmiana opisana w docs/subiekt-gt-edu-setup.md
+  // dokumenty zwrotów: każdy typ na magazynie Zwroty, chyba że DOK_TYP_ZWROTY zawęża
+  const zwTypFilter = c.dokTypyZwroty.length
+    ? ` AND d.dok_Typ IN (${c.dokTypyZwroty.map((n) => Math.trunc(n)).join(",")})`
+    : "";
   const dokumenty = (
     await pool
       .request()
       .input("mgp", sql.Int, config.magId.MGP)
+      .input("zw", sql.Int, config.magId.ZWROTY)
       .input("fz", sql.Int, c.dokTypFZ)
       .input("pz", sql.Int, c.dokTypPZ)
       .input("cutoff", sql.VarChar, new Date(Date.now() - DOC_IMPORT_DAYS * 86400_000).toISOString().slice(0, 10))
@@ -115,7 +121,8 @@ export async function importFromMssql(): Promise<ImportStats> {
                 ${c.bufferExpr} AS w_buforze
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
-         WHERE d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz)
+         WHERE ((d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
+             OR (d.dok_MagId = @zw${zwTypFilter}))
            AND d.dok_DataWyst >= @cutoff`
       )
   ).recordset;
@@ -153,6 +160,7 @@ export async function importFromMssql(): Promise<ImportStats> {
     }
     d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MAG, "MAG");
     d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MGP, "MGP");
+    d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.ZWROTY, "ZWROTY");
 
     for (const t of towary) {
       insTowar.run({
@@ -172,9 +180,15 @@ export async function importFromMssql(): Promise<ImportStats> {
       insStan.run(s.st_TowId, s.st_MagId, s.st_Stan ?? 0, s.st_StanRez ?? 0);
     }
     for (const doc of dokumenty) {
+      const typ =
+        doc.dok_MagId === config.magId.ZWROTY
+          ? "ZW"
+          : doc.dok_Typ === c.dokTypFZ
+            ? "FZ"
+            : "PZ";
       insDok.run(
         doc.dok_Id,
-        doc.dok_Typ === c.dokTypFZ ? "FZ" : "PZ",
+        typ,
         doc.dok_NrPelny,
         doc.data_wyst,
         doc.dok_MagId,

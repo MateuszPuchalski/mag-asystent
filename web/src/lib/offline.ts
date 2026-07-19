@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError, getUser } from "./api";
 import { toast } from "./store";
 
 /* ── Bufor operacji zapisu na czas braku sieci ──────────────────────────────
@@ -12,8 +12,8 @@ type SetLocationBody = Parameters<typeof api.setLocation>[1];
 type MmBody = Parameters<typeof api.mm>[0];
 
 type Op =
-  | { id: string; kind: "setLocation"; productId: number; body: SetLocationBody; at: number }
-  | { id: string; kind: "mm"; body: MmBody; at: number };
+  | { id: string; kind: "setLocation"; productId: number; body: SetLocationBody; at: number; user?: string }
+  | { id: string; kind: "mm"; body: MmBody; at: number; user?: string };
 
 const KEY = "wertis_offline";
 let buffer: Op[] = load();
@@ -55,8 +55,10 @@ function isNetworkError(e: unknown): boolean {
 }
 
 async function send(op: Op): Promise<{ queueId?: number }> {
-  if (op.kind === "setLocation") return api.setLocation(op.productId, op.body);
-  return api.mm(op.body);
+  // op.user: autor operacji z chwili zbuforowania — flush może nastąpić po
+  // zmianie użytkownika na wspólnym urządzeniu
+  if (op.kind === "setLocation") return api.setLocation(op.productId, op.body, op.user);
+  return api.mm(op.body, op.user);
 }
 
 /** Usuń operację z bufora (COFNIJ przed wysłaniem). Zwraca czy istniała. */
@@ -113,7 +115,7 @@ export async function runOrBuffer(
     }
   }
   const bufferId = nextId();
-  buffer = [...buffer, { ...op, id: bufferId, at: Date.now() } as Op];
+  buffer = [...buffer, { ...op, id: bufferId, at: Date.now(), user: getUser() } as Op];
   persist();
   return { offline: true, bufferId };
 }
