@@ -13,3 +13,11 @@ server/data/*.db-*
 
 # wagi modeli ASR (pobierane przez tools/fetch-asr-model.mjs)
 web/public/models/
+
+# Android (android/)
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+android/app/libs/*.aar
+android/.kotlin/

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Motyw okna przed startem Compose: papier WERTIS + grafitowy status bar. -->
+    <style name="Theme.Wertis" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#2A2A2C</item>
+        <item name="android:navigationBarColor">#F6F5F2</item>
+        <item name="android:windowBackground">#F6F5F2</item>
+    </style>
+</resources>
