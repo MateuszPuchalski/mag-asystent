@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,6 +56,7 @@ import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.SectionLabel
+import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.formatQty
 import pl.wertis.kolektor.ui.product.LocChoice
 import pl.wertis.kolektor.ui.product.LocChoiceSheet
@@ -63,10 +66,12 @@ import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
 import pl.wertis.kolektor.ui.theme.BarlowCond
 import pl.wertis.kolektor.ui.theme.BorderCol
+import pl.wertis.kolektor.ui.theme.CardBorder
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
+import pl.wertis.kolektor.ui.theme.cardSurface
 
 /* ── Karta towaru — port web/src/screens/Product.tsx ────────────────────────
    Intencja z kolejności skanów: na karcie skan etykiety regału = przenieś TEN
@@ -183,6 +188,7 @@ fun ProductScreen(graph: AppGraph) {
                 value = p.mag.avail,
                 sub = "rez. ${formatQty(p.mag.rez)} · razem ${formatQty(p.mag.stan)}",
                 highlight = false,
+                unit = p.unit,
                 modifier = Modifier.weight(1f),
             )
             StockCard(
@@ -194,6 +200,7 @@ fun ProductScreen(graph: AppGraph) {
                     else -> "strefa przyjęć pusta"
                 },
                 highlight = p.mgp.stan > 0,
+                unit = p.unit,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -203,23 +210,30 @@ fun ProductScreen(graph: AppGraph) {
                 value = p.zwroty!!.stan,
                 sub = "czeka na rozłożenie (karton zwrotów)",
                 highlight = true,
+                unit = p.unit,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         if (hasPendingMM) {
-            Text(
-                "W kolejce Sfery ⏳ ${formatQty(p.mgp.pendingOut)} szt — stan uwzględni zapis za chwilę",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = AmberInk,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .border(1.dp, AmberLine, RoundedCornerShape(10.dp))
                     .background(AmberBgSoft)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Icon(WIcons.Clock, null, tint = AmberInk, modifier = Modifier.size(16.dp))
+                Text(
+                    "W kolejce Sfery ${formatQty(p.mgp.pendingOut)} szt — stan uwzględni zapis za chwilę",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmberInk,
+                )
+            }
         }
 
         // lokalizacje
@@ -283,7 +297,12 @@ fun ProductScreen(graph: AppGraph) {
                             }
                         }
                     }
-                    Text("✕", color = InkMute, fontSize = 16.sp, modifier = Modifier.clickable { chipMenu = null }.padding(4.dp))
+                    Icon(
+                        WIcons.Close,
+                        contentDescription = "Zamknij",
+                        tint = InkMute,
+                        modifier = Modifier.clickable { chipMenu = null }.padding(4.dp).size(18.dp),
+                    )
                 }
             }
         }
@@ -295,9 +314,7 @@ fun ProductScreen(graph: AppGraph) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(1.dp, BorderCol, RoundedCornerShape(10.dp))
-                        .background(CardWhite)
+                        .cardSurface()
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
@@ -331,10 +348,10 @@ fun ProductScreen(graph: AppGraph) {
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, modifier = Modifier.weight(1f)) {
+            OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.weight(1f)) {
                 graph.nav.openScanLoc()
             }
-            OutlineButton("⇄ MM MGP → MAG", tall = true, modifier = Modifier.weight(1f)) {
+            OutlineButton("MM MGP → MAG", tall = true, leadingIcon = WIcons.Transfer, modifier = Modifier.weight(1f)) {
                 if (noMgp) graph.effects.toast("Brak stanu na MGP") else graph.nav.openMM()
             }
         }
@@ -349,22 +366,35 @@ fun ProductScreen(graph: AppGraph) {
 }
 
 @Composable
-private fun StockCard(label: String, value: Double, sub: String, highlight: Boolean, modifier: Modifier = Modifier) {
+private fun StockCard(label: String, value: Double, sub: String, highlight: Boolean, unit: String = "", modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, if (highlight) AmberLine else BorderCol, RoundedCornerShape(10.dp))
-            .background(if (highlight) AmberBg else CardWhite)
+            .cardSurface(
+                background = if (highlight) AmberBg else CardWhite,
+                borderColor = if (highlight) AmberLine else CardBorder,
+            )
             .padding(12.dp),
     ) {
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = InkMute)
-        Text(
-            formatQty(value),
-            fontFamily = BarlowCond,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 30.sp,
-            color = if (highlight) AmberInk else Ink,
-        )
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = InkSoft)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                formatQty(value),
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 36.sp,
+                lineHeight = 38.sp,
+                color = if (highlight) AmberInk else Ink,
+            )
+            if (unit.isNotEmpty()) {
+                Text(
+                    unit,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = InkMute,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 5.dp),
+                )
+            }
+        }
         Text(sub, fontSize = 11.sp, color = InkSoft)
     }
 }

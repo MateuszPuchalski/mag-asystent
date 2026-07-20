@@ -7,17 +7,20 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,6 +39,7 @@ import pl.wertis.kolektor.core.nav.SCREEN_TITLES
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.QueueSummary
 import pl.wertis.kolektor.data.userInitials
+import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
@@ -43,6 +49,8 @@ import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Destructive
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkSoft
+import pl.wertis.kolektor.ui.theme.PillRest
+import pl.wertis.kolektor.ui.theme.ShadowInk
 import pl.wertis.kolektor.ui.theme.Success
 
 /* ── Pasek górny: wstecz/logo · tytuł · awatar · pastylka Sfery ───────────── */
@@ -61,21 +69,20 @@ fun TopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(Ink)
-            .height(48.dp)
-            .padding(horizontal = 8.dp),
+            .height(52.dp)
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (hasBack) {
-            Text(
-                "‹",
-                color = Amber,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
+            Box(
                 modifier = Modifier
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .clickable(onClick = onBack)
-                    .padding(horizontal = 12.dp),
-            )
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(WIcons.Back, contentDescription = "Wstecz", tint = Amber, modifier = Modifier.size(24.dp))
+            }
         } else {
             Text(
                 "WERTIS",
@@ -83,7 +90,7 @@ fun TopBar(
                 fontFamily = BarlowCond,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 18.sp,
-                modifier = Modifier.padding(horizontal = 8.dp),
+                modifier = Modifier.padding(horizontal = 10.dp),
             )
         }
         Text(
@@ -99,16 +106,17 @@ fun TopBar(
         // awatar (inicjały) → ustawienia
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(40.dp)
                 .clip(CircleShape)
                 .background(Amber)
                 .clickable(onClick = onOpenSettings),
             contentAlignment = Alignment.Center,
         ) {
-            Text(userInitials(user), color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(userInitials(user), color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
         Box(Modifier.size(8.dp))
         SferaPill(summary, onClick = onOpenQueue)
+        Box(Modifier.size(2.dp))
     }
 }
 
@@ -119,11 +127,15 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
     val errors = summary?.error ?: 0
     val pending = summary?.pending ?: 0
 
-    val (bg: Color, fg: Color, label: String) = when {
-        errors > 0 -> Triple(Destructive, CardWhite, if (errors == 1) "1 błąd" else "$errors błędy")
-        pending > 0 -> Triple(Amber, Ink, "$pending w kolejce")
-        else -> Triple(Ink, CardWhite, "Sfera")
+    val bg: Color; val fg: Color; val label: String; val icon: ImageVector?
+    when {
+        errors > 0 -> { bg = Destructive; fg = CardWhite; label = if (errors == 1) "1 błąd" else "$errors błędy"; icon = WIcons.Alert }
+        pending > 0 -> { bg = Amber; fg = Ink; label = "$pending w kolejce"; icon = WIcons.Clock }
+        // spoczynek: uniesiona grafitowa powierzchnia z obrysem — nie grafit-na-grafit
+        else -> { bg = PillRest; fg = CardWhite; label = "Sfera"; icon = null }
     }
+    val resting = errors == 0 && pending == 0
+
     val pulse = rememberInfiniteTransition(label = "pill")
     val alpha by pulse.animateFloat(
         initialValue = 1f,
@@ -131,25 +143,37 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
         animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
         label = "pillAlpha",
     )
+    val shape = RoundedCornerShape(50)
 
     Row(
         modifier = Modifier
             .alpha(alpha)
-            .clip(RoundedCornerShape(50))
+            .shadow(3.dp, shape, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
+            .clip(shape)
             .background(bg)
+            .then(if (resting) Modifier.border(1.dp, Color.White.copy(alpha = 0.18f), shape) else Modifier)
+            .heightIn(min = 40.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (errors == 0 && pending == 0) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(Success))
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(15.dp))
+        } else {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Success)
+                    .border(3.dp, Success.copy(alpha = 0.25f), CircleShape),
+            )
         }
-        Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = fg, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
-/* ── Dolny pasek: SKAN · ROZKŁADANIE ──────────────────────────────────────── */
+/* ── Dolny pasek: SKAN · ROZKŁADANIE (ikona + etykieta, aktywna w bursztynie) ── */
 
 @Composable
 fun TabBar(screen: Screen, onHome: () -> Unit, onPutaway: () -> Unit) {
@@ -158,38 +182,50 @@ fun TabBar(screen: Screen, onHome: () -> Unit, onPutaway: () -> Unit) {
 
     Row(
         modifier = Modifier
+            .shadow(8.dp, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
             .fillMaxWidth()
             .background(CardWhite)
-            .height(54.dp),
+            .height(62.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TabItem("SKAN", homeActive, Modifier.weight(1f), onHome)
-        TabItem("ROZKŁADANIE", putawayActive, Modifier.weight(1f), onPutaway)
+        TabItem("SKAN", WIcons.Scan, homeActive, Modifier.weight(1f), onHome)
+        TabItem("ROZKŁADANIE", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
     }
 }
 
 @Composable
-private fun TabItem(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Box(
+private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Column(
         modifier = modifier
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = if (active) AmberInk else InkSoft,
+            modifier = Modifier
+                .then(
+                    if (active) {
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(AmberBg)
+                            .padding(horizontal = 16.dp, vertical = 3.dp)
+                    } else {
+                        Modifier.padding(horizontal = 16.dp, vertical = 3.dp)
+                    },
+                )
+                .size(23.dp),
+        )
         Text(
             label,
             fontFamily = BarlowCond,
             fontWeight = if (active) FontWeight.ExtraBold else FontWeight.SemiBold,
-            fontSize = 15.sp,
+            fontSize = 12.5.sp,
+            letterSpacing = 0.4.sp,
             color = if (active) AmberInk else InkSoft,
-            modifier = if (active) {
-                Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(AmberBg)
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-            } else {
-                Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-            },
         )
     }
 }
