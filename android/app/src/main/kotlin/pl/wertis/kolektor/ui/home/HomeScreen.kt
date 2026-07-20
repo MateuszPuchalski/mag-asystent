@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,11 +48,14 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.SectionLabel
+import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
-import pl.wertis.kolektor.ui.theme.BorderCol
-import pl.wertis.kolektor.ui.theme.CardWhite
+import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
+import pl.wertis.kolektor.ui.theme.InkSoft
+import pl.wertis.kolektor.ui.theme.Secondary
+import pl.wertis.kolektor.ui.theme.cardSurface
 
 /* ── Ekran główny: skan / wyszukiwarka / ostatnio skanowane ─────────────────
    Port web/src/screens/Home.tsx. Wykrywanie skanu w polu: tempo znaków
@@ -166,6 +172,7 @@ fun HomeScreen(graph: AppGraph) {
                 queryFlow.value = newValue
             },
             placeholder = "Skanuj lub wpisz symbol / nazwę…",
+            leadingIcon = WIcons.Search,
             imeAction = ImeAction.Search,
             onDone = ::onEnter,
         )
@@ -189,7 +196,7 @@ fun HomeScreen(graph: AppGraph) {
         } else {
             Text("Dane na żywo z serwera (odczyt SQL z Subiekta)", fontSize = 11.sp, color = InkMute)
 
-            OutlineButton("📍 SKANUJ LOKALIZACJĘ", modifier = Modifier.fillMaxWidth()) {
+            OutlineButton("SKANUJ LOKALIZACJĘ", leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
                 graph.nav.openLocation("")
             }
 
@@ -199,10 +206,10 @@ fun HomeScreen(graph: AppGraph) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(CardWhite)
+                            .cardSurface()
+                            .heightIn(min = 48.dp)
                             .clickable { graph.nav.openProduct(r.id, RecentEntry(r.id, r.sym, r.loc)) }
-                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -212,15 +219,17 @@ fun HomeScreen(graph: AppGraph) {
                             color = Ink,
                             modifier = Modifier.weight(1f),
                         )
-                        Text(
-                            r.loc,
-                            fontSize = 12.sp,
-                            color = InkMute,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(BorderCol.copy(alpha = 0.5f))
-                                .padding(horizontal = 7.dp, vertical = 2.dp),
-                        )
+                                .background(Secondary)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Icon(WIcons.Pin, null, tint = AmberInk, modifier = Modifier.size(13.dp))
+                            Text(r.loc, fontSize = 12.sp, color = InkSoft)
+                        }
                     }
                 }
             }

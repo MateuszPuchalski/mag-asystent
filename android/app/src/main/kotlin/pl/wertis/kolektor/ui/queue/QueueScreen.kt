@@ -1,17 +1,23 @@
 package pl.wertis.kolektor.ui.queue
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -37,16 +43,18 @@ import pl.wertis.kolektor.core.net.QueueStatus
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
+import pl.wertis.kolektor.ui.components.WIcons
+import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
-import pl.wertis.kolektor.ui.theme.BorderCol
-import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Destructive
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
 import pl.wertis.kolektor.ui.theme.Muted
 import pl.wertis.kolektor.ui.theme.Success
+import pl.wertis.kolektor.ui.theme.cardSurface
+import androidx.compose.ui.graphics.vector.ImageVector
 
 /* ── Kolejka Sfery — port web/src/screens/Queue.tsx ─────────────────────────
    Lista zadań workera (ostatnie 100), PONÓW przy błędzie, ANULUJ dla
@@ -66,6 +74,21 @@ private fun statusColors(s: QueueStatus): Pair<Color, Color> = when (s) {
     QueueStatus.ERROR -> Destructive.copy(alpha = 0.12f) to Destructive
     QueueStatus.PENDING, QueueStatus.PROCESSING, QueueStatus.WAITING_FOR_DOC -> AmberBg to AmberInk
     QueueStatus.CANCELLED -> Muted to InkMute
+}
+
+/** Boczny pasek stanu — status widać zanim przeczytasz plakietkę. */
+private fun stripeColor(s: QueueStatus): Color = when (s) {
+    QueueStatus.DONE -> Success
+    QueueStatus.ERROR -> Destructive
+    QueueStatus.PENDING, QueueStatus.PROCESSING, QueueStatus.WAITING_FOR_DOC -> Amber
+    QueueStatus.CANCELLED -> InkMute
+}
+
+private fun badgeIcon(s: QueueStatus): ImageVector? = when (s) {
+    QueueStatus.DONE -> WIcons.Check
+    QueueStatus.ERROR -> WIcons.Alert
+    QueueStatus.PENDING, QueueStatus.PROCESSING, QueueStatus.WAITING_FOR_DOC -> WIcons.Clock
+    QueueStatus.CANCELLED -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,43 +161,55 @@ fun QueueScreen(graph: AppGraph) {
 @Composable
 private fun QueueRow(item: QueueItem, onRetry: () -> Unit, onCancel: () -> Unit) {
     val (bg, fg) = statusColors(item.status)
-    Column(
+    val bIcon = badgeIcon(item.status)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, BorderCol, RoundedCornerShape(10.dp))
-            .background(CardWhite)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .cardSurface()
+            .height(IntrinsicSize.Min),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.label, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink, maxLines = 1)
-                if (item.detail.isNotEmpty()) {
-                    Text(item.detail, fontSize = 12.sp, color = InkSoft, maxLines = 2)
+        Box(
+            Modifier
+                .width(4.dp)
+                .fillMaxHeight()
+                .background(stripeColor(item.status)),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.label, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink, maxLines = 1)
+                    if (item.detail.isNotEmpty()) {
+                        Text(item.detail, fontSize = 12.sp, color = InkSoft, maxLines = 2)
+                    }
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(bg)
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        bIcon?.let { Icon(it, null, tint = fg, modifier = Modifier.size(12.dp)) }
+                        Text(statusLabel(item.status), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = fg)
+                    }
+                    Text(item.time, fontSize = 10.sp, color = InkMute)
                 }
             }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    statusLabel(item.status),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = fg,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(bg)
-                        .padding(horizontal = 7.dp, vertical = 2.dp),
-                )
-                Text(item.time, fontSize = 10.sp, color = InkMute)
+            item.errMsg?.let {
+                Text(it, fontSize = 12.sp, color = Destructive)
             }
-        }
-        item.errMsg?.let {
-            Text(it, fontSize = 12.sp, color = Destructive)
-        }
-        when (item.status) {
-            QueueStatus.ERROR -> OutlineButton("PONÓW", modifier = Modifier.fillMaxWidth(), onClick = onRetry)
-            QueueStatus.PENDING -> OutlineButton("ANULUJ", danger = true, modifier = Modifier.fillMaxWidth(), onClick = onCancel)
-            else -> {}
+            when (item.status) {
+                QueueStatus.ERROR -> OutlineButton("PONÓW", modifier = Modifier.fillMaxWidth(), onClick = onRetry)
+                QueueStatus.PENDING -> OutlineButton("ANULUJ", danger = true, modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+                else -> {}
+            }
         }
     }
 }
