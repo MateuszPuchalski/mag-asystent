@@ -87,5 +87,12 @@ class DtosTest {
             """{"docId":2,"typ":"PZ","nrPelny":"PZ 9","dataWyst":"","dostawca":"","positions":1,"zone":"mgp"}"""
         )
         assertNull(d2.session)
+        assertEquals(false, d2.onMag) // domyślnie false, gdy pole nieobecne
+
+        // dostawa już przeniesiona na MAG (biuro zrobiło MM) — do zlokalizowania
+        val d3 = WertisJson.decodeFromString<PutawayDocument>(
+            """{"docId":3,"typ":"PZ","nrPelny":"PZ 12","positions":2,"zone":"mgp","onMag":true}"""
+        )
+        assertEquals(true, d3.onMag)
     }
 }

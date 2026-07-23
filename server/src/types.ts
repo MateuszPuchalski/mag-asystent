@@ -41,6 +41,12 @@ export interface PutawayDocument {
   positions: number;
   /** Strefa źródłowa dokumentu: dostawy (MGP) lub zwroty od klientów. */
   zone: "mgp" | "zwroty";
+  /**
+   * Towary z dokumentu są już na MAG (biuro wykonało MM MGP→MAG przed
+   * rozłożeniem): strefa źródłowa pusta, a stan jest na magazynie głównym.
+   * Dostawa nadal wymaga rozłożenia — tylko bez MM, sam set_location.
+   */
+  onMag?: boolean;
   session?: { id: number; status: string; progressPct: number };
 }
 

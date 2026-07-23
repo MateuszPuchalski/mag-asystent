@@ -155,6 +155,8 @@ data class PutawayDocument(
     val positions: Int = 0,
     /** Strefa źródłowa: dostawy (MGP) lub zwroty od klientów. */
     val zone: PutawayZone = PutawayZone.MGP,
+    /** Towar z dokumentu jest już na MAG (biuro zrobiło MM) — dostawa nadal do rozłożenia, bez MM. */
+    val onMag: Boolean = false,
     val session: PutawaySessionRef? = null,
 )
 

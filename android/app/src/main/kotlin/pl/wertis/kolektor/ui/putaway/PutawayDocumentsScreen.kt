@@ -183,6 +183,21 @@ private fun DocRow(d: PutawayDocument, onClick: () -> Unit) {
                     )
                 }
             }
+            if (d.onMag && (d.session?.progressPct ?: 0.0) < 100.0) {
+                Text(
+                    "na MAG · do zlokalizowania",
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AmberInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(top = 3.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(AmberBg)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
             Text(d.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${d.dataWyst} · ${d.positions} poz.", fontSize = 11.sp, color = InkMute)
         }
