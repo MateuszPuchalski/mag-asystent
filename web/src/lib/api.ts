@@ -73,6 +73,8 @@ export interface PutawayDocument {
   positions: number;
   /** Strefa źródłowa: dostawy (MGP) lub zwroty od klientów. */
   zone: "mgp" | "zwroty";
+  /** Towar z dokumentu jest już na MAG (biuro zrobiło MM) — dostawa nadal do rozłożenia, bez MM. */
+  onMag?: boolean;
   session?: { id: number; status: string; progressPct: number };
 }
 export interface PutawayItem {

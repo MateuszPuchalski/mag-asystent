@@ -45,12 +45,15 @@ export function PutawayDocuments() {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-cond text-[15px] font-bold tracking-wide">{d.nrPelny}</span>
           {d.session && (
             <Badge variant={d.session.progressPct === 100 ? "success" : "amber"}>
               {d.session.progressPct}%
             </Badge>
+          )}
+          {d.onMag && d.session?.progressPct !== 100 && (
+            <Badge variant="amber">na MAG · do zlokalizowania</Badge>
           )}
         </div>
         <div className="truncate text-xs text-ink-soft">{d.dostawca}</div>
