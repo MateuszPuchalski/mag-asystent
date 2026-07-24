@@ -1,16 +1,15 @@
 # WERTIS · Asystent magazyniera (kolektor) — aplikacja full-stack
 
-Aplikacja PWA na kolektor (Honeywell / Android, skaner emulujący klawiaturę)
-dla magazynu części ogrodniczych pracującego na **Subiekcie GT**. Implementacja
-zgodna ze specyfikacją (`SPEC magazyn kolektor`) i projektem UI
-`Kolektor_WERTIS`, z **prawdziwymi danymi** (3415 kartotek z eksportu
-`magmat.xlsx`).
+System dla magazynu części ogrodniczych pracującego na **Subiekcie GT**,
+z **prawdziwymi danymi** (3415 kartotek z eksportu `magmat.xlsx`). Dwa klienty,
+każdy do swojej roli:
 
-> **Klient natywny (Android):** oprócz PWA dostępny jest natywny klient
-> Kotlin/Compose w [`android/`](android/README.md) — ten sam serwer, skan
-> sprzętowy (Honeywell DataCollection + Zebra DataWedge), trwały offline bez
-> service workera i kiosk przez Android lock-task/MDM. Bez funkcji głosowych
-> (ASR/komendy) i skanu kamerą. Szczegóły wdrożenia: [`DEPLOY.md`](DEPLOY.md) §6b.
+- **Kolektor = natywna aplikacja Android** ([`android/`](android/README.md),
+  Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
+  trwały offline (Room), kiosk przez Android lock-task/MDM. Wdrożenie:
+  [`DEPLOY.md`](DEPLOY.md) §5.
+- **Biuro = statyczna strona `/lookup`** (tylko odczyt, przeglądarka desktop) —
+  serwowana wprost przez serwer, bez builda frontendu.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta/Sfery jest za adapterami: w tym
@@ -21,27 +20,28 @@ produkcyjne (MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
 
 | Warstwa | Technologia |
 |---|---|
-| Frontend (`web/`) | React 19 · Vite 6 · Tailwind CSS v4 · shadcn/ui · TanStack Query · PWA |
-| Klient natywny (`android/`) | Kotlin · Jetpack Compose · Retrofit — ten sam serwer, skan sprzętowy, bez AI ([README](android/README.md)) |
+| Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · Room — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
+| Podgląd biurowy (`web/public/`) | statyczny `lookup.html` (vanilla JS + fetch) → `/lookup`, tylko odczyt |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
 | Baza aplikacji | SQLite (better-sqlite3) — kolejka, sesje, events, locki (spec §7) |
 | Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
 
-Motyw shadcn dostrojony do kolorystyki logo WERTIS (amber `#F7A600`, grafit
-`#2A2A2C`, papier `#F6F5F2`). Strefa przyjęć nazywa się **MGP**.
+Kolorystyka WERTIS: amber `#F7A600`, grafit `#2A2A2C`, papier `#F6F5F2`.
+Strefa przyjęć nazywa się **MGP**.
 
 ## Architektura (spec §3)
 
 ```
-Kolektor (PWA React)  ──REST/JSON──►  Serwer Fastify
-                                        │  SQLite: sfera_queue, putaway_*, events
-                                        │  SubiektAdapter (odczyt)  → enqueue
-                                        ▼
-                                      Worker (poll 1–2 s, sekwencyjnie)
-                                        │  SferaAdapter (zapis)
-                                        ▼
-                          DEV: tabele sgt_* (SQLite, seed z mag.xlsx)
-                          PROD: MSSQL SELECT (read-only) + Sfera COM (Windows)
+Kolektor (Android)  ─┐
+Biuro (/lookup)     ─┴─REST/JSON──►  Serwer Fastify
+                                       │  SQLite: sfera_queue, putaway_*, events
+                                       │  SubiektAdapter (odczyt)  → enqueue
+                                       ▼
+                                     Worker (poll 1–2 s, sekwencyjnie)
+                                       │  SferaAdapter (zapis)
+                                       ▼
+                         DEV: tabele sgt_* (SQLite, seed z mag.xlsx)
+                         PROD: MSSQL SELECT (read-only) + Sfera COM (Windows)
 ```
 
 Twarde zasady (spec §12) egzekwowane na serwerze: zero zapisu do „SGT" poza
@@ -54,19 +54,22 @@ każda operacja w `events`.
 ```bash
 npm install
 npm run seed     # zasila SQLite z web/public/data/products.json (raz; FORCE_SEED=1 nadpisuje)
-npm run dev      # api :3001 + worker + web :5173 (proxy /api → :3001)
+npm run dev      # api :3001 + worker; podgląd biurowy: http://localhost:3001/lookup
 ```
+
+Kolektor: build APK w [`android/`](android/README.md) (`./gradlew :app:assembleDebug`
+albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2:3001`).
 
 Produkcyjnie:
 
 ```bash
-npm run build    # web → web/dist, server → server/dist
-npm start        # Fastify serwuje web/dist + API (worker: npm -w server run start:worker)
+npm run build    # server → server/dist (frontend bez builda — web/public serwowane wprost)
+npm start        # Fastify serwuje web/public + API (worker: npm -w server run start:worker)
 ```
 
 **Wdrożenie w firmie (on-premise):** kompletna instrukcja — maszyna z Subiektem,
-usługi Windows (NSSM), DNS/zapora, HTTPS przez Caddy, tryb kiosku na
-kolektorach, etapy przejścia na MSSQL/Sferę i backup — w [`DEPLOY.md`](DEPLOY.md).
+usługi Windows (NSSM), DNS/zapora, instalacja APK na kolektorach (MDM/kiosk),
+etapy przejścia na MSSQL/Sferę i backup — w [`DEPLOY.md`](DEPLOY.md).
 
 Parametry (env, dev):
 
@@ -78,11 +81,12 @@ Parametry (env, dev):
 | `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 
-## Funkcje
+## Funkcje (kolektor — aplikacja Android)
 
 **Podgląd i operacje ad-hoc**
-- Skan (EAN 8/12/13/14, rozpoznanie po tempie <50 ms) / wyszukiwarka (symbol,
-  nazwa, końcówka EAN) — logika `SELECT` na serwerze (spec §5.1).
+- Skan sprzętowy (Zebra DataWedge / Honeywell DataCollection, fallback
+  klawiaturowy) / wyszukiwarka (symbol, nazwa, końcówka EAN) — logika `SELECT`
+  na serwerze (spec §5.1).
 - Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
@@ -92,6 +96,8 @@ Parametry (env, dev):
   PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
   prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
   błąd) — jest jednocześnie wskaźnikiem stanu; dolny pasek ma 2 zakładki.
+- Bufor offline (Room) na zapisy przy zaniku Wi-Fi, pasek COFNIJ (anulowanie
+  zadania w oknie łaski), potrząśnięcie = cofnij, asysta niskiej baterii.
 
 **Rozkładanie dostaw (put-away, spec §5.4)** — druga zakładka
 - Lista dokumentów FZ/PZ na MGP (14 dni) z postępem sesji; tryb zapasowy
@@ -119,14 +125,12 @@ Parametry (env, dev):
 ## Struktura repo
 
 ```
-web/                       frontend (React/Vite/Tailwind/shadcn)
-  src/lib/api.ts           klient REST
-  src/lib/hooks.ts         TanStack Query (dane + mutacje)
-  src/lib/store.ts         stan UI (nawigacja, feedback)
-  src/screens/             Home, Product, ScanLoc, MM, Queue
-  src/screens/putaway/     Documents, Session (wózek)
-  public/lookup.html       podgląd magazynu (biuro, read-only) → /lookup
-  public/data/products.json  3415 kartotek z magmat.xlsx
+android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
+  core/                    czysta logika JVM (skan, DTO, offline) + testy jednostkowe
+  app/                     aplikacja Compose: 10 ekranów, skanery, czujniki
+web/public/                statyki serwowane wprost przez serwer (bez builda)
+  lookup.html              podgląd magazynu (biuro, read-only) → /lookup
+  data/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
 server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
   src/db/seed.ts           seed z products.json + dokumenty FZ/PZ per dostawca
@@ -134,9 +138,6 @@ server/                    backend (Fastify + SQLite + worker)
   src/services/            stock (korekta o kolejkę), putaway, queue, events
   src/routes/              products, mm, queue, putaway (§8)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
-android/                   natywny klient Android (Kotlin/Compose) — patrz android/README.md
-  core/                    czysta logika JVM (skan, DTO, offline) + testy jednostkowe
-  app/                     aplikacja Compose: 10 ekranów, skanery, czujniki
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 ```
 

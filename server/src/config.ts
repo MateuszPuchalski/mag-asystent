@@ -121,7 +121,8 @@ export const config = {
   },
 
   /** Serwowanie zbudowanego frontendu (prod). */
-  webDist: process.env.WEB_DIST ?? path.resolve(__dirname, "../../web/dist"),
+  /** Katalog statyczny (lookup.html + assets) — serwowany wprost, bez builda. */
+  webDist: process.env.WEB_DIST ?? path.resolve(__dirname, "../../web/public"),
 };
 
 export type Config = typeof config;
