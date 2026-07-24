@@ -1,15 +1,16 @@
 # Wdrożenie WERTIS — on-premise (serwer w magazynie)
 
 Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
-**Subiekt GT ze Sferą**. Cała aplikacja (API + worker + frontend) działa na
-jednym hoście w sieci LAN magazynu; kolektory łączą się przez WiFi. Zero chmury.
+**Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
+magazynu; kolektory (aplikacja Android) łączą się przez WiFi, biuro używa
+strony `/lookup` w przeglądarce. Zero chmury, zero builda frontendu.
 
 ```
-Kolektory Honeywell (WiFi LAN)
-        │  http(s)://mag.wertis.local:3001
+Kolektory Zebra/Honeywell (APK, WiFi LAN) ─┐
+Biuro (przeglądarka → /lookup)            ─┴─ http://mag.wertis.local:3001
         ▼
 Maszyna z Subiektem GT (Windows)
-  ├─ wertis-api     Fastify: REST + serwuje frontend (web/dist)
+  ├─ wertis-api     Fastify: REST + statyki web/public (lookup)
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
   ├─ wertis.db      SQLite: kolejka, sesje rozkładania, audyt events
   ├─ MSSQL Subiekta (odczyt: login read-only)
@@ -33,7 +34,7 @@ cd C:\
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis
 cd C:\wertis
 npm ci
-npm run build      # web -> web\dist, server -> server\dist
+npm run build      # server -> server\dist (frontend bez builda: web\public serwowane wprost)
 npm run seed       # pierwszy start: zasila SQLite danymi (tryb seeded)
 ```
 
@@ -41,7 +42,7 @@ Szybki test ręczny (przed rejestracją usług):
 
 ```powershell
 node server\dist\index.js          # w drugim oknie: node server\dist\worker\worker.js
-# przeglądarka: http://localhost:3001  → aplikacja powinna działać
+# przeglądarka: http://localhost:3001/lookup  → podgląd magazynu powinien działać
 ```
 
 ## 3. Rejestracja usług Windows (NSSM)
@@ -93,91 +94,15 @@ nssm set wertis-worker AppEnvironmentExtra SGT_MODE=mssql
 netsh advfirewall firewall add rule name="WERTIS kolektor" dir=in action=allow protocol=TCP localport=3001 remoteip=localsubnet
 ```
 
-Kolektory otwierają: `http://mag.wertis.local:3001`.
+Kolektory i biuro otwierają: `http://mag.wertis.local:3001` (biuro:
+`/lookup`). HTTPS nie jest wymagane — klient natywny i statyczna strona
+`/lookup` działają po zwykłym HTTP w LAN (nie ma service workera).
 
-## 5. HTTPS (opcjonalnie, zalecane docelowo)
+## 5. Kolektory — natywna aplikacja Android (APK)
 
-Po HTTP wszystko działa, ale bez HTTPS przeglądarka nie zainstaluje PWA
-„jak aplikacji" i nie włączy cache offline (service worker wymaga secure
-context). Rozwiązanie lekkie: [Caddy](https://caddyserver.com) jako
-reverse-proxy z lokalnym CA.
-
-`C:\caddy\Caddyfile`:
-
-```
-mag.wertis.local {
-    tls internal
-    reverse_proxy localhost:3001
-}
-```
-
-```powershell
-nssm install wertis-caddy C:\caddy\caddy.exe "run --config C:\caddy\Caddyfile"
-nssm set wertis-caddy Start SERVICE_AUTO_START
-nssm start wertis-caddy
-```
-
-Certyfikat root Caddy (`%AppData%\Caddy\pki\authorities\local\root.crt`)
-zainstaluj raz na każdym kolektorze (Ustawienia → Zabezpieczenia → Zainstaluj
-certyfikat CA). Od tej pory kolektory używają `https://mag.wertis.local`.
-
-## 6. Kolektory (Honeywell / Zebra)
-
-Dwie ścieżki instalacji na kolektorze — serwer (sekcje 1–5) jest **wspólny**:
-- **6a. PWA w przeglądarce kiosku** — bez instalacji APK, wymaga HTTPS (sekcja 5)
-  do trybu „jak aplikacji" i offline; obejmuje komendy głosowe.
-- **6b. Natywna aplikacja Android (APK)** — skan przez SDK producenta, trwały
-  offline i kiosk bez przeglądarki i lokalnego CA; **bez** funkcji głosowych.
-
-### 6a. PWA w przeglądarce kiosku
-
-- Zainstaluj **Fully Kiosk Browser** (lub tryb kiosku Honeywell Enterprise
-  Browser): Start URL = adres aplikacji, pełny ekran, bez paska adresu,
-  autostart po włączeniu urządzenia.
-- Skaner pracuje jako klawiatura (keyboard wedge) z sufiksem Enter — aplikacja
-  tego oczekuje; nic nie trzeba konfigurować w samej appce.
-- WiFi: kolektory i serwer w tym samym VLAN/podsieci.
-
-#### Komendy głosowe — wagi modelu ASR (offline, tylko PWA)
-
-Rozpoznawanie mowy działa w całości na kolektorze (Whisper ONNX). Backendem jest
-ONNX Runtime **WASM** (pewny na każdym kolektorze), a ten obsługuje bez problemu
-tylko wagi **fp32** — kwantyzowany enkoder oraz kwantyzowany (4-bit/MatMulNBits)
-dekoder modeli `onnx-community/*` nie tworzą sesji. Dlatego domyślnie pobieramy
-enkoder i dekoder w fp32 (whisper-tiny ≈ 150 MB — jednorazowo, potem z cache).
-Magazyn nie ma internetu, więc wagi trzeba wgrać na serwer WERTIS:
-
-```bash
-# na dowolnej maszynie Z INTERNETEM (w repo):
-node tools/fetch-asr-model.mjs                       # domyślnie whisper-tiny, fp32
-node tools/fetch-asr-model.mjs onnx-community/whisper-base   # lepsza polszczyzna, większy
-```
-
-Powstaje katalog `web/public/models/<id-modelu>/…` — skopiuj go na serwer
-przed `npm run build` (trafi do `web/dist/models/`) albo bezpośrednio do
-`web/dist/models/` na działającej instalacji. Aplikacja ładuje wagi najpierw
-z własnego serwera (`models/…`), a huggingface.co jest tylko fallbackiem.
-Po pierwszym załadowaniu przeglądarka trzyma wagi w cache (offline).
-Przy zmianie modelu ustaw `VITE_ASR_MODEL=<id>` podczas builda frontu.
-W Ustawieniach kolektora wiersz „Komendy głosowe" pokazuje postęp pobierania,
-a przy błędzie — przyczynę i przycisk PONÓW PRÓBĘ.
-
-**Wariant lżejszy (mniejszy download, ~60 MB):** dekoder w int8 (q8) — działa
-na WASM tylko z **modelami Xenova** (standardowy int8, bez MatMulNBits):
-
-```bash
-node tools/fetch-asr-model.mjs Xenova/whisper-tiny q8
-# oraz build frontu z:  VITE_ASR_MODEL=Xenova/whisper-tiny  VITE_ASR_DECODER_DTYPE=q8
-```
-
-### 6b. Natywna aplikacja Android (APK)
-
-Alternatywa dla PWA — natywny klient z [`android/`](android/README.md).
-**Serwer bez zmian** (sekcje 1–4); aplikacja to czysty klient REST. Zalety na
-kolektorze: skan przez SDK producenta zamiast heurystyki wedge, trwały offline
-bez service workera, kiosk przez Android lock-task/MDM — **HTTPS/Caddy (sekcja 5)
-nie jest wymagane** (brak service workera, więc cleartext HTTP w LAN wystarcza).
-**Bez** komend głosowych i skanu kamerą.
+Kolektor to natywny klient z [`android/`](android/README.md) — czysty klient
+REST tego serwera. Skan przez SDK producenta (Zebra DataWedge / Honeywell
+DataCollection), trwały offline (Room), kiosk przez Android lock-task/MDM.
 
 **1. Zbuduj APK** (maszyna z Android SDK / Android Studio albo artefakt z CI
 `.github/workflows/android.yml` — job „build" wystawia `wertis-kolektor-debug-apk`):
@@ -207,7 +132,7 @@ keystore) — instrukcja podpisu jak w standardowym projekcie Android.
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
-## 7. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
+## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
 > **Test na wersji edu (bez Sfery):** kompletna instrukcja krok po kroku —
 > konfiguracja SQL Servera, loginy, checklist `[WERYFIKUJ]`, env i test
@@ -253,7 +178,7 @@ Domyślne przy `SGT_MODE=mssql`.
 
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ, MM per wózek.
 
-## 8. Backup i utrzymanie
+## 7. Backup i utrzymanie
 
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 
@@ -276,9 +201,9 @@ Domyślne przy `SGT_MODE=mssql`.
   nssm restart wertis-worker
   ```
 
-  Aktualizacja PWA idzie z buildem serwera (kolektory dostają nowy frontend po
-  odświeżeniu). **Klient natywny (APK)** aktualizuje się osobno — nowy build
-  z CI/`./gradlew :app:assembleRelease` i rozesłanie przez MDM (sekcja 6b).
+  Strona `/lookup` aktualizuje się razem z repo (statyk, bez builda — wystarczy
+  `git pull` + restart). **Klient natywny (APK)** aktualizuje się osobno — nowy
+  build z CI/`./gradlew :app:assembleRelease` i rozesłanie przez MDM (sekcja 5).
 - **Diagnoza:** `http://mag.wertis.local:3001/api/health` → `{ ok: true, mode: ... }`;
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.
 

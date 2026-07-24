@@ -2,19 +2,18 @@
   "name": "wertis-kolektor",
   "private": true,
   "version": "0.3.0",
-  "description": "WERTIS — asystent magazyniera na kolektor (Subiekt GT). Monorepo: web (React/Vite/Tailwind/shadcn) + server (Fastify/SQLite/worker).",
-  "workspaces": ["web", "server"],
+  "description": "WERTIS — asystent magazyniera (Subiekt GT). Monorepo: server (Fastify/SQLite/worker) + android (kolektor Kotlin/Compose) + web/public (statyczny podgląd /lookup).",
+  "workspaces": ["server"],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "concurrently -n api,worker,web -c green,magenta,blue \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:web\"",
+    "dev": "concurrently -n api,worker -c green,magenta \"npm:dev:api\" \"npm:dev:worker\"",
     "dev:api": "npm -w server run dev",
     "dev:worker": "npm -w server run worker",
-    "dev:web": "npm -w web run dev",
     "seed": "npm -w server run seed",
     "import:mssql": "npm -w server run import:mssql",
-    "build": "npm -w web run build && npm -w server run build",
+    "build": "npm -w server run build",
     "start": "npm -w server run start"
   },
   "devDependencies": {

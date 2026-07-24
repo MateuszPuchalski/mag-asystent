@@ -1,9 +1,11 @@
 # WERTIS Kolektor — natywna aplikacja Android
 
-Natywny klient (Kotlin + Jetpack Compose) asystenta magazyniera WERTIS.
-Czysty klient REST istniejącego serwera (`server/`, Fastify) — backend bez zmian.
-W stosunku do PWA (`web/`) **usunięto funkcje AI** (rozpoznawanie mowy Whisper,
-komendy głosowe, TTS) oraz skanowanie kamerą — skanowanie wyłącznie sprzętowe.
+**Jedyny klient kolektora** WERTIS — natywna aplikacja (Kotlin + Jetpack
+Compose), czysty klient REST istniejącego serwera (`server/`, Fastify).
+Skanowanie wyłącznie sprzętowe (Zebra DataWedge / Honeywell DataCollection,
+fallback klawiaturowy); bez funkcji głosowych i skanu kamerą. (Historycznie
+aplikacja powstała jako port PWA `web/src` — dawny kod webowy usunięto,
+odniesienia „port z web/src/…" niżej opisują pochodzenie logiki.)
 
 ## Moduły
 
