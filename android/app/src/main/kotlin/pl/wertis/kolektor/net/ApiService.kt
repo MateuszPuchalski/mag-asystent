@@ -11,7 +11,6 @@ import pl.wertis.kolektor.core.net.ConfirmBody
 import pl.wertis.kolektor.core.net.ConfirmResponse
 import pl.wertis.kolektor.core.net.CreateSessionBody
 import pl.wertis.kolektor.core.net.DeviceEventBody
-import pl.wertis.kolektor.core.net.HealthResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LocationProductsResponse
 import pl.wertis.kolektor.core.net.LocationsInfo
@@ -109,6 +108,4 @@ interface ApiService {
     @POST("api/putaway/sessions/{id}/close")
     suspend fun closeSession(@Path("id") sid: Long, @Body body: RequestBody = EMPTY_BODY): CloseSessionResponse
 
-    @GET("api/health")
-    suspend fun health(): HealthResponse
 }

@@ -5,6 +5,7 @@ import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import { pendingMmByTw } from "./stock.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
+import { parseLocs, pickingLoc } from "../locs.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type { PutawayDocument, PutawayItemView } from "../types.js";
 
@@ -26,6 +27,17 @@ function sessionMagId(session: { source_mag_id?: number | null }): number {
 /** Lista dokumentów do rozłożenia: FZ/PZ na MGP + zwroty (14 dni), z postępem sesji (spec §5.4). */
 export function listDocuments(days = 14): PutawayDocument[] {
   const docs = subiekt.listPutawayDocuments(days);
+  // mapa MM „w drodze" liczona RAZ na magazyn źródłowy dla całej listy — inaczej
+  // pełny skan kolejki (z JSON.parse) wykonywałby się per pozycja per dokument
+  const pendingByMag = new Map<number, Map<number, number>>();
+  const pendingFor = (magId: number): Map<number, number> => {
+    let m = pendingByMag.get(magId);
+    if (!m) {
+      m = pendingMmByTw(magId);
+      pendingByMag.set(magId, m);
+    }
+    return m;
+  };
   return docs.map((d) => {
     const posList = subiekt.getDocumentPositions(d.dok_id);
     const sess = db()
@@ -53,10 +65,11 @@ export function listDocuments(days = 14): PutawayDocument[] {
     // pusta (po odjęciu MM w drodze), a stan leży na MAG. Dostawa nadal wymaga
     // rozłożenia (sam set_location). Nie oznaczamy tak dostaw już rozłożonych.
     const srcMag = d.mag_id ?? config.magId.MGP;
+    const pending = pendingFor(srcMag);
     let srcUnits = 0;
     let magUnits = 0;
     for (const p of posList) {
-      srcUnits += availableIn(srcMag, p.tw_id);
+      srcUnits += availableIn(srcMag, p.tw_id, pending);
       magUnits += subiekt.getStock(p.tw_id, config.magId.MAG).stan;
     }
     const onMag =
@@ -127,7 +140,7 @@ export function createSession(
   const tx = db().transaction(() => {
     for (const [twId, qty] of agg) {
       const t = subiekt.getProductById(twId);
-      const targetLoc = t?.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean)[0] ?? null : null;
+      const targetLoc = pickingLoc(t?.lokalizacja);
       insItem.run(sessionId, twId, targetLoc, qty);
     }
   });
@@ -228,9 +241,10 @@ function freshLock(lockedBy: string | null, lockedAt: string | null): string | n
 }
 
 /** Dostępny stan strefy źródłowej = stan magazynowy minus MM „w drodze" z tej strefy. */
-function availableIn(magId: number, twId: number): number {
+function availableIn(magId: number, twId: number, pending?: Map<number, number>): number {
   const stan = subiekt.getStock(twId, magId).stan;
-  return stan - (pendingMmByTw(magId).get(twId) ?? 0);
+  const inTransit = (pending ?? pendingMmByTw(magId)).get(twId) ?? 0;
+  return stan - inTransit;
 }
 
 /** Stan na magazynie głównym (MAG). */
@@ -279,7 +293,7 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
 
   const remaining = item.qty_expected - item.qty_done;
   const defaultQty = locateOnly ? Math.max(remaining, 1) : Math.min(Math.max(remaining, 1), avail);
-  const targetLoc = t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean)[0] ?? null : null;
+  const targetLoc = pickingLoc(t.lokalizacja);
 
   db()
     .prepare(
@@ -302,7 +316,7 @@ export function addOffDocument(sessionId: number, twId: number, user: string) {
   if (locateOnly && magStock(twId) <= 0)
     return { error: `Brak stanu na ${magKod(srcMag)} ani na MAG` };
   const qty = locateOnly ? Math.max(magStock(twId), 1) : avail;
-  const targetLoc = t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean)[0] ?? null : null;
+  const targetLoc = pickingLoc(t.lokalizacja);
   const id = Number(
     db()
       .prepare(
@@ -423,7 +437,7 @@ export function commitCart(sessionId: number, user: string) {
       // set_location, gdy zeskanowana lokalizacja różni się i user zatwierdził
       // aktualizację; dla pozycji „tylko lokalizacja" zapis wymuszamy zawsze
       const t = subiekt.getProductById(i.tw_id);
-      const current = t?.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean) : [];
+      const current = parseLocs(t?.lokalizacja);
       const locateOnly = isLocateOnly(srcMag, i.tw_id);
       const forceLoc = i.stage_update_loc || locateOnly;
       if (forceLoc && i.stage_loc && current[0] !== i.stage_loc) {

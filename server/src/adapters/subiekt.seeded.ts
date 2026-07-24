@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import type { ProductRow } from "../types.js";
+import { parseLocs } from "../locs.js";
 import type {
   RawDocument,
   RawPosition,
@@ -69,7 +70,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       ean: r.ean ?? "",
       mag: r.mag,
       mgp: r.mgp,
-      locs: r.lok ? r.lok.split(" ").filter(Boolean) : [],
+      locs: parseLocs(r.lok),
     }));
   }
 
@@ -117,7 +118,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .all() as Array<{ lokalizacja: string }>;
     const set = new Set<string>();
     for (const r of rows) {
-      for (const c of r.lokalizacja.split(" ").filter(Boolean)) set.add(c);
+      for (const c of parseLocs(r.lokalizacja)) set.add(c);
     }
     return [...set].sort();
   }
@@ -146,7 +147,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       ean: r.ean ?? "",
       mag: r.mag,
       mgp: r.mgp,
-      locs: r.lok ? r.lok.split(" ").filter(Boolean) : [],
+      locs: parseLocs(r.lok),
     }));
   }
 }

@@ -70,11 +70,11 @@ function fail(task: Task, msg: string) {
   }
 }
 
-function process(task: Task) {
+async function process(task: Task): Promise<void> {
   const payload = JSON.parse(task.payload);
 
-  // dokument w buforze → czekaj (spec §8 D8). Ścieżka synchroniczna — nie
-  // zajmuje slotu workera (busy pozostaje wolne po powrocie z tick()).
+  // dokument w buforze → czekaj (spec §8 D8). Nie zajmuje slotu workera —
+  // `busy` nie jest tu ustawiane, więc następny tick weźmie inne zadanie.
   if ((task.type === "mm" || task.type === "combo") && task.source_doc_id && inBuffer(task.source_doc_id)) {
     db()
       .prepare("UPDATE sfera_queue SET status='waiting_for_doc', next_attempt_at=? WHERE id=?")
@@ -85,35 +85,35 @@ function process(task: Task) {
 
   db().prepare("UPDATE sfera_queue SET status='processing' WHERE id=?").run(task.id);
 
-  busy = true; // slot zajęty tylko na czas realnego zapisu (COM/Sfera)
-  setTimeout(async () => {
-    try {
-      if (config.worker.simErrors && Math.random() < 0.45) {
-        throw new Error("Zapis Sfery nieudany — kartoteka w edycji (Subiekt)");
-      }
-      let docNo: string | null = null;
-      if (task.type === "set_location") {
-        await sfera.applySetLocation(payload.twId, payload.newValue);
-      } else if (task.type === "mm") {
-        docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
-      } else if (task.type === "combo") {
-        docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
-        for (const it of payload.items as MmItem[]) {
-          await sfera.applySetLocation(it.twId, payload.location);
-        }
-      } else {
-        throw new Error("Nieznany typ zadania: " + task.type);
-      }
-      db()
-        .prepare("UPDATE sfera_queue SET status='done', sgt_doc_number=?, processed_at=? WHERE id=?")
-        .run(docNo, nowIso(), task.id);
-      console.log(`[worker] #${task.id} OK ${task.type}${docNo ? " · MM " + docNo : ""}`);
-    } catch (e) {
-      fail(task, e instanceof Error ? e.message : String(e));
-    } finally {
-      busy = false;
+  // slot zajęty na czas realnego zapisu — zapis do SGT musi iść sekwencyjnie
+  // (COM Sfery nie jest thread-safe, spec §9)
+  busy = true;
+  try {
+    if (config.worker.simErrors && Math.random() < 0.45) {
+      throw new Error("Zapis Sfery nieudany — kartoteka w edycji (Subiekt)");
     }
-  }, config.worker.delayMs);
+    let docNo: string | null = null;
+    if (task.type === "set_location") {
+      await sfera.applySetLocation(payload.twId, payload.newValue);
+    } else if (task.type === "mm") {
+      docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
+    } else if (task.type === "combo") {
+      docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
+      for (const it of payload.items as MmItem[]) {
+        await sfera.applySetLocation(it.twId, payload.location);
+      }
+    } else {
+      throw new Error("Nieznany typ zadania: " + task.type);
+    }
+    db()
+      .prepare("UPDATE sfera_queue SET status='done', sgt_doc_number=?, processed_at=? WHERE id=?")
+      .run(docNo, nowIso(), task.id);
+    console.log(`[worker] #${task.id} OK ${task.type}${docNo ? " · MM " + docNo : ""}`);
+  } catch (e) {
+    fail(task, e instanceof Error ? e.message : String(e));
+  } finally {
+    busy = false;
+  }
 }
 
 let busy = false;
@@ -121,13 +121,12 @@ function tick() {
   if (busy) return;
   const task = pickTask();
   if (!task) return;
-  try {
-    process(task);
-  } catch (e) {
+  // błąd przed ustawieniem `busy` (np. zepsuty payload) też musi oznaczyć zadanie
+  void process(task).catch((e) => {
     busy = false;
     fail(task, e instanceof Error ? e.message : String(e));
-  }
+  });
 }
 
-console.log(`[worker] start · poll ${config.worker.pollMs}ms · delay ${config.worker.delayMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · SFERA_MODE=${config.sferaMode}`);
+console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · SFERA_MODE=${config.sferaMode}`);
 setInterval(tick, config.worker.pollMs);

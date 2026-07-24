@@ -43,6 +43,8 @@ import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.scan.DEFAULT_LOC_PREFIX
 import pl.wertis.kolektor.core.scan.EAN_RE
+import pl.wertis.kolektor.core.scan.ScanKind
+import pl.wertis.kolektor.core.scan.classify
 import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -63,9 +65,12 @@ import pl.wertis.kolektor.ui.theme.cardSurface
 
 private const val SCAN_CHAR_MS = 50L
 
-/** Kod „wygląda jak lokalizacja”: ma literę, nie jest czystym ciągiem cyfr. */
-private fun looksLikeLocation(code: String): Boolean =
-    code.any { it.isLetter() } && !code.all { it.isDigit() } && !code.any { it.isWhitespace() }
+/**
+ * Kod „wygląda jak lokalizacja” — ta sama (przetestowana) reguła co w skanerze,
+ * z :core. Wcześniej był tu osobny odpowiednik na `Char.isLetter()`, który dla
+ * kodów z polskimi znakami / małymi literami klasyfikował inaczej niż `classify`.
+ */
+private fun looksLikeLocation(code: String): Boolean = classify(code).kind == ScanKind.LOC
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -121,7 +126,7 @@ fun HomeScreen(graph: AppGraph) {
                     // nieznany towar — jeśli kod wygląda jak lokalizacja, pokaż jej zawartość
                     if (looksLikeLocation(code)) {
                         graph.feedback.beep(true)
-                        graph.nav.openLocation(code)
+                        graph.nav.openLocation(normalizeLoc(code))
                     } else {
                         graph.feedback.beep(false)
                         graph.effects.toast("Nieznany kod: $code")

@@ -5,6 +5,7 @@ import { buildProductCard } from "../services/stock.js";
 import { enqueueSetLocation } from "../services/queue.js";
 import { logEvent, productHistory } from "../services/events.js";
 import { validateLocationCode } from "../services/locations.js";
+import { parseLocs } from "../locs.js";
 
 type LocAction = "replace" | "add" | "remove" | "replace_one";
 
@@ -80,7 +81,7 @@ export async function productRoutes(app: FastifyInstance) {
         const err = validateLocationCode(body.value ?? "");
         if (err) return reply.code(400).send({ error: err });
       }
-      const current = p.lokalizacja ? p.lokalizacja.split(" ").filter(Boolean) : [];
+      const current = parseLocs(p.lokalizacja);
       const next = computeNewLocs(current, body);
       const joined = next.join(" ");
       if (joined.length > config.locFieldLimit) {

@@ -295,8 +295,6 @@ data class CommitCartResponse(val queueIds: List<Long> = emptyList(), val commit
 @Serializable
 data class CloseSessionResponse(val status: String, val summary: Map<String, Int> = emptyMap())
 
-@Serializable
-data class HealthResponse(val ok: Boolean = false, val mode: String = "", val sferaMode: String = "", val lastSync: String? = null)
 
 @Serializable
 data class ApiErrorBody(val error: String? = null, val available: Double? = null)

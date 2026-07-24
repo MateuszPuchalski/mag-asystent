@@ -2,6 +2,7 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import type { ProductCard, StockView } from "../types.js";
+import { parseLocs } from "../locs.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
@@ -68,7 +69,7 @@ export function buildProductCard(
     unit: t.unit,
     ordered: t.ordered,
     desc: t.opis ?? "",
-    locs: t.lokalizacja ? t.lokalizacja.split(" ").filter(Boolean) : [],
+    locs: parseLocs(t.lokalizacja),
     // strefy źródłowe tracą to, co w kolejce do przeniesienia; MAG zyskuje (⏳ w drodze)
     mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, pendingMgp, 0),
     zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, pendingZw, 0),

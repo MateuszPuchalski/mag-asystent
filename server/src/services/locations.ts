@@ -31,15 +31,6 @@ export function validateLocationCode(raw: string): string | null {
   return null;
 }
 
-/** Czy kod pasuje do skonfigurowanego wzorca (do podpowiedzi po stronie klienta). */
-export function matchesFormat(code: string): boolean {
-  try {
-    return new RegExp(config.locFormat).test(code.trim().toUpperCase());
-  } catch {
-    return true;
-  }
-}
-
 /** Wykaz istniejących kodów lokalizacji (słownik) — do ostrzeżeń o kodzie spoza wykazu. */
 export function listLocations(): string[] {
   return subiekt.listLocations();

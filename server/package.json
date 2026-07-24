@@ -12,7 +12,6 @@
     "dev": "tsx watch src/index.ts",
     "worker": "tsx watch src/worker/worker.ts",
     "seed": "tsx src/db/seed.ts",
-    "import:mssql": "tsx src/db/import-mssql.ts",
     "build": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('src/db/schema.sql','dist/db/schema.sql')\"",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker/worker.js"

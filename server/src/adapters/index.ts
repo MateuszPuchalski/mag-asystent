@@ -4,7 +4,6 @@ import type { SferaAdapter } from "./sfera.js";
 import { SeededSubiektAdapter } from "./subiekt.seeded.js";
 import { DevSferaAdapter } from "./sfera.dev.js";
 import { SqlSferaAdapter } from "./sfera.sql.js";
-import { ComSferaAdapter } from "./sfera.com.js";
 
 /**
  * Fabryki adapterów.
@@ -14,20 +13,14 @@ import { ComSferaAdapter } from "./sfera.com.js";
  * SGT_MODE=mssql → import z bazy Subiekta (subiekt.mssql.ts, przy starcie
  * API + co MSSQL_SYNC_MS + POST /api/admin/resync).
  *
- * ZAPIS (worker): wg SFERA_MODE — 'dev' (mutacja sgt_*), 'sql' (UPDATE
- * tw_Lokalizacja w MSSQL; MM błąd — edu bez Sfery), 'com' (Sfera, szkielet).
+ * ZAPIS (worker): wg SFERA_MODE — 'dev' (mutacja sgt_*) albo 'sql' (UPDATE
+ * tw_Lokalizacja w MSSQL; MM błąd — edu bez Sfery). Zapis przez Sferę (COM)
+ * realizuje osobny proces na Windows — kontrakt w `sfera.ts`.
  */
 export function makeSubiektAdapter(): SubiektAdapter {
   return new SeededSubiektAdapter();
 }
 
 export function makeSferaAdapter(): SferaAdapter {
-  switch (config.sferaMode) {
-    case "sql":
-      return new SqlSferaAdapter();
-    case "com":
-      return new ComSferaAdapter();
-    default:
-      return new DevSferaAdapter();
-  }
+  return config.sferaMode === "sql" ? new SqlSferaAdapter() : new DevSferaAdapter();
 }
