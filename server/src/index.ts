@@ -55,6 +55,8 @@ async function main() {
   // serwowanie zbudowanego frontendu (prod)
   if (fs.existsSync(config.webDist)) {
     await app.register(fstatic, { root: config.webDist, wildcard: false });
+    // czysty adres podglądu magazynu (biuro, przeglądarka desktop, tylko odczyt)
+    app.get("/lookup", (_req, reply) => reply.sendFile("lookup.html"));
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith("/api/")) return reply.code(404).send({ error: "Not found" });
       return reply.sendFile("index.html");

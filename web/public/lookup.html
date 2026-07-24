@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WERTIS · Podgląd magazynu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --amber:#F7A600; --amber-dark:#D98E00; --amber-ink:#B87C00; --amber-bg:#FFF3D6; --amber-line:#F0D9A6;
+    --ink:#2A2A2C; --ink-soft:#55555B; --ink-mute:#6B6B71;
+    --paper:#F6F5F2; --card:#fff; --secondary:#EDEBE4; --border:#E7E4DC;
+    --destructive:#B33A3A; --success:#4C9A52;
+    --cond:"Barlow Semi Condensed",system-ui,sans-serif;
+    --shadow:0 1px 2px rgba(42,42,44,.05), 0 6px 20px rgba(42,42,44,.07);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* top bar */
+  header{background:var(--ink);color:#fff;display:flex;align-items:center;gap:14px;
+    padding:10px 20px;flex:0 0 auto}
+  header .brand{font-family:var(--cond);font-weight:800;font-size:22px;color:var(--amber);letter-spacing:.02em}
+  header .sub{font-family:var(--cond);font-weight:600;font-size:15px;color:#cfcdc8;letter-spacing:.04em;text-transform:uppercase}
+  header .spacer{flex:1}
+  .chip{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);padding:4px 10px;border-radius:999px}
+  .conn{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#cfcdc8}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--success)}
+  .dot.bad{background:var(--destructive)}
+
+  /* search */
+  .searchbar{padding:16px 20px 10px;flex:0 0 auto}
+  .searchwrap{position:relative;max-width:820px}
+  .searchwrap svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:22px;height:22px;color:var(--ink-mute)}
+  #q{width:100%;font-size:19px;font-weight:500;padding:15px 16px 15px 48px;border-radius:14px;border:1.5px solid var(--border);
+    background:var(--card);color:var(--ink);box-shadow:var(--shadow);outline:none}
+  #q:focus{border-color:var(--amber)}
+  #q::placeholder{color:var(--ink-mute)}
+  .hints{max-width:820px;margin-top:8px;font-size:12.5px;color:var(--ink-mute);display:flex;gap:16px;flex-wrap:wrap}
+  kbd{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:var(--secondary);border:1px solid var(--border);
+    border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--ink-soft)}
+
+  /* body grid */
+  main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;padding:6px 20px 20px}
+  @media (max-width:820px){ main{grid-template-columns:1fr;grid-auto-rows:min-content} }
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);
+    min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .panel .phead{padding:11px 15px;border-bottom:1px solid var(--border);
+    font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);
+    display:flex;align-items:center;justify-content:space-between}
+  .panel .scroll{overflow-y:auto;padding:8px}
+
+  /* result rows */
+  .row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+  .row:hover{background:var(--paper)}
+  .row.sel{background:var(--amber-bg);border-color:var(--amber-line)}
+  .row .info{min-width:0;flex:1}
+  .row .sym{font-family:var(--cond);font-weight:700;font-size:16px}
+  .row .name{font-size:12.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .loc{font-size:11.5px;color:var(--ink-mute);margin-top:1px}
+  .row .qty{text-align:right;flex:0 0 auto}
+  .row .qty .big{font-family:var(--cond);font-weight:800;font-size:20px}
+  .row .qty .mgp{font-size:11px;font-weight:700;color:var(--amber-ink);background:var(--amber-bg);border-radius:6px;padding:1px 6px;display:inline-block;margin-top:2px}
+  .muted{color:var(--ink-mute);font-size:14px;text-align:center;padding:26px 16px}
+
+  /* detail */
+  .detail{padding:18px 20px;overflow-y:auto}
+  .detail .name{font-family:var(--cond);font-weight:800;font-size:26px;line-height:1.1}
+  .detail .meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:6px;font-size:13.5px;color:var(--ink-soft)}
+  .detail .meta b{color:var(--ink);font-weight:700}
+  .detail .desc{font-size:13px;color:var(--ink-mute);margin-top:6px}
+  .stocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:18px}
+  .stock{border:1px solid var(--border);border-radius:14px;padding:14px 15px;background:var(--card);box-shadow:var(--shadow)}
+  .stock.hl{background:var(--amber-bg);border-color:var(--amber-line)}
+  .stock .lab{font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+  .stock .val{font-family:var(--cond);font-weight:800;font-size:40px;line-height:1.05;margin-top:2px}
+  .stock.hl .val{color:var(--amber-ink)}
+  .stock .val .u{font-family:"Barlow";font-weight:600;font-size:13px;color:var(--ink-mute);margin-left:5px}
+  .stock .sub{font-size:12px;color:var(--ink-soft);margin-top:3px}
+  .stock .pend{font-size:11.5px;font-weight:600;color:var(--amber-ink);margin-top:5px}
+  .sec{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-mute);margin:22px 0 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .locchip{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--ink);border-radius:999px;padding:7px 13px;
+    font-family:var(--cond);font-weight:700;font-size:15px;background:#fff}
+  .locchip.pri{background:var(--ink);color:#fff}
+  .locchip .pindot{width:7px;height:7px;border-radius:50%;background:var(--amber)}
+  .hist{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .hist .h{display:flex;gap:10px;padding:7px 12px;font-size:12.5px;border-bottom:1px solid var(--secondary)}
+  .hist .h:last-child{border-bottom:none}
+  .hist .h .d{flex:1;color:var(--ink-soft);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist .h .m{color:var(--ink-mute);white-space:nowrap}
+  .emptybig{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--ink-mute);text-align:center;padding:40px}
+  .emptybig svg{width:56px;height:56px;color:var(--border)}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:11px 18px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;
+    transition:opacity .18s, transform .18s;pointer-events:none}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(-2px)}
+  .live{font-size:11px;color:var(--ink-mute);font-weight:600}
+</style>
+</head>
+<body>
+  <header>
+    <span class="brand">WERTIS</span>
+    <span class="sub">Podgląd magazynu</span>
+    <span class="spacer"></span>
+    <span class="chip">tylko podgląd</span>
+    <span class="conn"><span class="dot" id="dot"></span><span id="connlbl">łączenie…</span></span>
+  </header>
+
+  <div class="searchbar">
+    <div class="searchwrap">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" autocomplete="off" spellcheck="false" placeholder="Skanuj kod lub wpisz symbol / nazwę / lokalizację…" />
+    </div>
+    <div class="hints">
+      <span><kbd>Enter</kbd> szukaj / skan</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> wybór</span>
+      <span><kbd>/</kbd> fokus pola</span>
+      <span><kbd>Esc</kbd> wyczyść</span>
+      <span>Skaner: kod + Enter</span>
+    </div>
+  </div>
+
+  <main>
+    <section class="panel">
+      <div class="phead"><span id="listtitle">Wyniki</span><span class="live" id="listcount"></span></div>
+      <div class="scroll" id="list"><div class="muted">Zacznij pisać lub zeskanuj kod.</div></div>
+    </section>
+    <section class="panel">
+      <div class="detail" id="detail">
+        <div class="emptybig">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8M12 13v8" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <div>Wybierz towar z listy albo zeskanuj kod,<br/>aby zobaczyć stany i lokalizacje.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const listEl = $('#list'), detailEl = $('#detail'), qEl = $('#q');
+let results = [], selIdx = -1, curId = null, poll = null, seq = 0;
+
+const EAN = /^\d{8}$|^\d{12,14}$/;
+function looksLikeLoc(code){
+  const up = code.toUpperCase();
+  if (up.startsWith('LOC:')) return true;
+  return /[A-Z]/.test(up) && !/\s/.test(up) && !/^\d+$/.test(up);
+}
+const fmt = v => (v === v|0 ? String(v|0) : String(v));
+const esc = s => String(s ?? '').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+async function api(path){
+  const r = await fetch(path, { headers:{ 'x-user':'podglad' } });
+  if(!r.ok){ let e; try{ e=(await r.json()).error }catch{} throw new Error(e || ('Błąd '+r.status)); }
+  return r.json();
+}
+let toastT;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+
+async function ping(){
+  try{ const h = await api('/api/health'); $('#dot').classList.remove('bad');
+    $('#connlbl').textContent = 'serwer OK · '+(h.mode||''); }
+  catch{ $('#dot').classList.add('bad'); $('#connlbl').textContent='brak połączenia'; }
+}
+
+/* ---- search (debounced) ---- */
+let debT;
+qEl.addEventListener('input', ()=>{ clearTimeout(debT); debT=setTimeout(runSearch, 220); });
+async function runSearch(){
+  const v = qEl.value.trim();
+  if(v.length < 1){ results=[]; renderList('Wyniki','Zacznij pisać lub zeskanuj kod.'); return; }
+  const my = ++seq;
+  try{
+    const { results:rows } = await api('/api/products/search?q='+encodeURIComponent(v));
+    if(my!==seq) return;
+    results = rows; selIdx = rows.length?0:-1;
+    renderList('Wyniki', rows.length?null:('Brak wyników dla „'+esc(v)+'”'));
+  }catch(e){ if(my===seq) renderList('Wyniki', esc(e.message)); }
+}
+
+/* ---- Enter: scan / exact / location ---- */
+qEl.addEventListener('keydown', (e)=>{
+  // Enter/skan ma pierwszeństwo nad debounce'owanym wyszukiwaniem: anuluj
+  // oczekujące szukanie i unieważnij trwający fetch (inaczej wynik listy
+  // nadpisałby np. podgląd lokalizacji tuż po skanie kodu regału).
+  if(e.key==='Enter'){ e.preventDefault(); clearTimeout(debT); seq++; onEnter(); }
+  else if(e.key==='ArrowDown'){ e.preventDefault(); move(1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); }
+  else if(e.key==='Escape'){ qEl.value=''; results=[]; renderList('Wyniki','Zacznij pisać lub zeskanuj kod.'); }
+});
+function move(d){ if(!results.length) return; selIdx=(selIdx+d+results.length)%results.length; paintSel(); const el=listEl.children[selIdx]; el&&el.scrollIntoView({block:'nearest'}); }
+
+async function onEnter(){
+  const v = qEl.value.trim(); if(!v) return;
+  if(selIdx>=0 && results[selIdx] && document.activeElement===qEl && results.length){ /* fall through to scan for exact codes */ }
+  if(looksLikeLoc(v)){ return openLocation(v.toUpperCase().replace(/^LOC:/,'')); }
+  try{
+    const r = await api('/api/products/scan/'+encodeURIComponent(v));
+    if(r.type==='product'){ openProduct(r.card); }
+    else if(r.type==='search'){ results=r.results; selIdx=r.results.length?0:-1; renderList('Wyniki', r.results.length?null:('Brak wyników dla „'+esc(v)+'”')); if(r.results.length===1) openProduct(r.results[0].id); }
+    else { toast('Nieznany kod: '+v); }
+  }catch(e){ toast(e.message); }
+}
+
+/* ---- render results ---- */
+function renderList(title, emptyMsg){
+  $('#listtitle').textContent = title;
+  $('#listcount').textContent = results.length ? results.length+' poz.' : '';
+  if(!results.length){ listEl.innerHTML = '<div class="muted">'+(emptyMsg||'Brak wyników')+'</div>'; return; }
+  listEl.innerHTML = results.map((r,i)=>`
+    <div class="row ${i===selIdx?'sel':''}" data-i="${i}">
+      <div class="info">
+        <div class="sym">${esc(r.sym)}</div>
+        <div class="name">${esc(r.name)}</div>
+        ${r.locs&&r.locs.length?`<div class="loc">${esc(r.locs.join(' '))}</div>`:''}
+      </div>
+      <div class="qty"><div class="big num">${fmt(r.mag)}</div>${r.mgp>0?`<div class="mgp num">MGP ${fmt(r.mgp)}</div>`:''}</div>
+    </div>`).join('');
+  [...listEl.children].forEach(el=>{ const i=+el.dataset.i; el.onclick=()=>{ selIdx=i; paintSel(); openProduct(results[i].id); }; });
+}
+function paintSel(){ [...listEl.children].forEach((el,i)=>el.classList.toggle('sel', i===+el.dataset.i && i===selIdx)); }
+
+/* ---- product detail ---- */
+async function openProduct(idOrCard){
+  const card = typeof idOrCard==='object' ? idOrCard : await api('/api/products/'+idOrCard).catch(e=>{toast(e.message);return null;});
+  if(!card) return;
+  curId = card.id;
+  renderDetail(card);
+  loadHistory(card.id);
+  startPoll(card.id);
+}
+function stockCard(lab, sv, hl, subFn){
+  const pend = sv.pendingOut>0 ? `⏳ ${fmt(sv.pendingOut)} szt w drodze` : (sv.pendingIn>0?`⏳ +${fmt(sv.pendingIn)} szt`:'');
+  return `<div class="stock ${hl?'hl':''}"><div class="lab">${lab}</div>
+    <div class="val num">${fmt(sv.avail??sv.stan)}<span class="u">szt</span></div>
+    <div class="sub">${subFn(sv)}</div>${pend?`<div class="pend">${pend}</div>`:''}</div>`;
+}
+function renderDetail(c){
+  const locs = c.locs||[];
+  detailEl.innerHTML = `
+    <div class="name">${esc(c.name)}</div>
+    <div class="meta"><span><b>${esc(c.sym)}</b></span><span>EAN ${esc(c.ean||'—')}</span><span>${esc(c.unit||'szt')}</span>${c.ordered>0?`<span>zam. u dostawcy: <b>${fmt(c.ordered)}</b></span>`:''}</div>
+    ${c.desc?`<div class="desc">${esc(c.desc)}</div>`:''}
+    <div class="stocks">
+      ${stockCard('MAG · dostępne', c.mag, false, sv=>`rez. ${fmt(sv.rez)} · razem ${fmt(sv.stan)}`)}
+      ${stockCard('MGP · strefa przyjęć', c.mgp, c.mgp.stan>0, sv=> sv.stan>0?'do zasilenia MAG':'strefa przyjęć pusta')}
+      ${c.zwroty&&c.zwroty.stan>0?stockCard('Zwroty od klientów', c.zwroty, true, ()=> 'czeka na rozłożenie'):''}
+    </div>
+    <div class="sec">Lokalizacje ${locs.length?'(pierwsza = pickingowa)':''}</div>
+    <div class="chips">
+      ${locs.length? locs.map((code,i)=>`<span class="locchip ${i===0?'pri':''}">${i===0?'<span class=pindot></span>':''}${esc(code)}</span>`).join('') : '<span class="muted" style="padding:0">brak lokalizacji</span>'}
+    </div>
+    <div class="sec">Historia</div>
+    <div id="hist" class="hist"><div class="muted" style="padding:12px">—</div></div>`;
+}
+async function loadHistory(id){
+  try{
+    const { entries } = await api('/api/products/'+id+'/history');
+    const h = $('#hist'); if(!h || curId!==id) return;
+    if(!entries.length){ h.innerHTML='<div class="muted" style="padding:12px">Brak ruchów</div>'; return; }
+    h.innerHTML = entries.slice(0,8).map(e=>`<div class="h"><div class="d">${esc(e.detail||e.type)}</div><div class="m">${esc(e.user)} · ${esc((e.at||'').slice(5,16).replace('T',' '))}</div></div>`).join('');
+  }catch{}
+}
+/* live stock refresh for the open product (queue-corrected) */
+function startPoll(id){
+  if(poll) clearInterval(poll);
+  poll = setInterval(async ()=>{
+    if(curId!==id || document.hidden) return;
+    try{ const c = await api('/api/products/'+id); if(curId===id) renderDetail(c); }catch{}
+  }, 8000);
+}
+
+/* ---- location contents ---- */
+async function openLocation(code){
+  try{
+    const { code:cc, products } = await api('/api/locations/'+encodeURIComponent(code)+'/products');
+    curId=null; if(poll) clearInterval(poll);
+    results = products; selIdx = -1;
+    renderList('Zawartość lokalizacji '+esc(cc), products.length?null:'Slot pusty — nic nie leży na '+esc(cc));
+    detailEl.innerHTML = `<div class="emptybig"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/></svg><div>Lokalizacja <b>${esc(cc)}</b> · ${products.length} poz.<br/>Wybierz towar, aby zobaczyć szczegóły.</div></div>`;
+  }catch(e){ toast(e.message); }
+}
+
+/* ---- global keys ---- */
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='/' && document.activeElement!==qEl){ e.preventDefault(); qEl.focus(); qEl.select(); }
+});
+qEl.focus();
+ping(); setInterval(ping, 15000);
+</script>
+</body>
+</html>
