@@ -104,6 +104,17 @@ Parametry (env, dev):
 - **Zatwierdź wózek → jeden dokument MM + zadania `set_location`** z tej rundy.
 - Locki multi-user (TTL 30 min), `waiting_for_doc` gdy dokument w buforze,
   zamknięcie sesji z rozliczeniem (`closed` / `closed_with_deviations`).
+- **Dostawa już na MAG** (biuro zrobiło MM MGP→MAG przed rozłożeniem): dokument
+  ma plakietkę **„na MAG · do zlokalizowania"** (`onMag`) i nadal jest do
+  rozłożenia — w trybie **„tylko lokalizacja"** (skan bez „Brak stanu na MGP",
+  zatwierdzenie tworzy **sam `set_location`, bez MM**). Zwykłe dostawy bez zmian.
+
+**Podgląd magazynu (biuro) — `/lookup`**
+- Lekka strona **tylko do odczytu** na tym samym serwerze i API, dla przeglądarki
+  desktop (biuro). Skan/wyszukiwarka → karta towaru (stany MAG/MGP/Zwroty
+  skorygowane o kolejkę, lokalizacje, historia); skan kodu regału → zawartość
+  lokalizacji. Klawiaturowa (`Enter`/`↑`/`↓`/`/`/`Esc`), auto-odświeżanie karty
+  co 8 s. **Zero operacji zapisu** (brak zmiany lokalizacji, MM, rozkładania).
 
 ## Struktura repo
 
@@ -114,6 +125,7 @@ web/                       frontend (React/Vite/Tailwind/shadcn)
   src/lib/store.ts         stan UI (nawigacja, feedback)
   src/screens/             Home, Product, ScanLoc, MM, Queue
   src/screens/putaway/     Documents, Session (wózek)
+  public/lookup.html       podgląd magazynu (biuro, read-only) → /lookup
   public/data/products.json  3415 kartotek z magmat.xlsx
 server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
