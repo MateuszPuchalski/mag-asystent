@@ -33,24 +33,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
-import pl.wertis.kolektor.core.loc.isKnownLoc
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.LocAction
 import pl.wertis.kolektor.core.net.LocationsInfo
-import pl.wertis.kolektor.core.net.SetLocationBody
-import pl.wertis.kolektor.core.offline.PendingOp
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
-import pl.wertis.kolektor.ui.chrome.UndoInfo
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.product.LocChoice
+import pl.wertis.kolektor.ui.product.saveLocation
 import pl.wertis.kolektor.ui.product.LocChoiceSheet
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
@@ -90,24 +87,8 @@ fun ScanLocScreen(graph: AppGraph) {
         saving = true
         scope.launch {
             try {
-                val warn = if (!isKnownLoc(choice.value, locInfo)) "Lokalizacja spoza wykazu — sprawdź etykietę" else null
-                val res = graph.offlineQueue.runOrBuffer(
-                    kind = PendingOp.OpKind.SET_LOCATION,
-                    user = graph.users.currentUser,
-                    productId = id,
-                    setLocation = SetLocationBody(choice.action, value = choice.value, replaced = choice.replaced),
-                )
-                graph.queueRepo.refreshNow()
-                graph.feedback.beep(true)
+                saveLocation(graph, id, choice, successMsg, locInfo)
                 pending = null
-                graph.effects.showUndo(
-                    UndoInfo(
-                        msg = if (res.offline) "Zapisano lokalnie · ${choice.value}" else "$successMsg · ${choice.value}",
-                        queueId = res.queueId,
-                        bufferId = res.bufferId,
-                        warn = warn,
-                    )
-                )
                 graph.nav.go(Screen.PRODUCT)
             } catch (e: Exception) {
                 graph.effects.toast(e.message ?: "Błąd zapisu")

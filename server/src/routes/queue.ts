@@ -38,14 +38,6 @@ export async function queueRoutes(app: FastifyInstance) {
     return { items: rows.map(mapRow), summary };
   });
 
-  app.get<{ Params: { id: string } }>("/api/queue/:id", async (req, reply) => {
-    const r = db()
-      .prepare("SELECT * FROM sfera_queue WHERE id = ?")
-      .get(Number(req.params.id)) as QueueRow | undefined;
-    if (!r) return reply.code(404).send({ error: "Brak zadania" });
-    return mapRow(r);
-  });
-
   // ponowienie zadania błędnego (przycisk PONÓW na kolektorze)
   app.post<{ Params: { id: string } }>("/api/queue/:id/retry", async (req, reply) => {
     const id = Number(req.params.id);

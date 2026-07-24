@@ -21,13 +21,14 @@ export const config = {
   sgtMode: (process.env.SGT_MODE ?? "seeded") as "seeded" | "mssql",
 
   /**
-   * Adapter zapisu (worker): 'dev' (mutacja sgt_*), 'sql' (UPDATE tw_Lokalizacja
-   * bezpośrednio w MSSQL — plan B ze spec §9; MM niedostępne, wersja edu bez
-   * Sfery), 'com' (Sfera COM — wymaga licencji). Domyślnie: 'sql' gdy
-   * SGT_MODE=mssql, inaczej 'dev'.
+   * Adapter zapisu (worker): 'dev' (mutacja sgt_*) albo 'sql' (UPDATE
+   * tw_Lokalizacja bezpośrednio w MSSQL — plan B ze spec §9; MM niedostępne,
+   * wersja edu bez Sfery). Domyślnie: 'sql' gdy SGT_MODE=mssql, inaczej 'dev'.
+   * Zapis przez Sferę (COM) realizuje osobny proces na Windows — kontrakt
+   * w `adapters/sfera.ts` (nie ma trybu 'com' w tym procesie).
    */
   sferaMode: (process.env.SFERA_MODE ??
-    (process.env.SGT_MODE === "mssql" ? "sql" : "dev")) as "dev" | "sql" | "com",
+    (process.env.SGT_MODE === "mssql" ? "sql" : "dev")) as "dev" | "sql",
 
   /**
    * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql). Wartości [WERYFIKUJ]
@@ -112,7 +113,6 @@ export const config = {
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
     pollMs: num(process.env.WORKER_POLL_MS, 1200),
-    delayMs: num(process.env.WORKER_DELAY_MS, 1500),
     simErrors: process.env.WORKER_SIM_ERRORS === "1",
     // backoff dla retry (spec §9): 5s / 30s / 2min
     backoffMs: [5000, 30000, 120000],
@@ -120,9 +120,26 @@ export const config = {
     waitingRetryMs: 60000,
   },
 
-  /** Serwowanie zbudowanego frontendu (prod). */
   /** Katalog statyczny (lookup.html + assets) — serwowany wprost, bez builda. */
   webDist: process.env.WEB_DIST ?? path.resolve(__dirname, "../../web/public"),
 };
+
+/**
+ * Walidacja trybów przy starcie. Bez tego literówka albo nieobsługiwana wartość
+ * (np. dawne SFERA_MODE=com) cicho degradowała działanie — a w usłudze NSSM
+ * z `AppExit Default Restart` kończyła się pętlą restartów bez śladu w logu.
+ */
+function assertMode(name: string, value: string, allowed: readonly string[]): void {
+  if (!allowed.includes(value)) {
+    throw new Error(
+      `${name}=${value} — nieobsługiwana wartość. Dozwolone: ${allowed.join(" | ")}.` +
+        (name === "SFERA_MODE"
+          ? " Zapis przez Sferę (COM) realizuje osobny proces na Windows — patrz adapters/sfera.ts."
+          : "")
+    );
+  }
+}
+assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
+assertMode("SFERA_MODE", config.sferaMode, ["dev", "sql"]);
 
 export type Config = typeof config;

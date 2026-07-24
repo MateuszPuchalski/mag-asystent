@@ -75,7 +75,6 @@ Parametry (env, dev):
 
 | Zmienna | Znaczenie |
 |---|---|
-| `WORKER_DELAY_MS` | czas „zapisu Sfery" (domyślnie 1500) |
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
 | `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |

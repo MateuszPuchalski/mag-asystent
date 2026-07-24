@@ -14,10 +14,8 @@ val AmberLine = Color(0xFFF0D9A6)
 val Ink = Color(0xFF2A2A2C)
 // Ramp przyciemniony do WCAG AA na papierze (#F6F5F2):
 //   InkSoft  #55555B ≈ 6.1:1  ·  InkMute #6B6B71 ≈ 4.7:1  (były 6E6E73 / 8A8A8E)
-// InkFaint tylko do dużego tekstu / dekoracji (nie przechodzi AA dla drobnego).
 val InkSoft = Color(0xFF55555B)
 val InkMute = Color(0xFF6B6B71)
-val InkFaint = Color(0xFF8A8A8E)
 
 val Paper = Color(0xFFF6F5F2)
 val CardWhite = Color(0xFFFFFFFF)
