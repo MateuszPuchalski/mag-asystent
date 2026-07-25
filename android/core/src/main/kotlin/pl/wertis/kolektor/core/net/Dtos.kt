@@ -104,8 +104,8 @@ enum class QueueItemType {
     @SerialName("set_location") SET_LOCATION,
     /** Flaga sprawdzenia faktury (tryb A) — jedyny zapis do SGT poza lokalizacją. */
     @SerialName("set_doc_flag") SET_DOC_FLAG,
+    /** Dokument MM — powstaje wyłącznie z wózka trybu B (zatwierdzenie rundy). */
     @SerialName("mm") MM,
-    @SerialName("combo") COMBO,
 }
 
 @Serializable
@@ -232,12 +232,6 @@ data class SetLocationBody(
     val value: String? = null,
     val replaced: String? = null,
 )
-
-@Serializable
-data class MmItem(val twId: Long, val qty: Double)
-
-@Serializable
-data class MmBody(val items: List<MmItem>)
 
 @Serializable
 data class CreateSessionBody(val docId: Long)

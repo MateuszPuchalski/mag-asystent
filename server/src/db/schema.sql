@@ -9,7 +9,7 @@ PRAGMA foreign_keys = ON;
 -- ── Kolejka zadań dla workera Sfery (spec §7) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS sfera_queue (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  type           TEXT NOT NULL,                 -- set_location | set_doc_flag | mm | combo
+  type           TEXT NOT NULL,                 -- set_location | set_doc_flag | mm (mm: wyłącznie tryb B)
   payload        TEXT NOT NULL,                 -- JSON
   status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error
   attempts       INTEGER NOT NULL DEFAULT 0,

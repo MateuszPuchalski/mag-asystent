@@ -6,12 +6,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.Serializable
 import pl.wertis.kolektor.core.net.ApiError
-import pl.wertis.kolektor.core.net.MmBody
 import pl.wertis.kolektor.core.net.SetLocationBody
 
 /* ── Bufor operacji zapisu na czas braku sieci ──────────────────────────────
    Port web/src/lib/offline.ts. Kolektor gubi Wi-Fi przy metalowych regałach —
-   zamiast tracić skan, buforujemy operację (zmiana lokalizacji / MM) i wysyłamy
+   zamiast tracić skan, buforujemy operację (zmiana lokalizacji) i wysyłamy
    po odzyskaniu połączenia. Serwer i tak kolejkuje przez worker Sfery, więc
    bufor to tylko warstwa transportu.
 
@@ -24,13 +23,12 @@ data class PendingOp(
     val kind: OpKind,
     val productId: Long? = null,
     val setLocation: SetLocationBody? = null,
-    val mm: MmBody? = null,
     val at: Long,
     /** Autor z chwili zbuforowania — flush może nastąpić po zmianie użytkownika. */
     val user: String,
 ) {
     @Serializable
-    enum class OpKind { SET_LOCATION, MM }
+    enum class OpKind { SET_LOCATION }
 }
 
 /** Trwały zapis bufora (aplikacja: plik JSON — odpowiednik localStorage). */
@@ -91,9 +89,8 @@ class OfflineQueue(
         user: String,
         productId: Long? = null,
         setLocation: SetLocationBody? = null,
-        mm: MmBody? = null,
     ): RunResult {
-        val op = PendingOp(nextId(), kind, productId, setLocation, mm, at = now(), user = user)
+        val op = PendingOp(nextId(), kind, productId, setLocation, at = now(), user = user)
         if (isOnline()) {
             try {
                 return RunResult(offline = false, queueId = sender.send(op))

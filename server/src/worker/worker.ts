@@ -75,7 +75,7 @@ async function process(task: Task): Promise<void> {
 
   // dokument w buforze → czekaj (spec §8 D8). Nie zajmuje slotu workera —
   // `busy` nie jest tu ustawiane, więc następny tick weźmie inne zadanie.
-  if ((task.type === "mm" || task.type === "combo") && task.source_doc_id && inBuffer(task.source_doc_id)) {
+  if (task.type === "mm" && task.source_doc_id && inBuffer(task.source_doc_id)) {
     db()
       .prepare("UPDATE sfera_queue SET status='waiting_for_doc', next_attempt_at=? WHERE id=?")
       .run(new Date(Date.now() + config.worker.waitingRetryMs).toISOString(), task.id);
@@ -99,11 +99,6 @@ async function process(task: Task): Promise<void> {
       await sfera.applyDocFlag(payload.dokId, payload.wartosc, payload.flaga);
     } else if (task.type === "mm") {
       docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
-    } else if (task.type === "combo") {
-      docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
-      for (const it of payload.items as MmItem[]) {
-        await sfera.applySetLocation(it.twId, payload.location);
-      }
     } else {
       throw new Error("Nieznany typ zadania: " + task.type);
     }
@@ -130,5 +125,5 @@ function tick() {
   });
 }
 
-console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · SFERA_MODE=${config.sferaMode}`);
+console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · zapis=${config.sferaMode}`);
 setInterval(tick, config.worker.pollMs);

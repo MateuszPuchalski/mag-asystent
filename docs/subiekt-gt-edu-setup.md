@@ -2,7 +2,9 @@
 
 Instrukcja podłączenia WERTIS do **Subiekta GT edu** na Twoim komputerze,
 żeby aplikacja działała na prawdziwych danych z Subiekta zamiast seedu
-z `mag.xlsx`.
+z `mag.xlsx`. Docelowa wersja produkcyjna w firmie: **Subiekt GT 1.87 SP3 HF1**
+(era KSeF) — potwierdza wybór pola dodatkowego na lokalizację, bo natywnego
+`tw_Lokalizacja` w tych wersjach nie ma.
 
 ## Co działa, a co nie (edu = bez Sfery)
 
@@ -19,9 +21,8 @@ Dwie twarde zasady środowiska:
 1. **Wszystko dzieje się na Windowsie z Subiektem** (lub w jego LAN).
    Instalator InsERT stawia SQL Server jako instancję nazwaną — zwykle
    `.\INSERTGT`. Aplikacji nie podłączysz do Subiekta z chmury.
-2. Tryb wybierają dwie zmienne: `SGT_MODE=mssql` (odczyt z bazy Subiekta)
-   i `SFERA_MODE=sql` (zapis lokalizacji po SQL; to domyślne przy
-   `SGT_MODE=mssql`).
+2. Tryb wybiera JEDNA zmienna: `SGT_MODE=mssql`. Zapis (bezpośredni UPDATE
+   dwóch kolumn) wynika z niej automatycznie — osobnego przełącznika nie ma.
 
 Jak to działa w środku: interfejs odczytu aplikacji jest synchroniczny, więc
 zamiast żywych SELECT-ów per skan **importujemy** dane Subiekta do lokalnego
@@ -88,36 +89,38 @@ połączenie appki z Subiektem, dopisz w samym Subiekcie kilka rzeczy:
 Nie musisz wpisywać setek rekordów — kilkanaście kartotek i jeden dokument
 wystarczą, żeby end-to-end zweryfikować połączenie.
 
-## 2. Utwórz loginy SQL (najmniejsze uprawnienia)
+## 2. Utwórz JEDEN login SQL (najmniejsze uprawnienia)
 
-W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasła). Skrypt jest
+Jeden login = jedna rzecz do założenia i jedna do pilnowania. Uprawnienia są
+kolumnowe: nawet przy przejęciu credentiala da się zmienić wyłącznie dwie
+kolumny, reszta bazy pozostaje nietykalna.
+
+W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasło). Skrypt jest
 idempotentny — bezpiecznie uruchomić go ponownie (np. po zmianie
-`MSSQL_LOC_COLUMN`), `CREATE LOGIN`/`CREATE USER` nie wysypią się błędem
-„already exists", jeśli loginy już są:
+`MSSQL_LOC_COLUMN` albo ustaleniu kolumny flagi):
 
 ```sql
 USE [NAZWA_BAZY];
 
--- login ODCZYTU: wyłącznie SELECT na tabelach potrzebnych aplikacji
-IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis_read')
-    CREATE LOGIN wertis_read WITH PASSWORD = 'silne-haslo-1', CHECK_POLICY = ON;
-IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'wertis_read')
-    CREATE USER wertis_read FOR LOGIN wertis_read;
-GRANT SELECT ON dbo.tw__Towar      TO wertis_read;
-GRANT SELECT ON dbo.tw_Stan        TO wertis_read;
-GRANT SELECT ON dbo.dok__Dokument  TO wertis_read;
-GRANT SELECT ON dbo.dok_Pozycja    TO wertis_read;
-GRANT SELECT ON dbo.kh__Kontrahent TO wertis_read;
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis')
+    CREATE LOGIN wertis WITH PASSWORD = 'silne-haslo', CHECK_POLICY = ON;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'wertis')
+    CREATE USER wertis FOR LOGIN wertis;
 
--- login ZAPISU: UPDATE wyłącznie na jednej kolumnie (plan B, spec §9).
--- Podmień tw_Pole1 na pole, które wybrałeś w §1a (MSSQL_LOC_COLUMN musi się
--- z tym zgadzać!).
-IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis_write')
-    CREATE LOGIN wertis_write WITH PASSWORD = 'silne-haslo-2', CHECK_POLICY = ON;
-IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'wertis_write')
-    CREATE USER wertis_write FOR LOGIN wertis_write;
-GRANT SELECT ON dbo.tw__Towar TO wertis_write;                 -- WHERE tw_Id=…
-GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis_write;
+-- ODCZYT: wyłącznie 5 tabel potrzebnych aplikacji
+GRANT SELECT ON dbo.tw__Towar      TO wertis;
+GRANT SELECT ON dbo.tw_Stan        TO wertis;
+GRANT SELECT ON dbo.dok__Dokument  TO wertis;
+GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
+GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
+
+-- ZAPIS: dokładnie DWIE kolumny.
+-- Podmień tw_Pole1 na pole wybrane w §1a (MSSQL_LOC_COLUMN musi się zgadzać!),
+-- a <kolumna_flagi> na kolumnę flagi sprawdzenia ustaloną w checkliście §3
+-- (MSSQL_DOC_FLAG_COLUMN). Dopóki kolumny flagi nie znasz — pomiń ten GRANT;
+-- zadania set_doc_flag będą kończyć się czytelnym błędem, reszta działa.
+GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis;
+-- GRANT UPDATE ON dbo.dok__Dokument (<kolumna_flagi>) TO wertis;
 ```
 
 Weryfikacja, że uprawnienia faktycznie się nadały (przydaje się też po każdym
@@ -132,8 +135,8 @@ SELECT dp.permission_name, dp.state_desc,
 FROM sys.database_permissions dp
 LEFT JOIN sys.columns c ON c.object_id = dp.major_id AND c.column_id = dp.minor_id
 JOIN sys.database_principals pr ON pr.principal_id = dp.grantee_principal_id
-WHERE pr.name IN ('wertis_read','wertis_write')
-ORDER BY pr.name, dp.permission_name;
+WHERE pr.name = 'wertis'
+ORDER BY dp.permission_name;
 ```
 
 ## 3. Checklist `[WERYFIKUJ]` — ustal wartości dla SWOJEJ bazy
@@ -156,7 +159,7 @@ FROM dok__Dokument ORDER BY dok_Id DESC;   -- → env DOK_TYP_FZ / DOK_TYP_PZ
 
 -- b) mag_Id magazynów (głównego i strefy przyjęć MGP z §1b):
 SELECT * FROM sl_Magazyn;                  -- → env MAG_ID_MAG / MAG_ID_MGP
--- (jeśli SELECT nie przejdzie na loginie wertis_read, wykonaj jako sa —
+-- (jeśli SELECT nie przejdzie na loginie wertis, wykonaj jako sa —
 --  tabela słownikowa nie jest potrzebna aplikacji w runtime)
 
 -- c) flaga bufora: zapisz dokument „do bufora" w Subiekcie i porównaj
@@ -186,10 +189,8 @@ $env:SGT_MODE        = "mssql"
 $env:MSSQL_SERVER    = "localhost"
 $env:MSSQL_INSTANCE  = "INSERTGT"
 $env:MSSQL_DATABASE  = "NAZWA_BAZY"
-$env:MSSQL_USER      = "wertis_read"
-$env:MSSQL_PASSWORD  = "silne-haslo-1"
-$env:MSSQL_WRITE_USER     = "wertis_write"
-$env:MSSQL_WRITE_PASSWORD = "silne-haslo-2"
+$env:MSSQL_USER      = "wertis"
+$env:MSSQL_PASSWORD  = "silne-haslo"
 
 # wartości z checklisty [WERYFIKUJ]:
 $env:MSSQL_LOC_COLUMN  = "tw_Pole1"   # pole dodatkowe wybrane w §1a
@@ -200,10 +201,8 @@ $env:MAG_ID_MGP   = "2"
 $env:MSSQL_BUFFER_EXPR = "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END"
 $env:LOC_FIELD_LIMIT   = "50"
 
-# test importu (jednorazowy — loguje liczby zaimportowanych wierszy):
-npm run import:mssql
-
-# API (importuje przy starcie i odświeża co MSSQL_SYNC_MS, domyślnie 60 s):
+# API (importuje przy starcie i odświeża co MSSQL_SYNC_MS, domyślnie 60 s;
+# liczby zaimportowanych wierszy widać w logu i w GET /api/health):
 node server\dist\index.js
 # w drugim oknie (z tymi samymi $env:) worker zapisu:
 node server\dist\worker\worker.js
@@ -245,6 +244,7 @@ Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
   wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)` —
   wymaga dodatkowego `GRANT SELECT` i korekty JOIN-a w
   `server/src/adapters/subiekt.mssql.ts`.
-- Pełny obieg z MM wymaga licencji **Sfery** na produkcyjnym Subiekcie —
-  wtedy `SFERA_MODE=com` i implementacja `server/src/adapters/sfera.com.ts`
-  (etap 2 w [DEPLOY.md](../DEPLOY.md), §7).
+- Dokumenty MM (wyłącznie tryb B — wózek) wymagają licencji **Sfery** na
+  produkcyjnym Subiekcie: osobny worker COM na Windows (C#/pywin32) czytający
+  tę samą tabelę `sfera_queue` — kontrakt w `server/src/adapters/sfera.ts`,
+  etap 2 w [DEPLOY.md](../DEPLOY.md). Do tego czasu MM wystawia biuro.

@@ -55,8 +55,6 @@ class ApiOpSender(private val api: ApiService) : OpSender {
         when (op.kind) {
             PendingOp.OpKind.SET_LOCATION ->
                 api.setLocation(requireNotNull(op.productId), requireNotNull(op.setLocation), asUser = op.user).queueId
-            PendingOp.OpKind.MM ->
-                api.mm(requireNotNull(op.mm), asUser = op.user).queueId
         }
     }
 }

@@ -21,14 +21,13 @@ export const config = {
   sgtMode: (process.env.SGT_MODE ?? "seeded") as "seeded" | "mssql",
 
   /**
-   * Adapter zapisu (worker): 'dev' (mutacja sgt_*) albo 'sql' (UPDATE
-   * tw_Lokalizacja bezpośrednio w MSSQL — plan B ze spec §9; MM niedostępne,
-   * wersja edu bez Sfery). Domyślnie: 'sql' gdy SGT_MODE=mssql, inaczej 'dev'.
-   * Zapis przez Sferę (COM) realizuje osobny proces na Windows — kontrakt
-   * w `adapters/sfera.ts` (nie ma trybu 'com' w tym procesie).
+   * Adapter zapisu (worker) NIE jest osobną decyzją — wynika wprost ze źródła
+   * danych: 'mssql' → UPDATE dwóch kolumn w bazie Subiekta, 'seeded' → mutacja
+   * sgt_* (demo). Jeden przełącznik mniej do pomylenia; dawne SFERA_MODE
+   * usunięte. Dokumenty MM tworzy przyszły worker Sfery (osobny proces COM na
+   * Windows, kontrakt w `adapters/sfera.ts`) — nigdy ten proces.
    */
-  sferaMode: (process.env.SFERA_MODE ??
-    (process.env.SGT_MODE === "mssql" ? "sql" : "dev")) as "dev" | "sql",
+  sferaMode: (process.env.SGT_MODE === "mssql" ? "sql" : "dev") as "dev" | "sql",
 
   /**
    * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql). Wartości [WERYFIKUJ]
@@ -46,9 +45,6 @@ export const config = {
     password: process.env.MSSQL_PASSWORD ?? "",
     encrypt: process.env.MSSQL_ENCRYPT === "1",
     trustServerCertificate: process.env.MSSQL_TRUST_CERT !== "0",
-    /** Login zapisu (GRANT UPDATE tylko na tw__Towar.tw_Lokalizacja); domyślnie login odczytu. */
-    writeUser: process.env.MSSQL_WRITE_USER ?? process.env.MSSQL_USER ?? "",
-    writePassword: process.env.MSSQL_WRITE_PASSWORD ?? process.env.MSSQL_PASSWORD ?? "",
     /** Kody dok_Typ dla FZ/PZ ([WERYFIKUJ] na własnej bazie). */
     dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
     dokTypPZ: num(process.env.DOK_TYP_PZ, 5),
@@ -189,21 +185,15 @@ export const config = {
 };
 
 /**
- * Walidacja trybów przy starcie. Bez tego literówka albo nieobsługiwana wartość
- * (np. dawne SFERA_MODE=com) cicho degradowała działanie — a w usłudze NSSM
- * z `AppExit Default Restart` kończyła się pętlą restartów bez śladu w logu.
+ * Walidacja trybu przy starcie. Bez tego literówka cicho degradowała działanie —
+ * a w usłudze NSSM z `AppExit Default Restart` kończyła się pętlą restartów bez
+ * śladu w logu.
  */
 function assertMode(name: string, value: string, allowed: readonly string[]): void {
   if (!allowed.includes(value)) {
-    throw new Error(
-      `${name}=${value} — nieobsługiwana wartość. Dozwolone: ${allowed.join(" | ")}.` +
-        (name === "SFERA_MODE"
-          ? " Zapis przez Sferę (COM) realizuje osobny proces na Windows — patrz adapters/sfera.ts."
-          : "")
-    );
+    throw new Error(`${name}=${value} — nieobsługiwana wartość. Dozwolone: ${allowed.join(" | ")}.`);
   }
 }
 assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
-assertMode("SFERA_MODE", config.sferaMode, ["dev", "sql"]);
 
 export type Config = typeof config;

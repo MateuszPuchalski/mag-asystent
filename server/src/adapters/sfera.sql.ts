@@ -1,6 +1,6 @@
 import sql from "mssql";
 import { db } from "../db/db.js";
-import { mssqlWrite, assertSafeColumn } from "../db/mssql.js";
+import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 import type { MmItem, SferaAdapter } from "./sfera.js";
 
@@ -22,7 +22,7 @@ import type { MmItem, SferaAdapter } from "./sfera.js";
 export class SqlSferaAdapter implements SferaAdapter {
   async applySetLocation(twId: number, newValue: string): Promise<void> {
     const locCol = assertSafeColumn(config.mssql.locColumn);
-    const pool = await mssqlWrite();
+    const pool = await mssqlPool();
     const res = await pool
       .request()
       .input("id", sql.Int, twId)
@@ -58,7 +58,7 @@ export class SqlSferaAdapter implements SferaAdapter {
       );
     }
     const col = assertSafeColumn(config.mssql.docFlagColumn);
-    const pool = await mssqlWrite();
+    const pool = await mssqlPool();
     const res = await pool
       .request()
       .input("id", sql.Int, dokId)
@@ -72,9 +72,13 @@ export class SqlSferaAdapter implements SferaAdapter {
   }
 
   async createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {
+    // MM nie da się bezpiecznie zrobić SQL-em (dokument + numeracja + skutki
+    // magazynowe to domena Sfery). Docelowo tworzy je osobny worker Sfery (COM)
+    // na Windows, czytający tę samą tabelę sfera_queue — kontrakt w
+    // adapters/sfera.ts. Zadanie zostaje w kolejce ze statusem 'error' i PONÓW.
     throw new Error(
-      "Dokument MM wymaga Sfery (COM) — niedostępne w trybie SQL / wersji edu. " +
-        "Lokalizacje (set_location) działają; MM włącz po dokupieniu Sfery (SFERA_MODE=com)."
+      "Dokument MM tworzy worker Sfery (osobny proces COM na Windows — kontrakt w adapters/sfera.ts). " +
+        "Do czasu jego wdrożenia MM wystawia biuro w Subiekcie; lokalizacje i flagi działają normalnie."
     );
   }
 }

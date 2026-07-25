@@ -28,7 +28,6 @@ import pl.wertis.kolektor.ui.chrome.TopBar
 import pl.wertis.kolektor.ui.chrome.UndoBar
 import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
-import pl.wertis.kolektor.ui.mm.MMScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryLinesScreen
@@ -99,7 +98,6 @@ fun AppRoot(graph: AppGraph) {
                 Screen.HOME -> HomeScreen(graph)
                 Screen.PRODUCT -> ProductScreen(graph)
                 Screen.SCAN_LOC -> ScanLocScreen(graph)
-                Screen.MM -> MMScreen(graph)
                 Screen.QUEUE -> QueueScreen(graph)
                 Screen.DELIVERY_DOCS -> DeliveryDocumentsScreen(graph)
                 Screen.DELIVERY_LINES -> DeliveryLinesScreen(graph)

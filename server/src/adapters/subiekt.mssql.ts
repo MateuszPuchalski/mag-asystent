@@ -1,6 +1,6 @@
 import sql from "mssql";
 import { db, nowIso } from "../db/db.js";
-import { mssqlRead, assertSafeColumn } from "../db/mssql.js";
+import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 
 /**
@@ -74,7 +74,7 @@ export interface ImportStats {
 export let lastImport: ImportStats | null = null;
 
 export async function importFromMssql(): Promise<ImportStats> {
-  const pool = await mssqlRead();
+  const pool = await mssqlPool();
   const c = config.mssql;
   // nowsze SGT nie mają natywnego tw_Lokalizacja — alias na skonfigurowane
   // pole dodatkowe (domyślnie tw_Pole1), żeby reszta kodu widziała stałą nazwę

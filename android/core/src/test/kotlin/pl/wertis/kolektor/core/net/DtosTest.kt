@@ -71,12 +71,12 @@ class DtosTest {
             {"items":[
               {"id":1,"type":"set_location","status":"waiting_for_doc","label":"L","detail":"D","errMsg":null,"time":"12:00"},
               {"id":2,"type":"mm","status":"error","label":"L2","detail":"","errMsg":"Błąd Sfery","time":"12:01"},
-              {"id":3,"type":"combo","status":"done","label":"L3","detail":"","errMsg":null,"time":"12:02"}
+              {"id":3,"type":"mm","status":"done","label":"L3","detail":"","errMsg":null,"time":"12:02"}
              ],"summary":{"pending":1,"error":1,"done":1}}
         """.trimIndent()
         val r = WertisJson.decodeFromString<QueueResponse>(json)
         assertEquals(QueueStatus.WAITING_FOR_DOC, r.items[0].status)
-        assertEquals(QueueItemType.COMBO, r.items[2].type)
+        assertEquals(QueueItemType.MM, r.items[2].type)
         assertEquals("Błąd Sfery", r.items[1].errMsg)
         assertEquals(1, r.summary.error)
     }

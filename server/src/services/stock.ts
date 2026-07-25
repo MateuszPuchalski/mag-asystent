@@ -6,7 +6,7 @@ import { parseLocs } from "../locs.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
- * Uwzględnia zadania typu mm/combo w statusach pending/processing/waiting_for_doc
+ * Uwzględnia zadania typu mm w statusach pending/processing/waiting_for_doc
  * (spec §5.1 — „korekta o kolejkę"). `magFrom` zawęża do MM z danego magazynu
  * źródłowego (MGP lub Zwroty); bez argumentu — wszystkie MM w drodze na MAG.
  */
@@ -14,7 +14,7 @@ export function pendingMmByTw(magFrom?: number): Map<number, number> {
   const rows = db()
     .prepare(
       `SELECT payload FROM sfera_queue
-       WHERE type IN ('mm','combo')
+       WHERE type = 'mm'
          AND status IN ('pending','processing','waiting_for_doc')`
     )
     .all() as Array<{ payload: string }>;

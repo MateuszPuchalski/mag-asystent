@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,9 +40,7 @@ import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.net.LocAction
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
-import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.net.SetLocationBody
-import pl.wertis.kolektor.core.net.StockView
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
@@ -139,7 +136,6 @@ fun ProductScreen(graph: AppGraph) {
     }
 
     val locStr = p.locs.joinToString(" ")
-    val noMgp = p.mgp.stan == 0.0
     val hasPendingMM = p.mgp.pendingOut > 0
 
     Column(
@@ -328,13 +324,10 @@ fun ProductScreen(graph: AppGraph) {
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.weight(1f)) {
-                graph.nav.openScanLoc()
-            }
-            OutlineButton("MM MGP → MAG", tall = true, leadingIcon = WIcons.Transfer, modifier = Modifier.weight(1f)) {
-                if (noMgp) graph.effects.toast("Brak stanu na MGP") else graph.nav.openMM()
-            }
+        // MM ad-hoc wycięte (wywiad): przesunięcia robi tryb B (wózek) albo biuro.
+        // Karta towaru zapisuje wyłącznie lokalizację.
+        OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
+            graph.nav.openScanLoc()
         }
     }
 

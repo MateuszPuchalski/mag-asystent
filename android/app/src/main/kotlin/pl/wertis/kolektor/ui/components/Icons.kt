@@ -76,10 +76,6 @@ object WIcons {
         moveTo(12f, 13f); lineTo(12f, 21f)
     }
 
-    val Transfer: ImageVector = strokeIcon("transfer") {
-        moveTo(4f, 9f); lineTo(17f, 9f); lineTo(14f, 6f)
-        moveTo(20f, 15f); lineTo(7f, 15f); lineTo(10f, 18f)
-    }
 
     val Check: ImageVector = strokeIcon("check", 2.4f) {
         moveTo(20f, 6f); lineTo(9f, 17f); lineTo(4f, 12f)

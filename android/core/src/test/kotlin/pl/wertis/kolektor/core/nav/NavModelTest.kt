@@ -9,7 +9,6 @@ class NavModelTest {
     @Test fun `statyczna mapa powrotow`() {
         assertEquals(Screen.HOME, backTarget(Screen.PRODUCT, null))
         assertEquals(Screen.PRODUCT, backTarget(Screen.SCAN_LOC, null))
-        assertEquals(Screen.PRODUCT, backTarget(Screen.MM, null))
         assertEquals(Screen.PUTAWAY_DOCS, backTarget(Screen.PUTAWAY_SESSION, null))
         // tryb A: dokument dostawy → lista dostaw
         assertEquals(Screen.DELIVERY_DOCS, backTarget(Screen.DELIVERY_LINES, null))

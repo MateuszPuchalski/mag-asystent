@@ -85,7 +85,6 @@ Parametry (env, dev):
 |---|---|
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
-| `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 | `MSSQL_DOC_FLAG_COLUMN` | kolumna `dok__Dokument` z flagą sprawdzenia faktury — **bez domyślnej**, patrz `[WERYFIKUJ]` w DEPLOY §6 |
 | `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag pokazywane człowiekowi (domyślnie słownictwo firmy) |
@@ -101,7 +100,6 @@ Parametry (env, dev):
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
-- MM MGP→MAG i ⚡ zasilenie (kombo: MM całości + lokalizacja jednym zadaniem).
 - Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
   PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
   prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
@@ -214,12 +212,19 @@ na MGP. Seed buduje z nich dokumenty FZ/PZ **pogrupowane po realnym dostawcy**
 
 ## Praca z prawdziwym Subiektem GT
 
-Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**): importer
+Docelowa wersja w firmie: **Subiekt GT 1.87 SP3 HF1** (era KSeF — brak natywnego
+pola lokalizacji, stąd pole dodatkowe `tw_Pole1..8`).
+
+Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**) to CAŁE
+połączenie: **jeden login** o kolumnowych uprawnieniach, importer
 `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto z bazy
-MSSQL Subiekta (przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`),
-a worker w `SFERA_MODE=sql` zapisuje lokalizacje bezpośrednim UPDATE
-(plan B ze spec §9; MM wymaga licencji Sfery — `sfera.com.ts` pozostaje
-szkieletem). Instrukcja krok po kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
+(przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`), a worker zapisuje
+bezpośrednim UPDATE dokładnie **dwie kolumny**: lokalizację na `tw__Towar`
+i flagę sprawdzenia na `dok__Dokument`. Tryb zapisu wynika z `SGT_MODE` — nie ma
+osobnego przełącznika. Dokumenty MM (wyłącznie tryb B — wózek) tworzy docelowo
+osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`; do tego czasu
+zadanie MM kończy się czytelnym błędem, a MM wystawia biuro. Instrukcja krok po
+kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 
 W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —
 API, kolejka, worker i rozkładanie realnie na SQLite zasilonym danymi

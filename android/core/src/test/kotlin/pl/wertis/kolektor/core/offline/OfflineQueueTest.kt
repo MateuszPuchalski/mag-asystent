@@ -9,8 +9,6 @@ import org.junit.Assert.fail
 import org.junit.Test
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.LocAction
-import pl.wertis.kolektor.core.net.MmBody
-import pl.wertis.kolektor.core.net.MmItem
 import pl.wertis.kolektor.core.net.SetLocationBody
 import java.io.IOException
 
@@ -23,7 +21,6 @@ class OfflineQueueTest {
     }
 
     private val setLoc = SetLocationBody(LocAction.REPLACE, value = "E08-03-01")
-    private val mmBody = MmBody(listOf(MmItem(7, 2.0)))
 
     @Test fun `online sukces - nie buforuje, zwraca queueId`() = runTest {
         val storage = MemStorage()
@@ -40,7 +37,7 @@ class OfflineQueueTest {
         val storage = MemStorage()
         val q = OfflineQueue(storage, { throw ApiError(400, "Zła ilość") }, isOnline = { true })
         try {
-            q.runOrBuffer(PendingOp.OpKind.MM, user = "anna", mm = mmBody)
+            q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, user = "anna", productId = 7, setLocation = setLoc)
             fail("oczekiwano ApiError")
         } catch (e: ApiError) {
             assertEquals(400, e.status)
@@ -61,7 +58,7 @@ class OfflineQueueTest {
     @Test fun `offline - buforuje bez proby wysylki`() = runTest {
         var sends = 0
         val q = OfflineQueue(MemStorage(), { sends++; null }, isOnline = { false })
-        val r = q.runOrBuffer(PendingOp.OpKind.MM, user = "jan", mm = mmBody)
+        val r = q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, user = "jan", productId = 7, setLocation = setLoc)
         assertTrue(r.offline)
         assertEquals(0, sends)
     }
@@ -122,7 +119,7 @@ class OfflineQueueTest {
 
     @Test fun `remove - COFNIJ przed wysylka`() = runTest {
         val q = OfflineQueue(MemStorage(), { null }, isOnline = { false })
-        val r = q.runOrBuffer(PendingOp.OpKind.MM, "a", mm = mmBody)
+        val r = q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
         assertTrue(q.remove(r.bufferId!!))
         assertFalse(q.remove(r.bufferId!!))
         assertEquals(0, q.count.value)
@@ -142,7 +139,7 @@ class OfflineQueueTest {
         var online = false
         val users = mutableListOf<String>()
         val q = OfflineQueue(storage, { op -> users += op.user; null }, isOnline = { online })
-        q.runOrBuffer(PendingOp.OpKind.MM, user = "anna", mm = mmBody)
+        q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, user = "anna", productId = 7, setLocation = setLoc)
         // zmiana użytkownika na urządzeniu przed flushem nie zmienia autora
         online = true
         q.flush()

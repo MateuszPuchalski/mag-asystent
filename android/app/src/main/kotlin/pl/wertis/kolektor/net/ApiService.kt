@@ -15,7 +15,6 @@ import pl.wertis.kolektor.core.net.EanConflictsResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LocationProductsResponse
 import pl.wertis.kolektor.core.net.LocationsInfo
-import pl.wertis.kolektor.core.net.MmBody
 import pl.wertis.kolektor.core.net.OkResponse
 import pl.wertis.kolektor.core.net.ProblemTypesResponse
 import pl.wertis.kolektor.core.net.ProblemsResponse
@@ -72,9 +71,6 @@ interface ApiService {
         @Body body: SetLocationBody,
         @Header("x-user") asUser: String? = null,
     ): QueueIdResponse
-
-    @POST("api/mm")
-    suspend fun mm(@Body body: MmBody, @Header("x-user") asUser: String? = null): QueueIdResponse
 
     @GET("api/locations")
     suspend fun locations(): LocationsInfo
