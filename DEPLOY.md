@@ -146,60 +146,71 @@ działa od razu po instalacji; dane z eksportu `magmat.xlsx`. Magazynier testuje
 wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
 **Etap 1 — odczyt z MSSQL (`SGT_MODE=mssql`):**
-1. Utwórz login SQL **read-only** (GRANT SELECT wyłącznie na: `tw__Towar`,
-   `tw_Stan`, `dok__Dokument`, `dok_Pozycja`, `kh__Kontrahent`).
-2. Przejdź checklistę `[WERYFIKUJ]` ze spec §11 — na własnej bazie sprawdź:
-   - wartości `dok_Typ` dla FZ i PZ (po znanym numerze dokumentu) i który typ
-     niesie skutek magazynowy (→ env `DOK_TYP_FZ` / `DOK_TYP_PZ`),
-   - kolumnę/flagę bufora w `dok__Dokument` (→ env `MSSQL_BUFFER_EXPR`),
-   - `mag_Id` magazynów MAG, MGP i **Zwroty** (→ env `MAG_ID_MAG` /
-     `MAG_ID_MGP` / `MAG_ID_ZWROTY`) — to magazyn skutku rozstrzyga, którym
-     trybem idzie dokument, więc pomyłka tutaj wysyła dostawę do złej zakładki,
-   - kody `dok_Typ` dokumentów, którymi biuro przyjmuje **zwroty** na magazyn
-     Zwroty (→ env `DOK_TYP_ZWROTY`, lista po przecinku). Puste = każdy dokument
-     na tym magazynie — bezpieczna wartość startowa, zawężać dopiero, gdyby na
-     Zwrotach lądowało coś jeszcze,
+1. Utwórz login SQL o minimalnych uprawnieniach — gotowy, idempotentny skrypt
+   w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md) §2.
+   `GRANT SELECT` na siedem tabel, `GRANT UPDATE` na jedną kolumnę
+   (lokalizacja) i `GRANT INSERT, UPDATE` na `fl_Wartosc` (flagi). Aplikacja
+   **nie potrzebuje żadnego prawa zapisu do `dok__Dokument`**.
+2. Przejdź checklistę `[WERYFIKUJ]`. Jest krótka, bo nazwy tabel, kolumn oraz
+   kody `dok_Typ` i `dok_Status` są odczytane wprost z oficjalnego opisu
+   struktury InsERT dla wersji bazy 1.8731.31.6933 (tej, którą ma firma) —
+   patrz [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+   Domyślne w `config.ts` są z niego wzięte i nie trzeba ich ustalać:
+   `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), `DOK_TYP_ZWROTY=14`
+   (ZW), bufor = `dok_Status = 3` (odłożony).
+
+   Do ustalenia na własnej bazie zostają **trzy** rzeczy:
+
+   - **`mag_Id` magazynów MAG, MGP i Zwroty** (→ `MAG_ID_MAG` / `MAG_ID_MGP` /
+     `MAG_ID_ZWROTY`). To magazyn skutku rozstrzyga, którym trybem idzie
+     dokument, więc pomyłka wysyła dostawę do złej zakładki:
+
+     ```sql
+     SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
+     ```
+
+     Główny poznasz po `mag_Glowny = 1`; MGP i Zwroty po nazwie firmowej.
+
    - **pole lokalizacji na `tw__Towar`.** W 1.87 SP3 HF1 (era KSeF) natywnej
      kolumny `tw_Lokalizacja` **nie ma** — trzeba wybrać jedno z ośmiu pól
-     dodatkowych `tw_Pole1..tw_Pole8` (→ `MSSQL_LOC_COLUMN`, domyślnie
-     `tw_Pole1`) i sprawdzić jego długość:
-
-     ```sql
-     SELECT COL_LENGTH('tw__Towar','tw_Pole1');   -- → LOC_FIELD_LIMIT
-     ```
-
+     własnych `tw_Pole1..tw_Pole8`, każde `varchar(50)` (→ `MSSQL_LOC_COLUMN`,
+     domyślnie `tw_Pole1`; `LOC_FIELD_LIMIT=50` wynika z rozmiaru kolumny).
      Wybierz pole, którego firma nie używa do niczego innego — worker nadpisuje
-     je bezwarunkowo. Szczegóły: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md),
-   - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`,
-   - **flaga sprawdzenia faktury** — firma używa **wbudowanych flag dokumentu**
-     (kolumna „FW" na liście *Faktury zakupu* + filtr „Flaga:"), więc w bazie to
-     najpewniej **liczba (id koloru)**, a nie polski napis. Trzeba ustalić dwie
-     rzeczy: kolumnę (→ `MSSQL_DOC_FLAG_COLUMN`) i wartość każdej z czterech flag
-     (→ `DOC_FLAG_*_SGT`). Metoda: oflaguj ręcznie w Subiekcie dwie faktury
-     różnymi flagami i porównaj wiersze.
+     je bezwarunkowo.
+
+   - **flaga sprawdzenia faktury.** Kolumna „FW" na liście *Faktury zakupu*
+     **nie odpowiada żadnej kolumnie `dok__Dokument`** — InsERT trzyma flagi
+     w osobnej parze tabel: `fl__Flagi` (definicje) i `fl_Wartosc` (przypisania,
+     klucz złożony grupa + typ obiektu + id dokumentu). Oflaguj ręcznie jedną
+     fakturę i podstaw jej numer:
 
      ```sql
-     -- podstaw numery dwóch dokumentów oflagowanych ręcznie różnymi flagami
-     SELECT * FROM dok__Dokument
-     WHERE dok_NrPelny IN ('FZ 60/MAG/07/2026', 'FZ 48/MAG/07/2026');
+     SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
+     FROM fl_Wartosc w
+     JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
+     JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
+     WHERE d.dok_NrPelny = 'FZ 60/MAG/07/2026';
      ```
 
-     Kolumna, która się między nimi różni, to ta szukana; jej wartości wpisz do
-     `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`
-     i `DOC_FLAG_DONE_ERRORS_SGT`.
+     → `MSSQL_FLAG_GRUPA` (`flw_IdGrupyFlag`) i `MSSQL_FLAG_TYP_OBIEKTU`
+     (`flw_TypObiektu`). Potem wypisz wszystkie flagi i przypisz cztery używane
+     przez WERTIS:
+
+     ```sql
+     SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
+     ```
+
+     → `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`,
+     `DOC_FLAG_DONE_ERRORS_SGT` — wpisujesz `flg_Id` (liczbę), nie nazwę; nazwa
+     idzie do `DOC_FLAG_*` i służy wyłącznie ludziom.
 
      Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
-     zamiast pisać na oślep w tabelę dokumentów. Reszta aplikacji działa
-     normalnie — flaga jest jedyną rzeczą, która czeka.
+     zamiast pisać w losową grupę flag. Reszta aplikacji działa normalnie —
+     flaga jest jedyną rzeczą, która czeka.
 
-     Przy okazji sprawdź, czy **dokumenty zwrotów** też mają tę kolumnę
-     wypełnialną — leżą w tej samej tabeli `dok__Dokument`, więc najpewniej tak,
-     ale aplikacja flaguje je dokładnie tak samo jak faktury zakupu:
+     Dokumenty zwrotów flagują się tym samym mechanizmem (to ten sam typ
+     obiektu), więc nie wymagają osobnej konfiguracji.
 
-     ```sql
-     SELECT dok_NrPelny, dok_Typ, <kolumna_flagi> FROM dok__Dokument
-     WHERE dok_MagId = <mag_Id magazynu Zwroty>;
-     ```
 3. Ustaw env połączenia `MSSQL_*` (patrz `docs/subiekt-gt-edu-setup.md` §4);
    importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.

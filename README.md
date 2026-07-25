@@ -52,14 +52,19 @@ kolejką; stany na ekranie skorygowane o oczekujące MM; walidacja długości
 `tw_Lokalizacja` (twardy błąd, nie ucięcie); kody lokalizacji bez spacji;
 każda operacja w `events`.
 
-**Zapis do Subiekta ogranicza się do dwóch pól** — `tw_Lokalizacja` na kartotece
-oraz **flaga sprawdzenia na fakturze dostawy**. Ta druga to świadomy, nazwany
+**Zapis do Subiekta ogranicza się do dwóch rzeczy** — pola lokalizacji na
+kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie mają)
+oraz **flagi sprawdzenia na fakturze dostawy**. Ta druga to świadomy, nazwany
 wyjątek od reguły „tylko lokalizacja": w tej firmie rozkładanie JEST sprawdzaniem
 faktury, więc bez niej biuro musiałoby pytać magazyn o stan każdej dostawy.
-Oba zapisy idą tą samą drogą (kolejka → worker → adapter), więc kolektor nigdy
-nie czeka na COM. Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM przy
-dostawie krajowej, zero modyfikacji stanów. Dokumenty MM (kontener, zwroty)
-tworzy osobny worker Sfery na Windows — ten proces tylko je kolejkuje.
+Flaga nie jest kolumną dokumentu — InsERT trzyma ją w osobnej tabeli przypisań
+`fl_Wartosc`, więc aplikacja **nie potrzebuje żadnego prawa zapisu do
+`dok__Dokument`**. Oba zapisy idą tą samą drogą (kolejka → worker → adapter),
+więc kolektor nigdy nie czeka na COM. Nic poza tym: zero `INSERT` do tabel
+dokumentów, zero MM przy dostawie krajowej, zero modyfikacji stanów. Dokumenty
+MM (kontener, zwroty) tworzy osobny worker Sfery na Windows — ten proces tylko
+je kolejkuje. Zweryfikowana struktura bazy (wersja 1.8731.31.6933, ta sama co
+w firmie): [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
 ## Uruchomienie
 
@@ -90,9 +95,9 @@ Parametry (env, dev):
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
-| `MSSQL_DOC_FLAG_COLUMN` | kolumna `dok__Dokument` z flagą sprawdzenia faktury — **bez domyślnej**, patrz `[WERYFIKUJ]` w DEPLOY §6 |
+| `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU` | gdzie w `fl_Wartosc` siedzą flagi faktur zakupu — **bez domyślnych**, jeden SELECT wg DEPLOY §6 |
 | `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag pokazywane człowiekowi (domyślnie słownictwo firmy) |
-| `DOC_FLAG_*_SGT` | co wpisać do Subiekta dla danej flagi — przy flagach wbudowanych **id koloru**, nie nazwa |
+| `DOC_FLAG_*_SGT` | `flg_Id` czterech flag z `fl__Flagi` — liczba, nie nazwa |
 | `MAG_ID_MAG` / `MAG_ID_MGP` / `MAG_ID_ZWROTY` | id magazynów w SGT — rozstrzygają, którym trybem idzie dokument |
 | `DOK_TYP_ZWROTY` | kody `dok_Typ` zwrotów na magazynie Zwroty (CSV); puste = każdy dokument na tym magazynie |
 
@@ -258,11 +263,11 @@ Docelowa wersja w firmie: **Subiekt GT 1.87 SP3 HF1** (era KSeF — brak natywne
 pola lokalizacji, stąd pole dodatkowe `tw_Pole1..8`).
 
 Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**) to CAŁE
-połączenie: **jeden login** o kolumnowych uprawnieniach, importer
+połączenie: **jeden login** o minimalnych uprawnieniach, importer
 `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto z bazy
 (przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`), a worker zapisuje
-bezpośrednim UPDATE dokładnie **dwie kolumny**: lokalizację na `tw__Towar`
-i flagę sprawdzenia na `dok__Dokument`. Tryb zapisu wynika z `SGT_MODE` — nie ma
+w dwóch miejscach: UPDATE **jednej kolumny** (lokalizacja na `tw__Towar`) oraz
+MERGE w `fl_Wartosc` (flaga). Tryb zapisu wynika z `SGT_MODE` — nie ma
 osobnego przełącznika. Dokumenty MM — a powstają w dwóch miejscach: runda wózka
 w trybie B i **zamknięty koszyk zwrotu** — tworzy docelowo osobny worker Sfery
 (COM) czytający tę samą kolejkę `sfera_queue`; do tego czasu zadanie MM kończy

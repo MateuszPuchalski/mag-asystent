@@ -15,16 +15,17 @@ import { config } from "../config.js";
  * niewidoczny dla magazyniera.
  *
  * Login: read-only, GRANT SELECT wyłącznie na tw__Towar, tw_Stan,
- * dok__Dokument, dok_Pozycja, kh__Kontrahent. Wartości [WERYFIKUJ]
- * (dok_Typ FZ/PZ, mag_Id, flaga bufora, kolumna lokalizacji) — env, patrz
- * docs/subiekt-gt-edu-setup.md.
+ * dok__Dokument, dok_Pozycja, kh__Kontrahent, fl_Wartosc, fl__Flagi.
+ * Nazwy tabel i kolumn są zweryfikowane wprost z oficjalnego opisu struktury
+ * InsERT GT dla wersji bazy 1.8731.31.6933 — patrz docs/subiekt-gt-struktura.md.
+ * Zostaje do ustalenia na własnej bazie tylko to, czego dokumentacja nie
+ * zawiera: id magazynów oraz para (grupa flag, typ obiektu).
  *
  * UWAGA: nowsze wersje SGT (z polami KSeF) NIE MAJĄ natywnej kolumny
- * tw_Lokalizacja na tw__Towar — zweryfikowane empirycznie (INFORMATION_SCHEMA
- * na instalacji edu). Lokalizację trzeba trzymać w jednym z generycznych pól
- * dodatkowych tw_Pole1..tw_Pole8 (varchar(50) każde) — który konkretnie,
- * ustala się przy zakładaniu kartotek (env MSSQL_LOC_COLUMN, domyślnie
- * tw_Pole1).
+ * tw_Lokalizacja na tw__Towar — lokalizację trzyma się w jednym z ośmiu pól
+ * własnych tw_Pole1..tw_Pole8 (varchar(50) każde, potwierdzone w strukturze);
+ * który konkretnie, ustala się przy zakładaniu kartotek (env MSSQL_LOC_COLUMN,
+ * domyślnie tw_Pole1).
  */
 
 /** Okno importu dokumentów FZ/PZ [dni] — szersze niż 14 dni widoku (spec §5.4). */
@@ -103,11 +104,20 @@ export async function importFromMssql(): Promise<ImportStats> {
 
   // dostawca: kh_Symbol jest pewny w każdej wersji SGT; pełna nazwa siedzi w
   // adr__Ekran (adr_NazwaPelna) — podmiana opisana w docs/subiekt-gt-edu-setup.md
-  // dokumenty zwrotów: każdy typ na magazynie Zwroty, chyba że DOK_TYP_ZWROTY zawęża
-  // flaga sprawdzenia faktury — czytamy tylko, gdy wiadomo, z której kolumny
-  // ([WERYFIKUJ]); bez konfiguracji wszystkie dokumenty mają flagę NULL i
-  // mechanizm „nadpisanie biura wygrywa" po prostu nie ma czego porównywać
-  const flagSelect = c.docFlagColumn ? `d.${assertSafeColumn(c.docFlagColumn)}` : "NULL";
+  // dokumenty zwrotów: domyślnie ZW (dok_Typ 14), DOK_TYP_ZWROTY może rozszerzyć
+  //
+  // Flaga sprawdzenia faktury nie jest kolumną dokumentu — leży w `fl_Wartosc`
+  // pod kluczem (grupa flag, typ obiektu, id dokumentu). Czytamy `flw_IdFlagi`,
+  // czyli dokładnie tę wartość, którą sami tam wpisujemy; bez konfiguracji
+  // grupy/typu wszystkie dokumenty mają flagę NULL i mechanizm „nadpisanie biura
+  // wygrywa" po prostu nie ma czego porównywać ([WERYFIKUJ], DEPLOY §6).
+  const flagJoin =
+    c.flagGrupa && c.flagTypObiektu
+      ? `LEFT JOIN fl_Wartosc fw ON fw.flw_IdObiektu = d.dok_Id
+            AND fw.flw_IdGrupyFlag = ${Math.trunc(c.flagGrupa)}
+            AND fw.flw_TypObiektu = ${Math.trunc(c.flagTypObiektu)}`
+      : "";
+  const flagSelect = flagJoin ? "CONVERT(varchar(20), fw.flw_IdFlagi)" : "NULL";
   const zwTypFilter = c.dokTypyZwroty.length
     ? ` AND d.dok_Typ IN (${c.dokTypyZwroty.map((n) => Math.trunc(n)).join(",")})`
     : "";
@@ -129,6 +139,7 @@ export async function importFromMssql(): Promise<ImportStats> {
                 ${flagSelect} AS flaga
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
+         ${flagJoin}
          WHERE (
                  -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
                  (d.dok_MagId = @mag AND d.dok_Typ IN (@fz, @pz))

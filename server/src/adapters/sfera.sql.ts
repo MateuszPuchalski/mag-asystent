@@ -35,38 +35,55 @@ export class SqlSferaAdapter implements SferaAdapter {
   }
 
   /**
-   * Flaga sprawdzenia faktury tą samą drogą co lokalizacja: jedna kolumna,
-   * osobny login, `GRANT UPDATE` wyłącznie na nią.
+   * Flaga sprawdzenia faktury. NIE jest kolumną `dok__Dokument` — InsERT trzyma
+   * flagi w osobnej parze tabel: `fl__Flagi` (definicja: `flg_Id`, `flg_Text`,
+   * `flg_Numer` = ikona) i `fl_Wartosc` (przypisanie do obiektu). Klucz główny
+   * `fl_Wartosc` jest złożony: (`flw_IdGrupyFlag`, `flw_TypObiektu`,
+   * `flw_IdObiektu`) — jeden obiekt ma najwyżej jedną flagę w grupie, więc zapis
+   * to MERGE: podmień, jeśli już jest, wstaw, jeśli nie.
    *
-   * [WERYFIKUJ] `MSSQL_DOC_FLAG_COLUMN` — nie ustaliliśmy, gdzie firma trzyma tę
-   * flagę (wbudowana flaga dokumentu / pole własne / słownik). Dopóki kolumna nie
-   * jest ustawiona, zadanie kończy się czytelnym błędem zamiast pisać na oślep
-   * w losową kolumnę tabeli dokumentów.
+   * To zawężenie, nie rozszerzenie uprawnień: aplikacja przestaje potrzebować
+   * jakiegokolwiek UPDATE na tabeli dokumentów. `fl_Wartosc` nie uczestniczy
+   * w numeracji ani w skutkach magazynowych, więc zapis tutaj nie może naruszyć
+   * integralności dokumentu — inaczej niż UPDATE w `dok__Dokument`.
+   *
+   * [WERYFIKUJ] para (grupa flag, typ obiektu) — jedyne, czego nie da się
+   * odczytać z dokumentacji struktury; jeden SELECT na własnej bazie (DEPLOY §6).
    */
   async applyDocFlag(dokId: number, wartosc: string, klucz: string): Promise<void> {
-    if (!config.mssql.docFlagColumn) {
+    const { flagGrupa, flagTypObiektu } = config.mssql;
+    if (!flagGrupa || !flagTypObiektu) {
       throw new Error(
-        "Nie ustawiono MSSQL_DOC_FLAG_COLUMN — nie wiadomo, w której kolumnie " +
-          "dok__Dokument siedzi flaga sprawdzenia. Ustal ją na własnej bazie " +
-          "(docs/subiekt-gt-edu-setup.md) i uzupełnij env."
+        "Nie ustawiono MSSQL_FLAG_GRUPA / MSSQL_FLAG_TYP_OBIEKTU — nie wiadomo, " +
+          "w której grupie flag `fl_Wartosc` siedzą flagi faktur zakupu. Ustal je " +
+          "jednym SELECT-em na własnej bazie (DEPLOY §6) i uzupełnij env."
       );
     }
-    if (!wartosc) {
+    if (!/^\d+$/.test(wartosc)) {
       throw new Error(
-        `Brak wartości SGT dla flagi „${klucz}" — ustaw DOC_FLAG_*_SGT. ` +
-          "Flagi wbudowane Subiekta są identyfikowane liczbą, nie nazwą."
+        `Wartość flagi „${klucz}" musi być liczbą (flg_Id z fl__Flagi), a jest „${wartosc}". ` +
+          "Ustaw DOC_FLAG_*_SGT na identyfikatory flag z własnej bazy."
       );
     }
-    const col = assertSafeColumn(config.mssql.docFlagColumn);
     const pool = await mssqlPool();
     const res = await pool
       .request()
+      .input("grupa", sql.Int, Math.trunc(flagGrupa))
+      .input("typ", sql.Int, Math.trunc(flagTypObiektu))
       .input("id", sql.Int, dokId)
-      // typ dobieramy do wartości: flagi wbudowane to liczba, pole własne — tekst
-      .input("v", /^\d+$/.test(wartosc) ? sql.Int : sql.NVarChar, /^\d+$/.test(wartosc) ? Number(wartosc) : wartosc)
-      .query(`UPDATE dok__Dokument SET ${col} = @v WHERE dok_Id = @id`);
+      .input("flaga", sql.Int, Number(wartosc))
+      .query(
+        `MERGE fl_Wartosc AS t
+         USING (SELECT @grupa AS g, @typ AS t, @id AS o) AS s
+            ON t.flw_IdGrupyFlag = s.g AND t.flw_TypObiektu = s.t AND t.flw_IdObiektu = s.o
+         WHEN MATCHED THEN
+           UPDATE SET flw_IdFlagi = @flaga, flw_CzasOstatniejZmiany = GETDATE()
+         WHEN NOT MATCHED THEN
+           INSERT (flw_IdGrupyFlag, flw_TypObiektu, flw_IdObiektu, flw_IdFlagi, flw_CzasOstatniejZmiany)
+           VALUES (@grupa, @typ, @id, @flaga, GETDATE());`
+      );
     if (!res.rowsAffected[0]) {
-      throw new Error(`Nie znaleziono dokumentu dok_Id=${dokId} w bazie Subiekta`);
+      throw new Error(`Nie udało się zapisać flagi dokumentu dok_Id=${dokId}`);
     }
     db().prepare("UPDATE sgt_dokument SET flaga = ? WHERE dok_id = ?").run(wartosc, dokId);
   }

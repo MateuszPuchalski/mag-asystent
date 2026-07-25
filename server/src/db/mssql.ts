@@ -4,12 +4,16 @@ import { config } from "../config.js";
 /**
  * JEDNA pula połączeń do bazy MSSQL Subiekta GT (SGT_MODE=mssql), jeden login.
  *
- * Login `wertis` dostaje minimalny, kolumnowy zakres uprawnień — pełny skrypt
+ * Login `wertis` dostaje minimalny zakres uprawnień — pełny skrypt
  * w docs/subiekt-gt-edu-setup.md:
- *  • GRANT SELECT: tw__Towar, tw_Stan, dok__Dokument, dok_Pozycja, kh__Kontrahent,
- *  • GRANT UPDATE wyłącznie na DWIE kolumny: lokalizacja na tw__Towar
- *    (config.mssql.locColumn) i flaga sprawdzenia na dok__Dokument
- *    (config.mssql.docFlagColumn).
+ *  • GRANT SELECT: tw__Towar, tw_Stan, dok__Dokument, dok_Pozycja,
+ *    kh__Kontrahent, fl_Wartosc, fl__Flagi,
+ *  • GRANT UPDATE na JEDNĄ kolumnę: lokalizacja na tw__Towar
+ *    (config.mssql.locColumn),
+ *  • GRANT INSERT+UPDATE na fl_Wartosc — tabelę przypisań flag. Flaga faktury
+ *    nie jest kolumną dokumentu, więc aplikacja NIE potrzebuje żadnego prawa
+ *    zapisu do `dok__Dokument`; `fl_Wartosc` nie uczestniczy w numeracji ani
+ *    w skutkach magazynowych, więc zapis tam nie może naruszyć integralności.
  * Nawet przy przejęciu credentiala reszta bazy pozostaje nietykalna, a jeden
  * login to jedna rzecz do założenia i jedna do pilnowania.
  */
