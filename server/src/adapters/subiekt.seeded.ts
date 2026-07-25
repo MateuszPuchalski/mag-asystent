@@ -100,15 +100,19 @@ export class SeededSubiektAdapter implements SubiektAdapter {
 
   listDeliveryDocuments(days: number): RawDocument[] {
     const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
-    // po TYPIE dokumentu, nie po magazynie: w trybie A skutek idzie wprost na MAG,
-    // a zwroty (ZW) mają własną ścieżkę
+    // O trybie decyduje MAGAZYN SKUTKU, nie typ dokumentu. Tryb A obsługuje
+    // dokumenty księgowane wprost na MAG (towar już leży na hali, brakuje mu
+    // tylko adresu — D1). Wszystko, co ląduje na MGP albo Zwrotach, wymaga
+    // realnego MM i należy do trybu B. Podział po typie dawał ten sam dokument
+    // w obu zakładkach: w trybie A kolektor nadałby lokalizację BEZ MM, a stan
+    // zostałby na MGP — adres na półce kłamałby względem Subiekta.
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE typ IN ('FZ','PZ') AND data_wyst >= ?
+         WHERE typ IN ('FZ','PZ') AND mag_id = ? AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(cutoff) as RawDocument[];
+      .all(config.magId.MAG, cutoff) as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
@@ -121,14 +125,6 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare("SELECT tw_id, ilosc FROM sgt_pozycja WHERE dok_id = ?")
       .all(docId) as RawPosition[];
-  }
-
-  listMgpStockProducts(): RawPosition[] {
-    return db()
-      .prepare(
-        "SELECT tw_id, stan AS ilosc FROM sgt_stan WHERE mag_id = ? AND stan > 0"
-      )
-      .all(config.magId.MGP) as RawPosition[];
   }
 
   listLocations(): string[] {

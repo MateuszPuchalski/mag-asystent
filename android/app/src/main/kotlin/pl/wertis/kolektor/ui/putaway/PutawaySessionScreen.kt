@@ -384,7 +384,7 @@ private fun SessionHeader(sess: PutawaySession) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                sess.sourceDocNumber ?: "Całe MGP",
+                sess.sourceDocNumber ?: "Sesja bez dokumentu",
                 fontFamily = BarlowCond,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,

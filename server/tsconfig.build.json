@@ -1,0 +1,7 @@
+{
+  // Build produkcyjny: to samo co tsconfig.json, ale bez testów w dist.
+  // Testy zostają w tsconfig.json, żeby `tsc --noEmit` nadal je sprawdzał —
+  // test, którego nie typuje kompilator, psuje się po cichu.
+  "extends": "./tsconfig.json",
+  "exclude": ["src/**/*.test.ts"]
+}

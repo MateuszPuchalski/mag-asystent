@@ -70,6 +70,13 @@ export const config = {
      * SQL (białe znaki/średniki odrzucane) przed wstrzyknięciem do zapytania.
      */
     locColumn: process.env.MSSQL_LOC_COLUMN ?? "tw_Pole1",
+    /**
+     * Kolumna `dok__Dokument` z flagą sprawdzenia faktury. Celowo BEZ wartości
+     * domyślnej: nie wiadomo jeszcze, gdzie firma trzyma tę flagę, a zgadnięcie
+     * oznaczałoby zapis w losową kolumnę tabeli dokumentów. Puste = zadania
+     * `set_doc_flag` kończą się czytelnym błędem ([WERYFIKUJ]).
+     */
+    docFlagColumn: process.env.MSSQL_DOC_FLAG_COLUMN ?? "",
     /** Wyrażenie SQL 0/1: dokument w buforze ([WERYFIKUJ], np. inna kolumna/status). */
     bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
@@ -114,6 +121,52 @@ export const config = {
   ].map((p) => new RegExp(p)),
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
+
+  /**
+   * Flaga sprawdzenia faktury dostawy w Subiekcie. W tej firmie rozkładanie JEST
+   * sprawdzaniem faktury, więc postęp kolektora i flaga opisują to samo — trzymanie
+   * dwóch prawd obok siebie kończy się rozjazdem między magazynem a biurem.
+   *
+   * ROZDZIELONE NA TRZY RZECZY, bo to trzy różne byty:
+   *  • klucz    — stała domeny, nigdy się nie zmienia (nasze logi, dedupe, kolory),
+   *  • `label`  — nazwa flagi jak w Subiekcie, do pokazania człowiekowi,
+   *  • `sgt`    — co faktycznie wpisujemy do bazy Subiekta.
+   *
+   * Rozdział jest konieczny, bo firma używa WBUDOWANYCH flag dokumentu (kolumna
+   * „FW" na liście faktur zakupu, filtr „Flaga:"), a te są ikoną/kolorem — w bazie
+   * niemal na pewno liczbą, nie polskim napisem. Gdyby domena operowała samą
+   * etykietą, zapis do SGT rozsypałby się na ostatnim calu, a zmiana nazwy flagi
+   * w Subiekcie zerwałaby historię `flaga_wyslana`.
+   *
+   * [WERYFIKUJ] `MSSQL_DOC_FLAG_COLUMN` + wartości `DOC_FLAG_*_SGT`: ustal na
+   * własnej bazie, porównując dokument oflagowany ręcznie (DEPLOY §6). Puste
+   * `sgt` = zadanie kończy się czytelnym błędem zamiast zapisu na oślep.
+   */
+  docFlag: {
+    /** Praca trwa: ktoś stoi teraz przy tej dostawie. */
+    in_progress: {
+      label: process.env.DOC_FLAG_IN_PROGRESS ?? "W trakcie sprawdzania",
+      sgt: process.env.DOC_FLAG_IN_PROGRESS_SGT ?? "",
+    },
+    /** Praca przerwana, ale postęp per pozycja jest zapisany. */
+    paused: {
+      label: process.env.DOC_FLAG_PAUSED ?? "Do sprawdzenia z zapisanym postępem",
+      sgt: process.env.DOC_FLAG_PAUSED_SGT ?? "",
+    },
+    /** Wszystko policzone i odłożone, zero rozbieżności ilościowych. */
+    done: {
+      label: process.env.DOC_FLAG_DONE ?? "Sprawdzone",
+      sgt: process.env.DOC_FLAG_DONE_SGT ?? "",
+    },
+    /**
+     * Domknięte, ale ilości się nie zgadzały. WYŁĄCZNIE rozbieżność ilościowa —
+     * uszkodzenie czy brak miejsca to sprawy reklamacyjne, nie zgodność faktury.
+     */
+    done_with_errors: {
+      label: process.env.DOC_FLAG_DONE_ERRORS ?? "Sprawdzone z błędami",
+      sgt: process.env.DOC_FLAG_DONE_ERRORS_SGT ?? "",
+    },
+  } as Record<string, { label: string; sgt: string }>,
 
   /**
    * Karencja COFNIJ [ms]: zadanie set_location z kolektora dostaje next_attempt_at

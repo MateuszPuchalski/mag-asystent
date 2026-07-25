@@ -6,10 +6,9 @@ import { pendingMmByTw } from "./stock.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
+import { freshLock } from "./locks.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type { PutawayDocument, PutawayItemView } from "../types.js";
-
-const LOCK_TTL_MS = 30 * 60 * 1000;
 
 /** Strefa (etykieta) magazynu źródłowego sesji/dokumentu. */
 function zoneOf(magId: number | null | undefined): "mgp" | "zwroty" {
@@ -24,20 +23,9 @@ function sessionMagId(session: { source_mag_id?: number | null }): number {
   return session.source_mag_id ?? config.magId.MGP;
 }
 
-/** Lista dokumentów do rozłożenia: FZ/PZ na MGP + zwroty (14 dni), z postępem sesji (spec §5.4). */
+/** Lista dokumentów do rozłożenia: kontenery na MGP + zwroty (14 dni), z postępem sesji (spec §5.4). */
 export function listDocuments(days = 14): PutawayDocument[] {
   const docs = subiekt.listPutawayDocuments(days);
-  // mapa MM „w drodze" liczona RAZ na magazyn źródłowy dla całej listy — inaczej
-  // pełny skan kolejki (z JSON.parse) wykonywałby się per pozycja per dokument
-  const pendingByMag = new Map<number, Map<number, number>>();
-  const pendingFor = (magId: number): Map<number, number> => {
-    let m = pendingByMag.get(magId);
-    if (!m) {
-      m = pendingMmByTw(magId);
-      pendingByMag.set(magId, m);
-    }
-    return m;
-  };
   return docs.map((d) => {
     const posList = subiekt.getDocumentPositions(d.dok_id);
     const sess = db()
@@ -61,20 +49,6 @@ export function listDocuments(days = 14): PutawayDocument[] {
       };
     }
 
-    // „na MAG": biuro wykonało MM MGP→MAG przed rozłożeniem — strefa źródłowa
-    // pusta (po odjęciu MM w drodze), a stan leży na MAG. Dostawa nadal wymaga
-    // rozłożenia (sam set_location). Nie oznaczamy tak dostaw już rozłożonych.
-    const srcMag = d.mag_id ?? config.magId.MGP;
-    const pending = pendingFor(srcMag);
-    let srcUnits = 0;
-    let magUnits = 0;
-    for (const p of posList) {
-      srcUnits += availableIn(srcMag, p.tw_id, pending);
-      magUnits += subiekt.getStock(p.tw_id, config.magId.MAG).stan;
-    }
-    const onMag =
-      srcUnits <= 0 && magUnits > 0 && !(session && session.progressPct === 100);
-
     return {
       docId: d.dok_id,
       typ: d.typ,
@@ -83,46 +57,30 @@ export function listDocuments(days = 14): PutawayDocument[] {
       dostawca: d.dostawca ?? "",
       positions: posList.length,
       zone: zoneOf(d.mag_id),
-      onMag,
       session,
     };
   });
 }
 
-/** Utwórz (lub wznów) sesję rozkładania dla dokumentu lub trybu „całe MGP". */
-export function createSession(
-  opts: { docId?: number; mode?: "all_mgp" },
-  user: string
-): number {
-  let sourceDocId: number | null = null;
-  let sourceDocNumber: string | null = null;
-  let sourceMagId = config.magId.MGP;
-  let positions: Array<{ tw_id: number; ilosc: number }>;
+/** Utwórz (lub wznów) sesję rozkładania dokumentu. */
+export function createSession(docId: number, user: string): number {
+  const doc = subiekt.getDocument(docId);
+  if (!doc) throw new Error("Nie znaleziono dokumentu");
+  // wznowienie istniejącej otwartej sesji
+  const open = db()
+    .prepare("SELECT id FROM putaway_sessions WHERE source_doc_id=? AND status='open' ORDER BY id DESC LIMIT 1")
+    .get(docId) as { id: number } | undefined;
+  if (open) return open.id;
 
-  if (opts.docId) {
-    const doc = subiekt.getDocument(opts.docId);
-    if (!doc) throw new Error("Nie znaleziono dokumentu");
-    // wznowienie istniejącej otwartej sesji
-    const open = db()
-      .prepare("SELECT id FROM putaway_sessions WHERE source_doc_id=? AND status='open' ORDER BY id DESC LIMIT 1")
-      .get(opts.docId) as { id: number } | undefined;
-    if (open) return open.id;
-    sourceDocId = doc.dok_id;
-    sourceDocNumber = doc.nr_pelny;
-    sourceMagId = doc.mag_id ?? config.magId.MGP;
-    positions = subiekt.getDocumentPositions(opts.docId);
-  } else {
-    // wznowienie istniejącej otwartej sesji „całe MGP" — bez duplikatów pozycji
-    const open = db()
-      .prepare("SELECT id FROM putaway_sessions WHERE source_doc_id IS NULL AND status='open' ORDER BY id DESC LIMIT 1")
-      .get() as { id: number } | undefined;
-    if (open) return open.id;
-    positions = subiekt.listMgpStockProducts();
-  }
+  const sourceDocId = doc.dok_id;
+  const sourceDocNumber = doc.nr_pelny;
+  const sourceMagId = doc.mag_id ?? config.magId.MGP;
 
   // agregacja tego samego towaru (różne partie/ceny → jedna pozycja sesji)
   const agg = new Map<number, number>();
-  for (const p of positions) agg.set(p.tw_id, (agg.get(p.tw_id) ?? 0) + p.ilosc);
+  for (const p of subiekt.getDocumentPositions(docId)) {
+    agg.set(p.tw_id, (agg.get(p.tw_id) ?? 0) + p.ilosc);
+  }
 
   const sessionId = Number(
     db()
@@ -235,29 +193,11 @@ export function getSession(sessionId: number) {
   };
 }
 
-function freshLock(lockedBy: string | null, lockedAt: string | null): string | null {
-  if (!lockedBy || !lockedAt) return null;
-  return Date.now() - Date.parse(lockedAt) < LOCK_TTL_MS ? lockedBy : null;
-}
-
 /** Dostępny stan strefy źródłowej = stan magazynowy minus MM „w drodze" z tej strefy. */
-function availableIn(magId: number, twId: number, pending?: Map<number, number>): number {
+function availableIn(magId: number, twId: number): number {
   const stan = subiekt.getStock(twId, magId).stan;
-  const inTransit = (pending ?? pendingMmByTw(magId)).get(twId) ?? 0;
+  const inTransit = pendingMmByTw(magId).get(twId) ?? 0;
   return stan - inTransit;
-}
-
-/** Stan na magazynie głównym (MAG). */
-function magStock(twId: number): number {
-  return subiekt.getStock(twId, config.magId.MAG).stan;
-}
-
-/**
- * Tryb „tylko lokalizacja": w strefie źródłowej nic nie ma (biuro już zrobiło
- * MM na MAG), ale towar leży na MAG — rozkładamy bez MM, samym set_location.
- */
-function isLocateOnly(srcMag: number, twId: number): boolean {
-  return availableIn(srcMag, twId) <= 0 && magStock(twId) > 0;
 }
 
 /** Magazyn źródłowy sesji po jej id (dla operacji na pozycjach). */
@@ -283,16 +223,15 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
   const lock = freshLock(item.locked_by, item.locked_at);
   if (lock && lock !== user) return { locked: true, lockedBy: lock };
 
-  // bez stanu w strefie źródłowej I na MAG nie ma czego rozkładać; gdy strefa
-  // pusta, ale towar jest na MAG → tryb „tylko lokalizacja" (biuro zrobiło MM)
+  // pusta strefa źródłowa = nie ma czego przenosić. Przypadek „towar już na MAG,
+  // brakuje tylko lokalizacji" obsługuje tryb A (dostawy) — tu nie ma po nim
+  // śladu, bo dublowanie tej ścieżki w dwóch miejscach kosztowało więcej niż dawało
   const srcMag = magOfSession(sessionId);
   const avail = availableIn(srcMag, twId);
-  const locateOnly = avail <= 0;
-  if (locateOnly && magStock(twId) <= 0)
-    return { error: `Brak stanu na ${magKod(srcMag)} ani na MAG` };
+  if (avail <= 0) return { error: `Brak stanu na ${magKod(srcMag)}` };
 
   const remaining = item.qty_expected - item.qty_done;
-  const defaultQty = locateOnly ? Math.max(remaining, 1) : Math.min(Math.max(remaining, 1), avail);
+  const defaultQty = Math.min(Math.max(remaining, 1), avail);
   const targetLoc = pickingLoc(t.lokalizacja);
 
   db()
@@ -302,8 +241,8 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
        WHERE id=?`
     )
     .run(defaultQty, targetLoc, user, new Date().toISOString(), item.id);
-  logEvent("putaway_confirm", user, twId, { sessionId, stage: "on_cart", qty: defaultQty, locateOnly });
-  return { itemId: item.id, twId, sym: t.symbol, name: t.nazwa, qty: defaultQty, targetLoc, onMag: locateOnly };
+  logEvent("putaway_confirm", user, twId, { sessionId, stage: "on_cart", qty: defaultQty });
+  return { itemId: item.id, twId, sym: t.symbol, name: t.nazwa, qty: defaultQty, targetLoc };
 }
 
 /** Dodanie towaru spoza dokumentu (spec §5.4 pkt 5). */
@@ -311,11 +250,8 @@ export function addOffDocument(sessionId: number, twId: number, user: string) {
   const t = subiekt.getProductById(twId);
   if (!t) return { error: "Nieznany towar" };
   const srcMag = magOfSession(sessionId);
-  const avail = availableIn(srcMag, twId);
-  const locateOnly = avail <= 0;
-  if (locateOnly && magStock(twId) <= 0)
-    return { error: `Brak stanu na ${magKod(srcMag)} ani na MAG` };
-  const qty = locateOnly ? Math.max(magStock(twId), 1) : avail;
+  const qty = availableIn(srcMag, twId);
+  if (qty <= 0) return { error: `Brak stanu na ${magKod(srcMag)}` };
   const targetLoc = pickingLoc(t.lokalizacja);
   const id = Number(
     db()
@@ -345,14 +281,11 @@ export function confirmItem(
   if (!Number.isFinite(qty) || qty <= 0) return { error: "Ilość musi być większa od zera" };
   const srcMag = magOfSession(item.session_id);
   const avail = availableIn(srcMag, item.tw_id);
-  // tryb „tylko lokalizacja" (towar już na MAG) — nie waliduj ilości względem
-  // strefy źródłowej i wymuś zapis lokalizacji (o to właśnie chodzi)
-  const locateOnly = avail <= 0 && magStock(item.tw_id) > 0;
-  if (!locateOnly && qty > avail)
+  if (qty > avail)
     return { error: `Na ${magKod(srcMag)} dostępne tylko ${avail} szt`, status: 409 };
   db()
     .prepare("UPDATE putaway_items SET status='on_cart', stage_qty=?, stage_loc=?, stage_update_loc=? WHERE id=?")
-    .run(qty, location.toUpperCase(), updateLoc || locateOnly ? 1 : 0, itemId);
+    .run(qty, location.toUpperCase(), updateLoc ? 1 : 0, itemId);
   logEvent("putaway_confirm", user, item.tw_id, { itemId, qty, location, updateLoc });
   return { ok: true };
 }
@@ -396,11 +329,9 @@ export function commitCart(sessionId: number, user: string) {
   if (!cart.length) return { error: "Wózek pusty — najpierw potwierdź pozycje ze skanem lokalizacji" };
 
   const srcMag = sessionMagId(session);
-  // podział wózka: pozycje z realnym stanem w strefie źródłowej → MM MGP→MAG;
-  // pozycje „tylko lokalizacja" (towar już na MAG, biuro zrobiło MM) → bez MM,
-  // sam set_location. Dzięki temu dostawę można dokończyć mimo pustej strefy.
+  // cały wózek to realne przesunięcie stanu: jeden dokument MM ze strefy na MAG
   const mmItems: MmItem[] = cart
-    .filter((i) => i.stage_qty > 0 && !isLocateOnly(srcMag, i.tw_id))
+    .filter((i) => i.stage_qty > 0)
     .map((i) => ({ twId: i.tw_id, qty: i.stage_qty }));
 
   // walidacja przed kolejką: suma z wózka per towar vs stan strefy źródłowej
@@ -435,12 +366,10 @@ export function commitCart(sessionId: number, user: string) {
   const tx = db().transaction(() => {
     for (const i of cart) {
       // set_location, gdy zeskanowana lokalizacja różni się i user zatwierdził
-      // aktualizację; dla pozycji „tylko lokalizacja" zapis wymuszamy zawsze
+      // aktualizację
       const t = subiekt.getProductById(i.tw_id);
       const current = parseLocs(t?.lokalizacja);
-      const locateOnly = isLocateOnly(srcMag, i.tw_id);
-      const forceLoc = i.stage_update_loc || locateOnly;
-      if (forceLoc && i.stage_loc && current[0] !== i.stage_loc) {
+      if (i.stage_update_loc && i.stage_loc && current[0] !== i.stage_loc) {
         const newLocs = current.length <= 1 ? [i.stage_loc] : Array.from(new Set([i.stage_loc, ...current]));
         const joined = newLocs.join(" ").slice(0, config.locFieldLimit);
         const qid = enqueueSetLocation(i.tw_id, joined, {
@@ -452,9 +381,7 @@ export function commitCart(sessionId: number, user: string) {
         });
         queueIds.push(qid);
       }
-      // „tylko lokalizacja": towar w całości na MAG — zamykamy pozycję w całości
-      // (nie przenosimy ilości, jedynie nadajemy lokalizację)
-      const doneQty = locateOnly ? i.qty_expected : i.qty_done + (i.stage_qty ?? 0);
+      const doneQty = i.qty_done + (i.stage_qty ?? 0);
       const status = doneQty >= i.qty_expected ? "done" : "partial";
       db()
         .prepare(

@@ -16,6 +16,15 @@ export class DevSferaAdapter implements SferaAdapter {
     if (res.changes === 0) throw new Error(`Nie znaleziono towaru tw_id=${twId}`);
   }
 
+  async applyDocFlag(dokId: number, wartosc: string, klucz: string): Promise<void> {
+    // dev nie ma flag wbudowanych Subiekta — gdy mapowanie na wartość SGT nie
+    // jest jeszcze skonfigurowane, zapisujemy klucz, żeby demo pozostało czytelne
+    const res = db()
+      .prepare("UPDATE sgt_dokument SET flaga = ? WHERE dok_id = ?")
+      .run(wartosc || klucz, dokId);
+    if (res.changes === 0) throw new Error(`Nie znaleziono dokumentu dok_id=${dokId}`);
+  }
+
   async createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string> {
     const d = db();
     const tx = d.transaction(() => {

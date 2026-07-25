@@ -42,6 +42,7 @@ import pl.wertis.kolektor.core.net.LocApplyAction
 import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.ScanBody
 import pl.wertis.kolektor.core.net.ScanResolution
+import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
@@ -97,6 +98,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     /** Zgłoszenie wyjątku; `line` = null → problem całej dostawy (D8). */
     var problemFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     var problemOpen by remember(id) { mutableStateOf(false) }
+    /** Typ wstępnie wybrany w arkuszu wyjątku (skrót „INNA ILOŚĆ"). */
+    var problemType by remember(id) { mutableStateOf<ProblemType?>(null) }
     var busy by remember { mutableStateOf(false) }
 
     suspend fun resolveProduct(code: String) {
@@ -113,6 +116,11 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 is ScanResolution.OffDocument -> {
                     graph.feedback.beep(false)
                     graph.effects.toast("${r.sym} nie jest w tym dokumencie")
+                }
+                is ScanResolution.Locked -> {
+                    // ktoś obok już bierze tę pozycję — idź dalej alejką
+                    graph.feedback.beep(false)
+                    graph.effects.toast("${r.sym} — pozycję rozkłada ${r.lockedBy}")
                 }
                 is ScanResolution.Unknown -> {
                     graph.feedback.beep(false)
@@ -187,15 +195,18 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             graph = graph,
             deliveryId = id,
             line = problemFor,
+            initialType = problemType,
             onDone = {
                 problemOpen = false
                 problemFor = null
+                problemType = null
                 active = null
                 reload++
             },
             onCancel = {
                 problemOpen = false
                 problemFor = null
+                problemType = null
             },
         )
         return
@@ -234,7 +245,16 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 problemFor = line
                 problemOpen = true
             },
-            onCancel = { active = null },
+            onQtyIssue = {
+                problemFor = line
+                problemType = ProblemType.QTY_SHORT
+                problemOpen = true
+            },
+            onCancel = {
+                active = null
+                // oddaj linię od razu, zamiast trzymać ją do wygaśnięcia TTL
+                scope.launch { runCatching { apiCall { graph.api.releaseLine(id, line.id) } } }
+            },
         )
         return
     }
@@ -248,7 +268,10 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     ) {
         // nagłówek dostawy + postęp
         Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(v.nrPelny, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(v.nrPelny, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+                FlagBadge(v.flaga, v.flagaKey)
+            }
             Text(v.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -394,7 +417,12 @@ private fun LineRow(line: DeliveryLineView, onClick: () -> Unit) {
 
 /** Karta po pierwszym skanie: ilość i lokalizacja czytelne z odległości ramienia. */
 @Composable
-private fun PutawayCard(line: DeliveryLineView, onProblem: () -> Unit, onCancel: () -> Unit) {
+private fun PutawayCard(
+    line: DeliveryLineView,
+    onProblem: () -> Unit,
+    onQtyIssue: () -> Unit,
+    onCancel: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -440,7 +468,16 @@ private fun PutawayCard(line: DeliveryLineView, onProblem: () -> Unit, onCancel:
             )
         }
 
-        // wyjście awaryjne z rutyny: uszkodzone, brakuje, nie mieści się (§4.6)
+        // Rozkładanie JEST sprawdzaniem faktury i liczy się KAŻDĄ pozycję, więc
+        // rozbieżność ilościowa to najczęstszy wyjątek — zasługuje na własny
+        // przycisk, a nie na szukanie kafla wśród siedmiu typów.
+        OutlineButton(
+            "INNA ILOŚĆ",
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = WIcons.Alert,
+            onClick = onQtyIssue,
+        )
+        // pozostałe wyjścia awaryjne: uszkodzone, zły towar, brak miejsca (§4.6)
         OutlineButton(
             "PROBLEM",
             modifier = Modifier.fillMaxWidth(),

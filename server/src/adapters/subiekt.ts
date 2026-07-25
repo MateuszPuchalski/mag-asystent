@@ -56,8 +56,6 @@ export interface SubiektAdapter {
   listDeliveryDocuments(days: number): RawDocument[];
   getDocument(docId: number): RawDocument | undefined;
   getDocumentPositions(docId: number): RawPosition[];
-  /** Towary o stanie MGP > 0 (tryb „całe MGP"). */
-  listMgpStockProducts(): RawPosition[];
   /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */
   listLocations(): string[];
   /** Towary, których pole lokalizacji zawiera dany kod (reverse lookup). */

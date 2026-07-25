@@ -113,11 +113,11 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
         sorted.forEach { d -> DocRow(d) { open(d) } }
 
         OutlineButton(
-            "TRYB KONTENEROWY",
+            "KONTENERY I ZWROTY",
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         ) { graph.nav.go(pl.wertis.kolektor.core.nav.Screen.PUTAWAY_DOCS) }
         Text(
-            "Kontener importowy — sesja z wózkiem i dokumentami MM (4× w roku).",
+            "Towar spoza MAG — sesja z wózkiem i dokumentem MM (kontener 4× w roku, zwroty).",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,
@@ -183,6 +183,8 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
                 fontSize = 11.sp,
                 color = InkMute,
             )
+            // stan sprawdzenia faktury — to samo, co biuro widzi w Subiekcie
+            FlagBadge(d.flaga, d.flagaKey, Modifier.padding(top = 3.dp))
             if (d.linesTotal > 0) {
                 ProgressBar(d.linesDone, d.linesTotal, complete)
             }

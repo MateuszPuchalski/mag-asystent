@@ -48,6 +48,25 @@ export function enqueueSetLocation(
   return insert("set_location", { twId, newValue }, base);
 }
 
+/**
+ * Zadanie ustawienia flagi sprawdzenia na fakturze dostawy.
+ *
+ * To ŚWIADOME zawężone złamanie §16 („zero zapisu do SGT poza tw_Lokalizacja"):
+ * w tej firmie rozkładanie jest sprawdzaniem faktury, więc bez tego zapisu biuro
+ * musiałoby pytać magazyn o stan każdej dostawy. Zapis idzie tą samą drogą co
+ * lokalizacja — kolejka → worker → adapter — więc kolektor nigdy nie czeka na COM.
+ */
+export function enqueueDocFlag(
+  dokId: number,
+  /** Klucz stanu — do audytu i czytelnych logów. */
+  flaga: string,
+  /** Surowa wartość dla Subiekta (flagi wbudowane = id koloru), patrz config.docFlag. */
+  wartosc: string,
+  base: EnqueueBase
+): number {
+  return insert("set_doc_flag", { dokId, flaga, wartosc }, base);
+}
+
 /** Zadanie MM (spec §5.3). items: przesunięcie MGP→MAG. */
 export function enqueueMM(
   magFrom: number,

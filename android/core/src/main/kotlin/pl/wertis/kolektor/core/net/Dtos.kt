@@ -102,6 +102,8 @@ data class LocationProductsResponse(
 @Serializable
 enum class QueueItemType {
     @SerialName("set_location") SET_LOCATION,
+    /** Flaga sprawdzenia faktury (tryb A) — jedyny zapis do SGT poza lokalizacją. */
+    @SerialName("set_doc_flag") SET_DOC_FLAG,
     @SerialName("mm") MM,
     @SerialName("combo") COMBO,
 }
@@ -153,10 +155,8 @@ data class PutawayDocument(
     val dataWyst: String = "",
     val dostawca: String = "",
     val positions: Int = 0,
-    /** Strefa źródłowa: dostawy (MGP) lub zwroty od klientów. */
+    /** Strefa źródłowa: kontenery (MGP) lub zwroty od klientów. */
     val zone: PutawayZone = PutawayZone.MGP,
-    /** Towar z dokumentu jest już na MAG (biuro zrobiło MM) — dostawa nadal do rozłożenia, bez MM. */
-    val onMag: Boolean = false,
     val session: PutawaySessionRef? = null,
 )
 
@@ -240,7 +240,7 @@ data class MmItem(val twId: Long, val qty: Double)
 data class MmBody(val items: List<MmItem>)
 
 @Serializable
-data class CreateSessionBody(val docId: Long? = null, val mode: String? = null)
+data class CreateSessionBody(val docId: Long)
 
 @Serializable
 data class CartBody(val twId: Long, val offDocument: Boolean? = null)
@@ -316,6 +316,10 @@ data class DeliveryDocument(
     val linesTotal: Int = 0,
     val linesDone: Int = 0,
     val status: String? = null,
+    /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
+    val flaga: String? = null,
+    /** Klucz stanu — stabilny; po nim dobieramy kolor, bo nazwy są konfigurowalne. */
+    val flagaKey: String? = null,
 )
 
 @Serializable
@@ -353,6 +357,10 @@ data class DeliveryView(
     val dostawca: String = "",
     val dataWyst: String = "",
     val status: String = "open",
+    /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
+    val flaga: String? = null,
+    /** Klucz stanu — stabilny; po nim dobieramy kolor. */
+    val flagaKey: String? = null,
     val progress: DeliveryProgress = DeliveryProgress(),
     val lines: List<DeliveryLineView> = emptyList(),
 )
@@ -385,6 +393,15 @@ sealed class ScanResolution {
 
     @Serializable @SerialName("off_document")
     data class OffDocument(val code: String = "", val twId: Long = 0, val sym: String = "", val name: String = "") : ScanResolution()
+
+    /** Linię trzyma teraz ktoś inny — nie odbieramy jej po cichu. */
+    @Serializable @SerialName("locked")
+    data class Locked(
+        val code: String = "",
+        val lockedBy: String = "",
+        val sym: String = "",
+        val name: String = "",
+    ) : ScanResolution()
 
     @Serializable @SerialName("unknown")
     data class Unknown(val code: String = "") : ScanResolution()

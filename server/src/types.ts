@@ -39,14 +39,8 @@ export interface PutawayDocument {
   dataWyst: string;
   dostawca: string;
   positions: number;
-  /** Strefa źródłowa dokumentu: dostawy (MGP) lub zwroty od klientów. */
+  /** Strefa źródłowa dokumentu: kontenery (MGP) lub zwroty od klientów. */
   zone: "mgp" | "zwroty";
-  /**
-   * Towary z dokumentu są już na MAG (biuro wykonało MM MGP→MAG przed
-   * rozłożeniem): strefa źródłowa pusta, a stan jest na magazynie głównym.
-   * Dostawa nadal wymaga rozłożenia — tylko bez MM, sam set_location.
-   */
-  onMag?: boolean;
   session?: { id: number; status: string; progressPct: number };
 }
 
@@ -84,6 +78,10 @@ export interface DeliveryDocument {
   linesTotal: number;
   linesDone: number;
   status: string | null;
+  /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
+  flaga: string | null;
+  /** Klucz stanu — stabilny, po nim kolektor dobiera kolor (nazwy są konfigurowalne). */
+  flagaKey: string | null;
 }
 
 export interface DeliveryLineView {
@@ -107,6 +105,10 @@ export interface DeliveryView {
   dostawca: string;
   dataWyst: string;
   status: string;
+  /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
+  flaga: string | null;
+  /** Klucz stanu — stabilny, po nim kolektor dobiera kolor. */
+  flagaKey: string | null;
   /** `problems` ⊂ `done` — linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
   progress: { total: number; done: number; remaining: number; problems: number };
   lines: DeliveryLineView[];
@@ -127,6 +129,8 @@ export type ScanResolution =
   | { kind: "line"; line: DeliveryLineView }
   | { kind: "conflict"; code: string; candidates: EanCandidate[] }
   | { kind: "off_document"; code: string; twId: number; sym: string; name: string }
+  /** Linię trzyma teraz ktoś inny — nie odbieramy jej po cichu. */
+  | { kind: "locked"; code: string; lockedBy: string; sym: string; name: string }
   | { kind: "unknown"; code: string };
 
 /* ── Faza 2: wyjątki (D8) ───────────────────────────────────────────────── */

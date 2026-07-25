@@ -53,6 +53,8 @@ interface DokRow {
   dok_MagId: number;
   dostawca: string | null;
   w_buforze: number;
+  /** Flaga sprawdzenia faktury; NULL gdy kolumna nieskonfigurowana. */
+  flaga: string | null;
 }
 interface PozRow {
   ob_DokHanId: number;
@@ -102,12 +104,17 @@ export async function importFromMssql(): Promise<ImportStats> {
   // dostawca: kh_Symbol jest pewny w każdej wersji SGT; pełna nazwa siedzi w
   // adr__Ekran (adr_NazwaPelna) — podmiana opisana w docs/subiekt-gt-edu-setup.md
   // dokumenty zwrotów: każdy typ na magazynie Zwroty, chyba że DOK_TYP_ZWROTY zawęża
+  // flaga sprawdzenia faktury — czytamy tylko, gdy wiadomo, z której kolumny
+  // ([WERYFIKUJ]); bez konfiguracji wszystkie dokumenty mają flagę NULL i
+  // mechanizm „nadpisanie biura wygrywa" po prostu nie ma czego porównywać
+  const flagSelect = c.docFlagColumn ? `d.${assertSafeColumn(c.docFlagColumn)}` : "NULL";
   const zwTypFilter = c.dokTypyZwroty.length
     ? ` AND d.dok_Typ IN (${c.dokTypyZwroty.map((n) => Math.trunc(n)).join(",")})`
     : "";
   const dokumenty = (
     await pool
       .request()
+      .input("mag", sql.Int, config.magId.MAG)
       .input("mgp", sql.Int, config.magId.MGP)
       .input("zw", sql.Int, config.magId.ZWROTY)
       .input("fz", sql.Int, c.dokTypFZ)
@@ -118,11 +125,17 @@ export async function importFromMssql(): Promise<ImportStats> {
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
                 d.dok_MagId,
                 ISNULL(k.kh_Symbol, '') AS dostawca,
-                ${c.bufferExpr} AS w_buforze
+                ${c.bufferExpr} AS w_buforze,
+                ${flagSelect} AS flaga
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
-         WHERE ((d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
-             OR (d.dok_MagId = @zw${zwTypFilter}))
+         WHERE (
+                 -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
+                 (d.dok_MagId = @mag AND d.dok_Typ IN (@fz, @pz))
+                 -- tryb B: towar leży poza halą i wymaga realnego MM strefa→MAG
+              OR (d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
+              OR (d.dok_MagId = @zw${zwTypFilter})
+               )
            AND d.dok_DataWyst >= @cutoff`
       )
   ).recordset;
@@ -149,8 +162,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
   );
   const insDok = d.prepare(
-    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
-     VALUES (?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze, flaga)
+     VALUES (?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
 
@@ -193,7 +206,8 @@ export async function importFromMssql(): Promise<ImportStats> {
         doc.data_wyst,
         doc.dok_MagId,
         doc.dostawca ?? "",
-        doc.w_buforze ? 1 : 0
+        doc.w_buforze ? 1 : 0,
+        doc.flaga ?? null
       );
     }
     for (const p of pozycje) {

@@ -152,7 +152,27 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    - kolumnę/flagę bufora w `dok__Dokument` (→ env `MSSQL_BUFFER_EXPR`),
    - `mag_Id` magazynów MAG i MGP (→ env `MAG_ID_MAG` / `MAG_ID_MGP`),
    - `SELECT COL_LENGTH('tw__Towar','tw_Lokalizacja')` (ustaw `LOC_FIELD_LIMIT`),
-   - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`.
+   - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`,
+   - **flaga sprawdzenia faktury** — firma używa **wbudowanych flag dokumentu**
+     (kolumna „FW" na liście *Faktury zakupu* + filtr „Flaga:"), więc w bazie to
+     najpewniej **liczba (id koloru)**, a nie polski napis. Trzeba ustalić dwie
+     rzeczy: kolumnę (→ `MSSQL_DOC_FLAG_COLUMN`) i wartość każdej z czterech flag
+     (→ `DOC_FLAG_*_SGT`). Metoda: oflaguj ręcznie w Subiekcie dwie faktury
+     różnymi flagami i porównaj wiersze.
+
+     ```sql
+     -- podstaw numery dwóch dokumentów oflagowanych ręcznie różnymi flagami
+     SELECT * FROM dok__Dokument
+     WHERE dok_NrPelny IN ('FZ 60/MAG/07/2026', 'FZ 48/MAG/07/2026');
+     ```
+
+     Kolumna, która się między nimi różni, to ta szukana; jej wartości wpisz do
+     `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`
+     i `DOC_FLAG_DONE_ERRORS_SGT`.
+
+     Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
+     zamiast pisać na oślep w tabelę dokumentów. Reszta aplikacji działa
+     normalnie — flaga jest jedyną rzeczą, która czeka.
 3. Ustaw env połączenia `MSSQL_*` (patrz `docs/subiekt-gt-edu-setup.md` §4);
    importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.

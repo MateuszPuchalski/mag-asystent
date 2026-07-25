@@ -9,7 +9,7 @@ PRAGMA foreign_keys = ON;
 -- ── Kolejka zadań dla workera Sfery (spec §7) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS sfera_queue (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  type           TEXT NOT NULL,                 -- set_location | mm | combo
+  type           TEXT NOT NULL,                 -- set_location | set_doc_flag | mm | combo
   payload        TEXT NOT NULL,                 -- JSON
   status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error
   attempts       INTEGER NOT NULL DEFAULT 0,
@@ -101,9 +101,10 @@ CREATE TABLE IF NOT EXISTS sgt_dokument (
   typ        TEXT NOT NULL,                     -- FZ | PZ
   nr_pelny   TEXT NOT NULL,
   data_wyst  TEXT NOT NULL,                     -- ISO date
-  mag_id     INTEGER NOT NULL,                  -- magazyn skutku (MGP)
+  mag_id     INTEGER NOT NULL,                  -- magazyn skutku: MAG (tryb A) | MGP | Zwroty
   dostawca   TEXT,
-  w_buforze  INTEGER NOT NULL DEFAULT 0
+  w_buforze  INTEGER NOT NULL DEFAULT 0,
+  flaga      TEXT                               -- flaga sprawdzenia faktury (§ wywiad)
 );
 
 CREATE TABLE IF NOT EXISTS sgt_pozycja (
@@ -134,7 +135,15 @@ CREATE TABLE IF NOT EXISTS delivery (
   data_dok      TEXT,
   status        TEXT NOT NULL DEFAULT 'open',   -- open | done | abandoned
   opened_at     TEXT NOT NULL,
-  closed_at     TEXT
+  closed_at     TEXT,
+  -- Ostatnia flaga wysłana do Subiekta. Służy do dwóch rzeczy: nie kolejkujemy
+  -- tego samego stanu w kółko, a rozjazd z sgt_dokument.flaga jest dowodem, że
+  -- biuro ustawiło flagę poza aplikacją (i wtedy jego decyzja wygrywa).
+  flaga_wyslana TEXT,
+  -- Ostatni dotyk człowieka (otwarcie, skan, odłożenie). Odróżnia „ktoś przy tym
+  -- stoi TERAZ" od „leży zaczęte" — lock na pojedynczej linii to za wąski sygnał,
+  -- bo magazynier jest przy palecie także zanim cokolwiek zeskanuje.
+  active_at     TEXT
 );
 
 -- Postęp per linia (D4): zapis natychmiastowy, przerwanie pracy nic nie kosztuje.
@@ -150,7 +159,12 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   lok_faktyczna  TEXT,                          -- zeskanowana (fakt, nie intencja — D3)
   status         TEXT NOT NULL DEFAULT 'todo',  -- todo | done | partial | problem | skipped
   done_at        TEXT,
-  done_by        TEXT
+  done_by        TEXT,
+  -- Przy natłoku jedną dostawę rozkłada kilka osób (TTL w services/locks.ts).
+  -- Świeży lock jest zarazem jedynym sygnałem „ktoś pracuje TERAZ", na którym
+  -- opiera się flaga „W trakcie sprawdzania".
+  locked_by      TEXT,
+  locked_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);

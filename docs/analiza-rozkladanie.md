@@ -20,7 +20,7 @@ Stan na: lipiec 2026. Problemy P1–P4 zostały naprawione w tym samym PR, w kt�
 - **Model wózka rundami** — odpowiada realnej pracy: załaduj wózek na MGP → trasa po regałach → zatwierdź → wróć po następną partię.
 - **Agregacja po `tw_id`** — magazynier rozkłada towar, nie pozycje księgowe z partii.
 - **Blokady pozycji per użytkownik z TTL** — kilka osób może rozkładać jedną dostawę.
-- **Towar spoza dokumentu + tryb „całe MGP"** — bo w realu na palecie leży to, co leży, a nie to, co na dokumencie.
+- **Towar spoza dokumentu** — bo w realu na palecie leży to, co leży, a nie to, co na dokumencie. (Tryb „całe MGP" usunięty po redesignie v2.0: jednostką pracy jest dokument, a strefa przyjęć nie jest już workiem bez ewidencji.)
 - **Skan lokalizacji przy regale jako potwierdzenie** — właściwy moment weryfikacji (a nie „z pamięci" przy biurku).
 
 ## 2. Konfrontacja z realiami pracy — problemy krytyczne (naprawione)

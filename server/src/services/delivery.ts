@@ -6,6 +6,8 @@ import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
 import { recordEanConflict } from "./ean.js";
+import { lockedByOther } from "./locks.js";
+import { deliveryFlag, flagLabel, syncFlag, touchDelivery } from "./delivery-flag.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -43,15 +45,24 @@ export function listDocuments(days = 14): DeliveryDocument[] {
   const docs = subiekt.listDeliveryDocuments(days);
   const progress = db()
     .prepare(
-      `SELECT d.sgt_dok_id AS dokId,
+      `SELECT d.id AS deliveryId,
+              d.sgt_dok_id AS dokId,
               COUNT(l.id) AS total,
               SUM(CASE WHEN l.status IN ('done','skipped','problem') THEN 1 ELSE 0 END) AS done,
               d.status AS status
        FROM delivery d LEFT JOIN delivery_line l ON l.delivery_id = d.id
        GROUP BY d.id`
     )
-    .all() as Array<{ dokId: number; total: number; done: number; status: string }>;
+    .all() as Array<{ deliveryId: number; dokId: number; total: number; done: number; status: string }>;
   const byDoc = new Map(progress.map((p) => [p.dokId, p]));
+
+  // Przejście „W trakcie sprawdzania" → „Do sprawdzenia z zapisanym postępem"
+  // nie ma własnego zdarzenia — dzieje się przez UPŁYW CZASU (wygasa lock).
+  // Doganiamy je tutaj, przy odczycie listy, zamiast trzymać osobny scheduler
+  // dla jednej przemiany. Dedupe w syncFlag pilnuje, żeby nie generować pracy.
+  for (const p of progress) {
+    if (p.status === "open") syncFlag(p.deliveryId, "system");
+  }
 
   return docs.map((d) => {
     const p = byDoc.get(d.dok_id);
@@ -68,6 +79,9 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       linesTotal: p?.total ?? 0,
       linesDone: p?.done ?? 0,
       status: p?.status ?? null,
+      /** stan sprawdzenia faktury — to samo, co widzi biuro w Subiekcie */
+      flaga: p ? flagLabel(deliveryFlag(p.deliveryId)) : null,
+      flagaKey: p ? deliveryFlag(p.deliveryId) : null,
     };
   });
 }
@@ -111,6 +125,9 @@ export function openDelivery(dokId: number, user: string): number {
   })();
 
   logEvent("delivery_open", user, null, { deliveryId: id, dokId });
+  // otwarcie dokumentu to już początek sprawdzania — magazynier stoi przy palecie
+  touchDelivery(id);
+  syncFlag(id, user);
   return id;
 }
 
@@ -171,6 +188,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dostawca: d.dostawca ?? "",
     dataWyst: d.data_dok ?? "",
     status: d.status,
+    flaga: flagLabel(deliveryFlag(d.id)),
+    flagaKey: deliveryFlag(d.id),
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     lines,
   };
@@ -236,7 +255,30 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   if (!line) {
     return { kind: "off_document", code, twId: p.tw_id, sym: p.symbol, name: p.nazwa };
   }
+  // Przy natłoku dostawę robi kilka osób. Nie odbieramy linii koledze po cichu:
+  // druga osoba dowiaduje się, kto ją trzyma, i idzie dalej po alejce.
+  const holder = lockedByOther(line.locked_by, line.locked_at, user);
+  if (holder) return { kind: "locked", code, lockedBy: holder, sym: p.symbol, name: p.nazwa };
+
+  claimLine(line.id, user);
+  touchDelivery(deliveryId);
+  syncFlag(deliveryId, user);
   return toResolution(p, line);
+}
+
+/** Zajęcie linii na czas odkładania (TTL — patrz services/locks.ts). */
+export function claimLine(lineId: number, user: string): void {
+  db()
+    .prepare("UPDATE delivery_line SET locked_by=?, locked_at=? WHERE id=?")
+    .run(user, nowIso(), lineId);
+}
+
+/** Zwolnienie linii (anulowanie karty odkładania albo zakończenie operacji). */
+export function releaseLine(lineId: number, user: string): { ok: true } {
+  db()
+    .prepare("UPDATE delivery_line SET locked_by=NULL, locked_at=NULL WHERE id=? AND locked_by=?")
+    .run(lineId, user);
+  return { ok: true };
 }
 
 function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {
@@ -306,10 +348,15 @@ export function putawayLine(
     });
   }
 
+  // skan półki jest zarazem potwierdzeniem POLICZONEJ ilości: w tej firmie
+  // rozkładanie JEST sprawdzaniem faktury i liczy się każdą pozycję. Rozbieżność
+  // zgłasza się osobno („INNA ILOŚĆ" → wyjątek ilościowy), więc dojście tutaj
+  // znaczy „policzyłem, zgadza się".
   db()
     .prepare(
       `UPDATE delivery_line
-       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?
+       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?,
+           locked_by=NULL, locked_at=NULL
        WHERE id=?`
     )
     .run(doneQty, code, status, nowIso(), user, lineId);
@@ -331,6 +378,8 @@ export function putawayLine(
   }
 
   closeIfComplete(line.delivery_id, user);
+  touchDelivery(line.delivery_id);
+  syncFlag(line.delivery_id, user);
   return { ok: true, queueId, mismatch, status };
 }
 
