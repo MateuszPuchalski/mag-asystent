@@ -6,9 +6,9 @@ package pl.wertis.kolektor.core.nav
 
 enum class Screen {
     SPLASH, HOME, PRODUCT, SCAN_LOC, QUEUE,
-    // tryb A (dostawy krajowe) — dokument jest jednostką pracy
+    // tryb A (dostawy krajowe i zwroty) — dokument jest jednostką pracy
     DELIVERY_DOCS, DELIVERY_LINES,
-    // tryb B (kontener) — sesja z wózkiem, schowany za osobnym wejściem
+    // tryb B (kontener importowy) — sesja z wózkiem, schowany za osobnym wejściem
     PUTAWAY_DOCS, PUTAWAY_SESSION, LOCATION, SETTINGS,
     // wyjątki: nierozwiązane zgłoszenia + kolizje EAN do naprawy w kartotece
     PROBLEMS,

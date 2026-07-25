@@ -34,13 +34,16 @@ Strefa przyjęć nazywa się **MGP**.
 ```
 Kolektor (Android)  ─┐
 Biuro (/lookup)     ─┴─REST/JSON──►  Serwer Fastify
-                                       │  SQLite: sfera_queue, putaway_*, events
+                                       │  SQLite: delivery + delivery_line (tryb A:
+                                       │          dostawy, zwroty, koszyki),
+                                       │          problem + ean_conflict (wyjątki),
+                                       │          putaway_* (tryb B), sfera_queue, events
                                        │  SubiektAdapter (odczyt)  → enqueue
                                        ▼
                                      Worker (poll 1–2 s, sekwencyjnie)
                                        │  SferaAdapter (zapis)
                                        ▼
-                         DEV: tabele sgt_* (SQLite, seed z mag.xlsx)
+                         DEV: tabele sgt_* (SQLite, seed z magmat.xlsx)
                          PROD: MSSQL SELECT (read-only) + Sfera COM (Windows)
 ```
 
@@ -206,21 +209,29 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
-  core/                    czysta logika JVM (skan, DTO, offline) + testy jednostkowe
-  app/                     aplikacja Compose: 10 ekranów, skanery, czujniki
+  core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
+                           + 56 testów jednostkowych; buduje się bez Android SDK
+  app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup
   data/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
 server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
-  src/db/seed.ts           seed z products.json + dokumenty FZ/PZ per dostawca
-  src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+com (prod, szkielet)
-  src/services/            stock (korekta o kolejkę), delivery (tryb A), problems,
-                           ean (kolizje kodów), putaway (tryb B), queue, events
-  src/routes/              products, mm, queue, delivery, problems, putaway (§8)
+  src/db/seed.ts           seed z products.json: dokumenty FZ/PZ per dostawca,
+                           kontener na MGP, zbiorczy dokument zwrotów
+  src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+sql (prod)
+  src/services/            delivery + delivery-flag (tryb A: dostawy, zwroty, koszyki),
+                           problems + ean (wyjątki), putaway (tryb B — kontener),
+                           stock (korekta o kolejkę), queue, locks, locations, events
+  src/routes/              products, delivery, problems, putaway, queue,
+                           locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
+docs/                      analiza rozkładania + instrukcja podpięcia Subiekta GT
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
+tools/docs_check.py        kontrola spójności dokumentacji z repo (martwe ścieżki,
+                           usunięte byty, liczby ekranów/testów) — `python3 tools/docs_check.py`
+.github/workflows/         CI: testy :core + APK debug (ubuntu-latest ma Android SDK)
 ```
 
 ## Dane testowe
@@ -232,7 +243,13 @@ je wprost — bez syntetyki (dla starszego, płaskiego eksportu bez tych kolumn
 konwerter nadal rozdziela stany deterministycznie hashem). 94 towary mają stan
 na MGP. Seed buduje z nich dokumenty FZ/PZ **pogrupowane po realnym dostawcy**
 (duże paczki dzielone po ≤20 pozycji, jeden dokument w buforze — test
-`waiting_for_doc`). W produkcji stany i dokumenty pochodzą z `tw_Stan` /
+`waiting_for_doc`).
+
+Żeby obie ścieżki miały czym żyć, seed rozstawia dokumenty po **trzech
+magazynach skutku**: krajowe FZ/PZ na `MAG` (tryb A), jeden dokument zostaje na
+`MGP` jako kontener importowy (tryb B) i jeden zbiorczy dokument zwrotów na
+magazynie `Zwroty` — ten ostatni razem ze stanami, bo bez nich MM z koszyka nie
+miałby czego przenosić. W produkcji stany i dokumenty pochodzą z `tw_Stan` /
 `dok__Dokument` przez adapter MSSQL (patrz [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md)).
 
 ## Praca z prawdziwym Subiektem GT
@@ -246,10 +263,11 @@ połączenie: **jeden login** o kolumnowych uprawnieniach, importer
 (przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`), a worker zapisuje
 bezpośrednim UPDATE dokładnie **dwie kolumny**: lokalizację na `tw__Towar`
 i flagę sprawdzenia na `dok__Dokument`. Tryb zapisu wynika z `SGT_MODE` — nie ma
-osobnego przełącznika. Dokumenty MM (wyłącznie tryb B — wózek) tworzy docelowo
-osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`; do tego czasu
-zadanie MM kończy się czytelnym błędem, a MM wystawia biuro. Instrukcja krok po
-kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
+osobnego przełącznika. Dokumenty MM — a powstają w dwóch miejscach: runda wózka
+w trybie B i **zamknięty koszyk zwrotu** — tworzy docelowo osobny worker Sfery
+(COM) czytający tę samą kolejkę `sfera_queue`; do tego czasu zadanie MM kończy
+się czytelnym błędem, a MM wystawia biuro. Instrukcja krok po kroku:
+[`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 
 W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —
 API, kolejka, worker i rozkładanie realnie na SQLite zasilonym danymi

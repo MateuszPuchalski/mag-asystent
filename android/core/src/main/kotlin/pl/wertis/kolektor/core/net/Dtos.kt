@@ -284,9 +284,10 @@ data class CloseSessionResponse(val status: String, val summary: Map<String, Int
 @Serializable
 data class ApiErrorBody(val error: String? = null, val available: Double? = null)
 
-/* ── Tryb A: rozkładanie dostaw (redesign v2.0) ─────────────────────────────
-   Dokument FZ/PZ jest jednostką pracy; aplikacja zapisuje wyłącznie
-   lokalizację (D1) — bez MM i bez czekania na bufor SGT.                     */
+/* ── Tryb A: rozkładanie dostaw i zwrotów (redesign v2.0) ───────────────────
+   Dokument jest jednostką pracy. Przy dostawie krajowej aplikacja zapisuje
+   wyłącznie lokalizację (D1) — bez MM i bez czekania na bufor SGT. Przy zwrocie
+   dochodzi jeden MM Zwroty→MAG na każdy domknięty koszyk.                     */
 
 @Serializable
 data class DeliveryDocument(

@@ -31,7 +31,7 @@ function migrate(database: Database.Database) {
   };
   addColumn("sfera_queue", "session_id", "INTEGER");
   addColumn("putaway_sessions", "source_mag_id", "INTEGER");
-  // locki per linia dostawy (tryb A) — kilka osób przy jednej dostawie
+  // locki per linia (tryb A: dostawy i zwroty) — kilka osób przy jednym dokumencie
   addColumn("delivery_line", "locked_by", "TEXT");
   addColumn("delivery_line", "locked_at", "TEXT");
   // ostatnia flaga wysłana do Subiekta — rozjazd z sgt_dokument.flaga znaczy,

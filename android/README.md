@@ -4,15 +4,15 @@
 Compose), czysty klient REST istniejącego serwera (`server/`, Fastify).
 Skanowanie wyłącznie sprzętowe (Zebra DataWedge / Honeywell DataCollection,
 fallback klawiaturowy); bez funkcji głosowych i skanu kamerą. (Historycznie
-aplikacja powstała jako port PWA `web/src` — dawny kod webowy usunięto,
-odniesienia „port z web/src/…" niżej opisują pochodzenie logiki.)
+aplikacja powstała jako port PWA — dawny kod webowy usunięto z repo, więc
+odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 ## Moduły
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, bufor offline | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (10 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), bufor offline — **56 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose (12 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
 przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi
@@ -90,11 +90,11 @@ aplikacja też się buduje i działa (integracja przez refleksję —
 
 ## Architektura (skrót)
 
-- **Nawigacja**: statyczna mapa powrotów portowana z `web/src/lib/store.ts`
+- **Nawigacja**: statyczna mapa powrotów, nie stos
   (`core/nav/NavModel.kt` + `nav/AppNavState.kt`) — bez Navigation Compose.
-- **Skany**: `ScannerBus` = łańcuch handlerów jak `web/src/lib/scanner.ts`
+- **Skany**: `ScannerBus` = łańcuch handlerów
   (aktywny ekran ma pierwszeństwo, `false` = przekaż niżej, fallback globalny).
-- **Offline**: `core/offline/OfflineQueue.kt` = port `web/src/lib/offline.ts`
+- **Offline**: `core/offline/OfflineQueue.kt`
   (bufor tylko przy awarii sieci; błędy serwera propagują do UI). Trwałość:
   plik JSON, flush: powrót sieci / tyker 15 s / start / ręcznie / WorkManager.
 - **Polling**: kolejka Sfery 1.5 s (wspólna pętla dla pastylki i ekranu),

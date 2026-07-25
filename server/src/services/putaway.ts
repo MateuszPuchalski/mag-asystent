@@ -223,8 +223,9 @@ export function scanToCart(sessionId: number, twId: number, user: string) {
   if (lock && lock !== user) return { locked: true, lockedBy: lock };
 
   // pusta strefa źródłowa = nie ma czego przenosić. Przypadek „towar już na MAG,
-  // brakuje tylko lokalizacji" obsługuje tryb A (dostawy) — tu nie ma po nim
-  // śladu, bo dublowanie tej ścieżki w dwóch miejscach kosztowało więcej niż dawało
+  // brakuje tylko lokalizacji" obsługuje tryb A (dostawy i zwroty) — tu nie ma
+  // po nim śladu, bo dublowanie tej ścieżki w dwóch miejscach kosztowało więcej
+  // niż dawało
   const srcMag = magOfSession(sessionId);
   const avail = availableIn(srcMag, twId);
   if (avail <= 0) return { error: `Brak stanu na ${magKod(srcMag)}` };
