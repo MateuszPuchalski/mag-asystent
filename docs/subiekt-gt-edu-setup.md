@@ -107,20 +107,27 @@ IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis')
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'wertis')
     CREATE USER wertis FOR LOGIN wertis;
 
--- ODCZYT: wyłącznie 5 tabel potrzebnych aplikacji
+-- ODCZYT: wyłącznie tabele potrzebne aplikacji
 GRANT SELECT ON dbo.tw__Towar      TO wertis;
 GRANT SELECT ON dbo.tw_Stan        TO wertis;
 GRANT SELECT ON dbo.dok__Dokument  TO wertis;
 GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
+GRANT SELECT ON dbo.fl_Wartosc     TO wertis;   -- przypisania flag do dokumentów
+GRANT SELECT ON dbo.fl__Flagi      TO wertis;   -- definicje flag (nazwa, ikona)
 
--- ZAPIS: dokładnie DWIE kolumny.
--- Podmień tw_Pole1 na pole wybrane w §1a (MSSQL_LOC_COLUMN musi się zgadzać!),
--- a <kolumna_flagi> na kolumnę flagi sprawdzenia ustaloną w checkliście §3
--- (MSSQL_DOC_FLAG_COLUMN). Dopóki kolumny flagi nie znasz — pomiń ten GRANT;
--- zadania set_doc_flag będą kończyć się czytelnym błędem, reszta działa.
+-- ZAPIS — dwie rzeczy i ani jednej więcej.
+--
+-- 1) Lokalizacja: JEDNA kolumna na kartotece. Podmień tw_Pole1 na pole wybrane
+--    w §1a (MSSQL_LOC_COLUMN musi się zgadzać!).
 GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis;
--- GRANT UPDATE ON dbo.dok__Dokument (<kolumna_flagi>) TO wertis;
+
+-- 2) Flaga sprawdzenia faktury: tabela przypisań flag. Flaga NIE jest kolumną
+--    dokumentu (patrz docs/subiekt-gt-struktura.md), więc aplikacja nie
+--    potrzebuje ŻADNEGO prawa zapisu do dok__Dokument. fl_Wartosc nie
+--    uczestniczy w numeracji ani w skutkach magazynowych, więc zapis tutaj nie
+--    może naruszyć integralności dokumentu.
+GRANT INSERT, UPDATE ON dbo.fl_Wartosc TO wertis;
 ```
 
 Weryfikacja, że uprawnienia faktycznie się nadały (przydaje się też po każdym
@@ -141,10 +148,14 @@ ORDER BY dp.permission_name;
 
 ## 3. Checklist `[WERYFIKUJ]` — ustal wartości dla SWOJEJ bazy
 
-Nazwy/kody różnią się między wersjami SGT (spec §6, §11) — a jak się
-przekonaliśmy na tw_Lokalizacja, czasem różnią się też same kolumny. Nie
-zgaduj — uruchom w SSMS na kartotece/dokumencie, które utworzyłeś w §1b,
-i zanotuj wyniki:
+Większość dawnej checklisty jest już **zamknięta**: nazwy tabel, kolumn oraz
+kody `dok_Typ` i `dok_Status` odczytaliśmy wprost z oficjalnego opisu struktury
+InsERT dla wersji bazy 1.8731.31.6933 — patrz [`subiekt-gt-struktura.md`](subiekt-gt-struktura.md).
+Domyślne w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać:
+`DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=14`, bufor = `dok_Status = 3`.
+
+Zostały **trzy** rzeczy, których dokumentacja nie zawiera, bo zależą od
+konkretnego podmiotu. Uruchom w SSMS na kartotece/dokumencie z §1b:
 
 ```sql
 -- 0) potwierdź, że wybrane pole dodatkowe faktycznie trzyma to, co wpisałeś
@@ -153,27 +164,38 @@ SELECT tw_Symbol, tw_Pole1 FROM tw__Towar WHERE tw_Symbol = 'TWOJ-SYMBOL';
 --    → jeśli wartość się zgadza z tym, co wpisałeś w Subiekcie: env
 --      MSSQL_LOC_COLUMN=tw_Pole1 (albo inne pole, jeśli wybrałeś inne)
 
--- a) kody dok_Typ dla FZ i PZ (na dokumencie utworzonym w §1b):
-SELECT dok_Id, dok_Typ, dok_NrPelny, dok_MagId, dok_Status
-FROM dok__Dokument ORDER BY dok_Id DESC;   -- → env DOK_TYP_FZ / DOK_TYP_PZ
+-- a) mag_Id magazynów: głównego, strefy przyjęć MGP i Zwrotów:
+SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
+--    → env MAG_ID_MAG / MAG_ID_MGP / MAG_ID_ZWROTY
+--    (magazyn główny poznasz po mag_Glowny = 1; MGP i Zwroty po nazwie firmowej)
 
--- b) mag_Id magazynów (głównego i strefy przyjęć MGP z §1b):
-SELECT * FROM sl_Magazyn;                  -- → env MAG_ID_MAG / MAG_ID_MGP
--- (jeśli SELECT nie przejdzie na loginie wertis, wykonaj jako sa —
---  tabela słownikowa nie jest potrzebna aplikacji w runtime)
+-- b) flagi dokumentów: gdzie siedzą i jakie mają identyfikatory.
+--    Flaga NIE jest kolumną dok__Dokument — to wpis w fl_Wartosc pod kluczem
+--    (grupa flag, typ obiektu, id dokumentu). Oflaguj ręcznie w Subiekcie jedną
+--    fakturę zakupu i podstaw jej numer:
+SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
+FROM fl_Wartosc w
+JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
+JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
+WHERE d.dok_NrPelny = 'TWOJ-NUMER-FAKTURY';
+--    → env MSSQL_FLAG_GRUPA (flw_IdGrupyFlag) i MSSQL_FLAG_TYP_OBIEKTU (flw_TypObiektu)
 
--- c) flaga bufora: zapisz dokument „do bufora" w Subiekcie i porównaj
---    kolumny (najczęściej dok_Status; odłożony/bufor vs wystawiony):
-SELECT dok_Id, dok_NrPelny, dok_Status FROM dok__Dokument ORDER BY dok_Id DESC;
---    → env MSSQL_BUFFER_EXPR, np. 'CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END'
-
--- d) limit wybranego pola lokalizacji (tw_Pole1..8 to zawsze varchar(50),
---    ale podmień nazwę, jeśli wybrałeś inne pole):
-SELECT COL_LENGTH('tw__Towar','tw_Pole1');   -- → env LOC_FIELD_LIMIT
+--    …a potem wypisz wszystkie flagi, żeby przypisać cztery używane przez WERTIS:
+SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
+--    → env DOC_FLAG_IN_PROGRESS_SGT / _PAUSED_SGT / _DONE_SGT / _DONE_ERRORS_SGT
+--      (wpisujesz flg_Id, nie nazwę — nazwa idzie do DOC_FLAG_* i służy tylko ludziom)
 ```
 
-Uwaga do (a): interesuje Cię typ, który **niesie skutek magazynowy** na MGP —
-to on ma się pokazywać na liście „do rozłożenia".
+Dwie rzeczy warto tylko **potwierdzić**, bo domyślne powinny pasować:
+
+```sql
+-- pole dodatkowe wybrane w §1a faktycznie trzyma lokalizację i ma 50 znaków:
+SELECT COL_LENGTH('tw__Towar','tw_Pole1');          -- → LOC_FIELD_LIMIT (spodziewane 50)
+
+-- odłóż dokument do bufora w Subiekcie i sprawdź, czy dostał dok_Status = 3:
+SELECT dok_Id, dok_NrPelny, dok_Typ, dok_Status FROM dok__Dokument ORDER BY dok_Id DESC;
+--    → jeśli tak, MSSQL_BUFFER_EXPR zostaje domyślne
+```
 
 ## 4. Konfiguracja i uruchomienie aplikacji
 
@@ -194,12 +216,17 @@ $env:MSSQL_PASSWORD  = "silne-haslo"
 
 # wartości z checklisty [WERYFIKUJ]:
 $env:MSSQL_LOC_COLUMN  = "tw_Pole1"   # pole dodatkowe wybrane w §1a
-$env:DOK_TYP_FZ   = "1"
-$env:DOK_TYP_PZ   = "5"
-$env:MAG_ID_MAG   = "1"
-$env:MAG_ID_MGP   = "2"
-$env:MSSQL_BUFFER_EXPR = "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END"
-$env:LOC_FIELD_LIMIT   = "50"
+$env:MAG_ID_MAG      = "1"    # z checklisty (a)
+$env:MAG_ID_MGP      = "2"
+$env:MAG_ID_ZWROTY   = "3"
+$env:MSSQL_FLAG_GRUPA       = "1"   # z checklisty (b)
+$env:MSSQL_FLAG_TYP_OBIEKTU = "1"
+$env:DOC_FLAG_IN_PROGRESS_SGT = "…" # flg_Id czterech flag
+$env:DOC_FLAG_PAUSED_SGT      = "…"
+$env:DOC_FLAG_DONE_SGT        = "…"
+$env:DOC_FLAG_DONE_ERRORS_SGT = "…"
+# DOK_TYP_* i MSSQL_BUFFER_EXPR mają poprawne domyślne (ze struktury InsERT) —
+# ustawiaj je tylko, jeśli Twoja baza odbiega od standardu
 
 # API (importuje przy starcie i odświeża co MSSQL_SYNC_MS, domyślnie 60 s;
 # liczby zaimportowanych wierszy widać w logu i w GET /api/health):

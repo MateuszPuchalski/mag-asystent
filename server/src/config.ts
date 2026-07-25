@@ -45,15 +45,24 @@ export const config = {
     password: process.env.MSSQL_PASSWORD ?? "",
     encrypt: process.env.MSSQL_ENCRYPT === "1",
     trustServerCertificate: process.env.MSSQL_TRUST_CERT !== "0",
-    /** Kody dok_Typ dla FZ/PZ ([WERYFIKUJ] na własnej bazie). */
-    dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
-    dokTypPZ: num(process.env.DOK_TYP_PZ, 5),
     /**
-     * Kody dok_Typ dokumentów zwrotów listowanych na magazynie Zwroty
-     * (CSV, np. "14,7"). Puste = każdy dokument na tym magazynie — biuro
-     * wystawia różne typy ([WERYFIKUJ] na własnej bazie).
+     * Kody `dok_Typ`. Nie są już zgadywane: oficjalny „Opis struktury zbiorów
+     * danych InsERT GT" dla wersji bazy 1.8731.31.6933 wylicza je wprost
+     * (patrz docs/subiekt-gt-struktura.md):
+     *   1-FZ, 2-FS, 3-RZ, 4-RS, 5-KFZ, 6-KFS, 9-MM, 10-PZ, 11-WZ, 12-PW,
+     *   13-RW, 14-ZW, 15-ZD, 16-ZK, 21-PA, 29-IW
+     * Domyślne `DOK_TYP_PZ` wynosiło wcześniej 5, czyli KFZ — korektę faktury
+     * zakupu. Na prawdziwej bazie aplikacja listowałaby korekty jako dostawy
+     * i nie zobaczyła ani jednego PZ.
      */
-    dokTypyZwroty: (process.env.DOK_TYP_ZWROTY ?? "")
+    dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
+    dokTypPZ: num(process.env.DOK_TYP_PZ, 10),
+    /**
+     * Kody `dok_Typ` dokumentów zwrotów listowanych na magazynie Zwroty (CSV).
+     * Domyślnie `14` = ZW (zwrot). Puste = każdy dokument na tym magazynie —
+     * zostaw puste, jeśli biuro przyjmuje zwroty także innym typem.
+     */
+    dokTypyZwroty: (process.env.DOK_TYP_ZWROTY ?? "14")
       .split(",")
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n > 0),
@@ -67,14 +76,25 @@ export const config = {
      */
     locColumn: process.env.MSSQL_LOC_COLUMN ?? "tw_Pole1",
     /**
-     * Kolumna `dok__Dokument` z flagą sprawdzenia faktury. Celowo BEZ wartości
-     * domyślnej: nie wiadomo jeszcze, gdzie firma trzyma tę flagę, a zgadnięcie
-     * oznaczałoby zapis w losową kolumnę tabeli dokumentów. Puste = zadania
-     * `set_doc_flag` kończą się czytelnym błędem ([WERYFIKUJ]).
+     * Flaga sprawdzenia faktury NIE jest kolumną `dok__Dokument` — to osobny
+     * mechanizm InsERT-a: `fl__Flagi` (definicja: `flg_Id`, `flg_Text`,
+     * `flg_Numer` = ikona) plus `fl_Wartosc` (przypisanie do obiektu, klucz
+     * złożony `flw_IdGrupyFlag` + `flw_TypObiektu` + `flw_IdObiektu`).
+     *
+     * Te dwie liczby identyfikują „flagi dokumentów handlowych" i są jedynym,
+     * czego nie da się odczytać z dokumentacji — trzeba je wziąć z własnej bazy
+     * jednym SELECT-em (DEPLOY §6). Puste = zadania `set_doc_flag` kończą się
+     * czytelnym błędem zamiast pisać w losową grupę flag ([WERYFIKUJ]).
      */
-    docFlagColumn: process.env.MSSQL_DOC_FLAG_COLUMN ?? "",
-    /** Wyrażenie SQL 0/1: dokument w buforze ([WERYFIKUJ], np. inna kolumna/status). */
-    bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END",
+    flagGrupa: process.env.MSSQL_FLAG_GRUPA ? num(process.env.MSSQL_FLAG_GRUPA, 0) : 0,
+    flagTypObiektu: process.env.MSSQL_FLAG_TYP_OBIEKTU ? num(process.env.MSSQL_FLAG_TYP_OBIEKTU, 0) : 0,
+    /**
+     * Wyrażenie SQL 0/1: dokument w buforze. `dok_Status` ma udokumentowane
+     * wartości {0-wycofany, 1-wykonany, 2-unieważniony, 3-odłożony, 4-MM wydany,
+     * 5..8-zamówienia}. Bufor to dokument **odłożony** (3); poprzednie domyślne
+     * `= 0` wskazywało dokumenty **wycofane**, czyli mylił się w obie strony.
+     */
+    bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
     syncMs: num(process.env.MSSQL_SYNC_MS, 60000),
   },
@@ -129,14 +149,15 @@ export const config = {
    *  • `sgt`    — co faktycznie wpisujemy do bazy Subiekta.
    *
    * Rozdział jest konieczny, bo firma używa WBUDOWANYCH flag dokumentu (kolumna
-   * „FW" na liście faktur zakupu, filtr „Flaga:"), a te są ikoną/kolorem — w bazie
-   * niemal na pewno liczbą, nie polskim napisem. Gdyby domena operowała samą
-   * etykietą, zapis do SGT rozsypałby się na ostatnim calu, a zmiana nazwy flagi
-   * w Subiekcie zerwałaby historię `flaga_wyslana`.
+   * „FW" na liście faktur zakupu, filtr „Flaga:"). Struktura InsERT-a potwierdza
+   * ten podział 1:1: `flg_Text` to nazwa pokazywana człowiekowi, a `flg_Id` —
+   * liczba, którą wpisuje się w `fl_Wartosc.flw_IdFlagi`. Gdyby domena operowała
+   * samą etykietą, zapis rozsypałby się na ostatnim calu, a przemianowanie flagi
+   * w Subiekcie zerwałoby historię `flaga_wyslana`.
    *
-   * [WERYFIKUJ] `MSSQL_DOC_FLAG_COLUMN` + wartości `DOC_FLAG_*_SGT`: ustal na
-   * własnej bazie, porównując dokument oflagowany ręcznie (DEPLOY §6). Puste
-   * `sgt` = zadanie kończy się czytelnym błędem zamiast zapisu na oślep.
+   * [WERYFIKUJ] wartości `DOC_FLAG_*_SGT` to `flg_Id` czterech flag z `fl__Flagi`
+   * — jeden SELECT na własnej bazie (DEPLOY §6). Puste `sgt` = zadanie kończy się
+   * czytelnym błędem zamiast zapisu na oślep.
    */
   docFlag: {
     /** Praca trwa: ktoś stoi teraz przy tej dostawie. */
