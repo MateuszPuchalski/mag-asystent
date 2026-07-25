@@ -12,7 +12,9 @@ Biuro (przeglądarka → /lookup)            ─┴─ http://mag.wertis.local:3
 Maszyna z Subiektem GT (Windows)
   ├─ wertis-api     Fastify: REST + statyki web/public (lookup)
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
-  ├─ wertis.db      SQLite: kolejka, sesje rozkładania, audyt events
+  ├─ wertis.db      SQLite: dostawy i zwroty z postępem per pozycja, koszyki
+  │                 zwrotów, wyjątki, sesje trybu B, kolejka, audyt events
+  ├─ data/photos/   zdjęcia dowodowe do reklamacji (poza gitem, w backupie)
   ├─ MSSQL Subiekta (odczyt: login read-only)
   └─ Sfera (COM)    (zapis: wyłącznie przez workera)
 ```
@@ -140,7 +142,7 @@ Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](a
 > Etap 1 poniżej i zapis lokalizacji (plan B) są już **zaimplementowane**.
 
 **Etap 0 — pilot (tryb `seeded`, bez dotykania SGT):**
-działa od razu po instalacji; dane z eksportu `mag.xlsx`. Magazynier testuje
+działa od razu po instalacji; dane z eksportu `magmat.xlsx`. Magazynier testuje
 wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
 **Etap 1 — odczyt z MSSQL (`SGT_MODE=mssql`):**
@@ -150,8 +152,24 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    - wartości `dok_Typ` dla FZ i PZ (po znanym numerze dokumentu) i który typ
      niesie skutek magazynowy (→ env `DOK_TYP_FZ` / `DOK_TYP_PZ`),
    - kolumnę/flagę bufora w `dok__Dokument` (→ env `MSSQL_BUFFER_EXPR`),
-   - `mag_Id` magazynów MAG i MGP (→ env `MAG_ID_MAG` / `MAG_ID_MGP`),
-   - `SELECT COL_LENGTH('tw__Towar','tw_Lokalizacja')` (ustaw `LOC_FIELD_LIMIT`),
+   - `mag_Id` magazynów MAG, MGP i **Zwroty** (→ env `MAG_ID_MAG` /
+     `MAG_ID_MGP` / `MAG_ID_ZWROTY`) — to magazyn skutku rozstrzyga, którym
+     trybem idzie dokument, więc pomyłka tutaj wysyła dostawę do złej zakładki,
+   - kody `dok_Typ` dokumentów, którymi biuro przyjmuje **zwroty** na magazyn
+     Zwroty (→ env `DOK_TYP_ZWROTY`, lista po przecinku). Puste = każdy dokument
+     na tym magazynie — bezpieczna wartość startowa, zawężać dopiero, gdyby na
+     Zwrotach lądowało coś jeszcze,
+   - **pole lokalizacji na `tw__Towar`.** W 1.87 SP3 HF1 (era KSeF) natywnej
+     kolumny `tw_Lokalizacja` **nie ma** — trzeba wybrać jedno z ośmiu pól
+     dodatkowych `tw_Pole1..tw_Pole8` (→ `MSSQL_LOC_COLUMN`, domyślnie
+     `tw_Pole1`) i sprawdzić jego długość:
+
+     ```sql
+     SELECT COL_LENGTH('tw__Towar','tw_Pole1');   -- → LOC_FIELD_LIMIT
+     ```
+
+     Wybierz pole, którego firma nie używa do niczego innego — worker nadpisuje
+     je bezwarunkowo. Szczegóły: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md),
    - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`,
    - **flaga sprawdzenia faktury** — firma używa **wbudowanych flag dokumentu**
      (kolumna „FW" na liście *Faktury zakupu* + filtr „Flaga:"), więc w bazie to
@@ -173,6 +191,15 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
      Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
      zamiast pisać na oślep w tabelę dokumentów. Reszta aplikacji działa
      normalnie — flaga jest jedyną rzeczą, która czeka.
+
+     Przy okazji sprawdź, czy **dokumenty zwrotów** też mają tę kolumnę
+     wypełnialną — leżą w tej samej tabeli `dok__Dokument`, więc najpewniej tak,
+     ale aplikacja flaguje je dokładnie tak samo jak faktury zakupu:
+
+     ```sql
+     SELECT dok_NrPelny, dok_Typ, <kolumna_flagi> FROM dok__Dokument
+     WHERE dok_MagId = <mag_Id magazynu Zwroty>;
+     ```
 3. Ustaw env połączenia `MSSQL_*` (patrz `docs/subiekt-gt-edu-setup.md` §4);
    importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.
@@ -181,11 +208,16 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` i `set_doc_flag` bezpośrednim UPDATE dwóch kolumn
-objętych `GRANT UPDATE`. Zadania MM (wyłącznie tryb B) zgłaszają czytelny błąd —
-do czasu workera Sfery MM wystawia biuro w Subiekcie. Osobnego przełącznika
-trybu zapisu nie ma.
+objętych `GRANT UPDATE`. Zadania MM — z rundy wózka (kontener) i z zamkniętego
+koszyka zwrotu — zgłaszają czytelny błąd; do czasu workera Sfery MM wystawia
+biuro w Subiekcie. Osobnego przełącznika trybu zapisu nie ma.
 
-**Etap 2 — dokumenty MM przez Sferę (tylko tryb B — kontener, zwroty):**
+Konsekwencja dla zwrotów na tym etapie: adres na półce zapisuje aplikacja, ale
+towar zjeżdża z magazynu Zwroty dopiero po ręcznym MM w biurze. Kolejność jest
+bezpieczna (adres przed sprzedawalnością), więc opóźnienie kosztuje utraconą
+szansę sprzedaży, a nie błędny stan.
+
+**Etap 2 — dokumenty MM przez Sferę (kontener + zwroty):**
 1. Osobny proces na Windows (C# lub Python+pywin32 — COM Sfery najstabilniej
    działa z tych środowisk, spec §9), czytający tę samą tabelę `sfera_queue`
    i wykonujący wyłącznie zadania `mm`; kontrakt wywołań w
@@ -193,7 +225,7 @@ trybu zapisu nie ma.
 2. Najpierw jedno MM testowe na kartotece próbnej, potem produkcyjnie.
 
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ; MM per wózek
-z trybu B przez workera Sfery.
+(kontener) i MM per koszyk (zwroty) przez workera Sfery.
 
 ## 7. Backup i utrzymanie
 
@@ -203,8 +235,9 @@ z trybu B przez workera Sfery.
   Copy-Item C:\wertis\server\data\wertis.db "D:\backup\wertis-$(Get-Date -Format yyyyMMdd).db"
   ```
 
-  Plik trzyma kolejkę, sesje i audyt `events`; źródłem prawdy o towarach
-  i stanach pozostaje baza Subiekta, więc to lekki backup.
+  Plik trzyma postęp rozkładania dostaw i zwrotów (łącznie z tym, który koszyk
+  pojechał już MM-em), wyjątki, sesje trybu B, kolejkę i audyt `events`; źródłem
+  prawdy o towarach i stanach pozostaje baza Subiekta, więc to lekki backup.
 - **Zdjęcia dowodowe:** `C:\wertis\server\data\photos\` — to jedyne dane, których
   nie da się odtworzyć z Subiekta ani z seedu (dowód do reklamacji u dostawcy),
   więc kopiuj ten katalog razem z bazą:

@@ -2,7 +2,7 @@
 
 Instrukcja podłączenia WERTIS do **Subiekta GT edu** na Twoim komputerze,
 żeby aplikacja działała na prawdziwych danych z Subiekta zamiast seedu
-z `mag.xlsx`. Docelowa wersja produkcyjna w firmie: **Subiekt GT 1.87 SP3 HF1**
+z `magmat.xlsx`. Docelowa wersja produkcyjna w firmie: **Subiekt GT 1.87 SP3 HF1**
 (era KSeF) — potwierdza wybór pola dodatkowego na lokalizację, bo natywnego
 `tw_Lokalizacja` w tych wersjach nie ma.
 
@@ -244,7 +244,8 @@ Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
   wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)` —
   wymaga dodatkowego `GRANT SELECT` i korekty JOIN-a w
   `server/src/adapters/subiekt.mssql.ts`.
-- Dokumenty MM (wyłącznie tryb B — wózek) wymagają licencji **Sfery** na
-  produkcyjnym Subiekcie: osobny worker COM na Windows (C#/pywin32) czytający
-  tę samą tabelę `sfera_queue` — kontrakt w `server/src/adapters/sfera.ts`,
-  etap 2 w [DEPLOY.md](../DEPLOY.md). Do tego czasu MM wystawia biuro.
+- Dokumenty MM — z rundy wózka (kontener) i z zamkniętego koszyka zwrotu —
+  wymagają licencji **Sfery** na produkcyjnym Subiekcie: osobny worker COM na
+  Windows (C#/pywin32) czytający tę samą tabelę `sfera_queue` — kontrakt
+  w `server/src/adapters/sfera.ts`, etap 2 w [DEPLOY.md](../DEPLOY.md). Do tego
+  czasu MM wystawia biuro.

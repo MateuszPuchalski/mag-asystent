@@ -1,68 +1,158 @@
-# Analiza flow rozkładania towaru (MGP → MAG)
+# Analiza rozkładania towaru — trzy ścieżki
 
-Analiza modułu ROZKŁADANIE skonfrontowana z realiami pracy magazyniera na kolektorze.
-Stan na: lipiec 2026. Problemy P1–P4 zostały naprawione w tym samym PR, w którym powstał ten dokument.
+Rozkładanie skonfrontowane z realiami pracy magazyniera na kolektorze.
+Dokument opisuje **stan po redesignie v2.0 i module zwrotów**; sekcja 4 mówi,
+czym to się różni od pierwszej wersji analizy (lipiec 2026), żeby czytelnik
+starszych PR-ów wiedział, co zniknęło i dlaczego.
 
-## 1. Jak działa flow (stan obecny)
+O tym, **którą ścieżką idzie dokument, rozstrzyga magazyn skutku, nie typ
+dokumentu** — i kryteria muszą pozostać rozłączne. Ten sam dokument widoczny
+w dwóch zakładkach dałoby się rozłożyć dwiema niekompatybilnymi ścieżkami naraz:
+raz z przesunięciem stanu, raz bez.
 
-1. **Lista dokumentów** (`web/src/screens/putaway/Documents.tsx`) — dokumenty FZ/PZ na MGP z ostatnich 14 dni (`GET /api/putaway/documents`), z paskiem postępu istniejącej sesji. Tryb zapasowy: „ROZKŁADAJ CAŁE MGP" (sesja bez dokumentu, ze wszystkich stanów strefy przyjęć).
-2. **Sesja** (`server/src/services/putaway.ts` → `createSession`) — pozycje dokumentu agregowane po `tw_id` (różne partie/ceny → jedna pozycja), lokalizacja docelowa = pierwsza lokalizacja z kartoteki (`sgt_towar.lokalizacja`, lista rozdzielana spacją; pierwsza = lokalizacja pickingowa). Pozycje bez lokalizacji → „BRAK LOK", sortowane na końcu.
-3. **Wózek** — dotknięcie pozycji bierze ją na wózek (`scanToCart`): domyślna ilość ograniczona do stanu MGP, blokada per pozycja (TTL 30 min) chroni przed konfliktem dwóch osób w jednej sesji. Można dodać towar spoza dokumentu.
-4. **Przy regale** (`confirmItem`) — korekta ilości, skan lokalizacji docelowej (w wersji dev symulowany chipami `DEMO_LOCS`), „POTWIERDŹ NA <lok>", opcjonalnie „Inna lok.", „Pomiń" (z powodem), „Zdejmij".
-5. **Zatwierdzenie wózka** (`commitCart`) — jedno zadanie **MM** (MGP→MAG, wszystkie pozycje rundy) plus zadania **set_location** dla pozycji, gdzie zeskanowana lokalizacja różni się od pickingowej (nowa lokalizacja trafia na początek listy; pole ucinane do limitu 50 znaków). Zadania idą do `sfera_queue` — nigdy nie piszemy do Subiekta synchronicznie.
-6. **Worker** (`server/src/worker/worker.ts`) — wykonuje zadania sekwencyjnie z retry/backoff (3 próby: 5 s / 30 s / 120 s); dokument w buforze → `waiting_for_doc` i ponawianie. Widoki stanów korygowane o MM „w drodze" (`services/stock.ts`).
-7. **Zamknięcie sesji** (`closeSession`) — rozliczenie: `closed` albo `closed_with_deviations` (częściowe/pominięte/nietknięte).
+| magazyn skutku | ścieżka | jednostka pracy | skutek magazynowy |
+|---|---|---|---|
+| `MAG` | dostawa krajowa | dokument FZ/PZ | sam adres (`set_location`) |
+| `Zwroty` | zwroty | **koszyk** | adres + jeden MM na domknięty koszyk |
+| `MGP` | kontener importowy | sesja z wózkiem | adres + jeden MM na rundę |
 
-### Co jest zrobione dobrze (nie ruszać)
+## 1. Dostawa krajowa — dokument jako jednostka pracy
 
-- **Kolejka zapisów do Sfery** z retry/backoff i `waiting_for_doc` — jedyny bezpieczny sposób integracji z Subiektem; kolektor nigdy nie wisi na COM.
-- **Korekta stanów o kolejkę** („⏳ w drodze") — magazynier widzi prawdę, nie stan sprzed minuty.
-- **Model wózka rundami** — odpowiada realnej pracy: załaduj wózek na MGP → trasa po regałach → zatwierdź → wróć po następną partię.
-- **Agregacja po `tw_id`** — magazynier rozkłada towar, nie pozycje księgowe z partii.
-- **Blokady pozycji per użytkownik z TTL** — kilka osób może rozkładać jedną dostawę.
-- **Towar spoza dokumentu** — bo w realu na palecie leży to, co leży, a nie to, co na dokumencie. (Tryb „całe MGP" usunięty po redesignie v2.0: jednostką pracy jest dokument, a strefa przyjęć nie jest już workiem bez ewidencji.)
-- **Skan lokalizacji przy regale jako potwierdzenie** — właściwy moment weryfikacji (a nie „z pamięci" przy biurku).
+`server/src/services/delivery.ts`, ekrany `android/app/…/ui/delivery/`.
 
-## 2. Konfrontacja z realiami pracy — problemy krytyczne (naprawione)
+1. **Lista dokumentów** (`listDocuments`) — FZ/PZ na MAG z ostatnich 14 dni
+   z paskiem postępu liczonym z `delivery_line`. Dokument **w buforze** też jest
+   do wzięcia: skutek magazynowy niesie sam dokument w Subiekcie, więc
+   rozkładanie nie czeka na księgowość.
+2. **Otwarcie** (`openDelivery`) — pozycje snapshotowane w chwili otwarcia
+   i agregowane po `tw_id` (różne partie/ceny → jedna linia robocza). Zmiana
+   dokumentu przez księgowość w trakcie pracy nie rozjeżdża postępu.
+3. **Dwa skany na pozycję** — skan towaru (`resolveScan`) → karta z ilością
+   i lokalizacją docelową → skan etykiety regału (`putawayLine`) → zapis.
+   Zero dialogu potwierdzającego, zero tapnięć na ścieżce głównej.
+4. **Zapis** — wyłącznie zadanie `set_location` do `sfera_queue`. Żadnego MM,
+   żadnego `waiting_for_doc`.
+5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
+   czego rozkładać.
 
-### P1. Pozycje częściowe znikały z listy „Do rozłożenia"
+## 2. Zwroty — koszyk jako jednostka pracy
 
-Wózek nie mieści całej pozycji, część jest uszkodzona, brakuje miejsca na półce — częściowe rozłożenie to codzienność. Backend to wspierał (status `partial`, pozycja „zostaje na liście"), ale UI wrzucało `partial` do sekcji „Załatwione", skąd nie dało się jej wziąć na wózek ponownie. Reszta pozycji zostawała na MGP na zawsze albo wymagała nowej sesji.
+Ten sam moduł co dostawy, plus `closeBasket`.
 
-**Naprawa:** `partial` wraca do „Do rozłożenia" z opisem „zostało X z Y" (`web/src/screens/putaway/Session.tsx`). Konsekwencja: sesji nie da się zamknąć z niedokończoną częściówką bez świadomej decyzji (dokończ albo pomiń z powodem) — i tak ma być.
+Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn Zwroty
+**jednym zbiorczym dokumentem** i układa go w **koszyki opisane numerem zwrotu**.
+Podziału na koszyki nie ma w żadnym dokumencie — istnieje wyłącznie fizycznie.
+Dla aplikacji koszyk to więc grupa linii domkniętych za jednym podejściem,
+otagowana numerem (`delivery_line.koszyk`, wpisywanym ręcznie — koszyki nie mają
+kodów kreskowych).
 
-### P2. Brak walidacji ilości po stronie serwera
+Rozkładanie przebiega dokładnie jak przy dostawie. Różnica jest jedna:
+**po opróżnieniu koszyka domyka się go przyciskiem i powstaje jeden dokument MM
+Zwroty→MAG** na wszystko, co z niego poszło na półki.
 
-`confirmItem` przyjmował dowolne `qty` (0, ujemne, ponad stan), a `commitCart` kolejkował MM bez sprawdzenia stanu MGP pomniejszonego o MM „w drodze". W realu oznacza to: literówka w ilości albo dwie osoby rozkładające ten sam towar → MM pada dopiero w workerze po trzech próbach, a pozycje są już odhaczone jako rozłożone. `scanToCart` potrafił też położyć na wózek pozycję z ilością 0 (zerowy stan MGP).
+**Rozliczenie idzie ilościami** (`ilosc_odlozona − mm_ilosc`), nie statusem
+linii. Ten sam towar bywa w dwóch koszykach, bo dokument zbiorczy agreguje go
+w jedną linię — flaga „już w MM" gubiłaby resztę. Z arytmetyki wychodzą trzy
+rzeczy naraz: dedupe przy ponownym domknięciu koszyka, poprawne dzielenie linii
+między koszyki oraz to, że sztuki odłożone z pozycji zgłoszonej potem jako
+uszkodzona i tak jadą na MAG — leżą już na półce.
 
-**Naprawa** (`server/src/services/putaway.ts`):
-- `confirmItem`: `qty > 0` (400) oraz `qty ≤ stan MGP − MM w drodze` (409, komunikat z dostępną ilością). Limit `qty_expected` pozostaje miękki (tylko UI) — dostawy bywają większe niż dokument.
-- `commitCart`: przed kolejką suma z wózka per towar sprawdzana względem dostępnego stanu (409 z symbolem towaru).
-- `scanToCart` / `addOffDocument`: przy dostępnym stanie ≤ 0 → błąd „Brak stanu na MGP", zamiast pozycji z ilością 0.
-- Wspólny helper `availableMgp()` korzysta z istniejącego `pendingMmByTw()` (`services/stock.ts`) — ta sama logika co w `/api/mm`.
+## 3. Kontener importowy — sesja z wózkiem
 
-### P3. Cicha rozbieżność przy błędzie MM
+`server/src/services/putaway.ts`, ekrany `android/app/…/ui/putaway/`.
 
-`commitCart` odhacza pozycje natychmiast, a MM idzie asynchronicznie. Gdy zadanie kończyło w statusie `error`, sesja twierdziła „rozłożone", stan w Subiekcie się nie przesunął, a magazynier — już przy innym regale — nie miał jak się o tym dowiedzieć (błąd był widoczny tylko na osobnym ekranie Kolejka). Fizyczny towar na półce + brak MM = rozjazd inwentaryzacyjny.
+Kontener przychodzi ~4× w roku: 1000 kartonów, wiele kursów wózkiem. **To jedyny
+proces, który potrzebuje modelu sesji zamiast dokumentu.**
 
-**Naprawa:** zadania kolejki dostały `session_id` (`sfera_queue.session_id`, migracja w `db.ts`, przekazywane z `commitCart`). `getSession` zwraca `queueAlerts` (zadania sesji w błędzie) i `inFlight` (liczba zadań w drodze). Ekran sesji pokazuje czerwony banner „Nie zapisano w Subiekcie" z przyciskiem PONÓW (istniejący `POST /api/queue/:id/retry`) oraz wskaźnik „⏳ N" w nagłówku.
+1. **Sesja** (`createSession`) — pozycje agregowane po `tw_id`, lokalizacja
+   docelowa = pickingowa z kartoteki, `BRAK LOK` sortowane na końcu.
+2. **Wózek** (`scanToCart`) — domyślna ilość ograniczona do stanu MGP
+   pomniejszonego o MM „w drodze"; blokada per pozycja (TTL 30 min); można
+   dodać towar spoza dokumentu.
+3. **Przy regale** (`confirmItem`) — korekta ilości i skan lokalizacji docelowej.
+4. **Zatwierdzenie wózka** (`commitCart`) — zadania `set_location` z tej rundy,
+   a **na końcu** jeden dokument MM MGP→MAG (patrz niezmiennik niżej).
+5. **Zamknięcie sesji** (`closeSession`) — `closed` albo
+   `closed_with_deviations` (częściowe / pominięte / nietknięte).
 
-### P4. „ROZKŁADAJ CAŁE MGP" duplikowało sesje
+Pusta strefa źródłowa to **błąd**, a nie cicha zmiana trybu: przypadek „towar
+leży już na MAG, brakuje mu adresu" obsługuje ścieżka dostaw i dublowanie go
+tutaj kosztowało więcej, niż dawało.
 
-Wznowienie działało tylko dla sesji dokumentowych — każde dotknięcie przycisku all-MGP tworzyło nową sesję z nakładającymi się pozycjami. Blokady pozycji są per sesja, więc dwie osoby w dwóch sesjach all-MGP mogły „rozłożyć" ten sam towar dwa razy → MM ponad stan.
+## Co działa dobrze — nie ruszać
 
-**Naprawa:** `createSession` wznawia otwartą sesję all-MGP (`source_doc_id IS NULL AND status='open'`), tak samo jak dokumentową.
+- **Kolejka zapisów z retry/backoff i `waiting_for_doc`** — jedyny bezpieczny
+  sposób integracji z Subiektem; kolektor nigdy nie wisi na COM.
+- **Niezmiennik „adres zawsze przed sprzedawalnością".** MM czyni towar
+  sprzedawalnym, a worker bierze zadania po `id` rosnąco — więc `set_location`
+  MUSI trafić do kolejki wcześniej. Odwrotna kolejność dawała okno, w którym
+  towar jest już do sprzedania, a jego adres stary albo pusty; przy nieudanym
+  zapisie lokalizacji ten stan był **trwały**. Po odwróceniu najgorszy możliwy
+  stan leży po bezpiecznej stronie: towar na półce z poprawnym adresem, jeszcze
+  niesprzedawalny, i naprawia się sam po PONÓW.
+- **Korekta stanów o kolejkę** („⏳ w drodze") — magazynier widzi prawdę, nie
+  stan sprzed minuty.
+- **Skan lokalizacji jako dowód.** Jedyne potwierdzenie, że towar trafił tam,
+  gdzie system myśli — i właściwy moment weryfikacji, nie „z pamięci" przy biurku.
+- **Twarda walidacja adresu.** Kod spoza wzorca (regał `A00-00-00`, paleta
+  `PAL-000`) to błąd, nigdy cichy zapis. Bez tego pomyłkowy skan etykiety towaru
+  zakładał „lokalizację" o nazwie EAN-u i nadpisywał pickingową.
+- **Niejednoznaczny kod kreskowy zatrzymuje operację.** Aplikacja nigdy nie
+  bierze „pierwszego dopasowania"; jedyne automatyczne zawężenie to dokładnie
+  jeden kandydat obecny w otwartym dokumencie. Kolizje lądują w raporcie dla
+  biura — aplikacja mierzy jakość danych, zamiast tylko na niej cierpieć.
+- **Flaga sprawdzenia faktury jako jedyna prawda o stanie dostawy.** Rozkładanie
+  JEST sprawdzaniem faktury, więc stan nie jest trzymany drugi raz — jest
+  wyprowadzany i rzutowany do Subiekta. Magazyn i biuro patrzą na to samo.
+- **Wyjątki jako obiekt pierwszej klasy** ze zdjęciem dowodowym. Pozycja
+  z wyjątkiem wypada z rutyny, ale nie blokuje domknięcia dostawy — inaczej
+  zgłoszenie problemu karałoby zgłaszającego i nikt by go nie zgłaszał.
+- **Blokady pozycji per użytkownik z TTL** — przy natłoku jedną dostawę rozkłada
+  kilka osób; druga osoba dowiaduje się, kto trzyma linię, zamiast odkładać ten
+  sam towar drugi raz.
+- **Agregacja po `tw_id`** — magazynier rozkłada towar, nie pozycje księgowe
+  z partii.
+- **Towar spoza dokumentu** (tryb B) — bo na palecie leży to, co leży, a nie to,
+  co na dokumencie.
 
-## 3. Backlog — pomysły do dalszych iteracji
+## 4. Czym to się różni od pierwszej analizy (lipiec 2026)
 
-Uporządkowane wg tego, jak bardzo bolą w codziennej pracy:
+Tamta wersja opisywała jeden proces (MGP→MAG, sesja z wózkiem) w kliencie PWA.
+Zniknęły od tego czasu:
 
-1. **Prawdziwe skanowanie kolektorem w sesji.** Dziś towar bierze się na wózek dotykiem, a lokalizację „skanuje" chipami `DEMO_LOCS`. Na Honeywellu z rękawicami dotyk jest zawodny; skaner (klawiatura-wedge) jest szybszy i bezbłędny. Wzorzec detekcji skanu już istnieje (`web/src/screens/Home.tsx` — szybkość wpisywania + wzorce EAN); potrzebny globalny listener na ekranie sesji: skan EAN → pozycja na wózek, skan kodu lokalizacji → potwierdzenie aktywnej pozycji. To największa pojedyncza wygrana ergonomiczna.
-2. **Ilość z klawiatury numerycznej + przycisk „całość".** Stepper +/− nie nadaje się do korekty z 400 na 250. Dotknięcie liczby powinno otwierać numpad.
-3. **Rozróżnienie kodu lokalizacji od EAN towaru.** Dziś każdy zeskanowany ciąg może zostać lokalizacją — pomyłkowy skan etykiety towaru utworzy „lokalizację" o nazwie EAN-u i nadpisze pickingową. Walidacja formatu (np. `^[A-Z]\d{2}-\d{2}-\d{2}$|^PALETA\d+$`) albo słownik lokalizacji.
-4. **Sortowanie wózka po lokalizacji docelowej.** Lista „Do rozłożenia" jest sortowana po lokalizacji (trasa marszu), ale wózek już nie — pozycje wyświetlają się w kolejności brania. Po załadowaniu wózka magazynier idzie trasą: wózek też powinien być posortowany po `stage_loc`/`target_loc`.
-5. **Podpowiedzi dla BRAK LOK.** Towar bez lokalizacji wymaga znalezienia miejsca. Aplikacja może podpowiadać: pozostałe lokalizacje tego towaru, lokalizacje towarów o podobnym symbolu (ta sama grupa asortymentowa) — zamiast zostawiać człowieka z pustą półką w głowie.
-6. **Ekspozycja przełącznika `updateLoc`.** Backend umie zatwierdzić rozłożenie bez nadpisywania lokalizacji pickingowej (dorzucenie do lokalizacji dodatkowej), ale UI zawsze wysyła `updateLoc: true`. Częsty przypadek: dokładka na paletę buforową nie powinna zmieniać lokalizacji pickingowej.
-7. **Odporność na dziury Wi-Fi.** Każda akcja to żywy REST; w martwej strefie radiowej potwierdzenie przy regale się nie zapisze. PWA ma service workera tylko do cache. Docelowo: bufor akcji sesji po stronie klienta + sync po odzyskaniu łącza; minimum: czytelny stan „offline" i ponowienie zamiast cichego błędu.
-8. **Korekta po zatwierdzeniu.** Pomyłkowo zatwierdzonej pozycji nie da się cofnąć (MM już w kolejce). Przycisk „cofnij" = odwrotne MM + przywrócenie pozycji.
-9. **Świeżość sesji all-MGP.** Pozycje sesji to snapshot z chwili otwarcia — nowe przyjęcia w trakcie dnia nie dochodzą. Przycisk „odśwież pozycje" dociągający nowe stany MGP do otwartej sesji.
+- **klient PWA** — zastąpiony natywnym kolektorem Android, a jego kod usunięty
+  z repo; `web/public/` to dziś tylko statyczna strona `/lookup` dla biura,
+- **tryb „ROZKŁADAJ CAŁE MGP"** — sesja bez dokumentu; jednostką pracy jest
+  dokument, a strefa przyjęć przestała być workiem bez ewidencji,
+- **`POST /api/mm`** (MM ad-hoc z karty towaru) — nieużywane, wycięte,
+- **ścieżka „tylko lokalizacja"** w trybie B — pusta strefa źródłowa jest dziś
+  błędem,
+- **strefa źródłowa w trybie B** — zwroty przeszły do ścieżki dokumentowej,
+  więc tryb B ma już tylko MGP.
+
+Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykonana:
+skanowanie sprzętowe (Zebra/Honeywell) zastąpiło dotyk i chipy `DEMO_LOCS`;
+rozróżnienie kodu lokalizacji od EAN-u to dziś twarda walidacja; przełącznik
+„zamień / dodaj lokalizację" jest wystawiony jako decyzja człowieka przy
+rozjeździe półek; odporność na dziury Wi-Fi daje trwały bufor offline (Room).
+
+## 5. Backlog — co nadal boli
+
+1. **Podpowiedzi dla BRAK LOK.** Towar bez lokalizacji wymaga znalezienia
+   miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru albo
+   lokalizacje towarów o podobnym symbolu — zamiast zostawiać człowieka z pustą
+   półką w głowie.
+2. **Korekta po zatwierdzeniu MM.** Okno COFNIJ działa dla zapisu lokalizacji
+   z karty towaru (karencja `UNDO_GRACE_MS`), ale pomyłkowo domkniętego koszyka
+   ani zatwierdzonego wózka nie da się cofnąć — to wymagałoby odwrotnego MM.
+3. **Świeżość snapshotu.** Pozycje dostawy i sesji to snapshot z chwili
+   otwarcia; korekta dokumentu przez księgowość w trakcie pracy nie dochodzi.
+   Świadomy kompromis (postęp się nie rozjeżdża), ale przydałby się sygnał
+   „dokument zmieniony od otwarcia".
+4. **Dług danych w kartotece.** Około 16 adresów półek to literówki
+   (np. `C07A-06-01`), których walidator słusznie nie przyjmuje — do poprawienia
+   po stronie Subiekta, nie aplikacji.
+5. **Dokumenty MM czekają na workera Sfery.** Do czasu uruchomienia procesu COM
+   (etap 2 w [DEPLOY.md](../DEPLOY.md)) MM z wózka i z koszyka wystawia biuro
+   ręcznie. Otwarte pytanie: czy wystarczy **import EPP/EDI++**, który obsługuje
+   MM bez licencji Sfery — jeden test na instalacji 1.87 SP3 HF1 to rozstrzyga.

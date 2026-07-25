@@ -18,7 +18,7 @@ class AppNavState(private val recentStore: RecentStore) {
 
     @Volatile var curId: Long? = null; private set
     @Volatile var sessionId: Long? = null; private set
-    /** Tryb A: otwarta dostawa (dokument = jednostka pracy). */
+    /** Tryb A: otwarta dostawa albo zwrot (dokument = jednostka pracy). */
     @Volatile var deliveryId: Long? = null; private set
     @Volatile var locCode: String? = null; private set
     @Volatile var queueReturn: Screen? = null; private set
