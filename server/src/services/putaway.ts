@@ -351,18 +351,6 @@ export function commitCart(sessionId: number, user: string) {
   }
 
   const queueIds: number[] = [];
-  if (mmItems.length) {
-    const qid = enqueueMM(srcMag, config.magId.MAG, mmItems, {
-      createdBy: user,
-      twId: null,
-      sourceDocId: session.source_doc_id,
-      sessionId,
-      label: `MM wózek · ${mmItems.length} poz.`,
-      detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt ${magKod(srcMag)}→MAG (rozkładanie)`,
-    });
-    queueIds.push(qid);
-  }
-
   const tx = db().transaction(() => {
     for (const i of cart) {
       // set_location, gdy zeskanowana lokalizacja różni się i user zatwierdził
@@ -388,6 +376,33 @@ export function commitCart(sessionId: number, user: string) {
           "UPDATE putaway_items SET qty_done=?, status=?, stage_qty=NULL, stage_loc=NULL, locked_by=NULL, locked_at=NULL WHERE id=?"
         )
         .run(doneQty, status, i.id);
+    }
+
+    /* MM NA KOŃCU — niezmiennik: ADRES ZAWSZE PRZED SPRZEDAWALNOŚCIĄ.
+       MM przenosi towar ze strefy na MAG, czyli czyni go dostępnym do
+       sprzedaży i kompletacji. Worker bierze zadania po `id` rosnąco, więc
+       zakolejkowanie MM przed `set_location` dawało okno, w którym towar jest
+       już sprzedawalny, a jego adres w kartotece stary albo pusty — a przy
+       nieudanym zapisie lokalizacji stan ten był TRWAŁY. Kompletujący
+       dostawał wtedy zlecenie na towar, którego nie ma pod wskazanym adresem:
+       dokładnie ten problem, przed którym chroni strefa przyjęć, tylko już po
+       rozłożeniu.
+
+       Po odwróceniu kolejności najgorszy możliwy stan odwraca się na bezpieczną
+       stronę: towar leży na półce z poprawnym adresem, ale jeszcze nie jest
+       sprzedawalny (utracona szansa sprzedaży zamiast zmarnowanego kursu),
+       i naprawia się sam po PONÓW. */
+    if (mmItems.length) {
+      queueIds.push(
+        enqueueMM(srcMag, config.magId.MAG, mmItems, {
+          createdBy: user,
+          twId: null,
+          sourceDocId: session.source_doc_id,
+          sessionId,
+          label: `MM wózek · ${mmItems.length} poz.`,
+          detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt ${magKod(srcMag)}→MAG (rozkładanie)`,
+        })
+      );
     }
   });
   tx();
