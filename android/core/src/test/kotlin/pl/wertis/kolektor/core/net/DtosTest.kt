@@ -66,24 +66,52 @@ class DtosTest {
         assertNull(stary.flaga)
     }
 
+    @Test fun `zwrot niesie koszyki czekajace na MM`() {
+        val v = WertisJson.decodeFromString<DeliveryView>(
+            """{"id":9,"dokId":7,"nrPelny":"ZW 7/07/2026","status":"open","zwrot":true,
+                "koszyki":[{"numer":"1","lines":3,"qty":6}],
+                "lines":[{"id":1,"twId":4,"sym":"S","name":"N","qtyDoc":2,"qtyDone":2,
+                          "status":"done","aisle":"C","koszyk":"1"}]}"""
+        )
+        assertTrue(v.zwrot)
+        assertEquals("1", v.koszyki[0].numer)
+        assertEquals(6.0, v.koszyki[0].qty, 0.0)
+        assertEquals("1", v.lines[0].koszyk)
+
+        // dostawa krajowa: brak pól → zwrot fałszywy, zero koszyków (nie crash)
+        val krajowa = WertisJson.decodeFromString<DeliveryView>("""{"id":10,"nrPelny":"FZ 1"}""")
+        assertTrue(!krajowa.zwrot)
+        assertTrue(krajowa.koszyki.isEmpty())
+    }
+
+    @Test fun `numer koszyka jedzie z odlozeniem, ale tylko gdy jest`() {
+        val zZwrotem = WertisJson.encodeToString(
+            PutawayLineBody.serializer(),
+            PutawayLineBody("E03-04-03", koszyk = "12")
+        )
+        assertTrue(zZwrotem.contains("\"koszyk\":\"12\""))
+        val bezZwrotu = WertisJson.encodeToString(PutawayLineBody.serializer(), PutawayLineBody("E03-04-03"))
+        assertTrue(!bezZwrotu.contains("koszyk"))
+    }
+
     @Test fun `QueueResponse - statusy i summary`() {
         val json = """
             {"items":[
               {"id":1,"type":"set_location","status":"waiting_for_doc","label":"L","detail":"D","errMsg":null,"time":"12:00"},
               {"id":2,"type":"mm","status":"error","label":"L2","detail":"","errMsg":"Błąd Sfery","time":"12:01"},
-              {"id":3,"type":"combo","status":"done","label":"L3","detail":"","errMsg":null,"time":"12:02"}
+              {"id":3,"type":"mm","status":"done","label":"L3","detail":"","errMsg":null,"time":"12:02"}
              ],"summary":{"pending":1,"error":1,"done":1}}
         """.trimIndent()
         val r = WertisJson.decodeFromString<QueueResponse>(json)
         assertEquals(QueueStatus.WAITING_FOR_DOC, r.items[0].status)
-        assertEquals(QueueItemType.COMBO, r.items[2].type)
+        assertEquals(QueueItemType.MM, r.items[2].type)
         assertEquals("Błąd Sfery", r.items[1].errMsg)
         assertEquals(1, r.summary.error)
     }
 
     @Test fun `PutawaySession - pelny kszalt`() {
         val json = """
-            {"id":5,"sourceDocId":11,"sourceDocNumber":"FZ 1/2026","zone":"zwroty","status":"open",
+            {"id":5,"sourceDocId":11,"sourceDocNumber":"FZ 1/2026","status":"open",
              "progress":{"total":10,"done":3,"remaining":7,"onCart":2},
              "queueAlerts":[{"id":9,"type":"mm","label":"MM","detail":"x","errorMsg":"e"}],
              "inFlight":1,
@@ -92,7 +120,6 @@ class DtosTest {
                        "lockedBy":"anna","offDocument":false,"stageQty":2.5,"stageLoc":"E01-01-01"}]}
         """.trimIndent()
         val s = WertisJson.decodeFromString<PutawaySession>(json)
-        assertEquals(PutawayZone.ZWROTY, s.zone)
         assertEquals(PutawayItemStatus.ON_CART, s.items[0].status)
         assertEquals(2.5, s.items[0].stageQty!!, 0.0)
         assertNull(s.items[0].targetLoc)
@@ -112,20 +139,14 @@ class DtosTest {
 
     @Test fun `PutawayDocument z sesja i bez`() {
         val d1 = WertisJson.decodeFromString<PutawayDocument>(
-            """{"docId":1,"typ":"FZ","nrPelny":"FZ 1","dataWyst":"2026-07-01","dostawca":"X","positions":3,"zone":"mgp",
+            """{"docId":1,"typ":"FZ","nrPelny":"FZ 1","dataWyst":"2026-07-01","dostawca":"X","positions":3,
                 "session":{"id":2,"status":"open","progressPct":50}}"""
         )
         assertEquals(50.0, d1.session!!.progressPct, 0.0)
         val d2 = WertisJson.decodeFromString<PutawayDocument>(
-            """{"docId":2,"typ":"PZ","nrPelny":"PZ 9","dataWyst":"","dostawca":"","positions":1,"zone":"mgp"}"""
+            """{"docId":2,"typ":"PZ","nrPelny":"PZ 9","dataWyst":"","dostawca":"","positions":1}"""
         )
         assertNull(d2.session)
-
-        // zwroty od klientów — druga strefa źródłowa trybu B
-        val d3 = WertisJson.decodeFromString<PutawayDocument>(
-            """{"docId":3,"typ":"ZW","nrPelny":"ZW 12","positions":2,"zone":"zwroty"}"""
-        )
-        assertEquals(PutawayZone.ZWROTY, d3.zone)
     }
 
     @Test fun `ScanResolution rozroznia kolizje EAN od linii`() {

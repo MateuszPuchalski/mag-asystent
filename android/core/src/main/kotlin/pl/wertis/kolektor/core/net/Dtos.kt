@@ -104,8 +104,8 @@ enum class QueueItemType {
     @SerialName("set_location") SET_LOCATION,
     /** Flaga sprawdzenia faktury (tryb A) — jedyny zapis do SGT poza lokalizacją. */
     @SerialName("set_doc_flag") SET_DOC_FLAG,
+    /** Dokument MM — powstaje wyłącznie z wózka trybu B (zatwierdzenie rundy). */
     @SerialName("mm") MM,
-    @SerialName("combo") COMBO,
 }
 
 @Serializable
@@ -139,12 +139,6 @@ data class QueueResponse(
 )
 
 @Serializable
-enum class PutawayZone {
-    @SerialName("mgp") MGP,
-    @SerialName("zwroty") ZWROTY,
-}
-
-@Serializable
 data class PutawaySessionRef(val id: Long, val status: String, val progressPct: Double = 0.0)
 
 @Serializable
@@ -155,8 +149,6 @@ data class PutawayDocument(
     val dataWyst: String = "",
     val dostawca: String = "",
     val positions: Int = 0,
-    /** Strefa źródłowa: kontenery (MGP) lub zwroty od klientów. */
-    val zone: PutawayZone = PutawayZone.MGP,
     val session: PutawaySessionRef? = null,
 )
 
@@ -208,7 +200,6 @@ data class PutawaySession(
     val id: Long,
     val sourceDocId: Long? = null,
     val sourceDocNumber: String? = null,
-    val zone: PutawayZone = PutawayZone.MGP,
     val status: String = "",
     val progress: PutawayProgress = PutawayProgress(),
     val queueAlerts: List<PutawayQueueAlert> = emptyList(),
@@ -232,12 +223,6 @@ data class SetLocationBody(
     val value: String? = null,
     val replaced: String? = null,
 )
-
-@Serializable
-data class MmItem(val twId: Long, val qty: Double)
-
-@Serializable
-data class MmBody(val items: List<MmItem>)
 
 @Serializable
 data class CreateSessionBody(val docId: Long)
@@ -320,6 +305,8 @@ data class DeliveryDocument(
     val flaga: String? = null,
     /** Klucz stanu — stabilny; po nim dobieramy kolor, bo nazwy są konfigurowalne. */
     val flagaKey: String? = null,
+    /** Zbiorczy dokument zwrotów: rozkłada się koszykami, każdy domykany MM-em. */
+    val zwrot: Boolean = false,
 )
 
 @Serializable
@@ -338,7 +325,13 @@ data class DeliveryLineView(
     val status: String = "todo",
     /** Litera alejki — nagłówek sekcji listy; null = brak lokalizacji. */
     val aisle: String? = null,
+    /** Zwroty: numer koszyka, z którego pozycję odłożono. */
+    val koszyk: String? = null,
 )
+
+/** Koszyk zwrotu rozłożony na półki, ale jeszcze nieprzesunięty na MAG. */
+@Serializable
+data class KoszykView(val numer: String, val lines: Int = 0, val qty: Double = 0.0)
 
 @Serializable
 data class DeliveryProgress(
@@ -362,6 +355,10 @@ data class DeliveryView(
     /** Klucz stanu — stabilny; po nim dobieramy kolor. */
     val flagaKey: String? = null,
     val progress: DeliveryProgress = DeliveryProgress(),
+    /** Zbiorczy dokument zwrotów: rozkłada się koszykami, każdy domykany MM-em. */
+    val zwrot: Boolean = false,
+    /** Koszyki rozłożone, ale jeszcze nieprzesunięte na MAG (puste przy dostawie krajowej). */
+    val koszyki: List<KoszykView> = emptyList(),
     val lines: List<DeliveryLineView> = emptyList(),
 )
 
@@ -420,6 +417,17 @@ data class PutawayLineBody(
      * `null` = ścieżka bez rozjazdu (serwer przyjmuje domyślne `replace`).
      */
     val locAction: LocApplyAction? = null,
+    /** Zwroty: numer koszyka, z którego wzięto towar (serwer wymaga go przy zwrocie). */
+    val koszyk: String? = null,
+)
+
+/** Odpowiedź zamknięcia koszyka: jeden MM Zwroty→MAG na całą jego zawartość. */
+@Serializable
+data class CloseBasketResponse(
+    val ok: Boolean = true,
+    val queueId: Long = 0,
+    val lines: Int = 0,
+    val qty: Double = 0.0,
 )
 
 /** Wybór operatora przy skanie innej półki niż oczekiwana (§4.3). */

@@ -54,8 +54,9 @@ oraz **flaga sprawdzenia na fakturze dostawy**. Ta druga to świadomy, nazwany
 wyjątek od reguły „tylko lokalizacja": w tej firmie rozkładanie JEST sprawdzaniem
 faktury, więc bez niej biuro musiałoby pytać magazyn o stan każdej dostawy.
 Oba zapisy idą tą samą drogą (kolejka → worker → adapter), więc kolektor nigdy
-nie czeka na COM. Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM
-w trybie A, zero modyfikacji stanów.
+nie czeka na COM. Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM przy
+dostawie krajowej, zero modyfikacji stanów. Dokumenty MM (kontener, zwroty)
+tworzy osobny worker Sfery na Windows — ten proces tylko je kolejkuje.
 
 ## Uruchomienie
 
@@ -85,11 +86,12 @@ Parametry (env, dev):
 |---|---|
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
-| `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 | `MSSQL_DOC_FLAG_COLUMN` | kolumna `dok__Dokument` z flagą sprawdzenia faktury — **bez domyślnej**, patrz `[WERYFIKUJ]` w DEPLOY §6 |
 | `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag pokazywane człowiekowi (domyślnie słownictwo firmy) |
 | `DOC_FLAG_*_SGT` | co wpisać do Subiekta dla danej flagi — przy flagach wbudowanych **id koloru**, nie nazwa |
+| `MAG_ID_MAG` / `MAG_ID_MGP` / `MAG_ID_ZWROTY` | id magazynów w SGT — rozstrzygają, którym trybem idzie dokument |
+| `DOK_TYP_ZWROTY` | kody `dok_Typ` zwrotów na magazynie Zwroty (CSV); puste = każdy dokument na tym magazynie |
 
 ## Funkcje (kolektor — aplikacja Android)
 
@@ -101,7 +103,6 @@ Parametry (env, dev):
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
-- MM MGP→MAG i ⚡ zasilenie (kombo: MM całości + lokalizacja jednym zadaniem).
 - Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
   PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
   prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
@@ -109,10 +110,12 @@ Parametry (env, dev):
 - Bufor offline (Room) na zapisy przy zaniku Wi-Fi, pasek COFNIJ (anulowanie
   zadania w oknie łaski), potrząśnięcie = cofnij, asysta niskiej baterii.
 
-**Rozkładanie dostaw krajowych — Tryb A (redesign v2.0)** — druga zakładka
-- Jednostką pracy jest **dokument FZ/PZ**, nie sesja. Dokumenty **w buforze** też
-  są do wzięcia: skutek magazynowy niesie sam dokument w Subiekcie, więc
-  aplikacja zapisuje **wyłącznie lokalizację** — zero MM, zero `waiting_for_doc`.
+**Rozkładanie dostaw i zwrotów — Tryb A (redesign v2.0)** — druga zakładka
+- Jednostką pracy jest **dokument** (FZ/PZ albo zbiorczy dokument zwrotów), nie
+  sesja. Dokumenty **w buforze** też
+  są do wzięcia: przy dostawie krajowej skutek magazynowy niesie sam dokument
+  w Subiekcie, więc aplikacja zapisuje **wyłącznie lokalizację** — zero MM, zero
+  `waiting_for_doc`.
 - Ścieżka codzienna to **dwa skany na pozycję**: skan towaru → karta z ilością
   i lokalizacją docelową → skan etykiety regału → zapis. Bez dialogu
   potwierdzającego. Postęp zapisuje się per pozycja, więc przerwanie pracy nic
@@ -151,10 +154,30 @@ Parametry (env, dev):
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
   pod `GET /api/delivery/:id/problems.csv`.
 
-**Kontenery i zwroty — Tryb B (sesja z wózkiem, spec §5.4)**
-- Wchodzi tu **wyłącznie towar leżący fizycznie poza halą** i wymagający
-  realnego przesunięcia stanu: kontener importowy na MGP (~4× w roku) oraz
-  kartony zwrotów od klientów na magazynie Zwroty.
+**Zwroty — koszyk jako jednostka pracy (w trybie A, osobna sekcja listy)**
+- Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn **Zwroty**
+  jednym **zbiorczym dokumentem** i układa go w **koszyki opisane numerem
+  zwrotu**. Podziału na koszyki nie ma w żadnym dokumencie — istnieje wyłącznie
+  fizycznie, więc w aplikacji koszyk to grupa linii domkniętych za jednym
+  podejściem, otagowana numerem (krótkim, wpisywanym ręcznie — koszyki nie mają
+  kodów kreskowych).
+- Rozkładanie przebiega dokładnie jak przy dostawie: dwa skany, sekcje alejek,
+  INNA ILOŚĆ, wyjątki ze zdjęciem, kolizje EAN, te same cztery flagi dokumentu.
+- Różnica jest jedna: **po opróżnieniu koszyka domyka się go przyciskiem i
+  powstaje JEDEN dokument MM Zwroty→MAG** na wszystko, co z niego poszło na
+  półki. `set_location` powstaje przy każdym odłożeniu, MM dopiero na końcu, więc
+  niezmiennik **adres zawsze przed sprzedawalnością** trzyma się sam.
+- Rozliczenie idzie **ilościami** (`odłożone − objęte MM`), nie statusem linii:
+  ten sam towar bywa w dwóch koszykach (dokument zbiorczy agreguje go w jedną
+  linię), ponowne domknięcie koszyka nie dubluje przesunięcia, a sztuki odłożone
+  z pozycji zgłoszonej potem jako uszkodzona i tak jadą na MAG.
+- Otwarte koszyki (rozłożone, bez MM) widać na ekranie dostawy i **wstrzymują jej
+  domknięcie**: dopóki MM nie powstanie, towar leży na półce, ale w Subiekcie
+  wisi na Zwrotach — czyli jest niesprzedawalny.
+
+**Kontener importowy — Tryb B (sesja z wózkiem, spec §5.4)**
+- Wchodzi tu **wyłącznie kontener na MGP** (~4× w roku): 1000 kartonów, wiele
+  kursów wózkiem. Tylko ten proces potrzebuje modelu sesji zamiast dokumentu.
 - Lista dokumentów (14 dni) z postępem sesji; pozycje **sortowane po lokalizacji
   docelowej**, `BRAK LOK` na końcu, agregacja tego samego towaru.
 - Tryb wózka: skan towaru na wózek (domyślna ilość = min(pozostało, stan strefy)),
@@ -166,11 +189,11 @@ Parametry (env, dev):
   zamknięcie sesji z rozliczeniem (`closed` / `closed_with_deviations`).
 
 **Który tryb obsługuje dokument — rozstrzyga magazyn skutku, nie typ**
-Dokument księgowany wprost na **MAG** idzie trybem A (towar już leży na hali,
-brakuje mu tylko adresu). Dokument lądujący na **MGP albo Zwrotach** idzie trybem
-B, bo wymaga MM. Kryteria są rozłączne — ten sam dokument nie może pojawić się
-w obu zakładkach, inaczej kolektor nadałby adres bez przesunięcia stanu i półka
-kłamałaby względem Subiekta.
+`MAG` → tryb A (dostawa krajowa: towar już leży na hali, brakuje mu adresu).
+`Zwroty` → tryb A, sekcja zwrotów (adres jak wyżej + MM na zamknięty koszyk).
+`MGP` → tryb B (kontener: sesja z wózkiem, MM na rundę). Kryteria są **rozłączne**
+— ten sam dokument nie może pojawić się w obu zakładkach, inaczej dałoby się go
+rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 
 **Podgląd magazynu (biuro) — `/lookup`**
 - Lekka strona **tylko do odczytu** na tym samym serwerze i API, dla przeglądarki
@@ -214,12 +237,19 @@ na MGP. Seed buduje z nich dokumenty FZ/PZ **pogrupowane po realnym dostawcy**
 
 ## Praca z prawdziwym Subiektem GT
 
-Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**): importer
+Docelowa wersja w firmie: **Subiekt GT 1.87 SP3 HF1** (era KSeF — brak natywnego
+pola lokalizacji, stąd pole dodatkowe `tw_Pole1..8`).
+
+Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**) to CAŁE
+połączenie: **jeden login** o kolumnowych uprawnieniach, importer
 `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto z bazy
-MSSQL Subiekta (przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`),
-a worker w `SFERA_MODE=sql` zapisuje lokalizacje bezpośrednim UPDATE
-(plan B ze spec §9; MM wymaga licencji Sfery — `sfera.com.ts` pozostaje
-szkieletem). Instrukcja krok po kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
+(przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`), a worker zapisuje
+bezpośrednim UPDATE dokładnie **dwie kolumny**: lokalizację na `tw__Towar`
+i flagę sprawdzenia na `dok__Dokument`. Tryb zapisu wynika z `SGT_MODE` — nie ma
+osobnego przełącznika. Dokumenty MM (wyłącznie tryb B — wózek) tworzy docelowo
+osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`; do tego czasu
+zadanie MM kończy się czytelnym błędem, a MM wystawia biuro. Instrukcja krok po
+kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 
 W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —
 API, kolejka, worker i rozkładanie realnie na SQLite zasilonym danymi

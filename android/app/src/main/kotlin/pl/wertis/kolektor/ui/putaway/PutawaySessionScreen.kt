@@ -45,7 +45,6 @@ import pl.wertis.kolektor.core.net.ConfirmBody
 import pl.wertis.kolektor.core.net.PutawayItem
 import pl.wertis.kolektor.core.net.PutawayItemStatus
 import pl.wertis.kolektor.core.net.PutawaySession
-import pl.wertis.kolektor.core.net.PutawayZone
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.SkipBody
 import pl.wertis.kolektor.core.scan.ScanKind
@@ -289,7 +288,7 @@ fun PutawaySessionScreen(graph: AppGraph) {
                             color = AmberInk,
                         )
                         cart.forEach { item ->
-                            CartRow(graph, sid, item, sess.zone, onChange = ::refresh)
+                            CartRow(graph, sid, item, onChange = ::refresh)
                         }
                         PrimaryButton(
                             "ZATWIERDŹ WÓZEK (${cart.size}) → MM + LOKALIZACJE",
@@ -390,19 +389,6 @@ private fun SessionHeader(sess: PutawaySession) {
                 fontSize = 15.sp,
                 color = Ink,
             )
-            if (sess.zone == PutawayZone.ZWROTY) {
-                Text(
-                    "ZWROTY",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AmberInk,
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(AmberBg)
-                        .padding(horizontal = 6.dp, vertical = 1.dp),
-                )
-            }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 if (sess.inFlight > 0) {
                     Text("⏳ ${sess.inFlight}  ", fontSize = 12.sp, color = InkSoft, fontWeight = FontWeight.SemiBold)
@@ -518,7 +504,7 @@ private fun DoneRow(item: PutawayItem) {
 
 /* Wiersz wózka: ilość, lokalizacja (skan lub POTWIERDŹ), pomiń, zdejmij. */
 @Composable
-private fun CartRow(graph: AppGraph, sid: Long, item: PutawayItem, zone: PutawayZone, onChange: () -> Unit) {
+private fun CartRow(graph: AppGraph, sid: Long, item: PutawayItem, onChange: () -> Unit) {
     val scope = rememberCoroutineScope()
     var qty by rememberSaveable(item.id) { mutableStateOf(item.stageQty ?: minOf(item.delta.takeIf { d -> d > 0 } ?: item.qtyExpected, item.mgpStan).coerceAtLeast(1.0)) }
     var loc by rememberSaveable(item.id) { mutableStateOf(item.stageLoc ?: item.targetLoc ?: "") }
@@ -592,7 +578,7 @@ private fun CartRow(graph: AppGraph, sid: Long, item: PutawayItem, zone: Putaway
                 qty = (qty + 1).coerceAtMost(item.qtyExpected.takeIf { q -> q > 0 } ?: (qty + 1))
             }
             Text(
-                "z ${if (item.qtyExpected > 0) formatQty(item.qtyExpected) else "—"} · ${if (zone == PutawayZone.ZWROTY) "ZWROTY" else "MGP"} ${formatQty(item.mgpStan)}",
+                "z ${if (item.qtyExpected > 0) formatQty(item.qtyExpected) else "—"} · MGP ${formatQty(item.mgpStan)}",
                 fontSize = 11.sp,
                 color = InkMute,
                 modifier = Modifier.weight(1f),

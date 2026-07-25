@@ -135,10 +135,12 @@ function seed() {
   });
   buildDocs();
 
-  // ── syntetyczny karton zwrotów od klientów (magazyn Zwroty) ──────────────
-  // Biuro kompletuje zwroty w kartony (~20 szt.) i wystawia dokument; kolektor
-  // otwiera go w rozkładaniu i robi MM Zwroty→MAG. Pozycje: towary z MAG
-  // z lokalizacją (wróciły od klientów) + jeden bez lokalizacji (BRAK LOK).
+  // ── zbiorczy dokument zwrotów od klientów (magazyn Zwroty) ───────────────
+  // Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn Zwroty
+  // JEDNYM zbiorczym dokumentem i układa go w koszyki opisane numerem zwrotu.
+  // Magazynier bierze koszyk, rozkłada go na półki (tryb A) i zamyka koszyk —
+  // dopiero wtedy powstaje MM Zwroty→MAG. Pozycje: towary z MAG z lokalizacją
+  // (wróciły od klientów) + jeden bez lokalizacji (BRAK LOK).
   const zwrotItems: Array<{ tw_id: number; qty: number }> = [];
   rows.forEach((r, i) => {
     const mag = r[3];

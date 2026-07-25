@@ -46,12 +46,16 @@ export interface SubiektAdapter {
   getProductBySymbol(symbol: string): RawProduct | undefined;
   search(q: string, limit: number): ProductRow[];
   getStock(twId: number, magId: number): RawStock;
-  /** Dokumenty do rozłożenia z ostatnich N dni: FZ/PZ na MGP + zwroty na mag. Zwroty (spec §5.4). */
+  /** Tryb B: kontenery na MGP z ostatnich N dni — sesja z wózkiem i MM na rundę (spec §5.4). */
   listPutawayDocuments(days: number): RawDocument[];
   /**
-   * Tryb A: dostawy krajowe FZ/PZ z ostatnich N dni — niezależnie od magazynu
-   * skutku (w trybie A księgują się wprost na MAG). Dokumenty w buforze też,
-   * bo rozkładanie nie czeka na księgowość (D1).
+   * Tryb A z ostatnich N dni: dostawy krajowe FZ/PZ księgowane wprost na MAG
+   * oraz zbiorcze dokumenty zwrotów na magazynie Zwroty. Dokumenty w buforze
+   * też, bo rozkładanie nie czeka na księgowość (D1).
+   *
+   * Kryteria tej listy i `listPutawayDocuments` MUSZĄ być rozłączne — dokument
+   * widoczny w obu zakładkach dałoby się rozłożyć dwiema niekompatybilnymi
+   * ścieżkami naraz.
    */
   listDeliveryDocuments(days: number): RawDocument[];
   getDocument(docId: number): RawDocument | undefined;

@@ -50,7 +50,6 @@ class AppNavState(private val recentStore: RecentStore) {
     }
 
     fun openScanLoc() = go(Screen.SCAN_LOC)
-    fun openMM() = go(Screen.MM)
 
     fun openDelivery(id: Long) {
         deliveryId = id

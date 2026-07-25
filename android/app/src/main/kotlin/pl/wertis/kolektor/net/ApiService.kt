@@ -15,7 +15,6 @@ import pl.wertis.kolektor.core.net.EanConflictsResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LocationProductsResponse
 import pl.wertis.kolektor.core.net.LocationsInfo
-import pl.wertis.kolektor.core.net.MmBody
 import pl.wertis.kolektor.core.net.OkResponse
 import pl.wertis.kolektor.core.net.ProblemTypesResponse
 import pl.wertis.kolektor.core.net.ProblemsResponse
@@ -24,6 +23,7 @@ import pl.wertis.kolektor.core.net.PutawayDocumentsResponse
 import pl.wertis.kolektor.core.net.RaiseProblemBody
 import pl.wertis.kolektor.core.net.RaiseProblemResponse
 import pl.wertis.kolektor.core.net.ResolveProblemBody
+import pl.wertis.kolektor.core.net.CloseBasketResponse
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.OpenDeliveryResponse
@@ -73,9 +73,6 @@ interface ApiService {
         @Header("x-user") asUser: String? = null,
     ): QueueIdResponse
 
-    @POST("api/mm")
-    suspend fun mm(@Body body: MmBody, @Header("x-user") asUser: String? = null): QueueIdResponse
-
     @GET("api/locations")
     suspend fun locations(): LocationsInfo
 
@@ -122,7 +119,7 @@ interface ApiService {
     suspend fun closeSession(@Path("id") sid: Long, @Body body: RequestBody = EMPTY_BODY): CloseSessionResponse
 
 
-    /* ── Tryb A: rozkładanie dostaw (dokument = jednostka pracy) ─────────── */
+    /* ── Tryb A: rozkładanie dostaw i zwrotów (dokument = jednostka pracy) ─ */
 
     @GET("api/delivery/documents")
     suspend fun deliveryDocuments(): DeliveryDocumentsResponse
@@ -144,6 +141,14 @@ interface ApiService {
         @Path("lineId") lineId: Long,
         @Body body: PutawayLineBody,
     ): PutawayLineResponse
+
+    /** Zwroty: koszyk rozłożony → jeden dokument MM Zwroty→MAG. */
+    @POST("api/delivery/{id}/koszyk/{numer}/zamknij")
+    suspend fun closeBasket(
+        @Path("id") id: Long,
+        @Path("numer") numer: String,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): CloseBasketResponse
 
     /** Oddanie linii po ANULUJ — bez tego wisi zajęta do wygaśnięcia TTL. */
     @POST("api/delivery/{id}/lines/{lineId}/release")

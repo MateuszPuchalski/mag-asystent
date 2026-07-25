@@ -3,11 +3,11 @@
  * Worker jest jedynym miejscem, które go używa; kolektor nigdy nie czeka
  * synchronicznie na COM (spec §12).
  *
- * Implementacje (SFERA_MODE):
- *   'dev' — mutacja tabel sgt_* (sfera.dev.ts): realna zmiana stanu w read-modelu,
- *           jedyny sposób na przećwiczenie ścieżki kolejka→worker bez Subiekta.
- *   'sql' — UPDATE tw_Lokalizacja w MSSQL (sfera.sql.ts); MM zgłasza błąd
- *           (plan B ze spec §9, edu bez licencji Sfery).
+ * Implementacje (wybór wynika z SGT_MODE — patrz adapters/index.ts):
+ *   dev — mutacja tabel sgt_* (sfera.dev.ts): realna zmiana stanu w read-modelu,
+ *         jedyny sposób na przećwiczenie ścieżki kolejka→worker bez Subiekta.
+ *   sql — UPDATE dwóch kolumn w MSSQL (sfera.sql.ts): lokalizacja + flaga,
+ *         jednym loginem o kolumnowych uprawnieniach; MM zgłasza błąd.
  *
  * ─── Zapis przez Sferę (COM) — kontrakt do implementacji ─────────────────────
  * Sfera to COM/Windows + licencja, więc nie ma tu implementacji w Node.

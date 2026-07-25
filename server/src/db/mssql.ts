@@ -2,22 +2,25 @@ import sql from "mssql";
 import { config } from "../config.js";
 
 /**
- * Pule połączeń do bazy MSSQL Subiekta GT (SGT_MODE=mssql).
- *  • pula ODCZYTU — login read-only (GRANT SELECT na tw__Towar, tw_Stan,
- *    dok__Dokument, dok_Pozycja, kh__Kontrahent), używana przez importer,
- *  • pula ZAPISU — osobny login z GRANT UPDATE wyłącznie na kolumnę
- *    lokalizacji (config.mssql.locColumn, plan B ze spec §9), używana przez
- *    workera.
- * Gdy MSSQL_WRITE_USER nie jest ustawiony, obie pule dzielą login odczytu.
+ * JEDNA pula połączeń do bazy MSSQL Subiekta GT (SGT_MODE=mssql), jeden login.
+ *
+ * Login `wertis` dostaje minimalny, kolumnowy zakres uprawnień — pełny skrypt
+ * w docs/subiekt-gt-edu-setup.md:
+ *  • GRANT SELECT: tw__Towar, tw_Stan, dok__Dokument, dok_Pozycja, kh__Kontrahent,
+ *  • GRANT UPDATE wyłącznie na DWIE kolumny: lokalizacja na tw__Towar
+ *    (config.mssql.locColumn) i flaga sprawdzenia na dok__Dokument
+ *    (config.mssql.docFlagColumn).
+ * Nawet przy przejęciu credentiala reszta bazy pozostaje nietykalna, a jeden
+ * login to jedna rzecz do założenia i jedna do pilnowania.
  */
-function poolConfig(user: string, password: string): sql.config {
+function poolConfig(): sql.config {
   const c = config.mssql;
   return {
     server: c.server,
     ...(c.port ? { port: c.port } : {}),
     database: c.database,
-    user,
-    password,
+    user: c.user,
+    password: c.password,
     options: {
       encrypt: c.encrypt,
       trustServerCertificate: c.trustServerCertificate,
@@ -28,23 +31,12 @@ function poolConfig(user: string, password: string): sql.config {
   };
 }
 
-let _read: sql.ConnectionPool | null = null;
-let _write: sql.ConnectionPool | null = null;
+let _pool: sql.ConnectionPool | null = null;
 
-export async function mssqlRead(): Promise<sql.ConnectionPool> {
-  if (_read?.connected) return _read;
-  _read = await new sql.ConnectionPool(
-    poolConfig(config.mssql.user, config.mssql.password)
-  ).connect();
-  return _read;
-}
-
-export async function mssqlWrite(): Promise<sql.ConnectionPool> {
-  const c = config.mssql;
-  if (c.writeUser === c.user && c.writePassword === c.password) return mssqlRead();
-  if (_write?.connected) return _write;
-  _write = await new sql.ConnectionPool(poolConfig(c.writeUser, c.writePassword)).connect();
-  return _write;
+export async function mssqlPool(): Promise<sql.ConnectionPool> {
+  if (_pool?.connected) return _pool;
+  _pool = await new sql.ConnectionPool(poolConfig()).connect();
+  return _pool;
 }
 
 /**

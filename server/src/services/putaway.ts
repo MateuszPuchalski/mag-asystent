@@ -10,11 +10,12 @@ import { freshLock } from "./locks.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type { PutawayDocument, PutawayItemView } from "../types.js";
 
-/** Strefa (etykieta) magazynu źródłowego sesji/dokumentu. */
-function zoneOf(magId: number | null | undefined): "mgp" | "zwroty" {
-  return magId === config.magId.ZWROTY ? "zwroty" : "mgp";
-}
-/** Kod magazynu do komunikatów dla magazyniera. */
+/**
+ * Kod magazynu do komunikatów dla magazyniera. Zwroty przeszły do trybu A
+ * (koszyk jako jednostka pracy), więc nowe sesje powstają wyłącznie na MGP —
+ * ale `source_mag_id` bywa w bazie ustawiony na Zwroty ze starszych sesji,
+ * a komunikat „Brak stanu na …" nie może wskazywać nie tej strefy co trzeba.
+ */
 function magKod(magId: number): string {
   return magId === config.magId.ZWROTY ? "ZWROTY" : "MGP";
 }
@@ -23,7 +24,7 @@ function sessionMagId(session: { source_mag_id?: number | null }): number {
   return session.source_mag_id ?? config.magId.MGP;
 }
 
-/** Lista dokumentów do rozłożenia: kontenery na MGP + zwroty (14 dni), z postępem sesji (spec §5.4). */
+/** Lista kontenerów do rozłożenia (MGP, 14 dni), z postępem sesji (spec §5.4). */
 export function listDocuments(days = 14): PutawayDocument[] {
   const docs = subiekt.listPutawayDocuments(days);
   return docs.map((d) => {
@@ -56,7 +57,6 @@ export function listDocuments(days = 14): PutawayDocument[] {
       dataWyst: d.data_wyst,
       dostawca: d.dostawca ?? "",
       positions: posList.length,
-      zone: zoneOf(d.mag_id),
       session,
     };
   });
@@ -184,7 +184,6 @@ export function getSession(sessionId: number) {
     id: session.id,
     sourceDocId: session.source_doc_id,
     sourceDocNumber: session.source_doc_number,
-    zone: zoneOf(srcMag),
     status: session.status,
     progress: { total, done: doneCount, remaining: total - doneCount, onCart },
     queueAlerts,
@@ -351,18 +350,6 @@ export function commitCart(sessionId: number, user: string) {
   }
 
   const queueIds: number[] = [];
-  if (mmItems.length) {
-    const qid = enqueueMM(srcMag, config.magId.MAG, mmItems, {
-      createdBy: user,
-      twId: null,
-      sourceDocId: session.source_doc_id,
-      sessionId,
-      label: `MM wózek · ${mmItems.length} poz.`,
-      detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt ${magKod(srcMag)}→MAG (rozkładanie)`,
-    });
-    queueIds.push(qid);
-  }
-
   const tx = db().transaction(() => {
     for (const i of cart) {
       // set_location, gdy zeskanowana lokalizacja różni się i user zatwierdził
@@ -388,6 +375,33 @@ export function commitCart(sessionId: number, user: string) {
           "UPDATE putaway_items SET qty_done=?, status=?, stage_qty=NULL, stage_loc=NULL, locked_by=NULL, locked_at=NULL WHERE id=?"
         )
         .run(doneQty, status, i.id);
+    }
+
+    /* MM NA KOŃCU — niezmiennik: ADRES ZAWSZE PRZED SPRZEDAWALNOŚCIĄ.
+       MM przenosi towar ze strefy na MAG, czyli czyni go dostępnym do
+       sprzedaży i kompletacji. Worker bierze zadania po `id` rosnąco, więc
+       zakolejkowanie MM przed `set_location` dawało okno, w którym towar jest
+       już sprzedawalny, a jego adres w kartotece stary albo pusty — a przy
+       nieudanym zapisie lokalizacji stan ten był TRWAŁY. Kompletujący
+       dostawał wtedy zlecenie na towar, którego nie ma pod wskazanym adresem:
+       dokładnie ten problem, przed którym chroni strefa przyjęć, tylko już po
+       rozłożeniu.
+
+       Po odwróceniu kolejności najgorszy możliwy stan odwraca się na bezpieczną
+       stronę: towar leży na półce z poprawnym adresem, ale jeszcze nie jest
+       sprzedawalny (utracona szansa sprzedaży zamiast zmarnowanego kursu),
+       i naprawia się sam po PONÓW. */
+    if (mmItems.length) {
+      queueIds.push(
+        enqueueMM(srcMag, config.magId.MAG, mmItems, {
+          createdBy: user,
+          twId: null,
+          sourceDocId: session.source_doc_id,
+          sessionId,
+          label: `MM wózek · ${mmItems.length} poz.`,
+          detail: `${mmItems.reduce((s, i) => s + i.qty, 0)} szt ${magKod(srcMag)}→MAG (rozkładanie)`,
+        })
+      );
     }
   });
   tx();

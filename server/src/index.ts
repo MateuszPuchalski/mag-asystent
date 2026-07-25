@@ -5,7 +5,6 @@ import fs from "node:fs";
 import { config } from "./config.js";
 import { db } from "./db/db.js";
 import { productRoutes } from "./routes/products.js";
-import { mmRoutes } from "./routes/mm.js";
 import { queueRoutes } from "./routes/queue.js";
 import { putawayRoutes } from "./routes/putaway.js";
 import { deliveryRoutes } from "./routes/delivery.js";
@@ -52,7 +51,6 @@ async function main() {
   });
 
   await app.register(productRoutes);
-  await app.register(mmRoutes);
   await app.register(queueRoutes);
   await app.register(putawayRoutes);
   await app.register(deliveryRoutes);

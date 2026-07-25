@@ -179,24 +179,21 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 4. `nssm set wertis-api AppEnvironmentExtra SGT_MODE=mssql MSSQL_SERVER=… …`
    + restart.
 
-**Etap 1a — zapis lokalizacji bez Sfery (`SFERA_MODE=sql`, plan B ze spec §9):**
-login z `GRANT UPDATE` wyłącznie na kolumnę `tw__Towar(tw_Lokalizacja)`
-(env `MSSQL_WRITE_USER` / `MSSQL_WRITE_PASSWORD`); worker wykonuje
-`set_location` bezpośrednio po SQL, a zadania MM zgłaszają czytelny błąd.
-Domyślne przy `SGT_MODE=mssql`.
+**Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
+wykonuje `set_location` i `set_doc_flag` bezpośrednim UPDATE dwóch kolumn
+objętych `GRANT UPDATE`. Zadania MM (wyłącznie tryb B) zgłaszają czytelny błąd —
+do czasu workera Sfery MM wystawia biuro w Subiekcie. Osobnego przełącznika
+trybu zapisu nie ma.
 
-**Etap 2 — zapis przez Sferę:**
-1. Test 10-linijkowym skryptem, czy Sfera eksponuje pole lokalizacji na
-   obiekcie towaru (wczytaj → zmień → zapisz → sprawdź w SGT). Jeśli nie —
-   plan B ze spec §9: UPDATE jednej kolumny `tw_Lokalizacja` osobnym loginem
-   z GRANT UPDATE tylko na nią.
-2. Implementacja `server/src/adapters/sfera.com.ts`. Rekomendacja: pętla
-   workera zostaje w Node, a sam zapis COM jako mały helper C# lub
-   Python+pywin32 wołany przez adapter (COM Sfery najstabilniej działa
-   z tych środowisk — spec §9).
-3. Najpierw włącz tylko `set_location` na jednej kartotece testowej, potem MM.
+**Etap 2 — dokumenty MM przez Sferę (tylko tryb B — kontener, zwroty):**
+1. Osobny proces na Windows (C# lub Python+pywin32 — COM Sfery najstabilniej
+   działa z tych środowisk, spec §9), czytający tę samą tabelę `sfera_queue`
+   i wykonujący wyłącznie zadania `mm`; kontrakt wywołań w
+   `server/src/adapters/sfera.ts`.
+2. Najpierw jedno MM testowe na kartotece próbnej, potem produkcyjnie.
 
-**Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ, MM per wózek.
+**Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ; MM per wózek
+z trybu B przez workera Sfery.
 
 ## 7. Backup i utrzymanie
 

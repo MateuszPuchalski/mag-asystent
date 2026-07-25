@@ -39,6 +39,11 @@ function migrate(database: Database.Database) {
   addColumn("delivery", "flaga_wyslana", "TEXT");
   addColumn("delivery", "active_at", "TEXT");
   addColumn("sgt_dokument", "flaga", "TEXT");
+  // zwroty w trybie A: koszyk jako jednostka pracy + rozliczenie MM per linia
+  addColumn("delivery", "source_mag_id", "INTEGER");
+  addColumn("delivery_line", "koszyk", "TEXT");
+  addColumn("delivery_line", "mm_ilosc", "REAL NOT NULL DEFAULT 0");
+  addColumn("delivery_line", "mm_queue_id", "INTEGER");
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */
