@@ -9,6 +9,7 @@ import { mmRoutes } from "./routes/mm.js";
 import { queueRoutes } from "./routes/queue.js";
 import { putawayRoutes } from "./routes/putaway.js";
 import { deliveryRoutes } from "./routes/delivery.js";
+import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
 import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
@@ -27,7 +28,11 @@ async function main() {
     }, config.mssql.syncMs);
   }
 
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
+  const app = Fastify({
+    logger: { level: process.env.LOG_LEVEL ?? "info" },
+    // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
+    bodyLimit: 6 * 1024 * 1024,
+  });
   await app.register(cors, { origin: true });
 
   app.get("/api/health", async () => ({
@@ -51,6 +56,7 @@ async function main() {
   await app.register(queueRoutes);
   await app.register(putawayRoutes);
   await app.register(deliveryRoutes);
+  await app.register(problemRoutes);
   await app.register(locationRoutes);
   await app.register(deviceRoutes);
 

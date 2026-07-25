@@ -154,3 +154,37 @@ CREATE TABLE IF NOT EXISTS delivery_line (
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
+
+-- ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
+-- Bez tego nie da się zmierzyć, ile kosztują. Typy zamknięte (§4.6); zdjęcie
+-- obowiązkowe przy `damaged` / `wrong_item` / `unknown_barcode` — egzekwowane
+-- w serwisie, bo to reguła domenowa, nie schematu.
+CREATE TABLE IF NOT EXISTS problem (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  delivery_id   INTEGER REFERENCES delivery(id),
+  line_id       INTEGER REFERENCES delivery_line(id),
+  typ           TEXT NOT NULL,      -- qty_short|qty_over|damaged|wrong_item|no_space|unknown_barcode|ean_conflict
+  ilosc         REAL,
+  opis          TEXT,
+  foto_ref      TEXT,               -- nazwa pliku w data/photos
+  created_at    TEXT NOT NULL,
+  created_by    TEXT,
+  resolved_at   TEXT,
+  resolved_note TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_problem_delivery ON problem(delivery_id);
+-- lista „nierozwiązane" jest odpytywana przy każdym starcie aplikacji
+CREATE INDEX IF NOT EXISTS ix_problem_unresolved ON problem(resolved_at);
+
+-- Kolizje kodów kreskowych — raport dla biura. Aplikacja staje się instrumentem
+-- pomiaru jakości danych, a nie tylko ich konsumentem (§4.5).
+CREATE TABLE IF NOT EXISTS ean_conflict (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  ean           TEXT NOT NULL,
+  tw_ids        TEXT NOT NULL,      -- JSON array (SQLite nie ma INTEGER[])
+  wybrany_tw_id INTEGER,
+  auto          INTEGER NOT NULL DEFAULT 0,
+  seen_at       TEXT NOT NULL,
+  context       TEXT                -- 'przyjecie' | 'zmiana_lokalizacji' | 'podglad'
+);
+CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);

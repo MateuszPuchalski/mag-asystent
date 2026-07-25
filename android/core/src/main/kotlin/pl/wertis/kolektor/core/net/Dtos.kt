@@ -337,7 +337,13 @@ data class DeliveryLineView(
 )
 
 @Serializable
-data class DeliveryProgress(val total: Int = 0, val done: Int = 0, val remaining: Int = 0)
+data class DeliveryProgress(
+    val total: Int = 0,
+    val done: Int = 0,
+    val remaining: Int = 0,
+    /** Podzbiór `done`: linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
+    val problems: Int = 0,
+)
 
 @Serializable
 data class DeliveryView(
@@ -388,7 +394,23 @@ sealed class ScanResolution {
 data class ScanBody(val code: String)
 
 @Serializable
-data class PutawayLineBody(val location: String, val qty: Double? = null)
+data class PutawayLineBody(
+    val location: String,
+    val qty: Double? = null,
+    /**
+     * Rozjazd lokalizacji (§4.3) — decyduje magazynier, nie serwer: „ZAMIEŃ"
+     * gdy towar przeniesiono, „DODAJ" gdy leży teraz w dwóch miejscach.
+     * `null` = ścieżka bez rozjazdu (serwer przyjmuje domyślne `replace`).
+     */
+    val locAction: LocApplyAction? = null,
+)
+
+/** Wybór operatora przy skanie innej półki niż oczekiwana (§4.3). */
+@Serializable
+enum class LocApplyAction {
+    @SerialName("add") ADD,
+    @SerialName("replace") REPLACE,
+}
 
 @Serializable
 data class PutawayLineResponse(
@@ -397,3 +419,61 @@ data class PutawayLineResponse(
     val mismatch: Boolean = false,
     val status: String = "",
 )
+
+/* ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
+   Wyjątek to wiersz w bazie ze zdjęciem, nie notatka w głowie magazyniera —
+   inaczej nie da się go zmierzyć ani zgłosić reklamacji dostawcy.            */
+
+@Serializable
+data class ProblemTypesResponse(val types: List<String> = emptyList())
+
+@Serializable
+data class ProblemView(
+    val id: Long,
+    val deliveryId: Long? = null,
+    val lineId: Long? = null,
+    val typ: String = "",
+    val qty: Double? = null,
+    val opis: String? = null,
+    val hasPhoto: Boolean = false,
+    val createdAt: String = "",
+    val createdBy: String? = null,
+    val resolvedAt: String? = null,
+    val resolvedNote: String? = null,
+    /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
+    val docNumber: String? = null,
+    val sym: String? = null,
+    val name: String? = null,
+)
+
+@Serializable
+data class ProblemsResponse(val problems: List<ProblemView> = emptyList())
+
+@Serializable
+data class RaiseProblemBody(
+    val typ: String,
+    val lineId: Long? = null,
+    val qty: Double? = null,
+    val opis: String? = null,
+    /** JPEG w base64 — dowód do reklamacji; serwer zapisuje na dysk. */
+    val photoBase64: String? = null,
+)
+
+@Serializable
+data class RaiseProblemResponse(val id: Long)
+
+@Serializable
+data class ResolveProblemBody(val note: String? = null)
+
+/** Kolizja EAN w kartotece — raport dla biura (§4.5). */
+@Serializable
+data class EanConflictRow(
+    val ean: String = "",
+    val hits: Int = 0,
+    val autoResolved: Int = 0,
+    val twIds: List<Long> = emptyList(),
+    val lastSeen: String = "",
+)
+
+@Serializable
+data class EanConflictsResponse(val conflicts: List<EanConflictRow> = emptyList())

@@ -98,7 +98,33 @@ Parametry (env, dev):
 - Bufor offline (Room) na zapisy przy zaniku Wi-Fi, pasek COFNIJ (anulowanie
   zadania w oknie łaski), potrząśnięcie = cofnij, asysta niskiej baterii.
 
-**Rozkładanie dostaw (put-away, spec §5.4)** — druga zakładka
+**Rozkładanie dostaw krajowych — Tryb A (redesign v2.0)** — druga zakładka
+- Jednostką pracy jest **dokument FZ/PZ**, nie sesja. Dokumenty **w buforze** też
+  są do wzięcia: skutek magazynowy niesie sam dokument w Subiekcie, więc
+  aplikacja zapisuje **wyłącznie lokalizację** — zero MM, zero `waiting_for_doc`.
+- Ścieżka codzienna to **dwa skany na pozycję**: skan towaru → karta z ilością
+  i lokalizacją docelową → skan etykiety regału → zapis. Bez dialogu
+  potwierdzającego. Postęp zapisuje się per pozycja, więc przerwanie pracy nic
+  nie kosztuje; dostawa zamyka się sama, gdy nie ma już czego rozkładać.
+- Lista **posortowana po lokalizacji docelowej** (alejkami, nie kolejnością
+  z faktury), pozycje **BEZ LOKALIZACJI** w osobnej sekcji na końcu.
+- **Niejednoznaczny kod kreskowy zatrzymuje operację** — aplikacja nigdy nie
+  bierze „pierwszego dopasowania”. Jedyne automatyczne zawężenie: dokładnie
+  jeden kandydat występuje w otwartym dokumencie.
+- **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie
+  **PRZED zapisem** — „przeniesiony (ZAMIEŃ)” czy „leży w obu (DODAJ)”. Z samego
+  skanu tych dwóch sytuacji odróżnić się nie da, więc decyduje człowiek.
+- **Wyjątki jako obiekt pierwszej klasy**: zamknięta lista typów (za mało, za
+  dużo, uszkodzony, zły towar, brak miejsca, nieznany kod, kolizja EAN);
+  przy uszkodzeniu / złym towarze / nieznanym kodzie **zdjęcie jest
+  obowiązkowe** (dowód do reklamacji, robi je systemowy aparat). Pozycja
+  z wyjątkiem wypada z rutyny, ale nie blokuje zamknięcia dostawy.
+- Ekran **WYJĄTKI**: nierozwiązane zgłoszenia (pytane przy starcie aplikacji,
+  czerwony pasek na każdym ekranie do czasu zamknięcia) + **raport kolizji
+  kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
+  pod `GET /api/delivery/:id/problems.csv`.
+
+**Rozkładanie kontenera — Tryb B (sesja z wózkiem, spec §5.4)**
 - Lista dokumentów FZ/PZ na MGP (14 dni) z postępem sesji; tryb zapasowy
   „Rozkładaj całe MGP".
 - Sesja: pozycje **sortowane po lokalizacji docelowej**, `BRAK LOK` na końcu,
@@ -134,8 +160,10 @@ server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
   src/db/seed.ts           seed z products.json + dokumenty FZ/PZ per dostawca
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+com (prod, szkielet)
-  src/services/            stock (korekta o kolejkę), putaway, queue, events
-  src/routes/              products, mm, queue, putaway (§8)
+  src/services/            stock (korekta o kolejkę), delivery (tryb A), problems,
+                           ean (kolizje kodów), putaway (tryb B), queue, events
+  src/routes/              products, mm, queue, delivery, problems, putaway (§8)
+  data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 ```

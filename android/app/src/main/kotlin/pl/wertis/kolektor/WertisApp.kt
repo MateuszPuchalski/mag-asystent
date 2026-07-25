@@ -8,6 +8,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.data.LocationsRepository
+import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SettingsRepository
@@ -45,6 +46,7 @@ class AppGraph(context: Context) {
     val connectivity = ConnectivityMonitor(context)
     val queueRepo = QueueRepository(api, appScope)
     val locationsRepo = LocationsRepository(api)
+    val problemsRepo = ProblemsRepository(api, appScope)
 
     val effects = UiEffects(appScope)
     val nav = AppNavState(recent)
@@ -87,6 +89,8 @@ class AppGraph(context: Context) {
 
     init {
         wireOfflineFlush(context, offlineQueue, connectivity, appScope)
+        // nierozwiązane wyjątki od razu przy starcie (D8) — inaczej nikt ich nie ruszy
+        problemsRepo.refresh()
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

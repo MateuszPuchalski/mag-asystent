@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -86,6 +87,7 @@ fun WertisTextField(
     placeholder: String = "",
     leadingIcon: ImageVector? = null,
     imeAction: ImeAction = ImeAction.Done,
+    keyboardType: KeyboardType = KeyboardType.Text,
     onDone: () -> Unit = {},
 ) {
     OutlinedTextField(
@@ -99,7 +101,7 @@ fun WertisTextField(
         leadingIcon = leadingIcon?.let { { Icon(it, null, tint = InkMute, modifier = Modifier.size(18.dp)) } },
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
-        keyboardOptions = KeyboardOptions(imeAction = imeAction),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
         keyboardActions = KeyboardActions(onDone = { onDone() }, onSearch = { onDone() }),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Amber,

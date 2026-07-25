@@ -10,6 +10,8 @@ enum class Screen {
     DELIVERY_DOCS, DELIVERY_LINES,
     // tryb B (kontener) — sesja z wózkiem, schowany za osobnym wejściem
     PUTAWAY_DOCS, PUTAWAY_SESSION, LOCATION, SETTINGS,
+    // wyjątki: nierozwiązane zgłoszenia + kolizje EAN do naprawy w kartotece
+    PROBLEMS,
 }
 
 private val BACK: Map<Screen, Screen> = mapOf(
@@ -21,6 +23,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.PUTAWAY_SESSION to Screen.PUTAWAY_DOCS,
     Screen.LOCATION to Screen.HOME,
     Screen.SETTINGS to Screen.HOME,
+    Screen.PROBLEMS to Screen.HOME,
 )
 
 /** Cel przycisku wstecz; null = brak (splash/home/putawayDocs pokazują logo). */
@@ -40,4 +43,5 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.PUTAWAY_SESSION to "SESJA ROZKŁADANIA",
     Screen.LOCATION to "LOKALIZACJA",
     Screen.SETTINGS to "USTAWIENIA",
+    Screen.PROBLEMS to "WYJĄTKI",
 )

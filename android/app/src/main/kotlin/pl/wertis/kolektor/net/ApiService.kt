@@ -11,13 +11,19 @@ import pl.wertis.kolektor.core.net.ConfirmBody
 import pl.wertis.kolektor.core.net.ConfirmResponse
 import pl.wertis.kolektor.core.net.CreateSessionBody
 import pl.wertis.kolektor.core.net.DeviceEventBody
+import pl.wertis.kolektor.core.net.EanConflictsResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LocationProductsResponse
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MmBody
 import pl.wertis.kolektor.core.net.OkResponse
+import pl.wertis.kolektor.core.net.ProblemTypesResponse
+import pl.wertis.kolektor.core.net.ProblemsResponse
 import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.net.PutawayDocumentsResponse
+import pl.wertis.kolektor.core.net.RaiseProblemBody
+import pl.wertis.kolektor.core.net.RaiseProblemResponse
+import pl.wertis.kolektor.core.net.ResolveProblemBody
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.OpenDeliveryResponse
@@ -138,4 +144,26 @@ interface ApiService {
         @Path("lineId") lineId: Long,
         @Body body: PutawayLineBody,
     ): PutawayLineResponse
+
+
+    /* ── Faza 2: wyjątki (D8) ────────────────────────────────────────────── */
+
+    @GET("api/problems/types")
+    suspend fun problemTypes(): ProblemTypesResponse
+
+    /** Lista pytana przy starcie — wyjątek bez ekranu przestaje istnieć. */
+    @GET("api/problems/unresolved")
+    suspend fun unresolvedProblems(): ProblemsResponse
+
+    @POST("api/problems/{id}/resolve")
+    suspend fun resolveProblem(@Path("id") id: Long, @Body body: ResolveProblemBody): OkResponse
+
+    @POST("api/delivery/{id}/problems")
+    suspend fun raiseProblem(@Path("id") id: Long, @Body body: RaiseProblemBody): RaiseProblemResponse
+
+    @GET("api/delivery/{id}/problems")
+    suspend fun deliveryProblems(@Path("id") id: Long): ProblemsResponse
+
+    @GET("api/ean-conflicts")
+    suspend fun eanConflicts(): EanConflictsResponse
 }

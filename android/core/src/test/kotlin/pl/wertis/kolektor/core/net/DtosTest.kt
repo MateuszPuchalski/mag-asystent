@@ -116,4 +116,58 @@ class DtosTest {
         val unknown = WertisJson.decodeFromString<ScanResolution>("""{"kind":"unknown","code":"123"}""")
         assertEquals("123", (unknown as ScanResolution.Unknown).code)
     }
+
+    @Test fun `wyjatki - lista nierozwiazanych z kontekstem`() {
+        val r = WertisJson.decodeFromString<ProblemsResponse>(
+            """{"problems":[
+                {"id":3,"deliveryId":1,"lineId":7,"typ":"damaged","qty":null,"opis":"zgnieciony karton",
+                 "hasPhoto":true,"createdAt":"2026-07-25T10:00:00Z","createdBy":"anna",
+                 "resolvedAt":null,"resolvedNote":null,
+                 "docNumber":"FZ 120/07/2026","sym":"W04-0103","name":"Wąż"}]}"""
+        )
+        val p = r.problems.single()
+        assertEquals("damaged", p.typ)
+        assertEquals(true, p.hasPhoto)
+        assertEquals("FZ 120/07/2026", p.docNumber)
+        assertNull(p.resolvedAt)
+    }
+
+    @Test fun `putaway - locAction jest opcjonalne i serializuje sie kluczem protokolu`() {
+        // ścieżka bez rozjazdu: pole w ogóle nie leci na serwer
+        val plain = WertisJson.encodeToString(
+            PutawayLineBody.serializer(), PutawayLineBody("E03-04-03")
+        )
+        assertTrue(!plain.contains("locAction"))
+
+        val add = WertisJson.encodeToString(
+            PutawayLineBody.serializer(), PutawayLineBody("PAL-042", locAction = LocApplyAction.ADD)
+        )
+        assertTrue(add.contains("\"add\""))
+        val replace = WertisJson.encodeToString(
+            PutawayLineBody.serializer(), PutawayLineBody("PAL-043", locAction = LocApplyAction.REPLACE)
+        )
+        assertTrue(replace.contains("\"replace\""))
+    }
+
+    @Test fun `postep dostawy niesie licznik problemow`() {
+        val v = WertisJson.decodeFromString<DeliveryView>(
+            """{"id":1,"dokId":2,"nrPelny":"FZ 1","dostawca":"X","dataWyst":"","status":"open",
+                "progress":{"total":5,"done":3,"remaining":2,"problems":2},"lines":[]}"""
+        )
+        assertEquals(2, v.progress.problems)
+
+        // starszy serwer bez pola nie może wywrócić kolektora
+        val old = WertisJson.decodeFromString<DeliveryProgress>("""{"total":1,"done":1,"remaining":0}""")
+        assertEquals(0, old.problems)
+    }
+
+    @Test fun `raport kolizji EAN`() {
+        val r = WertisJson.decodeFromString<EanConflictsResponse>(
+            """{"conflicts":[{"ean":"5905947596430","hits":4,"autoResolved":3,
+                "twIds":[1,2],"lastSeen":"2026-07-25T10:00:00Z"}]}"""
+        )
+        val c = r.conflicts.single()
+        assertEquals(4, c.hits)
+        assertEquals(listOf(1L, 2L), c.twIds)
+    }
 }

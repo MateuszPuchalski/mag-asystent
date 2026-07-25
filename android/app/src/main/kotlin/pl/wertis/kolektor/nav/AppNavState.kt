@@ -69,5 +69,7 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openSettings() = go(Screen.SETTINGS)
 
+    fun openProblems() = go(Screen.PROBLEMS)
+
     fun start() = go(Screen.HOME) // Splash: „Kto pracuje?” → home
 }

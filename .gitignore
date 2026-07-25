@@ -8,11 +8,11 @@ node_modules/.tmp/
 # baza aplikacji (SQLite) — generowana z seedu
 server/data/*.db
 server/data/*.db-*
+
+# zdjęcia dowodowe do reklamacji — dane produkcyjne, nie kod
+server/data/photos/
 *.sqlite
 *.sqlite-*
-
-# wagi modeli ASR (pobierane przez tools/fetch-asr-model.mjs)
-web/public/models/
 
 # Android (android/)
 android/.gradle/
