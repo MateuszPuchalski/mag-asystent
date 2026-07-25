@@ -43,7 +43,7 @@ export class SqlSferaAdapter implements SferaAdapter {
    * jest ustawiona, zadanie kończy się czytelnym błędem zamiast pisać na oślep
    * w losową kolumnę tabeli dokumentów.
    */
-  async applyDocFlag(dokId: number, flaga: string): Promise<void> {
+  async applyDocFlag(dokId: number, wartosc: string, klucz: string): Promise<void> {
     if (!config.mssql.docFlagColumn) {
       throw new Error(
         "Nie ustawiono MSSQL_DOC_FLAG_COLUMN — nie wiadomo, w której kolumnie " +
@@ -51,17 +51,24 @@ export class SqlSferaAdapter implements SferaAdapter {
           "(docs/subiekt-gt-edu-setup.md) i uzupełnij env."
       );
     }
+    if (!wartosc) {
+      throw new Error(
+        `Brak wartości SGT dla flagi „${klucz}" — ustaw DOC_FLAG_*_SGT. ` +
+          "Flagi wbudowane Subiekta są identyfikowane liczbą, nie nazwą."
+      );
+    }
     const col = assertSafeColumn(config.mssql.docFlagColumn);
     const pool = await mssqlWrite();
     const res = await pool
       .request()
       .input("id", sql.Int, dokId)
-      .input("v", sql.NVarChar, flaga)
+      // typ dobieramy do wartości: flagi wbudowane to liczba, pole własne — tekst
+      .input("v", /^\d+$/.test(wartosc) ? sql.Int : sql.NVarChar, /^\d+$/.test(wartosc) ? Number(wartosc) : wartosc)
       .query(`UPDATE dok__Dokument SET ${col} = @v WHERE dok_Id = @id`);
     if (!res.rowsAffected[0]) {
       throw new Error(`Nie znaleziono dokumentu dok_Id=${dokId} w bazie Subiekta`);
     }
-    db().prepare("UPDATE sgt_dokument SET flaga = ? WHERE dok_id = ?").run(flaga, dokId);
+    db().prepare("UPDATE sgt_dokument SET flaga = ? WHERE dok_id = ?").run(wartosc, dokId);
   }
 
   async createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {

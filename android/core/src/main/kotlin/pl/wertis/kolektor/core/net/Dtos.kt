@@ -316,8 +316,10 @@ data class DeliveryDocument(
     val linesTotal: Int = 0,
     val linesDone: Int = 0,
     val status: String? = null,
-    /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+    /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
     val flaga: String? = null,
+    /** Klucz stanu — stabilny; po nim dobieramy kolor, bo nazwy są konfigurowalne. */
+    val flagaKey: String? = null,
 )
 
 @Serializable
@@ -355,8 +357,10 @@ data class DeliveryView(
     val dostawca: String = "",
     val dataWyst: String = "",
     val status: String = "open",
-    /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+    /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
     val flaga: String? = null,
+    /** Klucz stanu — stabilny; po nim dobieramy kolor. */
+    val flagaKey: String? = null,
     val progress: DeliveryProgress = DeliveryProgress(),
     val lines: List<DeliveryLineView> = emptyList(),
 )

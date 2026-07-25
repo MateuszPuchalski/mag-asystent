@@ -78,8 +78,10 @@ export interface DeliveryDocument {
   linesTotal: number;
   linesDone: number;
   status: string | null;
-  /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+  /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
   flaga: string | null;
+  /** Klucz stanu — stabilny, po nim kolektor dobiera kolor (nazwy są konfigurowalne). */
+  flagaKey: string | null;
 }
 
 export interface DeliveryLineView {
@@ -103,8 +105,10 @@ export interface DeliveryView {
   dostawca: string;
   dataWyst: string;
   status: string;
-  /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+  /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
   flaga: string | null;
+  /** Klucz stanu — stabilny, po nim kolektor dobiera kolor. */
+  flagaKey: string | null;
   /** `problems` ⊂ `done` — linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
   progress: { total: number; done: number; remaining: number; problems: number };
   lines: DeliveryLineView[];

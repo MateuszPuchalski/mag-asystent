@@ -7,7 +7,7 @@ import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
 import { recordEanConflict } from "./ean.js";
 import { lockedByOther } from "./locks.js";
-import { deliveryFlag, syncFlag, touchDelivery } from "./delivery-flag.js";
+import { deliveryFlag, flagLabel, syncFlag, touchDelivery } from "./delivery-flag.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -80,7 +80,8 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       linesDone: p?.done ?? 0,
       status: p?.status ?? null,
       /** stan sprawdzenia faktury — to samo, co widzi biuro w Subiekcie */
-      flaga: p ? deliveryFlag(p.deliveryId) : null,
+      flaga: p ? flagLabel(deliveryFlag(p.deliveryId)) : null,
+      flagaKey: p ? deliveryFlag(p.deliveryId) : null,
     };
   });
 }
@@ -187,7 +188,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dostawca: d.dostawca ?? "",
     dataWyst: d.data_dok ?? "",
     status: d.status,
-    flaga: deliveryFlag(d.id),
+    flaga: flagLabel(deliveryFlag(d.id)),
+    flagaKey: deliveryFlag(d.id),
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     lines,
   };

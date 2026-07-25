@@ -153,14 +153,22 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    - `mag_Id` magazynów MAG i MGP (→ env `MAG_ID_MAG` / `MAG_ID_MGP`),
    - `SELECT COL_LENGTH('tw__Towar','tw_Lokalizacja')` (ustaw `LOC_FIELD_LIMIT`),
    - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`,
-   - **gdzie siedzi flaga sprawdzenia faktury** (→ env `MSSQL_DOC_FLAG_COLUMN`).
-     To jedyne pole poza lokalizacją, do którego aplikacja pisze, więc nie
-     zgaduj: znajdź je po znanym dokumencie, np.
+   - **flaga sprawdzenia faktury** — firma używa **wbudowanych flag dokumentu**
+     (kolumna „FW" na liście *Faktury zakupu* + filtr „Flaga:"), więc w bazie to
+     najpewniej **liczba (id koloru)**, a nie polski napis. Trzeba ustalić dwie
+     rzeczy: kolumnę (→ `MSSQL_DOC_FLAG_COLUMN`) i wartość każdej z czterech flag
+     (→ `DOC_FLAG_*_SGT`). Metoda: oflaguj ręcznie w Subiekcie dwie faktury
+     różnymi flagami i porównaj wiersze.
 
      ```sql
-     -- porównaj kolumny dokumentu oflagowanego ręcznie w Subiekcie
-     SELECT * FROM dok__Dokument WHERE dok_NrPelny = 'FZ 120/07/2026';
+     -- podstaw numery dwóch dokumentów oflagowanych ręcznie różnymi flagami
+     SELECT * FROM dok__Dokument
+     WHERE dok_NrPelny IN ('FZ 60/MAG/07/2026', 'FZ 48/MAG/07/2026');
      ```
+
+     Kolumna, która się między nimi różni, to ta szukana; jej wartości wpisz do
+     `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`
+     i `DOC_FLAG_DONE_ERRORS_SGT`.
 
      Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
      zamiast pisać na oślep w tabelę dokumentów. Reszta aplikacji działa

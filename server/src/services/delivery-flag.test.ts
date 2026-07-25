@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { config } from "../config.js";
-import { flagFor } from "./delivery-flag.js";
+import { flagFor, flagLabel } from "./delivery-flag.js";
 import { freshLock, isFresh, lockedByOther, LOCK_TTL_MS } from "./locks.js";
 
 /* Reguła flagi jest jedynym miejscem, w którym żyje wiedza o tym, jak firma
@@ -15,21 +15,21 @@ test("dostawa nietknięta nie ma flagi — aplikacja nie ma nic do powiedzenia",
 });
 
 test("ktoś pracuje teraz → w trakcie sprawdzania", () => {
-  assert.equal(flagFor({ ...base, someoneWorking: true }), config.docFlag.inProgress);
+  assert.equal(flagFor({ ...base, someoneWorking: true }), "in_progress");
 });
 
 test("otwarta, nikt nie pracuje → zapisany postęp", () => {
-  assert.equal(flagFor(base), config.docFlag.paused);
+  assert.equal(flagFor(base), "paused");
 });
 
 test("domknięta bez rozbieżności → sprawdzone", () => {
-  assert.equal(flagFor({ ...base, status: "done" }), config.docFlag.done);
+  assert.equal(flagFor({ ...base, status: "done" }), "done");
 });
 
 test("domknięta z rozbieżnością ilościową → sprawdzone z błędami", () => {
   assert.equal(
     flagFor({ ...base, status: "done", qtyMismatch: true }),
-    config.docFlag.doneWithErrors
+    "done_with_errors"
   );
 });
 
@@ -37,7 +37,7 @@ test("po domknięciu lock już nie wpływa na flagę", () => {
   // ktoś może mieć otwarty ekran, ale faktura jest sprawdzona
   assert.equal(
     flagFor({ ...base, status: "done", someoneWorking: true }),
-    config.docFlag.done
+    "done"
   );
 });
 
@@ -45,7 +45,13 @@ test("rozwiązanie rozbieżności zdejmuje „z błędami”", () => {
   const zBledami = flagFor({ ...base, status: "done", qtyMismatch: true });
   const poRozwiazaniu = flagFor({ ...base, status: "done", qtyMismatch: false });
   assert.notEqual(zBledami, poRozwiazaniu);
-  assert.equal(poRozwiazaniu, config.docFlag.done);
+  assert.equal(poRozwiazaniu, "done");
+});
+
+test("etykieta jest oddzielona od klucza — przemianowanie flagi nie rusza domeny", () => {
+  // klucz to stała domeny; label to nazwa z Subiekta, konfigurowalna
+  assert.equal(flagLabel("done"), config.docFlag.done.label);
+  assert.equal(flagLabel(null), null);
 });
 
 /* ── TTL: przejście „w trakcie" → „zapisany postęp" dzieje się przez czas ──── */

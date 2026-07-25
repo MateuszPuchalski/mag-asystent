@@ -23,25 +23,23 @@ import pl.wertis.kolektor.ui.theme.Success
    zanim aplikacja zaczęła tę flagę ustawiać, jedynym sposobem uzgodnienia stanu
    było zapytanie przez halę.
 
-   Kolor bierzemy z SENSU stanu, nie z dopasowania do konkretnego napisu — nazwy
-   flag są konfigurowalne (config.docFlag), więc dopasowanie do literalnych
-   stringów rozsypałoby się przy pierwszej zmianie słownictwa w firmie.        */
+   Kolor bierzemy z KLUCZA stanu przysyłanego przez serwer, a nie z parsowania
+   polskiej nazwy: nazwy flag są konfigurowalne po stronie Subiekta, więc
+   dopasowanie do literalnych napisów rozsypałoby się przy pierwszej zmianie
+   słownictwa w firmie. Napis pokazujemy taki, jaki widzi biuro.               */
 
 private enum class FlagTone { DONE, ERROR, WORK }
 
-private fun toneOf(flaga: String): FlagTone {
-    val f = flaga.lowercase()
-    return when {
-        f.contains("błęd") || f.contains("blad") || f.contains("błąd") -> FlagTone.ERROR
-        f.startsWith("sprawdzone") || f.startsWith("sprawdzona") -> FlagTone.DONE
-        else -> FlagTone.WORK
-    }
+private fun toneOf(key: String?): FlagTone = when (key) {
+    "done" -> FlagTone.DONE
+    "done_with_errors" -> FlagTone.ERROR
+    else -> FlagTone.WORK
 }
 
 @Composable
-fun FlagBadge(flaga: String?, modifier: Modifier = Modifier) {
+fun FlagBadge(flaga: String?, flagaKey: String? = null, modifier: Modifier = Modifier) {
     if (flaga.isNullOrBlank()) return
-    val tone = toneOf(flaga)
+    val tone = toneOf(flagaKey)
     val bg = when (tone) {
         FlagTone.DONE -> Success.copy(alpha = 0.15f)
         FlagTone.ERROR -> Destructive.copy(alpha = 0.15f)
@@ -66,8 +64,8 @@ fun FlagBadge(flaga: String?, modifier: Modifier = Modifier) {
 
 /** Kolor akcentu flagi — do kropki/paska poza samą plakietką. */
 @Composable
-fun flagColor(flaga: String?): Color = when (flaga?.let(::toneOf)) {
+fun flagColor(flagaKey: String?): Color = when (toneOf(flagaKey)) {
     FlagTone.DONE -> Success
     FlagTone.ERROR -> Destructive
-    else -> AmberInk
+    FlagTone.WORK -> AmberInk
 }

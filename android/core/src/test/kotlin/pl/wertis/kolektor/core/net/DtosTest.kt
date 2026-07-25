@@ -53,9 +53,12 @@ class DtosTest {
 
     @Test fun `flaga faktury w DTO dostawy`() {
         val d = WertisJson.decodeFromString<DeliveryDocument>(
-            """{"dokId":1,"typ":"FZ","nrPelny":"FZ 1","positions":3,"flaga":"Sprawdzone z błędami"}"""
+            """{"dokId":1,"typ":"FZ","nrPelny":"FZ 1","positions":3,
+                "flaga":"Sprawdzone z błędami","flagaKey":"done_with_errors"}"""
         )
+        // etykieta do pokazania, klucz do koloru — nazwy flag są konfigurowalne
         assertEquals("Sprawdzone z błędami", d.flaga)
+        assertEquals("done_with_errors", d.flagaKey)
         // starszy serwer bez pola nie może wywrócić kolektora
         val stary = WertisJson.decodeFromString<DeliveryDocument>(
             """{"dokId":2,"typ":"PZ","nrPelny":"PZ 2","positions":1}"""

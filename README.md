@@ -87,8 +87,9 @@ Parametry (env, dev):
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
 | `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
-| `MSSQL_DOC_FLAG_COLUMN` | kolumna `dok__Dokument` z flagą sprawdzenia faktury — **bez domyślnej**, patrz `[WERYFIKUJ]` w DEPLOY §5 |
-| `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag (domyślnie słownictwo firmy) |
+| `MSSQL_DOC_FLAG_COLUMN` | kolumna `dok__Dokument` z flagą sprawdzenia faktury — **bez domyślnej**, patrz `[WERYFIKUJ]` w DEPLOY §6 |
+| `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag pokazywane człowiekowi (domyślnie słownictwo firmy) |
+| `DOC_FLAG_*_SGT` | co wpisać do Subiekta dla danej flagi — przy flagach wbudowanych **id koloru**, nie nazwa |
 
 ## Funkcje (kolektor — aplikacja Android)
 
@@ -127,7 +128,9 @@ Parametry (env, dev):
   przy tym stoi), *Do sprawdzenia z zapisanym postępem* (przerwane), *Sprawdzone*,
   *Sprawdzone z błędami* (**wyłącznie** rozbieżność ilościowa — uszkodzenie czy
   brak miejsca to sprawy reklamacyjne, nie zgodność dokumentu). Magazynier widzi
-  tę samą plakietkę, co biuro. Nazwy flag konfigurowalne (`DOC_FLAG_*`).
+  tę samą plakietkę, co biuro. Firma używa **wbudowanych flag dokumentu** (kolumna
+  „FW" na liście faktur zakupu), więc domena operuje stabilnym kluczem, a mapowanie
+  klucz → nazwa → wartość w bazie siedzi w konfiguracji (`DOC_FLAG_*`).
   Nadpisanie przez biuro wygrywa: aplikacja schodzi z takiej faktury i zapisuje
   to w `events`.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,

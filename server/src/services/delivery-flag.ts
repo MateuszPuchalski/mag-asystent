@@ -14,7 +14,34 @@ import { logEvent } from "./events.js";
    aplikacja i tak wie, i rzutowany do Subiekta jako flaga. Ta funkcja jest
    jedynym miejscem, w którym ta reguła istnieje.                              */
 
-export type DocFlag = string;
+/**
+ * Klucz stanu — stała domeny. NIE jest tym, co ląduje w Subiekcie (tam idzie
+ * `config.docFlag[key].sgt`) ani tym, co widzi człowiek (`.label`). Rozdział
+ * jest po to, żeby zmiana nazwy albo koloru flagi w Subiekcie nie zrywała ani
+ * historii `flaga_wyslana`, ani kolorów na kolektorze.
+ */
+export type DocFlagKey = "in_progress" | "paused" | "done" | "done_with_errors";
+
+/** Nazwa flagi tak, jak brzmi w Subiekcie (do pokazania człowiekowi). */
+export function flagLabel(key: DocFlagKey | null): string | null {
+  return key ? (config.docFlag[key]?.label ?? key) : null;
+}
+
+/** Co faktycznie wpisujemy do bazy Subiekta ('' = nieskonfigurowane). */
+export function flagSgtValue(key: DocFlagKey): string {
+  return config.docFlag[key]?.sgt ?? "";
+}
+
+/**
+ * Wartość, która realnie ląduje w `sgt_dokument.flaga`. Gdy mapowanie na wartość
+ * Subiekta nie jest jeszcze skonfigurowane, adapter `dev` zapisuje sam klucz —
+ * i porównanie musi to uwzględniać, inaczej wykrywanie nadpisania przez biuro
+ * wyłączałoby się po cichu dokładnie wtedy, gdy env jest jeszcze pusty (pilot).
+ * Adapter `sql` nigdy nie zapisuje klucza — tam pusta wartość to twardy błąd.
+ */
+export function flagWrittenValue(key: DocFlagKey): string {
+  return flagSgtValue(key) || key;
+}
 
 /** Wejście reguły — wyciągnięte z bazy, żeby samą regułę dało się przetestować. */
 export interface FlagInputs {
@@ -32,15 +59,15 @@ export interface FlagInputs {
  * Reguła w czystej postaci: bez bazy, bez zegara, w pełni testowalna.
  * `null` = dostawa nietknięta, aplikacja nie ma nic do powiedzenia o tej fakturze.
  */
-export function flagFor(i: FlagInputs): DocFlag | null {
+export function flagFor(i: FlagInputs): DocFlagKey | null {
   if (!i.exists) return null;
   if (i.status === "open") {
     // rozróżnienie „ktoś przy tym siedzi" od „leży zaczęte" — sygnałem jest
     // ostatni dotyk dostawy (albo świeży lock na pozycji), patrz flagInputs
-    return i.someoneWorking ? config.docFlag.inProgress : config.docFlag.paused;
+    return i.someoneWorking ? "in_progress" : "paused";
   }
   // domknięte: o „z błędami" decyduje WYŁĄCZNIE rozbieżność ilościowa
-  return i.qtyMismatch ? config.docFlag.doneWithErrors : config.docFlag.done;
+  return i.qtyMismatch ? "done_with_errors" : "done";
 }
 
 /** Typy wyjątków, które psują zgodność faktury (a nie są sprawą reklamacyjną). */
@@ -77,7 +104,7 @@ export function flagInputs(deliveryId: number, now: number = Date.now()): FlagIn
 }
 
 /** Flaga, jaką aplikacja uważa za prawdziwą dla tej dostawy. */
-export function deliveryFlag(deliveryId: number, now: number = Date.now()): DocFlag | null {
+export function deliveryFlag(deliveryId: number, now: number = Date.now()): DocFlagKey | null {
   return flagFor(flagInputs(deliveryId, now));
 }
 
@@ -111,7 +138,10 @@ export function officeOverride(d: DeliveryRow): string | null {
       | undefined
   )?.flaga;
   if (inSgt == null) return null;
-  return inSgt !== d.flaga_wyslana ? inSgt : null;
+  // w SGT leży SUROWA wartość (dla flag wbudowanych: id koloru), więc
+  // porównujemy z tym, co sami tam wysłaliśmy — nie z kluczem domeny
+  const wyslana = flagWrittenValue(d.flaga_wyslana as DocFlagKey);
+  return String(inSgt) !== wyslana ? String(inSgt) : null;
 }
 
 /**
@@ -142,17 +172,19 @@ export function syncFlag(deliveryId: number, user: string): number | null {
     return null;
   }
 
-  const flaga = deliveryFlag(deliveryId);
-  if (flaga == null || flaga === d.flaga_wyslana) return null;
+  const key = deliveryFlag(deliveryId);
+  // w `flaga_wyslana` trzymamy KLUCZ, nie etykietę: przemianowanie flagi
+  // w Subiekcie nie może wyglądać jak zmiana stanu dostawy
+  if (key == null || key === d.flaga_wyslana) return null;
 
-  const queueId = enqueueDocFlag(d.sgt_dok_id, flaga, {
+  const queueId = enqueueDocFlag(d.sgt_dok_id, key, flagSgtValue(key), {
     createdBy: user,
     twId: null,
     sourceDocId: d.sgt_dok_id,
     label: `Flaga · ${d.sgt_dok_numer}`,
-    detail: flaga,
+    detail: flagLabel(key) ?? key,
   });
-  db().prepare("UPDATE delivery SET flaga_wyslana=? WHERE id=?").run(flaga, deliveryId);
-  logEvent("delivery_flag_set", user, null, { deliveryId, dokId: d.sgt_dok_id, flaga, queueId });
+  db().prepare("UPDATE delivery SET flaga_wyslana=? WHERE id=?").run(key, deliveryId);
+  logEvent("delivery_flag_set", user, null, { deliveryId, dokId: d.sgt_dok_id, flaga: key, queueId });
   return queueId;
 }
