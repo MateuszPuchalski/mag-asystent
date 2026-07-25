@@ -18,6 +18,8 @@ class AppNavState(private val recentStore: RecentStore) {
 
     @Volatile var curId: Long? = null; private set
     @Volatile var sessionId: Long? = null; private set
+    /** Tryb A: otwarta dostawa (dokument = jednostka pracy). */
+    @Volatile var deliveryId: Long? = null; private set
     @Volatile var locCode: String? = null; private set
     @Volatile var queueReturn: Screen? = null; private set
 
@@ -49,6 +51,11 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openScanLoc() = go(Screen.SCAN_LOC)
     fun openMM() = go(Screen.MM)
+
+    fun openDelivery(id: Long) {
+        deliveryId = id
+        go(Screen.DELIVERY_LINES)
+    }
 
     fun openSession(id: Long) {
         sessionId = id

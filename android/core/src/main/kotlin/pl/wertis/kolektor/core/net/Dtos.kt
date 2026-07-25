@@ -298,3 +298,102 @@ data class CloseSessionResponse(val status: String, val summary: Map<String, Int
 
 @Serializable
 data class ApiErrorBody(val error: String? = null, val available: Double? = null)
+
+/* ── Tryb A: rozkładanie dostaw (redesign v2.0) ─────────────────────────────
+   Dokument FZ/PZ jest jednostką pracy; aplikacja zapisuje wyłącznie
+   lokalizację (D1) — bez MM i bez czekania na bufor SGT.                     */
+
+@Serializable
+data class DeliveryDocument(
+    val dokId: Long,
+    val typ: String = "",
+    val nrPelny: String = "",
+    val dataWyst: String = "",
+    val dostawca: String = "",
+    val positions: Int = 0,
+    /** Dokument w buforze SGT — nadal można na nim pracować. */
+    val wBuforze: Boolean = false,
+    val linesTotal: Int = 0,
+    val linesDone: Int = 0,
+    val status: String? = null,
+)
+
+@Serializable
+data class DeliveryDocumentsResponse(val documents: List<DeliveryDocument> = emptyList())
+
+@Serializable
+data class DeliveryLineView(
+    val id: Long,
+    val twId: Long,
+    val sym: String = "",
+    val name: String = "",
+    val qtyDoc: Double = 0.0,
+    val qtyDone: Double = 0.0,
+    val locExpected: String? = null,
+    val locActual: String? = null,
+    val status: String = "todo",
+    /** Litera alejki — nagłówek sekcji listy; null = brak lokalizacji. */
+    val aisle: String? = null,
+)
+
+@Serializable
+data class DeliveryProgress(val total: Int = 0, val done: Int = 0, val remaining: Int = 0)
+
+@Serializable
+data class DeliveryView(
+    val id: Long,
+    val dokId: Long = 0,
+    val nrPelny: String = "",
+    val dostawca: String = "",
+    val dataWyst: String = "",
+    val status: String = "open",
+    val progress: DeliveryProgress = DeliveryProgress(),
+    val lines: List<DeliveryLineView> = emptyList(),
+)
+
+@Serializable
+data class OpenDeliveryResponse(val deliveryId: Long)
+
+/** Kandydat przy niejednoznacznym kodzie kreskowym (D7). */
+@Serializable
+data class EanCandidate(
+    val twId: Long,
+    val sym: String = "",
+    val name: String = "",
+    val inDocument: Boolean = false,
+    val qtyDoc: Double? = null,
+    val locExpected: String? = null,
+)
+
+/** Wynik skanu towaru w kontekście dostawy (dyskryminator `kind`). */
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("kind")
+sealed class ScanResolution {
+    @Serializable @SerialName("line")
+    data class Line(val line: DeliveryLineView) : ScanResolution()
+
+    /** Kod wskazuje >1 kartotekę — operacja STOI, użytkownik wybiera (D7). */
+    @Serializable @SerialName("conflict")
+    data class Conflict(val code: String = "", val candidates: List<EanCandidate> = emptyList()) : ScanResolution()
+
+    @Serializable @SerialName("off_document")
+    data class OffDocument(val code: String = "", val twId: Long = 0, val sym: String = "", val name: String = "") : ScanResolution()
+
+    @Serializable @SerialName("unknown")
+    data class Unknown(val code: String = "") : ScanResolution()
+}
+
+@Serializable
+data class ScanBody(val code: String)
+
+@Serializable
+data class PutawayLineBody(val location: String, val qty: Double? = null)
+
+@Serializable
+data class PutawayLineResponse(
+    val ok: Boolean = true,
+    val queueId: Long? = null,
+    val mismatch: Boolean = false,
+    val status: String = "",
+)

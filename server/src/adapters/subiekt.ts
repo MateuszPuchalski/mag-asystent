@@ -37,11 +37,23 @@ export interface RawPosition {
 export interface SubiektAdapter {
   getProductById(twId: number): RawProduct | undefined;
   getProductByEan(ean: string): RawProduct | undefined;
+  /**
+   * WSZYSTKIE kartoteki o danym kodzie EAN. W kartotece istnieją kody wskazujące
+   * na >1 SKU, więc ścieżki operacyjne muszą widzieć komplet kandydatów i same
+   * rozstrzygnąć (D7) — nigdy „pierwsze dopasowanie".
+   */
+  findProductsByEan(ean: string): RawProduct[];
   getProductBySymbol(symbol: string): RawProduct | undefined;
   search(q: string, limit: number): ProductRow[];
   getStock(twId: number, magId: number): RawStock;
   /** Dokumenty do rozłożenia z ostatnich N dni: FZ/PZ na MGP + zwroty na mag. Zwroty (spec §5.4). */
   listPutawayDocuments(days: number): RawDocument[];
+  /**
+   * Tryb A: dostawy krajowe FZ/PZ z ostatnich N dni — niezależnie od magazynu
+   * skutku (w trybie A księgują się wprost na MAG). Dokumenty w buforze też,
+   * bo rozkładanie nie czeka na księgowość (D1).
+   */
+  listDeliveryDocuments(days: number): RawDocument[];
   getDocument(docId: number): RawDocument | undefined;
   getDocumentPositions(docId: number): RawPosition[];
   /** Towary o stanie MGP > 0 (tryb „całe MGP"). */

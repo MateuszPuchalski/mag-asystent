@@ -67,3 +67,63 @@ export interface PutawayItemView {
   stageQty: number | null;
   stageLoc: string | null;
 }
+
+/* ── Tryb A: rozkładanie dostaw (redesign v2.0) ─────────────────────────────
+   Jednostką pracy jest dokument FZ/PZ; aplikacja zapisuje wyłącznie
+   lokalizację (D1) — bez MM i bez zależności od bufora SGT.                 */
+
+export interface DeliveryDocument {
+  dokId: number;
+  typ: string;
+  nrPelny: string;
+  dataWyst: string;
+  dostawca: string;
+  positions: number;
+  /** Dokument w buforze SGT — nadal można na nim pracować (D1). */
+  wBuforze: boolean;
+  linesTotal: number;
+  linesDone: number;
+  status: string | null;
+}
+
+export interface DeliveryLineView {
+  id: number;
+  twId: number;
+  sym: string;
+  name: string;
+  qtyDoc: number;
+  qtyDone: number;
+  locExpected: string | null;
+  locActual: string | null;
+  status: string;
+  /** Litera alejki (nagłówek sekcji listy) albo null przy braku lokalizacji. */
+  aisle: string | null;
+}
+
+export interface DeliveryView {
+  id: number;
+  dokId: number;
+  nrPelny: string;
+  dostawca: string;
+  dataWyst: string;
+  status: string;
+  progress: { total: number; done: number; remaining: number };
+  lines: DeliveryLineView[];
+}
+
+/** Kandydat przy niejednoznacznym kodzie kreskowym (D7). */
+export interface EanCandidate {
+  twId: number;
+  sym: string;
+  name: string;
+  inDocument: boolean;
+  qtyDoc: number | null;
+  locExpected: string | null;
+}
+
+/** Wynik skanu towaru w kontekście dostawy. */
+export type ScanResolution =
+  | { kind: "line"; line: DeliveryLineView }
+  | { kind: "conflict"; code: string; candidates: EanCandidate[] }
+  | { kind: "off_document"; code: string; twId: number; sym: string; name: string }
+  | { kind: "unknown"; code: string };

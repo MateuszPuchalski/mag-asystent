@@ -18,6 +18,13 @@ import pl.wertis.kolektor.core.net.MmBody
 import pl.wertis.kolektor.core.net.OkResponse
 import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.net.PutawayDocumentsResponse
+import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
+import pl.wertis.kolektor.core.net.DeliveryView
+import pl.wertis.kolektor.core.net.OpenDeliveryResponse
+import pl.wertis.kolektor.core.net.PutawayLineBody
+import pl.wertis.kolektor.core.net.PutawayLineResponse
+import pl.wertis.kolektor.core.net.ScanBody
+import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.net.PutawaySession
 import pl.wertis.kolektor.core.net.QueueIdResponse
 import pl.wertis.kolektor.core.net.QueueResponse
@@ -108,4 +115,27 @@ interface ApiService {
     @POST("api/putaway/sessions/{id}/close")
     suspend fun closeSession(@Path("id") sid: Long, @Body body: RequestBody = EMPTY_BODY): CloseSessionResponse
 
+
+    /* ── Tryb A: rozkładanie dostaw (dokument = jednostka pracy) ─────────── */
+
+    @GET("api/delivery/documents")
+    suspend fun deliveryDocuments(): DeliveryDocumentsResponse
+
+    @POST("api/delivery/documents/{dokId}/open")
+    suspend fun openDelivery(@Path("dokId") dokId: Long): OpenDeliveryResponse
+
+    @GET("api/delivery/{id}")
+    suspend fun delivery(@Path("id") id: Long): DeliveryView
+
+    /** Skan towaru → linia / kolizja EAN / spoza dokumentu / nieznany. */
+    @POST("api/delivery/{id}/scan")
+    suspend fun deliveryScan(@Path("id") id: Long, @Body body: ScanBody): ScanResolution
+
+    /** Odłożenie linii — skan lokalizacji obowiązkowy, bez MM. */
+    @POST("api/delivery/{id}/lines/{lineId}/putaway")
+    suspend fun deliveryPutaway(
+        @Path("id") id: Long,
+        @Path("lineId") lineId: Long,
+        @Body body: PutawayLineBody,
+    ): PutawayLineResponse
 }

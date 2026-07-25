@@ -1,0 +1,331 @@
+import { db } from "../db/db.js";
+import { config } from "../config.js";
+import { subiekt } from "../context.js";
+import { enqueueSetLocation } from "./queue.js";
+import { logEvent } from "./events.js";
+import { validateLocationCode } from "./locations.js";
+import { parseLocs, pickingLoc } from "../locs.js";
+import type {
+  DeliveryDocument,
+  DeliveryLineView,
+  DeliveryView,
+  ScanResolution,
+} from "../types.js";
+
+/* ── Tryb A: rozkładanie dostaw krajowych (redesign v2.0) ────────────────────
+   Jednostką pracy jest DOKUMENT FZ/PZ (D2). Skutek magazynowy niesie sam
+   dokument w Subiekcie (księgowany wprost na MAG), więc tutaj zapisujemy
+   WYŁĄCZNIE lokalizację (D1): zero MM, zero waiting_for_doc, zero zależności
+   od bufora — dostawę można rozkładać, zanim księgowość zaksięguje FZ.       */
+
+const nowIso = () => new Date().toISOString();
+
+/**
+ * Walidacja kodu lokalizacji w trybie A — twarda (§9, §16). Poza bazowymi
+ * regułami (pusty / spacja / EAN) kod MUSI pasować do jednego ze wzorców:
+ * regał `A00-00-00` albo miejsce paletowe `PAL-000`. Literówka w kartotece
+ * („paletq29", „lA03-04-01") nigdy nie dopasuje się do skanu — ma być błędem
+ * przy odkładaniu, a nie cichym zapisem fikcyjnego adresu.
+ */
+export function validateDeliveryLocation(code: string): string | null {
+  const base = validateLocationCode(code);
+  if (base) return base;
+  if (config.deliveryLocPatterns.some((re) => re.test(code))) return null;
+  return `Kod „${code}" nie jest poprawnym adresem (regał A00-00-00 albo paleta PAL-000)`;
+}
+
+/** Lista dostaw FZ/PZ (N dni) z postępem liczonym z delivery_line. */
+export function listDocuments(days = 14): DeliveryDocument[] {
+  const docs = subiekt.listDeliveryDocuments(days);
+  const progress = db()
+    .prepare(
+      `SELECT d.sgt_dok_id AS dokId,
+              COUNT(l.id) AS total,
+              SUM(CASE WHEN l.status IN ('done','skipped') THEN 1 ELSE 0 END) AS done,
+              d.status AS status
+       FROM delivery d LEFT JOIN delivery_line l ON l.delivery_id = d.id
+       GROUP BY d.id`
+    )
+    .all() as Array<{ dokId: number; total: number; done: number; status: string }>;
+  const byDoc = new Map(progress.map((p) => [p.dokId, p]));
+
+  return docs.map((d) => {
+    const p = byDoc.get(d.dok_id);
+    const positions = subiekt.getDocumentPositions(d.dok_id).length;
+    return {
+      dokId: d.dok_id,
+      typ: d.typ,
+      nrPelny: d.nr_pelny,
+      dataWyst: d.data_wyst,
+      dostawca: d.dostawca ?? "",
+      positions,
+      /** dokument w buforze jest normalnie dostępny do pracy (D1) */
+      wBuforze: !!d.w_buforze,
+      linesTotal: p?.total ?? 0,
+      linesDone: p?.done ?? 0,
+      status: p?.status ?? null,
+    };
+  });
+}
+
+/**
+ * Otwórz (lub wznów) rozkładanie dokumentu. Pozycje są snapshotowane w chwili
+ * otwarcia — jeśli księgowość zmieni FZ w trakcie, praca się nie rozjeżdża.
+ */
+export function openDelivery(dokId: number, user: string): number {
+  const existing = db()
+    .prepare("SELECT id FROM delivery WHERE sgt_dok_id = ?")
+    .get(dokId) as { id: number } | undefined;
+  if (existing) return existing.id;
+
+  const doc = subiekt.getDocument(dokId);
+  if (!doc) throw new Error("Nie znaleziono dokumentu");
+
+  const id = Number(
+    db()
+      .prepare(
+        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, status, opened_at)
+         VALUES (?,?,?,?, 'open', ?)`
+      )
+      .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, nowIso()).lastInsertRowid
+  );
+
+  // agregacja tego samego towaru (różne partie/ceny → jedna linia robocza)
+  const agg = new Map<number, number>();
+  for (const p of subiekt.getDocumentPositions(dokId)) {
+    agg.set(p.tw_id, (agg.get(p.tw_id) ?? 0) + p.ilosc);
+  }
+  const ins = db().prepare(
+    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, lok_oczekiwana)
+     VALUES (?,?,?,?,?,?)`
+  );
+  db().transaction(() => {
+    for (const [twId, qty] of agg) {
+      const t = subiekt.getProductById(twId);
+      ins.run(id, twId, t?.symbol ?? String(twId), t?.nazwa ?? "", qty, pickingLoc(t?.lokalizacja));
+    }
+  })();
+
+  logEvent("delivery_open", user, null, { deliveryId: id, dokId });
+  return id;
+}
+
+/**
+ * Widok dostawy. Linie sortowane po lokalizacji docelowej (magazynier chodzi
+ * alejkami, nie w kolejności z faktury), pozycje BEZ lokalizacji na końcu —
+ * to są SKU wymagające decyzji, nie rutyny.
+ */
+export function getDelivery(id: number): DeliveryView | undefined {
+  const d = db().prepare("SELECT * FROM delivery WHERE id = ?").get(id) as
+    | {
+        id: number;
+        sgt_dok_id: number;
+        sgt_dok_numer: string;
+        dostawca: string | null;
+        data_dok: string | null;
+        status: string;
+      }
+    | undefined;
+  if (!d) return undefined;
+
+  const rows = db()
+    .prepare("SELECT * FROM delivery_line WHERE delivery_id = ?")
+    .all(id) as Array<any>;
+
+  const lines: DeliveryLineView[] = rows
+    .map((r) => ({
+      id: r.id,
+      twId: r.tw_id,
+      sym: r.tw_symbol,
+      name: r.tw_nazwa,
+      qtyDoc: r.ilosc_dok,
+      qtyDone: r.ilosc_odlozona,
+      locExpected: r.lok_oczekiwana,
+      locActual: r.lok_faktyczna,
+      status: r.status,
+      /** litera alejki — nagłówek sekcji na liście */
+      aisle: r.lok_oczekiwana ? String(r.lok_oczekiwana)[0] : null,
+    }))
+    // faza 1: sort alfabetyczny po kodzie (A→J odpowiada układowi alejek);
+    // zamiana na trasę = zmiana tego komparatora (§5)
+    .sort((a, b) => {
+      if (!a.locExpected && !b.locExpected) return a.sym.localeCompare(b.sym);
+      if (!a.locExpected) return 1;
+      if (!b.locExpected) return -1;
+      return a.locExpected.localeCompare(b.locExpected) || a.sym.localeCompare(b.sym);
+    });
+
+  const done = lines.filter((l) => l.status === "done" || l.status === "skipped").length;
+  return {
+    id: d.id,
+    dokId: d.sgt_dok_id,
+    nrPelny: d.sgt_dok_numer,
+    dostawca: d.dostawca ?? "",
+    dataWyst: d.data_dok ?? "",
+    status: d.status,
+    progress: { total: lines.length, done, remaining: lines.length - done },
+    lines,
+  };
+}
+
+/**
+ * Skan towaru w kontekście dostawy → rozstrzygnięcie na linię.
+ *
+ * Niejednoznaczny EAN ZATRZYMUJE operację (D7): kod wskazujący >1 kartotekę
+ * nigdy nie wybiera „pierwszego dopasowania". Jedyne automatyczne zawężenie:
+ * gdy dokładnie jeden kandydat występuje w otwartym dokumencie.
+ */
+export function resolveScan(deliveryId: number, rawCode: string, user: string): ScanResolution {
+  const code = rawCode.trim();
+  const lines = db()
+    .prepare("SELECT * FROM delivery_line WHERE delivery_id = ?")
+    .all(deliveryId) as Array<any>;
+  const lineByTw = new Map<number, any>(lines.map((l) => [l.tw_id, l]));
+
+  // kandydaci: po EAN (może być wiele!) albo po symbolu
+  let candidates = subiekt.findProductsByEan(code);
+  if (candidates.length === 0) {
+    const bySym = subiekt.getProductBySymbol(code);
+    if (bySym) candidates = [bySym];
+  }
+  if (candidates.length === 0) return { kind: "unknown", code };
+
+  if (candidates.length > 1) {
+    const inDoc = candidates.filter((c) => lineByTw.has(c.tw_id));
+    if (inDoc.length === 1) {
+      // zawężenie kontekstem dokumentu — kolizja zostaje w logu jako dług w kartotece
+      logEvent("ean_conflict_autoresolved", user, inDoc[0].tw_id, {
+        ean: code,
+        candidates: candidates.map((c) => c.tw_id),
+      });
+      return toResolution(inDoc[0], lineByTw.get(inDoc[0].tw_id));
+    }
+    logEvent("ean_conflict", user, null, {
+      ean: code,
+      candidates: candidates.map((c) => c.tw_id),
+    });
+    return {
+      kind: "conflict",
+      code,
+      candidates: candidates.map((c) => {
+        const l = lineByTw.get(c.tw_id);
+        return {
+          twId: c.tw_id,
+          sym: c.symbol,
+          name: c.nazwa,
+          inDocument: !!l,
+          qtyDoc: l?.ilosc_dok ?? null,
+          locExpected: l ? l.lok_oczekiwana : pickingLoc(c.lokalizacja),
+        };
+      }),
+    };
+  }
+
+  const p = candidates[0];
+  const line = lineByTw.get(p.tw_id);
+  if (!line) {
+    return { kind: "off_document", code, twId: p.tw_id, sym: p.symbol, name: p.nazwa };
+  }
+  return toResolution(p, line);
+}
+
+function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {
+  return {
+    kind: "line",
+    line: {
+      id: line.id,
+      twId: line.tw_id,
+      sym: p.symbol,
+      name: p.nazwa,
+      qtyDoc: line.ilosc_dok,
+      qtyDone: line.ilosc_odlozona,
+      locExpected: line.lok_oczekiwana,
+      locActual: line.lok_faktyczna,
+      status: line.status,
+      aisle: line.lok_oczekiwana ? String(line.lok_oczekiwana)[0] : null,
+    },
+  };
+}
+
+/**
+ * Odłożenie linii: skan lokalizacji jest OBOWIĄZKOWY (D3) — to jedyny dowód,
+ * że towar trafił tam, gdzie system myśli. Zapis lokalizacji idzie do kolejki
+ * jako `set_location`; ŻADNEGO dokumentu MM (D1).
+ */
+export function putawayLine(
+  lineId: number,
+  location: string,
+  qty: number | undefined,
+  user: string
+): { ok: true; queueId?: number; mismatch: boolean; status: string } | { error: string; status?: number } {
+  const line = db().prepare("SELECT * FROM delivery_line WHERE id = ?").get(lineId) as any;
+  if (!line) return { error: "Brak pozycji" };
+
+  const code = location.trim().toUpperCase();
+  const locErr = validateDeliveryLocation(code);
+  if (locErr) return { error: locErr };
+
+  const putQty = qty ?? Math.max(line.ilosc_dok - line.ilosc_odlozona, 0);
+  if (!Number.isFinite(putQty) || putQty <= 0) return { error: "Ilość musi być większa od zera" };
+
+  const doneQty = line.ilosc_odlozona + putQty;
+  const status = doneQty >= line.ilosc_dok ? "done" : "partial";
+  const mismatch = !!line.lok_oczekiwana && line.lok_oczekiwana !== code;
+
+  // zapis lokalizacji do SGT — tylko gdy faktycznie się zmienia
+  const t = subiekt.getProductById(line.tw_id);
+  const current = parseLocs(t?.lokalizacja);
+  let queueId: number | undefined;
+  if (current[0] !== code) {
+    const newLocs = current.length <= 1 ? [code] : Array.from(new Set([code, ...current]));
+    queueId = enqueueSetLocation(line.tw_id, newLocs.join(" ").slice(0, config.locFieldLimit), {
+      createdBy: user,
+      twId: line.tw_id,
+      label: "Lokalizacja · " + (t?.symbol ?? line.tw_id),
+      detail: `${code} (dostawa)`,
+    });
+  }
+
+  db()
+    .prepare(
+      `UPDATE delivery_line
+       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?
+       WHERE id=?`
+    )
+    .run(doneQty, code, status, nowIso(), user, lineId);
+
+  logEvent("putaway_line_done", user, line.tw_id, {
+    lineId,
+    qty: putQty,
+    location: code,
+    expected: line.lok_oczekiwana,
+    status,
+  });
+  if (mismatch) {
+    // częstotliwość per lokalizacja = raport o przepełnionych gniazdach
+    logEvent("location_mismatch", user, line.tw_id, {
+      lineId,
+      expected: line.lok_oczekiwana,
+      actual: code,
+    });
+  }
+
+  closeIfComplete(line.delivery_id, user);
+  return { ok: true, queueId, mismatch, status };
+}
+
+/** Dostawa zamyka się sama, gdy nie ma już czego rozkładać. */
+function closeIfComplete(deliveryId: number, user: string): void {
+  const left = (
+    db()
+      .prepare(
+        "SELECT COUNT(*) AS n FROM delivery_line WHERE delivery_id=? AND status NOT IN ('done','skipped')"
+      )
+      .get(deliveryId) as { n: number }
+  ).n;
+  if (left > 0) return;
+  db()
+    .prepare("UPDATE delivery SET status='done', closed_at=? WHERE id=? AND status='open'")
+    .run(nowIso(), deliveryId);
+  logEvent("delivery_done", user, null, { deliveryId });
+}
