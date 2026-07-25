@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.CreateSessionBody
 import pl.wertis.kolektor.core.net.PutawayDocument
-import pl.wertis.kolektor.core.net.PutawayZone
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.theme.AmberBg
@@ -48,12 +47,13 @@ import pl.wertis.kolektor.ui.theme.InkSoft
 import pl.wertis.kolektor.ui.theme.Secondary
 import pl.wertis.kolektor.ui.theme.Success
 
-/* ── Tryb B: dokumenty ze strefą źródłową ───────────────────────────────────
-   Zwroty od klientów + kontenery na MGP (14 dni) z postępem sesji.
+/* ── Tryb B: kontenery na MGP ───────────────────────────────────────────────
+   Kontener importowy (14 dni) z postępem sesji: 1000 kartonów, wiele kursów
+   wózkiem, MM MGP→MAG po każdej rundzie.
 
-   Tu trafia WYŁĄCZNIE towar, który fizycznie leży poza magazynem głównym i
-   wymaga realnego przesunięcia stanu (MM strefa→MAG). Dostawy krajowe FZ/PZ
-   księgują się wprost na MAG i idą trybem A — bez sesji, bez wózka, bez MM.  */
+   To jedyny proces, który tego modelu potrzebuje. Dostawy krajowe księgują się
+   wprost na MAG, a zwroty rozkłada się koszykami — jedno i drugie idzie trybem
+   A, gdzie jednostką pracy jest dokument, a nie sesja.                        */
 
 @Composable
 fun PutawayDocumentsScreen(graph: AppGraph) {
@@ -84,9 +84,6 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
         return
     }
 
-    val deliveries = docs!!.filter { it.zone != PutawayZone.ZWROTY }
-    val returns = docs!!.filter { it.zone == PutawayZone.ZWROTY }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -94,17 +91,6 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (returns.isNotEmpty()) {
-            Text(
-                "ZWROTY OD KLIENTÓW · KARTONY DO ROZŁOŻENIA",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                color = AmberInk,
-            )
-            returns.forEach { d -> DocRow(d) { open(d.docId) } }
-        }
-
         Text(
             "KONTENERY NA MGP · OSTATNIE 14 DNI",
             fontSize = 11.sp,
@@ -112,19 +98,19 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
             letterSpacing = 1.2.sp,
             color = InkMute,
         )
-        if (deliveries.isEmpty()) {
+        if (docs!!.isEmpty()) {
             Text(
-                "Brak dokumentów do rozłożenia",
+                "Brak kontenerów do rozłożenia",
                 color = InkMute,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             )
         }
-        deliveries.forEach { d -> DocRow(d) { open(d.docId) } }
+        docs!!.forEach { d -> DocRow(d) { open(d.docId) } }
 
         Text(
-            "Dostawy krajowe FZ/PZ rozkłada się w zakładce ROZKŁADANIE — bez sesji i bez MM.",
+            "Dostawy krajowe i zwroty rozkłada się w zakładce ROZKŁADANIE — dokument, nie sesja.",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,
@@ -153,11 +139,7 @@ private fun DocRow(d: PutawayDocument, onClick: () -> Unit) {
                 .background(Secondary),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                if (d.zone == PutawayZone.ZWROTY) "↩" else "📦",
-                fontSize = 18.sp,
-                color = if (d.zone == PutawayZone.ZWROTY) AmberInk else Ink,
-            )
+            Text("📦", fontSize = 18.sp, color = Ink)
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -132,9 +132,11 @@ export async function importFromMssql(): Promise<ImportStats> {
          WHERE (
                  -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
                  (d.dok_MagId = @mag AND d.dok_Typ IN (@fz, @pz))
-                 -- tryb B: towar leży poza halą i wymaga realnego MM strefa→MAG
-              OR (d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
+                 -- tryb A (zwroty): zbiorczy dokument na mag. Zwroty; MM powstaje
+                 -- dopiero przy zamknięciu koszyka, nie przy imporcie
               OR (d.dok_MagId = @zw${zwTypFilter})
+                 -- tryb B: kontener na MGP — sesja z wózkiem i MM na rundę
+              OR (d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
                )
            AND d.dok_DataWyst >= @cutoff`
       )

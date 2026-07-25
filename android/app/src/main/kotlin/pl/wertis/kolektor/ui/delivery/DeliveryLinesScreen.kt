@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +39,7 @@ import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.EanCandidate
+import pl.wertis.kolektor.core.net.KoszykView
 import pl.wertis.kolektor.core.net.LocApplyAction
 import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.ScanBody
@@ -50,6 +52,7 @@ import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
+import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.components.formatQty
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
@@ -66,14 +69,21 @@ import pl.wertis.kolektor.ui.theme.InkSoft
 import pl.wertis.kolektor.ui.theme.Success
 import pl.wertis.kolektor.ui.theme.cardSurface
 
-/* ── Tryb A: rozkładanie dostawy (redesign §4.2–§4.5) ───────────────────────
+/* ── Tryb A: rozkładanie dostawy i zwrotu (redesign §4.2–§4.5) ──────────────
    Ścieżka główna to DWA SKANY na linię i zero tapnięć: skan towaru → karta
    z ilością i lokalizacją docelową → skan etykiety regału → zapis, wibracja,
    powrót do listy. Zero dialogu potwierdzającego.
 
    Lista posortowana po lokalizacji docelowej (magazynier chodzi alejkami,
    nie w kolejności z faktury), pozycje BEZ lokalizacji w wyróżnionej sekcji
-   na końcu — to SKU wymagające decyzji, nie rutyny.                          */
+   na końcu — to SKU wymagające decyzji, nie rutyny.
+
+   ZWROT różni się dwiema rzeczami: u góry stoi numer koszyka (wpisany raz,
+   dopisywany do każdego odłożenia — koszyki nie mają kodów kreskowych), a po
+   opróżnieniu koszyka trzeba go domknąć, żeby powstał MM Zwroty→MAG. Dopóki
+   koszyk nie jest domknięty, towar leży na półce, ale w Subiekcie wisi na
+   Zwrotach i jest niesprzedawalny — dlatego otwarte koszyki widać na ekranie
+   jako osobne przyciski, a nie jako jedno pole „bieżący koszyk".             */
 
 @Composable
 fun DeliveryLinesScreen(graph: AppGraph) {
@@ -100,6 +110,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var problemOpen by remember(id) { mutableStateOf(false) }
     /** Typ wstępnie wybrany w arkuszu wyjątku (skrót „INNA ILOŚĆ"). */
     var problemType by remember(id) { mutableStateOf<ProblemType?>(null) }
+    /** Zwroty: numer koszyka, z którego magazynier bierze towar (wpisany raz). */
+    var koszyk by remember(id) { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
 
     suspend fun resolveProduct(code: String) {
@@ -137,7 +149,13 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         if (busy) return
         busy = true
         try {
-            apiCall { graph.api.deliveryPutaway(id, line.id, PutawayLineBody(code, locAction = locAction)) }
+            apiCall {
+                graph.api.deliveryPutaway(
+                    id,
+                    line.id,
+                    PutawayLineBody(code, locAction = locAction, koszyk = koszyk.trim().ifEmpty { null }),
+                )
+            }
             graph.feedback.beep(true)
             active = null
             mismatch = null
@@ -157,6 +175,27 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * zapis CZEKA na decyzję człowieka — serwer nie zgadnie, czy towar
      * przeniesiono, czy leży teraz w dwóch miejscach (§4.3).
      */
+    /**
+     * Koszyk opróżniony → jeden MM Zwroty→MAG na wszystko, co z niego poszło
+     * na półki. Wciska to człowiek, bo tylko on widzi, że koszyk jest pusty.
+     */
+    suspend fun closeKoszyk(numer: String) {
+        if (busy) return
+        busy = true
+        try {
+            val r = apiCall { graph.api.closeBasket(id, numer) }
+            graph.feedback.beep(true)
+            reload++
+            graph.queueRepo.refreshNow()
+            graph.effects.flashSuccess("KOSZYK $numer → MM · ${formatQty(r.qty)} szt")
+        } catch (e: Exception) {
+            graph.feedback.beep(false)
+            graph.effects.toast(e.message ?: "Nie udało się zamknąć koszyka")
+        } finally {
+            busy = false
+        }
+    }
+
     suspend fun putaway(line: DeliveryLineView, code: String) {
         val expected = line.locExpected
         if (!expected.isNullOrBlank() && expected != code) {
@@ -173,6 +212,14 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     // człowieka nie może zostać przewinięta przez przypadkowy strzał skanera.
     ScanHandlerEffect { scan ->
         if (mismatch != null || problemOpen) return@ScanHandlerEffect true
+        // Przy zwrocie numer koszyka jest częścią każdego odłożenia. Zatrzymujemy
+        // na PIERWSZYM skanie, a nie dopiero na zapisie: inaczej magazynier
+        // zeskanowałby towar i półkę, żeby usłyszeć „podaj numer koszyka".
+        if (view?.zwrot == true && koszyk.isBlank()) {
+            graph.feedback.beep(false)
+            graph.effects.toast("Najpierw wpisz numer koszyka")
+            return@ScanHandlerEffect true
+        }
         val line = active
         if (line != null && scan.kind != ScanKind.EAN) {
             scope.launch { putaway(line, normalizeLoc(scan.code)) }
@@ -307,8 +354,19 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             }
         }
 
+        if (v.zwrot) {
+            KoszykBar(
+                koszyk = koszyk,
+                onKoszykChange = { koszyk = it },
+                otwarte = v.koszyki,
+                busy = busy,
+                onClose = { numer -> scope.launch { closeKoszyk(numer) } },
+            )
+        }
+
         Text(
-            "Zeskanuj towar z palety — lista jest ułożona wg alejek",
+            if (v.zwrot) "Zeskanuj towar z koszyka — lista jest ułożona wg alejek"
+            else "Zeskanuj towar z palety — lista jest ułożona wg alejek",
             fontSize = 12.sp,
             color = InkSoft,
             textAlign = TextAlign.Center,
@@ -355,6 +413,55 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 )
             }
             withoutLoc.forEach { line -> LineRow(line) { scope.launch { resolveProduct(line.sym) } } }
+        }
+    }
+}
+
+/**
+ * Pasek koszyka (tylko zwroty): numer bieżącego koszyka + przyciski domknięcia
+ * KAŻDEGO koszyka, który ma coś na półkach, a nie ma jeszcze MM.
+ *
+ * Lista otwartych koszyków jest tu ważniejsza od samego pola: zapomniany koszyk
+ * to towar leżący na półce i jednocześnie niesprzedawalny w Subiekcie — awaria
+ * bez żadnego objawu, dopóki ktoś nie zapyta „gdzie to jest".
+ */
+@Composable
+private fun KoszykBar(
+    koszyk: String,
+    onKoszykChange: (String) -> Unit,
+    otwarte: List<KoszykView>,
+    busy: Boolean,
+    onClose: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(background = AmberBgSoft, borderColor = AmberLine)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "KOSZYK ZWROTU",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = AmberInk,
+        )
+        WertisTextField(
+            value = koszyk,
+            onValueChange = { onKoszykChange(it.trim()) },
+            placeholder = "numer zwrotu z koszyka",
+            keyboardType = KeyboardType.Number,
+            leadingIcon = WIcons.Box,
+        )
+        otwarte.forEach { k ->
+            OutlineButton(
+                "KOSZYK ${k.numer} ROZŁOŻONY → MM  (${formatQty(k.qty)} szt)",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                leadingIcon = WIcons.Check,
+                onClick = { onClose(k.numer) },
+            )
         }
     }
 }

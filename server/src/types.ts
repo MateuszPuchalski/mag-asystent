@@ -39,8 +39,6 @@ export interface PutawayDocument {
   dataWyst: string;
   dostawca: string;
   positions: number;
-  /** Strefa źródłowa dokumentu: kontenery (MGP) lub zwroty od klientów. */
-  zone: "mgp" | "zwroty";
   session?: { id: number; status: string; progressPct: number };
 }
 
@@ -62,9 +60,10 @@ export interface PutawayItemView {
   stageLoc: string | null;
 }
 
-/* ── Tryb A: rozkładanie dostaw (redesign v2.0) ─────────────────────────────
-   Jednostką pracy jest dokument FZ/PZ; aplikacja zapisuje wyłącznie
-   lokalizację (D1) — bez MM i bez zależności od bufora SGT.                 */
+/* ── Tryb A: rozkładanie dostaw i zwrotów (redesign v2.0) ───────────────────
+   Jednostką pracy jest dokument. Przy dostawie krajowej aplikacja zapisuje
+   wyłącznie lokalizację (D1) — bez MM i bez zależności od bufora SGT. Przy
+   zwrocie dochodzi jeden MM Zwroty→MAG na każdy rozłożony KOSZYK.           */
 
 export interface DeliveryDocument {
   dokId: number;
@@ -82,6 +81,8 @@ export interface DeliveryDocument {
   flaga: string | null;
   /** Klucz stanu — stabilny, po nim kolektor dobiera kolor (nazwy są konfigurowalne). */
   flagaKey: string | null;
+  /** Zbiorczy dokument zwrotów: rozkładanie koszykami, każdy domknięty MM-em. */
+  zwrot: boolean;
 }
 
 export interface DeliveryLineView {
@@ -96,6 +97,17 @@ export interface DeliveryLineView {
   status: string;
   /** Litera alejki (nagłówek sekcji listy) albo null przy braku lokalizacji. */
   aisle: string | null;
+  /** Zwroty: numer koszyka, z którego pozycję odłożono (null przy dostawie krajowej). */
+  koszyk: string | null;
+}
+
+/** Koszyk zwrotu czekający na przesunięcie (rozłożony, jeszcze bez MM). */
+export interface KoszykView {
+  numer: string;
+  /** Ile linii tego koszyka czeka na MM. */
+  lines: number;
+  /** Ile sztuk łącznie czeka na MM. */
+  qty: number;
 }
 
 export interface DeliveryView {
@@ -111,6 +123,10 @@ export interface DeliveryView {
   flagaKey: string | null;
   /** `problems` ⊂ `done` — linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
   progress: { total: number; done: number; remaining: number; problems: number };
+  /** Zbiorczy dokument zwrotów: rozkładanie koszykami, każdy domknięty MM-em. */
+  zwrot: boolean;
+  /** Koszyki rozłożone, ale jeszcze nieprzesunięte na MAG (puste przy dostawie krajowej). */
+  koszyki: KoszykView[];
   lines: DeliveryLineView[];
 }
 

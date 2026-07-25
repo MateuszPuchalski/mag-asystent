@@ -1,25 +1,35 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
-import { enqueueSetLocation } from "./queue.js";
+import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
 import { recordEanConflict } from "./ean.js";
 import { lockedByOther } from "./locks.js";
 import { deliveryFlag, flagLabel, syncFlag, touchDelivery } from "./delivery-flag.js";
+import type { MmItem } from "../adapters/sfera.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
   DeliveryView,
+  KoszykView,
   ScanResolution,
 } from "../types.js";
 
-/* ── Tryb A: rozkładanie dostaw krajowych (redesign v2.0) ────────────────────
-   Jednostką pracy jest DOKUMENT FZ/PZ (D2). Skutek magazynowy niesie sam
-   dokument w Subiekcie (księgowany wprost na MAG), więc tutaj zapisujemy
-   WYŁĄCZNIE lokalizację (D1): zero MM, zero waiting_for_doc, zero zależności
-   od bufora — dostawę można rozkładać, zanim księgowość zaksięguje FZ.       */
+/* ── Tryb A: rozkładanie dostaw krajowych i zwrotów (redesign v2.0) ──────────
+   Jednostką pracy jest DOKUMENT (D2), nie sesja.
+
+   Dostawa krajowa: skutek magazynowy niesie sam dokument w Subiekcie
+   (księgowany wprost na MAG), więc zapisujemy WYŁĄCZNIE lokalizację (D1) —
+   zero MM, zero waiting_for_doc, zero zależności od bufora; dostawę można
+   rozkładać, zanim księgowość zaksięguje FZ.
+
+   Zwrot: biuro wystawia JEDEN zbiorczy dokument na magazyn Zwroty, a towar
+   fizycznie leży w koszykach opisanych numerem zwrotu. Koszyk nie istnieje
+   nigdzie w Subiekcie — dla aplikacji jest to po prostu grupa linii domkniętych
+   za jednym podejściem, otagowana numerem. Po rozłożeniu całego koszyka
+   powstaje JEDEN dokument MM Zwroty→MAG (patrz `closeBasket`).                */
 
 const nowIso = () => new Date().toISOString();
 
@@ -40,7 +50,12 @@ export function validateDeliveryLocation(code: string): string | null {
   return `Kod „${code}" nie jest poprawnym adresem (regał A00-00-00 albo paleta PAL-000)`;
 }
 
-/** Lista dostaw FZ/PZ (N dni) z postępem liczonym z delivery_line. */
+/** Czy dokument o tym magazynie skutku wymaga MM strefa→MAG (zwrot). */
+function requiresMm(magId: number | null | undefined): boolean {
+  return magId != null && magId !== config.magId.MAG;
+}
+
+/** Lista dostaw FZ/PZ i zwrotów (N dni) z postępem liczonym z delivery_line. */
 export function listDocuments(days = 14): DeliveryDocument[] {
   const docs = subiekt.listDeliveryDocuments(days);
   const progress = db()
@@ -82,6 +97,8 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       /** stan sprawdzenia faktury — to samo, co widzi biuro w Subiekcie */
       flaga: p ? flagLabel(deliveryFlag(p.deliveryId)) : null,
       flagaKey: p ? deliveryFlag(p.deliveryId) : null,
+      /** zwrot rozkłada się koszykami i kończy MM-em; dostawa krajowa nie */
+      zwrot: requiresMm(d.mag_id),
     };
   });
 }
@@ -99,13 +116,17 @@ export function openDelivery(dokId: number, user: string): number {
   const doc = subiekt.getDocument(dokId);
   if (!doc) throw new Error("Nie znaleziono dokumentu");
 
+  // Magazyn skutku jest SNAPSHOTOWANY razem z pozycjami: decyduje o tym, czy
+  // po rozłożeniu potrzebny jest MM. Gdyby czytać go na bieżąco z read-modelu,
+  // przeksięgowanie dokumentu w połowie pracy zmieniałoby reguły w jej trakcie.
   const id = Number(
     db()
       .prepare(
-        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, status, opened_at)
-         VALUES (?,?,?,?, 'open', ?)`
+        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, source_mag_id, status, opened_at)
+         VALUES (?,?,?,?,?, 'open', ?)`
       )
-      .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, nowIso()).lastInsertRowid
+      .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, doc.mag_id, nowIso())
+      .lastInsertRowid
   );
 
   // agregacja tego samego towaru (różne partie/ceny → jedna linia robocza)
@@ -144,6 +165,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
         sgt_dok_numer: string;
         dostawca: string | null;
         data_dok: string | null;
+        source_mag_id: number | null;
         status: string;
       }
     | undefined;
@@ -166,6 +188,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
       status: r.status,
       /** litera alejki — nagłówek sekcji na liście */
       aisle: r.lok_oczekiwana ? String(r.lok_oczekiwana)[0] : null,
+      koszyk: r.koszyk ?? null,
     }))
     // faza 1: sort alfabetyczny po kodzie (A→J odpowiada układowi alejek);
     // zamiana na trasę = zmiana tego komparatora (§5)
@@ -181,6 +204,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
   // zgłaszającego i nikt by go nie zgłaszał (D8)
   const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
   const problems = lines.filter((l) => l.status === "problem").length;
+  const zwrot = requiresMm(d.source_mag_id);
   return {
     id: d.id,
     dokId: d.sgt_dok_id,
@@ -191,8 +215,30 @@ export function getDelivery(id: number): DeliveryView | undefined {
     flaga: flagLabel(deliveryFlag(d.id)),
     flagaKey: deliveryFlag(d.id),
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
+    zwrot,
+    koszyki: zwrot ? openBaskets(id) : [],
     lines,
   };
+}
+
+/**
+ * Koszyki rozłożone, ale jeszcze nieprzesunięte na MAG.
+ *
+ * To jedyny sygnał, że praca została wykonana tylko w połowie: towar leży już
+ * na półce, ale w Subiekcie wisi dalej na magazynie Zwroty, czyli jest
+ * NIESPRZEDAWALNY. Bez tej listy zapomniany koszyk nie dawałby żadnego objawu —
+ * a właśnie tak wygląda najkosztowniejszy błąd w tym procesie.
+ */
+export function openBaskets(deliveryId: number): KoszykView[] {
+  return db()
+    .prepare(
+      `SELECT koszyk AS numer, COUNT(*) AS lines, SUM(ilosc_odlozona - mm_ilosc) AS qty
+       FROM delivery_line
+       WHERE delivery_id = ? AND koszyk IS NOT NULL AND ilosc_odlozona > mm_ilosc
+       GROUP BY koszyk
+       ORDER BY koszyk`
+    )
+    .all(deliveryId) as KoszykView[];
 }
 
 /**
@@ -295,35 +341,56 @@ function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line:
       locActual: line.lok_faktyczna,
       status: line.status,
       aisle: line.lok_oczekiwana ? String(line.lok_oczekiwana)[0] : null,
+      koszyk: line.koszyk ?? null,
     },
   };
+}
+
+export interface PutawayLineOpts {
+  /** Ile sztuk odłożono; brak = cała reszta z dokumentu. */
+  qty?: number;
+  /**
+   * Co zrobić z dotychczasowymi lokalizacjami, gdy magazynier odłożył gdzie
+   * indziej (§4.3): 'replace' = towar przeniesiony, 'add' = druga lokalizacja.
+   * Domyślnie 'replace' — zgodność ze ścieżką bez rozjazdu.
+   */
+  locAction?: "add" | "replace";
+  /** Zwroty: numer koszyka, z którego wzięto towar (obowiązkowy dla zwrotu). */
+  koszyk?: string;
 }
 
 /**
  * Odłożenie linii: skan lokalizacji jest OBOWIĄZKOWY (D3) — to jedyny dowód,
  * że towar trafił tam, gdzie system myśli. Zapis lokalizacji idzie do kolejki
  * jako `set_location`; ŻADNEGO dokumentu MM (D1).
+ *
+ * Przy zwrocie MM też tu nie powstaje — dopiero przy zamknięciu koszyka
+ * (`closeBasket`). Dzięki temu niezmiennik „ADRES ZAWSZE PRZED
+ * SPRZEDAWALNOŚCIĄ" trzyma się sam: `set_location` każdej pozycji jest
+ * zakolejkowany wcześniej niż MM, a worker bierze zadania po `id` rosnąco.
  */
 export function putawayLine(
   lineId: number,
   location: string,
-  qty: number | undefined,
   user: string,
-  /**
-   * Co zrobić z dotychczasowymi lokalizacjami, gdy magazynier odłożył gdzie
-   * indziej (§4.3): 'replace' = towar przeniesiony, 'add' = druga lokalizacja.
-   * Domyślnie 'replace' — zgodność ze ścieżką bez rozjazdu.
-   */
-  locAction: "add" | "replace" = "replace"
+  opts: PutawayLineOpts = {}
 ): { ok: true; queueId?: number; mismatch: boolean; status: string } | { error: string; status?: number } {
   const line = db().prepare("SELECT * FROM delivery_line WHERE id = ?").get(lineId) as any;
   if (!line) return { error: "Brak pozycji" };
+  const locAction = opts.locAction ?? "replace";
 
   const code = location.trim().toUpperCase();
   const locErr = validateDeliveryLocation(code);
   if (locErr) return { error: locErr };
 
-  const putQty = qty ?? Math.max(line.ilosc_dok - line.ilosc_odlozona, 0);
+  // Zwrot bez numeru koszyka byłby sierotą: adres na półce zapisany, ale nic
+  // nie powie, którym MM-em towar ma zjechać z magazynu Zwroty — i zostałby
+  // tam niesprzedawalny, bez żadnego objawu. Dlatego twardy błąd, nie domysł.
+  const koszyk = (opts.koszyk ?? "").trim();
+  const zwrot = requiresMm(deliveryMagId(line.delivery_id));
+  if (zwrot && !koszyk) return { error: "Podaj numer koszyka" };
+
+  const putQty = opts.qty ?? Math.max(line.ilosc_dok - line.ilosc_odlozona, 0);
   if (!Number.isFinite(putQty) || putQty <= 0) return { error: "Ilość musi być większa od zera" };
 
   const doneQty = line.ilosc_odlozona + putQty;
@@ -356,10 +423,10 @@ export function putawayLine(
     .prepare(
       `UPDATE delivery_line
        SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?,
-           locked_by=NULL, locked_at=NULL
+           koszyk=COALESCE(?, koszyk), locked_by=NULL, locked_at=NULL
        WHERE id=?`
     )
-    .run(doneQty, code, status, nowIso(), user, lineId);
+    .run(doneQty, code, status, nowIso(), user, koszyk || null, lineId);
 
   logEvent("putaway_line_done", user, line.tw_id, {
     lineId,
@@ -367,6 +434,7 @@ export function putawayLine(
     location: code,
     expected: line.lok_oczekiwana,
     status,
+    koszyk: koszyk || null,
   });
   if (mismatch) {
     // częstotliwość per lokalizacja = raport o przepełnionych gniazdach
@@ -383,7 +451,44 @@ export function putawayLine(
   return { ok: true, queueId, mismatch, status };
 }
 
-/** Dostawa zamyka się sama, gdy nie ma już czego rozkładać. */
+/** Magazyn skutku dostawy (snapshot z chwili otwarcia). */
+function deliveryMagId(deliveryId: number): number | null {
+  const d = db()
+    .prepare("SELECT source_mag_id FROM delivery WHERE id=?")
+    .get(deliveryId) as { source_mag_id: number | null } | undefined;
+  return d?.source_mag_id ?? null;
+}
+
+/**
+ * Ile sztuk tej dostawy jest już na półkach, ale wciąż na magazynie źródłowym.
+ *
+ * Liczy się WYŁĄCZNIE tam, gdzie MM w ogóle występuje. Przy dostawie krajowej
+ * `mm_ilosc` zostaje zerem na zawsze (skutek niesie sam dokument w Subiekcie),
+ * więc licznik „odłożone − objęte MM" pokazywałby całą dostawę jako zaległość
+ * i żadna krajówka nigdy by się nie domknęła.
+ */
+function pendingMmQty(deliveryId: number): number {
+  if (!requiresMm(deliveryMagId(deliveryId))) return 0;
+  return (
+    (
+      db()
+        .prepare(
+          "SELECT SUM(ilosc_odlozona - mm_ilosc) AS q FROM delivery_line WHERE delivery_id=? AND ilosc_odlozona > mm_ilosc"
+        )
+        .get(deliveryId) as { q: number | null }
+    ).q ?? 0
+  );
+}
+
+/**
+ * Dostawa zamyka się sama, gdy nie ma już czego rozkładać.
+ *
+ * Przy zwrocie „nie ma czego rozkładać" to za mało: dopóki ostatni koszyk nie
+ * pojechał MM-em, towar leży na półce, ale w Subiekcie wisi na magazynie
+ * Zwroty — czyli jest niesprzedawalny. Domknięcie dostawy przestawiłoby flagę
+ * na „Sprawdzone" i biuro zobaczyłoby robotę skończoną, choć połowa skutku
+ * jeszcze nie istnieje.
+ */
 export function closeIfComplete(deliveryId: number, user: string): void {
   const left = (
     db()
@@ -393,8 +498,79 @@ export function closeIfComplete(deliveryId: number, user: string): void {
       .get(deliveryId) as { n: number }
   ).n;
   if (left > 0) return;
+  if (pendingMmQty(deliveryId) > 0) return;
   db()
     .prepare("UPDATE delivery SET status='done', closed_at=? WHERE id=? AND status='open'")
     .run(nowIso(), deliveryId);
   logEvent("delivery_done", user, null, { deliveryId });
+}
+
+/**
+ * Zamknięcie koszyka zwrotu: jeden dokument MM Zwroty→MAG na wszystko, co z
+ * tego koszyka trafiło na półki i jeszcze nie pojechało.
+ *
+ * Rozliczamy ILOŚCIAMI (`ilosc_odlozona − mm_ilosc`), nie statusem linii, bo:
+ *  • ten sam towar bywa w dwóch koszykach (dokument zbiorczy agreguje go w jedną
+ *    linię), więc „linia objęta MM" gubiłoby resztę,
+ *  • ponowne zamknięcie tego samego koszyka daje wtedy zero do przeniesienia —
+ *    dedupe wychodzi z arytmetyki, nie z osobnej flagi,
+ *  • linia zgłoszona jako uszkodzona wciąż mogła mieć część odłożoną na półkę:
+ *    te sztuki MUSZĄ pojechać, a te, których nie odłożono, zostają na Zwrotach.
+ */
+export function closeBasket(
+  deliveryId: number,
+  numer: string,
+  user: string
+): { ok: true; queueId: number; lines: number; qty: number } | { error: string; status?: number } {
+  const koszyk = numer.trim();
+  if (!koszyk) return { error: "Podaj numer koszyka" };
+  const srcMag = deliveryMagId(deliveryId);
+  if (srcMag == null) return { error: "Brak dostawy", status: 404 };
+  if (!requiresMm(srcMag)) return { error: "Ta dostawa nie wymaga przesunięcia magazynowego" };
+
+  const rows = db()
+    .prepare(
+      `SELECT id, tw_id, tw_symbol, ilosc_odlozona, mm_ilosc
+       FROM delivery_line
+       WHERE delivery_id=? AND koszyk=? AND ilosc_odlozona > mm_ilosc`
+    )
+    .all(deliveryId, koszyk) as Array<{
+    id: number;
+    tw_id: number;
+    tw_symbol: string;
+    ilosc_odlozona: number;
+    mm_ilosc: number;
+  }>;
+  if (!rows.length) return { error: `Koszyk ${koszyk}: nie ma czego przenosić` };
+
+  // agregacja per towar — jeden wiersz MM na kartotekę, nie na linię
+  const perTw = new Map<number, number>();
+  for (const r of rows) {
+    const delta = r.ilosc_odlozona - r.mm_ilosc;
+    perTw.set(r.tw_id, (perTw.get(r.tw_id) ?? 0) + delta);
+  }
+  const items: MmItem[] = [...perTw].map(([twId, qty]) => ({ twId, qty }));
+  const qty = items.reduce((s, i) => s + i.qty, 0);
+
+  let queueId = 0;
+  db().transaction(() => {
+    queueId = enqueueMM(srcMag, config.magId.MAG, items, {
+      createdBy: user,
+      twId: null,
+      sourceDocId: (db().prepare("SELECT sgt_dok_id FROM delivery WHERE id=?").get(deliveryId) as {
+        sgt_dok_id: number;
+      }).sgt_dok_id,
+      label: `MM koszyk ${koszyk} · ${items.length} poz.`,
+      detail: `${qty} szt ZWROTY→MAG (zwrot)`,
+    });
+    const upd = db().prepare("UPDATE delivery_line SET mm_ilosc=ilosc_odlozona, mm_queue_id=? WHERE id=?");
+    for (const r of rows) upd.run(queueId, r.id);
+  })();
+
+  logEvent("koszyk_zamkniety", user, null, { deliveryId, koszyk, queueId, items: items.length, qty });
+  touchDelivery(deliveryId);
+  // ostatni koszyk mógł być tym, który trzymał dostawę otwartą
+  closeIfComplete(deliveryId, user);
+  syncFlag(deliveryId, user);
+  return { ok: true, queueId, lines: rows.length, qty };
 }

@@ -51,10 +51,15 @@ import pl.wertis.kolektor.ui.theme.Secondary
 import pl.wertis.kolektor.ui.theme.Success
 import pl.wertis.kolektor.ui.theme.cardSurface
 
-/* ── Tryb A: wybór dostawy (redesign §4.1) ──────────────────────────────────
+/* ── Tryb A: wybór dokumentu (redesign §4.1) ────────────────────────────────
    Lista FZ/PZ z 14 dni, malejąco po dacie, z paskiem postępu. Dokumenty
    w buforze SGT są normalnie dostępne do pracy (D1) — rozkładanie nie czeka
-   na księgowość. Ukończone schodzą na dół i szarzeją, ale nie znikają.       */
+   na księgowość. Ukończone schodzą na dół i szarzeją, ale nie znikają.
+
+   Zwroty mają własną sekcję na górze: to inny rytm pracy (koszyk, nie paleta)
+   i inny skutek (MM Zwroty→MAG po każdym koszyku), więc mieszanie ich w jednej
+   liście z dostawami kazałoby czytać typ dokumentu, żeby wiedzieć, co się
+   właśnie robi.                                                              */
 
 @Composable
 fun DeliveryDocumentsScreen(graph: AppGraph) {
@@ -86,6 +91,8 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
 
     // ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie)
     val sorted = docs!!.sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
+    val zwroty = sorted.filter { it.zwrot }
+    val dostawy = sorted.filter { !it.zwrot }
 
     Column(
         modifier = Modifier
@@ -94,14 +101,26 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (zwroty.isNotEmpty()) {
+            Text(
+                "ZWROTY DO ROZŁOŻENIA · KOSZYKAMI",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                color = AmberInk,
+            )
+            zwroty.forEach { d -> DocRow(d) { open(d) } }
+        }
+
         Text(
             "DOSTAWY FZ/PZ · OSTATNIE 14 DNI",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
             color = InkSoft,
+            modifier = Modifier.padding(top = if (zwroty.isEmpty()) 0.dp else 6.dp),
         )
-        if (sorted.isEmpty()) {
+        if (dostawy.isEmpty()) {
             Text(
                 "Brak dostaw do rozłożenia",
                 color = InkMute,
@@ -110,14 +129,14 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             )
         }
-        sorted.forEach { d -> DocRow(d) { open(d) } }
+        dostawy.forEach { d -> DocRow(d) { open(d) } }
 
         OutlineButton(
-            "KONTENERY I ZWROTY",
+            "KONTENERY",
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         ) { graph.nav.go(pl.wertis.kolektor.core.nav.Screen.PUTAWAY_DOCS) }
         Text(
-            "Towar spoza MAG — sesja z wózkiem i dokumentem MM (kontener 4× w roku, zwroty).",
+            "Kontener importowy (4× w roku) — sesja z wózkiem i MM MGP→MAG po każdej rundzie.",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,
@@ -144,13 +163,24 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (complete) Success.copy(alpha = 0.15f) else Secondary),
+                .background(
+                    when {
+                        complete -> Success.copy(alpha = 0.15f)
+                        // zwrot odróżnia się także po przewinięciu nagłówka sekcji
+                        d.zwrot -> AmberBg
+                        else -> Secondary
+                    }
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 if (complete) WIcons.Check else WIcons.Box,
                 contentDescription = null,
-                tint = if (complete) Success else Ink,
+                tint = when {
+                    complete -> Success
+                    d.zwrot -> AmberInk
+                    else -> Ink
+                },
                 modifier = Modifier.size(20.dp),
             )
         }

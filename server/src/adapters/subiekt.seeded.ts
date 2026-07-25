@@ -92,27 +92,29 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE mag_id IN (?, ?) AND data_wyst >= ?
+         WHERE mag_id = ? AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(config.magId.MGP, config.magId.ZWROTY, cutoff) as RawDocument[];
+      .all(config.magId.MGP, cutoff) as RawDocument[];
   }
 
   listDeliveryDocuments(days: number): RawDocument[] {
     const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
-    // O trybie decyduje MAGAZYN SKUTKU, nie typ dokumentu. Tryb A obsługuje
-    // dokumenty księgowane wprost na MAG (towar już leży na hali, brakuje mu
-    // tylko adresu — D1). Wszystko, co ląduje na MGP albo Zwrotach, wymaga
-    // realnego MM i należy do trybu B. Podział po typie dawał ten sam dokument
-    // w obu zakładkach: w trybie A kolektor nadałby lokalizację BEZ MM, a stan
-    // zostałby na MGP — adres na półce kłamałby względem Subiekta.
+    // O trybie decyduje MAGAZYN SKUTKU, nie typ dokumentu — i kryteria obu list
+    // muszą pozostać ROZŁĄCZNE, inaczej ten sam dokument wisi w dwóch zakładkach
+    // i można na nim pracować dwoma niekompatybilnymi ścieżkami naraz.
+    //
+    //   MAG    → tryb A, dostawa krajowa: towar już leży na hali, brakuje adresu (D1)
+    //   Zwroty → tryb A, zwroty: adres jak wyżej + jeden MM na zamknięty koszyk
+    //   MGP    → tryb B, kontener: sesja z wózkiem, MM na rundę
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE typ IN ('FZ','PZ') AND mag_id = ? AND data_wyst >= ?
+         WHERE ((typ IN ('FZ','PZ') AND mag_id = ?) OR mag_id = ?)
+           AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(config.magId.MAG, cutoff) as RawDocument[];
+      .all(config.magId.MAG, config.magId.ZWROTY, cutoff) as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
