@@ -102,6 +102,8 @@ data class LocationProductsResponse(
 @Serializable
 enum class QueueItemType {
     @SerialName("set_location") SET_LOCATION,
+    /** Flaga sprawdzenia faktury (tryb A) — jedyny zapis do SGT poza lokalizacją. */
+    @SerialName("set_doc_flag") SET_DOC_FLAG,
     @SerialName("mm") MM,
     @SerialName("combo") COMBO,
 }
@@ -314,6 +316,8 @@ data class DeliveryDocument(
     val linesTotal: Int = 0,
     val linesDone: Int = 0,
     val status: String? = null,
+    /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+    val flaga: String? = null,
 )
 
 @Serializable
@@ -351,6 +355,8 @@ data class DeliveryView(
     val dostawca: String = "",
     val dataWyst: String = "",
     val status: String = "open",
+    /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+    val flaga: String? = null,
     val progress: DeliveryProgress = DeliveryProgress(),
     val lines: List<DeliveryLineView> = emptyList(),
 )
@@ -383,6 +389,15 @@ sealed class ScanResolution {
 
     @Serializable @SerialName("off_document")
     data class OffDocument(val code: String = "", val twId: Long = 0, val sym: String = "", val name: String = "") : ScanResolution()
+
+    /** Linię trzyma teraz ktoś inny — nie odbieramy jej po cichu. */
+    @Serializable @SerialName("locked")
+    data class Locked(
+        val code: String = "",
+        val lockedBy: String = "",
+        val sym: String = "",
+        val name: String = "",
+    ) : ScanResolution()
 
     @Serializable @SerialName("unknown")
     data class Unknown(val code: String = "") : ScanResolution()

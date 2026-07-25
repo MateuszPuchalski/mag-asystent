@@ -78,6 +78,8 @@ export interface DeliveryDocument {
   linesTotal: number;
   linesDone: number;
   status: string | null;
+  /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+  flaga: string | null;
 }
 
 export interface DeliveryLineView {
@@ -101,6 +103,8 @@ export interface DeliveryView {
   dostawca: string;
   dataWyst: string;
   status: string;
+  /** Flaga sprawdzenia faktury — ten sam stan, który biuro widzi w Subiekcie. */
+  flaga: string | null;
   /** `problems` ⊂ `done` — linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
   progress: { total: number; done: number; remaining: number; problems: number };
   lines: DeliveryLineView[];
@@ -121,6 +125,8 @@ export type ScanResolution =
   | { kind: "line"; line: DeliveryLineView }
   | { kind: "conflict"; code: string; candidates: EanCandidate[] }
   | { kind: "off_document"; code: string; twId: number; sym: string; name: string }
+  /** Linię trzyma teraz ktoś inny — nie odbieramy jej po cichu. */
+  | { kind: "locked"; code: string; lockedBy: string; sym: string; name: string }
   | { kind: "unknown"; code: string };
 
 /* ── Faza 2: wyjątki (D8) ───────────────────────────────────────────────── */

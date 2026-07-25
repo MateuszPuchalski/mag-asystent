@@ -30,6 +30,15 @@
  *   mm.Zapisz();
  *   return mm.NumerPelny;   // zapis zwrotny do sfera_queue.sgt_doc_number
  *
+ * set_doc_flag (flaga sprawdzenia faktury):
+ *   var d = sfera.DokumentyZakupuManager.Wczytaj(dokId);   // [WERYFIKUJ] manager
+ *   d.PoleWlasne["Flaga sprawdzenia"] = flaga;             // [WERYFIKUJ] gdzie siedzi
+ *   d.Zapisz();
+ *   // PLAN B jak przy lokalizacji: UPDATE dok__Dokument SET <kolumna>=@v
+ *   //   osobnym loginem z GRANT UPDATE wyłącznie na tę kolumnę.
+ *   // NIEUSTALONE: czy to wbudowana flaga dokumentu, pole własne, czy słownik —
+ *   //   ustalić zapytaniem grupującym z podglądem dok_NrPelny, nie zgadywać.
+ *
  * Sekwencyjność: COM Sfery nie jest thread-safe — przetwarzać po jednym zadaniu.
  */
 export interface MmItem {
@@ -45,4 +54,9 @@ export interface SferaAdapter {
    * zwróć numer dokumentu MM (spec §5.3 / §9).
    */
   createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string>;
+  /**
+   * Ustaw flagę sprawdzenia na fakturze dostawy. Jedyny zapis do SGT poza
+   * `tw_Lokalizacja` — świadomy, nazwany wyjątek od §16 (patrz services/queue.ts).
+   */
+  applyDocFlag(dokId: number, flaga: string): Promise<void>;
 }

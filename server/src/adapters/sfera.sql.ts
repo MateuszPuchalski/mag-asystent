@@ -34,6 +34,36 @@ export class SqlSferaAdapter implements SferaAdapter {
     db().prepare("UPDATE sgt_towar SET lokalizacja = ? WHERE tw_id = ?").run(newValue, twId);
   }
 
+  /**
+   * Flaga sprawdzenia faktury tą samą drogą co lokalizacja: jedna kolumna,
+   * osobny login, `GRANT UPDATE` wyłącznie na nią.
+   *
+   * [WERYFIKUJ] `MSSQL_DOC_FLAG_COLUMN` — nie ustaliliśmy, gdzie firma trzyma tę
+   * flagę (wbudowana flaga dokumentu / pole własne / słownik). Dopóki kolumna nie
+   * jest ustawiona, zadanie kończy się czytelnym błędem zamiast pisać na oślep
+   * w losową kolumnę tabeli dokumentów.
+   */
+  async applyDocFlag(dokId: number, flaga: string): Promise<void> {
+    if (!config.mssql.docFlagColumn) {
+      throw new Error(
+        "Nie ustawiono MSSQL_DOC_FLAG_COLUMN — nie wiadomo, w której kolumnie " +
+          "dok__Dokument siedzi flaga sprawdzenia. Ustal ją na własnej bazie " +
+          "(docs/subiekt-gt-edu-setup.md) i uzupełnij env."
+      );
+    }
+    const col = assertSafeColumn(config.mssql.docFlagColumn);
+    const pool = await mssqlWrite();
+    const res = await pool
+      .request()
+      .input("id", sql.Int, dokId)
+      .input("v", sql.NVarChar, flaga)
+      .query(`UPDATE dok__Dokument SET ${col} = @v WHERE dok_Id = @id`);
+    if (!res.rowsAffected[0]) {
+      throw new Error(`Nie znaleziono dokumentu dok_Id=${dokId} w bazie Subiekta`);
+    }
+    db().prepare("UPDATE sgt_dokument SET flaga = ? WHERE dok_id = ?").run(flaga, dokId);
+  }
+
   async createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {
     throw new Error(
       "Dokument MM wymaga Sfery (COM) — niedostępne w trybie SQL / wersji edu. " +

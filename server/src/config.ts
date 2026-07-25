@@ -70,6 +70,13 @@ export const config = {
      * SQL (białe znaki/średniki odrzucane) przed wstrzyknięciem do zapytania.
      */
     locColumn: process.env.MSSQL_LOC_COLUMN ?? "tw_Pole1",
+    /**
+     * Kolumna `dok__Dokument` z flagą sprawdzenia faktury. Celowo BEZ wartości
+     * domyślnej: nie wiadomo jeszcze, gdzie firma trzyma tę flagę, a zgadnięcie
+     * oznaczałoby zapis w losową kolumnę tabeli dokumentów. Puste = zadania
+     * `set_doc_flag` kończą się czytelnym błędem ([WERYFIKUJ]).
+     */
+    docFlagColumn: process.env.MSSQL_DOC_FLAG_COLUMN ?? "",
     /** Wyrażenie SQL 0/1: dokument w buforze ([WERYFIKUJ], np. inna kolumna/status). */
     bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 0 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
@@ -114,6 +121,31 @@ export const config = {
   ].map((p) => new RegExp(p)),
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
+
+  /**
+   * Flaga sprawdzenia faktury dostawy w Subiekcie. W tej firmie rozkładanie JEST
+   * sprawdzaniem faktury, więc postęp kolektora i flaga opisują to samo — trzymanie
+   * dwóch prawd obok siebie kończy się rozjazdem między magazynem a biurem.
+   *
+   * Wartości w env, bo to słownictwo firmy, nie stała programu. Zmiana nazwy
+   * w Subiekcie nie może wymagać zmiany kodu.
+   *
+   * [WERYFIKUJ] gdzie te wartości siedzą w bazie SGT (flaga dokumentu / pole własne
+   * / słownik) oraz czy Sfera eksponuje to pole — patrz adapters/sfera.ts.
+   */
+  docFlag: {
+    /** Praca trwa: ktoś ma teraz zajętą pozycję z tej dostawy. */
+    inProgress: process.env.DOC_FLAG_IN_PROGRESS ?? "W trakcie sprawdzania",
+    /** Praca przerwana, ale postęp per pozycja jest zapisany. */
+    paused: process.env.DOC_FLAG_PAUSED ?? "Do sprawdzenia z zapisanym postępem",
+    /** Wszystko policzone i odłożone, zero rozbieżności ilościowych. */
+    done: process.env.DOC_FLAG_DONE ?? "Sprawdzone",
+    /**
+     * Domknięte, ale ilości się nie zgadzały. WYŁĄCZNIE rozbieżność ilościowa —
+     * uszkodzenie czy brak miejsca to sprawy reklamacyjne, nie zgodność faktury.
+     */
+    doneWithErrors: process.env.DOC_FLAG_DONE_ERRORS ?? "Sprawdzone z błędami",
+  },
 
   /**
    * Karencja COFNIJ [ms]: zadanie set_location z kolektora dostaje next_attempt_at

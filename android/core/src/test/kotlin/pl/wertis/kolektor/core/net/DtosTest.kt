@@ -33,6 +33,36 @@ class DtosTest {
         assertEquals("XYZ", (n as ScanResult.NotFound).code)
     }
 
+    @Test fun `QueueItemType zna zadanie flagi faktury`() {
+        // bez tego kolektor wywraca się na ekranie kolejki, gdy tryb A ustawi flagę
+        val r = WertisJson.decodeFromString<QueueResponse>(
+            """{"items":[{"id":9,"type":"set_doc_flag","status":"pending",
+                "label":"Flaga · FZ 1","detail":"W trakcie sprawdzania","errMsg":null,"time":"12:00"}],
+                "summary":{"pending":1,"error":0,"done":0}}"""
+        )
+        assertEquals(QueueItemType.SET_DOC_FLAG, r.items[0].type)
+        assertEquals("W trakcie sprawdzania", r.items[0].detail)
+    }
+
+    @Test fun `ScanResolution - linia zajeta przez kogos innego`() {
+        val r = WertisJson.decodeFromString<ScanResolution>(
+            """{"kind":"locked","code":"5901234","lockedBy":"anna","sym":"W04-0103","name":"Wąż"}"""
+        )
+        assertEquals("anna", (r as ScanResolution.Locked).lockedBy)
+    }
+
+    @Test fun `flaga faktury w DTO dostawy`() {
+        val d = WertisJson.decodeFromString<DeliveryDocument>(
+            """{"dokId":1,"typ":"FZ","nrPelny":"FZ 1","positions":3,"flaga":"Sprawdzone z błędami"}"""
+        )
+        assertEquals("Sprawdzone z błędami", d.flaga)
+        // starszy serwer bez pola nie może wywrócić kolektora
+        val stary = WertisJson.decodeFromString<DeliveryDocument>(
+            """{"dokId":2,"typ":"PZ","nrPelny":"PZ 2","positions":1}"""
+        )
+        assertNull(stary.flaga)
+    }
+
     @Test fun `QueueResponse - statusy i summary`() {
         val json = """
             {"items":[

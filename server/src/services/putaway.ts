@@ -6,10 +6,9 @@ import { pendingMmByTw } from "./stock.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
+import { freshLock } from "./locks.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type { PutawayDocument, PutawayItemView } from "../types.js";
-
-const LOCK_TTL_MS = 30 * 60 * 1000;
 
 /** Strefa (etykieta) magazynu źródłowego sesji/dokumentu. */
 function zoneOf(magId: number | null | undefined): "mgp" | "zwroty" {
@@ -192,11 +191,6 @@ export function getSession(sessionId: number) {
     inFlight,
     items,
   };
-}
-
-function freshLock(lockedBy: string | null, lockedAt: string | null): string | null {
-  if (!lockedBy || !lockedAt) return null;
-  return Date.now() - Date.parse(lockedAt) < LOCK_TTL_MS ? lockedBy : null;
 }
 
 /** Dostępny stan strefy źródłowej = stan magazynowy minus MM „w drodze" z tej strefy. */

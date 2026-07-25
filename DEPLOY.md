@@ -152,7 +152,19 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    - kolumnę/flagę bufora w `dok__Dokument` (→ env `MSSQL_BUFFER_EXPR`),
    - `mag_Id` magazynów MAG i MGP (→ env `MAG_ID_MAG` / `MAG_ID_MGP`),
    - `SELECT COL_LENGTH('tw__Towar','tw_Lokalizacja')` (ustaw `LOC_FIELD_LIMIT`),
-   - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`.
+   - czy używacie dodatkowych kodów kreskowych poza `tw_PodstKodKresk`,
+   - **gdzie siedzi flaga sprawdzenia faktury** (→ env `MSSQL_DOC_FLAG_COLUMN`).
+     To jedyne pole poza lokalizacją, do którego aplikacja pisze, więc nie
+     zgaduj: znajdź je po znanym dokumencie, np.
+
+     ```sql
+     -- porównaj kolumny dokumentu oflagowanego ręcznie w Subiekcie
+     SELECT * FROM dok__Dokument WHERE dok_NrPelny = 'FZ 120/07/2026';
+     ```
+
+     Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
+     zamiast pisać na oślep w tabelę dokumentów. Reszta aplikacji działa
+     normalnie — flaga jest jedyną rzeczą, która czeka.
 3. Ustaw env połączenia `MSSQL_*` (patrz `docs/subiekt-gt-edu-setup.md` §4);
    importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.

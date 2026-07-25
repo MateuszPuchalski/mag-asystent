@@ -23,14 +23,22 @@ export function db(): Database.Database {
 
 /** Dostawki do istniejących baz (CREATE TABLE IF NOT EXISTS nie dodaje kolumn). */
 function migrate(database: Database.Database) {
-  const cols = database.prepare("PRAGMA table_info(sfera_queue)").all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === "session_id")) {
-    database.exec("ALTER TABLE sfera_queue ADD COLUMN session_id INTEGER");
-  }
-  const sessCols = database.prepare("PRAGMA table_info(putaway_sessions)").all() as Array<{ name: string }>;
-  if (!sessCols.some((c) => c.name === "source_mag_id")) {
-    database.exec("ALTER TABLE putaway_sessions ADD COLUMN source_mag_id INTEGER");
-  }
+  const addColumn = (table: string, column: string, decl: string) => {
+    const cols = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === column)) {
+      database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+    }
+  };
+  addColumn("sfera_queue", "session_id", "INTEGER");
+  addColumn("putaway_sessions", "source_mag_id", "INTEGER");
+  // locki per linia dostawy (tryb A) — kilka osób przy jednej dostawie
+  addColumn("delivery_line", "locked_by", "TEXT");
+  addColumn("delivery_line", "locked_at", "TEXT");
+  // ostatnia flaga wysłana do Subiekta — rozjazd z sgt_dokument.flaga znaczy,
+  // że biuro nadpisało ją poza aplikacją
+  addColumn("delivery", "flaga_wyslana", "TEXT");
+  addColumn("delivery", "active_at", "TEXT");
+  addColumn("sgt_dokument", "flaga", "TEXT");
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */

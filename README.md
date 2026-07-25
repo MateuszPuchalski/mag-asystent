@@ -49,6 +49,14 @@ kolejką; stany na ekranie skorygowane o oczekujące MM; walidacja długości
 `tw_Lokalizacja` (twardy błąd, nie ucięcie); kody lokalizacji bez spacji;
 każda operacja w `events`.
 
+**Zapis do Subiekta ogranicza się do dwóch pól** — `tw_Lokalizacja` na kartotece
+oraz **flaga sprawdzenia na fakturze dostawy**. Ta druga to świadomy, nazwany
+wyjątek od reguły „tylko lokalizacja": w tej firmie rozkładanie JEST sprawdzaniem
+faktury, więc bez niej biuro musiałoby pytać magazyn o stan każdej dostawy.
+Oba zapisy idą tą samą drogą (kolejka → worker → adapter), więc kolektor nigdy
+nie czeka na COM. Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM
+w trybie A, zero modyfikacji stanów.
+
 ## Uruchomienie
 
 ```bash
@@ -79,6 +87,8 @@ Parametry (env, dev):
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
 | `SFERA_MODE` | zapis: `dev` (domyślnie), `sql` (UPDATE lokalizacji w MSSQL, edu) lub `com` (Sfera) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
+| `MSSQL_DOC_FLAG_COLUMN` | kolumna `dok__Dokument` z flagą sprawdzenia faktury — **bez domyślnej**, patrz `[WERYFIKUJ]` w DEPLOY §5 |
+| `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag (domyślnie słownictwo firmy) |
 
 ## Funkcje (kolektor — aplikacja Android)
 
@@ -111,6 +121,20 @@ Parametry (env, dev):
 - **Niejednoznaczny kod kreskowy zatrzymuje operację** — aplikacja nigdy nie
   bierze „pierwszego dopasowania”. Jedyne automatyczne zawężenie: dokładnie
   jeden kandydat występuje w otwartym dokumencie.
+- **Flaga sprawdzenia faktury zamiast drugiej prawdy.** Rozkładanie JEST
+  sprawdzaniem faktury, więc aplikacja nie trzyma własnego stanu obok stanu
+  z Subiekta — wyprowadza go i wysyła jako flagę: *W trakcie sprawdzania* (ktoś
+  przy tym stoi), *Do sprawdzenia z zapisanym postępem* (przerwane), *Sprawdzone*,
+  *Sprawdzone z błędami* (**wyłącznie** rozbieżność ilościowa — uszkodzenie czy
+  brak miejsca to sprawy reklamacyjne, nie zgodność dokumentu). Magazynier widzi
+  tę samą plakietkę, co biuro. Nazwy flag konfigurowalne (`DOC_FLAG_*`).
+  Nadpisanie przez biuro wygrywa: aplikacja schodzi z takiej faktury i zapisuje
+  to w `events`.
+- **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
+  zgadza się"; rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ** (najczęstszy
+  wyjątek nie może wymagać szukania kafla wśród siedmiu typów).
+- **Kilka osób przy jednej dostawie**: lock per pozycja z TTL 30 min — drugi
+  skaner mówi, kto trzyma linię, zamiast pozwolić na podwójne odłożenie.
 - **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie
   **PRZED zapisem** — „przeniesiony (ZAMIEŃ)” czy „leży w obu (DODAJ)”. Z samego
   skanu tych dwóch sytuacji odróżnić się nie da, więc decyduje człowiek.

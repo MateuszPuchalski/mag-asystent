@@ -145,6 +145,14 @@ interface ApiService {
         @Body body: PutawayLineBody,
     ): PutawayLineResponse
 
+    /** Oddanie linii po ANULUJ — bez tego wisi zajęta do wygaśnięcia TTL. */
+    @POST("api/delivery/{id}/lines/{lineId}/release")
+    suspend fun releaseLine(
+        @Path("id") id: Long,
+        @Path("lineId") lineId: Long,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): OkResponse
+
 
     /* ── Faza 2: wyjątki (D8) ────────────────────────────────────────────── */
 

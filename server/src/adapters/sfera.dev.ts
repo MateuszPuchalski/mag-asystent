@@ -16,6 +16,13 @@ export class DevSferaAdapter implements SferaAdapter {
     if (res.changes === 0) throw new Error(`Nie znaleziono towaru tw_id=${twId}`);
   }
 
+  async applyDocFlag(dokId: number, flaga: string): Promise<void> {
+    const res = db()
+      .prepare("UPDATE sgt_dokument SET flaga = ? WHERE dok_id = ?")
+      .run(flaga, dokId);
+    if (res.changes === 0) throw new Error(`Nie znaleziono dokumentu dok_id=${dokId}`);
+  }
+
   async createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string> {
     const d = db();
     const tx = d.transaction(() => {

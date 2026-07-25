@@ -5,6 +5,7 @@ import {
   listDocuments,
   openDelivery,
   putawayLine,
+  releaseLine,
   resolveScan,
 } from "../services/delivery.js";
 import type { LocApplyAction } from "../types.js";
@@ -61,8 +62,18 @@ export async function deliveryRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: `Nieznana akcja lokalizacji: ${locAction}` });
       }
       const r = putawayLine(Number(req.params.lineId), location, qty, userOf(req), locAction ?? "replace");
+      // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
       return r;
     }
+  );
+
+  /**
+   * Zwolnienie linii po ANULUJ na karcie odkładania. Bez tego linia wisiałaby
+   * zajęta do wygaśnięcia TTL, a kolega obok dostawałby „zajęte" bez powodu.
+   */
+  app.post<{ Params: { lineId: string } }>(
+    "/api/delivery/:id/lines/:lineId/release",
+    async (req) => releaseLine(Number(req.params.lineId), userOf(req))
   );
 }

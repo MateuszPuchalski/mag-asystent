@@ -183,6 +183,8 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
                 fontSize = 11.sp,
                 color = InkMute,
             )
+            // stan sprawdzenia faktury — to samo, co biuro widzi w Subiekcie
+            FlagBadge(d.flaga, Modifier.padding(top = 3.dp))
             if (d.linesTotal > 0) {
                 ProgressBar(d.linesDone, d.linesTotal, complete)
             }

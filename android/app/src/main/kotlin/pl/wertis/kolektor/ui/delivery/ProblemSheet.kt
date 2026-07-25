@@ -81,13 +81,15 @@ fun ProblemSheet(
     graph: AppGraph,
     deliveryId: Long,
     line: DeliveryLineView?,
+    /** Typ wybrany z góry (skrót „INNA ILOŚĆ") — oszczędza szukanie kafla. */
+    initialType: ProblemType? = null,
     onDone: () -> Unit,
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var type by remember { mutableStateOf<ProblemType?>(null) }
+    var type by remember { mutableStateOf(initialType) }
     var qty by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var photoFile by remember { mutableStateOf<File?>(null) }
