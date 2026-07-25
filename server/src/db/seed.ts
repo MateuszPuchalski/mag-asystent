@@ -7,12 +7,15 @@ import { config } from "../config.js";
  * (eksport magmat.xlsx:
  *  [symbol,nazwa,ean,mag,rez,mgp,unit,ordered,lokalizacja,opis,dostawca]).
  *
- * Dodatkowo syntetyzuje dokumenty FZ/PZ na magazyn MGP (eksport to płaski
- * stan, bez dokumentów przyjęć), aby moduł rozkładania miał realną zawartość:
- * pozycjami są towary z bieżącym stanem na MGP (fizycznie czekają na
- * rozłożenie), POGRUPOWANE po prawdziwym dostawcy z eksportu — jeden dostawca
- * = jeden dokument dostawy. Dodatkowo kilka pozycji bez lokalizacji trafia do
- * dokumentów (ścieżka BRAK LOK).
+ * Dodatkowo syntetyzuje dokumenty FZ/PZ (eksport to płaski stan, bez dokumentów
+ * przyjęć), aby moduł rozkładania miał realną zawartość: pozycjami są towary
+ * z bieżącym stanem na MGP (fizycznie czekają na rozłożenie), POGRUPOWANE po
+ * prawdziwym dostawcy z eksportu — jeden dostawca = jeden dokument dostawy.
+ * Dodatkowo kilka pozycji bez lokalizacji trafia do dokumentów (ścieżka BRAK LOK).
+ *
+ * Magazyn skutku dokumentu rozstrzyga, który tryb go obsługuje, i celowo daje
+ * dane obu ścieżkom: krajowe FZ/PZ na MAG (tryb A — sam adres), jeden kontener
+ * na MGP i jeden karton zwrotów (tryb B — sesja z wózkiem i MM).
  */
 
 type Row = [
@@ -105,9 +108,22 @@ function seed() {
       const typ = k % 2 === 0 ? "FZ" : "PZ";
       const nr = `${typ} ${120 + k}/07/2026`;
       const date = new Date(baseDate.getTime() - k * 86400_000).toISOString().slice(0, 10);
-      // ostatni dokument w buforze → test ścieżki waiting_for_doc (spec §8 D8)
+      // ostatni dokument w buforze → dokument w buforze jest normalnie do pracy (D1)
       const wBuforze = k === paczki.length - 1 ? 1 : 0;
-      insDok.run(dok_id, typ, nr, date, config.magId.MGP, paczka.dostawca, wBuforze);
+      // Magazyn skutku decyduje o trybie rozkładania (i tylko on — dokument nie
+      // może wisieć w obu zakładkach naraz). Krajowe FZ/PZ księgują się wprost
+      // na MAG → tryb A, sam adres. Jeden dokument zostaje na MGP jako kontener
+      // importowy → tryb B, sesja z wózkiem i realnym MM MGP→MAG.
+      const kontener = k === 1;
+      insDok.run(
+        dok_id,
+        typ,
+        nr,
+        date,
+        kontener ? config.magId.MGP : config.magId.MAG,
+        paczka.dostawca,
+        wBuforze
+      );
 
       for (const p of paczka.items) insPoz.run(dok_id, p.tw_id, p.mgp);
 

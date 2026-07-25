@@ -14,21 +14,19 @@ import {
 } from "../services/putaway.js";
 
 export async function putawayRoutes(app: FastifyInstance) {
-  // lista dokumentów do rozłożenia (FZ/PZ na MGP + zwroty), 14 dni, z postępem sesji (spec §5.4)
+  // lista dokumentów do rozłożenia (kontenery na MGP + zwroty), 14 dni, z postępem sesji (spec §5.4)
   app.get("/api/putaway/documents", async () => ({ documents: listDocuments(14) }));
 
-  // start/wznowienie sesji: { docId } | { mode: "all_mgp" }
-  app.post<{ Body: { docId?: number; mode?: "all_mgp" } }>(
-    "/api/putaway/sessions",
-    async (req, reply) => {
-      try {
-        const id = createSession(req.body ?? {}, userOf(req));
-        return { sessionId: id };
-      } catch (e) {
-        return reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
-      }
+  // start/wznowienie sesji dla dokumentu
+  app.post<{ Body: { docId?: number } }>("/api/putaway/sessions", async (req, reply) => {
+    const docId = req.body?.docId;
+    if (!docId) return reply.code(400).send({ error: "Brak dokumentu" });
+    try {
+      return { sessionId: createSession(docId, userOf(req)) };
+    } catch (e) {
+      return reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
     }
-  );
+  });
 
   app.get<{ Params: { id: string } }>("/api/putaway/sessions/:id", async (req, reply) => {
     const s = getSession(Number(req.params.id));

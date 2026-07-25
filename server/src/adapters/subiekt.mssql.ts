@@ -108,6 +108,7 @@ export async function importFromMssql(): Promise<ImportStats> {
   const dokumenty = (
     await pool
       .request()
+      .input("mag", sql.Int, config.magId.MAG)
       .input("mgp", sql.Int, config.magId.MGP)
       .input("zw", sql.Int, config.magId.ZWROTY)
       .input("fz", sql.Int, c.dokTypFZ)
@@ -121,8 +122,13 @@ export async function importFromMssql(): Promise<ImportStats> {
                 ${c.bufferExpr} AS w_buforze
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
-         WHERE ((d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
-             OR (d.dok_MagId = @zw${zwTypFilter}))
+         WHERE (
+                 -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
+                 (d.dok_MagId = @mag AND d.dok_Typ IN (@fz, @pz))
+                 -- tryb B: towar leży poza halą i wymaga realnego MM strefa→MAG
+              OR (d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
+              OR (d.dok_MagId = @zw${zwTypFilter})
+               )
            AND d.dok_DataWyst >= @cutoff`
       )
   ).recordset;

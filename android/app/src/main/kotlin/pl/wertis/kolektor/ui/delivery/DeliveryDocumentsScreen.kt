@@ -113,11 +113,11 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
         sorted.forEach { d -> DocRow(d) { open(d) } }
 
         OutlineButton(
-            "TRYB KONTENEROWY",
+            "KONTENERY I ZWROTY",
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         ) { graph.nav.go(pl.wertis.kolektor.core.nav.Screen.PUTAWAY_DOCS) }
         Text(
-            "Kontener importowy — sesja z wózkiem i dokumentami MM (4× w roku).",
+            "Towar spoza MAG — sesja z wózkiem i dokumentem MM (kontener 4× w roku, zwroty).",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,

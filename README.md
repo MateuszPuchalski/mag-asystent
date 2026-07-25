@@ -124,21 +124,26 @@ Parametry (env, dev):
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
   pod `GET /api/delivery/:id/problems.csv`.
 
-**Rozkładanie kontenera — Tryb B (sesja z wózkiem, spec §5.4)**
-- Lista dokumentów FZ/PZ na MGP (14 dni) z postępem sesji; tryb zapasowy
-  „Rozkładaj całe MGP".
-- Sesja: pozycje **sortowane po lokalizacji docelowej**, `BRAK LOK` na końcu,
-  agregacja tego samego towaru, licznik `zostało N/M poz.`.
-- Tryb wózka: skan towaru na wózek (domyślna ilość = min(pozostało, stan MGP)),
+**Kontenery i zwroty — Tryb B (sesja z wózkiem, spec §5.4)**
+- Wchodzi tu **wyłącznie towar leżący fizycznie poza halą** i wymagający
+  realnego przesunięcia stanu: kontener importowy na MGP (~4× w roku) oraz
+  kartony zwrotów od klientów na magazynie Zwroty.
+- Lista dokumentów (14 dni) z postępem sesji; pozycje **sortowane po lokalizacji
+  docelowej**, `BRAK LOK` na końcu, agregacja tego samego towaru.
+- Tryb wózka: skan towaru na wózek (domyślna ilość = min(pozostało, stan strefy)),
   potwierdzenie ze skanem lokalizacji, częściowe rozłożenie, pomiń, dodanie
   spoza dokumentu, rozjazd lokalizacji.
-- **Zatwierdź wózek → jeden dokument MM + zadania `set_location`** z tej rundy.
+- **Zatwierdź wózek → jeden dokument MM strefa→MAG + zadania `set_location`**
+  z tej rundy.
 - Locki multi-user (TTL 30 min), `waiting_for_doc` gdy dokument w buforze,
   zamknięcie sesji z rozliczeniem (`closed` / `closed_with_deviations`).
-- **Dostawa już na MAG** (biuro zrobiło MM MGP→MAG przed rozłożeniem): dokument
-  ma plakietkę **„na MAG · do zlokalizowania"** (`onMag`) i nadal jest do
-  rozłożenia — w trybie **„tylko lokalizacja"** (skan bez „Brak stanu na MGP",
-  zatwierdzenie tworzy **sam `set_location`, bez MM**). Zwykłe dostawy bez zmian.
+
+**Który tryb obsługuje dokument — rozstrzyga magazyn skutku, nie typ**
+Dokument księgowany wprost na **MAG** idzie trybem A (towar już leży na hali,
+brakuje mu tylko adresu). Dokument lądujący na **MGP albo Zwrotach** idzie trybem
+B, bo wymaga MM. Kryteria są rozłączne — ten sam dokument nie może pojawić się
+w obu zakładkach, inaczej kolektor nadałby adres bez przesunięcia stanu i półka
+kłamałaby względem Subiekta.
 
 **Podgląd magazynu (biuro) — `/lookup`**
 - Lekka strona **tylko do odczytu** na tym samym serwerze i API, dla przeglądarki

@@ -153,10 +153,8 @@ data class PutawayDocument(
     val dataWyst: String = "",
     val dostawca: String = "",
     val positions: Int = 0,
-    /** Strefa źródłowa: dostawy (MGP) lub zwroty od klientów. */
+    /** Strefa źródłowa: kontenery (MGP) lub zwroty od klientów. */
     val zone: PutawayZone = PutawayZone.MGP,
-    /** Towar z dokumentu jest już na MAG (biuro zrobiło MM) — dostawa nadal do rozłożenia, bez MM. */
-    val onMag: Boolean = false,
     val session: PutawaySessionRef? = null,
 )
 
@@ -240,7 +238,7 @@ data class MmItem(val twId: Long, val qty: Double)
 data class MmBody(val items: List<MmItem>)
 
 @Serializable
-data class CreateSessionBody(val docId: Long? = null, val mode: String? = null)
+data class CreateSessionBody(val docId: Long)
 
 @Serializable
 data class CartBody(val twId: Long, val offDocument: Boolean? = null)

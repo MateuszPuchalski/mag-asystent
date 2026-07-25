@@ -37,7 +37,6 @@ import pl.wertis.kolektor.core.net.PutawayDocument
 import pl.wertis.kolektor.core.net.PutawayZone
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
-import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.BarlowCond
@@ -49,9 +48,12 @@ import pl.wertis.kolektor.ui.theme.InkSoft
 import pl.wertis.kolektor.ui.theme.Secondary
 import pl.wertis.kolektor.ui.theme.Success
 
-/* ── Dokumenty do rozłożenia — port putaway/Documents.tsx ───────────────────
-   Zwroty od klientów + dostawy FZ/PZ (14 dni) z postępem sesji; tryb
-   zapasowy „ROZKŁADAJ CAŁE MGP” (bez dokumentu).                             */
+/* ── Tryb B: dokumenty ze strefą źródłową ───────────────────────────────────
+   Zwroty od klientów + kontenery na MGP (14 dni) z postępem sesji.
+
+   Tu trafia WYŁĄCZNIE towar, który fizycznie leży poza magazynem głównym i
+   wymaga realnego przesunięcia stanu (MM strefa→MAG). Dostawy krajowe FZ/PZ
+   księgują się wprost na MAG i idą trybem A — bez sesji, bez wózka, bez MM.  */
 
 @Composable
 fun PutawayDocumentsScreen(graph: AppGraph) {
@@ -65,10 +67,10 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
         }
     }
 
-    fun open(docId: Long?, mode: String? = null) {
+    fun open(docId: Long) {
         scope.launch {
             try {
-                val r = apiCall { graph.api.createSession(CreateSessionBody(docId = docId, mode = mode)) }
+                val r = apiCall { graph.api.createSession(CreateSessionBody(docId = docId)) }
                 reload++
                 graph.nav.openSession(r.sessionId)
             } catch (e: Exception) {
@@ -104,7 +106,7 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
         }
 
         Text(
-            "DOSTAWY FZ/PZ NA MGP · OSTATNIE 14 DNI",
+            "KONTENERY NA MGP · OSTATNIE 14 DNI",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
@@ -121,15 +123,12 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
         }
         deliveries.forEach { d -> DocRow(d) { open(d.docId) } }
 
-        OutlineButton("⧉ ROZKŁADAJ CAŁE MGP", tall = true, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            open(null, mode = "all_mgp")
-        }
         Text(
-            "Tryb zapasowy — wszystkie towary ze stanem na strefie przyjęć, bez dokumentu.",
+            "Dostawy krajowe FZ/PZ rozkłada się w zakładce ROZKŁADANIE — bez sesji i bez MM.",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         )
     }
 }
@@ -182,21 +181,6 @@ private fun DocRow(d: PutawayDocument, onClick: () -> Unit) {
                             .padding(horizontal = 6.dp, vertical = 1.dp),
                     )
                 }
-            }
-            if (d.onMag && (d.session?.progressPct ?: 0.0) < 100.0) {
-                Text(
-                    "na MAG · do zlokalizowania",
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AmberInk,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(top = 3.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(AmberBg)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
             }
             Text(d.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${d.dataWyst} · ${d.positions} poz.", fontSize = 11.sp, color = InkMute)
