@@ -100,4 +100,11 @@ object WIcons {
         moveTo(6f, 6f); lineTo(18f, 18f)
         moveTo(18f, 6f); lineTo(6f, 18f)
     }
+
+    /** Zdjęcie dowodowe do zgłoszenia wyjątku. */
+    val Camera: ImageVector = strokeIcon("camera") {
+        moveTo(3f, 8f); lineTo(7f, 8f); lineTo(9f, 5.5f); lineTo(15f, 5.5f); lineTo(17f, 8f)
+        lineTo(21f, 8f); lineTo(21f, 19f); lineTo(3f, 19f); close()
+        circle(12f, 13f, 3.6f)
+    }
 }

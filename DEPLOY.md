@@ -188,6 +188,16 @@ Domyślne przy `SGT_MODE=mssql`.
 
   Plik trzyma kolejkę, sesje i audyt `events`; źródłem prawdy o towarach
   i stanach pozostaje baza Subiekta, więc to lekki backup.
+- **Zdjęcia dowodowe:** `C:\wertis\server\data\photos\` — to jedyne dane, których
+  nie da się odtworzyć z Subiekta ani z seedu (dowód do reklamacji u dostawcy),
+  więc kopiuj ten katalog razem z bazą:
+
+  ```powershell
+  Copy-Item C:\wertis\server\data\photos "D:\backup\photos-$(Get-Date -Format yyyyMMdd)" -Recurse
+  ```
+
+  Kolektor skaluje kadr do 1280 px / JPEG 70 (~200 KB), więc katalog rośnie
+  wolno; po zamknięciu reklamacji stare zdjęcia można archiwizować ręcznie.
 - **Logi:** `C:\wertis\logs\` (rotacja przez NSSM). Błędy zapisu Sfery widać
   też na kolektorze (czerwona pastylka + PONÓW).
 - **Aktualizacja aplikacji:**

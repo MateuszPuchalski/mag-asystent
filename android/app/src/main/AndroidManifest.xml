@@ -6,6 +6,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Zdjęcie dowodowe robi systemowy aparat. NIE deklarujemy CAMERA:
+         ACTION_IMAGE_CAPTURE jej nie wymaga, a deklaracja wymusiłaby pytanie
+         o uprawnienie w alejce. Na Androidzie 11+ intencja musi być widoczna. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".WertisApp"
         android:allowBackup="true"
@@ -28,5 +37,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Aparat pisze do cache aplikacji; plik ginie zaraz po zakodowaniu. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.photos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

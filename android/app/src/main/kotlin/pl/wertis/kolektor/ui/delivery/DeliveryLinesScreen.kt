@@ -38,6 +38,7 @@ import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.EanCandidate
+import pl.wertis.kolektor.core.net.LocApplyAction
 import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.ScanBody
 import pl.wertis.kolektor.core.net.ScanResolution
@@ -91,6 +92,11 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var active by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     /** Kolizja EAN — operacja stoi, aż użytkownik wybierze (D7). */
     var conflict by remember(id) { mutableStateOf<List<EanCandidate>?>(null) }
+    /** Rozjazd lokalizacji — pytamy PRZED zapisem, nigdy po (§4.3). */
+    var mismatch by remember(id) { mutableStateOf<Pair<DeliveryLineView, String>?>(null) }
+    /** Zgłoszenie wyjątku; `line` = null → problem całej dostawy (D8). */
+    var problemFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
+    var problemOpen by remember(id) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
     suspend fun resolveProduct(code: String) {
@@ -118,21 +124,18 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         }
     }
 
-    /** Drugi skan: lokalizacja → zapis linii (bez MM) i powrót do listy. */
-    suspend fun putaway(line: DeliveryLineView, code: String) {
+    /** Zapis linii (bez MM). `locAction` = null na ścieżce bez rozjazdu. */
+    suspend fun commitPutaway(line: DeliveryLineView, code: String, locAction: LocApplyAction?) {
         if (busy) return
         busy = true
         try {
-            val r = apiCall { graph.api.deliveryPutaway(id, line.id, PutawayLineBody(code)) }
+            apiCall { graph.api.deliveryPutaway(id, line.id, PutawayLineBody(code, locAction = locAction)) }
             graph.feedback.beep(true)
             active = null
+            mismatch = null
             reload++
             graph.queueRepo.refreshNow()
-            if (r.mismatch) {
-                graph.effects.toast("Odłożono w $code (oczekiwano ${line.locExpected})")
-            } else {
-                graph.effects.flashSuccess("$code · ${line.sym}")
-            }
+            graph.effects.flashSuccess("$code · ${line.sym}")
         } catch (e: Exception) {
             graph.feedback.beep(false)
             graph.effects.toast(e.message ?: "Błąd zapisu")
@@ -141,9 +144,27 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         }
     }
 
+    /**
+     * Drugi skan: lokalizacja. Gdy zeskanowana półka nie zgadza się z kartoteką,
+     * zapis CZEKA na decyzję człowieka — serwer nie zgadnie, czy towar
+     * przeniesiono, czy leży teraz w dwóch miejscach (§4.3).
+     */
+    suspend fun putaway(line: DeliveryLineView, code: String) {
+        val expected = line.locExpected
+        if (!expected.isNullOrBlank() && expected != code) {
+            graph.feedback.beep(false)
+            mismatch = line to code
+            return
+        }
+        commitPutaway(line, code, locAction = null)
+    }
+
     // router skanów: gdy czekamy na lokalizację — LOC kończy operację;
-    // w innym wypadku każdy skan próbuje rozstrzygnąć towar
+    // w innym wypadku każdy skan próbuje rozstrzygnąć towar.
+    // Przy otwartym pytaniu (rozjazd / wyjątek) skan jest połykany — decyzja
+    // człowieka nie może zostać przewinięta przez przypadkowy strzał skanera.
     ScanHandlerEffect { scan ->
+        if (mismatch != null || problemOpen) return@ScanHandlerEffect true
         val line = active
         if (line != null && scan.kind != ScanKind.EAN) {
             scope.launch { putaway(line, normalizeLoc(scan.code)) }
@@ -156,6 +177,39 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     val v = view
     if (v == null) {
         LoadingRow("Wczytywanie dostawy…")
+        return
+    }
+
+    // zgłoszenie wyjątku przykrywa wszystko — magazynier już zdecydował, że
+    // rutyna tu nie działa
+    if (problemOpen) {
+        ProblemSheet(
+            graph = graph,
+            deliveryId = id,
+            line = problemFor,
+            onDone = {
+                problemOpen = false
+                problemFor = null
+                active = null
+                reload++
+            },
+            onCancel = {
+                problemOpen = false
+                problemFor = null
+            },
+        )
+        return
+    }
+
+    // rozjazd lokalizacji — zapis czeka na decyzję (§4.3)
+    mismatch?.let { (line, code) ->
+        MismatchSheet(
+            sym = line.sym,
+            expected = line.locExpected ?: "—",
+            scanned = code,
+            onPick = { action -> scope.launch { commitPutaway(line, code, action) } },
+            onCancel = { mismatch = null },
+        )
         return
     }
 
@@ -174,7 +228,14 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
     // karta odkładania (po pierwszym skanie) — wielkie cyfry, czytelne z ramienia
     active?.let { line ->
-        PutawayCard(line, onCancel = { active = null })
+        PutawayCard(
+            line = line,
+            onProblem = {
+                problemFor = line
+                problemOpen = true
+            },
+            onCancel = { active = null },
+        )
         return
     }
 
@@ -211,6 +272,16 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     color = if (v.progress.remaining == 0) Success else Ink,
                 )
             }
+            // wyjątki na tej dostawie nie mają prawa zniknąć z oczu (D8)
+            if (v.progress.problems > 0) {
+                Text(
+                    "${v.progress.problems} ${if (v.progress.problems == 1) "pozycja z problemem" else "pozycje z problemem"}",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Destructive,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
 
         Text(
@@ -219,6 +290,17 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             color = InkSoft,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
+        )
+
+        // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
+        OutlineButton(
+            "ZGŁOŚ PROBLEM DOSTAWY",
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = WIcons.Alert,
+            onClick = {
+                problemFor = null
+                problemOpen = true
+            },
         )
 
         val withLoc = v.lines.filter { it.locExpected != null }
@@ -257,6 +339,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 @Composable
 private fun LineRow(line: DeliveryLineView, onClick: () -> Unit) {
     val done = line.status == "done" || line.status == "skipped"
+    val problem = line.status == "problem"
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,9 +351,17 @@ private fun LineRow(line: DeliveryLineView, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(
-            if (done) WIcons.Check else WIcons.Box,
+            when {
+                problem -> WIcons.Alert
+                done -> WIcons.Check
+                else -> WIcons.Box
+            },
             contentDescription = null,
-            tint = if (done) Success else InkMute,
+            tint = when {
+                problem -> Destructive
+                done -> Success
+                else -> InkMute
+            },
             modifier = Modifier.size(18.dp),
         )
         Column(Modifier.weight(1f)) {
@@ -283,10 +374,19 @@ private fun LineRow(line: DeliveryLineView, onClick: () -> Unit) {
             )
             Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${line.locExpected ?: "—"} · ${formatQty(line.qtyDoc)} szt" +
-                    if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else "",
+                if (problem) {
+                    "ZGŁOSZONY PROBLEM · ${formatQty(line.qtyDoc)} szt"
+                } else {
+                    "${line.locExpected ?: "—"} · ${formatQty(line.qtyDoc)} szt" +
+                        if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else ""
+                },
                 fontSize = 11.sp,
-                color = if (line.locExpected == null) AmberInk else InkMute,
+                fontWeight = if (problem) FontWeight.Bold else FontWeight.Normal,
+                color = when {
+                    problem -> Destructive
+                    line.locExpected == null -> AmberInk
+                    else -> InkMute
+                },
             )
         }
     }
@@ -294,7 +394,7 @@ private fun LineRow(line: DeliveryLineView, onClick: () -> Unit) {
 
 /** Karta po pierwszym skanie: ilość i lokalizacja czytelne z odległości ramienia. */
 @Composable
-private fun PutawayCard(line: DeliveryLineView, onCancel: () -> Unit) {
+private fun PutawayCard(line: DeliveryLineView, onProblem: () -> Unit, onCancel: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -340,6 +440,14 @@ private fun PutawayCard(line: DeliveryLineView, onCancel: () -> Unit) {
             )
         }
 
+        // wyjście awaryjne z rutyny: uszkodzone, brakuje, nie mieści się (§4.6)
+        OutlineButton(
+            "PROBLEM",
+            modifier = Modifier.fillMaxWidth(),
+            danger = true,
+            leadingIcon = WIcons.Alert,
+            onClick = onProblem,
+        )
         OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
     }
 }

@@ -7,6 +7,7 @@ import {
   putawayLine,
   resolveScan,
 } from "../services/delivery.js";
+import type { LocApplyAction } from "../types.js";
 
 /* ── Tryb A: rozkładanie dostaw krajowych (redesign v2.0) ────────────────────
    Ścieżka codzienna: dokument → skan towaru → skan lokalizacji. Zapis wyłącznie
@@ -42,13 +43,24 @@ export async function deliveryRoutes(app: FastifyInstance) {
     }
   );
 
-  /** Odłożenie linii: skan lokalizacji obowiązkowy (D3). Bez MM. */
-  app.post<{ Params: { id: string; lineId: string }; Body: { location: string; qty?: number } }>(
+  /**
+   * Odłożenie linii: skan lokalizacji obowiązkowy (D3). Bez MM.
+   * `locAction` rozstrzyga rozjazd (§4.3): 'replace' = towar przeniesiony,
+   * 'add' = druga lokalizacja tego samego towaru. Decyduje magazynier w dialogu,
+   * a nie serwer — z samego skanu nie da się odróżnić tych dwóch sytuacji.
+   */
+  app.post<{
+    Params: { id: string; lineId: string };
+    Body: { location: string; qty?: number; locAction?: LocApplyAction };
+  }>(
     "/api/delivery/:id/lines/:lineId/putaway",
     async (req, reply) => {
-      const { location, qty } = req.body ?? ({} as { location?: string; qty?: number });
+      const { location, qty, locAction } = req.body ?? ({} as { location?: string; qty?: number });
       if (!location) return reply.code(400).send({ error: "Brak kodu lokalizacji" });
-      const r = putawayLine(Number(req.params.lineId), location, qty, userOf(req));
+      if (locAction && locAction !== "add" && locAction !== "replace") {
+        return reply.code(400).send({ error: `Nieznana akcja lokalizacji: ${locAction}` });
+      }
+      const r = putawayLine(Number(req.params.lineId), location, qty, userOf(req), locAction ?? "replace");
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
       return r;
     }

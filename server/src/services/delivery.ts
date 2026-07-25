@@ -5,6 +5,7 @@ import { enqueueSetLocation } from "./queue.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
+import { recordEanConflict } from "./ean.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -19,6 +20,9 @@ import type {
    od bufora — dostawę można rozkładać, zanim księgowość zaksięguje FZ.       */
 
 const nowIso = () => new Date().toISOString();
+
+/** Statusy linii, które nie wracają już do rutyny alejkowej. */
+const TERMINAL_LINE: ReadonlySet<string> = new Set(["done", "skipped", "problem"]);
 
 /**
  * Walidacja kodu lokalizacji w trybie A — twarda (§9, §16). Poza bazowymi
@@ -41,7 +45,7 @@ export function listDocuments(days = 14): DeliveryDocument[] {
     .prepare(
       `SELECT d.sgt_dok_id AS dokId,
               COUNT(l.id) AS total,
-              SUM(CASE WHEN l.status IN ('done','skipped') THEN 1 ELSE 0 END) AS done,
+              SUM(CASE WHEN l.status IN ('done','skipped','problem') THEN 1 ELSE 0 END) AS done,
               d.status AS status
        FROM delivery d LEFT JOIN delivery_line l ON l.delivery_id = d.id
        GROUP BY d.id`
@@ -155,7 +159,11 @@ export function getDelivery(id: number): DeliveryView | undefined {
       return a.locExpected.localeCompare(b.locExpected) || a.sym.localeCompare(b.sym);
     });
 
-  const done = lines.filter((l) => l.status === "done" || l.status === "skipped").length;
+  // linia z problemem wychodzi z rutyny alejkowej (żyje dalej na liście wyjątków),
+  // więc nie trzyma dostawy otwartej — inaczej zgłoszenie problemu karałoby
+  // zgłaszającego i nikt by go nie zgłaszał (D8)
+  const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
+  const problems = lines.filter((l) => l.status === "problem").length;
   return {
     id: d.id,
     dokId: d.sgt_dok_id,
@@ -163,7 +171,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dostawca: d.dostawca ?? "",
     dataWyst: d.data_dok ?? "",
     status: d.status,
-    progress: { total: lines.length, done, remaining: lines.length - done },
+    progress: { total: lines.length, done, remaining: lines.length - done, problems },
     lines,
   };
 }
@@ -198,12 +206,14 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
         ean: code,
         candidates: candidates.map((c) => c.tw_id),
       });
+      recordEanConflict(code, candidates.map((c) => c.tw_id), inDoc[0].tw_id, true);
       return toResolution(inDoc[0], lineByTw.get(inDoc[0].tw_id));
     }
     logEvent("ean_conflict", user, null, {
       ean: code,
       candidates: candidates.map((c) => c.tw_id),
     });
+    recordEanConflict(code, candidates.map((c) => c.tw_id), null, false);
     return {
       kind: "conflict",
       code,
@@ -256,7 +266,13 @@ export function putawayLine(
   lineId: number,
   location: string,
   qty: number | undefined,
-  user: string
+  user: string,
+  /**
+   * Co zrobić z dotychczasowymi lokalizacjami, gdy magazynier odłożył gdzie
+   * indziej (§4.3): 'replace' = towar przeniesiony, 'add' = druga lokalizacja.
+   * Domyślnie 'replace' — zgodność ze ścieżką bez rozjazdu.
+   */
+  locAction: "add" | "replace" = "replace"
 ): { ok: true; queueId?: number; mismatch: boolean; status: string } | { error: string; status?: number } {
   const line = db().prepare("SELECT * FROM delivery_line WHERE id = ?").get(lineId) as any;
   if (!line) return { error: "Brak pozycji" };
@@ -277,7 +293,11 @@ export function putawayLine(
   const current = parseLocs(t?.lokalizacja);
   let queueId: number | undefined;
   if (current[0] !== code) {
-    const newLocs = current.length <= 1 ? [code] : Array.from(new Set([code, ...current]));
+    const newLocs =
+      locAction === "add"
+        ? Array.from(new Set([code, ...current]))
+        : // 'replace' — towar przeniesiony: nowa lokalizacja zastępuje pickingową
+          Array.from(new Set([code, ...current.slice(1)]));
     queueId = enqueueSetLocation(line.tw_id, newLocs.join(" ").slice(0, config.locFieldLimit), {
       createdBy: user,
       twId: line.tw_id,
@@ -315,11 +335,11 @@ export function putawayLine(
 }
 
 /** Dostawa zamyka się sama, gdy nie ma już czego rozkładać. */
-function closeIfComplete(deliveryId: number, user: string): void {
+export function closeIfComplete(deliveryId: number, user: string): void {
   const left = (
     db()
       .prepare(
-        "SELECT COUNT(*) AS n FROM delivery_line WHERE delivery_id=? AND status NOT IN ('done','skipped')"
+        "SELECT COUNT(*) AS n FROM delivery_line WHERE delivery_id=? AND status NOT IN ('done','skipped','problem')"
       )
       .get(deliveryId) as { n: number }
   ).n;

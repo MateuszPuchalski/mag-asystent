@@ -107,7 +107,8 @@ export interface DeliveryView {
   dostawca: string;
   dataWyst: string;
   status: string;
-  progress: { total: number; done: number; remaining: number };
+  /** `problems` ⊂ `done` — linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
+  progress: { total: number; done: number; remaining: number; problems: number };
   lines: DeliveryLineView[];
 }
 
@@ -127,3 +128,35 @@ export type ScanResolution =
   | { kind: "conflict"; code: string; candidates: EanCandidate[] }
   | { kind: "off_document"; code: string; twId: number; sym: string; name: string }
   | { kind: "unknown"; code: string };
+
+/* ── Faza 2: wyjątki (D8) ───────────────────────────────────────────────── */
+
+export type ProblemType =
+  | "qty_short"
+  | "qty_over"
+  | "damaged"
+  | "wrong_item"
+  | "no_space"
+  | "unknown_barcode"
+  | "ean_conflict";
+
+export interface ProblemView {
+  id: number;
+  deliveryId: number | null;
+  lineId: number | null;
+  typ: string;
+  qty: number | null;
+  opis: string | null;
+  hasPhoto: boolean;
+  createdAt: string;
+  createdBy: string | null;
+  resolvedAt: string | null;
+  resolvedNote: string | null;
+  /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
+  docNumber: string | null;
+  sym: string | null;
+  name: string | null;
+}
+
+/** Wybór operatora przy skanie innej półki niż oczekiwana (§4.3). */
+export type LocApplyAction = "add" | "replace";
