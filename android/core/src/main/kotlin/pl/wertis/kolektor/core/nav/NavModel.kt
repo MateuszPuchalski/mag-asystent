@@ -6,6 +6,9 @@ package pl.wertis.kolektor.core.nav
 
 enum class Screen {
     SPLASH, HOME, PRODUCT, SCAN_LOC, MM, QUEUE,
+    // tryb A (dostawy krajowe) — dokument jest jednostką pracy
+    DELIVERY_DOCS, DELIVERY_LINES,
+    // tryb B (kontener) — sesja z wózkiem, schowany za osobnym wejściem
     PUTAWAY_DOCS, PUTAWAY_SESSION, LOCATION, SETTINGS,
 }
 
@@ -13,6 +16,8 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.PRODUCT to Screen.HOME,
     Screen.SCAN_LOC to Screen.PRODUCT,
     Screen.MM to Screen.PRODUCT,
+    Screen.DELIVERY_LINES to Screen.DELIVERY_DOCS,
+    Screen.PUTAWAY_DOCS to Screen.DELIVERY_DOCS,
     Screen.PUTAWAY_SESSION to Screen.PUTAWAY_DOCS,
     Screen.LOCATION to Screen.HOME,
     Screen.SETTINGS to Screen.HOME,
@@ -29,7 +34,9 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.SCAN_LOC to "ZMIANA LOKALIZACJI",
     Screen.MM to "MM MGP→MAG",
     Screen.QUEUE to "KOLEJKA SFERY",
-    Screen.PUTAWAY_DOCS to "ROZKŁADANIE",
+    Screen.DELIVERY_DOCS to "ROZKŁADANIE",
+    Screen.DELIVERY_LINES to "DOSTAWA",
+    Screen.PUTAWAY_DOCS to "KONTENER",
     Screen.PUTAWAY_SESSION to "SESJA ROZKŁADANIA",
     Screen.LOCATION to "LOKALIZACJA",
     Screen.SETTINGS to "USTAWIENIA",

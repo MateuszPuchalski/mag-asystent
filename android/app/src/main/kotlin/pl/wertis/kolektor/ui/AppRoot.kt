@@ -30,6 +30,8 @@ import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.mm.MMScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
+import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
+import pl.wertis.kolektor.ui.delivery.DeliveryLinesScreen
 import pl.wertis.kolektor.ui.putaway.PutawayDocumentsScreen
 import pl.wertis.kolektor.ui.putaway.PutawaySessionScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
@@ -92,6 +94,8 @@ fun AppRoot(graph: AppGraph) {
                 Screen.SCAN_LOC -> ScanLocScreen(graph)
                 Screen.MM -> MMScreen(graph)
                 Screen.QUEUE -> QueueScreen(graph)
+                Screen.DELIVERY_DOCS -> DeliveryDocumentsScreen(graph)
+                Screen.DELIVERY_LINES -> DeliveryLinesScreen(graph)
                 Screen.PUTAWAY_DOCS -> PutawayDocumentsScreen(graph)
                 Screen.PUTAWAY_SESSION -> PutawaySessionScreen(graph)
                 Screen.LOCATION -> LocationScreen(graph)
@@ -107,7 +111,7 @@ fun AppRoot(graph: AppGraph) {
         TabBar(
             screen = screen,
             onHome = { graph.nav.go(Screen.HOME) },
-            onPutaway = { graph.nav.go(Screen.PUTAWAY_DOCS) },
+            onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
         )
     }
 }

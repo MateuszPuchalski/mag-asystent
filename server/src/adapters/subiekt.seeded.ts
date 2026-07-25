@@ -27,6 +27,12 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .get(ean) as RawProduct | undefined;
   }
 
+  findProductsByEan(ean: string): RawProduct[] {
+    return db()
+      .prepare("SELECT * FROM sgt_towar WHERE ean = ? ORDER BY symbol")
+      .all(ean) as RawProduct[];
+  }
+
   getProductBySymbol(symbol: string): RawProduct | undefined {
     return db()
       .prepare("SELECT * FROM sgt_towar WHERE symbol = ? COLLATE NOCASE")
@@ -90,6 +96,19 @@ export class SeededSubiektAdapter implements SubiektAdapter {
          ORDER BY data_wyst DESC, dok_id DESC`
       )
       .all(config.magId.MGP, config.magId.ZWROTY, cutoff) as RawDocument[];
+  }
+
+  listDeliveryDocuments(days: number): RawDocument[] {
+    const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+    // po TYPIE dokumentu, nie po magazynie: w trybie A skutek idzie wprost na MAG,
+    // a zwroty (ZW) mają własną ścieżkę
+    return db()
+      .prepare(
+        `SELECT * FROM sgt_dokument
+         WHERE typ IN ('FZ','PZ') AND data_wyst >= ?
+         ORDER BY data_wyst DESC, dok_id DESC`
+      )
+      .all(cutoff) as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {

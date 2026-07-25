@@ -95,4 +95,25 @@ class DtosTest {
         )
         assertEquals(true, d3.onMag)
     }
+
+    @Test fun `ScanResolution rozroznia kolizje EAN od linii`() {
+        val line = WertisJson.decodeFromString<ScanResolution>(
+            """{"kind":"line","line":{"id":7,"twId":401,"sym":"56-003","name":"Pilnik","qtyDoc":50,
+                "qtyDone":0,"locExpected":"C03-01-03","status":"todo","aisle":"C"}}"""
+        )
+        assertEquals("56-003", (line as ScanResolution.Line).line.sym)
+
+        // kod wskazujący 2 kartoteki musi dać conflict — nigdy „pierwsze dopasowanie"
+        val c = WertisJson.decodeFromString<ScanResolution>(
+            """{"kind":"conflict","code":"5905947596430","candidates":[
+                {"twId":1,"sym":"W43-2002-1M","name":"sznurek 1 m","inDocument":true,"qtyDoc":200,"locExpected":"G14-03-03"},
+                {"twId":2,"sym":"W43-2002","name":"sznurek 100 m","inDocument":false}]}"""
+        )
+        val conflict = c as ScanResolution.Conflict
+        assertEquals(2, conflict.candidates.size)
+        assertEquals(true, conflict.candidates[0].inDocument)
+
+        val unknown = WertisJson.decodeFromString<ScanResolution>("""{"kind":"unknown","code":"123"}""")
+        assertEquals("123", (unknown as ScanResolution.Unknown).code)
+    }
 }

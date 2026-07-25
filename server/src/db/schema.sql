@@ -120,3 +120,37 @@ CREATE TABLE IF NOT EXISTS counters (
   value INTEGER NOT NULL
 );
 INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
+
+-- ── Tryb A: rozkładanie dostaw krajowych (redesign v2.0) ────────────────────
+-- Jednostką pracy jest DOKUMENT FZ/PZ, nie sesja (D2). Skutek magazynowy niesie
+-- sam dokument w Subiekcie (księgowany wprost na MAG), więc aplikacja zapisuje
+-- WYŁĄCZNIE lokalizację (D1): żadnego MM, żadnego waiting_for_doc. Dzięki temu
+-- można rozkładać dostawę, zanim księgowość zaksięguje FZ (dokument w buforze).
+CREATE TABLE IF NOT EXISTS delivery (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  sgt_dok_id    INTEGER NOT NULL UNIQUE,
+  sgt_dok_numer TEXT NOT NULL,
+  dostawca      TEXT,
+  data_dok      TEXT,
+  status        TEXT NOT NULL DEFAULT 'open',   -- open | done | abandoned
+  opened_at     TEXT NOT NULL,
+  closed_at     TEXT
+);
+
+-- Postęp per linia (D4): zapis natychmiastowy, przerwanie pracy nic nie kosztuje.
+CREATE TABLE IF NOT EXISTS delivery_line (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  delivery_id    INTEGER NOT NULL REFERENCES delivery(id),
+  tw_id          INTEGER NOT NULL,
+  tw_symbol      TEXT NOT NULL,
+  tw_nazwa       TEXT NOT NULL,
+  ilosc_dok      REAL NOT NULL,                 -- snapshot z FZ w chwili otwarcia
+  ilosc_odlozona REAL NOT NULL DEFAULT 0,
+  lok_oczekiwana TEXT,                          -- tw_Lokalizacja w chwili otwarcia
+  lok_faktyczna  TEXT,                          -- zeskanowana (fakt, nie intencja — D3)
+  status         TEXT NOT NULL DEFAULT 'todo',  -- todo | done | partial | problem | skipped
+  done_at        TEXT,
+  done_by        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
+CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);

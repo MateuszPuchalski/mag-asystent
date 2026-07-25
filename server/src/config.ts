@@ -101,6 +101,17 @@ export const config = {
   locFormat: process.env.LOC_FORMAT ?? "^[A-Z]\\d{2}-\\d{2}-\\d{2}$",
   /** Twarde egzekwowanie `locFormat` (odrzuca kody spoza wzorca). */
   locStrict: process.env.LOC_STRICT === "1",
+
+  /**
+   * Wzorce kodów lokalizacji egzekwowane BEZWARUNKOWO w trybie A (redesign §9).
+   * Skan lokalizacji jest tam jedynym dowodem, że towar trafił tam, gdzie system
+   * myśli (D3) — kod spoza wzorca musi być błędem, nigdy cichym zapisem.
+   * Kompilowane raz (nie per wywołanie).
+   */
+  deliveryLocPatterns: [
+    process.env.LOC_FORMAT_STANDARD ?? "^[A-J]\\d{2}-\\d{2}-\\d{2}$",
+    process.env.LOC_FORMAT_PALLET ?? "^PAL-\\d{3}$",
+  ].map((p) => new RegExp(p)),
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
 

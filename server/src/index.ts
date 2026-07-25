@@ -8,6 +8,7 @@ import { productRoutes } from "./routes/products.js";
 import { mmRoutes } from "./routes/mm.js";
 import { queueRoutes } from "./routes/queue.js";
 import { putawayRoutes } from "./routes/putaway.js";
+import { deliveryRoutes } from "./routes/delivery.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
 import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
@@ -49,6 +50,7 @@ async function main() {
   await app.register(mmRoutes);
   await app.register(queueRoutes);
   await app.register(putawayRoutes);
+  await app.register(deliveryRoutes);
   await app.register(locationRoutes);
   await app.register(deviceRoutes);
 

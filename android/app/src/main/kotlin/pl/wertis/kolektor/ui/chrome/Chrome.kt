@@ -177,7 +177,8 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
 
 @Composable
 fun TabBar(screen: Screen, onHome: () -> Unit, onPutaway: () -> Unit) {
-    val putawayActive = screen == Screen.PUTAWAY_DOCS || screen == Screen.PUTAWAY_SESSION
+    val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES ||
+        screen == Screen.PUTAWAY_DOCS || screen == Screen.PUTAWAY_SESSION
     val homeActive = !putawayActive && screen != Screen.QUEUE
 
     Row(
