@@ -154,11 +154,6 @@ fun SettingsScreen(graph: AppGraph) {
                 settings.wakeLock,
             ) { v -> graph.settings.update { it.copy(wakeLock = v) } }
             ToggleRow(
-                "Potrząśnij = COFNIJ",
-                "działa tylko w oknie karencji po zapisie",
-                settings.shakeUndo,
-            ) { v -> graph.settings.update { it.copy(shakeUndo = v) } }
-            ToggleRow(
                 "Log upadków urządzenia",
                 "wpis audytowy device_drop dla serwisu",
                 settings.dropLog,

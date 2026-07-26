@@ -98,7 +98,7 @@ fun ProductScreen(graph: AppGraph) {
 
     val p = poll.data
 
-    /** Zapis relokacji ze skanu + pasek COFNIJ (wspólny zapis — SaveLocation.kt). */
+    /** Zapis relokacji ze skanu (wspólny zapis — SaveLocation.kt). */
     fun saveLoc(choice: LocChoice, successMsg: String) {
         if (saving) return
         saving = true

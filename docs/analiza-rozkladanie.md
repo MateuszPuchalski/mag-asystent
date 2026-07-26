@@ -142,9 +142,10 @@ rozjeździe półek; odporność na dziury Wi-Fi daje trwały bufor offline (Roo
    miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru albo
    lokalizacje towarów o podobnym symbolu — zamiast zostawiać człowieka z pustą
    półką w głowie.
-2. **Korekta po zatwierdzeniu MM.** Okno COFNIJ działa dla zapisu lokalizacji
-   z karty towaru (karencja `UNDO_GRACE_MS`), ale pomyłkowo domkniętego koszyka
-   ani zatwierdzonego wózka nie da się cofnąć — to wymagałoby odwrotnego MM.
+2. **Korekta po zatwierdzeniu MM.** Pomyłkowej lokalizacji nie trzeba cofać —
+   wystarczy zeskanować właściwą półkę (dlatego mechanizm COFNIJ i jego karencja
+   zostały usunięte). Ale pomyłkowo domkniętego koszyka ani zatwierdzonego wózka
+   odkręcić się nie da — to wymagałoby odwrotnego MM.
 3. **Świeżość snapshotu.** Pozycje dostawy i sesji to snapshot z chwili
    otwarcia; korekta dokumentu przez księgowość w trakcie pracy nie dochodzi.
    Świadomy kompromis (postęp się nie rozjeżdża), ale przydałby się sygnał

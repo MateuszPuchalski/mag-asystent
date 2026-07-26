@@ -5,14 +5,17 @@ import pl.wertis.kolektor.core.loc.isKnownLoc
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.offline.PendingOp
-import pl.wertis.kolektor.ui.chrome.UndoInfo
 
 /* ── Zapis lokalizacji towaru — jedno miejsce dla karty towaru i ekranu skanu ──
-   Semantyka offline (bufor) + pasek COFNIJ musi być identyczna na obu ekranach,
-   więc mieszka tutaj, a nie w dwóch kopiach.                                   */
+   Semantyka offline (bufor) i potwierdzenie muszą być identyczne na obu
+   ekranach, więc mieszkają tutaj, a nie w dwóch kopiach.
+
+   Pasek COFNIJ został usunięty: pomyłkową lokalizację poprawia się skanując
+   właściwą półkę — ta sama liczba ruchów, a bez karencji zapis rusza od razu
+   zamiast czekać 5 sekund na okno anulowania.                                  */
 
 /**
- * Zapisz lokalizację (przez bufor offline) i pokaż pasek COFNIJ.
+ * Zapisz lokalizację (przez bufor offline) i potwierdź na ekranie.
  * Rzuca wyjątkiem tylko z błędu serwera — wołający decyduje, co pokazać.
  */
 suspend fun saveLocation(
@@ -32,12 +35,10 @@ suspend fun saveLocation(
     )
     graph.queueRepo.refreshNow()
     graph.feedback.beep(true)
-    graph.effects.showUndo(
-        UndoInfo(
-            msg = if (res.offline) "Zapisano lokalnie · ${choice.value}" else "$successMsg · ${choice.value}",
-            queueId = res.queueId,
-            bufferId = res.bufferId,
-            warn = warn,
-        )
+    graph.effects.flashSuccess(
+        if (res.offline) "Zapisano lokalnie · ${choice.value}" else "$successMsg · ${choice.value}"
     )
+    // kod spoza wykazu to nie błąd, ale magazynier ma go zobaczyć — toast żyje
+    // dłużej niż plakietka sukcesu, więc nie ginie pod nią
+    warn?.let { graph.effects.toast(it) }
 }

@@ -39,16 +39,14 @@ interface OpStorage {
 
 /** Wysyłka operacji na serwer. Rzuca ApiError przy odrzuceniu, inne wyjątki = sieć. */
 fun interface OpSender {
-    /** @return queueId zadania w kolejce Sfery (do COFNIJ), gdy serwer go zwraca. */
+    /** @return queueId zadania w kolejce Sfery, gdy serwer go zwraca. */
     suspend fun send(op: PendingOp): Long?
 }
 
 data class RunResult(
     val offline: Boolean,
-    /** id zadania w kolejce Sfery (online) — do COFNIJ. */
+    /** id zadania w kolejce Sfery (online); null gdy poszło do bufora. */
     val queueId: Long? = null,
-    /** id operacji w buforze (offline) — do COFNIJ. */
-    val bufferId: String? = null,
 )
 
 class OfflineQueue(
@@ -99,15 +97,7 @@ class OfflineQueue(
             }
         }
         persist(ops + op)
-        return RunResult(offline = true, bufferId = op.id)
-    }
-
-    /** Usuń operację z bufora (COFNIJ przed wysłaniem). Zwraca czy istniała. */
-    fun remove(bufferId: String): Boolean {
-        val next = ops.filter { it.id != bufferId }
-        val removed = next.size != ops.size
-        if (removed) persist(next)
-        return removed
+        return RunResult(offline = true)
     }
 
     /** Spróbuj wysłać całą kolejkę. Przy awarii sieci — przerwij i zostaw resztę. */

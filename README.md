@@ -125,8 +125,8 @@ Parametry (env, dev):
   PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
   prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
   błąd) — jest jednocześnie wskaźnikiem stanu; dolny pasek ma 2 zakładki.
-- Bufor offline (Room) na zapisy przy zaniku Wi-Fi, pasek COFNIJ (anulowanie
-  zadania w oknie łaski), potrząśnięcie = cofnij, asysta niskiej baterii.
+- Bufor offline (Room) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
+  log upadków urządzenia (`device_drop`) dla serwisu.
 
 **Rozkładanie dostaw i zwrotów — Tryb A (redesign v2.0)** — druga zakładka
 - Jednostką pracy jest **dokument** (FZ/PZ albo zbiorczy dokument zwrotów), nie
@@ -225,7 +225,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 56 testów jednostkowych; buduje się bez Android SDK
+                           + 55 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup
