@@ -209,6 +209,11 @@ class DtosTest {
     }
 
     @Test fun `ScanResolution rozroznia kolizje EAN od linii`() {
+        // `aisle` NIE jest już polem DTO — kolektor przestał grupować listę po
+        // alejkach, gdy okazało się, że rozkłada się „co wpadnie w rękę". Serwer
+        // dalej je wysyła (dalej po nim sortuje), więc to zostaje w JSON-ie
+        // celowo: gdyby `ignoreUnknownKeys` kiedyś zniknęło, ten test padnie
+        // zamiast wywalić rozkładanie na kolektorze.
         val line = WertisJson.decodeFromString<ScanResolution>(
             """{"kind":"line","line":{"id":7,"twId":401,"sym":"56-003","name":"Pilnik","qtyDoc":50,
                 "qtyDone":0,"locExpected":"C03-01-03","status":"todo","aisle":"C"}}"""

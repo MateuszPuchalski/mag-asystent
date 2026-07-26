@@ -27,9 +27,12 @@ raz z przesunięciem stanu, raz bez.
 2. **Otwarcie** (`openDelivery`) — pozycje snapshotowane w chwili otwarcia
    i agregowane po `tw_id` (różne partie/ceny → jedna linia robocza). Zmiana
    dokumentu przez księgowość w trakcie pracy nie rozjeżdża postępu.
-3. **Dwa skany na pozycję** — skan towaru (`resolveScan`) → karta z ilością
-   i lokalizacją docelową → skan etykiety regału (`putawayLine`) → zapis.
-   Zero dialogu potwierdzającego, zero tapnięć na ścieżce głównej.
+3. **Dwa skany na pozycję** — skan towaru (`resolveScan`) → wiersz na liście
+   rozwija się z ilością i lokalizacją docelową → skan etykiety regału
+   (`putawayLine`) → zapis, wiersz zwija się jako odłożony. Zero dialogu
+   potwierdzającego, zero tapnięć na ścieżce głównej i **zero podmieniania
+   ekranu**: lista zostaje widoczna, bo to na niej widać, ile jeszcze zostało
+   w kartonie. Wcześniej wchodziła tu pełnoekranowa karta, która listę gasiła.
 4. **Zapis** — wyłącznie zadanie `set_location` do `sfera_queue`. Żadnego MM,
    żadnego `waiting_for_doc`.
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już

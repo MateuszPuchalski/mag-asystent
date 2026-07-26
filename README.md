@@ -227,12 +227,21 @@ Parametry (env, dev):
   są do wzięcia: przy dostawie krajowej skutek magazynowy niesie sam dokument
   w Subiekcie, więc aplikacja zapisuje **wyłącznie lokalizację** — zero MM, zero
   `waiting_for_doc`.
-- Ścieżka codzienna to **dwa skany na pozycję**: skan towaru → karta z ilością
-  i lokalizacją docelową → skan etykiety regału → zapis. Bez dialogu
-  potwierdzającego. Postęp zapisuje się per pozycja, więc przerwanie pracy nic
-  nie kosztuje; dostawa zamyka się sama, gdy nie ma już czego rozkładać.
-- Lista **posortowana po lokalizacji docelowej** (alejkami, nie kolejnością
-  z faktury), pozycje **BEZ LOKALIZACJI** w osobnej sekcji na końcu.
+- Ścieżka codzienna to **dwa skany na pozycję**: skan towaru → wiersz rozwija
+  się z ilością i lokalizacją docelową → skan etykiety regału → zapis, a wiersz
+  zwija się jako odłożony. Bez dialogu potwierdzającego. Postęp zapisuje się per
+  pozycja, więc przerwanie pracy nic nie kosztuje; dostawa zamyka się sama, gdy
+  nie ma już czego rozkładać.
+- **Nic nie podmienia listy.** Rutyna i rozjazd lokalizacji dzieją się w wierszu,
+  a wyjątek ze zdjęciem i wybór przy kolizji EAN wysuwają się jako arkusz od
+  dołu — dostawa zostaje widoczna pod spodem, bo to na niej widać, ile jeszcze
+  zostało w kartonie.
+- Lista jest **kontrolą kompletności, nie kolejką**: pozycje bierze się z kartonu
+  w takiej kolejności, w jakiej wpadną w rękę. Odłożone **zwężają się w miejscu**
+  (dziesięć pozycji drobnicy mieści się na jednym ekranie), kolejność wierszy się
+  nie zmienia, a pozycje **BEZ LOKALIZACJI** idą na koniec jako osobna sekcja.
+  Serwer sortuje po lokalizacji docelowej, ale kolektor nie rysuje już nagłówków
+  alejek — przy pracy „co wpadnie w rękę" nikt po nich nie nawigował.
 - **Niejednoznaczny kod kreskowy zatrzymuje operację** — aplikacja nigdy nie
   bierze „pierwszego dopasowania”. Jedyne automatyczne zawężenie: dokładnie
   jeden kandydat występuje w otwartym dokumencie.
@@ -363,7 +372,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 85 testów jednostkowych; buduje się bez Android SDK
+                           + 92 testy jednostkowe; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

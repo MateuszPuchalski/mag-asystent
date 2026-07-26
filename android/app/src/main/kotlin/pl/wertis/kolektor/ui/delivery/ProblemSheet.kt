@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +66,7 @@ import pl.wertis.kolektor.ui.theme.Destructive
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
+import pl.wertis.kolektor.ui.theme.Paper
 import pl.wertis.kolektor.ui.theme.Muted
 import pl.wertis.kolektor.ui.theme.cardSurface
 import java.io.File
@@ -74,8 +77,15 @@ import java.io.File
    OBOWIĄZKOWE: bez dowodu nie ma rozmowy z dostawcą, jest tylko wersja.
 
    Blokadę pokazujemy jako zdanie pod przyciskiem, a nie jako wyszarzenie bez
-   powodu — magazynier w alejce musi wiedzieć, czego brakuje.                  */
+   powodu — magazynier w alejce musi wiedzieć, czego brakuje.
 
+   ARKUSZ OD DOŁU, NIE PEŁNY EKRAN. Wcześniej ten composable wchodził przez
+   `return` przed listą pozycji i gasił ją całkowicie. Zgłoszenie wyjątku
+   potrzebuje miejsca (siedem kafli, notatka, aparat), ale nie potrzebuje
+   ZABIERAĆ kontekstu: pod spodem ma zostać widok dostawy, z którego widać,
+   ile jeszcze zostało i czy ta pozycja jest ostatnia.                         */
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProblemSheet(
     graph: AppGraph,
@@ -169,8 +179,19 @@ fun ProblemSheet(
         }
     }
 
+    ModalBottomSheet(
+        onDismissRequest = {
+            PhotoCapture.discard(photoFile)
+            onCancel()
+        },
+        containerColor = Paper,
+    ) {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 14.dp)
+            .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -257,6 +278,7 @@ fun ProblemSheet(
                 onCancel()
             },
         )
+    }
     }
 }
 
