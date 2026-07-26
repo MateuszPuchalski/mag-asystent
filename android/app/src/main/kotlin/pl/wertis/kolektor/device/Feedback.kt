@@ -31,11 +31,6 @@ class Feedback(context: Context) {
         vibrate(ok)
     }
 
-    /**
-     * Jedna długa wibracja — wygaśnięcie przypiętego kontekstu (plan §6).
-     * Musi być odczuwalnie inna niż „skan przyjęty", bo mówi coś przeciwnego:
-     * to, co było, właśnie przestało obowiązywać.
-
     private fun vibrate(ok: Boolean) {
         val v = vibrator ?: return
         try {
