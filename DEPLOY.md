@@ -21,6 +21,9 @@ Maszyna z Subiektem GT (Windows)
 
 ---
 
+> **Jak to jest zbudowane i dlaczego tak** — [`docs/architektura.md`](docs/architektura.md).
+> Ten dokument mówi tylko, jak to uruchomić.
+
 ## 1. Wymagania
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,
@@ -265,6 +268,21 @@ curl -X POST http://<IP-serwera>:3001/api/users/migrate-history \
 Po migracji przejrzyj `nazwy` — wpisy w rodzaju „magazynier" albo „test"
 wyłącz przez `POST /api/users/:id/active` z `{"active":false,"pinAutora":"4821"}`.
 Konta się **nie kasuje**: historia w `events` musi mieć na co wskazywać.
+
+**3a. Co wymaga PIN-u.** Sam badge wystarcza do codziennej pracy. PIN wchodzi
+w dwóch miejscach, bo badge'e bywają pożyczane:
+
+| operacja | kto | gdzie |
+|---|---|---|
+| odebranie koledze zajętej pozycji przed 30-min TTL | brygadzista lub biuro | kolektor: skan zajętego towaru → propozycja odebrania |
+| zakładanie kont, PIN-y, wyłączanie kont | **tylko biuro** | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
+
+Odebranie pozycji zapisuje w `events` (`lock_forced`) **komu i przez kogo**.
+Lock już wygasły zdejmuje się bez wpisu — po TTL nikomu nic nie odebrano.
+
+Zarządzanie kontami jest zastrzeżone dla biura, bo to jedyna operacja tworząca
+tożsamość: brygadzista mogący zakładać konta założyłby konto biura z własnym
+PIN-em i reszta reguł przestałaby cokolwiek znaczyć.
 
 **4. Raport wydajności (`GET /api/wydajnosc?days=7`) — obowiązek formalny
 PRZED uruchomieniem.** Telemetria per pracownik to **monitoring pracowniczy**

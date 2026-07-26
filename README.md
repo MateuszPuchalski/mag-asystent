@@ -53,6 +53,10 @@ Strefa przyjęć nazywa się **MGP**.
 
 ## Architektura (spec §3)
 
+> Pełny opis — komponenty, granica do Subiekta, model danych, tożsamość,
+> offline i decyzje projektowe wraz z powodami — w
+> [`docs/architektura.md`](docs/architektura.md). Poniżej sam szkielet.
+
 ```
 Kolektor (Android)  ───REST/JSON──►  Serwer Fastify
                                        │  SQLite: delivery + delivery_line (tryb A:
@@ -374,7 +378,10 @@ server/                    backend (Fastify + SQLite + worker)
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
-docs/                      analiza rozkładania + instrukcja podpięcia Subiekta GT
+docs/architektura.md       jak to jest zbudowane i dlaczego tak (start dla nowej osoby)
+docs/analiza-rozkladanie.md trzy ścieżki rozkładania + backlog
+docs/subiekt-gt-edu-setup.md  podpięcie Subiekta GT krok po kroku
+docs/subiekt-gt-struktura.md  co WERTIS czyta i pisze w bazie Subiekta
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 tools/docs_check.py        kontrola spójności dokumentacji z repo (martwe ścieżki,
                            usunięte byty, liczby ekranów/testów) — `python3 tools/docs_check.py`
