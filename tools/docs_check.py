@@ -54,11 +54,21 @@ def main() -> int:
             bad += 1
         # Sekcja opisująca, co zniknęło, MA prawo nazywać usunięte byty po
         # imieniu — po to istnieje. Reszta dokumentu nie.
+        #
+        # Zwolnienie jest JAWNE: komentarz `<!-- docs_check: historia -->`
+        # otwiera je, a następny nagłówek zamyka. Wcześniej dopasowywało się do
+        # słowa „różni" w nagłówku, co działało dla jednej sekcji i milcząco
+        # przestałoby działać przy jej przemianowaniu — zwolnienie musi być
+        # widoczne w miejscu, w którym się z niego korzysta.
         heading = ""
+        historia = False
         for i, line in enumerate(text.splitlines(), 1):
             if line.startswith("#"):
                 heading = line
-            if "różni" in heading:
+                historia = False
+            if "docs_check: historia" in line:
+                historia = True
+            if historia or "różni" in heading:
                 continue
             for token in REMOVED:
                 if token in line:
