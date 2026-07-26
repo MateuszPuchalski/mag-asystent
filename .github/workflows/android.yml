@@ -23,6 +23,12 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      # Namiastka kompilatora dla brakujących importów — `:app` nie kompiluje
+      # się poza CI, więc ta pomyłka wychodziła dopiero tutaj. Tanie, biegnie
+      # przed Gradle'em.
+      - name: Kontrola importów Kotlina
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/kt_imports_check.py
       - name: Testy :core (JVM)
         run: ./gradlew :core:test
       - name: Testy jednostkowe + APK debug

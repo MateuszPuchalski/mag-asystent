@@ -5,6 +5,7 @@ import pl.wertis.kolektor.core.loc.isKnownLoc
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.offline.PendingOp
+import pl.wertis.kolektor.core.session.userId
 
 /* ── Zapis lokalizacji towaru — jedno miejsce dla karty towaru i ekranu skanu ──
    Semantyka offline (bufor) i potwierdzenie muszą być identyczne na obu
