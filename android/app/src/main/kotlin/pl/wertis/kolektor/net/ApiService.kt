@@ -3,6 +3,8 @@ package pl.wertis.kolektor.net
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.BadgeBody
+import pl.wertis.kolektor.core.net.CreateUserBody
+import pl.wertis.kolektor.core.net.CreateUserResponse
 import pl.wertis.kolektor.core.net.CartBody
 import pl.wertis.kolektor.core.net.CartRemoveBody
 import pl.wertis.kolektor.core.net.CartResponse
@@ -44,7 +46,9 @@ import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.SearchResponse
 import pl.wertis.kolektor.core.net.SessionIdResponse
 import pl.wertis.kolektor.core.net.SetLocationBody
+import pl.wertis.kolektor.core.net.SetupResponse
 import pl.wertis.kolektor.core.net.UnlockResponse
+import pl.wertis.kolektor.core.net.UsersResponse
 import pl.wertis.kolektor.core.net.SkipBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -224,4 +228,17 @@ interface ApiService {
         @Path("lineId") lineId: Long,
         @Body body: ForceReleaseBody,
     ): ForceReleaseResponse
+
+    /* ── Zakładanie kont z kolektora ──────────────────────────────────────
+       Pierwsze konto przechodzi bez sesji, ale TYLKO przy pustej bazie;
+       każde następne wymaga nagłówka `x-session` biura i jego PIN-u.       */
+
+    @GET("api/setup")
+    suspend fun setupPotrzebny(): SetupResponse
+
+    @POST("api/users")
+    suspend fun createUser(@Body body: CreateUserBody): CreateUserResponse
+
+    @GET("api/users")
+    suspend fun listUsers(): UsersResponse
 }

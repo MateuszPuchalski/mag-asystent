@@ -11,8 +11,8 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia — **74 testów** | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (12 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia — **85 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
 przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi
@@ -98,7 +98,12 @@ aplikacja też się buduje i działa (integracja przez refleksję —
 - [ ] **blokada**: 10 min bezczynności → ekran „Sesja zablokowana", pod spodem
       dalej widać otwartą dostawę; skan własnego badge'a wraca do pracy bez straty,
 - [ ] **PIN**: skan towaru zajętego przez kogoś innego → propozycja odebrania;
-      magazynier dostaje odmowę, brygadzista z PIN-em przechodzi.
+      magazynier dostaje odmowę, brygadzista z PIN-em przechodzi,
+- [ ] **pierwsze uruchomienie na pustym serwerze**: ekran startowy proponuje
+      ZAŁÓŻ KONTA (nie skan plakietki), kreator zakłada całą listę i pokazuje
+      kody badge'ów; po wyjściu ta sama instalacja prosi już o skan,
+- [ ] **przerwane zakładanie**: wyłącz Wi-Fi w połowie listy — ekran ma pokazać
+      konta, które JUŻ powstały, a nie sam komunikat o błędzie.
 
 ## Architektura (skrót)
 

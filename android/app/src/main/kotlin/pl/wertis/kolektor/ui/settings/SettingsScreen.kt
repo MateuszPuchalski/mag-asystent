@@ -109,6 +109,13 @@ fun SettingsScreen(graph: AppGraph) {
                     )
                 }
             }
+            if ((stan as? SessionState.Aktywna)?.role == "biuro") {
+                // Dopisywanie osób bez terminala — ta sama droga co przy
+                // pierwszym uruchomieniu, tylko z istniejącą sesją biura.
+                OutlineButton("DODAJ OSOBY", modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    graph.nav.openSetup(odZera = false)
+                }
+            }
             if (stan !is SessionState.Brak) {
                 // Wylogowanie to JAWNA decyzja człowieka. Bezczynność blokuje,
                 // nie wylogowuje — sesja gubiąca 30 rozłożonych pozycji to

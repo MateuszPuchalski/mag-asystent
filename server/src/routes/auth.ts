@@ -100,6 +100,20 @@ export async function authRoutes(app: FastifyInstance) {
      przy każdym wydruku plakietek, a wpisywanie PIN-u do czytania zamieniłoby
      go w odruch, czyli w nic.                                                */
 
+  /**
+   * Czy instalacja jest jeszcze pusta — pytanie zadawane przez kolektor przy
+   * pierwszym starcie.
+   *
+   * Bez tego kolektor nie odróżnia „system dopiero powstaje" od „zeskanowałeś
+   * zły badge": obie sytuacje wyglądają jak 401 z `/api/auth/badge`. Człowiek
+   * rozpakowujący kolektor w poniedziałek rano zobaczyłby ekran proszący
+   * o skan plakietki, których jeszcze nikt nie wydrukował.
+   *
+   * Odpowiedź nie jest tajemnicą: dokładnie tę samą informację ujawnia próba
+   * założenia konta (`POST /api/users` przechodzi albo żąda sesji).
+   */
+  app.get("/api/setup", async () => ({ potrzebne: brakKont() }));
+
   /** Sesja biura + PIN; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
   function odmowaZarzadzania(pin: string | null): { kod: number; error: string } | null {
     const s = sesja(token());

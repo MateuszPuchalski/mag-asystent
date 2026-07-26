@@ -622,3 +622,27 @@ data class ForceReleaseBody(val pin: String)
 
 @Serializable
 data class ForceReleaseResponse(val ok: Boolean = true, val odebrano: String? = null)
+
+/** Czy instalacja nie ma jeszcze żadnego konta (kolektor pyta przy starcie). */
+@Serializable
+data class SetupResponse(val potrzebne: Boolean = false)
+
+/**
+ * Założenie konta. `pin` to PIN ZAKŁADANEGO konta, `pinAutora` — PIN biura,
+ * które je zakłada. Dwa różne PIN-y w jednym żądaniu wyglądają na pomyłkę,
+ * więc nazwy są rozłączne: mylne podstawienie kończyłoby się kontem z cudzym
+ * PIN-em.
+ */
+@Serializable
+data class CreateUserBody(
+    val name: String,
+    val role: String? = null,
+    val pin: String? = null,
+    val pinAutora: String? = null,
+)
+
+@Serializable
+data class CreateUserResponse(val user: UserDto = UserDto())
+
+@Serializable
+data class UsersResponse(val users: List<UserDto> = emptyList())

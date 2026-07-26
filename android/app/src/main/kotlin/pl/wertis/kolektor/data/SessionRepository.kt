@@ -82,6 +82,15 @@ class SessionRepository(
     }
 
     /**
+     * Sesja przyjęta z kreatora kont: konto właśnie powstało i od razu się nim
+     * logujemy, bo bez sesji nie da się założyć ani jednego następnego.
+     * Osobne wejście, żeby `zapisz` mogło zostać prywatne.
+     */
+    fun przyjmijZSetupu(token: String, user: UserDto) {
+        zapisz(token, user, zablokowana = false)
+    }
+
+    /**
      * Odświeżenie stanu z serwera — przy starcie i po powrocie z tła.
      *
      * Blokada jest stanem SERWERA, nie kolektora: to serwer widzi ostatnią
