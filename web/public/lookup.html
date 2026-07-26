@@ -125,6 +125,7 @@
       <span><kbd>↑</kbd><kbd>↓</kbd> wybór</span>
       <span><kbd>/</kbd> fokus pola</span>
       <span><kbd>Esc</kbd> wyczyść</span>
+      <span><kbd>m</kbd> metryki</span>
       <span>Skaner: kod + Enter</span>
     </div>
   </div>
@@ -312,9 +313,40 @@ function showLocation(cc, products){
   detailEl.innerHTML = `<div class="emptybig"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/></svg><div>Lokalizacja <b>${esc(cc)}</b> · ${products.length} poz.<br/>Wybierz towar, aby zobaczyć szczegóły.</div></div>`;
 }
 
+/* ---- metryki (plan §10) --------------------------------------------------
+   Cztery liczby, każda mówiąca CO ZROBIĆ, a nie tylko „ile było". Widok, nie
+   panel: wchodzi się tu raz na jakiś czas, więc nie zasługuje na własny ekran
+   w aplikacji ani na miejsce w codziennej ścieżce.                           */
+async function showMetrics(){
+  try{
+    const m = await api('/api/metrics?days=30');
+    const pct = v => Math.round(v*100)+'%';
+    const cel = (v, prog) => v==null ? '<span class="muted">brak danych</span>'
+      : `<b style="color:${v<=prog?'var(--success)':'var(--destructive)'}">${v}</b>`;
+    curId=null; if(poll) clearInterval(poll);
+    detailEl.innerHTML = `
+      <div style="padding:18px;overflow:auto">
+        <div class="sec">Metryki · ostatnie ${m.days} dni (${m.zdarzen} zdarzeń)</div>
+        <p>Dotknięcia na pozycję: ${cel(m.dotknieciaNaPozycje, 0.3)} <span class="muted">(cel &lt; 0,3 — główny wskaźnik jakości UX)</span></p>
+        <p>p95 skan → odpowiedź: ${cel(m.p95OdpowiedziMs, 150)} ms <span class="muted">(cel &lt; 150 ms; powyżej ~300 ms ludzie skanują podwójnie)</span></p>
+        <div class="sec" style="margin-top:14px">Etykiety regałów do przedruku</div>
+        ${m.etykietyDoPrzedruku.length
+          ? '<ul>'+m.etykietyDoPrzedruku.map(r=>`<li><b>${esc(r.code)}</b> — wpisane ręcznie ${r.reczne}/${r.razem} (${pct(r.udzial)})</li>`).join('')+'</ul>'
+          : '<p class="muted">Wszystkie etykiety czytelne — zero wpisów ręcznych.</p>'}
+        <div class="sec" style="margin-top:14px">Kartoteki bez czytelnego kodu</div>
+        ${m.towaryBezCzytelnegoKodu.length
+          ? '<ul>'+m.towaryBezCzytelnegoKodu.map(r=>`<li><b>${esc(r.code)}</b> — wpisane ręcznie ${r.reczne}×</li>`).join('')+'</ul>'
+          : '<p class="muted">Zero wpisów ręcznych po stronie towarów.</p>'}
+        <p class="muted" style="margin-top:16px">Świadomie bez raportu wydajności per osoba — to monitoring
+        pracowniczy w rozumieniu Kodeksu pracy i wymaga osobnej decyzji formalnej.</p>
+      </div>`;
+  }catch(e){ toast(e.message); }
+}
+
 /* ---- global keys ---- */
 document.addEventListener('keydown',(e)=>{
   if(e.key==='/' && document.activeElement!==qEl){ e.preventDefault(); qEl.focus(); qEl.select(); }
+  if(e.key==='m' && document.activeElement!==qEl){ e.preventDefault(); showMetrics(); }
 });
 qEl.focus();
 ping(); setInterval(ping, 15000);

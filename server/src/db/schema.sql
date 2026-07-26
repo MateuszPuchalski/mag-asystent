@@ -65,9 +65,16 @@ CREATE TABLE IF NOT EXISTS events (
   tw_id      INTEGER,
   payload    TEXT,                              -- JSON
   user_id    TEXT NOT NULL,
+  -- Który egzemplarz kolektora — pierwsze pytanie przy diagnozie („to jedno
+  -- urządzenie czy wszystkie?"), a bez tego nie do odzyskania po fakcie.
+  device_id  TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS ix_events_type ON events(type);
+-- Bez indeksu po czasie każdy raport („ile dotknięć na pozycję w zeszłym
+-- tygodniu") skanuje całą tabelę — a events rośnie z każdym skanem.
+CREATE INDEX IF NOT EXISTS ix_events_time ON events(created_at);
+CREATE INDEX IF NOT EXISTS ix_events_user_time ON events(user_id, created_at);
 
 -- ── Read-model Subiekta GT (seed z mag.xlsx; prod = MSSQL) ─────────────────
 CREATE TABLE IF NOT EXISTS sgt_magazyn (

@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import fstatic from "@fastify/static";
 import fs from "node:fs";
 import { config } from "./config.js";
+import { withRequestContext } from "./context.js";
 import { db } from "./db/db.js";
 import { productRoutes } from "./routes/products.js";
 import { queueRoutes } from "./routes/queue.js";
@@ -34,6 +35,8 @@ async function main() {
     bodyLimit: 6 * 1024 * 1024,
   });
   await app.register(cors, { origin: true });
+  // kontekst żądania (device_id do events) — musi być przed trasami
+  withRequestContext(app);
 
   app.get("/api/health", async () => ({
     ok: true,

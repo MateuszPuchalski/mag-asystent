@@ -25,9 +25,21 @@ import pl.wertis.kolektor.ui.product.saveLocation
  * @param onSearch co zrobić z wieloznacznym tekstem — ekran główny podstawia go
  *   do wyszukiwarki, pozostałe ekrany wracają na główny.
  */
-suspend fun routeScan(graph: AppGraph, code: String, onSearch: (String) -> Unit) {
+suspend fun routeScan(
+    graph: AppGraph,
+    code: String,
+    manual: Boolean = false,
+    screen: String? = null,
+    onSearch: (String) -> Unit,
+) {
+    val start = System.currentTimeMillis()
     try {
-        when (val r = apiCall { graph.api.scan(code) }) {
+        val odpowiedz = apiCall { graph.api.scan(code, if (manual) "1" else null, screen) }
+        // Czas MIERZONY U CZŁOWIEKA, nie na serwerze: powyżej ~300 ms ludzie
+        // zaczynają skanować podwójnie, a podwójny skan przy liczeniu pozycji
+        // to błąd ilościowy. Wysyłane obok, żeby nie wydłużać ścieżki skanu.
+        graph.telemetry.scanTiming(System.currentTimeMillis() - start)
+        when (val r = odpowiedz) {
             is ScanResult.Product -> {
                 graph.feedback.beep(true)
                 when (val a = graph.pin.onProduct(r.card.id, r.card.sym)) {

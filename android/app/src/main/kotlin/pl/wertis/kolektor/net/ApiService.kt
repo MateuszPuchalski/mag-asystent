@@ -54,8 +54,16 @@ import retrofit2.http.Query
 val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null)
 
 interface ApiService {
+    /**
+     * @param manual `1` gdy kod wpisano z ręki, nie zeskanowano — udział wpisów
+     *   ręcznych per regał to darmowy raport jakości etykiet (plan §10).
+     */
     @GET("api/products/scan/{code}")
-    suspend fun scan(@Path("code") code: String): ScanResult
+    suspend fun scan(
+        @Path("code") code: String,
+        @Query("manual") manual: String? = null,
+        @Query("screen") screen: String? = null,
+    ): ScanResult
 
     @GET("api/products/search")
     suspend fun search(@Query("q") q: String): SearchResponse

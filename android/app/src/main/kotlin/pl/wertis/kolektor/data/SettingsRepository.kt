@@ -2,6 +2,7 @@ package pl.wertis.kolektor.data
 
 import android.content.Context
 import androidx.core.content.edit
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -33,6 +34,18 @@ data class AppSettings(
 
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences("wertis_settings", Context.MODE_PRIVATE)
+
+    /**
+     * Trwały identyfikator egzemplarza kolektora — losowany raz, przy pierwszym
+     * uruchomieniu. Świadomie NIE jest to `ANDROID_ID` ani numer seryjny: do
+     * pytania „który egzemplarz to robi?" wystarczy dowolny stabilny klucz,
+     * a identyfikatory sprzętowe są danymi, których nie musimy zbierać.
+     */
+    val deviceId: String = prefs.getString("deviceId", null) ?: run {
+        val nowy = UUID.randomUUID().toString().take(8)
+        prefs.edit { putString("deviceId", nowy) }
+        nowy
+    }
 
     private val _settings = MutableStateFlow(load())
     val settings: StateFlow<AppSettings> = _settings

@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.core.pin.PinGone
 import pl.wertis.kolektor.data.PinRepository
+import pl.wertis.kolektor.data.TelemetryRepository
 import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
@@ -40,6 +41,7 @@ class AppGraph(context: Context) {
 
     val apiClient = ApiClient(
         currentUser = { users.currentUser },
+        deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
     )
     val api get() = apiClient.service
@@ -77,6 +79,8 @@ class AppGraph(context: Context) {
             }
         )
     }
+
+    val telemetry = TelemetryRepository(api, appScope)
 
     val scanner = ScannerManager(context)
 

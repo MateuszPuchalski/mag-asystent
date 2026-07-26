@@ -34,16 +34,26 @@ class HostSelectionInterceptor(@Volatile var baseUrl: HttpUrl?) : Interceptor {
     }
 }
 
-/** Dokleja x-user (bieżący magazynier), o ile żądanie nie niesie go jawnie. */
-class UserHeaderInterceptor(private val currentUser: () -> String) : Interceptor {
+/**
+ * Dokleja `x-user` (bieżący magazynier) i `x-device` (egzemplarz kolektora).
+ *
+ * `x-device` jest polem diagnostycznym: przy współdzielonych kolektorach
+ * pierwsze pytanie przy awarii brzmi „to jedno urządzenie czy wszystkie?",
+ * a bez zapisu nie da się na nie odpowiedzieć po fakcie.
+ */
+class IdentityHeaderInterceptor(
+    private val currentUser: () -> String,
+    private val deviceId: String,
+) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val req = chain.request()
-        if (req.header("x-user") != null) return chain.proceed(req)
-        return chain.proceed(req.newBuilder().header("x-user", currentUser()).build())
+        val b = req.newBuilder().header("x-device", deviceId)
+        if (req.header("x-user") == null) b.header("x-user", currentUser())
+        return chain.proceed(b.build())
     }
 }
 
-class ApiClient(currentUser: () -> String, initialBaseUrl: String) {
+class ApiClient(currentUser: () -> String, deviceId: String, initialBaseUrl: String) {
     val hostSelection = HostSelectionInterceptor(initialBaseUrl.toHttpUrlOrNull())
 
     private val okHttp = OkHttpClient.Builder()
@@ -51,7 +61,7 @@ class ApiClient(currentUser: () -> String, initialBaseUrl: String) {
         .readTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
         .addInterceptor(hostSelection)
-        .addInterceptor(UserHeaderInterceptor(currentUser))
+        .addInterceptor(IdentityHeaderInterceptor(currentUser, deviceId))
         .build()
 
     val service: ApiService = Retrofit.Builder()
