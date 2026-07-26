@@ -109,12 +109,12 @@ fun ProductScreen(graph: AppGraph) {
     val p = poll.data
 
     /** Zapis relokacji ze skanu (wspólny zapis — SaveLocation.kt). */
-    fun saveLoc(choice: LocChoice, successMsg: String) {
+    fun saveLoc(choice: LocChoice) {
         if (saving) return
         saving = true
         scope.launch {
             try {
-                saveLocation(graph, id, choice, successMsg, locInfo)
+                saveLocation(graph, id, choice, locInfo)
                 pendingLoc = null
             } catch (e: Exception) {
                 graph.effects.toast(e.message ?: "Błąd zapisu")
@@ -135,7 +135,7 @@ fun ProductScreen(graph: AppGraph) {
             }
             scan.code in card.locs -> graph.effects.toast("Towar już ma lokalizację ${scan.code}")
             card.locs.size > 1 -> pendingLoc = scan.code
-            else -> saveLoc(LocChoice(LocAction.REPLACE, scan.code), "Lokalizacja zapisana")
+            else -> saveLoc(LocChoice(LocAction.REPLACE, scan.code))
         }
         true
     }
@@ -289,6 +289,23 @@ fun ProductScreen(graph: AppGraph) {
                         state = if (zmiana.status == "error") LocState.FAILED else LocState.ADDING,
                     ) { graph.nav.openQueue() }
                 }
+                /* DOŁOŻENIE ADRESU stoi w rzędzie chipów, a nie w przycisku pod
+                   spodem, bo to operacja NA TEJ LIŚCIE — obok adresów, które
+                   zostają. Przycisk „ZMIEŃ LOKALIZACJĘ" niżej robi co innego
+                   (zastępuje) i mylenie tych dwóch kosztuje adres. */
+                Text(
+                    "+ DODAJ",
+                    fontFamily = BarlowCond,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = AmberInk,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .border(1.5.dp, AmberLine, RoundedCornerShape(50))
+                        .background(AmberBgSoft)
+                        .clickable { graph.nav.openScanLoc(dodaj = true) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                )
             }
             if (p.pendingLocs.isNotEmpty()) {
                 val blad = p.pendingLocs.any { it.status == "error" }
@@ -319,7 +336,13 @@ fun ProductScreen(graph: AppGraph) {
                                 apiCall { graph.api.setLocation(id, SetLocationBody(LocAction.REMOVE, value = code)) }
                                 graph.queueRepo.refreshNow()
                                 chipMenu = null
-                                graph.effects.flashSuccess("Lokalizacja usunięta")
+                                /* Bez nakładki — chip przechodzi w REMOVING
+                                   i sam znika, gdy Subiekt potwierdzi. Ale
+                                   stan chipa bierze się z odpowiedzi serwera,
+                                   więc dochodzi dopiero z odpytaniem (2 s);
+                                   beep potwierdza SAM TAP od razu, żeby ta
+                                   sekunda nie wyglądała jak martwy przycisk. */
+                                graph.feedback.beep(true)
                             } catch (e: Exception) {
                                 graph.effects.toast(e.message ?: "Błąd zapisu")
                             }
@@ -337,7 +360,8 @@ fun ProductScreen(graph: AppGraph) {
 
         Spacer(Modifier.height(2.dp))
         Text(
-            "skan etykiety regału = przenieś tutaj · skan towaru = następna karta",
+            "skan etykiety regału = przenieś tutaj · „+ DODAJ” = dołóż adres · " +
+                "skan towaru = następna karta",
             fontSize = 11.sp,
             color = InkMute,
             modifier = Modifier.fillMaxWidth(),

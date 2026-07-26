@@ -47,17 +47,26 @@ import pl.wertis.kolektor.ui.theme.InkMute
 
 /* ── Podgląd zawartości lokalizacji — port web/src/screens/Location.tsx ─────
    Skan etykiety regału → co powinno tu leżeć. Skan innej etykiety = przełącz
-   podgląd; skan EAN przechodzi do fallbacku (karta towaru).                  */
+   podgląd; skan EAN przechodzi do fallbacku (karta towaru).
+
+   KOD REGAŁU CZYTAMY Z FLOW, NIE DO LOKALNEJ KOPII. Wcześniej stało tu
+   `remember { mutableStateOf(graph.nav.locCode.orEmpty()) }` — bez klucza,
+   czyli odczyt JEDEN RAZ, przy pierwszym wejściu na ekran. Skan drugiego
+   regału przy otwartym podglądzie pierwszego nie zmieniał nic widocznego,
+   niezależnie od tego, którą drogą przyszedł (własny handler czy globalny
+   fallback po odpowiedzi serwera). Lokalna kopia dodatkowo rozjeżdżała się
+   z `nav.locCode`, więc „regał X" w audycie przejęcia pracy mógł nie zgadzać
+   się z regałem NA EKRANIE.                                                  */
 
 @Composable
 fun LocationScreen(graph: AppGraph) {
-    var code by remember { mutableStateOf(graph.nav.locCode.orEmpty()) }
+    val code = graph.nav.locCodeFlow.collectAsState().value.orEmpty()
     var manual by remember { mutableStateOf("") }
 
     ScanHandlerEffect { scan ->
         if (scan.kind != ScanKind.LOC) return@ScanHandlerEffect false
         graph.feedback.beep(true)
-        code = scan.code
+        graph.nav.openLocation(scan.code)
         true
     }
 
@@ -98,10 +107,14 @@ fun LocationScreen(graph: AppGraph) {
                     onValueChange = { manual = it.uppercase() },
                     placeholder = "albo wpisz kod, np. A01-02-03",
                     modifier = Modifier.weight(1f),
-                    onDone = { manual.trim().takeIf { it.isNotEmpty() }?.let { code = normalizeLoc(it) } },
+                    onDone = {
+                        manual.trim().takeIf { it.isNotEmpty() }
+                            ?.let { graph.nav.openLocation(normalizeLoc(it)) }
+                    },
                 )
                 PrimaryButton("POKAŻ") {
-                    manual.trim().takeIf { it.isNotEmpty() }?.let { code = normalizeLoc(it) }
+                    manual.trim().takeIf { it.isNotEmpty() }
+                        ?.let { graph.nav.openLocation(normalizeLoc(it)) }
                 }
             }
             Text(

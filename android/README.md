@@ -97,6 +97,14 @@ aplikacja też się buduje i działa (integracja przez refleksję —
       adres TEGO towaru; ten sam skan bez otwartej karty pokazuje zawartość regału,
 - [ ] otwórz kartę towaru A, wróć, otwórz kartę towaru B, zeskanuj regał —
       adres ma dostać **B**, nigdy A (regresja po wycięciu kontekstu przyklejonego),
+- [ ] **regał → regał**: przy otwartym podglądzie regału zeskanuj INNY regał —
+      widok ma przeskoczyć na zeskanowany (regresja: `locCode` nieobserwowalny,
+      ekran zostawał na pierwszym),
+- [ ] **dołożenie adresu**: towar z JEDNYM adresem → „+ DODAJ" w rzędzie chipów
+      → skan półki → towar ma **dwa** adresy (skan wprost z karty dalej zastępuje),
+- [ ] **brak nakładki przy zapisie adresu**: po skanie półki NIE ma zielonego
+      kafla na środku; chip nowego adresu jest przygaszony i bez cienia, a po
+      przejściu kolejki Sfery robi się normalny,
 - [ ] **badge**: skan plakietki na ekranie startowym loguje; skan własnej przy
       czynnej sesji nie robi nic; skan cudzej pyta o przejęcie pracy,
 - [ ] **blokada**: 10 min bezczynności → ekran „Sesja zablokowana", pod spodem

@@ -28,7 +28,17 @@ class AppNavState(private val recentStore: RecentStore) {
     @Volatile var sessionId: Long? = null; private set
     /** Tryb A: otwarta dostawa albo zwrot (dokument = jednostka pracy). */
     @Volatile var deliveryId: Long? = null; private set
-    @Volatile var locCode: String? = null; private set
+
+    /* locCode jest obserwowalny z DOKŁADNIE tego samego powodu co `curId`
+       wyżej — i był to ten sam błąd, tylko nienaprawiony. Skan regału przy
+       otwartym podglądzie innego regału ustawia `_screen` na LOCATION, czyli
+       na wartość, którą ekran już ma; StateFlow zgniata równe wartości, więc
+       nie leciała żadna emisja, a `LocationScreen` czytał kod do bezkluczowego
+       `remember` — raz, przy pierwszym wejściu. Efekt na sprzęcie: skanujesz
+       drugi regał i NIC SIĘ NIE DZIEJE. */
+    private val _locCode = MutableStateFlow<String?>(null)
+    val locCodeFlow: StateFlow<String?> = _locCode
+    val locCode: String? get() = _locCode.value
     @Volatile var queueReturn: Screen? = null; private set
 
     /** Skan-tekst z fallbacku, który dał wiele wyników — Home podstawia do wyszukiwarki. */
@@ -57,7 +67,19 @@ class AppNavState(private val recentStore: RecentStore) {
         _screen.value = Screen.PRODUCT
     }
 
-    fun openScanLoc() = go(Screen.SCAN_LOC)
+    /**
+     * Czy ekran skanu ma DOŁOŻYĆ adres, czy przenieść towar.
+     *
+     * Bez tego rozróżnienia towar z jednym adresem nie mógł dostać drugiego:
+     * skan zawsze szedł jako `REPLACE`, a arkusz z wyborem otwierał się dopiero
+     * przy dwóch adresach — czyli przy stanie, do którego nie dało się dojść.
+     */
+    @Volatile var scanLocDodaj: Boolean = false; private set
+
+    fun openScanLoc(dodaj: Boolean = false) {
+        scanLocDodaj = dodaj
+        go(Screen.SCAN_LOC)
+    }
 
     fun openDelivery(id: Long) {
         deliveryId = id
@@ -70,7 +92,7 @@ class AppNavState(private val recentStore: RecentStore) {
     }
 
     fun openLocation(code: String) {
-        locCode = code.trim().uppercase()
+        _locCode.value = code.trim().uppercase()
         _screen.value = Screen.LOCATION
     }
 

@@ -41,7 +41,7 @@ fun LocChoiceSheet(
     product: ProductCard,
     code: String?,
     onClose: () -> Unit,
-    onPick: (LocChoice, String) -> Unit,
+    onPick: (LocChoice) -> Unit,
 ) {
     if (code == null) return
     var pickOne by remember(code) { mutableStateOf(false) }
@@ -66,7 +66,7 @@ fun LocChoiceSheet(
                 "ZASTĄP WSZYSTKIE",
                 tall = true,
                 modifier = Modifier.fillMaxWidth(),
-            ) { onPick(LocChoice(LocAction.REPLACE, code), "Lokalizacja zapisana") }
+            ) { onPick(LocChoice(LocAction.REPLACE, code)) }
             Text(
                 "usuniesz: ${product.locs.joinToString(", ")} · zostanie: $code",
                 fontSize = 11.sp,
@@ -78,7 +78,7 @@ fun LocChoiceSheet(
                 "DODAJ JAKO KOLEJNĄ",
                 tall = true,
                 modifier = Modifier.fillMaxWidth(),
-            ) { onPick(LocChoice(LocAction.ADD, code), "Lokalizacja dodana") }
+            ) { onPick(LocChoice(LocAction.ADD, code)) }
 
             if (!pickOne) {
                 OutlineButton(
@@ -94,7 +94,7 @@ fun LocChoiceSheet(
                 ) {
                     product.locs.forEach { old ->
                         OutlineButton("$old → $code") {
-                            onPick(LocChoice(LocAction.REPLACE_ONE, code, replaced = old), "Lokalizacja zapisana")
+                            onPick(LocChoice(LocAction.REPLACE_ONE, code, replaced = old))
                         }
                     }
                 }
