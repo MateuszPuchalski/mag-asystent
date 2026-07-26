@@ -9,9 +9,6 @@ import { raportWydajnosci } from "../services/wydajnosc.js";
 const ALLOWED = new Set([
   "device_drop",
   "battery_low",
-  /* Wygaśnięcie kontekstu przyklejonego (plan §6). Wysoka częstość = ludzie są
-     przerywani albo TTL jest za krótki — to jest pomiar, nie ciekawostka. */
-  "pin_expired",
   /* Skan → odpowiedź mierzone U CZŁOWIEKA (plan §10). Czas serwera pomijałby
      sieć i render, czyli akurat to, gdzie problem naprawdę siedzi. */
   "scan_timing",

@@ -297,12 +297,6 @@ data class DeviceEventBody(
     val type: String,
     val magnitude: Double? = null,
     val level: Double? = null,
-    /** `pin_expired`: dlaczego kontekst zniknął (ttl / away / user / manual). */
-    val reason: String? = null,
-    /** `pin_expired`: co było przypięte (`loc:A01-02-03` albo `tw:7`). */
-    val pinned: String? = null,
-    /** `pin_expired`: jak długo kontekst obowiązywał — mierzy, czy TTL pasuje. */
-    val heldMs: Long? = null,
     /** `scan_timing`: skan → odpowiedź, mierzone u człowieka (cel p95 < 150 ms). */
     val ms: Long? = null,
 )

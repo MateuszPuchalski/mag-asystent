@@ -30,48 +30,6 @@ import pl.wertis.kolektor.ui.theme.Success
 /* ── Nakładki: toast (2.6 s) · plakietka sukcesu (1.5 s) ───────────────────
    Czasy pilnuje UiEffects.                                                   */
 
-/**
- * Pasek przypiętego kontekstu (plan §5).
- *
- * Duży druk i duży `[X]`, na górze KAŻDEGO ekranu — nie subtelny chip. Ten
- * mechanizm zapisuje dane bez pytania, więc jego stan musi być widoczny bez
- * szukania: człowiek, który nie wie, że coś jest przypięte, zapisze towar na
- * półkę, o której nie myśli.
- */
-@Composable
-fun PinBar(label: String, sub: String, onRelease: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Ink)
-            .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("📍", fontSize = 18.sp)
-        Column(Modifier.weight(1f)) {
-            Text(
-                label,
-                color = Amber,
-                fontFamily = BarlowCond,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                letterSpacing = 0.5.sp,
-                maxLines = 1,
-            )
-            Text(sub, color = CardWhite, fontSize = 11.sp, maxLines = 1)
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onRelease)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            Text("✕", color = CardWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
 @Composable
 fun BoxScope.ToastOverlay(msg: String?) {
     if (msg == null) return

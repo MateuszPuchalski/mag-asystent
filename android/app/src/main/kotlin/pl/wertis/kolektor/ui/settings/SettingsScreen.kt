@@ -172,38 +172,6 @@ fun SettingsScreen(graph: AppGraph) {
             ) { v -> graph.settings.update { it.copy(batteryAssist = v) } }
         }
 
-        SectionLabel("Kontekst przyklejony")
-        SectionCard {
-            Text(
-                "Przypięty regał albo towar wygasa po tym czasie bez skanu. Za długo = " +
-                    "zapis trafia na półkę, przy której już nikogo nie ma; za krótko = " +
-                    "kontekst znika w trakcie pracy.",
-                fontSize = 12.sp,
-                color = InkMute,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf(120, 180, 240, 300).forEach { sec ->
-                    val wybrany = settings.pinTtlSec == sec
-                    Text(
-                        "${sec / 60} min",
-                        fontSize = 14.sp,
-                        fontWeight = if (wybrany) FontWeight.Bold else FontWeight.Normal,
-                        color = if (wybrany) AmberInk else Ink,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (wybrany) AmberBg else CardWhite)
-                            .clickable { graph.settings.update { it.copy(pinTtlSec = sec) } }
-                            .padding(vertical = 12.dp),
-                    )
-                }
-            }
-        }
-
         Text(
             "WERTIS Kolektor ${BuildConfig.VERSION_NAME} · natywna aplikacja Android",
             fontSize = 11.sp,
@@ -211,7 +179,7 @@ fun SettingsScreen(graph: AppGraph) {
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         )
 
-        OutlineButton("ZMIEŃ UŻYTKOWNIKA (EKRAN STARTOWY)", modifier = Modifier.fillMaxWidth()) {
+        OutlineButton("EKRAN STARTOWY (SKAN BADGE'A)", modifier = Modifier.fillMaxWidth()) {
             graph.nav.go(Screen.SPLASH)
         }
     }

@@ -177,22 +177,18 @@ Parametry (env, dev):
   nie trzeba wcześniej wybierać trybu. Pusty regał to poprawna odpowiedź
   („Regał A01-02-03 pusty"), bo półkę skanuje się także po to, żeby sprawdzić,
   czy jest wolna.
-- **Kontekst przyklejony — parowanie regał ↔ towar w obie strony.** Przypięty
-  zostaje slot zeskanowany **jako pierwszy**, bo to odwzorowuje fizykę: kto
-  zaczął od regału, stoi przy regale i odłoży tam kilka indeksów; kto zaczął od
-  towaru, trzyma pudełko i szuka dla niego miejsca. Osiem indeksów na jeden
-  regał to **9 skanów i zero dotknięć** zamiast 16 skanów z nawigacją między
-  ekranami.
-- **Przypięcie wygasa — i to jest wymaganie bezpieczeństwa danych, nie wygody.**
-  Kontekst, który przeżyje odejście pracownika od regału, zapisuje towar na
-  półkę, przy której nikogo już nie ma; nic nie wygląda na zepsute, dopóki ktoś
-  nie pójdzie po ten towar. Wygasa po 4 min bezczynności (parametr w
-  Ustawieniach), a wygaszony ekran dłużej niż minutę gasi go od razu — odejście
-  jest mocniejszym sygnałem niż sam upływ czasu. **Wygaśnięcie jest głośne**:
-  pasek znika, idzie długa wibracja i zdanie, co się stało. Zmiana użytkownika
-  czyści kontekst bezwarunkowo. Każde wygaśnięcie ląduje w `events`
-  (`pin_expired`) — wysoka częstość znaczy, że ludzie są przerywani albo że TTL
-  jest za krótki, i to jest pomiar, nie ciekawostka.
+- **Kontekstem jest OTWARTY EKRAN, nie ukryty stan.** Skan robi to, co widać:
+  karta towaru otwarta + skan regału → ten towar dostaje ten adres; skan regału
+  bez otwartej karty → zawartość regału; skan towaru → jego karta. Nie ma paska
+  „przypięto", nie ma trybu, nie ma czego zdejmować.
+- **Dlaczego zniknął kontekst przyklejony.** Wcześniej pierwszy skan przypinał
+  regał albo towar, a kolejne wpadały w to przypięcie — osiem indeksów na jeden
+  regał kosztowało 9 skanów zamiast 16. Cena była jednak taka, że dało się mieć
+  **przypięty towar A i otwartą kartę towaru B**: pasek mówił jedno, a zapis szedł
+  gdzie indziej. Adres zapisany na niewłaściwy towar jest błędem CICHYM — nic nie
+  wygląda na zepsute, dopóki ktoś nie pójdzie po ten towar. Siedem zaoszczędzonych
+  skanów tego nie warte. Razem z mechanizmem zniknął jego TTL w Ustawieniach
+  i telemetria `pin_expired`.
 - Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
@@ -353,7 +349,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 85 testów jednostkowych; buduje się bez Android SDK
+                           + 71 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup

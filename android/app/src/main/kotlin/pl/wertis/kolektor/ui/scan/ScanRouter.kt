@@ -2,25 +2,30 @@ package pl.wertis.kolektor.ui.scan
 
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.badge.looksLikeBadge
-import pl.wertis.kolektor.core.net.LocAction
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.nav.Screen
-import pl.wertis.kolektor.core.pin.PinAction
 import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.net.apiCall
-import pl.wertis.kolektor.ui.product.LocChoice
-import pl.wertis.kolektor.ui.product.saveLocation
 
-/* ── Jedna droga skanu przez kontekst przyklejony ───────────────────────────
+/* ── Jedna droga skanu ──────────────────────────────────────────────────────
    Wcześniej ta sama obsługa („co zrobić z odpowiedzią /scan") żyła w dwóch
-   kopiach: na ekranie głównym i w globalnym fallbacku. Kontekst przyklejony
-   musi działać identycznie w obu, więc kopia znika.
+   kopiach: na ekranie głównym i w globalnym fallbacku. Kopia znika.
 
-   Rozstrzygnięcie ZASTĄP/DODAJ zostaje przy człowieku dokładnie tam, gdzie
-   naprawdę jest decyzją (§5.3):
-     0 lokalizacji  → dodaj po cichu, nie ma z czym kolidować,
-     1 lokalizacja  → ZASTĄP, bo operacja nazywa się „zmiana lokalizacji",
-     ≥2 lokalizacje → arkusz na karcie towaru; tam jest komplet informacji.   */
+   KONTEKSTEM JEST OTWARTY EKRAN, nie ukryty stan. Skan robi dokładnie to, co
+   widać:
+     karta towaru otwarta + skan regału → TEN towar dostaje ten adres
+       (przechwytuje `ProductScreen`, zanim skan tu dojdzie),
+     skan regału bez otwartej karty     → pokaż zawartość regału,
+     skan towaru                        → otwórz jego kartę.
+
+   Wcześniej stał tu „kontekst przyklejony": pierwszy skan przypinał regał albo
+   towar, a kolejne wpadały w to przypięcie. Oszczędzał skany (osiem indeksów na
+   jeden regał to było 9 skanów zamiast 16), ale kosztem stanu, którego nie było
+   widać na ekranie, na którym się stało. Dało się mieć przypięty towar A
+   i otwartą kartę towaru B — pasek mówił wtedy jedno, a zapis szedł gdzie
+   indziej. Adres zapisany na niewłaściwy towar jest błędem CICHYM: nic nie
+   wygląda na zepsute, dopóki ktoś nie pójdzie po ten towar. Oszczędność siedmiu
+   skanów tego nie warta.                                                      */
 
 /**
  * @param onSearch co zrobić z wieloznacznym tekstem — ekran główny podstawia go
@@ -53,22 +58,16 @@ suspend fun routeScan(
         when (val r = odpowiedz) {
             is ScanResult.Product -> {
                 graph.feedback.beep(true)
-                when (val a = graph.pin.onProduct(r.card.id, r.card.sym)) {
-                    is PinAction.Assign -> przypisz(graph, a, r.card.locs)
-                    else -> graph.nav.openProduct(
-                        r.card.id,
-                        RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji"),
-                    )
-                }
+                graph.nav.openProduct(
+                    r.card.id,
+                    RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji"),
+                )
             }
             is ScanResult.Location -> {
                 graph.feedback.beep(true)
-                when (val a = graph.pin.onLoc(r.code)) {
-                    is PinAction.Assign -> przypisz(graph, a, locsOf(graph, a.twId))
-                    // pusty regał to poprawna odpowiedź — skanuje się półkę
-                    // także po to, żeby sprawdzić, czy jest wolna
-                    else -> graph.nav.openLocation(r.code)
-                }
+                // pusty regał to poprawna odpowiedź — półkę skanuje się także
+                // po to, żeby sprawdzić, czy jest wolna
+                graph.nav.openLocation(r.code)
             }
             is ScanResult.Search -> {
                 graph.feedback.beep(true)
@@ -82,26 +81,6 @@ suspend fun routeScan(
     } catch (_: Exception) {
         graph.feedback.beep(false)
         graph.effects.toast("Błąd połączenia z serwerem")
-    }
-}
-
-/** Lokalizacje przypiętego towaru — przy skanie półki nie mamy jego karty. */
-private suspend fun locsOf(graph: AppGraph, twId: Long): List<String> =
-    runCatching { apiCall { graph.api.product(twId) }.locs }.getOrDefault(emptyList())
-
-private suspend fun przypisz(graph: AppGraph, a: PinAction.Assign, obecne: List<String>) {
-    if (obecne.size > 1) {
-        // realna decyzja człowieka — arkusz na karcie, gdzie widać wszystkie
-        graph.nav.openProductWithLoc(a.twId, a.code)
-        return
-    }
-    val akcja = if (obecne.isEmpty()) LocAction.ADD else LocAction.REPLACE
-    val opis = if (obecne.isEmpty()) "${a.sym} → ${a.code}" else "${a.sym}: ${obecne[0]} → ${a.code}"
-    try {
-        saveLocation(graph, a.twId, LocChoice(akcja, a.code), opis, graph.locationsRepo.cached())
-    } catch (e: Exception) {
-        graph.feedback.beep(false)
-        graph.effects.toast(e.message ?: "Błąd zapisu")
     }
 }
 

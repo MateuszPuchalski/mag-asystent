@@ -15,12 +15,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.nav.Screen
-import pl.wertis.kolektor.core.pin.Pin
 import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
-import pl.wertis.kolektor.ui.chrome.PinBar
 import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
@@ -52,12 +50,13 @@ fun AppRoot(graph: AppGraph) {
     val success by graph.effects.success.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
-    val pin by graph.pin.pin.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // Globalny fallback skanów. Wszystko idzie przez `/scan/:code`, także kod
-    // rozpoznany lokalnie jako lokalizacja — serwer jest właścicielem reguły
-    // i on rozstrzyga, a kontekst przyklejony działa wtedy w jednym miejscu.
+    // Globalny fallback skanów — łapie to, czego OTWARTY EKRAN nie przechwycił.
+    // Kolejność jest tu całą regułą kontekstu: karta towaru bierze skan półki
+    // dla siebie, a dopiero skan z ekranu, który się nim nie zainteresował,
+    // trafia tutaj. Wszystko idzie przez `/scan/:code`, także kod rozpoznany
+    // lokalnie jako lokalizacja — właścicielem reguły jest serwer.
     DisposableEffect(graph) {
         ScannerBus.setFallback { scan ->
             scope.launch { globalScan(graph, scan.code) }
@@ -85,13 +84,6 @@ fun AppRoot(graph: AppGraph) {
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
         )
-        // przypięcie zapisuje dane bez pytania, więc wisi NAD wszystkim innym
-        pin?.let { p ->
-            when (p) {
-                is Pin.Loc -> PinBar(p.code, "skanuj towary — trafią na ten regał") { graph.pin.release() }
-                is Pin.Tow -> PinBar(p.sym, "skanuj regał — towar tam trafi") { graph.pin.release() }
-            }
-        }
         OfflineBanner(offlineCount) {
             scope.launch { graph.offlineQueue.flush() }
         }

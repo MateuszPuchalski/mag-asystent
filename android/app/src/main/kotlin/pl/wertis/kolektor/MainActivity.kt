@@ -35,24 +35,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Kiedy aplikacja zeszła z ekranu — odejście od regału gasi kontekst (§6). */
-    private var wyszedlO = 0L
-
     override fun onResume() {
         super.onResume()
         appGraph.scanner.start(this)
         appGraph.motion.start()
         appGraph.batteryAssist.start()
-        // wygaszony ekran / inna aplikacja to mocniejszy sygnał niż sam upływ
-        // czasu: człowiek fizycznie przestał pracować przy tym regale
-        if (wyszedlO > 0) appGraph.pin.onResume(System.currentTimeMillis() - wyszedlO)
         // Blokada sesji jest stanem SERWERA (plan §7) — po powrocie z tła
         // pytamy o nią, zamiast prowadzić drugi zegar po stronie kolektora.
         appGraph.session.refresh()
     }
 
     override fun onPause() {
-        wyszedlO = System.currentTimeMillis()
         appGraph.scanner.stop(this)
         appGraph.motion.stop()
         appGraph.batteryAssist.stop()

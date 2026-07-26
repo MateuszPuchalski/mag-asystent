@@ -21,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,8 +96,10 @@ fun ProductScreen(graph: AppGraph) {
     var chipMenu by remember(id) { mutableStateOf<String?>(null) }
     // skan przy wielu lokalizacjach — także ten z trybu przypiętego, który
     // przyprowadził nas na tę kartę właśnie po rozstrzygnięcie
-    var pendingLoc by remember(id) { mutableStateOf(graph.nav.pendingLoc) }
-    LaunchedEffect(id) { graph.nav.pendingLoc = null }
+    /* Półka zeskanowana przy towarze mającym ≥2 adresy — wtedy ZASTĄP/DODAJ
+       jest realną decyzją człowieka i arkusz otwiera się tutaj, gdzie widać
+       wszystkie adresy naraz. */
+    var pendingLoc by remember(id) { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
 
     val p = poll.data

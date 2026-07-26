@@ -35,15 +35,6 @@ class Feedback(context: Context) {
      * Jedna długa wibracja — wygaśnięcie przypiętego kontekstu (plan §6).
      * Musi być odczuwalnie inna niż „skan przyjęty", bo mówi coś przeciwnego:
      * to, co było, właśnie przestało obowiązywać.
-     */
-    fun pinLost() {
-        val v = vibrator ?: return
-        try {
-            v.vibrate(VibrationEffect.createOneShot(450, VibrationEffect.DEFAULT_AMPLITUDE))
-        } catch (_: Exception) {
-            /* brak wibratora */
-        }
-    }
 
     private fun vibrate(ok: Boolean) {
         val v = vibrator ?: return
