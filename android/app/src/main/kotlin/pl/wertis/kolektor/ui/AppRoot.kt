@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.pin.Pin
+import pl.wertis.kolektor.core.session.SessionState
+import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
 import pl.wertis.kolektor.ui.chrome.PinBar
@@ -36,12 +38,15 @@ import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.scan.globalScan
+import pl.wertis.kolektor.ui.session.HandoverDialog
+import pl.wertis.kolektor.ui.session.LockOverlay
 import pl.wertis.kolektor.ui.splash.SplashScreen
 
 @Composable
 fun AppRoot(graph: AppGraph) {
     val screen by graph.nav.screen.collectAsStateWithLifecycle()
-    val users by graph.users.users.collectAsStateWithLifecycle()
+    val stan by graph.session.state.collectAsStateWithLifecycle()
+    val pytanie by graph.session.pytanie.collectAsStateWithLifecycle()
     val queue by graph.queueRepo.queue.collectAsStateWithLifecycle()
     val toastMsg by graph.effects.toastMsg.collectAsStateWithLifecycle()
     val success by graph.effects.success.collectAsStateWithLifecycle()
@@ -65,7 +70,7 @@ fun AppRoot(graph: AppGraph) {
         graph.nav.goBack()
     }
 
-    if (screen == Screen.SPLASH) {
+    if (screen == Screen.SPLASH || stan is SessionState.Brak) {
         SplashScreen(graph)
         return
     }
@@ -74,7 +79,7 @@ fun AppRoot(graph: AppGraph) {
         TopBar(
             screen = screen,
             hasBack = graph.nav.backTargetOf(screen) != null,
-            user = users.current,
+            user = stan.osoba ?: "?",
             summary = queue?.summary,
             onBack = { graph.nav.goBack() },
             onOpenQueue = { graph.nav.openQueue() },
@@ -111,6 +116,24 @@ fun AppRoot(graph: AppGraph) {
             }
             ToastOverlay(toastMsg)
             SuccessOverlay(success)
+            /* Blokada NIE zdejmuje ekranu spod spodu — otwarta dostawa ma być
+               widoczna, bo to ona jest dowodem, że nic nie zginęło. Skaner
+               działa dalej: badge to jedyny sposób na zdjęcie blokady. */
+            if (stan is SessionState.Zablokowana) {
+                LockOverlay(stan.osoba ?: "")
+            }
+            pytanie?.let { p ->
+                HandoverDialog(
+                    pytanie = p,
+                    kontekst = graph.nav.opisPracy(),
+                    onPotwierdz = {
+                        scope.launch {
+                            graph.session.przejmij(graph.nav.opisPracy())?.let { graph.effects.toast(it) }
+                        }
+                    },
+                    onOdrzuc = { graph.session.odrzucPrzejecie() },
+                )
+            }
         }
         TabBar(
             screen = screen,

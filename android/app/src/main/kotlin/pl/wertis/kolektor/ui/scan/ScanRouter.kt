@@ -1,6 +1,7 @@
 package pl.wertis.kolektor.ui.scan
 
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.badge.looksLikeBadge
 import pl.wertis.kolektor.core.net.LocAction
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.nav.Screen
@@ -32,6 +33,16 @@ suspend fun routeScan(
     screen: String? = null,
     onSearch: (String) -> Unit,
 ) {
+    // Badge NIGDY nie jedzie do /api/scan. Nie chodzi o oszczędność round-tripu:
+    // skan plakietki znaczy „zmienia się KTO pracuje", a nie „pokaż mi to" —
+    // wrzucony we wspólną ścieżkę wróciłby jako nieznany kod i zniknął, albo
+    // (gorzej) trafił do wyszukiwarki towarów jako tekst.
+    if (looksLikeBadge(code)) {
+        graph.feedback.beep(true)
+        graph.session.onBadge(code)?.let { graph.effects.toast(it) }
+        return
+    }
+
     val start = System.currentTimeMillis()
     try {
         val odpowiedz = apiCall { graph.api.scan(code, if (manual) "1" else null, screen) }

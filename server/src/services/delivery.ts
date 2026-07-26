@@ -309,7 +309,12 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   // Przy natłoku dostawę robi kilka osób. Nie odbieramy linii koledze po cichu:
   // druga osoba dowiaduje się, kto ją trzyma, i idzie dalej po alejce.
   const holder = lockedByOther(line.locked_by, line.locked_at, user);
-  if (holder) return { kind: "locked", code, lockedBy: holder, sym: p.symbol, name: p.nazwa };
+  // `lineId` jedzie w odpowiedzi, bo bez niego brygadzista nie ma jak
+  // odebrać linii przed TTL — a 30 minut czekania na kolegę, który
+  // skończył zmianę, to czekanie na nic
+  if (holder) {
+    return { kind: "locked", code, lineId: line.id, lockedBy: holder, sym: p.symbol, name: p.nazwa };
+  }
 
   claimLine(line.id, user);
   touchDelivery(deliveryId);

@@ -137,6 +137,31 @@ Parametry (env, dev):
 
 ## Funkcje (kolektor — aplikacja Android)
 
+**Kto pracuje — badge, nie wolny tekst (plan §7)**
+- **Jeden skan plakietki loguje** (~1 s, bez PIN-u na ścieżce codziennej).
+  Wcześniej „użytkownik" był dowolnym łańcuchem wpisywanym z klawiatury
+  i wysyłanym w nagłówku `X-User`: `events.user_id` zbierał warianty tej samej
+  osoby (`Jan`, `jan`, `Jan K`), więc audyt nadawał się do czytania oczami i do
+  niczego więcej, a każdy mógł podać się za kogokolwiek jednym wpisem.
+- **Kod badge'a `PRC-0007-3` niesie cyfrę kontrolną** (wagi 3-1-3-1). Bez niej
+  starty znak na etykiecie zamienia Jana w Piotra, a audyt wskazuje niewinnego —
+  to jest różnica między „nie dało się odczytać" a „odczytano źle". Kod **nie
+  niesie nazwiska**: badge się gubi i zostaje na kurtce, więc powiązanie
+  kod → człowiek żyje wyłącznie w bazie.
+- **Bezczynność BLOKUJE sesję, nigdy jej nie kończy.** Po 10 minutach ekran
+  mówi wprost, że nic nie zginęło; otwarta dostawa i cały postęp czekają,
+  a odblokowanie to jeden skan własnego badge'a — ten sam token. Wylogowanie
+  gubiące 30 rozłożonych pozycji to najprostszy sposób na aplikację, która leży
+  w szufladzie.
+- **Skan cudzego badge'a nigdy nie przełącza po cichu.** Ekran pyta „Przejąć
+  pracę? Trwa: dostawa #17, rozpoczęte przez: Jan Kowalski", a przejęcie ląduje
+  w `events` (`session_handover`). Ciche przełączenie podpisałoby cudze pozycje
+  nie tym nazwiskiem i nie zostawiłoby po sobie śladu.
+- **PIN tam, gdzie badge nie wystarcza.** Badge'e bywają pożyczane („podaj mi
+  swój, mam ręce w oleju"), więc odebranie koledze linii przed wygaśnięciem TTL
+  wymaga PIN-u. To jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez
+  jej wiedzy — zdarzenie `lock_forced` zapisuje komu i przez kogo.
+
 **Podgląd i operacje ad-hoc**
 - Skan sprzętowy (Zebra DataWedge / Honeywell DataCollection, fallback
   klawiaturowy) / wyszukiwarka (symbol, nazwa, końcówka EAN) — logika `SELECT`
@@ -328,7 +353,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 76 testów jednostkowych; buduje się bez Android SDK
+                           + 85 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup

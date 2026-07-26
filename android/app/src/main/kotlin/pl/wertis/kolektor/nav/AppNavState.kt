@@ -83,5 +83,20 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openProblems() = go(Screen.PROBLEMS)
 
-    fun start() = go(Screen.HOME) // Splash: „Kto pracuje?” → home
+    fun start() = go(Screen.HOME) // Splash: „Zeskanuj badge" → home
+
+    /**
+     * Krótki opis TRWAJĄCEJ pracy — do pytania o przejęcie i do audytu.
+     *
+     * „Przejąć pracę?" bez powiedzenia JAKĄ jest pytaniem, na które nie da się
+     * odpowiedzieć: człowiek stojący przy kolektorze widzi ekran, ale ten, kto
+     * będzie czytał `events` za miesiąc, nie zobaczy nic. `null`, gdy nic nie
+     * jest otwarte — wtedy przejęcie jest zwykłą zmianą osoby.
+     */
+    fun opisPracy(): String? = when {
+        deliveryId != null -> "dostawa #" + deliveryId
+        sessionId != null -> "sesja kontenerowa #" + sessionId
+        locCode != null -> "regał " + locCode
+        else -> null
+    }
 }

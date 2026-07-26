@@ -14,8 +14,8 @@ import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.data.RecentStore
+import pl.wertis.kolektor.data.SessionRepository
 import pl.wertis.kolektor.data.SettingsRepository
-import pl.wertis.kolektor.data.UsersRepository
 import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
 import pl.wertis.kolektor.device.Feedback
@@ -36,11 +36,16 @@ class AppGraph(context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val settings = SettingsRepository(context)
-    val users = UsersRepository(context)
     val recent = RecentStore(context)
 
+    /* Tożsamość rozstrzyga serwer na podstawie skanu badge'a (plan §7).
+       Repozytorium powstaje PRZED klientem HTTP, bo klient musi umieć
+       doczytać z niego token; `api` jedzie w drugą stronę jako lambda. */
+    val session = SessionRepository({ api }, appScope, context)
+
     val apiClient = ApiClient(
-        currentUser = { users.currentUser },
+        currentUser = { session.currentUser },
+        sessionToken = { session.token },
         deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
     )
@@ -116,7 +121,10 @@ class AppGraph(context: Context) {
         appScope.launch { locationsRepo.get() }
         // cudzy regał nie jest moim regałem — jeden punkt wpięcia, żeby żadna
         // ścieżka zmiany użytkownika tego nie pominęła
-        users.onUserChanged = { pin.onUserChanged() }
+        session.onUserChanged = { pin.onUserChanged() }
+        // blokada jest stanem serwera — pytamy o nią przy starcie, a nie
+        // liczymy drugiego zegara po stronie kolektora
+        session.refresh()
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

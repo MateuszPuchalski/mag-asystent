@@ -46,6 +46,9 @@ class MainActivity : ComponentActivity() {
         // wygaszony ekran / inna aplikacja to mocniejszy sygnał niż sam upływ
         // czasu: człowiek fizycznie przestał pracować przy tym regale
         if (wyszedlO > 0) appGraph.pin.onResume(System.currentTimeMillis() - wyszedlO)
+        // Blokada sesji jest stanem SERWERA (plan §7) — po powrocie z tła
+        // pytamy o nią, zamiast prowadzić drugi zegar po stronie kolektora.
+        appGraph.session.refresh()
     }
 
     override fun onPause() {

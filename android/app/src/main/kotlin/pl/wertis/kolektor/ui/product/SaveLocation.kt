@@ -29,7 +29,7 @@ suspend fun saveLocation(
         if (!isKnownLoc(choice.value, locInfo)) "Lokalizacja spoza wykazu — sprawdź etykietę" else null
     val res = graph.offlineQueue.runOrBuffer(
         kind = PendingOp.OpKind.SET_LOCATION,
-        user = graph.users.currentUser,
+        user = graph.session.currentUser,
         productId = productId,
         setLocation = SetLocationBody(choice.action, value = choice.value, replaced = choice.replaced),
     )

@@ -42,6 +42,7 @@ import pl.wertis.kolektor.core.net.EanCandidate
 import pl.wertis.kolektor.core.net.KoszykView
 import pl.wertis.kolektor.core.net.LocApplyAction
 import pl.wertis.kolektor.core.net.PutawayLineBody
+import pl.wertis.kolektor.core.net.ForceReleaseBody
 import pl.wertis.kolektor.core.net.ScanBody
 import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.problem.ProblemType
@@ -54,6 +55,7 @@ import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.components.formatQty
+import pl.wertis.kolektor.ui.session.PinSheet
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
@@ -113,6 +115,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     /** Zwroty: numer koszyka, z którego magazynier bierze towar (wpisany raz). */
     var koszyk by remember(id) { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    /** Linia trzymana przez kogoś innego, którą brygadzista chce odebrać (§7). */
+    var doOdebrania by remember(id) { mutableStateOf<ScanResolution.Locked?>(null) }
+    var pinBlad by remember(id) { mutableStateOf<String?>(null) }
 
     suspend fun resolveProduct(code: String) {
         try {
@@ -130,9 +135,12 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     graph.effects.toast("${r.sym} nie jest w tym dokumencie")
                 }
                 is ScanResolution.Locked -> {
-                    // ktoś obok już bierze tę pozycję — idź dalej alejką
+                    // Domyślna odpowiedź to „idź dalej alejką" — cudzej pracy
+                    // się nie odbiera odruchowo. Odebranie jest możliwe, ale
+                    // wymaga PIN-u i zostawia ślad (patrz `PinSheet` niżej).
                     graph.feedback.beep(false)
                     graph.effects.toast("${r.sym} — pozycję rozkłada ${r.lockedBy}")
+                    doOdebrania = r
                 }
                 is ScanResolution.Unknown -> {
                     graph.feedback.beep(false)
@@ -255,6 +263,35 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 problemFor = null
                 problemType = null
             },
+        )
+        return
+    }
+
+    // odebranie cudzej linii przed TTL — PIN, nie sam badge (§7)
+    doOdebrania?.let { l ->
+        PinSheet(
+            tytul = "Odebrać pozycję?",
+            opis = "${l.sym} rozkłada ${l.lockedBy}. Bez tego pozycja zwolni się sama " +
+                "po 30 minutach. Odebranie zostanie zapisane w historii.",
+            blad = pinBlad,
+            onPotwierdz = { pin ->
+                scope.launch {
+                    try {
+                        val r = apiCall { graph.api.forceReleaseLine(id, l.lineId, ForceReleaseBody(pin)) }
+                        doOdebrania = null
+                        pinBlad = null
+                        graph.feedback.beep(true)
+                        graph.effects.toast(
+                            r.odebrano?.let { "Pozycja odebrana: $it" } ?: "Pozycja była już wolna"
+                        )
+                        resolveProduct(l.code)
+                    } catch (e: Exception) {
+                        graph.feedback.beep(false)
+                        pinBlad = e.message ?: "Odmowa"
+                    }
+                }
+            },
+            onAnuluj = { doOdebrania = null; pinBlad = null },
         )
         return
     }

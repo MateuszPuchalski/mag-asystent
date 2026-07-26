@@ -167,7 +167,7 @@ export type ScanResolution =
   | { kind: "conflict"; code: string; candidates: EanCandidate[] }
   | { kind: "off_document"; code: string; twId: number; sym: string; name: string }
   /** Linię trzyma teraz ktoś inny — nie odbieramy jej po cichu. */
-  | { kind: "locked"; code: string; lockedBy: string; sym: string; name: string }
+  | { kind: "locked"; code: string; lineId: number; lockedBy: string; sym: string; name: string }
   | { kind: "unknown"; code: string };
 
 /* ── Faza 2: wyjątki (D8) ───────────────────────────────────────────────── */

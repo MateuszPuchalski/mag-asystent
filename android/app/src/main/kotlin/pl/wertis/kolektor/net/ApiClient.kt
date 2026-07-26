@@ -35,7 +35,12 @@ class HostSelectionInterceptor(@Volatile var baseUrl: HttpUrl?) : Interceptor {
 }
 
 /**
- * Dokleja `x-user` (bieżący magazynier) i `x-device` (egzemplarz kolektora).
+ * Dokleja `x-session` (token sesji), `x-user` (podpowiedź) i `x-device`.
+ *
+ * `x-session` to TOŻSAMOŚĆ: serwer rozstrzyga ją z tokenu wydanego po skanie
+ * badge'a. `x-user` zostaje wyłącznie jako podpowiedź dla instalacji, które
+ * nie przeszły jeszcze na badge'y — dało się go wpisać ręcznie, więc nigdy nie
+ * był dowodem, tylko deklaracją (plan §7).
  *
  * `x-device` jest polem diagnostycznym: przy współdzielonych kolektorach
  * pierwsze pytanie przy awarii brzmi „to jedno urządzenie czy wszystkie?",
@@ -43,17 +48,24 @@ class HostSelectionInterceptor(@Volatile var baseUrl: HttpUrl?) : Interceptor {
  */
 class IdentityHeaderInterceptor(
     private val currentUser: () -> String,
+    private val sessionToken: () -> String?,
     private val deviceId: String,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val req = chain.request()
         val b = req.newBuilder().header("x-device", deviceId)
+        sessionToken()?.let { b.header("x-session", it) }
         if (req.header("x-user") == null) b.header("x-user", currentUser())
         return chain.proceed(b.build())
     }
 }
 
-class ApiClient(currentUser: () -> String, deviceId: String, initialBaseUrl: String) {
+class ApiClient(
+    currentUser: () -> String,
+    sessionToken: () -> String?,
+    deviceId: String,
+    initialBaseUrl: String,
+) {
     val hostSelection = HostSelectionInterceptor(initialBaseUrl.toHttpUrlOrNull())
 
     private val okHttp = OkHttpClient.Builder()
@@ -61,7 +73,7 @@ class ApiClient(currentUser: () -> String, deviceId: String, initialBaseUrl: Str
         .readTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
         .addInterceptor(hostSelection)
-        .addInterceptor(IdentityHeaderInterceptor(currentUser, deviceId))
+        .addInterceptor(IdentityHeaderInterceptor(currentUser, sessionToken, deviceId))
         .build()
 
     val service: ApiService = Retrofit.Builder()

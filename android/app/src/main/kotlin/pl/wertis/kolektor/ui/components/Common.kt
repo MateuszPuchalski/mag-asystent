@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,6 +93,8 @@ fun WertisTextField(
     leadingIcon: ImageVector? = null,
     imeAction: ImeAction = ImeAction.Done,
     keyboardType: KeyboardType = KeyboardType.Text,
+    /** Maskowanie treści — PIN wpisuje się na hali, przy ludziach. */
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     onDone: () -> Unit = {},
 ) {
     OutlinedTextField(
@@ -106,6 +109,7 @@ fun WertisTextField(
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        visualTransformation = visualTransformation,
         keyboardActions = KeyboardActions(onDone = { onDone() }, onSearch = { onDone() }),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Amber,

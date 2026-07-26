@@ -32,7 +32,9 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.BuildConfig
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.data.AppSettings
-import pl.wertis.kolektor.data.userInitials
+import pl.wertis.kolektor.core.session.SessionState
+import pl.wertis.kolektor.core.session.osoba
+import pl.wertis.kolektor.core.session.userInitials
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.SectionCard
@@ -54,9 +56,8 @@ import pl.wertis.kolektor.ui.theme.InkSoft
 
 @Composable
 fun SettingsScreen(graph: AppGraph) {
-    val users by graph.users.users.collectAsStateWithLifecycle()
+    val stan by graph.session.state.collectAsStateWithLifecycle()
     val settings by graph.settings.settings.collectAsStateWithLifecycle()
-    var newUser by remember { mutableStateOf("") }
     var serverUrl by remember { mutableStateOf(settings.serverUrl) }
 
     Column(
@@ -66,61 +67,57 @@ fun SettingsScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SectionLabel("Użytkownicy kolektora")
+        SectionLabel("Kto pracuje")
         SectionCard {
-            users.list.forEach { name ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { graph.users.selectUser(name) }
-                        .padding(vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+            // Lista imion wpisywanych z klawiatury zniknęła razem z nagłówkiem
+            // X-User (plan §7): tożsamość rozstrzyga skan badge'a po stronie
+            // serwera. Konta zakłada biuro, nie kolektor.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier.size(30.dp).clip(CircleShape)
+                        .background(if (stan is SessionState.Brak) InkMute.copy(alpha = 0.25f) else Amber),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(
-                        modifier = Modifier.size(30.dp).clip(CircleShape)
-                            .background(if (name == users.current) Amber else InkMute.copy(alpha = 0.25f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(userInitials(name), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink)
-                    }
                     Text(
-                        name,
-                        fontSize = 14.sp,
-                        fontWeight = if (name == users.current) FontWeight.Bold else FontWeight.Normal,
+                        userInitials(stan.osoba ?: "?"),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
                         color = Ink,
-                        modifier = Modifier.weight(1f),
                     )
-                    if (name == users.current) {
-                        Text("aktywny", fontSize = 11.sp, color = InkSoft)
-                    } else if (users.list.size > 1) {
-                        Text(
-                            "usuń",
-                            fontSize = 12.sp,
-                            color = InkMute,
-                            modifier = Modifier
-                                .clickable { graph.users.removeUser(name) }
-                                .padding(4.dp),
-                        )
-                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stan.osoba ?: "nikt nie jest zalogowany",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Ink,
+                    )
+                    Text(
+                        // `when (val s = ...)`, bo `stan` jest właściwością
+                        // delegowaną — smart cast by się nie odbył
+                        when (val s = stan) {
+                            is SessionState.Aktywna -> s.role
+                            is SessionState.Zablokowana -> "sesja zablokowana — zeskanuj badge"
+                            SessionState.Brak -> "zeskanuj badge, żeby zacząć"
+                        },
+                        fontSize = 11.sp,
+                        color = InkSoft,
+                    )
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                WertisTextField(
-                    value = newUser,
-                    onValueChange = { newUser = it },
-                    placeholder = "Nowa osoba…",
-                    modifier = Modifier.weight(1f),
-                    onDone = {
-                        if (graph.users.addUser(newUser) != null) newUser = ""
-                    },
-                )
-                PrimaryButton("DODAJ", enabled = newUser.isNotBlank()) {
-                    if (graph.users.addUser(newUser) != null) newUser = ""
+            if (stan !is SessionState.Brak) {
+                // Wylogowanie to JAWNA decyzja człowieka. Bezczynność blokuje,
+                // nie wylogowuje — sesja gubiąca 30 rozłożonych pozycji to
+                // najprostszy sposób na aplikację leżącą w szufladzie.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PrimaryButton("WYLOGUJ") { graph.session.wyloguj() }
                 }
             }
         }
