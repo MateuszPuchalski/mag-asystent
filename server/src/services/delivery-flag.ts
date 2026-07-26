@@ -33,6 +33,25 @@ export function flagSgtValue(key: DocFlagKey): string {
 }
 
 /**
+ * Czy jest DOKĄD wysłać flagę.
+ *
+ * Wersja edu Subiekta nie ma flag dokumentów w ogóle, a na produkcji para
+ * (grupa flag, typ obiektu) bywa jeszcze nieustalona. W obu przypadkach
+ * kolejkowanie zadania nic nie daje: worker odbije je trzy razy i zostawi
+ * w statusie `error`. Przy dostawie z dwudziestoma pozycjami to seria czerwonych
+ * zadań i stale czerwona pastylka Sfery na kolektorze — a w tym szumie ginie
+ * realny błąd zapisu lokalizacji, czyli jedyna rzecz, którą trzeba tam zobaczyć.
+ *
+ * Dlatego brak konfiguracji znaczy „flagi wyłączone", a nie „flagi zepsute".
+ * Cisza nie jest myląca, bo stan widać w `/api/health` (pole `docFlag`).
+ */
+export function docFlagAvailable(): boolean {
+  // adapter dev (tryb seeded) pisze do sgt_dokument i działa zawsze
+  if (config.sferaMode !== "sql") return true;
+  return !!(config.mssql.flagGrupa && config.mssql.flagTypObiektu);
+}
+
+/**
  * Wartość, która realnie ląduje w `sgt_dokument.flaga`. Gdy mapowanie na wartość
  * Subiekta nie jest jeszcze skonfigurowane, adapter `dev` zapisuje sam klucz —
  * i porównanie musi to uwzględniać, inaczej wykrywanie nadpisania przez biuro
@@ -154,6 +173,9 @@ export function officeOverride(d: DeliveryRow): string | null {
  * Zwraca id zadania albo `null`, gdy nic nie trzeba było wysyłać.
  */
 export function syncFlag(deliveryId: number, user: string): number | null {
+  // brak miejsca zapisu (edu / nieustalona grupa flag) — nie produkujemy zadań,
+  // które i tak skończą się błędem; stan widać w /api/health
+  if (!docFlagAvailable()) return null;
   const d = db()
     .prepare("SELECT id, sgt_dok_id, sgt_dok_numer, flaga_wyslana FROM delivery WHERE id=?")
     .get(deliveryId) as DeliveryRow | undefined;

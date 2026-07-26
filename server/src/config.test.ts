@@ -44,6 +44,16 @@ test("flagi bez konfiguracji grupy/typu — brak domysłu, zadanie ma paść", (
   assert.equal(config.mssql.flagTypObiektu, 0);
 });
 
+test("bez konfiguracji grupy flag nie ma dokąd wysyłać — flagi wyłączone", async () => {
+  const { docFlagAvailable } = await import("./services/delivery-flag.js");
+  // tryb seeded pisze do sgt_dokument adapterem dev i działa zawsze
+  assert.equal(config.sferaMode, "dev");
+  assert.equal(docFlagAvailable(), true);
+  // w trybie sql bez MSSQL_FLAG_* zadanie skończyłoby się błędem po 3 próbach,
+  // więc nie ma go po co tworzyć — patrz komentarz przy docFlagAvailable()
+  assert.equal(config.mssql.flagGrupa && config.mssql.flagTypObiektu ? "on" : "off", "off");
+});
+
 test("magazyny rozstrzygają o trybie, więc muszą być różne", () => {
   const { MAG, MGP, ZWROTY } = config.magId;
   assert.equal(new Set([MAG, MGP, ZWROTY]).size, 3);
