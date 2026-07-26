@@ -84,13 +84,11 @@ fun AppRoot(graph: AppGraph) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TopBar(
             screen = screen,
-            hasBack = graph.nav.backTargetOf(screen) != null,
             // ten sam ekran, dwie intencje — nagłówek nie może kłamać
             titleOverride = "DODANIE LOKALIZACJI"
                 .takeIf { screen == Screen.SCAN_LOC && graph.nav.scanLocDodaj },
             user = stan.osoba ?: "?",
             summary = queue?.summary,
-            onBack = { graph.nav.goBack() },
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
         )
@@ -138,10 +136,13 @@ fun AppRoot(graph: AppGraph) {
                 )
             }
         }
+        // WSTECZ zeszło tu z lewego górnego rogu — kciuk go tam nie dosięgał
         TabBar(
             screen = screen,
+            hasBack = graph.nav.backTargetOf(screen) != null,
             onHome = { graph.nav.go(Screen.HOME) },
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
+            onBack = { graph.nav.goBack() },
         )
     }
 }

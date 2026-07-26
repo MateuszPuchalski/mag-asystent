@@ -121,6 +121,11 @@ aplikacja też się buduje i działa (integracja przez refleksję —
       miejscu (lista nie przeskakuje po żadnym odłożeniu),
 - [ ] **brak nagłówków alejek**, lokalizacja czytelna jako pastylka przy każdym
       wierszu; „BEZ LOKALIZACJI (n)" nadal osobną sekcją na końcu,
+- [ ] **WSTECZ w zasięgu kciuka**: przycisk jest w prawym DOLNYM rogu, nie
+      w lewym górnym; da się wrócić jedną ręką, nie przekładając kolektora,
+- [ ] **SKAN i ROZKŁADANIE nie przeskakują**: wejdź w podekran i wróć — oba
+      przyciski mają zostać dokładnie tam, gdzie były (slot WSTECZ jest
+      zarezerwowany także wtedy, gdy nie ma dokąd wracać),
 - [ ] **badge**: skan plakietki na ekranie startowym loguje; skan własnej przy
       czynnej sesji nie robi nic; skan cudzej pyta o przejęcie pracy,
 - [ ] **blokada**: 10 min bezczynności → ekran „Sesja zablokowana", pod spodem
