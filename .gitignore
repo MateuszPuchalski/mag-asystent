@@ -5,6 +5,9 @@ dev-dist/
 .DS_Store
 node_modules/.tmp/
 
+# ustawienia środowiska (hasło do bazy Subiekta) — szablon: wertis.env.example
+wertis.env
+
 # baza aplikacji (SQLite) — generowana z seedu
 server/data/*.db
 server/data/*.db-*

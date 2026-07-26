@@ -74,6 +74,16 @@ npm run seed     # zasila SQLite z web/public/data/products.json (raz; FORCE_SEE
 npm run dev      # api :3001 + worker; podgląd biurowy: http://localhost:3001/lookup
 ```
 
+To jest **tryb `seeded`** — dane demo z `magmat.xlsx`, zero kontaktu z Subiektem.
+Połączenie z prawdziwą bazą włącza `SGT_MODE=mssql` wraz z resztą `MSSQL_*`;
+ustawienia trzyma jeden plik dla obu procesów (API i workera):
+
+```bash
+cp wertis.env.example wertis.env && nano wertis.env
+source wertis.env && npm run dev
+curl -s http://localhost:3001/api/health    # "mode" musi być "mssql"
+```
+
 Kolektor: build APK w [`android/`](android/README.md) (`./gradlew :app:assembleDebug`
 albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2:3001`).
 
