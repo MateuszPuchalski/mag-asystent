@@ -154,8 +154,19 @@ fun ProductScreen(graph: AppGraph) {
         // nagłówek
         Column {
             Text(p.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink, lineHeight = 20.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 3.dp)) {
-                Text(p.sym, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Ink)
+            // Symbol to jedyny identyfikator, którym magazynier posługuje się przy
+            // regale (nazwy się powtarzają, EAN-u nie da się przeczytać z ręki) —
+            // dlatego własny wiersz i rozmiar nagłówka, a nie linijka metadanych.
+            Text(
+                p.sym,
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 26.sp,
+                lineHeight = 28.sp,
+                color = Ink,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("EAN ${p.ean.ifEmpty { "—" }}", fontSize = 12.sp, color = InkSoft)
                 Text(p.unit, fontSize = 12.sp, color = InkSoft)
             }
@@ -320,7 +331,24 @@ fun ProductScreen(graph: AppGraph) {
             }
         }
 
-        // historia (ostatnie 4)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "skan etykiety regału = przenieś tutaj · skan towaru = następna karta",
+            fontSize = 11.sp,
+            color = InkMute,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+
+        // MM ad-hoc wycięte (wywiad): przesunięcia robi tryb B (wózek) albo biuro.
+        // Karta towaru zapisuje wyłącznie lokalizację.
+        OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
+            graph.nav.openScanLoc()
+        }
+
+        // Historia (ostatnie 4) — na samym dole, bo sięga się po nią dopiero, gdy
+        // coś się nie zgadza („kto to ruszył?"). Codzienna ścieżka to stany,
+        // lokalizacje i zmiana lokalizacji — te muszą być nad zgięciem ekranu.
         if (history.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 SectionLabel("Historia")
@@ -349,21 +377,6 @@ fun ProductScreen(graph: AppGraph) {
                     }
                 }
             }
-        }
-
-        Spacer(Modifier.height(2.dp))
-        Text(
-            "skan etykiety regału = przenieś tutaj · skan towaru = następna karta",
-            fontSize = 11.sp,
-            color = InkMute,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-
-        // MM ad-hoc wycięte (wywiad): przesunięcia robi tryb B (wózek) albo biuro.
-        // Karta towaru zapisuje wyłącznie lokalizację.
-        OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
-            graph.nav.openScanLoc()
         }
     }
 

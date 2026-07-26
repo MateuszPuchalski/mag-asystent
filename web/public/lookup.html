@@ -74,7 +74,10 @@
   /* detail */
   .detail{padding:18px 20px;overflow-y:auto}
   .detail .name{font-family:var(--cond);font-weight:800;font-size:26px;line-height:1.1}
-  .detail .meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:6px;font-size:13.5px;color:var(--ink-soft)}
+  /* symbol = identyfikator, po którym biuro rozmawia z magazynem — czytany
+     głośno przez telefon, więc większy niż reszta metadanych karty */
+  .detail .sym{font-family:var(--cond);font-weight:800;font-size:34px;line-height:1.05;margin-top:4px;letter-spacing:.01em}
+  .detail .meta{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:4px;font-size:13.5px;color:var(--ink-soft)}
   .detail .meta b{color:var(--ink);font-weight:700}
   .detail .desc{font-size:13px;color:var(--ink-mute);margin-top:6px}
   .stocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:18px}
@@ -267,7 +270,8 @@ function renderDetail(c){
   const locs = c.locs||[];
   detailEl.innerHTML = `
     <div class="name">${esc(c.name)}</div>
-    <div class="meta"><span><b>${esc(c.sym)}</b></span><span>EAN ${esc(c.ean||'—')}</span><span>${esc(c.unit||'szt')}</span>${c.ordered>0?`<span>zam. u dostawcy: <b>${fmt(c.ordered)}</b></span>`:''}</div>
+    <div class="sym num">${esc(c.sym)}</div>
+    <div class="meta"><span>EAN ${esc(c.ean||'—')}</span><span>${esc(c.unit||'szt')}</span>${c.ordered>0?`<span>zam. u dostawcy: <b>${fmt(c.ordered)}</b></span>`:''}</div>
     ${c.desc?`<div class="desc">${esc(c.desc)}</div>`:''}
     <div class="stocks">
       ${stockCard('MAG · dostępne', c.mag, false, sv=>`rez. ${fmt(sv.rez)} · razem ${fmt(sv.stan)}`)}
