@@ -196,11 +196,22 @@ fun SettingsScreen(graph: AppGraph) {
  * Zmiana adresu unieważnia zapamiętaną regułę lokalizacji — inny serwer to inny
  * magazyn i potencjalnie inny wzorzec adresu. Do czasu pobrania nowej reguły
  * skaner wraca do trybu ostrożnego, zamiast stosować wzorzec cudzego magazynu.
+ *
+ * Widoczne poza Ustawieniami, bo ekran startowy musi umieć to samo: przed
+ * zalogowaniem Ustawienia są niedostępne (nie ma paska górnego), a to właśnie
+ * wtedy adres bywa zły — świeża instalacja startuje z adresem emulatora.
  */
-private fun saveServerUrl(graph: AppGraph, url: String) {
+fun saveServerUrl(graph: AppGraph, url: String) {
     val next = url.trim()
     if (next != graph.settings.current.serverUrl) graph.locationsRepo.forget()
     graph.settings.update { s -> s.copy(serverUrl = next) }
+    /* Podmiana NATYCHMIAST, nie przez obserwatora w `AppGraph.init`. Oba
+       czytają ten sam `StateFlow`, ale kolejność dwóch niezależnych kolektorów
+       nie jest niczym zagwarantowana — a ekran startowy odpytuje serwer zaraz
+       po zapisie. Przy niepomyślnej kolejności sprawdzenie poszłoby pod STARY
+       adres i poprawny nowy adres zostałby pokazany jako nieosiągalny. Setter
+       jest idempotentny, więc późniejsze przejście obserwatora nic nie zmienia. */
+    graph.apiClient.setBaseUrl(next)
 }
 
 @Composable

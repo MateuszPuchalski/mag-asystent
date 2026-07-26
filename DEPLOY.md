@@ -180,8 +180,14 @@ keystore) — instrukcja podpisu jak w standardowym projekcie Android.
 - Wgraj APK przez MDM (SOTI / Honeywell / Zebra) lub `adb install app-debug.apk`.
 - Kiosk: przypnij aplikację przez Android lock-task / device owner (MDM) —
   Fully Kiosk Browser nie jest potrzebny.
-- Przy pierwszym starcie: **Ustawienia → Serwer WERTIS** → adres API w LAN
-  (`http://mag.wertis.local:3001` lub `http://<IP-serwera>:3001`).
+- Przy pierwszym starcie adres serwera podajesz **na ekranie startowym**
+  (`ZMIEŃ ADRES SERWERA`) — adres API w LAN, czyli
+  `http://mag.wertis.local:3001` albo `http://<IP-serwera>:3001`. Ustawienia
+  są za bramką sesji, więc przed pierwszym zalogowaniem tamtędy nie wejdziesz;
+  po zalogowaniu ten sam adres zmienia się w **Ustawienia → Serwer WERTIS**.
+- Fabryczna wartość to `http://10.0.2.2:3001` — alias hosta **w emulatorze**.
+  Na fizycznym kolektorze nie wskazuje na nic, więc dopóki jej nie zmienisz,
+  ekran startowy pokazuje „Nie widzę serwera pod adresem…".
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
@@ -194,6 +200,13 @@ badge'a i nie przepuszcza dalej.
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
 ekran startowy pokazuje **ZAŁÓŻ KONTA** zamiast prosić o skan plakietki
 (których jeszcze nie ma).
+
+> Przycisk **ZAŁÓŻ KONTA** pojawia się dopiero wtedy, gdy serwer odpowiedział.
+> Jeśli widzisz sam napis „Zeskanuj swój badge", to znaczy, że kolektor NIE
+> DOGADAŁ SIĘ Z SERWEREM — poprawny adres jest warunkiem wstępnym całego tego
+> punktu. Brak odpowiedzi świadomie nie odblokowuje kreatora: martwe Wi-Fi
+> wyglądałoby wtedy jak pusta instalacja i powstałby drugi komplet kont obok
+> istniejącego.
 
 W kreatorze wpisujesz wszystkich naraz:
 
