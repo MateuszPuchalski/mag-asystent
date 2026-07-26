@@ -140,13 +140,21 @@ export async function authRoutes(app: FastifyInstance) {
 
     const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
     if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
-    if (req.body?.role !== "magazynier" && !req.body?.pin) {
+
+    /* Rola EFEKTYWNA, nie surowe pole z żądania. Sprawdzanie `req.body.role`
+       wprost znaczyło, że pominięcie pola (czyli poleganie na domyślnym
+       `magazynier`) trafiało w warunek `!== "magazynier"` i kończyło się
+       żądaniem PIN-u dla konta, które PIN-u nie potrzebuje. Domyślna wartość
+       musi być ustalona RAZ i przed walidacją — inaczej walidacja pilnuje
+       czegoś innego niż to, co powstanie. */
+    const rola: Rola = req.body?.role ?? "magazynier";
+    if (rola !== "magazynier" && !req.body?.pin) {
       // konto uprzywilejowane bez PIN-u i tak nic nie wykona (patrz `autoryzuj`)
       return reply.code(400).send({ error: "Konto brygadzisty i biura wymaga PIN-u" });
     }
     // badge nadaje SERWER — numer musi być unikalny w całej firmie, a kod
     // nieść poprawną cyfrę kontrolną
-    const u = createUser(name, req.body?.role ?? "magazynier", req.body?.pin);
+    const u = createUser(name, rola, req.body?.pin);
     logEvent("user_created", u.name, null, { userId: u.userId, role: u.role });
     return { user: u };
   });

@@ -2,15 +2,15 @@
 
 Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 **Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
-magazynu; kolektory (aplikacja Android) łączą się przez WiFi, biuro używa
-strony `/lookup` w przeglądarce. Zero chmury, zero builda frontendu.
+magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro **nie ma
+własnego ekranu** — serwer wystawia wyłącznie API i eksporty CSV. Zero chmury,
+zero frontendu.
 
 ```
-Kolektory Zebra/Honeywell (APK, WiFi LAN) ─┐
-Biuro (przeglądarka → /lookup)            ─┴─ http://mag.wertis.local:3001
+Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
         ▼
 Maszyna z Subiektem GT (Windows)
-  ├─ wertis-api     Fastify: REST + statyki web/public (lookup)
+  ├─ wertis-api     Fastify: REST (bez statyk — aplikacji webowej nie ma)
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
   ├─ wertis.db      SQLite: dostawy i zwroty z postępem per pozycja, koszyki
   │                 zwrotów, wyjątki, sesje trybu B, kolejka, audyt events
@@ -41,7 +41,7 @@ cd /c
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis
 cd /c/wertis
 npm ci
-npm run build      # server → server/dist (frontend bez builda: web/public serwowane wprost)
+npm run build      # server → server/dist (frontendu nie ma — samo API)
 npm run seed       # zasila SQLite danymi demo (tryb seeded)
 ```
 
@@ -50,7 +50,7 @@ Szybki test ręczny (przed rejestracją usług):
 ```bash
 npm start                              # API
 npm -w server run start:worker         # worker, w drugim oknie
-# przeglądarka: http://localhost:3001/lookup  → podgląd magazynu powinien działać
+curl -s http://localhost:3001/api/health      # {"ok":true,...} = API stoi
 ```
 
 > ⚠️ **To jest tryb DEMO, nie Subiekt.** Bez `SGT_MODE=mssql` aplikacja czyta
@@ -145,9 +145,8 @@ nssm restart wertis-api ; nssm restart wertis-worker
 netsh advfirewall firewall add rule name="WERTIS kolektor" dir=in action=allow protocol=TCP localport=3001 remoteip=localsubnet
 ```
 
-Kolektory i biuro otwierają: `http://mag.wertis.local:3001` (biuro:
-`/lookup`). HTTPS nie jest wymagane — klient natywny i statyczna strona
-`/lookup` działają po zwykłym HTTP w LAN (nie ma service workera).
+Kolektory łączą się z `http://mag.wertis.local:3001`. HTTPS nie jest wymagane —
+klient natywny działa po zwykłym HTTP w LAN.
 
 ## 5. Kolektory — natywna aplikacja Android (APK)
 
@@ -457,8 +456,7 @@ szansę sprzedaży, a nie błędny stan.
   nssm restart wertis-worker
   ```
 
-  Strona `/lookup` aktualizuje się razem z repo (statyk, bez builda — wystarczy
-  `git pull` + restart). **Klient natywny (APK)** aktualizuje się osobno — nowy
+  **Klient natywny (APK)** aktualizuje się osobno — nowy
   build z CI/`./gradlew :app:assembleRelease` i rozesłanie przez MDM (sekcja 5).
 - **Diagnoza:** `http://mag.wertis.local:3001/api/health` → `{ ok: true, mode: ... }`;
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.

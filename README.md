@@ -8,8 +8,9 @@ każdy do swojej roli:
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
   trwały offline (Room), kiosk przez Android lock-task/MDM. Wdrożenie:
   [`DEPLOY.md`](DEPLOY.md) §5.
-- **Biuro = statyczna strona `/lookup`** (tylko odczyt, przeglądarka desktop) —
-  serwowana wprost przez serwer, bez builda frontendu.
+- **Biuro nie ma własnego ekranu.** Podgląd `/lookup` został usunięty; serwer
+  nie serwuje żadnych statyk. Do biura zostaje REST (`/api/*`) i eksporty CSV
+  z wyjątków i rekoncyliacji. Jedynym interfejsem człowieka jest kolektor.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta/Sfery jest za adapterami: w tym
@@ -43,7 +44,6 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 | Warstwa | Technologia |
 |---|---|
 | Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · Room — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
-| Podgląd biurowy (`web/public/`) | statyczny `lookup.html` (vanilla JS + fetch) → `/lookup`, tylko odczyt |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
 | Baza aplikacji | SQLite (better-sqlite3) — kolejka, sesje, events, locki (spec §7) |
 | Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
@@ -54,8 +54,7 @@ Strefa przyjęć nazywa się **MGP**.
 ## Architektura (spec §3)
 
 ```
-Kolektor (Android)  ─┐
-Biuro (/lookup)     ─┴─REST/JSON──►  Serwer Fastify
+Kolektor (Android)  ───REST/JSON──►  Serwer Fastify
                                        │  SQLite: delivery + delivery_line (tryb A:
                                        │          dostawy, zwroty, koszyki),
                                        │          problem + ean_conflict (wyjątki),
@@ -92,8 +91,8 @@ w firmie): [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
 ```bash
 npm install
-npm run seed     # zasila SQLite z web/public/data/products.json (raz; FORCE_SEED=1 nadpisuje)
-npm run dev      # api :3001 + worker; podgląd biurowy: http://localhost:3001/lookup
+npm run seed     # zasila SQLite z server/seed/products.json (raz; FORCE_SEED=1 nadpisuje)
+npm run dev      # api :3001 + worker; sprawdzenie: http://localhost:3001/api/health
 ```
 
 To jest **tryb `seeded`** — dane demo z `magmat.xlsx`, zero kontaktu z Subiektem.
@@ -112,8 +111,8 @@ albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2
 Produkcyjnie:
 
 ```bash
-npm run build    # server → server/dist (frontend bez builda — web/public serwowane wprost)
-npm start        # Fastify serwuje web/public + API (worker: npm -w server run start:worker)
+npm run build    # server → server/dist (frontendu nie ma — serwer wystawia samo API)
+npm start        # Fastify wystawia API (worker: npm -w server run start:worker)
 ```
 
 **Wdrożenie w firmie (on-premise):** kompletna instrukcja — maszyna z Subiektem,
@@ -306,7 +305,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
   obsługi na serwerze pomija sieć i render — czyli akurat to, gdzie problem
   siedzi. Cel: `p95 < 150 ms`; powyżej ~300 ms ludzie zaczynają skanować
   podwójnie, a podwójny skan przy liczeniu pozycji to błąd **ilościowy**.
-- Cztery liczby w `/lookup` pod klawiszem `m` — widok, nie panel.
+- Cztery liczby pod `GET /api/metrics` — liczby, nie panel.
   **Świadomie bez raportu wydajności per osoba:** to monitoring pracowniczy
   w rozumieniu Kodeksu pracy (art. 22² i nast.) i wymaga zapisu w regulaminie
   oraz uprzedzenia ludzi przed uruchomieniem. Techniczny audyt „kto zmienił
@@ -337,12 +336,14 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
   być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
   + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
-**Podgląd magazynu (biuro) — `/lookup`**
-- Lekka strona **tylko do odczytu** na tym samym serwerze i API, dla przeglądarki
-  desktop (biuro). Skan/wyszukiwarka → karta towaru (stany MAG/MGP/Zwroty
-  skorygowane o kolejkę, lokalizacje, historia); skan kodu regału → zawartość
-  lokalizacji. Klawiaturowa (`Enter`/`↑`/`↓`/`/`/`Esc`), auto-odświeżanie karty
-  co 8 s. **Zero operacji zapisu** (brak zmiany lokalizacji, MM, rozkładania).
+**Biuro — bez własnego ekranu**
+- Strona `/lookup` została **usunięta**, razem z serwowaniem statyk. Serwer
+  wystawia wyłącznie API. Biuro sięga po dane przez `GET /api/products/search`,
+  `GET /api/locations/:code/products`, `GET /api/metrics`, `GET /api/reconcile`
+  oraz eksporty CSV wyjątków i rekoncyliacji.
+- Konsekwencja, którą trzeba znać przed wdrożeniem: **nikt w biurze nie sprawdzi
+  już lokalizacji towaru bez kolektora albo bez narzędzia, które umie wywołać
+  REST.** To była jedyna droga „z przeglądarki".
 
 ## Struktura repo
 
@@ -351,8 +352,6 @@ android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), andr
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
                            + 73 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
-web/public/                statyki serwowane wprost przez serwer (bez builda)
-  lookup.html              podgląd magazynu (biuro, read-only) → /lookup
   data/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
 server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
@@ -375,7 +374,7 @@ tools/docs_check.py        kontrola spójności dokumentacji z repo (martwe ści
 
 ## Dane testowe
 
-`web/public/data/products.json` z eksportu `magmat.xlsx` (`tools/convert_xlsx.py`,
+`server/seed/products.json` z eksportu `magmat.xlsx` (`tools/convert_xlsx.py`,
 rozpoznaje kolumny po nazwie). Eksport zawiera **prawdziwe** kolumny `Stan`
 (MAG), `Rezerwacja`, `MGP` (strefa przyjęć) i `Dostawca`, więc konwerter bierze
 je wprost — bez syntetyki (dla starszego, płaskiego eksportu bez tych kolumn

@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
 import { classifyScan, matchesLocPattern, normalizeLoc, locRulesVersion } from "./scan.js";
 import { config } from "./config.js";
 
@@ -83,8 +82,7 @@ test("wersja reguły jest stabilna i krótka", () => {
 
 /** Ta sama kartoteka, z której powstaje seed — plik jest w repo. */
 function kartoteka(): string[][] {
-  const plik = path.join(config.webDist, "data", "products.json");
-  return JSON.parse(fs.readFileSync(plik, "utf8")) as string[][];
+  return JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
 }
 
 const SYMBOL = 0;

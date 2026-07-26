@@ -99,10 +99,13 @@ export const config = {
     syncMs: num(process.env.MSSQL_SYNC_MS, 60000),
   },
 
-  /** Katalog seedu (products.json z web/public/data). */
+  /**
+   * Kartoteka demo dla `npm run seed`. Leżała pod `web/public/data`, bo
+   * serwowała ją skasowana już PWA — po usunięciu aplikacji webowej to są
+   * po prostu DANE SERWERA i mieszkają razem z nim.
+   */
   seedProducts:
-    process.env.SEED_PRODUCTS ??
-    path.resolve(__dirname, "../../web/public/data/products.json"),
+    process.env.SEED_PRODUCTS ?? path.resolve(__dirname, "../seed/products.json"),
 
   /** Identyfikatory magazynów w SGT (spec §11 pkt 5; [WERYFIKUJ] na własnej bazie). */
   magId: {
@@ -196,8 +199,6 @@ export const config = {
     waitingRetryMs: 60000,
   },
 
-  /** Katalog statyczny (lookup.html + assets) — serwowany wprost, bez builda. */
-  webDist: process.env.WEB_DIST ?? path.resolve(__dirname, "../../web/public"),
 };
 
 /**

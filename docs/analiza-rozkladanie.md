@@ -121,7 +121,7 @@ Tamta wersja opisywała jeden proces (MGP→MAG, sesja z wózkiem) w kliencie PW
 Zniknęły od tego czasu:
 
 - **klient PWA** — zastąpiony natywnym kolektorem Android, a jego kod usunięty
-  z repo; `web/public/` to dziś tylko statyczna strona `/lookup` dla biura,
+  z repo; aplikacji webowej nie ma — `/lookup` i serwowanie statyk usunięte,
 - **tryb „ROZKŁADAJ CAŁE MGP"** — sesja bez dokumentu; jednostką pracy jest
   dokument, a strefa przyjęć przestała być workiem bez ewidencji,
 - **`POST /api/mm`** (MM ad-hoc z karty towaru) — nieużywane, wycięte,
