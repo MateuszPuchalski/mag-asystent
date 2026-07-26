@@ -76,6 +76,41 @@ CREATE INDEX IF NOT EXISTS ix_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS ix_events_time ON events(created_at);
 CREATE INDEX IF NOT EXISTS ix_events_user_time ON events(user_id, created_at);
 
+-- ── Konta pracowników (plan §7) ────────────────────────────────────────────
+-- Do lipca 2026 „użytkownik" to był DOWOLNY łańcuch wpisywany ręcznie na
+-- kolektorze i wysyłany w nagłówku X-User. Skutek: `events.user_id` zawiera
+-- literówki i warianty tej samej osoby (Jan, jan, Jan K, JanK), więc audyt
+-- nadawał się tylko do czytania oczami — nie do żadnego zestawienia. Do tego
+-- każdy mógł podać się za kogokolwiek jednym wpisem.
+--
+-- `badge_code` nie niesie nazwiska: badge się gubi i zostaje na kurtce.
+-- Powiązanie kod → człowiek żyje wyłącznie tutaj.
+CREATE TABLE IF NOT EXISTS app_user (
+  user_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+  badge_code TEXT NOT NULL UNIQUE,               -- PRC-0007-3 (z cyfrą kontrolną)
+  name       TEXT NOT NULL,
+  -- Tylko dla ról uprzywilejowanych. Badge'e bywają pożyczane; PIN sprawia,
+  -- że „ktoś użył mojego badge'a" jest kłamstwem, a nie wymówką.
+  pin_hash   TEXT,
+  role       TEXT NOT NULL DEFAULT 'magazynier', -- magazynier | brygadzista | biuro
+  active     INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Sesja urządzenia: skan badge'a → token. Nagłówek `X-User` przestaje być
+-- tożsamością (dało się go wpisać ręcznie), a staje się co najwyżej podpowiedzią.
+CREATE TABLE IF NOT EXISTS device_session (
+  token      TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES app_user(user_id),
+  device_id  TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Ostatnia aktywność. BLOKADA po bezczynności, nigdy wylogowanie: wylogowanie
+  -- gubiące 30 rozłożonych pozycji to sposób na aplikację leżącą w szufladzie.
+  last_seen  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_session_user ON device_session(user_id);
+
 -- ── Read-model Subiekta GT (seed z mag.xlsx; prod = MSSQL) ─────────────────
 CREATE TABLE IF NOT EXISTS sgt_magazyn (
   mag_id INTEGER PRIMARY KEY,

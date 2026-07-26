@@ -12,6 +12,7 @@ import { deliveryRoutes } from "./routes/delivery.js";
 import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
+import { authRoutes } from "./routes/auth.js";
 import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
 import { docFlagAvailable } from "./services/delivery-flag.js";
 
@@ -65,6 +66,7 @@ async function main() {
   await app.register(problemRoutes);
   await app.register(locationRoutes);
   await app.register(deviceRoutes);
+  await app.register(authRoutes);
 
   // statyki (web/public): podgląd magazynu /lookup — bez builda i bez SPA
   if (fs.existsSync(config.webDist)) {

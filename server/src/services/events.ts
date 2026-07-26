@@ -1,5 +1,5 @@
 import { db } from "../db/db.js";
-import { currentDevice } from "../context.js";
+import { currentDevice, currentUserRef } from "../context.js";
 
 /**
  * Log zdarzeń — audyt każdego skanu i decyzji (spec §7, §12).
@@ -16,9 +16,16 @@ export function logEvent(
 ): void {
   db()
     .prepare(
-      "INSERT INTO events(type, tw_id, payload, user_id, device_id) VALUES (?,?,?,?,?)"
+      "INSERT INTO events(type, tw_id, payload, user_id, device_id, user_ref) VALUES (?,?,?,?,?,?)"
     )
-    .run(type, twId, payload == null ? null : JSON.stringify(payload), userId, currentDevice());
+    .run(
+      type,
+      twId,
+      payload == null ? null : JSON.stringify(payload),
+      userId,
+      currentDevice(),
+      currentUserRef()
+    );
 }
 
 export interface MovementEntry {
