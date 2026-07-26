@@ -328,7 +328,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 68 testów jednostkowych; buduje się bez Android SDK
+                           + 76 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup

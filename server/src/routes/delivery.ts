@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { userOf } from "../context.js";
+import { currentToken, userOf } from "../context.js";
+import { autoryzuj, sesja } from "../services/auth.js";
 import {
   closeBasket,
+  forceReleaseLine,
   getDelivery,
   listDocuments,
   openDelivery,
@@ -93,5 +95,25 @@ export async function deliveryRoutes(app: FastifyInstance) {
   app.post<{ Params: { lineId: string } }>(
     "/api/delivery/:id/lines/:lineId/release",
     async (req) => releaseLine(Number(req.params.lineId), userOf(req))
+  );
+
+  /**
+   * Odebranie linii koledze przed wygaśnięciem TTL — PIN, nie sam badge.
+   *
+   * Bez tego jedyną drogą jest odczekanie 30 minut, a najczęstsza przyczyna
+   * wiszącego locka (koniec zmiany, utrata zasięgu) sprawia, że czeka się na
+   * nic. Jednocześnie to jedyne miejsce w aplikacji, gdzie jedna osoba odbiera
+   * pracę drugiej bez jej wiedzy — więc badge nie wystarcza (badge'e bywają
+   * pożyczane), a zdarzenie idzie do `events` zawsze.
+   */
+  app.post<{ Params: { lineId: string }; Body: { pin?: string } }>(
+    "/api/delivery/:id/lines/:lineId/force-release",
+    async (req, reply) => {
+      const s = sesja(currentToken());
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
+      const w = autoryzuj(s.user, "zdjecie_cudzego_locka", req.body?.pin ?? null);
+      if (!w.ok) return reply.code(403).send({ error: w.powod });
+      return forceReleaseLine(Number(req.params.lineId), s.user.name);
+    }
   );
 }

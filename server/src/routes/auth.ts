@@ -1,26 +1,15 @@
 import type { FastifyInstance } from "fastify";
-import { currentDevice } from "../context.js";
-import {
-  BLOKADA_MIN,
-  autoryzuj,
-  odblokuj,
-  przejmij,
-  sesja,
-  wyloguj,
-  zaloguj,
-  type OperacjaUprzywilejowana,
-} from "../services/auth.js";
+import { currentDevice, currentToken } from "../context.js";
+import { BLOKADA_MIN, odblokuj, przejmij, sesja, wyloguj, zaloguj } from "../services/auth.js";
 import { createUser, listUsers, migrujHistorie, setActive, setPin } from "../services/users.js";
 
 /* ── Tożsamość: badge zamiast wolnego tekstu (plan §7) ──────────────────────
    Jeden skan na ścieżce codziennej. PIN dopiero tam, gdzie badge nie
    wystarcza, bo badge'e bywają pożyczane.                                    */
 
-const token = (req: { headers: Record<string, unknown> }): string | null => {
-  const h = req.headers["x-session"];
-  const v = Array.isArray(h) ? h[0] : h;
-  return (v && String(v).trim()) || null;
-};
+// Token czyta kontekst żądania (`context.ts`), a nie każda trasa z osobna —
+// druga kopia odczytu nagłówka to druga okazja do rozjazdu.
+const token = currentToken;
 
 export async function authRoutes(app: FastifyInstance) {
   /** Skan badge'a → sesja urządzenia. */
@@ -35,15 +24,15 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   /** Kim jestem — kolektor pyta przy starcie i po powrocie z tła. */
-  app.get("/api/auth/me", async (req, reply) => {
-    const s = sesja(token(req));
+  app.get("/api/auth/me", async (_req, reply) => {
+    const s = sesja(token());
     if (!s) return reply.code(401).send({ error: "Brak sesji" });
     return { user: s.user, zablokowana: s.zablokowana, blokadaMin: BLOKADA_MIN };
   });
 
   /** Odblokowanie WŁASNEJ sesji po bezczynności — nic nie zostało utracone. */
   app.post<{ Body: { badge?: string } }>("/api/auth/unlock", async (req, reply) => {
-    const s = odblokuj(token(req) ?? "", req.body?.badge ?? "");
+    const s = odblokuj(token() ?? "", req.body?.badge ?? "");
     if (!s) {
       return reply
         .code(401)
@@ -60,7 +49,7 @@ export async function authRoutes(app: FastifyInstance) {
     "/api/auth/handover",
     async (req, reply) => {
       const s = przejmij(
-        token(req) ?? "",
+        token() ?? "",
         req.body?.badge ?? "",
         currentDevice(),
         req.body?.kontekst
@@ -70,23 +59,17 @@ export async function authRoutes(app: FastifyInstance) {
     }
   );
 
-  app.post("/api/auth/logout", async (req) => {
-    const t = token(req);
+  app.post("/api/auth/logout", async () => {
+    const t = token();
     if (t) wyloguj(t);
     return { ok: true };
   });
 
-  /** Sprawdzenie PIN-u przed operacją uprzywilejowaną. */
-  app.post<{ Body: { pin?: string; operacja?: OperacjaUprzywilejowana } }>(
-    "/api/auth/privileged",
-    async (req, reply) => {
-      const s = sesja(token(req));
-      if (!s) return reply.code(401).send({ error: "Brak sesji" });
-      const w = autoryzuj(s.user, req.body?.operacja ?? "ustawienia", req.body?.pin ?? null);
-      if (!w.ok) return reply.code(403).send({ error: w.powod });
-      return { ok: true };
-    }
-  );
+  /* PIN sprawdza TA TRASA, która wykonuje operację (dziś:
+     `/api/delivery/:id/lines/:lineId/force-release`), a nie osobne
+     „czy mój PIN jest dobry". Osobne wejście dawałoby dwa miejsca, w których
+     wolno powiedzieć „ok", i tylko jedno, które faktycznie coś robi —
+     a sprawdzenie oderwane od skutku zawsze kiedyś od niego odjedzie.        */
 
   /* ── Administracja kontami (biuro) ─────────────────────────────────────── */
 

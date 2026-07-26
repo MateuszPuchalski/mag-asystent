@@ -3,6 +3,7 @@ import { userOf } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { metrics } from "../services/metrics.js";
 import { reconcile } from "../services/reconcile.js";
+import { raportWydajnosci } from "../services/wydajnosc.js";
 
 /** Telemetria urządzenia z kolektora (akcelerometr/bateria) → audyt w events. */
 const ALLOWED = new Set([
@@ -30,6 +31,20 @@ export async function deviceRoutes(app: FastifyInstance) {
    * przebieg, tylko liczone teraz. Read-only, więc `/lookup` może to pokazać.
    */
   app.get("/api/reconcile", async () => reconcile());
+
+  /**
+   * Wydajność per osoba (plan §7) — dla biura, nie dla kolektora.
+   *
+   * Osobna trasa od `/api/metrics` celowo: tamte cztery liczby opisują SYSTEM
+   * i wolno je pokazywać komukolwiek, ta opisuje LUDZI i jest monitoringiem
+   * pracowniczym w rozumieniu Kodeksu pracy. Zlanie ich w jeden endpoint
+   * sprawiłoby, że dane osobowe wyciekają wszędzie tam, gdzie ktoś chciał
+   * tylko sprawdzić p95. Obowiązek formalny jedzie w odpowiedzi
+   * (`podstawaPrawna`) — patrz services/wydajnosc.ts.
+   */
+  app.get<{ Querystring: { days?: string } }>("/api/wydajnosc", async (req) => {
+    return raportWydajnosci(Number(req.query.days) || 7);
+  });
 
   app.post<{ Body: { type?: string; [k: string]: unknown } }>(
     "/api/device/event",

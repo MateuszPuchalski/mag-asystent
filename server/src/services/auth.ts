@@ -119,13 +119,20 @@ export function wyloguj(token: string): void {
    badge nie wystarcza. PIN sprawia, że „ktoś użył mojego badge'a" jest
    kłamstwem, a nie wymówką.                                                  */
 
+/**
+ * Operacje wymagające PIN-u.
+ *
+ * Plan §7 wymienia cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
+ * z nierozwiązanymi wyjątkami, zdjęcie cudzego locka i zmianę ustawień serwera.
+ * Trasa istnieje dziś tylko dla jednej — pozostałe trzy nie mają w aplikacji
+ * żadnego wejścia (nie ma domykania dostawy, nie ma ekranu ustawień serwera,
+ * a korekta lokalizacji jest ścieżką codzienną, nie wyjątkiem). Wartości enuma
+ * bez trasy byłyby martwym kodem udającym zabezpieczenie, więc dochodzą razem
+ * ze swoimi trasami, nie wcześniej.
+ */
 export type OperacjaUprzywilejowana =
-  /** Domknięcie dostawy mimo nierozwiązanych wyjątków. */
-  | "domkniecie_z_wyjatkami"
   /** Zdjęcie cudzej blokady linii przed wygaśnięciem TTL. */
-  | "zdjecie_cudzego_locka"
-  /** Zmiana ustawień serwera. */
-  | "ustawienia";
+  "zdjecie_cudzego_locka";
 
 export interface WynikAutoryzacji {
   ok: boolean;
