@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { classifyScan, matchesLocPattern, normalizeLoc, locRulesVersion } from "./scan.js";
+import { config } from "./config.js";
 
 /* Klasyfikator jest jedynym miejscem, w którym system decyduje, CZYM jest
    zeskanowany kod. Pomyłka tutaj nie kończy się komunikatem — kończy się
@@ -65,4 +68,50 @@ test("matchesLocPattern nie pyta o słownik — tylko o kształt", () => {
 test("wersja reguły jest stabilna i krótka", () => {
   assert.match(locRulesVersion, /^[0-9a-f]{8}$/);
   assert.equal(locRulesVersion, locRulesVersion);
+});
+
+/* ── Strażnik audytu kolizji kodów (plan §2) ────────────────────────────────
+   Cały klasyfikator stoi na jednym założeniu: ŻADEN symbol towaru ani kod
+   kreskowy nie ma kształtu adresu. Audyt z 2026-07-26 potwierdził je na pełnej
+   kartotece (3415 pozycji, zero trafień) — ale jednorazowe zapytanie chroni
+   przez jeden dzień.
+
+   Ten test chroni zawsze: wywali się w chwili, gdy ktoś założy kartotekę
+   o symbolu w kształcie regału. Margines jest cienki — najbliżej stoi rodzina
+   akumulatorów `B20-40-S` (8 znaków; wzorzec wymaga 9), więc wariant nazwany
+   `B20-40-01` byłby już kolizją.                                             */
+
+/** Ta sama kartoteka, z której powstaje seed — plik jest w repo. */
+function kartoteka(): string[][] {
+  const plik = path.join(config.webDist, "data", "products.json");
+  return JSON.parse(fs.readFileSync(plik, "utf8")) as string[][];
+}
+
+const SYMBOL = 0;
+const EAN = 2;
+
+test("żaden symbol ani kod kreskowy w kartotece nie ma kształtu adresu", () => {
+  const rows = kartoteka();
+  // brak danych to NIE jest wynik „zero kolizji" — strażnik bez danych milczy
+  assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length} pozycji`);
+
+  const kolizje = rows
+    .flatMap((r) => [r[SYMBOL], r[EAN]])
+    .filter((v) => v && matchesLocPattern(String(v).trim().toUpperCase()));
+
+  assert.deepEqual(kolizje, [], `kod o kształcie adresu w kartotece: ${kolizje.join(", ")}`);
+});
+
+test("strażnik faktycznie wykrywa kolizję, a nie tylko przechodzi", () => {
+  // Bez tej asercji zepsuty strażnik jest zielony i wygląda jak dowód —
+  // czyli dokładnie ta klasa cichej awarii, którą audyt miał wykluczyć.
+  const podstawione = [
+    ["B20-40-01", "Akumulator 20V — hipotetyczny wariant", "5901234567890"],
+    ["W32-0203", "Symbol, który kolizją nie jest", "5901234567891"],
+  ];
+  const kolizje = podstawione
+    .flatMap((r) => [r[SYMBOL], r[EAN]])
+    .filter((v) => v && matchesLocPattern(String(v).trim().toUpperCase()));
+
+  assert.deepEqual(kolizje, ["B20-40-01"]);
 });
