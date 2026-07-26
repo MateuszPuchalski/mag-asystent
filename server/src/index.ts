@@ -12,6 +12,7 @@ import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
 import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
+import { docFlagAvailable } from "./services/delivery-flag.js";
 
 async function main() {
   db(); // migracja schematu przy starcie
@@ -38,6 +39,10 @@ async function main() {
     ok: true,
     mode: config.sgtMode,
     sferaMode: config.sferaMode,
+    // flagi faktur: „off" gdy nie ma dokąd ich wysłać (edu nie ma flag
+    // dokumentów, na produkcji para grupa/typ bywa jeszcze nieustalona).
+    // Bez tego pola cisza po stronie flag byłaby nie do odróżnienia od awarii.
+    docFlag: docFlagAvailable() ? "on" : "off (brak MSSQL_FLAG_GRUPA / MSSQL_FLAG_TYP_OBIEKTU)",
     ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
   }));
 

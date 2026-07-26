@@ -15,6 +15,13 @@ z `magmat.xlsx`. Docelowa wersja produkcyjna w firmie: **Subiekt GT 1.87 SP3 HF1
 | Lista dokumentów FZ/PZ do rozłożenia | ✅ | jw. |
 | Zmiana lokalizacji (`set_location`) | ✅ | bezpośredni `UPDATE` na wybranym polu dodatkowym `tw__Towar` (plan B ze spec §9 — patrz §1a niżej) |
 | Dokumenty MM (MGP→MAG, zatwierdź wózek) | ❌ | wymaga **Sfery** (COM) — brak w edu; zadanie w kolejce dostanie status `error` z komunikatem |
+| Flaga sprawdzenia faktury | ➖ | **edu nie ma flag dokumentów**, więc nie da się ustalić `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU`. Aplikacja wtedy **nie kolejkuje** zadań `set_doc_flag` — `/api/health` pokazuje `docFlag: "off …"`. Reszta (postęp dostawy, wyjątki, koszyki) działa normalnie |
+
+> Różnica między ❌ a ➖ jest celowa. MM **próbuje** się wykonać i kończy błędem,
+> bo to funkcja, którą firma ma na produkcji — chcemy widzieć, że jej brakuje.
+> Flagi po prostu **nie istnieją** w tej wersji, więc generowanie zadań, które
+> zawsze padną, tylko zapchałoby kolejkę i zapaliło czerwoną pastylkę na stałe —
+> a wtedy realny błąd zapisu lokalizacji utonąłby w szumie.
 
 Dwie twarde zasady środowiska:
 
