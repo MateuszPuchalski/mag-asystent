@@ -320,6 +320,27 @@ szansę sprzedaży, a nie błędny stan.
   wolno; po zamknięciu reklamacji stare zdjęcia można archiwizować ręcznie.
 - **Logi:** `C:\wertis\logs\` (rotacja przez NSSM). Błędy zapisu Sfery widać
   też na kolektorze (czerwona pastylka + PONÓW).
+- **Nocna rekoncyliacja — ustaw ją, zanim ruszy praca na prawdziwych danych.**
+  Aplikacja pisze do Subiekta przez kolejkę, ale bez tego kroku **nikt nie
+  sprawdza, czy stan po stronie Subiekta odpowiada temu, co aplikacja myśli, że
+  zapisała**. To najtańsza obrona przed cichym błędem: kod działa, wygląda
+  dobrze i przez trzy tygodnie rozjeżdża dane.
+
+  ```bash
+  # Harmonogram zadań Windows / cron, raz na dobę:
+  cd /c/wertis && source wertis.env && npm run reconcile
+  ```
+
+  Sprawdza cztery rzeczy: adres w Subiekcie kontra ostatni udany zapis (24 h),
+  zadania w `error` starsze niż doba, `waiting_for_doc` starsze niż trzy dni
+  (dokument raczej nie wyjdzie już z bufora) oraz koszyki zwrotów rozłożone bez
+  MM. Ostatnia pozycja mierzy niezmiennik „adres przed sprzedawalnością" —
+  niezmienniki trzeba mierzyć, nie deklarować.
+
+  **Zerowy wynik nie tworzy pliku i kończy się kodem 0**, bo raport przychodzący
+  codziennie przestaje być czytany po tygodniu. Rozjazdy → CSV z datą w nazwie,
+  w katalogu `reconcile/` obok bazy, i **kod wyjścia 2** do podpięcia pod alert.
+  Podgląd na żądanie: `GET /api/reconcile`.
 - **Aktualizacja aplikacji:**
 
   ```bash

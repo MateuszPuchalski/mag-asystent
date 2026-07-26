@@ -291,6 +291,16 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
   oraz uprzedzenia ludzi przed uruchomieniem. Techniczny audyt „kto zmienił
   lokalizację" to co innego i zostaje.
 
+**Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
+- Aplikacja pisze do Subiekta przez kolejkę, ale nikt nie sprawdzał, **czy stan
+  po stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała**.
+  `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
+  z ostatnim udanym zapisem, wyławia zadania w `error` starsze niż doba,
+  `waiting_for_doc` starsze niż trzy dni i koszyki zwrotów rozłożone bez MM.
+- **Zerowy wynik nie tworzy raportu** — raport przychodzący codziennie przestaje
+  być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
+  + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
+
 **Podgląd magazynu (biuro) — `/lookup`**
 - Lekka strona **tylko do odczytu** na tym samym serwerze i API, dla przeglądarki
   desktop (biuro). Skan/wyszukiwarka → karta towaru (stany MAG/MGP/Zwroty

@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.3.0",
   "description": "WERTIS — asystent magazyniera (Subiekt GT). Monorepo: server (Fastify/SQLite/worker) + android (kolektor Kotlin/Compose) + web/public (statyczny podgląd /lookup).",
-  "workspaces": ["server"],
+  "workspaces": [
+    "server"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -13,7 +15,8 @@
     "dev:worker": "npm -w server run worker",
     "seed": "npm -w server run seed",
     "build": "npm -w server run build",
-    "start": "npm -w server run start"
+    "start": "npm -w server run start",
+    "reconcile": "npm -w server run reconcile"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

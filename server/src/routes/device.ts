@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { userOf } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { metrics } from "../services/metrics.js";
+import { reconcile } from "../services/reconcile.js";
 
 /** Telemetria urządzenia z kolektora (akcelerometr/bateria) → audyt w events. */
 const ALLOWED = new Set([
@@ -23,6 +24,12 @@ export async function deviceRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { days?: string } }>("/api/metrics", async (req) => {
     return metrics(Number(req.query.days) || 7);
   });
+
+  /**
+   * Rekoncyliacja na żądanie (plan §9) — te same cztery kontrole co nocny
+   * przebieg, tylko liczone teraz. Read-only, więc `/lookup` może to pokazać.
+   */
+  app.get("/api/reconcile", async () => reconcile());
 
   app.post<{ Body: { type?: string; [k: string]: unknown } }>(
     "/api/device/event",

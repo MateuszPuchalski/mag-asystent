@@ -14,6 +14,8 @@ server/data/*.db-*
 
 # zdjęcia dowodowe do reklamacji — dane produkcyjne, nie kod
 server/data/photos/
+# raporty rekoncyliacji — dane operacyjne, nie kod
+server/data/reconcile/
 *.sqlite
 *.sqlite-*
 
