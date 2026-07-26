@@ -172,6 +172,29 @@ export function officeOverride(d: DeliveryRow): string | null {
  *
  * Zwraca id zadania albo `null`, gdy nic nie trzeba było wysyłać.
  */
+/**
+ * Cofnięcie zapisu „ta flaga poszła", gdy zadanie ostatecznie NIE poszło.
+ *
+ * `flaga_wyslana` ustawiamy w chwili kolejkowania, bo `syncFlag` musi na czymś
+ * oprzeć dedupe — inaczej ten sam stan wchodziłby do kolejki w kółko. Cena
+ * jest taka, że zadanie zakończone błędem albo anulowane zostawia pole
+ * mówiące nieprawdę, a wtedy `syncFlag` NIGDY już tej flagi nie ponowi
+ * (`key === d.flaga_wyslana` ucina wejście) i faktura zostaje nieoznaczona
+ * bez śladu.
+ *
+ * Rekoncyliacja łapie zadania w stanie `error`, ale nie `cancelled` — a to
+ * jeden klik na ekranie kolejki. Dlatego czyścimy pole u ŹRÓDŁA: przy każdym
+ * terminalnym niepowodzeniu. Następny `syncFlag` policzy stan od nowa.
+ */
+export function cofnijFlage(sgtDokId: number, powod: string): void {
+  const r = db()
+    .prepare("UPDATE delivery SET flaga_wyslana=NULL WHERE sgt_dok_id=? AND flaga_wyslana IS NOT NULL")
+    .run(sgtDokId);
+  if (r.changes > 0) {
+    logEvent("delivery_flag_reverted", "system", null, { dokId: sgtDokId, powod });
+  }
+}
+
 export function syncFlag(deliveryId: number, user: string): number | null {
   // brak miejsca zapisu (edu / nieustalona grupa flag) — nie produkujemy zadań,
   // które i tak skończą się błędem; stan widać w /api/health

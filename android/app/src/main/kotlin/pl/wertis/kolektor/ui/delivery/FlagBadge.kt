@@ -61,11 +61,3 @@ fun FlagBadge(flaga: String?, flagaKey: String? = null, modifier: Modifier = Mod
         )
     }
 }
-
-/** Kolor akcentu flagi — do kropki/paska poza samą plakietką. */
-@Composable
-fun flagColor(flagaKey: String?): Color = when (toneOf(flagaKey)) {
-    FlagTone.DONE -> Success
-    FlagTone.ERROR -> Destructive
-    FlagTone.WORK -> AmberInk
-}

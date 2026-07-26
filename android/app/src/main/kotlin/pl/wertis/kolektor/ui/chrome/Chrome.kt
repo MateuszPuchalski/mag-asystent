@@ -232,7 +232,3 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier:
 }
 
 /* separator górnej/dolnej krawędzi */
-@Composable
-fun HairLine() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(BorderCol))
-}
