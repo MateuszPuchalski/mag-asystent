@@ -1,6 +1,7 @@
 package pl.wertis.kolektor.ui.delivery
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,12 +13,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -29,12 +36,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.delivery.TrybWiersza
+import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.DeliveryView
@@ -51,7 +61,6 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
-import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.components.formatQty
@@ -72,13 +81,23 @@ import pl.wertis.kolektor.ui.theme.Success
 import pl.wertis.kolektor.ui.theme.cardSurface
 
 /* ── Tryb A: rozkładanie dostawy i zwrotu (redesign §4.2–§4.5) ──────────────
-   Ścieżka główna to DWA SKANY na linię i zero tapnięć: skan towaru → karta
-   z ilością i lokalizacją docelową → skan etykiety regału → zapis, wibracja,
-   powrót do listy. Zero dialogu potwierdzającego.
+   Ścieżka główna to DWA SKANY na linię i zero tapnięć: skan towaru → wiersz
+   rozwija się z ilością i lokalizacją docelową → skan etykiety regału → zapis,
+   wibracja, wiersz zwija się jako odłożony. Zero dialogu potwierdzającego.
 
-   Lista posortowana po lokalizacji docelowej (magazynier chodzi alejkami,
-   nie w kolejności z faktury), pozycje BEZ lokalizacji w wyróżnionej sekcji
-   na końcu — to SKU wymagające decyzji, nie rutyny.
+   NIC NA TYM EKRANIE NIE PODMIENIA LISTY. Wcześniej robiło to pięć osobnych
+   `return`-ów (karta odkładania, rozjazd lokalizacji, kolizja EAN, wyjątek,
+   PIN) i za każdym razem gasło jedyne, po co się tu przychodzi: ile jeszcze
+   zostało w kartonie. Teraz rutyna i rozjazd dzieją się W WIERSZU, a rzeczy
+   wymagające miejsca (wyjątek ze zdjęciem, wybór przy kolizji EAN) wysuwają
+   się od dołu jako arkusz, z listą widoczną pod spodem.
+
+   Lista jest KONTROLĄ KOMPLETNOŚCI, nie kolejką: pozycje bierze się z kartonu
+   w takiej kolejności, w jakiej wpadną w rękę, i skanuje. Dlatego kolejność
+   wierszy jest stała, a odłożone zwężają się w miejscu zamiast znikać.
+   Pozycje BEZ lokalizacji idą na koniec — to SKU wymagające decyzji, nie
+   rutyny. (Serwer dalej sortuje po lokalizacji; zniknęły tylko nagłówki
+   alejek, bo przy pracy „co wpadnie w rękę" nikt po nich nie nawigował.)
 
    ZWROT różni się dwiema rzeczami: u góry stoi numer koszyka (wpisany raz,
    dopisywany do każdego odłożenia — koszyki nie mają kodów kreskowych), a po
@@ -243,30 +262,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         return
     }
 
-    // zgłoszenie wyjątku przykrywa wszystko — magazynier już zdecydował, że
-    // rutyna tu nie działa
-    if (problemOpen) {
-        ProblemSheet(
-            graph = graph,
-            deliveryId = id,
-            line = problemFor,
-            initialType = problemType,
-            onDone = {
-                problemOpen = false
-                problemFor = null
-                problemType = null
-                active = null
-                reload++
-            },
-            onCancel = {
-                problemOpen = false
-                problemFor = null
-                problemType = null
-            },
-        )
-        return
-    }
-
     // odebranie cudzej linii przed TTL — PIN, nie sam badge (§7)
     doOdebrania?.let { l ->
         PinSheet(
@@ -296,19 +291,205 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         return
     }
 
-    // rozjazd lokalizacji — zapis czeka na decyzję (§4.3)
-    mismatch?.let { (line, code) ->
-        MismatchSheet(
-            sym = line.sym,
-            expected = line.locExpected ?: "—",
-            scanned = code,
-            onPick = { action -> scope.launch { commitPutaway(line, code, action) } },
-            onCancel = { mismatch = null },
-        )
-        return
+    /** Zwolnienie pozycji: zwinięcie wiersza oddaje lock, zamiast czekać na TTL. */
+    fun zwolnij(line: DeliveryLineView) {
+        active = null
+        mismatch = null
+        scope.launch { runCatching { apiCall { graph.api.releaseLine(id, line.id) } } }
     }
 
-    // ekran kolizji EAN ma pierwszeństwo — operacja stoi
+    /* KOLEJNOŚĆ WIERSZY JEST STAŁA. Serwer sortuje po lokalizacji i tak zostaje;
+       odłożone pozycje zwężają się W MIEJSCU, zamiast znikać albo spadać na dół.
+       Powód jest z hali: karton drobnicy to dziesięć pozycji, każda na własną
+       półkę, a rozkłada się je w kolejności „co wpadnie w rękę". Lista nie jest
+       więc kolejką, tylko kontrolą kompletności — a lista, która przestawia się
+       po każdym odłożeniu, do sprawdzania wzrokiem się nie nadaje.
+
+       Jedyne przestawienie, jakie zostaje, to zepchnięcie pozycji BEZ
+       LOKALIZACJI na koniec: to nie rutyna, tylko SKU wymagające decyzji. */
+    val bezLok = v.lines.filter { it.locExpected == null }
+    val uporzadkowane = v.lines.filter { it.locExpected != null } + bezLok
+    val pierwszyBezLok = bezLok.firstOrNull()?.id
+
+    /* Rozwinięta pozycja idzie pod górną krawędź. To NIE jest kosmetyka: właśnie
+       po to karta odkładania była kiedyś pełnoekranowa — z lokalizacją trzeba
+       dojść do regału i czytać ją z odległości ramienia. Przewinięcie pod górę
+       zachowuje tę własność, nie gasząc listy.
+
+       Cała szapka jest JEDNYM elementem listy, więc przesunięcie indeksu wynosi
+       zawsze 1. Rozbicie jej na osobne elementy wymagałoby liczenia ich tutaj,
+       a taki licznik rozjeżdża się po cichu przy pierwszej dołożonej sekcji. */
+    val listState = rememberLazyListState()
+    val indeksAktywnej = active?.let { a -> uporzadkowane.indexOfFirst { it.id == a.id } } ?: -1
+    LaunchedEffect(active?.id) {
+        if (indeksAktywnej >= 0) listState.animateScrollToItem(indeksAktywnej + 1)
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item(key = "szapka") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // nagłówek dostawy + postęp
+                Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(v.nrPelny, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+                        FlagBadge(v.flaga, v.flagaKey)
+                    }
+                    Text(v.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)).background(CardBorder),
+                        ) {
+                            val frac = if (v.progress.total > 0) v.progress.done.toFloat() / v.progress.total else 0f
+                            Box(
+                                Modifier.fillMaxWidth(frac).height(6.dp).clip(RoundedCornerShape(50))
+                                    .background(if (v.progress.remaining == 0) Success else Amber),
+                            )
+                        }
+                        /* „ZOSTAŁO N" zamiast samego „done/total". Lista jest
+                           kontrolą kompletności, więc liczbą, po którą sięga
+                           oko, jest ta, ile jeszcze leży w kartonie. */
+                        Text(
+                            if (v.progress.remaining == 0) "KOMPLET" else "zostało ${v.progress.remaining}",
+                            fontFamily = BarlowCond,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 17.sp,
+                            color = if (v.progress.remaining == 0) Success else Ink,
+                        )
+                        Text("${v.progress.done}/${v.progress.total}", fontSize = 11.sp, color = InkMute)
+                    }
+                    // wyjątki na tej dostawie nie mają prawa zniknąć z oczu (D8)
+                    if (v.progress.problems > 0) {
+                        Text(
+                            "${v.progress.problems} ${if (v.progress.problems == 1) "pozycja z problemem" else "pozycje z problemem"}",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Destructive,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+
+                if (v.zwrot) {
+                    KoszykBar(
+                        koszyk = koszyk,
+                        onKoszykChange = { koszyk = it },
+                        otwarte = v.koszyki,
+                        busy = busy,
+                        onClose = { numer -> scope.launch { closeKoszyk(numer) } },
+                    )
+                }
+
+                /* Dawniej stało tu „lista jest ułożona wg alejek". Zdanie było
+                   prawdziwe (serwer dalej tak sortuje), ale opisywało coś, po
+                   czym nikt nie pracuje: pozycje bierze się z kartonu w takiej
+                   kolejności, w jakiej wpadną w rękę, i skanuje. */
+                Text(
+                    if (v.zwrot) "Zeskanuj towar z koszyka — w dowolnej kolejności"
+                    else "Zeskanuj towar z palety — w dowolnej kolejności",
+                    fontSize = 12.sp,
+                    color = InkSoft,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
+                OutlineButton(
+                    "ZGŁOŚ PROBLEM DOSTAWY",
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = WIcons.Alert,
+                    onClick = {
+                        problemFor = null
+                        problemOpen = true
+                    },
+                )
+            }
+        }
+
+        items(uporzadkowane, key = { it.id }) { line ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                /* Nagłówek sekcji jedzie WEWNĄTRZ pierwszego wiersza bez
+                   lokalizacji, a nie jako osobny element listy — dzięki temu
+                   lista pozycji zostaje płaska i indeks przewijania nie musi
+                   znać żadnych wtrąceń. */
+                if (line.id == pierwszyBezLok) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 6.dp),
+                    ) {
+                        Icon(WIcons.Alert, null, tint = AmberInk, modifier = Modifier.size(15.dp))
+                        Text(
+                            "BEZ LOKALIZACJI (${bezLok.size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.1.sp,
+                            color = AmberInk,
+                        )
+                    }
+                }
+                LineRow(
+                    line = line,
+                    tryb = trybWiersza(line.status, aktywna = active?.id == line.id),
+                    rozjazd = mismatch?.takeIf { it.first.id == line.id }?.second,
+                    onTap = {
+                        if (active?.id == line.id) zwolnij(line)
+                        else scope.launch { resolveProduct(line.sym) }
+                    },
+                    onProblem = {
+                        problemFor = line
+                        problemOpen = true
+                    },
+                    onQtyIssue = {
+                        problemFor = line
+                        problemType = ProblemType.QTY_SHORT
+                        problemOpen = true
+                    },
+                    onCancel = { zwolnij(line) },
+                    onRozjazd = { action ->
+                        mismatch?.let { (l, code) -> scope.launch { commitPutaway(l, code, action) } }
+                    },
+                    onRozjazdAnuluj = { mismatch = null },
+                )
+            }
+        }
+    }
+
+    /* Arkusze wysuwają się OD DOŁU, zamiast podmieniać ekran. Wcześniej oba
+       robiły `return` przed listą, więc każde pytanie gasiło kontekst pracy —
+       a to właśnie na liście widać, ile jeszcze zostało w kartonie. */
+    if (problemOpen) {
+        ProblemSheet(
+            graph = graph,
+            deliveryId = id,
+            line = problemFor,
+            initialType = problemType,
+            onDone = {
+                problemOpen = false
+                problemFor = null
+                problemType = null
+                active = null
+                reload++
+            },
+            onCancel = {
+                problemOpen = false
+                problemFor = null
+                problemType = null
+            },
+        )
+    }
+
+    // kolizja EAN — operacja stoi, aplikacja nigdy nie wybiera pierwszego (D7)
     conflict?.let { candidates ->
         EanConflictSheet(
             candidates = candidates,
@@ -318,139 +499,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             },
             onCancel = { conflict = null },
         )
-        return
-    }
-
-    // karta odkładania (po pierwszym skanie) — wielkie cyfry, czytelne z ramienia
-    active?.let { line ->
-        PutawayCard(
-            line = line,
-            onProblem = {
-                problemFor = line
-                problemOpen = true
-            },
-            onQtyIssue = {
-                problemFor = line
-                problemType = ProblemType.QTY_SHORT
-                problemOpen = true
-            },
-            onCancel = {
-                active = null
-                // oddaj linię od razu, zamiast trzymać ją do wygaśnięcia TTL
-                scope.launch { runCatching { apiCall { graph.api.releaseLine(id, line.id) } } }
-            },
-        )
-        return
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // nagłówek dostawy + postęp
-        Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(v.nrPelny, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
-                FlagBadge(v.flaga, v.flagaKey)
-            }
-            Text(v.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)).background(CardBorder),
-                ) {
-                    val frac = if (v.progress.total > 0) v.progress.done.toFloat() / v.progress.total else 0f
-                    Box(
-                        Modifier.fillMaxWidth(frac).height(6.dp).clip(RoundedCornerShape(50))
-                            .background(if (v.progress.remaining == 0) Success else Amber),
-                    )
-                }
-                Text(
-                    "${v.progress.done}/${v.progress.total}",
-                    fontFamily = BarlowCond,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 15.sp,
-                    color = if (v.progress.remaining == 0) Success else Ink,
-                )
-            }
-            // wyjątki na tej dostawie nie mają prawa zniknąć z oczu (D8)
-            if (v.progress.problems > 0) {
-                Text(
-                    "${v.progress.problems} ${if (v.progress.problems == 1) "pozycja z problemem" else "pozycje z problemem"}",
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Destructive,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
-
-        if (v.zwrot) {
-            KoszykBar(
-                koszyk = koszyk,
-                onKoszykChange = { koszyk = it },
-                otwarte = v.koszyki,
-                busy = busy,
-                onClose = { numer -> scope.launch { closeKoszyk(numer) } },
-            )
-        }
-
-        Text(
-            if (v.zwrot) "Zeskanuj towar z koszyka — lista jest ułożona wg alejek"
-            else "Zeskanuj towar z palety — lista jest ułożona wg alejek",
-            fontSize = 12.sp,
-            color = InkSoft,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
-        OutlineButton(
-            "ZGŁOŚ PROBLEM DOSTAWY",
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = WIcons.Alert,
-            onClick = {
-                problemFor = null
-                problemOpen = true
-            },
-        )
-
-        val withLoc = v.lines.filter { it.locExpected != null }
-        val withoutLoc = v.lines.filter { it.locExpected == null }
-
-        // sekcje per alejka — magazynier wie, kiedy zmienia korytarz
-        var lastAisle: String? = null
-        withLoc.forEach { line ->
-            if (line.aisle != lastAisle) {
-                lastAisle = line.aisle
-                SectionLabel("Alejka ${line.aisle}")
-            }
-            LineRow(line) { scope.launch { resolveProduct(line.sym) } }
-        }
-
-        if (withoutLoc.isNotEmpty()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(top = 6.dp),
-            ) {
-                Icon(WIcons.Alert, null, tint = AmberInk, modifier = Modifier.size(15.dp))
-                Text(
-                    "BEZ LOKALIZACJI (${withoutLoc.size})",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.1.sp,
-                    color = AmberInk,
-                )
-            }
-            withoutLoc.forEach { line -> LineRow(line) { scope.launch { resolveProduct(line.sym) } } }
-        }
     }
 }
 
@@ -503,145 +551,248 @@ private fun KoszykBar(
     }
 }
 
+/**
+ * Wiersz pozycji — i, po rozwinięciu, całe odkładanie tej pozycji.
+ *
+ * DAWNIEJ ODKŁADANIE BYŁO OSOBNYM PEŁNYM EKRANEM (`PutawayCard`) wstawianym
+ * przez `return` przed listą. Znikała wtedy jedyna rzecz, po którą się na tę
+ * listę przychodzi: ile jeszcze zostało w kartonie. Teraz panel wisi pod
+ * wierszem, w tej samej karcie, a lista zostaje pod spodem.
+ *
+ * Wielkie cyfry zostają — z lokalizacją idzie się do regału i czyta ją
+ * z odległości ramienia. Utrzymuje je przewinięcie rozwiniętego wiersza pod
+ * górną krawędź (`animateScrollToItem` w ekranie).
+ */
 @Composable
-private fun LineRow(line: DeliveryLineView, onClick: () -> Unit) {
-    val done = line.status == "done" || line.status == "skipped"
-    val problem = line.status == "problem"
-    Row(
+private fun LineRow(
+    line: DeliveryLineView,
+    tryb: TrybWiersza,
+    /** Zeskanowana półka niezgodna z kartoteką — decyzja zapada TU (§4.3). */
+    rozjazd: String?,
+    onTap: () -> Unit,
+    onProblem: () -> Unit,
+    onQtyIssue: () -> Unit,
+    onCancel: () -> Unit,
+    onRozjazd: (LocApplyAction) -> Unit,
+    onRozjazdAnuluj: () -> Unit,
+) {
+    val problem = tryb == TrybWiersza.PROBLEM
+    val zwiniety = tryb == TrybWiersza.ZWINIETY
+    val rozwiniety = tryb == TrybWiersza.ROZWINIETY
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .cardSurface()
-            .heightIn(min = 52.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            when {
-                problem -> WIcons.Alert
-                done -> WIcons.Check
-                else -> WIcons.Box
-            },
-            contentDescription = null,
-            tint = when {
-                problem -> Destructive
-                done -> Success
-                else -> InkMute
-            },
-            modifier = Modifier.size(18.dp),
-        )
-        Column(Modifier.weight(1f)) {
-            Text(
-                line.sym,
-                fontFamily = BarlowCond,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = if (done) InkMute else Ink,
+            .cardSurface(
+                background = if (rozwiniety) AmberBgSoft else CardWhite,
+                borderColor = if (rozwiniety) AmberLine else CardBorder,
             )
-            Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                if (problem) {
-                    "ZGŁOSZONY PROBLEM · ${formatQty(line.qtyDoc)} szt"
-                } else {
-                    "${line.locExpected ?: "—"} · ${formatQty(line.qtyDoc)} szt" +
-                        if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else ""
+            .clickable(onClick = onTap),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                // zwinięty pasek jest o połowę niższy — dziesięć pozycji drobnicy
+                // ma się zmieścić na ekranie bez przewijania
+                .heightIn(min = if (zwiniety) 34.dp else 52.dp)
+                .padding(horizontal = 12.dp, vertical = if (zwiniety) 4.dp else 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                when {
+                    problem -> WIcons.Alert
+                    zwiniety -> WIcons.Check
+                    else -> WIcons.Box
                 },
-                fontSize = 11.sp,
-                fontWeight = if (problem) FontWeight.Bold else FontWeight.Normal,
-                color = when {
+                contentDescription = null,
+                tint = when {
                     problem -> Destructive
-                    line.locExpected == null -> AmberInk
+                    zwiniety -> Success
                     else -> InkMute
                 },
+                modifier = Modifier.size(if (zwiniety) 14.dp else 18.dp),
             )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    line.sym,
+                    fontFamily = BarlowCond,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (zwiniety) 13.sp else 15.sp,
+                    color = if (zwiniety) InkMute else Ink,
+                    textDecoration = if (zwiniety) TextDecoration.LineThrough else null,
+                )
+                // Nazwa i metadane znikają przy zwijaniu; symbol zostaje, bo to
+                // po nim magazynier rozpoznaje towar przy regale.
+                if (!zwiniety) {
+                    Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (problem) {
+                            "ZGŁOSZONY PROBLEM · ${formatQty(line.qtyDoc)} szt"
+                        } else {
+                            "${formatQty(line.qtyDoc)} szt" +
+                                if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else ""
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = if (problem) FontWeight.Bold else FontWeight.Normal,
+                        color = if (problem) Destructive else InkMute,
+                    )
+                }
+            }
+            /* LOKALIZACJA JAKO PASTYLKA, nie jako fragment linijki metadanych.
+               Każda pozycja drobnicy jedzie na własną półkę, więc to jest ta
+               informacja, po którą sięga oko — a nagłówki alejek, które kiedyś
+               ją dublowały, zniknęły. */
+            if (!rozwiniety) LokPastylka(line.locExpected, przygaszona = zwiniety)
+        }
+
+        if (rozwiniety) {
+            if (rozjazd != null) {
+                RozjazdPanel(
+                    oczekiwana = line.locExpected ?: "—",
+                    zeskanowana = rozjazd,
+                    onPick = onRozjazd,
+                    onCancel = onRozjazdAnuluj,
+                )
+            } else {
+                PanelOdkladania(
+                    line = line,
+                    onProblem = onProblem,
+                    onQtyIssue = onQtyIssue,
+                    onCancel = onCancel,
+                )
+            }
         }
     }
 }
 
-/** Karta po pierwszym skanie: ilość i lokalizacja czytelne z odległości ramienia. */
+/** Docelowa półka pozycji; brak adresu jest wyróżniony, bo wymaga decyzji. */
 @Composable
-private fun PutawayCard(
+private fun LokPastylka(code: String?, przygaszona: Boolean) {
+    val brak = code == null
+    val wyroznij = brak && !przygaszona
+    Text(
+        code ?: "BRAK",
+        fontFamily = BarlowCond,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = if (przygaszona) 12.sp else 15.sp,
+        color = when {
+            przygaszona -> InkMute
+            brak -> AmberInk
+            else -> Ink
+        },
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.5.dp, if (wyroznij) AmberLine else CardBorder, RoundedCornerShape(50))
+            .background(if (wyroznij) AmberBg else CardWhite)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
+
+/** Zawartość rozwiniętego wiersza: dokąd i ile, plus wyjścia awaryjne. */
+@Composable
+private fun PanelOdkladania(
     line: DeliveryLineView,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
     onCancel: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(line.sym, fontFamily = BarlowCond, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Ink)
-        Text(line.name, fontSize = 13.sp, color = InkSoft, maxLines = 2)
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .cardSurface(background = AmberBgSoft, borderColor = AmberLine)
-                .padding(vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 "${formatQty(line.qtyDoc - line.qtyDone)} szt",
                 fontFamily = BarlowCond,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 46.sp,
+                fontSize = 32.sp,
                 color = Ink,
             )
             Text(
                 "→ ${line.locExpected ?: "BRAK LOKALIZACJI"}",
                 fontFamily = BarlowCond,
-                fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 28.sp,
                 color = AmberInk,
+                modifier = Modifier.weight(1f),
             )
         }
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(WIcons.Pin, null, tint = InkSoft, modifier = Modifier.size(18.dp))
-            Text(
-                "zeskanuj etykietę lokalizacji",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = InkSoft,
-            )
+            Text("zeskanuj etykietę lokalizacji", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = InkSoft)
         }
-
         // Rozkładanie JEST sprawdzaniem faktury i liczy się KAŻDĄ pozycję, więc
         // rozbieżność ilościowa to najczęstszy wyjątek — zasługuje na własny
         // przycisk, a nie na szukanie kafla wśród siedmiu typów.
-        OutlineButton(
-            "INNA ILOŚĆ",
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = WIcons.Alert,
-            onClick = onQtyIssue,
-        )
-        // pozostałe wyjścia awaryjne: uszkodzone, zły towar, brak miejsca (§4.6)
-        OutlineButton(
-            "PROBLEM",
-            modifier = Modifier.fillMaxWidth(),
-            danger = true,
-            leadingIcon = WIcons.Alert,
-            onClick = onProblem,
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlineButton("INNA ILOŚĆ", modifier = Modifier.weight(1f), onClick = onQtyIssue)
+            OutlineButton("PROBLEM", modifier = Modifier.weight(1f), danger = true, onClick = onProblem)
+        }
         OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
     }
 }
 
-/** Kolizja EAN — operacja stoi, aplikacja nigdy nie wybiera pierwszego (D7). */
+/**
+ * Rozjazd lokalizacji (§4.3) — decyduje magazynier, nie serwer.
+ *
+ * Siedzi w rozwiniętym wierszu, bo to ciąg dalszy TEJ SAMEJ operacji na TEJ
+ * SAMEJ pozycji; osobny pełny ekran kazał człowiekowi odpowiedzieć na pytanie
+ * o towar, którego w tym momencie już nie widział.
+ */
+@Composable
+private fun RozjazdPanel(
+    oczekiwana: String,
+    zeskanowana: String,
+    onPick: (LocApplyAction) -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(18.dp))
+            Text("Inna półka niż w kartotece", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
+        }
+        Text("kartoteka: $oczekiwana · zeskanowano: $zeskanowana", fontSize = 12.sp, color = InkSoft)
+        OutlineButton("PRZENIESIONY — ZAMIEŃ", modifier = Modifier.fillMaxWidth(), tall = true) {
+            onPick(LocApplyAction.REPLACE)
+        }
+        OutlineButton("LEŻY W OBU — DODAJ", modifier = Modifier.fillMaxWidth(), tall = true) {
+            onPick(LocApplyAction.ADD)
+        }
+        OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+    }
+}
+
+/**
+ * Kolizja EAN — operacja stoi, aplikacja nigdy nie wybiera pierwszego (D7).
+ *
+ * Arkusz od dołu, nie pełny ekran: lista pozycji ma zostać widoczna, bo to na
+ * niej widać, który z kandydatów w ogóle jest w tym dokumencie.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EanConflictSheet(
     candidates: List<EanCandidate>,
     onPick: (EanCandidate) -> Unit,
     onCancel: () -> Unit,
 ) {
+    ModalBottomSheet(onDismissRequest = onCancel, containerColor = CardWhite) {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 14.dp)
+            .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -684,5 +835,6 @@ private fun EanConflictSheet(
         }
 
         OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+    }
     }
 }

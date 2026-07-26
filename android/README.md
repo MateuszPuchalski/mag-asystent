@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia — **85 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania — **92 testy** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -97,6 +97,30 @@ aplikacja też się buduje i działa (integracja przez refleksję —
       adres TEGO towaru; ten sam skan bez otwartej karty pokazuje zawartość regału,
 - [ ] otwórz kartę towaru A, wróć, otwórz kartę towaru B, zeskanuj regał —
       adres ma dostać **B**, nigdy A (regresja po wycięciu kontekstu przyklejonego),
+- [ ] **regał → regał**: przy otwartym podglądzie regału zeskanuj INNY regał —
+      widok ma przeskoczyć na zeskanowany (regresja: `locCode` nieobserwowalny,
+      ekran zostawał na pierwszym),
+- [ ] **dołożenie adresu**: towar z JEDNYM adresem → „+ DODAJ" w rzędzie chipów
+      → skan półki → towar ma **dwa** adresy (skan wprost z karty dalej zastępuje),
+- [ ] **brak nakładki przy zapisie adresu**: po skanie półki NIE ma zielonego
+      kafla na środku; chip nowego adresu jest przygaszony i bez cienia, a po
+      przejściu kolejki Sfery robi się normalny,
+- [ ] **rozkładanie bez podmiany ekranu**: skan towaru z dostawy → wiersz
+      rozwija się W MIEJSCU (ilość i lokalizacja dużym drukiem), reszta listy
+      zostaje widoczna pod spodem; skan półki zwija wiersz jako odłożony,
+- [ ] **rozwinięty wiersz idzie pod górną krawędź** — lokalizację ma się dać
+      odczytać, idąc z towarem do regału,
+- [ ] **powtórny tap w rozwinięty wiersz zwalnia pozycję**: druga osoba może ją
+      od razu wziąć (bez czekania na 30-minutowy TTL),
+- [ ] **rozjazd lokalizacji w wierszu**: skan innej półki niż w kartotece →
+      ZAMIEŃ / DODAJ pojawia się pod wierszem, nie na pełnym ekranie,
+- [ ] **PROBLEM to arkusz od dołu**: lista dostawy widoczna pod spodem, aparat
+      działa, po zgłoszeniu wiersz zostaje oznaczony i NIE zwija się,
+- [ ] **gęstość drobnicy**: dostawa 10 pozycji mieści się na jednym ekranie bez
+      przewijania; odłożone są cienkie i przekreślone, ale zostają na swoim
+      miejscu (lista nie przeskakuje po żadnym odłożeniu),
+- [ ] **brak nagłówków alejek**, lokalizacja czytelna jako pastylka przy każdym
+      wierszu; „BEZ LOKALIZACJI (n)" nadal osobną sekcją na końcu,
 - [ ] **badge**: skan plakietki na ekranie startowym loguje; skan własnej przy
       czynnej sesji nie robi nic; skan cudzej pyta o przejęcie pracy,
 - [ ] **blokada**: 10 min bezczynności → ekran „Sesja zablokowana", pod spodem

@@ -62,12 +62,20 @@ import pl.wertis.kolektor.ui.theme.InkSoft
 /* ── Zmiana lokalizacji: skan towaru → skan etykiety regału ─────────────────
    Auto-zapis bez tapa: skan etykiety półki od razu zapisuje lokalizację;
    przy >1 lokalizacjach arkusz zastąp/dodaj/zastąp jedną. EAN przechodzi
-   do fallbacku (karta innego towaru).                                        */
+   do fallbacku (karta innego towaru).
+
+   DWA TRYBY, bo to dwie różne intencje i mylenie ich kosztuje adres:
+   PRZENIEŚ (domyślny) zastępuje, DODAJ dokłada kolejny. Wcześniej istniał
+   wyłącznie pierwszy, a arkusz z opcją „DODAJ JAKO KOLEJNĄ" otwierał się
+   dopiero przy DWÓCH adresach — czyli przy stanie, do którego nie dało się
+   dojść, bo drugiego adresu nie było jak nadać. Towar z jednym adresem był
+   więc trwale jednoadresowy.                                                 */
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ScanLocScreen(graph: AppGraph) {
     val id = graph.nav.curId ?: return
+    val dodaj = graph.nav.scanLocDodaj
     val scope = rememberCoroutineScope()
 
     val poll by remember(id) { pollFlow(2000) { apiCall { graph.api.product(id) } } }
@@ -82,12 +90,12 @@ fun ScanLocScreen(graph: AppGraph) {
     val p = poll.data
 
     /** Auto-zapis i powrót na kartę. */
-    fun save(choice: LocChoice, successMsg: String) {
+    fun save(choice: LocChoice) {
         if (saving) return
         saving = true
         scope.launch {
             try {
-                saveLocation(graph, id, choice, successMsg, locInfo)
+                saveLocation(graph, id, choice, locInfo)
                 pending = null
                 graph.nav.go(Screen.PRODUCT)
             } catch (e: Exception) {
@@ -107,11 +115,22 @@ fun ScanLocScreen(graph: AppGraph) {
             graph.feedback.beep(false)
             return
         }
+        if (code in card.locs) {
+            graph.effects.toast("Towar już ma lokalizację $code")
+            graph.feedback.beep(false)
+            return
+        }
+        // Tryb DODAJ jest jednoznaczny — człowiek zadeklarował intencję,
+        // wchodząc tu przyciskiem, więc nie ma o co pytać drugi raz.
+        if (dodaj) {
+            save(LocChoice(LocAction.ADD, code))
+            return
+        }
         if (card.locs.size > 1) {
             pending = code // realna decyzja — arkusz zostaje
             return
         }
-        save(LocChoice(LocAction.REPLACE, code), "Lokalizacja zapisana")
+        save(LocChoice(LocAction.REPLACE, code))
     }
 
     ScanHandlerEffect { scan ->
@@ -175,7 +194,12 @@ fun ScanLocScreen(graph: AppGraph) {
         }
 
         Text(
-            "Podejdź do miejsca docelowego i zeskanuj jego etykietę — zapis nastąpi od razu.",
+            if (dodaj) {
+                "Podejdź do NOWEGO miejsca i zeskanuj jego etykietę — adres " +
+                    "dojdzie do listy, dotychczasowe zostają."
+            } else {
+                "Podejdź do miejsca docelowego i zeskanuj jego etykietę — zapis nastąpi od razu."
+            },
             fontSize = 13.sp,
             color = InkSoft,
         )

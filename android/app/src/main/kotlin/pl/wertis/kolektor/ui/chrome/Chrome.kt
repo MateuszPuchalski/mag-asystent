@@ -59,6 +59,8 @@ import pl.wertis.kolektor.ui.theme.Success
 fun TopBar(
     screen: Screen,
     hasBack: Boolean,
+    /** Nadpisanie tytułu, gdy jeden ekran ma dwa znaczenia (SCAN_LOC: przenieś / dodaj). */
+    titleOverride: String? = null,
     user: String,
     summary: QueueSummary?,
     onBack: () -> Unit,
@@ -94,7 +96,7 @@ fun TopBar(
             )
         }
         Text(
-            SCREEN_TITLES[screen] ?: "",
+            titleOverride ?: SCREEN_TITLES[screen] ?: "",
             color = CardWhite,
             fontFamily = BarlowCond,
             fontWeight = FontWeight.SemiBold,

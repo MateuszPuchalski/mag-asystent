@@ -85,6 +85,9 @@ fun AppRoot(graph: AppGraph) {
         TopBar(
             screen = screen,
             hasBack = graph.nav.backTargetOf(screen) != null,
+            // ten sam ekran, dwie intencje — nagłówek nie może kłamać
+            titleOverride = "DODANIE LOKALIZACJI"
+                .takeIf { screen == Screen.SCAN_LOC && graph.nav.scanLocDodaj },
             user = stan.osoba ?: "?",
             summary = queue?.summary,
             onBack = { graph.nav.goBack() },

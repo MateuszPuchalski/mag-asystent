@@ -397,8 +397,6 @@ data class DeliveryLineView(
     val locExpected: String? = null,
     val locActual: String? = null,
     val status: String = "todo",
-    /** Litera alejki — nagłówek sekcji listy; null = brak lokalizacji. */
-    val aisle: String? = null,
     /** Zwroty: numer koszyka, z którego pozycję odłożono. */
     val koszyk: String? = null,
 )
