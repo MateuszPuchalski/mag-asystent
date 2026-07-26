@@ -204,7 +204,7 @@ przy najbliższym przedruku.
 **Jak, skoro audyt szedł bez dostępu do MSSQL.** Zapytanie C (rozkład liczby
 myślników w symbolach) na produkcji dało `0:1403, 1:1878, 2:64, 3:32, 4:36,
 5:2` — czyli **identycznie, we wszystkich sześciu kubełkach**, jak
-`web/public/data/products.json` w tym repo. To ta sama kartoteka, więc A, A2 i D
+`server/seed/products.json` w tym repo. To ta sama kartoteka, więc A, A2 i D
 policzono na niej. To jest dowód przez zgodność rozkładu, nie skrót ani
 założenie — i dlatego nie ma potrzeby powtarzać audytu bez zmiany kartoteki.
 

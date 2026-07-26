@@ -1,7 +1,5 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import fstatic from "@fastify/static";
-import fs from "node:fs";
 import { config } from "./config.js";
 import { withRequestContext } from "./context.js";
 import { db } from "./db/db.js";
@@ -67,14 +65,6 @@ async function main() {
   await app.register(locationRoutes);
   await app.register(deviceRoutes);
   await app.register(authRoutes);
-
-  // statyki (web/public): podgląd magazynu /lookup — bez builda i bez SPA
-  if (fs.existsSync(config.webDist)) {
-    await app.register(fstatic, { root: config.webDist, wildcard: false });
-    // czysty adres podglądu magazynu (biuro, przeglądarka desktop, tylko odczyt)
-    app.get("/lookup", (_req, reply) => reply.sendFile("lookup.html"));
-    app.get("/", (_req, reply) => reply.redirect("/lookup"));
-  }
 
   await app.listen({ port: config.port, host: config.host });
   console.log(`[api] WERTIS serwer na http://${config.host}:${config.port} · SGT_MODE=${config.sgtMode}`);

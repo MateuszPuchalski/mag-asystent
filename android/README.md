@@ -99,6 +99,7 @@ aplikacja też się buduje i działa (integracja przez refleksję —
       dalej widać otwartą dostawę; skan własnego badge'a wraca do pracy bez straty,
 - [ ] **PIN**: skan towaru zajętego przez kogoś innego → propozycja odebrania;
       magazynier dostaje odmowę, brygadzista z PIN-em przechodzi.
+
 ## Architektura (skrót)
 
 - **Nawigacja**: statyczna mapa powrotów, nie stos
@@ -106,9 +107,13 @@ aplikacja też się buduje i działa (integracja przez refleksję —
 - **Skany**: `ScannerBus` = łańcuch handlerów
   (aktywny ekran ma pierwszeństwo, `false` = przekaż niżej, fallback globalny).
   Rozpoznanie kodu należy do serwera (`core/scan/ScanRules`), a to, co skan
-  ZNACZY w bieżącym kontekście, rozstrzyga `core/pin/PinModel.kt` — czysty stan
-  z wstrzykniętym zegarem, wspólny dla ekranu głównego i fallbacku
-  (`ui/scan/ScanRouter.kt`).
+  ZNACZY, wynika z OTWARTEGO EKRANU: karta towaru bierze skan regału dla siebie,
+  reszta spada do globalnego fallbacku (`ui/scan/ScanRouter.kt`). Nie ma
+  ukrytego stanu między skanami — kontekst przyklejony został wycięty, bo dało
+  się mieć przypięty jeden towar i otwartą kartę drugiego.
+- **Tożsamość**: skan badge'a → token sesji (`core/session/SessionModel.kt`
+  + `data/SessionRepository.kt`). Decyzja „zaloguj / odblokuj / zapytaj
+  o przejęcie / nic" jest czystą funkcją, poza Androidem i z testami.
 - **Offline**: `core/offline/OfflineQueue.kt`
   (bufor tylko przy awarii sieci; błędy serwera propagują do UI). Trwałość:
   plik JSON, flush: powrót sieci / tyker 15 s / start / ręcznie / WorkManager.
