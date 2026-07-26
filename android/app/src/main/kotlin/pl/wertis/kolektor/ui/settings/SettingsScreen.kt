@@ -137,10 +137,10 @@ fun SettingsScreen(graph: AppGraph) {
                     onValueChange = { serverUrl = it },
                     placeholder = AppSettings.DEFAULT_SERVER_URL,
                     modifier = Modifier.weight(1f),
-                    onDone = { graph.settings.update { s -> s.copy(serverUrl = serverUrl.trim()) } },
+                    onDone = { saveServerUrl(graph, serverUrl) },
                 )
                 OutlineButton("ZAPISZ") {
-                    graph.settings.update { s -> s.copy(serverUrl = serverUrl.trim()) }
+                    saveServerUrl(graph, serverUrl)
                     graph.effects.toast("Zapisano adres serwera")
                 }
             }
@@ -181,6 +181,17 @@ fun SettingsScreen(graph: AppGraph) {
             graph.nav.go(Screen.SPLASH)
         }
     }
+}
+
+/**
+ * Zmiana adresu unieważnia zapamiętaną regułę lokalizacji — inny serwer to inny
+ * magazyn i potencjalnie inny wzorzec adresu. Do czasu pobrania nowej reguły
+ * skaner wraca do trybu ostrożnego, zamiast stosować wzorzec cudzego magazynu.
+ */
+private fun saveServerUrl(graph: AppGraph, url: String) {
+    val next = url.trim()
+    if (next != graph.settings.current.serverUrl) graph.locationsRepo.forget()
+    graph.settings.update { s -> s.copy(serverUrl = next) }
 }
 
 @Composable

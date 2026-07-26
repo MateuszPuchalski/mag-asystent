@@ -67,8 +67,8 @@ private const val SCAN_CHAR_MS = 50L
 
 /**
  * Kod „wygląda jak lokalizacja” — ta sama (przetestowana) reguła co w skanerze,
- * z :core. Wcześniej był tu osobny odpowiednik na `Char.isLetter()`, który dla
- * kodów z polskimi znakami / małymi literami klasyfikował inaczej niż `classify`.
+ * z :core, czyli wzorzec pobrany z serwera. Używane wyłącznie do skrótu przy
+ * ręcznym wpisaniu; skan rozstrzyga serwer.
  */
 private fun looksLikeLocation(code: String): Boolean = classify(code).kind == ScanKind.LOC
 
@@ -118,19 +118,20 @@ fun HomeScreen(graph: AppGraph) {
                         RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji"),
                     )
                 }
+                // skan etykiety regału → od razu jego zawartość; pusty regał to
+                // poprawna odpowiedź, bo skanuje się półkę także po to, żeby
+                // sprawdzić, czy jest wolna
+                is ScanResult.Location -> {
+                    graph.feedback.beep(true)
+                    graph.nav.openLocation(r.code)
+                }
                 is ScanResult.Search -> {
                     query = code
                     queryFlow.value = code
                 }
                 is ScanResult.NotFound -> {
-                    // nieznany towar — jeśli kod wygląda jak lokalizacja, pokaż jej zawartość
-                    if (looksLikeLocation(code)) {
-                        graph.feedback.beep(true)
-                        graph.nav.openLocation(normalizeLoc(code))
-                    } else {
-                        graph.feedback.beep(false)
-                        graph.effects.toast("Nieznany kod: $code")
-                    }
+                    graph.feedback.beep(false)
+                    graph.effects.toast("Nieznany kod kreskowy: $code")
                 }
             }
         } catch (_: Exception) {
@@ -141,8 +142,9 @@ fun HomeScreen(graph: AppGraph) {
     fun onEnter() {
         val v = query.trim()
         if (v.isEmpty()) return
-        // prefiks skanera dla lokalizacji → od razu podgląd zawartości
-        if (v.uppercase().startsWith(DEFAULT_LOC_PREFIX)) {
+        // wpisany albo zeskanowany kod regału → od razu podgląd zawartości,
+        // bez zaglądania do wyszukiwarki towarów (ta lokalizacji nie zna)
+        if (v.uppercase().startsWith(DEFAULT_LOC_PREFIX) || looksLikeLocation(v)) {
             fast.count = 0
             query = ""
             queryFlow.value = ""

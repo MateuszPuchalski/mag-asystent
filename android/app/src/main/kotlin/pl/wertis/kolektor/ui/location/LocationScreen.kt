@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
@@ -33,8 +35,10 @@ import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
+import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.SectionLabel
+import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
 import pl.wertis.kolektor.ui.theme.BarlowCond
@@ -48,6 +52,7 @@ import pl.wertis.kolektor.ui.theme.InkMute
 @Composable
 fun LocationScreen(graph: AppGraph) {
     var code by remember { mutableStateOf(graph.nav.locCode.orEmpty()) }
+    var manual by remember { mutableStateOf("") }
 
     ScanHandlerEffect { scan ->
         if (scan.kind != ScanKind.LOC) return@ScanHandlerEffect false
@@ -64,7 +69,8 @@ fun LocationScreen(graph: AppGraph) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (code.isEmpty()) {
-            // wejście z kafelka „SKANUJ LOKALIZACJĘ” — czekamy na skan
+            // Wejście przyciskiem — dziś to ścieżka AWARYJNA (zdarta etykieta),
+            // bo skan regału z ekranu głównego otwiera zawartość wprost.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -86,6 +92,23 @@ fun LocationScreen(graph: AppGraph) {
                 )
                 Text("czekam na skan…", fontSize = 11.sp, color = InkMute)
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WertisTextField(
+                    value = manual,
+                    onValueChange = { manual = it.uppercase() },
+                    placeholder = "albo wpisz kod, np. A01-02-03",
+                    modifier = Modifier.weight(1f),
+                    onDone = { manual.trim().takeIf { it.isNotEmpty() }?.let { code = normalizeLoc(it) } },
+                )
+                PrimaryButton("POKAŻ") {
+                    manual.trim().takeIf { it.isNotEmpty() }?.let { code = normalizeLoc(it) }
+                }
+            }
+            Text(
+                "Ręczne wpisanie ma sens przy zdartej etykiecie — skan jest pewniejszy.",
+                fontSize = 11.sp,
+                color = InkMute,
+            )
             return@Column
         }
 
@@ -106,8 +129,10 @@ fun LocationScreen(graph: AppGraph) {
 
         when {
             contents == null -> LoadingRow()
+            // pusty regał to poprawna odpowiedź, nie awaria — magazynier skanuje
+            // półkę także po to, żeby sprawdzić, czy jest wolna
             contents.isEmpty() -> Text(
-                "Slot pusty — nic nie powinno tu leżeć",
+                "Regał pusty (0 towarów) — nic tu nie powinno leżeć",
                 color = InkMute,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,

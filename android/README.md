@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), bufor offline — **56 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), bufor offline — **54 testy** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (12 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -82,11 +82,13 @@ aplikacja też się buduje i działa (integracja przez refleksję —
 ### Checklist smoke-test na sprzęcie
 
 - [ ] skan EAN na ekranie głównym otwiera kartę towaru (beep OK),
-- [ ] skan etykiety regału na karcie towaru = relokacja + pasek COFNIJ,
+- [ ] skan etykiety regału **na ekranie głównym** otwiera zawartość tego regału,
+- [ ] skan etykiety regału na karcie towaru = relokacja (chip-duch → potwierdzony),
+- [ ] skan **symbolu towaru** tam, gdzie oczekiwana jest lokalizacja, mówi
+      „To kod towaru, nie etykieta regału" — a nie zapisuje widmowego adresu,
 - [ ] Zebra: profil WERTIS widoczny w DataWedge, brak „wpisywania" kodu do pól,
 - [ ] Honeywell: skaner działa po `onPause`/`onResume` (claim/release),
-- [ ] tryb samolotowy → zapis lokalizacji → baner „operacja czeka na sieć" → sieć wraca → flush,
-- [ ] potrząśnięcie w oknie karencji cofa zapis (Ustawienia → Potrząśnij = COFNIJ).
+- [ ] tryb samolotowy → zapis lokalizacji → baner „operacja czeka na sieć" → sieć wraca → flush.
 
 ## Architektura (skrót)
 

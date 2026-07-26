@@ -44,7 +44,7 @@ class AppGraph(context: Context) {
 
     val connectivity = ConnectivityMonitor(context)
     val queueRepo = QueueRepository(api, appScope)
-    val locationsRepo = LocationsRepository(api)
+    val locationsRepo = LocationsRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
 
     val effects = UiEffects(appScope)
@@ -86,6 +86,10 @@ class AppGraph(context: Context) {
         wireOfflineFlush(context, offlineQueue, connectivity, appScope)
         // nierozwiązane wyjątki od razu przy starcie (D8) — inaczej nikt ich nie ruszy
         problemsRepo.refresh()
+        // reguła rozpoznawania kodu lokalizacji należy do serwera; do czasu jej
+        // pobrania skaner pracuje ostrożnie (tylko prefiks LOC:), więc pierwszy
+        // skan po starcie nie może na nią czekać
+        appScope.launch { locationsRepo.get() }
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

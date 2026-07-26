@@ -152,10 +152,24 @@ const listEl = $('#list'), detailEl = $('#detail'), qEl = $('#q');
 let results = [], selIdx = -1, curId = null, poll = null, seq = 0;
 
 const EAN = /^\d{8}$|^\d{12,14}$/;
+
+/* Reguła rozpoznawania adresu należy do serwera (plan §3) — ta strona jej nie
+   kopiuje, tylko pobiera. Do czasu odpowiedzi rozstrzyga wyłącznie prefiks
+   `LOC:`; skan i tak klasyfikuje serwer, więc to jedynie skrót przy wpisywaniu. */
+let locPatterns = [];
+fetch('/api/locations', { headers:{ 'x-user':'podglad' } })
+  .then(r => r.ok ? r.json() : null)
+  .then(info => {
+    const src = (info && info.patterns && info.patterns.length) ? info.patterns
+              : (info && info.format ? [info.format] : []);
+    locPatterns = src.map(p => { try { return new RegExp(p); } catch { return null; } }).filter(Boolean);
+  })
+  .catch(()=>{});
+
 function looksLikeLoc(code){
   const up = code.toUpperCase();
   if (up.startsWith('LOC:')) return true;
-  return /[A-Z]/.test(up) && !/\s/.test(up) && !/^\d+$/.test(up);
+  return locPatterns.some(re => re.test(up));
 }
 const fmt = v => (v === v|0 ? String(v|0) : String(v));
 const esc = s => String(s ?? '').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -208,6 +222,8 @@ async function onEnter(){
   try{
     const r = await api('/api/products/scan/'+encodeURIComponent(v));
     if(r.type==='product'){ openProduct(r.card); }
+    // serwer sam rozpoznaje etykietę regału — pusty regał to poprawna odpowiedź
+    else if(r.type==='location'){ showLocation(r.code, r.products||[]); }
     else if(r.type==='search'){ results=r.results; selIdx=r.results.length?0:-1; renderList('Wyniki', r.results.length?null:('Brak wyników dla „'+esc(v)+'”')); if(r.results.length===1) openProduct(r.results[0].id); }
     else { toast('Nieznany kod: '+v); }
   }catch(e){ toast(e.message); }
@@ -285,11 +301,15 @@ function startPoll(id){
 async function openLocation(code){
   try{
     const { code:cc, products } = await api('/api/locations/'+encodeURIComponent(code)+'/products');
-    curId=null; if(poll) clearInterval(poll);
-    results = products; selIdx = -1;
-    renderList('Zawartość lokalizacji '+esc(cc), products.length?null:'Slot pusty — nic nie leży na '+esc(cc));
-    detailEl.innerHTML = `<div class="emptybig"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/></svg><div>Lokalizacja <b>${esc(cc)}</b> · ${products.length} poz.<br/>Wybierz towar, aby zobaczyć szczegóły.</div></div>`;
+    showLocation(cc, products);
   }catch(e){ toast(e.message); }
+}
+
+function showLocation(cc, products){
+  curId=null; if(poll) clearInterval(poll);
+  results = products; selIdx = -1;
+  renderList('Zawartość lokalizacji '+esc(cc), products.length?null:'Regał pusty (0 towarów) — nic tu nie leży');
+  detailEl.innerHTML = `<div class="emptybig"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/></svg><div>Lokalizacja <b>${esc(cc)}</b> · ${products.length} poz.<br/>Wybierz towar, aby zobaczyć szczegóły.</div></div>`;
 }
 
 /* ---- global keys ---- */
