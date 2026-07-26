@@ -48,6 +48,7 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LocChip
+import pl.wertis.kolektor.ui.components.LocState
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
@@ -244,10 +245,40 @@ fun ProductScreen(graph: AppGraph) {
                     )
                 }
                 p.locs.forEachIndexed { i, code ->
-                    LocChip(code, primary = i == 0) {
-                        chipMenu = if (chipMenu == code) null else code
+                    // lokalizacja potwierdzona, chyba że w kolejce czeka jej usunięcie
+                    val zmiana = p.pendingLocs.find { it.code == code }
+                    LocChip(
+                        code,
+                        primary = i == 0,
+                        state = when {
+                            zmiana == null -> LocState.CONFIRMED
+                            zmiana.status == "error" -> LocState.FAILED
+                            else -> LocState.REMOVING
+                        },
+                    ) {
+                        if (zmiana?.status == "error") graph.nav.openQueue()
+                        else chipMenu = if (chipMenu == code) null else code
                     }
                 }
+                // lokalizacje DOCHODZĄCE nie są jeszcze w `locs` — bez tego skan
+                // wyglądałby, jakby nic nie zrobił
+                p.pendingLocs.filter { it.kind == "add" }.forEach { zmiana ->
+                    LocChip(
+                        zmiana.code,
+                        primary = false,
+                        state = if (zmiana.status == "error") LocState.FAILED else LocState.ADDING,
+                    ) { graph.nav.openQueue() }
+                }
+            }
+            if (p.pendingLocs.isNotEmpty()) {
+                val blad = p.pendingLocs.any { it.status == "error" }
+                Text(
+                    if (blad) "Zapis do Subiekta nie powiódł się — dotknij, żeby otworzyć kolejkę"
+                    else "⏳ czeka na zapis w Subiekcie",
+                    fontSize = 11.5.sp,
+                    fontWeight = if (blad) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (blad) MaterialTheme.colorScheme.error else InkMute,
+                )
             }
             chipMenu?.let { code ->
                 Row(

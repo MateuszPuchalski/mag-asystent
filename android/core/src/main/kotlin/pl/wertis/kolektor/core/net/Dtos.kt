@@ -27,6 +27,17 @@ data class StockView(
     val effective: Double,
 )
 
+/** Zmiana lokalizacji czekająca w kolejce — pojedynczy kod, nie całe pole. */
+@Serializable
+data class PendingLocChange(
+    val code: String,
+    /** `add` = dochodzi na tę półkę, `remove` = z niej schodzi. */
+    val kind: String = "add",
+    /** `pending` = worker to jeszcze zrobi; `error` = nie zrobi bez PONÓW. */
+    val status: String = "pending",
+    val queueId: Long = 0,
+)
+
 @Serializable
 data class ProductCard(
     val id: Long,
@@ -36,7 +47,10 @@ data class ProductCard(
     val unit: String,
     val ordered: Double = 0.0,
     val desc: String = "",
+    /** Lokalizacje POTWIERDZONE — to, co naprawdę jest w Subiekcie. */
     val locs: List<String> = emptyList(),
+    /** Zmiany w kolejce; `locs` celowo ich nie zawiera. */
+    val pendingLocs: List<PendingLocChange> = emptyList(),
     val mag: StockView,
     val mgp: StockView,
     /** Strefa zwrotów od klientów (magazyn Zwroty). */
@@ -52,6 +66,11 @@ data class ProductRow(
     val mag: Double,
     val mgp: Double,
     val locs: List<String> = emptyList(),
+    /**
+     * Tylko na liście zawartości regału: `add` = towar właśnie tu jedzie,
+     * `remove` = schodzi, `error` = zapis się nie udał. W wyszukiwarce null.
+     */
+    val pendingHere: String? = null,
 )
 
 @Serializable

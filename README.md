@@ -121,6 +121,15 @@ Parametry (env, dev):
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
+  Pomyłkę poprawia się skanem właściwej półki — nie ma czego cofać.
+- **Lokalizacja „w drodze".** Pole lokalizacji w Subiekcie zmienia się dopiero po
+  udanym zapisie przez workera, więc do tego czasu karta pokazywałaby stan sprzed
+  skanu. Chipy niosą więc stan zamiast milczeć: dochodząca — przerywana ramka
+  i `⏳`; schodząca — kod przekreślony; **nieudany zapis — czerwony i pulsuje**,
+  a tapnięcie prowadzi wprost do kolejki z PONÓW. Pulsuje wyłącznie błąd, bo
+  tylko on wymaga reakcji człowieka i tylko on jest stanem trwałym. Ten sam
+  sygnał widać z drugiej strony — na zawartości regału (`jedzie tutaj` /
+  `schodzi stąd`). To ten sam pomysł, co `⏳ N szt w drodze` przy stanach.
 - Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
   PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
   prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
@@ -225,7 +234,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 55 testów jednostkowych; buduje się bez Android SDK
+                           + 56 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup

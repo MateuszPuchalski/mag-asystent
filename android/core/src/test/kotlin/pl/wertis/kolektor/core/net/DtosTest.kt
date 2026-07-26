@@ -214,6 +214,40 @@ class DtosTest {
         assertEquals(0, old.problems)
     }
 
+    @Test fun `lokalizacje w drodze - obok locs, nie zamiast`() {
+        val card = WertisJson.decodeFromString<ProductCard>(
+            """{"id":7,"sym":"AB-1","name":"N","ean":"","unit":"szt","ordered":0,"desc":"",
+                "locs":["E08-03-01"],
+                "pendingLocs":[{"code":"C03-01-02","kind":"add","status":"pending","queueId":41},
+                               {"code":"E08-03-01","kind":"remove","status":"error","queueId":42}],
+                "mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0}}"""
+        )
+        // `locs` zostaje prawdą z Subiekta — niepotwierdzone leżą osobno
+        assertEquals(listOf("E08-03-01"), card.locs)
+        assertEquals("add", card.pendingLocs[0].kind)
+        assertEquals(41L, card.pendingLocs[0].queueId)
+        assertEquals("error", card.pendingLocs[1].status)
+
+        // starszy serwer bez pola nie może wywrócić kolektora
+        val stary = WertisJson.decodeFromString<ProductCard>(
+            """{"id":7,"sym":"AB-1","name":"N","ean":"","unit":"szt","ordered":0,"desc":"","locs":[],
+                "mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0}}"""
+        )
+        assertTrue(stary.pendingLocs.isEmpty())
+
+        // znacznik półki tylko przy zawartości regału; w wyszukiwarce null
+        val naPolce = WertisJson.decodeFromString<ProductRow>(
+            """{"id":1,"sym":"S","name":"N","ean":"","mag":1,"mgp":0,"locs":[],"pendingHere":"add"}"""
+        )
+        assertEquals("add", naPolce.pendingHere)
+        val zWyszukiwarki = WertisJson.decodeFromString<ProductRow>(
+            """{"id":1,"sym":"S","name":"N","ean":"","mag":1,"mgp":0,"locs":[]}"""
+        )
+        assertNull(zWyszukiwarki.pendingHere)
+    }
+
     @Test fun `raport kolizji EAN`() {
         val r = WertisJson.decodeFromString<EanConflictsResponse>(
             """{"conflicts":[{"ean":"5905947596430","hits":4,"autoResolved":3,
