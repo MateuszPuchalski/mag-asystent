@@ -22,6 +22,7 @@ import pl.wertis.kolektor.device.Feedback
 import pl.wertis.kolektor.device.MotionMonitor
 import pl.wertis.kolektor.nav.AppNavState
 import pl.wertis.kolektor.net.ApiClient
+import pl.wertis.kolektor.net.ApiService
 import pl.wertis.kolektor.offline.ApiOpSender
 import pl.wertis.kolektor.offline.FileOpStorage
 import pl.wertis.kolektor.offline.wireOfflineFlush
@@ -39,17 +40,23 @@ class AppGraph(context: Context) {
     val recent = RecentStore(context)
 
     /* Tożsamość rozstrzyga serwer na podstawie skanu badge'a (plan §7).
-       Repozytorium powstaje PRZED klientem HTTP, bo klient musi umieć
-       doczytać z niego token; `api` jedzie w drugą stronę jako lambda. */
-    val session = SessionRepository({ api }, appScope, context)
+       Repozytorium powstaje PRZED klientem HTTP, bo klient musi umieć doczytać
+       z niego token; `api` jedzie w drugą stronę jako lambda.
 
-    val apiClient = ApiClient(
+       TYPY SĄ TU JAWNE I MUSZĄ TAKIE ZOSTAĆ. Zależność jest cykliczna
+       (session → api → apiClient → session) i wykonanie rozplątuje ją leniwie,
+       ale WNIOSKOWANIE typów tego nie potrafi: kompilator kończy na
+       „Type checking has run into a recursive problem". Adnotacja przecina
+       cykl, bo typ `api` jest znany bez zaglądania do `apiClient`. */
+    val session: SessionRepository = SessionRepository({ api }, appScope, context)
+
+    val apiClient: ApiClient = ApiClient(
         currentUser = { session.currentUser },
         sessionToken = { session.token },
         deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
     )
-    val api get() = apiClient.service
+    val api: ApiService get() = apiClient.service
 
     val connectivity = ConnectivityMonitor(context)
     val queueRepo = QueueRepository(api, appScope)
