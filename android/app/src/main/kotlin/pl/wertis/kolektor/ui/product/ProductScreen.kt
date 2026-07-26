@@ -46,10 +46,12 @@ import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
+import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.LocState
 import pl.wertis.kolektor.ui.components.OutlineButton
+import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.formatQty
@@ -78,7 +80,9 @@ private const val LOC_LIMIT = 50
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProductScreen(graph: AppGraph) {
-    val id = graph.nav.curId ?: return
+    // przez flow, nie przez pole: bez tego wejście w zamiennik zmienia `curId`,
+    // a ekran zostaje na starym towarze (patrz komentarz w AppNavState)
+    val id = graph.nav.curIdFlow.collectAsState().value ?: return
     val scope = rememberCoroutineScope()
 
     val poll by remember(id) {
@@ -344,6 +348,35 @@ fun ProductScreen(graph: AppGraph) {
         // Karta towaru zapisuje wyłącznie lokalizację.
         OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
             graph.nav.openScanLoc()
+        }
+
+        /* Zamienniki — wyczytane z opisu przez serwer (services/zamienniki.ts).
+           Pytanie „czym to zastąpić?" pada dopiero wtedy, gdy stan nie wystarcza,
+           więc sekcja stoi pod przyciskiem, a nie nad lokalizacjami: codzienna
+           ścieżka to stany → lokalizacje → ZMIEŃ LOKALIZACJĘ i ona zostaje na
+           swoim miejscu. Sekcja pokazuje się na ~1 karcie na 5. */
+        if (p.zamienniki.znane.isNotEmpty() || p.zamienniki.obce.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SectionLabel("Zamienniki")
+                p.zamienniki.znane.forEach { row ->
+                    ProductRowCard(row) {
+                        graph.nav.openProduct(
+                            row.id,
+                            RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji"),
+                        )
+                    }
+                }
+                if (p.zamienniki.obce.isNotEmpty()) {
+                    // numerów obcych nie mamy u siebie — nie ma dokąd w nie wejść,
+                    // ale to one idą w rozmowę z dostawcą
+                    Text(
+                        "Numery obce: " + p.zamienniki.obce.joinToString(" · "),
+                        fontSize = 11.5.sp,
+                        color = InkMute,
+                        lineHeight = 15.sp,
+                    )
+                }
+            }
         }
 
         // Historia (ostatnie 4) — na samym dole, bo sięga się po nią dopiero, gdy

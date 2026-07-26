@@ -16,7 +16,15 @@ class AppNavState(private val recentStore: RecentStore) {
     private val _screen = MutableStateFlow(Screen.SPLASH)
     val screen: StateFlow<Screen> = _screen
 
-    @Volatile var curId: Long? = null; private set
+    /* curId JEST obserwowalny, i to nie jest ozdoba. `openProduct` przy otwartej
+       karcie ustawia `_screen` na tę samą wartość, a StateFlow zgniata równe
+       wartości — więc przejście towar→towar nie emitowało NICZEGO. Karta
+       zmieniała się dopiero przy przypadkowej rekompozycji z innego powodu
+       (kolejka, toast, licznik offline), czyli czasem. To dlatego obietnica
+       z dołu karty („skan towaru = następna karta") działała losowo. */
+    private val _curId = MutableStateFlow<Long?>(null)
+    val curIdFlow: StateFlow<Long?> = _curId
+    val curId: Long? get() = _curId.value
     @Volatile var sessionId: Long? = null; private set
     /** Tryb A: otwarta dostawa albo zwrot (dokument = jednostka pracy). */
     @Volatile var deliveryId: Long? = null; private set
@@ -45,7 +53,7 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openProduct(id: Long, meta: RecentEntry? = null) {
         if (meta != null) recentStore.push(meta.copy(id = id))
-        curId = id
+        _curId.value = id
         _screen.value = Screen.PRODUCT
     }
 
