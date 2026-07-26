@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), bufor offline — **54 testy** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), kontekst przyklejony — **68 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (12 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -88,7 +88,13 @@ aplikacja też się buduje i działa (integracja przez refleksję —
       „To kod towaru, nie etykieta regału" — a nie zapisuje widmowego adresu,
 - [ ] Zebra: profil WERTIS widoczny w DataWedge, brak „wpisywania" kodu do pól,
 - [ ] Honeywell: skaner działa po `onPause`/`onResume` (claim/release),
-- [ ] tryb samolotowy → zapis lokalizacji → baner „operacja czeka na sieć" → sieć wraca → flush.
+- [ ] tryb samolotowy → zapis lokalizacji → baner „operacja czeka na sieć" → sieć wraca → flush,
+- [ ] **kontekst przyklejony**: skan regału → pasek 📍 → osiem skanów towarów =
+      osiem zapisów bez ani jednego dotknięcia ekranu,
+- [ ] **wygaśnięcie**: przypnij regał, odejdź, wróć po 6 minutach, zeskanuj towar —
+      ma otworzyć jego kartę, **nie** zapisać go na porzucony regał (długa wibracja),
+- [ ] wygaszenie ekranu na >60 s czyści kontekst od razu, niezależnie od TTL,
+- [ ] zmiana użytkownika czyści kontekst bezwarunkowo.
 
 ## Architektura (skrót)
 
@@ -96,6 +102,10 @@ aplikacja też się buduje i działa (integracja przez refleksję —
   (`core/nav/NavModel.kt` + `nav/AppNavState.kt`) — bez Navigation Compose.
 - **Skany**: `ScannerBus` = łańcuch handlerów
   (aktywny ekran ma pierwszeństwo, `false` = przekaż niżej, fallback globalny).
+  Rozpoznanie kodu należy do serwera (`core/scan/ScanRules`), a to, co skan
+  ZNACZY w bieżącym kontekście, rozstrzyga `core/pin/PinModel.kt` — czysty stan
+  z wstrzykniętym zegarem, wspólny dla ekranu głównego i fallbacku
+  (`ui/scan/ScanRouter.kt`).
 - **Offline**: `core/offline/OfflineQueue.kt`
   (bufor tylko przy awarii sieci; błędy serwera propagują do UI). Trwałość:
   plik JSON, flush: powrót sieci / tyker 15 s / start / ręcznie / WorkManager.

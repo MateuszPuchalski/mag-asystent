@@ -39,6 +39,11 @@ import pl.wertis.kolektor.ui.components.SectionCard
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.theme.Amber
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
+import pl.wertis.kolektor.ui.theme.AmberBg
+import pl.wertis.kolektor.ui.theme.AmberInk
+import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
@@ -168,6 +173,38 @@ fun SettingsScreen(graph: AppGraph) {
                 "flush bufora + ostrzeżenie przy <15% (hot-swap)",
                 settings.batteryAssist,
             ) { v -> graph.settings.update { it.copy(batteryAssist = v) } }
+        }
+
+        SectionLabel("Kontekst przyklejony")
+        SectionCard {
+            Text(
+                "Przypięty regał albo towar wygasa po tym czasie bez skanu. Za długo = " +
+                    "zapis trafia na półkę, przy której już nikogo nie ma; za krótko = " +
+                    "kontekst znika w trakcie pracy.",
+                fontSize = 12.sp,
+                color = InkMute,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(120, 180, 240, 300).forEach { sec ->
+                    val wybrany = settings.pinTtlSec == sec
+                    Text(
+                        "${sec / 60} min",
+                        fontSize = 14.sp,
+                        fontWeight = if (wybrany) FontWeight.Bold else FontWeight.Normal,
+                        color = if (wybrany) AmberInk else Ink,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (wybrany) AmberBg else CardWhite)
+                            .clickable { graph.settings.update { it.copy(pinTtlSec = sec) } }
+                            .padding(vertical = 12.dp),
+                    )
+                }
+            }
         }
 
         Text(

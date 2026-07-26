@@ -38,15 +38,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
-import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.net.ProductRow
-import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.scan.DEFAULT_LOC_PREFIX
 import pl.wertis.kolektor.core.scan.EAN_RE
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.scan.classify
 import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.net.apiCall
+import pl.wertis.kolektor.ui.scan.routeScan
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.SectionLabel
@@ -108,52 +107,24 @@ fun HomeScreen(graph: AppGraph) {
         graph.nav.openProduct(x.id, RecentEntry(x.id, x.sym, x.locs.firstOrNull() ?: "brak lokalizacji"))
     }
 
-    suspend fun handleScan(code: String) {
-        try {
-            when (val r = apiCall { graph.api.scan(code) }) {
-                is ScanResult.Product -> {
-                    graph.feedback.beep(true)
-                    graph.nav.openProduct(
-                        r.card.id,
-                        RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji"),
-                    )
-                }
-                // skan etykiety regału → od razu jego zawartość; pusty regał to
-                // poprawna odpowiedź, bo skanuje się półkę także po to, żeby
-                // sprawdzić, czy jest wolna
-                is ScanResult.Location -> {
-                    graph.feedback.beep(true)
-                    graph.nav.openLocation(r.code)
-                }
-                is ScanResult.Search -> {
-                    query = code
-                    queryFlow.value = code
-                }
-                is ScanResult.NotFound -> {
-                    graph.feedback.beep(false)
-                    graph.effects.toast("Nieznany kod kreskowy: $code")
-                }
-            }
-        } catch (_: Exception) {
-            graph.effects.toast("Błąd połączenia z serwerem")
-        }
+    // jedna droga skanu dla całej aplikacji — kontekst przyklejony musi
+    // działać tak samo tutaj i w globalnym fallbacku (ui/scan/ScanRouter.kt)
+    suspend fun handleScan(code: String) = routeScan(graph, code) {
+        query = it
+        queryFlow.value = it
     }
 
     fun onEnter() {
         val v = query.trim()
         if (v.isEmpty()) return
-        // wpisany albo zeskanowany kod regału → od razu podgląd zawartości,
-        // bez zaglądania do wyszukiwarki towarów (ta lokalizacji nie zna)
-        if (v.uppercase().startsWith(DEFAULT_LOC_PREFIX) || looksLikeLocation(v)) {
-            fast.count = 0
+        // Kod regału — wpisany czy zeskanowany — idzie tą samą drogą co skan,
+        // żeby kontekst przyklejony działał także przy wpisywaniu z ręki.
+        val jakSkan = fast.count >= 3 || EAN_RE.matches(v) ||
+            v.uppercase().startsWith(DEFAULT_LOC_PREFIX) || looksLikeLocation(v)
+        fast.count = 0
+        if (jakSkan) {
             query = ""
             queryFlow.value = ""
-            graph.nav.openLocation(normalizeLoc(v))
-            return
-        }
-        val isScan = fast.count >= 3 || EAN_RE.matches(v)
-        fast.count = 0
-        if (isScan) {
             scope.launch { handleScan(v) }
         } else {
             results.firstOrNull()?.let { openRow(it) }
@@ -203,7 +174,9 @@ fun HomeScreen(graph: AppGraph) {
         } else {
             Text("Dane na żywo z serwera (odczyt SQL z Subiekta)", fontSize = 11.sp, color = InkMute)
 
-            OutlineButton("SKANUJ LOKALIZACJĘ", leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
+            // Skan etykiety regału otwiera go wprost, więc to jest dziś ścieżka
+            // AWARYJNA — dla zdartej etykiety, którą trzeba wpisać z ręki.
+            OutlineButton("REGAŁ — WPISZ KOD RĘCZNIE", leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
                 graph.nav.openLocation("")
             }
 

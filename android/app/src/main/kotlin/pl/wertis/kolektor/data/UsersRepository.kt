@@ -21,6 +21,14 @@ data class UsersState(val list: List<String>, val current: String)
 class UsersRepository(context: Context) {
     private val prefs = context.getSharedPreferences("wertis_users", Context.MODE_PRIVATE)
 
+    /**
+     * Wołane po KAŻDEJ zmianie aktywnej osoby — z ekranu startowego, z ustawień
+     * i po usunięciu bieżącego użytkownika. Kontekst przyklejony musi wtedy
+     * zniknąć bezwarunkowo (§6): cudzy regał nie jest moim regałem, a jeden
+     * punkt wpięcia jest jedynym sposobem, żeby żadna ścieżka tego nie pominęła.
+     */
+    var onUserChanged: (() -> Unit)? = null
+
     private val _users = MutableStateFlow(load())
     val users: StateFlow<UsersState> = _users
 
@@ -42,11 +50,13 @@ class UsersRepository(context: Context) {
     }
 
     private fun persist(state: UsersState) {
+        val zmiana = state.current != _users.value.current
         prefs.edit {
             putString("list", WertisJson.encodeToString(ListSerializer(String.serializer()), state.list))
             putString("current", state.current)
         }
         _users.value = state
+        if (zmiana) onUserChanged?.invoke()
     }
 
     /** Dodaj użytkownika (lub wskaż istniejącego o tej nazwie) i ustaw jako aktywnego. */

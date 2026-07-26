@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.net.DeviceEventBody
+import pl.wertis.kolektor.core.pin.PinGone
+import pl.wertis.kolektor.data.PinRepository
 import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
@@ -58,6 +60,24 @@ class AppGraph(context: Context) {
         onRejected = { _, msg -> effects.toast("Operacja z bufora odrzucona: $msg") },
     )
 
+    /**
+     * Kontekst przyklejony. Wygaśnięcie jest GŁOŚNE — pasek znika, idzie jedna
+     * długa wibracja i zdanie, co się stało. Ciche wygaśnięcie byłoby gorsze
+     * niż brak mechanizmu: następny skan wpadłby w kontekst, o którym człowiek
+     * myśli, że nadal obowiązuje.
+     */
+    val pin = PinRepository(api, appScope, settings) { e ->
+        feedback.pinLost()
+        effects.toast(
+            when (e.reason) {
+                PinGone.TTL -> "Kontekst wygasł po przerwie — zeskanuj ponownie"
+                PinGone.AWAY -> "Kolektor był odłożony — kontekst wyczyszczony"
+                PinGone.USER -> "Zmiana użytkownika — kontekst wyczyszczony"
+                PinGone.MANUAL -> "Kontekst zdjęty"
+            }
+        )
+    }
+
     val scanner = ScannerManager(context)
 
     val motion = MotionMonitor(
@@ -90,6 +110,9 @@ class AppGraph(context: Context) {
         // pobrania skaner pracuje ostrożnie (tylko prefiks LOC:), więc pierwszy
         // skan po starcie nie może na nią czekać
         appScope.launch { locationsRepo.get() }
+        // cudzy regał nie jest moim regałem — jeden punkt wpięcia, żeby żadna
+        // ścieżka zmiany użytkownika tego nie pominęła
+        users.onUserChanged = { pin.onUserChanged() }
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

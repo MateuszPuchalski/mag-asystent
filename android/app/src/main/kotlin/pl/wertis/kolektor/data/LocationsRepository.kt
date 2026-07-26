@@ -49,6 +49,9 @@ class LocationsRepository(context: Context, private val api: ApiService) {
         cached
     }
 
+    /** Ostatnia znana reguła bez sięgania do sieci (wołane spoza korutyny). */
+    fun cached(): LocationsInfo? = cached
+
     /** Reguła przestaje obowiązywać po zmianie serwera — inny magazyn, inne wzorce. */
     fun forget() {
         cached = null
