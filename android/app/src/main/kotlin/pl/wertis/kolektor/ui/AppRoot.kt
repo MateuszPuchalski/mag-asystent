@@ -15,12 +15,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.nav.Screen
-import pl.wertis.kolektor.core.net.ScanResult
-import pl.wertis.kolektor.core.scan.ScanKind
-import pl.wertis.kolektor.data.RecentEntry
-import pl.wertis.kolektor.net.apiCall
+import pl.wertis.kolektor.core.pin.Pin
 import pl.wertis.kolektor.scan.ScannerBus
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
+import pl.wertis.kolektor.ui.chrome.PinBar
 import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
@@ -37,6 +35,7 @@ import pl.wertis.kolektor.ui.putaway.PutawaySessionScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
+import pl.wertis.kolektor.ui.scan.globalScan
 import pl.wertis.kolektor.ui.splash.SplashScreen
 
 @Composable
@@ -48,18 +47,15 @@ fun AppRoot(graph: AppGraph) {
     val success by graph.effects.success.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
+    val pin by graph.pin.pin.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // globalny fallback skanów: LOC → zawartość lokalizacji; reszta → /scan/:code
+    // Globalny fallback skanów. Wszystko idzie przez `/scan/:code`, także kod
+    // rozpoznany lokalnie jako lokalizacja — serwer jest właścicielem reguły
+    // i on rozstrzyga, a kontekst przyklejony działa wtedy w jednym miejscu.
     DisposableEffect(graph) {
         ScannerBus.setFallback { scan ->
-            when (scan.kind) {
-                ScanKind.LOC -> {
-                    graph.feedback.beep(true)
-                    graph.nav.openLocation(scan.code)
-                }
-                else -> scope.launch { globalScan(graph, scan.code) }
-            }
+            scope.launch { globalScan(graph, scan.code) }
             true
         }
         onDispose { ScannerBus.setFallback(null) }
@@ -84,6 +80,13 @@ fun AppRoot(graph: AppGraph) {
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
         )
+        // przypięcie zapisuje dane bez pytania, więc wisi NAD wszystkim innym
+        pin?.let { p ->
+            when (p) {
+                is Pin.Loc -> PinBar(p.code, "skanuj towary — trafią na ten regał") { graph.pin.release() }
+                is Pin.Tow -> PinBar(p.sym, "skanuj regał — towar tam trafi") { graph.pin.release() }
+            }
+        }
         OfflineBanner(offlineCount) {
             scope.launch { graph.offlineQueue.flush() }
         }
@@ -114,32 +117,5 @@ fun AppRoot(graph: AppGraph) {
             onHome = { graph.nav.go(Screen.HOME) },
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
         )
-    }
-}
-
-/** Fallback EAN/tekst: GET /scan/:code → karta / wyniki / nieznany kod. */
-private suspend fun globalScan(graph: AppGraph, code: String) {
-    try {
-        when (val r = apiCall { graph.api.scan(code) }) {
-            is ScanResult.Product -> {
-                graph.feedback.beep(true)
-                graph.nav.openProduct(
-                    r.card.id,
-                    RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: ""),
-                )
-            }
-            is ScanResult.Search -> {
-                graph.feedback.beep(true)
-                graph.nav.pendingSearch = code
-                graph.nav.go(Screen.HOME)
-            }
-            is ScanResult.NotFound -> {
-                graph.feedback.beep(false)
-                graph.effects.toast("Nieznany kod: ${r.code}")
-            }
-        }
-    } catch (_: Exception) {
-        graph.feedback.beep(false)
-        graph.effects.toast("Błąd połączenia z serwerem")
     }
 }
