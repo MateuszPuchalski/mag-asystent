@@ -1,8 +1,18 @@
 package pl.wertis.kolektor.core.scan
 
 /* ── Klasyfikacja skanów ────────────────────────────────────────────────────
-   Wierne przeniesienie web/src/lib/scanner.ts: kod ze skanera (EAN / etykieta
-   lokalizacji / tekst). Prefiks LOC: (z QR etykiet) rozstrzyga jednoznacznie. */
+   Kod ze skanera: EAN / etykieta lokalizacji / tekst.
+
+   Reguła brzmiała kiedyś „zawiera literę, nie ma spacji, nie jest samą cyfrą
+   → to lokalizacja". Pod tę regułę podpada CAŁA rodzina symboli towarów tej
+   firmy (`W32-0203`), więc `LOC` była kategorią DOMYŚLNĄ — a domyślną została
+   akurat ta, której pomyłka kosztuje najwięcej: zapis widmowego adresu
+   o nazwie symbolu towaru.
+
+   Teraz `LOC` jest kategorią ZAMKNIĘTĄ: kod, który nie pasuje do wzorca
+   lokalizacji, lokalizacją nie jest. Wzorce pochodzą WYŁĄCZNIE z serwera
+   (`GET /api/locations`) — klient nie ma własnej kopii reguły, bo trzy jej
+   niezależne kopie były przyczyną tego błędu.                                */
 
 enum class ScanKind { EAN, LOC, TEXT }
 
@@ -19,20 +29,61 @@ const val DEFAULT_LOC_PREFIX = "LOC:"
 const val GAP_MS = 300L
 const val MIN_LEN = 3
 
-private val HAS_LETTER = Regex("[A-Z]")
-private val HAS_WHITESPACE = Regex("\\s")
-private val ALL_DIGITS = Regex("^\\d+$")
+/**
+ * Reguła rozpoznawania kodu, pobrana z serwera.
+ *
+ * `locPatterns` PUSTE = tryb ostrożny: nie znamy jeszcze reguły (kolektor nigdy
+ * nie dostał odpowiedzi z serwera), więc lokalizacją jest wyłącznie to, co
+ * człowiek zadeklarował prefiksem `LOC:` z etykiety QR. Zgadywanie wzorca
+ * w tym stanie byłoby powrotem do heurystyki, którą ta zmiana usuwa.
+ */
+data class ScanConfig(
+    val locPrefix: String = DEFAULT_LOC_PREFIX,
+    val locPatterns: List<Regex> = emptyList(),
+) {
+    fun isLoc(upperCode: String): Boolean = locPatterns.any { it.matches(upperCode) }
 
-/** Klasyfikacja zeskanowanego kodu — port scanner.ts:classify. */
-fun classify(raw: String, locPrefix: String = DEFAULT_LOC_PREFIX): Scan {
+    companion object {
+        val CAUTIOUS = ScanConfig()
+
+        /** Kompiluje wzorce z serwera; zły regex jest pomijany, nie wywraca skanera. */
+        fun of(patterns: List<String>, locPrefix: String = DEFAULT_LOC_PREFIX): ScanConfig =
+            ScanConfig(locPrefix, patterns.mapNotNull { runCatching { Regex(it) }.getOrNull() })
+    }
+}
+
+/**
+ * Aktualna reguła. Źródła sprzętowe (Honeywell/Zebra/wedge) klasyfikują skan
+ * poza Compose i poza korutyną, więc reguła musi być osiągalna globalnie —
+ * `LocationsRepository` podstawia ją po każdym pobraniu słownika.
+ */
+object ScanRules {
+    @Volatile
+    var current: ScanConfig = ScanConfig.CAUTIOUS
+        private set
+
+    fun apply(cfg: ScanConfig) {
+        current = cfg
+    }
+
+    /** Powrót do trybu ostrożnego — testy i zmiana adresu serwera. */
+    fun reset() {
+        current = ScanConfig.CAUTIOUS
+    }
+}
+
+/**
+ * Klasyfikacja zeskanowanego kodu. Kolejność wynika z tego, która pomyłka jest
+ * droższa: prefiks (jawna deklaracja człowieka) → wzorzec lokalizacji → EAN →
+ * wszystko inne jako kandydat na symbol/nazwę, którego rozstrzyga serwer.
+ */
+fun classify(raw: String, cfg: ScanConfig = ScanRules.current): Scan {
     val trimmed = raw.trim()
     val up = trimmed.uppercase()
-    if (locPrefix.isNotEmpty() && up.startsWith(locPrefix.uppercase())) {
-        return Scan(up.substring(locPrefix.length), ScanKind.LOC)
+    if (cfg.locPrefix.isNotEmpty() && up.startsWith(cfg.locPrefix.uppercase())) {
+        return Scan(up.substring(cfg.locPrefix.length), ScanKind.LOC)
     }
+    if (cfg.isLoc(up)) return Scan(up, ScanKind.LOC)
     if (EAN_RE.matches(trimmed)) return Scan(trimmed, ScanKind.EAN)
-    if (HAS_LETTER.containsMatchIn(up) && !HAS_WHITESPACE.containsMatchIn(up) && !ALL_DIGITS.matches(up)) {
-        return Scan(up, ScanKind.LOC)
-    }
     return Scan(trimmed, ScanKind.TEXT)
 }

@@ -2,18 +2,37 @@ import { db } from "../db/db.js";
 import { subiekt } from "../context.js";
 import { config } from "../config.js";
 import { parseLocs } from "../locs.js";
+import { matchesLocPattern } from "../scan.js";
 import type { PendingLocChange, ProductRow } from "../types.js";
 
 /** Wzorzec EAN — kod towaru, którego NIE wolno zapisać jako lokalizacji. */
 const EAN_RE = /^\d{8}$|^\d{12,14}$/;
 
 /**
- * Walidacja kodu lokalizacji (spec §4, §12 + analiza „widmowe lokalizacje").
+ * Komunikat o niedopasowaniu do wzorca — nazywa rzecz po imieniu.
+ *
+ * Kod z zerem albo jednym myślnikiem to niemal zawsze SYMBOL towaru
+ * (`W32-0203`, `50-111`), czyli mis-skan etykiety towaru zamiast regału. Adres
+ * regału ma zawsze dwa myślniki, a paleta — jedna, ale z prefiksem `PAL` — i tak
+ * przechodzi wzorzec, więc tu nie trafia. Zdanie „nie pasuje do formatu" zostawia
+ * człowieka z pytaniem, co zrobił źle; „to kod towaru" mówi mu to wprost.
+ */
+function wrongShape(code: string): string {
+  const dashes = (code.match(/-/g) ?? []).length;
+  if (dashes <= 1 && !code.startsWith("PAL")) return "To kod towaru, nie etykieta regału";
+  return `Kod „${code}" nie jest poprawnym adresem (regał A01-02-03 albo paleta PAL-042)`;
+}
+
+/**
+ * Walidacja kodu lokalizacji (spec §4, §12 + plan §1).
  * Reguły bazowe działają zawsze (chronią przed mis-skanem etykiety towaru):
  *  - brak pustego / spacji (spacja = separator w polu tw_Lokalizacja),
- *  - kod nie może być EAN-em (skan towaru zamiast etykiety regału),
- *  - kod musi zawierać literę (lokalizacje mają litery A–J/PALETA; EAN nie).
- * Dodatkowo — gdy `locStrict` — twarde dopasowanie do `locFormat`.
+ *  - kod nie może być EAN-em (skan towaru zamiast etykiety regału).
+ * Dodatkowo — gdy `locStrict` (domyślnie WŁĄCZONE) — twarde dopasowanie do
+ * wzorca z `config.locPatterns`, wspólnego dla serwera i kolektora.
+ *
+ * Reguła „musi zawierać literę" została usunięta: przepuszczała całą rodzinę
+ * symboli towarów, a nie chroniła przed niczym, czego nie łapie wzorzec.
  * Zwraca komunikat błędu lub `null` gdy kod jest poprawny.
  */
 export function validateLocationCode(raw: string): string | null {
@@ -21,15 +40,7 @@ export function validateLocationCode(raw: string): string | null {
   if (!code) return "Pusty kod lokalizacji";
   if (/\s/.test(code)) return "Kod lokalizacji nie może zawierać spacji";
   if (EAN_RE.test(code)) return "To wygląda jak kod towaru (EAN), nie etykieta lokalizacji";
-  if (!/[A-Z]/.test(code)) return "Kod lokalizacji musi zawierać literę — to nie wygląda na miejsce";
-  if (config.locStrict) {
-    try {
-      if (!new RegExp(config.locFormat).test(code))
-        return "Kod nie pasuje do formatu lokalizacji (np. E08-03-01)";
-    } catch {
-      /* zły regex w konfiguracji — pomiń twardą walidację formatu */
-    }
-  }
+  if (config.locStrict && !matchesLocPattern(code)) return wrongShape(code);
   return null;
 }
 

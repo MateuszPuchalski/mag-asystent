@@ -16,6 +16,28 @@ To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 środowisku (Linux, bez Subiekta) zasilana z eksportu `magmat.xlsx`, a adaptery
 produkcyjne (MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
 
+## Realia magazynu — liczby, które rozstrzygają decyzje projektowe
+
+| Fakt | Wartość |
+|---|---|
+| kartoteki ogółem / **aktywne** | ~3 600 / **~1 000** |
+| powierzchnia | 19 × 18 m ≈ **342 m²**, przekątna ~26 m |
+| dostawy krajowe | 7–8 małych tygodniowo (kontener importowy ~4×/rok) |
+| format adresu regału | `A01-02-03` — litera + trzy pola po dwie cyfry, **2 myślniki** |
+| format symbolu towaru | `W32-0203`, `50-111` — **0–1 myślnik**, bywa bez litery |
+
+Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
+
+- **Formaty adresu i symbolu są rozłączne po liczbie myślników.** To jedyny
+  pewny dyskryminator — i dlatego rozpoznawanie skanu opiera się na wzorcu,
+  a nie na heurystyce „ma literę". Szczegóły:
+  [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+- **Przy 342 m² optymalizacja drogi poziomej nie ma sensu ekonomicznego** —
+  przejście róg–róg to ~20 s, więc różnica między najlepszym a najgorszym
+  ułożeniem „po alejkach" to kilka sekund na pobranie. Realny koszt siedzi
+  w pionie (drabina, schylanie) i w ~2 600 martwych kartotekach zajmujących
+  dobre miejsca.
+
 ## Stack
 
 | Warstwa | Technologia |
@@ -105,6 +127,8 @@ Parametry (env, dev):
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
+| `LOC_FORMAT_STANDARD` / `LOC_FORMAT_PALLET` | wzorce adresu — **jedno źródło prawdy**, kolektor pobiera je z `/api/locations` |
+| `LOC_STRICT=0` | wyłącza twarde egzekwowanie wzorca poza rozkładaniem (domyślnie **włączone**) |
 | `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU` | gdzie w `fl_Wartosc` siedzą flagi faktur zakupu — **bez domyślnych**, jeden SELECT wg DEPLOY §6 |
 | `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag pokazywane człowiekowi (domyślnie słownictwo firmy) |
 | `DOC_FLAG_*_SGT` | `flg_Id` czterech flag z `fl__Flagi` — liczba, nie nazwa |
@@ -117,6 +141,33 @@ Parametry (env, dev):
 - Skan sprzętowy (Zebra DataWedge / Honeywell DataCollection, fallback
   klawiaturowy) / wyszukiwarka (symbol, nazwa, końcówka EAN) — logika `SELECT`
   na serwerze (spec §5.1).
+- **Rozpoznanie kodu po wzorcu, nie po heurystyce.** `LOC` jest kategorią
+  **zamkniętą**: kod, który nie pasuje do wzorca adresu, adresem nie jest.
+  Wzorzec należy do serwera i kolektor go tylko pobiera — trzy niezależne kopie
+  tej reguły były przyczyną błędu, w którym symbol `W32-0203` udawał lokalizację.
+  Zanim kolektor pobierze regułę, pracuje ostrożnie: adresem jest wyłącznie kod
+  z prefiksem `LOC:` z etykiety QR. Po klasyfikacji obowiązuje **jedno
+  wyszukanie w jednej dziedzinie, bez fallbacku na drugą**.
+- **Skan etykiety regału pokazuje jego zawartość od razu**, z ekranu głównego —
+  nie trzeba wcześniej wybierać trybu. Pusty regał to poprawna odpowiedź
+  („Regał A01-02-03 pusty"), bo półkę skanuje się także po to, żeby sprawdzić,
+  czy jest wolna.
+- **Kontekst przyklejony — parowanie regał ↔ towar w obie strony.** Przypięty
+  zostaje slot zeskanowany **jako pierwszy**, bo to odwzorowuje fizykę: kto
+  zaczął od regału, stoi przy regale i odłoży tam kilka indeksów; kto zaczął od
+  towaru, trzyma pudełko i szuka dla niego miejsca. Osiem indeksów na jeden
+  regał to **9 skanów i zero dotknięć** zamiast 16 skanów z nawigacją między
+  ekranami.
+- **Przypięcie wygasa — i to jest wymaganie bezpieczeństwa danych, nie wygody.**
+  Kontekst, który przeżyje odejście pracownika od regału, zapisuje towar na
+  półkę, przy której nikogo już nie ma; nic nie wygląda na zepsute, dopóki ktoś
+  nie pójdzie po ten towar. Wygasa po 4 min bezczynności (parametr w
+  Ustawieniach), a wygaszony ekran dłużej niż minutę gasi go od razu — odejście
+  jest mocniejszym sygnałem niż sam upływ czasu. **Wygaśnięcie jest głośne**:
+  pasek znika, idzie długa wibracja i zdanie, co się stało. Zmiana użytkownika
+  czyści kontekst bezwarunkowo. Każde wygaśnięcie ląduje w `events`
+  (`pin_expired`) — wysoka częstość znaczy, że ludzie są przerywani albo że TTL
+  jest za krótki, i to jest pomiar, nie ciekawostka.
 - Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
@@ -234,7 +285,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 56 testów jednostkowych; buduje się bez Android SDK
+                           + 68 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 web/public/                statyki serwowane wprost przez serwer (bez builda)
   lookup.html              podgląd magazynu (biuro, read-only) → /lookup

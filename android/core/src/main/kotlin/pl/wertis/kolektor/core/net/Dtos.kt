@@ -85,6 +85,19 @@ sealed interface ScanResult {
     @SerialName("search")
     data class Search(val results: List<ProductRow>) : ScanResult
 
+    /**
+     * Skan etykiety regału. Pusta lista to POPRAWNA odpowiedź — magazynier
+     * skanuje półkę między innymi po to, żeby sprawdzić, czy jest wolna.
+     */
+    @Serializable
+    @SerialName("location")
+    data class Location(
+        val code: String,
+        /** Czy ten adres występuje dziś w kartotece (a nie: czy jest poprawny). */
+        val known: Boolean = false,
+        val products: List<ProductRow> = emptyList(),
+    ) : ScanResult
+
     @Serializable
     @SerialName("notfound")
     data class NotFound(val code: String) : ScanResult
@@ -104,13 +117,29 @@ data class MovementEntry(
 @Serializable
 data class HistoryResponse(val entries: List<MovementEntry>)
 
+/**
+ * Słownik lokalizacji i REGUŁA rozpoznawania kodu — serwer jest jej jedynym
+ * właścicielem (plan §3). Klient cache'uje to, co dostanie, i nie ma własnej
+ * kopii wzorca.
+ */
 @Serializable
 data class LocationsInfo(
     val codes: List<String> = emptyList(),
+    /** Wzorce kodu lokalizacji. Puste = starszy serwer, patrz `locPatterns()`. */
+    val patterns: List<String> = emptyList(),
+    /** Wersja reguły — zmiana oznacza, że cache kolektora jest nieaktualny. */
+    val version: String = "",
+    /** Zgodność wsteczna: starszy serwer wysyła jeden wzorzec zamiast listy. */
     val format: String = "",
     val strict: Boolean = false,
     val allowManual: Boolean = true,
-)
+    /** Kiedy kolektor to pobrał (ms epoch); 0 = nigdy, tryb ostrożny. */
+    val fetchedAt: Long = 0,
+) {
+    /** Wzorce niezależnie od wersji serwera; pusta lista = reguła nieznana. */
+    fun locPatterns(): List<String> =
+        if (patterns.isNotEmpty()) patterns else listOfNotNull(format.ifEmpty { null })
+}
 
 @Serializable
 data class LocationProductsResponse(
@@ -264,7 +293,17 @@ data class ConfirmBody(
 data class SkipBody(val itemId: Long, val reason: String? = null)
 
 @Serializable
-data class DeviceEventBody(val type: String, val magnitude: Double? = null, val level: Double? = null)
+data class DeviceEventBody(
+    val type: String,
+    val magnitude: Double? = null,
+    val level: Double? = null,
+    /** `pin_expired`: dlaczego kontekst zniknął (ttl / away / user / manual). */
+    val reason: String? = null,
+    /** `pin_expired`: co było przypięte (`loc:A01-02-03` albo `tw:7`). */
+    val pinned: String? = null,
+    /** `pin_expired`: jak długo kontekst obowiązywał — mierzy, czy TTL pasuje. */
+    val heldMs: Long? = null,
+)
 
 /* ── Odpowiedzi ───────────────────────────────────────────────────────── */
 

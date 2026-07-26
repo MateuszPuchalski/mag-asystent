@@ -26,6 +26,13 @@ class AppNavState(private val recentStore: RecentStore) {
     /** Skan-tekst z fallbacku, który dał wiele wyników — Home podstawia do wyszukiwarki. */
     @Volatile var pendingSearch: String? = null
 
+    /**
+     * Lokalizacja zeskanowana w trybie przypiętym dla towaru o ≥2 adresach —
+     * karta otwiera na niej arkusz ZASTĄP/DODAJ. Rozstrzygnięcie zostaje przy
+     * człowieku i w jednym miejscu, zamiast dublować arkusz w routerze skanów.
+     */
+    @Volatile var pendingLoc: String? = null
+
     fun backTargetOf(s: Screen): Screen? = backTarget(s, queueReturn)
 
     fun go(screen: Screen) {
@@ -47,6 +54,12 @@ class AppNavState(private val recentStore: RecentStore) {
         if (meta != null) recentStore.push(meta.copy(id = id))
         curId = id
         _screen.value = Screen.PRODUCT
+    }
+
+    /** Karta towaru od razu z otwartym arkuszem ZASTĄP/DODAJ dla tej półki. */
+    fun openProductWithLoc(id: Long, code: String) {
+        pendingLoc = code
+        openProduct(id)
     }
 
     fun openScanLoc() = go(Screen.SCAN_LOC)

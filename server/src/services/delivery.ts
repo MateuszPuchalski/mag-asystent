@@ -5,6 +5,7 @@ import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
+import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
 import { lockedByOther } from "./locks.js";
 import { deliveryFlag, flagLabel, syncFlag, touchDelivery } from "./delivery-flag.js";
@@ -39,15 +40,19 @@ const TERMINAL_LINE: ReadonlySet<string> = new Set(["done", "skipped", "problem"
 /**
  * Walidacja kodu lokalizacji w trybie A — twarda (§9, §16). Poza bazowymi
  * regułami (pusty / spacja / EAN) kod MUSI pasować do jednego ze wzorców:
- * regał `A00-00-00` albo miejsce paletowe `PAL-000`. Literówka w kartotece
+ * regał `A01-02-03` albo miejsce paletowe `PAL-042`. Literówka w kartotece
  * („paletq29", „lA03-04-01") nigdy nie dopasuje się do skanu — ma być błędem
  * przy odkładaniu, a nie cichym zapisem fikcyjnego adresu.
+ *
+ * Wzorzec jest ten sam co w `validateLocationCode` (plan §3, jedno źródło);
+ * różni się WYMUSZENIE: tu bezwarunkowe, tam sterowane `LOC_STRICT`, bo skan
+ * lokalizacji jest w trybie A jedynym dowodem odłożenia (D3).
  */
 export function validateDeliveryLocation(code: string): string | null {
   const base = validateLocationCode(code);
   if (base) return base;
-  if (config.deliveryLocPatterns.some((re) => re.test(code))) return null;
-  return `Kod „${code}" nie jest poprawnym adresem (regał A00-00-00 albo paleta PAL-000)`;
+  if (matchesLocPattern(code)) return null;
+  return `Kod „${code}" nie jest poprawnym adresem (regał A01-02-03 albo paleta PAL-042)`;
 }
 
 /** Czy dokument o tym magazynie skutku wymaga MM strefa→MAG (zwrot). */

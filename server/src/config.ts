@@ -116,25 +116,26 @@ export const config = {
   locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50),
 
   /**
-   * Format kodu lokalizacji (regex). Domyślnie wzorzec regału „E08-03-01"
-   * (litera + 3 grupy po 2 cyfry) — 96% realnych kodów w mag.xlsx. Egzekwowany
-   * jako twardy błąd tylko przy `locStrict=1`; inaczej służy tylko do
-   * podpowiedzi. Walidacja bazowa (bez EAN, ze spacją, z literą) działa zawsze.
+   * Wzorce kodu lokalizacji — JEDNO źródło prawdy dla całego systemu (plan §3).
+   * Serwer jest właścicielem tej reguły; kolektor pobiera ją w `GET /api/locations`
+   * i nie ma własnej kopii. Wcześniej żyła w czterech miejscach o trzech różnych
+   * kształtach i to była przyczyna, dla której symbol towaru `W32-0203` udawał
+   * lokalizację.
+   *
+   * Formaty są rozłączne po liczbie myślników i to jest cały dyskryminator:
+   *   regał  `A01-02-03`  2 myślniki    paleta `PAL-042`  1 myślnik + prefiks
+   *   EAN    `5901…`      0            symbol `W32-0203` 0–1 myślnik
    */
-  locFormat: process.env.LOC_FORMAT ?? "^[A-Z]\\d{2}-\\d{2}-\\d{2}$",
-  /** Twarde egzekwowanie `locFormat` (odrzuca kody spoza wzorca). */
-  locStrict: process.env.LOC_STRICT === "1",
-
-  /**
-   * Wzorce kodów lokalizacji egzekwowane BEZWARUNKOWO w trybie A (redesign §9).
-   * Skan lokalizacji jest tam jedynym dowodem, że towar trafił tam, gdzie system
-   * myśli (D3) — kod spoza wzorca musi być błędem, nigdy cichym zapisem.
-   * Kompilowane raz (nie per wywołanie).
-   */
-  deliveryLocPatterns: [
-    process.env.LOC_FORMAT_STANDARD ?? "^[A-J]\\d{2}-\\d{2}-\\d{2}$",
+  locPatterns: [
+    process.env.LOC_FORMAT_STANDARD ?? "^[A-Z]\\d{2}-\\d{2}-\\d{2}$",
     process.env.LOC_FORMAT_PALLET ?? "^PAL-\\d{3}$",
-  ].map((p) => new RegExp(p)),
+  ],
+  /**
+   * Twarde egzekwowanie wzorca poza trybem A (karta towaru, ekran skanu).
+   * Domyślnie WŁĄCZONE: format jest znany i stabilny, a tryb luźny istniał na
+   * czas, gdy nie był. Wyłącza się jawnie przez `LOC_STRICT=0`.
+   */
+  locStrict: process.env.LOC_STRICT !== "0",
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
 

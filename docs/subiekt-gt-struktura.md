@@ -162,6 +162,47 @@ WERTIS tego dziś nie czyta. Reklamacja i zwrot ze sprzedaży to jednak różne
 sytuacje na magazynie (reklamowany towar często nie wraca na półkę), więc jeśli
 biuro tę informację wypełnia, warto ją pokazać magazynierowi przy koszyku.
 
+## Audyt kolizji kodów — założenie klasyfikatora skanów
+
+Od lipca 2026 kolektor rozpoznaje etykietę regału **po wzorcu**, nie po
+heurystyce „ma literę, nie ma spacji". `LOC` jest kategorią **zamkniętą**:
+
+```
+regał   ^[A-Z]\d{2}-\d{2}-\d{2}$     A01-02-03    2 myślniki
+paleta  ^PAL-\d{3}$                  PAL-042      1 myślnik + prefiks
+EAN     ^\d{8}$|^\d{12,14}$                       0 myślników
+symbol  wszystko pozostałe           W32-0203     0–1 myślnik
+```
+
+Ta reguła stoi na jednym założeniu: **żaden symbol towaru ani kod kreskowy
+w kartotece nie ma kształtu lokalizacji.** Formaty są rozłączne po liczbie
+myślników, więc założenie jest prawdopodobne — ale kartoteka ma ~3 600 pozycji
+wprowadzanych ręcznie przez lata, więc prawdopodobne to nie to samo co
+sprawdzone.
+
+Weryfikuje je [`tools/audyt-kolizji.sql`](../tools/audyt-kolizji.sql). Uruchom
+na produkcyjnej bazie loginem read-only:
+
+```bash
+sqlcmd -S localhost -d Subiekt_GT -U wertis -P "$MSSQL_PASSWORD" \
+       -i tools/audyt-kolizji.sql -s ';' -W > audyt.txt
+```
+
+**Zapytanie A musi zwrócić 0 wierszy.** Gdy zwróci kilka — popraw symbole
+w Subiekcie (taniej niż kod obronny na zawsze). Gdy kilkadziesiąt — to decyzja
+właściciela, bo najprostszym wyjściem jest prefiks `L` na etykietach regałów
+przy najbliższym przedruku.
+
+### Wynik
+
+| data | A (symbol = regał) | A2 (symbol = paleta) | D (kod kreskowy = regał) | kto |
+|---|---|---|---|---|
+| — | `[WERYFIKUJ]` | `[WERYFIKUJ]` | `[WERYFIKUJ]` | — |
+
+Do czasu wypełnienia tego wiersza założenie pozostaje **niesprawdzone na
+produkcji**. Wynik wpisz z datą — bez zapisu za rok nikt nie będzie wiedział,
+że cokolwiek sprawdzano.
+
 ## Zasada nadrzędna
 
 Zapis do bazy Subiekta ogranicza się do **dwóch rzeczy**: pola lokalizacji na

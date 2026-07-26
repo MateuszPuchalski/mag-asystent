@@ -3,7 +3,13 @@ import { userOf } from "../context.js";
 import { logEvent } from "../services/events.js";
 
 /** Telemetria urządzenia z kolektora (akcelerometr/bateria) → audyt w events. */
-const ALLOWED = new Set(["device_drop", "battery_low"]);
+const ALLOWED = new Set([
+  "device_drop",
+  "battery_low",
+  /* Wygaśnięcie kontekstu przyklejonego (plan §6). Wysoka częstość = ludzie są
+     przerywani albo TTL jest za krótki — to jest pomiar, nie ciekawostka. */
+  "pin_expired",
+]);
 
 export async function deviceRoutes(app: FastifyInstance) {
   app.post<{ Body: { type?: string; [k: string]: unknown } }>(

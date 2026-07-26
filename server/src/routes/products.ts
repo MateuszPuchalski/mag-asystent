@@ -4,7 +4,12 @@ import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
 import { enqueueSetLocation } from "../services/queue.js";
 import { logEvent, productHistory } from "../services/events.js";
-import { validateLocationCode } from "../services/locations.js";
+import {
+  validateLocationCode,
+  listLocations,
+  getProductsByLocation,
+} from "../services/locations.js";
+import { classifyScan, normalizeLoc } from "../scan.js";
 import { parseLocs } from "../locs.js";
 
 type LocAction = "replace" | "add" | "remove" | "replace_one";
@@ -30,18 +35,43 @@ function computeNewLocs(current: string[], body: LocBody): string[] {
 }
 
 export async function productRoutes(app: FastifyInstance) {
-  // rozpoznanie skanu → karta / wyniki (spec §4)
+  /**
+   * Rozpoznanie skanu → karta / zawartość regału / wyniki (spec §4, plan §4).
+   *
+   * Klasyfikacja idzie PRZED wyszukiwaniem, bo bez niej skan etykiety regału
+   * trafiał do wyszukiwarki towarów (`subiekt.search` nie zna lokalizacji),
+   * zwracał zero wyników i magazynier oglądał pustą listę z kodem półki
+   * w polu — zamiast jej zawartości.
+   *
+   * Po klasyfikacji obowiązuje JEDNO wyszukanie w JEDNEJ dziedzinie, bez
+   * fallbacku na drugą. Fallback jest zależny od kolejności, a zależność od
+   * kolejności to sposób, w jaki mis-skan cicho robi coś innego, niż wygląda.
+   */
   app.get<{ Params: { code: string } }>("/api/products/scan/:code", async (req) => {
-    const code = decodeURIComponent(req.params.code).trim();
-    logEvent("scan", userOf(req), null, { code });
-    if (/^\d{8}$|^\d{12,14}$/.test(code)) {
-      const p = subiekt.getProductByEan(code);
-      if (p) return { type: "product", card: buildProductCard(subiekt, p.tw_id) };
-      return { type: "notfound", code };
+    const raw = decodeURIComponent(req.params.code).trim();
+    const scan = classifyScan(raw);
+    logEvent("scan", userOf(req), null, { code: raw, kind: scan.kind });
+
+    if (scan.kind === "LOC") {
+      const code = normalizeLoc(scan.code);
+      // Pusty regał to POPRAWNA odpowiedź, nie błąd — magazynier skanuje półkę
+      // między innymi po to, żeby sprawdzić, czy jest wolna. `known` mówi tylko,
+      // czy ten adres występuje dziś w kartotece.
+      return {
+        type: "location",
+        code,
+        known: listLocations().includes(code),
+        products: getProductsByLocation(code),
+      };
     }
-    const bySym = subiekt.getProductBySymbol(code);
+    if (scan.kind === "EAN") {
+      const p = subiekt.getProductByEan(scan.code);
+      if (p) return { type: "product", card: buildProductCard(subiekt, p.tw_id) };
+      return { type: "notfound", code: scan.code };
+    }
+    const bySym = subiekt.getProductBySymbol(scan.code);
     if (bySym) return { type: "product", card: buildProductCard(subiekt, bySym.tw_id) };
-    const results = subiekt.search(code, 20);
+    const results = subiekt.search(scan.code, 20);
     if (results.length === 1) {
       return { type: "product", card: buildProductCard(subiekt, results[0].id) };
     }

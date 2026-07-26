@@ -14,10 +14,36 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-lo
 
 let db: typeof import("../db/db.js").db;
 let pendingLocChanges: typeof import("./locations.js").pendingLocChanges;
+let validateLocationCode: typeof import("./locations.js").validateLocationCode;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ pendingLocChanges } = await import("./locations.js"));
+  ({ pendingLocChanges, validateLocationCode } = await import("./locations.js"));
+});
+
+/* ── Walidacja kodu (plan §1) ─────────────────────────────────────────────── */
+
+test("symbol towaru NIE jest poprawną lokalizacją", () => {
+  // sedno poprawki: `W32-0203` przechodziło, bo miało literę i nie miało spacji
+  assert.equal(validateLocationCode("W32-0203"), "To kod towaru, nie etykieta regału");
+  assert.equal(validateLocationCode("50-111"), "To kod towaru, nie etykieta regału");
+});
+
+test("poprawne adresy przechodzą", () => {
+  for (const kod of ["A01-02-03", "J14-05-02", "PAL-042", "a01-02-03"]) {
+    assert.equal(validateLocationCode(kod), null, kod);
+  }
+});
+
+test("bazowe reguły działają niezależnie od wzorca", () => {
+  assert.equal(validateLocationCode(""), "Pusty kod lokalizacji");
+  assert.match(validateLocationCode("A01 02-03") ?? "", /spacj/);
+  assert.match(validateLocationCode("5901234567890") ?? "", /EAN/);
+});
+
+test("literówka z kartoteki jest błędem, nie adresem", () => {
+  // C07A-06-01 to znany dług danych — walidator ma go odrzucać, nie naprawiać
+  assert.notEqual(validateLocationCode("C07A-06-01"), null);
 });
 
 const TW = 7;

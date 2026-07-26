@@ -22,6 +22,42 @@ class DtosTest {
         assertNull(card.zwroty)
     }
 
+    @Test fun `ScanResult - skan regalu zwraca jego zawartosc`() {
+        val r = WertisJson.decodeFromString<ScanResult>(
+            """{"type":"location","code":"A01-02-03","known":true,
+                "products":[{"id":1,"sym":"S","name":"N","ean":"","mag":3,"mgp":0,"locs":["A01-02-03"]}]}"""
+        )
+        val loc = r as ScanResult.Location
+        assertEquals("A01-02-03", loc.code)
+        assertEquals(1, loc.products.size)
+
+        // pusty regał to POPRAWNA odpowiedź, nie błąd — i nie może wywrócić kolektora
+        val pusty = WertisJson.decodeFromString<ScanResult>(
+            """{"type":"location","code":"Z99-99-99"}"""
+        ) as ScanResult.Location
+        assertTrue(pusty.products.isEmpty())
+        assertEquals(false, pusty.known)
+    }
+
+    @Test fun `LocationsInfo - regula lokalizacji przychodzi z serwera`() {
+        val info = WertisJson.decodeFromString<LocationsInfo>(
+            """{"codes":["A01-02-03"],"patterns":["^[A-Z]\\d{2}-\\d{2}-\\d{2}$","^PAL-\\d{3}$"],
+                "version":"a1b2c3d4","format":"^[A-Z]\\d{2}-\\d{2}-\\d{2}$","strict":true,"allowManual":false}"""
+        )
+        assertEquals(2, info.locPatterns().size)
+        assertEquals("a1b2c3d4", info.version)
+        assertTrue(info.strict)
+
+        // starszy serwer nie zna `patterns` — kolektor spada na `format`, nie na zgadywanie
+        val stary = WertisJson.decodeFromString<LocationsInfo>(
+            """{"codes":[],"format":"^[A-Z]\\d{2}-\\d{2}-\\d{2}$","strict":true}"""
+        )
+        assertEquals(listOf("^[A-Z]\\d{2}-\\d{2}-\\d{2}$"), stary.locPatterns())
+
+        // serwer bez jednego i drugiego = reguła nieznana, tryb ostrożny
+        assertTrue(WertisJson.decodeFromString<LocationsInfo>("""{}""").locPatterns().isEmpty())
+    }
+
     @Test fun `ScanResult - search i notfound`() {
         val s = WertisJson.decodeFromString<ScanResult>(
             """{"type":"search","results":[{"id":1,"sym":"S","name":"N","ean":"","mag":1,"mgp":0,"locs":[]}]}"""
