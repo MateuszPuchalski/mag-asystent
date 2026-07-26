@@ -39,6 +39,36 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .get(symbol) as RawProduct | undefined;
   }
 
+  getProductsBySymbols(symbols: string[]): ProductRow[] {
+    if (symbols.length === 0) return [];
+    const dziury = symbols.map(() => "?").join(",");
+    // `symbol COLLATE NOCASE IN (…)` — kolatacja PO stronie kolumny, żeby
+    // zapytanie mogło skorzystać z ix_towar_symbol_nocase. Zapisane odwrotnie
+    // (`IN (…) COLLATE NOCASE`) SQLite zejdzie do skanu całej kartoteki.
+    const rows = db()
+      .prepare(
+        `SELECT t.tw_id AS id, t.symbol AS sym, t.nazwa AS name, t.ean AS ean,
+                t.lokalizacja AS lok,
+                COALESCE(mag.stan,0) AS mag, COALESCE(mgp.stan,0) AS mgp
+         FROM sgt_towar t
+         LEFT JOIN sgt_stan mag ON mag.tw_id = t.tw_id AND mag.mag_id = ?
+         LEFT JOIN sgt_stan mgp ON mgp.tw_id = t.tw_id AND mgp.mag_id = ?
+         WHERE t.symbol COLLATE NOCASE IN (${dziury})`
+      )
+      .all(config.magId.MAG, config.magId.MGP, ...symbols) as Array<{
+      id: number; sym: string; name: string; ean: string; lok: string; mag: number; mgp: number;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      sym: r.sym,
+      name: r.name,
+      ean: r.ean ?? "",
+      mag: r.mag,
+      mgp: r.mgp,
+      locs: parseLocs(r.lok),
+    }));
+  }
+
   search(q: string, limit: number): ProductRow[] {
     // §5.1: symbol prefix > nazwa infix > końcówka EAN (dla ciągu numerycznego ≥5)
     const isNum = /^\d{5,}$/.test(q);

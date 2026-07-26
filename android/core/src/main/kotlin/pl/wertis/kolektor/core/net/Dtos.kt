@@ -55,6 +55,25 @@ data class ProductCard(
     val mgp: StockView,
     /** Strefa zwrotów od klientów (magazyn Zwroty). */
     val zwroty: StockView? = null,
+    /** Zamienniki wyczytane z opisu — regułę ma serwer, kolektor tylko rysuje. */
+    val zamienniki: Zamienniki = Zamienniki(),
+)
+
+/**
+ * Zamienniki z opisu kartoteki, rozstrzygnięte przez serwer.
+ *
+ * `znane` to nasze towary — zwykłe wiersze listy, więc rysuje je ten sam
+ * komponent co wyniki wyszukiwania, i da się w nie wejść. `obce` to numery OEM
+ * i katalogi innych producentów: zostają jako tekst, bo nie ma dokąd z nimi
+ * pójść, ale to one idą w rozmowę z dostawcą.
+ *
+ * Wartości domyślne trzymają zgodność ze starszym serwerem, który tego pola
+ * jeszcze nie zna.
+ */
+@Serializable
+data class Zamienniki(
+    val znane: List<ProductRow> = emptyList(),
+    val obce: List<String> = emptyList(),
 )
 
 @Serializable

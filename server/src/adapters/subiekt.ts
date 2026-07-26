@@ -44,6 +44,12 @@ export interface SubiektAdapter {
    */
   findProductsByEan(ean: string): RawProduct[];
   getProductBySymbol(symbol: string): RawProduct | undefined;
+  /**
+   * Wiersze listy dla zbioru symboli — jedno zapytanie, nie N. Symbole nie
+   * istniejące w kartotece po prostu nie wracają; to jest cały mechanizm
+   * odsiewania numerów obcych przy zamiennikach z opisu.
+   */
+  getProductsBySymbols(symbols: string[]): ProductRow[];
   search(q: string, limit: number): ProductRow[];
   getStock(twId: number, magId: number): RawStock;
   /** Tryb B: kontenery na MGP z ostatnich N dni — sesja z wózkiem i MM na rundę (spec §5.4). */

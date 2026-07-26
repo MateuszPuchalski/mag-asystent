@@ -20,6 +20,29 @@ class DtosTest {
         assertEquals("AB-1", card.sym)
         assertEquals(9.0, card.mag.effective, 0.0)
         assertNull(card.zwroty)
+        // starszy serwer nie zna pola `zamienniki` — karta i tak musi się
+        // zdekodować, a pusta sekcja to poprawna odpowiedź, nie awaria
+        assertTrue(card.zamienniki.znane.isEmpty())
+        assertTrue(card.zamienniki.obce.isEmpty())
+    }
+
+    @Test fun `ProductCard - zamienniki, klikalne osobno od numerow obcych`() {
+        // `znane` to zwykłe wiersze listy, więc rysuje je ten sam komponent co
+        // wyniki wyszukiwania; `obce` zostają tekstem, bo nie ma dokąd z nimi wejść
+        val json = """
+            {"id":7,"sym":"W10-0412","name":"Szczotka","ean":"","unit":"szt","ordered":0,
+             "desc":"Zamiennik: FTC212 / EX1095","locs":[],
+             "mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+             "mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+             "zamienniki":{"znane":[{"id":9,"sym":"EX1095","name":"Szczotka nylonowa","ean":"",
+                                     "mag":1,"mgp":0,"locs":["D04-01-05"]}],
+                           "obce":["FTC212","M06973"]}}
+        """.trimIndent()
+        val card = WertisJson.decodeFromString<ProductCard>(json)
+        assertEquals(1, card.zamienniki.znane.size)
+        assertEquals("EX1095", card.zamienniki.znane[0].sym)
+        assertEquals("D04-01-05", card.zamienniki.znane[0].locs.first())
+        assertEquals(listOf("FTC212", "M06973"), card.zamienniki.obce)
     }
 
     @Test fun `ScanResult - skan regalu zwraca jego zawartosc`() {
