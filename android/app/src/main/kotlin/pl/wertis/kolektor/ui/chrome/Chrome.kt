@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -44,7 +46,6 @@ import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.BarlowCond
-import pl.wertis.kolektor.ui.theme.BorderCol
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Destructive
 import pl.wertis.kolektor.ui.theme.Ink
@@ -53,17 +54,22 @@ import pl.wertis.kolektor.ui.theme.PillRest
 import pl.wertis.kolektor.ui.theme.ShadowInk
 import pl.wertis.kolektor.ui.theme.Success
 
-/* ── Pasek górny: wstecz/logo · tytuł · awatar · pastylka Sfery ───────────── */
+/* ── Pasek górny: logo · tytuł · awatar · pastylka Sfery ──────────────────────
+   WSTECZ STĄD ZNIKŁO. Siedziało w lewym górnym rogu, czyli w miejscu, którego
+   kciuk nie dosięga na żadnym sposobie trzymania kolektora — a to najczęściej
+   naciskany przycisk w całej aplikacji. Przeniesione na dolny pasek (`TabBar`),
+   po prawej, bo tak trzyma się sprzęt na tej hali.
+
+   Górny pasek zostaje przy rzeczach, po które sięga się rzadko i świadomie:
+   ustawienia i kolejka Sfery.                                                 */
 
 @Composable
 fun TopBar(
     screen: Screen,
-    hasBack: Boolean,
     /** Nadpisanie tytułu, gdy jeden ekran ma dwa znaczenia (SCAN_LOC: przenieś / dodaj). */
     titleOverride: String? = null,
     user: String,
     summary: QueueSummary?,
-    onBack: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -75,26 +81,14 @@ fun TopBar(
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (hasBack) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(WIcons.Back, contentDescription = "Wstecz", tint = Amber, modifier = Modifier.size(24.dp))
-            }
-        } else {
-            Text(
-                "WERTIS",
-                color = Amber,
-                fontFamily = BarlowCond,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(horizontal = 10.dp),
-            )
-        }
+        Text(
+            "WERTIS",
+            color = Amber,
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
         Text(
             titleOverride ?: SCREEN_TITLES[screen] ?: "",
             color = CardWhite,
@@ -175,10 +169,21 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
     }
 }
 
-/* ── Dolny pasek: SKAN · ROZKŁADANIE (ikona + etykieta, aktywna w bursztynie) ── */
+/* ── Dolny pasek: SKAN · ROZKŁADANIE · WSTECZ ────────────────────────────────
+   WSTECZ stoi PO PRAWEJ, bo kolektor trzyma się w prawej dłoni i tam ląduje
+   kciuk. Wcześniej był w lewym górnym rogu — najdalszym punkcie ekranu od
+   kciuka przy dowolnym chwycie.
+
+   MIEJSCE NA WSTECZ JEST ZAREZERWOWANE ZAWSZE, także gdy nie ma dokąd wracać.
+   Inaczej SKAN i ROZKŁADANIE przeskakiwałyby w bok przy każdym wejściu
+   w podekran, a te dwa przyciski trafia się z pamięci, nie wzrokiem —
+   przesuwający się cel to wciśnięcie sąsiada.                                 */
+
+/** Szerokość slotu WSTECZ — stała, bo rezerwacja miejsca jest tu całym sensem. */
+private val BackSlot = 76.dp
 
 @Composable
-fun TabBar(screen: Screen, onHome: () -> Unit, onPutaway: () -> Unit) {
+fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -> Unit, onBack: () -> Unit) {
     val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES ||
         screen == Screen.PUTAWAY_DOCS || screen == Screen.PUTAWAY_SESSION
     val homeActive = !putawayActive && screen != Screen.QUEUE
@@ -193,6 +198,50 @@ fun TabBar(screen: Screen, onHome: () -> Unit, onPutaway: () -> Unit) {
     ) {
         TabItem("SKAN", WIcons.Scan, homeActive, Modifier.weight(1f), onHome)
         TabItem("ROZKŁADANIE", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
+        if (hasBack) {
+            BackTab(Modifier.width(BackSlot), onBack)
+        } else {
+            // pusty slot tej samej szerokości — patrz komentarz wyżej
+            Box(Modifier.width(BackSlot))
+        }
+    }
+}
+
+/**
+ * WSTECZ — wizualnie odrębny od zakładek, bo robi co innego.
+ *
+ * SKAN i ROZKŁADANIE PRZEŁĄCZAJĄ tryb pracy i mają stan „aktywny"; WSTECZ
+ * cofa o krok i stanu nie ma. Gdyby wyglądał jak trzecia zakładka, człowiek
+ * szukałby w nim trzeciego trybu.
+ */
+@Composable
+private fun BackTab(modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Ink)
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(WIcons.Back, contentDescription = "Wstecz", tint = Amber, modifier = Modifier.size(22.dp))
+        }
+        Text(
+            "WSTECZ",
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.5.sp,
+            letterSpacing = 0.4.sp,
+            color = InkSoft,
+            modifier = Modifier.padding(top = 3.dp),
+        )
     }
 }
 
