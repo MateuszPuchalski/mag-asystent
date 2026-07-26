@@ -187,26 +187,40 @@ Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](a
 Bez kont kolektor nie ma czym podpisać operacji: ekran startowy prosi o skan
 badge'a i nie przepuszcza dalej.
 
-**1. Załóż PIERWSZE konto — biura, z PIN-em.** Dopóki tabela kont jest pusta,
-ta jedna trasa działa bez sesji; w chwili powstania pierwszego wiersza furtka
-zamyka się sama i wszystko dalej wymaga zalogowanego biura z PIN-em.
+**1. Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
+adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
+ekran startowy pokazuje **ZAŁÓŻ KONTA** zamiast prosić o skan plakietki
+(których jeszcze nie ma).
+
+W kreatorze wpisujesz wszystkich naraz:
+
+- **pierwsza pozycja to konto biura z PIN-em** — pole roli jest zablokowane,
+  bo to konto zakłada wszystkie następne i tylko ono widzi listę kodów.
+  Konto magazyniera na tej pozycji zamurowałoby administrację;
+- kolejne osoby: imię, nazwisko, rola. PIN wymagany tylko dla brygadzisty
+  i biura — bez niego takie konto i tak nic nie zatwierdzi;
+- po zatwierdzeniu kolektor pokazuje **kody badge'ów** — to jedyny moment,
+  w którym widać je wszystkie naraz. Przepisz je albo sfotografuj.
+
+Kolejność wysyłki układa kreator (biuro zawsze pierwsze) i sam loguje się
+nowym kontem biura, żeby móc założyć resztę. Jeśli coś padnie w połowie —
+zerwane Wi-Fi przy czwartej osobie z sześciu — ekran pokazuje **co już
+powstało**; tych osób nie zakładaj drugi raz, dopisz tylko brakujące.
+
+Nowe osoby dochodzą później tą samą drogą: **Ustawienia → DODAJ OSOBY**
+(widoczne tylko dla konta biura, wymaga jego PIN-u).
+
+**1b. Alternatywa: `curl`,** gdy kolektora jeszcze nie ma pod ręką albo konta
+zakłada się skryptem.
 
 ```bash
+# pierwsze konto — bez sesji, ale TYLKO przy pustej bazie
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H 'content-type: application/json' \
-  -d '{"name":"Biuro Zakupy","pin":"4821"}'
+  -d '{"name":"Biuro Zakupy","role":"biuro","pin":"4821"}'
 # → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"biuro","maPin":true}}
-```
 
-Rola i PIN są tu wymuszone: to konto jest jedyną drogą do wszystkich
-następnych, więc konto magazyniera bez PIN-u zablokowałoby całą administrację
-i trzeba by ruszać bazę ręcznie.
-
-**1b. Zaloguj biuro i załóż resztę kont.** Każda zmiana wymaga sesji biura
-(nagłówek `x-session`) ORAZ PIN-u w polu `pinAutora` — badge'e bywają
-pożyczane, a te trasy tworzą tożsamość.
-
-```bash
+# zaloguj się nim i dopisz resztę
 TOKEN=$(curl -s -X POST http://<IP-serwera>:3001/api/auth/badge \
   -H 'content-type: application/json' \
   -d '{"badge":"PRC-0001-9"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
@@ -215,13 +229,15 @@ curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
   -d '{"name":"Jan Kowalski","pinAutora":"4821"}'
 
-# brygadzista — rola uprzywilejowana WYMAGA własnego PIN-u
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
   -d '{"name":"Adam Nowak","role":"brygadzista","pin":"7315","pinAutora":"4821"}'
 
 curl http://<IP-serwera>:3001/api/users -H "x-session: $TOKEN"   # lista do wydruku
 ```
+
+`GET /api/setup` odpowiada `{"potrzebne":true}`, dopóki nie ma ani jednego
+konta — tego samego pytania używa kolektor.
 
 **Lista kont jest dostępna tylko dla biura** i to nie jest przesada: zwraca
 `badgeCode` każdej osoby, a logowanie to sam skan badge'a. Wystawiona hali

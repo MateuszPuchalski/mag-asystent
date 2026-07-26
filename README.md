@@ -350,8 +350,8 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 73 testów jednostkowych; buduje się bez Android SDK
-  app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
+                           + 84 testów jednostkowych; buduje się bez Android SDK
+  app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
   data/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
 server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*

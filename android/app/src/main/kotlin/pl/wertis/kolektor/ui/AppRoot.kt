@@ -38,6 +38,7 @@ import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.scan.globalScan
 import pl.wertis.kolektor.ui.session.HandoverDialog
 import pl.wertis.kolektor.ui.session.LockOverlay
+import pl.wertis.kolektor.ui.setup.SetupScreen
 import pl.wertis.kolektor.ui.splash.SplashScreen
 
 @Composable
@@ -69,6 +70,12 @@ fun AppRoot(graph: AppGraph) {
         graph.nav.goBack()
     }
 
+    // Kreator kont MUSI wyprzedzać bramkę sesji: przy pustej instalacji sesji
+    // jeszcze nie ma i nie ma jak jej zdobyć, dopóki nie powstanie pierwsze konto.
+    if (screen == Screen.SETUP) {
+        SetupScreen(graph)
+        return
+    }
     if (screen == Screen.SPLASH || stan is SessionState.Brak) {
         SplashScreen(graph)
         return
@@ -105,6 +112,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.SETTINGS -> SettingsScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)
                 Screen.SPLASH -> {}
+                Screen.SETUP -> {}
             }
             ToastOverlay(toastMsg)
             SuccessOverlay(success)

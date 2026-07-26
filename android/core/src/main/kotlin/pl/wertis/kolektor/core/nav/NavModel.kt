@@ -12,6 +12,8 @@ enum class Screen {
     PUTAWAY_DOCS, PUTAWAY_SESSION, LOCATION, SETTINGS,
     // wyjątki: nierozwiązane zgłoszenia + kolizje EAN do naprawy w kartotece
     PROBLEMS,
+    // zakładanie kont: pierwsze uruchomienie ORAZ dopisywanie osób przez biuro
+    SETUP,
 }
 
 private val BACK: Map<Screen, Screen> = mapOf(
@@ -23,6 +25,8 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.LOCATION to Screen.HOME,
     Screen.SETTINGS to Screen.HOME,
     Screen.PROBLEMS to Screen.HOME,
+    // z kreatora wraca się do ustawień; przy pustej instalacji nie ma dokąd
+    Screen.SETUP to Screen.SETTINGS,
 )
 
 /** Cel przycisku wstecz; null = brak (splash/home/putawayDocs pokazują logo). */
@@ -42,4 +46,5 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.LOCATION to "LOKALIZACJA",
     Screen.SETTINGS to "USTAWIENIA",
     Screen.PROBLEMS to "WYJĄTKI",
+    Screen.SETUP to "KONTA",
 )

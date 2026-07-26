@@ -51,6 +51,11 @@ fun SplashScreen(graph: AppGraph) {
     val stan by graph.session.state.collectAsStateWithLifecycle()
     var reczny by remember { mutableStateOf("") }
     var blad by remember { mutableStateOf<String?>(null) }
+    /* `null` = jeszcze nie wiemy (serwer nie odpowiedział). Rozróżnienie jest
+       istotne: przy braku odpowiedzi NIE pokazujemy zaproszenia do zakładania
+       kont, bo martwe Wi-Fi wyglądałoby jak pusta instalacja i ktoś założyłby
+       drugi komplet kont obok istniejącego. */
+    var pustaInstalacja by remember { mutableStateOf<Boolean?>(null) }
     val scope = rememberCoroutineScope()
 
     // Sesja może już istnieć (kolektor wrócił z kieszeni, proces był ubity) —
@@ -59,6 +64,11 @@ fun SplashScreen(graph: AppGraph) {
     LaunchedEffect(stan) {
         if (stan !is SessionState.Brak) graph.nav.start()
     }
+
+    // Bez tego pytania kolektor prosi o skan plakietki, których jeszcze nikt
+    // nie wydrukował — bo z samego 401 nie da się odróżnić „system dopiero
+    // powstaje" od „zły badge".
+    LaunchedEffect(Unit) { pustaInstalacja = graph.setup.potrzebny() }
 
     fun sprobuj(kod: String) {
         if (kod.isBlank()) return
@@ -111,6 +121,22 @@ fun SplashScreen(graph: AppGraph) {
         blad?.let {
             Text(it, fontSize = 14.sp, color = Amber, textAlign = TextAlign.Center)
             Spacer(Modifier.height(12.dp))
+        }
+
+        if (pustaInstalacja == true) {
+            Text(
+                "Na tym serwerze nie ma jeszcze żadnego konta. Zacznij od " +
+                    "założenia kont — badge'y nadaje serwer, więc wydrukujesz je " +
+                    "dopiero potem.",
+                fontSize = 13.sp,
+                color = InkMute,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton("ZAŁÓŻ KONTA", modifier = Modifier.fillMaxWidth(), tall = true) {
+                graph.nav.openSetup(odZera = true)
+            }
+            Spacer(Modifier.height(20.dp))
         }
 
         // ostatnia deska ratunku przy zdartej etykiecie — cyfra kontrolna

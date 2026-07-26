@@ -68,6 +68,21 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openSettings() = go(Screen.SETTINGS)
 
+    /**
+     * Czy kreator kont działa na PUSTEJ instalacji.
+     *
+     * Rozstrzyga dwie rzeczy naraz: czy pierwsze konto idzie bez sesji i czy
+     * lista musi zawierać biuro. Ustawiane przy wejściu, bo w środku kreatora
+     * odpowiedź nie może się zmienić — inaczej w połowie wpisywania zmieniłyby
+     * się reguły walidacji.
+     */
+    @Volatile var setupOdZera: Boolean = false; private set
+
+    fun openSetup(odZera: Boolean) {
+        setupOdZera = odZera
+        go(Screen.SETUP)
+    }
+
     fun openProblems() = go(Screen.PROBLEMS)
 
     fun start() = go(Screen.HOME) // Splash: „Zeskanuj badge" → home

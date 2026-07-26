@@ -6,10 +6,18 @@ SDK, a środowisko pracy go nie ma (settings.gradle świadomie pomija moduł).
 Każdy brakujący import wychodzi więc dopiero na runnerze, kosztuje pełny cykl
 CI i wraca jako czerwony build. Dwa razy pod rząd był to dokładnie ten błąd.
 
-CO SPRAWDZA. Dla każdego pliku `.kt`: czy użyte identyfikatory, które są
-TOP-LEVELOWYMI deklaracjami w innym pakiecie tego repo, mają import. To łapie
-najczęstszy przypadek — funkcję albo właściwość rozszerzającą przeniesioną do
-`:core` i użytą bez importu (kompilator mówi wtedy „Unresolved reference").
+CO SPRAWDZA. Dwie rzeczy, obie tanie i obie złapane już na żywym błędzie:
+
+  1. BRAKUJĄCE IMPORTY. Czy użyte identyfikatory, które są top-levelowymi
+     deklaracjami w innym pakiecie tego repo, mają import. Łapie funkcję albo
+     właściwość rozszerzającą przeniesioną do `:core` i użytą bez importu
+     (kompilator mówi wtedy „Unresolved reference").
+
+  2. BILANS KLAMER I NAWIASÓW po usunięciu komentarzy i literałów. Brzmi
+     trywialnie, a wyłapało dwa realne błędy: komentarz rozwalony przy
+     usuwaniu kodu wyrażeniem regularnym oraz polski cudzysłów zamknięty
+     PROSTYM znakiem `"` wewnątrz łańcucha — Kotlin kończy na nim string
+     i dalej wszystko się rozjeżdża.
 
 CZEGO NIE SPRAWDZA. Typów, sygnatur, przeciążeń, wnioskowania. To NIE jest
 kompilator i nie udaje nim być — ma wyłapać jedną, powtarzalną pomyłkę,
@@ -108,6 +116,20 @@ def zbierz_deklaracje() -> tuple[dict[str, set[str]], dict[str, set[str]]]:
     return mapa, ext
 
 
+def bilans(p: Path, kod: str) -> list[str]:
+    """Klamry i nawiasy po wycięciu komentarzy i łańcuchów."""
+    problemy: list[str] = []
+    for otw, zam, nazwa in (("{", "}", "klamry"), ("(", ")", "nawiasy")):
+        d = kod.count(otw) - kod.count(zam)
+        if d:
+            problemy.append(
+                f"{p.relative_to(KORZEN.parent)}: niezbilansowane {nazwa} (różnica {d}) "
+                f"— najczęstsza przyczyna to `\"` zamykający cudzysłów wewnątrz łańcucha "
+                f"albo komentarz uszkodzony przy usuwaniu kodu"
+            )
+    return problemy
+
+
 def sprawdz(
     pliki: list[Path], deklaracje: dict[str, set[str]], rozszerzenia: dict[str, set[str]]
 ) -> list[str]:
@@ -143,6 +165,7 @@ def sprawdz(
 
         zglos({i.group(1) for i in ODWOLANIE.finditer(kod)}, deklaracje, "symbol")
         zglos({i.group(1) for i in PO_KROPCE.finditer(kod)}, rozszerzenia, "rozszerzenie")
+        problemy += bilans(p, kod)
     return problemy
 
 
@@ -158,7 +181,7 @@ def main() -> int:
         print(x)
     print(
         f"\nsprawdzono plików: {len(pliki)}; "
-        + ("OK — brak brakujących importów" if not problemy else f"{len(set(problemy))} problemów")
+        + ("OK — importy i bilans nawiasów" if not problemy else f"{len(set(problemy))} problemów")
     )
     return 1 if problemy else 0
 

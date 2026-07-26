@@ -13,6 +13,7 @@ import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SessionRepository
+import pl.wertis.kolektor.data.SetupRepository
 import pl.wertis.kolektor.data.SettingsRepository
 import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
@@ -71,6 +72,9 @@ class AppGraph(context: Context) {
         isOnline = { connectivity.isOnline },
         onRejected = { _, msg -> effects.toast("Operacja z bufora odrzucona: $msg") },
     )
+
+    /* Kreator kont — jedyna droga do założenia pierwszego konta bez terminala. */
+    val setup = SetupRepository({ api }, session)
 
     val telemetry = TelemetryRepository(api, appScope)
 

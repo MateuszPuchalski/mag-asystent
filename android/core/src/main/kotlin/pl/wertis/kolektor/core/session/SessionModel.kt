@@ -18,6 +18,20 @@ package pl.wertis.kolektor.core.session
    pozycje odłożone przez Jana dostają nazwisko Piotra i nikt się o tym nie
    dowie. Dlatego decyzja należy do człowieka, a nie do aplikacji.            */
 
+/**
+ * Rola konta.
+ *
+ * Typ istnieje dla EKRANÓW, które muszą pokazać człowiekowi listę do wyboru.
+ * `SessionState.role` zostaje surowym łańcuchem z serwera i to jest celowe:
+ * serwer jest właścicielem zbioru ról, a nieznana rola ma zalogować z ograniczonymi
+ * uprawnieniami, nie wywrócić aplikacji przy `valueOf`.
+ */
+enum class Rola(val wire: String, val etykieta: String, val wymagaPinu: Boolean) {
+    MAGAZYNIER("magazynier", "Magazynier", false),
+    BRYGADZISTA("brygadzista", "Brygadzista", true),
+    BIURO("biuro", "Biuro", true),
+}
+
 /** Stan sesji urządzenia widziany przez UI. */
 sealed interface SessionState {
     /** Nikt nie zeskanował badge'a — kolektor nie wie, kto pracuje. */
