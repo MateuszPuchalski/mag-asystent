@@ -359,12 +359,10 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 84 testów jednostkowych; buduje się bez Android SDK
+                           + 85 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
-                           + 74 testów jednostkowych; buduje się bez Android SDK
-  app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
-  data/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
 server/                    backend (Fastify + SQLite + worker)
+  seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
   src/db/seed.ts           seed z products.json: dokumenty FZ/PZ per dostawca,
                            kontener na MGP, zbiorczy dokument zwrotów
@@ -380,7 +378,10 @@ docs/                      analiza rozkładania + instrukcja podpięcia Subiekta
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 tools/docs_check.py        kontrola spójności dokumentacji z repo (martwe ścieżki,
                            usunięte byty, liczby ekranów/testów) — `python3 tools/docs_check.py`
-.github/workflows/         CI: testy :core + APK debug (ubuntu-latest ma Android SDK)
+tools/kt_imports_check.py  namiastka kompilatora dla :app (brakujące importy,
+                           bilans nawiasów) — :app nie kompiluje się bez SDK
+.github/workflows/         CI: android.yml (testy :core + APK debug) oraz
+                           server.yml (testy serwera, tsc, docs_check)
 ```
 
 ## Dane testowe
