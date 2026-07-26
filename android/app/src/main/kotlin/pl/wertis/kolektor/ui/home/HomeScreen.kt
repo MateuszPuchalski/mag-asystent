@@ -109,23 +109,27 @@ fun HomeScreen(graph: AppGraph) {
 
     // jedna droga skanu dla całej aplikacji — kontekst przyklejony musi
     // działać tak samo tutaj i w globalnym fallbacku (ui/scan/ScanRouter.kt)
-    suspend fun handleScan(code: String) = routeScan(graph, code) {
-        query = it
-        queryFlow.value = it
-    }
+    suspend fun handleScan(code: String, manual: Boolean = false) =
+        routeScan(graph, code, manual, screen = "home") {
+            query = it
+            queryFlow.value = it
+        }
 
     fun onEnter() {
         val v = query.trim()
         if (v.isEmpty()) return
         // Kod regału — wpisany czy zeskanowany — idzie tą samą drogą co skan,
         // żeby kontekst przyklejony działał także przy wpisywaniu z ręki.
-        val jakSkan = fast.count >= 3 || EAN_RE.matches(v) ||
+        val zeSkanera = fast.count >= 3
+        val jakSkan = zeSkanera || EAN_RE.matches(v) ||
             v.uppercase().startsWith(DEFAULT_LOC_PREFIX) || looksLikeLocation(v)
         fast.count = 0
         if (jakSkan) {
             query = ""
             queryFlow.value = ""
-            scope.launch { handleScan(v) }
+            // wpisane z ręki liczy się osobno: udział wpisów per regał mówi,
+            // która etykieta jest nieczytelna i wymaga przedruku
+            scope.launch { handleScan(v, manual = !zeSkanera) }
         } else {
             results.firstOrNull()?.let { openRow(it) }
         }

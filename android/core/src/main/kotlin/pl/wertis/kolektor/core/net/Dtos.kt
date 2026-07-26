@@ -303,6 +303,8 @@ data class DeviceEventBody(
     val pinned: String? = null,
     /** `pin_expired`: jak długo kontekst obowiązywał — mierzy, czy TTL pasuje. */
     val heldMs: Long? = null,
+    /** `scan_timing`: skan → odpowiedź, mierzone u człowieka (cel p95 < 150 ms). */
+    val ms: Long? = null,
 )
 
 /* ── Odpowiedzi ───────────────────────────────────────────────────────── */

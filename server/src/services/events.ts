@@ -1,6 +1,13 @@
 import { db } from "../db/db.js";
+import { currentDevice } from "../context.js";
 
-/** Log zdarzeń — audyt każdego skanu i decyzji (spec §7, §12). */
+/**
+ * Log zdarzeń — audyt każdego skanu i decyzji (spec §7, §12).
+ *
+ * `device_id` dochodzi z kontekstu żądania, nie z parametru: przeciąganie go
+ * przez wszystkie warstwy usług kosztowałoby więcej, niż wnosi pole
+ * diagnostyczne. Poza żądaniem (worker) jest `null` i to jest poprawne.
+ */
 export function logEvent(
   type: string,
   userId: string,
@@ -9,9 +16,9 @@ export function logEvent(
 ): void {
   db()
     .prepare(
-      "INSERT INTO events(type, tw_id, payload, user_id) VALUES (?,?,?,?)"
+      "INSERT INTO events(type, tw_id, payload, user_id, device_id) VALUES (?,?,?,?,?)"
     )
-    .run(type, twId, payload == null ? null : JSON.stringify(payload), userId);
+    .run(type, twId, payload == null ? null : JSON.stringify(payload), userId, currentDevice());
 }
 
 export interface MovementEntry {

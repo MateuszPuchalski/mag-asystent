@@ -47,10 +47,21 @@ export async function productRoutes(app: FastifyInstance) {
    * fallbacku na drugą. Fallback jest zależny od kolejności, a zależność od
    * kolejności to sposób, w jaki mis-skan cicho robi coś innego, niż wygląda.
    */
-  app.get<{ Params: { code: string } }>("/api/products/scan/:code", async (req) => {
+  app.get<{ Params: { code: string }; Querystring: { manual?: string; screen?: string } }>(
+    "/api/products/scan/:code",
+    async (req) => {
     const raw = decodeURIComponent(req.params.code).trim();
     const scan = classifyScan(raw);
-    logEvent("scan", userOf(req), null, { code: raw, kind: scan.kind });
+    // Wejście RĘCZNE liczone osobno od skanu — udział wpisów per lokalizacja to
+    // darmowy raport jakości etykiet („który regał wymaga przedruku"), a per
+    // towar mówi, która kartoteka nie ma czytelnego kodu. Wrzucone do jednego
+    // worka z `scan` nie mierzy niczego.
+    const reczne = req.query.manual === "1";
+    logEvent(reczne ? "manual_entry" : "scan", userOf(req), null, {
+      code: raw,
+      kind: scan.kind,
+      ...(reczne && req.query.screen ? { screen: req.query.screen } : {}),
+    });
 
     if (scan.kind === "LOC") {
       const code = normalizeLoc(scan.code);
@@ -75,8 +86,9 @@ export async function productRoutes(app: FastifyInstance) {
     if (results.length === 1) {
       return { type: "product", card: buildProductCard(subiekt, results[0].id) };
     }
-    return { type: "search", results };
-  });
+      return { type: "search", results };
+    }
+  );
 
   // wyszukiwarka (spec §5.1)
   app.get<{ Querystring: { q?: string } }>("/api/products/search", async (req) => {

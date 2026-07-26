@@ -15,7 +15,9 @@
     "build": "tsc -p tsconfig.build.json && node -e \"require('fs').copyFileSync('src/db/schema.sql','dist/db/schema.sql')\"",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker/worker.js",
-    "test": "tsx --test src/*.test.ts src/**/*.test.ts"
+    "test": "tsx --test src/*.test.ts src/**/*.test.ts",
+    "reconcile": "tsx src/reconcile-run.ts",
+    "start:reconcile": "node dist/reconcile-run.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

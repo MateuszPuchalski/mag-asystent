@@ -44,6 +44,8 @@ function migrate(database: Database.Database) {
   addColumn("delivery_line", "koszyk", "TEXT");
   addColumn("delivery_line", "mm_ilosc", "REAL NOT NULL DEFAULT 0");
   addColumn("delivery_line", "mm_queue_id", "INTEGER");
+  // telemetria: który egzemplarz kolektora wygenerował zdarzenie
+  addColumn("events", "device_id", "TEXT");
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */

@@ -273,6 +273,34 @@ Parametry (env, dev):
 — ten sam dokument nie może pojawić się w obu zakładkach, inaczej dałoby się go
 rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 
+**Telemetria, która mierzy właściwą rzecz**
+- `events` ma indeks po czasie (bez niego każdy raport skanuje całą tabelę)
+  i `device_id` — przy współdzielonych kolektorach pierwsze pytanie przy awarii
+  brzmi „to jedno urządzenie czy wszystkie?".
+- **Wejście ręczne liczone osobno od skanu** (`manual_entry`). To nie jest
+  kosmetyka: udział wpisów ręcznych **per regał** to darmowy raport jakości
+  etykiet (który wymaga przedruku), a **per towar** mówi, która kartoteka nie ma
+  czytelnego kodu. W jednym worku ze skanem nie mierzy niczego.
+- **Czas skan → odpowiedź mierzy klient, nie serwer** (`scan_timing`), bo czas
+  obsługi na serwerze pomija sieć i render — czyli akurat to, gdzie problem
+  siedzi. Cel: `p95 < 150 ms`; powyżej ~300 ms ludzie zaczynają skanować
+  podwójnie, a podwójny skan przy liczeniu pozycji to błąd **ilościowy**.
+- Cztery liczby w `/lookup` pod klawiszem `m` — widok, nie panel.
+  **Świadomie bez raportu wydajności per osoba:** to monitoring pracowniczy
+  w rozumieniu Kodeksu pracy (art. 22² i nast.) i wymaga zapisu w regulaminie
+  oraz uprzedzenia ludzi przed uruchomieniem. Techniczny audyt „kto zmienił
+  lokalizację" to co innego i zostaje.
+
+**Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
+- Aplikacja pisze do Subiekta przez kolejkę, ale nikt nie sprawdzał, **czy stan
+  po stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała**.
+  `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
+  z ostatnim udanym zapisem, wyławia zadania w `error` starsze niż doba,
+  `waiting_for_doc` starsze niż trzy dni i koszyki zwrotów rozłożone bez MM.
+- **Zerowy wynik nie tworzy raportu** — raport przychodzący codziennie przestaje
+  być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
+  + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
+
 **Podgląd magazynu (biuro) — `/lookup`**
 - Lekka strona **tylko do odczytu** na tym samym serwerze i API, dla przeglądarki
   desktop (biuro). Skan/wyszukiwarka → karta towaru (stany MAG/MGP/Zwroty
