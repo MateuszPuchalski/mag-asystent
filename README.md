@@ -190,6 +190,15 @@ Parametry (env, dev):
   i telemetria `pin_expired`.
 - Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
+- **Zamienniki z opisu kartoteki.** Opisy od lat niosą symbole zamienników
+  (`Zamiennik: 24-04003`, `Zamiennie: 101-024 // KAR00149`), tyle że jako prozę,
+  której nie da się dotknąć. Serwer je wycina (`services/zamienniki.ts`), a to,
+  co jest NASZĄ kartoteką, staje się wierszem ze stanem i lokalizacją —
+  dotknięcie otwiera kartę zamiennika. Rozstrzyga kartoteka, nie wzorzec:
+  z 2304 tokenów w sekcjach zamienników tylko 478 to nasze towary, reszta to
+  numery OEM i katalogi obcych firm (zostają szarym tekstem, bo idą w rozmowę
+  z dostawcą). `+` nigdy nie rozdziela — w opisach łączy części zestawu, więc
+  podział podałby pół kompletu jako pełnoprawny zamiennik.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
   Pomyłkę poprawia się skanem właściwej półki — nie ma czego cofać.
@@ -350,7 +359,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 73 testów jednostkowych; buduje się bez Android SDK
+                           + 74 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
   data/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
 server/                    backend (Fastify + SQLite + worker)

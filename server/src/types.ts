@@ -35,6 +35,22 @@ export interface ProductCard {
   mgp: StockView;
   /** Strefa zwrotów od klientów (magazyn Zwroty). */
   zwroty: StockView;
+  /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
+  zamienniki: Zamienniki;
+}
+
+/**
+ * Zamienniki z opisu kartoteki, rozstrzygnięte kartoteką.
+ *
+ * `znane` to nasze towary — w nie da się kliknąć i przejść na ich kartę;
+ * `obce` to numery OEM i katalogi innych producentów, których u siebie nie
+ * mamy. Obcych jest zwykle więcej niż znanych (w całej kartotece 2304 tokeny,
+ * z czego 478 nasze), ale zostają na karcie, bo to one idą w rozmowę
+ * z dostawcą.
+ */
+export interface Zamienniki {
+  znane: ProductRow[];
+  obce: string[];
 }
 
 export interface ProductRow {

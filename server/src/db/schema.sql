@@ -128,6 +128,10 @@ CREATE TABLE IF NOT EXISTS sgt_towar (
   lokalizacja TEXT NOT NULL DEFAULT ''          -- string rozdzielany spacją (wariant B, spec D1)
 );
 CREATE INDEX IF NOT EXISTS ix_towar_symbol ON sgt_towar(symbol);
+-- Szukanie po symbolu jest ZAWSZE bez rozróżniania wielkości liter (skan,
+-- zamienniki z opisu), a indeksu z kolatacją BINARY SQLite do takiego
+-- porównania nie użyje — bez tej pary każde takie zapytanie to skan kartoteki.
+CREATE INDEX IF NOT EXISTS ix_towar_symbol_nocase ON sgt_towar(symbol COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS ix_towar_ean ON sgt_towar(ean);
 
 CREATE TABLE IF NOT EXISTS sgt_stan (
