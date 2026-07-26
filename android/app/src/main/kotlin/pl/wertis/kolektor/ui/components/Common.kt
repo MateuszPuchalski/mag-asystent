@@ -3,6 +3,7 @@ package pl.wertis.kolektor.ui.components
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -41,6 +42,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +60,9 @@ import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberDark
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.BarlowCond
+import androidx.compose.ui.text.style.TextDecoration
 import pl.wertis.kolektor.ui.theme.BorderCol
+import pl.wertis.kolektor.ui.theme.Destructive
 import pl.wertis.kolektor.ui.theme.CardBorder
 import pl.wertis.kolektor.ui.theme.CardShape
 import pl.wertis.kolektor.ui.theme.CardWhite
@@ -279,6 +283,13 @@ fun ProductRowCard(row: ProductRow, onClick: () -> Unit) {
             if (row.locs.isNotEmpty()) {
                 Text(row.locs.joinToString(" "), fontSize = 11.sp, color = InkMute, maxLines = 1)
             }
+            // wypełniane wyłącznie przy zawartości regału — read-model pokazałby
+            // stan sprzed zmiany, więc bez tego wiersz milczy o tym, co się dzieje
+            when (row.pendingHere) {
+                "add" -> PendingHereNote("⏳ jedzie tutaj — zapis w kolejce", false)
+                "remove" -> PendingHereNote("⏳ schodzi stąd — zapis w kolejce", false)
+                "error" -> PendingHereNote("⚠ zapis do Subiekta się nie udał", true)
+            }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
@@ -304,33 +315,97 @@ fun ProductRowCard(row: ProductRow, onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun PendingHereNote(text: String, alarm: Boolean) {
+    Text(
+        text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = if (alarm) Destructive else AmberInk,
+        maxLines = 1,
+    )
+}
+
+/**
+ * Stan chipa lokalizacji względem Subiekta.
+ *
+ * Read-model aktualizuje się dopiero po udanym zapisie przez workera, więc
+ * między skanem a potwierdzeniem karta pokazywałaby stan sprzed zmiany i nic
+ * by o tym nie mówiła. Przy błędzie zapisu ten stan jest TRWAŁY — i tylko on
+ * wymaga reakcji człowieka, dlatego tylko on pulsuje.
+ */
+enum class LocState { CONFIRMED, ADDING, REMOVING, FAILED }
+
 /** Chip lokalizacji (pierwsza = pickingowa, z bursztynową kropką; reszta z pinezką). */
 @Composable
-fun LocChip(code: String, primary: Boolean, onClick: () -> Unit) {
+fun LocChip(
+    code: String,
+    primary: Boolean,
+    state: LocState = LocState.CONFIRMED,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(50)
+    val failed = state == LocState.FAILED
+    val waiting = state == LocState.ADDING || state == LocState.REMOVING
+
+    // pulsuje WYŁĄCZNIE błąd — animacja na ekranie trzymanym otwartym cały dzień
+    // kosztuje baterię i po godzinie staje się tłem, więc zostaje zarezerwowana
+    // dla jedynego stanu, który wymaga działania
+    val alpha = if (failed) {
+        rememberInfiniteTransition(label = "loc-error").animateFloat(
+            initialValue = 1f,
+            targetValue = 0.45f,
+            animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+            label = "alpha",
+        ).value
+    } else if (waiting) 0.55f else 1f
+
+    val border = when {
+        failed -> Destructive
+        waiting -> InkMute
+        else -> Ink
+    }
+    val fill = if (primary && state == LocState.CONFIRMED) Ink else CardWhite
+    val ink = when {
+        failed -> Destructive
+        primary && state == LocState.CONFIRMED -> Color.White
+        else -> Ink
+    }
+
     Row(
         modifier = Modifier
-            .shadow(2.dp, shape, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
+            .alpha(alpha)
+            .then(
+                // cień tylko na potwierdzonym: „w drodze" ma leżeć płasko,
+                // żeby różnica była czytelna także w słońcu na hali
+                if (state == LocState.CONFIRMED) {
+                    Modifier.shadow(2.dp, shape, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
+                } else Modifier
+            )
             .clip(shape)
-            .border(1.5.dp, Ink, shape)
-            .background(if (primary) Ink else CardWhite)
+            .border(if (failed) 2.dp else 1.5.dp, border, shape)
+            .background(fill)
             .heightIn(min = 44.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (primary) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(Amber))
-        } else {
-            Icon(WIcons.Pin, null, tint = Ink, modifier = Modifier.size(14.dp))
+        when {
+            failed -> Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(14.dp))
+            waiting -> Text("⏳", fontSize = 12.sp)
+            primary -> Box(Modifier.size(7.dp).clip(CircleShape).background(Amber))
+            else -> Icon(WIcons.Pin, null, tint = Ink, modifier = Modifier.size(14.dp))
         }
         Text(
             code,
             fontFamily = BarlowCond,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
-            color = if (primary) Color.White else Ink,
+            color = ink,
+            // schodząca lokalizacja jeszcze JEST w Subiekcie — przekreślenie mówi
+            // „to zaraz zniknie", a nie „tego już nie ma"
+            textDecoration = if (state == LocState.REMOVING) TextDecoration.LineThrough else null,
         )
     }
 }

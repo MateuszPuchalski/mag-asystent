@@ -60,7 +60,7 @@ import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
 
 /* ── Zmiana lokalizacji: skan towaru → skan etykiety regału ─────────────────
-   Port web/src/screens/ScanLoc.tsx. Auto-zapis (bez tapa) + pasek COFNIJ;
+   Auto-zapis bez tapa: skan etykiety półki od razu zapisuje lokalizację;
    przy >1 lokalizacjach arkusz zastąp/dodaj/zastąp jedną. EAN przechodzi
    do fallbacku (karta innego towaru).                                        */
 
@@ -81,7 +81,7 @@ fun ScanLocScreen(graph: AppGraph) {
 
     val p = poll.data
 
-    /** Auto-zapis + pasek COFNIJ, powrót na kartę. */
+    /** Auto-zapis i powrót na kartę. */
     fun save(choice: LocChoice, successMsg: String) {
         if (saving) return
         saving = true
@@ -175,7 +175,7 @@ fun ScanLocScreen(graph: AppGraph) {
         }
 
         Text(
-            "Podejdź do miejsca docelowego i zeskanuj jego etykietę — zapis nastąpi od razu (z opcją COFNIJ).",
+            "Podejdź do miejsca docelowego i zeskanuj jego etykietę — zapis nastąpi od razu.",
             fontSize = 13.sp,
             color = InkSoft,
         )

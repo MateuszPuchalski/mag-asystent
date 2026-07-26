@@ -8,8 +8,6 @@ export interface EnqueueBase {
   sessionId?: number | null;
   label: string;
   detail: string;
-  /** Okno COFNIJ [ms]: worker nie weźmie zadania przed upływem karencji. */
-  graceMs?: number;
 }
 
 function insert(
@@ -17,9 +15,8 @@ function insert(
   payload: unknown,
   base: EnqueueBase
 ): number {
-  const nextAttemptAt = base.graceMs
-    ? new Date(Date.now() + base.graceMs).toISOString()
-    : null;
+  // `next_attempt_at` zostaje NULL — zadanie jest do wzięcia od razu. Kolumnę
+  // wypełnia dopiero worker: backoff przy retry i `waiting_for_doc`.
   const res = db()
     .prepare(
       `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by, next_attempt_at)
@@ -34,7 +31,7 @@ function insert(
       base.sourceDocId ?? null,
       base.sessionId ?? null,
       base.createdBy,
-      nextAttemptAt
+      null
     );
   return Number(res.lastInsertRowid);
 }

@@ -12,9 +12,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.scan.ScanKind
+import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.RecentEntry
+import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
@@ -87,14 +89,12 @@ fun LocationScreen(graph: AppGraph) {
             return@Column
         }
 
-        val contents by produceState<List<ProductRow>?>(null, code) {
-            value = null
-            value = try {
-                apiCall { graph.api.locationProducts(code) }.products
-            } catch (_: Exception) {
-                emptyList()
-            }
-        }
+        // odpytywanie, nie jednorazowy odczyt: znaczniki „jedzie tutaj / schodzi
+        // stąd" biorą się z kolejki, więc muszą same znikać po zapisie
+        val poll by remember(code) {
+            pollFlow(2000) { apiCall { graph.api.locationProducts(code) }.products }
+        }.collectAsState(initial = Poll())
+        val contents: List<ProductRow>? = poll.data ?: if (poll.loading) null else emptyList()
 
         Text(
             code,
@@ -106,7 +106,7 @@ fun LocationScreen(graph: AppGraph) {
 
         when {
             contents == null -> LoadingRow()
-            contents!!.isEmpty() -> Text(
+            contents.isEmpty() -> Text(
                 "Slot pusty — nic nie powinno tu leżeć",
                 color = InkMute,
                 fontSize = 14.sp,
@@ -114,8 +114,8 @@ fun LocationScreen(graph: AppGraph) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
             )
             else -> {
-                SectionLabel("Powinno tu leżeć (${contents!!.size})")
-                contents!!.forEach { row ->
+                SectionLabel("Powinno tu leżeć (${contents.size})")
+                contents.forEach { row ->
                     ProductRowCard(row) {
                         graph.nav.openProduct(
                             row.id,

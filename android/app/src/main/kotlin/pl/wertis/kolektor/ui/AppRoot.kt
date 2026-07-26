@@ -25,7 +25,6 @@ import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
 import pl.wertis.kolektor.ui.chrome.TopBar
-import pl.wertis.kolektor.ui.chrome.UndoBar
 import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
@@ -47,7 +46,6 @@ fun AppRoot(graph: AppGraph) {
     val queue by graph.queueRepo.queue.collectAsStateWithLifecycle()
     val toastMsg by graph.effects.toastMsg.collectAsStateWithLifecycle()
     val success by graph.effects.success.collectAsStateWithLifecycle()
-    val undoInfo by graph.effects.undo.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -110,9 +108,6 @@ fun AppRoot(graph: AppGraph) {
             }
             ToastOverlay(toastMsg)
             SuccessOverlay(success)
-            UndoBar(undoInfo) {
-                scope.launch { graph.undo.performUndo() }
-            }
         }
         TabBar(
             screen = screen,

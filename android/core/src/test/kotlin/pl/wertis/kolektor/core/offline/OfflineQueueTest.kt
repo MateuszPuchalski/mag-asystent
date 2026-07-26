@@ -28,7 +28,6 @@ class OfflineQueueTest {
         val r = q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, user = "anna", productId = 7, setLocation = setLoc)
         assertFalse(r.offline)
         assertEquals(42L, r.queueId)
-        assertNull(r.bufferId)
         assertTrue(storage.saved.isEmpty())
         assertEquals(0, q.count.value)
     }
@@ -114,14 +113,6 @@ class OfflineQueueTest {
         q.flush()
         assertEquals(listOf(1L, 3L), sentProducts) // odrzucona 2 nie blokuje
         assertEquals(listOf("konflikt"), rejected)
-        assertEquals(0, q.count.value)
-    }
-
-    @Test fun `remove - COFNIJ przed wysylka`() = runTest {
-        val q = OfflineQueue(MemStorage(), { null }, isOnline = { false })
-        val r = q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
-        assertTrue(q.remove(r.bufferId!!))
-        assertFalse(q.remove(r.bufferId!!))
         assertEquals(0, q.count.value)
     }
 

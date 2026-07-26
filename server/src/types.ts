@@ -7,6 +7,18 @@ export interface StockView {
   effective: number;  // stan skorygowany o kolejkę
 }
 
+/**
+ * Zmiana lokalizacji czekająca w kolejce — pojedynczy kod, nie całe pole.
+ * `pending` = worker to jeszcze zrobi; `error` = nie zrobi bez PONÓW.
+ */
+export interface PendingLocChange {
+  code: string;
+  kind: "add" | "remove";
+  status: "pending" | "error";
+  /** Zadanie kolejki — kolektor prowadzi z chipa prosto do PONÓW. */
+  queueId: number;
+}
+
 export interface ProductCard {
   id: number;
   sym: string;
@@ -15,7 +27,10 @@ export interface ProductCard {
   unit: string;
   ordered: number;
   desc: string;
+  /** Lokalizacje POTWIERDZONE — to, co naprawdę jest w Subiekcie. */
   locs: string[];
+  /** Zmiany czekające w kolejce; `locs` celowo ich nie zawiera. */
+  pendingLocs: PendingLocChange[];
   mag: StockView;
   mgp: StockView;
   /** Strefa zwrotów od klientów (magazyn Zwroty). */
@@ -30,6 +45,12 @@ export interface ProductRow {
   mag: number;
   mgp: number;
   locs: string[];
+  /**
+   * Wypełniane WYŁĄCZNIE przy liście zawartości regału: czy ten towar właśnie
+   * na tę półkę jedzie, czy z niej schodzi. W wynikach wyszukiwania `null` —
+   * tam pytanie „której półki?" nie ma sensu.
+   */
+  pendingHere?: "add" | "remove" | "error" | null;
 }
 
 export interface PutawayDocument {

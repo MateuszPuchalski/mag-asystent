@@ -121,12 +121,21 @@ Parametry (env, dev):
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
+  Pomyłkę poprawia się skanem właściwej półki — nie ma czego cofać.
+- **Lokalizacja „w drodze".** Pole lokalizacji w Subiekcie zmienia się dopiero po
+  udanym zapisie przez workera, więc do tego czasu karta pokazywałaby stan sprzed
+  skanu. Chipy niosą więc stan zamiast milczeć: dochodząca — przerywana ramka
+  i `⏳`; schodząca — kod przekreślony; **nieudany zapis — czerwony i pulsuje**,
+  a tapnięcie prowadzi wprost do kolejki z PONÓW. Pulsuje wyłącznie błąd, bo
+  tylko on wymaga reakcji człowieka i tylko on jest stanem trwałym. Ten sam
+  sygnał widać z drugiej strony — na zawartości regału (`jedzie tutaj` /
+  `schodzi stąd`). To ten sam pomysł, co `⏳ N szt w drodze` przy stanach.
 - Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
   PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
   prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
   błąd) — jest jednocześnie wskaźnikiem stanu; dolny pasek ma 2 zakładki.
-- Bufor offline (Room) na zapisy przy zaniku Wi-Fi, pasek COFNIJ (anulowanie
-  zadania w oknie łaski), potrząśnięcie = cofnij, asysta niskiej baterii.
+- Bufor offline (Room) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
+  log upadków urządzenia (`device_drop`) dla serwisu.
 
 **Rozkładanie dostaw i zwrotów — Tryb A (redesign v2.0)** — druga zakładka
 - Jednostką pracy jest **dokument** (FZ/PZ albo zbiorczy dokument zwrotów), nie

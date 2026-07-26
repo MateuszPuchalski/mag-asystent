@@ -25,7 +25,6 @@ import pl.wertis.kolektor.offline.wireOfflineFlush
 import pl.wertis.kolektor.core.offline.OfflineQueue
 import pl.wertis.kolektor.scan.ScannerManager
 import pl.wertis.kolektor.ui.chrome.UiEffects
-import pl.wertis.kolektor.undo.UndoManager
 
 /* ── Kompozycja aplikacji — ręczny service locator (bez DI frameworka) ──────
    ~10 singletonów; ViewModel-e dostają graf przez viewModelFactory helper.   */
@@ -59,15 +58,11 @@ class AppGraph(context: Context) {
         onRejected = { _, msg -> effects.toast("Operacja z bufora odrzucona: $msg") },
     )
 
-    val undo = UndoManager(api, offlineQueue, queueRepo, effects)
     val scanner = ScannerManager(context)
 
     val motion = MotionMonitor(
         context,
-        shakeEnabled = { settings.current.shakeUndo },
         dropLogEnabled = { settings.current.dropLog },
-        undoVisible = { effects.undo.value != null },
-        onShakeUndo = { appScope.launch { undo.performUndo() } },
         onDrop = { fallMs ->
             appScope.launch {
                 runCatching { api.deviceEvent(DeviceEventBody(type = "device_drop", magnitude = fallMs.toDouble())) }

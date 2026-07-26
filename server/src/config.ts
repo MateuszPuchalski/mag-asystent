@@ -185,12 +185,6 @@ export const config = {
     },
   } as Record<string, { label: string; sgt: string }>,
 
-  /**
-   * Karencja COFNIJ [ms]: zadanie set_location z kolektora dostaje next_attempt_at
-   * w przyszłości, więc worker nie weźmie go zanim minie okno anulowania na UI.
-   */
-  undoGraceMs: num(process.env.UNDO_GRACE_MS, 5000),
-
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
     pollMs: num(process.env.WORKER_POLL_MS, 1200),

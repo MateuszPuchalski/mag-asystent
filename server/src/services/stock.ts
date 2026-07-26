@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import type { ProductCard, StockView } from "../types.js";
 import { parseLocs } from "../locs.js";
+import { pendingLocChanges } from "./locations.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
@@ -60,6 +61,7 @@ export function buildProductCard(
   const zwRaw = adapter.getStock(twId, config.magId.ZWROTY);
   const pendingMgp = pendingMmByTw(config.magId.MGP).get(twId) ?? 0;
   const pendingZw = pendingMmByTw(config.magId.ZWROTY).get(twId) ?? 0;
+  const locs = parseLocs(t.lokalizacja);
 
   return {
     id: t.tw_id,
@@ -69,7 +71,10 @@ export function buildProductCard(
     unit: t.unit,
     ordered: t.ordered,
     desc: t.opis ?? "",
-    locs: parseLocs(t.lokalizacja),
+    locs,
+    // to, co jeszcze nie doszło do Subiekta — świadomie OBOK `locs`, żeby karta
+    // nie zaczęła kłamać w drugą stronę (pokazywać niepotwierdzone jako pewne)
+    pendingLocs: pendingLocChanges(twId, locs),
     // strefy źródłowe tracą to, co w kolejce do przeniesienia; MAG zyskuje (⏳ w drodze)
     mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, pendingMgp, 0),
     zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, pendingZw, 0),

@@ -26,8 +26,8 @@ import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.Success
 
-/* ── Nakładki: toast (2.6 s) · sukces (1.5 s) · pasek COFNIJ (6 s) ─────────
-   Odpowiednik web/src/components/Overlays.tsx; czasy pilnuje UiEffects.      */
+/* ── Nakładki: toast (2.6 s) · plakietka sukcesu (1.5 s) ───────────────────
+   Czasy pilnuje UiEffects.                                                   */
 
 @Composable
 fun BoxScope.ToastOverlay(msg: String?) {
@@ -58,37 +58,6 @@ fun BoxScope.SuccessOverlay(msg: String?) {
     ) {
         Text("✓", color = CardWhite, fontSize = 34.sp, fontWeight = FontWeight.Bold)
         Text(msg, color = CardWhite, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-fun BoxScope.UndoBar(info: UndoInfo?, onUndo: () -> Unit) {
-    if (info == null) return
-    Column(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .padding(12.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Ink)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(info.msg, color = CardWhite, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Text(
-                "COFNIJ",
-                color = Amber,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onUndo)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
-        }
-        info.warn?.let {
-            Text(it, color = AmberBg, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-        }
     }
 }
 
