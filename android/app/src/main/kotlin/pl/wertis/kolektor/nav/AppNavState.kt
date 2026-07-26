@@ -26,13 +26,6 @@ class AppNavState(private val recentStore: RecentStore) {
     /** Skan-tekst z fallbacku, który dał wiele wyników — Home podstawia do wyszukiwarki. */
     @Volatile var pendingSearch: String? = null
 
-    /**
-     * Lokalizacja zeskanowana w trybie przypiętym dla towaru o ≥2 adresach —
-     * karta otwiera na niej arkusz ZASTĄP/DODAJ. Rozstrzygnięcie zostaje przy
-     * człowieku i w jednym miejscu, zamiast dublować arkusz w routerze skanów.
-     */
-    @Volatile var pendingLoc: String? = null
-
     fun backTargetOf(s: Screen): Screen? = backTarget(s, queueReturn)
 
     fun go(screen: Screen) {
@@ -56,12 +49,6 @@ class AppNavState(private val recentStore: RecentStore) {
         _screen.value = Screen.PRODUCT
     }
 
-    /** Karta towaru od razu z otwartym arkuszem ZASTĄP/DODAJ dla tej półki. */
-    fun openProductWithLoc(id: Long, code: String) {
-        pendingLoc = code
-        openProduct(id)
-    }
-
     fun openScanLoc() = go(Screen.SCAN_LOC)
 
     fun openDelivery(id: Long) {
@@ -83,5 +70,20 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openProblems() = go(Screen.PROBLEMS)
 
-    fun start() = go(Screen.HOME) // Splash: „Kto pracuje?” → home
+    fun start() = go(Screen.HOME) // Splash: „Zeskanuj badge" → home
+
+    /**
+     * Krótki opis TRWAJĄCEJ pracy — do pytania o przejęcie i do audytu.
+     *
+     * „Przejąć pracę?" bez powiedzenia JAKĄ jest pytaniem, na które nie da się
+     * odpowiedzieć: człowiek stojący przy kolektorze widzi ekran, ale ten, kto
+     * będzie czytał `events` za miesiąc, nie zobaczy nic. `null`, gdy nic nie
+     * jest otwarte — wtedy przejęcie jest zwykłą zmianą osoby.
+     */
+    fun opisPracy(): String? = when {
+        deliveryId != null -> "dostawa #" + deliveryId
+        sessionId != null -> "sesja kontenerowa #" + sessionId
+        locCode != null -> "regał " + locCode
+        else -> null
+    }
 }

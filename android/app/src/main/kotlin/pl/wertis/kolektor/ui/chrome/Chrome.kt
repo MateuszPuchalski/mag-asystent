@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.core.nav.SCREEN_TITLES
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.QueueSummary
-import pl.wertis.kolektor.data.userInitials
+import pl.wertis.kolektor.core.session.userInitials
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg

@@ -46,6 +46,12 @@ function migrate(database: Database.Database) {
   addColumn("delivery_line", "mm_queue_id", "INTEGER");
   // telemetria: który egzemplarz kolektora wygenerował zdarzenie
   addColumn("events", "device_id", "TEXT");
+  /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot
+     tego, co aplikacja wtedy wiedziała, i jedyny ślad po zdarzeniach sprzed
+     kont. Obok dochodzi `user_ref` wskazujące na app_user. Historii się nie
+     kasuje ani nie nadpisuje: zdarzenie, którego nie da się przypisać, zostaje
+     z `user_ref = NULL`, bo to jest uczciwe, w odróżnieniu od zgadywania. */
+  addColumn("events", "user_ref", "INTEGER");
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */

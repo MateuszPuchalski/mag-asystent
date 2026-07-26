@@ -183,6 +183,61 @@ keystore) — instrukcja podpisu jak w standardowym projekcie Android.
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
+## 5a. Konta pracowników i badge'e (plan §7)
+
+Bez kont kolektor nie ma czym podpisać operacji: ekran startowy prosi o skan
+badge'a i nie przepuszcza dalej.
+
+**1. Załóż konta** (raz, z dowolnej maszyny w LAN — numer badge'a nadaje
+serwer, żeby był unikalny w całej firmie i miał poprawną cyfrę kontrolną):
+
+```bash
+curl -X POST http://<IP-serwera>:3001/api/users \
+  -H 'content-type: application/json' \
+  -d '{"name":"Jan Kowalski"}'
+# → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"magazynier",...}}
+
+# brygadzista — rola uprzywilejowana WYMAGA PIN-u
+curl -X POST http://<IP-serwera>:3001/api/users \
+  -H 'content-type: application/json' \
+  -d '{"name":"Adam Nowak","role":"brygadzista","pin":"4821"}'
+
+curl http://<IP-serwera>:3001/api/users        # lista z kodami do wydruku
+```
+
+**2. Wydrukuj plakietki.** Na plakietce ma być **kod kreskowy z `badgeCode`**
+(Code 128 — ten sam symbol, co etykiety regałów) i pod nim ten sam kod tekstem,
+na wypadek zdartej etykiety. **Nazwiska na plakietce nie drukuj**: badge się
+gubi i zostaje na kurtce, a powiązanie kod → człowiek żyje wyłącznie w bazie.
+Format `PRC-0000-0` jest stały, więc jedna szablonowa etykieta wystarczy.
+
+**3. Migracja historii** (tylko przy aktualizacji istniejącej instalacji —
+jednorazowo, idempotentnie). Zakłada konta dla nazw, które już są w `events`,
+scala warianty tej samej osoby (`Jan`, `jan`, `Jan K`) w jedno konto i wypełnia
+`events.user_ref`. Historii nie kasuje: `user_id` zostaje jako tekstowy
+snapshot, a zdarzenia niedopasowane zostają z `user_ref = NULL`.
+
+```bash
+curl -X POST http://<IP-serwera>:3001/api/users/migrate-history
+# → {"zalozonychKont":4,"przypisanychZdarzen":1281,"nieprzypisanych":37,"nazwy":[...]}
+```
+
+Po migracji przejrzyj `nazwy` — wpisy w rodzaju „magazynier" albo „test"
+wyłącz przez `POST /api/users/:id/active` z `{"active":false}`. Konta się
+**nie kasuje**: historia w `events` musi mieć na co wskazywać.
+
+**4. Raport wydajności (`GET /api/wydajnosc?days=7`) — obowiązek formalny
+PRZED uruchomieniem.** Telemetria per pracownik to **monitoring pracowniczy**
+w rozumieniu Kodeksu pracy (art. 22² i nast.). Wymaga:
+- zapisu w **regulaminie pracy**, a gdy regulaminu nie ma — w **obwieszczeniu**,
+- **uprzedzenia pracowników na 2 tygodnie** przed uruchomieniem,
+- informacji dla nowych osób **przed dopuszczeniem do pracy**.
+
+Bez tego dane są kwestionowalne w każdym zastosowaniu kadrowym. Kod tego nie
+blokuje — decyzja należy do pracodawcy — a sam raport niesie tę informację
+w polu `podstawaPrawna`. Techniczny audyt „kto zmienił lokalizację" to **co
+innego** i nie wymaga wstrzymania.
+
 ## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
 > **Test na wersji edu (bez Sfery):** kompletna instrukcja krok po kroku —

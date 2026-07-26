@@ -7,7 +7,7 @@ import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
-import { lockedByOther } from "./locks.js";
+import { freshLock, lockedByOther } from "./locks.js";
 import { deliveryFlag, flagLabel, syncFlag, touchDelivery } from "./delivery-flag.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type {
@@ -309,7 +309,12 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   // Przy natłoku dostawę robi kilka osób. Nie odbieramy linii koledze po cichu:
   // druga osoba dowiaduje się, kto ją trzyma, i idzie dalej po alejce.
   const holder = lockedByOther(line.locked_by, line.locked_at, user);
-  if (holder) return { kind: "locked", code, lockedBy: holder, sym: p.symbol, name: p.nazwa };
+  // `lineId` jedzie w odpowiedzi, bo bez niego brygadzista nie ma jak
+  // odebrać linii przed TTL — a 30 minut czekania na kolegę, który
+  // skończył zmianę, to czekanie na nic
+  if (holder) {
+    return { kind: "locked", code, lineId: line.id, lockedBy: holder, sym: p.symbol, name: p.nazwa };
+  }
 
   claimLine(line.id, user);
   touchDelivery(deliveryId);
@@ -330,6 +335,25 @@ export function releaseLine(lineId: number, user: string): { ok: true } {
     .prepare("UPDATE delivery_line SET locked_by=NULL, locked_at=NULL WHERE id=? AND locked_by=?")
     .run(lineId, user);
   return { ok: true };
+}
+
+/**
+ * Zdjęcie CUDZEGO locka przed wygaśnięciem TTL.
+ *
+ * Bez tego jedyną drogą jest odczekanie 30 minut — a najczęstsza przyczyna
+ * wiszącego locka to kolega, który skończył zmianę albo zgubił zasięg, więc
+ * czeka się na nic. Operacja jest jednak uprzywilejowana i zawsze zostawia
+ * ślad: to jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez jej
+ * wiedzy, więc audyt musi wiedzieć KOMU i przez KOGO.
+ */
+export function forceReleaseLine(lineId: number, user: string): { ok: true; odebrano: string | null } {
+  const row = db()
+    .prepare("SELECT locked_by, locked_at FROM delivery_line WHERE id=?")
+    .get(lineId) as { locked_by: string | null; locked_at: string | null } | undefined;
+  const holder = row ? freshLock(row.locked_by, row.locked_at) : null;
+  db().prepare("UPDATE delivery_line SET locked_by=NULL, locked_at=NULL WHERE id=?").run(lineId);
+  if (holder) logEvent("lock_forced", user, null, { lineId, odebrano: holder });
+  return { ok: true, odebrano: holder };
 }
 
 function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {

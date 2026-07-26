@@ -17,14 +17,6 @@ data class AppSettings(
     val dropLog: Boolean = true, // log upadków urządzenia do audytu
     val walkMode: Boolean = true, // nakładka NASTĘPNE po zatwierdzeniu wózka
     val batteryAssist: Boolean = true, // podpowiedź hot-swap przy niskiej baterii
-    /**
-     * Bezczynność, po której przypięty kontekst (regał / towar) przestaje
-     * obowiązywać. Parametr, nie stała: właściwa wartość zależy od tego, jak
-     * często ludzie są na hali przerywani — mierzy to zdarzenie `pin_expired`.
-     */
-    val pinTtlSec: Int = 240, // [WERYFIKUJ na hali: 3–5 min]
-    /** Wygaszony ekran / aplikacja w tle dłużej niż to = wygaśnięcie od razu. */
-    val pinAwaySec: Int = 60,
 ) {
     companion object {
         /** 10.0.2.2 = localhost hosta z emulatora; na kolektorze ustaw adres LAN. */
@@ -56,8 +48,6 @@ class SettingsRepository(context: Context) {
         dropLog = prefs.getBoolean("dropLog", true),
         walkMode = prefs.getBoolean("walkMode", true),
         batteryAssist = prefs.getBoolean("batteryAssist", true),
-        pinTtlSec = prefs.getInt("pinTtlSec", 240),
-        pinAwaySec = prefs.getInt("pinAwaySec", 60),
     )
 
     val current: AppSettings get() = _settings.value
@@ -70,8 +60,6 @@ class SettingsRepository(context: Context) {
             putBoolean("dropLog", next.dropLog)
             putBoolean("walkMode", next.walkMode)
             putBoolean("batteryAssist", next.batteryAssist)
-            putInt("pinTtlSec", next.pinTtlSec)
-            putInt("pinAwaySec", next.pinAwaySec)
         }
         _settings.value = next
     }

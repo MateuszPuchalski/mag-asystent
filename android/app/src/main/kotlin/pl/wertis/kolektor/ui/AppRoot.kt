@@ -15,10 +15,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.nav.Screen
-import pl.wertis.kolektor.core.pin.Pin
+import pl.wertis.kolektor.core.session.SessionState
+import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
-import pl.wertis.kolektor.ui.chrome.PinBar
 import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
@@ -36,23 +36,27 @@ import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.scan.globalScan
+import pl.wertis.kolektor.ui.session.HandoverDialog
+import pl.wertis.kolektor.ui.session.LockOverlay
 import pl.wertis.kolektor.ui.splash.SplashScreen
 
 @Composable
 fun AppRoot(graph: AppGraph) {
     val screen by graph.nav.screen.collectAsStateWithLifecycle()
-    val users by graph.users.users.collectAsStateWithLifecycle()
+    val stan by graph.session.state.collectAsStateWithLifecycle()
+    val pytanie by graph.session.pytanie.collectAsStateWithLifecycle()
     val queue by graph.queueRepo.queue.collectAsStateWithLifecycle()
     val toastMsg by graph.effects.toastMsg.collectAsStateWithLifecycle()
     val success by graph.effects.success.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
-    val pin by graph.pin.pin.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // Globalny fallback skanów. Wszystko idzie przez `/scan/:code`, także kod
-    // rozpoznany lokalnie jako lokalizacja — serwer jest właścicielem reguły
-    // i on rozstrzyga, a kontekst przyklejony działa wtedy w jednym miejscu.
+    // Globalny fallback skanów — łapie to, czego OTWARTY EKRAN nie przechwycił.
+    // Kolejność jest tu całą regułą kontekstu: karta towaru bierze skan półki
+    // dla siebie, a dopiero skan z ekranu, który się nim nie zainteresował,
+    // trafia tutaj. Wszystko idzie przez `/scan/:code`, także kod rozpoznany
+    // lokalnie jako lokalizacja — właścicielem reguły jest serwer.
     DisposableEffect(graph) {
         ScannerBus.setFallback { scan ->
             scope.launch { globalScan(graph, scan.code) }
@@ -65,7 +69,7 @@ fun AppRoot(graph: AppGraph) {
         graph.nav.goBack()
     }
 
-    if (screen == Screen.SPLASH) {
+    if (screen == Screen.SPLASH || stan is SessionState.Brak) {
         SplashScreen(graph)
         return
     }
@@ -74,19 +78,12 @@ fun AppRoot(graph: AppGraph) {
         TopBar(
             screen = screen,
             hasBack = graph.nav.backTargetOf(screen) != null,
-            user = users.current,
+            user = stan.osoba ?: "?",
             summary = queue?.summary,
             onBack = { graph.nav.goBack() },
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
         )
-        // przypięcie zapisuje dane bez pytania, więc wisi NAD wszystkim innym
-        pin?.let { p ->
-            when (p) {
-                is Pin.Loc -> PinBar(p.code, "skanuj towary — trafią na ten regał") { graph.pin.release() }
-                is Pin.Tow -> PinBar(p.sym, "skanuj regał — towar tam trafi") { graph.pin.release() }
-            }
-        }
         OfflineBanner(offlineCount) {
             scope.launch { graph.offlineQueue.flush() }
         }
@@ -111,6 +108,24 @@ fun AppRoot(graph: AppGraph) {
             }
             ToastOverlay(toastMsg)
             SuccessOverlay(success)
+            /* Blokada NIE zdejmuje ekranu spod spodu — otwarta dostawa ma być
+               widoczna, bo to ona jest dowodem, że nic nie zginęło. Skaner
+               działa dalej: badge to jedyny sposób na zdjęcie blokady. */
+            if (stan is SessionState.Zablokowana) {
+                LockOverlay(stan.osoba ?: "")
+            }
+            pytanie?.let { p ->
+                HandoverDialog(
+                    pytanie = p,
+                    kontekst = graph.nav.opisPracy(),
+                    onPotwierdz = {
+                        scope.launch {
+                            graph.session.przejmij(graph.nav.opisPracy())?.let { graph.effects.toast(it) }
+                        }
+                    },
+                    onOdrzuc = { graph.session.odrzucPrzejecie() },
+                )
+            }
         }
         TabBar(
             screen = screen,

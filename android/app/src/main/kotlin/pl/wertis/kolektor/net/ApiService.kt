@@ -2,6 +2,7 @@ package pl.wertis.kolektor.net
 
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import pl.wertis.kolektor.core.net.BadgeBody
 import pl.wertis.kolektor.core.net.CartBody
 import pl.wertis.kolektor.core.net.CartRemoveBody
 import pl.wertis.kolektor.core.net.CartResponse
@@ -12,7 +13,12 @@ import pl.wertis.kolektor.core.net.ConfirmResponse
 import pl.wertis.kolektor.core.net.CreateSessionBody
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.core.net.EanConflictsResponse
+import pl.wertis.kolektor.core.net.ForceReleaseBody
+import pl.wertis.kolektor.core.net.ForceReleaseResponse
+import pl.wertis.kolektor.core.net.HandoverBody
 import pl.wertis.kolektor.core.net.HistoryResponse
+import pl.wertis.kolektor.core.net.LoginResponse
+import pl.wertis.kolektor.core.net.MeResponse
 import pl.wertis.kolektor.core.net.LocationProductsResponse
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.OkResponse
@@ -38,6 +44,7 @@ import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.SearchResponse
 import pl.wertis.kolektor.core.net.SessionIdResponse
 import pl.wertis.kolektor.core.net.SetLocationBody
+import pl.wertis.kolektor.core.net.UnlockResponse
 import pl.wertis.kolektor.core.net.SkipBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -187,4 +194,32 @@ interface ApiService {
 
     @GET("api/ean-conflicts")
     suspend fun eanConflicts(): EanConflictsResponse
+
+    /* ── Tożsamość: badge zamiast wolnego tekstu (plan §7) ─────────────────
+       Token sesji dokleja `IdentityHeaderInterceptor`, więc trasy poniżej go
+       nie przyjmują — jedno miejsce, w którym żyje nagłówek.                */
+
+    @POST("api/auth/badge")
+    suspend fun authBadge(@Body body: BadgeBody): LoginResponse
+
+    @GET("api/auth/me")
+    suspend fun authMe(): MeResponse
+
+    @POST("api/auth/unlock")
+    suspend fun authUnlock(@Body body: BadgeBody): UnlockResponse
+
+    /** Wołane DOPIERO po potwierdzeniu przez człowieka — nigdy z samego skanu. */
+    @POST("api/auth/handover")
+    suspend fun authHandover(@Body body: HandoverBody): LoginResponse
+
+    @POST("api/auth/logout")
+    suspend fun authLogout(@Body body: RequestBody = EMPTY_BODY): OkResponse
+
+    /** Odebranie cudzej linii przed TTL — wymaga PIN-u, nie samego badge'a. */
+    @POST("api/delivery/{id}/lines/{lineId}/force-release")
+    suspend fun forceReleaseLine(
+        @Path("id") deliveryId: Long,
+        @Path("lineId") lineId: Long,
+        @Body body: ForceReleaseBody,
+    ): ForceReleaseResponse
 }

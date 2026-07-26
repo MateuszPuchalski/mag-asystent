@@ -297,12 +297,6 @@ data class DeviceEventBody(
     val type: String,
     val magnitude: Double? = null,
     val level: Double? = null,
-    /** `pin_expired`: dlaczego kontekst zniknął (ttl / away / user / manual). */
-    val reason: String? = null,
-    /** `pin_expired`: co było przypięte (`loc:A01-02-03` albo `tw:7`). */
-    val pinned: String? = null,
-    /** `pin_expired`: jak długo kontekst obowiązywał — mierzy, czy TTL pasuje. */
-    val heldMs: Long? = null,
     /** `scan_timing`: skan → odpowiedź, mierzone u człowieka (cel p95 < 150 ms). */
     val ms: Long? = null,
 )
@@ -456,6 +450,8 @@ sealed class ScanResolution {
     @Serializable @SerialName("locked")
     data class Locked(
         val code: String = "",
+        /** Do odebrania linii przed TTL (operacja na PIN, plan §7). */
+        val lineId: Long = 0,
         val lockedBy: String = "",
         val sym: String = "",
         val name: String = "",
@@ -563,3 +559,47 @@ data class EanConflictRow(
 
 @Serializable
 data class EanConflictsResponse(val conflicts: List<EanConflictRow> = emptyList())
+
+/* ── Tożsamość: badge, sesja urządzenia (plan §7) ─────────────────────────── */
+
+@Serializable
+data class BadgeBody(val badge: String)
+
+/** Przejęcie pracy — `kontekst` opisuje CO jest przejmowane, dla audytu. */
+@Serializable
+data class HandoverBody(val badge: String, val kontekst: String? = null)
+
+@Serializable
+data class UserDto(
+    val userId: Long = 0,
+    val badgeCode: String = "",
+    val name: String = "",
+    val role: String = "magazynier",
+    val active: Boolean = true,
+    val maPin: Boolean = false,
+)
+
+@Serializable
+data class LoginResponse(
+    val token: String = "",
+    val user: UserDto = UserDto(),
+    /** Po tylu minutach bezczynności sesja się BLOKUJE (nie: kończy). */
+    val blokadaMin: Int = 10,
+)
+
+@Serializable
+data class MeResponse(
+    val user: UserDto = UserDto(),
+    val zablokowana: Boolean = false,
+    val blokadaMin: Int = 10,
+)
+
+@Serializable
+data class UnlockResponse(val user: UserDto = UserDto(), val zablokowana: Boolean = false)
+
+/** Odebranie cudzej linii przed wygaśnięciem TTL — operacja na PIN. */
+@Serializable
+data class ForceReleaseBody(val pin: String)
+
+@Serializable
+data class ForceReleaseResponse(val ok: Boolean = true, val odebrano: String? = null)

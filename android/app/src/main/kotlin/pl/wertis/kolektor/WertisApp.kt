@@ -7,21 +7,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.net.DeviceEventBody
-import pl.wertis.kolektor.core.pin.PinGone
-import pl.wertis.kolektor.data.PinRepository
 import pl.wertis.kolektor.data.TelemetryRepository
 import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.data.RecentStore
+import pl.wertis.kolektor.data.SessionRepository
 import pl.wertis.kolektor.data.SettingsRepository
-import pl.wertis.kolektor.data.UsersRepository
 import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
 import pl.wertis.kolektor.device.Feedback
 import pl.wertis.kolektor.device.MotionMonitor
 import pl.wertis.kolektor.nav.AppNavState
 import pl.wertis.kolektor.net.ApiClient
+import pl.wertis.kolektor.net.ApiService
 import pl.wertis.kolektor.offline.ApiOpSender
 import pl.wertis.kolektor.offline.FileOpStorage
 import pl.wertis.kolektor.offline.wireOfflineFlush
@@ -36,15 +35,26 @@ class AppGraph(context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val settings = SettingsRepository(context)
-    val users = UsersRepository(context)
     val recent = RecentStore(context)
 
-    val apiClient = ApiClient(
-        currentUser = { users.currentUser },
+    /* Tożsamość rozstrzyga serwer na podstawie skanu badge'a (plan §7).
+       Repozytorium powstaje PRZED klientem HTTP, bo klient musi umieć doczytać
+       z niego token; `api` jedzie w drugą stronę jako lambda.
+
+       TYPY SĄ TU JAWNE I MUSZĄ TAKIE ZOSTAĆ. Zależność jest cykliczna
+       (session → api → apiClient → session) i wykonanie rozplątuje ją leniwie,
+       ale WNIOSKOWANIE typów tego nie potrafi: kompilator kończy na
+       „Type checking has run into a recursive problem". Adnotacja przecina
+       cykl, bo typ `api` jest znany bez zaglądania do `apiClient`. */
+    val session: SessionRepository = SessionRepository({ api }, appScope, context)
+
+    val apiClient: ApiClient = ApiClient(
+        currentUser = { session.currentUser },
+        sessionToken = { session.token },
         deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
     )
-    val api get() = apiClient.service
+    val api: ApiService get() = apiClient.service
 
     val connectivity = ConnectivityMonitor(context)
     val queueRepo = QueueRepository(api, appScope)
@@ -61,24 +71,6 @@ class AppGraph(context: Context) {
         isOnline = { connectivity.isOnline },
         onRejected = { _, msg -> effects.toast("Operacja z bufora odrzucona: $msg") },
     )
-
-    /**
-     * Kontekst przyklejony. Wygaśnięcie jest GŁOŚNE — pasek znika, idzie jedna
-     * długa wibracja i zdanie, co się stało. Ciche wygaśnięcie byłoby gorsze
-     * niż brak mechanizmu: następny skan wpadłby w kontekst, o którym człowiek
-     * myśli, że nadal obowiązuje.
-     */
-    val pin = PinRepository(api, appScope, settings) { e ->
-        feedback.pinLost()
-        effects.toast(
-            when (e.reason) {
-                PinGone.TTL -> "Kontekst wygasł po przerwie — zeskanuj ponownie"
-                PinGone.AWAY -> "Kolektor był odłożony — kontekst wyczyszczony"
-                PinGone.USER -> "Zmiana użytkownika — kontekst wyczyszczony"
-                PinGone.MANUAL -> "Kontekst zdjęty"
-            }
-        )
-    }
 
     val telemetry = TelemetryRepository(api, appScope)
 
@@ -114,9 +106,9 @@ class AppGraph(context: Context) {
         // pobrania skaner pracuje ostrożnie (tylko prefiks LOC:), więc pierwszy
         // skan po starcie nie może na nią czekać
         appScope.launch { locationsRepo.get() }
-        // cudzy regał nie jest moim regałem — jeden punkt wpięcia, żeby żadna
-        // ścieżka zmiany użytkownika tego nie pominęła
-        users.onUserChanged = { pin.onUserChanged() }
+        // blokada jest stanem serwera — pytamy o nią przy starcie, a nie
+        // liczymy drugiego zegara po stronie kolektora
+        session.refresh()
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }
