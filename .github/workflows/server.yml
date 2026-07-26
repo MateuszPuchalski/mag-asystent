@@ -1,0 +1,48 @@
+# Bramka dla serwera i dokumentacji. Do tej pory jedynym workflow był Android
+# z `paths: ["android/**"]`, więc 135 testów serwera, kontrola typów i spójność
+# dokumentacji nie bramkowały niczego — przechodziły tylko wtedy, gdy ktoś
+# uruchomił je u siebie.
+name: Serwer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "tools/**"
+      - "package.json"
+      - "README.md"
+      - "android/README.md"
+      - ".github/workflows/server.yml"
+  pull_request:
+    paths:
+      - "server/**"
+      - "tools/**"
+      - "package.json"
+      - "README.md"
+      - "android/README.md"
+      - ".github/workflows/server.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      # repo jest npm workspace (`workspaces: ["server"]`), więc lockfile
+      # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć
+      - name: Instalacja zależności
+        run: npm ci
+      - name: Kontrola typów
+        working-directory: server
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Testy jednostkowe
+        working-directory: server
+        run: npm test
+      # docs_check pilnuje, żeby liczby w README (ekrany, trasy, testy) nie
+      # rozjechały się z kodem — bez tego dokumentacja starzeje się po cichu.
+      - name: Spójność dokumentacji
+        run: python3 tools/docs_check.py

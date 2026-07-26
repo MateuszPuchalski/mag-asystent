@@ -122,11 +122,24 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
     reczne: number;
   }>;
 
-  const czasy = d.prepare(
-    `SELECT created_at FROM events
-      WHERE user_ref = ? AND created_at >= datetime('now', ?)
-        AND type IN (${PRACA.map(() => "?").join(",")})`
-  );
+  /* Znaczniki czasu JEDNYM zapytaniem dla wszystkich osób naraz, nie po jednym
+     na wiersz. Przy dziesięciu osobach różnica jest nieistotna, ale wzorzec
+     „zapytanie w pętli" rośnie razem z zatrudnieniem, a tutaj kosztuje jeden
+     `GROUP BY` po stronie kodu. */
+  const znacznikiPer = new Map<number, number[]>();
+  for (const r of d
+    .prepare(
+      `SELECT user_ref AS ref, created_at FROM events
+        WHERE user_ref IS NOT NULL AND created_at >= datetime('now', ?)
+          AND type IN (${PRACA.map(() => "?").join(",")})`
+    )
+    .all(od, ...PRACA) as Array<{ ref: number; created_at: string }>) {
+    const t = Date.parse(r.created_at);
+    if (Number.isNaN(t)) continue;
+    const lista = znacznikiPer.get(r.ref);
+    if (lista) lista.push(t);
+    else znacznikiPer.set(r.ref, [t]);
+  }
 
   const nieprzypisanych = (
     d
@@ -142,10 +155,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
     progWiarygodnosci: PROG_WIARYGODNOSCI,
     nieprzypisanychZdarzen: nieprzypisanych,
     wiersze: wiersze.map((r) => {
-      const znaczniki = (czasy.all(r.userId, od, ...PRACA) as Array<{ created_at: string }>)
-        .map((x) => Date.parse(x.created_at))
-        .filter((t) => !Number.isNaN(t));
-      const minuty = czasAktywny(znaczniki);
+      const minuty = czasAktywny(znacznikiPer.get(r.userId) ?? []);
       const wiarygodne = r.pozycje >= PROG_WIARYGODNOSCI && minuty > 0;
       return {
         userId: r.userId,

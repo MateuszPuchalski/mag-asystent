@@ -26,6 +26,16 @@ data class PendingOp(
     val at: Long,
     /** Autor z chwili zbuforowania — flush może nastąpić po zmianie użytkownika. */
     val user: String,
+    /**
+     * KONTO autora z chwili zbuforowania.
+     *
+     * Sama nazwa nie wystarcza: serwer rozstrzyga tożsamość z tokenu sesji,
+     * a token przy wysyłce należy już do osoby, która akurat trzyma kolektor.
+     * Bez tego pola dwanaście pozycji odłożonych przez Jana poza zasięgiem
+     * dostałoby w audycie nazwisko Piotra, który przejął pracę, zanim wróciło
+     * Wi-Fi. `null` dla operacji zbuforowanych przed wprowadzeniem kont.
+     */
+    val userRef: Long? = null,
 ) {
     @Serializable
     enum class OpKind { SET_LOCATION }
@@ -87,8 +97,13 @@ class OfflineQueue(
         user: String,
         productId: Long? = null,
         setLocation: SetLocationBody? = null,
+        /** Konto autora — patrz `PendingOp.userRef`. Na końcu, żeby nie ruszać
+            wywołań pozycyjnych. */
+        userRef: Long? = null,
     ): RunResult {
-        val op = PendingOp(nextId(), kind, productId, setLocation, at = now(), user = user)
+        val op = PendingOp(
+            nextId(), kind, productId, setLocation, at = now(), user = user, userRef = userRef,
+        )
         if (isOnline()) {
             try {
                 return RunResult(offline = false, queueId = sender.send(op))

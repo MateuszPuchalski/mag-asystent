@@ -139,9 +139,17 @@ export function setActive(userId: number, active: boolean): void {
   db().prepare("UPDATE app_user SET active = ? WHERE user_id = ?").run(active ? 1 : 0, userId);
 }
 
-/** Czy rola wymaga PIN-u przy operacjach uprzywilejowanych. */
-export function rolaUprzywilejowana(u: Uzytkownik): boolean {
-  return u.role === "brygadzista" || u.role === "biuro";
+/**
+ * Czy w bazie nie ma jeszcze ŻADNEGO konta.
+ *
+ * Jedyny moment, w którym wolno założyć konto bez sesji biura — inaczej
+ * pierwszego konta nie dałoby się utworzyć niczym. Ta furtka zamyka się sama
+ * w chwili, gdy powstanie pierwszy wiersz, i dlatego pierwsze konto MUSI być
+ * kontem biura z PIN-em: gdyby było magazynierem, nikt nie mógłby założyć
+ * kolejnych i trzeba by ruszać bazę ręcznie.
+ */
+export function brakKont(): boolean {
+  return (db().prepare("SELECT COUNT(*) n FROM app_user").get() as { n: number }).n === 0;
 }
 
 /* ── Migracja historii ──────────────────────────────────────────────────────

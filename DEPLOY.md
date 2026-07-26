@@ -188,22 +188,45 @@ Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](a
 Bez kont kolektor nie ma czym podpisać operacji: ekran startowy prosi o skan
 badge'a i nie przepuszcza dalej.
 
-**1. Załóż konta** (raz, z dowolnej maszyny w LAN — numer badge'a nadaje
-serwer, żeby był unikalny w całej firmie i miał poprawną cyfrę kontrolną):
+**1. Załóż PIERWSZE konto — biura, z PIN-em.** Dopóki tabela kont jest pusta,
+ta jedna trasa działa bez sesji; w chwili powstania pierwszego wiersza furtka
+zamyka się sama i wszystko dalej wymaga zalogowanego biura z PIN-em.
 
 ```bash
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H 'content-type: application/json' \
-  -d '{"name":"Jan Kowalski"}'
-# → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"magazynier",...}}
-
-# brygadzista — rola uprzywilejowana WYMAGA PIN-u
-curl -X POST http://<IP-serwera>:3001/api/users \
-  -H 'content-type: application/json' \
-  -d '{"name":"Adam Nowak","role":"brygadzista","pin":"4821"}'
-
-curl http://<IP-serwera>:3001/api/users        # lista z kodami do wydruku
+  -d '{"name":"Biuro Zakupy","pin":"4821"}'
+# → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"biuro","maPin":true}}
 ```
+
+Rola i PIN są tu wymuszone: to konto jest jedyną drogą do wszystkich
+następnych, więc konto magazyniera bez PIN-u zablokowałoby całą administrację
+i trzeba by ruszać bazę ręcznie.
+
+**1b. Zaloguj biuro i załóż resztę kont.** Każda zmiana wymaga sesji biura
+(nagłówek `x-session`) ORAZ PIN-u w polu `pinAutora` — badge'e bywają
+pożyczane, a te trasy tworzą tożsamość.
+
+```bash
+TOKEN=$(curl -s -X POST http://<IP-serwera>:3001/api/auth/badge \
+  -H 'content-type: application/json' \
+  -d '{"badge":"PRC-0001-9"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+
+curl -X POST http://<IP-serwera>:3001/api/users \
+  -H "x-session: $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"Jan Kowalski","pinAutora":"4821"}'
+
+# brygadzista — rola uprzywilejowana WYMAGA własnego PIN-u
+curl -X POST http://<IP-serwera>:3001/api/users \
+  -H "x-session: $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"Adam Nowak","role":"brygadzista","pin":"7315","pinAutora":"4821"}'
+
+curl http://<IP-serwera>:3001/api/users -H "x-session: $TOKEN"   # lista do wydruku
+```
+
+**Lista kont jest dostępna tylko dla biura** i to nie jest przesada: zwraca
+`badgeCode` każdej osoby, a logowanie to sam skan badge'a. Wystawiona hali
+byłaby listą tożsamości do przepisania na własną plakietkę.
 
 **2. Wydrukuj plakietki.** Na plakietce ma być **kod kreskowy z `badgeCode`**
 (Code 128 — ten sam symbol, co etykiety regałów) i pod nim ten sam kod tekstem,
@@ -218,13 +241,15 @@ scala warianty tej samej osoby (`Jan`, `jan`, `Jan K`) w jedno konto i wypełnia
 snapshot, a zdarzenia niedopasowane zostają z `user_ref = NULL`.
 
 ```bash
-curl -X POST http://<IP-serwera>:3001/api/users/migrate-history
+curl -X POST http://<IP-serwera>:3001/api/users/migrate-history \
+  -H "x-session: $TOKEN" -H 'content-type: application/json' \
+  -d '{"pinAutora":"4821"}'
 # → {"zalozonychKont":4,"przypisanychZdarzen":1281,"nieprzypisanych":37,"nazwy":[...]}
 ```
 
 Po migracji przejrzyj `nazwy` — wpisy w rodzaju „magazynier" albo „test"
-wyłącz przez `POST /api/users/:id/active` z `{"active":false}`. Konta się
-**nie kasuje**: historia w `events` musi mieć na co wskazywać.
+wyłącz przez `POST /api/users/:id/active` z `{"active":false,"pinAutora":"4821"}`.
+Konta się **nie kasuje**: historia w `events` musi mieć na co wskazywać.
 
 **4. Raport wydajności (`GET /api/wydajnosc?days=7`) — obowiązek formalny
 PRZED uruchomieniem.** Telemetria per pracownik to **monitoring pracowniczy**

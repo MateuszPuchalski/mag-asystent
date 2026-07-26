@@ -5,6 +5,7 @@ import pl.wertis.kolektor.core.loc.isKnownLoc
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.offline.PendingOp
+import pl.wertis.kolektor.core.session.userId
 
 /* ── Zapis lokalizacji towaru — jedno miejsce dla karty towaru i ekranu skanu ──
    Semantyka offline (bufor) i potwierdzenie muszą być identyczne na obu
@@ -30,6 +31,9 @@ suspend fun saveLocation(
     val res = graph.offlineQueue.runOrBuffer(
         kind = PendingOp.OpKind.SET_LOCATION,
         user = graph.session.currentUser,
+        // konto autora wędruje z operacją, żeby flush po zmianie zmiany
+        // nie podpisał jej cudzym nazwiskiem
+        userRef = graph.session.state.value.userId,
         productId = productId,
         setLocation = SetLocationBody(choice.action, value = choice.value, replaced = choice.replaced),
     )

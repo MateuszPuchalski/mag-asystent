@@ -2,6 +2,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { makeSferaAdapter } from "../adapters/index.js";
 import type { MmItem } from "../adapters/sfera.js";
+import { cofnijFlage } from "../services/delivery-flag.js";
 
 /**
  * Worker Sfery (spec §9). Jeden proces, pętla poll, przetwarzanie sekwencyjne
@@ -66,6 +67,12 @@ function fail(task: Task, msg: string) {
     db()
       .prepare("UPDATE sfera_queue SET status='error', attempts=?, error_msg=?, processed_at=? WHERE id=?")
       .run(attempts, msg, nowIso(), task.id);
+    // Zadanie flagi, które ostatecznie nie poszło, MUSI cofnąć `flaga_wyslana`
+    // — inaczej dedupe w `syncFlag` nigdy go nie ponowi i faktura zostanie
+    // nieoznaczona bez śladu.
+    if (task.type === "set_doc_flag" && task.source_doc_id != null) {
+      cofnijFlage(task.source_doc_id, `zadanie #${task.id} zakończone błędem`);
+    }
     console.log(`[worker] #${task.id} ERROR (wyczerpano próby): ${msg}`);
   }
 }

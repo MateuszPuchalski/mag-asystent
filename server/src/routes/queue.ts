@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/db.js";
+import { cofnijFlage } from "../services/delivery-flag.js";
 
 interface QueueRow {
   id: number;
@@ -57,15 +58,22 @@ export async function queueRoutes(app: FastifyInstance) {
   // anulowanie zadania oczekującego (pomyłka przy skanie) — tylko zanim worker je weźmie
   app.post<{ Params: { id: string } }>("/api/queue/:id/cancel", async (req, reply) => {
     const id = Number(req.params.id);
-    const r = db().prepare("SELECT status FROM sfera_queue WHERE id = ?").get(id) as
-      | { status: string }
-      | undefined;
+    const r = db()
+      .prepare("SELECT status, type, source_doc_id FROM sfera_queue WHERE id = ?")
+      .get(id) as { status: string; type: string; source_doc_id: number | null } | undefined;
     if (!r) return reply.code(404).send({ error: "Brak zadania" });
     if (r.status !== "pending")
       return reply.code(409).send({ error: "Można anulować tylko zadanie oczekujące (nie w trakcie zapisu)" });
     db()
       .prepare("UPDATE sfera_queue SET status='cancelled', processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?")
       .run(id);
+    // Anulowane zadanie flagi zostawiłoby `flaga_wyslana` mówiące nieprawdę,
+    // a rekoncyliacja szuka tylko zadań w stanie `error` — czyli tego jednego
+    // kliknięcia by nie zobaczyła. Cofamy zapis, żeby `syncFlag` policzył
+    // stan od nowa.
+    if (r.type === "set_doc_flag" && r.source_doc_id != null) {
+      cofnijFlage(r.source_doc_id, `zadanie #${id} anulowane`);
+    }
     return { ok: true };
   });
 }
