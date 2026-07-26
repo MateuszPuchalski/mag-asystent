@@ -199,48 +199,75 @@ SELECT dok_Id, dok_NrPelny, dok_Typ, dok_Status FROM dok__Dokument ORDER BY dok_
 
 ## 4. Konfiguracja i uruchomienie aplikacji
 
-Na maszynie z Subiektem (PowerShell, w katalogu repo):
+Na maszynie z Subiektem, w katalogu repo (Git Bash albo WSL):
 
-```powershell
+```bash
 npm ci
 npm run build
+```
 
-# połączenie (instancja nazwana; przy stałym porcie zamiast MSSQL_INSTANCE
+Ustawienia idą do **jednego pliku dla obu procesów** — API i worker mają osobne
+środowiska, a rozjazd między nimi kończy się cichym gubieniem zapisów:
+
+```bash
+cp wertis.env.example wertis.env
+nano wertis.env
+```
+
+```bash
+# wertis.env — połączenie (przy stałym porcie zamiast MSSQL_INSTANCE
 # ustaw MSSQL_PORT=1433)
-$env:SGT_MODE        = "mssql"
-$env:MSSQL_SERVER    = "localhost"
-$env:MSSQL_INSTANCE  = "INSERTGT"
-$env:MSSQL_DATABASE  = "NAZWA_BAZY"
-$env:MSSQL_USER      = "wertis"
-$env:MSSQL_PASSWORD  = "silne-haslo"
+export SGT_MODE=mssql
+export MSSQL_SERVER=localhost
+export MSSQL_INSTANCE=INSERTGT
+export MSSQL_DATABASE=NAZWA_BAZY
+export MSSQL_USER=wertis
+export MSSQL_PASSWORD=silne-haslo
 
-# wartości z checklisty [WERYFIKUJ]:
-$env:MSSQL_LOC_COLUMN  = "tw_Pole1"   # pole dodatkowe wybrane w §1a
-$env:MAG_ID_MAG      = "1"    # z checklisty (a)
-$env:MAG_ID_MGP      = "2"
-$env:MAG_ID_ZWROTY   = "3"
-$env:MSSQL_FLAG_GRUPA       = "1"   # z checklisty (b)
-$env:MSSQL_FLAG_TYP_OBIEKTU = "1"
-$env:DOC_FLAG_IN_PROGRESS_SGT = "…" # flg_Id czterech flag
-$env:DOC_FLAG_PAUSED_SGT      = "…"
-$env:DOC_FLAG_DONE_SGT        = "…"
-$env:DOC_FLAG_DONE_ERRORS_SGT = "…"
+# wartości z checklisty §3:
+export MSSQL_LOC_COLUMN=tw_Pole1      # pole dodatkowe wybrane w §1a
+export MAG_ID_MAG=1                   # z checklisty (a)
+export MAG_ID_MGP=2
+export MAG_ID_ZWROTY=3
+export MSSQL_FLAG_GRUPA=1             # z checklisty (b)
+export MSSQL_FLAG_TYP_OBIEKTU=1
+export DOC_FLAG_IN_PROGRESS_SGT=…     # flg_Id czterech flag
+export DOC_FLAG_PAUSED_SGT=…
+export DOC_FLAG_DONE_SGT=…
+export DOC_FLAG_DONE_ERRORS_SGT=…
 # DOK_TYP_* i MSSQL_BUFFER_EXPR mają poprawne domyślne (ze struktury InsERT) —
 # ustawiaj je tylko, jeśli Twoja baza odbiega od standardu
+```
 
-# API (importuje przy starcie i odświeża co MSSQL_SYNC_MS, domyślnie 60 s;
-# liczby zaimportowanych wierszy widać w logu i w GET /api/health):
-node server\dist\index.js
-# w drugim oknie (z tymi samymi $env:) worker zapisu:
-node server\dist\worker\worker.js
+Uruchomienie — **oba okna z tego samego pliku**:
+
+```bash
+# okno 1: API (importuje przy starcie i odświeża co MSSQL_SYNC_MS, domyślnie
+# 60 s; liczby zaimportowanych wierszy widać w logu i w GET /api/health)
+source wertis.env && npm start
+
+# okno 2: worker zapisu
+source wertis.env && npm -w server run start:worker
 ```
 
 Przeglądarka / kolektor: `http://localhost:3001`.
-Kontrola: `http://localhost:3001/api/health` →
-`{ ok: true, mode: "mssql", sferaMode: "sql", lastSync: { towary: …, … } }`.
+
+**Najpierw sprawdź, czy w ogóle rozmawiasz z Subiektem:**
+
+```bash
+curl -s http://localhost:3001/api/health
+# {"ok":true,"mode":"mssql","sferaMode":"sql","lastSync":{"towary":…,"at":"…"}}
+```
+
+`"mode":"seeded"` znaczy, że `SGT_MODE` nie doszło do procesu i pracujesz na
+danych demo z `magmat.xlsx` — Subiekt nie jest wtedy ani odczytywany, ani
+zapisywany, mimo że wszystko wygląda normalnie.
 
 Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
-`POST http://localhost:3001/api/admin/resync`.
+
+```bash
+curl -s -X POST http://localhost:3001/api/admin/resync
+```
 
 ## 5. Test end-to-end
 
@@ -251,7 +278,15 @@ Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
    towaru → Pola dodatkowe) lub w SSMS:
    `SELECT tw_Pole1 FROM tw__Towar WHERE tw_Id = …` (nazwa pola jak w
    `MSSQL_LOC_COLUMN`).
-3. **MM (oczekiwany błąd):** zatwierdź MM/wózek — zadanie po 3 próbach
+
+   Jeśli w aplikacji zmiana widać, a w Subiekcie nie — najpierw sprawdź
+   `curl -s http://localhost:3001/api/health`. `"mode":"seeded"` w którymkolwiek
+   z procesów oznacza, że zapis poszedł do lokalnej bazy aplikacji, a zadanie
+   i tak zakończyło się statusem `done`.
+
+3. **Usunięcie lokalizacji:** wyczyść lokalizację i sprawdź to samo — pusta
+   wartość to osobna ścieżka zapisu i warto ją przejść świadomie.
+4. **MM (oczekiwany błąd):** zatwierdź MM/wózek — zadanie po 3 próbach
    dostanie `error` z komunikatem „Dokument MM wymaga Sfery…". To poprawne
    zachowanie na edu.
 

@@ -25,60 +25,109 @@ Maszyna z Subiektem GT (Windows)
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,
 - [Node.js LTS 22](https://nodejs.org) (`node -v` ≥ 22),
-- [Git](https://git-scm.com) (albo kopia repo z pendrive'a),
+- [Git](https://git-scm.com) — instalator daje też **Git Bash**, w którym
+  wykonuje się polecenia z tej instrukcji (albo WSL, jeśli wolisz),
 - [NSSM](https://nssm.cc) do rejestracji usług (pojedynczy `nssm.exe`),
 - stały adres maszyny w LAN (rezerwacja DHCP).
 
+> Wszystkie polecenia niżej są w **bashu** (Git Bash). Ścieżki windowsowe
+> zapisuje się w nim jako `/c/wertis`; tam, gdzie narzędzie Windows wymaga
+> `C:\...` (NSSM), ścieżka jest w apostrofach, żeby bash nie zjadł ukośników.
+
 ## 2. Instalacja aplikacji
 
-```powershell
-cd C:\
+```bash
+cd /c
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis
-cd C:\wertis
+cd /c/wertis
 npm ci
-npm run build      # server -> server\dist (frontend bez builda: web\public serwowane wprost)
-npm run seed       # pierwszy start: zasila SQLite danymi (tryb seeded)
+npm run build      # server → server/dist (frontend bez builda: web/public serwowane wprost)
+npm run seed       # zasila SQLite danymi demo (tryb seeded)
 ```
 
 Szybki test ręczny (przed rejestracją usług):
 
-```powershell
-node server\dist\index.js          # w drugim oknie: node server\dist\worker\worker.js
+```bash
+npm start                              # API
+npm -w server run start:worker         # worker, w drugim oknie
 # przeglądarka: http://localhost:3001/lookup  → podgląd magazynu powinien działać
 ```
 
+> ⚠️ **To jest tryb DEMO, nie Subiekt.** Bez `SGT_MODE=mssql` aplikacja czyta
+> i zapisuje wyłącznie własną bazę SQLite zasiloną z `magmat.xlsx` — Subiekt nie
+> jest ani odczytywany, ani zapisywany. Wszystko działa i wygląda normalnie,
+> więc łatwo to przeoczyć: zmiana lokalizacji „się uda", a w Subiekcie nic się
+> nie zmieni. Połączenie z prawdziwą bazą włącza **Etap 1 w §6**.
+
+## 2a. Plik ustawień (`wertis.env`)
+
+API i worker to **osobne procesy z osobnym środowiskiem**. Gdy tylko jeden
+dostanie `SGT_MODE=mssql`, zapisy po cichu wylądują w lokalnej bazie zamiast
+w Subiekcie — i mimo to zgłoszą sukces. Dlatego jeden plik dla obu:
+
+```bash
+cd /c/wertis
+cp wertis.env.example wertis.env
+nano wertis.env            # uzupełnij MSSQL_* i magazyny (§6 Etap 1)
+
+source wertis.env && npm start                            # okno 1: API
+source wertis.env && npm -w server run start:worker       # okno 2: worker
+```
+
+`wertis.env` jest w `.gitignore` (trzyma hasło). Sprawdzenie, że oba procesy
+faktycznie widzą Subiekta:
+
+```bash
+curl -s http://localhost:3001/api/health
+# → {"ok":true,"mode":"mssql","sferaMode":"sql","lastSync":{...}}
+```
+
+`"mode":"seeded"` znaczy, że pracujesz na danych demo.
+
 ## 3. Rejestracja usług Windows (NSSM)
 
-```powershell
+NSSM to narzędzie Windows, ale uruchamia się je z Git Basha tak samo jak
+z wiersza poleceń. Ścieżki `C:\...` w apostrofach — bash nie tknie wtedy
+ukośników:
+
+```bash
+mkdir -p /c/wertis/logs
+
 # API (serwuje też frontend)
-nssm install wertis-api "C:\Program Files\nodejs\node.exe" "C:\wertis\server\dist\index.js"
-nssm set wertis-api AppDirectory C:\wertis
-nssm set wertis-api AppStdout C:\wertis\logs\api.log
-nssm set wertis-api AppStderr C:\wertis\logs\api.err.log
+nssm install wertis-api 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\index.js'
+nssm set wertis-api AppDirectory 'C:\wertis'
+nssm set wertis-api AppStdout 'C:\wertis\logs\api.log'
+nssm set wertis-api AppStderr 'C:\wertis\logs\api.err.log'
 nssm set wertis-api AppRotateFiles 1
 nssm set wertis-api AppRotateBytes 10485760
 nssm set wertis-api Start SERVICE_AUTO_START
 nssm set wertis-api AppExit Default Restart
 
 # Worker Sfery
-nssm install wertis-worker "C:\Program Files\nodejs\node.exe" "C:\wertis\server\dist\worker\worker.js"
-nssm set wertis-worker AppDirectory C:\wertis
-nssm set wertis-worker AppStdout C:\wertis\logs\worker.log
-nssm set wertis-worker AppStderr C:\wertis\logs\worker.err.log
+nssm install wertis-worker 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\worker\worker.js'
+nssm set wertis-worker AppDirectory 'C:\wertis'
+nssm set wertis-worker AppStdout 'C:\wertis\logs\worker.log'
+nssm set wertis-worker AppStderr 'C:\wertis\logs\worker.err.log'
 nssm set wertis-worker AppRotateFiles 1
 nssm set wertis-worker Start SERVICE_AUTO_START
 nssm set wertis-worker AppExit Default Restart
 
-mkdir C:\wertis\logs
 nssm start wertis-api
 nssm start wertis-worker
 ```
 
-Zmienne środowiskowe usług (gdy trzeba, np. przejście na MSSQL):
+**Zmienne środowiskowe usług.** Usługa nie czyta `wertis.env` — NSSM podaje
+środowisko sam. Wartości muszą być **identyczne dla obu usług**; różnica
+oznacza ciche gubienie zapisów:
 
-```powershell
-nssm set wertis-api AppEnvironmentExtra SGT_MODE=mssql PORT=3001
-nssm set wertis-worker AppEnvironmentExtra SGT_MODE=mssql
+```bash
+ENV_WERTIS="SGT_MODE=mssql MSSQL_SERVER=localhost MSSQL_INSTANCE=INSERTGT \
+MSSQL_DATABASE=NAZWA_BAZY MSSQL_USER=wertis MSSQL_PASSWORD=silne-haslo \
+MSSQL_LOC_COLUMN=tw_Pole1 MAG_ID_MAG=1 MAG_ID_MGP=2 MAG_ID_ZWROTY=3"
+
+nssm set wertis-api    AppEnvironmentExtra $ENV_WERTIS PORT=3001
+nssm set wertis-worker AppEnvironmentExtra $ENV_WERTIS
+nssm restart wertis-api ; nssm restart wertis-worker
 ```
 
 > **Uwaga:** worker Sfery musi działać na TEJ maszynie (COM Sfery jest lokalny)
@@ -92,7 +141,7 @@ nssm set wertis-worker AppEnvironmentExtra SGT_MODE=mssql
    Bez własnego DNS: wpis w plikach hosts kolektorów albo używanie samego IP.
 3. **Zapora Windows** — wpuść port 3001 tylko z sieci LAN:
 
-```powershell
+```bash
 netsh advfirewall firewall add rule name="WERTIS kolektor" dir=in action=allow protocol=TCP localport=3001 remoteip=localsubnet
 ```
 
@@ -211,11 +260,21 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
      Dokumenty zwrotów flagują się tym samym mechanizmem (to ten sam typ
      obiektu), więc nie wymagają osobnej konfiguracji.
 
-3. Ustaw env połączenia `MSSQL_*` (patrz `docs/subiekt-gt-edu-setup.md` §4);
-   importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
+3. Wpisz wartości do `wertis.env` (§2a) — jeden plik dla API i workera.
+   Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.
-4. `nssm set wertis-api AppEnvironmentExtra SGT_MODE=mssql MSSQL_SERVER=… …`
-   + restart.
+4. Uruchom oba procesy z tego pliku, a przy pracy na usługach — przenieś te
+   same wartości do `AppEnvironmentExtra` **obu** usług (§3):
+
+   ```bash
+   source wertis.env && npm start                          # okno 1
+   source wertis.env && npm -w server run start:worker     # okno 2
+
+   curl -s http://localhost:3001/api/health   # ma pokazać "mode":"mssql"
+   ```
+
+   Dopóki `/api/health` mówi `"mode":"seeded"`, pracujesz na danych demo
+   i **nic nie trafia do Subiekta**.
 
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` i `set_doc_flag` bezpośrednim UPDATE dwóch kolumn
@@ -242,8 +301,8 @@ szansę sprzedaży, a nie błędny stan.
 
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 
-  ```powershell
-  Copy-Item C:\wertis\server\data\wertis.db "D:\backup\wertis-$(Get-Date -Format yyyyMMdd).db"
+  ```bash
+  cp /c/wertis/server/data/wertis.db "/d/backup/wertis-$(date +%Y%m%d).db"
   ```
 
   Plik trzyma postęp rozkładania dostaw i zwrotów (łącznie z tym, który koszyk
@@ -253,8 +312,8 @@ szansę sprzedaży, a nie błędny stan.
   nie da się odtworzyć z Subiekta ani z seedu (dowód do reklamacji u dostawcy),
   więc kopiuj ten katalog razem z bazą:
 
-  ```powershell
-  Copy-Item C:\wertis\server\data\photos "D:\backup\photos-$(Get-Date -Format yyyyMMdd)" -Recurse
+  ```bash
+  cp -r /c/wertis/server/data/photos "/d/backup/photos-$(date +%Y%m%d)"
   ```
 
   Kolektor skaluje kadr do 1280 px / JPEG 70 (~200 KB), więc katalog rośnie
@@ -263,8 +322,8 @@ szansę sprzedaży, a nie błędny stan.
   też na kolektorze (czerwona pastylka + PONÓW).
 - **Aktualizacja aplikacji:**
 
-  ```powershell
-  cd C:\wertis
+  ```bash
+  cd /c/wertis
   git pull
   npm ci
   npm run build
