@@ -341,6 +341,31 @@ szansę sprzedaży, a nie błędny stan.
   codziennie przestaje być czytany po tygodniu. Rozjazdy → CSV z datą w nazwie,
   w katalogu `reconcile/` obok bazy, i **kod wyjścia 2** do podpięcia pod alert.
   Podgląd na żądanie: `GET /api/reconcile`.
+- **Raport przeslotowania — 1–2× w roku, przed sezonem.** Nie jest to funkcja
+  aplikacji ani zadanie cykliczne; uruchamia się go ręcznie, gdy jest czas na
+  przestawianie towaru.
+
+  ```bash
+  cd /c/wertis && source wertis.env && npm run reslot
+  ```
+
+  Czyta bazę Subiekta **wyłącznie do odczytu** i wypisuje CSV z czterema
+  listami. Liczy **pion, nie odległość**: przy 342 m² przejście róg–róg to ~20 s,
+  a pobranie z podłogi albo z drabiny 10–25 s wobec ~3 s ze strefy złotej.
+
+  **Kolejność ma znaczenie i jest w nagłówku pliku:** najpierw eksmisja martwych
+  indeksów ze strefy złotej (daje ~80% korzyści i jest bezpieczna — przenosisz
+  towar, którego nikt nie ruszał), dopiero potem awanse, bo te wymagają
+  zwolnionych miejsc.
+
+  Skrypt **odmawia wypisania list 1–3, gdy nie widzi historii pobrań** — bez niej
+  każdy indeks wygląda na martwy i raport kazałby opróżnić całą strefę złotą.
+  Jeśli tak się stanie, sprawdź `dok_Typ` dokumentów WZ i zakres dat.
+
+  Poziomy strefy złotej są per zakres regałów w
+  `server/src/services/strefa-zlota.ts` — regały bez reguły trafiają na osobną,
+  czwartą listę, zamiast po cichu wpaść do złego kubełka.
+
 - **Aktualizacja aplikacji:**
 
   ```bash

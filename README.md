@@ -291,6 +291,21 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
   oraz uprzedzenia ludzi przed uruchomieniem. Techniczny audyt „kto zmienił
   lokalizację" to co innego i zostaje.
 
+**Raport przeslotowania — mierzy pion, nie odległość**
+- `npm run reslot` (1–2× w roku, przed sezonem) czyta Subiekta read-only i daje
+  cztery listy do wydruku, posortowane **po lokalizacji**, żeby chodzić alejką
+  raz. Nie jest to funkcja aplikacji — człowiek z wydrukiem robi to w dzień.
+- **Pobrania liczone jako wystąpienia pozycji na WZ, nie suma ilości.** Indeks
+  wydany 400× po sztuce generuje wielokrotnie więcej pracy niż wydany 4× po
+  100 szt.; mylenie tych dwóch liczb to najczęstszy błąd domowych analiz ABC.
+- Strefa złota jest **per zakres regałów** (`A,B,H,J` → poziomy 2-3-4, `F` → 4 i 8,
+  `E03–E04` → tylko 2…), bo ten sam numer poziomu to inna wysokość w różnej
+  geometrii regału. Regał bez reguły trafia na **czwartą listę**, nie do kosza
+  „poza strefą" — inaczej jego martwy towar zniknąłby z oczu.
+- **Bez historii pobrań skrypt odmawia wypisania list 1–3.** Każdy indeks
+  wyglądałby wtedy na martwy, a raport kazałby opróżnić całą strefę złotą —
+  i wyglądałby przy tym jak zlecenie robocze, nie jak awaria.
+
 **Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
 - Aplikacja pisze do Subiekta przez kolejkę, ale nikt nie sprawdzał, **czy stan
   po stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała**.

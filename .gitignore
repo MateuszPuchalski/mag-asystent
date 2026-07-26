@@ -16,6 +16,7 @@ server/data/*.db-*
 server/data/photos/
 # raporty rekoncyliacji — dane operacyjne, nie kod
 server/data/reconcile/
+server/data/reslot/
 *.sqlite
 *.sqlite-*
 

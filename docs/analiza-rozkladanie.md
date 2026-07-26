@@ -138,6 +138,12 @@ rozjeździe półek; odporność na dziury Wi-Fi daje trwały bufor offline (Roo
 
 ## 5. Backlog — co nadal boli
 
+> **Przeslotowanie ma już narzędzie.** `npm run reslot` (opis w README i DEPLOY §7)
+> liczy pion, nie odległość: przy 342 m² przejście róg–róg to ~20 s, a pobranie
+> z drabiny albo z podłogi 10–25 s wobec ~3 s ze strefy złotej. Klasyczny
+> argument za slottingiem ABC „po alejkach" tu się nie broni liczbowo.
+
+
 1. **Podpowiedzi dla BRAK LOK.** Towar bez lokalizacji wymaga znalezienia
    miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru albo
    lokalizacje towarów o podobnym symbolu — zamiast zostawiać człowieka z pustą

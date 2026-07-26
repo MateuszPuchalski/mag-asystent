@@ -16,7 +16,8 @@
     "seed": "npm -w server run seed",
     "build": "npm -w server run build",
     "start": "npm -w server run start",
-    "reconcile": "npm -w server run reconcile"
+    "reconcile": "npm -w server run reconcile",
+    "reslot": "npm -w server run reslot --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
