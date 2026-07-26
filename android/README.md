@@ -30,9 +30,13 @@ cd android
 ## Uruchomienie przeciwko serwerowi dev
 
 1. W katalogu głównym repo: `npm install && npm run seed && npm run dev` (API na `:3001`).
-2. W aplikacji: **Ustawienia → Serwer WERTIS**:
-   - emulator: `http://10.0.2.2:3001` (domyślne),
-   - fizyczny kolektor: `http://<IP-serwera-w-LAN>:3001`.
+2. Adres serwera:
+   - emulator: `http://10.0.2.2:3001` (domyślne, nic nie trzeba robić),
+   - fizyczny kolektor: `http://<IP-serwera-w-LAN>:3001` — wpisz go na
+     **ekranie startowym** (`ZMIEŃ ADRES SERWERA`). Ustawienia siedzą pod
+     paskiem górnym, a paska nie ma przed zalogowaniem, więc na świeżej
+     instalacji ekran startowy jest jedynym wejściem. Po zalogowaniu ten sam
+     adres jest w **Ustawienia → Serwer WERTIS**.
 3. Manifest zezwala na cleartext HTTP (sieć magazynowa on-premise). HTTPS przez
    Caddy działa bez zmian — podaj `https://mag.wertis.local` jako adres.
 
@@ -102,6 +106,13 @@ aplikacja też się buduje i działa (integracja przez refleksję —
 - [ ] **pierwsze uruchomienie na pustym serwerze**: ekran startowy proponuje
       ZAŁÓŻ KONTA (nie skan plakietki), kreator zakłada całą listę i pokazuje
       kody badge'ów; po wyjściu ta sama instalacja prosi już o skan,
+- [ ] **zły adres serwera na starcie**: świeża instalacja na sprzęcie (adres
+      fabryczny `10.0.2.2`) ma pokazać „Nie widzę serwera pod adresem…"
+      i ROZWINIĘTE pole adresu — a nie sam napis „Zeskanuj swój badge",
+      z którego nie da się wyjść bez konta,
+- [ ] **poprawienie adresu bez logowania**: wpisz właściwy adres LAN, ZAPISZ
+      I SPRAWDŹ → ekran przechodzi do ZAŁÓŻ KONTA (pusty serwer) albo do prośby
+      o skan (serwer z kontami), bez restartu aplikacji,
 - [ ] **przerwane zakładanie**: wyłącz Wi-Fi w połowie listy — ekran ma pokazać
       konta, które JUŻ powstały, a nie sam komunikat o błędzie.
 
