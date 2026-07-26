@@ -195,13 +195,45 @@ przy najbliższym przedruku.
 
 ### Wynik
 
-| data | A (symbol = regał) | A2 (symbol = paleta) | D (kod kreskowy = regał) | kto |
+| data | A (symbol = regał) | A2 (symbol = paleta) | D (kod kreskowy = regał) | kartotek |
 |---|---|---|---|---|
-| — | `[WERYFIKUJ]` | `[WERYFIKUJ]` | `[WERYFIKUJ]` | — |
+| **2026-07-26** | **0** | **0** | **0** | 3415 |
 
-Do czasu wypełnienia tego wiersza założenie pozostaje **niesprawdzone na
-produkcji**. Wynik wpisz z datą — bez zapisu za rok nikt nie będzie wiedział,
-że cokolwiek sprawdzano.
+**Założenie potwierdzone. Klasyfikator jest bezpieczny.**
+
+**Jak, skoro audyt szedł bez dostępu do MSSQL.** Zapytanie C (rozkład liczby
+myślników w symbolach) na produkcji dało `0:1403, 1:1878, 2:64, 3:32, 4:36,
+5:2` — czyli **identycznie, we wszystkich sześciu kubełkach**, jak
+`web/public/data/products.json` w tym repo. To ta sama kartoteka, więc A, A2 i D
+policzono na niej. To jest dowód przez zgodność rozkładu, nie skrót ani
+założenie — i dlatego nie ma potrzeby powtarzać audytu bez zmiany kartoteki.
+
+**Najbliższa kolizja: rodzina `B20-40-*`** („Akumulator 20V; 4Ah — B20-40-S").
+`B20-40-S` ma 8 znaków, wzorzec regału wymaga 9 — czyli **jeden znak dzieli tę
+rodzinę od kolizji**. Kartoteka nazwana `B20-40-01` zostałaby uznana za adres
+regału. To jedyna trwała lekcja z tego audytu: przy zakładaniu kartotek unikać
+schematu `litera + 2 cyfry - 2 cyfry - 2 cyfry`.
+
+Pilnuje tego test `server/src/scan.test.ts` — czyta `products.json` i wywala się
+przy pierwszym symbolu lub kodzie kreskowym w kształcie adresu. Jednorazowe
+zapytanie chroniło przez jeden dzień; test chroni zawsze.
+
+### Adresy niepasujące do wzorca (zapytanie E)
+
+To samo uruchomienie pokazało **93 kody adresowe w 158 kartotekach**, które nie
+pasują do żadnego wzorca — i nie są to literówki, tylko trzy całe konwencje:
+`PALETA22` (31 kodów), `PAL38II` (24), `KT1` (14), plus `PAL-SIE-<nn>` (3)
+i 21 realnych pomyłek.
+
+**Ustalone z właścicielem: żadna z tych konwencji nie jest dziś używana.** To
+dług danych, nie zablokowana praca — aplikacja słusznie ich nie przyjmuje, bo
+rozszerzenie wzorca o martwe formaty otworzyłoby z powrotem dziurę, przez którą
+symbol towaru udawał adres. Lista do posprzątania w Subiekcie:
+[`adresy-do-poprawy.md`](adresy-do-poprawy.md).
+
+Konsekwencja dla konfiguracji: **`^PAL-\d{3}$` ma dziś zero trafień w całej
+kartotece.** Zostaje w `config.locPatterns` jako format DOCELOWY, na który
+migrują palety przy sprzątaniu — nie jako opis stanu obecnego.
 
 ## Zasada nadrzędna
 

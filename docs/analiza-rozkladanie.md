@@ -150,9 +150,14 @@ rozjeździe półek; odporność na dziury Wi-Fi daje trwały bufor offline (Roo
    otwarcia; korekta dokumentu przez księgowość w trakcie pracy nie dochodzi.
    Świadomy kompromis (postęp się nie rozjeżdża), ale przydałby się sygnał
    „dokument zmieniony od otwarcia".
-4. **Dług danych w kartotece.** Około 16 adresów półek to literówki
-   (np. `C07A-06-01`), których walidator słusznie nie przyjmuje — do poprawienia
-   po stronie Subiekta, nie aplikacji.
+4. **Dług danych w kartotece — większy, niż się wydawało.** Audyt z 2026-07-26
+   naliczył **93 kody adresowe w 158 kartotekach**, których walidator nie
+   przyjmuje. Wcześniejszy zapis („około 16 literówek") mylił się nie tylko co do
+   skali, ale i co do rodzaju: większość to nie pomyłki, lecz **trzy martwe
+   konwencje** (`PALETA22`, `PAL38II`, `KT1`), a literówek jest 21. Żadna z tych
+   konwencji nie jest już używana, więc odrzucanie ich jest poprawne — do
+   poprawienia po stronie Subiekta, nie aplikacji. Lista:
+   [`adresy-do-poprawy.md`](adresy-do-poprawy.md).
 5. **Dokumenty MM czekają na workera Sfery.** Do czasu uruchomienia procesu COM
    (etap 2 w [DEPLOY.md](../DEPLOY.md)) MM z wózka i z koszyka wystawia biuro
    ręcznie. Otwarte pytanie: czy wystarczy **import EPP/EDI++**, który obsługuje
