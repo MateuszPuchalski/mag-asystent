@@ -136,4 +136,32 @@ class OfflineQueueTest {
         q.flush()
         assertEquals(listOf("anna"), users)
     }
+
+    @Test fun `operacja z bufora niesie KONTO autora, nie tylko nazwe`() = runTest {
+        // Jan odkłada poza zasięgiem, oddaje kolektor Piotrowi, wraca Wi-Fi.
+        // Serwer rozstrzyga tożsamość z tokenu sesji — a ten przy wysyłce jest
+        // już Piotra. Bez `userRef` pozycje Jana dostałyby nazwisko Piotra,
+        // czyli tę samą cichą podmianę, przed którą broni jawne przejęcie.
+        val storage = MemStorage()
+        val q = OfflineQueue(storage, { 1L }, isOnline = { false })
+        q.runOrBuffer(
+            PendingOp.OpKind.SET_LOCATION,
+            user = "Jan Kowalski",
+            productId = 7,
+            setLocation = setLoc,
+            userRef = 4L,
+        )
+        assertEquals(1, storage.saved.size)
+        assertEquals("Jan Kowalski", storage.saved[0].user)
+        assertEquals(4L, storage.saved[0].userRef)
+    }
+
+    @Test fun `operacja sprzed kont przechodzi bez konta, a nie z cudzym`() = runTest {
+        // bufor zapisany starszą wersją aplikacji nie ma `userRef` — wtedy
+        // uczciwe jest `null`, nie doklejenie kogokolwiek
+        val storage = MemStorage()
+        val q = OfflineQueue(storage, { 1L }, isOnline = { false })
+        q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, user = "anna", productId = 7, setLocation = setLoc)
+        assertEquals(null, storage.saved[0].userRef)
+    }
 }

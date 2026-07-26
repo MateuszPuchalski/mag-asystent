@@ -30,6 +30,9 @@ suspend fun saveLocation(
     val res = graph.offlineQueue.runOrBuffer(
         kind = PendingOp.OpKind.SET_LOCATION,
         user = graph.session.currentUser,
+        // konto autora wędruje z operacją, żeby flush po zmianie zmiany
+        // nie podpisał jej cudzym nazwiskiem
+        userRef = graph.session.state.value.userId,
         productId = productId,
         setLocation = SetLocationBody(choice.action, value = choice.value, replaced = choice.replaced),
     )

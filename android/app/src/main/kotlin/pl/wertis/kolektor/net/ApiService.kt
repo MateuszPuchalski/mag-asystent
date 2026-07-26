@@ -86,6 +86,8 @@ interface ApiService {
         @Path("id") id: Long,
         @Body body: SetLocationBody,
         @Header("x-user") asUser: String? = null,
+        /** Konto autora dla operacji z bufora — patrz `ApiOpSender`. */
+        @Header("x-buffered-user") bufferedUser: String? = null,
     ): QueueIdResponse
 
     @GET("api/locations")

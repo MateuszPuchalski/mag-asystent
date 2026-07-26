@@ -49,12 +49,24 @@ class FileOpStorage(context: Context) : OpStorage {
     }
 }
 
-/** Wysyłka zbuforowanej operacji przez REST — z autorem z chwili zbuforowania. */
+/**
+ * Wysyłka zbuforowanej operacji przez REST — z autorem z chwili ZBUFOROWANIA.
+ *
+ * `bufferedUser` niesie KONTO autora, bo sam nagłówek `x-user` serwer traktuje
+ * już tylko jako podpowiedź: tożsamość rozstrzyga token sesji, a ten przy
+ * wysyłce należy do osoby, która akurat trzyma kolektor. Bez tego pozycje
+ * odłożone przed przejęciem pracy dostałyby cudze nazwisko.
+ */
 class ApiOpSender(private val api: ApiService) : OpSender {
     override suspend fun send(op: PendingOp): Long? = apiCall {
         when (op.kind) {
             PendingOp.OpKind.SET_LOCATION ->
-                api.setLocation(requireNotNull(op.productId), requireNotNull(op.setLocation), asUser = op.user).queueId
+                api.setLocation(
+                    requireNotNull(op.productId),
+                    requireNotNull(op.setLocation),
+                    asUser = op.user,
+                    bufferedUser = op.userRef?.toString(),
+                ).queueId
         }
     }
 }

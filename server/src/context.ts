@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { makeSubiektAdapter } from "./adapters/index.js";
+import { userById } from "./services/users.js";
 
 /** Współdzielony adapter odczytu (Subiekt). Zapis idzie przez kolejkę/worker. */
 export const subiekt = makeSubiektAdapter();
@@ -21,6 +22,47 @@ function header(req: FastifyRequest, name: string): string | null {
  */
 export function userOf(req: FastifyRequest): string {
   return currentUserName() ?? header(req, "x-user") ?? "anonim";
+}
+
+export interface Autor {
+  /** Do `events.user_id` — tekstowy snapshot. */
+  nazwa: string;
+  /** Do `events.user_ref`; `null` gdy nie da się wskazać konta. */
+  ref: number | null;
+  /** Sesja, która FIZYCZNIE wysłała żądanie, gdy to nie ta sama osoba. */
+  wyslanePrzez: string | null;
+}
+
+/**
+ * Autor operacji z uwzględnieniem BUFORA OFFLINE.
+ *
+ * Bufor przechowuje operacje wykonane bez zasięgu i wysyła je później — czasem
+ * po zmianie zmiany. Gdyby autorem był zawsze właściciel bieżącej sesji,
+ * dwanaście pozycji odłożonych przez Jana poza zasięgiem dostałoby nazwisko
+ * Piotra, który akurat przejął kolektor. To jest dokładnie ta cicha podmiana
+ * tożsamości, przed którą broni jawne przejęcie pracy — tylko wejściem od tyłu.
+ *
+ * Dlatego autor jest z chwili WYKONANIA (`x-buffered-user`, id konta), a fakt
+ * wysyłki przez kogoś innego zostaje w payloadzie zdarzenia. Audyt widzi obie
+ * osoby, bo obie naprawdę brały udział.
+ *
+ * Nagłówek jest przyjmowany tylko, gdy wskazuje ISTNIEJĄCE konto — inaczej
+ * byłby to powrót do „podaj się za kogo chcesz" z §7.
+ */
+export function autorOperacji(req: FastifyRequest): Autor {
+  const sesyjny = currentUserName();
+  const buforowany = Number(header(req, "x-buffered-user"));
+  if (Number.isInteger(buforowany) && buforowany > 0) {
+    const u = userById(buforowany);
+    if (u) {
+      return {
+        nazwa: u.name,
+        ref: u.userId,
+        wyslanePrzez: sesyjny && sesyjny !== u.name ? sesyjny : null,
+      };
+    }
+  }
+  return { nazwa: userOf(req), ref: currentUserRef(), wyslanePrzez: null };
 }
 
 /* ── Kontekst żądania ───────────────────────────────────────────────────────

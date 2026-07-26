@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { subiekt, userOf } from "../context.js";
+import { autorOperacji, subiekt, userOf } from "../context.js";
 import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
 import { enqueueSetLocation } from "../services/queue.js";
@@ -133,7 +133,10 @@ export async function productRoutes(app: FastifyInstance) {
         });
       }
 
-      const user = userOf(req);
+      // Autor Z CHWILI WYKONANIA, nie z chwili wysyłki — operacja z bufora
+      // offline może dojechać po zmianie zmiany (patrz `autorOperacji`).
+      const autor = autorOperacji(req);
+      const user = autor.nazwa;
       const desc = describeLoc(body, current);
       const queueId = enqueueSetLocation(twId, joined, {
         createdBy: user,
@@ -145,7 +148,8 @@ export async function productRoutes(app: FastifyInstance) {
         body.action === "remove" ? "location_removed" : "location_set",
         user,
         twId,
-        { action: body.action, value: body.value, result: joined }
+        { action: body.action, value: body.value, result: joined, wyslanePrzez: autor.wyslanePrzez },
+        autor.ref
       );
       return { queueId };
     }

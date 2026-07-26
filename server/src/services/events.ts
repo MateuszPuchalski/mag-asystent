@@ -12,7 +12,13 @@ export function logEvent(
   type: string,
   userId: string,
   twId: number | null = null,
-  payload: unknown = null
+  payload: unknown = null,
+  /**
+   * Konto autora, gdy NIE jest nim właściciel bieżącej sesji — operacja
+   * z bufora offline wykonana przed zmianą zmiany (patrz `autorOperacji`).
+   * `undefined` = zwykła ścieżka, konto bierzemy z sesji.
+   */
+  userRef?: number | null
 ): void {
   db()
     .prepare(
@@ -24,7 +30,7 @@ export function logEvent(
       payload == null ? null : JSON.stringify(payload),
       userId,
       currentDevice(),
-      currentUserRef()
+      userRef === undefined ? currentUserRef() : userRef
     );
 }
 

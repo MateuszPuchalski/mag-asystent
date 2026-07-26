@@ -1,7 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { currentDevice, currentToken } from "../context.js";
-import { BLOKADA_MIN, odblokuj, przejmij, sesja, wyloguj, zaloguj } from "../services/auth.js";
-import { createUser, listUsers, migrujHistorie, setActive, setPin } from "../services/users.js";
+import {
+  BLOKADA_MIN,
+  autoryzuj,
+  odblokuj,
+  przejmij,
+  sesja,
+  wyloguj,
+  zaloguj,
+} from "../services/auth.js";
+import { logEvent } from "../services/events.js";
+import {
+  brakKont,
+  createUser,
+  listUsers,
+  migrujHistorie,
+  setActive,
+  setPin,
+  type Rola,
+} from "../services/users.js";
 
 /* ── Tożsamość: badge zamiast wolnego tekstu (plan §7) ──────────────────────
    Jeden skan na ścieżce codziennej. PIN dopiero tam, gdzie badge nie
@@ -65,40 +82,95 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /* PIN sprawdza TA TRASA, która wykonuje operację (dziś:
-     `/api/delivery/:id/lines/:lineId/force-release`), a nie osobne
-     „czy mój PIN jest dobry". Osobne wejście dawałoby dwa miejsca, w których
-     wolno powiedzieć „ok", i tylko jedno, które faktycznie coś robi —
-     a sprawdzenie oderwane od skutku zawsze kiedyś od niego odjedzie.        */
+  /* PIN sprawdza TA TRASA, która wykonuje operację, a nie osobne „czy mój PIN
+     jest dobry". Osobne wejście dawałoby dwa miejsca, w których wolno
+     powiedzieć „ok", i tylko jedno, które faktycznie coś robi — a sprawdzenie
+     oderwane od skutku zawsze kiedyś od niego odjedzie.                      */
 
-  /* ── Administracja kontami (biuro) ─────────────────────────────────────── */
+  /* ── Administracja kontami — WYŁĄCZNIE biuro z PIN-em ─────────────────────
+     Te trasy tworzą TOŻSAMOŚĆ, więc bez strażnika cała reszta §7 jest
+     dekoracją: `GET /api/users` wystawia `badgeCode` każdego, a logowanie to
+     sam skan badge'a, więc jedno żądanie z sieci magazynu daje listę
+     wszystkich tożsamości i możliwość zalogowania się jako dowolna z nich.
+     `POST /api/users` pozwalałby założyć konto biura z własnym PIN-em,
+     a `:id/pin` zresetować cudzy.
 
-  app.get("/api/users", async () => ({ users: listUsers() }));
+     Dlatego: rola `biuro` + PIN przy każdej zmianie, a `GET` co najmniej za
+     sesją biura. PIN-u przy odczycie nie wymagamy — lista kont jest potrzebna
+     przy każdym wydruku plakietek, a wpisywanie PIN-u do czytania zamieniłoby
+     go w odruch, czyli w nic.                                                */
 
-  app.post<{ Body: { name?: string; role?: "magazynier" | "brygadzista" | "biuro"; pin?: string } }>(
-    "/api/users",
-    async (req, reply) => {
-      const name = (req.body?.name ?? "").trim();
-      if (!name) return reply.code(400).send({ error: "Podaj imię i nazwisko" });
-      // badge nadaje SERWER — numer musi być unikalny w całej firmie, a kod
-      // nieść poprawną cyfrę kontrolną
-      return { user: createUser(name, req.body?.role ?? "magazynier", req.body?.pin) };
+  /** Sesja biura + PIN; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
+  function odmowaZarzadzania(pin: string | null): { kod: number; error: string } | null {
+    const s = sesja(token());
+    if (!s) return { kod: 401, error: "Brak sesji — zeskanuj badge" };
+    const w = autoryzuj(s.user, "zarzadzanie_kontami", pin);
+    return w.ok ? null : { kod: 403, error: w.powod ?? "Brak uprawnień" };
+  }
+
+  app.get("/api/users", async (_req, reply) => {
+    const s = sesja(token());
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
+    if (s.user.role !== "biuro") {
+      // kody badge'y to lista tożsamości — nie wystawiamy jej hali
+      return reply.code(403).send({ error: "Lista kont jest dostępna tylko dla biura" });
     }
-  );
+    return { users: listUsers() };
+  });
 
-  app.post<{ Params: { id: string }; Body: { pin?: string | null } }>(
+  app.post<{
+    Body: { name?: string; role?: Rola; pin?: string; pinAutora?: string };
+  }>("/api/users", async (req, reply) => {
+    const name = (req.body?.name ?? "").trim();
+    if (!name) return reply.code(400).send({ error: "Podaj imię i nazwisko" });
+
+    // Pierwsze konto w pustej bazie zakłada się bez sesji — inaczej nie dałoby
+    // się założyć żadnego. Wymuszamy rolę `biuro` i PIN, bo to konto będzie
+    // jedyną drogą do wszystkich następnych.
+    if (brakKont()) {
+      if (!req.body?.pin) {
+        return reply
+          .code(400)
+          .send({ error: "Pierwsze konto to konto biura i wymaga PIN-u" });
+      }
+      const u = createUser(name, "biuro", req.body.pin);
+      logEvent("user_created", u.name, null, { userId: u.userId, role: u.role, pierwsze: true });
+      return { user: u };
+    }
+
+    const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
+    if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+    if (req.body?.role !== "magazynier" && !req.body?.pin) {
+      // konto uprzywilejowane bez PIN-u i tak nic nie wykona (patrz `autoryzuj`)
+      return reply.code(400).send({ error: "Konto brygadzisty i biura wymaga PIN-u" });
+    }
+    // badge nadaje SERWER — numer musi być unikalny w całej firmie, a kod
+    // nieść poprawną cyfrę kontrolną
+    const u = createUser(name, req.body?.role ?? "magazynier", req.body?.pin);
+    logEvent("user_created", u.name, null, { userId: u.userId, role: u.role });
+    return { user: u };
+  });
+
+  app.post<{ Params: { id: string }; Body: { pin?: string | null; pinAutora?: string } }>(
     "/api/users/:id/pin",
-    async (req) => {
+    async (req, reply) => {
+      const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
+      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
       setPin(Number(req.params.id), req.body?.pin ?? null);
+      logEvent("user_pin_changed", "biuro", null, { userId: Number(req.params.id) });
       return { ok: true };
     }
   );
 
-  app.post<{ Params: { id: string }; Body: { active?: boolean } }>(
+  app.post<{ Params: { id: string }; Body: { active?: boolean; pinAutora?: string } }>(
     "/api/users/:id/active",
-    async (req) => {
+    async (req, reply) => {
+      const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
+      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
       // konta się nie kasuje — historia w `events` musi mieć na co wskazywać
-      setActive(Number(req.params.id), req.body?.active !== false);
+      const active = req.body?.active !== false;
+      setActive(Number(req.params.id), active);
+      logEvent("user_active_changed", "biuro", null, { userId: Number(req.params.id), active });
       return { ok: true };
     }
   );
@@ -107,5 +179,12 @@ export async function authRoutes(app: FastifyInstance) {
    * Jednorazowa migracja historii: nazwy z `events` → konta.
    * Idempotentna — dotyka wyłącznie zdarzeń bez `user_ref`.
    */
-  app.post("/api/users/migrate-history", async () => migrujHistorie());
+  app.post<{ Body: { pinAutora?: string } }>(
+    "/api/users/migrate-history",
+    async (req, reply) => {
+      const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
+      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+      return migrujHistorie();
+    }
+  );
 }

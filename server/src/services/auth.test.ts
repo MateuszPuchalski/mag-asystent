@@ -233,8 +233,73 @@ test("lock wygasły zdejmuje się bez wpisu — nikomu nic nie odebrano", () => 
   assert.equal(zdarzenia("lock_forced").length, 0);
 });
 
+/* ── Zarządzanie kontami: tylko biuro ────────────────────────────────────── */
+
+test("brygadzista NIE zakłada kont, choć zdejmuje cudze locki", () => {
+  // to jest jedyna operacja tworząca TOŻSAMOŚĆ: brygadzista, który może
+  // założyć konto, może założyć konto biura z własnym PIN-em — i cała reszta
+  // reguł przestaje cokolwiek znaczyć
+  const b = U.createUser("Adam Brygadzista", "brygadzista", "4821");
+  assert.equal(A.autoryzuj(b, "zdjecie_cudzego_locka", "4821").ok, true);
+  const w = A.autoryzuj(b, "zarzadzanie_kontami", "4821");
+  assert.equal(w.ok, false);
+  assert.match(w.powod!, /biura/i, "komunikat mówi, czyich uprawnień brakuje");
+});
+
+test("magazynier nie zbliża się do kont", () => {
+  const m = U.createUser("Jan Kowalski", "magazynier", "1111");
+  assert.equal(A.autoryzuj(m, "zarzadzanie_kontami", "1111").ok, false);
+});
+
+test("biuro z PIN-em zarządza kontami, bez PIN-u nie", () => {
+  const b = U.createUser("Biuro Zakupy", "biuro", "1234");
+  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami", null).ok, false);
+  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami", "9999").ok, false);
+  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami", "1234").ok, true);
+});
+
+test("furtka pierwszego konta zamyka się sama", () => {
+  // bez niej nie dałoby się założyć ŻADNEGO konta; z nią otwartą na stałe
+  // każdy w sieci magazynu zakładałby sobie konto biura
+  assert.equal(U.brakKont(), true, "pusta baza — furtka otwarta");
+  U.createUser("Biuro Zakupy", "biuro", "1234");
+  assert.equal(U.brakKont(), false, "jeden wiersz i furtka zamknięta");
+});
+
 test("biuro też podaje PIN — rola mówi KTO może, PIN KTO to jest", () => {
   const u = U.createUser("Biuro Zakupy", "biuro", "1234");
   assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", null).ok, false);
   assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", "1234").ok, true);
+});
+
+/* ── Autor operacji z bufora offline ─────────────────────────────────────── */
+
+/** Minimalne żądanie — `autorOperacji` czyta wyłącznie nagłówki. */
+const zadanie = (h: Record<string, string>) => ({ headers: h }) as never;
+
+test("operacja z bufora zostaje przy SWOIM autorze", async () => {
+  // Jan odkłada 12 pozycji poza zasięgiem, oddaje kolektor Piotrowi, wraca
+  // Wi-Fi. Bez tego wszystkie 12 dostałoby nazwisko Piotra — czyli ta sama
+  // cicha podmiana tożsamości, przed którą broni jawne przejęcie pracy.
+  const { autorOperacji } = await import("../context.js");
+  const jan = U.createUser("Jan Kowalski");
+  const a = autorOperacji(zadanie({ "x-buffered-user": String(jan.userId) }));
+  assert.equal(a.nazwa, "Jan Kowalski");
+  assert.equal(a.ref, jan.userId);
+});
+
+test("nagłówek wskazujący nieistniejące konto NIE jest tożsamością", async () => {
+  // inaczej byłby to powrót do „podaj się za kogo chcesz" sprzed §7
+  const { autorOperacji } = await import("../context.js");
+  const a = autorOperacji(zadanie({ "x-buffered-user": "99999", "x-user": "ktoś" }));
+  assert.equal(a.ref, null);
+  assert.equal(a.nazwa, "ktoś", "zostaje najwyżej podpowiedź z x-user");
+});
+
+test("śmieci w nagłówku nie wywracają ścieżki", async () => {
+  const { autorOperacji } = await import("../context.js");
+  for (const zly of ["", "abc", "-1", "0", "1.5"]) {
+    const a = autorOperacji(zadanie({ "x-buffered-user": zly }));
+    assert.equal(a.ref, null, zly);
+  }
 });

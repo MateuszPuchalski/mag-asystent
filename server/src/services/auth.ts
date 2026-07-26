@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { db, nowIso } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { userByBadge, userById, sprawdzPin, type Uzytkownik } from "./users.js";
+import { userByBadge, userById, sprawdzPin, type Rola, type Uzytkownik } from "./users.js";
 
 /* ── Sesja urządzenia (plan §7) ─────────────────────────────────────────────
    Skan badge'a = zalogowanie I szybka zmiana zmiany. Jeden skan, ~1 s, bez
@@ -61,8 +61,22 @@ export function sesja(token: string | null): Sesja | null {
   return { token, user, zablokowana: minut(r.last_seen) >= BLOKADA_MIN };
 }
 
-/** Odnotowanie aktywności — odsuwa blokadę. */
-export function dotknij(token: string): void {
+/**
+ * Odnotowanie aktywności — odsuwa blokadę.
+ *
+ * Zapis jest DŁAWIONY, bo `dotknij` woła się z każdego żądania, a kolektor
+ * odpytuje serwer co 2 s z czterech ekranów. Bez dławienia każdy odczyt
+ * pociągałby UPDATE do bazy dla pola, którego dokładność ma sens najwyżej
+ * minutowy: blokada zapada po 10 minutach, więc odświeżanie częściej niż raz
+ * na minutę nie zmienia niczego poza liczbą zapisów.
+ */
+const DLAWIENIE_MS = 60_000;
+
+export function dotknij(token: string, force = false): void {
+  const r = db().prepare("SELECT last_seen FROM device_session WHERE token = ?").get(token) as
+    | { last_seen: string }
+    | undefined;
+  if (!force && r && minut(r.last_seen) * 60_000 < DLAWIENIE_MS) return;
   db().prepare("UPDATE device_session SET last_seen = ? WHERE token = ?").run(nowIso(), token);
 }
 
@@ -77,7 +91,7 @@ export function odblokuj(token: string, badge: string): Sesja | null {
   if (!s) return null;
   const kto = userByBadge(badge);
   if (!kto || kto.userId !== s.user.userId) return null;
-  dotknij(token);
+  dotknij(token, true); // odblokowanie MUSI zapisać, niezależnie od dławienia
   return { ...s, zablokowana: false };
 }
 
@@ -124,15 +138,34 @@ export function wyloguj(token: string): void {
  *
  * Plan §7 wymienia cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
  * z nierozwiązanymi wyjątkami, zdjęcie cudzego locka i zmianę ustawień serwera.
- * Trasa istnieje dziś tylko dla jednej — pozostałe trzy nie mają w aplikacji
- * żadnego wejścia (nie ma domykania dostawy, nie ma ekranu ustawień serwera,
- * a korekta lokalizacji jest ścieżką codzienną, nie wyjątkiem). Wartości enuma
- * bez trasy byłyby martwym kodem udającym zabezpieczenie, więc dochodzą razem
- * ze swoimi trasami, nie wcześniej.
+ * Trasy istnieją dziś dla dwóch — pozostałe nie mają w aplikacji żadnego
+ * wejścia (nie ma domykania dostawy, a korekta lokalizacji jest ścieżką
+ * codzienną, nie wyjątkiem). Wartości enuma bez trasy byłyby martwym kodem
+ * udającym zabezpieczenie, więc dochodzą razem ze swoimi trasami.
  */
 export type OperacjaUprzywilejowana =
   /** Zdjęcie cudzej blokady linii przed wygaśnięciem TTL. */
-  "zdjecie_cudzego_locka";
+  | "zdjecie_cudzego_locka"
+  /** Zakładanie kont, PIN-y, wyłączanie kont, migracja historii. */
+  | "zarzadzanie_kontami";
+
+/**
+ * Kto MOŻE — zanim PIN rozstrzygnie, czy to naprawdę ta osoba.
+ *
+ * Zarządzanie kontami jest tylko dla biura, bo to jedyna operacja, która
+ * tworzy TOŻSAMOŚĆ. Brygadzista, który może założyć konto, może założyć konto
+ * biura z własnym PIN-em — i cała reszta reguł przestaje cokolwiek znaczyć.
+ */
+const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
+  zdjecie_cudzego_locka: ["brygadzista", "biuro"],
+  zarzadzanie_kontami: ["biuro"],
+};
+
+const NAZWA_ROL: Record<Rola, string> = {
+  magazynier: "magazyniera",
+  brygadzista: "brygadzisty",
+  biuro: "biura",
+};
 
 export interface WynikAutoryzacji {
   ok: boolean;
@@ -150,8 +183,10 @@ export function autoryzuj(
   operacja: OperacjaUprzywilejowana,
   pin: string | null
 ): WynikAutoryzacji {
-  if (user.role === "magazynier") {
-    return { ok: false, powod: `Operacja „${operacja}" wymaga uprawnień brygadzisty lub biura` };
+  const dozwolone = WYMAGANA_ROLA[operacja];
+  if (!dozwolone.includes(user.role)) {
+    const kto = dozwolone.map((r) => NAZWA_ROL[r]).join(" albo ");
+    return { ok: false, powod: `Operacja „${operacja}" wymaga uprawnień ${kto}` };
   }
   if (!user.maPin) {
     // Konto uprzywilejowane bez PIN-u to konto, którego nie da się przypisać

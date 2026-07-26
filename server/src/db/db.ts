@@ -52,6 +52,10 @@ function migrate(database: Database.Database) {
      kasuje ani nie nadpisuje: zdarzenie, którego nie da się przypisać, zostaje
      z `user_ref = NULL`, bo to jest uczciwe, w odróżnieniu od zgadywania. */
   addColumn("events", "user_ref", "INTEGER");
+  /* Indeks MUSI powstać tutaj, nie w schema.sql: `user_ref` dochodzi migracją,
+     więc w chwili wykonania schematu ta kolumna jeszcze nie istnieje. Raport
+     wydajności (§7) grupuje właśnie po niej. */
+  database.exec("CREATE INDEX IF NOT EXISTS ix_events_ref_time ON events(user_ref, created_at)");
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */
