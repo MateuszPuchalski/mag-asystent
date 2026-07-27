@@ -4,6 +4,67 @@
 # jest referencją tego, co ten plik automatyzuje, i jedyną drogą, gdy coś
 # tutaj zawiedzie.
 
+function Zapewnij-Katalog {
+    <#
+        .SYNOPSIS
+        Tworzy katalog, jeśli go nie ma. Bezpieczne dla korzenia dysku.
+        .DESCRIPTION
+        POWSTAŁO PO AWARII U KLIENTA (27.07). Instalator robił
+        `New-Item -ItemType Directory -Force -Path (Split-Path $Katalog)`,
+        a dla domyślnego `C:\wertis` daje to `Split-Path` → `C:\`. `New-Item`
+        na korzeniu dysku rzuca „Ścieżka ma niedozwolony format", więc
+        instalacja wywracała się przy DOMYŚLNYCH ustawieniach — u każdego, kto
+        uruchomił instalator bez `-Katalog`.
+
+        Sprawdzenie `Test-Path` załatwia to bez specjalnego kodu na literę
+        dysku: korzeń zawsze istnieje, więc po prostu nie ma czego tworzyć.
+    #>
+    param([string]$Sciezka)
+    if (-not $Sciezka) { return }          # Split-Path bywa pusty
+    if (Test-Path $Sciezka) { return }     # istnieje — także "C:\"
+    New-Item -ItemType Directory -Force -Path $Sciezka | Out-Null
+}
+
+function Write-WertisPlik {
+    <#
+        .SYNOPSIS
+        Zapis tekstu jako UTF-8 BEZ BOM.
+        .DESCRIPTION
+        `Set-Content -Encoding UTF8` w Windows PowerShell 5.1 dokleja BOM.
+        Serwer by to przeżył (`parseEnvFile` robi `trim()`, a ten w JS usuwa
+        U+FEFF), ale DEPLOY §2a obiecuje, że `wertis.env` zostaje wczytywalny
+        TAKŻE przez `source wertis.env` w bashu — a tam BOM przed `#` psuje
+        pierwszą linię.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Sciezka,
+        [Parameter(Mandatory)][string]$Tresc
+    )
+    [System.IO.File]::WriteAllText($Sciezka, $Tresc, (New-Object System.Text.UTF8Encoding $false))
+}
+
+function Initialize-WertisSiec {
+    <#
+        .SYNOPSIS
+        Wymusza TLS 1.2 na pobieraniach.
+        .DESCRIPTION
+        `Invoke-WebRequest` w Windows PowerShell 5.1 bierze protokół
+        z ustawień .NET Framework i na części maszyn nadal startuje z TLS 1.0.
+        nssm.cc i nodejs.org takie połączenie odrzucają, a komunikat („nie
+        można utworzyć bezpiecznego kanału SSL/TLS") nie mówi nic osobie,
+        która ma tylko zainstalować program.
+
+        To OSŁONA, nie naprawa zaobserwowanej awarii — nie wiadomo, czy dana
+        maszyna by ją trafiła. Kosztuje jedną linię.
+    #>
+    try {
+        [Net.ServicePointManager]::SecurityProtocol =
+            [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch {
+        # starsze .NET bez Tls12 w enumie — wtedy i tak nic nie poradzimy
+    }
+}
+
 function Test-Administrator {
     if (-not $IsWindows -and $null -ne $IsWindows) { return $false }
     $tozsamosc = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -46,6 +107,7 @@ function Install-WertisNarzedzie {
         # Starsze Windows Server nie mają wingeta. Instalator MSI działa
         # wszędzie, tylko trzeba go pobrać ręcznie.
         Write-Uwaga "Brak wingeta — pobieram instalator $Opis bezpośrednio."
+        Initialize-WertisSiec
         $msi = Join-Path $env:TEMP ([IO.Path]::GetFileName($UrlAwaryjny))
         Invoke-WebRequest -Uri $UrlAwaryjny -OutFile $msi -UseBasicParsing
         Start-Process msiexec.exe -ArgumentList "/i", "`"$msi`"", "/qn", "/norestart" -Wait
@@ -110,7 +172,8 @@ function Get-WertisNssm {
     }
     if (Test-DryRun "Pobrałbym nssm.exe do $docelowy.") { return $docelowy }
 
-    New-Item -ItemType Directory -Force -Path (Split-Path $docelowy) | Out-Null
+    Zapewnij-Katalog (Split-Path $docelowy)
+    Initialize-WertisSiec
     $zip  = Join-Path $env:TEMP "nssm-2.24.zip"
     $rozp = Join-Path $env:TEMP "nssm-2.24-rozpakowany"
     Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $zip -UseBasicParsing
@@ -215,7 +278,10 @@ function Publish-WertisKonfiguracja {
     $linie += ""
 
     if (-not (Test-DryRun "Zapisałbym $plik ($($klucze.Count) ustawień).")) {
-        Set-Content -Path $plik -Value $linie -Encoding UTF8
+        # Zakończenia linii w stylu Uniksa: plik jest wczytywany także przez
+        # `source wertis.env` w Git Bashu, a CR na końcu wartości wjechałby
+        # do hasła.
+        Write-WertisPlik -Sciezka $plik -Tresc (($linie -join "`n") + "`n")
         Write-Ok "Zapisano $plik ($($klucze.Count) ustawień)."
     }
 

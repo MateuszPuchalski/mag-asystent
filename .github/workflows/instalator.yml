@@ -66,14 +66,25 @@ jobs:
           }
           if ($bledy) { exit 1 }
 
+      # Asercje na logice, którą da się wywołać bez dotykania systemu. Idą
+      # PRZED przebiegiem próbnym, bo są tańsze i konkretniejsze — i dlatego,
+      # że -DryRun tej klasy błędów nie widzi (patrz komentarz niżej).
+      - name: Testy instalatora
+        run: .\instalator\testy.ps1
+
       # Scalanie sprawdza przy okazji, czy znaczniki MODULY-* nadal są na
-      # miejscu i czy scalony plik się parsuje.
+      # miejscu i czy scalony plik się parsuje. Kopiuje też URUCHOM.cmd.
       - name: Scalenie do jednego pliku
         run: .\instalator\build.ps1 -Wyjscie dist\WERTIS-Instalator.ps1
 
       # Przebieg próbny idzie na SCALONYM pliku, a nie na źródłach — to jest
       # ten artefakt, który dostanie klient. Katalog jest tymczasowy, żeby
       # nawet przy pomyłce w -DryRun nie tknąć niczego pod C:\wertis.
+      #
+      # UWAGA na zakres tego kroku: -DryRun dowodzi PRZEBIEGU STEROWANIA, nie
+      # poprawności kroków — każdy krok wykonawczy siedzi za `Test-DryRun`
+      # i jest tu pomijany. Tak przeszła awaria z 27.07 (`New-Item` na
+      # korzeniu dysku). Tę klasę błędów łapie krok „Testy instalatora".
       - name: Przebieg probny (-DryRun)
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Katalog "$env:RUNNER_TEMP\wertis-proba"
 
@@ -97,12 +108,13 @@ jobs:
           path: |
             dist/WERTIS-Instalator.exe
             dist/WERTIS-Instalator.ps1
+            dist/URUCHOM.cmd
 
-      # Do wydania idą OBA pliki. .exe jest wygodniejszy, ale niepodpisany —
+      # Do wydania idą TRZY pliki. .exe jest wygodniejszy, ale niepodpisany —
       # gdy polityka firmy albo antywirus go zablokuje, .ps1 jest drogą
       # wyjścia, a nie awaryjnym półśrodkiem (to dokładnie ten sam kod).
       - name: Dolaczenie do wydania
         if: github.event_name == 'release'
-        run: gh release upload "$env:GITHUB_REF_NAME" dist\WERTIS-Instalator.exe dist\WERTIS-Instalator.ps1 --clobber
+        run: gh release upload "$env:GITHUB_REF_NAME" dist\WERTIS-Instalator.exe dist\WERTIS-Instalator.ps1 dist\URUCHOM.cmd --clobber
         env:
           GH_TOKEN: ${{ github.token }}
