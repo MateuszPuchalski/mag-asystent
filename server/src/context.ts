@@ -108,6 +108,35 @@ export function setCurrentUser(userId: number, name: string): void {
 /** Nazwa z sesji, gdy jest — inaczej nagłówek `X-User` jako podpowiedź. */
 export const currentUserName = (): string | null => store.getStore()?.userName ?? null;
 
+/* ── Bramka sesji ───────────────────────────────────────────────────────────
+   Do tej pory token był ROZPOZNAWANY, ale nie WYMAGANY: sesji żądały trzy
+   miejsca (logowanie, `/api/users`, zdjęcie cudzego locka), a cała reszta —
+   w tym zmiana lokalizacji w Subiekcie i raport wydajności per pracownik —
+   przechodziła bez niczego, podpisując operację nagłówkiem `x-user` albo
+   słowem „anonim". Bramka jest tutaj, a nie w każdej trasie z osobna, bo
+   trasa dopisana jutro ma być domyślnie zamknięta, nie domyślnie otwarta.  */
+
+/** Metody zmieniające stan. GET i HEAD tylko czytają. */
+const zapis = (metoda: string): boolean => !["GET", "HEAD", "OPTIONS"].includes(metoda);
+
+/**
+ * Trasy działające bez sesji. Lista jest jawna, krótka i zamknięta — każda
+ * pozycja jest tu dlatego, że BEZ NIEJ NIE DA SIĘ URUCHOMIĆ INSTALACJI.
+ *
+ * `POST /api/users` wygląda na wyłom, ale nim nie jest: trasa sama wpuszcza
+ * bez sesji wyłącznie przy pustej bazie (pierwsze konto biura), a w każdym
+ * innym przypadku sprawdza sesję i PIN. Bramka nie ma czego dokładać.
+ */
+const BEZ_SESJI: ReadonlyArray<[metoda: string, sciezka: string]> = [
+  ["GET", "/api/health"],
+  ["GET", "/api/setup"],
+  ["POST", "/api/auth/badge"],
+  ["POST", "/api/users"],
+];
+
+const otwarta = (metoda: string, sciezka: string): boolean =>
+  BEZ_SESJI.some(([m, s]) => m === metoda && s === sciezka);
+
 export function withRequestContext(app: FastifyInstance): void {
   app.addHook("onRequest", (req, _reply, done) => {
     store.run({ device: header(req, "x-device"), token: header(req, "x-session") }, done);
@@ -115,15 +144,50 @@ export function withRequestContext(app: FastifyInstance): void {
   // Rozpoznanie sesji osobnym hookiem, PO ustawieniu kontekstu: dopiero tu
   // wolno dotknąć bazy, a `services/auth` importuje `context`, więc import
   // musi być leniwy (inaczej cykl).
-  app.addHook("preHandler", async (req) => {
+  app.addHook("preHandler", async (req, reply) => {
     const t = currentToken();
-    if (!t) return;
     const { sesja, dotknij } = await import("./services/auth.js");
-    const s = sesja(t);
-    if (!s) return;
-    setCurrentUser(s.user.userId, s.user.name);
-    // każde żądanie odsuwa blokadę — praca trwa, więc sesja nie ma prawa wygasać
-    if (!s.zablokowana) dotknij(t);
-    void req;
+    const s = t ? sesja(t) : null;
+
+    if (s) {
+      setCurrentUser(s.user.userId, s.user.name);
+      if (!s.zablokowana) dotknij(t!);
+    }
+
+    // Bramka dotyczy tylko API; serwer nie serwuje niczego innego, ale ta
+    // jedna linia sprawia, że nie zacznie od odrzucania własnych statyk,
+    // gdyby kiedyś wróciły.
+    const sciezka = req.url.split("?")[0];
+    if (!sciezka.startsWith("/api/")) return;
+    if (otwarta(req.method, sciezka)) return;
+
+    if (!s) {
+      return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
+    }
+
+    /* Sesja zablokowana po bezczynności NIE jest wylogowaniem (§7): zachowuje
+       otwartą dostawę i kontekst, żeby nie zgubić trzydziestu rozłożonych
+       pozycji. Odczyty przechodzą, bo z nich składa się ekran blokady.
+
+       Zapis wymaga odblokowania — Z JEDNYM WYJĄTKIEM, i ten wyjątek jest
+       konieczny, nie wygodny. Kolektor opróżnia bufor offline z tykera co 15 s,
+       niezależnie od tego, czy ktoś trzyma urządzenie w ręku. Gdyby wysyłka
+       z zablokowanej sesji dostawała odmowę, `OfflineQueue.flush()` uznałby ją
+       za błąd serwera i SKASOWAŁ operację z bufora — praca wykonana poza
+       zasięgiem znikałaby po dziesięciu minutach leżenia kolektora na regale.
+
+       Rozróżnia je `x-buffered-user`: niesie konto autora Z CHWILI WYKONANIA
+       i jest przyjmowany tylko, gdy wskazuje istniejące konto (`autorOperacji`).
+       Operacja interaktywna go nie ma, więc dalej wymaga skanu badge'a.       */
+    if (s.zablokowana && zapis(req.method) && !zBufora(req)) {
+      return reply.code(423).send({ error: "Sesja zablokowana — zeskanuj badge" });
+    }
   });
 }
+
+/** Czy żądanie niesie operację z bufora offline wskazującą istniejące konto. */
+function zBufora(req: FastifyRequest): boolean {
+  const id = Number(header(req, "x-buffered-user"));
+  return Number.isInteger(id) && id > 0 && userById(id) !== null;
+}
+

@@ -22,7 +22,6 @@
     "start:reslot": "node dist/reslot-run.js"
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.2",
     "fastify": "^5.2.1",
     "mssql": "^11.0.1"
   },

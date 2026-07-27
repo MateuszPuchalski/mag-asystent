@@ -20,7 +20,19 @@ interface LocBody {
   replaced?: string;
 }
 
-function computeNewLocs(current: string[], body: LocBody): string[] {
+const AKCJE: readonly LocAction[] = ["replace", "add", "remove", "replace_one"];
+
+/**
+ * `null` dla nieznanej albo brakującej akcji.
+ *
+ * TypeScript uznawał ten `switch` za wyczerpujący, bo typ `LocBody.action` to
+ * unia czterech wartości — ale to jest deklaracja o ciele żądania, nie o tym,
+ * co przyjdzie po sieci. Żądanie bez pola `action` przechodziło przez wszystkie
+ * `case`, funkcja zwracała `undefined`, a wywołujący robił na tym `.join()`
+ * i kończyło się to **500 zamiast 400**. Typ opisywał kontrakt, walidacji nie
+ * było wcale.
+ */
+function computeNewLocs(current: string[], body: LocBody): string[] | null {
   const v = (body.value ?? "").trim().toUpperCase();
   switch (body.action) {
     case "replace":
@@ -31,6 +43,8 @@ function computeNewLocs(current: string[], body: LocBody): string[] {
       return current.filter((l) => l !== v);
     case "replace_one":
       return current.map((l) => (l === body.replaced ? v : l));
+    default:
+      return null;
   }
 }
 
@@ -118,13 +132,21 @@ export async function productRoutes(app: FastifyInstance) {
       const p = subiekt.getProductById(twId);
       if (!p) return reply.code(404).send({ error: "Nie znaleziono towaru" });
 
-      const body = req.body;
+      const body = req.body ?? ({} as LocBody);
+      // Akcja PRZED walidacją kodu: bez niej nie wiadomo nawet, czy kod jest
+      // w tym żądaniu potrzebny (`remove` go nie waliduje).
+      if (!AKCJE.includes(body.action)) {
+        return reply
+          .code(400)
+          .send({ error: `Nieznana akcja „${body.action ?? ""}". Dozwolone: ${AKCJE.join(", ")}` });
+      }
       if (body.action !== "remove") {
         const err = validateLocationCode(body.value ?? "");
         if (err) return reply.code(400).send({ error: err });
       }
       const current = parseLocs(p.lokalizacja);
       const next = computeNewLocs(current, body);
+      if (!next) return reply.code(400).send({ error: "Nieznana akcja" });
       const joined = next.join(" ");
       if (joined.length > config.locFieldLimit) {
         // twardy błąd, NIE ciche ucięcie (spec §5.2, §12)

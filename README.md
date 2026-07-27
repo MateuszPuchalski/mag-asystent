@@ -145,9 +145,22 @@ Na ekranie startowym kolektora, obok skanera, jest pole tekstowe — kod
 **wpisuje się z klawiatury**, więc emulator bez skanera wystarczy. Domyślny adres
 serwera (`http://10.0.2.2:3001`) jest już ustawiony na localhost hosta.
 
-Samo API to osobna sprawa: poza `/api/users*` i zdjęciem cudzego locka żadna
-trasa nie sprawdza sesji, więc do grzebania curlem konto nie jest potrzebne
-(operacje podpiszą się jako `anonim`).
+**Konto jest potrzebne także do grzebania curlem.** API wymaga nagłówka
+`x-session` na każdej trasie poza czterema: `GET /api/health`, `GET /api/setup`,
+`POST /api/auth/badge` i `POST /api/users` przy pustej bazie. Token bierze się
+tak samo jak kolektor — z `POST /api/auth/badge`:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/badge \
+  -H 'content-type: application/json' -d '{"badge":"PRC-0001-9"}' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+curl -s http://localhost:3001/api/queue -H "x-session: $TOKEN"
+```
+
+Do lipca było odwrotnie: sesji żądały trzy trasy, a reszta — łącznie ze zmianą
+lokalizacji w Subiekcie i raportem wydajności per pracownik — przyjmowała
+żądania bez niczego i podpisywała je nagłówkiem `x-user` albo słowem `anonim`.
+Nagłówek `x-user` **nie jest tożsamością** i sam bramki nie otwiera.
 
 Produkcyjnie:
 

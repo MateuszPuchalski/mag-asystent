@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import cors from "@fastify/cors";
+import { pathToFileURL } from "node:url";
 import { config, envFile } from "./config.js";
 import { withRequestContext } from "./context.js";
 import { db } from "./db/db.js";
@@ -15,28 +15,24 @@ import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
 import { docFlagAvailable } from "./services/delivery-flag.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
 
-async function main() {
-  db(); // migracja schematu przy starcie
-  zamelduj("api");
-
-  // SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
-  // starcie (twardy błąd, gdy baza nieosiągalna), potem co MSSQL_SYNC_MS.
-  if (config.sgtMode === "mssql") {
-    await importFromMssql();
-    setInterval(() => {
-      importFromMssql().catch((e) =>
-        console.error("[mssql] odświeżenie nieudane:", e instanceof Error ? e.message : e)
-      );
-    }, config.mssql.syncMs);
-  }
-
+/**
+ * Złożenie aplikacji BEZ nasłuchiwania.
+ *
+ * Wydzielone z `main()`, żeby dało się je przetestować: `app.inject()` z
+ * Fastify wykonuje pełne żądanie — hooki, walidację, trasę — nie otwierając
+ * portu. Wcześniej budowanie i `listen` siedziały w jednej funkcji, więc test
+ * trasy wymagałby postawienia serwera i strzelania do niego po sieci.
+ *
+ * Poza tym zostaje tu wyłącznie to, co niepotrzebne w teście: cykliczny import
+ * z MSSQL i samo `listen`.
+ */
+export async function buildApp() {
   const app = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
     // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
     bodyLimit: 6 * 1024 * 1024,
   });
-  await app.register(cors, { origin: true });
-  // kontekst żądania (device_id do events) — musi być przed trasami
+  // kontekst żądania (device_id do events) + bramka sesji — przed trasami
   withRequestContext(app);
 
   /* Health ma odpowiadać na pytanie „czy wdrożenie jest poprawne", a nie tylko
@@ -85,11 +81,35 @@ async function main() {
   await app.register(deviceRoutes);
   await app.register(authRoutes);
 
+  await app.ready();
+  return app;
+}
+
+async function main() {
+  db(); // migracja schematu przy starcie
+  zamelduj("api");
+
+  // SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
+  // starcie (twardy błąd, gdy baza nieosiągalna), potem co MSSQL_SYNC_MS.
+  if (config.sgtMode === "mssql") {
+    await importFromMssql();
+    setInterval(() => {
+      importFromMssql().catch((e) =>
+        console.error("[mssql] odświeżenie nieudane:", e instanceof Error ? e.message : e)
+      );
+    }, config.mssql.syncMs);
+  }
+
+  const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });
   console.log(`[api] WERTIS serwer na http://${config.host}:${config.port} · SGT_MODE=${config.sgtMode}`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+/* Import z testu nie może uruchomić serwera. `import.meta.main` jest w Node
+   dopiero od 24, a repo celuje w 22.5, więc porównujemy ścieżkę wprost. */
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
