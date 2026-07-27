@@ -44,7 +44,9 @@ import pl.wertis.kolektor.core.session.userInitials
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
+import pl.wertis.kolektor.ui.theme.AmberBgSoft
 import pl.wertis.kolektor.ui.theme.AmberInk
+import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.BarlowCond
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Destructive
@@ -283,3 +285,39 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier:
 }
 
 /* separator górnej/dolnej krawędzi */
+
+/* ── Pasek wersji ───────────────────────────────────────────────────────────
+   POD paskiem zakładek, nie w nim. Dolne 62 dp to teren kciuka: SKAN,
+   ROZKŁADANIE i WSTECZ zeszły tam właśnie po to, żeby dało się je trafić bez
+   patrzenia. Napis wciśnięty między nie odebrałby im pola dotyku, a przy
+   okazji przesunął cele — czyli zepsułby dokładnie to, co tamta zmiana
+   naprawiała.
+
+   Wersja serwera stoi obok wersji aplikacji, bo pytanie po każdej
+   aktualizacji brzmi „czy kolektor ma już nowy build". `git pull` przestawia
+   serwer od razu, APK czeka na rozesłanie przez MDM — i to rozjazd, nie
+   awaria, więc ma być widoczny, a nie alarmujący.                           */
+
+@Composable
+fun WersjaBar(wersjaAplikacji: String, wersjaSerwera: String?) {
+    val rozjazd = wersjaSerwera != null && wersjaSerwera.isNotBlank() && wersjaSerwera != wersjaAplikacji
+    val opis = when {
+        wersjaSerwera.isNullOrBlank() -> "WERTIS $wersjaAplikacji · serwer: brak połączenia"
+        rozjazd -> "WERTIS $wersjaAplikacji · serwer $wersjaSerwera — wersje różne"
+        else -> "WERTIS $wersjaAplikacji"
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (rozjazd) AmberBgSoft else CardWhite)
+            .padding(vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            opis,
+            fontSize = 9.5.sp,
+            letterSpacing = 0.4.sp,
+            color = if (rozjazd) AmberInk else InkMute,
+        )
+    }
+}

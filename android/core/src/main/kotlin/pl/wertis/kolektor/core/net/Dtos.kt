@@ -59,6 +59,17 @@ data class MagazynInfo(
 @Serializable
 data class MagazynyResponse(val magazyny: List<MagazynInfo> = emptyList())
 
+/**
+ * `/api/health` — tu interesuje nas WYŁĄCZNIE wersja serwera.
+ *
+ * Reszta pól (tryb, worker, problemy) zostaje po stronie serwera; kolektor
+ * pokazuje numer obok własnego, bo rozjazd „serwer nowszy niż APK" to
+ * najczęstsze pytanie po aktualizacji — `git pull` przestawia serwer od razu,
+ * a APK czeka na rozesłanie przez MDM.
+ */
+@Serializable
+data class HealthResponse(val wersja: String = "")
+
 @Serializable
 data class WidocznoscRequest(val ukryte: List<Long>, val pinAutora: String)
 

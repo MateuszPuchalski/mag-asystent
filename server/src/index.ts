@@ -15,6 +15,7 @@ import { magazynRoutes } from "./routes/magazyny.js";
 import { brakDostepuDoMagazynow, importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
 import { docFlagAvailable } from "./services/delivery-flag.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
+import { WERSJA } from "./wersja.js";
 
 /**
  * Złożenie aplikacji BEZ nasłuchiwania.
@@ -46,6 +47,11 @@ export async function buildApp() {
     const problemy = [worker.problem, brakDostepuDoMagazynow].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
+      /* Wersja serwera — kolektor pokazuje ją obok własnej na dole ekranu.
+         Rozjazd („serwer 0.5.0, kolektor 0.4.0") to najczęstsze pytanie po
+         aktualizacji: `git pull` przestawia serwer, ale APK na kolektorze
+         zostaje stary do czasu rozesłania przez MDM. */
+      wersja: WERSJA,
       mode: config.sgtMode,
       sferaMode: config.sferaMode,
       // skąd wzięła się konfiguracja — pierwsze pytanie przy „u mnie nie działa"

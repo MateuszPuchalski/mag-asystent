@@ -5,6 +5,31 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+/* ── Wersja: JEDNO źródło prawdy ────────────────────────────────────────────
+   Do sierpnia 2026 numer stał wpisany tutaj z komentarzem „zgodnie z wersją
+   monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwał sześć
+   zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
+   Komentarz nie jest mechanizmem.
+
+   Teraz numer pochodzi z `package.json` w korzeniu repo. Podbicie w jednym
+   miejscu przestawia APK, serwer i pasek na dole ekranu naraz.              */
+val wersjaMonorepo: String = run {
+    val pkg = rootProject.file("../package.json").readText()
+    Regex("\"version\"\\s*:\\s*\"([^\"]+)\"").find(pkg)?.groupValues?.get(1)
+        ?: error("Nie znalazłem pola \"version\" w package.json korzenia repo")
+}
+
+/* Android wymaga rosnącej liczby całkowitej, inaczej instalacja nowszego APK
+   nad starszym zostanie odrzucona jako „downgrade". Wyliczamy ją z numeru
+   wersji, żeby nie było DRUGIEJ rzeczy do pamiętania przy wydaniu.
+   0.4.0 → 400, 1.2.3 → 10203. Zapas przy patchu i minorze: 99. */
+val kodWersji: Int = run {
+    val (major, minor, patch) = (wersjaMonorepo.substringBefore('-').split('.') + listOf("0", "0"))
+        .take(3)
+        .map { it.toIntOrNull() ?: 0 }
+    major * 10_000 + minor * 100 + patch
+}
+
 android {
     namespace = "pl.wertis.kolektor"
     compileSdk = 35
@@ -13,8 +38,8 @@ android {
         applicationId = "pl.wertis.kolektor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.3.0" // zgodnie z wersją monorepo
+        versionCode = kodWersji
+        versionName = wersjaMonorepo
 
         resourceConfigurations += "pl"
     }
