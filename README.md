@@ -432,6 +432,8 @@ docs/porownanie-asystent.md WERTIS a Firmes+ Asystent Magazyniera — materiał 
                            środowisko demo
 docs/subiekt-gt-edu-setup.md  podpięcie Subiekta GT krok po kroku
 docs/subiekt-gt-struktura.md  co WERTIS czyta i pisze w bazie Subiekta
+instalator/README.md       instalator Windows: usługi, kreator konfiguracji,
+                           konto SQL o minimalnych uprawnieniach
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 tools/docs_check.py        kontrola spójności dokumentacji z repo (martwe ścieżki,
                            usunięte byty, liczby ekranów/testów) — `python3 tools/docs_check.py`

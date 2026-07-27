@@ -11,7 +11,9 @@ import os
 import re
 import sys
 
-DOCS = ["README.md", "DEPLOY.md", "android/README.md"] + sorted(glob.glob("docs/*.md"))
+DOCS = ["README.md", "DEPLOY.md", "android/README.md", "instalator/README.md"] + sorted(
+    glob.glob("docs/*.md")
+)
 
 # Ścieżki, których BRAK jest poprawny: artefakty builda i plik dostarczany
 # ręcznie (licencja Honeywella nie pozwala go trzymać w repo).
@@ -38,7 +40,9 @@ REMOVED = [
     "10 ekran",
 ]
 
-PATH_RE = re.compile(r"(?<![\w./-])((?:server|android|web|docs|tools|\.github)/[\w./-]*[\w/])")
+PATH_RE = re.compile(
+    r"(?<![\w./-])((?:server|android|web|docs|tools|instalator|\.github)/[\w./-]*[\w/])"
+)
 
 
 def main() -> int:
