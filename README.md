@@ -389,6 +389,9 @@ server/                    backend (Fastify + SQLite + worker)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
 docs/architektura.md       jak to jest zbudowane i dlaczego tak (start dla nowej osoby)
 docs/analiza-rozkladanie.md trzy ścieżki rozkładania + backlog
+docs/porownanie-asystent.md WERTIS a Firmes+ Asystent Magazyniera — materiał do
+                           decyzji dla właściciela: zakres, scenariusze, koszty,
+                           środowisko demo
 docs/subiekt-gt-edu-setup.md  podpięcie Subiekta GT krok po kroku
 docs/subiekt-gt-struktura.md  co WERTIS czyta i pisze w bazie Subiekta
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json

@@ -331,7 +331,7 @@ Raport ma trzy reguły wbudowane w kod, każda z testem:
 | co | ile | gdzie |
 |---|---|---|
 | serwer | 153 | `cd server && npm test` (node:test przez tsx) |
-| `:core` | 85 | `cd android && ./gradlew :core:test` — **bez Android SDK** |
+| `:core` | 92 | `cd android && ./gradlew :core:test` — **bez Android SDK** |
 | `:app` | — | tylko CI: wymaga Android SDK |
 
 Dwa workflow: `android.yml` (`:core` + APK debug) i `server.yml` (testy, `tsc`,
