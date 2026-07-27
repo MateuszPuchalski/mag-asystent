@@ -3,19 +3,30 @@
 Dokument dla właściciela. Odpowiada na jedno pytanie: **zostajemy przy
 Asystencie, wdrażamy WERTIS, czy trzymamy oba.**
 
-> **Jak czytać ten dokument.** Opis Asystenta pochodzi z materiałów producenta
-> i InsERT (linki w §10), **nie z testu porównawczego na naszym magazynie**.
-> Nie mierzyliśmy obu systemów na tej samej dostawie. Tam, gdzie praktyka
-> rozmija się z materiałami producenta, rację ma praktyka — i proszę o korektę.
+> **Jak czytać ten dokument.** Opis *możliwości* Asystenta pochodzi z materiałów
+> producenta i InsERT (linki w §10), **nie z testu porównawczego na naszym
+> magazynie**. Informacja o tym, **z czego firma realnie korzysta**, pochodzi od
+> właściciela — i tam, gdzie te dwa źródła się rozmijają, rozstrzyga praktyka.
 > Wszystkie liczby po stronie WERTIS pochodzą z uruchomionego kodu.
+>
+> **To rozróżnienie decyduje o wnioskach.** Katalog funkcji producenta jest
+> szerszy niż zakres używany w tej firmie, a porównywanie katalogów prowadzi do
+> fałszywego wniosku, że dwa systemy się uzupełniają. Dokument porównuje więc
+> **wykonywaną pracę**, nie listy funkcji.
 
 ---
 
 ## 1. Streszczenie decyzyjne
 
-**Co jest dziś.** Asystent obsługuje kompletację zamówień, tworzenie dokumentów
+**Co jest dziś.** Asystent *oferuje* kompletację zamówień, tworzenie dokumentów
 magazynowych (WZ, PZ, RW, PW, MM), zamówienia ZK i inwentaryzację. Lokalizację
 towaru trzyma w polach własnych kartoteki.
+
+**Ale z wydań w Asystencie nie korzystamy.** To rozstrzyga porównanie i dlatego
+stoi tak wysoko. Katalog funkcji producenta jest szerszy niż to, co realnie
+pracuje w tej firmie — a płacimy za katalog, nie za użycie. Funkcja, której się
+nie używa, **nie jest argumentem za utrzymaniem systemu**; jest pozycją
+w cenniku.
 
 **Co proponujemy.** WERTIS przejmuje **przyjęcie dostawy i wyszukiwanie towaru** —
 dwie ścieżki, które w naszej firmie są codzienne i na których rozkładanie jest
@@ -23,9 +34,10 @@ zarazem sprawdzaniem faktury. WERTIS zapisuje do Subiekta **wyłącznie dwie
 rzeczy**: pole lokalizacji na kartotece i flagę sprawdzenia na fakturze. Zero
 tworzenia dokumentów, zero modyfikacji stanów.
 
-**Czego to nie zastępuje.** **Kompletacji zamówień i wydań (WZ) — to zostaje
-przy Asystencie i nie planujemy tego przejmować.** Przesunięcia magazynowe (MM)
-i inwentaryzacja są w WERTIS zaplanowane, ale dziś ich nie ma.
+**Czego to nie zastępuje.** Po odjęciu funkcji nieużywanych zostają **dwie
+realne**: **inwentaryzacja** i **przesunięcia magazynowe (MM)**. Obie są
+w WERTIS w drodze — MM jest kolejne w kolejce i ma gotowy kontrakt w kodzie,
+inwentaryzacja jest zaplanowana.
 
 **Ile to kosztuje.** Asystent: 589 zł netto licencja startowa, 389 zł netto za
 każde kolejne urządzenie, licencja roczna. WERTIS: brak opłat licencyjnych, ale
@@ -34,14 +46,31 @@ do którego można zadzwonić.
 
 ### Rekomendacja
 
-**Oba systemy równolegle, z jasnym podziałem: WERTIS na przyjęciu, Asystent na
-wydaniu.** Nie jest to stan przejściowy ani kompromis — to podział, który
-wynika z tego, gdzie każdy z systemów jest mocny. Oba zapisują lokalizację
-w to samo pole kartoteki, więc **nie rozjadą się na danych**.
+**WERTIS na przyjęciu i wyszukiwaniu od zaraz. Asystent utrzymywać tylko tak
+długo, jak długo realnie coś w nim pracuje.**
 
-Decyzja o rezygnacji z Asystenta byłaby przedwczesna do czasu, aż WERTIS ma
-przesunięcia magazynowe i inwentaryzację, a granica produkcyjna do Subiekta
-przejdzie test na prawdziwej bazie (§8).
+Z zestawienia katalogów obu produktów wychodzi wniosek kuszący i fałszywy:
+trwały podział ról, WERTIS na przyjęciu, Asystent na wydaniu. **Fałszywy, bo
+z wydań nie korzystamy** — podział ról wymagałby, żeby obie role były
+obsadzone, a druga jest pusta.
+
+Pytanie „zostajemy przy Asystencie czy nie" zawęża się więc do dwóch rzeczy
+i tylko one powinny decydować:
+
+| Pytanie | Jeśli **tak** | Jeśli **nie** |
+|---|---|---|
+| Czy robicie inwentaryzację przez Asystenta? | trzymać do czasu, aż WERTIS to dostanie | jeden powód mniej |
+| Czy wystawiacie MM przez Asystenta? | trzymać do uruchomienia zapisu przez Sferę | jeden powód mniej |
+
+Jeśli odpowiedź na oba brzmi „nie", **Asystent nie robi dziś nic, czego nie
+zrobi WERTIS** — a wtedy roczna licencja opłaca funkcje leżące odłogiem.
+
+> **Do potwierdzenia.** Nie wiem, czy korzystacie z inwentaryzacji i MM
+> w Asystencie. Dokument jest w tym miejscu **warunkowy celowo** — dwie
+> odpowiedzi zamieniają go w jednoznaczną rekomendację. Niezależnie od nich
+> zostaje warunek techniczny: granica produkcyjna WERTIS do Subiekta nie była
+> jeszcze uruchomiona (§8), więc wyłączanie czegokolwiek przed tym testem
+> byłoby przedwczesne.
 
 ---
 
@@ -55,12 +84,15 @@ z Subiektem** oraz **aplikacji na urządzeniach mobilnych** (Android), pracując
 w sieci lokalnej po WiFi. Producent podaje zgodność od **Androida 4.1** — czyli
 działa również na starszym i tańszym sprzęcie.
 
-Zakres: kontrola kompletacji zamówień (z pokazaniem lokalizacji i zdjęć towaru),
-kontrola zgodności towaru z dokumentami WZ/PZ/RW/PW/MM, tworzenie tych
-dokumentów oraz zamówień ZK ze skanowanego towaru, podgląd i edycja kartotek,
-zarządzanie lokalizacją (mechanizm oparty o **pola własne towaru**),
-inwentaryzacja. Licencja jest pobierana automatycznie z serwera licencyjnego
-producenta przy uruchomieniu na nowym podmiocie.
+Zakres deklarowany przez producenta: kontrola kompletacji zamówień (z pokazaniem
+lokalizacji i zdjęć towaru), kontrola zgodności towaru z dokumentami
+WZ/PZ/RW/PW/MM, tworzenie tych dokumentów oraz zamówień ZK ze skanowanego towaru,
+podgląd i edycja kartotek, zarządzanie lokalizacją (mechanizm oparty o **pola
+własne towaru**), inwentaryzacja. Licencja jest pobierana automatycznie z serwera
+licencyjnego producenta przy uruchomieniu na nowym podmiocie.
+
+**Z tego zakresu firma nie korzysta z bloku wydań** — kompletacji zamówień ani
+tworzenia WZ. Reszta listy pozostaje do potwierdzenia (§1).
 
 ### WERTIS
 
@@ -84,15 +116,25 @@ adres w polu tekstowym albo złą flagę. Obie rzeczy cofa jeden `UPDATE`.
 Trzy stany: **jest** · **w drodze** (zaplanowane, nie ma tego w kodzie) ·
 **—** (nie robimy i nie planujemy).
 
+Kolumna Asystenta rozróżnia **funkcję dostępną** od **funkcji używanej**.
+To rozróżnienie jest tu najważniejsze: porównywanie katalogów producentów
+odpowiada na pytanie, który program ma dłuższą listę — a nie na pytanie, który
+wykonuje pracę wykonywaną w tej firmie.
+
 ### Wydania i dokumenty
 
 | Funkcja | Asystent | WERTIS |
 |---|---|---|
-| Kompletacja zamówień (zbiórka pod ZK) | **jest** | **—** *zostaje przy Asystencie* |
-| Tworzenie WZ ze skanowanego towaru | **jest** | **—** *zostaje przy Asystencie* |
-| Tworzenie PZ / RW / PW / ZK | **jest** | **—** |
+| Kompletacja zamówień (zbiórka pod ZK) | jest, ale **nieużywane** | **—** |
+| Tworzenie WZ ze skanowanego towaru | jest, ale **nieużywane** | **—** |
+| Tworzenie PZ / RW / PW / ZK | jest, ale **nieużywane** | **—** |
 | Przesunięcia magazynowe (MM) | **jest** | **w drodze** — kolejne w kolejce |
 | Inwentaryzacja (arkusze ze skanu) | **jest** | **w drodze** — planowana |
+
+> Trzy pierwsze wiersze to **cały blok wydań** — i w tej firmie leży on
+> odłogiem. Dlatego w porównaniu nie liczy się na korzyść żadnej ze stron.
+> Przy dwóch ostatnich wierszach nie wiem, czy są w użyciu; jeśli nie, blok jest
+> martwy w całości.
 
 ### Przyjęcie i rozkładanie
 
@@ -288,9 +330,16 @@ sprzęt (kolektory z Androidem 8.0+), czas rozwoju i czas serwisu, który przy
 Asystencie kupuje się razem z licencją. Przy jednym czy dwóch urządzeniach różnica
 w opłatach jest niewielka; rośnie dopiero przy większej liczbie kolektorów.
 
-**Uczciwa konkluzja kosztowa:** przy obecnej skali licencja Asystenta nie jest
-pozycją, dla której warto go porzucać. Argumentem za WERTIS jest dopasowanie do
-procesu, nie oszczędność.
+**Konkluzja kosztowa.** Sama kwota jest mała i nie o nią tu chodzi. Istotne jest
+co innego: **licencja obejmuje cały katalog, a używana jest jego część.** Blok
+wydań — kompletacja, WZ, PZ/RW/PW/ZK — jest opłacany i nieużywany.
+
+Nie jest to zarzut wobec Asystenta; tak działa licencjonowanie pakietowe
+i w wielu firmach ten blok pracuje. U nas nie. Wniosek praktyczny jest więc
+odwrotny niż zwykle przy takim porównaniu: **oszczędność nie jest głównym
+argumentem za WERTIS — ale nie jest też argumentem za utrzymaniem Asystenta.**
+O jego dalszym losie decyduje wyłącznie to, czy inwentaryzacja i MM są w użyciu
+(§1), a nie 589 zł rocznie.
 
 ---
 
@@ -375,9 +424,12 @@ plakietką i blokada sesji, praca offline, raport kolizji kodów, nocna
 rekoncyliacja, raport przeslotowania.
 
 **W drodze:** przesunięcia magazynowe (MM) — kolejne w kolejce, kontrakt gotowy;
-inwentaryzacja — planowana.
+inwentaryzacja — planowana. **To jedyne dwie rzeczy, które Asystent robi, a my
+jeszcze nie.**
 
-**Nie planowane:** kompletacja zamówień i wydania.
+**Nie planowane:** kompletacja zamówień i wydania — **bo nie są używane**.
+Gdyby firma zaczęła kompletować zamówienia z kolektora, byłaby to decyzja do
+podjęcia od nowa, a nie luka do zasypania.
 
 **Do zrobienia przed produkcją:**
 
