@@ -18,6 +18,9 @@ on:
       - "package.json"
       - "README.md"
       - "android/README.md"
+      - "instalator/README.md"
+      - "DEPLOY.md"
+      - "CHANGELOG.md"
       - "docs/**"
       - ".github/workflows/server.yml"
   pull_request:
@@ -27,6 +30,9 @@ on:
       - "package.json"
       - "README.md"
       - "android/README.md"
+      - "instalator/README.md"
+      - "DEPLOY.md"
+      - "CHANGELOG.md"
       - "docs/**"
       - ".github/workflows/server.yml"
 
@@ -53,3 +59,9 @@ jobs:
       # rozjechały się z kodem — bez tego dokumentacja starzeje się po cichu.
       - name: Spójność dokumentacji
         run: python3 tools/docs_check.py
+      # styl_check mierzy to, co da się zmierzyć z reguł `docs/slownik.md`:
+      # długość zdania i akapitu oraz odrzucone warianty terminów. Bez pomiaru
+      # styl wraca do stanu wyjściowego przy pierwszym PR — tak samo jak liczby
+      # w README zestarzały się, zanim powstał docs_check.
+      - name: Styl dokumentacji
+        run: python3 tools/styl_check.py

@@ -1,12 +1,12 @@
 # Analiza rozkładania towaru — trzy ścieżki
 
 Rozkładanie skonfrontowane z realiami pracy magazyniera na kolektorze.
-Dokument opisuje **stan po redesignie v2.0 i module zwrotów**; sekcja 4 mówi,
-czym to się różni od pierwszej wersji analizy (lipiec 2026), żeby czytelnik
-starszych PR-ów wiedział, co zniknęło i dlaczego.
+Dokument opisuje **stan po redesignie v2.0 i module zwrotów**. Sekcja 4 mówi,
+czym to się różni od pierwszej wersji analizy (lipiec 2026). Czytelnik starszych
+PR-ów dowie się z niej, co zniknęło i dlaczego.
 
 O tym, **którą ścieżką idzie dokument, rozstrzyga magazyn skutku, nie typ
-dokumentu** — i kryteria muszą pozostać rozłączne. Ten sam dokument widoczny
+dokumentu.** Kryteria muszą pozostać rozłączne. Ten sam dokument widoczny
 w dwóch zakładkach dałoby się rozłożyć dwiema niekompatybilnymi ścieżkami naraz:
 raz z przesunięciem stanu, raz bez.
 
@@ -27,12 +27,13 @@ raz z przesunięciem stanu, raz bez.
 2. **Otwarcie** (`openDelivery`) — pozycje snapshotowane w chwili otwarcia
    i agregowane po `tw_id` (różne partie/ceny → jedna linia robocza). Zmiana
    dokumentu przez księgowość w trakcie pracy nie rozjeżdża postępu.
-3. **Dwa skany na pozycję** — skan towaru (`resolveScan`) → wiersz na liście
-   rozwija się z ilością i lokalizacją docelową → skan etykiety regału
-   (`putawayLine`) → zapis, wiersz zwija się jako odłożony. Zero dialogu
-   potwierdzającego, zero tapnięć na ścieżce głównej i **zero podmieniania
-   ekranu**: lista zostaje widoczna, bo to na niej widać, ile jeszcze zostało
-   w kartonie. Wcześniej wchodziła tu pełnoekranowa karta, która listę gasiła.
+3. **Dwa skany na pozycję.** Skan towaru (`resolveScan`) rozwija wiersz
+   z ilością i lokalizacją docelową. Skan etykiety regału (`putawayLine`)
+   zapisuje adres i zwija wiersz jako odłożony.
+
+   Zero dialogu potwierdzającego, zero tapnięć i **zero podmieniania ekranu**.
+   Lista zostaje widoczna, bo to na niej widać, ile jeszcze zostało w kartonie.
+   Wcześniej wchodziła tu pełnoekranowa karta, która listę gasiła.
 4. **Zapis** — wyłącznie zadanie `set_location` do `sfera_queue`. Żadnego MM,
    żadnego `waiting_for_doc`.
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
@@ -55,10 +56,12 @@ Zwroty→MAG** na wszystko, co z niego poszło na półki.
 
 **Rozliczenie idzie ilościami** (`ilosc_odlozona − mm_ilosc`), nie statusem
 linii. Ten sam towar bywa w dwóch koszykach, bo dokument zbiorczy agreguje go
-w jedną linię — flaga „już w MM" gubiłaby resztę. Z arytmetyki wychodzą trzy
-rzeczy naraz: dedupe przy ponownym domknięciu koszyka, poprawne dzielenie linii
-między koszyki oraz to, że sztuki odłożone z pozycji zgłoszonej potem jako
-uszkodzona i tak jadą na MAG — leżą już na półce.
+w jedną linię — flaga „już w MM" gubiłaby resztę.
+
+Z arytmetyki wychodzą trzy rzeczy naraz. Dedupe przy ponownym domknięciu
+koszyka. Poprawne dzielenie linii między koszyki. Wreszcie to, że sztuki
+odłożone z pozycji zgłoszonej potem jako uszkodzona i tak jadą na MAG —
+leżą już na półce.
 
 ## 3. Kontener importowy — sesja z wózkiem
 
@@ -70,16 +73,16 @@ proces, który potrzebuje modelu sesji zamiast dokumentu.**
 1. **Sesja** (`createSession`) — pozycje agregowane po `tw_id`, lokalizacja
    docelowa = pickingowa z kartoteki, `BRAK LOK` sortowane na końcu.
 2. **Wózek** (`scanToCart`) — domyślna ilość ograniczona do stanu MGP
-   pomniejszonego o MM „w drodze"; blokada per pozycja (TTL 30 min); można
-   dodać towar spoza dokumentu.
+   pomniejszonego o MM „w drodze". Blokada działa per pozycja (TTL 30 min).
+   Można dodać towar spoza dokumentu.
 3. **Przy regale** (`confirmItem`) — korekta ilości i skan lokalizacji docelowej.
 4. **Zatwierdzenie wózka** (`commitCart`) — zadania `set_location` z tej rundy,
    a **na końcu** jeden dokument MM MGP→MAG (patrz niezmiennik niżej).
 5. **Zamknięcie sesji** (`closeSession`) — `closed` albo
    `closed_with_deviations` (częściowe / pominięte / nietknięte).
 
-Pusta strefa źródłowa to **błąd**, a nie cicha zmiana trybu: przypadek „towar
-leży już na MAG, brakuje mu adresu" obsługuje ścieżka dostaw i dublowanie go
+Pusta strefa źródłowa to **błąd**, a nie cicha zmiana trybu. Przypadek „towar
+leży już na MAG, brakuje mu adresu" obsługuje ścieżka dostaw. Dublowanie go
 tutaj kosztowało więcej, niż dawało.
 
 ## Co działa dobrze — nie ruszać
@@ -110,8 +113,8 @@ tutaj kosztowało więcej, niż dawało.
 - **Wyjątki jako obiekt pierwszej klasy** ze zdjęciem dowodowym. Pozycja
   z wyjątkiem wypada z rutyny, ale nie blokuje domknięcia dostawy — inaczej
   zgłoszenie problemu karałoby zgłaszającego i nikt by go nie zgłaszał.
-- **Blokady pozycji per użytkownik z TTL** — przy natłoku jedną dostawę rozkłada
-  kilka osób; druga osoba dowiaduje się, kto trzyma linię, zamiast odkładać ten
+- **Blokady pozycji per magazynier, z TTL.** Przy natłoku jedną dostawę rozkłada
+  kilka osób. Druga osoba dowiaduje się, kto trzyma linię, zamiast odkładać ten
   sam towar drugi raz.
 - **Agregacja po `tw_id`** — magazynier rozkłada towar, nie pozycje księgowe
   z partii.
@@ -134,23 +137,25 @@ Zniknęły od tego czasu:
   więc tryb B ma już tylko MGP.
 
 Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykonana:
-skanowanie sprzętowe (Zebra/Honeywell) zastąpiło dotyk i chipy `DEMO_LOCS`;
-rozróżnienie kodu lokalizacji od EAN-u to dziś twarda walidacja; przełącznik
-„zamień / dodaj lokalizację" jest wystawiony jako decyzja człowieka przy
-rozjeździe półek; odporność na dziury Wi-Fi daje trwały bufor offline (Room).
+
+- skanowanie sprzętowe (Zebra/Honeywell) zastąpiło dotyk i chipy `DEMO_LOCS`,
+- rozróżnienie kodu lokalizacji od EAN-u to dziś twarda walidacja,
+- przełącznik „zamień / dodaj lokalizację" jest decyzją człowieka przy
+  rozjeździe półek,
+- odporność na dziury Wi-Fi daje trwały bufor offline (Room).
 
 ## 5. Backlog — co nadal boli
 
-> **Przeslotowanie ma już narzędzie.** `npm run reslot` (opis w README i DEPLOY §7)
-> liczy pion, nie odległość: przy 342 m² przejście róg–róg to ~20 s, a pobranie
-> z drabiny albo z podłogi 10–25 s wobec ~3 s ze strefy złotej. Klasyczny
-> argument za slottingiem ABC „po alejkach" tu się nie broni liczbowo.
+> **Przeslotowanie ma już narzędzie.** `npm run reslot` (opis w README
+> i DEPLOY §7) liczy pion, nie odległość. Przy 342 m² przejście róg–róg to
+> ~20 s. Pobranie z drabiny albo z podłogi trwa 10–25 s wobec ~3 s ze strefy
+> złotej. Klasyczny argument za slottingiem ABC „po alejkach" nie broni się tu
+> liczbowo.
 
 
 1. **Podpowiedzi dla BRAK LOK.** Towar bez lokalizacji wymaga znalezienia
-   miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru albo
-   lokalizacje towarów o podobnym symbolu — zamiast zostawiać człowieka z pustą
-   półką w głowie.
+   miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru.
+   Może też podpowiadać lokalizacje towarów o podobnym symbolu.
 2. **Korekta po zatwierdzeniu MM.** Pomyłkowej lokalizacji nie trzeba cofać —
    wystarczy zeskanować właściwą półkę (dlatego mechanizm COFNIJ i jego karencja
    zostały usunięte). Ale pomyłkowo domkniętego koszyka ani zatwierdzonego wózka
@@ -161,13 +166,14 @@ rozjeździe półek; odporność na dziury Wi-Fi daje trwały bufor offline (Roo
    „dokument zmieniony od otwarcia".
 4. **Dług danych w kartotece — większy, niż się wydawało.** Audyt z 2026-07-26
    naliczył **93 kody adresowe w 158 kartotekach**, których walidator nie
-   przyjmuje. Wcześniejszy zapis („około 16 literówek") mylił się nie tylko co do
-   skali, ale i co do rodzaju: większość to nie pomyłki, lecz **trzy martwe
-   konwencje** (`PALETA22`, `PAL38II`, `KT1`), a literówek jest 21. Żadna z tych
-   konwencji nie jest już używana, więc odrzucanie ich jest poprawne — do
-   poprawienia po stronie Subiekta, nie aplikacji. Lista:
+   przyjmuje. Wcześniejszy zapis („około 16 literówek") mylił się co do skali
+   i co do rodzaju. Większość to nie pomyłki, lecz **trzy martwe konwencje**
+   (`PALETA22`, `PAL38II`, `KT1`). Literówek jest 21.
+
+   Żadna z tych konwencji nie jest już używana, więc odrzucanie ich jest
+   poprawne. Poprawia się je po stronie Subiekta, nie aplikacji. Lista:
    [`adresy-do-poprawy.md`](adresy-do-poprawy.md).
 5. **Dokumenty MM czekają na workera Sfery.** Do czasu uruchomienia procesu COM
    (etap 2 w [DEPLOY.md](../DEPLOY.md)) MM z wózka i z koszyka wystawia biuro
-   ręcznie. Otwarte pytanie: czy wystarczy **import EPP/EDI++**, który obsługuje
-   MM bez licencji Sfery — jeden test na instalacji 1.87 SP3 HF1 to rozstrzyga.
+   ręcznie. Otwarte pytanie: czy wystarczy **import EPP/EDI++**, obsługujący
+   MM bez licencji Sfery. Rozstrzyga to jeden test na instalacji 1.87 SP3 HF1.

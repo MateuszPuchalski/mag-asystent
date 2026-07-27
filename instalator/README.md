@@ -1,13 +1,13 @@
 # Instalator WERTIS dla Windows
 
-Stawia serwer WERTIS na maszynie z Subiektem GT: instaluje zależności, pobiera
-i buduje aplikację, rejestruje dwie usługi Windows, otwiera port dla kolektorów,
-wypełnia konfigurację odpytując bazę Subiekta i zakłada konto SQL o minimalnych
-uprawnieniach.
+Stawia serwer WERTIS na maszynie z Subiektem GT. Instaluje zależności, pobiera
+i buduje aplikację, rejestruje dwie usługi Windows i otwiera port dla
+kolektorów. Wypełnia konfigurację odpytując bazę Subiekta. Zakłada konto SQL
+o minimalnych uprawnieniach.
 
 Robi to, co [`DEPLOY.md`](../DEPLOY.md) każe zrobić ręcznie. **Tamta instrukcja
-zostaje i jest referencją tego katalogu** — gdy instalator zawiedzie w połowie,
-ręczna droga nadal działa, a każdy krok da się dokończyć z palca.
+zostaje i jest referencją tego katalogu.** Gdy instalator zawiedzie w połowie,
+ręczna droga nadal działa. Każdy krok da się dokończyć z palca.
 
 ## Uruchomienie
 
@@ -40,10 +40,12 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 
 1. **Zależności** — Node.js LTS i Git przez `winget` (bez wingeta: instalator
    MSI z nodejs.org). Sprawdza też **wersję Node**: aplikacja wymaga co
-   najmniej 22.5, bo używa wbudowanego sterownika SQLite, a starszy Node
-   przechodzi zwykłe „czy jest node?" i wywala się dopiero przy starcie usługi.
-   Git jest w komplecie celowo: bieżąca obsługa z `DEPLOY.md` §7 stoi na
-   `git pull` i Git Bashu.
+   najmniej 22.5. Git jest w komplecie celowo. Bieżąca obsługa
+   z `DEPLOY.md` §7 stoi na `git pull` i Git Bashu.
+
+   > **Dlaczego wersja, a nie sama obecność.** Serwer używa wbudowanego
+   > sterownika SQLite, którego starsze wersje nie mają. Starszy Node przechodzi
+   > zwykłe „czy jest node?". Wywala się dopiero przy starcie usługi.
 2. **Aplikacja** — `git clone` do `C:\wertis`, `npm ci`, `npm run build`.
    Ponowne uruchomienie instalatora jest zarazem **aktualizacją** (`git pull`).
 3. **Usługi** — `wertis-api` i `wertis-worker` przez NSSM, z logami, rotacją,
@@ -74,7 +76,7 @@ workera, więc samo zielone API mówiłoby o połowie instalacji.
 Skrypt pochodzi z [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md) §2
 i nadaje:
 
-- `SELECT` na **siedmiu** tabelach,
+- `SELECT` na **ośmiu** tabelach,
 - `UPDATE` na **jednej kolumnie** kartoteki (tej wybranej na lokalizację),
 - `INSERT, UPDATE` na tabeli przypisań flag,
 - **ani jednego prawa zapisu do `dok__Dokument`**.
@@ -106,16 +108,22 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
 
 ## Dwie rzeczy, o których instalator pyta osobno
 
-**Restart usługi SQL.** Włączenie TCP/IP i uwierzytelniania mieszanego wymaga
-restartu instancji, czyli **wyrzucenia wszystkich z Subiekta** na kilkanaście
-sekund. Jedyny krok o skutku poza samą aplikacją. Gdy oba ustawienia są już
-włączone — a zwykle są — restartu nie ma wcale.
+**Restart usługi SQL.**
 
-**Pole lokalizacji.** Subiekt w tych wersjach nie ma kolumny „lokalizacja";
-używa się jednego z ośmiu pól własnych kartoteki, a aplikacja **nadpisuje je
-bezwarunkowo**. Kreator pokazuje, ile kartotek ma każde pole zajęte i czym,
-i przy niepustym żąda potwierdzenia. Wskazanie pola używanego przez firmę do
-czegoś innego kasuje te dane bezpowrotnie.
+> ⚠️ Restart instancji **wyrzuca wszystkich z Subiekta** na kilkanaście sekund.
+> To jedyny krok instalatora o skutku poza samą aplikacją.
+
+Restartu wymaga włączenie TCP/IP i uwierzytelniania mieszanego. Gdy oba
+ustawienia są już włączone — a zwykle są — restartu nie ma wcale.
+
+**Pole lokalizacji.**
+
+> ⚠️ Aplikacja **nadpisuje wybrane pole bezwarunkowo**. Wskazanie pola, którego
+> firma używa do czegoś innego, kasuje te dane bezpowrotnie.
+
+Subiekt w tych wersjach nie ma kolumny „lokalizacja". Używa się jednego
+z ośmiu pól własnych kartoteki. Kreator pokazuje, ile kartotek ma każde pole
+zajęte i czym. Przy niepustym polu żąda potwierdzenia.
 
 ## Rozwój
 
@@ -156,8 +164,8 @@ zdanie jest tu po przejściach. Każdy krok wykonawczy siedzi za `Test-DryRun`
 i w przebiegu próbnym jest pomijany, więc zielone CI nie znaczy, że kroki
 działają. Tak przeszła awaria z 27 lipca: `New-Item` na korzeniu dysku
 (`Split-Path "C:\wertis"` → `C:\`) wywracał instalację przy **domyślnych**
-ustawieniach, a CI świeciło zielono. Od tego czasu logika, którą da się
-wywołać bez dotykania systemu, ma asercje w `testy.ps1` — i to one, a nie
+ustawieniach, a CI świeciło zielono. Od tego czasu asercje w `testy.ps1`
+obejmują całą logikę wywoływalną bez dotykania systemu. To one, a nie
 `-DryRun`, są bramką na tę klasę błędów.
 
 Nadal **nie sprawdzamy** niczego, co wymaga Subiekta: połączenia z bazą,

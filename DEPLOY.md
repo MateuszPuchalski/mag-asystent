@@ -50,10 +50,10 @@ WERTIS-Instalator.exe -Demo
 ```
 
 **Reszta tego dokumentu opisuje to samo krok po kroku i nadal obowiązuje.**
-Instalator nie robi wszystkiego: konta pracowników zakłada się z kolektora
-(§5a), a kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia
-ręcznie — obie **zanim** ruszy praca na prawdziwych danych. Gdy instalator
-zawiedzie w połowie, każdy jego krok da się dokończyć poniższą drogą.
+Instalator nie robi wszystkiego. Konta pracowników zakłada się z kolektora
+(§5a). Kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia ręcznie —
+obie **zanim** ruszy praca na prawdziwych danych. Gdy instalator zawiedzie
+w połowie, każdy jego krok da się dokończyć poniższą drogą.
 
 ## 1. Wymagania
 
@@ -204,7 +204,7 @@ netsh advfirewall firewall add rule name="WERTIS kolektor" dir=in action=allow p
 ```
 
 Kolektory łączą się z `http://mag.wertis.local:3001`. HTTPS nie jest wymagane —
-klient natywny działa po zwykłym HTTP w LAN.
+kolektor działa po zwykłym HTTP w LAN.
 
 ## 5. Kolektory — natywna aplikacja Android (APK)
 
@@ -248,13 +248,14 @@ Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](a
 
 ## 5a. Konta pracowników i badge'e (plan §7)
 
-Bez kont kolektor nie ma czym podpisać operacji: ekran startowy prosi o skan
+Bez kont kolektor nie ma czym podpisać operacji. Ekran startowy prosi o skan
 badge'a i nie przepuszcza dalej. **Tak samo API** — od lipca każda trasa poza
 czterema (`GET /api/health`, `GET /api/setup`, `POST /api/auth/badge`
-i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`. Wcześniej
-bramką był wyłącznie ekran kolektora, więc dowolne urządzenie w sieci hali
-mogło zmienić lokalizację w Subiekcie albo pobrać raport wydajności per
-pracownik, podpisując się dowolnym nazwiskiem.
+i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`.
+
+> **Dlaczego.** Wcześniej bramką był wyłącznie ekran kolektora. Dowolne
+> urządzenie w sieci hali mogło zmienić lokalizację w Subiekcie albo pobrać
+> raport wydajności per pracownik. Podpisywało operację dowolnym nazwiskiem.
 
 **1. Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
@@ -278,10 +279,12 @@ W kreatorze wpisujesz wszystkich naraz:
 - po zatwierdzeniu kolektor pokazuje **kody badge'ów** — to jedyny moment,
   w którym widać je wszystkie naraz. Przepisz je albo sfotografuj.
 
-Kolejność wysyłki układa kreator (biuro zawsze pierwsze) i sam loguje się
-nowym kontem biura, żeby móc założyć resztę. Jeśli coś padnie w połowie —
-zerwane Wi-Fi przy czwartej osobie z sześciu — ekran pokazuje **co już
-powstało**; tych osób nie zakładaj drugi raz, dopisz tylko brakujące.
+Kolejność wysyłki układa kreator: biuro zawsze pierwsze. Kreator sam loguje się
+nowym kontem biura, żeby móc założyć resztę.
+
+Gdy coś padnie w połowie — zerwane Wi-Fi przy czwartej osobie z sześciu — ekran
+pokazuje **co już powstało**. Tych osób nie zakładaj drugi raz. Dopisz tylko
+brakujące.
 
 Nowe osoby dochodzą później tą samą drogą: **Ustawienia → DODAJ OSOBY**
 (widoczne tylko dla konta biura, wymaga jego PIN-u).
@@ -320,10 +323,12 @@ konta — tego samego pytania używa kolektor.
 byłaby listą tożsamości do przepisania na własną plakietkę.
 
 **2. Wydrukuj plakietki.** Na plakietce ma być **kod kreskowy z `badgeCode`**
-(Code 128 — ten sam symbol, co etykiety regałów) i pod nim ten sam kod tekstem,
-na wypadek zdartej etykiety. **Nazwiska na plakietce nie drukuj**: badge się
-gubi i zostaje na kurtce, a powiązanie kod → człowiek żyje wyłącznie w bazie.
-Format `PRC-0000-0` jest stały, więc jedna szablonowa etykieta wystarczy.
+w symbolice Code 128 — tej samej, co etykiety regałów. Pod kodem umieść ten sam
+ciąg tekstem, na wypadek zdartej etykiety.
+
+**Nazwiska na plakietce nie drukuj.** Badge się gubi i zostaje na kurtce,
+a powiązanie kod → człowiek żyje wyłącznie w bazie. Format `PRC-0000-0` jest
+stały, więc jedna szablonowa etykieta wystarczy.
 
 **3. Migracja historii** (tylko przy aktualizacji istniejącej instalacji —
 jednorazowo, idempotentnie). Zakłada konta dla nazw, które już są w `events`,
@@ -354,8 +359,8 @@ Odebranie pozycji zapisuje w `events` (`lock_forced`) **komu i przez kogo**.
 Lock już wygasły zdejmuje się bez wpisu — po TTL nikomu nic nie odebrano.
 
 Zarządzanie kontami jest zastrzeżone dla biura, bo to jedyna operacja tworząca
-tożsamość: brygadzista mogący zakładać konta założyłby konto biura z własnym
-PIN-em i reszta reguł przestałaby cokolwiek znaczyć.
+tożsamość. Brygadzista mogący zakładać konta założyłby konto biura z własnym
+PIN-em. Reszta reguł przestałaby wtedy cokolwiek znaczyć.
 
 **4. Raport wydajności (`GET /api/wydajnosc?days=7`) — obowiązek formalny
 PRZED uruchomieniem.** Telemetria per pracownik to **monitoring pracowniczy**
@@ -381,15 +386,19 @@ działa od razu po instalacji; dane z eksportu `magmat.xlsx`. Magazynier testuje
 wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
 **Etap 1 — odczyt z MSSQL (`SGT_MODE=mssql`):**
-1. Utwórz login SQL o minimalnych uprawnieniach — gotowy, idempotentny skrypt
-   w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md) §2.
-   `GRANT SELECT` na osiem tabel, `GRANT UPDATE` na jedną kolumnę
+1. Utwórz login SQL o minimalnych uprawnieniach. Gotowy, idempotentny skrypt
+   jest w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md) §2.
+
+   Skrypt nadaje `GRANT SELECT` na osiem tabel, `GRANT UPDATE` na jedną kolumnę
    (lokalizacja) i `GRANT INSERT, UPDATE` na `fl_Wartosc` (flagi). Aplikacja
    **nie potrzebuje żadnego prawa zapisu do `dok__Dokument`**.
-2. Przejdź checklistę `[WERYFIKUJ]`. Jest krótka, bo nazwy tabel, kolumn oraz
-   kody `dok_Typ` i `dok_Status` są odczytane wprost z oficjalnego opisu
-   struktury InsERT dla wersji bazy 1.8731.31.6933 (tej, którą ma firma) —
-   patrz [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+2. Przejdź checklistę `[WERYFIKUJ]`. Jest krótka.
+
+   Nazwy tabel i kolumn oraz kody `dok_Typ` i `dok_Status` są odczytane wprost
+   z oficjalnego opisu struktury InsERT dla wersji bazy 1.8731.31.6933 — tej,
+   którą ma firma. Patrz
+   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+
    Domyślne w `config.ts` są z niego wzięte i nie trzeba ich ustalać:
    `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), `DOK_TYP_ZWROTY=14`
    (ZW), bufor = `dok_Status = 3` (odłożony).
@@ -397,27 +406,31 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    Do ustalenia na własnej bazie zostają **trzy** rzeczy:
 
    - **`mag_Id` magazynów MAG, MGP i Zwroty** (→ `MAG_ID_MAG` / `MAG_ID_MGP` /
-     `MAG_ID_ZWROTY`). To magazyn skutku rozstrzyga, którym trybem idzie
-     dokument, więc pomyłka wysyła dostawę do złej zakładki:
+     `MAG_ID_ZWROTY`). O trybie dokumentu rozstrzyga magazyn skutku, więc
+     pomyłka wysyła dostawę do złej zakładki.
 
      ```sql
      SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
      ```
 
-     Główny poznasz po `mag_Glowny = 1`; MGP i Zwroty po nazwie firmowej.
+     Główny poznasz po `mag_Glowny = 1`. MGP i Zwroty — po nazwie firmowej.
 
-   - **pole lokalizacji na `tw__Towar`.** W 1.87 SP3 HF1 (era KSeF) natywnej
-     kolumny `tw_Lokalizacja` **nie ma** — trzeba wybrać jedno z ośmiu pól
-     własnych `tw_Pole1..tw_Pole8`, każde `varchar(50)` (→ `MSSQL_LOC_COLUMN`,
-     domyślnie `tw_Pole1`; `LOC_FIELD_LIMIT=50` wynika z rozmiaru kolumny).
-     Wybierz pole, którego firma nie używa do niczego innego — worker nadpisuje
-     je bezwarunkowo.
+   - **pole lokalizacji na `tw__Towar`.**
+
+     > ⚠️ Worker **nadpisuje wybrane pole bezwarunkowo**. Wybierz takie, którego
+     > firma nie używa do niczego innego.
+
+     W 1.87 SP3 HF1 (era KSeF) natywnej kolumny `tw_Lokalizacja` **nie ma**.
+     Wybierz jedno z ośmiu pól własnych `tw_Pole1..tw_Pole8`, każde
+     `varchar(50)` (→ `MSSQL_LOC_COLUMN`, domyślnie `tw_Pole1`).
+     `LOC_FIELD_LIMIT=50` wynika z rozmiaru kolumny.
 
    - **flaga sprawdzenia faktury.** Kolumna „FW" na liście *Faktury zakupu*
-     **nie odpowiada żadnej kolumnie `dok__Dokument`** — InsERT trzyma flagi
+     **nie odpowiada żadnej kolumnie `dok__Dokument`**. InsERT trzyma flagi
      w osobnej parze tabel: `fl__Flagi` (definicje) i `fl_Wartosc` (przypisania,
-     klucz złożony grupa + typ obiektu + id dokumentu). Oflaguj ręcznie jedną
-     fakturę i podstaw jej numer:
+     klucz złożony grupa + typ obiektu + id dokumentu).
+
+     Oflaguj ręcznie jedną fakturę i podstaw jej numer:
 
      ```sql
      SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
@@ -475,10 +488,11 @@ bezpieczna (adres przed sprzedawalnością), więc opóźnienie kosztuje utracon
 szansę sprzedaży, a nie błędny stan.
 
 **Etap 2 — dokumenty MM przez Sferę (kontener + zwroty):**
-1. Osobny proces na Windows (C# lub Python+pywin32 — COM Sfery najstabilniej
-   działa z tych środowisk, spec §9), czytający tę samą tabelę `sfera_queue`
-   i wykonujący wyłącznie zadania `mm`; kontrakt wywołań w
-   `server/src/adapters/sfera.ts`.
+1. Postaw osobny proces na Windows w C# albo w Pythonie z pywin32. COM Sfery
+   najstabilniej działa z tych środowisk (spec §9).
+
+   Proces czyta tę samą tabelę `sfera_queue` i wykonuje wyłącznie zadania `mm`.
+   Kontrakt wywołań jest w `server/src/adapters/sfera.ts`.
 2. Najpierw jedno MM testowe na kartotece próbnej, potem produkcyjnie.
 
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ; MM per wózek
@@ -492,12 +506,13 @@ szansę sprzedaży, a nie błędny stan.
   cp /c/wertis/server/data/wertis.db "/d/backup/wertis-$(date +%Y%m%d).db"
   ```
 
-  Plik trzyma postęp rozkładania dostaw i zwrotów (łącznie z tym, który koszyk
-  pojechał już MM-em), wyjątki, sesje trybu B, kolejkę i audyt `events`; źródłem
-  prawdy o towarach i stanach pozostaje baza Subiekta, więc to lekki backup.
-- **Zdjęcia dowodowe:** `C:\wertis\server\data\photos\` — to jedyne dane, których
-  nie da się odtworzyć z Subiekta ani z seedu (dowód do reklamacji u dostawcy),
-  więc kopiuj ten katalog razem z bazą:
+  Plik trzyma postęp rozkładania dostaw i zwrotów, łącznie z tym, który koszyk
+  pojechał już MM-em. Trzyma też wyjątki, sesje trybu B, kolejkę i audyt
+  `events`. Źródłem prawdy o towarach i stanach pozostaje baza Subiekta, więc
+  to lekki backup.
+- **Zdjęcia dowodowe:** `C:\wertis\server\data\photos\`. To jedyne dane, których
+  nie da się odtworzyć z Subiekta ani z seedu — dowód do reklamacji u dostawcy.
+  Kopiuj ten katalog razem z bazą:
 
   ```bash
   cp -r /c/wertis/server/data/photos "/d/backup/photos-$(date +%Y%m%d)"
@@ -518,11 +533,16 @@ szansę sprzedaży, a nie błędny stan.
   cd /c/wertis && npm run reconcile
   ```
 
-  Sprawdza cztery rzeczy: adres w Subiekcie kontra ostatni udany zapis (24 h),
-  zadania w `error` starsze niż doba, `waiting_for_doc` starsze niż trzy dni
-  (dokument raczej nie wyjdzie już z bufora) oraz koszyki zwrotów rozłożone bez
-  MM. Ostatnia pozycja mierzy niezmiennik „adres przed sprzedawalnością" —
-  niezmienniki trzeba mierzyć, nie deklarować.
+  Sprawdza cztery rzeczy:
+
+  1. adres w Subiekcie kontra ostatni udany zapis (24 h),
+  2. zadania w `error` starsze niż doba,
+  3. `waiting_for_doc` starsze niż trzy dni (dokument raczej nie wyjdzie już
+     z bufora),
+  4. koszyki zwrotów rozłożone bez MM.
+
+  Ostatnia pozycja mierzy niezmiennik „adres przed sprzedawalnością".
+  Niezmienniki trzeba mierzyć, nie deklarować.
 
   **Zerowy wynik nie tworzy pliku i kończy się kodem 0**, bo raport przychodzący
   codziennie przestaje być czytany po tygodniu. Rozjazdy → CSV z datą w nazwie,
@@ -537,12 +557,13 @@ szansę sprzedaży, a nie błędny stan.
   ```
 
   Czyta bazę Subiekta **wyłącznie do odczytu** i wypisuje CSV z czterema
-  listami. Liczy **pion, nie odległość**: przy 342 m² przejście róg–róg to ~20 s,
-  a pobranie z podłogi albo z drabiny 10–25 s wobec ~3 s ze strefy złotej.
+  listami. Liczy **pion, nie odległość**. Przy 342 m² przejście róg–róg to
+  ~20 s, a pobranie z podłogi albo z drabiny 10–25 s wobec ~3 s ze strefy
+  złotej.
 
-  **Kolejność ma znaczenie i jest w nagłówku pliku:** najpierw eksmisja martwych
-  indeksów ze strefy złotej (daje ~80% korzyści i jest bezpieczna — przenosisz
-  towar, którego nikt nie ruszał), dopiero potem awanse, bo te wymagają
+  **Kolejność ma znaczenie i jest w nagłówku pliku.** Najpierw eksmisja martwych
+  indeksów ze strefy złotej: daje ~80% korzyści i jest bezpieczna, bo przenosisz
+  towar, którego nikt nie ruszał. Awanse idą dopiero potem, bo wymagają
   zwolnionych miejsc.
 
   Skrypt **odmawia wypisania list 1–3, gdy nie widzi historii pobrań** — bez niej
@@ -564,15 +585,15 @@ szansę sprzedaży, a nie błędny stan.
   nssm restart wertis-worker
   ```
 
-  **Klient natywny (APK)** aktualizuje się osobno — nowy
-  build z CI/`./gradlew :app:assembleRelease` i rozesłanie przez MDM (sekcja 5).
+  **Kolektor aktualizuje się osobno.** Zbuduj nowy APK w CI albo przez
+  `./gradlew :app:assembleRelease` i roześlij go przez MDM (sekcja 5).
 - **Diagnoza:** `http://mag.wertis.local:3001/api/health` → `{ ok: true, mode: ... }`;
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.
 
 ## Dlaczego nie chmura
 
-Worker musi rozmawiać ze Sferą przez COM na maszynie z Subiektem, a odczyt
-idzie z MSSQL w LAN — chmura nie ma dostępu do żadnego z nich. Hostowanie
-samego frontendu na zewnątrz dodaje zależność od internetu w hali bez żadnej
-korzyści (kolektory i tak są w LAN). Jedna maszyna on-premise = najprostsza
+Worker musi rozmawiać ze Sferą przez COM na maszynie z Subiektem, a odczyt idzie
+z MSSQL w LAN. Chmura nie ma dostępu do żadnego z nich. Hostowanie samego
+frontendu na zewnątrz dodaje zależność od internetu w hali bez żadnej korzyści,
+bo kolektory i tak są w LAN. Jedna maszyna on-premise = najprostsza
 i najodporniejsza topologia dla tej skali.

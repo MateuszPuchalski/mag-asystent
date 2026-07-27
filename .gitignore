@@ -27,3 +27,6 @@ android/*/build/
 android/local.properties
 android/app/libs/*.aar
 android/.kotlin/
+
+# artefakt importu tools/*.py (styl_check bywa importowany przy diagnozie)
+__pycache__/
