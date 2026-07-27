@@ -24,6 +24,37 @@ Maszyna z Subiektem GT (Windows)
 > **Jak to jest zbudowane i dlaczego tak** — [`docs/architektura.md`](docs/architektura.md).
 > Ten dokument mówi tylko, jak to uruchomić.
 
+## 0. Instalator (zalecana droga)
+
+Rozdziały 1–4 i checklistę z §6 wykonuje za Ciebie
+[**instalator dla Windows**](instalator/README.md): pobierz
+`WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
+i uruchom jako administrator. Stawia Node i Gita, buduje aplikację, rejestruje
+obie usługi, otwiera port, wypełnia `wertis.env` **odpytując bazę Subiekta**
+i zakłada konto SQL o minimalnych uprawnieniach.
+
+Trzy rzeczy robi lepiej niż ręczna droga, i to jest jego właściwy powód:
+
+- **pokazuje zajętość wszystkich ośmiu pól własnych**, zanim wybierzesz to na
+  lokalizację (§6 Etap 1) — aplikacja nadpisuje wybrane pole bezwarunkowo;
+- **kasuje `AppEnvironmentExtra` obu usług**, bo zmienne środowiskowe
+  przykrywają `wertis.env` (§2a) — pozostałość po starszej instalacji wygrałaby
+  po cichu z nowymi ustawieniami;
+- **sprawdza wersję Node** (aplikacja wymaga ≥ 22.5, §1) zamiast pozwolić jej
+  wywalić się dopiero przy starcie usługi.
+
+Instalacja pilotażowa bez dotykania Subiekta (Etap 0 z §6):
+
+```powershell
+WERTIS-Instalator.exe -Demo
+```
+
+**Reszta tego dokumentu opisuje to samo krok po kroku i nadal obowiązuje.**
+Instalator nie robi wszystkiego: konta pracowników zakłada się z kolektora
+(§5a), a kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia
+ręcznie — obie **zanim** ruszy praca na prawdziwych danych. Gdy instalator
+zawiedzie w połowie, każdy jego krok da się dokończyć poniższą drogą.
+
 ## 1. Wymagania
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,

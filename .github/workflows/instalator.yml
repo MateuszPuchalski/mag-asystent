@@ -1,0 +1,108 @@
+# Bramka i wydanie instalatora Windows (instalator/).
+#
+# Instalatora nie da się w CI naprawdę uruchomić — nie ma tu Subiekta, SQL
+# Servera ani usług do zarejestrowania. Bramkujemy więc to, co bramkować się
+# da: składnię, kodowanie i pełny przebieg sterowania w trybie -DryRun.
+# Reszta weryfikacji jest ręczna i opisana w instalator/README.md.
+#
+# Wszystko leci przez `powershell` (Windows PowerShell 5.1), a nie `pwsh`:
+# to jest środowisko, w którym instalator faktycznie działa u klienta —
+# zarówno jako .ps1, jak i w środku .exe z ps2exe. Pod pwsh brakuje
+# System.Data.SqlClient i błąd wyszedłby dopiero na maszynie z Subiektem.
+name: Instalator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "instalator/**"
+      - ".github/workflows/instalator.yml"
+  pull_request:
+    paths:
+      - "instalator/**"
+      - ".github/workflows/instalator.yml"
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+
+      # UTF-8 bez BOM Windows PowerShell 5.1 czyta jako ANSI — polskie znaki
+      # w komunikatach instalatora zamieniłyby się wtedy w krzaki na ekranie
+      # osoby, która ma tę instalację przeprowadzić. Wychodzi to dopiero na
+      # Windowsie, więc pilnujemy tego tutaj.
+      - name: Kodowanie plików (UTF-8 z BOM)
+        run: |
+          $bledy = 0
+          Get-ChildItem instalator\*.ps1 | ForEach-Object {
+            $b = [System.IO.File]::ReadAllBytes($_.FullName)
+            if ($b.Length -lt 3 -or $b[0] -ne 0xEF -or $b[1] -ne 0xBB -or $b[2] -ne 0xBF) {
+              Write-Host "BRAK BOM: $($_.Name)"
+              $bledy++
+            }
+          }
+          if ($bledy) { exit 1 }
+          Write-Host "Wszystkie skrypty maja UTF-8 BOM."
+
+      - name: Kontrola skladni
+        run: |
+          $bledy = 0
+          Get-ChildItem instalator\*.ps1 | ForEach-Object {
+            $e = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$e)
+            if ($e -and $e.Count) {
+              Write-Host "BLAD $($_.Name)"
+              $e | ForEach-Object { Write-Host "  $($_.Extent.StartLineNumber): $($_.Message)" }
+              $bledy += $e.Count
+            } else {
+              Write-Host "OK   $($_.Name)"
+            }
+          }
+          if ($bledy) { exit 1 }
+
+      # Scalanie sprawdza przy okazji, czy znaczniki MODULY-* nadal są na
+      # miejscu i czy scalony plik się parsuje.
+      - name: Scalenie do jednego pliku
+        run: .\instalator\build.ps1 -Wyjscie dist\WERTIS-Instalator.ps1
+
+      # Przebieg próbny idzie na SCALONYM pliku, a nie na źródłach — to jest
+      # ten artefakt, który dostanie klient. Katalog jest tymczasowy, żeby
+      # nawet przy pomyłce w -DryRun nie tknąć niczego pod C:\wertis.
+      - name: Przebieg probny (-DryRun)
+        run: .\dist\WERTIS-Instalator.ps1 -DryRun -Katalog "$env:RUNNER_TEMP\wertis-proba"
+
+      - name: Przebieg probny wariantu demo
+        run: .\dist\WERTIS-Instalator.ps1 -DryRun -Demo -Katalog "$env:RUNNER_TEMP\wertis-demo"
+
+      - name: Budowa .exe
+        run: |
+          Install-Module -Name ps2exe -Force -Scope CurrentUser -AllowClobber
+          Import-Module ps2exe
+          Invoke-ps2exe -inputFile dist\WERTIS-Instalator.ps1 -outputFile dist\WERTIS-Instalator.exe `
+            -title "WERTIS - instalator" `
+            -description "Instalator serwera WERTIS dla maszyny z Subiektem GT" `
+            -company "WERTIS" -product "WERTIS" -requireAdmin
+          if (-not (Test-Path dist\WERTIS-Instalator.exe)) { throw "ps2exe nie wyprodukowal pliku .exe" }
+
+      - name: Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: wertis-instalator
+          path: |
+            dist/WERTIS-Instalator.exe
+            dist/WERTIS-Instalator.ps1
+
+      # Do wydania idą OBA pliki. .exe jest wygodniejszy, ale niepodpisany —
+      # gdy polityka firmy albo antywirus go zablokuje, .ps1 jest drogą
+      # wyjścia, a nie awaryjnym półśrodkiem (to dokładnie ten sam kod).
+      - name: Dolaczenie do wydania
+        if: github.event_name == 'release'
+        run: gh release upload "$env:GITHUB_REF_NAME" dist\WERTIS-Instalator.exe dist\WERTIS-Instalator.ps1 --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

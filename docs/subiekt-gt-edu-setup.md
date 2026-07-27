@@ -102,6 +102,12 @@ Jeden login = jedna rzecz do założenia i jedna do pilnowania. Uprawnienia są
 kolumnowe: nawet przy przejęciu credentiala da się zmienić wyłącznie dwie
 kolumny, reszta bazy pozostaje nietykalna.
 
+> **Ten skrypt jest źródłem prawdy dla instalatora.** `Get-WertisSkryptUprawnien`
+> w [`instalator/sql.ps1`](../instalator/sql.ps1) odtwarza go co do grantu —
+> przy zmianie uprawnień poprawia się **oba miejsca**. Rozjazd nie rzuciłby
+> błędem: aplikacja działałaby tak samo, tylko konto miałoby inne prawa, niż
+> mówi ta instrukcja.
+
 W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasło). Skrypt jest
 idempotentny — bezpiecznie uruchomić go ponownie (np. po zmianie
 `MSSQL_LOC_COLUMN` albo ustaleniu kolumny flagi):
