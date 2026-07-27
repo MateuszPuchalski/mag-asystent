@@ -92,7 +92,7 @@ export function sprawdzPin(pin: string, hash: string | null): boolean {
 /* ── Konta ──────────────────────────────────────────────────────────────── */
 
 export function listUsers(): Uzytkownik[] {
-  return (db().prepare("SELECT * FROM app_user ORDER BY name").all() as UserRow[]).map(widok);
+  return (db().prepare("SELECT * FROM app_user ORDER BY name").all() as unknown as UserRow[]).map(widok);
 }
 
 export function userByBadge(kod: string): Uzytkownik | null {
@@ -197,7 +197,7 @@ export function migrujHistorie(): MigracjaWynik {
   for (const n of nazwy) {
     const u = istniejace.get(klucz(n));
     if (!u) continue;
-    przypisanych += przypisz.run(u.userId, n).changes;
+    przypisanych += Number(przypisz.run(u.userId, n).changes);
   }
 
   const nieprzypisanych = (

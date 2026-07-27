@@ -27,7 +27,10 @@ Maszyna z Subiektem GT (Windows)
 ## 1. Wymagania
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,
-- [Node.js LTS 22](https://nodejs.org) (`node -v` ≥ 22),
+- [Node.js LTS 22](https://nodejs.org) — **wymagane ≥ 22.5** (`node -v`).
+  Serwer używa wbudowanego `node:sqlite`, którego starsze wersje nie mają;
+  w zamian **nie kompiluje już żadnego modułu natywnego**, więc `npm ci`
+  nie potrzebuje build tools,
 - [Git](https://git-scm.com) — instalator daje też **Git Bash**, w którym
   wykonuje się polecenia z tej instrukcji (albo WSL, jeśli wolisz),
 - [NSSM](https://nssm.cc) do rejestracji usług (pojedynczy `nssm.exe`),

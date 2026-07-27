@@ -1,9 +1,9 @@
 import fs from "node:fs";
-import { db, nowIso } from "./db.js";
+import { db, nowIso, transaction } from "./db.js";
 import { config } from "../config.js";
 
 /**
- * Zasila read-model sgt_* prawdziwymi danymi z web/public/data/products.json
+ * Zasila read-model sgt_* prawdziwymi danymi z server/seed/products.json
  * (eksport magmat.xlsx:
  *  [symbol,nazwa,ean,mag,rez,mgp,unit,ordered,lokalizacja,opis,dostawca]).
  *
@@ -36,7 +36,7 @@ function seed() {
   const rows: Row[] = JSON.parse(fs.readFileSync(config.seedProducts, "utf8"));
   console.log(`[seed] wczytano ${rows.length} kartotek z ${config.seedProducts}`);
 
-  const wipe = d.transaction(() => {
+  const wipe = transaction(d, () => {
     for (const t of ["sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn"]) {
       d.prepare(`DELETE FROM ${t}`).run();
     }
@@ -58,7 +58,7 @@ function seed() {
   const mgpProducts: Array<{ tw_id: number; mgp: number; dostawca: string }> = [];
   const noLocProducts: number[] = [];
 
-  const insertAll = d.transaction((data: Row[]) => {
+  const insertAll = transaction(d, (data: Row[]) => {
     data.forEach((r, i) => {
       const tw_id = i + 1;
       const [symbol, nazwa, ean, mag, rez, mgp, unit, ordered, lokalizacja, opis, dostawca] = r;
@@ -100,14 +100,22 @@ function seed() {
       paczki.push({ dostawca, items: items.slice(i, i + MAX_POZ) });
     }
   }
-  const baseDate = new Date("2026-07-16T00:00:00Z");
+  /* Data bazowa liczona od DZISIAJ, nie zapisana na sztywno.
+     Wcześniej stało tu `new Date("2026-07-16")`, a lista dostaw pokazuje okno
+     14 dni — więc demo się STARZAŁO: dwa tygodnie po tej dacie `npm run seed`
+     dawał bazę, w której zakładka rozkładania jest pusta. Przy pokazie
+     u klienta wygląda to jak zepsuta aplikacja, a nie jak stare dane. */
+  const dzis = new Date();
+  const baseDate = new Date(Date.UTC(dzis.getUTCFullYear(), dzis.getUTCMonth(), dzis.getUTCDate()));
+  const mmrrrr = (d: Date) => `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 
-  const buildDocs = d.transaction(() => {
+  const buildDocs = transaction(d, () => {
     paczki.forEach((paczka, k) => {
       const dok_id = k + 1;
       const typ = k % 2 === 0 ? "FZ" : "PZ";
-      const nr = `${typ} ${120 + k}/07/2026`;
-      const date = new Date(baseDate.getTime() - k * 86400_000).toISOString().slice(0, 10);
+      const dataDok = new Date(baseDate.getTime() - k * 86400_000);
+      const nr = `${typ} ${120 + k}/${mmrrrr(dataDok)}`;
+      const date = dataDok.toISOString().slice(0, 10);
       // ostatni dokument w buforze → dokument w buforze jest normalnie do pracy (D1)
       const wBuforze = k === paczki.length - 1 ? 1 : 0;
       // Magazyn skutku decyduje o trybie rozkładania (i tylko on — dokument nie
@@ -153,8 +161,8 @@ function seed() {
 
   if (zwrotItems.length) {
     const zwDokId = paczki.length + 1;
-    const buildZwrot = d.transaction(() => {
-      insDok.run(zwDokId, "ZW", `ZW 7/07/2026`, baseDate.toISOString().slice(0, 10), config.magId.ZWROTY, "Zwroty klienckie", 0);
+    const buildZwrot = transaction(d, () => {
+      insDok.run(zwDokId, "ZW", `ZW 7/${mmrrrr(baseDate)}`, baseDate.toISOString().slice(0, 10), config.magId.ZWROTY, "Zwroty klienckie", 0);
       const insZwStan = d.prepare(
         "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,0) ON CONFLICT(tw_id, mag_id) DO UPDATE SET stan = stan + excluded.stan"
       );

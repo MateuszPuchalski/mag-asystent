@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,14 +6,33 @@ import { config } from "../config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-let _db: Database.Database | null = null;
+/* ── Dlaczego wbudowany `node:sqlite`, a nie `better-sqlite3` ────────────────
+   `better-sqlite3` był JEDYNYM modułem natywnym w całym serwerze i blokował
+   dwie rzeczy naraz:
 
-export function db(): Database.Database {
+   1. Instalację. `npm ci` na Windows kompiluje go ze źródeł, co potrafi wymagać
+      build tools — czego dokumentacja wdrożenia nawet nie wspominała.
+   2. Spakowanie serwera do jednego pliku wykonywalnego. Moduł natywny nie
+      wchodzi do bundla, a bez tego nie ma `.exe` dla osoby nietechnicznej.
+
+   `node:sqlite` jest w środku Node'a, więc obie przeszkody znikają razem
+   z zależnością. Reszta kodu tego nie zauważa: używaliśmy wyłącznie
+   `prepare/run/all/get/exec/pragma`, bez `pluck`, `iterate`, `raw` i BigIntów.
+
+   UWAGA przy budowaniu `.exe`: w Node 22 `node:sqlite` wypisuje ostrzeżenie
+   o eksperymentalności na stderr (w usłudze NSSM ląduje ono w logu). Stabilne
+   jest od Node 24 i stamtąd należy budować.                                   */
+
+export type Db = DatabaseSync;
+
+let _db: DatabaseSync | null = null;
+
+export function db(): DatabaseSync {
   if (_db) return _db;
   fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
-  const database = new Database(config.dbPath);
-  database.pragma("journal_mode = WAL");
-  database.pragma("foreign_keys = ON");
+  const database = new DatabaseSync(config.dbPath);
+  database.exec("PRAGMA journal_mode = WAL");
+  database.exec("PRAGMA foreign_keys = ON");
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   database.exec(schema);
   migrate(database);
@@ -21,8 +40,43 @@ export function db(): Database.Database {
   return database;
 }
 
+/**
+ * Transakcja. `node:sqlite` nie ma odpowiednika `db.transaction(fn)`
+ * z `better-sqlite3`, więc sterujemy nią wprost.
+ *
+ * Sygnatura celowo bierze i zwraca zwykłą funkcję — miejsca wywołania
+ * wyglądają tak samo jak wcześniej, więc podmiana sterownika nie rozlała się
+ * po serwisach.
+ *
+ * ROLLBACK jest tu istotny, a nie kosmetyczny: `putaway` i `delivery` zapisują
+ * w jednej transakcji pozycję ORAZ zadanie do kolejki Sfery. Przerwanie
+ * w połowie zostawiłoby zadanie zapisu bez pokrycia w danych albo odwrotnie.
+ */
+export function transaction<A extends unknown[], R>(
+  database: DatabaseSync,
+  fn: (...args: A) => R,
+): (...args: A) => R {
+  return (...args: A): R => {
+    database.exec("BEGIN");
+    try {
+      const out = fn(...args);
+      database.exec("COMMIT");
+      return out;
+    } catch (e) {
+      /* Wycofanie samo może paść (np. gdy transakcja została już zamknięta) —
+         wtedy ważniejszy jest oryginalny błąd, bo to on mówi, co się stało. */
+      try {
+        database.exec("ROLLBACK");
+      } catch {
+        /* ignorujemy: przekazujemy dalej pierwotną przyczynę */
+      }
+      throw e;
+    }
+  };
+}
+
 /** Dostawki do istniejących baz (CREATE TABLE IF NOT EXISTS nie dodaje kolumn). */
-function migrate(database: Database.Database) {
+function migrate(database: DatabaseSync) {
   const addColumn = (table: string, column: string, decl: string) => {
     const cols = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === column)) {

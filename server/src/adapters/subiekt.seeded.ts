@@ -30,7 +30,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
   findProductsByEan(ean: string): RawProduct[] {
     return db()
       .prepare("SELECT * FROM sgt_towar WHERE ean = ? ORDER BY symbol")
-      .all(ean) as RawProduct[];
+      .all(ean) as unknown as RawProduct[];
   }
 
   getProductBySymbol(symbol: string): RawProduct | undefined {
@@ -125,7 +125,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
          WHERE mag_id = ? AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(config.magId.MGP, cutoff) as RawDocument[];
+      .all(config.magId.MGP, cutoff) as unknown as RawDocument[];
   }
 
   listDeliveryDocuments(days: number): RawDocument[] {
@@ -144,7 +144,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
            AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(config.magId.MAG, config.magId.ZWROTY, cutoff) as RawDocument[];
+      .all(config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
@@ -156,7 +156,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
   getDocumentPositions(docId: number): RawPosition[] {
     return db()
       .prepare("SELECT tw_id, ilosc FROM sgt_pozycja WHERE dok_id = ?")
-      .all(docId) as RawPosition[];
+      .all(docId) as unknown as RawPosition[];
   }
 
   listLocations(): string[] {

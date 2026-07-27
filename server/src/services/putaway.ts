@@ -1,4 +1,4 @@
-import { db } from "../db/db.js";
+import { db, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
@@ -95,7 +95,7 @@ export function createSession(docId: number, user: string): number {
     `INSERT INTO putaway_items(session_id, tw_id, target_loc, qty_expected, status, off_document)
      VALUES (?,?,?,?, 'pending', 0)`
   );
-  const tx = db().transaction(() => {
+  const tx = transaction(db(), () => {
     for (const [twId, qty] of agg) {
       const t = subiekt.getProductById(twId);
       const targetLoc = pickingLoc(t?.lokalizacja);
@@ -351,7 +351,7 @@ export function commitCart(sessionId: number, user: string) {
   }
 
   const queueIds: number[] = [];
-  const tx = db().transaction(() => {
+  const tx = transaction(db(), () => {
     for (const i of cart) {
       // set_location, gdy zeskanowana lokalizacja różni się i user zatwierdził
       // aktualizację

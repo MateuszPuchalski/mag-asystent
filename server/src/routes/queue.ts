@@ -30,7 +30,7 @@ export async function queueRoutes(app: FastifyInstance) {
   app.get("/api/queue", async () => {
     const rows = db()
       .prepare("SELECT * FROM sfera_queue ORDER BY id DESC LIMIT 100")
-      .all() as QueueRow[];
+      .all() as unknown as QueueRow[];
     const summary = {
       pending: rows.filter((r) => r.status === "pending" || r.status === "processing" || r.status === "waiting_for_doc").length,
       error: rows.filter((r) => r.status === "error").length,
