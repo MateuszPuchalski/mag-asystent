@@ -14,8 +14,13 @@ ręczna droga nadal działa, a każdy krok da się dokończyć z palca.
 Pobierz `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
 i uruchom **jako administrator**.
 
+Z repo albo z gołego `.ps1` — **`URUCHOM.cmd`**, prawym przyciskiem →
+*Uruchom jako administrator*. Windows domyślnie odmawia uruchamiania plików
+`.ps1` (`running scripts is disabled on this system`), a ten plik omija to
+dla jednego uruchomienia, nie ruszając polityki systemowej:
+
 ```powershell
-# albo z repo, tym samym skutkiem:
+# to samo z wiersza poleceń:
 powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 ```
 
@@ -115,6 +120,7 @@ czegoś innego kasuje te dane bezpowrotnie.
 ## Rozwój
 
 ```powershell
+.\testy.ps1                 # asercje — najtańsza i najkonkretniejsza bramka
 .\build.ps1                 # scalenie do dist\WERTIS-Instalator.ps1
 .\build.ps1 -Exe            # dodatkowo .exe (wymaga modulu ps2exe)
 .\wertis-instalator.ps1 -DryRun -Katalog C:\proba
@@ -126,7 +132,9 @@ czegoś innego kasuje te dane bezpowrotnie.
 | `ui.ps1` | komunikaty, pytania, generator hasła |
 | `sql.ps1` | połączenie z SQL Serverem, checklista, konto aplikacji |
 | `uslugi.ps1` | zależności, NSSM, zapora, publikacja konfiguracji |
-| `build.ps1` | scalenie czterech plików w jeden + `.exe` |
+| `testy.ps1` | asercje na logice wywoływalnej bez dotykania systemu |
+| `build.ps1` | scalenie czterech plików w jeden + `.exe` + `URUCHOM.cmd` |
+| `URUCHOM.cmd` | uruchomienie z pominięciem polityki wykonywania |
 
 `build.ps1` podmienia blok między znacznikami `MODULY-POCZATEK` i
 `MODULY-KONIEC` w skrypcie głównym. Scalanie jest konieczne, bo `ps2exe` pakuje
@@ -139,11 +147,22 @@ ekranie osoby przeprowadzającej instalację. Pilnuje tego osobny krok w
 
 ### Co bramkuje CI, a czego nie
 
-CI sprawdza kodowanie, składnię, scalanie i **pełny przebieg `-DryRun`** (wariant
-zwykły i `-Demo`) na `windows-latest`, przez Windows PowerShell. Nie sprawdza
-niczego, co wymaga Subiekta: prawdziwego połączenia z bazą, zakładania konta,
-rejestracji usług i reguły zapory. Te cztery rzeczy weryfikuje się ręcznie —
-najtaniej na Subiekcie w wersji edu, wg
+CI sprawdza kodowanie, składnię, **asercje z `testy.ps1`**, scalanie i przebieg
+`-DryRun` (wariant zwykły i `-Demo`) na `windows-latest`, przez Windows
+PowerShell.
+
+**`-DryRun` dowodzi PRZEBIEGU STEROWANIA, nie poprawności kroków** — i to
+zdanie jest tu po przejściach. Każdy krok wykonawczy siedzi za `Test-DryRun`
+i w przebiegu próbnym jest pomijany, więc zielone CI nie znaczy, że kroki
+działają. Tak przeszła awaria z 27 lipca: `New-Item` na korzeniu dysku
+(`Split-Path "C:\wertis"` → `C:\`) wywracał instalację przy **domyślnych**
+ustawieniach, a CI świeciło zielono. Od tego czasu logika, którą da się
+wywołać bez dotykania systemu, ma asercje w `testy.ps1` — i to one, a nie
+`-DryRun`, są bramką na tę klasę błędów.
+
+Nadal **nie sprawdzamy** niczego, co wymaga Subiekta: połączenia z bazą,
+zakładania konta, rejestracji usług i reguły zapory. Te cztery rzeczy
+weryfikuje się ręcznie — najtaniej na Subiekcie w wersji edu, wg
 [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md).
 
 ## Znane ograniczenia

@@ -107,13 +107,37 @@ if (-not $TylkoKonfiguracja) {
         if (-not (Test-DryRun "Zaktualizowałbym repozytorium (git pull).")) {
             Push-Location $Katalog
             & git pull --ff-only origin $Galaz
+            $kod = $LASTEXITCODE
             Pop-Location
+            if ($kod -ne 0) {
+                Write-Blad "git pull nie powiódł się (kod $kod)."
+                Write-Info "Najczęstsza przyczyna: lokalne zmiany w $Katalog albo rozjazd z gałęzią $Galaz."
+                exit 1
+            }
             Write-Ok "Kod zaktualizowany."
         }
     } else {
+        # Stan pośredni: katalog jest, ale bez repozytorium. Wyłapujemy go
+        # ZANIM git odmówi, bo jego komunikat mówi mniej niż ten.
+        if ((Test-Path $Katalog) -and (Get-ChildItem $Katalog -Force | Select-Object -First 1)) {
+            Write-Blad "$Katalog istnieje i nie jest pusty, a nie ma w nim repozytorium."
+            Write-Info "git clone odmówi. Usuń katalog albo wskaż inny przez -Katalog."
+            # Przebieg próbny ma POKAZAĆ problem, a nie go rozstrzygać — inaczej
+            # -DryRun na maszynie z istniejącą instalacją kończyłby się błędem
+            # zamiast raportem.
+            if (-not $DryRun) { exit 1 }
+        }
         if (-not (Test-DryRun "Sklonowałbym $Repo do $Katalog.")) {
-            New-Item -ItemType Directory -Force -Path (Split-Path $Katalog) | Out-Null
+            Zapewnij-Katalog (Split-Path $Katalog)
             & git clone --branch $Galaz $Repo $Katalog
+            # Bez tego sprawdzenia nieudany klon wypisywał „[ok] Kod pobrany"
+            # i przewracał się dopiero na `npm ci`, czyli DWA KROKI DALEJ niż
+            # przyczyna. Najgorszy rodzaj błędu: taki, który udaje sukces.
+            if ($LASTEXITCODE -ne 0) {
+                Write-Blad "git clone nie powiódł się (kod $LASTEXITCODE)."
+                Write-Info "Sprawdź dostęp do $Repo i połączenie z siecią."
+                exit 1
+            }
             Write-Ok "Kod pobrany."
         }
     }
@@ -371,7 +395,7 @@ if ($podlaczacDoSubiekta) {
         # Furtka z etapu 4: firma, w której nikt nie wypuszcza 'sa' z rąk,
         # nadal ma z instalatora pożytek - dostaje gotowy skrypt do przekazania.
         if (-not (Test-DryRun "Zapisałbym gotowy skrypt uprawnień do $plikSkryptu.")) {
-            Set-Content -Path $plikSkryptu -Value $skrypt -Encoding UTF8
+            Write-WertisPlik -Sciezka $plikSkryptu -Tresc $skrypt
         }
         Write-Uwaga "Zapisałem gotowy skrypt: $plikSkryptu"
         Write-Info "Przekaż go administratorowi SQL - wystarczy wkleić do SSMS i uruchomić."

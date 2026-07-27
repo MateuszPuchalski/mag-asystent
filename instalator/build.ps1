@@ -75,6 +75,15 @@ if ($bledy -and $bledy.Count) {
 }
 Write-Host "Skladnia scalonego skryptu: OK"
 
+# URUCHOM.cmd jedzie obok scalonego .ps1 — bez niego wariant „goły skrypt"
+# odbija się od domyślnej polityki wykonywania, zanim ktokolwiek zajrzy
+# do README.
+$cmdZrodlo = Join-Path $zrodlo "URUCHOM.cmd"
+if (Test-Path $cmdZrodlo) {
+    Copy-Item $cmdZrodlo (Join-Path (Split-Path $pelna) "URUCHOM.cmd") -Force
+    Write-Host "Skopiowano: URUCHOM.cmd"
+}
+
 if ($Exe) {
     if (-not (Get-Module -ListAvailable -Name ps2exe)) {
         Install-Module -Name ps2exe -Force -Scope CurrentUser -AllowClobber
