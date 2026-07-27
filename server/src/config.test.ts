@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { config } from "./config.js";
+import { config, bledyKonfiguracji } from "./config.js";
 
 /* Kody Subiekta jako test, nie jako komentarz.
    ─────────────────────────────────────────────────────────────────────────
@@ -57,4 +57,65 @@ test("bez konfiguracji grupy flag nie ma dokąd wysyłać — flagi wyłączone"
 test("magazyny rozstrzygają o trybie, więc muszą być różne", () => {
   const { MAG, MGP, ZWROTY } = config.magId;
   assert.equal(new Set([MAG, MGP, ZWROTY]).size, 3);
+});
+
+/* ── Walidacja konfiguracji wdrożenia ────────────────────────────────────────
+   Te reguły istniały wcześniej wyłącznie w głowie autora dokumentacji albo jako
+   test na wartościach domyślnych. Teraz pracują na produkcji, więc muszą mieć
+   pokrycie na wartościach BŁĘDNYCH — bo to one są tym, przed czym bronią.     */
+
+test("te same id magazynow to blad, nie ostrzezenie", () => {
+  // magazyn skutku rozstrzyga, którym trybem idzie dokument; dwa te same id
+  // znaczą, że dostawa i kontener trafiają do jednej zakładki — a wygląda to
+  // jak „brakuje dostaw", nie jak literówka w wertis.env
+  const zly = { ...config, magId: { MAG: 1, MGP: 1, ZWROTY: 3 } };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /muszą być różne/);
+  assert.match(bledy[0], /sl_Magazyn/, "komunikat ma prowadzić do zapytania, nie tylko stwierdzać fakt");
+});
+
+test("SGT_MODE=mssql bez danych logowania nie przechodzi startu", () => {
+  // wcześniej puste dane przechodziły, a awaria wychodziła przy pierwszym
+  // zapytaniu — czyli PO tym, jak instalator uznał, że skończył
+  const zly = {
+    ...config,
+    sgtMode: "mssql" as const,
+    mssql: { ...config.mssql, database: "", user: "", password: "" },
+  };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  for (const k of ["MSSQL_DATABASE", "MSSQL_USER", "MSSQL_PASSWORD"]) {
+    assert.match(bledy[0], new RegExp(k), `${k} ma być wymienione z nazwy`);
+  }
+});
+
+test("tryb seeded nie wymaga danych logowania", () => {
+  // demo ma działać bez niczego — to jest cała jego wartość
+  const demo = { ...config, sgtMode: "seeded" as const, mssql: { ...config.mssql, database: "", user: "", password: "" } };
+  assert.deepEqual(bledyKonfiguracji(demo as typeof config), []);
+});
+
+test("zepsuty wzorzec lokalizacji wychodzi przy starcie, nie przy skanie", () => {
+  const zly = { ...config, locPatterns: ["^[A-Z\\d{2}$"] };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /wyrażeniem regularnym/);
+});
+
+test("wszystkie problemy naraz, nie po jednym na restart", () => {
+  // naprawianie konfiguracji metodą „restart po każdym błędzie" to najgorszy
+  // możliwy sposób spędzania czasu przy wdrożeniu
+  const zly = {
+    ...config,
+    sgtMode: "mssql" as const,
+    magId: { MAG: 2, MGP: 2, ZWROTY: 2 },
+    mssql: { ...config.mssql, database: "", user: "", password: "" },
+    locPatterns: ["("],
+  };
+  assert.equal(bledyKonfiguracji(zly as typeof config).length, 3);
+});
+
+test("domyslna konfiguracja jest poprawna", () => {
+  assert.deepEqual(bledyKonfiguracji(), []);
 });

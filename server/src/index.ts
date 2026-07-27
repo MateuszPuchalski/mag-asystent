@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { config } from "./config.js";
+import { config, envFile } from "./config.js";
 import { withRequestContext } from "./context.js";
 import { db } from "./db/db.js";
 import { productRoutes } from "./routes/products.js";
@@ -13,9 +13,11 @@ import { deviceRoutes } from "./routes/device.js";
 import { authRoutes } from "./routes/auth.js";
 import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
 import { docFlagAvailable } from "./services/delivery-flag.js";
+import { zamelduj, stanWorkera } from "./services/process-state.js";
 
 async function main() {
   db(); // migracja schematu przy starcie
+  zamelduj("api");
 
   // SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
   // starcie (twardy błąd, gdy baza nieosiągalna), potem co MSSQL_SYNC_MS.
@@ -37,16 +39,33 @@ async function main() {
   // kontekst żądania (device_id do events) — musi być przed trasami
   withRequestContext(app);
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    mode: config.sgtMode,
-    sferaMode: config.sferaMode,
-    // flagi faktur: „off" gdy nie ma dokąd ich wysłać (edu nie ma flag
-    // dokumentów, na produkcji para grupa/typ bywa jeszcze nieustalona).
-    // Bez tego pola cisza po stronie flag byłaby nie do odróżnienia od awarii.
-    docFlag: docFlagAvailable() ? "on" : "off (brak MSSQL_FLAG_GRUPA / MSSQL_FLAG_TYP_OBIEKTU)",
-    ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
-  }));
+  /* Health ma odpowiadać na pytanie „czy wdrożenie jest poprawne", a nie tylko
+     „czy proces API odpowiada". Do tej pory raportował wyłącznie własny config,
+     więc najgroźniejsza pomyłka wdrożenia — worker w innym trybie niż API —
+     była przez niego NIEWYKRYWALNA. Teraz `ok` jest fałszywe, gdy cokolwiek
+     wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
+  app.get("/api/health", async () => {
+    const worker = stanWorkera();
+    const problemy = [worker.problem].filter((x): x is string => x !== null);
+    return {
+      ok: problemy.length === 0,
+      mode: config.sgtMode,
+      sferaMode: config.sferaMode,
+      // skąd wzięła się konfiguracja — pierwsze pytanie przy „u mnie nie działa"
+      configZPliku: envFile.path,
+      worker: {
+        zyje: worker.zyje,
+        mode: worker.sgtMode,
+        widziany: worker.widziany,
+      },
+      // flagi faktur: „off" gdy nie ma dokąd ich wysłać (edu nie ma flag
+      // dokumentów, na produkcji para grupa/typ bywa jeszcze nieustalona).
+      // Bez tego pola cisza po stronie flag byłaby nie do odróżnienia od awarii.
+      docFlag: docFlagAvailable() ? "on" : "off (brak MSSQL_FLAG_GRUPA / MSSQL_FLAG_TYP_OBIEKTU)",
+      ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
+      ...(problemy.length ? { problemy } : {}),
+    };
+  });
 
   // wymuszenie odświeżenia read-modelu (mssql): np. po przyjęciu dostawy w Subiekcie
   app.post("/api/admin/resync", async (_req, reply) => {
