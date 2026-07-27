@@ -102,6 +102,11 @@ Jeden login = jedna rzecz do założenia i jedna do pilnowania. Uprawnienia są
 kolumnowe: nawet przy przejęciu credentiala da się zmienić wyłącznie dwie
 kolumny, reszta bazy pozostaje nietykalna.
 
+> **Instalacja sprzed sierpnia 2026 musi uruchomić ten skrypt PONOWNIE.**
+> Doszedł `GRANT SELECT ON dbo.sl_Magazyn` — bez niego karta towaru pokazuje
+> tylko MAG, MGP i Zwroty, a `/api/health` mówi o tym wprost w `problemy`.
+> Aplikacja działa dalej; traci wyłącznie zestawienie „gdzie towar jeszcze leży".
+
 > **Ten skrypt jest źródłem prawdy dla instalatora.** `Get-WertisSkryptUprawnien`
 > w [`instalator/sql.ps1`](../instalator/sql.ps1) odtwarza go co do grantu —
 > przy zmianie uprawnień poprawia się **oba miejsca**. Rozjazd nie rzuciłby
@@ -128,6 +133,7 @@ GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
 GRANT SELECT ON dbo.fl_Wartosc     TO wertis;   -- przypisania flag do dokumentów
 GRANT SELECT ON dbo.fl__Flagi      TO wertis;   -- definicje flag (nazwa, ikona)
+GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
 
 -- ZAPIS — dwie rzeczy i ani jednej więcej.
 --

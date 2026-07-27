@@ -15,6 +15,17 @@ export interface RawStock {
   stan: number;
   stan_rez: number;
 }
+/** Magazyn ze słownika Subiekta (`sl_Magazyn`). */
+export interface RawMagazyn {
+  mag_id: number;
+  /** `mag_Symbol` — krótki kod, ten sam, który biuro widzi w Subiekcie. */
+  kod: string;
+  nazwa: string;
+}
+/** Stan jednego towaru w jednym magazynie — do zestawienia „gdzie jeszcze leży". */
+export interface RawStockRow extends RawStock {
+  mag_id: number;
+}
 export interface RawDocument {
   dok_id: number;
   typ: string;
@@ -52,6 +63,18 @@ export interface SubiektAdapter {
   getProductsBySymbols(symbols: string[]): ProductRow[];
   search(q: string, limit: number): ProductRow[];
   getStock(twId: number, magId: number): RawStock;
+  /**
+   * Wszystkie magazyny ze słownika Subiekta.
+   *
+   * Do lipca 2026 aplikacja znała DOKŁADNIE TRZY magazyny — te z `MAG_ID_*` —
+   * i nie było to ograniczenie wyświetlania: importer filtrował `tw_Stan`
+   * po tych trzech identyfikatorach, więc stany reszty nigdy nie trafiały do
+   * read-modelu. Magazynier nie miał jak się dowiedzieć, że towar leży jeszcze
+   * gdzie indziej.
+   */
+  listMagazyny(): RawMagazyn[];
+  /** Stany towaru we WSZYSTKICH magazynach — do zestawienia na karcie. */
+  getStockAll(twId: number): RawStockRow[];
   /** Tryb B: kontenery na MGP z ostatnich N dni — sesja z wózkiem i MM na rundę (spec §5.4). */
   listPutawayDocuments(days: number): RawDocument[];
   /**

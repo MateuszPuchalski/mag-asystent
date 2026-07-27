@@ -25,6 +25,13 @@ type Row = [
 
 const DOSTAWCA_FALLBACK = "Dostawca nieznany";
 
+/* Magazyny demo bez roli. Identyfikatory z góry zakresu, żeby nie zderzyć się
+   z MAG_ID_* nawet po ich przestawieniu w konfiguracji — seed nie ma prawa
+   nadpisać magazynu, któremu ktoś właśnie nadał rolę. */
+const MAG_SERWIS = 91;
+const MAG_EKSPOZYCJA = 92;
+const MAG_ARCHIWUM = 93;
+
 function seed() {
   const d = db();
   const already = (d.prepare("SELECT COUNT(*) AS n FROM sgt_towar").get() as { n: number }).n;
@@ -43,9 +50,19 @@ function seed() {
   });
   wipe();
 
-  d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MAG, "MAG");
-  d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MGP, "MGP");
-  d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.ZWROTY, "ZWROTY");
+  const insMag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
+  insMag.run(config.magId.MAG, "MAG", "Magazyn główny");
+  insMag.run(config.magId.MGP, "MGP", "Strefa przyjęć");
+  insMag.run(config.magId.ZWROTY, "ZWROTY", "Zwroty od klientów");
+  /* Magazyny BEZ ROLI — po to, żeby tryb demo w ogóle pokazywał zestawienie
+     „gdzie ten towar jeszcze leży" i sekcję ukrywania w ustawieniach. Bez nich
+     ta funkcja byłaby niewidoczna aż do podłączenia prawdziwego Subiekta. */
+  const DEMO_MAGAZYNY: Array<[number, string, string]> = [
+    [MAG_SERWIS, "SERWIS", "Serwis i reklamacje"],
+    [MAG_EKSPOZYCJA, "EKSPO", "Ekspozycja / salon"],
+    [MAG_ARCHIWUM, "ARCH", "Magazyn sezonowy"],
+  ];
+  for (const [id, kod, nazwa] of DEMO_MAGAZYNY) insMag.run(id, kod, nazwa);
 
   const insTowar = d.prepare(
     `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, ordered, opis, lokalizacja)
@@ -68,6 +85,12 @@ function seed() {
       });
       insStan.run(tw_id, config.magId.MAG, mag || 0, rez || 0);
       insStan.run(tw_id, config.magId.MGP, mgp || 0, 0);
+      /* Co ósma kartoteka leży też w serwisie, co jedenasta na ekspozycji —
+         rozrzedzone celowo, żeby sekcja „pozostałe magazyny" pojawiała się
+         czasem, a nie na każdym towarze. Magazyn sezonowy zostaje PUSTY:
+         zerowe stany też mają być widoczne i trzeba je na czymś sprawdzić. */
+      if (tw_id % 8 === 0) insStan.run(tw_id, MAG_SERWIS, (tw_id % 5) + 1, 0);
+      if (tw_id % 11 === 0) insStan.run(tw_id, MAG_EKSPOZYCJA, 1, 0);
       if (mgp > 0) mgpProducts.push({ tw_id, mgp, dostawca: dostawca || DOSTAWCA_FALLBACK });
       else if (!lokalizacja) noLocProducts.push(tw_id);
     });

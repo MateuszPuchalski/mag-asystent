@@ -6,6 +6,8 @@ import pl.wertis.kolektor.core.net.BadgeBody
 import pl.wertis.kolektor.core.net.CreateUserBody
 import pl.wertis.kolektor.core.net.CreateUserResponse
 import pl.wertis.kolektor.core.net.CartBody
+import pl.wertis.kolektor.core.net.MagazynyResponse
+import pl.wertis.kolektor.core.net.WidocznoscRequest
 import pl.wertis.kolektor.core.net.CartRemoveBody
 import pl.wertis.kolektor.core.net.CartResponse
 import pl.wertis.kolektor.core.net.CloseSessionResponse
@@ -241,4 +243,16 @@ interface ApiService {
 
     @GET("api/users")
     suspend fun listUsers(): UsersResponse
+
+    /* ── Widoczność magazynów ─────────────────────────────────────────────
+       Ustawienie GLOBALNE: zapis przestawia je wszystkim kolektorom naraz,
+       więc wymaga konta biura i jego PIN-u. Odczyt wystarczy zwykłą sesją —
+       lista magazynów firmy nie jest tajemnicą, w odróżnieniu od kodów
+       badge'ów.                                                            */
+
+    @GET("api/magazyny")
+    suspend fun listMagazyny(): MagazynyResponse
+
+    @POST("api/magazyny/widocznosc")
+    suspend fun setWidocznoscMagazynow(@Body body: WidocznoscRequest): MagazynyResponse
 }
