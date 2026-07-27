@@ -9,11 +9,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.BuildConfig
+import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
@@ -23,6 +26,7 @@ import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
 import pl.wertis.kolektor.ui.chrome.TopBar
+import pl.wertis.kolektor.ui.chrome.WersjaBar
 import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
@@ -51,6 +55,7 @@ fun AppRoot(graph: AppGraph) {
     val success by graph.effects.success.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
+    val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // Globalny fallback skanów — łapie to, czego OTWARTY EKRAN nie przechwycił.
@@ -66,6 +71,17 @@ fun AppRoot(graph: AppGraph) {
         onDispose { ScannerBus.setFallback(null) }
     }
 
+    /* Wersja serwera — raz na start aplikacji i po każdej zmianie adresu.
+       Nie w pętli: numer zmienia się przy restarcie usługi, nie co sekundę,
+       a pasek na dole ekranu nie jest powodem do ruchu w sieci. */
+    val wersjaSerwera by produceState<String?>(null, ustawienia.serverUrl) {
+        value = try {
+            apiCall { graph.api.health() }.wersja
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     BackHandler(enabled = screen != Screen.SPLASH && screen != Screen.HOME) {
         graph.nav.goBack()
     }
@@ -77,7 +93,13 @@ fun AppRoot(graph: AppGraph) {
         return
     }
     if (screen == Screen.SPLASH || stan is SessionState.Brak) {
-        SplashScreen(graph)
+        /* Pasek wersji także TUTAJ, i to nie dla porządku: ekran startowy jest
+           miejscem, w którym najczęściej pyta się „co ten kolektor ma w środku"
+           — przy „nie widzę serwera" i przy pierwszym uruchomieniu. */
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) { SplashScreen(graph) }
+            WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera)
+        }
         return
     }
 
@@ -144,5 +166,6 @@ fun AppRoot(graph: AppGraph) {
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
             onBack = { graph.nav.goBack() },
         )
+        WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera)
     }
 }

@@ -20,6 +20,7 @@ import pl.wertis.kolektor.core.net.EanConflictsResponse
 import pl.wertis.kolektor.core.net.ForceReleaseBody
 import pl.wertis.kolektor.core.net.ForceReleaseResponse
 import pl.wertis.kolektor.core.net.HandoverBody
+import pl.wertis.kolektor.core.net.HealthResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LoginResponse
 import pl.wertis.kolektor.core.net.MeResponse
@@ -249,6 +250,10 @@ interface ApiService {
        więc wymaga konta biura i jego PIN-u. Odczyt wystarczy zwykłą sesją —
        lista magazynów firmy nie jest tajemnicą, w odróżnieniu od kodów
        badge'ów.                                                            */
+
+    /** Wersja serwera do paska na dole ekranu. Nie wymaga sesji. */
+    @GET("api/health")
+    suspend fun health(): HealthResponse
 
     @GET("api/magazyny")
     suspend fun listMagazyny(): MagazynyResponse

@@ -7,13 +7,18 @@ jest gorszy niż jego brak — czytelnik nie wie, która część opisu jest jes
 prawdziwa. Ten skrypt łapie to automatycznie, a nie okiem.
 """
 import glob
+import json
 import os
 import re
 import sys
 
-DOCS = ["README.md", "DEPLOY.md", "android/README.md", "instalator/README.md"] + sorted(
-    glob.glob("docs/*.md")
-)
+DOCS = [
+    "README.md",
+    "DEPLOY.md",
+    "CHANGELOG.md",
+    "android/README.md",
+    "instalator/README.md",
+] + sorted(glob.glob("docs/*.md"))
 
 # Ścieżki, których BRAK jest poprawny: artefakty builda i plik dostarczany
 # ręcznie (licencja Honeywella nie pozwala go trzymać w repo).
@@ -45,8 +50,39 @@ PATH_RE = re.compile(
 )
 
 
-def main() -> int:
+def sprawdz_wersje() -> int:
+    """Wersja ma JEDNO źródło i musi być opisana w CHANGELOG-u.
+
+    `0.3.0` przetrwało sześć zmergowanych zmian, bo numer stał w trzech
+    miejscach, a zgodność pilnował komentarz „zgodnie z wersją monorepo".
+    Komentarz nie jest mechanizmem — to jest.
+    """
     bad = 0
+    wersja = json.load(open("package.json", encoding="utf-8"))["version"]
+
+    srv = json.load(open("server/package.json", encoding="utf-8"))["version"]
+    if srv != wersja:
+        print(f"ZŁA WERSJA      server/package.json → {srv}, w korzeniu {wersja}")
+        bad += 1
+
+    # Android czyta package.json przy budowaniu; pilnujemy, że NADAL czyta,
+    # a nie że ktoś w pośpiechu wpisał numer z powrotem na sztywno.
+    gradle = open("android/app/build.gradle.kts", encoding="utf-8").read()
+    if "versionName = wersjaMonorepo" not in gradle:
+        print("ZŁA WERSJA      android/app/build.gradle.kts nie czyta wersji z package.json")
+        bad += 1
+
+    changelog = open("CHANGELOG.md", encoding="utf-8").read()
+    if f"## {wersja}" not in changelog:
+        print(f"BRAK WPISU      CHANGELOG.md nie opisuje wersji {wersja}")
+        bad += 1
+
+    print(f"wersja: {wersja}")
+    return bad
+
+
+def main() -> int:
+    bad = sprawdz_wersje()
     for doc in DOCS:
         text = open(doc, encoding="utf-8").read()
         base = os.path.dirname(doc)

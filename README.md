@@ -443,6 +443,8 @@ docs/analiza-rozkladanie.md trzy ścieżki rozkładania + backlog
 docs/porownanie-asystent.md WERTIS a Firmes+ Asystent Magazyniera — materiał do
                            decyzji dla właściciela: zakres, scenariusze, koszty,
                            środowisko demo
+CHANGELOG.md               co się zmieniło i czy wymaga działania przy wdrożeniu;
+                           tam też reguła, kiedy rośnie który człon wersji
 docs/subiekt-gt-edu-setup.md  podpięcie Subiekta GT krok po kroku
 docs/subiekt-gt-struktura.md  co WERTIS czyta i pisze w bazie Subiekta
 instalator/README.md       instalator Windows: usługi, kreator konfiguracji,
