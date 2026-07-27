@@ -16,7 +16,7 @@ testować. Gdy kolumny są obecne, używamy wartości WPROST z eksportu.
 Format wyjściowy — tablica tablic:
   [symbol, nazwa, ean, mag, rez, mgp, jm, zamowione, lokalizacja, opis, dostawca]
 
-Użycie: python3 tools/convert_xlsx.py magmat.xlsx web/public/data/products.json
+Użycie: python3 tools/convert_xlsx.py magmat.xlsx server/seed/products.json
 """
 import hashlib
 import json

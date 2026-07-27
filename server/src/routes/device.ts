@@ -17,7 +17,8 @@ const ALLOWED = new Set([
 export async function deviceRoutes(app: FastifyInstance) {
   /**
    * Cztery liczby dla biura (plan §10) — jeden endpoint, bez panelu.
-   * Read-only, więc `/lookup` może je pokazać bez naruszania swojej zasady.
+   * Read-only, więc wolno je pokazać wszędzie, także tam, gdzie zapis nie
+   * wchodzi w grę.
    */
   app.get<{ Querystring: { days?: string } }>("/api/metrics", async (req) => {
     return metrics(Number(req.query.days) || 7);
@@ -25,7 +26,7 @@ export async function deviceRoutes(app: FastifyInstance) {
 
   /**
    * Rekoncyliacja na żądanie (plan §9) — te same cztery kontrole co nocny
-   * przebieg, tylko liczone teraz. Read-only, więc `/lookup` może to pokazać.
+   * przebieg, tylko liczone teraz. Read-only, jak `/api/metrics` wyżej.
    */
   app.get("/api/reconcile", async () => reconcile());
 

@@ -19,6 +19,9 @@ ALLOWED_MISSING = {
     "server/dist",
     "android/app/libs/honeywell-datacollection.aar",
     "android/app/build/outputs/apk/debug",
+    # baza powstaje przy `npm run seed`; w świeżym klonie (i w CI) jej nie ma,
+    # ale instrukcja resetu musi móc nazwać plik po imieniu
+    "server/data/wertis.db",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis
