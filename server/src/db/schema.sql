@@ -268,3 +268,17 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
   context       TEXT                -- 'przyjecie' | 'zmiana_lokalizacji' | 'podglad'
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
+
+-- Meldunek procesu (API i worker). POWSTAŁO, ŻEBY ROZJAZD KONFIGURACJI DAŁ SIĘ
+-- ZOBACZYĆ. API i worker to osobne procesy; worker bez SGT_MODE=mssql pisze do
+-- lokalnej bazy i ZGŁASZA SUKCES, więc awaria nie ma żadnego objawu. Zalecana
+-- w dokumentacji weryfikacja `curl /api/health` nie mogła tego wykryć, bo
+-- raportowała wyłącznie proces API. Teraz każdy proces melduje swój tryb tutaj,
+-- a /api/health je porównuje.
+CREATE TABLE IF NOT EXISTS process_state (
+  name       TEXT PRIMARY KEY,   -- 'api' | 'worker'
+  pid        INTEGER NOT NULL,
+  sgt_mode   TEXT NOT NULL,
+  sfera_mode TEXT NOT NULL,
+  at         TEXT NOT NULL       -- ISO UTC, odświeżane w pętli
+);

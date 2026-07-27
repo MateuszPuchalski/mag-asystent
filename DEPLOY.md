@@ -27,7 +27,10 @@ Maszyna z Subiektem GT (Windows)
 ## 1. Wymagania
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,
-- [Node.js LTS 22](https://nodejs.org) (`node -v` ≥ 22),
+- [Node.js LTS 22](https://nodejs.org) — **wymagane ≥ 22.5** (`node -v`).
+  Serwer używa wbudowanego `node:sqlite`, którego starsze wersje nie mają;
+  w zamian **nie kompiluje już żadnego modułu natywnego**, więc `npm ci`
+  nie potrzebuje build tools,
 - [Git](https://git-scm.com) — instalator daje też **Git Bash**, w którym
   wykonuje się polecenia z tej instrukcji (albo WSL, jeśli wolisz),
 - [NSSM](https://nssm.cc) do rejestracji usług (pojedynczy `nssm.exe`),
@@ -64,28 +67,44 @@ curl -s http://localhost:3001/api/health      # {"ok":true,...} = API stoi
 
 ## 2a. Plik ustawień (`wertis.env`)
 
-API i worker to **osobne procesy z osobnym środowiskiem**. Gdy tylko jeden
-dostanie `SGT_MODE=mssql`, zapisy po cichu wylądują w lokalnej bazie zamiast
-w Subiekcie — i mimo to zgłoszą sukces. Dlatego jeden plik dla obu:
+API i worker to **osobne procesy**. Gdy tylko jeden dostanie
+`SGT_MODE=mssql`, zapisy po cichu wylądują w lokalnej bazie zamiast w Subiekcie —
+i mimo to zgłoszą sukces. Dlatego **oba czytają ten sam plik z dysku**:
 
 ```bash
 cd /c/wertis
 cp wertis.env.example wertis.env
 nano wertis.env            # uzupełnij MSSQL_* i magazyny (§6 Etap 1)
 
-source wertis.env && npm start                            # okno 1: API
-source wertis.env && npm -w server run start:worker       # okno 2: worker
+npm start                            # okno 1: API
+npm -w server run start:worker       # okno 2: worker
 ```
 
-`wertis.env` jest w `.gitignore` (trzyma hasło). Sprawdzenie, że oba procesy
-faktycznie widzą Subiekta:
+Aplikacja szuka `wertis.env` obok pliku wykonywalnego, a w instalacji z repo —
+w katalogu, z którego ją uruchomiono. `source wertis.env` nie jest już
+potrzebne (dalej działa: zmienne środowiskowe mają pierwszeństwo nad plikiem).
+Inną ścieżkę wskazuje `WERTIS_ENV_FILE`.
+
+`wertis.env` jest w `.gitignore` (trzyma hasło). Sprawdzenie, że **oba** procesy
+widzą Subiekta:
 
 ```bash
 curl -s http://localhost:3001/api/health
-# → {"ok":true,"mode":"mssql","sferaMode":"sql","lastSync":{...}}
+# → {"ok":true,"mode":"mssql","worker":{"zyje":true,"mode":"mssql"},...}
 ```
 
-`"mode":"seeded"` znaczy, że pracujesz na danych demo.
+Czytaj tak:
+
+| co widzisz | co to znaczy |
+|---|---|
+| `"ok":true` | oba procesy żyją i pracują w tym samym trybie |
+| `"mode":"seeded"` | pracujesz na danych demo, Subiekt nietknięty |
+| `"problemy":[...]` | **przeczytaj zdanie** — mówi, co jest nie tak |
+| `"worker":{"zyje":false}` | usługa `wertis-worker` nie działa; zapisy stoją w kolejce |
+
+Wcześniej ten `curl` **nie mógł wykryć rozjazdu**: raportował wyłącznie proces
+API, więc worker pracujący na demo wyglądał identycznie jak poprawny. Teraz
+każdy proces melduje swój tryb i `/api/health` je porównuje.
 
 ## 3. Rejestracja usług Windows (NSSM)
 
@@ -119,19 +138,24 @@ nssm start wertis-api
 nssm start wertis-worker
 ```
 
-**Zmienne środowiskowe usług.** Usługa nie czyta `wertis.env` — NSSM podaje
-środowisko sam. Wartości muszą być **identyczne dla obu usług**; różnica
-oznacza ciche gubienie zapisów:
+**Konfiguracja usług — nic do przepisywania.** Obie usługi mają
+`AppDirectory C:\wertis`, więc czytają `C:\wertis\wertis.env` — ten sam plik,
+który uzupełniłeś w §2a. Po jego zmianie wystarczy restart:
 
 ```bash
-ENV_WERTIS="SGT_MODE=mssql MSSQL_SERVER=localhost MSSQL_INSTANCE=INSERTGT \
-MSSQL_DATABASE=NAZWA_BAZY MSSQL_USER=wertis MSSQL_PASSWORD=silne-haslo \
-MSSQL_LOC_COLUMN=tw_Pole1 MAG_ID_MAG=1 MAG_ID_MGP=2 MAG_ID_ZWROTY=3"
-
-nssm set wertis-api    AppEnvironmentExtra $ENV_WERTIS PORT=3001
-nssm set wertis-worker AppEnvironmentExtra $ENV_WERTIS
 nssm restart wertis-api ; nssm restart wertis-worker
 ```
+
+> **Dlaczego nie przez `AppEnvironmentExtra`.** Wcześniej te same wartości
+> wpisywało się TRZECI raz — osobno dla każdej usługi — i to była najgroźniejsza
+> pułapka całego wdrożenia. Rozjazd nie dawał objawu: worker bez
+> `SGT_MODE=mssql` pisał do lokalnej bazy i oznaczał zadania jako wykonane.
+> Do tego przykład `ENV_WERTIS` pomijał zmienne flag (kto wkleił go dosłownie,
+> tracił flagi faktur), a niecytowana zmienna rozbijała się o spację w haśle.
+> Jeden plik usuwa wszystkie trzy problemy naraz.
+>
+> Zmienne środowiskowe dalej działają i mają pierwszeństwo nad plikiem — gdyby
+> ktoś ich kiedyś użył, `/api/health` pokaże rozjazd zamiast go przemilczeć.
 
 > **Uwaga:** worker Sfery musi działać na TEJ maszynie (COM Sfery jest lokalny)
 > i oba procesy muszą widzieć ten sam plik `C:\wertis\server\data\wertis.db`.
@@ -389,18 +413,19 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 3. Wpisz wartości do `wertis.env` (§2a) — jeden plik dla API i workera.
    Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.
-4. Uruchom oba procesy z tego pliku, a przy pracy na usługach — przenieś te
-   same wartości do `AppEnvironmentExtra` **obu** usług (§3):
+4. Uruchom oba procesy — czytają ten sam plik, więc nie ma czego przenosić.
+   Przy pracy na usługach wystarczy `nssm restart` obu (§3):
 
    ```bash
-   source wertis.env && npm start                          # okno 1
-   source wertis.env && npm -w server run start:worker     # okno 2
+   npm start                          # okno 1
+   npm -w server run start:worker     # okno 2
 
-   curl -s http://localhost:3001/api/health   # ma pokazać "mode":"mssql"
+   curl -s http://localhost:3001/api/health
    ```
 
-   Dopóki `/api/health` mówi `"mode":"seeded"`, pracujesz na danych demo
-   i **nic nie trafia do Subiekta**.
+   Ma pokazać `"ok":true`, `"mode":"mssql"` **oraz** `"worker":{"mode":"mssql"}`.
+   Dopóki którykolwiek mówi `seeded`, ta strona pracuje na danych demo
+   i **nic nie trafia do Subiekta** — a `"problemy"` powiedzą, która to.
 
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` i `set_doc_flag` bezpośrednim UPDATE dwóch kolumn
@@ -454,7 +479,7 @@ szansę sprzedaży, a nie błędny stan.
 
   ```bash
   # Harmonogram zadań Windows / cron, raz na dobę:
-  cd /c/wertis && source wertis.env && npm run reconcile
+  cd /c/wertis && npm run reconcile
   ```
 
   Sprawdza cztery rzeczy: adres w Subiekcie kontra ostatni udany zapis (24 h),
@@ -472,7 +497,7 @@ szansę sprzedaży, a nie błędny stan.
   przestawianie towaru.
 
   ```bash
-  cd /c/wertis && source wertis.env && npm run reslot
+  cd /c/wertis && npm run reslot
   ```
 
   Czyta bazę Subiekta **wyłącznie do odczytu** i wypisuje CSV z czterema

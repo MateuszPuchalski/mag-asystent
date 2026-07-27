@@ -1,23 +1,42 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadEnvFile } from "./env-file.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const num = (v: string | undefined, def: number) => {
+/* Wertis.env wczytujemy PRZED literałem konfiguracji — inaczej `process.env`
+   byłoby jeszcze puste. Wynik trzymamy, bo `/api/health` pokazuje, skąd wzięła
+   się konfiguracja: przy zgłoszeniu „nie działa" pierwsze pytanie brzmi
+   „a który plik czytasz". */
+export const envFile = loadEnvFile();
+
+/**
+ * Liczba z env. Śmieci są BŁĘDEM, nie cichym powrotem do domyślnej.
+ *
+ * Wcześniej `MAG_ID_MAG=jeden` dawało po cichu 1. Przy magazynach to znaczy
+ * dostawa w złej zakładce, a przy porcie — serwer pod innym adresem niż ten
+ * wpisany na kolektorach. Obie awarie wyglądają jak „aplikacja nie działa"
+ * i żadna nie prowadzi do literówki w pliku.
+ */
+const num = (v: string | undefined, def: number, name?: string) => {
+  if (v === undefined || v === "") return def;
   const n = Number(v);
-  return Number.isFinite(n) ? n : def;
+  if (!Number.isFinite(n)) {
+    throw new Error(`${name ?? "wartość"}=${v} — oczekiwano liczby. Popraw w wertis.env.`);
+  }
+  return n;
 };
 
 export const config = {
   /** Port serwera API. */
-  port: num(process.env.PORT, 3001),
+  port: num(process.env.PORT, 3001, "PORT"),
   host: process.env.HOST ?? "0.0.0.0",
 
   /** Ścieżka pliku bazy SQLite aplikacji. */
   dbPath:
     process.env.DB_PATH ?? path.resolve(__dirname, "../data/wertis.db"),
 
-  /** Źródło danych Subiekta: 'seeded' (SQLite z mag.xlsx) lub 'mssql' (produkcja). */
+  /** Źródło danych Subiekta: 'seeded' (SQLite z magmat.xlsx) lub 'mssql' (produkcja). */
   sgtMode: (process.env.SGT_MODE ?? "seeded") as "seeded" | "mssql",
 
   /**
@@ -39,7 +58,7 @@ export const config = {
     /** Instancja nazwana (instalator InsERT tworzy zwykle INSERTGT). */
     instance: process.env.MSSQL_INSTANCE ?? "INSERTGT",
     /** Port TCP — gdy ustawiony, ma pierwszeństwo przed instancją nazwaną. */
-    port: process.env.MSSQL_PORT ? num(process.env.MSSQL_PORT, 1433) : undefined,
+    port: process.env.MSSQL_PORT ? num(process.env.MSSQL_PORT, 1433, "MSSQL_PORT") : undefined,
     database: process.env.MSSQL_DATABASE ?? "",
     user: process.env.MSSQL_USER ?? "",
     password: process.env.MSSQL_PASSWORD ?? "",
@@ -55,8 +74,8 @@ export const config = {
      * zakupu. Na prawdziwej bazie aplikacja listowałaby korekty jako dostawy
      * i nie zobaczyła ani jednego PZ.
      */
-    dokTypFZ: num(process.env.DOK_TYP_FZ, 1),
-    dokTypPZ: num(process.env.DOK_TYP_PZ, 10),
+    dokTypFZ: num(process.env.DOK_TYP_FZ, 1, "DOK_TYP_FZ"),
+    dokTypPZ: num(process.env.DOK_TYP_PZ, 10, "DOK_TYP_PZ"),
     /**
      * Kody `dok_Typ` dokumentów zwrotów listowanych na magazynie Zwroty (CSV).
      * Domyślnie `14` = ZW (zwrot). Puste = każdy dokument na tym magazynie —
@@ -86,8 +105,8 @@ export const config = {
      * jednym SELECT-em (DEPLOY §6). Puste = zadania `set_doc_flag` kończą się
      * czytelnym błędem zamiast pisać w losową grupę flag ([WERYFIKUJ]).
      */
-    flagGrupa: process.env.MSSQL_FLAG_GRUPA ? num(process.env.MSSQL_FLAG_GRUPA, 0) : 0,
-    flagTypObiektu: process.env.MSSQL_FLAG_TYP_OBIEKTU ? num(process.env.MSSQL_FLAG_TYP_OBIEKTU, 0) : 0,
+    flagGrupa: process.env.MSSQL_FLAG_GRUPA ? num(process.env.MSSQL_FLAG_GRUPA, 0, "MSSQL_FLAG_GRUPA") : 0,
+    flagTypObiektu: process.env.MSSQL_FLAG_TYP_OBIEKTU ? num(process.env.MSSQL_FLAG_TYP_OBIEKTU, 0, "MSSQL_FLAG_TYP_OBIEKTU") : 0,
     /**
      * Wyrażenie SQL 0/1: dokument w buforze. `dok_Status` ma udokumentowane
      * wartości {0-wycofany, 1-wykonany, 2-unieważniony, 3-odłożony, 4-MM wydany,
@@ -96,7 +115,7 @@ export const config = {
      */
     bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
-    syncMs: num(process.env.MSSQL_SYNC_MS, 60000),
+    syncMs: num(process.env.MSSQL_SYNC_MS, 60000, "MSSQL_SYNC_MS"),
   },
 
   /**
@@ -109,14 +128,14 @@ export const config = {
 
   /** Identyfikatory magazynów w SGT (spec §11 pkt 5; [WERYFIKUJ] na własnej bazie). */
   magId: {
-    MAG: num(process.env.MAG_ID_MAG, 1),
-    MGP: num(process.env.MAG_ID_MGP, 2),
+    MAG: num(process.env.MAG_ID_MAG, 1, "MAG_ID_MAG"),
+    MGP: num(process.env.MAG_ID_MGP, 2, "MAG_ID_MGP"),
     /** Magazyn zwrotów od klientów (biuro kompletuje kartony i wystawia dokument). */
-    ZWROTY: num(process.env.MAG_ID_ZWROTY, 3),
+    ZWROTY: num(process.env.MAG_ID_ZWROTY, 3, "MAG_ID_ZWROTY"),
   },
 
   /** Limit długości pola tw_Lokalizacja (spec §5.2, COL_LENGTH; [WERYFIKUJ]). */
-  locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50),
+  locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50, "LOC_FIELD_LIMIT"),
 
   /**
    * Wzorce kodu lokalizacji — JEDNO źródło prawdy dla całego systemu (plan §3).
@@ -191,7 +210,7 @@ export const config = {
 
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
-    pollMs: num(process.env.WORKER_POLL_MS, 1200),
+    pollMs: num(process.env.WORKER_POLL_MS, 1200, "WORKER_POLL_MS"),
     simErrors: process.env.WORKER_SIM_ERRORS === "1",
     // backoff dla retry (spec §9): 5s / 30s / 2min
     backoffMs: [5000, 30000, 120000],
@@ -212,5 +231,56 @@ function assertMode(name: string, value: string, allowed: readonly string[]): vo
   }
 }
 assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
+
+/**
+ * Reguły, które muszą być spełnione, żeby wdrożenie w ogóle mogło działać.
+ *
+ * Zwraca listę zdań zamiast rzucać — tej samej funkcji używa diagnostyka, a ta
+ * ma pokazać WSZYSTKIE problemy naraz. Naprawianie konfiguracji po jednym
+ * błędzie na restart to najgorszy możliwy sposób spędzania czasu przy wdrożeniu.
+ */
+export function bledyKonfiguracji(c: Config = config): string[] {
+  const bledy: string[] = [];
+
+  /* Magazyn skutku rozstrzyga, którym trybem idzie dokument. Dwa te same id
+     znaczą, że dostawa i kontener trafiają do tej samej zakładki — a to wygląda
+     jak „brakuje dostaw", nie jak błąd konfiguracji. Reguła istniała dotąd
+     wyłącznie jako test (config.test.ts); tu pracuje na produkcji. */
+  const mag = [c.magId.MAG, c.magId.MGP, c.magId.ZWROTY];
+  if (new Set(mag).size !== 3) {
+    bledy.push(
+      `MAG_ID_MAG/_MGP/_ZWROTY muszą być różne, są [${mag.join(", ")}] — ` +
+        "sprawdź SELECT mag_Id, mag_Symbol, mag_Nazwa FROM sl_Magazyn (DEPLOY §6).",
+    );
+  }
+
+  /* Puste dane logowania przechodziły przez start i wywalały się dopiero przy
+     pierwszym zapytaniu — czyli po tym, jak instalator uznał, że skończył. */
+  if (c.sgtMode === "mssql") {
+    const brak = (["database", "user", "password"] as const).filter((k) => !c.mssql[k]);
+    if (brak.length) {
+      bledy.push(
+        `SGT_MODE=mssql wymaga ${brak.map((k) => "MSSQL_" + k.toUpperCase()).join(", ")} — ` +
+          "bez tego nie ma połączenia z bazą Subiekta.",
+      );
+    }
+  }
+
+  // Wzorce adresów przychodzą z env; zły regex wysypuje każdy skan, nie start.
+  for (const p of c.locPatterns) {
+    try {
+      new RegExp(p);
+    } catch {
+      bledy.push(`Wzorzec lokalizacji "${p}" nie jest poprawnym wyrażeniem regularnym.`);
+    }
+  }
+
+  return bledy;
+}
+
+const bledy = bledyKonfiguracji();
+if (bledy.length) {
+  throw new Error("Błędna konfiguracja:\n  - " + bledy.join("\n  - "));
+}
 
 export type Config = typeof config;

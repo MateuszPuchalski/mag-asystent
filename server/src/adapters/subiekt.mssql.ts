@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { db, nowIso } from "../db/db.js";
+import { db, nowIso, transaction } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 
@@ -180,7 +180,7 @@ export async function importFromMssql(): Promise<ImportStats> {
   );
   const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
 
-  const apply = d.transaction(() => {
+  const apply = transaction(d, () => {
     for (const t of ["sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn"]) {
       d.prepare(`DELETE FROM ${t}`).run();
     }

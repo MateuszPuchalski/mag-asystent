@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { makeSferaAdapter } from "../adapters/index.js";
 import type { MmItem } from "../adapters/sfera.js";
 import { cofnijFlage } from "../services/delivery-flag.js";
+import { zamelduj } from "../services/process-state.js";
 
 /**
  * Worker Sfery (spec §9). Jeden proces, pętla poll, przetwarzanie sekwencyjne
@@ -132,5 +133,13 @@ function tick() {
   });
 }
 
+/* Meldunek trybu przy starcie i w pętli. Bez tego jedynym śladem po tym, w
+   jakim trybie pracuje worker, była ta linia w logu — a rozjazd z API nie miał
+   żadnego objawu poza brakiem zmian w Subiekcie. Teraz widzi go /api/health. */
+zamelduj("worker");
+
 console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · zapis=${config.sferaMode}`);
-setInterval(tick, config.worker.pollMs);
+setInterval(() => {
+  zamelduj("worker");
+  tick();
+}, config.worker.pollMs);

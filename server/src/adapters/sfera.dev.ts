@@ -1,4 +1,4 @@
-import { db, nextMmNumber } from "../db/db.js";
+import { db, nextMmNumber, transaction } from "../db/db.js";
 import type { MmItem, SferaAdapter } from "./sfera.js";
 
 /**
@@ -27,7 +27,7 @@ export class DevSferaAdapter implements SferaAdapter {
 
   async createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string> {
     const d = db();
-    const tx = d.transaction(() => {
+    const tx = transaction(d, () => {
       for (const it of items) {
         const from = d
           .prepare("SELECT stan FROM sgt_stan WHERE tw_id = ? AND mag_id = ?")

@@ -1,4 +1,4 @@
-import { db } from "../db/db.js";
+import { db, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
@@ -143,7 +143,7 @@ export function openDelivery(dokId: number, user: string): number {
     `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, lok_oczekiwana)
      VALUES (?,?,?,?,?,?)`
   );
-  db().transaction(() => {
+  transaction(db(), () => {
     for (const [twId, qty] of agg) {
       const t = subiekt.getProductById(twId);
       ins.run(id, twId, t?.symbol ?? String(twId), t?.nazwa ?? "", qty, pickingLoc(t?.lokalizacja));
@@ -243,7 +243,7 @@ export function openBaskets(deliveryId: number): KoszykView[] {
        GROUP BY koszyk
        ORDER BY koszyk`
     )
-    .all(deliveryId) as KoszykView[];
+    .all(deliveryId) as unknown as KoszykView[];
 }
 
 /**
@@ -582,7 +582,7 @@ export function closeBasket(
   const qty = items.reduce((s, i) => s + i.qty, 0);
 
   let queueId = 0;
-  db().transaction(() => {
+  transaction(db(), () => {
     queueId = enqueueMM(srcMag, config.magId.MAG, items, {
       createdBy: user,
       twId: null,
