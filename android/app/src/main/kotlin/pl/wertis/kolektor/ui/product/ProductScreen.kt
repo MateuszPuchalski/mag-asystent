@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.net.LocAction
+import pl.wertis.kolektor.core.net.MagazynStan
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.SetLocationBody
@@ -211,6 +212,24 @@ fun ProductScreen(graph: AppGraph) {
                 unit = p.unit,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        /* Pozostałe magazyny firmy. Trzy kafle wyżej mają własną semantykę
+           (MAG = dostępne, MGP = do zasilenia, Zwroty = do rozłożenia), więc
+           te idą osobno i kompaktowo — to informacja pomocnicza, nie kolejny
+           krok pracy. Które magazyny tu wchodzą, rozstrzyga serwer; ukrywanie
+           jest globalne (Ustawienia → MAGAZYNY). */
+        if (p.magazyny.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "POZOSTAŁE MAGAZYNY",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = InkMute,
+                )
+                p.magazyny.forEach { m -> MagazynRow(m, p.unit) }
+            }
         }
 
         if (hasPendingMM) {
@@ -443,6 +462,57 @@ fun ProductScreen(graph: AppGraph) {
         onClose = { pendingLoc = null },
         onPick = ::saveLoc,
     )
+}
+
+/**
+ * Jeden magazyn bez roli: kod, nazwa i stan w jednej linii.
+ *
+ * Świadomie NIE jest to `StockCard` — te kafle mają 36 sp cyfry i zajmują pół
+ * ekranu, bo niosą decyzję („ile odłożyć"). Tu chodzi o odpowiedź na pytanie
+ * pomocnicze, więc wiersz ma być wąski nawet przy ośmiu magazynach.
+ *
+ * Zerowy stan zostaje WIDOCZNY, tylko przygaszony: zgłoszenie mówiło
+ * o wszystkich magazynach, a od chowania jest osobne ustawienie. Milczące
+ * odsiewanie zer kazałoby się domyślać, czy magazyn jest pusty, czy ukryty.
+ */
+@Composable
+private fun MagazynRow(m: MagazynStan, unit: String) {
+    val pusty = m.stan == 0.0
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(background = CardWhite, borderColor = CardBorder)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                m.kod,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (pusty) InkMute else Ink,
+            )
+            if (m.nazwa.isNotBlank()) {
+                Text(m.nazwa, fontSize = 11.sp, color = InkMute, maxLines = 1)
+            }
+        }
+        Text(
+            formatQty(m.stan),
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 20.sp,
+            color = if (pusty) InkMute else Ink,
+        )
+        if (unit.isNotEmpty()) {
+            Text(
+                unit,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = InkMute,
+                modifier = Modifier.padding(start = 3.dp),
+            )
+        }
+    }
 }
 
 @Composable

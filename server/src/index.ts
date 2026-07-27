@@ -11,7 +11,8 @@ import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
 import { authRoutes } from "./routes/auth.js";
-import { importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
+import { magazynRoutes } from "./routes/magazyny.js";
+import { brakDostepuDoMagazynow, importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
 import { docFlagAvailable } from "./services/delivery-flag.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
 
@@ -42,7 +43,7 @@ export async function buildApp() {
      wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
   app.get("/api/health", async () => {
     const worker = stanWorkera();
-    const problemy = [worker.problem].filter((x): x is string => x !== null);
+    const problemy = [worker.problem, brakDostepuDoMagazynow].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
       mode: config.sgtMode,
@@ -80,6 +81,7 @@ export async function buildApp() {
   await app.register(locationRoutes);
   await app.register(deviceRoutes);
   await app.register(authRoutes);
+  await app.register(magazynRoutes);
 
   await app.ready();
   return app;

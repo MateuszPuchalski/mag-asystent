@@ -142,9 +142,15 @@ Sprawdz "podstawia wybraną kolumnę do grantu kolumnowego" {
     Zaloz ($skrypt -match "GRANT UPDATE ON dbo\.tw__Towar \(tw_Pole3\)") "brak grantu na wybraną kolumnę"
 }
 
-Sprawdz "nadaje SELECT na siedmiu tabelach" {
+Sprawdz "nadaje SELECT na osmiu tabelach" {
+    # 8, nie 7: doszedł sl_Magazyn, bez którego karta towaru mogłaby pokazać
+    # najwyżej `mag_Id = 7` zamiast nazwy magazynu
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
-    Zaloz ($ile -eq 7) "GRANT SELECT jest $ile razy, ma być 7"
+    Zaloz ($ile -eq 8) "GRANT SELECT jest $ile razy, ma być 8"
+}
+
+Sprawdz "czyta slownik magazynow" {
+    Zaloz ($skrypt -match "GRANT SELECT ON dbo\.sl_Magazyn") "brak grantu na sl_Magazyn"
 }
 
 Sprawdz "NIE nadaje żadnego prawa zapisu do dok__Dokument" {

@@ -74,6 +74,46 @@ export interface ImportStats {
 /** Znacznik ostatniego udanego importu (do /api/health). */
 export let lastImport: ImportStats | null = null;
 
+/**
+ * Ustawiane, gdy login nie ma `GRANT SELECT ON dbo.sl_Magazyn`.
+ *
+ * Czytane przez `/api/health` — bo objawem braku uprawnienia jest „karta
+ * pokazuje tylko trzy magazyny", czyli dokładnie to, co było przed zmianą.
+ * Bez tego komunikatu nikt by nie skojarzył, że trzeba ponownie uruchomić
+ * skrypt uprawnień.
+ */
+export let brakDostepuDoMagazynow: string | null = null;
+
+interface MagRow {
+  mag_Id: number;
+  mag_Symbol: string;
+  mag_Nazwa: string;
+}
+
+async function pobierzMagazyny(pool: sql.ConnectionPool): Promise<MagRow[]> {
+  try {
+    const r = await pool
+      .request()
+      .query<MagRow>("SELECT mag_Id, mag_Symbol, mag_Nazwa FROM sl_Magazyn");
+    brakDostepuDoMagazynow = null;
+    return r.recordset;
+  } catch (e) {
+    /* Degradacja do stanu sprzed zmiany: trzy magazyny z konfiguracji, bez
+       nazw ze słownika. Aplikacja działa dalej — traci tylko zestawienie
+       „gdzie jeszcze leży". */
+    brakDostepuDoMagazynow =
+      "Brak GRANT SELECT na sl_Magazyn — karta towaru pokazuje tylko MAG, MGP " +
+      "i Zwroty. Uruchom ponownie skrypt uprawnień (DEPLOY §6) albo instalator " +
+      "z -TylkoKonfiguracja.";
+    console.warn(`[mssql] ${brakDostepuDoMagazynow} (${e instanceof Error ? e.message : e})`);
+    return [
+      { mag_Id: config.magId.MAG, mag_Symbol: "MAG", mag_Nazwa: "Magazyn główny" },
+      { mag_Id: config.magId.MGP, mag_Symbol: "MGP", mag_Nazwa: "Strefa przyjęć" },
+      { mag_Id: config.magId.ZWROTY, mag_Symbol: "ZWROTY", mag_Nazwa: "Zwroty od klientów" },
+    ];
+  }
+}
+
 export async function importFromMssql(): Promise<ImportStats> {
   const pool = await mssqlPool();
   const c = config.mssql;
@@ -90,16 +130,22 @@ export async function importFromMssql(): Promise<ImportStats> {
     )
   ).recordset;
 
+  /* Magazyny ze słownika. NOWY GRANT: `GRANT SELECT ON dbo.sl_Magazyn`.
+     Instalacja sprzed lipca 2026 go NIE MA, a `git pull` nie ma prawa jej
+     wywrócić — dlatego brak uprawnienia degraduje import do dawnego
+     zachowania (trzy magazyny z konfiguracji) i melduje się zdaniem
+     w /api/health, zamiast przerywać synchronizację. */
+  const magazyny = await pobierzMagazyny(pool);
+
+  /* Stany WSZYSTKICH magazynów, nie tylko trzech z rolami. Wcześniejszy filtr
+     `st_MagId IN (@mag,@mgp,@zw)` sprawiał, że reszta nigdy nie trafiała do
+     read-modelu — karta towaru fizycznie nie miała skąd wziąć informacji, że
+     towar leży gdzie indziej. Przy 3415 kartotekach i kilku magazynach to
+     nadal kilkadziesiąt tysięcy wierszy, czyli dla SQLite nic. */
   const stany = (
-    await pool
-      .request()
-      .input("mag", sql.Int, config.magId.MAG)
-      .input("mgp", sql.Int, config.magId.MGP)
-      .input("zw", sql.Int, config.magId.ZWROTY)
-      .query<StanRow>(
-        `SELECT st_TowId, st_MagId, st_Stan, st_StanRez
-         FROM tw_Stan WHERE st_MagId IN (@mag, @mgp, @zw)`
-      )
+    await pool.request().query<StanRow>(
+      `SELECT st_TowId, st_MagId, st_Stan, st_StanRez FROM tw_Stan`
+    )
   ).recordset;
 
   // dostawca: kh_Symbol jest pewny w każdej wersji SGT; pełna nazwa siedzi w
@@ -184,9 +230,10 @@ export async function importFromMssql(): Promise<ImportStats> {
     for (const t of ["sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn"]) {
       d.prepare(`DELETE FROM ${t}`).run();
     }
-    d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MAG, "MAG");
-    d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.MGP, "MGP");
-    d.prepare("INSERT INTO sgt_magazyn(mag_id, kod) VALUES (?,?)").run(config.magId.ZWROTY, "ZWROTY");
+    const insMag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
+    for (const m of magazyny) {
+      insMag.run(m.mag_Id, (m.mag_Symbol ?? "").trim() || `MAG${m.mag_Id}`, (m.mag_Nazwa ?? "").trim());
+    }
 
     for (const t of towary) {
       insTowar.run({

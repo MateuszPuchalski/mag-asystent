@@ -32,6 +32,7 @@ Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=
 | `dok_Pozycja` | `ob_DokHanId` (→ `dok_Id`), `ob_TowId` (→ `tw_Id`), `ob_IloscMag` |
 | `kh__Kontrahent` | `kh_Id`, `kh_Symbol` |
 | `fl_Wartosc` + `fl__Flagi` | flaga sprawdzenia faktury — patrz niżej |
+| `sl_Magazyn` | `mag_Id`, `mag_Symbol`, `mag_Nazwa` — nazwy magazynów na karcie towaru |
 
 ## Lokalizacja: pola własne, nie `tw_Lokalizacja`
 
@@ -131,6 +132,12 @@ SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGr
 ## Magazyny
 
 `sl_Magazyn`: `mag_Id`, `mag_Symbol` varchar(3), `mag_Nazwa`, `mag_Glowny` (bit).
+
+Od sierpnia 2026 importer **czyta tę tabelę** i pobiera stany ze WSZYSTKICH
+magazynów, nie tylko z trzech skonfigurowanych — karta towaru odpowiada na
+pytanie „gdzie ten towar jeszcze leży". Wymaga to `GRANT SELECT ON dbo.sl_Magazyn`
+(`docs/subiekt-gt-edu-setup.md` §2); bez niego aplikacja degraduje się do trzech
+magazynów i mówi o tym w `/api/health`.
 
 `[WERYFIKUJ]` id magazynów MAG / MGP / Zwroty (`MAG_ID_*`). Magazyn główny da się
 wykryć automatycznie (`mag_Glowny = 1`), ale MGP i Zwroty są nazwane po firmowemu:

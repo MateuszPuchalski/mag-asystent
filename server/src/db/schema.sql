@@ -114,7 +114,8 @@ CREATE INDEX IF NOT EXISTS ix_session_user ON device_session(user_id);
 -- ── Read-model Subiekta GT (seed z mag.xlsx; prod = MSSQL) ─────────────────
 CREATE TABLE IF NOT EXISTS sgt_magazyn (
   mag_id INTEGER PRIMARY KEY,
-  kod    TEXT NOT NULL
+  kod    TEXT NOT NULL,
+  nazwa  TEXT NOT NULL DEFAULT ''    -- mag_Nazwa z sl_Magazyn; kod to mag_Symbol
 );
 
 CREATE TABLE IF NOT EXISTS sgt_towar (
@@ -281,4 +282,19 @@ CREATE TABLE IF NOT EXISTS process_state (
   sgt_mode   TEXT NOT NULL,
   sfera_mode TEXT NOT NULL,
   at         TEXT NOT NULL       -- ISO UTC, odświeżane w pętli
+);
+
+-- Widoczność magazynów na karcie towaru. OSOBNA tabela, nie kolumna
+-- w `sgt_magazyn`, i to jest tu sedno: `sgt_*` to lustro Subiekta czyszczone
+-- w całości przy każdym imporcie (co MSSQL_SYNC_MS, domyślnie 60 s). Flaga
+-- trzymana tam znikałaby co minutę, a objawem byłoby „ukrywanie nie działa".
+-- Ta tabela należy do aplikacji i importu nie dotyka.
+--
+-- Brak wiersza = magazyn widoczny. Zapisujemy więc tylko ukryte, dzięki czemu
+-- magazyn dodany w Subiekcie pojawia się sam, bez żadnej akcji biura.
+CREATE TABLE IF NOT EXISTS magazyn_widocznosc (
+  mag_id INTEGER PRIMARY KEY,
+  ukryty INTEGER NOT NULL DEFAULT 0,
+  at     TEXT,                      -- kiedy ukryto (do audytu)
+  przez  TEXT                       -- kto ukrył
 );

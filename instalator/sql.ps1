@@ -337,6 +337,7 @@ GRANT SELECT ON dbo.dok_Pozycja    TO [$Login];
 GRANT SELECT ON dbo.kh__Kontrahent TO [$Login];
 GRANT SELECT ON dbo.fl_Wartosc     TO [$Login];
 GRANT SELECT ON dbo.fl__Flagi      TO [$Login];
+GRANT SELECT ON dbo.sl_Magazyn     TO [$Login];   -- nazwy i symbole magazynów
 
 -- ZAPIS: dwie rzeczy i ani jedna więcej.
 -- 1) lokalizacja — JEDNA kolumna kartoteki (ta sama, co MSSQL_LOC_COLUMN)

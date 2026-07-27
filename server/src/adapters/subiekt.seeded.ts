@@ -4,9 +4,11 @@ import type { ProductRow } from "../types.js";
 import { parseLocs } from "../locs.js";
 import type {
   RawDocument,
+  RawMagazyn,
   RawPosition,
   RawProduct,
   RawStock,
+  RawStockRow,
   SubiektAdapter,
 } from "./subiekt.js";
 
@@ -115,6 +117,18 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .prepare("SELECT stan, stan_rez FROM sgt_stan WHERE tw_id = ? AND mag_id = ?")
       .get(twId, magId) as RawStock | undefined;
     return row ?? { stan: 0, stan_rez: 0 };
+  }
+
+  listMagazyny(): RawMagazyn[] {
+    return db()
+      .prepare("SELECT mag_id, kod, nazwa FROM sgt_magazyn ORDER BY mag_id")
+      .all() as unknown as RawMagazyn[];
+  }
+
+  getStockAll(twId: number): RawStockRow[] {
+    return db()
+      .prepare("SELECT mag_id, stan, stan_rez FROM sgt_stan WHERE tw_id = ? ORDER BY mag_id")
+      .all(twId) as unknown as RawStockRow[];
   }
 
   listPutawayDocuments(days: number): RawDocument[] {

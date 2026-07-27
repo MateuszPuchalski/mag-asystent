@@ -5,6 +5,7 @@ import type { ProductCard, StockView, Zamienniki } from "../types.js";
 import { parseLocs } from "../locs.js";
 import { pendingLocChanges } from "./locations.js";
 import { kandydaciZamiennikow, podzielZamienniki } from "./zamienniki.js";
+import { magazynyTowaru } from "./magazyny.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
@@ -110,6 +111,10 @@ export function buildProductCard(
     mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, pendingMgp, 0),
     zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, pendingZw, 0),
     mag: stockView(magRaw.stan, magRaw.stan_rez, 0, pendingMgp + pendingZw),
+    /* Magazyny BEZ ROLI, pominąwszy ukryte. Trójka wyżej ma własne kafle
+       z własną semantyką, więc powtarzanie jej tutaj dublowałoby tę samą
+       liczbę w dwóch miejscach ekranu. */
+    magazyny: magazynyTowaru(twId),
     zamienniki: zamiennikiZOpisu(adapter, t.opis ?? "", t.symbol),
   };
 }

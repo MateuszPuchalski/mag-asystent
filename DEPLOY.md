@@ -383,7 +383,7 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 **Etap 1 — odczyt z MSSQL (`SGT_MODE=mssql`):**
 1. Utwórz login SQL o minimalnych uprawnieniach — gotowy, idempotentny skrypt
    w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md) §2.
-   `GRANT SELECT` na siedem tabel, `GRANT UPDATE` na jedną kolumnę
+   `GRANT SELECT` na osiem tabel, `GRANT UPDATE` na jedną kolumnę
    (lokalizacja) i `GRANT INSERT, UPDATE` na `fl_Wartosc` (flagi). Aplikacja
    **nie potrzebuje żadnego prawa zapisu do `dok__Dokument`**.
 2. Przejdź checklistę `[WERYFIKUJ]`. Jest krótka, bo nazwy tabel, kolumn oraz

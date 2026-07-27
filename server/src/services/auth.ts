@@ -147,7 +147,16 @@ export type OperacjaUprzywilejowana =
   /** Zdjęcie cudzej blokady linii przed wygaśnięciem TTL. */
   | "zdjecie_cudzego_locka"
   /** Zakładanie kont, PIN-y, wyłączanie kont, migracja historii. */
-  | "zarzadzanie_kontami";
+  | "zarzadzanie_kontami"
+  /**
+   * Ukrywanie magazynów na karcie towaru.
+   *
+   * Osobna operacja, a nie „zarządzanie kontami" pod inną nazwą: wpis
+   * `privileged` w audycie niesie nazwę operacji, więc wrzucenie tego do
+   * wspólnego worka znaczyłoby, że „biuro zmieniło widoczność magazynów"
+   * i „biuro założyło konto" wyglądają w historii identycznie.
+   */
+  | "widocznosc_magazynow";
 
 /**
  * Kto MOŻE — zanim PIN rozstrzygnie, czy to naprawdę ta osoba.
@@ -159,6 +168,9 @@ export type OperacjaUprzywilejowana =
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   zdjecie_cudzego_locka: ["brygadzista", "biuro"],
   zarzadzanie_kontami: ["biuro"],
+  // widoczność magazynów jest wspólna dla wszystkich kolektorów, więc ustawia
+  // ją ta sama rola, która odpowiada za konfigurację — nie pojedynczy magazynier
+  widocznosc_magazynow: ["biuro"],
 };
 
 const NAZWA_ROL: Record<Rola, string> = {

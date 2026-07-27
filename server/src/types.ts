@@ -19,6 +19,8 @@ export interface PendingLocChange {
   queueId: number;
 }
 
+import type { MagazynStan } from "./services/magazyny.js";
+
 export interface ProductCard {
   id: number;
   sym: string;
@@ -35,6 +37,12 @@ export interface ProductCard {
   mgp: StockView;
   /** Strefa zwrotów od klientów (magazyn Zwroty). */
   zwroty: StockView;
+  /**
+   * Pozostałe magazyny firmy — bez trójki z rolami i bez ukrytych w ustawieniach.
+   * Do lipca 2026 karta znała wyłącznie MAG/MGP/Zwroty, więc „gdzie ten towar
+   * jeszcze leży" było pytaniem bez odpowiedzi.
+   */
+  magazyny: MagazynStan[];
   /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
   zamienniki: Zamienniki;
 }

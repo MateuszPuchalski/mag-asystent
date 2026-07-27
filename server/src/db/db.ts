@@ -129,6 +129,10 @@ function migrate(database: DatabaseSync) {
      więc w chwili wykonania schematu ta kolumna jeszcze nie istnieje. Raport
      wydajności (§7) grupuje właśnie po niej. */
   database.exec("CREATE INDEX IF NOT EXISTS ix_events_ref_time ON events(user_ref, created_at)");
+  /* Nazwa magazynu z sl_Magazyn. `CREATE TABLE IF NOT EXISTS` nie dokłada
+     kolumny do tabeli, która już istnieje — bez tej linii istniejąca instalacja
+     miałaby `sgt_magazyn` bez `nazwa` i import wywaliłby się na INSERT. */
+  addColumn("sgt_magazyn", "nazwa", "TEXT NOT NULL DEFAULT ''");
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */

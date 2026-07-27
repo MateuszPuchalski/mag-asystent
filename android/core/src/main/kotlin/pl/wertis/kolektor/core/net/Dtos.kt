@@ -27,6 +27,41 @@ data class StockView(
     val effective: Double,
 )
 
+/**
+ * Stan towaru w magazynie BEZ ROLI (nie MAG/MGP/Zwroty).
+ *
+ * Odpowiada na pytanie „gdzie ten towar jeszcze leży", którego do lipca 2026
+ * nie dało się zadać: serwer znał wyłącznie trzy magazyny z konfiguracji.
+ * Które magazyny tu wchodzą, rozstrzyga SERWER — ukrywanie jest globalne,
+ * więc kolektor niczego nie filtruje, tylko rysuje to, co dostał.
+ */
+@Serializable
+data class MagazynStan(
+    val magId: Long,
+    /** `mag_Symbol` — ten sam krótki kod, który biuro widzi w Subiekcie. */
+    val kod: String,
+    val nazwa: String = "",
+    val stan: Double = 0.0,
+    val rez: Double = 0.0,
+)
+
+/** Magazyn na liście ustawień: z rolą i informacją, czy jest ukryty. */
+@Serializable
+data class MagazynInfo(
+    val magId: Long,
+    val kod: String,
+    val nazwa: String = "",
+    /** "MAG" | "MGP" | "ZWROTY" | null — z rolą nie da się ukryć. */
+    val rola: String? = null,
+    val ukryty: Boolean = false,
+)
+
+@Serializable
+data class MagazynyResponse(val magazyny: List<MagazynInfo> = emptyList())
+
+@Serializable
+data class WidocznoscRequest(val ukryte: List<Long>, val pinAutora: String)
+
 /** Zmiana lokalizacji czekająca w kolejce — pojedynczy kod, nie całe pole. */
 @Serializable
 data class PendingLocChange(
@@ -55,6 +90,12 @@ data class ProductCard(
     val mgp: StockView,
     /** Strefa zwrotów od klientów (magazyn Zwroty). */
     val zwroty: StockView? = null,
+    /**
+     * Pozostałe magazyny firmy — bez trójki z rolami i bez ukrytych.
+     * Pusta domyślna trzyma zgodność ze starszym serwerem, który tego pola
+     * nie wysyła (tak samo jak przy `zwroty` i `zamienniki`).
+     */
+    val magazyny: List<MagazynStan> = emptyList(),
     /** Zamienniki wyczytane z opisu — regułę ma serwer, kolektor tylko rysuje. */
     val zamienniki: Zamienniki = Zamienniki(),
 )
