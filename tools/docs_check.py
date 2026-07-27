@@ -102,7 +102,10 @@ def main() -> int:
                 checked += 1
 
     print(f"\nzweryfikowanych liczb w dokumentacji: {checked}")
-    print(f"stan kodu: ekrany={screens}, pliki routes={len(glob.glob('server/src/routes/*.ts'))}, testy :core={tests}")
+    # bez *.test.ts — od kiedy trasy mają własne testy, zwykły glob liczył je
+    # jako trasy i statystyka kłamała o dwie pozycje
+    routes = [f for f in glob.glob("server/src/routes/*.ts") if not f.endswith(".test.ts")]
+    print(f"stan kodu: ekrany={screens}, pliki routes={len(routes)}, testy :core={tests}")
     print("OK — dokumentacja spójna z repo" if not bad else f"\n{bad} rozbieżności")
     return 1 if bad else 0
 

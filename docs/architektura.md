@@ -328,11 +328,17 @@ Raport ma trzy reguły wbudowane w kod, każda z testem:
 
 ## 10. Testy i bramki
 
-| co | ile | gdzie |
-|---|---|---|
-| serwer | 153 | `cd server && npm test` (node:test przez tsx) |
-| `:core` | 92 | `cd android && ./gradlew :core:test` — **bez Android SDK** |
-| `:app` | — | tylko CI: wymaga Android SDK |
+| co | gdzie |
+|---|---|
+| serwer (jednostkowe + trasy przez `app.inject()`) | `cd server && npm test` (node:test przez tsx) |
+| `:core` | `cd android && ./gradlew :core:test` — **bez Android SDK** |
+| `:app` | tylko CI: wymaga Android SDK; testów nie ma |
+
+> Liczb testów ta tabela celowo **nie podaje**. `tools/docs_check.py` pilnuje
+> ich wyłącznie w `README.md` i `android/README.md`, a policzyć ich statycznie
+> się nie da (`grep` po `test(` daje 138 przy 199 uruchomionych — testy
+> parametryzowane i zagnieżdżone). Liczba poza kontrolą narzędzia starzeje się
+> po cichu; tak właśnie ten dokument doszedł do „153" przy 199.
 
 Dwa workflow: `android.yml` (`:core` + APK debug) i `server.yml` (testy, `tsc`,
 `docs_check`).
@@ -376,9 +382,14 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 
 ## 12. Znane ograniczenia
 
-- **Brak testów na poziomie tras.** Testy serwera są jednostkowe; błąd
-  w warstwie routingu (np. walidacja czytająca surowe pole zamiast wartości
-  efektywnej) wychodzi dopiero przy ręcznym `curl`. Taki błąd realnie wystąpił.
+- **Brak testów adapterów MSSQL.** `adapters/subiekt.mssql.ts`
+  i `adapters/sfera.sql.ts` to jedyny kod piszący do bazy firmy, a sensowny
+  test wymagałby działającego SQL Servera. Weryfikuje je **ręczna** checklista
+  na Subiekcie edu (`docs/subiekt-gt-edu-setup.md` §5) — zielone `npm test`
+  nie mówi o nich nic.
+- **Brak testów w module `:app`** (~8,6 tys. linii Kotlina). Logika, którą dało
+  się wynieść, siedzi w `:core` i ma testy; w `:app` zostają ViewModele,
+  obsługa błędów sieci i wyzwalacze flusha bufora.
 - **Dokumenty MM nie są jeszcze tworzone** — kontrakt istnieje
   (`adapters/sfera.ts`), implementacja czeka na worker COM na Windows.
 - **Otwarte `[WERYFIKUJ]`** dla własnej bazy: `MAG_ID_*`, które `tw_Pole1..8`

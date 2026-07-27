@@ -249,7 +249,12 @@ Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](a
 ## 5a. Konta pracowników i badge'e (plan §7)
 
 Bez kont kolektor nie ma czym podpisać operacji: ekran startowy prosi o skan
-badge'a i nie przepuszcza dalej.
+badge'a i nie przepuszcza dalej. **Tak samo API** — od lipca każda trasa poza
+czterema (`GET /api/health`, `GET /api/setup`, `POST /api/auth/badge`
+i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`. Wcześniej
+bramką był wyłącznie ekran kolektora, więc dowolne urządzenie w sieci hali
+mogło zmienić lokalizację w Subiekcie albo pobrać raport wydajności per
+pracownik, podpisując się dowolnym nazwiskiem.
 
 **1. Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,

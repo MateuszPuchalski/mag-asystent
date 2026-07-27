@@ -33,6 +33,17 @@ export function db(): DatabaseSync {
   const database = new DatabaseSync(config.dbPath);
   database.exec("PRAGMA journal_mode = WAL");
   database.exec("PRAGMA foreign_keys = ON");
+  /* Bazę otwierają DWA procesy: API i worker. WAL rozdziela czytających od
+     piszących, ale NIE dwóch piszących — a piszą obaj: API przy każdym
+     odłożeniu, worker przy każdym zadaniu z kolejki. Bez tego ustawienia
+     kolizja kończy się natychmiastowym SQLITE_BUSY: losowe 500 dla
+     magazyniera albo zadanie w statusie `error`, bez wzorca i bez tropu.
+
+     Domyślna wartość w `node:sqlite` to zero, więc trzeba ją podać wprost.
+     Pięć sekund to dużo ponad najdłuższą transakcję w tym kodzie (kilka
+     INSERT-ów) — czekanie tyle znaczyłoby, że drugi proces wisi, i wtedy
+     błąd jest poprawną odpowiedzią.                                        */
+  database.exec("PRAGMA busy_timeout = 5000");
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   database.exec(schema);
   migrate(database);
@@ -51,13 +62,21 @@ export function db(): DatabaseSync {
  * ROLLBACK jest tu istotny, a nie kosmetyczny: `putaway` i `delivery` zapisują
  * w jednej transakcji pozycję ORAZ zadanie do kolejki Sfery. Przerwanie
  * w połowie zostawiłoby zadanie zapisu bez pokrycia w danych albo odwrotnie.
+ *
+ * BEGIN **IMMEDIATE**, nie zwykłe BEGIN, i to nie jest drobiazg przy dwóch
+ * procesach. Zwykłe BEGIN jest odroczone: blokadę zapisu bierze dopiero przy
+ * pierwszym INSERT-cie, czyli podnosi transakcję z odczytu na zapis. Gdy
+ * w międzyczasie zapisał ktoś inny, SQLite zwraca SQLITE_BUSY **natychmiast
+ * i wbrew `busy_timeout`** — bo czekanie mogłoby zakleszczyć oba procesy.
+ * IMMEDIATE bierze blokadę od razu, więc `busy_timeout` faktycznie działa
+ * i kolizja kończy się chwilą czekania zamiast błędem.
  */
 export function transaction<A extends unknown[], R>(
   database: DatabaseSync,
   fn: (...args: A) => R,
 ): (...args: A) => R {
   return (...args: A): R => {
-    database.exec("BEGIN");
+    database.exec("BEGIN IMMEDIATE");
     try {
       const out = fn(...args);
       database.exec("COMMIT");
