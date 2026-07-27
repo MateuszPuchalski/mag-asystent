@@ -99,6 +99,11 @@ npm run seed     # zasila SQLite z server/seed/products.json (raz; FORCE_SEED=1 
 npm run dev      # api :3001 + worker; sprawdzenie: http://localhost:3001/api/health
 ```
 
+`npm run dev` odpala OBA procesy, i to nie jest wygoda: API wyłącznie kolejkuje
+zapisy, więc bez workera chip lokalizacji zostaje „w drodze" bez końca, a stan
+nie drgnie. `/api/health` mówi to wprost (`"ok":false` i zdanie o workerze) —
+zajrzyj tam, zanim uznasz, że coś jest zepsute.
+
 To jest **tryb `seeded`** — dane demo z `magmat.xlsx`, zero kontaktu z Subiektem.
 Połączenie z prawdziwą bazą włącza `SGT_MODE=mssql` wraz z resztą `MSSQL_*`;
 ustawienia trzyma jeden plik dla obu procesów (API i workera):
@@ -109,8 +114,40 @@ source wertis.env && npm run dev
 curl -s http://localhost:3001/api/health    # "mode" musi być "mssql"
 ```
 
+Ten plik dotyczy **wyłącznie** trybu MSSQL — w dev nie tyka się go wcale. Ma
+w środku `SGT_MODE=mssql`, więc `source wertis.env` bez działającego Subiekta
+wywraca start API. Tryb `seeded` nie potrzebuje ani jednej zmiennej.
+
 Kolektor: build APK w [`android/`](android/README.md) (`./gradlew :app:assembleDebug`
 albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2:3001`).
+
+### Pierwsze konto — bez niego kolektor nie wpuści
+
+`npm run seed` zasila kartotekę, ale **nie zakłada żadnego konta**, a ekran
+startowy jest twardą bramką: bez badge'a nie ma jak podpisać operacji, więc nie
+ma przejścia dalej. Pierwsze konto zakłada się w pustej bazie bez sesji — inaczej
+nie dałoby się założyć żadnego. Wymuszona rola to `biuro` i PIN, bo to konto
+będzie drogą do wszystkich następnych:
+
+```bash
+curl -X POST http://localhost:3001/api/users \
+  -H 'content-type: application/json' \
+  -d '{"name":"Biuro Zakupy","pin":"4821"}'
+# → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"biuro","maPin":true}}
+```
+
+Badge nadaje serwer, z cyfrą kontrolną i kolejnym numerem — **pierwsze konto to
+zawsze `PRC-0001-9`**, drugie `PRC-0002-8`. Furtka zamyka się sama: kolejne
+żądanie bez sesji dostaje już 401, a następne konta wymagają `x-session`
+i `pinAutora` ([`DEPLOY.md`](DEPLOY.md) §5a).
+
+Na ekranie startowym kolektora, obok skanera, jest pole tekstowe — kod
+**wpisuje się z klawiatury**, więc emulator bez skanera wystarczy. Domyślny adres
+serwera (`http://10.0.2.2:3001`) jest już ustawiony na localhost hosta.
+
+Samo API to osobna sprawa: poza `/api/users*` i zdjęciem cudzego locka żadna
+trasa nie sprawdza sesji, więc do grzebania curlem konto nie jest potrzebne
+(operacje podpiszą się jako `anonim`).
 
 Produkcyjnie:
 
@@ -129,6 +166,7 @@ Parametry (env, dev):
 |---|---|
 | `WORKER_SIM_ERRORS=1` | losowe błędy zapisu (test ścieżki `error` + PONÓW) |
 | `SGT_MODE` | `seeded` (domyślnie) lub `mssql` (prawdziwa baza Subiekta) |
+| `FORCE_SEED=1` | przeładowuje kartotekę, ale czyści **tylko** tabele `sgt_*` — dostawy, kolejka i `events` zostają i wskazują na skasowane `dok_id`. Pełny reset to usunięcie pliku bazy (`server/data/wertis.db`) |
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 | `LOC_FORMAT_STANDARD` / `LOC_FORMAT_PALLET` | wzorce adresu — **jedno źródło prawdy**, kolektor pobiera je z `/api/locations` |
 | `LOC_STRICT=0` | wyłącza twarde egzekwowanie wzorca poza rozkładaniem (domyślnie **włączone**) |

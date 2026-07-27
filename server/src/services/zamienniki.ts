@@ -6,7 +6,7 @@
    samych separatorów.
 
    Regułę ma serwer, nie klient — tak samo jak klasyfikację skanu (`scan.ts`)
-   i rozpoznawanie adresu regału. Kolektor i /lookup tylko renderują wynik.
+   i rozpoznawanie adresu regału. Kolektor tylko renderuje wynik.
 
    Filtrem „czy to nasz towar" jest KARTOTEKA, nie wzorzec. Regexa na symbol
    towaru nie da się napisać: obok siebie stoją `W32-0203`, `50-111`, `FTC201`,
