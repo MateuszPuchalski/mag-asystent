@@ -63,8 +63,8 @@ function zalogowany(rola: "magazynier" | "biuro" = "magazynier"): string {
   return token;
 }
 
-/** Sesja bezczynna ponad BLOKADA_MIN — czyli zablokowana, ale nieusunięta. */
-function zablokowany(): { token: string; userId: number } {
+/** Sesja bez ruchu od godziny — kiedyś zablokowana, dziś zwyczajnie czynna. */
+function bezczynny(): { token: string; userId: number } {
   const u = createUser("Stary Testowy", "magazynier");
   const token = `tok-old-${u.userId}`;
   const dawno = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -171,13 +171,19 @@ test("z sesją zapis przechodzi i podpisuje się kontem z tokenu, nie nagłówki
   assert.equal(ev?.user_id, "Jan Testowy");
 });
 
-// ── Sesja zablokowana ───────────────────────────────────────────────────────
+// ── Sesja bezczynna ─────────────────────────────────────────────────────────
 
-test("zablokowana sesja czyta, ale nie pisze", async () => {
-  const { token } = zablokowany();
+test("sesja bezczynna od godziny pisze tak samo jak świeża", async () => {
+  /* Regresja na usunięty TTL. Do sierpnia 2026 zapis z takiej sesji dostawał
+     423 („Sesja zablokowana — zeskanuj badge"), a kolektor pokazywał wtedy
+     pełnoekranową blokadę. Bramka zna dziś dwa stany: jest sesja albo jej nie
+     ma. */
+  const { token } = bezczynny();
 
-  // odczyt przechodzi — z niego składa się ekran blokady z zachowanym kontekstem
-  assert.equal((await app.inject({ url: "/api/metrics", headers: { "x-session": token } })).statusCode, 200);
+  assert.equal(
+    (await app.inject({ url: "/api/metrics", headers: { "x-session": token } })).statusCode,
+    200
+  );
 
   const zapis = await app.inject({
     method: "POST",
@@ -185,16 +191,16 @@ test("zablokowana sesja czyta, ale nie pisze", async () => {
     headers: { "x-session": token },
     payload: { action: "replace", value: "A01-02-03" },
   });
-  assert.equal(zapis.statusCode, 423);
+  assert.equal(zapis.statusCode, 200);
 });
 
-test("wysyłka z bufora offline przechodzi mimo blokady — inaczej praca znika", async () => {
+test("wysyłka z bufora offline przechodzi — inaczej praca znika", async () => {
   /* `OfflineQueue.flush()` na kolektorze opróżnia bufor z tykera co 15 s,
      niezależnie od tego, czy ktoś trzyma urządzenie. Przy odmowie uznaje ją za
      błąd serwera i KASUJE operację z bufora (core/offline/OfflineQueue.kt).
-     Bramka bez tego wyjątku kasowałaby pracę wykonaną poza zasięgiem po
-     dziesięciu minutach leżenia kolektora na regale. */
-  const { token, userId } = zablokowany();
+     Po usunięciu blokady nic już tej ścieżki nie odrzuca, ale `x-buffered-user`
+     dalej rozstrzyga, KTO podpisuje operację wykonaną poza zasięgiem. */
+  const { token, userId } = bezczynny();
   const r = await app.inject({
     method: "POST",
     url: "/api/products/1/location",
@@ -202,15 +208,4 @@ test("wysyłka z bufora offline przechodzi mimo blokady — inaczej praca znika"
     payload: { action: "replace", value: "A01-02-03" },
   });
   assert.equal(r.statusCode, 200);
-});
-
-test("zmyślone konto w x-buffered-user nie otwiera bramki", async () => {
-  const { token } = zablokowany();
-  const r = await app.inject({
-    method: "POST",
-    url: "/api/products/1/location",
-    headers: { "x-session": token, "x-buffered-user": "99999" },
-    payload: { action: "replace", value: "A01-02-03" },
-  });
-  assert.equal(r.statusCode, 423);
 });

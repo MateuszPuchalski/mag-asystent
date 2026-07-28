@@ -25,8 +25,8 @@ import pl.wertis.kolektor.net.apiCall
 
    Token i kod badge'a leżą w prefsach, bo mają przeżyć zabicie procesu:
    kolektor idzie do kieszeni, Android ubija aplikację, a człowiek wraca do
-   tej samej dostawy. Konieczność ponownego skanowania po każdym ubiciu
-   byłaby dokładnie tym, przed czym broni blokada zamiast wylogowania.
+   tej samej dostawy. Sesja kończy się wyłącznie jawną decyzją: wylogowaniem
+   z Ustawień albo przejęciem pracy cudzym badge'em.
 
    Sam kod badge'a zapisujemy po to, żeby ROZPOZNAĆ WŁASNY skan bez pytania
    serwera — inaczej każdy odruchowy skan własnej plakietki kosztowałby
@@ -67,17 +67,15 @@ class SessionRepository(
     /** Czy ktokolwiek jest zalogowany na tym urządzeniu (Splash przy starcie). */
     val hasSession: Boolean get() = token != null
 
-    private fun zapisz(token: String?, user: UserDto?, zablokowana: Boolean) {
+    private fun zapisz(token: String?, user: UserDto?) {
         val poprzedni = _state.value.userId
         prefs.edit {
             if (token == null) remove("token") else putString("token", token)
             if (user == null) remove("badge") else putString("badge", user.badgeCode)
         }
-        _state.value = when {
-            user == null -> SessionState.Brak
-            zablokowana -> SessionState.Zablokowana(user.userId, user.name, user.role)
-            else -> SessionState.Aktywna(user.userId, user.name, user.role)
-        }
+        _state.value =
+            if (user == null) SessionState.Brak
+            else SessionState.Aktywna(user.userId, user.name, user.role)
         if (user?.userId != poprzedni) onUserChanged?.invoke()
     }
 
@@ -87,25 +85,24 @@ class SessionRepository(
      * Osobne wejście, żeby `zapisz` mogło zostać prywatne.
      */
     fun przyjmijZSetupu(token: String, user: UserDto) {
-        zapisz(token, user, zablokowana = false)
+        zapisz(token, user)
     }
 
     /**
      * Odświeżenie stanu z serwera — przy starcie i po powrocie z tła.
      *
-     * Blokada jest stanem SERWERA, nie kolektora: to serwer widzi ostatnią
-     * aktywność, także tę z innego urządzenia. Liczenie jej lokalnie dałoby
-     * dwa zegary i dwie odpowiedzi na to samo pytanie.
+     * Właścicielem sesji jest SERWER: to on wie, czy token nadal wskazuje
+     * czynne konto — także po przejęciu pracy z innego urządzenia.
      */
     fun refresh() {
         if (token == null) return
         scope.launch {
             runCatching { apiCall { api().authMe() } }
-                .onSuccess { zapisz(token, it.user, it.zablokowana) }
+                .onSuccess { zapisz(token, it.user) }
                 .onFailure { e ->
                     // 401 = serwer nie zna tego tokenu (restart bazy, unieważnienie).
                     // Błąd sieci NIE kasuje sesji — offline nie jest wylogowaniem.
-                    if (e is ApiError && e.status == 401) zapisz(null, null, false)
+                    if (e is ApiError && e.status == 401) zapisz(null, null)
                 }
         }
     }
@@ -119,7 +116,6 @@ class SessionRepository(
     suspend fun onBadge(kod: String): String? =
         when (val a = naBadge(_state.value, kod, mojBadge)) {
             is BadgeAction.Zaloguj -> zaloguj(a.badge)
-            is BadgeAction.Odblokuj -> odblokuj(a.badge)
             is BadgeAction.ZapytajOPrzejecie -> {
                 _pytanie.value = PytanieOPrzejecie(a.badge, a.od)
                 null
@@ -131,32 +127,10 @@ class SessionRepository(
         runCatching { apiCall { api().authBadge(BadgeBody(badge)) } }
             .fold(
                 onSuccess = {
-                    zapisz(it.token, it.user, zablokowana = false)
+                    zapisz(it.token, it.user)
                     "Zalogowano: ${it.user.name}"
                 },
                 onFailure = { it.komunikat("Nie rozpoznano badge'a") },
-            )
-
-    private suspend fun odblokuj(badge: String): String? =
-        runCatching { apiCall { api().authUnlock(BadgeBody(badge)) } }
-            .fold(
-                onSuccess = {
-                    zapisz(token, it.user, zablokowana = false)
-                    null // odblokowanie własnej sesji to nie jest wiadomość
-                },
-                onFailure = { e ->
-                    // Cudzy badge na zablokowanej sesji: serwer odmawia, a my
-                    // przechodzimy na jawną drogę zamiast pokazać błąd. Ten
-                    // przypadek zdarza się, gdy kolektor stracił zapamiętany
-                    // kod badge'a i klient nie mógł rozpoznać skanu sam.
-                    if (e is ApiError && e.status == 401) {
-                        _pytanie.value =
-                            PytanieOPrzejecie(badge, _state.value.osoba ?: "poprzednia osoba")
-                        null
-                    } else {
-                        e.komunikat("Nie udało się odblokować")
-                    }
-                },
             )
 
     /** Potwierdzone przejęcie pracy. Wołane WYŁĄCZNIE z dialogu, nigdy ze skanu. */
@@ -166,7 +140,7 @@ class SessionRepository(
         return runCatching { apiCall { api().authHandover(HandoverBody(p.badge, kontekst)) } }
             .fold(
                 onSuccess = {
-                    zapisz(it.token, it.user, zablokowana = false)
+                    zapisz(it.token, it.user)
                     "Pracę przejął: ${it.user.name}"
                 },
                 onFailure = { it.komunikat("Nie udało się przejąć pracy") },
@@ -179,12 +153,12 @@ class SessionRepository(
 
     /**
      * Wylogowanie — JEDYNIE z jawnej decyzji człowieka (Ustawienia).
-     * Bezczynność blokuje, nie wylogowuje: patrz `core/session/SessionModel.kt`.
+     * Bezczynność nie robi nic: patrz `core/session/SessionModel.kt`.
      */
     fun wyloguj() {
         scope.launch {
             runCatching { apiCall { api().authLogout() } }
-            zapisz(null, null, false)
+            zapisz(null, null)
         }
     }
 

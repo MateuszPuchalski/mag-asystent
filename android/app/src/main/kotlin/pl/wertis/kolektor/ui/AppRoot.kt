@@ -41,7 +41,6 @@ import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.scan.globalScan
 import pl.wertis.kolektor.ui.session.HandoverDialog
-import pl.wertis.kolektor.ui.session.LockOverlay
 import pl.wertis.kolektor.ui.setup.SetupScreen
 import pl.wertis.kolektor.ui.splash.SplashScreen
 
@@ -139,12 +138,6 @@ fun AppRoot(graph: AppGraph) {
             }
             ToastOverlay(toastMsg)
             SuccessOverlay(success)
-            /* Blokada NIE zdejmuje ekranu spod spodu — otwarta dostawa ma być
-               widoczna, bo to ona jest dowodem, że nic nie zginęło. Skaner
-               działa dalej: badge to jedyny sposób na zdjęcie blokady. */
-            if (stan is SessionState.Zablokowana) {
-                LockOverlay(stan.osoba ?: "")
-            }
             pytanie?.let { p ->
                 HandoverDialog(
                     pytanie = p,

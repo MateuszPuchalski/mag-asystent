@@ -4,8 +4,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* Sesja rozstrzyga, KTO pracuje. Dwa zachowania są tu ważniejsze od reszty
-   i mają własne testy: blokada NIE gubi pracy, a przejęcie NIE jest ciche.   */
+/* Sesja rozstrzyga, KTO pracuje. Jedno zachowanie jest tu ważniejsze od reszty
+   i ma własne testy: przejęcie pracy NIE jest ciche.
+
+   Blokada po bezczynności została usunięta w sierpniu 2026 razem z ekranem
+   „Sesja zablokowana". Sesja trwa do jawnego wylogowania albo przejęcia —
+   testy niżej pilnują właśnie tego, że bezczynność jej NIE rusza.            */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-auth-")), "t.db");
 
@@ -50,7 +54,6 @@ test("skan badge'a zakłada sesję i zapisuje kto", () => {
   const s = A.zaloguj(u.badgeCode, "KOLEKTOR-1");
   assert.ok(s, "poprawny badge loguje");
   assert.equal(s.user.userId, u.userId);
-  assert.equal(s.zablokowana, false);
   assert.equal(zdarzenia("login").length, 1);
 });
 
@@ -70,50 +73,36 @@ test("konto wyłączone nie loguje się, choć badge jest poprawny", () => {
   assert.equal(A.zaloguj(u.badgeCode, null), null);
 });
 
-/* ── Blokada, nie wylogowanie ────────────────────────────────────────────── */
+/* ── Sesja nie wygasa sama ───────────────────────────────────────────────── */
 
-test("bezczynność BLOKUJE sesję, ale jej nie kasuje", () => {
-  // wylogowanie gubiące 30 rozłożonych pozycji to najprostszy sposób na
-  // aplikację, która leży w szufladzie — dlatego sesja tylko się blokuje
+test("bezczynność NIE rusza sesji, choćby trwała dobę", () => {
+  // Regresja na usunięty TTL. Kolektor odłożony na regale na całą przerwę
+  // ma wrócić do pracy bez żadnego skanu — blokada po 10 minutach kosztowała
+  // ten skan i nie kupowała za to niczego, bo urządzenia nie opuszczają hali.
   const u = U.createUser("Jan Kowalski");
   const s = A.zaloguj(u.badgeCode, "KOLEKTOR-1")!;
-  bezczynnaOd(s.token, A.BLOKADA_MIN + 1);
+  bezczynnaOd(s.token, 24 * 60);
 
   const po = A.sesja(s.token);
   assert.ok(po, "sesja ISTNIEJE dalej");
-  assert.equal(po.zablokowana, true);
   assert.equal(po.user.userId, u.userId, "i wie, czyja jest");
 });
 
-test("każda aktywność odsuwa blokadę", () => {
+test("`dotknij` odnotowuje aktywność, ale niczego nie bramkuje", () => {
+  // `last_seen` został jako jedyny ślad, kiedy dany kolektor się odezwał.
+  // Test pilnuje, że zapis nadal działa — po usunięciu blokady nic innego
+  // by tego nie zauważyło.
   const u = U.createUser("Jan Kowalski");
   const s = A.zaloguj(u.badgeCode, null)!;
-  bezczynnaOd(s.token, A.BLOKADA_MIN - 1);
-  assert.equal(A.sesja(s.token)?.zablokowana, false, "tuż przed progiem jeszcze nie");
+  bezczynnaOd(s.token, 120);
   A.dotknij(s.token);
-  bezczynnaOd(s.token, A.BLOKADA_MIN - 1);
-  assert.equal(A.sesja(s.token)?.zablokowana, false);
-});
 
-test("odblokowanie to JEDEN skan własnego badge'a", () => {
-  const u = U.createUser("Jan Kowalski");
-  const s = A.zaloguj(u.badgeCode, null)!;
-  bezczynnaOd(s.token, A.BLOKADA_MIN + 5);
-  const odblokowana = A.odblokuj(s.token, u.badgeCode);
-  assert.ok(odblokowana);
-  assert.equal(odblokowana.zablokowana, false);
-  assert.equal(odblokowana.token, s.token, "TEN SAM token — kontekst pracy zostaje");
-});
-
-test("cudzy badge NIE odblokowuje cudzej sesji po cichu", () => {
-  // ciche przełączenie tożsamości w środku dostawy niszczy audyt dokładnie
-  // tam, gdzie jest potrzebny — przejęcie idzie osobną, jawną drogą
-  const jan = U.createUser("Jan Kowalski");
-  const piotr = U.createUser("Piotr Nowak");
-  const s = A.zaloguj(jan.badgeCode, null)!;
-  bezczynnaOd(s.token, A.BLOKADA_MIN + 5);
-  assert.equal(A.odblokuj(s.token, piotr.badgeCode), null);
-  assert.equal(A.sesja(s.token)?.user.userId, jan.userId, "sesja dalej Jana");
+  const r = db()
+    .prepare("SELECT last_seen FROM device_session WHERE token = ?")
+    .get(s.token) as { last_seen: string };
+  const minutTemu = (Date.now() - new Date(r.last_seen).getTime()) / 60_000;
+  assert.ok(minutTemu < 1, `last_seen odświeżone, a jest sprzed ${minutTemu} min`);
+  assert.ok(A.sesja(s.token), "i sesja dalej jest");
 });
 
 /* ── Przejęcie pracy ─────────────────────────────────────────────────────── */

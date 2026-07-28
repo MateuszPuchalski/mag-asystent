@@ -420,7 +420,7 @@ WERTIS to projekt młody. Uczciwy obraz:
 **Gotowe i działające na danych demo:** przyjęcie dostaw krajowych, zwroty
 w koszykach, kontener importowy, wyszukiwanie i karta towaru, podgląd regału,
 wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, logowanie
-plakietką i blokada sesji, praca offline, raport kolizji kodów, nocna
+plakietką i przejęcie pracy, praca offline, raport kolizji kodów, nocna
 rekoncyliacja, raport przeslotowania.
 
 **W drodze:** przesunięcia magazynowe (MM) — kolejne w kolejce, kontrakt gotowy;

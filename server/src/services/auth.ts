@@ -7,23 +7,24 @@ import { userByBadge, userById, sprawdzPin, type Rola, type Uzytkownik } from ".
    Skan badge'a = zalogowanie I szybka zmiana zmiany. Jeden skan, ~1 s, bez
    PIN-u na ścieżce codziennej.
 
-   BLOKADA PO BEZCZYNNOŚCI, NIGDY WYLOGOWANIE. To nie jest niuans: wylogowanie
-   gubiące 30 rozłożonych pozycji to najprostszy sposób na aplikację, która
-   leży w szufladzie. Sesja po TTL nie znika — przechodzi w stan `zablokowana`,
-   zachowuje otwartą dostawę i kontekst, a odblokowanie to jeden skan badge'a.
+   SESJA NIE WYGASA SAMA. Trwa do jawnej decyzji człowieka: wylogowania
+   z Ustawień albo przejęcia pracy cudzym badge'em. Bezczynność nie robi nic.
+
+   Do sierpnia 2026 sesja blokowała się po 10 minutach bez ruchu, a kolektor
+   pokazywał wtedy ekran „Sesja zablokowana". Blokada nigdy nie gubiła pracy,
+   ale kosztowała skan przy każdym powrocie do odłożonego kolektora — i to był
+   jej całkowity efekt, bo urządzenia nie opuszczają hali.
+
+   Tożsamość pilnuje dziś jedno miejsce: skan CUDZEGO badge'a. Nigdy nie
+   przełącza po cichu — pyta człowieka i zapisuje przejęcie w `events`.
 
    Nagłówek `X-User` przestaje być tożsamością. Dało się go wpisać ręcznie,
    więc każdy mógł podać się za kogokolwiek — zostaje najwyżej jako podpowiedź
    dla instalacji, które nie przeszły jeszcze na badge'y.                     */
 
-/** Po tylu minutach bez ruchu sesja jest zablokowana (nie: usunięta). */
-export const BLOKADA_MIN = 10;
-
 export interface Sesja {
   token: string;
   user: Uzytkownik;
-  /** Bezczynna dłużej niż TTL — wymaga skanu badge'a, ale nic nie utraciła. */
-  zablokowana: boolean;
 }
 
 interface SessionRow {
@@ -46,7 +47,7 @@ export function zaloguj(badge: string, deviceId: string | null): Sesja | null {
     .prepare("INSERT INTO device_session(token, user_id, device_id, created_at, last_seen) VALUES (?,?,?,?,?)")
     .run(token, user.userId, deviceId, nowIso(), nowIso());
   logEvent("login", user.name, null, { badge: user.badgeCode, role: user.role });
-  return { token, user, zablokowana: false };
+  return { token, user };
 }
 
 /** Sesja po tokenie; `null` gdy nie istnieje albo została unieważniona. */
@@ -58,41 +59,29 @@ export function sesja(token: string | null): Sesja | null {
   if (!r) return null;
   const user = userById(r.user_id);
   if (!user || !user.active) return null;
-  return { token, user, zablokowana: minut(r.last_seen) >= BLOKADA_MIN };
+  return { token, user };
 }
 
 /**
- * Odnotowanie aktywności — odsuwa blokadę.
+ * Odnotowanie aktywności sesji.
  *
- * Zapis jest DŁAWIONY, bo `dotknij` woła się z każdego żądania, a kolektor
- * odpytuje serwer co 2 s z czterech ekranów. Bez dławienia każdy odczyt
- * pociągałby UPDATE do bazy dla pola, którego dokładność ma sens najwyżej
- * minutowy: blokada zapada po 10 minutach, więc odświeżanie częściej niż raz
- * na minutę nie zmienia niczego poza liczbą zapisów.
+ * Od czasu usunięcia blokady po bezczynności `last_seen` NICZEGO NIE BRAMKUJE
+ * — jest jedynym śladem, kiedy dany kolektor ostatnio się odezwał, i tyle.
+ * Przy awarii pierwsze pytanie brzmi „to jedno urządzenie czy wszystkie?",
+ * a bez tego pola nie da się na nie odpowiedzieć.
+ *
+ * Zapis zostaje DŁAWIONY, bo `dotknij` woła się z każdego żądania, a kolektor
+ * odpytuje serwer co 2 s z czterech ekranów. Dokładność minutowa w zupełności
+ * wystarcza do diagnozy.
  */
 const DLAWIENIE_MS = 60_000;
 
-export function dotknij(token: string, force = false): void {
+export function dotknij(token: string): void {
   const r = db().prepare("SELECT last_seen FROM device_session WHERE token = ?").get(token) as
     | { last_seen: string }
     | undefined;
-  if (!force && r && minut(r.last_seen) * 60_000 < DLAWIENIE_MS) return;
+  if (r && minut(r.last_seen) * 60_000 < DLAWIENIE_MS) return;
   db().prepare("UPDATE device_session SET last_seen = ? WHERE token = ?").run(nowIso(), token);
-}
-
-/**
- * Odblokowanie zablokowanej sesji skanem badge'a.
- *
- * Cudzy badge NIE odblokowuje cudzej sesji po cichu — to jest przejęcie pracy
- * i idzie osobną drogą (`przejmij`), z jawnym potwierdzeniem człowieka.
- */
-export function odblokuj(token: string, badge: string): Sesja | null {
-  const s = sesja(token);
-  if (!s) return null;
-  const kto = userByBadge(badge);
-  if (!kto || kto.userId !== s.user.userId) return null;
-  dotknij(token, true); // odblokowanie MUSI zapisać, niezależnie od dławienia
-  return { ...s, zablokowana: false };
 }
 
 /**
