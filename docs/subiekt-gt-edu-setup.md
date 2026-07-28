@@ -1,9 +1,11 @@
 # Test z prawdziwym Subiektem GT (wersja edu) — krok po kroku
 
-Instrukcja podłączenia WERTIS do **Subiekta GT edu** na Twoim komputerze,
-żeby aplikacja działała na prawdziwych danych z Subiekta zamiast seedu
-z `magmat.xlsx`. Docelowa wersja produkcyjna w firmie: **Subiekt GT 1.87 SP3 HF1**
-(era KSeF) — potwierdza wybór pola dodatkowego na lokalizację, bo natywnego
+Instrukcja podłączenia WERTIS do **Subiekta GT edu** na Twoim komputerze.
+Aplikacja zadziała wtedy na prawdziwych danych z Subiekta zamiast na seedzie
+z `magmat.xlsx`.
+
+Docelowa wersja produkcyjna w firmie to **Subiekt GT 1.87 SP3 HF1** (era KSeF).
+Potwierdza ona wybór pola własnego na lokalizację — natywnego
 `tw_Lokalizacja` w tych wersjach nie ma.
 
 ## Co działa, a co nie (edu = bez Sfery)
@@ -13,15 +15,15 @@ z `magmat.xlsx`. Docelowa wersja produkcyjna w firmie: **Subiekt GT 1.87 SP3 HF1
 | Skan / wyszukiwarka / karta towaru | ✅ | odczyt z bazy MSSQL Subiekta (import do read-modelu) |
 | Stany MAG / MGP, lokalizacje | ✅ | jw. |
 | Lista dokumentów FZ/PZ do rozłożenia | ✅ | jw. |
-| Zmiana lokalizacji (`set_location`) | ✅ | bezpośredni `UPDATE` na wybranym polu dodatkowym `tw__Towar` (plan B ze spec §9 — patrz §1a niżej) |
+| Zmiana lokalizacji (`set_location`) | ✅ | bezpośredni `UPDATE` na wybranym polu własnym `tw__Towar` (plan B ze spec §9 — patrz §1a niżej) |
 | Dokumenty MM (MGP→MAG, zatwierdź wózek) | ❌ | wymaga **Sfery** (COM) — brak w edu; zadanie w kolejce dostanie status `error` z komunikatem |
 | Flaga sprawdzenia faktury | ➖ | **edu nie ma flag dokumentów**, więc nie da się ustalić `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU`. Aplikacja wtedy **nie kolejkuje** zadań `set_doc_flag` — `/api/health` pokazuje `docFlag: "off …"`. Reszta (postęp dostawy, wyjątki, koszyki) działa normalnie |
 
 > Różnica między ❌ a ➖ jest celowa. MM **próbuje** się wykonać i kończy błędem,
 > bo to funkcja, którą firma ma na produkcji — chcemy widzieć, że jej brakuje.
-> Flagi po prostu **nie istnieją** w tej wersji, więc generowanie zadań, które
-> zawsze padną, tylko zapchałoby kolejkę i zapaliło czerwoną pastylkę na stałe —
-> a wtedy realny błąd zapisu lokalizacji utonąłby w szumie.
+> Flagi po prostu **nie istnieją** w tej wersji. Generowanie zadań, które zawsze
+> padną, zapchałoby kolejkę i zapaliło czerwoną pastylkę na stałe. Realny błąd
+> zapisu lokalizacji utonąłby wtedy w szumie.
 
 Dwie twarde zasady środowiska:
 
@@ -31,11 +33,13 @@ Dwie twarde zasady środowiska:
 2. Tryb wybiera JEDNA zmienna: `SGT_MODE=mssql`. Zapis (bezpośredni UPDATE
    dwóch kolumn) wynika z niej automatycznie — osobnego przełącznika nie ma.
 
-Jak to działa w środku: interfejs odczytu aplikacji jest synchroniczny, więc
-zamiast żywych SELECT-ów per skan **importujemy** dane Subiekta do lokalnego
-read-modelu `sgt_*` (SQLite) — przy starcie API, potem co `MSSQL_SYNC_MS`
-(domyślnie 60 s) i na żądanie (`POST /api/admin/resync`). Stany na ekranie są
-i tak korygowane o kolejkę, więc lag odświeżania nie przekłamuje obrazu.
+Jak to działa w środku: interfejs odczytu aplikacji jest synchroniczny. Zamiast
+żywych SELECT-ów per skan **importujemy** dane Subiekta do lokalnego
+read-modelu `sgt_*` (SQLite). Import idzie przy starcie API, potem
+co `MSSQL_SYNC_MS` (domyślnie 60 s) i na żądanie (`POST /api/admin/resync`).
+
+Stany na ekranie są i tak korygowane o kolejkę, więc lag odświeżania nie
+przekłamuje obrazu.
 
 ## 1. Włącz TCP/IP i logowanie SQL w instancji INSERTGT
 
@@ -56,25 +60,27 @@ Domyślnie instancja Subiekta przyjmuje tylko lokalne połączenia Windows.
 > Nazwę bazy znajdziesz w Subiekcie (pasek tytułu / wybór podmiotu) albo
 > w SSMS — baza podmiotu utworzona przy zakładaniu firmy testowej edu.
 
-## 1a. Lokalizacja: nie ma kolumny `tw_Lokalizacja` — wybierz pole dodatkowe
+## 1a. Lokalizacja: nie ma kolumny `tw_Lokalizacja` — wybierz pole własne
 
 Zweryfikowane empirycznie (na edu): nowsze wersje Subiekta GT (z polami KSeF)
 **nie mają natywnej kolumny lokalizacji** na `tw__Towar`. Zamiast tego są
-generyczne pola dodatkowe **`tw_Pole1` … `tw_Pole8`** (każde `varchar(50)`) —
-InsERT zostawia użytkownikowi decyzję, do czego ich użyć.
+generyczne pola własne `tw_Pole1` … `tw_Pole8`, każde `varchar(50)`. InsERT
+zostawia decyzję o ich przeznaczeniu firmie.
 
 Skoro budujesz dane testowe w edu **od zera**, to Ty decydujesz. Domyślnie
-aplikacja używa **`tw_Pole1`** jako lokalizacji (`MSSQL_LOC_COLUMN=tw_Pole1`,
-patrz §4) — możesz to zmienić na inne pole, jeśli wolisz. Jedyna zasada: pole
-dodatkowe, które wybierzesz, wpisujesz w Subiekcie na karcie towaru (zakładka
-**Pola dodatkowe**) — tam, gdzie normalnie magazynier wpisywałby kod regału.
+aplikacja używa `tw_Pole1` jako lokalizacji (`MSSQL_LOC_COLUMN=tw_Pole1`,
+patrz §4). Możesz wybrać inne pole.
 
-> Jeśli kiedyś dostaniesz dostęp do prawdziwej, produkcyjnej bazy WERTIS —
-> **nie zakładaj**, że tam też jest `tw_Pole1`. To osobna instalacja z osobną
-> konfiguracją; ktoś z dostępem do niej musi sprawdzić, którego pola
-> faktycznie używają (ten sam sposób co niżej — `INFORMATION_SCHEMA.COLUMNS`
-> + porównanie wartości ze znanym rekordem), i ustawić `MSSQL_LOC_COLUMN`
-> odpowiednio.
+Jedyna zasada: wybrane pole własne wpisujesz w Subiekcie na karcie towaru,
+w zakładce **Pola dodatkowe**. To tam, gdzie normalnie magazynier wpisywałby
+kod regału.
+
+> ⚠️ Przy prawdziwej, produkcyjnej bazie **nie zakładaj**, że tam też jest
+> `tw_Pole1`. To osobna instalacja z osobną konfiguracją.
+>
+> Ktoś z dostępem do niej musi sprawdzić, którego pola firma faktycznie używa,
+> i ustawić `MSSQL_LOC_COLUMN`. Sposób jest ten sam co niżej:
+> `INFORMATION_SCHEMA.COLUMNS` plus porównanie wartości ze znanym rekordem.
 
 ## 1b. Zbuduj dane testowe w edu
 
@@ -82,16 +88,19 @@ Baza edu jest pusta/demo — nie ma w niej danych z Twojego `magmat.xlsx`
 (to osobny, niepowiązany system, do którego nie masz dostępu). Żeby przetestować
 połączenie appki z Subiektem, dopisz w samym Subiekcie kilka rzeczy:
 
-1. **Magazyn MGP** (jeśli go nie masz): *Ustawienia → Słowniki → Magazyny* →
-   dodaj drugi magazyn obok domyślnego (np. kod `MGP`, nazwa „Strefa przyjęć").
-2. **Kilka kartotek towaru** (*Towary → Dodaj*): wypełnij Symbol, Nazwę, Kod
-   kreskowy (EAN), stan na obu magazynach, a w zakładce **Pola dodatkowe**
-   wpisz kod lokalizacji w polu, które wybrałeś w §1a (np. `tw_Pole1` →
-   `H04-05-02`). Dla części towarów zostaw to pole puste — to przetestuje
-   ścieżkę „BRAK LOK".
-3. **Jeden dokument PZ/FZ** na magazyn MGP (*Dokumenty → Nowy → PZ*), z kilkoma
-   pozycjami z kroku 2 — to da Ci dane do checklisty §3 (a) i (c) oraz coś do
-   rozłożenia w module put-away.
+1. **Magazyn MGP** — w *Ustawienia → Słowniki → Magazyny* dodaj drugi magazyn
+   obok domyślnego (np. kod `MGP`, nazwa „Strefa przyjęć").
+2. **Kilka kartotek towaru** — w *Towary → Dodaj* wypełnij Symbol, Nazwę, kod
+   kreskowy (EAN) i stan na obu magazynach.
+
+   W zakładce **Pola dodatkowe** wpisz kod lokalizacji w polu wybranym w §1a
+   (np. `tw_Pole1` → `H04-05-02`). Dla części towarów zostaw to pole puste —
+   przetestuje to ścieżkę „BRAK LOK".
+3. **Jeden dokument PZ/FZ** na magazyn MGP — *Dokumenty → Nowy → PZ*, z kilkoma
+   pozycjami z kroku 2.
+
+   Da Ci to dane do checklisty §3 (a) i (c) oraz coś do rozłożenia w module
+   put-away.
 
 Nie musisz wpisywać setek rekordów — kilkanaście kartotek i jeden dokument
 wystarczą, żeby end-to-end zweryfikować połączenie.
@@ -149,9 +158,9 @@ GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis;
 GRANT INSERT, UPDATE ON dbo.fl_Wartosc TO wertis;
 ```
 
-Weryfikacja, że uprawnienia faktycznie się nadały (przydaje się też po każdym
-`GRANT`, bo błąd na `CREATE LOGIN`/`CREATE USER` nie przerywa reszty skryptu —
-kolejne `GRANT`-y w SSMS i tak się wykonują):
+Sprawdź teraz, że uprawnienia faktycznie się nadały. Warto to robić po każdym
+`GRANT`: błąd na `CREATE LOGIN` albo `CREATE USER` nie przerywa reszty skryptu,
+bo kolejne `GRANT`-y w SSMS i tak się wykonują.
 
 ```sql
 SELECT dp.permission_name, dp.state_desc,
@@ -167,9 +176,11 @@ ORDER BY dp.permission_name;
 
 ## 3. Checklist `[WERYFIKUJ]` — ustal wartości dla SWOJEJ bazy
 
-Większość dawnej checklisty jest już **zamknięta**: nazwy tabel, kolumn oraz
+Większość dawnej checklisty jest już **zamknięta**. Nazwy tabel i kolumn oraz
 kody `dok_Typ` i `dok_Status` odczytaliśmy wprost z oficjalnego opisu struktury
-InsERT dla wersji bazy 1.8731.31.6933 — patrz [`subiekt-gt-struktura.md`](subiekt-gt-struktura.md).
+InsERT dla wersji bazy 1.8731.31.6933 — patrz
+[`subiekt-gt-struktura.md`](subiekt-gt-struktura.md).
+
 Domyślne w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać:
 `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=14`, bufor = `dok_Status = 3`.
 
@@ -177,7 +188,7 @@ Zostały **trzy** rzeczy, których dokumentacja nie zawiera, bo zależą od
 konkretnego podmiotu. Uruchom w SSMS na kartotece/dokumencie z §1b:
 
 ```sql
--- 0) potwierdź, że wybrane pole dodatkowe faktycznie trzyma to, co wpisałeś
+-- 0) potwierdź, że wybrane pole własne faktycznie trzyma to, co wpisałeś
 --    na karcie towaru (podmień symbol i tw_Pole1 na swój wybór z §1a):
 SELECT tw_Symbol, tw_Pole1 FROM tw__Towar WHERE tw_Symbol = 'TWOJ-SYMBOL';
 --    → jeśli wartość się zgadza z tym, co wpisałeś w Subiekcie: env
@@ -208,7 +219,7 @@ SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGr
 Dwie rzeczy warto tylko **potwierdzić**, bo domyślne powinny pasować:
 
 ```sql
--- pole dodatkowe wybrane w §1a faktycznie trzyma lokalizację i ma 50 znaków:
+-- pole własne wybrane w §1a faktycznie trzyma lokalizację i ma 50 znaków:
 SELECT COL_LENGTH('tw__Towar','tw_Pole1');          -- → LOC_FIELD_LIMIT (spodziewane 50)
 
 -- odłóż dokument do bufora w Subiekcie i sprawdź, czy dostał dok_Status = 3:
@@ -244,7 +255,7 @@ export MSSQL_USER=wertis
 export MSSQL_PASSWORD=silne-haslo
 
 # wartości z checklisty §3:
-export MSSQL_LOC_COLUMN=tw_Pole1      # pole dodatkowe wybrane w §1a
+export MSSQL_LOC_COLUMN=tw_Pole1      # pole własne wybrane w §1a
 export MAG_ID_MAG=1                   # z checklisty (a)
 export MAG_ID_MGP=2
 export MAG_ID_ZWROTY=3
@@ -278,8 +289,8 @@ curl -s http://localhost:3001/api/health
 # {"ok":true,"mode":"mssql","sferaMode":"sql","lastSync":{"towary":…,"at":"…"}}
 ```
 
-`"mode":"seeded"` znaczy, że `SGT_MODE` nie doszło do procesu i pracujesz na
-danych demo z `magmat.xlsx` — Subiekt nie jest wtedy ani odczytywany, ani
+`"mode":"seeded"` znaczy, że `SGT_MODE` nie doszło do procesu. Pracujesz wtedy
+na danych demo z `magmat.xlsx`. Subiekt nie jest ani odczytywany, ani
 zapisywany, mimo że wszystko wygląda normalnie.
 
 Wymuszenie odświeżenia po zmianach w Subiekcie (np. nowe PZ):
@@ -297,41 +308,44 @@ curl -s -X POST http://localhost:3001/api/admin/resync
 
 1. **Odczyt:** zeskanuj / wyszukaj towar, który widzisz w Subiekcie —
    porównaj stany MAG/MGP i lokalizację z kartoteką.
-2. **Zapis lokalizacji:** zmień lokalizację testowej kartoteki w aplikacji;
-   po przejściu zadania w kolejce na `done` sprawdź w Subiekcie (karta
-   towaru → Pola dodatkowe) lub w SSMS:
-   `SELECT tw_Pole1 FROM tw__Towar WHERE tw_Id = …` (nazwa pola jak w
-   `MSSQL_LOC_COLUMN`).
+2. **Zapis lokalizacji:** zmień lokalizację testowej kartoteki w aplikacji.
+   Poczekaj, aż zadanie w kolejce przejdzie na `done`.
 
-   Jeśli w aplikacji zmiana widać, a w Subiekcie nie — najpierw sprawdź
+   Sprawdź wynik w Subiekcie (karta towaru → **Pola dodatkowe**) albo w SSMS:
+   `SELECT tw_Pole1 FROM tw__Towar WHERE tw_Id = …`. Nazwa pola jak
+   w `MSSQL_LOC_COLUMN`.
+
+   Jeśli zmianę widać w aplikacji, a w Subiekcie nie — sprawdź najpierw
    `curl -s http://localhost:3001/api/health`. `"mode":"seeded"` w którymkolwiek
-   z procesów oznacza, że zapis poszedł do lokalnej bazy aplikacji, a zadanie
+   z procesów znaczy, że zapis poszedł do lokalnej bazy aplikacji. Zadanie
    i tak zakończyło się statusem `done`.
 
-3. **Usunięcie lokalizacji:** wyczyść lokalizację i sprawdź to samo — pusta
+3. **Usunięcie lokalizacji:** wyczyść lokalizację i sprawdź to samo. Pusta
    wartość to osobna ścieżka zapisu i warto ją przejść świadomie.
-4. **MM (oczekiwany błąd):** zatwierdź MM/wózek — zadanie po 3 próbach
+4. **MM (oczekiwany błąd):** zatwierdź MM albo wózek. Zadanie po 3 próbach
    dostanie `error` z komunikatem „Dokument MM wymaga Sfery…". To poprawne
    zachowanie na edu.
 
 ## Ograniczenia i uwagi
 
-- **edu** ma limity ilości zapisów/dokumentów i jest wyłącznie do nauki/testów
-  — idealne do tego scenariusza, nie do produkcji.
+- **edu** ma limity ilości zapisów i dokumentów. Służy wyłącznie do nauki
+  i testów — idealnie do tego scenariusza, nie do produkcji.
 - **edu to osobna instalacja, niepowiązana z prawdziwą bazą produkcyjną**
-  (skąd np. pochodzi eksport `magmat.xlsx`). Wartości ustalone tu (kolumna
-  lokalizacji, kody `dok_Typ`, `mag_Id`) dotyczą TYLKO tej instalacji edu —
-  przy podłączaniu do prawdziwego Subiekta trzeba je ustalić od nowa, na tamtej
-  bazie (ktoś z dostępem do niej powtarza checklistę §3).
-- Kolumna „Zamówione" w karcie towaru pokazuje 0 w trybie mssql (w bazie SGT
-  nie ma prostej kolumny; wartość pochodzi z dokumentów ZK/ZD) — do
+  (skąd pochodzi na przykład eksport `magmat.xlsx`).
+
+  Wartości ustalone tutaj — kolumna lokalizacji, kody `dok_Typ`, `mag_Id` —
+  dotyczą TYLKO tej instalacji edu. Przy podłączaniu do prawdziwego Subiekta
+  ustala się je od nowa, na tamtej bazie. Checklistę §3 powtarza ktoś
+  z dostępem do niej.
+- Kolumna „Zamówione" w karcie towaru pokazuje 0 w trybie mssql. W bazie SGT
+  nie ma prostej kolumny — wartość pochodzi z dokumentów ZK/ZD. Zostaje to do
   ewentualnej rozbudowy importera.
 - Nazwa dostawcy na liście dokumentów to `kh_Symbol` (pewna kolumna w każdej
-  wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)` —
-  wymaga dodatkowego `GRANT SELECT` i korekty JOIN-a w
-  `server/src/adapters/subiekt.mssql.ts`.
+  wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)`.
+  Wymaga to dodatkowego `GRANT SELECT` i korekty JOIN-a
+  w `server/src/adapters/subiekt.mssql.ts`.
 - Dokumenty MM — z rundy wózka (kontener) i z zamkniętego koszyka zwrotu —
-  wymagają licencji **Sfery** na produkcyjnym Subiekcie: osobny worker COM na
-  Windows (C#/pywin32) czytający tę samą tabelę `sfera_queue` — kontrakt
-  w `server/src/adapters/sfera.ts`, etap 2 w [DEPLOY.md](../DEPLOY.md). Do tego
-  czasu MM wystawia biuro.
+  wymagają licencji **Sfery** na produkcyjnym Subiekcie. Potrzebny jest osobny
+  worker COM na Windows (C#/pywin32) czytający tę samą tabelę `sfera_queue`.
+  Kontrakt jest w `server/src/adapters/sfera.ts`, etap 2
+  w [DEPLOY.md](../DEPLOY.md). Do tego czasu MM wystawia biuro.

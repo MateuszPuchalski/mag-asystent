@@ -13,8 +13,8 @@ każdy do swojej roli:
   z wyjątków i rekoncyliacji. Jedynym interfejsem człowieka jest kolektor.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
-(spec §3, §7, §8). Granica do Subiekta/Sfery jest za adapterami: w tym
-środowisku (Linux, bez Subiekta) zasilana z eksportu `magmat.xlsx`, a adaptery
+(spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
+środowisku (Linux, bez Subiekta) zasila ją eksport `magmat.xlsx`. Adaptery
 produkcyjne (MSSQL + Sfera COM) są gotowym do podpięcia szkieletem.
 
 ## Realia magazynu — liczby, które rozstrzygają decyzje projektowe
@@ -33,8 +33,8 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
   pewny dyskryminator — i dlatego rozpoznawanie skanu opiera się na wzorcu,
   a nie na heurystyce „ma literę". Szczegóły:
   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
-- **Przy 342 m² optymalizacja drogi poziomej nie ma sensu ekonomicznego** —
-  przejście róg–róg to ~20 s, więc różnica między najlepszym a najgorszym
+- **Przy 342 m² optymalizacja drogi poziomej nie ma sensu ekonomicznego.**
+  Przejście róg–róg to ~20 s, więc różnica między najlepszym a najgorszym
   ułożeniem „po alejkach" to kilka sekund na pobranie. Realny koszt siedzi
   w pionie (drabina, schylanie) i w ~2 600 martwych kartotekach zajmujących
   dobre miejsca.
@@ -45,7 +45,7 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 |---|---|
 | Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · Room — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
-| Baza aplikacji | SQLite (better-sqlite3) — kolejka, sesje, events, locki (spec §7) |
+| Baza aplikacji | SQLite (wbudowany `node:sqlite`, zero modułów natywnych) — kolejka, sesje, events, locki (spec §7) |
 | Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
 
 Kolorystyka WERTIS: amber `#F7A600`, grafit `#2A2A2C`, papier `#F6F5F2`.
@@ -72,24 +72,32 @@ Kolektor (Android)  ───REST/JSON──►  Serwer Fastify
                          PROD: MSSQL SELECT (read-only) + Sfera COM (Windows)
 ```
 
-Twarde zasady (spec §12) egzekwowane na serwerze: zero zapisu do „SGT" poza
-kolejką; stany na ekranie skorygowane o oczekujące MM; walidacja długości
-`tw_Lokalizacja` (twardy błąd, nie ucięcie); kody lokalizacji bez spacji;
-każda operacja w `events`.
+Twarde zasady (spec §12) egzekwowane na serwerze:
 
-**Zapis do Subiekta ogranicza się do dwóch rzeczy** — pola lokalizacji na
-kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie mają)
-oraz **flagi sprawdzenia na fakturze dostawy**. Ta druga to świadomy, nazwany
-wyjątek od reguły „tylko lokalizacja": w tej firmie rozkładanie JEST sprawdzaniem
-faktury, więc bez niej biuro musiałoby pytać magazyn o stan każdej dostawy.
-Flaga nie jest kolumną dokumentu — InsERT trzyma ją w osobnej tabeli przypisań
+- zero zapisu do „SGT" poza kolejką,
+- stany na ekranie skorygowane o oczekujące MM,
+- walidacja długości `tw_Lokalizacja` (twardy błąd, nie ucięcie),
+- kody lokalizacji bez spacji,
+- każda operacja w `events`.
+
+**Zapis do Subiekta ogranicza się do dwóch rzeczy.** Pierwsza to pole
+lokalizacji na kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze
+wersje nie mają). Druga to **flaga sprawdzenia na fakturze dostawy**.
+
+Flaga jest świadomym, nazwanym wyjątkiem od reguły „tylko lokalizacja".
+W tej firmie rozkładanie JEST sprawdzaniem faktury. Bez flagi biuro musiałoby
+pytać magazyn o stan każdej dostawy.
+
+Flaga nie jest kolumną dokumentu. InsERT trzyma ją w osobnej tabeli przypisań
 `fl_Wartosc`, więc aplikacja **nie potrzebuje żadnego prawa zapisu do
 `dok__Dokument`**. Oba zapisy idą tą samą drogą (kolejka → worker → adapter),
-więc kolektor nigdy nie czeka na COM. Nic poza tym: zero `INSERT` do tabel
-dokumentów, zero MM przy dostawie krajowej, zero modyfikacji stanów. Dokumenty
-MM (kontener, zwroty) tworzy osobny worker Sfery na Windows — ten proces tylko
-je kolejkuje. Zweryfikowana struktura bazy (wersja 1.8731.31.6933, ta sama co
-w firmie): [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+więc kolektor nigdy nie czeka na COM.
+
+Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM przy dostawie
+krajowej, zero modyfikacji stanów. Dokumenty MM (kontener, zwroty) tworzy
+osobny worker Sfery na Windows — ten proces tylko je kolejkuje. Zweryfikowana
+struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
+[`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
 ## Uruchomienie
 
@@ -99,10 +107,10 @@ npm run seed     # zasila SQLite z server/seed/products.json (raz; FORCE_SEED=1 
 npm run dev      # api :3001 + worker; sprawdzenie: http://localhost:3001/api/health
 ```
 
-`npm run dev` odpala OBA procesy, i to nie jest wygoda: API wyłącznie kolejkuje
-zapisy, więc bez workera chip lokalizacji zostaje „w drodze" bez końca, a stan
-nie drgnie. `/api/health` mówi to wprost (`"ok":false` i zdanie o workerze) —
-zajrzyj tam, zanim uznasz, że coś jest zepsute.
+`npm run dev` odpala OBA procesy, i to nie jest wygoda. API wyłącznie kolejkuje
+zapisy. Bez workera chip lokalizacji zostaje „w drodze" bez końca, a stan nie
+drgnie. `/api/health` mówi to wprost: `"ok":false` i zdanie o workerze. Zajrzyj
+tam, zanim uznasz, że coś jest zepsute.
 
 To jest **tryb `seeded`** — dane demo z `magmat.xlsx`, zero kontaktu z Subiektem.
 Połączenie z prawdziwą bazą włącza `SGT_MODE=mssql` wraz z resztą `MSSQL_*`;
@@ -123,11 +131,13 @@ albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2
 
 ### Pierwsze konto — bez niego kolektor nie wpuści
 
-`npm run seed` zasila kartotekę, ale **nie zakłada żadnego konta**, a ekran
+`npm run seed` zasila kartotekę, ale **nie zakłada żadnego konta**. Ekran
 startowy jest twardą bramką: bez badge'a nie ma jak podpisać operacji, więc nie
-ma przejścia dalej. Pierwsze konto zakłada się w pustej bazie bez sesji — inaczej
-nie dałoby się założyć żadnego. Wymuszona rola to `biuro` i PIN, bo to konto
-będzie drogą do wszystkich następnych:
+ma przejścia dalej.
+
+Pierwsze konto zakłada się w pustej bazie bez sesji — inaczej nie dałoby się
+założyć żadnego. Wymuszona rola to `biuro` i PIN, bo to konto będzie drogą do
+wszystkich następnych:
 
 ```bash
 curl -X POST http://localhost:3001/api/users \
@@ -157,9 +167,9 @@ TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/badge \
 curl -s http://localhost:3001/api/queue -H "x-session: $TOKEN"
 ```
 
-Do lipca było odwrotnie: sesji żądały trzy trasy, a reszta — łącznie ze zmianą
+Do lipca było odwrotnie. Sesji żądały trzy trasy. Reszta — łącznie ze zmianą
 lokalizacji w Subiekcie i raportem wydajności per pracownik — przyjmowała
-żądania bez niczego i podpisywała je nagłówkiem `x-user` albo słowem `anonim`.
+żądania bez niczego. Podpisywała je nagłówkiem `x-user` albo słowem `anonim`.
 Nagłówek `x-user` **nie jest tożsamością** i sam bramki nie otwiera.
 
 Produkcyjnie:
@@ -169,9 +179,10 @@ npm run build    # server → server/dist (frontendu nie ma — serwer wystawia 
 npm start        # Fastify wystawia API (worker: npm -w server run start:worker)
 ```
 
-**Wdrożenie w firmie (on-premise):** kompletna instrukcja — maszyna z Subiektem,
-usługi Windows (NSSM), DNS/zapora, instalacja APK na kolektorach (MDM/kiosk),
-etapy przejścia na MSSQL/Sferę i backup — w [`DEPLOY.md`](DEPLOY.md).
+**Wdrożenie w firmie (on-premise):** kompletna instrukcja jest
+w [`DEPLOY.md`](DEPLOY.md). Obejmuje maszynę z Subiektem, usługi Windows (NSSM),
+DNS i zaporę, instalację APK na kolektorach (MDM/kiosk), etapy przejścia na
+MSSQL i Sferę oraz backup.
 
 Parametry (env, dev):
 
@@ -193,18 +204,19 @@ Parametry (env, dev):
 
 **Kto pracuje — badge, nie wolny tekst (plan §7)**
 - **Jeden skan plakietki loguje** (~1 s, bez PIN-u na ścieżce codziennej).
-  Wcześniej „użytkownik" był dowolnym łańcuchem wpisywanym z klawiatury
-  i wysyłanym w nagłówku `X-User`: `events.user_id` zbierał warianty tej samej
-  osoby (`Jan`, `jan`, `Jan K`), więc audyt nadawał się do czytania oczami i do
-  niczego więcej, a każdy mógł podać się za kogokolwiek jednym wpisem.
+
+  > **Dlaczego.** Wcześniej podpisem był dowolny łańcuch wpisywany z klawiatury
+  > i wysyłany w nagłówku `X-User`. `events.user_id` zbierał warianty tej samej
+  > osoby (`Jan`, `jan`, `Jan K`). Audyt nadawał się do czytania oczami i do
+  > niczego więcej. Każdy mógł podać się za kogokolwiek jednym wpisem.
 - **Kod badge'a `PRC-0007-3` niesie cyfrę kontrolną** (wagi 3-1-3-1). Bez niej
   starty znak na etykiecie zamienia Jana w Piotra, a audyt wskazuje niewinnego —
   to jest różnica między „nie dało się odczytać" a „odczytano źle". Kod **nie
   niesie nazwiska**: badge się gubi i zostaje na kurtce, więc powiązanie
   kod → człowiek żyje wyłącznie w bazie.
 - **Bezczynność BLOKUJE sesję, nigdy jej nie kończy.** Po 10 minutach ekran
-  mówi wprost, że nic nie zginęło; otwarta dostawa i cały postęp czekają,
-  a odblokowanie to jeden skan własnego badge'a — ten sam token. Wylogowanie
+  mówi wprost, że nic nie zginęło. Otwarta dostawa i cały postęp czekają.
+  Odblokowanie to jeden skan własnego badge'a — ten sam token. Wylogowanie
   gubiące 30 rozłożonych pozycji to najprostszy sposób na aplikację, która leży
   w szufladzie.
 - **Skan cudzego badge'a nigdy nie przełącza po cichu.** Ekran pyta „Przejąć
@@ -231,9 +243,9 @@ Parametry (env, dev):
   nie trzeba wcześniej wybierać trybu. Pusty regał to poprawna odpowiedź
   („Regał A01-02-03 pusty"), bo półkę skanuje się także po to, żeby sprawdzić,
   czy jest wolna.
-- **Kontekstem jest OTWARTY EKRAN, nie ukryty stan.** Skan robi to, co widać:
-  karta towaru otwarta + skan regału → ten towar dostaje ten adres; skan regału
-  bez otwartej karty → zawartość regału; skan towaru → jego karta. Nie ma paska
+- **Kontekstem jest OTWARTY EKRAN, nie ukryty stan.** Skan robi to, co widać.
+  Karta towaru otwarta + skan regału → ten towar dostaje ten adres. Skan regału
+  bez otwartej karty → zawartość regału. Skan towaru → jego karta. Nie ma paska
   „przypięto", nie ma trybu, nie ma czego zdejmować.
 - **Dlaczego zniknął kontekst przyklejony.** Wcześniej pierwszy skan przypinał
   regał albo towar, a kolejne wpadały w to przypięcie — osiem indeksów na jeden
@@ -249,48 +261,54 @@ Parametry (env, dev):
   (`Zamiennik: 24-04003`, `Zamiennie: 101-024 // KAR00149`), tyle że jako prozę,
   której nie da się dotknąć. Serwer je wycina (`services/zamienniki.ts`), a to,
   co jest NASZĄ kartoteką, staje się wierszem ze stanem i lokalizacją —
-  dotknięcie otwiera kartę zamiennika. Rozstrzyga kartoteka, nie wzorzec:
-  z 2304 tokenów w sekcjach zamienników tylko 478 to nasze towary, reszta to
-  numery OEM i katalogi obcych firm (zostają szarym tekstem, bo idą w rozmowę
-  z dostawcą). `+` nigdy nie rozdziela — w opisach łączy części zestawu, więc
-  podział podałby pół kompletu jako pełnoprawny zamiennik.
+  dotknięcie otwiera kartę zamiennika.
+
+  Rozstrzyga kartoteka, nie wzorzec. Z 2304 tokenów w sekcjach zamienników tylko
+  478 to nasze towary. Reszta to numery OEM i katalogi obcych firm — zostają
+  szarym tekstem, bo idą w rozmowę z dostawcą. `+` nigdy nie rozdziela:
+  w opisach łączy części zestawu, więc podział podałby pół kompletu jako
+  pełnoprawny zamiennik.
 - Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
   bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
   Pomyłkę poprawia się skanem właściwej półki — nie ma czego cofać.
 - **Lokalizacja „w drodze".** Pole lokalizacji w Subiekcie zmienia się dopiero po
   udanym zapisie przez workera, więc do tego czasu karta pokazywałaby stan sprzed
   skanu. Chipy niosą więc stan zamiast milczeć: dochodząca — przerywana ramka
-  i `⏳`; schodząca — kod przekreślony; **nieudany zapis — czerwony i pulsuje**,
-  a tapnięcie prowadzi wprost do kolejki z PONÓW. Pulsuje wyłącznie błąd, bo
-  tylko on wymaga reakcji człowieka i tylko on jest stanem trwałym. Ten sam
-  sygnał widać z drugiej strony — na zawartości regału (`jedzie tutaj` /
-  `schodzi stąd`). To ten sam pomysł, co `⏳ N szt w drodze` przy stanach.
+  i `⏳`; schodząca — kod przekreślony; **nieudany zapis — czerwony i pulsuje**.
+  Tapnięcie w czerwony chip prowadzi wprost do kolejki z PONÓW.
+
+  Pulsuje wyłącznie błąd, bo tylko on wymaga reakcji człowieka i tylko on jest
+  stanem trwałym. Ten sam sygnał widać z drugiej strony — na zawartości regału
+  (`jedzie tutaj` / `schodzi stąd`). To ten sam pomysł, co `⏳ N szt w drodze`
+  przy stanach.
 - Kolejka Sfery: statusy `pending`/`processing`/`waiting_for_doc`/`done`/`error`,
-  PONÓW, polling, pull-to-refresh. Wejście przez **pastylkę statusu Sfery** w
-  prawym górnym rogu (zielona = OK, amber = ⏳ w kolejce z licznikiem, czerwona =
-  błąd) — jest jednocześnie wskaźnikiem stanu; dolny pasek ma 2 zakładki.
+  PONÓW, polling, pull-to-refresh. Wejście prowadzi przez **pastylkę statusu
+  Sfery** w prawym górnym rogu. Pastylka jest zarazem wskaźnikiem stanu: zielona
+  = OK, amber = ⏳ w kolejce z licznikiem, czerwona = błąd. Dolny pasek ma
+  2 zakładki.
 - Bufor offline (Room) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
   log upadków urządzenia (`device_drop`) dla serwisu.
 
 **Rozkładanie dostaw i zwrotów — Tryb A (redesign v2.0)** — druga zakładka
 - Jednostką pracy jest **dokument** (FZ/PZ albo zbiorczy dokument zwrotów), nie
-  sesja. Dokumenty **w buforze** też
-  są do wzięcia: przy dostawie krajowej skutek magazynowy niesie sam dokument
-  w Subiekcie, więc aplikacja zapisuje **wyłącznie lokalizację** — zero MM, zero
-  `waiting_for_doc`.
-- Ścieżka codzienna to **dwa skany na pozycję**: skan towaru → wiersz rozwija
-  się z ilością i lokalizacją docelową → skan etykiety regału → zapis, a wiersz
-  zwija się jako odłożony. Bez dialogu potwierdzającego. Postęp zapisuje się per
-  pozycja, więc przerwanie pracy nic nie kosztuje; dostawa zamyka się sama, gdy
-  nie ma już czego rozkładać.
-- **Nic nie podmienia listy.** Rutyna i rozjazd lokalizacji dzieją się w wierszu,
-  a wyjątek ze zdjęciem i wybór przy kolizji EAN wysuwają się jako arkusz od
-  dołu — dostawa zostaje widoczna pod spodem, bo to na niej widać, ile jeszcze
-  zostało w kartonie.
-- Lista jest **kontrolą kompletności, nie kolejką**: pozycje bierze się z kartonu
+  sesja. Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
+  skutek magazynowy niesie sam dokument w Subiekcie, więc aplikacja zapisuje
+  **wyłącznie lokalizację** — zero MM, zero `waiting_for_doc`.
+- Ścieżka codzienna to **dwa skany na pozycję**. Skan towaru rozwija wiersz
+  z ilością i lokalizacją docelową. Skan etykiety regału zapisuje adres i zwija
+  wiersz jako odłożony. Bez dialogu potwierdzającego.
+
+  Postęp zapisuje się per pozycja, więc przerwanie pracy nic nie kosztuje.
+  Dostawa zamyka się sama, gdy nie ma już czego rozkładać.
+- **Nic nie podmienia listy.** Rutyna i rozjazd lokalizacji dzieją się
+  w wierszu. Wyjątek ze zdjęciem i wybór przy kolizji EAN wysuwają się jako
+  arkusz od dołu. Dostawa zostaje widoczna pod spodem, bo to na niej widać, ile
+  jeszcze zostało w kartonie.
+- Lista jest **kontrolą kompletności, nie kolejką**. Pozycje bierze się z kartonu
   w takiej kolejności, w jakiej wpadną w rękę. Odłożone **zwężają się w miejscu**
-  (dziesięć pozycji drobnicy mieści się na jednym ekranie), kolejność wierszy się
+  i dziesięć pozycji drobnicy mieści się na jednym ekranie. Kolejność wierszy się
   nie zmienia, a pozycje **BEZ LOKALIZACJI** idą na koniec jako osobna sekcja.
+
   Serwer sortuje po lokalizacji docelowej, ale kolektor nie rysuje już nagłówków
   alejek — przy pracy „co wpadnie w rękę" nikt po nich nie nawigował.
 - **Niejednoznaczny kod kreskowy zatrzymuje operację** — aplikacja nigdy nie
@@ -298,28 +316,32 @@ Parametry (env, dev):
   jeden kandydat występuje w otwartym dokumencie.
 - **Flaga sprawdzenia faktury zamiast drugiej prawdy.** Rozkładanie JEST
   sprawdzaniem faktury, więc aplikacja nie trzyma własnego stanu obok stanu
-  z Subiekta — wyprowadza go i wysyła jako flagę: *W trakcie sprawdzania* (ktoś
-  przy tym stoi), *Do sprawdzenia z zapisanym postępem* (przerwane), *Sprawdzone*,
-  *Sprawdzone z błędami* (**wyłącznie** rozbieżność ilościowa — uszkodzenie czy
-  brak miejsca to sprawy reklamacyjne, nie zgodność dokumentu). Magazynier widzi
-  tę samą plakietkę, co biuro. Firma używa **wbudowanych flag dokumentu** (kolumna
-  „FW" na liście faktur zakupu), więc domena operuje stabilnym kluczem, a mapowanie
-  klucz → nazwa → wartość w bazie siedzi w konfiguracji (`DOC_FLAG_*`).
-  Nadpisanie przez biuro wygrywa: aplikacja schodzi z takiej faktury i zapisuje
-  to w `events`.
+  z Subiekta. Wyprowadza go i wysyła jako flagę: *W trakcie sprawdzania* (ktoś
+  przy tym stoi), *Do sprawdzenia z zapisanym postępem* (przerwane),
+  *Sprawdzone*, *Sprawdzone z błędami*.
+
+  Ostatnia oznacza **wyłącznie** rozbieżność ilościową. Uszkodzenie czy brak
+  miejsca to sprawy reklamacyjne, nie zgodność dokumentu. Magazynier widzi tę
+  samą plakietkę, co biuro.
+
+  Firma używa **wbudowanych flag dokumentu** — kolumna „FW" na liście faktur
+  zakupu. Domena operuje więc stabilnym kluczem, a mapowanie klucz → nazwa →
+  wartość w bazie siedzi w konfiguracji (`DOC_FLAG_*`). Nadpisanie przez biuro
+  wygrywa: aplikacja schodzi z takiej faktury i zapisuje to w `events`.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
-  zgadza się"; rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ** (najczęstszy
-  wyjątek nie może wymagać szukania kafla wśród siedmiu typów).
+  zgadza się". Rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ**: najczęstszy
+  wyjątek nie może wymagać szukania kafla wśród siedmiu typów.
 - **Kilka osób przy jednej dostawie**: lock per pozycja z TTL 30 min — drugi
   skaner mówi, kto trzyma linię, zamiast pozwolić na podwójne odłożenie.
 - **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie
   **PRZED zapisem** — „przeniesiony (ZAMIEŃ)” czy „leży w obu (DODAJ)”. Z samego
   skanu tych dwóch sytuacji odróżnić się nie da, więc decyduje człowiek.
-- **Wyjątki jako obiekt pierwszej klasy**: zamknięta lista typów (za mało, za
-  dużo, uszkodzony, zły towar, brak miejsca, nieznany kod, kolizja EAN);
-  przy uszkodzeniu / złym towarze / nieznanym kodzie **zdjęcie jest
-  obowiązkowe** (dowód do reklamacji, robi je systemowy aparat). Pozycja
-  z wyjątkiem wypada z rutyny, ale nie blokuje zamknięcia dostawy.
+- **Wyjątki jako obiekt pierwszej klasy.** Lista typów jest zamknięta: za mało,
+  za dużo, uszkodzony, zły towar, brak miejsca, nieznany kod, kolizja EAN.
+
+  Przy uszkodzeniu, złym towarze i nieznanym kodzie **zdjęcie jest obowiązkowe**
+  — to dowód do reklamacji, robi je systemowy aparat. Pozycja z wyjątkiem wypada
+  z rutyny, ale nie blokuje zamknięcia dostawy.
 - Ekran **WYJĄTKI**: nierozwiązane zgłoszenia (pytane przy starcie aplikacji,
   czerwony pasek na każdym ekranie do czasu zamknięcia) + **raport kolizji
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
@@ -329,22 +351,22 @@ Parametry (env, dev):
 - Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn **Zwroty**
   jednym **zbiorczym dokumentem** i układa go w **koszyki opisane numerem
   zwrotu**. Podziału na koszyki nie ma w żadnym dokumencie — istnieje wyłącznie
-  fizycznie, więc w aplikacji koszyk to grupa linii domkniętych za jednym
-  podejściem, otagowana numerem (krótkim, wpisywanym ręcznie — koszyki nie mają
-  kodów kreskowych).
+  fizycznie. W aplikacji koszyk to grupa linii domkniętych za jednym podejściem,
+  otagowana krótkim numerem wpisywanym ręcznie. Koszyki nie mają kodów
+  kreskowych.
 - Rozkładanie przebiega dokładnie jak przy dostawie: dwa skany, sekcje alejek,
   INNA ILOŚĆ, wyjątki ze zdjęciem, kolizje EAN, te same cztery flagi dokumentu.
 - Różnica jest jedna: **po opróżnieniu koszyka domyka się go przyciskiem i
   powstaje JEDEN dokument MM Zwroty→MAG** na wszystko, co z niego poszło na
   półki. `set_location` powstaje przy każdym odłożeniu, MM dopiero na końcu, więc
   niezmiennik **adres zawsze przed sprzedawalnością** trzyma się sam.
-- Rozliczenie idzie **ilościami** (`odłożone − objęte MM`), nie statusem linii:
-  ten sam towar bywa w dwóch koszykach (dokument zbiorczy agreguje go w jedną
-  linię), ponowne domknięcie koszyka nie dubluje przesunięcia, a sztuki odłożone
+- Rozliczenie idzie **ilościami** (`odłożone − objęte MM`), nie statusem linii.
+  Ten sam towar bywa w dwóch koszykach, bo dokument zbiorczy agreguje go w jedną
+  linię. Ponowne domknięcie koszyka nie dubluje przesunięcia. Sztuki odłożone
   z pozycji zgłoszonej potem jako uszkodzona i tak jadą na MAG.
-- Otwarte koszyki (rozłożone, bez MM) widać na ekranie dostawy i **wstrzymują jej
-  domknięcie**: dopóki MM nie powstanie, towar leży na półce, ale w Subiekcie
-  wisi na Zwrotach — czyli jest niesprzedawalny.
+- Otwarte koszyki (rozłożone, bez MM) widać na ekranie dostawy i **wstrzymują
+  jej domknięcie**. Dopóki MM nie powstanie, towar leży na półce, ale
+  w Subiekcie wisi na Zwrotach — czyli jest niesprzedawalny.
 
 **Kontener importowy — Tryb B (sesja z wózkiem, spec §5.4)**
 - Wchodzi tu **wyłącznie kontener na MGP** (~4× w roku): 1000 kartonów, wiele
@@ -367,20 +389,20 @@ Parametry (env, dev):
 rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 
 **Telemetria, która mierzy właściwą rzecz**
-- `events` ma indeks po czasie (bez niego każdy raport skanuje całą tabelę)
-  i `device_id` — przy współdzielonych kolektorach pierwsze pytanie przy awarii
-  brzmi „to jedno urządzenie czy wszystkie?".
+- `events` ma indeks po czasie — bez niego każdy raport skanuje całą tabelę.
+  Ma też `device_id`: przy współdzielonych kolektorach pierwsze pytanie przy
+  awarii brzmi „to jedno urządzenie czy wszystkie?".
 - **Wejście ręczne liczone osobno od skanu** (`manual_entry`). To nie jest
-  kosmetyka: udział wpisów ręcznych **per regał** to darmowy raport jakości
-  etykiet (który wymaga przedruku), a **per towar** mówi, która kartoteka nie ma
-  czytelnego kodu. W jednym worku ze skanem nie mierzy niczego.
+  kosmetyka. Udział wpisów ręcznych **per regał** to darmowy raport jakości
+  etykiet — mówi, która wymaga przedruku. **Per towar** mówi, która kartoteka
+  nie ma czytelnego kodu. W jednym worku ze skanem nie mierzy niczego.
 - **Czas skan → odpowiedź mierzy klient, nie serwer** (`scan_timing`), bo czas
   obsługi na serwerze pomija sieć i render — czyli akurat to, gdzie problem
   siedzi. Cel: `p95 < 150 ms`; powyżej ~300 ms ludzie zaczynają skanować
   podwójnie, a podwójny skan przy liczeniu pozycji to błąd **ilościowy**.
 - Cztery liczby pod `GET /api/metrics` — liczby, nie panel.
-  **Świadomie bez raportu wydajności per osoba:** to monitoring pracowniczy
-  w rozumieniu Kodeksu pracy (art. 22² i nast.) i wymaga zapisu w regulaminie
+  **Świadomie bez raportu wydajności per osoba.** To monitoring pracowniczy
+  w rozumieniu Kodeksu pracy (art. 22² i nast.). Wymaga zapisu w regulaminie
   oraz uprzedzenia ludzi przed uruchomieniem. Techniczny audyt „kto zmienił
   lokalizację" to co innego i zostaje.
 
@@ -391,8 +413,8 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 - **Pobrania liczone jako wystąpienia pozycji na WZ, nie suma ilości.** Indeks
   wydany 400× po sztuce generuje wielokrotnie więcej pracy niż wydany 4× po
   100 szt.; mylenie tych dwóch liczb to najczęstszy błąd domowych analiz ABC.
-- Strefa złota jest **per zakres regałów** (`A,B,H,J` → poziomy 2-3-4, `F` → 4 i 8,
-  `E03–E04` → tylko 2…), bo ten sam numer poziomu to inna wysokość w różnej
+- Strefa złota jest **per zakres regałów**: `A,B,H,J` → poziomy 2-3-4, `F` → 4
+  i 8, `E03–E04` → tylko 2. Ten sam numer poziomu to inna wysokość w różnej
   geometrii regału. Regał bez reguły trafia na **czwartą listę**, nie do kosza
   „poza strefą" — inaczej jego martwy towar zniknąłby z oczu.
 - **Bez historii pobrań skrypt odmawia wypisania list 1–3.** Każdy indeks
@@ -403,7 +425,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 - Aplikacja pisze do Subiekta przez kolejkę, ale nikt nie sprawdzał, **czy stan
   po stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała**.
   `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
-  z ostatnim udanym zapisem, wyławia zadania w `error` starsze niż doba,
+  z ostatnim udanym zapisem. Wyławia też zadania w `error` starsze niż doba,
   `waiting_for_doc` starsze niż trzy dni i koszyki zwrotów rozłożone bez MM.
 - **Zerowy wynik nie tworzy raportu** — raport przychodzący codziennie przestaje
   być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
@@ -447,11 +469,15 @@ CHANGELOG.md               co się zmieniło i czy wymaga działania przy wdroż
                            tam też reguła, kiedy rośnie który człon wersji
 docs/subiekt-gt-edu-setup.md  podpięcie Subiekta GT krok po kroku
 docs/subiekt-gt-struktura.md  co WERTIS czyta i pisze w bazie Subiekta
+docs/slownik.md            jak pisze się tę dokumentację: reguły w duchu
+                           ASD-STE100 i słowniczek terminów
 instalator/README.md       instalator Windows: usługi, kreator konfiguracji,
                            konto SQL o minimalnych uprawnieniach
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
 tools/docs_check.py        kontrola spójności dokumentacji z repo (martwe ścieżki,
                            usunięte byty, liczby ekranów/testów) — `python3 tools/docs_check.py`
+tools/styl_check.py        mierzalna część reguł z docs/slownik.md (długość zdania
+                           i akapitu, odrzucone terminy)
 tools/kt_imports_check.py  namiastka kompilatora dla :app (brakujące importy,
                            bilans nawiasów) — :app nie kompiluje się bez SDK
 .github/workflows/         CI: android.yml (testy :core + APK debug) oraz
@@ -463,34 +489,43 @@ tools/kt_imports_check.py  namiastka kompilatora dla :app (brakujące importy,
 `server/seed/products.json` z eksportu `magmat.xlsx` (`tools/convert_xlsx.py`,
 rozpoznaje kolumny po nazwie). Eksport zawiera **prawdziwe** kolumny `Stan`
 (MAG), `Rezerwacja`, `MGP` (strefa przyjęć) i `Dostawca`, więc konwerter bierze
-je wprost — bez syntetyki (dla starszego, płaskiego eksportu bez tych kolumn
-konwerter nadal rozdziela stany deterministycznie hashem). 94 towary mają stan
-na MGP. Seed buduje z nich dokumenty FZ/PZ **pogrupowane po realnym dostawcy**
-(duże paczki dzielone po ≤20 pozycji, jeden dokument w buforze — test
-`waiting_for_doc`).
+je wprost, bez syntetyki. Dla starszego, płaskiego eksportu bez tych kolumn
+konwerter nadal rozdziela stany deterministycznie hashem.
+
+94 towary mają stan na MGP. Seed buduje z nich dokumenty FZ/PZ **pogrupowane po
+realnym dostawcy**. Duże paczki dzieli po ≤20 pozycji i zostawia jeden dokument
+w buforze, jako test `waiting_for_doc`.
 
 Żeby obie ścieżki miały czym żyć, seed rozstawia dokumenty po **trzech
-magazynach skutku**: krajowe FZ/PZ na `MAG` (tryb A), jeden dokument zostaje na
-`MGP` jako kontener importowy (tryb B) i jeden zbiorczy dokument zwrotów na
-magazynie `Zwroty` — ten ostatni razem ze stanami, bo bez nich MM z koszyka nie
-miałby czego przenosić. W produkcji stany i dokumenty pochodzą z `tw_Stan` /
-`dok__Dokument` przez adapter MSSQL (patrz [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md)).
+magazynach skutku**:
+
+- krajowe FZ/PZ na `MAG` (tryb A),
+- jeden dokument na `MGP` jako kontener importowy (tryb B),
+- jeden zbiorczy dokument zwrotów na magazynie `Zwroty`.
+
+Ten ostatni dostaje też stany — bez nich MM z koszyka nie miałby czego
+przenosić. W produkcji stany i dokumenty pochodzą z `tw_Stan` i `dok__Dokument`
+przez adapter MSSQL (patrz
+[`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md)).
 
 ## Praca z prawdziwym Subiektem GT
 
 Docelowa wersja w firmie: **Subiekt GT 1.87 SP3 HF1** (era KSeF — brak natywnego
-pola lokalizacji, stąd pole dodatkowe `tw_Pole1..8`).
+pola lokalizacji, stąd pole własne `tw_Pole1..8`).
 
 Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**) to CAŁE
-połączenie: **jeden login** o minimalnych uprawnieniach, importer
-`server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto z bazy
-(przy starcie, co `MSSQL_SYNC_MS`, `POST /api/admin/resync`), a worker zapisuje
-w dwóch miejscach: UPDATE **jednej kolumny** (lokalizacja na `tw__Towar`) oraz
-MERGE w `fl_Wartosc` (flaga). Tryb zapisu wynika z `SGT_MODE` — nie ma
-osobnego przełącznika. Dokumenty MM — a powstają w dwóch miejscach: runda wózka
-w trybie B i **zamknięty koszyk zwrotu** — tworzy docelowo osobny worker Sfery
-(COM) czytający tę samą kolejkę `sfera_queue`; do tego czasu zadanie MM kończy
-się czytelnym błędem, a MM wystawia biuro. Instrukcja krok po kroku:
+połączenie. Wystarczy do niego **jeden login** o minimalnych uprawnieniach.
+
+Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto
+z bazy: przy starcie, co `MSSQL_SYNC_MS` i na `POST /api/admin/resync`. Worker
+zapisuje w dwóch miejscach — UPDATE **jednej kolumny** (lokalizacja na
+`tw__Towar`) oraz MERGE w `fl_Wartosc` (flaga). Tryb zapisu wynika z `SGT_MODE`;
+osobnego przełącznika nie ma.
+
+Dokumenty MM powstają w dwóch miejscach: runda wózka w trybie B i **zamknięty
+koszyk zwrotu**. Tworzy je docelowo osobny worker Sfery (COM) czytający tę samą
+kolejkę `sfera_queue`. Do tego czasu zadanie MM kończy się czytelnym błędem,
+a MM wystawia biuro. Instrukcja krok po kroku:
 [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 
 W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —

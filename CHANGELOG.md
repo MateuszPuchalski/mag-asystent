@@ -28,6 +28,42 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.4.1 — 27 lipca 2026
+
+Dokumentacja przepisana według reguł ASD-STE100 w zakresie, jaki da się
+przenieść na polski. PATCH, bo na ekranie nic się nie zmienia — `git pull`,
+`npm ci`, `npm run build`, restart usług.
+
+### Nowe
+
+- **[`docs/slownik.md`](docs/slownik.md)** — jedno miejsce z regułami pisania
+  dokumentacji i słowniczkiem terminów. Mówi też wprost, których reguł STE
+  **nie** stosujemy, bo zależą od angielskiego. Zgodności ze standardem nie
+  deklarujemy: poza angielskim nie da się jej spełnić.
+- **`tools/styl_check.py`** — mierzy trzy reguły ze słownika: długość zdania
+  (20 wyrazów w kroku procedury, 25 w prozie), długość akapitu i odrzucone
+  warianty terminów. Bramkuje CI obok `docs_check.py`.
+
+### Poprawione
+
+- **Osiem dokumentów przepisanych.** Instrukcja została krótka i rozkazująca,
+  a „dlaczego" zeszło pod nią do osobnych bloków. Najdłuższe zdanie w repo
+  spadło z 52 do 25 wyrazów, ostrzeżenia stoją teraz **przed** krokiem, a
+  40-pozycyjna checklista smoke-testu ma jedną rzecz do sprawdzenia na pozycję.
+- **`README.md` mówił `better-sqlite3`** — moduł natywny zniknął w 0.4.0
+  na rzecz wbudowanego `node:sqlite`.
+- **`instalator/README.md` mówił o `SELECT` na siedmiu tabelach** — od 0.4.0
+  jest ich osiem (`sl_Magazyn`).
+- **CI nie uruchamiało się przy zmianie samego `DEPLOY.md`.** `docs_check.py`
+  czytał ten plik od zawsze, ale nie było go w `paths` workflow — razem
+  z `CHANGELOG.md` i `instalator/README.md`.
+
+Poza zakresem świadomie zostały `docs/architektura.md`,
+`docs/porownanie-asystent.md` i ten plik: to uzasadnienia decyzji, a limit
+długości zdania wycina z nich dokładnie tę treść, dla której powstały.
+
+---
+
 ## 0.4.0 — 27 lipca 2026
 
 Pierwsze wydanie z numerem, który cokolwiek znaczy. Zbiera sześć zmian

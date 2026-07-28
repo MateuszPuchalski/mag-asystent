@@ -99,12 +99,12 @@ Trzy konsekwencje dla WERTIS:
    człowieka, `flg_Id` to liczba do zapisu — dokładnie te dwa byty, które
    `services/delivery-flag.ts` już rozróżnia.
 2. **Aplikacja nie potrzebuje żadnego prawa zapisu do `dok__Dokument`.**
-   To zawężenie uprawnień, nie rozszerzenie: `fl_Wartosc` nie uczestniczy
-   w numeracji ani w skutkach magazynowych, więc zapis tam nie może naruszyć
+   To zawężenie uprawnień, nie rozszerzenie. `fl_Wartosc` nie uczestniczy
+   w numeracji ani w skutkach magazynowych. Zapis tam nie może naruszyć
    integralności dokumentu.
-3. **Wykrywanie „biuro nadpisało flagę" staje się precyzyjne** —
-   `flw_IdUzytkownika` i `flw_CzasOstatniejZmiany` mówią wprost kto i kiedy,
-   zamiast wnioskowania z samej różnicy wartości.
+3. **Wykrywanie „biuro nadpisało flagę" staje się precyzyjne.**
+   `flw_IdUzytkownika` i `flw_CzasOstatniejZmiany` mówią wprost kto i kiedy.
+   Wcześniej trzeba było wnioskować z samej różnicy wartości.
 
 `[WERYFIKUJ]` para (`flw_IdGrupyFlag`, `flw_TypObiektu`) dla faktur zakupu — jedyna
 rzecz w całym mechanizmie flag, której dokumentacja nie zawiera. Jeden SELECT:
@@ -133,11 +133,13 @@ SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGr
 
 `sl_Magazyn`: `mag_Id`, `mag_Symbol` varchar(3), `mag_Nazwa`, `mag_Glowny` (bit).
 
-Od sierpnia 2026 importer **czyta tę tabelę** i pobiera stany ze WSZYSTKICH
-magazynów, nie tylko z trzech skonfigurowanych — karta towaru odpowiada na
-pytanie „gdzie ten towar jeszcze leży". Wymaga to `GRANT SELECT ON dbo.sl_Magazyn`
-(`docs/subiekt-gt-edu-setup.md` §2); bez niego aplikacja degraduje się do trzech
-magazynów i mówi o tym w `/api/health`.
+Od sierpnia 2026 importer **czyta tę tabelę**. Pobiera stany ze WSZYSTKICH
+magazynów, nie tylko z trzech skonfigurowanych. Karta towaru odpowiada dzięki
+temu na pytanie „gdzie ten towar jeszcze leży".
+
+Wymaga to `GRANT SELECT ON dbo.sl_Magazyn` (`docs/subiekt-gt-edu-setup.md` §2).
+Bez tego grantu aplikacja degraduje się do trzech magazynów i mówi o tym
+w `/api/health`.
 
 `[WERYFIKUJ]` id magazynów MAG / MGP / Zwroty (`MAG_ID_*`). Magazyn główny da się
 wykryć automatycznie (`mag_Glowny = 1`), ale MGP i Zwroty są nazwane po firmowemu:
@@ -166,8 +168,8 @@ Typ dokumentu MM to `dok_Typ = 9`.
 ```
 
 WERTIS tego dziś nie czyta. Reklamacja i zwrot ze sprzedaży to jednak różne
-sytuacje na magazynie (reklamowany towar często nie wraca na półkę), więc jeśli
-biuro tę informację wypełnia, warto ją pokazać magazynierowi przy koszyku.
+sytuacje na magazynie — reklamowany towar często nie wraca na półkę. Jeśli biuro
+tę informację wypełnia, warto ją pokazać magazynierowi przy koszyku.
 
 ## Audyt kolizji kodów — założenie klasyfikatora skanów
 
@@ -183,9 +185,8 @@ symbol  wszystko pozostałe           W32-0203     0–1 myślnik
 
 Ta reguła stoi na jednym założeniu: **żaden symbol towaru ani kod kreskowy
 w kartotece nie ma kształtu lokalizacji.** Formaty są rozłączne po liczbie
-myślników, więc założenie jest prawdopodobne — ale kartoteka ma ~3 600 pozycji
-wprowadzanych ręcznie przez lata, więc prawdopodobne to nie to samo co
-sprawdzone.
+myślników, więc założenie jest prawdopodobne. Kartoteka ma jednak ~3 600 pozycji
+wprowadzanych ręcznie przez lata. Prawdopodobne to nie to samo co sprawdzone.
 
 Weryfikuje je [`tools/audyt-kolizji.sql`](../tools/audyt-kolizji.sql). Uruchom
 na produkcyjnej bazie loginem read-only:
@@ -228,12 +229,12 @@ zapytanie chroniło przez jeden dzień; test chroni zawsze.
 ### Adresy niepasujące do wzorca (zapytanie E)
 
 To samo uruchomienie pokazało **93 kody adresowe w 158 kartotekach**, które nie
-pasują do żadnego wzorca — i nie są to literówki, tylko trzy całe konwencje:
-`PALETA22` (31 kodów), `PAL38II` (24), `KT1` (14), plus `PAL-SIE-<nn>` (3)
-i 21 realnych pomyłek.
+pasują do żadnego wzorca. Nie są to literówki, tylko trzy całe konwencje:
+`PALETA22` (31 kodów), `PAL38II` (24) i `KT1` (14). Do tego dochodzi
+`PAL-SIE-<nn>` (3) i 21 realnych pomyłek.
 
 **Ustalone z właścicielem: żadna z tych konwencji nie jest dziś używana.** To
-dług danych, nie zablokowana praca — aplikacja słusznie ich nie przyjmuje, bo
+dług danych, nie zablokowana praca. Aplikacja słusznie ich nie przyjmuje:
 rozszerzenie wzorca o martwe formaty otworzyłoby z powrotem dziurę, przez którą
 symbol towaru udawał adres. Lista do posprzątania w Subiekcie:
 [`adresy-do-poprawy.md`](adresy-do-poprawy.md).
