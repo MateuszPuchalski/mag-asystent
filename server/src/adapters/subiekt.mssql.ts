@@ -31,6 +31,13 @@ import { config } from "../config.js";
 /** Okno importu dokumentów FZ/PZ [dni] — szersze niż 14 dni widoku (spec §5.4). */
 const DOC_IMPORT_DAYS = 60;
 
+/**
+ * Okno importu zamówień do dostawcy [dni] — WŁASNE, szersze niż dla dostaw.
+ * Zamówienie bywa starsze niż dwa miesiące i wciąż otwarte, a jest ich o rząd
+ * wielkości mniej niż dokumentów, więc szersze okno nic nie kosztuje.
+ */
+const ZAM_IMPORT_DAYS = 180;
+
 interface TowarRow {
   tw_Id: number;
   tw_Symbol: string;
@@ -63,11 +70,28 @@ interface PozRow {
   ob_IloscMag: number;
 }
 
+interface ZamRow {
+  dok_Id: number;
+  dok_NrPelny: string;
+  data_wyst: string;
+  termin: string | null;
+  dok_Status: number;
+  dostawca: string | null;
+}
+interface ZamPozRow {
+  ob_DokHanId: number;
+  ob_TowId: number;
+  ob_IloscMag: number;
+  zreal: number;
+}
+
 export interface ImportStats {
   towary: number;
   stany: number;
   dokumenty: number;
   pozycje: number;
+  zamowienia: number;
+  zamPozycje: number;
   at: string;
 }
 
@@ -83,6 +107,19 @@ export let lastImport: ImportStats | null = null;
  * skrypt uprawnień.
  */
 export let brakDostepuDoMagazynow: string | null = null;
+
+/**
+ * Ustawiane, gdy `dok_Pozycja` nie ma kolumny z ilością zrealizowaną
+ * (`MSSQL_ZD_ZREAL_COLUMN`).
+ *
+ * Czytane przez `/api/health` i przenoszone na kartę jako `szacunek`. Bez tej
+ * kolumny zamówienie zrealizowane w połowie pokazuje pełną ilość — magazynier
+ * musi wiedzieć, że liczba jest górnym oszacowaniem, a nie tym, co przyjedzie.
+ */
+export let brakKolumnyZrealizowano: string | null = null;
+
+/** Czy ostatni import umiał odczytać ilość zrealizowaną. Czyta serwis karty. */
+export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
 
 interface MagRow {
   mag_Id: number;
@@ -112,6 +149,86 @@ async function pobierzMagazyny(pool: sql.ConnectionPool): Promise<MagRow[]> {
       { mag_Id: config.magId.ZWROTY, mag_Symbol: "ZWROTY", mag_Nazwa: "Zwroty od klientów" },
     ];
   }
+}
+
+/**
+ * Otwarte zamówienia do dostawcy wraz z pozycjami.
+ *
+ * Te same tabele co reszta importu (`dok__Dokument`, `dok_Pozycja`,
+ * `kh__Kontrahent`), więc ZERO nowych GRANT-ów — konsekwencja tego, że adapter
+ * MSSQL jest wyłącznie importerem, a odczyty idą przez read-model.
+ */
+async function pobierzZamowienia(
+  pool: sql.ConnectionPool
+): Promise<{ zamowienia: ZamRow[]; zamPozycje: ZamPozRow[] }> {
+  const c = config.mssql;
+  const statusy = c.dokStatusyZDOtwarte.map((n) => Math.trunc(n));
+  if (statusy.length === 0) return { zamowienia: [], zamPozycje: [] };
+
+  const terminSelect = c.zdTerminColumn
+    ? `CONVERT(varchar(10), d.${assertSafeColumn(c.zdTerminColumn)}, 120)`
+    : "NULL";
+  const cutoff = new Date(Date.now() - ZAM_IMPORT_DAYS * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  const zamowienia = (
+    await pool
+      .request()
+      .input("zd", sql.Int, c.dokTypZD)
+      .input("cutoff", sql.VarChar, cutoff)
+      .query<ZamRow>(
+        `SELECT d.dok_Id, d.dok_NrPelny,
+                CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
+                ${terminSelect} AS termin,
+                d.dok_Status,
+                ISNULL(k.kh_Symbol, '') AS dostawca
+         FROM dok__Dokument d
+         LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
+         WHERE d.dok_Typ = @zd
+           AND d.dok_Status IN (${statusy.join(",")})
+           AND d.dok_DataWyst >= @cutoff`
+      )
+  ).recordset;
+
+  if (zamowienia.length === 0) return { zamowienia, zamPozycje: [] };
+  const ids = zamowienia.map((z) => z.dok_Id).join(",");
+
+  /* Ilość zrealizowana: najpierw z kolumną, a gdy jej nie ma — DRUGIE PODEJŚCIE
+     bez niej. Wyjątek nie może tu wywrócić całej synchronizacji, bo stany
+     i lokalizacje są ważniejsze od zamówień; ale nie może też przejść bez echa,
+     stąd komunikat czytany przez /api/health. */
+  if (c.zdZrealColumn) {
+    const zrealCol = assertSafeColumn(c.zdZrealColumn);
+    try {
+      const zamPozycje = (
+        await pool.request().query<ZamPozRow>(
+          `SELECT ob_DokHanId, ob_TowId, ob_IloscMag, ${zrealCol} AS zreal
+           FROM dok_Pozycja WHERE ob_DokHanId IN (${ids})`
+        )
+      ).recordset;
+      brakKolumnyZrealizowano = null;
+      return { zamowienia, zamPozycje };
+    } catch (e) {
+      brakKolumnyZrealizowano =
+        `Kolumna ${zrealCol} nie istnieje w dok_Pozycja — zamówienia u dostawcy ` +
+        "pokazują ilość ZAMÓWIONĄ, bez odjęcia już odebranej. Sprawdź nazwę " +
+        "kolumny na własnej bazie i ustaw MSSQL_ZD_ZREAL_COLUMN (DEPLOY §6).";
+      console.warn(
+        `[mssql] ${brakKolumnyZrealizowano} (${e instanceof Error ? e.message : e})`
+      );
+    }
+  } else {
+    brakKolumnyZrealizowano = null; // puste = świadoma rezygnacja, nie awaria
+  }
+
+  const zamPozycje = (
+    await pool.request().query<ZamPozRow>(
+      `SELECT ob_DokHanId, ob_TowId, ob_IloscMag, 0 AS zreal
+       FROM dok_Pozycja WHERE ob_DokHanId IN (${ids})`
+    )
+  ).recordset;
+  return { zamowienia, zamPozycje };
 }
 
 export async function importFromMssql(): Promise<ImportStats> {
@@ -209,13 +326,15 @@ export async function importFromMssql(): Promise<ImportStats> {
       ).recordset
     : [];
 
+  const { zamowienia, zamPozycje } = await pobierzZamowienia(pool);
+
   // ── wpis do read-modelu sgt_* (wzorzec wipe+insert z seed.ts) ─────────────
   const d = db();
   const knownTw = new Set(towary.map((t) => t.tw_Id));
 
   const insTowar = d.prepare(
-    `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, ordered, opis, lokalizacja)
-     VALUES (@tw_id,@symbol,@nazwa,@ean,@unit,@ordered,@opis,@lokalizacja)`
+    `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, opis, lokalizacja)
+     VALUES (@tw_id,@symbol,@nazwa,@ean,@unit,@opis,@lokalizacja)`
   );
   const insStan = d.prepare(
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
@@ -225,9 +344,20 @@ export async function importFromMssql(): Promise<ImportStats> {
      VALUES (?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
+  const insZam = d.prepare(
+    `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
+     VALUES (?,?,?,?,?,?)`
+  );
+  const insZamPoz = d.prepare(
+    "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
+  );
 
   const apply = transaction(d, () => {
-    for (const t of ["sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn"]) {
+    /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy. */
+    for (const t of [
+      "sgt_zam_pozycja", "sgt_zamowienie",
+      "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
+    ]) {
       d.prepare(`DELETE FROM ${t}`).run();
     }
     const insMag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
@@ -242,8 +372,6 @@ export async function importFromMssql(): Promise<ImportStats> {
         nazwa: t.tw_Nazwa ?? "",
         ean: t.tw_PodstKodKresk ?? "",
         unit: t.tw_JednMiary || "szt.",
-        // „Zamówione" nie ma prostej kolumny w tw_Stan (pochodzi z ZK/ZD) — 0
-        ordered: 0,
         opis: t.tw_Opis ?? "",
         lokalizacja: t.tw_Lokalizacja ?? "",
       });
@@ -274,6 +402,20 @@ export async function importFromMssql(): Promise<ImportStats> {
       if (!knownTw.has(p.ob_TowId)) continue;
       insPoz.run(p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag ?? 0);
     }
+    for (const z of zamowienia) {
+      insZam.run(
+        z.dok_Id,
+        z.dok_NrPelny,
+        z.data_wyst,
+        z.termin || null,
+        z.dostawca ?? "",
+        z.dok_Status ?? 0
+      );
+    }
+    for (const p of zamPozycje) {
+      if (!knownTw.has(p.ob_TowId)) continue;
+      insZamPoz.run(p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag ?? 0, p.zreal ?? 0);
+    }
   });
   apply();
 
@@ -282,11 +424,14 @@ export async function importFromMssql(): Promise<ImportStats> {
     stany: stany.length,
     dokumenty: dokumenty.length,
     pozycje: pozycje.length,
+    zamowienia: zamowienia.length,
+    zamPozycje: zamPozycje.length,
     at: nowIso(),
   };
   console.log(
     `[mssql] import: towary=${lastImport.towary}, stany=${lastImport.stany}, ` +
-      `dokumenty=${lastImport.dokumenty}, pozycje=${lastImport.pozycje}`
+      `dokumenty=${lastImport.dokumenty}, pozycje=${lastImport.pozycje}, ` +
+      `zamowienia=${lastImport.zamowienia}, zamPozycje=${lastImport.zamPozycje}`
   );
   return lastImport;
 }

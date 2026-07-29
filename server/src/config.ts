@@ -76,6 +76,21 @@ export const config = {
      */
     dokTypFZ: num(process.env.DOK_TYP_FZ, 1, "DOK_TYP_FZ"),
     dokTypPZ: num(process.env.DOK_TYP_PZ, 10, "DOK_TYP_PZ"),
+    /** Zamówienie do dostawcy — ZD. Wartość z tej samej listy, więc pewna. */
+    dokTypZD: num(process.env.DOK_TYP_ZD, 15, "DOK_TYP_ZD"),
+    /**
+     * `dok_Status` zamówień, które UZNAJEMY ZA OTWARTE (CSV).
+     *
+     * Opis struktury wylicza tylko „5..8-zamówienia (różne stany realizacji)"
+     * i NIE mówi, który numer co znaczy — domyślne poniżej bierze więc wszystkie
+     * cztery i jest ZAŁOŻENIEM, nie ustaleniem ([WERYFIKUJ], DEPLOY §6).
+     * Skutkiem błędu w tę stronę jest zamówienie zamknięte wiszące na karcie;
+     * osłania przed tym odjęcie ilości zrealizowanej i okno importu.
+     */
+    dokStatusyZDOtwarte: (process.env.DOK_STATUS_ZD_OTWARTE ?? "5,6,7,8")
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n >= 0),
     /**
      * Kody `dok_Typ` dokumentów zwrotów listowanych na magazynie Zwroty (CSV).
      * Domyślnie `14` = ZW (zwrot). Puste = każdy dokument na tym magazynie —
@@ -94,6 +109,24 @@ export const config = {
      * SQL (białe znaki/średniki odrzucane) przed wstrzyknięciem do zapytania.
      */
     locColumn: process.env.MSSQL_LOC_COLUMN ?? "tw_Pole1",
+    /**
+     * Kolumna `dok_Pozycja` z ilością JUŻ ZREALIZOWANĄ na zamówieniu. Nasz opis
+     * struktury jej nie wymienia, więc domyślna nazwa to [WERYFIKUJ] — sprawdź
+     * ją jednym SELECT-em (DEPLOY §6).
+     *
+     * Gdy kolumny nie ma, import NIE przerywa się: powtarza zapytanie bez niej,
+     * wpisuje zero i melduje to w /api/health. Ilość jest wtedy zawyżona
+     * o odebrane sztuki, a karta mówi wprost, że to szacunek. Cicha degradacja
+     * byłaby gorsza niż brak funkcji: magazynier liczyłby na towar, którego
+     * nikt już nie wyśle. Puste = świadoma rezygnacja, bez komunikatu.
+     */
+    zdZrealColumn: process.env.MSSQL_ZD_ZREAL_COLUMN ?? "ob_IloscZrealizowana",
+    /**
+     * Kolumna `dok__Dokument` z terminem realizacji zamówienia. Puste = karta
+     * pokazuje zamówienia bez terminu (na końcu listy) — bo „nie wiem kiedy"
+     * jest uczciwsze niż podstawienie daty wystawienia w miejsce terminu.
+     */
+    zdTerminColumn: process.env.MSSQL_ZD_TERMIN_COLUMN ?? "",
     /**
      * Flaga sprawdzenia faktury NIE jest kolumną `dok__Dokument` — to osobny
      * mechanizm InsERT-a: `fl__Flagi` (definicja: `flg_Id`, `flg_Text`,

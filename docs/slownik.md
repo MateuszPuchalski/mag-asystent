@@ -68,6 +68,7 @@ lista wariantów rosłaby o każdy przypadek gramatyczny z osobna.
 | **badge** | kod `PRC-0000-0` i sesja, którą otwiera | |
 | **plakietka** | fizyczny wydruk badge'a z kodem kreskowym | |
 | **karta towaru** | ekran ze stanami, lokalizacjami i zamiennikami | |
+| **zamówienie u dostawcy** | dokument ZD — towar zamówiony, jeszcze nieprzyjęty; samo „zamówienie" myli się z ZK od klienta | |
 | **kreator** | dialog instalatora pytający o bazę Subiekta | |
 | **regał** | miejsce o adresie `A01-02-03`; etykieta wisi na jego półce | |
 | **kolejka Sfery** | tabela `sfera_queue` i zadania zapisu do Subiekta | |

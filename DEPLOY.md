@@ -459,6 +459,36 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
      Dokumenty zwrotów flagują się tym samym mechanizmem (to ten sam typ
      obiektu), więc nie wymagają osobnej konfiguracji.
 
+   - **zamówienia do dostawcy (ZD) na karcie towaru.** Dwie rzeczy, obie
+     opcjonalne — bez nich karta działa, tylko mniej dokładnie.
+
+     Które statusy znaczą „zamówienie otwarte":
+
+     ```sql
+     SELECT dok_Status, COUNT(*) AS ile FROM dok__Dokument
+     WHERE dok_Typ = 15 GROUP BY dok_Status ORDER BY dok_Status;
+     ```
+
+     → `DOK_STATUS_ZD_OTWARTE` (domyślnie `5,6,7,8`, czyli wszystkie).
+
+     Jak nazywa się kolumna z ilością już odebraną:
+
+     ```sql
+     SELECT name FROM sys.columns
+     WHERE object_id = OBJECT_ID('dok_Pozycja') AND name LIKE 'ob_Ilosc%';
+     ```
+
+     → `MSSQL_ZD_ZREAL_COLUMN` (domyślnie `ob_IloscZrealizowana`).
+
+     Gdy ta kolumna nie istnieje, `/api/health` zgłasza zdanie z jej nazwą,
+     a karta pokazuje ilość **zamówioną** zamiast pozostałej, opisując ją jako
+     oszacowanie. Nic się nie psuje, ale zamówienie odebrane w połowie wygląda
+     na nietknięte — dlatego warto sprawdzić nazwę i wpisać właściwą.
+
+     Termin realizacji (`MSSQL_ZD_TERMIN_COLUMN`) jest domyślnie pusty i karta
+     pisze wtedy „termin nieznany". Ustaw go tylko, jeśli firma faktycznie
+     wypełnia termin na zamówieniach.
+
 3. Wpisz wartości do `wertis.env` (§2a) — jeden plik dla API i workera.
    Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`
    przy starcie API, co `MSSQL_SYNC_MS` i przez `POST /api/admin/resync`.

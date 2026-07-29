@@ -21,6 +21,7 @@ export interface PendingLocChange {
 
 import type { MagazynStan } from "./services/magazyny.js";
 import type { WDostawie } from "./services/dostawy-towaru.js";
+import type { ZamowioneUDostawcy } from "./services/zamowienia-towaru.js";
 
 export interface ProductCard {
   id: number;
@@ -28,7 +29,6 @@ export interface ProductCard {
   name: string;
   ean: string;
   unit: string;
-  ordered: number;
   desc: string;
   /** Lokalizacje POTWIERDZONE — to, co naprawdę jest w Subiekcie. */
   locs: string[];
@@ -54,6 +54,14 @@ export interface ProductCard {
    * „leży w regale" od „stoi na palecie w przyjęciach".
    */
   wDostawie: WDostawie[];
+  /**
+   * Otwarte zamówienia u dostawcy. Puste = nic nie jest w drodze.
+   *
+   * Druga połowa pytania „nie ma tego na półce": `wDostawie` mówi „przyjechało,
+   * poszukaj w przyjęciach", to pole mówi „nie ma i trzeba poczekać". Zastąpiło
+   * pole `ordered`, które importer produkcyjny wypełniał zerem na sztywno.
+   */
+  zamowione: ZamowioneUDostawcy[];
   /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
   zamienniki: Zamienniki;
 }

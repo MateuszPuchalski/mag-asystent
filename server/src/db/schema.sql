@@ -124,6 +124,12 @@ CREATE TABLE IF NOT EXISTS sgt_towar (
   nazwa       TEXT NOT NULL,
   ean         TEXT,
   unit        TEXT NOT NULL DEFAULT 'szt.',
+  -- MARTWA od 0.7.0. „Zamówione" nie ma prostej kolumny w Subiekcie — pochodzi
+  -- z dokumentów ZD — więc importer produkcyjny wpisywał tu 0 na sztywno i kafel
+  -- „zam. u dostawcy" nie zapalił się ani razu na prawdziwych danych. Zastąpiona
+  -- przez sgt_zamowienie/sgt_zam_pozycja, które działają tak samo w demo i na
+  -- produkcji. Kolumna ZOSTAJE, bo DROP COLUMN w SQLite to przepisanie tabeli:
+  -- nikt jej już nie czyta ani nie zapisuje.
   ordered     REAL NOT NULL DEFAULT 0,
   opis        TEXT,
   lokalizacja TEXT NOT NULL DEFAULT ''          -- string rozdzielany spacją (wariant B, spec D1)
@@ -161,6 +167,32 @@ CREATE TABLE IF NOT EXISTS sgt_pozycja (
   ilosc  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_pozycja_dok ON sgt_pozycja(dok_id);
+
+-- ── Zamówienia do dostawcy (ZD) ────────────────────────────────────────────
+-- OSOBNE tabele, a nie kolejny typ w sgt_dokument, i to nie jest kwestia gustu:
+-- `listPutawayDocuments` filtruje dokumenty po SAMYM `mag_id`, bez warunku na
+-- typ. Zamówienie zapisane obok dostaw wskoczyłoby do zakładki rozkładania jako
+-- kontener do rozłożenia. Rozdział tabel czyni tę pomyłkę niemożliwą, zamiast
+-- pilnować jej warunkiem, który ktoś kiedyś rozluźni.
+CREATE TABLE IF NOT EXISTS sgt_zamowienie (
+  dok_id    INTEGER PRIMARY KEY,
+  nr_pelny  TEXT NOT NULL,
+  data_wyst TEXT NOT NULL,                        -- ISO date
+  termin    TEXT,                                 -- NULL gdy kolumna terminu nieskonfigurowana
+  dostawca  TEXT,
+  status    INTEGER NOT NULL DEFAULT 0            -- surowy dok_Status, do diagnostyki
+);
+
+CREATE TABLE IF NOT EXISTS sgt_zam_pozycja (
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  dok_id INTEGER NOT NULL REFERENCES sgt_zamowienie(dok_id),
+  tw_id  INTEGER NOT NULL,
+  ilosc  REAL NOT NULL,                           -- zamówiona
+  zreal  REAL NOT NULL DEFAULT 0                  -- zrealizowana; 0 gdy baza nie ma tej kolumny
+);
+-- Karta towaru odświeża się co 2 s z każdego otwartego ekranu, a pyta właśnie
+-- po towarze — bez tego indeksu każde odświeżenie skanuje wszystkie pozycje.
+CREATE INDEX IF NOT EXISTS ix_zam_poz_tw ON sgt_zam_pozycja(tw_id);
 
 -- licznik numeracji MM (dev — w prod nadaje Subiekt)
 CREATE TABLE IF NOT EXISTS counters (

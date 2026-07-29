@@ -12,7 +12,12 @@ import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
 import { authRoutes } from "./routes/auth.js";
 import { magazynRoutes } from "./routes/magazyny.js";
-import { brakDostepuDoMagazynow, importFromMssql, lastImport } from "./adapters/subiekt.mssql.js";
+import {
+  brakDostepuDoMagazynow,
+  brakKolumnyZrealizowano,
+  importFromMssql,
+  lastImport,
+} from "./adapters/subiekt.mssql.js";
 import { docFlagAvailable } from "./services/delivery-flag.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
@@ -44,7 +49,9 @@ export async function buildApp() {
      wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
   app.get("/api/health", async () => {
     const worker = stanWorkera();
-    const problemy = [worker.problem, brakDostepuDoMagazynow].filter((x): x is string => x !== null);
+    const problemy = [worker.problem, brakDostepuDoMagazynow, brakKolumnyZrealizowano].filter(
+      (x): x is string => x !== null
+    );
     return {
       ok: problemy.length === 0,
       /* Wersja serwera — kolektor pokazuje ją obok własnej na dole ekranu.

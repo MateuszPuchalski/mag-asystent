@@ -268,6 +268,15 @@ Parametry (env, dev):
   > nie odróżnia „leży w regale" od „stoi na palecie w przyjęciach" i pokazywał
   > 12 szt przy pustej półce. Pominięte pozycje i te ze zgłoszonym wyjątkiem
   > ZOSTAJĄ na liście — tak samo nie ma ich w regale.
+- **„Zamówione u dostawcy" — czego nie ma i kiedy przyjedzie.** Osobna sekcja
+  z numerem zamówienia ZD, ilością pozostałą do dostarczenia, terminem
+  i dostawcą. Zamówienie odebrane w całości znika z listy.
+
+  > **Dlaczego.** To druga połowa tego samego pytania. Sekcja wyżej mówi
+  > „przyjechało, poszukaj w przyjęciach", ta mówi „nie ma i trzeba poczekać".
+  > Stoi niżej i ma spokojne tło zamiast bursztynowego: bursztyn na tej karcie
+  > znaczy „zrób coś teraz", a zamówienie nie daje żadnej czynności. Kolejność
+  > idzie po terminie, nie po dacie wystawienia — pytanie brzmi „kiedy będzie".
 - **Zamienniki z opisu kartoteki.** Opisy od lat niosą symbole zamienników
   (`Zamiennik: 24-04003`, `Zamiennie: 101-024 // KAR00149`), tyle że jako prozę,
   której nie da się dotknąć. Serwer je wycina (`services/zamienniki.ts`), a to,
@@ -456,7 +465,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 90 testów jednostkowych; buduje się bez Android SDK
+                           + 92 testy jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

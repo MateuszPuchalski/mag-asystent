@@ -91,7 +91,6 @@ data class ProductCard(
     val name: String,
     val ean: String,
     val unit: String,
-    val ordered: Double = 0.0,
     val desc: String = "",
     /** Lokalizacje POTWIERDZONE — to, co naprawdę jest w Subiekcie. */
     val locs: List<String> = emptyList(),
@@ -117,6 +116,8 @@ data class ProductCard(
      * na palecie w przyjęciach". Liczy SERWER — kolektor tylko rysuje.
      */
     val wDostawie: List<WDostawie> = emptyList(),
+    /** Otwarte zamówienia u dostawcy — czego jeszcze nie ma i kiedy przyjedzie. */
+    val zamowione: List<ZamowioneUDostawcy> = emptyList(),
     /** Zamienniki wyczytane z opisu — regułę ma serwer, kolektor tylko rysuje. */
     val zamienniki: Zamienniki = Zamienniki(),
 )
@@ -135,6 +136,25 @@ data class WDostawie(
     val wBuforze: Boolean = false,
     /** `null` = dokumentu nikt nie otwierał; inaczej status linii rozkładania. */
     val status: String? = null,
+)
+
+/** Jedno otwarte zamówienie do dostawcy, na którym stoi ten towar. */
+@Serializable
+data class ZamowioneUDostawcy(
+    val dokId: Long = 0,
+    val nrPelny: String = "",
+    val dataWyst: String = "",
+    /** Termin realizacji; pusty, gdy baza go nie udostępnia. */
+    val termin: String? = null,
+    val dostawca: String = "",
+    /** Ile jeszcze nie przyjechało. Zawsze > 0. */
+    val ilosc: Double = 0.0,
+    /**
+     * Serwer nie umiał odjąć części już odebranej — ilość jest GÓRNYM
+     * oszacowaniem. Ekran musi to napisać, bo inaczej magazynier liczy na
+     * towar, którego nikt już nie wyśle.
+     */
+    val szacunek: Boolean = false,
 )
 
 /**

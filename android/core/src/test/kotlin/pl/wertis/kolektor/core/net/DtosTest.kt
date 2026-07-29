@@ -312,6 +312,38 @@ class DtosTest {
         assertNull(zWyszukiwarki.pendingHere)
     }
 
+    @Test fun `zamowienia u dostawcy na karcie towaru`() {
+        val p = WertisJson.decodeFromString<ProductCard>(
+            """{"id":7,"sym":"AB-1","name":"N","ean":"","unit":"szt","desc":"","locs":[],
+                "mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},"mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "zwroty":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "zamowione":[
+                  {"dokId":41,"nrPelny":"ZD 41/2026","dataWyst":"2026-07-01",
+                   "termin":"2026-08-05","dostawca":"HURT-AB","ilosc":15,"szacunek":false},
+                  {"dokId":42,"nrPelny":"ZD 42/2026","dataWyst":"2026-06-01",
+                   "termin":null,"dostawca":"","ilosc":4,"szacunek":true}]}"""
+        )
+        assertEquals(2, p.zamowione.size)
+        assertEquals(15.0, p.zamowione[0].ilosc, 0.0)
+        // termin bywa nieznany i MUSI przejść jako null — podstawienie daty
+        // wystawienia w to miejsce byłoby obietnicą, której nikt nie złożył
+        assertNull(p.zamowione[1].termin)
+        assertEquals(true, p.zamowione[1].szacunek)
+    }
+
+    @Test fun `stary serwer bez pola zamowione nie wywraca karty`() {
+        /* APK aktualizuje się przez MDM, serwer przez `git pull` — te dwa
+           zdarzenia nigdy nie są jednoczesne. Kolektor z nową kartą musi
+           przeżyć odpowiedź serwera sprzed 0.7.0, a `ordered` z takiej
+           odpowiedzi ma po cichu wypaść (pole już nie istnieje). */
+        val p = WertisJson.decodeFromString<ProductCard>(
+            """{"id":7,"sym":"AB-1","name":"N","ean":"","unit":"szt","ordered":12,"desc":"",
+                "locs":[],"mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},"mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "zwroty":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0}}"""
+        )
+        assertEquals(emptyList<ZamowioneUDostawcy>(), p.zamowione)
+    }
+
     @Test fun `raport kolizji EAN`() {
         val r = WertisJson.decodeFromString<EanConflictsResponse>(
             """{"conflicts":[{"ean":"5905947596430","hits":4,"autoResolved":3,

@@ -28,6 +28,71 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.7.0 — 29 lipca 2026
+
+Karta towaru mówi, czego nie ma na półce, bo jeszcze nie przyjechało od dostawcy.
+
+### Dodane
+
+- **Sekcja „ZAMÓWIONE U DOSTAWCY" na karcie towaru.** Numer zamówienia, ilość
+  pozostała do dostarczenia, termin i dostawca. Domyka pytanie otwarte przez
+  0.6.0: tamta zmiana odpowiadała „towar przyjechał, poszukaj w przyjęciach",
+  ta odpowiada „towaru nie ma i trzeba poczekać".
+
+  Sekcja stoi **pod** „W DOSTAWIE, NIEROZŁOŻONE" i ma spokojne tło zamiast
+  bursztynowego. Bursztyn na tej karcie znaczy „zrób coś teraz"; zamówienie nie
+  daje żadnej czynności. Ten sam kolor w obu miejscach kazałby magazynierowi
+  szukać towaru, którego w budynku nie ma.
+
+  Zamówienie zrealizowane w całości znika z listy — pytanie brzmi „czego
+  jeszcze nie ma", a nie „co zamówiono". Kolejność idzie po **terminie**, nie po
+  dacie wystawienia; zamówienia bez terminu lądują na końcu z dopiskiem „termin
+  nieznany", bo to uczciwsze niż podstawienie daty wystawienia w miejsce
+  obietnicy dostawy.
+
+### Poprawione
+
+- **Napis „zam. u dostawcy" na kaflu MGP nie zapalił się nigdy na produkcji.**
+  Karta brała go z pola `ordered`, a importer MSSQL wpisywał w nie **zero na
+  sztywno** — „zamówione" nie ma w Subiekcie prostej kolumny, pochodzi
+  z dokumentów ZD. Napis działał wyłącznie w trybie demo, gdzie seed czytał tę
+  liczbę z arkusza. Czyli funkcja istniała dokładnie tam, gdzie nikt jej nie
+  potrzebował.
+
+  Pole `ordered` zniknęło z serwera, DTO i kafla. Ta sama liczba z arkusza
+  zasila teraz syntetyczne zamówienia w seedzie, więc demo i produkcja chodzą
+  **tym samym torem** — czego wcześniej nie robiły.
+
+### Do sprawdzenia na własnej bazie
+
+- **[wymaga działania — opcjonalne]** Doszły dwa `[WERYFIKUJ]` (łącznie cztery,
+  `docs/subiekt-gt-struktura.md`). Bez nich karta działa, tylko mniej dokładnie:
+
+  - `DOK_STATUS_ZD_OTWARTE` — opis struktury InsERT mówi tylko „5..8 —
+    zamówienia (różne stany realizacji)" i nie rozpisuje ich. Domyślne bierze
+    wszystkie cztery i jest **założeniem, nie ustaleniem**.
+  - `MSSQL_ZD_ZREAL_COLUMN` — nazwy kolumny z ilością już odebraną nie ma
+    w naszym opisie struktury. Gdy nie istnieje, import **nie przerywa się**:
+    wpisuje zero, `/api/health` zgłasza zdanie z nazwą do poprawienia, a karta
+    opisuje ilość jako oszacowanie. Zamówienie odebrane w połowie wygląda wtedy
+    na nietknięte — dlatego to tryb awaryjny, nie docelowy.
+
+  Oba `SELECT`-y są w DEPLOY §6. **Nowych uprawnień SQL nie trzeba** — ZD leży
+  w tych samych tabelach co dostawy.
+
+### Uwagi
+
+- ZK (zamówienie **od klienta**, `dok_Typ = 16`) celowo poza zakresem. To ruch
+  w drugą stronę i pokrywa go rezerwacja na kaflu MAG; wciągnięcie go do sekcji
+  o nazwie „zamówione u dostawcy" pomyliłoby dwa przeciwne kierunki.
+- Kolumna `sgt_towar.ordered` **zostaje w bazie** jako martwa. `DROP COLUMN`
+  w SQLite to przepisanie tabeli, a kod jej już nie czyta ani nie zapisuje.
+- Testy: 244 serwera (doszło 9), 92 w `:core` (doszły 2). Reguły „zrealizowane
+  znika" i „kolejność po terminie" sprawdzone sabotażem — odwrócenie sortowania
+  zapala dwie asercje, usunięcie odejmowania cztery.
+
+---
+
 ## 0.6.1 — 29 lipca 2026
 
 Instalator pokazuje, która baza Subiekta jest produkcyjna, a która jest jej kopią.

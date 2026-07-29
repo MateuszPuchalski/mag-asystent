@@ -43,6 +43,7 @@ import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.WDostawie
+import pl.wertis.kolektor.core.net.ZamowioneUDostawcy
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
@@ -70,6 +71,7 @@ import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
+import pl.wertis.kolektor.ui.theme.Secondary
 import pl.wertis.kolektor.ui.theme.cardSurface
 
 /* ── Karta towaru — port web/src/screens/Product.tsx ────────────────────────
@@ -194,11 +196,12 @@ fun ProductScreen(graph: AppGraph) {
             StockCard(
                 label = "MGP · STREFA PRZYJĘĆ",
                 value = p.mgp.stan,
-                sub = when {
-                    p.mgp.stan > 0 -> "do zasilenia MAG"
-                    p.ordered > 0 -> "zam. u dostawcy: ${formatQty(p.ordered)}"
-                    else -> "strefa przyjęć pusta"
-                },
+                /* Był tu trzeci wariant „zam. u dostawcy: N" z pola `ordered`.
+                   Zniknął razem z tym polem: importer produkcyjny wpisywał w nie
+                   zero na sztywno, więc napis nie zapalił się nigdy poza demem.
+                   Zamówienia mają teraz własną sekcję niżej — z dostawcą
+                   i terminem, czyli tym, o co magazynier faktycznie pyta. */
+                sub = if (p.mgp.stan > 0) "do zasilenia MAG" else "strefa przyjęć pusta",
                 highlight = p.mgp.stan > 0,
                 unit = p.unit,
                 modifier = Modifier.weight(1f),
@@ -222,6 +225,14 @@ fun ProductScreen(graph: AppGraph) {
            od „stoi na palecie w przyjęciach". */
         if (p.wDostawie.isNotEmpty()) {
             WDostawieSekcja(p.wDostawie, p.unit)
+        }
+
+        /* Druga połowa tego samego pytania. Sekcja wyżej mówi „jest u nas,
+           poszukaj w przyjęciach"; ta mówi „nie ma i trzeba poczekać". Stoi
+           NIŻEJ, bo kolejność jest tu treścią: najpierw to, co magazynier może
+           znaleźć dzisiaj, potem to, na co nie ma wpływu. */
+        if (p.zamowione.isNotEmpty()) {
+            ZamowioneSekcja(p.zamowione, p.unit)
         }
 
         /* Pozostałe magazyny firmy. Trzy kafle wyżej mają własną semantykę
@@ -571,6 +582,70 @@ private fun WDostawieSekcja(pozycje: List<WDostawie>, unit: String) {
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AmberInk,
+            )
+        }
+    }
+}
+
+/**
+ * Otwarte zamówienia u dostawcy.
+ *
+ * NIEKLIKALNA, tak samo jak sekcja dostaw i z tego samego powodu: nie ma trasy
+ * „otwórz zamówienie", a udawane wejście prowadziłoby donikąd.
+ *
+ * Powierzchnia jest SPOKOJNA, nie bursztynowa, i to jest decyzja. Bursztyn na
+ * tym ekranie znaczy „zrób coś teraz" — towar leży w przyjęciach, idź po niego.
+ * Zamówienie nie daje żadnej czynności: pozostaje czekać. Ten sam kolor
+ * w obu miejscach kazałby magazynierowi szukać towaru, którego w budynku nie ma.
+ */
+@Composable
+private fun ZamowioneSekcja(pozycje: List<ZamowioneUDostawcy>, unit: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(background = Secondary, borderColor = BorderCol)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Icon(WIcons.Box, null, tint = InkSoft, modifier = Modifier.size(16.dp))
+            Text(
+                "ZAMÓWIONE U DOSTAWCY — ${formatQty(pozycje.sumOf { it.ilosc })}" +
+                    if (unit.isNotEmpty()) " $unit" else "",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = InkSoft,
+            )
+        }
+        pozycje.forEach { z ->
+            Text(
+                buildString {
+                    append(z.nrPelny)
+                    append(" · ").append(formatQty(z.ilosc))
+                    if (unit.isNotEmpty()) append(" ").append(unit)
+                    // Termin przed dostawcą: „kiedy" jest pytaniem, „od kogo"
+                    // dopowiedzeniem. Bez terminu mówimy to wprost, zamiast
+                    // podstawiać datę wystawienia w miejsce obietnicy dostawy.
+                    append(" · ").append(z.termin ?: "termin nieznany")
+                    if (z.dostawca.isNotEmpty()) append(" · ").append(z.dostawca)
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = InkSoft,
+            )
+        }
+        /* Jedno zdanie na całą sekcję, nie dopisek przy każdej linii: powód jest
+           wspólny (serwer nie umiał odjąć odebranej części), a powtórzony przy
+           każdym wierszu zamieniłby się w szum, który przestaje się czytać. */
+        if (pozycje.any { it.szacunek }) {
+            Text(
+                "Ilości są górnym oszacowaniem — serwer nie odjął tego, co już przyjechało.",
+                fontSize = 11.sp,
+                color = InkMute,
             )
         }
     }
