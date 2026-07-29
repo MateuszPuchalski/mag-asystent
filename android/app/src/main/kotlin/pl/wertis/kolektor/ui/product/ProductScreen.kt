@@ -42,6 +42,7 @@ import pl.wertis.kolektor.core.net.MagazynStan
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.SetLocationBody
+import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
@@ -212,6 +213,15 @@ fun ProductScreen(graph: AppGraph) {
                 unit = p.unit,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        /* „Stan mówi 12, a półka pusta" — sekcja stoi TUTAJ, bo odpowiada na
+           pytanie postawione przez kafel wyżej, a nie jest osobnym krokiem
+           pracy. Przy dostawie krajowej towar figuruje na MAG od chwili
+           zaksięgowania dokumentu, więc kafel nie odróżnia „leży w regale"
+           od „stoi na palecie w przyjęciach". */
+        if (p.wDostawie.isNotEmpty()) {
+            WDostawieSekcja(p.wDostawie, p.unit)
         }
 
         /* Pozostałe magazyny firmy. Trzy kafle wyżej mają własną semantykę
@@ -513,6 +523,67 @@ private fun MagazynRow(m: MagazynStan, unit: String) {
             )
         }
     }
+}
+
+/**
+ * „W dostawie, nierozłożone" — czemu stanu nie widać na półce.
+ *
+ * Sekcja jest NIEKLIKALNA i to jest decyzja, nie niedoróbka. Wejście w dokument
+ * z karty towaru musiałoby wołać `openDelivery`, a ta trasa zakłada rozkładanie
+ * i przestawia flagę faktury w Subiekcie na „W trakcie sprawdzania". Biuro
+ * zobaczyłoby, że ktoś sprawdza fakturę, bo magazynier zajrzał na kartę towaru.
+ * Numer dokumentu w zupełności wystarcza, żeby znaleźć paletę.
+ */
+@Composable
+private fun WDostawieSekcja(pozycje: List<WDostawie>, unit: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(background = AmberBgSoft, borderColor = AmberLine)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Icon(WIcons.Clock, null, tint = AmberInk, modifier = Modifier.size(16.dp))
+            Text(
+                "W DOSTAWIE, NIEROZŁOŻONE — ${formatQty(pozycje.sumOf { it.ilosc })}" +
+                    if (unit.isNotEmpty()) " $unit" else "",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = AmberInk,
+            )
+        }
+        pozycje.forEach { d ->
+            Text(
+                buildString {
+                    append(d.nrPelny)
+                    append(" · ").append(d.dataWyst)
+                    append(" · ").append(formatQty(d.ilosc))
+                    if (unit.isNotEmpty()) append(" ").append(unit)
+                    // Status mówi, czy ktoś już się o tę pozycję potknął —
+                    // milczenie kazałoby szukać towaru, którego nie ma.
+                    opisStatusu(d)?.let { append(" · ").append(it) }
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AmberInk,
+            )
+        }
+    }
+}
+
+/** Dopisek za ilością; `null` gdy nie ma nic do dodania ponad sam fakt dostawy. */
+private fun opisStatusu(d: WDostawie): String? = when {
+    d.status == "problem" -> "zgłoszony problem"
+    d.status == "skipped" -> "pominięte przy rozkładaniu"
+    d.status != null -> "rozkładanie w toku"
+    d.zwrot -> "zwrot, czeka na rozłożenie"
+    d.wBuforze -> "dokument w buforze"
+    else -> null
 }
 
 @Composable

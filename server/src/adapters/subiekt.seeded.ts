@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import type { ProductRow } from "../types.js";
 import { parseLocs } from "../locs.js";
 import type {
+  RawDocPosition,
   RawDocument,
   RawMagazyn,
   RawPosition,
@@ -165,6 +166,28 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare("SELECT * FROM sgt_dokument WHERE dok_id = ?")
       .get(docId) as RawDocument | undefined;
+  }
+
+  getDeliveryPositionsForProduct(twId: number, days: number): RawDocPosition[] {
+    const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+    // Warunek na dokumenty jest DOKŁADNIE ten sam co w `listDeliveryDocuments`
+    // wyżej — i musi taki pozostać. To dwie strony jednego pytania: tamta metoda
+    // pyta „które dostawy są do rozłożenia", ta „na których z nich stoi ten
+    // towar". Rozjazd kryteriów pokazałby na karcie dokument, którego nie da się
+    // otworzyć z zakładki rozkładania.
+    return db()
+      .prepare(
+        `SELECT d.dok_id, d.typ, d.nr_pelny, d.data_wyst, d.mag_id, d.dostawca,
+                d.w_buforze, SUM(p.ilosc) AS ilosc
+         FROM sgt_pozycja p
+         JOIN sgt_dokument d ON d.dok_id = p.dok_id
+         WHERE p.tw_id = ?
+           AND ((d.typ IN ('FZ','PZ') AND d.mag_id = ?) OR d.mag_id = ?)
+           AND d.data_wyst >= ?
+         GROUP BY d.dok_id
+         ORDER BY d.data_wyst DESC, d.dok_id DESC`
+      )
+      .all(twId, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocPosition[];
   }
 
   getDocumentPositions(docId: number): RawPosition[] {

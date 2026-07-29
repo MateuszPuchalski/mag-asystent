@@ -28,6 +28,56 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.6.0 — 29 lipca 2026
+
+Karta towaru mówi, czy towar przyszedł, ale nie leży jeszcze w regale.
+
+### Nowe
+
+- **„W dostawie, nierozłożone" na karcie towaru.** Pod kaflami stanów doszła
+  sekcja z numerem dokumentu, datą i ilością, której jeszcze nie odłożono.
+  Liczy się z dwóch źródeł: co przyszło (`sgt_pozycja`) minus co trafiło
+  w regał (`delivery_line.ilosc_odlozona`). Okno to 14 dni, jak lista
+  w zakładce rozkładania.
+
+  > **Dlaczego.** Przy dostawie krajowej skutek magazynowy niesie sam dokument
+  > w Subiekcie, więc towar figuruje na MAG od zaksięgowania. Kafel „MAG ·
+  > DOSTĘPNE" pokazywał 12 szt przy pustej półce i nie mówił, że sześć z nich
+  > stoi na palecie w przyjęciach. Odpowiadał na pytanie POZORNIE, a to gorsze
+  > od milczenia.
+
+- **Pominięte pozycje i te ze zgłoszonym wyjątkiem ZOSTAJĄ na liście.** Tak samo
+  nie ma ich w regale, a magazynier, który właśnie ich szuka, ma prawo wiedzieć,
+  że ktoś się już o nie potknął.
+
+**Sekcja jest nieklikalna i to jest decyzja.** Wejście w dokument z karty
+towaru wołałoby `openDelivery`, a ta trasa przestawia flagę faktury w Subiekcie
+na „W trakcie sprawdzania". Biuro widziałoby, że ktoś sprawdza fakturę, bo
+magazynier zajrzał na kartę towaru.
+
+### Poza zakresem, świadomie
+
+Kontener na MGP — idzie osobnym torem (`putaway_*`) i widać go na własnym kaflu
+strefy przyjęć. Dokładanie go tutaj dublowałoby tę samą liczbę na jednym ekranie.
+
+**Zamówienia u dostawcy (ZK/ZD) to osobna zmiana.** Karta odpowiada dziś na
+„przyjechało, ale nie na półce", a nie na „nie ma w firmie, ale jedzie". Przy
+okazji wyszło, że importer wpisuje `ordered: 0` na sztywno
+(`subiekt.mssql.ts:246`), więc podpis „zam. u dostawcy" na kaflu MGP na
+prawdziwych danych **nigdy się nie pokazuje**.
+
+### Pod spodem
+
+- Testy serwera 220 → 235: `services/dostawy-towaru.test.ts` (12 przypadków)
+  i `routes/karta-towaru.test.ts` (przejście pola przez trasę).
+- Adapter dostał `getDeliveryPositionsForProduct` — odwrotność
+  `listDeliveryDocuments`, w tym samym pliku i z tym samym warunkiem `WHERE`.
+
+**Nowy APK jest potrzebny**, inaczej kolektor nie narysuje sekcji. Serwer
+wysyła pole niezależnie od wersji aplikacji.
+
+---
+
 ## 0.5.0 — 27 lipca 2026
 
 Ekran blokady po bezczynności zniknął. Sesja urządzenia nie wygasa sama.

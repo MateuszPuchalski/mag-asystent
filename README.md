@@ -259,6 +259,15 @@ Parametry (env, dev):
   i telemetria `pin_expired`.
 - Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
   (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
+- **„W dostawie, nierozłożone" — czemu stanu nie widać na półce.** Karta podaje,
+  ile sztuk przyszło na dokumencie z ostatnich 14 dni i nie trafiło jeszcze
+  w regał, z numerem dokumentu i datą.
+
+  > **Dlaczego.** Przy dostawie krajowej skutek magazynowy niesie sam dokument
+  > w Subiekcie, więc towar figuruje na MAG od chwili zaksięgowania. Kafel stanu
+  > nie odróżnia „leży w regale" od „stoi na palecie w przyjęciach" i pokazywał
+  > 12 szt przy pustej półce. Pominięte pozycje i te ze zgłoszonym wyjątkiem
+  > ZOSTAJĄ na liście — tak samo nie ma ich w regale.
 - **Zamienniki z opisu kartoteki.** Opisy od lat niosą symbole zamienników
   (`Zamiennik: 24-04003`, `Zamiennie: 101-024 // KAR00149`), tyle że jako prozę,
   której nie da się dotknąć. Serwer je wycina (`services/zamienniki.ts`), a to,
@@ -457,7 +466,8 @@ server/                    backend (Fastify + SQLite + worker)
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+sql (prod)
   src/services/            delivery + delivery-flag (tryb A: dostawy, zwroty, koszyki),
                            problems + ean (wyjątki), putaway (tryb B — kontener),
-                           stock (korekta o kolejkę), queue, locks, locations, events
+                           stock (korekta o kolejkę), dostawy-towaru (co przyszło,
+                           a nie leży w regale), queue, locks, locations, events
   src/routes/              products, delivery, problems, putaway, queue,
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)

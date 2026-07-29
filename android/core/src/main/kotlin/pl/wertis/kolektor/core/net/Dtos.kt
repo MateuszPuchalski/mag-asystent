@@ -107,8 +107,34 @@ data class ProductCard(
      * nie wysyła (tak samo jak przy `zwroty` i `zamienniki`).
      */
     val magazyny: List<MagazynStan> = emptyList(),
+    /**
+     * Przyjechało na dokumencie, jeszcze nie odłożone. Puste = wszystko, co
+     * przyszło, leży już w regale.
+     *
+     * Odpowiada na pytanie, którego kafle stanów nie zamykają: „MAG pokazuje
+     * 12 szt, a półka pusta". Przy dostawie krajowej towar figuruje na MAG od
+     * zaksięgowania dokumentu, więc stan nie odróżnia „leży w regale" od „stoi
+     * na palecie w przyjęciach". Liczy SERWER — kolektor tylko rysuje.
+     */
+    val wDostawie: List<WDostawie> = emptyList(),
     /** Zamienniki wyczytane z opisu — regułę ma serwer, kolektor tylko rysuje. */
     val zamienniki: Zamienniki = Zamienniki(),
+)
+
+/** Jedna dostawa, na której ten towar przyjechał i nie został odłożony. */
+@Serializable
+data class WDostawie(
+    val dokId: Long = 0,
+    val typ: String = "",
+    val nrPelny: String = "",
+    val dataWyst: String = "",
+    /** Ile z tego dokumentu jeszcze nie trafiło w regał. Zawsze > 0. */
+    val ilosc: Double = 0.0,
+    /** Zbiorczy dokument zwrotów — towar leży na magazynie Zwroty. */
+    val zwrot: Boolean = false,
+    val wBuforze: Boolean = false,
+    /** `null` = dokumentu nikt nie otwierał; inaczej status linii rozkładania. */
+    val status: String? = null,
 )
 
 /**
