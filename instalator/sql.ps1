@@ -199,9 +199,10 @@ function Enable-WertisWymogiSql {
 function Get-WertisBazy {
     param([Parameter(Mandatory)]$Polaczenie)
     # database_id > 4 pomija master/tempdb/model/msdb; podmiot Subiekta jest
-    # zwykłą bazą użytkownika.
+    # zwykłą bazą użytkownika. `create_date` dochodzi tym samym zapytaniem, bo
+    # kopia jest z definicji młodsza od podmiotu, którego jest kopią.
     return Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
-SELECT name FROM sys.databases WHERE database_id > 4 AND state = 0 ORDER BY name;
+SELECT name, create_date FROM sys.databases WHERE database_id > 4 AND state = 0 ORDER BY name;
 "@
 }
 
@@ -217,6 +218,166 @@ SELECT COUNT(*) AS ile FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_NAME IN ('tw__Towar','dok__Dokument','sl_Magazyn','tw_Stan');
 "@
     return ($r.Count -gt 0 -and [int]$r[0].ile -eq 4)
+}
+
+# ── Która z tych baz to podmiot, a która jego kopia ─────────────────────────
+# Firma trzyma obok podmiotu jego kopie — do testów, do sprawdzenia czegoś,
+# po awarii. Kopia ma DOKŁADNIE te same tabele co produkcja, więc
+# `Test-WertisBazaSubiekta` jej nie odsieje: ono odpowiada na pytanie „czy to
+# jest baza Subiekta", a nie „czy to jest TA baza".
+#
+# Pomyłka jest cicha i dlatego kosztowna. Instalator założyłby konto na kopii,
+# aplikacja czytałaby nieaktualne stany i zapisywała lokalizacje w martwą bazę,
+# a wszystko wyglądałoby poprawnie — objawem byłby dopiero magazynier, któremu
+# stany nie zgadzają się z półką.
+#
+# Rozstrzyga DATA OSTATNIEGO DOKUMENTU: żywa baza ma dzisiejszą, kopia stoi na
+# dniu zrzutu. To heurystyka, nie dowód — firma z przerwą w wystawianiu
+# dokumentów wygląda tak samo — więc instalator nigdy nie odrzuca bazy sam.
+# Pokazuje różnicę i pyta.
+
+# Powyżej tylu baz pomijamy sondowanie — kreator ma nie wisieć minuty.
+$script:WertisMaksBadanychBaz = 25
+
+function Get-WertisStatystykiBazy {
+    <#
+        .SYNOPSIS
+        Dla każdej bazy z listy: czy to Subiekt, kiedy ostatni dokument, ile ich.
+        .DESCRIPTION
+        Obie liczby są tanie CELOWO. `TOP 1 ... ORDER BY dok_Id DESC` idzie po
+        kluczu głównym; `ORDER BY dok_DataWyst` wymagałoby indeksu, którego nie
+        ma gwarancji. Licznik bierzemy z metadanych (`sys.partitions`), bo
+        `COUNT(*)` na produkcyjnym serwerze, z którego biuro właśnie korzysta,
+        to nie jest cena, którą kreator ma prawo zapłacić za podpowiedź.
+    #>
+    param(
+        [Parameter(Mandatory)]$Polaczenie,
+        [Parameter(Mandatory)][object[]]$Bazy,
+        [int]$Maks = $script:WertisMaksBadanychBaz
+    )
+    $wynik = @()
+    for ($i = 0; $i -lt $Bazy.Count; $i++) {
+        $w = [pscustomobject]@{
+            Nazwa           = "$($Bazy[$i].name)"
+            Utworzona       = $(if ($Bazy[$i].create_date -is [datetime]) { $Bazy[$i].create_date } else { $null })
+            Subiekt         = $false
+            OstatniDokument = $null
+            Dokumentow      = $null
+            Uwaga           = $null
+        }
+        if ($i -ge $Maks) {
+            # Milcząco obcięta lista wyglądałaby jak pełna — stąd adnotacja
+            # przy KAŻDEJ pominiętej pozycji, a nie jedno zdanie na górze.
+            $w.Uwaga = "nie sprawdzano (ponad $Maks baz)"
+            $wynik += $w
+            continue
+        }
+        try {
+            $Polaczenie.ChangeDatabase($w.Nazwa)
+            if (Test-WertisBazaSubiekta -Polaczenie $Polaczenie) {
+                $w.Subiekt = $true
+                $ost = Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
+SELECT TOP 1 dok_DataWyst FROM dok__Dokument ORDER BY dok_Id DESC;
+"@
+                if ($ost.Count -gt 0 -and $ost[0].dok_DataWyst -is [datetime]) {
+                    $w.OstatniDokument = $ost[0].dok_DataWyst
+                }
+                $ile = Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
+SELECT ISNULL(SUM(p.rows), 0) AS ile
+FROM sys.partitions p
+JOIN sys.objects o ON o.object_id = p.object_id
+WHERE o.name = 'dok__Dokument' AND o.schema_id = SCHEMA_ID('dbo') AND p.index_id IN (0, 1);
+"@
+                if ($ile.Count -gt 0) { $w.Dokumentow = [int64]$ile[0].ile }
+            } else {
+                $w.Uwaga = "nie jest bazą Subiekta"
+            }
+        } catch {
+            # baza offline, w trakcie odtwarzania albo bez dostępu dla tego konta
+            $w.Uwaga = "brak dostępu"
+        }
+        $wynik += $w
+    }
+    try { $Polaczenie.ChangeDatabase("master") } catch { }
+    return $wynik
+}
+
+function Sort-WertisBazy {
+    <#
+        .SYNOPSIS
+        Najświeższy podmiot na górze, bazy spoza Subiekta na dole.
+        .DESCRIPTION
+        Alfabet nie niesie tu żadnej informacji, a przy sortowaniu po nazwie
+        kopia potrafi stanąć NAD produkcyjną. Świeżość jest całą treścią pytania,
+        więc to ona porządkuje listę.
+    #>
+    param([Parameter(Mandatory)][object[]]$Bazy)
+    return @($Bazy | Sort-Object `
+        @{ Expression = { if ($_.Subiekt) { 0 } else { 1 } } },
+        @{ Expression = { if ($_.OstatniDokument) { $_.OstatniDokument } else { [datetime]::MinValue } }; Descending = $true },
+        @{ Expression = { $_.Nazwa } })
+}
+
+function Get-WertisSugerowanaBaza {
+    <#
+        .SYNOPSIS
+        Indeks bazy do podpowiedzi Enterem; -1 gdy podpowiedź byłaby zgadywaniem.
+        .DESCRIPTION
+        Podpowiadamy WYŁĄCZNIE bazę o ściśle najświeższym dokumencie. Przy
+        remisie — dwie kopie zrobione tego samego dnia — podpowiedź byłaby rzutem
+        monetą udającym radę, więc wybór wraca do człowieka.
+    #>
+    param([Parameter(Mandatory)][object[]]$Bazy)
+    $zDokumentem = @($Bazy | Where-Object { $_.Subiekt -and $_.OstatniDokument })
+    if ($zDokumentem.Count -eq 0) { return -1 }
+
+    $naj = @($zDokumentem | Sort-Object OstatniDokument -Descending)[0]
+    $data = ([datetime]$naj.OstatniDokument).Date
+    $remis = @($zDokumentem | Where-Object { ([datetime]$_.OstatniDokument).Date -eq $data })
+    if ($remis.Count -gt 1) { return -1 }
+
+    for ($i = 0; $i -lt $Bazy.Count; $i++) {
+        if ($Bazy[$i].Nazwa -eq $naj.Nazwa) { return $i }
+    }
+    return -1
+}
+
+# Po tylu dniach bez dokumentu baza wygląda na kopię.
+$script:WertisDniPodejrzanejKopii = 7
+
+function Test-WertisBazaPodejrzana {
+    <#
+        .SYNOPSIS
+        Czy wybrana baza wygląda na kopię, a nie na podmiot produkcyjny.
+        .PARAMETER Teraz
+        Wstrzykiwany czas — inaczej tej reguły nie dałoby się sprawdzić asercją.
+    #>
+    param(
+        [Parameter(Mandatory)]$Baza,
+        [int]$Dni = $script:WertisDniPodejrzanejKopii,
+        [datetime]$Teraz = (Get-Date)
+    )
+    if (-not $Baza.Subiekt) { return $false }
+    # Świeży podmiot nie ma jeszcze ani jednego dokumentu. To pustka, nie kopia —
+    # i ma własny komunikat, żeby nie straszyć przy pierwszym wdrożeniu.
+    if (-not $Baza.OstatniDokument) { return $false }
+    return ((($Teraz).Date - ([datetime]$Baza.OstatniDokument).Date).TotalDays -gt $Dni)
+}
+
+function Format-WertisEtykietaBazy {
+    <#
+        .SYNOPSIS
+        Jedna linia listy wyboru — tak, żeby pomyłka rzucała się w oczy.
+    #>
+    param([Parameter(Mandatory)]$Baza)
+    $nazwa = "{0,-20}" -f $Baza.Nazwa
+    if ($Baza.Uwaga) { return "$nazwa ($($Baza.Uwaga))" }
+
+    $ost = if ($Baza.OstatniDokument) { ([datetime]$Baza.OstatniDokument).ToString("yyyy-MM-dd") }
+           else { "brak dokumentów" }
+    $ile = if ($null -ne $Baza.Dokumentow) { "{0,9:N0}" -f $Baza.Dokumentow } else { "        ?" }
+    $utw = if ($Baza.Utworzona) { ([datetime]$Baza.Utworzona).ToString("yyyy-MM-dd") } else { "?" }
+    return ("{0} ost. dokument: {1,-16} dok: {2}   utw.: {3}" -f $nazwa, $ost, $ile, $utw)
 }
 
 function Get-WertisMagazyny {

@@ -28,6 +28,49 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.6.1 — 29 lipca 2026
+
+Instalator pokazuje, która baza Subiekta jest produkcyjna, a która jest jej kopią.
+
+### Poprawione
+
+- **Kreator nie odróżniał podmiotu od kopii.** Listował bazy alfabetycznie,
+  a po wyborze sprawdzał obecność czterech tabel Subiekta. Kopia ma dokładnie
+  te same tabele, więc przechodziła bez słowa — a sortowanie po nazwie potrafiło
+  postawić ją **nad** produkcyjną.
+
+  > **Dlaczego to bolało.** Pomyłka nie dawała objawu: konto SQL powstawało na
+  > kopii, aplikacja czytała nieaktualne stany i zapisywała lokalizacje
+  > w martwą bazę, a wszystko wyglądało poprawnie. Dowiedziałby się o tym
+  > dopiero magazynier, któremu stany nie zgadzają się z półką.
+
+- **Lista niesie teraz datę ostatniego dokumentu, liczbę dokumentów i datę
+  utworzenia bazy**, posortowana od najświeższej. Żywa baza ma dzisiejszy
+  dokument, kopia stoi na dniu zrzutu.
+- **Podpowiedź Enterem tylko przy ściśle najświeższej bazie.** Dwie kopie z tego
+  samego dnia podpowiedzi nie dostają — byłaby rzutem monetą udającym radę.
+- **Ostrzeżenie po wyborze bazy z dokumentem starszym niż tydzień**, z potwierdzeniem
+  domyślnie na „nie". Baza bez ani jednego dokumentu ma osobny komunikat: świeży
+  podmiot jest pusty, a nie podejrzany.
+
+Obie liczby są tanie celowo: `TOP 1 ... ORDER BY dok_Id DESC` idzie po kluczu
+głównym, a licznik dokumentów bierze się z `sys.partitions`. `COUNT(*)` na
+serwerze, z którego biuro właśnie korzysta, to nie jest cena za podpowiedź.
+
+### Pod spodem
+
+- `instalator/testy.ps1` — 14 nowych asercji na funkcjach czystych (21 → 31)
+  (`Format-WertisEtykietaBazy`, `Sort-WertisBazy`, `Get-WertisSugerowanaBaza`,
+  `Test-WertisBazaPodejrzana`). Decyzja i formatowanie są osobno od SQL-a
+  właśnie po to, żeby reguła „przy remisie nie podpowiadaj" miała asercję,
+  a nie komentarz.
+
+**Wdrożenie: nic.** Zmiana dotyczy wyłącznie `instalator/**` i dokumentacji.
+Działający system, konfiguracja i APK zostają bez zmian — dlatego PATCH,
+mimo że osoba uruchamiająca instalator zobaczy inny ekran.
+
+---
+
 ## 0.6.0 — 29 lipca 2026
 
 Karta towaru mówi, czy towar przyszedł, ale nie leży jeszcze w regale.
