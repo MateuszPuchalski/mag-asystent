@@ -26,6 +26,8 @@ import pl.wertis.kolektor.core.net.LoginResponse
 import pl.wertis.kolektor.core.net.MeResponse
 import pl.wertis.kolektor.core.net.LocationProductsResponse
 import pl.wertis.kolektor.core.net.LocationsInfo
+import pl.wertis.kolektor.core.net.MeldunekOdrzuconych
+import pl.wertis.kolektor.core.net.MeldunekPrzyjety
 import pl.wertis.kolektor.core.net.OkResponse
 import pl.wertis.kolektor.core.net.ProblemTypesResponse
 import pl.wertis.kolektor.core.net.ProblemsResponse
@@ -95,6 +97,17 @@ interface ApiService {
         /** Konto autora dla operacji z bufora — patrz `ApiOpSender`. */
         @Header("x-buffered-user") bufferedUser: String? = null,
     ): QueueIdResponse
+
+    /**
+     * Meldunek o operacjach, których kolektor NIE ZDOŁAŁ wykonać.
+     *
+     * Bufor offline żyje w pliku na urządzeniu — a urządzenie zginie albo
+     * zostanie zresetowane. Bez tego wywołania operacja odrzucona przez serwer
+     * znikała razem z plikiem i nikt nie umiał powiedzieć magazynierowi, co się
+     * stało z jego skanem.
+     */
+    @POST("api/events/kolektor")
+    suspend fun meldujOdrzucone(@Body body: MeldunekOdrzuconych): MeldunekPrzyjety
 
     @GET("api/locations")
     suspend fun locations(): LocationsInfo

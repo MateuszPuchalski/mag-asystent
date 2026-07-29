@@ -28,6 +28,91 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.8.0 — 29 lipca 2026
+
+Ślad audytowy odpowiada na reklamację faktem, a nie hipotezą.
+
+Wymaganie brzmiało: *„za miesiąc ktoś powie «aplikacja mi zjadła 30 sztuk» —
+chcesz mieć odpowiedź"*. Okazało się, że dane w większości **już były**: `events`
+zbierał 28 typów zdarzeń od pierwszego dnia instalacji, z osobą, kontem,
+urządzeniem i czasem, i nic ich nie kasuje. Brakowało czterech rzeczy — i to one
+były robotą, nie „logowanie".
+
+### Dodane
+
+- **Trasa audytu `GET /api/events` i eksport CSV.** Filtr po osobie, towarze,
+  urządzeniu, typie zdarzenia i zakresie dat. To był największy brak: odpowiedź
+  na reklamację wymagała dotąd `sqlite3` na serwerze, czyli praktycznie nie
+  istniała.
+
+  Bramka na rolę **brygadzisty albo biura**, bez PIN-u — wzorem `GET
+  /api/users`, gdzie PIN chroni zmiany, a nie odczyt. Log mówi, kto ile
+  zeskanował, więc jest narzędziem nadzoru i hala go nie ogląda. **Kto wyniesie
+  CSV, sam trafia do śladu** (`audyt_eksport`).
+
+- **Wynik zapisu do Subiekta.** Worker zapisuje `queue_applied` (weszło i o
+  której), `queue_retry` (nie weszło, wróci) i `queue_failed` (nie weszło
+  i już nie wejdzie). `sfera_queue` dostała kolumnę `created_by_ref`, bo worker
+  działa poza żądaniem i bez niej umiałby podać tylko nazwę, a nie konto.
+
+- **`GET /api/health` mierzy wzrost historii** — liczba zdarzeń, data
+  najstarszego i rozmiar bazy. Nie czyścimy `events` i to jest decyzja, ale
+  „rośnie w nieskończoność" bez licznika kończy się pełnym dyskiem.
+
+- **Indeks `ix_events_tw_time`.** „Co się działo z tym towarem" to najczęstsze
+  pytanie przy reklamacji, a `tw_id` nie miało **żadnego** indeksu — nawet
+  historia na karcie towaru skanowała całą tabelę.
+
+### Poprawione
+
+- **Bufor offline kasował operacje przy przejściowym błędzie serwera.**
+  `OfflineQueue` klasyfikował `isNetworkError(e) = e !is ApiError`, więc
+  **`ApiError(500)` nie był błędem sieci** — `flush()` wyrzucał operację
+  z bufora i wołał lokalny toast. Restart serwera albo 503 spod reverse proxy
+  zjadał zeskanowaną pracę magazyniera: bez śladu, bez ostrzeżenia, bez szansy
+  na powtórkę.
+
+  Teraz 5xx, 408 i 429 znaczą „serwer choruje, operacja jest zdrowa" —
+  **zostaje w buforze** i wraca przy następnym flushu. Dopiero 4xx (żądanie
+  wadliwe, ponowienie nic nie da) ją usuwa, i **melduje na serwer**
+  (`klient_odrzucona`) z czasem wykonania na kolektorze, nie dosłania. Licznik
+  `proby` pilnuje, żeby jedna chora operacja nie zamroziła kolejki na zawsze.
+
+- **Odrzucone żądania nie zostawiały śladu.** 400 za przekroczony limit pola,
+  zły kod półki czy nieznany towar wracały do kolektora i znikały — „skanowałem
+  i się nie zapisało" nie miało po stronie serwera żadnego potwierdzenia. Hook
+  `onSend` zapisuje je jako `http_rejected` z metodą, ścieżką, statusem
+  i powodem.
+
+  **Ciała żądania NIE zapisujemy i to jest zasada, nie przeoczenie** — przez
+  `POST /api/users` przechodzi PIN. Pilnuje tego osobna asercja: log
+  audytowy z PIN-ami w środku jest gorszy niż brak logu. `401` na `GET` jest
+  pomijane, bo karta odpytuje serwer co 2 s i wygasła sesja utopiłaby resztę
+  audytu w szumie; `401` na zapisie **jest** logowane.
+
+- **Zdarzenia ilościowe niosą wartość sprzed zmiany** (`qtyPrzed`). Dotąd był
+  sam stan po, więc „było 30, jest 0" trzeba było odtwarzać z całej sekwencji
+  i ufać, że żadne zdarzenie nie zginęło.
+
+### Czego to NIE naprawia
+
+Operacja wykonana **bez Wi-Fi** żyje w pliku na kolektorze aż do połączenia.
+Zginie urządzenie przed odzyskaniem sieci — śladu nie ma i **żadna zmiana po
+stronie serwera tego nie zmieni**. Lukę zawęża to, że buforowana jest wyłącznie
+zmiana lokalizacji; skany i rozkładanie offline po prostu nie działają.
+
+### Uwagi
+
+- Log audytowy jest narzędziem nadzoru. Warto powiedzieć zespołowi, że istnieje
+  — cichy nadzór jest gorszy od jawnego.
+- `klient_odrzucona` to **relacja urządzenia**, nie fakt zaobserwowany przez
+  serwer. Prefiks `klient_` trzyma tę różnicę na wierzchu.
+- Testy: 244 → **260** serwera, 92 → **96** w `:core`. Sabotażem sprawdzone:
+  zdjęcie warunku metody przy `401` zapala 2 asercje, dopisanie ciała żądania
+  do logu — asercję o PIN-ie, powrót starej klasyfikacji błędów — asercję 5xx.
+
+---
+
 ## 0.7.0 — 29 lipca 2026
 
 Karta towaru mówi, czego nie ma na półce, bo jeszcze nie przyjechało od dostawcy.

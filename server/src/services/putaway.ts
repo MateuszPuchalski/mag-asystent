@@ -286,7 +286,16 @@ export function confirmItem(
   db()
     .prepare("UPDATE putaway_items SET status='on_cart', stage_qty=?, stage_loc=?, stage_update_loc=? WHERE id=?")
     .run(qty, location.toUpperCase(), updateLoc ? 1 : 0, itemId);
-  logEvent("putaway_confirm", user, item.tw_id, { itemId, qty, location, updateLoc });
+  /* `qtyPrzed` obok `qty`: bez wartości SPRZED zmiany odtworzenie „było 30,
+     jest 0" wymaga przejścia całej sekwencji zdarzeń i założenia, że żadne
+     nie zginęło. Jeden wiersz ma wystarczyć do odpowiedzi na reklamację. */
+  logEvent("putaway_confirm", user, item.tw_id, {
+    itemId,
+    qtyPrzed: item.stage_qty ?? null,
+    qty,
+    location,
+    updateLoc,
+  });
   return { ok: true };
 }
 

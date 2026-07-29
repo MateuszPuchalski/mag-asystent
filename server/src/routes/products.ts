@@ -162,6 +162,7 @@ export async function productRoutes(app: FastifyInstance) {
       const desc = describeLoc(body, current);
       const queueId = enqueueSetLocation(twId, joined, {
         createdBy: user,
+        createdByRef: autor.ref,
         twId,
         label: "Lokalizacja · " + p.symbol,
         detail: desc,

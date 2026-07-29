@@ -83,24 +83,30 @@ const stan = (id: number) =>
     sgt_doc_number: string | null;
   };
 
+/* Pola, które `Task` niesie WYŁĄCZNIE dla audytu — worker działa poza żądaniem,
+   więc autora musi dostać wierszem kolejki. Żaden test sterowania kolejką ich
+   nie dotyczy, więc idą jednym rozwinięciem zamiast trzech linii w każdym
+   literale. */
+const AUDYT = { tw_id: null, created_by: "tester", created_by_ref: null };
+
 // ── Ścieżka udana ───────────────────────────────────────────────────────────
 
 test("udane zadanie kończy się statusem done", async () => {
   const id = dodajZadanie("set_location", { twId: 1, newValue: "A01-02-03" });
-  await K.przetworzZadanie({ id, type: "set_location", payload: JSON.stringify({ twId: 1, newValue: "A01-02-03" }), attempts: 0, source_doc_id: null }, udany());
+  await K.przetworzZadanie({ id, type: "set_location", payload: JSON.stringify({ twId: 1, newValue: "A01-02-03" }), attempts: 0, source_doc_id: null, ...AUDYT }, udany());
   assert.equal(stan(id).status, "done");
 });
 
 test("MM zapisuje numer dokumentu zwrócony przez Sferę", async () => {
   const payload = { magFrom: 2, magTo: 1, items: [{ twId: 1, qty: 3 }] };
   const id = dodajZadanie("mm", payload);
-  await K.przetworzZadanie({ id, type: "mm", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null }, udany());
+  await K.przetworzZadanie({ id, type: "mm", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null, ...AUDYT }, udany());
   assert.equal(stan(id).sgt_doc_number, "MM 1/2026");
 });
 
 test("nieznany typ zadania to błąd, nie ciche pominięcie", async () => {
   const id = dodajZadanie("zrob_cos_dziwnego", {});
-  await K.przetworzZadanie({ id, type: "zrob_cos_dziwnego", payload: "{}", attempts: 0, source_doc_id: null }, udany());
+  await K.przetworzZadanie({ id, type: "zrob_cos_dziwnego", payload: "{}", attempts: 0, source_doc_id: null, ...AUDYT }, udany());
   assert.match(stan(id).error_msg ?? "", /Nieznany typ/);
 });
 
@@ -108,7 +114,7 @@ test("nieznany typ zadania to błąd, nie ciche pominięcie", async () => {
 
 test("pierwsza porażka wraca do pending i planuje ponowienie", async () => {
   const id = dodajZadanie("set_location", { twId: 1, newValue: "A01-02-03" });
-  await K.przetworzZadanie({ id, type: "set_location", payload: JSON.stringify({ twId: 1, newValue: "A" }), attempts: 0, source_doc_id: null }, padajacy());
+  await K.przetworzZadanie({ id, type: "set_location", payload: JSON.stringify({ twId: 1, newValue: "A" }), attempts: 0, source_doc_id: null, ...AUDYT }, padajacy());
 
   const s = stan(id);
   assert.equal(s.status, "pending"); // wróci, nie przepadło
@@ -125,7 +131,7 @@ test("po wyczerpaniu prób zadanie przechodzi w error", async () => {
   const { config } = await import("../config.js");
   const ostatnia = config.worker.maxAttempts - 1;
   const id = dodajZadanie("set_location", { twId: 1, newValue: "A" }, { attempts: ostatnia });
-  await K.przetworzZadanie({ id, type: "set_location", payload: JSON.stringify({ twId: 1, newValue: "A" }), attempts: ostatnia, source_doc_id: null }, padajacy());
+  await K.przetworzZadanie({ id, type: "set_location", payload: JSON.stringify({ twId: 1, newValue: "A" }), attempts: ostatnia, source_doc_id: null, ...AUDYT }, padajacy());
 
   const s = stan(id);
   assert.equal(s.status, "error");
@@ -145,7 +151,7 @@ test("MM na dokumencie w buforze czeka i NIE zajmuje slotu", async () => {
     .run();
   const id = dodajZadanie("mm", { magFrom: 2, magTo: 1, items: [] }, { docId: 7 });
 
-  const czeka = K.czekaNaDokument({ id, type: "mm", payload: "{}", attempts: 0, source_doc_id: 7 });
+  const czeka = K.czekaNaDokument({ id, type: "mm", payload: "{}", attempts: 0, source_doc_id: 7, ...AUDYT });
   assert.equal(czeka, true);
   assert.equal(stan(id).status, "waiting_for_doc");
 });
@@ -156,7 +162,7 @@ test("dokument poza buforem nie wstrzymuje zadania", async () => {
     .run();
   const id = dodajZadanie("mm", { magFrom: 2, magTo: 1, items: [] }, { docId: 8 });
   assert.equal(
-    K.czekaNaDokument({ id, type: "mm", payload: "{}", attempts: 0, source_doc_id: 8 }),
+    K.czekaNaDokument({ id, type: "mm", payload: "{}", attempts: 0, source_doc_id: 8, ...AUDYT }),
     false
   );
 });
@@ -167,7 +173,7 @@ test("set_location nie czeka na dokument — wstrzymanie dotyczy tylko MM", asyn
     .run();
   const id = dodajZadanie("set_location", { twId: 1, newValue: "A" }, { docId: 9 });
   assert.equal(
-    K.czekaNaDokument({ id, type: "set_location", payload: "{}", attempts: 0, source_doc_id: 9 }),
+    K.czekaNaDokument({ id, type: "set_location", payload: "{}", attempts: 0, source_doc_id: 9, ...AUDYT }),
     false
   );
 });
@@ -186,7 +192,7 @@ test("przegrane zadanie flagi cofa flaga_wyslana, żeby dedupe je ponowił", asy
   const payload = { dokId: 11, wartosc: "3", flaga: "done" };
   const id = dodajZadanie("set_doc_flag", payload, { attempts: ostatnia, docId: 11 });
   await K.przetworzZadanie(
-    { id, type: "set_doc_flag", payload: JSON.stringify(payload), attempts: ostatnia, source_doc_id: 11 },
+    { id, type: "set_doc_flag", payload: JSON.stringify(payload), attempts: ostatnia, source_doc_id: 11, ...AUDYT },
     padajacy()
   );
 
@@ -207,7 +213,7 @@ test("porażka NIEterminalna flagi nie cofa — zadanie jeszcze wróci", async (
   const payload = { dokId: 12, wartosc: "3", flaga: "done" };
   const id = dodajZadanie("set_doc_flag", payload, { attempts: 0, docId: 12 });
   await K.przetworzZadanie(
-    { id, type: "set_doc_flag", payload: JSON.stringify(payload), attempts: 0, source_doc_id: 12 },
+    { id, type: "set_doc_flag", payload: JSON.stringify(payload), attempts: 0, source_doc_id: 12, ...AUDYT },
     padajacy()
   );
 

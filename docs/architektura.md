@@ -319,8 +319,8 @@ konto, a fakt wysyłki przez kogoś innego zapisuje w payloadzie zdarzenia.
 
 ## 9. Audyt i pomiar
 
-`events` to jedyna tabela, do której piszą wszystkie warstwy: **26 typów
-zapisywanych przez serwer** plus 3 przysyłane przez kolektor (`device_drop`,
+`events` to jedyna tabela, do której piszą wszystkie warstwy: **34 typy
+zapisywane przez serwer** plus 3 przysyłane przez kolektor (`device_drop`,
 `battery_low`, `scan_timing` — lista dozwolonych w `routes/device.ts`, żeby
 klient nie mógł wstrzyknąć dowolnego typu). Każdy wiersz niesie `user_id`
 (tekst), `user_ref` (konto), `device_id` i payload JSON.
@@ -336,6 +336,43 @@ w odróżnieniu od zgadywania po podobieństwie.
 | Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole; zerowy wynik **nie tworzy raportu** |
 | Wydajność per osoba | `GET /api/wydajnosc` | patrz ostrzeżenie niżej |
 | Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
+| **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola brygadzisty albo biura |
+
+### Łańcuch „poprosił → wykonane" musi być pełny w obie strony
+
+Raporty wyżej agregują. Reklamacja potrzebuje czegoś innego: pojedynczego
+zdarzenia z godziną i nazwiskiem. Do sierpnia 2026 łańcuch urywał się w dwóch
+miejscach i oba były po tej samej stronie — po stronie SKUTKU.
+
+`location_set` mówił, że człowiek o coś POPROSIŁ. Czy zapis wszedł do Subiekta,
+nie mówiło nic: sukces nie był logowany, a porażka istniała wyłącznie jako
+`error_msg` w wierszu kolejki, czyli poza tabelą, w której ktokolwiek by jej
+szukał. Dziś worker dopisuje `queue_applied`, `queue_retry` i `queue_failed`,
+a autora bierze z `sfera_queue.created_by_ref` — bo działa poza żądaniem
+i sesji tam nie ma.
+
+Drugie urwanie to **odrzucenia**. Żądanie zwrócone z 400 nie zostawiało nic,
+więc „skanowałem i się nie zapisało" dało się zbyć zdaniem „nie widzę takiej
+operacji" — prawdziwym i jednocześnie nieprawdziwym. Hook `onSend` zapisuje je
+jako `http_rejected`.
+
+**Ciała żądania nie zapisujemy nigdy** — przez `POST /api/users` przechodzi PIN,
+a log audytowy z PIN-ami w środku jest gorszy niż jego brak. Pilnuje tego osobna
+asercja w `routes/audyt.test.ts`. Z tego samego powodu `401` na `GET` jest
+pomijane: karta odpytuje serwer co 2 s i wygasła sesja utopiłaby resztę audytu
+w szumie.
+
+### Czego ślad nie obejmie
+
+Operacja wykonana bez Wi-Fi żyje w pliku na kolektorze aż do połączenia.
+Urządzenie zginie przed odzyskaniem sieci — śladu nie ma i **żadna zmiana po
+stronie serwera tego nie naprawi**. Lukę zawęża to, że buforowana jest wyłącznie
+zmiana lokalizacji.
+
+Co dało się naprawić, naprawione: bufor przestał kasować operacje przy
+przejściowym błędzie serwera (5xx/408/429 zostawiają je w kolejce), a operacja
+odrzucona trwale idzie na serwer jako `klient_odrzucona`. Prefiks `klient_` jest
+celowy — to relacja urządzenia, nie fakt zaobserwowany przez serwer.
 
 ### Raport wydajności to monitoring pracowniczy
 

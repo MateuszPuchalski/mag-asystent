@@ -459,6 +459,9 @@ export function putawayLine(
 
   logEvent("putaway_line_done", user, line.tw_id, {
     lineId,
+    // ile linia miała odłożone PRZED tym zapisem — patrz `confirmItem`
+    qtyPrzed: line.ilosc_odlozona ?? 0,
+    qtyPo: doneQty,
     qty: putQty,
     location: code,
     expected: line.lok_oczekiwana,

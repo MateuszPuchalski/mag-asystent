@@ -2,6 +2,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import type { MmItem, SferaAdapter } from "../adapters/sfera.js";
 import { cofnijFlage } from "../services/delivery-flag.js";
+import { logEvent } from "../services/events.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
    Wydzielone z `worker.ts`, bo tamten moduł przy imporcie startuje pętlę
@@ -20,6 +21,13 @@ export interface Task {
   payload: string;
   attempts: number;
   source_doc_id: number | null;
+  /* Poniższe trzy pola nie sterują niczym — służą WYŁĄCZNIE audytowi. Worker
+     działa poza żądaniem, więc `currentUserRef()` i `currentDevice()` są tam
+     puste; bez przeniesienia autora przez wiersz kolejki zdarzenie „zapis
+     wszedł do Subiekta" nie miałoby do kogo się przypiąć. */
+  tw_id: number | null;
+  created_by: string;
+  created_by_ref: number | null;
 }
 
 const inBuffer = (docId: number): boolean => {
@@ -34,7 +42,7 @@ export function pickTask(): Task | undefined {
   // najpierw waiting_for_doc gotowe do ponowienia
   const waiting = db()
     .prepare(
-      `SELECT id,type,payload,attempts,source_doc_id FROM sfera_queue
+      `SELECT id,type,payload,attempts,source_doc_id,tw_id,created_by,created_by_ref FROM sfera_queue
        WHERE status='waiting_for_doc' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
        ORDER BY id LIMIT 1`
     )
@@ -50,11 +58,23 @@ export function pickTask(): Task | undefined {
   }
   return db()
     .prepare(
-      `SELECT id,type,payload,attempts,source_doc_id FROM sfera_queue
+      `SELECT id,type,payload,attempts,source_doc_id,tw_id,created_by,created_by_ref FROM sfera_queue
        WHERE status='pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
        ORDER BY id LIMIT 1`
     )
     .get(now) as Task | undefined;
+}
+
+/**
+ * Zdarzenie audytowe workera.
+ *
+ * Autor idzie z WIERSZA KOLEJKI, nie z sesji: worker pracuje poza żądaniem,
+ * więc `currentUserRef()` jest tam puste, a zdarzenie bez autora nie odpowiada
+ * na pytanie „kto to zrobił". `device_id` zostaje pusty i to jest poprawne —
+ * zapisu do Subiekta nie wykonał żaden kolektor, tylko serwer.
+ */
+function zdarzenieZadania(task: Task, typ: string, dane: Record<string, unknown>): void {
+  logEvent(typ, task.created_by, task.tw_id, { queueId: task.id, typ: task.type, ...dane }, task.created_by_ref);
 }
 
 export function oznaczBlad(task: Task, msg: string): void {
@@ -64,6 +84,11 @@ export function oznaczBlad(task: Task, msg: string): void {
     db()
       .prepare("UPDATE sfera_queue SET status='pending', attempts=?, error_msg=?, next_attempt_at=? WHERE id=?")
       .run(attempts, msg, new Date(Date.now() + backoff).toISOString(), task.id);
+    /* Nieudana próba też jest faktem. Bez niej audyt pokazywałby wyłącznie
+       skutek ostateczny, a pytanie „dlaczego to weszło dopiero po godzinie"
+       zostawałoby bez odpowiedzi. Liczba wpisów jest ograniczona z góry przez
+       `maxAttempts`, więc to nie jest źródło szumu. */
+    zdarzenieZadania(task, "queue_retry", { proba: attempts, max: config.worker.maxAttempts, blad: msg });
     console.log(`[worker] #${task.id} błąd (próba ${attempts}/${config.worker.maxAttempts}), retry za ${backoff}ms: ${msg}`);
   } else {
     db()
@@ -75,6 +100,12 @@ export function oznaczBlad(task: Task, msg: string): void {
     if (task.type === "set_doc_flag" && task.source_doc_id != null) {
       cofnijFlage(task.source_doc_id, `zadanie #${task.id} zakończone błędem`);
     }
+    /* NAJWAŻNIEJSZY wpis w całym audycie. Trwale nieudany zapis do Subiekta to
+       najbardziej prawdopodobna odpowiedź na „aplikacja zjadła mi sztuki":
+       magazynier zrobił swoje, kolektor przyjął, a do bazy firmy nic nie
+       weszło. Do sierpnia 2026 ten fakt istniał wyłącznie jako `error_msg`
+       w wierszu kolejki — czyli poza śladem, w którym ktokolwiek by go szukał. */
+    zdarzenieZadania(task, "queue_failed", { proby: attempts, blad: msg });
     console.log(`[worker] #${task.id} ERROR (wyczerpano próby): ${msg}`);
   }
 }
@@ -117,6 +148,11 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
     db()
       .prepare("UPDATE sfera_queue SET status='done', sgt_doc_number=?, processed_at=? WHERE id=?")
       .run(docNo, nowIso(), task.id);
+    /* Sukces też jest zdarzeniem. `location_set` mówi tylko, że człowiek
+       POPROSIŁ; dopiero to mówi, że zapis naprawdę wszedł do bazy firmy i o
+       której. Bez tej pary audyt umie odpowiedzieć „chciał", ale nie „stało
+       się" — a różnica między nimi jest właśnie tym, o co pyta reklamacja. */
+    zdarzenieZadania(task, "queue_applied", { docNo, proby: task.attempts });
     console.log(`[worker] #${task.id} OK ${task.type}${docNo ? " · MM " + docNo : ""}`);
   } catch (e) {
     oznaczBlad(task, e instanceof Error ? e.message : String(e));

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
   source_doc_id  INTEGER,                       -- dok. źródłowy (waiting_for_doc)
   session_id     INTEGER,                       -- sesja rozkładania (alerty błędów w sesji)
   created_by     TEXT NOT NULL,
+  created_by_ref INTEGER,                       -- konto autora; nazwa wyżej to snapshot
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   next_attempt_at TEXT,                         -- backoff / waiting_for_doc
   processed_at   TEXT
@@ -75,6 +76,10 @@ CREATE INDEX IF NOT EXISTS ix_events_type ON events(type);
 -- tygodniu") skanuje całą tabelę — a events rośnie z każdym skanem.
 CREATE INDEX IF NOT EXISTS ix_events_time ON events(created_at);
 CREATE INDEX IF NOT EXISTS ix_events_user_time ON events(user_id, created_at);
+-- „Co się działo z TYM towarem" to najczęstsze pytanie przy reklamacji, a do
+-- sierpnia 2026 `tw_id` nie miało ŻADNEGO indeksu — nawet historia na karcie
+-- towaru skanowała całą tabelę, która rośnie z każdym skanem.
+CREATE INDEX IF NOT EXISTS ix_events_tw_time ON events(tw_id, created_at);
 
 -- ── Konta pracowników (plan §7) ────────────────────────────────────────────
 -- Do lipca 2026 „użytkownik" to był DOWOLNY łańcuch wpisywany ręcznie na
