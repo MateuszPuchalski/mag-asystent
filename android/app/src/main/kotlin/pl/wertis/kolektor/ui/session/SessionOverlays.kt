@@ -16,65 +16,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.data.PytanieOPrzejecie
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
-import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.BarlowCond
-import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.Paper
 
-/* ── Blokada i przejęcie pracy (plan §7) ─────────────────────────────────── */
+/* ── Przejęcie pracy (plan §7) ───────────────────────────────────────────────
+   Był tu też `LockOverlay` — pełnoekranowa blokada po 10 minutach bezczynności.
+   Zniknęła w sierpniu 2026 razem z całym TTL sesji: kolektory nie opuszczają
+   hali, więc blokada kosztowała skan przy każdym powrocie do odłożonego
+   urządzenia i nie kupowała za to niczego.
 
-/**
- * Ekran blokady po bezczynności.
- *
- * Mówi wprost, że NIC NIE ZGINĘŁO — i to jest jego główna treść, nie ozdoba.
- * Człowiek, który zobaczy ekran logowania po dziesięciu minutach przerwy,
- * zakłada najgorsze: że trzydzieści rozłożonych pozycji trzeba robić od nowa.
- * Ten strach wystarczy, żeby aplikacja wróciła do szuflady, nawet jeśli dane
- * naprawdę są bezpieczne.
- */
-@Composable
-fun LockOverlay(osoba: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Ink.copy(alpha = 0.94f))
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("🔒", fontSize = 48.sp)
-        Text(
-            "Sesja zablokowana",
-            fontFamily = BarlowCond,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 28.sp,
-            color = Amber,
-        )
-        Text(
-            osoba,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = CardWhite,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Text(
-            "Nic nie zginęło — otwarta dostawa i cały postęp czekają.\n" +
-                "Zeskanuj swój badge, żeby wrócić do pracy.",
-            fontSize = 14.sp,
-            color = CardWhite,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 16.dp),
-        )
-    }
-}
+   Tożsamości pilnuje dziś wyłącznie dialog niżej.                            */
 
 /**
  * Pytanie o przejęcie pracy.

@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania — **92 testy** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania — **90 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -153,9 +153,8 @@ przed którą ta pozycja broni.
 - [ ] skan plakietki na ekranie startowym loguje,
 - [ ] skan własnej plakietki przy czynnej sesji nie robi nic,
 - [ ] skan cudzej plakietki pyta o przejęcie pracy,
-- [ ] 10 min bezczynności pokazuje ekran „Sesja zablokowana",
-- [ ] pod tym ekranem dalej widać otwartą dostawę,
-- [ ] skan własnego badge'a wraca do pracy bez straty postępu,
+- [ ] odłóż kolektor na godzinę: wraca do otwartej dostawy bez skanu i bez
+      ekranu blokady (regresja: usunięty TTL sesji),
 - [ ] skan towaru zajętego przez kogoś innego proponuje odebranie,
 - [ ] magazynier dostaje odmowę, a brygadzista z PIN-em przechodzi.
 

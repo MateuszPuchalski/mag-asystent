@@ -214,11 +214,13 @@ Parametry (env, dev):
   to jest różnica między „nie dało się odczytać" a „odczytano źle". Kod **nie
   niesie nazwiska**: badge się gubi i zostaje na kurtce, więc powiązanie
   kod → człowiek żyje wyłącznie w bazie.
-- **Bezczynność BLOKUJE sesję, nigdy jej nie kończy.** Po 10 minutach ekran
-  mówi wprost, że nic nie zginęło. Otwarta dostawa i cały postęp czekają.
-  Odblokowanie to jeden skan własnego badge'a — ten sam token. Wylogowanie
-  gubiące 30 rozłożonych pozycji to najprostszy sposób na aplikację, która leży
-  w szufladzie.
+- **Sesja nie wygasa sama.** Trwa do wylogowania z Ustawień albo do przejęcia
+  pracy cudzym badge'em. Bezczynność nie robi nic.
+
+  > **Dlaczego zniknęła blokada.** Do sierpnia 2026 dziesięć minut bez ruchu
+  > przełączało kolektor na ekran „Sesja zablokowana". Nigdy nie gubiła pracy,
+  > ale kosztowała skan przy każdym powrocie do odłożonego urządzenia — a to
+  > był jej cały efekt, bo kolektory nie opuszczają hali.
 - **Skan cudzego badge'a nigdy nie przełącza po cichu.** Ekran pyta „Przejąć
   pracę? Trwa: dostawa #17, rozpoczęte przez: Jan Kowalski", a przejęcie ląduje
   w `events` (`session_handover`). Ciche przełączenie podpisałoby cudze pozycje
@@ -445,7 +447,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 92 testy jednostkowe; buduje się bez Android SDK
+                           + 90 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

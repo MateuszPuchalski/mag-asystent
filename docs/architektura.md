@@ -181,15 +181,21 @@ Trzy własności, każda z powodem:
 - **Prefiks czyni badge kategorią zamkniętą** w klasyfikatorze skanów —
   sprawdzone na realnej kartotece: zero symboli, EAN-ów i adresów ma ten kształt.
 
-### Blokada, nie wylogowanie
+### Sesja nie wygasa sama
 
-Po 10 minutach bezczynności sesja przechodzi w stan **zablokowana** — istnieje
-dalej, z otwartą dostawą i całym postępem. Odblokowanie to jeden skan własnego
-badge'a, ten sam token.
+Sesja urządzenia trwa do jawnej decyzji człowieka: wylogowania z Ustawień albo
+przejęcia pracy cudzym badge'em. Bezczynność jej nie rusza — kolektor odłożony
+na regale na całą przerwę wraca do otwartej dostawy bez żadnego skanu.
 
-Wylogowanie gubiące trzydzieści rozłożonych pozycji to najprostszy znany sposób
-na aplikację, która leży w szufladzie. Ekran blokady mówi wprost, że nic nie
-zginęło, i **nie zasłania ekranu pod spodem** — widoczna dostawa jest dowodem.
+Do sierpnia 2026 działał tu TTL: po 10 minutach sesja przechodziła w stan
+`zablokowana`, kolektor pokazywał pełnoekranowy komunikat, a zapis dostawał
+z serwera 423. Blokada nigdy nie gubiła pracy — zachowywała token, dostawę
+i postęp — więc jej jedynym mierzalnym skutkiem był skan przy każdym powrocie
+do urządzenia.
+
+Kupowała za to obronę przed scenariuszem, który tu nie występuje: kolektory nie
+opuszczają hali, a przed podszyciem się pod kogoś broni co innego — skan
+cudzego badge'a nigdy nie przełącza tożsamości po cichu.
 
 ### Przejęcie pracy nigdy nie jest ciche
 

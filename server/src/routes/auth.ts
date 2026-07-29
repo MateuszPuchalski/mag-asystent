@@ -1,14 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { currentDevice, currentToken } from "../context.js";
-import {
-  BLOKADA_MIN,
-  autoryzuj,
-  odblokuj,
-  przejmij,
-  sesja,
-  wyloguj,
-  zaloguj,
-} from "../services/auth.js";
+import { autoryzuj, przejmij, sesja, wyloguj, zaloguj } from "../services/auth.js";
 import { logEvent } from "../services/events.js";
 import {
   brakKont,
@@ -37,25 +29,20 @@ export async function authRoutes(app: FastifyInstance) {
       // człowieka to ten sam wniosek, a rozróżnianie kusiłoby do prób
       return reply.code(401).send({ error: "Nieznany badge albo uszkodzona etykieta" });
     }
-    return { token: s.token, user: s.user, blokadaMin: BLOKADA_MIN };
+    return { token: s.token, user: s.user };
   });
 
-  /** Kim jestem — kolektor pyta przy starcie i po powrocie z tła. */
+  /**
+   * Kim jestem — kolektor pyta przy starcie i po powrocie z tła.
+   *
+   * Odpowiedź nie niesie już stanu blokady ani TTL: sesja trwa do jawnego
+   * wylogowania albo przejęcia pracy. Zostaje jedno pytanie, na które ta trasa
+   * odpowiada — „czy ten token nadal wskazuje czynne konto".
+   */
   app.get("/api/auth/me", async (_req, reply) => {
     const s = sesja(token());
     if (!s) return reply.code(401).send({ error: "Brak sesji" });
-    return { user: s.user, zablokowana: s.zablokowana, blokadaMin: BLOKADA_MIN };
-  });
-
-  /** Odblokowanie WŁASNEJ sesji po bezczynności — nic nie zostało utracone. */
-  app.post<{ Body: { badge?: string } }>("/api/auth/unlock", async (req, reply) => {
-    const s = odblokuj(token() ?? "", req.body?.badge ?? "");
-    if (!s) {
-      return reply
-        .code(401)
-        .send({ error: "To nie jest badge osoby, która ma tę sesję — użyj przejęcia pracy" });
-    }
-    return { user: s.user, zablokowana: false };
+    return { user: s.user };
   });
 
   /**

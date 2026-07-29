@@ -28,6 +28,49 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.5.0 — 27 lipca 2026
+
+Ekran blokady po bezczynności zniknął. Sesja urządzenia nie wygasa sama.
+
+### Zmiana zachowania
+
+- **Kolektor nie pokazuje już ekranu „Sesja zablokowana".** Do tej pory
+  dziesięć minut bez ruchu przełączało go na pełnoekranowy komunikat, a powrót
+  do pracy kosztował skan badge'a. Kolektor odłożony na regale na całą przerwę
+  wraca dziś do otwartej dostawy bez niczego.
+- **Sesja kończy się wyłącznie jawną decyzją** — wylogowaniem z Ustawień albo
+  przejęciem pracy cudzym badge'em. Blokada nigdy nie gubiła postępu, więc jej
+  jedynym mierzalnym skutkiem był ten skan.
+- **Tożsamości pilnuje dalej to, co pilnowało naprawdę:** skan cudzego badge'a
+  nie przełącza po cichu — pyta człowieka i zapisuje przejęcie w `events`.
+
+**Nowy APK nie jest do tego potrzebny.** Blokadę zgłaszał serwer, więc starsze
+kolektory przestają ją pokazywać zaraz po restarcie usług. APK z tego wydania
+usuwa już tylko martwy kod po stronie aplikacji.
+
+### Usunięte
+
+- `POST /api/auth/unlock` — trasa nie ma czego odblokowywać.
+- Odpowiedzi `/api/auth/badge` i `/api/auth/me` nie niosą już `blokadaMin`
+  ani `zablokowana`.
+- Bramka `423 Sesja zablokowana` w `context.ts`. Razem z nią odpadł wyjątek dla
+  `x-buffered-user`, który istniał wyłącznie po to, żeby wysyłka z bufora
+  offline nie ginęła na zablokowanej sesji. Sam nagłówek **zostaje** — dalej
+  rozstrzyga, kto podpisuje operację wykonaną poza zasięgiem.
+- Stan `SessionState.Zablokowana` i akcja `BadgeAction.Odblokuj` w `:core`.
+
+`device_session.last_seen` zostaje, ale niczego już nie bramkuje: to jedyny
+ślad, kiedy dany kolektor się odezwał, i przydaje się przy pytaniu „to jedno
+urządzenie czy wszystkie?".
+
+### Pod spodem
+
+- Testy serwera 223 → 220, testy `:core` 92 → 90. W obu miejscach doszła
+  regresja na usunięty TTL: sesja bezczynna od godziny **pisze tak samo jak
+  świeża**, a wcześniej dostawała 423.
+
+---
+
 ## 0.4.1 — 27 lipca 2026
 
 Dokumentacja przepisana według reguł ASD-STE100 w zakresie, jaki da się

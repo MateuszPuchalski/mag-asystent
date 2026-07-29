@@ -649,22 +649,16 @@ data class UserDto(
 )
 
 @Serializable
-data class LoginResponse(
-    val token: String = "",
-    val user: UserDto = UserDto(),
-    /** Po tylu minutach bezczynności sesja się BLOKUJE (nie: kończy). */
-    val blokadaMin: Int = 10,
-)
+data class LoginResponse(val token: String = "", val user: UserDto = UserDto())
 
+/**
+ * Odpowiedź `/api/auth/me`.
+ *
+ * Nie niesie stanu blokady ani TTL — sesja nie wygasa sama. Odpowiada na jedno
+ * pytanie: czy zapamiętany token nadal wskazuje czynne konto.
+ */
 @Serializable
-data class MeResponse(
-    val user: UserDto = UserDto(),
-    val zablokowana: Boolean = false,
-    val blokadaMin: Int = 10,
-)
-
-@Serializable
-data class UnlockResponse(val user: UserDto = UserDto(), val zablokowana: Boolean = false)
+data class MeResponse(val user: UserDto = UserDto())
 
 /** Odebranie cudzej linii przed wygaśnięciem TTL — operacja na PIN. */
 @Serializable

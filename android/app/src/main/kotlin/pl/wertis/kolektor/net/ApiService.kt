@@ -50,7 +50,6 @@ import pl.wertis.kolektor.core.net.SearchResponse
 import pl.wertis.kolektor.core.net.SessionIdResponse
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.SetupResponse
-import pl.wertis.kolektor.core.net.UnlockResponse
 import pl.wertis.kolektor.core.net.UsersResponse
 import pl.wertis.kolektor.core.net.SkipBody
 import retrofit2.http.Body
@@ -213,9 +212,6 @@ interface ApiService {
 
     @GET("api/auth/me")
     suspend fun authMe(): MeResponse
-
-    @POST("api/auth/unlock")
-    suspend fun authUnlock(@Body body: BadgeBody): UnlockResponse
 
     /** Wołane DOPIERO po potwierdzeniu przez człowieka — nigdy z samego skanu. */
     @POST("api/auth/handover")

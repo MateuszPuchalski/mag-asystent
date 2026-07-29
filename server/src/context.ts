@@ -116,9 +116,6 @@ export const currentUserName = (): string | null => store.getStore()?.userName ?
    słowem „anonim". Bramka jest tutaj, a nie w każdej trasie z osobna, bo
    trasa dopisana jutro ma być domyślnie zamknięta, nie domyślnie otwarta.  */
 
-/** Metody zmieniające stan. GET i HEAD tylko czytają. */
-const zapis = (metoda: string): boolean => !["GET", "HEAD", "OPTIONS"].includes(metoda);
-
 /**
  * Trasy działające bez sesji. Lista jest jawna, krótka i zamknięta — każda
  * pozycja jest tu dlatego, że BEZ NIEJ NIE DA SIĘ URUCHOMIĆ INSTALACJI.
@@ -151,7 +148,7 @@ export function withRequestContext(app: FastifyInstance): void {
 
     if (s) {
       setCurrentUser(s.user.userId, s.user.name);
-      if (!s.zablokowana) dotknij(t!);
+      dotknij(t!);
     }
 
     // Bramka dotyczy tylko API; serwer nie serwuje niczego innego, ale ta
@@ -161,33 +158,13 @@ export function withRequestContext(app: FastifyInstance): void {
     if (!sciezka.startsWith("/api/")) return;
     if (otwarta(req.method, sciezka)) return;
 
+    /* Sesja albo jest, albo jej nie ma — trzeciego stanu nie ma od sierpnia
+       2026. Wcześniej bezczynność dłuższa niż 10 minut przełączała sesję
+       w `zablokowana`, a zapis z niej dostawał 423, żeby wymusić skan badge'a.
+       Razem z ekranem blokady zniknęła i ta bramka. */
     if (!s) {
       return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
     }
-
-    /* Sesja zablokowana po bezczynności NIE jest wylogowaniem (§7): zachowuje
-       otwartą dostawę i kontekst, żeby nie zgubić trzydziestu rozłożonych
-       pozycji. Odczyty przechodzą, bo z nich składa się ekran blokady.
-
-       Zapis wymaga odblokowania — Z JEDNYM WYJĄTKIEM, i ten wyjątek jest
-       konieczny, nie wygodny. Kolektor opróżnia bufor offline z tykera co 15 s,
-       niezależnie od tego, czy ktoś trzyma urządzenie w ręku. Gdyby wysyłka
-       z zablokowanej sesji dostawała odmowę, `OfflineQueue.flush()` uznałby ją
-       za błąd serwera i SKASOWAŁ operację z bufora — praca wykonana poza
-       zasięgiem znikałaby po dziesięciu minutach leżenia kolektora na regale.
-
-       Rozróżnia je `x-buffered-user`: niesie konto autora Z CHWILI WYKONANIA
-       i jest przyjmowany tylko, gdy wskazuje istniejące konto (`autorOperacji`).
-       Operacja interaktywna go nie ma, więc dalej wymaga skanu badge'a.       */
-    if (s.zablokowana && zapis(req.method) && !zBufora(req)) {
-      return reply.code(423).send({ error: "Sesja zablokowana — zeskanuj badge" });
-    }
   });
-}
-
-/** Czy żądanie niesie operację z bufora offline wskazującą istniejące konto. */
-function zBufora(req: FastifyRequest): boolean {
-  const id = Number(header(req, "x-buffered-user"));
-  return Number.isInteger(id) && id > 0 && userById(id) !== null;
 }
 

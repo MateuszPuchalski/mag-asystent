@@ -109,7 +109,6 @@ fun SettingsScreen(graph: AppGraph) {
                         // delegowaną — smart cast by się nie odbył
                         when (val s = stan) {
                             is SessionState.Aktywna -> s.role
-                            is SessionState.Zablokowana -> "sesja zablokowana — zeskanuj badge"
                             SessionState.Brak -> "zeskanuj badge, żeby zacząć"
                         },
                         fontSize = 11.sp,
