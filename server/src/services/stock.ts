@@ -6,6 +6,7 @@ import { parseLocs } from "../locs.js";
 import { pendingLocChanges } from "./locations.js";
 import { kandydaciZamiennikow, podzielZamienniki } from "./zamienniki.js";
 import { magazynyTowaru } from "./magazyny.js";
+import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
@@ -115,6 +116,10 @@ export function buildProductCard(
        z własną semantyką, więc powtarzanie jej tutaj dublowałoby tę samą
        liczbę w dwóch miejscach ekranu. */
     magazyny: magazynyTowaru(twId),
+    /* Dlaczego stan nie zgadza się z półką. Przy dostawie krajowej towar
+       figuruje na MAG od zaksięgowania dokumentu, więc `mag.stan` nie odróżnia
+       „leży w regale" od „stoi na palecie w przyjęciach". */
+    wDostawie: nierozlozoneZDostaw(twId),
     zamienniki: zamiennikiZOpisu(adapter, t.opis ?? "", t.symbol),
   };
 }

@@ -119,6 +119,16 @@ przed którą ta pozycja broni.
 - [ ] chip nowego adresu jest przygaszony i bez cienia,
 - [ ] po przejściu kolejki Sfery ten sam chip robi się normalny.
 
+**W dostawie, nierozłożone**
+
+- [ ] towar z nierozłożonej dostawy pokazuje na karcie amber sekcję z numerem
+      dokumentu, datą i ilością,
+- [ ] po odłożeniu części ilość w sekcji maleje o tyle, ile odłożono,
+- [ ] po odłożeniu całości sekcja znika,
+- [ ] pozycja ze zgłoszonym problemem ZOSTAJE, z dopiskiem „zgłoszony problem",
+- [ ] sekcja nie reaguje na dotknięcie (wejście w dokument przestawiłoby flagę
+      faktury w Subiekcie).
+
 **Rozkładanie**
 
 - [ ] skan towaru z dostawy rozwija wiersz W MIEJSCU, z ilością i lokalizacją

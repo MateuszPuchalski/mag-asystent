@@ -40,6 +40,12 @@ export interface RawPosition {
   ilosc: number;
 }
 
+/** Pozycja JEDNEGO towaru wraz z dokumentem, na którym stoi. */
+export interface RawDocPosition extends RawDocument {
+  /** Suma ilości z tego dokumentu — ten sam towar bywa w kilku pozycjach. */
+  ilosc: number;
+}
+
 /**
  * SubiektAdapter — granica odczytu z Subiekta GT (spec §6).
  * DEV: SELECT z tabel sgt_* (SQLite, seed z mag.xlsx).
@@ -87,6 +93,16 @@ export interface SubiektAdapter {
    * ścieżkami naraz.
    */
   listDeliveryDocuments(days: number): RawDocument[];
+  /**
+   * Odwrotność `listDeliveryDocuments`: na których dostawach z ostatnich N dni
+   * stoi TEN towar i w jakiej ilości.
+   *
+   * Ta metoda mieszka w adapterze, a nie w serwisie, z jednego powodu: warunek
+   * „co w ogóle jest dostawą" musi zostać w jednym pliku obok
+   * `listDeliveryDocuments`. Druga kopia tego kryterium rozjechałaby się przy
+   * pierwszej zmianie, a objawem byłby towar policzony dwa razy albo wcale.
+   */
+  getDeliveryPositionsForProduct(twId: number, days: number): RawDocPosition[];
   getDocument(docId: number): RawDocument | undefined;
   getDocumentPositions(docId: number): RawPosition[];
   /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */

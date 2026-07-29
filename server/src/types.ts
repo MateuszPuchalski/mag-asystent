@@ -20,6 +20,7 @@ export interface PendingLocChange {
 }
 
 import type { MagazynStan } from "./services/magazyny.js";
+import type { WDostawie } from "./services/dostawy-towaru.js";
 
 export interface ProductCard {
   id: number;
@@ -43,6 +44,16 @@ export interface ProductCard {
    * jeszcze leży" było pytaniem bez odpowiedzi.
    */
   magazyny: MagazynStan[];
+  /**
+   * Przyjechało na dokumencie, ale jeszcze nie odłożone. Puste = wszystko, co
+   * przyszło, leży już w regale.
+   *
+   * Odpowiada na pytanie, którego karta wcześniej nie zamykała: „stan mówi 12,
+   * a półka jest pusta — gdzie to jest?". Przy dostawie krajowej towar figuruje
+   * na MAG od chwili zaksięgowania dokumentu, więc kafel stanu nie odróżnia
+   * „leży w regale" od „stoi na palecie w przyjęciach".
+   */
+  wDostawie: WDostawie[];
   /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
   zamienniki: Zamienniki;
 }

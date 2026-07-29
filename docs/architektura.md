@@ -128,6 +128,29 @@ system, na którym ludzie wystawiają faktury. Stany na ekranie są więc **do 6
 opóźnione** — i to jest akceptowalne, bo do rozkładania towaru wystarczy
 wiedzieć, że coś jest, a nie ile dokładnie w tej sekundzie.
 
+### Stan to nie to samo co „leży w regale"
+
+Przy dostawie krajowej skutek magazynowy niesie sam dokument w Subiekcie —
+księgowany wprost na MAG. Towar figuruje więc w stanie od chwili zaksięgowania,
+choć fizycznie stoi na palecie w przyjęciach.
+
+Kafel „MAG · DOSTĘPNE" pokazywał z tego powodu 12 szt przy pustej półce
+i nie mówił dlaczego. Karta ma dziś osobną sekcję **„w dostawie, nierozłożone"**
+(`services/dostawy-towaru.ts`): dokumenty z ostatnich 14 dni, na których ten
+towar przyjechał, minus to, co już odłożono.
+
+Liczbę składają dwa źródła i to jest jej cała logika:
+
+- **`sgt_pozycja` + `sgt_dokument`** — co przyszło, wprost z lustra Subiekta,
+- **`delivery_line.ilosc_odlozona`** — co z tego trafiło w regał.
+
+Kryterium „co jest dostawą" siedzi w adapterze obok `listDeliveryDocuments`,
+a nie w serwisie. Dwie kopie tego warunku rozjechałyby się przy pierwszej
+zmianie, a objawem byłby towar policzony dwa razy albo wcale.
+
+Kontener na MGP tu nie wchodzi: idzie osobnym torem (`putaway_*`), a jego towar
+widać na własnym kaflu strefy przyjęć.
+
 ---
 
 ## 5. Trzy ścieżki rozkładania
