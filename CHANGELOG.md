@@ -59,7 +59,7 @@ serwerze, z którego biuro właśnie korzysta, to nie jest cena za podpowiedź.
 
 ### Pod spodem
 
-- `instalator/testy.ps1` — 14 nowych asercji na funkcjach czystych (21 → 31)
+- `instalator/testy.ps1` — 14 nowych asercji na funkcjach czystych (21 → 35 przebiegów)
   (`Format-WertisEtykietaBazy`, `Sort-WertisBazy`, `Get-WertisSugerowanaBaza`,
   `Test-WertisBazaPodejrzana`). Decyzja i formatowanie są osobno od SQL-a
   właśnie po to, żeby reguła „przy remisie nie podpowiadaj" miała asercję,
