@@ -248,16 +248,35 @@ if ($podlaczacDoSubiekta) {
     Write-Krok "Baza podmiotu"
     $baza = $null
     if ($polaczenie) {
-        $bazy = @(Get-WertisBazy -Polaczenie $polaczenie)
+        Write-Info "Kopia podmiotu ma te same tabele co baza produkcyjna, więc nazwa nie rozstrzyga."
+        Write-Info "Rozstrzyga data ostatniego dokumentu: żywa baza ma dzisiejszą, kopia stoi na dniu zrzutu."
+        $bazy = @(Sort-WertisBazy -Bazy (Get-WertisStatystykiBazy -Polaczenie $polaczenie `
+            -Bazy (Get-WertisBazy -Polaczenie $polaczenie)))
+        if ($bazy.Count -eq 0) {
+            Write-Blad "Na tej instancji nie ma ani jednej bazy użytkownika."
+            exit 1
+        }
         $wybor = Read-Wybor -Pozycje $bazy -Pytanie "Numer bazy podmiotu" `
-            -Etykieta { param($b) "$($b.name)" }
-        $baza = "$($wybor.name)"
+            -Etykieta { param($b) Format-WertisEtykietaBazy -Baza $b } `
+            -Domyslny (Get-WertisSugerowanaBaza -Bazy $bazy)
+        $baza = $wybor.Nazwa
         $polaczenie.ChangeDatabase($baza)
-        if (Test-WertisBazaSubiekta -Polaczenie $polaczenie) {
-            Write-Ok "Baza $baza wygląda na bazę Subiekta."
-        } else {
+
+        # Trzy różne „uważaj" i trzy różne powody — jeden wspólny komunikat
+        # kazałby się domyślać, czym ta baza właściwie jest.
+        if (-not $wybor.Subiekt) {
             Write-Uwaga "W bazie $baza nie widzę kompletu tabel Subiekta (tw__Towar, dok__Dokument, sl_Magazyn, tw_Stan)."
             if (-not (Read-Tak "Mimo to używać tej bazy?" -Domyslnie $false)) { exit 1 }
+        } elseif (Test-WertisBazaPodejrzana -Baza $wybor) {
+            $dni = [int](((Get-Date).Date - ([datetime]$wybor.OstatniDokument).Date).TotalDays)
+            Write-Uwaga "Ostatni dokument w $baza jest sprzed $dni dni — to wygląda na kopię, nie na bazę produkcyjną."
+            Write-Info "Firma z przerwą w wystawianiu dokumentów wygląda tak samo, więc decyzja należy do Ciebie."
+            if (-not (Read-Tak "Mimo to używać tej bazy?" -Domyslnie $false)) { exit 1 }
+        } elseif (-not $wybor.OstatniDokument) {
+            Write-Uwaga "Baza $baza nie ma ani jednego dokumentu — to świeży podmiot albo pusta kopia."
+            if (-not (Read-Tak "Mimo to używać tej bazy?" -Domyslnie $false)) { exit 1 }
+        } else {
+            Write-Ok "Baza $baza — ostatni dokument $(([datetime]$wybor.OstatniDokument).ToString('yyyy-MM-dd'))."
         }
     } else {
         $baza = Read-Tekst "Nazwa bazy podmiotu" -Domyslnie "NAZWA_BAZY"

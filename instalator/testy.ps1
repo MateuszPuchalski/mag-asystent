@@ -177,6 +177,113 @@ Sprawdz "podwaja apostrof w haśle, żeby nie rozerwać literału" {
     Zaloz ($s -match "PASSWORD = 'a''b'") "apostrof w haśle nie został podwojony"
 }
 
+# ── Wybór bazy podmiotu spośród jej kopii ───────────────────────────────────
+# Kopia ma DOKŁADNIE te same tabele co produkcja, więc kontrola „czy to baza
+# Subiekta" jej nie odsieje. Pomyłka jest cicha: konto powstaje na kopii,
+# aplikacja czyta nieaktualne stany i pisze w martwą bazę, a wszystko wygląda
+# poprawnie. Reguły niżej są jedynym, co przed tym broni.
+
+Write-Host ""
+Write-Host "Wybór bazy podmiotu"
+
+function Baza {
+    param([string]$Nazwa, [object]$Ostatni = $null, [bool]$Subiekt = $true,
+          [object]$Ile = $null, [string]$Uwaga = $null, [object]$Utworzona = $null)
+    return [pscustomobject]@{
+        Nazwa = $Nazwa; Utworzona = $Utworzona; Subiekt = $Subiekt
+        OstatniDokument = $Ostatni; Dokumentow = $Ile; Uwaga = $Uwaga
+    }
+}
+
+$dzis = Get-Date
+
+Sprawdz "etykieta pokazuje datę, licznik i utworzenie" {
+    $e = Format-WertisEtykietaBazy -Baza (Baza "WERTIS" ([datetime]"2026-07-29") $true 48210 $null ([datetime]"2019-03-11"))
+    Zaloz ($e -match "WERTIS") "brak nazwy"
+    Zaloz ($e -match "2026-07-29") "brak daty ostatniego dokumentu"
+    Zaloz ($e -match "2019-03-11") "brak daty utworzenia"
+}
+
+Sprawdz "etykieta nazywa bazę bez dokumentów, zamiast pokazywać pustkę" {
+    $e = Format-WertisEtykietaBazy -Baza (Baza "NOWY_PODMIOT")
+    Zaloz ($e -match "brak dokumentów") "pusta baza wygląda jak baza bez danych do pokazania"
+}
+
+Sprawdz "etykieta niesie uwagę zamiast liczb, gdy liczb nie ma" {
+    $e = Format-WertisEtykietaBazy -Baza (Baza "FK_ARCHIWUM" $null $false $null "nie jest bazą Subiekta")
+    Zaloz ($e -match "nie jest bazą Subiekta")
+    Zaloz (-not ($e -match "ost\. dokument")) "przy braku danych nie ma czego opisywać"
+}
+
+Sprawdz "sortowanie stawia najświeższy podmiot nad kopią" {
+    # alfabetycznie KOPIA stoi PRZED WERTIS — i to jest dokładnie ta pułapka
+    $lista = @(
+        (Baza "AAA_KOPIA" ([datetime]"2026-06-30")),
+        (Baza "WERTIS"    ([datetime]"2026-07-29")),
+        (Baza "FK"        $null $false)
+    )
+    $s = Sort-WertisBazy -Bazy $lista
+    Zaloz ($s[0].Nazwa -eq "WERTIS") "na górze ma być najświeższa baza, jest $($s[0].Nazwa)"
+    Zaloz ($s[2].Nazwa -eq "FK") "baza spoza Subiekta ma być na końcu"
+}
+
+Sprawdz "podpowiada bazę o ściśle najświeższym dokumencie" {
+    $lista = @(
+        (Baza "WERTIS" ([datetime]"2026-07-29")),
+        (Baza "KOPIA"  ([datetime]"2026-06-30"))
+    )
+    Zaloz ((Get-WertisSugerowanaBaza -Bazy $lista) -eq 0)
+}
+
+Sprawdz "REMIS dat NIE daje podpowiedzi — to byłby rzut monetą" {
+    # Dwie kopie zrobione tego samego dnia. Podpowiedź udawałaby radę,
+    # a Enter wybrałby jedną z nich bez żadnej przesłanki.
+    $lista = @(
+        (Baza "KOPIA_A" ([datetime]"2026-07-29")),
+        (Baza "KOPIA_B" ([datetime]"2026-07-29"))
+    )
+    Zaloz ((Get-WertisSugerowanaBaza -Bazy $lista) -eq -1) "przy remisie nie wolno podpowiadać"
+}
+
+Sprawdz "sama godzina nie rozstrzyga remisu — liczy się dzień" {
+    $lista = @(
+        (Baza "KOPIA_A" ([datetime]"2026-07-29 08:00")),
+        (Baza "KOPIA_B" ([datetime]"2026-07-29 17:30"))
+    )
+    Zaloz ((Get-WertisSugerowanaBaza -Bazy $lista) -eq -1) "dokumenty z tego samego dnia to remis"
+}
+
+Sprawdz "brak baz Subiekta — brak podpowiedzi" {
+    Zaloz ((Get-WertisSugerowanaBaza -Bazy @((Baza "FK" $null $false))) -eq -1)
+}
+
+Sprawdz "baza bez dokumentów nie bywa podpowiadana" {
+    Zaloz ((Get-WertisSugerowanaBaza -Bazy @((Baza "NOWY_PODMIOT"))) -eq -1)
+}
+
+Sprawdz "dokument sprzed 34 dni wygląda na kopię" {
+    $b = Baza "KOPIA" $dzis.AddDays(-34)
+    Zaloz (Test-WertisBazaPodejrzana -Baza $b -Teraz $dzis)
+}
+
+Sprawdz "dzisiejszy dokument nie budzi podejrzeń" {
+    Zaloz (-not (Test-WertisBazaPodejrzana -Baza (Baza "WERTIS" $dzis) -Teraz $dzis))
+}
+
+Sprawdz "próg 7 dni: szósty dzień jeszcze przechodzi" {
+    Zaloz (-not (Test-WertisBazaPodejrzana -Baza (Baza "WERTIS" $dzis.AddDays(-6)) -Teraz $dzis))
+}
+
+Sprawdz "pusty podmiot to NIE kopia — ma własny komunikat" {
+    # Pierwsze wdrożenie w świeżej firmie: dokumentów nie ma, bo jeszcze
+    # żadnego nie wystawiono. Ostrzeżenie o kopii straszyłoby bez powodu.
+    Zaloz (-not (Test-WertisBazaPodejrzana -Baza (Baza "NOWY_PODMIOT") -Teraz $dzis))
+}
+
+Sprawdz "baza spoza Subiekta nie jest oceniana pod kątem kopii" {
+    Zaloz (-not (Test-WertisBazaPodejrzana -Baza (Baza "FK" $null $false) -Teraz $dzis))
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""

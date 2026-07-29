@@ -106,7 +106,36 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
   w `DEPLOY.md` §7 i obie trzeba ustawić, **zanim** ruszy praca na prawdziwych
   danych.
 
-## Dwie rzeczy, o których instalator pyta osobno
+## Trzy rzeczy, o których instalator pyta osobno
+
+**Baza podmiotu, a nie jej kopia.**
+
+> ⚠️ Kopia podmiotu ma **te same tabele** co baza produkcyjna. Kontrola „czy to
+> jest baza Subiekta" jej nie odsieje — odpowiada na inne pytanie niż „czy to
+> jest TA baza".
+
+Pomyłka jest cicha i dlatego kosztowna. Konto powstałoby na kopii, aplikacja
+czytałaby nieaktualne stany i zapisywała lokalizacje w martwą bazę. Wszystko
+wyglądałoby poprawnie, a objawem byłby dopiero magazynier, któremu stany nie
+zgadzają się z półką.
+
+Kreator pokazuje przy każdej bazie **datę ostatniego dokumentu**, liczbę
+dokumentów i datę utworzenia, a listę sortuje od najświeższej:
+
+```
+ *  1. WERTIS            ost. dokument: 2026-07-29   dok:    48 210   utw.: 2019-03-11
+    2. WERTIS_KOPIA      ost. dokument: 2026-06-30   dok:    47 001   utw.: 2026-07-01
+    3. FK_ARCHIWUM       (nie jest bazą Subiekta)
+```
+
+Gwiazdka to podpowiedź Enterem. Pojawia się **tylko przy ściśle najświeższej**
+bazie — dwie kopie z tego samego dnia podpowiedzi nie dostaną, bo byłaby rzutem
+monetą udającym radę.
+
+Po wyborze bazy z dokumentem starszym niż tydzień kreator ostrzega i pyta
+o potwierdzenie. To heurystyka, nie dowód: firma z przerwą w wystawianiu
+dokumentów wygląda tak samo jak kopia, więc instalator nigdy nie odrzuca bazy
+sam.
 
 **Restart usługi SQL.**
 
