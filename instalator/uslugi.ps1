@@ -65,6 +65,66 @@ function Initialize-WertisSiec {
     }
 }
 
+<#
+    Sumy kontrolne pobieranych plików.
+
+    Instalator ściąga dwa pliki z internetu i URUCHAMIA je z uprawnieniami
+    administratora: instalator MSI Node'a i nssm.exe. Do sierpnia 2026 robił to
+    BEZ ŻADNEJ WERYFIKACJI — czyli przejęcie DNS w sieci klienta albo włamanie
+    na serwer wydań wystarczyło, żeby ta maszyna wykonała cudzy kod jako SYSTEM.
+    To była realna dziura, nie teoria, i nie ma nic wspólnego z tym, że
+    antywirus flaguje instalator heurystycznie.
+
+    Suma Node'a pochodzi z oficjalnego `SHASUMS256.txt` na nodejs.org — to
+    źródło autorytatywne, nie „zaobserwowane u nas".
+#>
+$script:SUMA_NODE_MSI = "9eea480bd30c98ae11a97cb89a9278235cbbbd03c171ee5e5198bd86b7965b4b"
+
+<#
+    Suma nssm-2.24.zip. PUSTA WARTOŚĆ JEST CELOWA i tymczasowa: nssm.cc nie było
+    osiągalne ze środowiska, w którym powstawał ten kod, a wpisanie tu sumy
+    „z pamięci" dałoby weryfikację pozorną — gorszą od jawnego jej braku, bo
+    wyglądającą na zabezpieczenie. Wartość ustala krok `suma-nssm` w
+    .github/workflows/instalator.yml, który pobiera plik z maszyny mającej do
+    niego dostęp i wypisuje sumę do zalogowania tutaj.
+
+    Dopóki jest pusta, instalator OSTRZEGA i idzie dalej; po wpisaniu —
+    przerywa przy niezgodności.
+#>
+$script:SUMA_NSSM_ZIP = ""
+
+function Test-WertisSuma {
+    <#
+        .SYNOPSIS
+        Sprawdza SHA-256 pobranego pliku. `$true` = wolno go użyć.
+        .DESCRIPTION
+        Pusta suma oczekiwana nie jest błędem, tylko stanem „jeszcze nie
+        ustalona" — wtedy leci ostrzeżenie z policzoną wartością, żeby dało się
+        ją zapisać. Niezgodność jest błędem TWARDYM: plik, który przyszedł inny
+        niż zamówiony, nie zasługuje na drugą szansę.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Sciezka,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Oczekiwana,
+        [Parameter(Mandatory)][string]$Opis
+    )
+    $suma = (Get-FileHash -Path $Sciezka -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not $Oczekiwana) {
+        Write-Uwaga "$Opis - suma kontrolna nie jest ustalona, pomijam weryfikacje."
+        Write-Info  "   Policzona teraz: $suma"
+        return $true
+    }
+    if ($suma -ne $Oczekiwana.ToLowerInvariant()) {
+        Write-Blad "$Opis - SUMA KONTROLNA SIE NIE ZGADZA. Przerywam."
+        Write-Info "   oczekiwana: $($Oczekiwana.ToLowerInvariant())"
+        Write-Info "   otrzymana:  $suma"
+        Write-Info "   Plik NIE jest tym, o ktory prosilismy. Nie uruchamiaj go."
+        return $false
+    }
+    Write-Ok "$Opis - suma kontrolna zgodna."
+    return $true
+}
+
 function Test-Administrator {
     if (-not $IsWindows -and $null -ne $IsWindows) { return $false }
     $tozsamosc = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -110,6 +170,12 @@ function Install-WertisNarzedzie {
         Initialize-WertisSiec
         $msi = Join-Path $env:TEMP ([IO.Path]::GetFileName($UrlAwaryjny))
         Invoke-WebRequest -Uri $UrlAwaryjny -OutFile $msi -UseBasicParsing
+        # MSI idzie za chwilę do msiexec z uprawnieniami administratora —
+        # weryfikacja MUSI być przed uruchomieniem, nie po.
+        if (-not (Test-WertisSuma -Sciezka $msi -Oczekiwana $script:SUMA_NODE_MSI -Opis "Instalator Node")) {
+            Remove-Item $msi -Force -ErrorAction SilentlyContinue
+            return $false
+        }
         Start-Process msiexec.exe -ArgumentList "/i", "`"$msi`"", "/qn", "/norestart" -Wait
     } else {
         Write-Blad "Brak $Opis i brak wingeta. Zainstaluj ręcznie i uruchom instalator ponownie."
@@ -177,6 +243,11 @@ function Get-WertisNssm {
     $zip  = Join-Path $env:TEMP "nssm-2.24.zip"
     $rozp = Join-Path $env:TEMP "nssm-2.24-rozpakowany"
     Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $zip -UseBasicParsing
+    # nssm.exe będzie zakładał usługi jako SYSTEM — sprawdzamy, ZANIM go rozpakujemy
+    if (-not (Test-WertisSuma -Sciezka $zip -Oczekiwana $script:SUMA_NSSM_ZIP -Opis "NSSM")) {
+        Remove-Item $zip -Force -ErrorAction SilentlyContinue
+        throw "Pobrany nssm-2.24.zip nie przeszedl weryfikacji sumy kontrolnej."
+    }
     if (Test-Path $rozp) { Remove-Item $rozp -Recurse -Force }
     Expand-Archive -Path $zip -DestinationPath $rozp -Force
     Copy-Item (Join-Path $rozp "nssm-2.24\win64\nssm.exe") $docelowy -Force

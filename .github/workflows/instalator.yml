@@ -91,6 +91,32 @@ jobs:
       - name: Przebieg probny wariantu demo
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Demo -Katalog "$env:RUNNER_TEMP\wertis-demo"
 
+      # Instalator pobiera nssm.exe i uruchamia go jako SYSTEM, więc suma
+      # kontrolna jest jedyną rzeczą stojącą między klientem a podmienionym
+      # plikiem. Wartości nie dało się ustalić przy pisaniu kodu (brak dostępu
+      # do nssm.cc), a wpisanie jej z pamięci dałoby weryfikację POZORNĄ.
+      # Ten krok liczy ją na maszynie, która ten adres widzi.
+      - name: Suma kontrolna NSSM
+        continue-on-error: true
+        run: |
+          $zip = "$env:RUNNER_TEMP\nssm.zip"
+          Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $zip -UseBasicParsing
+          $suma = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $kod = Get-Content instalator\uslugi.ps1 -Raw
+          if ($kod -notmatch '\$script:SUMA_NSSM_ZIP\s*=\s*"([0-9a-fA-F]*)"') {
+            throw "Nie znalazlem stalej SUMA_NSSM_ZIP w uslugi.ps1"
+          }
+          $oczekiwana = $Matches[1].ToLowerInvariant()
+          if (-not $oczekiwana) {
+            Write-Host "::warning::Suma NSSM nie jest jeszcze zapisana. Wpisz do instalator/uslugi.ps1: $suma"
+          } elseif ($oczekiwana -ne $suma) {
+            # Albo nssm.cc wydało nową binarkę, albo ktoś podmienił plik.
+            # Jedno i drugie wymaga OCZU CZŁOWIEKA, nie cichej aktualizacji.
+            throw "SUMA NSSM SIE ZMIENILA. W repo: $oczekiwana, pobrana: $suma"
+          } else {
+            Write-Host "Suma NSSM zgodna: $suma"
+          }
+
       - name: Budowa .exe
         run: |
           Install-Module -Name ps2exe -Force -Scope CurrentUser -AllowClobber
