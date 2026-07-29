@@ -52,6 +52,15 @@ gwarancją, że **od tamtej chwili plik się nie zmienił**.
   co podmieniony plik**. Nieosiągalne `nssm.cc` daje ostrzeżenie i przepuszcza;
   niezgodna suma zatrzymuje budowę.
 
+- **Wydanie powstawało PUSTE.** Workflow instalatora nie miał bloku
+  `permissions`, więc `github.token` dostawał dostęp tylko do odczytu,
+  a `gh release upload` kończył się `HTTP 403: Resource not accessible by
+  integration`. Tag się tworzył, **plików przy nim nie było** — a to jedyna
+  droga, którą instalator trafia do człowieka.
+
+  Znalezione przy okazji, w logach nieudanego biegu z 12:56, nie zgłoszone.
+  Dodane `contents: write` na poziomie zadania.
+
 ### Uwagi
 
 - Przebieg próbny w CI potwierdził, że `-DryRun` **pomija pobieranie**, więc

@@ -27,6 +27,17 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    # `contents: write` jest potrzebne WYŁĄCZNIE ostatniemu krokowi, który
+    # dokleja pliki instalatora do wydania. Bez tego `github.token` ma dostęp
+    # tylko do odczytu i `gh release upload` kończy się „HTTP 403: Resource not
+    # accessible by integration" — a wydanie POWSTAJE, tylko puste. Tak przeszło
+    # wydanie z 29.07: tag był, plików przy nim nie było.
+    #
+    # Uprawnienie jest wypisane jawnie i w komplecie, bo podanie choćby jednego
+    # klucza wyłącza wszystkie domyślne. Milcząca lista byłaby tu gorsza od
+    # żadnej.
+    permissions:
+      contents: write
     defaults:
       run:
         shell: powershell
