@@ -1,8 +1,15 @@
 import { db } from "../db/db.js";
+import { currentUserRef } from "../context.js";
 import type { MmItem } from "../adapters/sfera.js";
 
 export interface EnqueueBase {
   createdBy: string;
+  /**
+   * Konto autora. Puste = bierzemy z bieżącej sesji. Podaje się je wprost
+   * tylko wtedy, gdy autor NIE jest właścicielem sesji — operacja odbuforowana
+   * po zmianie zmiany (patrz `autorOperacji`).
+   */
+  createdByRef?: number | null;
   twId?: number | null;
   sourceDocId?: number | null;
   sessionId?: number | null;
@@ -15,12 +22,16 @@ function insert(
   payload: unknown,
   base: EnqueueBase
 ): number {
+  /* `created_by_ref` obok `created_by`: nazwa to snapshot z chwili zapisu,
+     konto to tożsamość. Worker działa POZA żądaniem — nie ma tam sesji ani
+     `currentUserRef()` — więc bez tej kolumny zdarzenia „zapis wszedł/nie
+     wszedł" umiałyby podać wyłącznie łańcuch znaków, a audyt wiąże po koncie. */
   // `next_attempt_at` zostaje NULL — zadanie jest do wzięcia od razu. Kolumnę
   // wypełnia dopiero worker: backoff przy retry i `waiting_for_doc`.
   const res = db()
     .prepare(
-      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by, next_attempt_at)
-       VALUES (?,?, 'pending', ?,?,?,?,?,?,?)`
+      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by, created_by_ref, next_attempt_at)
+       VALUES (?,?, 'pending', ?,?,?,?,?,?,?,?)`
     )
     .run(
       type,
@@ -31,6 +42,7 @@ function insert(
       base.sourceDocId ?? null,
       base.sessionId ?? null,
       base.createdBy,
+      base.createdByRef ?? currentUserRef(),
       null
     );
   return Number(res.lastInsertRowid);

@@ -80,6 +80,41 @@ Twarde zasady (spec §12) egzekwowane na serwerze:
 - kody lokalizacji bez spacji,
 - każda operacja w `events`.
 
+### Ślad audytowy — „aplikacja zjadła mi 30 sztuk"
+
+`events` zbiera od pierwszego dnia instalacji **każdy skan, każdą decyzję
+i każdy błąd**, z osobą, kontem, urządzeniem i czasem. Nic tego nie kasuje.
+Łańcuch jest pełny w obie strony:
+
+```
+skan → decyzja człowieka → zadanie w kolejce → ZAPIS DO SUBIEKTA (albo jego brak)
+scan   location_set        (sfera_queue)       queue_applied | queue_retry | queue_failed
+```
+
+`queue_failed` to najważniejszy wpis w całym logu: magazynier zrobił swoje,
+kolektor przyjął, a do bazy firmy nic nie weszło. Odrzucone żądania mają własny
+typ (`http_rejected`), więc „skanowałem i się nie zapisało" też zostawia ślad.
+
+Odczyt: `GET /api/events` z filtrem po osobie, towarze, urządzeniu, typie
+i dacie oraz `GET /api/events/csv` do arkusza. **Wymaga roli brygadzisty albo
+biura** — log mówi, kto ile zeskanował, więc jest narzędziem nadzoru. Kto
+wyniesie CSV, sam trafia do śladu.
+
+```bash
+curl -s -H "x-session: $TOKEN" \
+  'http://localhost:3001/api/events?twId=507&od=2026-07-01' | jq
+```
+
+> **Czego log NIE obejmuje.** Operacja wykonana bez Wi-Fi żyje w pliku na
+> kolektorze aż do połączenia. Zginie urządzenie przed odzyskaniem sieci —
+> śladu nie ma, i żadna zmiana po stronie serwera tego nie zmieni. Buforowana
+> jest wyłącznie zmiana lokalizacji; reszta offline nie działa, więc luka jest
+> wąska, ale realna.
+
+Rozmiar historii widać w `/api/health` (`audyt`). Nie czyścimy jej, bo
+reklamacja przychodzi po miesiącach — ale licznik jest po to, żeby decyzję
+o archiwum podjąć na liczbach.
+
 **Zapis do Subiekta ogranicza się do dwóch rzeczy.** Pierwsza to pole
 lokalizacji na kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze
 wersje nie mają). Druga to **flaga sprawdzenia na fakturze dostawy**.
@@ -465,7 +500,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 92 testy jednostkowych; buduje się bez Android SDK
+                           + 96 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

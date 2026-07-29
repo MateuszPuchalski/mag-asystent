@@ -736,3 +736,31 @@ data class CreateUserResponse(val user: UserDto = UserDto())
 
 @Serializable
 data class UsersResponse(val users: List<UserDto> = emptyList())
+
+/* ── Meldunek o operacjach odrzuconych na kolektorze ────────────────────────
+   Bufor offline to plik na urządzeniu, a urządzenie zginie albo zostanie
+   zresetowane. Operacja, której serwer nie przyjął, znikała razem z plikiem —
+   bez śladu i bez odpowiedzi na pytanie „co się stało z moim skanem".        */
+
+@Serializable
+data class OdrzuconaOperacja(
+    val rodzaj: String = "",
+    val twId: Long? = null,
+    val powod: String = "",
+    /** Kod HTTP, którym serwer odmówił. */
+    val status: Int = 0,
+    /** Ile razy próbowaliśmy przed poddaniem się. */
+    val proby: Int = 0,
+    /**
+     * Czas WYKONANIA na kolektorze w ISO 8601, nie czas dosłania. Operacja
+     * mogła czekać w buforze godzinami — bez tego pola audyt datowałby ją na
+     * moment, w którym się o niej dowiedział.
+     */
+    val at: String? = null,
+)
+
+@Serializable
+data class MeldunekOdrzuconych(val operacje: List<OdrzuconaOperacja> = emptyList())
+
+@Serializable
+data class MeldunekPrzyjety(val przyjeto: Int = 0)

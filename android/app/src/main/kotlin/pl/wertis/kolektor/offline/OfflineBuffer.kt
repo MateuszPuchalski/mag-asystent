@@ -10,12 +10,18 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import java.io.File
+import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
+import pl.wertis.kolektor.core.net.ApiError
+import pl.wertis.kolektor.core.net.MeldunekOdrzuconych
+import pl.wertis.kolektor.core.net.OdrzuconaOperacja
 import pl.wertis.kolektor.core.net.WertisJson
 import pl.wertis.kolektor.core.offline.OfflineQueue
+import pl.wertis.kolektor.core.offline.OpReporter
 import pl.wertis.kolektor.core.offline.OpSender
 import pl.wertis.kolektor.core.offline.OpStorage
 import pl.wertis.kolektor.core.offline.PendingOp
@@ -67,6 +73,41 @@ class ApiOpSender(private val api: ApiService) : OpSender {
                     asUser = op.user,
                     bufferedUser = op.userRef?.toString(),
                 ).queueId
+        }
+    }
+}
+
+/**
+ * Meldunek na serwer o operacji, której nie dało się wykonać.
+ *
+ * Wysyłka jest „best effort" i tak ma zostać: gdy sam meldunek nie przejdzie
+ * (bo właśnie zniknęła sieć), nie wolno mu wywrócić opróżniania kolejki —
+ * `OfflineQueue.odrzuc` łapie wyjątek. Utrata meldunku jest przykra; utrata
+ * całego bufora z jego powodu byłaby dokładnie tym błędem, który naprawiamy.
+ *
+ * `runBlocking` na wątku flusha jest tu świadome: `OpReporter` jest celowo
+ * synchroniczny, żeby `flush()` nie musiał wiedzieć o korutynach kolektora,
+ * a meldunek to jedno krótkie żądanie po już nawiązanym połączeniu.
+ */
+class ApiOpReporter(private val api: ApiService) : OpReporter {
+    override fun report(op: PendingOp, e: ApiError) {
+        runBlocking {
+            api.meldujOdrzucone(
+                MeldunekOdrzuconych(
+                    listOf(
+                        OdrzuconaOperacja(
+                            rodzaj = op.kind.name,
+                            twId = op.productId,
+                            powod = e.message ?: "błąd",
+                            status = e.status,
+                            proby = op.proby,
+                            // czas WYKONANIA, nie dosłania — operacja mogła
+                            // czekać w buforze godzinami
+                            at = Instant.ofEpochMilli(op.at).toString(),
+                        )
+                    )
+                )
+            )
         }
     }
 }

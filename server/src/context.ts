@@ -166,5 +166,47 @@ export function withRequestContext(app: FastifyInstance): void {
       return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
     }
   });
+
+  /* ── Odrzucone żądania ────────────────────────────────────────────────────
+     „Skanowałem i się nie zapisało" nie zostawiało po stronie serwera ŻADNEGO
+     śladu: 400 za przekroczony limit pola, zły kod półki czy nieznany towar
+     wracały do kolektora i znikały. Reklamację dało się wtedy zbyć zdaniem
+     „nie widzę takiej operacji" — co jest prawdą i jednocześnie nieprawdą.
+
+     Hook jest `onSend`, nie `onResponse`, bo tam ciała odpowiedzi już nie ma,
+     a wpis bez POWODU odrzucenia nie odpowiada na żadne pytanie.             */
+  app.addHook("onSend", async (req, reply, payload) => {
+    if (reply.statusCode < 400) return payload;
+    const sciezka = req.url.split("?")[0];
+    if (!sciezka.startsWith("/api/")) return payload;
+
+    /* Wygasła sesja przy odpytywaniu karty co 2 s dałaby 30 wierszy na minutę
+       z każdego kolektora i utopiła resztę audytu w szumie. Odczyt bez sesji
+       jest nudny; PRÓBA ZAPISU bez sesji już nie — i ta zostaje logowana. */
+    if (reply.statusCode === 401 && req.method === "GET") return payload;
+
+    const { logEvent } = await import("./services/events.js");
+    logEvent("http_rejected", currentUserName() ?? "anonim", null, {
+      metoda: req.method,
+      sciezka,
+      status: reply.statusCode,
+      /* WYŁĄCZNIE powód z odpowiedzi. Ciała ŻĄDANIA nie zapisujemy nigdy i to
+         jest zasada, nie przeoczenie: przez `POST /api/auth/pin` przechodzi
+         PIN, a log audytowy, który wycieka PIN-y, jest gorszy od jego braku. */
+      powod: powodOdrzucenia(payload),
+    });
+    return payload;
+  });
+}
+
+/** Komunikat błędu z ciała odpowiedzi; `null`, gdy odpowiedź go nie niesie. */
+function powodOdrzucenia(payload: unknown): string | null {
+  if (typeof payload !== "string") return null;
+  try {
+    const b = JSON.parse(payload) as { error?: unknown };
+    return typeof b.error === "string" ? b.error.slice(0, 300) : null;
+  } catch {
+    return null; // nie-JSON (np. odpowiedź Fastify na 404 trasy) — powodu brak
+  }
 }
 

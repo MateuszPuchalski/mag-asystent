@@ -11,6 +11,8 @@ import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
 import { deviceRoutes } from "./routes/device.js";
 import { authRoutes } from "./routes/auth.js";
+import { audytRoutes } from "./routes/audyt.js";
+import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import {
   brakDostepuDoMagazynow,
@@ -72,6 +74,11 @@ export async function buildApp() {
       // dokumentów, na produkcji para grupa/typ bywa jeszcze nieustalona).
       // Bez tego pola cisza po stronie flag byłaby nie do odróżnienia od awarii.
       docFlag: docFlagAvailable() ? "on" : "off (brak MSSQL_FLAG_GRUPA / MSSQL_FLAG_TYP_OBIEKTU)",
+      /* Ślad audytowy NIE JEST czyszczony — to świadoma decyzja, bo reklamacja
+         przychodzi po miesiącach. Ale „rośnie w nieskończoność" bez licznika
+         kończy się pełnym dyskiem o trzeciej w nocy, więc rozmiar i wiek
+         historii widać tutaj. Decyzję o archiwum podejmuje się na liczbach. */
+      audyt: statystykiAudytu(),
       ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
       ...(problemy.length ? { problemy } : {}),
     };
@@ -95,6 +102,7 @@ export async function buildApp() {
   await app.register(deviceRoutes);
   await app.register(authRoutes);
   await app.register(magazynRoutes);
+  await app.register(audytRoutes);
 
   await app.ready();
   return app;

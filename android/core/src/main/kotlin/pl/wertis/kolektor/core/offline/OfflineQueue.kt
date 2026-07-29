@@ -36,6 +36,15 @@ data class PendingOp(
      * Wi-Fi. `null` dla operacji zbuforowanych przed wprowadzeniem kont.
      */
     val userRef: Long? = null,
+    /**
+     * Ile razy serwer odrzucił tę operację błędem PRZEJŚCIOWYM.
+     *
+     * Bez licznika serwer zwracający 500 bez końca zamroziłby bufor na zawsze:
+     * pierwsza operacja wracałaby do kolejki w nieskończoność, a wszystko za
+     * nią nigdy by nie ruszyło. Po `MAX_PROB` traktujemy ją jak trwale
+     * odrzuconą — z meldunkiem, nie po cichu.
+     */
+    val proby: Int = 0,
 ) {
     @Serializable
     enum class OpKind { SET_LOCATION }
@@ -53,6 +62,18 @@ fun interface OpSender {
     suspend fun send(op: PendingOp): Long?
 }
 
+/**
+ * Meldunek o operacji, której NIE DAŁO SIĘ wykonać.
+ *
+ * Bufor to plik na kolektorze — urządzenie zginie albo zostanie zresetowane,
+ * więc operacja odrzucona i skasowana lokalnie przestaje istnieć. Serwer musi
+ * się o niej dowiedzieć, choćby po to, żeby ktoś mógł powiedzieć magazynierowi,
+ * co się stało z jego skanem.
+ */
+fun interface OpReporter {
+    fun report(op: PendingOp, e: ApiError)
+}
+
 data class RunResult(
     val offline: Boolean,
     /** id zadania w kolejce Sfery (online); null gdy poszło do bufora. */
@@ -65,6 +86,8 @@ class OfflineQueue(
     private val isOnline: () -> Boolean,
     /** Serwer odrzucił operację z bufora (np. zła ilość) — zgłoś, nie blokuj kolejki. */
     private val onRejected: (PendingOp, String) -> Unit = { _, _ -> },
+    /** Meldunek na serwer o operacji trwale odrzuconej — patrz `OpReporter`. */
+    private val reporter: OpReporter = OpReporter { _, _ -> },
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     private val lock = Any()
@@ -87,6 +110,22 @@ class OfflineQueue(
 
     /** Czy błąd to awaria sieci (a nie odpowiedź serwera 4xx/5xx). */
     private fun isNetworkError(e: Exception): Boolean = e !is ApiError
+
+    /**
+     * Czy odpowiedź serwera znaczy „spróbuj jeszcze raz", czy „to się nigdy nie
+     * uda".
+     *
+     * Do sierpnia 2026 tego rozróżnienia NIE BYŁO: `flush()` traktował każdy
+     * `ApiError` jednakowo i kasował operację z bufora. Przejściowy 500 przy
+     * restarcie serwera albo 503 spod reverse proxy kasował więc zeskanowaną
+     * pracę magazyniera — bez śladu, bez ostrzeżenia i bez szansy na powtórkę.
+     *
+     * 5xx to awaria SERWERA, a operacja jest zdrowa. 408 i 429 to wprost
+     * „ponów". Reszta 4xx mówi, że żądanie jest wadliwe — i żadna liczba
+     * ponowień tego nie naprawi.
+     */
+    private fun czyPrzejsciowy(e: ApiError): Boolean =
+        e.status >= 500 || e.status == 408 || e.status == 429 || e.status == 0
 
     /**
      * Wykonaj operację online; przy braku sieci — zbuforuj i zwróć znacznik offline.
@@ -115,7 +154,18 @@ class OfflineQueue(
         return RunResult(offline = true)
     }
 
-    /** Spróbuj wysłać całą kolejkę. Przy awarii sieci — przerwij i zostaw resztę. */
+    /**
+     * Spróbuj wysłać całą kolejkę.
+     *
+     * Trzy zakończenia, nie dwa:
+     *  - brak sieci albo błąd PRZEJŚCIOWY → przerwij, operacja ZOSTAJE w buforze,
+     *  - błąd TRWAŁY (4xx) → operacja wypada, ale zostaje ZAMELDOWANA,
+     *  - wyczerpane próby → jak trwały; inaczej jedna chora operacja blokuje
+     *    wszystkie następne w nieskończoność.
+     *
+     * Kasowanie bez śladu nie jest tu żadną z opcji — to był właśnie ten błąd,
+     * przez który praca magazyniera znikała bez odpowiedzi na pytanie „gdzie".
+     */
     suspend fun flush() {
         if (!flushMutex.tryLock()) return
         try {
@@ -127,12 +177,33 @@ class OfflineQueue(
                     persist(ops.drop(1))
                 } catch (e: Exception) {
                     if (isNetworkError(e)) break // nadal offline — spróbujemy później
+                    val err = e as ApiError
+                    if (czyPrzejsciowy(err) && op.proby + 1 < MAX_PROB) {
+                        // serwer choruje, operacja jest zdrowa: zostaje na czele
+                        // kolejki z podbitym licznikiem i wraca przy następnym flushu
+                        persist(listOf(op.copy(proby = op.proby + 1)) + ops.drop(1))
+                        break
+                    }
                     persist(ops.drop(1))
-                    onRejected(op, e.message ?: "błąd")
+                    odrzuc(op, err)
                 }
             }
         } finally {
             flushMutex.unlock()
         }
+    }
+
+    private fun odrzuc(op: PendingOp, e: ApiError) {
+        onRejected(op, e.message ?: "błąd")
+        /* Meldunek na serwer. Bufor żyje w pliku na kolektorze, więc odrzucona
+           operacja bez tego wpisu istnieje wyłącznie tam — a urządzenie zginie
+           albo zostanie zresetowane. Meldunek jest „best effort": gdy sam nie
+           przejdzie, nie wolno mu wywrócić opróżniania kolejki. */
+        runCatching { reporter.report(op, e) }
+    }
+
+    companion object {
+        /** Po tylu przejściowych odrzuceniach operacja przestaje blokować kolejkę. */
+        const val MAX_PROB = 5
     }
 }

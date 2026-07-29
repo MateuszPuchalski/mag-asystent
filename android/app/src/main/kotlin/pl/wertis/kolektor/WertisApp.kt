@@ -22,6 +22,7 @@ import pl.wertis.kolektor.device.MotionMonitor
 import pl.wertis.kolektor.nav.AppNavState
 import pl.wertis.kolektor.net.ApiClient
 import pl.wertis.kolektor.net.ApiService
+import pl.wertis.kolektor.offline.ApiOpReporter
 import pl.wertis.kolektor.offline.ApiOpSender
 import pl.wertis.kolektor.offline.FileOpStorage
 import pl.wertis.kolektor.offline.wireOfflineFlush
@@ -71,6 +72,10 @@ class AppGraph(context: Context) {
         sender = ApiOpSender(api),
         isOnline = { connectivity.isOnline },
         onRejected = { _, msg -> effects.toast("Operacja z bufora odrzucona: $msg") },
+        /* Toast znika razem z ekranem, a urządzenie potrafi zginąć — dlatego
+           odrzucona operacja idzie TAKŻE na serwer, do śladu, który przeżyje
+           kolektor. */
+        reporter = ApiOpReporter(api),
     )
 
     /* Kreator kont — jedyna droga do założenia pierwszego konta bez terminala. */

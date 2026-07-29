@@ -103,6 +103,12 @@ function migrate(database: DatabaseSync) {
     }
   };
   addColumn("sfera_queue", "session_id", "INTEGER");
+  /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
+     aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
+     kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
+     konta, a nazwa nie jest tożsamością. Stare zadania mają NULL i tak
+     zostaje: zgadywanie po nazwie byłoby gorsze niż uczciwy brak. */
+  addColumn("sfera_queue", "created_by_ref", "INTEGER");
   addColumn("putaway_sessions", "source_mag_id", "INTEGER");
   // locki per linia (tryb A: dostawy i zwroty) — kilka osób przy jednym dokumencie
   addColumn("delivery_line", "locked_by", "TEXT");
@@ -129,6 +135,10 @@ function migrate(database: DatabaseSync) {
      więc w chwili wykonania schematu ta kolumna jeszcze nie istnieje. Raport
      wydajności (§7) grupuje właśnie po niej. */
   database.exec("CREATE INDEX IF NOT EXISTS ix_events_ref_time ON events(user_ref, created_at)");
+  /* Indeks po towarze. `CREATE INDEX IF NOT EXISTS` w schema.sql wystarcza dla
+     NOWEJ bazy, ale istniejąca instalacja wykonała schemat dawno — bez tej
+     linii filtr audytu po towarze skanowałby u niej całą tabelę. */
+  database.exec("CREATE INDEX IF NOT EXISTS ix_events_tw_time ON events(tw_id, created_at)");
   /* Nazwa magazynu z sl_Magazyn. `CREATE TABLE IF NOT EXISTS` nie dokłada
      kolumny do tabeli, która już istnieje — bez tej linii istniejąca instalacja
      miałaby `sgt_magazyn` bez `nazwa` i import wywaliłby się na INSERT. */

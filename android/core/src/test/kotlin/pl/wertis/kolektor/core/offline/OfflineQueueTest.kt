@@ -164,4 +164,87 @@ class OfflineQueueTest {
         q.runOrBuffer(PendingOp.OpKind.SET_LOCATION, user = "anna", productId = 7, setLocation = setLoc)
         assertEquals(null, storage.saved[0].userRef)
     }
+    // ── Błąd przejściowy vs trwały ──────────────────────────────────────────
+    // Do sierpnia 2026 `flush()` kasował operację przy KAŻDYM `ApiError`, więc
+    // przejściowy 500 przy restarcie serwera zjadał zeskanowaną pracę
+    // magazyniera. Te trzy testy pilnują rozróżnienia, bez którego log po
+    // stronie serwera i tak nie miałby czego zapisać.
+
+    @Test fun `blad 5xx ZOSTAJE w buforze i idzie ponownie`() = runTest {
+        val storage = MemStorage()
+        var padaj = true
+        val wyslane = mutableListOf<Long?>()
+        val zameldowane = mutableListOf<Int>()
+        // do bufora przez brak sieci, żeby flush miał co wysyłać
+        OfflineQueue(storage, { throw java.io.IOException("x") }, isOnline = { true })
+            .runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
+
+        val q = OfflineQueue(
+            storage,
+            { op -> if (padaj) throw ApiError(500, "serwer padł") else { wyslane += op.productId; null } },
+            isOnline = { true },
+            reporter = { _, e -> zameldowane += e.status },
+        )
+        q.flush()
+        assertEquals("500 to awaria SERWERA — operacja jest zdrowa i ma zostać", 1, q.count.value)
+        assertTrue("nie meldujemy operacji, która jeszcze wróci", zameldowane.isEmpty())
+        assertEquals("licznik prób ma rosnąć, inaczej pętla nigdy się nie kończy", 1, storage.saved[0].proby)
+
+        padaj = false
+        q.flush()
+        assertEquals(listOf(7L), wyslane)
+        assertEquals(0, q.count.value)
+    }
+
+    @Test fun `blad 4xx wypada z bufora i JEST zameldowany`() = runTest {
+        val storage = MemStorage()
+        val zameldowane = mutableListOf<Pair<Long?, Int>>()
+        OfflineQueue(storage, { throw java.io.IOException("x") }, isOnline = { true })
+            .runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
+
+        val q = OfflineQueue(
+            storage,
+            { throw ApiError(400, "Nieznana akcja") },
+            isOnline = { true },
+            reporter = { op, e -> zameldowane += op.productId to e.status },
+        )
+        q.flush()
+        assertEquals(0, q.count.value)
+        // sedno całej zmiany: operacja znika z kolektora, ale NIE znika bez śladu
+        assertEquals(listOf(7L to 400), zameldowane)
+    }
+
+    @Test fun `po MAX_PROB przejsciowych odrzucen operacja przestaje blokowac kolejke`() = runTest {
+        // inaczej serwer zwracający 500 bez końca zamraża bufor na zawsze:
+        // pierwsza operacja wraca w nieskończoność, reszta nigdy nie rusza
+        val storage = MemStorage()
+        val zameldowane = mutableListOf<Int>()
+        OfflineQueue(storage, { throw java.io.IOException("x") }, isOnline = { true })
+            .runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
+
+        val q = OfflineQueue(
+            storage,
+            { throw ApiError(503, "chwilowo niedostępny") },
+            isOnline = { true },
+            reporter = { _, e -> zameldowane += e.status },
+        )
+        repeat(OfflineQueue.MAX_PROB) { q.flush() }
+        assertEquals(0, q.count.value)
+        assertEquals(listOf(503), zameldowane)
+    }
+
+    @Test fun `meldunek ktory sam padnie nie wywraca oproznienia kolejki`() = runTest {
+        val storage = MemStorage()
+        OfflineQueue(storage, { throw java.io.IOException("x") }, isOnline = { true })
+            .runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
+
+        val q = OfflineQueue(
+            storage,
+            { throw ApiError(400, "zła akcja") },
+            isOnline = { true },
+            reporter = { _, _ -> throw IllegalStateException("brak sieci na meldunek") },
+        )
+        q.flush() // nie może rzucić
+        assertEquals(0, q.count.value)
+    }
 }
