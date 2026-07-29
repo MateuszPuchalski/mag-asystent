@@ -271,10 +271,15 @@ Dziś obie pozycje mają sprawdzaną sumę SHA-256 **przed uruchomieniem**:
 
 - **Node** — suma z oficjalnego `SHASUMS256.txt` na nodejs.org; niezgodność
   przerywa instalację.
-- **NSSM** — stała `SUMA_NSSM_ZIP` w `uslugi.ps1`. Dopóki jest pusta,
-  instalator **ostrzega i wypisuje policzoną wartość** zamiast udawać, że
-  sprawdził. Ustala ją krok `Suma kontrolna NSSM` w CI; zmiana sumy przy
-  kolejnym wydaniu **zatrzymuje budowę**, bo to wymaga oczu człowieka.
+- **NSSM** — sumę policzył runner Windows w CI. Pobrał plik wprost
+  z `nssm.cc`. Nie jest wpisana „z pamięci", bo weryfikacja pozorna jest gorsza
+  od jawnego jej braku.
+
+  **Czego ta suma dowodzi, a czego nie.** Nie jest dowodem, że `nssm.cc` było
+  wtedy nienaruszone — to zaufanie przy pierwszym użyciu. Jest natomiast
+  gwarancją, że **od tamtej chwili plik się nie zmienił**. Podmiana zatrzyma
+  instalację u klienta, a w CI **zatrzyma budowę**. Niedostępne `nssm.cc` jest
+  odróżniane od niezgodnej sumy i samo w sobie CI nie psuje.
 
 ## Znane ograniczenia
 

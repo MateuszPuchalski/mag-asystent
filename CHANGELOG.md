@@ -28,6 +28,37 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.8.2 — 29 lipca 2026
+
+Suma kontrolna NSSM wpisana — strażnik z 0.8.1 działa w obie strony.
+
+W 0.8.1 stała `SUMA_NSSM_ZIP` została **celowo pusta**, bo `nssm.cc` nie było
+osiągalne ze środowiska, w którym powstawał tamten kod. Wartość policzył runner
+Windows w CI, pobierając plik wprost ze źródła:
+`727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743`.
+
+**Czego ta suma dowodzi, a czego nie.** Nie jest dowodem, że `nssm.cc` było
+w tamtej chwili nienaruszone — to zaufanie przy pierwszym użyciu. Jest natomiast
+gwarancją, że **od tamtej chwili plik się nie zmienił**.
+
+### Poprawione
+
+- **Krok CI stracił `continue-on-error`** i to jest sedno tej zmiany. Z pustą
+  sumą krok tylko meldował wartość, więc pobłażliwość nic nie kosztowała.
+  Z wpisaną — `continue-on-error` czyniłby strażnika **bezzębnym**: podmieniony
+  plik dawałby zielone CI.
+
+  Rozdzielone są za to dwa różne zdarzenia: **niedostępna sieć to nie to samo,
+  co podmieniony plik**. Nieosiągalne `nssm.cc` daje ostrzeżenie i przepuszcza;
+  niezgodna suma zatrzymuje budowę.
+
+### Uwagi
+
+- Przebieg próbny w CI potwierdził, że `-DryRun` **pomija pobieranie**, więc
+  weryfikacja sum nie zmienia zachowania trybu próbnego.
+
+---
+
 ## 0.8.1 — 29 lipca 2026
 
 Antywirus zablokował instalator — i przy okazji wyszła realna dziura.
