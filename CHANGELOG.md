@@ -28,6 +28,69 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.8.1 — 29 lipca 2026
+
+Antywirus zablokował instalator — i przy okazji wyszła realna dziura.
+
+Zgłoszenie brzmiało: *„antywirus zablokował wertis-instalator.ps1, IDP.Generic,
+zarażony"*. Audyt źródła: **plik jest czysty**. Zero kodu wykonywanego z sieci
+(`IEX`, `DownloadString`, base64, `-EncodedCommand`), zero osadzonych binariów,
+poprawny UTF-8 w całości, trzy adresy zewnętrzne — własne repo, `nodejs.org`,
+`nssm.cc`. `IDP.Generic` to detekcja heurystyczna: ocenia zachowanie, nie
+sygnaturę.
+
+Instalator wykonuje sześć czynności, które razem dają profil droppera: pobiera
+archiwum i uruchamia z niego plik, instaluje MSI po cichu (`/qn`), rozpakowuje
+`SecureString` do jawnego hasła, nadpisuje TLS, podnosi uprawnienia i zakłada
+usługi. Do tego **NSSM sam jest narzędziem dwojakiego użytku** — malware zakłada
+nim usługi dla przetrwania restartu. Antywirus zachował się poprawnie.
+
+### Poprawione
+
+- **Pobierane pliki nie były w ŻADEN sposób weryfikowane.** Instalator ściągał
+  instalator Node'a i `nssm.exe`, po czym uruchamiał je **z uprawnieniami
+  administratora** — bez sprawdzenia, co właściwie przyszło. Przejęcie DNS
+  w sieci klienta albo włamanie na serwer wydań wystarczyło, żeby ta maszyna
+  wykonała cudzy kod jako SYSTEM.
+
+  **To była realna dziura, nie fałszywy alarm** — znaleziona przy okazji, nie
+  zgłoszona. Obie pozycje mają teraz sprawdzaną sumę SHA-256 **przed
+  uruchomieniem**; niezgodność przerywa instalację i kasuje pobrany plik.
+
+  Suma Node'a pochodzi z oficjalnego `SHASUMS256.txt` na nodejs.org. Suma NSSM
+  została **celowo zostawiona pusta**: `nssm.cc` nie było osiągalne ze
+  środowiska, w którym powstawał ten kod, a wpisanie wartości „z pamięci"
+  dałoby weryfikację **pozorną** — gorszą od jawnego jej braku, bo wyglądającą
+  na zabezpieczenie. Dopóki jest pusta, instalator ostrzega i wypisuje
+  policzoną wartość. Ustala ją nowy krok CI na maszynie mającej dostęp do
+  `nssm.cc`; późniejsza zmiana sumy **zatrzymuje budowę**, bo wymaga oczu
+  człowieka.
+
+### Dodane
+
+- **`instalator/README.md` — sekcja „Antywirus zablokował instalator".** Co
+  znaczy `IDP.Generic`, tabela sześciu zachowań, które go wywołują, jak
+  **samodzielnie zweryfikować** plik (`.ps1` to czysty tekst — da się go
+  przeczytać), gdzie zgłosić fałszywy alarm i **czego nie robić** (nie
+  wykluczać całego katalogu, nie wyłączać ochrony).
+
+  Osobno wypisane, **kiedy zacząć się naprawdę martwić**: base64,
+  `Invoke-Expression`, `-EncodedCommand` albo adres spoza znanej trójki. Bez
+  tego akapitu instrukcja „to fałszywka, kliknij zezwól" uczyłaby ignorowania
+  antywirusa — czyli dokładnie odwrotnie, niż trzeba.
+
+### Uwagi
+
+- **`.exe` z `ps2exe` jest flagowany znacznie częściej niż `.ps1`.** Wydanie
+  niesie oba; przy blokadzie używaj skryptu.
+- **Wycięcie NSSM zostaje jako opcja.** Usunęłoby naraz pobieranie obcej
+  binarki, zależność od `nssm.cc` i najczęściej flagowany składnik. Wymaga
+  jednak przepisania rejestracji usług na Harmonogram zadań i **sprawdzenia na
+  prawdziwym Windowsie** — a to jest mechanizm, od którego zależy uruchomienie
+  produktu u klienta, więc nie idzie w ciemno razem z poprawką dokumentacji.
+
+---
+
 ## 0.8.0 — 29 lipca 2026
 
 Ślad audytowy odpowiada na reklamację faktem, a nie hipotezą.

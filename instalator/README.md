@@ -202,13 +202,86 @@ zakładania konta, rejestracji usług i reguły zapory. Te cztery rzeczy
 weryfikuje się ręcznie — najtaniej na Subiekcie w wersji edu, wg
 [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md).
 
+## Antywirus zablokował instalator (IDP.Generic i podobne)
+
+**To jest spodziewane i nie znaczy, że plik jest zarażony.** `IDP.Generic`
+(AVG/Avast), `Trojan:Script/Wacatac` (Defender) i pokrewne to detekcje
+**heurystyczne** — reagują na zachowanie, nie na sygnaturę znanego szkodnika.
+
+Instalator robi po kolei sześć rzeczy, z których każda osobno jest niewinna,
+a razem układają się w podręcznikowy profil droppera:
+
+| zachowanie | gdzie |
+|---|---|
+| pobiera archiwum z sieci, rozpakowuje i uruchamia z niego plik | `uslugi.ps1` — NSSM |
+| sam **NSSM jest narzędziem dwojakiego użytku** — malware zakłada nim usługi | `uslugi.ps1` |
+| cicha instalacja MSI (`/qn`, bez pytania) | `uslugi.ps1` — Node |
+| rozpakowanie `SecureString` do jawnego hasła | `wertis-instalator.ps1` — hasło `sa` |
+| nadpisanie protokołu TLS | `Initialize-WertisSiec` |
+| podniesienie uprawnień i zakładanie usług | `Test-Administrator`, `Register-WertisUsluga` |
+
+Sześć na sześć. Antywirus zachował się poprawnie — kłopot w tym, że legalny
+instalator usługi Windows i dropper wykonują te same czynności.
+
+### Sprawdź to sam, nie na słowo
+
+`.ps1` to **czysty tekst** i to jest jego przewaga nad `.exe`: da się go
+przeczytać przed uruchomieniem.
+
+```powershell
+notepad .\WERTIS-Instalator.ps1
+Get-FileHash .\WERTIS-Instalator.ps1 -Algorithm SHA256
+```
+
+Instalator sięga do **trzech** adresów i żadnego innego:
+
+- `github.com/MateuszPuchalski/mag-asystent.git` — kod aplikacji,
+- `nodejs.org` — instalator Node (suma kontrolna sprawdzana, patrz niżej),
+- `nssm.cc` — opakowanie usług Windows.
+
+**Kiedy zacząć się naprawdę martwić.** Jeśli w pliku zobaczysz długi ciąg
+base64, `Invoke-Expression`, `IEX (New-Object Net.WebClient).DownloadString(...)`,
+`-EncodedCommand` albo adres spoza tej trójki — to **nie jest** fałszywy alarm.
+Nie uruchamiaj i zgłoś. W wydanym pliku żadnej z tych rzeczy nie ma.
+
+Dodatkowo wrzuć plik na [VirusTotal](https://www.virustotal.com). Jeden silnik
+na siedemdziesiąt to fałszywka; dwadzieścia silników to nie fałszywka.
+
+### Co zrobić
+
+1. **Zgłoś fałszywy alarm producentowi.** AVG i Avast:
+   `https://www.avg.com/false-positive-file-form` (Avast ma bliźniaczy).
+   Microsoft: `https://www.microsoft.com/wdsi/filesubmission`. Zwykle poprawiają
+   w kilka dni i problem znika u wszystkich klientów naraz.
+2. **Użyj `.ps1` zamiast `.exe`.** Binarka z `ps2exe` jest flagowana **znacznie
+   częściej** — pakowanie skryptu w plik wykonywalny samo w sobie jest sygnałem
+   dla heurystyki. Każde wydanie niesie oba pliki.
+3. **Wykluczenie tylko w ostateczności** i **wyłącznie na konkretny plik**, na
+   czas instalacji. Nie wyłączaj ochrony i nie wykluczaj całego katalogu — to
+   zamienia jeden fałszywy alarm w trwałą dziurę.
+
+### Sumy kontrolne pobieranych plików
+
+Instalator ściąga dwa pliki i **uruchamia je z uprawnieniami administratora**.
+Do sierpnia 2026 robił to bez żadnej weryfikacji — czyli przejęcie DNS w sieci
+klienta wystarczyło, żeby maszyna wykonała cudzy kod jako SYSTEM. **To była
+realna dziura**, w odróżnieniu od detekcji heurystycznej opisanej wyżej.
+
+Dziś obie pozycje mają sprawdzaną sumę SHA-256 **przed uruchomieniem**:
+
+- **Node** — suma z oficjalnego `SHASUMS256.txt` na nodejs.org; niezgodność
+  przerywa instalację.
+- **NSSM** — stała `SUMA_NSSM_ZIP` w `uslugi.ps1`. Dopóki jest pusta,
+  instalator **ostrzega i wypisuje policzoną wartość** zamiast udawać, że
+  sprawdził. Ustala ją krok `Suma kontrolna NSSM` w CI; zmiana sumy przy
+  kolejnym wydaniu **zatrzymuje budowę**, bo to wymaga oczu człowieka.
+
 ## Znane ograniczenia
 
 - **`.exe` jest niepodpisany.** SmartScreen pokaże ostrzeżenie („Więcej
-  informacji" → „Uruchom mimo to"), a część antywirusów oflaguje heurystycznie
-  każdą binarkę z `ps2exe`. Dlatego każde wydanie niesie **także `.ps1`** — ten
-  sam kod, bez opakowania. Podpisanie wymaga certyfikatu code-signing, czyli
-  decyzji i kosztu po stronie firmy.
+  informacji" → „Uruchom mimo to"). Podpisanie wymaga certyfikatu
+  code-signing (OV około 400–600 zł rocznie), czyli decyzji i kosztu po stronie
+  firmy. Szczegóły detekcji antywirusowych — w sekcji wyżej.
 - **Sonda grupy flag jest heurystyczna.** Kreator dobiera parę „grupa flag / typ
   obiektu" po tym, która najczęściej trafia w faktury zakupu, i **prosi
   o potwierdzenie**. Gdy żadna faktura nie jest jeszcze oflagowana, zostawia
