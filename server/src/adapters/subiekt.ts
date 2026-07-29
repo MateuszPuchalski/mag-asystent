@@ -7,7 +7,6 @@ export interface RawProduct {
   nazwa: string;
   ean: string;
   unit: string;
-  ordered: number;
   opis: string;
   lokalizacja: string;
 }
@@ -44,6 +43,20 @@ export interface RawPosition {
 export interface RawDocPosition extends RawDocument {
   /** Suma ilości z tego dokumentu — ten sam towar bywa w kilku pozycjach. */
   ilosc: number;
+}
+
+/** Pozycja JEDNEGO towaru na otwartym zamówieniu do dostawcy (ZD). */
+export interface RawZamPosition {
+  dok_id: number;
+  nr_pelny: string;
+  data_wyst: string;
+  /** Termin realizacji; `null` gdy kolumna nieskonfigurowana albo pusta. */
+  termin: string | null;
+  dostawca: string;
+  /** Suma zamówiona — ten sam towar bywa w kilku pozycjach zamówienia. */
+  ilosc: number;
+  /** Suma zrealizowana. Zero, gdy baza nie udostępnia tej kolumny. */
+  zreal: number;
 }
 
 /**
@@ -103,6 +116,14 @@ export interface SubiektAdapter {
    * pierwszej zmianie, a objawem byłby towar policzony dwa razy albo wcale.
    */
   getDeliveryPositionsForProduct(twId: number, days: number): RawDocPosition[];
+  /**
+   * Otwarte zamówienia do dostawcy (ZD), na których stoi TEN towar.
+   *
+   * Bez parametru `days`: okno wycina już import (zamówienie bywa starsze niż
+   * dostawa i wciąż otwarte), a drugie okno tutaj tylko ukryłoby część tego, co
+   * importer uznał za aktualne — i to bez śladu na ekranie.
+   */
+  getOrdersForProduct(twId: number): RawZamPosition[];
   getDocument(docId: number): RawDocument | undefined;
   getDocumentPositions(docId: number): RawPosition[];
   /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */

@@ -44,7 +44,11 @@ function seed() {
   console.log(`[seed] wczytano ${rows.length} kartotek z ${config.seedProducts}`);
 
   const wipe = transaction(d, () => {
-    for (const t of ["sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn"]) {
+    /* Pozycje przed nagłówkami — trzyma je klucz obcy. */
+    for (const t of [
+      "sgt_zam_pozycja", "sgt_zamowienie",
+      "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
+    ]) {
       d.prepare(`DELETE FROM ${t}`).run();
     }
   });
@@ -65,8 +69,8 @@ function seed() {
   for (const [id, kod, nazwa] of DEMO_MAGAZYNY) insMag.run(id, kod, nazwa);
 
   const insTowar = d.prepare(
-    `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, ordered, opis, lokalizacja)
-     VALUES (@tw_id,@symbol,@nazwa,@ean,@unit,@ordered,@opis,@lokalizacja)`
+    `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, opis, lokalizacja)
+     VALUES (@tw_id,@symbol,@nazwa,@ean,@unit,@opis,@lokalizacja)`
   );
   const insStan = d.prepare(
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
@@ -74,6 +78,13 @@ function seed() {
 
   const mgpProducts: Array<{ tw_id: number; mgp: number; dostawca: string }> = [];
   const noLocProducts: number[] = [];
+  /* Kolumna `ordered` z eksportu NIE idzie już do sgt_towar. Do 0.7.0 leżała
+     tam jako gotowa liczba, ale importer produkcyjny nie miał jej skąd wziąć
+     (w Subiekcie „zamówione" pochodzi z dokumentów ZD, nie z kartoteki)
+     i wpisywał zero — czyli demo pokazywało coś, czego produkcja nie umiała.
+     Ta sama liczba zasila teraz syntetyczne zamówienia, więc obie ścieżki
+     chodzą tym samym torem. */
+  const zamowione: Array<{ tw_id: number; ilosc: number; dostawca: string }> = [];
 
   const insertAll = transaction(d, (data: Row[]) => {
     data.forEach((r, i) => {
@@ -81,8 +92,11 @@ function seed() {
       const [symbol, nazwa, ean, mag, rez, mgp, unit, ordered, lokalizacja, opis, dostawca] = r;
       insTowar.run({
         tw_id, symbol, nazwa, ean: ean || "", unit: unit || "szt.",
-        ordered: ordered || 0, opis: opis || "", lokalizacja: lokalizacja || "",
+        opis: opis || "", lokalizacja: lokalizacja || "",
       });
+      if (ordered > 0) {
+        zamowione.push({ tw_id, ilosc: ordered, dostawca: dostawca || DOSTAWCA_FALLBACK });
+      }
       insStan.run(tw_id, config.magId.MAG, mag || 0, rez || 0);
       insStan.run(tw_id, config.magId.MGP, mgp || 0, 0);
       /* Co ósma kartoteka leży też w serwisie, co jedenasta na ekspozycji —
@@ -196,6 +210,61 @@ function seed() {
     });
     buildZwrot();
     console.log(`[seed] karton zwrotów: ZW 7/07/2026, pozycji=${zwrotItems.length}`);
+  }
+
+  // ── syntetyczne zamówienia do dostawcy (ZD) ─────────────────────────────
+  // Jeden dostawca = jedno zamówienie, tak jak przy dostawach wyżej. Wariantów
+  // celowo kilka, bo karta ma je rozróżniać: część zamówień jest w połowie
+  // zrealizowana, część nie ma terminu (baza go nie udostępnia), a jedno ma
+  // termin już przeterminowany — dostawca się spóźnia i to widać.
+  if (zamowione.length) {
+    const insZam = d.prepare(
+      `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
+       VALUES (?,?,?,?,?,?)`
+    );
+    const insZamPoz = d.prepare(
+      "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
+    );
+    const zamByDostawca = new Map<string, Array<{ tw_id: number; ilosc: number }>>();
+    for (const z of zamowione) {
+      const g = zamByDostawca.get(z.dostawca) ?? [];
+      g.push({ tw_id: z.tw_id, ilosc: z.ilosc });
+      zamByDostawca.set(z.dostawca, g);
+    }
+    const buildZam = transaction(d, () => {
+      let dokId = 1;
+      let pozycji = 0;
+      for (const dostawca of [...zamByDostawca.keys()].sort()) {
+        const items = zamByDostawca.get(dostawca)!;
+        for (let i = 0; i < items.length; i += MAX_POZ, dokId++) {
+          // −7 dni na dokument: zamówienia są starsze niż dostawy i rozjeżdżają
+          // się w czasie, więc sortowanie po terminie ma co porządkować
+          const dataZam = new Date(baseDate.getTime() - dokId * 7 * 86400_000);
+          const terminDni = (dokId % 4) * 10 - 5; // −5, +5, +15, +25 od dziś
+          const termin =
+            dokId % 5 === 0
+              ? null // co piąte bez terminu — ścieżka „nie wiem kiedy"
+              : new Date(baseDate.getTime() + terminDni * 86400_000).toISOString().slice(0, 10);
+          insZam.run(
+            dokId,
+            `ZD ${40 + dokId}/${mmrrrr(dataZam)}`,
+            dataZam.toISOString().slice(0, 10),
+            termin,
+            dostawca,
+            5
+          );
+          for (const it of items.slice(i, i + MAX_POZ)) {
+            // co trzecia pozycja częściowo dostarczona — karta ma pokazać
+            // POZOSTAŁO, a nie pierwotnie zamówione
+            const zreal = it.tw_id % 3 === 0 ? Math.floor(it.ilosc / 2) : 0;
+            insZamPoz.run(dokId, it.tw_id, it.ilosc, zreal);
+            pozycji++;
+          }
+        }
+      }
+      console.log(`[seed] zamówienia ZD: ${dokId - 1}, pozycji=${pozycji}`);
+    });
+    buildZam();
   }
 
   const docs = d.prepare("SELECT dok_id, nr_pelny, w_buforze FROM sgt_dokument").all();

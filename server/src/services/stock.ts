@@ -7,6 +7,7 @@ import { pendingLocChanges } from "./locations.js";
 import { kandydaciZamiennikow, podzielZamienniki } from "./zamienniki.js";
 import { magazynyTowaru } from "./magazyny.js";
 import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
+import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
@@ -102,7 +103,6 @@ export function buildProductCard(
     name: t.nazwa,
     ean: t.ean ?? "",
     unit: t.unit,
-    ordered: t.ordered,
     desc: t.opis ?? "",
     locs,
     // to, co jeszcze nie doszło do Subiekta — świadomie OBOK `locs`, żeby karta
@@ -120,6 +120,10 @@ export function buildProductCard(
        figuruje na MAG od zaksięgowania dokumentu, więc `mag.stan` nie odróżnia
        „leży w regale" od „stoi na palecie w przyjęciach". */
     wDostawie: nierozlozoneZDostaw(twId),
+    /* Druga połowa tego samego pytania: nie „gdzie to jest", tylko „kiedy to
+       będzie". Sekcja stoi na karcie POD `wDostawie`, bo kolejność jest tu
+       treścią — najpierw „jest, ale nierozłożone", potem „nie ma, zamówione". */
+    zamowione: zamowioneUDostawcy(twId),
     zamienniki: zamiennikiZOpisu(adapter, t.opis ?? "", t.symbol),
   };
 }

@@ -10,6 +10,7 @@ import type {
   RawProduct,
   RawStock,
   RawStockRow,
+  RawZamPosition,
   SubiektAdapter,
 } from "./subiekt.js";
 
@@ -188,6 +189,22 @@ export class SeededSubiektAdapter implements SubiektAdapter {
          ORDER BY d.data_wyst DESC, d.dok_id DESC`
       )
       .all(twId, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocPosition[];
+  }
+
+  getOrdersForProduct(twId: number): RawZamPosition[] {
+    /* Bez odsiewu po dacie i bez odejmowania `zreal` — jedno i drugie należy do
+       warstw obok: okno wycina import, a regułę „zostało <= 0 wypada" ma serwis
+       razem ze swoim testem. Adapter zwraca to, co stoi w read-modelu. */
+    return db()
+      .prepare(
+        `SELECT z.dok_id, z.nr_pelny, z.data_wyst, z.termin, z.dostawca,
+                SUM(p.ilosc) AS ilosc, SUM(p.zreal) AS zreal
+         FROM sgt_zam_pozycja p
+         JOIN sgt_zamowienie z ON z.dok_id = p.dok_id
+         WHERE p.tw_id = ?
+         GROUP BY z.dok_id`
+      )
+      .all(twId) as unknown as RawZamPosition[];
   }
 
   getDocumentPositions(docId: number): RawPosition[] {

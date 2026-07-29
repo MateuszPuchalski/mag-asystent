@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzy.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały cztery.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -62,6 +62,52 @@ więc `dok_Status = 3`.
 > **Uwaga historyczna.** Wcześniej domyślne wyrażenie sprawdzało `= 0`, czyli
 > **wycofany**. Myliło się w obie strony: dokument wycofany pokazywałby się jako
 > bufor, a odłożony jako gotowy do pracy.
+
+## Zamówienia do dostawcy (ZD) — karta towaru
+
+Karta pokazuje, czego jeszcze nie ma na półce, ale jest zamówione u dostawcy.
+Importer czyta zamówienia z tych samych tabel co dostawy (`dok__Dokument`,
+`dok_Pozycja`, `kh__Kontrahent`), więc **nie potrzeba nowego GRANT-u**.
+
+Zamówienie do dostawcy to `dok_Typ = 15` — ta wartość jest pewna, bo stoi
+w liście kodów wyżej. Pewne kończy się jednak w tym miejscu i zaczynają się
+dwie rzeczy do sprawdzenia na własnej bazie.
+
+`[WERYFIKUJ]` **które statusy z zakresu 5..8 znaczą „zamówienie otwarte"**.
+Struktura mówi tylko „5..8-zamówienia (różne stany realizacji)" i nie rozpisuje
+ich. Domyślne `DOK_STATUS_ZD_OTWARTE=5,6,7,8` bierze więc wszystkie cztery i jest
+**założeniem, nie ustaleniem**. Policz, jak rozkładają się u Ciebie:
+
+```sql
+SELECT dok_Status, COUNT(*) AS ile
+FROM dok__Dokument
+WHERE dok_Typ = 15
+GROUP BY dok_Status
+ORDER BY dok_Status;
+```
+
+`[WERYFIKUJ]` **nazwa kolumny z ilością już zrealizowaną** na pozycji
+zamówienia. Opis struktury jej nie wymienia. Domyślne
+`MSSQL_ZD_ZREAL_COLUMN=ob_IloscZrealizowana` to nazwa prawdopodobna, nie
+potwierdzona. Sprawdź:
+
+```sql
+SELECT name FROM sys.columns
+WHERE object_id = OBJECT_ID('dok_Pozycja') AND name LIKE 'ob_Ilosc%';
+```
+
+Gdy tej kolumny nie ma, import **nie przerywa się**: wpisuje zero, a karta
+pokazuje ilość zamówioną z dopiskiem, że to górne oszacowanie. `/api/health`
+zgłasza wtedy zdanie z nazwą kolumny do poprawienia. Zamówienie zrealizowane
+w połowie pokaże w tym trybie pełną ilość — dlatego to jest tryb awaryjny,
+a nie docelowy.
+
+Termin realizacji (`MSSQL_ZD_TERMIN_COLUMN`) jest **opcjonalny i domyślnie
+pusty**. Bez niego karta pisze „termin nieznany", co jest uczciwsze niż
+podstawienie daty wystawienia w miejsce obietnicy dostawy.
+
+ZK (`dok_Typ = 16`, zamówienie **od klienta**) celowo nie jest czytane. To ruch
+w drugą stronę i pokrywa go rezerwacja `st_StanRez` na kaflu MAG.
 
 ## Flaga sprawdzenia faktury — osobny mechanizm, nie kolumna
 
