@@ -28,6 +28,79 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.9.0 — 29 lipca 2026
+
+Procedura wdrożenia na produkcji plus dwie usterki, które ta procedura wykryła.
+
+Pytanie brzmiało: *„jak bezpiecznie wprowadzić aplikację w firmie"*. Okazało
+się, że **mechanizmy bezpiecznego wdrożenia już były** — brakowało dokumentu,
+który każe ich użyć w odpowiedniej kolejności. Obie usterki niżej wyszły na
+kopii bazy, gdzie kosztowały jedno zapytanie SQL.
+
+### Dodane
+
+- **`docs/wdrozenie.md` — sześć etapów z bramkami.** Od demo, przez kopię bazy,
+  po jeden regał na produkcji. Każdy etap ma **zdanie sprawdzalne**, a nie
+  wrażenie, że wygląda dobrze, oraz opisany sposób wycofania.
+
+  Najważniejsze narzędzie było na miejscu od początku: `wertis-api`
+  i `wertis-worker` to osobne usługi, a **worker jest jedynym procesem
+  zapisującym do Subiekta**. Zatrzymanie go daje przebieg próbny na żywych
+  danych — aplikacja czyta produkcję, kolejkuje zamierzone zapisy i nie wykonuje
+  żadnego, a `/api/queue` staje się ich podglądem.
+
+  Dokument mówi też wprost dwie rzeczy, które łatwo przemilczeć: **kopia bazy na
+  tej samej instancji nie izoluje wszystkiego** (login powstaje na poziomie
+  instancji), a **`sa` nie jest wymagane** — Enter pomija pytanie, a instalator
+  zapisuje gotowy skrypt dla administratora bazy.
+
+- **`DOK_TYPY_DOSTAW`** — typy dokumentów na liście rozkładania jako lista,
+  domyślnie `1,10`.
+
+- **`DOK_DNI_WSTECZ`** — okno importu dokumentów, **domyślnie 14** zamiast
+  zaszytych 60.
+
+### Poprawione
+
+- **Para FZ/PZ była ZASZYTA w zapytaniu importu**, choć zwroty tuż obok miały już
+  listę z konfiguracji. Niespójność, nie decyzja projektowa. Firma przyjmująca
+  towar wyłącznie na FZ widziała na liście pracy magazyniera dokumenty
+  z zupełnie innego procesu i nie mogła ich wyłączyć bez zmiany kodu.
+
+- **Skrócenie okna importu kasowałoby niedokończoną pracę.** Okno obcina
+  dokumenty po dacie wystawienia, więc przejście z 60 dni na 14 usunęłoby
+  z ekranu dostawę sprzed trzech tygodni, której nikt nie rozłożył do końca.
+
+  Okno ma teraz **wyjątek dla dostaw otwartych** — zostają widoczne niezależnie
+  od wieku. Brak dostawy na liście wygląda identycznie jak dostawa rozłożona,
+  a to dwie zupełnie różne sytuacje.
+
+- **`MSSQL_ZD_ZREAL_COLUMN` może nie mieć żadnej poprawnej wartości.** Domyślne
+  `ob_IloscZrealizowana` było oznaczone `[WERYFIKUJ]` i okazało się zgadnięte
+  źle: na bazie 1.8731.31.6933 `dok_Pozycja` **nie niesie stopnia realizacji
+  w żadnym z 57 pól**. Poprawnym ustawieniem jest wtedy wartość pusta, i tak to
+  teraz opisują `DEPLOY.md` §6 oraz `wertis.env.example`.
+
+  Zostawiona nazwa nieistniejącej kolumny daje to samo zachowanie plus
+  ostrzeżenie, którego nie da się spełnić — a takie uczą ignorowania ostrzeżeń.
+
+- **`docs/wdrozenie.md` wchodzi pod bramkę stylu.** Lista dokumentów w
+  `tools/styl_check.py` jest zaszyta, więc nowy plik nie byłby sprawdzany —
+  a wykonuje go człowiek pod presją, na cudzej maszynie, często pierwszy raz.
+
+### Uwagi
+
+- Testy: 260 → **267**. Budowanie fragmentów `WHERE` wydzielone jako czysta
+  funkcja, bo bez serwera MSSQL to jedyna testowalna część importu.
+  Sabotażem sprawdzone trzy reguły: powrót zaszytej pary FZ/PZ, usunięcie
+  wyjątku na otwarte dostawy i wpuszczenie wszystkiego przy pustej liście typów.
+- **Ilość odebraną dałoby się policzyć inaczej.** W `dok_Pozycja` jest
+  `ob_DoId` — w Subiekcie pozycja dokumentu realizującego wskazuje nim pozycję
+  realizowaną. To **hipoteza niezweryfikowana**; wymaga sprawdzenia na
+  częściowo odebranym zamówieniu i jest zmianą kodu, nie ustawienia.
+
+---
+
 ## 0.8.2 — 29 lipca 2026
 
 Suma kontrolna NSSM wpisana — strażnik z 0.8.1 działa w obie strony.

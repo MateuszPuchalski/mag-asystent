@@ -28,8 +28,54 @@ import { config } from "../config.js";
  * domyślnie tw_Pole1).
  */
 
-/** Okno importu dokumentów FZ/PZ [dni] — szersze niż 14 dni widoku (spec §5.4). */
-const DOC_IMPORT_DAYS = 60;
+/**
+ * Dokumenty dostaw, których NIE ROZŁOŻONO do końca — ich `dok_Id` po stronie
+ * Subiekta.
+ *
+ * Okno importu obcina dokumenty po dacie wystawienia, ale niedokończona praca
+ * nie ma prawa zniknąć z ekranu tylko dlatego, że dostawa przyjechała trzy
+ * tygodnie temu. Brak dokumentu na liście wygląda przecież identycznie jak
+ * dokument rozłożony — a to dwie zupełnie różne sytuacje.
+ *
+ * Stan „niedokończona" jest po NASZEJ stronie: Subiekt nie wie nic o postępie
+ * rozkładania. Stąd odczyt z SQLite przed zapytaniem do MSSQL.
+ */
+function otwarteDokumenty(): number[] {
+  return (
+    db()
+      .prepare("SELECT sgt_dok_id FROM delivery WHERE status = 'open'")
+      .all() as Array<{ sgt_dok_id: number }>
+  ).map((r) => Math.trunc(r.sgt_dok_id));
+}
+
+/**
+ * Fragmenty `WHERE` dla zapytania o dokumenty. Wydzielone z zapytania, bo to
+ * JEDYNA logika w tym imporcie — reszta jest wejściem/wyjściem, którego bez
+ * serwera MSSQL nie da się przetestować.
+ *
+ * @param typy      kody `dok_Typ` uznawane za dostawę (`DOK_TYPY_DOSTAW`)
+ * @param otwarte   `dok_Id` dostaw nierozłożonych do końca — wchodzą niezależnie
+ *                  od okna dat
+ */
+export function budujFiltryDokumentow(
+  typy: number[],
+  otwarte: number[]
+): { dostawyTypFilter: string; oknoFilter: string } {
+  /* Pusta lista typów znaczy „ŻADEN typ", a nie „każdy". Literówka w ustawieniu
+     ma dać pustą listę pracy — zauważalną od razu — a nie wpuścić na ekran
+     magazyniera wszystkiego, co leży na magazynie. */
+  const dostawyTypFilter = `d.dok_Typ IN (${
+    typy.length ? typy.map((n) => Math.trunc(n)).join(",") : "NULL"
+  })`;
+
+  /* Przy braku otwartych dostaw CAŁA gałąź `OR` znika, bo `IN ()` jest błędem
+     składni SQL, a nie zbiorem pustym — zapytanie wywaliłoby się w całości. */
+  const oknoFilter = otwarte.length
+    ? `(d.dok_DataWyst >= @cutoff OR d.dok_Id IN (${otwarte.map((n) => Math.trunc(n)).join(",")}))`
+    : "d.dok_DataWyst >= @cutoff";
+
+  return { dostawyTypFilter, oknoFilter };
+}
 
 /**
  * Okno importu zamówień do dostawcy [dni] — WŁASNE, szersze niż dla dostaw.
@@ -284,15 +330,17 @@ export async function importFromMssql(): Promise<ImportStats> {
   const zwTypFilter = c.dokTypyZwroty.length
     ? ` AND d.dok_Typ IN (${c.dokTypyZwroty.map((n) => Math.trunc(n)).join(",")})`
     : "";
+  const { dostawyTypFilter, oknoFilter } = budujFiltryDokumentow(
+    c.dokTypyDostaw,
+    otwarteDokumenty()
+  );
   const dokumenty = (
     await pool
       .request()
       .input("mag", sql.Int, config.magId.MAG)
       .input("mgp", sql.Int, config.magId.MGP)
       .input("zw", sql.Int, config.magId.ZWROTY)
-      .input("fz", sql.Int, c.dokTypFZ)
-      .input("pz", sql.Int, c.dokTypPZ)
-      .input("cutoff", sql.VarChar, new Date(Date.now() - DOC_IMPORT_DAYS * 86400_000).toISOString().slice(0, 10))
+      .input("cutoff", sql.VarChar, new Date(Date.now() - c.dokDniWstecz * 86400_000).toISOString().slice(0, 10))
       .query<DokRow>(
         `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
@@ -305,14 +353,14 @@ export async function importFromMssql(): Promise<ImportStats> {
          ${flagJoin}
          WHERE (
                  -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
-                 (d.dok_MagId = @mag AND d.dok_Typ IN (@fz, @pz))
+                 (d.dok_MagId = @mag AND ${dostawyTypFilter})
                  -- tryb A (zwroty): zbiorczy dokument na mag. Zwroty; MM powstaje
                  -- dopiero przy zamknięciu koszyka, nie przy imporcie
               OR (d.dok_MagId = @zw${zwTypFilter})
                  -- tryb B: kontener na MGP — sesja z wózkiem i MM na rundę
-              OR (d.dok_MagId = @mgp AND d.dok_Typ IN (@fz, @pz))
+              OR (d.dok_MagId = @mgp AND ${dostawyTypFilter})
                )
-           AND d.dok_DataWyst >= @cutoff`
+           AND ${oknoFilter}`
       )
   ).recordset;
 

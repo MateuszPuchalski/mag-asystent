@@ -37,6 +37,9 @@ DOCS = [
     "docs/analiza-rozkladanie.md",
     "docs/subiekt-gt-edu-setup.md",
     "docs/subiekt-gt-struktura.md",
+    # Procedura wdrożenia wchodzi tu z tego samego powodu co DEPLOY: wykonuje ją
+    # człowiek pod presją, na cudzej maszynie, często pierwszy raz.
+    "docs/wdrozenie.md",
 ]
 
 SLOWNIK = "docs/slownik.md"

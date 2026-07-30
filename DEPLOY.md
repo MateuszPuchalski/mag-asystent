@@ -480,10 +480,20 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
      → `MSSQL_ZD_ZREAL_COLUMN` (domyślnie `ob_IloscZrealizowana`).
 
-     Gdy ta kolumna nie istnieje, `/api/health` zgłasza zdanie z jej nazwą,
-     a karta pokazuje ilość **zamówioną** zamiast pozostałej, opisując ją jako
-     oszacowanie. Nic się nie psuje, ale zamówienie odebrane w połowie wygląda
-     na nietknięte — dlatego warto sprawdzić nazwę i wpisać właściwą.
+     **Tej kolumny może nie być wcale.** Na bazie 1.8731.31.6933 `dok_Pozycja`
+     nie niesie stopnia realizacji w żadnym polu — są ilości tego dokumentu,
+     ceny, wartości i podatki, ale nie „ile już odebrano". Zapytanie wyżej
+     zwróci wtedy same `ob_Ilosc` i `ob_IloscMag`.
+
+     W takim wypadku **wpisz wartość pustą**: `MSSQL_ZD_ZREAL_COLUMN=`. Karta
+     dalej opisze ilość jako oszacowanie, a `/api/health` przestanie zgłaszać
+     problem, którego nie da się rozwiązać ustawieniem. Zostawiona nazwa
+     nieistniejącej kolumny daje to samo zachowanie plus ostrzeżenie niemożliwe
+     do spełnienia — a takie uczą ignorowania ostrzeżeń.
+
+     Gdy kolumna istnieje, `/api/health` zgłasza jej brak zdaniem z nazwą,
+     a karta pokazuje ilość **zamówioną** zamiast pozostałej — dlatego warto
+     wtedy sprawdzić nazwę i wpisać właściwą.
 
      Termin realizacji (`MSSQL_ZD_TERMIN_COLUMN`) jest domyślnie pusty i karta
      pisze wtedy „termin nieznany". Ustaw go tylko, jeśli firma faktycznie

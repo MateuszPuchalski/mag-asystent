@@ -101,6 +101,37 @@ export const config = {
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n > 0),
     /**
+     * Kody `dok_Typ` DOSTAW listowanych do rozłożenia (CSV).
+     *
+     * Domyślnie `1,10` — FZ i PZ — bo towar wchodzi obiema drogami: fakturą
+     * zakupu księgowaną wprost na magazyn albo przyjęciem zewnętrznym, gdy
+     * dokument handlowy przychodzi później. Dla magazyniera to ta sama praca:
+     * paleta do rozłożenia.
+     *
+     * ALE NIE W KAŻDEJ FIRMIE. Tam, gdzie dostawy idą wyłącznie na FZ, a PZ
+     * powstaje z zupełnie innego procesu, tamte dokumenty są na liście pracy
+     * czystym szumem — i wtedy ustawia się `DOK_TYPY_DOSTAW=1`.
+     *
+     * Do sierpnia 2026 ta para była ZASZYTA w zapytaniu, choć zwroty tuż obok
+     * miały już listę z konfiguracji. Niespójność, nie decyzja projektowa.
+     */
+    dokTypyDostaw: (process.env.DOK_TYPY_DOSTAW ?? "1,10")
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0),
+    /**
+     * Ile dni wstecz importować dokumenty. Domyślnie 14.
+     *
+     * To jest okno IMPORTU, nie filtr widoku: dokument spoza niego nie trafia
+     * do read-modelu w ogóle. Dlatego zapytanie ma wyjątek — dostawa, której
+     * ktoś NIE ROZŁOŻYŁ DO KOŃCA, zostaje widoczna niezależnie od wieku
+     * (patrz `otwarteDokumenty` w adapterze MSSQL).
+     *
+     * Bez tego wyjątku skrócenie okna kasowałoby z ekranu niedokończoną pracę,
+     * a brak dostawy na liście wygląda identycznie jak dostawa rozłożona.
+     */
+    dokDniWstecz: num(process.env.DOK_DNI_WSTECZ, 14, "DOK_DNI_WSTECZ"),
+    /**
      * Kolumna lokalizacji na tw__Towar. Nowsze wersje SGT (KSeF i późniejsze)
      * NIE mają natywnego pola „lokalizacja" — trzeba użyć jednego z ośmiu
      * generycznych pól dodatkowych (tw_Pole1..tw_Pole8, varchar(50) każde).

@@ -1,7 +1,7 @@
 {
   "name": "wertis-kolektor",
   "private": true,
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "WERTIS — asystent magazyniera (Subiekt GT). Monorepo: server (Fastify/SQLite/worker) + android (kolektor Kotlin/Compose) — jedynym interfejsem człowieka jest kolektor.",
   "workspaces": [
     "server"
