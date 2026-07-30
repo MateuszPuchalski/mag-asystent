@@ -375,7 +375,7 @@ export function commitCart(sessionId: number, user: string) {
           sessionId,
           label: "Lokalizacja · " + (t?.symbol ?? i.tw_id),
           detail: `${i.stage_loc} (rozkładanie)`,
-        });
+        }, { locsPrzed: t?.lokalizacja ?? "", zrodlo: "koszyk" });
         queueIds.push(qid);
       }
       const doneQty = i.qty_done + (i.stage_qty ?? 0);

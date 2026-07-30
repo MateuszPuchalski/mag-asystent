@@ -160,19 +160,29 @@ export async function productRoutes(app: FastifyInstance) {
       const autor = autorOperacji(req);
       const user = autor.nazwa;
       const desc = describeLoc(body, current);
-      const queueId = enqueueSetLocation(twId, joined, {
-        createdBy: user,
-        createdByRef: autor.ref,
+      /* Zdarzenie audytowe emituje `enqueueSetLocation`, nie ta trasa — patrz
+         `AudytLokalizacji`. Wpis TUTAJ byłby drugim wpisem o tej samej zmianie.
+
+         `p.lokalizacja` jest przekazywane SUROWE, nie jako `current.join(" ")`:
+         wycofanie polega na wpisaniu z powrotem dokładnie tego, co w polu
+         stało, a wartość po `parseLocs` jest już rekonstrukcją. */
+      const queueId = enqueueSetLocation(
         twId,
-        label: "Lokalizacja · " + p.symbol,
-        detail: desc,
-      });
-      logEvent(
-        body.action === "remove" ? "location_removed" : "location_set",
-        user,
-        twId,
-        { action: body.action, value: body.value, result: joined, wyslanePrzez: autor.wyslanePrzez },
-        autor.ref
+        joined,
+        {
+          createdBy: user,
+          createdByRef: autor.ref,
+          twId,
+          label: "Lokalizacja · " + p.symbol,
+          detail: desc,
+        },
+        {
+          locsPrzed: p.lokalizacja ?? "",
+          zrodlo: "karta",
+          akcja: body.action,
+          wartosc: body.value,
+          wyslanePrzez: autor.wyslanePrzez,
+        }
       );
       return { queueId };
     }

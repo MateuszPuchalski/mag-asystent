@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { currentUserRef } from "../context.js";
+import { logEvent } from "./events.js";
 import type { MmItem } from "../adapters/sfera.js";
 
 export interface EnqueueBase {
@@ -48,13 +49,68 @@ function insert(
   return Number(res.lastInsertRowid);
 }
 
-/** Zadanie zmiany lokalizacji (spec §5.2). */
+/**
+ * Dane audytowe zmiany lokalizacji. Parametr WYMAGANY — i to jest cały sens.
+ *
+ * Do sierpnia 2026 zdarzenie o zmianie lokalizacji emitowała wyłącznie trasa
+ * karty towaru. Dwie pozostałe ścieżki — rozkładanie linii dostawy i zamknięcie
+ * koszyka — kolejkowały ten sam zapis i logowały własne zdarzenia dziedzinowe,
+ * które o zawartości pola nie mówiły nic. Historia na karcie milczała więc
+ * o zmianach, których nie zrobiono z niej samej.
+ */
+export interface AudytLokalizacji {
+  /**
+   * Zawartość pola PRZED zmianą. **Surowa, nie przepuszczona przez
+   * `parseLocs`.**
+   *
+   * Wycofanie zmiany polega na wpisaniu z powrotem dokładnie tego, co tam
+   * stało. Wartość znormalizowana byłaby rekonstrukcją, nie zapisem — i przy
+   * pierwszej rozbieżności formatowania cofnęłaby coś innego, niż było.
+   */
+  locsPrzed: string;
+  /** Z którego ekranu wyszła zmiana. Pierwsze pytanie przy analizie. */
+  zrodlo: "karta" | "dostawa" | "koszyk";
+  /** Intencja człowieka — tylko z karty towaru (`add` | `replace` | `remove`). */
+  akcja?: string;
+  /** Kod, który człowiek podał — tylko z karty towaru. */
+  wartosc?: string;
+  /** Nazwa osoby, która operację WYSŁAŁA, gdy różni się od autora. */
+  wyslanePrzez?: string | null;
+}
+
+/**
+ * Zadanie zmiany lokalizacji (spec §5.2) wraz z wpisem do audytu.
+ *
+ * Zdarzenie powstaje TUTAJ, a nie w miejscach wywołania, i to jest decyzja
+ * strukturalna: zapisu lokalizacji nie da się zakolejkować bez śladu. Czwarta
+ * ścieżka, dopisana za pół roku, dostanie wpis bez pamiętania o tym.
+ */
 export function enqueueSetLocation(
   twId: number,
   newValue: string,
-  base: EnqueueBase
+  base: EnqueueBase,
+  audyt: AudytLokalizacji
 ): number {
-  return insert("set_location", { twId, newValue }, base);
+  const queueId = insert("set_location", { twId, newValue }, base);
+  /* Oba typy muszą przetrwać: `productHistory` po nich filtruje, a w bazie leżą
+     już wiersze historyczne. Klucze `action`, `value` i `result` zostają
+     w dotychczasowym kształcie — zmiana ich nazw unieważniłaby stare wpisy. */
+  logEvent(
+    audyt.akcja === "remove" ? "location_removed" : "location_set",
+    base.createdBy,
+    twId,
+    {
+      locsPrzed: audyt.locsPrzed,
+      result: newValue,
+      zrodlo: audyt.zrodlo,
+      queueId,
+      ...(audyt.akcja ? { action: audyt.akcja } : {}),
+      ...(audyt.wartosc ? { value: audyt.wartosc } : {}),
+      ...(audyt.wyslanePrzez ? { wyslanePrzez: audyt.wyslanePrzez } : {}),
+    },
+    base.createdByRef ?? currentUserRef()
+  );
+  return queueId;
 }
 
 /**

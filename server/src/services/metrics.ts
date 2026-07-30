@@ -54,9 +54,31 @@ export function metrics(days = 7): Metrics {
         .get(od, ...types) as { n: number }
     ).n;
 
-  // pozycje = realna praca (odłożenie w trybie A, potwierdzenie w trybie B,
-  // zmiana adresu z karty); dotknięcia = wszystko, co wymagało palca zamiast skanu
-  const pozycje = licz(["putaway_line_done", "putaway_confirm", "location_set", "location_removed"]);
+  /* Zmiany lokalizacji zrobione Z KARTY. Wpisy sprzed sierpnia 2026 nie mają
+     `zrodlo` — i to są właśnie zmiany z karty, bo wtedy tylko ona je emitowała.
+     Stąd `IS NULL` po stronie warunku, a nie pominięcie starych danych. */
+  const liczZKarty = (): number =>
+    (
+      d
+        .prepare(
+          `SELECT COUNT(*) AS n FROM events
+           WHERE created_at >= datetime('now', ?)
+             AND type IN ('location_set','location_removed')
+             AND (json_extract(payload,'$.zrodlo') IS NULL
+                  OR json_extract(payload,'$.zrodlo') = 'karta')`
+        )
+        .get(od) as { n: number }
+    ).n;
+
+  /* pozycje = realna praca (odłożenie w trybie A, potwierdzenie w trybie B,
+     zmiana adresu z karty); dotknięcia = wszystko, co wymagało palca zamiast skanu
+
+     UWAGA NA PODWÓJNE LICZENIE. Od sierpnia 2026 `location_set` powstaje TAKŻE
+     przy rozkładaniu, bo emituje je `enqueueSetLocation` wspólne dla trzech
+     ścieżek. Rozłożenie jednej linii daje więc `putaway_line_done` ORAZ
+     `location_set` — a to jedna czynność człowieka, nie dwie. Dlatego zdarzenia
+     lokalizacji liczymy WYŁĄCZNIE z karty towaru; rozkładanie ma już swoje. */
+  const pozycje = licz(["putaway_line_done", "putaway_confirm"]) + liczZKarty();
   const dotkniecia = licz(["manual_entry", "location_mismatch", "problem_raised"]);
 
   const czasy = (
