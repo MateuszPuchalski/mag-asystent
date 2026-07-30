@@ -27,6 +27,17 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    # `contents: write` jest potrzebne WYŁĄCZNIE ostatniemu krokowi, który
+    # dokleja pliki instalatora do wydania. Bez tego `github.token` ma dostęp
+    # tylko do odczytu i `gh release upload` kończy się „HTTP 403: Resource not
+    # accessible by integration" — a wydanie POWSTAJE, tylko puste. Tak przeszło
+    # wydanie z 29.07: tag był, plików przy nim nie było.
+    #
+    # Uprawnienie jest wypisane jawnie i w komplecie, bo podanie choćby jednego
+    # klucza wyłącza wszystkie domyślne. Milcząca lista byłaby tu gorsza od
+    # żadnej.
+    permissions:
+      contents: write
     defaults:
       run:
         shell: powershell
@@ -97,10 +108,19 @@ jobs:
       # do nssm.cc), a wpisanie jej z pamięci dałoby weryfikację POZORNĄ.
       # Ten krok liczy ją na maszynie, która ten adres widzi.
       - name: Suma kontrolna NSSM
-        continue-on-error: true
         run: |
+          # `continue-on-error` tu NIE MA i to jest celowe: z wpisaną sumą ten
+          # krok ma ZATRZYMAĆ budowę przy niezgodności, inaczej strażnik jest
+          # bezzębny. Rozdzielone są za to dwa różne zdarzenia — niedostępna
+          # sieć to nie jest to samo, co podmieniony plik, i tylko drugie
+          # zasługuje na czerwone CI.
           $zip = "$env:RUNNER_TEMP\nssm.zip"
-          Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $zip -UseBasicParsing
+          try {
+            Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $zip -UseBasicParsing
+          } catch {
+            Write-Host "::warning::nssm.cc niedostepne ($($_.Exception.Message)) - pomijam sprawdzenie sumy."
+            exit 0
+          }
           $suma = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           $kod = Get-Content instalator\uslugi.ps1 -Raw
           if ($kod -notmatch '\$script:SUMA_NSSM_ZIP\s*=\s*"([0-9a-fA-F]*)"') {

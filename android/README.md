@@ -21,11 +21,39 @@ albo dowolna maszyna z Android Studio.
 
 ## Budowanie
 
+### Najpierw sprawdź, czy w ogóle musisz
+
+**Gotowy APK wychodzi z CI.** Workflow `android.yml` buduje go przy każdej
+zmianie i wystawia jako artefakt:
+
+> Actions → **Android** → ostatni zielony bieg → **Artifacts** →
+> `wertis-kolektor-debug-apk`
+
+Do wgrania na kolektory to wystarcza i **nie wymaga ani Javy, ani Android SDK**.
+Build lokalny ma sens przy pracy nad kodem aplikacji, nie przy wdrożeniu.
+
+### Czego wymaga build lokalny
+
+**JDK 17** — Temurin, ta sama dystrybucja co w CI (`android.yml:22`). Nowszy JDK
+nie zadziała: moduły są przypięte do `VERSION_17` i `jvmTarget = "17"`.
+
+```powershell
+winget install EclipseAdoptium.Temurin.17.JDK   # Windows
+```
+
+Bez tego Gradle wita komunikatem `JAVA_HOME is not set and no 'java' command
+could be found in your PATH`, który nie mówi, **której** wersji brakuje.
+Po instalacji otwórz nowy terminal — zmienne środowiskowe nie wchodzą do już
+otwartego.
+
 ```bash
 cd android
-./gradlew :core:test          # testy logiki (bez SDK)
-./gradlew :app:assembleDebug  # APK (wymaga SDK) → app/build/outputs/apk/debug/
+./gradlew :core:test          # testy logiki — wystarczy sam JDK, bez SDK
+./gradlew :app:assembleDebug  # APK → app/build/outputs/apk/debug/
 ```
+
+Druga komenda potrzebuje **dodatkowo Android SDK** (Android Studio albo
+command-line tools plus akceptacja licencji) — samo JDK jej nie wystarczy.
 
 ## Uruchomienie przeciwko serwerowi dev
 

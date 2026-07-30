@@ -81,17 +81,17 @@ function Initialize-WertisSiec {
 $script:SUMA_NODE_MSI = "9eea480bd30c98ae11a97cb89a9278235cbbbd03c171ee5e5198bd86b7965b4b"
 
 <#
-    Suma nssm-2.24.zip. PUSTA WARTOŚĆ JEST CELOWA i tymczasowa: nssm.cc nie było
-    osiągalne ze środowiska, w którym powstawał ten kod, a wpisanie tu sumy
-    „z pamięci" dałoby weryfikację pozorną — gorszą od jawnego jej braku, bo
-    wyglądającą na zabezpieczenie. Wartość ustala krok `suma-nssm` w
-    .github/workflows/instalator.yml, który pobiera plik z maszyny mającej do
-    niego dostęp i wypisuje sumę do zalogowania tutaj.
+    Suma nssm-2.24.zip, policzona 29.07.2026 przez runnera Windows w CI, który
+    pobrał plik wprost z nssm.cc — nie wpisana „z pamięci", bo weryfikacja
+    pozorna jest gorsza od jawnego jej braku.
 
-    Dopóki jest pusta, instalator OSTRZEGA i idzie dalej; po wpisaniu —
-    przerywa przy niezgodności.
+    CZEGO TA SUMA DOWODZI, a czego nie. Nie jest dowodem, że nssm.cc było
+    w tamtej chwili nienaruszone — to zaufanie przy pierwszym użyciu. Jest
+    natomiast gwarancją, że od tamtej chwili plik SIĘ NIE ZMIENIŁ: każda
+    podmiana, po stronie serwera wydań czy po drodze, zatrzyma instalację
+    u klienta i budowę w CI.
 #>
-$script:SUMA_NSSM_ZIP = ""
+$script:SUMA_NSSM_ZIP = "727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743"
 
 function Test-WertisSuma {
     <#
