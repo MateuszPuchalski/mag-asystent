@@ -80,6 +80,18 @@ Twarde zasady (spec §12) egzekwowane na serwerze:
 - kody lokalizacji bez spacji,
 - każda operacja w `events`.
 
+### Wdrożenie na produkcji idzie etapami
+
+Aplikacja zapisuje do bazy firmy dwie rzeczy, obie odwracalne wyłącznie z kopii
+zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć etapów z bramkami**,
+opisanych w [`docs/wdrozenie.md`](docs/wdrozenie.md).
+
+Najważniejsze narzędzie jest darmowe: `wertis-api` i `wertis-worker` to osobne
+usługi, a **worker jest jedynym procesem zapisującym do Subiekta**. Zatrzymanie
+go daje przebieg próbny na żywych danych — aplikacja czyta produkcję, kolejkuje
+zamierzone zapisy i nie wykonuje żadnego. Kolejka staje się podglądem tego, co
+zrobiłaby, gdyby jej pozwolić.
+
 ### Ślad audytowy — „aplikacja zjadła mi 30 sztuk"
 
 `events` zbiera od pierwszego dnia instalacji **każdy skan, każdą decyzję
