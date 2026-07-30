@@ -375,7 +375,11 @@ Write-Host ""
 Write-Host "Get-WertisPlanDeinstalacji"
 
 Sprawdz "korzeń dysku NIE jest kasowany" {
-    foreach ($korzen in @("C:\", "D:\", "/", "")) {
+    # "C:" bez ukośnika stoi tu nieprzypadkowo. Pierwsza wersja rozpoznawała
+    # korzeń przez `Split-Path -Leaf`, które dla "C:" NIE zwraca "C:" — więc
+    # wzorzec nie trafiał i C:\ przechodziło bramkę. Ta asercja jest jedynym,
+    # co to złapało; logika przepisana poza PowerShellem świeciła na zielono.
+    foreach ($korzen in @("C:\", "C:", "D:\", "D:/", "c:\", "/", "\", "")) {
         $p = Get-WertisPlanDeinstalacji -Katalog $korzen -Zawartosc @("server", ".git")
         Zaloz (-not $p.Wolno) "zgoda na skasowanie korzenia '$korzen'"
     }

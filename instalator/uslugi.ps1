@@ -486,17 +486,16 @@ function Get-WertisPlanDeinstalacji {
         return $plan
     }
 
-    # Korzeń dysku (C:\, D:\) i ścieżka bez własnej nazwy nie mają czego
-    # rozpoznawać — Split-Path zwraca dla nich pustkę albo je samo.
+    # Korzeń dysku rozpoznajemy po SAMEJ ścieżce, nie przez Split-Path.
+    #
+    # Stało tu wcześniej `Split-Path $pelna -Leaf` i to był błąd: dla "C:"
+    # ta funkcja NIE zwraca "C:", więc wzorzec niżej nie trafiał i `C:\`
+    # przechodziło bramkę. Złapała to dopiero asercja na Windowsie — logika
+    # przepisana poza PowerShellem dawała inny wynik, bo modelowała
+    # Split-Path zgadywanką. Tu nie ma czego zgadywać: po przycięciu
+    # ukośników z korzenia zostaje samo "C:", a z "/" pustka.
     $pelna = $Katalog.TrimEnd('\', '/')
-    # Osobno, PRZED Split-Path: dla pustego łańcucha ten rzuca wyjątkiem
-    # zamiast zwrócić pustkę, a "/" po przycięciu jest właśnie pusty.
-    if (-not $pelna) {
-        $plan.Powod = "to jest korzeń dysku, nie katalog instalacji"
-        return $plan
-    }
-    $nazwa = Split-Path $pelna -Leaf
-    if (-not $nazwa -or $nazwa -match "^[A-Za-z]:$") {
+    if (-not $pelna -or $pelna -match "^[A-Za-z]:$") {
         $plan.Powod = "to jest korzeń dysku, nie katalog instalacji"
         return $plan
     }
