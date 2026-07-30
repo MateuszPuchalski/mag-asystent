@@ -72,6 +72,15 @@ export interface EnvFileResult {
   applied: string[];
   /** Klucze obecne w pliku, ale nadpisane przez zmienną środowiskową. */
   overridden: string[];
+  /**
+   * Wartości Z PLIKU dla kluczy przykrytych — do zdania diagnostycznego
+   * „w pliku stoi X, a proces pracuje na Y".
+   *
+   * **Ta mapa nie ma prawa trafić do odpowiedzi HTTP w całości**: plik trzyma
+   * `MSSQL_PASSWORD`. Wystawia się z niej pojedyncze, jawne wartości — dziś
+   * wyłącznie `SGT_MODE`, którego treścią jest „mssql" albo „seeded".
+   */
+  overriddenValues: Record<string, string>;
 }
 
 /**
@@ -91,15 +100,79 @@ export function loadEnvFile(): EnvFileResult {
     const parsed = parseEnvFile(text);
     const applied: string[] = [];
     const overridden: string[] = [];
+    const overriddenValues: Record<string, string> = {};
     for (const [k, v] of Object.entries(parsed)) {
       if (process.env[k] === undefined) {
         process.env[k] = v;
         applied.push(k);
       } else {
         overridden.push(k);
+        overriddenValues[k] = v;
       }
     }
-    return { path: candidate, applied, overridden };
+    return { path: candidate, applied, overridden, overriddenValues };
   }
-  return { path: null, applied: [], overridden: [] };
+  return { path: null, applied: [], overridden: [], overriddenValues: {} };
+}
+
+/**
+ * Klucze, których przykrycie ZMIENIA ZACHOWANIE, a nie tylko wartość.
+ *
+ * Reszta pliku też bywa nadpisywana i to jest w porządku — `LOG_LEVEL` czy
+ * `PORT` z powłoki nikogo nie zaskoczą. Te siedem decyduje o tym, DOKĄD idą
+ * zapisy, a pomyłka na nich nie daje żadnego objawu poza cichą demówką.
+ */
+export const KLUCZE_KRYTYCZNE = [
+  "SGT_MODE",
+  "MSSQL_SERVER",
+  "MSSQL_INSTANCE",
+  "MSSQL_DATABASE",
+  "MSSQL_USER",
+  "MSSQL_PASSWORD",
+  "MSSQL_LOC_COLUMN",
+];
+
+/**
+ * Zdanie do `problemy` w `/api/health`, gdy środowisko przykryło konfigurację
+ * z pliku. `null`, gdy nie ma o czym mówić.
+ *
+ * POWSTAŁO PO WDROŻENIU, KTÓRE PRZESZŁO CAŁY KREATOR I WYLĄDOWAŁO NA DEMÓWCE.
+ * Kreator zapisał `SGT_MODE=mssql`, plik został wczytany, a proces i tak
+ * pracował w trybie `seeded` — bo starsza instalacja zostawiła `SGT_MODE`
+ * w `AppEnvironment` usługi, a środowisko ma nad plikiem pierwszeństwo.
+ * Instalator kasował wtedy wyłącznie `AppEnvironmentExtra`, więc tamta wartość
+ * przeżywała każdą reinstalację.
+ *
+ * Sama lista przykrytych kluczy istniała już wcześniej — i była wyrzucana do
+ * kosza. To jedyne pole, które nazwałoby tę awarię z jednego spojrzenia.
+ *
+ * @param biezacyTryb wartość, na której proces FAKTYCZNIE pracuje
+ */
+export function problemPrzykrytejKonfiguracji(
+  env: EnvFileResult,
+  biezacyTryb: string
+): string | null {
+  /* Bez pliku nie ma sprzeczności do zgłoszenia. Tak wygląda `npm run dev`
+     i każdy test — nadpisywanie środowiskiem jest tam normalną drogą, a nie
+     usterką, i alarm w tym miejscu uczyłby ignorować `problemy`. */
+  if (!env.path) return null;
+
+  const krytyczne = env.overridden.filter((k) => KLUCZE_KRYTYCZNE.includes(k));
+  if (krytyczne.length === 0) return null;
+
+  /* Wartość podajemy TYLKO dla SGT_MODE. Reszta listy to nazwa bazy, login
+     i MSSQL_PASSWORD — odpowiedź /api/health nie jest miejscem na hasło. */
+  const zPliku = env.overriddenValues.SGT_MODE;
+  const tryb =
+    zPliku && zPliku !== biezacyTryb
+      ? ` W pliku stoi SGT_MODE=${zPliku}, a proces pracuje w trybie ${biezacyTryb} —` +
+        " zapisy NIE trafiają tam, gdzie wskazuje konfiguracja."
+      : "";
+
+  return (
+    `Zmienne środowiskowe usługi przykrywają ${env.path}: ${krytyczne.join(", ")}.` +
+    tryb +
+    " Wyczyść je: nssm reset wertis-api AppEnvironment oraz AppEnvironmentExtra" +
+    " (to samo dla wertis-worker), potem zrestartuj obie usługi."
+  );
 }

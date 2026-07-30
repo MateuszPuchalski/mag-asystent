@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { pathToFileURL } from "node:url";
 import { config, envFile } from "./config.js";
+import { problemPrzykrytejKonfiguracji } from "./env-file.js";
 import { withRequestContext } from "./context.js";
 import { db } from "./db/db.js";
 import { productRoutes } from "./routes/products.js";
@@ -51,9 +52,15 @@ export async function buildApp() {
      wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
   app.get("/api/health", async () => {
     const worker = stanWorkera();
-    const problemy = [worker.problem, brakDostepuDoMagazynow, brakKolumnyZrealizowano].filter(
-      (x): x is string => x !== null
-    );
+    const problemy = [
+      worker.problem,
+      /* PIERWSZY na liście świadomie: przykryta konfiguracja unieważnia
+         wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
+         więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
+      problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
+      brakDostepuDoMagazynow,
+      brakKolumnyZrealizowano,
+    ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
       /* Wersja serwera — kolektor pokazuje ją obok własnej na dole ekranu.
@@ -65,6 +72,9 @@ export async function buildApp() {
       sferaMode: config.sferaMode,
       // skąd wzięła się konfiguracja — pierwsze pytanie przy „u mnie nie działa"
       configZPliku: envFile.path,
+      /* Które klucze z pliku PRZEGRAŁY ze środowiskiem. Same nazwy, nigdy
+         wartości — w pliku leży MSSQL_PASSWORD. Puste w zdrowej instalacji. */
+      configPrzykryte: envFile.overridden,
       worker: {
         zyje: worker.zyje,
         mode: worker.sgtMode,

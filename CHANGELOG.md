@@ -28,6 +28,74 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.12.0 — 30 lipca 2026
+
+Kreator przeszedł do końca na prawdziwej bazie i wylądował na danych demo.
+
+```
+[ok] Konto gotowe: 8 tabel do odczytu, zapis tylko tw_Pole2 i fl_Wartosc.
+[ok] Zapisano C:\wertis\wertis.env (17 ustawień).
+[!]  Tryb: seeded - to DANE DEMO. Nic nie trafia do Subiekta.
+```
+
+**To jest dokładnie ta awaria, której cała architektura konfiguracji miała
+zapobiec** — opisana słowo w słowo w komentarzu `env-file.ts`: *„rozjazd nie
+dawał żadnego objawu, worker pisze do lokalnego SQLite i ZGŁASZA SUKCES.
+Na kolektorze zielono, w Subiekcie zero zmian"*.
+
+### Przyczyna: dwa ustawienia NSSM o tej samej nazwie w połowie
+
+| ustawienie | co robi |
+|---|---|
+| `AppEnvironmentExtra` | **dokłada** zmienne do środowiska procesu |
+| `AppEnvironment` | **zastępuje** je w całości |
+
+Instalator kasował **wyłącznie pierwsze**. Instalacja, która kiedyś użyła
+drugiego, przechodziła przez kreator nietknięta: plik dostawał `SGT_MODE=mssql`,
+był poprawnie wczytany, a proces i tak startował w trybie `seeded` — bo
+środowisko ma nad plikiem pierwszeństwo (zwykła semantyka dotenv).
+
+Od tej wersji lecą **oba**, listą w jednej stałej, którą asertuje
+`instalator/testy.ps1`.
+
+### `/api/health` przestaje milczeć
+
+`loadEnvFile()` **już liczył** listę przykrytych kluczy — i wyrzucał ją do
+kosza. To jedyne pole, które nazwałoby tę awarię z jednego spojrzenia.
+
+- **`configPrzykryte`** — które klucze z pliku przegrały ze środowiskiem.
+  Same nazwy, **nigdy wartości**: w pliku leży `MSSQL_PASSWORD`. Pilnuje tego
+  osobny test.
+- **wpis w `problemy`**, gdy przykryty jest klucz zmieniający zachowanie
+  (`SGT_MODE`, `MSSQL_*`). Wtedy `ok` jest fałszywe, a zdanie mówi, co zrobić.
+
+Alarm milczy tam, gdzie nadpisywanie środowiskiem jest normalną drogą — bez
+pliku (`npm run dev`, testy) i dla kluczy pokroju `LOG_LEVEL`. Bramka, która
+krzyczy bez powodu, uczy ignorować `problemy`.
+
+### Kreator nazywa rozjazd błędem, nie wyborem
+
+Gdy instalator właśnie zapisał `SGT_MODE=mssql`, a `/api/health` melduje
+`seeded`, to jest **błąd instalacji**. Dotąd leciał jako `[!]` z tekstem
+o poprawnym wariancie pilotażowym — czyli mylił w tym akurat przypadku
+najbardziej. Teraz wypisuje przykryte klucze i polecenie, którym się je czyści.
+
+### Weryfikacja
+
+Nowa bramka **sabotowana w dwie strony**: wyjęcie `SGT_MODE` z listy kluczy
+krytycznych i wpuszczenie wartości do komunikatu czerwienią dokładnie te dwie
+asercje, które mają czerwienić — w tym tę o niewyciekaniu hasła.
+
+**[wymaga działania]** Sam `git pull` naprawia przyszłe instalacje. Maszyna już
+dotknięta wymaga wyczyszczenia środowiska usług:
+
+```powershell
+nssm reset wertis-api AppEnvironment ; nssm reset wertis-worker AppEnvironment
+nssm restart wertis-api ; nssm restart wertis-worker
+```
+
+Ponowne uruchomienie kreatora robi to samo przy okazji.
+
 ## 0.11.0 — 30 lipca 2026
 
 Odinstalowanie jednym poleceniem — i uczciwa lista tego, czego ono **nie cofa**.

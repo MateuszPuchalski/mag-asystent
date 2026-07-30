@@ -64,10 +64,18 @@ API i worker to **osobne procesy**, ale czytają dziś ten sam `wertis.env`
 wprost z dysku ([`server/src/env-file.ts`](../server/src/env-file.ts)) — NSSM
 nie przenosi już żadnej konfiguracji. Instalator zapisuje więc **jeden plik**.
 
-Robi przy tym drugą rzecz, mniej oczywistą: **kasuje `AppEnvironmentExtra` obu
-usług**. Zmienne środowiskowe mają pierwszeństwo nad plikiem, więc pozostałość
-po starszej instalacji — choćby hasło sprzed zmiany — po cichu wygrałaby z tym,
+Robi przy tym drugą rzecz, mniej oczywistą: **kasuje środowisko obu usług**.
+Zmienne środowiskowe mają pierwszeństwo nad plikiem, więc pozostałość po
+starszej instalacji — choćby hasło sprzed zmiany — po cichu wygrałaby z tym,
 co instalator właśnie zapisał. Bez żadnego objawu poza „u mnie nie działa".
+
+> **Dwa ustawienia, nie jedno.** `AppEnvironmentExtra` **dokłada** zmienne do
+> środowiska procesu, a `AppEnvironment` **zastępuje je w całości**. Z nazw tej
+> różnicy nie widać, a kosztowała jedno wdrożenie.
+>
+> Kreator przeszedł wtedy do końca i zapisał `SGT_MODE=mssql`. Aplikacja i tak
+> wstała na danych demo, bo kasowane było tylko pierwsze z tych dwóch. Od
+> 0.12.0 lecą oba.
 
 Na koniec instalator odpytuje `/api/health` i pokazuje **stan obu procesów**:
 tryb API, tryb workera i listę `problemy`. Zapis do Subiekta idzie przez
