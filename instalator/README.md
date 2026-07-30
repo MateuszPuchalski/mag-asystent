@@ -30,6 +30,8 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 | `-Demo` | instalacja pilotażowa: dane demonstracyjne, **Subiekt nietknięty** (Etap 0 z `DEPLOY.md` §6) |
 | `-TylkoKonfiguracja` | sam kreator na działającej instalacji — do zmiany ustawień albo dokończenia po nieudanym podłączeniu |
 | `-DryRun` | wypisuje, co by zrobił, i **nie zmienia niczego**; nie zadaje pytań |
+| `-Odinstaluj` | zdejmuje usługi, regułę zapory i katalog; **Subiekta nie rusza** — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md) |
+| `-UsunDane` | tylko z `-Odinstaluj`: kasuje też ślad audytowy, po drugim potwierdzeniu |
 | `-Katalog`, `-Port`, `-Galaz` | odstępstwa od domyślnych `C:\wertis`, `3001`, `main` |
 
 > **Windows PowerShell, nie `pwsh`.** Instalator używa `System.Data.SqlClient`
@@ -105,6 +107,13 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
 - **Nie konfiguruje kopii zapasowej ani nocnej rekoncyliacji.** Obie są
   w `DEPLOY.md` §7 i obie trzeba ustawić, **zanim** ruszy praca na prawdziwych
   danych.
+- **Nie usuwa loginu SQL przy deinstalacji.** `-Odinstaluj` zdejmuje usługi,
+  zaporę i katalog, ale login `wertis` zostaje: powstał na poziomie **instancji**,
+  więc pomyłka dotknęłaby wszystkich baz na serwerze. Skrypt podaje gotowe
+  `DROP USER` i `DROP LOGIN` do wykonania przez administratora bazy.
+- **Nie cofa tego, co aplikacja zapisała do Subiekta.** Deinstalacja usuwa
+  program, nie jego pracę. Pole lokalizacji i flagi faktur odwraca wyłącznie
+  kopia bazy — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md).
 
 ## Trzy rzeczy, o których instalator pyta osobno
 

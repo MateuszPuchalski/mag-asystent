@@ -28,6 +28,81 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.11.0 — 30 lipca 2026
+
+Odinstalowanie jednym poleceniem — i uczciwa lista tego, czego ono **nie cofa**.
+
+```powershell
+.\wertis-instalator.ps1 -Odinstaluj
+```
+
+Do tej pory deinstalacji nie było w żadnej postaci: ani przełącznika, ani
+sekcji dokumentacji, ani jednego `nssm remove` w całym repozytorium.
+
+### Zdanie, które kłamało
+
+`docs/wdrozenie.md` obiecywał przy Etapie 0:
+
+> **Wycofanie:** odinstalowanie usług. Nic poza tym nie powstało.
+
+**To była nieprawda.** Po Etapie 0 zostawał katalog `C:\wertis` z całym klonem
+repo i `node_modules`, dwie usługi Windows, reguła zapory, `tools\nssm.exe`,
+baza SQLite, katalog logów oraz zainstalowane systemowo Node i Git. Człowiek,
+który zaufałby temu zdaniu przy pilocie, zostawał z instalacją, o której nie wie.
+
+### Czego deinstalacja NIE cofa
+
+To jest połowa wartości tej zmiany i skrypt wypisuje to na końcu przebiegu:
+
+| co zostaje | dlaczego |
+|---|---|
+| **wartości w bazie Subiekta** | to dane firmy, nie aplikacji — odwraca je wyłącznie kopia bazy |
+| **login SQL `wertis`** | stoi na poziomie **instancji**, więc pomyłka dotknęłaby wszystkich baz |
+| **ustawienia SQL Servera** | uwierzytelnianie mieszane, TCP i SQL Browser bywają używane przez inne aplikacje |
+| **Node.js i Git** | instalator dokłada je systemowo |
+
+Pierwszy wiersz jest sednem. **Odinstalowanie aplikacji nie jest cofnięciem jej
+pracy.** Pole lokalizacji na kartotekach i flagi na fakturach zostają dokładnie
+tam, gdzie je wpisała.
+
+### Ślad audytowy przeżywa deinstalację
+
+Domyślnie `server\data` — baza z historią zmian, zdjęcia problemów, kolejka —
+zostaje **przeniesiony obok** do `C:\wertis-dane-<data>`, a skrypt wypisuje tę
+ścieżkę. Historia bywa potrzebna długo po tym, jak aplikacja zniknie z maszyny;
+`docs/wdrozenie.md` czyni z niej jedyne źródło odpowiedzi na „co stało w polu
+przed zmianą".
+
+Skasowanie wymaga osobnego przełącznika `-UsunDane` i drugiego potwierdzenia.
+
+### Bramka, bez której tego kodu nie wolno byłoby wypuścić
+
+`Remove-Item -Recurse -Force` dostaje ścieżkę z parametru. To ta sama klasa
+błędu, na której instalator wywalił się u klienta 27 lipca (`New-Item -Path
+"C:\"`) — tylko że tam kosztowała nieudaną instalację, a tutaj kosztowałaby dysk.
+
+Dlatego kasowanie wymaga **rozpoznania instalacji**: katalog musi zawierać
+`server` oraz `.git` albo `wertis.env`. Sam `server` to za mało, bo bywa
+w cudzych projektach. Korzeń dysku, `C:\Windows` i literówka w `-Katalog`
+dostają odmowę z powodem, a nie usunięcie.
+
+Decyzja jest wyprowadzona do czystej funkcji `Get-WertisPlanDeinstalacji`, więc
+stoi za nią **dziesięć asercji** w `instalator/testy.ps1` — w większości na
+odmowach, nie na sukcesach.
+
+### Kolejność, która nie wynika z kodu
+
+Usługi → `nssm remove` → zapora → katalog. Odwrotnie się nie da: `nssm.exe` leży
+**wewnątrz** kasowanego katalogu, a działający `node.exe` trzyma uchwyty do
+plików. Bez `confirm` w `nssm remove` NSSM otwiera okno dialogowe i skrypt wisi
+w nieskończoność.
+
+**Czego to nie dowodzi.** Samego usuwania nie da się sprawdzić poza Windowsem
+z usługami — `-DryRun` z założenia pomija każdy krok wykonawczy. CI parsuje
+skrypty, uruchamia asercje i przechodzi gałąź deinstalacji w trybie próbnym.
+Pierwsze prawdziwe uruchomienie na maszynie testowej jest jedynym pełnym testem,
+i dlatego dokument opisuje też **drogę ręczną**.
+
 ## 0.10.1 — 30 lipca 2026
 
 Jak sprawdzić, **które z ośmiu pól własnych jest lokalizacją** — i cztery inne

@@ -33,6 +33,14 @@
     o nic — przyjmuje odpowiedzi domyślne. Tym trybem instalator jest
     sprawdzany w CI.
 
+.PARAMETER Odinstaluj
+    Zdejmuje usługi, regułę zapory i katalog aplikacji. NIE rusza Subiekta,
+    loginu SQL, rejestru ani Node'a z Gitem — pełna lista na końcu przebiegu.
+
+.PARAMETER UsunDane
+    Tylko z -Odinstaluj: kasuje też ślad audytowy i zdjęcia problemów.
+    Bez tego przełącznika `server\data` zostaje przeniesiony obok katalogu.
+
 .EXAMPLE
     .\wertis-instalator.ps1
     Pełna instalacja z kreatorem.
@@ -40,6 +48,10 @@
 .EXAMPLE
     .\wertis-instalator.ps1 -Demo
     Instalacja pilotażowa: działa od razu, Subiekt nietknięty.
+
+.EXAMPLE
+    .\wertis-instalator.ps1 -Odinstaluj -DryRun
+    Wypisuje, co zniknęłoby przy deinstalacji. Niczego nie usuwa.
 #>
 [CmdletBinding()]
 param(
@@ -49,7 +61,9 @@ param(
     [int]$Port = 3001,
     [switch]$Demo,
     [switch]$TylkoKonfiguracja,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$Odinstaluj,
+    [switch]$UsunDane
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,6 +103,67 @@ if (-not (Test-Administrator)) {
         Write-Info "Kliknij prawym na PowerShell i wybierz 'Uruchom jako administrator'."
         exit 1
     }
+}
+
+# ═══ DEINSTALACJA ════════════════════════════════════════════════════════════
+# Osobna gałąź kończąca się `exit 0`: usuwanie nie ma nic wspólnego z żadnym
+# etapem instalacji i nie wolno mu się z nimi przepleść.
+
+if ($Odinstaluj) {
+    Write-Krok "Deinstalacja WERTIS"
+    Write-Info "Zniknie: usługi wertis-api i wertis-worker, reguła zapory"
+    Write-Info "'WERTIS kolektor' oraz katalog $Katalog."
+    Write-Host ""
+    if ($UsunDane) {
+        Write-Uwaga "-UsunDane: ślad audytowy i zdjęcia problemów zostaną SKASOWANE."
+        Write-Uwaga "Historii zmian lokalizacji nie da się wtedy odtworzyć."
+    } else {
+        Write-Info "Dane (ślad audytowy, zdjęcia) zostaną przeniesione OBOK katalogu."
+    }
+    Write-Host ""
+
+    # W przebiegu próbnym nie pytamy o zgodę — nic się nie dzieje, a Read-Tak
+    # zwróciłby wtedy domyślne „nie" i -DryRun nie pokazałby ani jednego kroku.
+    $zgoda = if ($DryRun) { $true } else { Read-Tak "Na pewno odinstalować WERTIS?" -Domyslnie $false }
+    if (-not $zgoda) {
+        Write-Info "Przerwane. Nic nie zostało usunięte."
+        exit 0
+    }
+    if ($UsunDane -and -not $DryRun) {
+        if (-not (Read-Tak "Skasować także ślad audytowy, bezpowrotnie?" -Domyslnie $false)) {
+            Write-Info "Przerwane. Nic nie zostało usunięte."
+            exit 0
+        }
+    }
+
+    # Kolejność wymuszona przez Windows — patrz komentarz nad funkcjami
+    # w uslugi.ps1. nssm.exe leży w kasowanym katalogu, więc idzie przed nim.
+    Remove-WertisUslugi -Nssm (Join-Path $Katalog "tools\nssm.exe")
+    Remove-WertisRegulaZapory
+    $plan = Remove-WertisKatalog -Katalog $Katalog -UsunDane:$UsunDane
+
+    Write-Naglowek "Odinstalowane"
+    if ($plan -and $plan.DaneDo) {
+        Write-Ok "Ślad audytowy i zdjęcia leżą w: $($plan.DaneDo)"
+    }
+
+    # To jest połowa wartości tego trybu. Deinstalacja aplikacji NIE JEST
+    # cofnięciem jej pracy, a człowiek, który tego nie usłyszy, uzna inaczej.
+    Write-Host ""
+    Write-Host "  Czego to NIE cofa:" -ForegroundColor Cyan
+    Write-Uwaga "1. Zapisów w bazie Subiekta. Pole lokalizacji na kartotekach"
+    Write-Info "   i flagi na fakturach ZOSTAJĄ. Odwraca je wyłącznie kopia bazy."
+    Write-Uwaga "2. Loginu SQL 'wertis'. Powstał na poziomie INSTANCJI, nie bazy."
+    Write-Info "   Usuwa go administrator bazy, w bazie podmiotu:"
+    Write-Info "     DROP USER [wertis];"
+    Write-Info "     DROP LOGIN [wertis];"
+    Write-Uwaga "3. Ustawień SQL Servera. Uwierzytelnianie mieszane, TCP i SQL Browser"
+    Write-Info "   zostają. Cofnięcie odcięłoby inne aplikacje, które z nich żyją."
+    Write-Uwaga "4. Node.js i Gita - instalator dokłada je systemowo."
+    Write-Host ""
+    Write-Info "Pełny opis: docs/wdrozenie.md, sekcja 'Jak odinstalować'."
+    Write-Host ""
+    exit 0
 }
 
 # ═══ ETAP 1: instalacja ══════════════════════════════════════════════════════
