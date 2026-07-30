@@ -122,8 +122,8 @@ zobaczył kartę, zapisał lokalizację.
 - `/api/health` nie zgłasza nic poza zatrzymanym workerem,
 - **kopia zapasowa z `DEPLOY.md` §7 działa i została sprawdzona odtworzeniem.**
 
-Trzeci punkt nie jest formalnością. Wycofanie zmiany lokalizacji opiera się
-wyłącznie o kopię bazy — patrz sekcja niżej.
+Trzeci punkt nie jest formalnością. Audyt powie, co w polu stało, ale wpisanie
+tego z powrotem przy wielu kartotekach robi się kopią — patrz sekcja niżej.
 
 **Wycofanie:** zatrzymanie usług. Kolejka zostaje, ale nic z niej nie poszło.
 
@@ -177,13 +177,21 @@ nieudana instalacja.
 
 ## Wycofanie zapisu opiera się o kopię bazy
 
-Ślad audytowy zapisuje przy zmianie lokalizacji **nową** zawartość pola. Nie
-zapisuje wartości sprzed zmiany.
+Ślad audytowy zapisuje przy każdej zmianie lokalizacji **starą i nową**
+zawartość pola oraz to, z którego ekranu zmiana wyszła. Pytanie „co tam było
+przed" ma więc odpowiedź:
 
-Znaczy to tyle, że pojedynczej zmiany **nie da się cofnąć z samego audytu**.
-Trzeba albo odtworzyć pole z kopii zapasowej, albo prześledzić cały łańcuch
-zdarzeń dla tej kartoteki. Łańcuch ma dziurę wszędzie tam, gdzie pole ustawiło
-biuro poza aplikacją.
+```bash
+curl -s -H "x-session: $TOKEN" \
+  'http://localhost:3001/api/events?twId=507&typ=location_set,location_removed' | jq
+```
+
+Wartość „przed" jest zapisana **surowa**, dokładnie tak, jak stała w polu.
+To celowe: przywrócenie polega na wpisaniu jej z powrotem bez zmian.
+
+**Ale audyt nie jest mechanizmem przywracania.** Mówi, co wpisać; wpisać trzeba
+samemu — z kartoteki w Subiekcie albo z kopii bazy. Przy większej liczbie
+kartotek kopia jest jedyną rozsądną drogą.
 
 Dlatego kopia zapasowa musi działać **przed etapem 4**, nie po nim.
 

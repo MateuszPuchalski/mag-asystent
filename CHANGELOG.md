@@ -28,6 +28,64 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.10.0 — 30 lipca 2026
+
+Co było w polu lokalizacji przed zmianą — w każdej z trzech ścieżek.
+
+W `docs/wdrozenie.md` z 0.9.0 stało zdanie, że cofnięcie zmiany lokalizacji
+opiera się wyłącznie o kopię bazy, bo audyt nie zna wartości sprzed zmiany.
+**Research pokazał, że to zdanie było zbyt optymistyczne** — luka dotyczyła
+trzech ścieżek, a na dwóch była szersza, niż napisałem.
+
+| ścieżka | co wiedziała o polu |
+|---|---|
+| karta towaru | nową zawartość, **nie starą** |
+| linia dostawy, tryb A | tylko kod półki, **żadnej zawartości pola** |
+| koszyk, tryb B | **nic** — same `queueIds` |
+
+### Dodane
+
+- **`locsPrzed` i `zrodlo` w zdarzeniach lokalizacji.** Wartość sprzed zmiany
+  jest zapisywana **surowa**, nie przepuszczona przez `parseLocs`: przywrócenie
+  polega na wpisaniu z powrotem dokładnie tego, co w polu stało, a wartość
+  znormalizowana byłaby rekonstrukcją.
+
+- **Rozkładanie pojawia się w historii na karcie towaru.** Dotąd karta milczała
+  o zmianach, których nie zrobiono z niej samej — a rozkładanie jest najczęstszą
+  drogą, którą to pole się zmienia. Historia pokazuje teraz przejście
+  `A01-02-03 → B05-01-02` z oznaczeniem źródła.
+
+### Poprawione
+
+- **Zdarzenie powstaje w JEDNYM miejscu — `enqueueSetLocation`.** Dane audytowe
+  są tam **parametrem wymaganym**, więc zapisu lokalizacji nie da się
+  zakolejkować bez śladu. Czwarta ścieżka, dopisana za pół roku, dostanie wpis
+  bez pamiętania o tym. Dotąd każde z trzech miejsc logowało co innego i właśnie
+  tak powstała ta luka.
+
+- **Podwójne liczenie pracy w raporcie wydajności.** Ta zmiana sama je stworzyła:
+  rozłożenie jednej linii daje teraz `putaway_line_done` ORAZ `location_set`,
+  czyli dwa wiersze z jednej czynności człowieka. Bez odsiania raport zawyżałby
+  tempo **każdemu, kto rozkłada** — czyli całej hali.
+
+  W raporcie mierzącym ludzi zawyżenie jest gorsze niż brak liczby: trafia do
+  rozmowy o pracy i nikt nie ma jak go zauważyć. Zdarzenia lokalizacji liczą się
+  więc tylko z karty; rozkładanie ma już swoje.
+
+### Uwagi
+
+- **Wpisy sprzed tej zmiany nie mają `locsPrzed` ani `zrodlo`** i tak zostaje.
+  Historia formatuje się wtedy po staremu, a liczniki traktują je jak zmiany
+  z karty — bo wtedy tylko karta te zdarzenia emitowała.
+- **Audyt nie jest mechanizmem przywracania.** Mówi, co wpisać; wpisać trzeba
+  samemu. Przy większej liczbie kartotek kopia bazy zostaje jedyną rozsądną
+  drogą, i `docs/wdrozenie.md` mówi to dalej wprost.
+- Testy: 267 → **281**. Sabotażem sprawdzone cztery reguły: znormalizowana
+  wartość „przed", podwójny wpis z trasy karty, brak emisji dla dostawy
+  i koszyka oraz powrót podwójnego liczenia w raporcie.
+
+---
+
 ## 0.9.0 — 29 lipca 2026
 
 Procedura wdrożenia na produkcji plus dwie usterki, które ta procedura wykryła.

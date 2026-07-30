@@ -441,7 +441,7 @@ export function putawayLine(
       twId: line.tw_id,
       label: "Lokalizacja · " + (t?.symbol ?? line.tw_id),
       detail: `${code} (dostawa)`,
-    });
+    }, { locsPrzed: t?.lokalizacja ?? "", zrodlo: "dostawa" });
   }
 
   // skan półki jest zarazem potwierdzeniem POLICZONEJ ilości: w tej firmie

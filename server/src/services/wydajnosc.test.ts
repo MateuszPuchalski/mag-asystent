@@ -32,6 +32,13 @@ function ev(typ: string, userRef: number | null, minutTemu: number, name = "x") 
     .run(typ, name, userRef, new Date(Date.now() - minutTemu * 60_000).toISOString());
 }
 
+/** Zdarzenie z payloadem — do reguł zależnych od `zrodlo`. */
+function evP(typ: string, userRef: number | null, minutTemu: number, payload: unknown, name = "x") {
+  db()
+    .prepare("INSERT INTO events(type, user_id, user_ref, payload, created_at) VALUES (?,?,?,?,?)")
+    .run(typ, name, userRef, JSON.stringify(payload), new Date(Date.now() - minutTemu * 60_000).toISOString());
+}
+
 /** `ile` odłożeń co minutę, kończąc `odMinut` temu — seria pracy ciągłej. */
 function seriaPracy(userRef: number, ile: number, odMinut = 60, name = "x") {
   for (let i = 0; i < ile; i++) ev("putaway_line_done", userRef, odMinut - i, name);
@@ -154,4 +161,38 @@ test("pusty magazyn daje pusty raport, a nie zera przypisane komukolwiek", () =>
   U.createUser("Jan Kowalski");
   const r = W.raportWydajnosci(1);
   assert.deepEqual(r.wiersze, [], "konto bez pracy nie jest wierszem z zerem");
+});
+
+// ── Podwójne liczenie tej samej czynności ───────────────────────────────────
+
+test("rozłożenie linii to JEDNA pozycja, choć daje dwa zdarzenia", async () => {
+  /* Od sierpnia 2026 `location_set` powstaje także przy rozkładaniu, bo emituje
+     je wspólne `enqueueSetLocation`. Jedna czynność człowieka daje więc dwa
+     wiersze w `events`. Bez odsiania raport zawyżałby tempo KAŻDEMU, kto
+     rozkłada — czyli całej hali.
+
+     W raporcie mierzącym ludzi zawyżenie jest gorsze niż brak liczby: trafia
+     do rozmowy o pracy i nikt nie ma jak go zauważyć. */
+  const u = U.createUser("Jan Dubel", "magazynier");
+  ev("putaway_line_done", u.userId, 30);
+  evP("location_set", u.userId, 30, { zrodlo: "dostawa", locsPrzed: "A01-02-03" });
+
+  const r = (await W.raportWydajnosci(1)).wiersze.find((w) => w.userId === u.userId);
+  assert.equal(r?.pozycje, 1, "dwa zdarzenia z jednej czynności to jedna pozycja");
+});
+
+test("zmiana adresu Z KARTY liczy się normalnie", async () => {
+  // karta to osobna czynność, nie duplikat rozkładania — musi być policzona
+  const u = U.createUser("Jan Karta", "magazynier");
+  evP("location_set", u.userId, 30, { zrodlo: "karta", locsPrzed: "" });
+  const r = (await W.raportWydajnosci(1)).wiersze.find((w) => w.userId === u.userId);
+  assert.equal(r?.pozycje, 1);
+});
+
+test("wpis sprzed tej zmiany, bez `zrodlo`, liczy się jak z karty", async () => {
+  // wtedy tylko karta emitowała te zdarzenia, więc `NULL` znaczy „karta"
+  const u = U.createUser("Jan Stary", "magazynier");
+  evP("location_set", u.userId, 30, { result: "A01-02-03" });
+  const r = (await W.raportWydajnosci(1)).wiersze.find((w) => w.userId === u.userId);
+  assert.equal(r?.pozycje, 1, "historia nie może przestać się liczyć");
 });

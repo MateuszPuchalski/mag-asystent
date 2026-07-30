@@ -46,6 +46,25 @@ export const PODSTAWA_PRAWNA =
 /** Zdarzenia liczone jako wykonana pozycja — te same, co w `metrics()`. */
 const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
 
+/**
+ * Warunek odsiewający PODWÓJNE LICZENIE tej samej czynności.
+ *
+ * Od sierpnia 2026 `location_set` powstaje także przy rozkładaniu, bo emituje je
+ * `enqueueSetLocation` wspólne dla trzech ścieżek. Rozłożenie jednej linii daje
+ * więc `putaway_line_done` ORAZ `location_set` — jedną czynność człowieka, dwa
+ * wiersze. Bez tego warunku raport zawyżałby tempo każdemu, kto rozkłada, czyli
+ * całej hali.
+ *
+ * W raporcie MIERZĄCYM LUDZI zawyżenie jest gorsze niż brak liczby: cichy błąd
+ * w tę stronę trafia do rozmowy o pracy, a nikt nie ma jak go zauważyć.
+ *
+ * Wpisy sprzed tej zmiany nie mają `zrodlo` i są zmianami z karty — wtedy tylko
+ * ona je emitowała. Stąd `IS NULL` w warunku, a nie pominięcie starych danych.
+ */
+const BEZ_DUBLI = `(e.type NOT IN ('location_set','location_removed')
+       OR json_extract(e.payload,'$.zrodlo') IS NULL
+       OR json_extract(e.payload,'$.zrodlo') = 'karta')`;
+
 export interface WierszWydajnosci {
   userId: number | null;
   /** `null` dla zdarzeń sprzed kont — nie zgadujemy, kto to był. */
@@ -105,7 +124,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
     .prepare(
       `SELECT e.user_ref                                     AS userId,
               u.name                                         AS osoba,
-              SUM(CASE WHEN e.type IN (${PRACA.map(() => "?").join(",")}) THEN 1 ELSE 0 END) AS pozycje,
+              SUM(CASE WHEN e.type IN (${PRACA.map(() => "?").join(",")}) AND ${BEZ_DUBLI} THEN 1 ELSE 0 END) AS pozycje,
               SUM(CASE WHEN e.type = 'problem_raised' THEN 1 ELSE 0 END)  AS problemy,
               SUM(CASE WHEN e.type = 'manual_entry'   THEN 1 ELSE 0 END)  AS reczne
          FROM events e
@@ -131,7 +150,8 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
     .prepare(
       `SELECT user_ref AS ref, created_at FROM events
         WHERE user_ref IS NOT NULL AND created_at >= datetime('now', ?)
-          AND type IN (${PRACA.map(() => "?").join(",")})`
+          AND type IN (${PRACA.map(() => "?").join(",")})
+          AND ${BEZ_DUBLI.replace(/\be\./g, "")}`
     )
     .all(od, ...PRACA) as Array<{ ref: number; created_at: string }>) {
     const t = Date.parse(r.created_at);
