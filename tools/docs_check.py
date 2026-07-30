@@ -81,8 +81,56 @@ def sprawdz_wersje() -> int:
     return bad
 
 
+STRUKTURA = "docs/subiekt-gt-struktura.md"
+
+# Liczebniki, którymi preambuła może wyrazić liczbę rzeczy do ustalenia.
+LICZEBNIKI = {
+    "zero": 0, "jedna": 1, "dwie": 2, "trzy": 3, "cztery": 4,
+    "pięć": 5, "sześć": 6, "siedem": 7, "osiem": 8, "dziewięć": 9,
+}
+
+# Znacznik otwierający akapit — taka jest konwencja tego dokumentu. Wystąpienie
+# w środku zdania (jak w samej preambule) NIE jest pozycją do ustalenia.
+ZNACZNIK_RE = re.compile(r"^`\[WERYFIKUJ\]`", re.MULTILINE)
+DEKLARACJA_RE = re.compile(r"takich rzeczy zostały (\w+)")
+
+
+def sprawdz_licznik_weryfikuj() -> int:
+    """Preambuła `struktura.md` deklaruje liczbę rzeczy do ustalenia.
+
+    Ta liczba rozjechała się już raz: dokument mówił „cztery", a znaczników było
+    pięć. Rozjazd powstał przy dopisaniu sekcji i nikt go nie zauważył, bo liczbę
+    w prozie pilnowało wyłącznie oko.
+
+    To ten sam gatunek zgnilizny, dla którego powstał cały ten skrypt — więc
+    dostaje ten sam rodzaj odpowiedzi.
+    """
+    text = open(STRUKTURA, encoding="utf-8").read()
+    m = DEKLARACJA_RE.search(text)
+    if not m:
+        print(f"BRAK DEKLARACJI {STRUKTURA} nie mówi, ile rzeczy zostało do ustalenia")
+        return 1
+
+    slowo = m.group(1)
+    if slowo not in LICZEBNIKI:
+        print(f"ZŁY LICZEBNIK   {STRUKTURA}: {slowo!r} - dopisz go do LICZEBNIKI")
+        return 1
+
+    zadeklarowane = LICZEBNIKI[slowo]
+    faktyczne = len(ZNACZNIK_RE.findall(text))
+    if zadeklarowane != faktyczne:
+        print(
+            f"ZŁY LICZNIK     {STRUKTURA}: preambula mowi {slowo!r} "
+            f"({zadeklarowane}), a znacznikow [WERYFIKUJ] jest {faktyczne}"
+        )
+        return 1
+
+    print(f"znaczników [WERYFIKUJ]: {faktyczne} — zgodne z preambułą")
+    return 0
+
+
 def main() -> int:
-    bad = sprawdz_wersje()
+    bad = sprawdz_wersje() + sprawdz_licznik_weryfikuj()
     for doc in DOCS:
         text = open(doc, encoding="utf-8").read()
         base = os.path.dirname(doc)

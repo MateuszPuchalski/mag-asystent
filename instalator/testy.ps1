@@ -284,6 +284,85 @@ Sprawdz "baza spoza Subiekta nie jest oceniana pod kątem kopii" {
     Zaloz (-not (Test-WertisBazaPodejrzana -Baza (Baza "FK" $null $false) -Teraz $dzis))
 }
 
+# ── Pole lokalizacji na kartotece ───────────────────────────────────────────
+# Najgroźniejsze ustawienie całego kreatora: worker nadpisuje wskazaną kolumnę
+# BEZWARUNKOWO. Podpowiedź Enterem jest tu realną decyzją, bo prawie nikt jej
+# nie zmienia — więc reguła, która ją wybiera, musi mieć asercje.
+
+Write-Host ""
+Write-Host "Podpowiedź pola lokalizacji"
+
+function Pole {
+    param([string]$Nazwa, [int]$Niepuste = 0, [int]$Adresy = 0, [string[]]$Przyklady = @())
+    return [pscustomobject]@{ Pole = $Nazwa; Niepuste = $Niepuste; Adresy = $Adresy; Przyklady = $Przyklady }
+}
+
+Sprawdz "pole z adresami wygrywa z pierwszym pustym" {
+    # Sedno zmiany. Stara reguła brała tw_Pole1 (puste), zostawiając 841 adresów
+    # w tw_Pole3 — dwa źródła prawdy o tej samej lokalizacji.
+    $pola = @(
+        (Pole "tw_Pole1"),
+        (Pole "tw_Pole2" 3412),
+        (Pole "tw_Pole3" 847 841)
+    )
+    Zaloz ((Get-WertisSugerowanePole -Pola $pola) -eq 2) "podpowiedź ma paść na pole z adresami"
+}
+
+Sprawdz "BEZ adresów reguła wraca do pierwszego pustego" {
+    # Regresja, którą najłatwiej wprowadzić: dopisanie stopnia „adresy" tak,
+    # że przestaje działać zachowanie dotychczasowe.
+    $pola = @(
+        (Pole "tw_Pole1" 3412),
+        (Pole "tw_Pole2"),
+        (Pole "tw_Pole3")
+    )
+    Zaloz ((Get-WertisSugerowanePole -Pola $pola) -eq 1) "przy braku adresów wygrywa pierwsze puste"
+}
+
+Sprawdz "pole zajęte cudzymi danymi NIE jest podpowiadane" {
+    # Stary kod startował z `$wolne = 0` i przy braku pustego pola podpowiadał
+    # tw_Pole1 — czyli akurat kasowanie danych firmy.
+    $pola = @((Pole "tw_Pole1" 3412), (Pole "tw_Pole2" 12))
+    Zaloz ((Get-WertisSugerowanePole -Pola $pola) -eq -1) "tu każda podpowiedź celuje w cudze dane"
+}
+
+Sprawdz "REMIS adresów NIE daje podpowiedzi" {
+    # Dwa pola z adresami znaczą, że człowiek musi rozstrzygnąć, które obowiązuje.
+    $pola = @((Pole "tw_Pole1" 500 500), (Pole "tw_Pole2" 500 500))
+    Zaloz ((Get-WertisSugerowanePole -Pola $pola) -eq -1) "przy remisie nie wolno podpowiadać"
+}
+
+Sprawdz "więcej adresów wygrywa z mniejszą liczbą adresów" {
+    $pola = @((Pole "tw_Pole1" 40 40), (Pole "tw_Pole2" 900 841))
+    Zaloz ((Get-WertisSugerowanePole -Pola $pola) -eq 1)
+}
+
+Sprawdz "adresy biją pustkę nawet gdy puste pole stoi wcześniej" {
+    $pola = @((Pole "tw_Pole1"), (Pole "tw_Pole2" 841 841))
+    Zaloz ((Get-WertisSugerowanePole -Pola $pola) -eq 1)
+}
+
+Sprawdz "etykieta pokazuje liczbę adresów, nie samą zajętość" {
+    # Bez tej liczby pole z adresami wygląda na liście identycznie jak pole
+    # z opisami opakowań, a to są dwie przeciwne decyzje.
+    $e = Format-WertisEtykietaPola -Pole (Pole "tw_Pole3" 847 841 @("A01-02-03", "B05-01-02"))
+    Zaloz ($e -match "tw_Pole3") "brak nazwy pola"
+    Zaloz ($e -match "adresy półek: 841") "brak liczby adresów"
+    Zaloz ($e -match "A01-02-03") "brak przykładów"
+}
+
+Sprawdz "etykieta nazywa pole zajęte BEZ adresów" {
+    $e = Format-WertisEtykietaPola -Pole (Pole "tw_Pole2" 3412 0 @("karton 12szt"))
+    Zaloz ($e -match "bez adresów półek") "pole z cudzymi danymi ma być opisane wprost"
+    Zaloz ($e -match "karton 12szt") "brak przykładów"
+}
+
+Sprawdz "etykieta pustego pola nie wymyśla liczb" {
+    $e = Format-WertisEtykietaPola -Pole (Pole "tw_Pole1")
+    Zaloz ($e -match "puste")
+    Zaloz (-not ($e -match "np\.")) "puste pole nie ma przykładów do pokazania"
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""

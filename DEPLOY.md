@@ -403,54 +403,40 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), `DOK_TYP_ZWROTY=14`
    (ZW), bufor = `dok_Status = 3` (odłożony).
 
-   Do ustalenia na własnej bazie zostają **trzy** rzeczy:
+   Do ustalenia na własnej bazie zostają **cztery** rzeczy. Ta sekcja mówi,
+   **co i po co**. Zapytania, odczyt wyniku i skutki pomyłki opisuje rozdział
+   „Jak ustalić wszystkie wartości" w
+   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+
+   Zapytania stały wcześniej w obu plikach naraz. Czytelnik nie miał jak
+   poznać, która wersja jest aktualna — a jedna z nich była błędna przez pół
+   roku.
 
    - **`mag_Id` magazynów MAG, MGP i Zwroty** (→ `MAG_ID_MAG` / `MAG_ID_MGP` /
      `MAG_ID_ZWROTY`). O trybie dokumentu rozstrzyga magazyn skutku, więc
      pomyłka wysyła dostawę do złej zakładki.
 
-     ```sql
-     SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
-     ```
-
-     Główny poznasz po `mag_Glowny = 1`. MGP i Zwroty — po nazwie firmowej.
-
-   - **pole lokalizacji na `tw__Towar`.**
+   - **pole lokalizacji na `tw__Towar`** (→ `MSSQL_LOC_COLUMN`).
 
      > ⚠️ Worker **nadpisuje wybrane pole bezwarunkowo**. Wybierz takie, którego
      > firma nie używa do niczego innego.
 
      W 1.87 SP3 HF1 (era KSeF) natywnej kolumny `tw_Lokalizacja` **nie ma**.
-     Wybierz jedno z ośmiu pól własnych `tw_Pole1..tw_Pole8`, każde
-     `varchar(50)` (→ `MSSQL_LOC_COLUMN`, domyślnie `tw_Pole1`).
-     `LOC_FIELD_LIMIT=50` wynika z rozmiaru kolumny.
+     Wybierasz jedno z ośmiu pól własnych `tw_Pole1..tw_Pole8`, każde
+     `varchar(50)`. `LOC_FIELD_LIMIT=50` wynika z rozmiaru kolumny.
 
-   - **flaga sprawdzenia faktury.** Kolumna „FW" na liście *Faktury zakupu*
-     **nie odpowiada żadnej kolumnie `dok__Dokument`**. InsERT trzyma flagi
-     w osobnej parze tabel: `fl__Flagi` (definicje) i `fl_Wartosc` (przypisania,
-     klucz złożony grupa + typ obiektu + id dokumentu).
+     Kreator liczy dla każdego pola zajętość **i liczbę gotowych adresów
+     półek**, po czym podpowiada pole z adresami. Jeśli firma już gdzieś notuje
+     lokalizacje, to jest właśnie to pole. Wskazanie innego zostawiłoby dwa
+     źródła prawdy o tym samym.
 
-     Oflaguj ręcznie jedną fakturę i podstaw jej numer:
+   - **flaga sprawdzenia faktury** (→ `MSSQL_FLAG_GRUPA`,
+     `MSSQL_FLAG_TYP_OBIEKTU`, `DOC_FLAG_*_SGT`). Kolumna „FW" na liście
+     *Faktury zakupu* **nie odpowiada żadnej kolumnie `dok__Dokument`**.
 
-     ```sql
-     SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
-     FROM fl_Wartosc w
-     JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
-     JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
-     WHERE d.dok_NrPelny = 'FZ 60/MAG/07/2026';
-     ```
-
-     → `MSSQL_FLAG_GRUPA` (`flw_IdGrupyFlag`) i `MSSQL_FLAG_TYP_OBIEKTU`
-     (`flw_TypObiektu`). Potem wypisz wszystkie flagi i przypisz cztery używane
-     przez WERTIS:
-
-     ```sql
-     SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
-     ```
-
-     → `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`,
-     `DOC_FLAG_DONE_ERRORS_SGT` — wpisujesz `flg_Id` (liczbę), nie nazwę; nazwa
-     idzie do `DOC_FLAG_*` i służy wyłącznie ludziom.
+     InsERT trzyma flagi w osobnej parze tabel: `fl__Flagi` (definicje)
+     i `fl_Wartosc` (przypisania). Do `DOC_FLAG_*_SGT` wpisuje się `flg_Id`
+     (liczbę), a nie nazwę — nazwa idzie do `DOC_FLAG_*` i służy ludziom.
 
      Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
      zamiast pisać w losową grupę flag. Reszta aplikacji działa normalnie —
@@ -459,45 +445,17 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
      Dokumenty zwrotów flagują się tym samym mechanizmem (to ten sam typ
      obiektu), więc nie wymagają osobnej konfiguracji.
 
-   - **zamówienia do dostawcy (ZD) na karcie towaru.** Dwie rzeczy, obie
+   - **zamówienia do dostawcy (ZD) na karcie towaru** (→ `DOK_STATUS_ZD_OTWARTE`,
+     `MSSQL_ZD_ZREAL_COLUMN`, `MSSQL_ZD_TERMIN_COLUMN`). Wszystkie trzy są
      opcjonalne — bez nich karta działa, tylko mniej dokładnie.
 
-     Które statusy znaczą „zamówienie otwarte":
+     **Kolumny ilości zrealizowanej może nie być wcale.** Na bazie
+     1.8731.31.6933 `dok_Pozycja` nie niesie stopnia realizacji w żadnym polu.
+     Poprawnym ustawieniem jest wtedy wartość pusta: `MSSQL_ZD_ZREAL_COLUMN=`.
 
-     ```sql
-     SELECT dok_Status, COUNT(*) AS ile FROM dok__Dokument
-     WHERE dok_Typ = 15 GROUP BY dok_Status ORDER BY dok_Status;
-     ```
-
-     → `DOK_STATUS_ZD_OTWARTE` (domyślnie `5,6,7,8`, czyli wszystkie).
-
-     Jak nazywa się kolumna z ilością już odebraną:
-
-     ```sql
-     SELECT name FROM sys.columns
-     WHERE object_id = OBJECT_ID('dok_Pozycja') AND name LIKE 'ob_Ilosc%';
-     ```
-
-     → `MSSQL_ZD_ZREAL_COLUMN` (domyślnie `ob_IloscZrealizowana`).
-
-     **Tej kolumny może nie być wcale.** Na bazie 1.8731.31.6933 `dok_Pozycja`
-     nie niesie stopnia realizacji w żadnym polu — są ilości tego dokumentu,
-     ceny, wartości i podatki, ale nie „ile już odebrano". Zapytanie wyżej
-     zwróci wtedy same `ob_Ilosc` i `ob_IloscMag`.
-
-     W takim wypadku **wpisz wartość pustą**: `MSSQL_ZD_ZREAL_COLUMN=`. Karta
-     dalej opisze ilość jako oszacowanie, a `/api/health` przestanie zgłaszać
-     problem, którego nie da się rozwiązać ustawieniem. Zostawiona nazwa
-     nieistniejącej kolumny daje to samo zachowanie plus ostrzeżenie niemożliwe
-     do spełnienia — a takie uczą ignorowania ostrzeżeń.
-
-     Gdy kolumna istnieje, `/api/health` zgłasza jej brak zdaniem z nazwą,
-     a karta pokazuje ilość **zamówioną** zamiast pozostałej — dlatego warto
-     wtedy sprawdzić nazwę i wpisać właściwą.
-
-     Termin realizacji (`MSSQL_ZD_TERMIN_COLUMN`) jest domyślnie pusty i karta
-     pisze wtedy „termin nieznany". Ustaw go tylko, jeśli firma faktycznie
-     wypełnia termin na zamówieniach.
+   Kreator z §0 pyta sam o trzy pierwsze pozycje. **O ustawienia ZD, typy
+   dostaw i okno importu nie pyta wcale** — te dopisuje się ręcznie do
+   `wertis.env`. Komplet wymienia rozdział „Grupa 3" w opisie struktury.
 
 3. Wpisz wartości do `wertis.env` (§2a) — jeden plik dla API i workera.
    Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*`

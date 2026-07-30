@@ -86,21 +86,49 @@ GROUP BY dok_Status
 ORDER BY dok_Status;
 ```
 
-`[WERYFIKUJ]` **nazwa kolumny z ilością już zrealizowaną** na pozycji
-zamówienia. Opis struktury jej nie wymienia. Domyślne
-`MSSQL_ZD_ZREAL_COLUMN=ob_IloscZrealizowana` to nazwa prawdopodobna, nie
-potwierdzona. Sprawdź:
+**Ilości już zrealizowanej NIE MA w tej wersji bazy.** To ustalenie, nie
+założenie: sprawdzono komplet 57 kolumn `dok_Pozycja` na bazie 1.8731.31.6933.
+Są ilości tego dokumentu, ceny, wartości, podatki, akcyza, opłata cukrowa,
+kaucje, GTU i węgiel. Stopnia realizacji nie niesie żadne pole.
 
-```sql
-SELECT name FROM sys.columns
-WHERE object_id = OBJECT_ID('dok_Pozycja') AND name LIKE 'ob_Ilosc%';
+Domyślne `MSSQL_ZD_ZREAL_COLUMN=ob_IloscZrealizowana` było więc **zgadnięte
+i zgadnięte źle**. Właściwą wartością dla tej wersji jest **pusta**:
+
+```bash
+export MSSQL_ZD_ZREAL_COLUMN=
 ```
 
-Gdy tej kolumny nie ma, import **nie przerywa się**: wpisuje zero, a karta
-pokazuje ilość zamówioną z dopiskiem, że to górne oszacowanie. `/api/health`
-zgłasza wtedy zdanie z nazwą kolumny do poprawienia. Zamówienie zrealizowane
-w połowie pokaże w tym trybie pełną ilość — dlatego to jest tryb awaryjny,
-a nie docelowy.
+Sprawdź to u siebie **bez filtru na przedrostek** — filtr `LIKE 'ob_Ilosc%'`
+przegapiłby kolumnę nazwaną inaczej i sam był kiedyś źródłem fałszywego tropu:
+
+```sql
+SELECT name, TYPE_NAME(system_type_id) AS typ
+FROM sys.columns WHERE object_id = OBJECT_ID('dok_Pozycja')
+ORDER BY name;
+```
+
+Bez tej kolumny import **nie przerywa się**: wpisuje zero, a karta pokazuje
+ilość zamówioną z dopiskiem, że to górne oszacowanie. Zamówienie odebrane
+w połowie wygląda wtedy na nietknięte.
+
+Wartość pusta jest lepsza niż nazwa nieistniejącej kolumny. Obie dają to samo
+zachowanie, ale druga zostawia w `/api/health` ostrzeżenie, **którego nie da się
+spełnić** — a takie uczą ignorowania ostrzeżeń.
+
+> **Trop na przyszłość, niezweryfikowany.** W `dok_Pozycja` jest `ob_DoId`.
+> W Subiekcie pozycja dokumentu realizującego wskazuje nim pozycję realizowaną,
+> więc ilość odebraną dałoby się policzyć sumą. Sprawdź na zamówieniu, o którym
+> wiesz, że przyszło w części:
+>
+> ```sql
+> SELECT p.ob_Id, p.ob_TowId, p.ob_Ilosc AS zamowiono, p.ob_Status,
+>        (SELECT ISNULL(SUM(r.ob_Ilosc), 0)
+>           FROM dok_Pozycja r WHERE r.ob_DoId = p.ob_Id) AS zrealizowano
+> FROM dok_Pozycja p WHERE p.ob_DokHanId = 0;  -- podstaw dok_Id zamówienia
+> ```
+>
+> Zgodność z tym, co faktycznie przyjechało, potwierdzi trop. To byłaby zmiana
+> kodu, nie ustawienia.
 
 Termin realizacji (`MSSQL_ZD_TERMIN_COLUMN`) jest **opcjonalny i domyślnie
 pusty**. Bez niego karta pisze „termin nieznany", co jest uczciwsze niż
@@ -175,6 +203,38 @@ SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGr
 → `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`,
 `DOC_FLAG_DONE_ERRORS_SGT`.
 
+## Typy dostaw — czym towar naprawdę wchodzi na magazyn
+
+Lista rozkładania pokazuje dokumenty, których typ stoi w `DOK_TYPY_DOSTAW`.
+Domyślne `1,10` to FZ i PZ, bo towar wchodzi obiema drogami: fakturą zakupu
+księgowaną wprost na magazyn albo przyjęciem zewnętrznym, gdy dokument handlowy
+przychodzi później.
+
+**Ale nie w każdej firmie.** Tam, gdzie dostawy idą wyłącznie na FZ, a PZ
+powstaje z innego procesu, tamte dokumenty są na liście pracy czystym szumem.
+
+Nie zgaduj — sprawdź, co faktycznie ląduje na magazynie głównym:
+
+```sql
+SELECT dok_Typ, COUNT(*) AS ile, MIN(dok_DataWyst) AS od, MAX(dok_DataWyst) AS do
+FROM dok__Dokument
+WHERE dok_MagId = 1                    -- podstaw MAG_ID_MAG
+  AND dok_DataWyst >= DATEADD(month, -6, GETDATE())
+GROUP BY dok_Typ ORDER BY ile DESC;
+```
+
+Kody odczytasz z listy `dok_Typ` na początku tego dokumentu. Typ, którego tam
+nie ma albo który liczy pojedyncze sztuki, prawdopodobnie pochodzi z innego
+procesu — wtedy zawężasz listę, na przykład do `DOK_TYPY_DOSTAW=1`.
+
+Pusta lista znaczy **żaden typ**, a nie „każdy". Literówka w ustawieniu daje
+więc pustą listę pracy, zauważalną od razu.
+
+> **Uwaga historyczna.** Do sierpnia 2026 para FZ/PZ była **zaszyta w zapytaniu
+> importu**, choć zwroty tuż obok miały już listę z konfiguracji. Firma
+> przyjmująca towar wyłącznie na FZ nie mogła odfiltrować PZ bez zmiany kodu.
+> To była niespójność, nie decyzja projektowa.
+
 ## Magazyny
 
 `sl_Magazyn`: `mag_Id`, `mag_Symbol` varchar(3), `mag_Nazwa`, `mag_Glowny` (bit).
@@ -192,6 +252,172 @@ wykryć automatycznie (`mag_Glowny = 1`), ale MGP i Zwroty są nazwane po firmow
 
 ```sql
 SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
+```
+
+## Jak ustalić wszystkie wartości — w kolejności kreatora
+
+Ten rozdział jest przepisem do wykonania, nie opisem. Odpowiada na pytanie:
+**co wpisać, żeby aplikacja czytała właściwe dane**.
+
+Podział idzie po tym, **kto ustala wartość**. To rozstrzyga, czy musisz cokolwiek
+zrobić ręką:
+
+| grupa | ustawienia | co robisz |
+|---|---|---|
+| kreator ustala sam | baza, magazyny, pole lokalizacji, flagi | potwierdzasz wybór z listy |
+| kreator pyta wprost | serwer i instancja SQL | wpisujesz |
+| **kreator NIE pyta** | pięć pozycji niżej plus `MSSQL_PORT` | **dopisujesz do `wertis.env`** |
+| ustalone ze struktury | kody `dok_Typ`, bufor, limit pola | nic |
+
+Trzeci wiersz jest tu najważniejszy. Kreator kończy się słowem „Gotowe", więc
+**brak tych wartości nie daje żadnego sygnału**.
+
+### Grupa 1 — kreator ustala sam, Ty potwierdzasz
+
+Wszystko poniżej działa tylko wtedy, gdy kreator **połączył się z bazą**. Bez
+połączenia patrz ostrzeżenie na końcu rozdziału.
+
+**Baza podmiotu** (`MSSQL_DATABASE`). Kopia podmiotu ma te same tabele co baza
+produkcyjna, więc nazwa nie rozstrzyga. Rozstrzyga data ostatniego dokumentu:
+
+```sql
+SELECT DB_NAME() AS baza, MAX(dok_DataWyst) AS ostatni_dokument, COUNT(*) AS dokumentow
+FROM dok__Dokument;
+```
+
+Żywa baza ma dzisiejszą datę. Kopia stoi na dniu zrzutu. Uruchom to w każdej
+bazie kandydującej.
+
+**Magazyny** (`MAG_ID_MAG`, `MAG_ID_MGP`, `MAG_ID_ZWROTY`):
+
+```sql
+SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
+```
+
+Główny poznasz po `mag_Glowny = 1`. MGP i Zwroty są nazwane po firmowemu, więc
+tu decyduje człowiek. Trzy identyfikatory **muszą być różne** — inaczej serwer
+nie wystartuje. Magazyn skutku rozstrzyga tryb dokumentu, a dwa te same id
+wyglądają jak „brakuje dostaw", nie jak błąd ustawień.
+
+**Flagi faktury** (`MSSQL_FLAG_GRUPA`, `MSSQL_FLAG_TYP_OBIEKTU`). Oflaguj
+najpierw ręcznie jedną fakturę w Subiekcie, potem podstaw jej numer:
+
+```sql
+SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
+FROM fl_Wartosc w
+JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
+JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
+WHERE d.dok_NrPelny = 'FZ 60/MAG/07/2026';
+```
+
+Identyfikatory czterech stanów (`DOC_FLAG_*_SGT`) bierzesz z listy flag:
+
+```sql
+SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
+```
+
+Wpisujesz `flg_Id`, czyli liczbę — nie nazwę. Puste wartości znaczą, że zadania
+flagowania kończą się czytelnym błędem. Reszta aplikacji działa normalnie.
+
+### Grupa 2 — które z ośmiu pól jest lokalizacją
+
+**To jest najważniejsze ustawienie w całej konfiguracji.** Worker nadpisuje
+wybrane pole **bezwarunkowo**. Wskazanie pola, w którym firma trzyma coś swojego,
+kasuje te dane bez ostrzeżenia i bez możliwości cofnięcia.
+
+Sama nazwa kolumny nie mówi nic. Zapytanie odpowiada na trzy pytania naraz:
+
+```sql
+SELECT p.pole, p.niepuste, p.adresy, p.przyklad
+FROM (
+  SELECT 'tw_Pole1' AS pole,
+         COUNT(NULLIF(LTRIM(RTRIM(ISNULL(tw_Pole1,''))),'')) AS niepuste,
+         SUM(CASE WHEN LTRIM(RTRIM(ISNULL(tw_Pole1,''))) LIKE '[A-Z][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+                    OR LTRIM(RTRIM(ISNULL(tw_Pole1,''))) LIKE 'PAL-[0-9][0-9][0-9]'
+                  THEN 1 ELSE 0 END) AS adresy,
+         MAX(NULLIF(LTRIM(RTRIM(ISNULL(tw_Pole1,''))),'')) AS przyklad
+  FROM tw__Towar
+  UNION ALL SELECT 'tw_Pole2',
+         COUNT(NULLIF(LTRIM(RTRIM(ISNULL(tw_Pole2,''))),'')),
+         SUM(CASE WHEN LTRIM(RTRIM(ISNULL(tw_Pole2,''))) LIKE '[A-Z][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+                    OR LTRIM(RTRIM(ISNULL(tw_Pole2,''))) LIKE 'PAL-[0-9][0-9][0-9]'
+                  THEN 1 ELSE 0 END),
+         MAX(NULLIF(LTRIM(RTRIM(ISNULL(tw_Pole2,''))),''))
+  FROM tw__Towar
+  -- powtórz blok dla tw_Pole3 … tw_Pole8
+) p ORDER BY p.pole;
+```
+
+Kolumna `adresy` liczy wartości pasujące do wzorca regału albo palety — te same
+wzorce, którymi aplikacja rozpoznaje skan (`LOC_FORMAT_STANDARD`,
+`LOC_FORMAT_PALLET`). Wynik czyta się tak:
+
+| co widzisz | co to znaczy | co zrobić |
+|---|---|---|
+| `niepuste = 0` | pole jest wolne | **weź je** |
+| `adresy` bliskie `niepuste` | firma już tu zapisuje lokalizacje | **weź to samo pole** |
+| `niepuste` duże, `adresy = 0` | pole trzyma dane firmy | **nie ruszaj** |
+
+Drugi wiersz jest łatwy do przeoczenia i kosztowny. Magazyn, który dziś jakoś
+notuje adresy, robi to najczęściej w polu własnym. Wskazanie wtedy innego pola
+daje **dwa źródła prawdy o tym samym** — a starych adresów nikt nie skasuje.
+
+Kreator liczy to samo i podpowiada Enterem pole z adresami, a dopiero w drugiej
+kolejności pierwsze puste. Gdy adresy leżą w dwóch polach naraz, **nie podpowiada
+nic** — rozstrzygnięcie, które pole obowiązuje, należy do człowieka.
+
+Zapytanie wyżej zostaje mimo to, bo odpowiada na to samo pytanie **niezależnie od
+kreatora**. Przydaje się, gdy sonda nie połączyła się z bazą.
+
+`LOC_FIELD_LIMIT=50` to realny rozmiar kolumny `varchar(50)`, nie ostrożne
+założenie. Adres dłuższy niż limit jest twardym błędem, nie cichym ucięciem.
+
+### Grupa 3 — o te kreator NIE pyta
+
+> ⚠️ Kreator ich **nie dotyka**. Po instalacji trzeba je dopisać do
+> `C:\wertis\wertis.env` i zrestartować obie usługi.
+
+**Statusy otwartych zamówień** (`DOK_STATUS_ZD_OTWARTE`). Struktura wylicza tylko
+„5..8 — zamówienia (różne stany realizacji)" i nie mówi, który numer co znaczy:
+
+```sql
+SELECT dok_Status, COUNT(*) AS ile FROM dok__Dokument
+WHERE dok_Typ = 15 GROUP BY dok_Status ORDER BY dok_Status;
+```
+
+Domyślne `5,6,7,8` bierze wszystkie cztery. Skutkiem zbyt szerokiej listy jest
+zamknięte zamówienie wiszące na karcie towaru.
+
+**Ilość już odebrana** (`MSSQL_ZD_ZREAL_COLUMN`) — patrz osobna sekcja wyżej.
+Na tej wersji bazy właściwą wartością jest **pusta**.
+
+**Termin realizacji** (`MSSQL_ZD_TERMIN_COLUMN`). Domyślnie pusty, bo „nie wiem
+kiedy" jest uczciwsze niż podstawienie daty wystawienia. Ustaw go tylko wtedy,
+gdy firma faktycznie wypełnia termin na zamówieniach.
+
+**Typy dostaw** (`DOK_TYPY_DOSTAW`) — patrz osobna sekcja wyżej.
+
+**Okno importu** (`DOK_DNI_WSTECZ`). Domyślnie 14 dni. To okno **importu**, nie
+filtr widoku, ale dostawa nierozłożona do końca zostaje widoczna niezależnie od
+wieku.
+
+**Port SQL** (`MSSQL_PORT`). Kreator o niego nie pyta, choć zapisuje go do pliku.
+Potrzebny, gdy SQL stoi na innej maszynie, a nie da się otworzyć portu UDP 1434
+dla usługi SQL Browser. Wpisany port **ma pierwszeństwo** przed nazwą instancji.
+
+### Gdy kreator nie połączył się z bazą
+
+> ⚠️ Bez połączenia kreator podsuwa `1`, `2`, `3` dla magazynów oraz `tw_Pole1`
+> dla lokalizacji. **To nie są podpowiedzi z Twojej bazy**, tylko wartości
+> domyślne — a wyglądają identycznie jak wynik sondy.
+
+Flagi są w tej ścieżce **pomijane bez słowa**, bo cały ich blok wymaga
+połączenia. Zostają puste, więc zadania flagowania nie powstaną.
+
+Właściwą reakcją jest dokończenie konfiguracji później, po nadaniu uprawnień:
+
+```powershell
+.\wertis-instalator.ps1 -TylkoKonfiguracja
 ```
 
 ## Dokument MM — na przyszłość

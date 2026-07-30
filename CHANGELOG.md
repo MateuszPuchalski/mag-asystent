@@ -28,6 +28,89 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.10.1 — 30 lipca 2026
+
+Jak sprawdzić, **które z ośmiu pól własnych jest lokalizacją** — i cztery inne
+ustawienia, o które kreator nie pyta wcale.
+
+`docs/subiekt-gt-struktura.md` dostał rozdział „Jak ustalić wszystkie wartości",
+ułożony **w kolejności pytań kreatora**. Podział idzie po tym, kto ustala
+wartość, bo to rozstrzyga, czy trzeba cokolwiek zrobić ręką.
+
+| grupa | co robisz |
+|---|---|
+| kreator ustala sam | potwierdzasz wybór z listy |
+| kreator pyta wprost | wpisujesz |
+| **kreator NIE pyta** | **dopisujesz do `wertis.env`** |
+| ustalone ze struktury | nic |
+
+Trzecia grupa jest sednem. Kreator kończy się słowem „Gotowe", więc brak tych
+pięciu wartości **nie daje żadnego sygnału**. `MSSQL_PORT` jest tam luką osobnego
+rodzaju: stoi na liście zapisu, ale żaden krok kreatora go nie przypisuje.
+
+### Pole lokalizacji — pytanie, którego dotąd nie umiał zadać żaden dokument
+
+Worker nadpisuje wskazaną kolumnę **bezwarunkowo**. Zapytania, które by na to
+odpowiadało, nie było w żadnym pliku — istniało wyłącznie wewnątrz instalatora.
+`DEPLOY.md` opisywał problem słowami i nie podawał ani jednego `SELECT`-a.
+
+Zapytanie w dokumencie odpowiada teraz na trzy pytania, nie na dwa. Trzecie jest
+najważniejsze: **czy któreś pole już zawiera adresy półek**. Magazyn, który dziś
+jakoś notuje lokalizacje, robi to najczęściej w polu własnym — a wskazanie wtedy
+innego pola daje dwa źródła prawdy o tym samym.
+
+To samo rozpoznanie trafiło **do kreatora**, bo to w nim zapada decyzja.
+`Get-WertisPolaDodatkowe` liczy dodatkowo wartości w kształcie regału
+(`A01-02-03`) albo palety (`PAL-042`), tymi samymi wzorcami, którymi aplikacja
+rozpoznaje skan.
+
+Podpowiedź Enterem przestaje przez to padać na pierwsze puste pole:
+
+- pole z adresami wygrywa z pustym,
+- przy braku adresów reguła wraca do pierwszego pustego,
+- **pole zajęte cudzymi danymi nie jest podpowiadane wcale** — dotąd kreator
+  podpowiadał tam `tw_Pole1`, czyli akurat kasowanie danych firmy,
+- dwa pola z adresami to remis i brak podpowiedzi, bo to człowiek musi
+  rozstrzygnąć, które obowiązuje.
+
+Ostrzeżenie przed nadpisaniem pyta teraz o to, co **naprawdę zniknie**: liczy
+wartości, które nie wyglądają na adres. Straszenie adresami, które aplikacja
+i tak przejmuje, uczyłoby klikać „tak" także tam, gdzie ostrzeżenie jest prawdziwe.
+
+### Kolumna ilości zrealizowanej: `[WERYFIKUJ]` → ustalenie
+
+Dokument mówił, że `ob_IloscZrealizowana` to „nazwa prawdopodobna, nie
+potwierdzona". Została sprawdzona i jest **błędna**: pełna lista 57 kolumn
+`dok_Pozycja` z bazy 1.8731.31.6933 nie zawiera stopnia realizacji w żadnym polu.
+Poprawną wartością na tej wersji jest **pusta**.
+
+Zapytanie w dokumencie było przy okazji **źródłem tej pomyłki**: filtr
+`LIKE 'ob_Ilosc%'` przegapiłby kolumnę nazwaną inaczej. Nowa wersja wypisuje
+wszystkie kolumny.
+
+### Liczniki przestają być prozą
+
+Trzy miejsca myliły się co do samych siebie — preambuła `struktura.md` mówiła
+„cztery" przy pięciu znacznikach, `DEPLOY.md` „trzy" przy czterech punktach,
+a komentarz w `config.ts` trzymał na liście `[WERYFIKUJ]` bufor rozstrzygnięty
+pół roku wcześniej.
+
+Poprawienie ich nie wystarcza, bo rozjadą się znowu. `tools/docs_check.py`
+sprawdza teraz, że liczebnik w preambule zgadza się z liczbą znaczników — to ta
+sama klasa zgnilizny, dla której cały ten skrypt powstał.
+
+### Jedno miejsce zamiast dwóch
+
+Pięć bloków SQL stało w `DEPLOY.md` i w `struktura.md` naraz, a czytelnik nie
+miał jak poznać, która wersja jest aktualna — jedna z nich była błędna przez pół
+roku. §6 mówi teraz **kiedy i po co**, `struktura.md` — **jak**.
+
+**Czego to nie dowodzi.** Zmian w `sql.ps1` i w kreatorze nie da się sprawdzić
+poza Windowsem z Subiektem: w CI nie ma `pwsh` z połączeniem do SQL, a `-DryRun`
+do bazy się nie łączy. Regułę podpowiedzi pokrywa dziewięć asercji w
+`instalator/testy.ps1`, ale samo zapytanie weryfikuje dopiero pierwsze prawdziwe
+uruchomienie. Dlatego wersja z dokumentu zostaje jako droga niezależna.
+
 ## 0.10.0 — 30 lipca 2026
 
 Co było w polu lokalizacji przed zmianą — w każdej z trzech ścieżek.
