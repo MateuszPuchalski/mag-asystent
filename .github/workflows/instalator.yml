@@ -102,6 +102,13 @@ jobs:
       - name: Przebieg probny wariantu demo
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Demo -Katalog "$env:RUNNER_TEMP\wertis-demo"
 
+      # Gałąź deinstalacji ma WŁASNY przebieg sterowania i kończy się `exit 0`
+      # przed etapem 1 — bez tego kroku nie sprawdzałoby jej nic poza parserem.
+      # Katalog celowo wskazuje na nieistniejącą ścieżkę: to jest ten wariant,
+      # w którym plan musi ODMÓWIC kasowania, a usługi i tak zejść.
+      - name: Przebieg probny deinstalacji (-Odinstaluj -DryRun)
+        run: .\dist\WERTIS-Instalator.ps1 -DryRun -Odinstaluj -Katalog "$env:RUNNER_TEMP\wertis-nieistnieje"
+
       # Instalator pobiera nssm.exe i uruchamia go jako SYSTEM, więc suma
       # kontrolna jest jedyną rzeczą stojącą między klientem a podmienionym
       # plikiem. Wartości nie dało się ustalić przy pisaniu kodu (brak dostępu

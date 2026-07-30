@@ -363,6 +363,91 @@ Sprawdz "etykieta pustego pola nie wymyśla liczb" {
     Zaloz (-not ($e -match "np\.")) "puste pole nie ma przykładów do pokazania"
 }
 
+# ── Deinstalacja: co wolno skasować ─────────────────────────────────────────
+# NAJGROŹNIEJSZY kod w tym repozytorium. `Remove-Item -Recurse -Force` dostaje
+# ścieżkę z parametru, a instalator wywalił się już raz na literówce w takiej
+# ścieżce (awaria z 27.07, test na górze tego pliku). Tam kosztowała nieudaną
+# instalację — tutaj kosztowałaby dysk.
+#
+# Dlatego asercje niżej sprawdzają przede wszystkim ODMOWY, a nie sukcesy.
+
+Write-Host ""
+Write-Host "Get-WertisPlanDeinstalacji"
+
+Sprawdz "korzeń dysku NIE jest kasowany" {
+    foreach ($korzen in @("C:\", "D:\", "/", "")) {
+        $p = Get-WertisPlanDeinstalacji -Katalog $korzen -Zawartosc @("server", ".git")
+        Zaloz (-not $p.Wolno) "zgoda na skasowanie korzenia '$korzen'"
+    }
+}
+
+Sprawdz "katalog systemowy NIE jest kasowany" {
+    # C:\Windows ma podkatalog o nazwie „system", nie „server" — ale nawet
+    # gdyby miał, brak .git i wertis.env go ratuje.
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\Windows" -Zawartosc @("System32", "Temp", "explorer.exe")
+    Zaloz (-not $p.Wolno) "zgoda na skasowanie C:\Windows"
+}
+
+Sprawdz "katalog z samym server\ to za mało - brak znamion instalacji" {
+    # Sam `server` bywa w cudzych projektach. Rozpoznanie wymaga DRUGIEGO
+    # znamienia, bo inaczej -Katalog wskazujący czyjeś repo przechodzi.
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\projekty\cudze" -Zawartosc @("server", "README.md")
+    Zaloz (-not $p.Wolno) "sam server\ wystarczył do zgody"
+}
+
+Sprawdz "instalacja z .git przechodzi" {
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\wertis" -Zawartosc @("server", ".git", "tools", "logs")
+    Zaloz ($p.Wolno) "prawdziwa instalacja dostała odmowę: $($p.Powod)"
+}
+
+Sprawdz "instalacja bez .git, ale z wertis.env, też przechodzi" {
+    # Stan po ręcznym wdrożeniu z DEPLOY.md: pliki są, historii gita nie ma.
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\wertis" -Zawartosc @("server", "wertis.env")
+    Zaloz ($p.Wolno) "instalacja bez .git dostała odmowę: $($p.Powod)"
+}
+
+Sprawdz "domyślnie dane są OCALANE, ze stemplem w nazwie" {
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\wertis" -Zawartosc @("server", ".git") -Stempel "20260730-1530"
+    Zaloz ($p.Wolno)
+    Zaloz ($p.DaneDo -eq "C:\wertis-dane-20260730-1530") "zła ścieżka danych: '$($p.DaneDo)'"
+}
+
+Sprawdz "ukośnik na końcu nie rozdwaja ścieżki danych" {
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\wertis\" -Zawartosc @("server", ".git") -Stempel "20260730-1530"
+    Zaloz ($p.DaneDo -eq "C:\wertis-dane-20260730-1530") "zła ścieżka danych: '$($p.DaneDo)'"
+}
+
+Sprawdz "-UsunDane kasuje wszystko razem" {
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\wertis" -Zawartosc @("server", ".git") -UsunDane
+    Zaloz ($p.Wolno)
+    Zaloz ($p.DaneDo -eq "") "z -UsunDane nie ma czego przenosić, a plan wskazuje $($p.DaneDo)"
+}
+
+Sprawdz "brak katalogu to NIE błąd - usługi trzeba zdjąć mimo to" {
+    # Deinstalacja po ręcznym skasowaniu C:\wertis. Musi dojść do końca,
+    # a nie przewrócić się na pierwszym kroku.
+    $p = Get-WertisPlanDeinstalacji -Katalog "C:\wertis" -Zawartosc @()
+    Zaloz (-not $p.Wolno)
+    Zaloz ($p.Powod -match "nie ma") "powód ma nazywać brak katalogu, jest: '$($p.Powod)'"
+}
+
+Sprawdz "każda odmowa niesie powód" {
+    # Odmowa bez powodu wygląda na awarię skryptu i kończy się skasowaniem
+    # katalogu ręką — czyli dokładnie tym, przed czym bramka broni.
+    #
+    # Bez pętli po tablicy tablic CELOWO: @(@(), @("server")) PowerShell
+    # SPŁASZCZA, więc przypadek pustej zawartości zniknąłby po cichu.
+    foreach ($p in @(
+        (Get-WertisPlanDeinstalacji -Katalog "C:\cos" -Zawartosc @()),
+        (Get-WertisPlanDeinstalacji -Katalog "C:\cos" -Zawartosc @("server")),
+        (Get-WertisPlanDeinstalacji -Katalog "C:\cos" -Zawartosc @("System32")),
+        (Get-WertisPlanDeinstalacji -Katalog "C:\" -Zawartosc @("server", ".git"))
+    )) {
+        Zaloz (-not $p.Wolno) "zgoda tam, gdzie ma być odmowa"
+        Zaloz ([bool]$p.Powod) "odmowa bez powodu dla $($p.Katalog)"
+    }
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""

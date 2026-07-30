@@ -49,6 +49,18 @@ Instalacja pilotażowa bez dotykania Subiekta (Etap 0 z §6):
 WERTIS-Instalator.exe -Demo
 ```
 
+Odinstalowanie idzie tym samym plikiem:
+
+```powershell
+WERTIS-Instalator.exe -Odinstaluj
+```
+
+Zdejmuje usługi, regułę zapory i katalog. Ślad audytowy przenosi obok.
+
+**Nie cofa jednak tego, co aplikacja zapisała do Subiekta**, i nie usuwa loginu
+SQL. Pełną listę podaje [`docs/wdrozenie.md`](docs/wdrozenie.md), sekcja
+„Jak odinstalować".
+
 **Reszta tego dokumentu opisuje to samo krok po kroku i nadal obowiązuje.**
 Instalator nie robi wszystkiego. Konta pracowników zakłada się z kolektora
 (§5a). Kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia ręcznie —

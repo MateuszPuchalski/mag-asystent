@@ -423,3 +423,213 @@ function Test-WertisHealth {
     }
     return $null
 }
+
+# ════════════════════════════════════════════════════════════════════════════
+#  DEINSTALACJA
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Kolejność kroków jest wymuszona przez Windows i NIE wynika z samego kodu:
+#
+#   1. zatrzymanie usług   — działający node.exe trzyma uchwyty do plików
+#   2. nssm remove         — nssm.exe leży WEWNĄTRZ kasowanego katalogu
+#   3. reguła zapory
+#   4. katalog
+#
+# Odwrócenie 2 i 4 zostawia usługi zarejestrowane na zawsze, bez narzędzia,
+# którym dało się je zdjąć.
+
+function Get-WertisPlanDeinstalacji {
+    <#
+        .SYNOPSIS
+        Rozstrzyga, czy wolno skasować katalog i co z niego ocalić.
+        .DESCRIPTION
+        `Remove-Item -Recurse -Force` na ścieżce z parametru jest najgroźniejszą
+        rzeczą w tym repozytorium. Instalator wywalił się już raz u klienta na
+        `New-Item -Path "C:\"` (patrz testy.ps1) — ta sama literówka w -Katalog
+        kosztowałaby tutaj dysk, a nie nieudaną instalację.
+
+        Dlatego kasowanie wymaga ROZPOZNANIA instalacji: katalog musi zawierać
+        `server` oraz `.git` albo `wertis.env`. Korzeń dysku, C:\Windows i każda
+        ścieżka spoza tego wzorca dostają odmowę z powodem.
+
+        Funkcja jest czysta — stan dysku wchodzi przez -Zawartosc, bo inaczej
+        nie dałoby się napisać na to asercji (tak samo jak -Teraz
+        w Test-WertisBazaPodejrzana).
+        .PARAMETER Zawartosc
+        Nazwy pozycji w katalogu, np. @("server", ".git", "wertis.env").
+        Pusta tablica znaczy: katalogu nie ma albo jest pusty.
+        .PARAMETER Stempel
+        Znacznik czasu w nazwie katalogu z ocalonymi danymi. Wstrzykiwany,
+        żeby wynik funkcji był powtarzalny w teście.
+    #>
+    param(
+        # AllowEmptyString, bo pusta ścieżka ma dostać ODMOWĘ Z POWODEM, a nie
+        # wyjątek wiązania parametru. Bez tego gałąź „pusta ścieżka" niżej jest
+        # martwym kodem, a wywołujący dostaje komunikat PowerShella zamiast
+        # zdania po polsku.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Katalog,
+        [string[]]$Zawartosc = @(),
+        [switch]$UsunDane,
+        [string]$Stempel = (Get-Date -Format "yyyyMMdd-HHmm")
+    )
+
+    $plan = [pscustomobject]@{
+        Katalog     = $Katalog
+        Wolno       = $false
+        Powod       = ""
+        # Pusty = dane lecą razem z katalogiem.
+        DaneDo      = ""
+    }
+
+    if (-not $Katalog -or -not $Katalog.Trim()) {
+        $plan.Powod = "pusta ścieżka"
+        return $plan
+    }
+
+    # Korzeń dysku (C:\, D:\) i ścieżka bez własnej nazwy nie mają czego
+    # rozpoznawać — Split-Path zwraca dla nich pustkę albo je samo.
+    $pelna = $Katalog.TrimEnd('\', '/')
+    # Osobno, PRZED Split-Path: dla pustego łańcucha ten rzuca wyjątkiem
+    # zamiast zwrócić pustkę, a "/" po przycięciu jest właśnie pusty.
+    if (-not $pelna) {
+        $plan.Powod = "to jest korzeń dysku, nie katalog instalacji"
+        return $plan
+    }
+    $nazwa = Split-Path $pelna -Leaf
+    if (-not $nazwa -or $nazwa -match "^[A-Za-z]:$") {
+        $plan.Powod = "to jest korzeń dysku, nie katalog instalacji"
+        return $plan
+    }
+
+    if (@($Zawartosc).Count -eq 0) {
+        # Nie błąd: deinstalacja po ręcznym skasowaniu katalogu ma dojść do
+        # końca i zdjąć usługi, a nie przewrócić się na pierwszym kroku.
+        $plan.Powod = "katalogu nie ma albo jest pusty - nie ma czego kasować"
+        return $plan
+    }
+
+    # Dwa znamiona, nie jedno. Sam `server` bywa w cudzych projektach, więc
+    # -Katalog wskazujący czyjeś repo przechodziłby bramkę bez drugiego warunku.
+    $lista    = @($Zawartosc)
+    $maServer = $lista -contains "server"
+    $maZnak   = ($lista -contains ".git") -or ($lista -contains "wertis.env")
+    if (-not ($maServer -and $maZnak)) {
+        $plan.Powod = "to nie wygląda na instalację WERTIS (brak server\ oraz .git\ lub wertis.env)"
+        return $plan
+    }
+
+    $plan.Wolno = $true
+    if (-not $UsunDane) {
+        # Ślad audytowy przeżywa deinstalację CELOWO: docs/wdrozenie.md czyni
+        # z niego jedyne źródło odpowiedzi na „co stało w polu przed zmianą".
+        $plan.DaneDo = "$pelna-dane-$Stempel"
+    }
+    return $plan
+}
+
+function Remove-WertisUslugi {
+    <#
+        .SYNOPSIS
+        Zatrzymuje i wyrejestrowuje usługi. Odwrotność Register-WertisUsluga.
+        .DESCRIPTION
+        `nssm remove <nazwa> confirm` — bez słowa `confirm` NSSM otwiera OKNO
+        DIALOGOWE i skrypt wisi w nieskończoność na maszynie bez człowieka.
+
+        Gdy nssm.exe już nie istnieje (ktoś skasował katalog wcześniej), usługi
+        zostałyby zarejestrowane na zawsze. Awaryjnie idzie `sc.exe delete` —
+        brzydsze, ale to jedyne wyjście z tego stanu.
+    #>
+    param(
+        [string]$Nssm = "",
+        [string[]]$Uslugi = @("wertis-api", "wertis-worker")
+    )
+    foreach ($u in $Uslugi) {
+        if (Test-DryRun "Zatrzymał(a)bym i wyrejestrował(a)bym usługę $u.") { continue }
+        if ($null -eq (Get-Service -Name $u -ErrorAction SilentlyContinue)) {
+            Write-Info "Usługi $u nie ma - pomijam."
+            continue
+        }
+        Stop-Service -Name $u -Force -ErrorAction SilentlyContinue
+
+        if ($Nssm -and (Test-Path $Nssm)) {
+            & $Nssm remove $u confirm | Out-Null
+        } else {
+            Write-Uwaga "Brak nssm.exe - wyrejestrowuję $u przez sc.exe."
+            & sc.exe delete $u | Out-Null
+        }
+
+        if ($null -eq (Get-Service -Name $u -ErrorAction SilentlyContinue)) {
+            Write-Ok "Usługa $u usunięta."
+        } else {
+            # Windows zwalnia wpis dopiero po zamknięciu wszystkich uchwytów —
+            # najczęściej otwartego okna „Usługi". Mówimy to wprost, bo inaczej
+            # człowiek uzna deinstalację za nieudaną.
+            Write-Uwaga "Usługa $u nadal widnieje. Zamknij okno 'Usługi' i uruchom ponownie."
+        }
+    }
+}
+
+function Remove-WertisRegulaZapory {
+    <#
+        .SYNOPSIS
+        Zdejmuje regułę wpuszczającą kolektory. Odwrotność Add-WertisRegulaZapory.
+    #>
+    param([string]$Nazwa = "WERTIS kolektor")
+    if (Test-DryRun "Usunął(ęła)bym regułę zapory '$Nazwa'.") { return }
+
+    $istnieje = Get-NetFirewallRule -DisplayName $Nazwa -ErrorAction SilentlyContinue
+    if (-not $istnieje) {
+        Write-Info "Reguły zapory '$Nazwa' nie ma - pomijam."
+        return
+    }
+    Remove-NetFirewallRule -DisplayName $Nazwa -ErrorAction SilentlyContinue
+    Write-Ok "Reguła zapory '$Nazwa' usunięta."
+}
+
+function Remove-WertisKatalog {
+    <#
+        .SYNOPSIS
+        Kasuje katalog instalacji, ocalając dane — o ile plan na to pozwala.
+        .DESCRIPTION
+        Decyzję podejmuje Get-WertisPlanDeinstalacji; tutaj zostaje samo
+        wykonanie. Podział jest celowy: reguła bezpieczeństwa da się wtedy
+        sprawdzić asercją, a tego kroku nie da się w CI wykonać wcale.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Katalog,
+        [switch]$UsunDane
+    )
+    $zawartosc = if (Test-Path $Katalog) {
+        @(Get-ChildItem $Katalog -Force | ForEach-Object { $_.Name })
+    } else { @() }
+
+    $plan = Get-WertisPlanDeinstalacji -Katalog $Katalog -Zawartosc $zawartosc -UsunDane:$UsunDane
+    if (-not $plan.Wolno) {
+        Write-Uwaga "Nie kasuję $Katalog - $($plan.Powod)."
+        return $plan
+    }
+
+    if ($plan.DaneDo) {
+        if (-not (Test-DryRun "Przeniósłbym dane do $($plan.DaneDo), potem skasował resztę $Katalog.")) {
+            $dane = Join-Path $Katalog "server\data"
+            if (Test-Path $dane) {
+                Zapewnij-Katalog (Split-Path $plan.DaneDo)
+                Move-Item $dane $plan.DaneDo -Force
+                Write-Ok "Dane ocalone: $($plan.DaneDo)"
+            } else {
+                Write-Info "Nie ma server\data - nie było czego ocalać."
+                $plan.DaneDo = ""
+            }
+        }
+    }
+
+    if (Test-DryRun "Skasował(a)bym katalog $Katalog.") { return $plan }
+    Remove-Item $Katalog -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path $Katalog) {
+        Write-Uwaga "Katalog $Katalog nie zniknął w całości - pliki w użyciu."
+        Write-Info "Sprawdź, czy nie zostało otwarte okno w tym katalogu, i powtórz."
+    } else {
+        Write-Ok "Katalog $Katalog usunięty."
+    }
+    return $plan
+}

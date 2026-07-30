@@ -62,7 +62,9 @@ nietknięty.
 **Bramka:** magazynier przeszedł pełną ścieżkę na kolektorze. Zeskanował towar,
 zobaczył kartę, zapisał lokalizację.
 
-**Wycofanie:** odinstalowanie usług. Nic poza tym nie powstało.
+**Wycofanie:** `.\wertis-instalator.ps1 -Odinstaluj`. Subiekt zostaje nietknięty,
+bo ten etap nic do niego nie zapisał. Na maszynie zostaje jednak więcej, niż
+widać — patrz sekcja „Jak odinstalować" na końcu.
 
 ---
 
@@ -194,6 +196,78 @@ samemu — z kartoteki w Subiekcie albo z kopii bazy. Przy większej liczbie
 kartotek kopia jest jedyną rozsądną drogą.
 
 Dlatego kopia zapasowa musi działać **przed etapem 4**, nie po nim.
+
+## Jak odinstalować
+
+Jedno polecenie, uruchomione **jako administrator**:
+
+```powershell
+.\wertis-instalator.ps1 -Odinstaluj
+```
+
+Zdejmuje usługi `wertis-api` i `wertis-worker`, regułę zapory „WERTIS kolektor"
+oraz katalog `C:\wertis`. Pyta o potwierdzenie, zanim cokolwiek ruszy.
+
+Ślad audytowy i zdjęcia problemów **zostają**. Instalator przenosi je obok, do
+`C:\wertis-dane-<data>`, i wypisuje tę ścieżkę. Historia zmian lokalizacji bywa
+potrzebna długo po tym, jak aplikacja zniknie z maszyny.
+
+Kasowanie także jej wymaga osobnego przełącznika i drugiego potwierdzenia:
+
+```powershell
+.\wertis-instalator.ps1 -Odinstaluj -UsunDane
+```
+
+Przebieg próbny wypisze plan, nie ruszając niczego:
+
+```powershell
+.\wertis-instalator.ps1 -Odinstaluj -DryRun
+```
+
+### Czego deinstalacja NIE cofa
+
+To jest ważniejsze niż sama lista usuwanych rzeczy.
+
+| co zostaje | dlaczego | jak usunąć ręcznie |
+|---|---|---|
+| **wartości w bazie Subiekta** | aplikacja je tam zapisała — to dane firmy, nie jej własne | wyłącznie z kopii bazy |
+| **login SQL `wertis`** | stoi na poziomie **instancji**, nie bazy podmiotu | `DROP USER` i `DROP LOGIN` (niżej) |
+| **ustawienia SQL Servera** | inne aplikacje mogą z nich korzystać | ręcznie, świadomie |
+| **Node.js i Git** | instalator dokłada je systemowo | `winget uninstall` |
+
+Pierwszy wiersz jest sednem. **Odinstalowanie aplikacji nie jest cofnięciem jej
+pracy.** Pole lokalizacji na kartotekach i flagi na fakturach zostają dokładnie
+tam, gdzie je wpisała — tak samo, jakby wpisał je człowiek.
+
+Ustawienia SQL Servera to trzy rzeczy, które kreator przestawił, żeby w ogóle
+dało się połączyć: uwierzytelnianie mieszane, protokół TCP i usługa SQL Browser
+uruchamiana automatycznie. Zostają włączone. Cofnięcie któregokolwiek odcięłoby
+każdą inną aplikację, która się na nim opiera.
+
+Login usuwa administrator bazy, w bazie podmiotu:
+
+```sql
+DROP USER [wertis];
+DROP LOGIN [wertis];
+```
+
+Instalator nie robi tego sam celowo. Login jest obiektem instancji, więc
+pomyłka dotknęłaby wszystkich baz na serwerze, nie tylko tej jednej.
+
+### Droga ręczna
+
+Gdy skryptu nie ma pod ręką albo katalog zniknął wcześniej:
+
+```powershell
+nssm stop wertis-api ; nssm stop wertis-worker
+nssm remove wertis-api confirm ; nssm remove wertis-worker confirm
+Remove-NetFirewallRule -DisplayName "WERTIS kolektor"
+Remove-Item C:\wertis -Recurse -Force
+```
+
+Bez `nssm.exe` (leży w kasowanym katalogu) usługi zdejmuje `sc.exe delete
+wertis-api`. Kolejność jest wymuszona: katalog kasuje się **na końcu**, bo
+inaczej znika narzędzie, którym usuwa się usługi.
 
 ## Ustawienia do sprawdzenia przed etapem 3
 
