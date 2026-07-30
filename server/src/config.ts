@@ -49,9 +49,14 @@ export const config = {
   sferaMode: (process.env.SGT_MODE === "mssql" ? "sql" : "dev") as "dev" | "sql",
 
   /**
-   * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql). Wartości [WERYFIKUJ]
-   * (dok_Typ, mag_Id, flaga bufora) ustala się na własnej bazie — zapytania
-   * pomocnicze w docs/subiekt-gt-edu-setup.md.
+   * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql).
+   *
+   * Co trzeba ustalić na WŁASNEJ bazie — mag_Id magazynów, pole lokalizacji,
+   * flagi faktur — opisuje rozdział „Jak ustalić wszystkie wartości"
+   * w docs/subiekt-gt-struktura.md, w kolejności pytań kreatora.
+   *
+   * Kody dok_Typ i bufor (dok_Status = 3) NIE są już [WERYFIKUJ]: wynikają
+   * ze struktury bazy 1.8731.31.6933, a nie z ustawień podmiotu.
    */
   mssql: {
     server: process.env.MSSQL_SERVER ?? "localhost",

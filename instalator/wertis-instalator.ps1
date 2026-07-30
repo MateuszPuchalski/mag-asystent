@@ -312,19 +312,24 @@ if ($podlaczacDoSubiekta) {
     $kolumna = "tw_Pole1"
     if ($polaczenie) {
         $pola = @(Get-WertisPolaDodatkowe -Polaczenie $polaczenie)
-        $etykietaPola = {
-            param($p)
-            $opis = if ($p.Niepuste -eq 0) { "puste - wolne do użycia" }
-                    else { "$($p.Niepuste) kartotek zajętych, np. $($p.Przyklady -join ', ')" }
-            "{0,-9} {1}" -f $p.Pole, $opis
+        $podpowiedz = Get-WertisSugerowanePole -Pola $pola
+        if ($podpowiedz -ge 0 -and $pola[$podpowiedz].Adresy -gt 0) {
+            Write-Info "W $($pola[$podpowiedz].Pole) leżą już adresy półek - stąd podpowiedź."
+            Write-Info "Wskazanie innego pola zostawiłoby dwa źródła prawdy o lokalizacji."
         }
-        $wolne = 0
-        for ($i = 0; $i -lt $pola.Count; $i++) { if ($pola[$i].Niepuste -eq 0) { $wolne = $i; break } }
         $wybrane = Read-Wybor -Pozycje $pola -Pytanie "Które pole ma trzymać lokalizację" `
-            -Etykieta $etykietaPola -Domyslny $wolne
-        if ($wybrane.Niepuste -gt 0) {
-            Write-Uwaga "$($wybrane.Pole) jest już używane w $($wybrane.Niepuste) kartotekach."
-            Write-Uwaga "Aplikacja nadpisze te wartości bezwarunkowo i nie da się tego cofnąć."
+            -Etykieta { param($p) Format-WertisEtykietaPola -Pole $p } -Domyslny $podpowiedz
+
+        # Bramka pyta o to, co NAPRAWDĘ zniknie. Wartości w kształcie adresu
+        # aplikacja przejmuje — to jej własna treść. Straszenie nimi nauczyłoby
+        # klikać „tak" także tam, gdzie ostrzeżenie jest prawdziwe.
+        $obce = $wybrane.Niepuste - $wybrane.Adresy
+        if ($wybrane.Adresy -gt 0) {
+            Write-Info "$($wybrane.Pole): $($wybrane.Adresy) wartości to już adresy - aplikacja je przejmuje."
+        }
+        if ($obce -gt 0) {
+            Write-Uwaga "$($wybrane.Pole) ma $obce wartości, które nie wyglądają na adres półki."
+            Write-Uwaga "Aplikacja nadpisze je bezwarunkowo i nie da się tego cofnąć."
             if (-not (Read-Tak "Na pewno użyć $($wybrane.Pole)?" -Domyslnie $false)) {
                 Write-Blad "Przerwane. Uruchom instalator ponownie i wskaż inne pole."
                 exit 1

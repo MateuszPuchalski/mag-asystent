@@ -390,17 +390,31 @@ SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id
 function Get-WertisPolaDodatkowe {
     <#
         .SYNOPSIS
-        Dla tw_Pole1..8: ile kartotek ma je niepuste i trzy przykładowe wartości.
+        Dla tw_Pole1..8: zajętość, liczba ADRESÓW PÓŁEK i trzy przykłady.
         .DESCRIPTION
         To jest najważniejsze pytanie całego kreatora. Worker nadpisuje wybraną
         kolumnę BEZWARUNKOWO, więc wskazanie pola, w którym firma trzyma coś
         swojego, kasuje te dane bez ostrzeżenia i bez możliwości cofnięcia.
         Sama nazwa kolumny nic nie mówi — dopiero zajętość i przykłady.
+
+        `Adresy` liczy wartości w kształcie regału (A01-02-03) albo palety
+        (PAL-042). To pytanie WAŻNIEJSZE niż zajętość: magazyn, który dziś jakoś
+        notuje adresy, robi to najczęściej właśnie w polu własnym. Wskazanie
+        wtedy INNEGO pola daje dwa źródła prawdy o tym samym, a starych adresów
+        nikt nie skasuje.
     #>
     param([Parameter(Mandatory)]$Polaczenie)
 
+    # Wzorce muszą odpowiadać LOC_FORMAT_* z server/src/config.ts — w składni
+    # T-SQL, bo LIKE nie zna wyrażeń regularnych.
+    $regal  = "[A-Z][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+    $paleta = "PAL-[0-9][0-9][0-9]"
     $czesci = (1..8 | ForEach-Object {
-        "SELECT 'tw_Pole$_' AS pole, COUNT(CASE WHEN LTRIM(RTRIM(ISNULL(tw_Pole$_,''))) <> '' THEN 1 END) AS niepuste FROM tw__Towar"
+        $k = "LTRIM(RTRIM(ISNULL(tw_Pole$_,'')))"
+        "SELECT 'tw_Pole$_' AS pole," +
+        " COUNT(CASE WHEN $k <> '' THEN 1 END) AS niepuste," +
+        " COUNT(CASE WHEN $k LIKE '$regal' OR $k LIKE '$paleta' THEN 1 END) AS adresy" +
+        " FROM tw__Towar"
     }) -join " UNION ALL "
     $liczby = Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql "$czesci;"
 
@@ -417,10 +431,71 @@ FROM tw__Towar WHERE LTRIM(RTRIM(ISNULL($($w.pole),''))) <> '';
         $wynik += [pscustomobject]@{
             Pole      = [string]$w.pole
             Niepuste  = [int]$w.niepuste
+            Adresy    = [int]$w.adresy
             Przyklady = $przyklady
         }
     }
     return $wynik
+}
+
+function Get-WertisSugerowanePole {
+    <#
+        .SYNOPSIS
+        Indeks pola do podpowiedzi Enterem; -1 gdy podpowiedź byłaby zgadywaniem.
+        .DESCRIPTION
+        Reguła ma dwa stopnie, w tej kolejności:
+
+        1. **Pole z adresami wygrywa.** Magazyn, który dziś jakoś notuje adresy,
+           robi to najczęściej w polu własnym. Wskazanie wtedy INNEGO pola daje
+           dwa źródła prawdy o tym samym, a starych adresów nikt nie skasuje.
+        2. Dopiero gdy adresów nie ma nigdzie — pierwsze puste pole.
+
+        Zwracamy -1 zamiast strzelać w dwóch sytuacjach. Remis adresów znaczy, że
+        człowiek musi rozstrzygnąć, które pole jest tym prawdziwym. Brak i adresów,
+        i pustego pola znaczy, że KAŻDA podpowiedź celuje w cudze dane — a stary
+        kod podpowiadał tam `tw_Pole1`, czyli akurat to, czego nie wolno wziąć
+        w ciemno.
+    #>
+    param([Parameter(Mandatory)][object[]]$Pola)
+
+    $zAdresami = @($Pola | Where-Object { $_.Adresy -gt 0 })
+    if ($zAdresami.Count -gt 0) {
+        $naj = @($zAdresami | Sort-Object Adresy -Descending)[0]
+        if (@($zAdresami | Where-Object { $_.Adresy -eq $naj.Adresy }).Count -gt 1) { return -1 }
+        for ($i = 0; $i -lt $Pola.Count; $i++) {
+            if ($Pola[$i].Pole -eq $naj.Pole) { return $i }
+        }
+        return -1
+    }
+
+    for ($i = 0; $i -lt $Pola.Count; $i++) {
+        if ($Pola[$i].Niepuste -eq 0) { return $i }
+    }
+    return -1
+}
+
+function Format-WertisEtykietaPola {
+    <#
+        .SYNOPSIS
+        Jedna linia listy wyboru pola — z liczbą adresów, nie tylko zajętością.
+        .DESCRIPTION
+        Sama zajętość nie odróżnia pola z adresami półek od pola z opisami
+        opakowań, a to są dwie przeciwne decyzje: pierwsze trzeba wziąć,
+        drugiego nie wolno ruszyć.
+    #>
+    param([Parameter(Mandatory)]$Pole)
+
+    $opis = if ($Pole.Adresy -gt 0) {
+        "niepuste: $($Pole.Niepuste)   w tym adresy półek: $($Pole.Adresy)"
+    } elseif ($Pole.Niepuste -eq 0) {
+        "puste - wolne do użycia"
+    } else {
+        "niepuste: $($Pole.Niepuste)   bez adresów półek"
+    }
+    $np = if ($Pole.Przyklady -and @($Pole.Przyklady).Count -gt 0) {
+        "   np. $(@($Pole.Przyklady) -join ', ')"
+    } else { "" }
+    return ("{0,-9} {1}{2}" -f $Pole.Pole, $opis, $np)
 }
 
 function Get-WertisFlagi {
