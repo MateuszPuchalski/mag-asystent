@@ -65,6 +65,14 @@ ominięciem bramki bezpieczeństwa. Instalator wypisuje nazwy i PID-y tego, co
 trzyma katalog, a gdy lista jest pusta — kieruje do `resmon`, bo uchwyt trzyma
 wtedy okno Eksploratora albo edytor, nie proces z plikiem w środku.
 
+### Polecenia deinstalacji nie dało się wkleić
+
+`docs/wdrozenie.md` podawał `.\wertis-instalator.ps1 -Odinstaluj`, a Windows
+odpowiada na to `running scripts is disabled on this system` — i tak też
+skończyło się u klienta. Instrukcja przy instalacji kieruje do `URUCHOM.cmd`,
+ale deinstalacja potrzebuje argumentów, więc tamta osłona jej nie obejmuje.
+Wszystkie polecenia w tej sekcji mają teraz `-ExecutionPolicy Bypass` wprost.
+
 CI dostał przebieg próbny deinstalacji na **podrobionej instalacji**, gdzie
 bramka się zgadza. Poprzedni wariant szedł na nieistniejącym katalogu i mijał
 skanowanie procesów bokiem. Nowy woła `Get-Process` na prawdziwej tablicy

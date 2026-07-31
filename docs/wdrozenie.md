@@ -202,8 +202,15 @@ Dlatego kopia zapasowa musi działać **przed etapem 4**, nie po nim.
 Jedno polecenie, uruchomione **jako administrator**:
 
 ```powershell
-.\wertis-instalator.ps1 -Odinstaluj
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odinstaluj
 ```
+
+> **Dlaczego nie po prostu `.\wertis-instalator.ps1`.** Windows domyślnie
+> odmawia uruchamiania plików `.ps1` i odpowiada `running scripts is disabled on
+> this system`. `-ExecutionPolicy Bypass` dotyczy **tego jednego uruchomienia** —
+> polityka systemowa zostaje nietknięta. Przy instalacji tę samą osłonę daje
+> `URUCHOM.cmd` (prawym → „Uruchom jako administrator"), ale deinstalacja
+> potrzebuje argumentów, więc idzie wprost.
 
 Zdejmuje usługi `wertis-api` i `wertis-worker`, regułę zapory „WERTIS kolektor"
 oraz katalog `C:\wertis`. Pyta o potwierdzenie, zanim cokolwiek ruszy.
@@ -215,13 +222,13 @@ potrzebna długo po tym, jak aplikacja zniknie z maszyny.
 Kasowanie także jej wymaga osobnego przełącznika i drugiego potwierdzenia:
 
 ```powershell
-.\wertis-instalator.ps1 -Odinstaluj -UsunDane
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odinstaluj -UsunDane
 ```
 
 Przebieg próbny wypisze plan, nie ruszając niczego:
 
 ```powershell
-.\wertis-instalator.ps1 -Odinstaluj -DryRun
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odinstaluj -DryRun
 ```
 
 ### Instalatora nie uruchamia się z wnętrza kasowanego katalogu
@@ -235,9 +242,12 @@ Wynieś instalator poza katalog i uruchom go stamtąd:
 ```powershell
 cd C:\
 Copy-Item C:\wertis\instalator C:\wertis-instalator -Recurse
-cd C:\wertis-instalator
-.\wertis-instalator.ps1 -Odinstaluj -Katalog C:\wertis
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File C:\wertis-instalator\wertis-instalator.ps1 -Odinstaluj -Katalog C:\wertis
 ```
+
+Ścieżka do `-File` jest tu **pełna**, a powłoka zostaje w `C:\` — dzięki temu
+nie trzeba wchodzić do żadnego z tych katalogów.
 
 Deinstalacja ostrzeże, jeśli mimo to wykryje powłokę w środku — zanim zapyta
 o zgodę, nie po.
