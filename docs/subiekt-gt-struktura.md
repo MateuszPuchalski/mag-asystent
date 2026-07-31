@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały pięć.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały sześć.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -239,20 +239,29 @@ się preambuła.
 > rozdział o zamówieniach). Ta sama lista odpowiada na pytanie poniżej — jeśli
 > zachowała się z tamtego sprawdzenia, wystarczy do niej zajrzeć.
 
-### Czego brakuje po stronie WERTIS
+### Jak WERTIS wskazuje wiersz faktury
 
-Zapis per pozycja wymaga wskazania **konkretnego wiersza** `dok_Pozycja`, a tego
-identyfikatora aplikacja dziś nie ma. Importer czyta `ob_DokHanId, ob_TowId,
-ob_IloscMag` (`adapters/subiekt.mssql.ts`), a read-model `sgt_pozycja`
-i `delivery_line` trzymają tylko `tw_id`.
+Zapis per pozycja wymaga wskazania **konkretnego wiersza** `dok_Pozycja`.
 
 Dopasowanie po parze (dokument, towar) **nie jest bezpieczne**. Ten sam towar
 potrafi wystąpić na fakturze w dwóch wierszach — choćby w dwóch cenach albo
 z dwóch partii. Wtedy nie wiadomo, do której komórki pisać.
 
-Właściwą drogą jest zaimportowanie identyfikatora pozycji i przeniesienie go do
-`delivery_line`. To zmiana schematu, nie jednolinijkowa poprawka. Trzeba ją
-policzyć osobno.
+Od 0.13.0 identyfikator jest **importowany**. Read-model `sgt_pozycja` ma
+kolumnę `ob_id`, a linia robocza `delivery_line` — kolumnę `sgt_pozycje` z JSON-ową
+listą identyfikatorów, rosnąco.
+
+Lista, nie pojedyncza wartość: `openDelivery` agreguje ten sam towar z kilku
+wierszy faktury w jedną linię, bo magazynier ma przed sobą jedną paletę.
+
+`[WERYFIKUJ]` **nazwa kolumny klucza pozycji w `dok_Pozycja`**
+(`MSSQL_POZ_ID_COLUMN`, domyślnie `ob_Id`). Nasz opis struktury jej nie
+wymienia, więc domyślna jest **założeniem** — dokładnie w tej samej sytuacji
+`ob_IloscZrealizowana` okazało się zgadnięte źle. Rozstrzyga to zapytanie
+o komplet kolumn `dok_Pozycja` podane niżej, przy okazji „Opisu dostawy".
+
+Brak kolumny nie wywraca importu: pozycje wczytują się bez identyfikatora,
+`sgt_pozycje` zostaje puste, a `/api/health` mówi o tym wprost.
 
 `[WERYFIKUJ]` **gdzie „Opis dostawy" mieszka w bazie.** Odpowiedź musi objąć
 cztery rzeczy — tabelę, kolumnę, typ z długością oraz sposób powiązania
@@ -330,9 +339,10 @@ Trzy rzeczy do rozstrzygnięcia świadomie, nie przy implementacji:
    które to rozstrzyga: czy magazynier wpisuje różnice zanim biuro zatwierdzi
    fakturę, czy po. Dla dokumentu w buforze (`dok_Status = 3`) kolejka ma już
    osobny stan `waiting_for_doc`.
-3. **Identyfikator pozycji** — patrz „Czego brakuje po stronie WERTIS" wyżej.
-   Bez niego nie ma czego zaadresować przy towarze powtórzonym na dwóch
-   wierszach.
+3. **Do której komórki przy towarze powtórzonym.** Linia robocza niesie listę
+   identyfikatorów, a nie jeden — trzeba więc rozstrzygnąć regułę: pierwsza
+   pozycja, wszystkie, czy ta o największej ilości. Lista jest posortowana
+   rosnąco właśnie po to, żeby „pierwsza" była pojęciem jednoznacznym.
 
 ## Typy dostaw — czym towar naprawdę wchodzi na magazyn
 

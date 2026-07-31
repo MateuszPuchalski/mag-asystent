@@ -169,7 +169,17 @@ CREATE TABLE IF NOT EXISTS sgt_pozycja (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   dok_id INTEGER NOT NULL REFERENCES sgt_dokument(dok_id),
   tw_id  INTEGER NOT NULL,
-  ilosc  REAL NOT NULL
+  ilosc  REAL NOT NULL,
+  -- Identyfikator WIERSZA faktury w Subiekcie (klucz `dok_Pozycja`).
+  --
+  -- Potrzebny, bo ten sam towar potrafi stać na fakturze dwa razy — w dwóch
+  -- cenach albo z dwóch partii. Dopasowanie po parze (dokument, towar) nie
+  -- rozstrzyga wtedy, o który wiersz chodzi, a opis różnic biuro trzyma
+  -- właśnie PRZY POZYCJI (patrz docs/subiekt-gt-struktura.md).
+  --
+  -- Nullowalny celowo: baza bez tej kolumny albo starszy read-model mają dać
+  -- NULL, a nie wywrócić import.
+  ob_id  INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_pozycja_dok ON sgt_pozycja(dok_id);
 
@@ -249,6 +259,10 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   lok_oczekiwana TEXT,                          -- tw_Lokalizacja w chwili otwarcia
   lok_faktyczna  TEXT,                          -- zeskanowana (fakt, nie intencja — D3)
   status         TEXT NOT NULL DEFAULT 'todo',  -- todo | done | partial | problem | skipped
+  -- JSON: identyfikatory pozycji faktury składających się na tę linię, rosnąco.
+  -- LISTA, nie jedna wartość, bo openDelivery agreguje ten sam towar z kilku
+  -- wierszy dokumentu w jedną linię roboczą.
+  sgt_pozycje    TEXT,
   done_at        TEXT,
   done_by        TEXT,
   -- Przy natłoku jedną dostawę rozkłada kilka osób (TTL w services/locks.ts).

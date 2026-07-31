@@ -28,6 +28,53 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.13.0 — 31 lipca 2026
+
+WERTIS umie teraz wskazać **konkretny wiersz faktury**. Nic to jeszcze nie
+zmienia na ekranie — to warunek konieczny zapisu opisu różnic do Subiekta,
+policzony osobno, żeby tamta zmiana nie niosła przy okazji migracji schematu.
+
+### Dlaczego to nie jest jedna kolumna
+
+Naturalny odruch to dopisać `ob_id` do linii roboczej. **Byłby błędny.**
+`openDelivery` agreguje ten sam towar z kilku wierszy dokumentu w jedną linię —
+świadomie, bo magazynier ma przed sobą jedną paletę i ma ją zobaczyć raz.
+W Subiekcie duplikat jest normalny: dwie ceny, dwie partie, dwa wiersze.
+
+Linia dostaje więc `sgt_pozycje` — **listę** identyfikatorów, posortowaną
+rosnąco. Sortowanie nie jest kosmetyką: czyni „pierwszą pozycję tego towaru"
+pojęciem rozstrzygalnym, gdy przyjdzie wybrać komórkę zapisu.
+
+Agregacja została nietknięta. Rozbicie na wiersz-per-pozycję pokazałoby ten sam
+towar dwa razy przy jednej palecie — regresja w interfejsie wprowadzona po to,
+żeby uprościć zapis, którego jeszcze nie ma.
+
+### [wymaga działania] Nazwa kolumny jest ZAŁOŻENIEM
+
+Nowe `MSSQL_POZ_ID_COLUMN`, domyślnie `ob_Id`. Nasz opis struktury tej kolumny
+nie wymienia, więc domyślna jest **szóstym `[WERYFIKUJ]`** — dokładnie w tej
+samej sytuacji `ob_IloscZrealizowana` okazało się zgadnięte źle.
+
+Sprawdza to jedno zapytanie o komplet kolumn `dok_Pozycja`, to samo, które
+odpowiada na pytanie o „Opis dostawy" (`docs/subiekt-gt-struktura.md`).
+
+Brak kolumny **nie wywraca importu**: pozycje wczytują się bez identyfikatora,
+`sgt_pozycje` zostaje puste, a `/api/health` mówi o tym wprost. Cisza byłaby tu
+groźna — opis różnic trafiłby kiedyś w niewłaściwy wiersz i wyglądałby jak
+zwykły wpis.
+
+### Migracja
+
+Kolumny dochodzą same, przez `migrate()` w `db/db.ts` — ten sam mechanizm co
+przy `events.user_ref`. Sprawdzone na bazie założonej na schemacie sprzed
+zmiany: kolumny dochodzą, dane zostają, **stare wiersze mają `NULL`**, a nie
+zmyśloną wartość. Historii się nie dopisuje wstecz.
+
+Seed dostał fakturę z **tym samym towarem w dwóch wierszach** — bez niej ścieżka,
+dla której cała ta zmiana powstała, nie miałaby w demo ani jednego przebiegu.
+
+---
+
 ## 0.12.3 — 31 lipca 2026
 
 Zakładka rozkładania nazywa się teraz **DOSTAWY**, pokazuje **same faktury
