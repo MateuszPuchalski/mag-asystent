@@ -192,6 +192,18 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * zapis CZEKA na decyzję człowieka — serwer nie zgadnie, czy towar
      * przeniesiono, czy leży teraz w dwóch miejscach (§4.3).
      */
+    suspend fun putaway(line: DeliveryLineView, code: String) {
+        val expected = line.locExpected
+        if (!expected.isNullOrBlank() && expected != code) {
+            graph.feedback.beep(false)
+            mismatch = line to code
+            return
+        }
+        commitPutaway(line, code, locAction = null)
+    }
+
+    // router skanów: gdy czekamy na lokalizację — LOC kończy operację;
+    // w innym wypadku każdy skan próbuje rozstrzygnąć towar.
     // Przy otwartym pytaniu (rozjazd / wyjątek) skan jest połykany — decyzja
     // człowieka nie może zostać przewinięta przez przypadkowy strzał skanera.
     ScanHandlerEffect { scan ->
