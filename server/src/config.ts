@@ -97,15 +97,6 @@ export const config = {
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n >= 0),
     /**
-     * Kody `dok_Typ` dokumentów zwrotów listowanych na magazynie Zwroty (CSV).
-     * Domyślnie `14` = ZW (zwrot). Puste = każdy dokument na tym magazynie —
-     * zostaw puste, jeśli biuro przyjmuje zwroty także innym typem.
-     */
-    dokTypyZwroty: (process.env.DOK_TYP_ZWROTY ?? "14")
-      .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => Number.isFinite(n) && n > 0),
-    /**
      * Kody `dok_Typ` DOSTAW listowanych do rozłożenia (CSV).
      *
      * Domyślnie `1` — sama FZ. U tego klienta towar wchodzi wyłącznie fakturą

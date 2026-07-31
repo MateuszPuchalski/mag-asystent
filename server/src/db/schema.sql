@@ -221,9 +221,6 @@ INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
 -- aplikacja zapisuje WYŁĄCZNIE lokalizację (D1): żadnego MM, żadnego
 -- waiting_for_doc. Dzięki temu można rozkładać dostawę, zanim księgowość
 -- zaksięguje FZ (dokument w buforze).
---
--- Zwrot działa tak samo, z jedną różnicą: towar leży na magazynie Zwroty, więc
--- po rozłożeniu KOSZYKA trzeba go realnie przesunąć na MAG (jeden MM na koszyk).
 CREATE TABLE IF NOT EXISTS delivery (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   sgt_dok_id    INTEGER NOT NULL UNIQUE,
@@ -236,8 +233,7 @@ CREATE TABLE IF NOT EXISTS delivery (
   status        TEXT NOT NULL DEFAULT 'open',   -- open | done | (abandoned: historyczne)
   opened_at     TEXT NOT NULL,
   closed_at     TEXT,
-  -- Magazyn skutku dokumentu (snapshot z chwili otwarcia). Jedyne, co odróżnia
-  -- zwrot od dostawy krajowej: MAG ⇒ sam adres, Zwroty ⇒ dodatkowo MM na koszyk.
+  -- Magazyn skutku dokumentu (snapshot z chwili otwarcia).
   source_mag_id INTEGER
 );
 
@@ -261,20 +257,7 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   done_by        TEXT,
   -- Przy natłoku jedną dostawę rozkłada kilka osób (TTL w services/locks.ts).
   locked_by      TEXT,
-  locked_at      TEXT,
-  -- ── Zwroty: koszyk jako jednostka pracy ──────────────────────────────────
-  -- Numer koszyka wpisany przy odkładaniu. Podział na koszyki istnieje tylko
-  -- fizycznie (biuro wystawia JEDEN zbiorczy dokument), więc to tutaj jest
-  -- jego jedyny ślad w systemie.
-  koszyk         TEXT,
-  -- Ile z `ilosc_odlozona` objął już dokument MM. Różnica (odłożone − objęte)
-  -- to dokładnie to, co czeka na przesunięcie. Licznik, a nie flaga, bo TEN SAM
-  -- towar potrafi być w dwóch koszykach (klient A zwrócił 3, klient B 2), a
-  -- dokument zbiorczy agreguje go w jedną linię — flaga „już w MM" gubiłaby
-  -- resztę, a ponowne zamknięcie koszyka dublowałoby przesunięcie.
-  mm_ilosc       REAL NOT NULL DEFAULT 0,
-  -- Ostatni MM, który objął tę linię — do prześledzenia „czym pojechała".
-  mm_queue_id    INTEGER
+  locked_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);

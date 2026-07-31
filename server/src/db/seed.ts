@@ -15,7 +15,7 @@ import { config } from "../config.js";
  *
  * Magazyn skutku dokumentu rozstrzyga, który tryb go obsługuje, i celowo daje
  * dane obu ścieżkom: krajowe FZ/PZ na MAG (tryb A — sam adres), jeden kontener
- * na MGP i jeden karton zwrotów (tryb B — sesja z wózkiem i MM).
+ * na MGP (tryb B — sesja z wózkiem i MM).
  */
 
 type Row = [
@@ -201,12 +201,11 @@ function seed() {
   });
   buildDocs();
 
-  // ── zbiorczy dokument zwrotów od klientów (magazyn Zwroty) ───────────────
-  // Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn Zwroty
-  // JEDNYM zbiorczym dokumentem i układa go w koszyki opisane numerem zwrotu.
-  // Magazynier bierze koszyk, rozkłada go na półki (tryb A) i zamyka koszyk —
-  // dopiero wtedy powstaje MM Zwroty→MAG. Pozycje: towary z MAG z lokalizacją
-  // (wróciły od klientów) + jeden bez lokalizacji (BRAK LOK).
+  // ── stan na magazynie Zwroty ─────────────────────────────────────────────
+  // Zwroty przyjmuje i rozlicza biuro w Subiekcie — aplikacja nie ma tam nic do
+  // roboty (rozkładanie koszykami wypadło w 0.17.0). Stan zasiewamy mimo to,
+  // bo karta towaru odpowiada na pytanie „gdzie jeszcze leży" i magazyn Zwroty
+  // jest jedną z możliwych odpowiedzi.
   const zwrotItems: Array<{ tw_id: number; qty: number }> = [];
   rows.forEach((r, i) => {
     const mag = r[3];
@@ -218,19 +217,14 @@ function seed() {
   if (noLocProducts.length) zwrotItems.push({ tw_id: noLocProducts[0], qty: 2 });
 
   if (zwrotItems.length) {
-    const zwDokId = paczki.length + 1;
     const buildZwrot = transaction(d, () => {
-      insDok.run(zwDokId, "ZW", `ZW 7/${mmrrrr(baseDate)}`, baseDate.toISOString().slice(0, 10), config.magId.ZWROTY, "Zwroty klienckie", 0);
       const insZwStan = d.prepare(
         "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,0) ON CONFLICT(tw_id, mag_id) DO UPDATE SET stan = stan + excluded.stan"
       );
-      for (const it of zwrotItems) {
-        insPoz(zwDokId, it.tw_id, it.qty);
-        insZwStan.run(it.tw_id, config.magId.ZWROTY, it.qty);
-      }
+      for (const it of zwrotItems) insZwStan.run(it.tw_id, config.magId.ZWROTY, it.qty);
     });
     buildZwrot();
-    console.log(`[seed] karton zwrotów: ZW 7/07/2026, pozycji=${zwrotItems.length}`);
+    console.log(`[seed] stan na magazynie Zwroty: kartotek=${zwrotItems.length}`);
   }
 
   // ── syntetyczne zamówienia do dostawcy (ZD) ─────────────────────────────

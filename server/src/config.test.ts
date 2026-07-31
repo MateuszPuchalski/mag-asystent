@@ -23,10 +23,6 @@ test("dok_Typ dostaw: FZ=1, PZ=10 (5 to KFZ, nie PZ)", () => {
   assert.notEqual(config.mssql.dokTypPZ, 5);
 });
 
-test("dok_Typ zwrotów: ZW=14", () => {
-  assert.deepEqual(config.mssql.dokTypyZwroty, [14]);
-});
-
 test("bufor to dokument ODŁOŻONY (3), nie wycofany (0)", () => {
   assert.match(config.mssql.bufferExpr, /dok_Status\s*=\s*3/);
   assert.doesNotMatch(config.mssql.bufferExpr, /dok_Status\s*=\s*0/);

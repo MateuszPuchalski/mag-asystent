@@ -20,7 +20,6 @@ fun opisStatusu(d: WDostawie): String? = when {
     d.status == "problem" -> "zgłoszony problem"
     d.status == "skipped" -> "pominięte przy rozkładaniu"
     d.status != null -> "w toku"
-    d.zwrot -> "zwrot, czeka na rozłożenie"
     d.wBuforze -> "dokument w buforze"
     else -> null
 }

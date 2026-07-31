@@ -112,34 +112,6 @@ class DtosTest {
         assertEquals("anna", (r as ScanResolution.Locked).lockedBy)
     }
 
-    @Test fun `zwrot niesie koszyki czekajace na MM`() {
-        val v = WertisJson.decodeFromString<DeliveryView>(
-            """{"id":9,"dokId":7,"nrPelny":"ZW 7/07/2026","status":"open","zwrot":true,
-                "koszyki":[{"numer":"1","lines":3,"qty":6}],
-                "lines":[{"id":1,"twId":4,"sym":"S","name":"N","qtyDoc":2,"qtyDone":2,
-                          "status":"done","aisle":"C","koszyk":"1"}]}"""
-        )
-        assertTrue(v.zwrot)
-        assertEquals("1", v.koszyki[0].numer)
-        assertEquals(6.0, v.koszyki[0].qty, 0.0)
-        assertEquals("1", v.lines[0].koszyk)
-
-        // dostawa krajowa: brak pól → zwrot fałszywy, zero koszyków (nie crash)
-        val krajowa = WertisJson.decodeFromString<DeliveryView>("""{"id":10,"nrPelny":"FZ 1"}""")
-        assertTrue(!krajowa.zwrot)
-        assertTrue(krajowa.koszyki.isEmpty())
-    }
-
-    @Test fun `numer koszyka jedzie z odlozeniem, ale tylko gdy jest`() {
-        val zZwrotem = WertisJson.encodeToString(
-            PutawayLineBody.serializer(),
-            PutawayLineBody("E03-04-03", koszyk = "12")
-        )
-        assertTrue(zZwrotem.contains("\"koszyk\":\"12\""))
-        val bezZwrotu = WertisJson.encodeToString(PutawayLineBody.serializer(), PutawayLineBody("E03-04-03"))
-        assertTrue(!bezZwrotu.contains("koszyk"))
-    }
-
     @Test fun `QueueResponse - statusy i summary`() {
         val json = """
             {"items":[

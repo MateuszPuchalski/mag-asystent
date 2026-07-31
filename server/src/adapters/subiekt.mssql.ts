@@ -367,11 +367,7 @@ export async function importFromMssql(): Promise<ImportStats> {
 
   // dostawca: kh_Symbol jest pewny w każdej wersji SGT; pełna nazwa siedzi w
   // adr__Ekran (adr_NazwaPelna) — podmiana opisana w docs/subiekt-gt-edu-setup.md
-  // dokumenty zwrotów: domyślnie ZW (dok_Typ 14), DOK_TYP_ZWROTY może rozszerzyć
   //
-  const zwTypFilter = c.dokTypyZwroty.length
-    ? ` AND d.dok_Typ IN (${c.dokTypyZwroty.map((n) => Math.trunc(n)).join(",")})`
-    : "";
   const { dostawyTypFilter, oknoFilter } = budujFiltryDokumentow(
     c.dokTypyDostaw,
     otwarteDokumenty()
@@ -381,7 +377,6 @@ export async function importFromMssql(): Promise<ImportStats> {
       .request()
       .input("mag", sql.Int, config.magId.MAG)
       .input("mgp", sql.Int, config.magId.MGP)
-      .input("zw", sql.Int, config.magId.ZWROTY)
       .input("cutoff", sql.VarChar, new Date(Date.now() - c.dokDniWstecz * 86400_000).toISOString().slice(0, 10))
       .query<DokRow>(
         `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
@@ -394,9 +389,6 @@ export async function importFromMssql(): Promise<ImportStats> {
          WHERE (
                  -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
                  (d.dok_MagId = @mag AND ${dostawyTypFilter})
-                 -- tryb A (zwroty): zbiorczy dokument na mag. Zwroty; MM powstaje
-                 -- dopiero przy zamknięciu koszyka, nie przy imporcie
-              OR (d.dok_MagId = @zw${zwTypFilter})
                  -- tryb B: kontener na MGP — sesja z wózkiem i MM na rundę
               OR (d.dok_MagId = @mgp AND ${dostawyTypFilter})
                )
@@ -463,12 +455,7 @@ export async function importFromMssql(): Promise<ImportStats> {
       insStan.run(s.st_TowId, s.st_MagId, s.st_Stan ?? 0, s.st_StanRez ?? 0);
     }
     for (const doc of dokumenty) {
-      const typ =
-        doc.dok_MagId === config.magId.ZWROTY
-          ? "ZW"
-          : doc.dok_Typ === c.dokTypFZ
-            ? "FZ"
-            : "PZ";
+      const typ = doc.dok_Typ === c.dokTypFZ ? "FZ" : "PZ";
       insDok.run(
         doc.dok_Id,
         typ,

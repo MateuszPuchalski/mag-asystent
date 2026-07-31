@@ -14,10 +14,8 @@ import { reconcile, reconcileCsv } from "./services/reconcile.js";
    też o tym mówi: 0 = czysto, 2 = są rozjazdy (do podpięcia pod alert).       */
 
 const r = reconcile();
-const { kartotek, zadan, koszykow } = r.sprawdzono;
-console.log(
-  `[reconcile] sprawdzono: ${kartotek} kartotek, ${zadan} zadań, ${koszykow} koszyków`
-);
+const { kartotek, zadan } = r.sprawdzono;
+console.log(`[reconcile] sprawdzono: ${kartotek} kartotek, ${zadan} zadań`);
 
 if (r.rozjazdy.length === 0) {
   console.log("[reconcile] bez rozjazdów — raport nie powstaje");

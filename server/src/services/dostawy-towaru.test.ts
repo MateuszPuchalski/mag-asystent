@@ -90,7 +90,6 @@ test("dokumentu nikt nie otwierał — na karcie stoi całość", () => {
   assert.equal(w[0].ilosc, 6);
   assert.equal(w[0].status, null, "brak wiersza w delivery_line = nikt nie zaczął");
   assert.equal(w[0].nrPelny, "FZ 100/MAG/07/2026");
-  assert.equal(w[0].zwrot, false);
 });
 
 test("częściowo odłożone — zostaje reszta, nie całość", () => {
@@ -131,14 +130,6 @@ test("dwie dostawy — obie widoczne, najświeższa pierwsza", () => {
     w.map((p) => p.dokId),
     [106, 105]
   );
-});
-
-test("zwrot jest oznaczony — leży na Zwrotach, nie na MAG", () => {
-  dokument({ dokId: 107, ilosc: 2, magId: 3, typ: "ZW", nr: "ZW 4/ZWR/07/2026" });
-  const w = D.nierozlozoneZDostaw(TOWAR);
-  assert.equal(w.length, 1);
-  assert.equal(w[0].zwrot, true);
-  assert.equal(w[0].typ, "ZW");
 });
 
 test("zgłoszony problem ZOSTAJE — towaru nadal nie ma w regale", () => {

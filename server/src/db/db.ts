@@ -113,11 +113,7 @@ function migrate(database: DatabaseSync) {
   // locki per linia (tryb A: dostawy i zwroty) — kilka osób przy jednym dokumencie
   addColumn("delivery_line", "locked_by", "TEXT");
   addColumn("delivery_line", "locked_at", "TEXT");
-  // zwroty w trybie A: koszyk jako jednostka pracy + rozliczenie MM per linia
   addColumn("delivery", "source_mag_id", "INTEGER");
-  addColumn("delivery_line", "koszyk", "TEXT");
-  addColumn("delivery_line", "mm_ilosc", "REAL NOT NULL DEFAULT 0");
-  addColumn("delivery_line", "mm_queue_id", "INTEGER");
   /* Identyfikator wiersza faktury w Subiekcie i jego ślad na linii roboczej.
      `openDelivery` AGREGUJE pozycje po towarze (jedna paleta = jeden wiersz na
      ekranie), więc linia potrafi pokrywać kilka pozycji dokumentu — stąd na
