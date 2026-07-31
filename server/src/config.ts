@@ -155,23 +155,6 @@ export const config = {
      */
     zdTerminColumn: process.env.MSSQL_ZD_TERMIN_COLUMN ?? "",
     /**
-     * Kolumna `dok_Pozycja` z identyfikatorem WIERSZA faktury (klucz pozycji).
-     *
-     * Potrzebna, bo ten sam towar potrafi stać na fakturze dwa razy — w dwóch
-     * cenach albo z dwóch partii — a opis różnic biuro trzyma PRZY POZYCJI.
-     * Bez tego identyfikatora nie da się wskazać, o który wiersz chodzi.
-     *
-     * Nasz opis struktury tej kolumny nie wymienia, więc domyślna nazwa to
-     * [WERYFIKUJ] — dokładnie ta sama sytuacja co przy `zdZrealColumn`, gdzie
-     * zgadnięta nazwa okazała się BŁĘDNA. Sprawdź ją jednym SELECT-em
-     * (docs/subiekt-gt-struktura.md).
-     *
-     * Gdy kolumny nie ma, import NIE przerywa się: powtarza zapytanie bez niej,
-     * zostawia NULL i melduje to w /api/health. Puste = świadoma rezygnacja,
-     * bez komunikatu.
-     */
-    pozIdColumn: process.env.MSSQL_POZ_ID_COLUMN ?? "ob_Id",
-    /**
      * Wyrażenie SQL 0/1: dokument w buforze. `dok_Status` ma udokumentowane
      * wartości {0-wycofany, 1-wykonany, 2-unieważniony, 3-odłożony, 4-MM wydany,
      * 5..8-zamówienia}. Bufor to dokument **odłożony** (3); poprzednie domyślne

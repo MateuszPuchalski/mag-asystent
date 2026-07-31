@@ -117,16 +117,8 @@ function seed() {
     `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
      VALUES (?,?,?,?,?,?,?)`
   );
-  /* `ob_id` rośnie GLOBALNIE, przez wszystkie dokumenty — tak samo jak klucz
-     pozycji w Subiekcie, który jest identyfikatorem wiersza w całej tabeli,
-     a nie numerem porządkowym w obrębie faktury. Seed, który numerowałby od
-     nowa w każdym dokumencie, uczyłby kodu fałszywej własności. */
-  let obId = 0;
-  const insPozRaw = d.prepare(
-    "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc, ob_id) VALUES (?,?,?,?)"
-  );
-  const insPoz = (dokId: number, twId: number, ilosc: number) =>
-    insPozRaw.run(dokId, twId, ilosc, ++obId);
+  const insPozRaw = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
+  const insPoz = (dokId: number, twId: number, ilosc: number) => insPozRaw.run(dokId, twId, ilosc);
 
   // grupowanie towarów z MGP po prawdziwym dostawcy; duże grupy (np. własne
   // przyjęcia WERTIS) dzielimy na kilka mniejszych, dających się rozłożyć
@@ -189,11 +181,7 @@ function seed() {
       /* TEN SAM TOWAR W DRUGIM WIERSZU — pierwszy dokument dostaje duplikat.
          W Subiekcie zdarza się to normalnie: dwie ceny, dwie partie, dwa
          wiersze. Dla magazyniera to nadal jedna paleta, więc `openDelivery`
-         skleja je w jedną linię roboczą — ale opis różnic biuro trzyma PRZY
-         POZYCJI, więc linia musi pamiętać OBA identyfikatory.
-
-         Bez tego przypadku w demo ścieżka, dla której powstała kolumna
-         `sgt_pozycje`, nie miałaby ani jednego przebiegu. */
+         skleja je w jedną linię roboczą — i demo musi tę ścieżkę przechodzić. */
       if (k === 0 && paczka.items.length) {
         insPoz(dok_id, paczka.items[0].tw_id, 3);
       }

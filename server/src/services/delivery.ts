@@ -113,40 +113,19 @@ export function openDelivery(dokId: number, user: string): number {
 
   /* Agregacja tego samego towaru (różne partie/ceny → jedna linia robocza).
      Magazynier ma przed sobą JEDNĄ paletę, więc widzi towar raz, z sumą.
-
-     Obok sumy zbieramy IDENTYFIKATORY POZYCJI, z których ta suma powstała.
-     Opis różnic biuro trzyma przy pozycji faktury, a nie w jej nagłówku
-     (docs/subiekt-gt-struktura.md), więc linia musi pamiętać, które wiersze
-     dokumentu reprezentuje. Lista, nie pojedyncza wartość — bo agregacja
-     z definicji potrafi objąć kilka. */
-  const agg = new Map<number, { qty: number; pozycje: number[] }>();
+     W Subiekcie duplikat jest normalny: dwie ceny, dwie partie, dwa wiersze. */
+  const agg = new Map<number, number>();
   for (const p of subiekt.getDocumentPositions(dokId)) {
-    const wpis = agg.get(p.tw_id) ?? { qty: 0, pozycje: [] };
-    wpis.qty += p.ilosc;
-    // NULL zostaje NULL: baza bez kolumny klucza pozycji ma dać pustą listę,
-    // a nie listę zer, którą dałoby się wziąć za prawdziwe identyfikatory.
-    if (p.ob_id != null) wpis.pozycje.push(p.ob_id);
-    agg.set(p.tw_id, wpis);
+    agg.set(p.tw_id, (agg.get(p.tw_id) ?? 0) + p.ilosc);
   }
   const ins = db().prepare(
-    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, lok_oczekiwana, sgt_pozycje)
-     VALUES (?,?,?,?,?,?,?)`
+    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, lok_oczekiwana)
+     VALUES (?,?,?,?,?,?)`
   );
   transaction(db(), () => {
-    for (const [twId, { qty, pozycje }] of agg) {
+    for (const [twId, qty] of agg) {
       const t = subiekt.getProductById(twId);
-      // Sortowanie rosnące czyni „pierwszą pozycję tego towaru" pojęciem
-      // rozstrzygalnym — będzie potrzebne, gdy przyjdzie wybrać komórkę zapisu.
-      const lista = pozycje.length ? JSON.stringify([...pozycje].sort((a, b) => a - b)) : null;
-      ins.run(
-        id,
-        twId,
-        t?.symbol ?? String(twId),
-        t?.nazwa ?? "",
-        qty,
-        pickingLoc(t?.lokalizacja),
-        lista
-      );
+      ins.run(id, twId, t?.symbol ?? String(twId), t?.nazwa ?? "", qty, pickingLoc(t?.lokalizacja));
     }
   })();
 

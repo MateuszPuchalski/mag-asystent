@@ -112,8 +112,6 @@ interface PozRow {
   ob_DokHanId: number;
   ob_TowId: number;
   ob_IloscMag: number;
-  /** Klucz wiersza faktury; NULL gdy kolumny nie ma albo zrezygnowano z niej. */
-  ob_id: number | null;
 }
 
 interface ZamRow {
@@ -166,17 +164,6 @@ export let brakKolumnyZrealizowano: string | null = null;
 
 /** Czy ostatni import umiał odczytać ilość zrealizowaną. Czyta serwis karty. */
 export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
-
-/**
- * Ustawiane, gdy `dok_Pozycja` nie ma kolumny klucza pozycji
- * (`MSSQL_POZ_ID_COLUMN`).
- *
- * Czytane przez `/api/health`. Bez tej kolumny nie da się wskazać KONKRETNEGO
- * wiersza faktury, a ten sam towar potrafi stać na niej dwa razy. Cisza byłaby
- * tu groźna: opis różnic trafiłby kiedyś w niewłaściwą pozycję i nikt by tego
- * nie zauważył, bo wygląda to jak zwykły wpis.
- */
-export let brakKolumnyIdPozycji: string | null = null;
 
 interface MagRow {
   mag_Id: number;
@@ -288,49 +275,6 @@ async function pobierzZamowienia(
   return { zamowienia, zamPozycje };
 }
 
-/**
- * Pozycje dostaw, z identyfikatorem wiersza faktury albo bez niego.
- *
- * Ten sam wzorzec dwóch podejść co przy ilości zrealizowanej wyżej: najpierw
- * z kolumną, a gdy jej nie ma — jeszcze raz bez niej, z komunikatem do
- * /api/health. Pozycje dostaw są rdzeniem listy rozkładania, więc brak jednej
- * kolumny NIE MOŻE wywrócić importu — ale nie może też przejść w ciszy.
- */
-async function pobierzPozycje(pool: sql.ConnectionPool, dokIds: number[]): Promise<PozRow[]> {
-  const ids = dokIds.join(",");
-  const c = config.mssql;
-
-  if (c.pozIdColumn) {
-    const idCol = assertSafeColumn(c.pozIdColumn);
-    try {
-      const r = (
-        await pool.request().query<PozRow>(
-          `SELECT ob_DokHanId, ob_TowId, ob_IloscMag, ${idCol} AS ob_id
-           FROM dok_Pozycja WHERE ob_DokHanId IN (${ids})`
-        )
-      ).recordset;
-      brakKolumnyIdPozycji = null;
-      return r;
-    } catch (e) {
-      brakKolumnyIdPozycji =
-        `Kolumna ${idCol} nie istnieje w dok_Pozycja — nie da się wskazać ` +
-        "KONKRETNEGO wiersza faktury, a ten sam towar potrafi stać na niej " +
-        "dwa razy. Sprawdź nazwę klucza pozycji na własnej bazie i ustaw " +
-        "MSSQL_POZ_ID_COLUMN (docs/subiekt-gt-struktura.md).";
-      console.warn(`[mssql] ${brakKolumnyIdPozycji} (${e instanceof Error ? e.message : e})`);
-    }
-  } else {
-    brakKolumnyIdPozycji = null; // puste = świadoma rezygnacja, nie awaria
-  }
-
-  return (
-    await pool.request().query<PozRow>(
-      `SELECT ob_DokHanId, ob_TowId, ob_IloscMag, NULL AS ob_id
-       FROM dok_Pozycja WHERE ob_DokHanId IN (${ids})`
-    )
-  ).recordset;
-}
-
 export async function importFromMssql(): Promise<ImportStats> {
   const pool = await mssqlPool();
   const c = config.mssql;
@@ -396,7 +340,14 @@ export async function importFromMssql(): Promise<ImportStats> {
       )
   ).recordset;
 
-  const pozycje = dokumenty.length ? await pobierzPozycje(pool, dokumenty.map((d) => d.dok_Id)) : [];
+  const pozycje = dokumenty.length
+    ? (
+        await pool.request().query<PozRow>(
+          `SELECT ob_DokHanId, ob_TowId, ob_IloscMag
+           FROM dok_Pozycja WHERE ob_DokHanId IN (${dokumenty.map((d) => d.dok_Id).join(",")})`
+        )
+      ).recordset
+    : [];
 
   const { zamowienia, zamPozycje } = await pobierzZamowienia(pool);
 
@@ -416,7 +367,7 @@ export async function importFromMssql(): Promise<ImportStats> {
      VALUES (?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare(
-    "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc, ob_id) VALUES (?,?,?,?)"
+    "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
   );
   const insZam = d.prepare(
     `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
@@ -468,7 +419,7 @@ export async function importFromMssql(): Promise<ImportStats> {
     }
     for (const p of pozycje) {
       if (!knownTw.has(p.ob_TowId)) continue;
-      insPoz.run(p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag ?? 0, p.ob_id ?? null);
+      insPoz.run(p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag ?? 0);
     }
     for (const z of zamowienia) {
       insZam.run(

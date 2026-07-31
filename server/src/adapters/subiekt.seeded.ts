@@ -234,7 +234,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
 
   getDocumentPositions(docId: number): RawPosition[] {
     return db()
-      .prepare("SELECT tw_id, ilosc, ob_id FROM sgt_pozycja WHERE dok_id = ? ORDER BY id")
+      .prepare("SELECT tw_id, ilosc FROM sgt_pozycja WHERE dok_id = ? ORDER BY id")
       .all(docId) as unknown as RawPosition[];
   }
 
