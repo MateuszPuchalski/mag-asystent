@@ -304,31 +304,48 @@ Parametry (env, dev):
   wygląda na zepsute, dopóki ktoś nie pójdzie po ten towar. Siedem zaoszczędzonych
   skanów tego nie warte. Razem z mechanizmem zniknął jego TTL w Ustawieniach
   i telemetria `pin_expired`.
-- Karta towaru: stany MAG (dostępne/rez./razem) i MGP, **skorygowane o kolejkę**
-  (`⏳ N szt w drodze`), lokalizacje (pierwsza = pickingowa), limit 50 znaków.
-- **„W dostawie, nierozłożone" — czemu stanu nie widać na półce.** Karta podaje,
-  ile sztuk przyszło na dokumencie z ostatnich 14 dni i nie trafiło jeszcze
-  w regał, z numerem dokumentu i datą.
+- **Karta towaru odpowiada nagłówkiem na całe codzienne pytanie.** Symbol,
+  wielka liczba dostępnych sztuk i pastylka adresu pickingowego stoją w jednej
+  karcie. Rezerwacja, stan łączny i MGP idą podlinijką pod liczbą. Pozostałe
+  adresy leżą rzędem niżej, razem z licznikiem 50 znaków pola w Subiekcie.
+
+  > **Dlaczego.** Wcześniej to samo zajmowało dwa kafle po pół ekranu, a adres
+  > pickingowy siedział w rzędzie chipów jako jeden z wielu. Magazynier pyta
+  > o dwie rzeczy naraz — ile jest i gdzie leży — więc obie odpowiedzi mieszczą
+  > się teraz w jednym spojrzeniu. Reszta karty zeszła do trzech zwijanych
+  > sekcji.
+- **Trzy sekcje zwijane: HISTORIA, POZOSTAŁE MAGAZYNY, ZAMIENNIKI I OPIS.**
+  Każda niesie podsumowanie w nagłówku (`ost. Jan K · 07-28`, `SKLEP 3 · SERWIS 0`,
+  `24-04003 · MAG 4`). Sekcja bez danych nie pokazuje się wcale.
+
+  > **Dlaczego.** Wszystkie trzy odpowiadają na pytania zadawane rzadko i żadna
+  > nie jest krokiem codziennej pracy. Podsumowanie ma wystarczyć bez
+  > rozwijania, bo inaczej zwinięcie zamienia jedno spojrzenie w trzy
+  > dotknięcia na każdej karcie.
+- **„W dostawie, nierozłożone" — czemu stanu nie widać na półce.** Karta podaje
+  jedną linią, ile sztuk przyszło na dokumencie z ostatnich 14 dni i nie
+  trafiło jeszcze w regał, z numerem dokumentu.
 
   > **Dlaczego.** Przy dostawie krajowej skutek magazynowy niesie sam dokument
   > w Subiekcie, więc towar figuruje na MAG od chwili zaksięgowania. Kafel stanu
   > nie odróżnia „leży w regale" od „stoi na palecie w przyjęciach" i pokazywał
   > 12 szt przy pustej półce. Pominięte pozycje i te ze zgłoszonym wyjątkiem
   > ZOSTAJĄ na liście — tak samo nie ma ich w regale.
-- **„Zamówione u dostawcy" — czego nie ma i kiedy przyjedzie.** Osobna sekcja
-  z numerem zamówienia ZD, ilością pozostałą do dostarczenia, terminem
-  i dostawcą. Zamówienie odebrane w całości znika z listy.
+- **„Zamówione u dostawcy" — czego nie ma i kiedy przyjedzie.** Kolejna linia
+  tej samej karty: ilość pozostała do dostarczenia, termin i dostawca.
+  Zamówienie odebrane w całości znika z listy.
 
-  > **Dlaczego.** To druga połowa tego samego pytania. Sekcja wyżej mówi
+  > **Dlaczego.** To druga połowa tego samego pytania. Linia wyżej mówi
   > „przyjechało, poszukaj w przyjęciach", ta mówi „nie ma i trzeba poczekać".
-  > Stoi niżej i ma spokojne tło zamiast bursztynowego: bursztyn na tej karcie
-  > znaczy „zrób coś teraz", a zamówienie nie daje żadnej czynności. Kolejność
-  > idzie po terminie, nie po dacie wystawienia — pytanie brzmi „kiedy będzie".
+  > Stoi niżej i ma szary tusz oraz własną ikonę, bo nie daje żadnej czynności.
+  > Kolejność idzie po terminie, nie po dacie wystawienia — pytanie brzmi
+  > „kiedy będzie".
 - **Zamienniki z opisu kartoteki.** Opisy od lat niosą symbole zamienników
   (`Zamiennik: 24-04003`, `Zamiennie: 101-024 // KAR00149`), tyle że jako prozę,
   której nie da się dotknąć. Serwer je wycina (`services/zamienniki.ts`), a to,
   co jest NASZĄ kartoteką, staje się wierszem ze stanem i lokalizacją —
-  dotknięcie otwiera kartę zamiennika.
+  dotknięcie otwiera kartę zamiennika. Sekcja jest zwinięta i niesie także sam
+  opis kartoteki.
 
   Rozstrzyga kartoteka, nie wzorzec. Z 2304 tokenów w sekcjach zamienników tylko
   478 to nasze towary. Reszta to numery OEM i katalogi obcych firm — zostają
@@ -519,7 +536,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 102 testy jednostkowe; buduje się bez Android SDK
+                           + 123 testy jednostkowe; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

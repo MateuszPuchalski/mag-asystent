@@ -43,6 +43,18 @@ object WIcons {
         moveTo(15f, 18f); lineTo(9f, 12f); lineTo(15f, 6f)
     }
 
+    /**
+     * Strzałka zwiniętej sekcji (obracana w miejscu wywołania).
+     *
+     * Własna ikona, a nie glify `▸`/`▾`: ich obecność zależy od pokrycia fontu
+     * w ROM-ie kolektora Zebry albo Honeywella, a cały ten zestaw istnieje po
+     * to, żeby nie zależeć od cudzych zasobów. Obracany `Back` byłby tańszy
+     * o trzy wiersze, ale w miejscu wywołania czytałby się jako „wstecz".
+     */
+    val Chevron: ImageVector = strokeIcon("chevron", 2.2f) {
+        moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f)
+    }
+
     val Search: ImageVector = strokeIcon("search") {
         circle(11f, 11f, 7f)
         moveTo(21f, 21f); lineTo(16.7f, 16.7f)

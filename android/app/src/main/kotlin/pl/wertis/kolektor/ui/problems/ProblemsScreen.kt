@@ -36,13 +36,13 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.EanConflictRow
 import pl.wertis.kolektor.core.net.ProblemView
 import pl.wertis.kolektor.core.problem.ProblemType
+import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
-import pl.wertis.kolektor.ui.components.formatQty
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine

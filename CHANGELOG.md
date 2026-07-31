@@ -28,6 +28,64 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.15.0 — 31 lipca 2026
+
+Karta towaru mieści się teraz na jednym ekranie. Wcześniej była kolumną sekcji
+rozwijaną przewijaniem: dwa kafle stanów po pół ekranu, pod nimi dostawy,
+zamówienia, magazyny, lokalizacje, przycisk, zamienniki i historia. Codzienne
+pytanie brzmi „ile jest i gdzie leży", a odpowiedź na drugą jego połowę leżała
+poniżej zgięcia ekranu.
+
+### Nagłówek odpowiada na oba pytania naraz
+
+Symbol stoi pierwszy i największy — to jedyny identyfikator używany przy
+regale. Pod nim wielka liczba dostępnych sztuk, obok niej pastylka adresu
+pickingowego. Rezerwacja, stan łączny i MGP zeszły do jednej podlinijki, bo
+sięga się po nie dopiero wtedy, gdy liczba nie zgadza się z półką.
+
+Pastylka adresu to ten sam komponent, co chipy pod spodem (`LocChip(big)`).
+Dzięki temu niesie te same cztery stany zapisu: przekreślenie przy schodzącym
+adresie, ⏳ przy dochodzącym, czerwony puls przy nieudanym zapisie. Osobny
+widget znaczyłby, że stany trzeba napisać dwa razy — a wtedy rozjeżdżają się
+przy pierwszej zmianie.
+
+Towar bez adresu dostaje jasną, nieklikalną pastylkę „brak lokalizacji".
+Ciemna pastylka jest obietnicą adresu; czynność stoi niżej, w przycisku ZMIEŃ
+LOKALIZACJĘ.
+
+### Trzy sekcje zwijane zamiast czterech sekcji stale otwartych
+
+HISTORIA, POZOSTAŁE MAGAZYNY oraz ZAMIENNIKI I OPIS są zwinięte po wejściu na
+kartę. Każda niesie podsumowanie w nagłówku (`ost. Jan K · 07-28`,
+`SKLEP 3 · SERWIS 0`, `24-04003 · MAG 4`), więc w typowym dniu nie trzeba
+otwierać żadnej. Sekcja bez danych nie pokazuje się wcale — wyszarzony nagłówek
+byłby obietnicą treści, której nie ma.
+
+Wejście w zamiennik zwija je z powrotem: to inny towar i inne pytanie.
+
+Opis kartoteki zszedł z góry ekranu do sekcji zamienników. Jest prozą z numerami
+obcymi i dopiskami sprzed lat — czyta się go przy rozmowie z dostawcą, nie przy
+regale, a dwa wiersze pod EAN-em i tak go ucinały.
+
+### Dostawy i zamówienia w jednej karcie, po jednej linii
+
+„W dostawie" i „Zamówione u dostawcy" dzielą jedną powierzchnię. Rozróżnia je
+tusz i ikona: bursztyn przy dostawie, bo jest co zrobić — towar leży
+w przyjęciach; szarość przy zamówieniu, bo nie ma i trzeba poczekać. Każdy
+dokument to jedna linia z numerem, ilością i statusem; data wystawienia
+wypadła, bo numer niesie miesiąc i rok.
+
+Teksty tych linii oraz podsumowania sekcji liczy `:core`
+(`core/product/KartaTekst.kt`, 21 testów). To reguły „co pokazać, gdy danych
+brak albo jest ich osiem", a moduł `:app` nie ma testów w ogóle.
+
+### Co zniknęło z ekranu
+
+Kafel ZWROTY OD KLIENTÓW (stan wchodzi jako pierwszy wiersz POZOSTAŁYCH
+MAGAZYNÓW, z dopiskiem), pasek „W kolejce Sfery N szt", linia „⏳ czeka na
+zapis w Subiekcie" oraz podpowiedź o skanowaniu spod chipów. Sygnał nieudanego
+zapisu zostaje tam, gdzie był zawsze: pulsujący chip prowadzący do kolejki.
+
 ## 0.14.0 — 31 lipca 2026
 
 Flaga sprawdzenia faktury **wraca z Subiekta na kolektor**. Do tej pory szła
