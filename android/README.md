@@ -160,7 +160,8 @@ przed którą ta pozycja broni.
 **Karta towaru — nagłówek i sekcje**
 
 - [ ] nagłówek pokazuje symbol, liczbę dostępnych sztuk i adres pickingowy,
-- [ ] towar bez adresu ma jasną pastylkę „brak lokalizacji",
+- [ ] towar bez adresu ma w nagłówku pastylkę „+ DODAJ ADRES",
+- [ ] ta pastylka otwiera skan półki, a rząd chipów pod spodem znika,
 - [ ] adres w kolejce Sfery prowadzi z pastylki wprost do kolejki,
 - [ ] trzy sekcje są zwinięte po wejściu na kartę,
 - [ ] nagłówek sekcji niesie podsumowanie bez rozwijania,

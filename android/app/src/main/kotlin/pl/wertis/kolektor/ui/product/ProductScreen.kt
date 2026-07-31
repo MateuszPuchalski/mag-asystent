@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -64,7 +65,6 @@ import pl.wertis.kolektor.ui.theme.BorderCol
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
-import pl.wertis.kolektor.ui.theme.Secondary
 
 /* ── Karta towaru ───────────────────────────────────────────────────────────
    Jeden ekran bez przewijania: nagłówek odpowiada na codzienne pytanie („ile
@@ -173,7 +173,7 @@ fun ProductScreen(graph: AppGraph) {
                znakach, ale wykaz nie jest gwarancją. */
             Box(Modifier.widthIn(max = 168.dp)) {
                 if (adres.kod.isEmpty()) {
-                    BrakAdresu()
+                    DodajAdres { graph.nav.openScanLoc(dodaj = true) }
                 } else {
                     val zmiana = adres.zmiana
                     LocChip(
@@ -200,8 +200,11 @@ fun ProductScreen(graph: AppGraph) {
 
         FaktyCard(p)
 
-        // lokalizacje pozostałe (pierwsza siedzi w nagłówku)
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        /* Lokalizacje pozostałe — pierwsza siedzi w nagłówku. Przy towarze bez
+           ani jednego adresu cały rząd znika: „+ DODAJ" przeniósł się wtedy do
+           nagłówka, a licznik pokazywałby „0/50 zn.", czyli liczbę, która
+           niczego nie ogranicza. */
+        if (adres.kod.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -327,23 +330,40 @@ fun ProductScreen(graph: AppGraph) {
 }
 
 /**
- * Pastylka pustego stanu.
+ * Pastylka pustego stanu — od razu czynność, nie komunikat.
  *
- * Jasna i nieklikalna, choć adres pickingowy jest ciemny. Ciemna pastylka na
- * tym miejscu jest obietnicą adresu — pusta udawałaby, że towar gdzieś leży.
- * Czynność stoi czterdzieści dp niżej, w przycisku ZMIEŃ LOKALIZACJĘ, więc
- * pastylka nie musi jej dublować.
+ * Stoi na miejscu adresu pickingowego, bo tam pada pytanie „gdzie to leży".
+ * Odpowiedź „nigdzie" jest u tej firmy zadaniem do wykonania, a nie faktem do
+ * przyjęcia: kartoteka bez adresu znaczy, że towar leży gdzieś na hali i nikt
+ * poza znalazcą nie wie gdzie. Napis „brak lokalizacji" mówił to samo, tyle że
+ * kazał szukać czynności gdzie indziej.
+ *
+ * Bursztyn, nie grafit: ciemna pastylka jest obietnicą adresu i pusta udawałaby,
+ * że towar gdzieś leży. Pełne „+ DODAJ ADRES" zamiast samego „+ DODAJ" z rzędu
+ * chipów, bo tam chip stoi wśród adresów i wiadomo, do czego się dokłada — tu
+ * nie ma czego dokładać, więc słowo musi to powiedzieć.
  */
 @Composable
-private fun BrakAdresu() {
-    Text(
-        "brak lokalizacji",
-        fontSize = 13.sp,
-        color = InkMute,
+private fun DodajAdres(onClick: () -> Unit) {
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .border(1.5.dp, BorderCol, RoundedCornerShape(50))
-            .background(Secondary)
+            .border(1.5.dp, AmberLine, RoundedCornerShape(50))
+            .background(AmberBgSoft)
+            .heightIn(min = 52.dp)
+            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Icon(WIcons.Pin, null, tint = AmberInk, modifier = Modifier.size(16.dp))
+        Text(
+            "+ DODAJ ADRES",
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = AmberInk,
+            maxLines = 1,
+        )
+    }
 }
