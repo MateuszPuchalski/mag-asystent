@@ -108,19 +108,19 @@ export const config = {
     /**
      * Kody `dok_Typ` DOSTAW listowanych do rozłożenia (CSV).
      *
-     * Domyślnie `1,10` — FZ i PZ — bo towar wchodzi obiema drogami: fakturą
-     * zakupu księgowaną wprost na magazyn albo przyjęciem zewnętrznym, gdy
-     * dokument handlowy przychodzi później. Dla magazyniera to ta sama praca:
-     * paleta do rozłożenia.
+     * Domyślnie `1` — sama FZ. U tego klienta towar wchodzi wyłącznie fakturą
+     * zakupu, a PZ powstaje z zupełnie innego procesu, więc na liście pracy
+     * magazyniera byłoby czystym szumem.
      *
-     * ALE NIE W KAŻDEJ FIRMIE. Tam, gdzie dostawy idą wyłącznie na FZ, a PZ
-     * powstaje z zupełnie innego procesu, tamte dokumenty są na liście pracy
-     * czystym szumem — i wtedy ustawia się `DOK_TYPY_DOSTAW=1`.
+     * Domyślne było wcześniej `1,10` (FZ i PZ), bo w firmie, gdzie towar wchodzi
+     * obiema drogami, dla magazyniera to ta sama praca: paleta do rozłożenia.
+     * Tam wraca się do `DOK_TYPY_DOSTAW=1,10` — to nadal jedno ustawienie,
+     * nie zmiana kodu.
      *
-     * Do sierpnia 2026 ta para była ZASZYTA w zapytaniu, choć zwroty tuż obok
+     * Do sierpnia 2026 ta lista była ZASZYTA w zapytaniu, choć zwroty tuż obok
      * miały już listę z konfiguracji. Niespójność, nie decyzja projektowa.
      */
-    dokTypyDostaw: (process.env.DOK_TYPY_DOSTAW ?? "1,10")
+    dokTypyDostaw: (process.env.DOK_TYPY_DOSTAW ?? "1")
       .split(",")
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n > 0),

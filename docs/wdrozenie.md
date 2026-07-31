@@ -328,8 +328,9 @@ bazie. Zapytania podaje `DEPLOY.md` §6.
 |---|---|---|
 | `MSSQL_LOC_COLUMN` | pole lokalizacji na kartotece | **nadpisanie cudzych danych** — aplikacja pisze bezwarunkowo |
 | `MSSQL_DATABASE` | baza podmiotu | praca na kopii zamiast produkcji, bez objawu |
-| `DOK_TYPY_DOSTAW` | typy dokumentów na liście rozkładania | obce dokumenty na liście pracy magazyniera |
-| `DOK_DNI_WSTECZ` | okno importu dokumentów | nic nie ginie — niedokończone dostawy zostają mimo okna |
+| `DOK_TYPY_DOSTAW` | typy dokumentów w zakładce DOSTAWY (domyślnie sama FZ) | obce dokumenty na liście pracy magazyniera |
+| `DOK_DNI_WSTECZ` | okno importu i zakres listy dostaw | nic nie ginie — niedokończone dostawy zostają mimo okna |
+| **pole „Opis dostawy"** | gdzie biuro trzyma opis różnic przy pozycji faktury | zapis w niewłaściwą komórkę — patrz `docs/subiekt-gt-struktura.md` |
 | `MSSQL_ZD_ZREAL_COLUMN` | ilość już odebrana z zamówienia | zawyżone ilości na karcie towaru |
 | `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
 | `MSSQL_FLAG_GRUPA`, `MSSQL_FLAG_TYP_OBIEKTU` | flaga sprawdzenia faktury | flagi nie działają wcale |

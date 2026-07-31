@@ -15,6 +15,24 @@ import type {
 } from "./subiekt.js";
 
 /**
+ * `DOK_TYPY_DOSTAW` jako etykiety tekstowe read-modelu.
+ *
+ * Read-model trzyma typ dokumentu jako napis ('FZ'/'PZ'), a konfiguracja — jako
+ * kod `dok_Typ` (1/10), bo taki stoi w bazie Subiekta. Tłumaczenie musi być
+ * TUTAJ, w jednym miejscu: rozsypane po zapytaniach rozjechałoby się przy
+ * pierwszej zmianie ustawienia.
+ *
+ * Kod spoza pary FZ/PZ wypada cicho — seed innych typów nie syntetyzuje,
+ * a wpisanie ich do `DOK_TYPY_DOSTAW` dotyczy wyłącznie prawdziwej bazy.
+ */
+export function etykietyDostaw(): string[] {
+  const { dokTypyDostaw, dokTypFZ, dokTypPZ } = config.mssql;
+  return dokTypyDostaw
+    .map((kod) => (kod === dokTypFZ ? "FZ" : kod === dokTypPZ ? "PZ" : null))
+    .filter((s): s is "FZ" | "PZ" => s !== null);
+}
+
+/**
  * DEV/TEST — odczyt z tabel sgt_* (SQLite, seed z mag.xlsx).
  * Odzwierciedla SELECT-y ze spec §6, ale na lokalnym read-modelu.
  */
@@ -153,14 +171,20 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     //   MAG    → tryb A, dostawa krajowa: towar już leży na hali, brakuje adresu (D1)
     //   Zwroty → tryb A, zwroty: adres jak wyżej + jeden MM na zamknięty koszyk
     //   MGP    → tryb B, kontener: sesja z wózkiem, MM na rundę
+    // Typy dostaw biorą się z `DOK_TYPY_DOSTAW`, tak samo jak w adapterze MSSQL.
+    // Para ('FZ','PZ') była tu ZASZYTA i czyniła demo niewiernym: zawężenie
+    // konfiguracji do samych FZ nie robiło na tej liście żadnej różnicy, więc
+    // pokaz i produkcja pokazywały co innego z tych samych ustawień.
+    const etykiety = etykietyDostaw();
+    const luki = etykiety.map(() => "?").join(",");
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE ((typ IN ('FZ','PZ') AND mag_id = ?) OR mag_id = ?)
+         WHERE ((typ IN (${luki}) AND mag_id = ?) OR mag_id = ?)
            AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocument[];
+      .all(...etykiety, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
@@ -176,6 +200,8 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     // pyta „które dostawy są do rozłożenia", ta „na których z nich stoi ten
     // towar". Rozjazd kryteriów pokazałby na karcie dokument, którego nie da się
     // otworzyć z zakładki rozkładania.
+    const etykiety = etykietyDostaw();
+    const luki = etykiety.map(() => "?").join(",");
     return db()
       .prepare(
         `SELECT d.dok_id, d.typ, d.nr_pelny, d.data_wyst, d.mag_id, d.dostawca,
@@ -183,12 +209,12 @@ export class SeededSubiektAdapter implements SubiektAdapter {
          FROM sgt_pozycja p
          JOIN sgt_dokument d ON d.dok_id = p.dok_id
          WHERE p.tw_id = ?
-           AND ((d.typ IN ('FZ','PZ') AND d.mag_id = ?) OR d.mag_id = ?)
+           AND ((d.typ IN (${luki}) AND d.mag_id = ?) OR d.mag_id = ?)
            AND d.data_wyst >= ?
          GROUP BY d.dok_id
          ORDER BY d.data_wyst DESC, d.dok_id DESC`
       )
-      .all(twId, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocPosition[];
+      .all(twId, ...etykiety, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocPosition[];
   }
 
   getOrdersForProduct(twId: number): RawZamPosition[] {

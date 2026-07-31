@@ -482,7 +482,13 @@ data class DeliveryDocument(
 )
 
 @Serializable
-data class DeliveryDocumentsResponse(val documents: List<DeliveryDocument> = emptyList())
+data class DeliveryDocumentsResponse(
+    val documents: List<DeliveryDocument> = emptyList(),
+    /** Okno listy w dniach (`DOK_DNI_WSTECZ`) — nagłówek pokazuje tę liczbę,
+     *  zamiast mieć ją wpisaną po swojej stronie i cicho rozjeżdżać się
+     *  z serwerem. Domyślne 14 dotyczy starszego serwera bez tego pola. */
+    val dniWstecz: Int = 14,
+)
 
 @Serializable
 data class DeliveryLineView(

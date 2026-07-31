@@ -356,9 +356,10 @@ Parametry (env, dev):
 - Bufor offline (Room) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
   log upadków urządzenia (`device_drop`) dla serwisu.
 
-**Rozkładanie dostaw i zwrotów — Tryb A (redesign v2.0)** — druga zakładka
-- Jednostką pracy jest **dokument** (FZ/PZ albo zbiorczy dokument zwrotów), nie
-  sesja. Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
+**DOSTAWY — Tryb A (redesign v2.0)** — druga zakładka
+- Jednostką pracy jest **dokument**, nie sesja. Zakładka pokazuje typy z
+  `DOK_TYPY_DOSTAW` (domyślnie sama FZ) z okna `DOK_DNI_WSTECZ` (domyślnie
+  14 dni). Zwroty mają własną ścieżkę i nie są tu listowane. Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
   skutek magazynowy niesie sam dokument w Subiekcie, więc aplikacja zapisuje
   **wyłącznie lokalizację** — zero MM, zero `waiting_for_doc`.
 - Ścieżka codzienna to **dwa skany na pozycję**. Skan towaru rozwija wiersz

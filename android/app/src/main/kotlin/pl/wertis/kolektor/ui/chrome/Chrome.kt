@@ -171,13 +171,13 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
     }
 }
 
-/* ── Dolny pasek: SKAN · ROZKŁADANIE · WSTECZ ────────────────────────────────
+/* ── Dolny pasek: SKAN · DOSTAWY · WSTECZ ────────────────────────────────────
    WSTECZ stoi PO PRAWEJ, bo kolektor trzyma się w prawej dłoni i tam ląduje
    kciuk. Wcześniej był w lewym górnym rogu — najdalszym punkcie ekranu od
    kciuka przy dowolnym chwycie.
 
    MIEJSCE NA WSTECZ JEST ZAREZERWOWANE ZAWSZE, także gdy nie ma dokąd wracać.
-   Inaczej SKAN i ROZKŁADANIE przeskakiwałyby w bok przy każdym wejściu
+   Inaczej SKAN i DOSTAWY przeskakiwałyby w bok przy każdym wejściu
    w podekran, a te dwa przyciski trafia się z pamięci, nie wzrokiem —
    przesuwający się cel to wciśnięcie sąsiada.                                 */
 
@@ -199,7 +199,7 @@ fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TabItem("SKAN", WIcons.Scan, homeActive, Modifier.weight(1f), onHome)
-        TabItem("ROZKŁADANIE", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
+        TabItem("DOSTAWY", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
         if (hasBack) {
             BackTab(Modifier.width(BackSlot), onBack)
         } else {
@@ -212,7 +212,7 @@ fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -
 /**
  * WSTECZ — wizualnie odrębny od zakładek, bo robi co innego.
  *
- * SKAN i ROZKŁADANIE PRZEŁĄCZAJĄ tryb pracy i mają stan „aktywny"; WSTECZ
+ * SKAN i DOSTAWY PRZEŁĄCZAJĄ tryb pracy i mają stan „aktywny"; WSTECZ
  * cofa o krok i stanu nie ma. Gdyby wyglądał jak trzecia zakładka, człowiek
  * szukałby w nim trzeciego trybu.
  */
@@ -288,7 +288,7 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier:
 
 /* ── Pasek wersji ───────────────────────────────────────────────────────────
    POD paskiem zakładek, nie w nim. Dolne 62 dp to teren kciuka: SKAN,
-   ROZKŁADANIE i WSTECZ zeszły tam właśnie po to, żeby dało się je trafić bez
+   DOSTAWY i WSTECZ zeszły tam właśnie po to, żeby dało się je trafić bez
    patrzenia. Napis wciśnięty między nie odebrałby im pola dotyku, a przy
    okazji przesunął cele — czyli zepsułby dokładnie to, co tamta zmiana
    naprawiała.

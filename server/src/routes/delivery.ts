@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { config } from "../config.js";
 import { currentToken, userOf } from "../context.js";
 import { autoryzuj, sesja } from "../services/auth.js";
 import {
@@ -19,8 +20,22 @@ import type { LocApplyAction } from "../types.js";
    Tryb B (kontener na MGP) żyje dalej pod /api/putaway/*.                     */
 
 export async function deliveryRoutes(app: FastifyInstance) {
-  /** Lista dostaw FZ/PZ i zwrotów (14 dni) z postępem; dokumenty w buforze też (D1). */
-  app.get("/api/delivery/documents", async () => ({ documents: listDocuments(14) }));
+  /**
+   * Lista dostaw z postępem; dokumenty w buforze też (D1).
+   *
+   * Okno bierze się z `DOK_DNI_WSTECZ`, a nie z zaszytej czternastki. Zaszyta
+   * była do sierpnia 2026 i czyniła to ustawienie martwym w połowie: import
+   * respektował je, lista nie — więc `DOK_DNI_WSTECZ=30` nie pokazywało ani
+   * jednego dokumentu więcej.
+   *
+   * `dniWstecz` jedzie w odpowiedzi, bo nagłówek na kolektorze tę liczbę
+   * pokazuje. Wcześniej miał ją wpisaną w kodzie i był trzecim miejscem, gdzie
+   * ta sama czternastka mogła się rozjechać.
+   */
+  app.get("/api/delivery/documents", async () => ({
+    documents: listDocuments(config.mssql.dokDniWstecz),
+    dniWstecz: config.mssql.dokDniWstecz,
+  }));
 
   /** Otwórz/wznów rozkładanie dokumentu — snapshot pozycji w chwili otwarcia. */
   app.post<{ Params: { dokId: string } }>("/api/delivery/documents/:dokId/open", async (req, reply) => {

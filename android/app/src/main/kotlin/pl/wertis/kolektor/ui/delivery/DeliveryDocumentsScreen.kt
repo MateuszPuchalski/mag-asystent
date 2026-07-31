@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.DeliveryDocument
+import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -52,24 +53,27 @@ import pl.wertis.kolektor.ui.theme.Success
 import pl.wertis.kolektor.ui.theme.cardSurface
 
 /* ── Tryb A: wybór dokumentu (redesign §4.1) ────────────────────────────────
-   Lista FZ/PZ z 14 dni, malejąco po dacie, z paskiem postępu. Dokumenty
-   w buforze SGT są normalnie dostępne do pracy (D1) — rozkładanie nie czeka
-   na księgowość. Ukończone schodzą na dół i szarzeją, ale nie znikają.
+   Lista faktur zakupu z okna importu, malejąco po dacie, z paskiem postępu.
+   Dokumenty w buforze SGT są normalnie dostępne do pracy (D1) — rozkładanie nie
+   czeka na księgowość. Ukończone schodzą na dół i szarzeją, ale nie znikają.
 
-   Zwroty mają własną sekcję na górze: to inny rytm pracy (koszyk, nie paleta)
-   i inny skutek (MM Zwroty→MAG po każdym koszyku), więc mieszanie ich w jednej
-   liście z dostawami kazałoby czytać typ dokumentu, żeby wiedzieć, co się
-   właśnie robi.                                                              */
+   ZWROTY NIE SĄ TU LISTOWANE. Zakładka pokazuje wyłącznie to, czym towar wchodzi
+   na magazyn u tego klienta — a to są same FZ (`DOK_TYPY_DOSTAW=1`). Zwroty mają
+   inny rytm pracy (koszyk, nie paleta) i inny skutek (MM Zwroty→MAG), więc
+   wracają jako osobne wejście, a nie jako sekcja tutaj.
+
+   Serwerowa ścieżka koszyków ZOSTAJE nietknięta — to jest ukrycie wejścia,
+   nie wycofanie funkcji.                                                     */
 
 @Composable
 fun DeliveryDocumentsScreen(graph: AppGraph) {
     val scope = rememberCoroutineScope()
     var reload by remember { mutableStateOf(0) }
-    val docs by produceState<List<DeliveryDocument>?>(null, reload) {
+    val odpowiedz by produceState<DeliveryDocumentsResponse?>(null, reload) {
         value = try {
-            apiCall { graph.api.deliveryDocuments() }.documents
+            apiCall { graph.api.deliveryDocuments() }
         } catch (_: Exception) {
-            emptyList()
+            DeliveryDocumentsResponse()
         }
     }
 
@@ -84,15 +88,18 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
         }
     }
 
-    if (docs == null) {
+    val r = odpowiedz
+    if (r == null) {
         LoadingRow("Wczytywanie dostaw…")
         return
     }
 
     // ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie)
-    val sorted = docs!!.sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
-    val zwroty = sorted.filter { it.zwrot }
-    val dostawy = sorted.filter { !it.zwrot }
+    // Zwroty odfiltrowane TUTAJ, nie na serwerze: trasa i koszyki zostają
+    // sprawne, znika tylko wejście z tej zakładki.
+    val dostawy = r.documents
+        .filter { !it.zwrot }
+        .sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
 
     Column(
         modifier = Modifier
@@ -101,24 +108,12 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (zwroty.isNotEmpty()) {
-            Text(
-                "ZWROTY DO ROZŁOŻENIA · KOSZYKAMI",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                color = AmberInk,
-            )
-            zwroty.forEach { d -> DocRow(d) { open(d) } }
-        }
-
         Text(
-            "DOSTAWY FZ/PZ · OSTATNIE 14 DNI",
+            "FAKTURY ZAKUPU · OSTATNIE ${r.dniWstecz} DNI",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
             color = InkSoft,
-            modifier = Modifier.padding(top = if (zwroty.isEmpty()) 0.dp else 6.dp),
         )
         if (dostawy.isEmpty()) {
             Text(
