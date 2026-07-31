@@ -28,6 +28,77 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.16.0 — 31 lipca 2026
+
+<!-- docs_check: historia -->
+
+**Flaga sprawdzenia faktury wychodzi z aplikacji w całości.** Aplikacja nie
+zapisuje już do bazy Subiekta niczego poza polem lokalizacji na kartotece —
+reguła „tylko lokalizacja" nie ma od dziś ani jednego wyjątku.
+
+### Dlaczego, skoro dzień wcześniej ją naprawialiśmy
+
+Bo naprawa odpowiedziała na inne pytanie niż to, które padło potem: czy WERTIS
+w ogóle **potrzebuje** flag, żeby kontrolować dostawy. Nie potrzebuje. Kontrolę
+niesie w całości `delivery_line` — co odłożone, gdzie, przez kogo i z jakim
+wyjątkiem. Flaga nigdy nie była do tego potrzebna ani magazynierowi, ani
+serwerowi.
+
+Flaga była kanałem do **biura**: kolumną „FW" na liście faktur zakupu, czyli
+jedynym miejscem, w którym księgowość widziała stan rozkładania. Za ten jeden
+kanał płaciło się około 1 275 liniami w 30 plikach, sześcioma zmiennymi env,
+dwoma prawami zapisu do bazy firmy, tabelą read-modelu i typem zadania
+w kolejce. Właściciel zdecydował, że kanał nie jest tego wart.
+
+### Co znika
+
+Serwis `delivery-flag.ts` w całości, `applyDocFlag` z obu adapterów zapisu
+(w tym MERGE do tabeli przypisań flag), typ zadania w kolejce razem z gałęzią
+workera i kompensacją, tabela słownika flag, kolumny `flaga`, `flaga_wyslana`
+i `active_at`, pola `flaga`/`flagaKey` w dwóch DTO, pastylka na kolektorze,
+sześć zmiennych env, krok kreatora w instalatorze i dwa `GRANT`-y.
+
+Znika też cała klasa błędów wokół wykrywania „biuro nadpisało flagę" — łącznie
+z tym z 0.14.0, w którym zwolniony worker potrafił porzucić dostawę magazyniera.
+
+### Co świadomie tracimy
+
+Biuro nie zobaczy już stanu rozkładania w Subiekcie. Zostaje `/api/events`
+i eksport CSV, czyli surowe zdarzenia, a nie odpowiedź „czy FZ/123 sprawdzona"
+jednym spojrzeniem. Kolektor przestaje też odróżniać fakturę rozłożoną poza
+aplikacją od nietkniętej — pokazuje wyłącznie własny postęp.
+
+### Stare bazy i stare kolejki
+
+Kolumn nie kasujemy z istniejących plików `.db`: wszystkie są nullowalne, nic
+ich nie czyta, a `DROP COLUMN` w SQLite przepisuje tabelę. Nowe bazy powstają
+bez nich. Dawne dostawy w statusie `abandoned` zostają — ustawiał go usunięty
+mechanizm, a przepisywanie historii byłoby gorsze od jednej martwej wartości.
+
+Kolektor **nadal rozumie** dawny typ zadania na ekranie kolejki. Pole `type`
+nie ma wartości domyślnej, więc usunięcie go z modelu wywracałoby ten ekran na
+każdej instalacji z historią.
+
+### [wymaga działania] odbierz uprawnienia zapisu
+
+<!-- docs_check: historia -->
+
+Po aktualizacji, na serwerze SQL firmy:
+
+```sql
+REVOKE INSERT, UPDATE ON dbo.fl_Wartosc FROM wertis;
+REVOKE SELECT         ON dbo.fl_Wartosc FROM wertis;
+REVOKE SELECT         ON dbo.fl__Flagi  FROM wertis;
+```
+
+Konto WERTIS-a zostaje wtedy z **jednym** prawem zapisu w całej bazie: `UPDATE`
+na jednej kolumnie kartoteki. Wpisy `MSSQL_FLAG_*` i `DOC_FLAG_*` w `wertis.env`
+można usunąć — serwer ich nie czyta. Flagi postawione wcześniej **zostają na
+fakturach**; nic ich nie sprząta, bo to informacja biura, nie nasza.
+
+Poza tym `git pull`, `npm ci`, `npm run build` i restart usług. APK bez pastylki
+rozsyła MDM osobno.
+
 ## 0.15.0 — 31 lipca 2026
 
 Karta towaru mieści się teraz na jednym ekranie. Wcześniej była kolumną sekcji
@@ -127,6 +198,8 @@ kolejka opustoszeje.
 
 ### Obce flagi firmy mają nazwy
 
+<!-- docs_check: historia -->
+
 Firma trzyma w `fl__Flagi` więcej flag niż cztery nasze. Taka flaga pokazuje
 się z nazwą ze słownika, ale **bez koloru stanu** — o fladze spoza tego procesu
 wiadomo tylko tyle, że biuro ją postawiło. Słownik importuje się z `fl__Flagi`
@@ -137,6 +210,8 @@ nazwy, a `/api/health` mówi, czego brakuje. Skrypt uprawnień nadaje to prawo
 od dawna, więc typowa instalacja nie wymaga niczego.
 
 ### [wymaga działania] tylko gdy flagi nie były skonfigurowane
+
+<!-- docs_check: historia -->
 
 `MSSQL_FLAG_GRUPA` i `MSSQL_FLAG_TYP_OBIEKTU` rządzą teraz także **odczytem**.
 Puste znaczą, że kolektor nie zobaczy żadnej flagi biura i każda faktura będzie
@@ -330,6 +405,8 @@ Wyłączone konto daje dokładnie ten sam objaw i tę samą ciszę.
 
 ### Weryfikacja sprawdzała uprawnienia, nie logowanie
 
+<!-- docs_check: historia -->
+
 To jest właściwa przyczyna tego, że awaria wyszła dopiero przy starcie usługi.
 `Get-WertisUprawnienia` odpytuje `sys.database_permissions` **połączeniem
 administratora**, więc odpowiada na pytanie „czy konto ma prawa" — nigdy „czy
@@ -363,6 +440,8 @@ Po tym `nssm stop` i `nssm start` obu usług. Samo `start` nie wyjdzie ze stanu
 `SERVICE_PAUSED`, w który NSSM wpada po kilku szybkich awariach startu.
 
 ## 0.12.0 — 30 lipca 2026
+
+<!-- docs_check: historia -->
 
 Kreator przeszedł do końca na prawdziwej bazie i wylądował na danych demo.
 

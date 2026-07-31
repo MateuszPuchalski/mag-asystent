@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania, stan sprawdzenia faktury, teksty karty towaru — **123 testy** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **116 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -154,8 +154,8 @@ przed którą ta pozycja broni.
 - [ ] po odłożeniu części ilość w linii maleje o tyle, ile odłożono,
 - [ ] po odłożeniu całości linia znika,
 - [ ] pozycja ze zgłoszonym problemem ZOSTAJE, z dopiskiem „zgłoszony problem",
-- [ ] karta nie reaguje na dotknięcie (wejście w dokument przestawiłoby flagę
-      faktury w Subiekcie).
+- [ ] karta nie reaguje na dotknięcie (wejście w dokument z karty otwierałoby
+      rozkładanie w tle, bez zamiaru magazyniera).
 
 **Karta towaru — nagłówek i sekcje**
 

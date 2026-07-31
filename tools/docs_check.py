@@ -43,6 +43,15 @@ REMOVED = [
     "mag.xlsx",        # właściwa nazwa eksportu to magmat.xlsx
     "wyłącznie tryb B",
     "10 ekran",
+    # Flaga sprawdzenia faktury — wycięta w 0.16.0 razem z prawem zapisu do
+    # `fl_Wartosc`. Tokeny są identyfikatorami, nie polskim słowem „flaga":
+    # historia i uzasadnienie decyzji mogą o niej mówić prozą, ale instrukcja
+    # każąca cokolwiek ustawić albo nadać ma zapalić się na czerwono.
+    "set_doc_flag",
+    "DOC_FLAG_",
+    "MSSQL_FLAG_",
+    "fl_Wartosc",
+    "fl__Flagi",
 ]
 
 PATH_RE = re.compile(

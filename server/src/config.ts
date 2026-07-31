@@ -51,8 +51,8 @@ export const config = {
   /**
    * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql).
    *
-   * Co trzeba ustalić na WŁASNEJ bazie — mag_Id magazynów, pole lokalizacji,
-   * flagi faktur — opisuje rozdział „Jak ustalić wszystkie wartości"
+   * Co trzeba ustalić na WŁASNEJ bazie — mag_Id magazynów i pole lokalizacji
+   * — opisuje rozdział „Jak ustalić wszystkie wartości"
    * w docs/subiekt-gt-struktura.md, w kolejności pytań kreatora.
    *
    * Kody dok_Typ i bufor (dok_Status = 3) NIE są już [WERYFIKUJ]: wynikają
@@ -181,19 +181,6 @@ export const config = {
      */
     pozIdColumn: process.env.MSSQL_POZ_ID_COLUMN ?? "ob_Id",
     /**
-     * Flaga sprawdzenia faktury NIE jest kolumną `dok__Dokument` — to osobny
-     * mechanizm InsERT-a: `fl__Flagi` (definicja: `flg_Id`, `flg_Text`,
-     * `flg_Numer` = ikona) plus `fl_Wartosc` (przypisanie do obiektu, klucz
-     * złożony `flw_IdGrupyFlag` + `flw_TypObiektu` + `flw_IdObiektu`).
-     *
-     * Te dwie liczby identyfikują „flagi dokumentów handlowych" i są jedynym,
-     * czego nie da się odczytać z dokumentacji — trzeba je wziąć z własnej bazy
-     * jednym SELECT-em (DEPLOY §6). Puste = zadania `set_doc_flag` kończą się
-     * czytelnym błędem zamiast pisać w losową grupę flag ([WERYFIKUJ]).
-     */
-    flagGrupa: process.env.MSSQL_FLAG_GRUPA ? num(process.env.MSSQL_FLAG_GRUPA, 0, "MSSQL_FLAG_GRUPA") : 0,
-    flagTypObiektu: process.env.MSSQL_FLAG_TYP_OBIEKTU ? num(process.env.MSSQL_FLAG_TYP_OBIEKTU, 0, "MSSQL_FLAG_TYP_OBIEKTU") : 0,
-    /**
      * Wyrażenie SQL 0/1: dokument w buforze. `dok_Status` ma udokumentowane
      * wartości {0-wycofany, 1-wykonany, 2-unieważniony, 3-odłożony, 4-MM wydany,
      * 5..8-zamówienia}. Bufor to dokument **odłożony** (3); poprzednie domyślne
@@ -246,53 +233,6 @@ export const config = {
   locStrict: process.env.LOC_STRICT !== "0",
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
-
-  /**
-   * Flaga sprawdzenia faktury dostawy w Subiekcie. W tej firmie rozkładanie JEST
-   * sprawdzaniem faktury, więc postęp kolektora i flaga opisują to samo — trzymanie
-   * dwóch prawd obok siebie kończy się rozjazdem między magazynem a biurem.
-   *
-   * ROZDZIELONE NA TRZY RZECZY, bo to trzy różne byty:
-   *  • klucz    — stała domeny, nigdy się nie zmienia (nasze logi, dedupe, kolory),
-   *  • `label`  — nazwa flagi jak w Subiekcie, do pokazania człowiekowi,
-   *  • `sgt`    — co faktycznie wpisujemy do bazy Subiekta.
-   *
-   * Rozdział jest konieczny, bo firma używa WBUDOWANYCH flag dokumentu (kolumna
-   * „FW" na liście faktur zakupu, filtr „Flaga:"). Struktura InsERT-a potwierdza
-   * ten podział 1:1: `flg_Text` to nazwa pokazywana człowiekowi, a `flg_Id` —
-   * liczba, którą wpisuje się w `fl_Wartosc.flw_IdFlagi`. Gdyby domena operowała
-   * samą etykietą, zapis rozsypałby się na ostatnim calu, a przemianowanie flagi
-   * w Subiekcie zerwałoby historię `flaga_wyslana`.
-   *
-   * [WERYFIKUJ] wartości `DOC_FLAG_*_SGT` to `flg_Id` czterech flag z `fl__Flagi`
-   * — jeden SELECT na własnej bazie (DEPLOY §6). Puste `sgt` = zadanie kończy się
-   * czytelnym błędem zamiast zapisu na oślep.
-   */
-  docFlag: {
-    /** Praca trwa: ktoś stoi teraz przy tej dostawie. */
-    in_progress: {
-      label: process.env.DOC_FLAG_IN_PROGRESS ?? "W trakcie sprawdzania",
-      sgt: process.env.DOC_FLAG_IN_PROGRESS_SGT ?? "",
-    },
-    /** Praca przerwana, ale postęp per pozycja jest zapisany. */
-    paused: {
-      label: process.env.DOC_FLAG_PAUSED ?? "Do sprawdzenia z zapisanym postępem",
-      sgt: process.env.DOC_FLAG_PAUSED_SGT ?? "",
-    },
-    /** Wszystko policzone i odłożone, zero rozbieżności ilościowych. */
-    done: {
-      label: process.env.DOC_FLAG_DONE ?? "Sprawdzone",
-      sgt: process.env.DOC_FLAG_DONE_SGT ?? "",
-    },
-    /**
-     * Domknięte, ale ilości się nie zgadzały. WYŁĄCZNIE rozbieżność ilościowa —
-     * uszkodzenie czy brak miejsca to sprawy reklamacyjne, nie zgodność faktury.
-     */
-    done_with_errors: {
-      label: process.env.DOC_FLAG_DONE_ERRORS ?? "Sprawdzone z błędami",
-      sgt: process.env.DOC_FLAG_DONE_ERRORS_SGT ?? "",
-    },
-  } as Record<string, { label: string; sgt: string }>,
 
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {

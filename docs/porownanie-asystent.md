@@ -30,9 +30,9 @@ w cenniku.
 
 **Co proponujemy.** WERTIS przejmuje **przyjęcie dostawy i wyszukiwanie towaru** —
 dwie ścieżki, które w naszej firmie są codzienne i na których rozkładanie jest
-zarazem sprawdzaniem faktury. WERTIS zapisuje do Subiekta **wyłącznie dwie
-rzeczy**: pole lokalizacji na kartotece i flagę sprawdzenia na fakturze. Zero
-tworzenia dokumentów, zero modyfikacji stanów.
+zarazem sprawdzaniem faktury. WERTIS zapisuje do Subiekta **wyłącznie jedną
+rzecz**: pole lokalizacji na kartotece. Zero tworzenia dokumentów, zero
+modyfikacji stanów.
 
 **Czego to nie zastępuje.** Po odjęciu funkcji nieużywanych zostają **dwie
 realne**: **inwentaryzacja** i **przesunięcia magazynowe (MM)**. Obie są
@@ -107,7 +107,7 @@ siedzi za dwoma adapterami: odczyt z MSSQL (read-only), zapis przez kolejkę.
 
 Zasada, z której wynika reszta: **WERTIS dokłada Subiektowi jedną brakującą
 warstwę — lokalizację — i nic więcej.** Najgorsze, co może zrobić, to wpisać zły
-adres w polu tekstowym albo złą flagę. Obie rzeczy cofa jeden `UPDATE`.
+adres w jednym polu tekstowym. Cofa to jeden `UPDATE`.
 
 ---
 
@@ -144,7 +144,6 @@ wykonuje pracę wykonywaną w tej firmie.
 | Rozkładanie z obowiązkowym skanem półki jako dowodem odłożenia | brak danych | **jest** |
 | Postęp zapisywany per pozycja (przerwanie pracy nic nie kosztuje) | brak danych | **jest** |
 | Dostawa zamyka się sama, gdy nie ma czego rozkładać | brak danych | **jest** |
-| Flaga sprawdzenia faktury wracająca do Subiekta | brak danych | **jest** |
 | Zwroty w koszykach + jedno MM per opróżniony koszyk | brak danych | **w drodze** (samo MM) |
 | Kontener importowy: sesja z wózkiem, wiele pozycji na rundę | brak danych | **jest** |
 
@@ -200,9 +199,8 @@ odbywa się poza aplikacją.
 4. Idzie do regału, skanuje etykietę półki → zapis, wibracja, wiersz zwija się
    jako odłożony.
 5. Powtarza. **Dwa skany na pozycję, zero tapnięć.**
-6. Gdy nie ma już czego rozkładać, **dostawa zamyka się sama**, a do Subiekta
-   wraca flaga *Sprawdzone* (albo *Sprawdzone z błędami*, jeśli była rozbieżność
-   ilościowa).
+6. Gdy nie ma już czego rozkładać, **dostawa zamyka się sama** i schodzi na dół
+   listy.
 
 **Co się z tego zmienia.**
 
@@ -212,9 +210,9 @@ odbywa się poza aplikacją.
   z pamięci przy biurku" — weryfikacja dzieje się tam, gdzie stoi towar.
 - **Przerwanie pracy nic nie kosztuje.** Postęp jest zapisany per pozycja, więc
   po przerwie albo po przejęciu przez kogoś innego nie ma czego powtarzać.
-- **Biuro przestaje pytać magazyn o stan dostawy** — widzi flagę na fakturze
-  w Subiekcie. Nadpisanie flagi przez biuro wygrywa; aplikacja nie trzyma
-  własnej, drugiej prawdy obok stanu z Subiekta.
+- **Stan dostawy widać na kolektorze, nie w Subiekcie.** Aplikacja nie zapisuje
+  do bazy firmy niczego poza lokalizacją, więc biuro pyta o postęp tak samo jak
+  dotąd — albo czyta eksport zdarzeń.
 
 ### Scenariusz B: znalezienie towaru na półce
 
@@ -282,16 +280,16 @@ inaczej zgłoszenie problemu karałoby zgłaszającego i nikt by go nie zgłasza
 | Licencja | roczna, weryfikowana przez serwer licencyjny producenta | brak |
 | Wsparcie | producent | **brak — serwis po stronie firmy** |
 | Zmiana pod własny proces | przez producenta | własny kod |
-| Zapis do Subiekta | tworzy dokumenty magazynowe | **wyłącznie pole lokalizacji + flaga faktury** |
+| Zapis do Subiekta | tworzy dokumenty magazynowe | **wyłącznie pole lokalizacji** |
 
 ### Ryzyka po stronie WERTIS — wprost
 
 1. **Granica produkcyjna do Subiekta nie była jeszcze uruchomiona.** Aplikacja
    działa dziś na danych z eksportu. Przed przejściem na prawdziwą bazę trzeba
-   ustalić trzy rzeczy na miejscu (opisane w `DEPLOY.md` §6 Etap 1): numery
-   magazynów, **które z ośmiu pól własnych kartoteki ma trzymać lokalizację**,
-   oraz gdzie w bazie siedzą flagi faktur. To jest kilka zapytań SQL, ale
-   dopóki nie zostaną wykonane, nie ma dowodu, że całość działa na produkcji.
+   ustalić dwie rzeczy na miejscu (opisane w `DEPLOY.md` §6 Etap 1): numery
+   magazynów oraz **które z ośmiu pól własnych kartoteki ma trzymać
+   lokalizację**. To jest kilka zapytań SQL, ale dopóki nie zostaną wykonane,
+   nie ma dowodu, że całość działa na produkcji.
 2. **Przesunięcia magazynowe wymagają Sfery.** Kontrakt jest gotowy w kodzie
    (`server/src/adapters/sfera.ts`), ale sam zapis wykonuje osobny proces na
    Windows. Do czasu jego uruchomienia MM wystawia biuro ręcznie.

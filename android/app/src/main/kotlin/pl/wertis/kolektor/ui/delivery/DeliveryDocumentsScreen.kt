@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
-import pl.wertis.kolektor.core.delivery.dokumentZamkniety
 import pl.wertis.kolektor.core.net.DeliveryDocument
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
 import pl.wertis.kolektor.net.apiCall
@@ -95,16 +94,12 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
         return
     }
 
-    // Ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie).
-    // „Ukończone" obejmuje faktury oznaczone jako sprawdzone w SUBIEKCIE —
-    // rozkładanie jest sprawdzaniem faktury, więc taka dostawa nie ma czego
-    // szukać w kolejce do rozłożenia, choćby jej tu nikt nie otwierał.
-    //
+    // ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie)
     // Zwroty odfiltrowane TUTAJ, nie na serwerze: trasa i koszyki zostają
     // sprawne, znika tylko wejście z tej zakładki.
     val dostawy = r.documents
         .filter { !it.zwrot }
-        .sortedBy { dokumentZamkniety(it.linesTotal, it.linesDone, it.flagaKey) }
+        .sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
 
     Column(
         modifier = Modifier
@@ -147,7 +142,7 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
 
 @Composable
 private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
-    val complete = dokumentZamkniety(d.linesTotal, d.linesDone, d.flagaKey)
+    val complete = d.linesTotal > 0 && d.linesDone >= d.linesTotal
     val total = if (d.linesTotal > 0) d.linesTotal else d.positions
     Row(
         modifier = Modifier
@@ -213,8 +208,6 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
                 fontSize = 11.sp,
                 color = InkMute,
             )
-            // stan sprawdzenia faktury — to samo, co biuro widzi w Subiekcie
-            FlagBadge(d.flaga, d.flagaKey, Modifier.padding(top = 3.dp))
             if (d.linesTotal > 0) {
                 ProgressBar(d.linesDone, d.linesTotal, complete)
             }

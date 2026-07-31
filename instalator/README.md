@@ -54,7 +54,7 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
    autostartem i restartem po awarii.
 4. **Sieć** — reguła zapory na porcie API, wpuszczająca **tylko sieć lokalną**.
 5. **Kreator** — odpytuje bazę i podsuwa listy do wyboru zamiast kazać
-   przepisywać identyfikatory z SSMS: magazyny, pole lokalizacji, flagi faktur.
+   przepisywać identyfikatory z SSMS: magazyny i pole lokalizacji.
 6. **Konto SQL** — zakłada login `wertis` z losowym hasłem i uprawnieniami
    **kolumnowymi**, po czym sprawdza, co faktycznie zostało nadane.
 
@@ -86,14 +86,13 @@ workera, więc samo zielone API mówiłoby o połowie instalacji.
 Skrypt pochodzi z [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md) §2
 i nadaje:
 
-- `SELECT` na **ośmiu** tabelach,
+- `SELECT` na **sześciu** tabelach,
 - `UPDATE` na **jednej kolumnie** kartoteki (tej wybranej na lokalizację),
-- `INSERT, UPDATE` na tabeli przypisań flag,
-- **ani jednego prawa zapisu do `dok__Dokument`**.
+- **ani jednego innego prawa zapisu**.
 
-Przy przejęciu tego credentiala da się zmienić adres na półce i flagę faktury.
-Nic więcej — dokumenty, stany i numeracja pozostają nietykalne. Właśnie to
-ograniczenie ginie pierwsze, gdy konto zakłada się ręcznie w pośpiechu.
+Przy przejęciu tego credentiala da się zmienić adres na półce. Nic więcej —
+dokumenty, stany i numeracja pozostają nietykalne. Właśnie to ograniczenie
+ginie pierwsze, gdy konto zakłada się ręcznie w pośpiechu.
 
 Instalator **weryfikuje nadane uprawnienia po fakcie**, bo błąd `CREATE LOGIN`
 nie przerywa reszty skryptu: bez sprawdzenia „udana" instalacja mogłaby zostawić
@@ -120,7 +119,7 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
   więc pomyłka dotknęłaby wszystkich baz na serwerze. Skrypt podaje gotowe
   `DROP USER` i `DROP LOGIN` do wykonania przez administratora bazy.
 - **Nie cofa tego, co aplikacja zapisała do Subiekta.** Deinstalacja usuwa
-  program, nie jego pracę. Pole lokalizacji i flagi faktur odwraca wyłącznie
+  program, nie jego pracę. Pole lokalizacji odwraca wyłącznie
   kopia bazy — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md).
 
 ## Trzy rzeczy, o których instalator pyta osobno
@@ -304,11 +303,6 @@ Dziś obie pozycje mają sprawdzaną sumę SHA-256 **przed uruchomieniem**:
   informacji" → „Uruchom mimo to"). Podpisanie wymaga certyfikatu
   code-signing (OV około 400–600 zł rocznie), czyli decyzji i kosztu po stronie
   firmy. Szczegóły detekcji antywirusowych — w sekcji wyżej.
-- **Sonda grupy flag jest heurystyczna.** Kreator dobiera parę „grupa flag / typ
-  obiektu" po tym, która najczęściej trafia w faktury zakupu, i **prosi
-  o potwierdzenie**. Gdy żadna faktura nie jest jeszcze oflagowana, zostawia
-  puste — wtedy oflaguj ręcznie jedną fakturę w Subiekcie i wróć przez
-  `-TylkoKonfiguracja`.
 - **Instalator zakłada, że SQL Server jest na tej samej maszynie**, bo tak
   wygląda instalacja Subiekta. Zdalna instancja zadziała, ale wykrywanie TCP/IP
   i uwierzytelniania mieszanego czyta rejestr **lokalny** — tam trzeba ustawić

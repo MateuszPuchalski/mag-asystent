@@ -15,11 +15,11 @@ import { config } from "../config.js";
  * niewidoczny dla magazyniera.
  *
  * Login: read-only, GRANT SELECT wyłącznie na tw__Towar, tw_Stan,
- * dok__Dokument, dok_Pozycja, kh__Kontrahent, fl_Wartosc, fl__Flagi.
+ * dok__Dokument, dok_Pozycja, kh__Kontrahent.
  * Nazwy tabel i kolumn są zweryfikowane wprost z oficjalnego opisu struktury
  * InsERT GT dla wersji bazy 1.8731.31.6933 — patrz docs/subiekt-gt-struktura.md.
  * Zostaje do ustalenia na własnej bazie tylko to, czego dokumentacja nie
- * zawiera: id magazynów oraz para (grupa flag, typ obiektu).
+ * zawiera: id magazynów.
  *
  * UWAGA: nowsze wersje SGT (z polami KSeF) NIE MAJĄ natywnej kolumny
  * tw_Lokalizacja na tw__Towar — lokalizację trzyma się w jednym z ośmiu pól
@@ -107,8 +107,6 @@ interface DokRow {
   dok_MagId: number;
   dostawca: string | null;
   w_buforze: number;
-  /** Flaga sprawdzenia faktury; NULL gdy kolumna nieskonfigurowana. */
-  flaga: string | null;
 }
 interface PozRow {
   ob_DokHanId: number;
@@ -180,51 +178,10 @@ export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
  */
 export let brakKolumnyIdPozycji: string | null = null;
 
-/**
- * Ustawiane, gdy login nie ma `GRANT SELECT ON dbo.fl__Flagi`.
- *
- * Czytane przez `/api/health`. Bez słownika flag kolektor nadal widzi, ŻE biuro
- * postawiło na fakturze flagę spoza naszych czterech — ale nie umie jej nazwać.
- * Cisza byłaby myląca, bo objawem jest pastylka bez treści, a nie brak pastylki.
- */
-export let brakSlownikaFlag: string | null = null;
-
 interface MagRow {
   mag_Id: number;
   mag_Symbol: string;
   mag_Nazwa: string;
-}
-
-/** Wiersz słownika flag (`fl__Flagi`). */
-interface FlagaRow {
-  flg_Id: number;
-  flg_Text: string | null;
-}
-
-/**
- * Słownik flag dokumentów — nazwy, którymi biuro opisuje faktury.
- *
- * Czytamy CAŁĄ tabelę, bez zawężania do grupy z `MSSQL_FLAG_GRUPA`: `flg_Id`
- * jest kluczem głównym, więc kolizji między grupami nie ma, a zawężenie po
- * źle ustalonej grupie dałoby pusty słownik zamiast błędu.
- *
- * Brak uprawnienia degraduje do pustego słownika, tak samo jak przy magazynach.
- * Nazwy flag są ozdobą stanu, a nie stanem — nie mogą wywrócić importu stanów
- * i lokalizacji.
- */
-async function pobierzFlagi(pool: sql.ConnectionPool): Promise<FlagaRow[]> {
-  try {
-    const r = await pool.request().query<FlagaRow>("SELECT flg_Id, flg_Text FROM fl__Flagi");
-    brakSlownikaFlag = null;
-    return r.recordset;
-  } catch (e) {
-    brakSlownikaFlag =
-      "Brak GRANT SELECT na fl__Flagi — flaga postawiona przez biuro poza czterema " +
-      "znanymi aplikacji pokazuje się na kolektorze bez nazwy. Uruchom ponownie " +
-      "skrypt uprawnień (DEPLOY §6) albo instalator z -TylkoKonfiguracja.";
-    console.warn(`[mssql] ${brakSlownikaFlag} (${e instanceof Error ? e.message : e})`);
-    return [];
-  }
 }
 
 async function pobierzMagazyny(pool: sql.ConnectionPool): Promise<MagRow[]> {
@@ -412,18 +369,6 @@ export async function importFromMssql(): Promise<ImportStats> {
   // adr__Ekran (adr_NazwaPelna) — podmiana opisana w docs/subiekt-gt-edu-setup.md
   // dokumenty zwrotów: domyślnie ZW (dok_Typ 14), DOK_TYP_ZWROTY może rozszerzyć
   //
-  // Flaga sprawdzenia faktury nie jest kolumną dokumentu — leży w `fl_Wartosc`
-  // pod kluczem (grupa flag, typ obiektu, id dokumentu). Czytamy `flw_IdFlagi`,
-  // czyli dokładnie tę wartość, którą sami tam wpisujemy; bez konfiguracji
-  // grupy/typu wszystkie dokumenty mają flagę NULL i mechanizm „nadpisanie biura
-  // wygrywa" po prostu nie ma czego porównywać ([WERYFIKUJ], DEPLOY §6).
-  const flagJoin =
-    c.flagGrupa && c.flagTypObiektu
-      ? `LEFT JOIN fl_Wartosc fw ON fw.flw_IdObiektu = d.dok_Id
-            AND fw.flw_IdGrupyFlag = ${Math.trunc(c.flagGrupa)}
-            AND fw.flw_TypObiektu = ${Math.trunc(c.flagTypObiektu)}`
-      : "";
-  const flagSelect = flagJoin ? "CONVERT(varchar(20), fw.flw_IdFlagi)" : "NULL";
   const zwTypFilter = c.dokTypyZwroty.length
     ? ` AND d.dok_Typ IN (${c.dokTypyZwroty.map((n) => Math.trunc(n)).join(",")})`
     : "";
@@ -443,11 +388,9 @@ export async function importFromMssql(): Promise<ImportStats> {
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
                 d.dok_MagId,
                 ISNULL(k.kh_Symbol, '') AS dostawca,
-                ${c.bufferExpr} AS w_buforze,
-                ${flagSelect} AS flaga
+                ${c.bufferExpr} AS w_buforze
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
-         ${flagJoin}
          WHERE (
                  -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
                  (d.dok_MagId = @mag AND ${dostawyTypFilter})
@@ -460,10 +403,6 @@ export async function importFromMssql(): Promise<ImportStats> {
            AND ${oknoFilter}`
       )
   ).recordset;
-
-  // Słownik flag ma sens tylko wtedy, gdy w ogóle czytamy flagi: bez pary
-  // (grupa, typ obiektu) każdy dokument ma flagę NULL i nie ma czego nazywać.
-  const flagi = flagJoin ? await pobierzFlagi(pool) : [];
 
   const pozycje = dokumenty.length ? await pobierzPozycje(pool, dokumenty.map((d) => d.dok_Id)) : [];
 
@@ -481,13 +420,12 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
   );
   const insDok = d.prepare(
-    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze, flaga)
-     VALUES (?,?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
+     VALUES (?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare(
     "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc, ob_id) VALUES (?,?,?,?)"
   );
-  const insFlaga = d.prepare("INSERT INTO sgt_flaga(flg_id, nazwa) VALUES (?,?)");
   const insZam = d.prepare(
     `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
      VALUES (?,?,?,?,?,?)`
@@ -500,17 +438,9 @@ export async function importFromMssql(): Promise<ImportStats> {
     /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy. */
     for (const t of [
       "sgt_zam_pozycja", "sgt_zamowienie",
-      "sgt_pozycja", "sgt_dokument", "sgt_flaga", "sgt_stan", "sgt_towar", "sgt_magazyn",
+      "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
       d.prepare(`DELETE FROM ${t}`).run();
-    }
-    /* Słownik flag przed dokumentami — nie z powodu klucza obcego (nie ma go),
-       tylko dlatego, że dokument bez nazwy swojej flagi jest widoczny na
-       ekranie, a nazwa bez dokumentu nie jest widoczna nigdzie. */
-    for (const f of flagi) {
-      const nazwa = (f.flg_Text ?? "").trim();
-      if (!nazwa) continue; // flaga bez nazwy nie ma czego wnieść na pastylkę
-      insFlaga.run(f.flg_Id, nazwa);
     }
     const insMag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
     for (const m of magazyny) {
@@ -546,8 +476,7 @@ export async function importFromMssql(): Promise<ImportStats> {
         doc.data_wyst,
         doc.dok_MagId,
         doc.dostawca ?? "",
-        doc.w_buforze ? 1 : 0,
-        doc.flaga ?? null
+        doc.w_buforze ? 1 : 0
       );
     }
     for (const p of pozycje) {

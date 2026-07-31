@@ -165,7 +165,7 @@ if ($Odinstaluj) {
     Write-Host ""
     Write-Host "  Czego to NIE cofa:" -ForegroundColor Cyan
     Write-Uwaga "1. Zapisów w bazie Subiekta. Pole lokalizacji na kartotekach"
-    Write-Info "   i flagi na fakturach ZOSTAJĄ. Odwraca je wyłącznie kopia bazy."
+    Write-Info "   ZOSTAJE. Odwraca je wyłącznie kopia bazy."
     Write-Uwaga "2. Loginu SQL 'wertis'. Powstał na poziomie INSTANCJI, nie bazy."
     Write-Info "   Usuwa go administrator bazy, w bazie podmiotu:"
     Write-Info "     DROP USER [wertis];"
@@ -429,44 +429,6 @@ if ($podlaczacDoSubiekta) {
     }
     $ustawienia.MSSQL_LOC_COLUMN = (Assert-BezpiecznyIdentyfikator -Nazwa $kolumna -Opis "kolumna lokalizacji")
 
-    # ── Flagi faktur (checklista §3 b) ──────────────────────────────────────
-    Write-Krok "Flagi sprawdzenia faktury"
-    if ($polaczenie) {
-        $flagi = @(Get-WertisFlagi -Polaczenie $polaczenie)
-        if ($flagi.Count -eq 0) {
-            # Wersja edu nie ma flag dokumentów. To nie jest błąd instalacji.
-            Write-Uwaga "Ta baza nie ma zdefiniowanych flag dokumentów."
-            Write-Info "Zostawiam puste - zadania flagowania po prostu nie powstaną,"
-            Write-Info "a cała reszta aplikacji działa normalnie."
-        } else {
-            $grupy = @(Find-WertisGrupaFlag -Polaczenie $polaczenie)
-            if ($grupy.Count -eq 0) {
-                Write-Uwaga "Żadna faktura zakupu nie jest jeszcze oflagowana."
-                Write-Info "Oflaguj ręcznie jedną fakturę w Subiekcie i uruchom instalator"
-                Write-Info "z -TylkoKonfiguracja - dopiero wtedy da się ustalić grupę flag."
-            } else {
-                $g = Read-Wybor -Pozycje $grupy -Pytanie "Grupa flag faktur" -Domyslny 0 `
-                    -Etykieta { param($x) "grupa $($x.flw_IdGrupyFlag), typ obiektu $($x.flw_TypObiektu)  ($($x.ile) oflagowanych faktur)" }
-                $ustawienia.MSSQL_FLAG_GRUPA       = "$($g.flw_IdGrupyFlag)"
-                $ustawienia.MSSQL_FLAG_TYP_OBIEKTU = "$($g.flw_TypObiektu)"
-
-                $etykietaFlagi = { param($f) "{0,-5} {1}" -f $f.flg_Id, $f.flg_Text }
-                $mapa = @(
-                    @{ Klucz = "DOC_FLAG_IN_PROGRESS_SGT";  Opis = "dostawa w trakcie rozkładania" },
-                    @{ Klucz = "DOC_FLAG_PAUSED_SGT";       Opis = "rozkładanie wstrzymane" },
-                    @{ Klucz = "DOC_FLAG_DONE_SGT";         Opis = "dostawa rozłożona" },
-                    @{ Klucz = "DOC_FLAG_DONE_ERRORS_SGT";  Opis = "rozłożona z zastrzeżeniami" }
-                )
-                Write-Info "Dla każdego stanu wskaż flagę (Enter = pomiń ten stan)."
-                foreach ($m in $mapa) {
-                    $f = Read-Wybor -Pozycje $flagi -Pytanie "Flaga: $($m.Opis)" `
-                        -Etykieta $etykietaFlagi -PozwolPominac
-                    if ($f) { $ustawienia[$m.Klucz] = "$($f.flg_Id)" }
-                }
-            }
-        }
-    }
-
     # ── ETAP 4: konto SQL aplikacji ─────────────────────────────────────────
     Write-Krok "Konto SQL aplikacji"
     $login = "wertis"
@@ -477,8 +439,8 @@ if ($podlaczacDoSubiekta) {
 
     $zalozone = $false
     if ($polaczenie) {
-        Write-Info "Zakładam login '$login' z uprawnieniami kolumnowymi: odczyt siedmiu tabel,"
-        Write-Info "zapis JEDNEJ kolumny lokalizacji i tabeli flag. Zero praw do dok__Dokument."
+        Write-Info "Zakładam login '$login' z uprawnieniami kolumnowymi: odczyt sześciu tabel"
+        Write-Info "i zapis JEDNEJ kolumny lokalizacji. Zero praw zapisu poza nią."
         $wynik = Grant-WertisLogin -Polaczenie $polaczenie -Skrypt $skrypt
         if ($wynik.Udalo) {
             if ($DryRun) {

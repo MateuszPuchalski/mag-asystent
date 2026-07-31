@@ -3,7 +3,7 @@
 # ŹRÓDŁEM PRAWDY dla tego pliku jest `docs/subiekt-gt-edu-setup.md`:
 #   §1 — TCP/IP i uwierzytelnianie mieszane (wymogi wstępne),
 #   §2 — skrypt loginu `wertis` z uprawnieniami kolumnowymi + weryfikacja,
-#   §3 — checklista: magazyny, pole lokalizacji, flagi.
+#   §3 — checklista: magazyny i pole lokalizacji.
 # Zmiana uprawnień poprawia się W OBU MIEJSCACH. Instalator, który po cichu
 # nadałby inne prawa niż dokument, byłby gorszy od braku instalatora — nikt by
 # tego nie zauważył, bo aplikacja działałaby tak samo.
@@ -498,40 +498,6 @@ function Format-WertisEtykietaPola {
     return ("{0,-9} {1}{2}" -f $Pole.Pole, $opis, $np)
 }
 
-function Get-WertisFlagi {
-    param([Parameter(Mandatory)]$Polaczenie)
-    return Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
-SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
-"@
-}
-
-function Find-WertisGrupaFlag {
-    <#
-        .SYNOPSIS
-        Kandydaci na MSSQL_FLAG_GRUPA i MSSQL_FLAG_TYP_OBIEKTU.
-        .DESCRIPTION
-        Flaga nie jest kolumną dokumentu — to wpis w fl_Wartosc pod kluczem
-        (grupa, typ obiektu, id obiektu). Sonda jest HEURYSTYCZNA: łączymy
-        fl_Wartosc z fakturami zakupu po flw_IdObiektu i patrzymy, która para
-        (grupa, typ) trafia najczęściej. Złączenie po samym id może przypadkiem
-        trafić obiekt innego typu o tym samym identyfikatorze, dlatego wynik
-        jest PROPOZYCJĄ do potwierdzenia przez człowieka, a nie ustaleniem.
-        Pusta lista znaczy tyle, że nikt jeszcze nie oflagował faktury.
-    #>
-    param(
-        [Parameter(Mandatory)]$Polaczenie,
-        [int]$DokTypFz = 1
-    )
-    return Invoke-WertisZapytanie -Polaczenie $Polaczenie -Parametry @{ "@typ" = $DokTypFz } -Sql @"
-SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, COUNT(*) AS ile
-FROM fl_Wartosc w
-JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
-WHERE d.dok_Typ = @typ
-GROUP BY w.flw_IdGrupyFlag, w.flw_TypObiektu
-ORDER BY ile DESC;
-"@
-}
-
 # ── Konto aplikacji (docs/subiekt-gt-edu-setup.md §2) ────────────────────────
 
 function Get-WertisSkryptUprawnien {
@@ -541,10 +507,10 @@ function Get-WertisSkryptUprawnien {
         i do pliku awaryjnego, żeby nie mogły się rozjechać.
         .DESCRIPTION
         Idempotentny, więc wolno go puścić ponownie po zmianie pola
-        lokalizacji. Uprawnienia są KOLUMNOWE i to jest tu cała wartość:
-        UPDATE na jednej kolumnie tw__Towar, INSERT/UPDATE na fl_Wartosc
-        i ani jednego prawa zapisu do dok__Dokument. Przy przejęciu tego
-        credentiala da się zmienić lokalizację towaru i flagę — nic więcej.
+        lokalizacji. Uprawnienie zapisu jest KOLUMNOWE i to jest tu cała
+        wartość: UPDATE na jednej kolumnie tw__Towar i ani jednego prawa
+        zapisu gdziekolwiek indziej. Przy przejęciu tego credentiala da się
+        zmienić lokalizację towaru — nic więcej.
     #>
     param(
         [Parameter(Mandatory)][string]$Baza,
@@ -582,16 +548,11 @@ GRANT SELECT ON dbo.tw_Stan        TO [$Login];
 GRANT SELECT ON dbo.dok__Dokument  TO [$Login];
 GRANT SELECT ON dbo.dok_Pozycja    TO [$Login];
 GRANT SELECT ON dbo.kh__Kontrahent TO [$Login];
-GRANT SELECT ON dbo.fl_Wartosc     TO [$Login];
-GRANT SELECT ON dbo.fl__Flagi      TO [$Login];
 GRANT SELECT ON dbo.sl_Magazyn     TO [$Login];   -- nazwy i symbole magazynów
 
--- ZAPIS: dwie rzeczy i ani jedna więcej.
--- 1) lokalizacja — JEDNA kolumna kartoteki (ta sama, co MSSQL_LOC_COLUMN)
+-- ZAPIS: JEDNA kolumna kartoteki (ta sama, co MSSQL_LOC_COLUMN) i nic więcej.
+-- Dokumenty, flagi i stany pozostają dla tego loginu tylko do odczytu.
 GRANT UPDATE ON dbo.tw__Towar ($KolumnaLokalizacji) TO [$Login];
--- 2) flaga sprawdzenia faktury — tabela przypisań flag; dok__Dokument
---    pozostaje nietykalny, bo flaga nie jest jego kolumną
-GRANT INSERT, UPDATE ON dbo.fl_Wartosc TO [$Login];
 "@
 }
 

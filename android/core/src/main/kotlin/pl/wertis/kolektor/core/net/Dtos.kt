@@ -267,7 +267,12 @@ data class LocationProductsResponse(
 @Serializable
 enum class QueueItemType {
     @SerialName("set_location") SET_LOCATION,
-    /** Flaga sprawdzenia faktury (tryb A) — jedyny zapis do SGT poza lokalizacją. */
+    /**
+     * HISTORYCZNE. Aplikacja nie tworzy już zadań flagi faktury, ale w kolejce
+     * na wdrożonych instalacjach leżą dawne wiersze — a `QueueItem.type` nie ma
+     * wartości domyślnej, więc `coerceInputValues` ich nie uratuje. Usunięcie
+     * tej pozycji wywracałoby ekran kolejki na każdej bazie z historią.
+     */
     @SerialName("set_doc_flag") SET_DOC_FLAG,
     /** Dokument MM — powstaje wyłącznie z wózka trybu B (zatwierdzenie rundy). */
     @SerialName("mm") MM,
@@ -473,10 +478,6 @@ data class DeliveryDocument(
     val linesTotal: Int = 0,
     val linesDone: Int = 0,
     val status: String? = null,
-    /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
-    val flaga: String? = null,
-    /** Klucz stanu — stabilny; po nim dobieramy kolor, bo nazwy są konfigurowalne. */
-    val flagaKey: String? = null,
     /** Zbiorczy dokument zwrotów: rozkłada się koszykami, każdy domykany MM-em. */
     val zwrot: Boolean = false,
 )
@@ -526,10 +527,6 @@ data class DeliveryView(
     val dostawca: String = "",
     val dataWyst: String = "",
     val status: String = "open",
-    /** Nazwa flagi jak w Subiekcie — do pokazania człowiekowi. */
-    val flaga: String? = null,
-    /** Klucz stanu — stabilny; po nim dobieramy kolor. */
-    val flagaKey: String? = null,
     val progress: DeliveryProgress = DeliveryProgress(),
     /** Zbiorczy dokument zwrotów: rozkłada się koszykami, każdy domykany MM-em. */
     val zwrot: Boolean = false,

@@ -18,12 +18,11 @@ opisane niżej.
 
 ### Co WERTIS zapisuje do Subiekta
 
-Dokładnie dwie rzeczy, obie przez kolejkę i osobny proces:
+Dokładnie jedną rzecz, przez kolejkę i osobny proces:
 
 | co | gdzie | kiedy |
 |---|---|---|
 | pole lokalizacji na kartotece | `tw__Towar.tw_Pole1` (konfigurowalne) | po skanie regału |
-| flaga sprawdzenia faktury | `fl_Wartosc` (mechanizm flag InsERT-a) | przy zmianie stanu dostawy |
 
 **Zero `INSERT` do tabel dokumentów. Zero modyfikacji stanów.** Aplikacja nie
 tworzy dokumentów, nie zmienia ilości i nie rusza cen. Dokumenty MM
@@ -31,8 +30,8 @@ tworzy dokumentów, nie zmienia ilości i nie rusza cen. Dokumenty MM
 worker COM na Windows — nie ten proces.
 
 Wniosek praktyczny: **najgorsze, co WERTIS może zrobić Subiektowi, to wpisać zły
-adres w polu tekstowym albo złą flagę na fakturze.** Obie rzeczy są odwracalne
-jednym `UPDATE`. To była świadoma granica projektu, nie ograniczenie techniczne.
+adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
+świadoma granica projektu, nie ograniczenie techniczne.
 
 ---
 
@@ -106,7 +105,7 @@ pracuje na prawdziwej bazie, czy na demo.
 | interfejs | co robi | implementacje |
 |---|---|---|
 | `adapters/subiekt.ts` | **odczyt**: kartoteki, stany, dokumenty | `subiekt.seeded.ts` (SQLite z `products.json`), `subiekt.mssql.ts` (produkcja) |
-| `adapters/sfera.ts` | **zapis**: lokalizacja, flaga, MM | `sfera.dev.ts` (mutacja `sgt_*`), `sfera.sql.ts` (UPDATE w MSSQL) |
+| `adapters/sfera.ts` | **zapis**: lokalizacja, MM | `sfera.dev.ts` (mutacja `sgt_*`), `sfera.sql.ts` (UPDATE w MSSQL) |
 
 Wybór jest **jednym przełącznikiem**: `SGT_MODE=seeded|mssql`. Adapter zapisu
 nie jest osobną decyzją — wynika ze źródła danych (`config.sferaMode`).
@@ -441,7 +440,6 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 | Polling 2 s zamiast WebSocketów | kolektor traci Wi-Fi kilkanaście razy dziennie; reconnect WS to kod, którego przy pollingu nie ma |
 | Konta się nie kasuje | historia w `events` musi mieć na co wskazywać; jest `active = 0` |
 | `events` bez retencji | przy szacowanych kilkuset zdarzeniach dziennie to rząd 10⁵ wierszy rocznie — SQLite z indeksami tego nie zauważa. To ślad audytu, więc automatyczne kasowanie byłoby gorsze niż wzrost. Gdyby tabela urosła ponad oczekiwania, decyzję o archiwizacji podejmuje właściciel, nie kod |
-| `flaga_wyslana` zapisywana przy kolejkowaniu | dedupe musi się na czymś oprzeć. Terminalne niepowodzenie (błąd **albo anulowanie**) cofa zapis, żeby `syncFlag` policzył stan od nowa |
 | Numer badge'a nadaje serwer | musi być unikalny w całej firmie i nieść poprawną cyfrę kontrolną |
 
 ---
@@ -458,8 +456,8 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
   obsługa błędów sieci i wyzwalacze flusha bufora.
 - **Dokumenty MM nie są jeszcze tworzone** — kontrakt istnieje
   (`adapters/sfera.ts`), implementacja czeka na worker COM na Windows.
-- **Otwarte `[WERYFIKUJ]`** dla własnej bazy: `MAG_ID_*`, które `tw_Pole1..8`
-  trzyma lokalizację, para (grupa flag, typ obiektu). Lista i zapytania:
+- **Otwarte `[WERYFIKUJ]`** dla własnej bazy: `MAG_ID_*` oraz to, które
+  `tw_Pole1..8` trzyma lokalizację. Lista i zapytania:
   `docs/subiekt-gt-edu-setup.md` §3.
 - **Reguły strefy złotej** nie pokrywają regałów `D00`, `D06`, `D07`, `E01` —
   raport przeslotowania wskazuje je na osobnej liście „brak reguły" zamiast

@@ -6,8 +6,8 @@
  * Implementacje (wybór wynika z SGT_MODE — patrz adapters/index.ts):
  *   dev — mutacja tabel sgt_* (sfera.dev.ts): realna zmiana stanu w read-modelu,
  *         jedyny sposób na przećwiczenie ścieżki kolejka→worker bez Subiekta.
- *   sql — UPDATE dwóch kolumn w MSSQL (sfera.sql.ts): lokalizacja + flaga,
- *         jednym loginem o kolumnowych uprawnieniach; MM zgłasza błąd.
+ *   sql — UPDATE jednej kolumny w MSSQL (sfera.sql.ts): pole lokalizacji,
+ *         loginem o kolumnowym uprawnieniu; MM zgłasza błąd.
  *
  * ─── Zapis przez Sferę (COM) — kontrakt do implementacji ─────────────────────
  * Sfera to COM/Windows + licencja, więc nie ma tu implementacji w Node.
@@ -30,17 +30,6 @@
  *   mm.Zapisz();
  *   return mm.NumerPelny;   // zapis zwrotny do sfera_queue.sgt_doc_number
  *
- * set_doc_flag (flaga sprawdzenia faktury):
- *   var d = sfera.DokumentyZakupuManager.Wczytaj(dokId);   // [WERYFIKUJ] manager
- *   d.Flaga = wartosc;                                     // [WERYFIKUJ] nazwa własności
- *   d.Zapisz();
- *   // Firma używa WBUDOWANYCH flag dokumentu (kolumna „FW" na liście faktur
- *   //   zakupu + filtr „Flaga:"), więc `wartosc` to najpewniej id koloru, a nie
- *   //   polski napis — dlatego domena operuje kluczem, a mapowanie klucz→wartość
- *   //   siedzi w config.docFlag.
- *   // PLAN B jak przy lokalizacji: UPDATE dok__Dokument SET <kolumna>=@v
- *   //   osobnym loginem z GRANT UPDATE wyłącznie na tę kolumnę.
- *
  * Sekwencyjność: COM Sfery nie jest thread-safe — przetwarzać po jednym zadaniu.
  */
 export interface MmItem {
@@ -56,12 +45,4 @@ export interface SferaAdapter {
    * zwróć numer dokumentu MM (spec §5.3 / §9).
    */
   createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string>;
-  /**
-   * Ustaw flagę sprawdzenia na fakturze dostawy. Jedyny zapis do SGT poza
-   * `tw_Lokalizacja` — świadomy, nazwany wyjątek od §16 (patrz services/queue.ts).
-   *
-   * `wartosc` to SUROWA wartość dla Subiekta (przy flagach wbudowanych: id
-   * koloru), `klucz` służy tylko czytelności logów.
-   */
-  applyDocFlag(dokId: number, wartosc: string, klucz: string): Promise<void>;
 }

@@ -113,11 +113,6 @@ function migrate(database: DatabaseSync) {
   // locki per linia (tryb A: dostawy i zwroty) — kilka osób przy jednym dokumencie
   addColumn("delivery_line", "locked_by", "TEXT");
   addColumn("delivery_line", "locked_at", "TEXT");
-  // ostatnia flaga wysłana do Subiekta — rozjazd z sgt_dokument.flaga znaczy,
-  // że biuro nadpisało ją poza aplikacją
-  addColumn("delivery", "flaga_wyslana", "TEXT");
-  addColumn("delivery", "active_at", "TEXT");
-  addColumn("sgt_dokument", "flaga", "TEXT");
   // zwroty w trybie A: koszyk jako jednostka pracy + rozliczenie MM per linia
   addColumn("delivery", "source_mag_id", "INTEGER");
   addColumn("delivery_line", "koszyk", "TEXT");

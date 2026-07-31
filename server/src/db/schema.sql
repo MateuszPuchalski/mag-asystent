@@ -9,7 +9,7 @@ PRAGMA foreign_keys = ON;
 -- ── Kolejka zadań dla workera Sfery (spec §7) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS sfera_queue (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  type           TEXT NOT NULL,                 -- set_location | set_doc_flag | mm (mm: wyłącznie tryb B)
+  type           TEXT NOT NULL,                 -- set_location | mm (mm: wyłącznie tryb B)
   payload        TEXT NOT NULL,                 -- JSON
   status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error
   attempts       INTEGER NOT NULL DEFAULT 0,
@@ -161,21 +161,7 @@ CREATE TABLE IF NOT EXISTS sgt_dokument (
   data_wyst  TEXT NOT NULL,                     -- ISO date
   mag_id     INTEGER NOT NULL,                  -- magazyn skutku: MAG (tryb A) | MGP | Zwroty
   dostawca   TEXT,
-  w_buforze  INTEGER NOT NULL DEFAULT 0,
-  flaga      TEXT                               -- flaga sprawdzenia faktury (§ wywiad)
-);
-
--- Słownik flag Subiekta (`fl__Flagi`): identyfikator → nazwa widoczna dla ludzi.
---
--- Firma używa na fakturach więcej flag niż nasze cztery. Bez słownika obca flaga
--- byłaby na kolektorze albo niewidoczna, albo podpisana zgadywanką — a to jest
--- pastylka, którą magazynier czyta zamiast pytać przez halę.
---
--- Read-model, nie stan: wypełnia go import z MSSQL, w trybie seeded zostaje
--- pusty (dev zapisuje w `sgt_dokument.flaga` sam klucz stanu, nie `flg_Id`).
-CREATE TABLE IF NOT EXISTS sgt_flaga (
-  flg_id INTEGER PRIMARY KEY,                   -- `flg_Id` z fl__Flagi
-  nazwa  TEXT NOT NULL                          -- `flg_Text` — nazwa jak w Subiekcie
+  w_buforze  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sgt_pozycja (
@@ -244,20 +230,15 @@ CREATE TABLE IF NOT EXISTS delivery (
   sgt_dok_numer TEXT NOT NULL,
   dostawca      TEXT,
   data_dok      TEXT,
-  status        TEXT NOT NULL DEFAULT 'open',   -- open | done | abandoned
+  -- `abandoned` zostaje w słowniku wartości dla wierszy historycznych: ustawiał
+  -- go mechanizm flagi faktury, którego już nie ma. Nowe dostawy chodzą
+  -- wyłącznie open → done.
+  status        TEXT NOT NULL DEFAULT 'open',   -- open | done | (abandoned: historyczne)
   opened_at     TEXT NOT NULL,
   closed_at     TEXT,
   -- Magazyn skutku dokumentu (snapshot z chwili otwarcia). Jedyne, co odróżnia
   -- zwrot od dostawy krajowej: MAG ⇒ sam adres, Zwroty ⇒ dodatkowo MM na koszyk.
-  source_mag_id INTEGER,
-  -- Ostatnia flaga wysłana do Subiekta. Służy do dwóch rzeczy: nie kolejkujemy
-  -- tego samego stanu w kółko, a rozjazd z sgt_dokument.flaga jest dowodem, że
-  -- biuro ustawiło flagę poza aplikacją (i wtedy jego decyzja wygrywa).
-  flaga_wyslana TEXT,
-  -- Ostatni dotyk człowieka (otwarcie, skan, odłożenie). Odróżnia „ktoś przy tym
-  -- stoi TERAZ" od „leży zaczęte" — lock na pojedynczej linii to za wąski sygnał,
-  -- bo magazynier jest przy palecie także zanim cokolwiek zeskanuje.
-  active_at     TEXT
+  source_mag_id INTEGER
 );
 
 -- Postęp per linia (D4): zapis natychmiastowy, przerwanie pracy nic nie kosztuje.
@@ -279,8 +260,6 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   done_at        TEXT,
   done_by        TEXT,
   -- Przy natłoku jedną dostawę rozkłada kilka osób (TTL w services/locks.ts).
-  -- Świeży lock jest zarazem jedynym sygnałem „ktoś pracuje TERAZ", na którym
-  -- opiera się flaga „W trakcie sprawdzania".
   locked_by      TEXT,
   locked_at      TEXT,
   -- ── Zwroty: koszyk jako jednostka pracy ──────────────────────────────────

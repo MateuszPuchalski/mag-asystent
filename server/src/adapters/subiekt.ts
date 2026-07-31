@@ -33,14 +33,6 @@ export interface RawDocument {
   mag_id: number;
   dostawca: string;
   w_buforze: number;
-  /**
-   * Flaga sprawdzenia faktury tak, jak leży w Subiekcie (`flw_IdFlagi`).
-   *
-   * `null` znaczy „dokument nie ma flagi ALBO nie wiemy, gdzie ich szukać"
-   * (nieustawione `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU`). Rozróżnia te
-   * dwa przypadki `/api/health` polem `docFlag`, nie ta wartość.
-   */
-  flaga: string | null;
 }
 export interface RawPosition {
   tw_id: number;

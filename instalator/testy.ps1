@@ -142,15 +142,24 @@ Sprawdz "podstawia wybraną kolumnę do grantu kolumnowego" {
     Zaloz ($skrypt -match "GRANT UPDATE ON dbo\.tw__Towar \(tw_Pole3\)") "brak grantu na wybraną kolumnę"
 }
 
-Sprawdz "nadaje SELECT na osmiu tabelach" {
-    # 8, nie 7: doszedł sl_Magazyn, bez którego karta towaru mogłaby pokazać
-    # najwyżej `mag_Id = 7` zamiast nazwy magazynu
+Sprawdz "nadaje SELECT na szesciu tabelach" {
+    # 6, nie 8: w 0.16.0 wypadły fl_Wartosc i fl__Flagi razem z flagą faktury.
+    # Zostaje sl_Magazyn, bez którego karta towaru pokazałaby najwyżej
+    # `mag_Id = 7` zamiast nazwy magazynu.
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
-    Zaloz ($ile -eq 8) "GRANT SELECT jest $ile razy, ma być 8"
+    Zaloz ($ile -eq 6) "GRANT SELECT jest $ile razy, ma być 6"
 }
 
 Sprawdz "czyta slownik magazynow" {
     Zaloz ($skrypt -match "GRANT SELECT ON dbo\.sl_Magazyn") "brak grantu na sl_Magazyn"
+}
+
+Sprawdz "JEDYNYM prawem zapisu jest kolumna lokalizacji" {
+    # Test na samą dok__Dokument (niżej) przepuściłby kolejny wyjątek dopisany
+    # do INNEJ tabeli — dokładnie tak weszła kiedyś flaga faktury. Liczymy więc
+    # WSZYSTKIE granty zapisu: ma być dokładnie jeden.
+    $zapisy = ([regex]::Matches($skrypt, "GRANT (INSERT|UPDATE|DELETE)")).Count
+    Zaloz ($zapisy -eq 1) "grantów zapisu jest $zapisy, ma być 1"
 }
 
 Sprawdz "NIE nadaje żadnego prawa zapisu do dok__Dokument" {

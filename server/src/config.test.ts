@@ -36,24 +36,6 @@ test("limit lokalizacji = realny rozmiar tw_Pole1..8 (varchar(50))", () => {
   assert.equal(config.locFieldLimit, 50);
 });
 
-test("flagi bez konfiguracji grupy/typu — brak domysłu, zadanie ma paść", () => {
-  // Pary (grupa flag, typ obiektu) nie da się odczytać z dokumentacji struktury,
-  // więc domyślnej NIE MA. Zero znaczy „nieskonfigurowane" i adapter odmawia
-  // zapisu, zamiast wpisać flagę w losową grupę.
-  assert.equal(config.mssql.flagGrupa, 0);
-  assert.equal(config.mssql.flagTypObiektu, 0);
-});
-
-test("bez konfiguracji grupy flag nie ma dokąd wysyłać — flagi wyłączone", async () => {
-  const { docFlagAvailable } = await import("./services/delivery-flag.js");
-  // tryb seeded pisze do sgt_dokument adapterem dev i działa zawsze
-  assert.equal(config.sferaMode, "dev");
-  assert.equal(docFlagAvailable(), true);
-  // w trybie sql bez MSSQL_FLAG_* zadanie skończyłoby się błędem po 3 próbach,
-  // więc nie ma go po co tworzyć — patrz komentarz przy docFlagAvailable()
-  assert.equal(config.mssql.flagGrupa && config.mssql.flagTypObiektu ? "on" : "off", "off");
-});
-
 test("magazyny rozstrzygają o trybie, więc muszą być różne", () => {
   const { MAG, MGP, ZWROTY } = config.magId;
   assert.equal(new Set([MAG, MGP, ZWROTY]).size, 3);
