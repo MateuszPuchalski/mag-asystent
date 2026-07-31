@@ -28,6 +28,61 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.14.0 — 31 lipca 2026
+
+Flaga sprawdzenia faktury **wraca z Subiekta na kolektor**. Do tej pory szła
+wyłącznie w jedną stronę, więc faktura oznaczona przez biuro wyglądała na
+kolektorze dokładnie tak samo jak nietknięta: bez pastylki, na górze listy
+pracy. Magazynier dostawał do rozłożenia dostawę, którą ktoś już rozłożył.
+
+### Jedna flaga, dwa prawdziwe źródła
+
+Aplikacja czytała `sgt_dokument.flaga` tylko po to, żeby wykryć nadpisanie
+przez biuro — i tylko dla dostaw, które sama wcześniej oznaczyła. Dokument bez
+wiersza w `delivery` nie miał więc na ekranie żadnego stanu, choć w Subiekcie
+stan miał.
+
+Pierwszeństwo rozstrzyga jedna czysta reguła (`widokFlagi`): dopóki aplikacja
+prowadzi dokument, wygrywa jej wyliczenie, bo między policzeniem flagi a jej
+zapisem stoi kolejka. Poza tym wygrywa Subiekt — i to w dwóch sytuacjach:
+dokumentu nikt tu nie otwierał albo biuro przejęło flagę.
+
+Sprawdzona faktura schodzi teraz na dół zakładki DOSTAWY, szarzeje i dostaje
+ptaszek — tak samo jak dostawa rozłożona na kolektorze. Reguła mieszka
+w `:core`, bo jest regułą, a nie wyglądem.
+
+### Zwolniony worker nie porzuca już dostawy
+
+Przy okazji wyszedł błąd starszy niż ta zmiana. `officeOverride` porównywał
+Subiekta z tym, co sami wysłaliśmy, **nie patrząc na kolejkę**. Zadanie
+czekające na workera wyglądało więc jak decyzja biura: aplikacja porzucała
+własną dostawę zaraz po otwarciu, a flaga tej faktury nie zmieniała się już
+nigdy.
+
+Najłatwiej trafiała w to faktura z flagą postawioną wcześniej ręcznie — czyli
+dokładnie ta, od której zaczyna się ten wpis. Teraz porównanie czeka, aż
+kolejka opustoszeje.
+
+### Obce flagi firmy mają nazwy
+
+Firma trzyma w `fl__Flagi` więcej flag niż cztery nasze. Taka flaga pokazuje
+się z nazwą ze słownika, ale **bez koloru stanu** — o fladze spoza tego procesu
+wiadomo tylko tyle, że biuro ją postawiło. Słownik importuje się z `fl__Flagi`
+do nowej tabeli read-modelu `sgt_flaga`.
+
+Brak `GRANT SELECT` na `fl__Flagi` nie wywraca importu: pastylka zostaje bez
+nazwy, a `/api/health` mówi, czego brakuje. Skrypt uprawnień nadaje to prawo
+od dawna, więc typowa instalacja nie wymaga niczego.
+
+### [wymaga działania] tylko gdy flagi nie były skonfigurowane
+
+`MSSQL_FLAG_GRUPA` i `MSSQL_FLAG_TYP_OBIEKTU` rządzą teraz także **odczytem**.
+Puste znaczą, że kolektor nie zobaczy żadnej flagi biura i każda faktura będzie
+wyglądać na niesprawdzoną. Ustala się je jednym zapytaniem (DEPLOY §6).
+
+Poza tym `git pull`, `npm ci`, `npm run build` i restart usług. Nowa tabela
+powstaje sama przy starcie; APK z pastylkami rozsyła MDM osobno.
+
 ## 0.13.0 — 31 lipca 2026
 
 WERTIS umie teraz wskazać **konkretny wiersz faktury**. Nic to jeszcze nie

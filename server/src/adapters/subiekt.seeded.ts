@@ -205,7 +205,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare(
         `SELECT d.dok_id, d.typ, d.nr_pelny, d.data_wyst, d.mag_id, d.dostawca,
-                d.w_buforze, SUM(p.ilosc) AS ilosc
+                d.w_buforze, d.flaga, SUM(p.ilosc) AS ilosc
          FROM sgt_pozycja p
          JOIN sgt_dokument d ON d.dok_id = p.dok_id
          WHERE p.tw_id = ?

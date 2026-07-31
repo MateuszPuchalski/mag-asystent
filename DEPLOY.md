@@ -454,6 +454,11 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
      zamiast pisać w losową grupę flag. Reszta aplikacji działa normalnie —
      flaga jest jedyną rzeczą, która czeka.
 
+     **Ta sama para ustawień rządzi ODCZYTEM.** Bez niej kolektor nie widzi
+     flag postawionych przez biuro i każda faktura wygląda na niesprawdzoną.
+     Nazwy flag spoza tych czterech bierze się z `fl__Flagi`; brak `GRANT
+     SELECT` na tę tabelę melduje `/api/health`.
+
      Dokumenty zwrotów flagują się tym samym mechanizmem (to ten sam typ
      obiektu), więc nie wymagają osobnej konfiguracji.
 

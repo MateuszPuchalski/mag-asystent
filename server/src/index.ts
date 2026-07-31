@@ -19,6 +19,7 @@ import {
   brakDostepuDoMagazynow,
   brakKolumnyIdPozycji,
   brakKolumnyZrealizowano,
+  brakSlownikaFlag,
   importFromMssql,
   lastImport,
 } from "./adapters/subiekt.mssql.js";
@@ -62,6 +63,7 @@ export async function buildApp() {
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
       brakKolumnyIdPozycji,
+      brakSlownikaFlag,
     ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,

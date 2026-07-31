@@ -396,6 +396,12 @@ Parametry (env, dev):
   zakupu. Domena operuje więc stabilnym kluczem, a mapowanie klucz → nazwa →
   wartość w bazie siedzi w konfiguracji (`DOC_FLAG_*`). Nadpisanie przez biuro
   wygrywa: aplikacja schodzi z takiej faktury i zapisuje to w `events`.
+
+  **Flaga jest czytana także w drugą stronę.** Faktura oznaczona w Subiekcie
+  jest sprawdzona również na kolektorze — nawet gdy nikt jej tu nie otwierał.
+  Taka dostawa schodzi na dół listy, zamiast czekać w kolejce do rozłożenia.
+  Flagę spoza tych czterech kolektor pokazuje z nazwą ze słownika Subiekta,
+  ale bez koloru stanu: o obcej fladze wiadomo tylko tyle, że biuro ją postawiło.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
   zgadza się". Rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ**: najczęstszy
   wyjątek nie może wymagać szukania kafla wśród siedmiu typów.
@@ -513,7 +519,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 96 testów jednostkowych; buduje się bez Android SDK
+                           + 102 testy jednostkowe; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.delivery.dokumentZamkniety
 import pl.wertis.kolektor.core.net.DeliveryDocument
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
 import pl.wertis.kolektor.net.apiCall
@@ -94,12 +95,16 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
         return
     }
 
-    // ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie)
+    // Ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie).
+    // „Ukończone" obejmuje faktury oznaczone jako sprawdzone w SUBIEKCIE —
+    // rozkładanie jest sprawdzaniem faktury, więc taka dostawa nie ma czego
+    // szukać w kolejce do rozłożenia, choćby jej tu nikt nie otwierał.
+    //
     // Zwroty odfiltrowane TUTAJ, nie na serwerze: trasa i koszyki zostają
     // sprawne, znika tylko wejście z tej zakładki.
     val dostawy = r.documents
         .filter { !it.zwrot }
-        .sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
+        .sortedBy { dokumentZamkniety(it.linesTotal, it.linesDone, it.flagaKey) }
 
     Column(
         modifier = Modifier
@@ -142,7 +147,7 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
 
 @Composable
 private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
-    val complete = d.linesTotal > 0 && d.linesDone >= d.linesTotal
+    val complete = dokumentZamkniety(d.linesTotal, d.linesDone, d.flagaKey)
     val total = if (d.linesTotal > 0) d.linesTotal else d.positions
     Row(
         modifier = Modifier
