@@ -57,13 +57,13 @@ import pl.wertis.kolektor.core.net.ScanBody
 import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.scan.ScanKind
+import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
-import pl.wertis.kolektor.ui.components.formatQty
 import pl.wertis.kolektor.ui.session.PinSheet
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg

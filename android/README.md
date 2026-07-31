@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania, stan sprawdzenia faktury — **102 testy** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania, stan sprawdzenia faktury, teksty karty towaru — **123 testy** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -149,13 +149,23 @@ przed którą ta pozycja broni.
 
 **W dostawie, nierozłożone**
 
-- [ ] towar z nierozłożonej dostawy pokazuje na karcie amber sekcję z numerem
-      dokumentu, datą i ilością,
-- [ ] po odłożeniu części ilość w sekcji maleje o tyle, ile odłożono,
-- [ ] po odłożeniu całości sekcja znika,
+- [ ] towar z nierozłożonej dostawy ma na karcie amber linię z numerem
+      dokumentu i ilością,
+- [ ] po odłożeniu części ilość w linii maleje o tyle, ile odłożono,
+- [ ] po odłożeniu całości linia znika,
 - [ ] pozycja ze zgłoszonym problemem ZOSTAJE, z dopiskiem „zgłoszony problem",
-- [ ] sekcja nie reaguje na dotknięcie (wejście w dokument przestawiłoby flagę
+- [ ] karta nie reaguje na dotknięcie (wejście w dokument przestawiłoby flagę
       faktury w Subiekcie).
+
+**Karta towaru — nagłówek i sekcje**
+
+- [ ] nagłówek pokazuje symbol, liczbę dostępnych sztuk i adres pickingowy,
+- [ ] towar bez adresu ma jasną pastylkę „brak lokalizacji",
+- [ ] adres w kolejce Sfery prowadzi z pastylki wprost do kolejki,
+- [ ] trzy sekcje są zwinięte po wejściu na kartę,
+- [ ] nagłówek sekcji niesie podsumowanie bez rozwijania,
+- [ ] sekcja bez danych nie pokazuje się wcale,
+- [ ] wejście w zamiennik zwija sekcje z powrotem.
 
 **Rozkładanie**
 

@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.core.net.ProductRow
+import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.scan.WedgeKeySource
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
@@ -78,7 +79,8 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    Po odświeżeniu: głębia (cień), ikony, cele dotyku ≥48dp, stan wciśnięcia,
    szkielety ładowania. Kolory szarości przyciemnione do WCAG AA na papierze. */
 
-private val MinTap = 48.dp
+/** Minimalny cel dotyku — jedno źródło dla wszystkich klocków (także Collapsible.kt). */
+internal val MinTap = 48.dp
 
 /**
  * Pole tekstowe zgłaszające fokus do WedgeKeySource — gdy pole jest aktywne,
@@ -340,12 +342,22 @@ private fun PendingHereNote(text: String, alarm: Boolean) {
  */
 enum class LocState { CONFIRMED, ADDING, REMOVING, FAILED }
 
-/** Chip lokalizacji (pierwsza = pickingowa, z bursztynową kropką; reszta z pinezką). */
+/**
+ * Chip lokalizacji (pierwsza = pickingowa, z bursztynową kropką; reszta z pinezką).
+ *
+ * `big` to pastylka adresu w nagłówku karty towaru. Świadomie ten sam
+ * composable, a nie osobny widget: pastylka musi rysować DOKŁADNIE te same
+ * cztery stany co chip (przekreślenie przy schodzącym, ⏳ przy dochodzącym,
+ * czerwony puls przy nieudanym zapisie). Drugi widget znaczyłby, że stany
+ * trzeba zaimplementować dwa razy — a wtedy rozjeżdżają się przy pierwszej
+ * zmianie i nagłówek mówi co innego niż rząd chipów pod nim.
+ */
 @Composable
 fun LocChip(
     code: String,
     primary: Boolean,
     state: LocState = LocState.CONFIRMED,
+    big: Boolean = false,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(50)
@@ -383,29 +395,32 @@ fun LocChip(
                 // cień tylko na potwierdzonym: „w drodze" ma leżeć płasko,
                 // żeby różnica była czytelna także w słońcu na hali
                 if (state == LocState.CONFIRMED) {
-                    Modifier.shadow(2.dp, shape, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
+                    Modifier.shadow(if (big) 3.dp else 2.dp, shape, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
                 } else Modifier
             )
             .clip(shape)
             .border(if (failed) 2.dp else 1.5.dp, border, shape)
             .background(fill)
-            .heightIn(min = 44.dp)
+            .heightIn(min = if (big) 52.dp else 44.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = if (big) 16.dp else 14.dp, vertical = if (big) 12.dp else 9.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (big) 7.dp else 6.dp),
     ) {
+        val ikona = if (big) 16.dp else 14.dp
         when {
-            failed -> Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(14.dp))
-            waiting -> Text("⏳", fontSize = 12.sp)
-            primary -> Box(Modifier.size(7.dp).clip(CircleShape).background(Amber))
-            else -> Icon(WIcons.Pin, null, tint = Ink, modifier = Modifier.size(14.dp))
+            failed -> Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(ikona))
+            waiting -> Text("⏳", fontSize = if (big) 14.sp else 12.sp)
+            primary -> Box(Modifier.size(if (big) 8.dp else 7.dp).clip(CircleShape).background(Amber))
+            else -> Icon(WIcons.Pin, null, tint = Ink, modifier = Modifier.size(ikona))
         }
         Text(
             code,
             fontFamily = BarlowCond,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
+            fontWeight = if (big) FontWeight.ExtraBold else FontWeight.Bold,
+            fontSize = if (big) 19.sp else 15.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = ink,
             // schodząca lokalizacja jeszcze JEST w Subiekcie — przekreślenie mówi
             // „to zaraz zniknie", a nie „tego już nie ma"
@@ -414,6 +429,5 @@ fun LocChip(
     }
 }
 
-/** Liczby ilości: bez `.0` dla całkowitych (JS number → Double). */
-fun formatQty(v: Double): String =
-    if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
+/* `formatQty` mieszka w :core (core/text/Qty.kt) — teksty karty towaru
+   formatują ilości same, a testowalne są wyłącznie tam. */
