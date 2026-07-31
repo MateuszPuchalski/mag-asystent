@@ -165,6 +165,19 @@ CREATE TABLE IF NOT EXISTS sgt_dokument (
   flaga      TEXT                               -- flaga sprawdzenia faktury (§ wywiad)
 );
 
+-- Słownik flag Subiekta (`fl__Flagi`): identyfikator → nazwa widoczna dla ludzi.
+--
+-- Firma używa na fakturach więcej flag niż nasze cztery. Bez słownika obca flaga
+-- byłaby na kolektorze albo niewidoczna, albo podpisana zgadywanką — a to jest
+-- pastylka, którą magazynier czyta zamiast pytać przez halę.
+--
+-- Read-model, nie stan: wypełnia go import z MSSQL, w trybie seeded zostaje
+-- pusty (dev zapisuje w `sgt_dokument.flaga` sam klucz stanu, nie `flg_Id`).
+CREATE TABLE IF NOT EXISTS sgt_flaga (
+  flg_id INTEGER PRIMARY KEY,                   -- `flg_Id` z fl__Flagi
+  nazwa  TEXT NOT NULL                          -- `flg_Text` — nazwa jak w Subiekcie
+);
+
 CREATE TABLE IF NOT EXISTS sgt_pozycja (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   dok_id INTEGER NOT NULL REFERENCES sgt_dokument(dok_id),

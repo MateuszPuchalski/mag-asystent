@@ -8,7 +8,7 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
 import { freshLock, lockedByOther } from "./locks.js";
-import { deliveryFlag, flagLabel, syncFlag, touchDelivery } from "./delivery-flag.js";
+import { flagaDokumentu, syncFlag, touchDelivery } from "./delivery-flag.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type {
   DeliveryDocument,
@@ -87,6 +87,10 @@ export function listDocuments(days = 14): DeliveryDocument[] {
   return docs.map((d) => {
     const p = byDoc.get(d.dok_id);
     const positions = subiekt.getDocumentPositions(d.dok_id).length;
+    /* Flaga leci z DWÓCH źródeł naraz: naszego postępu i tego, co na fakturze
+       postawiło biuro. Dokument, którego tu nikt nie otwierał, ma tylko drugie —
+       i to jest normalny przypadek, a nie brak danych (patrz `widokFlagi`). */
+    const flaga = flagaDokumentu(d.flaga ?? null, p?.deliveryId ?? null, p?.status ?? null);
     return {
       dokId: d.dok_id,
       typ: d.typ,
@@ -100,8 +104,8 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       linesDone: p?.done ?? 0,
       status: p?.status ?? null,
       /** stan sprawdzenia faktury — to samo, co widzi biuro w Subiekcie */
-      flaga: p ? flagLabel(deliveryFlag(p.deliveryId)) : null,
-      flagaKey: p ? deliveryFlag(p.deliveryId) : null,
+      flaga: flaga.label,
+      flagaKey: flaga.key,
       /** zwrot rozkłada się koszykami i kończy MM-em; dostawa krajowa nie */
       zwrot: requiresMm(d.mag_id),
     };
@@ -233,6 +237,14 @@ export function getDelivery(id: number): DeliveryView | undefined {
   const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
   const problems = lines.filter((l) => l.status === "problem").length;
   const zwrot = requiresMm(d.source_mag_id);
+  // ta sama reguła pierwszeństwa co na liście dostaw — pastylka nie może
+  // zmieniać treści po samym wejściu w dokument
+  const sgtFlaga = (
+    db().prepare("SELECT flaga FROM sgt_dokument WHERE dok_id = ?").get(d.sgt_dok_id) as
+      | { flaga: string | null }
+      | undefined
+  )?.flaga;
+  const flaga = flagaDokumentu(sgtFlaga ?? null, d.id, d.status);
   return {
     id: d.id,
     dokId: d.sgt_dok_id,
@@ -240,8 +252,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dostawca: d.dostawca ?? "",
     dataWyst: d.data_dok ?? "",
     status: d.status,
-    flaga: flagLabel(deliveryFlag(d.id)),
-    flagaKey: deliveryFlag(d.id),
+    flaga: flaga.label,
+    flagaKey: flaga.key,
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     zwrot,
     koszyki: zwrot ? openBaskets(id) : [],

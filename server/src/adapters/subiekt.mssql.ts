@@ -180,10 +180,51 @@ export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
  */
 export let brakKolumnyIdPozycji: string | null = null;
 
+/**
+ * Ustawiane, gdy login nie ma `GRANT SELECT ON dbo.fl__Flagi`.
+ *
+ * Czytane przez `/api/health`. Bez słownika flag kolektor nadal widzi, ŻE biuro
+ * postawiło na fakturze flagę spoza naszych czterech — ale nie umie jej nazwać.
+ * Cisza byłaby myląca, bo objawem jest pastylka bez treści, a nie brak pastylki.
+ */
+export let brakSlownikaFlag: string | null = null;
+
 interface MagRow {
   mag_Id: number;
   mag_Symbol: string;
   mag_Nazwa: string;
+}
+
+/** Wiersz słownika flag (`fl__Flagi`). */
+interface FlagaRow {
+  flg_Id: number;
+  flg_Text: string | null;
+}
+
+/**
+ * Słownik flag dokumentów — nazwy, którymi biuro opisuje faktury.
+ *
+ * Czytamy CAŁĄ tabelę, bez zawężania do grupy z `MSSQL_FLAG_GRUPA`: `flg_Id`
+ * jest kluczem głównym, więc kolizji między grupami nie ma, a zawężenie po
+ * źle ustalonej grupie dałoby pusty słownik zamiast błędu.
+ *
+ * Brak uprawnienia degraduje do pustego słownika, tak samo jak przy magazynach.
+ * Nazwy flag są ozdobą stanu, a nie stanem — nie mogą wywrócić importu stanów
+ * i lokalizacji.
+ */
+async function pobierzFlagi(pool: sql.ConnectionPool): Promise<FlagaRow[]> {
+  try {
+    const r = await pool.request().query<FlagaRow>("SELECT flg_Id, flg_Text FROM fl__Flagi");
+    brakSlownikaFlag = null;
+    return r.recordset;
+  } catch (e) {
+    brakSlownikaFlag =
+      "Brak GRANT SELECT na fl__Flagi — flaga postawiona przez biuro poza czterema " +
+      "znanymi aplikacji pokazuje się na kolektorze bez nazwy. Uruchom ponownie " +
+      "skrypt uprawnień (DEPLOY §6) albo instalator z -TylkoKonfiguracja.";
+    console.warn(`[mssql] ${brakSlownikaFlag} (${e instanceof Error ? e.message : e})`);
+    return [];
+  }
 }
 
 async function pobierzMagazyny(pool: sql.ConnectionPool): Promise<MagRow[]> {
@@ -420,6 +461,10 @@ export async function importFromMssql(): Promise<ImportStats> {
       )
   ).recordset;
 
+  // Słownik flag ma sens tylko wtedy, gdy w ogóle czytamy flagi: bez pary
+  // (grupa, typ obiektu) każdy dokument ma flagę NULL i nie ma czego nazywać.
+  const flagi = flagJoin ? await pobierzFlagi(pool) : [];
+
   const pozycje = dokumenty.length ? await pobierzPozycje(pool, dokumenty.map((d) => d.dok_Id)) : [];
 
   const { zamowienia, zamPozycje } = await pobierzZamowienia(pool);
@@ -442,6 +487,7 @@ export async function importFromMssql(): Promise<ImportStats> {
   const insPoz = d.prepare(
     "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc, ob_id) VALUES (?,?,?,?)"
   );
+  const insFlaga = d.prepare("INSERT INTO sgt_flaga(flg_id, nazwa) VALUES (?,?)");
   const insZam = d.prepare(
     `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
      VALUES (?,?,?,?,?,?)`
@@ -454,9 +500,17 @@ export async function importFromMssql(): Promise<ImportStats> {
     /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy. */
     for (const t of [
       "sgt_zam_pozycja", "sgt_zamowienie",
-      "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
+      "sgt_pozycja", "sgt_dokument", "sgt_flaga", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
       d.prepare(`DELETE FROM ${t}`).run();
+    }
+    /* Słownik flag przed dokumentami — nie z powodu klucza obcego (nie ma go),
+       tylko dlatego, że dokument bez nazwy swojej flagi jest widoczny na
+       ekranie, a nazwa bez dokumentu nie jest widoczna nigdzie. */
+    for (const f of flagi) {
+      const nazwa = (f.flg_Text ?? "").trim();
+      if (!nazwa) continue; // flaga bez nazwy nie ma czego wnieść na pastylkę
+      insFlaga.run(f.flg_Id, nazwa);
     }
     const insMag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
     for (const m of magazyny) {
