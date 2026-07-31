@@ -370,8 +370,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
   );
   const insZam = d.prepare(
-    `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
-     VALUES (?,?,?,?,?,?)`
+    `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca)
+     VALUES (?,?,?,?,?)`
   );
   const insZamPoz = d.prepare(
     "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
@@ -427,8 +427,7 @@ export async function importFromMssql(): Promise<ImportStats> {
         z.dok_NrPelny,
         z.data_wyst,
         z.termin || null,
-        z.dostawca ?? "",
-        z.dok_Status ?? 0
+        z.dostawca ?? ""
       );
     }
     for (const p of zamPozycje) {

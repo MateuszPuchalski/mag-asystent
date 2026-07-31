@@ -222,8 +222,8 @@ function seed() {
   // termin już przeterminowany — dostawca się spóźnia i to widać.
   if (zamowione.length) {
     const insZam = d.prepare(
-      `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
-       VALUES (?,?,?,?,?,?)`
+      `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca)
+       VALUES (?,?,?,?,?)`
     );
     const insZamPoz = d.prepare(
       "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
@@ -253,8 +253,7 @@ function seed() {
             `ZD ${40 + dokId}/${mmrrrr(dataZam)}`,
             dataZam.toISOString().slice(0, 10),
             termin,
-            dostawca,
-            5
+            dostawca
           );
           for (const it of items.slice(i, i + MAX_POZ)) {
             // co trzecia pozycja częściowo dostarczona — karta ma pokazać

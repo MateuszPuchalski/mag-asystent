@@ -183,8 +183,7 @@ CREATE TABLE IF NOT EXISTS sgt_zamowienie (
   nr_pelny  TEXT NOT NULL,
   data_wyst TEXT NOT NULL,                        -- ISO date
   termin    TEXT,                                 -- NULL gdy kolumna terminu nieskonfigurowana
-  dostawca  TEXT,
-  status    INTEGER NOT NULL DEFAULT 0            -- surowy dok_Status, do diagnostyki
+  dostawca  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sgt_zam_pozycja (
@@ -275,10 +274,8 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   ean           TEXT NOT NULL,
   tw_ids        TEXT NOT NULL,      -- JSON array (SQLite nie ma INTEGER[])
-  wybrany_tw_id INTEGER,
   auto          INTEGER NOT NULL DEFAULT 0,
-  seen_at       TEXT NOT NULL,
-  context       TEXT                -- 'przyjecie' | 'zmiana_lokalizacji' | 'podglad'
+  seen_at       TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 

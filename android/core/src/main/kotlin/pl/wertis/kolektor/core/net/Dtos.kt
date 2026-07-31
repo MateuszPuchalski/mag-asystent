@@ -242,8 +242,6 @@ data class LocationsInfo(
     val codes: List<String> = emptyList(),
     /** Wzorce kodu lokalizacji. Puste = starszy serwer, patrz `locPatterns()`. */
     val patterns: List<String> = emptyList(),
-    /** Wersja reguły — zmiana oznacza, że cache kolektora jest nieaktualny. */
-    val version: String = "",
     /** Zgodność wsteczna: starszy serwer wysyła jeden wzorzec zamiast listy. */
     val format: String = "",
     val strict: Boolean = false,
@@ -599,9 +597,6 @@ data class PutawayLineResponse(
    inaczej nie da się go zmierzyć ani zgłosić reklamacji dostawcy.            */
 
 @Serializable
-data class ProblemTypesResponse(val types: List<String> = emptyList())
-
-@Serializable
 data class ProblemView(
     val id: Long,
     val deliveryId: Long? = null,
@@ -612,8 +607,6 @@ data class ProblemView(
     val hasPhoto: Boolean = false,
     val createdAt: String = "",
     val createdBy: String? = null,
-    val resolvedAt: String? = null,
-    val resolvedNote: String? = null,
     /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
     val docNumber: String? = null,
     val sym: String? = null,
@@ -668,7 +661,6 @@ data class UserDto(
     val name: String = "",
     val role: String = "magazynier",
     val active: Boolean = true,
-    val maPin: Boolean = false,
 )
 
 @Serializable
@@ -710,9 +702,6 @@ data class CreateUserBody(
 
 @Serializable
 data class CreateUserResponse(val user: UserDto = UserDto())
-
-@Serializable
-data class UsersResponse(val users: List<UserDto> = emptyList())
 
 /* ── Meldunek o operacjach odrzuconych na kolektorze ────────────────────────
    Bufor offline to plik na urządzeniu, a urządzenie zginie albo zostanie

@@ -3,9 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { userOf } from "../context.js";
 import { eanConflictReport } from "../services/ean.js";
 import {
-  PROBLEM_TYPES,
   exportCsv,
-  listByDelivery,
   listUnresolved,
   photoPath,
   photoRefOf,
@@ -16,9 +14,6 @@ import {
 /* ── Faza 2: wyjątki widoczne i mierzalne (D8) ──────────────────────────── */
 
 export async function problemRoutes(app: FastifyInstance) {
-  /** Słownik typów — klient nie zgaduje, co wolno zgłosić. */
-  app.get("/api/problems/types", async () => ({ types: PROBLEM_TYPES }));
-
   /**
    * Nierozwiązane wyjątki — pytane przy starcie aplikacji. Bez tego ekranu
    * wyjątki znikają z pola widzenia i nikt się nimi nie zajmuje.
@@ -63,10 +58,6 @@ export async function problemRoutes(app: FastifyInstance) {
     if ("error" in r) return reply.code(400).send({ error: r.error });
     return r;
   });
-
-  app.get<{ Params: { id: string } }>("/api/delivery/:id/problems", async (req) => ({
-    problems: listByDelivery(Number(req.params.id)),
-  }));
 
   /** CSV do reklamacji — podstawa rozmowy z dostawcą. */
   app.get<{ Params: { id: string } }>("/api/delivery/:id/problems.csv", async (req, reply) => {

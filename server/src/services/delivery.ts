@@ -226,14 +226,14 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
         ean: code,
         candidates: candidates.map((c) => c.tw_id),
       });
-      recordEanConflict(code, candidates.map((c) => c.tw_id), inDoc[0].tw_id, true);
+      recordEanConflict(code, candidates.map((c) => c.tw_id), true);
       return toResolution(inDoc[0], lineByTw.get(inDoc[0].tw_id));
     }
     logEvent("ean_conflict", user, null, {
       ean: code,
       candidates: candidates.map((c) => c.tw_id),
     });
-    recordEanConflict(code, candidates.map((c) => c.tw_id), null, false);
+    recordEanConflict(code, candidates.map((c) => c.tw_id), false);
     return {
       kind: "conflict",
       code,

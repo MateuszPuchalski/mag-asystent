@@ -52,7 +52,3 @@ fun trybWiersza(status: String, aktywna: Boolean): TrybWiersza = when {
     status == StatusLinii.DONE || status == StatusLinii.SKIPPED -> TrybWiersza.ZWINIETY
     else -> TrybWiersza.ZWYKLY
 }
-
-/** Czy pozycja jest domknięta — do licznika „zostało" i do wyglądu ikony. */
-fun zamknieta(status: String): Boolean =
-    status == StatusLinii.DONE || status == StatusLinii.SKIPPED || status == StatusLinii.PROBLEM

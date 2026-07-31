@@ -13,16 +13,11 @@ const nowIso = () => new Date().toISOString();
 export function recordEanConflict(
   ean: string,
   twIds: number[],
-  chosen: number | null,
-  auto: boolean,
-  context = "przyjecie"
+  auto: boolean
 ): void {
   db()
-    .prepare(
-      `INSERT INTO ean_conflict(ean, tw_ids, wybrany_tw_id, auto, seen_at, context)
-       VALUES (?,?,?,?,?,?)`
-    )
-    .run(ean, JSON.stringify(twIds), chosen, auto ? 1 : 0, nowIso(), context);
+    .prepare("INSERT INTO ean_conflict(ean, tw_ids, auto, seen_at) VALUES (?,?,?,?)")
+    .run(ean, JSON.stringify(twIds), auto ? 1 : 0, nowIso());
 }
 
 /** Zagregowany raport — ile razy który kod zatrzymał pracę. */

@@ -68,7 +68,6 @@ class DtosTest {
                 "version":"a1b2c3d4","format":"^[A-Z]\\d{2}-\\d{2}-\\d{2}$","strict":true,"allowManual":false}"""
         )
         assertEquals(2, info.locPatterns().size)
-        assertEquals("a1b2c3d4", info.version)
         assertTrue(info.strict)
 
         // starszy serwer nie zna `patterns` — kolektor spada na `format`, nie na zgadywanie
@@ -198,14 +197,12 @@ class DtosTest {
             """{"problems":[
                 {"id":3,"deliveryId":1,"lineId":7,"typ":"damaged","qty":null,"opis":"zgnieciony karton",
                  "hasPhoto":true,"createdAt":"2026-07-25T10:00:00Z","createdBy":"anna",
-                 "resolvedAt":null,"resolvedNote":null,
                  "docNumber":"FZ 120/07/2026","sym":"W04-0103","name":"Wąż"}]}"""
         )
         val p = r.problems.single()
         assertEquals("damaged", p.typ)
         assertEquals(true, p.hasPhoto)
         assertEquals("FZ 120/07/2026", p.docNumber)
-        assertNull(p.resolvedAt)
     }
 
     @Test fun `putaway - locAction jest opcjonalne i serializuje sie kluczem protokolu`() {
