@@ -122,6 +122,19 @@ if ($Odinstaluj) {
     }
     Write-Host ""
 
+    # Powłoka stojąca w kasowanym katalogu blokuje go tak samo jak działający
+    # proces, a Windows mówi wtedy tylko „jakiś proces używa". Ostrzeżenie idzie
+    # PRZED pytaniem o zgodę: po zgodzie człowiek potwierdziłby deinstalację,
+    # która i tak nie doszłaby do końca. Nie przerywamy — powłoka bywa
+    # w podkatalogu, który zniknie bez oporu.
+    if (Test-SciezkaWewnatrz -Sciezka (Get-Location).Path -Katalog $Katalog) {
+        Write-Uwaga "Stoisz w kasowanym katalogu ($((Get-Location).Path))."
+        Write-Info "Windows nie pozwoli usunąć katalogu, w którym stoi powłoka."
+        Write-Info "Wyjdź poza niego i uruchom instalator z kopii spoza $Katalog"
+        Write-Info "  cd C:\"
+        Write-Host ""
+    }
+
     # W przebiegu próbnym nie pytamy o zgodę — nic się nie dzieje, a Read-Tak
     # zwróciłby wtedy domyślne „nie" i -DryRun nie pokazałby ani jednego kroku.
     $zgoda = if ($DryRun) { $true } else { Read-Tak "Na pewno odinstalować WERTIS?" -Domyslnie $false }

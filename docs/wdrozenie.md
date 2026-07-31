@@ -224,6 +224,45 @@ Przebieg próbny wypisze plan, nie ruszając niczego:
 .\wertis-instalator.ps1 -Odinstaluj -DryRun
 ```
 
+### Instalatora nie uruchamia się z wnętrza kasowanego katalogu
+
+Windows nie pozwoli usunąć katalogu, w którym **stoi powłoka** — a wcześniejsze
+etapy każą wpisywać `cd C:\wertis` i `cd C:\wertis\tools`. Komunikat brzmi wtedy
+tylko „jakiś proces używa tego folderu" i nie mówi, że tym procesem jesteś ty.
+
+Wynieś instalator poza katalog i uruchom go stamtąd:
+
+```powershell
+cd C:\
+Copy-Item C:\wertis\instalator C:\wertis-instalator -Recurse
+cd C:\wertis-instalator
+.\wertis-instalator.ps1 -Odinstaluj -Katalog C:\wertis
+```
+
+Deinstalacja ostrzeże, jeśli mimo to wykryje powłokę w środku — zanim zapyta
+o zgodę, nie po.
+
+### Gdy katalog zostaje mimo wszystko
+
+Procesy uruchomione z kasowanego katalogu instalator zatrzymuje sam: osierocony
+`node.exe` potrafi przeżyć `nssm remove` i trzymać uchwyty na plikach. Zasięg
+jest wąski celowo — tylko procesy, których plik wykonywalny leży **wewnątrz**
+`C:\wertis`. `node.exe` obsługujący cudzą aplikację zostaje nietknięty.
+
+Gdy katalog nadal nie znika, instalator wypisze nazwy i numery PID tego, co go
+trzyma. Ubij je i powtórz:
+
+```powershell
+Get-Process | Where-Object { $_.Path -like 'C:\wertis\*' } |
+    Select-Object Id, ProcessName, Path
+Stop-Process -Id <numer> -Force
+```
+
+Pusta lista przy zablokowanym katalogu znaczy, że uchwyt trzyma coś bez własnego
+pliku w środku: otwarte okno Eksploratora, edytor albo druga powłoka. Znajdziesz
+to w Monitorze zasobów — `resmon`, zakładka **CPU**, sekcja **Skojarzone
+dojścia**, szukaj `wertis`.
+
 ### Czego deinstalacja NIE cofa
 
 To jest ważniejsze niż sama lista usuwanych rzeczy.

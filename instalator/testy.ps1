@@ -480,6 +480,92 @@ Sprawdz "każda odmowa niesie powód" {
     }
 }
 
+# ── Co blokuje kasowany katalog ─────────────────────────────────────────────
+# Deinstalacja u klienta stanęła na „jakiś proces używa": osierocony node.exe
+# przeżył `nssm remove`, a powłoka stała w C:\wertis, bo tak kazały wcześniejsze
+# kroki. Ubijanie procesów opiera się na porównaniu ścieżek — i to porównanie
+# jest tu najgroźniejszym miejscem w całej zmianie.
+
+Write-Host ""
+Write-Host "Test-SciezkaWewnatrz"
+
+Sprawdz "sąsiedni katalog o wspólnym przedrostku NIE jest wewnątrz" {
+    # Najdroższy możliwy błąd tej funkcji: bez separatora na końcu prefiksu
+    # deinstalacja WERTIS ubija node.exe z cudzej instalacji obok.
+    Zaloz (-not (Test-SciezkaWewnatrz -Sciezka "C:\wertis2\node.exe" -Katalog "C:\wertis"))
+}
+
+Sprawdz "plik w podkatalogu jest wewnątrz" {
+    Zaloz (Test-SciezkaWewnatrz -Sciezka "C:\wertis\server\node.exe" -Katalog "C:\wertis")
+}
+
+Sprawdz "sam katalog liczy się jako wewnątrz" {
+    # To jest przypadek powłoki: `cd C:\wertis` blokuje kasowanie tak samo
+    # jak proces z pliku w środku.
+    Zaloz (Test-SciezkaWewnatrz -Sciezka "C:\wertis" -Katalog "C:\wertis")
+}
+
+Sprawdz "ukośnik na końcu niczego nie zmienia" {
+    Zaloz (Test-SciezkaWewnatrz -Sciezka "C:\wertis\tools" -Katalog "C:\wertis\")
+    Zaloz (Test-SciezkaWewnatrz -Sciezka "C:\wertis\" -Katalog "C:\wertis")
+}
+
+Sprawdz "wielkość liter nie ma znaczenia" {
+    # Windows nie rozróżnia, a Get-Process potrafi zwrócić ścieżkę w innej
+    # wielkości niż ta wpisana w -Katalog.
+    Zaloz (Test-SciezkaWewnatrz -Sciezka "c:\WERTIS\server\node.exe" -Katalog "C:\wertis")
+}
+
+Sprawdz "pusta ścieżka daje fałsz, a nie wyjątek" {
+    # Get-Process zwraca procesy bez czytelnej ścieżki. Wyjątek tutaj
+    # przerwałby deinstalację na krok przed końcem.
+    foreach ($s in @($null, "", "   ")) {
+        Zaloz (-not (Test-SciezkaWewnatrz -Sciezka $s -Katalog "C:\wertis")) "'$s' uznane za wewnątrz"
+        Zaloz (-not (Test-SciezkaWewnatrz -Sciezka "C:\wertis\a.exe" -Katalog $s)) "pusty katalog przyjął ścieżkę"
+    }
+}
+
+Write-Host ""
+Write-Host "Get-WertisProcesyDoUbicia"
+
+# Namiastka tego, co zwraca Get-Process: liczy się Id, ProcessName i Path.
+function Proc { param($Id, $Nazwa, $Sciezka)
+    [pscustomobject]@{ Id = $Id; ProcessName = $Nazwa; Path = $Sciezka }
+}
+
+Sprawdz "bierze procesy z katalogu, zostawia te z zewnątrz" {
+    $do = Get-WertisProcesyDoUbicia -Katalog "C:\wertis" -WlasnyPid 1 -Procesy @(
+        (Proc 10 "node" "C:\wertis\server\node.exe"),
+        (Proc 11 "node" "C:\Program Files\nodejs\node.exe"),
+        (Proc 12 "node" "C:\wertis2\node.exe")
+    )
+    Zaloz (@($do).Count -eq 1) "wybrano $(@($do).Count) procesów zamiast jednego"
+    Zaloz ($do[0].Id -eq 10) "wybrano zły proces: PID $($do[0].Id)"
+}
+
+Sprawdz "własny PID nigdy nie trafia na listę" {
+    # Instalator uruchomiony z kopii wewnątrz katalogu ubiłby sam siebie
+    # w połowie deinstalacji, zostawiając usługi zdjęte, a katalog na miejscu.
+    $do = Get-WertisProcesyDoUbicia -Katalog "C:\wertis" -WlasnyPid 99 -Procesy @(
+        (Proc 99 "powershell" "C:\wertis\instalator\powershell.exe")
+    )
+    Zaloz (@($do).Count -eq 0) "instalator wybrał do ubicia samego siebie"
+}
+
+Sprawdz "proces bez czytelnej ścieżki jest pomijany, nie wywraca wyboru" {
+    $do = Get-WertisProcesyDoUbicia -Katalog "C:\wertis" -WlasnyPid 1 -Procesy @(
+        (Proc 20 "System" $null),
+        (Proc 21 "csrss" ""),
+        (Proc 22 "node" "C:\wertis\server\node.exe")
+    )
+    Zaloz (@($do).Count -eq 1) "pusta ścieżka zmyliła wybór"
+    Zaloz ($do[0].Id -eq 22)
+}
+
+Sprawdz "pusta lista procesów to pusty wynik" {
+    Zaloz (@(Get-WertisProcesyDoUbicia -Katalog "C:\wertis" -Procesy @()).Count -eq 0)
+}
+
 # ── Środowisko usług, które potrafi przykryć wertis.env ─────────────────────
 # Wdrożenie przeszło cały kreator i wylądowało na danych demo: instalator
 # zapisał SGT_MODE=mssql, plik został wczytany, a proces startował w trybie

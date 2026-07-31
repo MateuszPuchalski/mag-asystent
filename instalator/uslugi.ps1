@@ -555,6 +555,99 @@ function Get-WertisPlanDeinstalacji {
     return $plan
 }
 
+function Test-SciezkaWewnatrz {
+    <#
+        .SYNOPSIS
+        Czy $Sciezka leży wewnątrz $Katalog (albo NIM jest)?
+        .DESCRIPTION
+        Czysta funkcja, bez dotykania dysku — dzięki temu daje się sprawdzić
+        asercją w CI, tak samo jak Get-WertisPlanDeinstalacji. Świadomie NIE
+        woła Resolve-Path ani GetFullPath: te normalizują względem bieżącego
+        systemu, a testy chodzą na Linuksie na ścieżkach „C:\...".
+
+        Porównanie prefiksem MUSI kończyć się separatorem. Bez tego
+        "C:\wertis2\node.exe" wypada jako „wewnątrz C:\wertis" i deinstalacja
+        ubija cudzy proces. To ta sama klasa błędu co Split-Path na korzeniu
+        dysku wyżej: prawie-trafne porównanie ścieżek jest gorsze od żadnego.
+    #>
+    param(
+        [string]$Sciezka,
+        [string]$Katalog
+    )
+    if (-not $Sciezka -or -not $Sciezka.Trim()) { return $false }
+    if (-not $Katalog -or -not $Katalog.Trim()) { return $false }
+
+    $s = $Sciezka.Trim().Replace('/', '\')
+    $k = $Katalog.Trim().Replace('/', '\').TrimEnd('\')
+    if (-not $k) { return $false }
+
+    if ($s.TrimEnd('\') -eq $k) { return $true }
+    return $s.StartsWith("$k\", [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-WertisProcesyDoUbicia {
+    <#
+        .SYNOPSIS
+        Wybiera z podanej listy procesy, których plik wykonywalny leży
+        wewnątrz $Katalog.
+        .DESCRIPTION
+        Dostaje GOTOWĄ listę, zamiast wołać Get-Process samodzielnie — to
+        cała różnica między funkcją sprawdzalną w CI a taką, której nie da
+        się sprawdzić nigdzie poza maszyną klienta.
+
+        Własny PID wypada z listy: instalator nie ma popełnić samobójstwa
+        w połowie deinstalacji. Procesy bez czytelnej ścieżki (systemowe,
+        bez prawa odczytu) pomijamy cicho — .Path potrafi na nich rzucić.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Katalog,
+        [object[]]$Procesy = @(),
+        [int]$WlasnyPid = $PID
+    )
+    $wynik = @()
+    foreach ($p in @($Procesy)) {
+        if ($null -eq $p) { continue }
+        if ($p.Id -eq $WlasnyPid) { continue }
+
+        $sciezka = $null
+        try { $sciezka = $p.Path } catch { $sciezka = $null }
+        if (-not $sciezka) { continue }
+
+        if (Test-SciezkaWewnatrz -Sciezka $sciezka -Katalog $Katalog) { $wynik += $p }
+    }
+    return @($wynik)
+}
+
+function Stop-WertisProcesyWKatalogu {
+    <#
+        .SYNOPSIS
+        Ubija procesy uruchomione z kasowanego katalogu.
+        .DESCRIPTION
+        `nssm remove` wyrejestrowuje usługę, ale gdy proces wisiał (a wisiał —
+        stąd SERVICE_PAUSED w zgłoszeniu), node.exe zostaje z otwartymi
+        uchwytami na plikach i katalog nie daje się skasować.
+
+        Zasięg jest wąski CELOWO: tylko procesy, których plik wykonywalny
+        leży wewnątrz kasowanego katalogu. node.exe z C:\Program Files,
+        obsługujący cudzą aplikację, jest poza zasięgiem z definicji.
+    #>
+    param([Parameter(Mandatory)][string]$Katalog)
+
+    $doUbicia = @(Get-WertisProcesyDoUbicia -Katalog $Katalog `
+        -Procesy @(Get-Process -ErrorAction SilentlyContinue) -WlasnyPid $PID)
+
+    if ($doUbicia.Count -eq 0) {
+        Write-Info "Żaden działający proces nie siedzi w $Katalog."
+        return @()
+    }
+    foreach ($p in $doUbicia) {
+        if (Test-DryRun "Zatrzymał(a)bym proces $($p.ProcessName) (PID $($p.Id)) z $($p.Path).") { continue }
+        Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+        Write-Ok "Zatrzymany proces $($p.ProcessName) (PID $($p.Id))."
+    }
+    return $doUbicia
+}
+
 function Remove-WertisUslugi {
     <#
         .SYNOPSIS
@@ -637,6 +730,11 @@ function Remove-WertisKatalog {
         return $plan
     }
 
+    # PRZED przenoszeniem danych, nie tylko przed kasowaniem: zablokowany plik
+    # wywraca także Move-Item, a wtedy ślad audytowy zostaje w katalogu, który
+    # za chwilę ma zniknąć.
+    Stop-WertisProcesyWKatalogu -Katalog $Katalog | Out-Null
+
     if ($plan.DaneDo) {
         if (-not (Test-DryRun "Przeniósłbym dane do $($plan.DaneDo), potem skasował resztę $Katalog.")) {
             $dane = Join-Path $Katalog "server\data"
@@ -655,7 +753,23 @@ function Remove-WertisKatalog {
     Remove-Item $Katalog -Recurse -Force -ErrorAction SilentlyContinue
     if (Test-Path $Katalog) {
         Write-Uwaga "Katalog $Katalog nie zniknął w całości - pliki w użyciu."
-        Write-Info "Sprawdź, czy nie zostało otwarte okno w tym katalogu, i powtórz."
+
+        # „Pliki w użyciu" bez nazwy winowajcy kończy się kasowaniem katalogu
+        # ręką, czyli ominięciem bramki bezpieczeństwa. Mówimy CO trzyma.
+        $trzymaja = @(Get-WertisProcesyDoUbicia -Katalog $Katalog `
+            -Procesy @(Get-Process -ErrorAction SilentlyContinue) -WlasnyPid $PID)
+        if ($trzymaja.Count -gt 0) {
+            Write-Info "Trzymają go:"
+            foreach ($p in $trzymaja) {
+                Write-Info "  $($p.ProcessName) (PID $($p.Id)) - $($p.Path)"
+            }
+            Write-Info "Ubij je i powtórz deinstalację."
+        } else {
+            Write-Info "Żaden widoczny proces nie ma tu pliku wykonywalnego, więc uchwyt"
+            Write-Info "trzyma co innego: otwarte okno Eksploratora, edytor albo powłoka"
+            Write-Info "stojąca w tym katalogu (sprawdź, czy nie ta, w której to piszesz)."
+            Write-Info "Znajdziesz to w resmon: CPU > Skojarzone dojścia > szukaj 'wertis'."
+        }
     } else {
         Write-Ok "Katalog $Katalog usunięty."
     }
