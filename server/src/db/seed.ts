@@ -117,7 +117,16 @@ function seed() {
     `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
      VALUES (?,?,?,?,?,?,?)`
   );
-  const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
+  /* `ob_id` rośnie GLOBALNIE, przez wszystkie dokumenty — tak samo jak klucz
+     pozycji w Subiekcie, który jest identyfikatorem wiersza w całej tabeli,
+     a nie numerem porządkowym w obrębie faktury. Seed, który numerowałby od
+     nowa w każdym dokumencie, uczyłby kodu fałszywej własności. */
+  let obId = 0;
+  const insPozRaw = d.prepare(
+    "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc, ob_id) VALUES (?,?,?,?)"
+  );
+  const insPoz = (dokId: number, twId: number, ilosc: number) =>
+    insPozRaw.run(dokId, twId, ilosc, ++obId);
 
   // grupowanie towarów z MGP po prawdziwym dostawcy; duże grupy (np. własne
   // przyjęcia WERTIS) dzielimy na kilka mniejszych, dających się rozłożyć
@@ -170,11 +179,23 @@ function seed() {
         wBuforze
       );
 
-      for (const p of paczka.items) insPoz.run(dok_id, p.tw_id, p.mgp);
+      for (const p of paczka.items) insPoz(dok_id, p.tw_id, p.mgp);
 
       // dorzuć 2 nowe SKU bez lokalizacji (ścieżka BRAK LOK, §5.4 pkt 4)
       for (const twId of noLocProducts.slice(k * 2, k * 2 + 2)) {
-        insPoz.run(dok_id, twId, 12);
+        insPoz(dok_id, twId, 12);
+      }
+
+      /* TEN SAM TOWAR W DRUGIM WIERSZU — pierwszy dokument dostaje duplikat.
+         W Subiekcie zdarza się to normalnie: dwie ceny, dwie partie, dwa
+         wiersze. Dla magazyniera to nadal jedna paleta, więc `openDelivery`
+         skleja je w jedną linię roboczą — ale opis różnic biuro trzyma PRZY
+         POZYCJI, więc linia musi pamiętać OBA identyfikatory.
+
+         Bez tego przypadku w demo ścieżka, dla której powstała kolumna
+         `sgt_pozycje`, nie miałaby ani jednego przebiegu. */
+      if (k === 0 && paczka.items.length) {
+        insPoz(dok_id, paczka.items[0].tw_id, 3);
       }
     });
   });
@@ -204,7 +225,7 @@ function seed() {
         "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,0) ON CONFLICT(tw_id, mag_id) DO UPDATE SET stan = stan + excluded.stan"
       );
       for (const it of zwrotItems) {
-        insPoz.run(zwDokId, it.tw_id, it.qty);
+        insPoz(zwDokId, it.tw_id, it.qty);
         insZwStan.run(it.tw_id, config.magId.ZWROTY, it.qty);
       }
     });

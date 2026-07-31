@@ -37,6 +37,14 @@ export interface RawDocument {
 export interface RawPosition {
   tw_id: number;
   ilosc: number;
+  /**
+   * Identyfikator WIERSZA faktury w Subiekcie (klucz `dok_Pozycja`).
+   *
+   * `null`, gdy baza nie ma tej kolumny albo świadomie z niej zrezygnowano.
+   * Ten sam towar potrafi stać na fakturze dwa razy, więc bez tego pola nie da
+   * się wskazać, o którą pozycję chodzi.
+   */
+  ob_id?: number | null;
 }
 
 /** Pozycja JEDNEGO towaru wraz z dokumentem, na którym stoi. */

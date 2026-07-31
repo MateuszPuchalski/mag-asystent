@@ -123,6 +123,14 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery_line", "koszyk", "TEXT");
   addColumn("delivery_line", "mm_ilosc", "REAL NOT NULL DEFAULT 0");
   addColumn("delivery_line", "mm_queue_id", "INTEGER");
+  /* Identyfikator wiersza faktury w Subiekcie i jego ślad na linii roboczej.
+     `openDelivery` AGREGUJE pozycje po towarze (jedna paleta = jeden wiersz na
+     ekranie), więc linia potrafi pokrywać kilka pozycji dokumentu — stąd na
+     niej LISTA identyfikatorów, a nie pojedyncza wartość. Obie kolumny są
+     nullowalne: stare dostawy i stare pozycje zostają bez nich, bo tej wiedzy
+     nie da się odtworzyć wstecz, a zgadywanie byłoby gorsze od pustki. */
+  addColumn("sgt_pozycja", "ob_id", "INTEGER");
+  addColumn("delivery_line", "sgt_pozycje", "TEXT");
   // telemetria: który egzemplarz kolektora wygenerował zdarzenie
   addColumn("events", "device_id", "TEXT");
   /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot
