@@ -28,6 +28,65 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.12.3 — 31 lipca 2026
+
+Zakładka rozkładania nazywa się teraz **DOSTAWY**, pokazuje **same faktury
+zakupu** i przestaje kłamać o oknie czasowym.
+
+### „ROZKŁADANIE" → „DOSTAWY"
+
+Magazyn mówi „dostawy", nie „rozkładanie". Zmiana obejmuje etykietę zakładki
+w dolnym pasku i tytuł ekranu; ścieżka pracy się nie zmienia.
+
+### Tylko FZ, i to naprawdę tylko FZ
+
+Domyślne `DOK_TYPY_DOSTAW` zmieniło się z `1,10` na `1`. U tego klienta towar
+wchodzi wyłącznie fakturą zakupu, a PZ pochodzi z innego procesu i na liście
+pracy magazyniera było szumem. Firmy przyjmujące obiema drogami wracają do
+`DOK_TYPY_DOSTAW=1,10` — to nadal jedno ustawienie, nie zmiana kodu.
+
+Samo przestawienie domyślnego by nie wystarczyło: adapter **seeded** miał parę
+`('FZ','PZ')` ZASZYTĄ w dwóch zapytaniach i ustawienia nie czytał. Demo
+pokazywało więc co innego niż produkcja z tej samej konfiguracji. Tłumaczenie
+kodów `dok_Typ` na etykiety read-modelu jest teraz w jednym miejscu
+(`etykietyDostaw`), z asercjami — w tym na kod spoza pary FZ/PZ, który wcześniej
+wpadłby do SQL jako `null` i milczkiem opróżnił listę.
+
+Zwroty znikają z tej zakładki. Serwerowa ścieżka koszyków i MM **zostaje
+nietknięta** — to ukrycie wejścia, nie wycofanie funkcji.
+
+### `DOK_DNI_WSTECZ` działało tylko w połowie
+
+Trasa `/api/delivery/documents` miała `listDocuments(14)` zaszyte na sztywno,
+więc ustawienie rządziło importem, ale nie zakresem samej listy:
+`DOK_DNI_WSTECZ=30` nie pokazywało ani jednego dokumentu więcej. Teraz lista
+bierze okno z konfiguracji.
+
+Ta sama czternastka stała też w nagłówku kolektora („DOSTAWY FZ/PZ · OSTATNIE
+14 DNI") — trzecie miejsce, w którym mogła się rozjechać, i jedyne, które
+człowiek widzi. Serwer podaje teraz `dniWstecz` w odpowiedzi, a nagłówek go
+pokazuje zamiast zgadywać.
+
+### Gdzie biuro trzyma opis różnic — zwiad, nie implementacja
+
+Rozbieżności z faktury magazyn wpisuje ręcznie w kolumnie **„Opis dostawy"**,
+która — wbrew pierwszemu założeniu — stoi w siatce **pozycji** dokumentu, nie
+w nagłówku. Opis dotyczy więc konkretnego towaru, co dobrze pasuje do wyjątków
+WERTIS (`problem.line_id`).
+
+`docs/subiekt-gt-struktura.md` dostał rozdział z procedurą ustalenia, gdzie to
+pole mieszka (dwa niezależne tropy: po etykiecie i po zasianym znaczniku) oraz
+**piąty znacznik `[WERYFIKUJ]`**. Rozdział mówi wprost, czego repo nie wie:
+kolumn tekstowych `dok_Pozycja` nikt nie badał, a z `tw_Pole1..8` nie wynika
+istnienie analogicznych pól na pozycji.
+
+Odnotowana przy okazji luka: WERTIS **nie importuje identyfikatora pozycji**.
+Dopasowanie po parze (dokument, towar) nie jest bezpieczne, bo ten sam towar
+potrafi stać na fakturze w dwóch wierszach. Zapis do tego pola wymaga więc
+zmiany schematu — policzonej osobno, po zwiadzie.
+
+---
+
 ## 0.12.2 — 31 lipca 2026
 
 Deinstalacja u klienta stanęła na ostatnim kroku: „jakiś proces używa tego

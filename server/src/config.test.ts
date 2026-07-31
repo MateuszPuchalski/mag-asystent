@@ -119,3 +119,23 @@ test("wszystkie problemy naraz, nie po jednym na restart", () => {
 test("domyslna konfiguracja jest poprawna", () => {
   assert.deepEqual(bledyKonfiguracji(), []);
 });
+
+/* Zakładka Dostawy pokazuje SAME faktury zakupu
+   ─────────────────────────────────────────────────────────────────────────
+   U tego klienta towar wchodzi wyłącznie na FZ, a PZ powstaje z innego procesu
+   i na liście pracy magazyniera byłoby szumem. Domyślne było wcześniej `1,10`.
+
+   Test pilnuje domyślnego, bo skutek pomyłki jest cichy: PZ na liście wygląda
+   jak zwykła dostawa, więc nikt nie zgłosi, że coś jest nie tak — po prostu
+   ktoś rozłoży dokument, którego rozkładać nie miał.                         */
+
+test("domyślne typy dostaw: sama FZ, bez PZ", () => {
+  assert.deepEqual(config.mssql.dokTypyDostaw, [config.mssql.dokTypFZ]);
+  assert.ok(!config.mssql.dokTypyDostaw.includes(config.mssql.dokTypPZ));
+});
+
+test("okno listy dostaw: 14 dni domyślnie", () => {
+  // Ta sama liczba stała wcześniej ZASZYTA w trasie `/api/delivery/documents`
+  // i w nagłówku kolektora, więc `DOK_DNI_WSTECZ` rządziło tylko importem.
+  assert.equal(config.mssql.dokDniWstecz, 14);
+});

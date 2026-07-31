@@ -39,7 +39,7 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.PRODUCT to "KARTA TOWARU",
     Screen.SCAN_LOC to "ZMIANA LOKALIZACJI",
     Screen.QUEUE to "KOLEJKA SFERY",
-    Screen.DELIVERY_DOCS to "ROZKŁADANIE",
+    Screen.DELIVERY_DOCS to "DOSTAWY",
     Screen.DELIVERY_LINES to "DOSTAWA",
     Screen.PUTAWAY_DOCS to "KONTENERY",
     Screen.PUTAWAY_SESSION to "SESJA ROZKŁADANIA",

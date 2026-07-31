@@ -110,7 +110,7 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
         docs!!.forEach { d -> DocRow(d) { open(d.docId) } }
 
         Text(
-            "Dostawy krajowe i zwroty rozkłada się w zakładce ROZKŁADANIE — dokument, nie sesja.",
+            "Dostawy krajowe i zwroty rozkłada się w zakładce DOSTAWY — dokument, nie sesja.",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,

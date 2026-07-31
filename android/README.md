@@ -183,7 +183,7 @@ przed którą ta pozycja broni.
 - [ ] „BEZ LOKALIZACJI (n)" zostaje osobną sekcją na końcu,
 - [ ] WSTECZ jest w prawym DOLNYM rogu, nie w lewym górnym,
 - [ ] da się wrócić jedną ręką, nie przekładając kolektora,
-- [ ] wejdź w podekran i wróć: SKAN i ROZKŁADANIE zostają na swoich miejscach
+- [ ] wejdź w podekran i wróć: SKAN i DOSTAWY zostają na swoich miejscach
       (slot WSTECZ jest zarezerwowany zawsze).
 
 **Tożsamość**

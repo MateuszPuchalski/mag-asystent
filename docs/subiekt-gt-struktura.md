@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały cztery.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały pięć.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -203,15 +203,148 @@ SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGr
 → `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`,
 `DOC_FLAG_DONE_ERRORS_SGT`.
 
+## „Opis dostawy" — kolumna przy POZYCJI faktury zakupu
+
+Magazyn zapisuje dziś różnice w towarze **ręcznie**, w kolumnie nazwanej
+w Subiekcie firmy **„Opis dostawy"**. Na zrzucie z Subiekta klienta stoi ona
+w siatce **pozycji** dokumentu, między „Nazwa" a „Ilość". Opis dotyczy więc
+**konkretnego towaru na fakturze**, a nie faktury jako całości.
+
+To dobra wiadomość dla mapowania: wyjątki WERTIS są już per pozycja
+(`problem.line_id` → `delivery_line`), więc jedna rozbieżność ma dokładnie jedną
+komórkę docelową. WERTIS te różnice zna — typ, ilość policzoną, opis, zdjęcie —
+ale do Subiekta nie wysyła z nich ani jednego znaku. Biuro dostaje wyłącznie
+czterowartościową flagę opisaną wyżej.
+
+**Nazwa jest nadana przez firmę, nie przez InsERT.** Pole własne Subiekta
+domyślnie nazywa się „Pole własne N". Etykieta opisująca proces tej konkretnej
+firmy stawia je więc w tej samej kategorii co `MSSQL_LOC_COLUMN`: **ustawienie
+podmiotu, nie struktura bazy.** Kolejny klient nazwie to inaczej albo nie będzie
+miał tego pola wcale.
+
+### Czego ten dokument NIE wie
+
+Tabela na początku wymienia kolumny **używane przez WERTIS** — jej
+niekompletność jest zamierzona. Z `dok_Pozycja` importer bierze dziś trzy:
+`ob_DokHanId`, `ob_TowId`, `ob_IloscMag`. O kolumnach tekstowych tej tabeli ten
+dokument nie mówi nic; nikt ich nie badał.
+
+W szczególności **z `tw_Pole1..8` nie wynika istnienie analogicznych pól na
+pozycji.** Pola własne kartoteki towaru są zmierzone i pewne; przeniesienie tego
+wzorca gdziekolwiek indziej byłoby dokładnie tym zgadywaniem, przed którym broni
+się preambuła.
+
+> **Trop, który skraca zwiad.** Przy rozstrzyganiu ilości zrealizowanej
+> przejrzano **komplet 57 kolumn `dok_Pozycja`** na bazie 1.8731.31.6933 (patrz
+> rozdział o zamówieniach). Ta sama lista odpowiada na pytanie poniżej — jeśli
+> zachowała się z tamtego sprawdzenia, wystarczy do niej zajrzeć.
+
+### Czego brakuje po stronie WERTIS
+
+Zapis per pozycja wymaga wskazania **konkretnego wiersza** `dok_Pozycja`, a tego
+identyfikatora aplikacja dziś nie ma. Importer czyta `ob_DokHanId, ob_TowId,
+ob_IloscMag` (`adapters/subiekt.mssql.ts`), a read-model `sgt_pozycja`
+i `delivery_line` trzymają tylko `tw_id`.
+
+Dopasowanie po parze (dokument, towar) **nie jest bezpieczne**. Ten sam towar
+potrafi wystąpić na fakturze w dwóch wierszach — choćby w dwóch cenach albo
+z dwóch partii. Wtedy nie wiadomo, do której komórki pisać.
+
+Właściwą drogą jest zaimportowanie identyfikatora pozycji i przeniesienie go do
+`delivery_line`. To zmiana schematu, nie jednolinijkowa poprawka. Trzeba ją
+policzyć osobno.
+
+`[WERYFIKUJ]` **gdzie „Opis dostawy" mieszka w bazie.** Odpowiedź musi objąć
+cztery rzeczy — tabelę, kolumnę, typ z długością oraz sposób powiązania
+z pozycją dokumentu — bo bez czwartej `UPDATE` nadal nie da się napisać. Dwa
+niezależne tropy, które powinny wskazać to samo pole:
+
+**Trop 1 — po etykiecie.** Subiekt musi tę nazwę skądś brać, żeby narysować
+formularz. Zamiatarka po wszystkich kolumnach tekstowych w bazie:
+
+```sql
+DECLARE @szukane nvarchar(100) = N'Opis dostawy';
+DECLARE @sql nvarchar(max) = N'';
+
+SELECT @sql = @sql + CASE WHEN @sql = N'' THEN N'' ELSE N' UNION ALL ' END +
+  N'SELECT ' + QUOTENAME(t.name, '''') + N' AS tabela, '
+             + QUOTENAME(c.name, '''') + N' AS kolumna, COUNT(*) AS trafien FROM '
+             + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name)
+             + N' WHERE CAST(' + QUOTENAME(c.name) + N' AS nvarchar(max)) = @p'
+FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+JOIN sys.columns c ON c.object_id = t.object_id
+JOIN sys.types  ty ON ty.user_type_id = c.user_type_id
+WHERE ty.name IN ('varchar','nvarchar','char','nchar','text','ntext');
+
+SET @sql = N'SELECT * FROM (' + @sql + N') x WHERE trafien > 0 ORDER BY tabela;';
+EXEC sp_executesql @sql, N'@p nvarchar(100)', @p = @szukane;
+```
+
+Trafienie wskazuje tabelę **definicji** pól własnych. Pusty wynik znaczy, że
+etykieta siedzi poza bazą podmiotu — wtedy rozstrzyga wyłącznie trop 2.
+
+**Trop 2 — po treści.** W Subiekcie wpisz ciąg `ZNACZNIK-WERTIS-001` w „Opis
+dostawy" **przy jednej pozycji** dowolnej faktury zakupu. Zapisz dokument
+i zanotuj numer faktury oraz symbol towaru z tego wiersza. Potem ta sama zamiatarka
+z `@szukane = N'ZNACZNIK-WERTIS-001'` i porównaniem `LIKE N'%' + @p + N'%'`
+zamiast `= @p`. Wynik wskazuje tabelę i kolumnę **przechowującą treść** — czyli
+cel przyszłego zapisu.
+
+Zasiew jest po to, żeby szukać czegoś unikalnego: szukanie po prawdziwej treści
+(„brak 2 szt.") daje trafienia przypadkowe i nie rozstrzyga niczego. Po zwiadzie
+skasuj znacznik — w Subiekcie, nie `UPDATE`-em w SQL.
+
+Najprostszy wariant, gdy podejrzenie pada wprost na `dok_Pozycja`:
+
+```sql
+DECLARE @nr varchar(50) = 'FZ 123/2026';   -- faktura z zasiewem
+SELECT p.* FROM dok_Pozycja p
+JOIN dok__Dokument d ON d.dok_Id = p.ob_DokHanId
+WHERE d.dok_NrPelny = @nr;
+```
+
+Wiersz z znacznikiem pokaże wprost nazwę kolumny **oraz** identyfikator pozycji,
+którym trzeba będzie ją zaadresować. Gdy treść siedzi w tabeli osobnej:
+
+```sql
+SELECT * FROM <tabela z tropu 2>
+WHERE CAST(<kolumna z tropu 2> AS nvarchar(max)) LIKE N'%ZNACZNIK-WERTIS-001%';
+```
+
+Sprawdź, czy wiersz **istnieje zawsze, czy powstaje dopiero przy pierwszym
+wpisie**: to rozstrzyga między `UPDATE` a MERGE i między `GRANT UPDATE`
+a `GRANT INSERT, UPDATE`.
+
+### Zanim cokolwiek tam napisze
+
+Trzy rzeczy do rozstrzygnięcia świadomie, nie przy implementacji:
+
+1. **Gdyby to okazała się kolumna na `dok_Pozycja`.** Zapis tam wymaga
+   `GRANT UPDATE` na tabelę pozycji, czyli na rdzeń ewidencji. Stoją tam ilości
+   i ceny. Grant kolumnowy zawęża to do jednej kolumny, tak jak przy `tw_PoleN`.
+   Sama decyzja jest jednak architektoniczna: dotąd aplikacja nie miała prawa
+   zapisu do żadnej tabeli dokumentów. Patrz punkt 2 rozdziału o fladze.
+2. **Faktura zatwierdzona.** Subiekt blokuje edycję takich dokumentów
+   w interfejsie; `UPDATE` prosto w SQL tę blokadę obejdzie. Pytanie praktyczne,
+   które to rozstrzyga: czy magazynier wpisuje różnice zanim biuro zatwierdzi
+   fakturę, czy po. Dla dokumentu w buforze (`dok_Status = 3`) kolejka ma już
+   osobny stan `waiting_for_doc`.
+3. **Identyfikator pozycji** — patrz „Czego brakuje po stronie WERTIS" wyżej.
+   Bez niego nie ma czego zaadresować przy towarze powtórzonym na dwóch
+   wierszach.
+
 ## Typy dostaw — czym towar naprawdę wchodzi na magazyn
 
-Lista rozkładania pokazuje dokumenty, których typ stoi w `DOK_TYPY_DOSTAW`.
-Domyślne `1,10` to FZ i PZ, bo towar wchodzi obiema drogami: fakturą zakupu
-księgowaną wprost na magazyn albo przyjęciem zewnętrznym, gdy dokument handlowy
-przychodzi później.
+Zakładka DOSTAWY pokazuje dokumenty, których typ stoi w `DOK_TYPY_DOSTAW`.
+Domyślne `1` to sama FZ. Tak jest w firmie, dla której to powstało: towar wchodzi
+wyłącznie fakturą zakupu. PZ pochodzi tam z zupełnie innego procesu i na liście
+pracy magazyniera byłoby czystym szumem.
 
-**Ale nie w każdej firmie.** Tam, gdzie dostawy idą wyłącznie na FZ, a PZ
-powstaje z innego procesu, tamte dokumenty są na liście pracy czystym szumem.
+**Ale nie w każdej firmie.** Towar bywa przyjmowany obiema drogami: fakturą
+zakupu księgowaną wprost na magazyn albo przyjęciem zewnętrznym, gdy dokument
+handlowy przychodzi później. Dla magazyniera to ta sama praca — paleta do
+rozłożenia. Wtedy wraca się do `DOK_TYPY_DOSTAW=1,10`.
 
 Nie zgaduj — sprawdź, co faktycznie ląduje na magazynie głównym:
 
@@ -225,7 +358,7 @@ GROUP BY dok_Typ ORDER BY ile DESC;
 
 Kody odczytasz z listy `dok_Typ` na początku tego dokumentu. Typ, którego tam
 nie ma albo który liczy pojedyncze sztuki, prawdopodobnie pochodzi z innego
-procesu — wtedy zawężasz listę, na przykład do `DOK_TYPY_DOSTAW=1`.
+procesu — wtedy zostawiasz listę zawężoną.
 
 Pusta lista znaczy **żaden typ**, a nie „każdy". Literówka w ustawieniu daje
 więc pustą listę pracy, zauważalną od razu.

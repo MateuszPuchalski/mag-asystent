@@ -21,7 +21,7 @@ class NavModelTest {
     @Test fun `ekrany bazowe bez powrotu`() {
         assertNull(backTarget(Screen.SPLASH, null))
         assertNull(backTarget(Screen.HOME, null))
-        // korzeń zakładki „ROZKŁADANIE" w trybie A
+        // korzeń zakładki „DOSTAWY" w trybie A
         assertNull(backTarget(Screen.DELIVERY_DOCS, null))
     }
 
