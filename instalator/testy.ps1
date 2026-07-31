@@ -172,6 +172,34 @@ Sprawdz "odrzuca wstrzyknięcie przez nazwę kolumny" {
     Zaloz (-not $poszlo) "nazwa kolumny z wstrzyknięciem przeszła do DDL"
 }
 
+Sprawdz "ISTNIEJĄCY login dostaje NOWE hasło, a nie zostaje ze starym" {
+    <#
+        Awaria u klienta: pierwsze podejście kreatora wywaliło się na literówce
+        w nazwie instancji, ale login `wertis` zdążył powstać — jest obiektem
+        INSTANCJI, więc przeżył. Drugi przebieg trafił w `IF NOT EXISTS`,
+        pominął CREATE LOGIN i ZOSTAWIŁ STARE HASŁO, podczas gdy instalator
+        zapisał do wertis.env świeżo wylosowane.
+
+        Kreator zameldował „Konto gotowe". Objawem był dopiero
+        `Login failed for user 'wertis'` w logu usługi, przy starcie.
+    #>
+    Zaloz ($skrypt -match "ALTER LOGIN \[wertis\] WITH PASSWORD") "brak ALTER LOGIN dla istniejącego konta"
+    Zaloz ($skrypt -match "ELSE") "gałąź dla istniejącego loginu musi istnieć"
+}
+
+Sprawdz "wyłączony login jest z powrotem włączany" {
+    # Ten sam objaw i ta sama cisza co przy rozjechanym haśle.
+    Zaloz ($skrypt -match "ALTER LOGIN \[wertis\] ENABLE") "brak ALTER LOGIN ... ENABLE"
+}
+
+Sprawdz "hasło idzie do OBU gałęzi, nie tylko do CREATE" {
+    # Regresja najłatwiejsza do wprowadzenia: poprawka dopisana obok CREATE,
+    # ale bez podstawienia hasła — i konto znów zostaje ze starym.
+    $s = Get-WertisSkryptUprawnien -Baza "X" -KolumnaLokalizacji "tw_Pole1" -Haslo "Zzz-999abc"
+    $ile = ([regex]::Matches($s, [regex]::Escape("'Zzz-999abc'"))).Count
+    Zaloz ($ile -eq 2) "hasło ma stać w CREATE LOGIN i w ALTER LOGIN, stoi $ile raz(y)"
+}
+
 Sprawdz "podwaja apostrof w haśle, żeby nie rozerwać literału" {
     $s = Get-WertisSkryptUprawnien -Baza "X" -KolumnaLokalizacji "tw_Pole1" -Haslo "a'b"
     Zaloz ($s -match "PASSWORD = 'a''b'") "apostrof w haśle nie został podwojony"

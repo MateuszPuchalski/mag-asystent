@@ -28,6 +28,65 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.12.1 — 30 lipca 2026
+
+`Login failed for user 'wertis'` — po instalacji, która zameldowała sukces.
+
+### Idempotencja, która rozjeżdżała hasło
+
+Skrypt uprawnień zakładał konto tak:
+
+```sql
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'wertis')
+    CREATE LOGIN [wertis] WITH PASSWORD = '<nowe losowe>', CHECK_POLICY = ON;
+```
+
+Wygląda na bezpieczne przy ponownym uruchomieniu i takie było — **co do
+istnienia konta, ale nie co do poświadczeń**.
+
+Login jest obiektem **instancji**, więc przeżywa nieudany przebieg kreatora
+i skasowanie bazy. Pierwsze podejście u klienta wywaliło się na literówce
+w nazwie instancji, ale login zdążył powstać. Drugi przebieg trafił w
+`IF NOT EXISTS`, pominął `CREATE LOGIN` i **zostawił stare hasło** — podczas
+gdy instalator zapisał do `wertis.env` świeżo wylosowane.
+
+Teraz istniejący login dostaje `ALTER LOGIN ... WITH PASSWORD` i `ENABLE`.
+Wyłączone konto daje dokładnie ten sam objaw i tę samą ciszę.
+
+### Weryfikacja sprawdzała uprawnienia, nie logowanie
+
+To jest właściwa przyczyna tego, że awaria wyszła dopiero przy starcie usługi.
+`Get-WertisUprawnienia` odpytuje `sys.database_permissions` **połączeniem
+administratora**, więc odpowiada na pytanie „czy konto ma prawa" — nigdy „czy
+da się na nie zalogować". Kreator meldował więc:
+
+```
+[ok] Konto gotowe: 8 tabel do odczytu, zapis tylko tw_Pole2 i fl_Wartosc.
+```
+
+o koncie, którego hasła nikt nie potwierdził.
+
+Instalator otwiera teraz **osobne połączenie na tych poświadczeniach, które za
+chwilę trafią do pliku**, i wykonuje `SELECT 1`. Nieudana próba jest błędem
+kreatora z gotowym `ALTER LOGIN` do wklejenia — zamiast `Login failed for user`
+w logu usługi, kwadrans później.
+
+Gdy próba się nie uda, instalator idzie ścieżką „konto czeka na administratora"
+i zapisuje skrypt do przekazania. Skrypt zawiera już `ALTER LOGIN`, więc jego
+wykonanie naprawia dokładnie ten przypadek.
+
+### Naprawa istniejącej instalacji
+
+Ponowne uruchomienie kreatora (`-TylkoKonfiguracja`) wystarcza — przestawi
+hasło i sprawdzi logowanie. Ręcznie, w SSMS:
+
+```sql
+ALTER LOGIN [wertis] WITH PASSWORD = 'hasło z wertis.env';
+```
+
+Po tym `nssm stop` i `nssm start` obu usług. Samo `start` nie wyjdzie ze stanu
+`SERVICE_PAUSED`, w który NSSM wpada po kilku szybkich awariach startu.
+
 ## 0.12.0 — 30 lipca 2026
 
 Kreator przeszedł do końca na prawdziwej bazie i wylądował na danych demo.

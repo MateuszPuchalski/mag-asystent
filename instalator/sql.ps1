@@ -562,6 +562,17 @@ USE [$bazaEsc];
 
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$Login')
     CREATE LOGIN [$Login] WITH PASSWORD = '$hasloEsc', CHECK_POLICY = ON;
+ELSE
+BEGIN
+    -- Login przeżył wcześniejsze podejście: jest obiektem INSTANCJI, więc nie
+    -- znika ani z bazą, ani z nieudanym przebiegiem kreatora. Samo IF NOT
+    -- EXISTS zostawiało wtedy STARE hasło, a instalator zapisywał do
+    -- wertis.env świeżo wylosowane — usługa dostawała „Login failed for user"
+    -- przy starcie, długo po tym, jak kreator zameldował sukces.
+    ALTER LOGIN [$Login] WITH PASSWORD = '$hasloEsc';
+    -- Wyłączony login daje DOKŁADNIE ten sam objaw i tę samą ciszę.
+    ALTER LOGIN [$Login] ENABLE;
+END
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = '$Login')
     CREATE USER [$Login] FOR LOGIN [$Login];
 
@@ -582,6 +593,46 @@ GRANT UPDATE ON dbo.tw__Towar ($KolumnaLokalizacji) TO [$Login];
 --    pozostaje nietykalny, bo flaga nie jest jego kolumną
 GRANT INSERT, UPDATE ON dbo.fl_Wartosc TO [$Login];
 "@
+}
+
+function Test-WertisLogowanie {
+    <#
+        .SYNOPSIS
+        Loguje się JAKO `wertis` — tymi poświadczeniami, które idą do wertis.env.
+        .DESCRIPTION
+        POWSTAŁO PO INSTALACJI, KTÓRA ZAMELDOWAŁA „Konto gotowe", A USŁUGA NIE
+        WSTAŁA. Get-WertisUprawnienia sprawdza granty POŁĄCZENIEM ADMINISTRATORA,
+        więc odpowiada na pytanie „czy konto ma prawa", a nie „czy da się na nie
+        zalogować". Hasło było wtedy rozjechane i nikt się o tym nie dowiedział
+        aż do `Login failed for user 'wertis'` w logu usługi.
+
+        Ta funkcja zamyka tę lukę jedynym sposobem, jaki cokolwiek dowodzi:
+        otwiera OSOBNE połączenie na tych samych poświadczeniach, które za
+        chwilę trafią do pliku, i wykonuje najtańsze możliwe zapytanie.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Serwer,
+        [string]$Instancja,
+        [int]$Port,
+        [Parameter(Mandatory)][string]$Baza,
+        [Parameter(Mandatory)][string]$Login,
+        [Parameter(Mandatory)][string]$Haslo
+    )
+    if (Test-DryRun "Sprawdziłbym logowanie jako $Login.") {
+        return [pscustomobject]@{ Udalo = $true; Powod = $null }
+    }
+    $cs = Get-WertisConnectionString -Serwer $Serwer -Instancja $Instancja -Port $Port `
+        -Baza $Baza -Uzytkownik $Login -Haslo $Haslo
+    $conn = $null
+    try {
+        $conn = Open-WertisPolaczenie -ConnectionString $cs
+        [void](Invoke-WertisZapytanie -Polaczenie $conn -Sql "SELECT 1 AS ok;")
+        return [pscustomobject]@{ Udalo = $true; Powod = $null }
+    } catch {
+        return [pscustomobject]@{ Udalo = $false; Powod = $_.Exception.Message }
+    } finally {
+        if ($conn) { try { $conn.Close() } catch { } }
+    }
 }
 
 function Grant-WertisLogin {

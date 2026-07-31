@@ -478,8 +478,22 @@ if ($podlaczacDoSubiekta) {
                 $upr = @(Get-WertisUprawnienia -Polaczenie $polaczenie -Login $login)
                 $ocena = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN
                 if ($ocena.Ok) {
-                    Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ustawienia.MSSQL_LOC_COLUMN) i fl_Wartosc."
-                    $zalozone = $true
+                    # Granty sprawdziliśmy połączeniem ADMINISTRATORA — to mówi,
+                    # co konto może, a nie czy da się na nie zalogować. Hasło
+                    # potrafi się rozjechać (login przeżywa nieudany przebieg),
+                    # a objawem jest dopiero „Login failed" w logu usługi.
+                    $proba = Test-WertisLogowanie -Serwer $serwer -Instancja $instancja `
+                        -Baza $baza -Login $login -Haslo $haslo
+                    if ($proba.Udalo) {
+                        Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ustawienia.MSSQL_LOC_COLUMN) i fl_Wartosc."
+                        Write-Ok "Logowanie jako $login sprawdzone - usługi połączą się z bazą."
+                        $zalozone = $true
+                    } else {
+                        Write-Blad "Konto ma uprawnienia, ale NIE DA SIĘ na nie zalogować."
+                        Write-Info $proba.Powod
+                        Write-Info "Usługi zgłosiłyby to jako 'Login failed for user' dopiero przy starcie."
+                        Write-Info "Napraw w SSMS: ALTER LOGIN [$login] WITH PASSWORD = '<hasło z wertis.env>';"
+                    }
                 } else {
                     Write-Blad "Konto powstało, ale uprawnienia nie zgadzają się z oczekiwanymi."
                     Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma być 7), lokalizacja: $($ocena.LokalizacjaOk), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma być 0)"
