@@ -12,8 +12,8 @@ Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
 Maszyna z Subiektem GT (Windows)
   ├─ wertis-api     Fastify: REST (bez statyk — aplikacji webowej nie ma)
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
-  ├─ wertis.db      SQLite: dostawy i zwroty z postępem per pozycja, koszyki
-  │                 zwrotów, wyjątki, sesje trybu B, kolejka, audyt events
+  ├─ wertis.db      SQLite: faktury zakupu z postępem per pozycja, wyjątki,
+  │                 sesje trybu B, kolejka, audyt events
   ├─ data/photos/   zdjęcia dowodowe do reklamacji (poza gitem, w backupie)
   ├─ MSSQL Subiekta (odczyt: login read-only)
   └─ Sfera (COM)    (zapis: wyłącznie przez workera)
@@ -412,8 +412,8 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
    Domyślne w `config.ts` są z niego wzięte i nie trzeba ich ustalać:
-   `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), `DOK_TYP_ZWROTY=14`
-   (ZW), bufor = `dok_Status = 3` (odłożony).
+   `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), bufor =
+   `dok_Status = 3` (odłożony).
 
    Do ustalenia na własnej bazie zostają **trzy** rzeczy. Ta sekcja mówi,
    **co i po co**. Zapytania, odczyt wyniku i skutki pomyłki opisuje rozdział
@@ -426,7 +426,8 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
    - **`mag_Id` magazynów MAG, MGP i Zwroty** (→ `MAG_ID_MAG` / `MAG_ID_MGP` /
      `MAG_ID_ZWROTY`). O trybie dokumentu rozstrzyga magazyn skutku, więc
-     pomyłka wysyła dostawę do złej zakładki.
+     pomyłka wysyła dostawę do złej zakładki. Zwroty rozlicza biuro
+     w Subiekcie; aplikacja pokazuje tylko ich stan na karcie towaru.
 
    - **pole lokalizacji na `tw__Towar`** (→ `MSSQL_LOC_COLUMN`).
 
@@ -474,7 +475,7 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` bezpośrednim UPDATE jednej kolumny objętej
 `GRANT UPDATE`. Zadania MM — z rundy wózka (kontener) i z zamkniętego
-koszyka zwrotu — zgłaszają czytelny błąd; do czasu workera Sfery MM wystawia
+— zgłaszają czytelny błąd; do czasu workera Sfery MM wystawia
 biuro w Subiekcie. Osobnego przełącznika trybu zapisu nie ma.
 
 Konsekwencja dla zwrotów na tym etapie: adres na półce zapisuje aplikacja, ale
@@ -490,8 +491,8 @@ szansę sprzedaży, a nie błędny stan.
    Kontrakt wywołań jest w `server/src/adapters/sfera.ts`.
 2. Najpierw jedno MM testowe na kartotece próbnej, potem produkcyjnie.
 
-**Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ; MM per wózek
-(kontener) i MM per koszyk (zwroty) przez workera Sfery.
+**Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i MM per wózek
+(kontener) przez workera Sfery.
 
 ## 7. Backup i utrzymanie
 
@@ -501,9 +502,8 @@ szansę sprzedaży, a nie błędny stan.
   cp /c/wertis/server/data/wertis.db "/d/backup/wertis-$(date +%Y%m%d).db"
   ```
 
-  Plik trzyma postęp rozkładania dostaw i zwrotów, łącznie z tym, który koszyk
-  pojechał już MM-em. Trzyma też wyjątki, sesje trybu B, kolejkę i audyt
-  `events`. Źródłem prawdy o towarach i stanach pozostaje baza Subiekta, więc
+  Plik trzyma postęp rozkładania dostaw, wyjątki, sesje trybu B, kolejkę
+  i audyt `events`. Źródłem prawdy o towarach i stanach pozostaje baza Subiekta, więc
   to lekki backup.
 - **Zdjęcia dowodowe:** `C:\wertis\server\data\photos\`. To jedyne dane, których
   nie da się odtworzyć z Subiekta ani z seedu — dowód do reklamacji u dostawcy.
@@ -540,16 +540,15 @@ szansę sprzedaży, a nie błędny stan.
   cd /c/wertis && npm run reconcile
   ```
 
-  Sprawdza cztery rzeczy:
+  Sprawdza trzy rzeczy:
 
   1. adres w Subiekcie kontra ostatni udany zapis (24 h),
   2. zadania w `error` starsze niż doba,
   3. `waiting_for_doc` starsze niż trzy dni (dokument raczej nie wyjdzie już
-     z bufora),
-  4. koszyki zwrotów rozłożone bez MM.
+     z bufora).
 
-  Ostatnia pozycja mierzy niezmiennik „adres przed sprzedawalnością".
-  Niezmienniki trzeba mierzyć, nie deklarować.
+  Każda z nich mierzy zadeklarowany niezmiennik. Niezmienniki trzeba mierzyć,
+  nie deklarować.
 
   **Zerowy wynik nie tworzy pliku i kończy się kodem 0**, bo raport przychodzący
   codziennie przestaje być czytany po tygodniu. Rozjazdy → CSV z datą w nazwie,

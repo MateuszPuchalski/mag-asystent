@@ -144,7 +144,6 @@ wykonuje pracę wykonywaną w tej firmie.
 | Rozkładanie z obowiązkowym skanem półki jako dowodem odłożenia | brak danych | **jest** |
 | Postęp zapisywany per pozycja (przerwanie pracy nic nie kosztuje) | brak danych | **jest** |
 | Dostawa zamyka się sama, gdy nie ma czego rozkładać | brak danych | **jest** |
-| Zwroty w koszykach + jedno MM per opróżniony koszyk | brak danych | **w drodze** (samo MM) |
 | Kontener importowy: sesja z wózkiem, wiele pozycji na rundę | brak danych | **jest** |
 
 ### Wyszukiwanie i kartoteka
@@ -366,7 +365,7 @@ pokrywających wszystkie ścieżki:
 | 4 dostawy krajowe FZ/PZ | ścieżka codzienna: dwa skany na pozycję |
 | 1 dostawa **w buforze** Subiekta | dokument nieksięgowany też da się rozłożyć |
 | 1 kontener na strefie przyjęć | tryb wózka: wiele pozycji na rundę |
-| 1 zbiorczy dokument zwrotów | koszyki zwrotów |
+| 1 zbiorczy dokument zwrotów | rozlicza biuro w Subiekcie |
 | pozycje **BEZ LOKALIZACJI** w każdym dokumencie | osobna sekcja, wymaga decyzji człowieka |
 
 ### Przydatne przy pokazie
@@ -415,8 +414,8 @@ przejścia na prawdziwą bazę) opisuje `DEPLOY.md`.
 
 WERTIS to projekt młody. Uczciwy obraz:
 
-**Gotowe i działające na danych demo:** przyjęcie dostaw krajowych, zwroty
-w koszykach, kontener importowy, wyszukiwanie i karta towaru, podgląd regału,
+**Gotowe i działające na danych demo:** przyjęcie dostaw krajowych, kontener
+importowy, wyszukiwanie i karta towaru, podgląd regału,
 wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, logowanie
 plakietką i przejęcie pracy, praca offline, raport kolizji kodów, nocna
 rekoncyliacja, raport przeslotowania.

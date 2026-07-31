@@ -49,7 +49,7 @@ adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
 │  SQLite (better-sqlite3, WAL) — 16 tabel:                    │
-│    delivery + delivery_line   tryb A: dostawy, zwroty        │
+│    delivery + delivery_line   tryb A: faktury zakupu         │
 │    putaway_sessions + items   tryb B: kontener               │
 │    problem, ean_conflict      wyjątki                        │
 │    app_user, device_session   tożsamość (§7)                 │
@@ -159,7 +159,6 @@ Szczegóły w `docs/analiza-rozkladanie.md`; tu tylko podział i jego kryterium.
 | ścieżka | jednostka pracy | skutek magazynowy |
 |---|---|---|
 | **Dostawa krajowa** (tryb A) | dokument FZ/PZ | sam adres — dokument księguje się wprost na MAG |
-| **Zwrot** (tryb A) | koszyk w ramach dokumentu | adres + jeden MM Zwroty→MAG na koszyk |
 | **Kontener importowy** (tryb B) | sesja z wózkiem | adres + MM MGP→MAG |
 
 **Kryterium podziału to magazyn skutku, nie typ dokumentu.** To rozróżnienie
@@ -170,7 +169,7 @@ dokumentu w połowie pracy nie zmieniło reguł w jej trakcie.
 
 ### Niezmiennik: adres zawsze przed sprzedawalnością
 
-Przy zwrotach i kontenerach zadanie `set_location` trafia do kolejki **przed**
+Przy kontenerach zadanie `set_location` trafia do kolejki **przed**
 zadaniem `mm`. Kolejka jest FIFO, więc towar staje się sprzedawalny dopiero
 wtedy, gdy wiadomo, gdzie leży. Odwrotna kolejność dawałaby okno, w którym
 handlowiec widzi towar dostępny, a magazynier nie wie, gdzie po niego iść.

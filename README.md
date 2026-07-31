@@ -60,7 +60,7 @@ Strefa przyjęć nazywa się **MGP**.
 ```
 Kolektor (Android)  ───REST/JSON──►  Serwer Fastify
                                        │  SQLite: delivery + delivery_line (tryb A:
-                                       │          dostawy, zwroty, koszyki),
+                                       │          faktury zakupu),
                                        │          problem + ean_conflict (wyjątki),
                                        │          putaway_* (tryb B), sfera_queue, events
                                        │  SubiektAdapter (odczyt)  → enqueue
@@ -137,7 +137,7 @@ straciło przez to jedyne prawo zapisu poza kartoteką. Zapis idzie kolejką
 (kolejka → worker → adapter), więc kolektor nigdy nie czeka na COM.
 
 Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM przy dostawie
-krajowej, zero modyfikacji stanów. Dokumenty MM (kontener, zwroty) tworzy
+krajowej, zero modyfikacji stanów. Dokumenty MM (kontener) tworzy
 osobny worker Sfery na Windows — ten proces tylko je kolejkuje. Zweryfikowana
 struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
 [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
@@ -237,8 +237,7 @@ Parametry (env, dev):
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 | `LOC_FORMAT_STANDARD` / `LOC_FORMAT_PALLET` | wzorce adresu — **jedno źródło prawdy**, kolektor pobiera je z `/api/locations` |
 | `LOC_STRICT=0` | wyłącza twarde egzekwowanie wzorca poza rozkładaniem (domyślnie **włączone**) |
-| `MAG_ID_MAG` / `MAG_ID_MGP` / `MAG_ID_ZWROTY` | id magazynów w SGT — rozstrzygają, którym trybem idzie dokument |
-| `DOK_TYP_ZWROTY` | kody `dok_Typ` zwrotów na magazynie Zwroty (CSV); puste = każdy dokument na tym magazynie |
+| `MAG_ID_MAG` / `MAG_ID_MGP` / `MAG_ID_ZWROTY` | id magazynów w SGT — MAG i MGP rozstrzygają, którym trybem idzie dokument; Zwroty służą już tylko kafelkowi „gdzie jeszcze leży" |
 
 ## Funkcje (kolektor — aplikacja Android)
 
@@ -369,7 +368,7 @@ Parametry (env, dev):
 **DOSTAWY — Tryb A (redesign v2.0)** — druga zakładka
 - Jednostką pracy jest **dokument**, nie sesja. Zakładka pokazuje typy z
   `DOK_TYPY_DOSTAW` (domyślnie sama FZ) z okna `DOK_DNI_WSTECZ` (domyślnie
-  14 dni). Zwroty mają własną ścieżkę i nie są tu listowane. Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
+  14 dni). Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
   skutek magazynowy niesie sam dokument w Subiekcie, więc aplikacja zapisuje
   **wyłącznie lokalizację** — zero MM, zero `waiting_for_doc`.
 - Ścieżka codzienna to **dwa skany na pozycję**. Skan towaru rozwija wiersz
@@ -415,27 +414,6 @@ Parametry (env, dev):
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
   pod `GET /api/delivery/:id/problems.csv`.
 
-**Zwroty — koszyk jako jednostka pracy (w trybie A, osobna sekcja listy)**
-- Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn **Zwroty**
-  jednym **zbiorczym dokumentem** i układa go w **koszyki opisane numerem
-  zwrotu**. Podziału na koszyki nie ma w żadnym dokumencie — istnieje wyłącznie
-  fizycznie. W aplikacji koszyk to grupa linii domkniętych za jednym podejściem,
-  otagowana krótkim numerem wpisywanym ręcznie. Koszyki nie mają kodów
-  kreskowych.
-- Rozkładanie przebiega dokładnie jak przy dostawie: dwa skany, sekcje alejek,
-  INNA ILOŚĆ, wyjątki ze zdjęciem, kolizje EAN.
-- Różnica jest jedna: **po opróżnieniu koszyka domyka się go przyciskiem i
-  powstaje JEDEN dokument MM Zwroty→MAG** na wszystko, co z niego poszło na
-  półki. `set_location` powstaje przy każdym odłożeniu, MM dopiero na końcu, więc
-  niezmiennik **adres zawsze przed sprzedawalnością** trzyma się sam.
-- Rozliczenie idzie **ilościami** (`odłożone − objęte MM`), nie statusem linii.
-  Ten sam towar bywa w dwóch koszykach, bo dokument zbiorczy agreguje go w jedną
-  linię. Ponowne domknięcie koszyka nie dubluje przesunięcia. Sztuki odłożone
-  z pozycji zgłoszonej potem jako uszkodzona i tak jadą na MAG.
-- Otwarte koszyki (rozłożone, bez MM) widać na ekranie dostawy i **wstrzymują
-  jej domknięcie**. Dopóki MM nie powstanie, towar leży na półce, ale
-  w Subiekcie wisi na Zwrotach — czyli jest niesprzedawalny.
-
 **Kontener importowy — Tryb B (sesja z wózkiem, spec §5.4)**
 - Wchodzi tu **wyłącznie kontener na MGP** (~4× w roku): 1000 kartonów, wiele
   kursów wózkiem. Tylko ten proces potrzebuje modelu sesji zamiast dokumentu.
@@ -451,7 +429,6 @@ Parametry (env, dev):
 
 **Który tryb obsługuje dokument — rozstrzyga magazyn skutku, nie typ**
 `MAG` → tryb A (dostawa krajowa: towar już leży na hali, brakuje mu adresu).
-`Zwroty` → tryb A, sekcja zwrotów (adres jak wyżej + MM na zamknięty koszyk).
 `MGP` → tryb B (kontener: sesja z wózkiem, MM na rundę). Kryteria są **rozłączne**
 — ten sam dokument nie może pojawić się w obu zakładkach, inaczej dałoby się go
 rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
@@ -493,8 +470,8 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 - Aplikacja pisze do Subiekta przez kolejkę, ale nikt nie sprawdzał, **czy stan
   po stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała**.
   `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
-  z ostatnim udanym zapisem. Wyławia też zadania w `error` starsze niż doba,
-  `waiting_for_doc` starsze niż trzy dni i koszyki zwrotów rozłożone bez MM.
+  z ostatnim udanym zapisem. Wyławia też zadania w `error` starsze niż doba
+  i `waiting_for_doc` starsze niż trzy dni.
 - **Zerowy wynik nie tworzy raportu** — raport przychodzący codziennie przestaje
   być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
   + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
@@ -513,15 +490,15 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 116 testów jednostkowych; buduje się bez Android SDK
+                           + 108 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
   src/db/seed.ts           seed z products.json: dokumenty FZ/PZ per dostawca,
-                           kontener na MGP, zbiorczy dokument zwrotów
+                           kontener na MGP
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+sql (prod)
-  src/services/            delivery (tryb A: dostawy, zwroty, koszyki),
+  src/services/            delivery (tryb A: faktury zakupu),
                            problems + ean (wyjątki), putaway (tryb B — kontener),
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
                            a nie leży w regale), queue, locks, locations, events
@@ -565,15 +542,14 @@ konwerter nadal rozdziela stany deterministycznie hashem.
 realnym dostawcy**. Duże paczki dzieli po ≤20 pozycji i zostawia jeden dokument
 w buforze, jako test `waiting_for_doc`.
 
-Żeby obie ścieżki miały czym żyć, seed rozstawia dokumenty po **trzech
+Żeby obie ścieżki miały czym żyć, seed rozstawia dokumenty po **dwóch
 magazynach skutku**:
 
 - krajowe FZ/PZ na `MAG` (tryb A),
-- jeden dokument na `MGP` jako kontener importowy (tryb B),
-- jeden zbiorczy dokument zwrotów na magazynie `Zwroty`.
+- jeden dokument na `MGP` jako kontener importowy (tryb B).
 
-Ten ostatni dostaje też stany — bez nich MM z koszyka nie miałby czego
-przenosić. W produkcji stany i dokumenty pochodzą z `tw_Stan` i `dok__Dokument`
+Magazyn `Zwroty` dostaje same stany — kafel „gdzie jeszcze leży" ma wtedy co
+pokazać. W produkcji stany i dokumenty pochodzą z `tw_Stan` i `dok__Dokument`
 przez adapter MSSQL (patrz
 [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md)).
 
@@ -590,9 +566,8 @@ z bazy: przy starcie, co `MSSQL_SYNC_MS` i na `POST /api/admin/resync`. Worker
 zapisuje w JEDNYM miejscu — UPDATE **jednej kolumny** (lokalizacja na
 `tw__Towar`). Tryb zapisu wynika z `SGT_MODE`; osobnego przełącznika nie ma.
 
-Dokumenty MM powstają w dwóch miejscach: runda wózka w trybie B i **zamknięty
-koszyk zwrotu**. Tworzy je docelowo osobny worker Sfery (COM) czytający tę samą
-kolejkę `sfera_queue`. Do tego czasu zadanie MM kończy się czytelnym błędem,
+Dokumenty MM powstają w jednym miejscu: runda wózka w trybie B. Tworzy je
+docelowo osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`. Do tego czasu zadanie MM kończy się czytelnym błędem,
 a MM wystawia biuro. Instrukcja krok po kroku:
 [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 
