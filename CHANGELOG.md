@@ -49,9 +49,13 @@ adresie, ⏳ przy dochodzącym, czerwony puls przy nieudanym zapisie. Osobny
 widget znaczyłby, że stany trzeba napisać dwa razy — a wtedy rozjeżdżają się
 przy pierwszej zmianie.
 
-Towar bez adresu dostaje jasną, nieklikalną pastylkę „brak lokalizacji".
-Ciemna pastylka jest obietnicą adresu; czynność stoi niżej, w przycisku ZMIEŃ
-LOKALIZACJĘ.
+Towar bez adresu dostaje na tym samym miejscu bursztynową pastylkę
+**„+ DODAJ ADRES"**, która prowadzi wprost do skanu półki. Kartoteka bez adresu
+znaczy, że towar leży gdzieś na hali i nikt poza znalazcą nie wie gdzie — to
+zadanie do wykonania, nie fakt do przyjęcia. Napis „brak lokalizacji" mówił to
+samo, tyle że kazał szukać czynności gdzie indziej. Rząd chipów pod spodem
+wtedy znika: „+ DODAJ" przeniósł się do nagłówka, a licznik pokazywałby
+„0/50 zn.", czyli liczbę, która niczego nie ogranicza.
 
 ### Trzy sekcje zwijane zamiast czterech sekcji stale otwartych
 
