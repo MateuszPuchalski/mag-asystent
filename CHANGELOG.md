@@ -28,6 +28,58 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.12.2 — 31 lipca 2026
+
+Deinstalacja u klienta stanęła na ostatnim kroku: „jakiś proces używa tego
+folderu". Usługi zeszły, reguła zapory zniknęła, `C:\wertis` został.
+
+### Katalog trzymały dwie rzeczy naraz
+
+**Powłoka wewnątrz.** Wcześniejsze etapy każą wpisać `cd C:\wertis`, a Windows
+nie kasuje katalogu, w którym stoi proces. Instalator nie mówił o tym nic.
+Teraz sprawdza katalog roboczy i ostrzega **przed** pytaniem o zgodę — po
+zgodzie człowiek potwierdziłby deinstalację, która i tak nie dojdzie do końca.
+
+**Osierocony `node.exe`.** `nssm remove` wyrejestrowuje usługę, ale gdy proces
+wisiał (a wisiał — stąd `SERVICE_PAUSED`), zostaje z otwartymi uchwytami.
+Deinstalacja zatrzymuje teraz procesy uruchomione z kasowanego katalogu, zanim
+ruszy pliki: zablokowany plik wywraca także przenoszenie śladu audytowego, nie
+tylko kasowanie.
+
+Zasięg jest wąski celowo — liczy się plik wykonywalny **wewnątrz** kasowanego
+katalogu. `node.exe` z `C:\Program Files` obsługujący cudzą aplikację jest poza
+zasięgiem z definicji.
+
+### Porównanie ścieżek, które musiało być dokładne
+
+Prefiks bez separatora na końcu robi z `C:\wertis2\node.exe` mieszkańca
+`C:\wertis` — czyli deinstalacja WERTIS ubija cudzy proces. To ta sama klasa
+błędu co `Split-Path` na korzeniu dysku z 0.11.0. `Test-SciezkaWewnatrz` jest
+czystą funkcją i ma własne asercje; sabotaż tego jednego porównania wywraca
+dwa testy naraz.
+
+### „Pliki w użyciu" mówi teraz, jakie
+
+Komunikat bez nazwy winowajcy kończy się kasowaniem katalogu ręką, czyli
+ominięciem bramki bezpieczeństwa. Instalator wypisuje nazwy i PID-y tego, co
+trzyma katalog, a gdy lista jest pusta — kieruje do `resmon`, bo uchwyt trzyma
+wtedy okno Eksploratora albo edytor, nie proces z plikiem w środku.
+
+### Polecenia deinstalacji nie dało się wkleić
+
+`docs/wdrozenie.md` podawał `.\wertis-instalator.ps1 -Odinstaluj`, a Windows
+odpowiada na to `running scripts is disabled on this system` — i tak też
+skończyło się u klienta. Instrukcja przy instalacji kieruje do `URUCHOM.cmd`,
+ale deinstalacja potrzebuje argumentów, więc tamta osłona jej nie obejmuje.
+Wszystkie polecenia w tej sekcji mają teraz `-ExecutionPolicy Bypass` wprost.
+
+CI dostał przebieg próbny deinstalacji na **podrobionej instalacji**, gdzie
+bramka się zgadza. Poprzedni wariant szedł na nieistniejącym katalogu i mijał
+skanowanie procesów bokiem. Nowy woła `Get-Process` na prawdziwej tablicy
+procesów — część z nich nie oddaje `.Path` i to wywracało pierwszą wersję kodu.
+
+---
+
 ## 0.12.1 — 30 lipca 2026
 
 `Login failed for user 'wertis'` — po instalacji, która zameldowała sukces.

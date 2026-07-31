@@ -109,6 +109,23 @@ jobs:
       - name: Przebieg probny deinstalacji (-Odinstaluj -DryRun)
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Odinstaluj -Katalog "$env:RUNNER_TEMP\wertis-nieistnieje"
 
+      # Wariant, w którym plan ZGADZA SIĘ na kasowanie — a to jedyna droga do
+      # skanowania procesów trzymających katalog. Podrobiona instalacja musi
+      # nieść oba znamiona (server\ oraz wertis.env), inaczej bramka odmówi
+      # i krok znowu przejdzie obok badanego kodu.
+      #
+      # Wartość jest w Get-Process na PRAWDZIWEJ tablicy procesów: część z nich
+      # nie oddaje .Path (brak praw), a to wywracało pierwszą wersję tego kodu.
+      # Testy jednostkowe podają listę atrapą i tej klasy błędu nie zobaczą.
+      # Nic tu nie ginie — Stop-Process siedzi za `Test-DryRun`.
+      - name: Przebieg probny deinstalacji na podrobionej instalacji
+        run: |
+          $k = "$env:RUNNER_TEMP\wertis-do-kasowania"
+          New-Item -ItemType Directory -Force -Path "$k\server" | Out-Null
+          Set-Content -Path "$k\wertis.env" -Value "SGT_MODE=seeded"
+          .\dist\WERTIS-Instalator.ps1 -DryRun -Odinstaluj -Katalog $k
+          if (-not (Test-Path $k)) { throw "-DryRun skasowal katalog - to mial byc przebieg probny" }
+
       # Instalator pobiera nssm.exe i uruchamia go jako SYSTEM, więc suma
       # kontrolna jest jedyną rzeczą stojącą między klientem a podmienionym
       # plikiem. Wartości nie dało się ustalić przy pisaniu kodu (brak dostępu
