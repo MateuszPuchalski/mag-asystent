@@ -19,11 +19,9 @@ import {
   brakDostepuDoMagazynow,
   brakKolumnyIdPozycji,
   brakKolumnyZrealizowano,
-  brakSlownikaFlag,
   importFromMssql,
   lastImport,
 } from "./adapters/subiekt.mssql.js";
-import { docFlagAvailable } from "./services/delivery-flag.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 
@@ -63,8 +61,7 @@ export async function buildApp() {
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
       brakKolumnyIdPozycji,
-      brakSlownikaFlag,
-    ].filter((x): x is string => x !== null);
+        ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
       /* Wersja serwera — kolektor pokazuje ją obok własnej na dole ekranu.
@@ -84,10 +81,6 @@ export async function buildApp() {
         mode: worker.sgtMode,
         widziany: worker.widziany,
       },
-      // flagi faktur: „off" gdy nie ma dokąd ich wysłać (edu nie ma flag
-      // dokumentów, na produkcji para grupa/typ bywa jeszcze nieustalona).
-      // Bez tego pola cisza po stronie flag byłaby nie do odróżnienia od awarii.
-      docFlag: docFlagAvailable() ? "on" : "off (brak MSSQL_FLAG_GRUPA / MSSQL_FLAG_TYP_OBIEKTU)",
       /* Ślad audytowy NIE JEST czyszczony — to świadoma decyzja, bo reklamacja
          przychodzi po miesiącach. Ale „rośnie w nieskończoność" bez licznika
          kończy się pełnym dyskiem o trzeciej w nocy, więc rozmiar i wiek

@@ -17,13 +17,10 @@ Potwierdza ona wybór pola własnego na lokalizację — natywnego
 | Lista dokumentów FZ/PZ do rozłożenia | ✅ | jw. |
 | Zmiana lokalizacji (`set_location`) | ✅ | bezpośredni `UPDATE` na wybranym polu własnym `tw__Towar` (plan B ze spec §9 — patrz §1a niżej) |
 | Dokumenty MM (MGP→MAG, zatwierdź wózek) | ❌ | wymaga **Sfery** (COM) — brak w edu; zadanie w kolejce dostanie status `error` z komunikatem |
-| Flaga sprawdzenia faktury | ➖ | **edu nie ma flag dokumentów**, więc nie da się ustalić `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU`. Aplikacja wtedy **nie kolejkuje** zadań `set_doc_flag` — `/api/health` pokazuje `docFlag: "off …"`. Reszta (postęp dostawy, wyjątki, koszyki) działa normalnie |
 
-> Różnica między ❌ a ➖ jest celowa. MM **próbuje** się wykonać i kończy błędem,
-> bo to funkcja, którą firma ma na produkcji — chcemy widzieć, że jej brakuje.
-> Flagi po prostu **nie istnieją** w tej wersji. Generowanie zadań, które zawsze
-> padną, zapchałoby kolejkę i zapaliło czerwoną pastylkę na stałe. Realny błąd
-> zapisu lokalizacji utonąłby wtedy w szumie.
+> MM **próbuje** się wykonać i kończy błędem, bo to funkcja, którą firma ma na
+> produkcji — chcemy widzieć, że jej brakuje. Postęp rozkładania, wyjątki
+> i koszyki działają w edu normalnie, bo mieszkają w bazie aplikacji.
 
 Dwie twarde zasady środowiska:
 
@@ -99,8 +96,7 @@ połączenie appki z Subiektem, dopisz w samym Subiekcie kilka rzeczy:
 3. **Jeden dokument PZ/FZ** na magazyn MGP — *Dokumenty → Nowy → PZ*, z kilkoma
    pozycjami z kroku 2.
 
-   Da Ci to dane do checklisty §3 (a) i (c) oraz coś do rozłożenia w module
-   put-away.
+   Da Ci to dane do checklisty §3 oraz coś do rozłożenia w module put-away.
 
 Nie musisz wpisywać setek rekordów — kilkanaście kartotek i jeden dokument
 wystarczą, żeby end-to-end zweryfikować połączenie.
@@ -124,7 +120,7 @@ kolumny, reszta bazy pozostaje nietykalna.
 
 W SSMS, na bazie podmiotu (podmień `NAZWA_BAZY` i hasło). Skrypt jest
 idempotentny — bezpiecznie uruchomić go ponownie (np. po zmianie
-`MSSQL_LOC_COLUMN` albo ustaleniu kolumny flagi):
+`MSSQL_LOC_COLUMN`):
 
 ```sql
 USE [NAZWA_BAZY];
@@ -140,22 +136,14 @@ GRANT SELECT ON dbo.tw_Stan        TO wertis;
 GRANT SELECT ON dbo.dok__Dokument  TO wertis;
 GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
-GRANT SELECT ON dbo.fl_Wartosc     TO wertis;   -- przypisania flag do dokumentów
-GRANT SELECT ON dbo.fl__Flagi      TO wertis;   -- definicje flag (nazwa, ikona)
 GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
 
--- ZAPIS — dwie rzeczy i ani jednej więcej.
+-- ZAPIS — JEDNA rzecz i ani jednej więcej.
 --
--- 1) Lokalizacja: JEDNA kolumna na kartotece. Podmień tw_Pole1 na pole wybrane
---    w §1a (MSSQL_LOC_COLUMN musi się zgadzać!).
+-- Lokalizacja: JEDNA kolumna na kartotece. Podmień tw_Pole1 na pole wybrane
+-- w §1a (MSSQL_LOC_COLUMN musi się zgadzać!). Do dok__Dokument, tw_Stan
+-- i tabel dokumentów aplikacja nie ma żadnego prawa zapisu.
 GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis;
-
--- 2) Flaga sprawdzenia faktury: tabela przypisań flag. Flaga NIE jest kolumną
---    dokumentu (patrz docs/subiekt-gt-struktura.md), więc aplikacja nie
---    potrzebuje ŻADNEGO prawa zapisu do dok__Dokument. fl_Wartosc nie
---    uczestniczy w numeracji ani w skutkach magazynowych, więc zapis tutaj nie
---    może naruszyć integralności dokumentu.
-GRANT INSERT, UPDATE ON dbo.fl_Wartosc TO wertis;
 ```
 
 Sprawdź teraz, że uprawnienia faktycznie się nadały. Warto to robić po każdym
@@ -184,7 +172,7 @@ InsERT dla wersji bazy 1.8731.31.6933 — patrz
 Domyślne w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać:
 `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=14`, bufor = `dok_Status = 3`.
 
-Zostały **trzy** rzeczy, których dokumentacja nie zawiera, bo zależą od
+Zostały **dwie** rzeczy, których dokumentacja nie zawiera, bo zależą od
 konkretnego podmiotu. Uruchom w SSMS na kartotece/dokumencie z §1b:
 
 ```sql
@@ -198,22 +186,6 @@ SELECT tw_Symbol, tw_Pole1 FROM tw__Towar WHERE tw_Symbol = 'TWOJ-SYMBOL';
 SELECT mag_Id, mag_Symbol, mag_Nazwa, mag_Glowny FROM sl_Magazyn ORDER BY mag_Id;
 --    → env MAG_ID_MAG / MAG_ID_MGP / MAG_ID_ZWROTY
 --    (magazyn główny poznasz po mag_Glowny = 1; MGP i Zwroty po nazwie firmowej)
-
--- b) flagi dokumentów: gdzie siedzą i jakie mają identyfikatory.
---    Flaga NIE jest kolumną dok__Dokument — to wpis w fl_Wartosc pod kluczem
---    (grupa flag, typ obiektu, id dokumentu). Oflaguj ręcznie w Subiekcie jedną
---    fakturę zakupu i podstaw jej numer:
-SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
-FROM fl_Wartosc w
-JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
-JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
-WHERE d.dok_NrPelny = 'TWOJ-NUMER-FAKTURY';
---    → env MSSQL_FLAG_GRUPA (flw_IdGrupyFlag) i MSSQL_FLAG_TYP_OBIEKTU (flw_TypObiektu)
-
---    …a potem wypisz wszystkie flagi, żeby przypisać cztery używane przez WERTIS:
-SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
---    → env DOC_FLAG_IN_PROGRESS_SGT / _PAUSED_SGT / _DONE_SGT / _DONE_ERRORS_SGT
---      (wpisujesz flg_Id, nie nazwę — nazwa idzie do DOC_FLAG_* i służy tylko ludziom)
 ```
 
 Dwie rzeczy warto tylko **potwierdzić**, bo domyślne powinny pasować:
@@ -259,12 +231,6 @@ export MSSQL_LOC_COLUMN=tw_Pole1      # pole własne wybrane w §1a
 export MAG_ID_MAG=1                   # z checklisty (a)
 export MAG_ID_MGP=2
 export MAG_ID_ZWROTY=3
-export MSSQL_FLAG_GRUPA=1             # z checklisty (b)
-export MSSQL_FLAG_TYP_OBIEKTU=1
-export DOC_FLAG_IN_PROGRESS_SGT=…     # flg_Id czterech flag
-export DOC_FLAG_PAUSED_SGT=…
-export DOC_FLAG_DONE_SGT=…
-export DOC_FLAG_DONE_ERRORS_SGT=…
 # DOK_TYP_* i MSSQL_BUFFER_EXPR mają poprawne domyślne (ze struktury InsERT) —
 # ustawiaj je tylko, jeśli Twoja baza odbiega od standardu
 ```

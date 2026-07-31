@@ -1,15 +1,13 @@
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import type { MmItem, SferaAdapter } from "../adapters/sfera.js";
-import { cofnijFlage } from "../services/delivery-flag.js";
 import { logEvent } from "../services/events.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
    Wydzielone z `worker.ts`, bo tamten moduł przy imporcie startuje pętlę
    `setInterval` i melduje tryb procesu — czyli nie da się go dotknąć z testu,
    nie uruchamiając workera. A jest to jedyna logika sterująca ZAPISAMI DO
-   BAZY FIRMY: wybór zadania, retry z backoffem, terminalny błąd i cofnięcie
-   flagi faktury.
+   BAZY FIRMY: wybór zadania, retry z backoffem i terminalny błąd.
 
    Adapter Sfery wchodzi PARAMETREM, nie importem. Dzięki temu test podstawia
    własny (padający na żądanie) zamiast czekać na prawdziwy COM albo losować
@@ -94,12 +92,6 @@ export function oznaczBlad(task: Task, msg: string): void {
     db()
       .prepare("UPDATE sfera_queue SET status='error', attempts=?, error_msg=?, processed_at=? WHERE id=?")
       .run(attempts, msg, nowIso(), task.id);
-    // Zadanie flagi, które ostatecznie nie poszło, MUSI cofnąć `flaga_wyslana`
-    // — inaczej dedupe w `syncFlag` nigdy go nie ponowi i faktura zostanie
-    // nieoznaczona bez śladu.
-    if (task.type === "set_doc_flag" && task.source_doc_id != null) {
-      cofnijFlage(task.source_doc_id, `zadanie #${task.id} zakończone błędem`);
-    }
     /* NAJWAŻNIEJSZY wpis w całym audycie. Trwale nieudany zapis do Subiekta to
        najbardziej prawdopodobna odpowiedź na „aplikacja zjadła mi sztuki":
        magazynier zrobił swoje, kolektor przyjął, a do bazy firmy nic nie
@@ -138,8 +130,6 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
     let docNo: string | null = null;
     if (task.type === "set_location") {
       await sfera.applySetLocation(payload.twId, payload.newValue);
-    } else if (task.type === "set_doc_flag") {
-      await sfera.applyDocFlag(payload.dokId, payload.wartosc, payload.flaga);
     } else if (task.type === "mm") {
       docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
     } else {

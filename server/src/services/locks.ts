@@ -4,10 +4,8 @@
    magazynier odchodzi od wózka, gubi zasięg, kończy zmianę — pozycja
    zablokowana na zawsze byłaby gorsza od braku blokady.
 
-   Ten sam mechanizm świeżości (TTL) służy do drugiej rzeczy: odróżnienia
-   „ktoś pracuje TERAZ" od „leży zaczęte", na czym opiera się flaga
-   „W trakcie sprawdzania" vs „Do sprawdzenia z zapisanym postępem"
-   (patrz services/delivery-flag.ts).                                          */
+   Świeżość (TTL) mówi też, czy ktoś pracuje przy dostawie TERAZ — na tym
+   opiera się pokazanie „zajęte przez Annę" zamiast pustego wiersza.           */
 
 /** Po tym czasie pozycja wraca do puli, nawet jeśli nikt jej nie zwolnił. */
 export const LOCK_TTL_MS = 30 * 60 * 1000;

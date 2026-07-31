@@ -4,7 +4,6 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { closeIfComplete } from "./delivery.js";
-import { syncFlag } from "./delivery-flag.js";
 import type { ProblemView, ProblemType } from "../types.js";
 
 /* ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
@@ -121,9 +120,6 @@ export function raiseProblem(
     // po zwykłym odłożeniu — wyjątek żyje dalej na liście nierozwiązanych
     closeIfComplete(input.deliveryId, user);
   }
-  // wyjątek ILOŚCIOWY przełącza fakturę na „sprawdzone z błędami"; pozostałe typy
-  // (uszkodzenie, brak miejsca) to sprawy reklamacyjne i flagi nie ruszają
-  syncFlag(input.deliveryId, user);
   logEvent("problem_raised", user, null, { problemId: id, typ: input.typ, lineId: input.lineId ?? null });
   return { id };
 }
@@ -172,11 +168,6 @@ export function resolveProblem(id: number, note: string | undefined, user: strin
     .run(nowIso(), note ?? null, id);
   if (r.changes === 0) return { error: "Problem nie istnieje albo jest już rozwiązany" };
   logEvent("problem_resolved", user, null, { problemId: id });
-  // zamknięcie rozbieżności ilościowej zdejmuje z faktury „z błędami"
-  const owner = db().prepare("SELECT delivery_id FROM problem WHERE id=?").get(id) as
-    | { delivery_id: number | null }
-    | undefined;
-  if (owner?.delivery_id) syncFlag(owner.delivery_id, user);
   return { ok: true };
 }
 

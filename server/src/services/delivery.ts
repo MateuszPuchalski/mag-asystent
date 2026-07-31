@@ -8,7 +8,6 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
 import { freshLock, lockedByOther } from "./locks.js";
-import { flagaDokumentu, syncFlag, touchDelivery } from "./delivery-flag.js";
 import type { MmItem } from "../adapters/sfera.js";
 import type {
   DeliveryDocument,
@@ -76,21 +75,9 @@ export function listDocuments(days = 14): DeliveryDocument[] {
     .all() as Array<{ deliveryId: number; dokId: number; total: number; done: number; status: string }>;
   const byDoc = new Map(progress.map((p) => [p.dokId, p]));
 
-  // Przejście „W trakcie sprawdzania" → „Do sprawdzenia z zapisanym postępem"
-  // nie ma własnego zdarzenia — dzieje się przez UPŁYW CZASU (wygasa lock).
-  // Doganiamy je tutaj, przy odczycie listy, zamiast trzymać osobny scheduler
-  // dla jednej przemiany. Dedupe w syncFlag pilnuje, żeby nie generować pracy.
-  for (const p of progress) {
-    if (p.status === "open") syncFlag(p.deliveryId, "system");
-  }
-
   return docs.map((d) => {
     const p = byDoc.get(d.dok_id);
     const positions = subiekt.getDocumentPositions(d.dok_id).length;
-    /* Flaga leci z DWÓCH źródeł naraz: naszego postępu i tego, co na fakturze
-       postawiło biuro. Dokument, którego tu nikt nie otwierał, ma tylko drugie —
-       i to jest normalny przypadek, a nie brak danych (patrz `widokFlagi`). */
-    const flaga = flagaDokumentu(d.flaga ?? null, p?.deliveryId ?? null, p?.status ?? null);
     return {
       dokId: d.dok_id,
       typ: d.typ,
@@ -103,9 +90,6 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       linesTotal: p?.total ?? 0,
       linesDone: p?.done ?? 0,
       status: p?.status ?? null,
-      /** stan sprawdzenia faktury — to samo, co widzi biuro w Subiekcie */
-      flaga: flaga.label,
-      flagaKey: flaga.key,
       /** zwrot rozkłada się koszykami i kończy MM-em; dostawa krajowa nie */
       zwrot: requiresMm(d.mag_id),
     };
@@ -178,9 +162,6 @@ export function openDelivery(dokId: number, user: string): number {
   })();
 
   logEvent("delivery_open", user, null, { deliveryId: id, dokId });
-  // otwarcie dokumentu to już początek sprawdzania — magazynier stoi przy palecie
-  touchDelivery(id);
-  syncFlag(id, user);
   return id;
 }
 
@@ -237,14 +218,6 @@ export function getDelivery(id: number): DeliveryView | undefined {
   const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
   const problems = lines.filter((l) => l.status === "problem").length;
   const zwrot = requiresMm(d.source_mag_id);
-  // ta sama reguła pierwszeństwa co na liście dostaw — pastylka nie może
-  // zmieniać treści po samym wejściu w dokument
-  const sgtFlaga = (
-    db().prepare("SELECT flaga FROM sgt_dokument WHERE dok_id = ?").get(d.sgt_dok_id) as
-      | { flaga: string | null }
-      | undefined
-  )?.flaga;
-  const flaga = flagaDokumentu(sgtFlaga ?? null, d.id, d.status);
   return {
     id: d.id,
     dokId: d.sgt_dok_id,
@@ -252,8 +225,6 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dostawca: d.dostawca ?? "",
     dataWyst: d.data_dok ?? "",
     status: d.status,
-    flaga: flaga.label,
-    flagaKey: flaga.key,
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     zwrot,
     koszyki: zwrot ? openBaskets(id) : [],
@@ -352,8 +323,6 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   }
 
   claimLine(line.id, user);
-  touchDelivery(deliveryId);
-  syncFlag(deliveryId, user);
   return toResolution(p, line);
 }
 
@@ -513,8 +482,6 @@ export function putawayLine(
   }
 
   closeIfComplete(line.delivery_id, user);
-  touchDelivery(line.delivery_id);
-  syncFlag(line.delivery_id, user);
   return { ok: true, queueId, mismatch, status };
 }
 
@@ -552,8 +519,8 @@ function pendingMmQty(deliveryId: number): number {
  *
  * Przy zwrocie „nie ma czego rozkładać" to za mało: dopóki ostatni koszyk nie
  * pojechał MM-em, towar leży na półce, ale w Subiekcie wisi na magazynie
- * Zwroty — czyli jest niesprzedawalny. Domknięcie dostawy przestawiłoby flagę
- * na „Sprawdzone" i biuro zobaczyłoby robotę skończoną, choć połowa skutku
+ * Zwroty — czyli jest niesprzedawalny. Domknięta dostawa znika z listy pracy,
+ * więc zamknięcie jej teraz pokazywałoby robotę skończoną, choć połowa skutku
  * jeszcze nie istnieje.
  */
 export function closeIfComplete(deliveryId: number, user: string): void {
@@ -635,9 +602,7 @@ export function closeBasket(
   })();
 
   logEvent("koszyk_zamkniety", user, null, { deliveryId, koszyk, queueId, items: items.length, qty });
-  touchDelivery(deliveryId);
   // ostatni koszyk mógł być tym, który trzymał dostawę otwartą
   closeIfComplete(deliveryId, user);
-  syncFlag(deliveryId, user);
   return { ok: true, queueId, lines: rows.length, qty };
 }

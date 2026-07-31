@@ -7,13 +7,9 @@ import { config } from "../config.js";
  * Login `wertis` dostaje minimalny zakres uprawnień — pełny skrypt
  * w docs/subiekt-gt-edu-setup.md:
  *  • GRANT SELECT: tw__Towar, tw_Stan, dok__Dokument, dok_Pozycja,
- *    kh__Kontrahent, fl_Wartosc, fl__Flagi,
+ *    kh__Kontrahent, sl_Magazyn,
  *  • GRANT UPDATE na JEDNĄ kolumnę: lokalizacja na tw__Towar
- *    (config.mssql.locColumn),
- *  • GRANT INSERT+UPDATE na fl_Wartosc — tabelę przypisań flag. Flaga faktury
- *    nie jest kolumną dokumentu, więc aplikacja NIE potrzebuje żadnego prawa
- *    zapisu do `dok__Dokument`; `fl_Wartosc` nie uczestniczy w numeracji ani
- *    w skutkach magazynowych, więc zapis tam nie może naruszyć integralności.
+ *    (config.mssql.locColumn) — i to jest CAŁY zakres zapisu.
  * Nawet przy przejęciu credentiala reszta bazy pozostaje nietykalna, a jeden
  * login to jedna rzecz do założenia i jedna do pilnowania.
  */

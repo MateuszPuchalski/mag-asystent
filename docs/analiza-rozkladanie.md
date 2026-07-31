@@ -56,7 +56,7 @@ Zwroty→MAG** na wszystko, co z niego poszło na półki.
 
 **Rozliczenie idzie ilościami** (`ilosc_odlozona − mm_ilosc`), nie statusem
 linii. Ten sam towar bywa w dwóch koszykach, bo dokument zbiorczy agreguje go
-w jedną linię — flaga „już w MM" gubiłaby resztę.
+w jedną linię — znacznik „już w MM" na linii gubiłby resztę.
 
 Z arytmetyki wychodzą trzy rzeczy naraz. Dedupe przy ponownym domknięciu
 koszyka. Poprawne dzielenie linii między koszyki. Wreszcie to, że sztuki
@@ -107,9 +107,8 @@ tutaj kosztowało więcej, niż dawało.
   bierze „pierwszego dopasowania"; jedyne automatyczne zawężenie to dokładnie
   jeden kandydat obecny w otwartym dokumencie. Kolizje lądują w raporcie dla
   biura — aplikacja mierzy jakość danych, zamiast tylko na niej cierpieć.
-- **Flaga sprawdzenia faktury jako jedyna prawda o stanie dostawy.** Rozkładanie
-  JEST sprawdzaniem faktury, więc stan nie jest trzymany drugi raz — jest
-  wyprowadzany i rzutowany do Subiekta. Magazyn i biuro patrzą na to samo.
+- **Stan dostawy jest wyprowadzany z pozycji, nie trzymany osobno.** Postęp
+  wynika z tego, co odłożono; osobnego pola „status sprawdzenia" nie ma.
 - **Wyjątki jako obiekt pierwszej klasy** ze zdjęciem dowodowym. Pozycja
   z wyjątkiem wypada z rutyny, ale nie blokuje domknięcia dostawy — inaczej
   zgłoszenie problemu karałoby zgłaszającego i nikt by go nie zgłaszał.

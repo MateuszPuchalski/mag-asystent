@@ -127,18 +127,14 @@ Rozmiar historii widać w `/api/health` (`audyt`). Nie czyścimy jej, bo
 reklamacja przychodzi po miesiącach — ale licznik jest po to, żeby decyzję
 o archiwum podjąć na liczbach.
 
-**Zapis do Subiekta ogranicza się do dwóch rzeczy.** Pierwsza to pole
-lokalizacji na kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze
-wersje nie mają). Druga to **flaga sprawdzenia na fakturze dostawy**.
+**Zapis do Subiekta ogranicza się do JEDNEJ rzeczy.** Jest nią pole lokalizacji
+na kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie
+mają). Reguła „tylko lokalizacja" nie ma dziś ani jednego wyjątku.
 
-Flaga jest świadomym, nazwanym wyjątkiem od reguły „tylko lokalizacja".
-W tej firmie rozkładanie JEST sprawdzaniem faktury. Bez flagi biuro musiałoby
-pytać magazyn o stan każdej dostawy.
-
-Flaga nie jest kolumną dokumentu. InsERT trzyma ją w osobnej tabeli przypisań
-`fl_Wartosc`, więc aplikacja **nie potrzebuje żadnego prawa zapisu do
-`dok__Dokument`**. Oba zapisy idą tą samą drogą (kolejka → worker → adapter),
-więc kolektor nigdy nie czeka na COM.
+Do wersji 0.15.0 drugim zapisem była flaga sprawdzenia na fakturze — kanał do
+biura. Wypadła w 0.16.0: postęp rozkładania mieszka w aplikacji, a konto SQL
+straciło przez to jedyne prawo zapisu poza kartoteką. Zapis idzie kolejką
+(kolejka → worker → adapter), więc kolektor nigdy nie czeka na COM.
 
 Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM przy dostawie
 krajowej, zero modyfikacji stanów. Dokumenty MM (kontener, zwroty) tworzy
@@ -241,9 +237,6 @@ Parametry (env, dev):
 | `LOC_FIELD_LIMIT` | limit pola `tw_Lokalizacja` (domyślnie 50) |
 | `LOC_FORMAT_STANDARD` / `LOC_FORMAT_PALLET` | wzorce adresu — **jedno źródło prawdy**, kolektor pobiera je z `/api/locations` |
 | `LOC_STRICT=0` | wyłącza twarde egzekwowanie wzorca poza rozkładaniem (domyślnie **włączone**) |
-| `MSSQL_FLAG_GRUPA` / `MSSQL_FLAG_TYP_OBIEKTU` | gdzie w `fl_Wartosc` siedzą flagi faktur zakupu — **bez domyślnych**, jeden SELECT wg DEPLOY §6 |
-| `DOC_FLAG_IN_PROGRESS` / `_PAUSED` / `_DONE` / `_DONE_ERRORS` | nazwy czterech flag pokazywane człowiekowi (domyślnie słownictwo firmy) |
-| `DOC_FLAG_*_SGT` | `flg_Id` czterech flag z `fl__Flagi` — liczba, nie nazwa |
 | `MAG_ID_MAG` / `MAG_ID_MGP` / `MAG_ID_ZWROTY` | id magazynów w SGT — rozstrzygają, którym trybem idzie dokument |
 | `DOK_TYP_ZWROTY` | kody `dok_Typ` zwrotów na magazynie Zwroty (CSV); puste = każdy dokument na tym magazynie |
 
@@ -399,26 +392,10 @@ Parametry (env, dev):
 - **Niejednoznaczny kod kreskowy zatrzymuje operację** — aplikacja nigdy nie
   bierze „pierwszego dopasowania”. Jedyne automatyczne zawężenie: dokładnie
   jeden kandydat występuje w otwartym dokumencie.
-- **Flaga sprawdzenia faktury zamiast drugiej prawdy.** Rozkładanie JEST
-  sprawdzaniem faktury, więc aplikacja nie trzyma własnego stanu obok stanu
-  z Subiekta. Wyprowadza go i wysyła jako flagę: *W trakcie sprawdzania* (ktoś
-  przy tym stoi), *Do sprawdzenia z zapisanym postępem* (przerwane),
-  *Sprawdzone*, *Sprawdzone z błędami*.
-
-  Ostatnia oznacza **wyłącznie** rozbieżność ilościową. Uszkodzenie czy brak
-  miejsca to sprawy reklamacyjne, nie zgodność dokumentu. Magazynier widzi tę
-  samą plakietkę, co biuro.
-
-  Firma używa **wbudowanych flag dokumentu** — kolumna „FW" na liście faktur
-  zakupu. Domena operuje więc stabilnym kluczem, a mapowanie klucz → nazwa →
-  wartość w bazie siedzi w konfiguracji (`DOC_FLAG_*`). Nadpisanie przez biuro
-  wygrywa: aplikacja schodzi z takiej faktury i zapisuje to w `events`.
-
-  **Flaga jest czytana także w drugą stronę.** Faktura oznaczona w Subiekcie
-  jest sprawdzona również na kolektorze — nawet gdy nikt jej tu nie otwierał.
-  Taka dostawa schodzi na dół listy, zamiast czekać w kolejce do rozłożenia.
-  Flagę spoza tych czterech kolektor pokazuje z nazwą ze słownika Subiekta,
-  ale bez koloru stanu: o obcej fladze wiadomo tylko tyle, że biuro ją postawiło.
+- **Stan dostawy mieszka w aplikacji, nie w Subiekcie.** Postęp jest liczony
+  z pozycji: co odłożone, gdzie, przez kogo i z jakim wyjątkiem. Do 0.15.0
+  aplikacja rzutowała ten stan na flagę faktury, żeby widziało go biuro —
+  ten kanał został zamknięty razem z prawem zapisu do tabeli flag.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
   zgadza się". Rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ**: najczęstszy
   wyjątek nie może wymagać szukania kafla wśród siedmiu typów.
@@ -446,7 +423,7 @@ Parametry (env, dev):
   otagowana krótkim numerem wpisywanym ręcznie. Koszyki nie mają kodów
   kreskowych.
 - Rozkładanie przebiega dokładnie jak przy dostawie: dwa skany, sekcje alejek,
-  INNA ILOŚĆ, wyjątki ze zdjęciem, kolizje EAN, te same cztery flagi dokumentu.
+  INNA ILOŚĆ, wyjątki ze zdjęciem, kolizje EAN.
 - Różnica jest jedna: **po opróżnieniu koszyka domyka się go przyciskiem i
   powstaje JEDEN dokument MM Zwroty→MAG** na wszystko, co z niego poszło na
   półki. `set_location` powstaje przy każdym odłożeniu, MM dopiero na końcu, więc
@@ -536,7 +513,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 123 testy jednostkowe; buduje się bez Android SDK
+                           + 116 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
@@ -544,7 +521,7 @@ server/                    backend (Fastify + SQLite + worker)
   src/db/seed.ts           seed z products.json: dokumenty FZ/PZ per dostawca,
                            kontener na MGP, zbiorczy dokument zwrotów
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+sql (prod)
-  src/services/            delivery + delivery-flag (tryb A: dostawy, zwroty, koszyki),
+  src/services/            delivery (tryb A: dostawy, zwroty, koszyki),
                            problems + ean (wyjątki), putaway (tryb B — kontener),
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
                            a nie leży w regale), queue, locks, locations, events
@@ -610,9 +587,8 @@ połączenie. Wystarczy do niego **jeden login** o minimalnych uprawnieniach.
 
 Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto
 z bazy: przy starcie, co `MSSQL_SYNC_MS` i na `POST /api/admin/resync`. Worker
-zapisuje w dwóch miejscach — UPDATE **jednej kolumny** (lokalizacja na
-`tw__Towar`) oraz MERGE w `fl_Wartosc` (flaga). Tryb zapisu wynika z `SGT_MODE`;
-osobnego przełącznika nie ma.
+zapisuje w JEDNYM miejscu — UPDATE **jednej kolumny** (lokalizacja na
+`tw__Towar`). Tryb zapisu wynika z `SGT_MODE`; osobnego przełącznika nie ma.
 
 Dokumenty MM powstają w dwóch miejscach: runda wózka w trybie B i **zamknięty
 koszyk zwrotu**. Tworzy je docelowo osobny worker Sfery (COM) czytający tę samą

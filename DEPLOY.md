@@ -193,8 +193,9 @@ nssm restart wertis-api ; nssm restart wertis-worker
 > wpisywało się TRZECI raz — osobno dla każdej usługi — i to była najgroźniejsza
 > pułapka całego wdrożenia. Rozjazd nie dawał objawu: worker bez
 > `SGT_MODE=mssql` pisał do lokalnej bazy i oznaczał zadania jako wykonane.
-> Do tego przykład `ENV_WERTIS` pomijał zmienne flag (kto wkleił go dosłownie,
-> tracił flagi faktur), a niecytowana zmienna rozbijała się o spację w haśle.
+> Do tego przykład `ENV_WERTIS` pomijał część zmiennych (kto wkleił go
+> dosłownie, tracił je po cichu), a niecytowana zmienna rozbijała się o spację
+> w haśle.
 > Jeden plik usuwa wszystkie trzy problemy naraz.
 >
 > Zmienne środowiskowe dalej działają i mają pierwszeństwo nad plikiem — gdyby
@@ -401,9 +402,8 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 1. Utwórz login SQL o minimalnych uprawnieniach. Gotowy, idempotentny skrypt
    jest w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md) §2.
 
-   Skrypt nadaje `GRANT SELECT` na osiem tabel, `GRANT UPDATE` na jedną kolumnę
-   (lokalizacja) i `GRANT INSERT, UPDATE` na `fl_Wartosc` (flagi). Aplikacja
-   **nie potrzebuje żadnego prawa zapisu do `dok__Dokument`**.
+   Skrypt nadaje `GRANT SELECT` na sześć tabel i `GRANT UPDATE` na jedną
+   kolumnę (lokalizacja). Aplikacja **nie ma żadnego innego prawa zapisu**.
 2. Przejdź checklistę `[WERYFIKUJ]`. Jest krótka.
 
    Nazwy tabel i kolumn oraz kody `dok_Typ` i `dok_Status` są odczytane wprost
@@ -415,7 +415,7 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), `DOK_TYP_ZWROTY=14`
    (ZW), bufor = `dok_Status = 3` (odłożony).
 
-   Do ustalenia na własnej bazie zostają **cztery** rzeczy. Ta sekcja mówi,
+   Do ustalenia na własnej bazie zostają **trzy** rzeczy. Ta sekcja mówi,
    **co i po co**. Zapytania, odczyt wyniku i skutki pomyłki opisuje rozdział
    „Jak ustalić wszystkie wartości" w
    [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
@@ -441,26 +441,6 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
      półek**, po czym podpowiada pole z adresami. Jeśli firma już gdzieś notuje
      lokalizacje, to jest właśnie to pole. Wskazanie innego zostawiłoby dwa
      źródła prawdy o tym samym.
-
-   - **flaga sprawdzenia faktury** (→ `MSSQL_FLAG_GRUPA`,
-     `MSSQL_FLAG_TYP_OBIEKTU`, `DOC_FLAG_*_SGT`). Kolumna „FW" na liście
-     *Faktury zakupu* **nie odpowiada żadnej kolumnie `dok__Dokument`**.
-
-     InsERT trzyma flagi w osobnej parze tabel: `fl__Flagi` (definicje)
-     i `fl_Wartosc` (przypisania). Do `DOC_FLAG_*_SGT` wpisuje się `flg_Id`
-     (liczbę), a nie nazwę — nazwa idzie do `DOC_FLAG_*` i służy ludziom.
-
-     Dopóki env jest puste, zadania `set_doc_flag` kończą się czytelnym błędem
-     zamiast pisać w losową grupę flag. Reszta aplikacji działa normalnie —
-     flaga jest jedyną rzeczą, która czeka.
-
-     **Ta sama para ustawień rządzi ODCZYTEM.** Bez niej kolektor nie widzi
-     flag postawionych przez biuro i każda faktura wygląda na niesprawdzoną.
-     Nazwy flag spoza tych czterech bierze się z `fl__Flagi`; brak `GRANT
-     SELECT` na tę tabelę melduje `/api/health`.
-
-     Dokumenty zwrotów flagują się tym samym mechanizmem (to ten sam typ
-     obiektu), więc nie wymagają osobnej konfiguracji.
 
    - **zamówienia do dostawcy (ZD) na karcie towaru** (→ `DOK_STATUS_ZD_OTWARTE`,
      `MSSQL_ZD_ZREAL_COLUMN`, `MSSQL_ZD_TERMIN_COLUMN`). Wszystkie trzy są
@@ -492,8 +472,8 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    i **nic nie trafia do Subiekta** — a `"problemy"` powiedzą, która to.
 
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
-wykonuje `set_location` i `set_doc_flag` bezpośrednim UPDATE dwóch kolumn
-objętych `GRANT UPDATE`. Zadania MM — z rundy wózka (kontener) i z zamkniętego
+wykonuje `set_location` bezpośrednim UPDATE jednej kolumny objętej
+`GRANT UPDATE`. Zadania MM — z rundy wózka (kontener) i z zamkniętego
 koszyka zwrotu — zgłaszają czytelny błąd; do czasu workera Sfery MM wystawia
 biuro w Subiekcie. Osobnego przełącznika trybu zapisu nie ma.
 

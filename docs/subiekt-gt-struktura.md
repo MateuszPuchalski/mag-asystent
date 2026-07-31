@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały sześć.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały pięć.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -31,7 +31,6 @@ Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=
 | `dok__Dokument` | `dok_Id`, `dok_Typ`, `dok_NrPelny`, `dok_DataWyst`, `dok_MagId`, `dok_PlatnikId`, `dok_Status` |
 | `dok_Pozycja` | `ob_DokHanId` (→ `dok_Id`), `ob_TowId` (→ `tw_Id`), `ob_IloscMag` |
 | `kh__Kontrahent` | `kh_Id`, `kh_Symbol` |
-| `fl_Wartosc` + `fl__Flagi` | flaga sprawdzenia faktury — patrz niżej |
 | `sl_Magazyn` | `mag_Id`, `mag_Symbol`, `mag_Nazwa` — nazwy magazynów na karcie towaru |
 
 ## Lokalizacja: pola własne, nie `tw_Lokalizacja`
@@ -137,72 +136,6 @@ podstawienie daty wystawienia w miejsce obietnicy dostawy.
 ZK (`dok_Typ = 16`, zamówienie **od klienta**) celowo nie jest czytane. To ruch
 w drugą stronę i pokrywa go rezerwacja `st_StanRez` na kaflu MAG.
 
-## Flaga sprawdzenia faktury — osobny mechanizm, nie kolumna
-
-To najważniejsze ustalenie. Kolumna „FW" na liście faktur zakupu **nie odpowiada
-żadnej kolumnie `dok__Dokument`**. InsERT trzyma flagi w parze tabel:
-
-**`fl__Flagi`** — definicje flag (co istnieje):
-
-| Kolumna | Znaczenie |
-|---|---|
-| `flg_Id` | identyfikator flagi — **to wpisujemy jako `DOC_FLAG_*_SGT`** |
-| `flg_Numer` | numer wyznaczający ikonę |
-| `flg_Text` | tytuł flagi — **to widzi człowiek** (`DOC_FLAG_*`) |
-| `flg_IdGrupy` | grupa flag (→ `fl_Grupy.flp_Id`) |
-
-**`fl_Wartosc`** — przypisania (co jest oflagowane):
-
-| Kolumna | Znaczenie |
-|---|---|
-| `flw_IdGrupyFlag` | grupa flag |
-| `flw_TypObiektu` | typ obiektu w obrębie grupy |
-| `flw_IdObiektu` | id flagowanego obiektu — dla dokumentu `dok_Id` |
-| `flw_IdFlagi` | która flaga (→ `flg_Id`) |
-| `flw_Komentarz` | komentarz do obiektu |
-| `flw_IdUzytkownika` | kto ostatnio oflagował/zdjął |
-| `flw_CzasOstatniejZmiany` | kiedy |
-
-Klucz główny jest **złożony**: (`flw_IdGrupyFlag`, `flw_TypObiektu`,
-`flw_IdObiektu`). Jeden obiekt ma więc najwyżej jedną flagę w grupie, a zapis to
-MERGE — podmień, jeśli już jest, wstaw, jeśli nie (`adapters/sfera.sql.ts`).
-
-Trzy konsekwencje dla WERTIS:
-
-1. **Rozdział klucz / label / wartość okazał się trafny.** `flg_Text` to nazwa dla
-   człowieka, `flg_Id` to liczba do zapisu — dokładnie te dwa byty, które
-   `services/delivery-flag.ts` już rozróżnia.
-2. **Aplikacja nie potrzebuje żadnego prawa zapisu do `dok__Dokument`.**
-   To zawężenie uprawnień, nie rozszerzenie. `fl_Wartosc` nie uczestniczy
-   w numeracji ani w skutkach magazynowych. Zapis tam nie może naruszyć
-   integralności dokumentu.
-3. **Wykrywanie „biuro nadpisało flagę" staje się precyzyjne.**
-   `flw_IdUzytkownika` i `flw_CzasOstatniejZmiany` mówią wprost kto i kiedy.
-   Wcześniej trzeba było wnioskować z samej różnicy wartości.
-
-`[WERYFIKUJ]` para (`flw_IdGrupyFlag`, `flw_TypObiektu`) dla faktur zakupu — jedyna
-rzecz w całym mechanizmie flag, której dokumentacja nie zawiera. Jeden SELECT:
-
-```sql
--- podstaw numer faktury oflagowanej ręcznie w Subiekcie
-SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
-FROM fl_Wartosc w
-JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
-JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
-WHERE d.dok_NrPelny = 'FZ 60/MAG/07/2026';
-```
-
-Wynik daje naraz: obie liczby do env (`MSSQL_FLAG_GRUPA`,
-`MSSQL_FLAG_TYP_OBIEKTU`) oraz `flg_Id` + `flg_Text` tej flagi. Powtórz dla
-czterech flag albo wypisz je hurtem:
-
-```sql
-SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
-```
-
-→ `DOC_FLAG_IN_PROGRESS_SGT`, `DOC_FLAG_PAUSED_SGT`, `DOC_FLAG_DONE_SGT`,
-`DOC_FLAG_DONE_ERRORS_SGT`.
-
 ## „Opis dostawy" — kolumna przy POZYCJI faktury zakupu
 
 Magazyn zapisuje dziś różnice w towarze **ręcznie**, w kolumnie nazwanej
@@ -213,8 +146,7 @@ w siatce **pozycji** dokumentu, między „Nazwa" a „Ilość". Opis dotyczy wi
 To dobra wiadomość dla mapowania: wyjątki WERTIS są już per pozycja
 (`problem.line_id` → `delivery_line`), więc jedna rozbieżność ma dokładnie jedną
 komórkę docelową. WERTIS te różnice zna — typ, ilość policzoną, opis, zdjęcie —
-ale do Subiekta nie wysyła z nich ani jednego znaku. Biuro dostaje wyłącznie
-czterowartościową flagę opisaną wyżej.
+ale do Subiekta nie wysyła z nich ani jednego znaku.
 
 **Nazwa jest nadana przez firmę, nie przez InsERT.** Pole własne Subiekta
 domyślnie nazywa się „Pole własne N". Etykieta opisująca proces tej konkretnej
@@ -407,7 +339,7 @@ zrobić ręką:
 
 | grupa | ustawienia | co robisz |
 |---|---|---|
-| kreator ustala sam | baza, magazyny, pole lokalizacji, flagi | potwierdzasz wybór z listy |
+| kreator ustala sam | baza, magazyny, pole lokalizacji | potwierdzasz wybór z listy |
 | kreator pyta wprost | serwer i instancja SQL | wpisujesz |
 | **kreator NIE pyta** | pięć pozycji niżej plus `MSSQL_PORT` | **dopisujesz do `wertis.env`** |
 | ustalone ze struktury | kody `dok_Typ`, bufor, limit pola | nic |
@@ -441,26 +373,6 @@ Główny poznasz po `mag_Glowny = 1`. MGP i Zwroty są nazwane po firmowemu, wi�
 tu decyduje człowiek. Trzy identyfikatory **muszą być różne** — inaczej serwer
 nie wystartuje. Magazyn skutku rozstrzyga tryb dokumentu, a dwa te same id
 wyglądają jak „brakuje dostaw", nie jak błąd ustawień.
-
-**Flagi faktury** (`MSSQL_FLAG_GRUPA`, `MSSQL_FLAG_TYP_OBIEKTU`). Oflaguj
-najpierw ręcznie jedną fakturę w Subiekcie, potem podstaw jej numer:
-
-```sql
-SELECT w.flw_IdGrupyFlag, w.flw_TypObiektu, w.flw_IdFlagi, f.flg_Text, f.flg_Numer
-FROM fl_Wartosc w
-JOIN fl__Flagi  f ON f.flg_Id = w.flw_IdFlagi
-JOIN dok__Dokument d ON d.dok_Id = w.flw_IdObiektu
-WHERE d.dok_NrPelny = 'FZ 60/MAG/07/2026';
-```
-
-Identyfikatory czterech stanów (`DOC_FLAG_*_SGT`) bierzesz z listy flag:
-
-```sql
-SELECT flg_Id, flg_Text, flg_Numer, flg_IdGrupy FROM fl__Flagi ORDER BY flg_IdGrupy, flg_Numer;
-```
-
-Wpisujesz `flg_Id`, czyli liczbę — nie nazwę. Puste wartości znaczą, że zadania
-flagowania kończą się czytelnym błędem. Reszta aplikacji działa normalnie.
 
 ### Grupa 2 — które z ośmiu pól jest lokalizacją
 
@@ -553,9 +465,6 @@ dla usługi SQL Browser. Wpisany port **ma pierwszeństwo** przed nazwą instanc
 > ⚠️ Bez połączenia kreator podsuwa `1`, `2`, `3` dla magazynów oraz `tw_Pole1`
 > dla lokalizacji. **To nie są podpowiedzi z Twojej bazy**, tylko wartości
 > domyślne — a wyglądają identycznie jak wynik sondy.
-
-Flagi są w tej ścieżce **pomijane bez słowa**, bo cały ich blok wymaga
-połączenia. Zostają puste, więc zadania flagowania nie powstaną.
 
 Właściwą reakcją jest dokończenie konfiguracji później, po nadaniu uprawnień:
 
@@ -660,7 +569,7 @@ migrują palety przy sprzątaniu — nie jako opis stanu obecnego.
 
 ## Zasada nadrzędna
 
-Zapis do bazy Subiekta ogranicza się do **dwóch rzeczy**: pola lokalizacji na
-`tw__Towar` i przypisania flagi w `fl_Wartosc`. Zero `INSERT` do tabel
+Zapis do bazy Subiekta ogranicza się do **jednej rzeczy**: pola lokalizacji na
+`tw__Towar`. Zero `INSERT` do tabel
 dokumentów, zero modyfikacji stanów, zero ingerencji w numerację — dokumenty MM
 tworzy Sfera (COM) albo import EPP, nigdy bezpośredni SQL.

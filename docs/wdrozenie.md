@@ -8,8 +8,8 @@ wrażeniem, że wygląda dobrze. Bez spełnionej bramki nie przechodzi się dale
 
 ## Dlaczego etapami
 
-Aplikacja zapisuje do bazy firmy dwie rzeczy: pole lokalizacji na kartotece
-i flagę sprawdzenia na fakturze. Obie są odwracalne wyłącznie z kopii zapasowej.
+Aplikacja zapisuje do bazy firmy JEDNĄ rzecz: pole lokalizacji na kartotece.
+Jest odwracalne wyłącznie z kopii zapasowej.
 Etapy istnieją po to, żeby każdy błąd wyszedł tam, gdzie kosztuje jedno
 zapytanie, a nie tam, gdzie kosztuje dzień pracy magazynu.
 
@@ -285,8 +285,8 @@ To jest ważniejsze niż sama lista usuwanych rzeczy.
 | **Node.js i Git** | instalator dokłada je systemowo | `winget uninstall` |
 
 Pierwszy wiersz jest sednem. **Odinstalowanie aplikacji nie jest cofnięciem jej
-pracy.** Pole lokalizacji na kartotekach i flagi na fakturach zostają dokładnie
-tam, gdzie je wpisała — tak samo, jakby wpisał je człowiek.
+pracy.** Pole lokalizacji na kartotekach zostaje dokładnie tam, gdzie je
+wpisała — tak samo, jakby wpisał je człowiek.
 
 Ustawienia SQL Servera to trzy rzeczy, które kreator przestawił, żeby w ogóle
 dało się połączyć: uwierzytelnianie mieszane, protokół TCP i usługa SQL Browser
@@ -334,7 +334,6 @@ bazie. Zapytania podaje `DEPLOY.md` §6.
 | **pole „Opis dostawy"** | gdzie biuro trzyma opis różnic przy pozycji faktury | zapis w niewłaściwą komórkę — patrz `docs/subiekt-gt-struktura.md` |
 | `MSSQL_ZD_ZREAL_COLUMN` | ilość już odebrana z zamówienia | zawyżone ilości na karcie towaru |
 | `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
-| `MSSQL_FLAG_GRUPA`, `MSSQL_FLAG_TYP_OBIEKTU` | flaga sprawdzenia faktury | flagi nie działają wcale |
 
 **Kolumna ilości zrealizowanej może nie istnieć w ogóle.** W wersji sprawdzonej
 w tej firmie `dok_Pozycja` nie ma żadnej takiej kolumny. Poprawnym ustawieniem

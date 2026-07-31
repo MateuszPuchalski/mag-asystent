@@ -340,9 +340,6 @@ function Publish-WertisKonfiguracja {
         "MSSQL_USER", "MSSQL_PASSWORD",
         "MSSQL_LOC_COLUMN",
         "MAG_ID_MAG", "MAG_ID_MGP", "MAG_ID_ZWROTY",
-        "MSSQL_FLAG_GRUPA", "MSSQL_FLAG_TYP_OBIEKTU",
-        "DOC_FLAG_IN_PROGRESS_SGT", "DOC_FLAG_PAUSED_SGT",
-        "DOC_FLAG_DONE_SGT", "DOC_FLAG_DONE_ERRORS_SGT",
         "PORT"
     )
     $klucze = @($kolejnosc | Where-Object { $Ustawienia.ContainsKey($_) -and "$($Ustawienia[$_])" -ne "" })
