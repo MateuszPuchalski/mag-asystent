@@ -549,6 +549,18 @@ if ($kontoCzeka) {
     Write-Host ""
     if ($health.mode -eq "mssql") {
         Write-Ok "Tryb: mssql - aplikacja pracuje na prawdziwych danych Subiekta."
+    } elseif ($ustawienia.SGT_MODE -eq "mssql") {
+        # ROZJAZD, nie wybór. Kreator właśnie zapisał mssql, a proces wstał na
+        # demówce — czyli coś przykryło plik. Dotychczasowy tekst mówił o tym
+        # jak o poprawnym wariancie pilotażowym i był tu wprost mylący.
+        Write-Blad "BŁĄD: zapisałem SGT_MODE=mssql, a aplikacja wstała w trybie $($health.mode)."
+        Write-Info "Konfiguracja z pliku została CZYMŚ PRZYKRYTA - najczęściej zmienną"
+        Write-Info "środowiskową usługi, która przeżyła starszą instalację."
+        if (@($health.configPrzykryte).Count -gt 0) {
+            Write-Info "Przykryte klucze: $(@($health.configPrzykryte) -join ', ')"
+        }
+        Write-Info "Sprawdź: nssm get wertis-api AppEnvironment"
+        Write-Info "Wyczyść: nssm reset wertis-api AppEnvironment (to samo dla wertis-worker)"
     } else {
         Write-Uwaga "Tryb: $($health.mode) - to DANE DEMO. Nic nie trafia do Subiekta."
         Write-Info "Wszystko będzie działać i wyglądać normalnie, łącznie ze zmianą lokalizacji,"

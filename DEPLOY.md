@@ -37,9 +37,9 @@ Trzy rzeczy robi lepiej niż ręczna droga, i to jest jego właściwy powód:
 
 - **pokazuje zajętość wszystkich ośmiu pól własnych**, zanim wybierzesz to na
   lokalizację (§6 Etap 1) — aplikacja nadpisuje wybrane pole bezwarunkowo;
-- **kasuje `AppEnvironmentExtra` obu usług**, bo zmienne środowiskowe
-  przykrywają `wertis.env` (§2a) — pozostałość po starszej instalacji wygrałaby
-  po cichu z nowymi ustawieniami;
+- **kasuje `AppEnvironment` i `AppEnvironmentExtra` obu usług**, bo zmienne
+  środowiskowe przykrywają `wertis.env` (§2a) — pozostałość po starszej
+  instalacji wygrałaby po cichu z nowymi ustawieniami;
 - **sprawdza wersję Node** (aplikacja wymaga ≥ 22.5, §1) zamiast pozwolić jej
   wywalić się dopiero przy starcie usługi.
 
@@ -532,6 +532,18 @@ szansę sprzedaży, a nie błędny stan.
   wolno; po zamknięciu reklamacji stare zdjęcia można archiwizować ręcznie.
 - **Logi:** `C:\wertis\logs\` (rotacja przez NSSM). Błędy zapisu Sfery widać
   też na kolektorze (czerwona pastylka + PONÓW).
+- **„Tryb seeded, chociaż w `wertis.env` stoi `mssql`".** Konfigurację przykryła
+  zmienna środowiskowa usługi — środowisko ma nad plikiem pierwszeństwo.
+  `/api/health` wypisuje wtedy przykryte klucze w `configPrzykryte` i zgłasza
+  to jako problem.
+
+  ```powershell
+  nssm get wertis-api AppEnvironment ; nssm get wertis-api AppEnvironmentExtra
+  ```
+
+  Czyści się je przez `nssm reset <usługa> <ustawienie>`, dla obu usług, po
+  czym trzeba je zrestartować. To są **dwa różne ustawienia**: `Extra` dokłada
+  zmienne, `AppEnvironment` zastępuje całe środowisko procesu.
 - **Nocna rekoncyliacja — ustaw ją, zanim ruszy praca na prawdziwych danych.**
   Aplikacja pisze do Subiekta przez kolejkę, ale bez tego kroku **nikt nie
   sprawdza, czy stan po stronie Subiekta odpowiada temu, co aplikacja myśli, że

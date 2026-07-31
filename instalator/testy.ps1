@@ -452,6 +452,31 @@ Sprawdz "każda odmowa niesie powód" {
     }
 }
 
+# ── Środowisko usług, które potrafi przykryć wertis.env ─────────────────────
+# Wdrożenie przeszło cały kreator i wylądowało na danych demo: instalator
+# zapisał SGT_MODE=mssql, plik został wczytany, a proces startował w trybie
+# seeded — bo starsza instalacja zostawiła SGT_MODE w AppEnvironment, a kreator
+# kasował wyłącznie AppEnvironmentExtra.
+#
+# Samego `nssm reset` w CI wykonać się nie da (nie ma tu usług). Sprawdzalne
+# jest to, CZEGO instalator zamierza dotknąć — i to wystarczy, żeby regresja
+# „znowu tylko jedno" nie przeszła po cichu.
+
+Write-Host ""
+Write-Host "Klucze środowiska NSSM"
+
+Sprawdz "kasowane są OBA ustawienia, nie tylko Extra" {
+    $k = $script:WertisKluczeSrodowiskaNssm
+    Zaloz ($k -contains "AppEnvironmentExtra") "brak AppEnvironmentExtra"
+    Zaloz ($k -contains "AppEnvironment") "brak AppEnvironment - to była właśnie ta luka"
+}
+
+Sprawdz "lista nie zawiera nic ponad te dwa" {
+    # `nssm reset` na przypadkowym ustawieniu skasowałby konfigurację usługi,
+    # a nie zmienną środowiskową.
+    Zaloz (@($script:WertisKluczeSrodowiskaNssm).Count -eq 2) "lista ma mieć dokładnie dwie pozycje"
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""

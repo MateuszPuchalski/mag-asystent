@@ -93,6 +93,22 @@ $script:SUMA_NODE_MSI = "9eea480bd30c98ae11a97cb89a9278235cbbbd03c171ee5e5198bd8
 #>
 $script:SUMA_NSSM_ZIP = "727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743"
 
+<#
+    Ustawienia NSSM, którymi da się przykryć wertis.env. OBA, i to nie jest
+    nadmiarowość: z nazw nie widać, że są dwa niezależne mechanizmy.
+
+      AppEnvironmentExtra  DOKŁADA zmienne do środowiska procesu
+      AppEnvironment       ZASTĘPUJE je w całości
+
+    Do sierpnia 2026 instalator kasował wyłącznie pierwsze. Instalacja, która
+    kiedyś użyła drugiego, przechodziła przez kreator NIETKNIĘTA i lądowała na
+    danych demo mimo poprawnie zapisanego SGT_MODE=mssql.
+
+    Stała, a nie literał w pętli, bo `instalator/testy.ps1` asertuje jej
+    zawartość — samego `nssm reset` w CI wykonać się nie da (brak usług).
+#>
+$script:WertisKluczeSrodowiskaNssm = @("AppEnvironment", "AppEnvironmentExtra")
+
 function Test-WertisSuma {
     <#
         .SYNOPSIS
@@ -303,10 +319,11 @@ function Publish-WertisKonfiguracja {
         już żadnej konfiguracji.
 
         Dlatego ta funkcja robi też drugą rzecz, mniej oczywistą: KASUJE
-        AppEnvironmentExtra obu usług. Zmienne środowiskowe mają pierwszeństwo
-        nad plikiem, więc pozostałość po starszej instalacji — np. hasło
-        sprzed zmiany — po cichu wygrałaby z tym, co instalator właśnie
-        zapisał, i to bez żadnego objawu poza „u mnie nie działa".
+        środowisko obu usług — `AppEnvironment` ORAZ `AppEnvironmentExtra`.
+        Zmienne środowiskowe mają pierwszeństwo nad plikiem, więc pozostałość
+        po starszej instalacji — np. hasło sprzed zmiany albo SGT_MODE=seeded —
+        po cichu wygrałaby z tym, co instalator właśnie zapisał, i to bez
+        żadnego objawu poza „u mnie nie działa".
     #>
     param(
         [Parameter(Mandatory)][string]$Katalog,
@@ -357,13 +374,25 @@ function Publish-WertisKonfiguracja {
     }
 
     # Sprzątanie po starszych instalacjach: zmienne w usłudze przykrywają plik.
+    #
+    # OBA ustawienia, nie jedno — i z nazw tej różnicy nie widać:
+    #   AppEnvironmentExtra  DOKŁADA zmienne do środowiska procesu,
+    #   AppEnvironment       ZASTĘPUJE je w całości.
+    #
+    # Do sierpnia 2026 kasowane było wyłącznie to pierwsze. Instalacja, która
+    # kiedyś użyła AppEnvironment, przechodziła przez kreator NIETKNIĘTA:
+    # kreator zapisywał SGT_MODE=mssql, plik był wczytywany, a proces i tak
+    # startował w trybie seeded. Objawu nie było żadnego poza tym, że
+    # w Subiekcie nic się nie zmieniało.
     foreach ($usluga in $Uslugi) {
-        if (Test-DryRun "Wyczyścił(a)bym AppEnvironmentExtra usługi $usluga.") { continue }
+        if (Test-DryRun "Wyczyścił(a)bym AppEnvironment i AppEnvironmentExtra usługi $usluga.") { continue }
         if ($null -eq (Get-Service -Name $usluga -ErrorAction SilentlyContinue)) { continue }
-        $stare = (& $Nssm get $usluga AppEnvironmentExtra 2>$null | Out-String).Trim()
-        if ($stare) {
-            & $Nssm reset $usluga AppEnvironmentExtra | Out-Null
-            Write-Uwaga "Usunięto starą konfigurację ze środowiska usługi $usluga - przykrywałaby wertis.env."
+        foreach ($klucz in $script:WertisKluczeSrodowiskaNssm) {
+            $stare = (& $Nssm get $usluga $klucz 2>$null | Out-String).Trim()
+            if ($stare) {
+                & $Nssm reset $usluga $klucz | Out-Null
+                Write-Uwaga "Usunięto $klucz usługi $usluga - przykrywałoby wertis.env."
+            }
         }
     }
 }
