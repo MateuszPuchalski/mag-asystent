@@ -28,6 +28,39 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.19.0 — 1 sierpnia 2026
+
+<!-- docs_check: historia -->
+
+Serwer odpowiada pod `/sw.js` skryptem, który **grzebie starą aplikację
+webową**. Nic poza tym się nie zmienia.
+
+### Skasowany kod potrafi dalej stać na ekranie
+
+Aplikacja webowa („Kolektor magazynowy · prototyp v0.2") wyszła z repo
+26 lipca w 0.3.0 — katalog `web/`, trasy `/lookup` i `/`, `@fastify/static`.
+Mimo to na komputerze, który ją kiedyś otworzył, dalej wita splash z napisem
+„Dotknij, aby rozpocząć". Była PWA: `vite-plugin-pwa` zostawił service workera
+z precache całej powłoki, a taki worker odpowiada na żądanie **zanim** ruszy ono
+do sieci. Kasowanie kodu na serwerze nie mogło tego naprawić, bo serwer o tych
+żądaniach nie wiedział.
+
+Wyjście prowadzi przez ten sam adres, spod którego worker został zainstalowany.
+Przeglądarka sama sprawdza `sw.js` przy wejściu na stronę, a nowy skrypt bez
+rejestracji zdarzeń wymiata poprzednika: kasuje cache, wyrejestrowuje się
+i przeładowuje otwarte karty. Po tym `/` pokazuje to, co ma pokazywać —
+przekierowanie do podglądu biura.
+
+To jednorazowe sprzątanie, nie funkcja. Trasa może zniknąć, gdy żaden komputer
+w firmie nie będzie już miał starej PWA.
+
+### [wymaga działania] przy wdrożeniu
+
+`git pull`, `npm ci`, `npm run build`, restart usług. Potem na każdym komputerze
+biura raz wejść na `http://serwer:3001/` i odświeżyć. Jeśli aplikacja była
+**zainstalowana** jako osobne okno, trzeba ją odinstalować w przeglądarce
+(Chrome → Ustawienia → Aplikacje).
+
 ## 0.18.0 — 1 sierpnia 2026
 
 Biuro dostaje **podgląd pod `/biuro`** — pierwszy własny ekran od usunięcia
