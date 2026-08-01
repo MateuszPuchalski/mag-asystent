@@ -28,7 +28,6 @@ class KartaTekstTest {
     @Test fun `dostawa - zgloszony problem i pominiecie maja wlasne dopiski`() {
         assertEquals("zgłoszony problem", opisStatusu(WDostawie(status = "problem")))
         assertEquals("pominięte przy rozkładaniu", opisStatusu(WDostawie(status = "skipped")))
-        assertEquals("zwrot, czeka na rozłożenie", opisStatusu(WDostawie(zwrot = true)))
         assertEquals("dokument w buforze", opisStatusu(WDostawie(wBuforze = true)))
         assertNull(opisStatusu(WDostawie()))
     }

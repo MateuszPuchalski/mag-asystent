@@ -1,8 +1,6 @@
 package pl.wertis.kolektor.core.delivery
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /* Wiersz listy rozkładania ma jedną kolizję, która na ekranie wygląda jak
@@ -45,13 +43,5 @@ class LineDisplayTest {
         // serwer może dołożyć status, którego ta wersja kolektora nie zna;
         // bezpieczniej pokazać pozycję jako do zrobienia niż ją schować
         assertEquals(TrybWiersza.ZWYKLY, trybWiersza("cos_nowego", aktywna = false))
-    }
-
-    @Test fun `zamknieta liczy problem, bo pozycji z wyjatkiem juz sie nie odklada`() {
-        assertTrue(zamknieta(StatusLinii.DONE))
-        assertTrue(zamknieta(StatusLinii.SKIPPED))
-        assertTrue(zamknieta(StatusLinii.PROBLEM))
-        assertFalse(zamknieta(StatusLinii.TODO))
-        assertFalse(zamknieta(StatusLinii.PARTIAL))
     }
 }

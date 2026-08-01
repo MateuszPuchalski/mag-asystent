@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { classifyScan, matchesLocPattern, normalizeLoc, locRulesVersion } from "./scan.js";
+import { classifyScan, matchesLocPattern, normalizeLoc } from "./scan.js";
 import { config } from "./config.js";
 
 /* Klasyfikator jest jedynym miejscem, w którym system decyduje, CZYM jest
@@ -62,11 +62,6 @@ test("matchesLocPattern nie pyta o słownik — tylko o kształt", () => {
   // pusty regał nie występuje w kartotece, a mimo to jest poprawnym adresem
   assert.equal(matchesLocPattern("Z99-99-99"), true);
   assert.equal(matchesLocPattern("W32-0203"), false);
-});
-
-test("wersja reguły jest stabilna i krótka", () => {
-  assert.match(locRulesVersion, /^[0-9a-f]{8}$/);
-  assert.equal(locRulesVersion, locRulesVersion);
 });
 
 /* ── Strażnik audytu kolizji kodów (plan §2) ────────────────────────────────

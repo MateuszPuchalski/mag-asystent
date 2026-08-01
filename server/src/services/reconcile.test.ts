@@ -114,53 +114,6 @@ test("dokument, który nie wyszedł z bufora przez trzy dni", () => {
   assert.match(r.rozjazdy[0].opis, /77/);
 });
 
-test("koszyk zwrotu bez MM po dobie to utracona sprzedaż", () => {
-  towar("A01-02-03");
-  db()
-    .prepare(
-      `INSERT INTO delivery(id, sgt_dok_id, sgt_dok_numer, opened_at, source_mag_id)
-       VALUES (1, 900, 'ZW 7/07/2026', datetime('now'), 3)`
-    )
-    .run();
-  const linia = (odlozona: number, mm: number, dni: number) =>
-    db()
-      .prepare(
-        `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok,
-                                   ilosc_odlozona, status, koszyk, mm_ilosc, done_at)
-         VALUES (1, ?, 'W32-0203', 'Wąż', 5, ?, 'done', '3', ?, datetime('now', ?))`
-      )
-      .run(TW, odlozona, mm, `-${dni} days`);
-
-  linia(5, 5, 3); // domknięty MM-em — nie jest zaległością
-  assert.equal(reconcile().rozjazdy.length, 0);
-
-  db().prepare("DELETE FROM delivery_line").run();
-  linia(5, 0, 3);
-  const r = reconcile();
-  assert.equal(r.rozjazdy[0].rodzaj, "koszyk_bez_mm");
-  assert.match(r.rozjazdy[0].klucz, /ZW 7\/07\/2026 \/ koszyk 3/);
-  assert.match(r.rozjazdy[0].opis, /5 szt/);
-});
-
-test("dostawa krajowa nigdy nie jest koszykiem bez MM", () => {
-  // mm_ilosc zostaje tam zerem na zawsze — bez tego warunku raport krzyczałby
-  // codziennie na każdej krajówce, czyli przestałby być czytany
-  towar("A01-02-03");
-  db()
-    .prepare(
-      `INSERT INTO delivery(id, sgt_dok_id, sgt_dok_numer, opened_at, source_mag_id)
-       VALUES (2, 901, 'FZ 1/2026', datetime('now'), 1)`
-    )
-    .run();
-  db()
-    .prepare(
-      `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok,
-                                 ilosc_odlozona, status, koszyk, mm_ilosc, done_at)
-       VALUES (2, ?, 'W32-0203', 'Wąż', 5, 5, 'done', '1', 0, datetime('now','-3 days'))`
-    )
-    .run(TW);
-  assert.equal(reconcile().rozjazdy.length, 0);
-});
 
 test("CSV otwiera się w Excelu PL bez kreatora", () => {
   towar("B02-02-02");

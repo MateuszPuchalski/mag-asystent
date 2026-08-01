@@ -131,8 +131,6 @@ data class WDostawie(
     val dataWyst: String = "",
     /** Ile z tego dokumentu jeszcze nie trafiło w regał. Zawsze > 0. */
     val ilosc: Double = 0.0,
-    /** Zbiorczy dokument zwrotów — towar leży na magazynie Zwroty. */
-    val zwrot: Boolean = false,
     val wBuforze: Boolean = false,
     /** `null` = dokumentu nikt nie otwierał; inaczej status linii rozkładania. */
     val status: String? = null,
@@ -244,8 +242,6 @@ data class LocationsInfo(
     val codes: List<String> = emptyList(),
     /** Wzorce kodu lokalizacji. Puste = starszy serwer, patrz `locPatterns()`. */
     val patterns: List<String> = emptyList(),
-    /** Wersja reguły — zmiana oznacza, że cache kolektora jest nieaktualny. */
-    val version: String = "",
     /** Zgodność wsteczna: starszy serwer wysyła jeden wzorzec zamiast listy. */
     val format: String = "",
     val strict: Boolean = false,
@@ -460,10 +456,9 @@ data class CloseSessionResponse(val status: String, val summary: Map<String, Int
 @Serializable
 data class ApiErrorBody(val error: String? = null, val available: Double? = null)
 
-/* ── Tryb A: rozkładanie dostaw i zwrotów (redesign v2.0) ───────────────────
-   Dokument jest jednostką pracy. Przy dostawie krajowej aplikacja zapisuje
-   wyłącznie lokalizację (D1) — bez MM i bez czekania na bufor SGT. Przy zwrocie
-   dochodzi jeden MM Zwroty→MAG na każdy domknięty koszyk.                     */
+/* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ──────────────────────
+   Dokument jest jednostką pracy. Aplikacja zapisuje wyłącznie lokalizację
+   (D1) — bez MM i bez czekania na bufor SGT.                                  */
 
 @Serializable
 data class DeliveryDocument(
@@ -478,8 +473,6 @@ data class DeliveryDocument(
     val linesTotal: Int = 0,
     val linesDone: Int = 0,
     val status: String? = null,
-    /** Zbiorczy dokument zwrotów: rozkłada się koszykami, każdy domykany MM-em. */
-    val zwrot: Boolean = false,
 )
 
 @Serializable
@@ -502,13 +495,7 @@ data class DeliveryLineView(
     val locExpected: String? = null,
     val locActual: String? = null,
     val status: String = "todo",
-    /** Zwroty: numer koszyka, z którego pozycję odłożono. */
-    val koszyk: String? = null,
 )
-
-/** Koszyk zwrotu rozłożony na półki, ale jeszcze nieprzesunięty na MAG. */
-@Serializable
-data class KoszykView(val numer: String, val lines: Int = 0, val qty: Double = 0.0)
 
 @Serializable
 data class DeliveryProgress(
@@ -528,10 +515,6 @@ data class DeliveryView(
     val dataWyst: String = "",
     val status: String = "open",
     val progress: DeliveryProgress = DeliveryProgress(),
-    /** Zbiorczy dokument zwrotów: rozkłada się koszykami, każdy domykany MM-em. */
-    val zwrot: Boolean = false,
-    /** Koszyki rozłożone, ale jeszcze nieprzesunięte na MAG (puste przy dostawie krajowej). */
-    val koszyki: List<KoszykView> = emptyList(),
     val lines: List<DeliveryLineView> = emptyList(),
 )
 
@@ -592,17 +575,6 @@ data class PutawayLineBody(
      * `null` = ścieżka bez rozjazdu (serwer przyjmuje domyślne `replace`).
      */
     val locAction: LocApplyAction? = null,
-    /** Zwroty: numer koszyka, z którego wzięto towar (serwer wymaga go przy zwrocie). */
-    val koszyk: String? = null,
-)
-
-/** Odpowiedź zamknięcia koszyka: jeden MM Zwroty→MAG na całą jego zawartość. */
-@Serializable
-data class CloseBasketResponse(
-    val ok: Boolean = true,
-    val queueId: Long = 0,
-    val lines: Int = 0,
-    val qty: Double = 0.0,
 )
 
 /** Wybór operatora przy skanie innej półki niż oczekiwana (§4.3). */
@@ -625,9 +597,6 @@ data class PutawayLineResponse(
    inaczej nie da się go zmierzyć ani zgłosić reklamacji dostawcy.            */
 
 @Serializable
-data class ProblemTypesResponse(val types: List<String> = emptyList())
-
-@Serializable
 data class ProblemView(
     val id: Long,
     val deliveryId: Long? = null,
@@ -638,8 +607,6 @@ data class ProblemView(
     val hasPhoto: Boolean = false,
     val createdAt: String = "",
     val createdBy: String? = null,
-    val resolvedAt: String? = null,
-    val resolvedNote: String? = null,
     /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
     val docNumber: String? = null,
     val sym: String? = null,
@@ -694,7 +661,6 @@ data class UserDto(
     val name: String = "",
     val role: String = "magazynier",
     val active: Boolean = true,
-    val maPin: Boolean = false,
 )
 
 @Serializable
@@ -736,9 +702,6 @@ data class CreateUserBody(
 
 @Serializable
 data class CreateUserResponse(val user: UserDto = UserDto())
-
-@Serializable
-data class UsersResponse(val users: List<UserDto> = emptyList())
 
 /* ── Meldunek o operacjach odrzuconych na kolektorze ────────────────────────
    Bufor offline to plik na urządzeniu, a urządzenie zginie albo zostanie

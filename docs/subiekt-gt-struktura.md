@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały pięć.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzy.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -15,7 +15,7 @@ zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały pięć.
 12-PW  13-RW   14-ZW   15-ZD   16-ZK   21-PA   29-IW  35-ZPZ 36-ZWZ
 ```
 
-Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=14`.
+Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`.
 
 > **Uwaga historyczna.** WERTIS miał wcześniej `DOK_TYP_PZ=5`, a 5 to **KFZ —
 > korekta faktury zakupu**. Na prawdziwej bazie aplikacja listowałaby korekty
@@ -135,146 +135,6 @@ podstawienie daty wystawienia w miejsce obietnicy dostawy.
 
 ZK (`dok_Typ = 16`, zamówienie **od klienta**) celowo nie jest czytane. To ruch
 w drugą stronę i pokrywa go rezerwacja `st_StanRez` na kaflu MAG.
-
-## „Opis dostawy" — kolumna przy POZYCJI faktury zakupu
-
-Magazyn zapisuje dziś różnice w towarze **ręcznie**, w kolumnie nazwanej
-w Subiekcie firmy **„Opis dostawy"**. Na zrzucie z Subiekta klienta stoi ona
-w siatce **pozycji** dokumentu, między „Nazwa" a „Ilość". Opis dotyczy więc
-**konkretnego towaru na fakturze**, a nie faktury jako całości.
-
-To dobra wiadomość dla mapowania: wyjątki WERTIS są już per pozycja
-(`problem.line_id` → `delivery_line`), więc jedna rozbieżność ma dokładnie jedną
-komórkę docelową. WERTIS te różnice zna — typ, ilość policzoną, opis, zdjęcie —
-ale do Subiekta nie wysyła z nich ani jednego znaku.
-
-**Nazwa jest nadana przez firmę, nie przez InsERT.** Pole własne Subiekta
-domyślnie nazywa się „Pole własne N". Etykieta opisująca proces tej konkretnej
-firmy stawia je więc w tej samej kategorii co `MSSQL_LOC_COLUMN`: **ustawienie
-podmiotu, nie struktura bazy.** Kolejny klient nazwie to inaczej albo nie będzie
-miał tego pola wcale.
-
-### Czego ten dokument NIE wie
-
-Tabela na początku wymienia kolumny **używane przez WERTIS** — jej
-niekompletność jest zamierzona. Z `dok_Pozycja` importer bierze dziś trzy:
-`ob_DokHanId`, `ob_TowId`, `ob_IloscMag`. O kolumnach tekstowych tej tabeli ten
-dokument nie mówi nic; nikt ich nie badał.
-
-W szczególności **z `tw_Pole1..8` nie wynika istnienie analogicznych pól na
-pozycji.** Pola własne kartoteki towaru są zmierzone i pewne; przeniesienie tego
-wzorca gdziekolwiek indziej byłoby dokładnie tym zgadywaniem, przed którym broni
-się preambuła.
-
-> **Trop, który skraca zwiad.** Przy rozstrzyganiu ilości zrealizowanej
-> przejrzano **komplet 57 kolumn `dok_Pozycja`** na bazie 1.8731.31.6933 (patrz
-> rozdział o zamówieniach). Ta sama lista odpowiada na pytanie poniżej — jeśli
-> zachowała się z tamtego sprawdzenia, wystarczy do niej zajrzeć.
-
-### Jak WERTIS wskazuje wiersz faktury
-
-Zapis per pozycja wymaga wskazania **konkretnego wiersza** `dok_Pozycja`.
-
-Dopasowanie po parze (dokument, towar) **nie jest bezpieczne**. Ten sam towar
-potrafi wystąpić na fakturze w dwóch wierszach — choćby w dwóch cenach albo
-z dwóch partii. Wtedy nie wiadomo, do której komórki pisać.
-
-Od 0.13.0 identyfikator jest **importowany**. Read-model `sgt_pozycja` ma
-kolumnę `ob_id`, a linia robocza `delivery_line` — kolumnę `sgt_pozycje` z JSON-ową
-listą identyfikatorów, rosnąco.
-
-Lista, nie pojedyncza wartość: `openDelivery` agreguje ten sam towar z kilku
-wierszy faktury w jedną linię, bo magazynier ma przed sobą jedną paletę.
-
-`[WERYFIKUJ]` **nazwa kolumny klucza pozycji w `dok_Pozycja`**
-(`MSSQL_POZ_ID_COLUMN`, domyślnie `ob_Id`). Nasz opis struktury jej nie
-wymienia, więc domyślna jest **założeniem** — dokładnie w tej samej sytuacji
-`ob_IloscZrealizowana` okazało się zgadnięte źle. Rozstrzyga to zapytanie
-o komplet kolumn `dok_Pozycja` podane niżej, przy okazji „Opisu dostawy".
-
-Brak kolumny nie wywraca importu: pozycje wczytują się bez identyfikatora,
-`sgt_pozycje` zostaje puste, a `/api/health` mówi o tym wprost.
-
-`[WERYFIKUJ]` **gdzie „Opis dostawy" mieszka w bazie.** Odpowiedź musi objąć
-cztery rzeczy — tabelę, kolumnę, typ z długością oraz sposób powiązania
-z pozycją dokumentu — bo bez czwartej `UPDATE` nadal nie da się napisać. Dwa
-niezależne tropy, które powinny wskazać to samo pole:
-
-**Trop 1 — po etykiecie.** Subiekt musi tę nazwę skądś brać, żeby narysować
-formularz. Zamiatarka po wszystkich kolumnach tekstowych w bazie:
-
-```sql
-DECLARE @szukane nvarchar(100) = N'Opis dostawy';
-DECLARE @sql nvarchar(max) = N'';
-
-SELECT @sql = @sql + CASE WHEN @sql = N'' THEN N'' ELSE N' UNION ALL ' END +
-  N'SELECT ' + QUOTENAME(t.name, '''') + N' AS tabela, '
-             + QUOTENAME(c.name, '''') + N' AS kolumna, COUNT(*) AS trafien FROM '
-             + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name)
-             + N' WHERE CAST(' + QUOTENAME(c.name) + N' AS nvarchar(max)) = @p'
-FROM sys.tables t
-JOIN sys.schemas s ON s.schema_id = t.schema_id
-JOIN sys.columns c ON c.object_id = t.object_id
-JOIN sys.types  ty ON ty.user_type_id = c.user_type_id
-WHERE ty.name IN ('varchar','nvarchar','char','nchar','text','ntext');
-
-SET @sql = N'SELECT * FROM (' + @sql + N') x WHERE trafien > 0 ORDER BY tabela;';
-EXEC sp_executesql @sql, N'@p nvarchar(100)', @p = @szukane;
-```
-
-Trafienie wskazuje tabelę **definicji** pól własnych. Pusty wynik znaczy, że
-etykieta siedzi poza bazą podmiotu — wtedy rozstrzyga wyłącznie trop 2.
-
-**Trop 2 — po treści.** W Subiekcie wpisz ciąg `ZNACZNIK-WERTIS-001` w „Opis
-dostawy" **przy jednej pozycji** dowolnej faktury zakupu. Zapisz dokument
-i zanotuj numer faktury oraz symbol towaru z tego wiersza. Potem ta sama zamiatarka
-z `@szukane = N'ZNACZNIK-WERTIS-001'` i porównaniem `LIKE N'%' + @p + N'%'`
-zamiast `= @p`. Wynik wskazuje tabelę i kolumnę **przechowującą treść** — czyli
-cel przyszłego zapisu.
-
-Zasiew jest po to, żeby szukać czegoś unikalnego: szukanie po prawdziwej treści
-(„brak 2 szt.") daje trafienia przypadkowe i nie rozstrzyga niczego. Po zwiadzie
-skasuj znacznik — w Subiekcie, nie `UPDATE`-em w SQL.
-
-Najprostszy wariant, gdy podejrzenie pada wprost na `dok_Pozycja`:
-
-```sql
-DECLARE @nr varchar(50) = 'FZ 123/2026';   -- faktura z zasiewem
-SELECT p.* FROM dok_Pozycja p
-JOIN dok__Dokument d ON d.dok_Id = p.ob_DokHanId
-WHERE d.dok_NrPelny = @nr;
-```
-
-Wiersz z znacznikiem pokaże wprost nazwę kolumny **oraz** identyfikator pozycji,
-którym trzeba będzie ją zaadresować. Gdy treść siedzi w tabeli osobnej:
-
-```sql
-SELECT * FROM <tabela z tropu 2>
-WHERE CAST(<kolumna z tropu 2> AS nvarchar(max)) LIKE N'%ZNACZNIK-WERTIS-001%';
-```
-
-Sprawdź, czy wiersz **istnieje zawsze, czy powstaje dopiero przy pierwszym
-wpisie**: to rozstrzyga między `UPDATE` a MERGE i między `GRANT UPDATE`
-a `GRANT INSERT, UPDATE`.
-
-### Zanim cokolwiek tam napisze
-
-Trzy rzeczy do rozstrzygnięcia świadomie, nie przy implementacji:
-
-1. **Gdyby to okazała się kolumna na `dok_Pozycja`.** Zapis tam wymaga
-   `GRANT UPDATE` na tabelę pozycji, czyli na rdzeń ewidencji. Stoją tam ilości
-   i ceny. Grant kolumnowy zawęża to do jednej kolumny, tak jak przy `tw_PoleN`.
-   Sama decyzja jest jednak architektoniczna: dotąd aplikacja nie miała prawa
-   zapisu do żadnej tabeli dokumentów. Patrz punkt 2 rozdziału o fladze.
-2. **Faktura zatwierdzona.** Subiekt blokuje edycję takich dokumentów
-   w interfejsie; `UPDATE` prosto w SQL tę blokadę obejdzie. Pytanie praktyczne,
-   które to rozstrzyga: czy magazynier wpisuje różnice zanim biuro zatwierdzi
-   fakturę, czy po. Dla dokumentu w buforze (`dok_Status = 3`) kolejka ma już
-   osobny stan `waiting_for_doc`.
-3. **Do której komórki przy towarze powtórzonym.** Linia robocza niesie listę
-   identyfikatorów, a nie jeden — trzeba więc rozstrzygnąć regułę: pierwsza
-   pozycja, wszystkie, czy ta o największej ilości. Lista jest posortowana
-   rosnąco właśnie po to, żeby „pierwsza" była pojęciem jednoznacznym.
 
 ## Typy dostaw — czym towar naprawdę wchodzi na magazyn
 
@@ -481,19 +341,6 @@ używa dwóch pól magazynowych:
 - `dok_OdbiorcaId` — „dla MM oznacza identyfikator magazynu" (docelowy).
 
 Typ dokumentu MM to `dok_Typ = 9`.
-
-## Rodzaj zwrotu — niewykorzystana informacja
-
-`dok_StatusEx` dla dokumentów ZW rozróżnia:
-
-```
-0-nieokreślony rodzaj zwrotu   1-zwrot ze sprzedaży   2-reklamacja
-3-oczywista pomyłka
-```
-
-WERTIS tego dziś nie czyta. Reklamacja i zwrot ze sprzedaży to jednak różne
-sytuacje na magazynie — reklamowany towar często nie wraca na półkę. Jeśli biuro
-tę informację wypełnia, warto ją pokazać magazynierowi przy koszyku.
 
 ## Audyt kolizji kodów — założenie klasyfikatora skanów
 

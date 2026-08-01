@@ -52,7 +52,7 @@ import pl.wertis.kolektor.ui.theme.Success
    wózkiem, MM MGP→MAG po każdej rundzie.
 
    To jedyny proces, który tego modelu potrzebuje. Dostawy krajowe księgują się
-   wprost na MAG, a zwroty rozkłada się koszykami — jedno i drugie idzie trybem
+   wprost na MAG — to idzie trybem
    A, gdzie jednostką pracy jest dokument, a nie sesja.                        */
 
 @Composable
@@ -110,7 +110,7 @@ fun PutawayDocumentsScreen(graph: AppGraph) {
         docs!!.forEach { d -> DocRow(d) { open(d.docId) } }
 
         Text(
-            "Dostawy krajowe i zwroty rozkłada się w zakładce DOSTAWY — dokument, nie sesja.",
+            "Dostawy krajowe rozkłada się w zakładce DOSTAWY — dokument, nie sesja.",
             fontSize = 11.sp,
             color = InkMute,
             textAlign = TextAlign.Center,

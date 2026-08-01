@@ -3,7 +3,6 @@ import { config } from "../config.js";
 import { currentToken, userOf } from "../context.js";
 import { autoryzuj, sesja } from "../services/auth.js";
 import {
-  closeBasket,
   forceReleaseLine,
   getDelivery,
   listDocuments,
@@ -14,9 +13,9 @@ import {
 } from "../services/delivery.js";
 import type { LocApplyAction } from "../types.js";
 
-/* ── Tryb A: rozkładanie dostaw krajowych i zwrotów (redesign v2.0) ──────────
+/* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ───────────────────────
    Ścieżka codzienna: dokument → skan towaru → skan lokalizacji. Zapis wyłącznie
-   `set_location` (D1); przy zwrocie dochodzi jeden MM na zamknięty koszyk.
+   `set_location` (D1), zero dokumentów.
    Tryb B (kontener na MGP) żyje dalej pod /api/putaway/*.                     */
 
 export async function deliveryRoutes(app: FastifyInstance) {
@@ -71,33 +70,17 @@ export async function deliveryRoutes(app: FastifyInstance) {
    */
   app.post<{
     Params: { id: string; lineId: string };
-    Body: { location: string; qty?: number; locAction?: LocApplyAction; koszyk?: string };
+    Body: { location: string; qty?: number; locAction?: LocApplyAction };
   }>(
     "/api/delivery/:id/lines/:lineId/putaway",
     async (req, reply) => {
-      const { location, qty, locAction, koszyk } = req.body ?? ({} as { location?: string });
+      const { location, qty, locAction } = req.body ?? ({} as { location?: string });
       if (!location) return reply.code(400).send({ error: "Brak kodu lokalizacji" });
       if (locAction && locAction !== "add" && locAction !== "replace") {
         return reply.code(400).send({ error: `Nieznana akcja lokalizacji: ${locAction}` });
       }
-      const r = putawayLine(Number(req.params.lineId), location, userOf(req), { qty, locAction, koszyk });
+      const r = putawayLine(Number(req.params.lineId), location, userOf(req), { qty, locAction });
       // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
-      if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
-      return r;
-    }
-  );
-
-  /**
-   * Zwroty: koszyk rozłożony → jeden dokument MM Zwroty→MAG.
-   *
-   * Osobny krok, a nie skutek uboczny ostatniego odłożenia, bo tylko człowiek
-   * wie, że koszyk jest pusty — aplikacja nie ma pojęcia, ile pozycji w nim
-   * było (podział na koszyki nie istnieje w żadnym dokumencie).
-   */
-  app.post<{ Params: { id: string; numer: string } }>(
-    "/api/delivery/:id/koszyk/:numer/zamknij",
-    async (req, reply) => {
-      const r = closeBasket(Number(req.params.id), req.params.numer, userOf(req));
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
       return r;
     }

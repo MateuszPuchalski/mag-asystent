@@ -15,7 +15,7 @@ import { config } from "../config.js";
  *
  * Magazyn skutku dokumentu rozstrzyga, który tryb go obsługuje, i celowo daje
  * dane obu ścieżkom: krajowe FZ/PZ na MAG (tryb A — sam adres), jeden kontener
- * na MGP i jeden karton zwrotów (tryb B — sesja z wózkiem i MM).
+ * na MGP (tryb B — sesja z wózkiem i MM).
  */
 
 type Row = [
@@ -117,16 +117,8 @@ function seed() {
     `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
      VALUES (?,?,?,?,?,?,?)`
   );
-  /* `ob_id` rośnie GLOBALNIE, przez wszystkie dokumenty — tak samo jak klucz
-     pozycji w Subiekcie, który jest identyfikatorem wiersza w całej tabeli,
-     a nie numerem porządkowym w obrębie faktury. Seed, który numerowałby od
-     nowa w każdym dokumencie, uczyłby kodu fałszywej własności. */
-  let obId = 0;
-  const insPozRaw = d.prepare(
-    "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc, ob_id) VALUES (?,?,?,?)"
-  );
-  const insPoz = (dokId: number, twId: number, ilosc: number) =>
-    insPozRaw.run(dokId, twId, ilosc, ++obId);
+  const insPozRaw = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
+  const insPoz = (dokId: number, twId: number, ilosc: number) => insPozRaw.run(dokId, twId, ilosc);
 
   // grupowanie towarów z MGP po prawdziwym dostawcy; duże grupy (np. własne
   // przyjęcia WERTIS) dzielimy na kilka mniejszych, dających się rozłożyć
@@ -189,11 +181,7 @@ function seed() {
       /* TEN SAM TOWAR W DRUGIM WIERSZU — pierwszy dokument dostaje duplikat.
          W Subiekcie zdarza się to normalnie: dwie ceny, dwie partie, dwa
          wiersze. Dla magazyniera to nadal jedna paleta, więc `openDelivery`
-         skleja je w jedną linię roboczą — ale opis różnic biuro trzyma PRZY
-         POZYCJI, więc linia musi pamiętać OBA identyfikatory.
-
-         Bez tego przypadku w demo ścieżka, dla której powstała kolumna
-         `sgt_pozycje`, nie miałaby ani jednego przebiegu. */
+         skleja je w jedną linię roboczą — i demo musi tę ścieżkę przechodzić. */
       if (k === 0 && paczka.items.length) {
         insPoz(dok_id, paczka.items[0].tw_id, 3);
       }
@@ -201,12 +189,11 @@ function seed() {
   });
   buildDocs();
 
-  // ── zbiorczy dokument zwrotów od klientów (magazyn Zwroty) ───────────────
-  // Biuro otwiera zwroty karton po kartonie, przyjmuje towar na magazyn Zwroty
-  // JEDNYM zbiorczym dokumentem i układa go w koszyki opisane numerem zwrotu.
-  // Magazynier bierze koszyk, rozkłada go na półki (tryb A) i zamyka koszyk —
-  // dopiero wtedy powstaje MM Zwroty→MAG. Pozycje: towary z MAG z lokalizacją
-  // (wróciły od klientów) + jeden bez lokalizacji (BRAK LOK).
+  // ── stan na magazynie Zwroty ─────────────────────────────────────────────
+  // Zwroty przyjmuje i rozlicza biuro w Subiekcie — aplikacja nie ma tam nic do
+  // roboty (rozkładanie koszykami wypadło w 0.17.0). Stan zasiewamy mimo to,
+  // bo karta towaru odpowiada na pytanie „gdzie jeszcze leży" i magazyn Zwroty
+  // jest jedną z możliwych odpowiedzi.
   const zwrotItems: Array<{ tw_id: number; qty: number }> = [];
   rows.forEach((r, i) => {
     const mag = r[3];
@@ -218,19 +205,14 @@ function seed() {
   if (noLocProducts.length) zwrotItems.push({ tw_id: noLocProducts[0], qty: 2 });
 
   if (zwrotItems.length) {
-    const zwDokId = paczki.length + 1;
     const buildZwrot = transaction(d, () => {
-      insDok.run(zwDokId, "ZW", `ZW 7/${mmrrrr(baseDate)}`, baseDate.toISOString().slice(0, 10), config.magId.ZWROTY, "Zwroty klienckie", 0);
       const insZwStan = d.prepare(
         "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,0) ON CONFLICT(tw_id, mag_id) DO UPDATE SET stan = stan + excluded.stan"
       );
-      for (const it of zwrotItems) {
-        insPoz(zwDokId, it.tw_id, it.qty);
-        insZwStan.run(it.tw_id, config.magId.ZWROTY, it.qty);
-      }
+      for (const it of zwrotItems) insZwStan.run(it.tw_id, config.magId.ZWROTY, it.qty);
     });
     buildZwrot();
-    console.log(`[seed] karton zwrotów: ZW 7/07/2026, pozycji=${zwrotItems.length}`);
+    console.log(`[seed] stan na magazynie Zwroty: kartotek=${zwrotItems.length}`);
   }
 
   // ── syntetyczne zamówienia do dostawcy (ZD) ─────────────────────────────
@@ -240,8 +222,8 @@ function seed() {
   // termin już przeterminowany — dostawca się spóźnia i to widać.
   if (zamowione.length) {
     const insZam = d.prepare(
-      `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
-       VALUES (?,?,?,?,?,?)`
+      `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca)
+       VALUES (?,?,?,?,?)`
     );
     const insZamPoz = d.prepare(
       "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
@@ -271,8 +253,7 @@ function seed() {
             `ZD ${40 + dokId}/${mmrrrr(dataZam)}`,
             dataZam.toISOString().slice(0, 10),
             termin,
-            dostawca,
-            5
+            dostawca
           );
           for (const it of items.slice(i, i + MAX_POZ)) {
             // co trzecia pozycja częściowo dostarczona — karta ma pokazać

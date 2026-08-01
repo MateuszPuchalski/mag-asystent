@@ -29,7 +29,6 @@ interface WDostawie {
   dokId: number;
   nrPelny: string;
   ilosc: number;
-  zwrot: boolean;
   status: string | null;
 }
 
@@ -83,7 +82,6 @@ test("nierozłożona dostawa dojeżdża trasą na kartę", async () => {
   assert.equal(w.length, 1);
   assert.equal(w[0].nrPelny, "FZ 60/MAG/07/2026");
   assert.equal(w[0].ilosc, 6);
-  assert.equal(w[0].zwrot, false);
   assert.equal(w[0].status, null);
 });
 

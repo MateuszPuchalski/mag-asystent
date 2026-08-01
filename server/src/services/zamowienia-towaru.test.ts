@@ -46,15 +46,14 @@ function zamowienie(opts: {
 }) {
   const d = db();
   d.prepare(
-    `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca, status)
-     VALUES (?,?,?,?,?,?)`
+    `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca)
+     VALUES (?,?,?,?,?)`
   ).run(
     opts.dokId,
     `ZD ${opts.dokId}/2026`,
     opts.dataWyst ?? "2026-07-01",
     opts.termin === undefined ? "2026-08-01" : opts.termin,
-    "HURT-AB",
-    5
+    "HURT-AB"
   );
   d.prepare(
     "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"

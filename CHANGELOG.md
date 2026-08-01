@@ -28,6 +28,75 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.17.0 — 31 lipca 2026
+
+<!-- docs_check: historia -->
+
+Po wycięciu flagi padło pytanie, czy takich niepotrzebności jest w repo więcej.
+Przegląd trzech warstw znalazł je w trzech kształtach. Ten wpis usuwa te, które
+nie miały ani jednego konsumenta.
+
+### Zwroty koszykami — machineria bez wejścia
+
+Kompletna ścieżka po obu stronach: numer koszyka przy każdym odłożeniu, pasek
+otwartych koszyków, domykanie przyciskiem, rozliczenie ilościami, czwarta
+kontrola nocnej rekoncyliacji. **Wejścia do niej nie było od d131f75** —
+zakładka DOSTAWY filtrowała zwroty, a komentarz nazywał to „ukryciem wejścia,
+nie wycofaniem funkcji".
+
+Przywrócenie wejścia nie wchodziło w grę, bo funkcja wróciłaby ZEPSUTA:
+domknięcie koszyka kolejkuje MM, a dokumentów MM na produkcji nie da się dziś
+wystawić. Dostawa zwrotowa zostawałaby w `open` na zawsze.
+
+Zwroty rozlicza więc biuro w Subiekcie — tak jak faktycznie robi od roku.
+Karta towaru przestaje obiecywać „zwrot, czeka na rozłożenie". **Magazyn Zwroty
+zostaje**: kafel „gdzie jeszcze leży" ma nadal sens, zmienia się tylko podpis.
+
+### Klucz wiersza faktury — zalążek kanału, który już odrzuciliśmy
+
+<!-- docs_check: historia -->
+
+`delivery_line.sgt_pozycje` (0.13.0) zapisywało się przy każdym otwarciu
+dostawy i nie było czytane przez ani jedno miejsce w kodzie. Powstało pod
+„opis różnic przy pozycji faktury", czyli **ten sam kanał do biura, który
+wypadł w 0.16.0** — tylko droższy: docelowy zapis wymagałby prawa zapisu do
+tabeli z ilościami i cenami.
+
+Wypada razem z `MSSQL_POZ_ID_COLUMN`, dwoma podejściami w imporcie pozycji,
+jednym komunikatem w `/api/health` i rozdziałem dokumentacji, który opisywał
+niezaimplementowaną funkcję na 144 liniach.
+
+### Drobny martwy kod
+
+Kolumny pisane i nieczytane, cztery funkcje `:core` bez wołającego, trzy
+deklaracje Retrofit bez ani jednego wywołania i pięć pól DTO bez czytelnika.
+Przy okazji znika duplikat listy typów wyjątków — kolektor trzymał własną kopię
+obok serwerowej, a wołał wyłącznie swoją.
+
+Cyfra kontrolna badge'a ma teraz **jedną** implementację (serwer, z wektorami
+w testach). Kolektor rozpoznaje sam kształt kodu — i tylko tego potrzebuje.
+
+### Czego świadomie NIE ruszamy
+
+**MM i worker Sfery.** Około 450 linii serwera prowadzi do wywołania, które na
+produkcji zawsze rzuca wyjątek. To jest niedokończone, nie zbędne — tryb B
+(kontener, 4× w roku) zostaje nietknięty razem z `waiting_for_doc`.
+
+**Zdjęcia dowodowe i raporty dostępne tylko curlem.** Ślad audytowy ma wartość
+dowodową także wtedy, gdy nikt go nie ogląda co tydzień.
+
+### [wymaga działania] przy wdrożeniu
+
+<!-- docs_check: historia -->
+
+Zero pracy przy bazie Subiekta — ta zmiana **nie dotyka uprawnień**. Z
+`wertis.env` można usunąć `MSSQL_POZ_ID_COLUMN` i `DOK_TYP_ZWROTY`; serwer ich
+nie czyta. Poza tym `git pull`, `npm ci`, `npm run build` i restart usług.
+
+Stare bazy zachowują nieużywane kolumny (`koszyk`, `mm_ilosc`, `mm_queue_id`,
+`sgt_pozycje`, `ob_id`) — wszystkie nullowalne, nikt ich nie czyta, a
+`DROP COLUMN` w SQLite przepisuje tabelę. Nowe bazy powstają bez nich.
+
 ## 0.16.0 — 31 lipca 2026
 
 <!-- docs_check: historia -->
@@ -228,6 +297,8 @@ policzony osobno, żeby tamta zmiana nie niosła przy okazji migracji schematu.
 
 ### Dlaczego to nie jest jedna kolumna
 
+<!-- docs_check: historia -->
+
 Naturalny odruch to dopisać `ob_id` do linii roboczej. **Byłby błędny.**
 `openDelivery` agreguje ten sam towar z kilku wierszy dokumentu w jedną linię —
 świadomie, bo magazynier ma przed sobą jedną paletę i ma ją zobaczyć raz.
@@ -242,6 +313,8 @@ towar dwa razy przy jednej palecie — regresja w interfejsie wprowadzona po to,
 żeby uprościć zapis, którego jeszcze nie ma.
 
 ### [wymaga działania] Nazwa kolumny jest ZAŁOŻENIEM
+
+<!-- docs_check: historia -->
 
 Nowe `MSSQL_POZ_ID_COLUMN`, domyślnie `ob_Id`. Nasz opis struktury tej kolumny
 nie wymienia, więc domyślna jest **szóstym `[WERYFIKUJ]`** — dokładnie w tej

@@ -26,10 +26,8 @@ enum class ProblemType(
     EAN_CONFLICT("ean_conflict", "Kolizja EAN");
 
     companion object {
-        fun fromKey(key: String): ProblemType? = entries.firstOrNull { it.key == key }
-
         /** Etykieta do listy wyjątków; nieznany klucz pokazujemy surowo. */
-        fun labelOf(key: String): String = fromKey(key)?.label ?: key
+        fun labelOf(key: String): String = entries.firstOrNull { it.key == key }?.label ?: key
     }
 }
 

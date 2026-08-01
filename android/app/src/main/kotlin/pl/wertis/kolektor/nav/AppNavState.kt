@@ -26,7 +26,7 @@ class AppNavState(private val recentStore: RecentStore) {
     val curIdFlow: StateFlow<Long?> = _curId
     val curId: Long? get() = _curId.value
     @Volatile var sessionId: Long? = null; private set
-    /** Tryb A: otwarta dostawa albo zwrot (dokument = jednostka pracy). */
+    /** Tryb A: otwarta faktura zakupu (dokument = jednostka pracy). */
     @Volatile var deliveryId: Long? = null; private set
 
     /* locCode jest obserwowalny z DOKŁADNIE tego samego powodu co `curId`

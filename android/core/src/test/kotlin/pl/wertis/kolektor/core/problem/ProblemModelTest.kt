@@ -47,6 +47,5 @@ class ProblemModelTest {
     @Test fun `etykieta nieznanego klucza nie wybucha`() {
         assertEquals("Uszkodzony", ProblemType.labelOf("damaged"))
         assertEquals("cos_nowego", ProblemType.labelOf("cos_nowego"))
-        assertNull(ProblemType.fromKey("cos_nowego"))
     }
 }

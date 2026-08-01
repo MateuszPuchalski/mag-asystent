@@ -1,5 +1,4 @@
 import { db } from "../db/db.js";
-import { config } from "../config.js";
 import { subiekt } from "../context.js";
 
 /* ── „Przyjechało, ale jeszcze nie na półce" ─────────────────────────────────
@@ -26,8 +25,6 @@ export interface WDostawie {
   dataWyst: string;
   /** Ile z tego dokumentu jeszcze NIE odłożono. Zawsze > 0. */
   ilosc: number;
-  /** Zbiorczy dokument zwrotów — leży na magazynie Zwroty, nie na MAG. */
-  zwrot: boolean;
   /** Dokument w buforze SGT; rozkładanie i tak na niego nie czeka (D1). */
   wBuforze: boolean;
   /**
@@ -85,7 +82,6 @@ export function nierozlozoneZDostaw(twId: number): WDostawie[] {
         nrPelny: p.nr_pelny,
         dataWyst: p.data_wyst,
         ilosc: zostalo,
-        zwrot: p.mag_id !== config.magId.MAG,
         wBuforze: !!p.w_buforze,
         status: l?.status ?? null,
       },

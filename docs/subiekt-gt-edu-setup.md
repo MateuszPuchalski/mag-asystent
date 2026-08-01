@@ -19,8 +19,8 @@ Potwierdza ona wybór pola własnego na lokalizację — natywnego
 | Dokumenty MM (MGP→MAG, zatwierdź wózek) | ❌ | wymaga **Sfery** (COM) — brak w edu; zadanie w kolejce dostanie status `error` z komunikatem |
 
 > MM **próbuje** się wykonać i kończy błędem, bo to funkcja, którą firma ma na
-> produkcji — chcemy widzieć, że jej brakuje. Postęp rozkładania, wyjątki
-> i koszyki działają w edu normalnie, bo mieszkają w bazie aplikacji.
+> produkcji — chcemy widzieć, że jej brakuje. Postęp rozkładania i wyjątki
+> działają w edu normalnie, bo mieszkają w bazie aplikacji.
 
 Dwie twarde zasady środowiska:
 
@@ -170,7 +170,7 @@ InsERT dla wersji bazy 1.8731.31.6933 — patrz
 [`subiekt-gt-struktura.md`](subiekt-gt-struktura.md).
 
 Domyślne w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać:
-`DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, `DOK_TYP_ZWROTY=14`, bufor = `dok_Status = 3`.
+`DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, bufor = `dok_Status = 3`.
 
 Zostały **dwie** rzeczy, których dokumentacja nie zawiera, bo zależą od
 konkretnego podmiotu. Uruchom w SSMS na kartotece/dokumencie z §1b:
@@ -310,8 +310,7 @@ curl -s -X POST http://localhost:3001/api/admin/resync
   wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)`.
   Wymaga to dodatkowego `GRANT SELECT` i korekty JOIN-a
   w `server/src/adapters/subiekt.mssql.ts`.
-- Dokumenty MM — z rundy wózka (kontener) i z zamkniętego koszyka zwrotu —
-  wymagają licencji **Sfery** na produkcyjnym Subiekcie. Potrzebny jest osobny
+- Dokumenty MM — z rundy wózka (kontener) — wymagają licencji **Sfery** na produkcyjnym Subiekcie. Potrzebny jest osobny
   worker COM na Windows (C#/pywin32) czytający tę samą tabelę `sfera_queue`.
   Kontrakt jest w `server/src/adapters/sfera.ts`, etap 2
   w [DEPLOY.md](../DEPLOY.md). Do tego czasu MM wystawia biuro.

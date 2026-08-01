@@ -29,14 +29,12 @@ import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MeldunekOdrzuconych
 import pl.wertis.kolektor.core.net.MeldunekPrzyjety
 import pl.wertis.kolektor.core.net.OkResponse
-import pl.wertis.kolektor.core.net.ProblemTypesResponse
 import pl.wertis.kolektor.core.net.ProblemsResponse
 import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.net.PutawayDocumentsResponse
 import pl.wertis.kolektor.core.net.RaiseProblemBody
 import pl.wertis.kolektor.core.net.RaiseProblemResponse
 import pl.wertis.kolektor.core.net.ResolveProblemBody
-import pl.wertis.kolektor.core.net.CloseBasketResponse
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.OpenDeliveryResponse
@@ -52,7 +50,6 @@ import pl.wertis.kolektor.core.net.SearchResponse
 import pl.wertis.kolektor.core.net.SessionIdResponse
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.SetupResponse
-import pl.wertis.kolektor.core.net.UsersResponse
 import pl.wertis.kolektor.core.net.SkipBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -155,7 +152,7 @@ interface ApiService {
     suspend fun closeSession(@Path("id") sid: Long, @Body body: RequestBody = EMPTY_BODY): CloseSessionResponse
 
 
-    /* ── Tryb A: rozkładanie dostaw i zwrotów (dokument = jednostka pracy) ─ */
+    /* ── Tryb A: rozkładanie faktur zakupu (dokument = jednostka pracy) ──── */
 
     @GET("api/delivery/documents")
     suspend fun deliveryDocuments(): DeliveryDocumentsResponse
@@ -178,13 +175,6 @@ interface ApiService {
         @Body body: PutawayLineBody,
     ): PutawayLineResponse
 
-    /** Zwroty: koszyk rozłożony → jeden dokument MM Zwroty→MAG. */
-    @POST("api/delivery/{id}/koszyk/{numer}/zamknij")
-    suspend fun closeBasket(
-        @Path("id") id: Long,
-        @Path("numer") numer: String,
-        @Body body: RequestBody = EMPTY_BODY,
-    ): CloseBasketResponse
 
     /** Oddanie linii po ANULUJ — bez tego wisi zajęta do wygaśnięcia TTL. */
     @POST("api/delivery/{id}/lines/{lineId}/release")
@@ -197,9 +187,6 @@ interface ApiService {
 
     /* ── Faza 2: wyjątki (D8) ────────────────────────────────────────────── */
 
-    @GET("api/problems/types")
-    suspend fun problemTypes(): ProblemTypesResponse
-
     /** Lista pytana przy starcie — wyjątek bez ekranu przestaje istnieć. */
     @GET("api/problems/unresolved")
     suspend fun unresolvedProblems(): ProblemsResponse
@@ -209,9 +196,6 @@ interface ApiService {
 
     @POST("api/delivery/{id}/problems")
     suspend fun raiseProblem(@Path("id") id: Long, @Body body: RaiseProblemBody): RaiseProblemResponse
-
-    @GET("api/delivery/{id}/problems")
-    suspend fun deliveryProblems(@Path("id") id: Long): ProblemsResponse
 
     @GET("api/ean-conflicts")
     suspend fun eanConflicts(): EanConflictsResponse
@@ -250,9 +234,6 @@ interface ApiService {
 
     @POST("api/users")
     suspend fun createUser(@Body body: CreateUserBody): CreateUserResponse
-
-    @GET("api/users")
-    suspend fun listUsers(): UsersResponse
 
     /* ── Widoczność magazynów ─────────────────────────────────────────────
        Ustawienie GLOBALNE: zapis przestawia je wszystkim kolektorom naraz,

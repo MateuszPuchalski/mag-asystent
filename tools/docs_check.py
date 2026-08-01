@@ -47,11 +47,20 @@ REMOVED = [
     # `fl_Wartosc`. Tokeny są identyfikatorami, nie polskim słowem „flaga":
     # historia i uzasadnienie decyzji mogą o niej mówić prozą, ale instrukcja
     # każąca cokolwiek ustawić albo nadać ma zapalić się na czerwono.
-    "set_doc_flag",
     "DOC_FLAG_",
     "MSSQL_FLAG_",
     "fl_Wartosc",
     "fl__Flagi",
+    # Zwroty koszykami i klucz wiersza faktury — wycięte w 0.17.0. Ta sama
+    # zasada co wyżej: identyfikatory, nie polskie słowa. „Zwrot" jako pojęcie
+    # magazynowe zostaje (jest magazyn Zwroty), ale instrukcja każąca ustawić
+    # `DOK_TYP_ZWROTY` albo domknąć koszyk ma się zapalić na czerwono.
+    "set_doc_flag",
+    "DOK_TYP_ZWROTY",
+    "MSSQL_POZ_ID_COLUMN",
+    "sgt_pozycje",
+    "closeBasket",
+    "koszyk_bez_mm",
 ]
 
 PATH_RE = re.compile(

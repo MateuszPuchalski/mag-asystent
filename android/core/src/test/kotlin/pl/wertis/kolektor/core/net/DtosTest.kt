@@ -68,7 +68,6 @@ class DtosTest {
                 "version":"a1b2c3d4","format":"^[A-Z]\\d{2}-\\d{2}-\\d{2}$","strict":true,"allowManual":false}"""
         )
         assertEquals(2, info.locPatterns().size)
-        assertEquals("a1b2c3d4", info.version)
         assertTrue(info.strict)
 
         // starszy serwer nie zna `patterns` — kolektor spada na `format`, nie na zgadywanie
@@ -110,34 +109,6 @@ class DtosTest {
             """{"kind":"locked","code":"5901234","lockedBy":"anna","sym":"W04-0103","name":"Wąż"}"""
         )
         assertEquals("anna", (r as ScanResolution.Locked).lockedBy)
-    }
-
-    @Test fun `zwrot niesie koszyki czekajace na MM`() {
-        val v = WertisJson.decodeFromString<DeliveryView>(
-            """{"id":9,"dokId":7,"nrPelny":"ZW 7/07/2026","status":"open","zwrot":true,
-                "koszyki":[{"numer":"1","lines":3,"qty":6}],
-                "lines":[{"id":1,"twId":4,"sym":"S","name":"N","qtyDoc":2,"qtyDone":2,
-                          "status":"done","aisle":"C","koszyk":"1"}]}"""
-        )
-        assertTrue(v.zwrot)
-        assertEquals("1", v.koszyki[0].numer)
-        assertEquals(6.0, v.koszyki[0].qty, 0.0)
-        assertEquals("1", v.lines[0].koszyk)
-
-        // dostawa krajowa: brak pól → zwrot fałszywy, zero koszyków (nie crash)
-        val krajowa = WertisJson.decodeFromString<DeliveryView>("""{"id":10,"nrPelny":"FZ 1"}""")
-        assertTrue(!krajowa.zwrot)
-        assertTrue(krajowa.koszyki.isEmpty())
-    }
-
-    @Test fun `numer koszyka jedzie z odlozeniem, ale tylko gdy jest`() {
-        val zZwrotem = WertisJson.encodeToString(
-            PutawayLineBody.serializer(),
-            PutawayLineBody("E03-04-03", koszyk = "12")
-        )
-        assertTrue(zZwrotem.contains("\"koszyk\":\"12\""))
-        val bezZwrotu = WertisJson.encodeToString(PutawayLineBody.serializer(), PutawayLineBody("E03-04-03"))
-        assertTrue(!bezZwrotu.contains("koszyk"))
     }
 
     @Test fun `QueueResponse - statusy i summary`() {
@@ -226,14 +197,12 @@ class DtosTest {
             """{"problems":[
                 {"id":3,"deliveryId":1,"lineId":7,"typ":"damaged","qty":null,"opis":"zgnieciony karton",
                  "hasPhoto":true,"createdAt":"2026-07-25T10:00:00Z","createdBy":"anna",
-                 "resolvedAt":null,"resolvedNote":null,
                  "docNumber":"FZ 120/07/2026","sym":"W04-0103","name":"Wąż"}]}"""
         )
         val p = r.problems.single()
         assertEquals("damaged", p.typ)
         assertEquals(true, p.hasPhoto)
         assertEquals("FZ 120/07/2026", p.docNumber)
-        assertNull(p.resolvedAt)
     }
 
     @Test fun `putaway - locAction jest opcjonalne i serializuje sie kluczem protokolu`() {

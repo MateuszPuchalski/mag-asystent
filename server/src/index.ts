@@ -17,7 +17,6 @@ import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import {
   brakDostepuDoMagazynow,
-  brakKolumnyIdPozycji,
   brakKolumnyZrealizowano,
   importFromMssql,
   lastImport,
@@ -60,8 +59,7 @@ export async function buildApp() {
       problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
-      brakKolumnyIdPozycji,
-        ].filter((x): x is string => x !== null);
+            ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
       /* Wersja serwera — kolektor pokazuje ją obok własnej na dole ekranu.

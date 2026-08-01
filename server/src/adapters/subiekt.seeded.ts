@@ -168,9 +168,8 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     // muszą pozostać ROZŁĄCZNE, inaczej ten sam dokument wisi w dwóch zakładkach
     // i można na nim pracować dwoma niekompatybilnymi ścieżkami naraz.
     //
-    //   MAG    → tryb A, dostawa krajowa: towar już leży na hali, brakuje adresu (D1)
-    //   Zwroty → tryb A, zwroty: adres jak wyżej + jeden MM na zamknięty koszyk
-    //   MGP    → tryb B, kontener: sesja z wózkiem, MM na rundę
+    //   MAG → tryb A, dostawa krajowa: towar już leży na hali, brakuje adresu (D1)
+    //   MGP → tryb B, kontener: sesja z wózkiem, MM na rundę
     // Typy dostaw biorą się z `DOK_TYPY_DOSTAW`, tak samo jak w adapterze MSSQL.
     // Para ('FZ','PZ') była tu ZASZYTA i czyniła demo niewiernym: zawężenie
     // konfiguracji do samych FZ nie robiło na tej liście żadnej różnicy, więc
@@ -180,11 +179,11 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE ((typ IN (${luki}) AND mag_id = ?) OR mag_id = ?)
+         WHERE typ IN (${luki}) AND mag_id = ?
            AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(...etykiety, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocument[];
+      .all(...etykiety, config.magId.MAG, cutoff) as unknown as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
@@ -209,12 +208,12 @@ export class SeededSubiektAdapter implements SubiektAdapter {
          FROM sgt_pozycja p
          JOIN sgt_dokument d ON d.dok_id = p.dok_id
          WHERE p.tw_id = ?
-           AND ((d.typ IN (${luki}) AND d.mag_id = ?) OR d.mag_id = ?)
+           AND d.typ IN (${luki}) AND d.mag_id = ?
            AND d.data_wyst >= ?
          GROUP BY d.dok_id
          ORDER BY d.data_wyst DESC, d.dok_id DESC`
       )
-      .all(twId, ...etykiety, config.magId.MAG, config.magId.ZWROTY, cutoff) as unknown as RawDocPosition[];
+      .all(twId, ...etykiety, config.magId.MAG, cutoff) as unknown as RawDocPosition[];
   }
 
   getOrdersForProduct(twId: number): RawZamPosition[] {
@@ -235,7 +234,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
 
   getDocumentPositions(docId: number): RawPosition[] {
     return db()
-      .prepare("SELECT tw_id, ilosc, ob_id FROM sgt_pozycja WHERE dok_id = ? ORDER BY id")
+      .prepare("SELECT tw_id, ilosc FROM sgt_pozycja WHERE dok_id = ? ORDER BY id")
       .all(docId) as unknown as RawPosition[];
   }
 

@@ -15,42 +15,14 @@ package pl.wertis.kolektor.core.badge
       źle" — pierwsze jest widoczne, drugie nie.
    3. Kod NIE NIESIE NAZWISKA. Badge się gubi i zostaje na kurtce; nazwisko na
       etykiecie to dane osobowe leżące na parkingu. Powiązanie kod → człowiek
-      żyje wyłącznie w bazie.                                                  */
+      żyje wyłącznie w bazie.
 
-const val BADGE_PREFIX = "PRC-"
+   Kolektor rozpoznaje tu wyłącznie KSZTAŁT kodu — po to, żeby skan badge'a nie
+   poszedł ścieżką EAN-u. Generowanie numeru i weryfikacja cyfry kontrolnej
+   należą do serwera (`services/users.ts`) i tam mają swoje testy; druga kopia
+   po tej stronie mogłaby się z nią rozjechać bez żadnego objawu.              */
 
 private val BADGE_RE = Regex("""^PRC-(\d{4})-(\d)$""")
-
-/**
- * Cyfra kontrolna dla czterocyfrowego numeru.
- *
- * Wagi 3-1-3-1 i dopełnienie do dziesiątki — ten sam schemat co w EAN, bo
- * wyłapuje zarówno przekłamanie pojedynczej cyfry, jak i najczęstszą pomyłkę
- * przy przepisywaniu z ręki: przestawienie dwóch sąsiednich cyfr.
- */
-fun cyfraKontrolna(numer: Int): Int {
-    val cyfry = numer.toString().padStart(4, '0').map { it - '0' }
-    val suma = cyfry.mapIndexed { i, c -> c * if (i % 2 == 0) 3 else 1 }.sum()
-    return (10 - suma % 10) % 10
-}
-
-/** Pełny kod badge'a dla numeru pracownika (np. 7 → `PRC-0007-3`). */
-fun badgeCode(numer: Int): String =
-    "$BADGE_PREFIX${numer.toString().padStart(4, '0')}-${cyfraKontrolna(numer)}"
-
-/**
- * Numer pracownika z zeskanowanego kodu albo `null`, gdy kod nie jest badge'em
- * ALBO nie zgadza się cyfra kontrolna.
- *
- * Świadomie jedna wartość dla obu przypadków: dla wołającego to ten sam wniosek
- * („to nie jest ważny badge"), a rozróżnianie ich w UI kusiłoby, żeby przy złej
- * cyfrze kontrolnej „spróbować mimo wszystko".
- */
-fun parseBadge(raw: String): Int? {
-    val m = BADGE_RE.find(raw.trim().uppercase()) ?: return null
-    val numer = m.groupValues[1].toInt()
-    return if (m.groupValues[2].toInt() == cyfraKontrolna(numer)) numer else null
-}
 
 /** Czy kod ma KSZTAŁT badge'a — bez sprawdzania cyfry kontrolnej. */
 fun looksLikeBadge(raw: String): Boolean = BADGE_RE.matches(raw.trim().uppercase())

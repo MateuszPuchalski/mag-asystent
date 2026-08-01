@@ -168,17 +168,7 @@ CREATE TABLE IF NOT EXISTS sgt_pozycja (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   dok_id INTEGER NOT NULL REFERENCES sgt_dokument(dok_id),
   tw_id  INTEGER NOT NULL,
-  ilosc  REAL NOT NULL,
-  -- Identyfikator WIERSZA faktury w Subiekcie (klucz `dok_Pozycja`).
-  --
-  -- Potrzebny, bo ten sam towar potrafi stać na fakturze dwa razy — w dwóch
-  -- cenach albo z dwóch partii. Dopasowanie po parze (dokument, towar) nie
-  -- rozstrzyga wtedy, o który wiersz chodzi, a opis różnic biuro trzyma
-  -- właśnie PRZY POZYCJI (patrz docs/subiekt-gt-struktura.md).
-  --
-  -- Nullowalny celowo: baza bez tej kolumny albo starszy read-model mają dać
-  -- NULL, a nie wywrócić import.
-  ob_id  INTEGER
+  ilosc  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_pozycja_dok ON sgt_pozycja(dok_id);
 
@@ -193,8 +183,7 @@ CREATE TABLE IF NOT EXISTS sgt_zamowienie (
   nr_pelny  TEXT NOT NULL,
   data_wyst TEXT NOT NULL,                        -- ISO date
   termin    TEXT,                                 -- NULL gdy kolumna terminu nieskonfigurowana
-  dostawca  TEXT,
-  status    INTEGER NOT NULL DEFAULT 0            -- surowy dok_Status, do diagnostyki
+  dostawca  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sgt_zam_pozycja (
@@ -221,9 +210,6 @@ INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
 -- aplikacja zapisuje WYŁĄCZNIE lokalizację (D1): żadnego MM, żadnego
 -- waiting_for_doc. Dzięki temu można rozkładać dostawę, zanim księgowość
 -- zaksięguje FZ (dokument w buforze).
---
--- Zwrot działa tak samo, z jedną różnicą: towar leży na magazynie Zwroty, więc
--- po rozłożeniu KOSZYKA trzeba go realnie przesunąć na MAG (jeden MM na koszyk).
 CREATE TABLE IF NOT EXISTS delivery (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   sgt_dok_id    INTEGER NOT NULL UNIQUE,
@@ -236,8 +222,7 @@ CREATE TABLE IF NOT EXISTS delivery (
   status        TEXT NOT NULL DEFAULT 'open',   -- open | done | (abandoned: historyczne)
   opened_at     TEXT NOT NULL,
   closed_at     TEXT,
-  -- Magazyn skutku dokumentu (snapshot z chwili otwarcia). Jedyne, co odróżnia
-  -- zwrot od dostawy krajowej: MAG ⇒ sam adres, Zwroty ⇒ dodatkowo MM na koszyk.
+  -- Magazyn skutku dokumentu (snapshot z chwili otwarcia).
   source_mag_id INTEGER
 );
 
@@ -253,28 +238,11 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   lok_oczekiwana TEXT,                          -- tw_Lokalizacja w chwili otwarcia
   lok_faktyczna  TEXT,                          -- zeskanowana (fakt, nie intencja — D3)
   status         TEXT NOT NULL DEFAULT 'todo',  -- todo | done | partial | problem | skipped
-  -- JSON: identyfikatory pozycji faktury składających się na tę linię, rosnąco.
-  -- LISTA, nie jedna wartość, bo openDelivery agreguje ten sam towar z kilku
-  -- wierszy dokumentu w jedną linię roboczą.
-  sgt_pozycje    TEXT,
   done_at        TEXT,
   done_by        TEXT,
   -- Przy natłoku jedną dostawę rozkłada kilka osób (TTL w services/locks.ts).
   locked_by      TEXT,
-  locked_at      TEXT,
-  -- ── Zwroty: koszyk jako jednostka pracy ──────────────────────────────────
-  -- Numer koszyka wpisany przy odkładaniu. Podział na koszyki istnieje tylko
-  -- fizycznie (biuro wystawia JEDEN zbiorczy dokument), więc to tutaj jest
-  -- jego jedyny ślad w systemie.
-  koszyk         TEXT,
-  -- Ile z `ilosc_odlozona` objął już dokument MM. Różnica (odłożone − objęte)
-  -- to dokładnie to, co czeka na przesunięcie. Licznik, a nie flaga, bo TEN SAM
-  -- towar potrafi być w dwóch koszykach (klient A zwrócił 3, klient B 2), a
-  -- dokument zbiorczy agreguje go w jedną linię — flaga „już w MM" gubiłaby
-  -- resztę, a ponowne zamknięcie koszyka dublowałoby przesunięcie.
-  mm_ilosc       REAL NOT NULL DEFAULT 0,
-  -- Ostatni MM, który objął tę linię — do prześledzenia „czym pojechała".
-  mm_queue_id    INTEGER
+  locked_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
@@ -306,10 +274,8 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   ean           TEXT NOT NULL,
   tw_ids        TEXT NOT NULL,      -- JSON array (SQLite nie ma INTEGER[])
-  wybrany_tw_id INTEGER,
   auto          INTEGER NOT NULL DEFAULT 0,
-  seen_at       TEXT NOT NULL,
-  context       TEXT                -- 'przyjecie' | 'zmiana_lokalizacji' | 'podglad'
+  seen_at       TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 

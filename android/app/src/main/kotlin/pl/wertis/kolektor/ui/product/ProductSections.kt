@@ -97,7 +97,7 @@ fun MagazynySekcja(p: ProductCard, otwarta: Boolean, onToggle: () -> Unit) {
     val podsumowanie = podsumowanieMagazynow(p.magazyny, zwroty) ?: return
     CollapsibleSection("Pozostałe magazyny", podsumowanie, otwarta, onToggle) {
         if (zwroty > 0) {
-            MagazynRow("ZWROTY", "czeka na rozłożenie (karton zwrotów)", zwroty, p.unit)
+            MagazynRow("ZWROTY", "zwroty od klientów — rozlicza biuro", zwroty, p.unit)
         }
         p.magazyny.forEach { m -> MagazynRow(m.kod, m.nazwa, m.stan, p.unit) }
     }

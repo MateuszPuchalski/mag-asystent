@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
 import { listLocations, getProductsByLocation } from "../services/locations.js";
-import { locRulesVersion } from "../scan.js";
 
 export async function locationRoutes(app: FastifyInstance) {
   // Słownik lokalizacji + REGUŁA rozpoznawania kodu. Serwer jest jej jedynym
@@ -11,7 +10,6 @@ export async function locationRoutes(app: FastifyInstance) {
     codes: listLocations(),
     patterns: config.locPatterns,
     /** Wersja reguły — po niej klient poznaje, że jego cache jest nieaktualny. */
-    version: locRulesVersion,
     /** Zgodność wsteczna ze starszym kolektorem (jeden wzorzec zamiast listy). */
     format: config.locPatterns[0],
     strict: config.locStrict,

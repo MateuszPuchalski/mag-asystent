@@ -97,15 +97,6 @@ export const config = {
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n >= 0),
     /**
-     * Kody `dok_Typ` dokumentów zwrotów listowanych na magazynie Zwroty (CSV).
-     * Domyślnie `14` = ZW (zwrot). Puste = każdy dokument na tym magazynie —
-     * zostaw puste, jeśli biuro przyjmuje zwroty także innym typem.
-     */
-    dokTypyZwroty: (process.env.DOK_TYP_ZWROTY ?? "14")
-      .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => Number.isFinite(n) && n > 0),
-    /**
      * Kody `dok_Typ` DOSTAW listowanych do rozłożenia (CSV).
      *
      * Domyślnie `1` — sama FZ. U tego klienta towar wchodzi wyłącznie fakturą
@@ -163,23 +154,6 @@ export const config = {
      * jest uczciwsze niż podstawienie daty wystawienia w miejsce terminu.
      */
     zdTerminColumn: process.env.MSSQL_ZD_TERMIN_COLUMN ?? "",
-    /**
-     * Kolumna `dok_Pozycja` z identyfikatorem WIERSZA faktury (klucz pozycji).
-     *
-     * Potrzebna, bo ten sam towar potrafi stać na fakturze dwa razy — w dwóch
-     * cenach albo z dwóch partii — a opis różnic biuro trzyma PRZY POZYCJI.
-     * Bez tego identyfikatora nie da się wskazać, o który wiersz chodzi.
-     *
-     * Nasz opis struktury tej kolumny nie wymienia, więc domyślna nazwa to
-     * [WERYFIKUJ] — dokładnie ta sama sytuacja co przy `zdZrealColumn`, gdzie
-     * zgadnięta nazwa okazała się BŁĘDNA. Sprawdź ją jednym SELECT-em
-     * (docs/subiekt-gt-struktura.md).
-     *
-     * Gdy kolumny nie ma, import NIE przerywa się: powtarza zapytanie bez niej,
-     * zostawia NULL i melduje to w /api/health. Puste = świadoma rezygnacja,
-     * bez komunikatu.
-     */
-    pozIdColumn: process.env.MSSQL_POZ_ID_COLUMN ?? "ob_Id",
     /**
      * Wyrażenie SQL 0/1: dokument w buforze. `dok_Status` ma udokumentowane
      * wartości {0-wycofany, 1-wykonany, 2-unieważniony, 3-odłożony, 4-MM wydany,

@@ -57,13 +57,9 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    Dokumenty w buforze SGT są normalnie dostępne do pracy (D1) — rozkładanie nie
    czeka na księgowość. Ukończone schodzą na dół i szarzeją, ale nie znikają.
 
-   ZWROTY NIE SĄ TU LISTOWANE. Zakładka pokazuje wyłącznie to, czym towar wchodzi
-   na magazyn u tego klienta — a to są same FZ (`DOK_TYPY_DOSTAW=1`). Zwroty mają
-   inny rytm pracy (koszyk, nie paleta) i inny skutek (MM Zwroty→MAG), więc
-   wracają jako osobne wejście, a nie jako sekcja tutaj.
-
-   Serwerowa ścieżka koszyków ZOSTAJE nietknięta — to jest ukrycie wejścia,
-   nie wycofanie funkcji.                                                     */
+   ZWROTÓW TU NIE MA i nie ma ich też na serwerze: zakładka pokazuje wyłącznie
+   to, czym towar wchodzi na magazyn u tego klienta, czyli same FZ
+   (`DOK_TYPY_DOSTAW=1`). Zwroty rozlicza biuro w Subiekcie.                  */
 
 @Composable
 fun DeliveryDocumentsScreen(graph: AppGraph) {
@@ -95,11 +91,7 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
     }
 
     // ukończone na dół, reszta malejąco po dacie (serwer już sortuje po dacie)
-    // Zwroty odfiltrowane TUTAJ, nie na serwerze: trasa i koszyki zostają
-    // sprawne, znika tylko wejście z tej zakładki.
-    val dostawy = r.documents
-        .filter { !it.zwrot }
-        .sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
+    val dostawy = r.documents.sortedBy { it.linesTotal > 0 && it.linesDone >= it.linesTotal }
 
     Column(
         modifier = Modifier
@@ -159,23 +151,14 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(
-                    when {
-                        complete -> Success.copy(alpha = 0.15f)
-                        // zwrot odróżnia się także po przewinięciu nagłówka sekcji
-                        d.zwrot -> AmberBg
-                        else -> Secondary
-                    }
+                    if (complete) Success.copy(alpha = 0.15f) else Secondary
                 ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 if (complete) WIcons.Check else WIcons.Box,
                 contentDescription = null,
-                tint = when {
-                    complete -> Success
-                    d.zwrot -> AmberInk
-                    else -> Ink
-                },
+                tint = if (complete) Success else Ink,
                 modifier = Modifier.size(20.dp),
             )
         }

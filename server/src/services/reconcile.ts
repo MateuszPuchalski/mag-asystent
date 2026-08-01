@@ -1,6 +1,5 @@
 import { db } from "../db/db.js";
 import { subiekt } from "../context.js";
-import { config } from "../config.js";
 import { parseLocs } from "../locs.js";
 
 /* ── Nocna rekoncyliacja (plan §9) ──────────────────────────────────────────
@@ -8,7 +7,7 @@ import { parseLocs } from "../locs.js";
    stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała.
 
    To jest tania obrona przed cichym błędem: kod się kompiluje, działa, wygląda
-   dobrze i przez trzy tygodnie rozjeżdża dane. Wszystkie cztery kontrole
+   dobrze i przez trzy tygodnie rozjeżdża dane. Wszystkie trzy kontrole
    pytają o to samo — czy deklarowany niezmiennik jeszcze obowiązuje. Bo
    niezmienniki trzeba MIERZYĆ, nie deklarować.
 
@@ -16,7 +15,7 @@ import { parseLocs } from "../locs.js";
    być czytany po tygodniu — a wtedy nie chroni już przed niczym.             */
 
 export interface Rozjazd {
-  rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "koszyk_bez_mm";
+  rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -24,7 +23,7 @@ export interface Rozjazd {
 
 export interface Rekoncyliacja {
   at: string;
-  sprawdzono: { kartotek: number; zadan: number; koszykow: number };
+  sprawdzono: { kartotek: number; zadan: number };
   rozjazdy: Rozjazd[];
 }
 
@@ -109,56 +108,17 @@ function utknieteWBuforze(): Rozjazd[] {
   }));
 }
 
-/**
- * 4. Koszyki zwrotów rozłożone, ale bez MM, starsze niż 24 h.
- *
- * README opisuje „adres przed sprzedawalnością" jako niezmiennik. Koszyk bez MM
- * to dokładnie ten stan po bezpiecznej stronie — towar leży z adresem, ale
- * jeszcze nie jest sprzedawalny. Bezpieczny nie znaczy jednak „może tak zostać
- * na zawsze": po dobie to utracona sprzedaż, o której nikt nie wie.
- */
-function koszykiBezMm(): { rozjazdy: Rozjazd[]; sprawdzono: number } {
-  const rows = db()
-    .prepare(
-      `SELECT d.sgt_dok_numer AS dok, l.koszyk,
-              SUM(l.ilosc_odlozona - l.mm_ilosc) AS zaleglosc,
-              MIN(l.done_at) AS od
-       FROM delivery_line l JOIN delivery d ON d.id = l.delivery_id
-       WHERE l.koszyk IS NOT NULL AND l.ilosc_odlozona > l.mm_ilosc
-         AND d.source_mag_id IS NOT NULL AND d.source_mag_id <> ?
-       GROUP BY d.id, l.koszyk
-       HAVING od < datetime('now','-1 day')`
-    )
-    .all(config.magId.MAG) as Array<{
-    dok: string;
-    koszyk: string;
-    zaleglosc: number;
-    od: string;
-  }>;
-  return {
-    sprawdzono: rows.length,
-    rozjazdy: rows.map((r) => ({
-      rodzaj: "koszyk_bez_mm" as const,
-      klucz: `${r.dok} / koszyk ${r.koszyk}`,
-      opis: `${r.zaleglosc} szt. leży na półce z adresem, ale wciąż na magazynie Zwroty — brak MM`,
-      odKiedy: r.od,
-    })),
-  };
-}
-
 export function reconcile(): Rekoncyliacja {
   const loc = lokalizacje();
   const bledy = zadaniaWBledzie();
   const bufor = utknieteWBuforze();
-  const kosz = koszykiBezMm();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
       zadan: bledy.length + bufor.length,
-      koszykow: kosz.sprawdzono,
     },
-    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor, ...kosz.rozjazdy],
+    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor],
   };
 }
 
