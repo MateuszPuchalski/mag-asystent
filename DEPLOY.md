@@ -2,16 +2,15 @@
 
 Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 **Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
-magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd
-reklamacji pod `http://serwer:3001/biuro`** — nierozwiązane wyjątki i protokoły
-rozbieżności do wydruku. Status rozkładania i operacje zostają na kolektorze.
-Zero chmury.
+magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd pod
+`http://serwer:3001/biuro`** — status dostaw i protokoły rozbieżności do
+wydruku; operacje wykonuje się wyłącznie na kolektorze. Zero chmury.
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
         ▼
 Maszyna z Subiektem GT (Windows)
-  ├─ wertis-api     Fastify: REST + podgląd reklamacji pod /biuro
+  ├─ wertis-api     Fastify: REST + podgląd biura pod /biuro
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
   ├─ wertis.db      SQLite: faktury zakupu z postępem per pozycja, wyjątki,
   │                 sesje trybu B, kolejka, audyt events

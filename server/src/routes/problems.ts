@@ -3,7 +3,6 @@ import type { FastifyInstance } from "fastify";
 import { userOf } from "../context.js";
 import { eanConflictReport } from "../services/ean.js";
 import {
-  deliveryHeader,
   exportCsv,
   listByDelivery,
   listUnresolved,
@@ -61,15 +60,10 @@ export async function problemRoutes(app: FastifyInstance) {
     return r;
   });
 
-  /**
-   * Wyjątki JEDNEJ dostawy — źródło formularza reklamacyjnego w podglądzie
-   * biura. Razem z nimi idzie nagłówek dokumentu (dostawca, data): protokół
-   * potrzebuje go do druku, a podgląd nie czyta listy dostaw.
-   */
-  app.get<{ Params: { id: string } }>("/api/delivery/:id/problems", async (req) => {
-    const id = Number(req.params.id);
-    return { problems: listByDelivery(id), dokument: deliveryHeader(id) };
-  });
+  /** Wyjątki JEDNEJ dostawy — źródło formularza reklamacyjnego w podglądzie biura. */
+  app.get<{ Params: { id: string } }>("/api/delivery/:id/problems", async (req) => ({
+    problems: listByDelivery(Number(req.params.id)),
+  }));
 
   /** CSV do reklamacji — podstawa rozmowy z dostawcą. */
   app.get<{ Params: { id: string } }>("/api/delivery/:id/problems.csv", async (req, reply) => {

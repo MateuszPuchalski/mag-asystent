@@ -28,38 +28,6 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
-## 0.19.0 — 1 sierpnia 2026
-
-Z podglądu biura znika sekcja **DOSTAWY · STATUS ROZKŁADANIA** — dodana dzień
-wcześniej razem z resztą strony. Zostają **REKLAMACJE**: nierozwiązane wyjątki,
-protokół rozbieżności do wydruku i CSV.
-
-### Dlaczego wychodzi coś tak świeżego
-
-Tabela statusu była kopią ekranu kolektora w przeglądarce. Ten sam stan stał
-w dwóch miejscach, przy czym kopia w biurze była z definicji starsza o cykl
-odświeżania. Biuro nie mogło z nią nic zrobić: żadnego przycisku, żadnej
-decyzji, żadnego pola do wpisania. Sam odczyt stanu, który należy do człowieka
-wykonującego pracę.
-
-To ten sam kształt, który wycięły 0.16.0 i 0.17.0 — kanał informacyjny bez
-odbiorcy podejmującego działanie. Reklamacje są odwrotnością: dokument
-powstaje w biurze, jedzie do dostawcy i na kolektorze nie ma jak go wydrukować.
-
-### Co się zmieniło pod spodem
-
-Strona nie woła już `GET /api/delivery/documents`. Nagłówek protokołu
-(dostawca, data dokumentu) przychodzi teraz razem z wyjątkami: odpowiedź
-`GET /api/delivery/:id/problems` niesie dodatkowe pole `dokument`, czytane
-z lokalnej tabeli `delivery`. Wcześniej podgląd pobierał całą listę dostaw dla
-dwóch pól nagłówka.
-
-Trasa `GET /api/delivery/documents` **zostaje** — czyta ją kolektor.
-
-### [wymaga działania] przy wdrożeniu
-
-`git pull`, `npm ci`, `npm run build`, restart usług. Adres i konta bez zmian.
-
 ## 0.18.0 — 1 sierpnia 2026
 
 Biuro dostaje **podgląd pod `/biuro`** — pierwszy własny ekran od usunięcia

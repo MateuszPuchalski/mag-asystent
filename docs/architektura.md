@@ -66,14 +66,12 @@ adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
 └─────────────────────┘         └──────────────────────────────┘
 ```
 
-**Biuro ma podgląd reklamacji pod `/biuro`** — jedną stronę HTML bez builda
+**Biuro ma podgląd pod `/biuro`** — jedną stronę HTML bez builda
 (`server/src/web/biuro.html`), serwowaną przez API i czytającą istniejące trasy
 z tokenem sesji. Wcześniejszy `/lookup` zniknął razem z klientem PWA; nowy
 podgląd świadomie nie jest drugim frontem: zero frameworka, zero zapisu.
-Powstał w 0.18.0 z dwiema sekcjami; w 0.19.0 została jedna. Status rozkładania
-wyleciał, bo był kopią ekranu kolektora — biuro nie może z nim nic zrobić,
-a stan pracy należy do tego, kto ją wykonuje. Zostały reklamacje: wyjątki
-i protokoły rozbieżności, których na kolektorze wydrukować się nie da.
+Powstał w 0.18.0, bo wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał,
+którym biuro widziało stan dostaw.
 
 ---
 

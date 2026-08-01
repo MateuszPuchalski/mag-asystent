@@ -31,13 +31,6 @@ test("strona /biuro jest serwowana bez sesji", async () => {
   assert.match(r.body, /Podgląd biura/);
 });
 
-test("strona nie dubluje listy dostaw z kolektora", async () => {
-  // regresja tu wróciłaby jako druga kopia ekranu kolektora — wycięta w 0.19.0,
-  // bo status rozkładania należy do człowieka, który go zmienia
-  const r = await app.inject({ method: "GET", url: "/biuro" });
-  assert.doesNotMatch(r.body, /\/api\/delivery\/documents/);
-});
-
 test("korzeń przekierowuje do podglądu", async () => {
   const r = await app.inject({ method: "GET", url: "/" });
   assert.equal(r.statusCode, 302);
@@ -48,6 +41,7 @@ test("dane strony zostają za bramką sesji", async () => {
   // dokładnie trasy, z których strona czyta — regresja w którejkolwiek
   // otworzyłaby dane magazynu każdemu w LAN
   for (const url of [
+    "/api/delivery/documents",
     "/api/problems/unresolved",
     "/api/delivery/1/problems",
     "/api/delivery/1/problems.csv",

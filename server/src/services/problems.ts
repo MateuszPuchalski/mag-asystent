@@ -162,22 +162,6 @@ export function listByDelivery(deliveryId: number): ProblemView[] {
   ).map(mapRow);
 }
 
-/**
- * Nagłówek dostawy do protokołu reklamacyjnego: numer, dostawca, data.
- * Czytany z lokalnej tabeli `delivery`, bo protokół bez dostawcy nie jest
- * dokumentem do wysłania. Osobna funkcja, żeby podgląd biura nie musiał
- * pobierać całej listy dokumentów tylko dla dwóch pól nagłówka.
- */
-export function deliveryHeader(
-  deliveryId: number
-): { nrPelny: string; dostawca: string; dataWyst: string } | null {
-  const r = db()
-    .prepare("SELECT sgt_dok_numer, dostawca, data_dok FROM delivery WHERE id = ?")
-    .get(deliveryId) as { sgt_dok_numer: string; dostawca: string | null; data_dok: string | null } | undefined;
-  if (!r) return null;
-  return { nrPelny: r.sgt_dok_numer, dostawca: r.dostawca ?? "", dataWyst: r.data_dok ?? "" };
-}
-
 export function resolveProblem(id: number, note: string | undefined, user: string): { ok: true } | { error: string } {
   const r = db()
     .prepare("UPDATE problem SET resolved_at=?, resolved_note=? WHERE id=? AND resolved_at IS NULL")
