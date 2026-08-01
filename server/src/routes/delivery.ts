@@ -101,15 +101,15 @@ export async function deliveryRoutes(app: FastifyInstance) {
    * Bez tego jedyną drogą jest odczekanie 30 minut, a najczęstsza przyczyna
    * wiszącego locka (koniec zmiany, utrata zasięgu) sprawia, że czeka się na
    * nic. Jednocześnie to jedyne miejsce w aplikacji, gdzie jedna osoba odbiera
-   * pracę drugiej bez jej wiedzy — więc badge nie wystarcza (badge'e bywają
-   * pożyczane), a zdarzenie idzie do `events` zawsze.
+   * pracę drugiej bez jej wiedzy — więc zastrzegamy je dla brygadzisty i biura,
+   * a zdarzenie idzie do `events` zawsze.
    */
-  app.post<{ Params: { lineId: string }; Body: { pin?: string } }>(
+  app.post<{ Params: { lineId: string } }>(
     "/api/delivery/:id/lines/:lineId/force-release",
     async (req, reply) => {
       const s = sesja(currentToken());
-      if (!s) return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
-      const w = autoryzuj(s.user, "zdjecie_cudzego_locka", req.body?.pin ?? null);
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      const w = autoryzuj(s.user, "zdjecie_cudzego_locka");
       if (!w.ok) return reply.code(403).send({ error: w.powod });
       return forceReleaseLine(Number(req.params.lineId), s.user.name);
     }

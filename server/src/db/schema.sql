@@ -88,29 +88,31 @@ CREATE INDEX IF NOT EXISTS ix_events_tw_time ON events(tw_id, created_at);
 -- nadawał się tylko do czytania oczami — nie do żadnego zestawienia. Do tego
 -- każdy mógł podać się za kogokolwiek jednym wpisem.
 --
--- `badge_code` nie niesie nazwiska: badge się gubi i zostaje na kurtce.
--- Powiązanie kod → człowiek żyje wyłącznie tutaj.
+-- Wejście to LOGIN I HASŁO — ten sam wzorzec, co reszta systemów w firmie.
+-- Wcześniej był nim skan plakietki; wyszedł w 0.20.0 razem z PIN-em.
 CREATE TABLE IF NOT EXISTS app_user (
   user_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-  badge_code TEXT NOT NULL UNIQUE,               -- PRC-0007-3 (z cyfrą kontrolną)
+  -- NULL jest stanem prawidłowym i celowym: konto-ślad. Powstaje przy migracji
+  -- historii (`events.user_id` → konto) i po przejściu z plakietek. Ma na co
+  -- wskazywać audyt, ale nie ma czym się zalogować — i tak ma zostać.
+  login      TEXT UNIQUE,
+  -- scrypt, sól per konto, format `sol_hex:hash_hex`. NULL = konto nie loguje się.
+  haslo_hash TEXT,
   name       TEXT NOT NULL,
-  -- Tylko dla ról uprzywilejowanych. Badge'e bywają pożyczane; PIN sprawia,
-  -- że „ktoś użył mojego badge'a" jest kłamstwem, a nie wymówką.
-  pin_hash   TEXT,
   role       TEXT NOT NULL DEFAULT 'magazynier', -- magazynier | brygadzista | biuro
   active     INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
--- Sesja urządzenia: skan badge'a → token. Nagłówek `X-User` przestaje być
+-- Sesja urządzenia: login i hasło → token. Nagłówek `X-User` przestaje być
 -- tożsamością (dało się go wpisać ręcznie), a staje się co najwyżej podpowiedzią.
 CREATE TABLE IF NOT EXISTS device_session (
   token      TEXT PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES app_user(user_id),
   device_id  TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  -- Ostatnia aktywność. BLOKADA po bezczynności, nigdy wylogowanie: wylogowanie
-  -- gubiące 30 rozłożonych pozycji to sposób na aplikację leżącą w szufladzie.
+  -- Ostatnia aktywność. NICZEGO NIE BRAMKUJE od czasu usunięcia blokady po
+  -- bezczynności — jest jedynym śladem, kiedy dany kolektor się odezwał, i tyle.
   last_seen  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   revoked_at TEXT
 );

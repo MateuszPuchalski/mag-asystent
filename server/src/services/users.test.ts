@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* Badge rozstrzyga, KTO wykonał operację — błąd tutaj kończy się wpisem
+/* Konto rozstrzyga, KTO wykonał operację — błąd tutaj kończy się wpisem
    w audycie pod cudzym nazwiskiem, nie komunikatem na ekranie.               */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-usr-")), "t.db");
@@ -23,81 +23,70 @@ beforeEach(() => {
   db().prepare("DELETE FROM app_user").run();
 });
 
-/* ── Wektory WSPÓLNE z :core ────────────────────────────────────────────────
-   Cyfra kontrolna ma dwie niezależne implementacje — TypeScript tutaj
-   i Kotlin w `core/badge/Badge.kt` — bo algorytmu nie da się wysłać jako
-   wzorca, tak jak wysyłamy wzorce lokalizacji. Duplikacja jest więc
-   nieunikniona, ale rozjazd już nie: TA SAMA tabela jest zaasertowana po obu
-   stronach (`BadgeTest.kt`). Trzy niezależne kopie jednej reguły były
-   przyczyną §1 — ta ma dokładnie dwie i test, który je spina.                */
-const WEKTORY: Array<[number, string]> = [
-  [1, "PRC-0001-9"],
-  [7, "PRC-0007-3"],
-  [42, "PRC-0042-6"],
-  [999, "PRC-0999-5"],
-  [1234, "PRC-1234-2"],
-  [9999, "PRC-9999-8"],
-];
+/* ── Login ───────────────────────────────────────────────────────────────── */
 
-test("kody badge zgadzają się z implementacją kolektora", () => {
-  for (const [numer, kod] of WEKTORY) assert.equal(U.badgeCode(numer), kod, String(numer));
+test("login nie rozróżnia wielkości liter ani spacji", () => {
+  // inaczej „Kowalski" i „kowalski" byłyby dwoma kontami tej samej osoby
+  U.createUser("Jan Kowalski", "magazynier", "  JKowalski ", "tajnehaslo");
+  assert.equal(U.userByLogin("jkowalski")?.name, "Jan Kowalski");
+  assert.equal(U.userByLogin("JKOWALSKI")?.name, "Jan Kowalski");
 });
 
-test("odczyt wraca do numeru", () => {
-  for (const [numer, kod] of WEKTORY) assert.equal(U.parseBadge(kod), numer);
-});
-
-test("przekłamana cyfra to odmowa, NIE cudzy badge", () => {
-  // bez cyfry kontrolnej starty znak zamienia Jana w Piotra, a audyt wskazuje
-  // niewinnego — to jest różnica między „nie odczytano" a „odczytano źle"
-  assert.equal(U.parseBadge("PRC-0007-4"), null);
-  assert.equal(U.parseBadge("PRC-0008-3"), null);
-  assert.equal(U.parseBadge("PRC-0070-3"), null, "przestawione sąsiednie cyfry");
-});
-
-test("co nie jest badgem, nie udaje badge'a", () => {
-  for (const zly of ["PRC-007-3", "ABC-0007-3", "A01-02-03", "5901234567890", ""]) {
-    assert.equal(U.parseBadge(zly), null, zly);
+test("kształt loginu jest zamknięty", () => {
+  for (const dobry of ["jkowalski", "anna.nowak", "brygada_1", "p-nowak", "abc"]) {
+    assert.ok(U.poprawnyLogin(dobry), dobry);
+  }
+  for (const zly of ["ab", "jan kowalski", "jan@wertis.pl", "żółw", "-start", ""]) {
+    assert.ok(!U.poprawnyLogin(zly), zly);
   }
 });
 
-/* ── PIN ─────────────────────────────────────────────────────────────────── */
+/* ── Hasło ───────────────────────────────────────────────────────────────── */
 
-test("PIN nie jest przechowywany jawnie i weryfikuje się poprawnie", () => {
-  const hash = U.hashPin("4821");
-  assert.ok(!hash.includes("4821"), "PIN nie może być odtwarzalny z hasza");
-  assert.ok(U.sprawdzPin("4821", hash));
-  assert.ok(!U.sprawdzPin("4822", hash));
-  assert.ok(!U.sprawdzPin("4821", null));
+test("hasło nie jest przechowywane jawnie i weryfikuje się poprawnie", () => {
+  const hash = U.hashSekret("tajnehaslo");
+  assert.ok(!hash.includes("tajnehaslo"), "hasło nie może być odtwarzalne z hasza");
+  assert.ok(U.sprawdzSekret("tajnehaslo", hash));
+  assert.ok(!U.sprawdzSekret("tajnehasło", hash));
+  assert.ok(!U.sprawdzSekret("tajnehaslo", null));
 });
 
-test("ten sam PIN daje różne hasze — sól per konto", () => {
-  // bez soli identyczne PIN-y widać w bazie gołym okiem
-  assert.notEqual(U.hashPin("1111"), U.hashPin("1111"));
+test("to samo hasło daje różne hasze — sól per konto", () => {
+  // bez soli identyczne hasła widać w bazie gołym okiem
+  assert.notEqual(U.hashSekret("tajnehaslo"), U.hashSekret("tajnehaslo"));
+});
+
+test("hasła nie widać w widoku konta", () => {
+  const u = U.createUser("Jan Kowalski", "biuro", "jkowalski", "tajnehaslo");
+  assert.equal(JSON.stringify(u).includes("tajnehaslo"), false);
+  assert.equal(u.maHaslo, true, "widok mówi TYLKO, że hasło jest");
 });
 
 /* ── Konta ───────────────────────────────────────────────────────────────── */
 
-test("numery badge nadaje serwer, kolejno i bez powtórzeń", () => {
-  const a = U.createUser("Jan Kowalski");
-  const b = U.createUser("Anna Nowak");
-  assert.equal(a.badgeCode, "PRC-0001-9");
-  assert.equal(b.badgeCode, "PRC-0002-8");
-  assert.equal(U.userByBadge("PRC-0002-8")?.name, "Anna Nowak");
+test("konto bez hasła nie loguje się, ale zostaje w bazie", () => {
+  // taki kształt ma konto-ślad: z migracji historii i po przejściu z plakietek
+  const u = U.createUser("Historia Sprzed Kont");
+  assert.equal(u.login, null);
+  assert.equal(u.maHaslo, false);
+  assert.ok(U.userById(u.userId), "historia ma na co wskazywać");
 });
 
-test("badge nie niesie nazwiska", () => {
-  // badge się gubi i zostaje na kurtce
-  const u = U.createUser("Jan Kowalski");
-  assert.ok(!u.badgeCode.toLowerCase().includes("kowalski"));
-  assert.ok(!u.badgeCode.toLowerCase().includes("jan"));
-});
-
-test("konto nieaktywne nie loguje się badgem, ale zostaje w bazie", () => {
-  const u = U.createUser("Były Pracownik");
+test("konto nieaktywne nie loguje się, ale zostaje w bazie", () => {
+  const u = U.createUser("Były Pracownik", "magazynier", "bpracownik", "tajnehaslo");
   U.setActive(u.userId, false);
-  assert.equal(U.userByBadge(u.badgeCode), null, "nie zaloguje się");
+  assert.equal(U.userByLogin("bpracownik"), null, "nie zaloguje się");
   assert.ok(U.userById(u.userId), "ale historia ma na co wskazywać");
+});
+
+test("konto-ślad NIE otwiera furtki pierwszego konta", () => {
+  /* Furtka liczy konta Z LOGINEM. Gdyby liczyła wiersze, każda instalacja
+     z historią miałaby ją zamkniętą na głucho: żeby założyć konto, trzeba
+     sesji, a żeby mieć sesję, trzeba konta. */
+  U.createUser("Historia Sprzed Kont");
+  assert.equal(U.brakKont(), true, "sam ślad nie jest kontem do logowania");
+  U.createUser("Biuro Zakupy", "biuro", "biuro", "tajnehaslo");
+  assert.equal(U.brakKont(), false);
 });
 
 /* ── Migracja historii ───────────────────────────────────────────────────── */

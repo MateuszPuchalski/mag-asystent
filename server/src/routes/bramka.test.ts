@@ -52,7 +52,10 @@ beforeEach(() => {
 
 /** Konto + świeża sesja; zwraca token do nagłówka `x-session`. */
 function zalogowany(rola: "magazynier" | "biuro" = "magazynier"): string {
-  const u = createUser(rola === "biuro" ? "Biuro Testowe" : "Jan Testowy", rola, "4821");
+  const u =
+    rola === "biuro"
+      ? createUser("Biuro Testowe", rola, "biuro", "tajnehaslo")
+      : createUser("Jan Testowy", rola, "jtestowy", "tajnehaslo");
   const token = `tok-${u.userId}-${Math.random().toString(16).slice(2)}`;
   const teraz = new Date().toISOString();
   db()
@@ -65,7 +68,7 @@ function zalogowany(rola: "magazynier" | "biuro" = "magazynier"): string {
 
 /** Sesja bez ruchu od godziny — kiedyś zablokowana, dziś zwyczajnie czynna. */
 function bezczynny(): { token: string; userId: number } {
-  const u = createUser("Stary Testowy", "magazynier");
+  const u = createUser("Stary Testowy", "magazynier", "stestowy", "tajnehaslo");
   const token = `tok-old-${u.userId}`;
   const dawno = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   db()
@@ -126,7 +129,7 @@ test("pierwsze konto powstaje bez sesji, drugie już nie", async () => {
   const pierwsze = await app.inject({
     method: "POST",
     url: "/api/users",
-    payload: { name: "Biuro Zakupy", pin: "4821" },
+    payload: { name: "Biuro Zakupy", login: "biuro", haslo: "tajnehaslo" },
   });
   assert.equal(pierwsze.statusCode, 200);
   assert.equal(pierwsze.json().user.role, "biuro");
@@ -137,20 +140,47 @@ test("pierwsze konto powstaje bez sesji, drugie już nie", async () => {
   const drugie = await app.inject({
     method: "POST",
     url: "/api/users",
-    payload: { name: "Ktoś Obcy", pin: "1111" },
+    payload: { name: "Ktoś Obcy", login: "obcy", haslo: "tajnehaslo" },
   });
   assert.equal(drugie.statusCode, 401);
 });
 
-test("logowanie badge'em działa bez sesji, bo inaczej nie dałoby się zalogować", async () => {
-  const u = createUser("Jan Testowy", "magazynier");
+test("pierwsze konto BEZ hasła nie powstaje — inaczej instalacja jest martwa", async () => {
+  /* Konto bez hasła zamyka furtkę i samo się nie loguje. Powstałaby
+     instalacja, której nie da się odblokować niczym poza ręczną zmianą
+     w bazie — dlatego walidacja idzie PRZED założeniem konta. */
   const r = await app.inject({
     method: "POST",
-    url: "/api/auth/badge",
-    payload: { badge: u.badgeCode },
+    url: "/api/users",
+    payload: { name: "Biuro Zakupy", login: "biuro" },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.equal((await app.inject({ url: "/api/setup" })).json().potrzebne, true);
+});
+
+test("logowanie loginem i hasłem działa bez sesji, bo inaczej nie dałoby się zalogować", async () => {
+  createUser("Jan Testowy", "magazynier", "jtestowy", "tajnehaslo");
+  const r = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { login: "jtestowy", haslo: "tajnehaslo" },
   });
   assert.equal(r.statusCode, 200);
   assert.ok(r.json().token);
+});
+
+test("trasy logowania plakietką już nie ma", async () => {
+  /* Pilnuje, że stara droga wejścia nie została po cichu obok nowej.
+     Odpowiada BRAMKA, nie trasa — dlatego 401 z jej komunikatem, a nie 404:
+     bramka odrzuca wszystko pod `/api/` bez sesji, także ścieżki, których
+     nikt nie zarejestrował. */
+  const r = await app.inject({
+    method: "POST",
+    url: "/api/auth/badge",
+    payload: { badge: "PRC-0001-9" },
+  });
+  assert.equal(r.statusCode, 401);
+  assert.match(r.json().error, /Brak sesji/, "to bramka, nie logowanie plakietką");
 });
 
 // ── Z sesją ─────────────────────────────────────────────────────────────────

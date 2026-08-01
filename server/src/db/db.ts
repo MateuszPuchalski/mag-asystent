@@ -134,6 +134,71 @@ function migrate(database: DatabaseSync) {
      kolumny do tabeli, która już istnieje — bez tej linii istniejąca instalacja
      miałaby `sgt_magazyn` bez `nazwa` i import wywaliłby się na INSERT. */
   addColumn("sgt_magazyn", "nazwa", "TEXT NOT NULL DEFAULT ''");
+  naLoginIHaslo(database);
+}
+
+/**
+ * Przejście z plakietek na login i hasło (0.20.0).
+ *
+ * PIERWSZA przebudowa tabeli w tym repo — reszta migracji to `addColumn`.
+ * Tutaj nie ma innej drogi: `badge_code` jest `UNIQUE`, czyli ma indeks,
+ * a SQLite odmawia `DROP COLUMN` na kolumnie indeksowanej.
+ *
+ * Wiersze ZOSTAJĄ. Wskazują na nie `events.user_ref` i `sfera_queue.created_by_ref`,
+ * więc skasowanie tabeli skasowałoby sens całego audytu. Zostają jednak bez
+ * loginu i bez hasła, czyli jako konta-ślady: historia ma na co wskazywać,
+ * a zalogować się nimi nie da. Konta ludzi biuro zakłada po aktualizacji od nowa.
+ *
+ * Sesje giną wszystkie. Token wydany po skanie plakietki nie ma prawa przeżyć
+ * zmiany mechanizmu wejścia — inaczej kolektor odłożony w piątek pracuje
+ * w poniedziałek na uprawnieniach, których nikt już nie potwierdził.
+ */
+const maKolumne = (database: DatabaseSync, tabela: string, kolumna: string): boolean =>
+  (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).some(
+    (c) => c.name === kolumna
+  );
+
+function naLoginIHaslo(database: DatabaseSync) {
+  if (!maKolumne(database, "app_user", "badge_code")) return;
+
+  /* Klucze obce MUSZĄ zejść PRZED transakcją, nie w środku: `PRAGMA
+     foreign_keys` jest w transakcji ignorowane po cichu. Bez tego `DROP TABLE`
+     rodzica przy wierszach w `device_session` kończy się błędem przy starcie
+     usługi, czyli awarią dokładnie w chwili wdrożenia. */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      /* Warunek sprawdzany PONOWNIE, już pod blokadą zapisu. API i worker to
+         dwa procesy startowane razem przez NSSM i oba wołają `migrate()`.
+         `BEGIN IMMEDIATE` bierze blokadę od razu, więc drugi poczeka i zobaczy
+         tabelę już przebudowaną. */
+      if (!maKolumne(database, "app_user", "badge_code")) return;
+      database.exec(`
+        CREATE TABLE app_user_nowy (
+          user_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+          login      TEXT UNIQUE,
+          haslo_hash TEXT,
+          name       TEXT NOT NULL,
+          role       TEXT NOT NULL DEFAULT 'magazynier',
+          active     INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        );
+        INSERT INTO app_user_nowy(user_id, name, role, active, created_at)
+          SELECT user_id, name, role, active, created_at FROM app_user;
+        DROP TABLE app_user;
+        ALTER TABLE app_user_nowy RENAME TO app_user;
+      `);
+      /* `user_id` przepisujemy JAWNIE. Poleganie na AUTOINCREMENT przy
+         INSERT ... SELECT przenumerowałoby konta, a `events.user_ref`,
+         `sfera_queue.created_by_ref` i `device_session.user_id` wskazywałyby
+         wtedy cudze osoby — bez jednego objawu, aż do pierwszej reklamacji. */
+      database
+        .prepare("UPDATE device_session SET revoked_at = ? WHERE revoked_at IS NULL")
+        .run(nowIso());
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */

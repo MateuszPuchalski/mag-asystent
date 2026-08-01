@@ -1,36 +1,64 @@
 import type { FastifyInstance } from "fastify";
 import { currentDevice, currentToken } from "../context.js";
-import { autoryzuj, przejmij, sesja, wyloguj, zaloguj } from "../services/auth.js";
+import { autoryzuj, karaLogowania, sesja, wyloguj, zaloguj, zmienHaslo } from "../services/auth.js";
 import { logEvent } from "../services/events.js";
 import {
   brakKont,
   createUser,
+  HASLO_MIN,
   listUsers,
   migrujHistorie,
+  poprawnyLogin,
   setActive,
-  setPin,
+  setHaslo,
   type Rola,
 } from "../services/users.js";
 
-/* ── Tożsamość: badge zamiast wolnego tekstu (plan §7) ──────────────────────
-   Jeden skan na ścieżce codziennej. PIN dopiero tam, gdzie badge nie
-   wystarcza, bo badge'e bywają pożyczane.                                    */
+/* ── Tożsamość: konto imienne zamiast wolnego tekstu (plan §7) ──────────────
+   Login i hasło — ten sam wzorzec, co reszta systemów w firmie. Wcześniej był
+   nim skan plakietki; wyszedł w 0.20.0 razem z PIN-em do operacji
+   uprzywilejowanych, które rozstrzyga dziś sama rola.                        */
 
 // Token czyta kontekst żądania (`context.ts`), a nie każda trasa z osobna —
 // druga kopia odczytu nagłówka to druga okazja do rozjazdu.
 const token = currentToken;
 
 export async function authRoutes(app: FastifyInstance) {
-  /** Skan badge'a → sesja urządzenia. */
-  app.post<{ Body: { badge?: string } }>("/api/auth/badge", async (req, reply) => {
-    const s = zaloguj(req.body?.badge ?? "", currentDevice());
-    if (!s) {
-      // jeden komunikat dla „nie ma takiego" i „zła cyfra kontrolna" — dla
-      // człowieka to ten sam wniosek, a rozróżnianie kusiłoby do prób
-      return reply.code(401).send({ error: "Nieznany badge albo uszkodzona etykieta" });
+  /** Login i hasło → sesja urządzenia. */
+  app.post<{ Body: { login?: string; haslo?: string } }>(
+    "/api/auth/login",
+    async (req, reply) => {
+      const login = req.body?.login ?? "";
+      /* Dławienie odpowiada 429, nie 401, i to nie jest kosmetyka. „Odczekaj
+         chwilę" i „pomyliłeś hasło" to dla człowieka dwie różne instrukcje,
+         a kolektor po 401 kasuje operację z bufora (`czyPrzejsciowy`).
+         Kod nie zdradza niczego o koncie: licznik chodzi po wpisanym łańcuchu,
+         więc nieistniejący login blokuje się tak samo jak istniejący. */
+      if (karaLogowania(login) > 0) {
+        return reply.code(429).send({ error: "Za dużo prób logowania — odczekaj minutę" });
+      }
+      const s = zaloguj(login, req.body?.haslo ?? "", currentDevice());
+      if (!s) {
+        // JEDEN komunikat dla „nie ma takiego loginu", „złe hasło", „konto bez
+        // hasła" i „konto wyłączone". Rozróżnienie mówiłoby obcemu w sieci
+        // magazynu, które konta istnieją — a człowiekowi i tak nie pomaga.
+        return reply.code(401).send({ error: "Nieznany login albo błędne hasło" });
+      }
+      return { token: s.token, user: s.user };
     }
-    return { token: s.token, user: s.user };
-  });
+  );
+
+  /** Zmiana WŁASNEGO hasła — bez niej każdą zmianę musiałoby robić biuro. */
+  app.post<{ Body: { stare?: string; nowe?: string } }>(
+    "/api/auth/haslo",
+    async (req, reply) => {
+      const s = sesja(token());
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      const w = zmienHaslo(s.user, req.body?.stare ?? "", req.body?.nowe ?? "");
+      if (w.error) return reply.code(400).send({ error: w.error });
+      return { ok: true };
+    }
+  );
 
   /**
    * Kim jestem — kolektor pyta przy starcie i po powrocie z tła.
@@ -45,136 +73,121 @@ export async function authRoutes(app: FastifyInstance) {
     return { user: s.user };
   });
 
-  /**
-   * Przejęcie pracy przez inną osobę — JAWNE, nigdy po cichu.
-   * Kolektor wywołuje to dopiero po potwierdzeniu przez człowieka.
-   */
-  app.post<{ Body: { badge?: string; kontekst?: string } }>(
-    "/api/auth/handover",
-    async (req, reply) => {
-      const s = przejmij(
-        token() ?? "",
-        req.body?.badge ?? "",
-        currentDevice(),
-        req.body?.kontekst
-      );
-      if (!s) return reply.code(401).send({ error: "Nieznany badge albo uszkodzona etykieta" });
-      return { token: s.token, user: s.user };
-    }
-  );
-
   app.post("/api/auth/logout", async () => {
     const t = token();
     if (t) wyloguj(t);
     return { ok: true };
   });
 
-  /* PIN sprawdza TA TRASA, która wykonuje operację, a nie osobne „czy mój PIN
-     jest dobry". Osobne wejście dawałoby dwa miejsca, w których wolno
-     powiedzieć „ok", i tylko jedno, które faktycznie coś robi — a sprawdzenie
-     oderwane od skutku zawsze kiedyś od niego odjedzie.                      */
-
-  /* ── Administracja kontami — WYŁĄCZNIE biuro z PIN-em ─────────────────────
+  /* ── Administracja kontami — WYŁĄCZNIE biuro ──────────────────────────────
      Te trasy tworzą TOŻSAMOŚĆ, więc bez strażnika cała reszta §7 jest
-     dekoracją: `GET /api/users` wystawia `badgeCode` każdego, a logowanie to
-     sam skan badge'a, więc jedno żądanie z sieci magazynu daje listę
-     wszystkich tożsamości i możliwość zalogowania się jako dowolna z nich.
-     `POST /api/users` pozwalałby założyć konto biura z własnym PIN-em,
-     a `:id/pin` zresetować cudzy.
+     dekoracją: `GET /api/users` wystawia login każdego, `POST /api/users`
+     pozwalałby założyć konto biura z własnym hasłem, a `:id/haslo` zmienić
+     cudze. Jedno żądanie z sieci magazynu dałoby wtedy wszystko naraz.
 
-     Dlatego: rola `biuro` + PIN przy każdej zmianie, a `GET` co najmniej za
-     sesją biura. PIN-u przy odczycie nie wymagamy — lista kont jest potrzebna
-     przy każdym wydruku plakietek, a wpisywanie PIN-u do czytania zamieniłoby
-     go w odruch, czyli w nic.                                                */
+     Dlatego rola `biuro` przy każdej z nich. Do sierpnia 2026 dochodził PIN
+     przy zmianach; wyszedł razem z badge'em, bo hasło do konta jest już tym
+     sekretem, którym PIN był wobec pożyczanej plakietki.                     */
 
   /**
    * Czy instalacja jest jeszcze pusta — pytanie zadawane przez kolektor przy
    * pierwszym starcie.
    *
-   * Bez tego kolektor nie odróżnia „system dopiero powstaje" od „zeskanowałeś
-   * zły badge": obie sytuacje wyglądają jak 401 z `/api/auth/badge`. Człowiek
+   * Bez tego kolektor nie odróżnia „system dopiero powstaje" od „pomyliłeś
+   * hasło": obie sytuacje wyglądają jak 401 z `/api/auth/login`. Człowiek
    * rozpakowujący kolektor w poniedziałek rano zobaczyłby ekran proszący
-   * o skan plakietki, których jeszcze nikt nie wydrukował.
+   * o login, którego jeszcze nikt nie założył.
    *
    * Odpowiedź nie jest tajemnicą: dokładnie tę samą informację ujawnia próba
    * założenia konta (`POST /api/users` przechodzi albo żąda sesji).
    */
   app.get("/api/setup", async () => ({ potrzebne: brakKont() }));
 
-  /** Sesja biura + PIN; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
-  function odmowaZarzadzania(pin: string | null): { kod: number; error: string } | null {
+  /** Sesja biura; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
+  function odmowaZarzadzania(): { kod: number; error: string } | null {
     const s = sesja(token());
-    if (!s) return { kod: 401, error: "Brak sesji — zeskanuj badge" };
-    const w = autoryzuj(s.user, "zarzadzanie_kontami", pin);
+    if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
+    const w = autoryzuj(s.user, "zarzadzanie_kontami");
     return w.ok ? null : { kod: 403, error: w.powod ?? "Brak uprawnień" };
   }
 
   app.get("/api/users", async (_req, reply) => {
     const s = sesja(token());
-    if (!s) return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
     if (s.user.role !== "biuro") {
-      // kody badge'y to lista tożsamości — nie wystawiamy jej hali
+      // lista loginów to lista tożsamości — nie wystawiamy jej hali
       return reply.code(403).send({ error: "Lista kont jest dostępna tylko dla biura" });
     }
     return { users: listUsers() };
   });
 
+  /** Wspólna walidacja pary login-hasło; `null` = w porządku. */
+  function bladDanych(login: string, haslo: string): string | null {
+    if (!poprawnyLogin(login)) {
+      return "Login: 3-32 znaki, małe litery, cyfry oraz . _ -";
+    }
+    if ((haslo ?? "").length < HASLO_MIN) {
+      return `Hasło musi mieć co najmniej ${HASLO_MIN} znaków`;
+    }
+    return null;
+  }
+
   app.post<{
-    Body: { name?: string; role?: Rola; pin?: string; pinAutora?: string };
+    Body: { name?: string; login?: string; haslo?: string; role?: Rola };
   }>("/api/users", async (req, reply) => {
     const name = (req.body?.name ?? "").trim();
     if (!name) return reply.code(400).send({ error: "Podaj imię i nazwisko" });
 
+    const blad = bladDanych(req.body?.login ?? "", req.body?.haslo ?? "");
+    if (blad) return reply.code(400).send({ error: blad });
+
+    /* Rola EFEKTYWNA, nie surowe pole z żądania — pominięcie pola znaczy
+       `magazynier` i walidacja musi patrzeć na to samo, co powstanie. */
+    const rola: Rola = brakKont() ? "biuro" : (req.body?.role ?? "magazynier");
+
     // Pierwsze konto w pustej bazie zakłada się bez sesji — inaczej nie dałoby
-    // się założyć żadnego. Wymuszamy rolę `biuro` i PIN, bo to konto będzie
+    // się założyć żadnego. Rola `biuro` jest wymuszona, bo to konto będzie
     // jedyną drogą do wszystkich następnych.
-    if (brakKont()) {
-      if (!req.body?.pin) {
-        return reply
-          .code(400)
-          .send({ error: "Pierwsze konto to konto biura i wymaga PIN-u" });
-      }
-      const u = createUser(name, "biuro", req.body.pin);
-      logEvent("user_created", u.name, null, { userId: u.userId, role: u.role, pierwsze: true });
+    const pierwsze = brakKont();
+    if (!pierwsze) {
+      const odmowa = odmowaZarzadzania();
+      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+    }
+
+    try {
+      const u = createUser(name, rola, req.body?.login, req.body?.haslo);
+      logEvent("user_created", u.name, null, {
+        userId: u.userId,
+        role: u.role,
+        ...(pierwsze ? { pierwsze: true } : {}),
+      });
       return { user: u };
+    } catch {
+      // jedyny realny powód: UNIQUE na loginie
+      return reply.code(409).send({ error: "Taki login już istnieje" });
     }
-
-    const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
-    if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
-
-    /* Rola EFEKTYWNA, nie surowe pole z żądania. Sprawdzanie `req.body.role`
-       wprost znaczyło, że pominięcie pola (czyli poleganie na domyślnym
-       `magazynier`) trafiało w warunek `!== "magazynier"` i kończyło się
-       żądaniem PIN-u dla konta, które PIN-u nie potrzebuje. Domyślna wartość
-       musi być ustalona RAZ i przed walidacją — inaczej walidacja pilnuje
-       czegoś innego niż to, co powstanie. */
-    const rola: Rola = req.body?.role ?? "magazynier";
-    if (rola !== "magazynier" && !req.body?.pin) {
-      // konto uprzywilejowane bez PIN-u i tak nic nie wykona (patrz `autoryzuj`)
-      return reply.code(400).send({ error: "Konto brygadzisty i biura wymaga PIN-u" });
-    }
-    // badge nadaje SERWER — numer musi być unikalny w całej firmie, a kod
-    // nieść poprawną cyfrę kontrolną
-    const u = createUser(name, rola, req.body?.pin);
-    logEvent("user_created", u.name, null, { userId: u.userId, role: u.role });
-    return { user: u };
   });
 
-  app.post<{ Params: { id: string }; Body: { pin?: string | null; pinAutora?: string } }>(
-    "/api/users/:id/pin",
+  app.post<{ Params: { id: string }; Body: { haslo?: string | null } }>(
+    "/api/users/:id/haslo",
     async (req, reply) => {
-      const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
+      const odmowa = odmowaZarzadzania();
       if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
-      setPin(Number(req.params.id), req.body?.pin ?? null);
-      logEvent("user_pin_changed", "biuro", null, { userId: Number(req.params.id) });
+      const haslo = req.body?.haslo ?? null;
+      // `null` odbiera hasło, czyli zamyka konto na klucz bez kasowania go
+      if (haslo !== null && haslo.length < HASLO_MIN) {
+        return reply.code(400).send({ error: `Hasło musi mieć co najmniej ${HASLO_MIN} znaków` });
+      }
+      setHaslo(Number(req.params.id), haslo);
+      logEvent("user_haslo_changed", "biuro", null, { userId: Number(req.params.id) });
       return { ok: true };
     }
   );
 
-  app.post<{ Params: { id: string }; Body: { active?: boolean; pinAutora?: string } }>(
+  app.post<{ Params: { id: string }; Body: { active?: boolean } }>(
     "/api/users/:id/active",
     async (req, reply) => {
-      const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
+      const odmowa = odmowaZarzadzania();
       if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
       // konta się nie kasuje — historia w `events` musi mieć na co wskazywać
       const active = req.body?.active !== false;
@@ -188,12 +201,9 @@ export async function authRoutes(app: FastifyInstance) {
    * Jednorazowa migracja historii: nazwy z `events` → konta.
    * Idempotentna — dotyka wyłącznie zdarzeń bez `user_ref`.
    */
-  app.post<{ Body: { pinAutora?: string } }>(
-    "/api/users/migrate-history",
-    async (req, reply) => {
-      const odmowa = odmowaZarzadzania(req.body?.pinAutora ?? null);
-      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
-      return migrujHistorie();
-    }
-  );
+  app.post("/api/users/migrate-history", async (_req, reply) => {
+    const odmowa = odmowaZarzadzania();
+    if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+    return migrujHistorie();
+  });
 }

@@ -38,7 +38,7 @@ export async function audytRoutes(app: FastifyInstance) {
   /** `null` = wolno czytać; inaczej gotowa odmowa. */
   function odmowa(): { kod: number; error: string } | null {
     const s = sesja(currentToken() ?? "");
-    if (!s) return { kod: 401, error: "Brak sesji — zeskanuj badge" };
+    if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
     if (!CZYTAJACY.includes(s.user.role)) {
       return { kod: 403, error: "Ślad audytowy jest dostępny dla brygadzisty albo biura" };
     }

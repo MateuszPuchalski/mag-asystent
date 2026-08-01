@@ -14,10 +14,10 @@ import type { FastifyInstance } from "fastify";
       z niepewnych danych,
    2. że hala go nie ogląda — log mówi, kto ile zeskanował, więc jest narzędziem
       nadzoru i ma bramkę na rolę,
-   3. że NIE WYCIEKA PIN-ów. To asercja bezpieczeństwa, nie kosmetyka:
+   3. że NIE WYCIEKAJĄ HASŁA. To asercja bezpieczeństwa, nie kosmetyka:
       `http_rejected` zapisuje odrzucone żądania, a przez `/api/users`
-      przechodzi PIN autora. Log audytowy z PIN-ami w środku jest gorszy niż
-      brak logu.                                                              */
+      przechodzi hasło zakładanego konta. Log audytowy z hasłami w środku jest
+      gorszy niż brak logu.                                                   */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-audyt-")), "t.db");
 process.env.LOG_LEVEL = "silent";
@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 function zalogowany(rola: Rola): { token: string; userId: number } {
-  const u = createUser(`Ktoś ${rola}`, rola, "4821");
+  const u = createUser(`Ktoś ${rola}`, rola, `k${rola}`, "tajnehaslo");
   const token = `tok-${u.userId}-${Math.random().toString(16).slice(2)}`;
   const teraz = new Date().toISOString();
   db()
@@ -225,23 +225,23 @@ test("401 na GET to szum pollingu i NIE jest logowane, na POST jest", async () =
   assert.equal(liczba("http_rejected"), 1, "próba ZAPISU bez sesji to zdarzenie, nie szum");
 });
 
-test("ślad odrzucenia NIE zawiera ciała żądania — PIN nie ma prawa tam trafić", async () => {
+test("ślad odrzucenia NIE zawiera ciała żądania — hasło nie ma prawa tam trafić", async () => {
   /* `POST /api/users` przy niepustej bazie odrzuca bez sesji, a w ciele niesie
-     `pin` i `pinAutora`. To jest ten moment, w którym nieostrożny audyt
-     zapisuje PIN-y na zawsze. */
+     hasło zakładanego konta. To jest ten moment, w którym nieostrożny audyt
+     zapisuje hasła na zawsze. */
   zalogowany("biuro"); // baza przestaje być pusta, więc trasa odmawia
   await app.inject({
     method: "POST",
     url: "/api/users",
-    payload: { name: "Ktoś Nowy", role: "biuro", pin: "9137", pinAutora: "4821" },
+    payload: { name: "Ktoś Nowy", role: "biuro", login: "nowy", haslo: "sekret9137" },
   });
   const wiersze = db()
     .prepare("SELECT payload FROM events WHERE type = 'http_rejected'")
     .all() as Array<{ payload: string }>;
   assert.ok(wiersze.length > 0, "odrzucenie ma zostawić ślad");
   for (const w of wiersze) {
-    assert.doesNotMatch(w.payload, /9137|4821/, "PIN w śladzie audytowym");
-    assert.doesNotMatch(w.payload, /pinAutora/);
+    assert.doesNotMatch(w.payload, /sekret9137/, "hasło w śladzie audytowym");
+    assert.doesNotMatch(w.payload, /haslo/);
   }
 });
 
