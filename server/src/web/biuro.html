@@ -10,7 +10,7 @@
     --amber: #F7A600; --amber-bg: #FDF3DC; --amber-ink: #8a5b00;
     --ink: #2A2A2C; --ink-soft: #5c5c60; --ink-mute: #9a9aa0;
     --paper: #F6F5F2; --card: #ffffff; --border: #e3e1dc;
-    --ok: #1f8a4c; --ok-bg: #e4f3ea; --err: #c62828; --err-bg: #fdeaea;
+    --err: #c62828;
   }
   * { box-sizing: border-box; margin: 0; }
   /* `main` ma display:grid, a styl autora wygrywa z arkuszem przeglądarki —
@@ -30,22 +30,13 @@
   tr:last-child td { border-bottom: none; }
   .b { font-weight: 700; }
   .mute { color: var(--ink-mute); font-size: 12px; }
-  .badge { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
-  .badge.ok { background: var(--ok-bg); color: var(--ok); }
-  .badge.amber { background: var(--amber-bg); color: var(--amber-ink); }
-  .badge.err { background: var(--err-bg); color: var(--err); }
-  .badge.mute2 { background: #ededed; color: var(--ink-soft); }
-  .pasek { height: 6px; background: var(--border); border-radius: 6px; overflow: hidden; width: 120px; }
-  .pasek i { display: block; height: 6px; background: var(--amber); }
-  .pasek.done i { background: var(--ok); }
   button.akcja { background: var(--ink); color: #fff; border: 0; border-radius: 7px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
   button.akcja.cichy { background: #fff; color: var(--ink); border: 1px solid var(--border); }
   button.akcja + button.akcja { margin-left: 6px; }
   #login { max-width: 380px; margin: 80px auto; }
   #login input { width: 100%; font-size: 20px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; letter-spacing: 2px; }
   #login .blad { color: var(--err); font-size: 13px; min-height: 18px; }
-  .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); }
-  input.szukaj { border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; width: 240px; margin-bottom: 10px; }
+  .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -66,19 +57,14 @@
 
 <main id="panel" hidden>
   <section class="card">
-    <h2>DOSTAWY · STATUS ROZKŁADANIA</h2>
-    <input class="szukaj" id="szukaj" placeholder="szukaj: numer albo dostawca">
-    <table id="dostawy"></table>
-    <p class="odswiezono" id="odswiezono"></p>
-  </section>
-
-  <section class="card">
     <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI</h2>
     <p class="mute" style="margin-bottom:10px">
       FORMULARZ otwiera protokół rozbieżności do wydruku (ze zdjęciami dowodowymi).
       CSV pobiera te same dane do arkusza (średnik + BOM, Excel PL).
+      Postęp rozkładania widać na kolektorze — ta strona go nie dubluje.
     </p>
     <table id="reklamacje"></table>
+    <p class="odswiezono" id="odswiezono"></p>
   </section>
 </main>
 
@@ -86,7 +72,11 @@
 "use strict";
 /* Jedna strona, zero zależności, zero builda. Token sesji żyje w localStorage,
    a każde zapytanie API niesie go w nagłówku `x-session` — dokładnie tak samo
-   jak kolektor. Strona nie ma własnych uprawnień: widzi to, co sesja. */
+   jak kolektor. Strona nie ma własnych uprawnień: widzi to, co sesja.
+
+   Zakres jest celowo jednotematyczny: REKLAMACJE i nic więcej. Status
+   rozkładania stoi na kolektorze, u człowieka, który go zmienia — druga jego
+   kopia w przeglądarce była podglądem kolektora, nie narzędziem biura. */
 const $ = (id) => document.getElementById(id);
 const TYPY = {
   qty_short: "Za mało", qty_over: "Za dużo", damaged: "Uszkodzony",
@@ -98,7 +88,6 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
-let dokumenty = [];
 
 async function api(sciezka, opts = {}) {
   const r = await fetch(sciezka, {
@@ -134,34 +123,6 @@ async function zaloguj() {
   } catch (e) { $("loginBlad").textContent = e.message; }
 }
 
-/* ── Dostawy ── */
-function statusDostawy(d) {
-  if (d.status === "done") return '<span class="badge ok">ROZŁOŻONA</span>';
-  if (d.status === "open") return '<span class="badge amber">W TOKU</span>';
-  return '<span class="badge mute2">NIETKNIĘTA</span>';
-}
-
-function rysujDostawy() {
-  const q = $("szukaj").value.trim().toLowerCase();
-  const rows = dokumenty
-    .filter((d) => !q || d.nrPelny.toLowerCase().includes(q) || (d.dostawca || "").toLowerCase().includes(q))
-    .map((d) => {
-      const total = d.linesTotal || d.positions;
-      const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-      return `<tr>
-        <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
-        <td>${esc(d.dostawca)}</td>
-        <td class="mute">${esc(d.dataWyst)}</td>
-        <td>${statusDostawy(d)}</td>
-        <td><div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
-            <span class="mute">${d.linesDone}/${total} poz.</span></td>
-      </tr>`;
-    }).join("");
-  $("dostawy").innerHTML =
-    "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>DATA</th><th>STATUS</th><th>POSTĘP</th></tr>" +
-    (rows || '<tr><td colspan="5" class="mute">Brak dostaw w oknie importu</td></tr>');
-}
-
 /* ── Reklamacje ── */
 function rysujReklamacje(problemy) {
   const wgDok = new Map();
@@ -181,7 +142,8 @@ function rysujReklamacje(problemy) {
       ? `<button class="akcja" data-formularz="${dId}" data-nr="${esc(dok)}">FORMULARZ</button>
          <button class="akcja cichy" data-csv="${dId}" data-nr="${esc(dok)}">CSV</button>`
       : "";
-    return `<tr><td class="b">${esc(dok)}</td><td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
+    return `<tr><td class="b" style="white-space:nowrap">${esc(dok)}</td>
+      <td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
   }).join("");
   $("reklamacje").innerHTML =
     "<tr><th>DOKUMENT</th><th>WYJĄTKI</th><th></th></tr>" +
@@ -200,8 +162,11 @@ async function fotoUrl(problemId) {
 }
 
 async function otworzFormularz(deliveryId, nrDok) {
-  const problemy = (await (await api(`/api/delivery/${deliveryId}/problems`)).json()).problems;
-  const dok = dokumenty.find((d) => d.nrPelny === nrDok) || {};
+  // nagłówek (dostawca, data) przychodzi razem z wyjątkami — protokół bez
+  // dostawcy nie jest dokumentem, który da się wysłać
+  const odp = await (await api(`/api/delivery/${deliveryId}/problems`)).json();
+  const problemy = odp.problems;
+  const dok = odp.dokument || {};
   const zdjecia = [];
   for (const p of problemy) {
     if (p.hasPhoto) {
@@ -259,15 +224,9 @@ async function pobierzCsv(deliveryId, nrDok) {
 /* ── Cykl życia ── */
 async function odswiez() {
   try {
-    const [dok, prob] = await Promise.all([
-      (await api("/api/delivery/documents")).json(),
-      (await api("/api/problems/unresolved")).json(),
-    ]);
-    dokumenty = dok.documents || [];
-    rysujDostawy();
+    const prob = await (await api("/api/problems/unresolved")).json();
     rysujReklamacje(prob.problems || []);
-    $("odswiezono").textContent =
-      `okno: ostatnie ${dok.dniWstecz ?? 14} dni · odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
+    $("odswiezono").textContent = `odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
   } catch (e) { console.warn(e); }
 }
 
@@ -282,7 +241,6 @@ function start() {
 $("zaloguj").addEventListener("click", zaloguj);
 $("badge").addEventListener("keydown", (e) => { if (e.key === "Enter") zaloguj(); });
 $("wyloguj").addEventListener("click", wyloguj);
-$("szukaj").addEventListener("input", rysujDostawy);
 $("reklamacje").addEventListener("click", (e) => {
   const f = e.target.closest("[data-formularz]");
   if (f) return otworzFormularz(Number(f.dataset.formularz), f.dataset.nr);

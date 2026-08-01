@@ -8,10 +8,10 @@ każdy do swojej roli:
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
   trwały offline (Room), kiosk przez Android lock-task/MDM. Wdrożenie:
   [`DEPLOY.md`](DEPLOY.md) §5.
-- **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
-  i protokoły rozbieżności do wydruku, ze zdjęciami dowodowymi. Jedna strona
-  bez builda, logowanie badge'em, sam odczyt. Operacje wykonuje się wyłącznie
-  na kolektorze.
+- **Biuro ma podgląd reklamacji pod `/biuro`** (od 0.18.0): nierozwiązane
+  wyjątki i protokoły rozbieżności do wydruku, ze zdjęciami dowodowymi. Jedna
+  strona bez builda, logowanie badge'em, sam odczyt. Statusu rozkładania tu nie
+  ma — stoi na kolektorze; operacje też wykonuje się wyłącznie tam.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -477,13 +477,16 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
   być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
   + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
-**Biuro — podgląd pod `/biuro`**
+**Biuro — podgląd reklamacji pod `/biuro`**
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
   API. Logowanie badge'em, dane czytane istniejącymi trasami z tokenem sesji —
   strona nie ma własnych uprawnień ani żadnego zapisu.
-- Pokazuje **status rozkładania dostaw** (postęp per dokument) oraz
-  **reklamacje** — nierozwiązane wyjątki pogrupowane po dokumencie. Protokół
-  rozbieżności (ze zdjęciami dowodowymi) jest gotowy do druku; obok stoi CSV.
+- Pokazuje **jedną rzecz**: nierozwiązane wyjątki pogrupowane po dokumencie.
+  Protokół rozbieżności (ze zdjęciami dowodowymi) jest gotowy do druku; obok
+  stoi CSV.
+- Tabeli ze statusem rozkładania nie ma (od 0.19.0). Była kopią ekranu
+  kolektora w przeglądarce — ten sam stan w drugim miejscu, tyle że starszy
+  o cykl odświeżania i bez możliwości zrobienia z nim czegokolwiek.
 - Reszta zostaje po staremu: metryki, rekoncyliacja i audyt są dostępne przez
   REST (`GET /api/metrics`, `GET /api/reconcile`, `GET /api/events`).
 
