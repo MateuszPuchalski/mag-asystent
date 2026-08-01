@@ -156,7 +156,7 @@ export function listUnresolved(): ProblemView[] {
   );
 }
 
-function listByDelivery(deliveryId: number): ProblemView[] {
+export function listByDelivery(deliveryId: number): ProblemView[] {
   return (
     db().prepare(`${SELECT_JOIN} WHERE p.delivery_id = ? ORDER BY p.id`).all(deliveryId) as any[]
   ).map(mapRow);

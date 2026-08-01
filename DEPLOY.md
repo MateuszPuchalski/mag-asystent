@@ -2,15 +2,15 @@
 
 Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 **Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
-magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro **nie ma
-własnego ekranu** — serwer wystawia wyłącznie API i eksporty CSV. Zero chmury,
-zero frontendu.
+magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd pod
+`http://serwer:3001/biuro`** — status dostaw i protokoły rozbieżności do
+wydruku; operacje wykonuje się wyłącznie na kolektorze. Zero chmury.
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
         ▼
 Maszyna z Subiektem GT (Windows)
-  ├─ wertis-api     Fastify: REST (bez statyk — aplikacji webowej nie ma)
+  ├─ wertis-api     Fastify: REST + podgląd biura pod /biuro
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
   ├─ wertis.db      SQLite: faktury zakupu z postępem per pozycja, wyjątki,
   │                 sesje trybu B, kolejka, audyt events
@@ -90,7 +90,7 @@ cd /c
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis
 cd /c/wertis
 npm ci
-npm run build      # server → server/dist (frontendu nie ma — samo API)
+npm run build      # server → server/dist (API + strona /biuro)
 npm run seed       # zasila SQLite danymi demo (tryb seeded)
 ```
 
@@ -158,7 +158,7 @@ ukośników:
 ```bash
 mkdir -p /c/wertis/logs
 
-# API (serwuje też frontend)
+# API (razem z podglądem biura pod /biuro)
 nssm install wertis-api 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\index.js'
 nssm set wertis-api AppDirectory 'C:\wertis'
 nssm set wertis-api AppStdout 'C:\wertis\logs\api.log'
