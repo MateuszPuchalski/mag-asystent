@@ -15,6 +15,7 @@ import { authRoutes } from "./routes/auth.js";
 import { audytRoutes } from "./routes/audyt.js";
 import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
+import { biuroRoutes } from "./routes/biuro.js";
 import {
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
@@ -59,7 +60,7 @@ export async function buildApp() {
       problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
-            ].filter((x): x is string => x !== null);
+    ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
       /* Wersja serwera — kolektor pokazuje ją obok własnej na dole ekranu.
@@ -108,6 +109,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(magazynRoutes);
   await app.register(audytRoutes);
+  await app.register(biuroRoutes);
 
   await app.ready();
   return app;

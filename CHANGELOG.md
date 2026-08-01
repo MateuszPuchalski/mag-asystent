@@ -28,6 +28,47 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.18.0 — 1 sierpnia 2026
+
+Biuro dostaje **podgląd pod `/biuro`** — pierwszy własny ekran od usunięcia
+`/lookup`. Wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał, którym biuro
+widziało stan dostaw; CSV i REST istniały dalej, ale „wywołaj curlem z tokenem"
+nie jest interfejsem dla księgowości.
+
+### Co pokazuje
+
+Dwie sekcje, sam odczyt:
+
+- **DOSTAWY** — status rozkładania per dokument: nietknięta / w toku /
+  rozłożona, pasek postępu, plakietka bufora, szukajka po numerze i dostawcy.
+- **REKLAMACJE** — nierozwiązane wyjątki pogrupowane po dokumencie, z dwoma
+  wyjściami: **protokół rozbieżności do wydruku** (tabela wyjątków + zdjęcia
+  dowodowe + miejsca na podpisy) i **CSV** do arkusza.
+
+Protokół w końcu domyka pętlę zdjęć dowodowych: kolektor je wysyłał, serwer
+składował — a obejrzeć ich nie było gdzie. Teraz lądują na wydruku reklamacji,
+czyli dokładnie tam, po co powstały.
+
+### Jak to jest zbudowane — i czego świadomie NIE ma
+
+Jedna strona HTML bez builda i frameworka (`server/src/web/biuro.html`),
+serwowana przez API. Logowanie badge'em jak na kolektorze; dane czytane
+istniejącymi trasami z tokenem sesji w nagłówku. Strona nie ma własnych
+uprawnień ani żadnego zapisu — poprzedni podgląd zniknął razem z całym
+klientem PWA, bo dwa fronty to dwa razy utrzymanie, więc nowy nie ma prawa
+być drugim frontem.
+
+Zdjęcia pozostają za sesją: strona pobiera je fetchem i wstawia jako blob —
+nic nie jest publiczne w LAN. Wróciła trasa `GET /api/delivery/:id/problems`
+(wycięta w 0.17.0 jako „bez klienta") — teraz ma klienta.
+
+### [wymaga działania] przy wdrożeniu
+
+`git pull`, `npm ci`, `npm run build`, restart usług. Adres dla biura:
+`http://serwer:3001/biuro` (korzeń przekierowuje tamże). Konto dla biura
+zakłada się jak każde inne — na kolektorze albo przez `POST /api/users`
+(DEPLOY §5a); rola `biuro` nie jest wymagana do samego podglądu.
+
 ## 0.17.0 — 31 lipca 2026
 
 <!-- docs_check: historia -->

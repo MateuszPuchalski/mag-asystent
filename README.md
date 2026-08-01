@@ -8,9 +8,10 @@ każdy do swojej roli:
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
   trwały offline (Room), kiosk przez Android lock-task/MDM. Wdrożenie:
   [`DEPLOY.md`](DEPLOY.md) §5.
-- **Biuro nie ma własnego ekranu.** Podgląd `/lookup` został usunięty; serwer
-  nie serwuje żadnych statyk. Do biura zostaje REST (`/api/*`) i eksporty CSV
-  z wyjątków i rekoncyliacji. Jedynym interfejsem człowieka jest kolektor.
+- **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
+  i protokoły rozbieżności do wydruku, ze zdjęciami dowodowymi. Jedna strona
+  bez builda, logowanie badge'em, sam odczyt. Operacje wykonuje się wyłącznie
+  na kolektorze.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -82,8 +83,8 @@ Twarde zasady (spec §12) egzekwowane na serwerze:
 
 ### Wdrożenie na produkcji idzie etapami
 
-Aplikacja zapisuje do bazy firmy dwie rzeczy, obie odwracalne wyłącznie z kopii
-zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć etapów z bramkami**,
+Aplikacja zapisuje do bazy firmy jedną rzecz — pole lokalizacji — odwracalną
+wyłącznie z kopii zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć etapów z bramkami**,
 opisanych w [`docs/wdrozenie.md`](docs/wdrozenie.md).
 
 Najważniejsze narzędzie jest darmowe: `wertis-api` i `wertis-worker` to osobne
@@ -218,7 +219,7 @@ Nagłówek `x-user` **nie jest tożsamością** i sam bramki nie otwiera.
 Produkcyjnie:
 
 ```bash
-npm run build    # server → server/dist (frontendu nie ma — serwer wystawia samo API)
+npm run build    # server → server/dist (API + strona /biuro)
 npm start        # Fastify wystawia API (worker: npm -w server run start:worker)
 ```
 
@@ -476,14 +477,15 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
   być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
   + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
-**Biuro — bez własnego ekranu**
-- Strona `/lookup` została **usunięta**, razem z serwowaniem statyk. Serwer
-  wystawia wyłącznie API. Biuro sięga po dane przez `GET /api/products/search`,
-  `GET /api/locations/:code/products`, `GET /api/metrics`, `GET /api/reconcile`
-  oraz eksporty CSV wyjątków i rekoncyliacji.
-- Konsekwencja, którą trzeba znać przed wdrożeniem: **nikt w biurze nie sprawdzi
-  już lokalizacji towaru bez kolektora albo bez narzędzia, które umie wywołać
-  REST.** To była jedyna droga „z przeglądarki".
+**Biuro — podgląd pod `/biuro`**
+- Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
+  API. Logowanie badge'em, dane czytane istniejącymi trasami z tokenem sesji —
+  strona nie ma własnych uprawnień ani żadnego zapisu.
+- Pokazuje **status rozkładania dostaw** (postęp per dokument) oraz
+  **reklamacje** — nierozwiązane wyjątki pogrupowane po dokumencie. Protokół
+  rozbieżności (ze zdjęciami dowodowymi) jest gotowy do druku; obok stoi CSV.
+- Reszta zostaje po staremu: metryki, rekoncyliacja i audyt są dostępne przez
+  REST (`GET /api/metrics`, `GET /api/reconcile`, `GET /api/events`).
 
 ## Struktura repo
 

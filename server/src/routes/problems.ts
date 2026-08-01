@@ -4,6 +4,7 @@ import { userOf } from "../context.js";
 import { eanConflictReport } from "../services/ean.js";
 import {
   exportCsv,
+  listByDelivery,
   listUnresolved,
   photoPath,
   photoRefOf,
@@ -58,6 +59,11 @@ export async function problemRoutes(app: FastifyInstance) {
     if ("error" in r) return reply.code(400).send({ error: r.error });
     return r;
   });
+
+  /** Wyjątki JEDNEJ dostawy — źródło formularza reklamacyjnego w podglądzie biura. */
+  app.get<{ Params: { id: string } }>("/api/delivery/:id/problems", async (req) => ({
+    problems: listByDelivery(Number(req.params.id)),
+  }));
 
   /** CSV do reklamacji — podstawa rozmowy z dostawcą. */
   app.get<{ Params: { id: string } }>("/api/delivery/:id/problems.csv", async (req, reply) => {

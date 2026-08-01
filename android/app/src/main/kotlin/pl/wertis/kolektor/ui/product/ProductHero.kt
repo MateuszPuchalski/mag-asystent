@@ -139,9 +139,8 @@ fun ProductHero(p: ProductCard, adres: @Composable () -> Unit) {
  * Obie linie stoją na jednej powierzchni, a rozróżnia je tusz i ikona:
  * bursztyn przy dostawie (jest co zrobić), szarość przy zamówieniu (nie ma).
  * Karta jest NIEKLIKALNA i to jest decyzja, nie niedoróbka — wejście
- * w dokument z karty towaru wołałoby trasę rozkładania, a ta przestawia flagę
- * faktury w Subiekcie na „W trakcie sprawdzania". Biuro zobaczyłoby, że ktoś
- * sprawdza fakturę, bo magazynier zajrzał na kartę towaru. Numer dokumentu
+ * w dokument z karty towaru otwierałoby rozkładanie jako skutek uboczny
+ * zwykłego zaglądania na kartę, bez zamiaru magazyniera. Numer dokumentu
  * w zupełności wystarcza, żeby znaleźć paletę.
  */
 @Composable
