@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +20,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +33,7 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.BuildConfig
 import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.data.AppSettings
+import pl.wertis.kolektor.scan.WedgeKeySource
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WertisTextField
@@ -39,22 +44,27 @@ import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.Paper
 
-/* ── Splash: „Zeskanuj swój badge" (plan §7) ────────────────────────────────
+/* ── Splash: logowanie (plan §7) ────────────────────────────────────────────
    Dotąd stała tu lista imion wpisanych z klawiatury i wysyłanych w nagłówku
    `X-User`. Każdy mógł wybrać dowolne, a `events` zbierał warianty tej samej
    osoby, więc audyt nadawał się do czytania oczami i do niczego więcej.
+   Potem był skan plakietki — jedna sekunda, ale własny wzorzec w firmie,
+   która wszędzie indziej loguje się loginem i hasłem.
 
-   Teraz jeden skan, ~1 s, bez PIN-u. Pole tekstowe zostaje WYŁĄCZNIE na
-   wypadek uszkodzonej etykiety — kod przepisuje się wtedy z plakietki i tak
-   samo przechodzi przez cyfrę kontrolną, więc literówka jest odrzucana,
-   a nie zapisywana jako cudza tożsamość.
+   Login wstawiamy z pamięci, hasła NIGDY. Zapamiętane hasło byłoby plakietką
+   pod inną nazwą, tylko bez możliwości świadomego oddania jej komuś.
+
+   SKANER JEST TU WYŁĄCZONY. Na tym ekranie nie ma czego skanować, a wedge
+   zbiera znaki z klawiatury sprzętowej globalnie — bez tego jedno spóźnione
+   zdarzenie fokusu wystarczyłoby, żeby wpisywane hasło pojechało jako skan do
+   wyszukiwarki towarów i wylądowało w logu serwera.
 
    ADRES SERWERA JEST TUTAJ, A NIE TYLKO W USTAWIENIACH — i to nie jest
    duplikat wygody. Ustawienia wiszą pod paskiem górnym, a paska nie ma przed
    zalogowaniem; świeża instalacja startuje z adresem emulatora
    (`10.0.2.2`), który na fizycznym kolektorze nie znaczy nic. Bez tego pola
    pierwsze uruchomienie na sprzęcie kończyło się ekranem, z którego NIE DA SIĘ
-   wyjść: zalogować się nie można (badge'ów jeszcze nie ma), kont założyć nie
+   wyjść: zalogować się nie można (kont jeszcze nie ma), kont założyć nie
    można (przycisk pojawia się dopiero po odpowiedzi serwera), a adresu zmienić
    nie można (Ustawienia za bramką sesji).                                    */
 
@@ -65,8 +75,10 @@ private enum class StanSerwera { SPRAWDZAM, PUSTY, MA_KONTA, NIEOSIAGALNY }
 fun SplashScreen(graph: AppGraph) {
     val stan by graph.session.state.collectAsStateWithLifecycle()
     val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
-    var reczny by remember { mutableStateOf("") }
+    var login by remember { mutableStateOf(graph.session.ostatniLogin ?: "") }
+    var haslo by remember { mutableStateOf("") }
     var blad by remember { mutableStateOf<String?>(null) }
+    var loguje by remember { mutableStateOf(false) }
     /* Trzy odpowiedzi, nie dwie. „Nie widzę serwera" NIE MOŻE wyglądać jak
        „serwer pusty": martwe Wi-Fi zaprosiłoby wtedy do zakładania kont i ktoś
        postawiłby drugi komplet obok istniejącego. */
@@ -76,6 +88,13 @@ fun SplashScreen(graph: AppGraph) {
     var edycjaAdresu by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    // Wedge milczy przez cały czas życia tego ekranu, nie tylko przy fokusie
+    // w polu — patrz nagłówek pliku.
+    DisposableEffect(Unit) {
+        WedgeKeySource.wylaczony = true
+        onDispose { WedgeKeySource.wylaczony = false }
+    }
+
     // Sesja może już istnieć (kolektor wrócił z kieszeni, proces był ubity) —
     // wtedy Splash nie ma o co pytać i schodzi z drogi. W efekcie, nie w ciele
     // kompozycji: nawigacja z rysowania to pętla rekompozycji.
@@ -83,9 +102,9 @@ fun SplashScreen(graph: AppGraph) {
         if (stan !is SessionState.Brak) graph.nav.start()
     }
 
-    // Bez tego pytania kolektor prosi o skan plakietki, których jeszcze nikt
-    // nie wydrukował — bo z samego 401 nie da się odróżnić „system dopiero
-    // powstaje" od „zły badge". Powtarzane po każdej zmianie adresu, bo to
+    // Bez tego pytania kolektor prosi o login, którego jeszcze nikt nie
+    // założył — bo z samego 401 nie da się odróżnić „system dopiero powstaje"
+    // od „pomyliłeś hasło". Powtarzane po każdej zmianie adresu, bo to
     // pierwsze pytanie, na które nowy serwer musi umieć odpowiedzieć.
     LaunchedEffect(proba, ustawienia.serverUrl) {
         stanSerwera = StanSerwera.SPRAWDZAM
@@ -96,16 +115,19 @@ fun SplashScreen(graph: AppGraph) {
         }
     }
 
-    fun sprobuj(kod: String) {
-        if (kod.isBlank()) return
+    fun sprobuj() {
+        if (login.isBlank() || haslo.isBlank() || loguje) return
         scope.launch {
-            val msg = graph.session.onBadge(kod)
-            if (graph.session.hasSession) {
+            loguje = true
+            val msg = graph.session.zaloguj(login, haslo)
+            loguje = false
+            if (msg == null) {
+                haslo = ""
                 graph.feedback.beep(true)
                 graph.nav.start()
             } else {
                 graph.feedback.beep(false)
-                blad = msg ?: "Nie rozpoznano badge'a"
+                blad = msg
             }
         }
     }
@@ -129,7 +151,7 @@ fun SplashScreen(graph: AppGraph) {
         Text("Asystent magazyniera", fontSize = 14.sp, color = InkMute)
         Spacer(Modifier.height(28.dp))
         Text(
-            "Zeskanuj swój badge",
+            "Zaloguj się",
             fontFamily = BarlowCond,
             fontWeight = FontWeight.Bold,
             fontSize = 22.sp,
@@ -137,7 +159,7 @@ fun SplashScreen(graph: AppGraph) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Skan plakietki loguje i podpisuje każdą operację.",
+            "Konto podpisuje każdą operację — pracuj na swoim.",
             fontSize = 13.sp,
             color = InkMute,
             textAlign = TextAlign.Center,
@@ -152,8 +174,7 @@ fun SplashScreen(graph: AppGraph) {
         if (stanSerwera == StanSerwera.PUSTY) {
             Text(
                 "Na tym serwerze nie ma jeszcze żadnego konta. Zacznij od " +
-                    "założenia kont — badge'y nadaje serwer, więc wydrukujesz je " +
-                    "dopiero potem.",
+                    "założenia kont — pierwsze musi być kontem biura.",
                 fontSize = 13.sp,
                 color = InkMute,
                 textAlign = TextAlign.Center,
@@ -177,20 +198,27 @@ fun SplashScreen(graph: AppGraph) {
             Spacer(Modifier.height(12.dp))
         }
 
-        // ostatnia deska ratunku przy zdartej etykiecie — cyfra kontrolna
-        // pilnuje, żeby literówka nie stała się cudzą tożsamością
         WertisTextField(
-            value = reczny,
-            onValueChange = { reczny = it; blad = null },
-            placeholder = "…albo przepisz kod z plakietki",
-            onDone = { sprobuj(reczny) },
+            value = login,
+            onValueChange = { login = it; blad = null },
+            placeholder = "login",
+            imeAction = ImeAction.Next,
+        )
+        Spacer(Modifier.height(8.dp))
+        WertisTextField(
+            value = haslo,
+            onValueChange = { haslo = it; blad = null },
+            placeholder = "hasło",
+            keyboardType = KeyboardType.Password,
+            visualTransformation = PasswordVisualTransformation(),
+            onDone = { sprobuj() },
         )
         Spacer(Modifier.height(8.dp))
         PrimaryButton(
-            "ZALOGUJ",
+            if (loguje) "LOGOWANIE…" else "ZALOGUJ",
             modifier = Modifier.fillMaxWidth(),
-            enabled = reczny.isNotBlank(),
-        ) { sprobuj(reczny) }
+            enabled = login.isNotBlank() && haslo.isNotBlank() && !loguje,
+        ) { sprobuj() }
 
         Spacer(Modifier.height(24.dp))
         AdresSerwera(

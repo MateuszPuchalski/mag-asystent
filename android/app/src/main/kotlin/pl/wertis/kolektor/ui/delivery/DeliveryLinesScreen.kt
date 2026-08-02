@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -51,7 +52,6 @@ import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.EanCandidate
 import pl.wertis.kolektor.core.net.LocApplyAction
 import pl.wertis.kolektor.core.net.PutawayLineBody
-import pl.wertis.kolektor.core.net.ForceReleaseBody
 import pl.wertis.kolektor.core.net.ScanBody
 import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.problem.ProblemType
@@ -61,9 +61,9 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
+import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
-import pl.wertis.kolektor.ui.session.PinSheet
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
@@ -126,7 +126,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var busy by remember { mutableStateOf(false) }
     /** Linia trzymana przez kogoś innego, którą brygadzista chce odebrać (§7). */
     var doOdebrania by remember(id) { mutableStateOf<ScanResolution.Locked?>(null) }
-    var pinBlad by remember(id) { mutableStateOf<String?>(null) }
 
     suspend fun resolveProduct(code: String) {
         try {
@@ -145,8 +144,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 }
                 is ScanResolution.Locked -> {
                     // Domyślna odpowiedź to „idź dalej alejką" — cudzej pracy
-                    // się nie odbiera odruchowo. Odebranie jest możliwe, ale
-                    // wymaga PIN-u i zostawia ślad (patrz `PinSheet` niżej).
+                    // się nie odbiera odruchowo. Odebranie jest możliwe dla
+                    // brygadzisty i biura, i zawsze zostawia ślad.
                     graph.feedback.beep(false)
                     graph.effects.toast("${r.sym} — pozycję rozkłada ${r.lockedBy}")
                     doOdebrania = r
@@ -223,33 +222,43 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         return
     }
 
-    // odebranie cudzej linii przed TTL — PIN, nie sam badge (§7)
+    /* Odebranie cudzej linii przed TTL. Do sierpnia 2026 wymagało PIN-u, bo
+       plakietkę dawało się pożyczyć razem z tożsamością. Przy haśle rozstrzyga
+       sama rola — serwer odmówi magazynierowi, a zdarzenie i tak idzie do
+       historii. Pytanie zostaje, bo to jedyne miejsce, w którym jedna osoba
+       odbiera pracę drugiej bez jej wiedzy. */
     doOdebrania?.let { l ->
-        PinSheet(
-            tytul = "Odebrać pozycję?",
-            opis = "${l.sym} rozkłada ${l.lockedBy}. Bez tego pozycja zwolni się sama " +
-                "po 30 minutach. Odebranie zostanie zapisane w historii.",
-            blad = pinBlad,
-            onPotwierdz = { pin ->
-                scope.launch {
-                    try {
-                        val r = apiCall { graph.api.forceReleaseLine(id, l.lineId, ForceReleaseBody(pin)) }
-                        doOdebrania = null
-                        pinBlad = null
-                        graph.feedback.beep(true)
-                        graph.effects.toast(
-                            r.odebrano?.let { "Pozycja odebrana: $it" } ?: "Pozycja była już wolna"
-                        )
-                        resolveProduct(l.code)
-                    } catch (e: Exception) {
-                        graph.feedback.beep(false)
-                        pinBlad = e.message ?: "Odmowa"
+        AlertDialog(
+            onDismissRequest = { doOdebrania = null },
+            containerColor = CardWhite,
+            title = { Text("Odebrać pozycję?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "${l.sym} rozkłada ${l.lockedBy}. Bez tego pozycja zwolni się sama " +
+                        "po 30 minutach. Odebranie zostanie zapisane w historii."
+                )
+            },
+            confirmButton = {
+                PrimaryButton("ODBIERAM") {
+                    scope.launch {
+                        try {
+                            val r = apiCall { graph.api.forceReleaseLine(id, l.lineId) }
+                            doOdebrania = null
+                            graph.feedback.beep(true)
+                            graph.effects.toast(
+                                r.odebrano?.let { "Pozycja odebrana: $it" } ?: "Pozycja była już wolna"
+                            )
+                            resolveProduct(l.code)
+                        } catch (e: Exception) {
+                            doOdebrania = null
+                            graph.feedback.beep(false)
+                            graph.effects.toast(e.message ?: "Odmowa")
+                        }
                     }
                 }
             },
-            onAnuluj = { doOdebrania = null; pinBlad = null },
+            dismissButton = { OutlineButton("ZOSTAW") { doOdebrania = null } },
         )
-        return
     }
 
     /** Zwolnienie pozycji: zwinięcie wiersza oddaje lock, zamiast czekać na TTL. */

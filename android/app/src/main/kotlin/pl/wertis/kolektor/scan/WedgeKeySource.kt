@@ -12,15 +12,27 @@ import pl.wertis.kolektor.core.scan.classify
    MainActivity.dispatchKeyEvent przekazuje tu każde ACTION_DOWN.             */
 
 object WedgeKeySource {
-    /** Ustawiane przez pola tekstowe Compose (onFocusChanged) — wtedy nie zbieramy. */
-    @Volatile var textFieldFocused: Boolean = false
+    /* LICZNIK, nie flaga — i to nie jest nadmiarowa ostrożność. Compose przy
+       przejściu fokusu między dwoma polami wysyła „zyskał" i „stracił"
+       w kolejności, na którą nie ma gwarancji. Flaga bool zapisana przez
+       spóźnione „stracił" zostawiłaby zbieranie WŁĄCZONE przy aktywnym polu
+       hasła, a wtedy wpisywane znaki poleciałyby przez `classify` do
+       wyszukiwarki towarów — czyli hasło wylądowałoby w logu serwera. */
+    private val fokusy = java.util.concurrent.atomic.AtomicInteger(0)
+
+    fun ustawFokus(ma: Boolean) {
+        if (ma) fokusy.incrementAndGet() else fokusy.updateAndGet { maxOf(0, it - 1) }
+    }
+
+    /** Twarde wyłączenie na ekranach, na których nie ma czego skanować. */
+    @Volatile var wylaczony: Boolean = false
 
     private val buf = StringBuilder()
     private var last = 0L
 
     /** @return true = zdarzenie skonsumowane (Enter kończący skan). */
     fun onKeyDown(event: KeyEvent): Boolean {
-        if (textFieldFocused) return false // pole samo obsłuży Enter
+        if (wylaczony || fokusy.get() > 0) return false // pole samo obsłuży Enter
         val now = SystemClock.elapsedRealtime()
         if (now - last > GAP_MS) buf.setLength(0)
         last = now

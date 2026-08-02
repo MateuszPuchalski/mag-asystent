@@ -1,7 +1,5 @@
 package pl.wertis.kolektor.core.scan
 
-import pl.wertis.kolektor.core.badge.looksLikeBadge
-
 /* ── Klasyfikacja skanów ────────────────────────────────────────────────────
    Kod ze skanera: EAN / etykieta lokalizacji / tekst.
 
@@ -20,13 +18,6 @@ enum class ScanKind {
     EAN,
     LOC,
 
-    /**
-     * Badge pracownika (`PRC-0007-3`). Osobna kategoria, bo skan badge'a
-     * ZNACZY co innego niż skan czegokolwiek innego: zmienia to, KTO pracuje,
-     * a nie to, na czym się pracuje. Wrzucony do TEXT trafiłby do wyszukiwarki
-     * towarów i zniknął.
-     */
-    BADGE,
     TEXT,
 }
 
@@ -98,8 +89,6 @@ fun classify(raw: String, cfg: ScanConfig = ScanRules.current): Scan {
         return Scan(up.substring(cfg.locPrefix.length), ScanKind.LOC)
     }
     if (cfg.isLoc(up)) return Scan(up, ScanKind.LOC)
-    // badge przed EAN-em: kształt jest rozłączny, ale kolejność ma być jawna
-    if (looksLikeBadge(up)) return Scan(up, ScanKind.BADGE)
     if (EAN_RE.matches(trimmed)) return Scan(trimmed, ScanKind.EAN)
     return Scan(trimmed, ScanKind.TEXT)
 }

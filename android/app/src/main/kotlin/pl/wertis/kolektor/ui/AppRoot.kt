@@ -40,7 +40,6 @@ import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.scan.globalScan
-import pl.wertis.kolektor.ui.session.HandoverDialog
 import pl.wertis.kolektor.ui.setup.SetupScreen
 import pl.wertis.kolektor.ui.splash.SplashScreen
 
@@ -48,7 +47,6 @@ import pl.wertis.kolektor.ui.splash.SplashScreen
 fun AppRoot(graph: AppGraph) {
     val screen by graph.nav.screen.collectAsStateWithLifecycle()
     val stan by graph.session.state.collectAsStateWithLifecycle()
-    val pytanie by graph.session.pytanie.collectAsStateWithLifecycle()
     val queue by graph.queueRepo.queue.collectAsStateWithLifecycle()
     val toastMsg by graph.effects.toastMsg.collectAsStateWithLifecycle()
     val success by graph.effects.success.collectAsStateWithLifecycle()
@@ -138,18 +136,6 @@ fun AppRoot(graph: AppGraph) {
             }
             ToastOverlay(toastMsg)
             SuccessOverlay(success)
-            pytanie?.let { p ->
-                HandoverDialog(
-                    pytanie = p,
-                    kontekst = graph.nav.opisPracy(),
-                    onPotwierdz = {
-                        scope.launch {
-                            graph.session.przejmij(graph.nav.opisPracy())?.let { graph.effects.toast(it) }
-                        }
-                    },
-                    onOdrzuc = { graph.session.odrzucPrzejecie() },
-                )
-            }
         }
         // WSTECZ zeszło tu z lewego górnego rogu — kciuk go tam nie dosięgał
         TabBar(
