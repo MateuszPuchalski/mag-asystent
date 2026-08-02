@@ -42,7 +42,7 @@
   button.akcja.cichy { background: #fff; color: var(--ink); border: 1px solid var(--border); }
   button.akcja + button.akcja { margin-left: 6px; }
   #login { max-width: 380px; margin: 80px auto; }
-  #login input { width: 100%; font-size: 20px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; letter-spacing: 2px; }
+  #login input { width: 100%; font-size: 18px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; }
   #login .blad { color: var(--err); font-size: 13px; min-height: 18px; }
   .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); }
   input.szukaj { border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; width: 240px; margin-bottom: 10px; }
@@ -57,9 +57,12 @@
 
 <main id="login" class="card">
   <h2>LOGOWANIE</h2>
-  <p class="mute">Wpisz kod z badge'a (np. PRC-0007-3). Konto zakłada się na kolektorze
+  <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada biuro na kolektorze
      albo przez <code>POST /api/users</code> — patrz DEPLOY §5a.</p>
-  <input id="badge" placeholder="PRC-0000-0" autocomplete="off" autofocus>
+  <!-- `autocomplete` włączony celowo: to komputer w biurze, a menedżer haseł
+       jest tu sojusznikiem — inaczej hasło ląduje na kartce pod klawiaturą -->
+  <input id="poleLogin" placeholder="login" autocomplete="username" autofocus>
+  <input id="poleHaslo" type="password" placeholder="hasło" autocomplete="current-password">
   <div class="blad" id="loginBlad"></div>
   <button class="akcja" id="zaloguj">ZALOGUJ</button>
 </main>
@@ -121,15 +124,16 @@ function wyloguj() {
 async function zaloguj() {
   $("loginBlad").textContent = "";
   try {
-    const r = await fetch("/api/auth/badge", {
+    const r = await fetch("/api/auth/login", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ badge: $("badge").value.trim() }),
+      body: JSON.stringify({ login: $("poleLogin").value.trim(), haslo: $("poleHaslo").value }),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Logowanie nieudane");
     const d = await r.json();
     token = d.token; kto = d.user?.name || "";
     localStorage.setItem("wertis.token", token);
     localStorage.setItem("wertis.kto", kto);
+    $("poleHaslo").value = "";
     start();
   } catch (e) { $("loginBlad").textContent = e.message; }
 }
@@ -280,7 +284,9 @@ function start() {
 }
 
 $("zaloguj").addEventListener("click", zaloguj);
-$("badge").addEventListener("keydown", (e) => { if (e.key === "Enter") zaloguj(); });
+for (const id of ["poleLogin", "poleHaslo"]) {
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") zaloguj(); });
+}
 $("wyloguj").addEventListener("click", wyloguj);
 $("szukaj").addEventListener("input", rysujDostawy);
 $("reklamacje").addEventListener("click", (e) => {

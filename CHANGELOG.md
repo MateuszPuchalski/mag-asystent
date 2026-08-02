@@ -28,6 +28,69 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.20.0 — 1 sierpnia 2026
+
+<!-- docs_check: historia -->
+
+Wejście do WERTIS to **login i hasło** — na kolektorze, w biurze i w curl-u.
+Skan plakietki `PRC-0007-3` i PIN przy operacjach nieodwracalnych wychodzą
+z aplikacji.
+
+### Dlaczego
+
+Plakietka była szybka: jeden skan, około sekundy, bez wpisywania czegokolwiek
+w rękawicach. Była też własnym, osobnym mechanizmem w firmie, która wszędzie
+indziej loguje się loginem i hasłem — czyli drugą rzeczą do wytłumaczenia
+każdej nowej osobie i drugim zbiorem etykiet do wydrukowania i pilnowania.
+
+Cena jest realna i warto ją znać: wejście na kolektor kosztuje teraz kilkanaście
+sekund zamiast jednej, a razem z PIN-em znika drugi czynnik przy operacjach,
+których nie da się cofnąć. Porzucony zalogowany kolektor pozwala obcej osobie
+na wszystko, co może jego właściciel.
+
+### Co się zmienia w API
+
+<!-- docs_check: historia -->
+
+| było | jest |
+|---|---|
+| `POST /api/auth/badge` | `POST /api/auth/login` z ciałem `{login, haslo}` |
+| `POST /api/auth/handover` | znika — zmiana osoby to wylogowanie i zalogowanie |
+| `POST /api/users/:id/pin` | `POST /api/users/:id/haslo` |
+| `pinAutora` w ciele żądania | nic — rozstrzyga rola z sesji |
+| — | `POST /api/auth/haslo` do zmiany własnego hasła |
+
+Hasło leży wyłącznie jako hasz (scrypt, sól per konto), minimum osiem znaków,
+bez wymagań na wielkie litery i znaki specjalne. Nieznany login i błędne hasło
+dają jeden komunikat i ten sam czas odpowiedzi. Pięć nieudanych prób zamyka
+login na minutę — odpowiedzią jest 429, nie 401, bo kolektor po 401 kasuje
+operację z bufora offline.
+
+### Hasło mogło wyciec do logu serwera
+
+Przy okazji wyszła dziura, która istniała już wcześniej.
+`WedgeKeySource.textFieldFocused` było flagą `bool` ustawianą przez każde pole
+tekstowe. Kolejność zdarzeń fokusu między dwoma polami nie jest gwarantowana,
+więc spóźnione „stracił fokus" zostawiłoby zbieranie znaków włączone przy
+aktywnym polu hasła — a wtedy wpisane hasło pojechałoby jako skan do
+wyszukiwarki towarów i wylądowało w `events`. Flaga jest teraz licznikiem,
+a na ekranie logowania skaner jest wyłączony.
+
+### [wymaga działania] przy wdrożeniu
+
+`git pull`, `npm ci`, `npm run build`, restart usług, nowy APK przez MDM.
+
+1. **Migracja bazy jest automatyczna, ale kasuje wszystkie sesje.** Zrób
+   aktualizację **poza godzinami pracy** i upewnij się, że kolektory wysłały
+   bufor (`GET /api/queue` pusty) — operacja czekająca w buforze offline ginie
+   przy odmowie 401.
+2. **Konta zakłada się od nowa.** Stare zostają jako ślady w audycie: bez
+   loginu i bez hasła, żeby `events.user_ref` miało na co wskazywać. Furtka
+   pierwszego konta otwiera się sama, bo liczy konta z loginem — załóż konto
+   biura z kolektora (**ZAŁÓŻ KONTA**) albo curl-em z DEPLOY §5a.
+3. **Plakietki idą do kosza.** Zeskanowane na ekranie głównym pojadą teraz jako
+   zwykły tekst do wyszukiwarki towarów.
+
 ## 0.19.0 — 1 sierpnia 2026
 
 <!-- docs_check: historia -->
@@ -1313,6 +1376,8 @@ usuwa już tylko martwy kod po stronie aplikacji.
 
 ### Usunięte
 
+<!-- docs_check: historia -->
+
 - `POST /api/auth/unlock` — trasa nie ma czego odblokowywać.
 - Odpowiedzi `/api/auth/badge` i `/api/auth/me` nie niosą już `blokadaMin`
   ani `zablokowana`.
@@ -1376,6 +1441,8 @@ Pierwsze wydanie z numerem, który cokolwiek znaczy. Zbiera sześć zmian
 zmergowanych po `0.3.0`.
 
 ### Wymaga działania
+
+<!-- docs_check: historia -->
 
 - **[wymaga działania] Nowe uprawnienie SQL: `GRANT SELECT ON dbo.sl_Magazyn`.**
   Bez niego karta towaru pokazuje tylko MAG, MGP i Zwroty, a `/api/health`

@@ -10,8 +10,8 @@ każdy do swojej roli:
   [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku, ze zdjęciami dowodowymi. Jedna strona
-  bez builda, logowanie badge'em, sam odczyt. Operacje wykonuje się wyłącznie
-  na kolektorze.
+  bez builda, logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się
+  wyłącznie na kolektorze.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -176,37 +176,36 @@ albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2
 ### Pierwsze konto — bez niego kolektor nie wpuści
 
 `npm run seed` zasila kartotekę, ale **nie zakłada żadnego konta**. Ekran
-startowy jest twardą bramką: bez badge'a nie ma jak podpisać operacji, więc nie
+startowy jest twardą bramką: bez konta nie ma jak podpisać operacji, więc nie
 ma przejścia dalej.
 
 Pierwsze konto zakłada się w pustej bazie bez sesji — inaczej nie dałoby się
-założyć żadnego. Wymuszona rola to `biuro` i PIN, bo to konto będzie drogą do
+założyć żadnego. Wymuszona rola to `biuro`, bo to konto będzie drogą do
 wszystkich następnych:
 
 ```bash
 curl -X POST http://localhost:3001/api/users \
   -H 'content-type: application/json' \
-  -d '{"name":"Biuro Zakupy","pin":"4821"}'
-# → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"biuro","maPin":true}}
+  -d '{"name":"Biuro Zakupy","login":"biuro","haslo":"tajnehaslo"}'
+# → {"user":{"userId":1,"login":"biuro","role":"biuro","maHaslo":true}}
 ```
 
-Badge nadaje serwer, z cyfrą kontrolną i kolejnym numerem — **pierwsze konto to
-zawsze `PRC-0001-9`**, drugie `PRC-0002-8`. Furtka zamyka się sama: kolejne
-żądanie bez sesji dostaje już 401, a następne konta wymagają `x-session`
-i `pinAutora` ([`DEPLOY.md`](DEPLOY.md) §5a).
+Furtka zamyka się sama: kolejne żądanie bez sesji dostaje już 401, a następne
+konta wymagają `x-session` konta biura ([`DEPLOY.md`](DEPLOY.md) §5a). Warunek
+liczy konta **z loginem**, więc konta-ślady z migracji historii jej nie zamykają.
 
-Na ekranie startowym kolektora, obok skanera, jest pole tekstowe — kod
-**wpisuje się z klawiatury**, więc emulator bez skanera wystarczy. Domyślny adres
-serwera (`http://10.0.2.2:3001`) jest już ustawiony na localhost hosta.
+Na ekranie startowym kolektora są dwa pola — login i hasło — więc emulator bez
+skanera wystarczy. Domyślny adres serwera (`http://10.0.2.2:3001`) jest już
+ustawiony na localhost hosta.
 
 **Konto jest potrzebne także do grzebania curlem.** API wymaga nagłówka
 `x-session` na każdej trasie poza czterema: `GET /api/health`, `GET /api/setup`,
-`POST /api/auth/badge` i `POST /api/users` przy pustej bazie. Token bierze się
-tak samo jak kolektor — z `POST /api/auth/badge`:
+`POST /api/auth/login` i `POST /api/users` przy pustej bazie. Token bierze się
+tak samo jak kolektor:
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/badge \
-  -H 'content-type: application/json' -d '{"badge":"PRC-0001-9"}' \
+TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
+  -H 'content-type: application/json' -d '{"login":"biuro","haslo":"tajnehaslo"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 curl -s http://localhost:3001/api/queue -H "x-session: $TOKEN"
 ```
@@ -242,33 +241,35 @@ Parametry (env, dev):
 
 ## Funkcje (kolektor — aplikacja Android)
 
-**Kto pracuje — badge, nie wolny tekst (plan §7)**
-- **Jeden skan plakietki loguje** (~1 s, bez PIN-u na ścieżce codziennej).
+**Kto pracuje — konto imienne, nie wolny tekst (plan §7)**
+- **Login i hasło**, ten sam wzorzec, co w reszcie firmy (od 0.20.0).
 
   > **Dlaczego.** Wcześniej podpisem był dowolny łańcuch wpisywany z klawiatury
   > i wysyłany w nagłówku `X-User`. `events.user_id` zbierał warianty tej samej
   > osoby (`Jan`, `jan`, `Jan K`). Audyt nadawał się do czytania oczami i do
   > niczego więcej. Każdy mógł podać się za kogokolwiek jednym wpisem.
-- **Kod badge'a `PRC-0007-3` niesie cyfrę kontrolną** (wagi 3-1-3-1). Bez niej
-  starty znak na etykiecie zamienia Jana w Piotra, a audyt wskazuje niewinnego —
-  to jest różnica między „nie dało się odczytać" a „odczytano źle". Kod **nie
-  niesie nazwiska**: badge się gubi i zostaje na kurtce, więc powiązanie
-  kod → człowiek żyje wyłącznie w bazie.
-- **Sesja nie wygasa sama.** Trwa do wylogowania z Ustawień albo do przejęcia
-  pracy cudzym badge'em. Bezczynność nie robi nic.
+  > Potem był skan plakietki: jedna sekunda zamiast wpisywania, ale własny,
+  > osobny mechanizm w firmie, która wszędzie indziej loguje się hasłem.
+- **Hasło leży wyłącznie jako hasz** (scrypt, sól per konto). Minimum osiem
+  znaków, bez wymagań na wielkie litery i znaki specjalne: długość chroni lepiej
+  niż wymuszona `Wertis1!` zapisana na taśmie przyklejonej do kolektora.
+- **Nieznany login i błędne hasło wyglądają identycznie** — jeden komunikat
+  i ten sam czas odpowiedzi. Rozróżnienie zamieniłoby listę kont w listę celów
+  dla kogokolwiek w sieci magazynu.
+- **Pięć nieudanych prób zamyka login na minutę.** Plakietka była przedmiotem:
+  żeby jej użyć, trzeba było ją mieć. Hasło się zgaduje.
+- **Sesja nie wygasa sama.** Trwa do wylogowania z Ustawień. Bezczynność nie
+  robi nic.
 
   > **Dlaczego zniknęła blokada.** Do sierpnia 2026 dziesięć minut bez ruchu
   > przełączało kolektor na ekran „Sesja zablokowana". Nigdy nie gubiła pracy,
   > ale kosztowała skan przy każdym powrocie do odłożonego urządzenia — a to
   > był jej cały efekt, bo kolektory nie opuszczają hali.
-- **Skan cudzego badge'a nigdy nie przełącza po cichu.** Ekran pyta „Przejąć
-  pracę? Trwa: dostawa #17, rozpoczęte przez: Jan Kowalski", a przejęcie ląduje
-  w `events` (`session_handover`). Ciche przełączenie podpisałoby cudze pozycje
-  nie tym nazwiskiem i nie zostawiłoby po sobie śladu.
-- **PIN tam, gdzie badge nie wystarcza.** Badge'e bywają pożyczane („podaj mi
-  swój, mam ręce w oleju"), więc odebranie koledze linii przed wygaśnięciem TTL
-  wymaga PIN-u. To jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez
-  jej wiedzy — zdarzenie `lock_forced` zapisuje komu i przez kogo.
+- **Operacje nieodwracalne rozstrzyga ROLA.** Odebranie koledze linii przed
+  wygaśnięciem TTL jest zastrzeżone dla brygadzisty i biura; zdarzenie
+  `lock_forced` zapisuje komu i przez kogo. Cena jest jawna: porzucony
+  zalogowany kolektor pozwala obcej osobie na wszystko, co może jego właściciel
+  — dlatego wylogowanie po zmianie jest tu jedynym zabezpieczeniem.
 
 **Podgląd i operacje ad-hoc**
 - Skan sprzętowy (Zebra DataWedge / Honeywell DataCollection, fallback
@@ -479,7 +480,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 
 **Biuro — podgląd pod `/biuro`**
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
-  API. Logowanie badge'em, dane czytane istniejącymi trasami z tokenem sesji —
+  API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem sesji —
   strona nie ma własnych uprawnień ani żadnego zapisu.
 - Pokazuje **status rozkładania dostaw** (postęp per dokument) oraz
   **reklamacje** — nierozwiązane wyjątki pogrupowane po dokumencie. Protokół
@@ -492,7 +493,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 108 testów jednostkowych; buduje się bez Android SDK
+                           + 102 testy jednostkowe; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

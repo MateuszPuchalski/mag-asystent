@@ -186,31 +186,35 @@ Do lipca 2026 „użytkownik" był dowolnym łańcuchem wpisywanym na kolektorze
 i wysyłanym w `X-User`. Każdy mógł podać się za kogokolwiek, a `events.user_id`
 zbierał warianty tej samej osoby.
 
-Dziś: **skan badge'a → token sesji urządzenia**.
+Dziś: **login i hasło → token sesji urządzenia**. Hasło leży w `app_user`
+wyłącznie jako hasz (scrypt, sól per konto, porównanie stałoczasowe), minimum
+osiem znaków, bez wymagań na klasy znaków.
 
-```
-PRC-0007-3
-└┬┘ └┬─┘ ┬
- │   │   └ cyfra kontrolna (wagi 3-1-3-1, jak w EAN)
- │   └──── numer nadany przez SERWER (unikalny w firmie)
- └──────── prefiks — nie koliduje z niczym w budynku
-```
+Trzy decyzje, każda z powodem:
 
-Trzy własności, każda z powodem:
+- **Nieznany login i błędne hasło wyglądają identycznie** — jeden komunikat
+  i ten sam czas odpowiedzi, bo nieznany login też przechodzi przez scrypt po
+  atrapie hasza. Bez tego czas odpowiedzi mówi, które konta istnieją.
+- **Pięć nieudanych prób zamyka login na minutę.** Licznik żyje w pamięci
+  procesu, odpowiedź to 429, nie 401 — kolektor po 401 kasuje operację z bufora
+  offline, więc kod błędu jest tu decyzją o cudzej pracy, nie kosmetyką.
+- **Login JEST daną osobową**, w odróżnieniu od kodu plakietki. To realna
+  strata przy tej zmianie i nie ma sensu jej przemilczać: `GET /api/users`
+  wystawia listę loginów, więc zostaje zastrzeżone dla roli `biuro`.
 
-- **Cyfra kontrolna** wyklucza rozpoznanie uszkodzonej etykiety jako *cudzego*
-  badge'a. Bez niej starty znak zamienia Jana w Piotra, a audyt wskazuje
-  niewinnego. To różnica między „nie dało się odczytać" a „odczytano źle".
-- **Kod nie niesie nazwiska.** Badge się gubi i zostaje na kurtce; powiązanie
-  kod → człowiek żyje wyłącznie w `app_user`.
-- **Prefiks czyni badge kategorią zamkniętą** w klasyfikatorze skanów —
-  sprawdzone na realnej kartotece: zero symboli, EAN-ów i adresów ma ten kształt.
+<!-- docs_check: historia -->
+Do sierpnia 2026 tożsamością był skan plakietki `PRC-0007-3` — prefiks, numer
+nadawany przez serwer i cyfra kontrolna licząca wagami 3-1-3-1. Jedna sekunda
+zamiast wpisywania, kod bez nazwiska (plakietka się gubi i zostaje na kurtce)
+i kategoria zamknięta w klasyfikatorze skanów. Wypadło razem z PIN-em w 0.20.0,
+bo firma wszędzie indziej loguje się loginem i hasłem, a dwa wzorce naraz to
+dwa razy tyle do wytłumaczenia nowej osobie.
 
 ### Sesja nie wygasa sama
 
-Sesja urządzenia trwa do jawnej decyzji człowieka: wylogowania z Ustawień albo
-przejęcia pracy cudzym badge'em. Bezczynność jej nie rusza — kolektor odłożony
-na regale na całą przerwę wraca do otwartej dostawy bez żadnego skanu.
+Sesja urządzenia trwa do jawnej decyzji człowieka: wylogowania z Ustawień.
+Bezczynność jej nie rusza — kolektor odłożony na regale na całą przerwę wraca
+do otwartej dostawy bez logowania.
 
 Do sierpnia 2026 działał tu TTL: po 10 minutach sesja przechodziła w stan
 `zablokowana`, kolektor pokazywał pełnoekranowy komunikat, a zapis dostawał
@@ -219,36 +223,43 @@ i postęp — więc jej jedynym mierzalnym skutkiem był skan przy każdym powro
 do urządzenia.
 
 Kupowała za to obronę przed scenariuszem, który tu nie występuje: kolektory nie
-opuszczają hali, a przed podszyciem się pod kogoś broni co innego — skan
-cudzego badge'a nigdy nie przełącza tożsamości po cichu.
+opuszczają hali.
 
-### Przejęcie pracy nigdy nie jest ciche
+### Zmiana osoby to wylogowanie i zalogowanie
 
-Skan cudzego badge'a otwiera pytanie („Przejąć dostawę #17 od Jana?"), a nie
-przełącza tożsamości. Ciche przełączenie podpisałoby cudze pozycje nie tym
-nazwiskiem i nie zostawiło śladu. Potwierdzone przejęcie unieważnia starą sesję
-i ląduje w `events` jako `session_handover`.
+Przy plakietce ten sam gest — skan — znaczył trzy różne rzeczy naraz, więc
+kolektor musiał pytać „przejąć pracę?", zamiast przełączać po cichu. Przy haśle
+nie ma czego przejmować: kto siada do kolektora, ten się loguje, a poprzednik
+wylogowuje. Audyt na tym nie traci, bo każda operacja i tak niesie własne
+`user_ref` — przejęcie było zdarzeniem o SESJI, nie o pracy.
 
-Rozstrzyga **kod badge'a, nie nazwisko** — dwóch Kowalskich w magazynie to nie
-jest przypadek hipotetyczny.
+### Operacje uprzywilejowane rozstrzyga rola
 
-### PIN tam, gdzie badge nie wystarcza
+Dwie operacje są zastrzeżone dla ról:
 
-Badge'e bywają pożyczane („podaj swój, mam ręce w oleju"). Dwie operacje
-wymagają więc PIN-u (scrypt, sól per konto, porównanie stałoczasowe):
-
-- **zdjęcie cudzej blokady linii** przed wygaśnięciem TTL — jedyne miejsce,
-  gdzie jedna osoba odbiera pracę drugiej bez jej wiedzy,
+- **zdjęcie cudzej blokady linii** przed wygaśnięciem TTL (brygadzista, biuro) —
+  jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez jej wiedzy,
 - **zarządzanie kontami** — jedyna operacja tworząca *tożsamość*, dlatego
   zastrzeżona dla roli `biuro`. Brygadzista mogący zakładać konta założyłby
-  konto biura z własnym PIN-em i reszta reguł przestałaby cokolwiek znaczyć.
+  konto biura z własnym hasłem i reszta reguł przestałaby cokolwiek znaczyć.
+
+Drugiego czynnika nie ma. Do 0.20.0 obie wymagały PIN-u, bo plakietkę dawało
+się pożyczyć razem z tożsamością. Hasła się tak nie pożycza — ale porzucony
+zalogowany kolektor pozwala teraz obcej osobie na wszystko, co może jego
+właściciel, i to jest cena zapisana wprost w `services/auth.ts`.
 
 ### Konta zakłada się z kolektora
 
 Pusta instalacja → ekran startowy proponuje kreator (`ui/setup/`). Pierwsze
-konto powstaje **bez sesji**, ale tylko dopóki tabela `app_user` jest pusta —
-furtka zamyka się przy pierwszym wierszu i jest wymuszona jako konto biura
-z PIN-em, bo będzie jedyną drogą do wszystkich następnych.
+konto powstaje **bez sesji**, ale tylko dopóki nie ma ani jednego konta
+Z LOGINEM — furtka zamyka się przy pierwszym takim koncie i jest wymuszona jako
+konto biura, bo będzie jedyną drogą do wszystkich następnych.
+
+Warunek liczy konta z loginem, nie wiersze, i to nie jest szczegół
+implementacji. Konta-ślady po migracji historii zostają w tabeli na zawsze;
+gdyby liczyły się do tego warunku, furtka byłaby na każdej istniejącej
+instalacji zamknięta na głucho: żeby założyć konto, trzeba sesji, a żeby mieć
+sesję, trzeba konta.
 
 Kolejność wysyłki nie jest dowolna: biuro idzie pierwsze niezależnie od
 kolejności wpisywania. Gdyby poszedł pierwszy magazynier, zająłby tę jedyną
@@ -263,7 +274,6 @@ Ze skanera przychodzi łańcuch znaków. Trzeba rozstrzygnąć, czym jest.
 ```
 prefiks LOC:  →  adres (etykieta QR)
 wzorzec adresu →  adres          A01-02-03 (2 myślniki) | PAL-042
-kształt badge'a →  badge          PRC-0007-3
 13 cyfr        →  EAN
 reszta         →  tekst (wyszukiwarka)
 ```
@@ -290,7 +300,6 @@ Skan robi to, co widać:
 | karta towaru otwarta + skan regału | **ten** towar dostaje ten adres |
 | skan regału bez otwartej karty | pokaż zawartość regału |
 | skan towaru | otwórz jego kartę |
-| skan badge'a | zmienia się, KTO pracuje (nigdy nie idzie do `/api/scan`) |
 
 Istniał wcześniej „kontekst przyklejony" — pierwszy skan przypinał regał albo
 towar, kolejne wpadały w to przypięcie. Oszczędzał skany (8 indeksów na jeden
@@ -358,8 +367,8 @@ więc „skanowałem i się nie zapisało" dało się zbyć zdaniem „nie widz�
 operacji" — prawdziwym i jednocześnie nieprawdziwym. Hook `onSend` zapisuje je
 jako `http_rejected`.
 
-**Ciała żądania nie zapisujemy nigdy** — przez `POST /api/users` przechodzi PIN,
-a log audytowy z PIN-ami w środku jest gorszy niż jego brak. Pilnuje tego osobna
+**Ciała żądania nie zapisujemy nigdy** — przez `POST /api/users` przechodzi
+hasło, a log audytowy z hasłami w środku jest gorszy niż jego brak. Pilnuje tego osobna
 asercja w `routes/audyt.test.ts`. Z tego samego powodu `401` na `GET` jest
 pomijane: karta odpytuje serwer co 2 s i wygasła sesja utopiłaby resztę audytu
 w szumie.
@@ -443,7 +452,7 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 | Polling 2 s zamiast WebSocketów | kolektor traci Wi-Fi kilkanaście razy dziennie; reconnect WS to kod, którego przy pollingu nie ma |
 | Konta się nie kasuje | historia w `events` musi mieć na co wskazywać; jest `active = 0` |
 | `events` bez retencji | przy szacowanych kilkuset zdarzeniach dziennie to rząd 10⁵ wierszy rocznie — SQLite z indeksami tego nie zauważa. To ślad audytu, więc automatyczne kasowanie byłoby gorsze niż wzrost. Gdyby tabela urosła ponad oczekiwania, decyzję o archiwizacji podejmuje właściciel, nie kod |
-| Numer badge'a nadaje serwer | musi być unikalny w całej firmie i nieść poprawną cyfrę kontrolną |
+| Login wpisuje biuro, unikalności pilnuje baza | dwie osoby z tym samym loginem to jedno żądanie od pomyłki |
 
 ---
 
