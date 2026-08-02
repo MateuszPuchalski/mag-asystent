@@ -71,7 +71,7 @@ data class MagazynyResponse(val magazyny: List<MagazynInfo> = emptyList())
 data class HealthResponse(val wersja: String = "")
 
 @Serializable
-data class WidocznoscRequest(val ukryte: List<Long>, val pinAutora: String)
+data class WidocznoscRequest(val ukryte: List<Long>)
 
 /** Zmiana lokalizacji czekająca w kolejce — pojedynczy kod, nie całe pole. */
 @Serializable
@@ -645,19 +645,16 @@ data class EanConflictRow(
 @Serializable
 data class EanConflictsResponse(val conflicts: List<EanConflictRow> = emptyList())
 
-/* ── Tożsamość: badge, sesja urządzenia (plan §7) ─────────────────────────── */
+/* ── Tożsamość: login i hasło, sesja urządzenia (plan §7) ─────────────────── */
 
 @Serializable
-data class BadgeBody(val badge: String)
-
-/** Przejęcie pracy — `kontekst` opisuje CO jest przejmowane, dla audytu. */
-@Serializable
-data class HandoverBody(val badge: String, val kontekst: String? = null)
+data class LoginBody(val login: String, val haslo: String)
 
 @Serializable
 data class UserDto(
     val userId: Long = 0,
-    val badgeCode: String = "",
+    /** `null` = konto-ślad z migracji historii: audyt na nie wskazuje, zalogować się nim nie da. */
+    val login: String? = null,
     val name: String = "",
     val role: String = "magazynier",
     val active: Boolean = true,
@@ -675,10 +672,6 @@ data class LoginResponse(val token: String = "", val user: UserDto = UserDto())
 @Serializable
 data class MeResponse(val user: UserDto = UserDto())
 
-/** Odebranie cudzej linii przed wygaśnięciem TTL — operacja na PIN. */
-@Serializable
-data class ForceReleaseBody(val pin: String)
-
 @Serializable
 data class ForceReleaseResponse(val ok: Boolean = true, val odebrano: String? = null)
 
@@ -686,18 +679,13 @@ data class ForceReleaseResponse(val ok: Boolean = true, val odebrano: String? = 
 @Serializable
 data class SetupResponse(val potrzebne: Boolean = false)
 
-/**
- * Założenie konta. `pin` to PIN ZAKŁADANEGO konta, `pinAutora` — PIN biura,
- * które je zakłada. Dwa różne PIN-y w jednym żądaniu wyglądają na pomyłkę,
- * więc nazwy są rozłączne: mylne podstawienie kończyłoby się kontem z cudzym
- * PIN-em.
- */
+/** Założenie konta. Uprawnienie autora rozstrzyga sesja, nie drugi sekret w ciele. */
 @Serializable
 data class CreateUserBody(
     val name: String,
+    val login: String,
+    val haslo: String,
     val role: String? = null,
-    val pin: String? = null,
-    val pinAutora: String? = null,
 )
 
 @Serializable

@@ -122,12 +122,12 @@ export const currentUserName = (): string | null => store.getStore()?.userName ?
  *
  * `POST /api/users` wygląda na wyłom, ale nim nie jest: trasa sama wpuszcza
  * bez sesji wyłącznie przy pustej bazie (pierwsze konto biura), a w każdym
- * innym przypadku sprawdza sesję i PIN. Bramka nie ma czego dokładać.
+ * innym przypadku sprawdza sesję i rolę. Bramka nie ma czego dokładać.
  */
 const BEZ_SESJI: ReadonlyArray<[metoda: string, sciezka: string]> = [
   ["GET", "/api/health"],
   ["GET", "/api/setup"],
-  ["POST", "/api/auth/badge"],
+  ["POST", "/api/auth/login"],
   ["POST", "/api/users"],
 ];
 
@@ -163,7 +163,7 @@ export function withRequestContext(app: FastifyInstance): void {
        w `zablokowana`, a zapis z niej dostawał 423, żeby wymusić skan badge'a.
        Razem z ekranem blokady zniknęła i ta bramka. */
     if (!s) {
-      return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
+      return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
     }
   });
 

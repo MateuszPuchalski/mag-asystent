@@ -4,12 +4,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* Sesja rozstrzyga, KTO pracuje. Jedno zachowanie jest tu ważniejsze od reszty
-   i ma własne testy: przejęcie pracy NIE jest ciche.
+/* Sesja rozstrzyga, KTO pracuje. Wejściem jest login i hasło; testy niżej
+   pilnują dwóch rzeczy naraz — że poprawna para wpuszcza, a każda niepoprawna
+   wygląda tak samo z zewnątrz.
 
    Blokada po bezczynności została usunięta w sierpniu 2026 razem z ekranem
-   „Sesja zablokowana". Sesja trwa do jawnego wylogowania albo przejęcia —
-   testy niżej pilnują właśnie tego, że bezczynność jej NIE rusza.            */
+   „Sesja zablokowana". Sesja trwa do jawnego wylogowania — testy niżej
+   pilnują właśnie tego, że bezczynność jej NIE rusza.                        */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-auth-")), "t.db");
 
@@ -49,28 +50,84 @@ const zdarzenia = (typ: string) =>
 
 /* ── Logowanie ───────────────────────────────────────────────────────────── */
 
-test("skan badge'a zakłada sesję i zapisuje kto", () => {
-  const u = U.createUser("Jan Kowalski");
-  const s = A.zaloguj(u.badgeCode, "KOLEKTOR-1");
-  assert.ok(s, "poprawny badge loguje");
+const konto = (imie: string, login: string, rola: "magazynier" | "brygadzista" | "biuro" = "magazynier") =>
+  U.createUser(imie, rola, login, "tajnehaslo");
+
+test("poprawny login i hasło zakładają sesję i zapisują kto", () => {
+  const u = konto("Jan Kowalski", "loguje");
+  const s = A.zaloguj("loguje", "tajnehaslo", "KOLEKTOR-1");
+  assert.ok(s, "poprawna para loguje");
   assert.equal(s.user.userId, u.userId);
   assert.equal(zdarzenia("login").length, 1);
 });
 
-test("uszkodzona etykieta NIE loguje jako ktoś inny", () => {
-  // to jest cały powód istnienia cyfry kontrolnej: bez niej starty znak
-  // logowałby Jana jako Piotra, a audyt wskazałby niewinnego
-  U.createUser("Jan Kowalski"); // PRC-0001-9
-  U.createUser("Piotr Nowak"); // PRC-0002-8
-  assert.equal(A.zaloguj("PRC-0001-8", null), null, "cyfra z sąsiedniego konta");
-  assert.equal(A.zaloguj("PRC-0003-4", null), null, "konto nie istnieje");
+test("złe hasło nie loguje i zostawia ślad bez samego hasła", () => {
+  konto("Jan Kowalski", "zlehaslo");
+  assert.equal(A.zaloguj("zlehaslo", "inne_haslo", null), null);
   assert.equal(zdarzenia("login").length, 0);
+  const ev = zdarzenia("login_failed");
+  assert.equal(ev.length, 1, "nieudana próba MUSI być widoczna w audycie");
+  assert.equal(ev[0].payload!.includes("inne_haslo"), false, "hasło nie ma prawa tam trafić");
 });
 
-test("konto wyłączone nie loguje się, choć badge jest poprawny", () => {
-  const u = U.createUser("Były Pracownik");
+test("nieznany login odpada tak samo jak złe hasło", () => {
+  // z zewnątrz oba przypadki mają być nie do odróżnienia — inaczej lista kont
+  // staje się listą celów
+  konto("Jan Kowalski", "nierozroznia");
+  assert.equal(A.zaloguj("nieistnieje", "tajnehaslo", null), null);
+  assert.equal(A.zaloguj("nierozroznia", "zlehaslo", null), null);
+});
+
+test("konto bez hasła nie loguje się, choćby ktoś zgadł login", () => {
+  // konto-ślad z migracji historii ma login pusty, ale i tak: brak hasza to
+  // odmowa, a nie „wpuść bez hasła"
+  U.createUser("Historia", "magazynier", "historia", null);
+  assert.equal(A.zaloguj("historia", "", null), null);
+  assert.equal(A.zaloguj("historia", "cokolwiek", null), null);
+});
+
+test("konto wyłączone nie loguje się, choć hasło jest poprawne", () => {
+  const u = konto("Były Pracownik", "bpracownik");
   U.setActive(u.userId, false);
-  assert.equal(A.zaloguj(u.badgeCode, null), null);
+  assert.equal(A.zaloguj("bpracownik", "tajnehaslo", null), null);
+});
+
+/* ── Dławienie prób ──────────────────────────────────────────────────────── */
+
+test("po serii błędnych haseł logowanie odmawia przez chwilę", () => {
+  // plakietka była przedmiotem — żeby jej użyć, trzeba było ją mieć.
+  // Hasło się zgaduje, a serwer stoi w tej samej sieci co kolektory.
+  konto("Jan Kowalski", "dlawiony");
+  for (let i = 0; i < 5; i++) assert.equal(A.zaloguj("dlawiony", "zle", null), null);
+  assert.ok(A.karaLogowania("dlawiony") > 0, "piąta próba zamyka drzwi");
+  assert.equal(A.zaloguj("dlawiony", "tajnehaslo", null), null, "nawet z dobrym hasłem");
+});
+
+test("blokada dotyczy jednego loginu, nie całego magazynu", () => {
+  // inaczej jedno urządzenie z pętlą zatrzymuje pracę wszystkim
+  konto("Jan Kowalski", "atakowany");
+  konto("Anna Nowak", "pracujaca");
+  for (let i = 0; i < 5; i++) A.zaloguj("atakowany", "zle", null);
+  assert.ok(A.zaloguj("pracujaca", "tajnehaslo", null), "Anna pracuje dalej");
+});
+
+test("udane logowanie kasuje licznik nieudanych prób", () => {
+  konto("Jan Kowalski", "licznik");
+  for (let i = 0; i < 4; i++) A.zaloguj("licznik", "zle", null);
+  assert.ok(A.zaloguj("licznik", "tajnehaslo", null), "czwarta pomyłka jeszcze nie blokuje");
+  for (let i = 0; i < 4; i++) A.zaloguj("licznik", "zle", null);
+  assert.equal(A.karaLogowania("licznik"), 0, "licznik startuje od nowa");
+});
+
+/* ── Zmiana hasła ────────────────────────────────────────────────────────── */
+
+test("zmiana własnego hasła wymaga podania starego", () => {
+  // sam token nie wystarcza: kolektor jest współdzielony, a sesja nie wygasa
+  const u = konto("Jan Kowalski", "zmieniam");
+  assert.ok(A.zmienHaslo(u, "nie_to_haslo", "noweeeee1").error);
+  assert.equal(A.zmienHaslo(u, "tajnehaslo", "krotkie").error !== undefined, true, "za krótkie");
+  assert.equal(A.zmienHaslo(u, "tajnehaslo", "noweeeee1").error, undefined);
+  assert.ok(A.zaloguj("zmieniam", "noweeeee1", null), "nowe hasło działa");
 });
 
 /* ── Sesja nie wygasa sama ───────────────────────────────────────────────── */
@@ -79,8 +136,8 @@ test("bezczynność NIE rusza sesji, choćby trwała dobę", () => {
   // Regresja na usunięty TTL. Kolektor odłożony na regale na całą przerwę
   // ma wrócić do pracy bez żadnego skanu — blokada po 10 minutach kosztowała
   // ten skan i nie kupowała za to niczego, bo urządzenia nie opuszczają hali.
-  const u = U.createUser("Jan Kowalski");
-  const s = A.zaloguj(u.badgeCode, "KOLEKTOR-1")!;
+  const u = konto("Jan Kowalski", "bezczynny");
+  const s = A.zaloguj("bezczynny", "tajnehaslo", "KOLEKTOR-1")!;
   bezczynnaOd(s.token, 24 * 60);
 
   const po = A.sesja(s.token);
@@ -92,8 +149,8 @@ test("`dotknij` odnotowuje aktywność, ale niczego nie bramkuje", () => {
   // `last_seen` został jako jedyny ślad, kiedy dany kolektor się odezwał.
   // Test pilnuje, że zapis nadal działa — po usunięciu blokady nic innego
   // by tego nie zauważyło.
-  const u = U.createUser("Jan Kowalski");
-  const s = A.zaloguj(u.badgeCode, null)!;
+  konto("Jan Kowalski", "dotykany");
+  const s = A.zaloguj("dotykany", "tajnehaslo", null)!;
   bezczynnaOd(s.token, 120);
   A.dotknij(s.token);
 
@@ -105,74 +162,30 @@ test("`dotknij` odnotowuje aktywność, ale niczego nie bramkuje", () => {
   assert.ok(A.sesja(s.token), "i sesja dalej jest");
 });
 
-/* ── Przejęcie pracy ─────────────────────────────────────────────────────── */
-
-test("przejęcie unieważnia starą sesję i zostawia ślad", () => {
-  const jan = U.createUser("Jan Kowalski");
-  const piotr = U.createUser("Piotr Nowak");
-  const stara = A.zaloguj(jan.badgeCode, "KOLEKTOR-1")!;
-
-  const nowa = A.przejmij(stara.token, piotr.badgeCode, "KOLEKTOR-1", "dostawa 4711");
-  assert.ok(nowa);
-  assert.equal(nowa.user.userId, piotr.userId);
-  assert.notEqual(nowa.token, stara.token, "nowy token — to inna osoba");
-  assert.equal(A.sesja(stara.token), null, "stara sesja unieważniona");
-
-  const ev = zdarzenia("session_handover");
-  assert.equal(ev.length, 1, "przejęcie MUSI być widoczne w audycie");
-  const p = JSON.parse(ev[0].payload!);
-  assert.equal(p.od, "Jan Kowalski");
-  assert.equal(p.kontekst, "dostawa 4711", "kontekst przejmowanej pracy zapisany");
-});
-
-test("przejęcie nieznanym badgem nie rusza istniejącej sesji", () => {
-  const jan = U.createUser("Jan Kowalski");
-  const s = A.zaloguj(jan.badgeCode, null)!;
-  assert.equal(A.przejmij(s.token, "PRC-0099-1", null, undefined), null);
-  assert.equal(A.sesja(s.token)?.user.userId, jan.userId, "Jan dalej pracuje");
-  assert.equal(zdarzenia("session_handover").length, 0);
-});
-
 test("wylogowanie kończy sesję i to jest decyzja człowieka", () => {
-  const u = U.createUser("Jan Kowalski");
-  const s = A.zaloguj(u.badgeCode, null)!;
+  konto("Jan Kowalski", "wylogowany");
+  const s = A.zaloguj("wylogowany", "tajnehaslo", null)!;
   A.wyloguj(s.token);
   assert.equal(A.sesja(s.token), null);
 });
 
 /* ── Operacje uprzywilejowane ────────────────────────────────────────────── */
 
-test("magazynier nie dostaje operacji uprzywilejowanej nawet znając PIN", () => {
-  const u = U.createUser("Jan Kowalski", "magazynier", "4821");
-  const w = A.autoryzuj(u, "zdjecie_cudzego_locka", "4821");
+test("magazynier nie dostaje operacji uprzywilejowanej, choćby był zalogowany", () => {
+  const u = konto("Jan Kowalski", "magazynier1");
+  const w = A.autoryzuj(u, "zdjecie_cudzego_locka");
   assert.equal(w.ok, false);
   assert.match(w.powod!, /brygadzist/i, "komunikat mówi, czego brakuje");
 });
 
-test("brygadzista bez PIN-u dostaje odmowę, nie przepustkę", () => {
-  // konto uprzywilejowane bez PIN-u to konto, którego nie da się przypisać
-  // do człowieka — lepiej odmówić niż wpisać do audytu coś niepewnego
-  const u = U.createUser("Adam Brygadzista", "brygadzista");
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", null).ok, false);
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", "0000").ok, false);
-});
-
-test("PIN dowodzi, że to naprawdę ta osoba", () => {
-  // badge'e bywają pożyczane („podaj mi swój, mam ręce w oleju") — PIN
-  // sprawia, że „ktoś użył mojego badge'a" jest kłamstwem, a nie wymówką
-  const u = U.createUser("Adam Brygadzista", "brygadzista", "4821");
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", "4822").ok, false);
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", null).ok, false);
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", "4821").ok, true);
-});
-
-test("udana operacja uprzywilejowana zostawia ślad, nieudana nie udaje że była", () => {
-  const u = U.createUser("Adam Brygadzista", "brygadzista", "4821");
-  A.autoryzuj(u, "zdjecie_cudzego_locka", "9999");
-  assert.equal(zdarzenia("privileged").length, 0, "błędny PIN to nie operacja");
-  A.autoryzuj(u, "zdjecie_cudzego_locka", "4821");
+test("rola rozstrzyga operację uprzywilejowaną i zostawia ślad", () => {
+  // PIN wyszedł razem z plakietkami: nie ma już czego pożyczyć bez hasła,
+  // więc drugi sekret przestał cokolwiek dowodzić
+  const u = konto("Adam Brygadzista", "abrygadzista", "brygadzista");
+  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka").ok, true);
+  assert.equal(A.autoryzuj(u, "zarzadzanie_kontami").ok, false, "konta to wyłącznie biuro");
   const ev = zdarzenia("privileged");
-  assert.equal(ev.length, 1);
+  assert.equal(ev.length, 1, "nieudana próba nie udaje, że operacja była");
   assert.equal(JSON.parse(ev[0].payload!).operacja, "zdjecie_cudzego_locka");
 });
 
@@ -226,39 +239,32 @@ test("lock wygasły zdejmuje się bez wpisu — nikomu nic nie odebrano", () => 
 
 test("brygadzista NIE zakłada kont, choć zdejmuje cudze locki", () => {
   // to jest jedyna operacja tworząca TOŻSAMOŚĆ: brygadzista, który może
-  // założyć konto, może założyć konto biura z własnym PIN-em — i cała reszta
+  // założyć konto, może założyć konto biura z własnym hasłem — i cała reszta
   // reguł przestaje cokolwiek znaczyć
-  const b = U.createUser("Adam Brygadzista", "brygadzista", "4821");
-  assert.equal(A.autoryzuj(b, "zdjecie_cudzego_locka", "4821").ok, true);
-  const w = A.autoryzuj(b, "zarzadzanie_kontami", "4821");
+  const b = konto("Adam Brygadzista", "abrygadzista", "brygadzista");
+  assert.equal(A.autoryzuj(b, "zdjecie_cudzego_locka").ok, true);
+  const w = A.autoryzuj(b, "zarzadzanie_kontami");
   assert.equal(w.ok, false);
   assert.match(w.powod!, /biura/i, "komunikat mówi, czyich uprawnień brakuje");
 });
 
 test("magazynier nie zbliża się do kont", () => {
-  const m = U.createUser("Jan Kowalski", "magazynier", "1111");
-  assert.equal(A.autoryzuj(m, "zarzadzanie_kontami", "1111").ok, false);
+  const m = konto("Jan Kowalski", "magazynier2");
+  assert.equal(A.autoryzuj(m, "zarzadzanie_kontami").ok, false);
 });
 
-test("biuro z PIN-em zarządza kontami, bez PIN-u nie", () => {
-  const b = U.createUser("Biuro Zakupy", "biuro", "1234");
-  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami", null).ok, false);
-  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami", "9999").ok, false);
-  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami", "1234").ok, true);
+test("biuro zarządza kontami i ukrywa magazyny", () => {
+  const b = konto("Biuro Zakupy", "biuro", "biuro");
+  assert.equal(A.autoryzuj(b, "zarzadzanie_kontami").ok, true);
+  assert.equal(A.autoryzuj(b, "widocznosc_magazynow").ok, true);
 });
 
 test("furtka pierwszego konta zamyka się sama", () => {
   // bez niej nie dałoby się założyć ŻADNEGO konta; z nią otwartą na stałe
   // każdy w sieci magazynu zakładałby sobie konto biura
   assert.equal(U.brakKont(), true, "pusta baza — furtka otwarta");
-  U.createUser("Biuro Zakupy", "biuro", "1234");
-  assert.equal(U.brakKont(), false, "jeden wiersz i furtka zamknięta");
-});
-
-test("biuro też podaje PIN — rola mówi KTO może, PIN KTO to jest", () => {
-  const u = U.createUser("Biuro Zakupy", "biuro", "1234");
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", null).ok, false);
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka", "1234").ok, true);
+  konto("Biuro Zakupy", "biuro", "biuro");
+  assert.equal(U.brakKont(), false, "jedno konto z loginem i furtka zamknięta");
 });
 
 /* ── Autor operacji z bufora offline ─────────────────────────────────────── */

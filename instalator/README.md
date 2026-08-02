@@ -105,10 +105,10 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
 
 ## Czego instalator NIE robi
 
-- **Nie zakłada kont pracowników.** Badge'e powstają z kolektora
-  (`DEPLOY.md` §5a) — pierwsze konto to konto biura z PIN-em, a komplet kodów
-  widać dokładnie raz, na ekranie kolektora. Wypisywanie listy tożsamości na
-  monitorze w biurze byłoby krokiem w złą stronę.
+- **Nie zakłada kont pracowników.** Konta powstają z kolektora
+  (`DEPLOY.md` §5a) — pierwsze musi być kontem biura, bo zakłada wszystkie
+  następne. Wypisywanie loginów i haseł na monitorze w biurze byłoby krokiem
+  w złą stronę.
 - **Nie stawia workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — to
   osobny proces COM.
 - **Nie konfiguruje kopii zapasowej ani nocnej rekoncyliacji.** Obie są

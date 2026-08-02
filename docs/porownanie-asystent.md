@@ -165,8 +165,8 @@ wykonuje pracę wykonywaną w tej firmie.
 | Niejednoznaczny kod kreskowy **zatrzymuje** operację (nigdy „pierwsze dopasowanie") | brak danych | **jest** |
 | Zgłoszenie wyjątku ze zdjęciem dowodowym | brak danych | **jest** |
 | Eksport wyjątków do CSV pod reklamację u dostawcy | brak danych | **jest** |
-| Blokada pozycji między osobami (30 min) + przejęcie na PIN | brak danych | **jest** |
-| Logowanie skanem plakietki (bez hasła, ~1 s) | logowanie na konto programu | **jest** |
+| Blokada pozycji między osobami (30 min) + przejęcie przez brygadzistę | brak danych | **jest** |
+| Logowanie na konto imienne (login i hasło) | logowanie na konto programu | **tak samo** |
 | Praca bez sieci z trwałym buforem i dosłaniem po powrocie | brak danych | **jest** |
 | Pełny ślad „kto i kiedy" bez retencji | brak danych | **jest** |
 | Raport kolizji kodów kreskowych dla biura | brak danych | **jest** |
@@ -175,6 +175,11 @@ wykonuje pracę wykonywaną w tej firmie.
 
 > **„brak danych" znaczy dokładnie tyle, ile mówi** — materiały producenta tego
 > nie opisują, a my tego nie sprawdziliśmy. To nie jest ukryte „nie ma".
+
+Jeden wiersz tej tabeli był do 0.20.0 przewagą i przestał nią być. Logowanie
+skanem plakietki zajmowało około sekundy, bez wpisywania czegokolwiek. Firma
+woli jeden wzorzec logowania w całym budynku, więc WERTIS zrównał się tu
+z Asystentem — świadomie i kosztem tych sekund przy każdej zmianie osoby.
 
 ---
 
@@ -191,7 +196,7 @@ odbywa się poza aplikacją.
 
 **Jak w WERTIS.**
 
-1. Magazynier skanuje plakietkę — jest zalogowany (~1 s, bez hasła).
+1. Magazynier loguje się swoim loginem i hasłem.
 2. Wybiera dostawę z listy (widać pasek postępu każdej).
 3. Bierze z palety **cokolwiek**, skanuje kod towaru → wiersz na liście rozwija
    się w miejscu z ilością i adresem docelowym.
@@ -259,9 +264,9 @@ towary. Dwie osoby rozkładają tę samą dostawę. W kącie hali nie ma zasięg
 | **Kod wskazuje dwa towary** | **Operacja staje.** Aplikacja nigdy nie bierze pierwszego dopasowania — pokazuje kandydatów i każe wybrać. Kolizje lądują w raporcie dla biura, żeby dało się je posprzątać w kartotece. |
 | **Rozbieżność ilościowa** | Osobny przycisk INNA ILOŚĆ, bo to najczęstszy wyjątek — rozkładanie jest sprawdzaniem faktury. |
 | **Zeskanowana półka ≠ półka z kartoteki** | Zapis **czeka na decyzję człowieka**: towar przeniesiono czy leży w dwóch miejscach? Serwer tego nie zgadnie. |
-| **Dwie osoby na jednej dostawie** | Pozycja jest blokowana na czas rozkładania (30 min). Kolega dostaje „pozycję rozkłada Jan" i idzie dalej. Odebranie jest możliwe, ale wymaga **PIN-u** i zostaje w historii. |
+| **Dwie osoby na jednej dostawie** | Pozycja jest blokowana na czas rozkładania (30 min). Kolega dostaje „pozycję rozkłada Jan" i idzie dalej. Odebranie jest możliwe dla brygadzisty i biura, i zostaje w historii. |
 | **Brak zasięgu** | Operacja ląduje w trwałym buforze na urządzeniu i dosyła się po powrocie sieci — z kontem osoby, **która ją wykonała**, a nie tej, która akurat trzyma kolektor. |
-| **„Kto to zrobił"** | Każda operacja ma wpis w dzienniku zdarzeń, bez retencji. Logowanie jest skanem plakietki, więc nie ma wariantów tej samej osoby (`Jan`, `jan`, `Jan K`). |
+| **„Kto to zrobił"** | Każda operacja ma wpis w dzienniku zdarzeń, bez retencji. Logowanie jest kontem imiennym, więc nie ma wariantów tej samej osoby (`Jan`, `jan`, `Jan K`). |
 
 **Co się z tego zmienia.** Wyjątek przestaje być czymś, co się „obchodzi".
 Pozycja z wyjątkiem wypada z rutyny, ale **nie blokuje domknięcia dostawy** —
@@ -416,9 +421,9 @@ WERTIS to projekt młody. Uczciwy obraz:
 
 **Gotowe i działające na danych demo:** przyjęcie dostaw krajowych, kontener
 importowy, wyszukiwanie i karta towaru, podgląd regału,
-wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, logowanie
-plakietką i przejęcie pracy, praca offline, raport kolizji kodów, nocna
-rekoncyliacja, raport przeslotowania.
+wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, konta
+imienne z hasłem, praca offline, raport kolizji kodów, nocna rekoncyliacja,
+raport przeslotowania.
 
 **W drodze:** przesunięcia magazynowe (MM) — kolejne w kolejce, kontrakt gotowy;
 inwentaryzacja — planowana. **To jedyne dwie rzeczy, które Asystent robi, a my

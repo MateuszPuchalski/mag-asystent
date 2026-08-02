@@ -2,7 +2,7 @@ package pl.wertis.kolektor.net
 
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import pl.wertis.kolektor.core.net.BadgeBody
+import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.CreateUserBody
 import pl.wertis.kolektor.core.net.CreateUserResponse
 import pl.wertis.kolektor.core.net.CartBody
@@ -17,9 +17,7 @@ import pl.wertis.kolektor.core.net.ConfirmResponse
 import pl.wertis.kolektor.core.net.CreateSessionBody
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.core.net.EanConflictsResponse
-import pl.wertis.kolektor.core.net.ForceReleaseBody
 import pl.wertis.kolektor.core.net.ForceReleaseResponse
-import pl.wertis.kolektor.core.net.HandoverBody
 import pl.wertis.kolektor.core.net.HealthResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LoginResponse
@@ -200,34 +198,30 @@ interface ApiService {
     @GET("api/ean-conflicts")
     suspend fun eanConflicts(): EanConflictsResponse
 
-    /* ── Tożsamość: badge zamiast wolnego tekstu (plan §7) ─────────────────
+    /* ── Tożsamość: login i hasło (plan §7) ────────────────────────────────
        Token sesji dokleja `IdentityHeaderInterceptor`, więc trasy poniżej go
        nie przyjmują — jedno miejsce, w którym żyje nagłówek.                */
 
-    @POST("api/auth/badge")
-    suspend fun authBadge(@Body body: BadgeBody): LoginResponse
+    @POST("api/auth/login")
+    suspend fun authLogin(@Body body: LoginBody): LoginResponse
 
     @GET("api/auth/me")
     suspend fun authMe(): MeResponse
 
-    /** Wołane DOPIERO po potwierdzeniu przez człowieka — nigdy z samego skanu. */
-    @POST("api/auth/handover")
-    suspend fun authHandover(@Body body: HandoverBody): LoginResponse
-
     @POST("api/auth/logout")
     suspend fun authLogout(@Body body: RequestBody = EMPTY_BODY): OkResponse
 
-    /** Odebranie cudzej linii przed TTL — wymaga PIN-u, nie samego badge'a. */
+    /** Odebranie cudzej linii przed TTL — rozstrzyga rola z sesji. */
     @POST("api/delivery/{id}/lines/{lineId}/force-release")
     suspend fun forceReleaseLine(
         @Path("id") deliveryId: Long,
         @Path("lineId") lineId: Long,
-        @Body body: ForceReleaseBody,
+        @Body body: RequestBody = EMPTY_BODY,
     ): ForceReleaseResponse
 
     /* ── Zakładanie kont z kolektora ──────────────────────────────────────
        Pierwsze konto przechodzi bez sesji, ale TYLKO przy pustej bazie;
-       każde następne wymaga nagłówka `x-session` biura i jego PIN-u.       */
+       każde następne wymaga nagłówka `x-session` biura.                    */
 
     @GET("api/setup")
     suspend fun setupPotrzebny(): SetupResponse
@@ -237,9 +231,8 @@ interface ApiService {
 
     /* ── Widoczność magazynów ─────────────────────────────────────────────
        Ustawienie GLOBALNE: zapis przestawia je wszystkim kolektorom naraz,
-       więc wymaga konta biura i jego PIN-u. Odczyt wystarczy zwykłą sesją —
-       lista magazynów firmy nie jest tajemnicą, w odróżnieniu od kodów
-       badge'ów.                                                            */
+       więc wymaga konta biura. Odczyt wystarczy zwykłą sesją — lista
+       magazynów firmy nie jest tajemnicą, w odróżnieniu od listy kont.     */
 
     /** Wersja serwera do paska na dole ekranu. Nie wymaga sesji. */
     @GET("api/health")

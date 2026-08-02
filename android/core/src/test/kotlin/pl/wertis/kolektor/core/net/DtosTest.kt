@@ -300,6 +300,30 @@ class DtosTest {
         assertEquals(emptyList<ZamowioneUDostawcy>(), p.zamowione)
     }
 
+    @Test fun `logowanie - nazwy pol musza sie zgadzac z serwerem`() {
+        /* Jedyny kontrakt, którego literówki nie widać lokalnie: `:app` nie
+           kompiluje się w tym środowisku, a serwer po prostu odpowie 401.
+           Nazwy są po polsku, bo takie są w `routes/auth.ts`. */
+        assertEquals("""{"login":"jkowalski","haslo":"tajnehaslo"}""",
+            WertisJson.encodeToString(LoginBody.serializer(), LoginBody("jkowalski", "tajnehaslo")))
+        val r = WertisJson.decodeFromString<LoginResponse>(
+            """{"token":"abc","user":{"userId":7,"login":"jkowalski","name":"Jan Kowalski",
+                "role":"magazynier","active":true,"maHaslo":true}}"""
+        )
+        assertEquals("abc", r.token)
+        assertEquals("jkowalski", r.user.login)
+        assertEquals("Jan Kowalski", r.user.name)
+    }
+
+    @Test fun `konto-slad bez loginu czyta sie bez wywrotki`() {
+        // migracja historii zakłada konta, którymi nie da się zalogować —
+        // kolektor musi je przeczytać, bo wracają w `GET /api/users`
+        val u = WertisJson.decodeFromString<UserDto>(
+            """{"userId":3,"login":null,"name":"Historia","role":"magazynier","active":true}"""
+        )
+        assertNull(u.login)
+    }
+
     @Test fun `raport kolizji EAN`() {
         val r = WertisJson.decodeFromString<EanConflictsResponse>(
             """{"conflicts":[{"ean":"5905947596430","hits":4,"autoResolved":3,

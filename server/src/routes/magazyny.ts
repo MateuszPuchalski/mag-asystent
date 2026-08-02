@@ -21,13 +21,13 @@ export async function magazynRoutes(app: FastifyInstance) {
    * sprzed zmiany, a przy dwóch osobach w ustawieniach naraz kończyłoby się
    * cichym gubieniem jednej z decyzji.
    */
-  app.post<{ Body: { ukryte?: number[]; pinAutora?: string } }>(
+  app.post<{ Body: { ukryte?: number[] } }>(
     "/api/magazyny/widocznosc",
     async (req, reply) => {
       const s = sesja(currentToken());
-      if (!s) return reply.code(401).send({ error: "Brak sesji — zeskanuj badge" });
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
 
-      const w = autoryzuj(s.user, "widocznosc_magazynow", req.body?.pinAutora ?? null);
+      const w = autoryzuj(s.user, "widocznosc_magazynow");
       if (!w.ok) return reply.code(403).send({ error: w.powod ?? "Brak uprawnień" });
 
       const ukryte = req.body?.ukryte;

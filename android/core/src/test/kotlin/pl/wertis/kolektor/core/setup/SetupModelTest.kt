@@ -12,44 +12,48 @@ import pl.wertis.kolektor.core.session.Rola
 
 class SetupModelTest {
 
-    private val biuro = Konto("Biuro Zakupy", Rola.BIURO, "4821")
-    private val magazynier = Konto("Jan Kowalski", Rola.MAGAZYNIER)
+    private val biuro = Konto("Biuro Zakupy", "biuro", "tajnehaslo", Rola.BIURO)
+    private val magazynier = Konto("Jan Kowalski", "jkowalski", "tajnehaslo")
 
-    @Test fun `magazynier nie potrzebuje PIN-u`() {
+    @Test fun `poprawny wiersz przechodzi dla kazdej roli`() {
         assertNull(bladKonta(magazynier))
+        assertNull(bladKonta(biuro))
     }
 
-    @Test fun `brygadzista i biuro bez PIN-u to konta wadliwe od urodzenia`() {
-        // bez PIN-u nie wykonają ŻADNEJ operacji uprzywilejowanej, więc
-        // przepuszczenie takiego wiersza kończy się kontem, które nic nie może
-        assertEquals(BladKonta.PIN_WYMAGANY, bladKonta(Konto("Adam", Rola.BRYGADZISTA)))
-        assertEquals(BladKonta.PIN_WYMAGANY, bladKonta(Konto("Biuro", Rola.BIURO)))
+    @Test fun `konto bez hasla nie przechodzi, bo nie zalogowaloby sie nigdy`() {
+        // serwer przyjmie takie konto tylko jako ślad z migracji historii —
+        // wpisane ręcznie byłoby kontem, którego nikt nie użyje
+        assertEquals(BladKonta.BRAK_HASLA, bladKonta(magazynier.copy(haslo = "")))
     }
 
-    @Test fun `PIN musi byc cyframi i odpowiedniej dlugosci`() {
-        assertEquals(BladKonta.PIN_NIE_SAME_CYFRY, bladKonta(Konto("Adam", Rola.BIURO, "48a1")))
-        assertEquals(BladKonta.PIN_ZA_KROTKI, bladKonta(Konto("Adam", Rola.BIURO, "48")))
-        assertNull(bladKonta(Konto("Adam", Rola.BIURO, "4821")))
+    @Test fun `haslo krotsze niz minimum odpada tu, nie po podrozy przez siec`() {
+        assertEquals(BladKonta.HASLO_ZA_KROTKIE, bladKonta(magazynier.copy(haslo = "krotkie")))
+        assertEquals(HASLO_MIN, 8)
     }
 
-    @Test fun `magazynier moze miec PIN, ale musi byc poprawny`() {
-        // PIN magazyniera dziś nic nie otwiera, ale zapisany bylejaki stanie się
-        // problemem w dniu, w którym ktoś dostanie awans na brygadzistę
-        assertNull(bladKonta(Konto("Jan", Rola.MAGAZYNIER, "1234")))
-        assertEquals(BladKonta.PIN_ZA_KROTKI, bladKonta(Konto("Jan", Rola.MAGAZYNIER, "12")))
+    @Test fun `login o zlym ksztalcie odpada zanim poleci na serwer`() {
+        // ten sam wzorzec zna serwer i to on rozstrzyga; kopia tutaj oszczędza
+        // podróż przez sieć i komunikat, którego człowiek nie chciał zobaczyć
+        assertEquals(BladKonta.BRAK_LOGINU, bladKonta(magazynier.copy(login = "  ")))
+        for (zly in listOf("ab", "jan kowalski", "jan@wertis.pl", "żółw", "-start")) {
+            assertEquals(zly, BladKonta.LOGIN_ZLY_KSZTALT, bladKonta(magazynier.copy(login = zly)))
+        }
+        for (dobry in listOf("abc", "anna.nowak", "brygada_1", "p-nowak")) {
+            assertNull(dobry, bladKonta(magazynier.copy(login = dobry)))
+        }
     }
 
-    @Test fun `pusta nazwa to pierwszy blad, nie brak PIN-u`() {
+    @Test fun `pusta nazwa to pierwszy blad, nie brak loginu`() {
         // człowiek ma zobaczyć problem, który faktycznie popełnił
-        assertEquals(BladKonta.BRAK_NAZWY, bladKonta(Konto("   ", Rola.BIURO)))
+        assertEquals(BladKonta.BRAK_NAZWY, bladKonta(Konto("   ", "", "", Rola.BIURO)))
     }
 
     /* ── Warunki wysyłki ─────────────────────────────────────────────────── */
 
     @Test fun `lista od zera BEZ biura jest bezuzyteczna, wiec nie przechodzi`() {
-        // każdy wiersz z osobna jest poprawny, a mimo to nikt nie zalozy potem
-        // kolejnego konta ani nie zresetuje PIN-u
-        val bezBiura = listOf(magazynier, Konto("Adam", Rola.BRYGADZISTA, "7315"))
+        // każdy wiersz z osobna jest poprawny, a mimo to nikt nie założy potem
+        // kolejnego konta ani nie zmieni komuś hasła
+        val bezBiura = listOf(magazynier, Konto("Adam", "abrygadzista", "tajnehaslo", Rola.BRYGADZISTA))
         assertTrue(bezBiura.all { bladKonta(it) == null })
         assertFalse(mozliwaWysylka(bezBiura, odZera = true))
         // przy dokładaniu do istniejącej instalacji biuro już jest — wolno
@@ -62,7 +66,7 @@ class SetupModelTest {
     }
 
     @Test fun `jeden zly wiersz blokuje cala liste`() {
-        assertFalse(mozliwaWysylka(listOf(biuro, Konto("", Rola.MAGAZYNIER)), odZera = true))
+        assertFalse(mozliwaWysylka(listOf(biuro, Konto("", "", "", Rola.MAGAZYNIER)), odZera = true))
     }
 
     /* ── Kolejność ───────────────────────────────────────────────────────── */
@@ -71,7 +75,7 @@ class SetupModelTest {
         // serwer wpuszcza konto bez sesji tylko przy pustej bazie; gdyby poszedł
         // pierwszy magazynier, zajalby te furtke i reszta odbilaby sie od 401
         // z lista kont zalozona w polowie
-        val wpisane = listOf(magazynier, Konto("Adam", Rola.BRYGADZISTA, "7315"), biuro)
+        val wpisane = listOf(magazynier, Konto("Adam", "abrygadzista", "tajnehaslo", Rola.BRYGADZISTA), biuro)
         val kolejnosc = kolejnoscWysylki(wpisane, odZera = true)
         assertEquals(Rola.BIURO, kolejnosc.first().rola)
         assertEquals(wpisane.size, kolejnosc.size)
@@ -83,13 +87,5 @@ class SetupModelTest {
         // wierszy bez powodu myli człowieka, który je właśnie wpisał
         val wpisane = listOf(magazynier, biuro)
         assertEquals(wpisane, kolejnoscWysylki(wpisane, odZera = false))
-    }
-
-    @Test fun `rola niesie swoja wartosc dla serwera`() {
-        assertEquals("magazynier", Rola.MAGAZYNIER.wire)
-        assertEquals("brygadzista", Rola.BRYGADZISTA.wire)
-        assertEquals("biuro", Rola.BIURO.wire)
-        assertFalse(Rola.MAGAZYNIER.wymagaPinu)
-        assertTrue(Rola.BIURO.wymagaPinu)
     }
 }

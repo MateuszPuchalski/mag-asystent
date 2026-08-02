@@ -1,26 +1,34 @@
 import { randomBytes } from "node:crypto";
 import { db, nowIso } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { userByBadge, userById, sprawdzPin, type Rola, type Uzytkownik } from "./users.js";
+import {
+  hashSekret,
+  HASLO_MIN,
+  haszHasla,
+  normalizujLogin,
+  setHaslo,
+  sprawdzSekret,
+  userByLogin,
+  userById,
+  type Rola,
+  type Uzytkownik,
+} from "./users.js";
 
 /* ── Sesja urządzenia (plan §7) ─────────────────────────────────────────────
-   Skan badge'a = zalogowanie I szybka zmiana zmiany. Jeden skan, ~1 s, bez
-   PIN-u na ścieżce codziennej.
+   Login i hasło = zalogowanie. Zmiana osoby przy kolektorze to wylogowanie
+   i zalogowanie — nic po cichu.
 
    SESJA NIE WYGASA SAMA. Trwa do jawnej decyzji człowieka: wylogowania
-   z Ustawień albo przejęcia pracy cudzym badge'em. Bezczynność nie robi nic.
+   z Ustawień. Bezczynność nie robi nic.
 
    Do sierpnia 2026 sesja blokowała się po 10 minutach bez ruchu, a kolektor
    pokazywał wtedy ekran „Sesja zablokowana". Blokada nigdy nie gubiła pracy,
    ale kosztowała skan przy każdym powrocie do odłożonego kolektora — i to był
    jej całkowity efekt, bo urządzenia nie opuszczają hali.
 
-   Tożsamość pilnuje dziś jedno miejsce: skan CUDZEGO badge'a. Nigdy nie
-   przełącza po cichu — pyta człowieka i zapisuje przejęcie w `events`.
-
    Nagłówek `X-User` przestaje być tożsamością. Dało się go wpisać ręcznie,
    więc każdy mógł podać się za kogokolwiek — zostaje najwyżej jako podpowiedź
-   dla instalacji, które nie przeszły jeszcze na badge'y.                     */
+   dla instalacji, które nie przeszły jeszcze na konta.                       */
 
 export interface Sesja {
   token: string;
@@ -38,16 +46,68 @@ interface SessionRow {
 const minut = (od: string, doKiedy = Date.now()): number =>
   (doKiedy - new Date(od).getTime()) / 60000;
 
-/** Skan badge'a → nowa sesja urządzenia. */
-export function zaloguj(badge: string, deviceId: string | null): Sesja | null {
-  const user = userByBadge(badge);
-  if (!user) return null;
+/* ── Dławienie prób ─────────────────────────────────────────────────────────
+   Plakietka była przedmiotem: żeby jej użyć, trzeba było ją mieć. Hasło się
+   zgaduje, a serwer stoi w tej samej sieci co kolektory, więc bez licznika
+   jedno urządzenie z pętlą przechodzi cały słownik przez noc.
+
+   Licznik żyje w PAMIĘCI PROCESU, nie w bazie: restart usługi zwalnia blokadę
+   i to jest w porządku, bo atak przez restart wymaga dostępu do serwera, czyli
+   czegoś znacznie gorszego niż zgadywanie haseł.                             */
+
+const PROG_PROB = 5;
+const KARA_MS = 60_000;
+const proby = new Map<string, { ile: number; do: number }>();
+
+/** Ile milisekund zostało do końca kary; 0 = można próbować. */
+export function karaLogowania(login: string, teraz = Date.now()): number {
+  const p = proby.get(normalizujLogin(login));
+  return p && p.do > teraz ? p.do - teraz : 0;
+}
+
+function odnotujBlad(login: string, teraz = Date.now()): void {
+  const k = normalizujLogin(login);
+  const p = proby.get(k);
+  const ile = p && p.do > teraz - KARA_MS ? p.ile + 1 : 1;
+  proby.set(k, { ile, do: ile >= PROG_PROB ? teraz + KARA_MS : teraz });
+}
+
+/* Atrapa hasza dla nieistniejącego loginu. Bez niej odpowiedź dla nieznanego
+   konta wraca natychmiast, a dla znanego po kilkudziesięciu milisekundach
+   scrypta — czyli czas odpowiedzi mówi, które konta istnieją, i cała
+   ostrożność w jednym komunikacie błędu idzie na marne. */
+const HASZ_ATRAPA = hashSekret(randomBytes(16).toString("hex"));
+
+/** Login i hasło → nowa sesja urządzenia. */
+export function zaloguj(login: string, haslo: string, deviceId: string | null): Sesja | null {
+  if (karaLogowania(login) > 0) return null;
+  const user = userByLogin(login);
+  // konto bez hasła nie loguje się nigdy, choćby ktoś zgadł login
+  const hash = user ? haszHasla(user.userId) : null;
+  const zgadza = sprawdzSekret(haslo ?? "", hash ?? HASZ_ATRAPA);
+  if (!user || !hash || !zgadza) {
+    odnotujBlad(login);
+    logEvent("login_failed", normalizujLogin(login), null, { login: normalizujLogin(login) });
+    return null;
+  }
+  proby.delete(normalizujLogin(login));
   const token = randomBytes(24).toString("hex");
   db()
     .prepare("INSERT INTO device_session(token, user_id, device_id, created_at, last_seen) VALUES (?,?,?,?,?)")
     .run(token, user.userId, deviceId, nowIso(), nowIso());
-  logEvent("login", user.name, null, { badge: user.badgeCode, role: user.role });
+  logEvent("login", user.name, null, { login: user.login, role: user.role });
   return { token, user };
+}
+
+/** Zmiana własnego hasła — stare musi się zgadzać, nowe ma minimalną długość. */
+export function zmienHaslo(user: Uzytkownik, stare: string, nowe: string): { error?: string } {
+  if (!sprawdzSekret(stare, haszHasla(user.userId))) return { error: "Błędne hasło" };
+  if ((nowe ?? "").length < HASLO_MIN) {
+    return { error: `Nowe hasło musi mieć co najmniej ${HASLO_MIN} znaków` };
+  }
+  setHaslo(user.userId, nowe);
+  logEvent("user_haslo_changed", user.name, null, { userId: user.userId, wlasne: true });
+  return {};
 }
 
 /** Sesja po tokenie; `null` gdy nie istnieje albo została unieważniona. */
@@ -84,46 +144,27 @@ export function dotknij(token: string): void {
   db().prepare("UPDATE device_session SET last_seen = ? WHERE token = ?").run(nowIso(), token);
 }
 
-/**
- * Przejęcie pracy przez inną osobę.
- *
- * Ciche przełączenie niszczyłoby audyt dokładnie wtedy, gdy jest potrzebny —
- * przy dostawie zaczętej przez kogoś innego. Dlatego stara sesja jest jawnie
- * unieważniana, powstaje nowa, a fakt przejęcia ląduje w `events`.
- */
-export function przejmij(
-  token: string,
-  badge: string,
-  deviceId: string | null,
-  kontekst?: string
-): Sesja | null {
-  const stara = sesja(token);
-  const nowy = userByBadge(badge);
-  if (!nowy) return null;
-  if (stara) {
-    db().prepare("UPDATE device_session SET revoked_at = ? WHERE token = ?").run(nowIso(), token);
-    logEvent("session_handover", nowy.name, null, {
-      od: stara.user.name,
-      odBadge: stara.user.badgeCode,
-      doBadge: nowy.badgeCode,
-      kontekst: kontekst ?? null,
-    });
-  }
-  return zaloguj(badge, deviceId);
-}
+/* Przejęcie pracy cudzym badge'em (`przejmij`) wyszło razem z plakietkami
+   w 0.20.0. Miało sens, dopóki zmiana osoby kosztowała jeden skan: wtedy warto
+   było pytać „przejąć pracę?", zamiast przełączać po cichu. Przy haśle nie ma
+   czego przejmować — kto siada do kolektora, ten się loguje, a poprzednik
+   wylogowuje. Zdarzenia `session_handover` zostają w audycie jako historia. */
 
 export function wyloguj(token: string): void {
   db().prepare("UPDATE device_session SET revoked_at = ? WHERE token = ?").run(nowIso(), token);
 }
 
 /* ── Operacje uprzywilejowane ───────────────────────────────────────────────
-   Badge'e bywają pożyczane („podaj mi swój, mam ręce w oleju"), więc dla
-   operacji, których nie da się cofnąć albo które omijają cudzą pracę, sam
-   badge nie wystarcza. PIN sprawia, że „ktoś użył mojego badge'a" jest
-   kłamstwem, a nie wymówką.                                                  */
+   Rozstrzyga sama ROLA zalogowanego konta. Do sierpnia 2026 dochodził PIN,
+   bo plakietkę dawało się pożyczyć („weź moją, mam ręce w oleju") — hasła się
+   nie pożycza tak samo łatwo, więc drugi sekret wyszedł razem z badge'em.
+
+   Cena jest jawna: porzucony zalogowany kolektor pozwala obcej osobie na
+   wszystko, co może jego właściciel. Dlatego wylogowanie po zmianie jest
+   jedynym zabezpieczeniem, jakie tu zostało.                                 */
 
 /**
- * Operacje wymagające PIN-u.
+ * Operacje zastrzeżone dla ról.
  *
  * Plan §7 wymienia cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
  * z nierozwiązanymi wyjątkami, zdjęcie cudzego locka i zmianę ustawień serwera.
@@ -148,11 +189,11 @@ export type OperacjaUprzywilejowana =
   | "widocznosc_magazynow";
 
 /**
- * Kto MOŻE — zanim PIN rozstrzygnie, czy to naprawdę ta osoba.
+ * Kto może.
  *
  * Zarządzanie kontami jest tylko dla biura, bo to jedyna operacja, która
  * tworzy TOŻSAMOŚĆ. Brygadzista, który może założyć konto, może założyć konto
- * biura z własnym PIN-em — i cała reszta reguł przestaje cokolwiek znaczyć.
+ * biura z własnym hasłem — i cała reszta reguł przestaje cokolwiek znaczyć.
  */
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   zdjecie_cudzego_locka: ["brygadzista", "biuro"],
@@ -173,32 +214,15 @@ export interface WynikAutoryzacji {
   powod?: string;
 }
 
-/**
- * Czy ta osoba może wykonać operację uprzywilejowaną.
- *
- * `pin` jest wymagany zawsze, gdy konto ma go ustawiony — także dla roli
- * `biuro`. Rola mówi, KTO może; PIN dowodzi, że to naprawdę ta osoba.
- */
+/** Czy ta osoba może wykonać operację uprzywilejowaną. */
 export function autoryzuj(
   user: Uzytkownik,
-  operacja: OperacjaUprzywilejowana,
-  pin: string | null
+  operacja: OperacjaUprzywilejowana
 ): WynikAutoryzacji {
   const dozwolone = WYMAGANA_ROLA[operacja];
   if (!dozwolone.includes(user.role)) {
     const kto = dozwolone.map((r) => NAZWA_ROL[r]).join(" albo ");
     return { ok: false, powod: `Operacja „${operacja}" wymaga uprawnień ${kto}` };
-  }
-  if (!user.maPin) {
-    // Konto uprzywilejowane bez PIN-u to konto, którego nie da się przypisać
-    // do człowieka — lepiej odmówić, niż wpisać do audytu coś niepewnego.
-    return { ok: false, powod: "Konto uprzywilejowane bez ustawionego PIN-u" };
-  }
-  const row = db().prepare("SELECT pin_hash FROM app_user WHERE user_id = ?").get(user.userId) as
-    | { pin_hash: string | null }
-    | undefined;
-  if (!pin || !sprawdzPin(pin, row?.pin_hash ?? null)) {
-    return { ok: false, powod: "Błędny PIN" };
   }
   logEvent("privileged", user.name, null, { operacja });
   return { ok: true };

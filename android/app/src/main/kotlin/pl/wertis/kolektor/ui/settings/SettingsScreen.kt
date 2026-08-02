@@ -27,8 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,7 +76,7 @@ fun SettingsScreen(graph: AppGraph) {
         SectionLabel("Kto pracuje")
         SectionCard {
             // Lista imion wpisywanych z klawiatury zniknęła razem z nagłówkiem
-            // X-User (plan §7): tożsamość rozstrzyga skan badge'a po stronie
+            // X-User (plan §7): tożsamość rozstrzyga login i hasło po stronie
             // serwera. Konta zakłada biuro, nie kolektor.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
@@ -109,7 +107,7 @@ fun SettingsScreen(graph: AppGraph) {
                         // delegowaną — smart cast by się nie odbył
                         when (val s = stan) {
                             is SessionState.Aktywna -> s.role
-                            SessionState.Brak -> "zeskanuj badge, żeby zacząć"
+                            SessionState.Brak -> "zaloguj się, żeby zacząć"
                         },
                         fontSize = 11.sp,
                         color = InkSoft,
@@ -201,7 +199,7 @@ fun SettingsScreen(graph: AppGraph) {
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         )
 
-        OutlineButton("EKRAN STARTOWY (SKAN BADGE'A)", modifier = Modifier.fillMaxWidth()) {
+        OutlineButton("EKRAN LOGOWANIA", modifier = Modifier.fillMaxWidth()) {
             graph.nav.go(Screen.SPLASH)
         }
     }
@@ -264,7 +262,6 @@ private fun ToggleRow(title: String, sub: String, checked: Boolean, onChange: (B
 private fun MagazynySekcja(graph: AppGraph) {
     var magazyny by remember { mutableStateOf<List<MagazynInfo>>(emptyList()) }
     var ukryte by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var pin by remember { mutableStateOf("") }
     var zapisuje by remember { mutableStateOf(false) }
     var blad by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -331,15 +328,6 @@ private fun MagazynySekcja(graph: AppGraph) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                WertisTextField(
-                    value = pin,
-                    onValueChange = { pin = it },
-                    placeholder = "PIN biura",
-                    modifier = Modifier.weight(1f),
-                    // PIN wpisuje się na hali, przy ludziach — jak w PinSheet
-                    keyboardType = KeyboardType.NumberPassword,
-                    visualTransformation = PasswordVisualTransformation(),
-                )
                 OutlineButton(if (zapisuje) "ZAPISUJĘ…" else "ZAPISZ") {
                     if (zapisuje) return@OutlineButton
                     zapisuje = true
@@ -350,12 +338,11 @@ private fun MagazynySekcja(graph: AppGraph) {
                             // naraz nie mogą po cichu zgubić jednej z decyzji
                             val r = apiCall {
                                 graph.api.setWidocznoscMagazynow(
-                                    WidocznoscRequest(ukryte = ukryte.toList(), pinAutora = pin)
+                                    WidocznoscRequest(ukryte = ukryte.toList())
                                 )
                             }
                             magazyny = r.magazyny
                             ukryte = r.magazyny.filter { it.ukryty }.map { it.magId }.toSet()
-                            pin = ""
                             graph.effects.toast("Zapisano widoczność magazynów")
                         } catch (e: Exception) {
                             blad = e.message ?: "Nie udało się zapisać"

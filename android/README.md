@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), badge i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **108 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **102 testy** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -199,25 +199,27 @@ przed którą ta pozycja broni.
 
 **Tożsamość**
 
-- [ ] skan plakietki na ekranie startowym loguje,
-- [ ] skan własnej plakietki przy czynnej sesji nie robi nic,
-- [ ] skan cudzej plakietki pyta o przejęcie pracy,
-- [ ] odłóż kolektor na godzinę: wraca do otwartej dostawy bez skanu i bez
+- [ ] login i hasło logują, a pole loginu jest wypełnione ostatnią wartością,
+- [ ] zły login i złe hasło dają TEN SAM komunikat,
+- [ ] po pięciu pomyłkach ekran mówi, żeby odczekać chwilę,
+- [ ] **hasło wpisane z klawiatury sprzętowej NIE trafia do wyszukiwarki
+      towarów** — regresja na wedge, patrz `scan/WedgeKeySource.kt`,
+- [ ] odłóż kolektor na godzinę: wraca do otwartej dostawy bez logowania i bez
       ekranu blokady (regresja: usunięty TTL sesji),
 - [ ] skan towaru zajętego przez kogoś innego proponuje odebranie,
-- [ ] magazynier dostaje odmowę, a brygadzista z PIN-em przechodzi.
+- [ ] magazynier dostaje odmowę, brygadzista przechodzi.
 
 **Pierwsze uruchomienie**
 
-- [ ] pusty serwer: ekran startowy proponuje ZAŁÓŻ KONTA, nie skan plakietki,
-- [ ] kreator zakłada całą listę i pokazuje kody badge'ów,
-- [ ] po wyjściu z kreatora ta sama instalacja prosi już o skan,
+- [ ] pusty serwer: ekran startowy proponuje ZAŁÓŻ KONTA obok pól logowania,
+- [ ] kreator zakłada całą listę i pokazuje loginy, nigdy haseł,
+- [ ] po wyjściu z kreatora ta sama instalacja prosi już o logowanie,
 - [ ] świeża instalacja z adresem fabrycznym `10.0.2.2` pokazuje „Nie widzę
       serwera pod adresem…" i ROZWINIĘTE pole adresu,
-- [ ] nie pokazuje samego napisu „Zeskanuj swój badge" (bez konta nie dało się
-      z niego wyjść),
+- [ ] nie pokazuje samych pól logowania bez wyjścia (bez konta nie dało się
+      z tego ekranu wyjść),
 - [ ] wpisz właściwy adres LAN i naciśnij ZAPISZ I SPRAWDŹ,
-- [ ] ekran przechodzi do ZAŁÓŻ KONTA albo do prośby o skan, bez restartu
+- [ ] ekran przechodzi do ZAŁÓŻ KONTA albo do logowania, bez restartu
       aplikacji,
 - [ ] wyłącz Wi-Fi w połowie zakładania kont: ekran pokazuje konta, które JUŻ
       powstały, a nie sam komunikat o błędzie.
@@ -233,9 +235,10 @@ przed którą ta pozycja broni.
   reszta spada do globalnego fallbacku (`ui/scan/ScanRouter.kt`). Nie ma
   ukrytego stanu między skanami — kontekst przyklejony został wycięty, bo dało
   się mieć przypięty jeden towar i otwartą kartę drugiego.
-- **Tożsamość**: skan badge'a → token sesji (`core/session/SessionModel.kt`
-  + `data/SessionRepository.kt`). Decyzja „zaloguj / odblokuj / zapytaj
-  o przejęcie / nic" jest czystą funkcją, poza Androidem i z testami.
+- **Tożsamość**: login i hasło → token sesji (`core/session/SessionModel.kt`
+  + `data/SessionRepository.kt`). Kolektor zapamiętuje ostatni login, nigdy
+  hasła — zapamiętane hasło byłoby plakietką pod inną nazwą, tylko bez
+  możliwości świadomego oddania jej.
 - **Offline**: `core/offline/OfflineQueue.kt`
   (bufor tylko przy awarii sieci; błędy serwera propagują do UI). Trwałość:
   plik JSON, flush: powrót sieci / tyker 15 s / start / ręcznie / WorkManager.

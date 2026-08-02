@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.session.Rola
 import pl.wertis.kolektor.core.setup.Konto
+import pl.wertis.kolektor.core.setup.HASLO_MIN
 import pl.wertis.kolektor.core.setup.bladKonta
 import pl.wertis.kolektor.core.setup.mozliwaWysylka
 import pl.wertis.kolektor.core.setup.opisBledu
@@ -73,7 +75,6 @@ fun SetupScreen(graph: AppGraph) {
     // decyduje, czy pierwsze konto idzie bez sesji i czy wymagamy biura.
     val odZera = graph.nav.setupOdZera
     val konta = remember { mutableStateListOf(Konto(rola = if (odZera) Rola.BIURO else Rola.MAGAZYNIER)) }
-    var pinBiura by remember { mutableStateOf("") }
     var pokazBledy by remember { mutableStateOf(false) }
 
     when (val s = stan) {
@@ -91,7 +92,7 @@ fun SetupScreen(graph: AppGraph) {
         StanSetupu.Wpisywanie -> Unit
     }
 
-    val gotowe = mozliwaWysylka(konta.toList(), odZera) && (odZera || pinBiura.isNotBlank())
+    val gotowe = mozliwaWysylka(konta.toList(), odZera)
 
     Column(
         modifier = Modifier
@@ -112,25 +113,13 @@ fun SetupScreen(graph: AppGraph) {
             if (odZera) {
                 "Wpisz wszystkich, którzy będą pracować na kolektorze. Pierwsza " +
                     "pozycja musi być kontem biura — to ono zakłada wszystkie następne " +
-                    "i tylko ono widzi listę kodów."
+                    "i tylko ono widzi listę kont."
             } else {
-                "Nowe osoby dopisujesz tu samodzielnie. Potrzebny będzie PIN biura."
+                "Nowe osoby dopisujesz tu samodzielnie — jesteś zalogowany jako biuro."
             },
             fontSize = 13.sp,
             color = InkMute,
         )
-
-        if (!odZera) {
-            SectionLabel("PIN biura")
-            SectionCard {
-                WertisTextField(
-                    value = pinBiura,
-                    onValueChange = { pinBiura = it.filter { c -> c.isDigit() }.take(8) },
-                    placeholder = "PIN konta, którym jesteś zalogowany",
-                    keyboardType = KeyboardType.NumberPassword,
-                )
-            }
-        }
 
         konta.forEachIndexed { i, k ->
             SectionLabel("Osoba ${i + 1}")
@@ -141,22 +130,28 @@ fun SetupScreen(graph: AppGraph) {
                     placeholder = "Imię i nazwisko",
                 )
                 Spacer(Modifier.height(8.dp))
+                WertisTextField(
+                    value = k.login,
+                    // login wpisuje biuro, ale kształt narzuca serwer — od razu
+                    // odcinamy to, czego i tak nie przyjmie
+                    onValueChange = { konta[i] = k.copy(login = it.trim().lowercase()) },
+                    placeholder = "Login (np. jkowalski)",
+                )
+                Spacer(Modifier.height(8.dp))
+                WertisTextField(
+                    value = k.haslo,
+                    onValueChange = { konta[i] = k.copy(haslo = it) },
+                    placeholder = "Hasło (min. $HASLO_MIN znaków)",
+                    keyboardType = KeyboardType.Password,
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                Spacer(Modifier.height(8.dp))
                 WyborRoli(
                     wybrana = k.rola,
                     // pierwsze konto przy pustej bazie MUSI być biurem — serwer
                     // i tak to wymusi, więc nie udajemy, że jest wybór
                     zablokowane = odZera && i == 0,
                 ) { konta[i] = k.copy(rola = it) }
-
-                if (k.rola.wymagaPinu) {
-                    Spacer(Modifier.height(8.dp))
-                    WertisTextField(
-                        value = k.pin,
-                        onValueChange = { konta[i] = k.copy(pin = it.filter { c -> c.isDigit() }.take(8)) },
-                        placeholder = "PIN tej osoby (min. 4 cyfry)",
-                        keyboardType = KeyboardType.NumberPassword,
-                    )
-                }
 
                 val blad = if (pokazBledy) bladKonta(k) else null
                 blad?.let {
@@ -195,7 +190,7 @@ fun SetupScreen(graph: AppGraph) {
             pokazBledy = true
             if (gotowe) {
                 scope.launch {
-                    graph.setup.zaloz(konta.toList(), odZera, pinBiura.ifBlank { null })
+                    graph.setup.zaloz(konta.toList(), odZera)
                 }
             }
         }
@@ -242,11 +237,11 @@ private fun PostepZakladania(zrobione: Int, wszystkich: Int) {
 }
 
 /**
- * Podsumowanie — jedyne miejsce, w którym widać KODY BADGE'ÓW.
+ * Podsumowanie — potwierdzenie, czym się kto zaloguje.
  *
- * Kody trzeba przepisać albo sfotografować, bo bez nich nie ma czego wydrukować
- * na plakietkach. Później dostępne wyłącznie dla biura przez `GET /api/users`,
- * więc ten ekran mówi o tym wprost zamiast liczyć, że ktoś się domyśli.
+ * Haseł tu nie ma i nie będzie: biuro dopiero co je wpisało, a wypisanie ich
+ * na ekranie zamieniłoby ten widok w kartkę do sfotografowania. Loginy są
+ * jawne i biuro odczyta je później przez `GET /api/users`.
  */
 @Composable
 private fun Podsumowanie(s: StanSetupu.Gotowe, onDalej: () -> Unit) {
@@ -275,15 +270,15 @@ private fun Podsumowanie(s: StanSetupu.Gotowe, onDalej: () -> Unit) {
             )
         }
         Text(
-            "Przepisz kody na plakietki (kod kreskowy Code 128 + ten sam kod " +
-                "tekstem). NIE drukuj nazwisk — badge się gubi i zostaje na kurtce.",
+            "Rozdaj hasła osobiście — nigdzie ich już nie zobaczysz. Loginy " +
+                "poniżej biuro odczyta w każdej chwili.",
             fontSize = 13.sp,
             color = InkMute,
         )
 
         s.konta.forEach { k ->
             SectionCard {
-                Text(k.badgeCode, fontFamily = BarlowCond, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, color = Ink)
+                Text(k.login, fontFamily = BarlowCond, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Ink)
                 Text(k.imieNazwisko, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
                 Text(k.rola.etykieta, fontSize = 12.sp, color = InkSoft)
             }

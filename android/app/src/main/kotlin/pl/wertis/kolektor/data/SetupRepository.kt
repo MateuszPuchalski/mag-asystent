@@ -3,7 +3,7 @@ package pl.wertis.kolektor.data
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import pl.wertis.kolektor.core.net.ApiError
-import pl.wertis.kolektor.core.net.BadgeBody
+import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.CreateUserBody
 import pl.wertis.kolektor.core.setup.Konto
 import pl.wertis.kolektor.core.setup.ZalozoneKonto
@@ -50,19 +50,10 @@ class SetupRepository(
      *
      * @param odZera pusta instalacja — pierwsze konto idzie bez sesji, a zaraz
      *   po nim logujemy się nim, żeby móc założyć resztę.
-     * @param pinBiuraIstniejacego PIN zalogowanego biura; wymagany tylko przy
-     *   dokładaniu kont do działającej instalacji.
      */
-    suspend fun zaloz(
-        konta: List<Konto>,
-        odZera: Boolean,
-        pinBiuraIstniejacego: String? = null,
-    ) {
+    suspend fun zaloz(konta: List<Konto>, odZera: Boolean) {
         val kolejka = kolejnoscWysylki(konta, odZera)
         val powstale = mutableListOf<ZalozoneKonto>()
-        // PIN biura, którym autoryzujemy KAŻDE kolejne założenie. Przy pustej
-        // instalacji poznajemy go dopiero po założeniu pierwszego konta.
-        var pinAutora = pinBiuraIstniejacego
 
         for ((i, k) in kolejka.withIndex()) {
             _stan.value = StanSetupu.Zakladanie(i, kolejka.size)
@@ -75,21 +66,20 @@ class SetupRepository(
                             // przy pierwszym koncie serwer i tak wymusza `biuro`,
                             // ale wysyłamy jawnie, żeby żądanie mówiło prawdę
                             role = k.rola.wire,
-                            pin = k.pin.ifBlank { null },
-                            pinAutora = if (pierwszeBezSesji) null else pinAutora,
+                            login = k.login.trim().lowercase(),
+                            haslo = k.haslo,
                         )
                     )
                 }.user
-                powstale += ZalozoneKonto(u.name, u.badgeCode, k.rola)
+                powstale += ZalozoneKonto(u.name, u.login ?: k.login, k.rola)
 
                 if (pierwszeBezSesji) {
                     // Logujemy się kontem, które właśnie powstało — bez tego
                     // każde następne żądanie odbije się od „Brak sesji", a lista
                     // zostanie założona w jednej szóstej.
-                    apiCall { api().authBadge(BadgeBody(u.badgeCode)) }.let {
+                    apiCall { api().authLogin(LoginBody(k.login.trim().lowercase(), k.haslo)) }.let {
                         session.przyjmijZSetupu(it.token, it.user)
                     }
-                    pinAutora = k.pin
                 }
             } catch (e: Exception) {
                 _stan.value = StanSetupu.Gotowe(powstale, komunikat(e, k))

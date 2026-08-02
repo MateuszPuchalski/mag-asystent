@@ -7,8 +7,8 @@ import type { FastifyInstance } from "fastify";
 
 /* Widoczność magazynów jest USTAWIENIEM GLOBALNYM — jedna osoba przestawia je
    wszystkim kolektorom naraz. Dlatego bramka jest tu taka sama jak przy
-   zakładaniu kont: konto biura ORAZ jego PIN. Ten plik pilnuje, że magazynier
-   z ważną sesją tego nie ruszy, i że sam badge nie wystarcza.               */
+   zakładaniu kont: rola `biuro`. Ten plik pilnuje, że magazynier z ważną
+   sesją tego nie ruszy — sama sesja nie jest uprawnieniem.                 */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-magr-")), "t.db");
 process.env.LOG_LEVEL = "silent";
@@ -28,8 +28,11 @@ before(async () => {
 });
 
 /** Konto + sesja; zwraca token. */
-function zaloguj(rola: "magazynier" | "biuro", pin?: string): string {
-  const u = createUser(rola === "biuro" ? "Biuro Testowe" : "Jan Testowy", rola, pin);
+function zaloguj(rola: "magazynier" | "biuro"): string {
+  const u =
+    rola === "biuro"
+      ? createUser("Biuro Testowe", rola, "biuro", "tajnehaslo")
+      : createUser("Jan Testowy", rola, "jtestowy", "tajnehaslo");
   const token = `tok-${u.userId}`;
   const teraz = new Date().toISOString();
   db()
@@ -57,7 +60,7 @@ beforeEach(() => {
   insMag.run(3, "ZWROTY", "Zwroty od klientów");
   insMag.run(91, "SERWIS", "Serwis");
 
-  tokenBiura = zaloguj("biuro", "4821");
+  tokenBiura = zaloguj("biuro");
   tokenMagazyniera = zaloguj("magazynier");
 });
 
@@ -88,31 +91,22 @@ test("bez sesji nie ma listy — bramka globalna działa też tutaj", async () =
 
 // ── Zapis ───────────────────────────────────────────────────────────────────
 
-test("biuro z PIN-em ukrywa magazyn", async () => {
-  const r = await ukryj(tokenBiura, { ukryte: [91], pinAutora: "4821" });
+test("biuro ukrywa magazyn", async () => {
+  const r = await ukryj(tokenBiura, { ukryte: [91] });
   assert.equal(r.statusCode, 200);
   assert.deepEqual(r.json().ukryte, [91]);
 });
 
-test("magazynier nie ukryje nawet z poprawnym PIN-em biura", async () => {
-  const r = await ukryj(tokenMagazyniera, { ukryte: [91], pinAutora: "4821" });
+test("magazynier nie ukryje magazynu, choćby był zalogowany", async () => {
+  const r = await ukryj(tokenMagazyniera, { ukryte: [91] });
   assert.equal(r.statusCode, 403);
-});
-
-test("biuro bez PIN-u nie wystarcza — badge bywa pożyczony", async () => {
-  const r = await ukryj(tokenBiura, { ukryte: [91] });
-  assert.equal(r.statusCode, 403);
-});
-
-test("zły PIN odpada", async () => {
-  assert.equal((await ukryj(tokenBiura, { ukryte: [91], pinAutora: "0000" })).statusCode, 403);
 });
 
 test("bez sesji odpada", async () => {
   const r = await app.inject({
     method: "POST",
     url: "/api/magazyny/widocznosc",
-    payload: { ukryte: [91], pinAutora: "4821" },
+    payload: { ukryte: [91] },
   });
   assert.equal(r.statusCode, 401);
 });
@@ -120,15 +114,15 @@ test("bez sesji odpada", async () => {
 // ── Walidacja ───────────────────────────────────────────────────────────────
 
 test("próba ukrycia magazynu z rolą to 400 z powodem", async () => {
-  const r = await ukryj(tokenBiura, { ukryte: [2], pinAutora: "4821" });
+  const r = await ukryj(tokenBiura, { ukryte: [2] });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /MGP/);
 });
 
 test("ciało bez listy to 400, nie 500", async () => {
-  assert.equal((await ukryj(tokenBiura, { pinAutora: "4821" })).statusCode, 400);
+  assert.equal((await ukryj(tokenBiura, {})).statusCode, 400);
   assert.equal(
-    (await ukryj(tokenBiura, { ukryte: "wszystkie", pinAutora: "4821" })).statusCode,
+    (await ukryj(tokenBiura, { ukryte: "wszystkie" })).statusCode,
     400
   );
 });

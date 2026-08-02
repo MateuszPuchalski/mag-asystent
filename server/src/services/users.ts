@@ -7,83 +7,76 @@ import { db, nowIso } from "../db/db.js";
      • `events.user_id` zbiera warianty tej samej osoby (Jan, jan, Jan K),
        więc audyt nadaje się do czytania oczami i do niczego więcej,
      • każdy może podać się za kogokolwiek jednym wpisem,
-     • firma ma badge'y i chce kont imiennych — czego ten model nie realizuje.
+     • firma chce kont imiennych — czego ten model nie realizuje.
 
-   Badge to JEDEN skan (~1 s) na ścieżce codziennej, bez PIN-u. PIN wchodzi
-   dopiero tam, gdzie badge nie wystarcza, bo badge'e bywają pożyczane.       */
+   Wejściem jest LOGIN I HASŁO. Do sierpnia 2026 był nim skan plakietki
+   `PRC-0007-3` — jedna sekunda zamiast wpisywania, ale własny, osobny wzorzec
+   w firmie, która wszędzie indziej loguje się loginem i hasłem.              */
 
 export type Rola = "magazynier" | "brygadzista" | "biuro";
 
 export interface Uzytkownik {
   userId: number;
-  badgeCode: string;
+  /** `null` = konto-ślad: audyt ma na co wskazywać, zalogować się nie da. */
+  login: string | null;
   name: string;
   role: Rola;
   active: boolean;
-  /** Czy konto ma ustawiony PIN — samego hasza nigdy nie wystawiamy. */
-  maPin: boolean;
+  /** Czy konto ma ustawione hasło — samego hasza nigdy nie wystawiamy. */
+  maHaslo: boolean;
 }
 
 interface UserRow {
   user_id: number;
-  badge_code: string;
+  login: string | null;
+  haslo_hash: string | null;
   name: string;
-  pin_hash: string | null;
   role: string;
   active: number;
 }
 
 const widok = (r: UserRow): Uzytkownik => ({
   userId: r.user_id,
-  badgeCode: r.badge_code,
+  login: r.login,
   name: r.name,
   role: r.role as Rola,
   active: r.active === 1,
-  maPin: !!r.pin_hash,
+  maHaslo: !!r.haslo_hash,
 });
 
-/* ── Kod badge'a: prefiks + numer + cyfra kontrolna ─────────────────────────
-   Lustro `core/badge/Badge.kt`. Cyfra kontrolna wyklucza rozpoznanie
-   USZKODZONEJ etykiety jako CUDZEGO badge'a — bez niej starty znak zamienia
-   Jana w Piotra, a audyt wskazuje niewinnego.                                */
+/* ── Login ──────────────────────────────────────────────────────────────────
+   Wpisuje go biuro, więc kształt jest wąski celowo: login ma być czymś, co da
+   się bez pomyłki podyktować przez halę i wpisać w rękawicach. Wielkość liter
+   nie rozróżnia — „Kowalski" i „kowalski" to jedno konto, inaczej dwie osoby
+   z tym samym loginem byłyby jednym żądaniem od pomyłki.                     */
 
-const BADGE_RE = /^PRC-(\d{4})-(\d)$/;
+const LOGIN_RE = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 
-export function cyfraKontrolna(numer: number): number {
-  const cyfry = String(numer).padStart(4, "0").split("").map(Number);
-  const suma = cyfry.reduce((s, c, i) => s + c * (i % 2 === 0 ? 3 : 1), 0);
-  return (10 - (suma % 10)) % 10;
-}
+/** Postać kanoniczna loginu — TA SAMA przy zapisie i przy szukaniu. */
+export const normalizujLogin = (raw: string): string => (raw ?? "").trim().toLowerCase();
 
-export function badgeCode(numer: number): string {
-  return `PRC-${String(numer).padStart(4, "0")}-${cyfraKontrolna(numer)}`;
-}
+export const poprawnyLogin = (raw: string): boolean => LOGIN_RE.test(normalizujLogin(raw));
 
-/** Numer pracownika z kodu; `null` gdy to nie badge ALBO zła cyfra kontrolna. */
-export function parseBadge(raw: string): number | null {
-  const m = BADGE_RE.exec((raw ?? "").trim().toUpperCase());
-  if (!m) return null;
-  const numer = Number(m[1]);
-  return Number(m[2]) === cyfraKontrolna(numer) ? numer : null;
-}
+/** Minimalna długość hasła. Długość chroni lepiej niż wymuszona wielka litera. */
+export const HASLO_MIN = 8;
 
-/* ── PIN ────────────────────────────────────────────────────────────────────
-   scrypt z solą per konto. PIN jest krótki z natury (ludzie wpisują go
-   w rękawicach), więc funkcja MUSI być kosztowna — inaczej wyciek bazy oznacza
-   natychmiastowe odtworzenie wszystkich PIN-ów.                              */
+/* ── Sekrety ────────────────────────────────────────────────────────────────
+   scrypt z solą per konto. Hasło bywa krótkie i słownikowe, bo wpisuje się je
+   w rękawicach, więc funkcja MUSI być kosztowna — inaczej wyciek bazy oznacza
+   natychmiastowe odtworzenie wszystkich haseł.                               */
 
-export function hashPin(pin: string): string {
+export function hashSekret(sekret: string): string {
   const sol = randomBytes(16);
-  return `${sol.toString("hex")}:${scryptSync(pin, sol, 32).toString("hex")}`;
+  return `${sol.toString("hex")}:${scryptSync(sekret, sol, 32).toString("hex")}`;
 }
 
-export function sprawdzPin(pin: string, hash: string | null): boolean {
+export function sprawdzSekret(sekret: string, hash: string | null): boolean {
   if (!hash) return false;
   const [solHex, oczekiwany] = hash.split(":");
   if (!solHex || !oczekiwany) return false;
-  const wyliczony = scryptSync(pin, Buffer.from(solHex, "hex"), 32);
+  const wyliczony = scryptSync(sekret, Buffer.from(solHex, "hex"), 32);
   const bufOczekiwany = Buffer.from(oczekiwany, "hex");
-  // porównanie stałoczasowe — inaczej czas odpowiedzi zdradza prefiks PIN-u
+  // porównanie stałoczasowe — inaczej czas odpowiedzi zdradza prefiks hasła
   return (
     wyliczony.length === bufOczekiwany.length && timingSafeEqual(wyliczony, bufOczekiwany)
   );
@@ -95,12 +88,11 @@ export function listUsers(): Uzytkownik[] {
   return (db().prepare("SELECT * FROM app_user ORDER BY name").all() as unknown as UserRow[]).map(widok);
 }
 
-export function userByBadge(kod: string): Uzytkownik | null {
-  const numer = parseBadge(kod);
-  if (numer === null) return null;
+/** Konto po loginie — wyłącznie czynne i wyłącznie takie, które ma hasło. */
+export function userByLogin(login: string): Uzytkownik | null {
   const r = db()
-    .prepare("SELECT * FROM app_user WHERE badge_code = ? AND active = 1")
-    .get(badgeCode(numer)) as UserRow | undefined;
+    .prepare("SELECT * FROM app_user WHERE login = ? AND active = 1")
+    .get(normalizujLogin(login)) as UserRow | undefined;
   return r ? widok(r) : null;
 }
 
@@ -111,27 +103,45 @@ export function userById(userId: number): Uzytkownik | null {
   return r ? widok(r) : null;
 }
 
-/** Numer nadawany kolejno — badge drukuje się raz i zostaje na całe zatrudnienie. */
-function nastepnyNumer(): number {
-  const r = db().prepare("SELECT badge_code FROM app_user").all() as Array<{ badge_code: string }>;
-  const numery = r.map((x) => parseBadge(x.badge_code) ?? 0);
-  return Math.max(0, ...numery) + 1;
+/** Hasz hasła do porównania — nigdy nie wychodzi poza warstwę serwisów. */
+export function haszHasla(userId: number): string | null {
+  const r = db().prepare("SELECT haslo_hash FROM app_user WHERE user_id = ?").get(userId) as
+    | { haslo_hash: string | null }
+    | undefined;
+  return r?.haslo_hash ?? null;
 }
 
-export function createUser(name: string, role: Rola = "magazynier", pin?: string): Uzytkownik {
-  const kod = badgeCode(nastepnyNumer());
+/**
+ * Nowe konto.
+ *
+ * `login` i `haslo` są opcjonalne, bo konto-ślad z migracji historii nie ma
+ * ani jednego, ani drugiego — i nie ma mieć. Konto bez hasła nie zaloguje się
+ * nigdy, choćby ktoś zgadł login.
+ */
+export function createUser(
+  name: string,
+  role: Rola = "magazynier",
+  login?: string | null,
+  haslo?: string | null
+): Uzytkownik {
   const id = db()
     .prepare(
-      "INSERT INTO app_user(badge_code, name, pin_hash, role, created_at) VALUES (?,?,?,?,?)"
+      "INSERT INTO app_user(login, haslo_hash, name, role, created_at) VALUES (?,?,?,?,?)"
     )
-    .run(kod, name.trim(), pin ? hashPin(pin) : null, role, nowIso()).lastInsertRowid;
+    .run(
+      login ? normalizujLogin(login) : null,
+      haslo ? hashSekret(haslo) : null,
+      name.trim(),
+      role,
+      nowIso()
+    ).lastInsertRowid;
   return userById(Number(id))!;
 }
 
-export function setPin(userId: number, pin: string | null): void {
+export function setHaslo(userId: number, haslo: string | null): void {
   db()
-    .prepare("UPDATE app_user SET pin_hash = ? WHERE user_id = ?")
-    .run(pin ? hashPin(pin) : null, userId);
+    .prepare("UPDATE app_user SET haslo_hash = ? WHERE user_id = ?")
+    .run(haslo ? hashSekret(haslo) : null, userId);
 }
 
 export function setActive(userId: number, active: boolean): void {
@@ -140,16 +150,26 @@ export function setActive(userId: number, active: boolean): void {
 }
 
 /**
- * Czy w bazie nie ma jeszcze ŻADNEGO konta.
+ * Czy w bazie nie ma jeszcze konta, którym DA SIĘ SIĘ ZALOGOWAĆ.
  *
  * Jedyny moment, w którym wolno założyć konto bez sesji biura — inaczej
  * pierwszego konta nie dałoby się utworzyć niczym. Ta furtka zamyka się sama
- * w chwili, gdy powstanie pierwszy wiersz, i dlatego pierwsze konto MUSI być
- * kontem biura z PIN-em: gdyby było magazynierem, nikt nie mógłby założyć
- * kolejnych i trzeba by ruszać bazę ręcznie.
+ * w chwili, gdy powstanie pierwsze takie konto, i dlatego pierwsze konto MUSI
+ * być kontem biura: gdyby było magazynierem, nikt nie mógłby założyć kolejnych
+ * i trzeba by ruszać bazę ręcznie.
+ *
+ * Warunek liczy KONTA Z LOGINEM, nie wszystkie wiersze, i to nie jest
+ * kosmetyka. Konta-ślady (migracja historii, przejście z plakietek) zostają
+ * w tabeli na zawsze. Gdyby liczyły się do tego warunku, furtka byłaby na
+ * każdej istniejącej instalacji zamknięta na głucho: żeby założyć konto,
+ * trzeba sesji, a żeby mieć sesję, trzeba konta.
  */
 export function brakKont(): boolean {
-  return (db().prepare("SELECT COUNT(*) n FROM app_user").get() as { n: number }).n === 0;
+  return (
+    db()
+      .prepare("SELECT COUNT(*) n FROM app_user WHERE login IS NOT NULL AND active = 1")
+      .get() as { n: number }
+  ).n === 0;
 }
 
 /* ── Migracja historii ──────────────────────────────────────────────────────

@@ -95,7 +95,7 @@ fun WertisTextField(
     leadingIcon: ImageVector? = null,
     imeAction: ImeAction = ImeAction.Done,
     keyboardType: KeyboardType = KeyboardType.Text,
-    /** Maskowanie treści — PIN wpisuje się na hali, przy ludziach. */
+    /** Maskowanie treści — hasło wpisuje się na hali, przy ludziach. */
     visualTransformation: VisualTransformation = VisualTransformation.None,
     onDone: () -> Unit = {},
 ) {
@@ -105,7 +105,7 @@ fun WertisTextField(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = MinTap)
-            .onFocusChanged { WedgeKeySource.textFieldFocused = it.isFocused },
+            .onFocusChanged { WedgeKeySource.ustawFokus(it.isFocused) },
         placeholder = { Text(placeholder, color = InkMute) },
         leadingIcon = leadingIcon?.let { { Icon(it, null, tint = InkMute, modifier = Modifier.size(18.dp)) } },
         singleLine = true,

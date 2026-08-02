@@ -259,11 +259,11 @@ keystore) — instrukcja podpisu jak w standardowym projekcie Android.
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
-## 5a. Konta pracowników i badge'e (plan §7)
+## 5a. Konta pracowników i hasła (plan §7)
 
-Bez kont kolektor nie ma czym podpisać operacji. Ekran startowy prosi o skan
-badge'a i nie przepuszcza dalej. **Tak samo API** — od lipca każda trasa poza
-czterema (`GET /api/health`, `GET /api/setup`, `POST /api/auth/badge`
+Bez kont kolektor nie ma czym podpisać operacji. Ekran startowy prosi o login
+i hasło, i nie przepuszcza dalej. **Tak samo API** — od lipca każda trasa poza
+czterema (`GET /api/health`, `GET /api/setup`, `POST /api/auth/login`
 i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`.
 
 > **Dlaczego.** Wcześniej bramką był wyłącznie ekran kolektora. Dowolne
@@ -272,25 +272,25 @@ i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`.
 
 **1. Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
-ekran startowy pokazuje **ZAŁÓŻ KONTA** zamiast prosić o skan plakietki
-(których jeszcze nie ma).
+ekran startowy pokazuje **ZAŁÓŻ KONTA** obok pól logowania (których nikt
+jeszcze nie założył).
 
 > Przycisk **ZAŁÓŻ KONTA** pojawia się dopiero wtedy, gdy serwer odpowiedział.
-> Jeśli widzisz sam napis „Zeskanuj swój badge", to znaczy, że kolektor NIE
-> DOGADAŁ SIĘ Z SERWEREM — poprawny adres jest warunkiem wstępnym całego tego
+> Jeśli widzisz same pola logowania, to znaczy, że kolektor NIE DOGADAŁ SIĘ
+> Z SERWEREM — poprawny adres jest warunkiem wstępnym całego tego
 > punktu. Brak odpowiedzi świadomie nie odblokowuje kreatora: martwe Wi-Fi
 > wyglądałoby wtedy jak pusta instalacja i powstałby drugi komplet kont obok
 > istniejącego.
 
 W kreatorze wpisujesz wszystkich naraz:
 
-- **pierwsza pozycja to konto biura z PIN-em** — pole roli jest zablokowane,
-  bo to konto zakłada wszystkie następne i tylko ono widzi listę kodów.
-  Konto magazyniera na tej pozycji zamurowałoby administrację;
-- kolejne osoby: imię, nazwisko, rola. PIN wymagany tylko dla brygadzisty
-  i biura — bez niego takie konto i tak nic nie zatwierdzi;
-- po zatwierdzeniu kolektor pokazuje **kody badge'ów** — to jedyny moment,
-  w którym widać je wszystkie naraz. Przepisz je albo sfotografuj.
+- **pierwsza pozycja to konto biura** — pole roli jest zablokowane, bo to konto
+  zakłada wszystkie następne i tylko ono widzi listę kont. Konto magazyniera na
+  tej pozycji zamurowałoby administrację;
+- kolejne osoby: imię, nazwisko, login, hasło, rola. Hasło jest wymagane dla
+  każdej roli — konto bez hasła nie zaloguje się nigdy;
+- po zatwierdzeniu kolektor pokazuje **loginy**. Haseł nie pokazuje ani razu:
+  wpisałeś je przed chwilą, więc rozdaj je osobiście.
 
 Kolejność wysyłki układa kreator: biuro zawsze pierwsze. Kreator sam loguje się
 nowym kontem biura, żeby móc założyć resztę.
@@ -300,7 +300,7 @@ pokazuje **co już powstało**. Tych osób nie zakładaj drugi raz. Dopisz tylko
 brakujące.
 
 Nowe osoby dochodzą później tą samą drogą: **Ustawienia → DODAJ OSOBY**
-(widoczne tylko dla konta biura, wymaga jego PIN-u).
+(widoczne tylko dla konta biura).
 
 **1b. Alternatywa: `curl`,** gdy kolektora jeszcze nie ma pod ręką albo konta
 zakłada się skryptem.
@@ -309,39 +309,46 @@ zakłada się skryptem.
 # pierwsze konto — bez sesji, ale TYLKO przy pustej bazie
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H 'content-type: application/json' \
-  -d '{"name":"Biuro Zakupy","role":"biuro","pin":"4821"}'
-# → {"user":{"userId":1,"badgeCode":"PRC-0001-9","role":"biuro","maPin":true}}
+  -d '{"name":"Biuro Zakupy","role":"biuro","login":"biuro","haslo":"tajnehaslo"}'
+# → {"user":{"userId":1,"login":"biuro","role":"biuro","maHaslo":true}}
 
 # zaloguj się nim i dopisz resztę
-TOKEN=$(curl -s -X POST http://<IP-serwera>:3001/api/auth/badge \
+TOKEN=$(curl -s -X POST http://<IP-serwera>:3001/api/auth/login \
   -H 'content-type: application/json' \
-  -d '{"badge":"PRC-0001-9"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+  -d '{"login":"biuro","haslo":"tajnehaslo"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"Jan Kowalski","pinAutora":"4821"}'
+  -d '{"name":"Jan Kowalski","login":"jkowalski","haslo":"tajnehaslo"}'
 
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"Adam Nowak","role":"brygadzista","pin":"7315","pinAutora":"4821"}'
+  -d '{"name":"Adam Nowak","role":"brygadzista","login":"anowak","haslo":"tajnehaslo"}'
 
-curl http://<IP-serwera>:3001/api/users -H "x-session: $TOKEN"   # lista do wydruku
+curl http://<IP-serwera>:3001/api/users -H "x-session: $TOKEN"   # lista kont
 ```
+
+Hasła z przykładu zmień. `tajnehaslo` jest w tej instrukcji po to, żeby dało się
+ją wykonać bez zastanawiania się — nie po to, żeby zostało w firmie.
 
 `GET /api/setup` odpowiada `{"potrzebne":true}`, dopóki nie ma ani jednego
 konta — tego samego pytania używa kolektor.
 
 **Lista kont jest dostępna tylko dla biura** i to nie jest przesada: zwraca
-`badgeCode` każdej osoby, a logowanie to sam skan badge'a. Wystawiona hali
-byłaby listą tożsamości do przepisania na własną plakietkę.
+login każdej osoby, czyli połowę tego, czego trzeba do zalogowania. Wystawiona
+hali byłaby listą celów.
 
-**2. Wydrukuj plakietki.** Na plakietce ma być **kod kreskowy z `badgeCode`**
-w symbolice Code 128 — tej samej, co etykiety regałów. Pod kodem umieść ten sam
-ciąg tekstem, na wypadek zdartej etykiety.
+**2. Zmiana hasła.** Swoje hasło każdy zmienia sam:
 
-**Nazwiska na plakietce nie drukuj.** Badge się gubi i zostaje na kurtce,
-a powiązanie kod → człowiek żyje wyłącznie w bazie. Format `PRC-0000-0` jest
-stały, więc jedna szablonowa etykieta wystarczy.
+```bash
+curl -X POST http://<IP-serwera>:3001/api/auth/haslo \
+  -H "x-session: $TOKEN" -H 'content-type: application/json' \
+  -d '{"stare":"tajnehaslo","nowe":"noweHaslo123"}'
+```
+
+Cudze ustawia biuro przez `POST /api/users/:id/haslo` z ciałem `{"haslo":"…"}`.
+Podanie `null` odbiera hasło: konto zostaje w bazie razem z historią, ale nikt
+się nim nie zaloguje.
 
 **3. Migracja historii** (tylko przy aktualizacji istniejącej instalacji —
 jednorazowo, idempotentnie). Zakłada konta dla nazw, które już są w `events`,
@@ -351,29 +358,36 @@ snapshot, a zdarzenia niedopasowane zostają z `user_ref = NULL`.
 
 ```bash
 curl -X POST http://<IP-serwera>:3001/api/users/migrate-history \
-  -H "x-session: $TOKEN" -H 'content-type: application/json' \
-  -d '{"pinAutora":"4821"}'
+  -H "x-session: $TOKEN" -H 'content-type: application/json'
 # → {"zalozonychKont":4,"przypisanychZdarzen":1281,"nieprzypisanych":37,"nazwy":[...]}
 ```
 
-Po migracji przejrzyj `nazwy` — wpisy w rodzaju „magazynier" albo „test"
-wyłącz przez `POST /api/users/:id/active` z `{"active":false,"pinAutora":"4821"}`.
-Konta się **nie kasuje**: historia w `events` musi mieć na co wskazywać.
+Konta z migracji powstają **bez loginu i bez hasła** — to konta-ślady. Audyt ma
+na co wskazywać, a zalogować się nimi nie da. Po migracji przejrzyj `nazwy`;
+wpisy w rodzaju „magazynier" albo „test" wyłącz przez
+`POST /api/users/:id/active` z `{"active":false}`. Konta się **nie kasuje**:
+historia w `events` musi mieć na co wskazywać.
 
-**3a. Co wymaga PIN-u.** Sam badge wystarcza do codziennej pracy. PIN wchodzi
-w dwóch miejscach, bo badge'e bywają pożyczane:
+**3a. Co wymaga której roli.** Do codziennej pracy wystarcza zalogowanie. Dwie
+operacje są zastrzeżone:
 
 | operacja | kto | gdzie |
 |---|---|---|
 | odebranie koledze zajętej pozycji przed 30-min TTL | brygadzista lub biuro | kolektor: skan zajętego towaru → propozycja odebrania |
-| zakładanie kont, PIN-y, wyłączanie kont | **tylko biuro** | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
+| zakładanie kont, hasła, wyłączanie kont | **tylko biuro** | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
 
 Odebranie pozycji zapisuje w `events` (`lock_forced`) **komu i przez kogo**.
 Lock już wygasły zdejmuje się bez wpisu — po TTL nikomu nic nie odebrano.
 
 Zarządzanie kontami jest zastrzeżone dla biura, bo to jedyna operacja tworząca
 tożsamość. Brygadzista mogący zakładać konta założyłby konto biura z własnym
-PIN-em. Reszta reguł przestałaby wtedy cokolwiek znaczyć.
+hasłem. Reszta reguł przestałaby wtedy cokolwiek znaczyć.
+
+> **Drugiego czynnika już nie ma.** Do 0.20.0 obie operacje wymagały PIN-u,
+> bo plakietkę dawało się pożyczyć razem z tożsamością („weź moją, mam ręce
+> w oleju"). Hasła się tak nie pożycza, więc PIN wyszedł — ale porzucony
+> zalogowany kolektor pozwala teraz obcej osobie na wszystko, co może jego
+> właściciel. Wylogowanie po zmianie przestało być uprzejmością.
 
 **4. Raport wydajności (`GET /api/wydajnosc?days=7`) — obowiązek formalny
 PRZED uruchomieniem.** Telemetria per pracownik to **monitoring pracowniczy**

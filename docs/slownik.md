@@ -33,7 +33,7 @@ Deklaracja nie jest mechanizmem.
 | jedno pojęcie = jedno słowo | 1.1–1.5 | słowniczek niżej |
 | ostrzeżenie **przed** krokiem | 8.1 | czytelnik ma je zobaczyć, zanim wykona krok |
 | kroki sekwencyjne numerowane | 7.x | sekwencja nie jest prozą |
-| bez skupisk rzeczowników | 1.14 | „lista kodów badge'ów pracowników" trzeba rozbić |
+| bez skupisk rzeczowników | 1.14 | „lista loginów kont pracowników" trzeba rozbić |
 
 ## Uzasadnienia zostają — ale osobno
 
@@ -65,8 +65,8 @@ lista wariantów rosłaby o każdy przypadek gramatyczny z osobna.
 | **pole własne** | jedna z ośmiu kolumn `tw_Pole1..tw_Pole8` na `tw__Towar` | pol* dodatkow* |
 | **APK** | plik instalacyjny aplikacji kolektora | |
 | **magazynier**, **brygadzista**, **biuro** | trzy role w systemie; „użytkownik" nie jest rolą | |
-| **badge** | kod `PRC-0000-0` i sesja, którą otwiera | |
-| **plakietka** | fizyczny wydruk badge'a z kodem kreskowym | |
+| **login** | jawna nazwa konta, np. `jkowalski`; wpisuje ją biuro przy zakładaniu | |
+| **hasło** | sekret otwierający sesję; w bazie leży wyłącznie jako hasz | |
 | **karta towaru** | ekran ze stanami, lokalizacjami i zamiennikami | |
 | **zamówienie u dostawcy** | dokument ZD — towar zamówiony, jeszcze nieprzyjęty; samo „zamówienie" myli się z ZK od klienta | |
 | **kreator** | dialog instalatora pytający o bazę Subiekta | |

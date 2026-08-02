@@ -61,6 +61,20 @@ REMOVED = [
     "sgt_pozycje",
     "closeBasket",
     "koszyk_bez_mm",
+    # Logowanie plakietką i PIN — wycięte w 0.20.0. Znowu identyfikatory:
+    # „plakietka" jako przedmiot i historia decyzji mogą zostać prozą, ale
+    # instrukcja każąca zeskanować badge, wydrukować kod albo podać PIN
+    # w żądaniu ma się zapalić na czerwono.
+    "auth/badge",
+    "badgeCode",
+    "badge_code",
+    "PRC-",
+    "parseBadge",
+    "cyfraKontrolna",
+    "looksLikeBadge",
+    "pinAutora",
+    "hashPin",
+    "auth/handover",
 ]
 
 PATH_RE = re.compile(

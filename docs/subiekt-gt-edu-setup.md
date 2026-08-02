@@ -269,7 +269,7 @@ curl -s -X POST http://localhost:3001/api/admin/resync
 
 > **Najpierw konta.** Kolektor bez kont nie przepuszcza dalej niż ekran
 > startowy — przy pustej instalacji zaproponuje kreator (**ZAŁÓŻ KONTA**).
-> Bez badge'a nie zeskanujesz nic, więc ten krok wyprzedza wszystkie poniższe.
+> Bez konta nie zeskanujesz nic, więc ten krok wyprzedza wszystkie poniższe.
 > Instrukcja: [DEPLOY §5a](../DEPLOY.md).
 
 1. **Odczyt:** zeskanuj / wyszukaj towar, który widzisz w Subiekcie —

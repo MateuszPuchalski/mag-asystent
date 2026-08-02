@@ -7,12 +7,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.net.ApiError
-import pl.wertis.kolektor.core.net.BadgeBody
-import pl.wertis.kolektor.core.net.HandoverBody
+import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.UserDto
-import pl.wertis.kolektor.core.session.BadgeAction
 import pl.wertis.kolektor.core.session.SessionState
-import pl.wertis.kolektor.core.session.naBadge
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.core.session.userId
 import pl.wertis.kolektor.net.ApiService
@@ -20,21 +17,17 @@ import pl.wertis.kolektor.net.apiCall
 
 /* ── Sesja urządzenia (plan §7) ─────────────────────────────────────────────
    Zastępuje `UsersRepository`, w którym „użytkownik" był dowolnym łańcuchem
-   wpisywanym z klawiatury. Tożsamość rozstrzyga SERWER na podstawie skanu
-   badge'a; kolektor trzyma tylko token.
+   wpisywanym z klawiatury. Tożsamość rozstrzyga SERWER na podstawie loginu
+   i hasła; kolektor trzyma tylko token.
 
-   Token i kod badge'a leżą w prefsach, bo mają przeżyć zabicie procesu:
-   kolektor idzie do kieszeni, Android ubija aplikację, a człowiek wraca do
-   tej samej dostawy. Sesja kończy się wyłącznie jawną decyzją: wylogowaniem
-   z Ustawień albo przejęciem pracy cudzym badge'em.
+   Token leży w prefsach, bo ma przeżyć zabicie procesu: kolektor idzie do
+   kieszeni, Android ubija aplikację, a człowiek wraca do tej samej dostawy.
+   Sesja kończy się wyłącznie jawną decyzją — wylogowaniem z Ustawień.
 
-   Sam kod badge'a zapisujemy po to, żeby ROZPOZNAĆ WŁASNY skan bez pytania
-   serwera — inaczej każdy odruchowy skan własnej plakietki kosztowałby
-   round-trip, a przy martwym Wi-Fi kończyłby się pytaniem o przejęcie pracy
-   od samego siebie.                                                          */
-
-/** Pytanie do człowieka: „przejąć pracę?". `null` = nikt o nic nie pyta. */
-data class PytanieOPrzejecie(val badge: String, val od: String)
+   Obok tokenu zapisujemy OSTATNI LOGIN, nigdy hasła. Login i tak stoi na
+   pasku razem z nazwiskiem, więc niczego nie zdradza, a oszczędza wpisywanie
+   na urządzeniu współdzielonym przez zmianę. Zapamiętane hasło byłoby
+   plakietką pod inną nazwą, tylko bez możliwości świadomego oddania jej.     */
 
 class SessionRepository(
     /* Dostawca, nie gotowy `ApiService`: klient HTTP musi znać token sesji,
@@ -49,17 +42,14 @@ class SessionRepository(
     private val _state = MutableStateFlow<SessionState>(SessionState.Brak)
     val state: StateFlow<SessionState> = _state
 
-    private val _pytanie = MutableStateFlow<PytanieOPrzejecie?>(null)
-    val pytanie: StateFlow<PytanieOPrzejecie?> = _pytanie
-
     /** Wołane po KAŻDEJ zmianie osoby — kontekst przyklejony musi wtedy zniknąć. */
     var onUserChanged: (() -> Unit)? = null
 
     /** Token sesji — czytany synchronicznie przez `IdentityHeaderInterceptor`. */
     val token: String? get() = prefs.getString("token", null)
 
-    /** Kod badge'a właściciela sesji; `null` gdy sesji nie ma. */
-    val mojBadge: String? get() = prefs.getString("badge", null)
+    /** Ostatni udany login — do wstawienia w pole na ekranie logowania. */
+    val ostatniLogin: String? get() = prefs.getString("login", null)
 
     /** Nazwa do paska i do nagłówka `x-user` (podpowiedź, nie tożsamość). */
     val currentUser: String get() = _state.value.osoba ?: "anonim"
@@ -71,7 +61,9 @@ class SessionRepository(
         val poprzedni = _state.value.userId
         prefs.edit {
             if (token == null) remove("token") else putString("token", token)
-            if (user == null) remove("badge") else putString("badge", user.badgeCode)
+            // login przeżywa wylogowanie: następna osoba i tak go nadpisze,
+            // a ta sama nie musi go wpisywać po raz drugi
+            user?.login?.let { putString("login", it) }
         }
         _state.value =
             if (user == null) SessionState.Brak
@@ -108,48 +100,18 @@ class SessionRepository(
     }
 
     /**
-     * Skan badge'a. Decyzję („zaloguj / odblokuj / zapytaj / nic") podejmuje
-     * czysty model w `:core` — tutaj zostaje samo wykonanie.
-     *
-     * @return komunikat dla człowieka albo `null`, gdy nie ma co mówić.
+     * Logowanie. Zwraca `null` przy powodzeniu, komunikat przy odmowie —
+     * ekran nie musi wtedy znać ani kodów HTTP, ani treści błędów.
      */
-    suspend fun onBadge(kod: String): String? =
-        when (val a = naBadge(_state.value, kod, mojBadge)) {
-            is BadgeAction.Zaloguj -> zaloguj(a.badge)
-            is BadgeAction.ZapytajOPrzejecie -> {
-                _pytanie.value = PytanieOPrzejecie(a.badge, a.od)
-                null
-            }
-            BadgeAction.Nic -> null
-        }
-
-    private suspend fun zaloguj(badge: String): String? =
-        runCatching { apiCall { api().authBadge(BadgeBody(badge)) } }
+    suspend fun zaloguj(login: String, haslo: String): String? =
+        runCatching { apiCall { api().authLogin(LoginBody(login.trim().lowercase(), haslo)) } }
             .fold(
                 onSuccess = {
                     zapisz(it.token, it.user)
-                    "Zalogowano: ${it.user.name}"
+                    null
                 },
-                onFailure = { it.komunikat("Nie rozpoznano badge'a") },
+                onFailure = { it.komunikat("Nieznany login albo błędne hasło") },
             )
-
-    /** Potwierdzone przejęcie pracy. Wołane WYŁĄCZNIE z dialogu, nigdy ze skanu. */
-    suspend fun przejmij(kontekst: String?): String? {
-        val p = _pytanie.value ?: return null
-        _pytanie.value = null
-        return runCatching { apiCall { api().authHandover(HandoverBody(p.badge, kontekst)) } }
-            .fold(
-                onSuccess = {
-                    zapisz(it.token, it.user)
-                    "Pracę przejął: ${it.user.name}"
-                },
-                onFailure = { it.komunikat("Nie udało się przejąć pracy") },
-            )
-    }
-
-    fun odrzucPrzejecie() {
-        _pytanie.value = null
-    }
 
     /**
      * Wylogowanie — JEDYNIE z jawnej decyzji człowieka (Ustawienia).
