@@ -28,6 +28,90 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.21.0 — 3 sierpnia 2026
+
+Zgłoszenie niezgodności na kolektorze zbiera teraz **dokładnie to, czego żąda
+firmowy formularz „Niezgodność w dostawie"**. Do tej pory były to dwa różne
+zestawy pól: magazynier wypełniał jeden przy palecie, biuro przepisywało drugi
+do formularza dla dostawcy, a różnicę uzupełniało z pamięci i po fakcie.
+
+**[wymaga działania]** Nowy APK. Do czasu rozesłania przez MDM kolektory ze
+starym APK zgłaszają po staremu — serwer to przyjmuje, patrz niżej.
+
+### Pięć kategorii z formularza zamiast siedmiu własnych typów
+
+<!-- docs_check: historia -->
+
+Lista zgłoszeń to teraz: **błędny artykuł**, **brak w przesyłce**, **uszkodzone
+w transporcie**, **zła ilość**, **artykuł niezamówiony**. `wrong_item`
+i `damaged` zachowały klucze, bo znaczą to samo co w formularzu — zmiana klucza
+osierociłaby historię bez żadnego zysku.
+
+Odchodzą: „za mało" i „za dużo" (zastąpione przez „złą ilość", która niesie
+obie liczby naraz), „brak miejsca" i „nieznany kod". **Strata jest realna:**
+magazynier traci sposób na powiedzenie „nie mam gdzie tego położyć". Kolizja
+EAN ma własny mechanizm (`GET /api/ean-conflicts`) i nie potrzebowała pozycji
+na tej liście.
+
+Przy okazji doszło coś, czego wcześniej nie dało się zgłosić w ogóle: **artykuł
+spoza dokumentu**. Skan towaru, którego nie ma na fakturze, kończył się toastem
+„X nie jest w tym dokumencie" i niczym więcej. Teraz jest zgłoszeniem
+z numerem katalogowym.
+
+### Serwer przyjmuje stare klucze, choć kolektor ich nie oferuje
+
+<!-- docs_check: historia -->
+
+`git pull` przestawia serwer od razu, a APK czeka na MDM. Gdyby serwer odrzucał
+`qty_short`, każdy nierozesłany kolektor dostawałby 400 przy palecie, w rękawicy,
+w środku dostawy — przez cały czas wdrożenia. Klucze sprzed 0.21.0 są więc dalej
+zapisywalne i **na zawsze nazywalne**: protokół dla dostawcy nie może pokazywać
+surowego `qty_short`. Listę `TYPY_HISTORYCZNE` da się skasować, gdy wszystkie
+kolektory będą miały nowy APK.
+
+### Co arkusz pyta, a czego nie
+
+Ilości wymaga **każda** kategoria — tak jak formularz. Zdjęcie zostaje
+obowiązkowe przy uszkodzeniu i błędnym artykule. Nowe pola:
+
+- **numer katalogowy** artykułu spoza dokumentu (błędny / niezamówiony) — nie
+  ma linii, z której dałoby się go odczytać;
+- **„a miało przyjść"** przy błędnym artykule — zwinięte, bo formularz ma to
+  pole jako opcjonalne;
+- **numer przesyłki i protokół kuriera** — pytane RAZ na dostawę i zapisywane
+  na dostawie (`POST /api/delivery/:id/przesylka`), nie przy zgłoszeniu.
+  Przesyłka jest jedna; wpisana przy każdym uszkodzonym artykule z osobna
+  mogłaby się różnić sama ze sobą.
+
+Nie pyta o numer faktury, dostawcę ani numer katalogowy pozycji z dokumentu —
+to wszystko już jest w bazie. **Symbol z Subiekta JEST numerem katalogowym
+dostawcy**, więc pytanie o niego byłoby przepisywaniem z ekranu na ekran.
+
+Zgłoszenie zapisuje też **ilość z dokumentu jako snapshot**. Odczyt „na żywo"
+przy druku protokołu pokazywałby stan po ewentualnej korekcie faktury
+w Subiekcie, a protokół ma mówić, co widzieliśmy przy palecie.
+
+### Czego ta zmiana NIE robi
+
+Pole formularza **„Co zrobić z…?"** (do zwrotu / zafakturować / dołożyć do
+kolejnego zamówienia / pilnie przysłać / korekta) zostaje po stronie biura —
+decyzja handlowa nie zapada przy palecie. Kolumny na nią nie ma: kanał bez
+odbiorcy to dokładnie ten kształt, który repo wycięło w 0.16.0 i 0.17.0.
+
+Protokół dla dostawcy w `/biuro` i eksport CSV **zostały bez zmian**. Nowe pola
+są w bazie i w API, ale nie na wydruku — dołożenie ich to osobna zmiana jednego
+pliku.
+
+### Ryzyko, które zostaje
+
+Zgłoszenie **nie ma bufora offline** — arkusz woła API synchronicznie. Przy
+uszkodzeniu z numerem przesyłki to najdłuższa ścieżka w aplikacji, a zerwane
+Wi-Fi kasuje całość. Dlatego numer przesyłki idzie na serwer **przed**
+zgłoszeniem: jeśli sieć padnie w połowie, zostaje to, czym przewoźnik odnajduje
+paczkę.
+
+---
+
 ## 0.20.1 — 3 sierpnia 2026
 
 Przygotowanie pod przebudowę zgłaszania niezgodności w dostawie na wzór

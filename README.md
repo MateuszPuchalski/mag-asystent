@@ -399,18 +399,29 @@ Parametry (env, dev):
   ten kanał został zamknięty razem z prawem zapisu do tabeli flag.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
   zgadza się". Rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ**: najczęstszy
-  wyjątek nie może wymagać szukania kafla wśród siedmiu typów.
+  wyjątek nie może wymagać szukania kafla wśród pięciu kategorii.
 - **Kilka osób przy jednej dostawie**: lock per pozycja z TTL 30 min — drugi
   skaner mówi, kto trzyma linię, zamiast pozwolić na podwójne odłożenie.
 - **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie
   **PRZED zapisem** — „przeniesiony (ZAMIEŃ)” czy „leży w obu (DODAJ)”. Z samego
   skanu tych dwóch sytuacji odróżnić się nie da, więc decyduje człowiek.
-- **Wyjątki jako obiekt pierwszej klasy.** Lista typów jest zamknięta: za mało,
-  za dużo, uszkodzony, zły towar, brak miejsca, nieznany kod, kolizja EAN.
+- **Wyjątki jako obiekt pierwszej klasy.** Lista kategorii jest zamknięta. Od
+  0.21.0 jest to lista z firmowego formularza „Niezgodność w dostawie": błędny
+  artykuł, brak w przesyłce, uszkodzone w transporcie, zła ilość, artykuł
+  niezamówiony.
 
-  Przy uszkodzeniu, złym towarze i nieznanym kodzie **zdjęcie jest obowiązkowe**
-  — to dowód do reklamacji, robi je systemowy aparat. Pozycja z wyjątkiem wypada
-  z rutyny, ale nie blokuje zamknięcia dostawy.
+  Każda kategoria wymaga **ilości** — tak samo jak formularz. Przy uszkodzeniu
+  i błędnym artykule **zdjęcie jest obowiązkowe**: to dowód do reklamacji, robi
+  je systemowy aparat. Artykuł spoza dokumentu wymaga numeru katalogowego, bo
+  nie ma linii, z której dałoby się go odczytać. Numer przesyłki i pytanie
+  o protokół kuriera padają **raz na dostawę**, nie przy każdym artykule —
+  przesyłka jest jedna. Pozycja z wyjątkiem wypada z rutyny, ale nie blokuje
+  zamknięcia dostawy.
+
+  Klucze sprzed 0.21.0 (`qty_short`, `no_space`…) serwer dalej **przyjmuje**,
+  choć kolektor ich nie oferuje: `git pull` przestawia serwer od razu, a APK
+  czeka na rozesłanie przez MDM. Etykiety zostają na zawsze — historii się nie
+  kasuje, a protokół dla dostawcy nie może pokazywać surowego klucza.
 - Ekran **WYJĄTKI**: nierozwiązane zgłoszenia (pytane przy starcie aplikacji,
   czerwony pasek na każdym ekranie do czasu zamknięcia) + **raport kolizji
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
@@ -493,7 +504,7 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 102 testy jednostkowe; buduje się bez Android SDK
+                           + 106 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (które typy wymagają zdjęcia), logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **102 testy** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza i to, czego każda wymaga), logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **106 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -184,6 +184,22 @@ przed którą ta pozycja broni.
       spodem,
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
+
+**Niezgodność w dostawie (arkusz PROBLEM)**
+
+- [ ] arkusz pokazuje **pięć kafli**, nie siedem,
+- [ ] INNA ILOŚĆ otwiera arkusz z zaznaczoną „Zła ilość",
+- [ ] przy złej ilości widać „Zamówiono N szt" jako TEKST, a pole pyta o to,
+      ile faktycznie przyszło,
+- [ ] błędny artykuł pyta o numer katalogowy tego, co przyszło,
+- [ ] „a miało przyjść" startuje **zwinięte** i rozwija się dopiero na tap,
+- [ ] uszkodzenie w transporcie pyta o numer przesyłki i protokół kuriera,
+- [ ] drugie uszkodzenie w TEJ SAMEJ dostawie o przesyłkę już **nie pyta**,
+      tylko pokazuje zapisany numer,
+- [ ] wyjście z aplikacji i powrót nie wskrzesza pytania o przesyłkę
+      (regresja: stan pytany raz trzymany wyłącznie w pamięci ekranu),
+- [ ] lista WYJĄTKI pokazuje nazwę, nie surowy klucz — także dla zgłoszeń
+      sprzed 0.21.0 (`qty_short` → „Za mało").
 
 **Układ ekranu**
 
