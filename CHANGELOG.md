@@ -28,6 +28,41 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.20.1 — 3 sierpnia 2026
+
+Przygotowanie pod przebudowę zgłaszania niezgodności w dostawie na wzór
+firmowego formularza reklamacyjnego. Nic tu jeszcze nie zmienia ekranu — to
+dwie rzeczy, bez których ta przebudowa poszłaby na ślepo.
+
+### Wyjątki dostają testy po stronie serwera
+
+`raiseProblem`, `resolveProblem` i `exportCsv` nie miały ani jednego. Reguły
+kolektora (`core/problem/ProblemModel.kt`) mają test od początku, ale są
+uprzejmością wobec człowieka w alejce, a nie bramką: stary APK albo `curl`
+z sieci hali trafia wprost do serwisu. Trzynaście testów pilnuje teraz
+walidacji, skutku dla linii dostawy, ponownego rozwiązania wyjątku oraz CSV —
+łącznie z tym, że średnik wpisany w opis nie rozwala kolumn.
+
+### Słownik typów zamiast trzech kopii
+
+<!-- docs_check: historia -->
+
+Lista typów wyjątku żyła w trzech miejscach: `services/problems.ts`,
+`ProblemModel.kt` i `biuro.html`. Zgodności pilnował tylko test kotlinowy, więc
+dopisanie typu na serwerze zostawiało stronę biura z surowym kluczem
+(`qty_short`) na protokole dla dostawcy — i nikt by tego nie zauważył przed
+wysłaniem.
+
+`ProblemView` niesie teraz `typLabel` prosto z serwera, a strona biura straciła
+własny słownik. Kolektor swoją kopię **zachowuje świadomie**: etykiety muszą być
+na ekranie także wtedy, gdy Wi-Fi padło w połowie hali. Dwie kopie zamiast
+trzech, obie z testem.
+
+### [wymaga działania] przy wdrożeniu
+
+`git pull`, `npm ci`, `npm run build`, restart usług. Bez zmian w bazie i bez
+nowego APK — starszy kolektor po prostu ignoruje nowe pole.
+
 ## 0.20.0 — 1 sierpnia 2026
 
 <!-- docs_check: historia -->

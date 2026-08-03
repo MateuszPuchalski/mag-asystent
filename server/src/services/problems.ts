@@ -10,16 +10,36 @@ import type { ProblemView, ProblemType } from "../types.js";
    Wyjątek to wiersz w bazie, nie notatka w głowie magazyniera — inaczej nie da
    się zmierzyć, ile kosztują, ani zgłosić reklamacji dostawcy.               */
 
-/** Typy zamknięte (§4.6). */
-export const PROBLEM_TYPES: ProblemType[] = [
-  "qty_short",
-  "qty_over",
-  "damaged",
-  "wrong_item",
-  "no_space",
-  "unknown_barcode",
-  "ean_conflict",
-];
+/* ── Słownik typów ──────────────────────────────────────────────────────────
+   Typy są ZAMKNIĘTE (§4.6): otwarte pole „opisz problem" daje dane, których
+   nikt nie policzy, a zamknięta lista daje raport do pokazania dostawcy.
+
+   Etykieta stoi TUTAJ, obok klucza, i jedzie z każdym `ProblemView`. Do
+   sierpnia 2026 ta sama lista żyła w TRZECH miejscach: tu, w `ProblemModel.kt`
+   i w `biuro.html`. Kotlin ma test zgodności kluczy, ale strona biura była
+   trzecią kopią bez żadnego — dopisanie typu na serwerze zostawiało ją
+   z surowym kluczem na wydruku reklamacyjnym i nikt by tego nie zauważył.
+
+   Kolektor dalej trzyma własną kopię i tak ma być: etykiety muszą być na
+   ekranie także wtedy, gdy Wi-Fi padło w połowie hali.                       */
+
+export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
+  qty_short: "Za mało",
+  qty_over: "Za dużo",
+  damaged: "Uszkodzony",
+  wrong_item: "Zły towar",
+  no_space: "Brak miejsca",
+  unknown_barcode: "Nieznany kod",
+  ean_conflict: "Kolizja EAN",
+};
+
+export const PROBLEM_TYPES: ProblemType[] = Object.keys(
+  PROBLEM_TYPES_LABELS
+) as ProblemType[];
+
+/** Etykieta typu; nieznany klucz pokazujemy surowo, zamiast udawać, że go znamy. */
+export const etykietaTypu = (typ: string): string =>
+  PROBLEM_TYPES_LABELS[typ as ProblemType] ?? typ;
 
 /** Typy, przy których zdjęcie jest OBOWIĄZKOWE — dowód do reklamacji (§4.6). */
 const PHOTO_REQUIRED: ReadonlySet<string> = new Set(["damaged", "wrong_item", "unknown_barcode"]);
@@ -130,6 +150,7 @@ function mapRow(r: any): ProblemView {
     deliveryId: r.delivery_id,
     lineId: r.line_id,
     typ: r.typ,
+    typLabel: etykietaTypu(r.typ),
     qty: r.ilosc,
     opis: r.opis,
     hasPhoto: !!r.foto_ref,
