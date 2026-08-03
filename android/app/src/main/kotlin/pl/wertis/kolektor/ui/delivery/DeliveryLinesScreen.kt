@@ -405,7 +405,11 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     },
                     onQtyIssue = {
                         problemFor = line
-                        problemType = ProblemType.QTY_SHORT
+                        // od 0.21.0 „inna ilość" to jedna kategoria z formularza:
+                        // magazynier podaje, ile faktycznie przyszło, a serwer
+                        // zapisuje przy tym ilość z dokumentu — nikt nie zgaduje,
+                        // czy „za mało" znaczyło brak, czy niedowóz
+                        problemType = ProblemType.QTY_MISMATCH
                         problemOpen = true
                     },
                     onCancel = { zwolnij(line) },
@@ -427,6 +431,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             deliveryId = id,
             line = problemFor,
             initialType = problemType,
+            // numer przesyłki pytamy RAZ na dostawę — jeśli już go zapisano,
+            // arkusz o niego nie pyta, bo przesyłka jest jedna
+            nrPrzesylkiZapisany = view?.nrPrzesylki,
             onDone = {
                 problemOpen = false
                 problemFor = null

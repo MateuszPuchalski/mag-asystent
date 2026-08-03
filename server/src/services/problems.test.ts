@@ -20,10 +20,12 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-pr
 let db: typeof import("../db/db.js").db;
 let nowIso: typeof import("../db/db.js").nowIso;
 let P: typeof import("./problems.js");
+let getDelivery: typeof import("./delivery.js").getDelivery;
 
 before(async () => {
   ({ db, nowIso } = await import("../db/db.js"));
   P = await import("./problems.js");
+  ({ getDelivery } = await import("./delivery.js"));
 });
 
 let deliveryId = 0;
@@ -56,7 +58,7 @@ const ZDJECIE =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 const zglos = (wejscie: Partial<Parameters<typeof P.raiseProblem>[0]>) =>
-  P.raiseProblem({ deliveryId, typ: "no_space", ...wejscie } as never, "Jan Kowalski");
+  P.raiseProblem({ deliveryId, typ: "missing_item", ...wejscie } as never, "Jan Kowalski");
 
 const status = (id: number) =>
   (db().prepare("SELECT status FROM delivery_line WHERE id=?").get(id) as { status: string }).status;
@@ -73,23 +75,30 @@ test("każdy typ ma etykietę, a nieznany pokazuje się surowo", () => {
   assert.equal(P.etykietaTypu("cos_nowego"), "cos_nowego");
 });
 
-test("lista typów zgadza się z kolektorem", () => {
-  // lustro `ProblemType.entries` z `core/problem/ProblemModel.kt`; rozjazd
-  // kończy się 400 w alejce, przy palecie, z ręką w rękawicy
+test("lista kategorii zgadza się z formularzem i z kolektorem", () => {
+  // lustro `ProblemType.entries` z `core/problem/ProblemModel.kt` ORAZ pięciu
+  // checkboxów formularza; rozjazd kończy się 400 w alejce, przy palecie
   assert.deepEqual(P.PROBLEM_TYPES, [
-    "qty_short",
-    "qty_over",
-    "damaged",
     "wrong_item",
-    "no_space",
-    "unknown_barcode",
-    "ean_conflict",
+    "missing_item",
+    "damaged",
+    "qty_mismatch",
+    "extra_item",
   ]);
 });
 
+test("klucz sprzed 0.21.0 dalej się zapisuje, choć nikt go już nie oferuje", () => {
+  /* `git pull` przestawia serwer od razu, a kolektor czeka na MDM. Gdyby
+     serwer odrzucał stare klucze, każdy nierozesłany APK dostawałby 400 przy
+     palecie przez cały czas trwania wdrożenia. */
+  assert.ok("id" in zglos({ typ: "qty_short", lineId, qty: 3 }));
+  assert.equal(P.listUnresolved()[0].typLabel, "Za mało", "i nadal ma nazwę");
+  assert.ok(!P.PROBLEM_TYPES.includes("qty_short" as never), "ale nie jest oferowany");
+});
+
 test("widok wyjątku niesie etykietę, nie sam klucz", () => {
-  zglos({ typ: "damaged", lineId, photoBase64: ZDJECIE });
-  assert.equal(P.listUnresolved()[0].typLabel, "Uszkodzony");
+  zglos({ typ: "damaged", lineId, qty: 1, photoBase64: ZDJECIE });
+  assert.equal(P.listUnresolved()[0].typLabel, "Uszkodzone w transporcie");
 });
 
 /* ── Walidacje ───────────────────────────────────────────────────────────── */
@@ -97,21 +106,69 @@ test("widok wyjątku niesie etykietę, nie sam klucz", () => {
 test("zgłoszenie bez wymaganego zdjęcia odpada, i to na SERWERZE", () => {
   // bez dowodu to opinia, a nie zgłoszenie — a reguła kolektora jest tylko
   // uprzejmością wobec człowieka, nie bramką
-  for (const typ of ["damaged", "wrong_item", "unknown_barcode"]) {
-    const r = zglos({ typ, lineId });
+  for (const typ of ["damaged", "wrong_item"]) {
+    const r = zglos({ typ, lineId, qty: 1, symObcy: "OBCY-1" });
     assert.ok("error" in r, typ);
     assert.match((r as { error: string }).error, /zdj/i);
   }
   assert.equal(P.listUnresolved().length, 0, "nic nie wpadło do bazy");
 });
 
-test("zgłoszenie bez ilości faktycznej odpada przy typach ilościowych", () => {
-  for (const typ of ["qty_short", "qty_over"]) {
-    assert.ok("error" in zglos({ typ, lineId }), typ);
-    assert.ok("error" in zglos({ typ, lineId, qty: Number.NaN }), `${typ} + NaN`);
+test("każda kategoria formularza wymaga ilości", () => {
+  // formularz żąda jej we wszystkich pięciu blokach
+  for (const typ of P.PROBLEM_TYPES) {
+    const r = zglos({ typ, lineId, symObcy: "OBCY-1", photoBase64: ZDJECIE });
+    assert.ok("error" in r, typ);
+    assert.match((r as { error: string }).error, /ilo/i, typ);
   }
   // zero jest poprawną ilością: „naliczono 0 sztuk" to najczęstszy brak
-  assert.ok("id" in zglos({ typ: "qty_short", lineId, qty: 0 }));
+  assert.ok("id" in zglos({ typ: "missing_item", lineId, qty: 0 }));
+});
+
+test("artykuł spoza dokumentu wymaga numeru katalogowego", () => {
+  /* `wrong_item` i `extra_item` opisują towar, którego na fakturze NIE MA —
+     nie ma więc linii, z której dałoby się odczytać symbol. Do 0.21.0 takiego
+     towaru nie dało się zgłosić w ogóle: skan kończył się toastem. */
+  for (const typ of ["wrong_item", "extra_item"]) {
+    const r = zglos({ typ, qty: 2, photoBase64: ZDJECIE });
+    assert.ok("error" in r, typ);
+    assert.match((r as { error: string }).error, /numer katalogowy/i, typ);
+  }
+  assert.ok("id" in zglos({ typ: "extra_item", qty: 2, symObcy: "  FT-991  " }));
+  assert.equal(P.listUnresolved()[0].symObcy, "FT-991", "przycięty, ale zapisany");
+});
+
+test("zła ilość bez pozycji z dokumentu odpada", () => {
+  // „dostarczono złą ilość ZAMÓWIONEGO artykułu" — bez linii nie ma z czym
+  // porównać, a formularz chce obu liczb
+  const r = zglos({ typ: "qty_mismatch", qty: 2 });
+  assert.ok("error" in r);
+  assert.match((r as { error: string }).error, /dokument/i);
+});
+
+test("ilość z dokumentu zapisuje się jako snapshot, nie odczyt na żywo", () => {
+  /* Fakturę w Subiekcie da się poprawić po zgłoszeniu. Protokół dla dostawcy
+     ma pokazywać, co widzieliśmy przy palecie, a nie stan po korekcie. */
+  zglos({ typ: "qty_mismatch", lineId, qty: 3 });
+  db().prepare("UPDATE delivery_line SET ilosc_dok = 99 WHERE id = ?").run(lineId);
+  assert.equal(P.listUnresolved()[0].qtyDok, 5, "5 sztuk widziane w chwili zgłoszenia");
+});
+
+test("błędny artykuł niesie oba artykuły naraz", () => {
+  // formularz pyta o to, co przyszło (wymagane), i o to, co miało przyjść
+  const r = zglos({
+    typ: "wrong_item",
+    lineId,
+    qty: 2,
+    symObcy: "FT-777",
+    zamiastIlosc: 5,
+    photoBase64: ZDJECIE,
+  });
+  assert.ok("id" in r);
+  const p = P.listUnresolved()[0];
+  assert.equal(p.symObcy, "FT-777", "co przyszło");
+  assert.equal(p.sym, "W32-0401", "a co miało przyjść — z linii dokumentu");
+  assert.equal(p.zamiastIlosc, 5);
 });
 
 test("nieznany typ nie zapisuje się jako wyjątek", () => {
@@ -123,7 +180,7 @@ test("nieznany typ nie zapisuje się jako wyjątek", () => {
 });
 
 test("zdjęcie ląduje na dysku, a w bazie zostaje sama nazwa pliku", () => {
-  const r = zglos({ typ: "damaged", lineId, photoBase64: ZDJECIE });
+  const r = zglos({ typ: "damaged", lineId, qty: 1, photoBase64: ZDJECIE });
   assert.ok("id" in r);
   const p = P.listByDelivery(deliveryId)[0];
   assert.equal(p.hasPhoto, true);
@@ -135,24 +192,65 @@ test("zdjęcie ląduje na dysku, a w bazie zostaje sama nazwa pliku", () => {
 /* ── Skutek dla dostawy ──────────────────────────────────────────────────── */
 
 test("zgłoszenie wyjmuje linię z rutyny, ale nie blokuje reszty dostawy", () => {
-  assert.ok("id" in zglos({ typ: "no_space", lineId }));
+  assert.ok("id" in zglos({ typ: "missing_item", lineId, qty: 1 }));
   assert.equal(status(lineId), "problem");
   // wyjątek żyje dalej na liście nierozwiązanych — domknięcie dostawy go nie
   // zamiata, bo inaczej zgłoszenie problemu karałoby zgłaszającego
   assert.equal(P.listUnresolved().length, 1);
 });
 
+test("nieistniejąca pozycja to odmowa, nie błąd bazy", () => {
+  /* Klucz obcy odpowiedziałby 500 „FOREIGN KEY constraint failed" — zdanie
+     o bazie, nie o zgłoszeniu. Kolektor wysyła id z widoku, ale to walidacja
+     serwera decyduje, co jest zdaniem dla człowieka. */
+  const r = P.raiseProblem({ deliveryId, lineId: 999999, typ: "missing_item", qty: 1 }, "Jan");
+  assert.ok("error" in r);
+  assert.match(r.error, /pozycji/);
+});
+
 test("wyjątek bez linii jest zapisywany, choć nie ma czego wyjąć z rutyny", () => {
-  // skan nieznanego kodu przy palecie: towaru nie ma na dokumencie
-  const r = zglos({ typ: "unknown_barcode", photoBase64: ZDJECIE });
+  // artykuł niezamówiony: przyjechał obok wszystkiego, co miało przyjść
+  const r = zglos({ typ: "extra_item", qty: 4, symObcy: "FT-991" });
   assert.ok("id" in r);
   assert.equal(status(lineId), "todo", "cudza linia nietknięta");
+});
+
+/* ── Przesyłka ───────────────────────────────────────────────────────────── */
+
+test("numer przesyłki należy do dostawy, nie do zgłoszenia", () => {
+  /* Wpisany przy każdym uszkodzonym artykule z osobna mógłby się różnić,
+     a to jedna paczka. Dwa zgłoszenia widzą ten sam numer. */
+  assert.deepEqual(P.zapiszPrzesylke(deliveryId, "  00159876543  ", "tak", "Jan"), { ok: true });
+  const d = db()
+    .prepare("SELECT nr_przesylki, kurier_protokol, przesylka_by FROM delivery WHERE id=?")
+    .get(deliveryId) as { nr_przesylki: string; kurier_protokol: string; przesylka_by: string };
+  assert.equal(d.nr_przesylki, "00159876543", "przycięty");
+  assert.equal(d.kurier_protokol, "tak");
+  assert.equal(d.przesylka_by, "Jan", "kto wpisał — to dane od człowieka, nie z importu");
+});
+
+test("widok dostawy niesie numer przesyłki, żeby kolektor nie pytał drugi raz", () => {
+  /* Pytanie pada RAZ na dostawę. Gdyby widok tego nie niósł, restart aplikacji
+     pytałby o numer ponownie przy każdym uszkodzonym artykule. */
+  assert.equal(getDelivery(deliveryId)?.nrPrzesylki, null, "przed zapisem: nie pytano");
+  P.zapiszPrzesylke(deliveryId, "00159876543", "nie", "Jan");
+  const d = getDelivery(deliveryId);
+  assert.equal(d?.nrPrzesylki, "00159876543");
+  assert.equal(d?.kurierProtokol, "nie");
+});
+
+test("odpowiedź o protokole kuriera ma trzy stany, nie dwa", () => {
+  // NULL znaczy „nie pytano" i nie wolno go zwinąć do „nie": formularz
+  // reklamacyjny jedzie do przewoźnika
+  assert.deepEqual(P.zapiszPrzesylke(deliveryId, "123", null, "Jan"), { ok: true });
+  assert.ok("error" in P.zapiszPrzesylke(deliveryId, "123", "moze", "Jan"));
+  assert.ok("error" in P.zapiszPrzesylke(999999, "123", "tak", "Jan"), "nieistniejąca dostawa");
 });
 
 /* ── Rozwiązywanie ───────────────────────────────────────────────────────── */
 
 test("rozwiązanie wyjątku drugi raz to odmowa, nie cicha zmiana notatki", () => {
-  const { id } = zglos({ typ: "no_space", lineId }) as { id: number };
+  const { id } = zglos({ typ: "missing_item", lineId, qty: 1 }) as { id: number };
   assert.deepEqual(P.resolveProblem(id, "reklamacja 12/2026", "Biuro"), { ok: true });
   const drugie = P.resolveProblem(id, "coś innego", "Biuro");
   assert.ok("error" in drugie);
@@ -160,7 +258,7 @@ test("rozwiązanie wyjątku drugi raz to odmowa, nie cicha zmiana notatki", () =
 });
 
 test("rozwiązany wyjątek znika z listy nierozwiązanych, ale zostaje w dostawie", () => {
-  const { id } = zglos({ typ: "no_space", lineId }) as { id: number };
+  const { id } = zglos({ typ: "missing_item", lineId, qty: 1 }) as { id: number };
   P.resolveProblem(id, undefined, "Biuro");
   assert.equal(P.listUnresolved().length, 0);
   assert.equal(P.listByDelivery(deliveryId).length, 1, "historia dostawy nie gubi wyjątków");
@@ -169,7 +267,7 @@ test("rozwiązany wyjątek znika z listy nierozwiązanych, ale zostaje w dostawi
 /* ── CSV do reklamacji ───────────────────────────────────────────────────── */
 
 test("CSV ma BOM i średnik — Excel PL otwiera go bez kreatora importu", () => {
-  zglos({ typ: "qty_short", lineId, qty: 3 });
+  zglos({ typ: "qty_mismatch", lineId, qty: 3 });
   const csv = P.exportCsv(deliveryId);
   assert.ok(csv.startsWith("﻿"), "bez BOM Excel rozjeżdża polskie znaki");
   const [naglowek, wiersz] = csv.slice(1).split("\r\n");
@@ -180,7 +278,7 @@ test("CSV ma BOM i średnik — Excel PL otwiera go bez kreatora importu", () =>
 
 test("średnik i cudzysłów w opisie nie rozwalają kolumn", () => {
   // opis pisze człowiek na kolektorze — prędzej czy później wpisze średnik
-  zglos({ typ: "no_space", lineId, opis: 'karton 2; napis "UWAGA"' });
+  zglos({ typ: "missing_item", lineId, qty: 1, opis: 'karton 2; napis "UWAGA"' });
   const wiersz = P.exportCsv(deliveryId).slice(1).split("\r\n")[1];
   assert.match(wiersz, /"karton 2; napis ""UWAGA"""/);
   assert.equal(wiersz.split('"')[0].split(";").length, 7, "kolumny przed opisem bez zmian");

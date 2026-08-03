@@ -10,42 +10,91 @@ import type { ProblemView, ProblemType } from "../types.js";
    Wyjątek to wiersz w bazie, nie notatka w głowie magazyniera — inaczej nie da
    się zmierzyć, ile kosztują, ani zgłosić reklamacji dostawcy.               */
 
-/* ── Słownik typów ──────────────────────────────────────────────────────────
-   Typy są ZAMKNIĘTE (§4.6): otwarte pole „opisz problem" daje dane, których
-   nikt nie policzy, a zamknięta lista daje raport do pokazania dostawcy.
+/* ── Kategorie niezgodności ─────────────────────────────────────────────────
+   Lista jest ZAMKNIĘTA i od 0.21.0 jest to DOSŁOWNIE lista z firmowego
+   formularza „Niezgodność w dostawie". Powód jest prosty: zgłoszenie
+   z kolektora i formularz wysyłany dostawcy to dotąd były dwa różne zestawy
+   pól, a różnicę uzupełniało biuro z pamięci.
 
-   Etykieta stoi TUTAJ, obok klucza, i jedzie z każdym `ProblemView`. Do
-   sierpnia 2026 ta sama lista żyła w TRZECH miejscach: tu, w `ProblemModel.kt`
-   i w `biuro.html`. Kotlin ma test zgodności kluczy, ale strona biura była
-   trzecią kopią bez żadnego — dopisanie typu na serwerze zostawiało ją
-   z surowym kluczem na wydruku reklamacyjnym i nikt by tego nie zauważył.
+   ZGŁASZALNE i NAZYWALNE to dwie różne listy, i to jest zamierzone. Wyjątki
+   sprzed 0.21.0 zostają w bazie na zawsze — historii się nie kasuje — więc
+   muszą mieć etykietę, inaczej protokół dla dostawcy pokazałby surowy klucz
+   `qty_short`. Zgłosić ich już jednak nie sposób: formularz ich nie zna.
 
-   Kolektor dalej trzyma własną kopię i tak ma być: etykiety muszą być na
+   Kolektor trzyma własną kopię tej listy i tak ma być: etykiety muszą być na
    ekranie także wtedy, gdy Wi-Fi padło w połowie hali.                       */
 
+/** Kategorie z formularza — tylko te oferuje dziś kolektor. */
+export const PROBLEM_TYPES: ProblemType[] = [
+  "wrong_item",
+  "missing_item",
+  "damaged",
+  "qty_mismatch",
+  "extra_item",
+];
+
+/**
+ * Klucze sprzed 0.21.0 — PRZYJMOWANE, choć nieoferowane.
+ *
+ * `git pull` przestawia serwer od razu, a kolektor czeka na rozesłanie APK
+ * przez MDM (patrz preambuła CHANGELOG-a). Gdyby serwer odrzucał stare klucze,
+ * każdy nierozesłany kolektor dostawałby 400 przy palecie, w rękawicy,
+ * w środku dostawy — i to przez cały czas trwania wdrożenia.
+ *
+ * Ta lista może zniknąć, gdy wszystkie kolektory będą miały APK 0.21.0.
+ */
+const TYPY_HISTORYCZNE: readonly ProblemType[] = [
+  "qty_short",
+  "qty_over",
+  "no_space",
+  "unknown_barcode",
+  "ean_conflict",
+];
+
+/** Czy taki wyjątek wolno dziś zapisać (formularz + okno wdrożenia APK). */
+export const typZapisywalny = (typ: string): boolean =>
+  PROBLEM_TYPES.includes(typ as ProblemType) ||
+  TYPY_HISTORYCZNE.includes(typ as ProblemType);
+
 export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
+  // pięć kategorii formularza
+  wrong_item: "Błędny artykuł",
+  missing_item: "Brak w przesyłce",
+  damaged: "Uszkodzone w transporcie",
+  qty_mismatch: "Zła ilość",
+  extra_item: "Artykuł niezamówiony",
+  // sprzed 0.21.0 — do nazwania, nie do zgłoszenia
   qty_short: "Za mało",
   qty_over: "Za dużo",
-  damaged: "Uszkodzony",
-  wrong_item: "Zły towar",
   no_space: "Brak miejsca",
   unknown_barcode: "Nieznany kod",
   ean_conflict: "Kolizja EAN",
 };
 
-export const PROBLEM_TYPES: ProblemType[] = Object.keys(
-  PROBLEM_TYPES_LABELS
-) as ProblemType[];
-
 /** Etykieta typu; nieznany klucz pokazujemy surowo, zamiast udawać, że go znamy. */
 export const etykietaTypu = (typ: string): string =>
   PROBLEM_TYPES_LABELS[typ as ProblemType] ?? typ;
 
-/** Typy, przy których zdjęcie jest OBOWIĄZKOWE — dowód do reklamacji (§4.6). */
-const PHOTO_REQUIRED: ReadonlySet<string> = new Set(["damaged", "wrong_item", "unknown_barcode"]);
+/**
+ * Zdjęcie OBOWIĄZKOWE — dowód do reklamacji.
+ *
+ * Formularz żąda go wprost przy uszkodzeniu w transporcie (`type=file
+ * required`). Przy błędnym artykule jest u niego opcjonalne, ale zostaje
+ * wymagane u nas: „przyszło co innego" bez zdjęcia jest nie do obrony,
+ * gdy dostawca zapyta, co dokładnie przyjechało.
+ */
+const PHOTO_REQUIRED: ReadonlySet<string> = new Set([
+  "damaged",
+  "wrong_item",
+  "unknown_barcode", // historyczny — reguła zostaje dla starych APK
+]);
 
-/** Typy wymagające ilości faktycznej. */
-const QTY_REQUIRED: ReadonlySet<string> = new Set(["qty_short", "qty_over"]);
+/** Ilość wymagana. Formularz żąda jej w KAŻDEJ z pięciu kategorii. */
+const QTY_REQUIRED: ReadonlySet<string> = new Set([
+  ...PROBLEM_TYPES,
+  "qty_short",
+  "qty_over",
+]);
 
 const nowIso = () => new Date().toISOString();
 
@@ -84,9 +133,22 @@ export interface RaiseProblemInput {
   lineId?: number | null;
   typ: string;
   qty?: number | null;
+  /** Numer katalogowy artykułu, którego NIE MA na dokumencie. */
+  symObcy?: string | null;
+  /** Ile miało przyjść tego, co zamówiono, a nie dostarczono (`wrong_item`). */
+  zamiastIlosc?: number | null;
   opis?: string | null;
   photoBase64?: string | null;
 }
+
+/**
+ * Kategorie opisujące artykuł SPOZA dokumentu — numer katalogowy trzeba wtedy
+ * podać, bo nie ma linii, z której dałoby się go odczytać.
+ *
+ * `wrong_item`: przyszło coś, czego nie zamawialiśmy, w miejsce zamówionego.
+ * `extra_item`: przyszło dodatkowo, obok wszystkiego, co miało przyjść.
+ */
+const SYM_OBCY_REQUIRED: ReadonlySet<string> = new Set(["wrong_item", "extra_item"]);
 
 /**
  * Zgłoszenie wyjątku. Waliduje regułę domenową: uszkodzenie / zły towar /
@@ -96,7 +158,7 @@ export function raiseProblem(
   input: RaiseProblemInput,
   user: string
 ): { id: number } | { error: string } {
-  if (!PROBLEM_TYPES.includes(input.typ as ProblemType)) {
+  if (!typZapisywalny(input.typ)) {
     return { error: `Nieznany typ problemu: ${input.typ}` };
   }
   if (PHOTO_REQUIRED.has(input.typ) && !input.photoBase64) {
@@ -104,6 +166,30 @@ export function raiseProblem(
   }
   if (QTY_REQUIRED.has(input.typ) && (input.qty == null || !Number.isFinite(input.qty))) {
     return { error: "Podaj ilość faktyczną" };
+  }
+  if (SYM_OBCY_REQUIRED.has(input.typ) && !input.symObcy?.trim()) {
+    return { error: "Podaj numer katalogowy artykułu spoza dokumentu" };
+  }
+  if (input.typ === "qty_mismatch" && !input.lineId) {
+    // „zła ilość" mówi o pozycji Z DOKUMENTU — bez niej nie ma z czym porównać
+    return { error: "Zła ilość dotyczy pozycji z dokumentu" };
+  }
+
+  /* Snapshot ilości z dokumentu. Odczyt „na żywo" przy druku protokołu
+     pokazywałby stan PO ewentualnej korekcie faktury w Subiekcie, a protokół
+     ma mówić, co widzieliśmy przy palecie.
+
+     Sprawdzenie linii idzie PRZED zapisem zdjęcia — inaczej odrzucone
+     zgłoszenie zostawiałoby na dysku plik, którego nic już nie wskazuje. */
+  let iloscDok: number | null = null;
+  if (input.lineId) {
+    const linia = db()
+      .prepare("SELECT ilosc_dok FROM delivery_line WHERE id = ?")
+      .get(input.lineId) as { ilosc_dok: number } | undefined;
+    // bez tego nieistniejąca linia leci w klucz obcy i wraca jako 500 — a to
+    // jest zdanie o bazie, nie o zgłoszeniu, więc nikt się z nim nie policzy
+    if (!linia) return { error: "Nie ma takiej pozycji w dokumencie" };
+    iloscDok = linia.ilosc_dok;
   }
 
   let fotoRef: string | null = null;
@@ -118,14 +204,18 @@ export function raiseProblem(
   const id = Number(
     db()
       .prepare(
-        `INSERT INTO problem(delivery_id, line_id, typ, ilosc, opis, foto_ref, created_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?)`
+        `INSERT INTO problem(delivery_id, line_id, typ, ilosc, sym_obcy, zamiast_ilosc,
+                             ilosc_dok, opis, foto_ref, created_at, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         input.deliveryId,
         input.lineId ?? null,
         input.typ,
         input.qty ?? null,
+        input.symObcy?.trim() || null,
+        input.zamiastIlosc ?? null,
+        iloscDok,
         input.opis ?? null,
         fotoRef,
         nowIso(),
@@ -152,6 +242,9 @@ function mapRow(r: any): ProblemView {
     typ: r.typ,
     typLabel: etykietaTypu(r.typ),
     qty: r.ilosc,
+    symObcy: r.sym_obcy ?? null,
+    zamiastIlosc: r.zamiast_ilosc ?? null,
+    qtyDok: r.ilosc_dok ?? null,
     opis: r.opis,
     hasPhoto: !!r.foto_ref,
     createdAt: r.created_at,
@@ -181,6 +274,33 @@ export function listByDelivery(deliveryId: number): ProblemView[] {
   return (
     db().prepare(`${SELECT_JOIN} WHERE p.delivery_id = ? ORDER BY p.id`).all(deliveryId) as any[]
   ).map(mapRow);
+}
+
+/**
+ * Numer przesyłki i odpowiedź o protokole kuriera — dane CAŁEJ paczki.
+ *
+ * `kurierProtokol` ma trzy stany, nie dwa: `tak`, `nie` i NULL („nie pytano").
+ * Zwinięcie NULL-a do „nie" kłamałoby w formularzu reklamacyjnym, a to on
+ * jedzie do przewoźnika.
+ */
+export function zapiszPrzesylke(
+  deliveryId: number,
+  nrPrzesylki: string | null,
+  kurierProtokol: string | null,
+  user: string
+): { ok: true } | { error: string } {
+  if (kurierProtokol != null && !["tak", "nie"].includes(kurierProtokol)) {
+    return { error: "Protokół z kurierem: tak albo nie" };
+  }
+  const r = db()
+    .prepare(
+      `UPDATE delivery SET nr_przesylki = ?, kurier_protokol = ?, przesylka_at = ?, przesylka_by = ?
+       WHERE id = ?`
+    )
+    .run(nrPrzesylki?.trim() || null, kurierProtokol, nowIso(), user, deliveryId);
+  if (r.changes === 0) return { error: "Nie ma takiej dostawy" };
+  logEvent("przesylka_zapisana", user, null, { deliveryId, kurierProtokol });
+  return { ok: true };
 }
 
 export function resolveProblem(id: number, note: string | undefined, user: string): { ok: true } | { error: string } {

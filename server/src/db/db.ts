@@ -134,6 +134,16 @@ function migrate(database: DatabaseSync) {
      kolumny do tabeli, która już istnieje — bez tej linii istniejąca instalacja
      miałaby `sgt_magazyn` bez `nazwa` i import wywaliłby się na INSERT. */
   addColumn("sgt_magazyn", "nazwa", "TEXT NOT NULL DEFAULT ''");
+  /* Niezgodność w dostawie wg firmowego formularza (0.21.0). Kolumny są
+     nullowalne, więc wyjątki sprzed zmiany zostają nietknięte — a `ilosc_dok`
+     puste znaczy „zgłoszono, zanim zaczęliśmy zapisywać snapshot", nie zero. */
+  addColumn("problem", "sym_obcy", "TEXT");
+  addColumn("problem", "zamiast_ilosc", "REAL");
+  addColumn("problem", "ilosc_dok", "REAL");
+  addColumn("delivery", "nr_przesylki", "TEXT");
+  addColumn("delivery", "kurier_protokol", "TEXT");
+  addColumn("delivery", "przesylka_at", "TEXT");
+  addColumn("delivery", "przesylka_by", "TEXT");
   naLoginIHaslo(database);
 }
 

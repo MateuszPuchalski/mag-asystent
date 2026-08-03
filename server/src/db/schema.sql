@@ -225,7 +225,18 @@ CREATE TABLE IF NOT EXISTS delivery (
   opened_at     TEXT NOT NULL,
   closed_at     TEXT,
   -- Magazyn skutku dokumentu (snapshot z chwili otwarcia).
-  source_mag_id INTEGER
+  source_mag_id INTEGER,
+  -- Przesyłka (formularz „Niezgodność w dostawie", kategoria uszkodzeń
+  -- w transporcie). Numer i odpowiedź o protokole kuriera dotyczą CAŁEJ
+  -- paczki, nie pojedynczego artykułu — wpisane przy każdym uszkodzonym
+  -- towarze z osobna mogłyby się różnić, a to jedna paczka.
+  --
+  -- ZAŁOŻENIE, nie fakt: jedna faktura przyjeżdża jedną paczką. Gdy okaże się
+  -- fałszywe, drogą jest tabela `delivery_parcel` i `problem.parcel_id`.
+  nr_przesylki  TEXT,
+  kurier_protokol TEXT,             -- tak | nie | NULL (nie pytano)
+  przesylka_at  TEXT,
+  przesylka_by  TEXT
 );
 
 -- Postęp per linia (D4): zapis natychmiastowy, przerwanie pracy nic nie kosztuje.
@@ -250,15 +261,29 @@ CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
 
 -- ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
--- Bez tego nie da się zmierzyć, ile kosztują. Typy zamknięte (§4.6); zdjęcie
--- obowiązkowe przy `damaged` / `wrong_item` / `unknown_barcode` — egzekwowane
--- w serwisie, bo to reguła domenowa, nie schematu.
+-- Bez tego nie da się zmierzyć, ile kosztują. Kategorie zamknięte — od 0.21.0
+-- są to DOSŁOWNIE kategorie firmowego formularza „Niezgodność w dostawie",
+-- żeby biuro przepisywało gotowe wiersze, a nie dopytywało z pamięci.
+-- Zdjęcie obowiązkowe przy `damaged` i `wrong_item` — egzekwowane w serwisie,
+-- bo to reguła domenowa, nie schematu.
 CREATE TABLE IF NOT EXISTS problem (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   delivery_id   INTEGER REFERENCES delivery(id),
+  -- Linia dokumentu, której wyjątek dotyczy. NULL przy artykule, którego na
+  -- dokumencie NIE MA — wtedy numer katalogowy trzyma `sym_obcy`.
   line_id       INTEGER REFERENCES delivery_line(id),
-  typ           TEXT NOT NULL,      -- qty_short|qty_over|damaged|wrong_item|no_space|unknown_barcode|ean_conflict
-  ilosc         REAL,
+  typ           TEXT NOT NULL,      -- wrong_item|missing_item|damaged|qty_mismatch|extra_item (+ historyczne)
+  ilosc         REAL,               -- ilość faktyczna, której dotyczy zgłoszenie
+  -- Numer katalogowy artykułu spoza dokumentu: co PRZYSZŁO przy `wrong_item`,
+  -- co przyjechało nadto przy `extra_item`. Do 0.21.0 takiego towaru nie dało
+  -- się zgłosić w ogóle — skan kończył się toastem „nie jest w tym dokumencie".
+  sym_obcy      TEXT,
+  -- Ile miało przyjść tego, co zamówiono, a nie dostarczono (`wrong_item`).
+  -- Symbol tego artykułu wynika z `line_id`, więc nie ma go tu drugi raz.
+  zamiast_ilosc REAL,
+  -- Ilość z dokumentu w CHWILI ZGŁOSZENIA. Snapshot, nie odczyt: dokument
+  -- w Subiekcie da się poprawić, a protokół ma pokazywać, co widzieliśmy.
+  ilosc_dok     REAL,
   opis          TEXT,
   foto_ref      TEXT,               -- nazwa pliku w data/photos
   created_at    TEXT NOT NULL,

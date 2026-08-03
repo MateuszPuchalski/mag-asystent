@@ -28,6 +28,7 @@ import pl.wertis.kolektor.core.net.MeldunekOdrzuconych
 import pl.wertis.kolektor.core.net.MeldunekPrzyjety
 import pl.wertis.kolektor.core.net.OkResponse
 import pl.wertis.kolektor.core.net.ProblemsResponse
+import pl.wertis.kolektor.core.net.PrzesylkaBody
 import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.net.PutawayDocumentsResponse
 import pl.wertis.kolektor.core.net.RaiseProblemBody
@@ -194,6 +195,10 @@ interface ApiService {
 
     @POST("api/delivery/{id}/problems")
     suspend fun raiseProblem(@Path("id") id: Long, @Body body: RaiseProblemBody): RaiseProblemResponse
+
+    /** Numer przesyłki i protokół kuriera — dotyczą paczki, nie pojedynczego towaru. */
+    @POST("api/delivery/{id}/przesylka")
+    suspend fun zapiszPrzesylke(@Path("id") id: Long, @Body body: PrzesylkaBody): OkResponse
 
     @GET("api/ean-conflicts")
     suspend fun eanConflicts(): EanConflictsResponse

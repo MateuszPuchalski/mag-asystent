@@ -515,6 +515,10 @@ data class DeliveryView(
     val dataWyst: String = "",
     val status: String = "open",
     val progress: DeliveryProgress = DeliveryProgress(),
+    /** Numer przesyłki, jeśli już go podano — pytamy o niego raz na dostawę. */
+    val nrPrzesylki: String? = null,
+    /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
+    val kurierProtokol: String? = null,
     val lines: List<DeliveryLineView> = emptyList(),
 )
 
@@ -602,7 +606,15 @@ data class ProblemView(
     val deliveryId: Long? = null,
     val lineId: Long? = null,
     val typ: String = "",
+    /** Nazwa kategorii policzona przez serwer — także dla kluczy sprzed 0.21.0. */
+    val typLabel: String? = null,
     val qty: Double? = null,
+    /** Numer katalogowy artykułu spoza dokumentu (błędny / niezamówiony). */
+    val symObcy: String? = null,
+    /** Ile miało przyjść tego, co zamówiono, a nie dostarczono. */
+    val zamiastIlosc: Double? = null,
+    /** Ilość z dokumentu w chwili zgłoszenia — snapshot, nie odczyt na żywo. */
+    val qtyDok: Double? = null,
     val opis: String? = null,
     val hasPhoto: Boolean = false,
     val createdAt: String = "",
@@ -621,9 +633,24 @@ data class RaiseProblemBody(
     val typ: String,
     val lineId: Long? = null,
     val qty: Double? = null,
+    /** Numer katalogowy artykułu, którego NIE MA na dokumencie. */
+    val symObcy: String? = null,
+    /** Ile miało przyjść zamiast tego, co przyszło (opcjonalne w formularzu). */
+    val zamiastIlosc: Double? = null,
     val opis: String? = null,
     /** JPEG w base64 — dowód do reklamacji; serwer zapisuje na dysk. */
     val photoBase64: String? = null,
+)
+
+/**
+ * Numer przesyłki i odpowiedź o protokole kuriera — dane CAŁEJ paczki,
+ * pytane raz na dostawę, więc idą osobną trasą na dostawie, nie w zgłoszeniu.
+ */
+@Serializable
+data class PrzesylkaBody(
+    val nrPrzesylki: String? = null,
+    /** `tak` albo `nie`; null znaczy „nie pytano". */
+    val kurierProtokol: String? = null,
 )
 
 @Serializable
