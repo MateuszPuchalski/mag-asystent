@@ -165,6 +165,14 @@ export interface DeliveryView {
   status: string;
   /** `problems` ⊂ `done` — linie wyjęte z rutyny przez zgłoszony wyjątek (D8). */
   progress: { total: number; done: number; remaining: number; problems: number };
+  /**
+   * Przesyłka — pytana RAZ na dostawę, więc kolektor musi wiedzieć, czy już
+   * pytał. Trzymanie tego wyłącznie w pamięci ekranu znaczyłoby, że restart
+   * aplikacji pyta drugi raz o to samo.
+   */
+  nrPrzesylki: string | null;
+  /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
+  kurierProtokol: string | null;
   lines: DeliveryLineView[];
 }
 
@@ -189,11 +197,20 @@ export type ScanResolution =
 
 /* ── Faza 2: wyjątki (D8) ───────────────────────────────────────────────── */
 
+/**
+ * Kategoria niezgodności. Pięć pierwszych to lista z firmowego formularza
+ * „Niezgodność w dostawie" — tylko je wolno zgłosić. Pięć kolejnych zostało po
+ * wyjątkach sprzed 0.21.0: są w bazie, więc muszą mieć nazwę, ale formularz
+ * ich nie zna.
+ */
 export type ProblemType =
+  | "wrong_item"
+  | "missing_item"
+  | "damaged"
+  | "qty_mismatch"
+  | "extra_item"
   | "qty_short"
   | "qty_over"
-  | "damaged"
-  | "wrong_item"
   | "no_space"
   | "unknown_barcode"
   | "ean_conflict";
@@ -206,6 +223,12 @@ export interface ProblemView {
   /** Etykieta typu po polsku — żeby klient nie musiał trzymać własnego słownika. */
   typLabel: string;
   qty: number | null;
+  /** Numer katalogowy artykułu spoza dokumentu (`wrong_item`, `extra_item`). */
+  symObcy: string | null;
+  /** Ile miało przyjść tego, co zamówiono, a nie dostarczono (`wrong_item`). */
+  zamiastIlosc: number | null;
+  /** Ilość z dokumentu w chwili zgłoszenia — snapshot, nie odczyt na żywo. */
+  qtyDok: number | null;
   opis: string | null;
   hasPhoto: boolean;
   createdAt: string;

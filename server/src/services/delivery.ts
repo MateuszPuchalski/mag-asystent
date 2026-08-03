@@ -148,6 +148,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
         data_dok: string | null;
         source_mag_id: number | null;
         status: string;
+        nr_przesylki: string | null;
+        kurier_protokol: string | null;
       }
     | undefined;
   if (!d) return undefined;
@@ -192,6 +194,9 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dataWyst: d.data_dok ?? "",
     status: d.status,
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
+    // null tu znaczy „jeszcze nie pytano" — kolektor pyta wtedy i tylko wtedy
+    nrPrzesylki: d.nr_przesylki ?? null,
+    kurierProtokol: d.kurier_protokol ?? null,
     lines,
   };
 }
