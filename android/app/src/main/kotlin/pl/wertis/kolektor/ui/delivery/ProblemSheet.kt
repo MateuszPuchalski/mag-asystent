@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.DeliveryLineView
+import pl.wertis.kolektor.core.net.PrzesylkaBody
 import pl.wertis.kolektor.core.net.RaiseProblemBody
 import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.problem.problemBlocker
@@ -71,19 +72,28 @@ import pl.wertis.kolektor.ui.theme.Muted
 import pl.wertis.kolektor.ui.theme.cardSurface
 import java.io.File
 
-/* ── Zgłoszenie wyjątku (§4.6, D8) ───────────────────────────────────────────
+/* ── Niezgodność w dostawie (§4.6, D8) ───────────────────────────────────────
+   Od 0.21.0 arkusz zbiera DOKŁADNIE to, czego żąda firmowy formularz
+   „Niezgodność w dostawie": pięć kategorii i pola per kategoria. Wcześniej
+   kolektor zbierał własny zestaw siedmiu typów, a różnicę uzupełniało biuro
+   z pamięci, po fakcie.
+
    Typy są zamknięte — otwarte pole „opisz problem" daje dane, których nikt nie
-   policzy. Przy uszkodzeniu / złym towarze / nieznanym kodzie zdjęcie jest
-   OBOWIĄZKOWE: bez dowodu nie ma rozmowy z dostawcą, jest tylko wersja.
+   policzy. Przy uszkodzeniu i błędnym artykule zdjęcie jest OBOWIĄZKOWE: bez
+   dowodu nie ma rozmowy z dostawcą, jest tylko wersja.
 
    Blokadę pokazujemy jako zdanie pod przyciskiem, a nie jako wyszarzenie bez
    powodu — magazynier w alejce musi wiedzieć, czego brakuje.
 
    ARKUSZ OD DOŁU, NIE PEŁNY EKRAN. Wcześniej ten composable wchodził przez
    `return` przed listą pozycji i gasił ją całkowicie. Zgłoszenie wyjątku
-   potrzebuje miejsca (siedem kafli, notatka, aparat), ale nie potrzebuje
+   potrzebuje miejsca (kafle, ilość, notatka, aparat), ale nie potrzebuje
    ZABIERAĆ kontekstu: pod spodem ma zostać widok dostawy, z którego widać,
-   ile jeszcze zostało i czy ta pozycja jest ostatnia.                         */
+   ile jeszcze zostało i czy ta pozycja jest ostatnia.
+
+   CZEGO ARKUSZ NIE PYTA: numeru faktury, dostawcy ani numeru katalogowego
+   pozycji z dokumentu. To wszystko już jest w bazie — pytanie o nie byłoby
+   przepisywaniem z ekranu na ekran.                                          */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,6 +103,8 @@ fun ProblemSheet(
     line: DeliveryLineView?,
     /** Typ wybrany z góry (skrót „INNA ILOŚĆ") — oszczędza szukanie kafla. */
     initialType: ProblemType? = null,
+    /** Numer przesyłki zapisany wcześniej na tej dostawie; null = jeszcze nie pytano. */
+    nrPrzesylkiZapisany: String? = null,
     onDone: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -104,6 +116,15 @@ fun ProblemSheet(
     var note by remember { mutableStateOf("") }
     var photoFile by remember { mutableStateOf<File?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    /** Numer katalogowy artykułu SPOZA dokumentu — nie ma go skąd odczytać. */
+    var symObcy by remember { mutableStateOf("") }
+    /** Ilość zamówionego, które nie przyszło — w formularzu opcjonalna. */
+    var zamiastIlosc by remember { mutableStateOf("") }
+    var zamiastOtwarte by remember { mutableStateOf(false) }
+    /** Numer przesyłki i protokół kuriera — pytane raz na CAŁĄ dostawę. */
+    var nrPrzesylki by remember { mutableStateOf(nrPrzesylkiZapisany ?: "") }
+    var kurierProtokol by remember { mutableStateOf<String?>(null) }
 
     // podgląd miniatury — magazynier musi zobaczyć, że kadr nie jest rozmazany
     var preview by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
@@ -137,7 +158,18 @@ fun ProblemSheet(
 
     val chosen = type
     val qtyValue = qty.replace(',', '.').toDoubleOrNull()
-    val blocker = chosen?.let { problemBlocker(it, qtyValue, photoFile != null) }
+    /** Pytamy o przesyłkę tylko przy pierwszym uszkodzeniu w tej dostawie. */
+    val pytamOPrzesylke = chosen == ProblemType.DAMAGED && nrPrzesylkiZapisany.isNullOrBlank()
+    val blocker = chosen?.let {
+        problemBlocker(
+            type = it,
+            qty = qtyValue,
+            hasPhoto = photoFile != null,
+            symObcy = symObcy,
+            nrPrzesylki = nrPrzesylki.ifBlank { nrPrzesylkiZapisany },
+            lineId = line?.id,
+        )
+    }
 
     fun submit() {
         val t = chosen ?: return
@@ -153,6 +185,20 @@ fun ProblemSheet(
                     busy = false
                     return@launch
                 }
+                /* Przesyłka IDZIE PIERWSZA. Gdyby szła po zgłoszeniu, zerwane
+                   Wi-Fi zostawiłoby uszkodzenie bez numeru przesyłki — a numer
+                   jest tym, czym przewoźnik odnajduje paczkę. */
+                if (pytamOPrzesylke) {
+                    apiCall {
+                        graph.api.zapiszPrzesylke(
+                            deliveryId,
+                            PrzesylkaBody(
+                                nrPrzesylki = nrPrzesylki.trim(),
+                                kurierProtokol = kurierProtokol,
+                            ),
+                        )
+                    }
+                }
                 apiCall {
                     graph.api.raiseProblem(
                         deliveryId,
@@ -160,6 +206,8 @@ fun ProblemSheet(
                             typ = t.key,
                             lineId = line?.id,
                             qty = qtyValue,
+                            symObcy = symObcy.trim().takeIf { it.isNotEmpty() },
+                            zamiastIlosc = zamiastIlosc.replace(',', '.').toDoubleOrNull(),
                             opis = note.trim().takeIf { it.isNotEmpty() },
                             photoBase64 = base64,
                         ),
@@ -197,7 +245,7 @@ fun ProblemSheet(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(20.dp))
             Text(
-                "Zgłoś problem",
+                "Niezgodność w dostawie",
                 fontFamily = BarlowCond,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 20.sp,
@@ -229,21 +277,98 @@ fun ProblemSheet(
             }
         }
 
-        if (chosen?.qtyRequired == true) {
+        if (chosen != null) {
+            /* Numer katalogowy artykułu SPOZA dokumentu. Dla pozycji z faktury
+               bierzemy go z `line.sym` — symbol z Subiekta JEST numerem
+               katalogowym dostawcy, więc pytanie o niego byłoby przepisywaniem. */
+            if (chosen.symObcyRequired) {
+                WertisTextField(
+                    value = symObcy,
+                    onValueChange = { symObcy = it },
+                    placeholder = "Numer katalogowy tego, co przyszło",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            // przy złej ilości pokazujemy zamówioną jako TEKST — jest na
+            // dokumencie i nie ma powodu, żeby ktokolwiek ją przepisywał
+            if (chosen == ProblemType.QTY_MISMATCH && line != null) {
+                Text(
+                    "Zamówiono ${formatQty(line.qtyDoc)} szt — podaj, ile faktycznie przyszło.",
+                    fontSize = 12.5.sp,
+                    color = InkSoft,
+                )
+            }
+
             WertisTextField(
                 value = qty,
                 onValueChange = { qty = it.filter { c -> c.isDigit() || c == ',' || c == '.' } },
-                placeholder = "Ilość faktyczna",
+                placeholder = etykietaIlosci(chosen),
                 keyboardType = KeyboardType.Number,
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
 
-        if (chosen != null) {
+            /* „A miało przyjść" jest w formularzu OPCJONALNE, więc startuje
+               zwinięte — pole, którego nikt nie musi wypełnić, nie ma prawa
+               wydłużać ścieżki przy palecie. */
+            if (chosen == ProblemType.WRONG_ITEM) {
+                if (zamiastOtwarte) {
+                    Text(
+                        if (line != null) "Zamiast: ${line.sym}" else "Zamiast zamówionego artykułu",
+                        fontSize = 12.5.sp,
+                        color = InkSoft,
+                    )
+                    WertisTextField(
+                        value = zamiastIlosc,
+                        onValueChange = {
+                            zamiastIlosc = it.filter { c -> c.isDigit() || c == ',' || c == '.' }
+                        },
+                        placeholder = "Ile miało przyjść (opcjonalnie)",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    OutlineButton(
+                        "+ A MIAŁO PRZYJŚĆ",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { zamiastOtwarte = true },
+                    )
+                }
+            }
+
+            /* Numer przesyłki i protokół kuriera dotyczą CAŁEJ paczki, więc
+               pytamy o nie raz na dostawę. Przy drugim uszkodzonym artykule
+               pola już nie wracają — odpowiedź jest ta sama. */
+            if (pytamOPrzesylke) {
+                WertisTextField(
+                    value = nrPrzesylki,
+                    onValueChange = { nrPrzesylki = it },
+                    placeholder = "Numer przesyłki (z listu przewozowego)",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Czy spisano protokół z kurierem?", fontSize = 12.5.sp, color = InkSoft)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // trzeci stan („nie pytano") zostaje możliwy: brak wyboru
+                    // wysyła null, zamiast kłamać przewoźnikowi, że było „nie"
+                    ChoiceChip("TAK", kurierProtokol == "tak", Modifier.weight(1f)) {
+                        kurierProtokol = if (kurierProtokol == "tak") null else "tak"
+                    }
+                    ChoiceChip("NIE", kurierProtokol == "nie", Modifier.weight(1f)) {
+                        kurierProtokol = if (kurierProtokol == "nie") null else "nie"
+                    }
+                }
+            } else if (chosen == ProblemType.DAMAGED) {
+                Text(
+                    "Przesyłka $nrPrzesylkiZapisany — zapisana przy poprzednim zgłoszeniu.",
+                    fontSize = 12.5.sp,
+                    color = InkMute,
+                )
+            }
+
             WertisTextField(
                 value = note,
                 onValueChange = { note = it },
-                placeholder = "Opis (opcjonalnie)",
+                placeholder = "Uwagi (opcjonalnie)",
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -282,6 +407,39 @@ fun ProblemSheet(
     }
 }
 
+/**
+ * Etykieta pola ilości. Jedno słowo „ilość" znaczy co innego w każdej
+ * kategorii, a magazynier ma wpisać liczbę bez zastanawiania się, którą.
+ */
+private fun etykietaIlosci(type: ProblemType): String = when (type) {
+    ProblemType.MISSING_ITEM -> "Ile sztuk brakuje"
+    ProblemType.QTY_MISMATCH -> "Ile faktycznie przyszło"
+    ProblemType.DAMAGED -> "Ile sztuk uszkodzonych"
+    ProblemType.WRONG_ITEM, ProblemType.EXTRA_ITEM -> "Ile sztuk przyszło"
+}
+
+/** Odpowiedź TAK/NIE jako kafel — rękawica trafia w 48dp, nie w checkbox. */
+@Composable
+private fun ChoiceChip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) AmberBg else CardWhite)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Amber else CardBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = if (selected) AmberInk else InkSoft,
+        )
+    }
+}
+
 @Composable
 private fun TypeTile(type: ProblemType, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Column(
@@ -300,10 +458,9 @@ private fun TypeTile(type: ProblemType, selected: Boolean, modifier: Modifier, o
             fontSize = 15.sp,
             color = if (selected) AmberInk else Ink,
         )
+        // ilości wymaga każda kategoria, więc podpisujemy tylko to, co wyróżnia
         if (type.photoRequired) {
             Text("wymaga zdjęcia", fontSize = 10.5.sp, color = InkMute)
-        } else if (type.qtyRequired) {
-            Text("wymaga ilości", fontSize = 10.5.sp, color = InkMute)
         }
     }
 }
