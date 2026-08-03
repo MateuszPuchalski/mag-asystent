@@ -91,11 +91,9 @@
    a każde zapytanie API niesie go w nagłówku `x-session` — dokładnie tak samo
    jak kolektor. Strona nie ma własnych uprawnień: widzi to, co sesja. */
 const $ = (id) => document.getElementById(id);
-const TYPY = {
-  qty_short: "Za mało", qty_over: "Za dużo", damaged: "Uszkodzony",
-  wrong_item: "Zły towar", no_space: "Brak miejsca",
-  unknown_barcode: "Nieznany kod", ean_conflict: "Kolizja EAN",
-};
+/* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
+   słownika — trzecią obok serwera i kolektora, jedyną bez testu. Dopisanie
+   typu na serwerze zostawiało tu surowy klucz na wydruku dla dostawcy. */
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -177,7 +175,7 @@ function rysujReklamacje(problemy) {
   const rows = [...wgDok.entries()].map(([dok, lista]) => {
     const dId = lista.find((p) => p.deliveryId != null)?.deliveryId;
     const wiersze = lista.map((p) => `
-      <div>· <b>${esc(TYPY[p.typ] || p.typ)}</b> — ${esc(p.sym || "")} ${esc(p.name || "")}
+      <div>· <b>${esc(p.typLabel || p.typ)}</b> — ${esc(p.sym || "")} ${esc(p.name || "")}
         ${p.qty != null ? `(policzone: ${p.qty})` : ""}
         ${p.hasPhoto ? "📷" : ""}
         <span class="mute">${esc(p.createdBy || "")}</span></div>`).join("");
@@ -215,12 +213,12 @@ async function otworzFormularz(deliveryId, nrDok) {
   }
   const wiersze = problemy.map((p, i) => `<tr>
     <td>${i + 1}</td><td>${esc(p.sym || "")}<br><small>${esc(p.name || "")}</small></td>
-    <td>${esc(TYPY[p.typ] || p.typ)}</td><td>${p.qty ?? "—"}</td>
+    <td>${esc(p.typLabel || p.typ)}</td><td>${p.qty ?? "—"}</td>
     <td>${esc(p.opis || "")}</td><td>${esc(p.createdBy || "")}<br><small>${esc((p.createdAt || "").slice(0, 10))}</small></td>
     <td>${p.resolvedAt ? "rozwiązany" : "OTWARTY"}</td>
   </tr>`).join("");
   const fotki = zdjecia.map(({ p, url }) =>
-    `<figure><img src="${url}"><figcaption>${esc(p.sym || "")} · ${esc(TYPY[p.typ] || p.typ)}${p.opis ? " · " + esc(p.opis) : ""}</figcaption></figure>`).join("");
+    `<figure><img src="${url}"><figcaption>${esc(p.sym || "")} · ${esc(p.typLabel || p.typ)}${p.opis ? " · " + esc(p.opis) : ""}</figcaption></figure>`).join("");
 
   const w = window.open("", "_blank");
   w.document.write(`<!doctype html><html lang="pl"><head><meta charset="utf-8">

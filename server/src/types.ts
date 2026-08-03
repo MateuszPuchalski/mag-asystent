@@ -203,6 +203,8 @@ export interface ProblemView {
   deliveryId: number | null;
   lineId: number | null;
   typ: string;
+  /** Etykieta typu po polsku — żeby klient nie musiał trzymać własnego słownika. */
+  typLabel: string;
   qty: number | null;
   opis: string | null;
   hasPhoto: boolean;
