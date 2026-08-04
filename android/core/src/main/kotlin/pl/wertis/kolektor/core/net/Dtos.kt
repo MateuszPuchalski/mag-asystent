@@ -6,8 +6,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
 
-/* ── DTO REST — lustro web/src/lib/api.ts oraz server/src/types.ts ─────────
-   Ilości/stany jako Double (JS number bywa ułamkiem), identyfikatory Long.  */
+/* ── DTO REST — LUSTRO server/src/types.ts ─────────────────────────────────
+   Zmieniasz typ tu → sprawdź tam (i odwrotnie); rozjazd kończy się błędem
+   deserializacji na hali, nie w kompilatorze. Ilości/stany jako Double
+   (JS number bywa ułamkiem), identyfikatory Long.                           */
 
 /** Wspólna konfiguracja JSON dla całej aplikacji. */
 val WertisJson = Json {
