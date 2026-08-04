@@ -432,10 +432,10 @@ Parametry (env, dev):
   przesyłka jest jedna. Pozycja z wyjątkiem wypada z rutyny, ale nie blokuje
   zamknięcia dostawy.
 
-  Klucze sprzed 0.21.0 (`qty_short`, `no_space`…) serwer dalej **przyjmuje**,
-  choć kolektor ich nie oferuje: `git pull` przestawia serwer od razu, a APK
-  czeka na rozesłanie przez MDM. Etykiety zostają na zawsze — historii się nie
-  kasuje, a protokół dla dostawcy nie może pokazywać surowego klucza.
+  Kluczy sprzed 0.21.0 (`qty_short`, `no_space`…) serwer od 0.25.0 już **nie
+  przyjmuje** — okno wdrożenia APK się zamknęło. Etykiety zostają na zawsze:
+  historii się nie kasuje, a protokół dla dostawcy nie może pokazywać
+  surowego klucza.
 - Ekran **WYJĄTKI**: nierozwiązane zgłoszenia (pytane przy starcie aplikacji,
   czerwony pasek na każdym ekranie do czasu zamknięcia) + **raport kolizji
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)

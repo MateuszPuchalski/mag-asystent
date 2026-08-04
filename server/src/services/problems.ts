@@ -35,27 +35,15 @@ export const PROBLEM_TYPES: ProblemType[] = [
 ];
 
 /**
- * Klucze sprzed 0.21.0 — PRZYJMOWANE, choć nieoferowane.
+ * Czy taki wyjątek wolno dziś zapisać — wyłącznie kategorie formularza.
  *
- * `git pull` przestawia serwer od razu, a kolektor czeka na rozesłanie APK
- * przez MDM (patrz preambuła CHANGELOG-a). Gdyby serwer odrzucał stare klucze,
- * każdy nierozesłany kolektor dostawałby 400 przy palecie, w rękawicy,
- * w środku dostawy — i to przez cały czas trwania wdrożenia.
- *
- * Ta lista może zniknąć, gdy wszystkie kolektory będą miały APK 0.21.0.
+ * Do 0.25.0 przechodziły też klucze sprzed 0.21.0 (okno wdrożenia APK przez
+ * MDM); wszystkie kolektory mają już nowe APK, więc okno się zamknęło.
+ * Stare klucze zostają wyłącznie NAZYWALNE (etykiety niżej) — historia
+ * w bazie musi mieć etykietę na protokole dla dostawcy.
  */
-const TYPY_HISTORYCZNE: readonly ProblemType[] = [
-  "qty_short",
-  "qty_over",
-  "no_space",
-  "unknown_barcode",
-  "ean_conflict",
-];
-
-/** Czy taki wyjątek wolno dziś zapisać (formularz + okno wdrożenia APK). */
 export const typZapisywalny = (typ: string): boolean =>
-  PROBLEM_TYPES.includes(typ as ProblemType) ||
-  TYPY_HISTORYCZNE.includes(typ as ProblemType);
+  PROBLEM_TYPES.includes(typ as ProblemType);
 
 export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
   // pięć kategorii formularza
@@ -84,18 +72,10 @@ export const etykietaTypu = (typ: string): string =>
  * wymagane u nas: „przyszło co innego" bez zdjęcia jest nie do obrony,
  * gdy dostawca zapyta, co dokładnie przyjechało.
  */
-const PHOTO_REQUIRED: ReadonlySet<string> = new Set([
-  "damaged",
-  "wrong_item",
-  "unknown_barcode", // historyczny — reguła zostaje dla starych APK
-]);
+const PHOTO_REQUIRED: ReadonlySet<string> = new Set(["damaged", "wrong_item"]);
 
 /** Ilość wymagana. Formularz żąda jej w KAŻDEJ z pięciu kategorii. */
-const QTY_REQUIRED: ReadonlySet<string> = new Set([
-  ...PROBLEM_TYPES,
-  "qty_short",
-  "qty_over",
-]);
+const QTY_REQUIRED: ReadonlySet<string> = new Set(PROBLEM_TYPES);
 
 const nowIso = () => new Date().toISOString();
 

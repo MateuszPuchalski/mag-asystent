@@ -87,13 +87,13 @@ test("lista kategorii zgadza się z formularzem i z kolektorem", () => {
   ]);
 });
 
-test("klucz sprzed 0.21.0 dalej się zapisuje, choć nikt go już nie oferuje", () => {
-  /* `git pull` przestawia serwer od razu, a kolektor czeka na MDM. Gdyby
-     serwer odrzucał stare klucze, każdy nierozesłany APK dostawałby 400 przy
-     palecie przez cały czas trwania wdrożenia. */
-  assert.ok("id" in zglos({ typ: "qty_short", lineId, qty: 3 }));
-  assert.equal(P.listUnresolved()[0].typLabel, "Za mało", "i nadal ma nazwę");
-  assert.ok(!P.PROBLEM_TYPES.includes("qty_short" as never), "ale nie jest oferowany");
+test("klucz sprzed 0.21.0 nie zapisuje się, ale nadal ma nazwę", () => {
+  /* Okno wdrożenia APK 0.21.0 zamknęło się w 0.25.0: stare klucze wypadły
+     z listy zapisywalnych. Etykieta zostaje — wyjątki z historii muszą mieć
+     nazwę na protokole dla dostawcy. */
+  assert.ok("error" in zglos({ typ: "qty_short", lineId, qty: 3 }));
+  assert.equal(P.etykietaTypu("qty_short"), "Za mało");
+  assert.ok(!P.PROBLEM_TYPES.includes("qty_short" as never));
 });
 
 test("widok wyjątku niesie etykietę, nie sam klucz", () => {
