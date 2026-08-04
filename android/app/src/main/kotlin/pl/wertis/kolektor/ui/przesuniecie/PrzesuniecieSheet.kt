@@ -146,7 +146,14 @@ fun PrzesuniecieSheet(
     }
 
     fun wyslij() {
-        if (blocker != null || busy) return
+        /* Trzy wartości wyjmujemy ZANIM cokolwiek poleci — `blocker` już
+           sprawdził, że są, ale kompilator o tym nie wie, a wymuszanie ich
+           wykrzyknikiem znaczyłoby, że reguła i zapis mogą się rozjechać po
+           cichu. Tu rozjazd jest po prostu brakiem wysyłki. */
+        val ile = qtyValue
+        val skad = zrodlo
+        val dokad = magTo
+        if (blocker != null || busy || ile == null || skad == null || dokad == null) return
         busy = true
         scope.launch {
             try {
@@ -154,9 +161,9 @@ fun PrzesuniecieSheet(
                     graph.api.przesun(
                         PrzesuniecieBody(
                             twId = twId,
-                            qty = qtyValue!!,
-                            magFrom = zrodlo!!,
-                            magTo = magTo!!,
+                            qty = ile,
+                            magFrom = skad,
+                            magTo = dokad,
                             location = location.takeIf { pytamy },
                             lineId = lineId,
                         )
@@ -164,8 +171,8 @@ fun PrzesuniecieSheet(
                 }
                 graph.feedback.beep(true)
                 graph.queueRepo.refreshNow()
-                val kod = magazyny.firstOrNull { it.magId == magTo }?.kod ?: ""
-                graph.effects.toast("Przesunięto ${formatQty(qtyValue)} $unit → $kod")
+                val kod = magazyny.firstOrNull { it.magId == dokad }?.kod ?: ""
+                graph.effects.toast("Przesunięto ${formatQty(ile)} $unit → $kod")
                 onDone()
             } catch (e: Exception) {
                 graph.feedback.beep(false)
