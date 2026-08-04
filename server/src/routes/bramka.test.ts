@@ -239,3 +239,33 @@ test("wysyłka z bufora offline przechodzi — inaczej praca znika", async () =>
   });
   assert.equal(r.statusCode, 200);
 });
+
+/* ── Tryb serwisowy jest DOMYŚLNIE WYŁĄCZONY ─────────────────────────────────
+   Ten plik NIE ustawia `WERTIS_ADMIN`, więc opisuje instalację, która o trybie
+   serwisowym nic nie wie — czyli każdą u klienta. Asercje są tu po to, żeby
+   przełącznik nie zaczął kiedyś działać sam z siebie.                        */
+
+test("bez WERTIS_ADMIN konto serwisowe w ogóle nie powstaje", () => {
+  /* Sam wiersz w `app_user` jest dowodem, że tryb kiedykolwiek chodził na tej
+     instalacji. Gdyby powstawał zawsze, dowód przestałby cokolwiek znaczyć. */
+  const n = db()
+    .prepare("SELECT COUNT(*) n FROM app_user WHERE name = 'ADMIN (TRYB SERWISOWY)'")
+    .get() as { n: number };
+  assert.equal(n.n, 0);
+});
+
+test("bez WERTIS_ADMIN /api/health nie zgłasza trybu serwisowego", async () => {
+  const r = await app.inject({ method: "GET", url: "/api/health" });
+  const b = r.json();
+  assert.equal(b.adminMode, false);
+  assert.ok(
+    !(b.problemy ?? []).some((p: string) => p.includes("TRYB SERWISOWY")),
+    "ostrzeżenie o trybie nie ma prawa się pojawić"
+  );
+});
+
+test("bez WERTIS_ADMIN /api/setup milczy o trybie", async () => {
+  const b = (await app.inject({ method: "GET", url: "/api/setup" })).json();
+  assert.equal(b.adminMode, undefined, "pole nie istnieje, więc kolektor go nie zobaczy");
+  assert.equal(b.admin, undefined);
+});
