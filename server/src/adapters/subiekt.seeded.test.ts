@@ -24,12 +24,18 @@ test("kod PZ tłumaczy się na etykietę PZ", () => {
   }
 });
 
-test("kod spoza pary FZ/PZ wypada, zamiast trafić do SQL jako null", () => {
-  // null w `IN (?)` nie dopasowałby niczego i lista dostaw milczkiem opustoszałaby.
+test("kod bez nazwy dostaje własny symbol, a nie cudzy", () => {
+  /* Do 0.22.1 ta asercja brzmiała odwrotnie: kod spoza pary FZ/PZ WYPADAŁ
+     z listy etykiet. Zachowanie było spójne samo ze sobą, ale nie z importerem,
+     który ten sam kod zapisywał do read-modelu jako „PZ" — bo miał gałąź
+     `else`, nie filtr. Dopisanie trzeciego typu do `DOK_TYPY_DOSTAW` dawało
+     więc dokumenty pod CUDZĄ nazwą, bez jednego słowa błędu po drodze.
+
+     `TYP-14` jest brzydkie i o to chodzi: widać, że czegoś nie nazwano. */
   const orig = config.mssql.dokTypyDostaw;
-  config.mssql.dokTypyDostaw = [config.mssql.dokTypFZ, 14, 15];
+  config.mssql.dokTypyDostaw = [config.mssql.dokTypFZ, 14, 20];
   try {
-    assert.deepEqual(etykietyDostaw(), ["FZ"]);
+    assert.deepEqual(etykietyDostaw(), ["FZ", "TYP-14", "TYP-20"]);
   } finally {
     config.mssql.dokTypyDostaw = orig;
   }

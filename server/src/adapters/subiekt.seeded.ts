@@ -13,24 +13,12 @@ import type {
   RawZamPosition,
   SubiektAdapter,
 } from "./subiekt.js";
+import { etykietyDostaw } from "./typy-dokumentow.js";
 
-/**
- * `DOK_TYPY_DOSTAW` jako etykiety tekstowe read-modelu.
- *
- * Read-model trzyma typ dokumentu jako napis ('FZ'/'PZ'), a konfiguracja — jako
- * kod `dok_Typ` (1/10), bo taki stoi w bazie Subiekta. Tłumaczenie musi być
- * TUTAJ, w jednym miejscu: rozsypane po zapytaniach rozjechałoby się przy
- * pierwszej zmianie ustawienia.
- *
- * Kod spoza pary FZ/PZ wypada cicho — seed innych typów nie syntetyzuje,
- * a wpisanie ich do `DOK_TYPY_DOSTAW` dotyczy wyłącznie prawdziwej bazy.
- */
-export function etykietyDostaw(): string[] {
-  const { dokTypyDostaw, dokTypFZ, dokTypPZ } = config.mssql;
-  return dokTypyDostaw
-    .map((kod) => (kod === dokTypFZ ? "FZ" : kod === dokTypPZ ? "PZ" : null))
-    .filter((s): s is "FZ" | "PZ" => s !== null);
-}
+/* Symbole typów dokumentów mieszkają w `typy-dokumentow.ts` — tam, gdzie
+   tłumaczy je także importer MSSQL. Re-eksport, bo miejsca wywołania (seed,
+   testy) pytały dotąd tutaj i nie ma powodu ich przepisywać. */
+export { etykietyDostaw };
 
 /**
  * DEV/TEST — odczyt z tabel sgt_* (SQLite, seed z mag.xlsx).

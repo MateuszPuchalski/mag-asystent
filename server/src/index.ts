@@ -22,6 +22,7 @@ import {
   importFromMssql,
   lastImport,
 } from "./adapters/subiekt.mssql.js";
+import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 
@@ -60,6 +61,11 @@ export async function buildApp() {
       problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
+      /* Kod dostawy bez nazwy nie zatrzymuje pracy, więc nie jest błędem
+         konfiguracji — ale dokumenty chodzą wtedy po ekranie jako `TYP-7`
+         i ktoś powinien to dokończyć. Bez tej linii nie miałoby to gdzie
+         wypłynąć. */
+      nienazwaneTypyDostaw(),
     ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,

@@ -28,6 +28,45 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.22.1 — 4 sierpnia 2026
+
+Dwa miejsca, w których konfiguracja obiecywała elastyczność, a kod jej nie
+dowoził. Nic tu nie zmienia ekranu — to poprawki, których objawem byłby
+dokument pod cudzą nazwą albo karta towaru milcząca o dostawie.
+
+### Typ dokumentu tłumaczył się w dwóch miejscach, każde po swojemu
+
+<!-- docs_check: historia -->
+
+Subiekt trzyma typ dokumentu jako liczbę, read-model jako napis. Tłumaczenie
+stało w dwóch plikach i **oba miały inny błąd**:
+
+- importer (`adapters/subiekt.mssql.ts`) miał gałąź `else` — każdy kod inny niż
+  FZ lądował w bazie jako **`PZ`**, czyli pod cudzą nazwą;
+- odczyt (`adapters/subiekt.seeded.ts`) miał filtr — kod spoza pary FZ/PZ
+  **wypadał** z listy etykiet.
+
+Skutkiem było to, że dopisanie trzeciego typu do `DOK_TYPY_DOSTAW` — czynność
+na jedno ustawienie — dawało dokumenty z fałszywym symbolem na ekranie
+magazyniera, bez jednego słowa błędu po drodze. Test pilnował przy tym starego
+zachowania, więc **utrwalał błąd zamiast go łapać**.
+
+Teraz jedno źródło prawdy (`adapters/typy-dokumentow.ts`). Kod bez nazwy
+dostaje symbol `TYP-<kod>`: brzydki, ale widoczny i nieudający niczego innego.
+Że czegoś nie nazwano, mówi `/api/health` — razem z osobną uwagą o kodzie
+zamówienia do dostawcy wpisanym między dostawy, bo to pomyłka co do znaczenia,
+nie co do nazwy.
+
+### Okno dostaw było w dwóch miejscach
+
+`services/dostawy-towaru.ts` miał własną stałą `14` z komentarzem „tyle samo,
+co lista w zakładce rozkładania" — czyli zgodności pilnowało zdanie, nie
+mechanizm. Po zmianie `DOK_DNI_WSTECZ` na 30 karta towaru mówiłaby „nic nie
+przyszło" o dokumencie wiszącym obok w zakładce rozkładania. Okno idzie teraz
+z konfiguracji.
+
+---
+
 ## 0.22.0 — 4 sierpnia 2026
 
 <!-- docs_check: historia -->
