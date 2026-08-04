@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { subiekt } from "../context.js";
+import { config } from "../config.js";
 
 /* ── „Przyjechało, ale jeszcze nie na półce" ─────────────────────────────────
    Magazynier nie zastaje towaru w regale i nie ma jak sprawdzić, czy to dlatego,
@@ -16,8 +17,12 @@ import { subiekt } from "../context.js";
    a ten wiersz — NA KTÓRYM dokumencie i ile z tego nie ma jeszcze adresu. Druga
    liczba jest zarazem wejściem do pracy, pierwsza tylko stanem. */
 
-/** Ile dni wstecz szukamy dostaw — tyle samo, co lista w zakładce rozkładania. */
-const OKNO_DNI = 14;
+/* Okno bierzemy Z KONFIGURACJI, a nie z własnej stałej. Wcześniej stało tu
+   `14` z komentarzem „tyle samo, co lista w zakładce rozkładania" — czyli
+   zgodności pilnowało zdanie, nie mechanizm. Zmiana `DOK_DNI_WSTECZ` na 30
+   przestawiała listę dostaw, a ten wiersz zostawiała na czternastu dniach:
+   karta mówiła wtedy „nic nie przyszło" o dokumencie, który wisiał obok
+   w zakładce rozkładania. */
 
 export interface WDostawie {
   dokId: number;
@@ -52,7 +57,7 @@ interface PostepLinii {
  * właśnie jej szuka, ma prawo wiedzieć, że ktoś już się o nią potknął.
  */
 export function nierozlozoneZDostaw(twId: number): WDostawie[] {
-  const pozycje = subiekt.getDeliveryPositionsForProduct(twId, OKNO_DNI);
+  const pozycje = subiekt.getDeliveryPositionsForProduct(twId, config.mssql.dokDniWstecz);
   if (pozycje.length === 0) return [];
 
   /* Postęp per dokument w JEDNYM zapytaniu, nie po jednym na dokument: karta

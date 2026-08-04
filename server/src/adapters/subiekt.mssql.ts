@@ -2,6 +2,7 @@ import sql from "mssql";
 import { db, nowIso, transaction } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
+import { symbolTypu } from "./typy-dokumentow.js";
 
 /**
  * PRODUKCJA / edu — odczyt z bazy MSSQL Subiekta GT (spec §6, D2).
@@ -404,7 +405,7 @@ export async function importFromMssql(): Promise<ImportStats> {
       insStan.run(s.st_TowId, s.st_MagId, s.st_Stan ?? 0, s.st_StanRez ?? 0);
     }
     for (const doc of dokumenty) {
-      const typ = doc.dok_Typ === c.dokTypFZ ? "FZ" : "PZ";
+      const typ = symbolTypu(doc.dok_Typ);
       insDok.run(
         doc.dok_Id,
         typ,
