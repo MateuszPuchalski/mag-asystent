@@ -198,6 +198,25 @@ Na ekranie startowym kolektora są dwa pola — login i hasło — więc emulato
 skanera wystarczy. Domyślny adres serwera (`http://10.0.2.2:3001`) jest już
 ustawiony na localhost hosta.
 
+#### Tryb serwisowy — dla pracy nad kodem, nie dla firmy
+
+Przy bazie kasowanej kilka razy dziennie zakładanie konta jest piątym krokiem
+w czterokrokowej procedurze, wykonywanym dwa razy: raz dla kolektora, raz dla
+podglądu biura. `WERTIS_ADMIN=1` wyłącza logowanie w całości.
+
+```bash
+WERTIS_ADMIN=1 npm run dev
+```
+
+Kolektor i `/biuro` wchodzą wtedy od razu, a operacje podpisuje konto
+`ADMIN (TRYB SERWISOWY)`. Konto nie ma ani loginu, ani hasła, więc **nie da się
+nim zalogować** — istnieje wyłącznie po to, żeby operacja miała autora.
+
+Włączony tryb widać z trzech stron naraz. Czerwony pasek na kolektorze i w
+biurze, `ok: false` w `/api/health` z ostrzeżeniem na pierwszym miejscu, wpis
+`tryb_serwisowy_start` w dzienniku. **Instalator tej zmiennej nie zapisuje i nie
+ma prawa zacząć** — szczegóły w [`DEPLOY.md`](DEPLOY.md) §5a.
+
 **Konto jest potrzebne także do grzebania curlem.** API wymaga nagłówka
 `x-session` na każdej trasie poza czterema: `GET /api/health`, `GET /api/setup`,
 `POST /api/auth/login` i `POST /api/users` przy pustej bazie. Token bierze się
@@ -508,7 +527,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 111 testów jednostkowych; buduje się bez Android SDK
+                           + 113 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

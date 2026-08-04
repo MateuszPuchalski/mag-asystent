@@ -28,6 +28,72 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.23.0 — 4 sierpnia 2026
+
+**Przełącznik `WERTIS_ADMIN=1` wyłącza logowanie w całości — na kolektorze
+i w podglądzie biura naraz.** Do pracy nad kodem, nigdy u klienta.
+
+**[wymaga działania]** Nowy APK. Zmiennej nie ustawiaj na produkcji; instalator
+jej nie zapisuje.
+
+### Dlaczego
+
+Postawienie WERTIS od zera kończy się krokiem, którego nie da się
+zautomatyzować: ktoś musi ręcznie założyć pierwsze konto. Seed go nie zakłada,
+instalator też nie. Przy bazie kasowanej kilka razy dziennie to piąty krok
+w czterokrokowej procedurze — i wykonywany **dwa razy**, bo podgląd biura ma
+własne logowanie i na pustej bazie jest ślepym zaułkiem.
+
+### Konto bez hasła, i to jest sedno
+
+Operacje w tym trybie podpisuje konto `ADMIN (TRYB SERWISOWY)`. Jest prawdziwym
+wierszem w bazie, bo dziennik zdarzeń wskazuje na konta kluczem obcym — ale
+**nie ma ani loginu, ani hasła**:
+
+- nie da się nim zalogować żadną drogą, także po ręcznym nadaniu hasła;
+- nie ma domyślnego hasła do wycieknięcia;
+- nie dostaje tokenu sesji, więc **wyłączenie przełącznika odbiera dostęp
+  natychmiast** — nie ma czego unieważniać.
+
+Reguła „żadnych domyślnych haseł" zostaje więc nienaruszona. Zapisaliśmy ją
+przy okazji wprost w `DEPLOY.md`, bo dotąd trzymał się jej wyłącznie kod.
+
+### Co świadomie tracimy
+
+**Dziennik z tego okresu nie mówi, kto co zrobił.** Wszystko jest podpisane
+jedną nazwą — dlatego nazwa krzyczy, żeby historia z trybu serwisowego była
+odróżnialna od pracy ludzi także za pół roku. Zalogowanie się prawdziwym kontem
+dalej działa i wtedy operacje dostają nazwisko.
+
+**Dwa skutki przeżywają wyłączenie przełącznika**: konta założone w tym trybie
+i hasła w nim ustawione. Sam dostęp znika z chwilą wyłączenia, te dwie rzeczy
+nie.
+
+### Widać z trzech stron
+
+Czerwony pasek na każdym ekranie kolektora i w biurze, `ok: false`
+w `/api/health` z ostrzeżeniem na pierwszym miejscu, wpis
+`tryb_serwisowy_start` w dzienniku. Przy `SGT_MODE=mssql` ostrzeżenie jest
+ostrzejsze, ale tryb **nie jest blokowany**: Subiekt edu też jest trybem
+`mssql`, a to jedyne środowisko, dla którego ten przełącznik powstał.
+
+Sam wiersz `ADMIN (TRYB SERWISOWY)` w tabeli kont jest dowodem, że tryb
+kiedykolwiek na tej instalacji chodził — konto powstaje wyłącznie przy włączonej
+fladze.
+
+### Przy okazji: trasy przestały pytać bazę o sesję
+
+<!-- docs_check: historia -->
+
+Bramka rozpoznaje sesję raz na żądanie, a osiem miejsc w czterech plikach
+pytało o nią PONOWNIE, każde po swojemu. Poza podwójnym zapytaniem do bazy
+znaczyło to, że „kto pyta" miało osiem niezależnych odpowiedzi zamiast jednej —
+i tryb serwisowy wpuszczałby do odczytów, a odbijał od zarządzania kontami
+i audytu. Odkryte przy pisaniu tej zmiany, naprawione osobnym commitem przed
+nią.
+
+---
+
 ## 0.22.1 — 4 sierpnia 2026
 
 Dwa miejsca, w których konfiguracja obiecywała elastyczność, a kod jej nie

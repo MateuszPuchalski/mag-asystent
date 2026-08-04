@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { config } from "./config.js";
 import { makeSubiektAdapter } from "./adapters/index.js";
 import { userById } from "./services/users.js";
 
@@ -83,7 +84,20 @@ interface ReqCtx {
   /** Konto ustalone z tokenu; wypełniane leniwie, żeby nie pytać bazy bez potrzeby. */
   userRef?: number | null;
   userName?: string | null;
+  /**
+   * Sesja rozpoznana przez bramkę — JEDNO rozpoznanie na żądanie.
+   *
+   * Do 0.23.0 trasy pytające o rolę wołały `sesja(currentToken())` same, każda
+   * po swojemu (`sesja(token())`, `sesja(currentToken() ?? "")`). Bramka
+   * rozpoznawała sesję chwilę wcześniej i wynik wyrzucała, więc to samo
+   * zapytanie do bazy szło dwa razy na żądanie — a „kto pyta" miało osiem
+   * niezależnych odpowiedzi zamiast jednej.
+   */
+  sesja?: SesjaZadania | null;
 }
+
+/** Kształt sesji widziany przez trasy; import TYPU, więc nie zamyka cyklu. */
+type SesjaZadania = import("./services/auth.js").Sesja;
 
 const store = new AsyncLocalStorage<ReqCtx>();
 
@@ -107,6 +121,16 @@ export function setCurrentUser(userId: number, name: string): void {
 
 /** Nazwa z sesji, gdy jest — inaczej nagłówek `X-User` jako podpowiedź. */
 export const currentUserName = (): string | null => store.getStore()?.userName ?? null;
+
+/**
+ * Sesja bieżącego żądania, rozpoznana raz przez bramkę.
+ *
+ * Trasy sprawdzające rolę pytają TUTAJ, a nie bazy: bramka i tak musi
+ * rozpoznać sesję, żeby zdecydować o 401, więc drugie zapytanie niczego nie
+ * ustala, a otwiera możliwość, że dwa miejsca odpowiedzą inaczej na to samo
+ * pytanie. Poza żądaniem (worker) `null` i to jest poprawna odpowiedź.
+ */
+export const sesjaZadania = (): SesjaZadania | null => store.getStore()?.sesja ?? null;
 
 /* ── Bramka sesji ───────────────────────────────────────────────────────────
    Do tej pory token był ROZPOZNAWANY, ale nie WYMAGANY: sesji żądały trzy
@@ -146,6 +170,9 @@ export function withRequestContext(app: FastifyInstance): void {
     const { sesja, dotknij } = await import("./services/auth.js");
     const s = t ? sesja(t) : null;
 
+    const ctx = store.getStore();
+    if (ctx) ctx.sesja = s;
+
     if (s) {
       setCurrentUser(s.user.userId, s.user.name);
       dotknij(t!);
@@ -163,6 +190,29 @@ export function withRequestContext(app: FastifyInstance): void {
        w `zablokowana`, a zapis z niej dostawał 423, żeby wymusić skan badge'a.
        Razem z ekranem blokady zniknęła i ta bramka. */
     if (!s) {
+      /* TRYB SERWISOWY. Brak sesji przestaje znaczyć „odmowa" i zaczyna znaczyć
+         „konto serwisowe" — ale TYLKO tutaj, w jednym miejscu, i tylko przy
+         jawnym `WERTIS_ADMIN=1`. Bramka zostaje domyślnie zamknięta: trasa
+         dopisana jutro dziedziczy to zachowanie razem z 401, bez pamiętania
+         o nim.
+
+         Sesja ma pierwszeństwo (gałąź wyżej), więc zalogowany człowiek dalej
+         podpisuje pracę swoim nazwiskiem, nie ADMIN-em. */
+      if (config.trybSerwisowy) {
+        const { kontoSerwisowe } = await import("./services/tryb-serwisowy.js");
+        const u = kontoSerwisowe();
+        setCurrentUser(u.userId, u.name);
+        /* Sesja UDAWANA, nie zapisana. Trasy sprawdzające rolę pytają
+           `sesjaZadania()`, więc bez tej linii tryb serwisowy wpuszczałby do
+           odczytów, a odbijał od zarządzania kontami i audytu — czyli od tego,
+           po co powstał.
+
+           Token jest pusty i nic nie trafia do `device_session`: gdyby trafiło,
+           powstałby artefakt PRZEŻYWAJĄCY wyłączenie flagi, czyli trwała tylna
+           furtka. Tak wyłączenie odbiera dostęp natychmiast. */
+        if (ctx) ctx.sesja = { token: "", user: u };
+        return;
+      }
       return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
     }
   });

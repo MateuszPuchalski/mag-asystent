@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **111 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **113 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -184,6 +184,19 @@ przed którą ta pozycja broni.
       spodem,
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
+
+**Tryb serwisowy (WERTIS_ADMIN=1 po stronie serwera)**
+
+- [ ] kolektor wchodzi bez ekranu logowania,
+- [ ] czerwony pasek „TRYB SERWISOWY" jest na KAŻDYM ekranie, także na
+      kreatorze kont i na ekranie startowym,
+- [ ] operacja wykonana w tym trybie ma w audycie podpis
+      „ADMIN (TRYB SERWISOWY)",
+- [ ] zalogowanie się prawdziwym kontem nadal działa, a operacja dostaje
+      wtedy NAZWISKO, nie ADMIN-a (regresja: wyścig ze startowym `refresh()`),
+- [ ] wyłączenie trybu na serwerze i powrót aplikacji z tła sprowadza kolektor
+      na ekran logowania (regresja: `refresh()` wychodził przy pustym tokenie),
+- [ ] przy wyłączonym trybie kolektor pokazuje ekran logowania jak zawsze.
 
 **Przesunięcie stanu**
 

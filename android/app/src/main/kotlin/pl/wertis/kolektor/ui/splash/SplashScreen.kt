@@ -108,7 +108,22 @@ fun SplashScreen(graph: AppGraph) {
     // pierwsze pytanie, na które nowy serwer musi umieć odpowiedzieć.
     LaunchedEffect(proba, ustawienia.serverUrl) {
         stanSerwera = StanSerwera.SPRAWDZAM
-        stanSerwera = when (graph.setup.potrzebny()) {
+        val r = graph.setup.stanInstalacji()
+
+        /* TRYB SERWISOWY: serwer ma wyłączone logowanie, więc nie ma o co
+           pytać. Warunek jest POTRÓJNY i każdy człon jest konieczny —
+           `session.refresh()` leci równolegle ze startu aplikacji, a bez tego
+           wyścig nadpisałby prawdziwą sesję tożsamością serwisową i praca
+           magazyniera zostałaby podpisana ADMIN-em. */
+        val admin = r?.admin
+        if (r?.adminMode == true && admin != null &&
+            graph.session.token == null && stan is SessionState.Brak
+        ) {
+            graph.session.przyjmijTrybSerwisowy(admin)
+            return@LaunchedEffect
+        }
+
+        stanSerwera = when (r?.potrzebne) {
             true -> StanSerwera.PUSTY
             false -> StanSerwera.MA_KONTA
             null -> StanSerwera.NIEOSIAGALNY

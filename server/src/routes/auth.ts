@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { currentDevice, currentToken } from "../context.js";
-import { autoryzuj, karaLogowania, sesja, wyloguj, zaloguj, zmienHaslo } from "../services/auth.js";
+import { currentDevice, currentToken, sesjaZadania } from "../context.js";
+import { autoryzuj, karaLogowania, wyloguj, zaloguj, zmienHaslo } from "../services/auth.js";
 import { logEvent } from "../services/events.js";
+import { config } from "../config.js";
+import { kontoSerwisowe, toKontoSerwisowe } from "../services/tryb-serwisowy.js";
 import {
   brakKont,
   createUser,
@@ -52,7 +54,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { stare?: string; nowe?: string } }>(
     "/api/auth/haslo",
     async (req, reply) => {
-      const s = sesja(token());
+      const s = sesjaZadania();
       if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
       const w = zmienHaslo(s.user, req.body?.stare ?? "", req.body?.nowe ?? "");
       if (w.error) return reply.code(400).send({ error: w.error });
@@ -68,9 +70,12 @@ export async function authRoutes(app: FastifyInstance) {
    * odpowiada — „czy ten token nadal wskazuje czynne konto".
    */
   app.get("/api/auth/me", async (_req, reply) => {
-    const s = sesja(token());
-    if (!s) return reply.code(401).send({ error: "Brak sesji" });
-    return { user: s.user };
+    const s = sesjaZadania();
+    if (s) return { user: s.user };
+    // w trybie serwisowym bramka wpuściła bez sesji — odpowiadamy tym, czym
+    // podpisze się operacja, żeby kolektor nie musiał zgadywać
+    if (config.trybSerwisowy) return { user: kontoSerwisowe() };
+    return reply.code(401).send({ error: "Brak sesji" });
   });
 
   app.post("/api/auth/logout", async () => {
@@ -101,18 +106,32 @@ export async function authRoutes(app: FastifyInstance) {
    * Odpowiedź nie jest tajemnicą: dokładnie tę samą informację ujawnia próba
    * założenia konta (`POST /api/users` przechodzi albo żąda sesji).
    */
-  app.get("/api/setup", async () => ({ potrzebne: brakKont() }));
+  app.get("/api/setup", async () => {
+    /* Tryb serwisowy jedzie TĄ trasą, a nie `/api/health`: Splash kolektora
+       już ją woła przy starcie i przy każdej zmianie adresu serwera, a health
+       jest ciężki (statystyki audytu, stan workera, ostatni import).
+
+       `adminMode` domyślnie false — stary serwer bez tego pola nie wpuści
+       nowego kolektora bez logowania przez przypadek. */
+    if (!config.trybSerwisowy) return { potrzebne: brakKont() };
+    const u = kontoSerwisowe();
+    return {
+      potrzebne: brakKont(),
+      adminMode: true,
+      admin: { userId: u.userId, login: null, name: u.name, role: u.role, active: true, maHaslo: false },
+    };
+  });
 
   /** Sesja biura; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
   function odmowaZarzadzania(): { kod: number; error: string } | null {
-    const s = sesja(token());
+    const s = sesjaZadania();
     if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
     const w = autoryzuj(s.user, "zarzadzanie_kontami");
     return w.ok ? null : { kod: 403, error: w.powod ?? "Brak uprawnień" };
   }
 
   app.get("/api/users", async (_req, reply) => {
-    const s = sesja(token());
+    const s = sesjaZadania();
     if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
     if (s.user.role !== "biuro") {
       // lista loginów to lista tożsamości — nie wystawiamy jej hali
@@ -173,6 +192,16 @@ export async function authRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const odmowa = odmowaZarzadzania();
       if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+      /* Konta serwisowego nie da się ani wyłączyć, ani obdarzyć hasłem.
+         Bez tego zakazu ktoś „wyłączyłby" je w ustawieniach, UI pokazałby
+         konto nieczynne, a obejście działałoby dalej — bo bramka ustawia
+         tożsamość z konfiguracji, nie z flagi `active`. Stan, którego nikt
+         by nie zrozumiał. Tryb wyłącza się jedną drogą: WERTIS_ADMIN. */
+      if (toKontoSerwisowe(Number(req.params.id))) {
+        return reply.code(400).send({
+          error: "Konta serwisowego nie da się zmienić — wyłącz WERTIS_ADMIN i zrestartuj usługi",
+        });
+      }
       const haslo = req.body?.haslo ?? null;
       // `null` odbiera hasło, czyli zamyka konto na klucz bez kasowania go
       if (haslo !== null && haslo.length < HASLO_MIN) {
@@ -189,6 +218,12 @@ export async function authRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const odmowa = odmowaZarzadzania();
       if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+      // patrz zakaz przy `:id/haslo` — ta sama zasada, ten sam powód
+      if (toKontoSerwisowe(Number(req.params.id))) {
+        return reply.code(400).send({
+          error: "Konta serwisowego nie da się zmienić — wyłącz WERTIS_ADMIN i zrestartuj usługi",
+        });
+      }
       // konta się nie kasuje — historia w `events` musi mieć na co wskazywać
       const active = req.body?.active !== false;
       setActive(Number(req.params.id), active);

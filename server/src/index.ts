@@ -23,6 +23,7 @@ import {
   lastImport,
 } from "./adapters/subiekt.mssql.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
+import { ostrzezenieTrybuSerwisowego, przygotujTrybSerwisowy } from "./services/tryb-serwisowy.js";
 import { zamelduj, stanWorkera } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 
@@ -38,6 +39,13 @@ import { WERSJA } from "./wersja.js";
  * z MSSQL i samo `listen`.
  */
 export async function buildApp() {
+  /* Konto serwisowe zakładamy RAZ, tutaj — nie na ścieżce żądania. `login`
+     jest UNIQUE, ale SQLite przepuszcza wiele NULL-i, więc dwa równoległe
+     pierwsze żądania założyłyby dwa wiersze i audyt rozjechałby się na dwie
+     tożsamości. W `buildApp`, nie w `main`, bo testy budują aplikację tędy —
+     a tryb serwisowy ma być testowalny bez podnoszenia całego procesu. */
+  przygotujTrybSerwisowy();
+
   const app = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
     // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
@@ -54,6 +62,9 @@ export async function buildApp() {
   app.get("/api/health", async () => {
     const worker = stanWorkera();
     const problemy = [
+      /* PIERWSZE, przed wszystkim innym: instalacja bez logowania unieważnia
+         każdą inną odpowiedź na pytanie „czy to działa poprawnie". */
+      ostrzezenieTrybuSerwisowego(),
       worker.problem,
       /* PIERWSZY na liście świadomie: przykryta konfiguracja unieważnia
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
@@ -74,6 +85,9 @@ export async function buildApp() {
          aktualizacji: `git pull` przestawia serwer, ale APK na kolektorze
          zostaje stary do czasu rozesłania przez MDM. */
       wersja: WERSJA,
+      /* Podgląd biura pyta o to przy starcie: strona jest publiczna, więc nie
+         może sama zdecydować, że logowania nie ma — musi to usłyszeć. */
+      adminMode: config.trybSerwisowy,
       mode: config.sgtMode,
       sferaMode: config.sferaMode,
       // skąd wzięła się konfiguracja — pierwsze pytanie przy „u mnie nie działa"
@@ -139,6 +153,9 @@ async function main() {
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });
   console.log(`[api] WERTIS serwer na http://${config.host}:${config.port} · SGT_MODE=${config.sgtMode}`);
+  if (config.trybSerwisowy) {
+    console.warn("[api] TRYB SERWISOWY — logowanie WYŁĄCZONE (WERTIS_ADMIN=1). Nie zostawiaj tego u klienta.");
+  }
 }
 
 /* Import z testu nie może uruchomić serwera. `import.meta.main` jest w Node

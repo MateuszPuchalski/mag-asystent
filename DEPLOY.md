@@ -331,6 +331,36 @@ curl http://<IP-serwera>:3001/api/users -H "x-session: $TOKEN"   # lista kont
 Hasła z przykładu zmień. `tajnehaslo` jest w tej instrukcji po to, żeby dało się
 ją wykonać bez zastanawiania się — nie po to, żeby zostało w firmie.
 
+**Żadnych domyślnych haseł i żadnych domyślnych kont.** Ta reguła nie była
+dotąd nigdzie zapisana, choć kod trzymał się jej od początku. Instalator losuje
+hasło konta SQL, kreator nie pokazuje haseł ani razu, a konto bez hasła nie
+zaloguje się nigdy. Zapisujemy ją tutaj, bo od 0.23.0 istnieje tryb, który
+wygląda na wyjątek, a nim nie jest — patrz niżej.
+
+### Tryb serwisowy (`WERTIS_ADMIN=1`) — nigdy u klienta
+
+Przełącznik wyłącza logowanie w całości: kolektor i `/biuro` wchodzą od razu,
+a operacje podpisuje konto `ADMIN (TRYB SERWISOWY)`. Istnieje dla pracy nad
+kodem, gdzie baza kasuje się kilka razy dziennie.
+
+Konto serwisowe **nie ma ani loginu, ani hasła**, więc nie da się nim zalogować
+żadną drogą i nie ma czego wykraść — reguła wyżej zostaje nienaruszona. Nie
+dostaje też tokenu, więc wyłączenie przełącznika odbiera dostęp natychmiast:
+nie ma czego unieważniać.
+
+Łamana jest inna, dotąd niepisana zasada: **każda operacja jest podpisana przez
+kogoś, kto się uwierzytelnił**. W tym trybie każdy w sieci ma uprawnienia biura,
+łącznie z zakładaniem kont i ustawianiem hasła na cudzym koncie. **Te dwa skutki
+przeżywają wyłączenie przełącznika**, w odróżnieniu od samego dostępu.
+
+Włączony tryb widać z trzech stron: czerwony pasek na obu ekranach, `ok: false`
+w `/api/health` z ostrzeżeniem na pierwszym miejscu, wpis `tryb_serwisowy_start`
+w dzienniku. Sam wiersz `ADMIN (TRYB SERWISOWY)` w `app_user` jest dowodem, że
+tryb kiedykolwiek na tej instalacji chodził.
+
+Instalator tej zmiennej **nie zapisuje** — ani do `wertis.env`, ani do
+środowiska usług — i pilnuje tego jego własny zestaw testów.
+
 `GET /api/setup` odpowiada `{"potrzebne":true}`, dopóki nie ma ani jednego
 konta — tego samego pytania używa kolektor.
 
