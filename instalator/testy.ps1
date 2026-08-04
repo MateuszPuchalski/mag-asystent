@@ -643,6 +643,23 @@ Sprawdz "walidacja hasła admina odrzuca za krótkie" {
     Zaloz (Test-WertisHasloAdmina "osiemzna") "8 znaków ma przejść"
 }
 
+Sprawdz "przebieg próbny przechodzi krok konta z PUSTYM hasłem" {
+    <#
+        Regresja, która wywróciła CI przy pierwszym uruchomieniu tego kroku.
+        W `-DryRun` nikt o hasło nie pyta, więc do funkcji leci pusty łańcuch —
+        a `[Parameter(Mandatory)][string]` odrzuca go w BINDERZE, czyli zanim
+        `Test-DryRun` zdąży zwrócić $true. Przebieg próbny wywalał się na kroku,
+        który z definicji niczego nie robi.
+    #>
+    $bylo = $script:WertisDryRun
+    $script:WertisDryRun = $true
+    try {
+        Zaloz (New-WertisKontoAdmina -Login "admin" -Haslo "") "krok próbny ma przejść bez hasła"
+    } finally {
+        $script:WertisDryRun = $bylo
+    }
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""

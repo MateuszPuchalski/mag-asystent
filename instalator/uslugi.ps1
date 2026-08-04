@@ -505,11 +505,22 @@ function New-WertisKontoAdmina {
     #>
     param(
         [Parameter(Mandatory)][string]$Login,
-        [Parameter(Mandatory)][string]$Haslo,
+        # `AllowEmptyString`, bo w przebiegu próbnym hasła NIE MA — nikt o nie
+        # nie pytał. Bez tego atrybutu walidator parametru odrzuca wywołanie
+        # ZANIM `Test-DryRun` zdąży cokolwiek powiedzieć, i `-DryRun` wywala się
+        # na kroku, który z założenia niczego nie robi.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Haslo,
         [string]$Nazwa = "Administrator",
         [int]$Port = 3001
     )
     if (Test-DryRun "Założyłbym konto admina „$Login” przez API.") { return $true }
+
+    # Prawdziwy przebieg zostaje ŚCISŁY: pusty łańcuch przechodzi przez binder,
+    # ale nie przez to sprawdzenie — inaczej poszedłby w żądaniu do serwera.
+    if (-not (Test-WertisHasloAdmina $Haslo)) {
+        Write-Blad "Hasło admina jest za krótkie — konta nie zakładam."
+        return $false
+    }
 
     $body = @{ name = $Nazwa; login = $Login; haslo = $Haslo } | ConvertTo-Json -Compress
     try {
