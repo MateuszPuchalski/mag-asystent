@@ -148,6 +148,7 @@ struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
 ```bash
 npm install
 npm run seed     # zasila SQLite z server/seed/products.json (raz; FORCE_SEED=1 nadpisuje)
+npm run seed:scenariusze   # opcjonalnie: 65 przypadków brzegowych do przeklikania
 npm run dev      # api :3001 + worker; sprawdzenie: http://localhost:3001/api/health
 ```
 
@@ -529,6 +530,7 @@ server/                    backend (Fastify + SQLite + worker)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
   src/db/seed.ts           seed z products.json: dokumenty FZ/PZ per dostawca,
                            w tym jeden kontener na MGP
+  src/db/seed-scenariusze.ts  dane do przypadków brzegowych (docs/scenariusze-testowe.md)
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+sql (prod)
   src/services/            delivery (rozkładanie faktur zakupu),
                            przesuniecie (stan między magazynami, MM),
@@ -541,6 +543,8 @@ server/                    backend (Fastify + SQLite + worker)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
 docs/architektura.md       jak to jest zbudowane i dlaczego tak (start dla nowej osoby)
 docs/analiza-rozkladanie.md rozkładanie i przesunięcia + backlog
+docs/scenariusze-testowe.md katalog przypadków brzegowych: co seed buduje,
+                           jak to sprawdzić i czego oczekiwać
 docs/porownanie-asystent.md WERTIS a Firmes+ Asystent Magazyniera — materiał do
                            decyzji dla właściciela: zakres, scenariusze, koszty,
                            środowisko demo
@@ -585,6 +589,31 @@ Magazyn `Zwroty` dostaje same stany — kafel „gdzie jeszcze leży" ma wtedy c
 pokazać. W produkcji stany i dokumenty pochodzą z `tw_Stan` i `dok__Dokument`
 przez adapter MSSQL (patrz
 [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md)).
+
+### Przypadki brzegowe — `npm run seed:scenariusze`
+
+Kartoteka wyżej pokazuje ścieżkę codzienną i tyle. Rzeczy, na których aplikacja
+naprawdę się łamie, nie ma w niej wcale. Brakuje kolizji kodów, cudzej blokady
+pozycji, zadania w błędzie, zdjęcia bez pliku i adresu spoza wzorca.
+
+```bash
+npm run seed                 # kartoteka — raz
+npm run seed:scenariusze     # 65 przypadków brzegowych, dopisywane do kartoteki
+```
+
+Katalog scenariuszy z instrukcją sprawdzenia:
+[`docs/scenariusze-testowe.md`](docs/scenariusze-testowe.md). Źródłem danych jest
+[`server/src/db/seed-scenariusze.ts`](server/src/db/seed-scenariusze.ts), a test
+pilnuje, że oba mówią to samo.
+
+Seed jest **dopisaniem, nie wymianą**: kasuje wyłącznie własne wiersze
+(`tw_id` od 900001, `dok_id` od 9001, własne konta) i buduje je od nowa. Można go
+uruchamiać dowolnie często, żeby wrócić do punktu wyjścia.
+
+Zakłada konta ze znanym hasłem i wystawia gotowe tokeny sesji, więc przy
+`SGT_MODE=mssql` **odmawia startu**. Zasila też dokumenty WZ z historią pobrań —
+bez nich `npm run reslot -- --demo` nie ma czego liczyć i odmawia wypisania
+trzech pierwszych list.
 
 ## Praca z prawdziwym Subiektem GT
 

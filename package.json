@@ -14,6 +14,7 @@
     "dev:api": "npm -w server run dev",
     "dev:worker": "npm -w server run worker",
     "seed": "npm -w server run seed",
+    "seed:scenariusze": "npm -w server run seed:scenariusze --",
     "build": "npm -w server run build",
     "start": "npm -w server run start",
     "reconcile": "npm -w server run reconcile",
