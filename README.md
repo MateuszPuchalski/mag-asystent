@@ -10,9 +10,10 @@ każdy do swojej roli:
   lock-task/MDM. Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
-  kolejka zapisów, rekoncyliacja i ślad audytowy. Jedna strona bez builda,
-  logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się wyłącznie
-  na kolektorze.
+  kolejka zapisów, rekoncyliacja i ślad audytowy. Dostawca z własnym drukiem
+  reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
+  bez builda, logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się
+  wyłącznie na kolektorze.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym

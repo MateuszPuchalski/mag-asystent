@@ -78,6 +78,20 @@ test("strona czyta stan serwera bez sesji — i tylko to", async () => {
   assert.ok("worker" in h);
 });
 
+test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
+  /* GEKO i PARTNER mają własne druki reklamacyjne — wydruk ma wyglądać jak
+     ich formularz, nie jak nasz protokół. Wybór idzie po nazwie dostawcy
+     z dokumentu FZ; dane firmy do nadruku żyją w localStorage przeglądarki. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /Protokół zgłoszenia reklamacji B2B/, "szablon GEKO");
+  assert.match(html, /PROTOKÓŁ ZGŁOSZENIA REKLAMACJI/, "szablon PARTNER");
+  assert.match(html, /SZABLONY_DOSTAWCOW/, "wybór szablonu po dostawcy");
+  assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
+});
+
 test("podgląd nie oferuje raportu wydajności per osoba", () => {
   /* Monitoring pracowniczy (Kodeks pracy art. 22²) wymaga zapisu w regulaminie
      i uprzedzenia ludzi. `GET /api/wydajnosc` istnieje dla biura, ale przycisk
