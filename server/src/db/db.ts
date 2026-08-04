@@ -59,9 +59,10 @@ export function db(): DatabaseSync {
  * wyglądają tak samo jak wcześniej, więc podmiana sterownika nie rozlała się
  * po serwisach.
  *
- * ROLLBACK jest tu istotny, a nie kosmetyczny: `putaway` i `delivery` zapisują
- * w jednej transakcji pozycję ORAZ zadanie do kolejki Sfery. Przerwanie
- * w połowie zostawiłoby zadanie zapisu bez pokrycia w danych albo odwrotnie.
+ * ROLLBACK jest tu istotny, a nie kosmetyczny: rozkładanie i przesunięcie
+ * stanu zapisują w jednej transakcji pozycję ORAZ zadanie do kolejki Sfery.
+ * Przerwanie w połowie zostawiłoby zadanie zapisu bez pokrycia w danych albo
+ * odwrotnie.
  *
  * BEGIN **IMMEDIATE**, nie zwykłe BEGIN, i to nie jest drobiazg przy dwóch
  * procesach. Zwykłe BEGIN jest odroczone: blokadę zapisu bierze dopiero przy
@@ -102,15 +103,14 @@ function migrate(database: DatabaseSync) {
       database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
     }
   };
-  addColumn("sfera_queue", "session_id", "INTEGER");
+  usunSesjeRozkladania(database);
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
      konta, a nazwa nie jest tożsamością. Stare zadania mają NULL i tak
      zostaje: zgadywanie po nazwie byłoby gorsze niż uczciwy brak. */
   addColumn("sfera_queue", "created_by_ref", "INTEGER");
-  addColumn("putaway_sessions", "source_mag_id", "INTEGER");
-  // locki per linia (tryb A: dostawy i zwroty) — kilka osób przy jednym dokumencie
+  // locki per linia — kilka osób przy jednym dokumencie
   addColumn("delivery_line", "locked_by", "TEXT");
   addColumn("delivery_line", "locked_at", "TEXT");
   addColumn("delivery", "source_mag_id", "INTEGER");
@@ -145,6 +145,31 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery", "przesylka_at", "TEXT");
   addColumn("delivery", "przesylka_by", "TEXT");
   naLoginIHaslo(database);
+}
+
+/**
+ * Sesje rozkładania wychodzą razem z trybem kontenerowym (0.22.0).
+ *
+ * KOLEJNOŚĆ JEST WARUNKIEM POPRAWNOŚCI, nie stylem. `putaway_items` miało
+ * jedyny w tym schemacie klucz obcy (`session_id → putaway_sessions`), a baza
+ * chodzi z `PRAGMA foreign_keys = ON`. Dziecko przed rodzicem znaczy „nie ma
+ * już wierszy do sprawdzenia"; odwrotna kolejność wywaliłaby start API i workera
+ * naraz, na każdej istniejącej instalacji.
+ *
+ * `PRAGMA foreign_keys = OFF` NIE jest tu potrzebna — inaczej niż przy
+ * `naLoginIHaslo`, gdzie na kasowaną tabelę wskazywało coś Z ZEWNĄTRZ. Tutaj
+ * jedyny klucz obcy siedzi wewnątrz kasowanej pary i znika razem z nią.
+ *
+ * `sfera_queue.session_id` zostaje w starych bazach jako martwa kolumna: INSERT
+ * wymienia kolumny jawnie, więc działa i z nią, i bez niej, a przebudowa tabeli,
+ * którą jednocześnie trzyma otwartą worker, kosztowałaby bez żadnego zysku.
+ * To ten sam wybór co przy 0.17.0 (`koszyk`, `mm_ilosc`, `mm_queue_id`).
+ */
+function usunSesjeRozkladania(database: DatabaseSync) {
+  // `IF EXISTS` załatwia idempotencję w całości: to dwa DROP-y bez stanu
+  // pośredniego, więc API i worker mogą je wykonać w dowolnym przeplocie
+  database.exec("DROP TABLE IF EXISTS putaway_items");
+  database.exec("DROP TABLE IF EXISTS putaway_sessions");
 }
 
 /**

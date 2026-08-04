@@ -1,5 +1,6 @@
 package pl.wertis.kolektor.ui.product
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,7 +43,7 @@ import pl.wertis.kolektor.ui.theme.cardSurface
  *   `ProductScreen`, bo tylko on wie, co zrobić z dotknięciem.
  */
 @Composable
-fun ProductHero(p: ProductCard, adres: @Composable () -> Unit) {
+fun ProductHero(p: ProductCard, onPrzesunZMgp: (() -> Unit)? = null, adres: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,7 +107,9 @@ fun ProductHero(p: ProductCard, adres: @Composable () -> Unit) {
                    gdy wielka liczba nie zgadza się z półką — więc mają być
                    czytelne, a nie widoczne z drugiego końca alejki. MGP jest
                    pogrubione i bursztynowe, bo jako jedyne z tej trójki
-                   oznacza czynność: towar leży w przyjęciach, idź po niego. */
+                   oznacza czynność: towar leży w przyjęciach, idź po niego.
+                   Od 0.22.0 ta czynność jest wykonalna jednym dotknięciem —
+                   wcześniej trzeba było otworzyć sesję kontenerową. */
                 Row {
                     Text(
                         "rez. ${formatQty(p.mag.rez)} · razem ${formatQty(p.mag.stan)}",
@@ -115,10 +118,12 @@ fun ProductHero(p: ProductCard, adres: @Composable () -> Unit) {
                     )
                     if (p.mgp.stan > 0) {
                         Text(
-                            " · MGP ${formatQty(p.mgp.stan)}",
+                            " · MGP ${formatQty(p.mgp.stan)} — PRZESUŃ",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AmberInk,
+                            modifier = if (onPrzesunZMgp == null) Modifier
+                            else Modifier.clickable(onClick = onPrzesunZMgp),
                         )
                     }
                 }

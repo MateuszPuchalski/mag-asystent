@@ -35,9 +35,10 @@ rzecz**: pole lokalizacji na kartotece. Zero tworzenia dokumentów, zero
 modyfikacji stanów.
 
 **Czego to nie zastępuje.** Po odjęciu funkcji nieużywanych zostają **dwie
-realne**: **inwentaryzacja** i **przesunięcia magazynowe (MM)**. Obie są
-w WERTIS w drodze — MM jest kolejne w kolejce i ma gotowy kontrakt w kodzie,
-inwentaryzacja jest zaplanowana.
+realne**: **inwentaryzacja** i **przesunięcia magazynowe (MM)**. Przesunięcie
+jest już w WERTIS: kolektor je zbiera, waliduje i kolejkuje, ale sam dokument
+wystawia jeszcze biuro, bo worker Sfery czeka na wdrożenie. Inwentaryzacja jest
+zaplanowana.
 
 **Ile to kosztuje.** Asystent: 589 zł netto licencja startowa, 389 zł netto za
 każde kolejne urządzenie, licencja roczna. WERTIS: brak opłat licencyjnych, ale
@@ -60,7 +61,7 @@ i tylko one powinny decydować:
 | Pytanie | Jeśli **tak** | Jeśli **nie** |
 |---|---|---|
 | Czy robicie inwentaryzację przez Asystenta? | trzymać do czasu, aż WERTIS to dostanie | jeden powód mniej |
-| Czy wystawiacie MM przez Asystenta? | trzymać do uruchomienia zapisu przez Sferę | jeden powód mniej |
+| Czy wystawiacie MM przez Asystenta? | trzymać do uruchomienia workera Sfery | jeden powód mniej |
 
 Jeśli odpowiedź na oba brzmi „nie", **Asystent nie robi dziś nic, czego nie
 zrobi WERTIS** — a wtedy roczna licencja opłaca funkcje leżące odłogiem.
@@ -128,7 +129,7 @@ wykonuje pracę wykonywaną w tej firmie.
 | Kompletacja zamówień (zbiórka pod ZK) | jest, ale **nieużywane** | **—** |
 | Tworzenie WZ ze skanowanego towaru | jest, ale **nieużywane** | **—** |
 | Tworzenie PZ / RW / PW / ZK | jest, ale **nieużywane** | **—** |
-| Przesunięcia magazynowe (MM) | **jest** | **w drodze** — kolejne w kolejce |
+| Przesunięcia magazynowe (MM) | **jest** | **częściowo** — kolektor zbiera, dokument wystawia biuro |
 | Inwentaryzacja (arkusze ze skanu) | **jest** | **w drodze** — planowana |
 
 > Trzy pierwsze wiersze to **cały blok wydań** — i w tej firmie leży on
@@ -144,7 +145,7 @@ wykonuje pracę wykonywaną w tej firmie.
 | Rozkładanie z obowiązkowym skanem półki jako dowodem odłożenia | brak danych | **jest** |
 | Postęp zapisywany per pozycja (przerwanie pracy nic nie kosztuje) | brak danych | **jest** |
 | Dostawa zamyka się sama, gdy nie ma czego rozkładać | brak danych | **jest** |
-| Kontener importowy: sesja z wózkiem, wiele pozycji na rundę | brak danych | **jest** |
+| Kontener importowy: rozkładanie jak każda dostawa + przesunięcie stanu | brak danych | **jest** |
 
 ### Wyszukiwanie i kartoteka
 
@@ -369,7 +370,7 @@ pokrywających wszystkie ścieżki:
 |---|---|
 | 4 dostawy krajowe FZ/PZ | ścieżka codzienna: dwa skany na pozycję |
 | 1 dostawa **w buforze** Subiekta | dokument nieksięgowany też da się rozłożyć |
-| 1 kontener na strefie przyjęć | tryb wózka: wiele pozycji na rundę |
+| 1 kontener na strefie przyjęć | rozkładanie i przesunięcie stanu na halę |
 | 1 zbiorczy dokument zwrotów | rozlicza biuro w Subiekcie |
 | pozycje **BEZ LOKALIZACJI** w każdym dokumencie | osobna sekcja, wymaga decyzji człowieka |
 
@@ -425,9 +426,9 @@ wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, konta
 imienne z hasłem, praca offline, raport kolizji kodów, nocna rekoncyliacja,
 raport przeslotowania.
 
-**W drodze:** przesunięcia magazynowe (MM) — kolejne w kolejce, kontrakt gotowy;
-inwentaryzacja — planowana. **To jedyne dwie rzeczy, które Asystent robi, a my
-jeszcze nie.**
+**W drodze:** przesunięcia magazynowe (MM) — kolektor je zbiera i kolejkuje,
+ale dokument wystawia jeszcze biuro, bo worker Sfery czeka na wdrożenie;
+inwentaryzacja — planowana.
 
 **Nie planowane:** kompletacja zamówień i wydania — **bo nie są używane**.
 Gdyby firma zaczęła kompletować zamówienia z kolektora, byłaby to decyzja do

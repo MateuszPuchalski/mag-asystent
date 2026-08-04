@@ -186,8 +186,7 @@ private val BackSlot = 76.dp
 
 @Composable
 fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -> Unit, onBack: () -> Unit) {
-    val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES ||
-        screen == Screen.PUTAWAY_DOCS || screen == Screen.PUTAWAY_SESSION
+    val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES
     val homeActive = !putawayActive && screen != Screen.QUEUE
 
     Row(

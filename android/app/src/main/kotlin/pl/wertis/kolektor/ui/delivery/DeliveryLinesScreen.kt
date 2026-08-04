@@ -59,6 +59,7 @@ import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
+import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
@@ -126,6 +127,12 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var busy by remember { mutableStateOf(false) }
     /** Linia trzymana przez kogoś innego, którą brygadzista chce odebrać (§7). */
     var doOdebrania by remember(id) { mutableStateOf<ScanResolution.Locked?>(null) }
+    /** Otwarte przesunięcie stanu na halę (skrót z wiersza kontenera). */
+    var przesunFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
+    /* Magazyn skutku, jeśli nie jest halą — czyli kontener. Serwer podaje tu
+       `null` po dostawie krajowej, więc kolektor nie musi znać identyfikatorów
+       z konfiguracji, żeby wiedzieć, że nie ma czego przesuwać. */
+    val magZrodlowy = view?.sourceMagId
 
     suspend fun resolveProduct(code: String) {
         try {
@@ -403,6 +410,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         problemFor = line
                         problemOpen = true
                     },
+                    onPrzesun = magZrodlowy?.let { { przesunFor = line } },
                     onQtyIssue = {
                         problemFor = line
                         // od 0.21.0 „inna ilość" to jedna kategoria z formularza:
@@ -420,6 +428,29 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 )
             }
         }
+    }
+
+    /* Przesunięcie stanu ma sens tylko dla dostaw, które NIE zaksięgowały się
+       wprost na hali — czyli dla kontenerów z MGP. Po fakturze krajowej nie ma
+       czego przesuwać, więc przycisku po prostu nie ma. */
+    przesunFor?.let { linia ->
+        PrzesuniecieSheet(
+            graph = graph,
+            twId = linia.twId,
+            sym = linia.sym,
+            name = linia.name,
+            unit = "szt",
+            magFrom = magZrodlowy,
+            dostepne = linia.qtyDoc - linia.qtyDone,
+            qtyInit = linia.qtyDoc - linia.qtyDone,
+            lineId = linia.id,
+            onDone = {
+                przesunFor = null
+                active = null
+                reload++
+            },
+            onCancel = { przesunFor = null },
+        )
     }
 
     /* Arkusze wysuwają się OD DOŁU, zamiast podmieniać ekran. Wcześniej oba
@@ -483,6 +514,7 @@ private fun LineRow(
     onTap: () -> Unit,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
+    onPrzesun: (() -> Unit)?,
     onCancel: () -> Unit,
     onRozjazd: (LocApplyAction) -> Unit,
     onRozjazdAnuluj: () -> Unit,
@@ -570,6 +602,7 @@ private fun LineRow(
                     line = line,
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
+                    onPrzesun = onPrzesun,
                     onCancel = onCancel,
                 )
             }
@@ -606,6 +639,8 @@ private fun PanelOdkladania(
     line: DeliveryLineView,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
+    /** null = dostawa księgowana wprost na halę, nie ma czego przesuwać. */
+    onPrzesun: (() -> Unit)?,
     onCancel: () -> Unit,
 ) {
     Column(
@@ -642,10 +677,17 @@ private fun PanelOdkladania(
         }
         // Rozkładanie JEST sprawdzaniem faktury i liczy się KAŻDĄ pozycję, więc
         // rozbieżność ilościowa to najczęstszy wyjątek — zasługuje na własny
-        // przycisk, a nie na szukanie kafla wśród siedmiu typów.
+        // przycisk, a nie na szukanie kafla wśród pięciu kategorii.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlineButton("INNA ILOŚĆ", modifier = Modifier.weight(1f), onClick = onQtyIssue)
             OutlineButton("PROBLEM", modifier = Modifier.weight(1f), danger = true, onClick = onProblem)
+        }
+        /* Skrót dla kontenera: dostawa na MGP zostawia po odłożeniu adresów
+           jeszcze przesunięcie stanu na halę. Bez tego przycisku trzeba by je
+           robić z karty towaru, pozycja po pozycji. Po dostawie księgowanej
+           wprost na MAG nie ma czego przesuwać i przycisku nie ma. */
+        onPrzesun?.let {
+            OutlineButton("PRZESUŃ NA HALĘ", modifier = Modifier.fillMaxWidth(), onClick = it)
         }
         OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
     }

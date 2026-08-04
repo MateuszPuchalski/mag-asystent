@@ -6,7 +6,7 @@ import { withRequestContext } from "./context.js";
 import { db } from "./db/db.js";
 import { productRoutes } from "./routes/products.js";
 import { queueRoutes } from "./routes/queue.js";
-import { putawayRoutes } from "./routes/putaway.js";
+import { przesuniecieRoutes } from "./routes/przesuniecie.js";
 import { deliveryRoutes } from "./routes/delivery.js";
 import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
@@ -101,7 +101,7 @@ export async function buildApp() {
 
   await app.register(productRoutes);
   await app.register(queueRoutes);
-  await app.register(putawayRoutes);
+  await app.register(przesuniecieRoutes);
   await app.register(deliveryRoutes);
   await app.register(problemRoutes);
   await app.register(locationRoutes);

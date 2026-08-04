@@ -310,7 +310,7 @@ curl -s -X POST http://localhost:3001/api/admin/resync
   wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)`.
   Wymaga to dodatkowego `GRANT SELECT` i korekty JOIN-a
   w `server/src/adapters/subiekt.mssql.ts`.
-- Dokumenty MM — z rundy wózka (kontener) — wymagają licencji **Sfery** na produkcyjnym Subiekcie. Potrzebny jest osobny
+- Dokumenty MM z przesunięć stanu wymagają licencji **Sfery** na produkcyjnym Subiekcie. Potrzebny jest osobny
   worker COM na Windows (C#/pywin32) czytający tę samą tabelę `sfera_queue`.
   Kontrakt jest w `server/src/adapters/sfera.ts`, etap 2
   w [DEPLOY.md](../DEPLOY.md). Do tego czasu MM wystawia biuro.

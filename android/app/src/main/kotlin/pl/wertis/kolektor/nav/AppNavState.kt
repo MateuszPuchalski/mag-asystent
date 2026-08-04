@@ -9,7 +9,7 @@ import pl.wertis.kolektor.data.RecentStore
 
 /* ── Nawigacja UI — port web/src/lib/store.ts ───────────────────────────────
    Statyczna mapa powrotów (nie stos) + parametry kontekstu jak w PWA:
-   curId (towar), sessionId (rozkładanie), locCode (podgląd lokalizacji),
+   curId (towar), deliveryId (rozkładanie), locCode (podgląd lokalizacji),
    queueReturn (skąd otwarto kolejkę).                                        */
 
 class AppNavState(private val recentStore: RecentStore) {
@@ -25,7 +25,6 @@ class AppNavState(private val recentStore: RecentStore) {
     private val _curId = MutableStateFlow<Long?>(null)
     val curIdFlow: StateFlow<Long?> = _curId
     val curId: Long? get() = _curId.value
-    @Volatile var sessionId: Long? = null; private set
     /** Tryb A: otwarta faktura zakupu (dokument = jednostka pracy). */
     @Volatile var deliveryId: Long? = null; private set
 
@@ -86,11 +85,6 @@ class AppNavState(private val recentStore: RecentStore) {
         go(Screen.DELIVERY_LINES)
     }
 
-    fun openSession(id: Long) {
-        sessionId = id
-        _screen.value = Screen.PUTAWAY_SESSION
-    }
-
     fun openLocation(code: String) {
         _locCode.value = code.trim().uppercase()
         _screen.value = Screen.LOCATION
@@ -127,7 +121,6 @@ class AppNavState(private val recentStore: RecentStore) {
      */
     fun opisPracy(): String? = when {
         deliveryId != null -> "dostawa #" + deliveryId
-        sessionId != null -> "sesja kontenerowa #" + sessionId
         locCode != null -> "regał " + locCode
         else -> null
     }

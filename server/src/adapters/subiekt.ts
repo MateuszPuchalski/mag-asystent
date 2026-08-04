@@ -94,16 +94,14 @@ export interface SubiektAdapter {
   listMagazyny(): RawMagazyn[];
   /** Stany towaru we WSZYSTKICH magazynach — do zestawienia na karcie. */
   getStockAll(twId: number): RawStockRow[];
-  /** Tryb B: kontenery na MGP z ostatnich N dni — sesja z wózkiem i MM na rundę (spec §5.4). */
-  listPutawayDocuments(days: number): RawDocument[];
   /**
-   * Tryb A z ostatnich N dni: dostawy krajowe FZ/PZ księgowane wprost na MAG
-   * oraz zbiorcze dokumenty zwrotów na magazynie Zwroty. Dokumenty w buforze
-   * też, bo rozkładanie nie czeka na księgowość (D1).
+   * Dostawy z ostatnich N dni: FZ/PZ księgowane na MAG (krajowe) oraz na MGP
+   * (kontenery). Dokumenty w buforze też, bo rozkładanie nie czeka na
+   * księgowość (D1).
    *
-   * Kryteria tej listy i `listPutawayDocuments` MUSZĄ być rozłączne — dokument
-   * widoczny w obu zakładkach dałoby się rozłożyć dwiema niekompatybilnymi
-   * ścieżkami naraz.
+   * Jedna lista dla obu magazynów skutku. Do 0.22.0 kontener miał osobną
+   * zakładkę i osobną ścieżkę pracy; dziś różni się tylko tym, że po odłożeniu
+   * adresów zostaje jeszcze przesunięcie stanu na halę.
    */
   listDeliveryDocuments(days: number): RawDocument[];
   /**

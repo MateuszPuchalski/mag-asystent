@@ -9,11 +9,8 @@ class NavModelTest {
     @Test fun `statyczna mapa powrotow`() {
         assertEquals(Screen.HOME, backTarget(Screen.PRODUCT, null))
         assertEquals(Screen.PRODUCT, backTarget(Screen.SCAN_LOC, null))
-        assertEquals(Screen.PUTAWAY_DOCS, backTarget(Screen.PUTAWAY_SESSION, null))
-        // tryb A: dokument dostawy → lista dostaw
+        // dokument dostawy → lista dostaw; kontener idzie tą samą drogą
         assertEquals(Screen.DELIVERY_DOCS, backTarget(Screen.DELIVERY_LINES, null))
-        // tryb B (kontener) wchodzi się z listy dostaw, więc ma dokąd wrócić
-        assertEquals(Screen.DELIVERY_DOCS, backTarget(Screen.PUTAWAY_DOCS, null))
         assertEquals(Screen.HOME, backTarget(Screen.LOCATION, null))
         assertEquals(Screen.HOME, backTarget(Screen.SETTINGS, null))
     }
@@ -21,12 +18,12 @@ class NavModelTest {
     @Test fun `ekrany bazowe bez powrotu`() {
         assertNull(backTarget(Screen.SPLASH, null))
         assertNull(backTarget(Screen.HOME, null))
-        // korzeń zakładki „DOSTAWY" w trybie A
+        // korzeń zakładki „DOSTAWY"
         assertNull(backTarget(Screen.DELIVERY_DOCS, null))
     }
 
     @Test fun `kolejka wraca tam skad ja otwarto`() {
-        assertEquals(Screen.PUTAWAY_SESSION, backTarget(Screen.QUEUE, Screen.PUTAWAY_SESSION))
+        assertEquals(Screen.DELIVERY_LINES, backTarget(Screen.QUEUE, Screen.DELIVERY_LINES))
         assertEquals(Screen.PRODUCT, backTarget(Screen.QUEUE, Screen.PRODUCT))
         assertEquals(Screen.HOME, backTarget(Screen.QUEUE, null))
     }

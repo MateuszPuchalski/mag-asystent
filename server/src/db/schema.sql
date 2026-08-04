@@ -9,7 +9,7 @@ PRAGMA foreign_keys = ON;
 -- ── Kolejka zadań dla workera Sfery (spec §7) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS sfera_queue (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  type           TEXT NOT NULL,                 -- set_location | mm (mm: wyłącznie tryb B)
+  type           TEXT NOT NULL,                 -- set_location | mm (przesunięcie stanu)
   payload        TEXT NOT NULL,                 -- JSON
   status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error
   attempts       INTEGER NOT NULL DEFAULT 0,
@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
   detail         TEXT,                          -- opis dla kolektora
   tw_id          INTEGER,                       -- powiązany towar (dla korekty stanów)
   source_doc_id  INTEGER,                       -- dok. źródłowy (waiting_for_doc)
-  session_id     INTEGER,                       -- sesja rozkładania (alerty błędów w sesji)
   created_by     TEXT NOT NULL,
   created_by_ref INTEGER,                       -- konto autora; nazwa wyżej to snapshot
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -28,36 +27,6 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
 );
 CREATE INDEX IF NOT EXISTS ix_queue_status ON sfera_queue(status, id);
 CREATE INDEX IF NOT EXISTS ix_queue_tw ON sfera_queue(tw_id);
-
--- ── Sesje rozkładania (spec §7) ───────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS putaway_sessions (
-  id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  source_doc_id     INTEGER,                    -- dok_Id z SGT; NULL = tryb "całe MGP"
-  source_doc_number TEXT,
-  source_mag_id     INTEGER,                    -- magazyn źródłowy (NULL = MGP; zwroty = mag Zwroty)
-  status            TEXT NOT NULL DEFAULT 'open', -- open|closed|closed_with_deviations
-  created_by        TEXT NOT NULL,
-  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  closed_at         TEXT
-);
-
-CREATE TABLE IF NOT EXISTS putaway_items (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id    INTEGER NOT NULL REFERENCES putaway_sessions(id),
-  tw_id         INTEGER NOT NULL,
-  target_loc    TEXT,                           -- lokalizacja docelowa (snapshot) lub NULL = BRAK LOK
-  qty_expected  REAL NOT NULL,                  -- z dokumentu (po agregacji)
-  qty_done      REAL NOT NULL DEFAULT 0,
-  status        TEXT NOT NULL DEFAULT 'pending',-- pending|on_cart|done|partial|skipped
-  skip_reason   TEXT,
-  locked_by     TEXT,                           -- multi-user lock
-  locked_at     TEXT,                           -- TTL 30 min
-  off_document  INTEGER NOT NULL DEFAULT 0,     -- dodane spoza dokumentu
-  stage_qty     REAL,                           -- ilość na wózku (przed zatwierdzeniem)
-  stage_loc     TEXT,                           -- zeskanowana lokalizacja docelowa
-  stage_update_loc INTEGER NOT NULL DEFAULT 1   -- czy zapisać lokalizację w kartotece
-);
-CREATE INDEX IF NOT EXISTS ix_items_session ON putaway_items(session_id);
 
 -- ── Log zdarzeń (audyt — spec §7, §12) ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS events (
@@ -175,11 +144,11 @@ CREATE TABLE IF NOT EXISTS sgt_pozycja (
 CREATE INDEX IF NOT EXISTS ix_pozycja_dok ON sgt_pozycja(dok_id);
 
 -- ── Zamówienia do dostawcy (ZD) ────────────────────────────────────────────
--- OSOBNE tabele, a nie kolejny typ w sgt_dokument, i to nie jest kwestia gustu:
--- `listPutawayDocuments` filtruje dokumenty po SAMYM `mag_id`, bez warunku na
--- typ. Zamówienie zapisane obok dostaw wskoczyłoby do zakładki rozkładania jako
--- kontener do rozłożenia. Rozdział tabel czyni tę pomyłkę niemożliwą, zamiast
--- pilnować jej warunkiem, który ktoś kiedyś rozluźni.
+-- OSOBNE tabele, a nie kolejny typ w sgt_dokument, i to nie jest kwestia gustu.
+-- Zamówienie do dostawcy nie jest dostawą: zapisane obok niej zależałoby od
+-- tego, czy filtr listy rozkładania akurat pyta o typ dokumentu. Rozdział tabel
+-- czyni tę pomyłkę niemożliwą, zamiast pilnować jej warunkiem, który ktoś
+-- kiedyś rozluźni.
 CREATE TABLE IF NOT EXISTS sgt_zamowienie (
   dok_id    INTEGER PRIMARY KEY,
   nr_pelny  TEXT NOT NULL,
@@ -206,12 +175,15 @@ CREATE TABLE IF NOT EXISTS counters (
 );
 INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
 
--- ── Tryb A: rozkładanie dostaw krajowych i zwrotów (redesign v2.0) ──────────
--- Jednostką pracy jest DOKUMENT, nie sesja (D2). Przy dostawie krajowej skutek
--- magazynowy niesie sam dokument w Subiekcie (księgowany wprost na MAG), więc
--- aplikacja zapisuje WYŁĄCZNIE lokalizację (D1): żadnego MM, żadnego
--- waiting_for_doc. Dzięki temu można rozkładać dostawę, zanim księgowość
--- zaksięguje FZ (dokument w buforze).
+-- ── Rozkładanie dostaw (redesign v2.0) ─────────────────────────────────────
+-- Jednostką pracy jest DOKUMENT, nie sesja (D2). Rozkładanie zapisuje WYŁĄCZNIE
+-- lokalizację (D1): żadnego MM, żadnego waiting_for_doc. Dzięki temu można
+-- rozkładać dostawę, zanim księgowość zaksięguje FZ (dokument w buforze).
+--
+-- Dostawa krajowa księguje się wprost na MAG, więc po odłożeniu nie zostaje nic.
+-- Kontener księguje się na MGP i po odłożeniu adresów wymaga jeszcze
+-- PRZESUNIĘCIA STANU na halę — to osobna czynność (services/przesuniecie.ts),
+-- a nie inny tryb rozkładania. `source_mag_id` niżej jest tym, co je odróżnia.
 CREATE TABLE IF NOT EXISTS delivery (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   sgt_dok_id    INTEGER NOT NULL UNIQUE,

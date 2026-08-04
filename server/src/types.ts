@@ -96,37 +96,10 @@ export interface ProductRow {
   pendingHere?: "add" | "remove" | "error" | null;
 }
 
-export interface PutawayDocument {
-  docId: number;
-  typ: string;
-  nrPelny: string;
-  dataWyst: string;
-  dostawca: string;
-  positions: number;
-  session?: { id: number; status: string; progressPct: number };
-}
-
-export interface PutawayItemView {
-  id: number;
-  twId: number;
-  sym: string;
-  name: string;
-  targetLoc: string | null;
-  qtyExpected: number;
-  qtyDone: number;
-  delta: number;
-  mgpStan: number;
-  status: string;
-  skipReason: string | null;
-  lockedBy: string | null;
-  offDocument: boolean;
-  stageQty: number | null;
-  stageLoc: string | null;
-}
-
-/* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ──────────────────────
-   Jednostką pracy jest dokument. Aplikacja zapisuje wyłącznie lokalizację
-   (D1) — bez MM i bez zależności od bufora SGT.                             */
+/* ── Rozkładanie faktur zakupu (redesign v2.0) ──────────────────────────────
+   Jednostką pracy jest dokument. Rozkładanie zapisuje wyłącznie lokalizację
+   (D1) — bez MM i bez zależności od bufora SGT. Kontener z MGP idzie tą samą
+   ścieżką; stan przenosi się osobno (`services/przesuniecie.ts`).           */
 
 export interface DeliveryDocument {
   dokId: number;
@@ -137,6 +110,15 @@ export interface DeliveryDocument {
   positions: number;
   /** Dokument w buforze SGT — nadal można na nim pracować (D1). */
   wBuforze: boolean;
+  /**
+   * Dokument księgowany POZA halą (kontener na MGP). Rozkłada się tak samo, ale
+   * zostaje po nim przesunięcie stanu — i to jest jedyna rzecz, którą warto
+   * powiedzieć PRZED wejściem w dokument.
+   *
+   * Boolean, a nie `magId`: identyfikatory magazynów siedzą w konfiguracji
+   * serwera i kolektor nie ma ich skąd znać.
+   */
+  wPrzyjeciach: boolean;
   linesTotal: number;
   linesDone: number;
   status: string | null;
@@ -173,6 +155,12 @@ export interface DeliveryView {
   nrPrzesylki: string | null;
   /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
   kurierProtokol: string | null;
+  /**
+   * Magazyn skutku, snapshotowany przy otwarciu — ale TYLKO gdy nie jest halą.
+   * `null` znaczy wprost „nie ma czego przesuwać", więc kolektor nie musi znać
+   * identyfikatorów z konfiguracji serwera, żeby ukryć skrót „PRZESUŃ".
+   */
+  sourceMagId: number | null;
   lines: DeliveryLineView[];
 }
 

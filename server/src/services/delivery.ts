@@ -78,6 +78,7 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       positions,
       /** dokument w buforze jest normalnie dostępny do pracy (D1) */
       wBuforze: !!d.w_buforze,
+      wPrzyjeciach: d.mag_id !== config.magId.MAG,
       linesTotal: p?.total ?? 0,
       linesDone: p?.done ?? 0,
       status: p?.status ?? null,
@@ -194,6 +195,11 @@ export function getDelivery(id: number): DeliveryView | undefined {
     dataWyst: d.data_dok ?? "",
     status: d.status,
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
+    /* NULL, gdy dostawa zaksięgowała się wprost na halę — wtedy nie ma czego
+       przesuwać i kolektor chowa cały skrót. Kontener stoi na MGP i zostawia
+       stan do przeniesienia, więc niesie tu swój magazyn. */
+    sourceMagId:
+      d.source_mag_id != null && d.source_mag_id !== config.magId.MAG ? d.source_mag_id : null,
     // null tu znaczy „jeszcze nie pytano" — kolektor pyta wtedy i tylko wtedy
     nrPrzesylki: d.nr_przesylki ?? null,
     kurierProtokol: d.kurier_protokol ?? null,

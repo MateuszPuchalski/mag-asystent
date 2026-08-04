@@ -11,9 +11,10 @@ import { subiekt } from "../context.js";
    na palecie w strefie przyjęć. Liczby nie da się pogodzić z tym, co magazynier
    ma przed oczami, a karta nie mówi dlaczego.
 
-   Kontenera na MGP tu NIE MA i to jest decyzja: idzie osobnym torem (`putaway_*`,
-   nie `delivery_*`), a jego towar widać na kaflu MGP z podpisem „do zasilenia
-   MAG". Dołożenie go tutaj dublowałoby tę samą liczbę w dwóch miejscach ekranu. */
+   Kontener na MGP jest tu OD 0.22.0, odkąd rozkłada się tą samą ścieżką co
+   dostawa krajowa. To nie dubluje kafla MGP: kafel mówi, ILE stoi w przyjęciach,
+   a ten wiersz — NA KTÓRYM dokumencie i ile z tego nie ma jeszcze adresu. Druga
+   liczba jest zarazem wejściem do pracy, pierwsza tylko stanem. */
 
 /** Ile dni wstecz szukamy dostaw — tyle samo, co lista w zakładce rozkładania. */
 const OKNO_DNI = 14;

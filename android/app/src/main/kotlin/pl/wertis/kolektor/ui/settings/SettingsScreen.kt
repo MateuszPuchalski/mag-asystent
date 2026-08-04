@@ -181,11 +181,6 @@ fun SettingsScreen(graph: AppGraph) {
                 settings.dropLog,
             ) { v -> graph.settings.update { it.copy(dropLog = v) } }
             ToggleRow(
-                "Tryb marszu",
-                "wielka karta następnego celu po zatwierdzeniu wózka",
-                settings.walkMode,
-            ) { v -> graph.settings.update { it.copy(walkMode = v) } }
-            ToggleRow(
                 "Asysta niskiej baterii",
                 "flush bufora + ostrzeżenie przy <15% (hot-swap)",
                 settings.batteryAssist,

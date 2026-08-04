@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
+import { subiekt } from "../context.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import type { ProductCard, StockView, Zamienniki } from "../types.js";
 import { parseLocs } from "../locs.js";
@@ -11,11 +12,18 @@ import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
- * Uwzględnia zadania typu mm w statusach pending/processing/waiting_for_doc
- * (spec §5.1 — „korekta o kolejkę"). `magFrom` zawęża do MM z danego magazynu
- * źródłowego (MGP lub Zwroty); bez argumentu — wszystkie MM w drodze na MAG.
+ *
+ * Uwzględnia zadania typu `mm` w statusach pending/processing/waiting_for_doc
+ * (spec §5.1 — „korekta o kolejkę"). Filtr `z` zawęża do przesunięć
+ * wyjeżdżających z danego magazynu, `na` — do przyjeżdżających do niego.
+ *
+ * Do 0.22.0 funkcja znała tylko magazyn ŹRÓDŁOWY i milcząco zakładała, że
+ * każde MM jedzie na MAG — bo jedyne, jakie umiała powstać, szło z wózka na
+ * halę. Odkąd przesunięcie jest osobną czynnością między dowolną parą
+ * magazynów, to założenie kłamałoby przy pierwszym przesunięciu z MAG albo
+ * między magazynami bez roli.
  */
-export function pendingMmByTw(magFrom?: number): Map<number, number> {
+export function pendingMmByTw(filtr?: { z?: number; na?: number }): Map<number, number> {
   const rows = db()
     .prepare(
       `SELECT payload FROM sfera_queue
@@ -28,10 +36,15 @@ export function pendingMmByTw(magFrom?: number): Map<number, number> {
     try {
       const p = JSON.parse(r.payload) as {
         magFrom?: number;
+        magTo?: number;
         items?: Array<{ twId: number; qty: number }>;
       };
-      // starsze zadania bez magFrom traktujemy jak MGP (jedyne dawne źródło)
-      if (magFrom != null && (p.magFrom ?? config.magId.MGP) !== magFrom) continue;
+      // zadania sprzed 0.16.0 nie niosły pary magazynów: wszystkie szły z MGP
+      // na MAG, bo innej drogi wtedy nie było
+      const z = p.magFrom ?? config.magId.MGP;
+      const na = p.magTo ?? config.magId.MAG;
+      if (filtr?.z != null && z !== filtr.z) continue;
+      if (filtr?.na != null && na !== filtr.na) continue;
       for (const it of p.items ?? []) {
         map.set(it.twId, (map.get(it.twId) ?? 0) + it.qty);
       }
@@ -40,6 +53,20 @@ export function pendingMmByTw(magFrom?: number): Map<number, number> {
     }
   }
   return map;
+}
+
+/**
+ * Ile sztuk wolno dziś ruszyć z danego magazynu: stan MINUS to, co już czeka
+ * w kolejce na wyjazd stamtąd.
+ *
+ * Bez tego odejmowania dwa przesunięcia tego samego towaru, zrobione zanim
+ * worker dobił do pierwszego, wysłałyby do Subiekta sumę większą niż stan —
+ * a odmowa przyszłaby dopiero z kolejki, godzinę później i bez człowieka przy
+ * palecie. Kolejka jest więc zarazem rezerwacją.
+ */
+export function dostepneW(magId: number, twId: number): number {
+  const stan = subiekt.getStock(twId, magId).stan;
+  return stan - (pendingMmByTw({ z: magId }).get(twId) ?? 0);
 }
 
 /**
@@ -93,8 +120,11 @@ export function buildProductCard(
   const magRaw = adapter.getStock(twId, config.magId.MAG);
   const mgpRaw = adapter.getStock(twId, config.magId.MGP);
   const zwRaw = adapter.getStock(twId, config.magId.ZWROTY);
-  const pendingMgp = pendingMmByTw(config.magId.MGP).get(twId) ?? 0;
-  const pendingZw = pendingMmByTw(config.magId.ZWROTY).get(twId) ?? 0;
+  /* Co z danego magazynu WYJEŻDŻA i co na MAG PRZYJEŻDŻA — dwa różne pytania,
+     odkąd przesunięcie może iść między dowolną parą magazynów. Do 0.22.0
+     wystarczyła jedna liczba, bo każde MM szło z wózka na halę. */
+  const wyjezdzaZ = (magId: number) => pendingMmByTw({ z: magId }).get(twId) ?? 0;
+  const naMag = pendingMmByTw({ na: config.magId.MAG }).get(twId) ?? 0;
   const locs = parseLocs(t.lokalizacja);
 
   return {
@@ -108,14 +138,20 @@ export function buildProductCard(
     // to, co jeszcze nie doszło do Subiekta — świadomie OBOK `locs`, żeby karta
     // nie zaczęła kłamać w drugą stronę (pokazywać niepotwierdzone jako pewne)
     pendingLocs: pendingLocChanges(twId, locs),
-    // strefy źródłowe tracą to, co w kolejce do przeniesienia; MAG zyskuje (⏳ w drodze)
-    mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, pendingMgp, 0),
-    zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, pendingZw, 0),
-    mag: stockView(magRaw.stan, magRaw.stan_rez, 0, pendingMgp + pendingZw),
+    /* Każdy magazyn traci to, co z niego jedzie; MAG dodatkowo zyskuje
+       wszystko, co jedzie do niego — także z magazynów bez roli, co przed
+       0.22.0 nie mogło się zdarzyć. MAG bywa teraz również źródłem. */
+    mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, wyjezdzaZ(config.magId.MGP), 0),
+    zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, wyjezdzaZ(config.magId.ZWROTY), 0),
+    mag: stockView(magRaw.stan, magRaw.stan_rez, wyjezdzaZ(config.magId.MAG), naMag),
     /* Magazyny BEZ ROLI, pominąwszy ukryte. Trójka wyżej ma własne kafle
        z własną semantyką, więc powtarzanie jej tutaj dublowałoby tę samą
-       liczbę w dwóch miejscach ekranu. */
-    magazyny: magazynyTowaru(twId),
+       liczbę w dwóch miejscach ekranu.
+
+       Korekta o kolejkę siedzi TUTAJ, a nie w `magazynyTowaru`: tamten plik
+       jest właścicielem tożsamości i widoczności magazynów, a sięgnięcie
+       z niego po `pendingMmByTw` zamknęłoby cykl importów ze `stock.ts`. */
+    magazyny: magazynyTowaru(twId).map((m) => ({ ...m, wDrodze: wyjezdzaZ(m.magId) })),
     /* Dlaczego stan nie zgadza się z półką. Przy dostawie krajowej towar
        figuruje na MAG od zaksięgowania dokumentu, więc `mag.stan` nie odróżnia
        „leży w regale" od „stoi na palecie w przyjęciach". */

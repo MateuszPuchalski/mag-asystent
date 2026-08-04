@@ -31,6 +31,13 @@ export interface MagazynStan {
   nazwa: string;
   stan: number;
   rez: number;
+  /**
+   * Ile stąd wyjeżdża w zakolejkowanych przesunięciach.
+   *
+   * Dokłada `buildProductCard`, nie ten plik — korekta o kolejkę mieszka
+   * w `stock.ts` i sięganie po nią stąd zamknęłoby cykl importów.
+   */
+  wDrodze?: number;
 }
 
 export function rolaMagazynu(magId: number): RolaMagazynu {
@@ -43,9 +50,10 @@ export function rolaMagazynu(magId: number): RolaMagazynu {
 /**
  * MAG, MGP i Zwroty nie dają się ukryć — i to nie jest ostrożność, tylko
  * konsekwencja tego, że prowadzą rozkładanie. MGP to strefa przyjęć, z której
- * bierze się towar; Zwroty sterują koszykiem i MM; MAG jest celem każdego
- * przesunięcia. Ukrycie MGP zostawiłoby magazyniera z dostawą do rozłożenia
- * i bez kafla mówiącego, ile jeszcze w tej strefie leży.
+ * bierze się towar; Zwroty czekają na rozliczenie; MAG jest domyślnym celem
+ * każdego przesunięcia. Ukrycie MGP zostawiłoby magazyniera z dostawą do
+ * rozłożenia i bez kafla mówiącego, ile jeszcze w tej strefie leży — a od
+ * 0.22.0 także bez wejścia do przesunięcia stanu.
  */
 export const daSieUkryc = (magId: number): boolean => rolaMagazynu(magId) === null;
 

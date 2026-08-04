@@ -60,10 +60,10 @@ Strefa przyjęć nazywa się **MGP**.
 
 ```
 Kolektor (Android)  ───REST/JSON──►  Serwer Fastify
-                                       │  SQLite: delivery + delivery_line (tryb A:
-                                       │          faktury zakupu),
+                                       │  SQLite: delivery + delivery_line
+                                       │          (faktury zakupu),
                                        │          problem + ean_conflict (wyjątki),
-                                       │          putaway_* (tryb B), sfera_queue, events
+                                       │          sfera_queue, events
                                        │  SubiektAdapter (odczyt)  → enqueue
                                        ▼
                                      Worker (poll 1–2 s, sekwencyjnie)
@@ -427,24 +427,28 @@ Parametry (env, dev):
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
   pod `GET /api/delivery/:id/problems.csv`.
 
-**Kontener importowy — Tryb B (sesja z wózkiem, spec §5.4)**
-- Wchodzi tu **wyłącznie kontener na MGP** (~4× w roku): 1000 kartonów, wiele
-  kursów wózkiem. Tylko ten proces potrzebuje modelu sesji zamiast dokumentu.
-- Lista dokumentów (14 dni) z postępem sesji; pozycje **sortowane po lokalizacji
-  docelowej**, `BRAK LOK` na końcu, agregacja tego samego towaru.
-- Tryb wózka: skan towaru na wózek (domyślna ilość = min(pozostało, stan strefy)),
-  potwierdzenie ze skanem lokalizacji, częściowe rozłożenie, pomiń, dodanie
-  spoza dokumentu, rozjazd lokalizacji.
-- **Zatwierdź wózek → jeden dokument MM strefa→MAG + zadania `set_location`**
-  z tej rundy.
-- Locki multi-user (TTL 30 min), `waiting_for_doc` gdy dokument w buforze,
-  zamknięcie sesji z rozliczeniem (`closed` / `closed_with_deviations`).
+**Przesunięcie stanu między magazynami**
+- **Jedna czynność, nie tryb pracy**: przesuń tyle a tyle sztuk z magazynu do
+  magazynu. Wychodzi z kafla magazynu na karcie towaru, z podlinijki „MGP N"
+  oraz z rozwiniętego wiersza kontenera. To jedyne miejsce, w którym powstaje
+  dokument **MM**.
+- **Kolejka jest zarazem rezerwacją**: dostępne to stan minus przesunięcia,
+  które jeszcze czekają na workera. Drugie przesunięcie widzi już pomniejszony
+  stan, zamiast dowiadywać się o odmowie godzinę później.
+- **Adres najpierw, stan potem.** Zadanie `set_location` idzie do kolejki przed
+  `mm`, bo MM czyni towar sprzedawalnym. Odwrotna kolejność dawałaby okno,
+  w którym towar jest już do wzięcia, a jego adres w kartotece stary.
+- Przy celu **MAG skan półki jest obowiązkowy**, przy innym magazynie
+  **zabroniony**. Adres w kartotece to jedno pole na towar, bez wymiaru
+  magazynu — opisuje regał na hali.
+- **Bez bufora offline** — przesunięcie wymaga sieci. Wysłane pół godziny
+  później trafiłoby w stan, którego już nie ma.
 
-**Który tryb obsługuje dokument — rozstrzyga magazyn skutku, nie typ**
-`MAG` → tryb A (dostawa krajowa: towar już leży na hali, brakuje mu adresu).
-`MGP` → tryb B (kontener: sesja z wózkiem, MM na rundę). Kryteria są **rozłączne**
-— ten sam dokument nie może pojawić się w obu zakładkach, inaczej dałoby się go
-rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
+**Magazyn skutku decyduje, co zostaje PO rozłożeniu**
+`MAG` → dostawa krajowa: towar już leży na hali, brakuje mu adresu, po
+odłożeniu nie zostaje nic. `MGP` → kontener importowy (~4× w roku): rozkłada
+się identycznie, ale jego stan trzeba jeszcze przesunąć na halę. Lista dostaw
+oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w alejkę.
 
 **Telemetria, która mierzy właściwą rzecz**
 - `events` ma indeks po czasie — bez niego każdy raport skanuje całą tabelę.
@@ -504,24 +508,25 @@ rozłożyć dwiema niekompatybilnymi ścieżkami naraz.
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 106 testów jednostkowych; buduje się bez Android SDK
-  app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
+                           + 111 testów jednostkowych; buduje się bez Android SDK
+  app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
   src/db/seed.ts           seed z products.json: dokumenty FZ/PZ per dostawca,
-                           kontener na MGP
+                           w tym jeden kontener na MGP
   src/adapters/            Subiekt/Sfera: seeded+dev (tu) oraz mssql+sql (prod)
-  src/services/            delivery (tryb A: faktury zakupu),
-                           problems + ean (wyjątki), putaway (tryb B — kontener),
+  src/services/            delivery (rozkładanie faktur zakupu),
+                           przesuniecie (stan między magazynami, MM),
+                           problems + ean (wyjątki),
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
                            a nie leży w regale), queue, locks, locations, events
-  src/routes/              products, delivery, problems, putaway, queue,
+  src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
 docs/architektura.md       jak to jest zbudowane i dlaczego tak (start dla nowej osoby)
-docs/analiza-rozkladanie.md trzy ścieżki rozkładania + backlog
+docs/analiza-rozkladanie.md rozkładanie i przesunięcia + backlog
 docs/porownanie-asystent.md WERTIS a Firmes+ Asystent Magazyniera — materiał do
                            decyzji dla właściciela: zakres, scenariusze, koszty,
                            środowisko demo
@@ -556,11 +561,11 @@ konwerter nadal rozdziela stany deterministycznie hashem.
 realnym dostawcy**. Duże paczki dzieli po ≤20 pozycji i zostawia jeden dokument
 w buforze, jako test `waiting_for_doc`.
 
-Żeby obie ścieżki miały czym żyć, seed rozstawia dokumenty po **dwóch
-magazynach skutku**:
+Seed rozstawia dokumenty po **dwóch magazynach skutku**, żeby demo pokazywało
+oba przypadki:
 
-- krajowe FZ/PZ na `MAG` (tryb A),
-- jeden dokument na `MGP` jako kontener importowy (tryb B).
+- krajowe FZ/PZ na `MAG` — po odłożeniu nie zostaje nic,
+- jeden dokument na `MGP` jako kontener — zostaje stan do przesunięcia.
 
 Magazyn `Zwroty` dostaje same stany — kafel „gdzie jeszcze leży" ma wtedy co
 pokazać. W produkcji stany i dokumenty pochodzą z `tw_Stan` i `dok__Dokument`
@@ -580,9 +585,10 @@ z bazy: przy starcie, co `MSSQL_SYNC_MS` i na `POST /api/admin/resync`. Worker
 zapisuje w JEDNYM miejscu — UPDATE **jednej kolumny** (lokalizacja na
 `tw__Towar`). Tryb zapisu wynika z `SGT_MODE`; osobnego przełącznika nie ma.
 
-Dokumenty MM powstają w jednym miejscu: runda wózka w trybie B. Tworzy je
-docelowo osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`. Do tego czasu zadanie MM kończy się czytelnym błędem,
-a MM wystawia biuro. Instrukcja krok po kroku:
+Dokumenty MM powstają w jednym miejscu: przy przesunięciu stanu. Tworzy je
+docelowo osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`. Do
+tego czasu zadanie MM kończy się czytelnym błędem, a dokument wystawia biuro —
+arkusz przesunięcia mówi o tym wprost. Instrukcja krok po kroku:
 [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 
 W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —
