@@ -52,8 +52,40 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/delivery/1/problems",
     "/api/delivery/1/problems.csv",
     "/api/problems/1/photo",
+    /* Zakładka STAN SYSTEMU i DZIENNIK (0.27.0). Metryki i kolejka mówią, ile
+       kto zeskanował i co się nie zapisało, a ślad audytowy mówi to imiennie —
+       więc bramka obejmuje je tak samo jak dostawy. */
+    "/api/metrics",
+    "/api/queue",
+    "/api/reconcile",
+    "/api/ean-conflicts",
+    "/api/events",
+    "/api/events/csv",
   ]) {
     const r = await app.inject({ method: "GET", url });
     assert.equal(r.statusCode, 401, url);
   }
+});
+
+test("strona czyta stan serwera bez sesji — i tylko to", async () => {
+  /* `/api/health` jest jedyną trasą, z której pasek stanu korzysta przed
+     zalogowaniem, i jedyną, która ma prawo być otwarta: mówi o PROCESIE
+     (wersja, tryb, czy worker żyje), nie o towarze ani o ludziach. */
+  const r = await app.inject({ method: "GET", url: "/api/health" });
+  assert.equal(r.statusCode, 200);
+  const h = r.json();
+  assert.ok(typeof h.wersja === "string");
+  assert.ok("worker" in h);
+});
+
+test("podgląd nie oferuje raportu wydajności per osoba", () => {
+  /* Monitoring pracowniczy (Kodeks pracy art. 22²) wymaga zapisu w regulaminie
+     i uprzedzenia ludzi. `GET /api/wydajnosc` istnieje dla biura, ale przycisk
+     obok metryk zrobiłby z obowiązku formalnego przypadek — a tego nie widać
+     w kodzie strony inaczej niż tak. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.ok(!/["'`]\/api\/wydajnosc/.test(html), "strona odpytuje /api/wydajnosc");
 });

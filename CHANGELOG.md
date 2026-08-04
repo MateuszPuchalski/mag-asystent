@@ -28,6 +28,52 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.27.0 — 4 sierpnia 2026
+
+**Podgląd biura pokazuje metryki, kolejkę, rekoncyliacja i ślad audytowy.**
+Trzy zakładki i pasek stanu widoczny z każdej z nich.
+
+**[wymaga działania]** Nic. Zmiana dotyczy jednej strony HTML, którą serwuje
+API — bez nowego APK i bez nowych uprawnień.
+
+### Dlaczego
+
+Te dane istniały od dawna i były dostępne **wyłącznie przez `curl`**.
+Dokumentacja pisała o tym wprost: „metryki, rekoncyliacja i audyt są dostępne
+przez REST", co w praktyce znaczyło, że nie oglądał ich nikt poza osobą, która
+pisała ten kod. Biuro dostawało dwie karty o dostawach i nic więcej.
+
+Najgorzej wypadał przez to `queue_failed` — najważniejszy wpis w całym
+dzienniku. Magazynier zrobił swoje, kolektor przyjął, a do bazy firmy nic nie
+weszło. Do dziś dowiadywało się o tym biuro, które akurat wpisało adres kolejki
+w przeglądarce.
+
+### Pasek stanu odpowiada na cztery pytania naraz
+
+Wersja i tryb serwera, czy worker żyje, ile zadań stoi w błędzie, ile rozjazdów
+zna rekoncyliacja. Stoi nad zakładkami, bo pytanie „czy zapisy wchodzą do
+Subiekta" nie należy do żadnej z nich osobno. Kliknięcie prowadzi do szczegółu.
+
+Martwy worker jest tu wyróżniony celowo: to jedyny stan, w którym aplikacja
+wygląda na sprawną, a **żaden zapis nie dociera do bazy firmy**.
+
+### Co świadomie zostało poza stroną
+
+**Ponowienie zadania z kolejki.** Byłoby zapisem do Subiekta wykonanym przez
+osobę, która nie stoi przy półce i nie wie, czy towar tam leży. Zasada „operacje
+wykonuje się na kolektorze" jest starsza niż te zakładki i one jej nie zmieniają.
+
+**Raport wydajności per osoba.** `GET /api/wydajnosc` istnieje i zostaje pod
+REST-em. To monitoring pracowniczy w rozumieniu Kodeksu pracy (art. 22²):
+wymaga zapisu w regulaminie i uprzedzenia ludzi na dwa tygodnie przed
+uruchomieniem. Przycisk obok metryk zrobiłby z tego obowiązku przypadek, więc
+pilnuje tego osobny test strony.
+
+**Ślad audytowy zostaje za rolą.** Zakładka DZIENNIK czyta `GET /api/events`,
+więc magazynier zalogowany w biurze zobaczy tam odmowę, a nie dane. Jedyną
+trasą czytaną bez sesji jest `/api/health` — mówi o procesie, nie o towarze
+ani o ludziach.
+
 ## 0.26.0 — 4 sierpnia 2026
 
 **Mniej warstw, jedna kopia każdej reguły.** Przegląd architektury zdjął

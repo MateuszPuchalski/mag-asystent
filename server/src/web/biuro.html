@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WERTIS · Podgląd biura</title>
+<!-- Ikona wprost w dokumencie: strona jest JEDNYM plikiem bez builda, więc
+     osobny `/favicon.ico` byłby drugim zasobem do serwowania i 404 w logu
+     przy każdym otwarciu. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232A2A2C'/%3E%3Cpath d='M5 10h4l2 8 2-8h3l2 8 2-8h4l-4 14h-4l-1.5-6-1.5 6H9z' fill='%23F7A600'/%3E%3C/svg%3E">
 <style>
   /* Kolorystyka WERTIS: amber #F7A600, grafit #2A2A2C, papier #F6F5F2 */
   :root {
@@ -46,6 +50,33 @@
   #login .blad { color: var(--err); font-size: 13px; min-height: 18px; }
   .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); }
   input.szukaj { border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; width: 240px; margin-bottom: 10px; }
+
+  /* ── Zakładki ──────────────────────────────────────────────────────────────
+     Podgląd urósł z dwóch kart do czterech obszarów. Jedna kolumna kart
+     kazałaby biuru przewijać stronę w poszukiwaniu kolejki, a to jest ekran,
+     na który zagląda się w pośpiechu („czy coś się nie zapisało?"). */
+  nav.zakladki { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav.zakladki button {
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 14px; font: inherit; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+  }
+  nav.zakladki button[aria-current="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  /* Pasek stanu stoi NAD zakładkami i widać go z każdej z nich — bo pytanie
+     „czy zapisy wchodzą do Subiekta" nie należy do żadnej jednej zakładki. */
+  #stan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #stan .badge { cursor: pointer; }
+  .kafle { display: flex; gap: 12px; flex-wrap: wrap; }
+  .kafel { flex: 1 1 150px; border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
+  .kafel .liczba { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .kafel .liczba.zle { color: var(--err); }
+  .kafel .opis { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
+  .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 10px; }
+  .filtry label { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); display: block; }
+  .filtry input, .filtry select {
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; font: inherit;
+  }
+  code.payload { font-size: 11px; color: var(--ink-soft); word-break: break-all; }
 </style>
 </head>
 <body>
@@ -56,8 +87,8 @@
 </header>
 <main id="login" class="card">
   <h2>LOGOWANIE</h2>
-  <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada biuro na kolektorze
-     albo przez <code>POST /api/users</code> — patrz DEPLOY §5a.</p>
+  <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada admin albo biuro —
+     patrz DEPLOY §5a.</p>
   <!-- `autocomplete` włączony celowo: to komputer w biurze, a menedżer haseł
        jest tu sojusznikiem — inaczej hasło ląduje na kartce pod klawiaturą -->
   <input id="poleLogin" placeholder="login" autocomplete="username" autofocus>
@@ -67,28 +98,137 @@
 </main>
 
 <main id="panel" hidden>
-  <section class="card">
-    <h2>DOSTAWY · STATUS ROZKŁADANIA</h2>
-    <input class="szukaj" id="szukaj" placeholder="szukaj: numer albo dostawca">
-    <table id="dostawy"></table>
-    <p class="odswiezono" id="odswiezono"></p>
-  </section>
+  <div id="stan"></div>
+  <nav class="zakladki">
+    <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
+    <button data-widok="nadzor">STAN SYSTEMU</button>
+    <button data-widok="dziennik">DZIENNIK</button>
+  </nav>
 
-  <section class="card">
-    <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI</h2>
-    <p class="mute" style="margin-bottom:10px">
-      FORMULARZ otwiera protokół rozbieżności do wydruku (ze zdjęciami dowodowymi).
-      CSV pobiera te same dane do arkusza (średnik + BOM, Excel PL).
-    </p>
-    <table id="reklamacje"></table>
-  </section>
+  <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
+  <div id="widokDostawy" style="display:grid;gap:20px">
+    <section class="card">
+      <h2>DOSTAWY · STATUS ROZKŁADANIA</h2>
+      <input class="szukaj" id="szukaj" placeholder="szukaj: numer albo dostawca">
+      <table id="dostawy"></table>
+      <p class="odswiezono" id="odswiezono"></p>
+    </section>
+
+    <section class="card">
+      <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI</h2>
+      <p class="mute" style="margin-bottom:10px">
+        FORMULARZ otwiera protokół rozbieżności do wydruku (ze zdjęciami dowodowymi).
+        CSV pobiera te same dane do arkusza (średnik + BOM, Excel PL).
+      </p>
+      <table id="reklamacje"></table>
+    </section>
+  </div>
+
+  <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
+  <div id="widokNadzor" hidden style="display:grid;gap:20px">
+    <section class="card">
+      <h2>METRYKI · LICZBY, KTÓRE MÓWIĄ CO ZROBIĆ</h2>
+      <div class="filtry">
+        <div>
+          <label for="dniMetryk">OKNO</label>
+          <select id="dniMetryk">
+            <option value="7">7 dni</option>
+            <option value="30">30 dni</option>
+            <option value="90">90 dni</option>
+          </select>
+        </div>
+      </div>
+      <div class="kafle" id="kafleMetryk"></div>
+      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+        <div>
+          <h2>ETYKIETY DO PRZEDRUKU</h2>
+          <p class="mute" style="margin-bottom:6px">Regały, których kod trzeba wpisywać z ręki.</p>
+          <table id="etykiety"></table>
+        </div>
+        <div>
+          <h2>KARTOTEKI BEZ CZYTELNEGO KODU</h2>
+          <p class="mute" style="margin-bottom:6px">Wpisywane zamiast skanowane — kod do naprawy.</p>
+          <table id="bezKodu"></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>KOLEJKA ZAPISÓW DO SUBIEKTA</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Zadanie w błędzie znaczy, że magazynier zrobił swoje, a do bazy firmy nic
+        nie weszło. Ponawia się je <b>na kolektorze</b> — ta strona tylko czyta.
+      </p>
+      <div class="kafle" id="kafleKolejki"></div>
+      <table id="kolejka" style="margin-top:12px"></table>
+    </section>
+
+    <section class="card">
+      <h2>REKONCYLIACJA · CZY SUBIEKT MA TO, CO ZAPISALIŚMY</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Porównuje adres w Subiekcie z ostatnim udanym zapisem oraz wyławia zadania,
+        o których wszyscy zapomnieli. Pusty wynik to wynik dobry.
+      </p>
+      <button class="akcja" id="sprawdzRozjazdy">SPRAWDŹ TERAZ</button>
+      <button class="akcja cichy" id="csvRozjazdy" hidden>CSV</button>
+      <table id="rozjazdy" style="margin-top:12px"></table>
+    </section>
+
+    <section class="card">
+      <h2>KOLIZJE KODÓW KRESKOWYCH</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Jeden kod na kilku kartotekach zatrzymuje pracę w alejce. Ta lista mówi,
+        które poprawić najpierw — licznik to liczba zatrzymań.
+      </p>
+      <table id="kolizje"></table>
+    </section>
+
+    <section class="card">
+      <h2>SERWER</h2>
+      <table id="zdrowie"></table>
+    </section>
+  </div>
+
+  <!-- ── DZIENNIK ────────────────────────────────────────────────────────── -->
+  <div id="widokDziennik" hidden style="display:grid;gap:20px">
+    <section class="card">
+      <h2>ŚLAD AUDYTOWY</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Każdy skan, każda decyzja i każdy błąd — z osobą, urządzeniem i czasem.
+        Kto pobierze CSV, sam trafia do śladu.
+      </p>
+      <div class="filtry">
+        <div><label for="fOd">OD</label><input type="date" id="fOd"></div>
+        <div><label for="fDo">DO</label><input type="date" id="fDo"></div>
+        <div><label for="fTyp">TYP</label><select id="fTyp"><option value="">wszystkie</option></select></div>
+        <div><label for="fTw">TOWAR (tw_id)</label><input id="fTw" size="8" inputmode="numeric"></div>
+        <div><label for="fDev">URZĄDZENIE</label><input id="fDev" size="12"></div>
+        <div><label for="fLimit">WIERSZY</label>
+          <select id="fLimit"><option>100</option><option>500</option><option>1000</option></select></div>
+        <div><button class="akcja" id="szukajDziennik">SZUKAJ</button></div>
+        <div><button class="akcja cichy" id="csvDziennik">CSV</button></div>
+      </div>
+      <p class="mute" id="licznikDziennik"></p>
+      <table id="dziennik"></table>
+    </section>
+  </div>
 </main>
 
 <script>
 "use strict";
 /* Jedna strona, zero zależności, zero builda. Token sesji żyje w localStorage,
    a każde zapytanie API niesie go w nagłówku `x-session` — dokładnie tak samo
-   jak kolektor. Strona nie ma własnych uprawnień: widzi to, co sesja. */
+   jak kolektor. Strona nie ma własnych uprawnień: widzi to, co sesja.
+
+   ZERO ZAPISU. Podgląd czyta, a operacje wykonuje się na kolektorze — łącznie
+   z ponowieniem zadania z kolejki. Ta reguła jest starsza niż zakładki i one
+   jej nie zmieniają: przycisk „PONÓW" w biurze znaczyłby zapis do Subiekta
+   wykonany przez osobę, która nie stoi przy półce.
+
+   Raportu wydajności per osoba TU NIE MA i to jest decyzja, nie przeoczenie.
+   `GET /api/wydajnosc` istnieje, ale jest monitoringiem pracowniczym w rozumieniu
+   Kodeksu pracy — wymaga zapisu w regulaminie i uprzedzenia ludzi. Wystawienie
+   go jednym kliknięciem obok metryk zrobiłoby z obowiązku formalnego przypadek. */
 const $ = (id) => document.getElementById(id);
 /* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
    słownika — trzecią obok serwera i kolektora, jedyną bez testu. Dopisanie
@@ -98,7 +238,9 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
+let widok = localStorage.getItem("wertis.widok") || "dostawy";
 let dokumenty = [];
+let ostatnieRozjazdy = null;
 
 async function api(sciezka, opts = {}) {
   const r = await fetch(sciezka, {
@@ -111,6 +253,16 @@ async function api(sciezka, opts = {}) {
   }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Błąd ${r.status}`);
   return r;
+}
+
+/** Pobranie pliku zza sesji: nagłówka nie da się dołożyć do zwykłego linku. */
+async function pobierz(sciezka, nazwa) {
+  const blob = await (await api(sciezka)).blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nazwa;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function wyloguj() {
@@ -136,6 +288,48 @@ async function zaloguj() {
     $("poleHaslo").value = "";
     start();
   } catch (e) { $("loginBlad").textContent = e.message; }
+}
+
+/* ── Zakładki ── */
+function pokaz(nowy) {
+  widok = nowy;
+  localStorage.setItem("wertis.widok", nowy);
+  $("widokDostawy").hidden = nowy !== "dostawy";
+  $("widokNadzor").hidden = nowy !== "nadzor";
+  $("widokDziennik").hidden = nowy !== "dziennik";
+  for (const b of document.querySelectorAll("nav.zakladki button")) {
+    b.setAttribute("aria-current", String(b.dataset.widok === nowy));
+  }
+  if (nowy === "nadzor") odswiezNadzor();
+  if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
+}
+
+/* ── Pasek stanu ──────────────────────────────────────────────────────────────
+   Cztery pytania, na które biuro odpowiada najczęściej, w jednym rzędzie:
+   czy serwer jest zdrowy, czy worker żyje, czy coś się nie zapisało i czy
+   Subiekt zgadza się z tym, co zapisaliśmy. Kliknięcie prowadzi do szczegółu. */
+function rysujStan(health, kolejka) {
+  const kafle = [];
+  const zle = health && health.ok === false;
+  kafle.push(`<span class="badge ${zle ? "err" : "ok"}" data-do="nadzor">
+      ${zle ? "⚠ " : "✓ "}serwer ${esc(health?.wersja || "")} · ${esc(health?.mode || "")}</span>`);
+  if (health) {
+    const w = health.worker || {};
+    kafle.push(`<span class="badge ${w.zyje ? "ok" : "err"}" data-do="nadzor">
+      worker ${w.zyje ? "pracuje" : "NIE ŻYJE"}</span>`);
+  }
+  if (kolejka) {
+    const s = kolejka.summary || {};
+    if (s.error) kafle.push(`<span class="badge err" data-do="nadzor">${s.error} zadań w błędzie</span>`);
+    else kafle.push('<span class="badge ok" data-do="nadzor">kolejka bez błędów</span>');
+    if (s.pending) kafle.push(`<span class="badge amber" data-do="nadzor">${s.pending} w drodze</span>`);
+  }
+  if (ostatnieRozjazdy) {
+    const n = ostatnieRozjazdy.rozjazdy.length;
+    kafle.push(`<span class="badge ${n ? "err" : "ok"}" data-do="nadzor">
+      ${n ? n + " rozjazdów" : "bez rozjazdów"}</span>`);
+  }
+  $("stan").innerHTML = kafle.join(" ");
 }
 
 /* ── Dostawy ── */
@@ -190,6 +384,186 @@ function rysujReklamacje(problemy) {
   $("reklamacje").innerHTML =
     "<tr><th>DOKUMENT</th><th>WYJĄTKI</th><th></th></tr>" +
     (rows || '<tr><td colspan="3" class="mute">Brak nierozwiązanych wyjątków 🎉</td></tr>');
+}
+
+/* ── Metryki ──────────────────────────────────────────────────────────────────
+   Cele stoją obok liczb, bo liczba bez celu nie mówi, czy jest źle. `p95`
+   powyżej 300 ms znaczy, że ludzie zaczynają skanować podwójnie, a podwójny
+   skan przy liczeniu pozycji to błąd ILOŚCIOWY na fakturze. */
+function kafel(liczba, opis, zle) {
+  return `<div class="kafel"><div class="liczba${zle ? " zle" : ""}">${esc(liczba)}</div>
+          <div class="opis">${esc(opis)}</div></div>`;
+}
+
+function rysujMetryki(m) {
+  const dot = m.dotknieciaNaPozycje;
+  const p95 = m.p95OdpowiedziMs;
+  $("kafleMetryk").innerHTML = [
+    kafel(dot ?? "—", "dotknięć na pozycję · cel < 0,3", dot != null && dot >= 0.3),
+    kafel(p95 != null ? p95 + " ms" : "—", "p95 skan → odpowiedź · cel < 150 ms", p95 != null && p95 > 300),
+    kafel(m.zdarzen, `zdarzeń w oknie ${m.days} dni`, false),
+  ].join("");
+  $("etykiety").innerHTML =
+    "<tr><th>REGAŁ</th><th>RĘCZNIE</th><th>UDZIAŁ</th></tr>" +
+    (m.etykietyDoPrzedruku.map((e) =>
+      `<tr><td class="b">${esc(e.code)}</td><td>${e.reczne} z ${e.razem}</td>
+       <td>${Math.round(e.udzial * 100)}%</td></tr>`).join("") ||
+      '<tr><td colspan="3" class="mute">Wszystkie etykiety czytelne</td></tr>');
+  $("bezKodu").innerHTML =
+    "<tr><th>KOD</th><th>WPISANO RĘCZNIE</th></tr>" +
+    (m.towaryBezCzytelnegoKodu.map((t) =>
+      `<tr><td class="b">${esc(t.code)}</td><td>${t.reczne}×</td></tr>`).join("") ||
+      '<tr><td colspan="2" class="mute">Brak kartotek wpisywanych z ręki</td></tr>');
+}
+
+/* ── Kolejka ── */
+function odznaka(status) {
+  if (status === "error") return '<span class="badge err">BŁĄD</span>';
+  if (status === "done") return '<span class="badge ok">ZAPISANE</span>';
+  if (status === "waiting_for_doc") return '<span class="badge amber">CZEKA NA DOKUMENT</span>';
+  return '<span class="badge amber">W DRODZE</span>';
+}
+
+function rysujKolejke(q) {
+  const s = q.summary || {};
+  $("kafleKolejki").innerHTML = [
+    kafel(s.error ?? 0, "w błędzie · wymaga reakcji", (s.error ?? 0) > 0),
+    kafel(s.pending ?? 0, "czeka na workera", false),
+    kafel(s.done ?? 0, "zapisane (ostatnie 100)", false),
+  ].join("");
+  /* Najpierw błędy, potem reszta. Lista jest przycięta do dwudziestu wierszy,
+     bo to podgląd stanu, a nie kolejka do obsługi — tę ma kolektor. */
+  const wiersze = [...q.items].sort((a, b) =>
+    (a.status === "error" ? 0 : 1) - (b.status === "error" ? 0 : 1)).slice(0, 20);
+  $("kolejka").innerHTML =
+    "<tr><th>GODZ.</th><th>ZADANIE</th><th>SZCZEGÓŁ</th><th>STATUS</th></tr>" +
+    (wiersze.map((i) => `<tr>
+        <td class="mute">${esc(i.time)}</td>
+        <td class="b">${esc(i.label)}</td>
+        <td>${esc(i.detail)}${i.errMsg ? `<br><span class="mute">${esc(i.errMsg)}</span>` : ""}</td>
+        <td>${odznaka(i.status)}</td>
+      </tr>`).join("") ||
+      '<tr><td colspan="4" class="mute">Kolejka pusta — wszystko zapisane</td></tr>');
+}
+
+/* ── Rekoncyliacja ── */
+const NAZWA_ROZJAZDU = {
+  lokalizacja: "adres w Subiekcie",
+  zadanie_w_bledzie: "zadanie w błędzie",
+  utknelo_w_buforze: "utknęło w buforze",
+};
+
+function rysujRozjazdy(r) {
+  ostatnieRozjazdy = r;
+  $("csvRozjazdy").hidden = r.rozjazdy.length === 0;
+  $("rozjazdy").innerHTML =
+    "<tr><th>RODZAJ</th><th>CZEGO DOTYCZY</th><th>OPIS</th><th>OD KIEDY</th></tr>" +
+    (r.rozjazdy.map((x) => `<tr>
+        <td><span class="badge err">${esc(NAZWA_ROZJAZDU[x.rodzaj] || x.rodzaj)}</span></td>
+        <td class="b">${esc(x.klucz)}</td>
+        <td>${esc(x.opis)}</td>
+        <td class="mute">${esc((x.odKiedy || "").replace("T", " ").slice(0, 16))}</td>
+      </tr>`).join("") ||
+      `<tr><td colspan="4" class="mute">Bez rozjazdów — sprawdzono ${r.sprawdzono.kartotek} kartotek
+       i ${r.sprawdzono.zadan} zadań</td></tr>`);
+}
+
+/** CSV budowany na miejscu: rekoncyliacja nie ma trasy eksportu, a plik z crona
+    leży na serwerze, do którego biuro nie ma dostępu. */
+function csvRozjazdow(r) {
+  const esc2 = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const linie = [["rodzaj", "klucz", "opis", "od_kiedy"].join(";")];
+  for (const x of r.rozjazdy) {
+    linie.push([x.rodzaj, x.klucz, x.opis, x.odKiedy ?? ""].map(esc2).join(";"));
+  }
+  // BOM — bez niego Excel PL rozjeżdża polskie znaki
+  const blob = new Blob(["﻿" + linie.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `wertis-rozjazdy-${r.at.slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ── Kolizje kodów ── */
+function rysujKolizje(lista) {
+  $("kolizje").innerHTML =
+    "<tr><th>KOD</th><th>ZATRZYMAŃ</th><th>ROZSTRZYGNIĘTE DOKUMENTEM</th><th>KARTOTEKI</th><th>OSTATNIO</th></tr>" +
+    (lista.map((k) => `<tr>
+        <td class="b">${esc(k.ean)}</td>
+        <td>${k.hits}×</td>
+        <td class="mute">${k.autoResolved}×</td>
+        <td class="mute">${esc((k.twIds || []).join(", "))}</td>
+        <td class="mute">${esc((k.lastSeen || "").replace("T", " ").slice(0, 16))}</td>
+      </tr>`).join("") ||
+      '<tr><td colspan="5" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
+}
+
+/* ── Serwer ── */
+function bajty(n) {
+  if (!n) return "—";
+  const mb = n / 1024 / 1024;
+  return mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(n / 1024) + " kB";
+}
+
+function rysujZdrowie(h) {
+  const w = h.worker || {};
+  const a = h.audyt || {};
+  const wiersz = (k, v) => `<tr><td class="mute">${esc(k)}</td><td>${v}</td></tr>`;
+  const problemy = (h.problemy || [])
+    .map((p) => `<div><span class="badge err">uwaga</span> ${esc(p)}</div>`).join("");
+  $("zdrowie").innerHTML = [
+    wiersz("wersja serwera", esc(h.wersja)),
+    wiersz("źródło danych", `${esc(h.mode)}${h.mode === "seeded" ? ' <span class="badge mute2">demo</span>' : ""}`),
+    wiersz("worker Sfery", w.zyje
+      ? `<span class="badge ok">pracuje</span> <span class="mute">${esc(w.widziany || "")}</span>`
+      : '<span class="badge err">nie żyje</span> — zapisy do Subiekta NIE wchodzą'),
+    wiersz("plik konfiguracji", esc(h.configZPliku || "—")),
+    wiersz("ślad audytowy", `${a.zdarzen ?? 0} zdarzeń · od ${esc((a.najstarsze || "—").slice(0, 10))} · baza ${bajty(a.bazaBajtow)}`),
+    problemy ? wiersz("do sprawdzenia", problemy) : "",
+  ].join("");
+}
+
+/* ── Dziennik ── */
+function paramyDziennika() {
+  const p = new URLSearchParams();
+  const dodaj = (k, v) => { if (v) p.set(k, v); };
+  dodaj("od", $("fOd").value);
+  dodaj("do", $("fDo").value);
+  dodaj("typ", $("fTyp").value);
+  dodaj("twId", $("fTw").value.trim());
+  dodaj("device", $("fDev").value.trim());
+  dodaj("limit", $("fLimit").value);
+  return p.toString();
+}
+
+async function szukajDziennik() {
+  try {
+    const d = await (await api(`/api/events?${paramyDziennika()}`)).json();
+    if ($("fTyp").options.length === 1) {
+      for (const t of d.typy || []) {
+        $("fTyp").add(new Option(t, t));
+      }
+    }
+    $("licznikDziennik").textContent =
+      `pokazano ${d.wpisy.length} z ${d.razem} pasujących wpisów`;
+    $("dziennik").innerHTML =
+      "<tr><th>CZAS</th><th>TYP</th><th>OSOBA</th><th>URZĄDZENIE</th><th>TOWAR</th><th>SZCZEGÓŁY</th></tr>" +
+      (d.wpisy.map((w) => `<tr>
+          <td class="mute" style="white-space:nowrap">${esc(w.czas.replace("T", " ").slice(0, 19))}</td>
+          <td class="b">${esc(w.typ)}</td>
+          <td>${esc(w.uzytkownik)}${w.userRef == null ? ' <span class="badge mute2">bez konta</span>' : ""}</td>
+          <td class="mute">${esc(w.device || "—")}</td>
+          <td class="mute">${w.twId ?? "—"}</td>
+          <td><code class="payload">${esc((w.payload || "").slice(0, 160))}</code></td>
+        </tr>`).join("") ||
+        '<tr><td colspan="6" class="mute">Brak wpisów dla tego filtra</td></tr>');
+  } catch (e) {
+    /* 403 znaczy „ta rola nie ogląda śladu" i jest poprawną odpowiedzią, nie
+       awarią — magazynier zalogowany w biurze ma to zobaczyć wprost. */
+    $("licznikDziennik").textContent = "";
+    $("dziennik").innerHTML = `<tr><td class="mute">${esc(e.message)}</td></tr>`;
+  }
 }
 
 /* ── Formularz reklamacyjny (wydruk) ──────────────────────────────────────────
@@ -251,17 +625,22 @@ async function otworzFormularz(deliveryId, nrDok) {
   w.document.close();
 }
 
-async function pobierzCsv(deliveryId, nrDok) {
-  const blob = await (await api(`/api/delivery/${deliveryId}/problems.csv`)).blob();
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `reklamacja-${nrDok.replace(/[^\w-]+/g, "_")}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+/* ── Cykl życia ───────────────────────────────────────────────────────────────
+   Pasek stanu odświeża się zawsze, reszta tylko dla otwartej zakładki. Strona
+   wisi w biurze cały dzień, a `/api/reconcile` liczy się na żądanie — nie ma
+   powodu, żeby robiła to co pół minuty w tle. */
+async function odswiezStan() {
+  try {
+    const [h, q] = await Promise.all([
+      (await fetch("/api/health")).json(),
+      (await api("/api/queue")).json(),
+    ]);
+    rysujStan(h, q);
+    return { h, q };
+  } catch (e) { console.warn(e); return {}; }
 }
 
-/* ── Cykl życia ── */
-async function odswiez() {
+async function odswiezDostawy() {
   try {
     const [dok, prob] = await Promise.all([
       (await api("/api/delivery/documents")).json(),
@@ -275,12 +654,34 @@ async function odswiez() {
   } catch (e) { console.warn(e); }
 }
 
+async function odswiezNadzor() {
+  const { h, q } = await odswiezStan();
+  if (h) rysujZdrowie(h);
+  if (q) rysujKolejke(q);
+  try {
+    const [m, k] = await Promise.all([
+      (await api(`/api/metrics?days=${$("dniMetryk").value}`)).json(),
+      (await api("/api/ean-conflicts")).json(),
+    ]);
+    rysujMetryki(m);
+    rysujKolizje(k.conflicts || []);
+  } catch (e) { console.warn(e); }
+}
+
+async function odswiez() {
+  await odswiezStan();
+  if (widok === "dostawy") await odswiezDostawy();
+  else if (widok === "nadzor") await odswiezNadzor();
+}
+
 function start() {
   $("login").hidden = true;
   $("panel").hidden = false;
   $("wyloguj").hidden = false;
   $("kto").textContent = kto;
-  odswiez();
+  pokaz(widok);
+  odswiezDostawy();
+  odswiezStan();
 }
 
 $("zaloguj").addEventListener("click", zaloguj);
@@ -289,11 +690,37 @@ for (const id of ["poleLogin", "poleHaslo"]) {
 }
 $("wyloguj").addEventListener("click", wyloguj);
 $("szukaj").addEventListener("input", rysujDostawy);
+document.querySelector("nav.zakladki").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-widok]");
+  if (b) pokaz(b.dataset.widok);
+});
+$("stan").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-do]");
+  if (b) pokaz(b.dataset.do);
+});
+$("dniMetryk").addEventListener("change", odswiezNadzor);
+$("sprawdzRozjazdy").addEventListener("click", async () => {
+  $("rozjazdy").innerHTML = '<tr><td class="mute">Liczę…</td></tr>';
+  try {
+    const r = await (await api("/api/reconcile")).json();
+    rysujRozjazdy(r);
+    await odswiezStan();
+  } catch (e) {
+    $("rozjazdy").innerHTML = `<tr><td class="mute">${esc(e.message)}</td></tr>`;
+  }
+});
+$("csvRozjazdy").addEventListener("click", () => {
+  if (ostatnieRozjazdy) csvRozjazdow(ostatnieRozjazdy);
+});
+$("szukajDziennik").addEventListener("click", szukajDziennik);
+$("csvDziennik").addEventListener("click", () =>
+  pobierz(`/api/events/csv?${paramyDziennika()}`, "wertis-audyt.csv"));
 $("reklamacje").addEventListener("click", (e) => {
   const f = e.target.closest("[data-formularz]");
   if (f) return otworzFormularz(Number(f.dataset.formularz), f.dataset.nr);
   const c = e.target.closest("[data-csv]");
-  if (c) return pobierzCsv(Number(c.dataset.csv), c.dataset.nr);
+  if (c) return pobierz(`/api/delivery/${c.dataset.csv}/problems.csv`,
+    `reklamacja-${c.dataset.nr.replace(/[^\w-]+/g, "_")}.csv`);
 });
 setInterval(() => { if (token) odswiez(); }, 30_000);
 
