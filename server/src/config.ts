@@ -208,24 +208,6 @@ export const config = {
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
 
-  /**
-   * TRYB SERWISOWY — logowanie wyłączone. Do pracy nad kodem, nie do firmy.
-   *
-   * Świeża baza nie ma konta i nie da się go założyć inaczej niż kreatorem na
-   * kolektorze albo `curl`-em. Przy bazie kasowanej kilka razy dziennie to
-   * piąty krok w czterokrokowej procedurze, wykonywany dwa razy — bo podgląd
-   * biura ma własne logowanie.
-   *
-   * Domyślnie WYŁĄCZONY i włącza się WYŁĄCZNIE jawnym `WERTIS_ADMIN=1`.
-   * Świadomie nie wiążemy go z `SGT_MODE`: `seeded` jest wartością domyślną,
-   * więc „brak konfiguracji" znaczyłoby „logowanie wyłączone" — także na
-   * produkcji, której nikt nie skonfigurował do końca. Przełącznik ma być
-   * czynnością, nie brakiem czynności.
-   *
-   * Instalator tego klucza nie zapisuje i pilnuje tego `instalator/testy.ps1`.
-   */
-  trybSerwisowy: process.env.WERTIS_ADMIN === "1",
-
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
     pollMs: num(process.env.WORKER_POLL_MS, 1200, "WORKER_POLL_MS"),

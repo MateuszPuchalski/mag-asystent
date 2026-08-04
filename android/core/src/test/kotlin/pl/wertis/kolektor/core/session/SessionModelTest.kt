@@ -1,6 +1,8 @@
 package pl.wertis.kolektor.core.session
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /* Po przejściu na login i hasło (0.20.0) nie ma tu już żadnej decyzji do
@@ -32,5 +34,19 @@ class SessionModelTest {
         assertEquals("magazynier", Rola.MAGAZYNIER.wire)
         assertEquals("brygadzista", Rola.BRYGADZISTA.wire)
         assertEquals("biuro", Rola.BIURO.wire)
+        assertEquals("admin", Rola.ADMIN.wire)
+    }
+
+    @Test fun `sesja biurowa to biuro ALBO admin, nigdy hala`() {
+        // Ekrany pytały o to dwa razy przez `role == "biuro"`. Po dojściu
+        // czwartej roli taki zapis odbierałby adminowi konta i ustawienia
+        // globalne — i to bez żadnego objawu poza „u mnie tego nie ma".
+        for (r in listOf("biuro", "admin")) {
+            assertTrue(r, SessionState.Aktywna(1, "Ktos", r).biurowa)
+        }
+        for (r in listOf("magazynier", "brygadzista", "administrator", "")) {
+            assertFalse(r, SessionState.Aktywna(1, "Ktos", r).biurowa)
+        }
+        assertFalse(SessionState.Brak.biurowa)
     }
 }

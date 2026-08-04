@@ -22,7 +22,6 @@ import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
-import pl.wertis.kolektor.ui.chrome.TrybSerwisowyBanner
 import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
@@ -50,7 +49,6 @@ fun AppRoot(graph: AppGraph) {
     val toastMsg by graph.effects.toastMsg.collectAsStateWithLifecycle()
     val success by graph.effects.success.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
-    val trybSerwisowy by graph.session.trybSerwisowy.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
     val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -86,13 +84,7 @@ fun AppRoot(graph: AppGraph) {
     // Kreator kont MUSI wyprzedzać bramkę sesji: przy pustej instalacji sesji
     // jeszcze nie ma i nie ma jak jej zdobyć, dopóki nie powstanie pierwsze konto.
     if (screen == Screen.SETUP) {
-        /* Pasek także TUTAJ, bo kreator kont jest renderowany poza wspólną
-           kolumną z paskiem górnym — a to akurat ekran, na którym „logowanie
-           wyłączone" zaskakuje najbardziej. */
-        Column(Modifier.fillMaxSize()) {
-            TrybSerwisowyBanner(trybSerwisowy)
-            Box(Modifier.weight(1f)) { SetupScreen(graph) }
-        }
+        SetupScreen(graph)
         return
     }
     if (screen == Screen.SPLASH || stan is SessionState.Brak) {
@@ -100,7 +92,6 @@ fun AppRoot(graph: AppGraph) {
            miejscem, w którym najczęściej pyta się „co ten kolektor ma w środku"
            — przy „nie widzę serwera" i przy pierwszym uruchomieniu. */
         Column(Modifier.fillMaxSize()) {
-            TrybSerwisowyBanner(trybSerwisowy)
             Box(Modifier.weight(1f)) { SplashScreen(graph) }
             WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera)
         }
@@ -118,7 +109,6 @@ fun AppRoot(graph: AppGraph) {
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
         )
-        TrybSerwisowyBanner(trybSerwisowy)
         OfflineBanner(offlineCount) {
             scope.launch { graph.offlineQueue.flush() }
         }

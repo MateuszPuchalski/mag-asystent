@@ -50,7 +50,7 @@ const zdarzenia = (typ: string) =>
 
 /* ── Logowanie ───────────────────────────────────────────────────────────── */
 
-const konto = (imie: string, login: string, rola: "magazynier" | "brygadzista" | "biuro" = "magazynier") =>
+const konto = (imie: string, login: string, rola: import("./users.js").Rola = "magazynier") =>
   U.createUser(imie, rola, login, "tajnehaslo");
 
 test("poprawny login i hasło zakładają sesję i zapisują kto", () => {
@@ -257,6 +257,35 @@ test("biuro zarządza kontami i ukrywa magazyny", () => {
   const b = konto("Biuro Zakupy", "biuro", "biuro");
   assert.equal(A.autoryzuj(b, "zarzadzanie_kontami").ok, true);
   assert.equal(A.autoryzuj(b, "widocznosc_magazynow").ok, true);
+});
+
+/* ── Drugi stopień: czego biuru nie wolno ────────────────────────────────── */
+
+test("biuro NIE dotyka kont biura ani adminów", () => {
+  /* Najważniejsza asercja tej roli. Do 0.24.0 „zarządzanie kontami" było jedną
+     operacją, więc biuro zakładało konto biura z własnym hasłem — czyli rola
+     strzegąca tożsamości rozdawała ją sama sobie. Rozdzielenie na dwa stopnie
+     ma sens wyłącznie wtedy, gdy TEN test jest czerwony po scaleniu ich z
+     powrotem. */
+  const b = konto("Biuro Zakupy", "biuro", "biuro");
+  const w = A.autoryzuj(b, "zarzadzanie_biurem");
+  assert.equal(w.ok, false);
+  assert.match(w.powod!, /administratora/i, "komunikat mówi, czyich uprawnień brakuje");
+});
+
+test("admin może wszystko, co biuro, i jeszcze zarządzanie biurem", () => {
+  const a = konto("Właściciel", "wlasciciel", "admin");
+  for (const op of ["zarzadzanie_kontami", "widocznosc_magazynow", "zdjecie_cudzego_locka"] as const) {
+    assert.equal(A.autoryzuj(a, op).ok, true, op);
+  }
+  assert.equal(A.autoryzuj(a, "zarzadzanie_biurem").ok, true);
+});
+
+test("brygadzista i magazynier nie zbliżają się do drugiego stopnia", () => {
+  for (const rola of ["magazynier", "brygadzista"] as const) {
+    const u = konto(`Ktoś ${rola}`, `ktos-${rola}`, rola);
+    assert.equal(A.autoryzuj(u, "zarzadzanie_biurem").ok, false, rola);
+  }
 });
 
 test("furtka pierwszego konta zamyka się sama", () => {

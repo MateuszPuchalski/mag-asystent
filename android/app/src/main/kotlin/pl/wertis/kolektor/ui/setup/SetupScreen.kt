@@ -72,9 +72,9 @@ fun SetupScreen(graph: AppGraph) {
     val scope = rememberCoroutineScope()
 
     // `odZera` = pusta instalacja. Ustawiane przez Splash przed wejściem tutaj;
-    // decyduje, czy pierwsze konto idzie bez sesji i czy wymagamy biura.
+    // decyduje, czy pierwsze konto idzie bez sesji i czy wymagamy admina.
     val odZera = graph.nav.setupOdZera
-    val konta = remember { mutableStateListOf(Konto(rola = if (odZera) Rola.BIURO else Rola.MAGAZYNIER)) }
+    val konta = remember { mutableStateListOf(Konto(rola = if (odZera) Rola.ADMIN else Rola.MAGAZYNIER)) }
     var pokazBledy by remember { mutableStateOf(false) }
 
     when (val s = stan) {
@@ -176,10 +176,10 @@ fun SetupScreen(graph: AppGraph) {
             konta.add(Konto())
         }
 
-        if (pokazBledy && odZera && konta.none { it.rola == Rola.BIURO }) {
+        if (pokazBledy && odZera && konta.none { it.rola == Rola.ADMIN }) {
             Text(
-                "Potrzebne jest co najmniej jedno konto biura — bez niego nikt " +
-                    "nie założy kolejnych kont ani nie zresetuje PIN-u.",
+                "Potrzebne jest co najmniej jedno konto administratora — bez niego " +
+                    "nikt nie założy konta biura ani nie zresetuje hasła.",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Amber,

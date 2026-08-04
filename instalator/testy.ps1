@@ -600,6 +600,49 @@ Sprawdz "lista nie zawiera nic ponad te dwa" {
     Zaloz (@($script:WertisKluczeSrodowiskaNssm).Count -eq 2) "lista ma mieć dokładnie dwie pozycje"
 }
 
+# ── Konto admina: sekret idzie do bazy, nie na dysk ─────────────────────────
+# Instalator zakłada jedno konto (rola `admin`), pytając instalującego o hasło.
+# Hasło leci przez API i ma zniknąć razem z sesją konsoli. Gdyby trafiło do
+# `wertis.env`, zostałoby na dysku serwera na zawsze — w pliku, który czyta się
+# przy każdej diagnozie i wysyła w załączniku przy każdym zgłoszeniu.
+#
+# Uwaga o umiejscowieniu: te testy stoją PRZED sekcją wyniku świadomie. Dwa
+# testy dopisane tu w 0.23.0 stały po `exit 0` i nigdy się nie wykonały —
+# napisane, zielone w opisie, martwe w praktyce.
+
+Write-Host ""
+Write-Host "Konto admina"
+
+Sprawdz "biała lista wertis.env nie zna kluczy od kont" {
+    $zrodlo = Get-Content (Join-Path $PSScriptRoot "uslugi.ps1") -Raw
+    foreach ($klucz in @("ADMIN_HASLO", "ADMIN_LOGIN", "WERTIS_ADMIN")) {
+        Zaloz (-not ($zrodlo -match "`"$klucz`"")) "$klucz pojawił się na białej liście"
+    }
+}
+
+Sprawdz "hasło podane w ustawieniach NIE trafia do pliku" {
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-adm-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE    = "mssql"
+            ADMIN_HASLO = "tajnehaslo123"
+        }
+        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
+        Zaloz ($tresc -match "SGT_MODE=") "zwykłe ustawienie ma się zapisać"
+        Zaloz (-not ($tresc -match "tajnehaslo123")) "hasło admina przeciekło do wertis.env"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "walidacja hasła admina odrzuca za krótkie" {
+    # Ta sama reguła co na serwerze (HASLO_MIN = 8). Instalator sprawdza ją
+    # SAM, żeby nie odbić się od API po tym, jak człowiek wpisał hasło dwa razy.
+    Zaloz (-not (Test-WertisHasloAdmina "krotkie")) "7 znaków ma odpaść"
+    Zaloz (Test-WertisHasloAdmina "osiemzna") "8 znaków ma przejść"
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""
@@ -609,31 +652,3 @@ if ($script:bledy) {
 }
 Write-Host "$($script:zdane) zdanych, 0 niezdanych" -ForegroundColor Green
 exit 0
-
-# ── Tryb serwisowy nie ma prawa trafić na produkcję ─────────────────────────
-# `WERTIS_ADMIN=1` wyłącza logowanie w całości. Zdanie "instalator tego nie
-# zapisuje" jest gwarancją bierną i przestaje obowiązywać przy pierwszej
-# nieuważnej zmianie białej listy w `Publish-WertisKonfiguracja`. Ten test
-# zamienia je w mechanizm.
-
-Sprawdz "biała lista wertis.env nie zna WERTIS_ADMIN" {
-    $zrodlo = Get-Content (Join-Path $PSScriptRoot "uslugi.ps1") -Raw
-    Zaloz (-not ($zrodlo -match '"WERTIS_ADMIN"')) `
-        "WERTIS_ADMIN pojawił się w instalatorze — tryb serwisowy nie może wyjechać do klienta"
-}
-
-Sprawdz "WERTIS_ADMIN podany w ustawieniach NIE trafia do pliku" {
-    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-adm-" + [Guid]::NewGuid())
-    New-Item -ItemType Directory -Path $katalog | Out-Null
-    try {
-        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
-            SGT_MODE     = "mssql"
-            WERTIS_ADMIN = "1"
-        }
-        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
-        Zaloz ($tresc -match "SGT_MODE=") "zwykłe ustawienie ma się zapisać"
-        Zaloz (-not ($tresc -match "WERTIS_ADMIN")) "tryb serwisowy przeciekł do wertis.env"
-    } finally {
-        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}

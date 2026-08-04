@@ -28,7 +28,93 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.24.0 — 4 sierpnia 2026
+
+<!-- docs_check: historia -->
+
+**Konto administratora zakłada instalator, a loguje się ono jak każde inne.**
+Tryb serwisowy z 0.23.0 zostaje wycofany po jednym wydaniu.
+
+**[wymaga działania]** Nowy APK. Jeśli gdziekolwiek ustawiłeś `WERTIS_ADMIN=1` —
+usuń wpis; zmienna nie robi już nic, a jej obecność myli przy następnej
+diagnozie.
+
+### Dlaczego z powrotem
+
+0.23.0 rozwiązywała prawdziwy problem — świeża baza nie ma konta — ale
+rozwiązywała go **obejściem bramki**: brak sesji przestawał znaczyć „odmowa".
+Cena była nazwana już wtedy i właściciel ją teraz odrzucił: dziennik z takiego
+okresu nie mówi, kto co zrobił, a instalacja z zapomnianą flagą stoi otworem dla
+całej sieci hali.
+
+Problem zostaje ten sam, więc rozwiązujemy go tam, gdzie powstaje: **konto ma
+istnieć, a nie być udawane**. Instalator pyta instalującego o login i hasło
+i zakłada konto zaraz po starcie usług. `npm run seed` robi to samo dla pracy
+nad kodem — hasło bierze z `ADMIN_HASLO` albo losuje i pokazuje raz.
+
+Instalator hasła **nie wypisuje, tylko o nie pyta** — i to jest cała różnica
+wobec zdania, które stało dotąd w `instalator/README.md` („nie zakłada kont
+pracowników, bo wypisywanie loginów i haseł na monitorze byłoby krokiem w złą
+stronę"). Zdanie zostało odwrócone świadomie.
+
+### Czwarta rola i dziura, która wyszła po drodze
+
+Rola `admin` może dwie rzeczy więcej niż biuro: zakładać konta **o roli `biuro`
+i `admin`** oraz wyłączać konta i odbierać hasła. Poza tym jest równa biuru —
+audytu ani raportu wydajności świadomie nie dostaje, bo raport o pracy ludzi
+zostaje tam, gdzie był.
+
+To rozdzielenie zamyka dziurę, która istniała wcześniej i nie była hipotezą:
+„zarządzanie kontami" było **jedną** operacją, więc biuro zakładało konto biura
+z własnym hasłem. Rola strzegąca tożsamości rozdawała ją sama sobie.
+
+Druga rzecz wyszła przy pisaniu tej zmiany i była poważniejsza: `POST /api/users`
+brał `role` prosto z ciała żądania, `createUser` wkładał je do `INSERT`, a kolumna
+`role` nie ma `CHECK`. **Do bazy wchodziło dowolne słowo, łącznie z `admin`.**
+Dopóki tak było, cała ta zmiana byłaby dekoracją. Rola jest teraz sprawdzana
+przeciw zamkniętej liście i to jest najważniejszy nowy test w tym wydaniu.
+
+### Cena, którą warto znać
+
+**Biuro nie zresetuje hasła magazynierowi, który je zapomniał** — musi poprosić
+admina. To wynika wprost z wyboru właściciela, a nie ze splotu okoliczności;
+przeniesienie `:id/haslo` z powrotem do biura jest zmianą jednej linii
+w `WYMAGANA_ROLA`.
+
+Pierwsze konto na pustej bazie dostaje teraz rolę `admin`, nie `biuro` —
+inaczej instalacja postawiona kreatorem na kolektorze nie miałaby jak dorobić
+się kogokolwiek, kto zakłada konta biura.
+
+### Co zostaje z 0.23.0
+
+Refaktor sesji. Bramka rozpoznaje sesję raz na żądanie i trasy czytają wynik
+z kontekstu zamiast pytać bazę po raz drugi — to była zmiana niezależna od
+trybu i przeżyła jego wycofanie.
+
+### Przy okazji: dwa testy instalatora nigdy się nie wykonały
+
+<!-- docs_check: historia -->
+
+`instalator/testy.ps1` kończy się `exit 0`, a dwa testy dopisane w 0.23.0 stały
+**po** tej linii. W opisie PR-a napisałem, że przełącznika „pilnuje jego własny
+zestaw testów" — to była nieprawda i wychodzi dopiero teraz. Martwy kod za
+`exit 0` usunięty, nowe testy stoją przed sekcją wyniku.
+
+**Znalezione, poza zakresem:** `GET /api/wydajnosc` nie sprawdza roli, choć
+komentarz obok mówi „dla biura, nie dla kolektora". Dane per pracownik są dziś
+dostępne każdej zalogowanej sesji. Nie ruszam tego w tym wydaniu, ale to jest do
+zrobienia.
+
+---
+
 ## 0.23.0 — 4 sierpnia 2026
+
+<!-- docs_check: historia -->
+
+> **Wycofane w 0.24.0**, po jednym wydaniu. Wpis zostaje, bo „wprowadziliśmy
+> i wycofaliśmy" jest samo w sobie informacją — a powody, dla których to
+> rozwiązanie wyglądało dobrze, warto mieć zapisane obok powodów, dla których
+> nie wystarczyło.
 
 **Przełącznik `WERTIS_ADMIN=1` wyłącza logowanie w całości — na kolektorze
 i w podglądzie biura naraz.** Do pracy nad kodem, nigdy u klienta.
@@ -38,6 +124,8 @@ jej nie zapisuje.
 
 ### Dlaczego
 
+<!-- docs_check: historia -->
+
 Postawienie WERTIS od zera kończy się krokiem, którego nie da się
 zautomatyzować: ktoś musi ręcznie założyć pierwsze konto. Seed go nie zakłada,
 instalator też nie. Przy bazie kasowanej kilka razy dziennie to piąty krok
@@ -45,6 +133,8 @@ w czterokrokowej procedurze — i wykonywany **dwa razy**, bo podgląd biura ma
 własne logowanie i na pustej bazie jest ślepym zaułkiem.
 
 ### Konto bez hasła, i to jest sedno
+
+<!-- docs_check: historia -->
 
 Operacje w tym trybie podpisuje konto `ADMIN (TRYB SERWISOWY)`. Jest prawdziwym
 wierszem w bazie, bo dziennik zdarzeń wskazuje na konta kluczem obcym — ale
@@ -60,6 +150,8 @@ przy okazji wprost w `DEPLOY.md`, bo dotąd trzymał się jej wyłącznie kod.
 
 ### Co świadomie tracimy
 
+<!-- docs_check: historia -->
+
 **Dziennik z tego okresu nie mówi, kto co zrobił.** Wszystko jest podpisane
 jedną nazwą — dlatego nazwa krzyczy, żeby historia z trybu serwisowego była
 odróżnialna od pracy ludzi także za pół roku. Zalogowanie się prawdziwym kontem
@@ -70,6 +162,8 @@ i hasła w nim ustawione. Sam dostęp znika z chwilą wyłączenia, te dwie rzec
 nie.
 
 ### Widać z trzech stron
+
+<!-- docs_check: historia -->
 
 Czerwony pasek na każdym ekranie kolektora i w biurze, `ok: false`
 w `/api/health` z ostrzeżeniem na pierwszym miejscu, wpis
@@ -82,6 +176,8 @@ kiedykolwiek na tej instalacji chodził — konto powstaje wyłącznie przy wł�
 fladze.
 
 ### Przy okazji: trasy przestały pytać bazę o sesję
+
+<!-- docs_check: historia -->
 
 <!-- docs_check: historia -->
 

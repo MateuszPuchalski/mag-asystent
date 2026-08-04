@@ -25,7 +25,7 @@ process.env.LOG_LEVEL = "silent";
 let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
-type Rola = "magazynier" | "brygadzista" | "biuro";
+type Rola = import("../services/users.js").Rola;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));

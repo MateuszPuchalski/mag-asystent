@@ -91,6 +91,16 @@ REMOVED = [
     "pinAutora",
     "hashPin",
     "auth/handover",
+    # Tryb serwisowy — wprowadzony w 0.23.0 i wycofany w 0.24.0, po jednym
+    # wydaniu. Konto admina zakłada dziś instalator, a logowanie odbywa się jak
+    # każde inne. Ta sama zasada co wyżej: wpis w CHANGELOG-u opisujący, co było
+    # i dlaczego wyszło, stoi pod `docs_check: historia`; instrukcja każąca
+    # cokolwiek ustawić ma się zapalić na czerwono.
+    "WERTIS_ADMIN",
+    "tryb_serwisowy_start",
+    "przyjmijTrybSerwisowy",
+    "TrybSerwisowyBanner",
+    "adminMode",
 ]
 
 PATH_RE = re.compile(

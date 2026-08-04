@@ -129,10 +129,13 @@ test("pierwsze konto powstaje bez sesji, drugie już nie", async () => {
   const pierwsze = await app.inject({
     method: "POST",
     url: "/api/users",
-    payload: { name: "Biuro Zakupy", login: "biuro", haslo: "tajnehaslo" },
+    /* Rola z ŻĄDANIA jest tu ignorowana i to jest sedno: instalacja postawiona
+       kreatorem musi skończyć się adminem, inaczej nie ma jak dorobić się
+       kogokolwiek, kto zakłada konta biura. */
+    payload: { name: "Właściciel", login: "wlasciciel", haslo: "tajnehaslo", role: "magazynier" },
   });
   assert.equal(pierwsze.statusCode, 200);
-  assert.equal(pierwsze.json().user.role, "biuro");
+  assert.equal(pierwsze.json().user.role, "admin");
 
   /* Furtka zamyka się sama — i to jest najgroźniejsze miejsce tej zmiany:
      bramka zbyt szczelna zablokowałaby instalację u klienta, zbyt luźna
@@ -240,32 +243,20 @@ test("wysyłka z bufora offline przechodzi — inaczej praca znika", async () =>
   assert.equal(r.statusCode, 200);
 });
 
-/* ── Tryb serwisowy jest DOMYŚLNIE WYŁĄCZONY ─────────────────────────────────
-   Ten plik NIE ustawia `WERTIS_ADMIN`, więc opisuje instalację, która o trybie
-   serwisowym nic nie wie — czyli każdą u klienta. Asercje są tu po to, żeby
-   przełącznik nie zaczął kiedyś działać sam z siebie.                        */
+/* ── Po trybie serwisowym nie ma śladu ───────────────────────────────────────
+   0.23.0 wyłączała logowanie w całości za `WERTIS_ADMIN=1`; 0.24.0 wycofała to
+   na rzecz konta admina zakładanego przy instalacji. Że sama ZMIENNA nie ma już
+   czego włączyć, pilnuje `tools/docs_check.py` (lista `REMOVED`) — testem się
+   tego nie sprawdzi, bo `config.ts` czyta środowisko przy imporcie i zamraża
+   wynik, więc ustawienie jej w połowie pliku i tak nic by nie zmieniło.
 
-test("bez WERTIS_ADMIN konto serwisowe w ogóle nie powstaje", () => {
-  /* Sam wiersz w `app_user` jest dowodem, że tryb kiedykolwiek chodził na tej
-     instalacji. Gdyby powstawał zawsze, dowód przestałby cokolwiek znaczyć. */
-  const n = db()
-    .prepare("SELECT COUNT(*) n FROM app_user WHERE name = 'ADMIN (TRYB SERWISOWY)'")
-    .get() as { n: number };
-  assert.equal(n.n, 0);
-});
+   Tutaj asercja dotyczy tego, co widzi KLIENT: pól, po których kolektor i
+   podgląd biura poznawały tryb, nie ma w odpowiedziach.                      */
 
-test("bez WERTIS_ADMIN /api/health nie zgłasza trybu serwisowego", async () => {
-  const r = await app.inject({ method: "GET", url: "/api/health" });
-  const b = r.json();
-  assert.equal(b.adminMode, false);
-  assert.ok(
-    !(b.problemy ?? []).some((p: string) => p.includes("TRYB SERWISOWY")),
-    "ostrzeżenie o trybie nie ma prawa się pojawić"
-  );
-});
-
-test("bez WERTIS_ADMIN /api/setup milczy o trybie", async () => {
-  const b = (await app.inject({ method: "GET", url: "/api/setup" })).json();
-  assert.equal(b.adminMode, undefined, "pole nie istnieje, więc kolektor go nie zobaczy");
-  assert.equal(b.admin, undefined);
+test("/api/health i /api/setup nie znają pola adminMode", async () => {
+  const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
+  assert.equal(h.adminMode, undefined, "kolektor nie ma czego zobaczyć");
+  const s = (await app.inject({ method: "GET", url: "/api/setup" })).json();
+  assert.equal(s.adminMode, undefined);
+  assert.equal(s.admin, undefined);
 });

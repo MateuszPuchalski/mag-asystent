@@ -19,8 +19,13 @@ import pl.wertis.kolektor.core.session.Rola
 
    Kolejność zakładania nie jest dowolna i to też jest regułą, nie szczegółem
    implementacji: serwer wpuszcza pierwsze konto bez sesji tylko dopóki tabela
-   kont jest pusta. Każde następne wymaga zalogowanego biura, więc wiersz
-   „biuro" musi pójść pierwszy i po nim trzeba się zalogować.                  */
+   kont jest pusta i NADAJE MU ROLĘ `admin`, cokolwiek przyszło w żądaniu.
+   Każde następne wymaga sesji, a konto biura umie założyć wyłącznie admin —
+   więc wiersz admina musi pójść pierwszy i po nim trzeba się zalogować.
+
+   Do 0.24.0 pierwszym kontem było biuro. Zmiana wygląda na kosmetyczną, a nie
+   jest: biuro po niej nie zakłada już kont biura, więc lista zaczynająca się
+   od biura zatrzymałaby się na drugim wierszu z rolą `biuro`.                 */
 
 /** Jedna osoba do założenia. Login i hasło są wymagane dla każdej roli. */
 data class Konto(
@@ -68,27 +73,27 @@ fun opisBledu(b: BladKonta): String = when (b) {
 /**
  * Czy listę można wysłać na serwer.
  *
- * Wymaga CO NAJMNIEJ JEDNEGO konta biura, gdy zakładamy od zera. Lista bez
- * biura przechodzi walidację wiersz po wierszu i mimo to jest bezużyteczna:
- * nikt nie założy kolejnego konta ani nie zmieni komuś hasła. Lepiej
+ * Wymaga CO NAJMNIEJ JEDNEGO konta admina, gdy zakładamy od zera. Lista bez
+ * admina przechodzi walidację wiersz po wierszu i mimo to jest bezużyteczna:
+ * nikt nie założy kolejnego konta biura ani nie zmieni komuś hasła. Lepiej
  * powiedzieć to przed wysyłką niż po.
  */
 fun mozliwaWysylka(konta: List<Konto>, odZera: Boolean): Boolean {
     if (konta.isEmpty()) return false
     if (konta.any { bladKonta(it) != null }) return false
-    return !odZera || konta.any { it.rola == Rola.BIURO }
+    return !odZera || konta.any { it.rola == Rola.ADMIN }
 }
 
 /**
- * Kolejność wysyłki: biuro NAJPIERW.
+ * Kolejność wysyłki: admin NAJPIERW.
  *
  * Serwer wpuszcza pierwsze konto bez sesji tylko przy pustej bazie; wszystko
- * dalej wymaga zalogowanego biura. Gdyby wysyłać w kolejności wpisywania,
- * pierwszy magazynier zająłby tę jedyną furtkę i reszta listy odbiłaby się
- * od 401 — z listą kont w połowie założoną.
+ * dalej wymaga sesji, a konta biura i adminów zakłada wyłącznie admin. Gdyby
+ * wysyłać w kolejności wpisywania, pierwszy magazynier zająłby tę jedyną
+ * furtkę i reszta listy odbiłaby się od 401 — z listą kont w połowie założoną.
  */
 fun kolejnoscWysylki(konta: List<Konto>, odZera: Boolean): List<Konto> =
-    if (!odZera) konta else konta.sortedByDescending { it.rola == Rola.BIURO }
+    if (!odZera) konta else konta.sortedByDescending { it.rola == Rola.ADMIN }
 
 /** Wynik założenia jednego konta — login potwierdza, czym się zalogować. */
 data class ZalozoneKonto(val imieNazwisko: String, val login: String, val rola: Rola)

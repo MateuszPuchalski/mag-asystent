@@ -12,6 +12,7 @@ import pl.wertis.kolektor.core.session.Rola
 
 class SetupModelTest {
 
+    private val admin = Konto("Wlasciciel", "wlasciciel", "tajnehaslo", Rola.ADMIN)
     private val biuro = Konto("Biuro Zakupy", "biuro", "tajnehaslo", Rola.BIURO)
     private val magazynier = Konto("Jan Kowalski", "jkowalski", "tajnehaslo")
 
@@ -50,14 +51,15 @@ class SetupModelTest {
 
     /* ── Warunki wysyłki ─────────────────────────────────────────────────── */
 
-    @Test fun `lista od zera BEZ biura jest bezuzyteczna, wiec nie przechodzi`() {
+    @Test fun `lista od zera BEZ admina jest bezuzyteczna, wiec nie przechodzi`() {
         // każdy wiersz z osobna jest poprawny, a mimo to nikt nie założy potem
-        // kolejnego konta ani nie zmieni komuś hasła
-        val bezBiura = listOf(magazynier, Konto("Adam", "abrygadzista", "tajnehaslo", Rola.BRYGADZISTA))
-        assertTrue(bezBiura.all { bladKonta(it) == null })
-        assertFalse(mozliwaWysylka(bezBiura, odZera = true))
-        // przy dokładaniu do istniejącej instalacji biuro już jest — wolno
-        assertTrue(mozliwaWysylka(bezBiura, odZera = false))
+        // konta biura ani nie zmieni komuś hasła. Samo biuro NIE wystarcza od
+        // 0.24.0: biuro nie zakłada już kont biura.
+        val bezAdmina = listOf(magazynier, biuro, Konto("Adam", "abrygadzista", "tajnehaslo", Rola.BRYGADZISTA))
+        assertTrue(bezAdmina.all { bladKonta(it) == null })
+        assertFalse(mozliwaWysylka(bezAdmina, odZera = true))
+        // przy dokładaniu do istniejącej instalacji admin już jest — wolno
+        assertTrue(mozliwaWysylka(bezAdmina, odZera = false))
     }
 
     @Test fun `pusta lista nie jest gotowa do wyslania`() {
@@ -66,26 +68,26 @@ class SetupModelTest {
     }
 
     @Test fun `jeden zly wiersz blokuje cala liste`() {
-        assertFalse(mozliwaWysylka(listOf(biuro, Konto("", "", "", Rola.MAGAZYNIER)), odZera = true))
+        assertFalse(mozliwaWysylka(listOf(admin, Konto("", "", "", Rola.MAGAZYNIER)), odZera = true))
     }
 
     /* ── Kolejność ───────────────────────────────────────────────────────── */
 
-    @Test fun `biuro idzie PIERWSZE, niezaleznie od kolejnosci wpisywania`() {
+    @Test fun `admin idzie PIERWSZY, niezaleznie od kolejnosci wpisywania`() {
         // serwer wpuszcza konto bez sesji tylko przy pustej bazie; gdyby poszedł
         // pierwszy magazynier, zajalby te furtke i reszta odbilaby sie od 401
         // z lista kont zalozona w polowie
-        val wpisane = listOf(magazynier, Konto("Adam", "abrygadzista", "tajnehaslo", Rola.BRYGADZISTA), biuro)
+        val wpisane = listOf(magazynier, biuro, admin)
         val kolejnosc = kolejnoscWysylki(wpisane, odZera = true)
-        assertEquals(Rola.BIURO, kolejnosc.first().rola)
+        assertEquals(Rola.ADMIN, kolejnosc.first().rola)
         assertEquals(wpisane.size, kolejnosc.size)
         assertEquals(wpisane.toSet(), kolejnosc.toSet())
     }
 
     @Test fun `przy dokladaniu kolejnosc zostaje bez zmian`() {
-        // sesja biura już istnieje, więc nie ma czego sortować — a przestawianie
+        // sesja admina już istnieje, więc nie ma czego sortować — a przestawianie
         // wierszy bez powodu myli człowieka, który je właśnie wpisał
-        val wpisane = listOf(magazynier, biuro)
+        val wpisane = listOf(magazynier, admin)
         assertEquals(wpisane, kolejnoscWysylki(wpisane, odZera = false))
     }
 }

@@ -39,6 +39,7 @@ import pl.wertis.kolektor.net.apiCall
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.data.AppSettings
 import pl.wertis.kolektor.core.session.SessionState
+import pl.wertis.kolektor.core.session.biurowa
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.core.session.userInitials
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -114,7 +115,7 @@ fun SettingsScreen(graph: AppGraph) {
                     )
                 }
             }
-            if ((stan as? SessionState.Aktywna)?.role == "biuro") {
+            if (stan.biurowa) {
                 // Dopisywanie osób bez terminala — ta sama droga co przy
                 // pierwszym uruchomieniu, tylko z istniejącą sesją biura.
                 OutlineButton("DODAJ OSOBY", modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
@@ -137,7 +138,7 @@ fun SettingsScreen(graph: AppGraph) {
         /* Widoczność magazynów — tylko dla biura, bo ustawienie jest GLOBALNE:
            przestawia karty towaru na wszystkich kolektorach naraz. Ta sama
            bramka co przy kontach (rola + PIN), dlatego siedzi obok. */
-        if ((stan as? SessionState.Aktywna)?.role == "biuro") {
+        if (stan.biurowa) {
             SectionLabel("Magazyny")
             MagazynySekcja(graph)
         }
