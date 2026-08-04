@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { currentDevice, currentToken } from "../context.js";
-import { autoryzuj, karaLogowania, sesja, wyloguj, zaloguj, zmienHaslo } from "../services/auth.js";
+import { currentDevice, currentToken, sesjaZadania } from "../context.js";
+import { autoryzuj, karaLogowania, wyloguj, zaloguj, zmienHaslo } from "../services/auth.js";
 import { logEvent } from "../services/events.js";
 import {
   brakKont,
@@ -52,7 +52,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { stare?: string; nowe?: string } }>(
     "/api/auth/haslo",
     async (req, reply) => {
-      const s = sesja(token());
+      const s = sesjaZadania();
       if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
       const w = zmienHaslo(s.user, req.body?.stare ?? "", req.body?.nowe ?? "");
       if (w.error) return reply.code(400).send({ error: w.error });
@@ -68,7 +68,7 @@ export async function authRoutes(app: FastifyInstance) {
    * odpowiada — „czy ten token nadal wskazuje czynne konto".
    */
   app.get("/api/auth/me", async (_req, reply) => {
-    const s = sesja(token());
+    const s = sesjaZadania();
     if (!s) return reply.code(401).send({ error: "Brak sesji" });
     return { user: s.user };
   });
@@ -105,14 +105,14 @@ export async function authRoutes(app: FastifyInstance) {
 
   /** Sesja biura; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
   function odmowaZarzadzania(): { kod: number; error: string } | null {
-    const s = sesja(token());
+    const s = sesjaZadania();
     if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
     const w = autoryzuj(s.user, "zarzadzanie_kontami");
     return w.ok ? null : { kod: 403, error: w.powod ?? "Brak uprawnień" };
   }
 
   app.get("/api/users", async (_req, reply) => {
-    const s = sesja(token());
+    const s = sesjaZadania();
     if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
     if (s.user.role !== "biuro") {
       // lista loginów to lista tożsamości — nie wystawiamy jej hali

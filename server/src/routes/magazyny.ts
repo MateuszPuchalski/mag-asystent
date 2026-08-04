@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { currentToken } from "../context.js";
-import { autoryzuj, sesja } from "../services/auth.js";
+import { sesjaZadania } from "../context.js";
+import { autoryzuj } from "../services/auth.js";
 import { listaMagazynow, ustawUkryte } from "../services/magazyny.js";
 
 /**
@@ -24,7 +24,7 @@ export async function magazynRoutes(app: FastifyInstance) {
   app.post<{ Body: { ukryte?: number[] } }>(
     "/api/magazyny/widocznosc",
     async (req, reply) => {
-      const s = sesja(currentToken());
+      const s = sesjaZadania();
       if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
 
       const w = autoryzuj(s.user, "widocznosc_magazynow");

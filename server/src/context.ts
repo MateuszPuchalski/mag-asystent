@@ -83,7 +83,20 @@ interface ReqCtx {
   /** Konto ustalone z tokenu; wypełniane leniwie, żeby nie pytać bazy bez potrzeby. */
   userRef?: number | null;
   userName?: string | null;
+  /**
+   * Sesja rozpoznana przez bramkę — JEDNO rozpoznanie na żądanie.
+   *
+   * Do 0.23.0 trasy pytające o rolę wołały `sesja(currentToken())` same, każda
+   * po swojemu (`sesja(token())`, `sesja(currentToken() ?? "")`). Bramka
+   * rozpoznawała sesję chwilę wcześniej i wynik wyrzucała, więc to samo
+   * zapytanie do bazy szło dwa razy na żądanie — a „kto pyta" miało osiem
+   * niezależnych odpowiedzi zamiast jednej.
+   */
+  sesja?: SesjaZadania | null;
 }
+
+/** Kształt sesji widziany przez trasy; import TYPU, więc nie zamyka cyklu. */
+type SesjaZadania = import("./services/auth.js").Sesja;
 
 const store = new AsyncLocalStorage<ReqCtx>();
 
@@ -107,6 +120,16 @@ export function setCurrentUser(userId: number, name: string): void {
 
 /** Nazwa z sesji, gdy jest — inaczej nagłówek `X-User` jako podpowiedź. */
 export const currentUserName = (): string | null => store.getStore()?.userName ?? null;
+
+/**
+ * Sesja bieżącego żądania, rozpoznana raz przez bramkę.
+ *
+ * Trasy sprawdzające rolę pytają TUTAJ, a nie bazy: bramka i tak musi
+ * rozpoznać sesję, żeby zdecydować o 401, więc drugie zapytanie niczego nie
+ * ustala, a otwiera możliwość, że dwa miejsca odpowiedzą inaczej na to samo
+ * pytanie. Poza żądaniem (worker) `null` i to jest poprawna odpowiedź.
+ */
+export const sesjaZadania = (): SesjaZadania | null => store.getStore()?.sesja ?? null;
 
 /* ── Bramka sesji ───────────────────────────────────────────────────────────
    Do tej pory token był ROZPOZNAWANY, ale nie WYMAGANY: sesji żądały trzy
@@ -145,6 +168,9 @@ export function withRequestContext(app: FastifyInstance): void {
     const t = currentToken();
     const { sesja, dotknij } = await import("./services/auth.js");
     const s = t ? sesja(t) : null;
+
+    const ctx = store.getStore();
+    if (ctx) ctx.sesja = s;
 
     if (s) {
       setCurrentUser(s.user.userId, s.user.name);

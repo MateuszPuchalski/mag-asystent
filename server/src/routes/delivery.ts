@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
-import { currentToken, userOf } from "../context.js";
-import { autoryzuj, sesja } from "../services/auth.js";
+import { sesjaZadania, userOf } from "../context.js";
+import { autoryzuj } from "../services/auth.js";
 import {
   forceReleaseLine,
   getDelivery,
@@ -107,7 +107,7 @@ export async function deliveryRoutes(app: FastifyInstance) {
   app.post<{ Params: { lineId: string } }>(
     "/api/delivery/:id/lines/:lineId/force-release",
     async (req, reply) => {
-      const s = sesja(currentToken());
+      const s = sesjaZadania();
       if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
       const w = autoryzuj(s.user, "zdjecie_cudzego_locka");
       if (!w.ok) return reply.code(403).send({ error: w.powod });

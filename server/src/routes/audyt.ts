@@ -1,8 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { csv, policzZdarzenia, typyZdarzen, zdarzenia, type FiltrAudytu } from "../services/audyt.js";
 import { logEvent } from "../services/events.js";
-import { sesja } from "../services/auth.js";
-import { currentToken } from "../context.js";
+import { sesjaZadania } from "../context.js";
 
 /* ── Trasy audytu ────────────────────────────────────────────────────────────
    Odpowiedź na zdanie „za miesiąc ktoś powie, że aplikacja zjadła mu 30 sztuk".
@@ -37,7 +36,7 @@ function filtr(q: Record<string, string | undefined>): FiltrAudytu {
 export async function audytRoutes(app: FastifyInstance) {
   /** `null` = wolno czytać; inaczej gotowa odmowa. */
   function odmowa(): { kod: number; error: string } | null {
-    const s = sesja(currentToken() ?? "");
+    const s = sesjaZadania();
     if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
     if (!CZYTAJACY.includes(s.user.role)) {
       return { kod: 403, error: "Ślad audytowy jest dostępny dla brygadzisty albo biura" };
@@ -136,5 +135,5 @@ const liczbaLubNull = (v: unknown): number | null =>
 
 /** Nazwa z sesji; `logEvent` i tak dokłada `user_ref` z kontekstu żądania. */
 function nazwaCzytajacego(): string {
-  return sesja(currentToken() ?? "")?.user.name ?? "anonim";
+  return sesjaZadania()?.user.name ?? "anonim";
 }
