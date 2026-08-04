@@ -38,7 +38,7 @@ test("korzeń przekierowuje do podglądu", async () => {
 });
 
 test("trasa /sw.js wyszła razem z pogrzebem starej PWA", async () => {
-  // jednorazowe sprzątanie po PWA z 0.3.0 skończyło się w 0.25.0
+  // jednorazowe sprzątanie po PWA z 0.3.0 skończyło się w 0.26.0
   const r = await app.inject({ method: "GET", url: "/sw.js" });
   assert.equal(r.statusCode, 404);
 });

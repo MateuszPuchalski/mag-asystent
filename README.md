@@ -433,7 +433,7 @@ Parametry (env, dev):
   przesyłka jest jedna. Pozycja z wyjątkiem wypada z rutyny, ale nie blokuje
   zamknięcia dostawy.
 
-  Kluczy sprzed 0.21.0 (`qty_short`, `no_space`…) serwer od 0.25.0 już **nie
+  Kluczy sprzed 0.21.0 (`qty_short`, `no_space`…) serwer od 0.26.0 już **nie
   przyjmuje** — okno wdrożenia APK się zamknęło. Etykiety zostają na zawsze:
   historii się nie kasuje, a protokół dla dostawcy nie może pokazywać
   surowego klucza.

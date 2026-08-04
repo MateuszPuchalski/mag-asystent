@@ -29,7 +29,7 @@ export async function biuroRoutes(app: FastifyInstance) {
   // przeglądarki biura ma pokazać COŚ, a nie 404
   app.get("/", async (_req, reply) => reply.redirect("/biuro"));
 
-  /* Do 0.25.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service
+  /* Do 0.26.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service
      workera PWA usuniętej w 0.3.0. Komputery biura przeszły od tego czasu
      przez sprzątający skrypt, więc trasa wyszła razem ze swoim powodem. */
 }

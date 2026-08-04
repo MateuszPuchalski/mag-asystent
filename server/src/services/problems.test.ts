@@ -88,7 +88,7 @@ test("lista kategorii zgadza się z formularzem i z kolektorem", () => {
 });
 
 test("klucz sprzed 0.21.0 nie zapisuje się, ale nadal ma nazwę", () => {
-  /* Okno wdrożenia APK 0.21.0 zamknęło się w 0.25.0: stare klucze wypadły
+  /* Okno wdrożenia APK 0.21.0 zamknęło się w 0.26.0: stare klucze wypadły
      z listy zapisywalnych. Etykieta zostaje — wyjątki z historii muszą mieć
      nazwę na protokole dla dostawcy. */
   assert.ok("error" in zglos({ typ: "qty_short", lineId, qty: 3 }));

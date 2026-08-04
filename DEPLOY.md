@@ -659,8 +659,8 @@ stanu przez workera Sfery.
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.
 - **Komputer pokazuje stary splash kolektora zamiast podglądu biura.** To ślad
   po PWA usuniętej w 0.3.0: jej service worker serwuje splash z cache. Serwer
-  sprzątał to automatycznie trasą `/sw.js` (0.19.0–0.24.x); trasa wyszła
-  w 0.25.0. Gdyby objaw gdzieś wrócił, wyrejestruj workera ręcznie
+  sprzątał to automatycznie trasą `/sw.js` (0.19.0–0.25.x); trasa wyszła
+  w 0.26.0. Gdyby objaw gdzieś wrócił, wyrejestruj workera ręcznie
   (Chrome → DevTools → Application → Service workers → Unregister). Aplikację
   **zainstalowaną** jako osobne okno odinstaluj w przeglądarce
   (Chrome → Ustawienia → Aplikacje).

@@ -37,7 +37,7 @@ export const PROBLEM_TYPES: ProblemType[] = [
 /**
  * Czy taki wyjątek wolno dziś zapisać — wyłącznie kategorie formularza.
  *
- * Do 0.25.0 przechodziły też klucze sprzed 0.21.0 (okno wdrożenia APK przez
+ * Do 0.26.0 przechodziły też klucze sprzed 0.21.0 (okno wdrożenia APK przez
  * MDM); wszystkie kolektory mają już nowe APK, więc okno się zamknęło.
  * Stare klucze zostają wyłącznie NAZYWALNE (etykiety niżej) — historia
  * w bazie musi mieć etykietę na protokole dla dostawcy.

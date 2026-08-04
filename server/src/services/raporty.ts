@@ -1,7 +1,7 @@
 import { db } from "../db/db.js";
 
 /* ── Raporty liczone ze zdarzeń: metryki systemu i wydajność osób ───────────
-   Do 0.25.0 były to dwa moduły (`metrics.ts`, `wydajnosc.ts`), które
+   Do 0.26.0 były to dwa moduły (`metrics.ts`, `wydajnosc.ts`), które
    dublowały okno czasowe i — groźniej — regułę odsiewu podwójnego liczenia,
    każdy w innej formie. Rozjazd tych kopii zawyżałby raport mierzący ludzi,
    więc reguła mieszka teraz w JEDNYM miejscu (`bezDubli`), a oba raporty
