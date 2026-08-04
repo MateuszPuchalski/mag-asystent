@@ -13,7 +13,7 @@ Maszyna z Subiektem GT (Windows)
   ├─ wertis-api     Fastify: REST + podgląd biura pod /biuro
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
   ├─ wertis.db      SQLite: faktury zakupu z postępem per pozycja, wyjątki,
-  │                 sesje trybu B, kolejka, audyt events
+  │                 kolejka, audyt events
   ├─ data/photos/   zdjęcia dowodowe do reklamacji (poza gitem, w backupie)
   ├─ MSSQL Subiekta (odczyt: login read-only)
   └─ Sfera (COM)    (zapis: wyłącznie przez workera)
@@ -24,7 +24,7 @@ Maszyna z Subiektem GT (Windows)
 > **Jak to jest zbudowane i dlaczego tak** — [`docs/architektura.md`](docs/architektura.md).
 > Ten dokument mówi tylko, jak to uruchomić.
 
-## 0. Instalator (zalecana droga)
+## 0. Instalator — właściwa droga
 
 Rozdziały 1–4 i checklistę z §6 wykonuje za Ciebie
 [**instalator dla Windows**](instalator/README.md): pobierz
@@ -58,14 +58,16 @@ WERTIS-Instalator.exe -Odinstaluj
 Zdejmuje usługi, regułę zapory i katalog. Ślad audytowy przenosi obok.
 
 **Nie cofa jednak tego, co aplikacja zapisała do Subiekta**, i nie usuwa loginu
-SQL. Pełną listę podaje [`docs/wdrozenie.md`](docs/wdrozenie.md), sekcja
-„Jak odinstalować".
+SQL. Pełną procedurę i listę tego, co zostaje, podaje §8.
 
-**Reszta tego dokumentu opisuje to samo krok po kroku i nadal obowiązuje.**
+**Rozdziały 1–4 to droga ręczna — dokumentacja odniesienia instalatora.**
+Opisują krok po kroku to, co on robi sam. Sięgnij po nie, gdy instalator
+zawiedzie w połowie albo gdy chcesz wiedzieć, co dokładnie stanęło na maszynie.
+
+**Rozdziały 5–8 dotyczą każdej instalacji**, także tej z instalatora.
 Instalator nie robi wszystkiego. Konta pracowników zakłada się z kolektora
 (§5a). Kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia ręcznie —
-obie **zanim** ruszy praca na prawdziwych danych. Gdy instalator zawiedzie
-w połowie, każdy jego krok da się dokończyć poniższą drogą.
+obie **zanim** ruszy praca na prawdziwych danych.
 
 ## 1. Wymagania
 
@@ -223,7 +225,8 @@ kolektor działa po zwykłym HTTP w LAN.
 
 Kolektor to natywny klient z [`android/`](android/README.md) — czysty klient
 REST tego serwera. Skan przez SDK producenta (Zebra DataWedge / Honeywell
-DataCollection), trwały offline (Room), kiosk przez Android lock-task/MDM.
+DataCollection), trwały offline (bufor plikowy JSON + WorkManager), kiosk przez
+Android lock-task/MDM.
 
 **1. Zbuduj APK** (maszyna z Android SDK / Android Studio albo artefakt z CI
 `.github/workflows/android.yml` — job „build" wystawia `wertis-kolektor-debug-apk`):
@@ -455,6 +458,29 @@ innego** i nie wymaga wstrzymania.
 > end-to-end — w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
 > Etap 1 poniżej i zapis lokalizacji (plan B) są już **zaimplementowane**.
 
+### Najważniejsze narzędzie: zatrzymany worker
+
+`wertis-api` i `wertis-worker` to **dwie osobne usługi Windows**. API czyta bazę
+i przyjmuje pracę. Worker jest jedynym procesem, który **zapisuje do Subiekta**.
+
+Zatrzymanie workera daje więc przebieg próbny na żywych danych:
+
+```powershell
+nssm stop wertis-worker
+```
+
+Aplikacja czyta prawdziwą bazę i kolejkuje zamierzone zapisy. **Do Subiekta nie
+idzie nic.** Kolejka staje się listą tego, co aplikacja zrobiłaby, gdyby jej
+pozwolić:
+
+```bash
+curl -s -H "x-session: $TOKEN" http://localhost:3001/api/queue | jq '.items[] | {label, detail, status}'
+```
+
+`/api/health` zgłosi wtedy zatrzymany worker jako problem. Na etapach próbnych
+z [`docs/wdrozenie.md`](docs/wdrozenie.md) to jest oczekiwane, a nie usterka
+instalacji.
+
 **Etap 0 — pilot (tryb `seeded`, bez dotykania SGT):**
 działa od razu po instalacji; dane z eksportu `magmat.xlsx`. Magazynier testuje
 wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
@@ -533,6 +559,47 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    Dopóki którykolwiek mówi `seeded`, ta strona pracuje na danych demo
    i **nic nie trafia do Subiekta** — a `"problemy"` powiedzą, która to.
 
+### Konto SQL, gdy nie ma hasła `sa`
+
+**`sa` nie jest wymagane.** Wystarczy dowolne konto, które może założyć login
+i nadać uprawnienia. W wielu firmach nikt nie wypuszcza `sa` z rąk i instalator
+to przewiduje.
+
+Na pytanie o hasło **wciśnij Enter**. Instalator zapisze wtedy gotowy skrypt:
+
+```
+C:\wertis\nadaj-uprawnienia-wertis.sql
+```
+
+Hasło konta jest już w środku i w `wertis.env`, więc nic nie trzeba podmieniać.
+Przekaż plik administratorowi bazy. Po jego wykonaniu wystarczy restart usług:
+
+```powershell
+nssm restart wertis-api ; nssm restart wertis-worker
+```
+
+Do tego czasu aplikacja **nie połączy się z bazą**. To jest oczekiwane, a nie
+nieudana instalacja.
+
+### Czym grozi pomyłka w którym ustawieniu
+
+Część wartości domyślnych to ustalenia, a część **założenia**. Te drugie są
+oznaczone w kodzie jako `[WERYFIKUJ]` i wymagają jednego zapytania na własnej
+bazie. Przejdź tę tabelę przed pierwszą pracą na produkcji:
+
+| ustawienie | co ustala | czym grozi pomyłka |
+|---|---|---|
+| `MSSQL_LOC_COLUMN` | pole lokalizacji na kartotece | **nadpisanie cudzych danych** — aplikacja pisze bezwarunkowo |
+| `MSSQL_DATABASE` | baza podmiotu | praca na kopii zamiast produkcji, bez objawu |
+| `DOK_TYPY_DOSTAW` | typy dokumentów w zakładce DOSTAWY (domyślnie sama FZ) | obce dokumenty na liście pracy magazyniera |
+| `DOK_DNI_WSTECZ` | okno importu i zakres listy dostaw | nic nie ginie — niedokończone dostawy zostają mimo okna |
+| `MSSQL_ZD_ZREAL_COLUMN` | ilość już odebrana z zamówienia | zawyżone ilości na karcie towaru |
+| `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
+
+Gdy kolumny ilości zrealizowanej nie ma wcale (patrz Etap 1 wyżej), zostaw
+wartość pustą. Karta towaru opisze wtedy ilość jako oszacowanie, a `/api/health`
+przestanie zgłaszać problem, którego nie da się rozwiązać ustawieniem.
+
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` bezpośrednim UPDATE jednej kolumny objętej
 `GRANT UPDATE`. Zadania MM zgłaszają czytelny błąd; do czasu workera Sfery
@@ -564,9 +631,23 @@ stanu przez workera Sfery.
   cp /c/wertis/server/data/wertis.db "/d/backup/wertis-$(date +%Y%m%d).db"
   ```
 
-  Plik trzyma postęp rozkładania dostaw, wyjątki, sesje trybu B, kolejkę
-  i audyt `events`. Źródłem prawdy o towarach i stanach pozostaje baza Subiekta, więc
-  to lekki backup.
+  Plik trzyma postęp rozkładania dostaw, wyjątki, kolejkę i audyt `events`.
+  Źródłem prawdy o towarach i stanach pozostaje baza Subiekta, więc to lekki
+  backup.
+- **Cofnięcie zapisu lokalizacji opiera się o kopię bazy.** Ślad audytowy
+  zapisuje przy każdej zmianie **starą i nową** zawartość pola oraz ekran,
+  z którego zmiana wyszła:
+
+  ```bash
+  curl -s -H "x-session: $TOKEN" \
+    'http://localhost:3001/api/events?twId=507&typ=location_set,location_removed' | jq
+  ```
+
+  Wartość „przed" jest zapisana surowa — przywrócenie polega na wpisaniu jej
+  z powrotem bez zmian. Audyt mówi jednak tylko, **co** wpisać; wpisać trzeba
+  samemu, z kartoteki albo z kopii bazy. Przy większej liczbie kartotek kopia
+  jest jedyną rozsądną drogą — dlatego musi działać, **zanim** ruszą prawdziwe
+  zapisy ([`docs/wdrozenie.md`](docs/wdrozenie.md), etap 4).
 - **Zdjęcia dowodowe:** `C:\wertis\server\data\photos\`. To jedyne dane, których
   nie da się odtworzyć z Subiekta ani z seedu — dowód do reklamacji u dostawcy.
   Kopiuj ten katalog razem z bazą:
@@ -664,6 +745,127 @@ stanu przez workera Sfery.
   (Chrome → DevTools → Application → Service workers → Unregister). Aplikację
   **zainstalowaną** jako osobne okno odinstaluj w przeglądarce
   (Chrome → Ustawienia → Aplikacje).
+
+## 8. Odinstalowanie
+
+Jedno polecenie, uruchomione **jako administrator**:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odinstaluj
+```
+
+> **Dlaczego nie po prostu `.\wertis-instalator.ps1`.** Windows domyślnie
+> odmawia uruchamiania plików `.ps1` i odpowiada `running scripts is disabled on
+> this system`. `-ExecutionPolicy Bypass` dotyczy **tego jednego uruchomienia** —
+> polityka systemowa zostaje nietknięta. Przy instalacji tę samą osłonę daje
+> `URUCHOM.cmd` (prawym → „Uruchom jako administrator"), ale deinstalacja
+> potrzebuje argumentów, więc idzie wprost.
+
+Zdejmuje usługi `wertis-api` i `wertis-worker`, regułę zapory „WERTIS kolektor"
+oraz katalog `C:\wertis`. Pyta o potwierdzenie, zanim cokolwiek ruszy.
+
+Ślad audytowy i zdjęcia problemów **zostają**. Instalator przenosi je obok, do
+`C:\wertis-dane-<data>`, i wypisuje tę ścieżkę. Historia zmian lokalizacji bywa
+potrzebna długo po tym, jak aplikacja zniknie z maszyny.
+
+Kasowanie także jej wymaga osobnego przełącznika i drugiego potwierdzenia:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odinstaluj -UsunDane
+```
+
+Przebieg próbny wypisze plan, nie ruszając niczego:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odinstaluj -DryRun
+```
+
+### Instalatora nie uruchamia się z wnętrza kasowanego katalogu
+
+Windows nie pozwoli usunąć katalogu, w którym **stoi powłoka** — a wcześniejsze
+etapy każą wpisywać `cd C:\wertis` i `cd C:\wertis\tools`. Komunikat brzmi wtedy
+tylko „jakiś proces używa tego folderu" i nie mówi, że tym procesem jesteś ty.
+
+Wynieś instalator poza katalog i uruchom go stamtąd:
+
+```powershell
+cd C:\
+Copy-Item C:\wertis\instalator C:\wertis-instalator -Recurse
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File C:\wertis-instalator\wertis-instalator.ps1 -Odinstaluj -Katalog C:\wertis
+```
+
+Ścieżka do `-File` jest tu **pełna**, a powłoka zostaje w `C:\` — dzięki temu
+nie trzeba wchodzić do żadnego z tych katalogów.
+
+Deinstalacja ostrzeże, jeśli mimo to wykryje powłokę w środku — zanim zapyta
+o zgodę, nie po.
+
+### Gdy katalog zostaje mimo wszystko
+
+Procesy uruchomione z kasowanego katalogu instalator zatrzymuje sam: osierocony
+`node.exe` potrafi przeżyć `nssm remove` i trzymać uchwyty na plikach. Zasięg
+jest wąski celowo — tylko procesy, których plik wykonywalny leży **wewnątrz**
+`C:\wertis`. `node.exe` obsługujący cudzą aplikację zostaje nietknięty.
+
+Gdy katalog nadal nie znika, instalator wypisze nazwy i numery PID tego, co go
+trzyma. Ubij je i powtórz:
+
+```powershell
+Get-Process | Where-Object { $_.Path -like 'C:\wertis\*' } |
+    Select-Object Id, ProcessName, Path
+Stop-Process -Id <numer> -Force
+```
+
+Pusta lista przy zablokowanym katalogu znaczy, że uchwyt trzyma coś bez własnego
+pliku w środku: otwarte okno Eksploratora, edytor albo druga powłoka. Znajdziesz
+to w Monitorze zasobów — `resmon`, zakładka **CPU**, sekcja **Skojarzone
+dojścia**, szukaj `wertis`.
+
+### Czego deinstalacja NIE cofa
+
+To jest ważniejsze niż sama lista usuwanych rzeczy.
+
+| co zostaje | dlaczego | jak usunąć ręcznie |
+|---|---|---|
+| **wartości w bazie Subiekta** | aplikacja je tam zapisała — to dane firmy, nie jej własne | wyłącznie z kopii bazy |
+| **login SQL `wertis`** | stoi na poziomie **instancji**, nie bazy podmiotu | `DROP USER` i `DROP LOGIN` (niżej) |
+| **ustawienia SQL Servera** | inne aplikacje mogą z nich korzystać | ręcznie, świadomie |
+| **Node.js i Git** | instalator dokłada je systemowo | `winget uninstall` |
+
+Pierwszy wiersz jest sednem. **Odinstalowanie aplikacji nie jest cofnięciem jej
+pracy.** Pole lokalizacji na kartotekach zostaje dokładnie tam, gdzie je
+wpisała — tak samo, jakby wpisał je człowiek.
+
+Ustawienia SQL Servera to trzy rzeczy, które kreator przestawił, żeby w ogóle
+dało się połączyć: uwierzytelnianie mieszane, protokół TCP i usługa SQL Browser
+uruchamiana automatycznie. Zostają włączone. Cofnięcie któregokolwiek odcięłoby
+każdą inną aplikację, która się na nim opiera.
+
+Login usuwa administrator bazy, w bazie podmiotu:
+
+```sql
+DROP USER [wertis];
+DROP LOGIN [wertis];
+```
+
+Instalator nie robi tego sam celowo. Login jest obiektem instancji, więc
+pomyłka dotknęłaby wszystkich baz na serwerze, nie tylko tej jednej.
+
+### Droga ręczna
+
+Gdy skryptu nie ma pod ręką albo katalog zniknął wcześniej:
+
+```powershell
+nssm stop wertis-api ; nssm stop wertis-worker
+nssm remove wertis-api confirm ; nssm remove wertis-worker confirm
+Remove-NetFirewallRule -DisplayName "WERTIS kolektor"
+Remove-Item C:\wertis -Recurse -Force
+```
+
+Bez `nssm.exe` (leży w kasowanym katalogu) usługi zdejmuje `sc.exe delete
+wertis-api`. Kolejność jest wymuszona: katalog kasuje się **na końcu**, bo
+inaczej znika narzędzie, którym usuwa się usługi.
 
 ## Dlaczego nie chmura
 

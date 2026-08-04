@@ -84,14 +84,11 @@ Twarde zasady (spec §12) egzekwowane na serwerze:
 ### Wdrożenie na produkcji idzie etapami
 
 Aplikacja zapisuje do bazy firmy jedną rzecz — pole lokalizacji — odwracalną
-wyłącznie z kopii zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć etapów z bramkami**,
-opisanych w [`docs/wdrozenie.md`](docs/wdrozenie.md).
-
-Najważniejsze narzędzie jest darmowe: `wertis-api` i `wertis-worker` to osobne
-usługi, a **worker jest jedynym procesem zapisującym do Subiekta**. Zatrzymanie
-go daje przebieg próbny na żywych danych — aplikacja czyta produkcję, kolejkuje
-zamierzone zapisy i nie wykonuje żadnego. Kolejka staje się podglądem tego, co
-zrobiłaby, gdyby jej pozwolić.
+wyłącznie z kopii zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć
+etapów z bramkami**, opisanych w [`docs/wdrozenie.md`](docs/wdrozenie.md).
+Najważniejsze narzędzie jest darmowe: **worker jest jedynym procesem
+zapisującym do Subiekta**, więc jego zatrzymanie daje przebieg próbny na żywych
+danych ([`DEPLOY.md`](DEPLOY.md) §6).
 
 ### Ślad audytowy — „aplikacja zjadła mi 30 sztuk"
 
@@ -108,39 +105,19 @@ scan   location_set        (sfera_queue)       queue_applied | queue_retry | que
 kolektor przyjął, a do bazy firmy nic nie weszło. Odrzucone żądania mają własny
 typ (`http_rejected`), więc „skanowałem i się nie zapisało" też zostawia ślad.
 
-Odczyt: `GET /api/events` z filtrem po osobie, towarze, urządzeniu, typie
-i dacie oraz `GET /api/events/csv` do arkusza. **Wymaga roli brygadzisty albo
-biura** — log mówi, kto ile zeskanował, więc jest narzędziem nadzoru. Kto
-wyniesie CSV, sam trafia do śladu.
+Odczyt: `GET /api/events` z filtrami oraz `GET /api/events/csv` do arkusza —
+**wymaga roli brygadzisty albo biura**, bo log mówi, kto ile zeskanował.
+Rozmiar historii widać w `/api/health` (`audyt`); nie czyścimy jej, bo
+reklamacja przychodzi po miesiącach. Pełny opis łańcucha, jego luk i powodów:
+[`docs/architektura.md`](docs/architektura.md) §9.
 
-```bash
-curl -s -H "x-session: $TOKEN" \
-  'http://localhost:3001/api/events?twId=507&od=2026-07-01' | jq
-```
-
-> **Czego log NIE obejmuje.** Operacja wykonana bez Wi-Fi żyje w pliku na
-> kolektorze aż do połączenia. Zginie urządzenie przed odzyskaniem sieci —
-> śladu nie ma, i żadna zmiana po stronie serwera tego nie zmieni. Buforowana
-> jest wyłącznie zmiana lokalizacji; reszta offline nie działa, więc luka jest
-> wąska, ale realna.
-
-Rozmiar historii widać w `/api/health` (`audyt`). Nie czyścimy jej, bo
-reklamacja przychodzi po miesiącach — ale licznik jest po to, żeby decyzję
-o archiwum podjąć na liczbach.
-
-**Zapis do Subiekta ogranicza się do JEDNEJ rzeczy.** Jest nią pole lokalizacji
-na kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie
-mają). Reguła „tylko lokalizacja" nie ma dziś ani jednego wyjątku.
-
-Do wersji 0.15.0 drugim zapisem była flaga sprawdzenia na fakturze — kanał do
-biura. Wypadła w 0.16.0: postęp rozkładania mieszka w aplikacji, a konto SQL
-straciło przez to jedyne prawo zapisu poza kartoteką. Zapis idzie kolejką
-(kolejka → worker → adapter), więc kolektor nigdy nie czeka na COM.
-
-Nic poza tym: zero `INSERT` do tabel dokumentów, zero MM przy dostawie
-krajowej, zero modyfikacji stanów. Dokumenty MM (kontener) tworzy
-osobny worker Sfery na Windows — ten proces tylko je kolejkuje. Zweryfikowana
-struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
+**Zapis do Subiekta ogranicza się do JEDNEJ rzeczy**: pola lokalizacji na
+kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie
+mają). Zapis idzie kolejką (kolejka → worker → adapter), więc kolektor nigdy
+nie czeka na COM. Nic poza tym: zero `INSERT` do tabel dokumentów, zero
+modyfikacji stanów; dokumenty MM (kontener) tworzy osobny worker Sfery na
+Windows. Granice i ich powody: [`docs/architektura.md`](docs/architektura.md)
+§1; zweryfikowana struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
 [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
 ## Uruchomienie
@@ -159,17 +136,9 @@ tam, zanim uznasz, że coś jest zepsute.
 
 To jest **tryb `seeded`** — dane demo z `magmat.xlsx`, zero kontaktu z Subiektem.
 Połączenie z prawdziwą bazą włącza `SGT_MODE=mssql` wraz z resztą `MSSQL_*`;
-ustawienia trzyma jeden plik dla obu procesów (API i workera):
-
-```bash
-cp wertis.env.example wertis.env && nano wertis.env
-source wertis.env && npm run dev
-curl -s http://localhost:3001/api/health    # "mode" musi być "mssql"
-```
-
-Ten plik dotyczy **wyłącznie** trybu MSSQL — w dev nie tyka się go wcale. Ma
-w środku `SGT_MODE=mssql`, więc `source wertis.env` bez działającego Subiekta
-wywraca start API. Tryb `seeded` nie potrzebuje ani jednej zmiennej.
+ustawienia trzyma jeden plik `wertis.env` dla obu procesów
+([`DEPLOY.md`](DEPLOY.md) §2a). Ten plik dotyczy **wyłącznie** trybu MSSQL —
+w dev nie tyka się go wcale, a tryb `seeded` nie potrzebuje ani jednej zmiennej.
 
 Kolektor: build APK w [`android/`](android/README.md) (`./gradlew :app:assembleDebug`
 albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2:3001`).
@@ -193,21 +162,10 @@ znaczy nic. Drugi przebieg konta nie dubluje i nie rusza hasła.
 
 U klienta to samo konto zakłada instalator, pytając instalującego o hasło.
 
-Pierwsze konto da się też założyć ręcznie na pustej bazie, bez sesji — inaczej
-nie dałoby się założyć żadnego. Rola `admin` jest wtedy **wymuszona** niezależnie
-od tego, co przyszło w żądaniu, bo to konto będzie drogą do wszystkich
-następnych:
-
-```bash
-curl -X POST http://localhost:3001/api/users \
-  -H 'content-type: application/json' \
-  -d '{"name":"Właściciel","login":"wlasciciel","haslo":"tajnehaslo"}'
-# → {"user":{"userId":1,"login":"wlasciciel","role":"admin","maHaslo":true}}
-```
-
-Furtka zamyka się sama: kolejne żądanie bez sesji dostaje już 401, a następne
-konta wymagają `x-session` ([`DEPLOY.md`](DEPLOY.md) §5a). Warunek liczy konta
-**z loginem**, więc konta-ślady z migracji historii jej nie zamykają.
+Pierwsze konto da się też założyć ręcznie na pustej bazie, bez sesji. Rola
+`admin` jest wtedy **wymuszona**, a furtka zamyka się po pierwszym koncie
+z loginem. Procedurę `curl` i zakładanie reszty kont podaje
+[`DEPLOY.md`](DEPLOY.md) §5a.
 
 Na ekranie startowym kolektora są dwa pola — login i hasło — więc emulator bez
 skanera wystarczy. Domyślny adres serwera (`http://10.0.2.2:3001`) jest już
@@ -225,22 +183,9 @@ TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
 curl -s http://localhost:3001/api/queue -H "x-session: $TOKEN"
 ```
 
-Do lipca było odwrotnie. Sesji żądały trzy trasy. Reszta — łącznie ze zmianą
-lokalizacji w Subiekcie i raportem wydajności per pracownik — przyjmowała
-żądania bez niczego. Podpisywała je nagłówkiem `x-user` albo słowem `anonim`.
-Nagłówek `x-user` **nie jest tożsamością** i sam bramki nie otwiera.
-
-Produkcyjnie:
-
-```bash
-npm run build    # server → server/dist (API + strona /biuro)
-npm start        # Fastify wystawia API (worker: npm -w server run start:worker)
-```
-
-**Wdrożenie w firmie (on-premise):** kompletna instrukcja jest
-w [`DEPLOY.md`](DEPLOY.md). Obejmuje maszynę z Subiektem, usługi Windows (NSSM),
-DNS i zaporę, instalację APK na kolektorach (MDM/kiosk), etapy przejścia na
-MSSQL i Sferę oraz backup.
+**Produkcja i wdrożenie w firmie (on-premise): [`DEPLOY.md`](DEPLOY.md).**
+Instalator Windows, usługi NSSM, sieć i zapora, APK na kolektorach (MDM/kiosk),
+etapy przejścia na MSSQL i Sferę, backup — wszystko tam.
 
 Parametry (env, dev):
 
@@ -257,34 +202,18 @@ Parametry (env, dev):
 ## Funkcje (kolektor — aplikacja Android)
 
 **Kto pracuje — konto imienne, nie wolny tekst (plan §7)**
-- **Login i hasło**, ten sam wzorzec, co w reszcie firmy (od 0.20.0).
-
-  > **Dlaczego.** Wcześniej podpisem był dowolny łańcuch wpisywany z klawiatury
-  > i wysyłany w nagłówku `X-User`. `events.user_id` zbierał warianty tej samej
-  > osoby (`Jan`, `jan`, `Jan K`). Audyt nadawał się do czytania oczami i do
-  > niczego więcej. Każdy mógł podać się za kogokolwiek jednym wpisem.
-  > Potem był skan plakietki: jedna sekunda zamiast wpisywania, ale własny,
-  > osobny mechanizm w firmie, która wszędzie indziej loguje się hasłem.
-- **Hasło leży wyłącznie jako hasz** (scrypt, sól per konto). Minimum osiem
-  znaków, bez wymagań na wielkie litery i znaki specjalne: długość chroni lepiej
-  niż wymuszona `Wertis1!` zapisana na taśmie przyklejonej do kolektora.
+- **Login i hasło**, ten sam wzorzec, co w reszcie firmy (od 0.20.0). Hasło
+  leży wyłącznie jako hasz (scrypt, sól per konto), minimum osiem znaków.
 - **Nieznany login i błędne hasło wyglądają identycznie** — jeden komunikat
-  i ten sam czas odpowiedzi. Rozróżnienie zamieniłoby listę kont w listę celów
-  dla kogokolwiek w sieci magazynu.
-- **Pięć nieudanych prób zamyka login na minutę.** Plakietka była przedmiotem:
-  żeby jej użyć, trzeba było ją mieć. Hasło się zgaduje.
-- **Sesja nie wygasa sama.** Trwa do wylogowania z Ustawień. Bezczynność nie
+  i ten sam czas odpowiedzi. Pięć nieudanych prób zamyka login na minutę.
+- **Sesja nie wygasa sama.** Trwa do wylogowania z Ustawień; bezczynność nie
   robi nic.
-
-  > **Dlaczego zniknęła blokada.** Do sierpnia 2026 dziesięć minut bez ruchu
-  > przełączało kolektor na ekran „Sesja zablokowana". Nigdy nie gubiła pracy,
-  > ale kosztowała skan przy każdym powrocie do odłożonego urządzenia — a to
-  > był jej cały efekt, bo kolektory nie opuszczają hali.
 - **Operacje nieodwracalne rozstrzyga ROLA.** Odebranie koledze linii przed
-  wygaśnięciem TTL jest zastrzeżone dla brygadzisty i biura; zdarzenie
-  `lock_forced` zapisuje komu i przez kogo. Cena jest jawna: porzucony
-  zalogowany kolektor pozwala obcej osobie na wszystko, co może jego właściciel
-  — dlatego wylogowanie po zmianie jest tu jedynym zabezpieczeniem.
+  wygaśnięciem TTL jest zastrzeżone dla brygadzisty i biura; `lock_forced`
+  zapisuje komu i przez kogo.
+
+Historia tych decyzji — wolny tekst, plakietki, PIN, blokada bezczynności —
+i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
 
 **Podgląd i operacje ad-hoc**
 - Skan sprzętowy (Zebra DataWedge / Honeywell DataCollection, fallback
@@ -292,11 +221,10 @@ Parametry (env, dev):
   na serwerze (spec §5.1).
 - **Rozpoznanie kodu po wzorcu, nie po heurystyce.** `LOC` jest kategorią
   **zamkniętą**: kod, który nie pasuje do wzorca adresu, adresem nie jest.
-  Wzorzec należy do serwera i kolektor go tylko pobiera — trzy niezależne kopie
-  tej reguły były przyczyną błędu, w którym symbol `W32-0203` udawał lokalizację.
-  Zanim kolektor pobierze regułę, pracuje ostrożnie: adresem jest wyłącznie kod
-  z prefiksem `LOC:` z etykiety QR. Po klasyfikacji obowiązuje **jedno
-  wyszukanie w jednej dziedzinie, bez fallbacku na drugą**.
+  Wzorzec należy do serwera i kolektor go tylko pobiera (`/api/locations`).
+  Po klasyfikacji obowiązuje **jedno wyszukanie w jednej dziedzinie, bez
+  fallbacku na drugą**. Historia i powody:
+  [`docs/architektura.md`](docs/architektura.md) §7.
 - **Skan etykiety regału pokazuje jego zawartość od razu**, z ekranu głównego —
   nie trzeba wcześniej wybierać trybu. Pusty regał to poprawna odpowiedź
   („Regał A01-02-03 pusty"), bo półkę skanuje się także po to, żeby sprawdzić,
@@ -305,14 +233,9 @@ Parametry (env, dev):
   Karta towaru otwarta + skan regału → ten towar dostaje ten adres. Skan regału
   bez otwartej karty → zawartość regału. Skan towaru → jego karta. Nie ma paska
   „przypięto", nie ma trybu, nie ma czego zdejmować.
-- **Dlaczego zniknął kontekst przyklejony.** Wcześniej pierwszy skan przypinał
-  regał albo towar, a kolejne wpadały w to przypięcie — osiem indeksów na jeden
-  regał kosztowało 9 skanów zamiast 16. Cena była jednak taka, że dało się mieć
-  **przypięty towar A i otwartą kartę towaru B**: pasek mówił jedno, a zapis szedł
-  gdzie indziej. Adres zapisany na niewłaściwy towar jest błędem CICHYM — nic nie
-  wygląda na zepsute, dopóki ktoś nie pójdzie po ten towar. Siedem zaoszczędzonych
-  skanów tego nie warte. Razem z mechanizmem zniknął jego TTL w Ustawieniach
-  i telemetria `pin_expired`.
+
+  Dlaczego zniknął „kontekst przyklejony" — poprzednik tego modelu:
+  [`docs/architektura.md`](docs/architektura.md) §7.
 - **Karta towaru odpowiada nagłówkiem na całe codzienne pytanie.** Symbol,
   wielka liczba dostępnych sztuk i pastylka adresu pickingowego stoją w jednej
   karcie. Rezerwacja, stan łączny i MGP idą podlinijką pod liczbą. Pozostałe
@@ -466,47 +389,29 @@ się identycznie, ale jego stan trzeba jeszcze przesunąć na halę. Lista dosta
 oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w alejkę.
 
 **Telemetria, która mierzy właściwą rzecz**
-- `events` ma indeks po czasie — bez niego każdy raport skanuje całą tabelę.
-  Ma też `device_id`: przy współdzielonych kolektorach pierwsze pytanie przy
-  awarii brzmi „to jedno urządzenie czy wszystkie?".
-- **Wejście ręczne liczone osobno od skanu** (`manual_entry`). To nie jest
-  kosmetyka. Udział wpisów ręcznych **per regał** to darmowy raport jakości
-  etykiet — mówi, która wymaga przedruku. **Per towar** mówi, która kartoteka
-  nie ma czytelnego kodu. W jednym worku ze skanem nie mierzy niczego.
-- **Czas skan → odpowiedź mierzy klient, nie serwer** (`scan_timing`), bo czas
-  obsługi na serwerze pomija sieć i render — czyli akurat to, gdzie problem
-  siedzi. Cel: `p95 < 150 ms`; powyżej ~300 ms ludzie zaczynają skanować
-  podwójnie, a podwójny skan przy liczeniu pozycji to błąd **ilościowy**.
-- Cztery liczby pod `GET /api/metrics` — liczby, nie panel.
-  **Świadomie bez raportu wydajności per osoba.** To monitoring pracowniczy
-  w rozumieniu Kodeksu pracy (art. 22² i nast.). Wymaga zapisu w regulaminie
-  oraz uprzedzenia ludzi przed uruchomieniem. Techniczny audyt „kto zmienił
-  lokalizację" to co innego i zostaje.
+- **Wejście ręczne liczone osobno od skanu** (`manual_entry`). Udział wpisów
+  ręcznych **per regał** to darmowy raport jakości etykiet; **per towar** mówi,
+  która kartoteka nie ma czytelnego kodu.
+- **Czas skan → odpowiedź mierzy klient, nie serwer** (`scan_timing`), bo
+  serwer pomija sieć i render. Cel: `p95 < 150 ms`; powyżej ~300 ms ludzie
+  skanują podwójnie, a to błąd **ilościowy**.
+- Cztery liczby pod `GET /api/metrics` — liczby, nie panel. Raport wydajności
+  per osoba to **monitoring pracowniczy** — obowiązki formalne PRZED jego
+  uruchomieniem opisuje [`DEPLOY.md`](DEPLOY.md) §5a.
 
 **Raport przeslotowania — mierzy pion, nie odległość**
 - `npm run reslot` (1–2× w roku, przed sezonem) czyta Subiekta read-only i daje
   cztery listy do wydruku, posortowane **po lokalizacji**, żeby chodzić alejką
   raz. Nie jest to funkcja aplikacji — człowiek z wydrukiem robi to w dzień.
-- **Pobrania liczone jako wystąpienia pozycji na WZ, nie suma ilości.** Indeks
-  wydany 400× po sztuce generuje wielokrotnie więcej pracy niż wydany 4× po
-  100 szt.; mylenie tych dwóch liczb to najczęstszy błąd domowych analiz ABC.
-- Strefa złota jest **per zakres regałów**: `A,B,H,J` → poziomy 2-3-4, `F` → 4
-  i 8, `E03–E04` → tylko 2. Ten sam numer poziomu to inna wysokość w różnej
-  geometrii regału. Regał bez reguły trafia na **czwartą listę**, nie do kosza
-  „poza strefą" — inaczej jego martwy towar zniknąłby z oczu.
-- **Bez historii pobrań skrypt odmawia wypisania list 1–3.** Każdy indeks
-  wyglądałby wtedy na martwy, a raport kazałby opróżnić całą strefę złotą —
-  i wyglądałby przy tym jak zlecenie robocze, nie jak awaria.
+- Pobrania liczy jako **wystąpienia pozycji na WZ, nie sumę ilości**; strefa
+  złota jest per zakres regałów. Uruchomienie i pułapki (m.in. odmowa bez
+  historii pobrań): [`DEPLOY.md`](DEPLOY.md) §7.
 
 **Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
-- Aplikacja pisze do Subiekta przez kolejkę, ale nikt nie sprawdzał, **czy stan
-  po stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała**.
-  `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
-  z ostatnim udanym zapisem. Wyławia też zadania w `error` starsze niż doba
-  i `waiting_for_doc` starsze niż trzy dni.
-- **Zerowy wynik nie tworzy raportu** — raport przychodzący codziennie przestaje
-  być czytany po tygodniu, a wtedy nie chroni już przed niczym. Rozjazdy → CSV
-  + kod wyjścia `2` pod alert. Szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
+- `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
+  z ostatnim udanym zapisem i wyławia zawieszone zadania kolejki.
+- **Zerowy wynik nie tworzy raportu.** Rozjazdy → CSV + kod wyjścia `2` pod
+  alert. Ustawienie i szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
 **Biuro — podgląd pod `/biuro`**
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
@@ -621,18 +526,10 @@ Docelowa wersja w firmie: **Subiekt GT 1.87 SP3 HF1** (era KSeF — brak natywne
 pola lokalizacji, stąd pole własne `tw_Pole1..8`).
 
 Tryb `SGT_MODE=mssql` (Windows z Subiektem, także **wersja edu**) to CAŁE
-połączenie. Wystarczy do niego **jeden login** o minimalnych uprawnieniach.
-
-Importer `server/src/adapters/subiekt.mssql.ts` zasila read-model `sgt_*` prosto
-z bazy: przy starcie, co `MSSQL_SYNC_MS` i na `POST /api/admin/resync`. Worker
-zapisuje w JEDNYM miejscu — UPDATE **jednej kolumny** (lokalizacja na
-`tw__Towar`). Tryb zapisu wynika z `SGT_MODE`; osobnego przełącznika nie ma.
-
-Dokumenty MM powstają w jednym miejscu: przy przesunięciu stanu. Tworzy je
-docelowo osobny worker Sfery (COM) czytający tę samą kolejkę `sfera_queue`. Do
-tego czasu zadanie MM kończy się czytelnym błędem, a dokument wystawia biuro —
-arkusz przesunięcia mówi o tym wprost. Instrukcja krok po kroku:
-[`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md).
+połączenie. Wystarczy do niego **jeden login** o minimalnych uprawnieniach,
+a tryb zapisu wynika z `SGT_MODE` — osobnego przełącznika nie ma. Podpięcie
+krok po kroku: [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md);
+etapy przejścia na produkcję: [`DEPLOY.md`](DEPLOY.md) §6.
 
 W tym środowisku (chmura Linux, bez Subiekta/MSSQL) działa tryb `seeded` —
 API, kolejka, worker i rozkładanie realnie na SQLite zasilonym danymi
