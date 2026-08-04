@@ -96,37 +96,10 @@ export interface ProductRow {
   pendingHere?: "add" | "remove" | "error" | null;
 }
 
-export interface PutawayDocument {
-  docId: number;
-  typ: string;
-  nrPelny: string;
-  dataWyst: string;
-  dostawca: string;
-  positions: number;
-  session?: { id: number; status: string; progressPct: number };
-}
-
-export interface PutawayItemView {
-  id: number;
-  twId: number;
-  sym: string;
-  name: string;
-  targetLoc: string | null;
-  qtyExpected: number;
-  qtyDone: number;
-  delta: number;
-  mgpStan: number;
-  status: string;
-  skipReason: string | null;
-  lockedBy: string | null;
-  offDocument: boolean;
-  stageQty: number | null;
-  stageLoc: string | null;
-}
-
-/* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ──────────────────────
-   Jednostką pracy jest dokument. Aplikacja zapisuje wyłącznie lokalizację
-   (D1) — bez MM i bez zależności od bufora SGT.                             */
+/* ── Rozkładanie faktur zakupu (redesign v2.0) ──────────────────────────────
+   Jednostką pracy jest dokument. Rozkładanie zapisuje wyłącznie lokalizację
+   (D1) — bez MM i bez zależności od bufora SGT. Kontener z MGP idzie tą samą
+   ścieżką; stan przenosi się osobno (`services/przesuniecie.ts`).           */
 
 export interface DeliveryDocument {
   dokId: number;
@@ -137,6 +110,12 @@ export interface DeliveryDocument {
   positions: number;
   /** Dokument w buforze SGT — nadal można na nim pracować (D1). */
   wBuforze: boolean;
+  /**
+   * Magazyn skutku. Rozkłada się tak samo niezależnie od niego, ale po
+   * kontenerze (MGP) zostaje jeszcze przesunięcie stanu na halę — i to jest
+   * jedyna rzecz, którą warto powiedzieć PRZED wejściem w dokument.
+   */
+  magId: number;
   linesTotal: number;
   linesDone: number;
   status: string | null;
@@ -173,6 +152,12 @@ export interface DeliveryView {
   nrPrzesylki: string | null;
   /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
   kurierProtokol: string | null;
+  /**
+   * Magazyn skutku, snapshotowany przy otwarciu. Kolektor decyduje po nim,
+   * czy pokazać skrót „PRZESUŃ": po dostawie księgowanej wprost na MAG nie ma
+   * czego przesuwać.
+   */
+  sourceMagId: number | null;
   lines: DeliveryLineView[];
 }
 
