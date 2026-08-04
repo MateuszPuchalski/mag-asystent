@@ -28,6 +28,65 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.26.0 — 4 sierpnia 2026
+
+**Mniej warstw, jedna kopia każdej reguły.** Przegląd architektury zdjął
+z kodu to, co utrzymywało się bez pokrycia w potrzebie: fabrykę adaptera
+o jednej implementacji, cztery kopie składania CSV, dwa moduły raportowe
+z tą samą regułą w dwóch formach i dwa zakończone okresy przejściowe.
+
+**[wymaga działania]** Nic. Nowego APK nie potrzeba — kolektor się nie
+zmienił. Trasa `/sw.js` znika, ale komputery biura przeszły już przez jej
+sprzątający skrypt.
+
+### Co wypadło i dlaczego
+
+**Fabryka i interfejs adaptera odczytu.** `makeSubiektAdapter()` od zawsze
+zwracał jedną klasę, a interfejs miał jedną implementację — do tego część
+serwisów i tak sięga do tabel `sgt_*` bezpośrednio. Została sama klasa
+i alias typu; obietnica „podmienisz implementację", której nikt nie mógł
+spełnić, zniknęła.
+
+**Cztery kopie escapowania CSV.** Audyt, problemy, reslot i rekoncyliacja
+składały pliki każde po swojemu i kopie zaczęły się rozjeżdżać w szczegółach
+cytowania. Teraz jest jeden `services/csv.ts`; separatory zostały jak były
+(`;` dla biura, `,` dla audytu — RFC 4180).
+
+**Dwa moduły raportowe.** `metrics.ts` i `wydajnosc.ts` liczyły z tej samej
+tabeli `events` i każdy niósł własną formę reguły odsiewu podwójnego
+liczenia — a rozjazd tych kopii zawyżałby raport mierzący ludzi.
+W `services/raporty.ts` reguła istnieje w jednym egzemplarzu. Trasy
+`/api/metrics` i `/api/wydajnosc` odpowiadają dokładnie tym samym co dotąd.
+
+**Wsady roczne w buildzie produkcyjnym.** `reslot` i `reconcile` chodzą
+z checkoutu przez `npm run` — tak mówi ich własna dokumentacja. Wypadły
+z `dist` i ze skryptów `start:*`; usługa niesie tylko to, co naprawdę chodzi
+jako usługa.
+
+**Dwa okresy przejściowe.** Trasa `/sw.js` (pogrzeb PWA usuniętej w 0.3.0)
+zrobiła swoje. Klucze problemów sprzed 0.21.0 przestały być zapisywalne —
+wszystkie kolektory mają już nowe APK. Etykiety historyczne zostają:
+wyjątki z bazy muszą mieć nazwę na protokole dla dostawcy.
+
+### Dokumentacja: jedno źródło prawdy na temat
+
+Instrukcje operacyjne mieszkają teraz wyłącznie w `DEPLOY.md` — instalator
+jako właściwa droga, procedura ręczna jako jego dokumentacja odniesienia,
+plus nowy §8 o odinstalowaniu. `docs/wdrozenie.md` zwęża się do wdrożenia
+organizacyjnego i nie zawiera ani jednego bloku poleceń. README oddał
+treści krok-po-kroku i przestał twierdzić, że bufor offline używa Room —
+to plik JSON + WorkManager, jak było od początku.
+
+Audyt lustra DTO (`Dtos.kt` ↔ `types.ts`) pokazał, że każdy typ jest
+używany — nie było czego wycinać. Nagłówki obu plików mówią teraz o sobie
+nawzajem, zamiast odsyłać do klienta webowego usuniętego w 0.3.0.
+
+Świadomie NIE ruszone: mechanika MM z `waiting_for_doc` (kolejka z błędem
+„MM wystawia biuro" jest listą zadań biura), `env-file.ts`, narzędzia
+w `tools/` i instalator.
+
+---
+
 ## 0.25.0 — 4 sierpnia 2026
 
 **`npm run seed:scenariusze` buduje 66 przypadków brzegowych w bazie demo.**

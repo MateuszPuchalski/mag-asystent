@@ -61,7 +61,7 @@ adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
 │ Worker (osobny      │         │ MSSQL Subiekta GT            │
 │ proces Node)        │────────▶│  odczyt: kartoteki, stany,   │
 │ pętla poll, retry,  │  UPDATE │          dokumenty           │
-│ backoff             │  ×2     │  zapis: dwa pola (patrz §1)  │
+│ backoff             │         │  zapis: jedno pole (§1)      │
 └─────────────────────┘         └──────────────────────────────┘
 ```
 
