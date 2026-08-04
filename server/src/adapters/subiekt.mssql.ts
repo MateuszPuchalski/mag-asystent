@@ -330,12 +330,10 @@ export async function importFromMssql(): Promise<ImportStats> {
                 ${c.bufferExpr} AS w_buforze
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
-         WHERE (
-                 -- tryb A: dostawa krajowa księgowana wprost na MAG (sam adres, bez MM)
-                 (d.dok_MagId = @mag AND ${dostawyTypFilter})
-                 -- tryb B: kontener na MGP — sesja z wózkiem i MM na rundę
-              OR (d.dok_MagId = @mgp AND ${dostawyTypFilter})
-               )
+         -- Dostawy krajowe (MAG) i kontenery (MGP) idą jedną listą i jedną
+         -- ścieżką rozkładania. Magazyn skutku mówi już tylko tyle, że po
+         -- kontenerze zostaje jeszcze przesunięcie stanu na halę.
+         WHERE d.dok_MagId IN (@mag, @mgp) AND ${dostawyTypFilter}
            AND ${oknoFilter}`
       )
   ).recordset;

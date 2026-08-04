@@ -13,10 +13,10 @@ import {
 } from "../services/delivery.js";
 import type { LocApplyAction } from "../types.js";
 
-/* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ───────────────────────
+/* ── Rozkładanie faktur zakupu (redesign v2.0) ───────────────────────────────
    Ścieżka codzienna: dokument → skan towaru → skan lokalizacji. Zapis wyłącznie
-   `set_location` (D1), zero dokumentów.
-   Tryb B (kontener na MGP) żyje dalej pod /api/putaway/*.                     */
+   `set_location` (D1), zero dokumentów. Dotyczy też kontenerów z MGP — po nich
+   zostaje jeszcze przesunięcie stanu (`POST /api/przesuniecie`).             */
 
 export async function deliveryRoutes(app: FastifyInstance) {
   /**

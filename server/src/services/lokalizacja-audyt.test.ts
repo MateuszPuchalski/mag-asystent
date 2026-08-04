@@ -99,9 +99,9 @@ test("rozkładanie dostawy zostawia ślad — dawniej nie zostawiało żadnego",
   assert.equal(w[0].p.zrodlo, "dostawa");
 });
 
-test("koszyk zostawia ślad z własnym źródłem", () => {
-  enqueueSetLocation(705, "E08-03-01", baza(705), { locsPrzed: "", zrodlo: "koszyk" });
-  assert.equal(wpisy(705)[0].p.zrodlo, "koszyk");
+test("przesunięcie zostawia ślad z własnym źródłem", () => {
+  enqueueSetLocation(705, "E08-03-01", baza(705), { locsPrzed: "", zrodlo: "przesuniecie" });
+  assert.equal(wpisy(705)[0].p.zrodlo, "przesuniecie");
 });
 
 test("jedno zakolejkowanie to DOKŁADNIE JEDEN wpis", () => {

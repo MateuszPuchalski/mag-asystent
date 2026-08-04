@@ -13,7 +13,6 @@ export interface EnqueueBase {
   createdByRef?: number | null;
   twId?: number | null;
   sourceDocId?: number | null;
-  sessionId?: number | null;
   label: string;
   detail: string;
 }
@@ -31,8 +30,8 @@ function insert(
   // wypełnia dopiero worker: backoff przy retry i `waiting_for_doc`.
   const res = db()
     .prepare(
-      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, session_id, created_by, created_by_ref, next_attempt_at)
-       VALUES (?,?, 'pending', ?,?,?,?,?,?,?,?)`
+      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, created_by, created_by_ref, next_attempt_at)
+       VALUES (?,?, 'pending', ?,?,?,?,?,?,?)`
     )
     .run(
       type,
@@ -41,7 +40,6 @@ function insert(
       base.detail,
       base.twId ?? null,
       base.sourceDocId ?? null,
-      base.sessionId ?? null,
       base.createdBy,
       base.createdByRef ?? currentUserRef(),
       null
@@ -53,9 +51,9 @@ function insert(
  * Dane audytowe zmiany lokalizacji. Parametr WYMAGANY — i to jest cały sens.
  *
  * Do sierpnia 2026 zdarzenie o zmianie lokalizacji emitowała wyłącznie trasa
- * karty towaru. Dwie pozostałe ścieżki — rozkładanie linii dostawy i zamknięcie
- * koszyka — kolejkowały ten sam zapis i logowały własne zdarzenia dziedzinowe,
- * które o zawartości pola nie mówiły nic. Historia na karcie milczała więc
+ * karty towaru. Pozostałe ścieżki — rozkładanie linii dostawy i przesunięcie
+ * stanu — kolejkują ten sam zapis i logują własne zdarzenia dziedzinowe, które
+ * o zawartości pola nie mówią nic. Historia na karcie milczałaby więc
  * o zmianach, których nie zrobiono z niej samej.
  */
 export interface AudytLokalizacji {
@@ -69,7 +67,7 @@ export interface AudytLokalizacji {
    */
   locsPrzed: string;
   /** Z którego ekranu wyszła zmiana. Pierwsze pytanie przy analizie. */
-  zrodlo: "karta" | "dostawa" | "koszyk";
+  zrodlo: "karta" | "dostawa" | "przesuniecie";
   /** Intencja człowieka — tylko z karty towaru (`add` | `replace` | `remove`). */
   akcja?: string;
   /** Kod, który człowiek podał — tylko z karty towaru. */
@@ -113,7 +111,7 @@ export function enqueueSetLocation(
   return queueId;
 }
 
-/** Zadanie MM (spec §5.3). items: przesunięcie MGP→MAG. */
+/** Zadanie MM (spec §5.3): przesunięcie stanu między dowolną parą magazynów. */
 export function enqueueMM(
   magFrom: number,
   magTo: number,

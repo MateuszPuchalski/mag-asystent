@@ -151,25 +151,12 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .all(twId) as unknown as RawStockRow[];
   }
 
-  listPutawayDocuments(days: number): RawDocument[] {
-    const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
-    return db()
-      .prepare(
-        `SELECT * FROM sgt_dokument
-         WHERE mag_id = ? AND data_wyst >= ?
-         ORDER BY data_wyst DESC, dok_id DESC`
-      )
-      .all(config.magId.MGP, cutoff) as unknown as RawDocument[];
-  }
-
   listDeliveryDocuments(days: number): RawDocument[] {
     const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
-    // O trybie decyduje MAGAZYN SKUTKU, nie typ dokumentu — i kryteria obu list
-    // muszą pozostać ROZŁĄCZNE, inaczej ten sam dokument wisi w dwóch zakładkach
-    // i można na nim pracować dwoma niekompatybilnymi ścieżkami naraz.
-    //
-    //   MAG → tryb A, dostawa krajowa: towar już leży na hali, brakuje adresu (D1)
-    //   MGP → tryb B, kontener: sesja z wózkiem, MM na rundę
+    // Jedna lista, dwa magazyny skutku. Do 0.22.0 kontener na MGP miał własną
+    // zakładkę i własną ścieżkę pracy; teraz rozkłada się identycznie — zapisem
+    // adresu (D1) — a magazyn skutku mówi już tylko tyle, że po odłożeniu
+    // zostaje jeszcze przesunięcie stanu na halę.
     // Typy dostaw biorą się z `DOK_TYPY_DOSTAW`, tak samo jak w adapterze MSSQL.
     // Para ('FZ','PZ') była tu ZASZYTA i czyniła demo niewiernym: zawężenie
     // konfiguracji do samych FZ nie robiło na tej liście żadnej różnicy, więc
@@ -179,11 +166,11 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return db()
       .prepare(
         `SELECT * FROM sgt_dokument
-         WHERE typ IN (${luki}) AND mag_id = ?
+         WHERE typ IN (${luki}) AND mag_id IN (?, ?)
            AND data_wyst >= ?
          ORDER BY data_wyst DESC, dok_id DESC`
       )
-      .all(...etykiety, config.magId.MAG, cutoff) as unknown as RawDocument[];
+      .all(...etykiety, config.magId.MAG, config.magId.MGP, cutoff) as unknown as RawDocument[];
   }
 
   getDocument(docId: number): RawDocument | undefined {
@@ -208,12 +195,12 @@ export class SeededSubiektAdapter implements SubiektAdapter {
          FROM sgt_pozycja p
          JOIN sgt_dokument d ON d.dok_id = p.dok_id
          WHERE p.tw_id = ?
-           AND d.typ IN (${luki}) AND d.mag_id = ?
+           AND d.typ IN (${luki}) AND d.mag_id IN (?, ?)
            AND d.data_wyst >= ?
          GROUP BY d.dok_id
          ORDER BY d.data_wyst DESC, d.dok_id DESC`
       )
-      .all(twId, ...etykiety, config.magId.MAG, cutoff) as unknown as RawDocPosition[];
+      .all(twId, ...etykiety, config.magId.MAG, config.magId.MGP, cutoff) as unknown as RawDocPosition[];
   }
 
   getOrdersForProduct(twId: number): RawZamPosition[] {

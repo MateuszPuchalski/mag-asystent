@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { db, nowIso, transaction } from "./db.js";
 import { config } from "../config.js";
+import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
 
 /**
  * Zasila read-model sgt_* prawdziwymi danymi z server/seed/products.json
@@ -150,17 +151,21 @@ function seed() {
   const buildDocs = transaction(d, () => {
     paczki.forEach((paczka, k) => {
       const dok_id = k + 1;
-      const typ = k % 2 === 0 ? "FZ" : "PZ";
+      /* Typ kontenera bierzemy Z KONFIGURACJI, nie z parzystości. Lista dostaw
+         filtruje po `DOK_TYPY_DOSTAW`, a domyślne ustawienie zna tylko FZ —
+         kontener z zaszytym „PZ" wypadłby z demo bez jednego słowa błędu.
+         Ta sama pułapka, którą opisuje komentarz w `subiekt.seeded.ts`. */
+      const kontener = k === 1;
+      const typ = kontener ? (etykietyDostaw()[0] ?? "FZ") : k % 2 === 0 ? "FZ" : "PZ";
       const dataDok = new Date(baseDate.getTime() - k * 86400_000);
       const nr = `${typ} ${120 + k}/${mmrrrr(dataDok)}`;
       const date = dataDok.toISOString().slice(0, 10);
       // ostatni dokument w buforze → dokument w buforze jest normalnie do pracy (D1)
       const wBuforze = k === paczki.length - 1 ? 1 : 0;
-      // Magazyn skutku decyduje o trybie rozkładania (i tylko on — dokument nie
-      // może wisieć w obu zakładkach naraz). Krajowe FZ/PZ księgują się wprost
-      // na MAG → tryb A, sam adres. Jeden dokument zostaje na MGP jako kontener
-      // importowy → tryb B, sesja z wózkiem i realnym MM MGP→MAG.
-      const kontener = k === 1;
+      // Magazyn skutku nie zmienia sposobu rozkładania — zmienia to, co zostaje
+      // PO nim. Krajowe FZ/PZ księgują się wprost na MAG, więc po odłożeniu
+      // adresów nie zostaje nic. Jeden dokument stoi na MGP jako kontener
+      // importowy: jego stan trzeba jeszcze przesunąć na halę.
       insDok.run(
         dok_id,
         typ,
