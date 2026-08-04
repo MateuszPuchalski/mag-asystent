@@ -28,9 +28,9 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
-## 0.24.0 — 4 sierpnia 2026
+## 0.25.0 — 4 sierpnia 2026
 
-**`npm run seed:scenariusze` buduje 65 przypadków brzegowych w bazie demo.**
+**`npm run seed:scenariusze` buduje 66 przypadków brzegowych w bazie demo.**
 Kolizję kodów, cudzą blokadę pozycji, zadanie w błędzie sprzed trzech dni,
 zdjęcie bez pliku i adres spoza wzorca — wszystko naraz, jednym poleceniem.
 
@@ -50,7 +50,7 @@ nie ogląda przed wdrożeniem.
 
 ### Katalog jest jednym bytem, nie dwoma
 
-Scenariusze mają numery (`S01`–`S65`), a ich opisy leżą
+Scenariusze mają numery (`S01`–`S66`), a ich opisy leżą
 w `docs/scenariusze-testowe.md`. Zgodności katalogu z dokumentacją pilnuje test,
 nie oko: scenariusz bez opisu i opis bez scenariusza zapalają się na czerwono.
 
@@ -89,6 +89,27 @@ do sprawdzenia raportu, nigdy do decyzji o magazynie.
 Nie jest testem. Nie sprawdza niczego sam i nie zapali się na czerwono, gdy
 aplikacja się zepsuje — daje wyłącznie stan, w którym da się to zobaczyć okiem.
 Testy jednostkowe zostają tam, gdzie były.
+
+### Poprawka po zderzeniu z 0.24.0
+<!-- docs_check: historia -->
+
+Ten wpis stał przez chwilę pod numerem 0.24.0, czyli pod cudzym. Obie zmiany
+powstawały równolegle i scalenie skleiło je pod jednym nagłówkiem, a razem z nimi
+weszła na `main` czerwona kontrola dokumentacji: `docs/scenariusze-testowe.md`
+nazywał `tryb_serwisowy_start`, wycofany w 0.24.0 tego samego dnia.
+
+Scenariusze idą za kodem, więc dziennik demo niesie dziś zdarzenia zarządzania
+kontami (`user_created`, `user_active_changed`), a nie tryb serwisowy. Doszła
+też **czwarta rola**: konto `admin.test` i scenariusz S66 na trzy operacje, które
+umie sam admin — konto biurowe, odebranie hasła i wyłączenie konta.
+
+Konta `admin` z `npm run seed` seed scenariuszy nie tyka. Nie zna jego hasła,
+a podmiana cudzego byłaby najgorszym możliwym skutkiem polecenia, które ma
+wyłącznie dopisywać dane.
+
+---
+
+## 0.24.0 — 4 sierpnia 2026
 <!-- docs_check: historia -->
 
 **Konto administratora zakłada instalator, a loguje się ono jak każde inne.**

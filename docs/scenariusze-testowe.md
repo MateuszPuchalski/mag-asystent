@@ -54,6 +54,7 @@ z prawdziwego wdrożenia nie ma z tym nic wspólnego.
 | `jan.k` | magazynier | `wertis12345` |
 | `ewa.b` | brygadzista | `wertis12345` |
 | `biuro.test` | biuro | `wertis12345` |
+| `admin.test` | admin | `wertis12345` |
 | `zwolniony` | magazynier, konto wyłączone | `wertis12345` |
 | `bez.hasla` | magazynier, konto bez hasła | — |
 
@@ -64,8 +65,8 @@ curl -s -H "x-session: scenariusz-jan" localhost:3001/api/queue
 ```
 
 `scenariusz-jan` należy do magazyniera, `scenariusz-ewa` do brygadzisty,
-`scenariusz-biuro` do biura. Token `scenariusz-uniewazniona` jest unieważniony
-i ma zwracać 401.
+`scenariusz-biuro` do biura, a `scenariusz-admin` do admina. Token
+`scenariusz-uniewazniona` jest unieważniony i ma zwracać 401.
 
 ## Zakresy identyfikatorów
 
@@ -429,10 +430,13 @@ W kartotece stoi `A02-02-02`.
 
 ## Konta, sesje i uprawnienia
 
-### S51 — trzy role
+### S51 — cztery role
 
-Zaloguj się kolejno jako `jan.k`, `ewa.b` i `biuro.test`. Hasło jest jedno dla
-wszystkich kont: `wertis12345`.
+Zaloguj się kolejno jako `jan.k`, `ewa.b`, `biuro.test` i `admin.test`. Hasło
+jest jedno dla wszystkich kont: `wertis12345`.
+
+Konto `admin` z `npm run seed` zostaje nietknięte. Seed scenariuszy nie zna jego
+hasła i nie ma prawa go podmienić.
 
 ### S52 — konto wyłączone
 
@@ -479,6 +483,24 @@ Obie liczby w adresie są przykładowe. Numer dostawy i pozycji weź z odpowiedz
 W dzienniku zostaje wpis `lock_forced` z nazwiskiem osoby, której odebrano
 pozycję.
 
+### S66 — operacje wyłącznie dla admina
+
+Od 0.24.0 trzy rzeczy umie sam admin: założyć konto o roli `biuro` albo `admin`,
+odebrać komuś hasło i wyłączyć konto.
+
+Spróbuj każdej z nich tokenem `scenariusz-biuro`. Serwer ma odmówić kodem 403.
+Ten sam ruch tokenem `scenariusz-admin` ma się udać.
+
+```bash
+curl -X POST -H "x-session: scenariusz-biuro" -H 'content-type: application/json' \
+  -d '{"name":"Nowe biuro","login":"biuro2","haslo":"tajnehaslo","role":"biuro"}' \
+  localhost:3001/api/users
+```
+
+Rola strzegąca tożsamości nie ma jej rozdawać sama sobie. Zakładanie konta
+magazyniera zostaje przy biurze, więc ta sama trasa odpowiada raz tak, raz nie —
+zależnie od roli w ciele żądania.
+
 ---
 
 ## Dziennik, metryki i wydajność
@@ -486,7 +508,7 @@ pozycję.
 ### S57 — wszystkie typy zdarzeń
 
 Dziennik niesie po jednym wpisie każdego typu, którego szuka audyt. Są wśród
-nich `queue_failed`, `http_rejected`, `device_drop` i `tryb_serwisowy_start`.
+nich `queue_failed`, `http_rejected`, `device_drop` i `audyt_eksport`.
 
 Sprawdź `GET /api/events` z filtrami po osobie, towarze i dacie oraz eksport
 `GET /api/events/csv`. Obie trasy wymagają roli brygadzisty albo biura.

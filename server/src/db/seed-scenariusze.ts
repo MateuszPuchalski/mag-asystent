@@ -71,7 +71,7 @@ const MAG_ARCHIWUM = 93;
 export const HASLO_SCENARIUSZY = "wertis12345";
 
 /** Loginy zakładane przez ten skrypt — po nich rozpoznaje własne konta. */
-const LOGINY = ["jan.k", "ewa.b", "biuro.test", "zwolniony", "bez.hasla"];
+const LOGINY = ["jan.k", "ewa.b", "biuro.test", "admin.test", "zwolniony", "bez.hasla"];
 
 /**
  * Nazwy, którymi podpisane są zdarzenia scenariuszy.
@@ -91,10 +91,7 @@ const AUTORZY = [
   "Jan",
   "jan",
   "Jan K",
-  /* Podpis, którego nie stawia żaden człowiek: tryb serwisowy nazywa tak konto
-     techniczne. Bez niego lista wygląda na kompletną, a ten wiersz narasta po
-     cichu z każdym uruchomieniem seedu. */
-  "ADMIN (TRYB SERWISOWY)",
+  "Administrator (scenariusze)",
 ];
 
 /**
@@ -184,12 +181,13 @@ export const KATALOG: Scenariusz[] = [
   { id: "S50", obszar: "kolejka", tytul: "Rozjazd: zapis wszedł, kartoteka mówi co innego", wejscie: "npm run reconcile" },
 
   // ── konta, sesje, uprawnienia ──
-  { id: "S51", obszar: "konta", tytul: "Trzy role z hasłami", wejscie: "logowanie jan.k / ewa.b / biuro.test" },
+  { id: "S51", obszar: "konta", tytul: "Cztery role z hasłami", wejscie: "logowanie jan.k / ewa.b / biuro.test / admin.test" },
   { id: "S52", obszar: "konta", tytul: "Konto wyłączone", wejscie: "logowanie zwolniony" },
   { id: "S53", obszar: "konta", tytul: "Konto-ślad bez loginu (migracja historii)", wejscie: "POST /api/users/migrate-history" },
   { id: "S54", obszar: "konta", tytul: "Konto z loginem, bez hasła", wejscie: "logowanie bez.hasla" },
   { id: "S55", obszar: "konta", tytul: "Sesje: czynna, unieważniona i sprzed dwóch miesięcy", wejscie: "x-session: scenariusz-jan" },
   { id: "S56", obszar: "konta", tytul: "Operacja zastrzeżona dla roli (zdjęcie cudzego locka)", wejscie: "POST /api/delivery/:id/lines/:lineId/force-release" },
+  { id: "S66", obszar: "konta", tytul: "Konto biurowe, hasło i wyłączenie konta — wyłącznie admin", wejscie: "POST /api/users z rolą biuro" },
 
   // ── audyt, metryki, wydajność ──
   { id: "S57", obszar: "audyt", tytul: "Dziennik ze wszystkimi typami zdarzeń", wejscie: "GET /api/events" },
@@ -903,6 +901,10 @@ function konta(): number {
     ["jan.k", hash, "Jan Kowalski", "magazynier", 1],
     ["ewa.b", hash, "Ewa Bąk", "brygadzista", 1],
     ["biuro.test", hash, "Biuro (scenariusze)", "biuro", 1],
+    /* Czwarta rola z 0.24.0. Login jest inny niż `admin`, bo tamten zakłada
+       `npm run seed` — dwa konta o jednym loginie nie przeszłyby przez UNIQUE,
+       a podmiana cudzego hasła byłaby najgorszym możliwym skutkiem seedu. */
+    ["admin.test", hash, "Administrator (scenariusze)", "admin", 1],
     // S52 — konto wyłączone: hasło się zgadza, wejścia nie ma
     ["zwolniony", hash, "Marek Odszedł", "magazynier", 0],
     // S54 — login jest, hasła nie ma; takie konto nie zaloguje się nigdy
@@ -917,6 +919,8 @@ function konta(): number {
     if (name === "Jan Kowalski") idJana = id;
     if (name === "Ewa Bąk") idEwy = id;
     if (name === "Biuro (scenariusze)") idBiura = id;
+    if (name === "Administrator (scenariusze)") idAdmina = id;
+    if (name === "Marek Odszedł") idZwolnionego = id;
   }
 
   /* S55 — trzy sesje w trzech stanach. Tokeny są czytelne, żeby dało się nimi
@@ -928,6 +932,7 @@ function konta(): number {
   insSesja.run("scenariusz-jan", idPoLoginie.get("jan.k")!, "KOLEKTOR-01", chwila(-120), chwila(-3), null);
   insSesja.run("scenariusz-ewa", idPoLoginie.get("ewa.b")!, "KOLEKTOR-02", chwila(-240), chwila(-30), null);
   insSesja.run("scenariusz-biuro", idPoLoginie.get("biuro.test")!, null, chwila(-60), chwila(-1), null);
+  insSesja.run("scenariusz-admin", idPoLoginie.get("admin.test")!, null, chwila(-60), chwila(-2), null);
   // sesja unieważniona — token istnieje, a nie otwiera niczego
   insSesja.run("scenariusz-uniewazniona", idPoLoginie.get("jan.k")!, "KOLEKTOR-03", chwila(-1440), chwila(-1400), chwila(-1380));
   // sesja sprzed dwóch miesięcy — `last_seen` niczego nie bramkuje, jest śladem
@@ -941,6 +946,8 @@ function konta(): number {
 let idJana = 0;
 let idEwy = 0;
 let idBiura = 0;
+let idAdmina = 0;
+let idZwolnionego = 0;
 
 /* ── Kolejka Sfery ──────────────────────────────────────────────────────────
    Każdy status z osobna, plus trzy przypadki, których z kolektora wystawić się
@@ -1094,8 +1101,16 @@ function dziennik(): number {
   zdarzenie("queue_failed", "Jan Kowalski", idJana, 900_024, { queueId: 8, typ: "set_location", proby: 3, blad: "Kartoteka w edycji" }, -20, null);
   zdarzenie("http_rejected", "Jan Kowalski", idJana, null, { method: "POST", url: "/api/delivery/lines/6/putaway", status: 409 }, -35);
   zdarzenie("device_drop", "Jan Kowalski", idJana, null, { g: 5.8, bateria: 41 }, -30);
-  zdarzenie("user_haslo_changed", "Biuro (scenariusze)", idBiura, null, { userId: idJana, wlasne: false }, -1440, null);
-  zdarzenie("tryb_serwisowy_start", "ADMIN (TRYB SERWISOWY)", null, null, { sgtMode: "seeded" }, -300, null);
+  /* Trzy zdarzenia zarządzania kontami. Podpisuje je ADMIN, bo od 0.24.0 tylko
+     ta rola może zakładać konta biurowe, odbierać hasło i wyłączać konto —
+     i tylko na niej widać różnicę wobec biura. */
+  zdarzenie("user_created", "Administrator (scenariusze)", idAdmina, null, { userId: idBiura, role: "biuro" }, -3 * 1440, null);
+  zdarzenie("user_haslo_changed", "Administrator (scenariusze)", idAdmina, null, { userId: idJana, wlasne: false }, -1440, null);
+  zdarzenie("user_active_changed", "Administrator (scenariusze)", idAdmina, null, { userId: idZwolnionego, active: false }, -1400, null);
+  zdarzenie("magazyny_widocznosc", "Biuro (scenariusze)", idBiura, null, { ukryte: [MAG_ARCHIWUM], kody: ["ARCH"] }, -60, null);
+  zdarzenie("audyt_eksport", "Biuro (scenariusze)", idBiura, null, { filtr: { od: "2026-08-01" }, wierszy: 96 }, -15, null);
+  zdarzenie("search", "Jan Kowalski", idJana, null, { q: "filtr" }, -185);
+  zdarzenie("klient_odrzucona", "Jan Kowalski", idJana, null, { rodzaj: "offline_putaway", powod: "brak sesji przy odbuforowaniu", status: 401 }, -33);
 
   // ── S58: historia sprzed kont — trzy warianty jednej osoby, bez `user_ref` ──
   zdarzenie("scan", "Jan", null, 900_011, { code: "TEST-WIELE-LOK", kind: "TEXT" }, -40 * 1440, "KOLEKTOR-01");
@@ -1267,7 +1282,10 @@ function wypisz(licz: Podsumowanie): void {
   }
   console.log("");
   console.log(`[scenariusze] konta: ${LOGINY.join(", ")} — hasło „${HASLO_SCENARIUSZY}"`);
-  console.log("[scenariusze] gotowe tokeny: scenariusz-jan (magazynier), scenariusz-ewa (brygadzista), scenariusz-biuro (biuro)");
+  console.log(
+    "[scenariusze] gotowe tokeny: scenariusz-jan (magazynier), scenariusz-ewa (brygadzista), " +
+      "scenariusz-biuro (biuro), scenariusz-admin (admin)"
+  );
   console.log("[scenariusze] opis krok po kroku: docs/scenariusze-testowe.md");
 }
 

@@ -148,7 +148,7 @@ struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
 ```bash
 npm install
 npm run seed     # zasila SQLite z server/seed/products.json (raz; FORCE_SEED=1 nadpisuje)
-npm run seed:scenariusze   # opcjonalnie: 65 przypadków brzegowych do przeklikania
+npm run seed:scenariusze   # opcjonalnie: 66 przypadków brzegowych do przeklikania
 npm run dev      # api :3001 + worker; sprawdzenie: http://localhost:3001/api/health
 ```
 
@@ -598,7 +598,7 @@ pozycji, zadania w błędzie, zdjęcia bez pliku i adresu spoza wzorca.
 
 ```bash
 npm run seed                 # kartoteka — raz
-npm run seed:scenariusze     # 65 przypadków brzegowych, dopisywane do kartoteki
+npm run seed:scenariusze     # 66 przypadków brzegowych, dopisywane do kartoteki
 ```
 
 Katalog scenariuszy z instrukcją sprawdzenia:
