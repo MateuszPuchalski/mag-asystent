@@ -1,4 +1,5 @@
 import { db } from "../db/db.js";
+import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Odczyt śladu audytowego ─────────────────────────────────────────────────
    `events` zbiera 27 typów zdarzeń od pierwszego dnia instalacji i nic ich nie
@@ -142,26 +143,17 @@ export function typyZdarzen(): string[] {
 
 const KOLUMNY = ["id", "czas", "typ", "uzytkownik", "userRef", "device", "twId", "payload"] as const;
 
-/** Pole CSV wg RFC 4180: cudzysłów podwajamy, całość cytujemy, gdy trzeba. */
-function pole(v: unknown): string {
-  if (v == null) return "";
-  const s = String(v);
-  // payload to JSON — ma i przecinki, i cudzysłowy, więc ta gałąź jest regułą,
-  // nie przypadkiem brzegowym
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
 /**
  * CSV do arkusza. Separator to przecinek (RFC 4180), a nie średnik — Excel
  * w polskiej lokalizacji potrzebuje wtedy kroku „Dane → Tekst jako kolumny",
  * ale plik zostaje przenośny i czytelny dla każdego innego narzędzia.
+ * Payload to JSON — ma i przecinki, i cudzysłowy, więc cytowanie jest tu
+ * regułą, nie przypadkiem brzegowym.
  */
 export function csv(wiersze: WpisAudytu[]): string {
   const linie = [KOLUMNY.join(",")];
   for (const w of wiersze) {
-    linie.push(KOLUMNY.map((k) => pole((w as unknown as Record<string, unknown>)[k])).join(","));
+    linie.push(wierszCsv(KOLUMNY.map((k) => (w as unknown as Record<string, unknown>)[k]), ","));
   }
-  // BOM: bez niego Excel czyta UTF-8 jako ANSI i polskie znaki się sypią —
-  // ten sam problem, co z plikami .ps1 instalatora.
-  return "﻿" + linie.join("\r\n") + "\r\n";
+  return zbudujCsv(linie);
 }

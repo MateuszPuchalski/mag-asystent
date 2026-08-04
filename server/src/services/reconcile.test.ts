@@ -121,5 +121,6 @@ test("CSV otwiera się w Excelu PL bez kreatora", () => {
   const csv = reconcileCsv(reconcile());
   assert.ok(csv.startsWith("﻿"), "BOM");
   assert.match(csv.replace(/^﻿/, "").split("\r\n")[0], /^rodzaj;klucz;opis;od_kiedy$/);
-  assert.match(csv, /"lokalizacja"/);
+  // cytowanie jest warunkowe (wspólny csv.ts): zwykłe pole idzie bez cudzysłowów
+  assert.match(csv, /^lokalizacja;/m);
 });

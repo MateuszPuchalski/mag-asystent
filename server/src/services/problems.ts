@@ -4,6 +4,7 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { closeIfComplete } from "./delivery.js";
+import { wierszCsv, zbudujCsv } from "./csv.js";
 import type { ProblemView, ProblemType } from "../types.js";
 
 /* ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
@@ -315,10 +316,6 @@ export function resolveProblem(id: number, note: string | undefined, user: strin
 /** CSV do reklamacji u dostawcy (§4.6). Separator `;` — Excel PL. */
 export function exportCsv(deliveryId: number): string {
   const rows = listByDelivery(deliveryId);
-  const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
-    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
   const head = [
     "id",
     "dokument",
@@ -334,24 +331,24 @@ export function exportCsv(deliveryId: number): string {
     "notatka",
   ].join(";");
   const lines = rows.map((p) =>
-    [
-      p.id,
-      p.docNumber,
-      p.sym,
-      p.name,
-      p.typ,
-      p.qty,
-      p.opis,
-      p.hasPhoto ? "tak" : "nie",
-      p.createdAt,
-      p.createdBy,
-      p.resolvedAt,
-      p.resolvedNote,
-    ]
-      .map(esc)
-      .join(";")
+    wierszCsv(
+      [
+        p.id,
+        p.docNumber,
+        p.sym,
+        p.name,
+        p.typ,
+        p.qty,
+        p.opis,
+        p.hasPhoto ? "tak" : "nie",
+        p.createdAt,
+        p.createdBy,
+        p.resolvedAt,
+        p.resolvedNote,
+      ],
+      ";"
+    )
   );
-  // BOM — bez niego Excel PL rozjeżdża polskie znaki
-  return "﻿" + [head, ...lines].join("\r\n") + "\r\n";
+  return zbudujCsv([head, ...lines]);
 }
 
