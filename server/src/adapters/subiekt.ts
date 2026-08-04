@@ -1,4 +1,4 @@
-import type { ProductRow } from "../types.js";
+import type { SeededSubiektAdapter } from "./subiekt.seeded.js";
 
 /** Wiersz kartoteki + surowe stany (przed korektą o kolejkę). */
 export interface RawProduct {
@@ -60,72 +60,13 @@ export interface RawZamPosition {
 }
 
 /**
- * SubiektAdapter — granica odczytu z Subiekta GT (spec §6).
- * DEV: SELECT z tabel sgt_* (SQLite, seed z mag.xlsx).
- * PROD: SELECT read-only z MSSQL (subiekt.mssql.ts).
+ * SubiektAdapter — odczyt kartoteki Subiekta GT (spec §6).
+ *
+ * Jedyna implementacja to `SeededSubiektAdapter` — SELECT-y zawsze idą po
+ * lokalnym read-modelu sgt_* (SQLite). Tryb SGT_MODE zmienia tylko źródło
+ * zasilenia read-modelu: seed z mag.xlsx albo import z MSSQL
+ * (subiekt.mssql.ts). Alias typu zamiast interfejsu, bo drugiej implementacji
+ * nigdy nie było, a część serwisów i tak sięga do sgt_* bezpośrednio —
+ * adapter zbiera zapytania kartotekowe, nie szczelnie strzeże granicy.
  */
-export interface SubiektAdapter {
-  getProductById(twId: number): RawProduct | undefined;
-  getProductByEan(ean: string): RawProduct | undefined;
-  /**
-   * WSZYSTKIE kartoteki o danym kodzie EAN. W kartotece istnieją kody wskazujące
-   * na >1 SKU, więc ścieżki operacyjne muszą widzieć komplet kandydatów i same
-   * rozstrzygnąć (D7) — nigdy „pierwsze dopasowanie".
-   */
-  findProductsByEan(ean: string): RawProduct[];
-  getProductBySymbol(symbol: string): RawProduct | undefined;
-  /**
-   * Wiersze listy dla zbioru symboli — jedno zapytanie, nie N. Symbole nie
-   * istniejące w kartotece po prostu nie wracają; to jest cały mechanizm
-   * odsiewania numerów obcych przy zamiennikach z opisu.
-   */
-  getProductsBySymbols(symbols: string[]): ProductRow[];
-  search(q: string, limit: number): ProductRow[];
-  getStock(twId: number, magId: number): RawStock;
-  /**
-   * Wszystkie magazyny ze słownika Subiekta.
-   *
-   * Do lipca 2026 aplikacja znała DOKŁADNIE TRZY magazyny — te z `MAG_ID_*` —
-   * i nie było to ograniczenie wyświetlania: importer filtrował `tw_Stan`
-   * po tych trzech identyfikatorach, więc stany reszty nigdy nie trafiały do
-   * read-modelu. Magazynier nie miał jak się dowiedzieć, że towar leży jeszcze
-   * gdzie indziej.
-   */
-  listMagazyny(): RawMagazyn[];
-  /** Stany towaru we WSZYSTKICH magazynach — do zestawienia na karcie. */
-  getStockAll(twId: number): RawStockRow[];
-  /**
-   * Dostawy z ostatnich N dni: FZ/PZ księgowane na MAG (krajowe) oraz na MGP
-   * (kontenery). Dokumenty w buforze też, bo rozkładanie nie czeka na
-   * księgowość (D1).
-   *
-   * Jedna lista dla obu magazynów skutku. Do 0.22.0 kontener miał osobną
-   * zakładkę i osobną ścieżkę pracy; dziś różni się tylko tym, że po odłożeniu
-   * adresów zostaje jeszcze przesunięcie stanu na halę.
-   */
-  listDeliveryDocuments(days: number): RawDocument[];
-  /**
-   * Odwrotność `listDeliveryDocuments`: na których dostawach z ostatnich N dni
-   * stoi TEN towar i w jakiej ilości.
-   *
-   * Ta metoda mieszka w adapterze, a nie w serwisie, z jednego powodu: warunek
-   * „co w ogóle jest dostawą" musi zostać w jednym pliku obok
-   * `listDeliveryDocuments`. Druga kopia tego kryterium rozjechałaby się przy
-   * pierwszej zmianie, a objawem byłby towar policzony dwa razy albo wcale.
-   */
-  getDeliveryPositionsForProduct(twId: number, days: number): RawDocPosition[];
-  /**
-   * Otwarte zamówienia do dostawcy (ZD), na których stoi TEN towar.
-   *
-   * Bez parametru `days`: okno wycina już import (zamówienie bywa starsze niż
-   * dostawa i wciąż otwarte), a drugie okno tutaj tylko ukryłoby część tego, co
-   * importer uznał za aktualne — i to bez śladu na ekranie.
-   */
-  getOrdersForProduct(twId: number): RawZamPosition[];
-  getDocument(docId: number): RawDocument | undefined;
-  getDocumentPositions(docId: number): RawPosition[];
-  /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */
-  listLocations(): string[];
-  /** Towary, których pole lokalizacji zawiera dany kod (reverse lookup). */
-  getProductsByLocation(code: string): ProductRow[];
-}
+export type SubiektAdapter = SeededSubiektAdapter;

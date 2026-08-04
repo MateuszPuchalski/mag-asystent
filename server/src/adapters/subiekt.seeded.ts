@@ -11,7 +11,6 @@ import type {
   RawStock,
   RawStockRow,
   RawZamPosition,
-  SubiektAdapter,
 } from "./subiekt.js";
 import { etykietyDostaw } from "./typy-dokumentow.js";
 
@@ -21,10 +20,12 @@ import { etykietyDostaw } from "./typy-dokumentow.js";
 export { etykietyDostaw };
 
 /**
- * DEV/TEST — odczyt z tabel sgt_* (SQLite, seed z mag.xlsx).
- * Odzwierciedla SELECT-y ze spec §6, ale na lokalnym read-modelu.
+ * Odczyt kartoteki z tabel sgt_* (SQLite) — jedyna implementacja odczytu,
+ * w każdym trybie. SGT_MODE zmienia tylko zasilenie read-modelu: seed
+ * z mag.xlsx albo import z MSSQL (subiekt.mssql.ts). Odzwierciedla SELECT-y
+ * ze spec §6.
  */
-export class SeededSubiektAdapter implements SubiektAdapter {
+export class SeededSubiektAdapter {
   getProductById(twId: number): RawProduct | undefined {
     return db()
       .prepare("SELECT * FROM sgt_towar WHERE tw_id = ?")
@@ -37,6 +38,11 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .get(ean) as RawProduct | undefined;
   }
 
+  /**
+   * WSZYSTKIE kartoteki o danym kodzie EAN. W kartotece istnieją kody wskazujące
+   * na >1 SKU, więc ścieżki operacyjne muszą widzieć komplet kandydatów i same
+   * rozstrzygnąć (D7) — nigdy „pierwsze dopasowanie".
+   */
   findProductsByEan(ean: string): RawProduct[] {
     return db()
       .prepare("SELECT * FROM sgt_towar WHERE ean = ? ORDER BY symbol")
@@ -49,6 +55,11 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .get(symbol) as RawProduct | undefined;
   }
 
+  /**
+   * Wiersze listy dla zbioru symboli — jedno zapytanie, nie N. Symbole nie
+   * istniejące w kartotece po prostu nie wracają; to jest cały mechanizm
+   * odsiewania numerów obcych przy zamiennikach z opisu.
+   */
   getProductsBySymbols(symbols: string[]): ProductRow[] {
     if (symbols.length === 0) return [];
     const dziury = symbols.map(() => "?").join(",");
@@ -127,12 +138,22 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return row ?? { stan: 0, stan_rez: 0 };
   }
 
+  /**
+   * Wszystkie magazyny ze słownika Subiekta.
+   *
+   * Do lipca 2026 aplikacja znała DOKŁADNIE TRZY magazyny — te z `MAG_ID_*` —
+   * i nie było to ograniczenie wyświetlania: importer filtrował `tw_Stan`
+   * po tych trzech identyfikatorach, więc stany reszty nigdy nie trafiały do
+   * read-modelu. Magazynier nie miał jak się dowiedzieć, że towar leży jeszcze
+   * gdzie indziej.
+   */
   listMagazyny(): RawMagazyn[] {
     return db()
       .prepare("SELECT mag_id, kod, nazwa FROM sgt_magazyn ORDER BY mag_id")
       .all() as unknown as RawMagazyn[];
   }
 
+  /** Stany towaru we WSZYSTKICH magazynach — do zestawienia na karcie. */
   getStockAll(twId: number): RawStockRow[] {
     return db()
       .prepare("SELECT mag_id, stan, stan_rez FROM sgt_stan WHERE tw_id = ? ORDER BY mag_id")
@@ -191,6 +212,13 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .all(twId, ...etykiety, config.magId.MAG, config.magId.MGP, cutoff) as unknown as RawDocPosition[];
   }
 
+  /**
+   * Otwarte zamówienia do dostawcy (ZD), na których stoi TEN towar.
+   *
+   * Bez parametru `days`: okno wycina już import (zamówienie bywa starsze niż
+   * dostawa i wciąż otwarte), a drugie okno tutaj tylko ukryłoby część tego, co
+   * importer uznał za aktualne — i to bez śladu na ekranie.
+   */
   getOrdersForProduct(twId: number): RawZamPosition[] {
     /* Bez odsiewu po dacie i bez odejmowania `zreal` — jedno i drugie należy do
        warstw obok: okno wycina import, a regułę „zostało <= 0 wypada" ma serwis
@@ -213,6 +241,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
       .all(docId) as unknown as RawPosition[];
   }
 
+  /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */
   listLocations(): string[] {
     const rows = db()
       .prepare("SELECT lokalizacja FROM sgt_towar WHERE lokalizacja <> ''")
@@ -224,6 +253,7 @@ export class SeededSubiektAdapter implements SubiektAdapter {
     return [...set].sort();
   }
 
+  /** Towary, których pole lokalizacji zawiera dany kod (reverse lookup). */
   getProductsByLocation(code: string): ProductRow[] {
     // dopasowanie po całym kodzie w spacja-separated polu (granice słowa)
     const rows = db()
