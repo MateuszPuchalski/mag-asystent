@@ -334,6 +334,15 @@ function Publish-WertisKonfiguracja {
     )
     $plik = Join-Path $Katalog "wertis.env"
     $Ustawienia.PORT = "$Port"
+    <#
+        Lista jest BIAŁĄ LISTĄ, nie kolejnością wypisywania — i to jest jedyna
+        bariera, która działa, gdy ktoś zapomni. Klucz spoza niej nie trafi do
+        pliku, choćby siedział w `$Ustawienia`.
+
+        Najważniejszy z nieobecnych to `WERTIS_ADMIN`: wyłącza logowanie
+        w całości (DEPLOY §5a). Instalator nie ma prawa go zapisać ani dziś,
+        ani po dopisaniu do niego czegokolwiek — pilnuje tego `testy.ps1`.
+    #>
     $kolejnosc = @(
         "SGT_MODE",
         "MSSQL_SERVER", "MSSQL_INSTANCE", "MSSQL_PORT", "MSSQL_DATABASE",

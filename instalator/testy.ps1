@@ -609,3 +609,31 @@ if ($script:bledy) {
 }
 Write-Host "$($script:zdane) zdanych, 0 niezdanych" -ForegroundColor Green
 exit 0
+
+# ── Tryb serwisowy nie ma prawa trafić na produkcję ─────────────────────────
+# `WERTIS_ADMIN=1` wyłącza logowanie w całości. Zdanie "instalator tego nie
+# zapisuje" jest gwarancją bierną i przestaje obowiązywać przy pierwszej
+# nieuważnej zmianie białej listy w `Publish-WertisKonfiguracja`. Ten test
+# zamienia je w mechanizm.
+
+Sprawdz "biała lista wertis.env nie zna WERTIS_ADMIN" {
+    $zrodlo = Get-Content (Join-Path $PSScriptRoot "uslugi.ps1") -Raw
+    Zaloz (-not ($zrodlo -match '"WERTIS_ADMIN"')) `
+        "WERTIS_ADMIN pojawił się w instalatorze — tryb serwisowy nie może wyjechać do klienta"
+}
+
+Sprawdz "WERTIS_ADMIN podany w ustawieniach NIE trafia do pliku" {
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-adm-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE     = "mssql"
+            WERTIS_ADMIN = "1"
+        }
+        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
+        Zaloz ($tresc -match "SGT_MODE=") "zwykłe ustawienie ma się zapisać"
+        Zaloz (-not ($tresc -match "WERTIS_ADMIN")) "tryb serwisowy przeciekł do wertis.env"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
