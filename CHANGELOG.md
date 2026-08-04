@@ -28,6 +28,47 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.28.0 — 4 sierpnia 2026
+
+**Dostawca z własnym drukiem reklamacyjnym dostaje SWÓJ formularz.** Przycisk
+FORMULARZ w podglądzie biura rozpoznaje dostawcę z dokumentu FZ: GEKO dostaje
+swój „Protokół zgłoszenia reklamacji B2B" (tabela pozioma, przypisy, klauzula
+RODO), PARTNER — swój protokół opisowy, strona na każdy wyjątek. Pozostali
+dostawcy dostają protokół WERTIS jak dotąd.
+
+**[wymaga działania]** Nic obowiązkowego. Warto raz wpisać dane firmy
+(nazwa, NIP, adres, osoba kontaktowa) w sekcji REKLAMACJE podglądu biura —
+nadrukują się na formularzach zamiast pustych kropek.
+
+### Dlaczego
+
+Serwis dostawcy rozpatruje reklamację ze SWOJEGO druku. Protokół WERTIS był
+dla niego załącznikiem do przepisania: biuro przepisywało numer faktury, kod
+towaru i opis usterki ręcznie do formularza GEKO albo PARTNER. Teraz wydruk
+wychodzi od razu na właściwym druku, z wypełnionym tym, co system wie —
+numer FZ, kod i nazwa towaru, ilość, rodzaj rozbieżności, opis.
+
+Checkboxy zostają puste świadomie. Rodzaj usterki (mechaniczna/elektryczna)
+i dowód zakupu klienta ostatecznego to wiedza biura, nie magazynu — udawanie,
+że system ją ma, skończyłoby się błędnie zaznaczonym drukiem u dostawcy.
+
+### Dane firmy żyją w przeglądarce
+
+Druki dostawców pytają o dane zgłaszającego: nazwę firmy, NIP, adres, osobę
+kontaktową. System ich nigdzie nie miał, bo nie są danymi magazynu. Mieszkają
+teraz w localStorage przeglądarki biura, obok tokenu sesji — serwer nie musi
+wiedzieć, jak firma się nazywa. Bez wpisanych danych formularz drukuje się
+z kropkami do ręcznego uzupełnienia, jak oryginał.
+
+### Rozpoznanie po nazwie, nie po identyfikatorze
+
+Szablon wybiera fragment nazwy dostawcy (`GEKO`, `PARTNER`) z dokumentu FZ,
+nie sztywny identyfikator kontrahenta. Nazwa rejestrowa w Subiekcie bywa
+korygowana, a fragment przeżywa takie korekty. Zdjęcia dowodowe idą aneksem
+za formularzem — na każdym z trzech szablonów tak samo.
+
+---
+
 ## 0.27.0 — 4 sierpnia 2026
 
 **Podgląd biura pokazuje metryki, kolejkę, rekoncyliacja i ślad audytowy.**
