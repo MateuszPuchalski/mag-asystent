@@ -488,16 +488,17 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` bezpośrednim UPDATE jednej kolumny objętej
-`GRANT UPDATE`. Zadania MM — z rundy wózka (kontener) i z zamkniętego
-— zgłaszają czytelny błąd; do czasu workera Sfery MM wystawia
-biuro w Subiekcie. Osobnego przełącznika trybu zapisu nie ma.
+`GRANT UPDATE`. Zadania MM zgłaszają czytelny błąd; do czasu workera Sfery
+dokument MM wystawia biuro w Subiekcie. Osobnego przełącznika trybu zapisu
+nie ma.
 
-Konsekwencja dla zwrotów na tym etapie: adres na półce zapisuje aplikacja, ale
-towar zjeżdża z magazynu Zwroty dopiero po ręcznym MM w biurze. Kolejność jest
-bezpieczna (adres przed sprzedawalnością), więc opóźnienie kosztuje utraconą
-szansę sprzedaży, a nie błędny stan.
+Konsekwencja dla przesunięć na tym etapie: adres na półce zapisuje aplikacja,
+ale stan zjeżdża z magazynu źródłowego dopiero po ręcznym MM w biurze.
+Kolejność jest bezpieczna (adres przed sprzedawalnością), więc opóźnienie
+kosztuje utraconą szansę sprzedaży, a nie błędny stan. Arkusz przesunięcia mówi
+o tym wprost, zanim ktokolwiek dotknie przycisku.
 
-**Etap 2 — dokumenty MM przez Sferę (kontener + zwroty):**
+**Etap 2 — dokumenty MM przez Sferę:**
 1. Postaw osobny proces na Windows w C# albo w Pythonie z pywin32. COM Sfery
    najstabilniej działa z tych środowisk (spec §9).
 
@@ -505,8 +506,8 @@ szansę sprzedaży, a nie błędny stan.
    Kontrakt wywołań jest w `server/src/adapters/sfera.ts`.
 2. Najpierw jedno MM testowe na kartotece próbnej, potem produkcyjnie.
 
-**Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i MM per wózek
-(kontener) przez workera Sfery.
+**Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i przesunięcia
+stanu przez workera Sfery.
 
 ## 7. Backup i utrzymanie
 

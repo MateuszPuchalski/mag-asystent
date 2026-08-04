@@ -11,8 +11,8 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza i to, czego każda wymaga), logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **106 testów** | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (13 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, teksty karty towaru — **111 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
 przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi
@@ -184,6 +184,29 @@ przed którą ta pozycja broni.
       spodem,
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
+
+**Przesunięcie stanu**
+
+- [ ] kafel magazynu w sekcji „Pozostałe magazyny" otwiera arkusz przesunięcia,
+- [ ] kafel pustego magazynu NIE reaguje na dotknięcie,
+- [ ] podlinijka „MGP N — PRZESUŃ" w nagłówku karty otwiera ten sam arkusz,
+- [ ] przy celu MAG przycisk jest nieaktywny do skanu półki,
+- [ ] przy celu innym niż MAG strefa skanu znika i jest zdanie o hali,
+- [ ] zmiana magazynu docelowego **czyści** zeskanowany kod
+      (regresja: kod z poprzedniego wyboru leciał cicho w żądaniu),
+- [ ] tryb samolotowy → przesunięcie **nie** trafia do bufora, tylko mówi
+      o braku sieci (świadomie inaczej niż zapis lokalizacji),
+- [ ] po przesunięciu karta pokazuje „⏳ w drodze" na MAG i mniejszy MGP,
+- [ ] drugie przesunięcie tego samego towaru widzi mniejszy stan dostępny,
+- [ ] w kolejce zadanie `set_location` ma NIŻSZY numer niż `mm`.
+
+**Kontener na liście dostaw**
+
+- [ ] w zakładce DOSTAWY nie ma już przycisku KONTENERY,
+- [ ] dokument z MGP ma pastylkę „przyjęcia" i otwiera się jak każdy inny,
+- [ ] rozwinięty wiersz kontenera ma przycisk „PRZESUŃ NA HALĘ",
+- [ ] ten sam wiersz w dostawie krajowej przycisku NIE ma,
+- [ ] przesunięcie z wiersza odkłada linię i zamyka ją jako `done`.
 
 **Niezgodność w dostawie (arkusz PROBLEM)**
 

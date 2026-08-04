@@ -28,6 +28,125 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.22.0 — 4 sierpnia 2026
+
+<!-- docs_check: historia -->
+
+**Kontener rozkłada się jak każda inna dostawa, a przesunięcie stanu przestało
+być końcem sesji — stało się osobną czynnością dostępną z karty towaru.**
+
+**[wymaga działania]** Nowy APK oraz kopia bazy przed aktualizacją: migracja
+kasuje dwie tabele (szczegóły niżej).
+
+### Dlaczego, skoro pół roku temu zapisaliśmy coś przeciwnego
+
+<!-- docs_check: historia -->
+
+Wpis 0.17.0 mówi wprost: *„tryb B (kontener, 4× w roku) zostaje nietknięty"*.
+Wtedy była to decyzja poprawna — tryb kontenerowy był **jedynym konsumentem**
+dokumentu MM, więc jego usunięcie zabrałoby MM ostatnie wejście.
+
+Zmieniło się to, że proporcje przestały się bronić. Dwie tabele, dziesięć
+funkcji serwisu, osiem tras i 803 linie Compose obsługiwały proces zdarzający
+się cztery razy w roku — i cała ta machineria prowadziła do jednego wywołania,
+które na produkcji rzuca wyjątkiem, bo workera Sfery nie ma.
+
+Jednocześnie najzwyklejszego pytania nie dało się zadać: **„towar leży na MGP,
+jak go przenieść na halę, nie otwierając sesji kontenerowej"**. Trasa
+`POST /api/mm` istniała i została wycięta właśnie dlatego, że jedynym wejściem
+miał być wózek.
+
+### Co znika
+
+<!-- docs_check: historia -->
+
+Sesja z wózkiem w całości: `putaway_sessions` i `putaway_items`,
+`services/putaway.ts` (441 linii), `routes/putaway.ts` (82), osiem metod API,
+osiemnaście DTO kolektora, dwa ekrany i **tryb marszu** — nakładka „NASTĘPNE"
+po zatwierdzeniu wózka, która istniała wyłącznie w sesji. `enum Screen` schodzi
+z 13 na 11.
+
+Zakładka KONTENERY też znika. Dokumenty z MGP wpadają do zwykłej listy dostaw,
+oznaczone pastylką **przyjęcia**.
+
+### Co świadomie tracimy
+
+**Jeden dokument MM na rundę wózka.** Przesunięcie powstaje teraz per pozycja,
+więc przy tysiącu kartonów będzie ich znacznie więcej niż kilkanaście. To jest
+największa cena tej zmiany i trzeba ją znać przed najbliższym kontenerem.
+
+**Historię sesji.** Migracja kasuje obie tabele, więc odpowiedź na pytanie „kto
+rozkładał kontener w marcu" znika. Zdarzenia w dzienniku (`putaway_session_open`,
+`putaway_confirm`, `putaway_commit_cart`) **zostają** — dziennik pamięta
+czynność, traci tylko jej szczegóły, a `sessionId` w ich treści nie wskazuje już
+na nic.
+
+**Dodawanie towaru spoza dokumentu**, „pomiń z powodem" i zamknięcie sesji
+z rozliczeniem. Pierwsze zastąpiło zgłoszenie „artykuł niezamówiony" z 0.21.0,
+które robi to lepiej: trafia do formularza reklamacyjnego, a nie do wózka.
+
+**Kontener kosztuje teraz dwa przejścia**: adresy przy rozkładaniu, potem
+przesunięcia. Skrót „PRZESUŃ NA HALĘ" w wierszu dostawy skraca drugie z nich do
+jednego dotknięcia, ale go nie eliminuje.
+
+W zamian kontener dostaje wszystko, czego sesja z wózkiem nie miała nigdy:
+zgłaszanie wyjątków ze zdjęciem, przycisk INNA ILOŚĆ, eksport problemów do CSV,
+panel rozjazdu lokalizacji i auto-domknięcie dokumentu.
+
+### Przesunięcie stanu
+
+Jedna trasa, `POST /api/przesuniecie`, dla dowolnej pary magazynów. Wychodzi
+z trzech miejsc: kafla magazynu na karcie towaru, podlinijki „MGP N" w nagłówku
+karty oraz z rozwiniętego wiersza kontenera.
+
+- **Kolejka jest zarazem rezerwacją.** Dostępne to stan minus przesunięcia
+  czekające na workera, więc drugie przesunięcie widzi już pomniejszony stan.
+  Bez tego dwa zgłoszenia zrobione przed przejściem kolejki wysłałyby sumę
+  większą niż stan, a odmowa przyszłaby godzinę później i bez człowieka przy
+  palecie.
+- **Adres przed stanem.** `set_location` idzie do kolejki przed `mm` — ten sam
+  niezmiennik, który wcześniej pilnował rundy wózka, razem z uzasadnieniem.
+- **Skan półki obowiązkowy przy celu MAG, zabroniony przy innym.** Pole
+  lokalizacji w kartotece jest jedno na towar i opisuje regał na hali; zapisane
+  przy przesunięciu na inny magazyn wskazywałoby półkę, na której towaru nie ma.
+- **Bez bufora offline**, świadomie inaczej niż zapis lokalizacji. Bufor
+  przechowuje intencję, a walidacja liczy się w chwili zapisu.
+
+Siedemnaście testów serwera i dziewięć w `:core`. Tryb kontenerowy nie miał ani
+jednego testu serwera przez cały czas swojego istnienia.
+
+### Czego ta zmiana NIE naprawia
+
+**Dokument MM na produkcji dalej się nie tworzy.** Worker Sfery to Etap 2
+wdrożenia i nie powstał; zadanie po trzech próbach ląduje w `error`, a dokument
+wystawia biuro. Nowość polega na tym, że **arkusz mówi o tym przed dotknięciem
+przycisku**, a nie po fakcie czerwoną pastylką kolejki.
+
+**Adres po przesunięciu Z hali nie jest czyszczony.** Stan na MAG może spaść do
+zera, a adres w kartotece zostaje — to zasila problem, który mierzy raport
+przeslotowania. Czyszczenie adresu przy stanie zero to osobna decyzja.
+
+**`waiting_for_doc` rezerwuje stan bez limitu czasu.** Zadanie wstrzymane na
+dokumencie w buforze liczy się do „w drodze", a rekoncyliacja sygnalizuje je
+dopiero po 72 godzinach.
+
+### Stare bazy
+
+<!-- docs_check: historia -->
+
+Migracja kasuje `putaway_items`, a potem `putaway_sessions` — **w tej
+kolejności**, bo baza chodzi z `PRAGMA foreign_keys = ON` i rodzic skasowany
+przed dzieckiem wywaliłby start API oraz workera naraz. Kolumna
+`sfera_queue.session_id` **zostaje** jako martwa: kolumn ze starych baz się nie
+kasuje, a przebudowa tabeli trzymanej otwartej przez workera kosztowałaby bez
+żadnego zysku. Ten sam wybór co przy 0.17.0.
+
+Seed nadawał kontenerowi typ `PZ` z parzystości, a domyślne `DOK_TYPY_DOSTAW`
+zna tylko `FZ`. Po objęciu MGP filtrem typu kontener wypadłby z demo bez jednego
+słowa błędu — typ idzie teraz z konfiguracji.
+
+---
+
 ## 0.21.0 — 3 sierpnia 2026
 
 Zgłoszenie niezgodności na kolektorze zbiera teraz **dokładnie to, czego żąda

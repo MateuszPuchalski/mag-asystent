@@ -41,8 +41,24 @@ REMOVED = [
     "all_mgp",         # sesja „całe MGP"
     "PutawayZone",     # strefa źródłowa w trybie B
     "mag.xlsx",        # właściwa nazwa eksportu to magmat.xlsx
-    "wyłącznie tryb B",
     "10 ekran",
+    # Sesje rozkładania i tryb kontenerowy — wycięte w 0.22.0. Kontener rozkłada
+    # się dziś jak każda inna dostawa, a przesunięcie stanu jest osobną
+    # operacją (`services/przesuniecie.ts`). Tokeny są IDENTYFIKATORAMI, nie
+    # polskimi słowami: „kontener" jako przedmiot ma prawo zostać w prozie,
+    # instrukcja każąca zatwierdzić wózek — nie.
+    "putaway_sessions",
+    "putaway_items",
+    "api/putaway/",
+    "listPutawayDocuments",
+    "commitCart",
+    "scanToCart",
+    "closeSession",
+    "PutawaySession",
+    "PUTAWAY_DOCS",
+    "PUTAWAY_SESSION",
+    "walkMode",
+    "13 ekran",
     # Flaga sprawdzenia faktury — wycięta w 0.16.0 razem z prawem zapisu do
     # `fl_Wartosc`. Tokeny są identyfikatorami, nie polskim słowem „flaga":
     # historia i uzasadnienie decyzji mogą o niej mówić prozą, ale instrukcja

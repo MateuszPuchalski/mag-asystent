@@ -48,9 +48,8 @@ adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
 ┌──────────▼──────────────────────────────────────────────────┐
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
-│  SQLite (better-sqlite3, WAL) — 16 tabel:                    │
-│    delivery + delivery_line   tryb A: faktury zakupu         │
-│    putaway_sessions + items   tryb B: kontener               │
+│  SQLite (node:sqlite, WAL) — 14 tabel:                       │
+│    delivery + delivery_line   rozkładanie faktur zakupu      │
 │    problem, ean_conflict      wyjątki                        │
 │    app_user, device_session   tożsamość (§7)                 │
 │    sfera_queue                kolejka zapisów do Subiekta    │
@@ -151,32 +150,42 @@ Kryterium „co jest dostawą" siedzi w adapterze obok `listDeliveryDocuments`,
 a nie w serwisie. Dwie kopie tego warunku rozjechałyby się przy pierwszej
 zmianie, a objawem byłby towar policzony dwa razy albo wcale.
 
-Kontener na MGP tu nie wchodzi: idzie osobnym torem (`putaway_*`), a jego towar
-widać na własnym kaflu strefy przyjęć.
+Kontener na MGP wchodzi tu od 0.22.0, odkąd rozkłada się tą samą ścieżką. Nie
+dubluje to kafla strefy przyjęć: kafel mówi, ILE tam stoi, a ten wiersz — na
+którym dokumencie i ile z tego nie ma jeszcze adresu.
 
 ---
 
-## 5. Trzy ścieżki rozkładania
+## 5. Rozkładanie i przesunięcie stanu
 
-Szczegóły w `docs/analiza-rozkladanie.md`; tu tylko podział i jego kryterium.
+Szczegóły w `docs/analiza-rozkladanie.md`; tu tylko podział.
 
-| ścieżka | jednostka pracy | skutek magazynowy |
+**Rozkładanie jest jedno** i zapisuje wyłącznie adres. Magazyn skutku mówi,
+co zostaje po nim:
+
+| magazyn skutku | co to jest | co zostaje po odłożeniu |
 |---|---|---|
-| **Dostawa krajowa** (tryb A) | dokument FZ/PZ | sam adres — dokument księguje się wprost na MAG |
-| **Kontener importowy** (tryb B) | sesja z wózkiem | adres + MM MGP→MAG |
+| `MAG` | dostawa krajowa | nic — towar leży na hali z adresem |
+| `MGP` | kontener importowy | stan do przesunięcia na halę |
 
-**Kryterium podziału to magazyn skutku, nie typ dokumentu.** To rozróżnienie
-kosztowało jeden nieudany projekt modelu danych: `dok_Typ` nie mówi, gdzie towar
-wyląduje, bo ten sam typ dokumentu bywa księgowany na różne magazyny. Decyduje
-`mag_Id`, snapshotowany w chwili otwarcia dostawy — żeby przeksięgowanie
-dokumentu w połowie pracy nie zmieniło reguł w jej trakcie.
+**Przesunięcie stanu jest osobną czynnością**, nie końcem sesji. Do 0.22.0
+dokument MM umiał powstać wyłącznie przy zatwierdzeniu wózka w trybie
+kontenerowym; dziś wychodzi z karty towaru i z wiersza dostawy, dla dowolnej
+pary magazynów.
+
+Że o skutku decyduje **magazyn, nie typ dokumentu**, kosztowało jeden nieudany
+projekt modelu danych: `dok_Typ` nie mówi, gdzie towar wyląduje, bo ten sam typ
+bywa księgowany na różne magazyny. Decyduje `mag_Id`, snapshotowany w chwili
+otwarcia dostawy — żeby przeksięgowanie dokumentu w połowie pracy nie zmieniło
+reguł w jej trakcie.
 
 ### Niezmiennik: adres zawsze przed sprzedawalnością
 
-Przy kontenerach zadanie `set_location` trafia do kolejki **przed**
-zadaniem `mm`. Kolejka jest FIFO, więc towar staje się sprzedawalny dopiero
-wtedy, gdy wiadomo, gdzie leży. Odwrotna kolejność dawałaby okno, w którym
-handlowiec widzi towar dostępny, a magazynier nie wie, gdzie po niego iść.
+Przy przesunięciu zadanie `set_location` trafia do kolejki **przed** zadaniem
+`mm`. Kolejka jest FIFO, więc towar staje się sprzedawalny dopiero wtedy, gdy
+wiadomo, gdzie leży. Odwrotna kolejność dawałaby okno, w którym handlowiec widzi
+towar dostępny, a magazynier nie wie, gdzie po niego iść — i przy nieudanym
+zapisie adresu stan ten byłby trwały.
 
 ---
 
