@@ -176,8 +176,19 @@ export function wyloguj(token: string): void {
 export type OperacjaUprzywilejowana =
   /** Zdjęcie cudzej blokady linii przed wygaśnięciem TTL. */
   | "zdjecie_cudzego_locka"
-  /** Zakładanie kont, PIN-y, wyłączanie kont, migracja historii. */
+  /** Zakładanie kont magazynierów i brygadzistów, migracja historii. */
   | "zarzadzanie_kontami"
+  /**
+   * To, czego biuru NIE wolno: konta o roli `biuro` albo `admin`, wyłączanie
+   * kont i odbieranie haseł.
+   *
+   * Osobna operacja, bo „zarządzanie kontami" było jedną nazwą na dwie różne
+   * rzeczy. Kto zakłada konto biura z własnym hasłem, ten obchodzi każdą regułę
+   * wyżej — a do 0.24.0 biuro potrafiło to zrobić samo sobie. To była realna
+   * dziura, nie hipoteza: rola strzegąca tożsamości sama sobie tożsamość
+   * rozdawała.
+   */
+  | "zarzadzanie_biurem"
   /**
    * Ukrywanie magazynów na karcie towaru.
    *
@@ -191,22 +202,30 @@ export type OperacjaUprzywilejowana =
 /**
  * Kto może.
  *
- * Zarządzanie kontami jest tylko dla biura, bo to jedyna operacja, która
- * tworzy TOŻSAMOŚĆ. Brygadzista, który może założyć konto, może założyć konto
- * biura z własnym hasłem — i cała reszta reguł przestaje cokolwiek znaczyć.
+ * Zakładanie kont tworzy TOŻSAMOŚĆ, więc hala go nie dotyka: brygadzista, który
+ * może założyć konto, może założyć konto biura z własnym hasłem — i cała reszta
+ * reguł przestaje cokolwiek znaczyć. Ten sam argument obowiązuje o piętro
+ * wyżej i stąd `zarzadzanie_biurem` wyłącznie dla admina.
+ *
+ * Admin NIE dostaje audytu ani raportu wydajności JAKO UPRAWNIENIA PONAD
+ * biuro — dostaje dokładnie tyle, co biuro, żeby konto z instalatora nadawało
+ * się do pracy. Rozróżnienie jest nieoczywiste i dlatego zapisane: admin jest
+ * rolą wąską, od kont, a raport o pracy ludzi zostaje tam, gdzie był.
  */
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
-  zdjecie_cudzego_locka: ["brygadzista", "biuro"],
-  zarzadzanie_kontami: ["biuro"],
+  zdjecie_cudzego_locka: ["brygadzista", "biuro", "admin"],
+  zarzadzanie_kontami: ["biuro", "admin"],
+  zarzadzanie_biurem: ["admin"],
   // widoczność magazynów jest wspólna dla wszystkich kolektorów, więc ustawia
   // ją ta sama rola, która odpowiada za konfigurację — nie pojedynczy magazynier
-  widocznosc_magazynow: ["biuro"],
+  widocznosc_magazynow: ["biuro", "admin"],
 };
 
 const NAZWA_ROL: Record<Rola, string> = {
   magazynier: "magazyniera",
   brygadzista: "brygadzisty",
   biuro: "biura",
+  admin: "administratora",
 };
 
 export interface WynikAutoryzacji {

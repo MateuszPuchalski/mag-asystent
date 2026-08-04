@@ -185,18 +185,15 @@ przed którą ta pozycja broni.
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
 
-**Tryb serwisowy (WERTIS_ADMIN=1 po stronie serwera)**
+**Kreator kont i rola admina**
 
-- [ ] kolektor wchodzi bez ekranu logowania,
-- [ ] czerwony pasek „TRYB SERWISOWY" jest na KAŻDYM ekranie, także na
-      kreatorze kont i na ekranie startowym,
-- [ ] operacja wykonana w tym trybie ma w audycie podpis
-      „ADMIN (TRYB SERWISOWY)",
-- [ ] zalogowanie się prawdziwym kontem nadal działa, a operacja dostaje
-      wtedy NAZWISKO, nie ADMIN-a (regresja: wyścig ze startowym `refresh()`),
-- [ ] wyłączenie trybu na serwerze i powrót aplikacji z tła sprowadza kolektor
-      na ekran logowania (regresja: `refresh()` wychodził przy pustym tokenie),
-- [ ] przy wyłączonym trybie kolektor pokazuje ekran logowania jak zawsze.
+- [ ] na pustej instalacji pierwszy wiersz kreatora ma rolę **Administrator**
+      i pole roli jest zablokowane,
+- [ ] lista bez konta admina nie przechodzi — komunikat mówi dlaczego,
+- [ ] konto biura widzi DODAJ OSOBY i sekcję „Magazyny" w Ustawieniach,
+- [ ] konto admina widzi to samo (regresja: dwa sprawdzenia `role == "biuro"`
+      odbierałyby adminowi oba ekrany),
+- [ ] konto magazyniera nie widzi ani jednego, ani drugiego.
 
 **Przesunięcie stanu**
 

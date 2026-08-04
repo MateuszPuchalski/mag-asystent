@@ -525,6 +525,51 @@ Write-Krok "Uruchamianie usług"
 Restart-WertisUslugi
 
 $health = Test-WertisHealth -Port $Port
+
+# ═══ Konto administratora ═══════════════════════════════════════════════════
+#
+# PO starcie usług, bo konto zakłada API. Krok jest pomijany, gdy API nie
+# odpowiedziało (nie ma z czym rozmawiać) albo gdy baza ma już konta — wtedy
+# `POST /api/users` i tak by odmówił, a pytanie o hasło byłoby tylko stratą
+# czasu człowieka stojącego przy serwerze.
+
+$setup = $null
+if ($health) {
+    try { $setup = Invoke-RestMethod -Uri "http://localhost:$Port/api/setup" -TimeoutSec 5 } catch { }
+}
+
+if ($DryRun -or ($setup -and $setup.potrzebne)) {
+    Write-Krok "Konto administratora"
+    Write-Info "To konto zakłada wszystkie pozostałe - także konta biura."
+    Write-Info "Hasła nigdzie nie zapisuję: nie trafia ani do wertis.env, ani do logów."
+
+    $loginAdmina = Read-Tekst "Login administratora" "admin"
+    $hasloAdmina = ""
+    if (-not $DryRun) {
+        while ($true) {
+            $pierwsze = Read-Host "   Hasło (min. 8 znakow)" -AsSecureString
+            $drugie   = Read-Host "   Powtorz haslo" -AsSecureString
+            # SecureString wraca do zwykłego łańcucha dopiero tutaj: hasło musi
+            # pójść w ciele żądania HTTP, więc gdzieś zamienić je trzeba.
+            $a = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pierwsze))
+            $b = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($drugie))
+            if ($a -ne $b)                          { Write-Uwaga "Hasła się różnią."; continue }
+            if (-not (Test-WertisHasloAdmina $a))   { Write-Uwaga "Hasło musi mieć co najmniej 8 znaków."; continue }
+            $hasloAdmina = $a
+            break
+        }
+    }
+
+    if (-not (New-WertisKontoAdmina -Login $loginAdmina -Haslo $hasloAdmina -Port $Port)) {
+        Write-Info "Konto założysz kreatorem na kolektorze - patrz instalator\README.md."
+    }
+    $hasloAdmina = $null
+} elseif ($setup) {
+    Write-Info "Baza ma już konta - nie zakładam żadnego."
+}
+
 Write-Naglowek "Gotowe"
 
 if ($kontoCzeka) {

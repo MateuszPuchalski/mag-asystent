@@ -339,9 +339,9 @@ function Publish-WertisKonfiguracja {
         bariera, która działa, gdy ktoś zapomni. Klucz spoza niej nie trafi do
         pliku, choćby siedział w `$Ustawienia`.
 
-        Najważniejszy z nieobecnych to `WERTIS_ADMIN`: wyłącza logowanie
-        w całości (DEPLOY §5a). Instalator nie ma prawa go zapisać ani dziś,
-        ani po dopisaniu do niego czegokolwiek — pilnuje tego `testy.ps1`.
+        Nieobecne jest tu wszystko, co dotyczy KONT: hasło admina idzie przez
+        API do bazy i nie ma po co lądować w pliku, który potem zostaje na
+        dysku serwera. Pilnuje tego `testy.ps1`.
     #>
     $kolejnosc = @(
         "SGT_MODE",
@@ -457,6 +457,85 @@ function Test-WertisHealth {
         }
     }
     return $null
+}
+
+# ════════════════════════════════════════════════════════════════════════════
+#  KONTO ADMINA
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Świeża instalacja nie ma ŻADNEGO konta, a bez konta nie da się ani zalogować
+# na kolektorze, ani wejść do podglądu biura. Do 0.23.0 instalator kończył
+# pracę na tym miejscu i zostawiał człowieka z kreatorem na kolektorze albo
+# z `curl`-em w README.
+#
+# Hasła NIE generujemy. Człowiek, który właśnie stawia serwer, wpisuje je sam —
+# hasło wypisane na monitorze w biurze przepisuje się na karteczkę i zostaje na
+# monitorze. To dokładnie ta różnica, dla której `instalator/README.md` mówił
+# wcześniej „nie zakłada kont": nie samo zakładanie było problemem, tylko
+# wypisywanie sekretu.
+
+function Test-WertisHasloAdmina {
+    <#
+        .SYNOPSIS
+        Czy hasło spełnia regułę serwera. Ta sama liczba co `HASLO_MIN`.
+        .DESCRIPTION
+        Sprawdzamy TUTAJ, a nie dopiero po odpowiedzi API, bo człowiek wpisuje
+        hasło dwa razy (drugi raz na potwierdzenie) i odbicie się od serwera po
+        obu wpisaniach jest dwiema stratami zamiast jednej.
+    #>
+    param([string]$Haslo)
+    return ("$Haslo".Length -ge 8)
+}
+
+function New-WertisKontoAdmina {
+    <#
+        .SYNOPSIS
+        Zakłada pierwsze konto (rola `admin`) przez API. Zwraca $true przy
+        powodzeniu.
+        .DESCRIPTION
+        Idzie przez `POST /api/users`, a nie prosto do SQLite, z jednego
+        powodu: hasło hashuje serwer i tylko serwer wie, jak. Wpisywanie
+        wiersza do bazy z zewnątrz oznaczałoby drugą implementację tej samej
+        rzeczy — i pierwszą, która się rozjedzie.
+
+        Trasa przepuszcza bez sesji WYŁĄCZNIE przy pustej bazie i sama wymusza
+        rolę `admin`. Instalacja na bazie, która konta już ma, dostanie 401 —
+        i tak ma być: nie jest zadaniem instalatora dokładać konta do
+        działającej firmy.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Login,
+        # `AllowEmptyString`, bo w przebiegu próbnym hasła NIE MA — nikt o nie
+        # nie pytał. Bez tego atrybutu walidator parametru odrzuca wywołanie
+        # ZANIM `Test-DryRun` zdąży cokolwiek powiedzieć, i `-DryRun` wywala się
+        # na kroku, który z założenia niczego nie robi.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Haslo,
+        [string]$Nazwa = "Administrator",
+        [int]$Port = 3001
+    )
+    if (Test-DryRun "Założyłbym konto admina „$Login” przez API.") { return $true }
+
+    # Prawdziwy przebieg zostaje ŚCISŁY: pusty łańcuch przechodzi przez binder,
+    # ale nie przez to sprawdzenie — inaczej poszedłby w żądaniu do serwera.
+    if (-not (Test-WertisHasloAdmina $Haslo)) {
+        Write-Blad "Hasło admina jest za krótkie — konta nie zakładam."
+        return $false
+    }
+
+    $body = @{ name = $Nazwa; login = $Login; haslo = $Haslo } | ConvertTo-Json -Compress
+    try {
+        $odp = Invoke-RestMethod -Method Post -Uri "http://localhost:$Port/api/users" `
+            -ContentType "application/json; charset=utf-8" `
+            -Body ([Text.Encoding]::UTF8.GetBytes($body)) -TimeoutSec 10
+        Write-Ok "Konto „$($odp.user.login)” założone (rola: $($odp.user.role))."
+        return $true
+    } catch {
+        # 401 = baza ma już konta; 409 = ten login jest zajęty. Obie sytuacje są
+        # do naprawienia ręcznie i żadna nie jest powodem, żeby przerwać
+        # instalację, która poza tym się udała.
+        Write-Blad "Nie udało się założyć konta: $($_.Exception.Message)"
+        return $false
+    }
 }
 
 # ════════════════════════════════════════════════════════════════════════════

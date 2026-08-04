@@ -103,12 +103,29 @@ zapisuje gotowy, podstawiony skrypt do `C:\wertis\nadaj-uprawnienia-wertis.sql`
 i mówi, komu go przekazać. Hasło jest już w środku i w `wertis.env`, więc nic
 nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
 
+## Konto administratora
+
+**Od 0.24.0 instalator zakłada jedno konto** — o roli `admin`, zaraz po starcie
+usług. Pyta o login (domyślnie `admin`) i o hasło, dwa razy, z tą samą regułą
+długości co serwer. Bez tego konta świeża instalacja nie wpuszcza nikogo: ani
+na kolektor, ani do podglądu biura.
+
+Wcześniej stało w tym miejscu zdanie, że instalator kont **nie zakłada**, bo
+„wypisywanie loginów i haseł na monitorze w biurze byłoby krokiem w złą stronę".
+To zdanie zostało odwrócone świadomie i różnica jest dokładnie w tym, co je
+uzasadniało: instalator **nie wypisuje** hasła, tylko o nie **pyta**. Nie zapisuje
+go też nigdzie — ani do `wertis.env` (biała lista go nie przepuszcza), ani do
+logów. Hasło idzie przez `POST /api/users` prosto do bazy, gdzie hashuje je
+serwer.
+
+Krok jest pomijany, gdy baza ma już konta — dokładanie kont do działającej firmy
+nie jest zadaniem instalatora. Pozostałe konta zakłada się potem z kolektora
+albo `curl`-em (`DEPLOY.md` §5a).
+
 ## Czego instalator NIE robi
 
-- **Nie zakłada kont pracowników.** Konta powstają z kolektora
-  (`DEPLOY.md` §5a) — pierwsze musi być kontem biura, bo zakłada wszystkie
-  następne. Wypisywanie loginów i haseł na monitorze w biurze byłoby krokiem
-  w złą stronę.
+- **Nie zakłada kont pracowników.** Powstaje jedno konto administratora (wyżej);
+  magazynierów, brygadzistów i biuro zakłada się z kolektora (`DEPLOY.md` §5a).
 - **Nie stawia workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — to
   osobny proces COM.
 - **Nie konfiguruje kopii zapasowej ani nocnej rekoncyliacji.** Obie są

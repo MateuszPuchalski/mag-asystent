@@ -13,7 +13,15 @@ import { sesjaZadania } from "../context.js";
    mówi, kto co robił i o której, więc jest narzędziem nadzoru i hala go nie
    ogląda.                                                                     */
 
-const CZYTAJACY = ["brygadzista", "biuro"];
+/* DRUGA, niezależna lista ról — obok `WYMAGANA_ROLA` w `services/auth.ts`.
+   Osobna, bo audyt nie jest „operacją uprzywilejowaną": nic nie zmienia, więc
+   nie ma czego zapisywać wpisem `privileged`. Cena tej osobności jest taka, że
+   nowa rola musi trafić w DWA miejsca — `admin` dopisany tu w 0.24.0 właśnie
+   dlatego, że sam wpis w `WYMAGANA_ROLA` by nie wystarczył.
+
+   Admin nie dostaje audytu jako uprawnienia PONAD biuro — dostaje dokładnie
+   tyle, co biuro, żeby konto założone przez instalator nadawało się do pracy. */
+const CZYTAJACY = ["brygadzista", "biuro", "admin"];
 
 /** Filtr z query stringa. Puste i śmieciowe wartości znikają, nie wywracają. */
 function filtr(q: Record<string, string | undefined>): FiltrAudytu {

@@ -270,7 +270,11 @@ i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`.
 > urządzenie w sieci hali mogło zmienić lokalizację w Subiekcie albo pobrać
 > raport wydajności per pracownik. Podpisywało operację dowolnym nazwiskiem.
 
-**1. Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
+**1. Zwykle konto admina zakłada już INSTALATOR.** Pyta o login i hasło zaraz
+po starcie usług. Ten punkt dotyczy więc instalacji stawianej ręcznie albo
+serwera, na którym instalator tego kroku nie wykonał.
+
+**Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
 ekran startowy pokazuje **ZAŁÓŻ KONTA** obok pól logowania (których nikt
 jeszcze nie założył).
@@ -284,38 +288,40 @@ jeszcze nie założył).
 
 W kreatorze wpisujesz wszystkich naraz:
 
-- **pierwsza pozycja to konto biura** — pole roli jest zablokowane, bo to konto
-  zakłada wszystkie następne i tylko ono widzi listę kont. Konto magazyniera na
-  tej pozycji zamurowałoby administrację;
+- **pierwsza pozycja to konto administratora** — pole roli jest zablokowane.
+  Serwer wymusza rolę `admin` na pierwszym koncie w pustej bazie, a konto biura
+  umie założyć wyłącznie admin. Konto magazyniera na tej pozycji zamurowałoby
+  administrację;
 - kolejne osoby: imię, nazwisko, login, hasło, rola. Hasło jest wymagane dla
   każdej roli — konto bez hasła nie zaloguje się nigdy;
 - po zatwierdzeniu kolektor pokazuje **loginy**. Haseł nie pokazuje ani razu:
   wpisałeś je przed chwilą, więc rozdaj je osobiście.
 
-Kolejność wysyłki układa kreator: biuro zawsze pierwsze. Kreator sam loguje się
-nowym kontem biura, żeby móc założyć resztę.
+Kolejność wysyłki układa kreator: admin zawsze pierwszy. Kreator sam loguje się
+nowym kontem admina, żeby móc założyć resztę.
 
 Gdy coś padnie w połowie — zerwane Wi-Fi przy czwartej osobie z sześciu — ekran
 pokazuje **co już powstało**. Tych osób nie zakładaj drugi raz. Dopisz tylko
 brakujące.
 
 Nowe osoby dochodzą później tą samą drogą: **Ustawienia → DODAJ OSOBY**
-(widoczne tylko dla konta biura).
+(widoczne dla konta biura i admina).
 
 **1b. Alternatywa: `curl`,** gdy kolektora jeszcze nie ma pod ręką albo konta
 zakłada się skryptem.
 
 ```bash
-# pierwsze konto — bez sesji, ale TYLKO przy pustej bazie
+# pierwsze konto — bez sesji, ale TYLKO przy pustej bazie.
+# Rola `admin` jest WYMUSZONA; cokolwiek wpiszesz w `role`, zostanie zignorowane.
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H 'content-type: application/json' \
-  -d '{"name":"Biuro Zakupy","role":"biuro","login":"biuro","haslo":"tajnehaslo"}'
-# → {"user":{"userId":1,"login":"biuro","role":"biuro","maHaslo":true}}
+  -d '{"name":"Właściciel","login":"wlasciciel","haslo":"tajnehaslo"}'
+# → {"user":{"userId":1,"login":"wlasciciel","role":"admin","maHaslo":true}}
 
 # zaloguj się nim i dopisz resztę
 TOKEN=$(curl -s -X POST http://<IP-serwera>:3001/api/auth/login \
   -H 'content-type: application/json' \
-  -d '{"login":"biuro","haslo":"tajnehaslo"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+  -d '{"login":"wlasciciel","haslo":"tajnehaslo"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
@@ -325,6 +331,11 @@ curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
   -d '{"name":"Adam Nowak","role":"brygadzista","login":"anowak","haslo":"tajnehaslo"}'
 
+# konto biura — tę linię wykona TYLKO admin; biuro dostanie 403
+curl -X POST http://<IP-serwera>:3001/api/users \
+  -H "x-session: $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"Biuro Zakupy","role":"biuro","login":"biuro","haslo":"tajnehaslo"}'
+
 curl http://<IP-serwera>:3001/api/users -H "x-session: $TOKEN"   # lista kont
 ```
 
@@ -333,40 +344,43 @@ ją wykonać bez zastanawiania się — nie po to, żeby zostało w firmie.
 
 **Żadnych domyślnych haseł i żadnych domyślnych kont.** Ta reguła nie była
 dotąd nigdzie zapisana, choć kod trzymał się jej od początku. Instalator losuje
-hasło konta SQL, kreator nie pokazuje haseł ani razu, a konto bez hasła nie
-zaloguje się nigdy. Zapisujemy ją tutaj, bo od 0.23.0 istnieje tryb, który
-wygląda na wyjątek, a nim nie jest — patrz niżej.
+hasło konta SQL i **pyta o hasło admina zamiast je wymyślać**. Kreator nie
+pokazuje haseł ani razu, a konto bez hasła nie zaloguje się nigdy. Nawet
+`npm run seed` losuje hasło admina i pokazuje je raz, zamiast wpisywać stałe
+demo — wyjątek „tylko na dev" jest dokładnie tym, który jedzie potem na
+produkcję.
 
-### Tryb serwisowy (`WERTIS_ADMIN=1`) — nigdy u klienta
+### Cztery role i to, co je dzieli
 
-Przełącznik wyłącza logowanie w całości: kolektor i `/biuro` wchodzą od razu,
-a operacje podpisuje konto `ADMIN (TRYB SERWISOWY)`. Istnieje dla pracy nad
-kodem, gdzie baza kasuje się kilka razy dziennie.
+| rola | co może ponad poprzednią |
+|---|---|
+| `magazynier` | praca na hali: skanowanie, lokalizacje, zgłoszenia |
+| `brygadzista` | zdjęcie cudzej blokady linii, odczyt śladu audytowego |
+| `biuro` | lista kont, zakładanie kont magazynierów i brygadzistów, widoczność magazynów, raport wydajności |
+| `admin` | wszystko, co biuro, **plus** konta o roli `biuro` i `admin`, wyłączanie kont i odbieranie haseł |
 
-Konto serwisowe **nie ma ani loginu, ani hasła**, więc nie da się nim zalogować
-żadną drogą i nie ma czego wykraść — reguła wyżej zostaje nienaruszona. Nie
-dostaje też tokenu, więc wyłączenie przełącznika odbiera dostęp natychmiast:
-nie ma czego unieważniać.
+Granica między biurem a adminem jest jedyną nieoczywistą i dlatego ma własne
+uzasadnienie. Do 0.23.0 „zarządzanie kontami" było jedną operacją zastrzeżoną
+dla biura — czyli **biuro zakładało konto biura z własnym hasłem**. Rola
+strzegąca tożsamości rozdawała ją sama sobie i żadna reguła wyżej nic nie
+znaczyła. Od 0.24.0 to dwa osobne uprawnienia.
 
-Łamana jest inna, dotąd niepisana zasada: **każda operacja jest podpisana przez
-kogoś, kto się uwierzytelnił**. W tym trybie każdy w sieci ma uprawnienia biura,
-łącznie z zakładaniem kont i ustawianiem hasła na cudzym koncie. **Te dwa skutki
-przeżywają wyłączenie przełącznika**, w odróżnieniu od samego dostępu.
+**Cena jest jawna:** biuro nie zresetuje hasła magazynierowi, który je
+zapomniał — musi poprosić admina. To był świadomy wybór, nie skutek uboczny.
 
-Włączony tryb widać z trzech stron: czerwony pasek na obu ekranach, `ok: false`
-w `/api/health` z ostrzeżeniem na pierwszym miejscu, wpis `tryb_serwisowy_start`
-w dzienniku. Sam wiersz `ADMIN (TRYB SERWISOWY)` w `app_user` jest dowodem, że
-tryb kiedykolwiek na tej instalacji chodził.
+Admin **nie dostaje** audytu ani raportu wydajności jako uprawnienia ponad
+biuro. Dostaje dokładnie tyle, co biuro, żeby konto z instalatora nadawało się
+do pracy — raport o pracy ludzi zostaje tam, gdzie był.
 
-Instalator tej zmiennej **nie zapisuje** — ani do `wertis.env`, ani do
-środowiska usług — i pilnuje tego jego własny zestaw testów.
+Rola przychodząca w `POST /api/users` jest **sprawdzana przeciw zamkniętej
+liście**; słowo spoza niej to 400, a nie konto z rolą, której nikt nie zna.
 
 `GET /api/setup` odpowiada `{"potrzebne":true}`, dopóki nie ma ani jednego
 konta — tego samego pytania używa kolektor.
 
-**Lista kont jest dostępna tylko dla biura** i to nie jest przesada: zwraca
-login każdej osoby, czyli połowę tego, czego trzeba do zalogowania. Wystawiona
-hali byłaby listą celów.
+**Lista kont jest dostępna tylko dla biura i admina** i to nie jest przesada:
+zwraca login każdej osoby, czyli połowę tego, czego trzeba do zalogowania.
+Wystawiona hali byłaby listą celów.
 
 **2. Zmiana hasła.** Swoje hasło każdy zmienia sam:
 
@@ -376,9 +390,10 @@ curl -X POST http://<IP-serwera>:3001/api/auth/haslo \
   -d '{"stare":"tajnehaslo","nowe":"noweHaslo123"}'
 ```
 
-Cudze ustawia biuro przez `POST /api/users/:id/haslo` z ciałem `{"haslo":"…"}`.
-Podanie `null` odbiera hasło: konto zostaje w bazie razem z historią, ale nikt
-się nim nie zaloguje.
+Cudze ustawia **admin** przez `POST /api/users/:id/haslo` z ciałem
+`{"haslo":"…"}`. Podanie `null` odbiera hasło: konto zostaje w bazie razem
+z historią, ale nikt się nim nie zaloguje. Biuro dostanie na tej trasie 403 —
+patrz tabela ról wyżej.
 
 **3. Migracja historii** (tylko przy aktualizacji istniejącej instalacji —
 jednorazowo, idempotentnie). Zakłada konta dla nazw, które już są w `events`,
@@ -398,20 +413,22 @@ wpisy w rodzaju „magazynier" albo „test" wyłącz przez
 `POST /api/users/:id/active` z `{"active":false}`. Konta się **nie kasuje**:
 historia w `events` musi mieć na co wskazywać.
 
-**3a. Co wymaga której roli.** Do codziennej pracy wystarcza zalogowanie. Dwie
-operacje są zastrzeżone:
+**3a. Co wymaga której roli.** Do codziennej pracy wystarcza zalogowanie.
+Zastrzeżone są trzy rzeczy:
 
 | operacja | kto | gdzie |
 |---|---|---|
-| odebranie koledze zajętej pozycji przed 30-min TTL | brygadzista lub biuro | kolektor: skan zajętego towaru → propozycja odebrania |
-| zakładanie kont, hasła, wyłączanie kont | **tylko biuro** | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
+| odebranie koledze zajętej pozycji przed 30-min TTL | brygadzista, biuro, admin | kolektor: skan zajętego towaru → propozycja odebrania |
+| zakładanie kont magazynierów i brygadzistów | biuro, admin | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
+| konta o roli `biuro`/`admin`, wyłączanie kont, odbieranie haseł | **tylko admin** | `curl` |
 
 Odebranie pozycji zapisuje w `events` (`lock_forced`) **komu i przez kogo**.
 Lock już wygasły zdejmuje się bez wpisu — po TTL nikomu nic nie odebrano.
 
-Zarządzanie kontami jest zastrzeżone dla biura, bo to jedyna operacja tworząca
-tożsamość. Brygadzista mogący zakładać konta założyłby konto biura z własnym
-hasłem. Reszta reguł przestałaby wtedy cokolwiek znaczyć.
+Zakładanie kont nie schodzi na halę, bo to jedyna operacja tworząca tożsamość.
+Brygadzista mogący zakładać konta założyłby konto biura z własnym hasłem.
+Reszta reguł przestałaby wtedy cokolwiek znaczyć — i ten sam argument o piętro
+wyżej oddziela biuro od admina.
 
 > **Drugiego czynnika już nie ma.** Do 0.20.0 obie operacje wymagały PIN-u,
 > bo plakietkę dawało się pożyczyć razem z tożsamością („weź moją, mam ręce

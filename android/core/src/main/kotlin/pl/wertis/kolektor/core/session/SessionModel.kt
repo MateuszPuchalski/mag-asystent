@@ -22,7 +22,25 @@ enum class Rola(val wire: String, val etykieta: String) {
     MAGAZYNIER("magazynier", "Magazynier"),
     BRYGADZISTA("brygadzista", "Brygadzista"),
     BIURO("biuro", "Biuro"),
+    ADMIN("admin", "Administrator"),
 }
+
+/**
+ * Role, którym serwer daje wgląd w konta i ustawienia globalne.
+ *
+ * Jedno miejsce, bo ekrany pytały o to każdy po swojemu — dwa razy przez
+ * `role == "biuro"` w Ustawieniach. Po dojściu czwartej roli w 0.24.0 taki
+ * zapis milcząco odbierałby adminowi to, co ma z definicji.
+ *
+ * Porównanie idzie po `wire`, a nie po enumie, bo `SessionState.role` zostaje
+ * surowym łańcuchem z serwera — nieznana rola ma ograniczyć uprawnienia, a nie
+ * wywrócić aplikację przy `valueOf`.
+ */
+val ROLE_BIUROWE: Set<String> = setOf(Rola.BIURO.wire, Rola.ADMIN.wire)
+
+/** Czy ta sesja widzi konta, kreator i ustawienia globalne. */
+val SessionState.biurowa: Boolean
+    get() = (this as? SessionState.Aktywna)?.role in ROLE_BIUROWE
 
 /**
  * Stan sesji urządzenia widziany przez UI.

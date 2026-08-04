@@ -1,16 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { currentDevice, currentToken, sesjaZadania } from "../context.js";
-import { autoryzuj, karaLogowania, wyloguj, zaloguj, zmienHaslo } from "../services/auth.js";
+import {
+  autoryzuj,
+  karaLogowania,
+  wyloguj,
+  zaloguj,
+  zmienHaslo,
+  type OperacjaUprzywilejowana,
+} from "../services/auth.js";
 import { logEvent } from "../services/events.js";
-import { config } from "../config.js";
-import { kontoSerwisowe, toKontoSerwisowe } from "../services/tryb-serwisowy.js";
 import {
   brakKont,
   createUser,
   HASLO_MIN,
   listUsers,
   migrujHistorie,
+  poprawnaRola,
   poprawnyLogin,
+  ROLE,
+  ROLE_BIUROWE,
   setActive,
   setHaslo,
   type Rola,
@@ -71,11 +79,8 @@ export async function authRoutes(app: FastifyInstance) {
    */
   app.get("/api/auth/me", async (_req, reply) => {
     const s = sesjaZadania();
-    if (s) return { user: s.user };
-    // w trybie serwisowym bramka wpuściła bez sesji — odpowiadamy tym, czym
-    // podpisze się operacja, żeby kolektor nie musiał zgadywać
-    if (config.trybSerwisowy) return { user: kontoSerwisowe() };
-    return reply.code(401).send({ error: "Brak sesji" });
+    if (!s) return reply.code(401).send({ error: "Brak sesji" });
+    return { user: s.user };
   });
 
   app.post("/api/auth/logout", async () => {
@@ -84,15 +89,20 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /* ── Administracja kontami — WYŁĄCZNIE biuro ──────────────────────────────
+  /* ── Administracja kontami — biuro i admin ────────────────────────────────
      Te trasy tworzą TOŻSAMOŚĆ, więc bez strażnika cała reszta §7 jest
      dekoracją: `GET /api/users` wystawia login każdego, `POST /api/users`
      pozwalałby założyć konto biura z własnym hasłem, a `:id/haslo` zmienić
      cudze. Jedno żądanie z sieci magazynu dałoby wtedy wszystko naraz.
 
-     Dlatego rola `biuro` przy każdej z nich. Do sierpnia 2026 dochodził PIN
-     przy zmianach; wyszedł razem z badge'em, bo hasło do konta jest już tym
-     sekretem, którym PIN był wobec pożyczanej plakietki.                     */
+     Od 0.24.0 strażnik jest DWUSTOPNIOWY. Biuro zakłada halę — magazynierów
+     i brygadzistów. Konto o roli `biuro` albo `admin`, wyłączenie konta
+     i odebranie hasła należą do admina, bo inaczej biuro nadaje uprawnienia
+     samo sobie i pierwszy stopień nie znaczy nic.
+
+     Do sierpnia 2026 dochodził PIN przy zmianach; wyszedł razem z badge'em,
+     bo hasło do konta jest już tym sekretem, którym PIN był wobec pożyczanej
+     plakietki.                                                               */
 
   /**
    * Czy instalacja jest jeszcze pusta — pytanie zadawane przez kolektor przy
@@ -106,36 +116,30 @@ export async function authRoutes(app: FastifyInstance) {
    * Odpowiedź nie jest tajemnicą: dokładnie tę samą informację ujawnia próba
    * założenia konta (`POST /api/users` przechodzi albo żąda sesji).
    */
-  app.get("/api/setup", async () => {
-    /* Tryb serwisowy jedzie TĄ trasą, a nie `/api/health`: Splash kolektora
-       już ją woła przy starcie i przy każdej zmianie adresu serwera, a health
-       jest ciężki (statystyki audytu, stan workera, ostatni import).
+  app.get("/api/setup", async () => ({ potrzebne: brakKont() }));
 
-       `adminMode` domyślnie false — stary serwer bez tego pola nie wpuści
-       nowego kolektora bez logowania przez przypadek. */
-    if (!config.trybSerwisowy) return { potrzebne: brakKont() };
-    const u = kontoSerwisowe();
-    return {
-      potrzebne: brakKont(),
-      adminMode: true,
-      admin: { userId: u.userId, login: null, name: u.name, role: u.role, active: true, maHaslo: false },
-    };
-  });
-
-  /** Sesja biura; `null` = zgoda, obiekt = odmowa gotowa do odesłania. */
-  function odmowaZarzadzania(): { kod: number; error: string } | null {
+  /** Uprawnienie do operacji na kontach; `null` = zgoda, obiekt = odmowa. */
+  function odmowa(
+    operacja: OperacjaUprzywilejowana
+  ): { kod: number; error: string } | null {
     const s = sesjaZadania();
     if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
-    const w = autoryzuj(s.user, "zarzadzanie_kontami");
+    const w = autoryzuj(s.user, operacja);
     return w.ok ? null : { kod: 403, error: w.powod ?? "Brak uprawnień" };
   }
+
+  /** Nazwisko autora do audytu; wołane dopiero PO zgodzie, więc sesja jest. */
+  const kto = () => sesjaZadania()?.user.name ?? "anonim";
 
   app.get("/api/users", async (_req, reply) => {
     const s = sesjaZadania();
     if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
-    if (s.user.role !== "biuro") {
+    /* Świadomie NIE przez `autoryzuj`: odczyt niczego nie zmienia, więc wpis
+       `privileged` przy każdym wejściu na listę utopiłby dziennik. Cena jest
+       taka, że nowa rola musi trafić i tutaj, i do `WYMAGANA_ROLA`. */
+    if (!ROLE_BIUROWE.includes(s.user.role)) {
       // lista loginów to lista tożsamości — nie wystawiamy jej hali
-      return reply.code(403).send({ error: "Lista kont jest dostępna tylko dla biura" });
+      return reply.code(403).send({ error: "Lista kont jest dostępna dla biura i admina" });
     }
     return { users: listUsers() };
   });
@@ -151,6 +155,7 @@ export async function authRoutes(app: FastifyInstance) {
     return null;
   }
 
+
   app.post<{
     Body: { name?: string; login?: string; haslo?: string; role?: Rola };
   }>("/api/users", async (req, reply) => {
@@ -160,17 +165,33 @@ export async function authRoutes(app: FastifyInstance) {
     const blad = bladDanych(req.body?.login ?? "", req.body?.haslo ?? "");
     if (blad) return reply.code(400).send({ error: blad });
 
-    /* Rola EFEKTYWNA, nie surowe pole z żądania — pominięcie pola znaczy
-       `magazynier` i walidacja musi patrzeć na to samo, co powstanie. */
-    const rola: Rola = brakKont() ? "biuro" : (req.body?.role ?? "magazynier");
+    /* Rola z ŻĄDANIA musi przejść przez listę, zanim trafi do bazy. Kolumna
+       `role` nie ma `CHECK`, więc do 0.24.0 wchodziło tu dowolne słowo —
+       łącznie z `admin`. Sprawdzenie stoi PRZED autoryzacją, bo „nie ma takiej
+       roli" jest odpowiedzią na kształt żądania, nie na uprawnienia. */
+    const zadana = req.body?.role;
+    if (zadana !== undefined && !poprawnaRola(zadana)) {
+      return reply.code(400).send({ error: `Rola musi być jedną z: ${ROLE.join(", ")}` });
+    }
 
-    // Pierwsze konto w pustej bazie zakłada się bez sesji — inaczej nie dałoby
-    // się założyć żadnego. Rola `biuro` jest wymuszona, bo to konto będzie
-    // jedyną drogą do wszystkich następnych.
+    /* Pierwsze konto w pustej bazie zakłada się bez sesji — inaczej nie dałoby
+       się założyć żadnego. Rola `admin` jest wymuszona, bo to konto będzie
+       jedyną drogą do wszystkich następnych, a admin jako jedyny zakłada konta
+       biura. Instalacja stawiana kreatorem na kolektorze nie miałaby inaczej
+       jak dorobić się admina. */
     const pierwsze = brakKont();
+
+    /* Rola EFEKTYWNA, nie surowe pole z żądania — pominięcie pola znaczy
+       `magazynier` i autoryzacja musi patrzeć na to samo, co powstanie. */
+    const rola: Rola = pierwsze ? "admin" : (zadana ?? "magazynier");
+
     if (!pierwsze) {
-      const odmowa = odmowaZarzadzania();
-      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+      /* Dwa różne uprawnienia, bo to dwie różne rzeczy: biuro zakłada halę,
+         konto biura albo admina zakłada wyłącznie admin. */
+      const o = odmowa(
+        ROLE_BIUROWE.includes(rola) ? "zarzadzanie_biurem" : "zarzadzanie_kontami"
+      );
+      if (o) return reply.code(o.kod).send({ error: o.error });
     }
 
     try {
@@ -190,25 +211,22 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string }; Body: { haslo?: string | null } }>(
     "/api/users/:id/haslo",
     async (req, reply) => {
-      const odmowa = odmowaZarzadzania();
-      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
-      /* Konta serwisowego nie da się ani wyłączyć, ani obdarzyć hasłem.
-         Bez tego zakazu ktoś „wyłączyłby" je w ustawieniach, UI pokazałby
-         konto nieczynne, a obejście działałoby dalej — bo bramka ustawia
-         tożsamość z konfiguracji, nie z flagi `active`. Stan, którego nikt
-         by nie zrozumiał. Tryb wyłącza się jedną drogą: WERTIS_ADMIN. */
-      if (toKontoSerwisowe(Number(req.params.id))) {
-        return reply.code(400).send({
-          error: "Konta serwisowego nie da się zmienić — wyłącz WERTIS_ADMIN i zrestartuj usługi",
-        });
-      }
+      /* Odbieranie i nadawanie cudzych haseł jest sprawą admina. Cena jest
+         jawna: biuro nie zresetuje hasła magazynierowi, który je zapomniał —
+         musi poprosić admina. Tak zdecydował właściciel, a przeniesienie tego
+         z powrotem to jedna linia w `WYMAGANA_ROLA`. */
+      const o = odmowa("zarzadzanie_biurem");
+      if (o) return reply.code(o.kod).send({ error: o.error });
       const haslo = req.body?.haslo ?? null;
       // `null` odbiera hasło, czyli zamyka konto na klucz bez kasowania go
       if (haslo !== null && haslo.length < HASLO_MIN) {
         return reply.code(400).send({ error: `Hasło musi mieć co najmniej ${HASLO_MIN} znaków` });
       }
       setHaslo(Number(req.params.id), haslo);
-      logEvent("user_haslo_changed", "biuro", null, { userId: Number(req.params.id) });
+      /* Autorem jest KONKRETNA osoba, nie nazwa roli. Do 0.24.0 stało tu słowo
+         „biuro" — teraz byłoby wprost nieprawdziwe (zmienia admin), ale i
+         wcześniej audyt odpowiadał „biuro" na pytanie „kto odebrał hasło". */
+      logEvent("user_haslo_changed", kto(), null, { userId: Number(req.params.id) });
       return { ok: true };
     }
   );
@@ -216,18 +234,13 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string }; Body: { active?: boolean } }>(
     "/api/users/:id/active",
     async (req, reply) => {
-      const odmowa = odmowaZarzadzania();
-      if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
-      // patrz zakaz przy `:id/haslo` — ta sama zasada, ten sam powód
-      if (toKontoSerwisowe(Number(req.params.id))) {
-        return reply.code(400).send({
-          error: "Konta serwisowego nie da się zmienić — wyłącz WERTIS_ADMIN i zrestartuj usługi",
-        });
-      }
+      // patrz `:id/haslo` — odbieranie dostępu to ta sama sprawa, co odbieranie hasła
+      const o = odmowa("zarzadzanie_biurem");
+      if (o) return reply.code(o.kod).send({ error: o.error });
       // konta się nie kasuje — historia w `events` musi mieć na co wskazywać
       const active = req.body?.active !== false;
       setActive(Number(req.params.id), active);
-      logEvent("user_active_changed", "biuro", null, { userId: Number(req.params.id), active });
+      logEvent("user_active_changed", kto(), null, { userId: Number(req.params.id), active });
       return { ok: true };
     }
   );
@@ -237,8 +250,8 @@ export async function authRoutes(app: FastifyInstance) {
    * Idempotentna — dotyka wyłącznie zdarzeń bez `user_ref`.
    */
   app.post("/api/users/migrate-history", async (_req, reply) => {
-    const odmowa = odmowaZarzadzania();
-    if (odmowa) return reply.code(odmowa.kod).send({ error: odmowa.error });
+    const o = odmowa("zarzadzanie_kontami");
+    if (o) return reply.code(o.kod).send({ error: o.error });
     return migrujHistorie();
   });
 }
