@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { config } from "./config.js";
 import { makeSubiektAdapter } from "./adapters/index.js";
 import { userById } from "./services/users.js";
 
@@ -189,32 +188,7 @@ export function withRequestContext(app: FastifyInstance): void {
        2026. Wcześniej bezczynność dłuższa niż 10 minut przełączała sesję
        w `zablokowana`, a zapis z niej dostawał 423, żeby wymusić skan badge'a.
        Razem z ekranem blokady zniknęła i ta bramka. */
-    if (!s) {
-      /* TRYB SERWISOWY. Brak sesji przestaje znaczyć „odmowa" i zaczyna znaczyć
-         „konto serwisowe" — ale TYLKO tutaj, w jednym miejscu, i tylko przy
-         jawnym `WERTIS_ADMIN=1`. Bramka zostaje domyślnie zamknięta: trasa
-         dopisana jutro dziedziczy to zachowanie razem z 401, bez pamiętania
-         o nim.
-
-         Sesja ma pierwszeństwo (gałąź wyżej), więc zalogowany człowiek dalej
-         podpisuje pracę swoim nazwiskiem, nie ADMIN-em. */
-      if (config.trybSerwisowy) {
-        const { kontoSerwisowe } = await import("./services/tryb-serwisowy.js");
-        const u = kontoSerwisowe();
-        setCurrentUser(u.userId, u.name);
-        /* Sesja UDAWANA, nie zapisana. Trasy sprawdzające rolę pytają
-           `sesjaZadania()`, więc bez tej linii tryb serwisowy wpuszczałby do
-           odczytów, a odbijał od zarządzania kontami i audytu — czyli od tego,
-           po co powstał.
-
-           Token jest pusty i nic nie trafia do `device_session`: gdyby trafiło,
-           powstałby artefakt PRZEŻYWAJĄCY wyłączenie flagi, czyli trwała tylna
-           furtka. Tak wyłączenie odbiera dostęp natychmiast. */
-        if (ctx) ctx.sesja = { token: "", user: u };
-        return;
-      }
-      return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
-    }
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
   });
 
   /* ── Odrzucone żądania ────────────────────────────────────────────────────

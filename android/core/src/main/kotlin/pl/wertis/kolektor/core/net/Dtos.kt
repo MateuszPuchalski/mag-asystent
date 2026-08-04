@@ -628,19 +628,7 @@ data class ForceReleaseResponse(val ok: Boolean = true, val odebrano: String? = 
 
 /** Czy instalacja nie ma jeszcze żadnego konta (kolektor pyta przy starcie). */
 @Serializable
-data class SetupResponse(
-    val potrzebne: Boolean = false,
-    /**
-     * Serwer ma wyłączone logowanie (`WERTIS_ADMIN=1`).
-     *
-     * Domyślne `false` jest tu ZABEZPIECZENIEM, nie wygodą: starszy serwer nie
-     * zna tego pola, więc nowy kolektor nie wejdzie przypadkiem bez logowania,
-     * tylko dlatego, że czegoś nie zrozumiał.
-     */
-    val adminMode: Boolean = false,
-    /** Tożsamość, którą serwer podpisze pracę w tym trybie. */
-    val admin: UserDto? = null,
-)
+data class SetupResponse(val potrzebne: Boolean = false)
 
 /** Założenie konta. Uprawnienie autora rozstrzyga sesja, nie drugi sekret w ciele. */
 @Serializable

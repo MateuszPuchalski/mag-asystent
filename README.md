@@ -175,47 +175,42 @@ albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2
 
 ### Pierwsze konto — bez niego kolektor nie wpuści
 
-`npm run seed` zasila kartotekę, ale **nie zakłada żadnego konta**. Ekran
-startowy jest twardą bramką: bez konta nie ma jak podpisać operacji, więc nie
-ma przejścia dalej.
+Ekran startowy jest twardą bramką: bez konta nie ma jak podpisać operacji, więc
+nie ma przejścia dalej. `npm run seed` zakłada dlatego **jedno konto o roli
+`admin`** — login `admin`, hasło z `ADMIN_HASLO` albo wylosowane i wypisane raz:
 
-Pierwsze konto zakłada się w pustej bazie bez sesji — inaczej nie dałoby się
-założyć żadnego. Wymuszona rola to `biuro`, bo to konto będzie drogą do
-wszystkich następnych:
+```
+[seed] konto admina: login=admin hasło=4m9E0gfK806DVm07
+[seed] hasło wylosowane i pokazane RAZ — wpisz ADMIN_HASLO, żeby je ustalić.
+```
+
+Stałego hasła demo nie ma świadomie. Reguła „żadnych domyślnych haseł"
+([`DEPLOY.md`](DEPLOY.md) §5a) obowiązuje też tutaj: wyjątek „tylko na dev"
+jest dokładnie tym, który jedzie potem na produkcję. Zmienną
+`ADMIN_HASLO` czyta **wyłącznie skrypt seeda**, nigdy serwer — na produkcji nie
+znaczy nic. Drugi przebieg konta nie dubluje i nie rusza hasła.
+
+U klienta to samo konto zakłada instalator, pytając instalującego o hasło.
+
+Pierwsze konto da się też założyć ręcznie na pustej bazie, bez sesji — inaczej
+nie dałoby się założyć żadnego. Rola `admin` jest wtedy **wymuszona** niezależnie
+od tego, co przyszło w żądaniu, bo to konto będzie drogą do wszystkich
+następnych:
 
 ```bash
 curl -X POST http://localhost:3001/api/users \
   -H 'content-type: application/json' \
-  -d '{"name":"Biuro Zakupy","login":"biuro","haslo":"tajnehaslo"}'
-# → {"user":{"userId":1,"login":"biuro","role":"biuro","maHaslo":true}}
+  -d '{"name":"Właściciel","login":"wlasciciel","haslo":"tajnehaslo"}'
+# → {"user":{"userId":1,"login":"wlasciciel","role":"admin","maHaslo":true}}
 ```
 
 Furtka zamyka się sama: kolejne żądanie bez sesji dostaje już 401, a następne
-konta wymagają `x-session` konta biura ([`DEPLOY.md`](DEPLOY.md) §5a). Warunek
-liczy konta **z loginem**, więc konta-ślady z migracji historii jej nie zamykają.
+konta wymagają `x-session` ([`DEPLOY.md`](DEPLOY.md) §5a). Warunek liczy konta
+**z loginem**, więc konta-ślady z migracji historii jej nie zamykają.
 
 Na ekranie startowym kolektora są dwa pola — login i hasło — więc emulator bez
 skanera wystarczy. Domyślny adres serwera (`http://10.0.2.2:3001`) jest już
 ustawiony na localhost hosta.
-
-#### Tryb serwisowy — dla pracy nad kodem, nie dla firmy
-
-Przy bazie kasowanej kilka razy dziennie zakładanie konta jest piątym krokiem
-w czterokrokowej procedurze, wykonywanym dwa razy: raz dla kolektora, raz dla
-podglądu biura. `WERTIS_ADMIN=1` wyłącza logowanie w całości.
-
-```bash
-WERTIS_ADMIN=1 npm run dev
-```
-
-Kolektor i `/biuro` wchodzą wtedy od razu, a operacje podpisuje konto
-`ADMIN (TRYB SERWISOWY)`. Konto nie ma ani loginu, ani hasła, więc **nie da się
-nim zalogować** — istnieje wyłącznie po to, żeby operacja miała autora.
-
-Włączony tryb widać z trzech stron naraz. Czerwony pasek na kolektorze i w
-biurze, `ok: false` w `/api/health` z ostrzeżeniem na pierwszym miejscu, wpis
-`tryb_serwisowy_start` w dzienniku. **Instalator tej zmiennej nie zapisuje i nie
-ma prawa zacząć** — szczegóły w [`DEPLOY.md`](DEPLOY.md) §5a.
 
 **Konto jest potrzebne także do grzebania curlem.** API wymaga nagłówka
 `x-session` na każdej trasie poza czterema: `GET /api/health`, `GET /api/setup`,

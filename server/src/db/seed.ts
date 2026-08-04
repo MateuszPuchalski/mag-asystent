@@ -1,7 +1,9 @@
 import fs from "node:fs";
+import { randomBytes } from "node:crypto";
 import { db, nowIso, transaction } from "./db.js";
 import { config } from "../config.js";
 import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
+import { createUser, HASLO_MIN, userByLogin } from "../services/users.js";
 
 /**
  * Zasila read-model sgt_* prawdziwymi danymi z server/seed/products.json
@@ -33,7 +35,46 @@ const MAG_SERWIS = 91;
 const MAG_EKSPOZYCJA = 92;
 const MAG_ARCHIWUM = 93;
 
+/* ── Konto admina ───────────────────────────────────────────────────────────
+   Świeża baza nie ma żadnego konta, a bez konta nie da się ani zalogować na
+   kolektorze, ani wejść do podglądu biura. Przy bazie kasowanej kilka razy
+   dziennie zakładanie go ręcznie było piątym krokiem w czterokrokowej
+   procedurze — wykonywanym dwa razy, bo biuro loguje się osobno.
+
+   U klienta to samo konto zakłada instalator, pytając instalującego o hasło.
+   Tutaj hasło bierze się z `ADMIN_HASLO`, a bez tej zmiennej jest LOSOWANE
+   i wypisywane raz. Stałego hasła demo świadomie nie ma: `DEPLOY.md` mówi
+   „żadnych domyślnych haseł", a wyjątek „tylko na dev" jest dokładnie tym
+   wyjątkiem, który jedzie potem na produkcję.
+
+   `ADMIN_HASLO` czyta WYŁĄCZNIE ten skrypt, nigdy serwer — więc zmienna nie
+   znaczy nic na produkcji, nawet gdyby tam trafiła.                          */
+
+const ADMIN_LOGIN = "admin";
+
+function kontoAdmina() {
+  if (userByLogin(ADMIN_LOGIN)) {
+    console.log(`[seed] konto „${ADMIN_LOGIN}" już jest — nie ruszam hasła.`);
+    return;
+  }
+  const zEnv = process.env.ADMIN_HASLO;
+  if (zEnv !== undefined && zEnv.length < HASLO_MIN) {
+    console.error(`[seed] ADMIN_HASLO krótsze niż ${HASLO_MIN} znaków — konta nie zakładam.`);
+    return;
+  }
+  // base64url z 12 bajtów: 16 znaków bez metaznaków powłoki, więc da się je
+  // wkleić do `wertis.env` i przepisać z ekranu bez cudzysłowów
+  const haslo = zEnv ?? randomBytes(12).toString("base64url");
+  createUser("Administrator", "admin", ADMIN_LOGIN, haslo);
+  console.log(`[seed] konto admina: login=${ADMIN_LOGIN} hasło=${haslo}`);
+  if (zEnv === undefined) {
+    console.log("[seed] hasło wylosowane i pokazane RAZ — wpisz ADMIN_HASLO, żeby je ustalić.");
+  }
+}
+
 function seed() {
+  kontoAdmina();
+
   const d = db();
   const already = (d.prepare("SELECT COUNT(*) AS n FROM sgt_towar").get() as { n: number }).n;
   if (already > 0 && process.env.FORCE_SEED !== "1") {

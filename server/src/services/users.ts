@@ -13,7 +13,27 @@ import { db, nowIso } from "../db/db.js";
    `PRC-0007-3` — jedna sekunda zamiast wpisywania, ale własny, osobny wzorzec
    w firmie, która wszędzie indziej loguje się loginem i hasłem.              */
 
-export type Rola = "magazynier" | "brygadzista" | "biuro";
+export type Rola = "magazynier" | "brygadzista" | "biuro" | "admin";
+
+/* Lista ról ISTNIEJE W RUNTIME, bo typ TypeScriptu znika przy kompilacji.
+   `POST /api/users` bierze rolę z ciała żądania, a kolumna `role` nie ma
+   `CHECK` — bez tej listy `{"role":"admin"}` przechodziło i każde biuro
+   nadawało sobie admina jednym żądaniem. Kolejność jest od najmniejszych
+   uprawnień do największych, żeby czytało się jak drabina.                  */
+export const ROLE: readonly Rola[] = ["magazynier", "brygadzista", "biuro", "admin"];
+
+export const poprawnaRola = (raw: unknown): raw is Rola =>
+  typeof raw === "string" && (ROLE as readonly string[]).includes(raw);
+
+/**
+ * Role „nad halą" — te, których nadanie tworzy kogoś zarządzającego kontami.
+ *
+ * Jedna definicja na dwa użycia w `routes/auth.ts`: kto widzi listę kont
+ * i którą rolę wolno nadać wyłącznie adminowi. Rozjazd między tymi dwoma
+ * listami byłby cichy — biuro widziałoby listę, której nie umie uzupełnić,
+ * albo zakładałoby konta, których nie widzi.
+ */
+export const ROLE_BIUROWE: readonly Rola[] = ["biuro", "admin"];
 
 export interface Uzytkownik {
   userId: number;

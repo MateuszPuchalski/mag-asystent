@@ -18,8 +18,6 @@
   [hidden] { display: none !important; }
   body { background: var(--paper); color: var(--ink); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
   header { background: var(--ink); color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
-#pasekSerwisowy { background:#b3261e; color:#fff; font-weight:700; font-size:13px;
-  padding:8px 14px; letter-spacing:.02em; }
   header b { color: var(--amber); letter-spacing: 2px; }
   header .kto { margin-left: auto; font-size: 12px; color: #bbb; }
   header button { background: none; border: 1px solid #555; color: #ccc; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
@@ -56,11 +54,6 @@
   <span class="kto" id="kto"></span>
   <button id="wyloguj" hidden>Wyloguj</button>
 </header>
-<!-- Pasek trybu serwisowego. Widoczny zawsze, gdy logowanie jest wyłączone —
-     nie da się go zamknąć, bo to jedyna rzecz na tej stronie, która mówi, że
-     instalacja stoi otworem. -->
-<div id="pasekSerwisowy" hidden>TRYB SERWISOWY — logowanie wyłączone. Nie zostawiaj tego u klienta.</div>
-
 <main id="login" class="card">
   <h2>LOGOWANIE</h2>
   <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada biuro na kolektorze
@@ -105,10 +98,6 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
-/* Strona jest PUBLICZNA (`routes/biuro.ts`), więc nie może sama zdecydować,
-   że logowania nie ma — musi to usłyszeć od serwera. Pytamy `/api/setup`,
-   endpoint już dziś publiczny, który zdradza dokładnie tyle samo. */
-let trybSerwisowy = false;
 let dokumenty = [];
 
 async function api(sciezka, opts = {}) {
@@ -116,9 +105,7 @@ async function api(sciezka, opts = {}) {
     ...opts,
     headers: { "content-type": "application/json", "x-session": token, ...(opts.headers || {}) },
   });
-  /* W trybie serwisowym 401 nie może wyrzucać na ekran logowania: token jest
-     pusty z założenia, a wylogowanie zapętliłoby stronę. */
-  if (r.status === 401 && !trybSerwisowy) {
+  if (r.status === 401) {
     wyloguj();
     throw new Error("Sesja wygasła — zaloguj się ponownie");
   }
@@ -291,8 +278,7 @@ async function odswiez() {
 function start() {
   $("login").hidden = true;
   $("panel").hidden = false;
-  // w trybie serwisowym nie ma z czego się wylogować, a przycisk kusiłby
-  $("wyloguj").hidden = trybSerwisowy;
+  $("wyloguj").hidden = false;
   $("kto").textContent = kto;
   odswiez();
 }
@@ -309,23 +295,9 @@ $("reklamacje").addEventListener("click", (e) => {
   const c = e.target.closest("[data-csv]");
   if (c) return pobierzCsv(Number(c.dataset.csv), c.dataset.nr);
 });
-// bez `trybSerwisowy` odświeżanie stanęłoby, bo token jest wtedy pusty
-setInterval(() => { if (token || trybSerwisowy) odswiez(); }, 30_000);
+setInterval(() => { if (token) odswiez(); }, 30_000);
 
-(async () => {
-  try {
-    const d = await (await fetch("/api/setup")).json();
-    if (d.adminMode) {
-      trybSerwisowy = true;
-      kto = d.admin?.name || "";
-      $("pasekSerwisowy").hidden = false;
-      $("wyloguj").hidden = true;
-      start();
-      return;
-    }
-  } catch { /* serwer nieosiągalny — zostaje zwykły ekran logowania */ }
-  if (token) start();
-})();
+if (token) start();
 </script>
 </body>
 </html>
