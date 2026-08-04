@@ -37,7 +37,7 @@ DOCS = [
     "docs/analiza-rozkladanie.md",
     "docs/subiekt-gt-edu-setup.md",
     "docs/subiekt-gt-struktura.md",
-    # Katalog scenariuszy testowych: 65 pozycji, każdą czyta się osobno i pod
+    # Katalog scenariuszy testowych: 66 pozycji, każdą czyta się osobno i pod
     # ekranem. Długie zdanie kosztuje tu tyle samo, co w instrukcji wdrożenia.
     "docs/scenariusze-testowe.md",
     # Procedura wdrożenia wchodzi tu z tego samego powodu co DEPLOY: wykonuje ją
