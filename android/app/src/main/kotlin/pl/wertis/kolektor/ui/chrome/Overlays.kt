@@ -25,6 +25,8 @@ import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
+import pl.wertis.kolektor.ui.theme.Destructive
+import pl.wertis.kolektor.ui.theme.Paper
 import pl.wertis.kolektor.ui.theme.Success
 
 /* ── Nakładki: toast (2.6 s) · plakietka sukcesu (1.5 s) ───────────────────
@@ -59,6 +61,30 @@ fun BoxScope.SuccessOverlay(msg: String?) {
     ) {
         Text("✓", color = CardWhite, fontSize = 34.sp, fontWeight = FontWeight.Bold)
         Text(msg, color = CardWhite, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+fun TrybSerwisowyBanner(widoczny: Boolean) {
+    /* Czerwony, bez akcji i bez możliwości zamknięcia. To jedyna rzecz na
+       ekranie, która mówi, że instalacja nie pyta o hasło — a przełącznik,
+       który najgorzej zostawić włączony, musi być widoczny z drugiego końca
+       alejki, nie w diagnostyce serwera. */
+    if (!widoczny) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Destructive)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "TRYB SERWISOWY — logowanie wyłączone",
+            color = Paper,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

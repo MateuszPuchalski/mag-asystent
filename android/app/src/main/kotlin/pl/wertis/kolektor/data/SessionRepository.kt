@@ -42,6 +42,14 @@ class SessionRepository(
     private val _state = MutableStateFlow<SessionState>(SessionState.Brak)
     val state: StateFlow<SessionState> = _state
 
+    /**
+     * Serwer ma wyłączone logowanie. Osobny strumień od `state`, bo to nie jest
+     * cecha OSOBY, tylko SERWERA — i musi być widoczne także wtedy, gdy ktoś
+     * zaloguje się normalnie mimo włączonego trybu.
+     */
+    private val _trybSerwisowy = MutableStateFlow(false)
+    val trybSerwisowy: StateFlow<Boolean> = _trybSerwisowy
+
     /** Wołane po KAŻDEJ zmianie osoby — kontekst przyklejony musi wtedy zniknąć. */
     var onUserChanged: (() -> Unit)? = null
 
@@ -81,13 +89,33 @@ class SessionRepository(
     }
 
     /**
+     * Tożsamość z TRYBU SERWISOWEGO — serwer ma wyłączone logowanie.
+     *
+     * ŚWIADOMIE nie woła `zapisz()`: nic nie ląduje w SharedPreferences, bo nie
+     * ma czego zapisać. Tokenu nie ma — serwer wpuszcza po braku sesji, a nie
+     * po jakimś sekrecie. Dzięki temu restart aplikacji pyta serwer od nowa
+     * i wyłączenie trybu jest widoczne od razu, zamiast wisieć w prefsach.
+     */
+    fun przyjmijTrybSerwisowy(user: UserDto) {
+        _trybSerwisowy.value = true
+        _state.value = SessionState.Aktywna(user.userId, user.name, user.role)
+        onUserChanged?.invoke()
+    }
+
+    /**
      * Odświeżenie stanu z serwera — przy starcie i po powrocie z tła.
      *
      * Właścicielem sesji jest SERWER: to on wie, czy token nadal wskazuje
      * czynne konto — także po przejęciu pracy z innego urządzenia.
      */
     fun refresh() {
-        if (token == null) return
+        /* Tryb serwisowy: tokenu nie ma, a stan jest aktywny. Bez tej gałęzi
+           kolektor NIGDY by nie zauważył, że tryb wyłączono — zostałby w UI
+           „zalogowany", a każde żądanie wracałoby 401. */
+        if (token == null) {
+            if (_state.value is SessionState.Aktywna) scope.launch { sprawdzTrybSerwisowy() }
+            return
+        }
         scope.launch {
             runCatching { apiCall { api().authMe() } }
                 .onSuccess { zapisz(token, it.user) }
@@ -97,6 +125,13 @@ class SessionRepository(
                     if (e is ApiError && e.status == 401) zapisz(null, null)
                 }
         }
+    }
+
+    /** Czy serwer nadal ma wyłączone logowanie; jeśli nie — wracamy na splash. */
+    private suspend fun sprawdzTrybSerwisowy() {
+        val r = runCatching { apiCall { api().setupPotrzebny() } }.getOrNull() ?: return
+        _trybSerwisowy.value = r.adminMode
+        if (!r.adminMode) _state.value = SessionState.Brak
     }
 
     /**

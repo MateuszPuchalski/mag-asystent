@@ -2,6 +2,7 @@ package pl.wertis.kolektor.data
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import pl.wertis.kolektor.core.net.SetupResponse
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.CreateUserBody
@@ -44,6 +45,10 @@ class SetupRepository(
     /** Czy serwer nie ma jeszcze żadnego konta; `null` = nie udało się zapytać. */
     suspend fun potrzebny(): Boolean? =
         runCatching { apiCall { api().setupPotrzebny() }.potrzebne }.getOrNull()
+
+    /** Pełna odpowiedź `/api/setup` — potrzebna Splashowi także dla trybu serwisowego. */
+    suspend fun stanInstalacji(): SetupResponse? =
+        runCatching { apiCall { api().setupPotrzebny() } }.getOrNull()
 
     /**
      * Zakłada całą listę.

@@ -306,4 +306,25 @@ class DtosTest {
         assertEquals(4, c.hits)
         assertEquals(listOf(1L, 2L), c.twIds)
     }
+
+    /**
+     * Domyślne `false` przy `adminMode` jest ZABEZPIECZENIEM, nie wygodą:
+     * starszy serwer nie zna tego pola, a nowy kolektor nie ma prawa wejść bez
+     * logowania tylko dlatego, że czegoś nie zrozumiał.
+     */
+    @Test fun `stary serwer nie wlacza trybu serwisowego`() {
+        val r = WertisJson.decodeFromString(SetupResponse.serializer(), """{"potrzebne":true}""")
+        assertEquals(true, r.potrzebne)
+        assertEquals(false, r.adminMode)
+        assertEquals(null, r.admin)
+    }
+
+    @Test fun `tryb serwisowy niesie tozsamosc do podpisu`() {
+        val json = """{"potrzebne":true,"adminMode":true,""" +
+            """"admin":{"userId":1,"login":null,"name":"ADMIN (TRYB SERWISOWY)","role":"biuro","active":true,"maHaslo":false}}"""
+        val r = WertisJson.decodeFromString(SetupResponse.serializer(), json)
+        assertEquals(true, r.adminMode)
+        assertEquals("ADMIN (TRYB SERWISOWY)", r.admin?.name)
+        assertEquals("biuro", r.admin?.role)
+    }
 }
