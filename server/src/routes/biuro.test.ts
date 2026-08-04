@@ -37,15 +37,10 @@ test("korzeń przekierowuje do podglądu", async () => {
   assert.equal(r.headers.location, "/biuro");
 });
 
-test("sw.js wyrejestrowuje starą PWA i nie da się go zacache'ować", async () => {
-  // stary service worker serwuje splash kolektora z cache, więc żądanie nie
-  // dociera do serwera — kasowanie kodu tu nie wystarcza, trzeba go pogrzebać
+test("trasa /sw.js wyszła razem z pogrzebem starej PWA", async () => {
+  // jednorazowe sprzątanie po PWA z 0.3.0 skończyło się w 0.26.0
   const r = await app.inject({ method: "GET", url: "/sw.js" });
-  assert.equal(r.statusCode, 200);
-  assert.match(r.headers["content-type"] as string, /javascript/);
-  assert.equal(r.headers["cache-control"], "no-store");
-  assert.match(r.body, /registration\.unregister\(\)/);
-  assert.match(r.body, /caches\.delete/);
+  assert.equal(r.statusCode, 404);
 });
 
 test("dane strony zostają za bramką sesji", async () => {

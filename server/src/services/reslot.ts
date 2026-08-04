@@ -1,5 +1,6 @@
 import { parseAdres, pickingLoc } from "../locs.js";
 import { poziomyStrefy, wStrefieZlotej } from "./strefa-zlota.js";
+import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Raport przeslotowania (plan §8) ────────────────────────────────────────
    NIE jest to funkcja aplikacji, tylko wsad uruchamiany 1–2× w roku, przed
@@ -201,7 +202,6 @@ export function przeslotowanie(
 
 /** CSV jak pozostałe eksporty: `;` + BOM, żeby Excel PL otworzył bez kreatora. */
 export function reslotCsv(r: Raport): string {
-  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const naglowek = [
     "# WERTIS — raport przeslotowania, " + r.at.slice(0, 10),
     "# KOLEJNOSC MA ZNACZENIE: najpierw EKSMISJA, dopiero potem AWANS.",
@@ -214,12 +214,10 @@ export function reslotCsv(r: Raport): string {
     ...naglowek,
     ["lista", "symbol", "nazwa", "lokalizacja", "cel", "pobran_12m", "stan", "powod"].join(";"),
     ...r.wiersze.map((w) =>
-      [w.lista, w.symbol, w.nazwa, w.lokalizacja, w.cel, w.pobrania, w.stan, w.powod]
-        .map(esc)
-        .join(";")
+      wierszCsv([w.lista, w.symbol, w.nazwa, w.lokalizacja, w.cel, w.pobrania, w.stan, w.powod], ";")
     ),
   ];
-  return "﻿" + linie.join("\r\n") + "\r\n";
+  return zbudujCsv(linie);
 }
 
 /* ── Ładowanie danych z MSSQL ───────────────────────────────────────────────

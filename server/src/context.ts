@@ -1,10 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { makeSubiektAdapter } from "./adapters/index.js";
+import { SeededSubiektAdapter } from "./adapters/subiekt.seeded.js";
 import { userById } from "./services/users.js";
 
 /** Współdzielony adapter odczytu (Subiekt). Zapis idzie przez kolejkę/worker. */
-export const subiekt = makeSubiektAdapter();
+export const subiekt = new SeededSubiektAdapter();
 
 function header(req: FastifyRequest, name: string): string | null {
   const h = req.headers[name];

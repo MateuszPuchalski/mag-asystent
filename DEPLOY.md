@@ -657,13 +657,12 @@ stanu przez workera Sfery.
   `./gradlew :app:assembleRelease` i roześlij go przez MDM (sekcja 5).
 - **Diagnoza:** `http://mag.wertis.local:3001/api/health` → `{ ok: true, mode: ... }`;
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.
-- **Komputer pokazuje stary splash kolektora zamiast podglądu biura.** Aplikacja
-  webowa („Kolektor magazynowy · prototyp v0.2") wyszła z repo w 0.3.0. Była
-  jednak PWA: jej service worker serwuje splash z cache, więc żądanie w ogóle
-  nie dociera do serwera. Od 0.19.0 serwer odpowiada pod `/sw.js` skryptem, który
-  kasuje cache i wyrejestrowuje starego workera; wystarczy raz wejść na
-  `http://mag.wertis.local:3001/` i odświeżyć. Gdyby maszyna miała aplikację
-  **zainstalowaną** jako osobne okno, odinstaluj ją w przeglądarce
+- **Komputer pokazuje stary splash kolektora zamiast podglądu biura.** To ślad
+  po PWA usuniętej w 0.3.0: jej service worker serwuje splash z cache. Serwer
+  sprzątał to automatycznie trasą `/sw.js` (0.19.0–0.25.x); trasa wyszła
+  w 0.26.0. Gdyby objaw gdzieś wrócił, wyrejestruj workera ręcznie
+  (Chrome → DevTools → Application → Service workers → Unregister). Aplikację
+  **zainstalowaną** jako osobne okno odinstaluj w przeglądarce
   (Chrome → Ustawienia → Aplikacje).
 
 ## Dlaczego nie chmura

@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { userOf } from "../context.js";
 import { logEvent } from "../services/events.js";
-import { metrics } from "../services/metrics.js";
+import { metrics } from "../services/raporty.js";
 import { reconcile } from "../services/reconcile.js";
-import { raportWydajnosci } from "../services/wydajnosc.js";
+import { raportWydajnosci } from "../services/raporty.js";
 
 /** Telemetria urządzenia z kolektora (akcelerometr/bateria) → audyt w events. */
 const ALLOWED = new Set([
@@ -38,7 +38,7 @@ export async function deviceRoutes(app: FastifyInstance) {
    * pracowniczym w rozumieniu Kodeksu pracy. Zlanie ich w jeden endpoint
    * sprawiłoby, że dane osobowe wyciekają wszędzie tam, gdzie ktoś chciał
    * tylko sprawdzić p95. Obowiązek formalny jedzie w odpowiedzi
-   * (`podstawaPrawna`) — patrz services/wydajnosc.ts.
+   * (`podstawaPrawna`) — patrz services/raporty.ts.
    */
   app.get<{ Querystring: { days?: string } }>("/api/wydajnosc", async (req) => {
     return raportWydajnosci(Number(req.query.days) || 7);

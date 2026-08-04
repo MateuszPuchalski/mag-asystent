@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 import { subiekt } from "../context.js";
 import { parseLocs } from "../locs.js";
+import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Nocna rekoncyliacja (plan §9) ──────────────────────────────────────────
    Aplikacja pisze do SGT przez kolejkę, ale NIKT nie sprawdzał, czy stan po
@@ -124,10 +125,9 @@ export function reconcile(): Rekoncyliacja {
 
 /** CSV jak eksport wyjątków: `;` + BOM, żeby Excel PL otworzył bez kreatora. */
 export function reconcileCsv(r: Rekoncyliacja): string {
-  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const linie = [
     ["rodzaj", "klucz", "opis", "od_kiedy"].join(";"),
-    ...r.rozjazdy.map((x) => [x.rodzaj, x.klucz, x.opis, x.odKiedy ?? ""].map(esc).join(";")),
+    ...r.rozjazdy.map((x) => wierszCsv([x.rodzaj, x.klucz, x.opis, x.odKiedy ?? ""], ";")),
   ];
-  return "﻿" + linie.join("\r\n") + "\r\n";
+  return zbudujCsv(linie);
 }

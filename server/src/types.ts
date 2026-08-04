@@ -1,3 +1,7 @@
+/* ── Typy odpowiedzi REST — LUSTRO android/core/.../net/Dtos.kt ─────────────
+   Zmieniasz typ tu → sprawdź tam (i odwrotnie); rozjazd kończy się błędem
+   deserializacji na kolektorze, nie w kompilatorze.                          */
+
 export interface StockView {
   stan: number;       // stan SGT
   rez: number;        // rezerwacje

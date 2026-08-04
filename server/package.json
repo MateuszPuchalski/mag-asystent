@@ -18,9 +18,7 @@
     "start:worker": "node dist/worker/worker.js",
     "test": "tsx --test src/*.test.ts src/**/*.test.ts",
     "reconcile": "tsx src/reconcile-run.ts",
-    "start:reconcile": "node dist/reconcile-run.js",
-    "reslot": "tsx src/reslot-run.ts",
-    "start:reslot": "node dist/reslot-run.js"
+    "reslot": "tsx src/reslot-run.ts"
   },
   "dependencies": {
     "fastify": "^5.2.1",

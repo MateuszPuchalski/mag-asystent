@@ -23,9 +23,7 @@ import type {
    zero zależności od bufora; dostawę można rozkładać, zanim księgowość
    zaksięguje FZ.
 
-   Zwroty rozkładało się tędy koszykami do 0.17.0. Wejścia do tej ścieżki nie
-   było od d131f75, a jej finał (MM Zwroty→MAG) i tak wymagał workera Sfery,
-   którego nie ma — więc zwroty wróciły do obsługi ręcznej w Subiekcie.        */
+   Zwroty wróciły do obsługi ręcznej w Subiekcie w 0.17.0.                     */
 
 const nowIso = () => new Date().toISOString();
 

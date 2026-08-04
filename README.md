@@ -6,8 +6,8 @@ każdy do swojej roli:
 
 - **Kolektor = natywna aplikacja Android** ([`android/`](android/README.md),
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
-  trwały offline (Room), kiosk przez Android lock-task/MDM. Wdrożenie:
-  [`DEPLOY.md`](DEPLOY.md) §5.
+  trwały offline (bufor plikowy JSON + WorkManager), kiosk przez Android
+  lock-task/MDM. Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku, ze zdjęciami dowodowymi. Jedna strona
   bez builda, logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się
@@ -44,7 +44,7 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 
 | Warstwa | Technologia |
 |---|---|
-| Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · Room — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
+| Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · WorkManager — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
 | Baza aplikacji | SQLite (wbudowany `node:sqlite`, zero modułów natywnych) — kolejka, sesje, events, locki (spec §7) |
 | Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
@@ -379,7 +379,7 @@ Parametry (env, dev):
   Sfery** w prawym górnym rogu. Pastylka jest zarazem wskaźnikiem stanu: zielona
   = OK, amber = ⏳ w kolejce z licznikiem, czerwona = błąd. Dolny pasek ma
   2 zakładki.
-- Bufor offline (Room) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
+- Bufor offline (plik JSON + WorkManager) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
   log upadków urządzenia (`device_drop`) dla serwisu.
 
 **DOSTAWY — Tryb A (redesign v2.0)** — druga zakładka
@@ -433,10 +433,10 @@ Parametry (env, dev):
   przesyłka jest jedna. Pozycja z wyjątkiem wypada z rutyny, ale nie blokuje
   zamknięcia dostawy.
 
-  Klucze sprzed 0.21.0 (`qty_short`, `no_space`…) serwer dalej **przyjmuje**,
-  choć kolektor ich nie oferuje: `git pull` przestawia serwer od razu, a APK
-  czeka na rozesłanie przez MDM. Etykiety zostają na zawsze — historii się nie
-  kasuje, a protokół dla dostawcy nie może pokazywać surowego klucza.
+  Kluczy sprzed 0.21.0 (`qty_short`, `no_space`…) serwer od 0.26.0 już **nie
+  przyjmuje** — okno wdrożenia APK się zamknęło. Etykiety zostają na zawsze:
+  historii się nie kasuje, a protokół dla dostawcy nie może pokazywać
+  surowego klucza.
 - Ekran **WYJĄTKI**: nierozwiązane zgłoszenia (pytane przy starcie aplikacji,
   czerwony pasek na każdym ekranie do czasu zamknięcia) + **raport kolizji
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
