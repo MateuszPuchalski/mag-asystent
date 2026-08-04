@@ -17,28 +17,55 @@ import {
        source wertis.env && npm run reslot
        npm run reslot -- --demo      # bez MSSQL, na zaseedowanej kartotece
 
-   Tryb `--demo` nie da list eksmisji ani awansów, bo seed nie zawiera żadnego
-   dokumentu WZ. Odpowiada za to na inne pytanie, na które warto znać odpowiedź
-   PRZED sezonem: jak kompletne są reguły stref złotych.                      */
+   Tryb `--demo` czyta historię pobrań z dokumentów WZ w read-modelu. Zasiewa
+   je `npm run seed:scenariusze`; sam `npm run seed` ich nie ma, więc bez niego
+   raport odmawia wypisania list 1–3 i odpowiada tylko na pytanie, jak kompletne
+   są reguły stref złotych. Pobrania z seedu są SYNTETYCZNE — nadają się do
+   sprawdzenia raportu, nie do decyzji o magazynie.                           */
 
 const demo = process.argv.includes("--demo");
 
 async function zSeedu(): Promise<{ kartoteki: Kartoteka[]; pobrania: Pobrania[] }> {
   const { db } = await import("./db/db.js");
+  const { TYP_WZ } = await import("./db/seed-scenariusze.js");
+  /* Ostatni zakup liczony tak samo jak w zapytaniu MSSQL: maksymalna data
+     dokumentu przyjęcia, na którym ten towar stoi. Bez tego lista likwidacji
+     brała za kandydata także towar, który przyjechał w zeszłym tygodniu. */
   const rows = db()
     .prepare(
       `SELECT t.tw_id, t.symbol, t.nazwa, t.lokalizacja,
               COALESCE((SELECT stan FROM sgt_stan s
-                         WHERE s.tw_id = t.tw_id AND s.mag_id = ?), 0) AS stan
+                         WHERE s.tw_id = t.tw_id AND s.mag_id = ?), 0) AS stan,
+              (SELECT MAX(d.data_wyst) FROM sgt_pozycja p
+                 JOIN sgt_dokument d ON d.dok_id = p.dok_id
+                WHERE p.tw_id = t.tw_id AND d.typ <> ?) AS ostatni_zakup
          FROM sgt_towar t`
     )
-    .all(config.magId.MAG) as Array<{
+    .all(config.magId.MAG, TYP_WZ) as Array<{
     tw_id: number;
     symbol: string;
     nazwa: string;
     lokalizacja: string | null;
     stan: number;
+    ostatni_zakup: string | null;
   }>;
+
+  /* Historia pobrań pochodzi z dokumentów WZ, które zasiewa
+     `npm run seed:scenariusze`. Bez niego zapytanie zwraca pustą listę,
+     a raport zachowuje się jak dotąd: odmawia wypisania list 1–3.
+
+     LICZBA WYSTĄPIEŃ, nie suma ilości — indeks wydany 400× po sztuce generuje
+     wielokrotnie więcej pracy niż wydany 4× po 100 szt. Mylenie tych dwóch
+     liczb to najczęstszy błąd domowych analiz ABC (patrz `services/reslot.ts`). */
+  const pobrania = db()
+    .prepare(
+      `SELECT p.tw_id, COUNT(*) AS pobrania, SUM(p.ilosc) AS sztuki
+         FROM sgt_pozycja p JOIN sgt_dokument d ON d.dok_id = p.dok_id
+        WHERE d.typ = ?
+        GROUP BY p.tw_id`
+    )
+    .all(TYP_WZ) as Array<{ tw_id: number; pobrania: number; sztuki: number }>;
+
   return {
     kartoteki: rows.map((r) => ({
       twId: r.tw_id,
@@ -46,9 +73,9 @@ async function zSeedu(): Promise<{ kartoteki: Kartoteka[]; pobrania: Pobrania[] 
       nazwa: r.nazwa,
       lokalizacja: r.lokalizacja,
       stan: r.stan,
-      ostatniZakup: null,
+      ostatniZakup: r.ostatni_zakup,
     })),
-    pobrania: [], // seed nie ma dokumentów WZ
+    pobrania: pobrania.map((p) => ({ twId: p.tw_id, pobrania: p.pobrania, sztuki: p.sztuki })),
   };
 }
 

@@ -28,6 +28,68 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.24.0 — 4 sierpnia 2026
+
+**`npm run seed:scenariusze` buduje 65 przypadków brzegowych w bazie demo.**
+Kolizję kodów, cudzą blokadę pozycji, zadanie w błędzie sprzed trzech dni,
+zdjęcie bez pliku i adres spoza wzorca — wszystko naraz, jednym poleceniem.
+
+**[wymaga działania]** Nic. Nowego APK nie potrzeba, a na produkcji ten skrypt
+się nie uruchomi.
+
+### Dlaczego
+
+`npm run seed` zasila kartotekę i kilkanaście dostaw. Wystarcza to do ścieżki
+codziennej i do niczego więcej. Sprawdzenie wyjątku, kolejki albo rekoncyliacji
+wymagało zbudowania stanu ręcznie — a po każdym skasowaniu bazy od nowa.
+
+Części z tych stanów nie dało się zbudować z ekranu **wcale**. Nikt nie wystawi
+z kolektora zadania, które czeka w buforze od pięciu dni, ani zdarzenia sprzed
+wprowadzenia kont. Właśnie te przypadki są najdroższe w naprawie, bo nikt ich
+nie ogląda przed wdrożeniem.
+
+### Katalog jest jednym bytem, nie dwoma
+
+Scenariusze mają numery (`S01`–`S65`), a ich opisy leżą
+w `docs/scenariusze-testowe.md`. Zgodności katalogu z dokumentacją pilnuje test,
+nie oko: scenariusz bez opisu i opis bez scenariusza zapalają się na czerwono.
+
+To ta sama decyzja, co przy `tools/docs_check.py`. Komentarz „pamiętaj
+zaktualizować" nie jest mechanizmem.
+
+### Trzy reguły, które ten seed na siebie nakłada
+
+**Nie tyka danych spoza swojego zakresu.** Kartoteki scenariuszy mają `tw_id` od
+900001, dokumenty `dok_id` od 9001, konta własne loginy. Uruchomienie po
+`npm run seed` niczego z niego nie kasuje.
+
+**Jest idempotentny.** Każde uruchomienie kasuje najpierw własne wiersze, potem
+buduje je od nowa. Da się nim wrócić do punktu wyjścia w środku pracy, bez
+kasowania bazy.
+
+**Nie uruchomi się przy `SGT_MODE=mssql`.** Zakłada konta ze znanym hasłem
+i wystawia gotowe tokeny sesji, czyli robi dokładnie to, czego na bazie firmy
+robić nie wolno. Odmowa jest tu jedynym zabezpieczeniem, bo polecenie wygląda
+równie niewinnie jak `npm run seed`.
+
+### Raport przeslotowania w końcu ma co liczyć
+
+`npm run reslot -- --demo` odmawiał wypisania list eksmisji, awansów
+i likwidacji — zawsze, od pierwszego dnia. Bezpiecznik działał poprawnie: bez
+historii pobrań każdy indeks wygląda na martwy, więc raport kazałby opróżnić całą
+strefę złotą. Tyle że seed nie zawierał **ani jednego** dokumentu WZ, więc
+jedyna funkcja mierząca pracę magazynu nie dawała się zobaczyć przed wdrożeniem.
+
+Seed scenariuszy zasila historię pobrań i ostatnie zakupy, więc raport wypisuje
+wszystkie cztery listy. Liczby są syntetyczne i tak trzeba je czytać: nadają się
+do sprawdzenia raportu, nigdy do decyzji o magazynie.
+
+### Czego ten seed NIE zastępuje
+
+Nie jest testem. Nie sprawdza niczego sam i nie zapali się na czerwono, gdy
+aplikacja się zepsuje — daje wyłącznie stan, w którym da się to zobaczyć okiem.
+Testy jednostkowe zostają tam, gdzie były.
+
 ## 0.23.0 — 4 sierpnia 2026
 
 **Przełącznik `WERTIS_ADMIN=1` wyłącza logowanie w całości — na kolektorze

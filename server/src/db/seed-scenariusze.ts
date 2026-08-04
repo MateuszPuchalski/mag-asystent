@@ -1,0 +1,1286 @@
+import fs from "node:fs";
+import path from "node:path";
+import { db, transaction } from "./db.js";
+import { config } from "../config.js";
+import { hashSekret } from "../services/users.js";
+import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
+
+/* ── Seed scenariuszy — dane pod przypadki brzegowe ──────────────────────────
+   `npm run seed` daje KARTOTEKĘ: 3415 prawdziwych towarów i kilkanaście
+   dokumentów dostaw. Wystarcza do pokazu ścieżki codziennej i nie wystarcza do
+   niczego więcej. Przypadki, na których aplikacja naprawdę się łamie — kolizja
+   EAN, lock kolegi, zadanie w błędzie, zdjęcie bez pliku, adres spoza wzorca —
+   trzeba było dotąd zbudować ręcznie, za każdym razem od nowa, i w połowie
+   z nich nie dało się tego zrobić z ekranu wcale (nikt nie wystawi z kolektora
+   zadania w statusie `waiting_for_doc` sprzed pięciu dni).
+
+   Ten skrypt buduje je wprost w bazie. Każdy przypadek ma numer, tytuł i punkt
+   wejścia; katalog stoi niżej w `KATALOG` i jest tym samym katalogiem, co
+   `docs/scenariusze-testowe.md` — pilnuje tego test, nie oko.
+
+   TRZY REGUŁY, KTÓRE TEN SEED NA SIEBIE NAKŁADA:
+
+   1. NIE TYKA DANYCH SPOZA SWOJEGO ZAKRESU. Kartoteki scenariuszy mają
+      `tw_id >= 900001`, dokumenty `dok_id >= 9001`, konta swoje loginy.
+      Uruchomienie go po `npm run seed` niczego z niego nie kasuje.
+   2. JEST IDEMPOTENTNY. Każde uruchomienie kasuje NAJPIERW własne wiersze,
+      potem buduje je od nowa. Wielokrotne odpalenie daje ten sam stan bazy,
+      więc da się nim wrócić do punktu wyjścia w środku pracy.
+   3. NIE URUCHAMIA SIĘ NA PRAWDZIWEJ BAZIE. `SGT_MODE=mssql` przerywa go bez
+      zapisu: zakłada konta ze znanymi hasłami i wystawia gotowe tokeny sesji,
+      czyli robi dokładnie to, czego na produkcji robić nie wolno.
+
+   Dane są DETERMINISTYCZNE — zero `Math.random()`. Scenariusz, który raz na
+   pięć uruchomień wygląda inaczej, jest gorszy niż jego brak: nie da się
+   powiedzieć, czy zmiana na ekranie to skutek poprawki, czy losowania.       */
+
+/* ── Zakresy identyfikatorów ────────────────────────────────────────────────
+   Rozdział jest tu jedynym mechanizmem chroniącym dane z `npm run seed`.
+   Kartoteka z eksportu numeruje się od 1 w górę (3415 pozycji), dokumenty
+   dostaw i zamówienia — od 1 do kilkudziesięciu. Zakresy niżej stoją tak
+   wysoko, żeby kartoteka mogła urosnąć dziesięciokrotnie i nadal się nie
+   zderzyć.                                                                   */
+
+/** Pierwsze `tw_id` kartotek scenariuszowych. */
+export const TW_OD = 900_001;
+/** Pierwszy `dok_id` dokumentów scenariuszowych (dostawy i zamówienia). */
+export const DOK_OD = 9_001;
+/** Pierwszy `dok_id` dokumentów WZ z historią pobrań (raport przeslotowania). */
+export const DOK_WZ_OD = 20_001;
+
+/**
+ * Symbol wydania z magazynu w read-modelu `sgt_*`.
+ *
+ * Stoi TUTAJ, bo tutaj powstają jedyne takie dokumenty w całym systemie:
+ * importer MSSQL wciąga wyłącznie dostawy i zamówienia, więc na produkcji
+ * `sgt_dokument` nie ma ani jednego WZ. `reslot-run.ts` czyta tę stałą,
+ * zamiast powtarzać napis — dwie kopie rozjechałyby się przy pierwszej zmianie
+ * i raport pokazałby zero pobrań bez słowa błędu.
+ */
+export const TYP_WZ = "WZ";
+
+/* Magazyny bez roli — te same identyfikatory, co w `seed.ts`. Powtórzone
+   świadomie: seed scenariuszy ma działać także na PUSTEJ bazie, więc nie może
+   zakładać, że ktoś je wcześniej założył. `INSERT OR IGNORE` niżej sprawia, że
+   uruchomienie po `npm run seed` zostawia tamte wiersze nietknięte. */
+const MAG_SERWIS = 91;
+const MAG_EKSPOZYCJA = 92;
+const MAG_ARCHIWUM = 93;
+
+/** Hasło wszystkich kont scenariuszowych. Jawne, bo to jest dane demo. */
+export const HASLO_SCENARIUSZY = "wertis12345";
+
+/** Loginy zakładane przez ten skrypt — po nich rozpoznaje własne konta. */
+const LOGINY = ["jan.k", "ewa.b", "biuro.test", "zwolniony", "bez.hasla"];
+
+/**
+ * Nazwy, którymi podpisane są zdarzenia scenariuszy.
+ *
+ * Kasowanie idzie po tej liście, bo zdarzenie nie ma jak nieść znacznika:
+ * jeden ze scenariuszy zapisuje CELOWO uszkodzony payload, więc marker
+ * w środku JSON-a wypadłby akurat tam, gdzie jest najbardziej potrzebny.
+ *
+ * Skutek uboczny jest jawny: ponowne uruchomienie skryptu kasuje także
+ * zdarzenia, które powstały przy TWOJEJ pracy na koncie scenariuszowym.
+ */
+const AUTORZY = [
+  "Jan Kowalski",
+  "Ewa Bąk",
+  "Biuro (scenariusze)",
+  // warianty tej samej osoby sprzed kont — materiał do `migrujHistorie`
+  "Jan",
+  "jan",
+  "Jan K",
+  /* Podpis, którego nie stawia żaden człowiek: tryb serwisowy nazywa tak konto
+     techniczne. Bez niego lista wygląda na kompletną, a ten wiersz narasta po
+     cichu z każdym uruchomieniem seedu. */
+  "ADMIN (TRYB SERWISOWY)",
+];
+
+/**
+ * Wszystkie podpisy, jakie zostawiają scenariusze — do kasowania.
+ *
+ * Loginy dochodzą do nazw, bo NIEUDANE LOGOWANIE podpisuje się loginem: konta
+ * jeszcze nie ma, więc nie ma czyjej nazwy wpisać. Bez nich każda próba
+ * zalogowania się na `zwolniony` zostawiałaby wiersz, którego seed nie sprząta,
+ * a migracja historii robiłaby z niego kolejne konto-widmo.
+ */
+const PODPISY = [...new Set([...AUTORZY, ...LOGINY])];
+
+/* ── Katalog scenariuszy ─────────────────────────────────────────────────────
+   Jedno źródło prawdy dla skryptu, konsoli i dokumentacji. `docs/scenariusze-
+   testowe.md` opisuje każdy z nich krok po kroku, a test pilnuje, że opis
+   istnieje dla KAŻDEGO — inaczej katalog rozjechałby się z dokumentacją przy
+   pierwszym dopisanym scenariuszu. To ta sama lekcja, co `docs_check.py`.    */
+
+export interface Scenariusz {
+  /** Numer w katalogu, np. `S07`. Nie zmienia się — dokumentacja go cytuje. */
+  id: string;
+  obszar: string;
+  tytul: string;
+  /** Od czego zacząć na kolektorze albo w `curl`. */
+  wejscie: string;
+}
+
+export const KATALOG: Scenariusz[] = [
+  // ── skan i klasyfikacja kodu ──
+  { id: "S01", obszar: "skan", tytul: "Kolizja EAN — dwie kartoteki, żadna na dokumencie", wejscie: "skan 5901234567890" },
+  { id: "S02", obszar: "skan", tytul: "Kolizja EAN zawężona dokumentem (jeden kandydat w dostawie)", wejscie: "skan 5907654321098 w dokumencie FZ 9001" },
+  { id: "S03", obszar: "skan", tytul: "Kartoteka bez kodu kreskowego", wejscie: "skan TEST-BEZ-EAN" },
+  { id: "S04", obszar: "skan", tytul: "EAN ośmio- i czternastocyfrowy", wejscie: "skan 59012345 oraz 59012345678901" },
+  { id: "S05", obszar: "skan", tytul: "Symbol w kształcie adresu regału", wejscie: "skan E05-03-02" },
+  { id: "S06", obszar: "skan", tytul: "Symbol z jednym myślnikiem nie jest adresem", wejscie: "skan T32-0203" },
+  { id: "S07", obszar: "skan", tytul: "Adres regału i miejsce paletowe", wejscie: "skan A01-02-03 oraz PAL-042" },
+  { id: "S08", obszar: "skan", tytul: "Kod nieznany kartotece", wejscie: "skan 4006381333931" },
+
+  // ── karta towaru ──
+  { id: "S09", obszar: "karta", tytul: "Cztery adresy naraz — pastylka pickingowa i reszta", wejscie: "karta TEST-WIELE-LOK" },
+  { id: "S10", obszar: "karta", tytul: "Kartoteka bez adresu", wejscie: "karta TEST-BEZ-LOK" },
+  { id: "S11", obszar: "karta", tytul: "Pole lokalizacji na granicy 50 znaków", wejscie: "karta TEST-LOK-LIMIT" },
+  { id: "S12", obszar: "karta", tytul: "Adres spoza wzorca w kartotece (literówka)", wejscie: "karta TEST-LOK-BLAD" },
+  { id: "S13", obszar: "karta", tytul: "Stan ujemny", wejscie: "karta TEST-STAN-MINUS" },
+  { id: "S14", obszar: "karta", tytul: "Rezerwacja większa niż stan", wejscie: "karta TEST-REZERWACJA" },
+  { id: "S15", obszar: "karta", tytul: "Jednostka inna niż sztuka i ilość ułamkowa", wejscie: "karta TEST-ULAMEK" },
+  { id: "S16", obszar: "karta", tytul: "Długa nazwa i znaki specjalne (druk, CSV)", wejscie: "karta TEST-ZNAKI" },
+  { id: "S17", obszar: "karta", tytul: "Zamienniki: nasze, obce i zestaw z plusem", wejscie: "karta TEST-ZAMIENNIK" },
+  { id: "S18", obszar: "karta", tytul: "Magazyny: pusty, ukryty i wszystkie naraz", wejscie: "karta TEST-WSZEDZIE" },
+  { id: "S19", obszar: "karta", tytul: "Zamówienia u dostawcy: częściowe, bez terminu, po terminie", wejscie: "karta TEST-ZAMOWIONY" },
+
+  // ── rozkładanie dostaw ──
+  { id: "S20", obszar: "dostawa", tytul: "Dostawa nietknięta", wejscie: "zakładka DOSTAWY → FALON-TECH" },
+  { id: "S21", obszar: "dostawa", tytul: "Dostawa w toku — pięć statusów linii naraz", wejscie: "zakładka DOSTAWY → STIHL Polska" },
+  { id: "S22", obszar: "dostawa", tytul: "Linia zajęta przez kolegę (lock świeży)", wejscie: "skan TEST-LOCK w dostawie STIHL Polska" },
+  { id: "S23", obszar: "dostawa", tytul: "Lock wygasły po TTL", wejscie: "skan TEST-LOCK-STARY w dostawie STIHL Polska" },
+  { id: "S24", obszar: "dostawa", tytul: "Dostawa zamknięta", wejscie: "zakładka DOSTAWY → HUSQVARNA" },
+  { id: "S25", obszar: "dostawa", tytul: "Kontener na MGP w buforze — zostaje przesunięcie stanu", wejscie: "zakładka DOSTAWY → IMPORT SHANGHAI" },
+  { id: "S26", obszar: "dostawa", tytul: "Ten sam towar w dwóch wierszach dokumentu", wejscie: "zakładka DOSTAWY → DWIE PARTIE" },
+  { id: "S27", obszar: "dostawa", tytul: "Pozycja bez lokalizacji na końcu listy", wejscie: "zakładka DOSTAWY → FALON-TECH" },
+  { id: "S28", obszar: "dostawa", tytul: "Dostawa czterdziestopozycyjna", wejscie: "zakładka DOSTAWY → DROBNICA" },
+  { id: "S29", obszar: "dostawa", tytul: "Dostawa jednopozycyjna", wejscie: "zakładka DOSTAWY → JEDNA POZYCJA" },
+  { id: "S30", obszar: "dostawa", tytul: "Dokument spoza okna 14 dni", wejscie: "GET /api/delivery/documents" },
+  { id: "S31", obszar: "dostawa", tytul: "Dokument typu spoza DOK_TYPY_DOSTAW", wejscie: "DOK_TYPY_DOSTAW=1,10 i restart API" },
+  { id: "S32", obszar: "dostawa", tytul: "Rozjazd adresu — ZAMIEŃ albo DODAJ", wejscie: "skan TEST-WIELE-LOK, potem półka C01-02-02" },
+  { id: "S33", obszar: "dostawa", tytul: "Przesyłka: numer i protokół kuriera w trzech stanach", wejscie: "GET /api/delivery/:id" },
+
+  // ── wyjątki ──
+  { id: "S34", obszar: "wyjatki", tytul: "Pięć kategorii formularza niezgodności", wejscie: "GET /api/problems/unresolved" },
+  { id: "S35", obszar: "wyjatki", tytul: "Klucze sprzed 0.21.0 — do nazwania, nie do zgłoszenia", wejscie: "protokół dostawy HUSQVARNA" },
+  { id: "S36", obszar: "wyjatki", tytul: "Zdjęcie dowodowe na dysku", wejscie: "GET /api/problems/:id/photo" },
+  { id: "S37", obszar: "wyjatki", tytul: "Zdjęcie, którego plik zniknął", wejscie: "GET /api/problems/:id/photo" },
+  { id: "S38", obszar: "wyjatki", tytul: "Wyjątek rozwiązany i nierozwiązany", wejscie: "GET /api/problems/unresolved" },
+  { id: "S39", obszar: "wyjatki", tytul: "Średnik i cudzysłów w opisie (eksport CSV)", wejscie: "GET /api/delivery/:id/problems.csv" },
+  { id: "S40", obszar: "wyjatki", tytul: "Artykuł spoza dokumentu (bez linii)", wejscie: "protokół dostawy STIHL Polska" },
+
+  // ── kolejka i worker ──
+  { id: "S41", obszar: "kolejka", tytul: "Zadanie czekające na workera", wejscie: "pastylka Sfery → KOLEJKA" },
+  { id: "S42", obszar: "kolejka", tytul: "Zadanie w backoffie po nieudanej próbie", wejscie: "pastylka Sfery → KOLEJKA" },
+  { id: "S43", obszar: "kolejka", tytul: "Zadanie zawieszone w `processing` z uszkodzonym payloadem", wejscie: "GET /api/queue" },
+  { id: "S44", obszar: "kolejka", tytul: "MM czekające na wyjście dokumentu z bufora", wejscie: "GET /api/queue" },
+  { id: "S45", obszar: "kolejka", tytul: "Bufor trzyma zadanie od pięciu dni", wejscie: "npm run reconcile" },
+  { id: "S46", obszar: "kolejka", tytul: "Zadanie w błędzie — czerwony chip i PONÓW", wejscie: "karta TEST-BLAD-ZAPISU" },
+  { id: "S47", obszar: "kolejka", tytul: "Błąd starszy niż doba", wejscie: "npm run reconcile" },
+  { id: "S48", obszar: "kolejka", tytul: "Zadanie nieznanego typu", wejscie: "log workera" },
+  { id: "S49", obszar: "kolejka", tytul: "Kolejka jako rezerwacja stanu (drugie przesunięcie odmawia)", wejscie: "karta TEST-MGP → PRZESUŃ" },
+  { id: "S50", obszar: "kolejka", tytul: "Rozjazd: zapis wszedł, kartoteka mówi co innego", wejscie: "npm run reconcile" },
+
+  // ── konta, sesje, uprawnienia ──
+  { id: "S51", obszar: "konta", tytul: "Trzy role z hasłami", wejscie: "logowanie jan.k / ewa.b / biuro.test" },
+  { id: "S52", obszar: "konta", tytul: "Konto wyłączone", wejscie: "logowanie zwolniony" },
+  { id: "S53", obszar: "konta", tytul: "Konto-ślad bez loginu (migracja historii)", wejscie: "POST /api/users/migrate-history" },
+  { id: "S54", obszar: "konta", tytul: "Konto z loginem, bez hasła", wejscie: "logowanie bez.hasla" },
+  { id: "S55", obszar: "konta", tytul: "Sesje: czynna, unieważniona i sprzed dwóch miesięcy", wejscie: "x-session: scenariusz-jan" },
+  { id: "S56", obszar: "konta", tytul: "Operacja zastrzeżona dla roli (zdjęcie cudzego locka)", wejscie: "POST /api/delivery/:id/lines/:lineId/force-release" },
+
+  // ── audyt, metryki, wydajność ──
+  { id: "S57", obszar: "audyt", tytul: "Dziennik ze wszystkimi typami zdarzeń", wejscie: "GET /api/events" },
+  { id: "S58", obszar: "audyt", tytul: "Zdarzenia sprzed kont (bez `user_ref`)", wejscie: "GET /api/events?od=" },
+  { id: "S59", obszar: "audyt", tytul: "Uszkodzony payload i wpis bez `locsPrzed`", wejscie: "GET /api/products/900011/history" },
+  { id: "S60", obszar: "audyt", tytul: "Metryki: etykiety do przedruku i p95 powyżej celu", wejscie: "GET /api/metrics" },
+  { id: "S61", obszar: "audyt", tytul: "Wydajność: próbka wiarygodna i za mała", wejscie: "GET /api/wydajnosc" },
+  { id: "S62", obszar: "audyt", tytul: "Raport kolizji kodów kreskowych", wejscie: "GET /api/ean-conflicts" },
+
+  // ── przeslotowanie ──
+  { id: "S63", obszar: "reslot", tytul: "Historia pobrań: eksmisja i awans", wejscie: "npm run reslot -- --demo" },
+  { id: "S64", obszar: "reslot", tytul: "Pobrania to wystąpienia, nie sztuki", wejscie: "npm run reslot -- --demo" },
+  { id: "S65", obszar: "reslot", tytul: "Regał bez reguły strefy złotej", wejscie: "npm run reslot -- --demo" },
+];
+
+/* ── Pomocniki czasu ─────────────────────────────────────────────────────────
+   Wszystko liczy się OD DZISIAJ, nigdy od daty wpisanej na sztywno. Dane
+   z zaszytą datą starzeją się same: dwa tygodnie po niej lista dostaw jest
+   pusta, a przy pokazie wygląda to jak zepsuta aplikacja (patrz `seed.ts`).  */
+
+const DZIEN_MS = 86_400_000;
+const teraz = Date.now();
+
+/** Data ISO (bez czasu) przesunięta o `dni` względem dziś. */
+const dzien = (dni: number): string =>
+  new Date(teraz + dni * DZIEN_MS).toISOString().slice(0, 10);
+
+/** Znacznik czasu ISO przesunięty o `minut` względem teraz. */
+const chwila = (minut: number): string => new Date(teraz + minut * 60_000).toISOString();
+
+const mmrrrr = (iso: string): string => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/* ── Kartoteki scenariuszowe ────────────────────────────────────────────────
+   Symbole zaczynają się od `TEST-` z jednym wyjątkiem (`E05-03-02`, S05), bo
+   ten wyjątek JEST scenariuszem. Prefiks jest po to, żeby na liście wyników
+   wyszukiwania dane scenariuszowe dało się odróżnić od prawdziwej kartoteki
+   jednym spojrzeniem — pomylenie ich przy diagnozie kosztuje godzinę.        */
+
+interface TowarSc {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ean?: string;
+  unit?: string;
+  opis?: string;
+  lok?: string;
+  /** `[mag_id, stan, rezerwacja?]` — bez wpisu magazyn nie ma wiersza wcale. */
+  stany?: Array<[number, number, number?]>;
+}
+
+const MAG = config.magId.MAG;
+const MGP = config.magId.MGP;
+const ZWROTY = config.magId.ZWROTY;
+
+/** Pole lokalizacji o długości 49 znaków — o jeden kod od limitu 50. */
+const LOK_PRZY_LIMICIE = "A01-02-03 B01-02-03 C01-02-03 D01-02-03 E01-02-03";
+
+const TOWARY: TowarSc[] = [
+  // S01 — ten sam EAN na dwóch kartotekach, żadna nie stoi na dokumencie
+  { twId: 900_001, symbol: "TEST-KOLIZJA-A", nazwa: "Filtr powietrza — kolizja EAN (A)", ean: "5901234567890", lok: "A01-02-03", stany: [[MAG, 14]] },
+  { twId: 900_002, symbol: "TEST-KOLIZJA-B", nazwa: "Filtr powietrza — kolizja EAN (B)", ean: "5901234567890", lok: "B02-03-04", stany: [[MAG, 3]] },
+  // S02 — trzy kartoteki, jedna z nich stoi na dokumencie FZ 9001
+  { twId: 900_003, symbol: "TEST-TRIO-1", nazwa: "Świeca zapłonowa — trio EAN (na dokumencie)", ean: "5907654321098", lok: "C01-02-02", stany: [[MAG, 40], [MGP, 12]] },
+  { twId: 900_004, symbol: "TEST-TRIO-2", nazwa: "Świeca zapłonowa — trio EAN (2)", ean: "5907654321098", lok: "C01-02-03", stany: [[MAG, 5]] },
+  { twId: 900_005, symbol: "TEST-TRIO-3", nazwa: "Świeca zapłonowa — trio EAN (3)", ean: "5907654321098", stany: [[MAG, 0]] },
+  // S03, S04 — kartoteka bez kodu oraz EAN-8 i EAN-14
+  { twId: 900_006, symbol: "TEST-BEZ-EAN", nazwa: "Podkładka bez kodu kreskowego", ean: "", lok: "A01-02-04", stany: [[MAG, 9], [MGP, 4]] },
+  { twId: 900_007, symbol: "TEST-EAN8", nazwa: "Zawleczka w kodzie ośmiocyfrowym", ean: "59012345", lok: "A01-03-02", stany: [[MAG, 120]] },
+  { twId: 900_008, symbol: "TEST-EAN14", nazwa: "Karton zbiorczy w kodzie czternastocyfrowym", ean: "59012345678901", lok: "PAL-042", stany: [[MAG, 6]] },
+  // S05 — symbol o kształcie adresu; skan klasyfikuje go jako regał, nie towar
+  { twId: 900_009, symbol: "E05-03-02", nazwa: "Kartoteka o symbolu w kształcie adresu", ean: "", lok: "B02-03-05", stany: [[MAG, 2]] },
+  // S06 — jeden myślnik: to symbol, nie adres (W32-0203 z prawdziwej kartoteki)
+  { twId: 900_010, symbol: "T32-0203", nazwa: "Symbol z jednym myślnikiem", ean: "", lok: "B02-03-06", stany: [[MAG, 30]] },
+  // S09, S32 — cztery adresy: picking, drugi regał, paleta i regał w innej alejce
+  { twId: 900_011, symbol: "TEST-WIELE-LOK", nazwa: "Towar na czterech adresach", ean: "5900000000011", lok: "A01-02-03 B02-03-04 PAL-042 H04-01-02", stany: [[MAG, 88], [MGP, 6]] },
+  // S10 — kartoteka bez adresu (ścieżka BRAK LOK przy rozkładaniu)
+  { twId: 900_012, symbol: "TEST-BEZ-LOK", nazwa: "Nowe SKU bez adresu", ean: "5900000000012", stany: [[MAG, 0], [MGP, 18]] },
+  // S11 — pole na granicy limitu: kolejny kod już się nie zmieści w całości
+  { twId: 900_013, symbol: "TEST-LOK-LIMIT", nazwa: "Pole lokalizacji tuż pod limitem", ean: "5900000000013", lok: LOK_PRZY_LIMICIE, stany: [[MAG, 4]] },
+  // S12 — literówka w kartotece; skan nigdy jej nie dopasuje (docs/adresy-do-poprawy.md)
+  { twId: 900_014, symbol: "TEST-LOK-BLAD", nazwa: "Adres spoza wzorca w kartotece", ean: "5900000000014", lok: "paletq29", stany: [[MAG, 7]] },
+  // S13, S14 — stan ujemny oraz rezerwacja większa od stanu
+  { twId: 900_015, symbol: "TEST-STAN-MINUS", nazwa: "Stan ujemny po korekcie w Subiekcie", ean: "5900000000015", lok: "C01-03-02", stany: [[MAG, -3]] },
+  { twId: 900_016, symbol: "TEST-REZERWACJA", nazwa: "Rezerwacja większa niż stan", ean: "5900000000016", lok: "C01-03-03", stany: [[MAG, 5, 9]] },
+  // S15 — metry i ilość ułamkowa
+  { twId: 900_017, symbol: "TEST-ULAMEK", nazwa: "Wąż paliwowy na metry", ean: "5900000000017", unit: "m", lok: "D01-02-02", stany: [[MAG, 12.5]] },
+  // S16 — długa nazwa i znaki, które psują CSV i wydruk protokołu
+  {
+    twId: 900_018,
+    symbol: "TEST-ZNAKI",
+    nazwa: 'Uszczelka „O-ring” 3/8"; wersja A — komplet 12 szt. do pilarek spalinowych serii W32 i W48 (zamiennik)',
+    ean: "5900000000018",
+    unit: "kpl.",
+    lok: "D01-02-03",
+    stany: [[MAG, 11]],
+  },
+  // S17 — zamienniki: jeden nasz, reszta obca; `+` łączy zestaw, nie rozdziela
+  {
+    twId: 900_019,
+    symbol: "TEST-ZAMIENNIK",
+    nazwa: "Sprzęgło odśrodkowe z zamiennikami w opisie",
+    ean: "5900000000019",
+    lok: "E05-02-03",
+    opis: "Zamiennik: TEST-ZAMIENNIK-B // OEM-9988-XX, FTC242+92-009  OEM: 1234-5678  Modele: W32, W48",
+    stany: [[MAG, 15]],
+  },
+  { twId: 900_020, symbol: "TEST-ZAMIENNIK-B", nazwa: "Sprzęgło odśrodkowe — zamiennik naszej kartoteki", ean: "5900000000020", lok: "E05-02-04", stany: [[MAG, 2]] },
+  // S18 — stan we wszystkich magazynach naraz; ARCH zostaje pusty i ukryty
+  {
+    twId: 900_021,
+    symbol: "TEST-WSZEDZIE",
+    nazwa: "Towar leżący we wszystkich magazynach",
+    ean: "5900000000021",
+    lok: "H04-01-02",
+    stany: [[MAG, 25, 4], [MGP, 8], [ZWROTY, 3], [MAG_SERWIS, 2], [MAG_EKSPOZYCJA, 1]],
+  },
+  // S19 — zamówienia u dostawcy w czterech wariantach
+  { twId: 900_022, symbol: "TEST-ZAMOWIONY", nazwa: "Towar zamówiony u dostawcy", ean: "5900000000022", lok: "H04-01-03", stany: [[MAG, 0]] },
+  // S49 — stan na MGP pod przesunięcie; kolejka rezerwuje jego część
+  { twId: 900_023, symbol: "TEST-MGP", nazwa: "Towar w strefie przyjęć do przesunięcia", ean: "5900000000023", lok: "J02-02-03", stany: [[MAG, 5], [MGP, 60]] },
+  // S46 — kartoteka z nieudanym zapisem lokalizacji (czerwony chip)
+  { twId: 900_024, symbol: "TEST-BLAD-ZAPISU", nazwa: "Towar z nieudanym zapisem adresu", ean: "5900000000024", lok: "J02-02-04", stany: [[MAG, 12]] },
+  // S50 — kartoteka, w której zapis „wszedł", a pole mówi co innego
+  { twId: 900_025, symbol: "TEST-ROZJAZD", nazwa: "Towar z rozjazdem adresu wobec kolejki", ean: "5900000000025", lok: "A02-02-02", stany: [[MAG, 30]] },
+  // S22, S23 — linie pod lock świeży i wygasły
+  { twId: 900_026, symbol: "TEST-LOCK", nazwa: "Pozycja trzymana przez inną osobę", ean: "5900000000026", lok: "B03-02-02", stany: [[MAG, 20], [MGP, 10]] },
+  { twId: 900_027, symbol: "TEST-LOCK-STARY", nazwa: "Pozycja z lockiem sprzed TTL", ean: "5900000000027", lok: "B03-02-03", stany: [[MAG, 20], [MGP, 10]] },
+  // S63 — martwy towar w strefie złotej (A, poziom 3) → lista eksmisji
+  { twId: 900_028, symbol: "TEST-ZLOTA-MARTWY", nazwa: "Martwy indeks w strefie złotej", ean: "5900000000028", lok: "A03-02-03", stany: [[MAG, 8]] },
+  // S63 — szybkorotujący poza strefą (poziom 7 w alejce A) → lista awansów
+  { twId: 900_029, symbol: "TEST-ROTUJACY", nazwa: "Szybkorotujący poza strefą złotą", ean: "5900000000029", lok: "A03-02-07", stany: [[MAG, 60]] },
+  /* S64 — dwa pobrania po 200 szt: dużo sztuk, mało pracy. Adres leży poza
+     strefą złotą TAK SAMO jak u szybkorotującego wyżej, żeby jedyną różnicą
+     między nimi była liczba wystąpień na WZ — i żeby było widać, że to ona
+     rozstrzyga o awansie, a nie suma wydanych sztuk. */
+  { twId: 900_030, symbol: "TEST-DUZE-PACZKI", nazwa: "Wydawany rzadko, ale po 200 szt", ean: "5900000000030", lok: "B01-03-07", stany: [[MAG, 400]] },
+  // S65 — regał, dla którego nie ma reguły strefy złotej (D06)
+  { twId: 900_031, symbol: "TEST-BEZ-REGULY", nazwa: "Towar na regale bez reguły strefy", ean: "5900000000031", lok: "D06-01-02", stany: [[MAG, 5]] },
+  // S26 — ten sam towar w dwóch wierszach dokumentu
+  { twId: 900_032, symbol: "TEST-DWIE-PARTIE", nazwa: "Towar w dwóch wierszach faktury", ean: "5900000000032", lok: "C01-02-04", stany: [[MAG, 0], [MGP, 8]] },
+  // S29 — jedyna pozycja dokumentu jednopozycyjnego
+  { twId: 900_033, symbol: "TEST-JEDNA-POZ", nazwa: "Jedyna pozycja dostawy", ean: "5900000000033", lok: "D01-03-02", stany: [[MAG, 0], [MGP, 3]] },
+  // S30, S31 — dokument spoza okna i dokument typu spoza filtru
+  { twId: 900_034, symbol: "TEST-POZA-OKNEM", nazwa: "Towar z dostawy sprzed 20 dni", ean: "5900000000034", lok: "D01-03-03", stany: [[MAG, 4]] },
+  { twId: 900_035, symbol: "TEST-TYP-PZ", nazwa: "Towar z dokumentu PZ", ean: "5900000000035", lok: "E05-03-03", stany: [[MAG, 4]] },
+  // S21 — pozycje dostawy w toku, po jednej na każdy status linii
+  { twId: 900_036, symbol: "TEST-LINIA-TODO", nazwa: "Pozycja jeszcze nietknięta", ean: "5900000000036", lok: "F02-02-04", stany: [[MAG, 10], [MGP, 6]] },
+  { twId: 900_037, symbol: "TEST-LINIA-DONE", nazwa: "Pozycja odłożona w całości", ean: "5900000000037", lok: "F02-02-08", stany: [[MAG, 10], [MGP, 6]] },
+  { twId: 900_038, symbol: "TEST-LINIA-PART", nazwa: "Pozycja odłożona częściowo", ean: "5900000000038", lok: "G01-02-03", stany: [[MAG, 10], [MGP, 6]] },
+  { twId: 900_039, symbol: "TEST-LINIA-SKIP", nazwa: "Pozycja pominięta", ean: "5900000000039", lok: "G01-02-07", stany: [[MAG, 10], [MGP, 6]] },
+  { twId: 900_040, symbol: "TEST-LINIA-PROBLEM", nazwa: "Pozycja ze zgłoszonym wyjątkiem", ean: "5900000000040", lok: "H04-02-02", stany: [[MAG, 10], [MGP, 6]] },
+  /* Druga pozycja w statusie `problem`, bo „zła ilość" MUSI wskazywać linię
+     dokumentu — a linia z wyjątkiem ma w bazie status `problem`. Wpięcie tego
+     zgłoszenia w pozycję odłożoną częściowo dałoby stan, którego aplikacja nie
+     umie wyprodukować, czyli dane demo kłamiące o własnych regułach. */
+  { twId: 900_044, symbol: "TEST-LINIA-ILOSC", nazwa: "Pozycja z rozbieżną ilością", ean: "5900000000044", lok: "H04-02-03", stany: [[MAG, 10], [MGP, 6]] },
+  // S25 — pozycje kontenera na MGP
+  { twId: 900_041, symbol: "TEST-KONTENER-1", nazwa: "Pozycja kontenera importowego (1)", ean: "5900000000041", lok: "J02-03-02", stany: [[MGP, 120]] },
+  { twId: 900_042, symbol: "TEST-KONTENER-2", nazwa: "Pozycja kontenera importowego (2)", ean: "5900000000042", stany: [[MGP, 60]] },
+  { twId: 900_043, symbol: "TEST-KONTENER-3", nazwa: "Pozycja kontenera importowego (3)", ean: "5900000000043", lok: "J02-03-04", stany: [[MGP, 24]] },
+];
+
+/** Czterdzieści drobnic do dostawy S28 — generowane, bo liczy się tylko ich liczba. */
+const TW_DROBNICA_OD = 900_101;
+const DROBNICA: TowarSc[] = Array.from({ length: 40 }, (_, i) => {
+  const nr = String(i + 1).padStart(2, "0");
+  /* Adresy rozłożone po alejkach A–E, żeby sortowanie listy po lokalizacji
+     miało co porządkować. Co siódma pozycja BEZ adresu — sekcja „bez
+     lokalizacji" na końcu listy ma być widoczna także przy długiej dostawie. */
+  const alejka = "ABCDE"[i % 5];
+  const lok = i % 7 === 6 ? "" : `${alejka}0${(i % 4) + 1}-0${(i % 5) + 1}-0${(i % 3) + 2}`;
+  return {
+    twId: TW_DROBNICA_OD + i,
+    symbol: `TEST-DROBNICA-${nr}`,
+    nazwa: `Drobnica ${nr} — pozycja dostawy czterdziestopozycyjnej`,
+    ean: `59000001000${nr}`,
+    lok,
+    stany: [[MAG, 2 + (i % 9)] as [number, number], [MGP, 1 + (i % 5)] as [number, number]],
+  };
+});
+
+/* ── Zdjęcie dowodowe ────────────────────────────────────────────────────────
+   Najmniejszy poprawny JPEG. Treść nie ma znaczenia — znaczenie ma to, że plik
+   ISTNIEJE i da się go pobrać trasą `/api/problems/:id/photo`, bo scenariusz
+   S37 sprawdza dokładnie odwrotny przypadek: referencję bez pliku.           */
+const JPEG_1PX =
+  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof" +
+  "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAAB" +
+  "AAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
+
+const FOTO_USZKODZENIE = "scenariusz-uszkodzenie.jpg";
+const FOTO_BLEDNY = "scenariusz-bledny-artykul.jpg";
+const FOTO_HISTORYCZNE = "scenariusz-nieznany-kod.jpg";
+/** Referencja BEZ pliku — S37. Nic go nie tworzy i to jest cały scenariusz. */
+const FOTO_BRAK_PLIKU = "scenariusz-plik-skasowany.jpg";
+
+export interface Podsumowanie {
+  towary: number;
+  dokumenty: number;
+  dostawy: number;
+  linie: number;
+  wyjatki: number;
+  kolejka: number;
+  konta: number;
+  zdarzenia: number;
+  zamowienia: number;
+  dokumentyWz: number;
+  pozycjeWz: number;
+}
+
+/**
+ * Buduje wszystkie scenariusze. Zwraca liczniki — konsola je wypisuje, a test
+ * na nich sprawdza, że seed nie zaczął po cichu budować mniej.
+ */
+export function zbudujScenariusze(): Podsumowanie {
+  if (config.sgtMode === "mssql") {
+    throw new Error(
+      "SGT_MODE=mssql — seed scenariuszy zakłada konta ze znanym hasłem i gotowe " +
+        "tokeny sesji. Na bazie podpiętej do Subiekta nie ma prawa się uruchomić."
+    );
+  }
+
+  const d = db();
+  wyczysc();
+
+  const licz = {
+    towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
+    konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
+  };
+
+  const wszystkieTowary = [...TOWARY, ...DROBNICA];
+
+  transaction(d, () => {
+    magazyny();
+    licz.towary = kartoteki(wszystkieTowary);
+    const dok = dokumenty();
+    licz.dokumenty = dok.dokumentow;
+    licz.dostawy = dok.dostaw;
+    licz.linie = dok.linii;
+    licz.wyjatki = wyjatki(dok.idDostaw);
+    licz.zamowienia = zamowienia();
+    licz.konta = konta();
+    licz.kolejka = kolejka();
+    licz.zdarzenia = dziennik();
+    kolizjeEan();
+    const wz = historiaPobran();
+    licz.dokumentyWz = wz.dokumentow;
+    licz.pozycjeWz = wz.pozycji;
+  })();
+
+  // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
+  // i tak by ich nie usunęło. Kolejność (baza, potem pliki) jest bezpieczniejsza:
+  // referencja bez pliku ma w tym seedzie własny scenariusz i nie jest awarią.
+  zdjecia();
+
+  return licz;
+}
+
+/* ── Kasowanie własnych danych ──────────────────────────────────────────────
+   Kolejność wynika z kluczy obcych (`PRAGMA foreign_keys = ON`): najpierw
+   dzieci, potem rodzice. `problem` wskazuje na `delivery_line` i `delivery`,
+   `device_session` na `app_user`, `sgt_pozycja` na `sgt_dokument`.           */
+function wyczysc(): void {
+  const d = db();
+  const luki = (n: number) => Array.from({ length: n }, () => "?").join(",");
+
+  transaction(d, () => {
+    d.prepare(
+      `DELETE FROM problem WHERE delivery_id IN
+         (SELECT id FROM delivery WHERE sgt_dok_id >= ?)`
+    ).run(DOK_OD);
+    d.prepare(
+      `DELETE FROM delivery_line WHERE delivery_id IN
+         (SELECT id FROM delivery WHERE sgt_dok_id >= ?)`
+    ).run(DOK_OD);
+    d.prepare("DELETE FROM delivery WHERE sgt_dok_id >= ?").run(DOK_OD);
+
+    d.prepare("DELETE FROM sgt_pozycja WHERE dok_id >= ?").run(DOK_OD);
+    d.prepare("DELETE FROM sgt_dokument WHERE dok_id >= ?").run(DOK_OD);
+    d.prepare("DELETE FROM sgt_zam_pozycja WHERE dok_id >= ?").run(DOK_OD);
+    d.prepare("DELETE FROM sgt_zamowienie WHERE dok_id >= ?").run(DOK_OD);
+
+    d.prepare("DELETE FROM sgt_stan WHERE tw_id >= ?").run(TW_OD);
+    d.prepare("DELETE FROM sgt_towar WHERE tw_id >= ?").run(TW_OD);
+
+    d.prepare("DELETE FROM sfera_queue WHERE tw_id >= ?").run(TW_OD);
+    d.prepare(`DELETE FROM events WHERE user_id IN (${luki(PODPISY.length)})`).run(...PODPISY);
+    d.prepare(
+      `DELETE FROM device_session WHERE user_id IN
+         (SELECT user_id FROM app_user WHERE login IN (${luki(LOGINY.length)}))`
+    ).run(...LOGINY);
+    d.prepare(`DELETE FROM app_user WHERE login IN (${luki(LOGINY.length)})`).run(...LOGINY);
+    /* Konta bez loginu podpisane nazwą ze scenariuszy: konto-ślad zakładane
+       niżej ORAZ to, co z tych samych nazw zrobiła migracja historii
+       (`POST /api/users/migrate-history` — scenariusz S53). Bez tej linii każde
+       uruchomienie seedu zostawiałoby po sobie kolejne konto-widmo. */
+    d.prepare(
+      `DELETE FROM app_user WHERE login IS NULL AND name IN (${luki(PODPISY.length)})`
+    ).run(...PODPISY);
+
+    d.prepare("DELETE FROM ean_conflict WHERE ean IN (?,?)").run(
+      "5901234567890",
+      "5907654321098"
+    );
+  })();
+}
+
+function magazyny(): void {
+  const ins = db().prepare(
+    "INSERT OR IGNORE INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)"
+  );
+  ins.run(MAG, "MAG", "Magazyn główny");
+  ins.run(MGP, "MGP", "Strefa przyjęć");
+  ins.run(ZWROTY, "ZWROTY", "Zwroty od klientów");
+  ins.run(MAG_SERWIS, "SERWIS", "Serwis i reklamacje");
+  ins.run(MAG_EKSPOZYCJA, "EKSPO", "Ekspozycja / salon");
+  ins.run(MAG_ARCHIWUM, "ARCH", "Magazyn sezonowy");
+
+  /* S18 — magazyn ukryty. Brak wiersza znaczy „widoczny", więc zapisujemy
+     wyłącznie ukrycie. Sezonowy nadaje się do tego najlepiej: jest pusty, więc
+     jego zniknięcie z karty nie chowa żadnej liczby, którą ktoś śledzi. */
+  db()
+    .prepare(
+      `INSERT INTO magazyn_widocznosc(mag_id, ukryty, at, przez) VALUES (?,1,?,?)
+       ON CONFLICT(mag_id) DO UPDATE SET ukryty=1, at=excluded.at, przez=excluded.przez`
+    )
+    .run(MAG_ARCHIWUM, chwila(-60), "Biuro (scenariusze)");
+}
+
+function kartoteki(lista: TowarSc[]): number {
+  const insTowar = db().prepare(
+    `INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, unit, opis, lokalizacja)
+     VALUES (?,?,?,?,?,?,?)`
+  );
+  const insStan = db().prepare(
+    "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
+  );
+  for (const t of lista) {
+    insTowar.run(
+      t.twId, t.symbol, t.nazwa, t.ean ?? "", t.unit ?? "szt.", t.opis ?? "", t.lok ?? ""
+    );
+    for (const [magId, stan, rez] of t.stany ?? []) insStan.run(t.twId, magId, stan, rez ?? 0);
+  }
+  return lista.length;
+}
+
+/* ── Dostawy ────────────────────────────────────────────────────────────────
+   Część dokumentów zostaje NIEOTWARTA (bez wiersza w `delivery`) — otwarcie
+   jest częścią scenariusza i to na nim widać snapshot pozycji. Reszta ma
+   postęp zbudowany wprost, bo stanów typu „linia zajęta 40 minut temu przez
+   kogoś innego" nie da się wyklikać z jednego kolektora.                     */
+
+interface DokumentSc {
+  dokId: number;
+  typ: string;
+  dostawca: string;
+  dniWstecz: number;
+  magId: number;
+  wBuforze?: boolean;
+  /** `[tw_id, ilość]`; ten sam towar wolno podać dwa razy (S26). */
+  pozycje: Array<[number, number]>;
+}
+
+/** Symbol pierwszego typu z `DOK_TYPY_DOSTAW` — lista dostaw filtruje po nim. */
+const TYP_DOSTAWY = etykietyDostaw()[0] ?? "FZ";
+
+const DOKUMENTY: DokumentSc[] = [
+  // S20, S02, S27 — dostawa nietknięta; jedna pozycja bez adresu, jedna z trio EAN
+  {
+    dokId: 9_001, typ: TYP_DOSTAWY, dostawca: "FALON-TECH", dniWstecz: 0, magId: MAG,
+    pozycje: [[900_003, 12], [900_006, 8], [900_011, 24], [900_012, 18]],
+  },
+  // S21–S23, S32 — dostawa w toku ze wszystkimi statusami linii
+  {
+    dokId: 9_002, typ: TYP_DOSTAWY, dostawca: "STIHL Polska", dniWstecz: 1, magId: MAG,
+    pozycje: [
+      [900_036, 6], [900_037, 6], [900_038, 6], [900_039, 6], [900_040, 6], [900_044, 6],
+      [900_026, 10], [900_027, 10],
+    ],
+  },
+  // S24, S35 — dostawa zamknięta z wyjątkami historycznymi
+  {
+    dokId: 9_003, typ: TYP_DOSTAWY, dostawca: "HUSQVARNA", dniWstecz: 3, magId: MAG,
+    pozycje: [[900_007, 24], [900_008, 6]],
+  },
+  // S25, S44 — kontener na MGP, w buforze; po rozłożeniu zostaje przesunięcie
+  {
+    dokId: 9_004, typ: TYP_DOSTAWY, dostawca: "IMPORT SHANGHAI", dniWstecz: 2, magId: MGP,
+    wBuforze: true,
+    pozycje: [[900_041, 120], [900_042, 60], [900_043, 24]],
+  },
+  // S26, S15 — ten sam towar dwa razy, ilość ułamkowa i duża paczka
+  {
+    dokId: 9_005, typ: TYP_DOSTAWY, dostawca: "DWIE PARTIE sp. z o.o.", dniWstecz: 0, magId: MAG,
+    pozycje: [[900_032, 3], [900_032, 5], [900_017, 2.5], [900_007, 480]],
+  },
+  // S29 — dostawa jednopozycyjna
+  {
+    dokId: 9_007, typ: TYP_DOSTAWY, dostawca: "JEDNA POZYCJA", dniWstecz: 0, magId: MAG,
+    pozycje: [[900_033, 3]],
+  },
+  // S30 — dokument spoza okna DOK_DNI_WSTECZ
+  {
+    dokId: 9_008, typ: TYP_DOSTAWY, dostawca: "POZA OKNEM", dniWstecz: 20, magId: MAG,
+    pozycje: [[900_034, 4]],
+  },
+  // S31 — typ dokumentu spoza DOK_TYPY_DOSTAW (domyślnie sama FZ)
+  {
+    dokId: 9_009, typ: "PZ", dostawca: "TYP SPOZA FILTRU", dniWstecz: 0, magId: MAG,
+    pozycje: [[900_035, 4]],
+  },
+];
+
+/** S28 — czterdzieści pozycji drobnicy na jednym dokumencie. */
+const DOK_DROBNICA: DokumentSc = {
+  dokId: 9_006, typ: TYP_DOSTAWY, dostawca: "DROBNICA", dniWstecz: 0, magId: MAG,
+  pozycje: DROBNICA.map((t, i) => [t.twId, 1 + (i % 12)] as [number, number]),
+};
+
+function dokumenty(): { dokumentow: number; dostaw: number; linii: number; idDostaw: Map<number, number> } {
+  const d = db();
+  const insDok = d.prepare(
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
+     VALUES (?,?,?,?,?,?,?)`
+  );
+  const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
+
+  const lista = [...DOKUMENTY, DOK_DROBNICA];
+  for (const dok of lista) {
+    const data = dzien(-dok.dniWstecz);
+    insDok.run(
+      dok.dokId,
+      dok.typ,
+      `${dok.typ} ${dok.dokId}/${mmrrrr(data)}`,
+      data,
+      dok.magId,
+      dok.dostawca,
+      dok.wBuforze ? 1 : 0
+    );
+    for (const [twId, ilosc] of dok.pozycje) insPoz.run(dok.dokId, twId, ilosc);
+  }
+
+  const postep = postepDostaw();
+  return {
+    dokumentow: lista.length,
+    dostaw: postep.dostaw,
+    linii: postep.linii,
+    idDostaw: postep.idDostaw,
+  };
+}
+
+/* Rozkładanie zapisane wprost. `delivery_line.lok_oczekiwana` jest snapshotem
+   pola z kartoteki z chwili otwarcia — kopiujemy je tak samo, jak zrobiłby to
+   `openDelivery`, bo scenariusz o rozjeździe adresu (S32) mierzy różnicę
+   między tym snapshotem a zeskanowaną półką. */
+function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, number> } {
+  const d = db();
+  const idDostaw = new Map<number, number>();
+  let linii = 0;
+
+  const insDostawa = d.prepare(
+    `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, status, opened_at,
+                          closed_at, source_mag_id, nr_przesylki, kurier_protokol, przesylka_at, przesylka_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+  );
+  const insLinia = d.prepare(
+    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, ilosc_odlozona,
+                               lok_oczekiwana, lok_faktyczna, status, done_at, done_by, locked_by, locked_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  );
+  const wszystkie = new Map([...TOWARY, ...DROBNICA].map((t) => [t.twId, t]));
+  /* Snapshot tego, co `openDelivery` skopiowałoby z kartoteki: symbol, nazwa
+     i PIERWSZY kod z pola lokalizacji (adres pickingowy). */
+  const towar = (twId: number) => {
+    const t = wszystkie.get(twId);
+    return { sym: t?.symbol ?? String(twId), nazwa: t?.nazwa ?? "", lok: (t?.lok ?? "").split(" ")[0] || null };
+  };
+
+  const otworz = (dok: DokumentSc, status: string, opened: string, closed: string | null,
+                  przesylka: { nr: string | null; protokol: string | null }) => {
+    const data = dzien(-dok.dniWstecz);
+    const id = Number(
+      insDostawa.run(
+        dok.dokId,
+        `${dok.typ} ${dok.dokId}/${mmrrrr(data)}`,
+        dok.dostawca,
+        data,
+        status,
+        opened,
+        closed,
+        dok.magId,
+        przesylka.nr,
+        przesylka.protokol,
+        przesylka.nr || przesylka.protokol ? opened : null,
+        przesylka.nr || przesylka.protokol ? "Jan Kowalski" : null
+      ).lastInsertRowid
+    );
+    idDostaw.set(dok.dokId, id);
+    return id;
+  };
+
+  // ── S21–S23, S33: dostawa w toku ──
+  const wToku = DOKUMENTY.find((x) => x.dokId === 9_002)!;
+  const idWToku = otworz(wToku, "open", chwila(-95), null, {
+    nr: "PL-2026-08-000431",
+    protokol: "tak",
+  });
+  /* Pięć statusów w jednej dostawie. `done` i `partial` mają wypełnione
+     `lok_faktyczna`, bo skan półki JEST dowodem odłożenia — linia bez niego
+     wyglądałaby na odłożoną donikąd. */
+  const linie: Array<[number, number, number, string, string | null, string | null, string | null]> = [
+    // [tw_id, ilosc_dok, ilosc_odlozona, status, lok_faktyczna, locked_by, locked_at]
+    [900_036, 6, 0, "todo", null, null, null],
+    [900_037, 6, 6, "done", "F02-02-08", null, null],
+    [900_038, 6, 2, "partial", "G01-02-03", null, null],
+    [900_039, 6, 0, "skipped", null, null, null],
+    [900_040, 6, 0, "problem", null, null, null],
+    [900_044, 6, 0, "problem", null, null, null],
+    // S22 — lock świeży (10 minut temu, TTL 30 minut) trzymany przez kogoś innego
+    [900_026, 10, 0, "todo", null, "Ewa Bąk", chwila(-10)],
+    // S23 — lock sprzed 45 minut, czyli po TTL: pozycja jest wolna mimo wpisu
+    [900_027, 10, 0, "todo", null, "Ewa Bąk", chwila(-45)],
+  ];
+  for (const [twId, dok, odlozone, status, lokFakt, lockBy, lockAt] of linie) {
+    const t = towar(twId);
+    insLinia.run(
+      idWToku, twId, t.sym, t.nazwa, dok, odlozone, t.lok, lokFakt, status,
+      status === "done" || status === "partial" ? chwila(-60) : null,
+      status === "done" || status === "partial" ? "Jan Kowalski" : null,
+      lockBy, lockAt
+    );
+    linii++;
+  }
+
+  // ── S24, S35: dostawa zamknięta ──
+  const zamknieta = DOKUMENTY.find((x) => x.dokId === 9_003)!;
+  const idZamknietej = otworz(zamknieta, "done", chwila(-3 * 1440), chwila(-3 * 1440 + 70), {
+    nr: "PL-2026-07-009912",
+    protokol: "nie",
+  });
+  for (const [twId, ilosc] of zamknieta.pozycje) {
+    const t = towar(twId);
+    insLinia.run(
+      idZamknietej, twId, t.sym, t.nazwa, ilosc, ilosc, t.lok, t.lok, "done",
+      chwila(-3 * 1440 + 60), "Jan Kowalski", null, null
+    );
+    linii++;
+  }
+
+  // ── S25: kontener na MGP, rozłożony w połowie ──
+  const kontener = DOKUMENTY.find((x) => x.dokId === 9_004)!;
+  const idKontenera = otworz(kontener, "open", chwila(-2 * 1440), null, { nr: null, protokol: null });
+  kontener.pozycje.forEach(([twId, ilosc], i) => {
+    const t = towar(twId);
+    const done = i === 0;
+    insLinia.run(
+      idKontenera, twId, t.sym, t.nazwa, ilosc, done ? ilosc : 0, t.lok,
+      done ? t.lok : null, done ? "done" : "todo",
+      done ? chwila(-2 * 1440 + 30) : null, done ? "Ewa Bąk" : null, null, null
+    );
+    linii++;
+  });
+
+  // ── S30: dokument spoza okna, z NIEDOKOŃCZONĄ pracą ──
+  const pozaOknem = DOKUMENTY.find((x) => x.dokId === 9_008)!;
+  const idPozaOknem = otworz(pozaOknem, "open", chwila(-20 * 1440), null, { nr: null, protokol: null });
+  for (const [twId, ilosc] of pozaOknem.pozycje) {
+    const t = towar(twId);
+    insLinia.run(idPozaOknem, twId, t.sym, t.nazwa, ilosc, 0, t.lok, null, "todo", null, null, null, null);
+    linii++;
+  }
+
+  return { dostaw: idDostaw.size, linii, idDostaw };
+}
+
+/* ── Wyjątki ────────────────────────────────────────────────────────────────
+   Pięć kategorii formularza + pięć kluczy historycznych. Te drugie są tu po to,
+   żeby protokół dla dostawcy dało się wydrukować z wierszem sprzed 0.21.0
+   i sprawdzić, że pokazuje etykietę, a nie surowy klucz `qty_short`.         */
+function wyjatki(idDostaw: Map<number, number>): number {
+  const d = db();
+  const idWToku = idDostaw.get(9_002)!;
+  const idZamknietej = idDostaw.get(9_003)!;
+
+  const linia = (deliveryId: number, twId: number): number | null => {
+    const r = d
+      .prepare("SELECT id FROM delivery_line WHERE delivery_id=? AND tw_id=?")
+      .get(deliveryId, twId) as { id: number } | undefined;
+    return r?.id ?? null;
+  };
+  const iloscDok = (lineId: number | null): number | null => {
+    if (!lineId) return null;
+    const r = d.prepare("SELECT ilosc_dok FROM delivery_line WHERE id=?").get(lineId) as
+      | { ilosc_dok: number }
+      | undefined;
+    return r?.ilosc_dok ?? null;
+  };
+
+  const ins = d.prepare(
+    `INSERT INTO problem(delivery_id, line_id, typ, ilosc, sym_obcy, zamiast_ilosc, ilosc_dok,
+                         opis, foto_ref, created_at, created_by, resolved_at, resolved_note)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  );
+
+  const liniaProblem = linia(idWToku, 900_040);
+  const liniaIlosc = linia(idWToku, 900_044);
+
+  const wiersze: Array<{
+    delivery: number; line: number | null; typ: string; ilosc: number | null;
+    symObcy?: string | null; zamiast?: number | null; opis?: string | null;
+    foto?: string | null; minut: number; kto: string; rozwiazany?: string | null;
+  }> = [
+    // S34 — pięć kategorii formularza „Niezgodność w dostawie"
+    {
+      delivery: idWToku, line: liniaProblem, typ: "wrong_item", ilosc: 6,
+      symObcy: "OEM-77-521", zamiast: 6, foto: FOTO_BLEDNY, minut: -80, kto: "Jan Kowalski",
+      opis: "Przyszła inna średnica; etykieta dostawcy zgadza się z kartonem, nie z towarem",
+    },
+    {
+      // uszkodzenie dotyczy paczki, nie pozycji z dokumentu — stąd brak linii
+      delivery: idWToku, line: null, typ: "damaged", ilosc: 2, foto: FOTO_USZKODZENIE,
+      minut: -70, kto: "Jan Kowalski",
+      // S39 — średnik i cudzysłów w opisie: eksport CSV musi je ująć w cudzysłowy
+      opis: 'Karton przemoczony; dwie sztuki z pękniętą obudową — kierowca powiedział "spisz i tak"',
+    },
+    { delivery: idWToku, line: null, typ: "missing_item", ilosc: 4, minut: -65, kto: "Jan Kowalski",
+      opis: "Na liście przewozowym jest, w paczce nie ma" },
+    {
+      delivery: idWToku, line: liniaIlosc, typ: "qty_mismatch", ilosc: 4,
+      minut: -60, kto: "Jan Kowalski", opis: "Policzone dwa razy, za każdym razem 4 zamiast 6",
+    },
+    // S40 — artykuł spoza dokumentu: nie ma linii, jest numer katalogowy
+    { delivery: idWToku, line: null, typ: "extra_item", ilosc: 1, symObcy: "KAR00149",
+      minut: -55, kto: "Ewa Bąk", opis: "Przyjechało dodatkowo, nikt tego nie zamawiał" },
+    // S37 — referencja do zdjęcia, którego na dysku NIE MA
+    { delivery: idWToku, line: null, typ: "damaged", ilosc: 1, foto: FOTO_BRAK_PLIKU,
+      minut: -50, kto: "Ewa Bąk", opis: "Zdjęcie zrobione, plik przepadł przy synchronizacji" },
+
+    // S35 — klucze sprzed 0.21.0; kolektor ich nie oferuje, serwer je zna
+    { delivery: idZamknietej, line: null, typ: "qty_short", ilosc: 2, minut: -3 * 1440 + 40,
+      kto: "Jan Kowalski", opis: "Wpis sprzed zmiany formularza",
+      rozwiazany: "Dostawca dosłał 2 szt następną paczką" },
+    { delivery: idZamknietej, line: null, typ: "qty_over", ilosc: 1, minut: -3 * 1440 + 45, kto: "Jan Kowalski" },
+    { delivery: idZamknietej, line: null, typ: "no_space", ilosc: 3, minut: -3 * 1440 + 50, kto: "Jan Kowalski" },
+    { delivery: idZamknietej, line: null, typ: "unknown_barcode", ilosc: 1, foto: FOTO_HISTORYCZNE,
+      minut: -3 * 1440 + 55, kto: "Ewa Bąk" },
+    { delivery: idZamknietej, line: null, typ: "ean_conflict", ilosc: 1, minut: -3 * 1440 + 58, kto: "Ewa Bąk" },
+  ];
+
+  for (const w of wiersze) {
+    ins.run(
+      w.delivery, w.line, w.typ, w.ilosc, w.symObcy ?? null, w.zamiast ?? null,
+      iloscDok(w.line), w.opis ?? null, w.foto ?? null, chwila(w.minut), w.kto,
+      w.rozwiazany ? chwila(w.minut + 120) : null, w.rozwiazany ?? null
+    );
+  }
+  return wiersze.length;
+}
+
+/* ── Zamówienia do dostawcy ─────────────────────────────────────────────────
+   Cztery warianty na JEDNYM towarze, bo karta ma je rozróżniać obok siebie:
+   po terminie, w terminie, bez terminu i zrealizowane w całości (to ostatnie
+   MA zniknąć z listy — brak wiersza jest tu wynikiem, nie brakiem danych).   */
+function zamowienia(): number {
+  const d = db();
+  const insZam = d.prepare(
+    `INSERT INTO sgt_zamowienie(dok_id, nr_pelny, data_wyst, termin, dostawca) VALUES (?,?,?,?,?)`
+  );
+  const insPoz = d.prepare(
+    "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
+  );
+
+  const zam: Array<[number, number, string | null, string, number, number]> = [
+    // [dok_id, dni wstecz, termin, dostawca, ilość, zrealizowane]
+    [9_001, 30, dzien(-4), "FALON-TECH", 20, 0],          // po terminie — dostawca się spóźnia
+    [9_002, 12, dzien(9), "STIHL Polska", 50, 20],        // częściowo zrealizowane → zostało 30
+    [9_003, 20, null, "HUSQVARNA", 8, 0],                 // bez terminu → koniec listy
+    [9_004, 40, dzien(-20), "IMPORT SHANGHAI", 100, 100], // odebrane w całości → znika z karty
+  ];
+  for (const [dokId, wstecz, termin, dostawca, ilosc, zreal] of zam) {
+    const data = dzien(-wstecz);
+    insZam.run(dokId, `ZD ${dokId}/${mmrrrr(data)}`, data, termin, dostawca);
+    insPoz.run(dokId, 900_022, ilosc, zreal);
+  }
+  return zam.length;
+}
+
+/* ── Konta i sesje ──────────────────────────────────────────────────────────
+   Hasło jest jedno i jawne. Konta scenariuszowe istnieją po to, żeby dało się
+   sprawdzić RÓŻNICE między rolami — a nie po to, żeby chronić cokolwiek.     */
+
+/**
+ * Konto-ślad z migracji: ani loginu, ani hasła.
+ *
+ * Nazwa jest DOKŁADNIE jednym z wariantów z dziennika i to jest tu sedno.
+ * `migrujHistorie` dopasowuje po nazwie znormalizowanej, nie po podobieństwie,
+ * więc zdarzenia podpisane „Jan K" podepną się pod ten wiersz zamiast założyć
+ * kolejny. Dwa pozostałe warianty („Jan", „jan") zejdą się w jedno NOWE konto —
+ * i to też jest wynik scenariusza, nie jego usterka.
+ */
+const KONTO_SLAD = "Jan K";
+
+function konta(): number {
+  const d = db();
+  const ins = d.prepare(
+    "INSERT INTO app_user(login, haslo_hash, name, role, active, created_at) VALUES (?,?,?,?,?,?)"
+  );
+  const hash = hashSekret(HASLO_SCENARIUSZY);
+
+  const lista: Array<[string | null, string | null, string, string, number]> = [
+    ["jan.k", hash, "Jan Kowalski", "magazynier", 1],
+    ["ewa.b", hash, "Ewa Bąk", "brygadzista", 1],
+    ["biuro.test", hash, "Biuro (scenariusze)", "biuro", 1],
+    // S52 — konto wyłączone: hasło się zgadza, wejścia nie ma
+    ["zwolniony", hash, "Marek Odszedł", "magazynier", 0],
+    // S54 — login jest, hasła nie ma; takie konto nie zaloguje się nigdy
+    ["bez.hasla", null, "Konto bez hasła", "magazynier", 1],
+    // S53 — konto-ślad z migracji historii: ani loginu, ani hasła
+    [null, null, KONTO_SLAD, "magazynier", 1],
+  ];
+  const idPoLoginie = new Map<string, number>();
+  for (const [login, haslo, name, role, active] of lista) {
+    const id = Number(ins.run(login, haslo, name, role, active, chwila(-90 * 1440)).lastInsertRowid);
+    if (login) idPoLoginie.set(login, id);
+    if (name === "Jan Kowalski") idJana = id;
+    if (name === "Ewa Bąk") idEwy = id;
+    if (name === "Biuro (scenariusze)") idBiura = id;
+  }
+
+  /* S55 — trzy sesje w trzech stanach. Tokeny są czytelne, żeby dało się nimi
+     wołać `curl` bez logowania; w trybie `seeded` to jest cała ich rola. */
+  const insSesja = d.prepare(
+    `INSERT INTO device_session(token, user_id, device_id, created_at, last_seen, revoked_at)
+     VALUES (?,?,?,?,?,?)`
+  );
+  insSesja.run("scenariusz-jan", idPoLoginie.get("jan.k")!, "KOLEKTOR-01", chwila(-120), chwila(-3), null);
+  insSesja.run("scenariusz-ewa", idPoLoginie.get("ewa.b")!, "KOLEKTOR-02", chwila(-240), chwila(-30), null);
+  insSesja.run("scenariusz-biuro", idPoLoginie.get("biuro.test")!, null, chwila(-60), chwila(-1), null);
+  // sesja unieważniona — token istnieje, a nie otwiera niczego
+  insSesja.run("scenariusz-uniewazniona", idPoLoginie.get("jan.k")!, "KOLEKTOR-03", chwila(-1440), chwila(-1400), chwila(-1380));
+  // sesja sprzed dwóch miesięcy — `last_seen` niczego nie bramkuje, jest śladem
+  insSesja.run("scenariusz-stara", idPoLoginie.get("jan.k")!, "KOLEKTOR-04", chwila(-60 * 1440), chwila(-60 * 1440), null);
+
+  return lista.length;
+}
+
+/* Identyfikatory kont scenariuszowych — potrzebne dziennikowi i kolejce, żeby
+   `user_ref` i `created_by_ref` wskazywały na konto, a nie tylko na napis. */
+let idJana = 0;
+let idEwy = 0;
+let idBiura = 0;
+
+/* ── Kolejka Sfery ──────────────────────────────────────────────────────────
+   Każdy status z osobna, plus trzy przypadki, których z kolektora wystawić się
+   nie da: uszkodzony payload, zadanie nieznanego typu i wiersz `done`, którego
+   skutku nie widać w kartotece (materiał dla rekoncyliacji).                 */
+function kolejka(): number {
+  const ins = db().prepare(
+    `INSERT INTO sfera_queue(type, payload, status, attempts, error_msg, sgt_doc_number, label, detail,
+                             tw_id, source_doc_id, created_by, created_by_ref, created_at,
+                             next_attempt_at, processed_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  );
+
+  const zadania: Array<{
+    typ: string; payload: string; status: string; proby?: number; blad?: string | null;
+    docNo?: string | null; label: string; detail: string; twId: number; docId?: number | null;
+    kto: string; ref: number; utworzone: number; nastepna?: number | null; przetworzone?: number | null;
+  }> = [
+    /* S41 — świeże zadanie czekające na workera. Wartość RÓŻNI SIĘ od pola
+       w kartotece i to jest tu sedno: karta rysuje chipy z różnicy, więc
+       zadanie zapisujące to samo, co już stoi w Subiekcie, nie pokazałoby ani
+       chipa dochodzącego, ani schodzącego. Ten wpis daje oba naraz. */
+    {
+      typ: "set_location", payload: JSON.stringify({ twId: 900_011, newValue: "C01-02-02 B02-03-04 PAL-042 H04-01-02" }),
+      status: "pending", label: "Lokalizacja · TEST-WIELE-LOK", detail: "C01-02-02 (karta)",
+      twId: 900_011, kto: "Jan Kowalski", ref: idJana, utworzone: -2,
+    },
+    // S42 — pierwsza próba nieudana, następna za dwie minuty (backoff 5 s/30 s/2 min)
+    {
+      typ: "set_location", payload: JSON.stringify({ twId: 900_013, newValue: LOK_PRZY_LIMICIE }),
+      status: "pending", proby: 1, blad: "Zapis Sfery nieudany — kartoteka w edycji (Subiekt)",
+      label: "Lokalizacja · TEST-LOK-LIMIT", detail: "A01-02-03 (karta)",
+      twId: 900_013, kto: "Jan Kowalski", ref: idJana, utworzone: -8, nastepna: 2,
+    },
+    // S43 — worker padł w połowie i zostawił zadanie w `processing`; payload celowo
+    // nieparsowalny, bo `pendingMmByTw` musi taki wiersz przeżyć, nie wywalić kartę
+    {
+      typ: "mm", payload: "{to nie jest JSON", status: "processing",
+      label: "Przesunięcie · TEST-MGP", detail: "10 szt MGP→MAG",
+      twId: 900_023, kto: "Ewa Bąk", ref: idEwy, utworzone: -40,
+    },
+    // S44 — MM czeka na wyjście dokumentu 9004 z bufora
+    {
+      typ: "mm", payload: JSON.stringify({ magFrom: MGP, magTo: MAG, items: [{ twId: 900_041, qty: 40 }] }),
+      status: "waiting_for_doc", label: "Przesunięcie · TEST-KONTENER-1", detail: "40 szt MGP→MAG",
+      twId: 900_041, docId: 9_004, kto: "Ewa Bąk", ref: idEwy, utworzone: -30, nastepna: 1,
+    },
+    // S45 — to samo, ale od pięciu dni: rekoncyliacja ma je wyłowić
+    {
+      typ: "mm", payload: JSON.stringify({ magFrom: MGP, magTo: MAG, items: [{ twId: 900_043, qty: 24 }] }),
+      status: "waiting_for_doc", label: "Przesunięcie · TEST-KONTENER-3", detail: "24 szt MGP→MAG",
+      twId: 900_043, docId: 9_004, kto: "Ewa Bąk", ref: idEwy, utworzone: -5 * 1440, nastepna: 1,
+    },
+    // zapis udany i zgodny z kartoteką — tło dla rekoncyliacji (ma go pominąć)
+    {
+      typ: "set_location", payload: JSON.stringify({ twId: 900_021, newValue: "H04-01-02" }),
+      status: "done", label: "Lokalizacja · TEST-WSZEDZIE", detail: "H04-01-02 (dostawa)",
+      twId: 900_021, kto: "Jan Kowalski", ref: idJana, utworzone: -180, przetworzone: -179,
+    },
+    // S50 — zapis „wszedł", a w kartotece stoi co innego: rozjazd do wyłowienia
+    {
+      typ: "set_location", payload: JSON.stringify({ twId: 900_025, newValue: "F02-02-04" }),
+      status: "done", label: "Lokalizacja · TEST-ROZJAZD", detail: "F02-02-04 (karta)",
+      twId: 900_025, kto: "Jan Kowalski", ref: idJana, utworzone: -200, przetworzone: -199,
+    },
+    // S46 — błąd świeży: czerwony chip na karcie, PONÓW w kolejce
+    {
+      typ: "set_location", payload: JSON.stringify({ twId: 900_024, newValue: "J02-02-09" }),
+      status: "error", proby: 3, blad: "Zapis Sfery nieudany — kartoteka w edycji (Subiekt)",
+      label: "Lokalizacja · TEST-BLAD-ZAPISU", detail: "J02-02-09 (karta)",
+      twId: 900_024, kto: "Jan Kowalski", ref: idJana, utworzone: -25, przetworzone: -20,
+    },
+    // S47 — błąd sprzed trzech dni: nikt go nie ponowił, rekoncyliacja ma krzyknąć
+    {
+      typ: "mm", payload: JSON.stringify({ magFrom: MGP, magTo: MAG, items: [{ twId: 900_042, qty: 12 }] }),
+      status: "error", proby: 3, blad: "Worker Sfery (COM) niedostępny — dokument MM wystawia biuro",
+      label: "Przesunięcie · TEST-KONTENER-2", detail: "12 szt MGP→MAG",
+      twId: 900_042, kto: "Ewa Bąk", ref: idEwy, utworzone: -3 * 1440 - 60, przetworzone: -3 * 1440,
+    },
+    // S48 — typ, którego worker nie zna; kończy się czytelnym błędem, nie ciszą
+    {
+      typ: "przecena", payload: JSON.stringify({ twId: 900_007, cena: 12.5 }),
+      status: "pending", label: "Zadanie nieznanego typu", detail: "worker ma je odrzucić",
+      twId: 900_007, kto: "Biuro (scenariusze)", ref: idBiura, utworzone: -1,
+    },
+    // S49 — kolejka jest rezerwacją: 40 z 60 szt na MGP jest już zajęte
+    {
+      typ: "mm", payload: JSON.stringify({ magFrom: MGP, magTo: MAG, items: [{ twId: 900_023, qty: 40 }] }),
+      status: "pending", label: "Przesunięcie · TEST-MGP", detail: "40 szt MGP→MAG",
+      twId: 900_023, kto: "Jan Kowalski", ref: idJana, utworzone: -5,
+    },
+  ];
+
+  for (const z of zadania) {
+    ins.run(
+      z.typ, z.payload, z.status, z.proby ?? 0, z.blad ?? null, z.docNo ?? null,
+      z.label, z.detail, z.twId, z.docId ?? null, z.kto, z.ref,
+      chwila(z.utworzone),
+      z.nastepna == null ? null : chwila(z.nastepna),
+      z.przetworzone == null ? null : chwila(z.przetworzone)
+    );
+  }
+  return zadania.length;
+}
+
+/* ── Dziennik zdarzeń ───────────────────────────────────────────────────────
+   Dziennik jest jedyną odpowiedzią na „aplikacja zjadła mi 30 sztuk", więc
+   scenariusze muszą pokryć KAŻDY typ, który filtruje audyt — łącznie z tymi,
+   których nikt nie wywoła ręcznie (`queue_failed`, `http_rejected`).
+
+   Trzy wiersze są celowo zepsute albo niekompletne: uszkodzony payload, wpis
+   bez `locsPrzed` (historia sprzed sierpnia 2026) i zdarzenia bez konta.
+   Każdy z nich ma w kodzie gałąź, której nic innego nie sprawdza.            */
+function dziennik(): number {
+  const ins = db().prepare(
+    "INSERT INTO events(type, tw_id, payload, user_id, device_id, user_ref, created_at) VALUES (?,?,?,?,?,?,?)"
+  );
+  let n = 0;
+  const zdarzenie = (
+    typ: string, kto: string, ref: number | null, twId: number | null,
+    payload: unknown, minut: number, device: string | null = "KOLEKTOR-01"
+  ) => {
+    ins.run(
+      typ, twId,
+      typeof payload === "string" ? payload : payload == null ? null : JSON.stringify(payload),
+      kto, device, ref, chwila(minut)
+    );
+    n++;
+  };
+
+  // ── S57: po jednym wierszu każdego typu ──
+  zdarzenie("login", "Jan Kowalski", idJana, null, { login: "jan.k", role: "magazynier" }, -200);
+  zdarzenie("login_failed", "jan.k", null, null, { login: "jan.k" }, -205);
+  zdarzenie("scan", "Jan Kowalski", idJana, null, { code: "5900000000011", kind: "EAN" }, -190);
+  zdarzenie("delivery_open", "Jan Kowalski", idJana, null, { deliveryId: 1, dokId: 9_002 }, -95);
+  zdarzenie("putaway_line_done", "Jan Kowalski", idJana, 900_037, { lineId: 2, qty: 6, location: "F02-02-08", status: "done" }, -60);
+  zdarzenie("location_mismatch", "Jan Kowalski", idJana, 900_038, { expected: "G01-02-03", actual: "G01-02-07" }, -58);
+  zdarzenie("location_set", "Jan Kowalski", idJana, 900_011, { locsPrzed: "B02-03-04", result: "A01-02-03 B02-03-04", zrodlo: "karta", action: "add", value: "A01-02-03", queueId: 1 }, -55);
+  zdarzenie("location_removed", "Jan Kowalski", idJana, 900_011, { locsPrzed: "A01-02-03 PAL-042", result: "A01-02-03", zrodlo: "karta", action: "remove", value: "PAL-042" }, -54);
+  zdarzenie("przesuniecie", "Ewa Bąk", idEwy, 900_023, { magFrom: MGP, magTo: MAG, kodFrom: "MGP", kodTo: "MAG", qty: 40, dostepnePrzed: 60, location: "J02-02-03" }, -5, "KOLEKTOR-02");
+  zdarzenie("problem_raised", "Jan Kowalski", idJana, null, { problemId: 1, typ: "damaged", lineId: 6 }, -70);
+  zdarzenie("problem_resolved", "Biuro (scenariusze)", idBiura, null, { problemId: 7 }, -3 * 1440 + 160, null);
+  zdarzenie("przesylka_zapisana", "Jan Kowalski", idJana, null, { deliveryId: 1, kurierProtokol: "tak" }, -90);
+  zdarzenie("delivery_done", "Jan Kowalski", idJana, null, { deliveryId: 2 }, -3 * 1440 + 70);
+  zdarzenie("ean_conflict", "Jan Kowalski", idJana, null, { ean: "5901234567890", candidates: [900_001, 900_002] }, -45);
+  zdarzenie("ean_conflict_autoresolved", "Jan Kowalski", idJana, 900_003, { ean: "5907654321098", candidates: [900_003, 900_004, 900_005] }, -44);
+  zdarzenie("lock_forced", "Ewa Bąk", idEwy, null, { lineId: 6, odebrano: "Jan Kowalski" }, -40, "KOLEKTOR-02");
+  zdarzenie("privileged", "Ewa Bąk", idEwy, null, { operacja: "zdjecie_cudzego_locka" }, -41, "KOLEKTOR-02");
+  zdarzenie("queue_applied", "Jan Kowalski", idJana, 900_021, { queueId: 6, typ: "set_location", docNo: null, proby: 0 }, -179, null);
+  zdarzenie("queue_retry", "Jan Kowalski", idJana, 900_013, { queueId: 2, typ: "set_location", proba: 1, max: 3, blad: "Kartoteka w edycji" }, -8, null);
+  zdarzenie("queue_failed", "Jan Kowalski", idJana, 900_024, { queueId: 8, typ: "set_location", proby: 3, blad: "Kartoteka w edycji" }, -20, null);
+  zdarzenie("http_rejected", "Jan Kowalski", idJana, null, { method: "POST", url: "/api/delivery/lines/6/putaway", status: 409 }, -35);
+  zdarzenie("device_drop", "Jan Kowalski", idJana, null, { g: 5.8, bateria: 41 }, -30);
+  zdarzenie("user_haslo_changed", "Biuro (scenariusze)", idBiura, null, { userId: idJana, wlasne: false }, -1440, null);
+  zdarzenie("tryb_serwisowy_start", "ADMIN (TRYB SERWISOWY)", null, null, { sgtMode: "seeded" }, -300, null);
+
+  // ── S58: historia sprzed kont — trzy warianty jednej osoby, bez `user_ref` ──
+  zdarzenie("scan", "Jan", null, 900_011, { code: "TEST-WIELE-LOK", kind: "TEXT" }, -40 * 1440, "KOLEKTOR-01");
+  zdarzenie("location_set", "jan", null, 900_011, { action: "add", value: "PAL-042", result: "PAL-042" }, -40 * 1440 + 5, "KOLEKTOR-01");
+  zdarzenie("scan", "Jan K", null, 900_007, { code: "59012345", kind: "EAN" }, -39 * 1440, "KOLEKTOR-02");
+
+  // ── S59: dwa wiersze, na których historia karty musi się NIE wywrócić ──
+  // payload nie do sparsowania — `productHistory` ma pokazać wpis bez szczegółu
+  zdarzenie("location_set", "Jan Kowalski", idJana, 900_011, "{ucięty payload", -35 * 1440);
+  // wpis sprzed `locsPrzed`: formatowanie schodzi do „→ wartość"
+  zdarzenie("location_set", "Jan Kowalski", idJana, 900_011, { action: "replace", value: "B02-03-04", result: "B02-03-04" }, -34 * 1440);
+
+  // ── S60: metryki ──
+  /* Etykieta regału B02-03-04 wpisywana z ręki sześć razy na dziesięć skanów —
+     to jest ten raport, dla którego `manual_entry` jest osobnym typem. */
+  for (let i = 0; i < 6; i++) {
+    zdarzenie("manual_entry", "Jan Kowalski", idJana, null, { code: "B02-03-04", kind: "LOC", screen: "dostawa" }, -100 - i);
+  }
+  for (let i = 0; i < 4; i++) {
+    zdarzenie("scan", "Jan Kowalski", idJana, null, { code: "B02-03-04", kind: "LOC" }, -110 - i);
+  }
+  // kartoteka bez czytelnego kodu: wpisywana, nigdy skanowana
+  for (let i = 0; i < 3; i++) {
+    zdarzenie("manual_entry", "Ewa Bąk", idEwy, null, { code: "T32-0203", kind: "TEXT", screen: "skan" }, -120 - i, "KOLEKTOR-02");
+  }
+  /* Czasy skan → odpowiedź. Cel to p95 < 150 ms, a ten rozkład go PRZEKRACZA
+     (p95 = 420 ms) — metryka ma czasem świecić na czerwono, inaczej nie wiadomo,
+     czy w ogóle działa. */
+  for (const ms of [88, 92, 96, 101, 104, 110, 118, 124, 131, 140, 152, 168, 190, 220, 260, 310, 360, 420, 480, 520]) {
+    zdarzenie("scan_timing", "Jan Kowalski", idJana, null, { ms }, -130);
+  }
+
+  // ── S61: wydajność — jedna próbka wiarygodna, druga poniżej progu ──
+  /* Jan: 26 odłożeń w dwóch seriach z 40-minutową przerwą w środku. Przerwa
+     jest tu treścią scenariusza: `czasAktywny` ma ją ODCIĄĆ, więc tempo liczy
+     się z czasu pracy, a nie z okna „od pierwszego do ostatniego zdarzenia". */
+  for (let i = 0; i < 13; i++) {
+    zdarzenie("putaway_line_done", "Jan Kowalski", idJana, 900_036, { lineId: 1, qty: 1, status: "done" }, -300 + i * 3);
+  }
+  for (let i = 0; i < 13; i++) {
+    zdarzenie("putaway_line_done", "Jan Kowalski", idJana, 900_036, { lineId: 1, qty: 1, status: "done" }, -220 + i * 3);
+  }
+  // Ewa: osiem pozycji, czyli poniżej progu 20 — wiersz ma dostać `wiarygodne: false`
+  for (let i = 0; i < 8; i++) {
+    zdarzenie("putaway_line_done", "Ewa Bąk", idEwy, 900_041, { lineId: 9, qty: 1, status: "done" }, -180 + i * 4, "KOLEKTOR-02");
+  }
+
+  return n;
+}
+
+/* ── Kolizje kodów kreskowych ───────────────────────────────────────────────
+   Raport dla biura mierzy, ile razy dany kod ZATRZYMAŁ pracę. Dwa kody, dwa
+   różne kształty: jeden zatrzymuje zawsze, drugi bywa zawężany dokumentem.   */
+function kolizjeEan(): void {
+  const ins = db().prepare(
+    "INSERT INTO ean_conflict(ean, tw_ids, auto, seen_at) VALUES (?,?,?,?)"
+  );
+  for (let i = 0; i < 4; i++) {
+    ins.run("5901234567890", JSON.stringify([900_001, 900_002]), 0, chwila(-45 - i * 60));
+  }
+  ins.run("5907654321098", JSON.stringify([900_003, 900_004, 900_005]), 1, chwila(-44));
+  ins.run("5907654321098", JSON.stringify([900_003, 900_004, 900_005]), 0, chwila(-400));
+}
+
+/* ── Historia pobrań (dokumenty WZ) ─────────────────────────────────────────
+   Raport przeslotowania miał w trybie demo bezpiecznik: bez historii pobrań
+   odmawiał wypisania list 1–3, bo każdy indeks wyglądałby na martwy. Odmawiał
+   ZAWSZE, bo seed nie zawierał ani jednego WZ — czyli jedyna funkcja licząca
+   pracę magazynu nie dawała się w ogóle zobaczyć przed wdrożeniem.
+
+   Pobrania są syntetyczne i tak mają być rozumiane. Rozkład jest jednak
+   ZBLIŻONY do prawdy o tym magazynie: około 30% kartotek rusza się w ogóle,
+   a garstka odpowiada za większość wystąpień. Zero losowości — udział wynika
+   z `tw_id`, więc dwa uruchomienia dają tę samą historię.                    */
+
+/** Deterministyczny rozrzut 0–999 z `tw_id`; mnożnik Knutha, bez losowości. */
+const rozrzut = (twId: number): number => (twId * 2_654_435_761) % 1000;
+
+/** Ile razy dana kartoteka pojawiła się na WZ przez ostatnie 12 miesięcy. */
+function pobraniaDla(twId: number): number {
+  const h = rozrzut(twId);
+  if (h < 700) return 0;          // ~70% kartotek nie rusza się wcale
+  if (h < 950) return 1 + (h % 4); // wolnorotujące: 1–4 wystąpienia
+  return 12 + (h % 34);            // szybkorotujące: 12–45 wystąpień
+}
+
+/** Ile dokumentów WZ rozkłada na siebie całą historię. */
+const WZ_DOKUMENTOW = 120;
+
+function historiaPobran(): { dokumentow: number; pozycji: number } {
+  const d = db();
+  const insDok = d.prepare(
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
+     VALUES (?,?,?,?,?,?,0)`
+  );
+  const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
+
+  for (let i = 0; i < WZ_DOKUMENTOW; i++) {
+    // 120 dokumentów co trzy dni wstecz — równy rok historii
+    const data = dzien(-3 * i);
+    insDok.run(DOK_WZ_OD + i, TYP_WZ, `${TYP_WZ} ${1000 + i}/${mmrrrr(data)}`, data, MAG, "Wydania z magazynu");
+  }
+
+  /* Kartoteki z kolejki: prawdziwe (z `npm run seed`) i scenariuszowe.
+     Na pustej bazie pierwsza grupa jest pusta i to jest w porządku — raport
+     policzy wtedy same scenariusze S63–S65. */
+  const towary = d
+    .prepare("SELECT tw_id FROM sgt_towar WHERE lokalizacja <> '' ORDER BY tw_id")
+    .all() as Array<{ tw_id: number }>;
+
+  /* Kontrolowane przypadki mają liczby WPISANE, nie wyliczone: to na nich stoi
+     opis w dokumentacji, więc nie wolno im zależeć od funkcji rozrzutu. */
+  const wymuszone = new Map<number, { pobran: number; sztuk: number }>([
+    [900_028, { pobran: 0, sztuk: 0 }],    // S63 — martwy w strefie złotej
+    [900_029, { pobran: 40, sztuk: 1 }],   // S63 — szybkorotujący poza strefą
+    [900_030, { pobran: 2, sztuk: 200 }],  // S64 — mało pobrań, dużo sztuk
+    [900_031, { pobran: 0, sztuk: 0 }],    // S65 — regał bez reguły
+  ]);
+
+  let pozycji = 0;
+  for (const { tw_id } of towary) {
+    const wym = wymuszone.get(tw_id);
+    const ile = wym ? wym.pobran : pobraniaDla(tw_id);
+    const sztuk = wym ? wym.sztuk : 1 + (rozrzut(tw_id) % 3);
+    for (let i = 0; i < ile; i++) {
+      // rozrzucenie po dokumentach wprost z identyfikatorów — powtarzalne
+      const dok = DOK_WZ_OD + ((tw_id * 7 + i * 13) % WZ_DOKUMENTOW);
+      insPoz.run(dok, tw_id, sztuk);
+      pozycji++;
+    }
+  }
+  return { dokumentow: WZ_DOKUMENTOW, pozycji };
+}
+
+/* ── Zdjęcia dowodowe ───────────────────────────────────────────────────────
+   Trzy pliki na dysku i JEDNA referencja bez pliku (S37). Trasa zdjęcia musi
+   odróżniać te przypadki, bo w firmie zdarzy się dokładnie to: kopia bazy bez
+   katalogu `data/photos`.                                                    */
+function zdjecia(): void {
+  const dir = path.resolve(path.dirname(config.dbPath), "photos");
+  fs.mkdirSync(dir, { recursive: true });
+  const bajty = Buffer.from(JPEG_1PX, "base64");
+  for (const nazwa of [FOTO_USZKODZENIE, FOTO_BLEDNY, FOTO_HISTORYCZNE]) {
+    fs.writeFileSync(path.join(dir, nazwa), bajty);
+  }
+  // FOTO_BRAK_PLIKU celowo NIE powstaje; gdyby został po wcześniejszym
+  // uruchomieniu z inną zawartością, kasujemy go, żeby scenariusz był ten sam
+  fs.rmSync(path.join(dir, FOTO_BRAK_PLIKU), { force: true });
+}
+
+/* ── Wypis dla człowieka ────────────────────────────────────────────────────
+   Katalog na koniec, nie na początek: po uruchomieniu chce się wiedzieć, CO
+   teraz da się sprawdzić i od czego zacząć.                                  */
+function wypisz(licz: Podsumowanie): void {
+  console.log(
+    `[scenariusze] kartoteki=${licz.towary} dokumenty=${licz.dokumenty} dostawy=${licz.dostawy} ` +
+      `linie=${licz.linie} wyjątki=${licz.wyjatki} kolejka=${licz.kolejka} konta=${licz.konta} ` +
+      `zdarzenia=${licz.zdarzenia} zamówienia=${licz.zamowienia}`
+  );
+  console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
+  console.log("");
+  let obszar = "";
+  for (const s of KATALOG) {
+    if (s.obszar !== obszar) {
+      obszar = s.obszar;
+      console.log(`── ${obszar.toUpperCase()} ${"─".repeat(Math.max(0, 66 - obszar.length))}`);
+    }
+    console.log(`  ${s.id}  ${s.tytul}\n        ↳ ${s.wejscie}`);
+  }
+  console.log("");
+  console.log(`[scenariusze] konta: ${LOGINY.join(", ")} — hasło „${HASLO_SCENARIUSZY}"`);
+  console.log("[scenariusze] gotowe tokeny: scenariusz-jan (magazynier), scenariusz-ewa (brygadzista), scenariusz-biuro (biuro)");
+  console.log("[scenariusze] opis krok po kroku: docs/scenariusze-testowe.md");
+}
+
+/* Uruchomienie WYŁĄCZNIE wprost z wiersza poleceń. Import z testu ma dać sam
+   katalog i funkcję — inaczej samo `import` przebudowałoby bazę. */
+const wprost =
+  !!process.argv[1] &&
+  path.basename(process.argv[1]).replace(/\.(ts|js)$/, "") === "seed-scenariusze";
+
+if (wprost) {
+  if (process.argv.includes("--lista")) {
+    for (const s of KATALOG) console.log(`${s.id}\t${s.obszar}\t${s.tytul}\t${s.wejscie}`);
+  } else {
+    wypisz(zbudujScenariusze());
+  }
+}
