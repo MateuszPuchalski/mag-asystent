@@ -1,7 +1,9 @@
 {
-  // Build produkcyjny: to samo co tsconfig.json, ale bez testów w dist.
-  // Testy zostają w tsconfig.json, żeby `tsc --noEmit` nadal je sprawdzał —
-  // test, którego nie typuje kompilator, psuje się po cichu.
+  // Build produkcyjny: to samo co tsconfig.json, ale bez testów w dist
+  // i bez wsadów rocznych (reslot, rekoncyliacja) — te chodzą z checkoutu
+  // przez tsx, nie z dist. Testy i wsady zostają w tsconfig.json, żeby
+  // `tsc --noEmit` nadal je sprawdzał — plik, którego nie typuje kompilator,
+  // psuje się po cichu.
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/reslot-run.ts", "src/reconcile-run.ts"]
 }
