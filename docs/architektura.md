@@ -72,6 +72,14 @@ podgląd świadomie nie jest drugim frontem: zero frameworka, zero zapisu.
 Powstał w 0.18.0, bo wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał,
 którym biuro widziało stan dostaw.
 
+Od 0.27.0 ma trzy zakładki i pasek stanu: dostawy z reklamacjami, stan systemu
+(metryki, kolejka, rekoncyliacja, kolizje kodów, meldunek serwera) oraz ślad
+audytowy z filtrami. Zasada „zero zapisu" nie drgnęła — ponowienie zadania
+z kolejki zostaje na kolektorze, bo jest zapisem do bazy firmy wykonywanym
+przez osobę stojącą przy półce. Raportu wydajności per osoba strona nie
+odpytuje wcale; leży pod `GET /api/wydajnosc` i jest monitoringiem pracowniczym,
+który wymaga zapisu w regulaminie przed pierwszym użyciem.
+
 ---
 
 ## 3. Dlaczego dwa procesy

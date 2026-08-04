@@ -9,9 +9,10 @@ każdy do swojej roli:
   trwały offline (bufor plikowy JSON + WorkManager), kiosk przez Android
   lock-task/MDM. Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
-  i protokoły rozbieżności do wydruku, ze zdjęciami dowodowymi. Jedna strona
-  bez builda, logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się
-  wyłącznie na kolektorze.
+  i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
+  kolejka zapisów, rekoncyliacja i ślad audytowy. Jedna strona bez builda,
+  logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się wyłącznie
+  na kolektorze.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -417,11 +418,21 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
   API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem sesji —
   strona nie ma własnych uprawnień ani żadnego zapisu.
-- Pokazuje **status rozkładania dostaw** (postęp per dokument) oraz
-  **reklamacje** — nierozwiązane wyjątki pogrupowane po dokumencie. Protokół
-  rozbieżności (ze zdjęciami dowodowymi) jest gotowy do druku; obok stoi CSV.
-- Reszta zostaje po staremu: metryki, rekoncyliacja i audyt są dostępne przez
-  REST (`GET /api/metrics`, `GET /api/reconcile`, `GET /api/events`).
+- **Pasek stanu widać z każdej zakładki**: wersja i tryb serwera, czy worker
+  żyje, ile zadań stoi w błędzie, ile rozjazdów zna rekoncyliacja. Kliknięcie
+  prowadzi do szczegółu.
+- Trzy zakładki. **DOSTAWY I REKLAMACJE** — postęp per dokument oraz
+  nierozwiązane wyjątki; protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
+- **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
+  p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
+  kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów
+  i meldunek serwera.
+- **DZIENNIK** — ślad audytowy z filtrami po dacie, typie, towarze i urządzeniu
+  oraz eksport CSV. Wymaga roli brygadzisty, biura albo admina; magazynier
+  dostaje tu odmowę zamiast danych.
+- **Kolejki się stąd nie ponawia i wydajności per osoba tu nie ma.** Pierwsze
+  jest zapisem do Subiekta i zostaje na kolektorze, drugie jest monitoringiem
+  pracowniczym (Kodeks pracy art. 22²) i zostaje pod `GET /api/wydajnosc`.
 
 ## Struktura repo
 
