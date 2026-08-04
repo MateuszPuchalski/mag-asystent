@@ -11,12 +11,12 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-wyd-")), "t.db");
 
 let db: typeof import("../db/db.js").db;
-let W: typeof import("./wydajnosc.js");
+let W: typeof import("./raporty.js");
 let U: typeof import("./users.js");
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  W = await import("./wydajnosc.js");
+  W = await import("./raporty.js");
   U = await import("./users.js");
 });
 
@@ -44,7 +44,7 @@ function seriaPracy(userRef: number, ile: number, odMinut = 60, name = "x") {
   for (let i = 0; i < ile; i++) ev("putaway_line_done", userRef, odMinut - i, name);
 }
 
-type Raport = Awaited<ReturnType<typeof import("./wydajnosc.js").raportWydajnosci>>;
+type Raport = Awaited<ReturnType<typeof import("./raporty.js").raportWydajnosci>>;
 
 const wiersz = (r: Raport, osoba: string) => r.wiersze.find((w) => w.osoba === osoba);
 

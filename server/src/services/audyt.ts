@@ -8,9 +8,9 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
    miała więc odpowiedź w bazie i nie miała jej w rękach człowieka, który
    odpowiada klientowi.
 
-   Ten moduł jest WYŁĄCZNIE odczytem. Nie liczy wskaźników (to `metrics.ts`
-   i `wydajnosc.ts`) i niczego nie interpretuje — zwraca wiersze takie, jakie
-   są, bo audyt, który po drodze coś „porządkuje", przestaje być dowodem.    */
+   Ten moduł jest WYŁĄCZNIE odczytem. Nie liczy wskaźników (to `raporty.ts`)
+   i niczego nie interpretuje — zwraca wiersze takie, jakie są, bo audyt,
+   który po drodze coś „porządkuje", przestaje być dowodem.                  */
 
 /** Twardy sufit strony. Filtr po dacie potrafi objąć całą historię. */
 const MAX_LIMIT = 1000;

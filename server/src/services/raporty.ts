@@ -1,5 +1,155 @@
 import { db } from "../db/db.js";
 
+/* ── Raporty liczone ze zdarzeń: metryki systemu i wydajność osób ───────────
+   Do 0.25.0 były to dwa moduły (`metrics.ts`, `wydajnosc.ts`), które
+   dublowały okno czasowe i — groźniej — regułę odsiewu podwójnego liczenia,
+   każdy w innej formie. Rozjazd tych kopii zawyżałby raport mierzący ludzi,
+   więc reguła mieszka teraz w JEDNYM miejscu (`bezDubli`), a oba raporty
+   z niej korzystają.
+
+   Dwa raporty pozostają OSOBNYMI funkcjami z osobnymi trasami, bo opisują
+   co innego: `metrics()` mówi o SYSTEMIE (etykiety, czasy odpowiedzi),
+   `raportWydajnosci()` o LUDZIACH — i tylko ten drugi niesie obowiązek
+   formalny z Kodeksu pracy.                                                  */
+
+const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(days)))} days`;
+
+/** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów. */
+const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
+
+/**
+ * Warunek odsiewający PODWÓJNE LICZENIE tej samej czynności.
+ *
+ * Od sierpnia 2026 `location_set` powstaje także przy rozkładaniu, bo emituje je
+ * `enqueueSetLocation` wspólne dla trzech ścieżek. Rozłożenie jednej linii daje
+ * więc `putaway_line_done` ORAZ `location_set` — jedną czynność człowieka, dwa
+ * wiersze. Bez tego warunku raporty zawyżałyby tempo każdemu, kto rozkłada,
+ * czyli całej hali.
+ *
+ * W raporcie MIERZĄCYM LUDZI zawyżenie jest gorsze niż brak liczby: cichy błąd
+ * w tę stronę trafia do rozmowy o pracy, a nikt nie ma jak go zauważyć.
+ *
+ * Wpisy sprzed tej zmiany nie mają `zrodlo` i są zmianami z karty — wtedy tylko
+ * ona je emitowała. Stąd `IS NULL` w warunku, a nie pominięcie starych danych.
+ */
+const bezDubli = (alias: string) => `(${alias}type NOT IN ('location_set','location_removed')
+       OR json_extract(${alias}payload,'$.zrodlo') IS NULL
+       OR json_extract(${alias}payload,'$.zrodlo') = 'karta')`;
+
+/* ── Cztery liczby warte mierzenia (plan §10) ───────────────────────────────
+   `events` wystarczał do zapisu, nie do pomiaru. Te cztery metryki mają
+   wspólną cechę: każda mówi, CO ZROBIĆ, a nie tylko „ile było".
+
+   Świadomie NIE ma tu raportu wydajności per osoba — jest niżej, jako osobna
+   funkcja z osobną trasą i obowiązkiem formalnym (patrz sekcja wydajności).  */
+
+export interface Metrics {
+  /** Okno, którego dotyczą liczby. */
+  days: number;
+  /** Główny wskaźnik jakości UX; cel < 0,3. */
+  dotknieciaNaPozycje: number | null;
+  /** p95 skan → odpowiedź serwera (ms). Powyżej ~300 ms ludzie skanują dwa razy. */
+  p95OdpowiedziMs: number | null;
+  /** Regały, których etykiety najczęściej trzeba wpisywać z ręki — do przedruku. */
+  etykietyDoPrzedruku: Array<{ code: string; reczne: number; razem: number; udzial: number }>;
+  /** Kartoteki bez czytelnego kodu — wpisywane zamiast skanowane. */
+  towaryBezCzytelnegoKodu: Array<{ code: string; reczne: number }>;
+  /** Ile zdarzeń w oknie (sanity check — zero znaczy „nikt nie pracował"). */
+  zdarzen: number;
+}
+
+/** Percentyl z posortowanej tablicy; null gdy brak danych. */
+function p95(values: number[]): number | null {
+  if (!values.length) return null;
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1)];
+}
+
+export function metrics(days = 7): Metrics {
+  const od = OKNO(days);
+  const d = db();
+
+  const zdarzen = (
+    d.prepare("SELECT COUNT(*) n FROM events WHERE created_at >= datetime('now', ?)").get(od) as {
+      n: number;
+    }
+  ).n;
+
+  // dotknięcia = wejścia ręczne + otwarcia arkuszy decyzji; pozycje = odłożenia
+  const licz = (types: string[]): number =>
+    (
+      d
+        .prepare(
+          `SELECT COUNT(*) n FROM events
+           WHERE created_at >= datetime('now', ?) AND type IN (${types.map(() => "?").join(",")})`
+        )
+        .get(od, ...types) as { n: number }
+    ).n;
+
+  /* pozycje = realna praca (odłożenie w trybie A, potwierdzenie w trybie B,
+     zmiana adresu z karty); dotknięcia = wszystko, co wymagało palca zamiast
+     skanu. Zdarzenia lokalizacji wchodzą wyłącznie z karty — `bezDubli`,
+     ten sam warunek co w raporcie wydajności. */
+  const pozycje = (
+    d
+      .prepare(
+        `SELECT COUNT(*) AS n FROM events
+         WHERE created_at >= datetime('now', ?)
+           AND type IN (${PRACA.map(() => "?").join(",")})
+           AND ${bezDubli("")}`
+      )
+      .get(od, ...PRACA) as { n: number }
+  ).n;
+  const dotkniecia = licz(["manual_entry", "location_mismatch", "problem_raised"]);
+
+  const czasy = (
+    d
+      .prepare(
+        `SELECT json_extract(payload,'$.ms') AS ms FROM events
+         WHERE type = 'scan_timing' AND created_at >= datetime('now', ?)`
+      )
+      .all(od) as Array<{ ms: number | null }>
+  )
+    .map((r) => r.ms)
+    .filter((v): v is number => typeof v === "number");
+
+  /* Udział wejść ręcznych per KOD — z payloadu, bo tam siedzi to, co człowiek
+     naprawdę podał. Rozbicie na regały i towary robi kształt kodu, ten sam
+     dyskryminator co w klasyfikatorze. */
+  const perKod = d
+    .prepare(
+      `SELECT json_extract(payload,'$.code') AS code,
+              json_extract(payload,'$.kind') AS kind,
+              SUM(CASE WHEN type='manual_entry' THEN 1 ELSE 0 END) AS reczne,
+              COUNT(*) AS razem
+       FROM events
+       WHERE type IN ('scan','manual_entry') AND created_at >= datetime('now', ?)
+       GROUP BY code, kind
+       HAVING reczne > 0
+       ORDER BY reczne DESC
+       LIMIT 20`
+    )
+    .all(od) as Array<{ code: string | null; kind: string | null; reczne: number; razem: number }>;
+
+  return {
+    days,
+    dotknieciaNaPozycje: pozycje > 0 ? Number((dotkniecia / pozycje).toFixed(2)) : null,
+    p95OdpowiedziMs: p95(czasy),
+    etykietyDoPrzedruku: perKod
+      .filter((r) => r.kind === "LOC" && r.code)
+      .map((r) => ({
+        code: r.code!,
+        reczne: r.reczne,
+        razem: r.razem,
+        udzial: Number((r.reczne / r.razem).toFixed(2)),
+      })),
+    towaryBezCzytelnegoKodu: perKod
+      .filter((r) => r.kind !== "LOC" && r.code)
+      .map((r) => ({ code: r.code!, reczne: r.reczne })),
+    zdarzen,
+  };
+}
+
 /* ── Raport wydajności per osoba (plan §7) ──────────────────────────────────
 
    OBOWIĄZEK FORMALNY, NIE OPCJA. Telemetria per pracownik to monitoring
@@ -43,28 +193,6 @@ export const PODSTAWA_PRAWNA =
   "na 2 tygodnie przed uruchomieniem. Bez tego dane nie nadają się do " +
   "zastosowań kadrowych.";
 
-/** Zdarzenia liczone jako wykonana pozycja — te same, co w `metrics()`. */
-const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
-
-/**
- * Warunek odsiewający PODWÓJNE LICZENIE tej samej czynności.
- *
- * Od sierpnia 2026 `location_set` powstaje także przy rozkładaniu, bo emituje je
- * `enqueueSetLocation` wspólne dla trzech ścieżek. Rozłożenie jednej linii daje
- * więc `putaway_line_done` ORAZ `location_set` — jedną czynność człowieka, dwa
- * wiersze. Bez tego warunku raport zawyżałby tempo każdemu, kto rozkłada, czyli
- * całej hali.
- *
- * W raporcie MIERZĄCYM LUDZI zawyżenie jest gorsze niż brak liczby: cichy błąd
- * w tę stronę trafia do rozmowy o pracy, a nikt nie ma jak go zauważyć.
- *
- * Wpisy sprzed tej zmiany nie mają `zrodlo` i są zmianami z karty — wtedy tylko
- * ona je emitowała. Stąd `IS NULL` w warunku, a nie pominięcie starych danych.
- */
-const BEZ_DUBLI = `(e.type NOT IN ('location_set','location_removed')
-       OR json_extract(e.payload,'$.zrodlo') IS NULL
-       OR json_extract(e.payload,'$.zrodlo') = 'karta')`;
-
 export interface WierszWydajnosci {
   userId: number | null;
   /** `null` dla zdarzeń sprzed kont — nie zgadujemy, kto to był. */
@@ -90,8 +218,6 @@ export interface RaportWydajnosci {
   /** Zdarzenia bez konta — widoczne jako liczba, nigdy doklejane do kogoś. */
   nieprzypisanychZdarzen: number;
 }
-
-const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(days)))} days`;
 
 /**
  * Czas aktywny z samych znaczników zdarzeń.
@@ -124,7 +250,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
     .prepare(
       `SELECT e.user_ref                                     AS userId,
               u.name                                         AS osoba,
-              SUM(CASE WHEN e.type IN (${PRACA.map(() => "?").join(",")}) AND ${BEZ_DUBLI} THEN 1 ELSE 0 END) AS pozycje,
+              SUM(CASE WHEN e.type IN (${PRACA.map(() => "?").join(",")}) AND ${bezDubli("e.")} THEN 1 ELSE 0 END) AS pozycje,
               SUM(CASE WHEN e.type = 'problem_raised' THEN 1 ELSE 0 END)  AS problemy,
               SUM(CASE WHEN e.type = 'manual_entry'   THEN 1 ELSE 0 END)  AS reczne
          FROM events e
@@ -151,7 +277,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
       `SELECT user_ref AS ref, created_at FROM events
         WHERE user_ref IS NOT NULL AND created_at >= datetime('now', ?)
           AND type IN (${PRACA.map(() => "?").join(",")})
-          AND ${BEZ_DUBLI.replace(/\be\./g, "")}`
+          AND ${bezDubli("")}`
     )
     .all(od, ...PRACA) as Array<{ ref: number; created_at: string }>) {
     const t = Date.parse(r.created_at);

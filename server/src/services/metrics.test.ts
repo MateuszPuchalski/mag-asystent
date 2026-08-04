@@ -11,11 +11,11 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-met-")), "t.db");
 
 let db: typeof import("../db/db.js").db;
-let metrics: typeof import("./metrics.js").metrics;
+let metrics: typeof import("./raporty.js").metrics;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ metrics } = await import("./metrics.js"));
+  ({ metrics } = await import("./raporty.js"));
 });
 
 function zdarzenie(type: string, payload: unknown = null, dni = 0) {
