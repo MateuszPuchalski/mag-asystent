@@ -117,18 +117,6 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
             )
         }
         dostawy.forEach { d -> DocRow(d) { open(d) } }
-
-        OutlineButton(
-            "KONTENERY",
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-        ) { graph.nav.go(pl.wertis.kolektor.core.nav.Screen.PUTAWAY_DOCS) }
-        Text(
-            "Kontener importowy (4× w roku) — sesja z wózkiem i MM MGP→MAG po każdej rundzie.",
-            fontSize = 11.sp,
-            color = InkMute,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
@@ -171,6 +159,22 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
                     fontSize = 15.sp,
                     color = if (complete) InkMute else Ink,
                 )
+                /* Kontener rozkłada się tak samo jak faktura krajowa, ale po
+                   odłożeniu adresów zostaje jeszcze przesunięcie stanu na halę.
+                   To jedyne miejsce, w którym da się to powiedzieć ZANIM
+                   człowiek pójdzie w alejkę. */
+                if (d.wPrzyjeciach) {
+                    Text(
+                        "przyjęcia",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AmberInk,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(AmberBg)
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                    )
+                }
                 if (d.wBuforze) {
                     // bufor nie blokuje pracy (D1) — informacja, nie ostrzeżenie
                     Text(

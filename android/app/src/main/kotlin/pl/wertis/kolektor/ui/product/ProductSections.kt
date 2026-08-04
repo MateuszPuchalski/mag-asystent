@@ -1,5 +1,6 @@
 package pl.wertis.kolektor.ui.product
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -92,14 +93,35 @@ fun HistoriaSekcja(history: List<MovementEntry>?, otwarta: Boolean, onToggle: ()
  * jedyne z tej listy niosą czynność do wykonania.
  */
 @Composable
-fun MagazynySekcja(p: ProductCard, otwarta: Boolean, onToggle: () -> Unit) {
+fun MagazynySekcja(
+    p: ProductCard,
+    otwarta: Boolean,
+    onToggle: () -> Unit,
+    /**
+     * Dotknięcie kafla = przesunięcie stanu z TEGO magazynu. Magazyn podajemy
+     * identyfikatorem albo rolą: identyfikatory ról siedzą w konfiguracji
+     * serwera, więc kolektor zna je tylko przez `rola`.
+     */
+    onPrzesun: (magId: Long?, rola: String?, dostepne: Double) -> Unit,
+) {
     val zwroty = p.zwroty?.stan ?: 0.0
     val podsumowanie = podsumowanieMagazynow(p.magazyny, zwroty) ?: return
     CollapsibleSection("Pozostałe magazyny", podsumowanie, otwarta, onToggle) {
+        /* Wiersz jest teraz CZYNNOŚCIĄ, nie tylko liczbą: dotknięcie otwiera
+           przesunięcie z tego magazynu. Do 0.22.0 karta mówiła „towar leży też
+           tam" i na tym się kończyła — przenieść go dało się wyłącznie przez
+           sesję kontenerową albo ręcznie w Subiekcie. */
         if (zwroty > 0) {
-            MagazynRow("ZWROTY", "zwroty od klientów — rozlicza biuro", zwroty, p.unit)
+            MagazynRow("ZWROTY", "zwroty od klientów — rozlicza biuro", zwroty, p.unit) {
+                onPrzesun(null, "ZWROTY", zwroty)
+            }
         }
-        p.magazyny.forEach { m -> MagazynRow(m.kod, m.nazwa, m.stan, p.unit) }
+        p.magazyny.forEach { m ->
+            // dostępne = stan MINUS to, co z tego magazynu już jedzie
+            MagazynRow(m.kod, m.nazwa, m.stan, p.unit, m.wDrodze) {
+                onPrzesun(m.magId, null, m.stan - m.wDrodze)
+            }
+        }
     }
 }
 
@@ -151,12 +173,21 @@ fun ZamiennikiSekcja(
  * odsiewanie zer kazałoby się domyślać, czy magazyn jest pusty, czy ukryty.
  */
 @Composable
-private fun MagazynRow(kod: String, nazwa: String, stan: Double, unit: String) {
+private fun MagazynRow(
+    kod: String,
+    nazwa: String,
+    stan: Double,
+    unit: String,
+    wDrodze: Double = 0.0,
+    onTap: (() -> Unit)? = null,
+) {
     val pusty = stan == 0.0
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .cardSurface(background = CardWhite, borderColor = CardBorder)
+            // pusty magazyn nie ma czego oddać, więc nie udaje przycisku
+            .let { if (onTap != null && !pusty) it.clickable(onClick = onTap) else it }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -167,8 +198,9 @@ private fun MagazynRow(kod: String, nazwa: String, stan: Double, unit: String) {
                 fontWeight = FontWeight.Bold,
                 color = if (pusty) InkMute else Ink,
             )
-            if (nazwa.isNotBlank()) {
-                Text(nazwa, fontSize = 11.sp, color = InkMute, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val podpis = if (wDrodze > 0) "$nazwa · ⏳ ${formatQty(wDrodze)} w drodze" else nazwa
+            if (podpis.isNotBlank()) {
+                Text(podpis, fontSize = 11.sp, color = InkMute, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Text(

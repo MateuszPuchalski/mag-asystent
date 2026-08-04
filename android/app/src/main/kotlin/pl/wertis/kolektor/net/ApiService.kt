@@ -5,16 +5,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.CreateUserBody
 import pl.wertis.kolektor.core.net.CreateUserResponse
-import pl.wertis.kolektor.core.net.CartBody
 import pl.wertis.kolektor.core.net.MagazynyResponse
 import pl.wertis.kolektor.core.net.WidocznoscRequest
-import pl.wertis.kolektor.core.net.CartRemoveBody
-import pl.wertis.kolektor.core.net.CartResponse
-import pl.wertis.kolektor.core.net.CloseSessionResponse
-import pl.wertis.kolektor.core.net.CommitCartResponse
-import pl.wertis.kolektor.core.net.ConfirmBody
-import pl.wertis.kolektor.core.net.ConfirmResponse
-import pl.wertis.kolektor.core.net.CreateSessionBody
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.core.net.EanConflictsResponse
 import pl.wertis.kolektor.core.net.ForceReleaseResponse
@@ -30,7 +22,8 @@ import pl.wertis.kolektor.core.net.OkResponse
 import pl.wertis.kolektor.core.net.ProblemsResponse
 import pl.wertis.kolektor.core.net.PrzesylkaBody
 import pl.wertis.kolektor.core.net.ProductCard
-import pl.wertis.kolektor.core.net.PutawayDocumentsResponse
+import pl.wertis.kolektor.core.net.PrzesuniecieBody
+import pl.wertis.kolektor.core.net.PrzesuniecieResponse
 import pl.wertis.kolektor.core.net.RaiseProblemBody
 import pl.wertis.kolektor.core.net.RaiseProblemResponse
 import pl.wertis.kolektor.core.net.ResolveProblemBody
@@ -41,15 +34,12 @@ import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.PutawayLineResponse
 import pl.wertis.kolektor.core.net.ScanBody
 import pl.wertis.kolektor.core.net.ScanResolution
-import pl.wertis.kolektor.core.net.PutawaySession
 import pl.wertis.kolektor.core.net.QueueIdResponse
 import pl.wertis.kolektor.core.net.QueueResponse
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.SearchResponse
-import pl.wertis.kolektor.core.net.SessionIdResponse
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.SetupResponse
-import pl.wertis.kolektor.core.net.SkipBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -123,35 +113,14 @@ interface ApiService {
     @POST("api/queue/{id}/cancel")
     suspend fun cancel(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): OkResponse
 
-    @GET("api/putaway/documents")
-    suspend fun putawayDocuments(): PutawayDocumentsResponse
+    /**
+     * Przesunięcie stanu między magazynami — jedyne miejsce, w którym powstaje
+     * dokument MM. Bez bufora offline: patrz `PrzesuniecieSheet`.
+     */
+    @POST("api/przesuniecie")
+    suspend fun przesun(@Body body: PrzesuniecieBody): PrzesuniecieResponse
 
-    @POST("api/putaway/sessions")
-    suspend fun createSession(@Body body: CreateSessionBody): SessionIdResponse
-
-    @GET("api/putaway/sessions/{id}")
-    suspend fun session(@Path("id") id: Long): PutawaySession
-
-    @POST("api/putaway/sessions/{id}/cart")
-    suspend fun cart(@Path("id") sid: Long, @Body body: CartBody): CartResponse
-
-    @POST("api/putaway/sessions/{id}/cart/remove")
-    suspend fun cartRemove(@Path("id") sid: Long, @Body body: CartRemoveBody): CartResponse
-
-    @POST("api/putaway/sessions/{id}/confirm")
-    suspend fun confirm(@Path("id") sid: Long, @Body body: ConfirmBody): ConfirmResponse
-
-    @POST("api/putaway/sessions/{id}/skip")
-    suspend fun skip(@Path("id") sid: Long, @Body body: SkipBody): CartResponse
-
-    @POST("api/putaway/sessions/{id}/commit-cart")
-    suspend fun commitCart(@Path("id") sid: Long, @Body body: RequestBody = EMPTY_BODY): CommitCartResponse
-
-    @POST("api/putaway/sessions/{id}/close")
-    suspend fun closeSession(@Path("id") sid: Long, @Body body: RequestBody = EMPTY_BODY): CloseSessionResponse
-
-
-    /* ── Tryb A: rozkładanie faktur zakupu (dokument = jednostka pracy) ──── */
+    /* ── Rozkładanie faktur zakupu (dokument = jednostka pracy) ────────── */
 
     @GET("api/delivery/documents")
     suspend fun deliveryDocuments(): DeliveryDocumentsResponse

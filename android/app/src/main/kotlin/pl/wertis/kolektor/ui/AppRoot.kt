@@ -34,8 +34,6 @@ import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryLinesScreen
 import pl.wertis.kolektor.ui.problems.ProblemsBanner
 import pl.wertis.kolektor.ui.problems.ProblemsScreen
-import pl.wertis.kolektor.ui.putaway.PutawayDocumentsScreen
-import pl.wertis.kolektor.ui.putaway.PutawaySessionScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
@@ -126,8 +124,6 @@ fun AppRoot(graph: AppGraph) {
                 Screen.QUEUE -> QueueScreen(graph)
                 Screen.DELIVERY_DOCS -> DeliveryDocumentsScreen(graph)
                 Screen.DELIVERY_LINES -> DeliveryLinesScreen(graph)
-                Screen.PUTAWAY_DOCS -> PutawayDocumentsScreen(graph)
-                Screen.PUTAWAY_SESSION -> PutawaySessionScreen(graph)
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)

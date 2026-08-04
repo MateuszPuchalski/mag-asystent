@@ -126,23 +126,7 @@ class DtosTest {
         assertEquals(1, r.summary.error)
     }
 
-    @Test fun `PutawaySession - pelny kszalt`() {
-        val json = """
-            {"id":5,"sourceDocId":11,"sourceDocNumber":"FZ 1/2026","status":"open",
-             "progress":{"total":10,"done":3,"remaining":7,"onCart":2},
-             "queueAlerts":[{"id":9,"type":"mm","label":"MM","detail":"x","errorMsg":"e"}],
-             "inFlight":1,
-             "items":[{"id":1,"twId":7,"sym":"S","name":"N","targetLoc":null,"qtyExpected":4,
-                       "qtyDone":0,"delta":0,"mgpStan":4,"status":"on_cart","skipReason":null,
-                       "lockedBy":"anna","offDocument":false,"stageQty":2.5,"stageLoc":"E01-01-01"}]}
-        """.trimIndent()
-        val s = WertisJson.decodeFromString<PutawaySession>(json)
-        assertEquals(PutawayItemStatus.ON_CART, s.items[0].status)
-        assertEquals(2.5, s.items[0].stageQty!!, 0.0)
-        assertNull(s.items[0].targetLoc)
-        assertEquals("anna", s.items[0].lockedBy)
-    }
-
+    
     @Test fun `nieznane pola sa ignorowane`() {
         val r = WertisJson.decodeFromString<QueueIdResponse>("""{"queueId":42,"kind":"mm","extra":true}""")
         assertEquals(42L, r.queueId)
@@ -154,18 +138,7 @@ class DtosTest {
         assertTrue(!body.contains("replaced"))
     }
 
-    @Test fun `PutawayDocument z sesja i bez`() {
-        val d1 = WertisJson.decodeFromString<PutawayDocument>(
-            """{"docId":1,"typ":"FZ","nrPelny":"FZ 1","dataWyst":"2026-07-01","dostawca":"X","positions":3,
-                "session":{"id":2,"status":"open","progressPct":50}}"""
-        )
-        assertEquals(50.0, d1.session!!.progressPct, 0.0)
-        val d2 = WertisJson.decodeFromString<PutawayDocument>(
-            """{"docId":2,"typ":"PZ","nrPelny":"PZ 9","dataWyst":"","dostawca":"","positions":1}"""
-        )
-        assertNull(d2.session)
-    }
-
+    
     @Test fun `ScanResolution rozroznia kolizje EAN od linii`() {
         // `aisle` NIE jest już polem DTO — kolektor przestał grupować listę po
         // alejkach, gdy okazało się, że rozkłada się „co wpadnie w rękę". Serwer

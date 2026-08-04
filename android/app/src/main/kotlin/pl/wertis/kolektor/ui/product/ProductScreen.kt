@@ -62,6 +62,7 @@ import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
 import pl.wertis.kolektor.ui.theme.BarlowCond
 import pl.wertis.kolektor.ui.theme.BorderCol
+import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
@@ -114,6 +115,8 @@ fun ProductScreen(graph: AppGraph) {
        wszystkie adresy naraz. */
     var pendingLoc by remember(id) { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    /** Otwarte przesunięcie: skąd i ile wolno stamtąd wziąć. */
+    var przesun by remember(id) { mutableStateOf<Zrodlo?>(null) }
 
     val p = poll.data
 
@@ -167,7 +170,7 @@ fun ProductScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ProductHero(p) {
+        ProductHero(p, onPrzesunZMgp = { przesun = Zrodlo(null, "MGP", p.mgp.stan - p.mgp.pendingOut) }) {
             /* Pastylka adresu pickingowego. Ograniczona szerokość, żeby długi
                kod nie zepchnął liczby 44 sp — adresy mieszczą się w dziewięciu
                znakach, ale wykaz nie jest gwarancją. */
@@ -305,14 +308,14 @@ fun ProductScreen(graph: AppGraph) {
             }
         }
 
-        // MM ad-hoc wycięte (wywiad): przesunięcia robi tryb B (wózek) albo biuro.
-        // Karta towaru zapisuje wyłącznie lokalizację.
         OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
             graph.nav.openScanLoc()
         }
 
         HistoriaSekcja(history, "hist" in otwarte) { toggle("hist") }
-        MagazynySekcja(p, "mag" in otwarte) { toggle("mag") }
+        MagazynySekcja(p, "mag" in otwarte, { toggle("mag") }) { magId, rola, dostepne ->
+            przesun = Zrodlo(magId, rola, dostepne)
+        }
         ZamiennikiSekcja(p, "zam" in otwarte, { toggle("zam") }) { row ->
             graph.nav.openProduct(
                 row.id,
@@ -327,7 +330,25 @@ fun ProductScreen(graph: AppGraph) {
         onClose = { pendingLoc = null },
         onPick = ::saveLoc,
     )
+
+    przesun?.let { z ->
+        PrzesuniecieSheet(
+            graph = graph,
+            twId = p.id,
+            sym = p.sym,
+            name = p.name,
+            unit = p.unit,
+            magFrom = z.magId,
+            magFromRola = z.rola,
+            dostepne = z.dostepne,
+            onDone = { przesun = null },
+            onCancel = { przesun = null },
+        )
+    }
 }
+
+/** Skąd wychodzi przesunięcie: kafel zna `magId`, kafle ról znają tylko rolę. */
+private data class Zrodlo(val magId: Long?, val rola: String?, val dostepne: Double)
 
 /**
  * Pastylka pustego stanu — od razu czynność, nie komunikat.

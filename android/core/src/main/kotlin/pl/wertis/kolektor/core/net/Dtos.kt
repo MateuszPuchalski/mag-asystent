@@ -43,6 +43,8 @@ data class MagazynStan(
     val nazwa: String = "",
     val stan: Double = 0.0,
     val rez: Double = 0.0,
+    /** Ile stąd wyjeżdża w zakolejkowanych przesunięciach (⏳ w drodze). */
+    val wDrodze: Double = 0.0,
 )
 
 /** Magazyn na liście ustawień: z rolą i informacją, czy jest ukryty. */
@@ -58,6 +60,49 @@ data class MagazynInfo(
 
 @Serializable
 data class MagazynyResponse(val magazyny: List<MagazynInfo> = emptyList())
+
+/**
+ * Przesunięcie stanu między magazynami.
+ *
+ * `location` wypełnia się WYŁĄCZNIE przy celu MAG: adres w kartotece Subiekta
+ * to jedno pole na towar, bez wymiaru magazynu, więc opisuje regał na hali.
+ * Serwer odrzuca kod przy innym celu — i dobrze, bo zapisany nadpisałby adres
+ * hali adresem, którego na hali nie ma.
+ */
+/* ── Ciała żądań ──────────────────────────────────────────────────────── */
+
+@Serializable
+enum class LocAction {
+    @SerialName("replace") REPLACE,
+    @SerialName("add") ADD,
+    @SerialName("remove") REMOVE,
+    @SerialName("replace_one") REPLACE_ONE,
+}
+
+@Serializable
+data class SetLocationBody(
+    val action: LocAction,
+    val value: String? = null,
+    val replaced: String? = null,
+)
+
+@Serializable
+data class PrzesuniecieBody(
+    val twId: Long,
+    val qty: Double,
+    val magFrom: Long,
+    val magTo: Long,
+    val location: String? = null,
+    /** Pozycja dostawy, gdy przesunięcie wyszło ze skrótu na liście. */
+    val lineId: Long? = null,
+)
+
+@Serializable
+data class PrzesuniecieResponse(
+    val ok: Boolean = true,
+    val queueIds: List<Long> = emptyList(),
+    val dostepnePrzed: Double = 0.0,
+)
 
 /**
  * `/api/health` — tu interesuje nas WYŁĄCZNIE wersja serwera.
@@ -305,112 +350,6 @@ data class QueueResponse(
 )
 
 @Serializable
-data class PutawaySessionRef(val id: Long, val status: String, val progressPct: Double = 0.0)
-
-@Serializable
-data class PutawayDocument(
-    val docId: Long,
-    val typ: String,
-    val nrPelny: String,
-    val dataWyst: String = "",
-    val dostawca: String = "",
-    val positions: Int = 0,
-    val session: PutawaySessionRef? = null,
-)
-
-@Serializable
-enum class PutawayItemStatus {
-    @SerialName("pending") PENDING,
-    @SerialName("on_cart") ON_CART,
-    @SerialName("done") DONE,
-    @SerialName("partial") PARTIAL,
-    @SerialName("skipped") SKIPPED,
-}
-
-@Serializable
-data class PutawayItem(
-    val id: Long,
-    val twId: Long,
-    val sym: String,
-    val name: String,
-    val targetLoc: String? = null,
-    val qtyExpected: Double = 0.0,
-    val qtyDone: Double = 0.0,
-    val delta: Double = 0.0,
-    val mgpStan: Double = 0.0,
-    val status: PutawayItemStatus = PutawayItemStatus.PENDING,
-    val skipReason: String? = null,
-    val lockedBy: String? = null,
-    val offDocument: Boolean = false,
-    val stageQty: Double? = null,
-    val stageLoc: String? = null,
-)
-
-@Serializable
-data class PutawayQueueAlert(
-    val id: Long,
-    val type: QueueItemType,
-    val label: String,
-    val detail: String = "",
-    val errorMsg: String? = null,
-)
-
-@Serializable
-data class PutawayDocumentsResponse(val documents: List<PutawayDocument> = emptyList())
-
-@Serializable
-data class PutawayProgress(val total: Int = 0, val done: Int = 0, val remaining: Int = 0, val onCart: Int = 0)
-
-@Serializable
-data class PutawaySession(
-    val id: Long,
-    val sourceDocId: Long? = null,
-    val sourceDocNumber: String? = null,
-    val status: String = "",
-    val progress: PutawayProgress = PutawayProgress(),
-    val queueAlerts: List<PutawayQueueAlert> = emptyList(),
-    val inFlight: Int = 0,
-    val items: List<PutawayItem> = emptyList(),
-)
-
-/* ── Ciała żądań ──────────────────────────────────────────────────────── */
-
-@Serializable
-enum class LocAction {
-    @SerialName("replace") REPLACE,
-    @SerialName("add") ADD,
-    @SerialName("remove") REMOVE,
-    @SerialName("replace_one") REPLACE_ONE,
-}
-
-@Serializable
-data class SetLocationBody(
-    val action: LocAction,
-    val value: String? = null,
-    val replaced: String? = null,
-)
-
-@Serializable
-data class CreateSessionBody(val docId: Long)
-
-@Serializable
-data class CartBody(val twId: Long, val offDocument: Boolean? = null)
-
-@Serializable
-data class CartRemoveBody(val itemId: Long)
-
-@Serializable
-data class ConfirmBody(
-    val itemId: Long,
-    val qty: Double,
-    val location: String,
-    val updateLoc: Boolean? = null,
-)
-
-@Serializable
-data class SkipBody(val itemId: Long, val reason: String? = null)
-
-@Serializable
 data class DeviceEventBody(
     val type: String,
     val magnitude: Double? = null,
@@ -425,33 +364,7 @@ data class DeviceEventBody(
 data class QueueIdResponse(val queueId: Long, val kind: String? = null)
 
 @Serializable
-data class SessionIdResponse(val sessionId: Long)
-
-@Serializable
 data class OkResponse(val ok: Boolean = true)
-
-/** Odpowiedź /cart — unia luźnych kształtów (web typuje jako any). */
-@Serializable
-data class CartResponse(
-    val error: String? = null,
-    val locked: Boolean? = null,
-    val lockedBy: String? = null,
-    val offDocument: Boolean? = null,
-    val itemId: Long? = null,
-    val twId: Long? = null,
-    val sym: String? = null,
-    val name: String? = null,
-)
-
-@Serializable
-data class ConfirmResponse(val error: String? = null, val itemId: Long? = null, val status: String? = null)
-
-@Serializable
-data class CommitCartResponse(val queueIds: List<Long> = emptyList(), val committed: Int = 0)
-
-@Serializable
-data class CloseSessionResponse(val status: String, val summary: Map<String, Int> = emptyMap())
-
 
 @Serializable
 data class ApiErrorBody(val error: String? = null, val available: Double? = null)
@@ -470,6 +383,12 @@ data class DeliveryDocument(
     val positions: Int = 0,
     /** Dokument w buforze SGT — nadal można na nim pracować. */
     val wBuforze: Boolean = false,
+    /**
+     * Dokument księgowany POZA halą (kontener). Rozkłada się tak samo, ale
+     * zostaje po nim przesunięcie stanu na halę — i to jedyna rzecz, którą
+     * warto powiedzieć PRZED wejściem w dokument.
+     */
+    val wPrzyjeciach: Boolean = false,
     val linesTotal: Int = 0,
     val linesDone: Int = 0,
     val status: String? = null,
@@ -519,6 +438,11 @@ data class DeliveryView(
     val nrPrzesylki: String? = null,
     /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
     val kurierProtokol: String? = null,
+    /**
+     * Magazyn skutku, gdy NIE jest halą. `null` znaczy „nie ma czego
+     * przesuwać" — kolektor nie musi wtedy znać identyfikatorów z konfiguracji.
+     */
+    val sourceMagId: Long? = null,
     val lines: List<DeliveryLineView> = emptyList(),
 )
 

@@ -111,11 +111,14 @@ export interface DeliveryDocument {
   /** Dokument w buforze SGT — nadal można na nim pracować (D1). */
   wBuforze: boolean;
   /**
-   * Magazyn skutku. Rozkłada się tak samo niezależnie od niego, ale po
-   * kontenerze (MGP) zostaje jeszcze przesunięcie stanu na halę — i to jest
-   * jedyna rzecz, którą warto powiedzieć PRZED wejściem w dokument.
+   * Dokument księgowany POZA halą (kontener na MGP). Rozkłada się tak samo, ale
+   * zostaje po nim przesunięcie stanu — i to jest jedyna rzecz, którą warto
+   * powiedzieć PRZED wejściem w dokument.
+   *
+   * Boolean, a nie `magId`: identyfikatory magazynów siedzą w konfiguracji
+   * serwera i kolektor nie ma ich skąd znać.
    */
-  magId: number;
+  wPrzyjeciach: boolean;
   linesTotal: number;
   linesDone: number;
   status: string | null;
@@ -153,9 +156,9 @@ export interface DeliveryView {
   /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
   kurierProtokol: string | null;
   /**
-   * Magazyn skutku, snapshotowany przy otwarciu. Kolektor decyduje po nim,
-   * czy pokazać skrót „PRZESUŃ": po dostawie księgowanej wprost na MAG nie ma
-   * czego przesuwać.
+   * Magazyn skutku, snapshotowany przy otwarciu — ale TYLKO gdy nie jest halą.
+   * `null` znaczy wprost „nie ma czego przesuwać", więc kolektor nie musi znać
+   * identyfikatorów z konfiguracji serwera, żeby ukryć skrót „PRZESUŃ".
    */
   sourceMagId: number | null;
   lines: DeliveryLineView[];

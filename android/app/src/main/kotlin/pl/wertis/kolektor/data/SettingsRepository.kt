@@ -15,7 +15,6 @@ data class AppSettings(
     val serverUrl: String = DEFAULT_SERVER_URL,
     val wakeLock: Boolean = true, // ekran nie gaśnie podczas pracy
     val dropLog: Boolean = true, // log upadków urządzenia do audytu
-    val walkMode: Boolean = true, // nakładka NASTĘPNE po zatwierdzeniu wózka
     val batteryAssist: Boolean = true, // podpowiedź hot-swap przy niskiej baterii
 ) {
     companion object {
@@ -46,7 +45,6 @@ class SettingsRepository(context: Context) {
         serverUrl = prefs.getString("serverUrl", AppSettings.DEFAULT_SERVER_URL) ?: AppSettings.DEFAULT_SERVER_URL,
         wakeLock = prefs.getBoolean("wakeLock", true),
         dropLog = prefs.getBoolean("dropLog", true),
-        walkMode = prefs.getBoolean("walkMode", true),
         batteryAssist = prefs.getBoolean("batteryAssist", true),
     )
 
@@ -58,7 +56,6 @@ class SettingsRepository(context: Context) {
             putString("serverUrl", next.serverUrl)
             putBoolean("wakeLock", next.wakeLock)
             putBoolean("dropLog", next.dropLog)
-            putBoolean("walkMode", next.walkMode)
             putBoolean("batteryAssist", next.batteryAssist)
         }
         _settings.value = next
