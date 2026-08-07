@@ -328,10 +328,11 @@ potwierdzenia, z adresem wypisanym dużym drukiem. To nie jest formalność.
 
 Kolektor rozmawia z serwerem po **zwykłym HTTP** (§4), więc nie ma certyfikatu,
 po którym poznałby właściwy serwer. Cudze urządzenie w tej samej sieci może
-odpowiedzieć na rozgłoszenie szybciej albo można podłożyć inny wydruk. Kolektor
-związany po cichu z podstawionym adresem **oddaje mu login i hasło pierwszej
-osoby, która przyjdzie na zmianę** — dlatego ostatnim sprawdzeniem jest wzrok
-człowieka, a na wydruku obok kodu stoi ten sam adres do porównania.
+odpowiedzieć na rozgłoszenie szybciej albo można podłożyć inny wydruk.
+
+Kolektor związany po cichu z podstawionym adresem **oddaje mu login i hasło
+pierwszej osoby, która przyjdzie na zmianę**. Dlatego ostatnim sprawdzeniem
+jest wzrok człowieka. Na wydruku obok kodu stoi ten sam adres do porównania.
 
 Konfiguracja z MDM potwierdzenia nie wymaga, bo nie przyszła z sieci.
 
