@@ -66,7 +66,15 @@ import pl.wertis.kolektor.ui.theme.Paper
    pierwsze uruchomienie na sprzęcie kończyło się ekranem, z którego NIE DA SIĘ
    wyjść: zalogować się nie można (kont jeszcze nie ma), kont założyć nie
    można (przycisk pojawia się dopiero po odpowiedzi serwera), a adresu zmienić
-   nie można (Ustawienia za bramką sesji).                                    */
+   nie można (Ustawienia za bramką sesji).
+
+   WPISYWANIE ADRESU ZESZŁO NA DRUGI PLAN (0.29.0). Było jedynym krokiem
+   instalacji, którego nie dawało się zrobić skanerem — na urządzeniu bez
+   klawiatury, w rękawicach, z pamięci. Teraz pierwszy jest `PanelParowania`
+   (skan kodu ze strony `/parowanie` albo rozgłoszenie po sieci), a pole
+   tekstowe zostaje jako droga ostatnia. Zostaje NAPRAWDĘ, bo każda z tych
+   dróg zależy od czegoś, co w hali potrafi nie zadziałać: MDM od konsoli,
+   kod od wydruku, rozgłoszenie od punktu dostępowego.                        */
 
 /** Co wiemy o serwerze pod aktualnym adresem. */
 private enum class StanSerwera { SPRAWDZAM, PUSTY, MA_KONTA, NIEOSIAGALNY }
@@ -191,8 +199,8 @@ fun SplashScreen(graph: AppGraph) {
         if (stanSerwera == StanSerwera.NIEOSIAGALNY) {
             Text(
                 "Nie widzę serwera pod adresem ${ustawienia.serverUrl}.\n" +
-                    "Sprawdź, czy kolektor jest w tej samej sieci i czy adres " +
-                    "poniżej jest poprawny.",
+                    "Sprawdź, czy kolektor jest w sieci magazynu, i połącz go " +
+                    "z serwerem poniżej.",
                 fontSize = 13.sp,
                 color = Amber,
                 textAlign = TextAlign.Center,
@@ -223,20 +231,38 @@ fun SplashScreen(graph: AppGraph) {
         ) { sprobuj() }
 
         Spacer(Modifier.height(24.dp))
-        AdresSerwera(
-            adres = adres,
-            zapisany = ustawienia.serverUrl,
-            stanSerwera = stanSerwera,
-            rozwiniete = edycjaAdresu || stanSerwera == StanSerwera.NIEOSIAGALNY,
-            onZmien = { adres = it },
-            onRozwin = { edycjaAdresu = true },
-            onZapisz = {
-                saveServerUrl(graph, adres)
-                // Gdy adres się nie zmienił, `LaunchedEffect(ustawienia.serverUrl)`
-                // nie odpali — licznik prób wymusza ponowne pytanie mimo to.
-                proba++
-            },
-        )
+
+        /* Panel parowania wchodzi TYLKO wtedy, gdy serwera nie widać — i tylko
+           dopóki człowiek nie poprosił o wpisanie adresu z klawiatury. Na
+           działającej instalacji nie ma go wcale: magazynier logujący się rano
+           nie ma powodu oglądać niczego o adresach. */
+        if (stanSerwera == StanSerwera.NIEOSIAGALNY && !edycjaAdresu) {
+            PanelParowania(
+                aktualnyAdres = ustawienia.serverUrl,
+                onWybrano = { znaleziony ->
+                    // pole `adres` przestawia się samo: jest `remember`-owane
+                    // na kluczu `ustawienia.serverUrl`, który właśnie zmieniamy
+                    saveServerUrl(graph, znaleziony)
+                    proba++
+                },
+                onWpiszRecznie = { edycjaAdresu = true },
+            )
+        } else {
+            AdresSerwera(
+                adres = adres,
+                zapisany = ustawienia.serverUrl,
+                stanSerwera = stanSerwera,
+                rozwiniete = edycjaAdresu,
+                onZmien = { adres = it },
+                onRozwin = { edycjaAdresu = true },
+                onZapisz = {
+                    saveServerUrl(graph, adres)
+                    // Gdy adres się nie zmienił, `LaunchedEffect(ustawienia.serverUrl)`
+                    // nie odpali — licznik prób wymusza ponowne pytanie mimo to.
+                    proba++
+                },
+            )
+        }
 
         Spacer(Modifier.weight(1f))
         Text("wersja ${BuildConfig.VERSION_NAME}", fontSize = 11.sp, color = InkMute)

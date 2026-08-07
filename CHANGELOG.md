@@ -28,6 +28,48 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.29.0 — 7 sierpnia 2026
+
+**Kolektor poznaje adres serwera bez wpisywania go z palca.** Był to jedyny krok
+instalacji, którego **nie dało się zrobić skanerem** — na urządzeniu bez
+klawiatury, w rękawicach, z pamięci — a fabryczny adres (`10.0.2.2`, alias hosta
+w emulatorze) na fizycznym kolektorze nie wskazuje na nic. Trzy nowe drogi,
+wpisywanie zostaje jako czwarta:
+
+- **Konfiguracja z MDM** (`serverUrl`) — kolektor po wyczyszczeniu wstaje już
+  skonfigurowany i ekranu parowania nie ogląda wcale. Najlepsza dla floty.
+- **Kod QR** ze strony `/parowanie` — do wydrukowania i powieszenia przy
+  ładowarce. Skanuje się go tym samym skanerem, co półki, i działa nawet tam,
+  gdzie punkt dostępowy odrzuca rozgłoszenia.
+- **Szukanie w sieci** (rozgłoszenie UDP na porcie 3002) — jedno naciśnięcie,
+  ale zależne od tego, co przepuszcza punkt dostępowy.
+
+**Adres z sieci i z kodu wymaga POTWIERDZENIA na ekranie.** Kolektor rozmawia
+z serwerem po zwykłym HTTP, więc nie ma certyfikatu, po którym poznałby właściwy
+serwer: cudze urządzenie w tej samej sieci może odpowiedzieć szybciej, a wydruk
+można podłożyć. Kolektor związany po cichu z podstawionym adresem oddaje mu
+login i hasło pierwszej osoby, która przyjdzie na zmianę. Konfiguracja z MDM
+potwierdzenia nie wymaga — nie przyszła z sieci, tylko od właściciela sprzętu
+tym samym kanałem, co sama aplikacja.
+
+Nasłuch UDP **odpowiada wyłącznie na pytania z sieci prywatnej** i **wyłącznie
+na pytania nie mniejsze od odpowiedzi**. To drugie jest blokadą wzmocnienia:
+usługa odpowiadająca dłużej, niż ją pytano, jest gotowym wzmacniaczem do ataku
+na kogoś trzeciego, bo adres nadawcy w UDP podszywa się jednym polem.
+
+Generator kodów QR jest **napisany w repo, bez nowej zależności** (tryb bajtowy,
+korekcja M, wersje 1–6). Serwer ma dalej dwie zależności, a wynik jest
+porównany bit po bicie z niezależną implementacją.
+
+**[wymaga działania]** Nic obowiązkowego — stare instalacje działają bez zmian.
+Warte zrobienia przy okazji, oba opisane w `DEPLOY.md`:
+
+- **§4 — ustaw `HOST` w `wertis.env`** na adres LAN maszyny. Domyślne `0.0.0.0`
+  to nasłuch na wszystkich kartach sieciowych, więc od internetu dzieli API
+  **wyłącznie reguła zapory** — jedno ustawienie, którego zniknięcia nic nie
+  zgłosi. Wpisany adres zamyka to na poziomie gniazda.
+- **§5b — wydrukuj `/parowanie`** i powieś przy ładowarce kolektorów.
+
 ## 0.28.0 — 4 sierpnia 2026
 
 **Dostawca z własnym drukiem reklamacyjnym dostaje SWÓJ formularz.** Przycisk

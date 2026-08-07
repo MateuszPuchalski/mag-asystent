@@ -16,6 +16,9 @@ import { audytRoutes } from "./routes/audyt.js";
 import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import { biuroRoutes } from "./routes/biuro.js";
+import { parowanieRoutes } from "./routes/parowanie.js";
+import { uruchomOdkrywanie } from "./services/odkrywanie.js";
+import { adresBazowy } from "./services/parowanie.js";
 import {
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
@@ -116,6 +119,7 @@ export async function buildApp() {
   await app.register(magazynRoutes);
   await app.register(audytRoutes);
   await app.register(biuroRoutes);
+  await app.register(parowanieRoutes);
 
   await app.ready();
   return app;
@@ -139,6 +143,13 @@ async function main() {
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });
   console.log(`[api] WERTIS serwer na http://${config.host}:${config.port} · SGT_MODE=${config.sgtMode}`);
+
+  /* Odkrywanie startuje PO nasłuchu HTTP, nie przed: gdyby port API był zajęty,
+     serwer i tak nie wstanie, a rozgłaszanie adresu, pod którym nic nie
+     odpowiada, wysyłałoby kolektory donikąd. */
+  await uruchomOdkrywanie();
+  const adres = adresBazowy();
+  if (adres) console.log(`[api] parowanie kolektora: ${adres}/parowanie`);
 }
 
 /* Import z testu nie może uruchomić serwera. `import.meta.main` jest w Node

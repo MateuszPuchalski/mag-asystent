@@ -60,11 +60,17 @@ command-line tools plus akceptacja licencji) — samo JDK jej nie wystarczy.
 1. W katalogu głównym repo: `npm install && npm run seed && npm run dev` (API na `:3001`).
 2. Adres serwera:
    - emulator: `http://10.0.2.2:3001` (domyślne, nic nie trzeba robić),
-   - fizyczny kolektor: `http://<IP-serwera-w-LAN>:3001` — wpisz go na
-     **ekranie startowym** (`ZMIEŃ ADRES SERWERA`). Ustawienia siedzą pod
-     paskiem górnym, a paska nie ma przed zalogowaniem, więc na świeżej
-     instalacji ekran startowy jest jedynym wejściem. Po zalogowaniu ten sam
-     adres jest w **Ustawienia → Serwer WERTIS**.
+   - fizyczny kolektor: **sparuj go** — ekran startowy → `POŁĄCZ Z SERWEREM`.
+     Skan kodu QR ze strony `http://<IP-serwera>:3001/parowanie` (do wydruku),
+     przycisk `SZUKAJ SERWERA` (rozgłoszenie UDP) albo `WPISZ ADRES RĘCZNIE`.
+     Cała procedura z powodami: [`DEPLOY.md`](../DEPLOY.md) §5b.
+
+     Ustawienia siedzą pod paskiem górnym, a paska nie ma przed zalogowaniem,
+     więc na świeżej instalacji ekran startowy jest jedynym wejściem. Po
+     zalogowaniu ten sam adres jest w **Ustawienia → Serwer WERTIS**.
+   - flota przez MDM: wypełnij konfigurację zarządzaną `serverUrl`
+     (`res/xml/app_restrictions.xml`) — urządzenie wstaje skonfigurowane
+     i ekranu parowania nie widzi wcale.
 3. Manifest zezwala na cleartext HTTP (sieć magazynowa on-premise). HTTPS przez
    Caddy działa bez zmian — podaj `https://mag.wertis.local` jako adres.
 
@@ -264,10 +270,16 @@ przed którą ta pozycja broni.
 - [ ] kreator zakłada całą listę i pokazuje loginy, nigdy haseł,
 - [ ] po wyjściu z kreatora ta sama instalacja prosi już o logowanie,
 - [ ] świeża instalacja z adresem fabrycznym `10.0.2.2` pokazuje „Nie widzę
-      serwera pod adresem…" i ROZWINIĘTE pole adresu,
+      serwera pod adresem…" i panel POŁĄCZ Z SERWEREM,
 - [ ] nie pokazuje samych pól logowania bez wyjścia (bez konta nie dało się
       z tego ekranu wyjść),
-- [ ] wpisz właściwy adres LAN i naciśnij ZAPISZ I SPRAWDŹ,
+- [ ] SZUKAJ SERWERA znajduje serwer w tej samej sieci i pokazuje jego adres,
+- [ ] skan kodu ze strony `/parowanie` podstawia adres bez wpisywania,
+- [ ] oba wejścia pytają o POTWIERDZENIE, zanim przestawią adres,
+- [ ] hasło wpisane z klawiatury sprzętowej przy otwartym panelu parowania
+      NIE trafia nigdzie — ani na serwer, ani do wyszukiwarki towarów,
+- [ ] WPISZ ADRES RĘCZNIE dalej działa; wpisz właściwy adres LAN i naciśnij
+      ZAPISZ I SPRAWDŹ,
 - [ ] ekran przechodzi do ZAŁÓŻ KONTA albo do logowania, bez restartu
       aplikacji,
 - [ ] wyłącz Wi-Fi w połowie zakładania kont: ekran pokazuje konta, które JUŻ

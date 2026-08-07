@@ -30,7 +30,24 @@ const num = (v: string | undefined, def: number, name?: string) => {
 export const config = {
   /** Port serwera API. */
   port: num(process.env.PORT, 3001, "PORT"),
+
+  /**
+   * Interfejs nasłuchu.
+   *
+   * `0.0.0.0` znaczy WSZYSTKIE karty sieciowe, także tę od operatora, jeśli
+   * maszyna ma dwie. Jedyne, co dzieli wtedy API od internetu, to reguła
+   * zapory — czyli jedno ustawienie, którego zniknięcia nic nie zgłosi.
+   * Wpisanie adresu LAN maszyny zamyka to na poziomie gniazda: pod adresem
+   * WAN nie ma czego zaatakować, bo nikt tam nie słucha (DEPLOY.md §4).
+   */
   host: process.env.HOST ?? "0.0.0.0",
+
+  /**
+   * Port UDP, na którym serwer odpowiada na rozgłoszenia kolektorów szukających
+   * adresu (`services/odkrywanie.ts`). `0` wyłącza odpowiadanie — wtedy adres
+   * podaje kod QR ze strony `/parowanie` albo konfiguracja z MDM.
+   */
+  discoveryPort: num(process.env.DISCOVERY_PORT, 3002, "DISCOVERY_PORT"),
 
   /** Ścieżka pliku bazy SQLite aplikacji. */
   dbPath:

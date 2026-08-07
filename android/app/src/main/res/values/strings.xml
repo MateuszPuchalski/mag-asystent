@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">WERTIS Kolektor</string>
+
+    <!-- Widoczne w konsoli MDM-a, nie w aplikacji (res/xml/app_restrictions.xml). -->
+    <string name="mdm_server_url_title">Adres serwera WERTIS</string>
+    <string name="mdm_server_url_desc">Adres API w sieci magazynu, np. http://192.168.1.50:3001. Ustawiony tutaj, zwalnia magazyniera z parowania kolektora — urządzenie wstaje skonfigurowane.</string>
 </resources>

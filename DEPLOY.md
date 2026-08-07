@@ -251,14 +251,89 @@ keystore) — instrukcja podpisu jak w standardowym projekcie Android.
 - Wgraj APK przez MDM (SOTI / Honeywell / Zebra) lub `adb install app-debug.apk`.
 - Kiosk: przypnij aplikację przez Android lock-task / device owner (MDM) —
   Fully Kiosk Browser nie jest potrzebny.
-- Przy pierwszym starcie adres serwera podajesz **na ekranie startowym**
-  (`ZMIEŃ ADRES SERWERA`) — adres API w LAN, czyli
-  `http://mag.wertis.local:3001` albo `http://<IP-serwera>:3001`. Ustawienia
-  są za bramką sesji, więc przed pierwszym zalogowaniem tamtędy nie wejdziesz;
-  po zalogowaniu ten sam adres zmienia się w **Ustawienia → Serwer WERTIS**.
-- Fabryczna wartość to `http://10.0.2.2:3001` — alias hosta **w emulatorze**.
-  Na fizycznym kolektorze nie wskazuje na nic, więc dopóki jej nie zmienisz,
-  ekran startowy pokazuje „Nie widzę serwera pod adresem…".
+- Adres serwera ustawia się **parowaniem** — patrz §5b. Fabryczna wartość to
+  `http://10.0.2.2:3001` (alias hosta **w emulatorze**), więc dopóki kolektor
+  nie zna adresu, ekran startowy pokazuje „Nie widzę serwera pod adresem…"
+  i proponuje parowanie.
+- Po zalogowaniu ten sam adres zmienia się w **Ustawienia → Serwer WERTIS**.
+
+## 5b. Adres serwera na kolektorze — parowanie
+
+Wpisywanie adresu z palca było jedynym krokiem instalacji, którego **nie dało
+się zrobić skanerem**: na urządzeniu bez klawiatury, w rękawicach, z pamięci.
+Od 0.29.0 są trzy drogi, a wpisywanie zostaje jako czwarta. Każda kończy się
+tym samym adresem — wybierz tę, która pasuje do wdrożenia.
+
+### Droga 1 — konfiguracja z MDM (cała flota naraz)
+
+Najlepsza tam, gdzie kolektory i tak jadą przez MDM. Urządzenie po wyczyszczeniu
+wstaje **już skonfigurowane** i nikt nie dotyka ekranu parowania.
+
+W konsoli MDM-a (SOTI / Zebra / Honeywell) otwórz konfigurację zarządzaną
+aplikacji `pl.wertis.kolektor` i wypełnij pole **Adres serwera WERTIS**
+(klucz `serverUrl`):
+
+```
+http://192.168.1.50:3001
+```
+
+Przyjmowany jest też zapis `wertis://192.168.1.50:3001` z wydruku parowania —
+nie trzeba go przepisywać na inny.
+
+Ten adres **wygrywa z zapamiętanym na urządzeniu i nie pyta o potwierdzenie**.
+To jedyne źródło, które tak działa, i ma powód: przychodzi od właściciela
+sprzętu tym samym kanałem, którym przyszła sama aplikacja.
+
+### Droga 2 — kod QR (bez MDM-a, działa zawsze)
+
+Serwer wystawia stronę parowania z kodem QR:
+
+```
+http://<IP-serwera>:3001/parowanie
+```
+
+**Wydrukuj ją i powieś przy ładowarce kolektorów.** Na kolektorze: ekran
+startowy → **POŁĄCZ Z SERWEREM** → zeskanuj kod tym samym skanerem, którym
+skanujesz półki.
+
+Strona pokazuje kod dla każdej karty sieciowej maszyny, jeśli jest ich więcej,
+i wypisuje adres pod kodem do porównania. Nie wymaga logowania — służy
+urządzeniu, które jeszcze nie ma jak się zalogować.
+
+> Kod przestaje być aktualny, gdy maszyna dostanie inny adres IP. Dlatego
+> adres ma być zarezerwowany na routerze (rezerwacja DHCP, §4). Po zmianie
+> odśwież stronę i wydrukuj ponownie.
+
+### Droga 3 — szukanie w sieci
+
+Ekran startowy → **POŁĄCZ Z SERWEREM** → **SZUKAJ SERWERA**. Kolektor rozgłasza
+pytanie po LAN (UDP, port 3002), serwer odpowiada swoim adresem.
+
+Zero czynności poza naciśnięciem, ale **zależy od punktu dostępowego**: część
+sprzętu nie przepuszcza rozgłoszeń. Pusta lista znaczy „nie znalazłem", a nie
+„nie ma" — wtedy zostaje kod QR albo wpisanie adresu.
+
+Nasłuch wyłącza się `DISCOVERY_PORT=0` w `wertis.env`.
+
+### Droga 4 — wpisanie adresu
+
+Ekran startowy → **POŁĄCZ Z SERWEREM** → **WPISZ ADRES RĘCZNIE**. Zostaje
+dlatego, że każda z dróg wyżej zależy od czegoś, co w hali potrafi nie
+zadziałać: MDM od konsoli, kod od wydruku, rozgłoszenie od sieci.
+
+### Dlaczego kolektor pyta o potwierdzenie
+
+Adres z **kodu QR** i adres ze **szukania w sieci** trafiają najpierw na ekran
+potwierdzenia, z adresem wypisanym dużym drukiem. To nie jest formalność.
+
+Kolektor rozmawia z serwerem po **zwykłym HTTP** (§4), więc nie ma certyfikatu,
+po którym poznałby właściwy serwer. Cudze urządzenie w tej samej sieci może
+odpowiedzieć na rozgłoszenie szybciej albo można podłożyć inny wydruk. Kolektor
+związany po cichu z podstawionym adresem **oddaje mu login i hasło pierwszej
+osoby, która przyjdzie na zmianę** — dlatego ostatnim sprawdzeniem jest wzrok
+człowieka, a na wydruku obok kodu stoi ten sam adres do porównania.
+
+Konfiguracja z MDM potwierdzenia nie wymaga, bo nie przyszła z sieci.
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 

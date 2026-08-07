@@ -25,6 +25,12 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="35">
 
+        <!-- Adres serwera wypełniany z konsoli MDM-a; czyta go
+             data/KonfiguracjaZarzadzana.kt (DEPLOY.md §5). -->
+        <meta-data
+            android:name="android.content.APP_RESTRICTIONS"
+            android:resource="@xml/app_restrictions" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

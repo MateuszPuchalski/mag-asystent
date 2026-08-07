@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Konfiguracja zarządzana (MDM: SOTI / Zebra / Honeywell).
+
+    Administrator widzi te pola w konsoli MDM-a i wypełnia je raz, dla całej
+    floty. Dzięki temu wyczyszczony kolektor wstaje już skonfigurowany —
+    bez skanowania kodu parowania i bez wpisywania adresu na ekranie.
+
+    Wartość `serverUrl` czyta `data/KonfiguracjaZarzadzana.kt`.
+-->
+<restrictions xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <restriction
+        android:key="serverUrl"
+        android:restrictionType="string"
+        android:title="@string/mdm_server_url_title"
+        android:description="@string/mdm_server_url_desc"
+        android:defaultValue="" />
+
+</restrictions>

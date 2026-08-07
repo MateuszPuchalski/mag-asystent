@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.data.TelemetryRepository
 import pl.wertis.kolektor.data.LocationsRepository
+import pl.wertis.kolektor.data.adresZMdm
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.data.RecentStore
@@ -108,6 +109,23 @@ class AppGraph(context: Context) {
     )
 
     init {
+        /* Adres z konsoli MDM-a wygrywa z zapamiętanym i robi to BEZ PYTANIA —
+           inaczej niż adres z rozgłoszenia po sieci, który trafia na
+           potwierdzenie do człowieka (`PanelParowania`). Różnica jest w źródle:
+           konfiguracja zarządzana przychodzi od właściciela urządzenia tym samym
+           kanałem, którym przyszła sama aplikacja, a rozgłoszenie od kogokolwiek,
+           kto jest w tej sieci.
+
+           Tutaj, na początku `init`, bo wszystko niżej — pobranie reguły
+           lokalizacji, odświeżenie sesji — poleci już pod ten adres. */
+        adresZMdm(context)
+            ?.takeIf { it != settings.current.serverUrl }
+            ?.let { zMdm ->
+                locationsRepo.forget() // inny serwer to inny magazyn i inna reguła adresu
+                settings.update { s -> s.copy(serverUrl = zMdm) }
+                apiClient.setBaseUrl(zMdm)
+            }
+
         wireOfflineFlush(context, offlineQueue, connectivity, appScope)
         // nierozwiązane wyjątki od razu przy starcie (D8) — inaczej nikt ich nie ruszy
         problemsRepo.refresh()
