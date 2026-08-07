@@ -111,8 +111,8 @@ if (-not (Test-Administrator)) {
 
 if ($Odinstaluj) {
     Write-Krok "Deinstalacja WERTIS"
-    Write-Info "Zniknie: usługi wertis-api i wertis-worker, reguła zapory"
-    Write-Info "'WERTIS kolektor' oraz katalog $Katalog."
+    Write-Info "Zniknie: usługi wertis-api, wertis-worker i wertis-sfera (jeśli jest),"
+    Write-Info "reguła zapory 'WERTIS kolektor' oraz katalog $Katalog."
     Write-Host ""
     if ($UsunDane) {
         Write-Uwaga "-UsunDane: ślad audytowy i zdjęcia problemów zostaną SKASOWANE."
@@ -244,9 +244,9 @@ if (-not $TylkoKonfiguracja) {
     Write-Krok "Usługi Windows"
     $nssm = Get-WertisNssm -Katalog $Katalog
     $node = if (Test-DryRun) { "node.exe" } else { (Get-Command node).Source }
-    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-api" -Node $node -Katalog $Katalog `
+    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-api" -Aplikacja $node -Katalog $Katalog `
         -Skrypt (Join-Path $Katalog "server\dist\index.js")
-    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-worker" -Node $node -Katalog $Katalog `
+    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-worker" -Aplikacja $node -Katalog $Katalog `
         -Skrypt (Join-Path $Katalog "server\dist\worker\worker.js")
 
     Write-Krok "Sieć"
@@ -504,6 +504,27 @@ if ($podlaczacDoSubiekta) {
     $ustawienia.MSSQL_USER     = $login
     $ustawienia.MSSQL_PASSWORD = $haslo
 
+    # ── Worker Sfery: dokumenty MM (DEPLOY §6, etap 2) ──────────────────────
+    # Pytanie pada TYLKO, gdy exe faktycznie leży na dysku: SFERA_WORKER=1 bez
+    # wykonawcy zostawiłoby zadania mm w pending na zawsze (serwer zresztą
+    # odmówi startu — bledyKonfiguracji). Obecność exe jest świadomym krokiem
+    # człowieka (budowa wg sfera-worker/README.md), więc pytanie tu jedynie
+    # potwierdza zamiar.
+    $sferaExe = Join-Path $Katalog "sfera-worker\wertis-sfera-worker.exe"
+    if (Test-Path $sferaExe) {
+        Write-Krok "Worker Sfery (dokumenty MM)"
+        if (Read-Tak "Wystawiać dokumenty MM przez Sferę? (wymaga licencji Sfery)" -Domyslnie $true) {
+            $ustawienia.SFERA_WORKER = "1"
+            Write-Info "Operator Subiekta z prawem wystawiania MM (to konto Subiekta, nie login SQL)."
+            $ustawienia.SFERA_OPERATOR       = Read-Tekst "Operator Subiekta"
+            $ustawienia.SFERA_OPERATOR_HASLO = Read-Tekst "Hasło operatora"
+            Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-sfera" -Katalog $Katalog -Aplikacja $sferaExe
+        }
+    } else {
+        Write-Info "Workera Sfery nie ma ($sferaExe) - dokumenty MM wystawia biuro w Subiekcie."
+        Write-Info "Automatyzacja MM: zbuduj exe wg sfera-worker\README.md i uruchom instalator ponownie."
+    }
+
     if ($polaczenie) { $polaczenie.Close() }
 } elseif (-not $TylkoKonfiguracja) {
     # Tryb demo: dane z eksportu, zero kontaktu z Subiektem.
@@ -608,6 +629,16 @@ if ($kontoCzeka) {
     } else {
         Write-Blad "Worker NIE odpowiada - zapisy będą stały w kolejce."
         Write-Info "Zajrzyj do $Katalog\logs\wertis-worker.err.log"
+    }
+    # Pole `sfera` istnieje w odpowiedzi tylko przy SFERA_WORKER=1 — wtedy
+    # trzeci proces jest częścią instalacji i jego stan podlega tej samej ocenie.
+    if ($null -ne $health.sfera) {
+        if ($health.sfera.zyje) {
+            Write-Ok "Worker Sfery działa (tryb: $($health.sfera.mode))."
+        } else {
+            Write-Blad "Worker Sfery NIE odpowiada - dokumenty MM będą stały w kolejce."
+            Write-Info "Zajrzyj do $Katalog\logs\wertis-sfera.err.log"
+        }
     }
     foreach ($p in @($health.problemy)) { if ($p) { Write-Blad $p } }
 } elseif (-not $DryRun) {

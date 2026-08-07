@@ -134,6 +134,15 @@ test("zadanie w błędzie terminalnym nie jest już wybierane z kolejki", async 
   assert.equal(K.pickTask(), undefined);
 });
 
+/* Regresja podziału pracy: BEZ SFERA_WORKER ten worker obsługuje wszystko —
+   mm musi wychodzić z pickTask jak zawsze. Zachowanie przy WŁĄCZONYM
+   przełączniku testuje kolejka.sfera.test.ts (osobny plik, bo config jest
+   literałem zamrożonym przy imporcie). */
+test("bez SFERA_WORKER pickTask wybiera mm jak dotąd", async () => {
+  const id = dodajZadanie("mm", { magFrom: 2, magTo: 1, items: [{ twId: 1, qty: 3 }] });
+  assert.equal(K.pickTask()?.id, id);
+});
+
 // ── Dokument w buforze ──────────────────────────────────────────────────────
 
 test("MM na dokumencie w buforze czeka i NIE zajmuje slotu", async () => {

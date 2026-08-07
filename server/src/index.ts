@@ -23,7 +23,7 @@ import {
   lastImport,
 } from "./adapters/subiekt.mssql.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
-import { zamelduj, stanWorkera } from "./services/process-state.js";
+import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 
 /**
@@ -53,8 +53,14 @@ export async function buildApp() {
      wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
   app.get("/api/health", async () => {
     const worker = stanWorkera();
+    /* Blok Sfery istnieje TYLKO przy SFERA_WORKER=1. Bez przełącznika brak
+       tego procesu jest normą (etapy 0-1 wdrożenia) i zdanie o nim robiłoby
+       każdą dotychczasową instalację czerwoną bez powodu. */
+    const sfera = config.sferaWorker ? stanSfery() : null;
     const problemy = [
       worker.problem,
+      sfera?.problem ?? null,
+      config.sferaWorker ? zaleglosciMm() : null,
       /* PIERWSZY na liście świadomie: przykryta konfiguracja unieważnia
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
          więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
@@ -86,6 +92,9 @@ export async function buildApp() {
         mode: worker.sgtMode,
         widziany: worker.widziany,
       },
+      /* Pole addytywne — kolektor go nie deserializuje (Dtos.kt ignoruje
+         nieznane pola), więc stare APK nie mają czego zepsuć. */
+      ...(sfera ? { sfera: { zyje: sfera.zyje, mode: sfera.sgtMode, widziany: sfera.widziany } } : {}),
       /* Ślad audytowy NIE JEST czyszczony — to świadoma decyzja, bo reklamacja
          przychodzi po miesiącach. Ale „rośnie w nieskończoność" bez licznika
          kończy się pełnym dyskiem o trzeciej w nocy, więc rozmiar i wiek

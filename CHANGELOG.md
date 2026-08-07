@@ -28,6 +28,74 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.29.0 — 7 sierpnia 2026
+
+**Przesunięcia magazynowe dostają wykonawcę: worker Sfery (`sfera-worker/`).**
+Dokument MM — jedyna operacja, której nie da się bezpiecznie wystawić SQL-em —
+ma teraz swój proces: osobna usługa Windows w C#/.NET, czytająca tę samą
+kolejkę `sfera_queue` i wykonująca wyłącznie zadania `mm` przez COM Sfery.
+Wymaga licencji Sfery; wywołania COM są oznaczone `[WERYFIKUJ]` i czekają na
+potwierdzenie na maszynie testowej (wszystkie w jednym pliku
+`sfera-worker/src/SferaComAdapter.cs`).
+
+**[wymaga działania]** Nic dla istniejących instalacji: nowy przełącznik
+`SFERA_WORKER` jest domyślnie **wyłączony** i wszystko działa jak dotąd
+(MM kończy się czytelnym błędem, dokument wystawia biuro). Automatyzacja MM
+to świadoma ścieżka: budowa exe wg `sfera-worker/README.md`, checklist
+`[WERYFIKUJ]`, bramki z `docs/wdrozenie.md` („Dołączenie workera Sfery") —
+wszystko najpierw na kopii bazy.
+
+### Dlaczego
+
+Rozkładanie kontenera kończyło się połowicznie: adres na półce zapisany,
+a stan wisiał na MGP do ręcznego MM w biurze — każde przesunięcie lądowało
+w kolejce jako czerwony błąd z przyciskiem PONÓW, który generował dokładnie
+ten sam błąd. Sfera jest jedyną bezpieczną drogą do dokumentu MM (numeracja,
+skutki magazynowe, wycena), a COM Sfery żyje tylko na Windows z Subiektem —
+stąd osobny proces w C#, nie kod w serwerze Node.
+
+### Podział pracy pilnowany z obu stron
+
+Przy `SFERA_WORKER=1` worker Node **nie dotyka** zadań `mm` (filtr
+w `pickTask`) — inaczej ubijałby je padającym adapterem SQL, zanim worker
+Sfery zdąży je wziąć. Filtr to celowo `type <> 'mm'`, nie `= 'set_location'`:
+zadanie nieznanego typu nadal dostaje czytelny błąd od Node'a zamiast wisieć
+w ciszy.
+
+### Niezmiennik „adres przed sprzedawalnością" przestał być dziełem przypadku
+
+Przy jednym workerze kolejność wykonania była kolejnością wstawienia
+(`ORDER BY id`) — dwa niezależne pollery łamią to konstrukcyjnie. Worker Sfery
+pomija więc MM, dopóki wcześniejsze niewykonane `set_location` tego samego
+towaru nie wejdzie; poprzednik w `error` **blokuje** (stan bezpieczny to
+„adres zapisany, stan czeka"), a blokadę mierzy rekoncyliacja (nowy rodzaj
+`mm_czeka`) i `/api/health`, więc nie ma cichego zakleszczenia. Zapytania
+wyboru zadania mieszkają w `sfera-worker/sql/` i są wykonywane przez OBA
+światy: C# jako zasób wbudowany, testy Node (`sfera-pick.test.ts`) wprost
+z plików — jedno źródło prawdy, mierzone w CI bez dotneta.
+
+### Bez nowych statusów, z pełnym audytem
+
+Cały cykl życia mm mieści się w dotychczasowych statusach — enum na kolektorze
+nie zna wartości domyślnej i nowy status wywróciłby deserializację na każdym
+urządzeniu. Worker Sfery pisze te same zdarzenia audytowe
+(`queue_retry`/`queue_applied`/`queue_failed`) z autorem z wiersza kolejki
+i melduje się w `process_state` jak pozostałe procesy; `/api/health` przy
+włączonym przełączniku raportuje blok `sfera` i zaległe MM. Padnięcie w trakcie
+zapisu NIE wraca automatycznie do kolejki — zadanie ląduje w `error`
+z ostrzeżeniem o możliwym duplikacie, bo COM mógł zdążyć z `Zapisz()`, a SQLite
+nie; decyzję podejmuje człowiek (PONÓW).
+
+### Instalator stawia trzecią usługę, gdy jest co stawiać
+
+Gdy zbudowany `wertis-sfera-worker.exe` leży w `<katalog>\sfera-worker\`,
+kreator pyta o włączenie, dopisuje `SFERA_WORKER`/`SFERA_OPERATOR*` do
+`wertis.env` i rejestruje usługę `wertis-sfera`; bez exe — jedna linia
+informacji i nic się nie zmienia. Restart i deinstalacja obejmują trzecią
+usługę tylko wtedy, gdy istnieje.
+
+---
+
 ## 0.28.0 — 4 sierpnia 2026
 
 **Dostawca z własnym drukiem reklamacyjnym dostaje SWÓJ formularz.** Przycisk

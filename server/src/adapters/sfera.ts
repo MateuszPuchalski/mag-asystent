@@ -9,11 +9,12 @@
  *   sql — UPDATE jednej kolumny w MSSQL (sfera.sql.ts): pole lokalizacji,
  *         loginem o kolumnowym uprawnieniu; MM zgłasza błąd.
  *
- * ─── Zapis przez Sferę (COM) — kontrakt do implementacji ─────────────────────
+ * ─── Zapis przez Sferę (COM) — kontrakt ZREALIZOWANY w sfera-worker/ ─────────
  * Sfera to COM/Windows + licencja, więc nie ma tu implementacji w Node.
- * Rekomendacja spec §9: worker jako osobny proces na Windows — C# (stabilniejszy
- * COM interop) albo Python + pywin32 — czytający tę samą tabelę `sfera_queue`.
- * (Gdyby worker miał zostać w Node: `winax`/`edge-js`.) Szkic wywołań:
+ * Worker Sfery istnieje jako osobny proces C#/.NET w `sfera-worker/` (czyta tę
+ * samą tabelę `sfera_queue`, wyłącznie zadania `mm`; wdrożenie: DEPLOY §6
+ * etap 2). Wywołania COM tam są szkicem z tego kontraktu i noszą [WERYFIKUJ]
+ * do potwierdzenia na żywej Sferze. Szkic:
  *
  * set_location:
  *   var t = sfera.TowaryManager.Wczytaj(twId);

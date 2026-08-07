@@ -1,0 +1,28 @@
+# Bramka workera Sfery (sfera-worker/).
+#
+# COM Sfery nie istnieje poza Windows z Subiektem, więc CI bramkuje to, co
+# bramkować się da: że projekt się KOMPILUJE. Guard kolejności (sql/*.sql)
+# jest mierzony osobno i mocniej — testem server/src/worker/sfera-pick.test.ts
+# w workflow serwera, na tych samych plikach, które exe niesie jako zasoby.
+#
+# Osobny workflow, nie krok w server.yml: nic istniejącego nie zaczyna
+# wymagać dotneta, a zmiana wyłącznie w serwerze nie buduje C#.
+name: Worker Sfery
+
+on:
+  push:
+    branches: [main]
+    paths: ["sfera-worker/**", ".github/workflows/sfera-worker.yml"]
+  pull_request:
+    paths: ["sfera-worker/**", ".github/workflows/sfera-worker.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Kompilacja
+        run: dotnet build sfera-worker/WertisSferaWorker.csproj -c Release

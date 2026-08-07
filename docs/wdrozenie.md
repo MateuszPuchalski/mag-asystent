@@ -150,6 +150,36 @@ Cofnięcie już wykonanych wymaga kopii zapasowej.
 Bramek nie ma. Zostaje bieżąca obsługa z `DEPLOY.md` §7: nocna kopia,
 rekoncyliacja, przegląd `/api/health`.
 
+## Dołączenie workera Sfery (dokumenty MM) — osobna ścieżka, te same reguły
+
+Worker Sfery (`sfera-worker/`) automatyzuje dokumenty MM i dochodzi
+**po** ustabilizowaniu etapów powyżej. To nowy proces piszący do bazy firmy,
+więc obowiązuje ta sama zasada: każdy krok najpierw na **kopii**, każda bramka
+to zdanie sprawdzalne. Instrukcja instalacji: `DEPLOY.md` §6, etap 2.
+
+**Bramki — wszystkie na kopii bazy, zanim dotknie produkcji:**
+
+1. **Przebieg próbny** (`--dry-run`): pętla działa, `/api/health` pokazuje
+   blok `sfera` z `zyje: true`. Zadanie mm przechodzi cykl z numerem
+   `MM DRY-RUN/n` — dokument w Subiekcie NIE powstaje.
+2. **Jedno prawdziwe MM na kartotece próbnej.** Numer w `sgt_doc_number`
+   równa się numerowi dokumentu w Subiekcie. Stany zgadzają się na obu
+   magazynach. `queue_applied` w `GET /api/events` niesie autora z kolektora.
+3. **Bufor.** MM ze skrótu dostawy, której FZ jest odłożona, stoi
+   w `waiting_for_doc`. Wyjęcie dokumentu z bufora → wykonane w ≤ 60 s.
+4. **Guard kolejności.** Wpędź zapis lokalizacji w błąd (np. cofnięty GRANT
+   na kolumnę) i zleć przesunięcie tego samego towaru. MM ma stać w `pending`,
+   a rekoncyliacja wymienia je jako `mm_czeka`. PONÓW lokalizacji → MM wchodzi
+   samo, w tej kolejności. To jest niezmiennik „adres przed sprzedawalnością"
+   zmierzony, nie zadeklarowany.
+5. **Odporność.** Ubij proces w trakcie zapisu. Po restarcie zadanie jest
+   w `error` z ostrzeżeniem o możliwym duplikacie, a w Subiekcie NIE ma dwóch
+   MM. Zatrzymanie usługi → zdanie o Sferze w `problemy` w `/api/health`.
+
+**Wycofanie:** `SFERA_WORKER=0` (albo usunięcie wpisu) + restart usług —
+zadania mm wracają do dawnego zachowania (czytelny błąd, MM wystawia biuro).
+Dokumenty już wystawione cofa się w Subiekcie, jak każde MM.
+
 ## Konto SQL, gdy nie ma hasła `sa`
 
 **`sa` nie jest wymagane** — wystarczy dowolne konto, które może założyć login

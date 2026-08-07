@@ -126,8 +126,11 @@ albo `curl`-em (`DEPLOY.md` §5a).
 
 - **Nie zakłada kont pracowników.** Powstaje jedno konto administratora (wyżej);
   magazynierów, brygadzistów i biuro zakłada się z kolektora (`DEPLOY.md` §5a).
-- **Nie stawia workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — to
-  osobny proces COM.
+- **Nie buduje workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — exe
+  buduje się osobno wg `sfera-worker/README.md`. Gdy `wertis-sfera-worker.exe`
+  leży już w `<katalog>\sfera-worker\`, instalator pyta o włączenie i rejestruje
+  trzecią usługę `wertis-sfera`. Bez exe dokumenty MM wystawia biuro
+  w Subiekcie, jak dotąd.
 - **Nie konfiguruje kopii zapasowej ani nocnej rekoncyliacji.** Obie są
   w `DEPLOY.md` §7 i obie trzeba ustawić, **zanim** ruszy praca na prawdziwych
   danych.

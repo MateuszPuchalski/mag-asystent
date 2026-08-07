@@ -37,11 +37,13 @@ export class SqlSferaAdapter implements SferaAdapter {
 
   async createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {
     // MM nie da się bezpiecznie zrobić SQL-em (dokument + numeracja + skutki
-    // magazynowe to domena Sfery). Docelowo tworzy je osobny worker Sfery (COM)
-    // na Windows, czytający tę samą tabelę sfera_queue — kontrakt w
-    // adapters/sfera.ts. Zadanie zostaje w kolejce ze statusem 'error' i PONÓW.
+    // magazynowe to domena Sfery). Tworzy je worker Sfery — gotowy proces C#
+    // w sfera-worker/, czytający tę samą tabelę sfera_queue. Przy SFERA_WORKER=1
+    // pickTask w ogóle nie odda mm temu procesowi, więc ten wyjątek działa
+    // wyłącznie w instalacjach BEZ wdrożonego workera Sfery — i wtedy zadanie
+    // ląduje w 'error' z PONÓW, a dokument wystawia biuro.
     throw new Error(
-      "Dokument MM tworzy worker Sfery (osobny proces COM na Windows — kontrakt w adapters/sfera.ts). " +
+      "Dokument MM tworzy worker Sfery (usługa wertis-sfera — wdrożenie: DEPLOY §6 etap 2, sfera-worker/README.md). " +
         "Do czasu jego wdrożenia MM wystawia biuro w Subiekcie; lokalizacje działają normalnie."
     );
   }

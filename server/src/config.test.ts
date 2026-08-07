@@ -53,6 +53,15 @@ test("te same id magazynow to blad, nie ostrzezenie", () => {
   assert.match(bledy[0], /sl_Magazyn/, "komunikat ma prowadzić do zapytania, nie tylko stwierdzać fakt");
 });
 
+test("SFERA_WORKER=1 przy seeded to blad — zadania mm nie mialyby wykonawcy", () => {
+  // w demo MM obsługuje DevSferaAdapter w workerze Node; włączony przełącznik
+  // kazałby Node'owi omijać mm, które wisiałyby w pending na zawsze
+  const zly = { ...config, sferaWorker: true, sgtMode: "seeded" as const };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /SFERA_WORKER=1 wymaga SGT_MODE=mssql/);
+});
+
 test("SGT_MODE=mssql bez danych logowania nie przechodzi startu", () => {
   // wcześniej puste dane przechodziły, a awaria wychodziła przy pierwszym
   // zapytaniu — czyli PO tym, jak instalator uznał, że skończył

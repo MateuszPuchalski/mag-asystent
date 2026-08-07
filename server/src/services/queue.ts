@@ -111,7 +111,16 @@ export function enqueueSetLocation(
   return queueId;
 }
 
-/** Zadanie MM (spec §5.3): przesunięcie stanu między dowolną parą magazynów. */
+/**
+ * Zadanie MM (spec §5.3): przesunięcie stanu między dowolną parą magazynów.
+ *
+ * NIEZMIENNIK: każde MM jest jednopozycyjne i ma ustawione `base.twId`.
+ * Guard kolejności workera Sfery (sfera-worker/sql/pick_mm_*.sql) pilnuje
+ * „adres przed sprzedawalnością" po KOLUMNIE `tw_id` — MM wielopozycyjne
+ * albo bez `twId` prześlizgnęłoby się obok guardu i mogło wejść przed
+ * zapisem lokalizacji. Gdyby kiedyś powstał nadawca wielopozycyjny, guard
+ * musi najpierw nauczyć się czytać pozycje z payloadu.
+ */
 export function enqueueMM(
   magFrom: number,
   magTo: number,
