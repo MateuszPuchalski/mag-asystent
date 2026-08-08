@@ -130,6 +130,13 @@ w katalogu, z którego ją uruchomiono. `source wertis.env` nie jest już
 potrzebne (dalej działa: zmienne środowiskowe mają pierwszeństwo nad plikiem).
 Inną ścieżkę wskazuje `WERTIS_ENV_FILE`.
 
+Instalator **scala** ten plik, a nie nadpisuje. Klucz, o który kreator zapytał,
+bierze z odpowiedzi; klucza, o który nie pytał, nie rusza. Wartości dopisane
+ręką przeżywają więc kolejne przebiegi z `-TylkoKonfiguracja`. Nie przeżywają
+dwie rzeczy. **Komentarze własne** — plik jest generowany. **Klucze od kont**
+(`ADMIN_LOGIN`, `ADMIN_HASLO`) — sekret konta aplikacji idzie przez API do bazy
+i instalator usuwa go z pliku.
+
 `wertis.env` jest w `.gitignore` (trzyma hasło). Sprawdzenie, że **oba** procesy
 widzą Subiekta:
 

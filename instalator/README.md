@@ -64,6 +64,18 @@ API i worker to **osobne procesy**, ale czytają dziś ten sam `wertis.env`
 wprost z dysku ([`server/src/env-file.ts`](../server/src/env-file.ts)) — NSSM
 nie przenosi już żadnej konfiguracji. Instalator zapisuje więc **jeden plik**.
 
+**Zapis jest scaleniem, nie nadpisaniem.** Kreator wygrywa tam, gdzie ma
+zdanie: klucz, o który zapytał, idzie z jego odpowiedzi. Klucza, o który nie
+pytał, instalator nie rusza — wartość zostaje taka, jak w pliku. Dzięki temu
+ustawienia dopisywane ręką (`DOK_TYPY_DOSTAW`, `MSSQL_ZD_ZREAL_COLUMN`,
+`ZDJECIA_*`) przeżywają kolejne przebiegi z `-TylkoKonfiguracja`.
+
+> **Do 0.31.2 plik powstawał od zera.** Każdy klucz spoza pytań kreatora znikał
+> przy najbliższym przebiegu, a objawem była zgaszona funkcja bez jednego błędu
+> w logu. Dwa wyjątki od scalania zostają. **Komentarze własne** — plik jest
+> generowany. **Klucze od kont** (`ADMIN_LOGIN`, `ADMIN_HASLO`) — instalator
+> usuwa je z pliku, bo sekret konta nie ma prawa leżeć na dysku serwera.
+
 Robi przy tym drugą rzecz, mniej oczywistą: **kasuje środowisko obu usług**.
 Zmienne środowiskowe mają pierwszeństwo nad plikiem, więc pozostałość po
 starszej instalacji — choćby hasło sprzed zmiany — po cichu wygrałaby z tym,

@@ -109,6 +109,68 @@ $script:SUMA_NSSM_ZIP = "727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869
 #>
 $script:WertisKluczeSrodowiskaNssm = @("AppEnvironment", "AppEnvironmentExtra")
 
+<#
+    Klucze, których instalator NIE PRZEPISZE z istniejącego `wertis.env`.
+
+    Publikacja konfiguracji zachowuje dziś klucze dopisane ręką (patrz
+    `Publish-WertisKonfiguracja`), więc „nieznany" przestał znaczyć „zniknie".
+    Dla haseł do kont aplikacji to byłoby cofnięcie wcześniejszej decyzji:
+    sekret podany w kreatorze idzie przez API do bazy i nie ma prawa zostać
+    na dysku serwera. Gdyby ktoś dopisał go do pliku sam, przebieg instalatora
+    jest najlepszą okazją, żeby stamtąd zniknął.
+
+    To NIE JEST biała lista `$kolejnosc` — tamta rozstrzyga, co wolno zapisać
+    z ustawień kreatora, ta rozstrzyga, czego nie wolno przepisać z pliku.
+#>
+$script:WertisKluczeNieprzepisywane = @("ADMIN_LOGIN", "ADMIN_HASLO", "WERTIS_ADMIN")
+
+function Read-WertisEnv {
+    <#
+        .SYNOPSIS
+        Wczytuje `wertis.env` do słownika z zachowaniem kolejności kluczy.
+        .DESCRIPTION
+        Odpowiednik `parseEnvFile` z `server/src/env-file.ts` — ta sama składnia
+        musi być rozumiana po obu stronach, bo plik czyta serwer, a zapisuje go
+        instalator. Rozjazd parserów kończy się tym, że instalator „nie widzi"
+        klucza, który aplikacja stosuje, i kasuje go przy najbliższym przebiegu.
+
+        Obsługuje `export KLUCZ=wartość`, `KLUCZ=wartość`, apostrofy i cudzysłowy,
+        komentarze pełne oraz doklejone na końcu linii. Brak pliku to pusty
+        słownik, a nie błąd — pierwsza instalacja niczego jeszcze nie zapisała.
+    #>
+    param([Parameter(Mandatory)][string]$Sciezka)
+
+    $wynik = [ordered]@{}
+    if (-not (Test-Path $Sciezka)) { return $wynik }
+
+    foreach ($surowa in [System.IO.File]::ReadAllLines($Sciezka)) {
+        $linia = $surowa.Trim()
+        if (-not $linia -or $linia.StartsWith("#")) { continue }
+
+        $m = [regex]::Match($linia, '^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$')
+        if (-not $m.Success) { continue }
+
+        $wartosc = $m.Groups[2].Value
+        $znak = ""
+        if ($wartosc.Length -gt 0) { $znak = $wartosc.Substring(0, 1) }
+        if ($znak -eq '"' -or $znak -eq "'") {
+            # W cudzysłowie `#` jest zwykłym znakiem - hasło może go zawierać.
+            $koniec = $wartosc.IndexOf([char]$znak, 1)
+            if ($koniec -lt 0) {
+                $wartosc = $wartosc.Substring(1)
+            } else {
+                $wartosc = $wartosc.Substring(1, $koniec - 1)
+            }
+        } else {
+            # Bez cudzysłowu bash ucina komentarz dopiero po BIAŁYM ZNAKU, więc
+            # `haslo#7` zostaje w całości. Ta sama reguła co w env-file.ts.
+            $wartosc = ([regex]::Replace($wartosc, '\s+#.*$', '')).Trim()
+        }
+        $wynik[$m.Groups[1].Value] = $wartosc
+    }
+    return $wynik
+}
+
 function Test-WertisSuma {
     <#
         .SYNOPSIS
@@ -331,6 +393,18 @@ function Publish-WertisKonfiguracja {
         po starszej instalacji — np. hasło sprzed zmiany albo SGT_MODE=seeded —
         po cichu wygrałaby z tym, co instalator właśnie zapisał, i to bez
         żadnego objawu poza „u mnie nie działa".
+
+        ZAPIS JEST SCALENIEM, NIE NADPISANIEM. Do sierpnia 2026 plik powstawał
+        od zera z ustawień kreatora, więc każdy klucz dopisany ręką znikał przy
+        najbliższym `-TylkoKonfiguracja`. Dotyczyło to rzeczy, których kreator
+        z założenia nie zna: `DOK_TYPY_DOSTAW`, `MSSQL_ZD_ZREAL_COLUMN`,
+        ustawień zdjęć. Objawem była zgaszona funkcja bez jednego błędu w logu.
+
+        Reguła scalania jest jednozdaniowa: KREATOR WYGRYWA TAM, GDZIE MA
+        ZDANIE. Klucz obecny w `$Ustawienia` idzie z kreatora, także wtedy, gdy
+        jest pusty — pusta nazwa instancji MSSQL to świadome „instancja domyślna"
+        i stara wartość musi wtedy zniknąć. Klucza, o który kreator nie pytał,
+        funkcja nie rusza.
     #>
     param(
         [Parameter(Mandatory)][string]$Katalog,
@@ -344,13 +418,15 @@ function Publish-WertisKonfiguracja {
     $plik = Join-Path $Katalog "wertis.env"
     $Ustawienia.PORT = "$Port"
     <#
-        Lista jest BIAŁĄ LISTĄ, nie kolejnością wypisywania — i to jest jedyna
-        bariera, która działa, gdy ktoś zapomni. Klucz spoza niej nie trafi do
-        pliku, choćby siedział w `$Ustawienia`.
+        Lista jest BIAŁĄ LISTĄ USTAWIEŃ KREATORA, nie kolejnością wypisywania.
+        Wartość spoza niej nie trafi z `$Ustawienia` do pliku, choćby kreator ją
+        zebrał — a nieobecne jest tu wszystko, co dotyczy KONT: hasło admina
+        idzie przez API do bazy i nie ma po co lądować w pliku, który zostaje
+        na dysku serwera. Pilnuje tego `testy.ps1`.
 
-        Nieobecne jest tu wszystko, co dotyczy KONT: hasło admina idzie przez
-        API do bazy i nie ma po co lądować w pliku, który potem zostaje na
-        dysku serwera. Pilnuje tego `testy.ps1`.
+        Klucza dopisanego RĘKĄ ta lista nie dotyczy: takie przechodzą przez plik
+        nietknięte (poza `$script:WertisKluczeNieprzepisywane`). Lista mówi więc
+        dziś wyłącznie o tym, co kreator umie ustawić, i o kolejności wypisania.
     #>
     $kolejnosc = @(
         "SGT_MODE",
@@ -360,9 +436,8 @@ function Publish-WertisKonfiguracja {
         "MAG_ID_MAG", "MAG_ID_MGP", "MAG_ID_ZWROTY",
         # worker Sfery (dokumenty MM) — DEPLOY §6 etap 2, sfera-worker/README.md
         "SFERA_WORKER", "SFERA_OPERATOR", "SFERA_OPERATOR_HASLO",
-        # zdjęcia kartotek — kreator o nie NIE pyta, ale plik jest odtwarzany
-        # od zera przy każdym -TylkoKonfiguracja, więc bez tej listy klucz
-        # dopisany ręką zniknąłby przy najbliższym przebiegu
+        # zdjęcia kartotek — kreator o nie nie pyta; są tu dla stałego miejsca
+        # w pliku i po to, żeby dało się je podać wywołaniem programistycznym
         "ZDJECIA_ZRODLO", "ZDJECIA_TABELA", "ZDJECIA_KOLUMNA_KLUCZA",
         "ZDJECIA_KOLUMNA", "ZDJECIA_KOLUMNA_GLOWNE", "ZDJECIA_KOLUMNA_KOLEJNOSC",
         "ZDJECIA_KATALOG", "ZDJECIA_WZORZEC_PLIKU", "ZDJECIA_MAX_KB",
@@ -371,7 +446,29 @@ function Publish-WertisKonfiguracja {
         "STREFA_CZASU",
         "PORT"
     )
-    $klucze = @($kolejnosc | Where-Object { $Ustawienia.ContainsKey($_) -and "$($Ustawienia[$_])" -ne "" })
+    $poprzednie = Read-WertisEnv -Sciezka $plik
+
+    # Klucze znane instalatorowi. Kreator wygrywa tam, gdzie ma zdanie
+    # (`ContainsKey`); o resztę nie pytał, więc zostaje przy wartości z pliku.
+    $znane = [ordered]@{}
+    foreach ($k in $kolejnosc) {
+        $w = ""
+        if ($Ustawienia.ContainsKey($k)) { $w = "$($Ustawienia[$k])" }
+        elseif ($poprzednie.Contains($k)) { $w = "$($poprzednie[$k])" }
+        # Pusta wartość znaczy „nie ustawiono" — klucz po prostu nie wychodzi
+        # do pliku. Tak działa m.in. domyślna instancja MSSQL.
+        if ($w -ne "") { $znane[$k] = $w }
+    }
+
+    # Klucze dopisane ręką. Instalator ich nie rozumie i właśnie dlatego ich
+    # nie rusza — dokumentacja każe dopisywać tu rzeczy, o które kreator nie
+    # pyta (DOK_TYPY_DOSTAW, MSSQL_ZD_ZREAL_COLUMN, ustawienia zdjęć).
+    $reczne = [ordered]@{}
+    foreach ($k in @($poprzednie.Keys)) {
+        if ($kolejnosc -contains $k) { continue }
+        if ($script:WertisKluczeNieprzepisywane -contains $k) { continue }
+        $reczne[$k] = "$($poprzednie[$k])"
+    }
 
     $linie = @(
         "# WERTIS - ustawienia srodowiska. Plik wygenerowany przez instalator.",
@@ -381,23 +478,36 @@ function Publish-WertisKonfiguracja {
         "#   nssm restart wertis-api ; nssm restart wertis-worker",
         "#   (i wertis-sfera, jesli wdrozony worker Sfery - DEPLOY par. 6 etap 2)",
         "#",
+        "# Instalator SCALA, a nie nadpisuje: klucze dopisane recznie przezywaja",
+        "# kolejne przebiegi. Komentarze wlasne jednak nie - plik jest generowany.",
+        "#",
         "# Plik trzyma haslo do bazy - jest w .gitignore i nie ma go w repo.",
         ""
     )
-    foreach ($k in $klucze) {
+    foreach ($k in $znane.Keys) {
         # apostrofy wokół wartości: hasło może zawierać znaki, które bash
         # zinterpretowałby przy `source wertis.env` (plik ma pozostać
         # wczytywalny obiema drogami)
-        $linie += "export $k='$($Ustawienia[$k])'"
+        $linie += "export $k='$($znane[$k])'"
+    }
+    if ($reczne.Count -gt 0) {
+        $linie += @(
+            "",
+            "# Ponizsze klucze dopisano recznie - kreator o nie nie pyta i ich nie zmienia.",
+            "# Opis kazdego z nich jest w wertis.env.example."
+        )
+        foreach ($k in $reczne.Keys) { $linie += "export $k='$($reczne[$k])'" }
     }
     $linie += ""
 
-    if (-not (Test-DryRun "Zapisałbym $plik ($($klucze.Count) ustawień).")) {
+    $ile = $znane.Count + $reczne.Count
+    $zachowane = if ($reczne.Count -gt 0) { ", w tym $($reczne.Count) dopisanych recznie" } else { "" }
+    if (-not (Test-DryRun "Zapisałbym $plik ($ile ustawień$zachowane).")) {
         # Zakończenia linii w stylu Uniksa: plik jest wczytywany także przez
         # `source wertis.env` w Git Bashu, a CR na końcu wartości wjechałby
         # do hasła.
         Write-WertisPlik -Sciezka $plik -Tresc (($linie -join "`n") + "`n")
-        Write-Ok "Zapisano $plik ($($klucze.Count) ustawień)."
+        Write-Ok "Zapisano $plik ($ile ustawień$zachowane)."
     }
 
     # Sprzątanie po starszych instalacjach: zmienne w usłudze przykrywają plik.
