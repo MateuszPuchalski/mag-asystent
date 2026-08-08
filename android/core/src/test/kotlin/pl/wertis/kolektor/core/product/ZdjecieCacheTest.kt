@@ -1,8 +1,8 @@
 package pl.wertis.kolektor.core.product
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 /* Reguły cache'u zdjęć. Najważniejszy test w tym pliku to ten, który sprawdza,
    że przy świeżym pliku NIE MA żądania — karta towaru jest odpytywana co 2 s
@@ -91,6 +91,7 @@ class ZdjecieCacheTest {
         val wpisy = (1L..5L).associateWith { WpisZdjecia(brak = true, uzyto = TERAZ - it * 1000) }
         val usun = doUsuniecia(wpisy, limitBajtow = 1_000_000, limitWpisow = 3)
         assertEquals(2, usun.size)
-        assertEquals(listOf(5L, 4L), usun, "najdawniej używane najpierw")
+        // JUnit bierze komunikat PIERWSZYM argumentem, odwrotnie niż kotlin.test
+        assertEquals("najdawniej używane najpierw", listOf(5L, 4L), usun)
     }
 }
