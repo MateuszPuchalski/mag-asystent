@@ -1,6 +1,8 @@
 package pl.wertis.kolektor.net
 
+import java.io.File
 import java.util.concurrent.TimeUnit
+import okhttp3.Cache
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
@@ -65,6 +67,8 @@ class ApiClient(
     sessionToken: () -> String?,
     deviceId: String,
     initialBaseUrl: String,
+    /** Katalog na cache HTTP; null = bez cache (testy). */
+    cacheDir: File? = null,
 ) {
     val hostSelection = HostSelectionInterceptor(initialBaseUrl.toHttpUrlOrNull())
 
@@ -72,6 +76,14 @@ class ApiClient(
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
+        /* Cache dyskowy współpracuje z ETagami serwera: odpowiedzi odpytywane
+           co 1,5–2 s wracają jako puste 304, gdy nic się nie zmieniło, a OkHttp
+           podaje kopię z dysku — Retrofit nigdy nie widzi 304. Serwer wysyła
+           `no-cache` (przymus rewalidacji), więc offline nic nie jedzie
+           z dysku bez potwierdzenia — zachowanie bez sieci pozostaje przy
+           buforze offline i ostatniej dobrej wartości pollFlow. Klucz cache
+           to URL PO przepisaniu hosta, więc zmiana serwera nie miesza kopii. */
+        .apply { cacheDir?.let { cache(Cache(File(it, "wertis_http"), 20L * 1024 * 1024)) } }
         .addInterceptor(hostSelection)
         .addInterceptor(IdentityHeaderInterceptor(currentUser, sessionToken, deviceId))
         .build()

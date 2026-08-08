@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,14 +79,24 @@ fun ScanLocScreen(graph: AppGraph) {
     val dodaj = graph.nav.scanLocDodaj
     val scope = rememberCoroutineScope()
 
-    val poll by remember(id) { pollFlow(2000) { apiCall { graph.api.product(id) } } }
-        .collectAsState(initial = Poll())
-    val locInfo by produceState<LocationsInfo?>(null) { value = graph.locationsRepo.get() }
+    val seed = remember(id) { graph.cards.peekCard(id) }
+    val poll by remember(id) {
+        pollFlow(2000, initial = seed) {
+            apiCall { graph.api.product(id) }.also { graph.cards.putCard(it) }
+        }
+    }.collectAsState(initial = Poll(seed, loading = seed == null))
+    // znana reguła od razu — walidacja skanu półki nie czeka na sieć
+    val locInfo by produceState(graph.locationsRepo.cached()) { value = graph.locationsRepo.get() }
 
     var manualOpen by remember { mutableStateOf(false) }
     var manual by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    /* Skan, który przyszedł ZANIM karta dojechała. `handleCode` musi znać
+       obecne adresy towaru, więc bez karty nie ma jak rozstrzygnąć — ale
+       połknięcie skanu bez śladu to zapisany donikąd adres w głowie człowieka,
+       który już odszedł od regału. Kod czeka i odpala się, gdy karta jest. */
+    var queuedScan by remember(id) { mutableStateOf<String?>(null) }
 
     val p = poll.data
 
@@ -107,7 +118,10 @@ fun ScanLocScreen(graph: AppGraph) {
     }
 
     fun handleCode(raw: String) {
-        val card = p ?: return
+        val card = p ?: run {
+            queuedScan = raw
+            return
+        }
         val code = normalizeLoc(raw)
         val err = validateLoc(code, locInfo)
         if (err != null) {
@@ -137,6 +151,11 @@ fun ScanLocScreen(graph: AppGraph) {
         if (scan.kind == ScanKind.EAN) return@ScanHandlerEffect false // EAN → fallback
         handleCode(scan.code)
         true
+    }
+
+    // odczekany skan odpala się, gdy tylko karta dojedzie
+    LaunchedEffect(p != null) {
+        if (p != null) queuedScan?.let { queuedScan = null; handleCode(it) }
     }
 
     if (p == null) {

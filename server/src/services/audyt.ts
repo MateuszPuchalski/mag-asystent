@@ -91,11 +91,26 @@ function warunki(f: FiltrAudytu): Warunki {
  * kończy się pełnym dyskiem, więc rozmiar jest widoczny w `/api/health`
  * i decyzję o archiwum podejmie się na liczbach, a nie na przeczuciu.
  */
-export function statystykiAudytu(): {
+interface StatystykiAudytu {
   zdarzen: number;
   najstarsze: string | null;
   bazaBajtow: number;
-} {
+}
+
+/* COUNT(*) po nigdy nieczyszczonym `events` to pełny skan, a /api/health pyta
+   o niego przy każdym odpytaniu. Liczby są diagnostyczne (decyzja o archiwum
+   zapada na rzędach wielkości), więc 30 s starości nic nie zmienia. */
+let statystykiMemo: { wartosc: StatystykiAudytu; do_: number } | null = null;
+const STATYSTYKI_TTL_MS = 30_000;
+
+export function statystykiAudytu(): StatystykiAudytu {
+  if (statystykiMemo && Date.now() < statystykiMemo.do_) return statystykiMemo.wartosc;
+  const wartosc = obliczStatystyki();
+  statystykiMemo = { wartosc, do_: Date.now() + STATYSTYKI_TTL_MS };
+  return wartosc;
+}
+
+function obliczStatystyki(): StatystykiAudytu {
   const d = db();
   const r = d
     .prepare("SELECT COUNT(*) AS n, MIN(created_at) AS naj FROM events")

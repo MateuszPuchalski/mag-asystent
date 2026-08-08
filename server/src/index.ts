@@ -10,6 +10,7 @@ import { przesuniecieRoutes } from "./routes/przesuniecie.js";
 import { deliveryRoutes } from "./routes/delivery.js";
 import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
+import { withEtag } from "./routes/etag.js";
 import { deviceRoutes } from "./routes/device.js";
 import { authRoutes } from "./routes/auth.js";
 import { audytRoutes } from "./routes/audyt.js";
@@ -47,6 +48,8 @@ export async function buildApp() {
   });
   // kontekst żądania (device_id do events) + bramka sesji — przed trasami
   withRequestContext(app);
+  // ETag/304 dla odpytywanych odczytów — kolektor rewaliduje zamiast pobierać
+  withEtag(app);
 
   /* Health ma odpowiadać na pytanie „czy wdrożenie jest poprawne", a nie tylko
      „czy proces API odpowiada". Do tej pory raportował wyłącznie własny config,

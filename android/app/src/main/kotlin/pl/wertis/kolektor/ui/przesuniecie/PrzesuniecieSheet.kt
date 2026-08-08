@@ -115,9 +115,11 @@ fun PrzesuniecieSheet(
     var busy by remember { mutableStateOf(false) }
 
     /* Listę magazynów bierzemy z serwera, bo to on rozstrzyga o rolach
-       i ukrywaniu — kolektor niczego nie filtruje, tylko rysuje to, co dostał. */
+       i ukrywaniu — kolektor niczego nie filtruje, tylko rysuje to, co dostał.
+       Przez repozytorium: przy ciepłym cache arkusz otwiera się z wyborami
+       od razu, zamiast czekać na sieć z pustymi selektorami. */
     LaunchedEffect(Unit) {
-        val lista = runCatching { apiCall { graph.api.listMagazyny() }.magazyny }.getOrDefault(emptyList())
+        val lista = graph.magazynyRepo.get() ?: emptyList()
         magazynyWszystkie = lista
         val z = magFrom ?: lista.firstOrNull { it.rola == magFromRola }?.magId
         zrodlo = z
