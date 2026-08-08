@@ -544,10 +544,10 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
   implementacja istnieje (`sfera-worker/`), ale każde wywołanie COM nosi
   `[WERYFIKUJ]` (wszystkie w `SferaComAdapter.cs`), a `SFERA_WORKER` jest
   domyślnie wyłączony. Do czasu weryfikacji dokument MM wystawia biuro.
-- **Zdjęcia kartotek są wyłączone, dopóki nie wskaże się źródła.** Opis
-  struktury nie mówi, gdzie Subiekt trzyma obraz z zakładki „Opis"; nazwy
-  tabeli i kolumn ustala się na kopii bazy (`docs/subiekt-gt-struktura.md`)
-  i wszystkie są `[WERYFIKUJ]` w `adapters/zdjecia.sgt.ts`.
+- **Zdjęcia kartotek są wyłączone, dopóki nie wskaże się źródła.** Dla tego
+  podmiotu źródło jest już ustalone — `tw_ZdjecieTw`, komplet ustawień
+  w `docs/subiekt-gt-struktura.md` — ale funkcja rusza dopiero po wpisaniu ich
+  do `wertis.env` i nadaniu siódmego `GRANT SELECT`.
 - **Otwarte `[WERYFIKUJ]`** dla własnej bazy (komplet z `config.ts`):
   `MAG_ID_*`, `MSSQL_LOC_COLUMN` (które `tw_Pole1..8` trzyma lokalizację),
   `DOK_STATUS_ZD_OTWARTE`, `MSSQL_ZD_ZREAL_COLUMN`, `LOC_FIELD_LIMIT`.

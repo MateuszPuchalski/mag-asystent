@@ -500,6 +500,28 @@ function Format-WertisEtykietaPola {
 
 # ── Konto aplikacji (docs/subiekt-gt-edu-setup.md §2) ────────────────────────
 
+<#
+    Tabele, z których aplikacja CZYTA — jedno źródło dla skryptu nadającego
+    granty i dla sprawdzenia, czy je dostał.
+
+    POWSTAŁO PO DWÓCH ROZJAZDACH POD RZĄD. Liczba grantów żyła osobno od
+    skryptu: najpierw został próg `-ge 7`, gdy w 0.16.0 zeszliśmy do sześciu,
+    a zaraz potem próg `-ge 6`, gdy w 0.31.0 doszła tabela zdjęć. Za każdym
+    razem objawem było zdanie „uprawnienia nie zgadzają się z oczekiwanymi"
+    po POPRAWNEJ instalacji — albo, gorzej, jego brak przy niepełnej.
+
+    Dopóki obie strony czytają tę listę, rozjazd nie ma jak powstać.
+#>
+$script:WertisTabeleOdczytu = @(
+    @{ Tabela = "tw__Towar";      Po = "" },
+    @{ Tabela = "tw_Stan";        Po = "" },
+    @{ Tabela = "dok__Dokument";  Po = "" },
+    @{ Tabela = "dok_Pozycja";    Po = "" },
+    @{ Tabela = "kh__Kontrahent"; Po = "" },
+    @{ Tabela = "sl_Magazyn";     Po = "nazwy i symbole magazynów" },
+    @{ Tabela = "tw_ZdjecieTw";   Po = "zdjęcia kartotek na karcie towaru" }
+)
+
 function Get-WertisSkryptUprawnien {
     <#
         .SYNOPSIS
@@ -522,6 +544,11 @@ function Get-WertisSkryptUprawnien {
     [void](Assert-BezpiecznyIdentyfikator -Nazwa $Login -Opis "login")
     $bazaEsc  = $Baza  -replace "\]", "]]"
     $hasloEsc = $Haslo -replace "'", "''"
+    # Granty z jednej listy — patrz $script:WertisTabeleOdczytu
+    $granty = ($script:WertisTabeleOdczytu | ForEach-Object {
+        $linia = "GRANT SELECT ON dbo.{0,-14} TO [{1}];" -f $_.Tabela, $Login
+        if ($_.Po) { "$linia   -- $($_.Po)" } else { $linia }
+    }) -join "`n"
 
     return @"
 USE [$bazaEsc];
@@ -543,12 +570,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = '$Login')
     CREATE USER [$Login] FOR LOGIN [$Login];
 
 -- ODCZYT: wyłącznie tabele potrzebne aplikacji
-GRANT SELECT ON dbo.tw__Towar      TO [$Login];
-GRANT SELECT ON dbo.tw_Stan        TO [$Login];
-GRANT SELECT ON dbo.dok__Dokument  TO [$Login];
-GRANT SELECT ON dbo.dok_Pozycja    TO [$Login];
-GRANT SELECT ON dbo.kh__Kontrahent TO [$Login];
-GRANT SELECT ON dbo.sl_Magazyn     TO [$Login];   -- nazwy i symbole magazynów
+$granty
 
 -- ZAPIS: JEDNA kolumna kartoteki (ta sama, co MSSQL_LOC_COLUMN) i nic więcej.
 -- Dokumenty, flagi i stany pozostają dla tego loginu tylko do odczytu.
@@ -666,21 +688,18 @@ function Test-WertisUprawnienia {
     })
 
     <#
-        Próg SZEŚĆ, nie siedem — tyle `GRANT SELECT` nadaje
-        `Get-WertisSkryptUprawnien`: tw__Towar, tw_Stan, dok__Dokument,
-        dok_Pozycja, kh__Kontrahent, sl_Magazyn.
-
-        Stało tu `-ge 7` od czasów, gdy grantów było osiem. Gdy w 0.16.0
-        wypadły `fl_Wartosc` i `fl__Flagi` razem z flagą sprawdzenia faktury,
-        skrypt zszedł do sześciu, a próg został — czyli KOMPLET uprawnień
-        nadany własnym skryptem był meldowany jako niekompletny. Testy
-        w `testy.ps1` liczą tę wartość z samego skryptu, żeby drugi raz nie
-        dało się jej rozjechać.
+        Próg NIE jest liczbą wpisaną z ręki — bierze się z tej samej listy,
+        z której `Get-WertisSkryptUprawnien` nadaje granty. Dwa razy pod rząd
+        te wartości się rozjechały (0.16.0 zdjęło dwa granty, 0.31.0 dodało
+        jeden) i za każdym razem objawem było zdanie o niezgodnych
+        uprawnieniach po POPRAWNEJ instalacji.
     #>
+    $wymagane = @($script:WertisTabeleOdczytu).Count
     return [pscustomobject]@{
         TabeleOdczytu   = $select.Count
+        Wymaganych      = $wymagane
         LokalizacjaOk   = ($lokalizacja.Count -eq 1)
         ZapisDokumentow = $zapisDok.Count
-        Ok              = ($select.Count -ge 6 -and $lokalizacja.Count -eq 1 -and $zapisDok.Count -eq 0)
+        Ok              = ($select.Count -ge $wymagane -and $lokalizacja.Count -eq 1 -and $zapisDok.Count -eq 0)
     }
 }

@@ -97,6 +97,28 @@ test("ZDJECIA_ZRODLO=blob przy seeded to blad — nie ma skad wziac zdjec", () =
   assert.match(bledy[0], /wymaga SGT_MODE=mssql/);
 });
 
+test("osobna tabela zdjec bez kolumny kolejnosci nie przechodzi startu", () => {
+  // tw_ZdjecieTw.zd_IdTowar jest kluczem OBCYM — bez zd_Id porządek nie
+  // rozstrzyga, które z kilku zdjęć towaru wziąć, a objawem byłby ruch
+  // sieciowy (skaczący ETag), nie błąd
+  const zly = {
+    ...config,
+    sgtMode: "mssql" as const,
+    mssql: { ...config.mssql, database: "b", user: "u", password: "p" },
+    zdjecia: {
+      ...config.zdjecia,
+      zrodlo: "blob" as const,
+      tabela: "tw_ZdjecieTw",
+      kolumna: "zd_Zdjecie",
+      kolumnaKolejnosc: "",
+    },
+  };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /ZDJECIA_KOLUMNA_KOLEJNOSC/);
+  assert.match(bledy[0], /zd_Id/, "komunikat ma podać gotową wartość, nie tylko nazwę klucza");
+});
+
 test("ZDJECIA_ZRODLO=plik bez katalogu nie przechodzi startu", () => {
   const zly = { ...config, zdjecia: { ...config.zdjecia, zrodlo: "plik" as const, katalog: "" } };
   const bledy = bledyKonfiguracji(zly as typeof config);

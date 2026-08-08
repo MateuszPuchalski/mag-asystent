@@ -415,28 +415,56 @@ Konsekwencja dla konfiguracji: **`^PAL-\d{3}$` ma dziś zero trafień w całej
 kartotece.** Zostaje w `config.locPatterns` jako format DOCELOWY, na który
 migrują palety przy sprzątaniu — nie jako opis stanu obecnego.
 
-## Gdzie Subiekt trzyma zdjęcie kartoteki
+## Gdzie Subiekt trzyma zdjęcie kartoteki — USTALONE
 
-**Tego opis struktury nie zawiera, a repozytorium tego nie wie.** Wśród
-udokumentowanych kolumn `tw__Towar` nie ma ani jednej binarnej, a `tw_Opis`
-jest polem tekstowym — czyta je `services/zamienniki.ts` jako zwykły tekst.
+**Tabela `tw_ZdjecieTw`.** Opis struktury jej nie wymienia; ustalono ją
+zapytaniami z tego rozdziału na bazie firmy (2026-08-08).
 
-Wiadomo natomiast, jak to wygląda w programie. Zakładka **Opis** na kartotece
-ma sekcję „Zdjęcie" z podglądem, a obok niej: **Dodaj, Usuń, Pokaż, Ustaw jako
-główną, Sortuj, Zapisz** oraz strzałki `<<` `>>`. Wynikają z tego dwie rzeczy
-rozstrzygające dla aplikacji:
+| kolumna | typ | rola |
+|---|---|---|
+| `zd_Id` | `int` | klucz wiersza — **jedyne pewne kryterium porządku** |
+| `zd_IdTowar` | `int` | klucz obcy do `tw__Towar` |
+| `zd_Zdjecie` | `image` | sam obraz |
+| `zd_Glowne` | `bit` | zdjęcie główne („Ustaw jako główną" w Subiekcie) |
+| `zd_CRC` | `int` | suma kontrolna treści |
 
-- **kartoteka może mieć KILKA zdjęć**, z jednym oznaczonym jako główne
-  i z jawną kolejnością — więc kolektor musi wybierać deterministycznie,
-- zdjęcia sąsiadują z opcjami sklepu internetowego i synchronizacji z Sello.
-  Wskazuje to na tabelę powiązaną z modułem e-commerce, a nie na kolumnę
-  na samej kartotece.
+Konfiguracja, która z tego wynika:
 
-Kolektor pokazuje **jedno** zdjęcie i ma to być to samo, które biuro widzi jako
-główne. Stąd w konfiguracji osobno `ZDJECIA_KOLUMNA_GLOWNE` i
-`ZDJECIA_KOLUMNA_KOLEJNOSC`.
+```bash
+ZDJECIA_ZRODLO=blob
+ZDJECIA_TABELA=tw_ZdjecieTw
+ZDJECIA_KOLUMNA_KLUCZA=zd_IdTowar
+ZDJECIA_KOLUMNA=zd_Zdjecie
+ZDJECIA_KOLUMNA_GLOWNE=zd_Glowne
+ZDJECIA_KOLUMNA_KOLEJNOSC=zd_Id
+```
 
-### Zapytania rozpoznawcze
+Do tego **siódmy `GRANT SELECT`** na `tw_ZdjecieTw` (skrypt uprawnień, §2).
+
+### Dlaczego `zd_Id` jest w tej konfiguracji obowiązkowe
+
+Zakładka „Opis" ma przyciski „Ustaw jako główną" i „Sortuj" oraz strzałki
+między zdjęciami, więc **kartoteka może mieć ich kilka**. Kolektor pokazuje
+jedno i ma to być to samo, które biuro widzi jako główne.
+
+Kluczem wiążącym jest `zd_IdTowar` — **obcy**, czyli ten sam dla wszystkich
+zdjęć jednego towaru. Jako ostatnie kryterium porządku nie rozstrzyga więc
+niczego: przy dwóch zdjęciach bez flagi „główne" baza zwracałaby raz jedno, raz
+drugie. Objawem nie byłby błąd, tylko skaczący ETag i kolektory ściągające
+obraz przy każdym wejściu na kartę. Porządek domyka dopiero `zd_Id`, a brak
+tego ustawienia zatrzymuje start serwera (walidacja w `config.ts`).
+
+### Czego przy okazji NIE ma
+
+- **`tw__Towar.tw_Logo`** to `binary(50)` — pięćdziesiąt bajtów, więc nie
+  zdjęcie. Nie mylić z kolumną obrazu.
+- Osobnego pola kolejności w `tw_ZdjecieTw` nie ma; „Sortuj" w Subiekcie
+  operuje na kolejności wierszy, którą u nas odtwarza `zd_Id`.
+- `tw_Zmiana.zt_ZmianaZdjecie` (`datetime`) i `zd_CRC` pozwoliłyby wykrywać
+  zmianę zdjęcia bez pobierania obrazu. Dziś rewalidację robi TTL — to jest
+  gotowe usprawnienie na później, nie luka.
+
+### Zapytania, którymi to ustalono
 
 Wszystko na **KOPII** bazy, kontem administratora (login `wertis` tych widoków
 nie ma). Kolejność jest istotna — pierwsze kosztuje sekundę i potrafi zamknąć
@@ -508,12 +536,14 @@ JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0,1)
 GROUP BY t.name ORDER BY t.name;
 ```
 
-### Co z wynikiem zrobić
+Ta firma trafiła na wariant „osobna tabela" (`tw_ZdjecieTw`, wyżej). Zapytania
+zostają w dokumencie, bo inny podmiot albo inna wersja Subiekta mogą trafić na
+co innego, a wtedy odpowiedzi szuka się tą samą drogą:
 
 | wynik | GRANT | ustawienia |
 |---|---|---|
+| **osobna tabela** ← ten podmiot | **siódmy `GRANT SELECT`** | `ZDJECIA_TABELA`, `ZDJECIA_KOLUMNA_KLUCZA`, `ZDJECIA_KOLUMNA`, `ZDJECIA_KOLUMNA_GLOWNE`, `ZDJECIA_KOLUMNA_KOLEJNOSC` |
 | kolumna na `tw__Towar` | żaden nowy | `ZDJECIA_ZRODLO=blob`, `ZDJECIA_KOLUMNA` |
-| osobna tabela | **siódmy `GRANT SELECT`** | + `ZDJECIA_TABELA`, `ZDJECIA_KOLUMNA_KLUCZA`, `ZDJECIA_KOLUMNA_GLOWNE`, `ZDJECIA_KOLUMNA_KOLEJNOSC` |
 | ścieżka do pliku w polu tekstowym | żaden | `ZDJECIA_ZRODLO=plik`, `ZDJECIA_KATALOG` |
 | OLE / RTF / nic | — | funkcja zostaje wyłączona, wynik dopisujemy tutaj jako obalony |
 

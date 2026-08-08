@@ -471,7 +471,7 @@ if ($podlaczacDoSubiekta) {
                     }
                 } else {
                     Write-Blad "Konto powstało, ale uprawnienia nie zgadzają się z oczekiwanymi."
-                    Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma być 6), lokalizacja: $($ocena.LokalizacjaOk), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma być 0)"
+                    Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma być $($ocena.Wymaganych)), lokalizacja: $($ocena.LokalizacjaOk), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma być 0)"
                 }
             }
         } else {

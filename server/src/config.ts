@@ -363,6 +363,19 @@ export function bledyKonfiguracji(c: Config = config): string[] {
           "Subiekta, z której dałoby się zdjęcia wziąć.",
       );
     }
+    /* Osobna tabela znaczy klucz OBCY: `tw_ZdjecieTw.zd_IdTowar` jest ten sam
+       dla wszystkich zdjęć jednego towaru, więc jako ostatnie kryterium
+       porządku nie rozstrzyga NICZEGO. Bez kolumny kolejności (dla tej tabeli
+       `zd_Id`) baza zwracałaby raz jedno zdjęcie, raz drugie — a objawem nie
+       byłby błąd, tylko ETag skaczący przy każdym odczycie i kolektory
+       ściągające obraz w kółko. */
+    if (c.zdjecia.tabela && !c.zdjecia.kolumnaKolejnosc) {
+      bledy.push(
+        `ZDJECIA_TABELA=${c.zdjecia.tabela} wymaga ZDJECIA_KOLUMNA_KOLEJNOSC — ` +
+          "w osobnej tabeli klucz jest obcy i nie rozstrzyga, które zdjęcie wziąć " +
+          "(dla tw_ZdjecieTw ustaw zd_Id).",
+      );
+    }
   }
   if (c.zdjecia.zrodlo === "plik" && !c.zdjecia.katalog) {
     bledy.push("ZDJECIA_ZRODLO=plik wymaga ZDJECIA_KATALOG — katalogu ze zdjęciami.");
