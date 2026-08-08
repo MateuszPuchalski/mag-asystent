@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { budujZapytanieBlob, nazwaZeWzorca, rozpoznajMime } from "./zdjecia.sgt.js";
+import { budujZapytanieBlob, nazwaZeWzorca, rozpoznajMime, wybierzObraz } from "./zdjecia.sgt.js";
 
 /* ── Części czyste adaptera zdjęć ────────────────────────────────────────────
    Reszta modułu to wejście/wyjście, którego bez serwera MSSQL i bez udziału
@@ -45,10 +45,36 @@ test("prawdziwa tabela Subiekta: tw_ZdjecieTw domyka porządek po zd_Id", () => 
   assert.match(q, /WHERE zd_IdTowar = @id/);
 });
 
-test("zapytanie bierze DOKŁADNIE jeden wiersz i wiąże id parametrem", () => {
+test("zapytanie bierze garść wierszy i wiąże id parametrem", () => {
   const q = budujZapytanieBlob({ tabela: "tw__Towar", kolumna: "tw_Zdjecie", klucz: "tw_Id" });
-  assert.match(q, /^SELECT TOP 1 /);
+  /* TOP kilka, nie TOP 1: główne zdjęcie bywa kontenerem OLE, a wtedy kartoteka
+     wyglądała na pozbawioną zdjęcia mimo normalnych JPEG-ów obok. Liczba ma
+     jednak zostać mała — to są BLOB-y. */
+  assert.match(q, /^SELECT TOP [1-5] /);
   assert.match(q, /WHERE tw_Id = @id/, "id nigdy nie jest wklejane do tekstu zapytania");
+});
+
+// ── Wybór obrazu spośród zdjęć kartoteki ────────────────────────────────────
+
+test("bierze pierwszy kandydat, który jest obrazem", () => {
+  const OLE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+  const w = wybierzObraz([OLE, JPEG]);
+  assert.equal(w?.mime, "image/jpeg", "OLE nie narysuje żaden kolektor — bierzemy kolejne");
+  assert.equal(w?.bajty, JPEG);
+});
+
+test("gdy pierwszy JEST obrazem, dalszych nie ruszamy", () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  // porządek ustala baza: „główne" idzie pierwsze i ma wygrać
+  assert.equal(wybierzObraz([JPEG, PNG])?.bajty, JPEG);
+});
+
+test("same śmieci to brak zdjęcia, nie błąd", () => {
+  const RTF = Buffer.from([0x7b, 0x5c, 0x72, 0x74, 0x66, 0x31, 0x00, 0x00]);
+  assert.equal(wybierzObraz([RTF, null, Buffer.alloc(0)]), null);
+  assert.equal(wybierzObraz([]), null, "kartoteka bez ani jednego wiersza");
 });
 
 // ── Wstrzyknięcie przez nazwy z wertis.env ──────────────────────────────────

@@ -651,6 +651,21 @@ Miniatura na karcie towaru wymaga APK w wersji **0.30.0 lub nowszej**.
 Serwer wyda zdjęcia od razu po restarcie, starszy kolektor nie ma ich gdzie
 narysować.
 
+**Zdjęcie dodane w Subiekcie pojawia się z opóźnieniem** i to jest projektowe.
+Serwer pamięta „ta kartoteka zdjęcia nie ma" przez `ZDJECIA_BRAK_TTL_H`
+(12 godzin), a kolektor przez dobę. Inaczej setki kartotek bez zdjęcia
+odpytywałyby bazę przy każdym otwarciu karty. Najdalej nazajutrz obraz jest na
+ekranie. Gdy trzeba szybciej — na przykład przy sprawdzaniu, czy wdrożenie
+zadziałało — wymuś ponowne pytanie:
+
+```bash
+curl -s -X POST -H "x-session: <token>" http://localhost:3001/api/admin/zdjecia/odswiez
+```
+
+Kasuje to wyłącznie wpisy „brak zdjęcia" i te po błędzie. Zdjęcia już pobrane
+zostają, bo ich skasowanie kazałoby wszystkim kolektorom ściągnąć obrazy od
+nowa. Po stronie kolektora dobowej pamięci nie da się dziś skrócić.
+
 Po dniu pracy
 `/api/health` w polu `zdjecia` poda, ile zdjęć wpadło do cache'u i jak duże
 było największe — dopiero na tych liczbach dobiera się `ZDJECIA_MAX_KB`.

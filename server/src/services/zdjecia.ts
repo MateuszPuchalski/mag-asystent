@@ -169,9 +169,17 @@ export async function zapewnijZdjecie(
       if (stary.blad) {
         // Błąd źródła ponawiamy po minutach, nie po tygodniu.
         if (!starszyNiz(stary.pobrano_at, c.bladTtlMin / 60)) return stary;
-      } else if (!starszyNiz(stary.pobrano_at, c.ttlH)) {
-        if (stary.plik) dotknij(twId);
-        return stary;
+      } else {
+        /* „Zdjęcie jest" wolno trzymać tydzień — kartoteka rzadko zmienia
+           obraz. „Zdjęcia nie ma" trzeba sprawdzać CZĘŚCIEJ, bo to jedyny
+           stan, który zmienia się przez dodanie czegoś w Subiekcie, a kolektor
+           obiecuje, że zobaczy to najdalej nazajutrz. Jeden próg na oba stany
+           znaczył, że nowe zdjęcie czekało tydzień. */
+        const prog = stary.plik ? c.ttlH : c.brakTtlH;
+        if (!starszyNiz(stary.pobrano_at, prog)) {
+          if (stary.plik) dotknij(twId);
+          return stary;
+        }
       }
     }
   }
@@ -217,6 +225,24 @@ export async function zapewnijZdjecie(
   zapamietaj(twId, { plik, mime: zrodlo.mime, bajtow: zrodlo.bajty.length, etag });
   przytnijCache();
   return wpis(twId) ?? null;
+}
+
+/**
+ * Kasuje wpisy „zdjęcia nie ma" i te po błędzie — następne wejście na kartę
+ * zapyta źródło od nowa. Zwraca liczbę skasowanych.
+ *
+ * POWSTAŁO, BO NIE BYŁO JAK POCZEKAĆ KRÓCEJ. Zdjęcie dodane w Subiekcie
+ * pojawia się samo, ale dopiero po `ZDJECIA_BRAK_TTL_H` — a przy wdrożeniu
+ * i przy sprawdzaniu „czy już działa" te godziny są nie do przyjęcia.
+ *
+ * Wpisów Z PLIKIEM nie ruszamy: mają swój własny, dłuższy cykl odświeżania,
+ * a skasowanie ich kazałoby wszystkim kolektorom ściągnąć obrazy od nowa.
+ */
+export function zapomnijBrakiZdjec(): number {
+  const r = db()
+    .prepare("DELETE FROM zdjecie_cache WHERE plik IS NULL")
+    .run();
+  return Number(r.changes ?? 0);
 }
 
 /** Statystyki do `/api/health` — próg MAX_KB dobiera się na liczbach. */

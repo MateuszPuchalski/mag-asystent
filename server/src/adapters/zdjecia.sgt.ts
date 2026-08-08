@@ -125,10 +125,57 @@ export function budujZapytanieBlob(opts: {
     opts.kolejnosc ? assertSafeColumn(opts.kolejnosc) : null,
     id,
   ].filter(Boolean);
-  return `SELECT TOP 1 ${k} AS bajty FROM ${t} WHERE ${id} = @id ORDER BY ${porzadek.join(", ")}`;
+  return `SELECT TOP ${KANDYDATOW} ${k} AS bajty FROM ${t} WHERE ${id} = @id ORDER BY ${porzadek.join(", ")}`;
 }
 
-async function zBloba(twId: number): Promise<Buffer | null> {
+/**
+ * Ile zdjęć kartoteki bierzemy pod uwagę.
+ *
+ * Nie jedno, i to jest poprawka po zgłoszeniu z magazynu. Zakładka „Opis"
+ * przyjmuje dowolną zawartość, więc GŁÓWNE zdjęcie bywa kontenerem OLE albo
+ * metaplikiem — czymś, czego nie narysuje żaden kolektor. Przy `TOP 1` taka
+ * kartoteka wyglądała na pozbawioną zdjęcia, choć obok leżały normalne JPEG-i.
+ *
+ * Liczba jest mała świadomie: to są BLOB-y, a pobranie pięciu skanów po kilka
+ * megabajtów po to, żeby użyć jednego, kosztowałoby więcej niż problem, który
+ * rozwiązuje.
+ */
+const KANDYDATOW = 3;
+
+/**
+ * Pierwszy kandydat, który JEST obrazem — w kolejności ustalonej przez bazę.
+ *
+ * Wydzielone, bo to jedyna część tej ścieżki dająca się sprawdzić bez MSSQL.
+ * Rozmiar NIE jest tu kryterium: zdjęcie za duże to nadal właściwe zdjęcie
+ * kartoteki i decyduje o nim `services/zdjecia.ts`, zdaniem, po którym dobiera
+ * się `ZDJECIA_MAX_KB`. Podmiana na inne ukryłaby powód, dla którego główne
+ * się nie pokazuje.
+ */
+export function wybierzObraz(kandydaci: Array<Buffer | null>, twId = 0): ZdjecieZrodlo | null {
+  let odrzuconych = 0;
+  for (const bajty of kandydaci) {
+    if (!bajty || bajty.length === 0) continue;
+    const mime = rozpoznajMime(bajty.subarray(0, NAGLOWEK));
+    if (mime) {
+      if (odrzuconych > 0) {
+        console.warn(
+          `[zdjecia] tw_id=${twId}: pierwsze ${odrzuconych} zdjęć nie jest obrazem — biorę kolejne`
+        );
+      }
+      return { bajty, mime };
+    }
+    odrzuconych++;
+  }
+  if (odrzuconych > 0) {
+    /* Nie błąd źródła — źródło odpowiedziało. To kartoteka niesie coś, co nie
+       jest obrazem (kontener OLE, RTF, śmieci), i dla kolektora znaczy to
+       dokładnie tyle samo, co brak zdjęcia. */
+    console.warn(`[zdjecia] tw_id=${twId}: żadne z ${odrzuconych} zdjęć nie jest obrazem — pomijam`);
+  }
+  return null;
+}
+
+async function zBloba(twId: number): Promise<Array<Buffer | null>> {
   const c = config.zdjecia;
   const zapytanie = budujZapytanieBlob({
     tabela: c.tabela || "tw__Towar",
@@ -139,7 +186,7 @@ async function zBloba(twId: number): Promise<Buffer | null> {
   });
   const pool = await mssqlPool();
   const r = await pool.request().input("id", sql.Int, Math.trunc(twId)).query<{ bajty: Buffer | null }>(zapytanie);
-  return r.recordset[0]?.bajty ?? null;
+  return r.recordset.map((w) => w.bajty ?? null);
 }
 
 function zPliku(twId: number, symbol: string): Buffer | null {
@@ -166,9 +213,9 @@ export async function pobierzZeZrodla(twId: number, symbol: string): Promise<Zdj
     throw new Error(brakDostepuDoZdjec ?? "Źródło zdjęć chwilowo odcięte po serii błędów");
   }
 
-  let bajty: Buffer | null;
+  let kandydaci: Array<Buffer | null>;
   try {
-    bajty = c.zrodlo === "blob" ? await zBloba(twId) : zPliku(twId, symbol);
+    kandydaci = c.zrodlo === "blob" ? await zBloba(twId) : [zPliku(twId, symbol)];
     bledowZRzedu = 0;
     brakDostepuDoZdjec = null;
   } catch (e) {
@@ -188,16 +235,7 @@ export async function pobierzZeZrodla(twId: number, symbol: string): Promise<Zdj
     throw new Error(brakDostepuDoZdjec);
   }
 
-  if (!bajty || bajty.length === 0) return null;
-  const mime = rozpoznajMime(bajty.subarray(0, NAGLOWEK));
-  if (!mime) {
-    /* Nie błąd źródła — źródło odpowiedziało. To kartoteka niesie coś, co nie
-       jest obrazem (kontener OLE, RTF, śmieci), i dla kolektora znaczy to
-       dokładnie tyle samo, co brak zdjęcia. */
-    console.warn(`[zdjecia] tw_id=${twId}: zawartość nie jest obrazem (${bajty.length} B) — pomijam`);
-    return null;
-  }
-  return { bajty, mime };
+  return wybierzObraz(kandydaci, twId);
 }
 
 /** Wyłącznie dla testów: kasuje bezpiecznik między przypadkami. */

@@ -25,7 +25,7 @@ import {
 } from "./adapters/subiekt.mssql.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
-import { statystykiZdjec } from "./services/zdjecia.js";
+import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
 import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 
@@ -115,6 +115,18 @@ export async function buildApp() {
       ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
       ...(problemy.length ? { problemy } : {}),
     };
+  });
+
+  /* Wymuszenie ponownego pytania o zdjęcia, których wcześniej nie było.
+     Zdjęcie dodane w Subiekcie pojawia się samo po ZDJECIA_BRAK_TTL_H, ale
+     przy wdrożeniu i przy sprawdzaniu „czy już działa" nikt nie będzie czekał
+     kilkunastu godzin. Kolektor ma własną dobową pamięć braku — po tym
+     wywołaniu zobaczy zdjęcie najdalej nazajutrz, a nie po tygodniu. */
+  app.post("/api/admin/zdjecia/odswiez", async (_req, reply) => {
+    if (config.zdjecia.zrodlo === "") {
+      return reply.code(400).send({ error: "Zdjęcia są wyłączone (ZDJECIA_ZRODLO puste)" });
+    }
+    return { ok: true, zapomniano: zapomnijBrakiZdjec() };
   });
 
   // wymuszenie odświeżenia read-modelu (mssql): np. po przyjęciu dostawy w Subiekcie

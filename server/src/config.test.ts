@@ -119,6 +119,21 @@ test("osobna tabela zdjec bez kolumny kolejnosci nie przechodzi startu", () => {
   assert.match(bledy[0], /zd_Id/, "komunikat ma podać gotową wartość, nie tylko nazwę klucza");
 });
 
+test("pamiec braku zdjecia dluzsza niz doba nie przechodzi startu", () => {
+  /* Kolektor pamięta brak przez 24 h i na tym stoi obietnica „dodane dziś,
+     widoczne jutro". Dłuższa pamięć serwera unieważnia ją po cichu: kolektor
+     pyta po dobie i dostaje 404 ze starego wpisu. Dokładnie ten błąd siedział
+     w kodzie do 0.32.1, tyle że jako JEDEN próg na oba stany. */
+  const zly = {
+    ...config,
+    zdjecia: { ...config.zdjecia, zrodlo: "plik" as const, katalog: "/tmp/z", brakTtlH: 24 },
+  };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /ZDJECIA_BRAK_TTL_H/);
+  assert.match(bledy[0], /dob/, "komunikat ma powiedzieć, skąd bierze się granica");
+});
+
 test("ZDJECIA_ZRODLO=plik bez katalogu nie przechodzi startu", () => {
   const zly = { ...config, zdjecia: { ...config.zdjecia, zrodlo: "plik" as const, katalog: "" } };
   const bledy = bledyKonfiguracji(zly as typeof config);

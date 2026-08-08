@@ -253,6 +253,21 @@ export const config = {
     /** Po ilu godzinach pytamy źródło ponownie o to samo zdjęcie. */
     ttlH: num(process.env.ZDJECIA_TTL_H, 168, "ZDJECIA_TTL_H"),
     /**
+     * Po ilu godzinach pytamy ponownie o kartotekę, która zdjęcia NIE MIAŁA.
+     *
+     * MUSI być krótsze niż `ttlH` i krótsze niż doba, a to drugie jest twardym
+     * wymaganiem, nie ostrożnością. Kolektor pamięta własny „brak" przez 24 h
+     * i obiecuje, że zdjęcie dodane dziś w Subiekcie pojawi się najdalej jutro
+     * (`core/product/ZdjecieCache.kt`). Gdy serwer trzyma swój brak dłużej,
+     * kolektor po dobie grzecznie pyta, dostaje 404 z tygodniowej pamięci
+     * serwera i uzbraja negatyw na kolejne 24 h — obietnica jest wtedy pusta,
+     * a zdjęcie pojawia się po tygodniu.
+     *
+     * Koszt jest mały: to pojedyncze SELECT-y po kluczu głównym i tylko dla
+     * kartotek, które ktoś naprawdę otworzył.
+     */
+    brakTtlH: num(process.env.ZDJECIA_BRAK_TTL_H, 12, "ZDJECIA_BRAK_TTL_H"),
+    /**
      * Jak długo NIE ponawiamy po błędzie źródła. Bez tej przerwy zepsute
      * źródło zamienia każde wejście na kartę w kilkusekundowy timeout —
      * objaw „aplikacja zamarła", którego nikt nie skojarzy ze zdjęciami.
@@ -389,6 +404,16 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (c.zdjecia.zrodlo === "plik" && !c.zdjecia.katalog) {
     bledy.push("ZDJECIA_ZRODLO=plik wymaga ZDJECIA_KATALOG — katalogu ze zdjęciami.");
+  }
+  /* Kolektor pamięta własny „brak zdjęcia" przez 24 h i na tym stoi obietnica
+     „dodane dziś, widoczne jutro". Dłuższa pamięć serwera unieważnia ją po
+     cichu: kolektor pyta po dobie i dostaje 404 ze starego wpisu. */
+  if (c.zdjecia.zrodlo !== "" && c.zdjecia.brakTtlH >= 24) {
+    bledy.push(
+      `ZDJECIA_BRAK_TTL_H=${c.zdjecia.brakTtlH} — musi być mniejsze niż 24. ` +
+        "Kolektor pamięta brak zdjęcia przez dobę, więc dłuższa pamięć serwera " +
+        "opóźniałaby nowe zdjęcia o tydzień zamiast o dzień.",
+    );
   }
 
   // Wzorce adresów przychodzą z env; zły regex wysypuje każdy skan, nie start.

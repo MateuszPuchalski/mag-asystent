@@ -28,6 +28,53 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.32.1 — 8 sierpnia 2026
+
+**Zdjęcie dodane w Subiekcie pojawia się nazajutrz, a nie po tygodniu.**
+Do tego kartoteka z nietypowym zdjęciem głównym przestaje wyglądać na pustą.
+
+**[wymaga działania]** Nic. Po aktualizacji nowe zdjęcia dochodzą same. Gdy
+trzeba je zobaczyć od razu: `POST /api/admin/zdjecia/odswiez`.
+
+### Dwie pamięci braku unieważniały się nawzajem
+
+Kolektor pamięta „ta kartoteka zdjęcia nie ma" przez dobę i na tym stała
+obietnica zapisana wprost w jego kodzie: zdjęcie dodane dziś w Subiekcie ma się
+pokazać najdalej jutro. Serwer trzymał swój brak tak długo jak same zdjęcia,
+czyli **tydzień** — jeden próg obsługiwał oba stany.
+
+Skutek był taki, że obietnica nic nie znaczyła. Kolektor po dobie grzecznie
+pytał, dostawał 404 z tygodniowej pamięci serwera i uzbrajał własny negatyw na
+kolejne 24 godziny. I tak w kółko, aż do wygaśnięcia tego dłuższego progu.
+Objawu nie było żadnego: zdjęcie po prostu nie pojawiało się przez tydzień,
+a wszystko wyglądało na działające.
+
+Rozdzielone. `ZDJECIA_BRAK_TTL_H` (12 godzin) dotyczy WYŁĄCZNIE stanu „nie ma
+zdjęcia" — jedynego, który zmienia się przez dodanie czegoś w Subiekcie. Sam
+obraz zmienia się rzadko i zostaje przy tygodniu. Konfiguracja odmawia startu,
+gdy ktoś ustawi ten próg na dobę lub więcej, bo wracałby dokładnie ten błąd.
+
+Doszło też wymuszenie: `POST /api/admin/zdjecia/odswiez` kasuje wpisy „brak"
+i te po błędzie, zostawiając pobrane zdjęcia. Przy wdrożeniu, gdy sprawdza się
+„czy już działa", kilkanaście godzin czekania nie jest odpowiedzią.
+
+### Zdjęcie główne bywa czymś, czego nie da się narysować
+
+Zakładka „Opis" w Subiekcie przyjmuje dowolną zawartość, więc jako główne
+potrafi stać kontener OLE albo metaplik. Serwer brał dokładnie jeden wiersz,
+nie rozpoznawał w nim obrazu i meldował „brak zdjęcia" — mimo normalnych
+JPEG-ów leżących obok na tej samej kartotece.
+
+Bierzemy teraz kilka pierwszych zdjęć w kolejności ustalonej przez Subiekt
+i wybieramy pierwsze, które faktycznie jest obrazem. Liczba jest mała
+świadomie: to są BLOB-y, a ciągnięcie pięciu skanów po to, żeby użyć jednego,
+kosztowałoby więcej niż problem, który rozwiązuje.
+
+Rozmiar celowo NIE jest tu kryterium. Zdjęcie za duże to nadal właściwe zdjęcie
+kartoteki i zostaje przy nim zdanie mówiące, ile ważyło — po tej liczbie dobiera
+się `ZDJECIA_MAX_KB`. Podmiana na inne ukryłaby powód, dla którego główne się
+nie pokazuje.
+
 ## 0.32.0 — 8 sierpnia 2026
 
 **Kreator sam włącza zdjęcia kartotek.** Sprawdza bazę, ustawia sześć kluczy
