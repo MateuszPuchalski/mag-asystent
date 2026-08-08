@@ -1,4 +1,5 @@
 import { db, nowIso } from "../db/db.js";
+import { cachedByDbVersion } from "./cache.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
@@ -64,8 +65,18 @@ const ukryteIds = (): Set<number> =>
     }>).map((r) => r.mag_id)
   );
 
-/** Wszystkie magazyny z flagą `ukryty` i rolą — do ekranu ustawień. */
+/**
+ * Wszystkie magazyny z flagą `ukryty` i rolą — do ekranu ustawień.
+ *
+ * Cache'owane: lista wchodzi w KAŻDĄ kartę towaru (`magazynyTowaru`),
+ * odświeżaną co 2 s, a zmienia się tylko przy imporcie i przy zapisie
+ * widoczności — oba to zapisy, więc `cache.ts` je widzi.
+ */
 export function listaMagazynow(): Magazyn[] {
+  return cachedByDbVersion("magazyny", obliczListeMagazynow);
+}
+
+function obliczListeMagazynow(): Magazyn[] {
   const ukryte = ukryteIds();
   return subiekt.listMagazyny().map((m) => ({
     magId: m.mag_id,

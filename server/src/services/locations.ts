@@ -1,4 +1,5 @@
 import { db } from "../db/db.js";
+import { cachedByDbVersion } from "./cache.js";
 import { subiekt } from "../context.js";
 import { config } from "../config.js";
 import { parseLocs } from "../locs.js";
@@ -75,7 +76,23 @@ export function pendingLocChanges(twId: number, current: string[]): PendingLocCh
        WHERE type='set_location' AND tw_id=? AND status IN (${W_TOKU.map(() => "?").join(",")},'error')
        ORDER BY id`
     )
-    .all(twId, ...W_TOKU) as Array<{ id: number; payload: string; status: string }>;
+    .all(twId, ...W_TOKU) as unknown as ZadanieLoc[];
+  return pendingLocChangesFrom(rows, current);
+}
+
+/** Wiersz kolejki `set_location` w kształcie, jakiego potrzebuje różnica pól. */
+interface ZadanieLoc {
+  id: number;
+  payload: string;
+  status: string;
+}
+
+/**
+ * Ta sama różnica, liczona z wierszy już odczytanych. Zawartość półki pyta
+ * o zmiany dla KAŻDEGO towaru z listy — jeden odczyt całej kolejki i podział
+ * po `tw_id` zamiast zapytania na wiersz (`getProductsByLocation`).
+ */
+export function pendingLocChangesFrom(rows: ZadanieLoc[], current: string[]): PendingLocChange[] {
   if (!rows.length) return [];
 
   const target = (r: { payload: string }): string[] | null => {
@@ -117,9 +134,14 @@ export function pendingLocChanges(twId: number, current: string[]): PendingLocCh
   return out;
 }
 
-/** Wykaz istniejących kodów lokalizacji (słownik) — do ostrzeżeń o kodzie spoza wykazu. */
+/**
+ * Wykaz istniejących kodów lokalizacji (słownik) — do ostrzeżeń o kodzie spoza
+ * wykazu. Budowa to pełny skan `sgt_towar`, a wynik zmienia się tylko przy
+ * imporcie i przy zapisie lokalizacji przez workera — do tego czasu odpowiada
+ * cache (`cache.ts`).
+ */
 export function listLocations(): string[] {
-  return subiekt.listLocations();
+  return cachedByDbVersion("locations", () => subiekt.listLocations());
 }
 
 /**
@@ -134,8 +156,27 @@ export function getProductsByLocation(code: string): ProductRow[] {
   const kod = code.trim().toUpperCase();
   const rows = subiekt.getProductsByLocation(kod);
 
+  // Cała kolejka `set_location` jednym odczytem — półka odświeża się co 2 s,
+  // a wierszy potrafi być 200; zapytanie na wiersz zjadało cały budżet.
+  const zadania = db()
+    .prepare(
+      `SELECT id, tw_id, payload, status FROM sfera_queue
+       WHERE type='set_location' AND tw_id IS NOT NULL
+         AND status IN (${W_TOKU.map(() => "?").join(",")},'error')
+       ORDER BY id`
+    )
+    .all(...W_TOKU) as Array<{ id: number; tw_id: number; payload: string; status: string }>;
+  const poTowarze = new Map<number, typeof zadania>();
+  for (const z of zadania) {
+    const grupa = poTowarze.get(z.tw_id);
+    if (grupa) grupa.push(z);
+    else poTowarze.set(z.tw_id, [z]);
+  }
+
   const mark = (r: ProductRow): ProductRow => {
-    const zmiana = pendingLocChanges(r.id, r.locs).find((p) => p.code === kod);
+    const zmiana = pendingLocChangesFrom(poTowarze.get(r.id) ?? [], r.locs).find(
+      (p) => p.code === kod
+    );
     return zmiana
       ? { ...r, pendingHere: zmiana.status === "error" ? "error" : zmiana.kind }
       : { ...r, pendingHere: null };
@@ -144,19 +185,14 @@ export function getProductsByLocation(code: string): ProductRow[] {
 
   // Towary DOJEŻDŻAJĄCE na tę półkę nie są jeszcze w read-modelu, więc nie
   // wyszłyby z zapytania po kartotece — trzeba je dobrać z kolejki.
-  const jadace = db()
-    .prepare(
-      `SELECT DISTINCT tw_id FROM sfera_queue
-       WHERE type='set_location' AND tw_id IS NOT NULL
-         AND status IN (${W_TOKU.map(() => "?").join(",")},'error')`
-    )
-    .all(...W_TOKU) as Array<{ tw_id: number }>;
-  for (const { tw_id } of jadace) {
+  for (const tw_id of poTowarze.keys()) {
     if (out.some((r) => r.id === tw_id)) continue;
     const t = subiekt.getProductById(tw_id);
     if (!t) continue;
     const locs = parseLocs(t.lokalizacja);
-    const zmiana = pendingLocChanges(tw_id, locs).find((p) => p.code === kod && p.kind === "add");
+    const zmiana = pendingLocChangesFrom(poTowarze.get(tw_id) ?? [], locs).find(
+      (p) => p.code === kod && p.kind === "add"
+    );
     if (!zmiana) continue;
     const stan = (m: number) => subiekt.getStock(tw_id, m).stan;
     out.push({

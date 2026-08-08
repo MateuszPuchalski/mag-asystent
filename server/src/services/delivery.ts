@@ -63,10 +63,11 @@ export function listDocuments(days = 14): DeliveryDocument[] {
     )
     .all() as Array<{ deliveryId: number; dokId: number; total: number; done: number; status: string }>;
   const byDoc = new Map(progress.map((p) => [p.dokId, p]));
+  const pozycje = subiekt.countPositionsByDoc();
 
   return docs.map((d) => {
     const p = byDoc.get(d.dok_id);
-    const positions = subiekt.getDocumentPositions(d.dok_id).length;
+    const positions = pozycje.get(d.dok_id) ?? 0;
     return {
       dokId: d.dok_id,
       typ: d.typ,

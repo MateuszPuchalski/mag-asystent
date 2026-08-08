@@ -241,6 +241,17 @@ export class SeededSubiektAdapter {
       .all(docId) as unknown as RawPosition[];
   }
 
+  /**
+   * Liczba pozycji per dokument, jednym zapytaniem — lista dostaw pyta o nią
+   * dla każdego dokumentu z okna, a zapytanie na dokument to N+1.
+   */
+  countPositionsByDoc(): Map<number, number> {
+    const rows = db()
+      .prepare("SELECT dok_id, COUNT(*) AS n FROM sgt_pozycja GROUP BY dok_id")
+      .all() as Array<{ dok_id: number; n: number }>;
+    return new Map(rows.map((r) => [r.dok_id, r.n]));
+  }
+
   /** Wykaz istniejących kodów lokalizacji (słownik dla walidacji/podpowiedzi). */
   listLocations(): string[] {
     const rows = db()
