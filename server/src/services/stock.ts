@@ -24,6 +24,22 @@ import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
  * między magazynami bez roli.
  */
 export function pendingMmByTw(filtr?: { z?: number; na?: number }): Map<number, number> {
+  return sumujMm(czytajKolejkeMm(), filtr);
+}
+
+/** Zadanie MM z kolejki po sparsowaniu — para magazynów i pozycje. */
+interface MmZadanie {
+  z: number;
+  na: number;
+  items: Array<{ twId: number; qty: number }>;
+}
+
+/**
+ * Jeden odczyt kolejki MM. `buildProductCard` pyta o oczekujące przesunięcia
+ * raz dla każdego magazynu na karcie — czytamy i parsujemy kolejkę raz,
+ * a filtrowanie zostaje w pamięci (`sumujMm`).
+ */
+function czytajKolejkeMm(): MmZadanie[] {
   const rows = db()
     .prepare(
       `SELECT payload FROM sfera_queue
@@ -31,7 +47,7 @@ export function pendingMmByTw(filtr?: { z?: number; na?: number }): Map<number, 
          AND status IN ('pending','processing','waiting_for_doc')`
     )
     .all() as Array<{ payload: string }>;
-  const map = new Map<number, number>();
+  const out: MmZadanie[] = [];
   for (const r of rows) {
     try {
       const p = JSON.parse(r.payload) as {
@@ -41,15 +57,28 @@ export function pendingMmByTw(filtr?: { z?: number; na?: number }): Map<number, 
       };
       // zadania sprzed 0.16.0 nie niosły pary magazynów: wszystkie szły z MGP
       // na MAG, bo innej drogi wtedy nie było
-      const z = p.magFrom ?? config.magId.MGP;
-      const na = p.magTo ?? config.magId.MAG;
-      if (filtr?.z != null && z !== filtr.z) continue;
-      if (filtr?.na != null && na !== filtr.na) continue;
-      for (const it of p.items ?? []) {
-        map.set(it.twId, (map.get(it.twId) ?? 0) + it.qty);
-      }
+      out.push({
+        z: p.magFrom ?? config.magId.MGP,
+        na: p.magTo ?? config.magId.MAG,
+        items: p.items ?? [],
+      });
     } catch {
       /* pomiń uszkodzony payload */
+    }
+  }
+  return out;
+}
+
+function sumujMm(
+  zadania: MmZadanie[],
+  filtr?: { z?: number; na?: number }
+): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const zad of zadania) {
+    if (filtr?.z != null && zad.z !== filtr.z) continue;
+    if (filtr?.na != null && zad.na !== filtr.na) continue;
+    for (const it of zad.items) {
+      map.set(it.twId, (map.get(it.twId) ?? 0) + it.qty);
     }
   }
   return map;
@@ -122,9 +151,12 @@ export function buildProductCard(
   const zwRaw = adapter.getStock(twId, config.magId.ZWROTY);
   /* Co z danego magazynu WYJEŻDŻA i co na MAG PRZYJEŻDŻA — dwa różne pytania,
      odkąd przesunięcie może iść między dowolną parą magazynów. Do 0.22.0
-     wystarczyła jedna liczba, bo każde MM szło z wózka na halę. */
-  const wyjezdzaZ = (magId: number) => pendingMmByTw({ z: magId }).get(twId) ?? 0;
-  const naMag = pendingMmByTw({ na: config.magId.MAG }).get(twId) ?? 0;
+     wystarczyła jedna liczba, bo każde MM szło z wózka na halę.
+     Kolejka czytana RAZ na kartę — karta odświeża się co 2 s na każdym
+     kolektorze, a pytań o kierunek jest tyle, ile magazynów na ekranie. */
+  const zadaniaMm = czytajKolejkeMm();
+  const wyjezdzaZ = (magId: number) => sumujMm(zadaniaMm, { z: magId }).get(twId) ?? 0;
+  const naMag = sumujMm(zadaniaMm, { na: config.magId.MAG }).get(twId) ?? 0;
   const locs = parseLocs(t.lokalizacja);
 
   return {
