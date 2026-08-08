@@ -328,7 +328,7 @@ fun ProductScreen(graph: AppGraph) {
         MagazynySekcja(p, "mag" in otwarte, { toggle("mag") }) { magId, rola, dostepne ->
             przesun = Zrodlo(magId, rola, dostepne)
         }
-        ZamiennikiSekcja(p, "zam" in otwarte, { toggle("zam") }) { row ->
+        ZamiennikiSekcja(graph, p, "zam" in otwarte, { toggle("zam") }) { row ->
             graph.nav.openProduct(
                 row.id,
                 RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji"),

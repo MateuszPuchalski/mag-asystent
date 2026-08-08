@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.net.ProductRow
@@ -137,6 +138,7 @@ fun MagazynySekcja(
  */
 @Composable
 fun ZamiennikiSekcja(
+    graph: AppGraph,
     p: ProductCard,
     otwarta: Boolean,
     onToggle: () -> Unit,
@@ -144,7 +146,7 @@ fun ZamiennikiSekcja(
 ) {
     val podsumowanie = podsumowanieZamiennikow(p.zamienniki, p.desc) ?: return
     CollapsibleSection("Zamienniki i opis", podsumowanie, otwarta, onToggle) {
-        p.zamienniki.znane.forEach { row -> ProductRowCard(row) { onOpen(row) } }
+        p.zamienniki.znane.forEach { row -> ProductRowCard(graph, row) { onOpen(row) } }
         if (p.zamienniki.obce.isNotEmpty()) {
             // numerów obcych nie mamy u siebie — nie ma dokąd w nie wejść,
             // ale to one idą w rozmowę z dostawcą
