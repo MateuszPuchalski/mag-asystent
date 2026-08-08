@@ -62,6 +62,35 @@ fun BoxScope.SuccessOverlay(msg: String?) {
     }
 }
 
+/**
+ * Serwer nie odpowiada przy DZIAŁAJĄCEJ sieci.
+ *
+ * To inny stan niż offline i inny baner: offline mówi o TYM urządzeniu
+ * i o zapisach czekających w buforze; ten mówi, że liczby na ekranie
+ * przestały się odświeżać, choć nic na to nie wygląda — pastylka i karty
+ * świadomie trzymają ostatni znany stan. Bez przycisku: pętla kolejki
+ * i tak ponawia co 1,5 s, a baner gaśnie sam przy pierwszej odpowiedzi.
+ */
+@Composable
+fun SerwerBanner(widoczny: Boolean) {
+    if (!widoczny) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Ink)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Serwer nie odpowiada — dane na ekranie mogą być nieaktualne",
+            color = CardWhite,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 @Composable
 fun OfflineBanner(count: Int, onFlush: () -> Unit) {
     if (count == 0) return

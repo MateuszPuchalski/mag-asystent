@@ -22,6 +22,7 @@ import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
+import pl.wertis.kolektor.ui.chrome.SerwerBanner
 import pl.wertis.kolektor.ui.chrome.SuccessOverlay
 import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
@@ -49,6 +50,8 @@ fun AppRoot(graph: AppGraph) {
     val toastMsg by graph.effects.toastMsg.collectAsStateWithLifecycle()
     val success by graph.effects.success.collectAsStateWithLifecycle()
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
+    val serwerMilczy by graph.queueRepo.serwerMilczy.collectAsStateWithLifecycle()
+    val online by graph.connectivity.online.collectAsStateWithLifecycle()
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
     val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -109,6 +112,9 @@ fun AppRoot(graph: AppGraph) {
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
         )
+        /* Tylko przy działającej sieci: bez niej to urządzenie jest odcięte,
+           nie serwer — i wtedy mówi bufor offline, nie ten baner. */
+        SerwerBanner(serwerMilczy && online)
         OfflineBanner(offlineCount) {
             scope.launch { graph.offlineQueue.flush() }
         }
