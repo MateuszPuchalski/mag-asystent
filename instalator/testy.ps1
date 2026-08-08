@@ -154,6 +154,57 @@ Sprawdz "czyta slownik magazynow" {
     Zaloz ($skrypt -match "GRANT SELECT ON dbo\.sl_Magazyn") "brak grantu na sl_Magazyn"
 }
 
+# ── Próg sprawdzenia uprawnień kontra własny skrypt ─────────────────────────
+# POWSTAŁO PO ZASTANEJ USTERCE. `Test-WertisUprawnienia` żądało `-ge 7`, a
+# skrypt nadawał sześć grantów od 0.16.0 (wypadły fl_Wartosc i fl__Flagi).
+# Komplet uprawnień nadany WŁASNYM skryptem instalatora był więc meldowany
+# jako niekompletny, a kreator wypisywał czerwone zdanie po poprawnej
+# instalacji.
+#
+# Liczba w obu testach jest LICZONA ZE SKRYPTU, nie wpisana z palca — to jest
+# jedyny sposób, żeby próg i skrypt nie rozjechały się drugi raz. Dopisanie
+# siódmego grantu (np. tabeli ze zdjęciami) przestawi oba naraz.
+
+Write-Host ""
+Write-Host "Prog Test-WertisUprawnien"
+
+function Uprawnienia-Atrapa {
+    <#
+        .SYNOPSIS
+        Wiersze udające wynik `Get-WertisUprawnienia`: N grantów SELECT plus
+        kolumnowy UPDATE na lokalizacji.
+    #>
+    param([int]$Select, [string]$Kolumna = "tw_Pole3")
+    $wiersze = 1..$Select | ForEach-Object {
+        [pscustomobject]@{ permission_name = "SELECT"; state_desc = "GRANT"; obiekt = "tabela$_"; kolumna = $null }
+    }
+    return @($wiersze) + @(
+        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw__Towar"; kolumna = $Kolumna }
+    )
+}
+
+Sprawdz "prog przepuszcza komplet nadany wlasnym skryptem" {
+    $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
+    $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
+    Zaloz ($ocena.Ok) "prog odrzuca $ile grantow, czyli dokladnie tyle, ile nadaje skrypt"
+}
+
+Sprawdz "prog odrzuca komplet o jeden GRANT za maly" {
+    $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count - 1
+    $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
+    Zaloz (-not $ocena.Ok) "prog przepuszcza brakujacy GRANT"
+}
+
+Sprawdz "prog odrzuca prawo zapisu do dokumentow" {
+    # Ta reguła jest ważniejsza niż liczba tabel: rozluźnienie skryptu o zapis
+    # do dok__Dokument nie ma prawa przejść, choćby SELECT-ów było dość.
+    $upr = @(Uprawnienia-Atrapa -Select 6) + @(
+        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "dok__Dokument"; kolumna = $null }
+    )
+    $ocena = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3"
+    Zaloz (-not $ocena.Ok) "prog przepuszcza prawo zapisu do dok__Dokument"
+}
+
 Sprawdz "JEDYNYM prawem zapisu jest kolumna lokalizacji" {
     # Test na samą dok__Dokument (niżej) przepuściłby kolejny wyjątek dopisany
     # do INNEJ tabeli — dokładnie tak weszła kiedyś flaga faktury. Liczymy więc

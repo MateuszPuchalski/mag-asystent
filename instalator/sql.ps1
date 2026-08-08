@@ -665,10 +665,22 @@ function Test-WertisUprawnienia {
         $_.obiekt -eq "tw__Towar" -and $_.kolumna -eq $KolumnaLokalizacji
     })
 
+    <#
+        Próg SZEŚĆ, nie siedem — tyle `GRANT SELECT` nadaje
+        `Get-WertisSkryptUprawnien`: tw__Towar, tw_Stan, dok__Dokument,
+        dok_Pozycja, kh__Kontrahent, sl_Magazyn.
+
+        Stało tu `-ge 7` od czasów, gdy grantów było osiem. Gdy w 0.16.0
+        wypadły `fl_Wartosc` i `fl__Flagi` razem z flagą sprawdzenia faktury,
+        skrypt zszedł do sześciu, a próg został — czyli KOMPLET uprawnień
+        nadany własnym skryptem był meldowany jako niekompletny. Testy
+        w `testy.ps1` liczą tę wartość z samego skryptu, żeby drugi raz nie
+        dało się jej rozjechać.
+    #>
     return [pscustomobject]@{
         TabeleOdczytu   = $select.Count
         LokalizacjaOk   = ($lokalizacja.Count -eq 1)
         ZapisDokumentow = $zapisDok.Count
-        Ok              = ($select.Count -ge 7 -and $lokalizacja.Count -eq 1 -and $zapisDok.Count -eq 0)
+        Ok              = ($select.Count -ge 6 -and $lokalizacja.Count -eq 1 -and $zapisDok.Count -eq 0)
     }
 }

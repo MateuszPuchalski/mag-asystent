@@ -28,6 +28,36 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.29.2 — 8 sierpnia 2026
+
+<!-- docs_check: historia -->
+**Instalator przestaje meldować własną poprawną instalację jako niekompletną.**
+`Test-WertisUprawnienia` żądało siedmiu `GRANT SELECT`, a skrypt uprawnień
+nadaje sześć — od 0.16.0, kiedy razem z flagą sprawdzenia faktury wypadły
+granty `fl_Wartosc` i `fl__Flagi`. Skrypt zszedł do sześciu, próg został przy
+siedmiu i nikt tego nie zauważył, bo obie liczby żyły osobno.
+
+Skutek dla instalującego: konto SQL z **kompletem** uprawnień nadanych przez
+ten sam instalator kończyło etap czerwonym zdaniem „uprawnienia nie zgadzają
+się z oczekiwanymi", a poniżej podpowiedzią „ma być 7". Naprawa jest jedną
+cyfrą; wartość mają dopiero testy.
+
+### Liczba bierze się teraz ze skryptu, nie z pamięci
+
+Dwa nowe testy w `instalator/testy.ps1` **liczą granty w tekście skryptu**
+i tę samą liczbę podają progowi. Rozjazd drugi raz nie przejdzie, a dopisanie
+siódmego grantu (np. tabeli ze zdjęciami kartotek) przestawi oba naraz.
+Trzeci test pilnuje reguły ważniejszej niż liczba tabel: prawo zapisu do
+`dok__Dokument` ma odrzucać ocenę, choćby SELECT-ów było dość.
+
+Przy okazji dwa zdania kreatora z tej samej epoki — jedno wymieniało kolumnę,
+której instalator nie nadaje od 0.16.0, drugie podpowiadało siódemkę.
+
+**[wymaga działania]** Nic — `git pull`, ponowne zbudowanie instalatora
+(`instalator/build.ps1`), jeśli używasz wersji `.exe`.
+
+---
+
 ## 0.29.1 — 8 sierpnia 2026
 
 **Dokumentacja dogoniła workera Sfery.** Audyt `docs/architektura.md` przeciw
