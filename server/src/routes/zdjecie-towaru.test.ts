@@ -140,3 +140,39 @@ test("nieznany towar → 404", async () => {
   });
   assert.equal(r.statusCode, 404);
 });
+
+// ── POST /api/admin/zdjecia/odswiez ─────────────────────────────────────────
+// Wymuszenie ponownego pytania o kartoteki, które zdjęcia NIE MIAŁY. Bez tego
+// jedyną drogą było przeczekanie ZDJECIA_BRAK_TTL_H — nie do przyjęcia przy
+// wdrożeniu, gdy sprawdza się „czy już działa".
+
+test("odświeżenie braków jest za sesją", async () => {
+  const r = await app.inject({ method: "POST", url: "/api/admin/zdjecia/odswiez" });
+  assert.equal(r.statusCode, 401, "trasa administracyjna nie ma prawa być otwarta");
+});
+
+test("odświeżenie kasuje braki, a zdjęcia zostawia", async () => {
+  wCache(1);
+  const teraz = new Date().toISOString();
+  db()
+    .prepare(
+      `INSERT INTO zdjecie_cache(tw_id, plik, mime, bajtow, etag, pobrano_at, uzyto_at, blad)
+       VALUES (2,NULL,NULL,0,NULL,?,?,NULL)`
+    )
+    .run(teraz, teraz);
+
+  const r = await app.inject({
+    method: "POST",
+    url: "/api/admin/zdjecia/odswiez",
+    headers: { "x-session": token },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().zapomniano, 1, "kasujemy wyłącznie wpisy bez pliku");
+
+  const zostalo = db().prepare("SELECT tw_id FROM zdjecie_cache").all() as Array<{ tw_id: number }>;
+  assert.deepEqual(
+    zostalo.map((w) => w.tw_id),
+    [1],
+    "zdjęcia w cache'u zostają — inaczej wszystkie kolektory pobrałyby je od nowa"
+  );
+});

@@ -89,6 +89,44 @@ test("po TTL zdjęcie jest rewalidowane", async () => {
   assert.equal(z.ile(), 2);
 });
 
+/* ── Brak zdjęcia starzeje się SZYBCIEJ niż zdjęcie ──────────────────────────
+   To jest cała poprawka po zgłoszeniu z magazynu. Kolektor pamięta własny
+   „brak" przez dobę i obiecuje, że zdjęcie dodane dziś w Subiekcie pokaże
+   najdalej jutro. Gdy serwer trzymał swój brak tak długo jak zdjęcia — tydzień —
+   kolektor po dobie pytał, dostawał 404 ze starego wpisu i uzbrajał negatyw na
+   kolejną dobę. Obietnica była pusta, a zdjęcie pojawiało się po tygodniu.    */
+
+test("brak zdjęcia jest sprawdzany ponownie przed upływem doby", async () => {
+  const z = zrodlo(null);
+  await Z.zapewnijZdjecie(1, z.fn);
+  postarz(1, 13); // BRAK_TTL to 12 h, doba jeszcze nie minęła
+  await Z.zapewnijZdjecie(1, z.fn);
+  assert.equal(z.ile(), 2, "kolektor pyta po dobie i musi wtedy dostać świeżą odpowiedź");
+});
+
+test("zdjęcie, które JEST, nie jest ponawiane w tym samym oknie", async () => {
+  const z = zrodlo(JPEG);
+  await Z.zapewnijZdjecie(1, z.fn);
+  postarz(1, 13); // ten sam wiek, inny stan wpisu
+  await Z.zapewnijZdjecie(1, z.fn);
+  assert.equal(z.ile(), 1, "krótszy próg dotyczy WYŁĄCZNIE braku — obraz zmienia się rzadko");
+});
+
+test("zapomnijBrakiZdjec kasuje braki i błędy, zostawia zdjęcia", async () => {
+  await Z.zapewnijZdjecie(1, zrodlo(JPEG).fn); // ma plik
+  await Z.zapewnijZdjecie(2, zrodlo(null).fn); // potwierdzony brak
+
+  assert.equal(Z.zapomnijBrakiZdjec(), 1, "kasujemy wyłącznie wpisy bez pliku");
+
+  const z = zrodlo(JPEG);
+  await Z.zapewnijZdjecie(2, z.fn);
+  assert.equal(z.ile(), 1, "po skasowaniu braku następne wejście na kartę pyta źródło");
+
+  const dalej = zrodlo(JPEG);
+  await Z.zapewnijZdjecie(1, dalej.fn);
+  assert.equal(dalej.ile(), 0, "zdjęcia w cache'u zostają — inaczej wszystkie kolektory pobrałyby je od nowa");
+});
+
 // ── Błąd źródła to nie brak zdjęcia ─────────────────────────────────────────
 
 test("błąd źródła NIE zapisuje trwałego negatywu — ponawia po przerwie", async () => {
