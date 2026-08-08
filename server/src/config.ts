@@ -199,6 +199,58 @@ export const config = {
   locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50, "LOC_FIELD_LIMIT"),
 
   /**
+   * Zdjęcia kartotek na karcie towaru (0.30.0).
+   *
+   * `zrodlo` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM — puste znaczy „funkcji
+   * nie ma" i to jest domyślne. Dwa osobne klucze (włącznik + źródło) mogłyby
+   * się rozjechać ze sobą, a jeden nie może.
+   *
+   * Gdzie Subiekt trzyma zdjęcie z zakładki „Opis", repozytorium NIE WIE —
+   * `docs/subiekt-gt-struktura.md` nie wymienia ani jednej kolumny binarnej.
+   * Nazwy tabeli i kolumn są więc [WERYFIKUJ] i ustala się je zapytaniami
+   * z rozdziału „Gdzie Subiekt trzyma zdjęcie kartoteki".
+   */
+  zdjecia: {
+    /** `""` (brak funkcji) | `blob` (kolumna w MSSQL) | `plik` (katalog na dysku). */
+    zrodlo: (process.env.ZDJECIA_ZRODLO ?? "") as "" | "blob" | "plik",
+    /** [WERYFIKUJ] tabela ze zdjęciem; puste = `tw__Towar`. */
+    tabela: process.env.ZDJECIA_TABELA ?? "",
+    /** [WERYFIKUJ] kolumna wiążąca wiersz z kartoteką. */
+    kolumnaKlucza: process.env.ZDJECIA_KOLUMNA_KLUCZA ?? "tw_Id",
+    /** [WERYFIKUJ] kolumna varbinary/image ze zdjęciem. */
+    kolumna: process.env.ZDJECIA_KOLUMNA ?? "",
+    /**
+     * [WERYFIKUJ] kolumna „zdjęcie główne" (0/1). Kartoteka może mieć kilka
+     * zdjęć — zakładka „Opis" w Subiekcie ma „Ustaw jako główną", „Sortuj"
+     * i strzałki między nimi. Kolektor pokazuje jedno i ma to być TO SAMO,
+     * które biuro widzi jako główne.
+     */
+    kolumnaGlowne: process.env.ZDJECIA_KOLUMNA_GLOWNE ?? "",
+    /** [WERYFIKUJ] kolumna kolejności („Sortuj") — rozstrzyga przy równych. */
+    kolumnaKolejnosc: process.env.ZDJECIA_KOLUMNA_KOLEJNOSC ?? "",
+    /** Katalog źródłowy przy `zrodlo=plik` (udział sieciowy albo dysk lokalny). */
+    katalog: process.env.ZDJECIA_KATALOG ?? "",
+    /** Nazwa pliku przy `zrodlo=plik`: `{symbol}` i `{twId}` są podstawiane. */
+    wzorzecPliku: process.env.ZDJECIA_WZORZEC_PLIKU ?? "{symbol}.jpg",
+    /**
+     * Ponad tyle kilobajtów zdjęcia NIE bierzemy wcale. Serwer nie umie
+     * zmniejszać obrazów (zero modułów natywnych — patrz db/db.ts), więc
+     * jedyną obroną przed kartoteką ze skanem 20 MB jest odmowa.
+     */
+    maxKb: num(process.env.ZDJECIA_MAX_KB, 2048, "ZDJECIA_MAX_KB"),
+    /** Limit katalogu `data/zdjecia` [MB]; ponad to wypada najdawniej oglądane. */
+    cacheMb: num(process.env.ZDJECIA_CACHE_MB, 512, "ZDJECIA_CACHE_MB"),
+    /** Po ilu godzinach pytamy źródło ponownie o to samo zdjęcie. */
+    ttlH: num(process.env.ZDJECIA_TTL_H, 168, "ZDJECIA_TTL_H"),
+    /**
+     * Jak długo NIE ponawiamy po błędzie źródła. Bez tej przerwy zepsute
+     * źródło zamienia każde wejście na kartę w kilkusekundowy timeout —
+     * objaw „aplikacja zamarła", którego nikt nie skojarzy ze zdjęciami.
+     */
+    bladTtlMin: num(process.env.ZDJECIA_BLAD_TTL_MIN, 5, "ZDJECIA_BLAD_TTL_MIN"),
+  },
+
+  /**
    * Wzorce kodu lokalizacji — JEDNO źródło prawdy dla całego systemu (plan §3).
    * Serwer jest właścicielem tej reguły; kolektor pobiera ją w `GET /api/locations`
    * i nie ma własnej kopii. Wcześniej żyła w czterech miejscach o trzech różnych
@@ -288,6 +340,45 @@ export function bledyKonfiguracji(c: Config = config): string[] {
       "SFERA_WORKER=1 wymaga SGT_MODE=mssql — w trybie seeded dokumenty MM " +
         "wykonuje worker Node i zadania mm nie miałyby wykonawcy.",
     );
+  }
+
+  /* Zdjęcia kartotek. Każda z tych pomyłek daje ten sam objaw — pusty slot na
+     karcie towaru — i żadna nie prowadzi do przyczyny, bo brak zdjęcia wygląda
+     dokładnie tak samo jak zła nazwa kolumny. */
+  if (!["", "blob", "plik"].includes(c.zdjecia.zrodlo)) {
+    bledy.push(
+      `ZDJECIA_ZRODLO=${c.zdjecia.zrodlo} — dozwolone: puste (bez zdjęć), blob, plik.`,
+    );
+  }
+  if (c.zdjecia.zrodlo === "blob") {
+    if (!c.zdjecia.kolumna) {
+      bledy.push(
+        "ZDJECIA_ZRODLO=blob wymaga ZDJECIA_KOLUMNA — nazwę ustala się na własnej " +
+          "bazie zapytaniami z docs/subiekt-gt-struktura.md.",
+      );
+    }
+    if (c.sgtMode === "seeded") {
+      bledy.push(
+        "ZDJECIA_ZRODLO=blob wymaga SGT_MODE=mssql — w trybie demo nie ma bazy " +
+          "Subiekta, z której dałoby się zdjęcia wziąć.",
+      );
+    }
+    /* Osobna tabela znaczy klucz OBCY: `tw_ZdjecieTw.zd_IdTowar` jest ten sam
+       dla wszystkich zdjęć jednego towaru, więc jako ostatnie kryterium
+       porządku nie rozstrzyga NICZEGO. Bez kolumny kolejności (dla tej tabeli
+       `zd_Id`) baza zwracałaby raz jedno zdjęcie, raz drugie — a objawem nie
+       byłby błąd, tylko ETag skaczący przy każdym odczycie i kolektory
+       ściągające obraz w kółko. */
+    if (c.zdjecia.tabela && !c.zdjecia.kolumnaKolejnosc) {
+      bledy.push(
+        `ZDJECIA_TABELA=${c.zdjecia.tabela} wymaga ZDJECIA_KOLUMNA_KOLEJNOSC — ` +
+          "w osobnej tabeli klucz jest obcy i nie rozstrzyga, które zdjęcie wziąć " +
+          "(dla tw_ZdjecieTw ustaw zd_Id).",
+      );
+    }
+  }
+  if (c.zdjecia.zrodlo === "plik" && !c.zdjecia.katalog) {
+    bledy.push("ZDJECIA_ZRODLO=plik wymaga ZDJECIA_KATALOG — katalogu ze zdjęciami.");
   }
 
   // Wzorce adresów przychodzą z env; zły regex wysypuje każdy skan, nie start.

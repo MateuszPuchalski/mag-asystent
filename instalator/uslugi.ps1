@@ -360,6 +360,13 @@ function Publish-WertisKonfiguracja {
         "MAG_ID_MAG", "MAG_ID_MGP", "MAG_ID_ZWROTY",
         # worker Sfery (dokumenty MM) — DEPLOY §6 etap 2, sfera-worker/README.md
         "SFERA_WORKER", "SFERA_OPERATOR", "SFERA_OPERATOR_HASLO",
+        # zdjęcia kartotek — kreator o nie NIE pyta, ale plik jest odtwarzany
+        # od zera przy każdym -TylkoKonfiguracja, więc bez tej listy klucz
+        # dopisany ręką zniknąłby przy najbliższym przebiegu
+        "ZDJECIA_ZRODLO", "ZDJECIA_TABELA", "ZDJECIA_KOLUMNA_KLUCZA",
+        "ZDJECIA_KOLUMNA", "ZDJECIA_KOLUMNA_GLOWNE", "ZDJECIA_KOLUMNA_KOLEJNOSC",
+        "ZDJECIA_KATALOG", "ZDJECIA_WZORZEC_PLIKU", "ZDJECIA_MAX_KB",
+        "ZDJECIA_CACHE_MB", "ZDJECIA_TTL_H", "ZDJECIA_BLAD_TTL_MIN",
         "PORT"
     )
     $klucze = @($kolejnosc | Where-Object { $Ustawienia.ContainsKey($_) -and "$($Ustawienia[$_])" -ne "" })

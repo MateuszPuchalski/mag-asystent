@@ -17,6 +17,7 @@ import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SessionRepository
 import pl.wertis.kolektor.data.SetupRepository
 import pl.wertis.kolektor.data.SettingsRepository
+import pl.wertis.kolektor.data.ZdjeciaRepository
 import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
 import pl.wertis.kolektor.device.Feedback
@@ -70,6 +71,7 @@ class AppGraph(context: Context) {
     val locationsRepo = LocationsRepository(context, api)
     val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
+    val zdjeciaRepo = ZdjeciaRepository(context, api)
 
     val effects = UiEffects(appScope)
     val nav = AppNavState(recent)

@@ -544,11 +544,16 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
   implementacja istnieje (`sfera-worker/`), ale każde wywołanie COM nosi
   `[WERYFIKUJ]` (wszystkie w `SferaComAdapter.cs`), a `SFERA_WORKER` jest
   domyślnie wyłączony. Do czasu weryfikacji dokument MM wystawia biuro.
+- **Zdjęcia kartotek są wyłączone, dopóki nie wskaże się źródła.** Dla tego
+  podmiotu źródło jest już ustalone — `tw_ZdjecieTw`, komplet ustawień
+  w `docs/subiekt-gt-struktura.md` — ale funkcja rusza dopiero po wpisaniu ich
+  do `wertis.env` i nadaniu siódmego `GRANT SELECT`.
 - **Otwarte `[WERYFIKUJ]`** dla własnej bazy (komplet z `config.ts`):
   `MAG_ID_*`, `MSSQL_LOC_COLUMN` (które `tw_Pole1..8` trzyma lokalizację),
   `DOK_STATUS_ZD_OTWARTE`, `MSSQL_ZD_ZREAL_COLUMN`, `LOC_FIELD_LIMIT`.
   Zapytania: `docs/subiekt-gt-edu-setup.md` §3. Osobna rodzina: wywołania COM
   w `sfera-worker/src/SferaComAdapter.cs` — lista w `sfera-worker/README.md`.
+  Trzecia: `ZDJECIA_*`, gdy funkcja zdjęć ma być włączona.
 - **Reguły strefy złotej** nie pokrywają regałów `D00`, `D06`, `D07`, `E01` —
   raport przeslotowania wskazuje je na osobnej liście „brak reguły" zamiast
   zgadywać.

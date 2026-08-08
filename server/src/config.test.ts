@@ -62,6 +62,70 @@ test("SFERA_WORKER=1 przy seeded to blad — zadania mm nie mialyby wykonawcy", 
   assert.match(bledy[0], /SFERA_WORKER=1 wymaga SGT_MODE=mssql/);
 });
 
+/* Zdjęcia kartotek: każda z tych pomyłek daje TEN SAM objaw — pusty slot na
+   karcie towaru — i żadna nie prowadzi do przyczyny, bo kartoteka bez zdjęcia
+   wygląda dokładnie tak samo jak zła nazwa kolumny. Dlatego łapiemy je przy
+   starcie, a nie przy pierwszym otwarciu karty. */
+
+test("nieznane ZDJECIA_ZRODLO nie przechodzi startu", () => {
+  const zly = { ...config, zdjecia: { ...config.zdjecia, zrodlo: "sftp" as "blob" } };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /dozwolone: puste \(bez zdjęć\), blob, plik/);
+});
+
+test("ZDJECIA_ZRODLO=blob bez nazwy kolumny nie przechodzi startu", () => {
+  const zly = {
+    ...config,
+    sgtMode: "mssql" as const,
+    mssql: { ...config.mssql, database: "b", user: "u", password: "p" },
+    zdjecia: { ...config.zdjecia, zrodlo: "blob" as const, kolumna: "" },
+  };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /ZDJECIA_KOLUMNA/);
+});
+
+test("ZDJECIA_ZRODLO=blob przy seeded to blad — nie ma skad wziac zdjec", () => {
+  const zly = {
+    ...config,
+    sgtMode: "seeded" as const,
+    zdjecia: { ...config.zdjecia, zrodlo: "blob" as const, kolumna: "zdj_Dane" },
+  };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /wymaga SGT_MODE=mssql/);
+});
+
+test("osobna tabela zdjec bez kolumny kolejnosci nie przechodzi startu", () => {
+  // tw_ZdjecieTw.zd_IdTowar jest kluczem OBCYM — bez zd_Id porządek nie
+  // rozstrzyga, które z kilku zdjęć towaru wziąć, a objawem byłby ruch
+  // sieciowy (skaczący ETag), nie błąd
+  const zly = {
+    ...config,
+    sgtMode: "mssql" as const,
+    mssql: { ...config.mssql, database: "b", user: "u", password: "p" },
+    zdjecia: {
+      ...config.zdjecia,
+      zrodlo: "blob" as const,
+      tabela: "tw_ZdjecieTw",
+      kolumna: "zd_Zdjecie",
+      kolumnaKolejnosc: "",
+    },
+  };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /ZDJECIA_KOLUMNA_KOLEJNOSC/);
+  assert.match(bledy[0], /zd_Id/, "komunikat ma podać gotową wartość, nie tylko nazwę klucza");
+});
+
+test("ZDJECIA_ZRODLO=plik bez katalogu nie przechodzi startu", () => {
+  const zly = { ...config, zdjecia: { ...config.zdjecia, zrodlo: "plik" as const, katalog: "" } };
+  const bledy = bledyKonfiguracji(zly as typeof config);
+  assert.equal(bledy.length, 1);
+  assert.match(bledy[0], /ZDJECIA_KATALOG/);
+});
+
 test("SGT_MODE=mssql bez danych logowania nie przechodzi startu", () => {
   // wcześniej puste dane przechodziły, a awaria wychodziła przy pierwszym
   // zapytaniu — czyli PO tym, jak instalator uznał, że skończył

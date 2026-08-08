@@ -24,6 +24,8 @@ import {
   lastImport,
 } from "./adapters/subiekt.mssql.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
+import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
+import { statystykiZdjec } from "./services/zdjecia.js";
 import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 
@@ -70,6 +72,10 @@ export async function buildApp() {
       problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
+      /* Zdjęcia: brak dostępu do źródła wygląda dokładnie tak samo jak
+         kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by
+         nie skojarzył, że przyczyną jest brak GRANT-u albo zły katalog. */
+      brakDostepuDoZdjec,
       /* Kod dostawy bez nazwy nie zatrzymuje pracy, więc nie jest błędem
          konfiguracji — ale dokumenty chodzą wtedy po ekranie jako `TYP-7`
          i ktoś powinien to dokończyć. Bez tej linii nie miałoby to gdzie
@@ -103,6 +109,9 @@ export async function buildApp() {
          kończy się pełnym dyskiem o trzeciej w nocy, więc rozmiar i wiek
          historii widać tutaj. Decyzję o archiwum podejmuje się na liczbach. */
       audyt: statystykiAudytu(),
+      /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
+         z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
+      ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),
       ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
       ...(problemy.length ? { problemy } : {}),
     };

@@ -28,6 +28,125 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.31.0 — 8 sierpnia 2026
+
+**Wiadomo, gdzie Subiekt trzyma zdjęcia kartotek: `tw_ZdjecieTw`.** Ustalone
+zapytaniami na bazie firmy, więc `ZDJECIA_*` przestają być zgadywanką —
+komplet gotowych wartości leży w `wertis.env.example` i w opisie struktury.
+Tabela ma `zd_IdTowar` (klucz obcy), `zd_Zdjecie` (obraz), `zd_Glowne`
+(odpowiednik „Ustaw jako główną") i `zd_Id`.
+
+**[wymaga działania]** Żeby włączyć zdjęcia: uruchom ponownie skrypt uprawnień
+(doszedł **siódmy `GRANT SELECT`**, na `tw_ZdjecieTw`) albo instalator
+z `-TylkoKonfiguracja`, wpisz sześć kluczy `ZDJECIA_*` do `wertis.env`
+i zrestartuj `wertis-api`. Bez tego nic się nie zmienia.
+
+### Klucz obcy nie rozstrzyga, które zdjęcie wziąć
+
+Prawdziwa struktura obnażyła błąd, którego nie dało się zobaczyć bez niej.
+Zapytanie kończyło porządek na kolumnie klucza, a w osobnej tabeli klucz jest
+**obcy** — `zd_IdTowar` jest ten sam dla wszystkich zdjęć jednego towaru. Przy
+dwóch zdjęciach bez flagi „główne" baza zwracałaby raz jedno, raz drugie;
+objawem nie byłby błąd, tylko skaczący ETag i kolektory ściągające obraz przy
+każdym wejściu na kartę — dokładnie to, czemu cały ten cache ma zapobiegać.
+
+Porządek domyka teraz `ZDJECIA_KOLUMNA_KOLEJNOSC` (`zd_Id`), a **brak tego
+ustawienia przy osobnej tabeli zatrzymuje start serwera**. Reguła jest
+w walidacji, nie w komentarzu, bo tej pomyłki nie widać z ekranu.
+
+### Lista tabel zamiast dwóch liczb, które się rozjeżdżają
+
+Dodanie siódmego grantu natychmiast wywróciło test dopisany w 0.29.2 — próg
+`Test-WertisUprawnienia` znowu został w tyle za skryptem i niepełny komplet
+uprawnień znowu by przeszedł. To ten sam rozjazd co poprzednio, drugi raz pod
+rząd, więc tym razem naprawa nie polega na przestawieniu liczby.
+
+Tabele odczytu mieszkają teraz w **jednej liście** (`$script:WertisTabeleOdczytu`).
+Skrypt generuje z niej granty, sprawdzenie bierze z niej próg, a testy liczą
+z niej oczekiwanie. Dopisanie tabeli przestawia wszystko naraz — rozjazd nie
+ma już jak powstać. Kreator przestał też podawać liczbę wpisaną w tekst
+komunikatu.
+
+### Czego przy okazji nie ma
+
+`tw__Towar.tw_Logo` to `binary(50)` — pięćdziesiąt bajtów, więc nie zdjęcie.
+Osobnej kolumny kolejności w `tw_ZdjecieTw` nie ma; „Sortuj" w Subiekcie
+operuje kolejnością wierszy, którą odtwarza `zd_Id`. Są za to `zd_CRC`
+i `tw_Zmiana.zt_ZmianaZdjecie` — pozwolą kiedyś wykrywać zmianę zdjęcia bez
+pobierania obrazu, dziś rewalidację robi TTL.
+
+---
+
+## 0.30.0 — 8 sierpnia 2026
+
+**Karta towaru pokazuje zdjęcie z Subiekta.** Magazynier po skanie widział
+dotąd sam tekst, a nazwy się powtarzają — „nóż kosiarki" ma kilkanaście
+kartotek. Zdjęcie odpowiada na pytanie zadawane przed wszystkimi innymi: czy
+to na pewno TEN towar. Miniatura stoi w nagłówku karty, dotknięcie otwiera ją
+na pełny ekran.
+
+**[wymaga działania — opcjonalne]** Funkcja jest **domyślnie wyłączona**
+i niczego nie zmienia, dopóki nie wskaże się źródła. Uruchomienie wymaga
+ustalenia na własnej bazie, gdzie Subiekt trzyma zdjęcie — zapytania
+w `docs/subiekt-gt-struktura.md`, rozdział „Gdzie Subiekt trzyma zdjęcie
+kartoteki". Gdy zdjęcia leżą w osobnej tabeli, dochodzi **siódmy
+`GRANT SELECT`** i ponowne uruchomienie skryptu uprawnień. Do tego nowe APK
+przez MDM.
+
+### Czego repozytorium nie wiedziało
+
+Opis struktury InsERT GT nie wymienia ani jednej kolumny binarnej na
+`tw__Towar`, a `tw_Opis` jest polem tekstowym — czyta je parser zamienników.
+Gdzie naprawdę siedzi obraz, ustala się więc na kopii bazy; wszystkie nazwy
+tabel i kolumn są `[WERYFIKUJ]` i mieszkają w JEDNYM pliku
+(`adapters/zdjecia.sgt.ts`), tak jak wywołania COM w workerze Sfery.
+
+Zakładka „Opis" w Subiekcie rozstrzygnęła jedną rzecz od razu: obok podglądu
+stoją „Ustaw jako główną", „Sortuj" i strzałki, czyli **kartoteka może mieć
+kilka zdjęć**. Kolektor pokazuje jedno i ma to być to samo, które biuro widzi
+jako główne — stąd osobne ustawienia kolumny „główne" i kolumny kolejności.
+Wybór bez ustalonego porządku byłby gorszy niż brak zdjęcia: `TOP 1` zwracałby
+za każdym razem co innego, ETag skakałby, a kolektory pobierałyby obraz od
+nowa przy każdym wejściu na kartę.
+
+### Pół gigabajta, które nigdy nie jedzie
+
+3415 kartotek po ~150 kB to ~500 MB. Import działa co 60 sekund na maszynie,
+na której biuro wystawia faktury, więc zdjęcia **nie wchodzą do niego wcale**.
+Zamiast tego cache przelotowy: pierwsze otwarcie karty pobiera jedno zdjęcie,
+kolejne przez tydzień nie pytają o nic. Zmiana otwiera 100–300 kartotek, nie
+3415 — pół gigabajta zamienia się w kilkaset pojedynczych zapytań po kluczu
+głównym, wspólnych dla wszystkich kolektorów.
+
+Cache siedzi w `server/data/zdjecia/` — **osobno od `data/photos/`**, i to nie
+jest porządkowanie. Tamto są dowody do reklamacji, których nie wolno skasować
+nigdy; to jest cache, który kasuje się sam po przekroczeniu limitu. Jeden
+katalog na dwa takie cykle życia kończy się skasowanym dowodem.
+
+### Zdjęcie jedzie przez Wi-Fi raz na towar
+
+Karta jest odpytywana co dwie sekundy, więc zdjęcie nie mogło być jej polem —
+150 kB w base64 w tym cyklu to ponad 4 MB na minutę z jednego kolektora. Jest
+osobną trasą z ETagiem: kolejne wejście na kartę kończy się odpowiedzią „to
+samo, co masz" o rozmiarze nagłówka. Kolektor trzyma pliki w pamięci trwałej
+(nie w cache'u systemowym, który Android czyści właśnie wtedy, gdy brakuje
+miejsca) — dzięki temu zdjęcie jest na ekranie także w martwej strefie hali.
+
+Kartoteka bez zdjęcia jest zapamiętywana jako **potwierdzony brak**, na dobę.
+Bez tego setki takich kartotek pytałyby Subiekta przy każdym otwarciu karty.
+Błąd źródła to co innego niż brak zdjęcia i ponawia się po minutach, nie po
+tygodniu — inaczej awaria sieci zapisałaby się jako trwale pusta karta.
+
+### Slot ma stały rozmiar we wszystkich stanach
+
+Ładowanie, zdjęcie, kartoteka bez zdjęcia i brak zasięgu wyglądają różnie, ale
+zajmują tyle samo miejsca: element wskakujący po chwili przesuwa cele dotyku
+pod kciukiem. Braku zdjęcia świadomie nie odróżniamy od braku zasięgu — dla
+człowieka przy regale ta różnica nie jest wykonalna, a o braku sieci kolektor
+mówi już globalnie.
+
+---
+
 ## 0.29.2 — 8 sierpnia 2026
 
 <!-- docs_check: historia -->

@@ -142,16 +142,24 @@ Sprawdz "podstawia wybraną kolumnę do grantu kolumnowego" {
     Zaloz ($skrypt -match "GRANT UPDATE ON dbo\.tw__Towar \(tw_Pole3\)") "brak grantu na wybraną kolumnę"
 }
 
-Sprawdz "nadaje SELECT na szesciu tabelach" {
-    # 6, nie 8: w 0.16.0 wypadły fl_Wartosc i fl__Flagi razem z flagą faktury.
-    # Zostaje sl_Magazyn, bez którego karta towaru pokazałaby najwyżej
-    # `mag_Id = 7` zamiast nazwy magazynu.
+Sprawdz "nadaje SELECT dokladnie na tabelach z listy odczytu" {
+    # Liczba NIE jest wpisana z ręki po żadnej ze stron: skrypt generuje granty
+    # z `$script:WertisTabeleOdczytu`, a ten test z niej liczy oczekiwanie.
+    # Dopisanie tabeli przestawia jedno i drugie naraz.
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
-    Zaloz ($ile -eq 6) "GRANT SELECT jest $ile razy, ma być 6"
+    $oczekiwane = @($script:WertisTabeleOdczytu).Count
+    Zaloz ($ile -eq $oczekiwane) "GRANT SELECT jest $ile razy, a lista ma $oczekiwane pozycji"
+    foreach ($t in $script:WertisTabeleOdczytu) {
+        Zaloz ($skrypt -match "GRANT SELECT ON dbo\.$($t.Tabela)\b") "brak grantu na $($t.Tabela)"
+    }
 }
 
-Sprawdz "czyta slownik magazynow" {
+Sprawdz "czyta slownik magazynow i zdjecia kartotek" {
+    # Obie tabele mają własne uzasadnienie i obie łatwo przeoczyć przy
+    # przepisywaniu skryptu: bez sl_Magazyn karta pokazuje `mag_Id = 7` zamiast
+    # nazwy, bez tw_ZdjecieTw slot zdjęcia zostaje pusty bez powodu na ekranie.
     Zaloz ($skrypt -match "GRANT SELECT ON dbo\.sl_Magazyn") "brak grantu na sl_Magazyn"
+    Zaloz ($skrypt -match "GRANT SELECT ON dbo\.tw_ZdjecieTw") "brak grantu na tw_ZdjecieTw"
 }
 
 # ── Próg sprawdzenia uprawnień kontra własny skrypt ─────────────────────────
@@ -187,9 +195,14 @@ Sprawdz "prog przepuszcza komplet nadany wlasnym skryptem" {
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
     $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
     Zaloz ($ocena.Ok) "prog odrzuca $ile grantow, czyli dokladnie tyle, ile nadaje skrypt"
+    Zaloz ($ocena.Wymaganych -eq $ile) "prog mowi, ze wymaga $($ocena.Wymaganych), a skrypt nadaje $ile"
 }
 
 Sprawdz "prog odrzuca komplet o jeden GRANT za maly" {
+    # Ten test złapał REGRESJĘ przy dodawaniu tw_ZdjecieTw: skrypt urósł do
+    # siedmiu grantów, a próg został przy sześciu, więc niepełny komplet
+    # znowu przechodził. Dlatego liczba po obu stronach bierze się dziś
+    # z jednej listy, a nie z pamięci.
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count - 1
     $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
     Zaloz (-not $ocena.Ok) "prog przepuszcza brakujacy GRANT"
@@ -668,6 +681,26 @@ Sprawdz "biała lista wertis.env nie zna kluczy od kont" {
     $zrodlo = Get-Content (Join-Path $PSScriptRoot "uslugi.ps1") -Raw
     foreach ($klucz in @("ADMIN_HASLO", "ADMIN_LOGIN", "WERTIS_ADMIN")) {
         Zaloz (-not ($zrodlo -match "`"$klucz`"")) "$klucz pojawił się na białej liście"
+    }
+}
+
+Sprawdz "biala lista przepuszcza klucze zdjec kartotek" {
+    # Kreator o nie nie pyta, a `Publish-WertisKonfiguracja` odtwarza plik od
+    # zera — bez wpisu na tej liście klucz dopisany ręką znika przy najbliższym
+    # przebiegu -TylkoKonfiguracja i nikt nie kojarzy, dlaczego zdjęcia zgasły.
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-zdj-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE        = "mssql"
+            ZDJECIA_ZRODLO  = "blob"
+            ZDJECIA_KOLUMNA = "zdj_Dane"
+        }
+        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
+        Zaloz ($tresc -match "ZDJECIA_ZRODLO='blob'") "ZDJECIA_ZRODLO nie zapisalo sie do wertis.env"
+        Zaloz ($tresc -match "ZDJECIA_KOLUMNA='zdj_Dane'") "ZDJECIA_KOLUMNA nie zapisalo sie do wertis.env"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
