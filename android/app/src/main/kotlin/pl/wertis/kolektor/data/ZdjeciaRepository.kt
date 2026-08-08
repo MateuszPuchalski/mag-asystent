@@ -32,7 +32,10 @@ class ZdjeciaRepository(context: Context, private val api: ApiService) {
     private val mutex = Mutex()
     private var indeks: MutableMap<Long, WpisZdjecia> = load()
 
-    /** Miniatury trzymane w pamięci — powrót z zamiennika ma być natychmiastowy. */
+    /* Miniatury trzymane w pamięci — powrót z zamiennika ma być natychmiastowy,
+       a od kiedy miniatury stoją też w wierszach list, jeden ekran to i 20
+       towarów naraz. Pojemność musi mieścić ekran listy PLUS kartę, inaczej
+       każda rekompozycja listy mieli LRU od zera. */
     private val wPamieci = LinkedHashMap<Long, ByteArray>()
 
     private fun plik(twId: Long) = File(katalog, "t$twId.img")
@@ -44,6 +47,11 @@ class ZdjeciaRepository(context: Context, private val api: ApiService) {
      * rysujemy miniaturę, czy pełny ekran) albo `null`, gdy zdjęcia nie ma.
      * Sieć jest ruszana WYŁĄCZNIE wtedy, gdy `decyzja` tak powie — karta jest
      * odpytywana co 2 s i bez tego zdjęcie jechałoby w kółko.
+     *
+     * Jeden mutex na całość jest tu funkcją, nie wąskim gardłem: dwa pytania
+     * o ten sam towar rozstrzygają się bez drugiego pobrania (drugi trafia
+     * w pamięć albo w `UzyjLokalnego`), a lista 20 wierszy pobiera zdjęcia
+     * SEKWENCYJNIE — kolektor nie zalewa serwera dwudziestoma GET-ami naraz.
      */
     suspend fun zdjecie(twId: Long): ByteArray? = mutex.withLock {
         wPamieci[twId]?.let { return it }
@@ -152,7 +160,8 @@ class ZdjeciaRepository(context: Context, private val api: ApiService) {
         /** 32 MB albo 300 sztuk, co pierwsze — kolektor to nie galeria. */
         const val LIMIT_BAJTOW = 32 * 1024 * 1024
         const val LIMIT_WPISOW = 300
-        const val PAMIEC_SZTUK = 4
+        /** Ekran listy (~20 wierszy) + karta; ~100 KB/zdjęcie → ~3 MB. */
+        const val PAMIEC_SZTUK = 32
         val SERIALIZER = MapSerializer(Long.serializer(), WpisZdjecia.serializer())
     }
 }
