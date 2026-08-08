@@ -48,6 +48,7 @@ import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.product.LocChoice
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.product.saveLocation
 import pl.wertis.kolektor.ui.product.LocChoiceSheet
 import pl.wertis.kolektor.ui.theme.Amber
@@ -179,11 +180,22 @@ fun ScanLocScreen(graph: AppGraph) {
                 .background(CardWhite)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
-            Text(p.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 3.dp)) {
-                Text(p.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
-                Text("EAN ${p.ean.ifEmpty { "—" }}", fontSize = 12.sp, color = InkSoft)
-                Text(p.unit, fontSize = 12.sp, color = InkSoft)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(p.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 3.dp)) {
+                        Text(p.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
+                        Text("EAN ${p.ean.ifEmpty { "—" }}", fontSize = 12.sp, color = InkSoft)
+                        Text(p.unit, fontSize = 12.sp, color = InkSoft)
+                    }
+                }
+                /* Po prawej, żeby nazwa została flush-left jak dotąd.
+                   Z powiększeniem — „magazynier musi wiedzieć CO przenosi",
+                   a karta tożsamości nie ma tu innego gestu. */
+                MiniaturaTowaru(graph, p.id, 56.dp, powieksz = true)
             }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),

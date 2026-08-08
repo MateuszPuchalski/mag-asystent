@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.net.MagazynInfo
 import pl.wertis.kolektor.core.net.PrzesuniecieBody
 import pl.wertis.kolektor.core.przesuniecie.przesuniecieBlocker
@@ -205,14 +206,22 @@ fun PrzesuniecieSheet(
                 )
             }
 
-            Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 9.dp)) {
-                Text(sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
-                Text(name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "${formatQty(dostepne)} $unit dostępne w ${zrodloKod ?: "źródle"}",
-                    fontSize = 11.5.sp,
-                    color = InkMute,
-                )
+            Row(
+                Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // z powiększeniem — karta tożsamości nie ma tu innego gestu
+                MiniaturaTowaru(graph, twId, 56.dp, powieksz = true)
+                Column(Modifier.weight(1f)) {
+                    Text(sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
+                    Text(name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "${formatQty(dostepne)} $unit dostępne w ${zrodloKod ?: "źródle"}",
+                        fontSize = 11.5.sp,
+                        color = InkMute,
+                    )
+                }
             }
 
             Text("Dokąd?", fontSize = 12.5.sp, color = InkSoft)
