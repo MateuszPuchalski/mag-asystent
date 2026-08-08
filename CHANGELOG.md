@@ -28,6 +28,46 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.33.0 — 8 sierpnia 2026
+
+**Miniatura w pasku listy rozkładania i w ostatnio skanowanych.** Dwa miejsca,
+w których zdjęcia jeszcze nie było, a decyzja „czy to ten towar" właśnie tam
+zapada.
+
+**[wymaga działania]** Nowy APK przez MDM. Po stronie serwera nic.
+
+### Zdjęcie ma być tam, gdzie pada pytanie
+
+Miniatury weszły wcześniej na kartę towaru, do wyników wyszukiwania, na listę
+zawartości regału i do nagłówków arkuszy. W liście rozkładania stała jednak
+wyłącznie w wierszu ROZWINIĘTYM — czyli po tym, jak człowiek już wybrał pozycję.
+
+Zgłoszenie z magazynu wskazało moment wcześniejszy: pozycji szuka się wzrokiem
+po pasku, zanim ręka sięgnie do kartonu. Miniatura stoi więc teraz po lewej
+stronie symbolu w każdym pasku oczekującym. Rozwinięty wiersz ma swoją bez
+zmian, w miejscu pastylki adresu.
+
+Wiersz ZWINIĘTY jej nie dostaje. Pozycja jest odłożona, rozpoznawanie towaru nic
+już nie wnosi, a pasek jest o połowę niższy właśnie po to, żeby dziesięć pozycji
+drobnicy zmieściło się na ekranie.
+
+Ikona stanu zostaje na swoim miejscu i to nie jest kompromis. Mówi „zrobione"
+albo „zgłoszony problem" — co innego niż zdjęcie, które mówi „to ten towar".
+Podmiana zabrałaby ostrzeżenie z wiersza.
+
+Do tego lista ostatnio skanowanych: cztery pozycje, do których wraca się po
+czymś, co przed chwilą trzymało się w ręku. Zdjęcia są tam już w cache'u, bo
+kartę tego towaru otwierano chwilę wcześniej.
+
+### Odczyt zdjęć z dysku schodzi z wątku rysującego
+
+Usterka, którą odsłoniło dopiero wejście miniatur do list. Pobranie z sieci szło
+na wątek dyskowy od początku, ale odczyt gotowego pliku — ścieżka NAJCZĘSTSZA,
+bo plik zwykle już jest — zostawał na wątku wołającego. Przy jednym zdjęciu na
+karcie nie miało to znaczenia. Jedno wejście na listę to i dwadzieścia odczytów
+pod rząd, a wołane są z `LaunchedEffect`, czyli z wątku rysującego. Widać to
+jako zacięcie przy przewijaniu.
+
 ## 0.32.1 — 8 sierpnia 2026
 
 **Zdjęcie dodane w Subiekcie pojawia się nazajutrz, a nie po tygodniu.**
