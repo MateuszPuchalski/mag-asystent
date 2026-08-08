@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Worker Sfery: trzeci proces WERTIS (obok wertis-api i wertis-worker).
+       Wykonuje WYŁĄCZNIE zadania `mm` z sfera_queue przez COM Sfery Subiekta.
+       Dlaczego C#/.NET — patrz README.md; dlaczego osobny proces — spec §9
+       i docs/architektura.md (COM nie jest thread-safe, wisi i wymaga
+       restartu bez zatrzymywania magazynu). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>wertis-sfera-worker</AssemblyName>
+    <RootNamespace>WertisSferaWorker</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Ścieżki i formaty dat są ustalane ręcznie (ISO, lustro nowIso() z
+         Node) — globalizacja ICU tylko powiększałaby exe. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Jedyna zależność. SQLitePCLRaw niesie natywny sqlite3 dla win-x64,
+         więc self-contained publish daje jeden exe bez instalowania czegokolwiek. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Zapytania wyboru zadania jako zasoby wbudowane. TE SAME pliki wykonuje
+         test server/src/worker/sfera-pick.test.ts — jedno źródło prawdy dla
+         guardu kolejności, mierzone w CI bez dotneta. -->
+    <EmbeddedResource Include="sql\*.sql" />
+  </ItemGroup>
+
+</Project>

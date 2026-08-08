@@ -49,7 +49,8 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 | Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · WorkManager — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
 | Baza aplikacji | SQLite (wbudowany `node:sqlite`, zero modułów natywnych) — kolejka, sesje, events, locki (spec §7) |
-| Worker Sfery | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
+| Worker zapisu | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
+| Worker Sfery (`sfera-worker/`) | C#/.NET 8 · COM Sfery — dokumenty MM na produkcji, opcjonalny ([README](sfera-worker/README.md)) |
 
 Kolorystyka WERTIS: amber `#F7A600`, grafit `#2A2A2C`, papier `#F6F5F2`.
 Strefa przyjęć nazywa się **MGP**.

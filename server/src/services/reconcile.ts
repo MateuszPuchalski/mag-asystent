@@ -1,4 +1,5 @@
 import { db } from "../db/db.js";
+import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { parseLocs } from "../locs.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
@@ -16,7 +17,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
    być czytany po tygodniu — a wtedy nie chroni już przed niczym.             */
 
 export interface Rozjazd {
-  rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze";
+  rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -109,17 +110,52 @@ function utknieteWBuforze(): Rozjazd[] {
   }));
 }
 
+/**
+ * 4. MM czekające ponad dobę — worker Sfery nie działa albo zadanie blokuje
+ *    guard kolejności (zapis lokalizacji tego samego towaru w błędzie).
+ *
+ * Ten wpis domyka decyzję z guardu w `sfera-worker/sql/`: poprzednik
+ * `set_location` w `error` BLOKUJE MM w nieskończoność — świadomie, bo stan
+ * bezpieczny to „adres zapisany, stan czeka". Blokada bez tego pomiaru byłaby
+ * jednak cichym zakleszczeniem; tu dostaje nazwisko i instrukcję.
+ */
+function mmCzekajace(): Rozjazd[] {
+  /* Tylko przy SFERA_WORKER=1 — bez przełącznika mm wykonuje (albo ubija
+     czytelnym błędem) worker Node, więc wiszący pending znaczy „zatrzymany
+     worker", a to melduje już /api/health. Zdanie o Sferze by tu myliło. */
+  if (!config.sferaWorker) return [];
+  /* strftime w formacie ISO, nie datetime(): created_at ma `T…Z`, datetime()
+     spację — leksykalnie kłamią w obrębie tego samego dnia (patrz zaleglosciMm). */
+  const rows = db()
+    .prepare(
+      `SELECT id, label, created_at FROM sfera_queue
+       WHERE type='mm' AND status IN ('pending','waiting_for_doc')
+         AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')
+       ORDER BY id`
+    )
+    .all() as Array<{ id: number; label: string; created_at: string }>;
+  return rows.map((r) => ({
+    rodzaj: "mm_czeka" as const,
+    klucz: `#${r.id}`,
+    opis:
+      `${r.label} — MM czeka ponad dobę: worker Sfery nie działa albo zadanie ` +
+      "blokuje błąd zapisu lokalizacji (PONÓW lokalizację na kolektorze)",
+    odKiedy: r.created_at,
+  }));
+}
+
 export function reconcile(): Rekoncyliacja {
   const loc = lokalizacje();
   const bledy = zadaniaWBledzie();
   const bufor = utknieteWBuforze();
+  const mm = mmCzekajace();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
-      zadan: bledy.length + bufor.length,
+      zadan: bledy.length + bufor.length + mm.length,
     },
-    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor],
+    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor, ...mm],
   };
 }
 

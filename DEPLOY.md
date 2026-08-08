@@ -170,7 +170,7 @@ nssm set wertis-api AppRotateBytes 10485760
 nssm set wertis-api Start SERVICE_AUTO_START
 nssm set wertis-api AppExit Default Restart
 
-# Worker Sfery
+# Worker zapisu (lokalizacje; do czasu workera Sfery także zadania MM)
 nssm install wertis-worker 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\worker\worker.js'
 nssm set wertis-worker AppDirectory 'C:\wertis'
 nssm set wertis-worker AppStdout 'C:\wertis\logs\worker.log'
@@ -181,6 +181,21 @@ nssm set wertis-worker AppExit Default Restart
 
 nssm start wertis-api
 nssm start wertis-worker
+```
+
+**Trzecia usługa — worker Sfery (opcjonalna, etap 2 z §6).** Dochodzi dopiero
+przy automatyzacji dokumentów MM: samodzielny exe zbudowany wg
+[`sfera-worker/README.md`](sfera-worker/README.md), wymaga licencji Sfery
+i `SFERA_WORKER=1` w `wertis.env`:
+
+```powershell
+nssm install wertis-sfera 'C:\wertis\sfera-worker\wertis-sfera-worker.exe'
+nssm set wertis-sfera AppDirectory 'C:\wertis'
+nssm set wertis-sfera AppStdout 'C:\wertis\logs\wertis-sfera.log'
+nssm set wertis-sfera AppStderr 'C:\wertis\logs\wertis-sfera.err.log'
+nssm set wertis-sfera AppRotateFiles 1
+nssm set wertis-sfera Start SERVICE_AUTO_START
+nssm set wertis-sfera AppExit Default Restart
 ```
 
 **Konfiguracja usług — nic do przepisywania.** Obie usługi mają
@@ -204,7 +219,7 @@ nssm restart wertis-api ; nssm restart wertis-worker
 > ktoś ich kiedyś użył, `/api/health` pokaże rozjazd zamiast go przemilczeć.
 
 > **Uwaga:** worker Sfery musi działać na TEJ maszynie (COM Sfery jest lokalny)
-> i oba procesy muszą widzieć ten sam plik `C:\wertis\server\data\wertis.db`.
+> i wszystkie procesy muszą widzieć ten sam plik `C:\wertis\server\data\wertis.db`.
 > Nie przenoś API na inny host bez migracji kolejki na Postgres.
 
 ## 4. Sieć: stały adres + zapora + DNS
@@ -602,9 +617,10 @@ przestanie zgłaszać problem, którego nie da się rozwiązać ustawieniem.
 
 **Etap 1a — zapis (automatyczny przy `SGT_MODE=mssql`):** ten sam jeden login
 wykonuje `set_location` bezpośrednim UPDATE jednej kolumny objętej
-`GRANT UPDATE`. Zadania MM zgłaszają czytelny błąd; do czasu workera Sfery
-dokument MM wystawia biuro w Subiekcie. Osobnego przełącznika trybu zapisu
-nie ma.
+`GRANT UPDATE`. Zadania MM zgłaszają czytelny błąd; do czasu wdrożenia workera
+Sfery (etap 2 niżej) dokument MM wystawia biuro w Subiekcie. Osobnego
+przełącznika trybu zapisu nie ma — jest tylko `SFERA_WORKER=1` z etapu 2,
+który przenosi zadania MM do trzeciej usługi.
 
 Konsekwencja dla przesunięć na tym etapie: adres na półce zapisuje aplikacja,
 ale stan zjeżdża z magazynu źródłowego dopiero po ręcznym MM w biurze.
@@ -612,13 +628,35 @@ Kolejność jest bezpieczna (adres przed sprzedawalnością), więc opóźnienie
 kosztuje utraconą szansę sprzedaży, a nie błędny stan. Arkusz przesunięcia mówi
 o tym wprost, zanim ktokolwiek dotknie przycisku.
 
-**Etap 2 — dokumenty MM przez Sferę:**
-1. Postaw osobny proces na Windows w C# albo w Pythonie z pywin32. COM Sfery
-   najstabilniej działa z tych środowisk (spec §9).
+**Etap 2 — dokumenty MM przez Sferę (worker gotowy w `sfera-worker/`):**
 
-   Proces czyta tę samą tabelę `sfera_queue` i wykonuje wyłącznie zadania `mm`.
-   Kontrakt wywołań jest w `server/src/adapters/sfera.ts`.
-2. Najpierw jedno MM testowe na kartotece próbnej, potem produkcyjnie.
+Osobny proces C#/.NET czytający tę samą tabelę `sfera_queue` i wykonujący
+**wyłącznie zadania `mm`**. Wymaga: licencji Sfery, Windows z Subiektem GT
+(COM jest lokalny) i konta operatora Subiekta z prawem wystawiania MM.
+Kompletna instrukcja: [`sfera-worker/README.md`](sfera-worker/README.md).
+Kolejność — **wszystko najpierw na KOPII bazy**:
+
+1. Zbuduj exe (`sfera-worker\build.ps1`, maszyna z .NET 8 SDK) i skopiuj do
+   `C:\wertis\sfera-worker\`.
+2. Przejdź listę `[WERYFIKUJ]` z `sfera-worker/README.md` — ProgID, logowanie
+   operatora, model dodawania MM. Wszystko siedzi w jednym pliku
+   `src/SferaComAdapter.cs`.
+3. Dopisz do `wertis.env`: `SFERA_WORKER=1`, `SFERA_OPERATOR`,
+   `SFERA_OPERATOR_HASLO`. Zarejestruj usługę `wertis-sfera` (instalator
+   z `-TylkoKonfiguracja` zrobi to sam, gdy exe leży na miejscu — albo §3).
+   Zrestartuj WSZYSTKIE usługi: przełącznik zmienia też zachowanie workera
+   Node (przestaje dotykać zadań `mm`).
+4. Przebieg próbny: `wertis-sfera-worker.exe --dry-run` — pętla, heartbeat
+   i audyt działają, dokumenty NIE powstają (`sgt_doc_number` dostaje
+   `MM DRY-RUN/n`).
+5. **Jedno** MM na kartotece próbnej: numer z `sgt_doc_number` == numer
+   w Subiekcie, stany zgadzają się po obu stronach, `queue_applied` w
+   `GET /api/events`.
+6. `GET /api/health` pokazuje blok `sfera` z `zyje: true`; zatrzymanie usługi
+   ma dodać zdanie do `problemy`.
+
+Bramki odbioru (bufor, guard kolejności, odporność na restart) —
+[`docs/wdrozenie.md`](docs/wdrozenie.md), sekcja „Dołączenie workera Sfery".
 
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i przesunięcia
 stanu przez workera Sfery.

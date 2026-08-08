@@ -37,14 +37,21 @@ const inBuffer = (docId: number): boolean => {
 
 export function pickTask(): Task | undefined {
   const now = nowIso();
+  /* Przy SFERA_WORKER=1 zadania `mm` wykonuje osobny proces (sfera-worker/) —
+     ten worker ma ich NIE DOTYKAĆ, inaczej oznaczy je jako error padającym
+     adapterem SQL, zanim worker Sfery zdąży je wziąć. Celowo `type <> 'mm'`,
+     a nie `type = 'set_location'`: zadanie nieznanego typu nadal bierze Node
+     i kończy czytelnym błędem „Nieznany typ zadania", zamiast wisieć w ciszy. */
+  const bezMm = config.sferaWorker ? 1 : 0;
   // najpierw waiting_for_doc gotowe do ponowienia
   const waiting = db()
     .prepare(
       `SELECT id,type,payload,attempts,source_doc_id,tw_id,created_by,created_by_ref FROM sfera_queue
        WHERE status='waiting_for_doc' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         AND (? = 0 OR type <> 'mm')
        ORDER BY id LIMIT 1`
     )
-    .get(now) as Task | undefined;
+    .get(now, bezMm) as Task | undefined;
   if (waiting) {
     if (waiting.source_doc_id && inBuffer(waiting.source_doc_id)) {
       db()
@@ -58,9 +65,10 @@ export function pickTask(): Task | undefined {
     .prepare(
       `SELECT id,type,payload,attempts,source_doc_id,tw_id,created_by,created_by_ref FROM sfera_queue
        WHERE status='pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         AND (? = 0 OR type <> 'mm')
        ORDER BY id LIMIT 1`
     )
-    .get(now) as Task | undefined;
+    .get(now, bezMm) as Task | undefined;
 }
 
 /**

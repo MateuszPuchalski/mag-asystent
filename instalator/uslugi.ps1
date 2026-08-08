@@ -276,23 +276,30 @@ function Register-WertisUsluga {
         .SYNOPSIS
         Rejestruje jedną usługę przez NSSM — parametry jak w DEPLOY.md §3.
         Istniejącą usługę tylko przekonfigurowuje (idempotencja).
+        .DESCRIPTION
+        `-Aplikacja` to program uruchamiany przez NSSM. Dla usług Node jest to
+        node.exe ze skryptem w `-Skrypt`; worker Sfery (C#) jest samodzielnym
+        exe i `-Skrypt` zostaje wtedy pusty. Alias `-Node` trzyma zgodność
+        z wcześniejszymi wywołaniami.
     #>
     param(
         [Parameter(Mandatory)][string]$Nssm,
         [Parameter(Mandatory)][string]$Nazwa,
-        [Parameter(Mandatory)][string]$Skrypt,
+        [string]$Skrypt = "",
         [Parameter(Mandatory)][string]$Katalog,
-        [Parameter(Mandatory)][string]$Node
+        [Alias("Node")][Parameter(Mandatory)][string]$Aplikacja
     )
-    if (Test-DryRun "Zarejestrowałbym usługę $Nazwa ($Skrypt).") { return }
+    if (Test-DryRun "Zarejestrowałbym usługę $Nazwa ($(if ($Skrypt) { $Skrypt } else { $Aplikacja })).") { return }
 
     $istnieje = $null -ne (Get-Service -Name $Nazwa -ErrorAction SilentlyContinue)
     if ($istnieje) {
         Write-Info "Usługa $Nazwa już istnieje — przestawiam ustawienia."
-        & $Nssm set $Nazwa Application $Node        | Out-Null
+        & $Nssm set $Nazwa Application $Aplikacja   | Out-Null
         & $Nssm set $Nazwa AppParameters $Skrypt    | Out-Null
+    } elseif ($Skrypt) {
+        & $Nssm install $Nazwa $Aplikacja $Skrypt | Out-Null
     } else {
-        & $Nssm install $Nazwa $Node $Skrypt | Out-Null
+        & $Nssm install $Nazwa $Aplikacja | Out-Null
     }
     $logi = Join-Path $Katalog "logs"
     New-Item -ItemType Directory -Force -Path $logi | Out-Null
@@ -329,7 +336,9 @@ function Publish-WertisKonfiguracja {
         [Parameter(Mandatory)][string]$Katalog,
         [Parameter(Mandatory)][hashtable]$Ustawienia,
         [Parameter(Mandatory)][string]$Nssm,
-        [string[]]$Uslugi = @("wertis-api", "wertis-worker"),
+        # wertis-sfera jest na liście, choć usługa często nie istnieje —
+        # pętla czyszczenia i tak pomija usługi nieobecne (Get-Service)
+        [string[]]$Uslugi = @("wertis-api", "wertis-worker", "wertis-sfera"),
         [int]$Port = 3001
     )
     $plik = Join-Path $Katalog "wertis.env"
@@ -349,6 +358,8 @@ function Publish-WertisKonfiguracja {
         "MSSQL_USER", "MSSQL_PASSWORD",
         "MSSQL_LOC_COLUMN",
         "MAG_ID_MAG", "MAG_ID_MGP", "MAG_ID_ZWROTY",
+        # worker Sfery (dokumenty MM) — DEPLOY §6 etap 2, sfera-worker/README.md
+        "SFERA_WORKER", "SFERA_OPERATOR", "SFERA_OPERATOR_HASLO",
         "PORT"
     )
     $klucze = @($kolejnosc | Where-Object { $Ustawienia.ContainsKey($_) -and "$($Ustawienia[$_])" -ne "" })
@@ -356,9 +367,10 @@ function Publish-WertisKonfiguracja {
     $linie = @(
         "# WERTIS - ustawienia srodowiska. Plik wygenerowany przez instalator.",
         "#",
-        "# JEDYNE zrodlo konfiguracji: czytaja go OBA procesy (API i worker)",
-        "# wprost z dysku. Po zmianie wystarczy restart uslug:",
+        "# JEDYNE zrodlo konfiguracji: czytaja go WSZYSTKIE procesy (API, worker,",
+        "# worker Sfery) wprost z dysku. Po zmianie wystarczy restart uslug:",
         "#   nssm restart wertis-api ; nssm restart wertis-worker",
+        "#   (i wertis-sfera, jesli wdrozony worker Sfery - DEPLOY par. 6 etap 2)",
         "#",
         "# Plik trzyma haslo do bazy - jest w .gitignore i nie ma go w repo.",
         ""
@@ -422,9 +434,12 @@ function Add-WertisRegulaZapory {
 }
 
 function Restart-WertisUslugi {
-    param([string[]]$Uslugi = @("wertis-api", "wertis-worker"))
+    param([string[]]$Uslugi = @("wertis-api", "wertis-worker", "wertis-sfera"))
     if (Test-DryRun "Zrestartowałbym usługi: $($Uslugi -join ', ').") { return }
     foreach ($u in $Uslugi) {
+        # wertis-sfera istnieje tylko przy wdrożonym workerze Sfery — nieobecna
+        # usługa to norma, a nie powód do fałszywego "uruchomiona"
+        if ($null -eq (Get-Service -Name $u -ErrorAction SilentlyContinue)) { continue }
         Restart-Service -Name $u -Force -ErrorAction SilentlyContinue
         Start-Service  -Name $u -ErrorAction SilentlyContinue
         Write-Ok "Usługa $u uruchomiona."
@@ -747,7 +762,7 @@ function Remove-WertisUslugi {
     #>
     param(
         [string]$Nssm = "",
-        [string[]]$Uslugi = @("wertis-api", "wertis-worker")
+        [string[]]$Uslugi = @("wertis-api", "wertis-worker", "wertis-sfera")
     )
     foreach ($u in $Uslugi) {
         if (Test-DryRun "Zatrzymał(a)bym i wyrejestrował(a)bym usługę $u.") { continue }

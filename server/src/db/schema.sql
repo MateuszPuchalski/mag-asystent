@@ -285,7 +285,7 @@ CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 -- raportowała wyłącznie proces API. Teraz każdy proces melduje swój tryb tutaj,
 -- a /api/health je porównuje.
 CREATE TABLE IF NOT EXISTS process_state (
-  name       TEXT PRIMARY KEY,   -- 'api' | 'worker'
+  name       TEXT PRIMARY KEY,   -- 'api' | 'worker' | 'sfera' (worker MM, sfera-worker/)
   pid        INTEGER NOT NULL,
   sgt_mode   TEXT NOT NULL,
   sfera_mode TEXT NOT NULL,

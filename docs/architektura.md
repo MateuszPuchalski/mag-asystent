@@ -82,10 +82,10 @@ który wymaga zapisu w regulaminie przed pierwszym użyciem.
 
 ---
 
-## 3. Dlaczego dwa procesy
+## 3. Dlaczego osobne procesy
 
 API i worker to **osobne procesy z tą samą bazą**, i to nie jest podział dla
-elegancji.
+elegancji. (Na produkcji z MM dochodzi trzeci — worker Sfery, niżej.)
 
 Zapis do Subiekta przez Sferę idzie po COM, który nie jest thread-safe i potrafi
 się zawiesić. Gdyby robił to ten sam proces, który obsługuje skany, jedno
@@ -105,6 +105,34 @@ Cena: **stan w Subiekcie jest opóźniony o sekundy**. Dlatego karta towaru
 pokazuje stany **skorygowane o kolejkę** (`services/stock.ts`) i chipy
 lokalizacji „w drodze" — inaczej człowiek widziałby stan sprzed własnego skanu
 i skanowałby drugi raz.
+
+### Trzeci proces: worker Sfery (`sfera-worker/`, opcjonalny)
+
+Na produkcji dokumentów MM nie da się wystawić SQL-em (numeracja, skutki
+magazynowe, wycena — domena Sfery COM), a COM żyje tylko na Windows
+z Subiektem. Stąd trzeci proces — C#/.NET, ta sama baza, ta sama kolejka —
+wykonujący **wyłącznie zadania `mm`**. Włącza go `SFERA_WORKER=1`; bez
+przełącznika nic się nie zmienia (mm kończy się czytelnym błędem, dokument
+wystawia biuro).
+
+Podział pracy jest pilnowany z obu stron:
+
+- worker Node przy `SFERA_WORKER=1` **nie dotyka** zadań `mm`
+  (filtr w `pickTask`, `worker/kolejka.ts`),
+- worker Sfery bierze wyłącznie `mm` — i **pomija** zadanie, dopóki wcześniejsze
+  niewykonane `set_location` tego samego towaru nie wejdzie
+  (`sfera-worker/sql/pick_mm_pending.sql`).
+
+Ten drugi punkt to nowy strażnik starego niezmiennika. Przy jednym workerze
+„adres przed sprzedawalnością" gwarantowała kolejność wstawienia (`ORDER BY id`,
+patrz `services/przesuniecie.ts`); dwa niezależne pollery łamią ją
+konstrukcyjnie, więc guard przeniósł się do zapytania wyboru zadania. Te same
+pliki SQL wykonuje test `server/src/worker/sfera-pick.test.ts` — zmiana guardu
+jest mierzona w CI bez dotneta.
+
+Worker Sfery melduje się w `process_state` (wiersz `sfera`) jak pozostałe
+procesy, a `/api/health` przy `SFERA_WORKER=1` raportuje jego stan i zaległe
+MM. Szczegóły wdrożenia: [`sfera-worker/README.md`](../sfera-worker/README.md).
 
 ---
 

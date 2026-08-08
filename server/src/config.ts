@@ -49,6 +49,20 @@ export const config = {
   sferaMode: (process.env.SGT_MODE === "mssql" ? "sql" : "dev") as "dev" | "sql",
 
   /**
+   * Czy dokumenty MM przejmuje osobny worker Sfery (COM, `sfera-worker/`).
+   *
+   * Domyślnie NIE: worker Node bierze wszystkie zadania, a `mm` w trybie mssql
+   * kończy się czytelnym błędem z sfera.sql.ts („dokument MM wystawia biuro").
+   * Włączony: worker Node NIE DOTYKA zadań `mm` — wykonuje je usługa
+   * wertis-sfera, a jej brak melduje /api/health.
+   *
+   * To nie jest wybór adaptera (ten nadal wynika z SGT_MODE) — to fakt
+   * „istnieje trzeci proces", którego nie da się wywieść z niczego: zależy od
+   * licencji Sfery i od tego, czy exe faktycznie leży na maszynie.
+   */
+  sferaWorker: process.env.SFERA_WORKER === "1",
+
+  /**
    * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql).
    *
    * Co trzeba ustalić na WŁASNEJ bazie — mag_Id magazynów i pole lokalizacji
@@ -264,6 +278,16 @@ export function bledyKonfiguracji(c: Config = config): string[] {
           "bez tego nie ma połączenia z bazą Subiekta.",
       );
     }
+  }
+
+  /* W demo MM obsługuje DevSferaAdapter w workerze Node. Włączony przełącznik
+     kazałby Node'owi omijać zadania mm, których nikt inny tu nie wykona —
+     wisiałyby w pending na zawsze, bez objawu poza rosnącą kolejką. */
+  if (c.sferaWorker && c.sgtMode === "seeded") {
+    bledy.push(
+      "SFERA_WORKER=1 wymaga SGT_MODE=mssql — w trybie seeded dokumenty MM " +
+        "wykonuje worker Node i zadania mm nie miałyby wykonawcy.",
+    );
   }
 
   // Wzorce adresów przychodzą z env; zły regex wysypuje każdy skan, nie start.

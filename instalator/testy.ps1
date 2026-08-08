@@ -660,6 +660,63 @@ Sprawdz "przebieg próbny przechodzi krok konta z PUSTYM hasłem" {
     }
 }
 
+# ── Worker Sfery (usługa wertis-sfera) ──────────────────────────────────────
+# Trzecia usługa jest OPCJONALNA (wymaga licencji Sfery i zbudowanego exe),
+# więc reguły wokół niej to głównie „nic nie psuj, gdy jej nie ma".
+
+Write-Host ""
+Write-Host "Worker Sfery"
+
+Sprawdz "biała lista wertis.env przepuszcza klucze Sfery" {
+    # Bez wpisu na białej liście SFERA_WORKER nigdy nie trafiłby do pliku
+    # i wybór w kreatorze nie zmieniałby niczego — bez żadnego objawu.
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-sfw-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE       = "mssql"
+            SFERA_WORKER   = "1"
+            SFERA_OPERATOR = "Szef"
+        }
+        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
+        Zaloz ($tresc -match "SFERA_WORKER='1'") "SFERA_WORKER nie zapisał się do wertis.env"
+        Zaloz ($tresc -match "SFERA_OPERATOR='Szef'") "SFERA_OPERATOR nie zapisał się do wertis.env"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "rejestracja usługi z samym exe (bez -Skrypt) przechodzi przebieg próbny" {
+    <#
+        Ta sama klasa regresji co „puste hasło admina": worker Sfery to
+        samodzielny exe, więc `-Skrypt` bywa nieobecny — gdyby wrócił do
+        [Parameter(Mandatory)], binder odrzuciłby wywołanie ZANIM Test-DryRun
+        cokolwiek powie, i przebieg próbny wywracałby się na kroku,
+        który z definicji niczego nie robi.
+    #>
+    $bylo = $script:WertisDryRun
+    $script:WertisDryRun = $true
+    try {
+        Register-WertisUsluga -Nssm "nssm.exe" -Nazwa "wertis-sfera" -Katalog "C:\wertis" `
+            -Aplikacja "C:\wertis\sfera-worker\wertis-sfera-worker.exe"
+        Zaloz $true "rejestracja bez -Skrypt ma przejść"
+    } finally {
+        $script:WertisDryRun = $bylo
+    }
+}
+
+Sprawdz "stare wywołania z -Node nadal działają (alias)" {
+    $bylo = $script:WertisDryRun
+    $script:WertisDryRun = $true
+    try {
+        Register-WertisUsluga -Nssm "nssm.exe" -Nazwa "wertis-api" -Katalog "C:\wertis" `
+            -Node "node.exe" -Skrypt "server\dist\index.js"
+        Zaloz $true "alias -Node ma zostać zgodny wstecz"
+    } finally {
+        $script:WertisDryRun = $bylo
+    }
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""
