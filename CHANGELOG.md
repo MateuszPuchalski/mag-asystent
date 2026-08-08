@@ -28,6 +28,42 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.31.0 — 8 sierpnia 2026
+
+**Wiadomo, gdzie Subiekt trzyma zdjęcia kartotek: `tw_ZdjecieTw`.** Ustalone
+zapytaniami na bazie firmy, więc `ZDJECIA_*` przestają być zgadywanką —
+komplet gotowych wartości leży w `wertis.env.example` i w opisie struktury.
+Tabela ma `zd_IdTowar` (klucz obcy), `zd_Zdjecie` (obraz), `zd_Glowne`
+(odpowiednik „Ustaw jako główną") i `zd_Id`.
+
+**[wymaga działania]** Żeby włączyć zdjęcia: uruchom ponownie skrypt uprawnień
+(doszedł **siódmy `GRANT SELECT`**, na `tw_ZdjecieTw`) albo instalator
+z `-TylkoKonfiguracja`, wpisz sześć kluczy `ZDJECIA_*` do `wertis.env`
+i zrestartuj `wertis-api`. Bez tego nic się nie zmienia.
+
+### Klucz obcy nie rozstrzyga, które zdjęcie wziąć
+
+Prawdziwa struktura obnażyła błąd, którego nie dało się zobaczyć bez niej.
+Zapytanie kończyło porządek na kolumnie klucza, a w osobnej tabeli klucz jest
+**obcy** — `zd_IdTowar` jest ten sam dla wszystkich zdjęć jednego towaru. Przy
+dwóch zdjęciach bez flagi „główne" baza zwracałaby raz jedno, raz drugie;
+objawem nie byłby błąd, tylko skaczący ETag i kolektory ściągające obraz przy
+każdym wejściu na kartę — dokładnie to, czemu cały ten cache ma zapobiegać.
+
+Porządek domyka teraz `ZDJECIA_KOLUMNA_KOLEJNOSC` (`zd_Id`), a **brak tego
+ustawienia przy osobnej tabeli zatrzymuje start serwera**. Reguła jest
+w walidacji, nie w komentarzu, bo tej pomyłki nie widać z ekranu.
+
+### Czego przy okazji nie ma
+
+`tw__Towar.tw_Logo` to `binary(50)` — pięćdziesiąt bajtów, więc nie zdjęcie.
+Osobnej kolumny kolejności w `tw_ZdjecieTw` nie ma; „Sortuj" w Subiekcie
+operuje kolejnością wierszy, którą odtwarza `zd_Id`. Są za to `zd_CRC`
+i `tw_Zmiana.zt_ZmianaZdjecie` — pozwolą kiedyś wykrywać zmianę zdjęcia bez
+pobierania obrazu, dziś rewalidację robi TTL.
+
+---
+
 ## 0.30.0 — 8 sierpnia 2026
 
 **Karta towaru pokazuje zdjęcie z Subiekta.** Magazynier po skanie widział

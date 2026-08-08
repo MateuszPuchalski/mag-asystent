@@ -29,6 +29,22 @@ test("główne idzie przed kolejnością, kolejność przed kluczem", () => {
   assert.match(q, /ORDER BY zdj_Glowne DESC, zdj_Lp, zdj_TowId$/);
 });
 
+test("prawdziwa tabela Subiekta: tw_ZdjecieTw domyka porządek po zd_Id", () => {
+  /* Ustalone na bazie firmy: zdjęcia leżą w `tw_ZdjecieTw`, gdzie `zd_IdTowar`
+     jest kluczem OBCYM — ten sam dla wszystkich zdjęć jednego towaru. Gdyby
+     porządek kończył się na nim, dwa zdjęcia bez flagi „główne" wracałyby
+     losowo. Rozstrzyga dopiero `zd_Id`. */
+  const q = budujZapytanieBlob({
+    tabela: "tw_ZdjecieTw",
+    kolumna: "zd_Zdjecie",
+    klucz: "zd_IdTowar",
+    glowne: "zd_Glowne",
+    kolejnosc: "zd_Id",
+  });
+  assert.match(q, /ORDER BY zd_Glowne DESC, zd_Id, zd_IdTowar$/);
+  assert.match(q, /WHERE zd_IdTowar = @id/);
+});
+
 test("zapytanie bierze DOKŁADNIE jeden wiersz i wiąże id parametrem", () => {
   const q = budujZapytanieBlob({ tabela: "tw__Towar", kolumna: "tw_Zdjecie", klucz: "tw_Id" });
   assert.match(q, /^SELECT TOP 1 /);

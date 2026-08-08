@@ -96,9 +96,15 @@ export function nazwaZeWzorca(wzorzec: string, twId: number, symbol: string): st
  * `ORDER BY` jest przez to OBOWIĄZKOWY, a nie kosmetyczny: `TOP 1` bez
  * porządku zwraca „cokolwiek", a za każdym razem inne bajty to za każdym razem
  * inny ETag — czyli wszystkie kolektory pobierają obraz od nowa przy każdym
- * wejściu na kartę, dokładnie odwrotnie niż cały ten cache zamierza. Gdy
- * kolumny głównej/kolejności nie ustawiono, porządkiem zostaje sam klucz —
- * arbitralny, ale STAŁY, a o to tu chodzi.
+ * wejściu na kartę, dokładnie odwrotnie niż cały ten cache zamierza.
+ *
+ * UWAGA NA OSTATNIE KRYTERIUM. Klucz dopisujemy na końcu jako rozstrzygnięcie
+ * ostateczne, ale jest ono warte tyle, ile jego UNIKALNOŚĆ. Przy zdjęciach na
+ * samej kartotece (`tw_Id`) klucz jest unikalny i wystarcza. W osobnej tabeli
+ * (`tw_ZdjecieTw.zd_IdTowar`) klucz jest OBCY — ten sam dla wszystkich zdjęć
+ * jednego towaru — więc niczego nie rozstrzyga i porządek trzeba domknąć
+ * kolumną `kolejnosc` (dla `tw_ZdjecieTw` jest nią `zd_Id`). Pilnuje tego
+ * walidacja w `config.ts`, bo objawem pomyłki byłby ruch sieciowy, a nie błąd.
  *
  * Wydzielone z zapytania, bo to JEDYNA logika w tym module dająca się
  * przetestować bez serwera MSSQL (wzorzec: `budujFiltryDokumentow`).

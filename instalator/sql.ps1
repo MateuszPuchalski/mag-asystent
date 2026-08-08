@@ -549,6 +549,7 @@ GRANT SELECT ON dbo.dok__Dokument  TO [$Login];
 GRANT SELECT ON dbo.dok_Pozycja    TO [$Login];
 GRANT SELECT ON dbo.kh__Kontrahent TO [$Login];
 GRANT SELECT ON dbo.sl_Magazyn     TO [$Login];   -- nazwy i symbole magazynów
+GRANT SELECT ON dbo.tw_ZdjecieTw   TO [$Login];   -- zdjęcia kartotek na karcie towaru
 
 -- ZAPIS: JEDNA kolumna kartoteki (ta sama, co MSSQL_LOC_COLUMN) i nic więcej.
 -- Dokumenty, flagi i stany pozostają dla tego loginu tylko do odczytu.

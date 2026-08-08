@@ -142,12 +142,17 @@ Sprawdz "podstawia wybraną kolumnę do grantu kolumnowego" {
     Zaloz ($skrypt -match "GRANT UPDATE ON dbo\.tw__Towar \(tw_Pole3\)") "brak grantu na wybraną kolumnę"
 }
 
-Sprawdz "nadaje SELECT na szesciu tabelach" {
-    # 6, nie 8: w 0.16.0 wypadły fl_Wartosc i fl__Flagi razem z flagą faktury.
-    # Zostaje sl_Magazyn, bez którego karta towaru pokazałaby najwyżej
+Sprawdz "nadaje SELECT na siedmiu tabelach" {
+    # 7, nie 8: w 0.16.0 wypadły fl_Wartosc i fl__Flagi razem z flagą faktury
+    # (zostało 6), a w 0.31.0 doszło tw_ZdjecieTw ze zdjęciami kartotek.
+    # Zostaje też sl_Magazyn, bez którego karta towaru pokazałaby najwyżej
     # `mag_Id = 7` zamiast nazwy magazynu.
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
-    Zaloz ($ile -eq 6) "GRANT SELECT jest $ile razy, ma być 6"
+    Zaloz ($ile -eq 7) "GRANT SELECT jest $ile razy, ma być 7"
+}
+
+Sprawdz "czyta zdjecia kartotek" {
+    Zaloz ($skrypt -match "GRANT SELECT ON dbo\.tw_ZdjecieTw") "brak grantu na tw_ZdjecieTw"
 }
 
 Sprawdz "czyta slownik magazynow" {
