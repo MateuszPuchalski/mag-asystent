@@ -81,8 +81,8 @@ Zniknęły od tego czasu:
 - **tryb marszu** — nakładka „NASTĘPNE" po zatwierdzeniu wózka; istniała
   wyłącznie w sesji i nie ma dokąd jej przenieść,
 - **rozkładanie zwrotów koszykami** — wejścia do tej ścieżki nie było od
-  d131f75. Jej finał wymagał workera Sfery, którego nie ma. Zwroty rozlicza
-  biuro w Subiekcie (0.17.0).
+  d131f75. Jej finał wymagał workera Sfery, którego wtedy nie było. Zwroty
+  rozlicza biuro w Subiekcie (0.17.0).
 
 Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykonana:
 
@@ -121,6 +121,9 @@ Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykona
    Żadna z tych konwencji nie jest już używana, więc odrzucanie ich jest
    poprawne. Poprawia się je po stronie Subiekta, nie aplikacji. Lista:
    [`adresy-do-poprawy.md`](adresy-do-poprawy.md).
-5. **Dokumenty MM czekają na workera Sfery.** Do czasu uruchomienia procesu COM
-   (etap 2 w [DEPLOY.md](../DEPLOY.md)) dokument wystawia biuro ręcznie. Otwarte pytanie: czy wystarczy **import EPP/EDI++**, obsługujący
-   MM bez licencji Sfery. Rozstrzyga to jeden test na instalacji 1.87 SP3 HF1.
+5. **Dokumenty MM czekają na WŁĄCZENIE workera Sfery.** Proces istnieje
+   (`sfera-worker/`). `SFERA_WORKER` zostaje jednak wyłączony do etapu 2
+   wdrożenia (weryfikacja COM — [DEPLOY.md](../DEPLOY.md)); do tego czasu
+   dokument wystawia biuro ręcznie. Otwarte pytanie: czy wystarczyłby
+   **import EPP/EDI++** bez licencji Sfery. Rozstrzyga to jeden test na
+   instalacji 1.87 SP3 HF1.

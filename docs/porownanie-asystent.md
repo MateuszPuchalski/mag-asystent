@@ -36,9 +36,10 @@ modyfikacji stanów.
 
 **Czego to nie zastępuje.** Po odjęciu funkcji nieużywanych zostają **dwie
 realne**: **inwentaryzacja** i **przesunięcia magazynowe (MM)**. Przesunięcie
-jest już w WERTIS: kolektor je zbiera, waliduje i kolejkuje, ale sam dokument
-wystawia jeszcze biuro, bo worker Sfery czeka na wdrożenie. Inwentaryzacja jest
-zaplanowana.
+jest już w WERTIS: kolektor je zbiera, waliduje i kolejkuje, a dokument tworzy
+worker Sfery (`sfera-worker/`) — przełącznik `SFERA_WORKER` jest domyślnie
+wyłączony do czasu etapu 2 wdrożenia; do włączenia dokument wystawia biuro.
+Inwentaryzacja jest zaplanowana.
 
 **Ile to kosztuje.** Asystent: 589 zł netto licencja startowa, 389 zł netto za
 każde kolejne urządzenie, licencja roczna. WERTIS: brak opłat licencyjnych, ale
@@ -426,9 +427,10 @@ wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, konta
 imienne z hasłem, praca offline, raport kolizji kodów, nocna rekoncyliacja,
 raport przeslotowania.
 
-**W drodze:** przesunięcia magazynowe (MM) — kolektor je zbiera i kolejkuje,
-ale dokument wystawia jeszcze biuro, bo worker Sfery czeka na wdrożenie;
-inwentaryzacja — planowana.
+**Jest, za przełącznikiem:** przesunięcia magazynowe (MM) — kolektor je zbiera
+i kolejkuje, dokument tworzy worker Sfery (`sfera-worker/`); `SFERA_WORKER`
+zostaje wyłączony do etapu 2 wdrożenia i do tego czasu dokument wystawia biuro.
+**W drodze:** inwentaryzacja — planowana.
 
 **Nie planowane:** kompletacja zamówień i wydania — **bo nie są używane**.
 Gdyby firma zaczęła kompletować zamówienia z kolektora, byłaby to decyzja do

@@ -170,7 +170,7 @@ nssm set wertis-api AppRotateBytes 10485760
 nssm set wertis-api Start SERVICE_AUTO_START
 nssm set wertis-api AppExit Default Restart
 
-# Worker zapisu (lokalizacje; do czasu workera Sfery także zadania MM)
+# Worker zapisu (lokalizacje; gdy SFERA_WORKER=0 bierze też zadania MM)
 nssm install wertis-worker 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\worker\worker.js'
 nssm set wertis-worker AppDirectory 'C:\wertis'
 nssm set wertis-worker AppStdout 'C:\wertis\logs\worker.log'
