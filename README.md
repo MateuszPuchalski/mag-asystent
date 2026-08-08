@@ -222,6 +222,12 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
 - Skan sprzętowy (Zebra DataWedge / Honeywell DataCollection, fallback
   klawiaturowy) / wyszukiwarka (symbol, nazwa, końcówka EAN) — logika `SELECT`
   na serwerze (spec §5.1).
+- **Wyszukiwarka wybacza.** `gaznik` znajduje `gaźnik`, słowa mogą iść
+  w dowolnej kolejności, a myślnik w symbolu nie ma znaczenia. Literówka też
+  jest wybaczana, ale **dopiero gdy nic innego nie wyszło** — wmieszana
+  w ranking wypychałaby trafienia dokładne. Ścieżka skanu tej furtki nie ma
+  wcale: sama otwiera kartę przy jednym wyniku, więc dopasowanie przybliżone
+  prowadziłoby do cudzej kartoteki.
 - **Rozpoznanie kodu po wzorcu, nie po heurystyce.** `LOC` jest kategorią
   **zamkniętą**: kod, który nie pasuje do wzorca adresu, adresem nie jest.
   Wzorzec należy do serwera i kolektor go tylko pobiera (`/api/locations`).

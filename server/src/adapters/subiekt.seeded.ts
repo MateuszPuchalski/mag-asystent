@@ -13,6 +13,29 @@ import type {
   RawZamPosition,
 } from "./subiekt.js";
 import { etykietyDostaw } from "./typy-dokumentow.js";
+import {
+  naGlob,
+  naLike,
+  odlegloscOgraniczona,
+  progLiterowki,
+  sqlZloz,
+  sqlZwin,
+  sqlZwinSymbol,
+  tokeny,
+  zloz,
+  zwin,
+} from "../tekst.js";
+
+/** Kształt wiersza wracającego z SELECT-ów listy — jeden dla trzech zapytań. */
+interface WierszSurowy {
+  id: number;
+  sym: string;
+  name: string;
+  ean: string;
+  lok: string;
+  mag: number;
+  mgp: number;
+}
 
 /* Symbole typów dokumentów mieszkają w `typy-dokumentow.ts` — tam, gdzie
    tłumaczy je także importer MSSQL. Re-eksport, bo miejsca wywołania (seed,
@@ -90,50 +113,215 @@ export class SeededSubiektAdapter {
     }));
   }
 
-  search(q: string, limit: number): ProductRow[] {
-    /* §5.1: symbol prefix > nazwa infix > końcówka EAN (dla ciągu numerycznego ≥5)
-       — a W OBRĘBIE tej samej trafności najpierw to, co REALNIE LEŻY NA PÓŁCE.
+  /**
+   * Wyszukiwarka towarów.
+   *
+   * §5.1: symbol prefix > cała fraza w nazwie > rozproszone słowa > końcówka
+   * EAN — a W OBRĘBIE tej samej trafności najpierw to, co REALNIE LEŻY NA
+   * PÓŁCE.
+   *
+   * To nie jest kosmetyka listy. Z ~3600 kartotek aktywnych jest ~1000, więc
+   * dwie trzecie wyników wyszukiwania to kartoteki martwe: zerowy stan
+   * w obu magazynach i zerowa szansa, że magazynier czegoś takiego szuka.
+   * Sortowanie po samym symbolu wypychało je na górę alfabetem, a człowiek
+   * przy regale przewijał listę, żeby dojść do jedynej pozycji, którą można
+   * podać klientowi.
+   *
+   * Trafność zostaje PIERWSZA i to jest świadome: wpisany symbol ma wygrać
+   * z przypadkowym trafieniem w nazwie, choćby tamto miało pełny magazyn.
+   * Surowy symbol zostaje ostatnim kryterium — dla powtarzalności przy równym
+   * stanie; sortowanie po formie zwiniętej zgubiłoby rozstrzygnięcie tam,
+   * gdzie różni je myślnik.
+   *
+   * @param opcje.literowki `false` wyłącza furtkę przybliżoną — patrz
+   *   `szukajZFurtka`. Ścieżka skanu MUSI ją wyłączać.
+   */
+  search(q: string, limit: number, opcje: { literowki?: boolean } = {}): ProductRow[] {
+    return opcje.literowki === false
+      ? this.szukajDokladnie(q, limit)
+      : this.szukajZFurtka(q, limit).wyniki;
+  }
 
-       To nie jest kosmetyka listy. Z ~3600 kartotek aktywnych jest ~1000, więc
-       dwie trzecie wyników wyszukiwania to kartoteki martwe: zerowy stan
-       w obu magazynach i zerowa szansa, że magazynier czegoś takiego szuka.
-       Sortowanie po samym symbolu wypychało je na górę alfabetem, a człowiek
-       przy regale przewijał listę, żeby dojść do jedynej pozycji, którą można
-       podać klientowi.
+  /**
+   * Wyszukiwanie z furtką na literówki. `przyblizone` mówi, czy wyniki wyszły
+   * z dopasowania dosłownego, czy z niej.
+   *
+   * FURTKA ODPALA SIĘ WYŁĄCZNIE PRZY ZERZE WYNIKÓW i to jest cała jej
+   * bezpieczna postać. Dopasowanie rozmyte wmieszane w ranking wypycha
+   * trafienia dokładne — klasyczna wada wyszukiwarek, w których „gaz" wciąga
+   * „gips". Jako odpowiedź na „nic nie znalazłem" nie ma czego zepsuć, a koszt
+   * płaci się dokładnie wtedy, gdy człowiek i tak utknął.
+   */
+  szukajZFurtka(q: string, limit: number): { wyniki: ProductRow[]; przyblizone: boolean } {
+    const dokladne = this.szukajDokladnie(q, limit);
+    if (dokladne.length > 0) return { wyniki: dokladne, przyblizone: false };
+    const przyblizone = this.szukajPrzyblizone(q, limit);
+    return { wyniki: przyblizone, przyblizone: przyblizone.length > 0 };
+  }
 
-       Trafność zostaje PIERWSZA i to jest świadome: wpisany symbol ma wygrać
-       z przypadkowym trafieniem w nazwie, choćby tamto miało pełny magazyn.
-       Symbol zostaje ostatnim kryterium — dla powtarzalności kolejności przy
-       równym stanie. */
-    const isNum = /^\d{5,}$/.test(q);
+  private szukajDokladnie(q: string, limit: number): ProductRow[] {
+    const toks = tokeny(q);
+    /* Zapytanie bez ani jednego słowa („-", „///", same spacje). Koniunkcja po
+       pustym zbiorze jest PRAWDZIWA, więc bez tego strażnika wyszukiwarka
+       oddałaby całą kartotekę posortowaną po stanie. */
+    if (toks.length === 0) return [];
+
+    const symbolem = naLike(zwin(q));
+    const fraza = naGlob(zloz(q).trim());
+    const cyfry = q.replace(/\D/g, "");
+    const jakEan = cyfry.length >= 5 ? 1 : 0;
+    /* Token trafia w nazwę ALBO w symbol. Nazwa idzie przez GLOB (ogonki
+       i wielkość liter w klasach znaków), symbol przez LIKE na formie
+       zwiniętej — bo tam liczy się też brak myślnika.
+
+       TRZECIA MOŻLIWOŚĆ TYLKO DLA TOKENÓW Z CYFRĄ: nazwa ze zdjętymi
+       oddzielaczami. `sw40` ma znaleźć „SW-40 olej", a GLOB tego nie zrobi —
+       myślnika w środku nazwy nie da się w tym wzorcu pominąć. Kosztuje to
+       złożenie kolumny `nazwa`, czyli ~20 ms zamiast ~3 ms, więc bramkujemy
+       je kształtem tokenu: słowa („gaznik") tej gałęzi nie dotykają wcale,
+       a numery katalogowe są w wyszukiwarce rzadsze niż nazwy. */
+    const zCyfra = toks.some((t) => /\d/.test(t));
+    /* Przy zapytaniu jednosłownym wzorzec tokenu jest TYM SAMYM wzorcem co
+       fraza z rangi 1, a jest to najdroższa część zapytania. Skoro ranga 1 go
+       już sprawdziła i nie trafiła, powtórka w randze 2 nie ma prawa trafić —
+       zostaje jej sam symbol. Oszczędza to jedno przejście po kartotece na
+       najczęstszym kształcie zapytania. */
+    const frazaToToken = toks.length === 1 && zloz(q).trim() === toks[0];
+    const warunekTokenow = toks
+      .map(
+        () =>
+          "(" +
+          (frazaToToken ? "" : "t.nazwa GLOB ? OR ") +
+          `t.sy LIKE '%' || ? || '%' ESCAPE '\\'` +
+          (zCyfra ? ` OR t.nzw LIKE '%' || ? || '%' ESCAPE '\\')` : ")")
+      )
+      .join(" AND ");
+
+    /* SKŁADANIE NAZWY ZOSTAŁO ZASTĄPIONE WZORCEM GLOB — decyzja z pomiaru.
+       Łańcuch osiemnastu `replace` na kolumnie `nazwa` kosztował na prawdziwym
+       katalogu ~22 ms na zapytanie, bo baza buduje wtedy dla każdego z 3415
+       wierszy kilkanaście łańcuchów pośrednich. `GLOB` z klasami znaków daje
+       ten sam wynik w ~3 ms, niczego nie alokując. Serwer jest jednowątkowy
+       i w tym samym czasie odpowiada na odpytywanie listy rozkładania. */
+    const rows = db()
+      .prepare(
+        `SELECT id, sym, name, ean, lok, mag, mgp FROM (
+           SELECT t.tw_id AS id, t.symbol AS sym, t.nazwa AS name, t.ean AS ean,
+                  t.lokalizacja AS lok,
+                  COALESCE(mag.stan,0) AS mag, COALESCE(mgp.stan,0) AS mgp,
+                  COALESCE(mag.stan,0) + COALESCE(mgp.stan,0) AS stanRazem,
+                  CASE
+                    WHEN t.sy LIKE ? || '%' ESCAPE '\\' THEN 0
+                    WHEN t.nazwa GLOB ? THEN 1
+                    WHEN ${warunekTokenow} THEN 2
+                    WHEN ? = 1 AND t.ean LIKE '%' || ? THEN 3
+                    ELSE 9
+                  END AS rank
+           FROM (SELECT tw_id, symbol, nazwa, ean, lokalizacja,
+                        ${sqlZwinSymbol("symbol")} AS sy
+                        ${zCyfra ? `, ${sqlZwin("nazwa")} AS nzw` : ""}
+                 FROM sgt_towar) t
+           LEFT JOIN sgt_stan mag ON mag.tw_id = t.tw_id AND mag.mag_id = ?
+           LEFT JOIN sgt_stan mgp ON mgp.tw_id = t.tw_id AND mgp.mag_id = ?
+         )
+         WHERE rank < 9
+         ORDER BY rank, stanRazem DESC, sym
+         LIMIT ?`
+      )
+      .all(
+        symbolem,
+        fraza,
+        ...toks.flatMap((t) => {
+          const p: string[] = frazaToToken ? [] : [naGlob(t)];
+          p.push(naLike(t));
+          if (zCyfra) p.push(naLike(t));
+          return p;
+        }),
+        jakEan,
+        cyfry,
+        config.magId.MAG,
+        config.magId.MGP,
+        limit
+      ) as unknown as WierszSurowy[];
+    return this.mapujWiersze(rows);
+  }
+
+  /**
+   * Furtka: dopasowanie po odległości edycyjnej, gdy dosłowne nic nie dało.
+   *
+   * Porównujemy SŁOWO ZE SŁOWEM, nie z całą nazwą — odległość od
+   * `gaznikkompletnydokosy` przekroczy każdy rozsądny próg, więc forma zwinięta
+   * tu nie działa i pobieramy złożoną (ze spacjami).
+   */
+  private szukajPrzyblizone(q: string, limit: number): ProductRow[] {
+    const toks = tokeny(q);
+    if (toks.length === 0) return [];
+    const progi = toks.map((t) => progLiterowki(t.length));
+    // choć jedno słowo za krótkie na wybaczanie — całe zapytanie odpada
+    if (progi.some((p) => p === null)) return [];
+
+    const kandydaci = db()
+      .prepare(
+        `SELECT tw_id AS id, ${sqlZloz("symbol")} AS sy, ${sqlZloz("nazwa")} AS nz FROM sgt_towar`
+      )
+      .all() as Array<{ id: number; sy: string; nz: string }>;
+
+    const trafienia: Array<{ id: number; dystans: number }> = [];
+    for (const k of kandydaci) {
+      const slowa = `${k.nz} ${k.sy}`.split(/[\s\-./,]+/).filter((s) => s.length > 0);
+      let suma = 0;
+      let komplet = true;
+      for (let i = 0; i < toks.length; i++) {
+        const max = progi[i] as number;
+        let naj = max + 1;
+        for (const s of slowa) {
+          // podciąg dosłowny to odległość zero — nie ma po co liczyć macierzy
+          if (s.includes(toks[i])) { naj = 0; break; }
+          const d = odlegloscOgraniczona(toks[i], s, max);
+          if (d < naj) naj = d;
+          if (naj === 0) break;
+        }
+        if (naj > max) { komplet = false; break; }
+        suma += naj;
+      }
+      if (komplet) trafienia.push({ id: k.id, dystans: suma });
+    }
+    if (trafienia.length === 0) return [];
+
+    trafienia.sort((a, b) => a.dystans - b.dystans);
+    const wybrane = trafienia.slice(0, limit);
+    const dystansem = new Map(wybrane.map((t) => [t.id, t.dystans]));
+    const wiersze = this.wierszeDlaId(wybrane.map((t) => t.id));
+    /* Ta sama reguła co w etapie dosłownym: trafność pierwsza, stan rozstrzyga
+       wewnątrz niej. `dystans` gra tu rolę `rank`. */
+    return wiersze.sort(
+      (a, b) =>
+        (dystansem.get(a.id) ?? 9) - (dystansem.get(b.id) ?? 9) ||
+        b.mag + b.mgp - (a.mag + a.mgp) ||
+        a.sym.localeCompare(b.sym)
+    );
+  }
+
+  /** Wiersze listy dla zbioru identyfikatorów — ten sam JOIN co reszta. */
+  private wierszeDlaId(ids: number[]): ProductRow[] {
+    if (ids.length === 0) return [];
+    const dziury = ids.map(() => "?").join(",");
     const rows = db()
       .prepare(
         `SELECT t.tw_id AS id, t.symbol AS sym, t.nazwa AS name, t.ean AS ean,
                 t.lokalizacja AS lok,
-                COALESCE(mag.stan,0) AS mag, COALESCE(mgp.stan,0) AS mgp,
-                COALESCE(mag.stan,0) + COALESCE(mgp.stan,0) AS stanRazem,
-                CASE
-                  WHEN lower(t.symbol) LIKE lower(?) || '%' THEN 0
-                  WHEN lower(t.nazwa) LIKE '%' || lower(?) || '%' THEN 1
-                  WHEN ? = 1 AND t.ean LIKE '%' || ? THEN 2
-                  ELSE 9
-                END AS rank
+                COALESCE(mag.stan,0) AS mag, COALESCE(mgp.stan,0) AS mgp
          FROM sgt_towar t
          LEFT JOIN sgt_stan mag ON mag.tw_id = t.tw_id AND mag.mag_id = ?
          LEFT JOIN sgt_stan mgp ON mgp.tw_id = t.tw_id AND mgp.mag_id = ?
-         WHERE rank < 9
-         ORDER BY rank, stanRazem DESC, t.symbol
-         LIMIT ?`
+         WHERE t.tw_id IN (${dziury})`
       )
-      .all(
-        q,
-        q,
-        isNum ? 1 : 0,
-        q,
-        config.magId.MAG,
-        config.magId.MGP,
-        limit
-      ) as Array<{ id: number; sym: string; name: string; ean: string; lok: string; mag: number; mgp: number }>;
+      .all(config.magId.MAG, config.magId.MGP, ...ids) as unknown as WierszSurowy[];
+    return this.mapujWiersze(rows);
+  }
+
+  /** Jedno miejsce na kształt wiersza listy — trzy zapytania go dzielą. */
+  private mapujWiersze(rows: WierszSurowy[]): ProductRow[] {
     return rows.map((r) => ({
       id: r.id,
       sym: r.sym,
