@@ -460,7 +460,7 @@ if ($podlaczacDoSubiekta) {
                     $proba = Test-WertisLogowanie -Serwer $serwer -Instancja $instancja `
                         -Baza $baza -Login $login -Haslo $haslo
                     if ($proba.Udalo) {
-                        Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ustawienia.MSSQL_LOC_COLUMN) i fl_Wartosc."
+                        Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ustawienia.MSSQL_LOC_COLUMN)."
                         Write-Ok "Logowanie jako $login sprawdzone - usługi połączą się z bazą."
                         $zalozone = $true
                     } else {
@@ -471,7 +471,7 @@ if ($podlaczacDoSubiekta) {
                     }
                 } else {
                     Write-Blad "Konto powstało, ale uprawnienia nie zgadzają się z oczekiwanymi."
-                    Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma być 7), lokalizacja: $($ocena.LokalizacjaOk), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma być 0)"
+                    Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma być 6), lokalizacja: $($ocena.LokalizacjaOk), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma być 0)"
                 }
             }
         } else {
