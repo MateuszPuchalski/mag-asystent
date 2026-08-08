@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
 );
 CREATE INDEX IF NOT EXISTS ix_queue_status ON sfera_queue(status, id);
 CREATE INDEX IF NOT EXISTS ix_queue_tw ON sfera_queue(tw_id);
+-- korekty stanów i lokalizacji filtrują po typie zadania przy każdym
+-- odświeżeniu karty (co 2 s) — bez indeksu to pełny skan kolejki
+CREATE INDEX IF NOT EXISTS ix_queue_type_status ON sfera_queue(type, status);
 
 -- ── Log zdarzeń (audyt — spec §7, §12) ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS events (
@@ -142,6 +145,8 @@ CREATE TABLE IF NOT EXISTS sgt_pozycja (
   ilosc  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_pozycja_dok ON sgt_pozycja(dok_id);
+-- karta towaru pyta „na których dokumentach stoi TEN towar" (dostawy-towaru)
+CREATE INDEX IF NOT EXISTS ix_pozycja_tw ON sgt_pozycja(tw_id);
 
 -- ── Zamówienia do dostawcy (ZD) ────────────────────────────────────────────
 -- OSOBNE tabele, a nie kolejny typ w sgt_dokument, i to nie jest kwestia gustu.
