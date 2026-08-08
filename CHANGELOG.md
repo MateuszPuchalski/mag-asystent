@@ -28,6 +28,54 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.31.1 — 8 sierpnia 2026
+
+**Godziny w logach przestają być dwie godziny do tyłu, a wyniki wyszukiwania
+zaczynają się od tego, co realnie leży na półce.** Oba zgłoszenia z magazynu.
+
+**[wymaga działania]** Nic obowiązkowego. Serwer wyświetla godziny w strefie
+`Europe/Warsaw`; gdyby magazyn stał gdzie indziej, zmienia to `STREFA_CZASU`
+w `wertis.env`. Nowy APK przez MDM — poprawka czasu na karcie towaru siedzi
+po stronie kolektora.
+
+### Czas: zapis w UTC zostaje, pokazywanie było błędem
+
+Znaczniki w bazie są i pozostają w UTC — na tym stoi sortowanie po
+`created_at`, progi rekoncyliacji i porównania leksykalne. Błąd był w warstwie
+wyświetlania: godzinę wycinano z ciągu ISO (`.slice(11, 16)`, `at.drop(11)`),
+czyli pokazywano czas z Greenwich przy zegarze wskazującym czas polski. Latem
+dawało to dwie godziny wstecz, zimą jedną.
+
+Objaw mylił podwójnie. Zapis sprzed chwili wyglądał na sprzed dwóch godzin, co
+przy diagnozie „czy to weszło" prowadzi w złą stronę. Przy wpisach z okolic
+północy myliła się też **data**: operacja o 01:30 czasu polskiego ma w bazie
+23:30 UTC dnia poprzedniego i tak właśnie pokazywała się w historii.
+
+Konwersję dostały trzy miejsca: kolejka na kolektorze (`src/czas.ts`, strefa
+z ustawienia — nie ze strefy maszyny, bo serwer bywa stawiany z angielskiego
+obrazu), historia na karcie towaru (`:core`, strefa urządzenia) i dziennik
+w podglądzie biura (strefa przeglądarki). Znacznik bez strefy — starszy format
+bez `Z` — wraca niezmieniony: zgadywanie strefy dla takiego wpisu byłoby gorsze
+niż jego dosłowne powtórzenie.
+
+Przy okazji data na **formularzu reklamacyjnym dla dostawcy**: wystawiony po
+północy nosiłby datę dnia poprzedniego.
+
+### Wyszukiwanie: najpierw to, co jest
+
+Z ~3600 kartotek aktywnych jest ~1000, więc dwie trzecie trafień to kartoteki
+martwe — zerowy stan na hali i w przyjęciach. Sortowanie po samym symbolu
+wypychało je na górę alfabetem i magazynier przewijał listę, żeby dojść do
+jedynej pozycji, którą można podać klientowi.
+
+Wewnątrz tej samej trafności decyduje teraz **łączny stan** hali i przyjęć,
+malejąco. Trafność zostaje kryterium pierwszym i to jest świadome: wpisany
+symbol ma wygrać z przypadkowym trafieniem w nazwie, choćby tamto miało pełny
+magazyn — inaczej szukanie po symbolu przestałoby działać. Symbol zostaje
+ostatnim kryterium, żeby kolejność przy równym stanie była powtarzalna.
+
+---
+
 ## 0.31.0 — 8 sierpnia 2026
 
 **Wiadomo, gdzie Subiekt trzyma zdjęcia kartotek: `tw_ZdjecieTw`.** Ustalone

@@ -517,6 +517,26 @@ function rysujKolizje(lista) {
       '<tr><td colspan="5" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
 }
 
+/* Znaczniki z API są w UTC — do pokazania trzeba czasu lokalnego przeglądarki.
+   Wcześniej stało tu odcięcie znaków z ciągu ISO, czyli UTC pokazany jako
+   godzina zegarowa: latem dwie godziny wstecz, a przy wpisach z okolic
+   północy myliła się także data. Popsuty znacznik wraca niezmieniony,
+   bo wiersz dziennika ma dalej nieść typ, osobę i szczegóły. */
+const dwaZnaki = (n) => String(n).padStart(2, "0");
+
+function dataLokalna(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso ?? "");
+  return `${d.getFullYear()}-${dwaZnaki(d.getMonth() + 1)}-${dwaZnaki(d.getDate())}`;
+}
+
+function stempelLokalny(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso ?? "");
+  return `${dataLokalna(iso)} ` +
+    `${dwaZnaki(d.getHours())}:${dwaZnaki(d.getMinutes())}:${dwaZnaki(d.getSeconds())}`;
+}
+
 /* ── Serwer ── */
 function bajty(n) {
   if (!n) return "—";
@@ -537,7 +557,7 @@ function rysujZdrowie(h) {
       ? `<span class="badge ok">pracuje</span> <span class="mute">${esc(w.widziany || "")}</span>`
       : '<span class="badge err">nie żyje</span> — zapisy do Subiekta NIE wchodzą'),
     wiersz("plik konfiguracji", esc(h.configZPliku || "—")),
-    wiersz("ślad audytowy", `${a.zdarzen ?? 0} zdarzeń · od ${esc((a.najstarsze || "—").slice(0, 10))} · baza ${bajty(a.bazaBajtow)}`),
+    wiersz("ślad audytowy", `${a.zdarzen ?? 0} zdarzeń · od ${esc(a.najstarsze ? dataLokalna(a.najstarsze) : "—")} · baza ${bajty(a.bazaBajtow)}`),
     problemy ? wiersz("do sprawdzenia", problemy) : "",
   ].join("");
 }
@@ -568,7 +588,7 @@ async function szukajDziennik() {
     $("dziennik").innerHTML =
       "<tr><th>CZAS</th><th>TYP</th><th>OSOBA</th><th>URZĄDZENIE</th><th>TOWAR</th><th>SZCZEGÓŁY</th></tr>" +
       (d.wpisy.map((w) => `<tr>
-          <td class="mute" style="white-space:nowrap">${esc(w.czas.replace("T", " ").slice(0, 19))}</td>
+          <td class="mute" style="white-space:nowrap">${esc(stempelLokalny(w.czas))}</td>
           <td class="b">${esc(w.typ)}</td>
           <td>${esc(w.uzytkownik)}${w.userRef == null ? ' <span class="badge mute2">bez konta</span>' : ""}</td>
           <td class="mute">${esc(w.device || "—")}</td>
@@ -621,7 +641,10 @@ function zapiszFirme() {
    dostawcy także wtedy, gdy dane firmy nie są jeszcze zapisane. */
 const albo = (v) => (v ? esc(v) : "");
 
-const dzis = () => new Date().toISOString().slice(0, 10);
+/* Data LOKALNA, nie doba UTC. Formularz reklamacyjny idzie do dostawcy
+   z datą sporządzenia — wystawiony po północy czasu polskiego nosiłby datę
+   dnia poprzedniego. */
+const dzis = () => dataLokalna(new Date().toISOString());
 
 /** Zdjęcia dowodowe jako aneks — wspólny dla wszystkich szablonów. */
 function aneksZdjec(zdjecia) {
@@ -636,7 +659,7 @@ function formularzWertis(dok, nrDok, problemy, zdjecia) {
   const wiersze = problemy.map((p, i) => `<tr>
     <td>${i + 1}</td><td>${esc(p.sym || "")}<br><small>${esc(p.name || "")}</small></td>
     <td>${esc(p.typLabel || p.typ)}</td><td>${p.qty ?? "—"}</td>
-    <td>${esc(p.opis || "")}</td><td>${esc(p.createdBy || "")}<br><small>${esc((p.createdAt || "").slice(0, 10))}</small></td>
+    <td>${esc(p.opis || "")}</td><td>${esc(p.createdBy || "")}<br><small>${esc(p.createdAt ? dataLokalna(p.createdAt) : "")}</small></td>
     <td>${p.resolvedAt ? "rozwiązany" : "OTWARTY"}</td>
   </tr>`).join("");
   return {

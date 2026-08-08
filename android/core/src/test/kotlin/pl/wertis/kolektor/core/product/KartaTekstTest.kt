@@ -10,6 +10,7 @@ import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.net.Zamienniki
 import pl.wertis.kolektor.core.net.ZamowioneUDostawcy
+import java.time.ZoneId
 
 class KartaTekstTest {
 
@@ -67,7 +68,26 @@ class KartaTekstTest {
             MovementEntry("scan", "Piotr M", "2026-07-22 11:30:00", "Rozłożono 6 szt"),
         )
         assertEquals("ost. Jan K · 07-28", podsumowanieHistorii(h))
+        // znacznik BEZ strefy: nie ma czego przeliczać, pokazujemy co przyszło
         assertEquals("09:14", czasKrotki(h.first().at))
+    }
+
+    @Test fun `czas z serwera jest UTC i ma byc pokazany lokalnie`() {
+        // POWSTAŁO PO ZGŁOSZENIU „logi są dwie godziny do tyłu". Serwer zapisuje
+        // UTC, a kolektor pokazywał wycinek tego ciągu — czyli godzinę
+        // z Greenwich przy zegarze wskazującym czas polski.
+        val warszawa = ZoneId.of("Europe/Warsaw")
+        assertEquals("lato = UTC+2", "11:14", czasKrotki("2026-07-28T09:14:03.000Z", warszawa))
+        assertEquals("zima = UTC+1", "10:14", czasKrotki("2026-01-28T09:14:03.000Z", warszawa))
+    }
+
+    @Test fun `data z konca doby UTC nalezy juz do nastepnego dnia lokalnie`() {
+        // Wpis o 23:30 czasu polskiego ma w bazie 21:30 UTC TEGO SAMEGO dnia,
+        // ale wpis o 01:30 lokalnie ma 23:30 UTC dnia POPRZEDNIEGO — i to on
+        // pokazywał się w historii z wczorajszą datą.
+        val warszawa = ZoneId.of("Europe/Warsaw")
+        assertEquals("07-29", dataKrotka("2026-07-28T23:30:00.000Z", warszawa))
+        assertEquals("01:30", czasKrotki("2026-07-28T23:30:00.000Z", warszawa))
     }
 
     @Test fun `magazyny - kod i stan po przecinku srodkowym`() {

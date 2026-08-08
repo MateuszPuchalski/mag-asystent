@@ -199,6 +199,16 @@ export const config = {
   locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50, "LOC_FIELD_LIMIT"),
 
   /**
+   * Strefa czasowa do WYŚWIETLANIA godzin (`src/czas.ts`). W bazie wszystko
+   * zostaje w UTC — to jest wyłącznie warstwa prezentacji.
+   *
+   * Ustawienie, nie strefa maszyny: serwer bywa postawiony z lokalizacją
+   * systemu inną niż magazyn (obraz z chmury, angielski Windows), a wtedy
+   * godzina w kolejce rozjeżdża się z zegarem na ścianie bez żadnego tropu.
+   */
+  strefaCzasu: process.env.STREFA_CZASU ?? "Europe/Warsaw",
+
+  /**
    * Zdjęcia kartotek na karcie towaru (0.30.0).
    *
    * `zrodlo` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM — puste znaczy „funkcji
