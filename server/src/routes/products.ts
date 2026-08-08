@@ -98,7 +98,16 @@ export async function productRoutes(app: FastifyInstance) {
     }
     const bySym = subiekt.getProductBySymbol(scan.code);
     if (bySym) return { type: "product", card: buildProductCard(subiekt, bySym.tw_id) };
-    const results = subiekt.search(scan.code, 20);
+    /* FURTKA NA LITERÓWKI JEST TU WYŁĄCZONA — świadomie i to jest ważniejsze
+       niż wygoda. Ta ścieżka SAMA otwiera kartę, gdy wynik jest dokładnie
+       jeden, więc dopasowanie przybliżone prowadziłoby wprost do CUDZEJ
+       kartoteki: zdarta etykieta, kod wpisany z błędem, jedno trafienie po
+       literówce i magazynier zapisuje adres półki nie na tym towarze.
+       Zapis lokalizacji jest bezwarunkowy i nie ma po nim cofnięcia.
+
+       W wyszukiwarce na ekranie głównym furtka działa — tam wynik trafia na
+       listę, którą człowiek potwierdza wzrokiem. */
+    const results = subiekt.search(scan.code, 20, { literowki: false });
     if (results.length === 1) {
       return { type: "product", card: buildProductCard(subiekt, results[0].id) };
     }
@@ -111,7 +120,11 @@ export async function productRoutes(app: FastifyInstance) {
     const q = (req.query.q ?? "").trim();
     if (!q) return { results: [] };
     logEvent("search", userOf(req), null, { q });
-    return { results: subiekt.search(q, 20) };
+    const { wyniki, przyblizone } = subiekt.szukajZFurtka(q, 20);
+    /* Pole addytywne — kolektor ma `ignoreUnknownKeys` (Dtos.kt), więc stare
+       APK je zignoruje. Mówi „nie znalazłem dosłownie, to są podobne" i czeka
+       na ekran, który to pokaże. */
+    return { results: wyniki, przyblizone };
   });
 
   // karta towaru

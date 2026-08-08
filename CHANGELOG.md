@@ -28,6 +28,82 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.34.0 — 8 sierpnia 2026
+
+**Wyszukiwarka wybacza.** Wpisany `gaznik` znajduje `gaźnik`, słowa mogą iść
+w dowolnej kolejności, myślnik w symbolu nie ma znaczenia, a literówka nie
+kończy szukania.
+
+**[wymaga działania]** Nic. `git pull`, `npm ci`, `npm run build`, restart
+`wertis-api`. **Bez nowego APK** — kolektor nie szuka lokalnie, tylko pyta
+serwer, więc cała zmiana siedzi po jednej stronie.
+
+### Zepsute były dwie rzeczy, nie jedna
+
+Zgłoszenie brzmiało: „wpisuję gaznik i nie znajduje gaźnika". Przyczyna sięgała
+głębiej, bo SQLite nie zna polskich liter w żadnej z funkcji, których
+używaliśmy:
+
+```
+lower('GAŹNIK')                     → 'gaŹnik'
+'gaźnik' = 'GAŹNIK' COLLATE NOCASE  → 0
+```
+
+Diakrytyki nie były składane — i to było zgłoszenie. Ale **wielkość liter też
+nie działała dla polskich znaków**: wpisany `ŁAŃCUCH` nie znajdował kartoteki
+`łańcuch`. Nikt tego nie zauważył, bo szuka się małymi literami.
+
+Przy okazji wyszła trzecia, cicha wada: `%` i `_` wpisane w wyszukiwarkę
+działały jako wieloznaczniki. Samo `%` zwracało całą kartotekę, a `Filtr 100%`
+znajdowało też `Filtr 1005`.
+
+### Cztery poziomy wyrozumiałości
+
+**Polskie znaki i wielkość liter** — `gaznik`, `gaźnik`, `GAŹNIK` i `Gaznik`
+znajdują to samo, w obie strony. Kartoteka zapisana bez ogonków też jest
+znajdowana zapytaniem z ogonkami.
+
+**Słowa w dowolnej kolejności** — `ssanie gaznik` znajduje `Gaźnik ssanie
+ręczne`. Cała fraza w jednym kawałku wygrywa z rozproszonymi słowami, więc
+kolejność nadal coś znaczy dla trafności, tylko nie decyduje o znalezieniu.
+
+**Myślniki i spacje w symbolu** — `LS51139`, `ls51-139` i `LS51 139` to jedno
+i to samo. Etykieta bywa zdarta, a numer przepisywany z ręki.
+
+**Literówki, ale WYŁĄCZNIE gdy nic innego nie wyszło.** Odwrotność jest tu
+świadoma: dopasowanie rozmyte wmieszane w ranking wypycha trafienia dokładne —
+klasyczna wada wyszukiwarek, w których „gaz" wciąga „gips". Jako odpowiedź na
+„nic nie znalazłem" nie ma czego zepsuć. Krótkie słowa nie dostają prawa do
+literówki wcale: jeden błąd na trzech znakach zrównuje `kos`, `kot`, `koc`
+i `kod`.
+
+### Skan nigdy nie otworzy karty po literówce
+
+Ścieżka skanu ma furtkę **wyłączoną** i to jest ważniejsze niż wygoda. Gdy skan
+albo kod wpisany ręcznie daje dokładnie jeden wynik, serwer otwiera kartę bez
+pytania — więc dopasowanie przybliżone prowadziłoby wprost do CUDZEJ kartoteki.
+Zdarta etykieta, kod wpisany z błędem, jedno trafienie po literówce
+i magazynier zapisuje adres półki nie na tym towarze. Zapis lokalizacji jest
+bezwarunkowy i nie ma po nim cofnięcia.
+
+### Pomiar zdecydował o kształcie rozwiązania
+
+Pierwsza wersja składała obie kolumny łańcuchem osiemnastu `replace`. Na
+prawdziwym katalogu demo (3415 kartotek, 2671 z polskimi znakami w nazwie)
+kosztowało to **42–75 ms na zapytanie**, przy 5 ms wersji dotychczasowej.
+Serwer jest jednowątkowy i w tym samym czasie odpowiada na odpytywanie listy
+rozkładania, więc taki regres byłby widoczny na hali.
+
+Nazwa idzie więc przez `GLOB` z klasami znaków (`[aAąĄ]`, `[zZźŹżŻ]`), który
+niczego nie alokuje — tylko porównuje. Symbol nadal składamy, ale pełny łańcuch
+liczy się wyłącznie dla wierszy ze znakiem spoza ASCII; w tej kartotece jest ich
+**dwanaście na 3415**. Wynik: **10–12 ms** dla zapytania jednosłownego.
+
+Gdyby kartoteka kiedyś urosła na tyle, że i to zacznie przeszkadzać, następnym
+krokiem jest kolumna składana wyliczana przy imporcie — świadomie odrzucona
+teraz, bo wymaga dopisania się do trzech miejsc zapisu, a każde przyszłe, które
+o niej zapomni, robi towar po cichu niewyszukiwalnym.
+
 ## 0.33.1 — 8 sierpnia 2026
 
 **Rysunek pudełka ustępuje zdjęciu.** W pasku listy rozkładania stały obok
