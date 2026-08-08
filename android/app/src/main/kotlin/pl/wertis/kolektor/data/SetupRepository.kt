@@ -41,9 +41,24 @@ class SetupRepository(
     private val _stan = MutableStateFlow<StanSetupu>(StanSetupu.Wpisywanie)
     val stan: StateFlow<StanSetupu> = _stan
 
+    /* Ostatnia odpowiedź na „czy serwer ma konta". Splash pyta przy każdym
+       wejściu, a odpowiedź zmienia się raz w życiu instalacji (z „pusty" na
+       „ma konta") — do przyjścia świeżej ekran rysuje znaną, zamiast chować
+       przyciski za „Sprawdzam serwer…". Tylko pamięć: po zmianie adresu
+       serwera werdykt jest o INNYM serwerze i zostaje zapomniany. */
+    @Volatile private var werdykt: Boolean? = null
+
+    /** Ostatni znany werdykt bez pytania serwera; `null` = jeszcze nie znamy. */
+    fun znanyWerdykt(): Boolean? = werdykt
+
+    fun zapomnijWerdykt() {
+        werdykt = null
+    }
+
     /** Czy serwer nie ma jeszcze żadnego konta; `null` = nie udało się zapytać. */
     suspend fun potrzebny(): Boolean? =
         runCatching { apiCall { api().setupPotrzebny() }.potrzebne }.getOrNull()
+            ?.also { werdykt = it }
 
     /**
      * Zakłada całą listę.

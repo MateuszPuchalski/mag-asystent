@@ -6,9 +6,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import pl.wertis.kolektor.core.cache.CardsRepository
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.data.TelemetryRepository
 import pl.wertis.kolektor.data.LocationsRepository
+import pl.wertis.kolektor.data.MagazynyRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.data.RecentStore
@@ -55,12 +57,18 @@ class AppGraph(context: Context) {
         sessionToken = { session.token },
         deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
+        cacheDir = context.cacheDir,
     )
     val api: ApiService get() = apiClient.service
 
     val connectivity = ConnectivityMonitor(context)
+    /* Ostatnie znane odpowiedzi odczytów — ekran rysuje je od razu, a jego
+       zwykłe odpytywanie dociąga świeże. Tylko pamięć, czyszczone przy
+       zmianie serwera. */
+    val cards = CardsRepository()
     val queueRepo = QueueRepository(api, appScope)
     val locationsRepo = LocationsRepository(context, api)
+    val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
 
     val effects = UiEffects(appScope)

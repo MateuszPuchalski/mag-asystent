@@ -12,12 +12,19 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 data class Poll<T>(val data: T? = null, val error: String? = null, val loading: Boolean = true)
 
+/**
+ * @param initial ostatnia znana wartość (posiew z cache) — emitowana od razu,
+ *   PRZED pierwszym żądaniem, żeby ekran nie zaczynał od „Wczytywanie…".
+ *   Pierwsza odpowiedź sieci ją nadpisuje, więc posiew żyje najwyżej jeden cykl.
+ */
 fun <T> pollFlow(
     intervalMs: Long,
     kick: SharedFlow<Unit>? = null,
+    initial: T? = null,
     fetch: suspend () -> T,
 ): Flow<Poll<T>> = flow {
-    var last: T? = null
+    var last: T? = initial
+    if (initial != null) emit(Poll(initial, error = null, loading = false))
     while (true) {
         try {
             last = fetch()

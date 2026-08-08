@@ -65,11 +65,13 @@ import pl.wertis.kolektor.ui.theme.cardSurface
 fun DeliveryDocumentsScreen(graph: AppGraph) {
     val scope = rememberCoroutineScope()
     var reload by remember { mutableStateOf(0) }
-    val odpowiedz by produceState<DeliveryDocumentsResponse?>(null, reload) {
+    // posiew z cache: powrót na listę rysuje ostatni znany stan od razu,
+    // świeży dociąga w tle — bez „Wczytywanie…" przy każdym wejściu
+    val odpowiedz by produceState(graph.cards.peekDocuments(), reload) {
         value = try {
-            apiCall { graph.api.deliveryDocuments() }
+            apiCall { graph.api.deliveryDocuments() }.also { graph.cards.putDocuments(it) }
         } catch (_: Exception) {
-            DeliveryDocumentsResponse()
+            value ?: DeliveryDocumentsResponse()
         }
     }
 
