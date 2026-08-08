@@ -45,6 +45,7 @@ import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.scan.classify
 import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.net.apiCall
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.scan.routeScan
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
@@ -195,7 +196,14 @@ fun HomeScreen(graph: AppGraph) {
                             .clickable { graph.nav.openProduct(r.id, RecentEntry(r.id, r.sym, r.loc)) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
+                        /* Ta lista ma cztery pozycje i służy do powrotu do
+                           czegoś, co się przed chwilą trzymało w ręku —
+                           rozpoznanie po kształcie jest tu szybsze niż
+                           czytanie symbolu. Zdjęcia są już w cache'u, bo
+                           kartę tego towaru otwierano chwilę wcześniej. */
+                        MiniaturaTowaru(graph, r.id, 36.dp)
                         Text(
                             r.sym,
                             fontWeight = FontWeight.Bold,

@@ -563,6 +563,20 @@ private fun LineRow(
                 },
                 modifier = Modifier.size(if (zwiniety) 14.dp else 18.dp),
             )
+            /* Miniatura W PASKU, po lewej stronie symbolu — zgłoszenie
+               z magazynu. Rozwinięty wiersz ma już swoją (56 dp, w miejscu
+               pastylki), a decyzja „czy to ten towar" zapada WCZEŚNIEJ:
+               przy szukaniu pozycji wzrokiem po liście, zanim ręka sięgnie.
+
+               Wiersz zwinięty jej nie dostaje. Pozycja jest odłożona, więc
+               rozpoznawanie towaru nic już nie wnosi, a pasek jest o połowę
+               niższy właśnie po to, żeby dziesięć pozycji drobnicy zmieściło
+               się na ekranie.
+
+               Ikona stanu zostaje na swoim miejscu: mówi „zrobione" albo
+               „zgłoszony problem", czyli coś innego niż zdjęcie. Podmiana
+               zabrałaby ostrzeżenie z wiersza. */
+            if (!zwiniety && !rozwiniety) MiniaturaTowaru(graph, line.twId, 36.dp)
             Column(Modifier.weight(1f)) {
                 Text(
                     line.sym,

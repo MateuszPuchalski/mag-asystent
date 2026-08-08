@@ -65,8 +65,21 @@ class ZdjeciaRepository(context: Context, private val api: ApiService) {
         }
     }
 
-    private fun zDysku(twId: Long, f: File): ByteArray? = runCatching {
-        val bajty = f.readBytes()
+    /**
+     * Odczyt pliku LECI NA WĄTEK DYSKOWY, mimo że plik jest lokalny i mały.
+     *
+     * Przy jednym zdjęciu na karcie towaru nie miało to znaczenia i dlatego
+     * przeszło niezauważone. Od kiedy miniatury stoją w wierszach list, jedno
+     * wejście na listę to i dwadzieścia odczytów pod rząd — a `zdjecie()` woła
+     * się z `LaunchedEffect`, czyli domyślnie z wątku rysującego. Tam widać to
+     * jako zacięcie przy przewijaniu.
+     *
+     * Pobranie z sieci było na `Dispatchers.IO` od początku; brakowało dokładnie
+     * tej jednej ścieżki — tej, którą chodzi się NAJCZĘŚCIEJ, bo plik zwykle już
+     * jest.
+     */
+    private suspend fun zDysku(twId: Long, f: File): ByteArray? = runCatching {
+        val bajty = withContext(Dispatchers.IO) { f.readBytes() }
         odnotujUzycie(twId)
         zapamietajWPamieci(twId, bajty)
         bajty
