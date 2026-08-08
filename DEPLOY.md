@@ -636,16 +636,20 @@ kosztuje utraconą szansę sprzedaży, a nie błędny stan. Arkusz przesunięcia
 o tym wprost, zanim ktokolwiek dotknie przycisku.
 
 **Zdjęcia kartotek na karcie towaru (opcjonalne, niezależne od etapów).**
-Funkcja jest wyłączona, dopóki `ZDJECIA_ZRODLO` jest puste. Włączenie to sam
-ODCZYT, więc wolno je przećwiczyć już na etapie 1 (kopia bazy, worker
-zatrzymany). Kolejność:
+**Robi to kreator.** Instalator sprawdza, czy w bazie jest `tw_ZdjecieTw`
+z kompletem czterech kolumn, i gdy jest — włącza zdjęcia sam, ustawiając
+sześć kluczy `ZDJECIA_*` i nadając siódmy `GRANT SELECT`. Wypisuje przy tym,
+ile zdjęć znalazł. Nie ma tabeli, nie ma grantu i funkcja zostaje wyłączona.
 
-1. Ustal na kopii, gdzie leży zdjęcie — zapytania w
-   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
-2. Wpisz klucze `ZDJECIA_*` do `wertis.env`.
-3. Gdy zdjęcia są w osobnej tabeli, dodaj jej `GRANT SELECT` i uruchom skrypt
-   uprawnień ponownie.
-4. Zrestartuj `wertis-api`.
+Sam odczyt, zero zapisu — wolno to przećwiczyć już na etapie 1 (kopia bazy,
+worker zatrzymany). Ręcznie wpisuje się te klucze tylko wtedy, gdy zdjęcia
+leżą w katalogu na dysku (`ZDJECIA_ZRODLO=plik`), o co kreator nie pyta.
+Komplet wartości i zapytania rozpoznawcze:
+[`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+
+Miniatura na karcie towaru wymaga APK w wersji **0.30.0 lub nowszej**.
+Serwer wyda zdjęcia od razu po restarcie, starszy kolektor nie ma ich gdzie
+narysować.
 
 Po dniu pracy
 `/api/health` w polu `zdjecia` poda, ile zdjęć wpadło do cache'u i jak duże

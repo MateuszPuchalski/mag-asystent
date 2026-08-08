@@ -28,6 +28,62 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.32.0 — 8 sierpnia 2026
+
+**Kreator sam włącza zdjęcia kartotek.** Sprawdza bazę, ustawia sześć kluczy
+i nadaje siódmy grant — zamiast kazać przepisywać nazwy z dokumentacji.
+
+**[wymaga działania]** Uruchom instalator z `-TylkoKonfiguracja`, żeby zdjęcia
+włączyły się same. Kto wpisał klucze `ZDJECIA_*` ręką, nie musi robić nic —
+scalanie z 0.31.2 zostawia je w spokoju. Miniatura wymaga APK **0.30.0 lub
+nowszego**; serwer wyda zdjęcia od razu, starszy kolektor nie ma ich gdzie
+narysować.
+
+### Sześć kluczy do przepisania ręką było przeoczeniem
+
+Gdy zdjęcia powstawały (0.30.0), nikt nie wiedział, gdzie Subiekt trzyma obraz.
+Nazwy tabeli i kolumn nosiły znacznik `[WERYFIKUJ]`, więc kreator nie miał o co
+zapytać — mógłby najwyżej kazać przepisać je z SSMS.
+
+Rozpoznanie na bazie firmy zamknęło tamto pytanie w 0.31.0: `tw_ZdjecieTw`
+z kolumnami `zd_IdTowar`, `zd_Zdjecie`, `zd_Glowne` i `zd_Id`. Skrypt uprawnień
+od razu dostał siódmy `GRANT SELECT`. **Kreator nie dostał nic** i dalej o tym
+nie wiedział, choć wszystkie sześć wartości było już znanych i stałych.
+Uzasadnienie wygasło, a kod za nim nie poszedł.
+
+Teraz kreator nie pyta, tylko sprawdza. Wymaga **kompletu czterech kolumn**,
+nie samej obecności tabeli: bez `zd_Id` porządek traci rozstrzygalność, bo
+`zd_IdTowar` jest kluczem obcym i przy kilku zdjęciach jednej kartoteki nie
+domyka wyboru. Po wykryciu wypisuje, ile zdjęć i na ilu kartotekach znalazł.
+
+### Siódmy grant na bazie bez tej tabeli kasował całe konto
+
+Usterka wprowadzona razem z tamtym grantem i dotąd niewidoczna, bo w bazie
+firmy tabela jest. Skrypt uprawnień idzie do serwera **jednym poleceniem**,
+więc `GRANT SELECT` na nieistniejący obiekt przerywa wykonanie. Na instalacji
+ze starszym Subiektem konto zostawało bez ani jednego uprawnienia, a instalator
+proponował przekazanie skryptu administratorowi — skryptu, który u niego też by
+się wywalił.
+
+Grant jest teraz warunkowy, a próg weryfikacji idzie za tą samą decyzją. Obie
+liczby biorą się z jednej listy, więc nie mają jak się rozjechać — ten rozjazd
+zdarzył się już dwa razy i za każdym razem objawem było zdanie o niezgodnych
+uprawnieniach po poprawnej instalacji.
+
+### Kolumna ilości zrealizowanej: kreator sprawdza zamiast zgadywać
+
+Domyślna nazwa `ob_IloscZrealizowana` była zgadnięta i zgadnięta źle — w tej
+wersji bazy nie ma jej wcale, co potwierdził komplet 57 kolumn `dok_Pozycja`.
+Poprawną wartością jest pusta, a dowiadywało się o tym z `/api/health` długo
+po instalacji. Kreator ma otwarte połączenie i jedno zapytanie do `sys.columns`
+rozstrzyga sprawę na miejscu.
+
+Wymagało to poprawki w zapisie konfiguracji. Pusta wartość znaczyła dotąd
+„nie ustawiono" i klucz nie wychodził do pliku — a przy kluczach o **niepustej
+domyślnej** to jest różnica: brak wpisu przywraca wartość domyślną. Kreator nie
+miał więc jak powiedzieć „tego nie ma". Dotyczyło to także `MSSQL_INSTANCE`,
+gdzie pustka oznacza instancję domyślną i wracała do `INSERTGT` bez objawu.
+
 ## 0.31.2 — 8 sierpnia 2026
 
 **Ponowne uruchomienie instalatora nie kasuje już ustawień dopisanych ręką.**
