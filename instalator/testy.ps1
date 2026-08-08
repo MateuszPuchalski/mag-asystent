@@ -678,16 +678,119 @@ Write-Host ""
 Write-Host "Konto admina"
 
 Sprawdz "biała lista wertis.env nie zna kluczy od kont" {
+    <#
+        Test czyta ŹRÓDŁO, a nie zachowanie: chodzi o to, żeby klucz od konta
+        nie dał się dopisać do listy przez nieuwagę, zanim ktokolwiek uruchomi
+        kreator. Wycinek jest zawężony do samej `$kolejnosc`, bo te same nazwy
+        stoją dziś także na liście kluczy NIEPRZEPISYWANYCH z istniejącego
+        pliku — czyli dokładnie tam, gdzie mają stać.
+    #>
     $zrodlo = Get-Content (Join-Path $PSScriptRoot "uslugi.ps1") -Raw
+    $m = [regex]::Match($zrodlo, '(?s)\$kolejnosc = @\((.*?)\r?\n\s*\)')
+    Zaloz $m.Success "nie znalazłem definicji `$kolejnosc w uslugi.ps1"
     foreach ($klucz in @("ADMIN_HASLO", "ADMIN_LOGIN", "WERTIS_ADMIN")) {
-        Zaloz (-not ($zrodlo -match "`"$klucz`"")) "$klucz pojawił się na białej liście"
+        Zaloz (-not ($m.Groups[1].Value -match "`"$klucz`"")) "$klucz pojawił się na białej liście"
     }
 }
 
+Sprawdz "klucz dopisany ręką przeżywa ponowny przebieg instalatora" {
+    <#
+        POWSTAŁO PO ZGŁOSZENIU Z WDROŻENIA. `Publish-WertisKonfiguracja`
+        odtwarzało plik od zera z ustawień kreatora, więc każdy klucz, o który
+        kreator nie pyta — a dokumentacja każe dopisać ręką — znikał przy
+        najbliższym `-TylkoKonfiguracja`. Funkcja gasła bez jednego błędu.
+    #>
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-scal-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        $plik = Join-Path $katalog "wertis.env"
+        Write-WertisPlik -Sciezka $plik -Tresc @"
+# stary plik
+export SGT_MODE='mssql'
+export MSSQL_INSTANCE='INSERTGT'
+export DOK_TYPY_DOSTAW='7,8'
+export ZDJECIA_ZRODLO='blob'
+export ADMIN_HASLO='przeciek'
+"@
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE      = "mssql"
+            MSSQL_SERVER  = "SERWER"
+        }
+        $tresc = Get-Content $plik -Raw
+        Zaloz ($tresc -match "DOK_TYPY_DOSTAW='7,8'")   "klucz dopisany ręką zniknął przy przepisaniu pliku"
+        Zaloz ($tresc -match "ZDJECIA_ZRODLO='blob'")   "znany klucz spoza kreatora zniknął przy przepisaniu pliku"
+        Zaloz ($tresc -match "MSSQL_INSTANCE='INSERTGT'") "kreator nie pytał o instancję, a wartość zniknęła"
+        Zaloz ($tresc -match "MSSQL_SERVER='SERWER'")   "ustawienie kreatora nie trafiło do pliku"
+        Zaloz (-not ($tresc -match "przeciek"))         "hasło admina z pliku zostało przepisane"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "kreator wygrywa z wartością z pliku, także pustą" {
+    <#
+        Druga połowa reguły scalania. Gdyby zachowanie kluczy działało „stara
+        wartość wygrywa, gdy nowa jest pusta", przejście z instancji nazwanej
+        na domyślną byłoby niewykonalne przez kreator: człowiek zostawia pole
+        puste, a plik dalej wskazuje INSERTGT.
+    #>
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-nadp-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        $plik = Join-Path $katalog "wertis.env"
+        Write-WertisPlik -Sciezka $plik -Tresc "export MSSQL_INSTANCE='INSERTGT'`nexport MSSQL_USER='stary'`n"
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE       = "mssql"
+            MSSQL_INSTANCE = ""
+            MSSQL_USER     = "wertis"
+        }
+        $tresc = Get-Content $plik -Raw
+        Zaloz (-not ($tresc -match "INSERTGT")) "pusta wartość z kreatora nie skasowała starej instancji"
+        Zaloz ($tresc -match "MSSQL_USER='wertis'") "kreator nie nadpisał loginu"
+        Zaloz (-not ($tresc -match "'stary'")) "stary login został obok nowego"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "parser wertis.env rozumie to samo, co serwer" {
+    # Rozjazd z `parseEnvFile` (server/src/env-file.ts) kończy się tym, że
+    # instalator nie widzi klucza, którego aplikacja używa - i kasuje go.
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-parse-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        $plik = Join-Path $katalog "wertis.env"
+        Write-WertisPlik -Sciezka $plik -Tresc @"
+# komentarz pelnej linii
+export W_APOSTROFACH='ala ma kota'
+BEZ_EXPORT="w cudzyslowie"
+GOLA=wartosc   # komentarz doklejony
+Z_KRATKA=haslo#7
+   ODSTEP = 'z odstepami'
+to nie jest przypisanie
+"@
+        $wpisy = Read-WertisEnv -Sciezka $plik
+        Zaloz ($wpisy["W_APOSTROFACH"] -eq "ala ma kota")   "apostrofy nie zostały zdjęte"
+        Zaloz ($wpisy["BEZ_EXPORT"] -eq "w cudzyslowie")    "linia bez export nie została wczytana"
+        Zaloz ($wpisy["GOLA"] -eq "wartosc")                "komentarz po białym znaku nie został ucięty"
+        Zaloz ($wpisy["Z_KRATKA"] -eq "haslo#7")            "kratka bez odstępu ucięła wartość"
+        Zaloz ($wpisy["ODSTEP"] -eq "z odstepami")          "odstępy wokół znaku równości psują odczyt"
+        Zaloz ($wpisy.Count -eq 5)                          "parser wczytał coś ponad pięć kluczy"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "brak pliku to pusty wynik, a nie błąd" {
+    # Pierwsza instalacja niczego jeszcze nie zapisała.
+    $wpisy = Read-WertisEnv -Sciezka (Join-Path ([IO.Path]::GetTempPath()) ("nie-ma-" + [Guid]::NewGuid()))
+    Zaloz ($wpisy.Count -eq 0) "brakujący plik miał dać pusty słownik"
+}
+
 Sprawdz "biala lista przepuszcza klucze zdjec kartotek" {
-    # Kreator o nie nie pyta, a `Publish-WertisKonfiguracja` odtwarza plik od
-    # zera — bez wpisu na tej liście klucz dopisany ręką znika przy najbliższym
-    # przebiegu -TylkoKonfiguracja i nikt nie kojarzy, dlaczego zdjęcia zgasły.
+    # Ustawienia zdjęć wolno podać wywołaniem programistycznym, a nie tylko
+    # ręcznym wpisem do pliku — biała lista musi je znać, bo inaczej wartość
+    # przekazana w `$Ustawienia` przepadałaby bez śladu.
     $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-zdj-" + [Guid]::NewGuid())
     New-Item -ItemType Directory -Path $katalog | Out-Null
     try {

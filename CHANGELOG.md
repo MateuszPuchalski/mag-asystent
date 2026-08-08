@@ -28,6 +28,47 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.31.2 — 8 sierpnia 2026
+
+**Ponowne uruchomienie instalatora nie kasuje już ustawień dopisanych ręką.**
+Wprowadza swoje zmiany i zostawia resztę pliku w spokoju.
+
+**[wymaga działania]** Nic. Poprawka działa od pierwszego przebiegu po
+aktualizacji; klucze, które zniknęły wcześniej, trzeba dopisać raz jeszcze.
+
+### Plik ustawień był odtwarzany od zera
+
+`Publish-WertisKonfiguracja` budowało `wertis.env` z listy odpowiedzi kreatora.
+Klucz, o który kreator nie pyta, nie miał skąd się w tej liście wziąć — więc
+znikał przy najbliższym przebiegu z `-TylkoKonfiguracja`. Dotyczyło to
+dokładnie tych ustawień, które dokumentacja każe wpisać ręką: `DOK_TYPY_DOSTAW`,
+`MSSQL_ZD_ZREAL_COLUMN` i komplet `ZDJECIA_*`.
+
+Objawu nie było żadnego w chwili zdarzenia. Instalator meldował sukces, usługi
+wstawały, a funkcja gasła — zakładka DOSTAWY wracała do samych FZ, sloty zdjęć
+robiły się puste. Powiązanie tego z uruchomieniem kreatora sprzed tygodnia jest
+pracą detektywistyczną, nie diagnozą.
+
+### Zapis jest teraz scaleniem
+
+Reguła mieści się w jednym zdaniu: **kreator wygrywa tam, gdzie ma zdanie**.
+Klucz obecny w jego ustawieniach idzie z odpowiedzi — także wtedy, gdy jest
+pusty, bo pusta nazwa instancji MSSQL znaczy „instancja domyślna" i stara
+wartość musi wtedy zniknąć. Klucza, o który kreator nie pytał, funkcja nie
+rusza.
+
+Nie przeżywają dwie rzeczy i obie celowo. **Komentarze własne** — plik jest
+generowany i nagłówek mówi to wprost. **Klucze od kont** (`ADMIN_LOGIN`,
+`ADMIN_HASLO` i wycofany odpowiednik z 0.23.0) — sekret konta aplikacji idzie
+przez API do bazy i nie ma prawa leżeć na dysku serwera. Skoro nieznany klucz przestał znaczyć
+„zniknie", przebieg instalatora jest najlepszą okazją, żeby taki wpis wyczyścić.
+
+Odczyt pliku robi `Read-WertisEnv` — odpowiednik `parseEnvFile`
+z `server/src/env-file.ts`, bo obie strony muszą rozumieć tę samą składnię.
+Instalator, który „nie widzi" klucza stosowanego przez aplikację, skasowałby go
+mimo scalania. Zgodność parserów pilnują testy: apostrofy, cudzysłowy,
+komentarz doklejony po białym znaku i `haslo#7` bez odstępu.
+
 ## 0.31.1 — 8 sierpnia 2026
 
 **Godziny w logach przestają być dwie godziny do tyłu, a wyniki wyszukiwania
