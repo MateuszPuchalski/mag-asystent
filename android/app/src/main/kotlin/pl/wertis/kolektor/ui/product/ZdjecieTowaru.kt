@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.data.dekodujDo
@@ -43,6 +44,19 @@ import pl.wertis.kolektor.ui.theme.InkMute
 private const val BOK_DP = 76
 private const val MINIATURA_PX = 220
 
+/* Zdekodowane miniatury, klucz "twId:px". Wiersze list w Column+forEach mają
+   POZYCYJNY `remember` — przetasowanie wierszy (nowy wynik wyszukiwania, zmiana
+   kolejności na półce) przypisuje stan do złych towarów i wymusza ponowne
+   dekodowanie. Ta mapa robi z tego tanią wpadkę: trafienie to zero sieci
+   i zero BitmapFactory. 32 × ~120 px w ARGB_8888 ≈ 1,8 MB. */
+private val zdekodowane = android.util.LruCache<String, android.graphics.Bitmap>(32)
+
+private suspend fun miniaturaZCache(bajty: ByteArray, twId: Long, px: Int): android.graphics.Bitmap? {
+    val klucz = "$twId:$px"
+    zdekodowane.get(klucz)?.let { return it }
+    return dekodujDo(bajty, px)?.also { zdekodowane.put(klucz, it) }
+}
+
 @Composable
 fun ZdjecieKartoteki(graph: AppGraph, twId: Long) {
     var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
@@ -55,7 +69,7 @@ fun ZdjecieKartoteki(graph: AppGraph, twId: Long) {
     LaunchedEffect(twId) {
         val dane = graph.zdjeciaRepo.zdjecie(twId)
         bajty = dane
-        miniatura = dane?.let { dekodujDo(it, MINIATURA_PX) }
+        miniatura = dane?.let { miniaturaZCache(it, twId, MINIATURA_PX) }
     }
 
     Box(
@@ -81,6 +95,58 @@ fun ZdjecieKartoteki(graph: AppGraph, twId: Long) {
             Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(26.dp))
         }
     }
+
+    if (pelnyEkran) {
+        PelnyEkranZdjecia(bajty) { pelnyEkran = false }
+    }
+}
+
+/* ── Miniatura w wierszach list i nagłówkach arkuszy ────────────────────────
+   ODWROTNIE niż na karcie: ŻADNEGO zarezerwowanego slotu. Dopóki bajtów nie
+   ma — nie emituje nic; wiersz wygląda dokładnie jak przed erą zdjęć.
+   Karta rezerwuje slot, bo jest JEDNA i stała; wiersz listy jest jednym
+   z dwudziestu, a instalacja bez skonfigurowanego źródła zdjęć (ZDJECIA_ZRODLO
+   puste) dostawałaby dwadzieścia szarych kwadratów na każdym ekranie —
+   szum bez informacji. Cena odwrotnej reguły: element wskakuje po chwili
+   przy PIERWSZYM pobraniu; potem odpowiada cache i przesunięcia nie ma. */
+
+/**
+ * @param powieksz tap otwiera pełny ekran — true WYŁĄCZNIE w nagłówkach bez
+ *   własnego gestu (ScanLoc, przesunięcie, problem). Wiersze list mają swój
+ *   tap (nawigacja/wybór) i zagnieżdżony clickable kradłby go w rękawicach.
+ */
+@Composable
+fun MiniaturaTowaru(
+    graph: AppGraph,
+    twId: Long,
+    bok: Dp,
+    powieksz: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
+    var miniatura by remember(twId) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var pelnyEkran by remember(twId) { mutableStateOf(false) }
+
+    // stały mnożnik zamiast LocalDensity — klucz cache'a dekodowania nie może
+    // zależeć od ekranu, na którym akurat rysujemy
+    val px = bok.value.toInt() * 3
+
+    LaunchedEffect(twId) {
+        val dane = graph.zdjeciaRepo.zdjecie(twId)
+        bajty = dane
+        miniatura = dane?.let { miniaturaZCache(it, twId, px) }
+    }
+
+    val bmp = miniatura ?: return
+    Image(
+        bitmap = bmp.asImageBitmap(),
+        contentDescription = "Zdjęcie towaru",
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .size(bok)
+            .clip(RoundedCornerShape(8.dp))
+            .then(if (powieksz) Modifier.clickable { pelnyEkran = true } else Modifier),
+    )
 
     if (pelnyEkran) {
         PelnyEkranZdjecia(bajty) { pelnyEkran = false }

@@ -54,9 +54,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.scan.WedgeKeySource
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberDark
@@ -267,7 +269,7 @@ fun LoadingRow(text: String = "Wczytywanie…") {
 
 /** Wiersz wyniku wyszukiwania / zawartości lokalizacji (ProductRow). */
 @Composable
-fun ProductRowCard(row: ProductRow, onClick: () -> Unit) {
+fun ProductRowCard(graph: AppGraph, row: ProductRow, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -276,7 +278,9 @@ fun ProductRowCard(row: ProductRow, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        MiniaturaTowaru(graph, row.id, 40.dp)
         Column(Modifier.weight(1f)) {
             Text(row.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
             Text(

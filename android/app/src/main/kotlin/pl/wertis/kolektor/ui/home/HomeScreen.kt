@@ -164,7 +164,7 @@ fun HomeScreen(graph: AppGraph) {
             if (results.isNotEmpty()) {
                 SectionLabel("Wyniki (${results.size})${if (fetching) " …" else ""}")
                 results.forEach { row ->
-                    ProductRowCard(row) { openRow(row) }
+                    ProductRowCard(graph, row) { openRow(row) }
                 }
             } else {
                 Text(

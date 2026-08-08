@@ -158,7 +158,7 @@ fun LocationScreen(graph: AppGraph) {
             else -> {
                 SectionLabel("Powinno tu leżeć (${contents.size})")
                 contents.forEach { row ->
-                    ProductRowCard(row) {
+                    ProductRowCard(graph, row) {
                         graph.nav.openProduct(
                             row.id,
                             RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji"),

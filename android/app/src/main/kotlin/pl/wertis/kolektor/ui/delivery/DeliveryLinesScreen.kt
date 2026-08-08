@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
@@ -402,6 +403,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     }
                 }
                 LineRow(
+                    graph = graph,
                     line = line,
                     tryb = trybWiersza(line.status, aktywna = active?.id == line.id),
                     rozjazd = mismatch?.takeIf { it.first.id == line.id }?.second,
@@ -486,6 +488,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     // kolizja EAN — operacja stoi, aplikacja nigdy nie wybiera pierwszego (D7)
     conflict?.let { candidates ->
         EanConflictSheet(
+            graph = graph,
             candidates = candidates,
             onPick = { c ->
                 conflict = null
@@ -510,6 +513,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
  */
 @Composable
 private fun LineRow(
+    graph: AppGraph,
     line: DeliveryLineView,
     tryb: TrybWiersza,
     /** Zeskanowana półka niezgodna z kartoteką — decyzja zapada TU (§4.3). */
@@ -588,8 +592,14 @@ private fun LineRow(
             /* LOKALIZACJA JAKO PASTYLKA, nie jako fragment linijki metadanych.
                Każda pozycja drobnicy jedzie na własną półkę, więc to jest ta
                informacja, po którą sięga oko — a nagłówki alejek, które kiedyś
-               ją dublowały, zniknęły. */
+               ją dublowały, zniknęły.
+
+               Rozwinięty wiersz wymienia pastylkę na zdjęcie: adres i tak
+               krzyczy 28 sp w panelu odkładania niżej, a wątpliwość, którą
+               zdjęcie rozstrzyga („czy to na pewno TEN towar?"), pojawia się
+               dokładnie w chwili brania kartonu do ręki. */
             if (!rozwiniety) LokPastylka(line.locExpected, przygaszona = zwiniety)
+            else MiniaturaTowaru(graph, line.twId, 56.dp)
         }
 
         if (rozwiniety) {
@@ -738,6 +748,7 @@ private fun RozjazdPanel(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EanConflictSheet(
+    graph: AppGraph,
     candidates: List<EanCandidate>,
     onPick: (EanCandidate) -> Unit,
     onCancel: () -> Unit,
@@ -764,7 +775,9 @@ private fun EanConflictSheet(
         Text("Wybierz właściwy — aplikacja nie zgaduje.", fontSize = 13.sp, color = InkSoft)
 
         candidates.forEach { c ->
-            Column(
+            // zdjęcie obok kandydata — dokładnie tu rozstrzyga się „który to
+            // towar", a fotografia odpowiada szybciej niż porównywanie symboli
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .cardSurface(
@@ -773,20 +786,24 @@ private fun EanConflictSheet(
                     )
                     .clickable { onPick(c) }
                     .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(c.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
-                Text(c.name, fontSize = 12.5.sp, color = InkSoft, maxLines = 2)
-                Text(
-                    if (c.inDocument) {
-                        "w dokumencie: ${formatQty(c.qtyDoc ?: 0.0)} szt → ${c.locExpected ?: "—"}"
-                    } else {
-                        "spoza dokumentu → ${c.locExpected ?: "—"}"
-                    },
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (c.inDocument) AmberInk else InkMute,
-                )
+                MiniaturaTowaru(graph, c.twId, 56.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(c.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+                    Text(c.name, fontSize = 12.5.sp, color = InkSoft, maxLines = 2)
+                    Text(
+                        if (c.inDocument) {
+                            "w dokumencie: ${formatQty(c.qtyDoc ?: 0.0)} szt → ${c.locExpected ?: "—"}"
+                        } else {
+                            "spoza dokumentu → ${c.locExpected ?: "—"}"
+                        },
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (c.inDocument) AmberInk else InkMute,
+                    )
+                }
             }
         }
 

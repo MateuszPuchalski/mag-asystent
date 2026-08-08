@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.PrzesylkaBody
 import pl.wertis.kolektor.core.net.RaiseProblemBody
@@ -254,14 +255,24 @@ fun ProblemSheet(
         }
 
         if (line != null) {
-            Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 9.dp)) {
-                Text(line.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
-                Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "${formatQty(line.qtyDoc)} szt wg dokumentu · ${line.locExpected ?: "BRAK LOKALIZACJI"}",
-                    fontSize = 11.5.sp,
-                    color = InkMute,
-                )
+            Row(
+                Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                /* Z powiększeniem: zgłaszający porównuje wadliwą sztukę w ręce
+                   ze wzorcem z kartoteki, a karta tożsamości nie ma tu innego
+                   gestu, który tap mógłby ukraść. */
+                MiniaturaTowaru(graph, line.twId, 56.dp, powieksz = true)
+                Column(Modifier.weight(1f)) {
+                    Text(line.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
+                    Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "${formatQty(line.qtyDoc)} szt wg dokumentu · ${line.locExpected ?: "BRAK LOKALIZACJI"}",
+                        fontSize = 11.5.sp,
+                        color = InkMute,
+                    )
+                }
             }
         } else {
             Text("Zgłoszenie dotyczy całej dostawy.", fontSize = 12.5.sp, color = InkSoft)
