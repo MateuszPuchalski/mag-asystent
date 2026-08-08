@@ -1,5 +1,7 @@
+import fs from "node:fs";
 import type { FastifyInstance } from "fastify";
 import { autorOperacji, subiekt, userOf } from "../context.js";
+import { sciezkaZdjecia, zapewnijZdjecie } from "../services/zdjecia.js";
 import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
 import { enqueueSetLocation } from "../services/queue.js";
@@ -187,6 +189,40 @@ export async function productRoutes(app: FastifyInstance) {
       return { queueId };
     }
   );
+
+  /**
+   * Zdjęcie kartoteki (0.30.0).
+   *
+   * OSOBNA TRASA, nigdy pole karty — karta jest odpytywana co 2 s
+   * (ProductScreen.kt), a 150 KB w base64 w tym cyklu to ponad 4 MB na minutę
+   * z JEDNEGO kolektora. Osobny adres pozwala też na 304, czyli na to, że
+   * zdjęcie jedzie przez Wi-Fi raz na towar, a nie raz na spojrzenie.
+   *
+   * Zostaje za sesją (nie ma jej w `BEZ_SESJI`), tak samo jak zdjęcia dowodowe.
+   */
+  app.get<{ Params: { twId: string } }>("/api/products/:twId/zdjecie", async (req, reply) => {
+    const wpis = await zapewnijZdjecie(Number(req.params.twId));
+    if (!wpis?.plik || !wpis.etag) return reply.code(404).send({ error: "Brak zdjęcia" });
+
+    const etag = `"${wpis.etag}"`;
+    /* 304 PRZED otwarciem pliku. Kolektor pyta przy każdym wejściu na kartę,
+       a odpowiedź „to samo, co masz" ma kosztować nagłówek — nie transfer. */
+    if (req.headers["if-none-match"] === etag) {
+      return reply.code(304).header("etag", etag).send();
+    }
+
+    const plik = sciezkaZdjecia(wpis.plik);
+    if (!plik) return reply.code(404).send({ error: "Brak pliku" });
+    /* Długość ze `stat`, nie z bazy: między odczytem wpisu a wysyłką plik mógł
+       wypaść z cache'u, a skłamany content-length urywa obrazek w połowie
+       BEZ żadnego błędu — po stronie kolektora wygląda to jak zepsute zdjęcie. */
+    return reply
+      .type(wpis.mime ?? "image/jpeg")
+      .header("etag", etag)
+      .header("cache-control", "private, max-age=86400")
+      .header("content-length", String(fs.statSync(plik).size))
+      .send(fs.createReadStream(plik));
+  });
 }
 
 function describeLoc(body: LocBody, current: string[]): string {

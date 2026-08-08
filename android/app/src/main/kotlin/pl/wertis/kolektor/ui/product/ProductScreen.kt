@@ -170,7 +170,11 @@ fun ProductScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ProductHero(p, onPrzesunZMgp = { przesun = Zrodlo(null, "MGP", p.mgp.stan - p.mgp.pendingOut) }) {
+        ProductHero(
+            p,
+            onPrzesunZMgp = { przesun = Zrodlo(null, "MGP", p.mgp.stan - p.mgp.pendingOut) },
+            zdjecie = { ZdjecieKartoteki(graph, p.id) },
+        ) {
             /* Pastylka adresu pickingowego. Ograniczona szerokość, żeby długi
                kod nie zepchnął liczby 44 sp — adresy mieszczą się w dziewięciu
                znakach, ale wykaz nie jest gwarancją. */

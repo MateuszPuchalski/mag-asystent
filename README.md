@@ -441,7 +441,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 113 testów jednostkowych; buduje się bez Android SDK
+                           + 124 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
@@ -458,6 +458,7 @@ server/                    backend (Fastify + SQLite + worker)
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
+  data/zdjecia/            CACHE zdjęć kartotek z Subiekta — wolno skasować
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
 docs/architektura.md       jak to jest zbudowane i dlaczego tak (start dla nowej osoby)
 docs/analiza-rozkladanie.md rozkładanie i przesunięcia + backlog

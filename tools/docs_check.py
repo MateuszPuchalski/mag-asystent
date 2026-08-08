@@ -29,6 +29,9 @@ ALLOWED_MISSING = {
     # baza powstaje przy `npm run seed`; w świeżym klonie (i w CI) jej nie ma,
     # ale instrukcja resetu musi móc nazwać plik po imieniu
     "server/data/wertis.db",
+    # cache zdjęć kartotek — powstaje przy pierwszym otwarciu karty, w świeżym
+    # klonie go nie ma, ale dokumentacja musi móc nazwać katalog po imieniu
+    "server/data/zdjecia/",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis

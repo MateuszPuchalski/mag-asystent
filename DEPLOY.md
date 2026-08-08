@@ -628,6 +628,22 @@ Kolejność jest bezpieczna (adres przed sprzedawalnością), więc opóźnienie
 kosztuje utraconą szansę sprzedaży, a nie błędny stan. Arkusz przesunięcia mówi
 o tym wprost, zanim ktokolwiek dotknie przycisku.
 
+**Zdjęcia kartotek na karcie towaru (opcjonalne, niezależne od etapów).**
+Funkcja jest wyłączona, dopóki `ZDJECIA_ZRODLO` jest puste. Włączenie to sam
+ODCZYT, więc wolno je przećwiczyć już na etapie 1 (kopia bazy, worker
+zatrzymany). Kolejność:
+
+1. Ustal na kopii, gdzie leży zdjęcie — zapytania w
+   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
+2. Wpisz klucze `ZDJECIA_*` do `wertis.env`.
+3. Gdy zdjęcia są w osobnej tabeli, dodaj jej `GRANT SELECT` i uruchom skrypt
+   uprawnień ponownie.
+4. Zrestartuj `wertis-api`.
+
+Po dniu pracy
+`/api/health` w polu `zdjecia` poda, ile zdjęć wpadło do cache'u i jak duże
+było największe — dopiero na tych liczbach dobiera się `ZDJECIA_MAX_KB`.
+
 **Etap 2 — dokumenty MM przez Sferę (worker gotowy w `sfera-worker/`):**
 
 Osobny proces C#/.NET czytający tę samą tabelę `sfera_queue` i wykonujący

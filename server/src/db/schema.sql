@@ -284,6 +284,26 @@ CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 -- w dokumentacji weryfikacja `curl /api/health` nie mogła tego wykryć, bo
 -- raportowała wyłącznie proces API. Teraz każdy proces melduje swój tryb tutaj,
 -- a /api/health je porównuje.
+-- ── Cache zdjęć kartotek (0.30.0) ─────────────────────────────────────────
+-- NIE jest częścią read-modelu sgt_* i dlatego NIE stoi na liście kasowanej
+-- przy imporcie (subiekt.mssql.ts): wpis musi przeżyć synchronizację, bo jego
+-- jedynym zadaniem jest sprawić, żeby blob NIE jechał z bazy Subiekta drugi raz.
+--
+-- `plik IS NULL AND blad IS NULL` znaczy POTWIERDZONY BRAK zdjęcia i to jest
+-- stan trzeci, nie brak wpisu. Bez niego kartoteki bez zdjęcia — a jest ich
+-- sporo — pytałyby Subiekta przy każdym otwarciu karty.
+CREATE TABLE IF NOT EXISTS zdjecie_cache (
+  tw_id      INTEGER PRIMARY KEY,
+  plik       TEXT,                 -- nazwa pliku w data/zdjecia; NULL = brak zdjęcia
+  mime       TEXT,
+  bajtow     INTEGER NOT NULL DEFAULT 0,
+  etag       TEXT,                 -- sha1 treści — po nim idzie 304
+  pobrano_at TEXT NOT NULL,
+  uzyto_at   TEXT NOT NULL,        -- ostatnie UŻYCIE; po nim idzie eviction
+  blad       TEXT                  -- zdanie o BŁĘDZIE, nigdy o braku zdjęcia
+);
+CREATE INDEX IF NOT EXISTS ix_zdjecie_uzyto ON zdjecie_cache(uzyto_at);
+
 CREATE TABLE IF NOT EXISTS process_state (
   name       TEXT PRIMARY KEY,   -- 'api' | 'worker' | 'sfera' (worker MM, sfera-worker/)
   pid        INTEGER NOT NULL,

@@ -671,6 +671,26 @@ Sprawdz "biała lista wertis.env nie zna kluczy od kont" {
     }
 }
 
+Sprawdz "biala lista przepuszcza klucze zdjec kartotek" {
+    # Kreator o nie nie pyta, a `Publish-WertisKonfiguracja` odtwarza plik od
+    # zera — bez wpisu na tej liście klucz dopisany ręką znika przy najbliższym
+    # przebiegu -TylkoKonfiguracja i nikt nie kojarzy, dlaczego zdjęcia zgasły.
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-zdj-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE        = "mssql"
+            ZDJECIA_ZRODLO  = "blob"
+            ZDJECIA_KOLUMNA = "zdj_Dane"
+        }
+        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
+        Zaloz ($tresc -match "ZDJECIA_ZRODLO='blob'") "ZDJECIA_ZRODLO nie zapisalo sie do wertis.env"
+        Zaloz ($tresc -match "ZDJECIA_KOLUMNA='zdj_Dane'") "ZDJECIA_KOLUMNA nie zapisalo sie do wertis.env"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Sprawdz "hasło podane w ustawieniach NIE trafia do pliku" {
     $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-adm-" + [Guid]::NewGuid())
     New-Item -ItemType Directory -Path $katalog | Out-Null

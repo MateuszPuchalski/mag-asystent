@@ -415,9 +415,111 @@ Konsekwencja dla konfiguracji: **`^PAL-\d{3}$` ma dziś zero trafień w całej
 kartotece.** Zostaje w `config.locPatterns` jako format DOCELOWY, na który
 migrują palety przy sprzątaniu — nie jako opis stanu obecnego.
 
+## Gdzie Subiekt trzyma zdjęcie kartoteki
+
+**Tego opis struktury nie zawiera, a repozytorium tego nie wie.** Wśród
+udokumentowanych kolumn `tw__Towar` nie ma ani jednej binarnej, a `tw_Opis`
+jest polem tekstowym — czyta je `services/zamienniki.ts` jako zwykły tekst.
+
+Wiadomo natomiast, jak to wygląda w programie. Zakładka **Opis** na kartotece
+ma sekcję „Zdjęcie" z podglądem, a obok niej: **Dodaj, Usuń, Pokaż, Ustaw jako
+główną, Sortuj, Zapisz** oraz strzałki `<<` `>>`. Wynikają z tego dwie rzeczy
+rozstrzygające dla aplikacji:
+
+- **kartoteka może mieć KILKA zdjęć**, z jednym oznaczonym jako główne
+  i z jawną kolejnością — więc kolektor musi wybierać deterministycznie,
+- zdjęcia sąsiadują z opcjami sklepu internetowego i synchronizacji z Sello.
+  Wskazuje to na tabelę powiązaną z modułem e-commerce, a nie na kolumnę
+  na samej kartotece.
+
+Kolektor pokazuje **jedno** zdjęcie i ma to być to samo, które biuro widzi jako
+główne. Stąd w konfiguracji osobno `ZDJECIA_KOLUMNA_GLOWNE` i
+`ZDJECIA_KOLUMNA_KOLEJNOSC`.
+
+### Zapytania rozpoznawcze
+
+Wszystko na **KOPII** bazy, kontem administratora (login `wertis` tych widoków
+nie ma). Kolejność jest istotna — pierwsze kosztuje sekundę i potrafi zamknąć
+sprawę.
+
+```sql
+-- 1. Czy zdjęcie siedzi w tw_Opis? Średnia ~200 bajtów znaczy, że NIE.
+SELECT COUNT(*) AS kartotek,
+       AVG(CAST(DATALENGTH(tw_Opis) AS bigint)) AS opis_bajtow_srednio,
+       MAX(DATALENGTH(tw_Opis))                 AS opis_bajtow_max
+FROM dbo.tw__Towar;
+
+-- 2. Wszystkie kolumny binarne w bazie — tam mieszka zdjęcie, jeśli jest w bazie
+SELECT t.name AS tabela, c.name AS kolumna, ty.name AS typ, c.max_length
+FROM sys.columns c
+JOIN sys.tables t  ON t.object_id     = c.object_id
+JOIN sys.types  ty ON ty.user_type_id = c.user_type_id
+WHERE ty.name IN ('varbinary','image','binary')
+ORDER BY t.name, c.name;
+
+-- 3. Tabele i kolumny o mówiącej nazwie
+SELECT t.name AS tabela, c.name AS kolumna, ty.name AS typ
+FROM sys.columns c
+JOIN sys.tables t  ON t.object_id     = c.object_id
+JOIN sys.types  ty ON ty.user_type_id = c.user_type_id
+WHERE t.name LIKE '%zdj%' OR t.name LIKE '%zal%' OR t.name LIKE '%foto%'
+   OR t.name LIKE '%obraz%' OR t.name LIKE '%grafik%'
+   OR c.name LIKE '%zdj%' OR c.name LIKE '%glow%' OR c.name LIKE '%kolej%';
+
+-- 4. Co wskazuje na kartotekę — klucze obce do tw__Towar
+SELECT OBJECT_NAME(fk.parent_object_id) AS tabela, cp.name AS kolumna
+FROM sys.foreign_keys fk
+JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+JOIN sys.columns cp ON cp.object_id = fkc.parent_object_id AND cp.column_id = fkc.parent_column_id
+WHERE OBJECT_NAME(fk.referenced_object_id) = 'tw__Towar';
+```
+
+Dla znalezionego kandydata — rozmiar, pokrycie i format:
+
+```sql
+SELECT COUNT(<KOLUMNA>) AS niepustych,
+       SUM(CAST(DATALENGTH(<KOLUMNA>) AS bigint))/1048576.0 AS mb_razem,
+       AVG(CAST(DATALENGTH(<KOLUMNA>) AS bigint))/1024.0    AS kb_srednio,
+       MAX(DATALENGTH(<KOLUMNA>))/1024.0                    AS kb_max
+FROM dbo.<TABELA>;
+
+-- Nagłówek mówi, czy to naprawdę obraz
+SELECT TOP 20 DATALENGTH(<KOLUMNA>) AS bajtow,
+       CONVERT(varchar(40), CAST(SUBSTRING(<KOLUMNA>,1,16) AS varbinary(16)), 2) AS naglowek
+FROM dbo.<TABELA> WHERE <KOLUMNA> IS NOT NULL;
+```
+
+| nagłówek | co to | co robi aplikacja |
+|---|---|---|
+| `FFD8FF…` | JPEG | ścieżka podstawowa |
+| `89504E47…` | PNG | przechodzi bez zmian |
+| `424D…` / `47494638…` | BMP / GIF | przechodzi — kolektor je czyta |
+| `D0CF11E0…` | kontener OLE | **odrzucane** — obraz siedziałby w środku |
+| `7B5C727466` | RTF | **odrzucane** — jak wyżej |
+
+Gdy żadne z powyższych nie wskaże tabeli: zapisz liczby wierszy wszystkich
+tabel, wstaw zdjęcie do kartoteki testowej w Subiekcie podłączonym do kopii
+i powtórz. **Tabela, której przybyło wierszy, jest odpowiedzią.**
+
+```sql
+SELECT t.name AS tabela, SUM(p.rows) AS wierszy
+FROM sys.tables t
+JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0,1)
+GROUP BY t.name ORDER BY t.name;
+```
+
+### Co z wynikiem zrobić
+
+| wynik | GRANT | ustawienia |
+|---|---|---|
+| kolumna na `tw__Towar` | żaden nowy | `ZDJECIA_ZRODLO=blob`, `ZDJECIA_KOLUMNA` |
+| osobna tabela | **siódmy `GRANT SELECT`** | + `ZDJECIA_TABELA`, `ZDJECIA_KOLUMNA_KLUCZA`, `ZDJECIA_KOLUMNA_GLOWNE`, `ZDJECIA_KOLUMNA_KOLEJNOSC` |
+| ścieżka do pliku w polu tekstowym | żaden | `ZDJECIA_ZRODLO=plik`, `ZDJECIA_KATALOG` |
+| OLE / RTF / nic | — | funkcja zostaje wyłączona, wynik dopisujemy tutaj jako obalony |
+
 ## Zasada nadrzędna
 
 Zapis do bazy Subiekta ogranicza się do **jednej rzeczy**: pola lokalizacji na
-`tw__Towar`. Zero `INSERT` do tabel
+`tw__Towar`. Zdjęcia są **tylko odczytywane**. Zero `INSERT` do tabel
 dokumentów, zero modyfikacji stanów, zero ingerencji w numerację — dokumenty MM
 tworzy Sfera (COM) albo import EPP, nigdy bezpośredni SQL.

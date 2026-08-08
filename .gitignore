@@ -14,6 +14,8 @@ server/data/*.db-*
 
 # zdjęcia dowodowe do reklamacji — dane produkcyjne, nie kod
 server/data/photos/
+# zdjęcia kartotek z Subiekta — CACHE, wolno skasować w każdej chwili
+server/data/zdjecia/
 # raporty rekoncyliacji — dane operacyjne, nie kod
 server/data/reconcile/
 server/data/reslot/
