@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/db.js";
+import { czasLokalny } from "../czas.js";
 
 interface QueueRow {
   id: number;
@@ -21,7 +22,9 @@ function mapRow(r: QueueRow) {
     label: r.label,
     detail: r.detail + (r.sgt_doc_number ? ` · dok. MM ${r.sgt_doc_number}` : ""),
     errMsg: r.error_msg,
-    time: (r.processed_at ?? r.created_at).slice(11, 16),
+    /* Godzina LOKALNA, nie wycinek z ISO. Wycinek pokazywał UTC, czyli latem
+       dwie godziny wstecz — „zapisano 12:05" przy zegarze wskazującym 14:05. */
+    time: czasLokalny(r.processed_at ?? r.created_at),
   };
 }
 

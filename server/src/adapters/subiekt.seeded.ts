@@ -91,13 +91,27 @@ export class SeededSubiektAdapter {
   }
 
   search(q: string, limit: number): ProductRow[] {
-    // §5.1: symbol prefix > nazwa infix > końcówka EAN (dla ciągu numerycznego ≥5)
+    /* §5.1: symbol prefix > nazwa infix > końcówka EAN (dla ciągu numerycznego ≥5)
+       — a W OBRĘBIE tej samej trafności najpierw to, co REALNIE LEŻY NA PÓŁCE.
+
+       To nie jest kosmetyka listy. Z ~3600 kartotek aktywnych jest ~1000, więc
+       dwie trzecie wyników wyszukiwania to kartoteki martwe: zerowy stan
+       w obu magazynach i zerowa szansa, że magazynier czegoś takiego szuka.
+       Sortowanie po samym symbolu wypychało je na górę alfabetem, a człowiek
+       przy regale przewijał listę, żeby dojść do jedynej pozycji, którą można
+       podać klientowi.
+
+       Trafność zostaje PIERWSZA i to jest świadome: wpisany symbol ma wygrać
+       z przypadkowym trafieniem w nazwie, choćby tamto miało pełny magazyn.
+       Symbol zostaje ostatnim kryterium — dla powtarzalności kolejności przy
+       równym stanie. */
     const isNum = /^\d{5,}$/.test(q);
     const rows = db()
       .prepare(
         `SELECT t.tw_id AS id, t.symbol AS sym, t.nazwa AS name, t.ean AS ean,
                 t.lokalizacja AS lok,
                 COALESCE(mag.stan,0) AS mag, COALESCE(mgp.stan,0) AS mgp,
+                COALESCE(mag.stan,0) + COALESCE(mgp.stan,0) AS stanRazem,
                 CASE
                   WHEN lower(t.symbol) LIKE lower(?) || '%' THEN 0
                   WHEN lower(t.nazwa) LIKE '%' || lower(?) || '%' THEN 1
@@ -108,7 +122,7 @@ export class SeededSubiektAdapter {
          LEFT JOIN sgt_stan mag ON mag.tw_id = t.tw_id AND mag.mag_id = ?
          LEFT JOIN sgt_stan mgp ON mgp.tw_id = t.tw_id AND mgp.mag_id = ?
          WHERE rank < 9
-         ORDER BY rank, t.symbol
+         ORDER BY rank, stanRazem DESC, t.symbol
          LIMIT ?`
       )
       .all(

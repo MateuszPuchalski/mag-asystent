@@ -367,6 +367,8 @@ function Publish-WertisKonfiguracja {
         "ZDJECIA_KOLUMNA", "ZDJECIA_KOLUMNA_GLOWNE", "ZDJECIA_KOLUMNA_KOLEJNOSC",
         "ZDJECIA_KATALOG", "ZDJECIA_WZORZEC_PLIKU", "ZDJECIA_MAX_KB",
         "ZDJECIA_CACHE_MB", "ZDJECIA_TTL_H", "ZDJECIA_BLAD_TTL_MIN",
+        # strefa do wyświetlania godzin (baza zostaje w UTC)
+        "STREFA_CZASU",
         "PORT"
     )
     $klucze = @($kolejnosc | Where-Object { $Ustawienia.ContainsKey($_) -and "$($Ustawienia[$_])" -ne "" })

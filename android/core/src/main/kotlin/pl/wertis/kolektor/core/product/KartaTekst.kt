@@ -7,6 +7,9 @@ import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.net.Zamienniki
 import pl.wertis.kolektor.core.net.ZamowioneUDostawcy
 import pl.wertis.kolektor.core.text.formatQty
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 /* ── Teksty i reguły karty towaru ───────────────────────────────────────────
    Karta towaru jest jednym ekranem bez przewijania: fakt mieści się w JEDNEJ
@@ -53,11 +56,30 @@ fun liniaZamowione(z: ZamowioneUDostawcy, unit: String): String = buildString {
     if (z.dostawca.isNotEmpty()) append(" · ").append(z.dostawca)
 }
 
-/** `07-28` z `2026-07-28 09:14:03` — rok na karcie nie niesie niczego. */
-fun dataKrotka(at: String): String = at.drop(5).take(5)
+/* ── Czas na karcie: UTC z serwera, godzina lokalna na ekranie ───────────────
+   Serwer zapisuje znaczniki w UTC (`2026-07-28T09:14:03.123Z`) i tak ma
+   zostać. Kolektor pokazywał je jednak przez ODCIĘCIE ZNAKÓW z ciągu, czyli
+   UTC udające godzinę zegarową — latem w Polsce dwie godziny wstecz. Zmiana
+   sprzed chwili wyglądała na sprzed dwóch godzin, a przy wpisach z okolic
+   północy myliła się także data.
 
-/** `09:14` z `2026-07-28 09:14:03`. */
-fun czasKrotki(at: String): String = at.drop(11).take(5)
+   Znacznik BEZ strefy (starszy format, `2026-07-28 09:14:03`) nie daje się
+   przeliczyć — wtedy wracamy do odczytu pozycyjnego i pokazujemy to, co
+   przyszło. Zgadywanie strefy dla takiego wpisu byłoby gorsze niż jego
+   dosłowne powtórzenie.                                                       */
+
+private fun lokalnie(at: String, strefa: ZoneId): LocalDateTime? =
+    runCatching { Instant.parse(at).atZone(strefa).toLocalDateTime() }.getOrNull()
+
+/** `07-28` czasu lokalnego — rok na karcie nie niesie niczego. */
+fun dataKrotka(at: String, strefa: ZoneId = ZoneId.systemDefault()): String =
+    lokalnie(at, strefa)?.let { "%02d-%02d".format(it.monthValue, it.dayOfMonth) }
+        ?: at.drop(5).take(5)
+
+/** `09:14` czasu lokalnego. */
+fun czasKrotki(at: String, strefa: ZoneId = ZoneId.systemDefault()): String =
+    lokalnie(at, strefa)?.let { "%02d:%02d".format(it.hour, it.minute) }
+        ?: at.drop(11).take(5)
 
 /**
  * Podsumowanie zwiniętej HISTORII: „ost. Jan K · 07-28".
