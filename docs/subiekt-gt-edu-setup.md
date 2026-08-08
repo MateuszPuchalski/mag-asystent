@@ -137,6 +137,9 @@ GRANT SELECT ON dbo.dok__Dokument  TO wertis;
 GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
 GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
+-- Ostatni tylko wtedy, gdy ta tabela w bazie JEST. Nadanie go na bazie bez
+-- niej przerywa wykonanie i konto zostaje bez ani jednego uprawnienia.
+-- Instalator sprawdza to sam i pomija tę linię, gdy tabeli nie ma.
 GRANT SELECT ON dbo.tw_ZdjecieTw   TO wertis;   -- zdjęcia kartotek na karcie towaru
 
 -- ZAPIS — JEDNA rzecz i ani jednej więcej.

@@ -429,17 +429,64 @@ if ($podlaczacDoSubiekta) {
     }
     $ustawienia.MSSQL_LOC_COLUMN = (Assert-BezpiecznyIdentyfikator -Nazwa $kolumna -Opis "kolumna lokalizacji")
 
+    # ── Ilość już odebrana z zamówienia ─────────────────────────────────────
+    # Domyślna nazwa `ob_IloscZrealizowana` została zgadnięta i zgadnięta źle —
+    # w tej wersji bazy takiej kolumny nie ma. Kreator sprawdza to sam, bo ma
+    # otwarte połączenie, a człowiek dowiadywał się dotąd z /api/health.
+    if ($polaczenie) {
+        $zrealKolumna = "ob_IloscZrealizowana"
+        if (Test-WertisKolumnaIstnieje -Polaczenie $polaczenie -Tabela "dok_Pozycja" -Kolumna $zrealKolumna) {
+            $ustawienia.MSSQL_ZD_ZREAL_COLUMN = $zrealKolumna
+        } else {
+            # PUSTA wartość, nie brak klucza: brak znaczyłby „użyj domyślnej".
+            $ustawienia.MSSQL_ZD_ZREAL_COLUMN = ""
+            Write-Info "Kolumny $zrealKolumna nie ma w dok_Pozycja - karta poda ilość jako oszacowanie."
+        }
+    }
+
+    # ── Zdjęcia kartotek na karcie towaru ───────────────────────────────────
+    # Kreator nie pyta, tylko sprawdza. Struktura jest ustalona (tw_ZdjecieTw,
+    # opis struktury), więc przepisywanie sześciu nazw człowiekowi byłoby
+    # przerzucaniem na niego wiedzy, którą instalator ma.
+    Write-Krok "Zdjęcia kartotek"
+    $zdjecia = if ($polaczenie) { Get-WertisZdjeciaKartotek -Polaczenie $polaczenie }
+               else { [pscustomobject]@{ Jest = $true; Zdjec = 0; Kartotek = 0 } }
+    if ($zdjecia.Jest) {
+        if ($polaczenie) {
+            Write-Ok "Znalazłem $($zdjecia.Zdjec) zdjęć na $($zdjecia.Kartotek) kartotekach - włączam."
+        } else {
+            Write-Info "Bez połączenia zakładam standardową strukturę GT i włączam zdjęcia."
+        }
+        $ustawienia.ZDJECIA_ZRODLO           = "blob"
+        $ustawienia.ZDJECIA_TABELA           = "tw_ZdjecieTw"
+        $ustawienia.ZDJECIA_KOLUMNA_KLUCZA   = "zd_IdTowar"
+        $ustawienia.ZDJECIA_KOLUMNA          = "zd_Zdjecie"
+        $ustawienia.ZDJECIA_KOLUMNA_GLOWNE   = "zd_Glowne"
+        $ustawienia.ZDJECIA_KOLUMNA_KOLEJNOSC = "zd_Id"
+        Write-Info "Miniatura pojawi się na karcie towaru po wgraniu APK w wersji 0.30.0 lub nowszej."
+    } else {
+        # ŚWIADOMIE nie zerujemy tu ZDJECIA_ZRODLO. Wykrycie nie odróżnia „nie ma
+        # tabeli" od „nie dało się sprawdzić", a scalanie pliku nie rusza kluczy,
+        # o których kreator nie ma zdania. Gaszenie działającej funkcji na
+        # podstawie nieudanego zapytania byłoby gorsze niż jej niewłączenie.
+        Write-Info "Nie widzę tabeli tw_ZdjecieTw - zdjęć nie włączam."
+        Write-Info "Karta towaru pracuje bez nich; siódmy GRANT też nie zostanie nadany."
+    }
+
     # ── ETAP 4: konto SQL aplikacji ─────────────────────────────────────────
     Write-Krok "Konto SQL aplikacji"
     $login = "wertis"
     $haslo = New-WertisHaslo
+    # -Zdjecia rozstrzyga o SIÓDMYM grancie. Nadanie go na bazie bez tej tabeli
+    # wywala CAŁY skrypt (jeden ExecuteNonQuery) i zostawia konto bez uprawnień.
     $skrypt = Get-WertisSkryptUprawnien -Baza $baza -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN `
-        -Login $login -Haslo $haslo
+        -Login $login -Haslo $haslo -Zdjecia $zdjecia.Jest
     $plikSkryptu = Join-Path $Katalog "nadaj-uprawnienia-wertis.sql"
 
     $zalozone = $false
     if ($polaczenie) {
-        Write-Info "Zakładam login '$login' z uprawnieniami kolumnowymi: odczyt sześciu tabel"
+        $ileTabel = @(Get-WertisTabeleOdczytu -Zdjecia $zdjecia.Jest).Count
+        Write-Info "Zakładam login '$login' z uprawnieniami kolumnowymi: odczyt $ileTabel tabel"
         Write-Info "i zapis JEDNEJ kolumny lokalizacji. Zero praw zapisu poza nią."
         $wynik = Grant-WertisLogin -Polaczenie $polaczenie -Skrypt $skrypt
         if ($wynik.Udalo) {
@@ -451,7 +498,8 @@ if ($podlaczacDoSubiekta) {
                 # mogłoby zostać bez ani jednego grantu, a instalator i tak
                 # zameldowałby sukces.
                 $upr = @(Get-WertisUprawnienia -Polaczenie $polaczenie -Login $login)
-                $ocena = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN
+                $ocena = Test-WertisUprawnienia -Uprawnienia $upr `
+                    -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN -Zdjecia $zdjecia.Jest
                 if ($ocena.Ok) {
                     # Granty sprawdziliśmy połączeniem ADMINISTRATORA — to mówi,
                     # co konto może, a nie czy da się na nie zalogować. Hasło

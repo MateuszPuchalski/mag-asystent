@@ -154,6 +154,21 @@ Sprawdz "nadaje SELECT dokladnie na tabelach z listy odczytu" {
     }
 }
 
+Sprawdz "bez tabeli zdjec siodmy GRANT nie jest nadawany" {
+    <#
+        Skrypt idzie do bazy JEDNYM ExecuteNonQuery. `GRANT SELECT` na
+        nieistniejący obiekt wywala całe wykonanie, więc konto zostawałoby bez
+        ANI JEDNEGO uprawnienia — na bazie, na której zdjęć po prostu nie ma.
+    #>
+    $bez = Get-WertisSkryptUprawnien -Baza "FIRMA_TEST" -KolumnaLokalizacji "tw_Pole3" `
+        -Haslo "Abc-123xyz" -Zdjecia $false
+    Zaloz (-not ($bez -match "tw_ZdjecieTw")) "grant na tabelę zdjęć został mimo -Zdjecia:false"
+    Zaloz ($bez -match "GRANT SELECT ON dbo\.tw__Towar") "reszta grantów ma zostać"
+    $ile = ([regex]::Matches($bez, "GRANT SELECT ON")).Count
+    $oczekiwane = @(Get-WertisTabeleOdczytu -Zdjecia $false).Count
+    Zaloz ($ile -eq $oczekiwane) "GRANT SELECT jest $ile razy, a lista bez zdjęć ma $oczekiwane pozycji"
+}
+
 Sprawdz "czyta slownik magazynow i zdjecia kartotek" {
     # Obie tabele mają własne uzasadnienie i obie łatwo przeoczyć przy
     # przepisywaniu skryptu: bez sl_Magazyn karta pokazuje `mag_Id = 7` zamiast
@@ -206,6 +221,18 @@ Sprawdz "prog odrzuca komplet o jeden GRANT za maly" {
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count - 1
     $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
     Zaloz (-not $ocena.Ok) "prog przepuszcza brakujacy GRANT"
+}
+
+Sprawdz "prog idzie za ta sama decyzja o zdjeciach, co skrypt" {
+    # Gdyby próg został przy siedmiu, komplet nadany ŚWIADOMIE bez zdjęć byłby
+    # meldowany jako niekompletny — ta sama usterka co dwa razy wcześniej,
+    # tylko od drugiej strony. Obie liczby biorą się z jednej listy.
+    $ile = @(Get-WertisTabeleOdczytu -Zdjecia $false).Count
+    $upr = Uprawnienia-Atrapa -Select $ile
+    $ocena = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -Zdjecia $false
+    Zaloz ($ocena.Ok) "komplet bez zdjęć ma przechodzić przy -Zdjecia:false"
+    $zZdjeciami = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -Zdjecia $true
+    Zaloz (-not $zZdjeciami.Ok) "ten sam komplet ma NIE przechodzić, gdy zdjęcia są włączone"
 }
 
 Sprawdz "prog odrzuca prawo zapisu do dokumentow" {
@@ -748,6 +775,50 @@ Sprawdz "kreator wygrywa z wartością z pliku, także pustą" {
         Zaloz (-not ($tresc -match "INSERTGT")) "pusta wartość z kreatora nie skasowała starej instancji"
         Zaloz ($tresc -match "MSSQL_USER='wertis'") "kreator nie nadpisał loginu"
         Zaloz (-not ($tresc -match "'stary'")) "stary login został obok nowego"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "pusta wartosc kluczy o niepustej domyslnej trafia do pliku wprost" {
+    <#
+        `MSSQL_ZD_ZREAL_COLUMN` ma domyślną `ob_IloscZrealizowana` — nazwę
+        ZGADNIĘTĄ i błędną dla tej wersji bazy. Kreator sprawdza, czy kolumna
+        istnieje, i gdy jej nie ma, zapisuje PUSTKĘ. Gdyby pustka oznaczała tu
+        „nie ustawiono", klucz nie wyszedłby do pliku, serwer wróciłby do
+        wartości domyślnej i dalej pytał o nieistniejącą kolumnę — bez objawu.
+    #>
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-pust-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE              = "mssql"
+            MSSQL_ZD_ZREAL_COLUMN = ""
+            MSSQL_INSTANCE        = ""
+            MSSQL_DATABASE        = ""
+        }
+        $tresc = Get-Content (Join-Path $katalog "wertis.env") -Raw
+        Zaloz ($tresc -match "MSSQL_ZD_ZREAL_COLUMN=''") "pusta nazwa kolumny nie trafiła do pliku"
+        Zaloz ($tresc -match "MSSQL_INSTANCE=''")        "pusta instancja nie trafiła do pliku"
+        # Kontrola przeciwna: zwykły klucz o pustej wartości nadal się nie zapisuje
+        Zaloz (-not ($tresc -match "MSSQL_DATABASE"))    "pusty zwykły klucz nie ma prawa się zapisać"
+    } finally {
+        Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "pusta wartosc wpisana recznie tez przezywa przebieg" {
+    # Ten sam klucz, druga droga: dokumentacja każe wpisać `=` bez wartości.
+    $katalog = Join-Path ([IO.Path]::GetTempPath()) ("wertis-pust2-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $katalog | Out-Null
+    try {
+        $plik = Join-Path $katalog "wertis.env"
+        Write-WertisPlik -Sciezka $plik -Tresc "export MSSQL_ZD_ZREAL_COLUMN=`n"
+        Publish-WertisKonfiguracja -Katalog $katalog -Nssm "cmd.exe" -Uslugi @() -Ustawienia @{
+            SGT_MODE = "mssql"
+        }
+        $tresc = Get-Content $plik -Raw
+        Zaloz ($tresc -match "MSSQL_ZD_ZREAL_COLUMN=''") "pusta wartość z pliku przepadła przy przepisaniu"
     } finally {
         Remove-Item $katalog -Recurse -Force -ErrorAction SilentlyContinue
     }

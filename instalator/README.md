@@ -67,8 +67,14 @@ nie przenosi już żadnej konfiguracji. Instalator zapisuje więc **jeden plik**
 **Zapis jest scaleniem, nie nadpisaniem.** Kreator wygrywa tam, gdzie ma
 zdanie: klucz, o który zapytał, idzie z jego odpowiedzi. Klucza, o który nie
 pytał, instalator nie rusza — wartość zostaje taka, jak w pliku. Dzięki temu
-ustawienia dopisywane ręką (`DOK_TYPY_DOSTAW`, `MSSQL_ZD_ZREAL_COLUMN`,
-`ZDJECIA_*`) przeżywają kolejne przebiegi z `-TylkoKonfiguracja`.
+ustawienia dopisywane ręką (np. `DOK_TYPY_DOSTAW`) przeżywają kolejne przebiegi
+z `-TylkoKonfiguracja`.
+
+Jest jeden wyjątek od reguły „pusto znaczy nie ustawiono". `MSSQL_INSTANCE`
+i `MSSQL_ZD_ZREAL_COLUMN` mają **niepustą wartość domyślną**, więc pustka jest
+przy nich odpowiedzią, nie brakiem odpowiedzi — zapisuje się do pliku wprost
+jako `''`. Bez tego nie dałoby się wskazać instancji domyślnej ani powiedzieć,
+że kolumny ilości zrealizowanej w bazie nie ma.
 
 > **Do 0.31.2 plik powstawał od zera.** Każdy klucz spoza pytań kreatora znikał
 > przy najbliższym przebiegu, a objawem była zgaszona funkcja bez jednego błędu
@@ -98,9 +104,15 @@ workera, więc samo zielone API mówiłoby o połowie instalacji.
 Skrypt pochodzi z [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md) §2
 i nadaje:
 
-- `SELECT` na **sześciu** tabelach,
+- `SELECT` na **sześciu** tabelach, plus siódma ze zdjęciami, gdy jest w bazie,
 - `UPDATE` na **jednej kolumnie** kartoteki (tej wybranej na lokalizację),
 - **ani jednego innego prawa zapisu**.
+
+Siódmy grant jest warunkowy nie z ostrożności, tylko z konieczności. Skrypt
+idzie do bazy jednym poleceniem, więc `GRANT` na nieistniejącą tabelę przerywa
+wykonanie i konto zostaje **bez ani jednego uprawnienia**. Kreator sprawdza
+obecność `tw_ZdjecieTw` przed budową skryptu, a próg weryfikacji idzie za tą
+samą decyzją — obie liczby biorą się z jednej listy.
 
 Przy przejęciu tego credentiala da się zmienić adres na półce. Nic więcej —
 dokumenty, stany i numeracja pozostają nietykalne. Właśnie to ograniczenie

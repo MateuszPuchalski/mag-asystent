@@ -124,6 +124,23 @@ $script:WertisKluczeSrodowiskaNssm = @("AppEnvironment", "AppEnvironmentExtra")
 #>
 $script:WertisKluczeNieprzepisywane = @("ADMIN_LOGIN", "ADMIN_HASLO", "WERTIS_ADMIN")
 
+<#
+    Klucze, dla których PUSTA WARTOŚĆ JEST WARTOŚCIĄ, a nie brakiem ustawienia.
+
+    Zwykły klucz o pustej wartości po prostu nie wychodzi do pliku — aplikacja
+    weźmie swoją domyślną i to jest w porządku. Te dwa mają domyślne NIEPUSTE
+    i właśnie od nich trzeba umieć odejść:
+
+      MSSQL_INSTANCE          domyślnie `INSERTGT`; puste = instancja domyślna
+      MSSQL_ZD_ZREAL_COLUMN   domyślnie `ob_IloscZrealizowana`, czyli nazwa
+                              ZGADNIĘTA I BŁĘDNA; puste = kolumny nie ma
+
+    Bez tej listy kreator nie miał jak powiedzieć „nie ma tego": zapisywał
+    pustkę, funkcja pomijała klucz, a serwer wracał do wartości domyślnej.
+    Objawu nie było — po prostu dalej pytał o nieistniejącą kolumnę.
+#>
+$script:WertisKluczePusteZnaczace = @("MSSQL_INSTANCE", "MSSQL_ZD_ZREAL_COLUMN")
+
 function Read-WertisEnv {
     <#
         .SYNOPSIS
@@ -433,6 +450,9 @@ function Publish-WertisKonfiguracja {
         "MSSQL_SERVER", "MSSQL_INSTANCE", "MSSQL_PORT", "MSSQL_DATABASE",
         "MSSQL_USER", "MSSQL_PASSWORD",
         "MSSQL_LOC_COLUMN",
+        # kolumna ilości już odebranej — kreator SPRAWDZA, czy w ogóle istnieje,
+        # i zapisuje pustkę, gdy jej nie ma (patrz klucze puste znaczące)
+        "MSSQL_ZD_ZREAL_COLUMN",
         "MAG_ID_MAG", "MAG_ID_MGP", "MAG_ID_ZWROTY",
         # worker Sfery (dokumenty MM) — DEPLOY §6 etap 2, sfera-worker/README.md
         "SFERA_WORKER", "SFERA_OPERATOR", "SFERA_OPERATOR_HASLO",
@@ -453,11 +473,17 @@ function Publish-WertisKonfiguracja {
     $znane = [ordered]@{}
     foreach ($k in $kolejnosc) {
         $w = ""
-        if ($Ustawienia.ContainsKey($k)) { $w = "$($Ustawienia[$k])" }
-        elseif ($poprzednie.Contains($k)) { $w = "$($poprzednie[$k])" }
-        # Pusta wartość znaczy „nie ustawiono" — klucz po prostu nie wychodzi
-        # do pliku. Tak działa m.in. domyślna instancja MSSQL.
+        $maZdanie = $false
+        if ($Ustawienia.ContainsKey($k)) { $w = "$($Ustawienia[$k])"; $maZdanie = $true }
+        elseif ($poprzednie.Contains($k)) { $w = "$($poprzednie[$k])"; $maZdanie = $true }
+        <#
+            Pusta wartość zwykle znaczy „nie ustawiono" i klucz nie wychodzi do
+            pliku — aplikacja weźmie domyślną. Wyjątkiem są klucze, których
+            domyślna jest NIEPUSTA: tam pustka musi zostać zapisana wprost,
+            inaczej nie da się od tej domyślnej odejść.
+        #>
         if ($w -ne "") { $znane[$k] = $w }
+        elseif ($maZdanie -and $script:WertisKluczePusteZnaczace -contains $k) { $znane[$k] = "" }
     }
 
     # Klucze dopisane ręką. Instalator ich nie rozumie i właśnie dlatego ich

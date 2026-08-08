@@ -519,8 +519,98 @@ $script:WertisTabeleOdczytu = @(
     @{ Tabela = "dok_Pozycja";    Po = "" },
     @{ Tabela = "kh__Kontrahent"; Po = "" },
     @{ Tabela = "sl_Magazyn";     Po = "nazwy i symbole magazynów" },
-    @{ Tabela = "tw_ZdjecieTw";   Po = "zdjęcia kartotek na karcie towaru" }
+    # OPCJONALNA: tabela zdjęć jest w bieżących wersjach GT, ale nie w każdej.
+    # `GRANT SELECT` na nieistniejący obiekt kończy WYKONANIE CAŁEGO skryptu
+    # błędem (idzie jednym ExecuteNonQuery), więc konto zostawałoby bez ani
+    # jednego uprawnienia — na bazie, na której zdjęć po prostu nie ma.
+    @{ Tabela = "tw_ZdjecieTw";   Po = "zdjęcia kartotek na karcie towaru"; Opcjonalna = $true }
 )
+
+function Get-WertisTabeleOdczytu {
+    <#
+        .SYNOPSIS
+        Lista tabel do odczytu dla TEJ bazy. `-Zdjecia:$false` zdejmuje pozycje
+        opcjonalne.
+        .DESCRIPTION
+        Jedno wejście dla skryptu grantów i dla progu sprawdzenia, żeby decyzja
+        „nadajemy siódmy grant" i oczekiwanie „ma być siedem" nie mogły się
+        rozjechać. Rozjazd tych dwóch liczb był już przyczyną dwóch usterek.
+    #>
+    param([bool]$Zdjecia = $true)
+    return @($script:WertisTabeleOdczytu | Where-Object { $Zdjecia -or -not $_.Opcjonalna })
+}
+
+function Get-WertisZdjeciaKartotek {
+    <#
+        .SYNOPSIS
+        Czy w tej bazie są zdjęcia kartotek — i ile ich jest.
+        .DESCRIPTION
+        Kreator o zdjęcia NIE PYTA, tylko sprawdza. Do 0.31.2 sześć kluczy
+        `ZDJECIA_*` wpisywało się ręką, bo w chwili powstania funkcji nikt nie
+        wiedział, gdzie Subiekt trzyma obraz — nazwy były `[WERYFIKUJ]`.
+        Rozpoznanie na bazie firmy zamknęło tamto pytanie (`tw_ZdjecieTw`,
+        opis struktury), więc kreator ma dziś komplet odpowiedzi i nie ma
+        powodu przepisywać ich człowiekowi.
+
+        Sprawdzane są WSZYSTKIE cztery kolumny, nie sama obecność tabeli.
+        Brak `zd_Id` odebrałby porządkowi rozstrzygalność — `zd_IdTowar` jest
+        kluczem OBCYM i przy kilku zdjęciach jednej kartoteki nie domyka
+        wyboru. Serwer odmawia wtedy startu, więc lepiej tego nie ustawiać.
+    #>
+    param([Parameter(Mandatory)]$Polaczenie)
+
+    $brak = [pscustomobject]@{ Jest = $false; Zdjec = 0; Kartotek = 0 }
+    try {
+        $kolumny = Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
+SELECT name FROM sys.columns
+WHERE object_id = OBJECT_ID('dbo.tw_ZdjecieTw')
+  AND name IN ('zd_Id', 'zd_IdTowar', 'zd_Zdjecie', 'zd_Glowne');
+"@
+        if (@($kolumny).Count -lt 4) { return $brak }
+
+        $liczby = Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
+SELECT COUNT(*) AS zdjec, COUNT(DISTINCT zd_IdTowar) AS kartotek FROM dbo.tw_ZdjecieTw;
+"@
+        return [pscustomobject]@{
+            Jest     = $true
+            Zdjec    = [int]$liczby[0].zdjec
+            Kartotek = [int]$liczby[0].kartotek
+        }
+    } catch {
+        # Brak uprawnień do sys.columns albo zerwane połączenie. Zdjęcia są
+        # dodatkiem — cisza tutaj nie może zatrzymać całej instalacji.
+        return $brak
+    }
+}
+
+function Test-WertisKolumnaIstnieje {
+    <#
+        .SYNOPSIS
+        Czy tabela ma kolumnę o tej nazwie. `$true`/`$false`, bez wyjątku.
+        .DESCRIPTION
+        Używane do `MSSQL_ZD_ZREAL_COLUMN`, którego domyślna wartość
+        `ob_IloscZrealizowana` była zgadnięta i zgadnięta ŹLE — w tej wersji
+        bazy takiej kolumny nie ma wcale (opis struktury, komplet 57 kolumn
+        `dok_Pozycja`). Poprawną wartością jest wtedy PUSTA, a nie brak klucza:
+        brak oznacza „użyj domyślnej", czyli wraca do zgadniętej nazwy.
+    #>
+    param(
+        [Parameter(Mandatory)]$Polaczenie,
+        [Parameter(Mandatory)][string]$Tabela,
+        [Parameter(Mandatory)][string]$Kolumna
+    )
+    try {
+        $w = Invoke-WertisZapytanie -Polaczenie $Polaczenie `
+            -Parametry @{ "@k" = $Kolumna } -Sql @"
+SELECT name FROM sys.columns
+WHERE object_id = OBJECT_ID('dbo.$(Assert-BezpiecznyIdentyfikator -Nazwa $Tabela -Opis "tabela")')
+  AND name = @k;
+"@
+        return (@($w).Count -gt 0)
+    } catch {
+        return $false
+    }
+}
 
 function Get-WertisSkryptUprawnien {
     <#
@@ -538,14 +628,16 @@ function Get-WertisSkryptUprawnien {
         [Parameter(Mandatory)][string]$Baza,
         [Parameter(Mandatory)][string]$KolumnaLokalizacji,
         [string]$Login = "wertis",
-        [Parameter(Mandatory)][string]$Haslo
+        [Parameter(Mandatory)][string]$Haslo,
+        # $false, gdy w bazie nie ma tabeli zdjęć — patrz Get-WertisZdjeciaKartotek
+        [bool]$Zdjecia = $true
     )
     [void](Assert-BezpiecznyIdentyfikator -Nazwa $KolumnaLokalizacji -Opis "kolumna lokalizacji")
     [void](Assert-BezpiecznyIdentyfikator -Nazwa $Login -Opis "login")
     $bazaEsc  = $Baza  -replace "\]", "]]"
     $hasloEsc = $Haslo -replace "'", "''"
     # Granty z jednej listy — patrz $script:WertisTabeleOdczytu
-    $granty = ($script:WertisTabeleOdczytu | ForEach-Object {
+    $granty = (Get-WertisTabeleOdczytu -Zdjecia $Zdjecia | ForEach-Object {
         $linia = "GRANT SELECT ON dbo.{0,-14} TO [{1}];" -f $_.Tabela, $Login
         if ($_.Po) { "$linia   -- $($_.Po)" } else { $linia }
     }) -join "`n"
@@ -676,7 +768,10 @@ function Test-WertisUprawnienia {
     #>
     param(
         [Parameter(Mandatory)][object[]]$Uprawnienia,
-        [Parameter(Mandatory)][string]$KolumnaLokalizacji
+        [Parameter(Mandatory)][string]$KolumnaLokalizacji,
+        # musi być TĄ SAMĄ wartością, co przy budowie skryptu — inaczej próg
+        # żąda grantu, którego świadomie nie nadaliśmy
+        [bool]$Zdjecia = $true
     )
     $select = @($Uprawnienia | Where-Object { $_.permission_name -eq "SELECT" -and $_.state_desc -eq "GRANT" })
     $update = @($Uprawnienia | Where-Object { $_.permission_name -eq "UPDATE" -and $_.state_desc -eq "GRANT" })
@@ -694,7 +789,7 @@ function Test-WertisUprawnienia {
         jeden) i za każdym razem objawem było zdanie o niezgodnych
         uprawnieniach po POPRAWNEJ instalacji.
     #>
-    $wymagane = @($script:WertisTabeleOdczytu).Count
+    $wymagane = @(Get-WertisTabeleOdczytu -Zdjecia $Zdjecia).Count
     return [pscustomobject]@{
         TabeleOdczytu   = $select.Count
         Wymaganych      = $wymagane
