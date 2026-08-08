@@ -107,7 +107,13 @@ fun SplashScreen(graph: AppGraph) {
     // od „pomyliłeś hasło". Powtarzane po każdej zmianie adresu, bo to
     // pierwsze pytanie, na które nowy serwer musi umieć odpowiedzieć.
     LaunchedEffect(proba, ustawienia.serverUrl) {
-        stanSerwera = StanSerwera.SPRAWDZAM
+        // znany werdykt od razu — „Sprawdzam serwer…" tylko przy pierwszym
+        // pytaniu w życiu procesu; rewalidacja i tak biegnie niżej
+        stanSerwera = when (graph.setup.znanyWerdykt()) {
+            true -> StanSerwera.PUSTY
+            false -> StanSerwera.MA_KONTA
+            null -> StanSerwera.SPRAWDZAM
+        }
         val r = graph.setup.potrzebny()
 
         stanSerwera = when (r) {

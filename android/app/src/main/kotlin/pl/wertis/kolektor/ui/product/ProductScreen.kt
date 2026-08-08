@@ -86,20 +86,28 @@ fun ProductScreen(graph: AppGraph) {
     val id = graph.nav.curIdFlow.collectAsState().value ?: return
     val scope = rememberCoroutineScope()
 
+    /* Posiew z cache: skan przyniósł kartę w odpowiedzi /scan, a powrót
+       z zamiennika ogląda kartę sprzed sekundy — jedno i drugie rysuje się
+       od razu, podczas gdy odpytywanie dociąga świeżą wersję. */
+    val seed = remember(id) { graph.cards.peekCard(id) }
     val poll by remember(id) {
-        pollFlow(2000) { apiCall { graph.api.product(id) } }
-    }.collectAsState(initial = Poll())
+        pollFlow(2000, initial = seed) {
+            apiCall { graph.api.product(id) }.also { graph.cards.putCard(it) }
+        }
+    }.collectAsState(initial = Poll(seed, loading = seed == null))
     /* `null` = jeszcze nie wiem. Historia dochodzi osobnym żądaniem, więc bez
        tego rozróżnienia wiersz HISTORIA wskoczyłby po chwili i przesunął
-       sekcje pod nim — czyli cele dotyku pod kciukiem. */
-    val history by produceState<List<MovementEntry>?>(null, id) {
+       sekcje pod nim — czyli cele dotyku pod kciukiem. Posiew z cache
+       zachowuje to rozróżnienie: znana historia nie wraca do `null`. */
+    val history by produceState<List<MovementEntry>?>(graph.cards.peekHistory(id), id) {
         value = try {
-            apiCall { graph.api.history(id) }.entries
+            apiCall { graph.api.history(id) }.entries.also { graph.cards.putHistory(id, it) }
         } catch (_: Exception) {
-            emptyList()
+            value ?: emptyList()
         }
     }
-    val locInfo by produceState<LocationsInfo?>(null) { value = graph.locationsRepo.get() }
+    // znana reguła od razu — walidacja skanu półki nie czeka na sieć
+    val locInfo by produceState(graph.locationsRepo.cached()) { value = graph.locationsRepo.get() }
 
     var chipMenu by remember(id) { mutableStateOf<String?>(null) }
     /* Sekcje zwijane. Klucz `id`, bo wejście w zamiennik to inny towar i inne

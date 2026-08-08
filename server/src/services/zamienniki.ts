@@ -106,11 +106,38 @@ function fragmenty(seg: string, poziom: number, out: string[]): void {
 }
 
 /**
+ * Cache kandydatów. Rozbiór opisu jest czystą funkcją pary (opis, symbol),
+ * a karta towaru odświeża się co 2 s na każdym kolektorze — bez cache'a ta
+ * sama drabina regexów mieli ten sam opis w kółko. LRU przez porządek
+ * wstawiania Mapy: trafienie przestawia klucz na koniec, nadmiar wypada
+ * z początku. `podzielZamienniki` celowo BEZ cache'a — jego wynik zależy
+ * od kartoteki (`wKartotece`), nie tylko od argumentów.
+ */
+const KANDYDACI_CACHE_MAX = 512;
+const kandydaciCache = new Map<string, string[]>();
+
+export function kandydaciZamiennikow(desc: string, wlasnySymbol: string): string[] {
+  const klucz = wlasnySymbol + "\u0000" + desc;
+  const trafienie = kandydaciCache.get(klucz);
+  if (trafienie) {
+    kandydaciCache.delete(klucz);
+    kandydaciCache.set(klucz, trafienie);
+    return trafienie;
+  }
+  const wynik = obliczKandydatow(desc, wlasnySymbol);
+  kandydaciCache.set(klucz, wynik);
+  if (kandydaciCache.size > KANDYDACI_CACHE_MAX) {
+    kandydaciCache.delete(kandydaciCache.keys().next().value as string);
+  }
+  return wynik;
+}
+
+/**
  * Kandydaci do sprawdzenia w kartotece — wszystkie fragmenty z każdego
  * szczebla podziału. Rozstrzygnięcie należy do bazy, nie do wzorca, więc
  * pytamy o komplet i dopiero potem składamy wynik (`podzielZamienniki`).
  */
-export function kandydaciZamiennikow(desc: string, wlasnySymbol: string): string[] {
+function obliczKandydatow(desc: string, wlasnySymbol: string): string[] {
   const wlasny = wlasnySymbol.trim().toUpperCase();
   const out: string[] = [];
   const widziane = new Set<string>();

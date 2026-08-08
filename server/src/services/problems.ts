@@ -79,9 +79,14 @@ const QTY_REQUIRED: ReadonlySet<string> = new Set(PROBLEM_TYPES);
 
 const nowIso = () => new Date().toISOString();
 
+let photoDirGotowy = false;
+
 function photoDir(): string {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
-  fs.mkdirSync(dir, { recursive: true });
+  if (!photoDirGotowy) {
+    fs.mkdirSync(dir, { recursive: true });
+    photoDirGotowy = true;
+  }
   return dir;
 }
 

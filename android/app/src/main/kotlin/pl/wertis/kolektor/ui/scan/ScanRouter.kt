@@ -47,6 +47,9 @@ suspend fun routeScan(
         when (val r = odpowiedz) {
             is ScanResult.Product -> {
                 graph.feedback.beep(true)
+                // odpowiedź /scan NIESIE całą kartę — posiew do cache sprawia,
+                // że ekran rysuje ją bez drugiego żądania o to samo
+                graph.cards.putCard(r.card)
                 graph.nav.openProduct(
                     r.card.id,
                     RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji"),
@@ -56,6 +59,7 @@ suspend fun routeScan(
                 graph.feedback.beep(true)
                 // pusty regał to poprawna odpowiedź — półkę skanuje się także
                 // po to, żeby sprawdzić, czy jest wolna
+                graph.cards.putLocation(r.code, r.products)
                 graph.nav.openLocation(r.code)
             }
             is ScanResult.Search -> {

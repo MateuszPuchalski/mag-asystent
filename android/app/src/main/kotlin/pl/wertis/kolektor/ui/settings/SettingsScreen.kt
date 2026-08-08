@@ -212,7 +212,14 @@ fun SettingsScreen(graph: AppGraph) {
  */
 fun saveServerUrl(graph: AppGraph, url: String) {
     val next = url.trim()
-    if (next != graph.settings.current.serverUrl) graph.locationsRepo.forget()
+    if (next != graph.settings.current.serverUrl) {
+        graph.locationsRepo.forget()
+        // to samo dotyczy każdej zapamiętanej odpowiedzi — inny serwer to inne
+        // towary, inne magazyny i inna odpowiedź na „czy są konta"
+        graph.magazynyRepo.forget()
+        graph.cards.clear()
+        graph.setup.zapomnijWerdykt()
+    }
     graph.settings.update { s -> s.copy(serverUrl = next) }
     /* Podmiana NATYCHMIAST, nie przez obserwatora w `AppGraph.init`. Oba
        czytają ten sam `StateFlow`, ale kolejność dwóch niezależnych kolektorów
@@ -256,19 +263,21 @@ private fun ToggleRow(title: String, sub: String, checked: Boolean, onChange: (B
 
 @Composable
 private fun MagazynySekcja(graph: AppGraph) {
-    var magazyny by remember { mutableStateOf<List<MagazynInfo>>(emptyList()) }
-    var ukryte by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    // posiew z cache — sekcja rysuje się od razu, świeża lista dochodzi w tle
+    var magazyny by remember { mutableStateOf(graph.magazynyRepo.cached() ?: emptyList()) }
+    var ukryte by remember { mutableStateOf(magazyny.filter { it.ukryty }.map { it.magId }.toSet()) }
     var zapisuje by remember { mutableStateOf(false) }
     var blad by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         try {
-            val r = apiCall { graph.api.listMagazyny() }
-            magazyny = r.magazyny
-            ukryte = r.magazyny.filter { it.ukryty }.map { it.magId }.toSet()
+            val r = graph.magazynyRepo.refresh()
+            magazyny = r
+            ukryte = r.filter { it.ukryty }.map { it.magId }.toSet()
         } catch (e: Exception) {
-            blad = e.message ?: "Nie udało się pobrać listy magazynów"
+            // ze starą listą da się pracować; bez żadnej — trzeba powiedzieć czemu
+            if (magazyny.isEmpty()) blad = e.message ?: "Nie udało się pobrać listy magazynów"
         }
     }
 
@@ -339,6 +348,9 @@ private fun MagazynySekcja(graph: AppGraph) {
                             }
                             magazyny = r.magazyny
                             ukryte = r.magazyny.filter { it.ukryty }.map { it.magId }.toSet()
+                            // odpowiedź zapisu niesie świeżą listę — do cache,
+                            // żeby arkusz przesunięcia nie rysował sprzed zmiany
+                            graph.magazynyRepo.przyjmij(r.magazyny)
                             graph.effects.toast("Zapisano widoczność magazynów")
                         } catch (e: Exception) {
                             blad = e.message ?: "Nie udało się zapisać"

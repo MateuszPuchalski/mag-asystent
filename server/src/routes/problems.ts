@@ -37,7 +37,12 @@ export async function problemRoutes(app: FastifyInstance) {
     if (!ref) return reply.code(404).send({ error: "Brak zdjęcia" });
     const file = photoPath(ref);
     if (!file) return reply.code(404).send({ error: "Brak pliku" });
-    return reply.type("image/jpeg").send(fs.createReadStream(file));
+    // nazwa pliku niesie znacznik czasu (savePhoto), więc treść pod danym
+    // URL-em nie zmienia się nigdy — klient może trzymać kopię bez pytania
+    return reply
+      .type("image/jpeg")
+      .header("cache-control", "public, max-age=31536000, immutable")
+      .send(fs.createReadStream(file));
   });
 
   /** Zgłoszenie wyjątku dla linii dostawy. */

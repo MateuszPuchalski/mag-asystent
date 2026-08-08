@@ -26,8 +26,12 @@ class LocationsRepository(context: Context, private val api: ApiService) {
     private val mutex = Mutex()
     private var cached: LocationsInfo? = null
 
-    /** Odświeżenie z sieci; cache trwały służy tylko jako zapas na offline. */
-    private val ttlMs = 5 * 60_000L
+    /* Odświeżenie z sieci; cache trwały służy tylko jako zapas na offline.
+       Pół godziny, nie pięć minut: słownik adresów zmienia się przy imporcie
+       i relokacjach, a reguła wzorca — praktycznie nigdy. Słownik jest
+       ostrzegawczy (kod spoza wykazu to pytanie, nie odmowa), więc pół
+       godziny starości niczego nie psuje. */
+    private val ttlMs = 30 * 60_000L
 
     init {
         // reguła musi obowiązywać od pierwszego skanu, jeszcze przed odpowiedzią serwera

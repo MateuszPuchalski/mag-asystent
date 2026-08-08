@@ -127,9 +127,13 @@ fun LocationScreen(graph: AppGraph) {
 
         // odpytywanie, nie jednorazowy odczyt: znaczniki „jedzie tutaj / schodzi
         // stąd" biorą się z kolejki, więc muszą same znikać po zapisie
+        val seed = remember(code) { graph.cards.peekLocation(code) }
         val poll by remember(code) {
-            pollFlow(2000) { apiCall { graph.api.locationProducts(code) }.products }
-        }.collectAsState(initial = Poll())
+            pollFlow(2000, initial = seed) {
+                apiCall { graph.api.locationProducts(code) }.products
+                    .also { graph.cards.putLocation(code, it) }
+            }
+        }.collectAsState(initial = Poll(seed, loading = seed == null))
         val contents: List<ProductRow>? = poll.data ?: if (poll.loading) null else emptyList()
 
         Text(

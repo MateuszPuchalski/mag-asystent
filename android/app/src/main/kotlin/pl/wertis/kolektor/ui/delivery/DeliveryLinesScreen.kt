@@ -105,11 +105,14 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     val scope = rememberCoroutineScope()
     var reload by remember { mutableStateOf(0) }
 
-    val view by produceState<DeliveryView?>(null, id, reload) {
+    /* Posiew z cache: `reload++` po każdym odłożeniu wymusza świeży odczyt,
+       ale stary widok zostaje na ekranie do jego przyjścia — między dwiema
+       pozycjami z kartonu nie ma już mignięcia „Wczytywanie…". */
+    val view by produceState(graph.cards.peekDelivery(id), id, reload) {
         value = try {
-            apiCall { graph.api.delivery(id) }
+            apiCall { graph.api.delivery(id) }.also { graph.cards.putDelivery(id, it) }
         } catch (_: Exception) {
-            null
+            value
         }
     }
 
