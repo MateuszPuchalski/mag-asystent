@@ -41,44 +41,61 @@ import pl.wertis.kolektor.ui.theme.cardSurface
 /**
  * @param adres pastylka adresu pickingowego (albo pusty stan) — rysuje ją
  *   `ProductScreen`, bo tylko on wie, co zrobić z dotknięciem.
+ * @param zdjecie miniatura kartoteki — jak wyżej: `ProductScreen` wie, skąd
+ *   wziąć bajty i co zrobić z dotknięciem, nagłówek wie tylko, GDZIE ją
+ *   narysować.
  */
 @Composable
-fun ProductHero(p: ProductCard, onPrzesunZMgp: (() -> Unit)? = null, adres: @Composable () -> Unit) {
+fun ProductHero(
+    p: ProductCard,
+    onPrzesunZMgp: (() -> Unit)? = null,
+    zdjecie: @Composable () -> Unit = {},
+    adres: @Composable () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .cardSurface()
             .padding(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 12.dp),
     ) {
-        /* Symbol stoi PIERWSZY i największy. To jedyny identyfikator, którym
-           magazynier posługuje się przy regale: nazwy się powtarzają („nóż
-           kosiarki" ma kilkanaście kartotek), a EAN-u nie da się przeczytać
-           z ręki. Nazwa jest potwierdzeniem, że to ten towar — nie sposobem
-           na jego znalezienie. */
-        Text(
-            p.sym,
-            fontFamily = BarlowCond,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 30.sp,
-            lineHeight = 32.sp,
-            color = Ink,
-        )
-        Text(
-            p.name,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 17.sp,
-            color = InkSoft,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 1.dp),
-        )
-        Text(
-            "EAN ${p.ean.ifEmpty { "—" }} · ${p.unit.ifEmpty { "—" }}",
-            fontSize = 11.sp,
-            color = InkMute,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        /* Zdjęcie idzie OBOK tożsamości, nie pod nią: odpowiada na pytanie
+           zerowe („czy to na pewno TO"), zadawane zanim ktokolwiek spojrzy na
+           stan. Rząd z symbolem ma na nie zapas wysokości, a dolny — ten
+           z liczbą 44 sp i pastylką adresu — nie ma i nie wolno go ścieśniać. */
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                /* Symbol stoi PIERWSZY i największy. To jedyny identyfikator,
+                   którym magazynier posługuje się przy regale: nazwy się
+                   powtarzają („nóż kosiarki" ma kilkanaście kartotek), a EAN-u
+                   nie da się przeczytać z ręki. Nazwa jest potwierdzeniem, że
+                   to ten towar — nie sposobem na jego znalezienie. */
+                Text(
+                    p.sym,
+                    fontFamily = BarlowCond,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 30.sp,
+                    lineHeight = 32.sp,
+                    color = Ink,
+                )
+                Text(
+                    p.name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 17.sp,
+                    color = InkSoft,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+                Text(
+                    "EAN ${p.ean.ifEmpty { "—" }} · ${p.unit.ifEmpty { "—" }}",
+                    fontSize = 11.sp,
+                    color = InkMute,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            zdjecie()
+        }
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             verticalAlignment = Alignment.CenterVertically,

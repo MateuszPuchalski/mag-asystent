@@ -40,12 +40,15 @@ import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.SearchResponse
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.SetupResponse
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 /* ── Klient REST — lustro web/src/lib/api.ts ────────────────────────────────
    Nagłówek x-user dokleja UserHeaderInterceptor; parametr asUser nadpisuje go
@@ -74,6 +77,20 @@ interface ApiService {
 
     @GET("api/products/{id}/history")
     suspend fun history(@Path("id") id: Long): HistoryResponse
+
+    /**
+     * Zdjęcie kartoteki — BAJTY, nie JSON, i jedyna trasa w tym pliku zwracająca
+     * `Response<…>`. Status musi być widoczny wołającemu: 304 znaczy „to, co
+     * masz w cache, jest aktualne", a `apiCall` zamieniłoby go w wyjątek
+     * dokładnie tak samo jak 500 — czyli kolektor pobierałby obraz od nowa
+     * przy każdym wejściu na kartę.
+     */
+    @Streaming
+    @GET("api/products/{id}/zdjecie")
+    suspend fun zdjecie(
+        @Path("id") id: Long,
+        @Header("If-None-Match") etag: String? = null,
+    ): Response<ResponseBody>
 
     @POST("api/products/{id}/location")
     suspend fun setLocation(
