@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   type           TEXT NOT NULL,                 -- set_location | mm (przesunięcie stanu)
   payload        TEXT NOT NULL,                 -- JSON
-  status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error
+  status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error|cancelled
   attempts       INTEGER NOT NULL DEFAULT 0,
   error_msg      TEXT,
   sgt_doc_number TEXT,                          -- nr MM po utworzeniu (zwrotnie)

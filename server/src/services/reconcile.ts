@@ -9,7 +9,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
    stronie Subiekta odpowiada temu, co aplikacja myśli, że zapisała.
 
    To jest tania obrona przed cichym błędem: kod się kompiluje, działa, wygląda
-   dobrze i przez trzy tygodnie rozjeżdża dane. Wszystkie trzy kontrole
+   dobrze i przez trzy tygodnie rozjeżdża dane. Wszystkie cztery kontrole
    pytają o to samo — czy deklarowany niezmiennik jeszcze obowiązuje. Bo
    niezmienniki trzeba MIERZYĆ, nie deklarować.
 

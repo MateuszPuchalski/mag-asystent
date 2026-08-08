@@ -18,20 +18,24 @@ opisane niżej.
 
 ### Co WERTIS zapisuje do Subiekta
 
-Dokładnie jedną rzecz, przez kolejkę i osobny proces:
+Przez kolejkę i osobne procesy:
 
 | co | gdzie | kiedy |
 |---|---|---|
 | pole lokalizacji na kartotece | `tw__Towar.tw_Pole1` (konfigurowalne) | po skanie regału |
+| dokument MM | Sfera COM (`sfera-worker/`) | tylko przy `SFERA_WORKER=1` |
 
-**Zero `INSERT` do tabel dokumentów. Zero modyfikacji stanów.** Aplikacja nie
-tworzy dokumentów, nie zmienia ilości i nie rusza cen. Dokumenty MM
-(`applyCreateMM`) mają kontrakt w `adapters/sfera.ts`, ale wykonuje je przyszły
-worker COM na Windows — nie ten proces.
+**Procesy Node nie robią żadnego `INSERT` do tabel dokumentów i nie modyfikują
+stanów.** Nie tworzą dokumentów, nie zmieniają ilości i nie ruszają cen.
+Dokumenty MM (`createMM`, kontrakt w `adapters/sfera.ts`) wykonuje worker Sfery
+(`sfera-worker/`, C#) — osobny, opcjonalny proces włączany `SFERA_WORKER=1`
+(§3, „Trzeci proces").
 
-Wniosek praktyczny: **najgorsze, co WERTIS może zrobić Subiektowi, to wpisać zły
-adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
-świadoma granica projektu, nie ograniczenie techniczne.
+Wniosek praktyczny: przy wyłączonym `SFERA_WORKER` **najgorsze, co WERTIS może
+zrobić Subiektowi, to wpisać zły adres w jednym polu tekstowym kartoteki** —
+odwraca to jeden `UPDATE`. Włączenie workera Sfery świadomie rozszerza pole
+rażenia o dokument MM ze skutkiem magazynowym; dlatego siedzi za osobnym
+przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 
 ---
 
@@ -48,21 +52,28 @@ adres w jednym polu tekstowym kartoteki.** Odwraca to jeden `UPDATE`. To była
 ┌──────────▼──────────────────────────────────────────────────┐
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
-│  SQLite (node:sqlite, WAL) — 14 tabel:                       │
+│  SQLite (node:sqlite, WAL) — 18 tabel:                       │
 │    delivery + delivery_line   rozkładanie faktur zakupu      │
 │    problem, ean_conflict      wyjątki                        │
 │    app_user, device_session   tożsamość (§7)                 │
 │    sfera_queue                kolejka zapisów do Subiekta    │
 │    events                     audyt — każdy skan i decyzja   │
-│    sgt_*                      READ-MODEL Subiekta (5 tabel)  │
-└──────────┬───────────────────────────────┬──────────────────┘
+│    process_state              meldunki procesów (api|worker|sfera)
+│    counters, magazyn_widocznosc                              │
+│    sgt_*                      READ-MODEL Subiekta (7 tabel)  │
+└──────────┬───────────────┬───────────────┬──────────────────┘
            │ ta sama baza SQLite            │ odczyt co 60 s
-┌──────────▼──────────┐         ┌───────────▼──────────────────┐
-│ Worker (osobny      │         │ MSSQL Subiekta GT            │
-│ proces Node)        │────────▶│  odczyt: kartoteki, stany,   │
-│ pętla poll, retry,  │  UPDATE │          dokumenty           │
-│ backoff             │         │  zapis: jedno pole (§1)      │
-└─────────────────────┘         └──────────────────────────────┘
+┌──────────▼──────────┐    │    ┌───────────▼──────────────────┐
+│ Worker (osobny      │    │    │ MSSQL Subiekta GT            │
+│ proces Node)        │────┼───▶│  odczyt: kartoteki, stany,   │
+│ pętla poll, retry,  │ UPDATE  │          dokumenty           │
+│ backoff             │    │    │  zapis: jedno pole (§1)      │
+└─────────────────────┘    │    └──────────────▲───────────────┘
+┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐    │                   │ MM przez COM
+  Worker Sfery (C#)   ◀────┘                   │ Sfery
+│ opcjonalny:         │────────────────────────┘
+  SFERA_WORKER=1 (§3)
+└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
 **Biuro ma podgląd pod `/biuro`** — jedną stronę HTML bez builda
@@ -144,10 +155,13 @@ pracuje na prawdziwej bazie, czy na demo.
 | interfejs | co robi | implementacje |
 |---|---|---|
 | `adapters/subiekt.ts` | **odczyt**: kartoteki, stany, dokumenty | `subiekt.seeded.ts` (SQLite z `products.json`), `subiekt.mssql.ts` (produkcja) |
-| `adapters/sfera.ts` | **zapis**: lokalizacja, MM | `sfera.dev.ts` (mutacja `sgt_*`), `sfera.sql.ts` (UPDATE w MSSQL) |
+| `adapters/sfera.ts` | **zapis**: lokalizacja, MM | `sfera.dev.ts` (mutacja `sgt_*` — lokalizacja i MM), `sfera.sql.ts` (UPDATE w MSSQL — tylko lokalizacja, MM rzuca błąd) + `sfera-worker/` (C#/COM) — jedyna produkcyjna implementacja MM |
 
-Wybór jest **jednym przełącznikiem**: `SGT_MODE=seeded|mssql`. Adapter zapisu
-nie jest osobną decyzją — wynika ze źródła danych (`config.sferaMode`).
+Wybór adaptera jest **jednym przełącznikiem**: `SGT_MODE=seeded|mssql`. Adapter
+zapisu nie jest osobną decyzją — wynika ze źródła danych (`config.sferaMode`).
+`SFERA_WORKER` nie wybiera adaptera, tylko **wykonawcę** zadań `mm` (worker
+Node czy worker Sfery) — i wymaga `SGT_MODE=mssql`, czego pilnuje walidacja
+w `config.ts` (sprzeczne ustawienie nie przechodzi startu).
 
 <!-- docs_check: historia -->
 Był kiedyś drugi przełącznik, `SFERA_MODE`. Usunięto go, bo dawało się ustawić
@@ -209,6 +223,11 @@ dokument MM umiał powstać wyłącznie przy zatwierdzeniu wózka w trybie
 kontenerowym; dziś wychodzi z karty towaru i z wiersza dostawy, dla dowolnej
 pary magazynów.
 
+Kolejkowanie jest bezwarunkowe, wykonanie nie: przy `SFERA_WORKER=1` dokument
+MM wystawia worker Sfery (§3), a przy wyłączonym zadanie kończy się czytelnym
+błędem i dokument wystawia ręcznie biuro — adres na półce zapisuje się
+w obu wariantach.
+
 Że o skutku decyduje **magazyn, nie typ dokumentu**, kosztowało jeden nieudany
 projekt modelu danych: `dok_Typ` nie mówi, gdzie towar wyląduje, bo ten sam typ
 bywa księgowany na różne magazyny. Decyduje `mag_Id`, snapshotowany w chwili
@@ -222,6 +241,11 @@ Przy przesunięciu zadanie `set_location` trafia do kolejki **przed** zadaniem
 wiadomo, gdzie leży. Odwrotna kolejność dawałaby okno, w którym handlowiec widzi
 towar dostępny, a magazynier nie wie, gdzie po niego iść — i przy nieudanym
 zapisie adresu stan ten byłby trwały.
+
+Przy `SFERA_WORKER=1` samo FIFO przestaje wystarczać — zadania biorą dwa
+niezależne procesy. Gwarantem staje się wtedy guard w zapytaniu wyboru zadania
+mm (`sfera-worker/sql/`, opis w §3): MM stoi, dopóki wcześniejsze niewykonane
+`set_location` tego samego towaru nie wejdzie.
 
 ---
 
@@ -375,8 +399,8 @@ konto, a fakt wysyłki przez kogoś innego zapisuje w payloadzie zdarzenia.
 
 ## 9. Audyt i pomiar
 
-`events` to jedyna tabela, do której piszą wszystkie warstwy: **34 typy
-zapisywane przez serwer** plus 3 przysyłane przez kolektor (`device_drop`,
+`events` to jedyna tabela, do której piszą wszystkie warstwy: **29 typów
+zapisywanych przez serwer** plus 3 przysyłane przez kolektor (`device_drop`,
 `battery_low`, `scan_timing` — lista dozwolonych w `routes/device.ts`, żeby
 klient nie mógł wstrzyknąć dowolnego typu). Każdy wiersz niesie `user_id`
 (tekst), `user_ref` (konto), `device_id` i payload JSON.
@@ -389,7 +413,7 @@ w odróżnieniu od zgadywania po podobieństwie.
 | raport | trasa | co mówi |
 |---|---|---|
 | Cztery liczby | `GET /api/metrics` | dotknięcia/pozycję, p95 skanu, etykiety do przedruku, towary bez czytelnego kodu |
-| Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole; zerowy wynik **nie tworzy raportu** |
+| Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole (czwarta, `mm_czeka`, tylko przy `SFERA_WORKER=1`); zerowy wynik **nie tworzy raportu** |
 | Wydajność per osoba | `GET /api/wydajnosc` | patrz ostrzeżenie niżej |
 | Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
 | **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola brygadzisty albo biura |
@@ -403,9 +427,11 @@ miejscach i oba były po tej samej stronie — po stronie SKUTKU.
 `location_set` mówił, że człowiek o coś POPROSIŁ. Czy zapis wszedł do Subiekta,
 nie mówiło nic: sukces nie był logowany, a porażka istniała wyłącznie jako
 `error_msg` w wierszu kolejki, czyli poza tabelą, w której ktokolwiek by jej
-szukał. Dziś worker dopisuje `queue_applied`, `queue_retry` i `queue_failed`,
-a autora bierze z `sfera_queue.created_by_ref` — bo działa poza żądaniem
-i sesji tam nie ma.
+szukał. Dziś **oba workery** — Node i Sfery — dopisują `queue_applied`,
+`queue_retry` i `queue_failed`, a autora biorą z `sfera_queue.created_by_ref`,
+bo działają poza żądaniem i sesji tam nie ma. To jedyne miejsce, w którym ślad
+audytowy przekracza granicę Node/C#, i strona C# honoruje tę samą regułę autora
+(`sfera-worker/src/Queue.cs`).
 
 Drugie urwanie to **odrzucenia**. Żądanie zwrócone z 400 nie zostawiało nic,
 więc „skanowałem i się nie zapisało" dało się zbyć zdaniem „nie widzę takiej
@@ -458,12 +484,15 @@ Raport ma trzy reguły wbudowane w kod, każda z testem:
 
 > Liczb testów ta tabela celowo **nie podaje**. `tools/docs_check.py` pilnuje
 > ich wyłącznie w `README.md` i `android/README.md`, a policzyć ich statycznie
-> się nie da (`grep` po `test(` daje 138 przy 199 uruchomionych — testy
+> się nie da (`grep` po `test(` daje 363 przy 383 uruchomionych — testy
 > parametryzowane i zagnieżdżone). Liczba poza kontrolą narzędzia starzeje się
-> po cichu; tak właśnie ten dokument doszedł do „153" przy 199.
+> po cichu; tak właśnie ten dokument doszedł do „153" przy 199 — i do „138",
+> zanim ktoś znów policzył.
 
-Dwa workflow: `android.yml` (`:core` + APK debug) i `server.yml` (testy, `tsc`,
-`docs_check`).
+Cztery workflow: `android.yml` (`:core` + APK debug), `server.yml` (testy,
+`tsc`, `docs_check`), `instalator.yml` (składnia + przebieg `-DryRun`)
+i `sfera-worker.yml` (sama kompilacja C#, path-filtered do `sfera-worker/**` —
+dlatego guard kolejności jest mierzony testem Node w `server.yml`, bez dotneta).
 
 ### Dlaczego `:core` jest osobnym modułem
 
@@ -511,11 +540,15 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 - **Brak testów w module `:app`** (~8,6 tys. linii Kotlina). Logika, którą dało
   się wynieść, siedzi w `:core` i ma testy; w `:app` zostają ViewModele,
   obsługa błędów sieci i wyzwalacze flusha bufora.
-- **Dokumenty MM nie są jeszcze tworzone** — kontrakt istnieje
-  (`adapters/sfera.ts`), implementacja czeka na worker COM na Windows.
-- **Otwarte `[WERYFIKUJ]`** dla własnej bazy: `MAG_ID_*` oraz to, które
-  `tw_Pole1..8` trzyma lokalizację. Lista i zapytania:
-  `docs/subiekt-gt-edu-setup.md` §3.
+- **Wywołania COM workera Sfery są niezweryfikowane na żywej Sferze** —
+  implementacja istnieje (`sfera-worker/`), ale każde wywołanie COM nosi
+  `[WERYFIKUJ]` (wszystkie w `SferaComAdapter.cs`), a `SFERA_WORKER` jest
+  domyślnie wyłączony. Do czasu weryfikacji dokument MM wystawia biuro.
+- **Otwarte `[WERYFIKUJ]`** dla własnej bazy (komplet z `config.ts`):
+  `MAG_ID_*`, `MSSQL_LOC_COLUMN` (które `tw_Pole1..8` trzyma lokalizację),
+  `DOK_STATUS_ZD_OTWARTE`, `MSSQL_ZD_ZREAL_COLUMN`, `LOC_FIELD_LIMIT`.
+  Zapytania: `docs/subiekt-gt-edu-setup.md` §3. Osobna rodzina: wywołania COM
+  w `sfera-worker/src/SferaComAdapter.cs` — lista w `sfera-worker/README.md`.
 - **Reguły strefy złotej** nie pokrywają regałów `D00`, `D06`, `D07`, `E01` —
   raport przeslotowania wskazuje je na osobnej liście „brak reguły" zamiast
   zgadywać.

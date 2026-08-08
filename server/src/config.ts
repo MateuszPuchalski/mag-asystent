@@ -43,8 +43,8 @@ export const config = {
    * Adapter zapisu (worker) NIE jest osobną decyzją — wynika wprost ze źródła
    * danych: 'mssql' → UPDATE dwóch kolumn w bazie Subiekta, 'seeded' → mutacja
    * sgt_* (demo). Jeden przełącznik mniej do pomylenia; dawne SFERA_MODE
-   * usunięte. Dokumenty MM tworzy przyszły worker Sfery (osobny proces COM na
-   * Windows, kontrakt w `adapters/sfera.ts`) — nigdy ten proces.
+   * usunięte. Dokumenty MM tworzy worker Sfery (osobny proces C#/COM,
+   * sfera-worker/, włączany SFERA_WORKER=1) — nigdy ten proces.
    */
   sferaMode: (process.env.SGT_MODE === "mssql" ? "sql" : "dev") as "dev" | "sql",
 

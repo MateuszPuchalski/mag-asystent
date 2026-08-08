@@ -334,8 +334,9 @@ Właściwą reakcją jest dokończenie konfiguracji później, po nadaniu uprawn
 
 ## Dokument MM — na przyszłość
 
-Gdy ruszy worker Sfery (albo import EPP), przyda się to, że dla MM struktura
-używa dwóch pól magazynowych:
+Gdy worker Sfery (`sfera-worker/`, włączany `SFERA_WORKER=1`) zacznie tworzyć
+dokumenty — albo gdyby wystarczył import EPP — przyda się to, że dla MM
+struktura używa dwóch pól magazynowych:
 
 - `dok_MagId` — magazyn **źródłowy**,
 - `dok_OdbiorcaId` — „dla MM oznacza identyfikator magazynu" (docelowy).

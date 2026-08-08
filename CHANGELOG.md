@@ -28,6 +28,28 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.29.1 — 8 sierpnia 2026
+
+**Dokumentacja dogoniła workera Sfery.** Audyt `docs/architektura.md` przeciw
+kodowi 0.29.0 znalazł osiemnaście rozjazdów — od „przyszłego workera COM",
+który już istnieje, przez „zero modyfikacji stanów" (nieprawdziwe przy
+`SFERA_WORKER=1`), po stare liczby tabel, typów zdarzeń, testów i workflowów.
+Dokument mówi teraz prawdę: trzeci proces jest na diagramie, granica zapisu
+nazywa oba warianty, niezmiennik „adres przed sprzedawalnością" wskazuje
+swojego nowego strażnika (guard w zapytaniu wyboru), a lista `[WERYFIKUJ]`
+jest kompletna. Przy okazji poprawione przestarzałe zdania „worker Sfery czeka
+na wdrożenie" w pięciu innych dokumentach.
+
+**Podgląd biura przestał kłamać w dwóch miejscach.** Zadanie ANULOWANE
+pokazywało się jako „W DRODZE" (bursztyn obiecywał zapis, który świadomie
+wycofano — teraz szara odznaka), a nowy rodzaj rekoncyliacji `mm_czeka`
+wyświetlał surowy identyfikator zamiast nazwy.
+
+**[wymaga działania]** Nic — `git pull`, `npm ci`, `npm run build`, restart
+usług.
+
+---
+
 ## 0.29.0 — 7 sierpnia 2026
 
 **Przesunięcia magazynowe dostają wykonawcę: worker Sfery (`sfera-worker/`).**
