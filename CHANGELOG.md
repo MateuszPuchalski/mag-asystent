@@ -54,6 +54,19 @@ Porządek domyka teraz `ZDJECIA_KOLUMNA_KOLEJNOSC` (`zd_Id`), a **brak tego
 ustawienia przy osobnej tabeli zatrzymuje start serwera**. Reguła jest
 w walidacji, nie w komentarzu, bo tej pomyłki nie widać z ekranu.
 
+### Lista tabel zamiast dwóch liczb, które się rozjeżdżają
+
+Dodanie siódmego grantu natychmiast wywróciło test dopisany w 0.29.2 — próg
+`Test-WertisUprawnienia` znowu został w tyle za skryptem i niepełny komplet
+uprawnień znowu by przeszedł. To ten sam rozjazd co poprzednio, drugi raz pod
+rząd, więc tym razem naprawa nie polega na przestawieniu liczby.
+
+Tabele odczytu mieszkają teraz w **jednej liście** (`$script:WertisTabeleOdczytu`).
+Skrypt generuje z niej granty, sprawdzenie bierze z niej próg, a testy liczą
+z niej oczekiwanie. Dopisanie tabeli przestawia wszystko naraz — rozjazd nie
+ma już jak powstać. Kreator przestał też podawać liczbę wpisaną w tekst
+komunikatu.
+
 ### Czego przy okazji nie ma
 
 `tw__Towar.tw_Logo` to `binary(50)` — pięćdziesiąt bajtów, więc nie zdjęcie.

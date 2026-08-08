@@ -142,21 +142,24 @@ Sprawdz "podstawia wybraną kolumnę do grantu kolumnowego" {
     Zaloz ($skrypt -match "GRANT UPDATE ON dbo\.tw__Towar \(tw_Pole3\)") "brak grantu na wybraną kolumnę"
 }
 
-Sprawdz "nadaje SELECT na siedmiu tabelach" {
-    # 7, nie 8: w 0.16.0 wypadły fl_Wartosc i fl__Flagi razem z flagą faktury
-    # (zostało 6), a w 0.31.0 doszło tw_ZdjecieTw ze zdjęciami kartotek.
-    # Zostaje też sl_Magazyn, bez którego karta towaru pokazałaby najwyżej
-    # `mag_Id = 7` zamiast nazwy magazynu.
+Sprawdz "nadaje SELECT dokladnie na tabelach z listy odczytu" {
+    # Liczba NIE jest wpisana z ręki po żadnej ze stron: skrypt generuje granty
+    # z `$script:WertisTabeleOdczytu`, a ten test z niej liczy oczekiwanie.
+    # Dopisanie tabeli przestawia jedno i drugie naraz.
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
-    Zaloz ($ile -eq 7) "GRANT SELECT jest $ile razy, ma być 7"
+    $oczekiwane = @($script:WertisTabeleOdczytu).Count
+    Zaloz ($ile -eq $oczekiwane) "GRANT SELECT jest $ile razy, a lista ma $oczekiwane pozycji"
+    foreach ($t in $script:WertisTabeleOdczytu) {
+        Zaloz ($skrypt -match "GRANT SELECT ON dbo\.$($t.Tabela)\b") "brak grantu na $($t.Tabela)"
+    }
 }
 
-Sprawdz "czyta zdjecia kartotek" {
-    Zaloz ($skrypt -match "GRANT SELECT ON dbo\.tw_ZdjecieTw") "brak grantu na tw_ZdjecieTw"
-}
-
-Sprawdz "czyta slownik magazynow" {
+Sprawdz "czyta slownik magazynow i zdjecia kartotek" {
+    # Obie tabele mają własne uzasadnienie i obie łatwo przeoczyć przy
+    # przepisywaniu skryptu: bez sl_Magazyn karta pokazuje `mag_Id = 7` zamiast
+    # nazwy, bez tw_ZdjecieTw slot zdjęcia zostaje pusty bez powodu na ekranie.
     Zaloz ($skrypt -match "GRANT SELECT ON dbo\.sl_Magazyn") "brak grantu na sl_Magazyn"
+    Zaloz ($skrypt -match "GRANT SELECT ON dbo\.tw_ZdjecieTw") "brak grantu na tw_ZdjecieTw"
 }
 
 # ── Próg sprawdzenia uprawnień kontra własny skrypt ─────────────────────────
@@ -192,9 +195,14 @@ Sprawdz "prog przepuszcza komplet nadany wlasnym skryptem" {
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count
     $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
     Zaloz ($ocena.Ok) "prog odrzuca $ile grantow, czyli dokladnie tyle, ile nadaje skrypt"
+    Zaloz ($ocena.Wymaganych -eq $ile) "prog mowi, ze wymaga $($ocena.Wymaganych), a skrypt nadaje $ile"
 }
 
 Sprawdz "prog odrzuca komplet o jeden GRANT za maly" {
+    # Ten test złapał REGRESJĘ przy dodawaniu tw_ZdjecieTw: skrypt urósł do
+    # siedmiu grantów, a próg został przy sześciu, więc niepełny komplet
+    # znowu przechodził. Dlatego liczba po obu stronach bierze się dziś
+    # z jednej listy, a nie z pamięci.
     $ile = ([regex]::Matches($skrypt, "GRANT SELECT ON")).Count - 1
     $ocena = Test-WertisUprawnienia -Uprawnienia (Uprawnienia-Atrapa -Select $ile) -KolumnaLokalizacji "tw_Pole3"
     Zaloz (-not $ocena.Ok) "prog przepuszcza brakujacy GRANT"
