@@ -28,6 +28,31 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.33.1 — 8 sierpnia 2026
+
+**Rysunek pudełka ustępuje zdjęciu.** W pasku listy rozkładania stały obok
+siebie ikona pudełka i miniatura tego samego towaru.
+
+**[wymaga działania]** Nowy APK przez MDM.
+
+### Dwie ikony w jednym miejscu znaczyły to samo
+
+Rysunek pudełka nie niósł nic — mówił „towar". Obok miniatury tego samego
+towaru był powtórzeniem, bo zdjęcie mówi KTÓRY towar. Pojawia się teraz
+wyłącznie wtedy, gdy kartoteka zdjęcia nie ma.
+
+Ikony stanu zostają nietknięte i to jest granica tej zmiany. `Alert` mówi
+„zgłoszony problem", `Check` mówi „odłożone" — zdjęcie żadnej z tych rzeczy nie
+powie, więc podmiana zabrałaby z wiersza ostrzeżenie.
+
+Rysunek zajmuje przy tym **tyle samo miejsca co miniatura**, choć sam jest
+o połowę mniejszy. Bez tego wiersz przeskakiwałby w bok o 18 dp w chwili
+doczytania zdjęcia — dokładnie ten ruch pod kciukiem, przed którym broni się
+reszta tego ekranu.
+
+Rozwinięty wiersz zostaje bez zmian. Jego zdjęcie stoi na drugim końcu paska,
+w miejscu pastylki adresu, więc te dwa elementy nie sąsiadują.
+
 ## 0.33.0 — 8 sierpnia 2026
 
 **Miniatura w pasku listy rozkładania i w ostatnio skanowanych.** Dwa miejsca,

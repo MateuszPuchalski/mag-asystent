@@ -114,6 +114,11 @@ fun ZdjecieKartoteki(graph: AppGraph, twId: Long) {
  * @param powieksz tap otwiera pełny ekran — true WYŁĄCZNIE w nagłówkach bez
  *   własnego gestu (ScanLoc, przesunięcie, problem). Wiersze list mają swój
  *   tap (nawigacja/wybór) i zagnieżdżony clickable kradłby go w rękawicach.
+ * @param zamiast rysowane, gdy kartoteka zdjęcia NIE MA. Powstało dla ikony
+ *   pudełka w pasku rozkładania: stała obok miniatury i przy towarze ze
+ *   zdjęciem była powtórzeniem — rysunek pudełka mówi „towar", a zdjęcie mówi
+ *   KTÓRY. Domyślnie `null`, czyli reguła bez rezerwowanego slotu zostaje
+ *   nietknięta wszędzie, gdzie nikt zastępstwa nie podał.
  */
 @Composable
 fun MiniaturaTowaru(
@@ -122,6 +127,7 @@ fun MiniaturaTowaru(
     bok: Dp,
     powieksz: Boolean = false,
     modifier: Modifier = Modifier,
+    zamiast: (@Composable () -> Unit)? = null,
 ) {
     var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
     var miniatura by remember(twId) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -137,7 +143,15 @@ fun MiniaturaTowaru(
         miniatura = dane?.let { miniaturaZCache(it, twId, px) }
     }
 
-    val bmp = miniatura ?: return
+    val bmp = miniatura
+    if (bmp == null) {
+        /* Zastępstwo rysujemy TAKŻE w trakcie pobierania, nie dopiero po
+           potwierdzeniu braku. Ikona pudełka jest tym, co w tym miejscu stało
+           od zawsze — mignięcie pustki przed jej pojawieniem się byłoby
+           gorsze niż podmiana rysunku na zdjęcie. */
+        zamiast?.invoke()
+        return
+    }
     Image(
         bitmap = bmp.asImageBitmap(),
         contentDescription = "Zdjęcie towaru",

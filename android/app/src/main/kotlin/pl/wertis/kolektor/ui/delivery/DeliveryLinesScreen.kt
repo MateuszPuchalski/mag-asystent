@@ -549,20 +549,30 @@ private fun LineRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                when {
-                    problem -> WIcons.Alert
-                    zwiniety -> WIcons.Check
-                    else -> WIcons.Box
-                },
-                contentDescription = null,
-                tint = when {
-                    problem -> Destructive
-                    zwiniety -> Success
-                    else -> InkMute
-                },
-                modifier = Modifier.size(if (zwiniety) 14.dp else 18.dp),
-            )
+            /* IKONA STANU ZOSTAJE, IKONA PUDEŁKA USTĘPUJE ZDJĘCIU — i to są dwie
+               różne rzeczy, mimo że rysowane w tym samym miejscu.
+
+               `Alert` i `Check` niosą stan wiersza („zgłoszony problem",
+               „odłożone"), którego zdjęcie nie zastąpi; zostają zawsze.
+               `Box` nie niesie nic — to rysunek pudełka, znaczący tyle co
+               „towar". Obok miniatury tego samego towaru był powtórzeniem:
+               zdjęcie mówi KTÓRY towar. Dlatego jedzie jako `zamiast` i pojawia
+               się wyłącznie wtedy, gdy kartoteka zdjęcia nie ma. */
+            when {
+                problem -> Icon(
+                    WIcons.Alert,
+                    contentDescription = null,
+                    tint = Destructive,
+                    modifier = Modifier.size(18.dp),
+                )
+                zwiniety -> Icon(
+                    WIcons.Check,
+                    contentDescription = null,
+                    tint = Success,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+
             /* Miniatura W PASKU, po lewej stronie symbolu — zgłoszenie
                z magazynu. Rozwinięty wiersz ma już swoją (56 dp, w miejscu
                pastylki), a decyzja „czy to ten towar" zapada WCZEŚNIEJ:
@@ -571,12 +581,35 @@ private fun LineRow(
                Wiersz zwinięty jej nie dostaje. Pozycja jest odłożona, więc
                rozpoznawanie towaru nic już nie wnosi, a pasek jest o połowę
                niższy właśnie po to, żeby dziesięć pozycji drobnicy zmieściło
-               się na ekranie.
-
-               Ikona stanu zostaje na swoim miejscu: mówi „zrobione" albo
-               „zgłoszony problem", czyli coś innego niż zdjęcie. Podmiana
-               zabrałaby ostrzeżenie z wiersza. */
-            if (!zwiniety && !rozwiniety) MiniaturaTowaru(graph, line.twId, 36.dp)
+               się na ekranie. */
+            /* Rysunek pudełka zajmuje TYLE SAMO MIEJSCA co miniatura, choć sam
+               jest o połowę mniejszy. Bez tego wiersz przeskakiwałby w bok
+               o 18 dp w chwili doczytania zdjęcia — a to jest dokładnie ten
+               ruch pod kciukiem, przed którym broni się reszta tego ekranu.
+               Nie jest to „szary kwadrat, którego unikamy w listach": rysunek
+               stał tu od zawsze, zmienia się wyłącznie jego obwódka. */
+            val ikonaPudelka: @Composable () -> Unit = {
+                Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                    Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(18.dp))
+                }
+            }
+            if (!zwiniety && !rozwiniety) {
+                MiniaturaTowaru(
+                    graph,
+                    line.twId,
+                    36.dp,
+                    // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
+                    zamiast = if (problem) null else ikonaPudelka,
+                )
+            } else if (rozwiniety) {
+                /* Rozwinięty wiersz ZOSTAJE z rysunkiem pudełka. Jego zdjęcie
+                   stoi na drugim końcu paska, w miejscu pastylki adresu, więc
+                   te dwa elementy nie sąsiadują i powtórzenia nie widać.
+                   Ukrycie ikony wymagałoby tu wiedzy „czy zdjęcie jest" po tej
+                   stronie wiersza — czyli drugiego odczytu tylko po to, żeby
+                   nie narysować 18 dp szarości. */
+                ikonaPudelka()
+            }
             Column(Modifier.weight(1f)) {
                 Text(
                     line.sym,
