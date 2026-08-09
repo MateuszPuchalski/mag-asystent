@@ -39,7 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.alpha
@@ -101,6 +103,7 @@ fun WertisTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     onDone: () -> Unit = {},
 ) {
+    val focusManager = LocalFocusManager.current
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -114,7 +117,13 @@ fun WertisTextField(
         shape = RoundedCornerShape(12.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
         visualTransformation = visualTransformation,
-        keyboardActions = KeyboardActions(onDone = { onDone() }, onSearch = { onDone() }),
+        /* Next przechodzi do pola niżej — formularz kilkupolowy bez zamykania
+           i ponownego celowania w klawiaturę przy każdym polu. */
+        keyboardActions = KeyboardActions(
+            onDone = { onDone() },
+            onSearch = { onDone() },
+            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+        ),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Amber,
             unfocusedBorderColor = BorderCol,

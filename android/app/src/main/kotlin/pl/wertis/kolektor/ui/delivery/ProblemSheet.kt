@@ -54,6 +54,7 @@ import pl.wertis.kolektor.core.problem.problemBlocker
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.device.PhotoCapture
 import pl.wertis.kolektor.net.apiCall
+import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WIcons
@@ -160,6 +161,27 @@ fun ProblemSheet(
 
     val chosen = type
     val qtyValue = qty.replace(',', '.').toDoubleOrNull()
+
+    /* Skan zamiast klawiatury: numer katalogowy obcego artykułu jest na jego
+       etykiecie, numer przesyłki — na liście przewozowym; oba kody leżą
+       w zasięgu ręki, a przepisywanie ich w rękawicach to najdłuższe pisanie
+       w całym formularzu. Skan trafia do pierwszego PUSTEGO z tych pól;
+       poza tym arkusz połyka skany jak dotąd (przypadkowy strzał skanera nie
+       może przewinąć zgłoszenia). Wedge i tak pisze do pola z fokusem — ta
+       droga obsługuje skanery systemowe Zebra/Honeywell. */
+    ScanHandlerEffect { scan ->
+        when {
+            chosen?.symObcyRequired == true && symObcy.isBlank() -> {
+                symObcy = scan.code
+                graph.feedback.beep(true)
+            }
+            chosen == ProblemType.DAMAGED && nrPrzesylkiZapisany.isNullOrBlank() && nrPrzesylki.isBlank() -> {
+                nrPrzesylki = scan.code
+                graph.feedback.beep(true)
+            }
+        }
+        true
+    }
     /** Pytamy o przesyłkę tylko przy pierwszym uszkodzeniu w tej dostawie. */
     val pytamOPrzesylke = chosen == ProblemType.DAMAGED && nrPrzesylkiZapisany.isNullOrBlank()
     val blocker = chosen?.let {
@@ -298,7 +320,7 @@ fun ProblemSheet(
                 WertisTextField(
                     value = symObcy,
                     onValueChange = { symObcy = it },
-                    placeholder = "Numer katalogowy tego, co przyszło",
+                    placeholder = "Numer katalogowy — zeskanuj albo wpisz",
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -356,7 +378,7 @@ fun ProblemSheet(
                 WertisTextField(
                     value = nrPrzesylki,
                     onValueChange = { nrPrzesylki = it },
-                    placeholder = "Numer przesyłki (z listu przewozowego)",
+                    placeholder = "Nr przesyłki — zeskanuj list przewozowy albo wpisz",
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text("Czy spisano protokół z kurierem?", fontSize = 12.5.sp, color = InkSoft)
