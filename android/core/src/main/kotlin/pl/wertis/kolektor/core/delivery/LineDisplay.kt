@@ -43,6 +43,22 @@ enum class TrybWiersza {
 }
 
 /**
+ * Adres pokazywany na wierszu pozycji — FAKTYCZNY wygrywa z oczekiwanym.
+ *
+ * To są dwa różne pola i mylenie ich kosztowało błąd widoczny w hali: pozycja
+ * bez adresu, odłożona i opatrzona adresem, dalej pokazywała „BRAK".
+ *
+ * `locExpected` jest SNAPSHOTEM z chwili otwarcia dostawy i celowo nie zmienia
+ * się po odłożeniu — na nim stoi wykrywanie rozjazdu (§4.3) i kolejność listy,
+ * więc podmiana go po zapisie zepsułaby jedno i drugie. `locActual` mówi, gdzie
+ * towar NAPRAWDĘ wylądował, i tylko to interesuje człowieka patrzącego na
+ * zamkniętą pozycję.
+ *
+ * `null` znaczy „jeszcze nigdzie" — i dopiero to zasługuje na „BRAK".
+ */
+fun adresWiersza(locExpected: String?, locActual: String?): String? = locActual ?: locExpected
+
+/**
  * @param status wartość `DeliveryLineView.status`
  * @param aktywna czy to jest linia czekająca na skan lokalizacji
  */

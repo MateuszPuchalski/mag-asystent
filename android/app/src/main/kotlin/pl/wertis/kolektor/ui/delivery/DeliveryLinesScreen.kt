@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.TrybWiersza
+import pl.wertis.kolektor.core.delivery.adresWiersza
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
@@ -364,9 +365,17 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
        Jedyne przestawienie, jakie zostaje, to zepchnięcie pozycji BEZ
        LOKALIZACJI na koniec: to nie rutyna, tylko SKU wymagające decyzji. */
+    /* Grupowanie zostaje na SNAPSHOCIE (`locExpected`) i to jest świadome:
+       gdyby pozycja przeskakiwała do reszty listy w chwili nadania adresu,
+       wiersze skakałyby pod kciukiem przy każdym odłożeniu — dokładnie to,
+       czego zabrania reguła stałej kolejności. */
     val bezLok = v.lines.filter { it.locExpected == null }
     val uporzadkowane = v.lines.filter { it.locExpected != null } + bezLok
-    val pierwszyBezLok = bezLok.firstOrNull()?.id
+    /* Licznik nagłówka liczy natomiast to, co NAPRAWDĘ czeka na decyzję —
+       pozycja z nadanym adresem nie jest już „bez lokalizacji", choć zostaje
+       na swoim miejscu w liście. Gdy zostanie zero, nagłówek znika. */
+    val bezLokDoDecyzji = bezLok.count { it.locActual == null }
+    val pierwszyBezLok = if (bezLokDoDecyzji > 0) bezLok.firstOrNull()?.id else null
 
     /* Rozwinięta pozycja idzie pod górną krawędź. To NIE jest kosmetyka: właśnie
        po to karta odkładania była kiedyś pełnoekranowa — z lokalizacją trzeba
@@ -472,7 +481,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     ) {
                         Icon(WIcons.Alert, null, tint = AmberInk, modifier = Modifier.size(15.dp))
                         Text(
-                            "BEZ LOKALIZACJI (${bezLok.size})",
+                            "BEZ LOKALIZACJI ($bezLokDoDecyzji)",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.1.sp,
@@ -745,7 +754,10 @@ private fun LineRow(
                krzyczy 28 sp w panelu odkładania niżej, a wątpliwość, którą
                zdjęcie rozstrzyga („czy to na pewno TEN towar?"), pojawia się
                dokładnie w chwili brania kartonu do ręki. */
-            if (!rozwiniety) LokPastylka(line.locExpected, przygaszona = zwiniety)
+            // adres FAKTYCZNY, gdy pozycja już gdzieś poszła — patrz `adresWiersza`
+            if (!rozwiniety) {
+                LokPastylka(adresWiersza(line.locExpected, line.locActual), przygaszona = zwiniety)
+            }
             else MiniaturaTowaru(graph, line.twId, 56.dp)
         }
 
@@ -832,7 +844,9 @@ private fun PanelOdkladania(
                 color = Ink,
             )
             Text(
-                "→ ${line.locExpected ?: "BRAK LOKALIZACJI"}",
+                /* Przy pozycji odkładanej po kawałku pokazujemy adres, pod
+                   którym reszta partii już leży — a nie pustkę ze snapshotu. */
+                "→ ${adresWiersza(line.locExpected, line.locActual) ?: "BRAK LOKALIZACJI"}",
                 fontFamily = BarlowCond,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 28.sp,

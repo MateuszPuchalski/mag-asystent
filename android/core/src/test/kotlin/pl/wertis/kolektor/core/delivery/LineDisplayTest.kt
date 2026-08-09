@@ -1,6 +1,7 @@
 package pl.wertis.kolektor.core.delivery
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /* Wiersz listy rozkładania ma jedną kolizję, która na ekranie wygląda jak
@@ -43,5 +44,28 @@ class LineDisplayTest {
         // serwer może dołożyć status, którego ta wersja kolektora nie zna;
         // bezpieczniej pokazać pozycję jako do zrobienia niż ją schować
         assertEquals(TrybWiersza.ZWYKLY, trybWiersza("cos_nowego", aktywna = false))
+    }
+
+    /* ── Adres na wierszu ─────────────────────────────────────────────────── */
+
+    @Test fun `pozycja bez adresu po odlozeniu pokazuje adres nadany`() {
+        // TEN błąd był widoczny w hali: towar bez lokalizacji, odłożony
+        // i opatrzony adresem, dalej pokazywał „BRAK", bo ekran czytał wyłącznie
+        // snapshot z chwili otwarcia dostawy
+        assertEquals("E08-03-01", adresWiersza(locExpected = null, locActual = "E08-03-01"))
+    }
+
+    @Test fun `nigdzie nieodlozona pozycja bez adresu zostaje bez adresu`() {
+        assertNull(adresWiersza(locExpected = null, locActual = null))
+    }
+
+    @Test fun `faktyczny adres wygrywa z oczekiwanym`() {
+        // rozjazd rozstrzygnięty na ZAMIEŃ: towar leży tam, gdzie go odłożono,
+        // a nie tam, gdzie kartoteka spodziewała się go przy otwarciu dostawy
+        assertEquals("B02-01-01", adresWiersza(locExpected = "A01-02-03", locActual = "B02-01-01"))
+    }
+
+    @Test fun `przed odlozeniem pokazujemy adres oczekiwany`() {
+        assertEquals("A01-02-03", adresWiersza(locExpected = "A01-02-03", locActual = null))
     }
 }
