@@ -51,7 +51,8 @@ suspend fun saveLocation(
         ),
     )
     graph.queueRepo.refreshNow()
-    graph.feedback.beep(true)
+    // sygnał ZAPISU, nie wyboru — koniec operacji słyszalny bez patrzenia
+    graph.feedback.zapis()
     /* WYJĄTEK: zapis do bufora offline. Wtedy chip NIE pokaże nic — `pendingLocs`
        wylicza serwer ze SWOJEJ kolejki, a operacja jeszcze do niego nie dotarła.
        Bez tego jednego zdania zapis w trybie samolotowym nie dawałby żadnego

@@ -184,7 +184,8 @@ fun PrzesuniecieSheet(
                         )
                     )
                 }
-                graph.feedback.beep(true)
+                // sygnał ZAPISU — przesunięcie przyjęte, nie tylko „wybrano"
+                graph.feedback.zapis()
                 graph.queueRepo.refreshNow()
                 val kod = magazyny.firstOrNull { it.magId == dokad }?.kod ?: ""
                 graph.effects.toast("Przesunięto ${formatQty(ile)} $unit → $kod")

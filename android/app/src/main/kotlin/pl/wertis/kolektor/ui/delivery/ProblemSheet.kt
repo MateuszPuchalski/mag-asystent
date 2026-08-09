@@ -215,7 +215,8 @@ fun ProblemSheet(
                     )
                 }
                 PhotoCapture.discard(photoFile)
-                graph.feedback.beep(true)
+                // sygnał ZAPISU — zgłoszenie przyjęte
+                graph.feedback.zapis()
                 graph.problemsRepo.refresh()
                 graph.effects.toast("Zgłoszono: ${t.label}")
                 onDone()

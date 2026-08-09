@@ -22,6 +22,12 @@ class BatteryAssist(
     private var warned = false
     private var registered = false
 
+    /* Stan „niska bateria" jako flow — jednorazowy toast (2,6 s) nie dociera
+       do człowieka na drabinie, więc AppRoot trzyma z tego trwały pasek,
+       widoczny do wymiany baterii (powrót powyżej RESET_PCT gasi). */
+    private val _niska = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val niska: kotlinx.coroutines.flow.StateFlow<Boolean> = _niska
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             if (!enabled()) return
@@ -35,9 +41,11 @@ class BatteryAssist(
 
             if (!charging && pct < LOW_PCT && !warned) {
                 warned = true
+                _niska.value = true
                 onLowBattery(pct)
             } else if (pct > RESET_PCT) {
                 warned = false
+                _niska.value = false
             }
         }
     }

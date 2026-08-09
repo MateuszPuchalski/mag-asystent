@@ -214,7 +214,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     body = PutawayLineBody(code, locAction = locAction, recznie = recznie.takeIf { it }),
                 ),
             )
-            graph.feedback.beep(true)
+            // sygnał ZAPISU (dwa tony), nie wyboru — pozycja odłożona, idź dalej
+            graph.feedback.zapis()
             active = null
             mismatch = null
             if (res.offline) {
