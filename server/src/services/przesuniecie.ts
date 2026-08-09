@@ -28,6 +28,8 @@ export interface PrzesuniecieInput {
   location?: string | null;
   /** Pozycja dostawy, gdy przesunięcie wyszło ze skrótu na liście (opcjonalne). */
   lineId?: number | null;
+  /** Kod półki WPISANY z ręki — zasila raport etykiet do przedruku. */
+  recznie?: boolean;
 }
 
 export interface PrzesuniecieWynik {
@@ -162,6 +164,11 @@ export function przesunStan(
     return { error: e instanceof Error ? e.message : "Nie udało się przesunąć" };
   }
 
+  // kod półki wpisany z ręki = sygnał zniszczonej etykiety — ten sam kształt
+  // zdarzenia co przy ręcznym skanie, więc raport etykiet widzi go bez zmian
+  if (input.recznie && kod) {
+    logEvent("manual_entry", user, input.twId, { code: kod, kind: "LOC", zrodlo: "przesuniecie" });
+  }
   logEvent("przesuniecie", user, input.twId, {
     magFrom: input.magFrom,
     magTo: input.magTo,

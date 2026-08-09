@@ -158,6 +158,9 @@ interface ApiService {
         @Path("id") id: Long,
         @Path("lineId") lineId: Long,
         @Body body: PutawayLineBody,
+        @Header("x-user") asUser: String? = null,
+        /** Konto autora dla operacji z bufora — patrz `ApiOpSender`. */
+        @Header("x-buffered-user") bufferedUser: String? = null,
     ): PutawayLineResponse
 
 

@@ -52,7 +52,7 @@ suspend fun routeScan(
                 graph.cards.putCard(r.card)
                 graph.nav.openProduct(
                     r.card.id,
-                    RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji"),
+                    RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji", r.card.name),
                 )
             }
             is ScanResult.Location -> {

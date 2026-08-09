@@ -341,6 +341,8 @@ export interface PutawayLineOpts {
    * Domyślnie 'replace' — zgodność ze ścieżką bez rozjazdu.
    */
   locAction?: "add" | "replace";
+  /** Kod WPISANY z ręki, nie zeskanowany — zasila raport etykiet do przedruku. */
+  recznie?: boolean;
 }
 
 /**
@@ -404,6 +406,12 @@ export function putawayLine(
     )
     .run(doneQty, code, status, nowIso(), user, lineId);
 
+  /* Kod wpisany z ręki = sygnał zniszczonej etykiety regału. Ten sam kształt
+     zdarzenia co przy ręcznym skanie (`manual_entry` w routes/products.ts),
+     więc raport etykiet do przedruku widzi tę drogę bez żadnych zmian. */
+  if (opts.recznie) {
+    logEvent("manual_entry", user, line.tw_id, { code, kind: "LOC", zrodlo: "dostawa" });
+  }
   logEvent("putaway_line_done", user, line.tw_id, {
     lineId,
     // ile linia miała odłożone PRZED tym zapisem — patrz `confirmItem`

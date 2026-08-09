@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
-import { sesjaZadania, userOf } from "../context.js";
+import { autorOperacji, sesjaZadania, userOf } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
 import {
   forceReleaseLine,
@@ -70,16 +70,24 @@ export async function deliveryRoutes(app: FastifyInstance) {
    */
   app.post<{
     Params: { id: string; lineId: string };
-    Body: { location: string; qty?: number; locAction?: LocApplyAction };
+    Body: { location: string; qty?: number; locAction?: LocApplyAction; recznie?: boolean };
   }>(
     "/api/delivery/:id/lines/:lineId/putaway",
     async (req, reply) => {
-      const { location, qty, locAction } = req.body ?? ({} as { location?: string });
+      const { location, qty, locAction, recznie } = req.body ?? ({} as { location?: string });
       if (!location) return reply.code(400).send({ error: "Brak kodu lokalizacji" });
       if (locAction && locAction !== "add" && locAction !== "replace") {
         return reply.code(400).send({ error: `Nieznana akcja lokalizacji: ${locAction}` });
       }
-      const r = putawayLine(Number(req.params.lineId), location, userOf(req), { qty, locAction });
+      /* Autor z chwili WYKONANIA, nie wysyłki: odłożenie buforowane offline
+         dojeżdża po powrocie sieci, czasem po zmianie osoby przy kolektorze —
+         `x-buffered-user` niesie wtedy konto tego, kto naprawdę odłożył. */
+      const autor = autorOperacji(req);
+      const r = putawayLine(Number(req.params.lineId), location, autor.nazwa, {
+        qty,
+        locAction,
+        recznie,
+      });
       // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
       return r;

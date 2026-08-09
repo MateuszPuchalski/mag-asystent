@@ -18,6 +18,7 @@ export async function przesuniecieRoutes(app: FastifyInstance) {
       magTo?: number;
       location?: string;
       lineId?: number;
+      recznie?: boolean;
     };
   }>("/api/przesuniecie", async (req, reply) => {
     const b = req.body ?? {};
@@ -29,6 +30,7 @@ export async function przesuniecieRoutes(app: FastifyInstance) {
         magTo: Number(b.magTo),
         location: b.location ?? null,
         lineId: b.lineId ?? null,
+        recznie: b.recznie === true,
       },
       userOf(req)
     );

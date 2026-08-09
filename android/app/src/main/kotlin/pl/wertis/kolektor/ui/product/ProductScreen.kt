@@ -331,7 +331,7 @@ fun ProductScreen(graph: AppGraph) {
         ZamiennikiSekcja(graph, p, "zam" in otwarte, { toggle("zam") }) { row ->
             graph.nav.openProduct(
                 row.id,
-                RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji"),
+                RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji", row.name),
             )
         }
     }

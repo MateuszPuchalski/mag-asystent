@@ -50,6 +50,8 @@ import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.net.LocationsInfo
+import pl.wertis.kolektor.core.offline.PendingOp
+import pl.wertis.kolektor.core.offline.PutawayOp
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.EanCandidate
@@ -129,6 +131,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var conflict by remember(id) { mutableStateOf<List<EanCandidate>?>(null) }
     /** Rozjazd lokalizacji — pytamy PRZED zapisem, nigdy po (§4.3). */
     var mismatch by remember(id) { mutableStateOf<Pair<DeliveryLineView, String>?>(null) }
+    /** Czy kod w `mismatch` był wpisany z ręki — do raportu etykiet. */
+    var mismatchReczna by remember(id) { mutableStateOf(false) }
     /** Zgłoszenie wyjątku; `line` = null → problem całej dostawy (D8). */
     var problemFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     var problemOpen by remember(id) { mutableStateOf(false) }
@@ -169,7 +173,10 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 }
                 is ScanResolution.Unknown -> {
                     graph.feedback.beep(false)
-                    graph.effects.toast("Nieznany kod: ${r.code}")
+                    // druga połowa zdania to jedyna wskazówka, że nieczytelna
+                    // etykieta TOWARU nie zatrzymuje pracy — wybór z listy
+                    // robi dokładnie to samo co skan
+                    graph.effects.toast("Nieznany kod: ${r.code} — dotknij pozycji na liście, aby ją wybrać")
                 }
             }
         } catch (e: Exception) {
@@ -177,21 +184,56 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         }
     }
 
-    /** Zapis linii (bez MM). `locAction` = null na ścieżce bez rozjazdu. */
-    suspend fun commitPutaway(line: DeliveryLineView, code: String, locAction: LocApplyAction?) {
+    /**
+     * Zapis linii (bez MM). `locAction` = null na ścieżce bez rozjazdu.
+     *
+     * Przez bufor offline: rozkładanie to najdłuższa nieprzerwana praca na
+     * kolektorze i dzieje się także w martwych punktach hali — dziura Wi-Fi
+     * nie może gubić policzonej pozycji ani wyrzucać człowieka z rytmu.
+     * Błędy SERWERA (walidacja, zajęta linia) dalej wracają do UI od razu —
+     * buforuje się wyłącznie brak sieci, jak przy zmianie lokalizacji.
+     */
+    suspend fun commitPutaway(
+        line: DeliveryLineView,
+        code: String,
+        locAction: LocApplyAction?,
+        recznie: Boolean = false,
+    ) {
         if (busy) return
         busy = true
         try {
-            apiCall {
-                graph.api.deliveryPutaway(
-                    id,
-                    line.id,
-                    PutawayLineBody(code, locAction = locAction),
-                )
-            }
+            val res = graph.offlineQueue.runOrBuffer(
+                kind = PendingOp.OpKind.PUTAWAY,
+                user = graph.session.currentUser,
+                userRef = graph.session.state.value.userId,
+                productId = line.twId,
+                putaway = PutawayOp(
+                    deliveryId = id,
+                    lineId = line.id,
+                    body = PutawayLineBody(code, locAction = locAction, recznie = recznie.takeIf { it }),
+                ),
+            )
             graph.feedback.beep(true)
             active = null
             mismatch = null
+            if (res.offline) {
+                /* Bez sieci świeży odczyt nie przyjdzie, a lista musi iść
+                   dalej — pozycję odhaczamy w kopii widoku z cache, którą
+                   `reload++` zaraz poda jako posiew. Serwer i tak jest
+                   ostatecznym arbitrem: operacja doleci z bufora, a odrzucona
+                   wróci toastem i meldunkiem, jak każda inna z bufora. */
+                graph.cards.peekDelivery(id)?.let { v ->
+                    val zrobione = line.qtyDoc.coerceAtLeast(line.qtyDone)
+                    graph.cards.putDelivery(id, v.copy(
+                        lines = v.lines.map {
+                            if (it.id == line.id) {
+                                it.copy(qtyDone = zrobione, status = "done", locActual = code)
+                            } else it
+                        },
+                    ))
+                }
+                graph.effects.toast("Zapisano lokalnie · $code — czeka na sieć")
+            }
             reload++
             graph.queueRepo.refreshNow()
             graph.effects.flashSuccess("$code · ${line.sym}")
@@ -208,14 +250,17 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * zapis CZEKA na decyzję człowieka — serwer nie zgadnie, czy towar
      * przeniesiono, czy leży teraz w dwóch miejscach (§4.3).
      */
-    suspend fun putaway(line: DeliveryLineView, code: String) {
+    suspend fun putaway(line: DeliveryLineView, code: String, recznie: Boolean = false) {
         val expected = line.locExpected
         if (!expected.isNullOrBlank() && expected != code) {
             graph.feedback.beep(false)
+            // pochodzenie kodu przeżywa pytanie o rozjazd — inaczej ręczny
+            // wpis z inną półką wypadałby z raportu etykiet
+            mismatchReczna = recznie
             mismatch = line to code
             return
         }
-        commitPutaway(line, code, locAction = null)
+        commitPutaway(line, code, locAction = null, recznie = recznie)
     }
 
     // router skanów: gdy czekamy na lokalizację — LOC kończy operację;
@@ -421,7 +466,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                             graph.effects.toast(err)
                             graph.feedback.beep(false)
                         } else {
-                            scope.launch { putaway(line, code) }
+                            scope.launch { putaway(line, code, recznie = true) }
                         }
                     },
                     onTap = {
@@ -444,7 +489,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     },
                     onCancel = { zwolnij(line) },
                     onRozjazd = { action ->
-                        mismatch?.let { (l, code) -> scope.launch { commitPutaway(l, code, action) } }
+                        mismatch?.let { (l, code) ->
+                            scope.launch { commitPutaway(l, code, action, recznie = mismatchReczna) }
+                        }
                     },
                     onRozjazdAnuluj = { mismatch = null },
                 )

@@ -78,6 +78,8 @@ data class SetLocationBody(
     val action: LocAction,
     val value: String? = null,
     val replaced: String? = null,
+    /** Kod WPISANY z ręki, nie zeskanowany — zasila raport etykiet do przedruku. */
+    val recznie: Boolean? = null,
 )
 
 /**
@@ -97,6 +99,8 @@ data class PrzesuniecieBody(
     val location: String? = null,
     /** Pozycja dostawy, gdy przesunięcie wyszło ze skrótu na liście. */
     val lineId: Long? = null,
+    /** Kod półki WPISANY z ręki — zasila raport etykiet do przedruku. */
+    val recznie: Boolean? = null,
 )
 
 @Serializable
@@ -505,6 +509,8 @@ data class PutawayLineBody(
      * `null` = ścieżka bez rozjazdu (serwer przyjmuje domyślne `replace`).
      */
     val locAction: LocApplyAction? = null,
+    /** Kod WPISANY z ręki, nie zeskanowany — zasila raport etykiet do przedruku. */
+    val recznie: Boolean? = null,
 )
 
 /** Wybór operatora przy skanie innej półki niż oczekiwana (§4.3). */
@@ -585,6 +591,15 @@ data class RaiseProblemResponse(val id: Long)
 @Serializable
 data class ResolveProblemBody(val note: String? = null)
 
+/** Kartoteka z kolizji EAN — symbol i nazwa zamiast surowego tw_Id. */
+@Serializable
+data class KolizjaTowar(
+    val twId: Long = 0,
+    /** Pusty = kartoteka skasowana po zapisaniu kolizji; zostaje samo twId. */
+    val sym: String = "",
+    val name: String = "",
+)
+
 /** Kolizja EAN w kartotece — raport dla biura (§4.5). */
 @Serializable
 data class EanConflictRow(
@@ -592,6 +607,8 @@ data class EanConflictRow(
     val hits: Int = 0,
     val autoResolved: Int = 0,
     val twIds: List<Long> = emptyList(),
+    /** Puste przy starszym serwerze — karta wraca wtedy do listy twIds. */
+    val towary: List<KolizjaTowar> = emptyList(),
     val lastSeen: String = "",
 )
 
