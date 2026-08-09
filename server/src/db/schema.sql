@@ -283,6 +283,36 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 
+-- ── Kody kreskowe nadane w WERTIS (0.37.0) ────────────────────────────────
+-- Magazynier trzyma karton, na kartonie jest kod, a kartoteka go nie ma — do
+-- 0.37.0 jedynym wyjściem było „zapamiętaj i powiedz biuru", czyli nic.
+--
+-- Kod ląduje TUTAJ od razu i dopiero potem, przez kolejkę, w Subiekcie. Ta
+-- kolejność jest celowa: zapis do Subiekta bywa opóźniony (worker), a bywa
+-- NIEMOŻLIWY (brak GRANT-u na tw_PodstKodKresk). W obu przypadkach skan ma
+-- działać na kolektorze natychmiast, bo to jest jedyny powód, dla którego ktoś
+-- ten kod w ogóle nadał.
+--
+-- TABELA NIE JEST CZĘŚCIĄ READ-MODELU i nie wolno jej dopisać do listy
+-- kasowanej przy imporcie (`subiekt.mssql.ts`) — import zaorałby dokładnie tę
+-- wiedzę, której Subiekt jeszcze nie ma.
+--
+-- `ean` jest kluczem GŁÓWNYM, bo jeden kod ma wskazywać jedną kartotekę.
+-- Alias wskazujący na dwie odtworzyłby kolizję (§4.5), przed którą chroni
+-- odmowa zapisu — tu pilnuje tego baza, a nie tylko kod.
+CREATE TABLE IF NOT EXISTS ean_alias (
+  ean        TEXT PRIMARY KEY,
+  tw_id      INTEGER NOT NULL,
+  -- kod stojący na kartotece PRZED podmianą; NULL = pole było puste
+  ean_przed  TEXT,
+  -- zadanie, które niesie ten kod do Subiekta; po nim idzie diagnoza „czemu
+  -- Subiekt dalej go nie ma"
+  queue_id   INTEGER,
+  created_at TEXT NOT NULL,
+  created_by TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_ean_alias_tw ON ean_alias(tw_id);
+
 -- Meldunek procesu (API i worker). POWSTAŁO, ŻEBY ROZJAZD KONFIGURACJI DAŁ SIĘ
 -- ZOBACZYĆ. API i worker to osobne procesy; worker bez SGT_MODE=mssql pisze do
 -- lokalnej bazy i ZGŁASZA SUKCES, więc awaria nie ma żadnego objawu. Zalecana

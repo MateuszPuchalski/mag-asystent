@@ -28,6 +28,131 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.37.0 — 9 sierpnia 2026
+
+**Kody kreskowe da się nadawać z kolektora.** Karton ma kod, kartoteka go nie ma
+— do tej pory jedyną drogą było „zapamiętaj i powiedz biuru", czyli w praktyce
+nic, a nazajutrz ten sam karton zatrzymywał pracę drugi raz.
+
+**[wymaga działania]** **Nowe uprawnienie SQL i nowy APK.**
+
+1. Na bazie Subiekta wykonaj (SSMS, konto administratora):
+   ```sql
+   GRANT UPDATE ON dbo.tw__Towar (tw_PodstKodKresk) TO wertis;
+   ```
+   Bez tego funkcja **nie pada** — kod działa na kolektorze od pierwszej chwili,
+   a zapis do Subiekta czeka w kolejce ze statusem `error` i czytelnym
+   komunikatem. Po nadaniu uprawnienia wystarczy PONÓW na zadaniu.
+2. `git pull`, `npm ci`, `npm run build`, restart `wertis-api` i `wertis-worker`.
+3. **Nowy APK** — cała obsługa nadawania jest w kolektorze.
+
+### To jest rozszerzenie granicy zapisu i mówimy o tym wprost
+
+Od początku projektu aplikacja zmieniała w bazie firmy **jedno** pole —
+lokalizację. Teraz zmienia dwa. Zdanie „zapisuje jedną rzecz" zniknęło z README
+i z opisu architektury, bo przestało być prawdziwe, a dokumentacja, która kłamie
+o granicy zapisu, jest gorsza niż jej brak.
+
+Nic poza tym się nie zmieniło: dalej zero `INSERT` do tabel dokumentów, zero
+modyfikacji stanów, każdy zapis przez kolejkę i z wpisem w audycie.
+
+### Zapis idzie dwiema drogami — i to nie jest dublowanie
+
+Kod ląduje najpierw w bazie WERTIS (`ean_alias`), a dopiero potem, przez
+kolejkę, w Subiekcie. Powód jest praktyczny: zapis do Subiekta bywa **opóźniony**
+(worker pracuje sekwencyjnie) i bywa **niemożliwy** (brak GRANT-u). W obu
+przypadkach skan ma zadziałać natychmiast — bo to jest jedyny powód, dla którego
+ktoś ten kod nadał.
+
+Kod nadany u nas jest **furtką, nie pierwszeństwem**: szukamy go dopiero wtedy,
+gdy kartoteka Subiekta nie zwróciła ani jednego trafienia. Odwrotna kolejność
+znaczyłaby, że kod nadany przy półce przykrywa kod z Subiekta — czyli że
+magazynier cicho nadpisuje dane, których nie widzi.
+
+### Trzy sytuacje, trzy różne odpowiedzi
+
+- **Puste pole** — jeden skan i gotowe. Nic nie ginie, więc nie ma o co pytać.
+- **Kartoteka ma już kod** — arkusz pokazuje `STARY → NOWY` i pyta wprost, bo
+  stary kod zostaje na kartonach w hali i przestanie działać. Stary kod zapisuje
+  się w audycie, więc na pytanie „czemu ten karton się nie skanuje" da się
+  odpowiedzieć.
+- **Kod należy do INNEJ kartoteki** — droga zamknięta, bez możliwości przejścia
+  potwierdzeniem. Nadanie wyprodukowałoby kolizję (§4.5), czyli dokładnie ten
+  defekt danych, który system mierzy i raportuje biuru. Próba jest przy okazji
+  **zapisywana do rejestru kolizji** — widać ją, zanim zatrzyma pracę w alejce.
+
+Zlanie dwóch ostatnich w jedno „na pewno?" byłoby najgorszym z uproszczeń:
+pytanie wygląda tak samo, a odpowiedź „tak" raz naprawia kartotekę, a raz psuje
+cudzą. Reguła siedzi w `:core` razem ze swoim testem.
+
+### Gdzie się to nadaje
+
+Dwa wejścia, oba w miejscu, w którym człowiek trzyma karton:
+
+- **karta towaru** — linia „EAN —" była końcem drogi, teraz jest przyciskiem;
+- **rozkładanie dostawy** — zeskanowany kod, którego kartoteka nie zna, zostaje
+  zapamiętany; po dotknięciu właściwej pozycji z listy pojawia się propozycja
+  nadania mu tego kodu. To jedyny moment, w którym wiadomo na pewno, że kod
+  i towar do siebie pasują.
+
+**Bez bufora offline** — świadomie, tak jak przesunięcie stanu. Pytanie „czy ten
+kod nie należy już do innej kartoteki" musi paść, gdy człowiek stoi przy półce
+i może odpowiedzieć, a nie godzinę później przy odbuforowaniu.
+
+---
+
+## 0.36.1 — 9 sierpnia 2026
+
+**Poprawka: ten sam towar na dwóch dostawach pokazywał stary adres.** Magazynier
+rozkładał pierwszą dostawę i nadawał towarowi nowy adres; w drugiej ten sam
+towar dalej wskazywał starą półkę.
+
+**[wymaga działania]** Nic. `git pull`, `npm ci`, `npm run build`, restart
+`wertis-api`. **Bez nowego APK** — cała poprawka siedzi po stronie serwera.
+
+### Przyczyny były dwie i każda osobno wystarczyła
+
+1. **Zamrożony snapshot.** `lok_oczekiwana` zapisywała się RAZ, przy otwarciu
+   dostawy. Dostawa otwarta wcześniej pokazywała stary adres już na zawsze —
+   także długo po tym, jak kartoteka w Subiekcie była poprawna.
+2. **Opóźnienie zapisu.** Nawet dostawa otwarta ZARAZ po odłożeniu widziała
+   stary adres: zapis leżał jeszcze w kolejce, worker go nie wykonał,
+   a read-model `sgt_towar` odświeża się dopiero przy kolejnej synchronizacji.
+
+### Skutek nie kończył się na złym adresie
+
+Rozjazd (§4.3) liczył się względem zamrożonej wartości, więc odłożenie towaru
+pod adresem **aktualnym** podnosiło fałszywy alarm ZAMIEŃ/DODAJ i dopisywało
+`location_mismatch` do raportu przepełnionych gniazd. Kolejność alejkowa idzie
+po tym samym polu, czyli trasa przez halę prowadziła do starej półki.
+
+Jedno działało dobrze i tak zostaje: **zduplikowany zapis do Subiekta nie
+powstawał** — odłożenie sprawdza przed zakolejkowaniem żywą kartotekę.
+
+### Co się zmieniło
+
+Snapshot ma sens dla danych DOKUMENTU (co i ile przyjechało) — tam chroni pracę
+przed korektą faktury w trakcie. Adres nie jest daną dokumentu, tylko kartoteki,
+i zamrażanie go nie chroniło niczego. Od teraz:
+
+- pozycja, której **nikt jeszcze nie ruszył**, bierze adres żywy: z kartoteki,
+  skorygowany o zapisy czekające w kolejce — ta sama zasada, którą stosuje już
+  karta towaru i zawartość regału;
+- pozycja **tknięta** zachowuje swój adres z chwili pracy, bo to zapis tego,
+  czego się wtedy spodziewaliśmy, i na nim stoi udokumentowany rozjazd;
+- pozycja **częściowo odłożona** też go zachowuje: reszta partii ma dojechać
+  tam, gdzie pojechała pierwsza połowa, a nie gonić kartotekę w połowie pracy.
+
+Cena jest jawna: gdy ktoś zmieni adres w trakcie czyjejś pracy, wiersz może
+przeskoczyć w kolejności. Przeskakuje jednak dokładnie wtedy, kiedy człowiek ma
+o tym wiedzieć, a alternatywą jest wysłanie go do złego regału.
+
+Zaufanie do kolejki jest **skończone w czasie** (dwa cykle importu). Bez tego
+zadanie wykonane tydzień temu przebijałoby w nieskończoność adres zmieniony
+potem ręcznie w Subiekcie.
+
+---
+
 ## 0.36.0 — 9 sierpnia 2026
 
 **Biuro wchodzi w fakturę.** Kliknięcie dostawy w podglądzie pokazuje jej

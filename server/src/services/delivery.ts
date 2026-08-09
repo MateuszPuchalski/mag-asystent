@@ -8,6 +8,7 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
+import { aliasKodu } from "./ean-alias.js";
 import { freshLock, lockedByOther } from "./locks.js";
 import type {
   DeliveryDocument,
@@ -189,6 +190,125 @@ export function porownajAlejkowo(
   return a.locExpected.localeCompare(b.locExpected) || a.sym.localeCompare(b.sym);
 }
 
+/* ── Adres oczekiwany: co jest snapshotem, a co nie ──────────────────────────
+   POWSTAŁO PO ZGŁOSZENIU Z HALI: ten sam towar na dwóch dostawach. Magazynier
+   rozkłada pierwszą i nadaje nowy adres; w drugiej dostawie ten towar dalej
+   pokazuje STARY. Przyczyny są dwie i każda osobno wystarczy:
+
+     1. `lok_oczekiwana` zapisywała się RAZ, przy otwarciu dostawy. Dostawa
+        otwarta wcześniej pokazywała stary adres już na zawsze — także długo po
+        tym, jak kartoteka w Subiekcie była poprawna.
+     2. Nawet dostawa otwarta ZARAZ po odłożeniu widziała stary adres, bo zapis
+        leżał jeszcze w kolejce: worker go nie wykonał, a read-model `sgt_towar`
+        odświeża się dopiero przy kolejnej synchronizacji z MSSQL.
+
+   Skutek nie kończył się na złym adresie. Rozjazd (§4.3) liczył się względem
+   zamrożonej wartości, więc odłożenie towaru pod adresem AKTUALNYM podnosiło
+   fałszywy alarm ZAMIEŃ/DODAJ i zapisywało `location_mismatch` do raportu
+   przepełnionych gniazd. Kolejność alejkowa też idzie po tym polu, czyli trasa
+   prowadziła do starej półki.
+
+   ROZSTRZYGNIĘCIE. Snapshot ma sens dla danych DOKUMENTU (co i ile przyjechało)
+   — tam chroni pracę przed korektą faktury w trakcie. Adres nie jest daną
+   dokumentu, tylko kartoteki, i zamrażanie go nie chroniło niczego. Dlatego:
+
+     - pozycja, której NIKT jeszcze nie ruszył, bierze adres ŻYWY,
+     - pozycja tknięta zachowuje swój snapshot, bo to zapis tego, czego
+       spodziewaliśmy się w chwili wykonywania pracy.
+
+   Cena jest jawna: gdy ktoś zmieni adres w trakcie czyjejś pracy, wiersz może
+   przeskoczyć w kolejności. Przeskakuje jednak dokładnie wtedy, kiedy człowiek
+   ma o tym wiedzieć, a alternatywą jest wysłanie go do złego regału.          */
+
+/** Statusy zadania kolejki, które jeszcze NIE dotarły do Subiekta. */
+const LOC_W_TOKU = ["pending", "processing", "waiting_for_doc", "error"];
+
+/**
+ * Jak długo po wykonaniu zadania ufamy jeszcze KOLEJCE, a nie kartotece.
+ *
+ * Zadanie `done` zapisało się do Subiekta, ale read-model `sgt_towar` dowiaduje
+ * się o tym dopiero przy kolejnym imporcie. W tym oknie kartoteka mówi starą
+ * prawdę i to ona jest źródłem przyczyny nr 2. Okno musi być dłuższe niż cykl
+ * importu (stąd dwukrotność) i skończone, żeby zadanie sprzed tygodnia nie
+ * nadpisywało w nieskończoność adresu zmienionego potem ręcznie w Subiekcie.
+ */
+const oknoPoZapisieMs = () => 2 * config.mssql.syncMs;
+
+interface ZadanieAdresu {
+  tw_id: number;
+  payload: string;
+}
+
+/**
+ * Adres oczekiwany dla kompletu towarów — kartoteka skorygowana o kolejkę.
+ *
+ * Ta sama zasada, którą stosuje już karta towaru i zawartość regału: pokazujemy
+ * to, co BĘDZIE w Subiekcie, bo zapis jest tylko opóźniony, nie niepewny.
+ * Zadanie w błędzie też się liczy — towar fizycznie leży tam, gdzie ktoś go
+ * położył, niezależnie od tego, czy zapis przeszedł.
+ */
+export function adresyOczekiwane(twIds: number[]): Map<number, string | null> {
+  const out = new Map<number, string | null>();
+  if (twIds.length === 0) return out;
+
+  for (const [twId, pole] of subiekt.lokalizacjeDlaTowarow(twIds)) {
+    out.set(twId, pickingLoc(pole));
+  }
+  for (const twId of twIds) if (!out.has(twId)) out.set(twId, null);
+
+  const dziury = twIds.map(() => "?").join(",");
+  const luki = LOC_W_TOKU.map(() => "?").join(",");
+  const swiezo = new Date(Date.now() - oknoPoZapisieMs()).toISOString();
+  /* Ostatnie zadanie wygrywa — wcześniejsze i tak zostanie przez nie nadpisane.
+     `ORDER BY id` plus nadpisywanie w pętli daje ten sam wynik co „ostatnie per
+     towar", bez okna analitycznego. */
+  const zadania = db()
+    .prepare(
+      `SELECT tw_id, payload FROM sfera_queue
+       WHERE type='set_location' AND tw_id IN (${dziury})
+         AND (status IN (${luki}) OR (status='done' AND processed_at >= ?))
+       ORDER BY id`
+    )
+    .all(...twIds, ...LOC_W_TOKU, swiezo) as unknown as ZadanieAdresu[];
+
+  for (const z of zadania) {
+    try {
+      const cel = pickingLoc((JSON.parse(z.payload) as { newValue?: string }).newValue ?? "");
+      if (cel) out.set(z.tw_id, cel);
+    } catch {
+      // zadanie z popsutym payloadem nie ma prawa zepsuć adresu całej listy
+    }
+  }
+  return out;
+}
+
+/**
+ * Czy tej pozycji nikt jeszcze nie ruszył — tylko taka bierze adres żywy.
+ *
+ * `partial` NIE jest nietknięta: część partii już gdzieś leży i reszta ma
+ * dojechać tam samo, więc adres z chwili pierwszego odłożenia jest tu
+ * właściwą odpowiedzią, a nie przeszkodą.
+ */
+export const pozycjaNietknieta = (r: { status: string; ilosc_odlozona: number }): boolean =>
+  r.status === "todo" && (r.ilosc_odlozona ?? 0) === 0;
+
+/**
+ * Adres oczekiwany JEDNEJ linii — żywy dla nietkniętej, snapshot dla reszty.
+ *
+ * Jedno miejsce dla wszystkich czytelników (lista, skan towaru, wykrywanie
+ * rozjazdu, podgląd biura). Cztery własne warianty tej reguły rozjechałyby się
+ * przy pierwszej poprawce, a objawem byłby inny adres na liście niż w panelu.
+ */
+export function adresLinii(r: {
+  tw_id: number;
+  status: string;
+  ilosc_odlozona: number;
+  lok_oczekiwana: string | null;
+}): string | null {
+  if (!pozycjaNietknieta(r)) return r.lok_oczekiwana;
+  return adresyOczekiwane([r.tw_id]).get(r.tw_id) ?? null;
+}
+
 /**
  * Otwórz (lub wznów) rozkładanie dokumentu. Pozycje są snapshotowane w chwili
  * otwarcia — jeśli księgowość zmieni FZ w trakcie, praca się nie rozjeżdża.
@@ -265,24 +385,30 @@ export function getDelivery(id: number): DeliveryView | undefined {
      SUROWE, bez korekty o kolejkę: przy półce liczy się to, co fizycznie
      stoi w regale, a nie to, co czeka na zapis do Subiekta. Rezerwacje też
      są tu nieistotne — towar zarezerwowany nadal zajmuje miejsce. */
-  const stany = subiekt.stanyDlaTowarow(rows.map((r) => r.tw_id as number));
+  const twIds = rows.map((r) => r.tw_id as number);
+  const stany = subiekt.stanyDlaTowarow(twIds);
+  // pozycja nietknięta bierze adres ŻYWY — powód i cena przy `adresyOczekiwane`
+  const adresy = adresyOczekiwane(twIds);
 
   const lines: DeliveryLineView[] = rows
-    .map((r) => ({
-      id: r.id,
-      twId: r.tw_id,
-      sym: r.tw_symbol,
-      name: r.tw_nazwa,
-      qtyDoc: r.ilosc_dok,
-      qtyDone: r.ilosc_odlozona,
-      locExpected: r.lok_oczekiwana,
-      locActual: r.lok_faktyczna,
-      status: r.status,
-      stanMag: stany.get(r.tw_id)?.mag ?? 0,
-      stanMgp: stany.get(r.tw_id)?.mgp ?? 0,
-      /** litera alejki — nagłówek sekcji na liście */
-      aisle: r.lok_oczekiwana ? String(r.lok_oczekiwana)[0] : null,
-    }))
+    .map((r) => {
+      const oczekiwany = pozycjaNietknieta(r) ? adresy.get(r.tw_id) ?? null : r.lok_oczekiwana;
+      return {
+        id: r.id,
+        twId: r.tw_id,
+        sym: r.tw_symbol,
+        name: r.tw_nazwa,
+        qtyDoc: r.ilosc_dok,
+        qtyDone: r.ilosc_odlozona,
+        locExpected: oczekiwany,
+        locActual: r.lok_faktyczna,
+        status: r.status,
+        stanMag: stany.get(r.tw_id)?.mag ?? 0,
+        stanMgp: stany.get(r.tw_id)?.mgp ?? 0,
+        /** litera alejki — nagłówek sekcji na liście */
+        aisle: oczekiwany ? String(oczekiwany)[0] : null,
+      };
+    })
     .sort(porownajAlejkowo);
 
   // linia z problemem wychodzi z rutyny alejkowej (żyje dalej na liście wyjątków),
@@ -329,6 +455,16 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   if (candidates.length === 0) {
     const bySym = subiekt.getProductBySymbol(code);
     if (bySym) candidates = [bySym];
+  }
+  if (candidates.length === 0) {
+    /* Kod nadany w WERTIS — FURTKA, sprawdzana dopiero, gdy kartoteka nie zna
+       kodu ani jako EAN, ani jako symbol (0.37.0). Bez niej kod nadany przy
+       jednej dostawie nie działałby przy następnej, dopóki worker i import nie
+       przepchną go do Subiekta — czyli dokładnie tam, gdzie ktoś go nadał, żeby
+       działał od razu. */
+    const alias = aliasKodu(code);
+    const t = alias ? subiekt.getProductById(alias.twId) : undefined;
+    if (t) candidates = [t];
   }
   if (candidates.length === 0) return { kind: "unknown", code };
 
@@ -423,6 +559,10 @@ function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line:
      panelu odkładania — stan musi tu być, inaczej panel pokazywałby zera do
      najbliższego odświeżenia całej dostawy. Jeden towar, jedno zapytanie. */
   const stan = subiekt.stanyDlaTowarow([line.tw_id]).get(line.tw_id);
+  /* Adres liczy się TU tak samo jak na liście — to jest ekran, na który
+     magazynier patrzy przed pójściem do regału, więc rozjazd tych dwóch dróg
+     wysyłałby go gdzie indziej, niż pokazywała lista sekundę wcześniej. */
+  const oczekiwany = adresLinii(line);
   return {
     kind: "line",
     line: {
@@ -432,12 +572,12 @@ function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line:
       name: p.nazwa,
       qtyDoc: line.ilosc_dok,
       qtyDone: line.ilosc_odlozona,
-      locExpected: line.lok_oczekiwana,
+      locExpected: oczekiwany,
       locActual: line.lok_faktyczna,
       status: line.status,
       stanMag: stan?.mag ?? 0,
       stanMgp: stan?.mgp ?? 0,
-      aisle: line.lok_oczekiwana ? String(line.lok_oczekiwana)[0] : null,
+      aisle: oczekiwany ? String(oczekiwany)[0] : null,
     },
   };
 }
@@ -483,7 +623,12 @@ export function putawayLine(
 
   const doneQty = line.ilosc_odlozona + putQty;
   const status = doneQty >= line.ilosc_dok ? "done" : "partial";
-  const mismatch = !!line.lok_oczekiwana && line.lok_oczekiwana !== code;
+  /* Rozjazd liczymy względem adresu, KTÓRY MAGAZYNIER MIAŁ NA EKRANIE, czyli
+     żywego dla pozycji nietkniętej. Porównanie z zamrożonym snapshotem pytało
+     ZAMIEŃ/DODAJ przy odłożeniu pod adresem AKTUALNYM i zaśmiecało raport
+     przepełnionych gniazd fałszywym `location_mismatch`. */
+  const oczekiwany = adresLinii(line);
+  const mismatch = !!oczekiwany && oczekiwany !== code;
 
   // zapis lokalizacji do SGT — tylko gdy faktycznie się zmienia
   const t = subiekt.getProductById(line.tw_id);
@@ -529,14 +674,14 @@ export function putawayLine(
     qtyPo: doneQty,
     qty: putQty,
     location: code,
-    expected: line.lok_oczekiwana,
+    expected: oczekiwany,
     status,
   });
   if (mismatch) {
     // częstotliwość per lokalizacja = raport o przepełnionych gniazdach
     logEvent("location_mismatch", user, line.tw_id, {
       lineId,
-      expected: line.lok_oczekiwana,
+      expected: oczekiwany,
       actual: code,
     });
   }

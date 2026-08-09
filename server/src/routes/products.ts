@@ -4,7 +4,9 @@ import { autorOperacji, subiekt, userOf } from "../context.js";
 import { sciezkaZdjecia, zapewnijZdjecie } from "../services/zdjecia.js";
 import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
-import { enqueueSetLocation } from "../services/queue.js";
+import { enqueueSetEan, enqueueSetLocation } from "../services/queue.js";
+import { aliasKodu, bladKodu, ktoMaTenKod, zapiszAlias, zdejmijAlias } from "../services/ean-alias.js";
+import { recordEanConflict } from "../services/ean.js";
 import { logEvent, productHistory } from "../services/events.js";
 import {
   validateLocationCode,
@@ -96,6 +98,15 @@ export async function productRoutes(app: FastifyInstance) {
     if (scan.kind === "EAN") {
       const p = subiekt.getProductByEan(scan.code);
       if (p) return { type: "product", card: buildProductCard(subiekt, p.tw_id) };
+      /* FURTKA, NIE PIERWSZEŃSTWO. Kod nadany u nas sprawdzamy dopiero, gdy
+         kartoteka nie zna go wcale (0.37.0). Odwrotna kolejność znaczyłaby, że
+         kod nadany przy półce przykrywa kod z Subiekta — czyli że magazynier
+         cicho nadpisuje dane, których nie widzi. */
+      const alias = aliasKodu(scan.code);
+      if (alias) {
+        const card = buildProductCard(subiekt, alias.twId);
+        if (card) return { type: "product", card };
+      }
       return { type: "notfound", code: scan.code };
     }
     const bySym = subiekt.getProductBySymbol(scan.code);
@@ -211,6 +222,86 @@ export async function productRoutes(app: FastifyInstance) {
           zrodlo: "karta",
         });
       }
+      return { queueId };
+    }
+  );
+
+  /**
+   * Nadanie kodu kreskowego kartotece (0.37.0) → zadanie `set_ean`.
+   *
+   * POWSTAŁO Z SYTUACJI PRZY REGALE: karton ma kod, kartoteka go nie ma, a
+   * jedyną drogą było „zapamiętaj i powiedz biuru" — czyli nazajutrz ten sam
+   * karton zatrzymywał pracę drugi raz.
+   *
+   * Dwa tryby i to jest decyzja, nie wygoda:
+   *   UZUPEŁNIENIE (pole puste) przechodzi od razu — nic nie ginie;
+   *   PODMIANA wymaga `potwierdzone: true`, bo nadpisuje dane, których
+   *   magazynier nie widzi w całości, a stary kod zostaje na kartonach w hali.
+   * Odpowiedź 409 niesie stary kod, żeby kolektor mógł pokazać STARY → NOWY
+   * i dopiero wtedy poprosić o potwierdzenie.
+   *
+   * Kod zajęty przez INNĄ kartotekę jest odmawiany bezwarunkowo (409): nadanie
+   * go wyprodukowałoby własnoręcznie kolizję (§4.5), którą ten system mierzy
+   * i raportuje jako defekt danych.
+   */
+  app.post<{ Params: { twId: string }; Body: { ean?: string; potwierdzone?: boolean } }>(
+    "/api/products/:twId/ean",
+    async (req, reply) => {
+      const twId = Number(req.params.twId);
+      const p = subiekt.getProductById(twId);
+      if (!p) return reply.code(404).send({ error: "Nie znaleziono towaru" });
+
+      const kod = (req.body?.ean ?? "").trim();
+      const bladWalidacji = bladKodu(kod);
+      if (bladWalidacji) return reply.code(400).send({ error: bladWalidacji });
+
+      const zajety = ktoMaTenKod(kod);
+      if (zajety && zajety.twId !== twId) {
+        /* Kolizja ZAPISUJE SIĘ do rejestru, nie tylko odmawia. Próba nadania
+           zajętego kodu jest tym samym defektem danych, który mierzymy przy
+           skanowaniu — a tu widać go, ZANIM zatrzyma pracę w alejce. */
+        recordEanConflict(kod, [zajety.twId, twId], false);
+        const inny = subiekt.getProductById(zajety.twId);
+        return reply.code(409).send({
+          error: `Kod ${kod} należy już do ${inny?.symbol ?? zajety.twId}` +
+            (inny?.nazwa ? ` (${inny.nazwa})` : ""),
+          powod: "zajety",
+          twIdKolidujacy: zajety.twId,
+          symKolidujacy: inny?.symbol ?? "",
+        });
+      }
+      if (zajety && zajety.twId === twId) {
+        // ten sam kod na tej samej kartotece — nie ma czego zapisywać
+        return { queueId: null, bezZmian: true };
+      }
+
+      const eanPrzed = (p.ean ?? "").trim();
+      if (eanPrzed && !req.body?.potwierdzone) {
+        return reply.code(409).send({
+          error: `Kartoteka ma już kod ${eanPrzed}. Podmiana wymaga potwierdzenia.`,
+          powod: "podmiana",
+          eanPrzed,
+        });
+      }
+
+      const autor = autorOperacji(req);
+      const queueId = enqueueSetEan(
+        twId,
+        kod,
+        {
+          createdBy: autor.nazwa,
+          createdByRef: autor.ref,
+          twId,
+          label: "Kod kreskowy · " + p.symbol,
+          detail: eanPrzed ? `${eanPrzed} → ${kod}` : kod,
+        },
+        { eanPrzed, zrodlo: "karta", wyslanePrzez: autor.wyslanePrzez }
+      );
+
+      /* Alias zapisujemy PO zakolejkowaniu, żeby nieść `queueId`: gdy Subiekt
+         odmówi zapisu, pytanie brzmi „które zadanie stoi w błędzie". */
+      if (eanPrzed) zdejmijAlias(eanPrzed);
+      zapiszAlias(kod, twId, eanPrzed || null, queueId, autor.nazwa);
       return { queueId };
     }
   );

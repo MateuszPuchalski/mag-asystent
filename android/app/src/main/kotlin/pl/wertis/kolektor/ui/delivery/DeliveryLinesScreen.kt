@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.ui.product.EanSheet
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.adresWiersza
@@ -151,6 +152,13 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     /* Pole ręcznego wpisu otwarte per DOSTAWA, nie per pozycja: seria przy
        zniszczonych etykietach nie wymaga ponownego tapnięcia co pozycję. */
     var manualOpen by remember(id) { mutableStateOf(false) }
+    /* Ostatni kod, którego kartoteka nie zna. Trzymany PER DOSTAWA, bo tak
+       wygląda ta sytuacja: karton z nieczytelną albo brakującą etykietą leży na
+       palecie i człowiek szuka jego pozycji na liście. Kod przeżywa to szukanie,
+       żeby dało się go nadać, gdy pozycja się znajdzie. */
+    var nieznanyKod by remember(id) { mutableStateOf<String?>(null) }
+    /** Otwarty arkusz nadania kodu — dla której pozycji. */
+    var eanDla by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     /** Zgłoszenie wyjątku; `line` = null → problem całej dostawy (D8). */
     var problemFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     var problemOpen by remember(id) { mutableStateOf(false) }
@@ -191,10 +199,19 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 }
                 is ScanResolution.Unknown -> {
                     graph.feedback.beep(false)
-                    // druga połowa zdania to jedyna wskazówka, że nieczytelna
-                    // etykieta TOWARU nie zatrzymuje pracy — wybór z listy
-                    // robi dokładnie to samo co skan
-                    graph.effects.toast("Nieznany kod: ${r.code} — dotknij pozycji na liście, aby ją wybrać")
+                    /* Nieznany kod ZAPAMIĘTUJEMY (0.37.0). Człowiek stoi
+                       z kartonem, którego kartoteka nie zna, i to jest jedyny
+                       moment, w którym da się ten kod nadać — potem zostanie
+                       tylko wspomnienie. Rozwinięcie pozycji z listy pokaże
+                       przycisk z tym właśnie kodem.
+
+                       Druga połowa zdania zostaje: nieczytelna etykieta TOWARU
+                       nie zatrzymuje pracy, bo wybór z listy robi to samo co
+                       skan. */
+                    nieznanyKod = r.code
+                    graph.effects.toast(
+                        "Nieznany kod: ${r.code} — dotknij pozycji na liście, aby ją wybrać albo nadać mu ten kod"
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -502,6 +519,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                             scope.launch { putaway(line, code, recznie = true) }
                         }
                     },
+                    nieznanyKod = nieznanyKod,
+                    onNadajEan = { eanDla = line },
                     onTap = {
                         if (active?.id == line.id) zwolnij(line)
                         else scope.launch { resolveProduct(line.sym) }
@@ -585,6 +604,29 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         )
     }
 
+    /* Nadanie kodu kartotece, która go nie ma (0.37.0). Wejście jest wyłącznie
+       z rozwiniętej pozycji i wyłącznie po zeskanowaniu nieznanego kodu —
+       wtedy człowiek trzyma karton i wie na pewno, że kod i towar do siebie
+       pasują. `eanKartoteki` jest puste, bo linia dostawy nie niesie kodu:
+       skoro skan nie trafił, kartoteka albo go nie ma, albo ma inny, i to
+       serwer rozstrzygnie, czy to uzupełnienie, czy podmiana. */
+    eanDla?.let { line ->
+        EanSheet(
+            graph = graph,
+            twId = line.twId,
+            sym = line.sym,
+            nazwa = line.name,
+            eanKartoteki = "",
+            kodStartowy = nieznanyKod ?: "",
+            onClose = { eanDla = null },
+            onZapisano = {
+                eanDla = null
+                nieznanyKod = null
+                graph.effects.toast("Kod nadany — od teraz skan otwiera tę pozycję")
+            },
+        )
+    }
+
     // kolizja EAN — operacja stoi, aplikacja nigdy nie wybiera pierwszego (D7)
     conflict?.let { candidates ->
         EanConflictSheet(
@@ -624,6 +666,9 @@ private fun LineRow(
     /** Czy stan na hali zawiera już tę dostawę — patrz `PanelOdkladania`. */
     stanZawieraDostawe: Boolean,
     onRecznie: (String) -> Unit,
+    /** Kod bez kartoteki zeskanowany w tej dostawie — propozycja nadania go. */
+    nieznanyKod: String?,
+    onNadajEan: () -> Unit,
     onTap: () -> Unit,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
@@ -774,6 +819,8 @@ private fun LineRow(
                     onManualOpen = onManualOpen,
                     stanZawieraDostawe = stanZawieraDostawe,
                     onRecznie = onRecznie,
+                    nieznanyKod = nieznanyKod,
+                    onNadajEan = onNadajEan,
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
                     onPrzesun = onPrzesun,
@@ -826,6 +873,9 @@ private fun PanelOdkladania(
     stanZawieraDostawe: Boolean,
     /** Ręcznie wpisany kod półki — zniszczona etykieta nie może blokować pozycji. */
     onRecznie: (String) -> Unit,
+    /** Kod bez kartoteki zeskanowany w tej dostawie — propozycja nadania go. */
+    nieznanyKod: String?,
+    onNadajEan: () -> Unit,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
     /** null = dostawa księgowana wprost na halę, nie ma czego przesuwać. */
@@ -897,6 +947,24 @@ private fun PanelOdkladania(
         ) {
             Icon(WIcons.Pin, null, tint = InkSoft, modifier = Modifier.size(18.dp))
             Text("zeskanuj etykietę lokalizacji", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = InkSoft)
+        }
+        /* Kod, którego kartoteka nie znała, zeskanowany chwilę temu w tej
+           dostawie (0.37.0). Propozycja pojawia się TYLKO tutaj i tylko gdy
+           taki kod padł: człowiek stoi z tym kartonem i właśnie znalazł jego
+           pozycję na liście, więc to jedyny moment, w którym wie na pewno, że
+           kod i towar do siebie pasują. */
+        nieznanyKod?.let { kod ->
+            Text(
+                "Nadaj temu towarowi zeskanowany kod $kod…",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AmberDark,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClick = onNadajEan)
+                    .wrapContentHeight(),
+            )
         }
         /* Zniszczona etykieta nie może blokować pozycji — ta sama furtka co na
            ekranie zmiany lokalizacji, za tym samym przełącznikiem serwera

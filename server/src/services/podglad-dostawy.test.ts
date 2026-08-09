@@ -45,7 +45,13 @@ const ile = (tabela: string) =>
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["problem", "delivery_line", "delivery", "sgt_pozycja", "sgt_dokument", "sgt_towar"]) {
+  /* `sfera_queue` MUSI tu być: adres oczekiwany pozycji nietkniętej idzie za
+     kolejką przed kartoteką, więc zadanie z poprzedniego testu przeciekałoby
+     do następnego jako adres nie wiadomo skąd. */
+  for (const t of [
+    "problem", "delivery_line", "delivery", "sfera_queue", "events",
+    "sgt_pozycja", "sgt_dokument", "sgt_towar",
+  ]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const towar = d.prepare(
@@ -214,13 +220,26 @@ test("postęp liczy wyjątek jako domknięty (D8)", () => {
 
 /* ── Snapshot zostaje snapshotem ──────────────────────────────────────────── */
 
-test("podgląd NIE odświeża adresu oczekiwanego z kartoteki", () => {
-  /* Kolektor pracuje na wartości z chwili otwarcia i na niej stoi wykrywanie
-     rozjazdu. Przeliczenie jej tutaj dałoby biuru inny adres oczekiwany niż
-     osobie przy półce — i to bez śladu, że to dwie różne liczby. */
+test("pozycja NIETKNIĘTA idzie za kartoteką", () => {
+  /* Do 0.36.1 adres zamrażał się przy otwarciu dostawy i biuro oglądało go
+     nieaktualnym choćby przez tydzień. Tu obowiązuje ta sama reguła co na
+     kolektorze — inaczej dwa ekrany pokazywałyby dwie różne półki, żaden nie
+     mówiąc, że to dwie różne liczby. */
   otworz("LS51-139");
   db().prepare("UPDATE sgt_towar SET lokalizacja='Z99-09-09' WHERE tw_id=?").run(GAZNIK);
-  assert.equal(linia("LS51-139").locExpected, "A01-02-03");
+  assert.equal(linia("LS51-139").locExpected, "Z99-09-09");
+});
+
+test("pozycja TKNIĘTA zachowuje adres z chwili pracy", () => {
+  /* Odwrotna strona tej samej reguły: gdy praca już się odbyła, oczekiwany
+     adres jest zapisem tego, czego spodziewaliśmy się WTEDY. Przeliczenie go
+     zacierałoby rozjazd, który właśnie ta pozycja udokumentowała. */
+  const { lineId } = otworz("LS51-139");
+  D.putawayLine(lineId, "B02-01-01", "Jan Kowalski");
+  db().prepare("UPDATE sgt_towar SET lokalizacja='Z99-09-09' WHERE tw_id=?").run(GAZNIK);
+  const l = linia("LS51-139");
+  assert.equal(l.locExpected, "A01-02-03");
+  assert.equal(l.mismatch, true);
 });
 
 test("podgląd otwartej dostawy nie kasuje niczego ze snapshotu", () => {

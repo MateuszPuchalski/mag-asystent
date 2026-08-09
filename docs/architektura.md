@@ -23,7 +23,14 @@ Przez kolejkę i osobne procesy:
 | co | gdzie | kiedy |
 |---|---|---|
 | pole lokalizacji na kartotece | `tw__Towar.tw_Pole1` (konfigurowalne) | po skanie regału |
+| podstawowy kod kreskowy | `tw__Towar.tw_PodstKodKresk` (0.37.0) | gdy człowiek nada go kartotece |
 | dokument MM | Sfera COM (`sfera-worker/`) | tylko przy `SFERA_WORKER=1` |
+
+Kod kreskowy rozszerzył tę listę z jednej pozycji do dwóch i było to świadome:
+magazynier stojący z kartonem, którego kodu kartoteka nie zna, nie miał gdzie go
+wpisać. Rozszerzenie kosztuje osobny `GRANT UPDATE` na tę jedną kolumnę, a bez
+niego funkcja **nie pada** — kod działa na kolektorze (tabela `ean_alias`),
+a zadanie czeka w kolejce ze statusem `error`.
 
 **Procesy Node nie robią żadnego `INSERT` do tabel dokumentów i nie modyfikują
 stanów.** Nie tworzą dokumentów, nie zmieniają ilości i nie ruszają cen.
@@ -67,7 +74,7 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 │ Worker (osobny      │    │    │ MSSQL Subiekta GT            │
 │ proces Node)        │────┼───▶│  odczyt: kartoteki, stany,   │
 │ pętla poll, retry,  │ UPDATE  │          dokumenty           │
-│ backoff             │    │    │  zapis: jedno pole (§1)      │
+│ backoff             │    │    │  zapis: dwa pola (§1)        │
 └─────────────────────┘    │    └──────────────▲───────────────┘
 ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐    │                   │ MM przez COM
   Worker Sfery (C#)   ◀────┘                   │ Sfery
@@ -165,7 +172,7 @@ pracuje na prawdziwej bazie, czy na demo.
 | interfejs | co robi | implementacje |
 |---|---|---|
 | `adapters/subiekt.ts` | **odczyt**: kartoteki, stany, dokumenty | `subiekt.seeded.ts` (SQLite z `products.json`), `subiekt.mssql.ts` (produkcja) |
-| `adapters/sfera.ts` | **zapis**: lokalizacja, MM | `sfera.dev.ts` (mutacja `sgt_*` — lokalizacja i MM), `sfera.sql.ts` (UPDATE w MSSQL — tylko lokalizacja, MM rzuca błąd) + `sfera-worker/` (C#/COM) — jedyna produkcyjna implementacja MM |
+| `adapters/sfera.ts` | **zapis**: lokalizacja, kod kreskowy, MM | `sfera.dev.ts` (mutacja `sgt_*` — lokalizacja i MM), `sfera.sql.ts` (UPDATE w MSSQL — lokalizacja i kod kreskowy, MM rzuca błąd) + `sfera-worker/` (C#/COM) — jedyna produkcyjna implementacja MM |
 
 Wybór adaptera jest **jednym przełącznikiem**: `SGT_MODE=seeded|mssql`. Adapter
 zapisu nie jest osobną decyzją — wynika ze źródła danych (`config.sferaMode`).
