@@ -77,6 +77,21 @@
     border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; font: inherit;
   }
   code.payload { font-size: 11px; color: var(--ink-soft); word-break: break-all; }
+
+  /* ── Panel pozycji dokumentu ───────────────────────────────────────────────
+     Zdjęcie ma stały rozmiar, żeby wiersze nie skakały w trakcie doładowywania
+     — kartoteki mają obrazki w różnych proporcjach, a lista dogrywa je po
+     kolei już po narysowaniu tabeli. */
+  #dostawy tr[data-dok] { cursor: pointer; }
+  #szczegolLinie td.kolFoto { width: 56px; }
+  .foto, .brakfoto { width: 48px; height: 48px; border-radius: 6px; display: block; }
+  .foto { object-fit: cover; border: 1px solid var(--border); }
+  .brakfoto {
+    border: 1px dashed var(--border); color: var(--ink-mute); font-size: 9px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+  }
+  .wyjatek { margin-top: 5px; font-size: 12px; }
+  .wyjatek img { max-width: 120px; border-radius: 6px; margin-top: 4px; display: block; }
 </style>
 </head>
 <body>
@@ -107,14 +122,23 @@
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
   <div id="widokDostawy" style="display:grid;gap:20px">
-    <section class="card">
+    <!-- Pozycje jednego dokumentu. Zasłania obie karty poniżej, zamiast
+         doklejać się pod nimi: to jest wejście W dokument, nie dodatek obok. -->
+    <section class="card" id="szczegol" hidden>
+      <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
+      <div id="szczegolNaglowek" style="margin-top:12px"></div>
+      <table id="szczegolLinie"></table>
+      <div id="szczegolBezLinii"></div>
+    </section>
+
+    <section class="card" id="kartaDostaw">
       <h2>DOSTAWY · STATUS ROZKŁADANIA</h2>
       <input class="szukaj" id="szukaj" placeholder="szukaj: numer albo dostawca">
       <table id="dostawy"></table>
       <p class="odswiezono" id="odswiezono"></p>
     </section>
 
-    <section class="card">
+    <section class="card" id="kartaReklamacji">
       <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI</h2>
       <p class="mute" style="margin-bottom:10px">
         FORMULARZ otwiera protokół do wydruku (ze zdjęciami dowodowymi). Dostawca
@@ -255,6 +279,8 @@ let kto = localStorage.getItem("wertis.kto") || "";
 let widok = localStorage.getItem("wertis.widok") || "dostawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
+/** Czy serwer w ogóle ma skąd brać zdjęcia kartotek (ustawiane z /api/health). */
+let zdjeciaWlaczone = false;
 
 async function api(sciezka, opts = {}) {
   const r = await fetch(sciezka, {
@@ -281,6 +307,13 @@ async function pobierz(sciezka, nazwa) {
 
 function wyloguj() {
   token = ""; kto = "";
+  // blob-URL-e zdjęć trzymamy przez całą sesję (patrz `dolozZdjecia`), więc to
+  // jest jedyne miejsce, w którym wolno je zwolnić
+  for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);
+  zdjecia.clear();
+  kolejkaFoto.length = 0;
+  sesjaPodgladu++;
+  zamknijDokument();
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
   $("panel").hidden = true; $("wyloguj").hidden = true;
@@ -308,6 +341,10 @@ async function zaloguj() {
 function pokaz(nowy) {
   widok = nowy;
   localStorage.setItem("wertis.widok", nowy);
+  /* Otwarty dokument to drill-down, nie widok — inaczej powrót na zakładkę
+     DOSTAWY pokazywałby fakturę sprzed kwadransa jako stan bieżący. Z tego
+     samego powodu stan panelu NIE idzie do localStorage. */
+  zamknijDokument();
   $("widokDostawy").hidden = nowy !== "dostawy";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
@@ -323,6 +360,11 @@ function pokaz(nowy) {
    czy serwer jest zdrowy, czy worker żyje, czy coś się nie zapisało i czy
    Subiekt zgadza się z tym, co zapisaliśmy. Kliknięcie prowadzi do szczegółu. */
 function rysujStan(health, kolejka) {
+  /* `/api/health` niesie sekcję `zdjecia` TYLKO wtedy, gdy funkcja jest w ogóle
+     włączona (`ZDJECIA_ZRODLO`). Na instalacji bez zdjęć kolumna z ramkami
+     „bez zdjęcia" przy każdej pozycji byłaby czystym szumem — mówiłaby
+     o brakującej kartotece, choć brakuje ustawienia. */
+  if (health) zdjeciaWlaczone = !!health.zdjecia;
   const kafle = [];
   const zle = health && health.ok === false;
   kafle.push(`<span class="badge ${zle ? "err" : "ok"}" data-do="nadzor">
@@ -360,18 +402,154 @@ function rysujDostawy() {
     .map((d) => {
       const total = d.linesTotal || d.positions;
       const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-      return `<tr>
+      return `<tr data-dok="${d.dokId}">
         <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
         <td>${esc(d.dostawca)}</td>
         <td class="mute">${esc(d.dataWyst)}</td>
         <td>${statusDostawy(d)}</td>
         <td><div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
             <span class="mute">${d.linesDone}/${total} poz.</span></td>
+        <td style="white-space:nowrap"><button class="akcja cichy" data-dok="${d.dokId}">POZYCJE</button></td>
       </tr>`;
     }).join("");
   $("dostawy").innerHTML =
-    "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>DATA</th><th>STATUS</th><th>POSTĘP</th></tr>" +
-    (rows || '<tr><td colspan="5" class="mute">Brak dostaw w oknie importu</td></tr>');
+    "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>DATA</th><th>STATUS</th><th>POSTĘP</th><th></th></tr>" +
+    (rows || '<tr><td colspan="6" class="mute">Brak dostaw w oknie importu</td></tr>');
+}
+
+/* ── Pozycje jednego dokumentu ────────────────────────────────────────────────
+   Pasek postępu mówił „12/30" i na tym się kończyło — biuro nie miało jak
+   sprawdzić, KTÓRE dwanaście, kto je odłożył ani gdzie faktycznie wylądowały.
+   Odpowiedź wymagała otwarcia Subiekta obok.
+
+   Wejść da się w KAŻDY dokument, także taki, którego nikt nie zaczął — wtedy
+   serwer liczy pozycje wprost z faktury i mówi o tym w nagłówku. Podgląd jest
+   CZYTANIEM: kliknięcie tutaj nie otwiera dostawy i nie zabiera nikomu blokad,
+   bo to zrobiłoby z patrzenia zmianę stanu magazynu.                          */
+let otwartyDok = null;
+/* Token unieważniający dogrywanie zdjęć. Wyjście z dokumentu w połowie
+   ładowania zostawiłoby wpisy lądujące w tabeli, której już nie ma. */
+let sesjaPodgladu = 0;
+/* Surowa odpowiedź z poprzedniego cyklu. Bez tego odpytywanie co pół minuty
+   przerysowywałoby tabelę, w której nic się nie zmieniło — gubiąc przewinięcie
+   i mrugając zdjęciami. */
+let ostatniSzczegol = "";
+
+function otworzDokument(dokId) {
+  otwartyDok = dokId;
+  ostatniSzczegol = "";
+  $("kartaDostaw").hidden = true;
+  $("kartaReklamacji").hidden = true;
+  $("szczegol").hidden = false;
+  $("szczegolNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
+  $("szczegolLinie").innerHTML = "";
+  $("szczegolBezLinii").innerHTML = "";
+  odswiezSzczegol();
+}
+
+function zamknijDokument() {
+  if (otwartyDok == null) return;
+  otwartyDok = null;
+  sesjaPodgladu++;              // to, co jeszcze leci, ma nie trafić do DOM
+  $("szczegol").hidden = true;
+  $("kartaDostaw").hidden = false;
+  $("kartaReklamacji").hidden = false;
+  odswiezDostawy();
+}
+
+async function odswiezSzczegol() {
+  const dok = otwartyDok;
+  try {
+    const tekst = await (await api(`/api/biuro/dokument/${dok}`)).text();
+    if (otwartyDok !== dok) return;
+    if (tekst === ostatniSzczegol) return;
+    ostatniSzczegol = tekst;
+    rysujSzczegol(JSON.parse(tekst));
+  } catch (e) {
+    $("szczegolNaglowek").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
+  }
+}
+
+function rysujSzczegol(d) {
+  const frac = d.progress.total ? Math.round((d.progress.done / d.progress.total) * 100) : 0;
+  const prognoza = d.zrodlo === "podglad"
+    ? '<p class="mute">Nikt jeszcze nie otwierał tego dokumentu — to pozycje z faktury, tak jak zobaczy je kolektor.</p>'
+    : "";
+  $("szczegolNaglowek").innerHTML = `
+    <div class="b" style="font-size:16px">${esc(d.nrPelny)}
+      ${d.wBuforze ? '<span class="badge amber">bufor</span>' : ""}
+      ${d.wPrzyjeciach ? '<span class="badge amber">w przyjęciach</span>' : ""}
+      ${statusDostawy(d)}</div>
+    <div class="mute">${esc(d.dostawca)} · ${esc(d.dataWyst)}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
+      <span class="mute">${d.progress.done}/${d.progress.total} poz.${
+        d.progress.problems ? ` · ${d.progress.problems} z wyjątkiem` : ""}</span>
+    </div>
+    ${prognoza}`;
+
+  const kolumn = zdjeciaWlaczone ? 6 : 5;
+  $("szczegolLinie").innerHTML =
+    `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+    "<th>TOWAR</th><th>ILOŚĆ</th><th>LOKALIZACJA</th><th>STATUS</th><th>KTO ODŁOŻYŁ</th></tr>" +
+    (d.lines.map(wierszPozycji).join("") ||
+      `<tr><td colspan="${kolumn}" class="mute">Dokument nie ma pozycji do rozłożenia</td></tr>`);
+
+  /* Wyjątki bez linii to towar SPOZA dokumentu — nie mają w której pozycji
+     usiąść, a schowanie ich byłoby zgubieniem zgłoszenia. */
+  $("szczegolBezLinii").innerHTML = d.problemyBezLinii.length
+    ? `<h2 style="margin-top:18px">WYJĄTKI POZA POZYCJAMI DOKUMENTU</h2>` +
+      d.problemyBezLinii.map(wyjatek).join("")
+    : "";
+
+  dolozZdjecia(d);
+}
+
+function wierszPozycji(l) {
+  const frac = l.qtyDoc ? Math.min(100, Math.round((l.qtyDone / l.qtyDoc) * 100)) : 0;
+  const adres = l.mismatch
+    ? `<span class="badge err">${esc(l.locActual)}</span>
+       <div class="mute">zamiast ${esc(l.locExpected)}</div>`
+    : l.bezLokalizacji
+      ? '<span class="badge amber">BEZ LOKALIZACJI</span>'
+      : `<span class="b">${esc(l.locActual || l.locExpected)}</span>`;
+  const kto = l.doneBy
+    ? `${esc(l.doneBy)}<div class="mute">${esc(stempelLokalny(l.doneAt))}</div>`
+    : l.lockedBy
+      ? `<span class="badge amber">w rękach: ${esc(l.lockedBy)}</span>`
+      : '<span class="mute">—</span>';
+  return `<tr>
+    ${zdjeciaWlaczone ? `<td class="kolFoto" data-tw="${l.twId}"></td>` : ""}
+    <td><span class="b">${esc(l.sym)}</span><div class="mute">${esc(l.name)}</div>
+        ${l.problemy.map(wyjatek).join("")}</td>
+    <td>${esc(formatIlosc(l.qtyDone))}/${esc(formatIlosc(l.qtyDoc))}
+        <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div></td>
+    <td>${adres}</td>
+    <td>${statusPozycji(l.status)}</td>
+    <td>${kto}</td>
+  </tr>`;
+}
+
+function statusPozycji(s) {
+  if (s === "done") return '<span class="badge ok">ROZŁOŻONA</span>';
+  if (s === "partial") return '<span class="badge amber">CZĘŚCIOWO</span>';
+  if (s === "problem") return '<span class="badge err">WYJĄTEK</span>';
+  if (s === "skipped") return '<span class="badge mute2">POMINIĘTA</span>';
+  return '<span class="badge mute2">DO ZROBIENIA</span>';
+}
+
+/** Ilość bez sztucznych zer: 6 zamiast „6.00", ale 2.5 zostaje 2.5. */
+const formatIlosc = (n) => String(Math.round(Number(n) * 1000) / 1000);
+
+function wyjatek(p) {
+  return `<div class="wyjatek">
+    <span class="badge err">${esc(p.typLabel || p.typ)}</span>
+    ${p.qty != null ? `policzone: ${esc(formatIlosc(p.qty))}` : ""}
+    ${p.opis ? esc(p.opis) : ""}
+    <span class="mute">${esc(p.createdBy || "")} ${esc(stempelLokalny(p.createdAt))}</span>
+    ${p.resolvedAt ? '<span class="badge ok">rozwiązany</span>' : ""}
+    ${p.hasPhoto ? `<span data-foto="${p.id}"></span>` : ""}
+  </div>`;
 }
 
 /* ── Reklamacje ── */
@@ -613,6 +791,75 @@ async function fotoUrl(problemId) {
     const r = await api(`/api/problems/${problemId}/photo`);
     return URL.createObjectURL(await r.blob());
   } catch { return null; }
+}
+
+/* ── Zdjęcia w pozycjach dokumentu ────────────────────────────────────────────
+   Tą samą drogą co wyżej — zdjęcia kartotek też stoją za sesją. Trzy rzeczy
+   są tu jednak inne i każda ma swój powód:
+
+   1. TRZY POBRANIA NARAZ, nie czterdzieści. Przy pierwszym trafieniu serwer
+      ciągnie plik z Subiekta (`zapewnijZdjecie`) — tą samą drogą, z której
+      korzystają kolektory stojące przy regale. Otwarcie dużej dostawy nie ma
+      prawa ich zagłodzić.
+   2. BRAK ZDJĘCIA PAMIĘTAMY. Kartoteka bez obrazka odpowiada 404, a dokument
+      z czterdziestoma takimi pytałby czterdzieści razy co pół minuty, w kółko,
+      przez cały dzień.
+   3. BLOB-URL-E ŻYJĄ DO WYLOGOWANIA. Zwolnienie ich przy zamknięciu panelu
+      kasowałoby cache i kazało pobierać wszystko od nowa przy każdym wejściu
+      w ten sam dokument.                                                      */
+const zdjecia = new Map();      // klucz → blobUrl | null (null = na pewno brak)
+const kolejkaFoto = [];
+let pobieraczy = 0;
+const ROWNOLEGLE = 3;
+
+function dolozZdjecia(d) {
+  const moja = ++sesjaPodgladu;
+  const zadania = [];
+  for (const l of d.lines) {
+    if (zdjeciaWlaczone) {
+      zadania.push({ klucz: `t${l.twId}`, url: `/api/products/${l.twId}/zdjecie`,
+                     sel: `#szczegolLinie td.kolFoto[data-tw="${l.twId}"]`, klasa: "foto" });
+    }
+    for (const p of l.problemy) if (p.hasPhoto) zadania.push(zadanieDowodu(p));
+  }
+  for (const p of d.problemyBezLinii) if (p.hasPhoto) zadania.push(zadanieDowodu(p));
+
+  for (const z of zadania) {
+    if (zdjecia.has(z.klucz)) { wstawZdjecie(z, zdjecia.get(z.klucz)); continue; }
+    kolejkaFoto.push({ ...z, sesja: moja });
+  }
+  while (pobieraczy < ROWNOLEGLE && kolejkaFoto.length) pobieracz();
+}
+
+const zadanieDowodu = (p) => ({
+  klucz: `p${p.id}`, url: `/api/problems/${p.id}/photo`,
+  sel: `#szczegol [data-foto="${p.id}"]`, klasa: "",
+});
+
+async function pobieracz() {
+  pobieraczy++;
+  while (kolejkaFoto.length) {
+    const z = kolejkaFoto.shift();
+    // zadanie z poprzedniego dokumentu albo z poprzedniego przerysowania
+    if (z.sesja !== sesjaPodgladu) continue;
+    let url = zdjecia.get(z.klucz);
+    if (url === undefined) {
+      try { url = URL.createObjectURL(await (await api(z.url)).blob()); }
+      catch { url = null; }
+      zdjecia.set(z.klucz, url);
+    }
+    if (z.sesja !== sesjaPodgladu) continue;
+    wstawZdjecie(z, url);
+  }
+  pobieraczy--;
+}
+
+function wstawZdjecie(z, url) {
+  const cel = document.querySelector(z.sel);
+  if (!cel) return;
+  cel.innerHTML = url
+    ? `<img class="${z.klasa}" src="${url}" alt="">`
+    : z.klasa ? '<div class="brakfoto">bez zdjęcia</div>' : "";
 }
 
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
@@ -904,8 +1151,12 @@ async function odswiezNadzor() {
 
 async function odswiez() {
   await odswiezStan();
-  if (widok === "dostawy") await odswiezDostawy();
-  else if (widok === "nadzor") await odswiezNadzor();
+  if (widok === "dostawy") {
+    // przy otwartym dokumencie lista i reklamacje są schowane — odpytywanie ich
+    // byłoby pracą dla nikogo, a biuro chce widzieć postęp TEJ faktury na żywo
+    if (otwartyDok != null) await odswiezSzczegol();
+    else await odswiezDostawy();
+  } else if (widok === "nadzor") await odswiezNadzor();
 }
 
 function start() {
@@ -958,6 +1209,13 @@ $("reklamacje").addEventListener("click", (e) => {
   if (c) return pobierz(`/api/delivery/${c.dataset.csv}/problems.csv`,
     `reklamacja-${c.dataset.nr.replace(/[^\w-]+/g, "_")}.csv`);
 });
+$("dostawy").addEventListener("click", (e) => {
+  const w = e.target.closest("[data-dok]");
+  if (w) otworzDokument(Number(w.dataset.dok));
+});
+$("wrocDoListy").addEventListener("click", zamknijDokument);
+// panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") zamknijDokument(); });
 setInterval(() => { if (token) odswiez(); }, 30_000);
 
 if (token) start();
