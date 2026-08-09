@@ -52,6 +52,7 @@ import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.offline.PendingOp
 import pl.wertis.kolektor.core.offline.PutawayOp
+import pl.wertis.kolektor.core.session.userId
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.EanCandidate
