@@ -34,6 +34,9 @@ const padajacy = (msg = "Kartoteka w edycji"): SferaAdapter => ({
   applySetLocation: async () => {
     throw new Error(msg);
   },
+  applySetEan: async () => {
+    throw new Error(msg);
+  },
   createMM: async () => {
     throw new Error(msg);
   },
@@ -41,6 +44,7 @@ const padajacy = (msg = "Kartoteka w edycji"): SferaAdapter => ({
 
 const udany = (): SferaAdapter => ({
   applySetLocation: async () => {},
+  applySetEan: async () => {},
   createMM: async () => "MM 1/2026",
 });
 
@@ -93,6 +97,28 @@ test("MM zapisuje numer dokumentu zwrócony przez Sferę", async () => {
   const id = dodajZadanie("mm", payload);
   await K.przetworzZadanie({ id, type: "mm", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null, ...AUDYT }, udany());
   assert.equal(stan(id).sgt_doc_number, "MM 1/2026");
+});
+
+test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async () => {
+  /* `set_ean` to DRUGI typ zapisu do bazy firmy (0.37.0). Bez tego testu jego
+     literówka w dyspozytorze wyglądałaby jak „nieznany typ zadania" — czyli
+     zadanie w błędzie po trzech próbach, zamiast zapisu. */
+  const payload = { twId: 1, ean: "5901234123457" };
+  const zapisane: Array<[number, string]> = [];
+  const adapter: SferaAdapter = {
+    applySetLocation: async () => {},
+    applySetEan: async (twId, ean) => {
+      zapisane.push([twId, ean]);
+    },
+    createMM: async () => "MM 1/2026",
+  };
+  const id = dodajZadanie("set_ean", payload);
+  await K.przetworzZadanie(
+    { id, type: "set_ean", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null, ...AUDYT },
+    adapter,
+  );
+  assert.deepEqual(zapisane, [[1, "5901234123457"]]);
+  assert.equal(stan(id).status, "done");
 });
 
 test("nieznany typ zadania to błąd, nie ciche pominięcie", async () => {
