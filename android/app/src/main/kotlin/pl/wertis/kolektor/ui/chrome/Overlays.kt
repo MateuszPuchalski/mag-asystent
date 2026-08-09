@@ -91,6 +91,31 @@ fun SerwerBanner(widoczny: Boolean) {
     }
 }
 
+/**
+ * Niska bateria — pasek trwały, nie toast. Ostrzeżenie jednorazowe (2,6 s)
+ * nie dociera do człowieka na drabinie ani do nikogo, kto akurat nie patrzy;
+ * pasek wisi do wymiany baterii i gaśnie sam po powrocie powyżej progu.
+ */
+@Composable
+fun BateriaBanner(widoczny: Boolean) {
+    if (!widoczny) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AmberBg)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Niska bateria — wymień na zapasową",
+            color = AmberInk,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 @Composable
 fun OfflineBanner(count: Int, onFlush: () -> Unit) {
     if (count == 0) return
@@ -116,7 +141,9 @@ fun OfflineBanner(count: Int, onFlush: () -> Unit) {
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onFlush)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                // 48 dp na wysokość — jedyny przycisk banera musi trafiać się
+                // kciukiem w rękawicy, pasek i tak ma swój padding pionowy
+                .padding(horizontal = 12.dp, vertical = 14.dp),
         )
     }
 }

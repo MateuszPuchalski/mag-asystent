@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -127,20 +129,27 @@ fun ProductHero(
                    oznacza czynność: towar leży w przyjęciach, idź po niego.
                    Od 0.22.0 ta czynność jest wykonalna jednym dotknięciem —
                    wcześniej trzeba było otworzyć sesję kontenerową. */
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "rez. ${formatQty(p.mag.rez)} · razem ${formatQty(p.mag.stan)}",
                         fontSize = 11.sp,
                         color = InkSoft,
                     )
                     if (p.mgp.stan > 0) {
+                        /* Jedyne wejście w przesunięcie z MGP było celem
+                           wysokim na 15 dp — tekst 11 sp bez żadnego marginesu.
+                           40 dp to kompromis: rękawica trafia, a nagłówek nie
+                           puchnie o pełne 48. */
                         Text(
                             " · MGP ${formatQty(p.mgp.stan)} — PRZESUŃ",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AmberInk,
                             modifier = if (onPrzesunZMgp == null) Modifier
-                            else Modifier.clickable(onClick = onPrzesunZMgp),
+                            else Modifier
+                                .heightIn(min = 40.dp)
+                                .clickable(onClick = onPrzesunZMgp)
+                                .wrapContentHeight(),
                         )
                     }
                 }

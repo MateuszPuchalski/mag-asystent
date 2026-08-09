@@ -13,7 +13,14 @@ import kotlin.math.sin
 
 /* ── Sygnały skanu: beep + wibracja — port web/src/lib/feedback.ts ──────────
    OK: 1400 Hz + wibracja 40 ms; błąd: 320 Hz + wzór [60,40,60]. Ton ~160 ms
-   z wykładniczym wygaszeniem, syntetyzowany do AudioTrack (jak WebAudio).    */
+   z wykładniczym wygaszeniem, syntetyzowany do AudioTrack (jak WebAudio).
+
+   TRZY sygnały, nie dwa: „wybrano" (beep OK), „ZAPISANO" (dwa tony w górę)
+   i błąd. W hałasie hali sukces i błąd różniły się wyłącznie wysokością tonu
+   przy tej samej długości — a to właśnie zapis pozycji jest chwilą, w której
+   człowiek z kartonem NIE patrzy na ekran i musi wiedzieć bez patrzenia,
+   czy może iść dalej. Wibracje niosą tę samą trójkę: 1 impuls / 2 impulsy /
+   3 impulsy — rozróżnialne ręką przy wyłączonym dźwięku.                     */
 
 class Feedback(context: Context) {
     private val vibrator: Vibrator? =
@@ -26,9 +33,52 @@ class Feedback(context: Context) {
             context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
 
+    private val audio =
+        context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+
     fun beep(ok: Boolean = true) {
         playTone(if (ok) 1400.0 else 320.0)
         vibrate(ok)
+    }
+
+    /**
+     * Zapis PRZYJĘTY — odłożenie pozycji, adres, przesunięcie, zgłoszenie.
+     * Dwa tony w górę + dwa impulsy: sygnał końca operacji, nie jej kroku.
+     */
+    fun zapis() {
+        playTone(1400.0)
+        playTone(1900.0, opoznienieMs = 130)
+        val v = vibrator ?: return
+        runCatching {
+            v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 40, 70, 40), -1))
+        }
+    }
+
+    /**
+     * Alarm baterii — długi niski ton + mocna, długa wibracja. Toast na 2,6 s
+     * nie dociera do człowieka na drabinie; ten sygnał ma być czuty w kieszeni.
+     */
+    fun alarmBaterii() {
+        playTone(520.0)
+        playTone(520.0, opoznienieMs = 260)
+        val v = vibrator ?: return
+        runCatching {
+            v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300), -1))
+        }
+    }
+
+    /**
+     * Czy sygnały dźwiękowe są realnie niesłyszalne (urządzenie ściszone).
+     * Beep idzie strumieniem systemowym; sprawdzamy oba, po których ludzie
+     * ściszają kolektor. Wibracja zostaje, ale w rękawicy na wózku bywa jej
+     * za mało — ostrzeżenie mówi to raz, przy starcie.
+     */
+    fun scichniety(): Boolean {
+        val a = audio ?: return false
+        return runCatching {
+            a.getStreamVolume(android.media.AudioManager.STREAM_SYSTEM) == 0 &&
+                a.getStreamVolume(android.media.AudioManager.STREAM_MUSIC) == 0
+        }.getOrDefault(false)
     }
 
     private fun vibrate(ok: Boolean) {
@@ -45,9 +95,10 @@ class Feedback(context: Context) {
         }
     }
 
-    private fun playTone(freq: Double) {
+    private fun playTone(freq: Double, opoznienieMs: Long = 0) {
         thread(isDaemon = true, name = "wertis-beep") {
             try {
+                if (opoznienieMs > 0) Thread.sleep(opoznienieMs)
                 val sampleRate = 22050
                 val durationMs = 160
                 val samples = sampleRate * durationMs / 1000

@@ -111,6 +111,8 @@ class AppGraph(context: Context) {
         onLowBattery = { pct ->
             appScope.launch {
                 offlineQueue.flush() // wypchnij bufor, zanim bateria padnie / hot-swap
+                // sygnał czuty w kieszeni — toast nie dociera do człowieka na drabinie
+                feedback.alarmBaterii()
                 effects.toast("Niska bateria ($pct%) — wymień na zapasową")
                 runCatching { api.deviceEvent(DeviceEventBody(type = "battery_low", level = pct.toDouble())) }
             }

@@ -21,6 +21,8 @@ import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
+import androidx.compose.runtime.LaunchedEffect
+import pl.wertis.kolektor.ui.chrome.BateriaBanner
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
 import pl.wertis.kolektor.ui.chrome.SerwerBanner
 import pl.wertis.kolektor.ui.chrome.SuccessOverlay
@@ -52,6 +54,16 @@ fun AppRoot(graph: AppGraph) {
     val offlineCount by graph.offlineQueue.count.collectAsStateWithLifecycle()
     val serwerMilczy by graph.queueRepo.serwerMilczy.collectAsStateWithLifecycle()
     val online by graph.connectivity.online.collectAsStateWithLifecycle()
+    val niskaBateria by graph.batteryAssist.niska.collectAsStateWithLifecycle()
+
+    /* Raz na proces: kolektor ze ściszonym dźwiękiem daje tylko wibrację,
+       a w rękawicy na wózku bywa jej za mało. Powiedziane przy starcie,
+       nie przy każdym beepie — ściszenie bywa świadome (narada, telefon). */
+    LaunchedEffect(Unit) {
+        if (graph.feedback.scichniety()) {
+            graph.effects.toast("Kolektor jest ściszony — sygnały skanera będą tylko wibracją")
+        }
+    }
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
     val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -115,6 +127,7 @@ fun AppRoot(graph: AppGraph) {
         /* Tylko przy działającej sieci: bez niej to urządzenie jest odcięte,
            nie serwer — i wtedy mówi bufor offline, nie ten baner. */
         SerwerBanner(serwerMilczy && online)
+        BateriaBanner(niskaBateria)
         OfflineBanner(offlineCount) {
             scope.launch { graph.offlineQueue.flush() }
         }
