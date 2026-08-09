@@ -195,6 +195,23 @@ export const config = {
     ZWROTY: num(process.env.MAG_ID_ZWROTY, 3, "MAG_ID_ZWROTY"),
   },
 
+  /**
+   * Symbole kartotek, które na dokumencie NIE są towarem (CSV).
+   *
+   * Domyślnie `PRZESYŁKA` — wiersz „koszt transportu" stojący na części faktur
+   * zakupu. Nie ma go czym zeskanować ani gdzie położyć, więc wypada ze
+   * snapshotu dostawy w ogóle; uzasadnienie i cena tej decyzji stoją
+   * w `src/pomijane.ts`.
+   *
+   * Puste = funkcja wyłączona, wszystkie pozycje idą na listę jak dotąd.
+   * Porównanie ignoruje wielkość liter, polskie ogonki i myślniki (`zwin`),
+   * więc `przesylka` i `PRZESYŁKA` to jedno ustawienie.
+   */
+  pozycjeNieTowarowe: (process.env.POZYCJE_NIE_TOWAROWE ?? "PRZESYŁKA")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0),
+
   /** Limit długości pola tw_Lokalizacja (spec §5.2, COL_LENGTH; [WERYFIKUJ]). */
   locFieldLimit: num(process.env.LOC_FIELD_LIMIT, 50, "LOC_FIELD_LIMIT"),
 

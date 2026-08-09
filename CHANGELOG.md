@@ -28,6 +28,87 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.35.0 — 9 sierpnia 2026
+
+**Pięć poprawek z hali.** Faktury do dokończenia na górze listy, odłożona
+pozycja pokazuje adres, który dostała, stan magazynowy widać przy półce,
+odłożone schodzą na dół, a wiersz „koszt transportu" znika z rozkładania.
+
+**[wymaga działania]** Nic. `git pull`, `npm ci`, `npm run build`, restart
+`wertis-api` i `wertis-worker`. **Nowy APK potrzebny** — trzy z pięciu zmian
+siedzą w kolektorze.
+
+### Faktury do dokończenia na górze
+
+Lista dostaw szła dotąd po dacie dokumentu, więc rozgrzebana wczorajsza faktura
+lądowała pod dzisiejszymi, których nikt jeszcze nie tknął. Teraz porządek jest
+wprost o stanie pracy: **w toku → nowe → ukończone**, a wewnątrz grupy zostaje
+kolejność z serwera. Reguła mieszka w `:core` (`ListaDokumentow.kt`), bo
+„ukończona" to trzy różne rzeczy naraz — status dokumentu, licznik pozycji
+i sam fakt, że ktoś zaczął.
+
+### Odłożona pozycja pokazuje adres, który dostała
+
+Towar bez lokalizacji w kartotece, odłożony i opatrzony adresem, dalej wyświetlał
+**BRAK LOKALIZACJI**. Ekran czytał wyłącznie `locExpected` — snapshot z chwili
+otwarcia dostawy, celowo niezmienny, bo na nim stoi wykrywanie rozjazdu i
+kolejność listy. Brakowało drugiego pola: `locActual` mówi, gdzie towar
+NAPRAWDĘ wylądował, i to ono wygrywa na zamkniętej pozycji. „BRAK" zostaje
+zarezerwowany dla „jeszcze nigdzie".
+
+### Stan magazynowy przy półce
+
+Rozwinięty wiersz pokazuje, ile tego towaru już leży na hali i ile czeka
+w przyjęciach. Odpowiada na pytanie zadawane przy regale — „czy tego już tam
+coś nie ma" — bez schodzenia do karty towaru.
+
+Stan jest SUROWY, bez korekty o kolejkę i rezerwacje: przy półce liczy się to,
+co stoi fizycznie. Przy dostawie krajowej towar figuruje na MAG od zaksięgowania
+dokumentu, więc `stanMag` zawiera już to, co magazynier niesie w rękach —
+kolektor pisze o tym wprost („z tą dostawą"), zamiast liczyć za człowieka.
+
+### Odłożone pozycje schodzą na dół
+
+Odwrócona wcześniejsza decyzja i warto powiedzieć, czym za to płacimy. Do teraz
+odłożone pozycje zostawały na swoim miejscu, tylko zwężone — z obawy, że
+przenoszenie ich każe wierszom skakać po każdym zapisie. Praktyka pokazała drugą
+stronę: dziesięć zwiniętych pasków dalej zajmuje ekran, więc przy większym
+kartonie do pozycji „do zrobienia" trzeba się przewijać przez robotę wykonaną.
+
+Skok kosztuje mniej, niż zakładano, bo następną pozycję bierze się SKANEM,
+a skan trafia w towar po symbolu, nie w miejsce na ekranie. Dwa zabezpieczenia
+zostają: **pozycja z problemem nie schodzi na dół** (wyjątek czeka na decyzję,
+D8), a pozycje **bez lokalizacji** są osobną grupą tuż nad zrobionymi.
+
+### Wiersz „koszt transportu" nie jest towarem
+
+Na części faktur zakupu stoi pozycja o symbolu `PRZESYŁKA`. Nie ma jej czym
+zeskanować ani gdzie położyć, a mimo to czekała do końca dnia jako jedyna
+niezałatwiona linia i kazała komuś zgłaszać problem na coś, co problemem nie
+jest. Teraz wypada ze **snapshotu** dostawy, czyli nie istnieje dla tej pracy
+w ogóle.
+
+To jest wyjątek od reguły „rozkładanie JEST sprawdzaniem faktury i liczy się
+KAŻDĄ pozycję", więc cena jest jawna: dostawa z samą przesyłką zamyka się
+natychmiast, a licznik pozycji jest o tę jedną mniejszy niż w Subiekcie.
+Dlatego licznik PRZED otwarciem dostawy odsiewa dokładnie to samo — liczba
+zmieniająca się od samego wejścia w ekran wyglądałaby jak zgubiona pozycja.
+
+Rozpoznajemy po SYMBOLU, nie po opisie: opis jest polem swobodnym i różni się
+między dostawcami. Lista symboli siedzi w `POZYCJE_NIE_TOWAROWE` (domyślnie
+`PRZESYŁKA`, puste = funkcja wyłączona), a porównanie ignoruje wielkość liter,
+polskie ogonki i myślniki — tym samym składaniem, którego używa wyszukiwarka.
+Subiekt ma wprawdzie `tw_Rodzaj` z literą `U` dla usług i to byłoby źródło
+pewniejsze, ale read-model tej kolumny nie ma; gdyby usług przybyło, jest to
+właściwy następny krok.
+
+Dostawy otwarte STARSZĄ wersją mają ten wiersz w snapshocie i bez sprzątania
+zostałby tam na zawsze — dostawa raz otwarta nigdy nie wraca do gałęzi
+snapshotującej. Wznowienie kasuje go, ale **wyłącznie z linii nietkniętych**:
+jeśli ktoś zdążył na niej cokolwiek zrobić, to ślad ludzkiej decyzji i zostaje.
+
+---
+
 ## 0.34.0 — 8 sierpnia 2026
 
 **Wyszukiwarka wybacza.** Wpisany `gaznik` znajduje `gaźnik`, słowa mogą iść

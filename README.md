@@ -317,7 +317,10 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
 **DOSTAWY — Tryb A (redesign v2.0)** — druga zakładka
 - Jednostką pracy jest **dokument**, nie sesja. Zakładka pokazuje typy z
   `DOK_TYPY_DOSTAW` (domyślnie sama FZ) z okna `DOK_DNI_WSTECZ` (domyślnie
-  14 dni). Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
+  14 dni). Pozycje **usługowe** (symbole z `POZYCJE_NIE_TOWAROWE`, domyślnie
+  `PRZESYŁKA` — wiersz „koszt transportu") wypadają z rozkładania w ogóle: nie
+  ma ich czym zeskanować ani gdzie położyć.
+  Dokumenty **w buforze** też są do wzięcia. Przy dostawie krajowej
   skutek magazynowy niesie sam dokument w Subiekcie, więc aplikacja zapisuje
   **wyłącznie lokalizację** — zero MM, zero `waiting_for_doc`.
 - Ścieżka codzienna to **dwa skany na pozycję**. Skan towaru rozwija wiersz
@@ -447,7 +450,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 131 testów jednostkowych; buduje się bez Android SDK
+                           + 149 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

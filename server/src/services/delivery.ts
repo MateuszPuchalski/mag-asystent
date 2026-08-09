@@ -5,6 +5,7 @@ import { enqueueSetLocation } from "./queue.js";
 import { logEvent } from "./events.js";
 import { validateLocationCode } from "./locations.js";
 import { parseLocs, pickingLoc } from "../locs.js";
+import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
 import { freshLock, lockedByOther } from "./locks.js";
@@ -86,6 +87,35 @@ export function listDocuments(days = 14): DeliveryDocument[] {
 }
 
 /**
+ * Sprzątanie dostaw otwartych PRZED wprowadzeniem odsiewu pozycji usługowych.
+ *
+ * Snapshot jest snapshotem i normalnie się go nie rusza — ale wiersz
+ * `PRZESYŁKA` jest tam skutkiem naszego niedopatrzenia, a nie stanem faktury,
+ * i bez tego zostałby w bazie na zawsze: dostawa raz otwarta nigdy nie wraca
+ * do gałęzi snapshotującej. Efektem byłaby garść dostaw, których NIE DA SIĘ
+ * domknąć, bo jedyna zaległa pozycja jest niemożliwa do odłożenia.
+ *
+ * Kasujemy WYŁĄCZNIE linie nietknięte (`todo`, zero odłożone, bez blokady).
+ * Gdyby ktoś zdążył coś na tej linii zrobić — odłożyć „na siłę" albo zgłosić
+ * problem — to jest ślad ludzkiej decyzji i kasowanie go byłoby zacieraniem
+ * historii, a nie sprzątaniem.
+ */
+function usunPozycjeUslugowe(deliveryId: number): void {
+  const linie = db()
+    .prepare(
+      `SELECT id, tw_symbol FROM delivery_line
+       WHERE delivery_id = ? AND status = 'todo' AND COALESCE(ilosc_odlozona, 0) = 0`
+    )
+    .all(deliveryId) as Array<{ id: number; tw_symbol: string }>;
+  const doKasacji = linie.filter((l) => pomijanaPozycja(l.tw_symbol));
+  if (doKasacji.length === 0) return;
+  const del = db().prepare("DELETE FROM delivery_line WHERE id = ?");
+  transaction(db(), () => {
+    for (const l of doKasacji) del.run(l.id);
+  })();
+}
+
+/**
  * Otwórz (lub wznów) rozkładanie dokumentu. Pozycje są snapshotowane w chwili
  * otwarcia — jeśli księgowość zmieni FZ w trakcie, praca się nie rozjeżdża.
  */
@@ -93,7 +123,10 @@ export function openDelivery(dokId: number, user: string): number {
   const existing = db()
     .prepare("SELECT id FROM delivery WHERE sgt_dok_id = ?")
     .get(dokId) as { id: number } | undefined;
-  if (existing) return existing.id;
+  if (existing) {
+    usunPozycjeUslugowe(existing.id);
+    return existing.id;
+  }
 
   const doc = subiekt.getDocument(dokId);
   if (!doc) throw new Error("Nie znaleziono dokumentu");
@@ -125,6 +158,9 @@ export function openDelivery(dokId: number, user: string): number {
   transaction(db(), () => {
     for (const [twId, qty] of agg) {
       const t = subiekt.getProductById(twId);
+      // pozycja usługowa (`PRZESYŁKA`) nie wchodzi do snapshotu — uzasadnienie
+      // i cena tej decyzji stoją w `src/pomijane.ts`
+      if (pomijanaPozycja(t?.symbol)) continue;
       ins.run(id, twId, t?.symbol ?? String(twId), t?.nazwa ?? "", qty, pickingLoc(t?.lokalizacja));
     }
   })();
@@ -158,6 +194,12 @@ export function getDelivery(id: number): DeliveryView | undefined {
     .prepare("SELECT * FROM delivery_line WHERE delivery_id = ?")
     .all(id) as Array<any>;
 
+  /* Stany do panelu odkładania — komplet jednym zapytaniem (patrz adapter).
+     SUROWE, bez korekty o kolejkę: przy półce liczy się to, co fizycznie
+     stoi w regale, a nie to, co czeka na zapis do Subiekta. Rezerwacje też
+     są tu nieistotne — towar zarezerwowany nadal zajmuje miejsce. */
+  const stany = subiekt.stanyDlaTowarow(rows.map((r) => r.tw_id as number));
+
   const lines: DeliveryLineView[] = rows
     .map((r) => ({
       id: r.id,
@@ -169,6 +211,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
       locExpected: r.lok_oczekiwana,
       locActual: r.lok_faktyczna,
       status: r.status,
+      stanMag: stany.get(r.tw_id)?.mag ?? 0,
+      stanMgp: stany.get(r.tw_id)?.mgp ?? 0,
       /** litera alejki — nagłówek sekcji na liście */
       aisle: r.lok_oczekiwana ? String(r.lok_oczekiwana)[0] : null,
     }))
@@ -315,6 +359,10 @@ export function forceReleaseLine(lineId: number, user: string): { ok: true; odeb
 }
 
 function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {
+  /* Ta trasa odpowiada na SKAN TOWARU, czyli dokładnie na moment rozwinięcia
+     panelu odkładania — stan musi tu być, inaczej panel pokazywałby zera do
+     najbliższego odświeżenia całej dostawy. Jeden towar, jedno zapytanie. */
+  const stan = subiekt.stanyDlaTowarow([line.tw_id]).get(line.tw_id);
   return {
     kind: "line",
     line: {
@@ -327,6 +375,8 @@ function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line:
       locExpected: line.lok_oczekiwana,
       locActual: line.lok_faktyczna,
       status: line.status,
+      stanMag: stan?.mag ?? 0,
+      stanMgp: stan?.mgp ?? 0,
       aisle: line.lok_oczekiwana ? String(line.lok_oczekiwana)[0] : null,
     },
   };

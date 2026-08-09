@@ -2,6 +2,7 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import type { ProductRow } from "../types.js";
 import { parseLocs } from "../locs.js";
+import { sqlBezPozycjiUslugowych } from "../pomijane.js";
 import type {
   RawDocPosition,
   RawDocument,
@@ -444,13 +445,51 @@ export class SeededSubiektAdapter {
   }
 
   /**
+   * Stany kompletu towarów na hali i w przyjęciach — jedno zapytanie, nie N.
+   *
+   * Lista pozycji dostawy bywa kilkudziesięciowierszowa i odświeża się po
+   * KAŻDYM odłożeniu, więc pytanie o stan per wiersz zjadłoby dokładnie ten
+   * budżet, który przed chwilą odzyskaliśmy na innych trasach.
+   */
+  stanyDlaTowarow(twIds: number[]): Map<number, { mag: number; mgp: number }> {
+    const out = new Map<number, { mag: number; mgp: number }>();
+    if (twIds.length === 0) return out;
+    const dziury = twIds.map(() => "?").join(",");
+    const rows = db()
+      .prepare(
+        `SELECT tw_id, mag_id, stan FROM sgt_stan
+         WHERE tw_id IN (${dziury}) AND mag_id IN (?, ?)`
+      )
+      .all(...twIds, config.magId.MAG, config.magId.MGP) as unknown as Array<{
+      tw_id: number; mag_id: number; stan: number;
+    }>;
+    for (const r of rows) {
+      const wpis = out.get(r.tw_id) ?? { mag: 0, mgp: 0 };
+      if (r.mag_id === config.magId.MAG) wpis.mag = r.stan;
+      else wpis.mgp = r.stan;
+      out.set(r.tw_id, wpis);
+    }
+    return out;
+  }
+
+  /**
    * Liczba pozycji per dokument, jednym zapytaniem — lista dostaw pyta o nią
    * dla każdego dokumentu z okna, a zapytanie na dokument to N+1.
    */
   countPositionsByDoc(): Map<number, number> {
+    /* Pozycje usługowe odsiewamy TU TAK SAMO jak przy otwieraniu dostawy
+       (`src/pomijane.ts`). Gdyby liczyć je tylko przed otwarciem, dokument
+       „5 pozycji" po otwarciu robiłby się dokumentem „4 z 4" — a liczba,
+       która zmienia się od samego wejścia w ekran, wygląda jak zgubiona
+       pozycja i tak właśnie zostałaby zgłoszona. */
+    const bez = sqlBezPozycjiUslugowych("tw_id");
     const rows = db()
-      .prepare("SELECT dok_id, COUNT(*) AS n FROM sgt_pozycja GROUP BY dok_id")
-      .all() as Array<{ dok_id: number; n: number }>;
+      .prepare(
+        `SELECT dok_id, COUNT(*) AS n FROM sgt_pozycja
+         ${bez ? `WHERE ${bez.warunek}` : ""}
+         GROUP BY dok_id`
+      )
+      .all(...(bez?.parametry ?? [])) as Array<{ dok_id: number; n: number }>;
     return new Map(rows.map((r) => [r.dok_id, r.n]));
   }
 

@@ -50,6 +50,9 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.TrybWiersza
+import pl.wertis.kolektor.core.delivery.adresWiersza
+import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
+import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
@@ -355,17 +358,15 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         scope.launch { runCatching { apiCall { graph.api.releaseLine(id, line.id) } } }
     }
 
-    /* KOLEJNOŚĆ WIERSZY JEST STAŁA. Serwer sortuje po lokalizacji i tak zostaje;
-       odłożone pozycje zwężają się W MIEJSCU, zamiast znikać albo spadać na dół.
-       Powód jest z hali: karton drobnicy to dziesięć pozycji, każda na własną
-       półkę, a rozkłada się je w kolejności „co wpadnie w rękę". Lista nie jest
-       więc kolejką, tylko kontrolą kompletności — a lista, która przestawia się
-       po każdym odłożeniu, do sprawdzania wzrokiem się nie nadaje.
+    /* Do zrobienia na górze, bez lokalizacji pośrodku, ODŁOŻONE NA DOLE.
+       Reguła i powód jej odwrócenia (do 0.35.0 odłożone zostawały w miejscu)
+       siedzą w :core — razem z zabezpieczeniem, że pozycja z PROBLEMEM na dół
+       nie schodzi, bo czeka na decyzję (D8).
 
-       Jedyne przestawienie, jakie zostaje, to zepchnięcie pozycji BEZ
-       LOKALIZACJI na koniec: to nie rutyna, tylko SKU wymagające decyzji. */
-    val bezLok = v.lines.filter { it.locExpected == null }
-    val uporzadkowane = v.lines.filter { it.locExpected != null } + bezLok
+       Kolejność alejkowa z serwera przeżywa sortowanie, bo jest stabilne —
+       trasa przez halę się nie zmienia. */
+    val uporzadkowane = uporzadkujPozycje(v.lines, { it.status }, { it.locExpected })
+    val bezLok = czekaBezLokalizacji(v.lines, { it.status }, { it.locExpected })
     val pierwszyBezLok = bezLok.firstOrNull()?.id
 
     /* Rozwinięta pozycja idzie pod górną krawędź. To NIE jest kosmetyka: właśnie
@@ -488,6 +489,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     allowManual = locInfo?.allowManual != false,
                     manualOpen = manualOpen,
                     onManualOpen = { manualOpen = true },
+                    // dostawa krajowa jest księgowana wprost na MAG, kontener stoi
+                    // na MGP do przesunięcia — stąd różnica w opisie stanu
+                    stanZawieraDostawe = magZrodlowy == null,
                     onRecznie = { wpisany ->
                         val code = normalizeLoc(wpisany)
                         val err = validateLoc(code, locInfo)
@@ -617,6 +621,8 @@ private fun LineRow(
     allowManual: Boolean,
     manualOpen: Boolean,
     onManualOpen: () -> Unit,
+    /** Czy stan na hali zawiera już tę dostawę — patrz `PanelOdkladania`. */
+    stanZawieraDostawe: Boolean,
     onRecznie: (String) -> Unit,
     onTap: () -> Unit,
     onProblem: () -> Unit,
@@ -745,7 +751,10 @@ private fun LineRow(
                krzyczy 28 sp w panelu odkładania niżej, a wątpliwość, którą
                zdjęcie rozstrzyga („czy to na pewno TEN towar?"), pojawia się
                dokładnie w chwili brania kartonu do ręki. */
-            if (!rozwiniety) LokPastylka(line.locExpected, przygaszona = zwiniety)
+            // adres FAKTYCZNY, gdy pozycja już gdzieś poszła — patrz `adresWiersza`
+            if (!rozwiniety) {
+                LokPastylka(adresWiersza(line.locExpected, line.locActual), przygaszona = zwiniety)
+            }
             else MiniaturaTowaru(graph, line.twId, 56.dp)
         }
 
@@ -763,6 +772,7 @@ private fun LineRow(
                     allowManual = allowManual,
                     manualOpen = manualOpen,
                     onManualOpen = onManualOpen,
+                    stanZawieraDostawe = stanZawieraDostawe,
                     onRecznie = onRecznie,
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
@@ -806,6 +816,14 @@ private fun PanelOdkladania(
         nie wymaga ponownego tapnięcia linku przy każdej pozycji. */
     manualOpen: Boolean,
     onManualOpen: () -> Unit,
+    /**
+     * Czy stan na hali zawiera już rozkładaną partię.
+     *
+     * Dostawa krajowa jest księgowana wprost na MAG, więc tak; kontener stoi
+     * na MGP do czasu przesunięcia, więc nie. Różnica jest widoczna dla
+     * człowieka przy regale, bo zmienia to, ilu sztuk ma się tam spodziewać.
+     */
+    stanZawieraDostawe: Boolean,
     /** Ręcznie wpisany kod półki — zniszczona etykieta nie może blokować pozycji. */
     onRecznie: (String) -> Unit,
     onProblem: () -> Unit,
@@ -832,13 +850,46 @@ private fun PanelOdkladania(
                 color = Ink,
             )
             Text(
-                "→ ${line.locExpected ?: "BRAK LOKALIZACJI"}",
+                /* Przy pozycji odkładanej po kawałku pokazujemy adres, pod
+                   którym reszta partii już leży — a nie pustkę ze snapshotu. */
+                "→ ${adresWiersza(line.locExpected, line.locActual) ?: "BRAK LOKALIZACJI"}",
                 fontFamily = BarlowCond,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 28.sp,
                 color = AmberInk,
                 modifier = Modifier.weight(1f),
             )
+        }
+        /* Stan przy półce odpowiada na pytanie, które magazynier zadaje sobie
+           z kartonem w ręce: „czy tego już tam coś leży". Rozbieżność widać
+           dopiero tutaj — pusty regał przy stanie 40 znaczy, że poprzednia
+           dostawa nie została rozłożona albo poszła gdzie indziej.
+
+           Przy dostawie krajowej towar figuruje na MAG od ZAKSIĘGOWANIA
+           dokumentu, więc ta liczba zawiera już niesioną partię — i mówimy
+           o tym wprost, zamiast zostawiać człowieka z zagadką arytmetyczną. */
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                "na hali ${formatQty(line.stanMag)}",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Ink,
+            )
+            if (stanZawieraDostawe) {
+                Text("(z tą dostawą)", fontSize = 11.sp, color = InkMute)
+            }
+            if (line.stanMgp > 0) {
+                Text(
+                    "· w przyjęciach ${formatQty(line.stanMgp)}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmberInk,
+                )
+            }
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

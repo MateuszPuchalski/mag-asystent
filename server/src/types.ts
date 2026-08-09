@@ -138,6 +138,16 @@ export interface DeliveryLineView {
   locExpected: string | null;
   locActual: string | null;
   status: string;
+  /**
+   * Stan na hali i w przyjęciach — SUROWY, bez korekty o kolejkę i rezerwacje.
+   *
+   * Przy półce pytanie brzmi „czy tego już tam coś leży", więc liczy się to,
+   * co stoi fizycznie. Uwaga przy dostawie krajowej: towar figuruje na MAG od
+   * ZAKSIĘGOWANIA dokumentu, więc `stanMag` zawiera już to, co magazynier
+   * niesie w rękach — kolektor mówi o tym wprost na ekranie.
+   */
+  stanMag: number;
+  stanMgp: number;
   /** Litera alejki (nagłówek sekcji listy) albo null przy braku lokalizacji. */
   aisle: string | null;
 }

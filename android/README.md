@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru — **131 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru — **149 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -237,8 +237,9 @@ przed którą ta pozycja broni.
 **Układ ekranu**
 
 - [ ] dostawa 10 pozycji mieści się na jednym ekranie bez przewijania,
-- [ ] odłożone wiersze są cienkie i przekreślone, ale zostają na swoim miejscu,
-- [ ] lista nie przeskakuje po żadnym odłożeniu,
+- [ ] odłożone wiersze są cienkie, przekreślone i schodzą na **dół** listy,
+- [ ] pozycja ze zgłoszonym problemem NIE schodzi na dół (czeka na decyzję),
+- [ ] pozycje bez lokalizacji zostają osobną grupą tuż nad odłożonymi,
 - [ ] nie ma nagłówków alejek; lokalizacja jest pastylką przy każdym wierszu,
 - [ ] „BEZ LOKALIZACJI (n)" zostaje osobną sekcją na końcu,
 - [ ] WSTECZ jest w prawym DOLNYM rogu, nie w lewym górnym,

@@ -25,13 +25,12 @@ enum class TrybWiersza {
     ZWYKLY,
 
     /**
-     * Zrobione — cienki pasek z przekreśleniem, na swoim miejscu w liście.
+     * Zrobione — cienki pasek z przekreśleniem, zepchnięty na DÓŁ listy.
      *
-     * Zwężanie, a NIE ukrywanie ani przenoszenie na dół: karton drobnicy to
-     * dziesięć pozycji, które mają się zmieścić na jednym ekranie, ale lista
-     * jest kontrolą kompletności — trzeba móc wzrokiem sprawdzić, co już
-     * poszło i gdzie. Przenoszenie na dół sprawiałoby, że wiersze skaczą po
-     * każdym odłożeniu.
+     * Zwężanie, a nie ukrywanie: lista jest kontrolą kompletności, więc trzeba
+     * móc wzrokiem sprawdzić, co już poszło i gdzie. Ale od 0.35.0 zwinięte
+     * pozycje schodzą na koniec — powód i cena tej zmiany stoją przy
+     * `uporzadkujPozycje`.
      */
     ZWINIETY,
 
@@ -41,6 +40,72 @@ enum class TrybWiersza {
     /** Wyjątek (D8) — nie zwija się nigdy, bo wypadł z rutyny i wymaga decyzji. */
     PROBLEM,
 }
+
+/**
+ * Adres pokazywany na wierszu pozycji — FAKTYCZNY wygrywa z oczekiwanym.
+ *
+ * To są dwa różne pola i mylenie ich kosztowało błąd widoczny w hali: pozycja
+ * bez adresu, odłożona i opatrzona adresem, dalej pokazywała „BRAK".
+ *
+ * `locExpected` jest SNAPSHOTEM z chwili otwarcia dostawy i celowo nie zmienia
+ * się po odłożeniu — na nim stoi wykrywanie rozjazdu (§4.3) i kolejność listy,
+ * więc podmiana go po zapisie zepsułaby jedno i drugie. `locActual` mówi, gdzie
+ * towar NAPRAWDĘ wylądował, i tylko to interesuje człowieka patrzącego na
+ * zamkniętą pozycję.
+ *
+ * `null` znaczy „jeszcze nigdzie" — i dopiero to zasługuje na „BRAK".
+ */
+fun adresWiersza(locExpected: String?, locActual: String?): String? = locActual ?: locExpected
+
+/* ── Kolejność pozycji na liście rozkładania ────────────────────────────────
+   ODWRACAMY tu wcześniejszą decyzję i warto powiedzieć, czym za nią płacimy.
+   Do 0.35.0 odłożone pozycje zostawały na swoim miejscu, tylko zwężone —
+   z obawy, że przenoszenie ich na dół każe wierszom skakać po każdym zapisie.
+   Praktyka pokazała drugą stronę: dziesięć zwiniętych pasków dalej zajmuje
+   ekran, więc przy większym kartonie do pozycji „do zrobienia" trzeba się
+   PRZEWIJAĆ przez robotę już wykonaną.
+
+   Skok kosztuje mniej, niż zakładano, bo następną pozycję bierze się SKANEM,
+   a skan trafia w towar po symbolu, nie w miejsce na ekranie. Dotknięcie jest
+   ścieżką awaryjną i to ono płaci za tę zmianę.
+
+   Dwa zabezpieczenia zostają:
+   - POZYCJA Z PROBLEMEM NIE SCHODZI NA DÓŁ, choć jest „załatwiona" w sensie
+     licznika. Wyjątek wypadł z rutyny i czeka na decyzję (D8); zepchnięcie go
+     pod zrobione byłoby schowaniem go dokładnie tak, jak zabrania tego reguła
+     „wyjątek nie zwija się nigdy".
+   - Pozycje BEZ LOKALIZACJI zostają osobną grupą tuż nad zrobionymi — to nie
+     rutyna, tylko SKU wymagające decyzji.                                     */
+
+/** Kubełek pozycji: im niżej, tym dalej od uwagi człowieka. */
+private fun kubelekPozycji(status: String, locExpected: String?): Int = when {
+    trybWiersza(status, aktywna = false) == TrybWiersza.ZWINIETY -> 2
+    locExpected == null -> 1
+    else -> 0
+}
+
+/**
+ * Do zrobienia na górze, bez lokalizacji pośrodku, odłożone na dole.
+ *
+ * Sortowanie STABILNE — wewnątrz kubełka zostaje kolejność z serwera
+ * (alfabetycznie po adresie, czyli po alejkach), więc trasa przez halę się
+ * nie zmienia.
+ *
+ * @param status funkcja wyciągająca status pozycji
+ * @param locExpected funkcja wyciągająca adres oczekiwany
+ */
+fun <T> uporzadkujPozycje(
+    pozycje: List<T>,
+    status: (T) -> String,
+    locExpected: (T) -> String?,
+): List<T> = pozycje.sortedBy { kubelekPozycji(status(it), locExpected(it)) }
+
+/** Czy pozycja czeka jeszcze na decyzję „gdzie to położyć". */
+fun <T> czekaBezLokalizacji(
+    pozycje: List<T>,
+    status: (T) -> String,
+    locExpected: (T) -> String?,
+): List<T> = pozycje.filter { kubelekPozycji(status(it), locExpected(it)) == 1 }
 
 /**
  * @param status wartość `DeliveryLineView.status`
