@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.ApiErrorBody
+import pl.wertis.kolektor.core.net.EanOdmowa
 import pl.wertis.kolektor.core.net.MmConflict
 import pl.wertis.kolektor.core.net.WertisJson
 import retrofit2.HttpException
@@ -116,15 +117,25 @@ fun HttpException.toApiError(): ApiError {
     val status = code()
     var msg = "Błąd $status"
     var available: Double? = null
+    var powod: String? = null
+    var eanPrzed: String? = null
     try {
         val raw = response()?.errorBody()?.string()
         if (!raw.isNullOrBlank()) {
             val body = WertisJson.decodeFromString(ApiErrorBody.serializer(), raw)
             body.error?.let { msg = it }
             available = body.available
+            powod = body.powod
+            eanPrzed = body.eanPrzed
         }
     } catch (_: Exception) {
         /* brak treści / nie-JSON */
     }
-    return if (available != null) MmConflict(status, msg, available) else ApiError(status, msg)
+    return when {
+        available != null -> MmConflict(status, msg, available)
+        // odmowa nadania kodu niesie POWÓD, bo `podmiana` i `zajety` prowadzą
+        // w przeciwne strony: pierwszą da się przejść, drugiej nie
+        powod != null -> EanOdmowa(status, msg, powod, eanPrzed)
+        else -> ApiError(status, msg)
+    }
 }

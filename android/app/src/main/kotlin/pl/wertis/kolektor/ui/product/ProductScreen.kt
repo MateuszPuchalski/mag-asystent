@@ -125,6 +125,8 @@ fun ProductScreen(graph: AppGraph) {
     var saving by remember { mutableStateOf(false) }
     /** Otwarte przesunięcie: skąd i ile wolno stamtąd wziąć. */
     var przesun by remember(id) { mutableStateOf<Zrodlo?>(null) }
+    /** Arkusz nadania kodu kreskowego (0.37.0). */
+    var eanOtwarty by remember(id) { mutableStateOf(false) }
 
     val p = poll.data
 
@@ -181,6 +183,7 @@ fun ProductScreen(graph: AppGraph) {
         ProductHero(
             p,
             onPrzesunZMgp = { przesun = Zrodlo(null, "MGP", p.mgp.stan - p.mgp.pendingOut) },
+            onEan = { eanOtwarty = true },
             zdjecie = { ZdjecieKartoteki(graph, p.id) },
         ) {
             /* Pastylka adresu pickingowego. Ograniczona szerokość, żeby długi
@@ -357,6 +360,25 @@ fun ProductScreen(graph: AppGraph) {
             dostepne = z.dostepne,
             onDone = { przesun = null },
             onCancel = { przesun = null },
+        )
+    }
+
+    if (eanOtwarty) {
+        EanSheet(
+            graph = graph,
+            twId = p.id,
+            sym = p.sym,
+            nazwa = p.name,
+            eanKartoteki = p.ean,
+            onClose = { eanOtwarty = false },
+            onZapisano = {
+                eanOtwarty = false
+                /* Pole EAN na karcie pokazuje to, co stoi w SUBIEKCIE, więc
+                   zaktualizuje się dopiero po workerze — a skan działa już
+                   teraz, przez alias. Komunikat mówi wprost o tej różnicy,
+                   zamiast udawać, że kartoteka zmieniła się natychmiast. */
+                graph.effects.toast("Kod nadany — skan działa od razu, kartoteka po zapisie")
+            },
         )
     }
 }

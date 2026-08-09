@@ -28,6 +28,79 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.37.0 — 9 sierpnia 2026
+
+**Kody kreskowe da się nadawać z kolektora.** Karton ma kod, kartoteka go nie ma
+— do tej pory jedyną drogą było „zapamiętaj i powiedz biuru", czyli w praktyce
+nic, a nazajutrz ten sam karton zatrzymywał pracę drugi raz.
+
+**[wymaga działania]** **Nowe uprawnienie SQL i nowy APK.**
+
+1. Na bazie Subiekta wykonaj (SSMS, konto administratora):
+   ```sql
+   GRANT UPDATE ON dbo.tw__Towar (tw_PodstKodKresk) TO wertis;
+   ```
+   Bez tego funkcja **nie pada** — kod działa na kolektorze od pierwszej chwili,
+   a zapis do Subiekta czeka w kolejce ze statusem `error` i czytelnym
+   komunikatem. Po nadaniu uprawnienia wystarczy PONÓW na zadaniu.
+2. `git pull`, `npm ci`, `npm run build`, restart `wertis-api` i `wertis-worker`.
+3. **Nowy APK** — cała obsługa nadawania jest w kolektorze.
+
+### To jest rozszerzenie granicy zapisu i mówimy o tym wprost
+
+Od początku projektu aplikacja zmieniała w bazie firmy **jedno** pole —
+lokalizację. Teraz zmienia dwa. Zdanie „zapisuje jedną rzecz" zniknęło z README
+i z opisu architektury, bo przestało być prawdziwe, a dokumentacja, która kłamie
+o granicy zapisu, jest gorsza niż jej brak.
+
+Nic poza tym się nie zmieniło: dalej zero `INSERT` do tabel dokumentów, zero
+modyfikacji stanów, każdy zapis przez kolejkę i z wpisem w audycie.
+
+### Zapis idzie dwiema drogami — i to nie jest dublowanie
+
+Kod ląduje najpierw w bazie WERTIS (`ean_alias`), a dopiero potem, przez
+kolejkę, w Subiekcie. Powód jest praktyczny: zapis do Subiekta bywa **opóźniony**
+(worker pracuje sekwencyjnie) i bywa **niemożliwy** (brak GRANT-u). W obu
+przypadkach skan ma zadziałać natychmiast — bo to jest jedyny powód, dla którego
+ktoś ten kod nadał.
+
+Kod nadany u nas jest **furtką, nie pierwszeństwem**: szukamy go dopiero wtedy,
+gdy kartoteka Subiekta nie zwróciła ani jednego trafienia. Odwrotna kolejność
+znaczyłaby, że kod nadany przy półce przykrywa kod z Subiekta — czyli że
+magazynier cicho nadpisuje dane, których nie widzi.
+
+### Trzy sytuacje, trzy różne odpowiedzi
+
+- **Puste pole** — jeden skan i gotowe. Nic nie ginie, więc nie ma o co pytać.
+- **Kartoteka ma już kod** — arkusz pokazuje `STARY → NOWY` i pyta wprost, bo
+  stary kod zostaje na kartonach w hali i przestanie działać. Stary kod zapisuje
+  się w audycie, więc na pytanie „czemu ten karton się nie skanuje" da się
+  odpowiedzieć.
+- **Kod należy do INNEJ kartoteki** — droga zamknięta, bez możliwości przejścia
+  potwierdzeniem. Nadanie wyprodukowałoby kolizję (§4.5), czyli dokładnie ten
+  defekt danych, który system mierzy i raportuje biuru. Próba jest przy okazji
+  **zapisywana do rejestru kolizji** — widać ją, zanim zatrzyma pracę w alejce.
+
+Zlanie dwóch ostatnich w jedno „na pewno?" byłoby najgorszym z uproszczeń:
+pytanie wygląda tak samo, a odpowiedź „tak" raz naprawia kartotekę, a raz psuje
+cudzą. Reguła siedzi w `:core` razem ze swoim testem.
+
+### Gdzie się to nadaje
+
+Dwa wejścia, oba w miejscu, w którym człowiek trzyma karton:
+
+- **karta towaru** — linia „EAN —" była końcem drogi, teraz jest przyciskiem;
+- **rozkładanie dostawy** — zeskanowany kod, którego kartoteka nie zna, zostaje
+  zapamiętany; po dotknięciu właściwej pozycji z listy pojawia się propozycja
+  nadania mu tego kodu. To jedyny moment, w którym wiadomo na pewno, że kod
+  i towar do siebie pasują.
+
+**Bez bufora offline** — świadomie, tak jak przesunięcie stanu. Pytanie „czy ten
+kod nie należy już do innej kartoteki" musi paść, gdy człowiek stoi przy półce
+i może odpowiedzieć, a nie godzinę później przy odbuforowaniu.
+
+---
+
 ## 0.36.1 — 9 sierpnia 2026
 
 **Poprawka: ten sam towar na dwóch dostawach pokazywał stary adres.** Magazynier

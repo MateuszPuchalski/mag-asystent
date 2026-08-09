@@ -51,6 +51,8 @@ import pl.wertis.kolektor.ui.theme.cardSurface
 fun ProductHero(
     p: ProductCard,
     onPrzesunZMgp: (() -> Unit)? = null,
+    /** Otwarcie arkusza nadania kodu kreskowego (0.37.0). */
+    onEan: () -> Unit = {},
     zdjecie: @Composable () -> Unit = {},
     adres: @Composable () -> Unit,
 ) {
@@ -89,11 +91,21 @@ fun ProductHero(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 1.dp),
                 )
+                /* Linia EAN-u jest KLIKALNA (0.37.0). Kartoteka bez kodu ma tu
+                   myślnik, a myślnik był dotąd końcem drogi: magazynier trzymał
+                   karton z kodem i nie miał gdzie go wpisać. Cel dotyku 48 dp,
+                   bo klika się w rękawicach. */
                 Text(
-                    "EAN ${p.ean.ifEmpty { "—" }} · ${p.unit.ifEmpty { "—" }}",
+                    if (p.ean.isEmpty()) "EAN — · ${p.unit.ifEmpty { "—" }}  ✎ NADAJ KOD"
+                    else "EAN ${p.ean} · ${p.unit.ifEmpty { "—" }}",
                     fontSize = 11.sp,
-                    color = InkMute,
-                    modifier = Modifier.padding(top = 2.dp),
+                    color = if (p.ean.isEmpty()) AmberInk else InkMute,
+                    fontWeight = if (p.ean.isEmpty()) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .heightIn(min = 48.dp)
+                        .clickable(onClick = onEan)
+                        .wrapContentHeight(),
                 )
             }
             zdjecie()

@@ -86,8 +86,8 @@ Twarde zasady (spec §12) egzekwowane na serwerze:
 
 ### Wdrożenie na produkcji idzie etapami
 
-Aplikacja zapisuje do bazy firmy jedną rzecz — pole lokalizacji — odwracalną
-wyłącznie z kopii zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć
+Aplikacja zapisuje do bazy firmy dwie rzeczy — pole lokalizacji i podstawowy
+kod kreskowy (0.37.0) — odwracalne wyłącznie z kopii zapasowej. Dlatego wpuszczanie jej na produkcję ma **sześć
 etapów z bramkami**, opisanych w [`docs/wdrozenie.md`](docs/wdrozenie.md).
 Najważniejsze narzędzie jest darmowe: **worker jest jedynym procesem
 zapisującym do Subiekta**, więc jego zatrzymanie daje przebieg próbny na żywych
@@ -114,12 +114,14 @@ Rozmiar historii widać w `/api/health` (`audyt`); nie czyścimy jej, bo
 reklamacja przychodzi po miesiącach. Pełny opis łańcucha, jego luk i powodów:
 [`docs/architektura.md`](docs/architektura.md) §9.
 
-**Zapis do Subiekta ogranicza się do JEDNEJ rzeczy**: pola lokalizacji na
-kartotece (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie
-mają). Zapis idzie kolejką (kolejka → worker → adapter), więc kolektor nigdy
-nie czeka na COM. Nic poza tym: zero `INSERT` do tabel dokumentów, zero
-modyfikacji stanów; dokumenty MM (kontener) tworzy osobny worker Sfery na
-Windows. Granice i ich powody: [`docs/architektura.md`](docs/architektura.md)
+**Zapis do Subiekta ogranicza się do DWÓCH pól na kartotece**: lokalizacji
+(`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie mają) oraz
+podstawowego kodu kreskowego (`tw_PodstKodKresk`, od 0.37.0 — magazynier
+z kartonem, którego kodu kartoteka nie zna, nie miał gdzie go wpisać). Każde
+pole ma własny `GRANT UPDATE` na tę jedną kolumnę. Zapis idzie kolejką
+(kolejka → worker → adapter), więc kolektor nigdy nie czeka na COM. Nic poza
+tym: zero `INSERT` do tabel dokumentów, zero modyfikacji stanów; dokumenty MM
+(kontener) tworzy osobny worker Sfery na Windows. Granice i ich powody: [`docs/architektura.md`](docs/architektura.md)
 §1; zweryfikowana struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
 [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
@@ -456,7 +458,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 149 testów jednostkowych; buduje się bez Android SDK
+                           + 158 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

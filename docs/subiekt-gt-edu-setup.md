@@ -142,12 +142,25 @@ GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
 -- Instalator sprawdza to sam i pomija tę linię, gdy tabeli nie ma.
 GRANT SELECT ON dbo.tw_ZdjecieTw   TO wertis;   -- zdjęcia kartotek na karcie towaru
 
--- ZAPIS — JEDNA rzecz i ani jednej więcej.
+-- ZAPIS — DWIE kolumny na kartotece i ani jedna więcej.
 --
--- Lokalizacja: JEDNA kolumna na kartotece. Podmień tw_Pole1 na pole wybrane
--- w §1a (MSSQL_LOC_COLUMN musi się zgadzać!). Do dok__Dokument, tw_Stan
--- i tabel dokumentów aplikacja nie ma żadnego prawa zapisu.
+-- Do 0.37.0 była to JEDNA kolumna. Rozszerzenie granicy było świadome i ma
+-- konkretny powód: magazynier stojący z kartonem, którego kodu kartoteka nie
+-- zna, nie miał gdzie tego kodu wpisać.
+--
+-- Do dok__Dokument, tw_Stan i tabel dokumentów aplikacja nie ma żadnego prawa
+-- zapisu — i to się nie zmienia.
+--
+-- 1. Lokalizacja. Podmień tw_Pole1 na pole wybrane w §1a (MSSQL_LOC_COLUMN
+--    musi się zgadzać!).
 GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis;
+-- 2. Podstawowy kod kreskowy (0.37.0). Kolumna jest STAŁA — nie ma ustawienia,
+--    którym dałoby się ją pomylić.
+--    BEZ TEGO GRANT-U FUNKCJA NIE PADA: kod działa na kolektorze od razu
+--    (WERTIS trzyma go u siebie), a zadanie zapisu ląduje w kolejce ze
+--    statusem `error` i czytelnym komunikatem o braku uprawnienia. Do Subiekta
+--    kod dojedzie dopiero po nadaniu tej linii i ponowieniu zadania.
+GRANT UPDATE ON dbo.tw__Towar (tw_PodstKodKresk) TO wertis;
 ```
 
 Sprawdź teraz, że uprawnienia faktycznie się nadały. Warto to robić po każdym

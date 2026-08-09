@@ -83,6 +83,21 @@ data class SetLocationBody(
 )
 
 /**
+ * Nadanie kodu kreskowego kartotece (0.37.0).
+ *
+ * `potwierdzone` jest WYMAGANE tylko przy PODMIANIE istniejącego kodu. Serwer
+ * odmawia bez niego kodem 409 i odsyła stary kod, żeby dało się pokazać
+ * STARY → NOWY. Uzupełnienie pustego pola idzie jednym skanem, bez pytania —
+ * nic wtedy nie ginie.
+ */
+@Serializable
+data class SetEanBody(
+    val ean: String,
+    val potwierdzone: Boolean? = null,
+)
+
+
+/**
  * Przesunięcie stanu między magazynami.
  *
  * `location` wypełnia się WYŁĄCZNIE przy celu MAG: adres w kartotece Subiekta
@@ -373,7 +388,16 @@ data class QueueIdResponse(val queueId: Long, val kind: String? = null)
 data class OkResponse(val ok: Boolean = true)
 
 @Serializable
-data class ApiErrorBody(val error: String? = null, val available: Double? = null)
+data class ApiErrorBody(
+    val error: String? = null,
+    val available: Double? = null,
+    /** Odmowa nadania kodu (0.37.0): `podmiana` albo `zajety`. */
+    val powod: String? = null,
+    /** Kod stojący dziś na kartotece — do pokazania STARY → NOWY. */
+    val eanPrzed: String? = null,
+    /** Symbol kartoteki, która ten kod już ma. */
+    val symKolidujacy: String? = null,
+)
 
 /* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ──────────────────────
    Dokument jest jednostką pracy. Aplikacja zapisuje wyłącznie lokalizację

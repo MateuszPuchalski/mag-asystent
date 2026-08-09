@@ -38,6 +38,7 @@ import pl.wertis.kolektor.core.net.QueueIdResponse
 import pl.wertis.kolektor.core.net.QueueResponse
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.SearchResponse
+import pl.wertis.kolektor.core.net.SetEanBody
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.SetupResponse
 import okhttp3.ResponseBody
@@ -99,6 +100,22 @@ interface ApiService {
         @Header("x-user") asUser: String? = null,
         /** Konto autora dla operacji z bufora — patrz `ApiOpSender`. */
         @Header("x-buffered-user") bufferedUser: String? = null,
+    ): QueueIdResponse
+
+    /**
+     * Nadanie kodu kreskowego kartotece (0.37.0).
+     *
+     * BEZ BUFORA OFFLINE — świadomie, tak jak przesunięcie stanu. Bufor istnieje
+     * dla pracy w rytmie przy regale, w martwych strefach Wi-Fi. Nadanie kodu
+     * jest czynnością rzadką i rozstrzygającą o danych WSPÓLNYCH: pytanie „czy
+     * ten kod nie należy już do innej kartoteki" musi paść, gdy człowiek jeszcze
+     * stoi przy półce i może odpowiedzieć, a nie godzinę później przy
+     * odbuforowaniu.
+     */
+    @POST("api/products/{id}/ean")
+    suspend fun setEan(
+        @Path("id") id: Long,
+        @Body body: SetEanBody,
     ): QueueIdResponse
 
     /**
