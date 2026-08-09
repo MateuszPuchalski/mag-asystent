@@ -473,6 +473,24 @@ export class SeededSubiektAdapter {
   }
 
   /**
+   * Pola lokalizacji kompletu towarów — jedno zapytanie, nie N.
+   *
+   * Lista rozkładania potrzebuje adresu dla KAŻDEJ pozycji przy każdym
+   * odświeżeniu (co kilka sekund), więc `getProductById` per wiersz byłoby
+   * dokładnie tym N+1, które wypleniliśmy ze stanów magazynowych.
+   */
+  lokalizacjeDlaTowarow(twIds: number[]): Map<number, string> {
+    const out = new Map<number, string>();
+    if (twIds.length === 0) return out;
+    const dziury = twIds.map(() => "?").join(",");
+    const rows = db()
+      .prepare(`SELECT tw_id, lokalizacja FROM sgt_towar WHERE tw_id IN (${dziury})`)
+      .all(...twIds) as unknown as Array<{ tw_id: number; lokalizacja: string }>;
+    for (const r of rows) out.set(r.tw_id, r.lokalizacja ?? "");
+    return out;
+  }
+
+  /**
    * Liczba pozycji per dokument, jednym zapytaniem — lista dostaw pyta o nią
    * dla każdego dokumentu z okna, a zapytanie na dokument to N+1.
    */

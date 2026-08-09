@@ -1,7 +1,13 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
-import { pozycjeSnapshotu, porownajAlejkowo, TERMINAL_LINE } from "./delivery.js";
+import {
+  adresyOczekiwane,
+  porownajAlejkowo,
+  pozycjaNietknieta,
+  pozycjeSnapshotu,
+  TERMINAL_LINE,
+} from "./delivery.js";
 import { listByDelivery } from "./problems.js";
 import { freshLock } from "./locks.js";
 import type { ProblemView } from "../types.js";
@@ -149,25 +155,34 @@ function liniePoOtwarciu(deliveryId: number): PodgladLinii[] {
     wgLinii.set(p.lineId, lista);
   }
 
-  return rows.map((r) => ({
-    lineId: r.id,
-    twId: r.tw_id,
-    sym: r.tw_symbol,
-    name: r.tw_nazwa,
-    qtyDoc: r.ilosc_dok,
-    qtyDone: r.ilosc_odlozona,
-    locExpected: r.lok_oczekiwana,
-    locActual: r.lok_faktyczna,
-    status: r.status,
-    mismatch: !!r.lok_faktyczna && !!r.lok_oczekiwana && r.lok_faktyczna !== r.lok_oczekiwana,
-    // „bez lokalizacji" znaczy „NIGDZIE jeszcze nie leży" — pozycja bez adresu
-    // w kartotece, ale już odłożona, ma adres i przestaje być decyzją
-    bezLokalizacji: !r.lok_oczekiwana && !r.lok_faktyczna,
-    doneBy: r.done_by,
-    doneAt: r.done_at,
-    lockedBy: freshLock(r.locked_by, r.locked_at),
-    problemy: wgLinii.get(r.id) ?? [],
-  }));
+  /* Adres oczekiwany liczony TĄ SAMĄ regułą co na kolektorze: pozycja
+     nietknięta bierze żywy (patrz `adresyOczekiwane`). Inaczej biuro czytałoby
+     inny adres niż osoba przy półce — i żaden z dwóch ekranów nie mówiłby, że
+     to dwie różne liczby. */
+  const adresy = adresyOczekiwane(rows.map((r) => r.tw_id));
+
+  return rows.map((r) => {
+    const oczekiwany = pozycjaNietknieta(r) ? adresy.get(r.tw_id) ?? null : r.lok_oczekiwana;
+    return {
+      lineId: r.id,
+      twId: r.tw_id,
+      sym: r.tw_symbol,
+      name: r.tw_nazwa,
+      qtyDoc: r.ilosc_dok,
+      qtyDone: r.ilosc_odlozona,
+      locExpected: oczekiwany,
+      locActual: r.lok_faktyczna,
+      status: r.status,
+      mismatch: !!r.lok_faktyczna && !!oczekiwany && r.lok_faktyczna !== oczekiwany,
+      // „bez lokalizacji" znaczy „NIGDZIE jeszcze nie leży" — pozycja bez adresu
+      // w kartotece, ale już odłożona, ma adres i przestaje być decyzją
+      bezLokalizacji: !oczekiwany && !r.lok_faktyczna,
+      doneBy: r.done_by,
+      doneAt: r.done_at,
+      lockedBy: freshLock(r.locked_by, r.locked_at),
+      problemy: wgLinii.get(r.id) ?? [],
+    };
+  });
 }
 
 /**

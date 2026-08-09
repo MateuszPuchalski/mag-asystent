@@ -47,11 +47,13 @@ enum class TrybWiersza {
  * To są dwa różne pola i mylenie ich kosztowało błąd widoczny w hali: pozycja
  * bez adresu, odłożona i opatrzona adresem, dalej pokazywała „BRAK".
  *
- * `locExpected` jest SNAPSHOTEM z chwili otwarcia dostawy i celowo nie zmienia
- * się po odłożeniu — na nim stoi wykrywanie rozjazdu (§4.3) i kolejność listy,
- * więc podmiana go po zapisie zepsułaby jedno i drugie. `locActual` mówi, gdzie
- * towar NAPRAWDĘ wylądował, i tylko to interesuje człowieka patrzącego na
- * zamkniętą pozycję.
+ * `locExpected` mówi „gdzie to ma trafić" i od 0.36.1 dla pozycji NIETKNIĘTEJ
+ * jest wartością żywą — serwer liczy ją z kartoteki skorygowanej o kolejkę
+ * zapisów, bo zamrożona wysyłała ludzi do regału, z którego towar dawno zjechał
+ * (ten sam towar na dwóch dostawach). Pozycja, na której ktoś już pracował,
+ * zachowuje swoją wartość z chwili pracy — i na NIEJ stoi wykrywanie rozjazdu.
+ * `locActual` mówi, gdzie towar NAPRAWDĘ wylądował, i tylko to interesuje
+ * człowieka patrzącego na zamkniętą pozycję.
  *
  * `null` znaczy „jeszcze nigdzie" — i dopiero to zasługuje na „BRAK".
  */
