@@ -158,6 +158,12 @@ export function getDelivery(id: number): DeliveryView | undefined {
     .prepare("SELECT * FROM delivery_line WHERE delivery_id = ?")
     .all(id) as Array<any>;
 
+  /* Stany do panelu odkładania — komplet jednym zapytaniem (patrz adapter).
+     SUROWE, bez korekty o kolejkę: przy półce liczy się to, co fizycznie
+     stoi w regale, a nie to, co czeka na zapis do Subiekta. Rezerwacje też
+     są tu nieistotne — towar zarezerwowany nadal zajmuje miejsce. */
+  const stany = subiekt.stanyDlaTowarow(rows.map((r) => r.tw_id as number));
+
   const lines: DeliveryLineView[] = rows
     .map((r) => ({
       id: r.id,
@@ -169,6 +175,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
       locExpected: r.lok_oczekiwana,
       locActual: r.lok_faktyczna,
       status: r.status,
+      stanMag: stany.get(r.tw_id)?.mag ?? 0,
+      stanMgp: stany.get(r.tw_id)?.mgp ?? 0,
       /** litera alejki — nagłówek sekcji na liście */
       aisle: r.lok_oczekiwana ? String(r.lok_oczekiwana)[0] : null,
     }))
@@ -315,6 +323,10 @@ export function forceReleaseLine(lineId: number, user: string): { ok: true; odeb
 }
 
 function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {
+  /* Ta trasa odpowiada na SKAN TOWARU, czyli dokładnie na moment rozwinięcia
+     panelu odkładania — stan musi tu być, inaczej panel pokazywałby zera do
+     najbliższego odświeżenia całej dostawy. Jeden towar, jedno zapytanie. */
+  const stan = subiekt.stanyDlaTowarow([line.tw_id]).get(line.tw_id);
   return {
     kind: "line",
     line: {
@@ -327,6 +339,8 @@ function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line:
       locExpected: line.lok_oczekiwana,
       locActual: line.lok_faktyczna,
       status: line.status,
+      stanMag: stan?.mag ?? 0,
+      stanMgp: stan?.mgp ?? 0,
       aisle: line.lok_oczekiwana ? String(line.lok_oczekiwana)[0] : null,
     },
   };

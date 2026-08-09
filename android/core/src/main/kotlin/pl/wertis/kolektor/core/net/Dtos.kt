@@ -420,6 +420,14 @@ data class DeliveryLineView(
     val locExpected: String? = null,
     val locActual: String? = null,
     val status: String = "todo",
+    /**
+     * Stan na hali i w przyjęciach — surowy, bez korekty o kolejkę i rezerwacje.
+     * Przy dostawie krajowej `stanMag` zawiera już rozkładaną partię (towar
+     * figuruje na MAG od zaksięgowania dokumentu). Domyślne zera dotyczą
+     * starszego serwera, który tych pól nie wysyła.
+     */
+    val stanMag: Double = 0.0,
+    val stanMgp: Double = 0.0,
 )
 
 @Serializable

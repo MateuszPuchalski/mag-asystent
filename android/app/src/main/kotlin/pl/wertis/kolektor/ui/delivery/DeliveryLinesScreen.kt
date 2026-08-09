@@ -497,6 +497,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     allowManual = locInfo?.allowManual != false,
                     manualOpen = manualOpen,
                     onManualOpen = { manualOpen = true },
+                    // dostawa krajowa jest księgowana wprost na MAG, kontener stoi
+                    // na MGP do przesunięcia — stąd różnica w opisie stanu
+                    stanZawieraDostawe = magZrodlowy == null,
                     onRecznie = { wpisany ->
                         val code = normalizeLoc(wpisany)
                         val err = validateLoc(code, locInfo)
@@ -626,6 +629,8 @@ private fun LineRow(
     allowManual: Boolean,
     manualOpen: Boolean,
     onManualOpen: () -> Unit,
+    /** Czy stan na hali zawiera już tę dostawę — patrz `PanelOdkladania`. */
+    stanZawieraDostawe: Boolean,
     onRecznie: (String) -> Unit,
     onTap: () -> Unit,
     onProblem: () -> Unit,
@@ -775,6 +780,7 @@ private fun LineRow(
                     allowManual = allowManual,
                     manualOpen = manualOpen,
                     onManualOpen = onManualOpen,
+                    stanZawieraDostawe = stanZawieraDostawe,
                     onRecznie = onRecznie,
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
@@ -818,6 +824,14 @@ private fun PanelOdkladania(
         nie wymaga ponownego tapnięcia linku przy każdej pozycji. */
     manualOpen: Boolean,
     onManualOpen: () -> Unit,
+    /**
+     * Czy stan na hali zawiera już rozkładaną partię.
+     *
+     * Dostawa krajowa jest księgowana wprost na MAG, więc tak; kontener stoi
+     * na MGP do czasu przesunięcia, więc nie. Różnica jest widoczna dla
+     * człowieka przy regale, bo zmienia to, ilu sztuk ma się tam spodziewać.
+     */
+    stanZawieraDostawe: Boolean,
     /** Ręcznie wpisany kod półki — zniszczona etykieta nie może blokować pozycji. */
     onRecznie: (String) -> Unit,
     onProblem: () -> Unit,
@@ -853,6 +867,37 @@ private fun PanelOdkladania(
                 color = AmberInk,
                 modifier = Modifier.weight(1f),
             )
+        }
+        /* Stan przy półce odpowiada na pytanie, które magazynier zadaje sobie
+           z kartonem w ręce: „czy tego już tam coś leży". Rozbieżność widać
+           dopiero tutaj — pusty regał przy stanie 40 znaczy, że poprzednia
+           dostawa nie została rozłożona albo poszła gdzie indziej.
+
+           Przy dostawie krajowej towar figuruje na MAG od ZAKSIĘGOWANIA
+           dokumentu, więc ta liczba zawiera już niesioną partię — i mówimy
+           o tym wprost, zamiast zostawiać człowieka z zagadką arytmetyczną. */
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                "na hali ${formatQty(line.stanMag)}",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Ink,
+            )
+            if (stanZawieraDostawe) {
+                Text("(z tą dostawą)", fontSize = 11.sp, color = InkMute)
+            }
+            if (line.stanMgp > 0) {
+                Text(
+                    "· w przyjęciach ${formatQty(line.stanMgp)}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmberInk,
+                )
+            }
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

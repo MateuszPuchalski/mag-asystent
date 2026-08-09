@@ -444,6 +444,34 @@ export class SeededSubiektAdapter {
   }
 
   /**
+   * Stany kompletu towarów na hali i w przyjęciach — jedno zapytanie, nie N.
+   *
+   * Lista pozycji dostawy bywa kilkudziesięciowierszowa i odświeża się po
+   * KAŻDYM odłożeniu, więc pytanie o stan per wiersz zjadłoby dokładnie ten
+   * budżet, który przed chwilą odzyskaliśmy na innych trasach.
+   */
+  stanyDlaTowarow(twIds: number[]): Map<number, { mag: number; mgp: number }> {
+    const out = new Map<number, { mag: number; mgp: number }>();
+    if (twIds.length === 0) return out;
+    const dziury = twIds.map(() => "?").join(",");
+    const rows = db()
+      .prepare(
+        `SELECT tw_id, mag_id, stan FROM sgt_stan
+         WHERE tw_id IN (${dziury}) AND mag_id IN (?, ?)`
+      )
+      .all(...twIds, config.magId.MAG, config.magId.MGP) as unknown as Array<{
+      tw_id: number; mag_id: number; stan: number;
+    }>;
+    for (const r of rows) {
+      const wpis = out.get(r.tw_id) ?? { mag: 0, mgp: 0 };
+      if (r.mag_id === config.magId.MAG) wpis.mag = r.stan;
+      else wpis.mgp = r.stan;
+      out.set(r.tw_id, wpis);
+    }
+    return out;
+  }
+
+  /**
    * Liczba pozycji per dokument, jednym zapytaniem — lista dostaw pyta o nią
    * dla każdego dokumentu z okna, a zapytanie na dokument to N+1.
    */
