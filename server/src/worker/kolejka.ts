@@ -138,6 +138,8 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
     let docNo: string | null = null;
     if (task.type === "set_location") {
       await sfera.applySetLocation(payload.twId, payload.newValue);
+    } else if (task.type === "set_ean") {
+      await sfera.applySetEan(payload.twId, payload.ean);
     } else if (task.type === "mm") {
       docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
     } else {

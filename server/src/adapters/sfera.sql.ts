@@ -35,6 +35,30 @@ export class SqlSferaAdapter implements SferaAdapter {
     db().prepare("UPDATE sgt_towar SET lokalizacja = ? WHERE tw_id = ?").run(newValue, twId);
   }
 
+  /**
+   * Kod kreskowy — DRUGIE i ostatnie pole, które ten proces zmienia w bazie
+   * firmy (0.37.0).
+   *
+   * Kolumna jest STAŁA (`tw_PodstKodKresk`), więc nie przechodzi przez
+   * `assertSafeColumn` ani przez ustawienie: nie ma tu czego pomylić, a nazwa
+   * w kodzie jest zarazem dokumentacją wymaganego GRANT-u. Konto bez
+   * `GRANT UPDATE ON dbo.tw__Towar (tw_PodstKodKresk)` dostanie tu błąd
+   * uprawnień i zadanie wyląduje w `error` — funkcja NIE PADA, bo kod działa
+   * na kolektorze przez `ean_alias`, a biuro widzi w kolejce, czego brakuje.
+   */
+  async applySetEan(twId: number, ean: string): Promise<void> {
+    const pool = await mssqlPool();
+    const res = await pool
+      .request()
+      .input("id", sql.Int, twId)
+      .input("v", sql.NVarChar, ean)
+      .query("UPDATE tw__Towar SET tw_PodstKodKresk = @v WHERE tw_Id = @id");
+    if (!res.rowsAffected[0]) {
+      throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
+    }
+    db().prepare("UPDATE sgt_towar SET ean = ? WHERE tw_id = ?").run(ean, twId);
+  }
+
   async createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {
     // MM nie da się bezpiecznie zrobić SQL-em (dokument + numeracja + skutki
     // magazynowe to domena Sfery). Tworzy je worker Sfery — gotowy proces C#

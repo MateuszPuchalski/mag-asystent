@@ -77,6 +77,41 @@ export interface AudytLokalizacji {
 }
 
 /**
+ * Zadanie nadania kodu kreskowego (0.37.0) wraz z wpisem do audytu.
+ *
+ * DRUGIE pole, które aplikacja zapisuje do bazy firmy — do 0.37.0 była nim
+ * wyłącznie lokalizacja. Rozszerzenie granicy zapisu jest świadome i kosztuje
+ * nowe uprawnienie kolumnowe (`GRANT UPDATE ON dbo.tw__Towar
+ * (tw_PodstKodKresk)`); bez niego zadanie ląduje w błędzie, a kod i tak działa
+ * na kolektorze przez `ean_alias`.
+ *
+ * `eanPrzed` jest tu z tego samego powodu co `locsPrzed` niżej: wycofanie
+ * zmiany polega na wpisaniu z powrotem dokładnie tego, co w polu stało.
+ */
+export function enqueueSetEan(
+  twId: number,
+  ean: string,
+  base: EnqueueBase,
+  audyt: { eanPrzed: string; zrodlo: "karta" | "dostawa"; wyslanePrzez?: string | null }
+): number {
+  const queueId = insert("set_ean", { twId, ean }, base);
+  logEvent(
+    "ean_set",
+    base.createdBy,
+    twId,
+    {
+      eanPrzed: audyt.eanPrzed,
+      result: ean,
+      zrodlo: audyt.zrodlo,
+      queueId,
+      ...(audyt.wyslanePrzez ? { wyslanePrzez: audyt.wyslanePrzez } : {}),
+    },
+    base.createdByRef ?? currentUserRef()
+  );
+  return queueId;
+}
+
+/**
  * Zadanie zmiany lokalizacji (spec §5.2) wraz z wpisem do audytu.
  *
  * Zdarzenie powstaje TUTAJ, a nie w miejscach wywołania, i to jest decyzja

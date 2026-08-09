@@ -8,6 +8,7 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
+import { aliasKodu } from "./ean-alias.js";
 import { freshLock, lockedByOther } from "./locks.js";
 import type {
   DeliveryDocument,
@@ -454,6 +455,16 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   if (candidates.length === 0) {
     const bySym = subiekt.getProductBySymbol(code);
     if (bySym) candidates = [bySym];
+  }
+  if (candidates.length === 0) {
+    /* Kod nadany w WERTIS — FURTKA, sprawdzana dopiero, gdy kartoteka nie zna
+       kodu ani jako EAN, ani jako symbol (0.37.0). Bez niej kod nadany przy
+       jednej dostawie nie działałby przy następnej, dopóki worker i import nie
+       przepchną go do Subiekta — czyli dokładnie tam, gdzie ktoś go nadał, żeby
+       działał od razu. */
+    const alias = aliasKodu(code);
+    const t = alias ? subiekt.getProductById(alias.twId) : undefined;
+    if (t) candidates = [t];
   }
   if (candidates.length === 0) return { kind: "unknown", code };
 

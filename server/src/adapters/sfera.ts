@@ -42,6 +42,14 @@ export interface SferaAdapter {
   /** Ustaw pole lokalizacji na kartotece towaru (spec §5.2). */
   applySetLocation(twId: number, newValue: string): Promise<void>;
   /**
+   * Ustaw podstawowy kod kreskowy kartoteki — `tw_PodstKodKresk` (0.37.0).
+   *
+   * DRUGIE pole, które aplikacja zmienia w bazie firmy. Rozszerzenie tej
+   * granicy było świadome i kosztuje osobne uprawnienie kolumnowe; powód —
+   * karton z kodem, którego kartoteka nie zna — stoi w `services/ean-alias.ts`.
+   */
+  applySetEan(twId: number, ean: string): Promise<void>;
+  /**
    * Utwórz dokument MM (magazyn źródłowy → docelowy), przesuń pozycje,
    * zwróć numer dokumentu MM (spec §5.3 / §9).
    */
