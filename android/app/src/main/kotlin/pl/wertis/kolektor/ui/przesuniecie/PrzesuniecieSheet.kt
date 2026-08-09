@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -271,6 +275,16 @@ fun PrzesuniecieSheet(
                    ląduje w `location` jak skan — dalej działa ta sama walidacja
                    `blocker` i ta sama droga zapisu. */
                 if (locInfo?.allowManual != false) {
+                    /* Kod przyjęty → pole czyszczone: stary tekst przy
+                       następnym otwarciu byłby pułapką (OK wysłałby poprzedni
+                       adres). Fokus od razu po otwarciu — bez drugiego tapa. */
+                    val przyjmij = {
+                        przyjmijReczny(manual, locInfo, graph) {
+                            location = it
+                            locationReczna = true
+                            manual = ""
+                        }
+                    }
                     if (!manualOpen) {
                         Text(
                             "Wpisz lokalizację ręcznie…",
@@ -278,30 +292,25 @@ fun PrzesuniecieSheet(
                             fontWeight = FontWeight.SemiBold,
                             color = AmberDark,
                             modifier = Modifier
+                                .fillMaxWidth()
+                                // 48 dp — cel na rękawicę, nie na kursor
+                                .heightIn(min = 48.dp)
                                 .clickable { manualOpen = true }
-                                .padding(vertical = 2.dp),
+                                .wrapContentHeight(),
                         )
                     } else {
+                        val fokus = remember { FocusRequester() }
+                        LaunchedEffect(Unit) { fokus.requestFocus() }
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 WertisTextField(
                                     value = manual,
                                     onValueChange = { manual = it.uppercase() },
                                     placeholder = "np. E08-03-01",
-                                    modifier = Modifier.weight(1f),
-                                    onDone = {
-                                        przyjmijReczny(manual, locInfo, graph) {
-                                            location = it
-                                            locationReczna = true
-                                        }
-                                    },
+                                    modifier = Modifier.weight(1f).focusRequester(fokus),
+                                    onDone = { przyjmij() },
                                 )
-                                PrimaryButton("OK") {
-                                    przyjmijReczny(manual, locInfo, graph) {
-                                        location = it
-                                        locationReczna = true
-                                    }
-                                }
+                                PrimaryButton("OK") { przyjmij() }
                             }
                             Text("Bez spacji · ręczne wpisywanie = ryzyko literówek", fontSize = 11.sp, color = InkMute)
                         }

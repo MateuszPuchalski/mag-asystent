@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -136,6 +140,8 @@ fun ScanLocScreen(graph: AppGraph) {
             graph.feedback.beep(false)
             return
         }
+        // kod przyjęty — stary tekst w polu byłby pułapką przy następnym wpisie
+        manual = ""
         // Tryb DODAJ jest jednoznaczny — człowiek zadeklarował intencję,
         // wchodząc tu przyciskiem, więc nie ma o co pytać drugi raz.
         if (dodaj) {
@@ -271,17 +277,22 @@ fun ScanLocScreen(graph: AppGraph) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
+                        // 48 dp — cel na rękawicę, nie na kursor
+                        .heightIn(min = 48.dp)
                         .clickable { manualOpen = true }
-                        .padding(6.dp),
+                        .wrapContentHeight(),
                 )
             } else {
+                // fokus od razu — otwarcie pola nie wymaga drugiego tapnięcia
+                val fokus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { fokus.requestFocus() }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         WertisTextField(
                             value = manual,
                             onValueChange = { manual = it.uppercase() },
                             placeholder = "np. E08-03-01",
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).focusRequester(fokus),
                             onDone = { handleCode(manual, recznie = true) },
                         )
                         PrimaryButton("OK") { handleCode(manual, recznie = true) }

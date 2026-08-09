@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -34,6 +36,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -134,6 +138,16 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var mismatch by remember(id) { mutableStateOf<Pair<DeliveryLineView, String>?>(null) }
     /** Czy kod w `mismatch` był wpisany z ręki — do raportu etykiet. */
     var mismatchReczna by remember(id) { mutableStateOf(false) }
+    /* Pamięć decyzji rozjazdu W TEJ dostawie, per para oczekiwana→zeskanowana.
+       Dziesięć pozycji z jednego kartonu odłożonych na tę samą „inną" półkę
+       pytało dziesięć razy o to samo — identyczna odpowiedź przestaje być
+       decyzją, a staje się przeszkodą w rytmie. Powtórka idzie automatem
+       Z TOASTEM (człowiek widzi, co się stało), inna para pyta normalnie.
+       Pamięć umiera z dostawą — to decyzja o TYM kartonie, nie reguła. */
+    val rozjazdPamiec = remember(id) { mutableStateMapOf<Pair<String, String>, LocApplyAction>() }
+    /* Pole ręcznego wpisu otwarte per DOSTAWA, nie per pozycja: seria przy
+       zniszczonych etykietach nie wymaga ponownego tapnięcia co pozycję. */
+    var manualOpen by remember(id) { mutableStateOf(false) }
     /** Zgłoszenie wyjątku; `line` = null → problem całej dostawy (D8). */
     var problemFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     var problemOpen by remember(id) { mutableStateOf(false) }
@@ -255,6 +269,15 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     suspend fun putaway(line: DeliveryLineView, code: String, recznie: Boolean = false) {
         val expected = line.locExpected
         if (!expected.isNullOrBlank() && expected != code) {
+            val zapamietana = rozjazdPamiec[expected to code]
+            if (zapamietana != null) {
+                graph.effects.toast(
+                    "Rozjazd jak poprzednio: " +
+                        if (zapamietana == LocApplyAction.REPLACE) "ZAMIEŃ" else "DODAJ"
+                )
+                commitPutaway(line, code, zapamietana, recznie = recznie)
+                return
+            }
             graph.feedback.beep(false)
             // pochodzenie kodu przeżywa pytanie o rozjazd — inaczej ręczny
             // wpis z inną półką wypadałby z raportu etykiet
@@ -355,7 +378,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        a taki licznik rozjeżdża się po cichu przy pierwszej dołożonej sekcji. */
     val listState = rememberLazyListState()
     val indeksAktywnej = active?.let { a -> uporzadkowane.indexOfFirst { it.id == a.id } } ?: -1
-    LaunchedEffect(active?.id) {
+    /* Także gdy panel ROŚNIE (pytanie o rozjazd, pole ręcznego wpisu) —
+       bez tego dodatkowa treść uciekała pod dolną krawędź bez korekty. */
+    LaunchedEffect(active?.id, mismatch?.first?.id, manualOpen) {
         if (indeksAktywnej >= 0) listState.animateScrollToItem(indeksAktywnej + 1)
     }
 
@@ -461,6 +486,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     tryb = trybWiersza(line.status, aktywna = active?.id == line.id),
                     rozjazd = mismatch?.takeIf { it.first.id == line.id }?.second,
                     allowManual = locInfo?.allowManual != false,
+                    manualOpen = manualOpen,
+                    onManualOpen = { manualOpen = true },
                     onRecznie = { wpisany ->
                         val code = normalizeLoc(wpisany)
                         val err = validateLoc(code, locInfo)
@@ -492,6 +519,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     onCancel = { zwolnij(line) },
                     onRozjazd = { action ->
                         mismatch?.let { (l, code) ->
+                            // decyzja zostaje w pamięci dostawy — powtórka tej
+                            // samej pary półek nie zapyta drugi raz
+                            l.locExpected?.let { rozjazdPamiec[it to code] = action }
                             scope.launch { commitPutaway(l, code, action, recznie = mismatchReczna) }
                         }
                     },
@@ -585,6 +615,8 @@ private fun LineRow(
     /** Zeskanowana półka niezgodna z kartoteką — decyzja zapada TU (§4.3). */
     rozjazd: String?,
     allowManual: Boolean,
+    manualOpen: Boolean,
+    onManualOpen: () -> Unit,
     onRecznie: (String) -> Unit,
     onTap: () -> Unit,
     onProblem: () -> Unit,
@@ -729,6 +761,8 @@ private fun LineRow(
                 PanelOdkladania(
                     line = line,
                     allowManual = allowManual,
+                    manualOpen = manualOpen,
+                    onManualOpen = onManualOpen,
                     onRecznie = onRecznie,
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
@@ -768,6 +802,10 @@ private fun LokPastylka(code: String?, przygaszona: Boolean) {
 private fun PanelOdkladania(
     line: DeliveryLineView,
     allowManual: Boolean,
+    /** Otwarte per DOSTAWA (stan w ekranie) — seria zniszczonych etykiet
+        nie wymaga ponownego tapnięcia linku przy każdej pozycji. */
+    manualOpen: Boolean,
+    onManualOpen: () -> Unit,
     /** Ręcznie wpisany kod półki — zniszczona etykieta nie może blokować pozycji. */
     onRecznie: (String) -> Unit,
     onProblem: () -> Unit,
@@ -776,7 +814,6 @@ private fun PanelOdkladania(
     onPrzesun: (() -> Unit)?,
     onCancel: () -> Unit,
 ) {
-    var manualOpen by remember(line.id) { mutableStateOf(false) }
     var manual by remember(line.id) { mutableStateOf("") }
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
@@ -822,17 +859,23 @@ private fun PanelOdkladania(
                     fontWeight = FontWeight.SemiBold,
                     color = AmberDark,
                     modifier = Modifier
-                        .clickable { manualOpen = true }
-                        .padding(vertical = 4.dp),
+                        .fillMaxWidth()
+                        // pełny wiersz i 48 dp — łokieć w rękawicy, nie kursor
+                        .heightIn(min = 48.dp)
+                        .clickable(onClick = onManualOpen)
+                        .wrapContentHeight(),
                 )
             } else {
+                // fokus od razu — otwarcie pola nie wymaga drugiego tapnięcia
+                val fokus = remember { FocusRequester() }
+                LaunchedEffect(line.id) { fokus.requestFocus() }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         WertisTextField(
                             value = manual,
                             onValueChange = { manual = it.uppercase() },
                             placeholder = "np. E08-03-01",
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).focusRequester(fokus),
                             onDone = { onRecznie(manual) },
                         )
                         PrimaryButton("OK") { onRecznie(manual) }

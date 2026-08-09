@@ -108,13 +108,17 @@ fun LocationScreen(graph: AppGraph) {
                     placeholder = "albo wpisz kod, np. A01-02-03",
                     modifier = Modifier.weight(1f),
                     onDone = {
-                        manual.trim().takeIf { it.isNotEmpty() }
-                            ?.let { graph.nav.openLocation(normalizeLoc(it)) }
+                        manual.trim().takeIf { it.isNotEmpty() }?.let {
+                            graph.nav.openLocation(normalizeLoc(it))
+                            manual = "" // przyjęty kod nie może czekać w polu na pomyłkę
+                        }
                     },
                 )
                 PrimaryButton("POKAŻ") {
-                    manual.trim().takeIf { it.isNotEmpty() }
-                        ?.let { graph.nav.openLocation(normalizeLoc(it)) }
+                    manual.trim().takeIf { it.isNotEmpty() }?.let {
+                        graph.nav.openLocation(normalizeLoc(it))
+                        manual = ""
+                    }
                 }
             }
             Text(
