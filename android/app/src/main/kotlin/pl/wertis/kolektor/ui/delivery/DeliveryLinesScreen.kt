@@ -51,6 +51,8 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.adresWiersza
+import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
+import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
@@ -356,26 +358,16 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         scope.launch { runCatching { apiCall { graph.api.releaseLine(id, line.id) } } }
     }
 
-    /* KOLEJNOŚĆ WIERSZY JEST STAŁA. Serwer sortuje po lokalizacji i tak zostaje;
-       odłożone pozycje zwężają się W MIEJSCU, zamiast znikać albo spadać na dół.
-       Powód jest z hali: karton drobnicy to dziesięć pozycji, każda na własną
-       półkę, a rozkłada się je w kolejności „co wpadnie w rękę". Lista nie jest
-       więc kolejką, tylko kontrolą kompletności — a lista, która przestawia się
-       po każdym odłożeniu, do sprawdzania wzrokiem się nie nadaje.
+    /* Do zrobienia na górze, bez lokalizacji pośrodku, ODŁOŻONE NA DOLE.
+       Reguła i powód jej odwrócenia (do 0.35.0 odłożone zostawały w miejscu)
+       siedzą w :core — razem z zabezpieczeniem, że pozycja z PROBLEMEM na dół
+       nie schodzi, bo czeka na decyzję (D8).
 
-       Jedyne przestawienie, jakie zostaje, to zepchnięcie pozycji BEZ
-       LOKALIZACJI na koniec: to nie rutyna, tylko SKU wymagające decyzji. */
-    /* Grupowanie zostaje na SNAPSHOCIE (`locExpected`) i to jest świadome:
-       gdyby pozycja przeskakiwała do reszty listy w chwili nadania adresu,
-       wiersze skakałyby pod kciukiem przy każdym odłożeniu — dokładnie to,
-       czego zabrania reguła stałej kolejności. */
-    val bezLok = v.lines.filter { it.locExpected == null }
-    val uporzadkowane = v.lines.filter { it.locExpected != null } + bezLok
-    /* Licznik nagłówka liczy natomiast to, co NAPRAWDĘ czeka na decyzję —
-       pozycja z nadanym adresem nie jest już „bez lokalizacji", choć zostaje
-       na swoim miejscu w liście. Gdy zostanie zero, nagłówek znika. */
-    val bezLokDoDecyzji = bezLok.count { it.locActual == null }
-    val pierwszyBezLok = if (bezLokDoDecyzji > 0) bezLok.firstOrNull()?.id else null
+       Kolejność alejkowa z serwera przeżywa sortowanie, bo jest stabilne —
+       trasa przez halę się nie zmienia. */
+    val uporzadkowane = uporzadkujPozycje(v.lines, { it.status }, { it.locExpected })
+    val bezLok = czekaBezLokalizacji(v.lines, { it.status }, { it.locExpected })
+    val pierwszyBezLok = bezLok.firstOrNull()?.id
 
     /* Rozwinięta pozycja idzie pod górną krawędź. To NIE jest kosmetyka: właśnie
        po to karta odkładania była kiedyś pełnoekranowa — z lokalizacją trzeba
@@ -481,7 +473,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     ) {
                         Icon(WIcons.Alert, null, tint = AmberInk, modifier = Modifier.size(15.dp))
                         Text(
-                            "BEZ LOKALIZACJI ($bezLokDoDecyzji)",
+                            "BEZ LOKALIZACJI (${bezLok.size})",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.1.sp,
