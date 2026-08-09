@@ -768,7 +768,7 @@ private fun PanelOdkladania(
         if (allowManual) {
             if (!manualOpen) {
                 Text(
-                    "Etykieta zniszczona? Wpisz lokalizację ręcznie…",
+                    "Wpisz lokalizację ręcznie…",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AmberDark,
