@@ -48,6 +48,8 @@ import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
+import pl.wertis.kolektor.core.loc.validateLoc
+import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.DeliveryLineView
 import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.EanCandidate
@@ -69,6 +71,7 @@ import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
+import pl.wertis.kolektor.ui.theme.AmberDark
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
 import pl.wertis.kolektor.ui.theme.BarlowCond
@@ -116,6 +119,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             value
         }
     }
+
+    // reguła walidacji kodu półki — do ręcznego wpisu przy zniszczonej etykiecie
+    val locInfo by produceState(graph.locationsRepo.cached()) { value = graph.locationsRepo.get() }
 
     /** Linia oczekująca na skan lokalizacji (drugi skan). */
     var active by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
@@ -407,6 +413,17 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     line = line,
                     tryb = trybWiersza(line.status, aktywna = active?.id == line.id),
                     rozjazd = mismatch?.takeIf { it.first.id == line.id }?.second,
+                    allowManual = locInfo?.allowManual != false,
+                    onRecznie = { wpisany ->
+                        val code = normalizeLoc(wpisany)
+                        val err = validateLoc(code, locInfo)
+                        if (err != null) {
+                            graph.effects.toast(err)
+                            graph.feedback.beep(false)
+                        } else {
+                            scope.launch { putaway(line, code) }
+                        }
+                    },
                     onTap = {
                         if (active?.id == line.id) zwolnij(line)
                         else scope.launch { resolveProduct(line.sym) }
@@ -518,6 +535,8 @@ private fun LineRow(
     tryb: TrybWiersza,
     /** Zeskanowana półka niezgodna z kartoteką — decyzja zapada TU (§4.3). */
     rozjazd: String?,
+    allowManual: Boolean,
+    onRecznie: (String) -> Unit,
     onTap: () -> Unit,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
@@ -660,6 +679,8 @@ private fun LineRow(
             } else {
                 PanelOdkladania(
                     line = line,
+                    allowManual = allowManual,
+                    onRecznie = onRecznie,
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
                     onPrzesun = onPrzesun,
@@ -697,12 +718,17 @@ private fun LokPastylka(code: String?, przygaszona: Boolean) {
 @Composable
 private fun PanelOdkladania(
     line: DeliveryLineView,
+    allowManual: Boolean,
+    /** Ręcznie wpisany kod półki — zniszczona etykieta nie może blokować pozycji. */
+    onRecznie: (String) -> Unit,
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
     /** null = dostawa księgowana wprost na halę, nie ma czego przesuwać. */
     onPrzesun: (() -> Unit)?,
     onCancel: () -> Unit,
 ) {
+    var manualOpen by remember(line.id) { mutableStateOf(false) }
+    var manual by remember(line.id) { mutableStateOf("") }
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -734,6 +760,37 @@ private fun PanelOdkladania(
         ) {
             Icon(WIcons.Pin, null, tint = InkSoft, modifier = Modifier.size(18.dp))
             Text("zeskanuj etykietę lokalizacji", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = InkSoft)
+        }
+        /* Zniszczona etykieta nie może blokować pozycji — ta sama furtka co na
+           ekranie zmiany lokalizacji, za tym samym przełącznikiem serwera
+           (allowManual). Wpisany kod idzie DOKŁADNIE tą samą ścieżką co skan
+           (putaway), więc rozjazd z kartoteką dalej pyta człowieka. */
+        if (allowManual) {
+            if (!manualOpen) {
+                Text(
+                    "Etykieta zniszczona? Wpisz lokalizację ręcznie…",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmberDark,
+                    modifier = Modifier
+                        .clickable { manualOpen = true }
+                        .padding(vertical = 4.dp),
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WertisTextField(
+                            value = manual,
+                            onValueChange = { manual = it.uppercase() },
+                            placeholder = "np. E08-03-01",
+                            modifier = Modifier.weight(1f),
+                            onDone = { onRecznie(manual) },
+                        )
+                        PrimaryButton("OK") { onRecznie(manual) }
+                    }
+                    Text("Bez spacji · ręczne wpisywanie = ryzyko literówek", fontSize = 11.sp, color = InkMute)
+                }
+            }
         }
         // Rozkładanie JEST sprawdzaniem faktury i liczy się KAŻDĄ pozycję, więc
         // rozbieżność ilościowa to najczęstszy wyjątek — zasługuje na własny
