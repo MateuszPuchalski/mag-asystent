@@ -28,6 +28,68 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.36.0 — 9 sierpnia 2026
+
+**Biuro wchodzi w fakturę.** Kliknięcie dostawy w podglądzie pokazuje jej
+pozycje: zdjęcie kartoteki, ile odłożono z ilu, adres, kto odłożył i kiedy.
+
+**[wymaga działania]** Nic. `git pull`, `npm ci`, `npm run build`, restart
+`wertis-api`. **Bez nowego APK** — kolektor nie dostał ani jednego nowego pola
+i to był warunek projektowy, nie przypadek (niżej).
+
+### Pasek postępu nie odpowiadał na żadne pytanie
+
+Lista dostaw mówiła „12/30" i na tym się kończyła. Które dwanaście, kto je
+odłożył, gdzie faktycznie wylądowały — żeby to sprawdzić, trzeba było otworzyć
+Subiekta obok. Najgorsze, że odpowiedzi leżały w bazie: kolumny `done_by`,
+`done_at` i `lok_faktyczna` zapisywały się od 0.17.0 i **nie czytał ich nikt**.
+
+Teraz wiersz dokumentu jest klikalny, a panel pokazuje pozycję po pozycji.
+Trzy rzeczy poza samą listą:
+
+- **Rozjazd adresu** jest wyróżniony na czerwono, z dopiskiem „zamiast X". To
+  jedyna zmiana, jaką WERTIS zapisuje do Subiekta, więc biuro ma prawo widzieć
+  ją przy fakturze, a nie tylko zbiorczo w rekoncyliacji.
+- **„W rękach: X"** przy pozycji trzymanej właśnie przez kogoś — odpowiedź na
+  „czemu to stoi", której nie było nigdzie.
+- **Wyjątek w wierszu swojej pozycji**, ze zdjęciem dowodowym. Dotąd wyjątki
+  żyły w osobnej sekcji i nie było widać, której pozycji faktury dotyczą.
+
+### Wejść da się także w dokument, którego nikt nie zaczął
+
+I to jest cała trudność tej zmiany. Otwarcie dostawy (`openDelivery`) jest
+ZAPISEM: zakłada rekord, sprząta pozycje usługowe i przestawia dokument
+z NIETKNIĘTA na W TOKU. Wywołanie go z biura sprawiłoby, że **samo patrzenie
+zmienia stan magazynu** — lista pracy zapełniłaby się dostawami, których nikt
+nie zaczął, a ludziom przy półce znikałyby blokady.
+
+Podgląd czyta więc dwoma drogami: dokument otwarty wprost z bazy (snapshot jest
+snapshotem — adres oczekiwany NIE jest odświeżany z kartoteki, bo na nim stoi
+wykrywanie rozjazdu), a nietknięty przez tę samą funkcję, której użyje otwarcie.
+Nagłówek mówi wprost, którą z dwóch list widzisz: druga jest prognozą i zmieni
+się, gdy księgowość poprawi fakturę przed otwarciem.
+
+Regułę „zero zapisu z podglądu" pilnuje teraz test, a nie tylko komentarz:
+liczba zapisów w kodzie strony ma być równa **jeden** i jest nim logowanie.
+
+### Dlaczego bez nowego APK
+
+Kuszące byłoby dopisać `doneBy` do `DeliveryLineView`. Ale typy w `types.ts` są
+lustrem DTO kolektora — zmiana wymusiłaby nowy APK i rozesłanie przez MDM
+aplikacji, w której nic się nie zmieniło. Typy podglądu mieszkają więc
+w `services/podglad-dostawy.ts` i czyta je wyłącznie strona biura.
+
+### Zdjęcia po trzy naraz
+
+Przy pierwszym trafieniu serwer ciągnie plik z Subiekta tą samą drogą, z której
+korzystają kolektory stojące przy regale, więc otwarcie dużej dostawy nie ma
+prawa ich zagłodzić. Brak zdjęcia pamiętamy — inaczej dokument z czterdziestoma
+takimi kartotekami pytałby czterdzieści razy co pół minuty przez cały dzień.
+Gdy `ZDJECIA_ZRODLO` jest puste, kolumna nie powstaje wcale: ramka „bez zdjęcia"
+przy każdej pozycji mówiłaby o brakującej kartotece, choć brakuje ustawienia.
+
+---
+
 ## 0.35.0 — 9 sierpnia 2026
 
 **Pięć poprawek z hali.** Faktury do dokończenia na górze listy, odłożona

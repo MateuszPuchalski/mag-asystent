@@ -61,6 +61,8 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/ean-conflicts",
     "/api/events",
     "/api/events/csv",
+    // Pozycje dokumentu (0.36.0) — mówią, co przyjechało, po ile i gdzie leży.
+    "/api/biuro/dokument/1",
   ]) {
     const r = await app.inject({ method: "GET", url });
     assert.equal(r.statusCode, 401, url);
@@ -90,6 +92,37 @@ test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
   assert.match(html, /PROTOKÓŁ ZGŁOSZENIA REKLAMACJI/, "szablon PARTNER");
   assert.match(html, /SZABLONY_DOSTAWCOW/, "wybór szablonu po dostawcy");
   assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
+});
+
+test("strona biura nie zapisuje niczego poza logowaniem", () => {
+  /* „ZERO ZAPISU" jest w tym pliku regułą od 0.18.0 i do 0.36.0 pilnowało jej
+     wyłącznie oko. Wejście w dokument to pierwsze miejsce, w którym łatwo ją
+     złamać przez wygodę: `POST /api/delivery/documents/:dokId/open` różni się
+     od trasy podglądu o jeden człon ścieżki, a zwróciłby to samo. Kosztem
+     byłoby otwarcie dostawy przez samo PATRZENIE — czyli zabranie blokad
+     komuś przy półce i dokument w statusie W TOKU, którego nikt nie zaczął. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.equal(
+    (html.match(/method:\s*"POST"/g) ?? []).length,
+    1,
+    "jedynym zapisem strony ma zostać logowanie"
+  );
+  assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
+  assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
+});
+
+test("podgląd pokazuje, kto odłożył pozycję", () => {
+  /* `done_by` i `done_at` leżały w bazie od 0.17.0 bez ani jednego czytelnika.
+     Wyleciałyby z widoku niezauważone przy pierwszym porządkowaniu tabeli. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /doneBy/);
+  assert.match(html, /KTO ODŁOŻYŁ/);
 });
 
 test("podgląd nie oferuje raportu wydajności per osoba", () => {

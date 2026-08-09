@@ -434,6 +434,12 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   prowadzi do szczegółu.
 - Trzy zakładki. **DOSTAWY I REKLAMACJE** — postęp per dokument oraz
   nierozwiązane wyjątki; protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
+- **Wejście w fakturę** (0.36.0): kliknięcie wiersza pokazuje jej pozycje —
+  zdjęcie kartoteki, ile odłożono z ilu, adres, status, kto odłożył i kiedy.
+  Rozjazd adresu jest wyróżniony, a zgłoszony wyjątek siedzi w wierszu swojej
+  pozycji. Wejść da się także w dokument, którego **nikt jeszcze nie zaczął** —
+  wtedy pozycje idą wprost z faktury i nagłówek mówi o tym wprost. Podgląd
+  **czyta**: kliknięcie nie otwiera dostawy i nie zabiera nikomu blokad.
 - **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
   p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
   kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów
@@ -463,7 +469,9 @@ server/                    backend (Fastify + SQLite + worker)
                            przesuniecie (stan między magazynami, MM),
                            problems + ean (wyjątki),
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
-                           a nie leży w regale), queue, locks, locations, events
+                           a nie leży w regale), podglad-dostawy (pozycje
+                           dokumentu dla biura — sam odczyt),
+                           queue, locks, locations, events
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)

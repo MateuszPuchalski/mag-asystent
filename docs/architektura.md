@@ -83,6 +83,16 @@ podgląd świadomie nie jest drugim frontem: zero frameworka, zero zapisu.
 Powstał w 0.18.0, bo wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał,
 którym biuro widziało stan dostaw.
 
+Od 0.36.0 da się z listy **wejść w fakturę** i zobaczyć jej pozycje: zdjęcie,
+postęp, adres, autora odłożenia i wyjątek przy właściwej linii. Także taką,
+której nikt nie zaczął — a to jest cała trudność tej trasy. Otwarcie dostawy
+(`openDelivery`) jest ZAPISEM: zakłada rekord, sprząta pozycje usługowe
+i przestawia dokument na W TOKU. Podgląd nie ma prawa go wołać, bo wtedy samo
+patrzenie zapełniałoby listę pracy dokumentami, których nikt nie tknął. Dlatego
+`services/podglad-dostawy.ts` czyta dwoma drogami — snapshot z `delivery_line`
+albo pozycje z faktury tym samym helperem, którego użyje otwarcie — i mówi
+w odpowiedzi, którą z nich pokazuje.
+
 Od 0.27.0 ma trzy zakładki i pasek stanu: dostawy z reklamacjami, stan systemu
 (metryki, kolejka, rekoncyliacja, kolizje kodów, meldunek serwera) oraz ślad
 audytowy z filtrami. Zasada „zero zapisu" nie drgnęła — ponowienie zadania
