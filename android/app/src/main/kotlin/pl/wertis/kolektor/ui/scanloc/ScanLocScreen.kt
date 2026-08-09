@@ -92,6 +92,7 @@ fun ScanLocScreen(graph: AppGraph) {
     var manualOpen by remember { mutableStateOf(false) }
     var manual by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<String?>(null) }
+    var pendingReczne by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     /* Skan, który przyszedł ZANIM karta dojechała. `handleCode` musi znać
        obecne adresy towaru, więc bez karty nie ma jak rozstrzygnąć — ale
@@ -118,7 +119,7 @@ fun ScanLocScreen(graph: AppGraph) {
         }
     }
 
-    fun handleCode(raw: String) {
+    fun handleCode(raw: String, recznie: Boolean = false) {
         val card = p ?: run {
             queuedScan = raw
             return
@@ -138,14 +139,16 @@ fun ScanLocScreen(graph: AppGraph) {
         // Tryb DODAJ jest jednoznaczny — człowiek zadeklarował intencję,
         // wchodząc tu przyciskiem, więc nie ma o co pytać drugi raz.
         if (dodaj) {
-            save(LocChoice(LocAction.ADD, code))
+            save(LocChoice(LocAction.ADD, code, recznie = recznie))
             return
         }
         if (card.locs.size > 1) {
+            // pochodzenie kodu przeżywa arkusz zastąp/dodaj — do raportu etykiet
+            pendingReczne = recznie
             pending = code // realna decyzja — arkusz zostaje
             return
         }
-        save(LocChoice(LocAction.REPLACE, code))
+        save(LocChoice(LocAction.REPLACE, code, recznie = recznie))
     }
 
     ScanHandlerEffect { scan ->
@@ -279,9 +282,9 @@ fun ScanLocScreen(graph: AppGraph) {
                             onValueChange = { manual = it.uppercase() },
                             placeholder = "np. E08-03-01",
                             modifier = Modifier.weight(1f),
-                            onDone = { handleCode(manual) },
+                            onDone = { handleCode(manual, recznie = true) },
                         )
-                        PrimaryButton("OK") { handleCode(manual) }
+                        PrimaryButton("OK") { handleCode(manual, recznie = true) }
                     }
                     Text("Bez spacji · ręczne wpisywanie = ryzyko literówek", fontSize = 11.sp, color = InkMute)
                 }
@@ -289,5 +292,10 @@ fun ScanLocScreen(graph: AppGraph) {
         }
     }
 
-    LocChoiceSheet(product = p, code = pending, onClose = { pending = null }, onPick = ::save)
+    LocChoiceSheet(
+        product = p,
+        code = pending,
+        onClose = { pending = null },
+        onPick = { save(it.copy(recznie = pendingReczne)) },
+    )
 }

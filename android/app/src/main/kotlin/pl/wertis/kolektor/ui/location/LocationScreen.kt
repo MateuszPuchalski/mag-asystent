@@ -161,7 +161,7 @@ fun LocationScreen(graph: AppGraph) {
                     ProductRowCard(graph, row) {
                         graph.nav.openProduct(
                             row.id,
-                            RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji"),
+                            RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji", row.name),
                         )
                     }
                 }

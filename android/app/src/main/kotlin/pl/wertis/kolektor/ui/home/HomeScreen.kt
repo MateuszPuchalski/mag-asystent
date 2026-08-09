@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -105,7 +106,7 @@ fun HomeScreen(graph: AppGraph) {
     }
 
     fun openRow(x: ProductRow) {
-        graph.nav.openProduct(x.id, RecentEntry(x.id, x.sym, x.locs.firstOrNull() ?: "brak lokalizacji"))
+        graph.nav.openProduct(x.id, RecentEntry(x.id, x.sym, x.locs.firstOrNull() ?: "brak lokalizacji", x.name))
     }
 
     // jedna droga skanu dla całej aplikacji — kontekst przyklejony musi
@@ -204,13 +205,20 @@ fun HomeScreen(graph: AppGraph) {
                            czytanie symbolu. Zdjęcia są już w cache'u, bo
                            kartę tego towaru otwierano chwilę wcześniej. */
                         MiniaturaTowaru(graph, r.id, 36.dp)
-                        Text(
-                            r.sym,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = Ink,
-                            modifier = Modifier.weight(1f),
-                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(r.sym, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink)
+                            // sam symbol słabo działa jako pamięć podręczna —
+                            // „który to był W32-…?" rozstrzyga dopiero nazwa
+                            if (r.name.isNotBlank()) {
+                                Text(
+                                    r.name,
+                                    fontSize = 11.sp,
+                                    color = InkSoft,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp),

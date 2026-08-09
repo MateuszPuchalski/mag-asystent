@@ -43,7 +43,12 @@ suspend fun saveLocation(
         // nie podpisał jej cudzym nazwiskiem
         userRef = graph.session.state.value.userId,
         productId = productId,
-        setLocation = SetLocationBody(choice.action, value = choice.value, replaced = choice.replaced),
+        setLocation = SetLocationBody(
+            choice.action,
+            value = choice.value,
+            replaced = choice.replaced,
+            recznie = choice.recznie.takeIf { it },
+        ),
     )
     graph.queueRepo.refreshNow()
     graph.feedback.beep(true)

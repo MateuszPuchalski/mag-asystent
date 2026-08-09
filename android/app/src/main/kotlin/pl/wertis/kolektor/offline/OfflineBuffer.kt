@@ -73,6 +73,16 @@ class ApiOpSender(private val api: ApiService) : OpSender {
                     asUser = op.user,
                     bufferedUser = op.userRef?.toString(),
                 ).queueId
+            PendingOp.OpKind.PUTAWAY -> {
+                val p = requireNotNull(op.putaway)
+                api.deliveryPutaway(
+                    p.deliveryId,
+                    p.lineId,
+                    p.body,
+                    asUser = op.user,
+                    bufferedUser = op.userRef?.toString(),
+                ).queueId
+            }
         }
     }
 }

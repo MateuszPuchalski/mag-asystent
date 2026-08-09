@@ -20,6 +20,8 @@ interface LocBody {
   action: LocAction;
   value?: string;
   replaced?: string;
+  /** Kod WPISANY z ręki, nie zeskanowany — zasila raport etykiet do przedruku. */
+  recznie?: boolean;
 }
 
 const AKCJE: readonly LocAction[] = ["replace", "add", "remove", "replace_one"];
@@ -199,6 +201,16 @@ export async function productRoutes(app: FastifyInstance) {
           wyslanePrzez: autor.wyslanePrzez,
         }
       );
+      /* Kod wpisany z ręki zamiast zeskanowany = sygnał zniszczonej etykiety.
+         Ten sam kształt zdarzenia co przy ręcznym „skanie" (`manual_entry`
+         wyżej), więc raport etykiet do przedruku widzi obie drogi bez zmian. */
+      if (body.recznie && body.action !== "remove" && body.value) {
+        logEvent("manual_entry", user, twId, {
+          code: body.value.trim().toUpperCase(),
+          kind: "LOC",
+          zrodlo: "karta",
+        });
+      }
       return { queueId };
     }
   );

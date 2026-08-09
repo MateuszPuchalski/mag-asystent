@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.EanConflictRow
+import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.net.ProblemView
 import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.text.formatQty
@@ -124,7 +125,7 @@ fun ProblemsScreen(graph: AppGraph) {
                 fontSize = 11.5.sp,
                 color = InkSoft,
             )
-            c.forEach { row -> ConflictCard(row) }
+            c.forEach { row -> ConflictCard(graph, row) }
         }
     }
 }
@@ -176,7 +177,7 @@ private fun ProblemCard(p: ProblemView, onResolve: () -> Unit) {
 }
 
 @Composable
-private fun ConflictCard(row: EanConflictRow) {
+private fun ConflictCard(graph: AppGraph, row: EanConflictRow) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,7 +193,40 @@ private fun ConflictCard(row: EanConflictRow) {
             fontWeight = FontWeight.SemiBold,
             color = AmberInk,
         )
-        Text("tw_Id: ${row.twIds.joinToString(", ")}", fontSize = 11.sp, color = InkMute)
+        /* Kartoteki po ludzku: symbol i nazwa, nie surowe tw_Id — z gołego
+           identyfikatora nie da się rozpoznać, o które towary chodzi.
+           Starszy serwer nie wysyła `towary` — wtedy zostaje dawna linia. */
+        if (row.towary.isEmpty()) {
+            Text("tw_Id: ${row.twIds.joinToString(", ")}", fontSize = 11.sp, color = InkMute)
+        } else {
+            row.towary.forEach { t ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 2.dp),
+                ) {
+                    MiniaturaTowaru(graph, t.twId, 28.dp)
+                    Text(
+                        if (t.sym.isBlank()) "tw_Id ${t.twId} (kartoteka usunięta)"
+                        else t.sym,
+                        fontFamily = BarlowCond,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Ink,
+                    )
+                    if (t.name.isNotBlank()) {
+                        Text(
+                            t.name,
+                            fontSize = 11.5.sp,
+                            color = InkSoft,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

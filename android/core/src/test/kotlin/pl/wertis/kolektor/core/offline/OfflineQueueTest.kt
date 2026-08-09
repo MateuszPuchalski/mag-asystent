@@ -9,6 +9,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.LocAction
+import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.SetLocationBody
 import java.io.IOException
 
@@ -231,6 +232,32 @@ class OfflineQueueTest {
         repeat(OfflineQueue.MAX_PROB) { q.flush() }
         assertEquals(0, q.count.value)
         assertEquals(listOf(503), zameldowane)
+    }
+
+    @Test fun `odlozenie pozycji buforuje sie przy braku sieci i wychodzi po flushu`() = runTest {
+        // rozkładanie dzieje się także w martwych punktach hali — dziura Wi-Fi
+        // nie może gubić policzonej pozycji
+        val storage = MemStorage()
+        val odlozenie = PutawayOp(
+            deliveryId = 3,
+            lineId = 11,
+            body = PutawayLineBody("E08-03-01", recznie = true),
+        )
+        val q1 = OfflineQueue(storage, { throw IOException("brak sieci") }, isOnline = { true })
+        val r = q1.runOrBuffer(
+            PendingOp.OpKind.PUTAWAY, user = "anna", productId = 7, putaway = odlozenie,
+        )
+        assertTrue(r.offline)
+        assertEquals(1, q1.count.value)
+        // operacja przeżywa restart aplikacji z KOMPLETEM danych do wysłania
+        assertEquals(odlozenie, storage.saved.single().putaway)
+
+        val wyslane = mutableListOf<PendingOp>()
+        val q2 = OfflineQueue(storage, { wyslane += it; null }, isOnline = { true })
+        q2.flush()
+        assertEquals(0, q2.count.value)
+        assertEquals(PendingOp.OpKind.PUTAWAY, wyslane.single().kind)
+        assertEquals("anna", wyslane.single().user)
     }
 
     @Test fun `meldunek ktory sam padnie nie wywraca oproznienia kolejki`() = runTest {

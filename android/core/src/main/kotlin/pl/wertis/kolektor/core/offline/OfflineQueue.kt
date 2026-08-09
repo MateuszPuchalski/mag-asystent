@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.Serializable
 import pl.wertis.kolektor.core.net.ApiError
+import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.SetLocationBody
 
 /* ── Bufor operacji zapisu na czas braku sieci ──────────────────────────────
@@ -17,12 +18,27 @@ import pl.wertis.kolektor.core.net.SetLocationBody
    Niezmiennik: błędy serwera (ApiError) NIE są buforowane — propagują do UI
    (np. walidacja). Buforujemy wyłącznie awarie sieci (każdy inny wyjątek).   */
 
+/**
+ * Odłożenie pozycji dostawy do wysłania po powrocie sieci.
+ *
+ * Rozkładanie to najdłuższa nieprzerwana praca na kolektorze i dzieje się
+ * także w martwych punktach hali — dziura Wi-Fi nie może wyrzucać człowieka
+ * z rytmu ani gubić policzonej pozycji.
+ */
+@Serializable
+data class PutawayOp(
+    val deliveryId: Long,
+    val lineId: Long,
+    val body: PutawayLineBody,
+)
+
 @Serializable
 data class PendingOp(
     val id: String,
     val kind: OpKind,
     val productId: Long? = null,
     val setLocation: SetLocationBody? = null,
+    val putaway: PutawayOp? = null,
     val at: Long,
     /** Autor z chwili zbuforowania — flush może nastąpić po zmianie użytkownika. */
     val user: String,
@@ -47,7 +63,7 @@ data class PendingOp(
     val proby: Int = 0,
 ) {
     @Serializable
-    enum class OpKind { SET_LOCATION }
+    enum class OpKind { SET_LOCATION, PUTAWAY }
 }
 
 /** Trwały zapis bufora (aplikacja: plik JSON — odpowiednik localStorage). */
@@ -136,12 +152,13 @@ class OfflineQueue(
         user: String,
         productId: Long? = null,
         setLocation: SetLocationBody? = null,
+        putaway: PutawayOp? = null,
         /** Konto autora — patrz `PendingOp.userRef`. Na końcu, żeby nie ruszać
             wywołań pozycyjnych. */
         userRef: Long? = null,
     ): RunResult {
         val op = PendingOp(
-            nextId(), kind, productId, setLocation, at = now(), user = user, userRef = userRef,
+            nextId(), kind, productId, setLocation, putaway, at = now(), user = user, userRef = userRef,
         )
         if (isOnline()) {
             try {

@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -41,6 +42,8 @@ import pl.wertis.kolektor.core.net.PrzesuniecieBody
 import pl.wertis.kolektor.core.przesuniecie.przesuniecieBlocker
 import pl.wertis.kolektor.core.przesuniecie.pytamyOPolke
 import pl.wertis.kolektor.core.loc.normalizeLoc
+import pl.wertis.kolektor.core.loc.validateLoc
+import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.net.apiCall
@@ -50,6 +53,7 @@ import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.theme.Amber
+import pl.wertis.kolektor.ui.theme.AmberDark
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
@@ -113,7 +117,13 @@ fun PrzesuniecieSheet(
     var magTo by remember { mutableStateOf<Long?>(null) }
     var qty by remember { mutableStateOf(qtyInit?.let { formatQty(it) } ?: "") }
     var location by remember { mutableStateOf<String?>(null) }
+    /** Czy `location` pochodzi z ręcznego wpisu — do raportu etykiet. */
+    var locationReczna by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var manualOpen by remember { mutableStateOf(false) }
+    var manual by remember { mutableStateOf("") }
+    // reguła walidacji kodu półki — do ręcznego wpisu przy zniszczonej etykiecie
+    val locInfo by produceState(graph.locationsRepo.cached()) { value = graph.locationsRepo.get() }
 
     /* Listę magazynów bierzemy z serwera, bo to on rozstrzyga o rolach
        i ukrywaniu — kolektor niczego nie filtruje, tylko rysuje to, co dostał.
@@ -144,6 +154,7 @@ fun PrzesuniecieSheet(
         if (!pytamy) return@ScanHandlerEffect false
         if (scan.kind == ScanKind.EAN) return@ScanHandlerEffect false
         location = normalizeLoc(scan.code)
+        locationReczna = false
         graph.feedback.beep(true)
         true
     }
@@ -169,6 +180,7 @@ fun PrzesuniecieSheet(
                             magTo = dokad,
                             location = location.takeIf { pytamy },
                             lineId = lineId,
+                            recznie = (locationReczna && pytamy).takeIf { it },
                         )
                     )
                 }
@@ -233,6 +245,7 @@ fun PrzesuniecieSheet(
                             // zmiana celu czyści skan: kod z poprzedniego wyboru
                             // poleciałby cicho w żądaniu i trafił w złą kartotekę
                             location = null
+                            locationReczna = false
                         }
                     }
                     if (rzad.size == 1) Box(Modifier.weight(1f))
@@ -252,6 +265,47 @@ fun PrzesuniecieSheet(
                skanować i trzeba to powiedzieć, zamiast po cichu chować pole. */
             if (pytamy) {
                 SkanPolki(location)
+                /* Ta sama furtka co przy rozkładaniu i na ekranie zmiany
+                   lokalizacji, za tym samym przełącznikiem serwera. Wpisany kod
+                   ląduje w `location` jak skan — dalej działa ta sama walidacja
+                   `blocker` i ta sama droga zapisu. */
+                if (locInfo?.allowManual != false) {
+                    if (!manualOpen) {
+                        Text(
+                            "Wpisz lokalizację ręcznie…",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AmberDark,
+                            modifier = Modifier
+                                .clickable { manualOpen = true }
+                                .padding(vertical = 2.dp),
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                WertisTextField(
+                                    value = manual,
+                                    onValueChange = { manual = it.uppercase() },
+                                    placeholder = "np. E08-03-01",
+                                    modifier = Modifier.weight(1f),
+                                    onDone = {
+                                        przyjmijReczny(manual, locInfo, graph) {
+                                            location = it
+                                            locationReczna = true
+                                        }
+                                    },
+                                )
+                                PrimaryButton("OK") {
+                                    przyjmijReczny(manual, locInfo, graph) {
+                                        location = it
+                                        locationReczna = true
+                                    }
+                                }
+                            }
+                            Text("Bez spacji · ręczne wpisywanie = ryzyko literówek", fontSize = 11.sp, color = InkMute)
+                        }
+                    }
+                }
             } else if (magTo != null) {
                 Text(
                     "Adres w kartotece opisuje regał na hali, więc przy tym magazynie nie ma czego zeskanować.",
@@ -273,6 +327,24 @@ fun PrzesuniecieSheet(
             )
             OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onCancel)
         }
+    }
+}
+
+/** Walidacja ręcznie wpisanego kodu półki; poprawny trafia tam, gdzie skan. */
+private fun przyjmijReczny(
+    wpisany: String,
+    locInfo: LocationsInfo?,
+    graph: AppGraph,
+    onOk: (String) -> Unit,
+) {
+    val code = normalizeLoc(wpisany)
+    val err = validateLoc(code, locInfo)
+    if (err != null) {
+        graph.effects.toast(err)
+        graph.feedback.beep(false)
+    } else {
+        graph.feedback.beep(true)
+        onOk(code)
     }
 }
 

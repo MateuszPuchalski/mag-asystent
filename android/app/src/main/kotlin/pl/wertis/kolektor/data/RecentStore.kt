@@ -10,8 +10,9 @@ import pl.wertis.kolektor.core.net.WertisJson
 
 /* Ostatnio skanowane towary na ekranie głównym (wertis_recent, max 4). */
 
+/** `name` z domyślną wartością — wpisy zapisane przed jej dodaniem wciąż się wczytują. */
 @Serializable
-data class RecentEntry(val id: Long, val sym: String, val loc: String)
+data class RecentEntry(val id: Long, val sym: String, val loc: String, val name: String = "")
 
 class RecentStore(context: Context) {
     private val prefs = context.getSharedPreferences("wertis_recent", Context.MODE_PRIVATE)

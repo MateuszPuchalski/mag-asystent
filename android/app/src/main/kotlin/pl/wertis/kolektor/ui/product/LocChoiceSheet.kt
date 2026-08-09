@@ -33,7 +33,13 @@ import pl.wertis.kolektor.ui.theme.InkSoft
 /* ── Wybór przy wielu lokalizacjach — port LocChoiceDrawer.tsx ──────────────
    ZASTĄP WSZYSTKIE / DODAJ JAKO KOLEJNĄ / ZASTĄP JEDNĄ Z…                    */
 
-data class LocChoice(val action: LocAction, val value: String, val replaced: String? = null)
+data class LocChoice(
+    val action: LocAction,
+    val value: String,
+    val replaced: String? = null,
+    /** Kod WPISANY z ręki, nie zeskanowany — zasila raport etykiet do przedruku. */
+    val recznie: Boolean = false,
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
