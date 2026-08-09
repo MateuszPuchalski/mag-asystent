@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -459,6 +460,9 @@ private fun TypeTile(type: ProblemType, selected: Boolean, modifier: Modifier, o
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) AmberBg else CardWhite)
             .border(if (selected) 2.dp else 1.dp, if (selected) Amber else CardBorder, RoundedCornerShape(12.dp))
+            // 48 dp zadeklarowane, nie założone — komentarz przy kaflach mówi
+            // „rękawica trafia w 48dp", więc niech to będzie prawda z kodu
+            .heightIn(min = 48.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),

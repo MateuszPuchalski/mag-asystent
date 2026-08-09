@@ -141,7 +141,9 @@ fun OfflineBanner(count: Int, onFlush: () -> Unit) {
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onFlush)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                // 48 dp na wysokość — jedyny przycisk banera musi trafiać się
+                // kciukiem w rękawicy, pasek i tak ma swój padding pionowy
+                .padding(horizontal = 12.dp, vertical = 14.dp),
         )
     }
 }

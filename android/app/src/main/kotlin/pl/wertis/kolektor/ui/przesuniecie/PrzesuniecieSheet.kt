@@ -365,6 +365,9 @@ private fun MagTile(m: MagazynInfo, selected: Boolean, modifier: Modifier, onCli
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) AmberBg else CardWhite)
             .border(if (selected) 2.dp else 1.dp, if (selected) Amber else CardBorder, RoundedCornerShape(12.dp))
+            // 48 dp zadeklarowane, nie założone — kafel z samym kodem (bez
+            // nazwy) wychodził poniżej celu na rękawicę
+            .heightIn(min = 48.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),

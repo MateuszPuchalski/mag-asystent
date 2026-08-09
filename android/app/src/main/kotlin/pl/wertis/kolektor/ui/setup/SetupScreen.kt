@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -165,7 +167,8 @@ fun SetupScreen(graph: AppGraph) {
                             "usuń",
                             fontSize = 13.sp,
                             color = InkMute,
-                            modifier = Modifier.clickable { konta.removeAt(i) }.padding(6.dp),
+                            // padding PO clickable = obszar dotyku 48 dp
+                            modifier = Modifier.clickable { konta.removeAt(i) }.padding(15.dp),
                         )
                     }
                 }
@@ -213,8 +216,9 @@ private fun WyborRoli(wybrana: Rola, zablokowane: Boolean, onWybor: (Rola) -> Un
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (aktywna) AmberBg else CardWhite)
+                    .heightIn(min = 48.dp)
                     .then(if (zablokowane) Modifier else Modifier.clickable { onWybor(r) })
-                    .padding(vertical = 10.dp),
+                    .wrapContentHeight(),
             )
         }
     }

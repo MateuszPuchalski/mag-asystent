@@ -314,7 +314,9 @@ fun ProductScreen(graph: AppGraph) {
                         WIcons.Close,
                         contentDescription = "Zamknij",
                         tint = InkMute,
-                        modifier = Modifier.clickable { chipMenu = null }.padding(4.dp).size(18.dp),
+                        // padding PO clickable = obszar dotyku; ikona zostaje 18 dp,
+                        // ale cel rośnie do 48 — krzyżyk 18 dp w rękawicy to loteria
+                        modifier = Modifier.clickable { chipMenu = null }.padding(15.dp).size(18.dp),
                     )
                 }
             }
