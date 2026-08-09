@@ -114,15 +114,17 @@ Rozmiar historii widać w `/api/health` (`audyt`); nie czyścimy jej, bo
 reklamacja przychodzi po miesiącach. Pełny opis łańcucha, jego luk i powodów:
 [`docs/architektura.md`](docs/architektura.md) §9.
 
-**Zapis do Subiekta ogranicza się do DWÓCH pól na kartotece**: lokalizacji
-(`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie mają) oraz
-podstawowego kodu kreskowego (`tw_PodstKodKresk`, od 0.37.0 — magazynier
-z kartonem, którego kodu kartoteka nie zna, nie miał gdzie go wpisać). Każde
+**Zapis do Subiekta ogranicza się do DWÓCH pól na kartotece.** Pierwsze to
+lokalizacja (`tw_Pole1..8`, bo natywnego `tw_Lokalizacja` nowsze wersje nie
+mają). Drugie to podstawowy kod kreskowy (`tw_PodstKodKresk`, od 0.37.0), bo
+magazynier z kartonem nieznanego kartotece kodu nie miał gdzie go wpisać. Każde
 pole ma własny `GRANT UPDATE` na tę jedną kolumnę. Zapis idzie kolejką
 (kolejka → worker → adapter), więc kolektor nigdy nie czeka na COM. Nic poza
 tym: zero `INSERT` do tabel dokumentów, zero modyfikacji stanów; dokumenty MM
-(kontener) tworzy osobny worker Sfery na Windows. Granice i ich powody: [`docs/architektura.md`](docs/architektura.md)
-§1; zweryfikowana struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
+(kontener) tworzy osobny worker Sfery na Windows.
+
+Granice i ich powody: [`docs/architektura.md`](docs/architektura.md) §1;
+zweryfikowana struktura bazy (wersja 1.8731.31.6933, ta sama co w firmie):
 [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
 ## Uruchomienie
