@@ -28,8 +28,14 @@ import type {
 
 const nowIso = () => new Date().toISOString();
 
-/** Statusy linii, które nie wracają już do rutyny alejkowej. */
-const TERMINAL_LINE: ReadonlySet<string> = new Set(["done", "skipped", "problem"]);
+/**
+ * Statusy linii, które nie wracają już do rutyny alejkowej.
+ *
+ * Eksportowane, bo postęp liczą trzy miejsca — `getDelivery`, `closeIfComplete`
+ * i podgląd biura. Trzy własne listy rozjechałyby się przy pierwszym nowym
+ * statusie, a objawem byłaby dostawa „zamknięta" z niezerowym licznikiem.
+ */
+export const TERMINAL_LINE: ReadonlySet<string> = new Set(["done", "skipped", "problem"]);
 
 /**
  * Walidacja kodu lokalizacji w trybie A — twarda (§9, §16). Poza bazowymi
@@ -115,6 +121,74 @@ function usunPozycjeUslugowe(deliveryId: number): void {
   })();
 }
 
+/** Pozycja dokumentu po agregacji i odsiewie — tak, jak wejdzie do snapshotu. */
+export interface PozycjaSnapshotu {
+  twId: number;
+  sym: string;
+  nazwa: string;
+  qtyDoc: number;
+  locExpected: string | null;
+}
+
+/**
+ * Co wejdzie (albo weszło) do snapshotu dokumentu. CZYTA, niczego nie zapisuje.
+ *
+ * Wydzielone z `openDelivery`, bo od 0.36.0 ma DWÓCH wołających: snapshot przy
+ * otwieraniu i podgląd biura dla dokumentu, którego nikt jeszcze nie tknął.
+ * Gdyby każdy liczył zestaw wierszy po swojemu, biuro i hala patrzyłyby na dwie
+ * różne faktury — i nikt by się nie dowiedział, która jest prawdziwa, bo obie
+ * wyglądałyby wiarygodnie.
+ *
+ * Fallbacki (`?? String(twId)`, `?? ""`) są częścią kontraktu, nie ostrożnością:
+ * kartoteka potrafi zniknąć z read-modelu między importami, a wtedy obie strony
+ * muszą zmyślić DOKŁADNIE tak samo.
+ */
+export function pozycjeSnapshotu(dokId: number): PozycjaSnapshotu[] {
+  /* Agregacja tego samego towaru (różne partie/ceny → jedna linia robocza).
+     Magazynier ma przed sobą JEDNĄ paletę, więc widzi towar raz, z sumą.
+     W Subiekcie duplikat jest normalny: dwie ceny, dwie partie, dwa wiersze. */
+  const agg = new Map<number, number>();
+  for (const p of subiekt.getDocumentPositions(dokId)) {
+    agg.set(p.tw_id, (agg.get(p.tw_id) ?? 0) + p.ilosc);
+  }
+  const out: PozycjaSnapshotu[] = [];
+  for (const [twId, qty] of agg) {
+    const t = subiekt.getProductById(twId);
+    // pozycja usługowa (`PRZESYŁKA`) nie wchodzi do rozkładania — uzasadnienie
+    // i cena tej decyzji stoją w `src/pomijane.ts`
+    if (pomijanaPozycja(t?.symbol)) continue;
+    out.push({
+      twId,
+      sym: t?.symbol ?? String(twId),
+      nazwa: t?.nazwa ?? "",
+      qtyDoc: qty,
+      locExpected: pickingLoc(t?.lokalizacja),
+    });
+  }
+  return out;
+}
+
+/**
+ * Kolejność alejkowa: sort po adresie docelowym, pozycje BEZ adresu na końcu.
+ *
+ * Faza 1 — alfabetycznie po kodzie, bo układ A→J odpowiada układowi alejek;
+ * zamiana na prawdziwą trasę to zmiana tego jednego komparatora (§5).
+ *
+ * Wydzielone, żeby podgląd biura pokazywał pozycje w TEJ SAMEJ kolejności, co
+ * kolektor. Dwa niezależne sortowania rozjechałyby się przy pierwszej zmianie
+ * jednego z nich, a objawem byłoby „biuro czyta co innego, niż ja mam na
+ * ekranie" — zgłoszenie nie do odtworzenia.
+ */
+export function porownajAlejkowo(
+  a: { locExpected: string | null; sym: string },
+  b: { locExpected: string | null; sym: string }
+): number {
+  if (!a.locExpected && !b.locExpected) return a.sym.localeCompare(b.sym);
+  if (!a.locExpected) return 1;
+  if (!b.locExpected) return -1;
+  return a.locExpected.localeCompare(b.locExpected) || a.sym.localeCompare(b.sym);
+}
+
 /**
  * Otwórz (lub wznów) rozkładanie dokumentu. Pozycje są snapshotowane w chwili
  * otwarcia — jeśli księgowość zmieni FZ w trakcie, praca się nie rozjeżdża.
@@ -144,24 +218,17 @@ export function openDelivery(dokId: number, user: string): number {
       .lastInsertRowid
   );
 
-  /* Agregacja tego samego towaru (różne partie/ceny → jedna linia robocza).
-     Magazynier ma przed sobą JEDNĄ paletę, więc widzi towar raz, z sumą.
-     W Subiekcie duplikat jest normalny: dwie ceny, dwie partie, dwa wiersze. */
-  const agg = new Map<number, number>();
-  for (const p of subiekt.getDocumentPositions(dokId)) {
-    agg.set(p.tw_id, (agg.get(p.tw_id) ?? 0) + p.ilosc);
-  }
+  /* Zestaw wierszy liczy `pozycjeSnapshotu` — ta sama funkcja, z której czyta
+     podgląd biura. Odpytywanie adaptera dzieje się PRZED transakcją, więc
+     transakcja obejmuje już tylko zapisy. */
+  const pozycje = pozycjeSnapshotu(dokId);
   const ins = db().prepare(
     `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, lok_oczekiwana)
      VALUES (?,?,?,?,?,?)`
   );
   transaction(db(), () => {
-    for (const [twId, qty] of agg) {
-      const t = subiekt.getProductById(twId);
-      // pozycja usługowa (`PRZESYŁKA`) nie wchodzi do snapshotu — uzasadnienie
-      // i cena tej decyzji stoją w `src/pomijane.ts`
-      if (pomijanaPozycja(t?.symbol)) continue;
-      ins.run(id, twId, t?.symbol ?? String(twId), t?.nazwa ?? "", qty, pickingLoc(t?.lokalizacja));
+    for (const p of pozycje) {
+      ins.run(id, p.twId, p.sym, p.nazwa, p.qtyDoc, p.locExpected);
     }
   })();
 
@@ -216,14 +283,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
       /** litera alejki — nagłówek sekcji na liście */
       aisle: r.lok_oczekiwana ? String(r.lok_oczekiwana)[0] : null,
     }))
-    // faza 1: sort alfabetyczny po kodzie (A→J odpowiada układowi alejek);
-    // zamiana na trasę = zmiana tego komparatora (§5)
-    .sort((a, b) => {
-      if (!a.locExpected && !b.locExpected) return a.sym.localeCompare(b.sym);
-      if (!a.locExpected) return 1;
-      if (!b.locExpected) return -1;
-      return a.locExpected.localeCompare(b.locExpected) || a.sym.localeCompare(b.sym);
-    });
+    .sort(porownajAlejkowo);
 
   // linia z problemem wychodzi z rutyny alejkowej (żyje dalej na liście wyjątków),
   // więc nie trzyma dostawy otwartej — inaczej zgłoszenie problemu karałoby

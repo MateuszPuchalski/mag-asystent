@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
+import { podgladDokumentu } from "../services/podglad-dostawy.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
    Wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał, którym biuro widziało
@@ -28,6 +29,33 @@ export async function biuroRoutes(app: FastifyInstance) {
   // korzeń przekierowuje do podglądu: adres `http://serwer:3001` w pasku
   // przeglądarki biura ma pokazać COŚ, a nie 404
   app.get("/", async (_req, reply) => reply.redirect("/biuro"));
+
+  /**
+   * Pozycje dokumentu dla biura — CZYTA, nigdy nie otwiera dostawy.
+   *
+   * Trasa mieszka TU, a nie przy pozostałych trasach dostaw, i to jest decyzja
+   * o bezpieczeństwie, nie o porządku: jej sąsiadem byłby `POST
+   * /api/delivery/documents/:dokId/open`, czyli zapis różniący się o jeden
+   * człon ścieżki. `routes/delivery.ts` zostaje o ścieżce pracy kolektora,
+   * a to jedyna trasa czytana wyłącznie przez `/biuro`.
+   *
+   * Klucz to `dokId` (numer dokumentu w Subiekcie), a nie lokalne `deliveryId`,
+   * bo dokument, którego nikt nie tknął, żadnego `deliveryId` jeszcze nie ma —
+   * a wejść w niego biuro musi tak samo.
+   *
+   * Bez własnej bramki ról: globalna bramka sesji obejmuje wszystko pod `/api/`
+   * poza zamkniętą listą `BEZ_SESJI`, a te same dane pokazuje już lista dostaw
+   * i lista wyjątków. `autoryzuj()` byłoby tu wręcz szkodliwe — zapisuje
+   * zdarzenie `privileged` przy każdym sprawdzeniu, a to jest zwykły odczyt.
+   *
+   * ETag/304 dokłada hak `routes/etag.ts`. Warunek: w odpowiedzi NIE MA nic
+   * liczonego z zegara — strona odpytuje ją co pół minuty i ma dostawać 304.
+   */
+  app.get<{ Params: { dokId: string } }>("/api/biuro/dokument/:dokId", async (req, reply) => {
+    const d = podgladDokumentu(Number(req.params.dokId));
+    if (!d) return reply.code(404).send({ error: "Nie znaleziono dokumentu" });
+    return d;
+  });
 
   /* Do 0.26.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service
      workera PWA usuniętej w 0.3.0. Komputery biura przeszły od tego czasu
