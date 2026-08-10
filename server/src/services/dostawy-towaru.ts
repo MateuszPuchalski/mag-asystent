@@ -31,6 +31,14 @@ export interface WDostawie {
   dataWyst: string;
   /** Ile z tego dokumentu jeszcze NIE odłożono. Zawsze > 0. */
   ilosc: number;
+  /**
+   * Symbol kontrahenta z dokumentu (`kh_Symbol`); `""` gdy dokument go nie ma.
+   *
+   * Ta sama wartość, którą niesie lista rozkładania — magazynier rozpoznaje
+   * paletę w przyjęciach po dostawcy szybciej niż po numerze dokumentu, bo
+   * dostawca stoi na opakowaniu, a numer FZ nie stoi nigdzie.
+   */
+  dostawca: string;
   /** Dokument w buforze SGT; rozkładanie i tak na niego nie czeka (D1). */
   wBuforze: boolean;
   /**
@@ -88,6 +96,7 @@ export function nierozlozoneZDostaw(twId: number): WDostawie[] {
         nrPelny: p.nr_pelny,
         dataWyst: p.data_wyst,
         ilosc: zostalo,
+        dostawca: p.dostawca ?? "",
         wBuforze: !!p.w_buforze,
         status: l?.status ?? null,
       },

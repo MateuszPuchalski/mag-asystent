@@ -269,7 +269,11 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   > dotknięcia na każdej karcie.
 - **„W dostawie, nierozłożone" — czemu stanu nie widać na półce.** Karta podaje
   jedną linią, ile sztuk przyszło na dokumencie z ostatnich 14 dni i nie
-  trafiło jeszcze w regał, z numerem dokumentu.
+  trafiło jeszcze w regał, z numerem dokumentu i dostawcą.
+
+  > **Dlaczego dostawca.** Numer dokumentu identyfikuje dostawę w Subiekcie,
+  > ale w strefie przyjęć nie jest napisany nigdzie — na palecie i na kartonach
+  > widać nazwę dostawcy. To ona prowadzi rękę do towaru.
 
   > **Dlaczego.** Przy dostawie krajowej skutek magazynowy niesie sam dokument
   > w Subiekcie, więc towar figuruje na MAG od chwili zaksięgowania. Kafel stanu
@@ -460,7 +464,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 167 testów jednostkowych; buduje się bez Android SDK
+                           + 169 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

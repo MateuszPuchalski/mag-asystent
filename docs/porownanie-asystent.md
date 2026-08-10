@@ -107,9 +107,10 @@ i osobny proces workera** do zapisów, klient to **natywna aplikacja Android**
 (Kotlin/Compose) ze skanem sprzętowym Zebra/Honeywell. Cała wiedza o Subiekcie
 siedzi za dwoma adapterami: odczyt z MSSQL (read-only), zapis przez kolejkę.
 
-Zasada, z której wynika reszta: **WERTIS dokłada Subiektowi jedną brakującą
-warstwę — lokalizację — i nic więcej.** Najgorsze, co może zrobić, to wpisać zły
-adres w jednym polu tekstowym. Cofa to jeden `UPDATE`.
+Zasada, z której wynika reszta: **WERTIS dokłada Subiektowi brakującą warstwę
+magazynową i nic więcej.** Konto SQL aplikacji ma prawo zapisu do dwóch kolumn
+kartoteki: pola lokalizacji i podstawowego kodu kreskowego. Najgorsze, co może
+zrobić, to wpisać w nie złą wartość. Cofa to jeden `UPDATE`.
 
 ---
 

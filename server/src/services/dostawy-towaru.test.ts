@@ -46,6 +46,7 @@ function dokument(opts: {
   magId?: number;
   typ?: string;
   nr?: string;
+  dostawca?: string;
 }) {
   const d = db();
   d.prepare(
@@ -57,7 +58,7 @@ function dokument(opts: {
     opts.nr ?? `FZ ${opts.dokId}/MAG/07/2026`,
     dniTemu(opts.dni ?? 1),
     opts.magId ?? 1,
-    "Dostawca sp. z o.o."
+    opts.dostawca ?? "Dostawca sp. z o.o."
   );
   d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)").run(
     opts.dokId,
@@ -90,6 +91,18 @@ test("dokumentu nikt nie otwierał — na karcie stoi całość", () => {
   assert.equal(w[0].ilosc, 6);
   assert.equal(w[0].status, null, "brak wiersza w delivery_line = nikt nie zaczął");
   assert.equal(w[0].nrPelny, "FZ 100/MAG/07/2026");
+});
+
+test("dostawca z dokumentu idzie na kartę", () => {
+  // w strefie przyjęć numer FZ nie jest napisany nigdzie, a dostawca stoi na
+  // opakowaniu — bez tego pola karta mówi „przyjechało", nie mówiąc „od kogo"
+  dokument({ dokId: 113, ilosc: 6, dostawca: "OGRÓD-POL" });
+  assert.equal(D.nierozlozoneZDostaw(TOWAR)[0].dostawca, "OGRÓD-POL");
+});
+
+test("dokument bez kontrahenta daje pusty tekst, nie null", () => {
+  dokument({ dokId: 114, ilosc: 6, dostawca: "" });
+  assert.equal(D.nierozlozoneZDostaw(TOWAR)[0].dostawca, "");
 });
 
 test("częściowo odłożone — zostaje reszta, nie całość", () => {

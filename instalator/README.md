@@ -105,7 +105,8 @@ Skrypt pochodzi z [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.
 i nadaje:
 
 - `SELECT` na **sześciu** tabelach, plus siódma ze zdjęciami, gdy jest w bazie,
-- `UPDATE` na **jednej kolumnie** kartoteki (tej wybranej na lokalizację),
+- `UPDATE` na **dwóch kolumnach** kartoteki: wybranej na lokalizację oraz
+  `tw_PodstKodKresk` (kod kreskowy nadawany z kolektora, od 0.37.0),
 - **ani jednego innego prawa zapisu**.
 
 Siódmy grant jest warunkowy nie z ostrożności, tylko z konieczności. Skrypt
@@ -114,9 +115,21 @@ wykonanie i konto zostaje **bez ani jednego uprawnienia**. Kreator sprawdza
 obecność `tw_ZdjecieTw` przed budową skryptu, a próg weryfikacji idzie za tą
 samą decyzją — obie liczby biorą się z jednej listy.
 
-Przy przejęciu tego credentiala da się zmienić adres na półce. Nic więcej —
-dokumenty, stany i numeracja pozostają nietykalne. Właśnie to ograniczenie
-ginie pierwsze, gdy konto zakłada się ręcznie w pośpiechu.
+Kolumny zapisu biorą się z jednej listy (`Get-WertisKolumnyZapisu`), tak samo
+jak tabele odczytu — i z tego samego powodu. Do 0.38.0 liczba „jedna kolumna"
+stała wpisana w trzech miejscach: w skrypcie, w progu weryfikacji i w teście.
+Kod kreskowy dołożył drugą po stronie serwera, instalatora nikt nie ruszył,
+a objawem była **odmowa uprawnienia na produkcji** — długo po instalacji,
+która zameldowała sukces.
+
+**Instalacja zastana dostaje brakujący grant po ponownym uruchomieniu
+kreatora**: skrypt jest idempotentny, więc przebieg na już działającej
+instalacji dokłada wyłącznie to, czego brakuje. Kto nie chce uruchamiać
+kreatora, wykonuje jedną linię z `docs/subiekt-gt-edu-setup.md` §2.
+
+Przy przejęciu tego credentiala da się zmienić adres na półce i kod kreskowy.
+Nic więcej — dokumenty, stany i numeracja pozostają nietykalne. Właśnie to
+ograniczenie ginie pierwsze, gdy konto zakłada się ręcznie w pośpiechu.
 
 Instalator **weryfikuje nadane uprawnienia po fakcie**, bo błąd `CREATE LOGIN`
 nie przerywa reszty skryptu: bez sprawdzenia „udana" instalacja mogłaby zostawić

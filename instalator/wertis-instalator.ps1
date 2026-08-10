@@ -486,8 +486,10 @@ if ($podlaczacDoSubiekta) {
     $zalozone = $false
     if ($polaczenie) {
         $ileTabel = @(Get-WertisTabeleOdczytu -Zdjecia $zdjecia.Jest).Count
+        $ileKolumn = @(Get-WertisKolumnyZapisu -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN).Count
         Write-Info "Zakładam login '$login' z uprawnieniami kolumnowymi: odczyt $ileTabel tabel"
-        Write-Info "i zapis JEDNEJ kolumny lokalizacji. Zero praw zapisu poza nią."
+        Write-Info "i zapis $ileKolumn kolumn kartoteki ($($ustawienia.MSSQL_LOC_COLUMN), tw_PodstKodKresk)."
+        Write-Info "Zero praw zapisu poza nimi - dokumenty i stany zostaja tylko do odczytu."
         $wynik = Grant-WertisLogin -Polaczenie $polaczenie -Skrypt $skrypt
         if ($wynik.Udalo) {
             if ($DryRun) {
@@ -508,7 +510,7 @@ if ($podlaczacDoSubiekta) {
                     $proba = Test-WertisLogowanie -Serwer $serwer -Instancja $instancja `
                         -Baza $baza -Login $login -Haslo $haslo
                     if ($proba.Udalo) {
-                        Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ustawienia.MSSQL_LOC_COLUMN)."
+                        Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ocena.KolumnyZapisu) kolumn kartoteki."
                         Write-Ok "Logowanie jako $login sprawdzone - usługi połączą się z bazą."
                         $zalozone = $true
                     } else {
@@ -519,7 +521,12 @@ if ($podlaczacDoSubiekta) {
                     }
                 } else {
                     Write-Blad "Konto powstało, ale uprawnienia nie zgadzają się z oczekiwanymi."
-                    Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma być $($ocena.Wymaganych)), lokalizacja: $($ocena.LokalizacjaOk), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma być 0)"
+                    Write-Info "odczyt: $($ocena.TabeleOdczytu) tabel (ma byc $($ocena.Wymaganych)), zapis do dok__Dokument: $($ocena.ZapisDokumentow) (ma byc 0)"
+                    if ($ocena.BrakujaceZapisy.Count -gt 0) {
+                        # nazwa kolumny, a nie samo "nie zgadza sie" - to ona
+                        # mowi, ktora linia GRANT-a nie weszla
+                        Write-Info "brakuje prawa zapisu do kolumn: $($ocena.BrakujaceZapisy -join ', ')"
+                    }
                 }
             }
         } else {

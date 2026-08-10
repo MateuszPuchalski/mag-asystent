@@ -206,6 +206,8 @@ data class WDostawie(
     val dataWyst: String = "",
     /** Ile z tego dokumentu jeszcze nie trafiło w regał. Zawsze > 0. */
     val ilosc: Double = 0.0,
+    /** Symbol kontrahenta z dokumentu; puste, gdy dokument go nie niesie. */
+    val dostawca: String = "",
     val wBuforze: Boolean = false,
     /** `null` = dokumentu nikt nie otwierał; inaczej status linii rozkładania. */
     val status: String? = null,
