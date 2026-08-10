@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru — **167 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru — **169 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -150,7 +150,9 @@ przed którą ta pozycja broni.
 **W dostawie, nierozłożone**
 
 - [ ] towar z nierozłożonej dostawy ma na karcie amber linię z numerem
-      dokumentu i ilością,
+      dokumentu, ilością i dostawcą,
+- [ ] dostawca stoi między numerem a statusem („… · OGRÓD-POL · w toku"),
+- [ ] dokument bez kontrahenta nie zostawia w linii wiszącej kropki,
 - [ ] po odłożeniu części ilość w linii maleje o tyle, ile odłożono,
 - [ ] po odłożeniu całości linia znika,
 - [ ] pozycja ze zgłoszonym problemem ZOSTAJE, z dopiskiem „zgłoszony problem",

@@ -28,6 +28,35 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.39.0 — 10 sierpnia 2026
+
+**Linia „W dostawie" mówi też, od kogo ta dostawa jest.** Wiersz na karcie
+towaru wygląda teraz tak: „W dostawie 6 szt — FZ 214/07/2026 · OGRÓD-POL ·
+w toku".
+
+Linia odpowiada na pytanie „stan mówi 12, a półka pusta — gdzie to jest?", więc
+ma prowadzić do palety. Numer dokumentu tego nie robi: identyfikuje dostawę
+w Subiekcie, ale w strefie przyjęć nie jest napisany nigdzie. Na palecie i na
+kartonach widać dostawcę — i to jego magazynier czyta, szukając. Dotąd musiał
+odłożyć telefon, wejść w zakładkę rozkładania i tam dopiero zobaczyć nazwę przy
+tym samym dokumencie.
+
+Dostawca stoi **między** numerem a statusem, nie na końcu. Koniec linii należy
+do statusu („pominięte przy rozkładaniu", „zgłoszony problem") — to on ginie
+przy zawijaniu, a niesie ostrzeżenie, że ktoś już się o tę pozycję potknął.
+Dokument bez kontrahenta nie zostawia w linii wiszącej kropki.
+
+Serwer miał tę wartość od początku — `kh_Symbol` jechał w tym samym wierszu
+zapytania co numer i data, tylko nie wchodził do odpowiedzi. To ta sama
+wartość, którą pokazuje lista rozkładania i linia „Zamówione u dostawcy”, więc
+nazwa na karcie zgadza się z nazwą wszędzie indziej.
+
+**[wymaga działania]** Nic ponad `git pull` — ale nazwa pojawi się na karcie
+dopiero po **rozesłaniu nowego APK**. Starszy kolektor pomija nieznane pole
+i rysuje linię jak dotąd, bez dostawcy.
+
+---
+
 ## 0.38.1 — 10 sierpnia 2026
 
 **Instalator nadaje uprawnienie do kodu kreskowego.** To on był przyczyną

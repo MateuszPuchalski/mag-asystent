@@ -26,6 +26,18 @@ class KartaTekstTest {
         assertEquals("W dostawie 6 szt — FZ 214/07/2026 · w toku", liniaWDostawie(d, "szt"))
     }
 
+    @Test fun `dostawa - dostawca miedzy numerem a statusem`() {
+        // dostawca prowadzi do palety w przyjęciach, status mówi, czy ktoś już
+        // się o nią potknął — i dlatego status zostaje ostatni
+        val d = WDostawie(nrPelny = "FZ 214/07/2026", ilosc = 6.0, dostawca = "OGRÓD-POL", status = "open")
+        assertEquals("W dostawie 6 szt — FZ 214/07/2026 · OGRÓD-POL · w toku", liniaWDostawie(d, "szt"))
+    }
+
+    @Test fun `dostawa - dokument bez kontrahenta nie zostawia pustego czlonu`() {
+        val d = WDostawie(nrPelny = "FZ 214/07/2026", ilosc = 6.0, dostawca = "", status = "open")
+        assertEquals("W dostawie 6 szt — FZ 214/07/2026 · w toku", liniaWDostawie(d, "szt"))
+    }
+
     @Test fun `dostawa - zgloszony problem i pominiecie maja wlasne dopiski`() {
         assertEquals("zgłoszony problem", opisStatusu(WDostawie(status = "problem")))
         assertEquals("pominięte przy rozkładaniu", opisStatusu(WDostawie(status = "skipped")))

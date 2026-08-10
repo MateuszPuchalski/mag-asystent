@@ -28,17 +28,28 @@ fun opisStatusu(d: WDostawie): String? = when {
 }
 
 /**
- * Jedna dostawa, jedna linia: „W dostawie 6 szt — FZ 214/07/2026 · w toku".
+ * Jedna dostawa, jedna linia: „W dostawie 6 szt — FZ 214/07/2026 · OGRÓD-POL
+ * · w toku".
  *
  * Data wystawienia wypadła — numer dokumentu niesie miesiąc i rok, a linia ma
  * się zmieścić na 360 px razem ze statusem. Status zostaje, bo mówi, czy ktoś
  * już się o tę pozycję potknął; bez niego magazynier szuka towaru, którego
  * ktoś inny właśnie zgłosił jako uszkodzony.
+ *
+ * Dostawca stoi MIĘDZY numerem a statusem, i to jest ta kolejność, nie inna.
+ * Numer dokumentu identyfikuje dostawę w Subiekcie, ale w strefie przyjęć nie
+ * jest napisany nigdzie — na palecie i na kartonach widać dostawcę, więc to on
+ * prowadzi rękę do towaru i należy do części „gdzie to jest". Status zostaje
+ * na końcu, bo tam go szuka `FaktLinia` przy zawijaniu do dwóch linii.
+ *
+ * Puste pole = dokument bez kontrahenta; wtedy członu nie ma wcale, zamiast
+ * kropki wiodącej donikąd.
  */
 fun liniaWDostawie(d: WDostawie, unit: String): String = buildString {
     append("W dostawie ").append(formatQty(d.ilosc))
     if (unit.isNotEmpty()) append(" ").append(unit)
     append(" — ").append(d.nrPelny)
+    if (d.dostawca.isNotEmpty()) append(" · ").append(d.dostawca)
     opisStatusu(d)?.let { append(" · ").append(it) }
 }
 
