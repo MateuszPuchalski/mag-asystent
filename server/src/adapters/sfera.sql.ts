@@ -20,15 +20,44 @@ import type { MmItem, SferaAdapter } from "./sfera.js";
  * Po udanym UPDATE lustrzana zmiana w lokalnym sgt_towar, żeby UI widział
  * nową lokalizację od razu, nie dopiero po następnym imporcie.
  */
+/** Kolumna kodu kreskowego — stała, bo w Subiekcie nie ma tu wyboru. */
+const KOLUMNA_EAN = "tw_PodstKodKresk";
+
+/* ── Odmowa uprawnienia to NIE jest awaria, tylko brakująca linia GRANT-a ────
+   Surowy komunikat MSSQL brzmi „The UPDATE permission was denied on the column
+   … of the object …" i nie mówi ANI SŁOWA o tym, co z tym zrobić. Wdrożenie
+   0.37.0 potknęło się dokładnie na tym: człowiek widział błąd w kolejce i nie
+   miał jak zgadnąć, że brakuje jednej linii do wykonania w SSMS.
+
+   Zamiana komunikatu na gotowe polecenie kosztuje nas nic, a oszczędza godzinę
+   szukania. Oryginał zostaje w drugim zdaniu — bez niego nie da się odróżnić
+   braku GRANT-u od DENY albo od złej bazy.                                    */
+function opiszBlad(e: unknown, kolumna: string): string {
+  const tresc = e instanceof Error ? e.message : String(e);
+  if (!/permission was denied|odmowa|denied/i.test(tresc)) return tresc;
+  return (
+    `Konto SQL nie ma prawa zapisu do kolumny ${kolumna}. Wykonaj w SSMS ` +
+    `na bazie podmiotu: GRANT UPDATE ON dbo.tw__Towar (${kolumna}) TO wertis; ` +
+    `— potem PONÓW to zadanie. Komunikat serwera SQL: ${tresc}`
+  );
+}
+
 export class SqlSferaAdapter implements SferaAdapter {
   async applySetLocation(twId: number, newValue: string): Promise<void> {
     const locCol = assertSafeColumn(config.mssql.locColumn);
     const pool = await mssqlPool();
-    const res = await pool
-      .request()
-      .input("id", sql.Int, twId)
-      .input("v", sql.NVarChar, newValue)
-      .query(`UPDATE tw__Towar SET ${locCol} = @v WHERE tw_Id = @id`);
+    let res;
+    try {
+      res = await pool
+        .request()
+        .input("id", sql.Int, twId)
+        .input("v", sql.NVarChar, newValue)
+        .query(`UPDATE tw__Towar SET ${locCol} = @v WHERE tw_Id = @id`);
+    } catch (e) {
+      // ta sama podpowiedź co przy kodzie kreskowym — brak GRANT-u na kolumnę
+      // lokalizacji wygląda identycznie i tak samo nic nie mówi
+      throw new Error(opiszBlad(e, locCol));
+    }
     if (!res.rowsAffected[0]) {
       throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
     }
@@ -48,11 +77,16 @@ export class SqlSferaAdapter implements SferaAdapter {
    */
   async applySetEan(twId: number, ean: string): Promise<void> {
     const pool = await mssqlPool();
-    const res = await pool
-      .request()
-      .input("id", sql.Int, twId)
-      .input("v", sql.NVarChar, ean)
-      .query("UPDATE tw__Towar SET tw_PodstKodKresk = @v WHERE tw_Id = @id");
+    let res;
+    try {
+      res = await pool
+        .request()
+        .input("id", sql.Int, twId)
+        .input("v", sql.NVarChar, ean)
+        .query("UPDATE tw__Towar SET tw_PodstKodKresk = @v WHERE tw_Id = @id");
+    } catch (e) {
+      throw new Error(opiszBlad(e, KOLUMNA_EAN));
+    }
     if (!res.rowsAffected[0]) {
       throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
     }

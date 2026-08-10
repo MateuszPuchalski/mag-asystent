@@ -168,3 +168,46 @@ test("usunięcie ma własny typ zdarzenia — audyt musi je odróżniać", async
   };
   assert.equal(ev.type, "location_removed");
 });
+
+/* ── Ustawienie lokalizacji podstawowej (0.38.0) ─────────────────────────────
+   Pickingową jest PIERWSZA lokalizacja z pola. Towar leżący w dwóch miejscach
+   zmienia „główne" wraz z rotacją, a do 0.38.0 jedyną drogą było skasowanie
+   adresu i nadanie go od nowa — czyli utrata informacji, że drugie miejsce
+   w ogóle istnieje.                                                          */
+
+/** Ustawia pole lokalizacji towaru 1 na podaną zawartość. */
+const ustawPole = (v: string) =>
+  db().prepare("UPDATE sgt_towar SET lokalizacja = ? WHERE tw_id = 1").run(v);
+
+test("podniesienie adresu przestawia go na pierwsze miejsce", async () => {
+  ustawPole("A01-02-03 B02-01-01 C03-01-01");
+  const r = await zmien({ action: "promote", value: "B02-01-01" });
+  assert.equal(r.statusCode, 200);
+  assert.match(zadania()[0].payload, /"newValue":"B02-01-01 A01-02-03 C03-01-01"/);
+});
+
+test("podniesienie NIE gubi ani nie dopisuje adresów", async () => {
+  // cała różnica względem `replace`: tamto zostawiłoby jeden adres
+  ustawPole("A01-02-03 B02-01-01 C03-01-01");
+  await zmien({ action: "promote", value: "C03-01-01" });
+  const wynik = JSON.parse(zadania()[0].payload).newValue as string;
+  assert.deepEqual(wynik.split(" ").sort(), ["A01-02-03", "B02-01-01", "C03-01-01"]);
+});
+
+test("podniesienie adresu, którego towar nie ma, to 400 z czytelnym powodem", async () => {
+  /* Prośba „podnieś adres, którego tu nie ma" znaczy, że kolektor patrzy na
+     inny stan niż baza. Ciche dopisanie zamieniłoby ten rozjazd w zapis do
+     kartoteki firmy. */
+  ustawPole("A01-02-03");
+  const r = await zmien({ action: "promote", value: "Z09-09-09" });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /nie ma lokalizacji Z09-09-09/);
+  assert.equal(zadania().length, 0, "odmowa nie ma prawa nic zakolejkować");
+});
+
+test("podniesienie już podstawowej nic nie psuje", async () => {
+  ustawPole("A01-02-03 B02-01-01");
+  const r = await zmien({ action: "promote", value: "A01-02-03" });
+  assert.equal(r.statusCode, 200);
+  assert.match(zadania()[0].payload, /"newValue":"A01-02-03 B02-01-01"/);
+});

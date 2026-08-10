@@ -16,7 +16,7 @@ import {
 import { classifyScan, normalizeLoc } from "../scan.js";
 import { parseLocs } from "../locs.js";
 
-type LocAction = "replace" | "add" | "remove" | "replace_one";
+type LocAction = "replace" | "add" | "remove" | "replace_one" | "promote";
 
 interface LocBody {
   action: LocAction;
@@ -26,7 +26,7 @@ interface LocBody {
   recznie?: boolean;
 }
 
-const AKCJE: readonly LocAction[] = ["replace", "add", "remove", "replace_one"];
+const AKCJE: readonly LocAction[] = ["replace", "add", "remove", "replace_one", "promote"];
 
 /**
  * `null` dla nieznanej albo brakującej akcji.
@@ -49,6 +49,16 @@ function computeNewLocs(current: string[], body: LocBody): string[] | null {
       return current.filter((l) => l !== v);
     case "replace_one":
       return current.map((l) => (l === body.replaced ? v : l));
+    /* PODNIESIENIE na pierwsze miejsce (0.38.0). Pickingową jest PIERWSZA
+       lokalizacja z pola (`locs.ts`), więc „uczyń podstawową" to przestawienie
+       kolejności, a nie dopisanie ani skasowanie czegokolwiek — reszta adresów
+       zostaje nietknięta i w swojej kolejności.
+
+       Kod spoza listy odrzucamy zamiast dopisywać: prośba „podnieś adres,
+       którego tu nie ma" znaczy, że wołający patrzy na inny stan niż baza,
+       a ciche dopisanie zamieniłoby ten rozjazd w zapis do kartoteki. */
+    case "promote":
+      return current.includes(v) ? [v, ...current.filter((l) => l !== v)] : null;
     default:
       return null;
   }
@@ -174,7 +184,16 @@ export async function productRoutes(app: FastifyInstance) {
       }
       const current = parseLocs(p.lokalizacja);
       const next = computeNewLocs(current, body);
-      if (!next) return reply.code(400).send({ error: "Nieznana akcja" });
+      if (!next) {
+        /* Jedyna akcja, która dochodzi tu z POPRAWNĄ nazwą, to `promote` na
+           adres spoza listy — komunikat musi to powiedzieć, bo „nieznana
+           akcja" wysłałoby diagnozę w złą stronę. */
+        return reply.code(400).send({
+          error: body.action === "promote"
+            ? `Towar nie ma lokalizacji ${(body.value ?? "").toUpperCase()} — odśwież kartę`
+            : "Nieznana akcja",
+        });
+      }
       const joined = next.join(" ");
       if (joined.length > config.locFieldLimit) {
         // twardy błąd, NIE ciche ucięcie (spec §5.2, §12)
@@ -352,5 +371,7 @@ function describeLoc(body: LocBody, current: string[]): string {
       return `(usunięto ${body.value})`;
     case "replace_one":
       return `${v} (zamiast ${body.replaced})`;
+    case "promote":
+      return `${v} (ustawiono jako podstawową)`;
   }
 }
