@@ -201,9 +201,13 @@ function Uprawnienia-Atrapa {
     $wiersze = 1..$Select | ForEach-Object {
         [pscustomobject]@{ permission_name = "SELECT"; state_desc = "GRANT"; obiekt = "tabela$_"; kolumna = $null }
     }
-    return @($wiersze) + @(
-        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw__Towar"; kolumna = $Kolumna }
-    )
+    # Zapisy z tej samej listy, z ktorej nadaje je skrypt - inaczej atrapa
+    # opisywalaby komplet sprzed ostatniej zmiany i test przestalby cokolwiek
+    # sprawdzac.
+    $zapisy = Get-WertisKolumnyZapisu -KolumnaLokalizacji $Kolumna | ForEach-Object {
+        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw__Towar"; kolumna = $_.Kolumna }
+    }
+    return @($wiersze) + @($zapisy)
 }
 
 Sprawdz "prog przepuszcza komplet nadany wlasnym skryptem" {
@@ -245,12 +249,37 @@ Sprawdz "prog odrzuca prawo zapisu do dokumentow" {
     Zaloz (-not $ocena.Ok) "prog przepuszcza prawo zapisu do dok__Dokument"
 }
 
-Sprawdz "JEDYNYM prawem zapisu jest kolumna lokalizacji" {
+Sprawdz "prawa zapisu to DOKLADNIE kolumny z listy i nic wiecej" {
     # Test na samą dok__Dokument (niżej) przepuściłby kolejny wyjątek dopisany
     # do INNEJ tabeli — dokładnie tak weszła kiedyś flaga faktury. Liczymy więc
-    # WSZYSTKIE granty zapisu: ma być dokładnie jeden.
+    # WSZYSTKIE granty zapisu i porównujemy z listą, z której są nadawane.
+    #
+    # Do 0.38.0 stała tu liczba 1 wpisana z ręki. Kod kreskowy (0.37.0) dołożył
+    # drugą kolumnę po stronie serwera i nikt tego testu nie ruszył, bo
+    # instalatora też nikt nie ruszył — a objawem była odmowa uprawnienia na
+    # produkcji, długo po „udanej" instalacji.
+    $oczekiwane = @(Get-WertisKolumnyZapisu -KolumnaLokalizacji "tw_Pole3").Count
     $zapisy = ([regex]::Matches($skrypt, "GRANT (INSERT|UPDATE|DELETE)")).Count
-    Zaloz ($zapisy -eq 1) "grantów zapisu jest $zapisy, ma być 1"
+    Zaloz ($zapisy -eq $oczekiwane) "grantow zapisu jest $zapisy, ma byc $oczekiwane"
+}
+
+Sprawdz "nadaje prawo zapisu do kodu kreskowego" {
+    # Wdrozenie 0.37.0 potknelo sie o brak tej jednej linii.
+    Zaloz ($skrypt -match "GRANT UPDATE ON dbo\.tw__Towar \(tw_PodstKodKresk\)") "brak grantu na kod kreskowy"
+}
+
+Sprawdz "prog odrzuca komplet BEZ kodu kreskowego" {
+    # Regresja wprost na usterke: uprawnienia sprzed 0.37.0 (sama lokalizacja)
+    # maja byc zgloszone jako niekompletne, z nazwa brakujacej kolumny.
+    $ile = @(Get-WertisTabeleOdczytu -Zdjecia $true).Count
+    $stare = @(1..$ile | ForEach-Object {
+        [pscustomobject]@{ permission_name = "SELECT"; state_desc = "GRANT"; obiekt = "tabela$_"; kolumna = $null }
+    }) + @(
+        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw__Towar"; kolumna = "tw_Pole3" }
+    )
+    $ocena = Test-WertisUprawnienia -Uprawnienia $stare -KolumnaLokalizacji "tw_Pole3"
+    Zaloz (-not $ocena.Ok) "prog przepuszcza uprawnienia sprzed 0.37.0"
+    Zaloz ($ocena.BrakujaceZapisy -contains "tw_PodstKodKresk") "prog nie nazywa brakujacej kolumny"
 }
 
 Sprawdz "NIE nadaje żadnego prawa zapisu do dok__Dokument" {

@@ -28,6 +28,36 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.38.1 — 10 sierpnia 2026
+
+**Instalator nadaje uprawnienie do kodu kreskowego.** To on był przyczyną
+odmowy `The UPDATE permission was denied on the column 'tw_PodstKodKresk'` na
+produkcji: 0.37.0 dołożyło drugą kolumnę zapisu po stronie serwera, a kreator
+dalej nadawał komplet sprzed tej zmiany.
+
+**[wymaga działania]** Nic ponad `git pull` — ale **instalacja zastana dostaje
+brakujący grant dopiero po ponownym uruchomieniu kreatora**. Skrypt jest
+idempotentny, więc przebieg na działającej instalacji dokłada wyłącznie to,
+czego brakuje. Kto nie chce uruchamiać kreatora, wykonuje jedną linię
+z `docs/subiekt-gt-edu-setup.md` §2 i klika PONÓW na zadaniach w kolejce.
+
+### Ta usterka miała już dwa precedensy i ten sam kształt
+
+Liczba nadawanych grantów i liczba oczekiwanych rozjechały się w tym pliku
+dwa razy wcześniej — po stronie ODCZYTU. Naprawiono to wtedy jedną listą
+(`Get-WertisTabeleOdczytu`), z której idzie i skrypt, i próg weryfikacji.
+Strona ZAPISU takiej listy nie miała: „jedna kolumna" stała wpisana z ręki
+w trzech miejscach — w skrypcie, w progu i w teście — więc dołożenie drugiej
+kolumny w serwerze nie miało jak pociągnąć instalatora za sobą.
+
+Teraz zapis idzie z `Get-WertisKolumnyZapisu`, a próg i test liczą z tej samej
+listy. Doszedł też test-regresja wprost na tę usterkę: uprawnienia sprzed
+0.37.0 muszą zostać zgłoszone jako niekompletne, **z nazwą brakującej
+kolumny** — bo „uprawnienia się nie zgadzają" nie mówi, którą linię GRANT-a
+poprawić.
+
+---
+
 ## 0.38.0 — 9 sierpnia 2026
 
 Trzy rzeczy ze zgłoszeń po wdrożeniu 0.37.0. Jedna z nich to **cicha zmiana

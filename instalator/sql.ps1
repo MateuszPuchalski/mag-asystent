@@ -540,6 +540,32 @@ function Get-WertisTabeleOdczytu {
     return @($script:WertisTabeleOdczytu | Where-Object { $Zdjecia -or -not $_.Opcjonalna })
 }
 
+function Get-WertisKolumnyZapisu {
+    <#
+        .SYNOPSIS
+        Kolumny `tw__Towar`, do których konto ma prawo ZAPISU. Nic poza nimi.
+        .DESCRIPTION
+        Jedno wejście dla skryptu grantów, dla progu sprawdzenia i dla zdania
+        pokazywanego człowiekowi — z tego samego powodu, dla którego istnieje
+        `Get-WertisTabeleOdczytu`: liczba nadawanych grantów i liczba
+        oczekiwanych rozjechały się już dwa razy, a objawem było „niezgodne
+        uprawnienia" po POPRAWNEJ instalacji.
+
+        Do 0.37.0 kolumna była JEDNA. Kod kreskowy dołożył drugą i wdrożenie
+        potknęło się dokładnie o to: instalator nadawał komplet sprzed zmiany,
+        więc nadawanie kodów kończyło się odmową uprawnienia na produkcji.
+
+        `tw_PodstKodKresk` jest kolumną RDZENIOWĄ `tw__Towar` (opis struktury
+        InsERT), więc nie wymaga sprawdzania obecności — inaczej niż tabela
+        zdjęć, której brak wywalał cały skrypt.
+    #>
+    param([Parameter(Mandatory)][string]$KolumnaLokalizacji)
+    return @(
+        @{ Kolumna = $KolumnaLokalizacji; Po = "lokalizacja (MSSQL_LOC_COLUMN)" },
+        @{ Kolumna = "tw_PodstKodKresk";  Po = "kod kreskowy nadawany z kolektora (0.37.0)" }
+    )
+}
+
 function Get-WertisZdjeciaKartotek {
     <#
         .SYNOPSIS
@@ -641,6 +667,11 @@ function Get-WertisSkryptUprawnien {
         $linia = "GRANT SELECT ON dbo.{0,-14} TO [{1}];" -f $_.Tabela, $Login
         if ($_.Po) { "$linia   -- $($_.Po)" } else { $linia }
     }) -join "`n"
+    # Zapis z tej samej listy, z której idzie próg sprawdzenia — patrz
+    # `Get-WertisKolumnyZapisu`.
+    $zapisy = (Get-WertisKolumnyZapisu -KolumnaLokalizacji $KolumnaLokalizacji | ForEach-Object {
+        "GRANT UPDATE ON dbo.tw__Towar ({0}) TO [{1}];   -- {2}" -f $_.Kolumna, $Login, $_.Po
+    }) -join "`n"
 
     return @"
 USE [$bazaEsc];
@@ -664,9 +695,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = '$Login')
 -- ODCZYT: wyłącznie tabele potrzebne aplikacji
 $granty
 
--- ZAPIS: JEDNA kolumna kartoteki (ta sama, co MSSQL_LOC_COLUMN) i nic więcej.
--- Dokumenty, flagi i stany pozostają dla tego loginu tylko do odczytu.
-GRANT UPDATE ON dbo.tw__Towar ($KolumnaLokalizacji) TO [$Login];
+-- ZAPIS: DWIE kolumny kartoteki i ani jedna więcej. Dokumenty, flagi i stany
+-- pozostają dla tego loginu tylko do odczytu.
+$zapisy
 "@
 }
 
@@ -778,6 +809,19 @@ function Test-WertisUprawnienia {
     $zapisDok = @($Uprawnienia | Where-Object {
         $_.obiekt -eq "dok__Dokument" -and $_.permission_name -in @("UPDATE", "INSERT", "DELETE")
     })
+    <#
+        Kolumny zapisu sprawdzamy Z TEJ SAMEJ listy, z której są nadawane.
+        Do 0.38.0 stało tu wprost „ma być dokładnie jedna kolumna" — i przy
+        dołożeniu kodu kreskowego w 0.37.0 nikt tego nie ruszył, więc
+        instalator nadawał komplet sprzed zmiany, a produkcja odmawiała
+        zapisu kodów. Ta sama usterka co dwa razy wcześniej przy grantach
+        odczytu, tylko po stronie zapisu.
+    #>
+    $oczekiwaneZapisy = @(Get-WertisKolumnyZapisu -KolumnaLokalizacji $KolumnaLokalizacji)
+    $brakujaceZapisy = @($oczekiwaneZapisy | Where-Object {
+        $kol = $_.Kolumna
+        -not @($update | Where-Object { $_.obiekt -eq "tw__Towar" -and $_.kolumna -eq $kol })
+    })
     $lokalizacja = @($update | Where-Object {
         $_.obiekt -eq "tw__Towar" -and $_.kolumna -eq $KolumnaLokalizacji
     })
@@ -794,7 +838,11 @@ function Test-WertisUprawnienia {
         TabeleOdczytu   = $select.Count
         Wymaganych      = $wymagane
         LokalizacjaOk   = ($lokalizacja.Count -eq 1)
+        # nazwy kolumn, których zabrakło — komunikat ma powiedzieć KTÓREJ,
+        # a nie tylko „coś jest nie tak z uprawnieniami"
+        BrakujaceZapisy = @($brakujaceZapisy | ForEach-Object { $_.Kolumna })
+        KolumnyZapisu   = $oczekiwaneZapisy.Count
         ZapisDokumentow = $zapisDok.Count
-        Ok              = ($select.Count -ge $wymagane -and $lokalizacja.Count -eq 1 -and $zapisDok.Count -eq 0)
+        Ok              = ($select.Count -ge $wymagane -and $brakujaceZapisy.Count -eq 0 -and $zapisDok.Count -eq 0)
     }
 }
