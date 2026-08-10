@@ -28,6 +28,63 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.38.0 — 9 sierpnia 2026
+
+Trzy rzeczy ze zgłoszeń po wdrożeniu 0.37.0. Jedna z nich to **cicha zmiana
+danych w Subiekcie** — i to ona jest tu najważniejsza.
+
+**[wymaga działania]** Nowy APK (dwie z trzech zmian są w kolektorze).
+Poza tym `git pull`, `npm ci`, `npm run build`, restart usług.
+
+### Ekran przetrwał przerwę i zamienił skan półki w zmianę lokalizacji
+
+Magazynier otworzył kartę towaru, przełączył się do innej aplikacji, wrócił po
+dwudziestu minutach i zeskanował etykietę regału, żeby sprawdzić jego zawartość.
+Ale wciąż był na karcie towaru — a tam skan półki znaczy „ZMIEŃ LOKALIZACJĘ
+TEGO TOWARU". Adres kartoteki zmienił się bez jednego pytania.
+
+To nie była wina człowieka. Ekran przeżył przerwę, skaner nie ma pojęcia, że
+minęło dwadzieścia minut, a zapis lokalizacji jest bezwarunkowy i nie ma po nim
+cofnięcia. Od teraz **powrót po dłuższej niż dwuminutowej przerwie ląduje na
+ekranie głównym**, gdzie skan półki pokazuje jej zawartość — czyli robi to,
+czego ten człowiek chciał.
+
+Próg, a nie „zawsze", i to jest świadomy wybór: powrót na główny po każdym
+przełączeniu wyrzucałby z rozgrzebanej dostawy za każdym zerknięciem w inną
+aplikację, czyli karałby rytm pracy za czynność bez żadnego ryzyka.
+Niebezpieczna jest **przerwa, po której nie pamięta się, co było na ekranie** —
+kilkanaście sekund pamięta się zawsze. Kreator kont jest wyjątkiem: to formularz
+z wpisanymi danymi, a zakładanie konta nie reaguje na skan półki.
+
+### Lokalizację poboczną da się uczynić podstawową
+
+Pickingowa jest **pierwsza** lokalizacja z pola. Towar leżący w dwóch miejscach
+zmienia „główne" wraz z rotacją, a jedyną drogą było dotąd skasowanie adresu
+i nadanie go od nowa — czyli utrata informacji, że drugie miejsce istnieje.
+
+Dotknięcie chipa lokalizacji daje teraz **PODSTAWOWA** obok USUŃ. Przycisk
+pojawia się wyłącznie przy adresie, który podstawowy nie jest. Operacja
+przestawia kolejność i **nic nie dopisuje ani nie kasuje**; prośba o podniesienie
+adresu, którego towar nie ma, jest odmawiana (kolektor patrzy wtedy na inny stan
+niż baza, a ciche dopisanie zamieniłoby ten rozjazd w zapis do kartoteki).
+
+### Odmowa uprawnienia mówi teraz, co zrobić
+
+Wdrożenie 0.37.0 potknęło się o komunikat `The UPDATE permission was denied on
+the column 'tw_PodstKodKresk'` — prawdziwy, ale nie mówiący ANI SŁOWA o tym, co
+z nim zrobić. Zadanie w kolejce niesie teraz gotowe polecenie:
+
+> Konto SQL nie ma prawa zapisu do kolumny tw_PodstKodKresk. Wykonaj w SSMS na
+> bazie podmiotu: `GRANT UPDATE ON dbo.tw__Towar (tw_PodstKodKresk) TO wertis;`
+> — potem PONÓW to zadanie.
+
+Oryginalny komunikat serwera SQL zostaje w drugim zdaniu: bez niego nie da się
+odróżnić braku GRANT-u od `DENY` albo od wykonania polecenia na złej bazie. Ta
+sama podpowiedź działa dla kolumny lokalizacji — brak GRANT-u wygląda tam
+identycznie i tak samo nic nie mówił.
+
+---
+
 ## 0.37.0 — 9 sierpnia 2026
 
 **Kody kreskowe da się nadawać z kolektora.** Karton ma kod, kartoteka go nie ma

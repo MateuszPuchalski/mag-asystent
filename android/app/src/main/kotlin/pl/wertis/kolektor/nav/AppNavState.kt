@@ -4,6 +4,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.nav.backTarget
+import pl.wertis.kolektor.core.nav.ekranDoOpuszczenia
+import pl.wertis.kolektor.core.nav.wracacNaGlowny
 import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.data.RecentStore
 
@@ -51,6 +53,21 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun goBack() {
         _screen.value = backTargetOf(_screen.value) ?: Screen.HOME
+    }
+
+    /**
+     * Powrót na ekran główny po przerwie w tle (0.38.0).
+     *
+     * Reguła i jej powód mieszkają w `:core` (`PowrotDoPracy.kt`) — tu zostaje
+     * samo przestawienie ekranu. Zwraca `true`, gdy faktycznie wróciliśmy;
+     * wołający pokazuje wtedy komunikat, bo ekran zmieniony bez udziału
+     * człowieka wygląda jak awaria, dopóki nie powie się, dlaczego.
+     */
+    fun wrocNaGlownyPoPrzerwie(wTleOd: Long?, teraz: Long = System.currentTimeMillis()): Boolean {
+        if (!wracacNaGlowny(wTleOd, teraz)) return false
+        if (!ekranDoOpuszczenia(_screen.value)) return false
+        _screen.value = Screen.HOME
+        return true
     }
 
     /** Otwarcie kolejki Sfery z zapamiętaniem ekranu powrotu (pastylka statusu). */

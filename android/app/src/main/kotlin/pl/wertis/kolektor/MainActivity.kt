@@ -13,6 +13,10 @@ import pl.wertis.kolektor.ui.theme.WertisTheme
 
 class MainActivity : ComponentActivity() {
 
+    /* Znacznik wejścia w tło. Trzymany W AKTYWNOŚCI, nie w grafie: dotyczy
+       WIDOKU, a nie stanu aplikacji, i ma umrzeć razem z ekranem. */
+    private var wTleOd: Long? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val graph = appGraph
@@ -43,9 +47,23 @@ class MainActivity : ComponentActivity() {
         // Blokada sesji jest stanem SERWERA (plan §7) — po powrocie z tła
         // pytamy o nią, zamiast prowadzić drugi zegar po stronie kolektora.
         appGraph.session.refresh()
+
+        /* POWRÓT NA EKRAN GŁÓWNY PO DŁUŻSZEJ PRZERWIE (0.38.0).
+           Zgłoszenie z hali: karta towaru przetrwała dwudziestominutową
+           przerwę, magazynier zeskanował etykietę półki, żeby sprawdzić jej
+           zawartość — i zmienił lokalizację kartoteki, bo na karcie towaru
+           skan półki znaczy dokładnie to. Powód progu i to, dlaczego nie
+           „zawsze", stoi w `core/nav/PowrotDoPracy.kt`. */
+        if (appGraph.nav.wrocNaGlownyPoPrzerwie(wTleOd)) {
+            // ekran zmieniony bez udziału człowieka wygląda jak awaria,
+            // dopóki nie powie się, dlaczego
+            appGraph.effects.toast("Przerwa w pracy — wróciliśmy na ekran główny")
+        }
+        wTleOd = null
     }
 
     override fun onPause() {
+        wTleOd = System.currentTimeMillis()
         appGraph.scanner.stop(this)
         appGraph.motion.stop()
         appGraph.batteryAssist.stop()

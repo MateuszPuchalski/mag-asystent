@@ -295,6 +295,32 @@ fun ProductScreen(graph: AppGraph) {
                 ) {
                     Text("Lokalizacja", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
                     Text(code, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    /* PODSTAWOWA = pierwsza z listy (`locs.ts`), czyli ta, którą
+                       kolektor pokazuje w nagłówku i po której idzie pobranie.
+                       Towar leżący w dwóch miejscach zmienia „główne" wraz
+                       z rotacją, a do 0.38.0 jedyną drogą było skasowanie
+                       adresu i nadanie go ponownie — czyli utrata informacji,
+                       że drugie miejsce w ogóle istnieje.
+
+                       Przycisk pokazuje się WYŁĄCZNIE przy adresie, który
+                       podstawowy nie jest: „ustaw jako podstawową" przy już
+                       podstawowej byłaby akcją bez skutku. */
+                    if (code != adres.kod) {
+                        OutlineButton("PODSTAWOWA", enabled = !saving) {
+                            scope.launch {
+                                try {
+                                    apiCall {
+                                        graph.api.setLocation(id, SetLocationBody(LocAction.PROMOTE, value = code))
+                                    }
+                                    graph.queueRepo.refreshNow()
+                                    chipMenu = null
+                                    graph.feedback.beep(true)
+                                } catch (e: Exception) {
+                                    graph.effects.toast(e.message ?: "Błąd zapisu")
+                                }
+                            }
+                        }
+                    }
                     OutlineButton("USUŃ", danger = true, enabled = !saving) {
                         scope.launch {
                             try {

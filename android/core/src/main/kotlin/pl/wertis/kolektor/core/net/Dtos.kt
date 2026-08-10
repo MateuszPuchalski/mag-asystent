@@ -71,6 +71,15 @@ enum class LocAction {
     @SerialName("add") ADD,
     @SerialName("remove") REMOVE,
     @SerialName("replace_one") REPLACE_ONE,
+
+    /**
+     * Podniesienie istniejącego adresu na PIERWSZE miejsce (0.38.0).
+     *
+     * Pickingową jest pierwsza lokalizacja z pola, więc „uczyń podstawową" to
+     * przestawienie kolejności — reszta adresów zostaje. Do 0.38.0 jedyną drogą
+     * było skasowanie i nadanie na nowo, czyli utrata drugiego miejsca.
+     */
+    @SerialName("promote") PROMOTE,
 }
 
 @Serializable
