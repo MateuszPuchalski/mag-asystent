@@ -644,11 +644,18 @@ function Get-WertisSkryptUprawnien {
         Skrypt zakładający login `wertis` — ten sam, który idzie do wykonania
         i do pliku awaryjnego, żeby nie mogły się rozjechać.
         .DESCRIPTION
-        Idempotentny, więc wolno go puścić ponownie po zmianie pola
-        lokalizacji. Uprawnienie zapisu jest KOLUMNOWE i to jest tu cała
-        wartość: UPDATE na jednej kolumnie tw__Towar i ani jednego prawa
+        Idempotentny, więc wolno go puścić ponownie — po zmianie pola
+        lokalizacji ORAZ po wydaniu, które dokłada kolumnę zapisu. Istniejący
+        login dostaje wtedy nowe hasło i brakujące granty, bo `GRANT` powtórzony
+        jest bez skutku, a `CREATE LOGIN` stoi za `IF NOT EXISTS`. To jest
+        jedyna droga naprawy instalacji zastanej i CHCEMY, żeby taka była.
+
+        Uprawnienie zapisu jest KOLUMNOWE i to jest tu cała wartość: UPDATE
+        wyłącznie na kolumnach z `Get-WertisKolumnyZapisu` i ani jednego prawa
         zapisu gdziekolwiek indziej. Przy przejęciu tego credentiala da się
-        zmienić lokalizację towaru — nic więcej.
+        zmienić lokalizację i podstawowy kod kreskowy towaru — nic więcej.
+        Liczby kolumn tu NIE WPISYWAĆ: stała „jedna" przeżyła w tym miejscu
+        dołożenie drugiej i o to potknęło się wdrożenie 0.37.0.
     #>
     param(
         [Parameter(Mandatory)][string]$Baza,
