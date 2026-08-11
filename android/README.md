@@ -143,6 +143,9 @@ przed którą ta pozycja broni.
 
 - [ ] towar z JEDNYM adresem → „+ DODAJ" → skan półki → towar ma **dwa** adresy,
 - [ ] skan wprost z karty, bez „+ DODAJ", nadal **zastępuje** adres,
+- [ ] pod kartą NIE MA już przycisku „ZMIEŃ LOKALIZACJĘ" (0.41.0 — był
+      duplikatem skanu półki),
+- [ ] pasek górny ekranu skanu mówi „DODANIE LOKALIZACJI" na każdej drodze,
 - [ ] po skanie półki NIE ma zielonego kafla na środku ekranu,
 - [ ] chip nowego adresu jest przygaszony i bez cienia,
 - [ ] po przejściu kolejki Sfery ten sam chip robi się normalny,
@@ -167,6 +170,8 @@ przed którą ta pozycja broni.
 
 - [ ] nagłówek pokazuje symbol, liczbę dostępnych sztuk i adres pickingowy,
 - [ ] towar bez adresu ma w nagłówku pastylkę „+ DODAJ ADRES",
+- [ ] ta pastylka jest **tej samej wielkości** co pastylka z adresem — ta sama
+      wysokość, ten sam cień, ten sam obrys (0.41.0),
 - [ ] ta pastylka otwiera skan półki, a rząd chipów pod spodem znika,
 - [ ] adres w kolejce Sfery prowadzi z pastylki wprost do kolejki,
 - [ ] trzy sekcje są zwinięte po wejściu na kartę,

@@ -301,9 +301,19 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   szarym tekstem, bo idą w rozmowę z dostawcą. `+` nigdy nie rozdziela:
   w opisach łączy części zestawu, więc podział podałby pół kompletu jako
   pełnoprawny zamiennik.
-- Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
-  bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
-  Pomyłkę poprawia się skanem właściwej półki — nie ma czego cofać.
+- Zmiana lokalizacji: **skan półki przy otwartej karcie** — przy jednym adresie
+  zastępuje od razu, przy ≥2 pyta arkuszem zastąp/dodaj/zastąp jedną. Walidacje
+  bez spacji i długości. Pomyłkę poprawia się skanem właściwej półki — nie ma
+  czego cofać.
+
+  > **Dlaczego bez przycisku.** Do 0.41.0 stał pod spodem „ZMIEŃ LOKALIZACJĘ"
+  > i prowadził na ekran skanu, który robił dokładnie to samo, co ten sam skan
+  > przy otwartej karcie. Był przy tym największym elementem karty — a ZASTĄP
+  > kasuje istniejący adres, podczas gdy bezpieczne „+ DODAJ" jest tylko małym
+  > chipem. Waga na ekranie była odwrotna do ceny pomyłki.
+- Dołożenie drugiego adresu: chip **„+ DODAJ"** w rzędzie adresów (albo pastylka
+  „+ DODAJ ADRES" w nagłówku, gdy towar nie ma żadnego). To jedyne wejście na
+  ekran skanu półki i ma on od 0.41.0 jedno znaczenie: dokłada, nie zastępuje.
 - **Lokalizacja „w drodze".** Pole lokalizacji w Subiekcie zmienia się dopiero po
   udanym zapisie przez workera, więc do tego czasu karta pokazywałaby stan sprzed
   skanu. Chipy niosą więc stan zamiast milczeć: dochodząca — przerywana ramka

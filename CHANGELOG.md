@@ -28,6 +28,44 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.41.0 — 11 sierpnia 2026
+
+**Przycisk „ZMIEŃ LOKALIZACJĘ" znika z karty towaru.** Prowadził na ekran
+skanu, który po zeskanowaniu półki robił dokładnie to samo, co ten sam skan
+przy otwartej karcie: przy jednym adresie zastępował, przy kilku otwierał ten
+sam arkusz. Duplikat, i to najgorszego rodzaju — bo był **największym
+elementem karty**, choć ZASTĄP kasuje istniejący adres, a bezpieczne „+ DODAJ"
+stoi wyżej jako mały chip. Waga na ekranie była odwrotna do ceny pomyłki.
+
+Zostają dwie drogi do adresu i różnią się gestem, nie sąsiadującym przyciskiem:
+**skan półki przy otwartej karcie** przenosi towar, **„+ DODAJ"** dokłada
+kolejny adres.
+
+Razem z przyciskiem wyszedł tryb zastępowania z ekranu skanu — nie miał już ani
+jednego wołającego. Ekran ma teraz jedno znaczenie, więc znika stamtąd też
+arkusz ZASTĄP/DODAJ (pytanie bez drugiej opcji) i nadpisywanie tytułu w pasku
+górnym; pasek mówi „DODANIE LOKALIZACJI" na każdej drodze. Arkusz żyje dalej na
+karcie towaru, gdzie skan przy kilku adresach jest realną decyzją.
+
+**Cena tej zmiany, wprost:** ręczny wpis adresu przy PRZEPROWADZCE zniknął
+razem z ekranem w trybie zastępowania. Przy zdartej etykiecie przeprowadzka to
+teraz dwa kroki — „+ DODAJ" z wpisem ręcznym, potem USUŃ na starym chipie.
+Skan półki działa jak dotąd, jednym gestem.
+
+**Pastylka „+ DODAJ ADRES" ma tę samą bryłę co pastylka z adresem.** Obie stoją
+w tym samym miejscu nagłówka i są tą samą rzeczą w dwóch stanach, a różniły się
+cieniem i wysokością — karta towaru bez adresu wyglądała przez to jak inny
+ekran, nie jak ta sama karta z pustym polem. Wysokość 52 dp, cień 3 dp, obrys
+1,5 dp i wypełnienie przepisane wprost z `LocChip`. Napis został o dwa punkty
+mniejszy od kodu adresu i to jedyna rozmyślna różnica: „+ DODAJ ADRES" ma
+trzynaście znaków wobec dziewięciu w `A01-02-03` i przy pełnym rozmiarze
+zjadłby wielokropek.
+
+**[wymaga działania]** Nic po stronie serwera — to zmiana wyłącznie
+w kolektorze i wchodzi z **nowym APK**.
+
+---
+
 ## 0.40.0 — 11 sierpnia 2026
 
 **Dostawę rozłożoną poza WERTIS można wreszcie zdjąć z listy.** Zgłoszenie
