@@ -56,9 +56,22 @@ export function validateDeliveryLocation(code: string): string | null {
   return `Kod „${code}" nie jest poprawnym adresem (regał A01-02-03 albo paleta PAL-042)`;
 }
 
-/** Lista faktur zakupu (N dni) z postępem liczonym z delivery_line. */
+/**
+ * Lista faktur zakupu (N dni) z postępem liczonym z delivery_line.
+ *
+ * Dostawy oznaczone jako rozłożone POZA WERTIS wypadają z listy w całości.
+ * Nie „wyszarzone na dole", tylko nieobecne: to nie jest praca ukończona,
+ * tylko praca, której ta aplikacja nigdy nie dostała, a lista rozkładania
+ * odpowiada wyłącznie na pytanie „co mam zrobić".
+ *
+ * Odsiew stoi TUTAJ, a nie w kolektorze, i to jest decyzja o wdrożeniu:
+ * `stanDokumentu` w module `:core` zna trzy stany i nieznany status wrzuciłaby
+ * do „w toku", czyli na sam GÓRĘ listy. Zmiana po stronie serwera działa
+ * z APK, który magazynierzy mają w rękach dzisiaj — bez czekania na MDM.
+ */
 export function listDocuments(days = 14): DeliveryDocument[] {
-  const docs = subiekt.listDeliveryDocuments(days);
+  const poza = dokumentyPozaWertis();
+  const docs = subiekt.listDeliveryDocuments(days).filter((d) => !poza.has(d.dok_id));
   const progress = db()
     .prepare(
       `SELECT d.id AS deliveryId,
@@ -315,9 +328,18 @@ export function adresLinii(r: {
  */
 export function openDelivery(dokId: number, user: string): number {
   const existing = db()
-    .prepare("SELECT id FROM delivery WHERE sgt_dok_id = ?")
-    .get(dokId) as { id: number } | undefined;
+    .prepare("SELECT id, status FROM delivery WHERE sgt_dok_id = ?")
+    .get(dokId) as { id: number; status: string } | undefined;
   if (existing) {
+    /* Dostawa zamknięta jako rozłożona poza WERTIS NIE otwiera się skanem.
+       Ciche wskrzeszenie omijałoby rolę i powód, na których cała ta operacja
+       stoi — a wskrzeszony dokument nie ma ani jednej linii, więc kolektor
+       pokazałby pustą listę pracy i wyglądałoby to na awarię. */
+    if (existing.status === "external") {
+      throw new Error(
+        "Dostawa jest oznaczona jako rozłożona poza WERTIS — cofa ją biuro w panelu /biuro"
+      );
+    }
     usunPozycjeUslugowe(existing.id);
     return existing.id;
   }
@@ -708,4 +730,213 @@ export function closeIfComplete(deliveryId: number, user: string): void {
     .prepare("UPDATE delivery SET status='done', closed_at=? WHERE id=? AND status='open'")
     .run(nowIso(), deliveryId);
   logEvent("delivery_done", user, null, { deliveryId });
+}
+
+/* ── „Rozłożone poza WERTIS" ─────────────────────────────────────────────────
+   Dostawa rozłożona starą aplikacją (albo z ręki, w pośpiechu) nie ma w WERTIS
+   ANI JEDNEGO śladu — a postęp liczy się z `delivery_line`, więc odjęcie idzie
+   od zera i cała ilość wygląda na zaległą. Dokument stoi na liście rozkładania
+   jako nietknięty, a karta towaru mówi „w dostawie, nierozłożone" o towarze,
+   który leży w regale.
+
+   Do 0.40.0 nie było z tego wyjścia. Dokument RAZ OTWARTY w WERTIS zostaje na
+   liście niezależnie od wieku (celowy wyjątek w imporcie: skrócenie okna nie ma
+   kasować niedokończonej pracy), a domyka się dopiero, gdy każda linia jest
+   `done`/`skipped`/`problem`. Towar już leży na półkach, więc nikt tych linii
+   nie zeskanuje. Jedyną drogą było zgłoszenie WYJĄTKU na każdej pozycji, czyli
+   wpisanie fikcyjnych niezgodności do protokołów rozbieżności — dokumentu
+   księgowego. Narzędzie do sprzątania nie ma prawa fałszować dowodów.
+
+   Dlatego osobny status i osobna operacja. Zamknięcie NIE UDAJE odłożenia:
+   nie dopisuje ani jednej linii, nie zapisuje żadnego adresu, nie rusza
+   Subiekta. Mówi tylko tyle, że tej pracy nie ma po co wystawiać na ekran —
+   i mówi to podpisem oraz powodem.                                            */
+
+/** Jedna dostawa zdjęta z listy pracy jako rozłożona poza WERTIS. */
+export interface ZamknietaPozaWertis {
+  dokId: number;
+  nrPelny: string;
+  dostawca: string;
+  dataWyst: string;
+  zamknietaAt: string;
+  zamknietaBy: string;
+  powod: string;
+  /** Ile linii zdążył zapisać WERTIS, zanim dostawę zamknięto. */
+  linie: number;
+}
+
+/** Wiersz `delivery` po numerze dokumentu w Subiekcie. */
+function dostawaPoDokId(dokId: number) {
+  return db().prepare("SELECT * FROM delivery WHERE sgt_dok_id = ?").get(dokId) as
+    | {
+        id: number;
+        status: string;
+        sgt_dok_numer: string;
+        dostawca: string | null;
+        data_dok: string | null;
+      }
+    | undefined;
+}
+
+function liczLinie(deliveryId: number): number {
+  return (
+    db()
+      .prepare("SELECT COUNT(*) AS n FROM delivery_line WHERE delivery_id = ?")
+      .get(deliveryId) as { n: number }
+  ).n;
+}
+
+/**
+ * Oznacz dostawę jako rozłożoną poza WERTIS.
+ *
+ * Działa w dwóch sytuacjach i to jest cały zakres:
+ *
+ *  - dokumentu NIKT w WERTIS nie otwierał — powstaje wiersz `delivery` BEZ
+ *    linii. Brak linii jest tu treścią, nie brakiem danych: nikt tego nie
+ *    rozkładał w tej aplikacji i snapshot pozycji udawałby, że było inaczej;
+ *  - dostawa jest otwarta i porzucona — zostaje ze swoimi liniami dokładnie
+ *    takimi, jakie są. Odłożone zostają odłożone, zaległe zaległe. Status
+ *    dokumentu mówi „to się skończyło poza aplikacją", a nie „to się stało".
+ *
+ * Dostawa domknięta normalnie (`done`) nie przechodzi: nie ma czego zdejmować
+ * z listy, a nadpisanie statusu skasowałoby fakt, że praca została wykonana
+ * TUTAJ i ma pokrycie w skanach.
+ */
+export function zamknijPozaWertis(
+  dokId: number,
+  user: string,
+  powodRaw: string
+): { deliveryId: number; linie: number } {
+  const powod = powodRaw.trim();
+  if (!powod) throw new Error("Podaj powód — bez niego zamknięcie nie zostawia śladu");
+
+  const istnieje = dostawaPoDokId(dokId);
+  const at = nowIso();
+
+  if (!istnieje) {
+    const doc = subiekt.getDocument(dokId);
+    if (!doc) throw new Error("Nie znaleziono dokumentu");
+    const id = Number(
+      db()
+        .prepare(
+          `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, source_mag_id,
+                                status, opened_at, closed_at, closed_by, powod_zamkniecia)
+           VALUES (?,?,?,?,?, 'external', ?,?,?,?)`
+        )
+        .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, doc.mag_id, at, at, user, powod)
+        .lastInsertRowid
+    );
+    logEvent("delivery_external", user, null, { deliveryId: id, dokId, powod, linie: 0 });
+    return { deliveryId: id, linie: 0 };
+  }
+
+  if (istnieje.status === "external") {
+    throw new Error("Ta dostawa jest już oznaczona jako rozłożona poza WERTIS");
+  }
+  if (istnieje.status === "done") {
+    throw new Error("Dostawa została rozłożona w WERTIS — nie ma czego zdejmować z listy");
+  }
+
+  const linie = liczLinie(istnieje.id);
+  db()
+    .prepare(
+      `UPDATE delivery SET status='external', closed_at=?, closed_by=?, powod_zamkniecia=?
+       WHERE id=?`
+    )
+    .run(at, user, powod, istnieje.id);
+  logEvent("delivery_external", user, null, {
+    deliveryId: istnieje.id,
+    dokId,
+    powod,
+    linie,
+    // status sprzed zamknięcia: `open` to porzucona praca, którą właśnie
+    // przykryliśmy — w audycie to jest inna sytuacja niż dokument nietknięty
+    poprzedni: istnieje.status,
+  });
+  return { deliveryId: istnieje.id, linie };
+}
+
+/**
+ * Cofnij zamknięcie — dostawa wraca na listę pracy.
+ *
+ * Bez tego pomyłkowe kliknięcie chowa prawdziwą dostawę na zawsze, a operacja
+ * jest dostępna z przeglądarki, gdzie sąsiedni przycisk leży o centymetr dalej.
+ *
+ * Dostawa, której WERTIS nie zdążył nadać ani jednej linii, wraca do stanu
+ * NIETKNIĘTEJ — wiersz znika. Zostawienie pustej dostawy w stanie `open`
+ * pokazałoby na kolektorze dokument otwarty i bez pozycji, czyli pracę,
+ * której nie da się wykonać ani zamknąć.
+ */
+export function cofnijZamkniecie(dokId: number, user: string): { przywrocona: "nowa" | "otwarta" } {
+  const d = dostawaPoDokId(dokId);
+  if (!d) throw new Error("Nie znaleziono dostawy");
+  if (d.status !== "external") {
+    throw new Error("Ta dostawa nie jest oznaczona jako rozłożona poza WERTIS");
+  }
+
+  const linie = liczLinie(d.id);
+  /* Wyjątki zgłoszone przed zamknięciem trzymają wiersz przy życiu nawet bez
+     linii: `problem.delivery_id` na niego wskazuje, a kasowanie zostawiłoby
+     w protokołach rozbieżności sierotę. */
+  const wyjatki = (
+    db().prepare("SELECT COUNT(*) AS n FROM problem WHERE delivery_id = ?").get(d.id) as {
+      n: number;
+    }
+  ).n;
+
+  if (linie === 0 && wyjatki === 0) {
+    db().prepare("DELETE FROM delivery WHERE id = ?").run(d.id);
+    logEvent("delivery_external_undo", user, null, { deliveryId: d.id, dokId, przywrocona: "nowa" });
+    return { przywrocona: "nowa" };
+  }
+
+  db()
+    .prepare(
+      "UPDATE delivery SET status='open', closed_at=NULL, closed_by=NULL, powod_zamkniecia=NULL WHERE id=?"
+    )
+    .run(d.id);
+  logEvent("delivery_external_undo", user, null, {
+    deliveryId: d.id,
+    dokId,
+    przywrocona: "otwarta",
+    linie,
+  });
+  return { przywrocona: "otwarta" };
+}
+
+/**
+ * Dostawy zdjęte z listy pracy — do przeglądu i cofnięcia w biurze.
+ *
+ * Ta lista MUSI istnieć: zamknięty dokument znika z `/api/delivery/documents`,
+ * więc bez niej pomyłkowe zamknięcie nie miałoby gdzie zostać zauważone ani
+ * jak zostać cofnięte. Kolejność od ostatnio zamkniętych, bo pomyłkę
+ * zauważa się tego samego dnia.
+ */
+export function listaZamknietychPozaWertis(): ZamknietaPozaWertis[] {
+  return (
+    db()
+      .prepare(
+        `SELECT d.sgt_dok_id AS dokId, d.sgt_dok_numer AS nrPelny,
+                COALESCE(d.dostawca,'') AS dostawca, COALESCE(d.data_dok,'') AS dataWyst,
+                COALESCE(d.closed_at,'') AS zamknietaAt,
+                COALESCE(d.closed_by,'') AS zamknietaBy,
+                COALESCE(d.powod_zamkniecia,'') AS powod,
+                (SELECT COUNT(*) FROM delivery_line l WHERE l.delivery_id = d.id) AS linie
+         FROM delivery d
+         WHERE d.status = 'external'
+         ORDER BY d.closed_at DESC, d.id DESC`
+      )
+      .all() as unknown as ZamknietaPozaWertis[]
+  );
+}
+
+/** `sgt_dok_id` dostaw zdjętych z listy pracy — filtr dla listy i karty towaru. */
+export function dokumentyPozaWertis(): Set<number> {
+  return new Set(
+    (
+      db().prepare("SELECT sgt_dok_id FROM delivery WHERE status = 'external'").all() as Array<{
+        sgt_dok_id: number;
+      }>
+    ).map((r) => Math.trunc(r.sgt_dok_id))
+  );
 }

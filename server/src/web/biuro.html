@@ -138,6 +138,18 @@
       <p class="odswiezono" id="odswiezono"></p>
     </section>
 
+    <!-- Dostawy zdjęte z listy pracy. Osobna karta, a nie wiersze wyszarzone
+         w tabeli wyżej: tamta odpowiada na „co magazyn ma do zrobienia", a te
+         dokumenty właśnie z tego pytania wypadły. Karta istnieje po to, żeby
+         pomyłkowe zamknięcie dało się zauważyć i cofnąć — bez niej dokument
+         znika bez śladu widocznego dla człowieka. -->
+    <section class="card" id="kartaPozaWertis" hidden>
+      <h2>ROZŁOŻONE POZA WERTIS</h2>
+      <p class="mute">Zdjęte z listy rozkładania decyzją biura. Towar odłożono
+        bez tej aplikacji, więc nie ma z tego ani jednego skanu.</p>
+      <table id="pozaWertis"></table>
+    </section>
+
     <section class="card" id="kartaReklamacji">
       <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI</h2>
       <p class="mute" style="margin-bottom:10px">
@@ -391,6 +403,10 @@ function rysujStan(health, kolejka) {
 /* ── Dostawy ── */
 function statusDostawy(d) {
   if (d.status === "done") return '<span class="badge ok">ROZŁOŻONA</span>';
+  // `external` nie trafia na listę dostaw, ale trafia do panelu szczegółu —
+  // i tam MUSI się różnić od „ROZŁOŻONA", bo to jest cała różnica między
+  // „mamy z tego skany" a „ktoś orzekł, że nie trzeba"
+  if (d.status === "external") return '<span class="badge mute2">POZA WERTIS</span>';
   if (d.status === "open") return '<span class="badge amber">W TOKU</span>';
   return '<span class="badge mute2">NIETKNIĘTA</span>';
 }
@@ -472,9 +488,25 @@ async function odswiezSzczegol() {
 
 function rysujSzczegol(d) {
   const frac = d.progress.total ? Math.round((d.progress.done / d.progress.total) * 100) : 0;
-  const prognoza = d.zrodlo === "podglad"
-    ? '<p class="mute">Nikt jeszcze nie otwierał tego dokumentu — to pozycje z faktury, tak jak zobaczy je kolektor.</p>'
-    : "";
+  const prognoza = d.zamkniecie
+    ? '<p class="mute">Dostawa zdjęta z listy pracy — poniżej pozycje z faktury, bo w WERTIS nikt tego nie rozkładał.</p>'
+    : d.zrodlo === "podglad"
+      ? '<p class="mute">Nikt jeszcze nie otwierał tego dokumentu — to pozycje z faktury, tak jak zobaczy je kolektor.</p>'
+      : "";
+  /* Dostawy domkniętej normalnie nie ma czego zdejmować z listy — praca
+     została wykonana TUTAJ i ma pokrycie w skanach. Przycisku wtedy nie ma
+     wcale, zamiast wyszarzonego, który zaprasza do kliknięcia i odmawia. */
+  const akcja = d.zamkniecie
+    ? `<div class="mute" style="margin-top:8px">Rozłożone poza WERTIS ·
+         ${esc(d.zamkniecie.kto)} · ${esc(stempelLokalny(d.zamkniecie.at))}<br>
+         powód: ${esc(d.zamkniecie.powod)}</div>
+       <button class="akcja cichy" style="margin-top:6px"
+               data-przywroc="${d.dokId}">PRZYWRÓĆ NA LISTĘ</button>`
+    : d.status === "done"
+      ? ""
+      : `<button class="akcja cichy" style="margin-top:8px"
+                 data-zamknij-poza="${d.dokId}" data-nr="${esc(d.nrPelny)}"
+         >ROZŁOŻONE POZA WERTIS</button>`;
   $("szczegolNaglowek").innerHTML = `
     <div class="b" style="font-size:16px">${esc(d.nrPelny)}
       ${d.wBuforze ? '<span class="badge amber">bufor</span>' : ""}
@@ -486,7 +518,8 @@ function rysujSzczegol(d) {
       <span class="mute">${d.progress.done}/${d.progress.total} poz.${
         d.progress.problems ? ` · ${d.progress.problems} z wyjątkiem` : ""}</span>
     </div>
-    ${prognoza}`;
+    ${prognoza}
+    ${akcja}`;
 
   const kolumn = zdjeciaWlaczone ? 6 : 5;
   $("szczegolLinie").innerHTML =
@@ -553,6 +586,58 @@ function wyjatek(p) {
 }
 
 /* ── Reklamacje ── */
+/* ── Rozłożone poza WERTIS ──────────────────────────────────────────────────
+   Karta chowa się, gdy nie ma czego pokazać. Pusta tabela z nagłówkiem
+   sugerowałaby, że to zwykły element ekranu — a to jest wyjątek i ma tak
+   wyglądać: pojawia się dopiero, gdy ktoś z niego skorzystał.               */
+function rysujPozaWertis(lista) {
+  $("kartaPozaWertis").hidden = lista.length === 0;
+  if (!lista.length) return;
+  $("pozaWertis").innerHTML =
+    "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>ZAMKNĄŁ</th><th>POWÓD</th><th></th></tr>" +
+    lista.map((d) => `<tr>
+      <td class="b">${esc(d.nrPelny)}<div class="mute">${esc(d.dataWyst)}</div></td>
+      <td>${esc(d.dostawca)}</td>
+      <td>${esc(d.zamknietaBy)}<div class="mute">${esc(stempelLokalny(d.zamknietaAt))}</div></td>
+      <td>${esc(d.powod)}${
+        d.linie ? `<div class="mute">${d.linie} poz. zapisanych przed zamknięciem</div>` : ""}</td>
+      <td style="white-space:nowrap">
+        <button class="akcja cichy" data-dok="${d.dokId}">POZYCJE</button>
+        <button class="akcja cichy" data-przywroc="${d.dokId}">PRZYWRÓĆ</button></td>
+    </tr>`).join("");
+}
+
+/**
+ * Zdjęcie dostawy z listy pracy.
+ *
+ * `prompt` zamiast własnego arkusza i to jest świadome: strona nie ma builda
+ * ani frameworka, a modal z polem tekstowym byłby tu pierwszym własnym
+ * komponentem. Powód i tak waliduje serwer — puste okno kończy się czytelnym
+ * błędem, nie cichym zapisem.
+ */
+async function oznaczPozaWertis(dokId, nrPelny) {
+  const powod = prompt(
+    `Dostawa ${nrPelny} zniknie z listy rozkładania.\n\n` +
+    "Dlaczego? (np. „rozłożone starą aplikacją przed wdrożeniem WERTIS”)"
+  );
+  if (powod === null) return;                  // ANULUJ to nie jest pusty powód
+  try {
+    await api(`/api/biuro/dokument/${dokId}/zamknij`, {
+      method: "POST",
+      body: JSON.stringify({ powod }),
+    });
+    zamknijDokument();
+  } catch (e) { alert(e.message); }
+}
+
+/** Zwraca `true`, gdy przywrócenie przeszło — wołający decyduje, co odświeżyć. */
+async function przywrocDostawe(dokId) {
+  try {
+    await api(`/api/biuro/dokument/${dokId}/otworz`, { method: "POST" });
+    return true;
+  } catch (e) { alert(e.message); return false; }
+}
+
 function rysujReklamacje(problemy) {
   const wgDok = new Map();
   for (const p of problemy) {
@@ -1123,13 +1208,15 @@ async function odswiezStan() {
 
 async function odswiezDostawy() {
   try {
-    const [dok, prob] = await Promise.all([
+    const [dok, prob, poza] = await Promise.all([
       (await api("/api/delivery/documents")).json(),
       (await api("/api/problems/unresolved")).json(),
+      (await api("/api/biuro/zamkniete-poza")).json(),
     ]);
     dokumenty = dok.documents || [];
     rysujDostawy();
     rysujReklamacje(prob.problems || []);
+    rysujPozaWertis(poza.documents || []);
     $("odswiezono").textContent =
       `okno: ostatnie ${dok.dniWstecz ?? 14} dni · odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
   } catch (e) { console.warn(e); }
@@ -1212,6 +1299,23 @@ $("reklamacje").addEventListener("click", (e) => {
 $("dostawy").addEventListener("click", (e) => {
   const w = e.target.closest("[data-dok]");
   if (w) otworzDokument(Number(w.dataset.dok));
+});
+$("pozaWertis").addEventListener("click", (e) => {
+  const p = e.target.closest("[data-przywroc]");
+  if (p) {
+    przywrocDostawe(Number(p.dataset.przywroc)).then((ok) => { if (ok) odswiezDostawy(); });
+    return;
+  }
+  // wejście w pozycje PRZED przywróceniem: powód bywa jednym zdaniem, a decyzja
+  // wymaga zobaczenia, co na tej fakturze w ogóle stało
+  const w = e.target.closest("[data-dok]");
+  if (w) otworzDokument(Number(w.dataset.dok));
+});
+$("szczegolNaglowek").addEventListener("click", (e) => {
+  const z = e.target.closest("[data-zamknij-poza]");
+  if (z) oznaczPozaWertis(Number(z.dataset.zamknijPoza), z.dataset.nr);
+  const o = e.target.closest("[data-przywroc]");
+  if (o) przywrocDostawe(Number(o.dataset.przywroc)).then((ok) => { if (ok) zamknijDokument(); });
 });
 $("wrocDoListy").addEventListener("click", zamknijDokument);
 // panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury

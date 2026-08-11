@@ -18,11 +18,32 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-bi
 process.env.LOG_LEVEL = "silent";
 
 let app: FastifyInstance;
+let db: typeof import("../db/db.js").db;
+let createUser: typeof import("../services/users.js").createUser;
+type Rola = import("../services/users.js").Rola;
 
 before(async () => {
+  ({ db } = await import("../db/db.js"));
+  ({ createUser } = await import("../services/users.js"));
   const { buildApp } = await import("../index.js");
   app = await buildApp();
 });
+
+/** Konto danej roli + gotowa sesja; zwraca nagłówki do `app.inject`. */
+let kolejny = 0;
+function jako(rola: Rola): { headers: { "x-session": string } } {
+  // login unikalny per wywołanie: ten sam plik zakłada konto tej samej roli
+  // w kilku testach, a `app_user.login` ma UNIQUE
+  const u = createUser(`Ktoś ${rola}`, rola, `k${rola}-${++kolejny}`, "tajnehaslo");
+  const token = `tok-${u.userId}-${Math.random().toString(16).slice(2)}`;
+  const teraz = new Date().toISOString();
+  db()
+    .prepare(
+      "INSERT INTO device_session(token, user_id, device_id, created_at, last_seen) VALUES (?,?,?,?,?)"
+    )
+    .run(token, u.userId, "biuro-pc", teraz, teraz);
+  return { headers: { "x-session": token } };
+}
 
 test("strona /biuro jest serwowana bez sesji", async () => {
   const r = await app.inject({ method: "GET", url: "/biuro" });
@@ -63,8 +84,20 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/events/csv",
     // Pozycje dokumentu (0.36.0) — mówią, co przyjechało, po ile i gdzie leży.
     "/api/biuro/dokument/1",
+    // Dostawy zdjęte z listy pracy (0.40.0) — niosą nazwiska i powody.
+    "/api/biuro/zamkniete-poza",
   ]) {
     const r = await app.inject({ method: "GET", url });
+    assert.equal(r.statusCode, 401, url);
+  }
+});
+
+test("zapisy biura odpadają bez sesji, zanim ktokolwiek spojrzy na rolę", async () => {
+  /* Kolejność bramek ma znaczenie: 401 przed 403. Trasa, która najpierw pyta
+     o rolę, musiałaby najpierw czegoś się o wołającym domyślić — a bez sesji
+     nie ma o kim. */
+  for (const url of ["/api/biuro/dokument/1/zamknij", "/api/biuro/dokument/1/otworz"]) {
+    const r = await app.inject({ method: "POST", url, payload: { powod: "cokolwiek" } });
     assert.equal(r.statusCode, 401, url);
   }
 });
@@ -94,24 +127,31 @@ test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
   assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
 });
 
-test("strona biura nie zapisuje niczego poza logowaniem", () => {
-  /* „ZERO ZAPISU" jest w tym pliku regułą od 0.18.0 i do 0.36.0 pilnowało jej
-     wyłącznie oko. Wejście w dokument to pierwsze miejsce, w którym łatwo ją
-     złamać przez wygodę: `POST /api/delivery/documents/:dokId/open` różni się
-     od trasy podglądu o jeden człon ścieżki, a zwróciłby to samo. Kosztem
-     byłoby otwarcie dostawy przez samo PATRZENIE — czyli zabranie blokad
-     komuś przy półce i dokument w statusie W TOKU, którego nikt nie zaczął. */
+test("strona biura zapisuje TYLKO trzy rzeczy", () => {
+  /* „ZERO ZAPISU" było regułą tego pliku od 0.18.0 i skończyło się w 0.40.0:
+     doszło oznaczenie dostawy jako rozłożonej poza WERTIS i cofnięcie tego.
+     Reguła nie zniknęła, tylko dostała jawną listę — bo pilnuje czegoś, co
+     nadal obowiązuje.
+
+     Zakazany jest wciąż `POST /api/delivery/documents/:dokId/open`: różni się
+     od trasy podglądu o jeden człon ścieżki i zwróciłby to samo, a kosztem
+     byłoby otwarcie dostawy przez samo PATRZENIE — zabranie blokad komuś przy
+     półce i dokument W TOKU, którego nikt nie zaczął. Zamknięcie poza WERTIS
+     jest tego przeciwieństwem: nie otwiera pracy, tylko ją zdejmuje, i nie
+     dzieje się przy wejściu na ekran, lecz po kliknięciu i wpisaniu powodu. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    1,
-    "jedynym zapisem strony ma zostać logowanie"
+    3,
+    "logowanie, zamknięcie poza WERTIS i cofnięcie — nic ponadto"
   );
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
+  assert.match(html, /dokument\/\$\{dokId\}\/zamknij/, "zamknięcie poza WERTIS");
+  assert.match(html, /dokument\/\$\{dokId\}\/otworz/, "droga powrotna");
 });
 
 test("podgląd pokazuje, kto odłożył pozycję", () => {
@@ -135,4 +175,52 @@ test("podgląd nie oferuje raportu wydajności per osoba", () => {
     "utf8"
   );
   assert.ok(!/["'`]\/api\/wydajnosc/.test(html), "strona odpytuje /api/wydajnosc");
+});
+
+test("zdjęcie dostawy z listy jest zastrzeżone dla biura", async () => {
+  /* `services/auth.test.ts` sprawdza samą mapę uprawnień i NIE widzi, czy
+     trasa w ogóle o nią pyta. Bez tego testu mapa może być bez zarzutu, a
+     magazynier i tak zdejmie dostawę z listy jednym żądaniem. */
+  for (const rola of ["magazynier", "brygadzista"] as const) {
+    const r = await app.inject({
+      method: "POST",
+      url: "/api/biuro/dokument/1/zamknij",
+      ...jako(rola),
+      payload: { powod: "cokolwiek" },
+    });
+    assert.equal(r.statusCode, 403, rola);
+    assert.match(r.json().error, /biura/i, rola);
+  }
+  // to samo dla drogi powrotnej — inaczej cofnąć mógłby każdy
+  const r = await app.inject({
+    method: "POST",
+    url: "/api/biuro/dokument/1/otworz",
+    ...jako("brygadzista"),
+  });
+  assert.equal(r.statusCode, 403);
+});
+
+test("biuro przechodzi bramkę roli i dopiero wtedy dostaje odpowiedź o dokumencie", async () => {
+  /* 400, nie 403: rola się zgadza, tylko dokumentu nie ma w read-modelu.
+     Rozróżnienie jest tu całym testem — pomylone znaczyłoby, że bramka roli
+     odrzuca biuro albo że nie ma jej wcale. */
+  const r = await app.inject({
+    method: "POST",
+    url: "/api/biuro/dokument/424242/zamknij",
+    ...jako("biuro"),
+    payload: { powod: "rozłożone starą aplikacją" },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /Nie znaleziono/);
+});
+
+test("pusty powód odpada na trasie, a nie dopiero w bazie", async () => {
+  const r = await app.inject({
+    method: "POST",
+    url: "/api/biuro/dokument/424242/zamknij",
+    ...jako("biuro"),
+    payload: { powod: "   " },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /powód/i);
 });

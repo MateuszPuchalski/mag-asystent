@@ -435,8 +435,9 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 
 **Biuro — podgląd pod `/biuro`**
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
-  API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem sesji —
-  strona nie ma własnych uprawnień ani żadnego zapisu.
+  API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
+  sesji. Strona nie ma własnych uprawnień, a jedyny zapis poza logowaniem to
+  zdjęcie dostawy z listy pracy (niżej) — zastrzeżone dla roli `biuro`.
 - **Pasek stanu widać z każdej zakładki**: wersja i tryb serwera, czy worker
   żyje, ile zadań stoi w błędzie, ile rozjazdów zna rekoncyliacja. Kliknięcie
   prowadzi do szczegółu.
@@ -448,6 +449,22 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   pozycji. Wejść da się także w dokument, którego **nikt jeszcze nie zaczął** —
   wtedy pozycje idą wprost z faktury i nagłówek mówi o tym wprost. Podgląd
   **czyta**: kliknięcie nie otwiera dostawy i nie zabiera nikomu blokad.
+- **„ROZŁOŻONE POZA WERTIS"** (0.40.0) — dostawa rozłożona starą aplikacją albo
+  z ręki nie ma w WERTIS ani jednego śladu. Stoi więc na liście jako nietknięta
+  i psuje kartę towaru: „w dostawie" o towarze z półki. Biuro zdejmuje taki
+  dokument z listy, podając powód. Zamknięcie nie dopisuje ani jednej pozycji,
+  nie zapisuje adresu i nie rusza Subiekta. Zamknięte leżą w osobnej karcie
+  z nazwiskiem i powodem, i wracają na listę jednym kliknięciem.
+
+  > **Dlaczego to nie jest „ROZŁOŻONA".** `done` znaczy „ludzie odłożyli to
+  > tutaj i mamy z tego skany". O tej dostawie powiedzieć się tego nie da,
+  > a jedna wartość na oba stany kazałaby czytać raporty odłożeń jako pracę,
+  > której nikt nie wykonał.
+
+  > **Dlaczego biuro, nie brygadzista.** To jedyna operacja zdejmująca pracę
+  > z listy bez ani jednego skanu — czyli jedyny sposób, żeby „rozłożyć" całą
+  > dostawę, nie wstając z krzesła. Zdjęcie cudzego locka przekłada pracę
+  > z rąk do rąk i zostaje na hali; to ORZEKA, że pracy nie ma.
 - **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
   p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
   kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów

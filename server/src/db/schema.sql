@@ -197,10 +197,20 @@ CREATE TABLE IF NOT EXISTS delivery (
   data_dok      TEXT,
   -- `abandoned` zostaje w słowniku wartości dla wierszy historycznych: ustawiał
   -- go mechanizm flagi faktury, którego już nie ma. Nowe dostawy chodzą
-  -- wyłącznie open → done.
-  status        TEXT NOT NULL DEFAULT 'open',   -- open | done | (abandoned: historyczne)
+  -- open → done albo open → external.
+  --
+  -- `external` = ROZŁOŻONE POZA WERTIS. Osobna wartość, nie `done`, i to jest
+  -- sedno: `done` znaczy „ludzie odłożyli to tutaj, mamy z tego skany", a tego
+  -- o takiej dostawie powiedzieć nie można. Jedna wartość na oba stany kazałaby
+  -- czytać raporty odłożeń jako pracę, której nikt nie wykonał w tej aplikacji.
+  status        TEXT NOT NULL DEFAULT 'open',   -- open | done | external | (abandoned: historyczne)
   opened_at     TEXT NOT NULL,
   closed_at     TEXT,
+  -- Kto i dlaczego zamknął dostawę poza WERTIS. Powód jest WYMAGANY przy
+  -- zapisie: to jedyna operacja, która zdejmuje pracę z listy bez ani jednego
+  -- skanu, więc pole „dlaczego" jest tu całym dowodem.
+  closed_by     TEXT,
+  powod_zamkniecia TEXT,
   -- Magazyn skutku dokumentu (snapshot z chwili otwarcia).
   source_mag_id INTEGER,
   -- Przesyłka (formularz „Niezgodność w dostawie", kategoria uszkodzeń

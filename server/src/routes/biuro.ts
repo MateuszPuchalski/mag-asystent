@@ -2,6 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
+import { sesjaZadania } from "../context.js";
+import { autoryzuj } from "../services/auth.js";
+import {
+  cofnijZamkniecie,
+  listaZamknietychPozaWertis,
+  zamknijPozaWertis,
+} from "../services/delivery.js";
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
@@ -14,7 +21,15 @@ import { podgladDokumentu } from "../services/podglad-dostawy.js";
    (/lookup) zniknął razem z całym klientem PWA, bo dwa fronty to dwa razy
    utrzymanie — więc nowy nie ma prawa być drugim frontem. Strona jest cienka:
    sam odczyt istniejących tras API, z tokenem sesji w nagłówku, tak samo jak
-   kolektor. Zero własnych uprawnień, zero zapisu.
+   kolektor.
+
+   OD 0.40.0 NIE JEST JUŻ CZYSTYM ODCZYTEM i to zdanie stało tu wcześniej jako
+   „zero zapisu". Doszły dwie trasy zapisu: oznaczenie dostawy jako rozłożonej
+   POZA WERTIS i cofnięcie tego. Trafiły akurat tutaj, bo są jedyną operacją
+   w całej aplikacji, której NIE WOLNO wykonać z hali — zdejmują pracę z listy
+   bez ani jednego skanu, więc mieszkają tam, gdzie czyta się protokoły
+   rozbieżności, i za rolą `biuro`. Cienkość strony to nadal reguła: obie trasy
+   mają całą logikę w `services/delivery.ts`, razem z resztą reguł dostaw.
 
    Plik jest wczytywany RAZ, przy rejestracji tras — nie per żądanie. Zmiana
    strony wymaga restartu usługi, dokładnie jak zmiana kodu.                  */
@@ -56,6 +71,58 @@ export async function biuroRoutes(app: FastifyInstance) {
     if (!d) return reply.code(404).send({ error: "Nie znaleziono dokumentu" });
     return d;
   });
+
+  /**
+   * Dostawy zdjęte z listy pracy jako rozłożone poza WERTIS.
+   *
+   * Zwykły odczyt, więc bez `autoryzuj()` — tak samo jak podgląd dokumentu
+   * wyżej. Lista musi istnieć, bo zamknięty dokument znika z listy rozkładania:
+   * bez niej pomyłkowe zamknięcie nie miałoby jak zostać zauważone.
+   */
+  app.get("/api/biuro/zamkniete-poza", async () => ({
+    documents: listaZamknietychPozaWertis(),
+  }));
+
+  /**
+   * Oznacz dostawę jako rozłożoną poza WERTIS.
+   *
+   * Trzy bramki, każda z innego powodu. SESJA — bo bez nazwiska ta operacja nie
+   * zostawia śladu, a ślad jest tu jedynym dowodem. ROLA — bo to jedyny sposób
+   * na zdjęcie całej dostawy z listy bez odłożenia towaru. POWÓD — bo za pół
+   * roku „kto" i „kiedy" nie odpowie na pytanie, dlaczego tej faktury nikt nie
+   * rozkładał.
+   */
+  app.post<{ Params: { dokId: string }; Body: { powod?: string } }>(
+    "/api/biuro/dokument/:dokId/zamknij",
+    async (req, reply) => {
+      const s = sesjaZadania();
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      const w = autoryzuj(s.user, "domkniecie_dostawy");
+      if (!w.ok) return reply.code(403).send({ error: w.powod });
+      try {
+        return zamknijPozaWertis(Number(req.params.dokId), s.user.name, req.body?.powod ?? "");
+      } catch (e) {
+        // stan dostawy i pusty powód to decyzje wołającego, nie awaria serwera
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    }
+  );
+
+  /** Cofnięcie — dostawa wraca na listę pracy. Ta sama rola co zamknięcie. */
+  app.post<{ Params: { dokId: string } }>(
+    "/api/biuro/dokument/:dokId/otworz",
+    async (req, reply) => {
+      const s = sesjaZadania();
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      const w = autoryzuj(s.user, "domkniecie_dostawy");
+      if (!w.ok) return reply.code(403).send({ error: w.powod });
+      try {
+        return cofnijZamkniecie(Number(req.params.dokId), s.user.name);
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    }
+  );
 
   /* Do 0.26.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service
      workera PWA usuniętej w 0.3.0. Komputery biura przeszły od tego czasu

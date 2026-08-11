@@ -28,6 +28,56 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.40.0 — 11 sierpnia 2026
+
+**Dostawę rozłożoną poza WERTIS można wreszcie zdjąć z listy.** Zgłoszenie
+z magazynu: dostawy rozłożone starą aplikacją stoją w zakładce rozkładania
+jako nietknięte, a karta towaru mówi „w dostawie, nierozłożone" o towarze,
+który leży w regale.
+
+Przyczyna jest w sposobie liczenia: postęp bierze się z `delivery_line`, więc
+dokument, którego WERTIS nigdy nie widział, ma zero odłożone i całą ilość
+zaległą. Sam z siebie nie wyzeruje się nigdy.
+
+Gorzej — nie było z tego wyjścia. Dokument raz otwarty w WERTIS zostaje na
+liście niezależnie od wieku (celowy wyjątek w imporcie: skrócenie okna nie ma
+kasować niedokończonej pracy), a domyka się dopiero, gdy każda pozycja jest
+odłożona, pominięta albo zgłoszona jako wyjątek. Towar już leży na półkach,
+więc nikt tych pozycji nie zeskanuje. Jedyną drogą było zgłoszenie WYJĄTKU na
+każdej z nich, czyli wpisanie fikcyjnych niezgodności do protokołów
+rozbieżności — dokumentu księgowego. Narzędzie do sprzątania nie ma prawa
+fałszować dowodów.
+
+**Biuro dostaje przycisk „ROZŁOŻONE POZA WERTIS"** w panelu dokumentu, z polem
+na powód. Dostawa znika z listy rozkładania i z linii „w dostawie" na karcie
+towaru. Zamknięcie **nie udaje odłożenia**: nie dopisuje ani jednej pozycji,
+nie zapisuje żadnego adresu, nie rusza Subiekta. Zamknięte leżą w osobnej
+karcie z nazwiskiem, datą i powodem i wracają na listę jednym kliknięciem —
+dostawa bez zapisanych pozycji wraca jako nietknięta, dostawa porzucona
+w połowie wraca ze swoim postępem.
+
+Status w bazie to `external`, a nie `done`, i to jest sedno. `done` znaczy
+„ludzie odłożyli to tutaj i mamy z tego skany"; o takiej dostawie powiedzieć
+się tego nie da. Jedna wartość na oba stany kazałaby czytać raporty odłożeń
+jako pracę, której nikt nie wykonał.
+
+Operacja jest zastrzeżona dla roli **`biuro`** i dostępna wyłącznie z `/biuro`
+— nigdy z kolektora. Brygadzisty tu nie ma świadomie, choć zdejmuje cudze
+locki: tamto przekłada pracę z rąk do rąk i zostaje na hali, a to orzeka, że
+pracy nie ma. Skan nie wskrzesza zamkniętej dostawy po cichu — droga powrotna
+prowadzi przez biuro.
+
+Strona `/biuro` przestała tym samym być czystym odczytem, którym była od
+0.18.0. Reguła nie zniknęła, tylko dostała jawną listę: test pilnuje, że
+zapisy strony to dokładnie trzy rzeczy — logowanie, zamknięcie i cofnięcie.
+
+**[wymaga działania]** Nic ponad `git pull` i restart usług. Kolumny `closed_by`
+i `powod_zamkniecia` dokłada migracja przy starcie. **Nowy APK nie jest
+potrzebny**: dokumenty odsiewa serwer, więc kolektor, który magazynierzy mają
+dziś w rękach, przestanie je pokazywać od razu po restarcie.
+
+---
+
 ## 0.39.1 — 11 sierpnia 2026
 
 **„Ostatnio skanowane" pokazywało adres sprzed relokacji.** Zgłoszenie

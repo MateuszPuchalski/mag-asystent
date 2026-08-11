@@ -253,6 +253,21 @@ test("magazynier nie zbliża się do kont", () => {
   assert.equal(A.autoryzuj(m, "zarzadzanie_kontami").ok, false);
 });
 
+test("dostawę zdejmuje z listy biuro — brygadzista nie", () => {
+  /* Świadomie WĘŻEJ niż zdjęcie cudzego locka, choć obie operacje robi się
+     „za kogoś". Tamta przekłada pracę z rąk do rąk i zostaje na hali; ta
+     ORZEKA, że pracy nie ma — a takie orzeczenie należy do roli, która czyta
+     protokoły rozbieżności i odpowiada za zgodność z dokumentem. */
+  const b = konto("Adam Brygadzista", "abrygadzista2", "brygadzista");
+  assert.equal(A.autoryzuj(b, "zdjecie_cudzego_locka").ok, true);
+  const w = A.autoryzuj(b, "domkniecie_dostawy");
+  assert.equal(w.ok, false);
+  assert.match(w.powod!, /biura/i, "komunikat mówi, czyich uprawnień brakuje");
+
+  assert.equal(A.autoryzuj(konto("Ewa Biuro", "ebiuro2", "biuro"), "domkniecie_dostawy").ok, true);
+  assert.equal(A.autoryzuj(konto("Jan", "magazynier3"), "domkniecie_dostawy").ok, false);
+});
+
 test("biuro zarządza kontami i ukrywa magazyny", () => {
   const b = konto("Biuro Zakupy", "biuro", "biuro");
   assert.equal(A.autoryzuj(b, "zarzadzanie_kontami").ok, true);

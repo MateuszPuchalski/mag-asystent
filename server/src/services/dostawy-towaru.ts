@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 import { subiekt } from "../context.js";
 import { config } from "../config.js";
+import { dokumentyPozaWertis } from "./delivery.js";
 
 /* ── „Przyjechało, ale jeszcze nie na półce" ─────────────────────────────────
    Magazynier nie zastaje towaru w regale i nie ma jak sprawdzić, czy to dlatego,
@@ -65,7 +66,17 @@ interface PostepLinii {
  * właśnie jej szuka, ma prawo wiedzieć, że ktoś już się o nią potknął.
  */
 export function nierozlozoneZDostaw(twId: number): WDostawie[] {
-  const pozycje = subiekt.getDeliveryPositionsForProduct(twId, config.mssql.dokDniWstecz);
+  const wszystkie = subiekt.getDeliveryPositionsForProduct(twId, config.mssql.dokDniWstecz);
+  if (wszystkie.length === 0) return [];
+
+  /* Dostawa rozłożona POZA WERTIS (stara aplikacja, ręczne odłożenie) wypada
+     stąd tak samo, jak wypadła z listy rozkładania. Bez tego karta mówiłaby
+     „w dostawie 6 szt" o towarze, który leży w regale — a postęp liczy się
+     z `delivery_line`, więc taki dokument ma zawsze zero odłożone i NIGDY by
+     się nie wyzerował. To jest dokładnie ta usterka, dla której powstał
+     status `external`. */
+  const poza = dokumentyPozaWertis();
+  const pozycje = wszystkie.filter((p) => !poza.has(p.dok_id));
   if (pozycje.length === 0) return [];
 
   /* Postęp per dokument w JEDNYM zapytaniu, nie po jednym na dokument: karta

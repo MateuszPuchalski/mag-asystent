@@ -168,14 +168,21 @@ export function wyloguj(token: string): void {
  *
  * Plan §7 wymienia cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
  * z nierozwiązanymi wyjątkami, zdjęcie cudzego locka i zmianę ustawień serwera.
- * Trasy istnieją dziś dla dwóch — pozostałe nie mają w aplikacji żadnego
- * wejścia (nie ma domykania dostawy, a korekta lokalizacji jest ścieżką
- * codzienną, nie wyjątkiem). Wartości enuma bez trasy byłyby martwym kodem
- * udającym zabezpieczenie, więc dochodzą razem ze swoimi trasami.
+ * Trasy istnieją dziś dla trzech — korekta lokalizacji jest ścieżką codzienną,
+ * nie wyjątkiem. Wartości enuma bez trasy byłyby martwym kodem udającym
+ * zabezpieczenie, więc dochodzą razem ze swoimi trasami.
  */
 export type OperacjaUprzywilejowana =
   /** Zdjęcie cudzej blokady linii przed wygaśnięciem TTL. */
   | "zdjecie_cudzego_locka"
+  /**
+   * Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0).
+   *
+   * Jedyna operacja w aplikacji, która zdejmuje pracę z listy bez ani jednego
+   * skanu — a więc jedyna, którą da się „rozłożyć" całą dostawę, nie ruszając
+   * się z krzesła. Dlatego siedzi za rolą i za powodem wpisanym z ręki.
+   */
+  | "domkniecie_dostawy"
   /** Zakładanie kont magazynierów i brygadzistów, migracja historii. */
   | "zarzadzanie_kontami"
   /**
@@ -214,6 +221,11 @@ export type OperacjaUprzywilejowana =
  */
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   zdjecie_cudzego_locka: ["brygadzista", "biuro", "admin"],
+  /* Bez brygadzisty, w odróżnieniu od zdjęcia locka. Tamto przekłada pracę
+     z rąk do rąk i zostaje na hali; to ORZEKA, że dostawy nie trzeba rozkładać
+     — a takie orzeczenie należy do tej samej roli, która czyta protokoły
+     rozbieżności i odpowiada za zgodność z dokumentem. */
+  domkniecie_dostawy: ["biuro", "admin"],
   zarzadzanie_kontami: ["biuro", "admin"],
   zarzadzanie_biurem: ["admin"],
   // widoczność magazynów jest wspólna dla wszystkich kolektorów, więc ustawia
