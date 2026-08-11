@@ -116,9 +116,6 @@ fun AppRoot(graph: AppGraph) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TopBar(
             screen = screen,
-            // ten sam ekran, dwie intencje — nagłówek nie może kłamać
-            titleOverride = "DODANIE LOKALIZACJI"
-                .takeIf { screen == Screen.SCAN_LOC && graph.nav.scanLocDodaj },
             user = stan.osoba ?: "?",
             summary = queue?.summary,
             onOpenQueue = { graph.nav.openQueue() },

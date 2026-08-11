@@ -114,6 +114,12 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery_line", "locked_by", "TEXT");
   addColumn("delivery_line", "locked_at", "TEXT");
   addColumn("delivery", "source_mag_id", "INTEGER");
+  /* Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0). Kolumny są
+     nullowalne, więc dostawy zamknięte normalnie zostają nietknięte — a puste
+     `closed_by` przy statusie `done` znaczy „domknęła się sama, gdy skończyły
+     się pozycje", nie „nie wiadomo kto". */
+  addColumn("delivery", "closed_by", "TEXT");
+  addColumn("delivery", "powod_zamkniecia", "TEXT");
   // telemetria: który egzemplarz kolektora wygenerował zdarzenie
   addColumn("events", "device_id", "TEXT");
   /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot

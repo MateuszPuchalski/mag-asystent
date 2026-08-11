@@ -35,7 +35,8 @@ fun backTarget(screen: Screen, queueReturn: Screen?): Screen? =
 val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.HOME to "SKAN / SZUKAJ",
     Screen.PRODUCT to "KARTA TOWARU",
-    Screen.SCAN_LOC to "ZMIANA LOKALIZACJI",
+    // ekran ma od 0.41.0 jedno znaczenie — dokłada adres, nie zastępuje
+    Screen.SCAN_LOC to "DODANIE LOKALIZACJI",
     Screen.QUEUE to "KOLEJKA SFERY",
     Screen.DELIVERY_DOCS to "DOSTAWY",
     Screen.DELIVERY_LINES to "DOSTAWA",

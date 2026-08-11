@@ -3,7 +3,8 @@ package pl.wertis.kolektor.ui.scan
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.nav.Screen
-import pl.wertis.kolektor.data.RecentEntry
+import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.recent.etykietaAdresu
 import pl.wertis.kolektor.net.apiCall
 
 /* ── Jedna droga skanu ──────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ suspend fun routeScan(
                 graph.cards.putCard(r.card)
                 graph.nav.openProduct(
                     r.card.id,
-                    RecentEntry(r.card.id, r.card.sym, r.card.locs.firstOrNull() ?: "brak lokalizacji", r.card.name),
+                    RecentEntry(r.card.id, r.card.sym, etykietaAdresu(r.card.locs.firstOrNull()), r.card.name),
                 )
             }
             is ScanResult.Location -> {

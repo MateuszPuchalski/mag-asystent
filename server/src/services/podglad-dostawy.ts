@@ -67,6 +67,14 @@ export interface PodgladDokumentu {
   wPrzyjeciach: boolean;
   status: string | null;
   /**
+   * Kto, kiedy i dlaczego zdjął tę dostawę z listy jako rozłożoną poza WERTIS.
+   *
+   * `null` dla każdej innej dostawy. Powód jedzie na ekran razem z nazwiskiem,
+   * bo to jedyne, co odróżnia decyzję od pomyłki — a cofnięcie jest jedno
+   * kliknięcie dalej.
+   */
+  zamkniecie: { kto: string; at: string; powod: string } | null;
+  /**
    * `snapshot` — to, co widzi kolektor. `podglad` — to, co zobaczy po otwarciu.
    *
    * Rozróżnienie jedzie na ekran, bo dwie te listy są prawdziwe inaczej: druga
@@ -105,10 +113,22 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
   if (!doc) return undefined;
 
   const d = db()
-    .prepare("SELECT id, status FROM delivery WHERE sgt_dok_id = ?")
-    .get(dokId) as { id: number; status: string } | undefined;
+    .prepare(
+      `SELECT id, status, COALESCE(closed_by,'') AS closed_by,
+              COALESCE(closed_at,'') AS closed_at, COALESCE(powod_zamkniecia,'') AS powod
+       FROM delivery WHERE sgt_dok_id = ?`
+    )
+    .get(dokId) as
+    | { id: number; status: string; closed_by: string; closed_at: string; powod: string }
+    | undefined;
 
-  const lines = d ? liniePoOtwarciu(d.id) : liniePrzedOtwarciem(dokId);
+  /* Dostawa zdjęta z listy jako rozłożona poza WERTIS nie ma ANI JEDNEJ linii,
+     bo zamknięcie świadomie nie robi snapshotu — nikt tego tutaj nie
+     rozkładał. Pusta tabela byłaby jednak dla biura gorsza niż brak ekranu:
+     ocena, czy zamknięcie było słuszne, wymaga zobaczenia, co stoi NA
+     FAKTURZE. Dlatego wtedy — i tylko wtedy — wracamy do podglądu pozycji. */
+  const bezSnapshotu = d?.status === "external" && liniePoOtwarciu(d.id).length === 0;
+  const lines = d && !bezSnapshotu ? liniePoOtwarciu(d.id) : liniePrzedOtwarciem(dokId);
   lines.sort(porownajAlejkowo);
 
   const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
@@ -124,7 +144,11 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
     wBuforze: !!doc.w_buforze,
     wPrzyjeciach: doc.mag_id !== config.magId.MAG,
     status: d?.status ?? null,
-    zrodlo: d ? "snapshot" : "podglad",
+    zamkniecie:
+      d && d.status === "external"
+        ? { kto: d.closed_by, at: d.closed_at, powod: d.powod }
+        : null,
+    zrodlo: d && !bezSnapshotu ? "snapshot" : "podglad",
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     lines,
     problemyBezLinii: d ? listByDelivery(d.id).filter((p) => p.lineId == null) : [],

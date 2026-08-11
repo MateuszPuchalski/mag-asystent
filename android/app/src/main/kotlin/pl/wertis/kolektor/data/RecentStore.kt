@@ -4,15 +4,15 @@ import android.content.Context
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import pl.wertis.kolektor.core.net.WertisJson
+import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.recent.dopisz
+import pl.wertis.kolektor.core.recent.odswiez
 
-/* Ostatnio skanowane towary na ekranie głównym (wertis_recent, max 4). */
-
-/** `name` z domyślną wartością — wpisy zapisane przed jej dodaniem wciąż się wczytują. */
-@Serializable
-data class RecentEntry(val id: Long, val sym: String, val loc: String, val name: String = "")
+/* Ostatnio skanowane towary na ekranie głównym (wertis_recent, max 4).
+   Sam zapis do preferencji — reguły listy siedzą w `:core`
+   (`core/recent/OstatnioSkanowane.kt`), bo tamto da się przetestować. */
 
 class RecentStore(context: Context) {
     private val prefs = context.getSharedPreferences("wertis_recent", Context.MODE_PRIVATE)
@@ -27,9 +27,21 @@ class RecentStore(context: Context) {
         emptyList()
     }
 
-    fun push(entry: RecentEntry) {
-        val next = (listOf(entry) + _recent.value.filter { it.id != entry.id }).take(4)
+    private fun zapisz(next: List<RecentEntry>) {
+        // ta sama lista = brak zapisu; `odswiez` woła karta co 2 s
+        if (next === _recent.value) return
         prefs.edit { putString("list", WertisJson.encodeToString(serializer, next)) }
         _recent.value = next
     }
+
+    fun push(entry: RecentEntry) = zapisz(dopisz(_recent.value, entry))
+
+    /**
+     * Adres i nazwa po zmianie na karcie towaru.
+     *
+     * Bez tego lista pokazywała adres sprzed relokacji jeszcze przez cztery
+     * kolejne otwarcia kart — karta mówiła jedno, ekran główny drugie.
+     */
+    fun odswiezWpis(id: Long, loc: String, name: String) =
+        zapisz(odswiez(_recent.value, id, loc, name))
 }

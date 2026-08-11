@@ -301,9 +301,19 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   szarym tekstem, bo idą w rozmowę z dostawcą. `+` nigdy nie rozdziela:
   w opisach łączy części zestawu, więc podział podałby pół kompletu jako
   pełnoprawny zamiennik.
-- Zmiana lokalizacji: skan towaru → skan lokalizacji; przy ≥2 lokalizacjach
-  bottom-sheet zastąp/dodaj/zastąp jedną; walidacje bez spacji i długości.
-  Pomyłkę poprawia się skanem właściwej półki — nie ma czego cofać.
+- Zmiana lokalizacji: **skan półki przy otwartej karcie** — przy jednym adresie
+  zastępuje od razu, przy ≥2 pyta arkuszem zastąp/dodaj/zastąp jedną. Walidacje
+  bez spacji i długości. Pomyłkę poprawia się skanem właściwej półki — nie ma
+  czego cofać.
+
+  > **Dlaczego bez przycisku.** Do 0.41.0 stał pod spodem „ZMIEŃ LOKALIZACJĘ"
+  > i prowadził na ekran skanu, który robił dokładnie to samo, co ten sam skan
+  > przy otwartej karcie. Był przy tym największym elementem karty — a ZASTĄP
+  > kasuje istniejący adres, podczas gdy bezpieczne „+ DODAJ" jest tylko małym
+  > chipem. Waga na ekranie była odwrotna do ceny pomyłki.
+- Dołożenie drugiego adresu: chip **„+ DODAJ"** w rzędzie adresów (albo pastylka
+  „+ DODAJ ADRES" w nagłówku, gdy towar nie ma żadnego). To jedyne wejście na
+  ekran skanu półki i ma on od 0.41.0 jedno znaczenie: dokłada, nie zastępuje.
 - **Lokalizacja „w drodze".** Pole lokalizacji w Subiekcie zmienia się dopiero po
   udanym zapisie przez workera, więc do tego czasu karta pokazywałaby stan sprzed
   skanu. Chipy niosą więc stan zamiast milczeć: dochodząca — przerywana ramka
@@ -435,8 +445,9 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 
 **Biuro — podgląd pod `/biuro`**
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
-  API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem sesji —
-  strona nie ma własnych uprawnień ani żadnego zapisu.
+  API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
+  sesji. Strona nie ma własnych uprawnień, a jedyny zapis poza logowaniem to
+  zdjęcie dostawy z listy pracy (niżej) — zastrzeżone dla roli `biuro`.
 - **Pasek stanu widać z każdej zakładki**: wersja i tryb serwera, czy worker
   żyje, ile zadań stoi w błędzie, ile rozjazdów zna rekoncyliacja. Kliknięcie
   prowadzi do szczegółu.
@@ -448,6 +459,22 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   pozycji. Wejść da się także w dokument, którego **nikt jeszcze nie zaczął** —
   wtedy pozycje idą wprost z faktury i nagłówek mówi o tym wprost. Podgląd
   **czyta**: kliknięcie nie otwiera dostawy i nie zabiera nikomu blokad.
+- **„ROZŁOŻONE POZA WERTIS"** (0.40.0) — dostawa rozłożona starą aplikacją albo
+  z ręki nie ma w WERTIS ani jednego śladu. Stoi więc na liście jako nietknięta
+  i psuje kartę towaru: „w dostawie" o towarze z półki. Biuro zdejmuje taki
+  dokument z listy, podając powód. Zamknięcie nie dopisuje ani jednej pozycji,
+  nie zapisuje adresu i nie rusza Subiekta. Zamknięte leżą w osobnej karcie
+  z nazwiskiem i powodem, i wracają na listę jednym kliknięciem.
+
+  > **Dlaczego to nie jest „ROZŁOŻONA".** `done` znaczy „ludzie odłożyli to
+  > tutaj i mamy z tego skany". O tej dostawie powiedzieć się tego nie da,
+  > a jedna wartość na oba stany kazałaby czytać raporty odłożeń jako pracę,
+  > której nikt nie wykonał.
+
+  > **Dlaczego biuro, nie brygadzista.** To jedyna operacja zdejmująca pracę
+  > z listy bez ani jednego skanu — czyli jedyny sposób, żeby „rozłożyć" całą
+  > dostawę, nie wstając z krzesła. Zdjęcie cudzego locka przekłada pracę
+  > z rąk do rąk i zostaje na hali; to ORZEKA, że pracy nie ma.
 - **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
   p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
   kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów
@@ -464,7 +491,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 169 testów jednostkowych; buduje się bez Android SDK
+                           + 178 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

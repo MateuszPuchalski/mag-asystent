@@ -28,6 +28,125 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.41.0 — 11 sierpnia 2026
+
+**Przycisk „ZMIEŃ LOKALIZACJĘ" znika z karty towaru.** Prowadził na ekran
+skanu, który po zeskanowaniu półki robił dokładnie to samo, co ten sam skan
+przy otwartej karcie: przy jednym adresie zastępował, przy kilku otwierał ten
+sam arkusz. Duplikat, i to najgorszego rodzaju — bo był **największym
+elementem karty**, choć ZASTĄP kasuje istniejący adres, a bezpieczne „+ DODAJ"
+stoi wyżej jako mały chip. Waga na ekranie była odwrotna do ceny pomyłki.
+
+Zostają dwie drogi do adresu i różnią się gestem, nie sąsiadującym przyciskiem:
+**skan półki przy otwartej karcie** przenosi towar, **„+ DODAJ"** dokłada
+kolejny adres.
+
+Razem z przyciskiem wyszedł tryb zastępowania z ekranu skanu — nie miał już ani
+jednego wołającego. Ekran ma teraz jedno znaczenie, więc znika stamtąd też
+arkusz ZASTĄP/DODAJ (pytanie bez drugiej opcji) i nadpisywanie tytułu w pasku
+górnym; pasek mówi „DODANIE LOKALIZACJI" na każdej drodze. Arkusz żyje dalej na
+karcie towaru, gdzie skan przy kilku adresach jest realną decyzją.
+
+**Cena tej zmiany, wprost:** ręczny wpis adresu przy PRZEPROWADZCE zniknął
+razem z ekranem w trybie zastępowania. Przy zdartej etykiecie przeprowadzka to
+teraz dwa kroki — „+ DODAJ" z wpisem ręcznym, potem USUŃ na starym chipie.
+Skan półki działa jak dotąd, jednym gestem.
+
+**Pastylka „+ DODAJ ADRES" ma tę samą bryłę co pastylka z adresem.** Obie stoją
+w tym samym miejscu nagłówka i są tą samą rzeczą w dwóch stanach, a różniły się
+cieniem i wysokością — karta towaru bez adresu wyglądała przez to jak inny
+ekran, nie jak ta sama karta z pustym polem. Wysokość 52 dp, cień 3 dp, obrys
+1,5 dp i wypełnienie przepisane wprost z `LocChip`. Napis został o dwa punkty
+mniejszy od kodu adresu i to jedyna rozmyślna różnica: „+ DODAJ ADRES" ma
+trzynaście znaków wobec dziewięciu w `A01-02-03` i przy pełnym rozmiarze
+zjadłby wielokropek.
+
+**[wymaga działania]** Nic po stronie serwera — to zmiana wyłącznie
+w kolektorze i wchodzi z **nowym APK**.
+
+---
+
+## 0.40.0 — 11 sierpnia 2026
+
+**Dostawę rozłożoną poza WERTIS można wreszcie zdjąć z listy.** Zgłoszenie
+z magazynu: dostawy rozłożone starą aplikacją stoją w zakładce rozkładania
+jako nietknięte, a karta towaru mówi „w dostawie, nierozłożone" o towarze,
+który leży w regale.
+
+Przyczyna jest w sposobie liczenia: postęp bierze się z `delivery_line`, więc
+dokument, którego WERTIS nigdy nie widział, ma zero odłożone i całą ilość
+zaległą. Sam z siebie nie wyzeruje się nigdy.
+
+Gorzej — nie było z tego wyjścia. Dokument raz otwarty w WERTIS zostaje na
+liście niezależnie od wieku (celowy wyjątek w imporcie: skrócenie okna nie ma
+kasować niedokończonej pracy), a domyka się dopiero, gdy każda pozycja jest
+odłożona, pominięta albo zgłoszona jako wyjątek. Towar już leży na półkach,
+więc nikt tych pozycji nie zeskanuje. Jedyną drogą było zgłoszenie WYJĄTKU na
+każdej z nich, czyli wpisanie fikcyjnych niezgodności do protokołów
+rozbieżności — dokumentu księgowego. Narzędzie do sprzątania nie ma prawa
+fałszować dowodów.
+
+**Biuro dostaje przycisk „ROZŁOŻONE POZA WERTIS"** w panelu dokumentu, z polem
+na powód. Dostawa znika z listy rozkładania i z linii „w dostawie" na karcie
+towaru. Zamknięcie **nie udaje odłożenia**: nie dopisuje ani jednej pozycji,
+nie zapisuje żadnego adresu, nie rusza Subiekta. Zamknięte leżą w osobnej
+karcie z nazwiskiem, datą i powodem i wracają na listę jednym kliknięciem —
+dostawa bez zapisanych pozycji wraca jako nietknięta, dostawa porzucona
+w połowie wraca ze swoim postępem.
+
+Status w bazie to `external`, a nie `done`, i to jest sedno. `done` znaczy
+„ludzie odłożyli to tutaj i mamy z tego skany"; o takiej dostawie powiedzieć
+się tego nie da. Jedna wartość na oba stany kazałaby czytać raporty odłożeń
+jako pracę, której nikt nie wykonał.
+
+Operacja jest zastrzeżona dla roli **`biuro`** i dostępna wyłącznie z `/biuro`
+— nigdy z kolektora. Brygadzisty tu nie ma świadomie, choć zdejmuje cudze
+locki: tamto przekłada pracę z rąk do rąk i zostaje na hali, a to orzeka, że
+pracy nie ma. Skan nie wskrzesza zamkniętej dostawy po cichu — droga powrotna
+prowadzi przez biuro.
+
+Strona `/biuro` przestała tym samym być czystym odczytem, którym była od
+0.18.0. Reguła nie zniknęła, tylko dostała jawną listę: test pilnuje, że
+zapisy strony to dokładnie trzy rzeczy — logowanie, zamknięcie i cofnięcie.
+
+**[wymaga działania]** Nic ponad `git pull` i restart usług. Kolumny `closed_by`
+i `powod_zamkniecia` dokłada migracja przy starcie. **Nowy APK nie jest
+potrzebny**: dokumenty odsiewa serwer, więc kolektor, który magazynierzy mają
+dziś w rękach, przestanie je pokazywać od razu po restarcie.
+
+---
+
+## 0.39.1 — 11 sierpnia 2026
+
+**„Ostatnio skanowane" pokazywało adres sprzed relokacji.** Zgłoszenie
+z magazynu: wyszukać towar na ekranie głównym, wejść na kartę, zeskanować
+półkę, wrócić — i pod „Ostatnio skanowane" stoi stary adres. Karta mówiła
+jedno, ekran główny drugie, a nic na ekranie nie tłumaczyło, które jest
+prawdą.
+
+Lista jest migawką: wpis powstawał przy otwarciu karty i zapisywał adres
+z tamtej chwili, po czym nigdy się nie odświeżał. Zły adres dożywał tak do
+czterech kolejnych otwarć kart, bo dopiero piąte wypychało wpis z listy.
+
+Teraz karta towaru odświeża swój wpis, gdy zmieni się adres albo nazwa.
+Wpis idzie **za pastylką nagłówka** — za tym, co magazynier właśnie widział
+— więc adres w drodze do Subiekta liczy się tak samo w obu miejscach.
+Odświeżenie nie przestawia kolejności listy (kolejność mówi „co trzymałem
+w ręku") i nie dopisuje towarów, których na liście nie ma.
+
+Przy okazji: **dotknięcie pozycji listy gubiło jej nazwę.** Otwarcie karty
+z „Ostatnio skanowane" zapisywało wpis bez pola `name`, więc towar, który
+przed chwilą miał pod symbolem nazwę, zostawał już tylko z symbolem.
+
+Reguły listy przeniesione do `:core` (`core/recent/OstatnioSkanowane.kt`)
+razem z etykietą „brak lokalizacji", która stała wpisana z ręki w czterech
+miejscach. Dziewięć nowych testów; `:core` ma ich 178.
+
+**[wymaga działania]** Nic po stronie serwera — to zmiana wyłącznie
+w kolektorze i wchodzi z **nowym APK**.
+
+---
+
 ## 0.39.0 — 10 sierpnia 2026
 
 **Linia „W dostawie" mówi też, od kogo ta dostawa jest.** Wiersz na karcie

@@ -6,7 +6,7 @@ import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.nav.backTarget
 import pl.wertis.kolektor.core.nav.ekranDoOpuszczenia
 import pl.wertis.kolektor.core.nav.wracacNaGlowny
-import pl.wertis.kolektor.data.RecentEntry
+import pl.wertis.kolektor.core.recent.RecentEntry
 import pl.wertis.kolektor.data.RecentStore
 
 /* ── Nawigacja UI — port web/src/lib/store.ts ───────────────────────────────
@@ -84,18 +84,18 @@ class AppNavState(private val recentStore: RecentStore) {
     }
 
     /**
-     * Czy ekran skanu ma DOŁOŻYĆ adres, czy przenieść towar.
+     * Ekran skanu półki — WYŁĄCZNIE dokładanie adresu.
      *
-     * Bez tego rozróżnienia towar z jednym adresem nie mógł dostać drugiego:
-     * skan zawsze szedł jako `REPLACE`, a arkusz z wyborem otwierał się dopiero
-     * przy dwóch adresach — czyli przy stanie, do którego nie dało się dojść.
+     * Do 0.41.0 miał dwa tryby, bo prowadziły tu dwa przyciski: „+ DODAJ"
+     * dokładał, „ZMIEŃ LOKALIZACJĘ" zastępował. Ten drugi wyszedł jako
+     * duplikat skanu półki na karcie, a razem z nim tryb zastępowania: nie
+     * miał już ani jednego wołającego, a flaga bez wołającego to przełącznik
+     * udający wybór.
+     *
+     * Przeprowadzkę robi się skanem półki przy otwartej karcie — przy jednym
+     * adresie zastępuje od razu, przy kilku pyta arkuszem.
      */
-    @Volatile var scanLocDodaj: Boolean = false; private set
-
-    fun openScanLoc(dodaj: Boolean = false) {
-        scanLocDodaj = dodaj
-        go(Screen.SCAN_LOC)
-    }
+    fun openScanLoc() = go(Screen.SCAN_LOC)
 
     fun openDelivery(id: Long) {
         deliveryId = id

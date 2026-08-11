@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru — **169 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane" — **178 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -143,9 +143,16 @@ przed którą ta pozycja broni.
 
 - [ ] towar z JEDNYM adresem → „+ DODAJ" → skan półki → towar ma **dwa** adresy,
 - [ ] skan wprost z karty, bez „+ DODAJ", nadal **zastępuje** adres,
+- [ ] pod kartą NIE MA już przycisku „ZMIEŃ LOKALIZACJĘ" (0.41.0 — był
+      duplikatem skanu półki),
+- [ ] pasek górny ekranu skanu mówi „DODANIE LOKALIZACJI" na każdej drodze,
 - [ ] po skanie półki NIE ma zielonego kafla na środku ekranu,
 - [ ] chip nowego adresu jest przygaszony i bez cienia,
-- [ ] po przejściu kolejki Sfery ten sam chip robi się normalny.
+- [ ] po przejściu kolejki Sfery ten sam chip robi się normalny,
+- [ ] po relokacji i powrocie na ekran główny „Ostatnio skanowane" pokazuje
+      **nowy** adres (regresja: lista była migawką z chwili otwarcia karty),
+- [ ] odświeżony wpis **zostaje na swoim miejscu** listy, nie wskakuje na górę,
+- [ ] dotknięcie pozycji „Ostatnio skanowane" nie gubi nazwy towaru.
 
 **W dostawie, nierozłożone**
 
@@ -163,6 +170,8 @@ przed którą ta pozycja broni.
 
 - [ ] nagłówek pokazuje symbol, liczbę dostępnych sztuk i adres pickingowy,
 - [ ] towar bez adresu ma w nagłówku pastylkę „+ DODAJ ADRES",
+- [ ] ta pastylka jest **tej samej wielkości** co pastylka z adresem — ta sama
+      wysokość, ten sam cień, ten sam obrys (0.41.0),
 - [ ] ta pastylka otwiera skan półki, a rząd chipów pod spodem znika,
 - [ ] adres w kolejce Sfery prowadzi z pastylki wprost do kolejki,
 - [ ] trzy sekcje są zwinięte po wejściu na kartę,

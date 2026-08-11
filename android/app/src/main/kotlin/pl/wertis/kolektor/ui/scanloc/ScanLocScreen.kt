@@ -54,7 +54,6 @@ import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.product.LocChoice
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.product.saveLocation
-import pl.wertis.kolektor.ui.product.LocChoiceSheet
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
 import pl.wertis.kolektor.ui.theme.AmberDark
@@ -65,23 +64,24 @@ import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
 
-/* ── Zmiana lokalizacji: skan towaru → skan etykiety regału ─────────────────
-   Auto-zapis bez tapa: skan etykiety półki od razu zapisuje lokalizację;
-   przy >1 lokalizacjach arkusz zastąp/dodaj/zastąp jedną. EAN przechodzi
-   do fallbacku (karta innego towaru).
+/* ── Dołożenie lokalizacji: skan towaru → skan etykiety regału ──────────────
+   Auto-zapis bez tapa: skan etykiety półki od razu dokłada adres do listy.
+   EAN przechodzi do fallbacku (karta innego towaru).
 
-   DWA TRYBY, bo to dwie różne intencje i mylenie ich kosztuje adres:
-   PRZENIEŚ (domyślny) zastępuje, DODAJ dokłada kolejny. Wcześniej istniał
-   wyłącznie pierwszy, a arkusz z opcją „DODAJ JAKO KOLEJNĄ" otwierał się
-   dopiero przy DWÓCH adresach — czyli przy stanie, do którego nie dało się
-   dojść, bo drugiego adresu nie było jak nadać. Towar z jednym adresem był
-   więc trwale jednoadresowy.                                                 */
+   JEDEN TRYB, od 0.41.0. Wcześniej były dwa — PRZENIEŚ i DODAJ — bo prowadziły
+   tu dwa przyciski karty towaru. „ZMIEŃ LOKALIZACJĘ" wyszedł jako duplikat
+   skanu półki przy otwartej karcie (tam przy jednym adresie zastępuje od razu,
+   przy kilku pyta arkuszem), więc tryb zastępowania został tutaj bez ani
+   jednego wołającego. Martwa gałąź w ekranie, który zapisuje do Subiekta, jest
+   groźniejsza niż w każdym innym: wygląda jak działająca droga.
+
+   Ekran jest więc jednoznaczny i nie ma o co pytać drugi raz — człowiek
+   zadeklarował intencję, wchodząc tu przyciskiem „+ DODAJ".                   */
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ScanLocScreen(graph: AppGraph) {
     val id = graph.nav.curId ?: return
-    val dodaj = graph.nav.scanLocDodaj
     val scope = rememberCoroutineScope()
 
     val seed = remember(id) { graph.cards.peekCard(id) }
@@ -95,8 +95,6 @@ fun ScanLocScreen(graph: AppGraph) {
 
     var manualOpen by remember { mutableStateOf(false) }
     var manual by remember { mutableStateOf("") }
-    var pending by remember { mutableStateOf<String?>(null) }
-    var pendingReczne by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     /* Skan, który przyszedł ZANIM karta dojechała. `handleCode` musi znać
        obecne adresy towaru, więc bez karty nie ma jak rozstrzygnąć — ale
@@ -113,7 +111,6 @@ fun ScanLocScreen(graph: AppGraph) {
         scope.launch {
             try {
                 saveLocation(graph, id, choice, locInfo)
-                pending = null
                 graph.nav.go(Screen.PRODUCT)
             } catch (e: Exception) {
                 graph.effects.toast(e.message ?: "Błąd zapisu")
@@ -142,19 +139,7 @@ fun ScanLocScreen(graph: AppGraph) {
         }
         // kod przyjęty — stary tekst w polu byłby pułapką przy następnym wpisie
         manual = ""
-        // Tryb DODAJ jest jednoznaczny — człowiek zadeklarował intencję,
-        // wchodząc tu przyciskiem, więc nie ma o co pytać drugi raz.
-        if (dodaj) {
-            save(LocChoice(LocAction.ADD, code, recznie = recznie))
-            return
-        }
-        if (card.locs.size > 1) {
-            // pochodzenie kodu przeżywa arkusz zastąp/dodaj — do raportu etykiet
-            pendingReczne = recznie
-            pending = code // realna decyzja — arkusz zostaje
-            return
-        }
-        save(LocChoice(LocAction.REPLACE, code, recznie = recznie))
+        save(LocChoice(LocAction.ADD, code, recznie = recznie))
     }
 
     ScanHandlerEffect { scan ->
@@ -234,12 +219,8 @@ fun ScanLocScreen(graph: AppGraph) {
         }
 
         Text(
-            if (dodaj) {
-                "Podejdź do NOWEGO miejsca i zeskanuj jego etykietę — adres " +
-                    "dojdzie do listy, dotychczasowe zostają."
-            } else {
-                "Podejdź do miejsca docelowego i zeskanuj jego etykietę — zapis nastąpi od razu."
-            },
+            "Podejdź do NOWEGO miejsca i zeskanuj jego etykietę — adres " +
+                "dojdzie do listy, dotychczasowe zostają.",
             fontSize = 13.sp,
             color = InkSoft,
         )
@@ -303,10 +284,8 @@ fun ScanLocScreen(graph: AppGraph) {
         }
     }
 
-    LocChoiceSheet(
-        product = p,
-        code = pending,
-        onClose = { pending = null },
-        onPick = { save(it.copy(recznie = pendingReczne)) },
-    )
+    /* Arkusz ZASTĄP/DODAJ wyszedł stąd razem z trybem zastępowania (0.41.0).
+       Ten ekran ma jedną odpowiedź na zeskanowany kod, więc pytanie o wybór
+       byłoby pytaniem bez drugiej opcji. Arkusz żyje dalej na karcie towaru,
+       gdzie skan półki przy kilku adresach jest realną decyzją. */
 }

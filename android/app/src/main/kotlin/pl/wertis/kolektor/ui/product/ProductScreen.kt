@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,12 +46,13 @@ import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.product.adresHero
+import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.recent.etykietaAdresu
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
-import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.LocState
@@ -66,6 +69,7 @@ import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
+import pl.wertis.kolektor.ui.theme.ShadowInk
 
 /* ── Karta towaru ───────────────────────────────────────────────────────────
    Jeden ekran bez przewijania: nagłówek odpowiada na codzienne pytanie („ile
@@ -173,6 +177,16 @@ fun ProductScreen(graph: AppGraph) {
     val chipy = p.locs.drop(1)
     val chipyPending = p.pendingLocs.filter { it.kind == "add" && it.code != adres.kod }
 
+    /* „Ostatnio skanowane" bierze adres z chwili OTWARCIA karty, więc po
+       relokacji ekran główny pokazywał adres sprzed zmiany — jeszcze przez
+       cztery kolejne otwarcia. Wpis idzie za pastylką nagłówka, czyli za tym,
+       co magazynier właśnie widział, i tak samo liczy adres dochodzący
+       z kolejki Sfery. Wpisu spoza listy to nie dodaje ani nie przestawia —
+       reguła i jej powód siedzą w `:core` (`OstatnioSkanowane.kt`). */
+    LaunchedEffect(id, adres.kod, p.name) {
+        graph.recent.odswiezWpis(id, etykietaAdresu(adres.kod), p.name)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -191,7 +205,7 @@ fun ProductScreen(graph: AppGraph) {
                znakach, ale wykaz nie jest gwarancją. */
             Box(Modifier.widthIn(max = 168.dp)) {
                 if (adres.kod.isEmpty()) {
-                    DodajAdres { graph.nav.openScanLoc(dodaj = true) }
+                    DodajAdres { graph.nav.openScanLoc() }
                 } else {
                     val zmiana = adres.zmiana
                     LocChip(
@@ -252,10 +266,11 @@ fun ProductScreen(graph: AppGraph) {
                         state = if (zmiana.status == "error") LocState.FAILED else LocState.ADDING,
                     ) { graph.nav.openQueue() }
                 }
-                /* DOŁOŻENIE ADRESU stoi w rzędzie chipów, a nie w przycisku pod
-                   spodem, bo to operacja NA TEJ LIŚCIE — obok adresów, które
-                   zostają. Przycisk „ZMIEŃ LOKALIZACJĘ" niżej robi co innego
-                   (zastępuje) i mylenie tych dwóch kosztuje adres. */
+                /* DOŁOŻENIE ADRESU stoi w rzędzie chipów, bo to operacja NA TEJ
+                   LIŚCIE — obok adresów, które zostają. Przeprowadzka (skan
+                   półki przy otwartej karcie) nie ma tu swojego przycisku
+                   i tak ma być: to jedyne dwie drogi do adresu na tej karcie
+                   i różnią się gestem, nie sąsiadującym przyciskiem. */
                 Text(
                     "+ DODAJ",
                     fontFamily = BarlowCond,
@@ -266,7 +281,7 @@ fun ProductScreen(graph: AppGraph) {
                         .clip(RoundedCornerShape(50))
                         .border(1.5.dp, AmberLine, RoundedCornerShape(50))
                         .background(AmberBgSoft)
-                        .clickable { graph.nav.openScanLoc(dodaj = true) }
+                        .clickable { graph.nav.openScanLoc() }
                         .padding(horizontal = 12.dp, vertical = 9.dp),
                 )
                 /* Licznik znaków po prawej stronie rzędu. Pole lokalizacji
@@ -351,9 +366,16 @@ fun ProductScreen(graph: AppGraph) {
             }
         }
 
-        OutlineButton("ZMIEŃ LOKALIZACJĘ", tall = true, leadingIcon = WIcons.Pin, modifier = Modifier.fillMaxWidth()) {
-            graph.nav.openScanLoc()
-        }
+        /* Stał tu pełnej szerokości przycisk „ZMIEŃ LOKALIZACJĘ" i wyszedł
+           w 0.41.0. Prowadził na ekran skanu, który po zeskanowaniu robił
+           DOKŁADNIE to samo, co samo zeskanowanie półki przy otwartej karcie:
+           przy jednym adresie zastępował, przy kilku otwierał ten sam arkusz.
+           Duplikat najgorszego rodzaju — bo to on był największym elementem
+           karty, choć ZASTĄP kasuje istniejący adres, a bezpieczne „+ DODAJ"
+           stoi wyżej jako mały chip. Waga na ekranie była odwrócona wobec
+           ceny pomyłki.
+
+           Przeprowadzka idzie teraz jedną drogą: skan półki na karcie. */
 
         HistoriaSekcja(history, "hist" in otwarte) { toggle("hist") }
         MagazynySekcja(p, "mag" in otwarte, { toggle("mag") }) { magId, rola, dostepne ->
@@ -362,7 +384,7 @@ fun ProductScreen(graph: AppGraph) {
         ZamiennikiSekcja(graph, p, "zam" in otwarte, { toggle("zam") }) { row ->
             graph.nav.openProduct(
                 row.id,
-                RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji", row.name),
+                RecentEntry(row.id, row.sym, etykietaAdresu(row.locs.firstOrNull()), row.name),
             )
         }
     }
@@ -425,17 +447,31 @@ private data class Zrodlo(val magId: Long?, val rola: String?, val dostepne: Dou
  * że towar gdzieś leży. Pełne „+ DODAJ ADRES" zamiast samego „+ DODAJ" z rzędu
  * chipów, bo tam chip stoi wśród adresów i wiadomo, do czego się dokłada — tu
  * nie ma czego dokładać, więc słowo musi to powiedzieć.
+ *
+ * BRYŁA JEST TA SAMA CO W `LocChip(big = true)` i to nie jest kosmetyka: obie
+ * pastylki stoją w tym samym miejscu nagłówka i są tą samą rzeczą widzianą
+ * w dwóch stanach. Różniły się cieniem i wysokością wiersza, więc karta towaru
+ * bez adresu wyglądała jak inny ekran, a nie jak ta sama karta z pustym polem.
+ * Wysokość 52 dp, cień 3 dp, obrys 1,5 dp, wypełnienie 16/12 — wszystko
+ * przepisane z `LocChip`.
+ *
+ * Napis zostaje mniejszy od kodu adresu (17 sp wobec 19 sp) i to jedyna
+ * rozmyślna różnica: „+ DODAJ ADRES" ma trzynaście znaków wobec dziewięciu
+ * w `A01-02-03`, a pastylka mieści się w 168 dp nagłówka. Przy 19 sp napis
+ * zjadłby wielokropek i pastylka mówiłaby „+ DODAJ ADRE…".
  */
 @Composable
 private fun DodajAdres(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(50)
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .border(1.5.dp, AmberLine, RoundedCornerShape(50))
+            .shadow(3.dp, shape, clip = false, ambientColor = ShadowInk, spotColor = ShadowInk)
+            .clip(shape)
+            .border(1.5.dp, AmberLine, shape)
             .background(AmberBgSoft)
             .heightIn(min = 52.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
@@ -443,8 +479,8 @@ private fun DodajAdres(onClick: () -> Unit) {
         Text(
             "+ DODAJ ADRES",
             fontFamily = BarlowCond,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 17.sp,
             color = AmberInk,
             maxLines = 1,
         )

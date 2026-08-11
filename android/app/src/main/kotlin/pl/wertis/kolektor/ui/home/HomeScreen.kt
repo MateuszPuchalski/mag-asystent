@@ -40,11 +40,12 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ProductRow
+import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.recent.etykietaAdresu
 import pl.wertis.kolektor.core.scan.DEFAULT_LOC_PREFIX
 import pl.wertis.kolektor.core.scan.EAN_RE
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.scan.classify
-import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.scan.routeScan
@@ -106,7 +107,7 @@ fun HomeScreen(graph: AppGraph) {
     }
 
     fun openRow(x: ProductRow) {
-        graph.nav.openProduct(x.id, RecentEntry(x.id, x.sym, x.locs.firstOrNull() ?: "brak lokalizacji", x.name))
+        graph.nav.openProduct(x.id, RecentEntry(x.id, x.sym, etykietaAdresu(x.locs.firstOrNull()), x.name))
     }
 
     // jedna droga skanu dla całej aplikacji — kontekst przyklejony musi
@@ -194,7 +195,9 @@ fun HomeScreen(graph: AppGraph) {
                             .fillMaxWidth()
                             .cardSurface()
                             .heightIn(min = 48.dp)
-                            .clickable { graph.nav.openProduct(r.id, RecentEntry(r.id, r.sym, r.loc)) }
+                            // `r` w całości, z nazwą — pominięta gubiła ją
+                            // z listy przy pierwszym dotknięciu pozycji
+                            .clickable { graph.nav.openProduct(r.id, r) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
