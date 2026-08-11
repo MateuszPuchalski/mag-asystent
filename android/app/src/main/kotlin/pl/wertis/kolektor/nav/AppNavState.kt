@@ -6,7 +6,7 @@ import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.nav.backTarget
 import pl.wertis.kolektor.core.nav.ekranDoOpuszczenia
 import pl.wertis.kolektor.core.nav.wracacNaGlowny
-import pl.wertis.kolektor.data.RecentEntry
+import pl.wertis.kolektor.core.recent.RecentEntry
 import pl.wertis.kolektor.data.RecentStore
 
 /* ── Nawigacja UI — port web/src/lib/store.ts ───────────────────────────────

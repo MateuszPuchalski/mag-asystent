@@ -28,9 +28,10 @@ import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.net.ProductRow
+import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.recent.etykietaAdresu
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
-import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
@@ -165,7 +166,7 @@ fun LocationScreen(graph: AppGraph) {
                     ProductRowCard(graph, row) {
                         graph.nav.openProduct(
                             row.id,
-                            RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji", row.name),
+                            RecentEntry(row.id, row.sym, etykietaAdresu(row.locs.firstOrNull()), row.name),
                         )
                     }
                 }

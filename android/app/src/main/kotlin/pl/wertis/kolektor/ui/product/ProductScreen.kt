@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,12 +45,13 @@ import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.product.adresHero
+import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.recent.etykietaAdresu
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.data.Poll
 import pl.wertis.kolektor.data.pollFlow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
-import pl.wertis.kolektor.data.RecentEntry
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.LocState
@@ -172,6 +174,16 @@ fun ProductScreen(graph: AppGraph) {
     // adres pickingowy siedzi w nagłówku, więc rząd chipów pokazuje resztę
     val chipy = p.locs.drop(1)
     val chipyPending = p.pendingLocs.filter { it.kind == "add" && it.code != adres.kod }
+
+    /* „Ostatnio skanowane" bierze adres z chwili OTWARCIA karty, więc po
+       relokacji ekran główny pokazywał adres sprzed zmiany — jeszcze przez
+       cztery kolejne otwarcia. Wpis idzie za pastylką nagłówka, czyli za tym,
+       co magazynier właśnie widział, i tak samo liczy adres dochodzący
+       z kolejki Sfery. Wpisu spoza listy to nie dodaje ani nie przestawia —
+       reguła i jej powód siedzą w `:core` (`OstatnioSkanowane.kt`). */
+    LaunchedEffect(id, adres.kod, p.name) {
+        graph.recent.odswiezWpis(id, etykietaAdresu(adres.kod), p.name)
+    }
 
     Column(
         modifier = Modifier
@@ -362,7 +374,7 @@ fun ProductScreen(graph: AppGraph) {
         ZamiennikiSekcja(graph, p, "zam" in otwarte, { toggle("zam") }) { row ->
             graph.nav.openProduct(
                 row.id,
-                RecentEntry(row.id, row.sym, row.locs.firstOrNull() ?: "brak lokalizacji", row.name),
+                RecentEntry(row.id, row.sym, etykietaAdresu(row.locs.firstOrNull()), row.name),
             )
         }
     }

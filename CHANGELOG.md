@@ -28,6 +28,37 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.39.1 — 11 sierpnia 2026
+
+**„Ostatnio skanowane" pokazywało adres sprzed relokacji.** Zgłoszenie
+z magazynu: wyszukać towar na ekranie głównym, wejść na kartę, zeskanować
+półkę, wrócić — i pod „Ostatnio skanowane" stoi stary adres. Karta mówiła
+jedno, ekran główny drugie, a nic na ekranie nie tłumaczyło, które jest
+prawdą.
+
+Lista jest migawką: wpis powstawał przy otwarciu karty i zapisywał adres
+z tamtej chwili, po czym nigdy się nie odświeżał. Zły adres dożywał tak do
+czterech kolejnych otwarć kart, bo dopiero piąte wypychało wpis z listy.
+
+Teraz karta towaru odświeża swój wpis, gdy zmieni się adres albo nazwa.
+Wpis idzie **za pastylką nagłówka** — za tym, co magazynier właśnie widział
+— więc adres w drodze do Subiekta liczy się tak samo w obu miejscach.
+Odświeżenie nie przestawia kolejności listy (kolejność mówi „co trzymałem
+w ręku") i nie dopisuje towarów, których na liście nie ma.
+
+Przy okazji: **dotknięcie pozycji listy gubiło jej nazwę.** Otwarcie karty
+z „Ostatnio skanowane" zapisywało wpis bez pola `name`, więc towar, który
+przed chwilą miał pod symbolem nazwę, zostawał już tylko z symbolem.
+
+Reguły listy przeniesione do `:core` (`core/recent/OstatnioSkanowane.kt`)
+razem z etykietą „brak lokalizacji", która stała wpisana z ręki w czterech
+miejscach. Dziewięć nowych testów; `:core` ma ich 178.
+
+**[wymaga działania]** Nic po stronie serwera — to zmiana wyłącznie
+w kolektorze i wchodzi z **nowym APK**.
+
+---
+
 ## 0.39.0 — 10 sierpnia 2026
 
 **Linia „W dostawie" mówi też, od kogo ta dostawa jest.** Wiersz na karcie
