@@ -337,18 +337,45 @@ data class LocationProductsResponse(
     val products: List<ProductRow> = emptyList(),
 )
 
+/* ── Rodzaj zadania w kolejce Sfery ─────────────────────────────────────────
+   Ta lista MUSI znieść wartość, której nie zna — i to nie jest ostrożność,
+   tylko wniosek z awarii. `set_ean` doszedł na serwerze w 0.37.0 i nie doszedł
+   tutaj. Skutek: pierwsze nadanie kodu kreskowego wkładało do kolejki wiersz,
+   którego kolektor nie umiał odczytać, więc CAŁA odpowiedź `/api/queue` padała
+   na deserializacji — co 1,5 sekundy, w kółko, na każdym ekranie.
+
+   Objaw kłamał. Zapalał się baner „Serwer nie odpowiada", choć serwer
+   odpowiadał bez zarzutu; pastylka kolejki zamarzała, a ekran KOLEJKA SFERY
+   przestawał pokazywać zadania w błędzie — czyli jedyne miejsce, w którym
+   widać, że zapis do Subiekta NIE wszedł. Awaria wyglądała jak słabe Wi-Fi
+   i mogła tak wyglądać miesiącami.
+
+   Stąd `INNE` z wartością domyślną: `coerceInputValues` sprowadza do niej
+   każdą nieznaną wartość, więc kolejka przeżyje następny rodzaj zadania
+   dodany po stronie serwera. Pole nie jest dziś nigdzie czytane — wiersz
+   opisują `label` i `detail` z serwera — więc nieznany rodzaj rysuje się
+   normalnie zamiast wywracać ekran.                                          */
 @Serializable
 enum class QueueItemType {
     @SerialName("set_location") SET_LOCATION,
     /**
      * HISTORYCZNE. Aplikacja nie tworzy już zadań flagi faktury, ale w kolejce
-     * na wdrożonych instalacjach leżą dawne wiersze — a `QueueItem.type` nie ma
-     * wartości domyślnej, więc `coerceInputValues` ich nie uratuje. Usunięcie
-     * tej pozycji wywracałoby ekran kolejki na każdej bazie z historią.
+     * na wdrożonych instalacjach leżą dawne wiersze. Zostaje nazwana, bo nazwa
+     * niesie znaczenie — `INNE` byłoby dla niej degradacją, nie ratunkiem.
      */
     @SerialName("set_doc_flag") SET_DOC_FLAG,
     /** Dokument MM — powstaje wyłącznie z wózka trybu B (zatwierdzenie rundy). */
     @SerialName("mm") MM,
+    /** Nadanie podstawowego kodu kreskowego kartotece (0.37.0). */
+    @SerialName("set_ean") SET_EAN,
+    /**
+     * Rodzaj, którego ta wersja kolektora nie zna — wiersz i tak się rysuje.
+     *
+     * Wartość domyślna pola `type`, więc `coerceInputValues` tu właśnie ląduje.
+     * Nazwa serializacyjna jest nieosiągalna dla serwera celowo: nikt nie ma
+     * prawa wysłać `INNE` wprost, to jest wyłącznie miejsce lądowania.
+     */
+    @SerialName("__inne__") INNE,
 }
 
 @Serializable
@@ -364,7 +391,8 @@ enum class QueueStatus {
 @Serializable
 data class QueueItem(
     val id: Long,
-    val type: QueueItemType,
+    /** Wartość domyślna JEST mechanizmem — bez niej nieznany rodzaj rzuca. */
+    val type: QueueItemType = QueueItemType.INNE,
     val status: QueueStatus,
     val label: String,
     val detail: String = "",

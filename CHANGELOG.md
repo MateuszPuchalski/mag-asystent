@@ -28,6 +28,45 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.41.1 — 11 sierpnia 2026
+
+**Baner „Serwer nie odpowiada" kłamał — serwer odpowiadał bez zarzutu.**
+Zgłoszenie: baner wisi, choć wszystko działa. I działało: padał wyłącznie
+odczyt kolejki Sfery.
+
+Przyczyna nie ma nic wspólnego z siecią. Zadanie `set_ean` doszło po stronie
+serwera w 0.37.0 i **nie doszło do enuma `QueueItemType`** w kolektorze. Pole
+`type` nie miało wartości domyślnej, więc `coerceInputValues` nie miało czego
+podstawić i nieznana wartość rzucała wyjątkiem. Skutek: pierwsze nadanie kodu
+kreskowego wkładało do kolejki wiersz, którego kolektor nie umiał odczytać —
+i od tej chwili **cała** odpowiedź `/api/queue` padała na deserializacji, co
+1,5 sekundy, na każdym ekranie. Trzy porażki z rzędu zapalały baner i już nie
+gasł.
+
+Kosztowało to więcej niż jeden pasek na górze. Zamarzła pastylka kolejki,
+a ekran KOLEJKA SFERY przestał pokazywać zadania **w błędzie** — czyli jedyne
+miejsce, w którym widać, że zapis do Subiekta nie wszedł. Objaw wyglądał
+przy tym jak słabe Wi-Fi przy regałach, więc mógł tak wyglądać miesiącami.
+
+Poprawka jest dwuczęściowa i druga część jest ważniejsza:
+
+- `set_ean` dochodzi do enuma pod własną nazwą,
+- enum dostaje wartość `INNE`, a pole `type` **wartość domyślną**. Nieznany
+  rodzaj zadania ląduje teraz w `INNE` i wiersz rysuje się normalnie —
+  z `label` i `detail` od serwera — zamiast wywracać ekran. Rodzaj zadania
+  dodany kiedyś po stronie serwera nie zabierze już ze sobą całej kolejki,
+  a zadanie w błędzie zostanie widoczne razem z przyciskiem PONÓW.
+
+Dwa nowe testy w `:core`: `set_ean` parsuje się pod swoją nazwą, a wiersz
+o rodzaju z przyszłości nie zabiera ze sobą reszty listy. Razem 180.
+
+**[wymaga działania]** Nic po stronie serwera — usterka była wyłącznie
+w kolektorze i poprawka wchodzi z **nowym APK**. Do tego czasu obejście: baner
+gaśnie sam, gdy w odpowiedzi `/api/queue` nie ma wiersza `set_ean` (czyli po
+zejściu takich zadań z pierwszej setki), ale liczyć na to nie ma sensu.
+
+---
+
 ## 0.41.0 — 11 sierpnia 2026
 
 **Przycisk „ZMIEŃ LOKALIZACJĘ" znika z karty towaru.** Prowadził na ekran

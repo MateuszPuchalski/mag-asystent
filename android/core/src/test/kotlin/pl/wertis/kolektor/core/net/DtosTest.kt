@@ -91,10 +91,45 @@ class DtosTest {
         assertEquals("XYZ", (n as ScanResult.NotFound).code)
     }
 
+    @Test fun `QueueItemType zna zadanie kodu kreskowego`() {
+        /* REGRESJA 0.41.1. `set_ean` doszedł na serwerze w 0.37.0 i nie doszedł
+           do tego enuma. Pierwsze nadanie kodu kreskowego kładło CAŁĄ odpowiedź
+           `/api/queue` na deserializacji — co 1,5 s, na każdym ekranie — a na
+           wierzchu zapalał się baner „Serwer nie odpowiada", choć serwer
+           odpowiadał bez zarzutu. */
+        val r = WertisJson.decodeFromString<QueueResponse>(
+            """{"items":[{"id":42,"type":"set_ean","status":"pending",
+                "label":"Kod kreskowy · W32-0203","detail":"5905947595303","errMsg":null,"time":"12:00"}],
+                "summary":{"pending":1,"error":0,"done":0}}"""
+        )
+        assertEquals(QueueItemType.SET_EAN, r.items[0].type)
+        assertEquals("5905947595303", r.items[0].detail)
+    }
+
+    @Test fun `nieznany rodzaj zadania NIE wywraca calej kolejki`() {
+        /* Sedno poprawki, ważniejsze od samego `set_ean`: kolejka ma przeżyć
+           rodzaj zadania dodany po stronie serwera po wydaniu tego APK.
+           Wiersz opisują `label` i `detail`, więc rysuje się normalnie —
+           a zadanie W BŁĘDZIE zostaje widoczne, zamiast zniknąć razem z całym
+           ekranem. */
+        val r = WertisJson.decodeFromString<QueueResponse>(
+            """{"items":[
+                {"id":7,"type":"cos_z_przyszlosci","status":"error",
+                 "label":"Nowe zadanie","detail":"szczegół","errMsg":"Błąd Sfery","time":"12:00"},
+                {"id":8,"type":"set_location","status":"done","label":"L","detail":"","time":"12:01"}
+               ],"summary":{"pending":0,"error":1,"done":1}}"""
+        )
+        assertEquals("nieznany rodzaj nie zabiera ze sobą reszty listy", 2, r.items.size)
+        assertEquals(QueueItemType.INNE, r.items[0].type)
+        assertEquals("Nowe zadanie", r.items[0].label)
+        assertEquals("PONÓW ma zostać osiągalny", QueueStatus.ERROR, r.items[0].status)
+        assertEquals("Błąd Sfery", r.items[0].errMsg)
+        assertEquals(QueueItemType.SET_LOCATION, r.items[1].type)
+    }
+
     @Test fun `QueueItemType zna DAWNE zadanie flagi faktury`() {
         // Flagi faktur już nie ma, ale w kolejce wdrożonych instalacji leżą stare
-        // wiersze. `type` nie ma wartości domyślnej, więc nieznana wartość rzuca
-        // wyjątkiem — czyli ekran kolejki padłby na każdej bazie z historią.
+        // wiersze — nazwane, więc czytane wprost, nie przez `INNE`.
         val r = WertisJson.decodeFromString<QueueResponse>(
             """{"items":[{"id":9,"type":"set_doc_flag","status":"pending",
                 "label":"Flaga · FZ 1","detail":"W trakcie sprawdzania","errMsg":null,"time":"12:00"}],
