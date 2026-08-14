@@ -247,6 +247,35 @@ CREATE TABLE IF NOT EXISTS delivery_line (
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
 
+-- ── Notatki biura do dostawy (0.43.0) ──────────────────────────────────────
+-- Dostawca dosyła czasem brak, którego NIE MA na fakturze — biuro wie o tym
+-- z rozmowy albo z maila, a rozkładający nie ma tego skąd wiedzieć. Do 0.43.0
+-- jedyną drogą było „powiedz Krzyśkowi, jak przyjdzie", czyli kanał, który
+-- gubi się przy zmianie i nie zostawia śladu.
+--
+-- Klucz to `sgt_dok_id`, a NIE `delivery_id`, i to jest cała różnica: biuro
+-- pisze notatkę, zanim ktokolwiek otworzy rozkładanie, więc lokalnego wiersza
+-- dostawy zwykle jeszcze nie ma. Wiązanie przez dokument znaczy też, że
+-- notatka przeżywa cofnięcie zamknięcia „poza WERTIS" i ponowne otwarcie.
+--
+-- ODPOWIEDŹ JEST OBOWIĄZKOWA. Dopóki `odpowiedz` jest NULL, dostawa się nie
+-- domyka — ani ręcznie, ani sama po ostatniej pozycji. Pytanie bez wymuszonej
+-- odpowiedzi wraca do punktu wyjścia: ktoś je przeczyta i pójdzie dalej.
+CREATE TABLE IF NOT EXISTS delivery_note (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  sgt_dok_id INTEGER NOT NULL,
+  tresc      TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  -- NULL = nikt jeszcze nie odpowiedział; to ta wartość trzyma dostawę otwartą
+  odpowiedz  TEXT,
+  odp_at     TEXT,
+  odp_by     TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_note_dok ON delivery_note(sgt_dok_id);
+-- lista „czeka na odpowiedź" jest odpytywana przy każdym domknięciu dostawy
+CREATE INDEX IF NOT EXISTS ix_note_otwarte ON delivery_note(sgt_dok_id, odpowiedz);
+
 -- ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
 -- Bez tego nie da się zmierzyć, ile kosztują. Kategorie zamknięte — od 0.21.0
 -- są to DOSŁOWNIE kategorie firmowego formularza „Niezgodność w dostawie",

@@ -3,6 +3,7 @@ package pl.wertis.kolektor.net
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.LoginBody
+import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.net.CreateUserBody
 import pl.wertis.kolektor.core.net.CreateUserResponse
@@ -181,6 +182,13 @@ interface ApiService {
         @Header("x-buffered-user") bufferedUser: String? = null,
     ): PutawayLineResponse
 
+
+    /** Odpowiedź na notatkę biura — jedyna droga zdjęcia blokady z dostawy. */
+    @POST("api/delivery/notatki/{noteId}/odpowiedz")
+    suspend fun deliveryOdpowiedzNotatka(
+        @Path("noteId") noteId: Long,
+        @Body body: OdpowiedzBody,
+    ): OkResponse
 
     /** Co powstanie przy zakończeniu dostawy — czysty odczyt, bez zapisu. */
     @GET("api/delivery/{id}/zakonczenie")

@@ -9,6 +9,7 @@ import {
   listaZamknietychPozaWertis,
   zamknijPozaWertis,
 } from "../services/delivery.js";
+import { dodajNotatke, notatkiDokumentu } from "../services/notatki.js";
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
@@ -122,6 +123,31 @@ export async function biuroRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: (e as Error).message });
       }
     }
+  );
+
+  /**
+   * Notatka biura do dostawy (0.43.0) — pytanie, na które rozkładający MUSI
+   * odpowiedzieć, zanim domknie fakturę.
+   *
+   * Bez bramki roli, w odróżnieniu od zamykania „poza WERTIS". Notatka niczego
+   * nie orzeka i nie zdejmuje pracy z listy — ona ją DOKŁADA, a dokładanie
+   * sobie roboty nie wymaga uprawnień. Sesja wystarczy, bo wpis jest podpisany.
+   */
+  app.post<{ Params: { dokId: string }; Body: { tresc?: string } }>(
+    "/api/biuro/dokument/:dokId/notatka",
+    async (req, reply) => {
+      const s = sesjaZadania();
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      const r = dodajNotatke(Number(req.params.dokId), req.body?.tresc ?? "", s.user.name);
+      if ("error" in r) return reply.code(400).send(r);
+      return r;
+    }
+  );
+
+  /** Notatki dokumentu wraz z odpowiedziami — biuro czyta, czy już wiadomo. */
+  app.get<{ Params: { dokId: string } }>(
+    "/api/biuro/dokument/:dokId/notatki",
+    async (req) => ({ notatki: notatkiDokumentu(Number(req.params.dokId)) })
   );
 
   /* Do 0.26.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service

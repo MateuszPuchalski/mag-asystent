@@ -9,6 +9,7 @@ import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
 import { raiseProblem } from "./problems.js";
+import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js";
 import { aliasKodu } from "./ean-alias.js";
 import { freshLock, lockedByOther } from "./locks.js";
 import type {
@@ -455,6 +456,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
     // null tu znaczy „jeszcze nie pytano" — kolektor pyta wtedy i tylko wtedy
     nrPrzesylki: d.nr_przesylki ?? null,
     kurierProtokol: d.kurier_protokol ?? null,
+    notatki: notatkiDokumentu(d.sgt_dok_id),
     lines,
   };
 }
@@ -719,6 +721,17 @@ export function putawayLine(
  * wyjątków, więc trzymanie przez nią całej dostawy karałoby zgłaszającego (D8).
  */
 export function closeIfComplete(deliveryId: number, user: string): void {
+  /* Notatka biura bez odpowiedzi trzyma dostawę OTWARTĄ, choćby wszystkie
+     pozycje były rozstrzygnięte. Bramka stoi tutaj, a nie tylko przy
+     przycisku: samo domknięcie po ostatniej pozycji jest najczęstszą ścieżką
+     w całej aplikacji, więc regułę pilnowaną wyłącznie przy przycisku
+     obchodziłoby się przez zwykłe odłożenie towaru — czyli nie pilnowałoby jej
+     nic. Dostawa czeka; ekran rozkładania pokazuje pytanie i pole odpowiedzi. */
+  const dok = db()
+    .prepare("SELECT sgt_dok_id AS dokId FROM delivery WHERE id = ?")
+    .get(deliveryId) as { dokId: number } | undefined;
+  if (dok && czekaNaOdpowiedz(dok.dokId)) return;
+
   const left = (
     db()
       .prepare(
@@ -1027,11 +1040,23 @@ export function zakonczDostawe(
   deliveryId: number,
   user: string
 ): PodsumowanieZakonczenia | { error: string } {
-  const d = db().prepare("SELECT status FROM delivery WHERE id = ?").get(deliveryId) as
-    | { status: string }
-    | undefined;
+  const d = db()
+    .prepare("SELECT status, sgt_dok_id AS dokId FROM delivery WHERE id = ?")
+    .get(deliveryId) as { status: string; dokId: number } | undefined;
   if (!d) return { error: "Nie znaleziono dostawy" };
   if (d.status !== "open") return { error: "Ta dostawa jest już zamknięta" };
+
+  /* Odmowa NAZYWA powód i cytuje pytanie. „Nie można zamknąć" bez treści
+     notatki kazałoby szukać jej gdzie indziej — a szuka się jej wtedy,
+     gdy człowiek stoi przy palecie i chce skończyć. */
+  const czekaja = bezOdpowiedzi(d.dokId);
+  if (czekaja.length > 0) {
+    return {
+      error:
+        `Najpierw odpowiedz na notatkę biura: „${czekaja[0].tresc}"` +
+        (czekaja.length > 1 ? ` (i ${czekaja.length - 1} kolejne)` : ""),
+    };
+  }
 
   const podsumowanie = podgladZakonczenia(deliveryId);
 

@@ -127,7 +127,7 @@ test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
   assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
 });
 
-test("strona biura zapisuje TYLKO trzy rzeczy", () => {
+test("strona biura zapisuje TYLKO cztery rzeczy", () => {
   /* „ZERO ZAPISU" było regułą tego pliku od 0.18.0 i skończyło się w 0.40.0:
      doszło oznaczenie dostawy jako rozłożonej poza WERTIS i cofnięcie tego.
      Reguła nie zniknęła, tylko dostała jawną listę — bo pilnuje czegoś, co
@@ -145,8 +145,8 @@ test("strona biura zapisuje TYLKO trzy rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    3,
-    "logowanie, zamknięcie poza WERTIS i cofnięcie — nic ponadto"
+    4,
+    "logowanie, zamknięcie poza WERTIS, cofnięcie i notatka — nic ponadto"
   );
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");

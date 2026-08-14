@@ -83,6 +83,11 @@
      — kartoteki mają obrazki w różnych proporcjach, a lista dogrywa je po
      kolei już po narysowaniu tabeli. */
   #dostawy tr[data-dok] { cursor: pointer; }
+  /* Notatka czekająca na odpowiedź jest jedynym powodem, dla którego dostawa
+     nie może się domknąć — musi się odróżniać od tej już zamkniętej. */
+  .karta-notatka { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+  .karta-notatka.czeka { border-color: var(--amber); background: var(--amber-bg); }
+  .karta-notatka .odp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
   #szczegolLinie td.kolFoto { width: 56px; }
   .foto, .brakfoto { width: 48px; height: 48px; border-radius: 6px; display: block; }
   .foto { object-fit: cover; border: 1px solid var(--border); }
@@ -519,7 +524,8 @@ function rysujSzczegol(d) {
         d.progress.problems ? ` · ${d.progress.problems} z wyjątkiem` : ""}</span>
     </div>
     ${prognoza}
-    ${akcja}`;
+    ${akcja}
+    ${notatki(d)}`;
 
   const kolumn = zdjeciaWlaczone ? 6 : 5;
   $("szczegolLinie").innerHTML =
@@ -586,6 +592,50 @@ function wyjatek(p) {
 }
 
 /* ── Reklamacje ── */
+/**
+ * Notatki biura do dostawy.
+ *
+ * Stoją w panelu dokumentu, a nie w osobnej zakładce, bo pytanie dotyczy TEJ
+ * faktury i czyta się je razem z jej pozycjami. Nieodpowiedziana jest
+ * wyróżniona, bo to ona trzyma dostawę otwartą — i to jest jedyny powód,
+ * dla którego rozkładający nie może skończyć.
+ */
+function notatki(d) {
+  const lista = (d.notatki || []).map((n) => `
+    <div class="karta-notatka${n.odpowiedz ? "" : " czeka"}">
+      <div>${esc(n.tresc)}</div>
+      <div class="mute">${esc(n.createdBy)} · ${esc(stempelLokalny(n.createdAt))}</div>
+      ${n.odpowiedz
+        ? `<div class="odp"><b>Odpowiedź:</b> ${esc(n.odpowiedz)}
+             <div class="mute">${esc(n.odpBy)} · ${esc(stempelLokalny(n.odpAt))}</div></div>`
+        : '<div class="mute"><b>Czeka na odpowiedź</b> — dostawa się nie domknie, dopóki jej nie ma.</div>'}
+    </div>`).join("");
+  return `<h2 style="margin-top:18px">NOTATKI DO DOSTAWY</h2>
+    ${lista || '<p class="mute">Brak notatek.</p>'}
+    <button class="akcja cichy" data-notatka="${d.dokId}">+ DODAJ NOTATKĘ</button>`;
+}
+
+/**
+ * Nowa notatka. `prompt`, jak przy zamykaniu poza WERTIS — strona nie ma builda
+ * ani frameworka, a treść i tak waliduje serwer.
+ */
+async function dodajNotatke(dokId) {
+  const tresc = prompt(
+    "Notatka dla rozkładającego.\n\n" +
+    "Na tę notatkę trzeba będzie ODPOWIEDZIEĆ, żeby zamknąć dostawę.\n" +
+    "np. „Dostawca dosyła brakujące 3 szt W32-0203 — sprawdź, czy są w paczce”"
+  );
+  if (tresc === null) return;
+  try {
+    await api(`/api/biuro/dokument/${dokId}/notatka`, {
+      method: "POST",
+      body: JSON.stringify({ tresc }),
+    });
+    ostatniSzczegol = "";           // wymuś przerysowanie panelu
+    await odswiezSzczegol();
+  } catch (e) { alert(e.message); }
+}
+
 /* ── Rozłożone poza WERTIS ──────────────────────────────────────────────────
    Karta chowa się, gdy nie ma czego pokazać. Pusta tabela z nagłówkiem
    sugerowałaby, że to zwykły element ekranu — a to jest wyjątek i ma tak
@@ -1312,6 +1362,8 @@ $("pozaWertis").addEventListener("click", (e) => {
   if (w) otworzDokument(Number(w.dataset.dok));
 });
 $("szczegolNaglowek").addEventListener("click", (e) => {
+  const n = e.target.closest("[data-notatka]");
+  if (n) return dodajNotatke(Number(n.dataset.notatka));
   const z = e.target.closest("[data-zamknij-poza]");
   if (z) oznaczPozaWertis(Number(z.dataset.zamknijPoza), z.dataset.nr);
   const o = e.target.closest("[data-przywroc]");

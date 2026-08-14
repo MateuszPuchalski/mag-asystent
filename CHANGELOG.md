@@ -28,6 +28,44 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.43.0 — 14 sierpnia 2026
+
+**Biuro może zostawić notatkę do dostawy, a rozkładający musi na nią
+odpowiedzieć.** Dostawca dosyła czasem brak, którego nie ma na fakturze. Biuro
+wie o tym z rozmowy albo z maila; człowiek przy palecie nie ma tego skąd
+wiedzieć i musi sprawdzić, czy rzeczywiście dosłali. Do 0.43.0 jedyną drogą
+było „powiedz Krzyśkowi, jak przyjdzie" — kanał, który gubi się przy zmianie
+i nie zostawia po sobie ani śladu, ani odpowiedzi.
+
+Notatka wisi na **dokumencie**, nie na lokalnym wierszu dostawy: biuro pisze ją,
+zanim ktokolwiek otworzy rozkładanie, więc `delivery` zwykle jeszcze nie
+istnieje. Przy okazji przeżywa zamknięcie „poza WERTIS" i jego cofnięcie.
+
+**Odpowiedź jest obowiązkowa** i pilnują jej DWA miejsca, nie jedno. Oczywiste
+to przycisk „ZAKOŃCZ DOSTAWĘ" — odmawia i cytuje treść notatki, żeby nie
+trzeba jej było szukać. Drugie jest ważniejsze: **samoczynne domknięcie po
+odłożeniu ostatniej pozycji**. Bramka pilnowana wyłącznie przy przycisku
+obchodziłaby się przez zwykłe rozłożenie towaru, czyli przez najczęstszą
+czynność w aplikacji i bez żadnej złej woli.
+
+Na ekranie rozkładania notatka stoi **na górze**, przed podpowiedzią o skanie:
+pytanie „czy dosłali trzy sztuki" trzeba przeczytać, zanim się zacznie, bo
+odpowiedź bierze się z oglądania palety, a nie z pamięci pół godziny później.
+Nieodpowiedziana jest bursztynowa i mówi wprost, że blokuje zamknięcie.
+
+Odpowiedzi **nie da się podmienić**. To ona zdjęła blokadę z dokumentu, więc
+zmieniona po fakcie zmieniałaby powód decyzji, która już zapadła — nowe
+ustalenie to nowa notatka. Obie strony rozmowy idą do `events`.
+
+Trzynaście nowych testów, serwer ma ich 577.
+
+**[wymaga działania]** `git pull`, `npm run build` i restart usług — tabelę
+`delivery_note` zakłada schemat przy starcie. Zmiany w kolektorze wchodzą
+z **nowym APK**; do tego czasu notatki widać i pisze się je w `/biuro`, ale
+odpowiedzieć nie ma jak, więc nie dodawaj ich przed rozesłaniem APK.
+
+---
+
 ## 0.42.0 — 13 sierpnia 2026
 
 **Trzy rzeczy w oknie dostawy: szukanie, częściowe odkładanie i zakończenie.**

@@ -25,6 +25,7 @@ export interface PendingLocChange {
 
 import type { MagazynStan } from "./services/magazyny.js";
 import type { WDostawie } from "./services/dostawy-towaru.js";
+import type { Notatka } from "./services/notatki.js";
 import type { ZamowioneUDostawcy } from "./services/zamowienia-towaru.js";
 
 export interface ProductCard {
@@ -169,6 +170,15 @@ export interface DeliveryView {
   nrPrzesylki: string | null;
   /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
   kurierProtokol: string | null;
+  /**
+   * Notatki biura do tego dokumentu (0.43.0), od najstarszej.
+   *
+   * Jadą z widokiem dostawy, a nie osobnym żądaniem: pytanie o dosłany brak
+   * ma stać przed oczami TAM, gdzie rozkłada się towar, i od pierwszej klatki.
+   * Notatka bez odpowiedzi blokuje domknięcie dostawy — także to samoczynne
+   * po ostatniej pozycji.
+   */
+  notatki: Notatka[];
   /**
    * Magazyn skutku, snapshotowany przy otwarciu — ale TYLKO gdy nie jest halą.
    * `null` znaczy wprost „nie ma czego przesuwać", więc kolektor nie musi znać
