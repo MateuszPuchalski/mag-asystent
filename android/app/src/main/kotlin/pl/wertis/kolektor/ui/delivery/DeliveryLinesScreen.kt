@@ -1327,6 +1327,7 @@ private fun EanConflictSheet(
  * Przycisk potwierdzenia mówi, ILE zgłoszeń powstanie — „ZAKOŃCZ" bez liczby
  * jest zgodą na coś, czego się nie policzyło.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ZakonczenieSheet(
     podsumowanie: ZakonczenieDostawy,
