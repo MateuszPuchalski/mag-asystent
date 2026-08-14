@@ -1074,6 +1074,15 @@ foreach ($zakazane in @(
     }
 }
 
+Sprawdz "zatrzymuje DOKŁADNIE te usługi, które potem uruchamia" {
+    # Pierwsza wersja stopowała dwie, a startowała trzy: `wertis-sfera`
+    # przechodziła aktualizację na chodzie i mogła pisać do SQLite w trakcie
+    # migracji schematu. Asymetria wyszła dopiero na wydruku z produkcji.
+    foreach ($u in @("wertis-api", "wertis-worker", "wertis-sfera")) {
+        Zaloz ($galazKod -match [regex]::Escape($u)) "gałąź nie zatrzymuje $u"
+    }
+}
+
 Sprawdz "zatrzymuje usługi PRZED budowaniem" {
     # `npm ci` kasuje node_modules — działający worker traciłby moduły w locie
     $stop = $galazKod.IndexOf("Stop-Service")
