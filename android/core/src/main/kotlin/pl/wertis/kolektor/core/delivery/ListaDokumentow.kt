@@ -20,13 +20,30 @@ import pl.wertis.kolektor.core.net.DeliveryDocument
    rysowany jako aktywny, to najgorszy z możliwych stanów pośrednich.        */
 
 enum class StanDokumentu {
-    /** Zaczęty i nieskończony — jedyna pozycja, która na kogoś czeka. */
+    /** Zaczęty i nieskończony — pozycja, która czeka na konkretną osobę. */
     W_TOKU,
+
+    /**
+     * Wszystkie pozycje rozstrzygnięte, ale dostawa NADAL OTWARTA (0.44.1).
+     *
+     * Do notatek biura (0.43.0) ten stan był przelotny: `closeIfComplete`
+     * zamykał dostawę w tej samej sekundzie, w której ostatnia pozycja stawała
+     * się terminalna, więc lista praktycznie nigdy go nie widziała. Odkąd
+     * nieodpowiedziana notatka trzyma dostawę otwartą, stan jest TRWAŁY —
+     * a rysowany jak ukończony mówił „zrobione" o fakturze, której nikt nie
+     * zamknął. Dokładnie to zgłoszono z magazynu: „wszystko zeskanowane, a jest
+     * na zielono".
+     *
+     * Jedna nazwa na dwie przyczyny (czeka notatka albo nikt nie nacisnął
+     * ZAKOŃCZ), bo czynność jest ta sama: wejdź i dokończ. Rozróżnienie widać
+     * dopiero w środku, gdzie i tak trzeba wejść.
+     */
+    DO_ZAMKNIECIA,
 
     /** Jeszcze nietknięty. */
     NOWY,
 
-    /** Wszystkie pozycje rozłożone (albo pominięte / zgłoszone jako wyjątek). */
+    /** Dostawa zamknięta — `delivery.status = done`. */
     UKONCZONY,
 }
 
@@ -35,13 +52,19 @@ enum class StanDokumentu {
  *
  * `linesTotal == 0` znaczy „nie otwierano" — postęp liczy się z pozycji
  * zapisanych przy otwarciu, więc przed nim nie ma czego liczyć. `status`
- * pochodzi z tabeli `delivery`: `null` = nigdy nieotwierany, `open` = w toku,
- * `done` = zamknięty ręcznie. Zamknięcie ręczne wygrywa z liczeniem pozycji,
- * bo dostawę da się zamknąć z pozycjami pominiętymi.
+ * pochodzi z tabeli `delivery`: `null` = nigdy nieotwierany, `open` = otwarta,
+ * `done` = zamknięta.
+ *
+ * UKOŃCZONA JEST WYŁĄCZNIE DOSTAWA ZE STATUSEM `done`, i to jest sedno tej
+ * reguły. Do 0.44.1 komplet rozstrzygniętych pozycji też liczył się jako
+ * ukończenie — zgadzało się to z rzeczywistością dopóty, dopóki dostawa
+ * zamykała się sama w tej samej chwili. Notatka biura bez odpowiedzi zerwała
+ * tę równość: pozycje są zrobione, a faktura otwarta. Zielony wiersz mówił
+ * wtedy „zrobione" o czymś, co czeka na człowieka.
  */
 fun stanDokumentu(d: DeliveryDocument): StanDokumentu = when {
     d.status == "done" -> StanDokumentu.UKONCZONY
-    d.linesTotal > 0 && d.linesDone >= d.linesTotal -> StanDokumentu.UKONCZONY
+    d.linesTotal > 0 && d.linesDone >= d.linesTotal -> StanDokumentu.DO_ZAMKNIECIA
     // otwarty ALBO z jakimkolwiek postępem — drugi warunek łapie dostawę
     // otwartą przez kogoś innego i porzuconą przed zamknięciem
     d.status != null || d.linesDone > 0 -> StanDokumentu.W_TOKU

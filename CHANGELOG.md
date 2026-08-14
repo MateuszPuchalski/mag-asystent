@@ -47,8 +47,25 @@ z niego wynika na ekranie.
 
 Oba arkusze wróciły na poziom ekranu, obok pozostałych.
 
-**[wymaga działania]** Nic po stronie serwera — poprawka jest wyłącznie
-w kolektorze i wchodzi z **nowym APK**. Do tego czasu na notatkę nie da się
+**Faktura z kompletem zeskanowanych pozycji świeciła na zielono**, choć nikt
+jej nie zamknął — drugie zgłoszenie z magazynu, i to następstwo notatek.
+
+Do 0.43.0 komplet rozstrzygniętych pozycji ZNACZYŁ ukończenie, bo dostawa
+zamykała się sama w tej samej sekundzie; równość była prawdziwa. Notatka bez
+odpowiedzi ją zerwała: pozycje zrobione, faktura otwarta — i lista mówiła
+„zrobione" o czymś, co czeka na człowieka.
+
+Doszedł więc czwarty stan: **DO ZAMKNIĘCIA**. Bursztynowy jak „w toku", bo tak
+samo czeka, z osobną etykietą na wierszu — bez niej człowiek wchodzi w dostawę,
+widzi same odhaczone pozycje i wychodzi. Zielony zostaje wyłącznie dla dostawy
+naprawdę zamkniętej (`status = done`). W kolejności listy stoi zaraz za pracą
+zaczętą: jeden ruch od końca.
+
+Jedna nazwa na dwie przyczyny — czeka notatka albo nikt nie nacisnął ZAKOŃCZ —
+bo czynność jest ta sama: wejdź i dokończ.
+
+**[wymaga działania]** Nic po stronie serwera — obie poprawki są wyłącznie
+w kolektorze i wchodzą z **nowym APK**. Do tego czasu na notatkę nie da się
 odpowiedzieć, więc dostawa z notatką się nie domknie.
 
 ---

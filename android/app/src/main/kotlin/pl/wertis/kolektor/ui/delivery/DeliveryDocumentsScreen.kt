@@ -158,7 +158,11 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
 private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
     val stan = stanDokumentu(d)
     val complete = stan == StanDokumentu.UKONCZONY
-    val wToku = stan == StanDokumentu.W_TOKU
+    /* Komplet pozycji przy OTWARTEJ dostawie to czynność, nie ukończenie —
+       bursztyn tak samo jak „w toku", bo tak samo czeka na człowieka. Zielony
+       zostaje wyłącznie dla dostawy naprawdę zamkniętej. */
+    val doZamkniecia = stan == StanDokumentu.DO_ZAMKNIECIA
+    val wToku = stan == StanDokumentu.W_TOKU || doZamkniecia
     val total = if (d.linesTotal > 0) d.linesTotal else d.positions
     Row(
         modifier = Modifier
@@ -205,6 +209,23 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
                     fontSize = 15.sp,
                     color = if (complete) InkMute else Ink,
                 )
+                /* Wiersz z kompletem pozycji wygląda inaczej niż wszystkie
+                   pozostałe „w toku", bo i czynność jest inna: nie ma już czego
+                   skanować, trzeba wejść i dokończyć. Bez tego słowa człowiek
+                   otwiera dostawę, widzi same odhaczone pozycje i wychodzi. */
+                if (doZamkniecia) {
+                    Text(
+                        "DO ZAMKNIĘCIA",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        color = AmberInk,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(AmberBg)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
                 /* Kontener rozkłada się tak samo jak faktura krajowa, ale po
                    odłożeniu adresów zostaje jeszcze przesunięcie stanu na halę.
                    To jedyne miejsce, w którym da się to powiedzieć ZANIM
