@@ -705,6 +705,33 @@ stanu przez workera Sfery.
 
 ## 7. Backup i utrzymanie
 
+### Aktualizacja do nowej wersji
+
+W oknie **jako administrator**, na maszynie z serwerem:
+
+```powershell
+cd C:\wertis\instalator
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
+```
+
+Zatrzymuje usługi, pobiera kod, buduje, uruchamia z powrotem i porównuje numery
+wersji. **Nie zadaje pytań** i nie dotyka bazy aplikacji, konta SQL, GRANT-ów,
+`wertis.env`, konfiguracji Subiekta ani kont użytkowników.
+
+> `-ExecutionPolicy Bypass` dotyczy tego jednego uruchomienia. Bez niego Windows
+> odmawia: `running scripts is disabled on this system`.
+
+> Aktualizowany jest katalog z `-Katalog` (domyślnie `C:\wertis`), a **nie** ten,
+> w którym leży skrypt. Uruchomienie z klonu repo na pulpicie zaktualizuje
+> `C:\wertis`.
+
+Podgląd bez zmian: ten sam wiersz z `-DryRun`. Po nieudanym `git pull` usługi
+wracają na poprzedniej wersji; po nieudanym budowaniu zostają zatrzymane, bo
+stary `dist` z nową bazą mieszałby dwie wersje.
+
+**Nowy APK jest osobną czynnością** — patrz §5. Pasek na dole ekranu kolektora
+pokazuje obie wersje i podświetla rozjazd.
+
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 
   ```bash

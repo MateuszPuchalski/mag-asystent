@@ -66,7 +66,11 @@ konto SQL albo `wertis.env` nie wywraca niczego przy uruchomieniu i wyszłoby
 dopiero na produkcji.
 
 **[wymaga działania]** Nic — nowy tryb jest dodatkiem. Od następnej wersji
-aktualizacja serwera to `.\wertis-instalator.ps1 -Aktualizuj`.
+aktualizacja serwera to jeden wiersz, uruchomiony jako administrator:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
+```
 
 ---
 
