@@ -22,8 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +44,7 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.WIcons
+import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
@@ -89,6 +91,10 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
         }
     }
 
+    /* `rememberSaveable`, bo wejście w dostawę i powrót nie ma kasować tego,
+       czego człowiek właśnie szukał. */
+    var szukane by rememberSaveable { mutableStateOf("") }
+
     val r = odpowiedz
     if (r == null) {
         LoadingRow("Wczytywanie dostaw…")
@@ -98,7 +104,21 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
     /* Do dokończenia na górze, ukończone na dole, reszta pośrodku malejąco po
        dacie. Reguła siedzi w :core (`ListaDokumentow.kt`), bo rozstrzyga
        zarazem kolejność listy i wygląd wiersza. */
-    val dostawy = uporzadkujDokumenty(r.documents)
+    /* Filtr po numerze faktury i po dostawcy. Przy oknie trzydziestu dni lista
+       potrafi mieć kilkadziesiąt pozycji, a biuro dzwoni z KONKRETNYM numerem
+       („co z FZ 214?") — przewijanie kciukiem w rękawicy jest wtedy najgorszą
+       możliwą odpowiedzią.
+
+       Kolejność (do dokończenia → nowe → ukończone) liczy się PO odsianiu, więc
+       wynik szukania zachowuje ten sam porządek co pełna lista — inaczej ta sama
+       faktura stałaby raz wyżej, raz niżej, zależnie od wpisanego tekstu. */
+    val szukaneN = szukane.trim().lowercase()
+    val dostawy = uporzadkujDokumenty(
+        if (szukaneN.isEmpty()) r.documents
+        else r.documents.filter {
+            it.nrPelny.lowercase().contains(szukaneN) || it.dostawca.lowercase().contains(szukaneN)
+        }
+    )
 
     Column(
         modifier = Modifier
@@ -114,9 +134,16 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
             letterSpacing = 1.2.sp,
             color = InkSoft,
         )
+        WertisTextField(
+            value = szukane,
+            onValueChange = { szukane = it },
+            placeholder = "Szukaj faktury: numer albo dostawca…",
+            leadingIcon = WIcons.Search,
+        )
         if (dostawy.isEmpty()) {
             Text(
-                "Brak dostaw do rozłożenia",
+                if (szukaneN.isNotEmpty()) "Brak faktury pasującej do „$szukane”"
+                else "Brak dostaw do rozłożenia",
                 color = InkMute,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,

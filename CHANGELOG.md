@@ -28,6 +28,48 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.44.0 — 14 sierpnia 2026
+
+**Instalator dostaje tryb samej aktualizacji: `-Aktualizuj`.** Zatrzymuje
+usługi, pobiera nową wersję, buduje i uruchamia z powrotem. Nie zadaje ani
+jednego pytania.
+
+Pełny przebieg instalatora też aktualizuje kod, ale robi przy tym jeszcze
+siedem innych rzeczy: pyta o Subiekta, przelicza magazyny, sprawdza pole
+lokalizacji, zakłada konto SQL, nadaje GRANT-y, przepisuje `wertis.env` i pyta
+o konto administratora. Na działającej instalacji to jest siedem okazji do
+zmiany czegoś, co działa — i siedem pytań do człowieka, który chciał tylko
+wgrać nową wersję.
+
+Czego ten tryb **nie dotyka**, wprost: bazy aplikacji (`server\data`), konta
+SQL ani GRANT-ów, `wertis.env`, konfiguracji Subiekta, kont użytkowników,
+reguły zapory i rejestracji usług w NSSM. Wszystko to już istnieje —
+instalacja, której się nie stawia od nowa, nie potrzebuje niczego z tej listy.
+
+Dwie decyzje warte zapisania. Usługi stoją przez **cały** czas budowania, a nie
+tylko przy podmianie plików: `npm ci` kasuje `node_modules`, więc działający
+worker traciłby moduły w locie — a objawem byłby proces, który padł „bez
+powodu" w połowie aktualizacji. I dwie różne reakcje na błąd: po nieudanym
+`git pull` usługi **wracają** na poprzedniej wersji (magazyn nie ma stać przez
+nieudaną próbę), a po nieudanym budowaniu zostają **zatrzymane celowo**, bo
+stary `dist` z nową bazą mieszałby dwie wersje.
+
+**Wyszukiwarka w liście dostaw.** Filtruje po numerze faktury i po dostawcy.
+Przy oknie trzydziestu dni lista ma kilkadziesiąt pozycji, a biuro dzwoni
+z konkretnym numerem — przewijanie kciukiem w rękawicy jest wtedy najgorszą
+możliwą odpowiedzią. Kolejność (do dokończenia → nowe → ukończone) liczy się po
+odsianiu, więc wynik szukania zachowuje ten sam porządek co pełna lista.
+
+Trzynaście nowych testów instalatora; pilnują głównie **nieobecności** — tego,
+czego gałąź aktualizacji nie wywołuje. Dopisanie tam jednej linii ruszającej
+konto SQL albo `wertis.env` nie wywraca niczego przy uruchomieniu i wyszłoby
+dopiero na produkcji.
+
+**[wymaga działania]** Nic — nowy tryb jest dodatkiem. Od następnej wersji
+aktualizacja serwera to `.\wertis-instalator.ps1 -Aktualizuj`.
+
+---
+
 ## 0.43.0 — 14 sierpnia 2026
 
 **Biuro może zostawić notatkę do dostawy, a rozkładający musi na nią
