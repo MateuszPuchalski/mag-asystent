@@ -3,6 +3,7 @@ package pl.wertis.kolektor.net
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.LoginBody
+import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.net.CreateUserBody
 import pl.wertis.kolektor.core.net.CreateUserResponse
 import pl.wertis.kolektor.core.net.MagazynyResponse
@@ -180,6 +181,14 @@ interface ApiService {
         @Header("x-buffered-user") bufferedUser: String? = null,
     ): PutawayLineResponse
 
+
+    /** Co powstanie przy zakończeniu dostawy — czysty odczyt, bez zapisu. */
+    @GET("api/delivery/{id}/zakonczenie")
+    suspend fun deliveryZakonczenie(@Path("id") id: Long): ZakonczenieDostawy
+
+    /** Zakończenie dostawy: braki → wyjątki „zła ilość", nietknięte → pominięte. */
+    @POST("api/delivery/{id}/zakoncz")
+    suspend fun deliveryZakoncz(@Path("id") id: Long): ZakonczenieDostawy
 
     /** Oddanie linii po ANULUJ — bez tego wisi zajęta do wygaśnięcia TTL. */
     @POST("api/delivery/{id}/lines/{lineId}/release")

@@ -8,6 +8,7 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
+import { raiseProblem } from "./problems.js";
 import { aliasKodu } from "./ean-alias.js";
 import { freshLock, lockedByOther } from "./locks.js";
 import type {
@@ -939,4 +940,129 @@ export function dokumentyPozaWertis(): Set<number> {
       }>
     ).map((r) => Math.trunc(r.sgt_dok_id))
   );
+}
+
+/* ── Zakończenie dostawy ────────────────────────────────────────────────────
+   Do 0.42.0 dostawa nie miała momentu zamknięcia: `closeIfComplete` domykał ją
+   sam, gdy OSTATNIA pozycja stała się terminalna. Praca, której nikt nie
+   dokończył, zostawała więc otwarta w nieskończoność, a braki ilościowe —
+   pozycje z odłożoną częścią — nie zamieniały się w nic. Magazynier, który
+   znalazł 7 sztuk z 10, musiał pamiętać, żeby OSOBNO zgłosić wyjątek; jeśli
+   nie pamiętał, różnica ginęła między dokumentem a półką bez śladu.
+
+   Ta funkcja jest tym brakującym momentem i robi DWIE rzeczy, świadomie różne:
+
+     - pozycja Z CZĘŚCIOWYM ODŁOŻENIEM (0 < odłożone < dokument) staje się
+       wyjątkiem „zła ilość". Towar policzono i było go mniej — to jest fakt
+       o DOSTAWIE i należy do protokołu rozbieżności;
+     - pozycja NIETKNIĘTA (zero odłożone) staje się `skipped`, bez zgłoszenia.
+       Brak pracy to nie brak towaru: nikt tego kartonu nie otworzył, więc
+       twierdzenie wobec dostawcy nie ma pokrycia. Karta towaru pokazuje ją
+       dalej jako „w dostawie", bo w regale jej nie ma.
+
+   Rozróżnienie jest całą wartością tej operacji. Jedna reguła na obie sytuacje
+   znaczyłaby albo reklamacje bez pokrycia, albo ciche gubienie braków.       */
+
+/** Co powstało przy zamknięciu — kolektor pokazuje to człowiekowi PRZED zapisem. */
+export interface PodsumowanieZakonczenia {
+  /** Pozycje z niepełnym odłożeniem → wyjątki „zła ilość". */
+  braki: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number; qtyDone: number }>;
+  /** Pozycje, których nikt nie tknął → `skipped`, bez zgłoszenia. */
+  nietkniete: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number }>;
+}
+
+interface WierszDoZamkniecia {
+  id: number;
+  tw_symbol: string;
+  tw_nazwa: string;
+  ilosc_dok: number;
+  ilosc_odlozona: number | null;
+}
+
+/** Otwarte pozycje dostawy — te, które zamknięcie ma czym rozstrzygnąć. */
+function otwarteLinie(deliveryId: number): WierszDoZamkniecia[] {
+  return db()
+    .prepare(
+      `SELECT id, tw_symbol, tw_nazwa, ilosc_dok, ilosc_odlozona
+       FROM delivery_line
+       WHERE delivery_id = ? AND status NOT IN ('done','skipped','problem')
+       ORDER BY id`
+    )
+    .all(deliveryId) as unknown as WierszDoZamkniecia[];
+}
+
+/**
+ * Co się stanie po zakończeniu. CZYTA, niczego nie zapisuje.
+ *
+ * Osobna funkcja, bo kolektor pokazuje to PRZED zapisem — a zgłoszenie do
+ * dostawcy nie ma prawa powstać z przycisku, którego skutku nikt nie widział.
+ */
+export function podgladZakonczenia(deliveryId: number): PodsumowanieZakonczenia {
+  const braki: PodsumowanieZakonczenia["braki"] = [];
+  const nietkniete: PodsumowanieZakonczenia["nietkniete"] = [];
+  for (const l of otwarteLinie(deliveryId)) {
+    const done = l.ilosc_odlozona ?? 0;
+    if (done > 0 && done < l.ilosc_dok) {
+      braki.push({
+        lineId: l.id,
+        sym: l.tw_symbol,
+        nazwa: l.tw_nazwa,
+        qtyDoc: l.ilosc_dok,
+        qtyDone: done,
+      });
+    } else if (done <= 0) {
+      nietkniete.push({ lineId: l.id, sym: l.tw_symbol, nazwa: l.tw_nazwa, qtyDoc: l.ilosc_dok });
+    }
+  }
+  return { braki, nietkniete };
+}
+
+/**
+ * Zakończ dostawę: braki ilościowe → wyjątki, nietknięte → pominięte.
+ *
+ * Zwraca to samo podsumowanie co podgląd, więc kolektor pokazuje po zapisie
+ * dokładnie to, co obiecał przed nim.
+ */
+export function zakonczDostawe(
+  deliveryId: number,
+  user: string
+): PodsumowanieZakonczenia | { error: string } {
+  const d = db().prepare("SELECT status FROM delivery WHERE id = ?").get(deliveryId) as
+    | { status: string }
+    | undefined;
+  if (!d) return { error: "Nie znaleziono dostawy" };
+  if (d.status !== "open") return { error: "Ta dostawa jest już zamknięta" };
+
+  const podsumowanie = podgladZakonczenia(deliveryId);
+
+  /* Wyjątki idą przez `raiseProblem`, a nie przez własny INSERT: to on zna
+     snapshot ilości z dokumentu, ustawia linii status `problem` i pisze do
+     `events`. Drugi zapis obok byłby drugą definicją tego, czym jest wyjątek. */
+  for (const b of podsumowanie.braki) {
+    raiseProblem(
+      {
+        deliveryId,
+        lineId: b.lineId,
+        typ: "qty_mismatch",
+        qty: b.qtyDone,
+        opis: `Zakończenie dostawy: odłożono ${b.qtyDone} z ${b.qtyDoc}`,
+      },
+      user
+    );
+  }
+
+  const pomin = db().prepare("UPDATE delivery_line SET status='skipped' WHERE id=?");
+  transaction(db(), () => {
+    for (const n of podsumowanie.nietkniete) pomin.run(n.lineId);
+  })();
+
+  logEvent("delivery_finished", user, null, {
+    deliveryId,
+    braki: podsumowanie.braki.length,
+    nietkniete: podsumowanie.nietkniete.length,
+  });
+  /* Domknięcie liczy się TU, po wszystkich zmianach statusów — `raiseProblem`
+     woła je po drodze, ale wtedy pozycje nietknięte są jeszcze otwarte. */
+  closeIfComplete(deliveryId, user);
+  return podsumowanie;
 }

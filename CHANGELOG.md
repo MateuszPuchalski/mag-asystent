@@ -28,6 +28,52 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.42.0 — 13 sierpnia 2026
+
+**Trzy rzeczy w oknie dostawy: szukanie, częściowe odkładanie i zakończenie.**
+
+**Częściowe odkładanie działało na serwerze od dawna — kolektor go nie używał.**
+`putawayLine` przyjmuje ilość i sam nadaje status `partial`, ale skan półki
+zawsze zamykał CAŁĄ pozycję. Trzy sztuki z dziesięciu na wierzchu kartonu nie
+miały więc uczciwej odpowiedzi: albo odłożenie wszystkich dziesięciu
+(nieprawda), albo wyjątek „zła ilość", czyli reklamacja do dostawcy o towarze,
+który przyjechał w komplecie. W panelu odkładania są teraz **−** i **+**;
+domyślnie idzie cała reszta, bo tak wygląda większość odłożeń. Przy okazji
+poprawka w buforze offline: zapisywał `qtyDone = qtyDoc` niezależnie od ilości,
+więc reszta partii znikała z listy pracy do czasu odpowiedzi serwera.
+
+**Wyszukiwarka w oknie dostawy.** Filtruje po symbolu i nazwie. Droga
+podstawowa to nadal skan — pole jest dla kartonu, którego kod nie chce zejść:
+zdarty, zalany, zaklejony taśmą. Filtruje wyłącznie WIDOK: kolejność alejkowa,
+sekcja „bez lokalizacji" i liczniki postępu liczą się z pełnej listy, bo „7
+z 10" to stan dostawy, a nie stan ekranu.
+
+**„ZAKOŃCZ DOSTAWĘ" — moment, którego nie było.** Dotąd dostawa domykała się
+sama, gdy ostatnia pozycja stała się terminalna; praca porzucona w połowie
+zostawała otwarta bez końca, a braki ilościowe nie zamieniały się w nic.
+Magazynier, który znalazł 7 sztuk z 10, musiał pamiętać o osobnym zgłoszeniu —
+jeśli nie pamiętał, różnica ginęła między dokumentem a półką.
+
+Zakończenie robi dwie **świadomie różne** rzeczy:
+
+- pozycja z częściowym odłożeniem → wyjątek **„zła ilość"**. Towar policzono
+  i było go mniej: to fakt o dostawie i należy do protokołu rozbieżności;
+- pozycja **nietknięta** → `pominięta`, **bez zgłoszenia**. Brak pracy to nie
+  brak towaru — nikt tego kartonu nie otworzył, więc twierdzenie wobec dostawcy
+  nie miałoby pokrycia. Karta towaru pokazuje ją dalej jako „w dostawie".
+
+Przycisk otwiera najpierw **podsumowanie**: osobno lista idąca do dostawcy,
+osobno pomijane, a przycisk potwierdzenia mówi wprost, ile zgłoszeń powstanie.
+Zgłoszenie do dostawcy nie ma prawa powstać z przycisku, którego skutku nikt
+nie widział.
+
+Jedenaście nowych testów serwera, razem 564.
+
+**[wymaga działania]** `git pull` i restart usług po stronie serwera; zmiany
+w kolektorze wchodzą z **nowym APK**.
+
+---
+
 ## 0.41.1 — 11 sierpnia 2026
 
 **Baner „Serwer nie odpowiada" kłamał — serwer odpowiadał bez zarzutu.**

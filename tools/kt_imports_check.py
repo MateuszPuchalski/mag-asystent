@@ -6,7 +6,7 @@ SDK, a środowisko pracy go nie ma (settings.gradle świadomie pomija moduł).
 Każdy brakujący import wychodzi więc dopiero na runnerze, kosztuje pełny cykl
 CI i wraca jako czerwony build. Dwa razy pod rząd był to dokładnie ten błąd.
 
-CO SPRAWDZA. Dwie rzeczy, obie tanie i obie złapane już na żywym błędzie:
+CO SPRAWDZA. Trzy rzeczy, wszystkie tanie i wszystkie złapane na żywym błędzie:
 
   1. BRAKUJĄCE IMPORTY. Czy użyte identyfikatory, które są top-levelowymi
      deklaracjami w innym pakiecie tego repo, mają import. Łapie funkcję albo
@@ -18,6 +18,10 @@ CO SPRAWDZA. Dwie rzeczy, obie tanie i obie złapane już na żywym błędzie:
      usuwaniu kodu wyrażeniem regularnym oraz polski cudzysłów zamknięty
      PROSTYM znakiem `"` wewnątrz łańcucha — Kotlin kończy na nim string
      i dalej wszystko się rozjeżdża.
+
+  3. BRAK `@OptIn` przy API eksperymentalnym Compose. Kompilator `:app` odrzuca
+     to BŁĘDEM, nie ostrzeżeniem — a arkusz dolny bez adnotacji położył build
+     w 0.42.0, mimo że sąsiednie arkusze tego samego pliku miały ją od dawna.
 
 CZEGO NIE SPRAWDZA. Typów, sygnatur, przeciążeń, wnioskowania. To NIE jest
 kompilator i nie udaje nim być — ma wyłapać jedną, powtarzalną pomyłkę,
@@ -130,6 +134,58 @@ def bilans(p: Path, kod: str) -> list[str]:
     return problemy
 
 
+# Symbole Compose wymagające zgody na API eksperymentalne, i adnotacja, która
+# tej zgody udziela. Lista jest krótka i JAWNA: rośnie dopiero wtedy, gdy CI
+# złapie kolejny symbol — zgadywanie całego Material3 dawałoby fałszywe alarmy
+# przy każdej stabilizacji API po stronie Google'a.
+OPT_IN = {
+    "ModalBottomSheet": "ExperimentalMaterial3Api",
+    "FlowRow": "ExperimentalLayoutApi",
+    "FlowColumn": "ExperimentalLayoutApi",
+}
+
+# Funkcja NAJWYŻSZEGO POZIOMU (bez wcięcia). Zgoda `@OptIn` obowiązuje w całym
+# jej ciele, więc funkcje lokalne i composable zagnieżdżone dziedziczą ją po
+# niej — szukanie „najbliższego `fun` wstecz" bez tego warunku wskazywałoby
+# `fun handleCode` wewnątrz composable i dawało fałszywy alarm.
+FUNKCJA = re.compile(r"^(?:private\s+|internal\s+|public\s+)?fun\s", re.M)
+
+
+def opt_in(p: Path, kod: str) -> list[str]:
+    """
+    Użycie eksperymentalnego API bez `@OptIn` — kompilator `:app` odrzuca to
+    BŁĘDEM, nie ostrzeżeniem.
+
+    Powód istnienia: dokładnie ta pomyłka położyła build w 0.42.0. Nowy arkusz
+    dolny nie dostał adnotacji, którą pozostałe arkusze tego samego pliku miały
+    od dawna — a lokalnie nie ma jak tego zobaczyć, bo `:app` nie kompiluje się
+    bez Android SDK. Koszt: pełny cykl CI za jedną linijkę.
+
+    Zgoda liczy się z pliku (`@file:OptIn`) ALBO z adnotacji nad funkcją,
+    w której padło użycie. Szukanie funkcji idzie wstecz od miejsca użycia —
+    to przybliżenie, ale takie, które nie ma jak dać fałszywego alarmu:
+    adnotacja nad ZŁĄ funkcją i tak znaczy, że w pliku ktoś o `@OptIn` pomyślał.
+    """
+    out: list[str] = []
+    granice = [m.start() for m in FUNKCJA.finditer(kod)]
+    for symbol, adnotacja in OPT_IN.items():
+        wolanie = re.compile(rf"\b{symbol}\s*\(")
+        for uzycie in wolanie.finditer(kod):
+            poczatek = max((g for g in granice if g < uzycie.start()), default=None)
+            if poczatek is None:
+                continue
+            # blok adnotacji stoi NAD `fun`, więc czytamy kawałek powyżej
+            naglowek = kod[max(0, poczatek - 300):poczatek]
+            if "OptIn" in naglowek and adnotacja in naglowek:
+                continue
+            linia = kod.count("\n", 0, uzycie.start()) + 1
+            out.append(
+                f"{p.relative_to(KORZEN.parent)}:{linia}: '{symbol}' bez "
+                f"@OptIn({adnotacja}::class) — kompilator :app odrzuci to błędem"
+            )
+    return out
+
+
 def sprawdz(
     pliki: list[Path], deklaracje: dict[str, set[str]], rozszerzenia: dict[str, set[str]]
 ) -> list[str]:
@@ -166,6 +222,7 @@ def sprawdz(
         zglos({i.group(1) for i in ODWOLANIE.finditer(kod)}, deklaracje, "symbol")
         zglos({i.group(1) for i in PO_KROPCE.finditer(kod)}, rozszerzenia, "rozszerzenie")
         problemy += bilans(p, kod)
+        problemy += opt_in(p, kod)
     return problemy
 
 
@@ -181,7 +238,7 @@ def main() -> int:
         print(x)
     print(
         f"\nsprawdzono plików: {len(pliki)}; "
-        + ("OK — importy i bilans nawiasów" if not problemy else f"{len(set(problemy))} problemów")
+        + ("OK — importy, bilans nawiasów i @OptIn" if not problemy else f"{len(set(problemy))} problemów")
     )
     return 1 if problemy else 0
 

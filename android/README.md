@@ -154,6 +154,19 @@ przed którą ta pozycja broni.
 - [ ] odświeżony wpis **zostaje na swoim miejscu** listy, nie wskakuje na górę,
 - [ ] dotknięcie pozycji „Ostatnio skanowane" nie gubi nazwy towaru.
 
+**Rozkładanie dostawy**
+
+- [ ] pole „Szukaj w dostawie" zawęża listę po symbolu i po nazwie,
+- [ ] licznik postępu dostawy NIE zmienia się przy pisaniu w polu szukania,
+- [ ] „POKAŻ WSZYSTKIE POZYCJE" wraca do pełnej listy,
+- [ ] w panelu odkładania **−** i **+** zmieniają ilość, domyślnie cała reszta,
+- [ ] odłożenie 3 z 10 zostawia pozycję na liście z „odłożono 3",
+- [ ] to samo w trybie samolotowym: pozycja NIE znika z listy (regresja:
+      bufor zamykał całą pozycję),
+- [ ] „ZAKOŃCZ DOSTAWĘ" pokazuje najpierw podsumowanie, dopiero potem zapisuje,
+- [ ] pozycja odłożona częściowo trafia do zgłoszeń „zła ilość",
+- [ ] pozycja nietknięta jest POMINIĘTA i NIE trafia do dostawcy.
+
 **W dostawie, nierozłożone**
 
 - [ ] towar z nierozłożonej dostawy ma na karcie amber linię z numerem

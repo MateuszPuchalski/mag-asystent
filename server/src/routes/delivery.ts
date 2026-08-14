@@ -7,9 +7,11 @@ import {
   getDelivery,
   listDocuments,
   openDelivery,
+  podgladZakonczenia,
   putawayLine,
   releaseLine,
   resolveScan,
+  zakonczDostawe,
 } from "../services/delivery.js";
 import type { LocApplyAction } from "../types.js";
 
@@ -90,6 +92,32 @@ export async function deliveryRoutes(app: FastifyInstance) {
       });
       // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+      return r;
+    }
+  );
+
+  /**
+   * Podgląd zakończenia — co powstanie, gdyby zakończyć TERAZ. Czysty odczyt.
+   *
+   * Osobna trasa, bo kolektor pokazuje to człowiekowi PRZED zapisem: zgłoszenie
+   * do dostawcy nie ma prawa powstać z przycisku, którego skutku nikt nie
+   * widział.
+   */
+  app.get<{ Params: { id: string } }>(
+    "/api/delivery/:id/zakonczenie",
+    async (req) => podgladZakonczenia(Number(req.params.id))
+  );
+
+  /**
+   * Zakończenie dostawy: braki ilościowe → wyjątki „zła ilość", nietknięte →
+   * pominięte. Bez bramki roli — to jest czynność magazyniera przy palecie,
+   * a nie orzeczenie o pracy, której nie było (tamto siedzi pod `/biuro`).
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/delivery/:id/zakoncz",
+    async (req, reply) => {
+      const r = zakonczDostawe(Number(req.params.id), userOf(req));
+      if ("error" in r) return reply.code(400).send(r);
       return r;
     }
   );
