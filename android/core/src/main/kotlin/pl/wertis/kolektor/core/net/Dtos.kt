@@ -570,6 +570,31 @@ sealed class ScanResolution {
 @Serializable
 data class ScanBody(val code: String)
 
+/** Pozycja, która przy zakończeniu dostawy stanie się wyjątkiem albo pominięciem. */
+@Serializable
+data class PozycjaZakonczenia(
+    val lineId: Long = 0,
+    val sym: String = "",
+    val nazwa: String = "",
+    val qtyDoc: Double = 0.0,
+    /** Ile odłożono; przy pozycji nietkniętej pola nie ma. */
+    val qtyDone: Double = 0.0,
+)
+
+/**
+ * Co się stanie (albo stało) przy zakończeniu dostawy.
+ *
+ * Dwie listy, bo to dwie różne rzeczy: `braki` idą do dostawcy jako wyjątek
+ * „zła ilość", `nietkniete` są tylko pominięte. Kolektor pokazuje jedno i drugie
+ * PRZED zapisem — zgłoszenie do dostawcy nie powstaje z przycisku, którego
+ * skutku nikt nie widział.
+ */
+@Serializable
+data class ZakonczenieDostawy(
+    val braki: List<PozycjaZakonczenia> = emptyList(),
+    val nietkniete: List<PozycjaZakonczenia> = emptyList(),
+)
+
 @Serializable
 data class PutawayLineBody(
     val location: String,
