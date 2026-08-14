@@ -5,6 +5,7 @@ import { autoryzuj } from "../services/auth.js";
 import {
   forceReleaseLine,
   getDelivery,
+  korygujIlosc,
   listDocuments,
   openDelivery,
   podgladZakonczenia,
@@ -93,6 +94,22 @@ export async function deliveryRoutes(app: FastifyInstance) {
       });
       // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+      return r;
+    }
+  );
+
+  /**
+   * Korekta ilości odłożonej na pozycji (0.45.0).
+   *
+   * Bez bramki roli: to poprawianie WŁASNEJ pomyłki w liczeniu, zanim faktura
+   * zostanie zamknięta — nie orzeczenie o niczym i nie zapis do Subiekta.
+   * Każda zmiana idzie do `events` z nazwiskiem i obiema liczbami.
+   */
+  app.post<{ Params: { lineId: string }; Body: { qty?: number } }>(
+    "/api/delivery/:id/lines/:lineId/korekta",
+    async (req, reply) => {
+      const r = korygujIlosc(Number(req.params.lineId), Number(req.body?.qty), userOf(req));
+      if ("error" in r) return reply.code(400).send(r);
       return r;
     }
   );
