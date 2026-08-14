@@ -1004,6 +1004,99 @@ Sprawdz "stare wywołania z -Node nadal działają (alias)" {
     }
 }
 
+# ── Tryb -Aktualizuj ────────────────────────────────────────────────────────
+#
+# Sedno tego trybu jest NEGATYWNE: chodzi o to, czego NIE robi. Testy pilnują
+# więc głównie nieobecności — bo dopisanie do tej gałęzi jednej linii, która
+# rusza konto SQL albo `wertis.env`, nie wywraca niczego przy uruchomieniu
+# i wyszłoby dopiero na produkcji, na działającej instalacji.
+
+Write-Host "Get-WertisWersja"
+
+Sprawdz "czyta wersję z package.json" {
+    $kat = Join-Path $env:TEMP ("wertis-wer-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $kat -Force | Out-Null
+    try {
+        Set-Content -Path (Join-Path $kat "package.json") -Value '{"version":"0.43.0"}' -Encoding UTF8
+        Zaloz ((Get-WertisWersja -Katalog $kat) -eq "0.43.0")
+    } finally { Remove-Item $kat -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "brak pliku daje '?', a nie wyjątek" {
+    # numer wersji jest informacją dla człowieka, nie warunkiem powodzenia —
+    # aktualizacja nie ma prawa paść na tym, że nie umie się przedstawić
+    Zaloz ((Get-WertisWersja -Katalog (Join-Path $env:TEMP "nie-ma-takiego-katalogu-wertis")) -eq "?")
+}
+
+Sprawdz "uszkodzony JSON daje '?', a nie wyjątek" {
+    $kat = Join-Path $env:TEMP ("wertis-wer2-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $kat -Force | Out-Null
+    try {
+        Set-Content -Path (Join-Path $kat "package.json") -Value "{to nie jest json" -Encoding UTF8
+        Zaloz ((Get-WertisWersja -Katalog $kat) -eq "?")
+    } finally { Remove-Item $kat -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host "-Aktualizuj: czego ta galaz NIE dotyka"
+
+$skrypt = Get-Content (Join-Path $zrodlo "wertis-instalator.ps1") -Raw
+$galaz = ""
+if ($skrypt -match '(?s)if \(\$Aktualizuj\) \{(.*?)\n\}\r?\n\r?\n# ═══ ETAP 1') {
+    $galaz = $Matches[1]
+}
+
+Sprawdz "gałąź -Aktualizuj w ogóle istnieje i daje się wyciąć" {
+    Zaloz ($galaz.Length -gt 200) "nie znalazłem ciała gałęzi -Aktualizuj"
+}
+
+# Sprawdzamy, co gałąź ROBI, a nie co o sobie pisze. Odsiewamy komentarze
+# ORAZ linie `Write-*`: i jedne, i drugie wymieniają z nazwy wszystko, czego
+# gałąź nie dotyka („Nietkniete: konto SQL i GRANT-y…"), więc szukanie tych
+# słów w surowym tekście zapalałoby się na własnej dokumentacji i na własnym
+# podsumowaniu dla człowieka. Wypisanie nazwy niczego nie zmienia.
+$galazKod = ($galaz -split "\r?\n" |
+    Where-Object { $_.TrimStart() -notmatch '^#' -and $_.TrimStart() -notmatch '^Write-' }) -join "`n"
+
+foreach ($zakazane in @(
+    "New-WertisKontoAdmina",          # konta użytkowników
+    "Publish-WertisKonfiguracja",     # wertis.env i środowisko usług
+    "Add-WertisRegulaZapory",         # zapora
+    "Register-WertisUsluga",          # rejestracja usług w NSSM
+    "Read-Tekst",                     # jakiekolwiek pytanie do człowieka
+    "Read-Host",
+    "GRANT",
+    "CREATE LOGIN",
+    "CREATE USER"
+)) {
+    Sprawdz "nie wywołuje: $zakazane" {
+        Zaloz (-not ($galazKod -match [regex]::Escape($zakazane))) `
+            "gałąź -Aktualizuj dotyka '$zakazane', a miała tylko wgrać kod"
+    }
+}
+
+Sprawdz "zatrzymuje usługi PRZED budowaniem" {
+    # `npm ci` kasuje node_modules — działający worker traciłby moduły w locie
+    $stop = $galazKod.IndexOf("Stop-Service")
+    $build = $galazKod.IndexOf("npm run build")
+    Zaloz ($stop -ge 0 -and $build -ge 0 -and $stop -lt $build) `
+        "usługi muszą stanąć przed budowaniem"
+}
+
+Sprawdz "nieudany git pull przywraca usługi" {
+    # bez tego magazyn stoi po nieudanej próbie, a nikt nie wie dlaczego
+    $poBledzie = $galaz.Substring($galaz.IndexOf("git pull nie powiódł"))
+    Zaloz ($poBledzie -match "Restart-WertisUslugi") `
+        "po nieudanym git pull usługi zostają zatrzymane bez śladu"
+}
+
+Sprawdz "nieudane budowanie ZOSTAWIA usługi zatrzymane" {
+    # stary dist z nową bazą to dwie wersje naraz — lepiej stać niż zgadywać
+    $poBledzie = $galaz.Substring($galaz.IndexOf("Budowanie nie powiodło"))
+    $doExit = $poBledzie.Substring(0, $poBledzie.IndexOf("exit 1"))
+    Zaloz (-not ($doExit -match "Restart-WertisUslugi")) `
+        "po nieudanym budowaniu usługi NIE mają wstawać"
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""

@@ -33,6 +33,12 @@
     o nic — przyjmuje odpowiedzi domyślne. Tym trybem instalator jest
     sprawdzany w CI.
 
+.PARAMETER Aktualizuj
+    SAMA AKTUALIZACJA KODU. Zatrzymuje usługi, pobiera nową wersję, buduje
+    i uruchamia z powrotem. NIE dotyka bazy aplikacji, konta SQL, ustawień
+    w wertis.env, konfiguracji Subiekta ani kont użytkowników — nie zadaje
+    też ani jednego pytania.
+
 .PARAMETER Odinstaluj
     Zdejmuje usługi, regułę zapory i katalog aplikacji. NIE rusza Subiekta,
     loginu SQL, rejestru ani Node'a z Gitem — pełna lista na końcu przebiegu.
@@ -50,6 +56,10 @@
     Instalacja pilotażowa: działa od razu, Subiekt nietknięty.
 
 .EXAMPLE
+    .\wertis-instalator.ps1 -Aktualizuj
+    Wgrywa nową wersję na działającą instalację. Baza i konta nietknięte.
+
+.EXAMPLE
     .\wertis-instalator.ps1 -Odinstaluj -DryRun
     Wypisuje, co zniknęłoby przy deinstalacji. Niczego nie usuwa.
 #>
@@ -63,7 +73,8 @@ param(
     [switch]$TylkoKonfiguracja,
     [switch]$DryRun,
     [switch]$Odinstaluj,
-    [switch]$UsunDane
+    [switch]$UsunDane,
+    [switch]$Aktualizuj
 )
 
 $ErrorActionPreference = "Stop"
@@ -176,6 +187,98 @@ if ($Odinstaluj) {
     Write-Host ""
     Write-Info "Pełny opis: docs/wdrozenie.md, sekcja 'Jak odinstalować'."
     Write-Host ""
+    exit 0
+}
+
+# ═══ AKTUALIZACJA ════════════════════════════════════════════════════════════
+#
+# Osobna gałąź kończąca się `exit 0`, tak samo jak deinstalacja — i z tego
+# samego powodu: przeplecenie jej z etapami instalacji jest jedyną drogą do
+# tego, żeby aktualizacja ruszyła coś, czego ruszać nie miała.
+#
+# Pełny przebieg instalatora AKTUALIZUJE kod (git pull wyżej), ale robi przy
+# tym jeszcze siedem rzeczy: pyta o Subiekta, przelicza magazyny, sprawdza pole
+# lokalizacji, zakłada konto SQL, nadaje GRANT-y, przepisuje wertis.env i pyta
+# o konto administratora. Na działającej instalacji to jest siedem okazji do
+# zmiany czegoś, co działa — i siedem pytań do człowieka, który chciał tylko
+# wgrać nową wersję.
+#
+# CZEGO TA GAŁĄŹ NIE ROBI, wprost: nie tyka bazy aplikacji (`server\data`),
+# konta SQL ani GRANT-ów, `wertis.env`, kont użytkowników, reguły zapory
+# i rejestracji usług w NSSM. Wszystko to już istnieje — instalacja, której
+# się nie stawia od nowa, nie potrzebuje niczego z tej listy.
+#
+# Usługi stoją przez CAŁY czas budowania, a nie tylko przy podmianie plików.
+# `npm ci` kasuje `node_modules`, więc działający worker traciłby moduły
+# w locie: objawem byłby proces, który padł „bez powodu" w połowie aktualizacji.
+
+if ($Aktualizuj) {
+    Write-Naglowek "WERTIS - aktualizacja"
+
+    if (-not (Test-Path (Join-Path $Katalog ".git"))) {
+        Write-Blad "W $Katalog nie ma repozytorium WERTIS."
+        Write-Info "Aktualizacja działa na ISTNIEJĄCEJ instalacji. Do pierwszej instalacji uruchom instalator bez -Aktualizuj."
+        exit 1
+    }
+
+    $wersjaPrzed = Get-WertisWersja -Katalog $Katalog
+
+    Write-Krok "Zatrzymanie usług"
+    if (-not (Test-DryRun "Zatrzymałbym wertis-api i wertis-worker.")) {
+        foreach ($u in @("wertis-api", "wertis-worker")) {
+            $s = Get-Service -Name $u -ErrorAction SilentlyContinue
+            if ($s) { Stop-Service -Name $u -Force -ErrorAction SilentlyContinue }
+        }
+        Write-Ok "Usługi zatrzymane."
+    }
+
+    Write-Krok "Pobranie nowej wersji"
+    if (-not (Test-DryRun "Zaktualizowałbym repozytorium (git pull).")) {
+        Push-Location $Katalog
+        & git pull --ff-only origin $Galaz
+        $kod = $LASTEXITCODE
+        Pop-Location
+        if ($kod -ne 0) {
+            Write-Blad "git pull nie powiódł się (kod $kod)."
+            Write-Info "Najczęstsza przyczyna: lokalne zmiany w $Katalog albo rozjazd z gałęzią $Galaz."
+            # Usługi zostały zatrzymane — bez tego magazyn stoi, a nikt nie wie
+            # dlaczego. Wracamy do stanu sprzed próby, zanim zgłosimy błąd.
+            Write-Info "Przywracam usługi na POPRZEDNIEJ wersji."
+            Restart-WertisUslugi
+            exit 1
+        }
+        Write-Ok "Kod pobrany."
+    }
+
+    Write-Krok "Budowanie"
+    if (-not (Test-DryRun "Uruchomiłbym npm ci i npm run build w $Katalog.")) {
+        Push-Location $Katalog
+        & npm ci
+        $kodCi = $LASTEXITCODE
+        if ($kodCi -eq 0) { & npm run build; $kodCi = $LASTEXITCODE }
+        Pop-Location
+        if ($kodCi -ne 0) {
+            Write-Blad "Budowanie nie powiodło się (kod $kodCi)."
+            Write-Info "Kod jest już nowy, ale nie zbudowany - usługi zostają zatrzymane CELOWO."
+            Write-Info "Uruchomienie starego dist z nowym server\data mieszałoby dwie wersje."
+            Write-Info "Napraw przyczynę i powtórz: .\wertis-instalator.ps1 -Aktualizuj"
+            exit 1
+        }
+        Write-Ok "Aplikacja zbudowana."
+    }
+
+    Write-Krok "Uruchamianie usług"
+    Restart-WertisUslugi
+    $health = Test-WertisHealth -Port $Port
+
+    $wersjaPo = Get-WertisWersja -Katalog $Katalog
+    Write-Naglowek "Aktualizacja zakonczona"
+    Write-Info "Wersja: $wersjaPrzed -> $wersjaPo"
+    Write-Info "Nietkniete: baza aplikacji, konto SQL i GRANT-y, wertis.env, konta uzytkownikow."
+    if (-not $health -and -not $DryRun) {
+        Write-Uwaga "API nie odpowiedziało - sprawdź dziennik usługi wertis-api."
+        exit 1
+    }
     exit 0
 }
 

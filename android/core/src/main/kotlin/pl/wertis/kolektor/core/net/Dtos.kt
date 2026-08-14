@@ -515,6 +515,8 @@ data class DeliveryView(
     val nrPrzesylki: String? = null,
     /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
     val kurierProtokol: String? = null,
+    /** Notatki biura; bez odpowiedzi blokują domknięcie dostawy. */
+    val notatki: List<NotatkaDostawy> = emptyList(),
     /**
      * Magazyn skutku, gdy NIE jest halą. `null` znaczy „nie ma czego
      * przesuwać" — kolektor nie musi wtedy znać identyfikatorów z konfiguracji.
@@ -570,6 +572,23 @@ sealed class ScanResolution {
 @Serializable
 data class ScanBody(val code: String)
 
+/**
+ * Notatka biura do dostawy (0.43.0).
+ *
+ * `odpowiedz == null` znaczy „czeka" — i to jest jedyny stan, który blokuje
+ * domknięcie dostawy. Reguła siedzi na serwerze; kolektor rysuje i pyta.
+ */
+@Serializable
+data class NotatkaDostawy(
+    val id: Long = 0,
+    val tresc: String = "",
+    val createdAt: String = "",
+    val createdBy: String = "",
+    val odpowiedz: String? = null,
+    val odpAt: String? = null,
+    val odpBy: String? = null,
+)
+
 /** Pozycja, która przy zakończeniu dostawy stanie się wyjątkiem albo pominięciem. */
 @Serializable
 data class PozycjaZakonczenia(
@@ -594,6 +613,10 @@ data class ZakonczenieDostawy(
     val braki: List<PozycjaZakonczenia> = emptyList(),
     val nietkniete: List<PozycjaZakonczenia> = emptyList(),
 )
+
+/** Odpowiedź na notatkę biura. Pusta nie przechodzi — serwer odmawia. */
+@Serializable
+data class OdpowiedzBody(val odpowiedz: String)
 
 @Serializable
 data class PutawayLineBody(

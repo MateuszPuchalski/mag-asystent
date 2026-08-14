@@ -9,6 +9,32 @@ Robi to, co [`DEPLOY.md`](../DEPLOY.md) każe zrobić ręcznie. **Tamta instrukc
 zostaje i jest referencją tego katalogu.** Gdy instalator zawiedzie w połowie,
 ręczna droga nadal działa. Każdy krok da się dokończyć z palca.
 
+## Sama aktualizacja, bez ruszania bazy
+
+```powershell
+.\wertis-instalator.ps1 -Aktualizuj
+```
+
+Zatrzymuje usługi, pobiera nową wersję, buduje i uruchamia z powrotem.
+**Nie zadaje ani jednego pytania.**
+
+Nie dotyka: bazy aplikacji (`server\data`), konta SQL ani GRANT-ów,
+`wertis.env`, konfiguracji Subiekta, kont użytkowników, reguły zapory
+i rejestracji usług w NSSM.
+
+> **Dlaczego osobny tryb.** Pełny przebieg instalatora też aktualizuje kod.
+> Robi przy tym jednak jeszcze siedem innych rzeczy. Pyta o Subiekta, przelicza
+> magazyny, sprawdza pole lokalizacji, zakłada konto SQL, nadaje GRANT-y,
+> przepisuje `wertis.env` i pyta o konto administratora. Na działającej
+> instalacji to jest siedem okazji do zmiany czegoś, co działa.
+
+Usługi stoją przez **cały** czas budowania, nie tylko przy podmianie plików:
+`npm ci` kasuje `node_modules`, więc działający worker traciłby moduły w locie.
+
+Gdy `git pull` się nie uda, usługi **wracają** na poprzedniej wersji. Gdy nie
+uda się budowanie, zostają **zatrzymane celowo** — stary `dist` z nową bazą
+mieszałby dwie wersje.
+
 ## Uruchomienie
 
 Pobierz `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)

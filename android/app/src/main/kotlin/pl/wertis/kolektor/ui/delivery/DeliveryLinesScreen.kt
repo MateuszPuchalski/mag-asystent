@@ -68,6 +68,8 @@ import pl.wertis.kolektor.core.net.EanCandidate
 import pl.wertis.kolektor.core.net.LocApplyAction
 import pl.wertis.kolektor.core.net.PutawayLineBody
 import pl.wertis.kolektor.core.net.ScanBody
+import pl.wertis.kolektor.core.net.NotatkaDostawy
+import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.problem.ProblemType
@@ -137,6 +139,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
     // reguła walidacji kodu półki — do ręcznego wpisu przy zniszczonej etykiecie
     val locInfo by produceState(graph.locationsRepo.cached()) { value = graph.locationsRepo.get() }
+
+    /** Notatka, na którą właśnie odpowiadamy — `null` = arkusz zamknięty. */
+    var notatkaOtwarta by remember(id) { mutableStateOf<NotatkaDostawy?>(null) }
 
     /** Otwarte podsumowanie zakończenia — `null` = arkusz zamknięty. */
     var zakonczenie by remember(id) { mutableStateOf<ZakonczenieDostawy?>(null) }
@@ -513,6 +518,14 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                    prawdziwe (serwer dalej tak sortuje), ale opisywało coś, po
                    czym nikt nie pracuje: pozycje bierze się z kartonu w takiej
                    kolejności, w jakiej wpadną w rękę, i skanuje. */
+                /* Notatki biura STOJĄ NA GÓRZE, przed podpowiedzią o skanie.
+                   Pytanie „czy dosłali brakujące 3 sztuki" trzeba przeczytać
+                   ZANIM się zacznie, bo odpowiedź bierze się z oglądania
+                   palety — a nie z pamięci pół godziny później. */
+                v.notatki.forEach { n ->
+                    NotatkaCard(n) { notatkaOtwarta = n }
+                }
+
                 Text(
                     "Zeskanuj towar z palety — w dowolnej kolejności",
                     fontSize = 12.sp,
@@ -664,6 +677,31 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        wprost na hali — czyli dla kontenerów z MGP. Po fakturze krajowej nie ma
        czego przesuwać, więc przycisku po prostu nie ma. */
     przesunFor?.let { linia ->
+    notatkaOtwarta?.let { n ->
+        OdpowiedzSheet(
+            notatka = n,
+            busy = busy,
+            onCancel = { notatkaOtwarta = null },
+            onWyslij = { tekst ->
+                scope.launch {
+                    if (busy) return@launch
+                    busy = true
+                    try {
+                        apiCall { graph.api.deliveryOdpowiedzNotatka(n.id, OdpowiedzBody(tekst)) }
+                        notatkaOtwarta = null
+                        graph.feedback.zapis()
+                        reload++
+                    } catch (e: Exception) {
+                        graph.feedback.beep(false)
+                        graph.effects.toast(e.message ?: "Nie udało się zapisać odpowiedzi")
+                    } finally {
+                        busy = false
+                    }
+                }
+            },
+        )
+    }
+
     /* Arkusz zakończenia: pokazuje, co powstanie, i dopiero potem zapisuje. */
     zakonczenie?.let { z ->
         ZakonczenieSheet(
@@ -1409,6 +1447,110 @@ private fun ZakonczenieSheet(
                 onClick = onPotwierdz,
             )
             OutlineButton("WRÓĆ DO POZYCJI", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+        }
+    }
+}
+
+/**
+ * Notatka biura na liście rozkładania.
+ *
+ * Nieodpowiedziana jest bursztynowa i klikalna — to ona trzyma dostawę otwartą
+ * i jest jedynym powodem, dla którego „ZAKOŃCZ DOSTAWĘ" odmówi. Odpowiedziana
+ * gaśnie do szarości i zostaje: rozmowa jest częścią historii dostawy, a nie
+ * powiadomieniem do odhaczenia.
+ */
+@Composable
+private fun NotatkaCard(n: NotatkaDostawy, onOdpowiedz: () -> Unit) {
+    val czeka = n.odpowiedz == null
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(
+                background = if (czeka) AmberBgSoft else CardWhite,
+                borderColor = if (czeka) AmberLine else CardBorder,
+            )
+            .then(if (czeka) Modifier.clickable(onClick = onOdpowiedz) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                WIcons.Alert,
+                null,
+                tint = if (czeka) AmberInk else InkMute,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                if (czeka) "NOTATKA BIURA · ODPOWIEDZ" else "NOTATKA BIURA",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.1.sp,
+                color = if (czeka) AmberInk else InkMute,
+            )
+        }
+        Text(n.tresc, fontSize = 14.sp, color = Ink)
+        Text("${n.createdBy} · ${n.createdAt.take(10)}", fontSize = 11.sp, color = InkMute)
+        n.odpowiedz?.let { o ->
+            Text("Odpowiedź: $o", fontSize = 13.sp, color = InkSoft)
+            Text("${n.odpBy.orEmpty()}", fontSize = 11.sp, color = InkMute)
+        }
+        if (czeka) {
+            Text(
+                "Dostawy nie da się zamknąć bez odpowiedzi.",
+                fontSize = 11.sp,
+                color = AmberInk,
+            )
+        }
+    }
+}
+
+/** Odpowiedź na notatkę — jedno pole, bo pytanie jest jedno. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OdpowiedzSheet(
+    notatka: NotatkaDostawy,
+    busy: Boolean,
+    onCancel: () -> Unit,
+    onWyslij: (String) -> Unit,
+) {
+    var tekst by remember(notatka.id) { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onCancel, containerColor = Paper) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "ODPOWIEDŹ NA NOTATKĘ",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = Ink,
+            )
+            // pytanie zostaje na ekranie razem z polem — odpowiada się NA COŚ,
+            // a przewijanie w górę po treść kosztuje przy palecie więcej niż tutaj
+            Text(notatka.tresc, fontSize = 14.sp, color = Ink)
+            Text("${notatka.createdBy} · ${notatka.createdAt.take(10)}", fontSize = 11.sp, color = InkMute)
+
+            WertisTextField(
+                value = tekst,
+                onValueChange = { tekst = it },
+                placeholder = "np. Dosłali, były w drugim kartonie",
+            )
+            Text(
+                "Odpowiedzi nie da się później podmienić — nowe ustalenie to nowa notatka.",
+                fontSize = 11.sp,
+                color = InkMute,
+            )
+            PrimaryButton(
+                "ZAPISZ ODPOWIEDŹ",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy && tekst.isNotBlank(),
+                onClick = { onWyslij(tekst) },
+            )
+            OutlineButton("WRÓĆ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
         }
     }
 }

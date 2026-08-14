@@ -1,4 +1,5 @@
 import { db } from "../db/db.js";
+import { notatkiDokumentu, type Notatka } from "./notatki.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import {
@@ -74,6 +75,8 @@ export interface PodgladDokumentu {
    * kliknięcie dalej.
    */
   zamkniecie: { kto: string; at: string; powod: string } | null;
+  /** Notatki biura do tego dokumentu — panel pokazuje je razem z pozycjami. */
+  notatki: Notatka[];
   /**
    * `snapshot` — to, co widzi kolektor. `podglad` — to, co zobaczy po otwarciu.
    *
@@ -144,6 +147,7 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
     wBuforze: !!doc.w_buforze,
     wPrzyjeciach: doc.mag_id !== config.magId.MAG,
     status: d?.status ?? null,
+    notatki: notatkiDokumentu(dokId),
     zamkniecie:
       d && d.status === "external"
         ? { kto: d.closed_by, at: d.closed_at, powod: d.powod }

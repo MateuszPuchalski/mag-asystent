@@ -167,6 +167,16 @@ przed którą ta pozycja broni.
 - [ ] pozycja odłożona częściowo trafia do zgłoszeń „zła ilość",
 - [ ] pozycja nietknięta jest POMINIĘTA i NIE trafia do dostawcy.
 
+**Notatki biura**
+
+- [ ] notatka dodana w `/biuro` pojawia się na GÓRZE ekranu rozkładania,
+- [ ] nieodpowiedziana jest bursztynowa i klikalna,
+- [ ] „ZAKOŃCZ DOSTAWĘ" odmawia i CYTUJE treść notatki,
+- [ ] odłożenie ostatniej pozycji też NIE domyka dostawy (regresja: bramka
+      musi stać w `closeIfComplete`, nie tylko przy przycisku),
+- [ ] po odpowiedzi dostawa domyka się normalnie,
+- [ ] odpowiedź widać w `/biuro` z nazwiskiem i czasem.
+
 **W dostawie, nierozłożone**
 
 - [ ] towar z nierozłożonej dostawy ma na karcie amber linię z numerem

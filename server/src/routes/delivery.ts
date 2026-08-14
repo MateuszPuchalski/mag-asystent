@@ -13,6 +13,7 @@ import {
   resolveScan,
   zakonczDostawe,
 } from "../services/delivery.js";
+import { odpowiedzNaNotatke } from "../services/notatki.js";
 import type { LocApplyAction } from "../types.js";
 
 /* ── Rozkładanie faktur zakupu (redesign v2.0) ───────────────────────────────
@@ -92,6 +93,26 @@ export async function deliveryRoutes(app: FastifyInstance) {
       });
       // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
       if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+      return r;
+    }
+  );
+
+  /**
+   * Odpowiedź na notatkę biura — jedyna droga zdjęcia blokady z dostawy.
+   *
+   * Siedzi przy trasach kolektora, bo odpowiada CZŁOWIEK PRZY PALECIE: to on
+   * sprawdza, czy dosłali. Biuro pyta, hala odpowiada — i dlatego pisanie
+   * notatki jest pod `/api/biuro`, a odpowiadanie tutaj.
+   */
+  app.post<{ Params: { noteId: string }; Body: { odpowiedz?: string } }>(
+    "/api/delivery/notatki/:noteId/odpowiedz",
+    async (req, reply) => {
+      const r = odpowiedzNaNotatke(
+        Number(req.params.noteId),
+        req.body?.odpowiedz ?? "",
+        userOf(req)
+      );
+      if ("error" in r) return reply.code(400).send(r);
       return r;
     }
   );

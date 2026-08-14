@@ -591,6 +591,31 @@ function Restart-WertisUslugi {
     }
 }
 
+function Get-WertisWersja {
+    <#
+    .SYNOPSIS
+        Numer wersji z package.json w korzeniu repo.
+    .DESCRIPTION
+        Aktualizacja bez podania „z czego na co" nie mówi, czy w ogóle się
+        odbyła — a to jest pierwsze pytanie po jej zakończeniu. Czytamy JEDYNE
+        miejsce, w którym numer stoi (CHANGELOG.md, preambuła).
+
+        Brak pliku albo niepoprawny JSON zwraca "?" zamiast rzucać: numer jest
+        informacją dla człowieka, a nie warunkiem powodzenia aktualizacji.
+    #>
+    param([Parameter(Mandatory)][string]$Katalog)
+
+    $plik = Join-Path $Katalog "package.json"
+    if (-not (Test-Path $plik)) { return "?" }
+    try {
+        $json = Get-Content $plik -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($json.version) { return [string]$json.version }
+        return "?"
+    } catch {
+        return "?"
+    }
+}
+
 function Test-WertisHealth {
     <#
         .SYNOPSIS
