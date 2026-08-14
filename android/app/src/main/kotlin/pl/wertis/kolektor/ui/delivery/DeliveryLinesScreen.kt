@@ -673,10 +673,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         }
     }
 
-    /* Przesunięcie stanu ma sens tylko dla dostaw, które NIE zaksięgowały się
-       wprost na hali — czyli dla kontenerów z MGP. Po fakturze krajowej nie ma
-       czego przesuwać, więc przycisku po prostu nie ma. */
-    przesunFor?.let { linia ->
     notatkaOtwarta?.let { n ->
         OdpowiedzSheet(
             notatka = n,
@@ -731,6 +727,10 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         )
     }
 
+    /* Przesunięcie stanu ma sens tylko dla dostaw, które NIE zaksięgowały się
+       wprost na hali — czyli dla kontenerów z MGP. Po fakturze krajowej nie ma
+       czego przesuwać, więc przycisku po prostu nie ma. */
+    przesunFor?.let { linia ->
         PrzesuniecieSheet(
             graph = graph,
             twId = linia.twId,
