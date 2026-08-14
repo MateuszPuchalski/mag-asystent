@@ -223,13 +223,21 @@ if ($Aktualizuj) {
 
     $wersjaPrzed = Get-WertisWersja -Katalog $Katalog
 
+    # Ta sama trójka co w `Restart-WertisUslugi`, i to nie jest kosmetyka.
+    # Pierwsza wersja zatrzymywała dwie usługi, a uruchamiała trzy: `wertis-sfera`
+    # przechodziła całą aktualizację na chodzie. Nie jest procesem Node, więc
+    # `npm ci` jej nie dotyka — ale pisze do SQLite przez kolejkę zadań MM,
+    # a aktualizacja bywa zmianą SCHEMATU tej bazy. Zapis w trakcie migracji to
+    # najgorszy moment, jaki można wybrać. Nieobecna usługa (wdrożenie bez Sfery)
+    # jest normą i przechodzi bez słowa — dokładnie jak przy restarcie.
+    $doZatrzymania = @("wertis-api", "wertis-worker", "wertis-sfera")
     Write-Krok "Zatrzymanie usług"
-    if (-not (Test-DryRun "Zatrzymałbym wertis-api i wertis-worker.")) {
-        foreach ($u in @("wertis-api", "wertis-worker")) {
-            $s = Get-Service -Name $u -ErrorAction SilentlyContinue
-            if ($s) { Stop-Service -Name $u -Force -ErrorAction SilentlyContinue }
+    if (-not (Test-DryRun "Zatrzymałbym usługi: $($doZatrzymania -join ', ').")) {
+        foreach ($u in $doZatrzymania) {
+            if ($null -eq (Get-Service -Name $u -ErrorAction SilentlyContinue)) { continue }
+            Stop-Service -Name $u -Force -ErrorAction SilentlyContinue
+            Write-Ok "Usługa $u zatrzymana."
         }
-        Write-Ok "Usługi zatrzymane."
     }
 
     Write-Krok "Pobranie nowej wersji"

@@ -11,12 +11,26 @@ ręczna droga nadal działa. Każdy krok da się dokończyć z palca.
 
 ## Sama aktualizacja, bez ruszania bazy
 
+W oknie **uruchomionym jako administrator**:
+
 ```powershell
-.\wertis-instalator.ps1 -Aktualizuj
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
 ```
 
 Zatrzymuje usługi, pobiera nową wersję, buduje i uruchamia z powrotem.
 **Nie zadaje ani jednego pytania.**
+
+> **`-ExecutionPolicy Bypass` nie jest ozdobnikiem.** Windows domyślnie odmawia
+> uruchamiania plików `.ps1` (`running scripts is disabled on this system`).
+> Przełącznik dotyczy **tego jednego uruchomienia** i nie zmienia polityki
+> systemu.
+
+> **Aktualizowany jest `-Katalog`, a nie katalog ze skryptem.** Domyślnie
+> `C:\wertis`. Instalator uruchomiony z klonu repo na pulpicie zaktualizuje
+> instalację w `C:\wertis`, a nie ten klon. Przy innej lokalizacji serwera
+> dopisz `-Katalog "D:\wertis"`.
+
+Podgląd bez zmieniania czegokolwiek — ten sam wiersz z `-DryRun`.
 
 Nie dotyka: bazy aplikacji (`server\data`), konta SQL ani GRANT-ów,
 `wertis.env`, konfiguracji Subiekta, kont użytkowników, reguły zapory
