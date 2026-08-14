@@ -28,6 +28,48 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.44.1 — 14 sierpnia 2026
+
+**Dotknięcie notatki nie robiło nic — i to samo dotyczyło „ZAKOŃCZ DOSTAWĘ".**
+Zgłoszenie z magazynu dotyczyło notatki; drugiej usterki nikt jeszcze nie
+zdążył zauważyć, bo siedziała w tym samym miejscu.
+
+Oba arkusze — odpowiedzi na notatkę (0.43.0) i zakończenia dostawy (0.42.0) —
+wylądowały **wewnątrz** bloku `przesunFor?.let { … }`, czyli w gałęzi, która
+rysuje arkusz przesunięcia stanu. Rysowały się więc wyłącznie wtedy, gdy
+otwarte było przesunięcie — czyli praktycznie nigdy. Dotknięcie notatki
+ustawiało stan i na tym się kończyło.
+
+Kod był przy tym **poprawną Kotlinem** i miał zbilansowane nawiasy, więc nie
+złapał go ani kompilator, ani `kt_imports_check.py`, ani bramka `build` na CI.
+Zagnieżdżenie jednego `?.let` w drugim jest legalne; złe jest tylko to, co
+z niego wynika na ekranie.
+
+Oba arkusze wróciły na poziom ekranu, obok pozostałych.
+
+**Faktura z kompletem zeskanowanych pozycji świeciła na zielono**, choć nikt
+jej nie zamknął — drugie zgłoszenie z magazynu, i to następstwo notatek.
+
+Do 0.43.0 komplet rozstrzygniętych pozycji ZNACZYŁ ukończenie, bo dostawa
+zamykała się sama w tej samej sekundzie; równość była prawdziwa. Notatka bez
+odpowiedzi ją zerwała: pozycje zrobione, faktura otwarta — i lista mówiła
+„zrobione" o czymś, co czeka na człowieka.
+
+Doszedł więc czwarty stan: **DO ZAMKNIĘCIA**. Bursztynowy jak „w toku", bo tak
+samo czeka, z osobną etykietą na wierszu — bez niej człowiek wchodzi w dostawę,
+widzi same odhaczone pozycje i wychodzi. Zielony zostaje wyłącznie dla dostawy
+naprawdę zamkniętej (`status = done`). W kolejności listy stoi zaraz za pracą
+zaczętą: jeden ruch od końca.
+
+Jedna nazwa na dwie przyczyny — czeka notatka albo nikt nie nacisnął ZAKOŃCZ —
+bo czynność jest ta sama: wejdź i dokończ.
+
+**[wymaga działania]** Nic po stronie serwera — obie poprawki są wyłącznie
+w kolektorze i wchodzą z **nowym APK**. Do tego czasu na notatkę nie da się
+odpowiedzieć, więc dostawa z notatką się nie domknie.
+
+---
+
 ## 0.44.0 — 14 sierpnia 2026
 
 **Instalator dostaje tryb samej aktualizacji: `-Aktualizuj`.** Zatrzymuje
