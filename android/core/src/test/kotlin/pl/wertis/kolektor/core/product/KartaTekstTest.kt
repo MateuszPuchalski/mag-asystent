@@ -10,6 +10,7 @@ import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.net.Zamienniki
 import pl.wertis.kolektor.core.net.ZamowioneUDostawcy
+import pl.wertis.kolektor.core.net.ZlotaStrefa
 import java.time.ZoneId
 
 class KartaTekstTest {
@@ -65,6 +66,20 @@ class KartaTekstTest {
     @Test fun `zamowienie - bez dostawcy konczy sie na terminie`() {
         val z = ZamowioneUDostawcy(termin = "04.08", ilosc = 1.0)
         assertEquals("Zamówione 1 szt — 04.08", liniaZamowione(z, "szt"))
+    }
+
+    @Test fun `zlota strefa - czestosc PRZED poleceniem, poziomy w nawiasie`() {
+        // częstość jest argumentem — „przenieś" bez niej brzmiałoby jak rozkaz
+        val z = ZlotaStrefa(zbiorekNaDzien = 12.0, poziomy = "2 albo 3")
+        assertEquals(
+            "Zbierany 12×/dzień — przenieś do strefy złotej (poziom 2 albo 3)",
+            liniaZlotaStrefa(z),
+        )
+    }
+
+    @Test fun `zlota strefa - bez poziomow nie ma pustego nawiasu`() {
+        val z = ZlotaStrefa(zbiorekNaDzien = 3.5, poziomy = "")
+        assertEquals("Zbierany 3.5×/dzień — przenieś do strefy złotej", liniaZlotaStrefa(z))
     }
 
     /* ── podsumowania zwiniętych sekcji ───────────────────────────────────── */

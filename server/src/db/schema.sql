@@ -397,3 +397,33 @@ CREATE TABLE IF NOT EXISTS magazyn_widocznosc (
   at     TEXT,                      -- kiedy ukryto (do audytu)
   przez  TEXT                       -- kto ukrył
 );
+
+-- Zbiórki z systemu sprzedażowego (Sellasist) — import CSV z panelu biura,
+-- docelowo automatyczny POST z integracji. Surowe WIERSZE, nie agregaty:
+-- `koszyk_id` z eksportu jest unikalny per pozycja koszyka, więc INSERT OR
+-- IGNORE czyni import idempotentnym — nakładające się okresy i powtórne
+-- wgranie tego samego pliku niczego nie dublują. Agregaty (zbiórki na dzień,
+-- kandydaci do strefy złotej) liczą się na żądanie z indeksów niżej.
+-- Historii nie kasujemy — ta sama zasada co przy `events`.
+CREATE TABLE IF NOT EXISTS zbiorka (
+  koszyk_id  INTEGER PRIMARY KEY,
+  tw_id      INTEGER,               -- NULL = wiersz niedopasowany do kartoteki
+  symbol_csv TEXT NOT NULL,         -- co stało w pliku; diagnoza dopasowań
+  data       TEXT NOT NULL,         -- dzień zbiórki z pliku (RRRR-MM-DD)
+  ilosc      REAL NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS ix_zbiorka_tw_data ON zbiorka(tw_id, data);
+CREATE INDEX IF NOT EXISTS ix_zbiorka_data ON zbiorka(data);
+
+-- Reguły strefy złotej — edytowalne z panelu biura (0.50.0). Do tej wersji
+-- reguły były stałą w kodzie (services/strefa-zlota.ts); tamta tablica została
+-- ZIARNEM wsiewanym przy migracji, gdy tabela jest pusta. Raport reslot
+-- i adnotacja na karcie czytają te same wiersze — jedno źródło prawdy.
+-- `alejka` XOR (`regal_od`,`regal_do`): cała alejka albo zakres regałów.
+CREATE TABLE IF NOT EXISTS strefa_regula (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  alejka   TEXT,                    -- np. 'A' — cała alejka
+  regal_od TEXT,                    -- np. 'D01' — zakres włącznie
+  regal_do TEXT,
+  poziomy  TEXT NOT NULL            -- CSV numerów poziomów, np. '2,3,4'
+);

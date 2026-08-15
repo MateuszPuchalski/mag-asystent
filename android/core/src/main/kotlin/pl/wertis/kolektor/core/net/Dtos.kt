@@ -195,6 +195,20 @@ data class ProductCard(
     val zamowione: List<ZamowioneUDostawcy> = emptyList(),
     /** Zamienniki wyczytane z opisu — regułę ma serwer, kolektor tylko rysuje. */
     val zamienniki: Zamienniki = Zamienniki(),
+    /**
+     * Podpowiedź „przenieś do strefy złotej" z danych o zbiórkach. `null` =
+     * nic do zrobienia (albo starszy serwer bez tego pola). Kto i po czym to
+     * liczy — decyduje serwer; kolektor tylko rysuje linię w faktach.
+     */
+    val zlotaStrefa: ZlotaStrefa? = null,
+)
+
+/** Adnotacja przeslotowania: jak często towar jest zbierany i dokąd ma trafić. */
+@Serializable
+data class ZlotaStrefa(
+    val zbiorekNaDzien: Double = 0.0,
+    /** Poziomy strefy dla regału towaru, np. `2 albo 3`. */
+    val poziomy: String = "",
 )
 
 /** Jedna dostawa, na której ten towar przyjechał i nie został odłożony. */
