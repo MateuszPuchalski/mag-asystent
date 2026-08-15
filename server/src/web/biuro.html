@@ -123,6 +123,7 @@
     <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
     <button data-widok="nadzor">STAN SYSTEMU</button>
     <button data-widok="dziennik">DZIENNIK</button>
+    <button data-widok="analiza">ANALIZA</button>
   </nav>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
@@ -267,6 +268,68 @@
       <table id="dziennik"></table>
     </section>
   </div>
+
+  <!-- ── ANALIZA ─────────────────────────────────────────────────────────── -->
+  <div id="widokAnaliza" hidden style="display:grid;gap:20px">
+    <section class="card">
+      <h2>ANALIZA ŚLADU AUDYTOWEGO</h2>
+      <div class="filtry">
+        <div>
+          <label for="dniAnalizy">OKNO</label>
+          <select id="dniAnalizy">
+            <option value="7">7 dni</option>
+            <option value="30">30 dni</option>
+            <option value="90">90 dni</option>
+          </select>
+        </div>
+        <div><button class="akcja cichy" id="csvAnalizy">POBIERZ CSV</button></div>
+      </div>
+      <div class="kafle" id="kafleAnalizy"></div>
+      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+        <div>
+          <h2>OPERACJE PER DZIEŃ</h2>
+          <p class="mute" style="margin-bottom:6px">Wykonane pozycje — dni według zegara magazynu.</p>
+          <div id="wykresDni"></div>
+        </div>
+        <div>
+          <h2>ROZKŁAD PO GODZINACH</h2>
+          <p class="mute" style="margin-bottom:6px">O której naprawdę jest szczyt.</p>
+          <div id="wykresGodzin"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>WYDAJNOŚĆ PER OSOBA</h2>
+      <p class="mute" id="podstawaPrawna" style="margin-bottom:10px"></p>
+      <p class="mute" style="margin-bottom:10px">
+        Zgłoszone problemy to osobna kolumna i <b>nie są miarą błędu</b> —
+        zgłoszenie wyjątku jest pracą wykonaną dobrze, nie wpadką.
+      </p>
+      <table id="wydajnosc"></table>
+    </section>
+
+    <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+      <section class="card">
+        <h2>NAJCZĘŚCIEJ SZUKANE</h2>
+        <table id="szukaneTop"></table>
+      </section>
+      <section class="card">
+        <h2>SZUKANE BEZ WYNIKU</h2>
+        <p class="mute" style="margin-bottom:6px">
+          Towary, których ludzie szukają, a kartoteka ich nie zna — najtańsza
+          lista braków.
+        </p>
+        <table id="szukaneBrak"></table>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>URZĄDZENIA</h2>
+      <p class="mute" style="margin-bottom:6px">Upadki, baterie i odrzucone operacje — per kolektor, nie per osoba.</p>
+      <table id="urzadzenia"></table>
+    </section>
+  </div>
 </main>
 
 <script>
@@ -280,10 +343,12 @@
    jej nie zmieniają: przycisk „PONÓW" w biurze znaczyłby zapis do Subiekta
    wykonany przez osobę, która nie stoi przy półce.
 
-   Raportu wydajności per osoba TU NIE MA i to jest decyzja, nie przeoczenie.
-   `GET /api/wydajnosc` istnieje, ale jest monitoringiem pracowniczym w rozumieniu
-   Kodeksu pracy — wymaga zapisu w regulaminie i uprzedzenia ludzi. Wystawienie
-   go jednym kliknięciem obok metryk zrobiłoby z obowiązku formalnego przypadek. */
+   Raport wydajności per osoba JEST na zakładce ANALIZA — od 0.48.0, decyzją
+   właściciela ODWRACAJĄCĄ wcześniejszą (do 0.47.x strona celowo go nie miała).
+   To monitoring pracowniczy w rozumieniu Kodeksu pracy: wymaga zapisu
+   w regulaminie/obwieszczeniu i uprzedzenia załogi na 2 tygodnie przed użyciem
+   kadrowym. Dlatego podstawa prawna stoi NAD tabelą, na stałe, bez zwijania —
+   a serwer wysyła ją w odpowiedzi, żeby nie dała się pominąć. */
 const $ = (id) => document.getElementById(id);
 /* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
    słownika — trzecią obok serwera i kolektora, jedyną bez testu. Dopisanie
@@ -365,11 +430,13 @@ function pokaz(nowy) {
   $("widokDostawy").hidden = nowy !== "dostawy";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
+  $("widokAnaliza").hidden = nowy !== "analiza";
   for (const b of document.querySelectorAll("nav.zakladki button")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
+  if (nowy === "analiza") odswiezAnalize();
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -739,6 +806,106 @@ function rysujMetryki(m) {
     (m.towaryBezCzytelnegoKodu.map((t) =>
       `<tr><td class="b">${esc(t.code)}</td><td>${t.reczne}×</td></tr>`).join("") ||
       '<tr><td colspan="2" class="mute">Brak kartotek wpisywanych z ręki</td></tr>');
+}
+
+/* ── Analiza ──────────────────────────────────────────────────────────────────
+   Wykresy to inline SVG składane tutaj — strona ma zero zależności i zero
+   builda, a dwa słupkowe wykresy jednej serii nie uzasadniają biblioteki.
+   Jedna seria = bez legendy (nazwę niesie nagłówek sekcji); wartości nie
+   siedzą na każdym słupku, tylko na najwyższym; resztę mówi dymek `title`.  */
+
+/**
+ * Słupki jednej serii. `etykietaCo` przerzedza podpisy osi — przy 90 dniach
+ * podpis pod każdym słupkiem byłby nieczytelną kaszą.
+ */
+function slupkiSvg(dane, etykietaCo) {
+  const W = 560, H = 150, DOL = 22, GORA = 14;
+  if (!dane.length) return '<p class="mute">Brak danych w tym oknie.</p>';
+  const max = Math.max(...dane.map((d) => d.ile), 1);
+  const najlepszy = dane.findIndex((d) => d.ile === max);
+  const krok = W / dane.length;
+  const szer = Math.max(2, Math.min(26, krok - 2)); // 2px odstępu między słupkami
+  const czesci = dane.map((d, i) => {
+    const h = Math.round(((H - DOL - GORA) * d.ile) / max);
+    const x = (i * krok + (krok - szer) / 2).toFixed(1);
+    const y = H - DOL - h;
+    // zaokrąglone TYLKO końce danych: słupek zakotwiczony w osi, rx u góry
+    const r = Math.min(2, szer / 2, h);
+    const slupek = h === 0 ? "" :
+      `<path d="M${x} ${H - DOL} v${-(h - r)} q0 ${-r} ${r} ${-r} h${(szer - 2 * r).toFixed(1)} q${r} 0 ${r} ${r} v${h - r} z"
+         fill="var(--amber)"><title>${esc(d.tytul)}: ${d.ile}</title></path>`;
+    const podpis = i % etykietaCo === 0 ?
+      `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle"
+         font-size="10" fill="var(--ink-mute)">${esc(d.podpis)}</text>` : "";
+    const wartosc = i === najlepszy && max > 0 ?
+      `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${y - 3}" text-anchor="middle"
+         font-size="10" font-weight="700" fill="var(--ink-soft)">${max}</text>` : "";
+    return slupek + podpis + wartosc;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img">
+    <line x1="0" y1="${H - DOL}" x2="${W}" y2="${H - DOL}" stroke="var(--border)" stroke-width="1"/>
+    ${czesci.join("")}
+  </svg>`;
+}
+
+function rysujAnalize(a) {
+  const r = a.rytm;
+  $("kafleAnalizy").innerHTML = [
+    kafel(a.dni.reduce((s, d) => s + d.pozycje, 0), `pozycji w oknie ${a.days} dni`, false),
+    kafel(r.dostawZamknietych, "dostaw rozłożonych", false),
+    kafel(r.medianaMinutDostawy != null ? r.medianaMinutDostawy + " min" : "—",
+      "mediana czasu dostawy", false),
+    kafel(r.problemyOtwarte, "problemów czeka na biuro", r.problemyOtwarte > 0),
+  ].join("");
+
+  $("wykresDni").innerHTML = slupkiSvg(
+    a.dni.map((d) => ({ ile: d.pozycje, podpis: d.data.slice(5), tytul: d.data })),
+    a.days > 30 ? 14 : a.days > 7 ? 7 : 1
+  );
+  $("wykresGodzin").innerHTML = slupkiSvg(
+    a.godziny.map((ile, g) => ({ ile, podpis: String(g), tytul: `godzina ${g}:00` })),
+    3
+  );
+
+  const w = a.wydajnosc;
+  $("podstawaPrawna").textContent = w.podstawaPrawna;
+  $("wydajnosc").innerHTML =
+    "<tr><th>OSOBA</th><th>POZYCJE</th><th>CZAS AKTYWNY</th><th>TEMPO/H</th><th>ZGŁOSZONE PROBLEMY</th></tr>" +
+    (w.wiersze.map((o) =>
+      `<tr><td class="b">${esc(o.osoba)}</td><td>${o.pozycje}</td>
+       <td>${Math.round(o.minutyAktywne)} min</td>
+       <td>${o.wiarygodne ? o.tempo : '<span class="badge mute2">MAŁO DANYCH</span>'}</td>
+       <td>${o.zgloszoneProblemy}</td></tr>`).join("") ||
+      '<tr><td colspan="5" class="mute">Brak pracy w tym oknie</td></tr>') +
+    (w.nieprzypisanychZdarzen > 0 ?
+      `<tr><td class="mute" colspan="5">+ ${w.nieprzypisanychZdarzen} zdarzeń bez konta — nie doklejamy ich nikomu</td></tr>` : "");
+
+  const listaSzukan = (el, lista, pusto) => {
+    $(el).innerHTML =
+      "<tr><th>ZAPYTANIE</th><th>RAZY</th></tr>" +
+      (lista.map((t) => `<tr><td class="b">${esc(t.q)}</td><td>${t.ile}</td></tr>`).join("") ||
+        `<tr><td colspan="2" class="mute">${pusto}</td></tr>`);
+  };
+  listaSzukan("szukaneTop", a.szukania.top, "Nikt nic nie szukał");
+  listaSzukan("szukaneBrak", a.szukania.bezWynikow, "Wszystko, czego szukano, znajdowało się");
+
+  $("urzadzenia").innerHTML =
+    "<tr><th>URZĄDZENIE</th><th>UPADKI</th><th>NISKIE BATERIE</th><th>ODRZUCONE</th><th>ZDARZEŃ</th></tr>" +
+    (a.urzadzenia.map((u) =>
+      `<tr><td class="b">${esc(u.device)}</td>
+       <td>${u.upadki ? `<span class="badge err">${u.upadki}</span>` : 0}</td>
+       <td>${u.niskieBaterie}</td>
+       <td>${u.odrzucone ? `<span class="badge err">${u.odrzucone}</span>` : 0}</td>
+       <td>${u.zdarzen}</td></tr>`).join("") ||
+      '<tr><td colspan="5" class="mute">Brak zdarzeń z urządzeń w tym oknie</td></tr>');
+}
+
+async function odswiezAnalize() {
+  try {
+    rysujAnalize(await (await api(`/api/analiza?days=${$("dniAnalizy").value}`)).json());
+  } catch (e) {
+    $("kafleAnalizy").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
+  }
 }
 
 /* ── Kolejka ── */
@@ -1320,6 +1487,9 @@ $("stan").addEventListener("click", (e) => {
   if (b) pokaz(b.dataset.do);
 });
 $("dniMetryk").addEventListener("change", odswiezNadzor);
+$("dniAnalizy").addEventListener("change", odswiezAnalize);
+$("csvAnalizy").addEventListener("click", () =>
+  pobierz(`/api/analiza/csv?days=${$("dniAnalizy").value}`, "wertis-analiza.csv"));
 $("sprawdzRozjazdy").addEventListener("click", async () => {
   $("rozjazdy").innerHTML = '<tr><td class="mute">Liczę…</td></tr>';
   try {

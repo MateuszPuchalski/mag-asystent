@@ -100,13 +100,17 @@ patrzenie zapełniałoby listę pracy dokumentami, których nikt nie tknął. Dl
 albo pozycje z faktury tym samym helperem, którego użyje otwarcie — i mówi
 w odpowiedzi, którą z nich pokazuje.
 
-Od 0.27.0 ma trzy zakładki i pasek stanu: dostawy z reklamacjami, stan systemu
+Od 0.27.0 ma zakładki i pasek stanu: dostawy z reklamacjami, stan systemu
 (metryki, kolejka, rekoncyliacja, kolizje kodów, meldunek serwera) oraz ślad
 audytowy z filtrami. Zasada „zero zapisu" nie drgnęła — ponowienie zadania
 z kolejki zostaje na kolektorze, bo jest zapisem do bazy firmy wykonywanym
-przez osobę stojącą przy półce. Raportu wydajności per osoba strona nie
-odpytuje wcale; leży pod `GET /api/wydajnosc` i jest monitoringiem pracowniczym,
-który wymaga zapisu w regulaminie przed pierwszym użyciem.
+przez osobę stojącą przy półce.
+
+Od 0.48.0 doszła zakładka ANALIZA: operacje per dzień i per godzinę, rytm
+dostaw, najczęstsze wyszukiwania (w tym bez wyniku), zdrowie urządzeń oraz —
+decyzją właściciela ODWRACAJĄCĄ wcześniejszą — raport wydajności per osoba.
+Do 0.47.x strona celowo go nie odpytywała; teraz pokazuje go z podstawą
+prawną nad tabelą, bo obowiązek informacyjny z Kodeksu pracy nie zniknął.
 
 ---
 
