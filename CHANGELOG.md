@@ -28,6 +28,35 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.49.0 — 15 sierpnia 2026
+
+**Podmiana kodu kreskowego bez osobnego potwierdzenia.** Nadanie i zmiana idą
+jednym zatwierdzeniem — decyzja właściciela.
+
+**[wymaga działania]** Nowy APK przez MDM (arkusz kodu jest w kolektorze).
+Serwer: zwykła aktualizacja i restart; starsze APK działają dalej, bo flaga
+potwierdzenia jest nadal przyjmowana — po prostu już niczego nie bramkuje.
+
+### Co się zmienia, a co świadomie zostaje
+
+Do tej pory kartoteka z kodem dostawała przy zmianie osobny krok „Podmiana
+wymaga potwierdzenia" — po stronie serwera i w arkuszu kolektora. Oba wymogi
+są zdjęte: zapis idzie od razu.
+
+Trzy rzeczy zostają i to jest granica tej zmiany:
+
+- **Kod zajęty przez inną kartotekę to nadal twarda odmowa.** Tego nie dało
+  się i nie da przejść żadnym potwierdzeniem — dwa towary z jednym kodem
+  zatrzymują pracę w alejce, a próba zapisuje się do rejestru kolizji.
+- **Arkusz nadal pokazuje „STARY → NOWY"** z ostrzeżeniem, że kartony ze
+  starym kodem przestaną się skanować. Informacja zostaje; zniknęło tylko
+  dopytywanie.
+- **Stary kod jedzie do audytu** w każdym zapisie (`eanPrzed`) — gdyby trzeba
+  było wrócić, widać dokładnie, co stało na kartotece.
+
+Trasa nadania kodu dostała przy okazji własne testy — istniała od 0.37.0 bez
+żadnego, więc zmiana zachowania byłaby niewidzialna dla CI w obie strony.
+
 ## 0.48.0 — 15 sierpnia 2026
 
 **Zakładka ANALIZA w podglądzie biura.** Ślad audytowy zbierał wszystko od
