@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.ui.product.EanSheet
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
+import pl.wertis.kolektor.core.delivery.StatusLinii
 import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.adresWiersza
 import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
@@ -58,6 +59,7 @@ import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
+import pl.wertis.kolektor.core.net.KorektaBody
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.offline.PendingOp
 import pl.wertis.kolektor.core.offline.PutawayOp
@@ -145,6 +147,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
     /** Otwarte podsumowanie zakończenia — `null` = arkusz zamknięty. */
     var zakonczenie by remember(id) { mutableStateOf<ZakonczenieDostawy?>(null) }
+
+    /** Pozycja, której ilość odłożoną właśnie poprawiamy (0.45.0). */
+    var korektaDla by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
 
     /** Filtr listy pozycji — patrz komentarz przy `widoczne`. */
     var szukane by rememberSaveable(id) { mutableStateOf("") }
@@ -657,6 +662,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         problemOpen = true
                     },
                     onCancel = { zwolnij(line) },
+                    onKorekta = { korektaDla = line },
                     czesc = czesc,
                     onCzesc = { czesc = it },
                     onRozjazd = { action ->
@@ -719,6 +725,38 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     } catch (e: Exception) {
                         graph.feedback.beep(false)
                         graph.effects.toast(e.message ?: "Nie udało się zakończyć dostawy")
+                    } finally {
+                        busy = false
+                    }
+                }
+            },
+        )
+    }
+
+    /* Korekta ilości odłożonej. Arkusz stoi NA POZIOMIE EKRANU, nie w środku
+       innego `?.let` — zagnieżdżenie w cudzym bloku zabrało już raz widoczność
+       dwóm arkuszom naraz (0.44.1) i kompilator o tym nie powie. */
+    korektaDla?.let { linia ->
+        KorektaSheet(
+            line = linia,
+            busy = busy,
+            onCancel = { korektaDla = null },
+            onZapisz = { qty ->
+                scope.launch {
+                    if (busy) return@launch
+                    busy = true
+                    try {
+                        apiCall { graph.api.deliveryKorekta(id, linia.id, KorektaBody(qty)) }
+                        korektaDla = null
+                        // pozycja przestaje być „w rękach" — korekta kończy pracę
+                        // na niej tak samo jak odłożenie
+                        zwolnij(linia)
+                        graph.feedback.zapis()
+                        graph.effects.toast("${linia.sym} · odłożone ${formatQty(qty)} szt")
+                        reload++
+                    } catch (e: Exception) {
+                        graph.feedback.beep(false)
+                        graph.effects.toast(e.message ?: "Nie udało się poprawić ilości")
                     } finally {
                         busy = false
                     }
@@ -848,6 +886,8 @@ private fun LineRow(
     onProblem: () -> Unit,
     onQtyIssue: () -> Unit,
     onPrzesun: (() -> Unit)?,
+    /** Poprawienie liczby już odłożonych sztuk — patrz `PanelOdkladania`. */
+    onKorekta: () -> Unit,
     /** Ile sztuk z tej pozycji idzie na półkę; `null` = cała reszta. */
     czesc: Double?,
     onCzesc: (Double?) -> Unit,
@@ -1002,6 +1042,7 @@ private fun LineRow(
                     onProblem = onProblem,
                     onQtyIssue = onQtyIssue,
                     onPrzesun = onPrzesun,
+                    onKorekta = onKorekta,
                     onCancel = onCancel,
                     czesc = czesc,
                     onCzesc = onCzesc,
@@ -1085,6 +1126,8 @@ private fun PanelOdkladania(
     onQtyIssue: () -> Unit,
     /** null = dostawa księgowana wprost na halę, nie ma czego przesuwać. */
     onPrzesun: (() -> Unit)?,
+    /** Poprawienie liczby już odłożonych sztuk (0.45.0). */
+    onKorekta: () -> Unit,
     /** Ile sztuk z tej pozycji idzie na półkę; `null` = cała reszta. */
     czesc: Double?,
     onCzesc: (Double?) -> Unit,
@@ -1237,6 +1280,18 @@ private fun PanelOdkladania(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlineButton("INNA ILOŚĆ", modifier = Modifier.weight(1f), onClick = onQtyIssue)
             OutlineButton("PROBLEM", modifier = Modifier.weight(1f), danger = true, onClick = onProblem)
+        }
+        /* Poprawka WŁASNEJ pomyłki w liczeniu, nie zgłoszenie do dostawcy —
+           i dlatego stoi osobno, pod „INNĄ ILOŚCIĄ". Pozycja bez ani jednej
+           odłożonej sztuki nie ma czego poprawiać: tam drogą jest zwykłe
+           odłożenie. Przy zgłoszonym wyjątku serwer i tak odmówi, więc nie
+           dajemy przycisku, który obiecuje coś, czego nie zrobi. */
+        if (line.qtyDone > 0 && line.status != StatusLinii.PROBLEM) {
+            OutlineButton(
+                "POPRAW ILOŚĆ (${formatQty(line.qtyDone)})",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onKorekta,
+            )
         }
         /* Skrót dla kontenera: dostawa na MGP zostawia po odłożeniu adresów
            jeszcze przesunięcie stanu na halę. Bez tego przycisku trzeba by je
@@ -1549,6 +1604,93 @@ private fun OdpowiedzSheet(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy && tekst.isNotBlank(),
                 onClick = { onWyslij(tekst) },
+            )
+            OutlineButton("WRÓĆ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+        }
+    }
+}
+
+/**
+ * Korekta ilości odłożonej — poprawka pomyłki w liczeniu (0.45.0).
+ *
+ * Podaje się liczbę CAŁKOWITĄ, nie różnicę: człowiek przy palecie przelicza
+ * sztuki na półce i wie, ile ich tam leży, a nie o ile się wcześniej pomylił.
+ * Stąd suwak od zera do ilości z dokumentu, z wartością startową równą temu,
+ * co dziś stoi w systemie — poprawka zaczyna się od stanu, który się poprawia.
+ *
+ * To NIE JEST zgłoszenie do dostawcy. Zmiana zostaje w WERTIS, nie rusza
+ * Subiekta i nie tworzy wyjątku; jeśli po korekcie sztuk naprawdę brakuje,
+ * do dostawcy pojedzie to dopiero z „ZAKOŃCZ DOSTAWĘ". Zdanie o tym stoi
+ * w arkuszu, bo różnica między jednym a drugim jest tu całą stawką.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun KorektaSheet(
+    line: DeliveryLineView,
+    busy: Boolean,
+    onCancel: () -> Unit,
+    onZapisz: (Double) -> Unit,
+) {
+    var ile by remember(line.id) { mutableStateOf(line.qtyDone) }
+    ModalBottomSheet(onDismissRequest = onCancel, containerColor = Paper) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "POPRAW ODŁOŻONĄ ILOŚĆ",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = Ink,
+            )
+            Text(line.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+            Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                KrokIlosci("−", ile > 0.0) { ile = (ile - 1).coerceAtLeast(0.0) }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "${formatQty(ile)} szt",
+                        fontFamily = BarlowCond,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 32.sp,
+                        color = Ink,
+                    )
+                    Text("z ${formatQty(line.qtyDoc)} na dokumencie", fontSize = 11.sp, color = InkMute)
+                }
+                KrokIlosci("+", ile < line.qtyDoc) { ile = (ile + 1).coerceAtMost(line.qtyDoc) }
+            }
+
+            // co się stanie z pozycją po zapisie — mówimy wprost, bo status
+            // przelicza serwer i sam skok „odłożone → do zrobienia" bez
+            // uprzedzenia wygląda z hali jak skasowana praca
+            Text(
+                when {
+                    ile >= line.qtyDoc -> "Pozycja zostanie odłożona w całości."
+                    ile > 0.0 -> "Pozycja wróci na listę jako częściowo odłożona."
+                    else -> "Pozycja wróci na listę jako nieodłożona."
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AmberDark,
+            )
+            Text(
+                "Adres, pod którym towar już leży, zostaje bez zmian. To poprawka " +
+                    "liczenia w WERTIS, nie zgłoszenie do dostawcy.",
+                fontSize = 11.sp,
+                color = InkMute,
+            )
+
+            PrimaryButton(
+                "ZAPISZ ${formatQty(ile)} SZT",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy && ile != line.qtyDone,
+                onClick = { onZapisz(ile) },
             )
             OutlineButton("WRÓĆ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
         }

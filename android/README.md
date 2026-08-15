@@ -167,6 +167,18 @@ przed którą ta pozycja broni.
 - [ ] pozycja odłożona częściowo trafia do zgłoszeń „zła ilość",
 - [ ] pozycja nietknięta jest POMINIĘTA i NIE trafia do dostawcy.
 
+**Korekta ilości odłożonej**
+
+- [ ] „POPRAW ILOŚĆ (N)" jest w rozwiniętej pozycji, pod „INNĄ ILOŚCIĄ",
+- [ ] pozycja bez ani jednej odłożonej sztuki przycisku NIE ma,
+- [ ] pozycja ze zgłoszonym wyjątkiem przycisku NIE ma,
+- [ ] arkusz startuje od liczby zapisanej dziś, a **+** nie przekracza ilości
+      z dokumentu,
+- [ ] „ZAPISZ" jest wyszarzony, dopóki liczba się nie zmieni,
+- [ ] korekta w dół wraca pozycję na listę, w górę potrafi domknąć dostawę,
+- [ ] adres pozycji po korekcie do zera ZOSTAJE na miejscu,
+- [ ] korekta na dostawie już zamkniętej odmawia z czytelnym komunikatem.
+
 **Notatki biura**
 
 - [ ] notatka dodana w `/biuro` pojawia się na GÓRZE ekranu rozkładania,
