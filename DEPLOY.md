@@ -352,10 +352,6 @@ curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
   -d '{"name":"Jan Kowalski","login":"jkowalski","haslo":"tajnehaslo"}'
 
-curl -X POST http://<IP-serwera>:3001/api/users \
-  -H "x-session: $TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"Adam Nowak","role":"brygadzista","login":"anowak","haslo":"tajnehaslo"}'
-
 # konto biura — tę linię wykona TYLKO admin; biuro dostanie 403
 curl -X POST http://<IP-serwera>:3001/api/users \
   -H "x-session: $TOKEN" -H 'content-type: application/json' \
@@ -375,13 +371,12 @@ pokazuje haseł ani razu, a konto bez hasła nie zaloguje się nigdy. Nawet
 demo — wyjątek „tylko na dev" jest dokładnie tym, który jedzie potem na
 produkcję.
 
-### Cztery role i to, co je dzieli
+### Trzy role i to, co je dzieli
 
 | rola | co może ponad poprzednią |
 |---|---|
 | `magazynier` | praca na hali: skanowanie, lokalizacje, zgłoszenia |
-| `brygadzista` | zdjęcie cudzej blokady linii, odczyt śladu audytowego |
-| `biuro` | lista kont, zakładanie kont magazynierów i brygadzistów, widoczność magazynów, raport wydajności |
+| `biuro` | lista kont, zakładanie kont magazynierów, ślad audytowy, widoczność magazynów, raport wydajności, zdjęcie dostawy z listy |
 | `admin` | wszystko, co biuro, **plus** konta o roli `biuro` i `admin`, wyłączanie kont i odbieranie haseł |
 
 Granica między biurem a adminem jest jedyną nieoczywistą i dlatego ma własne
@@ -443,15 +438,15 @@ Zastrzeżone są trzy rzeczy:
 
 | operacja | kto | gdzie |
 |---|---|---|
-| odebranie koledze zajętej pozycji przed 30-min TTL | brygadzista, biuro, admin | kolektor: skan zajętego towaru → propozycja odebrania |
-| zakładanie kont magazynierów i brygadzistów | biuro, admin | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
+| zdjęcie dostawy z listy jako rozłożonej poza WERTIS | biuro, admin | przeglądarka: `/biuro` → DOSTAWY |
+| zakładanie kont magazynierów | biuro, admin | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
 | konta o roli `biuro`/`admin`, wyłączanie kont, odbieranie haseł | **tylko admin** | `curl` |
 
-Odebranie pozycji zapisuje w `events` (`lock_forced`) **komu i przez kogo**.
-Lock już wygasły zdejmuje się bez wpisu — po TTL nikomu nic nie odebrano.
+Zdjęcie dostawy z listy wymaga powodu wpisanego z ręki i zapisuje go w `events`
+razem z nazwiskiem. Cofnięcie jest jednym kliknięciem w tym samym miejscu.
 
 Zakładanie kont nie schodzi na halę, bo to jedyna operacja tworząca tożsamość.
-Brygadzista mogący zakładać konta założyłby konto biura z własnym hasłem.
+Magazynier mogący zakładać konta założyłby konto biura z własnym hasłem.
 Reszta reguł przestałaby wtedy cokolwiek znaczyć — i ten sam argument o piętro
 wyżej oddziela biuro od admina.
 

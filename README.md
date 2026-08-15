@@ -48,7 +48,7 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 |---|---|
 | Kolektor (`android/`) | Kotlin · Jetpack Compose · Retrofit · WorkManager — skan sprzętowy Zebra/Honeywell ([README](android/README.md)) |
 | Backend API (`server/`) | Node.js · Fastify 5 · TypeScript |
-| Baza aplikacji | SQLite (wbudowany `node:sqlite`, zero modułów natywnych) — kolejka, sesje, events, locki (spec §7) |
+| Baza aplikacji | SQLite (wbudowany `node:sqlite`, zero modułów natywnych) — kolejka, sesje, events (spec §7) |
 | Worker zapisu | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
 | Worker Sfery (`sfera-worker/`) | C#/.NET 8 · COM Sfery — dokumenty MM na produkcji, opcjonalny ([README](sfera-worker/README.md)) |
 
@@ -109,7 +109,7 @@ kolektor przyjął, a do bazy firmy nic nie weszło. Odrzucone żądania mają w
 typ (`http_rejected`), więc „skanowałem i się nie zapisało" też zostawia ślad.
 
 Odczyt: `GET /api/events` z filtrami oraz `GET /api/events/csv` do arkusza —
-**wymaga roli brygadzisty albo biura**, bo log mówi, kto ile zeskanował.
+**wymaga roli biura albo admina**, bo log mówi, kto ile zeskanował.
 Rozmiar historii widać w `/api/health` (`audyt`); nie czyścimy jej, bo
 reklamacja przychodzi po miesiącach. Pełny opis łańcucha, jego luk i powodów:
 [`docs/architektura.md`](docs/architektura.md) §9.
@@ -215,9 +215,9 @@ Parametry (env, dev):
   i ten sam czas odpowiedzi. Pięć nieudanych prób zamyka login na minutę.
 - **Sesja nie wygasa sama.** Trwa do wylogowania z Ustawień; bezczynność nie
   robi nic.
-- **Operacje nieodwracalne rozstrzyga ROLA.** Odebranie koledze linii przed
-  wygaśnięciem TTL jest zastrzeżone dla brygadzisty i biura; `lock_forced`
-  zapisuje komu i przez kogo.
+- **Operacje nieodwracalne rozstrzyga ROLA.** Zdjęcie dostawy z listy należy do
+  biura, a zakładanie kont biurowych do admina. Każde przejście przez bramkę
+  zostawia wpis `privileged` z nazwiskiem.
 
 Historia tych decyzji — wolny tekst, plakietki, PIN, blokada bezczynności —
 i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
@@ -372,8 +372,10 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   ustawia liczbę odłożonych sztuk na nowo, dopóki faktura jest otwarta. Zmiana
   zostaje w WERTIS: nie rusza Subiekta, nie kasuje zapisanego adresu i nie
   tworzy wyjątku. Pozycja ze zgłoszonym wyjątkiem jest poza jej zasięgiem.
-- **Kilka osób przy jednej dostawie**: lock per pozycja z TTL 30 min — drugi
-  skaner mówi, kto trzyma linię, zamiast pozwolić na podwójne odłożenie.
+- **Jedna dostawa, jedna osoba.** Blokady pozycji z TTL wyszły w 0.47.0. Nie
+  rozstrzygały tu żadnego realnego sporu, a kosztowały wiszące „zajęte przez"
+  po kolektorze odłożonym na koniec zmiany. Podwójne odłożenie widać na liście
+  („odłożono 8 z 5") i poprawia je POPRAW ILOŚĆ.
 - **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie
   **PRZED zapisem** — „przeniesiony (ZAMIEŃ)” czy „leży w obu (DODAJ)”. Z samego
   skanu tych dwóch sytuacji odróżnić się nie da, więc decyduje człowiek.
@@ -475,16 +477,16 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   > a jedna wartość na oba stany kazałaby czytać raporty odłożeń jako pracę,
   > której nikt nie wykonał.
 
-  > **Dlaczego biuro, nie brygadzista.** To jedyna operacja zdejmująca pracę
-  > z listy bez ani jednego skanu — czyli jedyny sposób, żeby „rozłożyć" całą
-  > dostawę, nie wstając z krzesła. Zdjęcie cudzego locka przekłada pracę
-  > z rąk do rąk i zostaje na hali; to ORZEKA, że pracy nie ma.
+  > **Dlaczego biuro, nie hala.** To jedyna operacja zdejmująca pracę z listy
+  > bez ani jednego skanu — czyli jedyny sposób, żeby „rozłożyć" całą dostawę,
+  > nie wstając z krzesła. ORZEKA, że pracy nie ma, więc należy do roli, która
+  > czyta protokoły rozbieżności.
 - **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
   p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
   kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów
   i meldunek serwera.
 - **DZIENNIK** — ślad audytowy z filtrami po dacie, typie, towarze i urządzeniu
-  oraz eksport CSV. Wymaga roli brygadzisty, biura albo admina; magazynier
+  oraz eksport CSV. Wymaga roli biura albo admina; magazynier
   dostaje tu odmowę zamiast danych.
 - **Kolejki się stąd nie ponawia i wydajności per osoba tu nie ma.** Pierwsze
   jest zapisem do Subiekta i zostaje na kolektorze, drugie jest monitoringiem
@@ -495,7 +497,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 184 testów jednostkowych; buduje się bez Android SDK
+                           + 183 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
@@ -510,7 +512,7 @@ server/                    backend (Fastify + SQLite + worker)
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
                            a nie leży w regale), podglad-dostawy (pozycje
                            dokumentu dla biura — sam odczyt),
-                           queue, locks, locations, events
+                           queue, locations, events
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)

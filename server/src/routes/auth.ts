@@ -95,8 +95,8 @@ export async function authRoutes(app: FastifyInstance) {
      pozwalałby założyć konto biura z własnym hasłem, a `:id/haslo` zmienić
      cudze. Jedno żądanie z sieci magazynu dałoby wtedy wszystko naraz.
 
-     Od 0.24.0 strażnik jest DWUSTOPNIOWY. Biuro zakłada halę — magazynierów
-     i brygadzistów. Konto o roli `biuro` albo `admin`, wyłączenie konta
+     Od 0.24.0 strażnik jest DWUSTOPNIOWY. Biuro zakłada halę, czyli konta
+     magazynierów. Konto o roli `biuro` albo `admin`, wyłączenie konta
      i odebranie hasła należą do admina, bo inaczej biuro nadaje uprawnienia
      samo sobie i pierwszy stopień nie znaczy nic.
 

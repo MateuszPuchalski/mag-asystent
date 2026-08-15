@@ -12,7 +12,6 @@ import pl.wertis.kolektor.core.net.MagazynyResponse
 import pl.wertis.kolektor.core.net.WidocznoscRequest
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.core.net.EanConflictsResponse
-import pl.wertis.kolektor.core.net.ForceReleaseResponse
 import pl.wertis.kolektor.core.net.HealthResponse
 import pl.wertis.kolektor.core.net.HistoryResponse
 import pl.wertis.kolektor.core.net.LoginResponse
@@ -207,15 +206,6 @@ interface ApiService {
     @POST("api/delivery/{id}/zakoncz")
     suspend fun deliveryZakoncz(@Path("id") id: Long): ZakonczenieDostawy
 
-    /** Oddanie linii po ANULUJ — bez tego wisi zajęta do wygaśnięcia TTL. */
-    @POST("api/delivery/{id}/lines/{lineId}/release")
-    suspend fun releaseLine(
-        @Path("id") id: Long,
-        @Path("lineId") lineId: Long,
-        @Body body: RequestBody = EMPTY_BODY,
-    ): OkResponse
-
-
     /* ── Faza 2: wyjątki (D8) ────────────────────────────────────────────── */
 
     /** Lista pytana przy starcie — wyjątek bez ekranu przestaje istnieć. */
@@ -248,13 +238,6 @@ interface ApiService {
     @POST("api/auth/logout")
     suspend fun authLogout(@Body body: RequestBody = EMPTY_BODY): OkResponse
 
-    /** Odebranie cudzej linii przed TTL — rozstrzyga rola z sesji. */
-    @POST("api/delivery/{id}/lines/{lineId}/force-release")
-    suspend fun forceReleaseLine(
-        @Path("id") deliveryId: Long,
-        @Path("lineId") lineId: Long,
-        @Body body: RequestBody = EMPTY_BODY,
-    ): ForceReleaseResponse
 
     /* ── Zakładanie kont z kolektora ──────────────────────────────────────
        Pierwsze konto przechodzi bez sesji, ale TYLKO przy pustej bazie;

@@ -139,13 +139,6 @@ class DtosTest {
         assertEquals("W trakcie sprawdzania", r.items[0].detail)
     }
 
-    @Test fun `ScanResolution - linia zajeta przez kogos innego`() {
-        val r = WertisJson.decodeFromString<ScanResolution>(
-            """{"kind":"locked","code":"5901234","lockedBy":"anna","sym":"W04-0103","name":"Wąż"}"""
-        )
-        assertEquals("anna", (r as ScanResolution.Locked).lockedBy)
-    }
-
     @Test fun `QueueResponse - statusy i summary`() {
         val json = """
             {"items":[

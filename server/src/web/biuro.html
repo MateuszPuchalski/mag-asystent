@@ -554,9 +554,7 @@ function wierszPozycji(l) {
       : `<span class="b">${esc(l.locActual || l.locExpected)}</span>`;
   const kto = l.doneBy
     ? `${esc(l.doneBy)}<div class="mute">${esc(stempelLokalny(l.doneAt))}</div>`
-    : l.lockedBy
-      ? `<span class="badge amber">w rękach: ${esc(l.lockedBy)}</span>`
-      : '<span class="mute">—</span>';
+    : '<span class="mute">—</span>';
   return `<tr>
     ${zdjeciaWlaczone ? `<td class="kolFoto" data-tw="${l.twId}"></td>` : ""}
     <td><span class="b">${esc(l.sym)}</span><div class="mute">${esc(l.name)}</div>

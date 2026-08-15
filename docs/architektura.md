@@ -321,18 +321,18 @@ wylogowuje. Audyt na tym nie traci, bo każda operacja i tak niesie własne
 
 ### Operacje uprzywilejowane rozstrzyga rola
 
-Trzy operacje są zastrzeżone dla ról:
+Dwie operacje są zastrzeżone dla ról:
 
-- **zdjęcie cudzej blokady linii** przed wygaśnięciem TTL (brygadzista, biuro) —
-  jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez jej wiedzy,
 - **zarządzanie kontami** — jedyna operacja tworząca *tożsamość*, dlatego
-  zastrzeżona dla roli `biuro`. Brygadzista mogący zakładać konta założyłby
+  zastrzeżona dla roli `biuro`. Człowiek z hali mogący zakładać konta założyłby
   konto biura z własnym hasłem i reszta reguł przestałaby cokolwiek znaczyć,
 - **domknięcie dostawy jako rozłożonej poza WERTIS** (`biuro`) — jedyna
-  operacja zdejmująca pracę z listy bez ani jednego skanu. Brygadzisty tu nie
-  ma świadomie: zdjęcie locka przekłada pracę z rąk do rąk i zostaje na hali,
-  a to *orzeka*, że pracy nie ma. Wymaga powodu wpisanego z ręki i zawsze idzie
-  do `events`; dostępna wyłącznie z `/biuro`, nigdy z kolektora.
+  operacja zdejmująca pracę z listy bez ani jednego skanu. Hali tu nie ma
+  świadomie: to *orzeka*, że pracy nie ma. Wymaga powodu wpisanego z ręki
+  i zawsze idzie do `events`; dostępna wyłącznie z `/biuro`, nigdy z kolektora.
+
+Trzecia — zdjęcie cudzej blokady pozycji — zniknęła w 0.47.0 razem z samymi
+blokadami i rolą brygadzisty, która istniała głównie dla niej.
 
 Drugiego czynnika nie ma. Do 0.20.0 obie wymagały PIN-u, bo plakietkę dawało
 się pożyczyć razem z tożsamością. Hasła się tak nie pożycza — ale porzucony
@@ -438,7 +438,7 @@ w odróżnieniu od zgadywania po podobieństwie.
 | Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole (czwarta, `mm_czeka`, tylko przy `SFERA_WORKER=1`); zerowy wynik **nie tworzy raportu** |
 | Wydajność per osoba | `GET /api/wydajnosc` | patrz ostrzeżenie niżej |
 | Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
-| **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola brygadzisty albo biura |
+| **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola biura albo admina |
 
 ### Łańcuch „poprosił → wykonane" musi być pełny w obie strony
 

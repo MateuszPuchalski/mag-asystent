@@ -181,21 +181,19 @@ test("zdjęcie dostawy z listy jest zastrzeżone dla biura", async () => {
   /* `services/auth.test.ts` sprawdza samą mapę uprawnień i NIE widzi, czy
      trasa w ogóle o nią pyta. Bez tego testu mapa może być bez zarzutu, a
      magazynier i tak zdejmie dostawę z listy jednym żądaniem. */
-  for (const rola of ["magazynier", "brygadzista"] as const) {
-    const r = await app.inject({
-      method: "POST",
-      url: "/api/biuro/dokument/1/zamknij",
-      ...jako(rola),
-      payload: { powod: "cokolwiek" },
-    });
-    assert.equal(r.statusCode, 403, rola);
-    assert.match(r.json().error, /biura/i, rola);
-  }
+  const z = await app.inject({
+    method: "POST",
+    url: "/api/biuro/dokument/1/zamknij",
+    ...jako("magazynier"),
+    payload: { powod: "cokolwiek" },
+  });
+  assert.equal(z.statusCode, 403);
+  assert.match(z.json().error, /biura/i);
   // to samo dla drogi powrotnej — inaczej cofnąć mógłby każdy
   const r = await app.inject({
     method: "POST",
     url: "/api/biuro/dokument/1/otworz",
-    ...jako("brygadzista"),
+    ...jako("magazynier"),
   });
   assert.equal(r.statusCode, 403);
 });

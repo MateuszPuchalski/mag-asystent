@@ -11,7 +11,6 @@ import { recordEanConflict } from "./ean.js";
 import { raiseProblem } from "./problems.js";
 import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js";
 import { aliasKodu } from "./ean-alias.js";
-import { freshLock, lockedByOther } from "./locks.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -531,52 +530,15 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   if (!line) {
     return { kind: "off_document", code, twId: p.tw_id, sym: p.symbol, name: p.nazwa };
   }
-  // Przy natłoku dostawę robi kilka osób. Nie odbieramy linii koledze po cichu:
-  // druga osoba dowiaduje się, kto ją trzyma, i idzie dalej po alejce.
-  const holder = lockedByOther(line.locked_by, line.locked_at, user);
-  // `lineId` jedzie w odpowiedzi, bo bez niego brygadzista nie ma jak
-  // odebrać linii przed TTL — a 30 minut czekania na kolegę, który
-  // skończył zmianę, to czekanie na nic
-  if (holder) {
-    return { kind: "locked", code, lineId: line.id, lockedBy: holder, sym: p.symbol, name: p.nazwa };
-  }
+  /* Skan NIE ZAJMUJE pozycji. Blokady per pozycja wyszły w 0.47.0: przy tej
+     organizacji pracy jedną dostawę rozkłada jedna osoba, więc lock nie
+     rozstrzygał żadnego realnego sporu, a kosztował — wiszące „zajęte przez"
+     po kolektorze odłożonym na koniec zmiany i całą ścieżkę odbierania pracy.
 
-  claimLine(line.id, user);
+     Cena jest jawna: dwie osoby przy jednym kartonie mogą odłożyć tę samą
+     pozycję dwa razy i licznik pokaże za dużo. Wykrywa się to na liście
+     („odłożono 8 z 5") i poprawia korektą ilości, bez niczyjej zgody.       */
   return toResolution(p, line);
-}
-
-/** Zajęcie linii na czas odkładania (TTL — patrz services/locks.ts). */
-export function claimLine(lineId: number, user: string): void {
-  db()
-    .prepare("UPDATE delivery_line SET locked_by=?, locked_at=? WHERE id=?")
-    .run(user, nowIso(), lineId);
-}
-
-/** Zwolnienie linii (anulowanie karty odkładania albo zakończenie operacji). */
-export function releaseLine(lineId: number, user: string): { ok: true } {
-  db()
-    .prepare("UPDATE delivery_line SET locked_by=NULL, locked_at=NULL WHERE id=? AND locked_by=?")
-    .run(lineId, user);
-  return { ok: true };
-}
-
-/**
- * Zdjęcie CUDZEGO locka przed wygaśnięciem TTL.
- *
- * Bez tego jedyną drogą jest odczekanie 30 minut — a najczęstsza przyczyna
- * wiszącego locka to kolega, który skończył zmianę albo zgubił zasięg, więc
- * czeka się na nic. Operacja jest jednak uprzywilejowana i zawsze zostawia
- * ślad: to jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez jej
- * wiedzy, więc audyt musi wiedzieć KOMU i przez KOGO.
- */
-export function forceReleaseLine(lineId: number, user: string): { ok: true; odebrano: string | null } {
-  const row = db()
-    .prepare("SELECT locked_by, locked_at FROM delivery_line WHERE id=?")
-    .get(lineId) as { locked_by: string | null; locked_at: string | null } | undefined;
-  const holder = row ? freshLock(row.locked_by, row.locked_at) : null;
-  db().prepare("UPDATE delivery_line SET locked_by=NULL, locked_at=NULL WHERE id=?").run(lineId);
-  if (holder) logEvent("lock_forced", user, null, { lineId, odebrano: holder });
-  return { ok: true, odebrano: holder };
 }
 
 function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {
@@ -680,8 +642,7 @@ export function putawayLine(
   db()
     .prepare(
       `UPDATE delivery_line
-       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?,
-           locked_by=NULL, locked_at=NULL
+       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?
        WHERE id=?`
     )
     .run(doneQty, code, status, nowIso(), user, lineId);

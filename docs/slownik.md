@@ -64,7 +64,7 @@ lista wariantów rosłaby o każdy przypadek gramatyczny z osobna.
 | **kolektor** | urządzenie Zebra albo Honeywell z aplikacją WERTIS | klien* natywn* |
 | **pole własne** | jedna z ośmiu kolumn `tw_Pole1..tw_Pole8` na `tw__Towar` | pol* dodatkow* |
 | **APK** | plik instalacyjny aplikacji kolektora | |
-| **magazynier**, **brygadzista**, **biuro** | trzy role w systemie; „użytkownik" nie jest rolą | |
+| **magazynier**, **biuro**, **admin** | trzy role w systemie; „użytkownik" nie jest rolą | |
 | **login** | jawna nazwa konta, np. `jkowalski`; wpisuje ją biuro przy zakładaniu | |
 | **hasło** | sekret otwierający sesję; w bazie leży wyłącznie jako hasz | |
 | **karta towaru** | ekran ze stanami, lokalizacjami i zamiennikami | |

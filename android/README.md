@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane" — **184 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane" — **183 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -222,8 +222,7 @@ przed którą ta pozycja broni.
 - [ ] skan półki zwija wiersz jako odłożony,
 - [ ] rozwinięty wiersz idzie pod górną krawędź (ma się dać odczytać w drodze
       do regału),
-- [ ] powtórny tap w rozwinięty wiersz zwalnia pozycję dla drugiej osoby,
-      bez czekania na 30-minutowy TTL,
+- [ ] powtórny tap w rozwinięty wiersz zwija go z powrotem,
 - [ ] skan innej półki niż w kartotece pokazuje ZAMIEŃ / DODAJ **pod wierszem**,
       nie na pełnym ekranie,
 - [ ] PROBLEM wysuwa się jako arkusz od dołu, z listą dostawy widoczną pod
@@ -302,8 +301,9 @@ przed którą ta pozycja broni.
       towarów** — regresja na wedge, patrz `scan/WedgeKeySource.kt`,
 - [ ] odłóż kolektor na godzinę: wraca do otwartej dostawy bez logowania i bez
       ekranu blokady (regresja: usunięty TTL sesji),
-- [ ] skan towaru zajętego przez kogoś innego proponuje odebranie,
-- [ ] magazynier dostaje odmowę, brygadzista przechodzi.
+- [ ] skan towaru rozkładanego przez kolegę otwiera pozycję normalnie —
+      blokad pozycji nie ma od 0.47.0 i nic już nie „proponuje odebrania",
+- [ ] w kreatorze kont są TRZY role: magazynier, biuro, administrator.
 
 **Pierwsze uruchomienie**
 

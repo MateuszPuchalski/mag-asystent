@@ -90,13 +90,10 @@ test("pominięta rola znaczy magazynier, a nie „cokolwiek”", async () => {
 
 /* ── Pierwszy stopień: biuro zakłada halę ────────────────────────────────── */
 
-test("biuro zakłada magazyniera i brygadzistę", async () => {
-  const biuro = jako("biuro");
-  for (const rola of ["magazynier", "brygadzista"] as const) {
-    const r = await zaloz(biuro, { role: rola, login: `nowa-${rola}` });
-    assert.equal(r.statusCode, 200, rola);
-    assert.equal(r.json().user.role, rola);
-  }
+test("biuro zakłada magazyniera", async () => {
+  const r = await zaloz(jako("biuro"), { role: "magazynier", login: "nowa-magazynier" });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().user.role, "magazynier");
 });
 
 /* ── Drugi stopień: konta biura i adminów ────────────────────────────────── */
@@ -170,8 +167,6 @@ test("listę kont widzą biuro i admin, hala nie", async () => {
     const r = await app.inject({ method: "GET", url: "/api/users", headers: jako(rola).headers });
     assert.equal(r.statusCode, 200, rola);
   }
-  for (const rola of ["magazynier", "brygadzista"] as const) {
-    const r = await app.inject({ method: "GET", url: "/api/users", headers: jako(rola).headers });
-    assert.equal(r.statusCode, 403, rola);
-  }
+  const hala = await app.inject({ method: "GET", url: "/api/users", headers: jako("magazynier").headers });
+  assert.equal(hala.statusCode, 403);
 });

@@ -10,7 +10,6 @@ import {
   TERMINAL_LINE,
 } from "./delivery.js";
 import { listByDelivery } from "./problems.js";
-import { freshLock } from "./locks.js";
 import type { ProblemView } from "../types.js";
 
 /* ── Podgląd dokumentu dla biura (0.36.0) ────────────────────────────────────
@@ -51,8 +50,6 @@ export interface PodgladLinii {
   bezLokalizacji: boolean;
   doneBy: string | null;
   doneAt: string | null;
-  /** Kto trzyma pozycję TERAZ (świeży lock) — odpowiedź na „czemu to stoi". */
-  lockedBy: string | null;
   problemy: ProblemView[];
 }
 
@@ -103,8 +100,6 @@ interface WierszLinii {
   status: string;
   done_at: string | null;
   done_by: string | null;
-  locked_by: string | null;
-  locked_at: string | null;
 }
 
 /**
@@ -207,7 +202,6 @@ function liniePoOtwarciu(deliveryId: number): PodgladLinii[] {
       bezLokalizacji: !oczekiwany && !r.lok_faktyczna,
       doneBy: r.done_by,
       doneAt: r.done_at,
-      lockedBy: freshLock(r.locked_by, r.locked_at),
       problemy: wgLinii.get(r.id) ?? [],
     };
   });
@@ -233,7 +227,6 @@ function liniePrzedOtwarciem(dokId: number): PodgladLinii[] {
     bezLokalizacji: !p.locExpected,
     doneBy: null,
     doneAt: null,
-    lockedBy: null,
     problemy: [],
   }));
 }

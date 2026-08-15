@@ -166,15 +166,14 @@ export function wyloguj(token: string): void {
 /**
  * Operacje zastrzeżone dla ról.
  *
- * Plan §7 wymienia cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
- * z nierozwiązanymi wyjątkami, zdjęcie cudzego locka i zmianę ustawień serwera.
- * Trasy istnieją dziś dla trzech — korekta lokalizacji jest ścieżką codzienną,
- * nie wyjątkiem. Wartości enuma bez trasy byłyby martwym kodem udającym
- * zabezpieczenie, więc dochodzą razem ze swoimi trasami.
+ * Plan §7 wymieniał cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
+ * z nierozwiązanymi wyjątkami, zdjęcie cudzej blokady pozycji i zmianę ustawień
+ * serwera. Zostały dwie: korekta lokalizacji okazała się ścieżką codzienną, nie
+ * wyjątkiem, a blokady pozycji wyszły w 0.47.0 razem z rolą brygadzisty, więc
+ * nie ma już czego odbierać. Wartości enuma bez trasy byłyby martwym kodem
+ * udającym zabezpieczenie, więc dochodzą razem ze swoimi trasami.
  */
 export type OperacjaUprzywilejowana =
-  /** Zdjęcie cudzej blokady linii przed wygaśnięciem TTL. */
-  | "zdjecie_cudzego_locka"
   /**
    * Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0).
    *
@@ -183,7 +182,7 @@ export type OperacjaUprzywilejowana =
    * się z krzesła. Dlatego siedzi za rolą i za powodem wpisanym z ręki.
    */
   | "domkniecie_dostawy"
-  /** Zakładanie kont magazynierów i brygadzistów, migracja historii. */
+  /** Zakładanie kont magazynierów, migracja historii. */
   | "zarzadzanie_kontami"
   /**
    * To, czego biuru NIE wolno: konta o roli `biuro` albo `admin`, wyłączanie
@@ -209,7 +208,7 @@ export type OperacjaUprzywilejowana =
 /**
  * Kto może.
  *
- * Zakładanie kont tworzy TOŻSAMOŚĆ, więc hala go nie dotyka: brygadzista, który
+ * Zakładanie kont tworzy TOŻSAMOŚĆ, więc hala go nie dotyka: magazynier, który
  * może założyć konto, może założyć konto biura z własnym hasłem — i cała reszta
  * reguł przestaje cokolwiek znaczyć. Ten sam argument obowiązuje o piętro
  * wyżej i stąd `zarzadzanie_biurem` wyłącznie dla admina.
@@ -220,11 +219,9 @@ export type OperacjaUprzywilejowana =
  * rolą wąską, od kont, a raport o pracy ludzi zostaje tam, gdzie był.
  */
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
-  zdjecie_cudzego_locka: ["brygadzista", "biuro", "admin"],
-  /* Bez brygadzisty, w odróżnieniu od zdjęcia locka. Tamto przekłada pracę
-     z rąk do rąk i zostaje na hali; to ORZEKA, że dostawy nie trzeba rozkładać
-     — a takie orzeczenie należy do tej samej roli, która czyta protokoły
-     rozbieżności i odpowiada za zgodność z dokumentem. */
+  /* ORZEKA, że dostawy nie trzeba rozkładać — a takie orzeczenie należy do tej
+     roli, która czyta protokoły rozbieżności i odpowiada za zgodność
+     z dokumentem, nie do człowieka przy palecie. */
   domkniecie_dostawy: ["biuro", "admin"],
   zarzadzanie_kontami: ["biuro", "admin"],
   zarzadzanie_biurem: ["admin"],
@@ -235,7 +232,6 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
 
 const NAZWA_ROL: Record<Rola, string> = {
   magazynier: "magazyniera",
-  brygadzista: "brygadzisty",
   biuro: "biura",
   admin: "administratora",
 };

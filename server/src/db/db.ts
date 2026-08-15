@@ -110,9 +110,6 @@ function migrate(database: DatabaseSync) {
      konta, a nazwa nie jest tożsamością. Stare zadania mają NULL i tak
      zostaje: zgadywanie po nazwie byłoby gorsze niż uczciwy brak. */
   addColumn("sfera_queue", "created_by_ref", "INTEGER");
-  // locki per linia — kilka osób przy jednym dokumencie
-  addColumn("delivery_line", "locked_by", "TEXT");
-  addColumn("delivery_line", "locked_at", "TEXT");
   addColumn("delivery", "source_mag_id", "INTEGER");
   /* Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0). Kolumny są
      nullowalne, więc dostawy zamknięte normalnie zostają nietknięte — a puste
@@ -151,6 +148,26 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery", "przesylka_at", "TEXT");
   addColumn("delivery", "przesylka_by", "TEXT");
   naLoginIHaslo(database);
+  bezBrygadzisty(database);
+}
+
+/**
+ * Rola `brygadzista` wychodzi razem z blokadami pozycji (0.47.0).
+ *
+ * Istniała po to, żeby ktoś mógł odebrać koledze zajętą pozycję. Bez locków
+ * nie ma czego odbierać, a rola bez ani jednego uprawnienia jest gorsza niż
+ * jej brak: widać ją na ekranie, więc obiecuje coś, czego nie robi.
+ *
+ * Konta ZOSTAJĄ, zmienia się wyłącznie rola. Kasowanie kont zabrałoby audytowi
+ * wskazanie (`events.user_ref`), a odebranie hasła zabrałoby ludziom dostęp do
+ * pracy, którą i tak wykonują — brygadzista miał uprawnienia magazyniera plus
+ * jedno, którego już nie ma.
+ *
+ * `UPDATE` z warunkiem jest idempotentny: po pierwszym przebiegu nie ma czego
+ * dopasować, więc kolejne starty API i workera nic nie robią.
+ */
+function bezBrygadzisty(database: DatabaseSync) {
+  database.exec("UPDATE app_user SET role = 'magazynier' WHERE role = 'brygadzista'");
 }
 
 /**

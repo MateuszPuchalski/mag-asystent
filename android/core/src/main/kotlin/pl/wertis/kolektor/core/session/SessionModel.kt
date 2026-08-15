@@ -20,7 +20,6 @@ package pl.wertis.kolektor.core.session
  */
 enum class Rola(val wire: String, val etykieta: String) {
     MAGAZYNIER("magazynier", "Magazynier"),
-    BRYGADZISTA("brygadzista", "Brygadzista"),
     BIURO("biuro", "Biuro"),
     ADMIN("admin", "Administrator"),
 }
