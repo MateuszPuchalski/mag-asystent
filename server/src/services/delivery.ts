@@ -1091,3 +1091,90 @@ export function zakonczDostawe(
   closeIfComplete(deliveryId, user);
   return podsumowanie;
 }
+
+/* ── Korekta ilości odłożonej ────────────────────────────────────────────────
+   Rozkładający pomyli się w liczeniu i chce poprawić, ZANIM zamknie fakturę.
+   Do 0.45.0 nie było na to drogi: skan półki wyłącznie DODAJE sztuki, a jedynym
+   sposobem na cofnięcie było zgłoszenie wyjątku — czyli wpis do protokołu
+   rozbieżności, dokumentu idącego do dostawcy. Pomyłka w liczeniu zamieniała
+   się w reklamację.
+
+   Korekta NIE RUSZA SUBIEKTA i to jest jej cała lekkość: adres został zapisany
+   przy odkładaniu i zostaje zapisany. `ilosc_odlozona` jest wyłącznie licznikiem
+   postępu po stronie WERTIS, więc poprawka jest lokalna — kolejka Sfery nawet
+   o niej nie wie.
+
+   `lok_faktyczna` ZOSTAJE nawet przy korekcie do zera. Adres naprawdę
+   pojechał do Subiekta i skasowanie go tutaj byłoby zacieraniem tego, co się
+   wydarzyło. Zero znaczy „nic z tego nie leży na półce", a nie „nigdy nie było
+   tu skanu".                                                                  */
+
+/**
+ * Ustaw ilość odłożoną na pozycji.
+ *
+ * Wartość BEZWZGLĘDNA, nie różnica: człowiek przy palecie wie, ile naprawdę
+ * odłożył, a nie o ile się pomylił. Status przelicza się z liczby, więc
+ * korekta w dół otwiera pozycję z powrotem do dokończenia, a w górę potrafi ją
+ * domknąć — razem z całą dostawą, jeśli była ostatnia.
+ *
+ * Pozycja ze ZGŁOSZONYM WYJĄTKIEM nie przechodzi. Wyjątek jest twierdzeniem
+ * wobec dostawcy i żyje własnym trybem (lista nierozwiązanych, protokół);
+ * ciche przestawienie pod nim liczby zmieniałoby dokument, którego ta funkcja
+ * nie widzi. Drogą jest rozwiązanie wyjątku, nie obejście go.
+ */
+export function korygujIlosc(
+  lineId: number,
+  qty: number,
+  user: string
+): { ok: true; status: string } | { error: string } {
+  if (!Number.isFinite(qty) || qty < 0) return { error: "Ilość nie może być ujemna" };
+
+  const l = db()
+    .prepare(
+      `SELECT l.id, l.delivery_id, l.tw_id, l.ilosc_dok, l.ilosc_odlozona, l.status,
+              d.status AS stanDostawy, d.sgt_dok_id AS dokId
+       FROM delivery_line l JOIN delivery d ON d.id = l.delivery_id
+       WHERE l.id = ?`
+    )
+    .get(lineId) as
+    | {
+        id: number;
+        delivery_id: number;
+        tw_id: number;
+        ilosc_dok: number;
+        ilosc_odlozona: number | null;
+        status: string;
+        stanDostawy: string;
+        dokId: number;
+      }
+    | undefined;
+  if (!l) return { error: "Brak pozycji" };
+
+  // „przed zakończeniem faktury" jest częścią zgłoszenia, nie ostrożnością:
+  // po zamknięciu dostawa bywa już policzona w protokole rozbieżności
+  if (l.stanDostawy !== "open") return { error: "Dostawa jest już zamknięta" };
+  if (l.status === "problem") {
+    return { error: "Pozycja ma zgłoszony wyjątek — najpierw rozwiąż go w wyjątkach" };
+  }
+  if (qty > l.ilosc_dok) {
+    return { error: `Na dokumencie jest ${l.ilosc_dok} — więcej nie da się odłożyć` };
+  }
+
+  const przed = l.ilosc_odlozona ?? 0;
+  const status = qty >= l.ilosc_dok ? "done" : qty > 0 ? "partial" : "todo";
+  db()
+    .prepare("UPDATE delivery_line SET ilosc_odlozona=?, status=? WHERE id=?")
+    .run(qty, status, lineId);
+
+  logEvent("putaway_qty_fixed", user, l.tw_id, {
+    lineId,
+    qtyPrzed: przed,
+    qtyPo: qty,
+    qtyDok: l.ilosc_dok,
+    status,
+  });
+
+  // korekta w GÓRĘ potrafi być ostatnią brakującą sztuką całej dostawy
+  closeIfComplete(l.delivery_id, user);
+  return { ok: true, status };
+}

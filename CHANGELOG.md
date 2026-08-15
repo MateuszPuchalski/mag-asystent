@@ -28,6 +28,40 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.45.0 — 14 sierpnia 2026
+
+**Korekta ilości odłożonej — serwer.** Rozkładający pomyli się w liczeniu
+i chce poprawić, zanim zamknie fakturę. Do tej wersji nie było na to drogi: skan
+półki wyłącznie DODAJE sztuki, a jedynym sposobem cofnięcia było zgłoszenie
+wyjątku — czyli wpis do protokołu rozbieżności, dokumentu idącego do dostawcy.
+Pomyłka w liczeniu zamieniała się w reklamację.
+
+Korekta ustawia wartość **bezwzględną**, nie różnicę: człowiek przy palecie wie,
+ile naprawdę odłożył, a nie o ile się pomylił. Status przelicza się z liczby,
+więc poprawka w dół otwiera pozycję z powrotem do dokończenia, a w górę potrafi
+domknąć ją razem z całą dostawą.
+
+Czego korekta **nie robi**, i to jest jej cała lekkość: nie tworzy zadania
+w kolejce Sfery, nie kasuje zapisanego adresu (nawet przy korekcie do zera —
+adres naprawdę pojechał do Subiekta) i nie tworzy wyjątku. `ilosc_odlozona` to
+licznik postępu po stronie WERTIS, więc poprawka jest lokalna.
+
+Dwie rzeczy zostają nietykalne. Pozycja ze **zgłoszonym wyjątkiem** — wyjątek
+jest twierdzeniem wobec dostawcy i żyje w protokole, więc ciche przestawienie
+pod nim liczby zmieniałoby dokument, którego ta operacja nie widzi. I **dostawa
+już zamknięta** — „przed zakończeniem faktury" było częścią zgłoszenia.
+
+Bez bramki roli: to poprawianie własnej pomyłki, nie orzeczenie o czymkolwiek.
+Obie liczby idą do `events` z nazwiskiem.
+
+Trzynaście testów, serwer ma ich 590.
+
+**[wymaga działania]** `git pull` i restart usług. **Kolektor nie ma jeszcze
+przycisku korekty** — trasa istnieje i jest przetestowana, ekran dojdzie
+w następnej wersji.
+
+---
+
 ## 0.44.1 — 14 sierpnia 2026
 
 **Dotknięcie notatki nie robiło nic — i to samo dotyczyło „ZAKOŃCZ DOSTAWĘ".**
