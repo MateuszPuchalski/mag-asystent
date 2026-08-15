@@ -20,8 +20,12 @@ import { sesjaZadania } from "../context.js";
    dlatego, że sam wpis w `WYMAGANA_ROLA` by nie wystarczył.
 
    Admin nie dostaje audytu jako uprawnienia PONAD biuro — dostaje dokładnie
-   tyle, co biuro, żeby konto założone przez instalator nadawało się do pracy. */
-const CZYTAJACY = ["brygadzista", "biuro", "admin"];
+   tyle, co biuro, żeby konto założone przez instalator nadawało się do pracy.
+
+   Od 0.47.0 lista jest krótsza o brygadzistę, bo takiej roli już nie ma. Hala
+   audytu nie czyta i to jest zamierzone: ślad audytowy odpowiada na pytania
+   „kto to zrobił i kiedy", zadawane przy biurku, a nie przy regale. */
+const CZYTAJACY = ["biuro", "admin"];
 
 /** Filtr z query stringa. Puste i śmieciowe wartości znikają, nie wywracają. */
 function filtr(q: Record<string, string | undefined>): FiltrAudytu {
@@ -47,7 +51,7 @@ export async function audytRoutes(app: FastifyInstance) {
     const s = sesjaZadania();
     if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
     if (!CZYTAJACY.includes(s.user.role)) {
-      return { kod: 403, error: "Ślad audytowy jest dostępny dla brygadzisty albo biura" };
+      return { kod: 403, error: "Ślad audytowy jest dostępny dla biura" };
     }
     return null;
   }

@@ -177,12 +177,6 @@ test("odłożenie zdejmuje marker braku lokalizacji", () => {
   assert.equal(linia("NOWOSC-1").bezLokalizacji, false);
 });
 
-test("świeży lock mówi, kto trzyma pozycję teraz", () => {
-  const { lineId } = otworz("LS51-139");
-  D.claimLine(lineId, "Ewa Bąk");
-  assert.equal(linia("LS51-139").lockedBy, "Ewa Bąk");
-});
-
 /* ── Wyjątki ──────────────────────────────────────────────────────────────── */
 
 /** Zgłasza wyjątek i UPADA, gdy serwis go odrzucił — cichy `{error}` przeszedłby tu jako „brak wyjątków". */

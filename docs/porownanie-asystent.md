@@ -168,7 +168,6 @@ wykonuje pracę wykonywaną w tej firmie.
 | Niejednoznaczny kod kreskowy **zatrzymuje** operację (nigdy „pierwsze dopasowanie") | brak danych | **jest** |
 | Zgłoszenie wyjątku ze zdjęciem dowodowym | brak danych | **jest** |
 | Eksport wyjątków do CSV pod reklamację u dostawcy | brak danych | **jest** |
-| Blokada pozycji między osobami (30 min) + przejęcie przez brygadzistę | brak danych | **jest** |
 | Logowanie na konto imienne (login i hasło) | logowanie na konto programu | **tak samo** |
 | Praca bez sieci z trwałym buforem i dosłaniem po powrocie | brak danych | **jest** |
 | Pełny ślad „kto i kiedy" bez retencji | brak danych | **jest** |
@@ -267,7 +266,7 @@ towary. Dwie osoby rozkładają tę samą dostawę. W kącie hali nie ma zasięg
 | **Kod wskazuje dwa towary** | **Operacja staje.** Aplikacja nigdy nie bierze pierwszego dopasowania — pokazuje kandydatów i każe wybrać. Kolizje lądują w raporcie dla biura, żeby dało się je posprzątać w kartotece. |
 | **Rozbieżność ilościowa** | Osobny przycisk INNA ILOŚĆ, bo to najczęstszy wyjątek — rozkładanie jest sprawdzaniem faktury. Zgłoszenie niesie ilość zamówioną i faktyczną naraz, więc nikt nie zgaduje, czy „za mało" znaczyło brak, czy niedowóz. |
 | **Zeskanowana półka ≠ półka z kartoteki** | Zapis **czeka na decyzję człowieka**: towar przeniesiono czy leży w dwóch miejscach? Serwer tego nie zgadnie. |
-| **Dwie osoby na jednej dostawie** | Pozycja jest blokowana na czas rozkładania (30 min). Kolega dostaje „pozycję rozkłada Jan" i idzie dalej. Odebranie jest możliwe dla brygadzisty i biura, i zostaje w historii. |
+| **Dwie osoby na jednej dostawie** | Nikt nikogo nie blokuje. Blokady pozycji wyszły w 0.47.0: przy tej organizacji pracy dostawę rozkłada jedna osoba, a wiszące „zajęte przez" kosztowało więcej niż chroniło. Podwójne odłożenie widać na liście i poprawia je korekta ilości. |
 | **Brak zasięgu** | Operacja ląduje w trwałym buforze na urządzeniu i dosyła się po powrocie sieci — z kontem osoby, **która ją wykonała**, a nie tej, która akurat trzyma kolektor. |
 | **„Kto to zrobił"** | Każda operacja ma wpis w dzienniku zdarzeń, bez retencji. Logowanie jest kontem imiennym, więc nie ma wariantów tej samej osoby (`Jan`, `jan`, `Jan K`). |
 

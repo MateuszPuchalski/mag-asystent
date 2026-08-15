@@ -28,6 +28,51 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.47.0 — 15 sierpnia 2026
+
+**Rola brygadzisty i blokady pozycji wychodzą z systemu.** Zgłoszenie
+z magazynu: specyfika pracy w firmie sprawia, że jedno i drugie jest zbędne.
+
+Blokada per pozycja miała chronić przed dwukrotnym odłożeniem tego samego
+towaru, gdy jedną dostawę rozkłada kilka osób. Tutaj rozkłada ją jedna, więc
+lock nie rozstrzygał żadnego realnego sporu — a kosztował: wiszące „pozycję
+rozkłada Jan" po kolektorze odłożonym na koniec zmiany, trzydziestominutowe
+czekanie na TTL i całą ścieżkę odbierania cudzej pracy z dialogiem
+potwierdzenia.
+
+Rola brygadzisty istniała głównie po to, żeby ktoś mógł taką pozycję odebrać.
+Bez blokad nie ma czego odbierać, a rola bez ani jednego uprawnienia jest gorsza
+niż jej brak: widać ją w kreatorze kont, więc obiecuje coś, czego nie robi.
+Zostają trzy role — magazynier, biuro, administrator.
+
+**Cena jest jawna.** Dwie osoby przy jednym kartonie mogą odłożyć tę samą
+pozycję dwa razy i licznik pokaże za dużo. Widać to na liście („odłożono 8 z 5")
+i poprawia się przyciskiem POPRAW ILOŚĆ z 0.46.0, bez niczyjej zgody.
+
+Co znika: `services/locks.ts` z TTL, kolumny `locked_by` i `locked_at`,
+odpowiedź skanu `kind: locked`, trasy `/release` i `/force-release`, operacja
+`zdjecie_cudzego_locka`, zdarzenie `lock_forced` i pastylka „w rękach: X"
+w podglądzie biura. Ślad audytowy schodzi do biura i admina — hala czytała go
+przez rolę, której już nie ma, a jest to pytanie zadawane przy biurku.
+
+**Konta zostają, zmienia się wyłącznie rola.** Migracja przy starcie serwera
+przestawia każde konto `brygadzista` na `magazynier`. Kasowanie kont zabrałoby
+audytowi wskazanie, a odebranie hasła zabrałoby ludziom dostęp do pracy, którą
+i tak wykonują.
+
+Historyczne wpisy `lock_forced` w `events` **zostają** — historii się nie
+przepisuje. Kolumny `locked_by` i `locked_at` zostają w istniejących bazach jako
+martwe, tak samo jak `sfera_queue.session_id` po 0.22.0: przebudowa tabeli
+trzymanej otwartą przez workera kosztowałaby bez żadnego zysku.
+
+Serwer ma 583 testy, `:core` 183.
+
+**[wymaga działania]** Nowy APK — kolektor nie ma już wariantu odpowiedzi
+`locked` i pokazuje trzy role w kreatorze kont. Serwer zwyczajnie: `git pull`,
+`npm ci`, `npm run build`, restart usług; migracja roli wykonuje się sama.
+
+---
+
 ## 0.46.0 — 15 sierpnia 2026
 
 **Korekta ilości odłożonej — przycisk w kolektorze.** Trasa powstała

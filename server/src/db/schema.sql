@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS app_user (
   -- scrypt, sól per konto, format `sol_hex:hash_hex`. NULL = konto nie loguje się.
   haslo_hash TEXT,
   name       TEXT NOT NULL,
-  role       TEXT NOT NULL DEFAULT 'magazynier', -- magazynier | brygadzista | biuro
+  role       TEXT NOT NULL DEFAULT 'magazynier', -- magazynier | biuro | admin
   active     INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -239,10 +239,7 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   lok_faktyczna  TEXT,                          -- zeskanowana (fakt, nie intencja — D3)
   status         TEXT NOT NULL DEFAULT 'todo',  -- todo | done | partial | problem | skipped
   done_at        TEXT,
-  done_by        TEXT,
-  -- Przy natłoku jedną dostawę rozkłada kilka osób (TTL w services/locks.ts).
-  locked_by      TEXT,
-  locked_at      TEXT
+  done_by        TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);

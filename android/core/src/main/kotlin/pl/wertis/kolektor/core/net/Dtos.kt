@@ -554,17 +554,6 @@ sealed class ScanResolution {
     @Serializable @SerialName("off_document")
     data class OffDocument(val code: String = "", val twId: Long = 0, val sym: String = "", val name: String = "") : ScanResolution()
 
-    /** Linię trzyma teraz ktoś inny — nie odbieramy jej po cichu. */
-    @Serializable @SerialName("locked")
-    data class Locked(
-        val code: String = "",
-        /** Do odebrania linii przed TTL (operacja na PIN, plan §7). */
-        val lineId: Long = 0,
-        val lockedBy: String = "",
-        val sym: String = "",
-        val name: String = "",
-    ) : ScanResolution()
-
     @Serializable @SerialName("unknown")
     data class Unknown(val code: String = "") : ScanResolution()
 }
@@ -770,9 +759,6 @@ data class LoginResponse(val token: String = "", val user: UserDto = UserDto())
  */
 @Serializable
 data class MeResponse(val user: UserDto = UserDto())
-
-@Serializable
-data class ForceReleaseResponse(val ok: Boolean = true, val odebrano: String? = null)
 
 /** Czy instalacja nie ma jeszcze żadnego konta (kolektor pyta przy starcie). */
 @Serializable

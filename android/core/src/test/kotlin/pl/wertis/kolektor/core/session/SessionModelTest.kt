@@ -32,7 +32,6 @@ class SessionModelTest {
         // `SessionState.role` zostaje surowym łańcuchem: właścicielem zbioru ról
         // jest serwer, a nieznana rola ma zalogować, nie wywrócić aplikacji
         assertEquals("magazynier", Rola.MAGAZYNIER.wire)
-        assertEquals("brygadzista", Rola.BRYGADZISTA.wire)
         assertEquals("biuro", Rola.BIURO.wire)
         assertEquals("admin", Rola.ADMIN.wire)
     }

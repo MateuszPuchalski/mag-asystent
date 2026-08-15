@@ -9,7 +9,7 @@ import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
    `npm run seed` daje KARTOTEKĘ: 3415 prawdziwych towarów i kilkanaście
    dokumentów dostaw. Wystarcza do pokazu ścieżki codziennej i nie wystarcza do
    niczego więcej. Przypadki, na których aplikacja naprawdę się łamie — kolizja
-   EAN, lock kolegi, zadanie w błędzie, zdjęcie bez pliku, adres spoza wzorca —
+   EAN, zadanie w błędzie, zdjęcie bez pliku, adres spoza wzorca —
    trzeba było dotąd zbudować ręcznie, za każdym razem od nowa, i w połowie
    z nich nie dało się tego zrobić z ekranu wcale (nikt nie wystawi z kolektora
    zadania w statusie `waiting_for_doc` sprzed pięciu dni).
@@ -146,8 +146,6 @@ export const KATALOG: Scenariusz[] = [
   // ── rozkładanie dostaw ──
   { id: "S20", obszar: "dostawa", tytul: "Dostawa nietknięta", wejscie: "zakładka DOSTAWY → FALON-TECH" },
   { id: "S21", obszar: "dostawa", tytul: "Dostawa w toku — pięć statusów linii naraz", wejscie: "zakładka DOSTAWY → STIHL Polska" },
-  { id: "S22", obszar: "dostawa", tytul: "Linia zajęta przez kolegę (lock świeży)", wejscie: "skan TEST-LOCK w dostawie STIHL Polska" },
-  { id: "S23", obszar: "dostawa", tytul: "Lock wygasły po TTL", wejscie: "skan TEST-LOCK-STARY w dostawie STIHL Polska" },
   { id: "S24", obszar: "dostawa", tytul: "Dostawa zamknięta", wejscie: "zakładka DOSTAWY → HUSQVARNA" },
   { id: "S25", obszar: "dostawa", tytul: "Kontener na MGP w buforze — zostaje przesunięcie stanu", wejscie: "zakładka DOSTAWY → IMPORT SHANGHAI" },
   { id: "S26", obszar: "dostawa", tytul: "Ten sam towar w dwóch wierszach dokumentu", wejscie: "zakładka DOSTAWY → DWIE PARTIE" },
@@ -186,7 +184,6 @@ export const KATALOG: Scenariusz[] = [
   { id: "S53", obszar: "konta", tytul: "Konto-ślad bez loginu (migracja historii)", wejscie: "POST /api/users/migrate-history" },
   { id: "S54", obszar: "konta", tytul: "Konto z loginem, bez hasła", wejscie: "logowanie bez.hasla" },
   { id: "S55", obszar: "konta", tytul: "Sesje: czynna, unieważniona i sprzed dwóch miesięcy", wejscie: "x-session: scenariusz-jan" },
-  { id: "S56", obszar: "konta", tytul: "Operacja zastrzeżona dla roli (zdjęcie cudzego locka)", wejscie: "POST /api/delivery/:id/lines/:lineId/force-release" },
   { id: "S66", obszar: "konta", tytul: "Konto biurowe, hasło i wyłączenie konta — wyłącznie admin", wejscie: "POST /api/users z rolą biuro" },
 
   // ── audyt, metryki, wydajność ──
@@ -312,9 +309,6 @@ const TOWARY: TowarSc[] = [
   { twId: 900_024, symbol: "TEST-BLAD-ZAPISU", nazwa: "Towar z nieudanym zapisem adresu", ean: "5900000000024", lok: "J02-02-04", stany: [[MAG, 12]] },
   // S50 — kartoteka, w której zapis „wszedł", a pole mówi co innego
   { twId: 900_025, symbol: "TEST-ROZJAZD", nazwa: "Towar z rozjazdem adresu wobec kolejki", ean: "5900000000025", lok: "A02-02-02", stany: [[MAG, 30]] },
-  // S22, S23 — linie pod lock świeży i wygasły
-  { twId: 900_026, symbol: "TEST-LOCK", nazwa: "Pozycja trzymana przez inną osobę", ean: "5900000000026", lok: "B03-02-02", stany: [[MAG, 20], [MGP, 10]] },
-  { twId: 900_027, symbol: "TEST-LOCK-STARY", nazwa: "Pozycja z lockiem sprzed TTL", ean: "5900000000027", lok: "B03-02-03", stany: [[MAG, 20], [MGP, 10]] },
   // S63 — martwy towar w strefie złotej (A, poziom 3) → lista eksmisji
   { twId: 900_028, symbol: "TEST-ZLOTA-MARTWY", nazwa: "Martwy indeks w strefie złotej", ean: "5900000000028", lok: "A03-02-03", stany: [[MAG, 8]] },
   // S63 — szybkorotujący poza strefą (poziom 7 w alejce A) → lista awansów
@@ -560,12 +554,11 @@ const DOKUMENTY: DokumentSc[] = [
     dokId: 9_001, typ: TYP_DOSTAWY, dostawca: "FALON-TECH", dniWstecz: 0, magId: MAG,
     pozycje: [[900_003, 12], [900_006, 8], [900_011, 24], [900_012, 18]],
   },
-  // S21–S23, S32 — dostawa w toku ze wszystkimi statusami linii
+  // S21, S32 — dostawa w toku ze wszystkimi statusami linii
   {
     dokId: 9_002, typ: TYP_DOSTAWY, dostawca: "STIHL Polska", dniWstecz: 1, magId: MAG,
     pozycje: [
       [900_036, 6], [900_037, 6], [900_038, 6], [900_039, 6], [900_040, 6], [900_044, 6],
-      [900_026, 10], [900_027, 10],
     ],
   },
   // S24, S35 — dostawa zamknięta z wyjątkami historycznymi
@@ -655,8 +648,8 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
   );
   const insLinia = d.prepare(
     `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, ilosc_odlozona,
-                               lok_oczekiwana, lok_faktyczna, status, done_at, done_by, locked_by, locked_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+                               lok_oczekiwana, lok_faktyczna, status, done_at, done_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
   );
   const wszystkie = new Map([...TOWARY, ...DROBNICA].map((t) => [t.twId, t]));
   /* Snapshot tego, co `openDelivery` skopiowałoby z kartoteki: symbol, nazwa
@@ -689,7 +682,7 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
     return id;
   };
 
-  // ── S21–S23, S33: dostawa w toku ──
+  // ── S21, S33: dostawa w toku ──
   const wToku = DOKUMENTY.find((x) => x.dokId === 9_002)!;
   const idWToku = otworz(wToku, "open", chwila(-95), null, {
     nr: "PL-2026-08-000431",
@@ -698,26 +691,21 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
   /* Pięć statusów w jednej dostawie. `done` i `partial` mają wypełnione
      `lok_faktyczna`, bo skan półki JEST dowodem odłożenia — linia bez niego
      wyglądałaby na odłożoną donikąd. */
-  const linie: Array<[number, number, number, string, string | null, string | null, string | null]> = [
-    // [tw_id, ilosc_dok, ilosc_odlozona, status, lok_faktyczna, locked_by, locked_at]
-    [900_036, 6, 0, "todo", null, null, null],
-    [900_037, 6, 6, "done", "F02-02-08", null, null],
-    [900_038, 6, 2, "partial", "G01-02-03", null, null],
-    [900_039, 6, 0, "skipped", null, null, null],
-    [900_040, 6, 0, "problem", null, null, null],
-    [900_044, 6, 0, "problem", null, null, null],
-    // S22 — lock świeży (10 minut temu, TTL 30 minut) trzymany przez kogoś innego
-    [900_026, 10, 0, "todo", null, "Ewa Bąk", chwila(-10)],
-    // S23 — lock sprzed 45 minut, czyli po TTL: pozycja jest wolna mimo wpisu
-    [900_027, 10, 0, "todo", null, "Ewa Bąk", chwila(-45)],
+  const linie: Array<[number, number, number, string, string | null]> = [
+    // [tw_id, ilosc_dok, ilosc_odlozona, status, lok_faktyczna]
+    [900_036, 6, 0, "todo", null],
+    [900_037, 6, 6, "done", "F02-02-08"],
+    [900_038, 6, 2, "partial", "G01-02-03"],
+    [900_039, 6, 0, "skipped", null],
+    [900_040, 6, 0, "problem", null],
+    [900_044, 6, 0, "problem", null],
   ];
-  for (const [twId, dok, odlozone, status, lokFakt, lockBy, lockAt] of linie) {
+  for (const [twId, dok, odlozone, status, lokFakt] of linie) {
     const t = towar(twId);
     insLinia.run(
       idWToku, twId, t.sym, t.nazwa, dok, odlozone, t.lok, lokFakt, status,
       status === "done" || status === "partial" ? chwila(-60) : null,
-      status === "done" || status === "partial" ? "Jan Kowalski" : null,
-      lockBy, lockAt
+      status === "done" || status === "partial" ? "Jan Kowalski" : null
     );
     linii++;
   }
@@ -732,7 +720,7 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
     const t = towar(twId);
     insLinia.run(
       idZamknietej, twId, t.sym, t.nazwa, ilosc, ilosc, t.lok, t.lok, "done",
-      chwila(-3 * 1440 + 60), "Jan Kowalski", null, null
+      chwila(-3 * 1440 + 60), "Jan Kowalski"
     );
     linii++;
   }
@@ -746,7 +734,7 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
     insLinia.run(
       idKontenera, twId, t.sym, t.nazwa, ilosc, done ? ilosc : 0, t.lok,
       done ? t.lok : null, done ? "done" : "todo",
-      done ? chwila(-2 * 1440 + 30) : null, done ? "Ewa Bąk" : null, null, null
+      done ? chwila(-2 * 1440 + 30) : null, done ? "Ewa Bąk" : null
     );
     linii++;
   });
@@ -756,7 +744,7 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
   const idPozaOknem = otworz(pozaOknem, "open", chwila(-20 * 1440), null, { nr: null, protokol: null });
   for (const [twId, ilosc] of pozaOknem.pozycje) {
     const t = towar(twId);
-    insLinia.run(idPozaOknem, twId, t.sym, t.nazwa, ilosc, 0, t.lok, null, "todo", null, null, null, null);
+    insLinia.run(idPozaOknem, twId, t.sym, t.nazwa, ilosc, 0, t.lok, null, "todo", null, null);
     linii++;
   }
 
@@ -899,7 +887,7 @@ function konta(): number {
 
   const lista: Array<[string | null, string | null, string, string, number]> = [
     ["jan.k", hash, "Jan Kowalski", "magazynier", 1],
-    ["ewa.b", hash, "Ewa Bąk", "brygadzista", 1],
+    ["ewa.b", hash, "Ewa Bąk", "magazynier", 1],
     ["biuro.test", hash, "Biuro (scenariusze)", "biuro", 1],
     /* Czwarta rola z 0.24.0. Login jest inny niż `admin`, bo tamten zakłada
        `npm run seed` — dwa konta o jednym loginie nie przeszłyby przez UNIQUE,
@@ -1094,8 +1082,7 @@ function dziennik(): number {
   zdarzenie("delivery_done", "Jan Kowalski", idJana, null, { deliveryId: 2 }, -3 * 1440 + 70);
   zdarzenie("ean_conflict", "Jan Kowalski", idJana, null, { ean: "5901234567890", candidates: [900_001, 900_002] }, -45);
   zdarzenie("ean_conflict_autoresolved", "Jan Kowalski", idJana, 900_003, { ean: "5907654321098", candidates: [900_003, 900_004, 900_005] }, -44);
-  zdarzenie("lock_forced", "Ewa Bąk", idEwy, null, { lineId: 6, odebrano: "Jan Kowalski" }, -40, "KOLEKTOR-02");
-  zdarzenie("privileged", "Ewa Bąk", idEwy, null, { operacja: "zdjecie_cudzego_locka" }, -41, "KOLEKTOR-02");
+  zdarzenie("privileged", "Biuro (scenariusze)", idBiura, null, { operacja: "domkniecie_dostawy" }, -41, null);
   zdarzenie("queue_applied", "Jan Kowalski", idJana, 900_021, { queueId: 6, typ: "set_location", docNo: null, proby: 0 }, -179, null);
   zdarzenie("queue_retry", "Jan Kowalski", idJana, 900_013, { queueId: 2, typ: "set_location", proba: 1, max: 3, blad: "Kartoteka w edycji" }, -8, null);
   zdarzenie("queue_failed", "Jan Kowalski", idJana, 900_024, { queueId: 8, typ: "set_location", proby: 3, blad: "Kartoteka w edycji" }, -20, null);
@@ -1283,7 +1270,7 @@ function wypisz(licz: Podsumowanie): void {
   console.log("");
   console.log(`[scenariusze] konta: ${LOGINY.join(", ")} — hasło „${HASLO_SCENARIUSZY}"`);
   console.log(
-    "[scenariusze] gotowe tokeny: scenariusz-jan (magazynier), scenariusz-ewa (brygadzista), " +
+    "[scenariusze] gotowe tokeny: scenariusz-jan (magazynier), scenariusz-ewa (magazynier), " +
       "scenariusz-biuro (biuro), scenariusz-admin (admin)"
   );
   console.log("[scenariusze] opis krok po kroku: docs/scenariusze-testowe.md");

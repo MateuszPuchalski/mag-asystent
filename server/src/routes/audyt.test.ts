@@ -92,9 +92,9 @@ test("magazynier NIE widzi śladu audytowego", async () => {
   assert.equal((await get("/api/events/csv", token)).statusCode, 403);
 });
 
-test("brygadzista i biuro widzą", async () => {
-  assert.equal((await get("/api/events", zalogowany("brygadzista").token)).statusCode, 200);
+test("biuro i admin widzą", async () => {
   assert.equal((await get("/api/events", zalogowany("biuro").token)).statusCode, 200);
+  assert.equal((await get("/api/events", zalogowany("admin").token)).statusCode, 200);
 });
 
 test("bez sesji nie ma audytu", async () => {
@@ -199,7 +199,7 @@ test("eksport sam trafia do śladu — kto wyniósł log, jest w logu", async ()
 // ── Odrzucone żądania ───────────────────────────────────────────────────────
 
 test("odrzucony zapis zostawia ślad z powodem", async () => {
-  const { token } = zalogowany("brygadzista");
+  const { token } = zalogowany("magazynier");
   const r = await app.inject({
     method: "POST",
     url: "/api/products/1/location",

@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -199,8 +198,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     /** Typ wstępnie wybrany w arkuszu wyjątku (skrót „INNA ILOŚĆ"). */
     var problemType by remember(id) { mutableStateOf<ProblemType?>(null) }
     var busy by remember { mutableStateOf(false) }
-    /** Linia trzymana przez kogoś innego, którą brygadzista chce odebrać (§7). */
-    var doOdebrania by remember(id) { mutableStateOf<ScanResolution.Locked?>(null) }
     /** Otwarte przesunięcie stanu na halę (skrót z wiersza kontenera). */
     var przesunFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     /* Magazyn skutku, jeśli nie jest halą — czyli kontener. Serwer podaje tu
@@ -223,14 +220,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 is ScanResolution.OffDocument -> {
                     graph.feedback.beep(false)
                     graph.effects.toast("${r.sym} nie jest w tym dokumencie")
-                }
-                is ScanResolution.Locked -> {
-                    // Domyślna odpowiedź to „idź dalej alejką" — cudzej pracy
-                    // się nie odbiera odruchowo. Odebranie jest możliwe dla
-                    // brygadzisty i biura, i zawsze zostawia ślad.
-                    graph.feedback.beep(false)
-                    graph.effects.toast("${r.sym} — pozycję rozkłada ${r.lockedBy}")
-                    doOdebrania = r
                 }
                 is ScanResolution.Unknown -> {
                     graph.feedback.beep(false)
@@ -384,51 +373,13 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         return
     }
 
-    /* Odebranie cudzej linii przed TTL. Do sierpnia 2026 wymagało PIN-u, bo
-       plakietkę dawało się pożyczyć razem z tożsamością. Przy haśle rozstrzyga
-       sama rola — serwer odmówi magazynierowi, a zdarzenie i tak idzie do
-       historii. Pytanie zostaje, bo to jedyne miejsce, w którym jedna osoba
-       odbiera pracę drugiej bez jej wiedzy. */
-    doOdebrania?.let { l ->
-        AlertDialog(
-            onDismissRequest = { doOdebrania = null },
-            containerColor = CardWhite,
-            title = { Text("Odebrać pozycję?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "${l.sym} rozkłada ${l.lockedBy}. Bez tego pozycja zwolni się sama " +
-                        "po 30 minutach. Odebranie zostanie zapisane w historii."
-                )
-            },
-            confirmButton = {
-                PrimaryButton("ODBIERAM") {
-                    scope.launch {
-                        try {
-                            val r = apiCall { graph.api.forceReleaseLine(id, l.lineId) }
-                            doOdebrania = null
-                            graph.feedback.beep(true)
-                            graph.effects.toast(
-                                r.odebrano?.let { "Pozycja odebrana: $it" } ?: "Pozycja była już wolna"
-                            )
-                            resolveProduct(l.code)
-                        } catch (e: Exception) {
-                            doOdebrania = null
-                            graph.feedback.beep(false)
-                            graph.effects.toast(e.message ?: "Odmowa")
-                        }
-                    }
-                }
-            },
-            dismissButton = { OutlineButton("ZOSTAW") { doOdebrania = null } },
-        )
-    }
-
-    /** Zwolnienie pozycji: zwinięcie wiersza oddaje lock, zamiast czekać na TTL. */
-    fun zwolnij(line: DeliveryLineView) {
+    /* Zwinięcie wiersza. Od 0.47.0 jest to czynność WYŁĄCZNIE ekranowa: skan
+       nie zajmuje już pozycji, więc nie ma czego oddawać serwerowi. Funkcja
+       zostaje, bo zamykanie panelu wygląda tak samo w pięciu miejscach. */
+    fun zwolnij(@Suppress("UNUSED_PARAMETER") line: DeliveryLineView) {
         active = null
         czesc = null
         mismatch = null
-        scope.launch { runCatching { apiCall { graph.api.releaseLine(id, line.id) } } }
     }
 
     /* Do zrobienia na górze, bez lokalizacji pośrodku, ODŁOŻONE NA DOLE.

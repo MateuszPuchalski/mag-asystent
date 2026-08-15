@@ -15,16 +15,13 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-auth-")), "t.db");
 
 let db: typeof import("../db/db.js").db;
-let nowIso: typeof import("../db/db.js").nowIso;
 let A: typeof import("./auth.js");
 let U: typeof import("./users.js");
-let D: typeof import("./delivery.js");
 
 before(async () => {
-  ({ db, nowIso } = await import("../db/db.js"));
+  ({ db } = await import("../db/db.js"));
   A = await import("./auth.js");
   U = await import("./users.js");
-  D = await import("./delivery.js");
 });
 
 beforeEach(() => {
@@ -173,99 +170,40 @@ test("wylogowanie kończy sesję i to jest decyzja człowieka", () => {
 
 test("magazynier nie dostaje operacji uprzywilejowanej, choćby był zalogowany", () => {
   const u = konto("Jan Kowalski", "magazynier1");
-  const w = A.autoryzuj(u, "zdjecie_cudzego_locka");
+  const w = A.autoryzuj(u, "domkniecie_dostawy");
   assert.equal(w.ok, false);
-  assert.match(w.powod!, /brygadzist/i, "komunikat mówi, czego brakuje");
+  assert.match(w.powod!, /biura/i, "komunikat mówi, czego brakuje");
 });
 
 test("rola rozstrzyga operację uprzywilejowaną i zostawia ślad", () => {
   // PIN wyszedł razem z plakietkami: nie ma już czego pożyczyć bez hasła,
   // więc drugi sekret przestał cokolwiek dowodzić
-  const u = konto("Adam Brygadzista", "abrygadzista", "brygadzista");
-  assert.equal(A.autoryzuj(u, "zdjecie_cudzego_locka").ok, true);
-  assert.equal(A.autoryzuj(u, "zarzadzanie_kontami").ok, false, "konta to wyłącznie biuro");
+  const u = konto("Ewa Biuro", "ebiuro1", "biuro");
+  assert.equal(A.autoryzuj(u, "domkniecie_dostawy").ok, true);
+  assert.equal(A.autoryzuj(u, "zarzadzanie_biurem").ok, false, "konta biura to wyłącznie admin");
   const ev = zdarzenia("privileged");
   assert.equal(ev.length, 1, "nieudana próba nie udaje, że operacja była");
-  assert.equal(JSON.parse(ev[0].payload!).operacja, "zdjecie_cudzego_locka");
-});
-
-/* ── Zdjęcie cudzego locka: jedyna trasa, której PIN dziś strzeże ────────── */
-
-/** Linia zablokowana przez `kto` sprzed `minut`. */
-function liniaZLockiem(kto: string, minut: number): number {
-  const d = db()
-    .prepare(
-      "INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, opened_at) VALUES (4711,'FZ 4711/2026',?)"
-    )
-    .run(nowIso()).lastInsertRowid;
-  return Number(
-    db()
-      .prepare(
-        `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, locked_by, locked_at)
-         VALUES (?,1,'SYM','Nazwa',1,?,?)`
-      )
-      .run(d, kto, new Date(Date.now() - minut * 60_000).toISOString()).lastInsertRowid
-  );
-}
-
-const lock = (lineId: number) =>
-  db().prepare("SELECT locked_by FROM delivery_line WHERE id=?").get(lineId) as {
-    locked_by: string | null;
-  };
-
-test("odebranie świeżego locka zostawia w audycie KOMU i przez KOGO", () => {
-  // to jedyne miejsce, gdzie jedna osoba odbiera pracę drugiej bez jej wiedzy
-  const line = liniaZLockiem("Jan Kowalski", 1);
-  const r = D.forceReleaseLine(line, "Adam Brygadzista");
-  assert.equal(r.odebrano, "Jan Kowalski");
-  assert.equal(lock(line).locked_by, null);
-  const ev = db().prepare("SELECT payload, user_id FROM events WHERE type='lock_forced'").all() as
-    Array<{ payload: string; user_id: string }>;
-  assert.equal(ev.length, 1);
-  assert.equal(ev[0].user_id, "Adam Brygadzista", "kto odebrał");
-  assert.equal(JSON.parse(ev[0].payload).odebrano, "Jan Kowalski", "komu odebrał");
-});
-
-test("lock wygasły zdejmuje się bez wpisu — nikomu nic nie odebrano", () => {
-  // po TTL linia i tak jest wolna; wpis „odebrał pracę" byłby wtedy oskarżeniem
-  // o coś, co się nie wydarzyło
-  const line = liniaZLockiem("Jan Kowalski", 60);
-  assert.equal(D.forceReleaseLine(line, "Adam Brygadzista").odebrano, null);
-  assert.equal(lock(line).locked_by, null);
-  assert.equal(zdarzenia("lock_forced").length, 0);
+  assert.equal(JSON.parse(ev[0].payload!).operacja, "domkniecie_dostawy");
 });
 
 /* ── Zarządzanie kontami: tylko biuro ────────────────────────────────────── */
 
-test("brygadzista NIE zakłada kont, choć zdejmuje cudze locki", () => {
-  // to jest jedyna operacja tworząca TOŻSAMOŚĆ: brygadzista, który może
+test("magazynier nie zbliża się do kont", () => {
+  // to jest jedyna operacja tworząca TOŻSAMOŚĆ: człowiek z hali, który może
   // założyć konto, może założyć konto biura z własnym hasłem — i cała reszta
   // reguł przestaje cokolwiek znaczyć
-  const b = konto("Adam Brygadzista", "abrygadzista", "brygadzista");
-  assert.equal(A.autoryzuj(b, "zdjecie_cudzego_locka").ok, true);
-  const w = A.autoryzuj(b, "zarzadzanie_kontami");
-  assert.equal(w.ok, false);
-  assert.match(w.powod!, /biura/i, "komunikat mówi, czyich uprawnień brakuje");
-});
-
-test("magazynier nie zbliża się do kont", () => {
   const m = konto("Jan Kowalski", "magazynier2");
   assert.equal(A.autoryzuj(m, "zarzadzanie_kontami").ok, false);
 });
 
-test("dostawę zdejmuje z listy biuro — brygadzista nie", () => {
-  /* Świadomie WĘŻEJ niż zdjęcie cudzego locka, choć obie operacje robi się
-     „za kogoś". Tamta przekłada pracę z rąk do rąk i zostaje na hali; ta
-     ORZEKA, że pracy nie ma — a takie orzeczenie należy do roli, która czyta
-     protokoły rozbieżności i odpowiada za zgodność z dokumentem. */
-  const b = konto("Adam Brygadzista", "abrygadzista2", "brygadzista");
-  assert.equal(A.autoryzuj(b, "zdjecie_cudzego_locka").ok, true);
-  const w = A.autoryzuj(b, "domkniecie_dostawy");
+test("dostawę zdejmuje z listy biuro — hala nie", () => {
+  /* To ORZECZENIE, że pracy nie ma: dostawa znika z listy bez ani jednego
+     skanu. Należy do roli, która czyta protokoły rozbieżności i odpowiada za
+     zgodność z dokumentem, a nie do człowieka przy palecie. */
+  const w = A.autoryzuj(konto("Jan", "magazynier3"), "domkniecie_dostawy");
   assert.equal(w.ok, false);
   assert.match(w.powod!, /biura/i, "komunikat mówi, czyich uprawnień brakuje");
-
   assert.equal(A.autoryzuj(konto("Ewa Biuro", "ebiuro2", "biuro"), "domkniecie_dostawy").ok, true);
-  assert.equal(A.autoryzuj(konto("Jan", "magazynier3"), "domkniecie_dostawy").ok, false);
 });
 
 test("biuro zarządza kontami i ukrywa magazyny", () => {
@@ -290,17 +228,15 @@ test("biuro NIE dotyka kont biura ani adminów", () => {
 
 test("admin może wszystko, co biuro, i jeszcze zarządzanie biurem", () => {
   const a = konto("Właściciel", "wlasciciel", "admin");
-  for (const op of ["zarzadzanie_kontami", "widocznosc_magazynow", "zdjecie_cudzego_locka"] as const) {
+  for (const op of ["zarzadzanie_kontami", "widocznosc_magazynow", "domkniecie_dostawy"] as const) {
     assert.equal(A.autoryzuj(a, op).ok, true, op);
   }
   assert.equal(A.autoryzuj(a, "zarzadzanie_biurem").ok, true);
 });
 
-test("brygadzista i magazynier nie zbliżają się do drugiego stopnia", () => {
-  for (const rola of ["magazynier", "brygadzista"] as const) {
-    const u = konto(`Ktoś ${rola}`, `ktos-${rola}`, rola);
-    assert.equal(A.autoryzuj(u, "zarzadzanie_biurem").ok, false, rola);
-  }
+test("magazynier nie zbliża się do drugiego stopnia", () => {
+  const u = konto("Ktoś z hali", "ktos-magazynier", "magazynier");
+  assert.equal(A.autoryzuj(u, "zarzadzanie_biurem").ok, false);
 });
 
 test("furtka pierwszego konta zamyka się sama", () => {

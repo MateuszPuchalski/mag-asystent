@@ -1,16 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
-import { autorOperacji, sesjaZadania, userOf } from "../context.js";
-import { autoryzuj } from "../services/auth.js";
+import { autorOperacji, userOf } from "../context.js";
 import {
-  forceReleaseLine,
   getDelivery,
   korygujIlosc,
   listDocuments,
   openDelivery,
   podgladZakonczenia,
   putawayLine,
-  releaseLine,
   resolveScan,
   zakonczDostawe,
 } from "../services/delivery.js";
@@ -157,35 +154,6 @@ export async function deliveryRoutes(app: FastifyInstance) {
       const r = zakonczDostawe(Number(req.params.id), userOf(req));
       if ("error" in r) return reply.code(400).send(r);
       return r;
-    }
-  );
-
-  /**
-   * Zwolnienie linii po ANULUJ na karcie odkładania. Bez tego linia wisiałaby
-   * zajęta do wygaśnięcia TTL, a kolega obok dostawałby „zajęte" bez powodu.
-   */
-  app.post<{ Params: { lineId: string } }>(
-    "/api/delivery/:id/lines/:lineId/release",
-    async (req) => releaseLine(Number(req.params.lineId), userOf(req))
-  );
-
-  /**
-   * Odebranie linii koledze przed wygaśnięciem TTL — PIN, nie sam badge.
-   *
-   * Bez tego jedyną drogą jest odczekanie 30 minut, a najczęstsza przyczyna
-   * wiszącego locka (koniec zmiany, utrata zasięgu) sprawia, że czeka się na
-   * nic. Jednocześnie to jedyne miejsce w aplikacji, gdzie jedna osoba odbiera
-   * pracę drugiej bez jej wiedzy — więc zastrzegamy je dla brygadzisty i biura,
-   * a zdarzenie idzie do `events` zawsze.
-   */
-  app.post<{ Params: { lineId: string } }>(
-    "/api/delivery/:id/lines/:lineId/force-release",
-    async (req, reply) => {
-      const s = sesjaZadania();
-      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
-      const w = autoryzuj(s.user, "zdjecie_cudzego_locka");
-      if (!w.ok) return reply.code(403).send({ error: w.powod });
-      return forceReleaseLine(Number(req.params.lineId), s.user.name);
     }
   );
 }

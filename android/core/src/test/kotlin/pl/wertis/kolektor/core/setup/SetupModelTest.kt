@@ -55,7 +55,7 @@ class SetupModelTest {
         // każdy wiersz z osobna jest poprawny, a mimo to nikt nie założy potem
         // konta biura ani nie zmieni komuś hasła. Samo biuro NIE wystarcza od
         // 0.24.0: biuro nie zakłada już kont biura.
-        val bezAdmina = listOf(magazynier, biuro, Konto("Adam", "abrygadzista", "tajnehaslo", Rola.BRYGADZISTA))
+        val bezAdmina = listOf(magazynier, biuro, Konto("Adam", "adam.n", "tajnehaslo", Rola.MAGAZYNIER))
         assertTrue(bezAdmina.all { bladKonta(it) == null })
         assertFalse(mozliwaWysylka(bezAdmina, odZera = true))
         // przy dokładaniu do istniejącej instalacji admin już jest — wolno

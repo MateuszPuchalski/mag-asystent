@@ -52,7 +52,7 @@ z prawdziwego wdrożenia nie ma z tym nic wspólnego.
 | login | rola | hasło |
 |---|---|---|
 | `jan.k` | magazynier | `wertis12345` |
-| `ewa.b` | brygadzista | `wertis12345` |
+| `ewa.b` | magazynier | `wertis12345` |
 | `biuro.test` | biuro | `wertis12345` |
 | `admin.test` | admin | `wertis12345` |
 | `zwolniony` | magazynier, konto wyłączone | `wertis12345` |
@@ -64,7 +64,7 @@ Gotowe tokeny sesji oszczędzają logowanie przy pracy z `curl`:
 curl -s -H "x-session: scenariusz-jan" localhost:3001/api/queue
 ```
 
-`scenariusz-jan` należy do magazyniera, `scenariusz-ewa` do brygadzisty,
+`scenariusz-jan` i `scenariusz-ewa` należą do magazynierów,
 `scenariusz-biuro` do biura, a `scenariusz-admin` do admina. Token
 `scenariusz-uniewazniona` jest unieważniony i ma zwracać 401.
 
@@ -226,18 +226,6 @@ pusty do chwili otwarcia.
 `partial`, `skipped` i `problem`.
 
 Linia z wyjątkiem nie trzyma dostawy otwartej. Postęp liczy ją jako domkniętą.
-
-### S22 — linia zajęta przez kolegę
-
-Pozycja `TEST-LOCK` w tej samej dostawie jest zablokowana przez Ewę Bąk od
-dziesięciu minut. Skan ma zwrócić `kind: locked` z jej nazwiskiem.
-
-Zdjęcie tej blokady przed czasem wymaga roli brygadzisty (patrz S56).
-
-### S23 — lock po czasie
-
-Pozycja `TEST-LOCK-STARY` ma blokadę sprzed 45 minut. Czas życia blokady to 30
-minut, więc pozycja jest wolna. Skan ma otworzyć zwykłą linię.
 
 ### S24 — dostawa zamknięta
 
@@ -467,22 +455,6 @@ być ten sam, co przy błędnym haśle.
 `scenariusz-stara` odezwała się ostatnio dwa miesiące temu i **nadal działa** —
 bezczynność niczego nie zamyka.
 
-### S56 — operacja zastrzeżona dla roli
-
-Spróbuj zdjąć blokadę z pozycji `TEST-LOCK` tokenem `scenariusz-jan`. Serwer ma
-odmówić kodem 403. Ten sam ruch tokenem `scenariusz-ewa` ma się udać.
-
-```bash
-curl -X POST -H "x-session: scenariusz-ewa" \
-  localhost:3001/api/delivery/5/lines/21/force-release
-```
-
-Obie liczby w adresie są przykładowe. Numer dostawy i pozycji weź z odpowiedzi
-`GET /api/delivery/:id` — rosną z każdym otwarciem dokumentu.
-
-W dzienniku zostaje wpis `lock_forced` z nazwiskiem osoby, której odebrano
-pozycję.
-
 ### S66 — operacje wyłącznie dla admina
 
 Od 0.24.0 trzy rzeczy umie sam admin: założyć konto o roli `biuro` albo `admin`,
@@ -511,7 +483,7 @@ Dziennik niesie po jednym wpisie każdego typu, którego szuka audyt. Są wśró
 nich `queue_failed`, `http_rejected`, `device_drop` i `audyt_eksport`.
 
 Sprawdź `GET /api/events` z filtrami po osobie, towarze i dacie oraz eksport
-`GET /api/events/csv`. Obie trasy wymagają roli brygadzisty albo biura.
+`GET /api/events/csv`. Obie trasy wymagają roli biura albo admina.
 
 ### S58 — zdarzenia sprzed kont
 
