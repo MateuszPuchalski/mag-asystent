@@ -82,6 +82,8 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/ean-conflicts",
     "/api/events",
     "/api/events/csv",
+    "/api/analiza",
+    "/api/analiza/csv",
     // Pozycje dokumentu (0.36.0) — mówią, co przyjechało, po ile i gdzie leży.
     "/api/biuro/dokument/1",
     // Dostawy zdjęte z listy pracy (0.40.0) — niosą nazwiska i powody.
@@ -165,16 +167,25 @@ test("podgląd pokazuje, kto odłożył pozycję", () => {
   assert.match(html, /KTO ODŁOŻYŁ/);
 });
 
-test("podgląd nie oferuje raportu wydajności per osoba", () => {
-  /* Monitoring pracowniczy (Kodeks pracy art. 22²) wymaga zapisu w regulaminie
-     i uprzedzenia ludzi. `GET /api/wydajnosc` istnieje dla biura, ale przycisk
-     obok metryk zrobiłby z obowiązku formalnego przypadek — a tego nie widać
-     w kodzie strony inaczej niż tak. */
+test("raport per osoba jedzie z podstawą prawną — nigdy bez niej", () => {
+  /* ODWRÓCENIE decyzji z 0.27.0, na polecenie właściciela (8.08.2026, wpis
+     0.48.0 w CHANGELOG). Do 0.47.x ten test pilnował, żeby strona raportu
+     wydajności NIE miała — monitoring pracowniczy (Kodeks pracy art. 22²)
+     wymaga zapisu w regulaminie i uprzedzenia załogi, a przycisk obok metryk
+     robiłby z obowiązku formalnego przypadek.
+
+     Właściciel został o tym uprzedzony i świadomie zdecydował inaczej. Test
+     pilnuje więc tego, co przy tej decyzji pozostaje niezbywalne: sekcja
+     imienna istnieje RAZEM z miejscem na podstawę prawną, którą serwer
+     wysyła w odpowiedzi. Zniknięcie któregokolwiek z tych elementów to
+     regresja prawna, nie kosmetyczna. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-  assert.ok(!/["'`]\/api\/wydajnosc/.test(html), "strona odpytuje /api/wydajnosc");
+  assert.match(html, /WYDAJNOŚĆ PER OSOBA/, "sekcja imienna zniknęła ze strony");
+  assert.match(html, /podstawaPrawna/, "strona nie pokazuje podstawy prawnej monitoringu");
+  assert.match(html, /nie są miarą błędu/, "zdanie o problemach jako nie-błędach musi zostać");
 });
 
 test("zdjęcie dostawy z listy jest zastrzeżone dla biura", async () => {

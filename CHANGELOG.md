@@ -28,6 +28,58 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.48.0 — 15 sierpnia 2026
+
+**Zakładka ANALIZA w podglądzie biura.** Ślad audytowy zbierał wszystko od
+pierwszego dnia, ale nic go nie liczyło — teraz odpowiada na cztery pytania:
+kto ile robi i kiedy jest szczyt, czy magazyn nadąża, czego ludzie szukają
+i nie znajdują, który kolektor się sypie. Do tego eksport CSV.
+
+**[wymaga działania]** Restart `wertis-api` po aktualizacji, bez nowego APK.
+**Zanim raport per osoba zostanie użyty do czegokolwiek kadrowego**: zapis
+w regulaminie pracy albo obwieszczeniu i uprzedzenie załogi co najmniej
+2 tygodnie wcześniej (Kodeks pracy art. 22² i nast.). To obowiązek formalny
+pracodawcy — panel pokazuje podstawę prawną nad tabelą i w pliku CSV.
+
+### Odwrócona decyzja: wydajność per osoba wchodzi na ekran
+
+Od 0.27.0 raport wydajności istniał na serwerze, ale strona biura celowo go
+nie odpytywała — pilnował tego test. Powód był formalny: monitoring
+pracowniczy wymaga poinformowania załogi, a przycisk obok metryk robiłby
+z tego obowiązku przypadek.
+
+Właściciel, uprzedzony o konsekwencjach, zdecydował inaczej — raport jest
+teraz na zakładce ANALIZA. Test strażnika został przepisany na odwrotny:
+pilnuje, żeby sekcja imienna nigdy nie pojawiła się BEZ podstawy prawnej
+i bez zdania, że zgłoszone problemy nie są miarą błędu. Trzy reguły raportu
+nie drgnęły: zgłoszenie wyjątku to nie wpadka, kolumny błędów nie ma, tempo
+z małej próbki pokazuje się jako „mało danych" zamiast liczby.
+
+### Co liczy analiza
+
+Operacje per dzień i rozkład po godzinach — z reguł wspólnych dla wszystkich
+raportów: podwójne zdarzenia jednej czynności odsiane, dni bucketowane po
+zegarze magazynu, nie po dobie UTC. Zdarzenie z 23:30 UTC to następny dzień
+polski i na osi ląduje we właściwym.
+
+Rytm dostaw liczy się z tabel operacyjnych, nie ze zdarzeń: dostawy
+zamknięte, mediana czasu od otwarcia do zamknięcia, pozycje na dostawę,
+problemy zgłoszone i rozwiązane w oknie oraz otwarte w ogóle.
+
+Wyszukiwarka zaczęła zapisywać liczbę wyników przy każdym zapytaniu, więc
+lista „szukane bez wyniku" pokazuje towary, których ludzie szukają, a których
+kartoteka nie zna — najtańsza lista braków. Zdarzenia sprzed tej wersji nie
+niosą liczby wyników i do listy braków nie wchodzą; potraktowane jako zero
+zamieniłyby całą historię w fałszywe braki.
+
+Zdrowie sprzętu grupuje po urządzeniu, nie po osobie: upadki, niskie baterie
+i operacje z bufora odrzucone przez serwer — per kolektor.
+
+Trasa `/api/analiza` ma bramkę jak ślad audytowy (biuro i admin), bo niesie
+dane imienne — magazynier nie czyta zestawień o kolegach. Eksport CSV
+zostawia ślad `analiza_eksport`: kto pobiera zestawienia o ludziach, sam
+trafia do logu.
+
 ## 0.47.0 — 15 sierpnia 2026
 
 **Rola brygadzisty i blokady pozycji wychodzą z systemu.** Zgłoszenie

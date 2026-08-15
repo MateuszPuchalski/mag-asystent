@@ -10,7 +10,9 @@ każdy do swojej roli:
   lock-task/MDM. Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
-  kolejka zapisów, rekoncyliacja i ślad audytowy. Dostawca z własnym drukiem
+  kolejka zapisów, rekoncyliacja i ślad audytowy. Od 0.48.0 zakładka ANALIZA:
+  wykresy operacji, rytm dostaw, szukane bez wyniku, zdrowie urządzeń
+  i wydajność per osoba (z podstawą prawną monitoringu). Dostawca z własnym drukiem
   reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
   bez builda, logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się
   wyłącznie na kolektorze.

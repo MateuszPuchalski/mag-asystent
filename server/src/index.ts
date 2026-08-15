@@ -14,6 +14,7 @@ import { withEtag } from "./routes/etag.js";
 import { deviceRoutes } from "./routes/device.js";
 import { authRoutes } from "./routes/auth.js";
 import { audytRoutes } from "./routes/audyt.js";
+import { analizaRoutes } from "./routes/analiza.js";
 import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import { biuroRoutes } from "./routes/biuro.js";
@@ -148,6 +149,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(magazynRoutes);
   await app.register(audytRoutes);
+  await app.register(analizaRoutes);
   await app.register(biuroRoutes);
 
   await app.ready();
