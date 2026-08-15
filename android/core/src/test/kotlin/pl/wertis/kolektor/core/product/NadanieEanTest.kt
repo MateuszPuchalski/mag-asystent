@@ -44,46 +44,23 @@ class NadanieEanTest {
     /* ── Krok arkusza ─────────────────────────────────────────────────────── */
 
     @Test fun `bez kodu czekamy na skan`() {
-        assertEquals(KrokEan.SKANUJ, krokEan(kod = "", eanKartoteki = ""))
+        assertEquals(KrokEan.SKANUJ, krokEan(kod = ""))
     }
 
-    @Test fun `puste pole to zwykle uzupelnienie`() {
-        // nic nie ginie, więc nie ma o co pytać
-        assertEquals(KrokEan.UZUPELNIJ, krokEan(kod = "5901234123457", eanKartoteki = ""))
-    }
-
-    @Test fun `kartoteka z kodem wymaga potwierdzenia podmiany`() {
-        // stary kod zostaje na kartonach w hali i przestanie działać
-        assertEquals(
-            KrokEan.POTWIERDZ_PODMIANE,
-            krokEan(kod = "5901234123457", eanKartoteki = "5900000000001"),
-        )
+    @Test fun `kod gotowy do zapisu to jeden krok — takze przy podmianie`() {
+        /* Do 0.49.0 kartoteka z kodem dostawała osobny krok potwierdzenia.
+           Wymóg zdjęty na polecenie właściciela: nadanie i podmiana idą tym
+           samym zatwierdzeniem, a „STARY → NOWY" zostało informacją arkusza. */
+        assertEquals(KrokEan.UZUPELNIJ, krokEan(kod = "5901234123457"))
     }
 
     @Test fun `ZAJETY WYGRYWA ZE WSZYSTKIM`() {
         /* Sedno tej klasy. Kod należący do innej kartoteki jest drogą zamkniętą
-           — także wtedy, gdy pole tej kartoteki jest puste i wszystko inne
-           wyglądałoby na zwykłe uzupełnienie. */
+           — zdjęcie potwierdzenia podmiany (0.49.0) NICZEGO tu nie zmienia,
+           bo odpowiedź „tak" przy kodzie zajętym psułaby cudzą kartotekę. */
         assertEquals(
             KrokEan.ZAJETY,
-            krokEan(kod = "5901234123457", eanKartoteki = "", zajetyPrzezInnego = true),
+            krokEan(kod = "5901234123457", zajetyPrzezInnego = true),
         )
-        assertEquals(
-            KrokEan.ZAJETY,
-            krokEan(kod = "5901234123457", eanKartoteki = "5900000000001", zajetyPrzezInnego = true),
-        )
-    }
-
-    /* ── Flaga potwierdzenia ──────────────────────────────────────────────── */
-
-    @Test fun `potwierdzenie leci WYLACZNIE przy podmianie`() {
-        /* Wysyłanie go zawsze znaczyłoby, że kolektor z góry zgadza się nadpisać
-           kod, o którym jeszcze nie wie: gdyby ktoś nadał kod tej kartotece
-           między otwarciem arkusza a zatwierdzeniem, serwer nadpisałby go bez
-           pytania. */
-        assertEquals(true, wymagaPotwierdzenia(KrokEan.POTWIERDZ_PODMIANE))
-        assertEquals(false, wymagaPotwierdzenia(KrokEan.UZUPELNIJ))
-        assertEquals(false, wymagaPotwierdzenia(KrokEan.SKANUJ))
-        assertEquals(false, wymagaPotwierdzenia(KrokEan.ZAJETY))
     }
 }
