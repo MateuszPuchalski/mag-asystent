@@ -368,6 +368,10 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
   zgadza się". Rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ**: najczęstszy
   wyjątek nie może wymagać szukania kafla wśród pięciu kategorii.
+- **Własna pomyłka w liczeniu to nie reklamacja.** Przycisk **POPRAW ILOŚĆ**
+  ustawia liczbę odłożonych sztuk na nowo, dopóki faktura jest otwarta. Zmiana
+  zostaje w WERTIS: nie rusza Subiekta, nie kasuje zapisanego adresu i nie
+  tworzy wyjątku. Pozycja ze zgłoszonym wyjątkiem jest poza jej zasięgiem.
 - **Kilka osób przy jednej dostawie**: lock per pozycja z TTL 30 min — drugi
   skaner mówi, kto trzyma linię, zamiast pozwolić na podwójne odłożenie.
 - **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie

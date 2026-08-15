@@ -2,6 +2,7 @@ package pl.wertis.kolektor.net
 
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import pl.wertis.kolektor.core.net.KorektaBody
 import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
@@ -182,6 +183,14 @@ interface ApiService {
         @Header("x-buffered-user") bufferedUser: String? = null,
     ): PutawayLineResponse
 
+
+    /** Korekta ilości odłożonej — wartość bezwzględna, wyłącznie przed zamknięciem. */
+    @POST("api/delivery/{id}/lines/{lineId}/korekta")
+    suspend fun deliveryKorekta(
+        @Path("id") id: Long,
+        @Path("lineId") lineId: Long,
+        @Body body: KorektaBody,
+    ): OkResponse
 
     /** Odpowiedź na notatkę biura — jedyna droga zdjęcia blokady z dostawy. */
     @POST("api/delivery/notatki/{noteId}/odpowiedz")

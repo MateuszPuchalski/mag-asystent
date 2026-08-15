@@ -28,6 +28,39 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.46.0 — 15 sierpnia 2026
+
+**Korekta ilości odłożonej — przycisk w kolektorze.** Trasa powstała
+w 0.45.0 i nie miała skąd być wywołana. Teraz w rozwiniętej pozycji, pod
+„INNĄ ILOŚCIĄ", stoi **POPRAW ILOŚĆ (N)** — z liczbą, którą system ma dziś
+zapisaną, żeby nie trzeba było jej szukać wzrokiem gdzie indziej.
+
+Arkusz pyta o liczbę **całkowitą**, nie o różnicę: przy palecie przelicza się
+sztuki na półce, a nie własną pomyłkę sprzed kwadransa. Suwak idzie od zera do
+ilości z dokumentu i startuje od stanu obecnego, minusem i plusem po 48 dp —
+klawiatura numeryczna w rękawicy to trzy pomyłki na dziesięć wpisów.
+
+Arkusz mówi wprost, co się stanie po zapisie: pozycja zostanie odłożona
+w całości, wróci jako częściowa albo jako nieodłożona. Skok „odłożone → do
+zrobienia" bez uprzedzenia wygląda z hali jak skasowana praca. Drugie zdanie
+pilnuje granicy, na której stoi cała ta funkcja: adres zostaje bez zmian,
+a poprawka jest liczeniem w WERTIS, nie zgłoszeniem do dostawcy — do niego
+braki jadą dopiero z „ZAKOŃCZ DOSTAWĘ".
+
+Przycisku nie ma tam, gdzie serwer i tak odmówi: przy pozycji bez ani jednej
+odłożonej sztuki (drogą jest zwykłe odłożenie) i przy zgłoszonym wyjątku.
+Po zapisie pozycja jest zwalniana — korekta kończy pracę na niej tak samo jak
+odłożenie.
+
+Arkusz stoi **na poziomie ekranu**, nie w środku cudzego `?.let`. To reguła
+kupiona usterką z 0.44.1, która zabrała widoczność dwóm arkuszom naraz przy
+poprawnie kompilującym się kodzie.
+
+**[wymaga działania]** Nowy APK — zmiana jest w kolektorze. Serwer wystarczy
+zaktualizować zwyczajnie (`git pull`, restart usług); trasa działa od 0.45.0.
+
+---
+
 ## 0.45.0 — 14 sierpnia 2026
 
 **Korekta ilości odłożonej — serwer.** Rozkładający pomyli się w liczeniu

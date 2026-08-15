@@ -618,6 +618,16 @@ data class ZakonczenieDostawy(
 @Serializable
 data class OdpowiedzBody(val odpowiedz: String)
 
+/**
+ * Korekta ilości odłożonej (0.45.0).
+ *
+ * `qty` jest wartością BEZWZGLĘDNĄ, nie różnicą: człowiek przy palecie wie,
+ * ile naprawdę odłożył, a nie o ile się pomylił. Serwer przelicza z niej status
+ * pozycji, więc korekta w dół otwiera ją z powrotem do dokończenia.
+ */
+@Serializable
+data class KorektaBody(val qty: Double)
+
 @Serializable
 data class PutawayLineBody(
     val location: String,
