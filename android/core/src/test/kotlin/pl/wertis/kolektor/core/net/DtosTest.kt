@@ -301,6 +301,27 @@ class DtosTest {
         assertEquals(emptyList<ZamowioneUDostawcy>(), p.zamowione)
     }
 
+    @Test fun `adnotacja zlotej strefy - obecna tylko, gdy jest co zrobic`() {
+        /* Pole addytywne z 0.50.0: serwer dokłada je wyłącznie towarom
+           z górnych 15% rotacji stojącym poza strefą złotą. */
+        val p = WertisJson.decodeFromString<ProductCard>(
+            """{"id":7,"sym":"AB-1","name":"N","ean":"","unit":"szt","desc":"","locs":[],
+                "mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "zlotaStrefa":{"zbiorekNaDzien":12.4,"poziomy":"2 albo 3"}}"""
+        )
+        assertEquals(12.4, p.zlotaStrefa!!.zbiorekNaDzien, 0.0)
+        assertEquals("2 albo 3", p.zlotaStrefa!!.poziomy)
+
+        // starszy serwer bez pola = nic do zrobienia, nie awaria karty
+        val stary = WertisJson.decodeFromString<ProductCard>(
+            """{"id":7,"sym":"AB-1","name":"N","ean":"","unit":"szt","desc":"","locs":[],
+                "mag":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0},
+                "mgp":{"stan":0,"rez":0,"avail":0,"pendingIn":0,"pendingOut":0,"effective":0}}"""
+        )
+        assertNull(stary.zlotaStrefa)
+    }
+
     @Test fun `logowanie - nazwy pol musza sie zgadzac z serwerem`() {
         /* Jedyny kontrakt, którego literówki nie widać lokalnie: `:app` nie
            kompiluje się w tym środowisku, a serwer po prostu odpowie 401.

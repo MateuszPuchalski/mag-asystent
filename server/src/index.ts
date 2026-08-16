@@ -18,6 +18,7 @@ import { analizaRoutes } from "./routes/analiza.js";
 import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import { biuroRoutes } from "./routes/biuro.js";
+import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import {
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
@@ -151,6 +152,7 @@ export async function buildApp() {
   await app.register(audytRoutes);
   await app.register(analizaRoutes);
   await app.register(biuroRoutes);
+  await app.register(zbiorkiRoutes);
 
   await app.ready();
   return app;

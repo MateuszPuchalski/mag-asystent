@@ -9,6 +9,7 @@ import { kandydaciZamiennikow, podzielZamienniki } from "./zamienniki.js";
 import { magazynyTowaru } from "./magazyny.js";
 import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
 import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
+import { adnotacjaStrefy } from "./zbiorki.js";
 
 /**
  * Suma oczekujących przesunięć MM per towar, z kolejki Sfery.
@@ -193,5 +194,12 @@ export function buildProductCard(
        treścią — najpierw „jest, ale nierozłożone", potem „nie ma, zamówione". */
     zamowione: zamowioneUDostawcy(twId),
     zamienniki: zamiennikiZOpisu(adapter, t.opis ?? "", t.symbol),
+    /* O(1) z cache'u kandydatów — karta odświeża się co 2 s i nie ma prawa
+       uruchamiać agregacji zbiórek. `undefined` gdy nie ma nic do powiedzenia,
+       więc pole w JSON-ie po prostu znika. */
+    ...(() => {
+      const a = adnotacjaStrefy(twId);
+      return a ? { zlotaStrefa: a } : {};
+    })(),
   };
 }

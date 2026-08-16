@@ -329,6 +329,43 @@
       <p class="mute" style="margin-bottom:6px">Upadki, baterie i odrzucone operacje — per kolektor, nie per osoba.</p>
       <table id="urzadzenia"></table>
     </section>
+
+    <section class="card">
+      <h2>STREFA ZŁOTA — KANDYDACI DO PRZENIESIENIA</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane
+        bierzemy z eksportu zbiórek (Sellasist, CSV) — wgranie tego samego
+        okresu drugi raz niczego nie zdubluje. Kandydat dostaje też adnotację
+        na karcie towaru w kolektorze.
+      </p>
+      <div class="filtry">
+        <div>
+          <button class="akcja" id="wgrajZbiorki">WGRAJ CSV ZBIÓREK</button>
+          <input type="file" id="plikZbiorek" accept=".csv,text/csv" hidden>
+        </div>
+        <div><button class="akcja cichy" id="csvKandydatow">POBIERZ CSV</button></div>
+      </div>
+      <p class="mute" id="wynikImportu"></p>
+      <p class="mute" id="oknoKandydatow" style="margin-bottom:6px"></p>
+      <table id="kandydaci"></table>
+    </section>
+
+    <section class="card">
+      <h2>REGUŁY STREFY ZŁOTEJ</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
+        drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
+        nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
+        wiem" to nie „nie". Zapis podmienia komplet reguł i od razu przelicza
+        kandydatów.
+      </p>
+      <table id="reguly"></table>
+      <div class="filtry" style="margin-top:8px">
+        <div><button class="akcja cichy" id="dodajRegule">+ REGUŁA</button></div>
+        <div><button class="akcja" id="zapiszStrefe">ZAPISZ REGUŁY</button></div>
+      </div>
+      <p class="mute" id="wynikStrefy"></p>
+    </section>
   </div>
 </main>
 
@@ -905,6 +942,102 @@ async function odswiezAnalize() {
     rysujAnalize(await (await api(`/api/analiza?days=${$("dniAnalizy").value}`)).json());
   } catch (e) {
     $("kafleAnalizy").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
+  }
+  // strefa złota żyje na tej samej zakładce, ale ma własne trasy — i własny
+  // try/catch, żeby błąd jednej sekcji nie gasił drugiej
+  odswiezKandydatow();
+  odswiezStrefe();
+}
+
+/* ── Strefa złota: kandydaci i reguły ────────────────────────────────────────
+   Wgranie CSV idzie przez FileReader + zwykły POST `{ csv }` — bez multipart,
+   bo ten sam POST ma w przyszłości wołać integracja z Sellasist. Serwer mówi
+   PRAWDĘ o dopasowaniu (ile wierszy poznał) i odrzuca plik z dopasowaniem
+   poniżej połowy — wynik importu pokazujemy w całości, łącznie z przykładami
+   niedopasowanych symboli.                                                   */
+
+function rysujKandydatow(r) {
+  $("oknoKandydatow").textContent = r.okno
+    ? `Dane ${r.okno.od} – ${r.okno.do} (${r.okno.dni} dni) · próg górnych 15%: ` +
+      `${r.prog} zbiórek · już w strefie: ${r.juzWStrefie} · regał bez reguły: ${r.bezReguly}`
+    : "Brak danych — wgraj CSV zbiórek.";
+  $("kandydaci").innerHTML =
+    "<tr><th>SYMBOL</th><th>NAZWA</th><th>ZBIÓRKI</th><th>NA DZIEŃ</th><th>OBECNY ADRES</th><th>DOKĄD</th></tr>" +
+    (r.kandydaci.map((k) =>
+      `<tr><td class="b">${esc(k.sym)}</td><td>${esc(k.nazwa)}</td>
+       <td>${k.zbiorki}</td><td>${k.zbiorekNaDzien}</td>
+       <td>${esc(k.adres ?? "—")}</td><td>poziom ${esc(k.poziomy)}</td></tr>`).join("") ||
+      '<tr><td colspan="6" class="mute">Nie ma kandydatów — szybka rotacja stoi tam, gdzie ma stać</td></tr>');
+}
+
+async function odswiezKandydatow() {
+  try {
+    rysujKandydatow(await (await api("/api/biuro/zbiorki/kandydaci")).json());
+  } catch (e) {
+    $("oknoKandydatow").textContent = e.message;
+    $("kandydaci").innerHTML = "";
+  }
+}
+
+async function wyslijZbiorki(plik) {
+  $("wynikImportu").textContent = `Wysyłam ${plik.name}…`;
+  try {
+    const csv = await plik.text();
+    const w = await (await api("/api/biuro/zbiorki/import", {
+      method: "POST", body: JSON.stringify({ csv }),
+    })).json();
+    $("wynikImportu").textContent =
+      `Wgrano: ${w.wierszy} wierszy (${w.okres ? `${w.okres.od} – ${w.okres.do}` : "?"}), ` +
+      `nowych ${w.nowych}, duplikatów ${w.pominietychDuplikatow}, ` +
+      `niedopasowanych ${w.niedopasowanych}` +
+      (w.przykladyNiedopasowanych.length
+        ? ` (np. ${w.przykladyNiedopasowanych.slice(0, 5).join(", ")})` : "") +
+      (w.odrzuconychWierszy ? ` · uciętych wierszy: ${w.odrzuconychWierszy}` : "");
+    await odswiezKandydatow();
+  } catch (e) {
+    $("wynikImportu").textContent = `Import odrzucony: ${e.message}`;
+  }
+}
+
+/* Edytor reguł: wiersze z polami, ZAPISZ wysyła KOMPLET — tak jak trasa.
+   Wiersz całkiem pusty jest pomijany, więc „usuń" to po prostu wyczyszczenie
+   pól albo krzyżyk z boku. */
+function wierszReguly(r = { alejka: "", od: "", do: "", poziomy: "" }) {
+  return `<tr>
+    <td><input data-p="alejka" size="3" maxlength="1" value="${esc(r.alejka)}" placeholder="A"></td>
+    <td><input data-p="od" size="5" maxlength="3" value="${esc(r.od)}" placeholder="D01"></td>
+    <td><input data-p="do" size="5" maxlength="3" value="${esc(r.do)}" placeholder="D05"></td>
+    <td><input data-p="poziomy" size="8" value="${esc(r.poziomy)}" placeholder="2,3"></td>
+    <td><button class="akcja cichy" data-usun>✕</button></td>
+  </tr>`;
+}
+
+function rysujReguly(reguly) {
+  $("reguly").innerHTML =
+    "<tr><th>ALEJKA</th><th>REGAŁ OD</th><th>REGAŁ DO</th><th>POZIOMY</th><th></th></tr>" +
+    reguly.map(wierszReguly).join("");
+}
+
+async function odswiezStrefe() {
+  try {
+    rysujReguly((await (await api("/api/biuro/strefa")).json()).reguly);
+    $("wynikStrefy").textContent = "";
+  } catch (e) {
+    $("wynikStrefy").textContent = e.message;
+  }
+}
+
+async function zapiszStrefe() {
+  const reguly = [...$("reguly").querySelectorAll("tr")].map((tr) => {
+    const p = (n) => tr.querySelector(`input[data-p="${n}"]`)?.value.trim() ?? "";
+    return { alejka: p("alejka"), od: p("od"), do: p("do"), poziomy: p("poziomy") };
+  }).filter((r) => r.alejka || r.od || r.do || r.poziomy);
+  try {
+    await api("/api/biuro/strefa", { method: "PUT", body: JSON.stringify({ reguly }) });
+    $("wynikStrefy").textContent = `Zapisano ${reguly.length} reguł — kandydaci przeliczeni.`;
+    await odswiezKandydatow();
+  } catch (e) {
+    $("wynikStrefy").textContent = e.message;
   }
 }
 
@@ -1490,6 +1623,21 @@ $("dniMetryk").addEventListener("change", odswiezNadzor);
 $("dniAnalizy").addEventListener("change", odswiezAnalize);
 $("csvAnalizy").addEventListener("click", () =>
   pobierz(`/api/analiza/csv?days=${$("dniAnalizy").value}`, "wertis-analiza.csv"));
+$("wgrajZbiorki").addEventListener("click", () => $("plikZbiorek").click());
+$("plikZbiorek").addEventListener("change", (e) => {
+  const plik = e.target.files?.[0];
+  if (plik) wyslijZbiorki(plik);
+  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
+});
+$("csvKandydatow").addEventListener("click", () =>
+  pobierz("/api/biuro/zbiorki/kandydaci/csv", "wertis-strefa-kandydaci.csv"));
+$("dodajRegule").addEventListener("click", () =>
+  $("reguly").insertAdjacentHTML("beforeend", wierszReguly()));
+$("reguly").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-usun]");
+  if (b) b.closest("tr").remove();
+});
+$("zapiszStrefe").addEventListener("click", zapiszStrefe);
 $("sprawdzRozjazdy").addEventListener("click", async () => {
   $("rozjazdy").innerHTML = '<tr><td class="mute">Liczę…</td></tr>';
   try {

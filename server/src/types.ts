@@ -69,6 +69,13 @@ export interface ProductCard {
   zamowione: ZamowioneUDostawcy[];
   /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
   zamienniki: Zamienniki;
+  /**
+   * Podpowiedź przeslotowania z danych o zbiórkach (`services/zbiorki.ts`).
+   * Obecne TYLKO gdy towar jest w górnych 15% rotacji, a jego adres pickingowy
+   * leży POZA strefą złotą — czyli gdy jest co zrobić. Pole addytywne: stare
+   * APK je ignorują (`ignoreUnknownKeys`).
+   */
+  zlotaStrefa?: { zbiorekNaDzien: number; poziomy: string };
 }
 
 /**

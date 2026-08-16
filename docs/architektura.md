@@ -112,6 +112,17 @@ decyzją właściciela ODWRACAJĄCĄ wcześniejszą — raport wydajności per o
 Do 0.47.x strona celowo go nie odpytywała; teraz pokazuje go z podstawą
 prawną nad tabelą, bo obowiązek informacyjny z Kodeksu pracy nie zniknął.
 
+Od 0.50.0 zakładka ANALIZA przyjmuje pierwszy kanał danych spoza Subiekta:
+eksport zbiórek z systemu sprzedażowego (Sellasist, CSV). Serwer liczy z niego
+kandydatów do strefy złotej — górne 15% rotacji stojące poza strefą — tą samą
+regułą progu co roczny raport przeslotowania. Kandydat dostaje adnotację na
+karcie towaru w kolektorze. Import jest idempotentny po `ID Koszyka`, a plik
+z dopasowaniem poniżej połowy wierszy jest odrzucany w całości. Reguły strefy
+(które poziomy regału są „złote") mieszkają w tabeli `strefa_regula` i są
+edytowalne z tej samej zakładki, za rolą `biuro`/`admin`. Docelowo ten sam
+`POST /api/biuro/zbiorki/import` ma wołać integracja — bez zmian po naszej
+stronie.
+
 ---
 
 ## 3. Dlaczego osobne procesy
@@ -442,6 +453,7 @@ w odróżnieniu od zgadywania po podobieństwie.
 | Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole (czwarta, `mm_czeka`, tylko przy `SFERA_WORKER=1`); zerowy wynik **nie tworzy raportu** |
 | Wydajność per osoba | `GET /api/wydajnosc` | patrz ostrzeżenie niżej |
 | Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
+| Kandydaci do strefy złotej | `GET /api/biuro/zbiorki/kandydaci` (+ `/csv`) | bieżąca rotacja ze zbiórek Sellasist; ten sam próg co reslot |
 | **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola biura albo admina |
 
 ### Łańcuch „poprosił → wykonane" musi być pełny w obie strony
@@ -580,9 +592,10 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
   Zapytania: `docs/subiekt-gt-edu-setup.md` §3. Osobna rodzina: wywołania COM
   w `sfera-worker/src/SferaComAdapter.cs` — lista w `sfera-worker/README.md`.
   Trzecia: `ZDJECIA_*`, gdy funkcja zdjęć ma być włączona.
-- **Reguły strefy złotej** nie pokrywają regałów `D00`, `D06`, `D07`, `E01` —
-  raport przeslotowania wskazuje je na osobnej liście „brak reguły" zamiast
-  zgadywać.
+- **Reguły strefy złotej** nie pokrywają w ziarnie regałów `D00`, `D06`,
+  `D07`, `E01` — raport przeslotowania i kandydaci ze zbiórek wskazują je na
+  osobnej liście „brak reguły" zamiast zgadywać. Od 0.50.0 reguły są
+  edytowalne z panelu biura, więc lukę zamyka wpis, nie wydanie.
 
 ---
 

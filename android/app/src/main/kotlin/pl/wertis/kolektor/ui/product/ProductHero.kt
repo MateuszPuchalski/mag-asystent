@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.core.net.ProductCard
 import pl.wertis.kolektor.core.product.liniaWDostawie
 import pl.wertis.kolektor.core.product.liniaZamowione
+import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
@@ -172,7 +173,10 @@ fun ProductHero(
 }
 
 /**
- * Karta faktów — po jednej linii na dokument.
+ * Karta faktów — po jednej linii na fakt.
+ *
+ * Od 0.50.0 bywa tu też linia przeslotowania („Zbierany 12×/dzień — przenieś
+ * do strefy złotej") — jedyna, która prosi o decyzję, więc stoi pierwsza.
  *
  * Dwie rzeczy, które kafel stanu przemilcza. „W dostawie" mówi: jest u nas,
  * poszukaj w przyjęciach — przy dostawie krajowej towar figuruje na MAG od
@@ -188,7 +192,7 @@ fun ProductHero(
  */
 @Composable
 fun FaktyCard(p: ProductCard) {
-    if (p.wDostawie.isEmpty() && p.zamowione.isEmpty()) return
+    if (p.wDostawie.isEmpty() && p.zamowione.isEmpty() && p.zlotaStrefa == null) return
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,6 +200,12 @@ fun FaktyCard(p: ProductCard) {
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
+        /* Przeslotowanie idzie PIERWSZE: dostawy i zamówienia opisują stan,
+           a ta linia jako jedyna prosi o decyzję. Rysuje ją serwer — pole jest
+           obecne tylko, gdy towar rotuje szybko I stoi poza strefą złotą. */
+        p.zlotaStrefa?.let { z ->
+            FaktLinia(WIcons.Pin, AmberInk, liniaZlotaStrefa(z), FontWeight.SemiBold)
+        }
         p.wDostawie.forEach { d ->
             FaktLinia(WIcons.Clock, AmberInk, liniaWDostawie(d, p.unit), FontWeight.SemiBold)
         }

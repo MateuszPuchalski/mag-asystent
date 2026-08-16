@@ -129,11 +129,13 @@ test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
   assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
 });
 
-test("strona biura zapisuje TYLKO cztery rzeczy", () => {
+test("strona biura zapisuje TYLKO sześć rzeczy", () => {
   /* „ZERO ZAPISU" było regułą tego pliku od 0.18.0 i skończyło się w 0.40.0:
      doszło oznaczenie dostawy jako rozłożonej poza WERTIS i cofnięcie tego.
      Reguła nie zniknęła, tylko dostała jawną listę — bo pilnuje czegoś, co
-     nadal obowiązuje.
+     nadal obowiązuje. W 0.50.0 lista urosła o import zbiórek i reguły strefy
+     złotej: oba zapisy dotyczą danych, których NIE MA w Subiekcie, oba stoją
+     za rolą biuro|admin i żaden nie rusza dostaw ani stanów.
 
      Zakazany jest wciąż `POST /api/delivery/documents/:dokId/open`: różni się
      od trasy podglądu o jeden człon ścieżki i zwróciłby to samo, a kosztem
@@ -147,13 +149,19 @@ test("strona biura zapisuje TYLKO cztery rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    4,
-    "logowanie, zamknięcie poza WERTIS, cofnięcie i notatka — nic ponadto"
+    5,
+    "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka i import zbiórek — nic ponadto"
+  );
+  assert.equal(
+    (html.match(/method:\s*"PUT"/g) ?? []).length,
+    1,
+    "jedyny PUT to komplet reguł strefy złotej"
   );
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
   assert.match(html, /dokument\/\$\{dokId\}\/zamknij/, "zamknięcie poza WERTIS");
   assert.match(html, /dokument\/\$\{dokId\}\/otworz/, "droga powrotna");
+  assert.match(html, /zbiorki\/import/, "import zbiórek z Sellasist");
 });
 
 test("podgląd pokazuje, kto odłożył pozycję", () => {

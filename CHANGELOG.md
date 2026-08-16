@@ -28,6 +28,42 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.50.0 — 15 sierpnia 2026
+
+**Strefa złota z danych o zbiórkach.** Biuro wgrywa eksport zbiórek
+z Sellasist (CSV) w zakładce ANALIZA. Serwer liczy z niego, które towary są
+w górnych 15% rotacji, a stoją poza strefą złotą — i dokłada im adnotację na
+karcie w kolektorze: „Zbierany 12×/dzień — przenieś do strefy złotej (poziom
+2 albo 3)". Do tego lista kandydatów w panelu biura z eksportem CSV oraz
+edytor reguł strefy (które poziomy którego regału są „złote").
+
+**[wymaga działania]** Nowy APK przez MDM (adnotacja na karcie towaru).
+Serwer: zwykła aktualizacja i restart. Pierwsze użycie to wgranie pliku CSV
+z Sellasist w `/biuro` → ANALIZA → „WGRAJ CSV ZBIÓREK" — bez pliku funkcja
+po prostu milczy.
+
+### Jak to działa
+
+- Import jest **idempotentny**: kluczem jest `ID Koszyka` z eksportu, więc
+  ponowne wgranie tego samego okresu (albo nakładających się) niczego nie
+  dubluje. Plik, w którym do kartoteki dopasowało się mniej niż połowa
+  wierszy, jest odrzucany w całości — z przykładami niedopasowanych symboli.
+- Próg „szybkiej rotacji" to ta sama reguła co w rocznym raporcie
+  przeslotowania (górne 15% liczby pobrań), więc obie ścieżki nigdy nie
+  wskażą sprzecznych list. Okno to ostatnie 30 dni **obecne w danych**,
+  nie kalendarzowe — adnotacje nie znikają, gdy plik wgrano z opóźnieniem.
+- Reguły strefy złotej przeniosły się ze stałej w kodzie do bazy i są
+  edytowalne z biura (rola `biuro`/`admin`). Dotychczasowa definicja
+  (zapis właściciela) została ziarnem — wsiewa się przy pierwszej migracji.
+  Regał bez reguły dalej znaczy „nie wiem", nie „poza strefą".
+- Towar **przeniesiony** traci adnotację sam: liczy się ona z żywej
+  lokalizacji, więc znika po zapisaniu nowego adresu kolektorem.
+- Import ma być w przyszłości wołany automatycznie z Sellasist — trasa to
+  zwykły `POST /api/biuro/zbiorki/import` z JSON-em `{ csv }`, integracja
+  użyje jej bez zmian po naszej stronie.
+
+---
+
 ## 0.49.0 — 15 sierpnia 2026
 
 **Podmiana kodu kreskowego bez osobnego potwierdzenia.** Nadanie i zmiana idą
