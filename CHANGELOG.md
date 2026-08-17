@@ -34,6 +34,10 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 kreskowy: `EAN 5905947596430` zamiast `EAN 5905947596430 · szt.`. Kartoteka
 bez kodu ma dalej myślnik i wejście „✎ NADAJ KOD".
 
+To samo na ekranie skanu lokalizacji, gdzie jednostka stała w rzędzie
+„symbol · EAN · jednostka". Tamten ekran nie pokazuje ani jednej ilości, więc
+jednostka nie miała tam nawet czego opisywać.
+
 **[wymaga działania]** Nowy APK przez MDM. Serwer bez zmian.
 
 Jednostka stała tuż pod wielką liczbą dostępnych, która i tak podpisuje się
