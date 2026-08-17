@@ -24,6 +24,7 @@ import pl.wertis.kolektor.core.product.podsumowanieHistorii
 import pl.wertis.kolektor.core.product.podsumowanieMagazynow
 import pl.wertis.kolektor.core.product.podsumowanieZamiennikow
 import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.ui.components.CollapsibleSection
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.theme.BarlowCond
@@ -212,14 +213,14 @@ private fun MagazynRow(
             fontSize = 20.sp,
             color = if (pusty) InkMute else Ink,
         )
-        if (unit.isNotEmpty()) {
-            Text(
-                unit,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = InkMute,
-                modifier = Modifier.padding(start = 3.dp),
-            )
-        }
+        // przez `jednostka()`, nie przez `unit` wprost: kartoteka bez jednostki
+        // zostawiała tu samą liczbę, a wiersz obok niej miał już swoją
+        Text(
+            jednostka(unit),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = InkMute,
+            modifier = Modifier.padding(start = 3.dp),
+        )
     }
 }

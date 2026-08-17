@@ -37,7 +37,7 @@ import pl.wertis.kolektor.core.net.EanConflictRow
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.net.ProblemView
 import pl.wertis.kolektor.core.problem.ProblemType
-import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
@@ -159,7 +159,7 @@ private fun ProblemCard(p: ProblemView, onResolve: () -> Unit) {
         Text(
             listOfNotNull(
                 p.docNumber,
-                p.qty?.let { "${formatQty(it)} szt" },
+                p.qty?.let { iloscZJednostka(it, p.unit) },
                 p.createdBy,
             ).joinToString(" · "),
             fontSize = 11.5.sp,

@@ -25,6 +25,7 @@ import pl.wertis.kolektor.core.product.liniaWDostawie
 import pl.wertis.kolektor.core.product.liniaZamowione
 import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
 import pl.wertis.kolektor.ui.theme.AmberInk
@@ -97,7 +98,7 @@ fun ProductHero(
                    karton z kodem i nie miał gdzie go wpisać. Cel dotyku 48 dp,
                    bo klika się w rękawicach.
 
-                   Jednostka STĄD WYSZŁA (0.50.1). Stała tu obok wielkiej liczby
+                   Jednostka STĄD WYSZŁA (0.51.0). Stała tu obok wielkiej liczby
                    dostępnych, która i tak podpisuje się „szt dostępne" — więc
                    mówiła to samo dwa razy, w linii mającej jedno zadanie: podać
                    kod albo drogę do jego nadania. */
@@ -131,7 +132,7 @@ fun ProductHero(
                         color = Ink,
                     )
                     Text(
-                        "${p.unit.ifEmpty { "szt" }} dostępne",
+                        "${jednostka(p.unit)} dostępne",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = InkMute,

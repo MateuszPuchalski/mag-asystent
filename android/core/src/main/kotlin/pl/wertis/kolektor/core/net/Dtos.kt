@@ -494,6 +494,11 @@ data class DeliveryLineView(
     val name: String = "",
     val qtyDoc: Double = 0.0,
     val qtyDone: Double = 0.0,
+    /**
+     * Jednostka z kartoteki (`szt.`, `kpl.`, `par`). Pusta = starszy serwer
+     * albo kartoteka bez jednostki — `jednostka()` podstawia wtedy „szt.".
+     */
+    val unit: String = "",
     val locExpected: String? = null,
     val locActual: String? = null,
     val status: String = "todo",
@@ -550,6 +555,8 @@ data class EanCandidate(
     val name: String = "",
     val inDocument: Boolean = false,
     val qtyDoc: Double? = null,
+    /** Jednostka z kartoteki; pusta = starszy serwer (patrz `jednostka()`). */
+    val unit: String = "",
     val locExpected: String? = null,
 )
 
@@ -601,6 +608,8 @@ data class PozycjaZakonczenia(
     val qtyDoc: Double = 0.0,
     /** Ile odłożono; przy pozycji nietkniętej pola nie ma. */
     val qtyDone: Double = 0.0,
+    /** Jednostka z kartoteki; pusta = starszy serwer (patrz `jednostka()`). */
+    val unit: String = "",
 )
 
 /**
@@ -687,6 +696,8 @@ data class ProblemView(
     val docNumber: String? = null,
     val sym: String? = null,
     val name: String? = null,
+    /** Jednostka z kartoteki; pusta = starszy serwer (patrz `jednostka()`). */
+    val unit: String = "",
 )
 
 @Serializable

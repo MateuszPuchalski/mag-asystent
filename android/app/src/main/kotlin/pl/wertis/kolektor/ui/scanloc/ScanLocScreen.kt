@@ -180,7 +180,7 @@ fun ScanLocScreen(graph: AppGraph) {
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(p.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink)
-                    /* Jednostka stała TU obok EAN-u i wyszła w 0.50.1 razem
+                    /* Jednostka stała TU obok EAN-u i wyszła w 0.51.0 razem
                        z bliźniaczką z karty towaru. Ten ekran nie pokazuje ani
                        jednej ilości — jednostka nie miała czego opisywać, a rząd
                        ma odpowiadać wyłącznie na pytanie „CO przenoszę". */

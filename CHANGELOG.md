@@ -28,21 +28,44 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
-## 0.50.1 — 16 sierpnia 2026
+## 0.51.0 — 17 sierpnia 2026
 
-**Jednostka znika z linii EAN-u na karcie towaru.** Linia pokazuje sam kod
-kreskowy: `EAN 5905947596430` zamiast `EAN 5905947596430 · szt.`. Kartoteka
-bez kodu ma dalej myślnik i wejście „✎ NADAJ KOD".
+**Jednostka miary mówi prawdę — i milczy, gdy nie ma czego opisywać.** Dwie
+strony tej samej sprawy, znalezione razem.
 
-To samo na ekranie skanu lokalizacji, gdzie jednostka stała w rzędzie
-„symbol · EAN · jednostka". Tamten ekran nie pokazuje ani jednej ilości, więc
-jednostka nie miała tam nawet czego opisywać.
+**[wymaga działania]** Nowy APK przez MDM. Serwer: zwykła aktualizacja
+i restart; starsze APK działają dalej.
 
-**[wymaga działania]** Nowy APK przez MDM. Serwer bez zmian.
+### Zniknęła tam, gdzie nie opisywała żadnej liczby
 
-Jednostka stała tuż pod wielką liczbą dostępnych, która i tak podpisuje się
-„szt dostępne" — mówiła więc to samo dwa razy, w linii mającej jedno zadanie:
-podać kod albo drogę do jego nadania.
+Linia EAN-u na karcie towaru pokazuje sam kod kreskowy: `EAN 5905947596430`
+zamiast `EAN 5905947596430 · szt.`. Jednostka stała tuż pod wielką liczbą
+dostępnych, która i tak podpisuje się „szt. dostępne" — mówiła więc to samo dwa
+razy, w linii mającej jedno zadanie: podać kod albo drogę do jego nadania.
+Kartoteka bez kodu ma dalej myślnik i wejście „✎ NADAJ KOD".
+
+To samo na ekranie skanu lokalizacji, w rzędzie „symbol · EAN · jednostka".
+Tamten ekran nie pokazuje ani jednej ilości, więc jednostka nie miała tam nawet
+czego opisywać.
+
+### Stała się prawdziwa tam, gdzie liczbę podpisuje
+
+Cała ścieżka rozkładania dostawy pisała „szt" wpisane w kolektorze na sztywno,
+bo serwer jednostki nie wysyłał. W kartotece 18 pozycji na 3415 mierzy się
+inaczej — sześć w kompletach, sześć w parach. Dla nich „3 szt" na liście
+znaczyło trzy sztuki tam, gdzie na dokumencie stały trzy KOMPLETY, czyli
+trzydzieści sześć sztuk towaru. Karta towaru mówiła wtedy „kpl.", a lista
+dostawy „szt" — o tym samym towarze.
+
+Serwer wysyła teraz jednostkę wszystkimi czterema drogami, którymi ilość trafia
+na ekran: lista pozycji, odpowiedź na skan, podsumowanie zamknięcia i lista
+wyjątków. Kolektor przestał zgadywać w dwunastu miejscach, a reguła zapasowa
+(„kartoteka nie ma jednostki → «szt.»") mieszka w jednym miejscu w `:core`
+zamiast w każdym z nich osobno. Przy okazji zniknął rozjazd pisowni: `szt.`
+z kropką wszędzie, tak jak w Subiekcie.
+
+Pola są **addytywne** — starsze APK ignorują je i pokazują to co dotąd, a nowy
+kolektor podłączony do starszego serwera podstawia „szt." zamiast pustki.
 
 ---
 
