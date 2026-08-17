@@ -11,6 +11,8 @@ import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.net.Zamienniki
 import pl.wertis.kolektor.core.net.ZamowioneUDostawcy
 import pl.wertis.kolektor.core.net.ZlotaStrefa
+import pl.wertis.kolektor.core.text.iloscZJednostka
+import pl.wertis.kolektor.core.text.jednostka
 import java.time.ZoneId
 
 class KartaTekstTest {
@@ -66,6 +68,24 @@ class KartaTekstTest {
     @Test fun `zamowienie - bez dostawcy konczy sie na terminie`() {
         val z = ZamowioneUDostawcy(termin = "04.08", ilosc = 1.0)
         assertEquals("Zamówione 1 szt — 04.08", liniaZamowione(z, "szt"))
+    }
+
+    @Test fun `jednostka - z kartoteki, a bez niej domyslna z kropka`() {
+        /* REGUŁA ZAPASOWA W JEDNYM MIEJSCU. Do 0.51.0 leżała rozsypana po
+           dwunastu miejscach `:app` jako wpisane z palca „szt" — a kartoteka
+           ma 18 pozycji mierzonych inaczej, dla których to słowo kłamało. */
+        assertEquals("kpl.", jednostka("kpl."))
+        assertEquals("par", jednostka("par"))
+        assertEquals("szt.", jednostka(""), )
+        assertEquals("starszy serwer nie przysyła pola", "szt.", jednostka("   "))
+    }
+
+    @Test fun `ilosc z jednostka - komplet nie udaje sztuk`() {
+        assertEquals("3 kpl.", iloscZJednostka(3.0, "kpl."))
+        assertEquals("12 szt.", iloscZJednostka(12.0, "szt."))
+        // ułamek zostaje ułamkiem — `formatQty` ucina tylko zera całkowitych
+        assertEquals("2.5 m", iloscZJednostka(2.5, "m"))
+        assertEquals("7 szt.", iloscZJednostka(7.0, ""))
     }
 
     @Test fun `zlota strefa - czestosc PRZED poleceniem, poziomy w nawiasie`() {

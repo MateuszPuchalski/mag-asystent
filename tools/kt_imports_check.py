@@ -72,7 +72,14 @@ LOKALNE = re.compile(r"(?:^|[(,]|\bval\s+|\bvar\s+)\s*(\w+)\s*(?::|=[^=])", re.M
 
 
 def bez_komentarzy(src: str) -> str:
-    """Usuwa komentarze i literały — inaczej słowa z prozy udają kod."""
+    """Usuwa komentarze, literały i nazwy w backtickach — inaczej słowa z prozy
+    udają kod.
+
+    Backticki dopisane po tym, jak sprawdzenie zgłosiło trzy fałszywe alarmy na
+    nazwach testów: `fun `zla ilosc dotyczy pozycji z dokumentu`()` niesie słowo
+    „ilosc", które akurat nazywa też funkcję z `:core`. Nazwa testu jest zdaniem
+    po polsku, nie wołaniem — a fałszywy alarm w bramce CI uczy ją omijać.
+    """
     out: list[str] = []
     i, n = 0, len(src)
     while i < n:
@@ -80,6 +87,9 @@ def bez_komentarzy(src: str) -> str:
         if c == "/" and src.startswith("//", i):
             while i < n and src[i] != "\n":
                 i += 1
+        elif c == "`":
+            j = src.find("`", i + 1)
+            i = n if j == -1 else j + 1
         elif c == "/" and src.startswith("/*", i):
             j = src.find("*/", i + 2)
             i = n if j == -1 else j + 2

@@ -473,6 +473,28 @@ export class SeededSubiektAdapter {
   }
 
   /**
+   * Jednostki miary kompletu towarów — jedno zapytanie, nie N.
+   *
+   * Lista rozkładania musi podpisać KAŻDĄ ilość jednostką z kartoteki, a nie
+   * słowem „szt" wpisanym w kolektorze na sztywno. W kartotece 18 pozycji na
+   * 3415 ma inną jednostkę (`kpl.`, `par`) — dla nich wbite „szt" znaczyło
+   * „trzy sztuki" tam, gdzie na dokumencie stały trzy KOMPLETY.
+   *
+   * Towar bez wpisu w mapie = kartoteka bez jednostki; kolektor podstawia
+   * wtedy „szt." (`:core`, `jednostka()`), a nie ciszę.
+   */
+  jednostkiDlaTowarow(twIds: number[]): Map<number, string> {
+    const out = new Map<number, string>();
+    if (twIds.length === 0) return out;
+    const dziury = twIds.map(() => "?").join(",");
+    const rows = db()
+      .prepare(`SELECT tw_id, unit FROM sgt_towar WHERE tw_id IN (${dziury})`)
+      .all(...twIds) as unknown as Array<{ tw_id: number; unit: string | null }>;
+    for (const r of rows) if (r.unit) out.set(r.tw_id, r.unit);
+    return out;
+  }
+
+  /**
    * Pola lokalizacji kompletu towarów — jedno zapytanie, nie N.
    *
    * Lista rozkładania potrzebuje adresu dla KAŻDEJ pozycji przy każdym

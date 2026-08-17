@@ -143,6 +143,14 @@ export interface DeliveryLineView {
   name: string;
   qtyDoc: number;
   qtyDone: number;
+  /**
+   * Jednostka z kartoteki (`szt.`, `kpl.`, `par`). Pusta = kartoteka jej nie
+   * ma; kolektor podstawia wtedy „szt.".
+   *
+   * Do 0.51.0 tego pola nie było i kolektor wpisywał „szt" na sztywno
+   * w dwunastu miejscach — komplet z dokumentu czytało się więc jako sztuki.
+   */
+  unit: string;
   locExpected: string | null;
   locActual: string | null;
   status: string;
@@ -202,6 +210,8 @@ export interface EanCandidate {
   name: string;
   inDocument: boolean;
   qtyDoc: number | null;
+  /** Jednostka z kartoteki — kandydat pokazuje ilość z dokumentu. */
+  unit: string;
   locExpected: string | null;
 }
 
@@ -256,6 +266,8 @@ export interface ProblemView {
   docNumber: string | null;
   sym: string | null;
   name: string | null;
+  /** Jednostka z kartoteki — wyjątek niesie ilość, więc musi ją podpisać. */
+  unit: string;
 }
 
 /** Wybór operatora przy skanie innej półki niż oczekiwana (§4.3). */

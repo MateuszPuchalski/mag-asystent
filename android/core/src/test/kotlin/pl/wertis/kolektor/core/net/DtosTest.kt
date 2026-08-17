@@ -301,6 +301,38 @@ class DtosTest {
         assertEquals(emptyList<ZamowioneUDostawcy>(), p.zamowione)
     }
 
+    @Test fun `jednostka linii dostawy - pole addytywne, stary serwer bezpieczny`() {
+        /* Serwer wysyła jednostkę od 0.51.0. APK aktualizuje się przez MDM,
+           serwer przez `git pull` — nowy kolektor musi przeżyć starszy serwer
+           i pokazać wtedy „szt." z reguły zapasowej, a nie pustkę. */
+        val z = WertisJson.decodeFromString<DeliveryLineView>(
+            """{"id":1,"twId":7,"sym":"AB-1","name":"N","qtyDoc":3,"qtyDone":0,"unit":"kpl.",
+                "locExpected":"A01-02-03","status":"todo"}"""
+        )
+        assertEquals("kpl.", z.unit)
+
+        val stary = WertisJson.decodeFromString<DeliveryLineView>(
+            """{"id":1,"twId":7,"sym":"AB-1","name":"N","qtyDoc":3,"qtyDone":0,"status":"todo"}"""
+        )
+        assertEquals("", stary.unit)
+
+        // to samo pole na trzech pozostałych drogach, którymi ilość dociera na ekran
+        val kand = WertisJson.decodeFromString<EanCandidate>(
+            """{"twId":7,"sym":"AB-1","name":"N","inDocument":true,"qtyDoc":3,"unit":"par"}"""
+        )
+        assertEquals("par", kand.unit)
+        val zakonczenie = WertisJson.decodeFromString<ZakonczenieDostawy>(
+            """{"braki":[{"lineId":1,"sym":"AB-1","nazwa":"N","qtyDoc":10,"qtyDone":3,"unit":"kpl."}],
+                "nietkniete":[{"lineId":2,"sym":"CD-2","nazwa":"M","qtyDoc":5}]}"""
+        )
+        assertEquals("kpl.", zakonczenie.braki[0].unit)
+        assertEquals("", zakonczenie.nietkniete[0].unit)
+        val problem = WertisJson.decodeFromString<ProblemView>(
+            """{"id":3,"typ":"qty_mismatch","qty":2,"createdAt":"","unit":"kpl."}"""
+        )
+        assertEquals("kpl.", problem.unit)
+    }
+
     @Test fun `adnotacja zlotej strefy - obecna tylko, gdy jest co zrobic`() {
         /* Pole addytywne z 0.50.0: serwer dokłada je wyłącznie towarom
            z górnych 15% rotacji stojącym poza strefą złotą. */

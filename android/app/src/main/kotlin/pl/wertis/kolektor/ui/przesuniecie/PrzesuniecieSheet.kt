@@ -50,6 +50,7 @@ import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -192,7 +193,7 @@ fun PrzesuniecieSheet(
                 graph.feedback.zapis()
                 graph.queueRepo.refreshNow()
                 val kod = magazyny.firstOrNull { it.magId == dokad }?.kod ?: ""
-                graph.effects.toast("Przesunięto ${formatQty(ile)} $unit → $kod")
+                graph.effects.toast("Przesunięto ${iloscZJednostka(ile, unit)} → $kod")
                 onDone()
             } catch (e: Exception) {
                 graph.feedback.beep(false)
@@ -234,7 +235,7 @@ fun PrzesuniecieSheet(
                     Text(sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
                     Text(name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${formatQty(dostepne)} $unit dostępne w ${zrodloKod ?: "źródle"}",
+                        "${iloscZJednostka(dostepne, unit)} dostępne w ${zrodloKod ?: "źródle"}",
                         fontSize = 11.5.sp,
                         color = InkMute,
                     )

@@ -25,6 +25,7 @@ import pl.wertis.kolektor.core.product.liniaWDostawie
 import pl.wertis.kolektor.core.product.liniaZamowione
 import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
 import pl.wertis.kolektor.ui.theme.AmberInk
@@ -95,10 +96,14 @@ fun ProductHero(
                 /* Linia EAN-u jest KLIKALNA (0.37.0). Kartoteka bez kodu ma tu
                    myślnik, a myślnik był dotąd końcem drogi: magazynier trzymał
                    karton z kodem i nie miał gdzie go wpisać. Cel dotyku 48 dp,
-                   bo klika się w rękawicach. */
+                   bo klika się w rękawicach.
+
+                   Jednostka STĄD WYSZŁA (0.51.0). Stała tu obok wielkiej liczby
+                   dostępnych, która i tak podpisuje się „szt dostępne" — więc
+                   mówiła to samo dwa razy, w linii mającej jedno zadanie: podać
+                   kod albo drogę do jego nadania. */
                 Text(
-                    if (p.ean.isEmpty()) "EAN — · ${p.unit.ifEmpty { "—" }}  ✎ NADAJ KOD"
-                    else "EAN ${p.ean} · ${p.unit.ifEmpty { "—" }}",
+                    if (p.ean.isEmpty()) "EAN —  ✎ NADAJ KOD" else "EAN ${p.ean}",
                     fontSize = 11.sp,
                     color = if (p.ean.isEmpty()) AmberInk else InkMute,
                     fontWeight = if (p.ean.isEmpty()) FontWeight.Bold else FontWeight.Normal,
@@ -127,7 +132,7 @@ fun ProductHero(
                         color = Ink,
                     )
                     Text(
-                        "${p.unit.ifEmpty { "szt" }} dostępne",
+                        "${jednostka(p.unit)} dostępne",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = InkMute,

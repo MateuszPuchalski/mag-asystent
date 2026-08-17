@@ -410,6 +410,9 @@ export function getDelivery(id: number): DeliveryView | undefined {
      są tu nieistotne — towar zarezerwowany nadal zajmuje miejsce. */
   const twIds = rows.map((r) => r.tw_id as number);
   const stany = subiekt.stanyDlaTowarow(twIds);
+  /* Jednostki tym samym trybem co stany: jedno zapytanie na całą listę.
+     Kolektor podpisuje nimi każdą ilość — do 0.51.0 wpisywał „szt" z palca. */
+  const jednostki = subiekt.jednostkiDlaTowarow(twIds);
   // pozycja nietknięta bierze adres ŻYWY — powód i cena przy `adresyOczekiwane`
   const adresy = adresyOczekiwane(twIds);
 
@@ -423,6 +426,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
         name: r.tw_nazwa,
         qtyDoc: r.ilosc_dok,
         qtyDone: r.ilosc_odlozona,
+        unit: jednostki.get(r.tw_id) ?? "",
         locExpected: oczekiwany,
         locActual: r.lok_faktyczna,
         status: r.status,
@@ -519,6 +523,8 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
           name: c.nazwa,
           inDocument: !!l,
           qtyDoc: l?.ilosc_dok ?? null,
+          // kandydat JEST wierszem kartoteki, więc jednostka jest tu za darmo
+          unit: c.unit ?? "",
           locExpected: l ? l.lok_oczekiwana : pickingLoc(c.lokalizacja),
         };
       }),
@@ -541,7 +547,10 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   return toResolution(p, line);
 }
 
-function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line: any): ScanResolution {
+function toResolution(
+  p: { tw_id: number; symbol: string; nazwa: string; unit?: string },
+  line: any
+): ScanResolution {
   /* Ta trasa odpowiada na SKAN TOWARU, czyli dokładnie na moment rozwinięcia
      panelu odkładania — stan musi tu być, inaczej panel pokazywałby zera do
      najbliższego odświeżenia całej dostawy. Jeden towar, jedno zapytanie. */
@@ -559,6 +568,7 @@ function toResolution(p: { tw_id: number; symbol: string; nazwa: string }, line:
       name: p.nazwa,
       qtyDoc: line.ilosc_dok,
       qtyDone: line.ilosc_odlozona,
+      unit: p.unit ?? "",
       locExpected: oczekiwany,
       locActual: line.lok_faktyczna,
       status: line.status,
@@ -940,9 +950,9 @@ export function dokumentyPozaWertis(): Set<number> {
 /** Co powstało przy zamknięciu — kolektor pokazuje to człowiekowi PRZED zapisem. */
 export interface PodsumowanieZakonczenia {
   /** Pozycje z niepełnym odłożeniem → wyjątki „zła ilość". */
-  braki: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number; qtyDone: number }>;
+  braki: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number; qtyDone: number; unit: string }>;
   /** Pozycje, których nikt nie tknął → `skipped`, bez zgłoszenia. */
-  nietkniete: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number }>;
+  nietkniete: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number; unit: string }>;
 }
 
 interface WierszDoZamkniecia {
@@ -951,16 +961,24 @@ interface WierszDoZamkniecia {
   tw_nazwa: string;
   ilosc_dok: number;
   ilosc_odlozona: number | null;
+  unit: string | null;
 }
 
-/** Otwarte pozycje dostawy — te, które zamknięcie ma czym rozstrzygnąć. */
+/**
+ * Otwarte pozycje dostawy — te, które zamknięcie ma czym rozstrzygnąć.
+ *
+ * `LEFT JOIN`, nie zwykły: pozycja dostawy przeżywa zniknięcie kartoteki
+ * z read-modelu (import biegnie osobno), a podsumowanie zamknięcia nie ma
+ * prawa zgubić przez to wiersza. Bez jednostki zostaje pusty łańcuch.
+ */
 function otwarteLinie(deliveryId: number): WierszDoZamkniecia[] {
   return db()
     .prepare(
-      `SELECT id, tw_symbol, tw_nazwa, ilosc_dok, ilosc_odlozona
-       FROM delivery_line
-       WHERE delivery_id = ? AND status NOT IN ('done','skipped','problem')
-       ORDER BY id`
+      `SELECT l.id, l.tw_symbol, l.tw_nazwa, l.ilosc_dok, l.ilosc_odlozona, t.unit
+       FROM delivery_line l
+       LEFT JOIN sgt_towar t ON t.tw_id = l.tw_id
+       WHERE l.delivery_id = ? AND l.status NOT IN ('done','skipped','problem')
+       ORDER BY l.id`
     )
     .all(deliveryId) as unknown as WierszDoZamkniecia[];
 }
@@ -983,9 +1001,16 @@ export function podgladZakonczenia(deliveryId: number): PodsumowanieZakonczenia 
         nazwa: l.tw_nazwa,
         qtyDoc: l.ilosc_dok,
         qtyDone: done,
+        unit: l.unit ?? "",
       });
     } else if (done <= 0) {
-      nietkniete.push({ lineId: l.id, sym: l.tw_symbol, nazwa: l.tw_nazwa, qtyDoc: l.ilosc_dok });
+      nietkniete.push({
+        lineId: l.id,
+        sym: l.tw_symbol,
+        nazwa: l.tw_nazwa,
+        qtyDoc: l.ilosc_dok,
+        unit: l.unit ?? "",
+      });
     }
   }
   return { braki, nietkniete };

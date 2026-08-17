@@ -240,14 +240,20 @@ function mapRow(r: any): ProblemView {
     docNumber: r.doc_number ?? null,
     sym: r.sym ?? null,
     name: r.name ?? null,
+    unit: r.unit ?? "",
   };
 }
 
+/* Jednostka dochodzi z kartoteki przez pozycję dostawy — wyjątek niesie ilość
+   („brakuje 3"), a bez jednostki kolektor dopisywał do niej „szt" z palca.
+   Wszystkie złączenia LEWE: wyjątek zgłoszony luzem nie ma pozycji, a pozycja
+   przeżywa zniknięcie kartoteki z read-modelu. */
 const SELECT_JOIN = `
-  SELECT p.*, d.sgt_dok_numer AS doc_number, l.tw_symbol AS sym, l.tw_nazwa AS name
+  SELECT p.*, d.sgt_dok_numer AS doc_number, l.tw_symbol AS sym, l.tw_nazwa AS name, t.unit
   FROM problem p
   LEFT JOIN delivery d ON d.id = p.delivery_id
-  LEFT JOIN delivery_line l ON l.id = p.line_id`;
+  LEFT JOIN delivery_line l ON l.id = p.line_id
+  LEFT JOIN sgt_towar t ON t.tw_id = l.tw_id`;
 
 /** Nierozwiązane wyjątki — ekran na starcie aplikacji, inaczej nikt się nimi nie zajmie. */
 export function listUnresolved(): ProblemView[] {

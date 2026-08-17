@@ -51,7 +51,7 @@ import pl.wertis.kolektor.core.net.PrzesylkaBody
 import pl.wertis.kolektor.core.net.RaiseProblemBody
 import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.problem.problemBlocker
-import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.device.PhotoCapture
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
@@ -292,7 +292,7 @@ fun ProblemSheet(
                     Text(line.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
                     Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${formatQty(line.qtyDoc)} szt wg dokumentu · ${line.locExpected ?: "BRAK LOKALIZACJI"}",
+                        "${iloscZJednostka(line.qtyDoc, line.unit)} wg dokumentu · ${line.locExpected ?: "BRAK LOKALIZACJI"}",
                         fontSize = 11.5.sp,
                         color = InkMute,
                     )
@@ -329,7 +329,7 @@ fun ProblemSheet(
             // dokumencie i nie ma powodu, żeby ktokolwiek ją przepisywał
             if (chosen == ProblemType.QTY_MISMATCH && line != null) {
                 Text(
-                    "Zamówiono ${formatQty(line.qtyDoc)} szt — podaj, ile faktycznie przyszło.",
+                    "Zamówiono ${iloscZJednostka(line.qtyDoc, line.unit)} — podaj, ile faktycznie przyszło.",
                     fontSize = 12.5.sp,
                     color = InkSoft,
                 )
