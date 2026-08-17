@@ -95,10 +95,14 @@ fun ProductHero(
                 /* Linia EAN-u jest KLIKALNA (0.37.0). Kartoteka bez kodu ma tu
                    myślnik, a myślnik był dotąd końcem drogi: magazynier trzymał
                    karton z kodem i nie miał gdzie go wpisać. Cel dotyku 48 dp,
-                   bo klika się w rękawicach. */
+                   bo klika się w rękawicach.
+
+                   Jednostka STĄD WYSZŁA (0.50.1). Stała tu obok wielkiej liczby
+                   dostępnych, która i tak podpisuje się „szt dostępne" — więc
+                   mówiła to samo dwa razy, w linii mającej jedno zadanie: podać
+                   kod albo drogę do jego nadania. */
                 Text(
-                    if (p.ean.isEmpty()) "EAN — · ${p.unit.ifEmpty { "—" }}  ✎ NADAJ KOD"
-                    else "EAN ${p.ean} · ${p.unit.ifEmpty { "—" }}",
+                    if (p.ean.isEmpty()) "EAN —  ✎ NADAJ KOD" else "EAN ${p.ean}",
                     fontSize = 11.sp,
                     color = if (p.ean.isEmpty()) AmberInk else InkMute,
                     fontWeight = if (p.ean.isEmpty()) FontWeight.Bold else FontWeight.Normal,
