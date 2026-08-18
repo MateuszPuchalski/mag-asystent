@@ -33,6 +33,28 @@ historii nie przepisujemy.
 
 ---
 
+## 0.52.4 — 18 sierpnia 2026
+
+**Instrukcja klucza podpisu nie mówiła, skąd wziąć `keytool`.** Zgłoszenie
+z wdrożenia: `keytool: command not found`. Polecenie przychodzi z JDK, a na
+serwerze WERTIS jest sam Node — więc na tej maszynie nie mogło zadziałać ani
+razu, a instrukcja stała w sekcji, którą wykonuje się właśnie tam.
+
+Sekcja mówi teraz trzy rzeczy, których brakowało. Że klucz **nie jest serwerowi
+do niczego potrzebny** — trafia do sekretów repozytorium, a podpisuje nim CI,
+więc robi się go na dowolnej maszynie z Javą. Że JDK instaluje jedno polecenie
+`winget`, a przy Android Studio `keytool` już jest, tylko poza `PATH`. I że po
+instalacji trzeba otworzyć nowy terminal.
+
+Doszło też to, co dalej blokowało: gotowe polecenie zamieniające keystore na
+base64 do sekretu `WERTIS_KEYSTORE_B64` oraz zdanie, że pytania kreatora
+o tożsamość w certyfikacie nie mają znaczenia technicznego. Bez nich człowiek
+zatrzymywał się dwa kroki dalej, przy tej samej ścianie.
+
+**[wymaga działania]** Nic. Sama dokumentacja.
+
+---
+
 ## 0.52.3 — 18 sierpnia 2026
 
 **Audyt przestał tonąć we własnym szumie.** Eksport śladu audytowego

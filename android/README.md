@@ -78,6 +78,9 @@ minifikacji dopiero w czasie działania. Plik jedzie sam na całą halę, więc 
 czasu sprawdzenia zminifikowanego APK na fizycznym kolektorze zostaje pełny.
 Rozmiar nie jest tu ceną: transfer idzie po sieci magazynu, nie przez sklep.
 
+`keytool` przychodzi z JDK, więc na maszynie bez Javy tego polecenia nie ma.
+Instrukcja wraz z komendą instalującą JDK stoi w `DEPLOY.md` §5.
+
 Zamiast zmiennych te same wartości przyjmuje plik `local.properties`
 w katalogu `android/`, w polach `wertis.keystore`, `wertis.keystore.haslo`, `wertis.klucz.alias`
 i `wertis.klucz.haslo`. Plik jest poza gitem. Skąd wziąć klucz: `DEPLOY.md` §5.

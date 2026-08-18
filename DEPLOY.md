@@ -273,12 +273,39 @@ odmawia instalacji aktualizacji podpisanej innym kluczem niż zainstalowana
 aplikacja. Build debugowy z CI dostaje losowy klucz przy każdym biegu, więc
 dwa kolejne artefakty nie zainstalują się jeden nad drugim.
 
-Klucz robi się raz:
+Klucz robi się raz. **`keytool` przychodzi z JDK**, a na serwerze WERTIS jest
+sam Node — więc tam tego polecenia nie ma i nie musi być. Klucz nie jest
+serwerowi do niczego potrzebny: trafia do sekretów repozytorium, a podpisuje
+nim CI. Zrób go na maszynie, która ma Javę.
+
+Bez JDK pod ręką wystarczy jedno z trzech:
+
+```powershell
+winget install EclipseAdoptium.Temurin.17.JDK   # ta sama dystrybucja co w CI
+```
+
+Z Android Studio `keytool` już jest, tylko poza `PATH`:
+`C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe`. Po instalacji
+JDK otwórz **nowy** terminal — zmienne środowiskowe nie wchodzą do już otwartego.
 
 ```bash
 keytool -genkeypair -v -keystore wertis.keystore -alias wertis \
   -keyalg RSA -keysize 4096 -validity 10000
 ```
+
+Pytania kreatora dotyczą tożsamości w certyfikacie i **nie mają znaczenia
+technicznego** — liczy się wyłącznie sam klucz. Hasło zapisz od razu tam, gdzie
+trzymasz resztę haseł firmy: drugi raz nikt go nie pokaże.
+
+Sekret dla CI to ten sam plik zakodowany base64:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("wertis.keystore")) > klucz.txt
+```
+
+Zawartość `klucz.txt` idzie do sekretu `WERTIS_KEYSTORE_B64` w ustawieniach
+repozytorium, obok trzech pozostałych: `WERTIS_KEYSTORE_HASLO`,
+`WERTIS_KLUCZ_ALIAS` (czyli `wertis`) i `WERTIS_KLUCZ_HASLO`.
 
 Build wydania czyta go ze zmiennych `WERTIS_KEYSTORE`, `WERTIS_KEYSTORE_HASLO`,
 `WERTIS_KLUCZ_ALIAS` i `WERTIS_KLUCZ_HASLO`. Te same wartości przyjmuje plik
