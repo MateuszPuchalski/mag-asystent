@@ -534,6 +534,19 @@ asercja w `routes/audyt.test.ts`. Z tego samego powodu `401` na `GET` jest
 pomijane: karta odpytuje serwer co 2 s i wygasła sesja utopiłaby resztę audytu
 w szumie.
 
+Ta sama reguła objęła w 0.52.3 **brak zdjęcia kartoteki**, i to na dowodach
+z produkcji: w oknie czterech dni 355 z 1000 zdarzeń było wpisem „404 Brak
+zdjęcia", przy 301 różnych kartotekach i zerze trafień, bo instalacja nie ma
+włączonych `ZDJECIA_*`. Prawdziwych odrzuceń było w tym samym oknie pięć.
+Kolektor pyta o miniaturę każdego rysowanego wiersza, więc częstotliwość bierze
+się z rysowania ekranu, a nie z pracy człowieka — a brak zdjęcia jest
+odpowiedzią, nie odmową: nikomu niczego nie odebrano.
+
+Lista wyciszonych tras (`BEZ_AUDYTU_404` w `context.ts`) jest wąska celowo.
+Wpis wymaga OBU warunków naraz: częstotliwości rysowania ekranu i normalności
+odpowiedzi „nie ma". Sam brak czegoś nie wystarcza — inaczej lista zjadłaby
+cały audyt odrzuceń, czyli to, po co on istnieje.
+
 ### Czego ślad nie obejmie
 
 Operacja wykonana bez Wi-Fi żyje w pliku na kolektorze aż do połączenia.

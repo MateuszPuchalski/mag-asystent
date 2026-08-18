@@ -168,6 +168,18 @@ const BEZ_SESJI: ReadonlyArray<[metoda: string, sciezka: string]> = [
 const otwarta = (metoda: string, sciezka: string): boolean =>
   BEZ_SESJI.some(([m, s]) => m === metoda && s === sciezka);
 
+/**
+ * Odczyty, których 404 nie idzie do audytu.
+ *
+ * Wpisuje się tu trasa spełniająca OBA warunki naraz: kolektor pyta o nią
+ * z częstotliwością rysowania ekranu, a odpowiedź „nie ma" jest normalna.
+ * Sam brak czegoś nie wystarcza — inaczej lista zjadłaby cały audyt odrzuceń.
+ */
+const BEZ_AUDYTU_404: ReadonlyArray<RegExp> = [/^\/api\/products\/\d+\/zdjecie$/];
+
+const odczytBezAudytu = (sciezka: string): boolean =>
+  BEZ_AUDYTU_404.some((wzorzec) => wzorzec.test(sciezka));
+
 export function withRequestContext(app: FastifyInstance): void {
   app.addHook("onRequest", (req, _reply, done) => {
     store.run({ device: header(req, "x-device"), token: header(req, "x-session") }, done);
@@ -219,6 +231,20 @@ export function withRequestContext(app: FastifyInstance): void {
        z każdego kolektora i utopiła resztę audytu w szumie. Odczyt bez sesji
        jest nudny; PRÓBA ZAPISU bez sesji już nie — i ta zostaje logowana. */
     if (reply.statusCode === 401 && req.method === "GET") return payload;
+
+    /* To samo, potwierdzone eksportem z produkcji: 355 z 1000 zdarzeń w oknie
+       czterech dni to „404 Brak zdjęcia". Kolektor pyta o miniaturę KAŻDEGO
+       rysowanego wiersza, a instalacja bez włączonych `ZDJECIA_*` odpowiada
+       404 za każdym razem — 301 różnych kartotek, ani jednego trafienia.
+       Prawdziwych odrzuceń było w tym samym oknie PIĘĆ i wszystkie utonęły.
+
+       Brak zdjęcia jest ODPOWIEDZIĄ, nie odmową: nikomu niczego nie odebrano,
+       więc nie ma czego dochodzić w reklamacji. Lista jest wąska i jawna —
+       404 na każdej innej trasie zostaje w audycie, bo tam znaczy „pytałeś
+       o coś, czego nie ma", a to bywa tropem.                                */
+    if (reply.statusCode === 404 && req.method === "GET" && odczytBezAudytu(sciezka)) {
+      return payload;
+    }
 
     const { logEvent } = await import("./services/events.js");
     logEvent("http_rejected", currentUserName() ?? "anonim", null, {

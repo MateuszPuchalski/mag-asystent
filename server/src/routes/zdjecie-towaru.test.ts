@@ -40,7 +40,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zdjecie_cache", "device_session", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
+  for (const t of ["zdjecie_cache", "device_session", "app_user", "events"]) d.prepare(`DELETE FROM ${t}`).run();
   d.prepare(
     "INSERT OR REPLACE INTO sgt_towar(tw_id, symbol, nazwa, ean, lokalizacja) VALUES (1,'W32-0203','Kosa','590','')"
   ).run();
@@ -175,4 +175,53 @@ test("odświeżenie kasuje braki, a zdjęcia zostawia", async () => {
     [1],
     "zdjęcia w cache'u zostają — inaczej wszystkie kolektory pobrałyby je od nowa"
   );
+});
+
+/* ── Audyt: brak zdjęcia NIE jest odrzuceniem ────────────────────────────────
+   Eksport z produkcji pokazał 355 wpisów „404 Brak zdjęcia" na 1000 zdarzeń
+   z czterech dni — 301 różnych kartotek, ani jednego trafienia, bo instalacja
+   nie ma włączonych `ZDJECIA_*`. Prawdziwych odrzuceń było w tym samym oknie
+   pięć i wszystkie utonęły w tym szumie.
+
+   Kolektor pyta o miniaturę każdego rysowanego wiersza, więc ta trasa jest
+   z definicji odpytywana z częstotliwością ekranu. Test pilnuje obu stron
+   reguły: cisza tutaj, ale ani jednej trasy więcej.                          */
+
+const odrzucenia = () =>
+  db().prepare("SELECT payload FROM events WHERE type = 'http_rejected'").all() as Array<{
+    payload: string;
+  }>;
+
+test("brak zdjęcia nie zostawia śladu w audycie", async () => {
+  const r = await app.inject(zSesja());
+  assert.equal(r.statusCode, 404);
+  assert.deepEqual(odrzucenia(), [], "404 o zdjęciu topi audyt, a nikomu niczego nie odebrano");
+});
+
+test("nieznany towar też milczy — ta sama trasa, ta sama częstotliwość", async () => {
+  const r = await app.inject({
+    method: "GET",
+    url: "/api/products/999999/zdjecie",
+    headers: { "x-session": token },
+  });
+  assert.equal(r.statusCode, 404);
+  assert.deepEqual(odrzucenia(), []);
+});
+
+test("404 na INNEJ trasie zostaje w audycie", async () => {
+  // wyciszenie ma być wąskie: gdzie indziej „nie ma" bywa tropem
+  const r = await app.inject({
+    method: "GET",
+    url: "/api/aktualizacja/apk",
+    headers: { "x-session": token },
+  });
+  assert.equal(r.statusCode, 404);
+  assert.equal(odrzucenia().length, 1, "wyciszenie objęło trasę, której nie miało obejmować");
+});
+
+test("odmowa sesji przy zdjęciu dalej NIE jest logowana", async () => {
+  // odczyt bez sesji był wyciszony wcześniej i ma taki zostać
+  const r = await app.inject({ method: "GET", url: "/api/products/1/zdjecie" });
+  assert.equal(r.statusCode, 401);
+  assert.deepEqual(odrzucenia(), []);
 });
