@@ -19,6 +19,10 @@ server/data/zdjecia/
 # raporty rekoncyliacji — dane operacyjne, nie kod
 server/data/reconcile/
 server/data/reslot/
+# APK kolektora wystawiany kolektorom do aktualizacji (0.52.0) — artefakt
+# wydania, nie kod. Kilkanaście megabajtów binarium w repo przy pierwszym
+# `git add -A` na serwerze.
+server/data/apk/
 *.sqlite
 *.sqlite-*
 
@@ -28,6 +32,10 @@ android/build/
 android/*/build/
 android/local.properties
 android/app/libs/*.aar
+# klucz podpisu wydania — w repo znaczyłby, że każdy z dostępem do kodu
+# podpisze APK, który kolektory przyjmą jako aktualizację WERTIS
+*.keystore
+*.jks
 android/.kotlin/
 
 # artefakt importu tools/*.py (styl_check bywa importowany przy diagnozie)

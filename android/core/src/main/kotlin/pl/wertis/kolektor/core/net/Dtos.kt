@@ -148,6 +148,22 @@ data class HealthResponse(val wersja: String = "")
 @Serializable
 data class WidocznoscRequest(val ukryte: List<Long>)
 
+/**
+ * Co serwer ma dla kolektorów do zainstalowania (0.52.0).
+ *
+ * `wersja` jest `null`, gdy serwer nie ma pliku — i to jest ODPOWIEDŹ, nie
+ * błąd. Domyślne wartości niosą tu drugie znaczenie: starszy serwer, który tej
+ * trasy nie zna, odda 404, a nowszy zawsze 200; kolektor w obu przypadkach ma
+ * milczeć, zamiast pokazywać cokolwiek.
+ */
+@Serializable
+data class AktualizacjaResponse(
+    val wersja: String? = null,
+    val kodWersji: Int = 0,
+    val bajtow: Long = 0,
+    val sha256: String = "",
+)
+
 /** Zmiana lokalizacji czekająca w kolejce — pojedynczy kod, nie całe pole. */
 @Serializable
 data class PendingLocChange(

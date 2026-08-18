@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -30,6 +32,34 @@ val kodWersji: Int = run {
     major * 10_000 + minor * 100 + patch
 }
 
+/* ── Podpis wydania (0.52.0) ────────────────────────────────────────────────
+   Android odmawia instalacji aktualizacji podpisanej INNYM kluczem — i to jest
+   jedyny powód, dla którego ta konfiguracja istnieje. Wcześniej repo nie miało
+   żadnej: CI budowało `assembleDebug`, a runner GitHuba generuje sobie własny
+   keystore debugowy przy każdym biegu. Dwa kolejne artefakty miały więc dwa
+   różne podpisy i żaden nie instalował się nad poprzednim.
+
+   KLUCZ NIE LEŻY W REPO. Wchodzi zmiennymi środowiskowymi (CI) albo
+   z `local.properties` (maszyna dewelopera; plik jest w .gitignore). Keystore
+   w gicie znaczyłby, że każdy z dostępem do repo podpisze plik, który kolektory
+   przyjmą jako aktualizację WERTIS.
+
+   Brak klucza NIE psuje builda debugowego — ten ma własny podpis i ma się
+   budować na maszynie bez sekretów. Psuje dopiero `assembleRelease`, i to
+   dopiero w chwili uruchomienia zadania, a nie przy konfiguracji projektu.  */
+val lokalne: Properties = Properties().apply {
+    val plik = rootProject.file("local.properties")
+    if (plik.exists()) plik.inputStream().use { load(it) }
+}
+
+fun sekret(zmienna: String, wlasciwosc: String): String? =
+    System.getenv(zmienna) ?: lokalne.getProperty(wlasciwosc)
+
+/* `takeIf { it.exists() }` jest tu istotne: ścieżka wskazująca w pustkę ma
+   znaczyć „nie ma klucza", a nie wywalić build komunikatem o pliku. */
+val plikKeystore: java.io.File? =
+    sekret("WERTIS_KEYSTORE", "wertis.keystore")?.let { file(it) }?.takeIf { it.exists() }
+
 android {
     namespace = "pl.wertis.kolektor"
     compileSdk = 35
@@ -44,11 +74,35 @@ android {
         resourceConfigurations += "pl"
     }
 
+    signingConfigs {
+        if (plikKeystore != null) {
+            create("wydanie") {
+                storeFile = plikKeystore
+                storePassword = sekret("WERTIS_KEYSTORE_HASLO", "wertis.keystore.haslo")
+                keyAlias = sekret("WERTIS_KLUCZ_ALIAS", "wertis.klucz.alias")
+                keyPassword = sekret("WERTIS_KLUCZ_HASLO", "wertis.klucz.haslo")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            /* R8 WYŁĄCZONY, i to jest decyzja z 0.52.0, nie zaniedbanie.
+               Od tej wersji APK rozjeżdża się SAM po kolektorach z serwera,
+               więc plik, którego nikt nie uruchomił, trafia od razu na całą
+               halę. Reguły `proguard-rules.pro` nie przeszły nigdy żadnego
+               builda wydania — Retrofit trzyma trasy w interfejsie czytanym
+               refleksją, a kotlinx.serialization generuje serializatory, więc
+               brakująca reguła nie psuje builda, tylko wywala aplikację przy
+               pierwszym wywołaniu API.
+
+               Rozmiar nie jest tu ceną: plik jedzie po sieci magazynu, a nie
+               przez Play. Włączyć z powrotem można wtedy, gdy ktoś sprawdzi
+               zminifikowane wydanie na fizycznym kolektorze — nie wcześniej. */
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("wydanie")
         }
     }
 
@@ -98,4 +152,19 @@ dependencies {
     }
 
     testImplementation(libs.junit)
+}
+
+/* Odmowa PRZY URUCHOMIENIU zadania, nie przy konfiguracji projektu. Gradle
+   konfiguruje wszystkie warianty przy każdym poleceniu, więc `error()` w bloku
+   `release` wywalałby także `:core:test` i `assembleDebug` na maszynie bez
+   sekretów — czyli w środowisku, w którym nikt wydania nie buduje. */
+if (plikKeystore == null) {
+    tasks.matching { it.name == "assembleRelease" }.configureEach {
+        doFirst {
+            error(
+                "Brak keystore wydania. Ustaw WERTIS_KEYSTORE (i hasła) albo wpisz " +
+                    "wertis.keystore w android/local.properties — patrz DEPLOY.md §5."
+            )
+        }
+    }
 }

@@ -334,6 +334,26 @@ nie ma czego przejmować: kto siada do kolektora, ten się loguje, a poprzednik
 wylogowuje. Audyt na tym nie traci, bo każda operacja i tak niesie własne
 `user_ref` — przejęcie było zdarzeniem o SESJI, nie o pracy.
 
+### Aktualizacja kolektora idzie z serwera, nie z CI
+
+Do 0.52.0 nowy APK wgrywał człowiek: artefakt z GitHuba, potem MDM albo
+`adb install` na każdym urządzeniu. Od 0.52.0 plik leży w `server/data/apk/`,
+a kolektor pyta o niego przy otwarciu aplikacji. Wersję niesie NAZWA pliku —
+czytanie `versionName` z APK znaczyłoby własny dekoder binarnego
+`AndroidManifest.xml` dla jednego pola.
+
+Obie trasy (`GET /api/aktualizacja` i `/api/aktualizacja/apk`) są poza bramką
+sesji. Powód jest ten sam, co przy kreatorze kont: bez nich kolektora, którego
+aplikacja jest zepsuta albo przestarzała, nie da się doprowadzić do stanu,
+w którym da się zalogować. Konsekwencja jest jawna — plik pobierze każdy w sieci
+magazynu, więc do APK nie wolno wbudować niczego tajnego.
+
+Tym, co odróżnia aktualizację WERTIS od dowolnego APK podanego kolektorowi
+z tej samej sieci, jest PODPIS: Android odmawia instalacji pliku podpisanego
+innym kluczem. Suma SHA-256 chroni wyłącznie przed uszkodzeniem w transporcie,
+bo przychodzi tym samym kanałem co plik. Dlatego klucz wydania jest tu
+zabezpieczeniem nośnym, a nie higieną, i nie może leżeć w repozytorium.
+
 ### Operacje uprzywilejowane rozstrzyga rola
 
 Dwie operacje są zastrzeżone dla ról:

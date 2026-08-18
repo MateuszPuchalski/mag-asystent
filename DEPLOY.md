@@ -258,8 +258,42 @@ cd android
 ./gradlew :app:assembleDebug        # → app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Do produkcji podpisz release (`./gradlew :app:assembleRelease` z własnym
-keystore) — instrukcja podpisu jak w standardowym projekcie Android.
+**Podpis wydania jest od 0.52.0 warunkiem aktualizacji, nie ozdobą.** Android
+odmawia instalacji aktualizacji podpisanej innym kluczem niż zainstalowana
+aplikacja. Build debugowy z CI dostaje losowy klucz przy każdym biegu, więc
+dwa kolejne artefakty nie zainstalują się jeden nad drugim.
+
+Klucz robi się raz:
+
+```bash
+keytool -genkeypair -v -keystore wertis.keystore -alias wertis \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Build wydania czyta go ze zmiennych `WERTIS_KEYSTORE`, `WERTIS_KEYSTORE_HASLO`,
+`WERTIS_KLUCZ_ALIAS` i `WERTIS_KLUCZ_HASLO`. Te same wartości przyjmuje plik
+`local.properties` w katalogu `android/`, w polach `wertis.keystore`,
+`wertis.keystore.haslo`, `wertis.klucz.alias` i `wertis.klucz.haslo`. W CI
+keystore leży jako sekret `WERTIS_KEYSTORE_B64`.
+
+> **Kopia klucza jest równie ważna jak kopia bazy.** Utrata keystore znaczy, że
+> żaden przyszły APK nie zainstaluje się nad obecnym. Jedynym wyjściem jest
+> wtedy odinstalowanie aplikacji na każdym kolektorze z osobna.
+
+**Przejście na własny klucz jest jednorazowo bolesne.** Kolektory z buildem
+debugowym odmówią aktualizacji komunikatem „App not installed". Każde
+urządzenie trzeba odinstalować i zainstalować od nowa, a to kasuje dane
+lokalne: adres serwera, listę ostatnio skanowanych i **bufor offline**.
+
+Kolejność na urządzenie, bez skrótów:
+
+1. Sprawdź, czy pasek bufora offline pokazuje zero operacji do wysłania.
+2. Odinstaluj aplikację.
+3. Zainstaluj nowy APK.
+4. Podaj adres serwera na ekranie startowym.
+
+Rób to po zmianie, urządzenie po urządzeniu. Każda kolejna aktualizacja wchodzi
+już po wierzchu i niczego nie kasuje.
 
 **2. Skaner sprzętowy** (bez konfiguracji w aplikacji — wybór wg producenta):
 - **Zebra (DataWedge):** aplikacja sama tworzy profil `WERTIS` przy starcie
@@ -270,7 +304,8 @@ keystore) — instrukcja podpisu jak w standardowym projekcie Android.
   Bez AAR-a aplikacja działa na skanerze klawiaturowym (wedge).
 
 **3. Instalacja i konfiguracja na kolektorze:**
-- Wgraj APK przez MDM (SOTI / Honeywell / Zebra) lub `adb install app-debug.apk`.
+- **Pierwsza instalacja** przez MDM (SOTI / Honeywell / Zebra) albo
+  `adb install`. Kolejne wersje kolektor bierze sam — patrz punkt 5.
 - Kiosk: przypnij aplikację przez Android lock-task / device owner (MDM) —
   Fully Kiosk Browser nie jest potrzebny.
 - Przy pierwszym starcie adres serwera podajesz **na ekranie startowym**
@@ -432,6 +467,24 @@ na co wskazywać, a zalogować się nimi nie da. Po migracji przejrzyj `nazwy`;
 wpisy w rodzaju „magazynier" albo „test" wyłącz przez
 `POST /api/users/:id/active` z `{"active":false}`. Konta się **nie kasuje**:
 historia w `events` musi mieć na co wskazywać.
+
+**5. Aktualizacja kolektorów (od 0.52.0).** Plik leży na serwerze WERTIS,
+w `server\data\apk\`, pod nazwą niosącą wersję: `wertis-kolektor-0.52.0.apk`.
+Kładzie go tam instalator przy `-Aktualizuj`; ręcznie wystarczy skopiować plik
+do tego katalogu.
+
+Kolektor pyta o nową wersję **przy otwarciu aplikacji** i proponuje pobranie.
+Pytanie działa także przed zalogowaniem — urządzenie z zepsutą aplikacją da się
+naprawić bez logowania się do niej.
+
+Trzy rzeczy warto wiedzieć przed pierwszym takim wdrożeniem:
+
+- Android poprosi o zgodę **„Instalowanie nieznanych aplikacji"** dla WERTIS.
+  Zgoda jest jednorazowa, per urządzenie.
+- Jeżeli MDM blokuje instalowanie spoza sklepu, kolektor powie to wprost i nic
+  nie pobierze. Wtedy zostaje droga przez MDM, jak dotąd.
+- Aktualizacja niczego nie kasuje: bufor offline, adres serwera i lista
+  ostatnio skanowanych zostają na miejscu.
 
 **3a. Co wymaga której roli.** Do codziennej pracy wystarcza zalogowanie.
 Zastrzeżone są trzy rzeczy:
@@ -724,8 +777,9 @@ Podgląd bez zmian: ten sam wiersz z `-DryRun`. Po nieudanym `git pull` usługi
 wracają na poprzedniej wersji; po nieudanym budowaniu zostają zatrzymane, bo
 stary `dist` z nową bazą mieszałby dwie wersje.
 
-**Nowy APK jest osobną czynnością** — patrz §5. Pasek na dole ekranu kolektora
-pokazuje obie wersje i podświetla rozjazd.
+**APK przynosi ten sam instalator** — ląduje w `server\data\apk\`, a kolektory
+proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
+obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 
@@ -836,8 +890,8 @@ pokazuje obie wersje i podświetla rozjazd.
   nssm restart wertis-worker
   ```
 
-  **Kolektor aktualizuje się osobno.** Zbuduj nowy APK w CI albo przez
-  `./gradlew :app:assembleRelease` i roześlij go przez MDM (sekcja 5).
+  **Kolektory biorą nowy APK z serwera** — plik kładzie tam `-Aktualizuj`,
+  a urządzenia proponują aktualizację przy otwarciu aplikacji (sekcja 5).
 - **Diagnoza:** `http://mag.wertis.local:3001/api/health` → `{ ok: true, mode: ... }`;
   tabela `sfera_queue` w `wertis.db` pokazuje pełną historię zadań.
 - **Komputer pokazuje stary splash kolektora zamiast podglądu biura.** To ślad

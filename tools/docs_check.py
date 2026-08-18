@@ -32,6 +32,9 @@ ALLOWED_MISSING = {
     # cache zdjęć kartotek — powstaje przy pierwszym otwarciu karty, w świeżym
     # klonie go nie ma, ale dokumentacja musi móc nazwać katalog po imieniu
     "server/data/zdjecia/",
+    # APK dla kolektorów — kładzie go instalator przy aktualizacji, w świeżym
+    # klonie go nie ma, a dokumentacja musi móc nazwać katalog po imieniu
+    "server/data/apk/",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis

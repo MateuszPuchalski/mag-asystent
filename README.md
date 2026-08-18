@@ -7,7 +7,9 @@ każdy do swojej roli:
 - **Kolektor = natywna aplikacja Android** ([`android/`](android/README.md),
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
   trwały offline (bufor plikowy JSON + WorkManager), kiosk przez Android
-  lock-task/MDM. Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5.
+  lock-task/MDM. Od 0.52.0 **aktualizuje się sam z serwera WERTIS**: plik leży
+  w sieci magazynu, a kolektor proponuje go przy otwarciu aplikacji. Wdrożenie:
+  [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
   kolejka zapisów, rekoncyliacja i ślad audytowy. Od 0.48.0 zakładka ANALIZA:
@@ -506,7 +508,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 187 testów jednostkowych; buduje się bez Android SDK
+                           + 200 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
@@ -521,7 +523,8 @@ server/                    backend (Fastify + SQLite + worker)
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
                            a nie leży w regale), podglad-dostawy (pozycje
                            dokumentu dla biura — sam odczyt),
-                           queue, locations, events
+                           queue, locations, events,
+                           aktualizacja (APK dla kolektorów)
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)

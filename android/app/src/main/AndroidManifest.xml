@@ -5,6 +5,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!--
+      Aktualizacja z serwera WERTIS (0.52.0). Uprawnienie jest instalacyjne, ale
+      NIE WYSTARCZA: człowiek musi jeszcze zgodzić się w ustawieniach Androida
+      na instalowanie z tej aplikacji. Kolektor pyta o to sam, zanim cokolwiek
+      pobierze — patrz `AktualizacjaRepository`.
+
+      Zastrzeżenia sklepu Play tego nie dotyczą: APK nigdy tam nie trafia,
+      jedzie po sieci magazynu. Nie usuwać „na wszelki wypadek".
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Zdjęcie dowodowe robi systemowy aparat. NIE deklarujemy CAMERA:
          ACTION_IMAGE_CAPTURE jej nie wymaga, a deklaracja wymusiłaby pytanie
@@ -39,6 +49,18 @@
         </activity>
 
         <!-- Aparat pisze do cache aplikacji; plik ginie zaraz po zakodowaniu. -->
+        <!--
+          Wynik sesji instalatora. W MANIFEŚCIE, bo instalacja zabija nasz
+          proces — odbiornik rejestrowany w kodzie nie dożyłby odpowiedzi.
+        -->
+        <receiver
+            android:name=".update.WynikInstalacji"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="pl.wertis.kolektor.INSTALACJA" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.photos"

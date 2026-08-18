@@ -6,9 +6,12 @@ name: Android
 on:
   push:
     branches: [main]
-    paths: ["android/**", ".github/workflows/android.yml"]
+    # `package.json` korzenia MUSI tu być: z niego bierze się `versionName`
+    # i `versionCode` APK. Bez tego sam podbicie wersji nie przebudowywało
+    # kolektora i na wydanie szedł plik z numerem sprzed zmiany.
+    paths: ["android/**", "package.json", ".github/workflows/android.yml"]
   pull_request:
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", "package.json", ".github/workflows/android.yml"]
 
 jobs:
   build:
@@ -33,8 +36,51 @@ jobs:
         run: ./gradlew :core:test
       - name: Testy jednostkowe + APK debug
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug
-      - name: Artefakt APK
+      - name: Artefakt APK debug
         uses: actions/upload-artifact@v4
         with:
           name: wertis-kolektor-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+
+      # ── Wydanie podpisane własnym kluczem (0.52.0) ──────────────────────
+      # Wyłącznie na `main`: sekretów nie ma w forkach, więc na PR-ach ten
+      # krok padłby na każdym zewnętrznym wkładzie. Podpis jest tu jedyną
+      # rzeczą odróżniającą aktualizację WERTIS od dowolnego APK podanego
+      # kolektorowi z sieci magazynu — patrz DEPLOY.md §5.
+      - name: Klucz podpisu
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          KLUCZ_B64: ${{ secrets.WERTIS_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KLUCZ_B64" ]; then
+            echo "::warning::Brak sekretu WERTIS_KEYSTORE_B64 — pomijam wydanie"
+            exit 0
+          fi
+          echo "$KLUCZ_B64" | base64 -d > "$RUNNER_TEMP/wertis.keystore"
+          echo "WERTIS_KEYSTORE=$RUNNER_TEMP/wertis.keystore" >> "$GITHUB_ENV"
+
+      - name: APK wydania
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        env:
+          WERTIS_KEYSTORE_HASLO: ${{ secrets.WERTIS_KEYSTORE_HASLO }}
+          WERTIS_KLUCZ_ALIAS: ${{ secrets.WERTIS_KLUCZ_ALIAS }}
+          WERTIS_KLUCZ_HASLO: ${{ secrets.WERTIS_KLUCZ_HASLO }}
+        run: ./gradlew :app:assembleRelease
+
+      # Nazwa pliku niesie wersję, bo po niej rozpoznaje ją serwer
+      # (`server/src/services/aktualizacja.ts`) — nie po zawartości APK.
+      - name: Nazwa z wersją i suma kontrolna
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        working-directory: ${{ github.workspace }}
+        run: |
+          wersja=$(node -p "require('./package.json').version")
+          mkdir -p wydanie
+          cp android/app/build/outputs/apk/release/*.apk "wydanie/wertis-kolektor-$wersja.apk"
+          cd wydanie && sha256sum "wertis-kolektor-$wersja.apk" > "wertis-kolektor-$wersja.apk.sha256"
+
+      - name: Artefakt APK wydania
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: wertis-kolektor-apk
+          path: wydanie/*

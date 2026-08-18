@@ -28,6 +28,87 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
+## 0.52.0 — 18 sierpnia 2026
+
+**Kolektor aktualizuje się sam, z serwera WERTIS.** Do tej wersji nowy APK
+wgrywał człowiek: zalogowanie do GitHuba, pobranie artefaktu z CI i obejście
+wszystkich kolektorów przez MDM albo `adb install`. Jedynym sygnałem, że trzeba
+to zrobić, był bursztynowy pasek „wersje różne" na dole ekranu — mówiący
+o problemie i nieoferujący z niego żadnego wyjścia.
+
+Teraz plik leży na serwerze w sieci magazynu, w `server/data/apk/`, a kolektor
+pyta o niego **przy otwarciu aplikacji**. Kolektor nigdy nie wychodzi do
+internetu; plik przynosi instalator przy `-Aktualizuj`, razem z aktualizacją
+serwera. Nieudane pobranie APK nie przerywa aktualizacji serwera — kolektory
+zostają wtedy tam, gdzie były przed tą wersją.
+
+**Pytanie pada przy otwarciu, nie w Ustawieniach.** Ustawienia wiszą pod paskiem
+górnym, a paska nie ma przed zalogowaniem, więc przycisk tam byłby pułapką dla
+kogoś, kogo aplikacja właśnie nie wpuszcza. Z tego samego powodu obie trasy
+aktualizacji działają bez sesji: urządzenie z zepsutą aplikacją da się naprawić
+bez logowania się do niej. Cena jest jawna i zapisana przy trasie — do APK nie
+wolno od teraz wbudować niczego tajnego.
+
+Sam ekran startowy też by nie wystarczył. Przy żywej sesji Splash schodzi z drogi
+od razu, a sesje nie wygasają od 0.20.0 — karta byłaby więc niewidoczna dokładnie
+dla tych, którzy pracują na kolektorze codziennie. Dlatego pytanie żyje o piętro
+wyżej, w `AppRoot`, i widzą je obie drogi.
+
+Pasek wersji na dole przestał być tylko napisem: dotknięcie pyta serwer od razu.
+
+**Kolejność kroków jest częścią projektu.** Zgody Androida na instalację pytamy
+PRZED pobraniem, a nie po nim — kazać człowiekowi czekać na kilkanaście
+megabajtów, żeby potem powiedzieć „system i tak nie pozwoli", to najgorsza
+możliwa kolejność. Plik jedzie do pamięci trwałej, nie do cache'u, który system
+czyści właśnie przy braku miejsca. Suma SHA-256 liczy się w trakcie strumienia,
+a właściwą nazwę plik dostaje dopiero po jej sprawdzeniu, więc pobranie ucięte
+w połowie nigdy nie wygląda na gotowe do instalacji.
+
+Aktualizacja niczego nie kasuje: bufor offline, adres serwera i lista ostatnio
+skanowanych zostają na miejscu. Nie blokuje też pracy — kartę da się zamknąć,
+a logowanie pod spodem działa przez cały czas.
+
+**Podpis wydania.** Android odmawia instalacji aktualizacji podpisanej innym
+kluczem niż zainstalowana aplikacja, a repo nie miało dotąd żadnej konfiguracji
+podpisu: CI budowało wariant debugowy, któremu runner GitHuba generuje losowy
+klucz przy każdym biegu. Dwa kolejne artefakty z CI miały więc dwa różne podpisy
+i żaden nie instalował się nad poprzednim. Bez tej zmiany reszta funkcji nie
+zadziałałaby ani razu.
+
+Klucz nie leży w repo — wchodzi zmiennymi środowiskowymi albo z pliku poza
+gitem. Skrót „wrzućmy stały keystore debugowy do repo" został odrzucony
+świadomie: od tej wersji podpis jest jedyną rzeczą odróżniającą aktualizację
+WERTIS od dowolnego APK podanego kolektorowi z sieci magazynu, a klucz w repo
+ma każdy, kto ma dostęp do kodu.
+
+**R8 wyłączony dla wydania.** Reguły `proguard-rules.pro` nie przeszły nigdy
+żadnego builda wydania, a Retrofit i kotlinx.serialization łamią się po
+minifikacji dopiero w czasie działania. Plik, którego nikt nie uruchomił, jedzie
+teraz sam na całą halę — więc do czasu sprawdzenia zminifikowanego wydania na
+fizycznym kolektorze APK zostaje pełny. Rozmiar nie jest tu ceną: plik idzie po
+sieci magazynu, nie przez sklep.
+
+Trzynaście testów serwera i trzynaście w `:core`; razem serwer ma 650, `:core` 200.
+
+**[wymaga działania]** Trzy rzeczy, po kolei:
+
+1. Wygeneruj keystore i dodaj sekrety `WERTIS_KEYSTORE_B64`,
+   `WERTIS_KEYSTORE_HASLO`, `WERTIS_KLUCZ_ALIAS`, `WERTIS_KLUCZ_HASLO`
+   w ustawieniach repozytorium. Instrukcja: `DEPLOY.md` §5.
+2. **Jednorazowo odinstaluj i zainstaluj aplikację na każdym kolektorze.**
+   Zmiana podpisu sprawia, że aktualizacja po wierzchu nie przejdzie, a
+   odinstalowanie kasuje dane lokalne urządzenia: adres serwera, listę ostatnio
+   skanowanych i **bufor offline**. Rób to po zmianie i przed odinstalowaniem
+   sprawdź na każdym urządzeniu, że bufor nie ma nic do wysłania.
+3. Na kolektorze zezwól WERTIS na „Instalowanie nieznanych aplikacji" — aplikacja
+   sama o to poprosi. Gdy MDM tego zabrania, aktualizacje idą dalej przez MDM
+   i kolektor powie to wprost.
+
+Serwer zwyczajnie: `git pull`, `npm ci`, `npm run build`, restart usług. Każda
+kolejna aktualizacja kolektora wchodzi już po wierzchu i niczego nie kasuje.
+
+---
+
 ## 0.51.0 — 17 sierpnia 2026
 
 **Jednostka miary mówi prawdę — i milczy, gdy nie ma czego opisywać.** Dwie
