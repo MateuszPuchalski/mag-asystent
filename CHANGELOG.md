@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.52.3 — 18 sierpnia 2026
+
+**Audyt przestał tonąć we własnym szumie.** Eksport śladu audytowego
+z produkcji pokazał, że **355 z 1000 zdarzeń** w oknie czterech dni to jeden
+wpis: „404 Brak zdjęcia". Zapytano o 301 różnych kartotek i ani jedna nie miała
+zdjęcia, bo instalacja nie ma włączonych `ZDJECIA_*`.
+
+Prawdziwych odrzuceń było w tym samym oknie **pięć**: dwie pomyłki w haśle,
+jedna zła reguła strefy, jedno puste żądanie i jedna próba odłożenia zera
+sztuk. Wszystkie utonęły w trzystu pięćdziesięciu wierszach o zdjęciach.
+
+Kolektor pyta o miniaturę KAŻDEGO rysowanego wiersza, więc częstotliwość tych
+zapytań bierze się z rysowania ekranu, a nie z pracy człowieka. A brak zdjęcia
+jest **odpowiedzią, nie odmową**: nikomu niczego nie odebrano, więc nie ma
+czego dochodzić w reklamacji — a to jest jedyny powód, dla którego ten log
+istnieje.
+
+Hook `onSend` miał już dokładnie taki wyjątek dla `401` na `GET`, z tym samym
+uzasadnieniem („karta odpytuje co 2 s i utopiłaby resztę audytu"). Zdjęcia były
+tym samym przypadkiem, tylko nieobjętym regułą.
+
+Lista wyciszonych tras jest wąska i jawna. Wpis wymaga OBU warunków naraz:
+częstotliwości rysowania ekranu i normalności odpowiedzi „nie ma". Sam brak
+czegoś nie wystarcza — 404 na każdej innej trasie zostaje w audycie, bo tam
+znaczy „pytałeś o coś, czego nie ma", a to bywa tropem. Pilnuje tego test:
+wycisza zdjęcia, a przy `GET /api/aktualizacja/apk` wymaga wpisu.
+
+Czego to NIE naprawia: kolektor dalej pyta o zdjęcia, których nie ma. Tańsze
+byłoby nie pytać, ale to zmiana w aplikacji i nowy APK. Najprostsze wyjście
+jest inne — **włączyć `ZDJECIA_*` w `wertis.env`** (`DEPLOY.md` §6), bo funkcja
+jest gotowa i czeka wyłącznie na konfigurację.
+
+Cztery testy, serwer ma ich 654.
+
+**[wymaga działania]** Nic. `git pull`, `npm ci`, `npm run build`, restart
+usług. Bez nowego APK.
+
+---
+
 ## 0.52.2 — 18 sierpnia 2026
 
 **Poprawka: APK nie trafiał tam, skąd instalator go bierze.** Zgłoszenie
