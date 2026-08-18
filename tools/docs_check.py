@@ -65,6 +65,18 @@ REMOVED = [
     "PUTAWAY_SESSION",
     "walkMode",
     "13 ekran",
+    # Blokady pozycji i rola brygadzisty — wycięte w 0.47.0. Jedną dostawę
+    # rozkłada tu jedna osoba, więc lock nie rozstrzygał żadnego sporu, a rola
+    # istniała głównie po to, żeby móc cudzą pozycję odebrać. Tokeny są
+    # IDENTYFIKATORAMI, nie polskimi słowami: „blokada" w prozie o historii ma
+    # prawo zostać, instrukcja każąca odebrać pozycję koledze — nie.
+    "services/locks.ts",
+    "locked_by",
+    "locked_at",
+    "forceReleaseLine",
+    "zdjecie_cudzego_locka",
+    "lock_forced",
+    "/force-release",
     # Flaga sprawdzenia faktury — wycięta w 0.16.0 razem z prawem zapisu do
     # `fl_Wartosc`. Tokeny są identyfikatorami, nie polskim słowem „flaga":
     # historia i uzasadnienie decyzji mogą o niej mówić prozą, ale instrukcja

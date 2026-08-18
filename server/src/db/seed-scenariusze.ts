@@ -179,7 +179,7 @@ export const KATALOG: Scenariusz[] = [
   { id: "S50", obszar: "kolejka", tytul: "Rozjazd: zapis wszedł, kartoteka mówi co innego", wejscie: "npm run reconcile" },
 
   // ── konta, sesje, uprawnienia ──
-  { id: "S51", obszar: "konta", tytul: "Cztery role z hasłami", wejscie: "logowanie jan.k / ewa.b / biuro.test / admin.test" },
+  { id: "S51", obszar: "konta", tytul: "Trzy role na czterech kontach", wejscie: "logowanie jan.k / ewa.b / biuro.test / admin.test" },
   { id: "S52", obszar: "konta", tytul: "Konto wyłączone", wejscie: "logowanie zwolniony" },
   { id: "S53", obszar: "konta", tytul: "Konto-ślad bez loginu (migracja historii)", wejscie: "POST /api/users/migrate-history" },
   { id: "S54", obszar: "konta", tytul: "Konto z loginem, bez hasła", wejscie: "logowanie bez.hasla" },

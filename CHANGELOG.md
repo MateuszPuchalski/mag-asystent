@@ -22,9 +22,64 @@ ma odpowiadać, brzmi: *„czy przy tej aktualizacji muszę coś zrobić ręką?
 | **PATCH** (`0.3.X`) | poprawka błędu, dokumentacja, refaktor bez śladu na ekranie | `git pull`, `npm ci`, `npm run build`, restart usług — nic więcej |
 | **MAJOR** (`1.0.0`) | **dopiero gdy system pracuje na produkcji codziennie** | zostaje `0` do tego czasu; podbicie będzie decyzją właściciela, nie skutkiem ubocznym |
 
-**Nowy APK to zawsze osobna czynność.** `git pull` przestawia serwer od razu,
-kolektor czeka na rozesłanie przez MDM — dlatego pasek na dole ekranu pokazuje
-obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
+**Nowy APK to nadal osobna czynność, ale od 0.52.0 nie ręczna.** `git pull`
+przestawia serwer od razu; APK kładzie obok niego instalator, a kolektory
+proponują go same przy otwarciu aplikacji. Pasek na dole ekranu dalej pokazuje
+obie wersje i podświetla rozjazd — to stan przejściowy, nie awaria. MDM zostaje
+dla pierwszej instalacji i dla flot, które blokują instalowanie spoza sklepu.
+
+Wpisy sprzed 0.52.0 mówią „nowy APK przez MDM" i tak było w dniu wydania —
+historii nie przepisujemy.
+
+---
+
+## 0.52.1 — 18 sierpnia 2026
+
+**Dokumentacja doprowadzona do stanu kodu.** Siedem wydań weszło w krótkim
+czasie z DWÓCH gałęzi naraz. Każda opisała swoją pracę u siebie i żadna nie
+widziała drugiej, a dwie zmiany były USUNIĘCIAMI. Dokumentacja nie tyle nie
+nadążyła, co miejscami zaczęła mówić nieprawdę — a zdanie nieprawdziwe czyta
+się jak instrukcję.
+
+Cztery rzeczy kosztowały realnie:
+
+- **Prawa zapisu do bazy firmy podane za wąsko w trzech miejscach.** `DEPLOY.md`
+  mówił `GRANT UPDATE` na jedną kolumnę, `porownanie-asystent.md` i `wdrozenie.md`
+  — „wyłącznie pole lokalizacji". Od 0.37.0 kolumny są dwie: lokalizacja
+  i `tw_PodstKodKresk`. Kto zakładał konto SQL z tych zdań, nadawał za mało
+  praw, a nadanie kodu kreskowego padało dopiero na produkcji, w workerze.
+- **Lista tras bez sesji krótsza o dwie pozycje.** README i DEPLOY mówiły „poza
+  czterema"; w kodzie jest sześć, bo doszły obie trasy aktualizacji kolektora.
+  To fakt o bramce sesji, więc rozjazd był tu najgorszy z możliwych.
+- **`android/README.md` wskazywał artefakt debugowy** ze zdaniem „do wgrania na
+  kolektory to wystarcza". Od 0.52.0 to pułapka: build debugowy dostaje losowy
+  klucz przy każdym biegu CI, więc na urządzeniu wyłącza samoaktualizację.
+- **`docs/wdrozenie.md` nie znało niczego z 0.52.0** — a to procedura
+  wykonywana raz, pod presją, na cudzej maszynie. Dostała sekcję o podpisie
+  wydania, jednorazowej reinstalacji floty i zgodzie „nieznane źródła".
+
+Poza tym: `instalator/README.md` nie mówił „APK" ani razu, choć od 0.52.0
+`-Aktualizuj` ten plik pobiera; zniknęła martwa rola brygadzisty i dwa
+odwołania do blokad pozycji; zestarzałe liczby (18 tabel zamiast 23, 29 typów
+zdarzeń zamiast 31, 153 i 92 testy zamiast 650 i 200) zostały policzone
+u źródła; słowniczek dostał pojęcia z 0.49–0.52, żeby `styl_check` miał czego
+pilnować.
+
+**Bramka zamiast oka.** Lista `REMOVED` w `tools/docs_check.py` dostała byty
+wycięte w 0.47.0. Od teraz dokument, który je nazwie, wywala bramkę — ta sama
+sztuczka, dzięki której po sesjach rozkładania z 0.22.0 nie został w dokumentach ślad.
+
+**Dług wypisany jawnie.** Dziesięć obszarów nie ma ani jednego scenariusza
+testowego: korekta ilości, notatki biura, zakończenie dostawy, domknięcie poza
+WERTIS, aktualizacja kolektora, nadanie kodu kreskowego, zbiórki i strefa
+złota, zakładka ANALIZA, jednostka miary, zdjęcia kartotek. Każdy wymaga pary —
+wpisu w katalogu `seed-scenariusze.ts` i opisu w `docs/scenariusze-testowe.md`
+— bo test wymusza zgodność w obie strony. Świadomie zostawione na osobną
+decyzję, żeby nie mieszać przeglądu dokumentacji z dopisywaniem danych
+testowych.
+
+**[wymaga działania]** Nic. `git pull`, `npm ci`, `npm run build`, restart
+usług. Bez nowego APK — kod aplikacji się nie zmienił.
 
 ---
 
@@ -288,6 +343,7 @@ Zostają trzy role — magazynier, biuro, administrator.
 pozycję dwa razy i licznik pokaże za dużo. Widać to na liście („odłożono 8 z 5")
 i poprawia się przyciskiem POPRAW ILOŚĆ z 0.46.0, bez niczyjej zgody.
 
+<!-- docs_check: historia -->
 Co znika: `services/locks.ts` z TTL, kolumny `locked_by` i `locked_at`,
 odpowiedź skanu `kind: locked`, trasy `/release` i `/force-release`, operacja
 `zdjecie_cudzego_locka`, zdarzenie `lock_forced` i pastylka „w rękach: X"

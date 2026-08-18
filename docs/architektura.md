@@ -59,9 +59,13 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 ┌──────────▼──────────────────────────────────────────────────┐
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
-│  SQLite (node:sqlite, WAL) — 18 tabel:                       │
+│  SQLite (node:sqlite, WAL) — 23 tabele:                      │
 │    delivery + delivery_line   rozkładanie faktur zakupu      │
+│    delivery_note              notatki biura do dostawy       │
 │    problem, ean_conflict      wyjątki                        │
+│    ean_alias                  kody nadane w WERTIS           │
+│    zdjecie_cache              zdjęcia kartotek z Subiekta    │
+│    zbiorka, strefa_regula     rotacja i strefa złota         │
 │    app_user, device_session   tożsamość (§7)                 │
 │    sfera_queue                kolejka zapisów do Subiekta    │
 │    events                     audyt — każdy skan i decyzja   │
@@ -266,6 +270,34 @@ bywa księgowany na różne magazyny. Decyduje `mag_Id`, snapshotowany w chwili
 otwarcia dostawy — żeby przeksięgowanie dokumentu w połowie pracy nie zmieniło
 reguł w jej trakcie.
 
+### Pomyłkę w liczeniu odkręca korekta, nie wyjątek
+
+Skan półki dodaje sztuki i nigdy ich nie odejmuje, więc do 0.45.0 jedyną drogą
+cofnięcia było zgłoszenie wyjątku — czyli wpis do protokołu rozbieżności,
+dokumentu idącego do dostawcy. Pomyłka w liczeniu zamieniała się w reklamację.
+
+`korygujIlosc` ustawia wartość **bezwzględną** i przelicza z niej status
+pozycji. Nie tworzy zadania w kolejce Sfery, nie kasuje zapisanego adresu i nie
+tworzy wyjątku: `ilosc_odlozona` jest licznikiem postępu po stronie WERTIS,
+więc poprawka jest lokalna. Pozycja ze zgłoszonym wyjątkiem jest poza jej
+zasięgiem — wyjątek jest twierdzeniem wobec dostawcy i żyje własnym trybem.
+
+Od 0.47.0 korekta jest też jedyną drogą odkręcenia **podwójnego odłożenia**.
+Blokady pozycji wyszły razem z rolą brygadzisty, więc dwie osoby przy jednym
+kartonie mogą policzyć tę samą pozycję dwa razy. Widać to na liście
+(„odłożono 8 z 5") i poprawia bez niczyjej zgody.
+
+### Notatka biura trzyma dostawę otwartą
+
+Biuro dopisuje do dostawy pytanie (`delivery_note`), a rozkładający musi na nie
+odpowiedzieć, zanim faktura się domknie. Bramka stoi w `closeIfComplete`, a nie
+tylko przy przycisku zakończenia — inaczej odłożenie ostatniej pozycji
+domykałoby dostawę z pytaniem bez odpowiedzi.
+
+Odpowiadanie jest świadomie **bez bramki roli**: odpowiada człowiek przy
+palecie, bo to on sprawdza, czy dosłali. Pisanie notatki jest pod `/api/biuro`,
+odpowiadanie przy trasach kolektora — i ten podział jest całą regułą.
+
 ### Niezmiennik: adres zawsze przed sprzedawalnością
 
 Przy przesunięciu zadanie `set_location` trafia do kolejki **przed** zadaniem
@@ -301,7 +333,7 @@ Trzy decyzje, każda z powodem:
   offline, więc kod błędu jest tu decyzją o cudzej pracy, nie kosmetyką.
 - **Login JEST daną osobową**, w odróżnieniu od kodu plakietki. To realna
   strata przy tej zmianie i nie ma sensu jej przemilczać: `GET /api/users`
-  wystawia listę loginów, więc zostaje zastrzeżone dla roli `biuro`.
+  wystawia listę loginów, więc zostaje zastrzeżone dla ról `biuro` i `admin`.
 
 <!-- docs_check: historia -->
 Do sierpnia 2026 tożsamością był skan plakietki `PRC-0007-3` — prefiks, numer
@@ -456,7 +488,7 @@ konto, a fakt wysyłki przez kogoś innego zapisuje w payloadzie zdarzenia.
 
 ## 9. Audyt i pomiar
 
-`events` to jedyna tabela, do której piszą wszystkie warstwy: **29 typów
+`events` to jedyna tabela, do której piszą wszystkie warstwy: **31 typów
 zapisywanych przez serwer** plus 3 przysyłane przez kolektor (`device_drop`,
 `battery_low`, `scan_timing` — lista dozwolonych w `routes/device.ts`, żeby
 klient nie mógł wstrzyknąć dowolnego typu). Każdy wiersz niesie `user_id`
@@ -542,7 +574,7 @@ Raport ma trzy reguły wbudowane w kod, każda z testem:
 
 > Liczb testów ta tabela celowo **nie podaje**. `tools/docs_check.py` pilnuje
 > ich wyłącznie w `README.md` i `android/README.md`, a policzyć ich statycznie
-> się nie da (`grep` po `test(` daje 363 przy 383 uruchomionych — testy
+> się nie da (`grep` po `test(` daje 610 przy 650 uruchomionych — testy
 > parametryzowane i zagnieżdżone). Liczba poza kontrolą narzędzia starzeje się
 > po cichu; tak właśnie ten dokument doszedł do „153" przy 199 — i do „138",
 > zanim ktoś znów policzył.

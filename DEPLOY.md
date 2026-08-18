@@ -256,7 +256,12 @@ Android lock-task/MDM.
 ```bash
 cd android
 ./gradlew :app:assembleDebug        # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease      # → app/build/outputs/apk/release/ (wymaga klucza)
 ```
+
+**Na kolektory idzie wyłącznie wydanie**, czyli drugie polecenie albo artefakt
+`wertis-kolektor-apk` z gałęzi `main`. Build debugowy dostaje losowy klucz przy
+każdym biegu CI, więc zainstalowany na urządzeniu wyłącza samoaktualizację.
 
 **Podpis wydania jest od 0.52.0 warunkiem aktualizacji, nie ozdobą.** Android
 odmawia instalacji aktualizacji podpisanej innym kluczem niż zainstalowana
@@ -323,8 +328,11 @@ Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](a
 
 Bez kont kolektor nie ma czym podpisać operacji. Ekran startowy prosi o login
 i hasło, i nie przepuszcza dalej. **Tak samo API** — od lipca każda trasa poza
-czterema (`GET /api/health`, `GET /api/setup`, `POST /api/auth/login`
-i `POST /api/users` przy pustej bazie) wymaga nagłówka `x-session`.
+sześcioma wymaga nagłówka `x-session`. Otwarte są: `GET /api/health`,
+`GET /api/setup`, `POST /api/auth/login`, `POST /api/users` przy pustej bazie
+oraz `GET /api/aktualizacja` i `GET /api/aktualizacja/apk`. Dwie ostatnie
+doszły w 0.52.0: kolektor pyta o nową wersję przy otwarciu aplikacji, więc
+także wtedy, gdy sesji nie ma.
 
 > **Dlaczego.** Wcześniej bramką był wyłącznie ekran kolektora. Dowolne
 > urządzenie w sieci hali mogło zmienić lokalizację w Subiekcie albo pobrać
@@ -559,8 +567,11 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
 1. Utwórz login SQL o minimalnych uprawnieniach. Gotowy, idempotentny skrypt
    jest w [`docs/subiekt-gt-edu-setup.md`](docs/subiekt-gt-edu-setup.md) §2.
 
-   Skrypt nadaje `GRANT SELECT` na sześć tabel i `GRANT UPDATE` na jedną
-   kolumnę (lokalizacja). Aplikacja **nie ma żadnego innego prawa zapisu**.
+   Skrypt nadaje `GRANT SELECT` na sześć tabel i `GRANT UPDATE` na **dwie
+   kolumny**: lokalizację (`MSSQL_LOC_COLUMN`) oraz `tw_PodstKodKresk` —
+   podstawowy kod kreskowy nadawany z kolektora od 0.37.0. Aplikacja **nie ma
+   żadnego innego prawa zapisu**. Nadanie tylko pierwszej kolumny kończy się
+   błędem dopiero w workerze, przy pierwszym nadaniu kodu.
 2. Przejdź checklistę `[WERYFIKUJ]`. Jest krótka.
 
    Nazwy tabel i kolumn oraz kody `dok_Typ` i `dok_Status` są odczytane wprost
@@ -917,11 +928,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Odi
 > `URUCHOM.cmd` (prawym → „Uruchom jako administrator"), ale deinstalacja
 > potrzebuje argumentów, więc idzie wprost.
 
-Zdejmuje usługi `wertis-api` i `wertis-worker`, regułę zapory „WERTIS kolektor"
-oraz katalog `C:\wertis`. Pyta o potwierdzenie, zanim cokolwiek ruszy.
+Zdejmuje usługi `wertis-api`, `wertis-worker` i `wertis-sfera`, regułę zapory
+„WERTIS kolektor" oraz katalog `C:\wertis`. Pyta o potwierdzenie, zanim
+cokolwiek ruszy.
 
-Ślad audytowy i zdjęcia problemów **zostają**. Instalator przenosi je obok, do
-`C:\wertis-dane-<data>`, i wypisuje tę ścieżkę. Historia zmian lokalizacji bywa
+**Cały katalog `server\data` zostaje.** Instalator przenosi go obok, do
+`C:\wertis-dane-<data>`, i wypisuje tę ścieżkę. Idzie tam baza, ślad audytowy,
+zdjęcia problemów, cache zdjęć kartotek, raporty i APK dla kolektorów. Historia zmian lokalizacji bywa
 potrzebna długo po tym, jak aplikacja zniknie z maszyny.
 
 Kasowanie także jej wymaga osobnego przełącznika i drugiego potwierdzenia:

@@ -185,9 +185,11 @@ skanera wystarczy. Domyślny adres serwera (`http://10.0.2.2:3001`) jest już
 ustawiony na localhost hosta.
 
 **Konto jest potrzebne także do grzebania curlem.** API wymaga nagłówka
-`x-session` na każdej trasie poza czterema: `GET /api/health`, `GET /api/setup`,
-`POST /api/auth/login` i `POST /api/users` przy pustej bazie. Token bierze się
-tak samo jak kolektor:
+`x-session` na każdej trasie poza sześcioma: `GET /api/health`, `GET /api/setup`,
+`POST /api/auth/login`, `POST /api/users` przy pustej bazie oraz dwie trasy
+aktualizacji kolektora (`GET /api/aktualizacja` i `/api/aktualizacja/apk`).
+Te ostatnie są otwarte, bo kolektor pyta o nową wersję przy otwarciu aplikacji
+— także wtedy, gdy sesji nie ma. Token bierze się tak samo jak kolektor:
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
@@ -197,7 +199,8 @@ curl -s http://localhost:3001/api/queue -H "x-session: $TOKEN"
 ```
 
 **Produkcja i wdrożenie w firmie (on-premise): [`DEPLOY.md`](DEPLOY.md).**
-Instalator Windows, usługi NSSM, sieć i zapora, APK na kolektorach (MDM/kiosk),
+Instalator Windows, usługi NSSM, sieć i zapora, APK na kolektorach (pierwsza
+instalacja przez MDM, kiosk),
 etapy przejścia na MSSQL i Sferę, backup — wszystko tam.
 
 Parametry (env, dev):
@@ -475,7 +478,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   Rozjazd adresu jest wyróżniony, a zgłoszony wyjątek siedzi w wierszu swojej
   pozycji. Wejść da się także w dokument, którego **nikt jeszcze nie zaczął** —
   wtedy pozycje idą wprost z faktury i nagłówek mówi o tym wprost. Podgląd
-  **czyta**: kliknięcie nie otwiera dostawy i nie zabiera nikomu blokad.
+  **czyta**: kliknięcie nie otwiera dostawy i niczego w niej nie przestawia.
 - **„ROZŁOŻONE POZA WERTIS"** (0.40.0) — dostawa rozłożona starą aplikacją albo
   z ręki nie ma w WERTIS ani jednego śladu. Stoi więc na liście jako nietknięta
   i psuje kartę towaru: „w dostawie" o towarze z półki. Biuro zdejmuje taki
@@ -523,12 +526,19 @@ server/                    backend (Fastify + SQLite + worker)
                            stock (korekta o kolejkę), dostawy-towaru (co przyszło,
                            a nie leży w regale), podglad-dostawy (pozycje
                            dokumentu dla biura — sam odczyt),
-                           queue, locations, events,
+                           queue, locations, events, notatki (do dostaw),
+                           zamienniki + zamowienia-towaru (karta towaru),
+                           raporty + reslot (analiza), zbiorki + strefa-zlota
+                           (rotacja z Sellasist),
                            aktualizacja (APK dla kolektorów)
   src/routes/              products, delivery, problems, przesuniecie, queue,
-                           locations, device (§8)
+                           locations, device (§8), auth, magazyny, audyt,
+                           analiza, zbiorki, biuro, aktualizacja (APK)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   data/zdjecia/            CACHE zdjęć kartotek z Subiekta — wolno skasować
+  data/apk/                APK dla kolektorów — kładzie go instalator
+  data/reconcile/          raporty rekoncyliacji (CSV)
+  data/reslot/             raporty przeslotowania
   src/worker/worker.ts     pętla poll, retry/backoff, waiting_for_doc (§9)
 docs/architektura.md       jak to jest zbudowane i dlaczego tak (start dla nowej osoby)
 docs/analiza-rozkladanie.md rozkładanie i przesunięcia + backlog
@@ -552,8 +562,9 @@ tools/styl_check.py        mierzalna część reguł z docs/slownik.md (długoś
                            i akapitu, odrzucone terminy)
 tools/kt_imports_check.py  namiastka kompilatora dla :app (brakujące importy,
                            bilans nawiasów) — :app nie kompiluje się bez SDK
-.github/workflows/         CI: android.yml (testy :core + APK debug) oraz
-                           server.yml (testy serwera, tsc, docs_check)
+.github/workflows/         CI: android.yml (testy :core, APK debug, a na main
+                           podpisane wydanie z sumą SHA-256), server.yml
+                           (testy serwera, tsc, docs_check), instalator.yml
 ```
 
 ## Dane testowe
@@ -582,8 +593,8 @@ przez adapter MSSQL (patrz
 ### Przypadki brzegowe — `npm run seed:scenariusze`
 
 Kartoteka wyżej pokazuje ścieżkę codzienną i tyle. Rzeczy, na których aplikacja
-naprawdę się łamie, nie ma w niej wcale. Brakuje kolizji kodów, cudzej blokady
-pozycji, zadania w błędzie, zdjęcia bez pliku i adresu spoza wzorca.
+naprawdę się łamie, nie ma w niej wcale. Brakuje kolizji kodów, zadania
+w błędzie, zdjęcia bez pliku i adresu spoza wzorca.
 
 ```bash
 npm run seed                 # kartoteka — raz

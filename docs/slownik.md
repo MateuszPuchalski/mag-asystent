@@ -72,6 +72,12 @@ lista wariantów rosłaby o każdy przypadek gramatyczny z osobna.
 | **kreator** | dialog instalatora pytający o bazę Subiekta | |
 | **regał** | miejsce o adresie `A01-02-03`; etykieta wisi na jego półce | |
 | **kolejka Sfery** | tabela `sfera_queue` i zadania zapisu do Subiekta | |
+| **strefa złota** | poziomy regału na wysokości rąk, bez schylania i drabiny | złot* stref* |
+| **zbiórka** | pobranie towaru pod zamówienie klienta, z eksportu Sellasist; nie mylić z kompletacją | |
+| **korekta ilości** | poprawienie liczby odłożonych sztuk przed zamknięciem faktury; na kolektorze przycisk POPRAW ILOŚĆ | |
+| **notatka biura** | pytanie dopisane do dostawy, wymagające odpowiedzi przed jej domknięciem; nie mylić z opisem przy wyjątku | |
+| **aktualizacja kolektora** | wymiana APK na urządzeniu; „aktualizacja" bez określenia myli się z aktualizacją serwera | |
+| **podpis wydania** | klucz, którym podpisany jest APK; bez tego samego klucza Android odrzuca aktualizację | |
 
 Nazwy własne zostają bez zmian: Subiekt GT, Sfera, InsERT, NSSM, DataWedge,
 DataCollection. Tak samo cytaty komunikatów aplikacji.
