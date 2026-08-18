@@ -877,21 +877,26 @@ z Allegro (scenariusze S67–S69).
 
 Import z MSSQL zaczyna też zaciągać dokumenty sprzedaży (FS i PA, okno
 `DOK_SPRZEDAZ_DNI_WSTECZ`, domyślnie 90 dni) — **zero nowych GRANT-ów**,
-te same tabele co dostawy.
+te same tabele co dostawy. Awaria tego odczytu (timeout, przeciążona baza)
+degraduje: magazyn pracuje, zwroty dopasowują na ostatnim udanym odczycie,
+a `/api/health` mówi o tym zdaniem. Na dużych bazach z obciążonym serwerem
+SQL można podnieść `MSSQL_REQUEST_TIMEOUT_MS` (domyślnie 30000).
 
 ### Do sprawdzenia na własnej bazie i koncie ([WERYFIKUJ])
 
 Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
 
 1. **Gdzie integracja sprzedażowa wpisuje numer zamówienia Allegro** na
-   dokumencie w Subiekcie. Sprawdź na świeżej sprzedaży:
-   `SELECT dok_NrPelny, dok_NrPelnyOryg FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC`.
-   Numer w `dok_NrPelnyOryg` → zostaw domyślne `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN`.
-   Numer w uwagach → ustaw `MSSQL_SPRZEDAZ_UWAGI_COLUMN`. Nigdzie → ustaw oba
+   dokumencie w Subiekcie. Obie kolumny istnieją w bazie 1.8731.31.6933
+   (`dok_NrPelnyOryg`, `dok_Uwagi`) i obie są domyślnie czytane. Sprawdź na
+   świeżej sprzedaży, czy któraś faktycznie niesie numer:
+   `SELECT dok_NrPelny, dok_NrPelnyOryg, dok_Uwagi FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC`.
+   Nigdzie → ustaw `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN`/`MSSQL_SPRZEDAZ_UWAGI_COLUMN`
    puste; dopasowanie działa wtedy po pozycjach z ręcznym wyborem kandydata.
-2. **Czy `offer.external.id` w zamówieniach niesie symbol kartoteki** (tak
-   ustawia się Sellasist). Bez tego pozycje zwrotu nie dopasują kartotek
-   i dokument trzeba wskazywać ręcznie.
+2. **Czy `offer.external.id` w zamówieniach niesie symbol kartoteki** —
+   POTWIERDZONE co do zasady: sygnatura oferty (SKU) jest wpisywana ręcznie
+   i równa `tw_Symbol`. Sprawdź wyrywkowo na kilku ofertach, że sygnatury są
+   uzupełnione — oferta bez sygnatury da pozycję zwrotu bez kartoteki.
 3. **Scope tokena**: żądamy `allegro:api:orders:read`; jeśli skan kończy się
    403, dodaj uprawnienie do zamówień przy rejestracji aplikacji.
 4. **Kształt pola powodu zwrotu** w odpowiedzi customer-returns — mapowanie

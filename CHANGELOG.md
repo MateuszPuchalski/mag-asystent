@@ -33,6 +33,49 @@ historii nie przepisujemy.
 
 ---
 
+## 0.53.1 — 18 sierpnia 2026
+
+**Aktualizacja 0.53.0 kładła API na starcie — import sprzedaży nie udźwignął
+skali Allegro.** Instalator kończył komunikatem „API nie odpowiedziało",
+a dziennik usługi pokazywał na przemian błąd SQL Servera 8623 („query
+processor ran out of internal resources") i timeout 15 s, przeplatane
+nieudanymi połączeniami — bo NSSM restartował padający proces w pętli,
+dobijając przy okazji serwer SQL.
+
+Przyczyna: zapytanie o pozycje dokumentów sprzedaży pytało listą
+`WHERE ob_DokHanId IN (id, id, …)` zawierającą WSZYSTKIE `dok_Id` z okna
+90 dni. Ten wzorzec jest bezpieczny przy dostawach (okno 14 dni, dziesiątki
+dokumentów) — sprzedaż wysyłkowa w kwartale to dziesiątki tysięcy
+identyfikatorów w jednym SQL-u, czyli dokładnie to, na co SQL Server
+odpowiada błędem 8623. A że import przy starcie API jest twardym błędem,
+usterka jednego zapytania wyłączała cały magazyn.
+
+Trzy zmiany:
+
+- **Pozycje sprzedaży idą JOIN-em** z tymi samymi filtrami co nagłówki —
+  długość SQL-a przestała zależeć od liczby dokumentów. Oba zapytania
+  sprzedaży dostały `WITH (NOLOCK)`: to read-model odświeżany co 60 s,
+  a w dzienniku był też deadlock z Subiektem pracującym obok.
+- **Awaria odczytu sprzedaży degraduje, nie przerywa.** Stany i lokalizacje
+  są ważniejsze od dopasowywania zwrotów: przy błędzie zostaje ostatni udany
+  odczyt `sgt_sprzedaz`, magazyn pracuje, a `/api/health` mówi zdaniem, co
+  się stało. API startuje zawsze.
+- **`MSSQL_REQUEST_TIMEOUT_MS`** (domyślnie 30000): limit pojedynczego
+  zapytania do bazy Subiekta przestał być zaszytym w driverze 15-sekundowym
+  przypadkiem — odczyt stu tysięcy wierszy stanów na obciążonej maszynie
+  bywał ścinany tuż przed metą.
+
+Przy okazji domknięte dwa [WERYFIKUJ] z 0.53.0 — właściciel dostarczył opis
+struktury bazy 1.8731.31.6933: `dok_NrPelnyOryg` (varchar 30) i `dok_Uwagi`
+(varchar 500) ISTNIEJĄ na `dok__Dokument`, więc kolumna uwag weszła do
+domyślnych sygnałów dopasowania (`MSSQL_SPRZEDAZ_UWAGI_COLUMN=dok_Uwagi`).
+Potwierdzone też, że sygnatura oferty Allegro (`external.id`) to `tw_Symbol`
+— dokładnie tak, jak dopasowuje serwis zwrotów. Do sprawdzenia na danych
+zostało tylko, czy integracja wpisuje numer zamówienia w któreś z tych pól.
+
+Zwykły PATCH: `git pull`, build, restart usług — nic ręcznego. Po starcie
+log importu ma pokazywać `sprzedaz=N` z niezerowym N.
+
 ## 0.53.0 — 18 sierpnia 2026
 
 **Zwroty Allegro, etap pierwszy: skan etykiety → rekord zwrotu → decyzje →
