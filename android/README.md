@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane" — **183 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane" — **196 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -54,6 +54,20 @@ cd android
 
 Druga komenda potrzebuje **dodatkowo Android SDK** (Android Studio albo
 command-line tools plus akceptacja licencji) — samo JDK jej nie wystarczy.
+
+**Build wydania wymaga klucza.** Od 0.48.0 kolektory aktualizują się z serwera,
+a Android odrzuca aktualizację podpisaną innym kluczem niż zainstalowana
+aplikacja. `assembleRelease` odmawia bez keystore i mówi, czego brakuje.
+
+```bash
+WERTIS_KEYSTORE=/sciezka/wertis.keystore WERTIS_KEYSTORE_HASLO=... \
+WERTIS_KLUCZ_ALIAS=wertis WERTIS_KLUCZ_HASLO=... \
+./gradlew :app:assembleRelease
+```
+
+Zamiast zmiennych te same wartości przyjmuje plik `local.properties`
+w katalogu `android/`, w polach `wertis.keystore`, `wertis.keystore.haslo`, `wertis.klucz.alias`
+i `wertis.klucz.haslo`. Plik jest poza gitem. Skąd wziąć klucz: `DEPLOY.md` §5.
 
 ## Uruchomienie przeciwko serwerowi dev
 
@@ -304,6 +318,20 @@ przed którą ta pozycja broni.
 - [ ] skan towaru rozkładanego przez kolegę otwiera pozycję normalnie —
       blokad pozycji nie ma od 0.47.0 i nic już nie „proponuje odebrania",
 - [ ] w kreatorze kont są TRZY role: magazynier, biuro, administrator.
+
+**Aktualizacja z serwera**
+
+- [ ] serwer z nowszym APK: karta pojawia się zaraz po otwarciu aplikacji,
+- [ ] karta wychodzi też przy żywej sesji, nie tylko na ekranie logowania,
+- [ ] serwer z tą samą wersją: karty NIE ma (regresja: proponowany downgrade),
+- [ ] serwer bez APK: karty NIE ma i nic się nie dzieje,
+- [ ] „NIE TERAZ" chowa kartę, a logowanie pod spodem działa przez cały czas,
+- [ ] po ponownym otwarciu aplikacji karta wraca,
+- [ ] dotknięcie paska wersji na dole pyta serwer od razu,
+- [ ] brak zgody na nieznane źródła: karta prosi o zgodę PRZED pobraniem,
+- [ ] wyłączone Wi-Fi w trakcie pobierania: komunikat, plik częściowy znika,
+- [ ] po instalacji zostają adres serwera i bufor offline,
+- [ ] kolektor z MDM blokującym instalacje: komunikat o dziale IT.
 
 **Pierwsze uruchomienie**
 

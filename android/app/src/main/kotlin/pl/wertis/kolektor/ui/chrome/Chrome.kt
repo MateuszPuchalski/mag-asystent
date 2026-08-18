@@ -295,8 +295,13 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier:
    serwer od razu, APK czeka na rozesłanie przez MDM — i to rozjazd, nie
    awaria, więc ma być widoczny, a nie alarmujący.                           */
 
+/**
+ * @param onDotkniecie od 0.48.0 pasek DAJE COŚ ZROBIĆ. Wcześniej mówił „wersje
+ *   różne" i na tym kończył — informacja o problemie bez ani jednej drogi
+ *   wyjścia. Teraz dotknięcie pyta serwer, czy ma nowy APK.
+ */
 @Composable
-fun WersjaBar(wersjaAplikacji: String, wersjaSerwera: String?) {
+fun WersjaBar(wersjaAplikacji: String, wersjaSerwera: String?, onDotkniecie: (() -> Unit)? = null) {
     val rozjazd = wersjaSerwera != null && wersjaSerwera.isNotBlank() && wersjaSerwera != wersjaAplikacji
     val opis = when {
         wersjaSerwera.isNullOrBlank() -> "WERTIS $wersjaAplikacji · serwer: brak połączenia"
@@ -307,6 +312,7 @@ fun WersjaBar(wersjaAplikacji: String, wersjaSerwera: String?) {
         modifier = Modifier
             .fillMaxWidth()
             .background(if (rozjazd) AmberBgSoft else CardWhite)
+            .then(if (onDotkniecie != null) Modifier.clickable(onClick = onDotkniecie) else Modifier)
             .padding(vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {

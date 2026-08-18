@@ -30,6 +30,7 @@ import pl.wertis.kolektor.ui.chrome.TabBar
 import pl.wertis.kolektor.ui.chrome.ToastOverlay
 import pl.wertis.kolektor.ui.chrome.TopBar
 import pl.wertis.kolektor.ui.chrome.WersjaBar
+import pl.wertis.kolektor.ui.update.AktualizacjaSheet
 import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
@@ -92,6 +93,18 @@ fun AppRoot(graph: AppGraph) {
         }
     }
 
+    /* Pytanie o nowy APK — PRZED wszystkimi wcześniejszymi wyjściami z tej
+       funkcji, więc pada także wtedy, gdy nikt nie jest zalogowany.
+
+       Ekran startowy sam by nie wystarczył: przy żywej sesji Splash schodzi
+       z drogi od razu (`SplashScreen` woła `nav.start()`), a sesje nie wygasają
+       od 0.20.0 — czyli karta na splashu byłaby niewidoczna dokładnie dla tych,
+       którzy pracują na kolektorze codziennie.
+
+       Rytm ten sam co przy wersji serwera: raz na start procesu i po zmianie
+       adresu. Aktualizacja pojawia się przy restarcie usługi, nie co sekundę. */
+    LaunchedEffect(ustawienia.serverUrl) { graph.aktualizacja.sprawdz() }
+
     BackHandler(enabled = screen != Screen.SPLASH && screen != Screen.HOME) {
         graph.nav.goBack()
     }
@@ -108,8 +121,12 @@ fun AppRoot(graph: AppGraph) {
            — przy „nie widzę serwera" i przy pierwszym uruchomieniu. */
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) { SplashScreen(graph) }
-            WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera)
+            WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera) {
+                scope.launch { graph.aktualizacja.sprawdz() }
+            }
         }
+        // arkusz NA POZIOMIE EKRANU, nie w środku cudzego bloku (patrz 0.44.1)
+        AktualizacjaSheet(graph)
         return
     }
 
@@ -157,6 +174,9 @@ fun AppRoot(graph: AppGraph) {
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
             onBack = { graph.nav.goBack() },
         )
-        WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera)
+        WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera) {
+            scope.launch { graph.aktualizacja.sprawdz() }
+        }
     }
+    AktualizacjaSheet(graph)
 }

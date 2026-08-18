@@ -140,8 +140,12 @@ export const sesjaZadania = (): SesjaZadania | null => store.getStore()?.sesja ?
    trasa dopisana jutro ma być domyślnie zamknięta, nie domyślnie otwarta.  */
 
 /**
- * Trasy działające bez sesji. Lista jest jawna, krótka i zamknięta — każda
- * pozycja jest tu dlatego, że BEZ NIEJ NIE DA SIĘ URUCHOMIĆ INSTALACJI.
+ * Trasy działające bez sesji. Lista jest jawna, krótka i zamknięta.
+ *
+ * Reguła wpuszczenia brzmi: BEZ TEJ TRASY KOLEKTORA NIE DA SIĘ DOPROWADZIĆ DO
+ * STANU, W KTÓRYM DA SIĘ ZALOGOWAĆ. Do 0.48.0 znaczyło to wyłącznie pierwsze
+ * uruchomienie instalacji; aktualizacja dokłada drugi taki przypadek i dlatego
+ * zdanie zostało przepisane, a nie rozciągnięte.
  *
  * `POST /api/users` wygląda na wyłom, ale nim nie jest: trasa sama wpuszcza
  * bez sesji wyłącznie przy pustej bazie (pierwsze konto biura), a w każdym
@@ -152,6 +156,13 @@ const BEZ_SESJI: ReadonlyArray<[metoda: string, sciezka: string]> = [
   ["GET", "/api/setup"],
   ["POST", "/api/auth/login"],
   ["POST", "/api/users"],
+  /* Aktualizacja kolektora (0.48.0) — jedyne pozycje NIE dotyczące uruchomienia
+     instalacji. Powód jest inny i równie twardy: kolektor pyta o nową wersję
+     przy otwarciu aplikacji, więc także wtedy, gdy sesji nie ma. Bez tego
+     urządzenie z zepsutą albo przestarzałą aplikacją da się naprawić dopiero
+     po zalogowaniu, czyli po użyciu tego, co właśnie nie działa. */
+  ["GET", "/api/aktualizacja"],
+  ["GET", "/api/aktualizacja/apk"],
 ];
 
 const otwarta = (metoda: string, sciezka: string): boolean =>

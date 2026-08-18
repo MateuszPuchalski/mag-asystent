@@ -2,6 +2,7 @@ package pl.wertis.kolektor.net
 
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import pl.wertis.kolektor.core.net.AktualizacjaResponse
 import pl.wertis.kolektor.core.net.KorektaBody
 import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.OdpowiedzBody
@@ -257,6 +258,27 @@ interface ApiService {
     /** Wersja serwera do paska na dole ekranu. Nie wymaga sesji. */
     @GET("api/health")
     suspend fun health(): HealthResponse
+
+    /* ── Aktualizacja kolektora z serwera (0.48.0) ────────────────────────
+       Obie trasy działają BEZ SESJI, bo pytanie pada przy otwarciu aplikacji
+       — także wtedy, gdy nikt nie jest zalogowany. Muszą iść przez Retrofit,
+       a nie przez własne wywołanie OkHttp: adres serwera podmienia dopiero
+       `HostSelectionInterceptor`, a bazowy URL Retrofita jest atrapą.      */
+
+    /** Co serwer ma do zainstalowania. `wersja: null` = nic. */
+    @GET("api/aktualizacja")
+    suspend fun aktualizacja(): AktualizacjaResponse
+
+    /**
+     * Sam plik APK — kilkanaście megabajtów, więc WYŁĄCZNIE strumieniem.
+     *
+     * `Response<…>` jak przy zdjęciu: wołający musi widzieć kod odpowiedzi,
+     * a ciało czyta się kawałkami. `body().bytes()` wciągnęłoby całe APK do
+     * pamięci kolektora naraz.
+     */
+    @Streaming
+    @GET("api/aktualizacja/apk")
+    suspend fun apk(): Response<ResponseBody>
 
     @GET("api/magazyny")
     suspend fun listMagazyny(): MagazynyResponse

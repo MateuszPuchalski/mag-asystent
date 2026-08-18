@@ -8,6 +8,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.core.cache.CardsRepository
 import pl.wertis.kolektor.core.net.DeviceEventBody
+import pl.wertis.kolektor.data.AktualizacjaRepository
 import pl.wertis.kolektor.data.TelemetryRepository
 import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.MagazynyRepository
@@ -72,6 +73,9 @@ class AppGraph(context: Context) {
     val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
     val zdjeciaRepo = ZdjeciaRepository(context, api)
+    /* Bierze `apiClient`, a nie `api`: pobranie APK musi iść tą samą drogą co
+       reszta wywołań, żeby złapać podmianę adresu serwera z ustawień. */
+    val aktualizacja = AktualizacjaRepository(context, apiClient)
 
     val effects = UiEffects(appScope)
     val nav = AppNavState(recent)
@@ -130,6 +134,8 @@ class AppGraph(context: Context) {
         // blokada jest stanem serwera — pytamy o nią przy starcie, a nie
         // liczymy drugiego zegara po stronie kolektora
         session.refresh()
+        // ślad po pobieraniu przerwanym w poprzednim uruchomieniu
+        aktualizacja.sprzatnij()
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

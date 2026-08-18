@@ -16,6 +16,7 @@ import { authRoutes } from "./routes/auth.js";
 import { audytRoutes } from "./routes/audyt.js";
 import { statystykiAudytu } from "./services/audyt.js";
 import { magazynRoutes } from "./routes/magazyny.js";
+import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
 import {
   brakDostepuDoMagazynow,
@@ -149,6 +150,7 @@ export async function buildApp() {
   await app.register(magazynRoutes);
   await app.register(audytRoutes);
   await app.register(biuroRoutes);
+  await app.register(aktualizacjaRoutes);
 
   await app.ready();
   return app;

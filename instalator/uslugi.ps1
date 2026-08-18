@@ -616,6 +616,73 @@ function Get-WertisWersja {
     }
 }
 
+function Get-WertisApk {
+    <#
+    .SYNOPSIS
+        Sciaga APK kolektora do server\data\apk. `$true` = plik lezy na miejscu.
+    .DESCRIPTION
+        Od 0.48.0 kolektory aktualizuja sie same, z serwera WERTIS w sieci
+        magazynu. Zeby mialy skad, plik musi trafic na serwer - i robi to ten
+        krok, razem z aktualizacja kodu.
+
+        NIEUDANE POBRANIE NIE JEST BLEDEM AKTUALIZACJI. Serwer dziala dalej,
+        a kolektory zostaja na starym APK - dokladnie tak, jak dzialaly przed
+        0.48.0. Zatrzymanie aktualizacji firmy przez plik, ktorego nikt w tej
+        minucie nie potrzebuje, byloby gorsze od jego braku.
+
+        Plik jedzie pod nazwa tymczasowa i dostaje wlasciwa dopiero po zgodnej
+        sumie SHA-256. Kolektor nie ma prawa zobaczyc pobrania w polowie:
+        wystawia je serwer kazdemu, kto zapyta, w tej samej sekundzie.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Katalog,
+        [Parameter(Mandatory)][string]$Wersja,
+        [string]$Zrodlo = "https://github.com/MateuszPuchalski/mag-asystent/releases/latest/download"
+    )
+
+    $katalogApk = Join-Path $Katalog "server\data\apk"
+    $nazwa = "wertis-kolektor-$Wersja.apk"
+    $cel = Join-Path $katalogApk $nazwa
+    if (Test-Path $cel) {
+        Write-Ok "APK kolektora $Wersja jest juz na serwerze."
+        return $true
+    }
+
+    Zapewnij-Katalog $katalogApk
+    $tymczasowy = "$cel.czesc"
+    try {
+        Invoke-WebRequest -Uri "$Zrodlo/$nazwa" -OutFile $tymczasowy -UseBasicParsing -ErrorAction Stop
+    } catch {
+        Remove-Item $tymczasowy -Force -ErrorAction SilentlyContinue
+        Write-Uwaga "Nie udalo sie pobrac APK kolektora ($nazwa)."
+        Write-Info  "   Serwer dziala; kolektory zostaja na dotychczasowej wersji."
+        Write-Info  "   Plik mozna dolozyc recznie do: $katalogApk"
+        return $false
+    }
+
+    $sumaOczekiwana = ""
+    try {
+        $odp = Invoke-WebRequest -Uri "$Zrodlo/$nazwa.sha256" -UseBasicParsing -ErrorAction Stop
+        $sumaOczekiwana = ($odp.Content -split '\s+')[0]
+    } catch {
+        Write-Uwaga "Brak pliku sumy kontrolnej dla $nazwa."
+    }
+
+    if (-not (Test-WertisSuma -Sciezka $tymczasowy -Oczekiwana $sumaOczekiwana -Opis "APK kolektora")) {
+        Remove-Item $tymczasowy -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+
+    Move-Item -Path $tymczasowy -Destination $cel -Force
+    # Stare wydania tylko zajmuja miejsce: serwer wystawia najwyzsza wersje
+    # i tak, wiec kazdy plik ponizej niej jest juz nieuzywany.
+    Get-ChildItem $katalogApk -Filter "wertis-kolektor-*.apk" |
+        Where-Object { $_.Name -ne $nazwa } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    Write-Ok "APK kolektora $Wersja gotowy dla kolektorow."
+    return $true
+}
+
 function Test-WertisHealth {
     <#
         .SYNOPSIS

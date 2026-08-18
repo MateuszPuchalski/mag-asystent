@@ -275,14 +275,24 @@ if ($Aktualizuj) {
         Write-Ok "Aplikacja zbudowana."
     }
 
+    $wersjaPo = Get-WertisWersja -Katalog $Katalog
+
+    # APK dla kolektorow (0.48.0). PO zbudowaniu, a PRZED startem uslug: serwer
+    # ma wstac z plikiem juz na miejscu, zeby pierwszy kolektor, ktory zapyta,
+    # dostal komplet, a nie 404 sprzed sekundy.
+    Write-Krok "APK kolektora"
+    if (-not (Test-DryRun "Pobralbym wertis-kolektor-$wersjaPo.apk do server\data\apk.")) {
+        [void](Get-WertisApk -Katalog $Katalog -Wersja $wersjaPo)
+    }
+
     Write-Krok "Uruchamianie usług"
     Restart-WertisUslugi
     $health = Test-WertisHealth -Port $Port
 
-    $wersjaPo = Get-WertisWersja -Katalog $Katalog
     Write-Naglowek "Aktualizacja zakonczona"
     Write-Info "Wersja: $wersjaPrzed -> $wersjaPo"
     Write-Info "Nietkniete: baza aplikacji, konto SQL i GRANT-y, wertis.env, konta uzytkownikow."
+    Write-Info "Kolektory zaproponuja aktualizacje same, przy nastepnym otwarciu aplikacji."
     if (-not $health -and -not $DryRun) {
         Write-Uwaga "API nie odpowiedziało - sprawdź dziennik usługi wertis-api."
         exit 1

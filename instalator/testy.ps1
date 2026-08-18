@@ -1106,6 +1106,67 @@ Sprawdz "nieudane budowanie ZOSTAWIA usługi zatrzymane" {
         "po nieudanym budowaniu usługi NIE mają wstawać"
 }
 
+# ── APK dla kolektorow (0.48.0) ─────────────────────────────────────────────
+
+Write-Host "Get-WertisApk"
+
+Sprawdz "istniejacy plik konczy sprawe bez ruchu w sieci" {
+    # bez tego kazdy `-Aktualizuj` sciagalby te same kilkanascie megabajtow
+    $kat = Join-Path $env:TEMP ("wertis-apk-" + [guid]::NewGuid())
+    $katApk = Join-Path $kat "server\data\apk"
+    New-Item -ItemType Directory -Path $katApk -Force | Out-Null
+    try {
+        Set-Content -Path (Join-Path $katApk "wertis-kolektor-0.48.0.apk") -Value "PK" -Encoding ASCII
+        # zrodlo celowo nieistniejace: gdyby funkcja siegnela do sieci, padnie
+        Zaloz (Get-WertisApk -Katalog $kat -Wersja "0.48.0" -Zrodlo "http://127.0.0.1:1/nie-ma")
+    } finally { Remove-Item $kat -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "nieudane pobranie zwraca false, a nie wyjatek" {
+    # aktualizacja serwera nie ma prawa paść przez plik dla kolektorow
+    $kat = Join-Path $env:TEMP ("wertis-apk2-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $kat -Force | Out-Null
+    try {
+        Zaloz (-not (Get-WertisApk -Katalog $kat -Wersja "0.48.0" -Zrodlo "http://127.0.0.1:1/nie-ma"))
+    } finally { Remove-Item $kat -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "po nieudanym pobraniu nie zostaje plik polowiczny" {
+    # kolektor dostaje ten plik od serwera w tej samej sekundzie, w ktorej go
+    # zobaczy - polowiczne pobranie zainstalowaloby sie jako uszkodzone APK
+    $kat = Join-Path $env:TEMP ("wertis-apk3-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $kat -Force | Out-Null
+    try {
+        [void](Get-WertisApk -Katalog $kat -Wersja "0.48.0" -Zrodlo "http://127.0.0.1:1/nie-ma")
+        $zostalo = Get-ChildItem (Join-Path $kat "server\data\apk") -ErrorAction SilentlyContinue
+        Zaloz ($null -eq $zostalo -or $zostalo.Count -eq 0) "zostal plik po nieudanym pobraniu"
+    } finally { Remove-Item $kat -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "galaz -Aktualizuj pobiera APK PO zbudowaniu" {
+    # przed budowaniem numer wersji jest jeszcze stary, wiec sciagnelibysmy
+    # plik sprzed aktualizacji
+    $build = $galazKod.IndexOf("npm run build")
+    $apk = $galazKod.IndexOf("Get-WertisApk")
+    Zaloz ($build -ge 0 -and $apk -ge 0 -and $build -lt $apk) `
+        "APK musi isc po zbudowaniu nowej wersji"
+}
+
+Sprawdz "galaz -Aktualizuj pobiera APK PRZED startem uslug" {
+    # serwer ma wstac z plikiem na miejscu; inaczej pierwszy kolektor, ktory
+    # zapyta, dostanie 404 sprzed sekundy
+    $apk = $galazKod.IndexOf("Get-WertisApk")
+    $start = $galazKod.IndexOf("Restart-WertisUslugi", $apk)
+    Zaloz ($apk -ge 0 -and $start -gt $apk) "APK ma byc gotowy przed startem uslug"
+}
+
+Sprawdz "nieudane pobranie APK nie przerywa aktualizacji" {
+    # `[void](...)` zamiast `if (-not ...) { exit }` — brak APK zostawia
+    # kolektory na starej wersji, czyli tam, gdzie byly przed 0.48.0
+    Zaloz ($galazKod -match '\[void\]\(Get-WertisApk') `
+        "wynik Get-WertisApk nie moze rozstrzygac o powodzeniu aktualizacji"
+}
+
 # ── Wynik ───────────────────────────────────────────────────────────────────
 
 Write-Host ""
