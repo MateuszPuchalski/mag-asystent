@@ -149,6 +149,39 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery", "przesylka_by", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
+  ziarnoStrefyZlotej(database);
+}
+
+/**
+ * Ziarno reguł strefy złotej (0.50.0).
+ *
+ * Reguły były stałą w kodzie (`services/strefa-zlota.ts`); od 0.50.0 są
+ * edytowalne z panelu biura, więc mieszkają w tabeli. Wsiewamy je WYŁĄCZNIE
+ * do pustej tabeli: instalacja, w której biuro już cokolwiek zmieniło, nie ma
+ * prawa dostać z powrotem wartości fabrycznych przy restarcie.
+ *
+ * Wartości są zapisem właściciela — komentarz przy `STREFA_ZLOTA` cytuje go
+ * słowo w słowo; tu tylko postać tabelaryczna.
+ */
+function ziarnoStrefyZlotej(database: DatabaseSync) {
+  const n = (database.prepare("SELECT COUNT(*) AS n FROM strefa_regula").get() as { n: number }).n;
+  if (n > 0) return;
+  const ins = database.prepare(
+    "INSERT INTO strefa_regula(alejka, regal_od, regal_do, poziomy) VALUES (?,?,?,?)"
+  );
+  const ziarno: Array<[string | null, string | null, string | null, string]> = [
+    ["A", null, null, "2,3,4"],
+    ["B", null, null, "2,3,4"],
+    ["H", null, null, "2,3,4"],
+    ["J", null, null, "2,3,4"],
+    ["C", null, null, "2,3"],
+    [null, "D01", "D05", "2,3"],
+    [null, "E03", "E04", "2"],
+    [null, "E05", "E08", "2,3"],
+    ["F", null, null, "4,8"],
+    ["G", null, null, "3,7"],
+  ];
+  for (const [alejka, od, doR, poziomy] of ziarno) ins.run(alejka, od, doR, poziomy);
 }
 
 /**

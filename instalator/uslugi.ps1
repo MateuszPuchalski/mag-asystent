@@ -621,13 +621,13 @@ function Get-WertisApk {
     .SYNOPSIS
         Sciaga APK kolektora do server\data\apk. `$true` = plik lezy na miejscu.
     .DESCRIPTION
-        Od 0.48.0 kolektory aktualizuja sie same, z serwera WERTIS w sieci
+        Od 0.52.0 kolektory aktualizuja sie same, z serwera WERTIS w sieci
         magazynu. Zeby mialy skad, plik musi trafic na serwer - i robi to ten
         krok, razem z aktualizacja kodu.
 
         NIEUDANE POBRANIE NIE JEST BLEDEM AKTUALIZACJI. Serwer dziala dalej,
         a kolektory zostaja na starym APK - dokladnie tak, jak dzialaly przed
-        0.48.0. Zatrzymanie aktualizacji firmy przez plik, ktorego nikt w tej
+        0.52.0. Zatrzymanie aktualizacji firmy przez plik, ktorego nikt w tej
         minucie nie potrzebuje, byloby gorsze od jego braku.
 
         Plik jedzie pod nazwa tymczasowa i dostaje wlasciwa dopiero po zgodnej

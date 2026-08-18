@@ -143,7 +143,7 @@ export const sesjaZadania = (): SesjaZadania | null => store.getStore()?.sesja ?
  * Trasy działające bez sesji. Lista jest jawna, krótka i zamknięta.
  *
  * Reguła wpuszczenia brzmi: BEZ TEJ TRASY KOLEKTORA NIE DA SIĘ DOPROWADZIĆ DO
- * STANU, W KTÓRYM DA SIĘ ZALOGOWAĆ. Do 0.48.0 znaczyło to wyłącznie pierwsze
+ * STANU, W KTÓRYM DA SIĘ ZALOGOWAĆ. Do 0.52.0 znaczyło to wyłącznie pierwsze
  * uruchomienie instalacji; aktualizacja dokłada drugi taki przypadek i dlatego
  * zdanie zostało przepisane, a nie rozciągnięte.
  *
@@ -156,7 +156,7 @@ const BEZ_SESJI: ReadonlyArray<[metoda: string, sciezka: string]> = [
   ["GET", "/api/setup"],
   ["POST", "/api/auth/login"],
   ["POST", "/api/users"],
-  /* Aktualizacja kolektora (0.48.0) — jedyne pozycje NIE dotyczące uruchomienia
+  /* Aktualizacja kolektora (0.52.0) — jedyne pozycje NIE dotyczące uruchomienia
      instalacji. Powód jest inny i równie twardy: kolektor pyta o nową wersję
      przy otwarciu aplikacji, więc także wtedy, gdy sesji nie ma. Bez tego
      urządzenie z zepsutą albo przestarzałą aplikacją da się naprawić dopiero

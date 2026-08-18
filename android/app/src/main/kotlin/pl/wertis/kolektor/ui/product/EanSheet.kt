@@ -29,7 +29,6 @@ import pl.wertis.kolektor.core.net.SetEanBody
 import pl.wertis.kolektor.core.product.KrokEan
 import pl.wertis.kolektor.core.product.bladKoduEan
 import pl.wertis.kolektor.core.product.krokEan
-import pl.wertis.kolektor.core.product.wymagaPotwierdzenia
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.net.apiCall
@@ -87,7 +86,10 @@ fun EanSheet(
         true
     }
 
-    val krok = krokEan(kod, eanKartoteki, zajety)
+    val krok = krokEan(kod, zajety)
+    // podmiana to od 0.49.0 informacja, nie bramka — arkusz pokazuje
+    // STARY → NOWY, ale zapis idzie tym samym jednym zatwierdzeniem
+    val podmiana = eanKartoteki.isNotBlank() && kod.isNotBlank()
 
     fun zapisz() {
         val walidacja = bladKoduEan(kod)
@@ -104,7 +106,11 @@ fun EanSheet(
                         twId,
                         SetEanBody(
                             ean = kod.trim(),
-                            potwierdzone = if (wymagaPotwierdzenia(krok)) true else null,
+                            /* Starszy serwer (≤0.48) przy podmianie żąda tej
+                               flagi — wysyłamy ją zawsze, gdy kartoteka ma kod,
+                               żeby rozjazd wersji nie kończył się martwym 409.
+                               Nowy serwer ją ignoruje. */
+                            potwierdzone = if (eanKartoteki.isNotBlank()) true else null,
                         ),
                     )
                 }
@@ -113,8 +119,7 @@ fun EanSheet(
                 onZapisano()
             } catch (e: EanOdmowa) {
                 /* Serwer rozstrzyga ostatecznie i to on wie o kodach nadanych
-                   przez innych w międzyczasie. `zajety` zamyka drogę; `podmiana`
-                   przestawia arkusz na pytanie STARY → NOWY. */
+                   przez innych w międzyczasie. `zajety` zamyka drogę. */
                 if (e.powod == "zajety") zajety = true
                 blad = e.message
                 graph.feedback.beep(false)
@@ -150,14 +155,11 @@ fun EanSheet(
                     color = InkSoft,
                 )
 
-                KrokEan.UZUPELNIJ -> Text(
-                    "Kartoteka nie ma kodu — zostanie nadany kod $kod.",
-                    fontSize = 14.sp,
-                    color = InkSoft,
-                )
-
-                KrokEan.POTWIERDZ_PODMIANE -> {
-                    // stary i nowy OBOK SIEBIE — to jest cała treść tego pytania
+                KrokEan.UZUPELNIJ -> if (podmiana) {
+                    /* Stary i nowy OBOK SIEBIE. To już nie jest pytanie —
+                       wymóg potwierdzenia zdjęty w 0.49.0 — ale informacja
+                       zostaje: stary kod przestanie wskazywać ten towar,
+                       a kartony z nim w hali przestaną się skanować. */
                     Text(
                         "$eanKartoteki  →  $kod",
                         fontWeight = FontWeight.Bold,
@@ -165,9 +167,15 @@ fun EanSheet(
                         color = Ink,
                     )
                     Text(
-                        "Kartoteka ma już kod. Po podmianie stary przestanie " +
-                            "wskazywać ten towar — kartony z nim nie będą się skanować.",
+                        "Kartoteka ma już kod — zapis go podmieni. Kartony ze " +
+                            "starym kodem nie będą się skanować.",
                         fontSize = 13.sp,
+                        color = InkSoft,
+                    )
+                } else {
+                    Text(
+                        "Kartoteka nie ma kodu — zostanie nadany kod $kod.",
+                        fontSize = 14.sp,
                         color = InkSoft,
                     )
                 }
@@ -206,15 +214,8 @@ fun EanSheet(
                     blad = null
                 }
 
-                KrokEan.POTWIERDZ_PODMIANE -> PrimaryButton(
-                    if (wysylka) "ZAPISUJĘ…" else "PODMIEŃ KOD",
-                    tall = true,
-                    enabled = !wysylka,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { zapisz() }
-
                 else -> PrimaryButton(
-                    if (wysylka) "ZAPISUJĘ…" else "NADAJ KOD",
+                    if (wysylka) "ZAPISUJĘ…" else if (podmiana) "PODMIEŃ KOD" else "NADAJ KOD",
                     tall = true,
                     enabled = !wysylka && kod.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),

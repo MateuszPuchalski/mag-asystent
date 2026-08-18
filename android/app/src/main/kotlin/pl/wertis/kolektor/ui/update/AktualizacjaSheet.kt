@@ -31,7 +31,7 @@ import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
 import pl.wertis.kolektor.ui.theme.Paper
 
-/* ── Propozycja aktualizacji (0.48.0) ────────────────────────────────────────
+/* ── Propozycja aktualizacji (0.52.0) ────────────────────────────────────────
    Arkusz od dołu, wołany z `AppRoot` NA POZIOMIE EKRANU — nigdy z wnętrza
    cudzego `?.let`. Ta reguła kosztowała już raz widoczność dwóch arkuszy naraz
    (0.44.1): kod był poprawny, kompilował się, przechodził bramki i po prostu

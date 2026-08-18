@@ -1106,7 +1106,7 @@ Sprawdz "nieudane budowanie ZOSTAWIA usługi zatrzymane" {
         "po nieudanym budowaniu usługi NIE mają wstawać"
 }
 
-# ── APK dla kolektorow (0.48.0) ─────────────────────────────────────────────
+# ── APK dla kolektorow (0.52.0) ─────────────────────────────────────────────
 
 Write-Host "Get-WertisApk"
 
@@ -1162,7 +1162,7 @@ Sprawdz "galaz -Aktualizuj pobiera APK PRZED startem uslug" {
 
 Sprawdz "nieudane pobranie APK nie przerywa aktualizacji" {
     # `[void](...)` zamiast `if (-not ...) { exit }` — brak APK zostawia
-    # kolektory na starej wersji, czyli tam, gdzie byly przed 0.48.0
+    # kolektory na starej wersji, czyli tam, gdzie byly przed 0.52.0
     Zaloz ($galazKod -match '\[void\]\(Get-WertisApk') `
         "wynik Get-WertisApk nie moze rozstrzygac o powodzeniu aktualizacji"
 }

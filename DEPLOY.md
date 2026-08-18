@@ -258,7 +258,7 @@ cd android
 ./gradlew :app:assembleDebug        # → app/build/outputs/apk/debug/app-debug.apk
 ```
 
-**Podpis wydania jest od 0.48.0 warunkiem aktualizacji, nie ozdobą.** Android
+**Podpis wydania jest od 0.52.0 warunkiem aktualizacji, nie ozdobą.** Android
 odmawia instalacji aktualizacji podpisanej innym kluczem niż zainstalowana
 aplikacja. Build debugowy z CI dostaje losowy klucz przy każdym biegu, więc
 dwa kolejne artefakty nie zainstalują się jeden nad drugim.
@@ -468,8 +468,8 @@ wpisy w rodzaju „magazynier" albo „test" wyłącz przez
 `POST /api/users/:id/active` z `{"active":false}`. Konta się **nie kasuje**:
 historia w `events` musi mieć na co wskazywać.
 
-**5. Aktualizacja kolektorów (od 0.48.0).** Plik leży na serwerze WERTIS,
-w `server\data\apk\`, pod nazwą niosącą wersję: `wertis-kolektor-0.48.0.apk`.
+**5. Aktualizacja kolektorów (od 0.52.0).** Plik leży na serwerze WERTIS,
+w `server\data\apk\`, pod nazwą niosącą wersję: `wertis-kolektor-0.52.0.apk`.
 Kładzie go tam instalator przy `-Aktualizuj`; ręcznie wystarczy skopiować plik
 do tego katalogu.
 

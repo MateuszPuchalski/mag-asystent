@@ -1,4 +1,5 @@
 import { db } from "../db/db.js";
+import { czasLokalny, dataLokalna } from "../czas.js";
 
 /* ── Raporty liczone ze zdarzeń: metryki systemu i wydajność osób ───────────
    Do 0.26.0 były to dwa moduły (`metrics.ts`, `wydajnosc.ts`), które
@@ -316,5 +317,185 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
         wiarygodne,
       };
     }),
+  };
+}
+
+/* ── Analiza śladu audytowego (0.48.0) ──────────────────────────────────────
+   Zakładka ANALIZA w podglądzie biura. Jedna funkcja, jeden fetch strony —
+   sześć sekcji liczonych z tego, co ślad audytowy i tabele operacyjne
+   zbierają od pierwszego dnia.
+
+   ŚWIADOMIE POZA /api/health: statystyki audytu w health są memoizowane, bo
+   siedzą w gorącej ścieżce. Ta funkcja liczy więcej i jest wołana wyłącznie
+   wtedy, gdy ktoś otworzy zakładkę.                                          */
+
+export interface DzienAnalizy {
+  /** Data LOKALNA (strefa z konfiguracji) — nie doba UTC. */
+  data: string;
+  /** Wykonane pozycje (typy PRACA, bez dubli). */
+  pozycje: number;
+  /** Wszystkie zdarzenia — tło, na którym widać udział pracy. */
+  zdarzen: number;
+}
+
+export interface AnalizaAudytu {
+  days: number;
+  /** Oś czasu po dniach lokalnych; dni bez zdarzeń mają zera, nie znikają. */
+  dni: DzienAnalizy[];
+  /** Rozkład operacji PRACA po godzinie lokalnej 0–23. */
+  godziny: number[];
+  rytm: {
+    dostawZamknietych: number;
+    /** Mediana minut od otwarcia do zamknięcia; null bez próbki. */
+    medianaMinutDostawy: number | null;
+    pozycjiNaDostawe: number | null;
+    problemyZgloszone: number;
+    problemyRozwiazane: number;
+    /** Nierozwiązane W OGÓLE — stan, nie okno; to one czekają na biuro. */
+    problemyOtwarte: number;
+  };
+  szukania: {
+    top: Array<{ q: string; ile: number }>;
+    /** Zapytania bez ani jednego wyniku — liczone od 0.48.0 (starsze
+        zdarzenia nie niosą liczby wyników i tu nie wchodzą). */
+    bezWynikow: Array<{ q: string; ile: number }>;
+  };
+  urzadzenia: Array<{
+    device: string;
+    upadki: number;
+    niskieBaterie: number;
+    /** Operacje z bufora offline odrzucone przez serwer. */
+    odrzucone: number;
+    zdarzen: number;
+  }>;
+  /** Raport per osoba — patrz obowiązek formalny przy `raportWydajnosci`. */
+  wydajnosc: RaportWydajnosci;
+}
+
+/** Mediana z tablicy; null dla pustej — brak danych to nie zero. */
+export function mediana(liczby: number[]): number | null {
+  if (liczby.length === 0) return null;
+  const s = [...liczby].sort((a, b) => a - b);
+  const i = Math.floor(s.length / 2);
+  return s.length % 2 === 1 ? s[i] : (s[i - 1] + s[i]) / 2;
+}
+
+/**
+ * Oś dni i rozkład godzin — bucketowanie w JS po czasie LOKALNYM.
+ *
+ * Nie w SQL, i to jest lekcja 0.31.1: znaczniki w bazie są w UTC, a zdarzenie
+ * z 23:30 UTC należy do NASTĘPNEGO dnia lokalnego. `date(created_at)` w SQLite
+ * przypisałoby wieczorną zmianę do złej doby, zimą inaczej niż latem.
+ */
+export function analiza(days = 7): AnalizaAudytu {
+  const od = OKNO(days);
+  const d = db();
+
+  // ── oś czasu: dni i godziny ───────────────────────────────────────────────
+  const zdarzenia = d
+    .prepare(
+      `SELECT created_at, type IN (${PRACA.map(() => "?").join(",")}) AND ${bezDubli("")} AS praca
+         FROM events WHERE created_at >= datetime('now', ?)`
+    )
+    .all(...PRACA, od) as Array<{ created_at: string; praca: number }>;
+
+  const poDniu = new Map<string, DzienAnalizy>();
+  // dni bez zdarzeń dostają zera — wykres z dziurami czyta się jako błąd danych
+  for (let i = days - 1; i >= 0; i--) {
+    const data = dataLokalna(new Date(Date.now() - i * 86_400_000).toISOString());
+    poDniu.set(data, { data, pozycje: 0, zdarzen: 0 });
+  }
+  const godziny = new Array<number>(24).fill(0);
+  for (const z of zdarzenia) {
+    const dzien = poDniu.get(dataLokalna(z.created_at));
+    if (dzien) {
+      dzien.zdarzen++;
+      if (z.praca) dzien.pozycje++;
+    }
+    if (z.praca) {
+      const godzina = Number(czasLokalny(z.created_at).slice(0, 2));
+      if (Number.isInteger(godzina) && godzina >= 0 && godzina < 24) godziny[godzina]++;
+    }
+  }
+
+  // ── rytm magazynu: z tabel operacyjnych, nie ze zdarzeń ──────────────────
+  const zamkniete = d
+    .prepare(
+      `SELECT opened_at, closed_at,
+              (SELECT COUNT(*) FROM delivery_line l WHERE l.delivery_id = delivery.id) AS pozycji
+         FROM delivery
+        WHERE status = 'done' AND closed_at >= datetime('now', ?)`
+    )
+    .all(od) as Array<{ opened_at: string; closed_at: string; pozycji: number }>;
+  const czasy = zamkniete
+    .map((r) => (Date.parse(r.closed_at) - Date.parse(r.opened_at)) / 60_000)
+    .filter((m) => Number.isFinite(m) && m >= 0);
+  const pozycjiRazem = zamkniete.reduce((s, r) => s + r.pozycji, 0);
+
+  const problemy = d
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN created_at >= datetime('now', ?) THEN 1 ELSE 0 END) AS zgloszone,
+         SUM(CASE WHEN resolved_at >= datetime('now', ?) THEN 1 ELSE 0 END) AS rozwiazane,
+         SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS otwarte
+       FROM problem`
+    )
+    .get(od, od) as { zgloszone: number | null; rozwiazane: number | null; otwarte: number | null };
+
+  // ── czego szukają — i czego nie znajdują ─────────────────────────────────
+  const top = d
+    .prepare(
+      `SELECT lower(json_extract(payload,'$.q')) AS q, COUNT(*) AS ile
+         FROM events
+        WHERE type = 'search' AND created_at >= datetime('now', ?)
+          AND json_extract(payload,'$.q') IS NOT NULL
+        GROUP BY lower(json_extract(payload,'$.q'))
+        ORDER BY ile DESC, q LIMIT 15`
+    )
+    .all(od) as Array<{ q: string; ile: number }>;
+  /* Tylko wiersze, które NIOSĄ liczbę wyników. Starsze zdarzenia mają samo
+     `q` — potraktowane jako zero robiłyby z całej historii listę braków. */
+  const bezWynikow = d
+    .prepare(
+      `SELECT lower(json_extract(payload,'$.q')) AS q, COUNT(*) AS ile
+         FROM events
+        WHERE type = 'search' AND created_at >= datetime('now', ?)
+          AND json_extract(payload,'$.wynikow') = 0
+        GROUP BY lower(json_extract(payload,'$.q'))
+        ORDER BY ile DESC, q LIMIT 15`
+    )
+    .all(od) as Array<{ q: string; ile: number }>;
+
+  // ── zdrowie sprzętu: per urządzenie, nie per osoba ───────────────────────
+  const urzadzenia = d
+    .prepare(
+      `SELECT device_id AS device,
+              SUM(CASE WHEN type = 'device_drop' THEN 1 ELSE 0 END) AS upadki,
+              SUM(CASE WHEN type = 'battery_low' THEN 1 ELSE 0 END) AS niskieBaterie,
+              SUM(CASE WHEN type = 'klient_odrzucona' THEN 1 ELSE 0 END) AS odrzucone,
+              COUNT(*) AS zdarzen
+         FROM events
+        WHERE device_id IS NOT NULL AND created_at >= datetime('now', ?)
+        GROUP BY device_id
+        ORDER BY upadki DESC, odrzucone DESC, zdarzen DESC LIMIT 20`
+    )
+    .all(od) as AnalizaAudytu["urzadzenia"];
+
+  return {
+    days,
+    dni: [...poDniu.values()],
+    godziny,
+    rytm: {
+      dostawZamknietych: zamkniete.length,
+      medianaMinutDostawy: mediana(czasy) != null ? Number(mediana(czasy)!.toFixed(0)) : null,
+      pozycjiNaDostawe:
+        zamkniete.length > 0 ? Number((pozycjiRazem / zamkniete.length).toFixed(1)) : null,
+      problemyZgloszone: problemy.zgloszone ?? 0,
+      problemyRozwiazane: problemy.rozwiazane ?? 0,
+      problemyOtwarte: problemy.otwarte ?? 0,
+    },
+    szukania: { top, bezWynikow },
+    urzadzenia,
+    wydajnosc: raportWydajnosci(days),
   };
 }

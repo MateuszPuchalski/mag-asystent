@@ -6,6 +6,7 @@ import pl.wertis.kolektor.core.net.PendingLocChange
 import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.net.Zamienniki
 import pl.wertis.kolektor.core.net.ZamowioneUDostawcy
+import pl.wertis.kolektor.core.net.ZlotaStrefa
 import pl.wertis.kolektor.core.text.formatQty
 import java.time.Instant
 import java.time.LocalDateTime
@@ -65,6 +66,19 @@ fun liniaZamowione(z: ZamowioneUDostawcy, unit: String): String = buildString {
     if (unit.isNotEmpty()) append(" ").append(unit)
     append(" — ").append(z.termin?.takeIf { it.isNotBlank() } ?: "termin nieznany")
     if (z.dostawca.isNotEmpty()) append(" · ").append(z.dostawca)
+}
+
+/**
+ * Podpowiedź przeslotowania, jedna linia: „Zbierany 12×/dzień — przenieś do
+ * strefy złotej (poziom 2 albo 3)".
+ *
+ * Częstość PRZED poleceniem, bo to ona jest argumentem — samo „przenieś"
+ * z karty towaru brzmiałoby jak rozkaz bez powodu. Poziomy w nawiasie mogą
+ * być puste (towar bez adresu regałowego): wtedy nawiasu nie ma wcale.
+ */
+fun liniaZlotaStrefa(z: ZlotaStrefa): String = buildString {
+    append("Zbierany ").append(formatQty(z.zbiorekNaDzien)).append("×/dzień — przenieś do strefy złotej")
+    if (z.poziomy.isNotEmpty()) append(" (poziom ").append(z.poziomy).append(")")
 }
 
 /* ── Czas na karcie: UTC z serwera, godzina lokalna na ekranie ───────────────

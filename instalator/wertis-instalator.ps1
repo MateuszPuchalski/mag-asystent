@@ -277,7 +277,7 @@ if ($Aktualizuj) {
 
     $wersjaPo = Get-WertisWersja -Katalog $Katalog
 
-    # APK dla kolektorow (0.48.0). PO zbudowaniu, a PRZED startem uslug: serwer
+    # APK dla kolektorow (0.52.0). PO zbudowaniu, a PRZED startem uslug: serwer
     # ma wstac z plikiem juz na miejscu, zeby pierwszy kolektor, ktory zapyta,
     # dostal komplet, a nie 404 sprzed sekundy.
     Write-Krok "APK kolektora"

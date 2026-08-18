@@ -259,7 +259,7 @@ interface ApiService {
     @GET("api/health")
     suspend fun health(): HealthResponse
 
-    /* ── Aktualizacja kolektora z serwera (0.48.0) ────────────────────────
+    /* ── Aktualizacja kolektora z serwera (0.52.0) ────────────────────────
        Obie trasy działają BEZ SESJI, bo pytanie pada przy otwarciu aplikacji
        — także wtedy, gdy nikt nie jest zalogowany. Muszą iść przez Retrofit,
        a nie przez własne wywołanie OkHttp: adres serwera podmienia dopiero

@@ -142,8 +142,13 @@ export async function productRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { q?: string } }>("/api/products/search", async (req) => {
     const q = (req.query.q ?? "").trim();
     if (!q) return { results: [] };
-    logEvent("search", userOf(req), null, { q });
     const { wyniki, przyblizone } = subiekt.szukajZFurtka(q, 20);
+    /* Liczba wyników jedzie do zdarzenia, bo „czego szukają i NIE ZNAJDUJĄ"
+       to najtańsza lista braków w kartotece — zapytania z zerem trafień to
+       towary, których ludzie szukają, a które mają złe nazwy albo nie istnieją.
+       Zdarzenia sprzed tej zmiany mają samo `q`; analiza traktuje brak pola
+       jako „nieznane", nigdy jako zero. */
+    logEvent("search", userOf(req), null, { q, wynikow: wyniki.length, przyblizone });
     /* Pole addytywne — kolektor ma `ignoreUnknownKeys` (Dtos.kt), więc stare
        APK je zignoruje. Mówi „nie znalazłem dosłownie, to są podobne" i czeka
        na ekran, który to pokaże. */
@@ -294,14 +299,13 @@ export async function productRoutes(app: FastifyInstance) {
         return { queueId: null, bezZmian: true };
       }
 
+      /* Podmiana istniejącego kodu przechodzi BEZ osobnego potwierdzenia —
+         wymóg zdjęty w 0.49.0 na polecenie właściciela. Pole `potwierdzone`
+         w body zostaje przyjmowane (starsze APK je wysyłają), ale niczego już
+         nie bramkuje. Zabezpieczenia, które zostają: kod zajęty przez inną
+         kartotekę to nadal twarda odmowa, a stary kod jedzie do audytu
+         w `eanPrzed` — widać, co było, gdyby trzeba było wrócić. */
       const eanPrzed = (p.ean ?? "").trim();
-      if (eanPrzed && !req.body?.potwierdzone) {
-        return reply.code(409).send({
-          error: `Kartoteka ma już kod ${eanPrzed}. Podmiana wymaga potwierdzenia.`,
-          powod: "podmiana",
-          eanPrzed,
-        });
-      }
 
       const autor = autorOperacji(req);
       const queueId = enqueueSetEan(

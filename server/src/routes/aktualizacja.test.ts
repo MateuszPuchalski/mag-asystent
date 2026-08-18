@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* ── Aktualizacja kolektora z serwera (0.48.0) ───────────────────────────────
+/* ── Aktualizacja kolektora z serwera (0.52.0) ───────────────────────────────
    Dwie rzeczy są tu warte testu bardziej niż reszta.
 
    Pierwsza: OBIE TRASY MUSZĄ ODPOWIADAĆ BEZ SESJI. Kolektor pyta o wersję przy

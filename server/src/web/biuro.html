@@ -123,6 +123,7 @@
     <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
     <button data-widok="nadzor">STAN SYSTEMU</button>
     <button data-widok="dziennik">DZIENNIK</button>
+    <button data-widok="analiza">ANALIZA</button>
   </nav>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
@@ -267,6 +268,105 @@
       <table id="dziennik"></table>
     </section>
   </div>
+
+  <!-- ── ANALIZA ─────────────────────────────────────────────────────────── -->
+  <div id="widokAnaliza" hidden style="display:grid;gap:20px">
+    <section class="card">
+      <h2>ANALIZA ŚLADU AUDYTOWEGO</h2>
+      <div class="filtry">
+        <div>
+          <label for="dniAnalizy">OKNO</label>
+          <select id="dniAnalizy">
+            <option value="7">7 dni</option>
+            <option value="30">30 dni</option>
+            <option value="90">90 dni</option>
+          </select>
+        </div>
+        <div><button class="akcja cichy" id="csvAnalizy">POBIERZ CSV</button></div>
+      </div>
+      <div class="kafle" id="kafleAnalizy"></div>
+      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+        <div>
+          <h2>OPERACJE PER DZIEŃ</h2>
+          <p class="mute" style="margin-bottom:6px">Wykonane pozycje — dni według zegara magazynu.</p>
+          <div id="wykresDni"></div>
+        </div>
+        <div>
+          <h2>ROZKŁAD PO GODZINACH</h2>
+          <p class="mute" style="margin-bottom:6px">O której naprawdę jest szczyt.</p>
+          <div id="wykresGodzin"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>WYDAJNOŚĆ PER OSOBA</h2>
+      <p class="mute" id="podstawaPrawna" style="margin-bottom:10px"></p>
+      <p class="mute" style="margin-bottom:10px">
+        Zgłoszone problemy to osobna kolumna i <b>nie są miarą błędu</b> —
+        zgłoszenie wyjątku jest pracą wykonaną dobrze, nie wpadką.
+      </p>
+      <table id="wydajnosc"></table>
+    </section>
+
+    <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+      <section class="card">
+        <h2>NAJCZĘŚCIEJ SZUKANE</h2>
+        <table id="szukaneTop"></table>
+      </section>
+      <section class="card">
+        <h2>SZUKANE BEZ WYNIKU</h2>
+        <p class="mute" style="margin-bottom:6px">
+          Towary, których ludzie szukają, a kartoteka ich nie zna — najtańsza
+          lista braków.
+        </p>
+        <table id="szukaneBrak"></table>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>URZĄDZENIA</h2>
+      <p class="mute" style="margin-bottom:6px">Upadki, baterie i odrzucone operacje — per kolektor, nie per osoba.</p>
+      <table id="urzadzenia"></table>
+    </section>
+
+    <section class="card">
+      <h2>STREFA ZŁOTA — KANDYDACI DO PRZENIESIENIA</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane
+        bierzemy z eksportu zbiórek (Sellasist, CSV) — wgranie tego samego
+        okresu drugi raz niczego nie zdubluje. Kandydat dostaje też adnotację
+        na karcie towaru w kolektorze.
+      </p>
+      <div class="filtry">
+        <div>
+          <button class="akcja" id="wgrajZbiorki">WGRAJ CSV ZBIÓREK</button>
+          <input type="file" id="plikZbiorek" accept=".csv,text/csv" hidden>
+        </div>
+        <div><button class="akcja cichy" id="csvKandydatow">POBIERZ CSV</button></div>
+      </div>
+      <p class="mute" id="wynikImportu"></p>
+      <p class="mute" id="oknoKandydatow" style="margin-bottom:6px"></p>
+      <table id="kandydaci"></table>
+    </section>
+
+    <section class="card">
+      <h2>REGUŁY STREFY ZŁOTEJ</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
+        drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
+        nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
+        wiem" to nie „nie". Zapis podmienia komplet reguł i od razu przelicza
+        kandydatów.
+      </p>
+      <table id="reguly"></table>
+      <div class="filtry" style="margin-top:8px">
+        <div><button class="akcja cichy" id="dodajRegule">+ REGUŁA</button></div>
+        <div><button class="akcja" id="zapiszStrefe">ZAPISZ REGUŁY</button></div>
+      </div>
+      <p class="mute" id="wynikStrefy"></p>
+    </section>
+  </div>
 </main>
 
 <script>
@@ -280,10 +380,12 @@
    jej nie zmieniają: przycisk „PONÓW" w biurze znaczyłby zapis do Subiekta
    wykonany przez osobę, która nie stoi przy półce.
 
-   Raportu wydajności per osoba TU NIE MA i to jest decyzja, nie przeoczenie.
-   `GET /api/wydajnosc` istnieje, ale jest monitoringiem pracowniczym w rozumieniu
-   Kodeksu pracy — wymaga zapisu w regulaminie i uprzedzenia ludzi. Wystawienie
-   go jednym kliknięciem obok metryk zrobiłoby z obowiązku formalnego przypadek. */
+   Raport wydajności per osoba JEST na zakładce ANALIZA — od 0.48.0, decyzją
+   właściciela ODWRACAJĄCĄ wcześniejszą (do 0.47.x strona celowo go nie miała).
+   To monitoring pracowniczy w rozumieniu Kodeksu pracy: wymaga zapisu
+   w regulaminie/obwieszczeniu i uprzedzenia załogi na 2 tygodnie przed użyciem
+   kadrowym. Dlatego podstawa prawna stoi NAD tabelą, na stałe, bez zwijania —
+   a serwer wysyła ją w odpowiedzi, żeby nie dała się pominąć. */
 const $ = (id) => document.getElementById(id);
 /* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
    słownika — trzecią obok serwera i kolektora, jedyną bez testu. Dopisanie
@@ -365,11 +467,13 @@ function pokaz(nowy) {
   $("widokDostawy").hidden = nowy !== "dostawy";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
+  $("widokAnaliza").hidden = nowy !== "analiza";
   for (const b of document.querySelectorAll("nav.zakladki button")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
+  if (nowy === "analiza") odswiezAnalize();
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -739,6 +843,202 @@ function rysujMetryki(m) {
     (m.towaryBezCzytelnegoKodu.map((t) =>
       `<tr><td class="b">${esc(t.code)}</td><td>${t.reczne}×</td></tr>`).join("") ||
       '<tr><td colspan="2" class="mute">Brak kartotek wpisywanych z ręki</td></tr>');
+}
+
+/* ── Analiza ──────────────────────────────────────────────────────────────────
+   Wykresy to inline SVG składane tutaj — strona ma zero zależności i zero
+   builda, a dwa słupkowe wykresy jednej serii nie uzasadniają biblioteki.
+   Jedna seria = bez legendy (nazwę niesie nagłówek sekcji); wartości nie
+   siedzą na każdym słupku, tylko na najwyższym; resztę mówi dymek `title`.  */
+
+/**
+ * Słupki jednej serii. `etykietaCo` przerzedza podpisy osi — przy 90 dniach
+ * podpis pod każdym słupkiem byłby nieczytelną kaszą.
+ */
+function slupkiSvg(dane, etykietaCo) {
+  const W = 560, H = 150, DOL = 22, GORA = 14;
+  if (!dane.length) return '<p class="mute">Brak danych w tym oknie.</p>';
+  const max = Math.max(...dane.map((d) => d.ile), 1);
+  const najlepszy = dane.findIndex((d) => d.ile === max);
+  const krok = W / dane.length;
+  const szer = Math.max(2, Math.min(26, krok - 2)); // 2px odstępu między słupkami
+  const czesci = dane.map((d, i) => {
+    const h = Math.round(((H - DOL - GORA) * d.ile) / max);
+    const x = (i * krok + (krok - szer) / 2).toFixed(1);
+    const y = H - DOL - h;
+    // zaokrąglone TYLKO końce danych: słupek zakotwiczony w osi, rx u góry
+    const r = Math.min(2, szer / 2, h);
+    const slupek = h === 0 ? "" :
+      `<path d="M${x} ${H - DOL} v${-(h - r)} q0 ${-r} ${r} ${-r} h${(szer - 2 * r).toFixed(1)} q${r} 0 ${r} ${r} v${h - r} z"
+         fill="var(--amber)"><title>${esc(d.tytul)}: ${d.ile}</title></path>`;
+    const podpis = i % etykietaCo === 0 ?
+      `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle"
+         font-size="10" fill="var(--ink-mute)">${esc(d.podpis)}</text>` : "";
+    const wartosc = i === najlepszy && max > 0 ?
+      `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${y - 3}" text-anchor="middle"
+         font-size="10" font-weight="700" fill="var(--ink-soft)">${max}</text>` : "";
+    return slupek + podpis + wartosc;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img">
+    <line x1="0" y1="${H - DOL}" x2="${W}" y2="${H - DOL}" stroke="var(--border)" stroke-width="1"/>
+    ${czesci.join("")}
+  </svg>`;
+}
+
+function rysujAnalize(a) {
+  const r = a.rytm;
+  $("kafleAnalizy").innerHTML = [
+    kafel(a.dni.reduce((s, d) => s + d.pozycje, 0), `pozycji w oknie ${a.days} dni`, false),
+    kafel(r.dostawZamknietych, "dostaw rozłożonych", false),
+    kafel(r.medianaMinutDostawy != null ? r.medianaMinutDostawy + " min" : "—",
+      "mediana czasu dostawy", false),
+    kafel(r.problemyOtwarte, "problemów czeka na biuro", r.problemyOtwarte > 0),
+  ].join("");
+
+  $("wykresDni").innerHTML = slupkiSvg(
+    a.dni.map((d) => ({ ile: d.pozycje, podpis: d.data.slice(5), tytul: d.data })),
+    a.days > 30 ? 14 : a.days > 7 ? 7 : 1
+  );
+  $("wykresGodzin").innerHTML = slupkiSvg(
+    a.godziny.map((ile, g) => ({ ile, podpis: String(g), tytul: `godzina ${g}:00` })),
+    3
+  );
+
+  const w = a.wydajnosc;
+  $("podstawaPrawna").textContent = w.podstawaPrawna;
+  $("wydajnosc").innerHTML =
+    "<tr><th>OSOBA</th><th>POZYCJE</th><th>CZAS AKTYWNY</th><th>TEMPO/H</th><th>ZGŁOSZONE PROBLEMY</th></tr>" +
+    (w.wiersze.map((o) =>
+      `<tr><td class="b">${esc(o.osoba)}</td><td>${o.pozycje}</td>
+       <td>${Math.round(o.minutyAktywne)} min</td>
+       <td>${o.wiarygodne ? o.tempo : '<span class="badge mute2">MAŁO DANYCH</span>'}</td>
+       <td>${o.zgloszoneProblemy}</td></tr>`).join("") ||
+      '<tr><td colspan="5" class="mute">Brak pracy w tym oknie</td></tr>') +
+    (w.nieprzypisanychZdarzen > 0 ?
+      `<tr><td class="mute" colspan="5">+ ${w.nieprzypisanychZdarzen} zdarzeń bez konta — nie doklejamy ich nikomu</td></tr>` : "");
+
+  const listaSzukan = (el, lista, pusto) => {
+    $(el).innerHTML =
+      "<tr><th>ZAPYTANIE</th><th>RAZY</th></tr>" +
+      (lista.map((t) => `<tr><td class="b">${esc(t.q)}</td><td>${t.ile}</td></tr>`).join("") ||
+        `<tr><td colspan="2" class="mute">${pusto}</td></tr>`);
+  };
+  listaSzukan("szukaneTop", a.szukania.top, "Nikt nic nie szukał");
+  listaSzukan("szukaneBrak", a.szukania.bezWynikow, "Wszystko, czego szukano, znajdowało się");
+
+  $("urzadzenia").innerHTML =
+    "<tr><th>URZĄDZENIE</th><th>UPADKI</th><th>NISKIE BATERIE</th><th>ODRZUCONE</th><th>ZDARZEŃ</th></tr>" +
+    (a.urzadzenia.map((u) =>
+      `<tr><td class="b">${esc(u.device)}</td>
+       <td>${u.upadki ? `<span class="badge err">${u.upadki}</span>` : 0}</td>
+       <td>${u.niskieBaterie}</td>
+       <td>${u.odrzucone ? `<span class="badge err">${u.odrzucone}</span>` : 0}</td>
+       <td>${u.zdarzen}</td></tr>`).join("") ||
+      '<tr><td colspan="5" class="mute">Brak zdarzeń z urządzeń w tym oknie</td></tr>');
+}
+
+async function odswiezAnalize() {
+  try {
+    rysujAnalize(await (await api(`/api/analiza?days=${$("dniAnalizy").value}`)).json());
+  } catch (e) {
+    $("kafleAnalizy").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
+  }
+  // strefa złota żyje na tej samej zakładce, ale ma własne trasy — i własny
+  // try/catch, żeby błąd jednej sekcji nie gasił drugiej
+  odswiezKandydatow();
+  odswiezStrefe();
+}
+
+/* ── Strefa złota: kandydaci i reguły ────────────────────────────────────────
+   Wgranie CSV idzie przez FileReader + zwykły POST `{ csv }` — bez multipart,
+   bo ten sam POST ma w przyszłości wołać integracja z Sellasist. Serwer mówi
+   PRAWDĘ o dopasowaniu (ile wierszy poznał) i odrzuca plik z dopasowaniem
+   poniżej połowy — wynik importu pokazujemy w całości, łącznie z przykładami
+   niedopasowanych symboli.                                                   */
+
+function rysujKandydatow(r) {
+  $("oknoKandydatow").textContent = r.okno
+    ? `Dane ${r.okno.od} – ${r.okno.do} (${r.okno.dni} dni) · próg górnych 15%: ` +
+      `${r.prog} zbiórek · już w strefie: ${r.juzWStrefie} · regał bez reguły: ${r.bezReguly}`
+    : "Brak danych — wgraj CSV zbiórek.";
+  $("kandydaci").innerHTML =
+    "<tr><th>SYMBOL</th><th>NAZWA</th><th>ZBIÓRKI</th><th>NA DZIEŃ</th><th>OBECNY ADRES</th><th>DOKĄD</th></tr>" +
+    (r.kandydaci.map((k) =>
+      `<tr><td class="b">${esc(k.sym)}</td><td>${esc(k.nazwa)}</td>
+       <td>${k.zbiorki}</td><td>${k.zbiorekNaDzien}</td>
+       <td>${esc(k.adres ?? "—")}</td><td>poziom ${esc(k.poziomy)}</td></tr>`).join("") ||
+      '<tr><td colspan="6" class="mute">Nie ma kandydatów — szybka rotacja stoi tam, gdzie ma stać</td></tr>');
+}
+
+async function odswiezKandydatow() {
+  try {
+    rysujKandydatow(await (await api("/api/biuro/zbiorki/kandydaci")).json());
+  } catch (e) {
+    $("oknoKandydatow").textContent = e.message;
+    $("kandydaci").innerHTML = "";
+  }
+}
+
+async function wyslijZbiorki(plik) {
+  $("wynikImportu").textContent = `Wysyłam ${plik.name}…`;
+  try {
+    const csv = await plik.text();
+    const w = await (await api("/api/biuro/zbiorki/import", {
+      method: "POST", body: JSON.stringify({ csv }),
+    })).json();
+    $("wynikImportu").textContent =
+      `Wgrano: ${w.wierszy} wierszy (${w.okres ? `${w.okres.od} – ${w.okres.do}` : "?"}), ` +
+      `nowych ${w.nowych}, duplikatów ${w.pominietychDuplikatow}, ` +
+      `niedopasowanych ${w.niedopasowanych}` +
+      (w.przykladyNiedopasowanych.length
+        ? ` (np. ${w.przykladyNiedopasowanych.slice(0, 5).join(", ")})` : "") +
+      (w.odrzuconychWierszy ? ` · uciętych wierszy: ${w.odrzuconychWierszy}` : "");
+    await odswiezKandydatow();
+  } catch (e) {
+    $("wynikImportu").textContent = `Import odrzucony: ${e.message}`;
+  }
+}
+
+/* Edytor reguł: wiersze z polami, ZAPISZ wysyła KOMPLET — tak jak trasa.
+   Wiersz całkiem pusty jest pomijany, więc „usuń" to po prostu wyczyszczenie
+   pól albo krzyżyk z boku. */
+function wierszReguly(r = { alejka: "", od: "", do: "", poziomy: "" }) {
+  return `<tr>
+    <td><input data-p="alejka" size="3" maxlength="1" value="${esc(r.alejka)}" placeholder="A"></td>
+    <td><input data-p="od" size="5" maxlength="3" value="${esc(r.od)}" placeholder="D01"></td>
+    <td><input data-p="do" size="5" maxlength="3" value="${esc(r.do)}" placeholder="D05"></td>
+    <td><input data-p="poziomy" size="8" value="${esc(r.poziomy)}" placeholder="2,3"></td>
+    <td><button class="akcja cichy" data-usun>✕</button></td>
+  </tr>`;
+}
+
+function rysujReguly(reguly) {
+  $("reguly").innerHTML =
+    "<tr><th>ALEJKA</th><th>REGAŁ OD</th><th>REGAŁ DO</th><th>POZIOMY</th><th></th></tr>" +
+    reguly.map(wierszReguly).join("");
+}
+
+async function odswiezStrefe() {
+  try {
+    rysujReguly((await (await api("/api/biuro/strefa")).json()).reguly);
+    $("wynikStrefy").textContent = "";
+  } catch (e) {
+    $("wynikStrefy").textContent = e.message;
+  }
+}
+
+async function zapiszStrefe() {
+  const reguly = [...$("reguly").querySelectorAll("tr")].map((tr) => {
+    const p = (n) => tr.querySelector(`input[data-p="${n}"]`)?.value.trim() ?? "";
+    return { alejka: p("alejka"), od: p("od"), do: p("do"), poziomy: p("poziomy") };
+  }).filter((r) => r.alejka || r.od || r.do || r.poziomy);
+  try {
+    await api("/api/biuro/strefa", { method: "PUT", body: JSON.stringify({ reguly }) });
+    $("wynikStrefy").textContent = `Zapisano ${reguly.length} reguł — kandydaci przeliczeni.`;
+    await odswiezKandydatow();
+  } catch (e) {
+    $("wynikStrefy").textContent = e.message;
+  }
 }
 
 /* ── Kolejka ── */
@@ -1320,6 +1620,24 @@ $("stan").addEventListener("click", (e) => {
   if (b) pokaz(b.dataset.do);
 });
 $("dniMetryk").addEventListener("change", odswiezNadzor);
+$("dniAnalizy").addEventListener("change", odswiezAnalize);
+$("csvAnalizy").addEventListener("click", () =>
+  pobierz(`/api/analiza/csv?days=${$("dniAnalizy").value}`, "wertis-analiza.csv"));
+$("wgrajZbiorki").addEventListener("click", () => $("plikZbiorek").click());
+$("plikZbiorek").addEventListener("change", (e) => {
+  const plik = e.target.files?.[0];
+  if (plik) wyslijZbiorki(plik);
+  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
+});
+$("csvKandydatow").addEventListener("click", () =>
+  pobierz("/api/biuro/zbiorki/kandydaci/csv", "wertis-strefa-kandydaci.csv"));
+$("dodajRegule").addEventListener("click", () =>
+  $("reguly").insertAdjacentHTML("beforeend", wierszReguly()));
+$("reguly").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-usun]");
+  if (b) b.closest("tr").remove();
+});
+$("zapiszStrefe").addEventListener("click", zapiszStrefe);
 $("sprawdzRozjazdy").addEventListener("click", async () => {
   $("rozjazdy").innerHTML = '<tr><td class="mute">Liczę…</td></tr>';
   try {

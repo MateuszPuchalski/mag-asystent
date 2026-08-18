@@ -20,8 +20,8 @@ import pl.wertis.kolektor.update.WynikInstalacji
 import java.io.File
 import java.security.MessageDigest
 
-/* ── Aktualizacja kolektora z serwera (0.48.0) ───────────────────────────────
-   Do 0.48.0 nowy APK wgrywał człowiek: pobranie artefaktu z GitHuba i obejście
+/* ── Aktualizacja kolektora z serwera (0.52.0) ───────────────────────────────
+   Do 0.52.0 nowy APK wgrywał człowiek: pobranie artefaktu z GitHuba i obejście
    wszystkich kolektorów przez MDM albo `adb install`. Pasek na dole ekranu
    mówił „wersje różne" i nie dawał z tym zrobić nic.
 

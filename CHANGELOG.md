@@ -28,7 +28,7 @@ obie wersje i podświetla rozjazd. To jest stan przejściowy, nie awaria.
 
 ---
 
-## 0.48.0 — 15 sierpnia 2026
+## 0.52.0 — 18 sierpnia 2026
 
 **Kolektor aktualizuje się sam, z serwera WERTIS.** Do tej wersji nowy APK
 wgrywał człowiek: zalogowanie do GitHuba, pobranie artefaktu z CI i obejście
@@ -88,7 +88,7 @@ teraz sam na całą halę — więc do czasu sprawdzenia zminifikowanego wydania
 fizycznym kolektorze APK zostaje pełny. Rozmiar nie jest tu ceną: plik idzie po
 sieci magazynu, nie przez sklep.
 
-Trzynaście testów serwera i trzynaście w `:core`; razem serwer ma 596, `:core` 196.
+Trzynaście testów serwera i trzynaście w `:core`; razem serwer ma 650, `:core` 200.
 
 **[wymaga działania]** Trzy rzeczy, po kolei:
 
@@ -108,6 +108,164 @@ Serwer zwyczajnie: `git pull`, `npm ci`, `npm run build`, restart usług. Każda
 kolejna aktualizacja kolektora wchodzi już po wierzchu i niczego nie kasuje.
 
 ---
+
+## 0.51.0 — 17 sierpnia 2026
+
+**Jednostka miary mówi prawdę — i milczy, gdy nie ma czego opisywać.** Dwie
+strony tej samej sprawy, znalezione razem.
+
+**[wymaga działania]** Nowy APK przez MDM. Serwer: zwykła aktualizacja
+i restart; starsze APK działają dalej.
+
+### Zniknęła tam, gdzie nie opisywała żadnej liczby
+
+Linia EAN-u na karcie towaru pokazuje sam kod kreskowy: `EAN 5905947596430`
+zamiast `EAN 5905947596430 · szt.`. Jednostka stała tuż pod wielką liczbą
+dostępnych, która i tak podpisuje się „szt. dostępne" — mówiła więc to samo dwa
+razy, w linii mającej jedno zadanie: podać kod albo drogę do jego nadania.
+Kartoteka bez kodu ma dalej myślnik i wejście „✎ NADAJ KOD".
+
+To samo na ekranie skanu lokalizacji, w rzędzie „symbol · EAN · jednostka".
+Tamten ekran nie pokazuje ani jednej ilości, więc jednostka nie miała tam nawet
+czego opisywać.
+
+### Stała się prawdziwa tam, gdzie liczbę podpisuje
+
+Cała ścieżka rozkładania dostawy pisała „szt" wpisane w kolektorze na sztywno,
+bo serwer jednostki nie wysyłał. W kartotece 18 pozycji na 3415 mierzy się
+inaczej — sześć w kompletach, sześć w parach. Dla nich „3 szt" na liście
+znaczyło trzy sztuki tam, gdzie na dokumencie stały trzy KOMPLETY, czyli
+trzydzieści sześć sztuk towaru. Karta towaru mówiła wtedy „kpl.", a lista
+dostawy „szt" — o tym samym towarze.
+
+Serwer wysyła teraz jednostkę wszystkimi czterema drogami, którymi ilość trafia
+na ekran: lista pozycji, odpowiedź na skan, podsumowanie zamknięcia i lista
+wyjątków. Kolektor przestał zgadywać w dwunastu miejscach, a reguła zapasowa
+(„kartoteka nie ma jednostki → «szt.»") mieszka w jednym miejscu w `:core`
+zamiast w każdym z nich osobno. Przy okazji zniknął rozjazd pisowni: `szt.`
+z kropką wszędzie, tak jak w Subiekcie.
+
+Pola są **addytywne** — starsze APK ignorują je i pokazują to co dotąd, a nowy
+kolektor podłączony do starszego serwera podstawia „szt." zamiast pustki.
+
+---
+
+## 0.50.0 — 15 sierpnia 2026
+
+**Strefa złota z danych o zbiórkach.** Biuro wgrywa eksport zbiórek
+z Sellasist (CSV) w zakładce ANALIZA. Serwer liczy z niego, które towary są
+w górnych 15% rotacji, a stoją poza strefą złotą — i dokłada im adnotację na
+karcie w kolektorze: „Zbierany 12×/dzień — przenieś do strefy złotej (poziom
+2 albo 3)". Do tego lista kandydatów w panelu biura z eksportem CSV oraz
+edytor reguł strefy (które poziomy którego regału są „złote").
+
+**[wymaga działania]** Nowy APK przez MDM (adnotacja na karcie towaru).
+Serwer: zwykła aktualizacja i restart. Pierwsze użycie to wgranie pliku CSV
+z Sellasist w `/biuro` → ANALIZA → „WGRAJ CSV ZBIÓREK" — bez pliku funkcja
+po prostu milczy.
+
+### Jak to działa
+
+- Import jest **idempotentny**: kluczem jest `ID Koszyka` z eksportu, więc
+  ponowne wgranie tego samego okresu (albo nakładających się) niczego nie
+  dubluje. Plik, w którym do kartoteki dopasowało się mniej niż połowa
+  wierszy, jest odrzucany w całości — z przykładami niedopasowanych symboli.
+- Próg „szybkiej rotacji" to ta sama reguła co w rocznym raporcie
+  przeslotowania (górne 15% liczby pobrań), więc obie ścieżki nigdy nie
+  wskażą sprzecznych list. Okno to ostatnie 30 dni **obecne w danych**,
+  nie kalendarzowe — adnotacje nie znikają, gdy plik wgrano z opóźnieniem.
+- Reguły strefy złotej przeniosły się ze stałej w kodzie do bazy i są
+  edytowalne z biura (rola `biuro`/`admin`). Dotychczasowa definicja
+  (zapis właściciela) została ziarnem — wsiewa się przy pierwszej migracji.
+  Regał bez reguły dalej znaczy „nie wiem", nie „poza strefą".
+- Towar **przeniesiony** traci adnotację sam: liczy się ona z żywej
+  lokalizacji, więc znika po zapisaniu nowego adresu kolektorem.
+- Import ma być w przyszłości wołany automatycznie z Sellasist — trasa to
+  zwykły `POST /api/biuro/zbiorki/import` z JSON-em `{ csv }`, integracja
+  użyje jej bez zmian po naszej stronie.
+
+---
+
+## 0.49.0 — 15 sierpnia 2026
+
+**Podmiana kodu kreskowego bez osobnego potwierdzenia.** Nadanie i zmiana idą
+jednym zatwierdzeniem — decyzja właściciela.
+
+**[wymaga działania]** Nowy APK przez MDM (arkusz kodu jest w kolektorze).
+Serwer: zwykła aktualizacja i restart; starsze APK działają dalej, bo flaga
+potwierdzenia jest nadal przyjmowana — po prostu już niczego nie bramkuje.
+
+### Co się zmienia, a co świadomie zostaje
+
+Do tej pory kartoteka z kodem dostawała przy zmianie osobny krok „Podmiana
+wymaga potwierdzenia" — po stronie serwera i w arkuszu kolektora. Oba wymogi
+są zdjęte: zapis idzie od razu.
+
+Trzy rzeczy zostają i to jest granica tej zmiany:
+
+- **Kod zajęty przez inną kartotekę to nadal twarda odmowa.** Tego nie dało
+  się i nie da przejść żadnym potwierdzeniem — dwa towary z jednym kodem
+  zatrzymują pracę w alejce, a próba zapisuje się do rejestru kolizji.
+- **Arkusz nadal pokazuje „STARY → NOWY"** z ostrzeżeniem, że kartony ze
+  starym kodem przestaną się skanować. Informacja zostaje; zniknęło tylko
+  dopytywanie.
+- **Stary kod jedzie do audytu** w każdym zapisie (`eanPrzed`) — gdyby trzeba
+  było wrócić, widać dokładnie, co stało na kartotece.
+
+Trasa nadania kodu dostała przy okazji własne testy — istniała od 0.37.0 bez
+żadnego, więc zmiana zachowania byłaby niewidzialna dla CI w obie strony.
+
+## 0.48.0 — 15 sierpnia 2026
+
+**Zakładka ANALIZA w podglądzie biura.** Ślad audytowy zbierał wszystko od
+pierwszego dnia, ale nic go nie liczyło — teraz odpowiada na cztery pytania:
+kto ile robi i kiedy jest szczyt, czy magazyn nadąża, czego ludzie szukają
+i nie znajdują, który kolektor się sypie. Do tego eksport CSV.
+
+**[wymaga działania]** Restart `wertis-api` po aktualizacji, bez nowego APK.
+**Zanim raport per osoba zostanie użyty do czegokolwiek kadrowego**: zapis
+w regulaminie pracy albo obwieszczeniu i uprzedzenie załogi co najmniej
+2 tygodnie wcześniej (Kodeks pracy art. 22² i nast.). To obowiązek formalny
+pracodawcy — panel pokazuje podstawę prawną nad tabelą i w pliku CSV.
+
+### Odwrócona decyzja: wydajność per osoba wchodzi na ekran
+
+Od 0.27.0 raport wydajności istniał na serwerze, ale strona biura celowo go
+nie odpytywała — pilnował tego test. Powód był formalny: monitoring
+pracowniczy wymaga poinformowania załogi, a przycisk obok metryk robiłby
+z tego obowiązku przypadek.
+
+Właściciel, uprzedzony o konsekwencjach, zdecydował inaczej — raport jest
+teraz na zakładce ANALIZA. Test strażnika został przepisany na odwrotny:
+pilnuje, żeby sekcja imienna nigdy nie pojawiła się BEZ podstawy prawnej
+i bez zdania, że zgłoszone problemy nie są miarą błędu. Trzy reguły raportu
+nie drgnęły: zgłoszenie wyjątku to nie wpadka, kolumny błędów nie ma, tempo
+z małej próbki pokazuje się jako „mało danych" zamiast liczby.
+
+### Co liczy analiza
+
+Operacje per dzień i rozkład po godzinach — z reguł wspólnych dla wszystkich
+raportów: podwójne zdarzenia jednej czynności odsiane, dni bucketowane po
+zegarze magazynu, nie po dobie UTC. Zdarzenie z 23:30 UTC to następny dzień
+polski i na osi ląduje we właściwym.
+
+Rytm dostaw liczy się z tabel operacyjnych, nie ze zdarzeń: dostawy
+zamknięte, mediana czasu od otwarcia do zamknięcia, pozycje na dostawę,
+problemy zgłoszone i rozwiązane w oknie oraz otwarte w ogóle.
+
+Wyszukiwarka zaczęła zapisywać liczbę wyników przy każdym zapytaniu, więc
+lista „szukane bez wyniku" pokazuje towary, których ludzie szukają, a których
+kartoteka nie zna — najtańsza lista braków. Zdarzenia sprzed tej wersji nie
+niosą liczby wyników i do listy braków nie wchodzą; potraktowane jako zero
+zamieniłyby całą historię w fałszywe braki.
+
+Zdrowie sprzętu grupuje po urządzeniu, nie po osobie: upadki, niskie baterie
+i operacje z bufora odrzucone przez serwer — per kolektor.
+
+Trasa `/api/analiza` ma bramkę jak ślad audytowy (biuro i admin), bo niesie
+dane imienne — magazynier nie czyta zestawień o kolegach. Eksport CSV
+zostawia ślad `analiza_eksport`: kto pobiera zestawienia o ludziach, sam
+trafia do logu.
 
 ## 0.47.0 — 15 sierpnia 2026
 

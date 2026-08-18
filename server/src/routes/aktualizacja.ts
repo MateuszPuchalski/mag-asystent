@@ -2,7 +2,7 @@ import fs from "node:fs";
 import type { FastifyInstance } from "fastify";
 import { apkNaSerwerze } from "../services/aktualizacja.js";
 
-/* ── Aktualizacja kolektora z serwera (0.48.0) ───────────────────────────────
+/* ── Aktualizacja kolektora z serwera (0.52.0) ───────────────────────────────
    OBIE TRASY SĄ POZA BRAMKĄ SESJI (`BEZ_SESJI` w `context.ts`) i to jest
    decyzja, nie przeoczenie. Pytanie pada przy otwarciu aplikacji, także wtedy,
    gdy nikt nie jest zalogowany — a kolektor, którego nie da się naprawić bez

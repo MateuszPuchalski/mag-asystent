@@ -76,6 +76,7 @@ import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
+import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
@@ -703,7 +704,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         // na niej tak samo jak odłożenie
                         zwolnij(linia)
                         graph.feedback.zapis()
-                        graph.effects.toast("${linia.sym} · odłożone ${formatQty(qty)} szt")
+                        graph.effects.toast("${linia.sym} · odłożone ${iloscZJednostka(qty, linia.unit)}")
                         reload++
                     } catch (e: Exception) {
                         graph.feedback.beep(false)
@@ -725,7 +726,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             twId = linia.twId,
             sym = linia.sym,
             name = linia.name,
-            unit = "szt",
+            unit = linia.unit,
             magFrom = magZrodlowy,
             dostepne = linia.qtyDoc - linia.qtyDone,
             qtyInit = linia.qtyDoc - linia.qtyDone,
@@ -945,9 +946,9 @@ private fun LineRow(
                     Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         if (problem) {
-                            "ZGŁOSZONY PROBLEM · ${formatQty(line.qtyDoc)} szt"
+                            "ZGŁOSZONY PROBLEM · ${iloscZJednostka(line.qtyDoc, line.unit)}"
                         } else {
-                            "${formatQty(line.qtyDoc)} szt" +
+                            iloscZJednostka(line.qtyDoc, line.unit) +
                                 if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else ""
                         },
                         fontSize = 11.sp,
@@ -1104,7 +1105,7 @@ private fun PanelOdkladania(
             KrokIlosci("−", ile > 1.0) { onCzesc((ile - 1).coerceAtLeast(1.0)) }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "${formatQty(ile)} szt",
+                    iloscZJednostka(ile, line.unit),
                     fontFamily = BarlowCond,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 32.sp,
@@ -1344,7 +1345,7 @@ private fun EanConflictSheet(
                     Text(c.name, fontSize = 12.5.sp, color = InkSoft, maxLines = 2)
                     Text(
                         if (c.inDocument) {
-                            "w dokumencie: ${formatQty(c.qtyDoc ?: 0.0)} szt → ${c.locExpected ?: "—"}"
+                            "w dokumencie: ${iloscZJednostka(c.qtyDoc ?: 0.0, c.unit)} → ${c.locExpected ?: "—"}"
                         } else {
                             "spoza dokumentu → ${c.locExpected ?: "—"}"
                         },
@@ -1415,7 +1416,7 @@ private fun ZakonczenieSheet(
                 )
                 podsumowanie.braki.forEach { b ->
                     Text(
-                        "${b.sym} · ${formatQty(b.qtyDone)} z ${formatQty(b.qtyDoc)} szt",
+                        "${b.sym} · ${formatQty(b.qtyDone)} z ${iloscZJednostka(b.qtyDoc, b.unit)}",
                         fontSize = 13.sp,
                         color = Ink,
                     )
@@ -1438,7 +1439,7 @@ private fun ZakonczenieSheet(
                 )
                 podsumowanie.nietkniete.forEach { n ->
                     Text(
-                        "${n.sym} · ${formatQty(n.qtyDoc)} szt",
+                        "${n.sym} · ${iloscZJednostka(n.qtyDoc, n.unit)}",
                         fontSize = 13.sp,
                         color = InkMute,
                     )
@@ -1606,7 +1607,7 @@ private fun KorektaSheet(
                 KrokIlosci("−", ile > 0.0) { ile = (ile - 1).coerceAtLeast(0.0) }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "${formatQty(ile)} szt",
+                        iloscZJednostka(ile, line.unit),
                         fontFamily = BarlowCond,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 32.sp,

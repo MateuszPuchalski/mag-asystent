@@ -149,7 +149,7 @@ data class HealthResponse(val wersja: String = "")
 data class WidocznoscRequest(val ukryte: List<Long>)
 
 /**
- * Co serwer ma dla kolektorów do zainstalowania (0.48.0).
+ * Co serwer ma dla kolektorów do zainstalowania (0.52.0).
  *
  * `wersja` jest `null`, gdy serwer nie ma pliku — i to jest ODPOWIEDŹ, nie
  * błąd. Domyślne wartości niosą tu drugie znaczenie: starszy serwer, który tej
@@ -211,6 +211,20 @@ data class ProductCard(
     val zamowione: List<ZamowioneUDostawcy> = emptyList(),
     /** Zamienniki wyczytane z opisu — regułę ma serwer, kolektor tylko rysuje. */
     val zamienniki: Zamienniki = Zamienniki(),
+    /**
+     * Podpowiedź „przenieś do strefy złotej" z danych o zbiórkach. `null` =
+     * nic do zrobienia (albo starszy serwer bez tego pola). Kto i po czym to
+     * liczy — decyduje serwer; kolektor tylko rysuje linię w faktach.
+     */
+    val zlotaStrefa: ZlotaStrefa? = null,
+)
+
+/** Adnotacja przeslotowania: jak często towar jest zbierany i dokąd ma trafić. */
+@Serializable
+data class ZlotaStrefa(
+    val zbiorekNaDzien: Double = 0.0,
+    /** Poziomy strefy dla regału towaru, np. `2 albo 3`. */
+    val poziomy: String = "",
 )
 
 /** Jedna dostawa, na której ten towar przyjechał i nie został odłożony. */
@@ -496,6 +510,11 @@ data class DeliveryLineView(
     val name: String = "",
     val qtyDoc: Double = 0.0,
     val qtyDone: Double = 0.0,
+    /**
+     * Jednostka z kartoteki (`szt.`, `kpl.`, `par`). Pusta = starszy serwer
+     * albo kartoteka bez jednostki — `jednostka()` podstawia wtedy „szt.".
+     */
+    val unit: String = "",
     val locExpected: String? = null,
     val locActual: String? = null,
     val status: String = "todo",
@@ -552,6 +571,8 @@ data class EanCandidate(
     val name: String = "",
     val inDocument: Boolean = false,
     val qtyDoc: Double? = null,
+    /** Jednostka z kartoteki; pusta = starszy serwer (patrz `jednostka()`). */
+    val unit: String = "",
     val locExpected: String? = null,
 )
 
@@ -603,6 +624,8 @@ data class PozycjaZakonczenia(
     val qtyDoc: Double = 0.0,
     /** Ile odłożono; przy pozycji nietkniętej pola nie ma. */
     val qtyDone: Double = 0.0,
+    /** Jednostka z kartoteki; pusta = starszy serwer (patrz `jednostka()`). */
+    val unit: String = "",
 )
 
 /**
@@ -689,6 +712,8 @@ data class ProblemView(
     val docNumber: String? = null,
     val sym: String? = null,
     val name: String? = null,
+    /** Jednostka z kartoteki; pusta = starszy serwer (patrz `jednostka()`). */
+    val unit: String = "",
 )
 
 @Serializable

@@ -42,7 +42,7 @@ jobs:
           name: wertis-kolektor-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
 
-      # ── Wydanie podpisane własnym kluczem (0.48.0) ──────────────────────
+      # ── Wydanie podpisane własnym kluczem (0.52.0) ──────────────────────
       # Wyłącznie na `main`: sekretów nie ma w forkach, więc na PR-ach ten
       # krok padłby na każdym zewnętrznym wkładzie. Podpis jest tu jedyną
       # rzeczą odróżniającą aktualizację WERTIS od dowolnego APK podanego

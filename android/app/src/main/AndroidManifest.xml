@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!--
-      Aktualizacja z serwera WERTIS (0.48.0). Uprawnienie jest instalacyjne, ale
+      Aktualizacja z serwera WERTIS (0.52.0). Uprawnienie jest instalacyjne, ale
       NIE WYSTARCZA: człowiek musi jeszcze zgodzić się w ustawieniach Androida
       na instalowanie z tej aplikacji. Kolektor pyta o to sam, zanim cokolwiek
       pobierze — patrz `AktualizacjaRepository`.

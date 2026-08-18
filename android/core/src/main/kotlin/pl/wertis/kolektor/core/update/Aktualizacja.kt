@@ -1,6 +1,6 @@
 package pl.wertis.kolektor.core.update
 
-/* ── Czy warto się zaktualizować (0.48.0) ───────────────────────────────────
+/* ── Czy warto się zaktualizować (0.52.0) ───────────────────────────────────
    Reguła jest jedna i twarda: PRZY KAŻDEJ WĄTPLIWOŚCI ODPOWIADAMY „NIE".
    Zaproponowana wersja starsza od zainstalowanej kosztuje pełne odinstalowanie
    aplikacji razem z buforem offline, więc niepewność ma tu milczeć, a nie

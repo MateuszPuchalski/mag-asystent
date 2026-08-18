@@ -296,7 +296,7 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier:
    awaria, więc ma być widoczny, a nie alarmujący.                           */
 
 /**
- * @param onDotkniecie od 0.48.0 pasek DAJE COŚ ZROBIĆ. Wcześniej mówił „wersje
+ * @param onDotkniecie od 0.52.0 pasek DAJE COŚ ZROBIĆ. Wcześniej mówił „wersje
  *   różne" i na tym kończył — informacja o problemie bez ani jednej drogi
  *   wyjścia. Teraz dotknięcie pyta serwer, czy ma nowy APK.
  */

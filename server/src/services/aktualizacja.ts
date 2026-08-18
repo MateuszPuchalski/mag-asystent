@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 
-/* ── APK kolektora do samodzielnej aktualizacji (0.48.0) ─────────────────────
-   Do 0.48.0 nowy APK trafiał na kolektory wyłącznie ręką człowieka: zalogowanie
+/* ── APK kolektora do samodzielnej aktualizacji (0.52.0) ─────────────────────
+   Do 0.52.0 nowy APK trafiał na kolektory wyłącznie ręką człowieka: zalogowanie
    do GitHuba, pobranie artefaktu, obejście wszystkich urządzeń przez MDM albo
    `adb install`. Jedynym sygnałem, że trzeba to zrobić, był bursztynowy pasek
    „wersje różne" na dole ekranu — mówiący o problemie i nieoferujący wyjścia.

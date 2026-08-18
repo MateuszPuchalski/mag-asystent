@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 
-/* ── Wynik sesji instalatora (0.48.0) ────────────────────────────────────────
+/* ── Wynik sesji instalatora (0.52.0) ────────────────────────────────────────
    ODBIORNIK JEST W MANIFEŚCIE, nie rejestrowany w kodzie, i to nie jest wybór
    stylu. Instalacja aktualizacji ZABIJA nasz proces — odbiornik zarejestrowany
    w locie nie dożyłby momentu, w którym system ma coś do powiedzenia.

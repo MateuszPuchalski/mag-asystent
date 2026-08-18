@@ -32,7 +32,7 @@ val kodWersji: Int = run {
     major * 10_000 + minor * 100 + patch
 }
 
-/* ── Podpis wydania (0.48.0) ────────────────────────────────────────────────
+/* ── Podpis wydania (0.52.0) ────────────────────────────────────────────────
    Android odmawia instalacji aktualizacji podpisanej INNYM kluczem — i to jest
    jedyny powód, dla którego ta konfiguracja istnieje. Wcześniej repo nie miało
    żadnej: CI budowało `assembleDebug`, a runner GitHuba generuje sobie własny
@@ -87,7 +87,7 @@ android {
 
     buildTypes {
         release {
-            /* R8 WYŁĄCZONY, i to jest decyzja z 0.48.0, nie zaniedbanie.
+            /* R8 WYŁĄCZONY, i to jest decyzja z 0.52.0, nie zaniedbanie.
                Od tej wersji APK rozjeżdża się SAM po kolektorach z serwera,
                więc plik, którego nikt nie uruchomił, trafia od razu na całą
                halę. Reguły `proguard-rules.pro` nie przeszły nigdy żadnego

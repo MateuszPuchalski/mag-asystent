@@ -7,15 +7,19 @@ każdy do swojej roli:
 - **Kolektor = natywna aplikacja Android** ([`android/`](android/README.md),
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
   trwały offline (bufor plikowy JSON + WorkManager), kiosk przez Android
-  lock-task/MDM. Od 0.48.0 **aktualizuje się sam z serwera WERTIS**: plik leży
+  lock-task/MDM. Od 0.52.0 **aktualizuje się sam z serwera WERTIS**: plik leży
   w sieci magazynu, a kolektor proponuje go przy otwarciu aplikacji. Wdrożenie:
   [`DEPLOY.md`](DEPLOY.md) §5.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
-  kolejka zapisów, rekoncyliacja i ślad audytowy. Dostawca z własnym drukiem
+  kolejka zapisów, rekoncyliacja i ślad audytowy. Od 0.48.0 zakładka ANALIZA:
+  wykresy operacji, rytm dostaw, szukane bez wyniku, zdrowie urządzeń
+  i wydajność per osoba (z podstawą prawną monitoringu). Od 0.50.0 także
+  import zbiórek z Sellasist i kandydaci do strefy złotej z edytorem reguł
+  strefy. Dostawca z własnym drukiem
   reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
-  bez builda, logowanie loginem i hasłem, sam odczyt. Operacje wykonuje się
-  wyłącznie na kolektorze.
+  bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
+  na kolektorze.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -444,6 +448,11 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - Pobrania liczy jako **wystąpienia pozycji na WZ, nie sumę ilości**; strefa
   złota jest per zakres regałów. Uruchomienie i pułapki (m.in. odmowa bez
   historii pobrań): [`DEPLOY.md`](DEPLOY.md) §7.
+- Od 0.50.0 **tę samą regułę progu** (górne 15% rotacji) stosuje bieżący
+  import zbiórek z Sellasist w panelu biura. Kandydat stojący poza strefą
+  dostaje adnotację na karcie towaru w kolektorze — obie ścieżki liczą jedną
+  miarą, więc nigdy nie wskażą sprzecznych list. Reguły strefy mieszkają
+  w bazie i są edytowalne z `/biuro` → ANALIZA.
 
 **Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
 - `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
@@ -499,7 +508,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 196 testów jednostkowych; buduje się bez Android SDK
+                           + 200 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

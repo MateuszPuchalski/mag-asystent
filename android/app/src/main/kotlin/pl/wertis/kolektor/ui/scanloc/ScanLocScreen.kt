@@ -180,10 +180,13 @@ fun ScanLocScreen(graph: AppGraph) {
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(p.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink)
+                    /* Jednostka stała TU obok EAN-u i wyszła w 0.51.0 razem
+                       z bliźniaczką z karty towaru. Ten ekran nie pokazuje ani
+                       jednej ilości — jednostka nie miała czego opisywać, a rząd
+                       ma odpowiadać wyłącznie na pytanie „CO przenoszę". */
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 3.dp)) {
                         Text(p.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
                         Text("EAN ${p.ean.ifEmpty { "—" }}", fontSize = 12.sp, color = InkSoft)
-                        Text(p.unit, fontSize = 12.sp, color = InkSoft)
                     }
                 }
                 /* Po prawej, żeby nazwa została flush-left jak dotąd.
