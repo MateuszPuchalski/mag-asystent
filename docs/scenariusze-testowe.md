@@ -558,3 +558,37 @@ czwartą listę, a nie do kosza „poza strefą".
 
 Regał bez reguły nie jest regałem poza strefą. Gdyby nim był, jego martwy towar
 zniknąłby z oczu.
+
+## Zwroty Allegro
+
+Zakładka ZWROTY w `/biuro` (rola biuro albo admin). W trybie demo
+(`SGT_MODE=seeded`) pracuje adapter dev — fikcyjne zwroty bez kontaktu
+z Allegro, zestrojone z dokumentami sprzedaży z tego seedu.
+
+### S67 — zwrot dopasowany jednoznacznie
+
+Skan `DEVWB0001` zakłada zwrot z dwiema pozycjami (`TEST-LINIA-TODO`,
+`TEST-LINIA-DONE`). Faktura `FS 30001` niesie numer zamówienia `dev-ord-1`
+w numerze obcym, więc dokument dopasowuje się sam (`dopasowanie=auto`).
+
+Decyzje per pozycja: jedna pełnowartościowa, druga do reklamacji — status
+zwrotu przechodzi na `oceniony` dopiero po OBU decyzjach. Przycisk
+ODDANO ŚRODKI kończy przepływ (`rozliczony`).
+
+### S68 — dwa kandydujące paragony i etykieta przewoźnika doręczającego
+
+Skan `DEVTW0002` — to numer przewoźnika DORĘCZAJĄCEGO (transportingWaybill),
+inny niż numer nadania zwrotu. Adapter ma go znaleźć tak samo jak numer
+nadania.
+
+Towar `TEST-ROTUJACY` stoi na DWÓCH paragonach bez numeru zamówienia —
+szczegół zwrotu pokazuje obu kandydatów z punktacją i czeka na wybór ręką
+(`dopasowanie=reczne`). Wybór da się cofnąć.
+
+### S69 — pozycja spoza kartoteki i etykieta nieznana
+
+Skan `DEVWB0003` zakłada zwrot, którego pozycja ma sygnaturę spoza kartoteki —
+`tw_id` zostaje puste (uczciwy brak), dokument się nie dopasowuje.
+
+Skan dowolnego innego kodu kończy się komunikatem „Allegro nie zna tej
+etykiety" i przyciskiem założenia zwrotu ręcznego.

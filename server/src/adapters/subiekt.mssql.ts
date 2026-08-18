@@ -85,6 +85,41 @@ export function budujFiltryDokumentow(
  */
 const ZAM_IMPORT_DAYS = 180;
 
+/**
+ * Dokumenty sprzedaży wskazane przez NIEROZLICZONE zwroty Allegro — `dok_Id`
+ * po stronie Subiekta. Ten sam wyjątek okna co `otwarteDokumenty`: dopasowany
+ * zwrot ma pokazywać pozycje dokumentu także wtedy, gdy dokument wypadł już
+ * z okna `DOK_SPRZEDAZ_DNI_WSTECZ` — paczka potrafi leżeć w „do wyjaśnienia"
+ * tygodniami, a brak dokumentu na ekranie wygląda jak zerwane dopasowanie.
+ */
+function dokumentyOtwartychZwrotow(): number[] {
+  return (
+    db()
+      .prepare(
+        "SELECT DISTINCT sgt_dok_id FROM zwrot WHERE sgt_dok_id IS NOT NULL AND status <> 'rozliczony'"
+      )
+      .all() as Array<{ sgt_dok_id: number }>
+  ).map((r) => Math.trunc(r.sgt_dok_id));
+}
+
+/**
+ * Fragmenty `WHERE` dla zapytania o dokumenty SPRZEDAŻY — lustro
+ * `budujFiltryDokumentow`, z tych samych powodów wydzielone: to jedyna logika,
+ * reszta to I/O nietestowalne bez serwera MSSQL.
+ */
+export function budujFiltrySprzedazy(
+  typy: number[],
+  otwarte: number[]
+): { typFilter: string; oknoFilter: string } {
+  const typFilter = `d.dok_Typ IN (${
+    typy.length ? typy.map((n) => Math.trunc(n)).join(",") : "NULL"
+  })`;
+  const oknoFilter = otwarte.length
+    ? `(d.dok_DataWyst >= @cutoff OR d.dok_Id IN (${otwarte.map((n) => Math.trunc(n)).join(",")}))`
+    : "d.dok_DataWyst >= @cutoff";
+  return { typFilter, oknoFilter };
+}
+
 interface TowarRow {
   tw_Id: number;
   tw_Symbol: string;
@@ -130,6 +165,16 @@ interface ZamPozRow {
   zreal: number;
 }
 
+interface SprzedazRow {
+  dok_Id: number;
+  dok_Typ: number;
+  dok_NrPelny: string;
+  nr_oryg: string | null;
+  data_wyst: string;
+  kontrahent: string | null;
+  uwagi: string | null;
+}
+
 export interface ImportStats {
   towary: number;
   stany: number;
@@ -137,6 +182,8 @@ export interface ImportStats {
   pozycje: number;
   zamowienia: number;
   zamPozycje: number;
+  sprzedaz: number;
+  sprzedazPozycje: number;
   at: string;
 }
 
@@ -165,6 +212,17 @@ export let brakKolumnyZrealizowano: string | null = null;
 
 /** Czy ostatni import umiał odczytać ilość zrealizowaną. Czyta serwis karty. */
 export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
+
+/**
+ * Ustawiane, gdy `dok__Dokument` nie ma którejś z opcjonalnych kolumn sprzedaży
+ * (`MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` / `MSSQL_SPRZEDAZ_UWAGI_COLUMN`).
+ *
+ * Czytane przez `/api/health`. Objawem braku kolumny jest „zwroty nigdy nie
+ * dopasowują się same" — czyli dokładnie to samo, co przy integracji, która
+ * numeru zamówienia nigdzie nie wpisuje. Bez tego zdania nikt nie odróżni
+ * jednej sytuacji od drugiej.
+ */
+export let brakKolumnSprzedazy: string | null = null;
 
 interface MagRow {
   mag_Id: number;
@@ -276,6 +334,71 @@ async function pobierzZamowienia(
   return { zamowienia, zamPozycje };
 }
 
+/**
+ * Dokumenty sprzedaży (FS/PA) z pozycjami — do dopasowywania zwrotów Allegro.
+ *
+ * Te same tabele co reszta importu (`dok__Dokument`, `dok_Pozycja`,
+ * `kh__Kontrahent`), więc ZERO nowych GRANT-ów.
+ *
+ * Kolumny `nr_oryg` i `uwagi` są OPCJONALNE i konfigurowalne: która z nich
+ * niesie numer zamówienia Allegro (jeśli którakolwiek), wie tylko własna baza
+ * ([WERYFIKUJ], DEPLOY §6). Nieistniejąca kolumna nie może wywrócić całej
+ * synchronizacji — stany i lokalizacje są ważniejsze — więc drugie podejście
+ * idzie bez obu, a przyczyna melduje się w /api/health (wzorzec `zdZrealColumn`).
+ */
+async function pobierzSprzedaz(
+  pool: sql.ConnectionPool
+): Promise<{ sprzedaz: SprzedazRow[]; sprzedazPozycje: PozRow[] }> {
+  const c = config.mssql;
+  const typy = [c.dokTypFS, c.dokTypPA];
+  const { typFilter, oknoFilter } = budujFiltrySprzedazy(typy, dokumentyOtwartychZwrotow());
+  const cutoff = new Date(Date.now() - c.sprzedazDniWstecz * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  const zapytanie = (nrOryg: string, uwagi: string) =>
+    pool
+      .request()
+      .input("cutoff", sql.VarChar, cutoff)
+      .query<SprzedazRow>(
+        `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
+                ${nrOryg} AS nr_oryg,
+                CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
+                ISNULL(k.kh_Symbol, '') AS kontrahent,
+                ${uwagi} AS uwagi
+         FROM dok__Dokument d
+         LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
+         WHERE ${typFilter} AND ${oknoFilter}`
+      );
+
+  const nrOrygCol = c.sprzedazNrOrygColumn ? `d.${assertSafeColumn(c.sprzedazNrOrygColumn)}` : "NULL";
+  const uwagiCol = c.sprzedazUwagiColumn ? `d.${assertSafeColumn(c.sprzedazUwagiColumn)}` : "NULL";
+
+  let sprzedaz: SprzedazRow[];
+  try {
+    sprzedaz = (await zapytanie(nrOrygCol, uwagiCol)).recordset;
+    brakKolumnSprzedazy = null;
+  } catch (e) {
+    if (nrOrygCol === "NULL" && uwagiCol === "NULL") throw e; // to nie kolumny opcjonalne
+    brakKolumnSprzedazy =
+      `Kolumna ${[nrOrygCol, uwagiCol].filter((k) => k !== "NULL").join(" lub ")} nie istnieje ` +
+      "w dok__Dokument — zwroty Allegro dopasowują dokument tylko po pozycjach, bez numeru " +
+      "zamówienia. Sprawdź nazwy na własnej bazie i ustaw MSSQL_SPRZEDAZ_NR_ORYG_COLUMN / " +
+      "MSSQL_SPRZEDAZ_UWAGI_COLUMN (DEPLOY §6); puste = świadoma rezygnacja.";
+    console.warn(`[mssql] ${brakKolumnSprzedazy} (${e instanceof Error ? e.message : e})`);
+    sprzedaz = (await zapytanie("NULL", "NULL")).recordset;
+  }
+
+  if (sprzedaz.length === 0) return { sprzedaz, sprzedazPozycje: [] };
+  const sprzedazPozycje = (
+    await pool.request().query<PozRow>(
+      `SELECT ob_DokHanId, ob_TowId, ob_IloscMag
+       FROM dok_Pozycja WHERE ob_DokHanId IN (${sprzedaz.map((s) => s.dok_Id).join(",")})`
+    )
+  ).recordset;
+  return { sprzedaz, sprzedazPozycje };
+}
+
 export async function importFromMssql(): Promise<ImportStats> {
   const pool = await mssqlPool();
   const c = config.mssql;
@@ -349,6 +472,7 @@ export async function importFromMssql(): Promise<ImportStats> {
     : [];
 
   const { zamowienia, zamPozycje } = await pobierzZamowienia(pool);
+  const { sprzedaz, sprzedazPozycje } = await pobierzSprzedaz(pool);
 
   // ── wpis do read-modelu sgt_* (wzorzec wipe+insert z seed.ts) ─────────────
   const d = db();
@@ -375,10 +499,21 @@ export async function importFromMssql(): Promise<ImportStats> {
   const insZamPoz = d.prepare(
     "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
   );
+  const insSprzedaz = d.prepare(
+    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi)
+     VALUES (?,?,?,?,?,?,?)`
+  );
+  const insSprzedazPoz = d.prepare(
+    "INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+  );
 
   const apply = transaction(d, () => {
-    /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy. */
+    /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy.
+       Na tej liście stoi WYŁĄCZNIE read-model sgt_* — tabele aplikacji
+       (zwrot, zwrot_pozycja, allegro_token, ean_alias…) nie mają tu wstępu:
+       import zaorałby wiedzę, której Subiekt nie ma. */
     for (const t of [
+      "sgt_sprzedaz_pozycja", "sgt_sprzedaz",
       "sgt_zam_pozycja", "sgt_zamowienie",
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
@@ -433,6 +568,24 @@ export async function importFromMssql(): Promise<ImportStats> {
       if (!knownTw.has(p.ob_TowId)) continue;
       insZamPoz.run(p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag ?? 0, p.zreal ?? 0);
     }
+    for (const s of sprzedaz) {
+      insSprzedaz.run(
+        s.dok_Id,
+        symbolTypu(s.dok_Typ),
+        s.dok_NrPelny,
+        s.nr_oryg || null,
+        s.data_wyst,
+        s.kontrahent ?? "",
+        s.uwagi || null
+      );
+    }
+    for (const p of sprzedazPozycje) {
+      if (!knownTw.has(p.ob_TowId)) continue;
+      /* ABS świadomie: znak ilości na dokumencie rozchodowym zależy od wersji
+         bazy, a dopasowanie zwrotu porównuje „ile sprzedano" z „ile wraca" —
+         obie liczby mają być dodatnie. */
+      insSprzedazPoz.run(p.ob_DokHanId, p.ob_TowId, Math.abs(p.ob_IloscMag ?? 0));
+    }
   });
   apply();
 
@@ -443,12 +596,15 @@ export async function importFromMssql(): Promise<ImportStats> {
     pozycje: pozycje.length,
     zamowienia: zamowienia.length,
     zamPozycje: zamPozycje.length,
+    sprzedaz: sprzedaz.length,
+    sprzedazPozycje: sprzedazPozycje.length,
     at: nowIso(),
   };
   console.log(
     `[mssql] import: towary=${lastImport.towary}, stany=${lastImport.stany}, ` +
       `dokumenty=${lastImport.dokumenty}, pozycje=${lastImport.pozycje}, ` +
-      `zamowienia=${lastImport.zamowienia}, zamPozycje=${lastImport.zamPozycje}`
+      `zamowienia=${lastImport.zamowienia}, zamPozycje=${lastImport.zamPozycje}, ` +
+      `sprzedaz=${lastImport.sprzedaz}, sprzedazPozycje=${lastImport.sprzedazPozycje}`
   );
   return lastImport;
 }

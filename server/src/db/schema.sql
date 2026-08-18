@@ -427,3 +427,127 @@ CREATE TABLE IF NOT EXISTS strefa_regula (
   regal_do TEXT,
   poziomy  TEXT NOT NULL            -- CSV numerów poziomów, np. '2,3,4'
 );
+
+-- ── Zwroty Allegro (Etap 1: skan → decyzja → dopasowanie dokumentu) ─────────
+-- Poprzedni moduł zwrotów wyszedł w 0.17.0 (koszyki+MM bez wejścia — jego
+-- finał wymagał workera Sfery, którego wtedy nie było). Ten jest INNY:
+-- jednostką jest ZWROT KLIENTA pobrany z Allegro API, nie dokument z Subiekta.
+-- Nazw martwych kolumn tamtego modułu (koszyk, mm_ilosc, mm_queue_id) nie
+-- używamy — stare bazy je mają i znaczyły co innego.
+--
+-- Etap 1 NICZEGO nie zapisuje do Subiekta (sfera_queue nietknięta): korekta
+-- i MM na magazyn zwrotów to Etap 2, stąd słownik statusów otwarty tekstem.
+
+-- Token OAuth konta Allegro. JEDEN wiersz (id=1): aplikacja obsługuje jedno
+-- konto sprzedawcy. Refresh token jest STANEM, nie konfiguracją — Allegro
+-- wydaje nową parę przy każdym odświeżeniu, więc env nie ma tu czego trzymać.
+-- NIE jest częścią read-modelu: import z MSSQL nie ma prawa go dotknąć.
+CREATE TABLE IF NOT EXISTS allegro_token (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),
+  access_token    TEXT NOT NULL,
+  refresh_token   TEXT NOT NULL,
+  wygasa_at       TEXT NOT NULL,      -- ISO UTC; odświeżamy 5 min przed
+  scope           TEXT,
+  -- prod | sandbox. Token NIE przeżywa zmiany środowiska: parowanie na
+  -- sandboksie i przełączenie na produkcję ma wymusić ponowne parowanie,
+  -- a nie sypać 401 bez wyjaśnienia.
+  srodowisko      TEXT NOT NULL,
+  polaczono_at    TEXT NOT NULL,
+  polaczono_przez TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zwrot (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- id z GET /order/customer-returns. UNIQUE robi skan idempotentnym: druga
+  -- osoba skanująca tę samą paczkę dostaje ISTNIEJĄCY zwrot, nie duplikat.
+  -- NULL = zwrot założony ręcznie (etykieta, której Allegro nie znało).
+  allegro_return_id TEXT UNIQUE,
+  allegro_order_id  TEXT,
+  -- referenceNumber — TEN numer widzi klient i panel sprzedawcy; UI pokazuje
+  -- go dużą czcionką, bo po nim pracownik odnajduje zwrot w panelu Allegro.
+  referencja        TEXT,
+  -- Co ZESKANOWANO (fakt) — niezależnie od parcels[] z API. Etykieta u drzwi
+  -- bywa numerem przewoźnika DORĘCZAJĄCEGO (transportingWaybill), innym niż
+  -- waybill nadania.
+  waybill           TEXT NOT NULL,
+  status_allegro    TEXT,              -- status z API, informacyjnie
+  kupujacy_login    TEXT,
+  kupujacy_email    TEXT,
+  utworzono_allegro TEXT,              -- createdAt zwrotu w Allegro (ISO)
+  -- Maszyna stanów Etapu 1; Etap 2 DOPISZE wartości (np. korekta_w_kolejce,
+  -- zakonczony) — dlatego status jest otwartym tekstem, nie CHECK-iem.
+  --   nowy       = przyjęty skanem, czeka na ocenę towaru
+  --   oceniony   = każda pozycja ma decyzję
+  --   rozliczony = oceniony + odnotowany zwrot środków
+  status            TEXT NOT NULL DEFAULT 'nowy',
+  -- Dokument źródłowy sprzedaży w Subiekcie. Numer i typ obok id ŚWIADOMIE:
+  -- read-model sgt_sprzedaz jest oknem czasowym i wiersz może z niego wypaść,
+  -- a zwrot ma dalej pokazywać, do czego został przypięty.
+  sgt_dok_id        INTEGER,
+  sgt_dok_numer     TEXT,
+  sgt_dok_typ       TEXT,              -- FS | PA (sprzedaż idzie OBIEMA drogami)
+  dopasowanie       TEXT NOT NULL DEFAULT 'brak',  -- brak | auto | reczne
+  -- Zwrot środków jest PÓŁAUTOMATYCZNY: link do panelu Allegro + stempel ręką.
+  -- Wywołań payments API nie ma — pieniądze rusza człowiek.
+  zwrot_srodkow_at  TEXT,
+  zwrot_srodkow_przez TEXT,
+  -- Pełna odpowiedź API. Diagnoza dopasowań dziś, paliwo korekty w Etapie 2.
+  surowe_json       TEXT,
+  utworzono_at      TEXT NOT NULL,
+  utworzono_przez   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_status ON zwrot(status, id);
+-- skan sprawdza najpierw, czy etykieta już ma rekord — przy każdym skanie
+CREATE INDEX IF NOT EXISTS ix_zwrot_waybill ON zwrot(waybill);
+
+CREATE TABLE IF NOT EXISTS zwrot_pozycja (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  zwrot_id      INTEGER NOT NULL REFERENCES zwrot(id),
+  offer_id      TEXT,                -- items[].offerId z Allegro
+  nazwa         TEXT NOT NULL,       -- nazwa oferty (snapshot — oferta znika po latach)
+  -- offer.external.id z zamówienia — sygnatura sprzedawcy, którą integracja
+  -- sprzedażowa zwykle wypełnia symbolem kartoteki ([WERYFIKUJ] na własnym koncie).
+  external_id   TEXT,
+  tw_id         INTEGER,             -- dopasowana kartoteka; NULL = uczciwy brak
+  ilosc         REAL NOT NULL DEFAULT 1,
+  powod         TEXT,                -- powód zwrotu z Allegro
+  powod_opis    TEXT,                -- komentarz kupującego
+  -- Decyzja pracownika po obejrzeniu towaru — per POZYCJA, bo jedna paczka
+  -- miewa artykuł pełnowartościowy i uszkodzony naraz. Zwrot per-paczka
+  -- wymuszałby najgorszy wspólny mianownik.
+  -- pelnowartosciowy | reklamacja | do_wyjasnienia | do_zniszczenia
+  decyzja       TEXT,
+  decyzja_at    TEXT,
+  decyzja_przez TEXT,
+  notatka       TEXT                 -- swobodna notatka do decyzji (opcjonalna)
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_poz ON zwrot_pozycja(zwrot_id);
+
+-- ── Read-model sprzedaży (FS/PA) do dopasowywania zwrotów ───────────────────
+-- OSOBNE tabele, nie kolejne typy w sgt_dokument — ten sam argument co przy
+-- sgt_zamowienie: dokument sprzedaży na liście rozkładania byłby błędem,
+-- a rozdział tabel czyni go niemożliwym. Okno importu własne
+-- (DOK_SPRZEDAZ_DNI_WSTECZ, domyślnie 90 dni), bo prawo zwrotu liczy się od
+-- dostawy do klienta, nie od naszego okna dostaw.
+CREATE TABLE IF NOT EXISTS sgt_sprzedaz (
+  dok_id     INTEGER PRIMARY KEY,
+  typ        TEXT NOT NULL,           -- FS | PA
+  nr_pelny   TEXT NOT NULL,
+  -- numer obcy/oryginalny dokumentu (MSSQL_SPRZEDAZ_NR_ORYG_COLUMN);
+  -- [WERYFIKUJ] czy integracja sprzedażowa wpisuje tam numer zamówienia Allegro
+  nr_oryg    TEXT,
+  data_wyst  TEXT NOT NULL,           -- ISO date
+  kontrahent TEXT,                    -- kh_Symbol płatnika
+  uwagi      TEXT                     -- kolumna z MSSQL_SPRZEDAZ_UWAGI_COLUMN; NULL gdy pominięta
+);
+CREATE INDEX IF NOT EXISTS ix_sprzedaz_data ON sgt_sprzedaz(data_wyst);
+
+CREATE TABLE IF NOT EXISTS sgt_sprzedaz_pozycja (
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  dok_id INTEGER NOT NULL REFERENCES sgt_sprzedaz(dok_id),
+  tw_id  INTEGER NOT NULL,
+  ilosc  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_sprzedaz_poz_dok ON sgt_sprzedaz_pozycja(dok_id);
+-- dopasowanie zwrotu pyta „które dokumenty mają TEN towar"
+CREATE INDEX IF NOT EXISTS ix_sprzedaz_poz_tw ON sgt_sprzedaz_pozycja(tw_id);

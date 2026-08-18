@@ -47,6 +47,8 @@ export const TW_OD = 900_001;
 export const DOK_OD = 9_001;
 /** Pierwszy `dok_id` dokumentów WZ z historią pobrań (raport przeslotowania). */
 export const DOK_WZ_OD = 20_001;
+/** Pierwszy `dok_id` dokumentów sprzedaży (FS/PA) pod zwroty Allegro. */
+export const DOK_SPRZ_OD = 30_001;
 
 /**
  * Symbol wydania z magazynu w read-modelu `sgt_*`.
@@ -198,6 +200,11 @@ export const KATALOG: Scenariusz[] = [
   { id: "S63", obszar: "reslot", tytul: "Historia pobrań: eksmisja i awans", wejscie: "npm run reslot -- --demo" },
   { id: "S64", obszar: "reslot", tytul: "Pobrania to wystąpienia, nie sztuki", wejscie: "npm run reslot -- --demo" },
   { id: "S65", obszar: "reslot", tytul: "Regał bez reguły strefy złotej", wejscie: "npm run reslot -- --demo" },
+
+  // ── zwroty Allegro (adapter dev — ALLEGRO_MODE puste przy SGT_MODE=seeded) ──
+  { id: "S67", obszar: "zwroty", tytul: "Zwrot dopasowany jednoznacznie (numer zamówienia na FS)", wejscie: "/biuro → ZWROTY → skan DEVWB0001" },
+  { id: "S68", obszar: "zwroty", tytul: "Dwa kandydujące paragony — wybór ręczny; etykieta przewoźnika doręczającego", wejscie: "/biuro → ZWROTY → skan DEVTW0002" },
+  { id: "S69", obszar: "zwroty", tytul: "Pozycja zwrotu spoza kartoteki i etykieta nieznana Allegro", wejscie: "/biuro → ZWROTY → skan DEVWB0003, potem dowolny inny kod" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -390,6 +397,7 @@ export interface Podsumowanie {
   zamowienia: number;
   dokumentyWz: number;
   pozycjeWz: number;
+  sprzedaz: number;
 }
 
 /**
@@ -410,6 +418,7 @@ export function zbudujScenariusze(): Podsumowanie {
   const licz = {
     towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
     konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
+    sprzedaz: 0,
   };
 
   const wszystkieTowary = [...TOWARY, ...DROBNICA];
@@ -430,6 +439,7 @@ export function zbudujScenariusze(): Podsumowanie {
     const wz = historiaPobran();
     licz.dokumentyWz = wz.dokumentow;
     licz.pozycjeWz = wz.pozycji;
+    licz.sprzedaz = sprzedazDemo();
   })();
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
@@ -463,6 +473,17 @@ function wyczysc(): void {
     d.prepare("DELETE FROM sgt_dokument WHERE dok_id >= ?").run(DOK_OD);
     d.prepare("DELETE FROM sgt_zam_pozycja WHERE dok_id >= ?").run(DOK_OD);
     d.prepare("DELETE FROM sgt_zamowienie WHERE dok_id >= ?").run(DOK_OD);
+
+    d.prepare("DELETE FROM sgt_sprzedaz_pozycja WHERE dok_id >= ?").run(DOK_SPRZ_OD);
+    d.prepare("DELETE FROM sgt_sprzedaz WHERE dok_id >= ?").run(DOK_SPRZ_OD);
+    /* Zwroty założone z adaptera dev (skan DEVWB…) — kasowane po znaczniku
+       `dev-ret-`, żeby ponowne uruchomienie wracało do punktu wyjścia także
+       w zakładce ZWROTY. Zwroty ręczne z innych etykiet zostają. */
+    d.prepare(
+      `DELETE FROM zwrot_pozycja WHERE zwrot_id IN
+         (SELECT id FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%')`
+    ).run();
+    d.prepare("DELETE FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%'").run();
 
     d.prepare("DELETE FROM sgt_stan WHERE tw_id >= ?").run(TW_OD);
     d.prepare("DELETE FROM sgt_towar WHERE tw_id >= ?").run(TW_OD);
@@ -1236,6 +1257,36 @@ function historiaPobran(): { dokumentow: number; pozycji: number } {
    Trzy pliki na dysku i JEDNA referencja bez pliku (S37). Trasa zdjęcia musi
    odróżniać te przypadki, bo w firmie zdarzy się dokładnie to: kopia bazy bez
    katalogu `data/photos`.                                                    */
+/* ── S67–S69: sprzedaż pod zwroty Allegro ───────────────────────────────────
+   Dokumenty FS/PA w read-modelu `sgt_sprzedaz` — dokładnie to, co na produkcji
+   przyniósłby importer MSSQL. Zestrojone 1:1 z fikcyjnymi zwrotami adaptera
+   dev (`adapters/allegro.dev.ts`): numery zamówień, symbole i ilości muszą się
+   zgadzać, bo scenariusze mierzą właśnie dopasowanie. */
+function sprzedazDemo(): number {
+  const d = db();
+  const insDok = d.prepare(
+    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi)
+     VALUES (?,?,?,?,?,?,?)`
+  );
+  const insPoz = d.prepare(
+    "INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+  );
+
+  // S67 — FS z numerem zamówienia Allegro w numerze obcym: dopasowanie auto
+  insDok.run(DOK_SPRZ_OD, "FS", `FS ${DOK_SPRZ_OD}/${mmrrrr(dzien(-10))}`, "dev-ord-1", dzien(-10), "ALLEGRO", null);
+  insPoz.run(DOK_SPRZ_OD, 900_036, 1); // TEST-LINIA-TODO
+  insPoz.run(DOK_SPRZ_OD, 900_037, 2); // TEST-LINIA-DONE
+
+  /* S68 — DWA paragony z tym samym towarem, żaden bez numeru zamówienia nie
+     wygrywa sam: szczegół zwrotu pokazuje kandydatów i czeka na wybór ręką. */
+  insDok.run(DOK_SPRZ_OD + 1, "PA", `PA ${DOK_SPRZ_OD + 1}/${mmrrrr(dzien(-12))}`, null, dzien(-12), "DETAL", null);
+  insPoz.run(DOK_SPRZ_OD + 1, 900_029, 1); // TEST-ROTUJACY
+  insDok.run(DOK_SPRZ_OD + 2, "PA", `PA ${DOK_SPRZ_OD + 2}/${mmrrrr(dzien(-20))}`, null, dzien(-20), "DETAL", null);
+  insPoz.run(DOK_SPRZ_OD + 2, 900_029, 1);
+
+  return 3;
+}
+
 function zdjecia(): void {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   fs.mkdirSync(dir, { recursive: true });
@@ -1258,6 +1309,7 @@ function wypisz(licz: Podsumowanie): void {
       `zdarzenia=${licz.zdarzenia} zamówienia=${licz.zamowienia}`
   );
   console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
+  console.log(`[scenariusze] sprzedaż pod zwroty Allegro: dokumentów=${licz.sprzedaz}`);
   console.log("");
   let obszar = "";
   for (const s of KATALOG) {

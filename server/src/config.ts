@@ -177,6 +177,78 @@ export const config = {
     bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
     syncMs: num(process.env.MSSQL_SYNC_MS, 60000, "MSSQL_SYNC_MS"),
+    /**
+     * Dokumenty SPRZEDAŻY do dopasowywania zwrotów Allegro (0.53.0).
+     *
+     * FS i PA z tej samej listy kodów co wyżej, więc wartości pewne. Sprzedaż
+     * w tej firmie idzie OBIEMA drogami (część zamówień na fakturę, część na
+     * paragon) — dlatego dwa typy, a nie jeden przełącznik.
+     */
+    dokTypFS: num(process.env.DOK_TYP_FS, 2, "DOK_TYP_FS"),
+    dokTypPA: num(process.env.DOK_TYP_PA, 21, "DOK_TYP_PA"),
+    /**
+     * Okno importu dokumentów sprzedaży [dni]. WŁASNE, szersze niż okno dostaw:
+     * klient ma prawo zwrotu liczone od doręczenia, a paczka wraca i po dwóch
+     * miesiącach. Dokument wskazany przez NIEROZLICZONY zwrot zostaje w imporcie
+     * niezależnie od wieku (ten sam wyjątek co `otwarteDokumenty`).
+     */
+    sprzedazDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 90, "DOK_SPRZEDAZ_DNI_WSTECZ"),
+    /**
+     * Kolumna `dok__Dokument` z numerem obcym/oryginalnym dokumentu.
+     * Integracje sprzedażowe zwykle wpisują tam numer zamówienia — jeśli tak
+     * jest i tu, dopasowanie zwrotu do dokumentu staje się jednoznaczne.
+     * Domyślna nazwa to [WERYFIKUJ] (nasz opis struktury jej nie wymienia);
+     * gdy kolumny nie ma, import ponawia zapytanie bez niej i melduje
+     * w /api/health. Puste = świadoma rezygnacja z tego sygnału.
+     */
+    sprzedazNrOrygColumn: process.env.MSSQL_SPRZEDAZ_NR_ORYG_COLUMN ?? "dok_NrPelnyOryg",
+    /**
+     * Kolumna `dok__Dokument` z uwagami — drugi kandydat na miejsce, gdzie
+     * integracja zostawia numer zamówienia Allegro. Domyślnie PUSTA (wyłączona):
+     * które pole faktycznie niesie numer, ustala się na własnej bazie
+     * ([WERYFIKUJ], DEPLOY §6). Dopasowanie bez tego sygnału degraduje do
+     * nakładki pozycji + ręcznego wyboru, nie do awarii.
+     */
+    sprzedazUwagiColumn: process.env.MSSQL_SPRZEDAZ_UWAGI_COLUMN ?? "",
+  },
+
+  /**
+   * Zwroty Allegro (0.53.0) — pierwsza integracja HTTP wychodząca w tym
+   * serwerze. Klient na globalnym `fetch` (Node ≥22.5), zero zależności.
+   *
+   * `clientId` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM (wzorzec
+   * `zdjecia.zrodlo`): puste znaczy „funkcji nie ma" i to jest domyślne.
+   * Zakładka ZWROTY w /biuro mówi to wtedy wprost, /api/health milczy.
+   * Ustawiony client_id BEZ sparowanego konta → zdanie w /api/health.
+   *
+   * Poświadczenia aplikacji rejestruje się na developer.allegro.pl (typ
+   * „urządzenie" / device flow — bez redirect URI). Token konta NIE mieszka
+   * w env, tylko w tabeli allegro_token: odświeżenie wydaje nową parę, więc
+   * to stan, nie konfiguracja.
+   */
+  allegro: {
+    clientId: process.env.ALLEGRO_CLIENT_ID ?? "",
+    clientSecret: process.env.ALLEGRO_CLIENT_SECRET ?? "",
+    /** 1 = środowisko testowe allegro.pl.allegrosandbox.pl. */
+    sandbox: process.env.ALLEGRO_SANDBOX === "1",
+    /**
+     * Wybór adaptera. Puste = wynika z SGT_MODE (seeded → dev, mssql → http)
+     * — ten sam wzorzec co `sferaMode`. `dev` wymusza fikcyjne zwroty
+     * (demo na produkcyjnej maszynie, testy); `http` wymusza prawdziwe API.
+     */
+    mode: (process.env.ALLEGRO_MODE ?? "") as "" | "dev" | "http",
+    /** Host autoryzacji (device flow + tokeny). Nadpisywalny na czarną godzinę. */
+    authUrl:
+      process.env.ALLEGRO_AUTH_URL ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/auth/oauth"
+        : "https://allegro.pl/auth/oauth"),
+    /** Host REST API. */
+    apiUrl:
+      process.env.ALLEGRO_API_URL ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://api.allegro.pl.allegrosandbox.pl"
+        : "https://api.allegro.pl"),
   },
 
   /**
@@ -440,6 +512,32 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     } catch {
       bledy.push(`Wzorzec lokalizacji "${p}" nie jest poprawnym wyrażeniem regularnym.`);
     }
+  }
+
+  /* Zwroty Allegro. Client_id bez sekretu przechodziłby start i wywalał się
+     dopiero przy parowaniu — czyli w chwili, gdy ktoś przy panelu czeka na
+     kod. Objaw („nie da się połączyć konta") nie prowadzi do przyczyny. */
+  if (c.allegro.clientId && !c.allegro.clientSecret) {
+    bledy.push(
+      "ALLEGRO_CLIENT_ID bez ALLEGRO_CLIENT_SECRET — oba wydaje rejestracja " +
+        "aplikacji na developer.allegro.pl (typ „urządzenie”). Uzupełnij wertis.env.",
+    );
+  }
+  if (!["", "dev", "http"].includes(c.allegro.mode)) {
+    bledy.push(
+      `ALLEGRO_MODE=${c.allegro.mode} — dozwolone: puste (wg SGT_MODE), dev, http.`,
+    );
+  }
+  /* Tryb http bez poświadczeń aplikacji nie ma jak zapytać o cokolwiek —
+     a wymuszony jawnie znaczy, że ktoś liczy na prawdziwe API. */
+  if (c.allegro.mode === "http" && !c.allegro.clientId) {
+    bledy.push("ALLEGRO_MODE=http wymaga ALLEGRO_CLIENT_ID i ALLEGRO_CLIENT_SECRET.");
+  }
+  if (c.mssql.dokTypFS === c.mssql.dokTypPA) {
+    bledy.push(
+      `DOK_TYP_FS i DOK_TYP_PA są równe (${c.mssql.dokTypFS}) — faktura i paragon ` +
+        "to różne kody dok_Typ (lista w docs/subiekt-gt-struktura.md).",
+    );
   }
 
   return bledy;

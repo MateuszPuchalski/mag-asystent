@@ -839,6 +839,64 @@ Bramki odbioru (bufor, guard kolejności, odporność na restart) —
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i przesunięcia
 stanu przez workera Sfery.
 
+## 6a. Zwroty Allegro (Etap 1 — rejestr i decyzje)
+
+Zakładka ZWROTY ALLEGRO w `/biuro`. Skan etykiety zwrotnej pobiera z Allegro
+dane kupującego, powód i pozycje, po czym zakłada rekord zwrotu. Aplikacja
+sama dopasowuje dokument sprzedaży (FS/PA) z Subiekta. Decyzje zapadają per
+pozycję: pełnowartościowy / reklamacja / do wyjaśnienia / do zniszczenia.
+Zwrot środków jest półautomatyczny: link do panelu Allegro + potwierdzenie ręką.
+**Ten etap niczego nie zapisuje do Subiekta** — korekty i MM na magazyn
+zwrotów to Etap 2.
+
+Domyślnie funkcja jest **wyłączona** (puste `ALLEGRO_CLIENT_ID`), a w trybie
+demo (`SGT_MODE=seeded`) działa na fikcyjnych zwrotach bez kontaktu
+z Allegro (scenariusze S67–S69).
+
+### Włączenie na produkcji
+
+1. **Rejestracja aplikacji** na <https://developer.allegro.pl> (konto
+   sprzedawcy firmy): *Moje aplikacje → Nowa aplikacja*, typ **„urządzenie”**
+   (device flow — bez adresu przekierowania). Zapisz `client_id`
+   i `client_secret` do `wertis.env`:
+
+   ```
+   export ALLEGRO_CLIENT_ID=...
+   export ALLEGRO_CLIENT_SECRET=...
+   ```
+
+2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` →
+   ZWROTY ALLEGRO → KONTO ALLEGRO → POŁĄCZ (rola **admin**). Strona pokaże
+   kod i link — otwórz go na zalogowanym koncie sprzedawcy i potwierdź.
+   Token zapisuje się w bazie aplikacji i odświeża sam. Wygasa dopiero po
+   ~3 miesiącach nieużywania — wtedy `/api/health` każe sparować ponownie.
+
+3. **Sandbox** (opcjonalnie, do prób): osobna rejestracja na
+   <https://developer.allegro.pl.allegrosandbox.pl> i `ALLEGRO_SANDBOX=1`.
+   Token nie przeżywa zmiany środowiska — po przełączeniu paruj ponownie.
+
+Import z MSSQL zaczyna też zaciągać dokumenty sprzedaży (FS i PA, okno
+`DOK_SPRZEDAZ_DNI_WSTECZ`, domyślnie 90 dni) — **zero nowych GRANT-ów**,
+te same tabele co dostawy.
+
+### Do sprawdzenia na własnej bazie i koncie ([WERYFIKUJ])
+
+Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
+
+1. **Gdzie integracja sprzedażowa wpisuje numer zamówienia Allegro** na
+   dokumencie w Subiekcie. Sprawdź na świeżej sprzedaży:
+   `SELECT dok_NrPelny, dok_NrPelnyOryg FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC`.
+   Numer w `dok_NrPelnyOryg` → zostaw domyślne `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN`.
+   Numer w uwagach → ustaw `MSSQL_SPRZEDAZ_UWAGI_COLUMN`. Nigdzie → ustaw oba
+   puste; dopasowanie działa wtedy po pozycjach z ręcznym wyborem kandydata.
+2. **Czy `offer.external.id` w zamówieniach niesie symbol kartoteki** (tak
+   ustawia się Sellasist). Bez tego pozycje zwrotu nie dopasują kartotek
+   i dokument trzeba wskazywać ręcznie.
+3. **Scope tokena**: żądamy `allegro:api:orders:read`; jeśli skan kończy się
+   403, dodaj uprawnienie do zamówień przy rejestracji aplikacji.
+4. **Kształt pola powodu zwrotu** w odpowiedzi customer-returns — mapowanie
+   przyjmuje znane warianty, nieznany daje pustą kolumnę POWÓD (nie błąd).
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
