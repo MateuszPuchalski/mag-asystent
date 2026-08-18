@@ -22,11 +22,14 @@ import { config } from "../config.js";
 
 /** Kody, których symbol znamy z konfiguracji. */
 function nazwane(): Map<number, string> {
-  const { dokTypFZ, dokTypPZ, dokTypZD } = config.mssql;
+  const { dokTypFZ, dokTypPZ, dokTypZD, dokTypFS, dokTypPA } = config.mssql;
   return new Map([
     [dokTypFZ, "FZ"],
     [dokTypPZ, "PZ"],
     [dokTypZD, "ZD"],
+    // sprzedaż (0.53.0) — read-model sgt_sprzedaz do dopasowywania zwrotów
+    [dokTypFS, "FS"],
+    [dokTypPA, "PA"],
   ]);
 }
 

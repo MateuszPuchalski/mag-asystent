@@ -129,13 +129,15 @@ test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
   assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
 });
 
-test("strona biura zapisuje TYLKO sześć rzeczy", () => {
+test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   /* „ZERO ZAPISU" było regułą tego pliku od 0.18.0 i skończyło się w 0.40.0:
      doszło oznaczenie dostawy jako rozłożonej poza WERTIS i cofnięcie tego.
      Reguła nie zniknęła, tylko dostała jawną listę — bo pilnuje czegoś, co
      nadal obowiązuje. W 0.50.0 lista urosła o import zbiórek i reguły strefy
-     złotej: oba zapisy dotyczą danych, których NIE MA w Subiekcie, oba stoją
-     za rolą biuro|admin i żaden nie rusza dostaw ani stanów.
+     złotej, w 0.53.0 — o zwroty Allegro (skan, wybór kandydata, decyzje,
+     pozycja ręczna, stempel środków, parowanie konta, dopasowanie dokumentu).
+     Wszystkie te zapisy dotyczą danych, których NIE MA w Subiekcie, stoją za
+     rolą biuro|admin i żaden nie rusza dostaw, stanów ani sfera_queue.
 
      Zakazany jest wciąż `POST /api/delivery/documents/:dokId/open`: różni się
      od trasy podglądu o jeden człon ścieżki i zwróciłby to samo, a kosztem
@@ -149,19 +151,27 @@ test("strona biura zapisuje TYLKO sześć rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    5,
-    "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka i import zbiórek — nic ponadto"
+    11,
+    "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek " +
+      "i sześć zapisów zwrotów Allegro (skan, utworzenie, decyzja, pozycja " +
+      "ręczna, środki, parowanie) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    1,
-    "jedyny PUT to komplet reguł strefy złotej"
+    2,
+    "PUT to komplet reguł strefy złotej i ręczny wybór dokumentu zwrotu"
+  );
+  assert.equal(
+    (html.match(/method:\s*"DELETE"/g) ?? []).length,
+    2,
+    "DELETE to odpięcie dokumentu zwrotu i rozłączenie konta Allegro"
   );
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
   assert.match(html, /dokument\/\$\{dokId\}\/zamknij/, "zamknięcie poza WERTIS");
   assert.match(html, /dokument\/\$\{dokId\}\/otworz/, "droga powrotna");
   assert.match(html, /zbiorki\/import/, "import zbiórek z Sellasist");
+  assert.match(html, /zwroty\/skan/, "skan etykiety zwrotu Allegro");
 });
 
 test("podgląd pokazuje, kto odłożył pozycję", () => {

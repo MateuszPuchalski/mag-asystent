@@ -121,6 +121,7 @@
   <div id="stan"></div>
   <nav class="zakladki">
     <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
+    <button data-widok="zwroty">ZWROTY ALLEGRO</button>
     <button data-widok="nadzor">STAN SYSTEMU</button>
     <button data-widok="dziennik">DZIENNIK</button>
     <button data-widok="analiza">ANALIZA</button>
@@ -177,6 +178,63 @@
           <div><button class="akcja" id="zapiszFirme">ZAPISZ</button></div>
         </div>
       </details>
+    </section>
+  </div>
+
+  <!-- ── ZWROTY ALLEGRO ──────────────────────────────────────────────────── -->
+  <div id="widokZwroty" hidden style="display:grid;gap:20px">
+    <!-- Szczegół zwrotu — zasłania karty poniżej (wzorzec #szczegol dostaw):
+         to jest wejście W zwrot, nie dodatek obok listy. -->
+    <section class="card" id="zwrotSzczegol" hidden>
+      <button class="akcja cichy" id="zwrotWroc">← WSZYSTKIE ZWROTY</button>
+      <div id="zwrotNaglowek" style="margin-top:12px"></div>
+      <table id="zwrotPozycje" style="margin-top:10px"></table>
+      <div id="zwrotDodajPozycje" style="margin-top:10px" hidden>
+        <h2>DOPISZ POZYCJĘ (ZWROT RĘCZNY)</h2>
+        <div class="filtry">
+          <div><label for="zwrotSzukajTowar">TOWAR (symbol / EAN / nazwa)</label>
+            <input id="zwrotSzukajTowar" size="28"></div>
+          <div><label for="zwrotIloscTowar">ILOŚĆ</label>
+            <input id="zwrotIloscTowar" size="5" inputmode="decimal" value="1"></div>
+          <div><button class="akcja cichy" id="zwrotSzukajTowarBtn">SZUKAJ</button></div>
+        </div>
+        <table id="zwrotTowarWyniki"></table>
+      </div>
+      <div id="zwrotDokument" style="margin-top:14px"></div>
+      <div id="zwrotRozliczenie" style="margin-top:14px"></div>
+    </section>
+
+    <section class="card" id="zwrotSkanKarta">
+      <h2>SKAN ETYKIETY ZWROTU</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
+        Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
+        doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
+      </p>
+      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:320px">
+      <div id="zwrotSkanWynik" style="margin-top:8px"></div>
+    </section>
+
+    <section class="card" id="zwrotListaKarta">
+      <h2>ZWROTY</h2>
+      <div class="filtry">
+        <div><label for="zwrotFiltrStatus">STATUS</label>
+          <select id="zwrotFiltrStatus">
+            <option value="">wszystkie</option>
+            <option value="nowy">nowe — czekają na ocenę</option>
+            <option value="oceniony">ocenione — czekają na środki</option>
+            <option value="rozliczony">rozliczone</option>
+          </select></div>
+        <div><label for="zwrotSzukajLista">SZUKAJ</label>
+          <input id="zwrotSzukajLista" placeholder="etykieta / login / numer zwrotu"></div>
+      </div>
+      <table id="zwrotLista"></table>
+    </section>
+
+    <section class="card" id="kontoAllegroKarta">
+      <h2>KONTO ALLEGRO</h2>
+      <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
+      <div id="allegroAkcje"></div>
     </section>
   </div>
 
@@ -433,6 +491,8 @@ function wyloguj() {
   kolejkaFoto.length = 0;
   sesjaPodgladu++;
   zamknijDokument();
+  zamknijZwrot();
+  parowanieTrwa = false;
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
   $("panel").hidden = true; $("wyloguj").hidden = true;
@@ -464,13 +524,16 @@ function pokaz(nowy) {
      DOSTAWY pokazywałby fakturę sprzed kwadransa jako stan bieżący. Z tego
      samego powodu stan panelu NIE idzie do localStorage. */
   zamknijDokument();
+  zamknijZwrot();
   $("widokDostawy").hidden = nowy !== "dostawy";
+  $("widokZwroty").hidden = nowy !== "zwroty";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
   for (const b of document.querySelectorAll("nav.zakladki button")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
+  if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
   if (nowy === "analiza") odswiezAnalize();
@@ -1591,7 +1654,285 @@ async function odswiez() {
     // byłoby pracą dla nikogo, a biuro chce widzieć postęp TEJ faktury na żywo
     if (otwartyDok != null) await odswiezSzczegol();
     else await odswiezDostawy();
-  } else if (widok === "nadzor") await odswiezNadzor();
+  } else if (widok === "zwroty") await odswiezZwroty();
+  else if (widok === "nadzor") await odswiezNadzor();
+}
+
+/* ── Zwroty Allegro ───────────────────────────────────────────────────────────
+   Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
+   (ocena towaru, dopasowanie dokumentu, stempel środków), nie operacja z hali,
+   więc reguła „operacje wykonuje się na kolektorze" jej nie dotyczy. Do
+   Subiekta i tak nic stąd nie idzie — Etap 1 nie tyka sfera_queue. */
+let otwartyZwrot = null;
+let stanAllegro = null;
+let parowanieTrwa = false;
+
+const DECYZJE_ZWROTU = [
+  ["pelnowartosciowy", "PEŁNOWARTOŚCIOWY", "ok"],
+  ["reklamacja", "REKLAMACJA", "amber"],
+  ["do_wyjasnienia", "DO WYJAŚNIENIA", "mute2"],
+  ["do_zniszczenia", "DO ZNISZCZENIA", "err"],
+];
+
+function badgeZwrotu(s) {
+  if (s === "rozliczony") return '<span class="badge ok">ROZLICZONY</span>';
+  if (s === "oceniony") return '<span class="badge amber">OCENIONY · CZEKA NA ŚRODKI</span>';
+  return '<span class="badge mute2">NOWY · DO OCENY</span>';
+}
+
+async function odswiezZwroty() {
+  if (otwartyZwrot != null) return odswiezSzczegolZwrotu();
+  try {
+    const q = new URLSearchParams();
+    if ($("zwrotFiltrStatus").value) q.set("status", $("zwrotFiltrStatus").value);
+    const szukaj = $("zwrotSzukajLista").value.trim();
+    if (szukaj) q.set("szukaj", szukaj);
+    const d = await (await api(`/api/biuro/zwroty?${q}`)).json();
+    stanAllegro = d.allegro || null;
+    rysujZwroty(d.zwroty || []);
+    rysujKontoAllegro();
+  } catch (e) { console.warn(e); }
+}
+
+function rysujZwroty(zwroty) {
+  const rows = zwroty.map((z) => `<tr data-zwrot="${z.id}" style="cursor:pointer">
+      <td class="b">${esc(z.referencja || z.waybill)}</td>
+      <td>${esc(z.kupujacyLogin || "—")}</td>
+      <td class="mute">${esc((z.utworzonoAt || "").slice(0, 10))}</td>
+      <td>${badgeZwrotu(z.status)}</td>
+      <td class="mute">${z.ocenionych}/${z.pozycji} poz.</td>
+      <td>${z.dokumentNumer ? esc(z.dokumentNumer) : '<span class="mute">bez dokumentu</span>'}</td>
+      <td><button class="akcja cichy" data-zwrot="${z.id}">OTWÓRZ</button></td>
+    </tr>`).join("");
+  $("zwrotLista").innerHTML =
+    "<tr><th>ZWROT</th><th>KUPUJĄCY</th><th>PRZYJĘTO</th><th>STATUS</th><th>OCENA</th><th>DOKUMENT</th><th></th></tr>" +
+    (rows || '<tr><td colspan="7" class="mute">Brak zwrotów — zeskanuj etykietę wyżej</td></tr>');
+}
+
+async function skanujZwrot() {
+  const kod = $("zwrotSkan").value.trim();
+  if (!kod) return;
+  const wynik = $("zwrotSkanWynik");
+  wynik.innerHTML = '<span class="mute">Pytam Allegro…</span>';
+  try {
+    const r = await fetch("/api/biuro/zwroty/skan", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session": token },
+      body: JSON.stringify({ kod }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 201 || (r.ok && d.zwrot)) {
+      $("zwrotSkan").value = "";
+      wynik.innerHTML = d.istniejacy
+        ? '<span class="badge amber">ta paczka ma już zwrot — otwieram</span>' : "";
+      return otworzZwrot(d.zwrot.id);
+    }
+    if (r.status === 300) {
+      wynik.innerHTML = '<p class="mute">Jeden numer, kilka zwrotów — wybierz właściwy:</p>' +
+        (d.kandydaciAllegro || []).map((k) =>
+          `<button class="akcja cichy" data-allegro="${esc(k.id)}" data-kod="${esc(d.kod)}" style="margin:4px 6px 0 0">
+             ${esc(k.referencja || k.id)} · ${esc(k.kupujacyLogin || "?")} · ${k.pozycji} poz.</button>`).join("");
+      return;
+    }
+    if (r.status === 404 && d.mozliwyReczny) {
+      wynik.innerHTML = `<span class="badge err">Allegro nie zna tej etykiety</span>
+        <button class="akcja cichy" data-reczny="${esc(d.kod)}" style="margin-left:8px">ZAŁÓŻ ZWROT RĘCZNY</button>`;
+      return;
+    }
+    wynik.innerHTML = `<span class="badge err">${esc(d.error || `Błąd ${r.status}`)}</span>`;
+  } catch (e) { wynik.innerHTML = `<span class="badge err">${esc(e.message)}</span>`; }
+}
+
+async function utworzZwrot(body) {
+  const d = await (await api("/api/biuro/zwroty", { method: "POST", body: JSON.stringify(body) })).json();
+  $("zwrotSkan").value = "";
+  $("zwrotSkanWynik").innerHTML = "";
+  otworzZwrot(d.zwrot.id);
+}
+
+function otworzZwrot(id) {
+  otwartyZwrot = id;
+  // szczegół ZASŁANIA karty poniżej (wzorzec #szczegol dostaw) — to wejście
+  // W zwrot, nie dodatek nad listą
+  $("zwrotSzczegol").hidden = false;
+  $("zwrotSkanKarta").hidden = true;
+  $("zwrotListaKarta").hidden = true;
+  $("kontoAllegroKarta").hidden = true;
+  odswiezSzczegolZwrotu();
+}
+
+function zamknijZwrot() {
+  otwartyZwrot = null;
+  $("zwrotSzczegol").hidden = true;
+  $("zwrotSkanKarta").hidden = false;
+  $("zwrotListaKarta").hidden = false;
+  $("kontoAllegroKarta").hidden = false;
+  $("zwrotTowarWyniki").innerHTML = "";
+}
+
+async function odswiezSzczegolZwrotu() {
+  if (otwartyZwrot == null) return;
+  try {
+    const d = await (await api(`/api/biuro/zwroty/${otwartyZwrot}`)).json();
+    rysujSzczegolZwrotu(d.zwrot);
+  } catch (e) {
+    $("zwrotNaglowek").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+function rysujSzczegolZwrotu(z) {
+  const zamkniety = z.status === "rozliczony";
+
+  $("zwrotNaglowek").innerHTML = `
+    <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
+      <span style="font-size:24px;font-weight:700">${esc(z.referencja || z.waybill)}</span>
+      ${badgeZwrotu(z.status)}
+      ${z.statusAllegro ? `<span class="badge mute2">Allegro: ${esc(z.statusAllegro)}</span>` : ""}
+      ${z.allegroReturnId ? "" : '<span class="badge amber">ZWROT RĘCZNY</span>'}
+    </div>
+    <p class="mute" style="margin-top:6px">
+      etykieta <b>${esc(z.waybill)}</b>
+      · kupujący <b>${esc(z.kupujacyLogin || "nieznany")}</b>${z.kupujacyEmail ? ` (${esc(z.kupujacyEmail)})` : ""}
+      ${z.utworzonoAllegro ? ` · zgłoszony w Allegro ${esc(z.utworzonoAllegro.slice(0, 10))}` : ""}
+      · przyjęty ${esc(z.utworzonoAt.slice(0, 10))} przez ${esc(z.utworzonoPrzez)}
+    </p>`;
+
+  const rows = z.pozycje.map((p) => {
+    const decyzje = zamkniety
+      ? (DECYZJE_ZWROTU.find(([k]) => k === p.decyzja)
+          ? `<span class="badge ${DECYZJE_ZWROTU.find(([k]) => k === p.decyzja)[2]}">${esc(DECYZJE_ZWROTU.find(([k]) => k === p.decyzja)[1])}</span>` : "—")
+      : DECYZJE_ZWROTU.map(([kod, opis]) =>
+          `<button class="akcja ${p.decyzja === kod ? "" : "cichy"}" data-poz="${p.id}" data-dec="${kod}"
+             style="margin:2px 4px 2px 0;font-size:11px;padding:4px 8px">${opis}</button>`).join("");
+    return `<tr>
+      <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}
+          ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}
+          ${p.externalId && !p.symbol ? `<span class="mute">sygnatura: ${esc(p.externalId)}</span>` : ""}</td>
+      <td class="b" style="white-space:nowrap">${p.ilosc}</td>
+      <td>${esc(p.powod || "—")}${p.powodOpis ? `<br><span class="mute">„${esc(p.powodOpis)}”</span>` : ""}</td>
+      <td>${decyzje}${p.notatka ? `<div class="mute">notatka: ${esc(p.notatka)}</div>` : ""}
+          ${p.decyzjaPrzez ? `<div class="mute">${esc(p.decyzjaPrzez)} · ${esc((p.decyzjaAt || "").slice(0, 16).replace("T", " "))}</div>` : ""}</td>
+    </tr>`;
+  }).join("");
+  $("zwrotPozycje").innerHTML =
+    "<tr><th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD ZWROTU</th><th>DECYZJA</th></tr>" +
+    (rows || '<tr><td colspan="4" class="mute">Bez pozycji — dopisz je niżej</td></tr>');
+
+  // dopisywanie pozycji: tylko zwrot ręczny i tylko przed rozliczeniem
+  $("zwrotDodajPozycje").hidden = !(z.allegroReturnId == null && !zamkniety);
+
+  if (z.dokument) {
+    $("zwrotDokument").innerHTML = `<h2>DOKUMENT SPRZEDAŻY</h2>
+      <p><span class="b">${esc(z.dokument.numer || z.dokument.dokId)}</span>
+        <span class="badge mute2">${esc(z.dokument.typ || "?")}</span>
+        <span class="badge ${z.dokument.dopasowanie === "auto" ? "ok" : "amber"}">
+          ${z.dokument.dopasowanie === "auto" ? "DOPASOWANY AUTOMATYCZNIE" : "WYBRANY RĘCZNIE"}</span>
+        ${zamkniety ? "" : '<button class="akcja cichy" data-odepnij style="margin-left:8px">ODEPNIJ</button>'}
+      </p>`;
+  } else {
+    const kandydaci = z.kandydaciDokumentu || [];
+    $("zwrotDokument").innerHTML = "<h2>DOKUMENT SPRZEDAŻY · KANDYDACI</h2>" + (kandydaci.length
+      ? "<table><tr><th>DOKUMENT</th><th>DATA</th><th>KONTRAHENT</th><th>PUNKTY</th><th>DLACZEGO</th><th></th></tr>" +
+        kandydaci.map((k) => `<tr>
+            <td class="b">${esc(k.numer)} <span class="badge mute2">${esc(k.typ)}</span></td>
+            <td class="mute">${esc(k.data)}</td>
+            <td>${esc(k.kontrahent || "—")}</td>
+            <td class="b">${k.punkty}</td>
+            <td class="mute">${esc(k.powody.join("; ") || "bliskość daty")}</td>
+            <td>${zamkniety ? "" : `<button class="akcja cichy" data-wybierz="${k.dokId}">WYBIERZ</button>`}</td>
+          </tr>`).join("") + "</table>"
+      : '<p class="mute">Brak kandydatów w oknie sprzedaży — dokument można będzie wskazać, gdy pojawi się w imporcie.</p>');
+  }
+
+  const srodki = z.zwrotSrodkow
+    ? `<span class="badge ok">ŚRODKI ODDANE</span>
+       <span class="mute">${esc(z.zwrotSrodkow.przez)} · ${esc(z.zwrotSrodkow.at.slice(0, 16).replace("T", " "))}</span>`
+    : (z.status === "oceniony"
+        ? '<button class="akcja" data-srodki>ODDANO ŚRODKI W PANELU</button>'
+        : '<span class="mute">Najpierw decyzja przy każdej pozycji — potem zwrot środków.</span>');
+  $("zwrotRozliczenie").innerHTML = `<h2>ZWROT ŚRODKÓW (PANEL ALLEGRO)</h2>
+    <p class="mute" style="margin-bottom:8px">
+      Pieniądze oddaje się w panelu Allegro — odszukaj zwrot po numerze
+      <b>${esc(z.referencja || z.waybill)}</b>, wykonaj zwrot środków i potwierdź tutaj.
+      <a href="${esc(z.linkPanel)}" target="_blank" rel="noopener">OTWÓRZ PANEL ZWROTÓW →</a>
+    </p>
+    ${srodki}`;
+}
+
+async function akcjaZwrotu(fn) {
+  try { await fn(); await odswiezSzczegolZwrotu(); }
+  catch (e) { alert(e.message); }
+}
+
+async function szukajTowaruDoZwrotu() {
+  const q = $("zwrotSzukajTowar").value.trim();
+  if (!q) return;
+  const d = await (await api(`/api/products/search?q=${encodeURIComponent(q)}`)).json();
+  const rows = (d.results || []).map((t) => `<tr>
+      <td class="b">${esc(t.sym)}</td><td>${esc(t.name)}</td>
+      <td><button class="akcja cichy" data-dodaj="${t.id ?? t.twId}">DODAJ</button></td>
+    </tr>`).join("");
+  $("zwrotTowarWyniki").innerHTML = rows || '<tr><td class="mute">Nic nie znaleziono</td></tr>';
+}
+
+/* ── Konto Allegro (device flow) ── */
+function rysujKontoAllegro() {
+  const s = stanAllegro;
+  if (!s) { $("allegroStan").textContent = ""; $("allegroAkcje").innerHTML = ""; return; }
+  if (parowanieTrwa) return; // trwające parowanie rysuje pollParowania
+  const akcje = [];
+  if (s.stan === "dev") {
+    $("allegroStan").innerHTML = 'Adapter <b>dev</b> — fikcyjne zwroty bez kontaktu z Allegro. ' +
+      'Do wypróbowania: skan <b>DEVWB0001</b>, <b>DEVTW0002</b>, <b>DEVWB0003</b> (scenariusze S67–S69).';
+  } else if (s.stan === "wylaczone") {
+    $("allegroStan").innerHTML = 'Funkcja wyłączona — ustaw <b>ALLEGRO_CLIENT_ID</b> i ' +
+      '<b>ALLEGRO_CLIENT_SECRET</b> w wertis.env (rejestracja aplikacji: developer.allegro.pl).';
+  } else if (s.stan === "polaczone") {
+    $("allegroStan").innerHTML = `<span class="badge ok">POŁĄCZONE</span> środowisko <b>${esc(s.srodowisko)}</b>` +
+      (s.wygasa ? ` · token ważny do ${esc(s.wygasa.slice(0, 16).replace("T", " "))} (odświeża się sam)` : "");
+    akcje.push('<button class="akcja cichy" data-rozlacz>ROZŁĄCZ KONTO</button>');
+  } else {
+    $("allegroStan").innerHTML = (s.stan === "zle_srodowisko"
+      ? '<span class="badge err">TOKEN Z INNEGO ŚRODOWISKA</span> zmieniono ALLEGRO_SANDBOX — sparuj ponownie. '
+      : '<span class="badge err">NIEPOŁĄCZONE</span> skan etykiety nie zadziała bez konta. ')
+      + `środowisko <b>${esc(s.srodowisko)}</b>`;
+    akcje.push('<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>');
+    akcje.push('<span class="mute" style="margin-left:8px">parowanie wykonuje admin</span>');
+  }
+  $("allegroAkcje").innerHTML = akcje.join(" ");
+}
+
+async function rozpocznijParowanieAllegro() {
+  try {
+    const d = await (await api("/api/biuro/allegro/parowanie", { method: "POST", body: "{}" })).json();
+    parowanieTrwa = true;
+    $("allegroStan").innerHTML = `Na SWOIM zalogowanym koncie Allegro otwórz
+      <a href="${esc(d.link)}" target="_blank" rel="noopener">link potwierdzenia</a>
+      i przepisz kod: <span style="font-size:22px;font-weight:700;letter-spacing:3px">${esc(d.userCode)}</span>`;
+    $("allegroAkcje").innerHTML = '<span class="mute">Czekam na potwierdzenie w Allegro…</span>';
+    pollParowania();
+  } catch (e) { alert(e.message); }
+}
+
+async function pollParowania() {
+  if (!parowanieTrwa) return;
+  try {
+    const d = await (await api("/api/biuro/allegro/parowanie")).json();
+    if (d.stan === "czekam" || d.stan === "brak") {
+      setTimeout(pollParowania, 3000);
+      return;
+    }
+    parowanieTrwa = false;
+    if (d.stan === "polaczone") { odswiezZwroty(); return; }
+    $("allegroStan").innerHTML = d.stan === "odmowa"
+      ? '<span class="badge err">ODMOWA W ALLEGRO</span> spróbuj ponownie'
+      : '<span class="badge err">KOD WYGASŁ</span> spróbuj ponownie';
+    $("allegroAkcje").innerHTML = '<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>';
+  } catch (e) {
+    parowanieTrwa = false;
+    alert(e.message);
+    odswiezZwroty();
+  }
 }
 
 function start() {
@@ -1687,7 +2028,72 @@ $("szczegolNaglowek").addEventListener("click", (e) => {
 });
 $("wrocDoListy").addEventListener("click", zamknijDokument);
 // panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") zamknijDokument(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { zamknijDokument(); if (otwartyZwrot != null) { zamknijZwrot(); odswiezZwroty(); } }
+});
+
+/* ── Zwroty Allegro — zdarzenia ── */
+$("zwrotSkan").addEventListener("keydown", (e) => { if (e.key === "Enter") skanujZwrot(); });
+$("zwrotSkanWynik").addEventListener("click", (e) => {
+  const a = e.target.closest("[data-allegro]");
+  if (a) return akcjaZwrotu(() => utworzZwrot({ allegroReturnId: a.dataset.allegro, waybill: a.dataset.kod }));
+  const r = e.target.closest("[data-reczny]");
+  if (r) return akcjaZwrotu(() => utworzZwrot({ reczny: true, waybill: r.dataset.reczny }));
+});
+$("zwrotLista").addEventListener("click", (e) => {
+  const w = e.target.closest("[data-zwrot]");
+  if (w) otworzZwrot(Number(w.dataset.zwrot));
+});
+$("zwrotWroc").addEventListener("click", () => { zamknijZwrot(); odswiezZwroty(); });
+$("zwrotFiltrStatus").addEventListener("change", odswiezZwroty);
+$("zwrotSzukajLista").addEventListener("input", odswiezZwroty);
+$("zwrotPozycje").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-poz]");
+  if (!b) return;
+  /* Notatka tylko przy decyzjach „coś jest nie tak" — pełnowartościowy nie ma
+     czego wyjaśniać, a okienko przy każdym kliku nauczyłoby ludzi klikać OK. */
+  const notatka = b.dataset.dec === "pelnowartosciowy"
+    ? null : (prompt("Notatka (opcjonalna):", "") || null);
+  akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/pozycje/${b.dataset.poz}/decyzja`, {
+    method: "POST", body: JSON.stringify({ decyzja: b.dataset.dec, notatka }),
+  }));
+});
+$("zwrotDokument").addEventListener("click", (e) => {
+  const w = e.target.closest("[data-wybierz]");
+  if (w) return akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokument`, {
+    method: "PUT", body: JSON.stringify({ dokId: Number(w.dataset.wybierz) }),
+  }));
+  const o = e.target.closest("[data-odepnij]");
+  if (o) return akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokument`, { method: "DELETE" }));
+});
+$("zwrotRozliczenie").addEventListener("click", (e) => {
+  if (e.target.closest("[data-srodki]")) {
+    // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
+    akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/zwrot-srodkow`, { method: "POST", body: "{}" }));
+  }
+});
+$("zwrotSzukajTowarBtn").addEventListener("click", szukajTowaruDoZwrotu);
+$("zwrotSzukajTowar").addEventListener("keydown", (e) => { if (e.key === "Enter") szukajTowaruDoZwrotu(); });
+$("zwrotTowarWyniki").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-dodaj]");
+  if (!b) return;
+  const ilosc = Number($("zwrotIloscTowar").value) || 1;
+  akcjaZwrotu(async () => {
+    await api(`/api/biuro/zwroty/${otwartyZwrot}/pozycje`, {
+      method: "POST", body: JSON.stringify({ twId: Number(b.dataset.dodaj), ilosc }),
+    });
+    $("zwrotTowarWyniki").innerHTML = "";
+    $("zwrotSzukajTowar").value = "";
+  });
+});
+$("allegroAkcje").addEventListener("click", (e) => {
+  if (e.target.closest("[data-polacz]")) return rozpocznijParowanieAllegro();
+  if (e.target.closest("[data-rozlacz]")) {
+    if (!confirm("Rozłączyć konto Allegro? Skan etykiet przestanie działać do ponownego parowania.")) return;
+    akcjaZwrotu(async () => { await api("/api/biuro/allegro", { method: "DELETE" }); odswiezZwroty(); });
+  }
+});
+
 setInterval(() => { if (token) odswiez(); }, 30_000);
 
 if (token) start();

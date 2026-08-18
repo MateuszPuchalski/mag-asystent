@@ -33,6 +33,61 @@ historii nie przepisujemy.
 
 ---
 
+## 0.53.0 — 18 sierpnia 2026
+
+**Zwroty Allegro, etap pierwszy: skan etykiety → rekord zwrotu → decyzje →
+dokument sprzedaży.** Do tej wersji zwrot z Allegro zaczynał się od papierowej
+kartki i ręcznego szukania w dwóch systemach: kto to odesłał, czemu, na którym
+dokumencie stała ta sprzedaż. Teraz biuro skanuje etykietę z paczki w nowej
+zakładce ZWROTY ALLEGRO w `/biuro` — aplikacja pyta Allegro API o zwrot,
+zakłada rekord z kupującym, powodem i pozycjami, po czym sama wskazuje
+dokument FS albo PA z Subiekta.
+
+Co wchodzi w skład:
+
+- **Skan etykiety.** Pytamy Allegro po numerze nadania ORAZ po numerze
+  przewoźnika doręczającego — etykieta u drzwi bywa tym drugim. Drugi skan tej
+  samej paczki otwiera istniejący zwrot, nie zakłada duplikatu. Etykieta
+  nieznana Allegro dostaje ścieżkę **zwrotu ręcznego** z pozycjami wskazywanymi
+  z kartoteki.
+- **Decyzja per pozycja**, nie per paczka: pełnowartościowy / reklamacja /
+  do wyjaśnienia / do zniszczenia — bo jedna paczka miewa artykuł
+  pełnowartościowy i uszkodzony naraz. Status zwrotu jest pochodną decyzji
+  (`nowy → oceniony → rozliczony`), decyzję można poprawić do rozliczenia,
+  a wszystko zostaje w dzienniku.
+- **Dopasowanie dokumentu.** Import z MSSQL zaciąga teraz też dokumenty
+  sprzedaży (FS i PA, własne okno `DOK_SPRZEDAZ_DNI_WSTECZ` = 90 dni, zero
+  nowych GRANT-ów). Numer zamówienia Allegro znaleziony na dokumencie
+  ([WERYFIKUJ] którą kolumną — DEPLOY §6a) dopasowuje automatycznie;
+  bez niego biuro wybiera z punktowanej listy kandydatów, która mówi wprost,
+  skąd punkty.
+- **Zwrot środków półautomatem.** Link do panelu zwrotów Allegro + przycisk
+  ODDANO ŚRODKI — pieniądze rusza człowiek, aplikacja pilnuje kolejności
+  (najpierw ocena towaru) i trzyma stempel kto/kiedy.
+- **Parowanie konta Allegro** device flow z karty KONTO ALLEGRO (rola admin):
+  kod + link, bez adresu przekierowania. Token mieszka w bazie aplikacji
+  i odświeża się sam; brak parowania melduje `/api/health`.
+- **Tryb demo bez Allegro:** przy `SGT_MODE=seeded` pracuje adapter `dev`
+  z fikcyjnymi zwrotami, zestrojonymi z seedem scenariuszy — nowe scenariusze
+  **S67–S69** (`docs/scenariusze-testowe.md`).
+
+**Ten etap NICZEGO nie zapisuje do Subiekta** — `sfera_queue` nietknięta.
+Korekta sprzedaży i MM na magazyn zwrotów jedną decyzją to etap drugi; kosze
+zwrotowe, roznoszenie na kolektorze i automatyczne cofnięcie bufora — trzeci.
+Poprzedni moduł zwrotów wyszedł w 0.17.0, bo jego finał wymagał workera Sfery,
+którego wtedy nie było — ta droga jest teraz otwarta, ale wchodzi etapami.
+
+Nowe tabele: `zwrot`, `zwrot_pozycja`, `allegro_token`, `sgt_sprzedaz`,
+`sgt_sprzedaz_pozycja` — powstają same przy starcie. 27 nowych testów
+(serwis, trasy, mapowanie API, filtry importu).
+
+**[wymaga działania]** Tylko jeśli chcesz włączyć zwroty na produkcji:
+rejestracja aplikacji na developer.allegro.pl, dwa klucze w `wertis.env`
+i parowanie konta — krok po kroku w DEPLOY §6a. Bez tych kluczy zakładka
+mówi, że funkcja jest wyłączona, i nic więcej się nie zmienia.
+
+---
+
 ## 0.52.5 — 18 sierpnia 2026
 
 **Instalator odrzucał poprawne APK z powodu własnego błędu w czytaniu sumy

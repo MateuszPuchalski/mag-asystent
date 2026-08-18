@@ -20,12 +20,15 @@ import { magazynRoutes } from "./routes/magazyny.js";
 import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
+import { zwrotyRoutes } from "./routes/zwroty.js";
 import {
   brakDostepuDoMagazynow,
+  brakKolumnSprzedazy,
   brakKolumnyZrealizowano,
   importFromMssql,
   lastImport,
 } from "./adapters/subiekt.mssql.js";
+import { problemAllegro } from "./services/allegro-token.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
@@ -75,6 +78,11 @@ export async function buildApp() {
       problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
+      /* Sprzedaż bez kolumny numeru obcego dopasowuje zwroty tylko po
+         pozycjach; konto Allegro niesparowane wysypuje każdy skan etykiety.
+         Oba stany wyglądają na ekranie jak „zwroty nie działają". */
+      brakKolumnSprzedazy,
+      problemAllegro(),
       /* Zdjęcia: brak dostępu do źródła wygląda dokładnie tak samo jak
          kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by
          nie skojarzył, że przyczyną jest brak GRANT-u albo zły katalog. */
@@ -154,6 +162,7 @@ export async function buildApp() {
   await app.register(analizaRoutes);
   await app.register(biuroRoutes);
   await app.register(zbiorkiRoutes);
+  await app.register(zwrotyRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();
