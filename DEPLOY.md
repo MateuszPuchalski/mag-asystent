@@ -322,9 +322,32 @@ base64 -w0 wertis.keystore > klucz.txt      # bash
 > Zostaje w historii powłoki, a to jest plik czytelny dla każdego, kto ma to
 > konto. Bez tego przełącznika `keytool` zapyta o hasło i nie wypisze go.
 
-Zawartość `klucz.txt` idzie do sekretu `WERTIS_KEYSTORE_B64` w ustawieniach
-repozytorium, obok trzech pozostałych: `WERTIS_KEYSTORE_HASLO`,
-`WERTIS_KLUCZ_ALIAS` (czyli `wertis`) i `WERTIS_KLUCZ_HASLO`.
+Sekrety wpisuje się na GitHubie, w repozytorium: **Settings → Secrets and
+variables → Actions → New repository secret**. Wprost:
+`https://github.com/MateuszPuchalski/mag-asystent/settings/secrets/actions`.
+Mają to być sekrety **repozytorium**, nie środowiska.
+
+| nazwa sekretu | co wkleić |
+|---|---|
+| `WERTIS_KEYSTORE_B64` | całą zawartość `klucz.txt`, jedną linią |
+| `WERTIS_KEYSTORE_HASLO` | hasło podane przy tworzeniu klucza |
+| `WERTIS_KLUCZ_ALIAS` | `wertis` |
+| `WERTIS_KLUCZ_HASLO` | **to samo hasło** co wyżej |
+
+> **Oba hasła muszą być identyczne.** Powstający magazyn jest w formacie PKCS12,
+> a ten nie obsługuje osobnego hasła klucza — `keytool` ostrzega o tym wprost
+> i ignoruje drugie. Dwie różne wartości w tych sekretach wywalają podpisywanie
+> przy budowaniu wydania.
+
+Nazwy są wrażliwe na wielkość liter i muszą zgadzać się co do znaku
+z `.github/workflows/android.yml`. Sekretu nie da się później podejrzeć —
+tylko nadpisać, więc hasło musi być zapisane gdzie indziej.
+
+Po dodaniu czwartego sekretu wystarczy dowolna zmiana wchodząca na `main`.
+Że zadziałało, poznasz po dwóch rzeczach: bieg **Android** wystawi artefakt
+`wertis-kolektor-apk`, a w zakładce Releases pojawi się wydanie `v<wersja>`
+z plikami `.apk` i `.apk.sha256`. Dopiero wtedy `-Aktualizuj` na serwerze
+skończy się linią „APK kolektora … gotowy dla kolektorow".
 
 Build wydania czyta go ze zmiennych `WERTIS_KEYSTORE`, `WERTIS_KEYSTORE_HASLO`,
 `WERTIS_KLUCZ_ALIAS` i `WERTIS_KLUCZ_HASLO`. Te same wartości przyjmuje plik

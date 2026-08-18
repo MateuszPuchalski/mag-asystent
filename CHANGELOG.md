@@ -51,6 +51,13 @@ base64 do sekretu `WERTIS_KEYSTORE_B64` oraz zdanie, że pytania kreatora
 o tożsamość w certyfikacie nie mają znaczenia technicznego. Bez nich człowiek
 zatrzymywał się dwa kroki dalej, przy tej samej ścianie.
 
+Doszło też **gdzie** te sekrety wpisać — ścieżka w ustawieniach repozytorium
+i pełny adres, bo instrukcja wymieniała cztery nazwy i milczała o miejscu.
+Razem z tabelą, co dokładnie wkleić w każdy z nich, i z regułą, której te nazwy
+wprost nie zdradzają: **oba hasła muszą być identyczne**, bo magazyn PKCS12
+nie obsługuje osobnego hasła klucza. Na końcu sprawdzian: artefakt
+`wertis-kolektor-apk` i wydanie `v<wersja>` w zakładce Releases.
+
 Wariant **bashowy** stoi obok PowerShellowego, bo instrukcja zakładała dotąd
 jedną powłokę: `base64 -w0`, wywołanie `keytool` z Android Studio pełną ścieżką
 w Git Bashu i ostrzeżenie, żeby nie podawać hasła przełącznikiem `-storepass` —
