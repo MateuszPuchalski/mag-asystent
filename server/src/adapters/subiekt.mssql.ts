@@ -224,6 +224,19 @@ export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
  */
 export let brakKolumnSprzedazy: string | null = null;
 
+/**
+ * Ustawiane, gdy odczyt sprzedaży NIE UDAŁ SIĘ w ogóle (timeout, błąd 8623,
+ * deadlock) — w odróżnieniu od `brakKolumnSprzedazy`, które mówi o złej nazwie
+ * kolumny opcjonalnej.
+ *
+ * Sprzedaż jest paliwem dopasowywania zwrotów, a nie warunkiem pracy magazynu:
+ * jej awaria degraduje (zostaje ostatni udany odczyt sgt_sprzedaz i zdanie
+ * w /api/health), zamiast wywracać cały import. Wdrożenie 0.53.0 pokazało cenę
+ * odwrotnej decyzji: import startowy jest twardym błędem, więc każda usterka
+ * zapytania sprzedaży kładła API w pętlę restartów.
+ */
+export let bladImportuSprzedazy: string | null = null;
+
 interface MagRow {
   mag_Id: number;
   mag_Symbol: string;
@@ -340,6 +353,19 @@ async function pobierzZamowienia(
  * Te same tabele co reszta importu (`dok__Dokument`, `dok_Pozycja`,
  * `kh__Kontrahent`), więc ZERO nowych GRANT-ów.
  *
+ * SKALA JEST TU INNA NIŻ PRZY DOSTAWACH i wymusiła dwa odstępstwa (0.53.1):
+ *
+ * 1. Pozycje idą JOIN-em z tymi samymi filtrami co nagłówki, NIE listą
+ *    `IN (id, id, …)`. Okno 90 dni sprzedaży to dziesiątki tysięcy dok_Id;
+ *    lista tej długości położyła wdrożenie 0.53.0 błędem 8623 („query
+ *    processor ran out of internal resources") na przemian z timeoutem 15 s —
+ *    a że import startowy jest twardym błędem, API weszło w pętlę restartów.
+ *    Wzorzec `IN` zostaje przy dostawach/zamówieniach, gdzie dokumentów są
+ *    dziesiątki, nie tysiące.
+ * 2. `WITH (NOLOCK)` na obu zapytaniach: to zasilanie read-modelu odświeżanego
+ *    co 60 s, brudny odczyt niczego nie psuje — a w dzienniku wdrożenia był
+ *    deadlock z Subiektem pracującym obok na tych samych tabelach.
+ *
  * Kolumny `nr_oryg` i `uwagi` są OPCJONALNE i konfigurowalne: która z nich
  * niesie numer zamówienia Allegro (jeśli którakolwiek), wie tylko własna baza
  * ([WERYFIKUJ], DEPLOY §6). Nieistniejąca kolumna nie może wywrócić całej
@@ -366,8 +392,8 @@ async function pobierzSprzedaz(
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
                 ISNULL(k.kh_Symbol, '') AS kontrahent,
                 ${uwagi} AS uwagi
-         FROM dok__Dokument d
-         LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
+         FROM dok__Dokument d WITH (NOLOCK)
+         LEFT JOIN kh__Kontrahent k WITH (NOLOCK) ON k.kh_Id = d.dok_PlatnikId
          WHERE ${typFilter} AND ${oknoFilter}`
       );
 
@@ -380,6 +406,12 @@ async function pobierzSprzedaz(
     brakKolumnSprzedazy = null;
   } catch (e) {
     if (nrOrygCol === "NULL" && uwagiCol === "NULL") throw e; // to nie kolumny opcjonalne
+    /* Rozróżnienie „zła nazwa kolumny" od „baza nie odpowiada" po numerze błędu
+       SQL Servera (207 = invalid column name). Timeout potraktowany jak brak
+       kolumny dawałby fałszywy komunikat i DRUGIE ciężkie zapytanie do bazy,
+       która właśnie nie wyrabia. */
+    const nr = (e as { number?: unknown }).number;
+    if (nr !== 207) throw e;
     brakKolumnSprzedazy =
       `Kolumna ${[nrOrygCol, uwagiCol].filter((k) => k !== "NULL").join(" lub ")} nie istnieje ` +
       "w dok__Dokument — zwroty Allegro dopasowują dokument tylko po pozycjach, bez numeru " +
@@ -391,10 +423,15 @@ async function pobierzSprzedaz(
 
   if (sprzedaz.length === 0) return { sprzedaz, sprzedazPozycje: [] };
   const sprzedazPozycje = (
-    await pool.request().query<PozRow>(
-      `SELECT ob_DokHanId, ob_TowId, ob_IloscMag
-       FROM dok_Pozycja WHERE ob_DokHanId IN (${sprzedaz.map((s) => s.dok_Id).join(",")})`
-    )
+    await pool
+      .request()
+      .input("cutoff", sql.VarChar, cutoff)
+      .query<PozRow>(
+        `SELECT p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag
+         FROM dok_Pozycja p WITH (NOLOCK)
+         JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId
+         WHERE ${typFilter} AND ${oknoFilter}`
+      )
   ).recordset;
   return { sprzedaz, sprzedazPozycje };
 }
@@ -472,7 +509,26 @@ export async function importFromMssql(): Promise<ImportStats> {
     : [];
 
   const { zamowienia, zamPozycje } = await pobierzZamowienia(pool);
-  const { sprzedaz, sprzedazPozycje } = await pobierzSprzedaz(pool);
+
+  /* Awaria sprzedaży degraduje, nie przerywa — stany i lokalizacje są
+     ważniejsze od dopasowywania zwrotów. `sprzedazOk` steruje niżej także
+     czyszczeniem: przy błędzie sgt_sprzedaz* zostaje z ostatniego udanego
+     odczytu, bo puste tabele wyglądałyby jak „zero sprzedaży", a to
+     nieprawda — to my nie umieliśmy zapytać. */
+  let sprzedaz: SprzedazRow[] = [];
+  let sprzedazPozycje: PozRow[] = [];
+  let sprzedazOk = false;
+  try {
+    ({ sprzedaz, sprzedazPozycje } = await pobierzSprzedaz(pool));
+    sprzedazOk = true;
+    bladImportuSprzedazy = null;
+  } catch (e) {
+    bladImportuSprzedazy =
+      "Odczyt dokumentów sprzedaży (FS/PA) nie powiódł się — zwroty Allegro " +
+      "dopasowują dokumenty na danych z ostatniej udanej synchronizacji. " +
+      `Przyczyna: ${e instanceof Error ? e.message : e}`;
+    console.warn(`[mssql] ${bladImportuSprzedazy}`);
+  }
 
   // ── wpis do read-modelu sgt_* (wzorzec wipe+insert z seed.ts) ─────────────
   const d = db();
@@ -511,9 +567,10 @@ export async function importFromMssql(): Promise<ImportStats> {
     /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy.
        Na tej liście stoi WYŁĄCZNIE read-model sgt_* — tabele aplikacji
        (zwrot, zwrot_pozycja, allegro_token, ean_alias…) nie mają tu wstępu:
-       import zaorałby wiedzę, której Subiekt nie ma. */
+       import zaorałby wiedzę, której Subiekt nie ma.
+       sgt_sprzedaz* czyszczone tylko przy udanym odczycie — patrz `sprzedazOk`. */
     for (const t of [
-      "sgt_sprzedaz_pozycja", "sgt_sprzedaz",
+      ...(sprzedazOk ? ["sgt_sprzedaz_pozycja", "sgt_sprzedaz"] : []),
       "sgt_zam_pozycja", "sgt_zamowienie",
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {

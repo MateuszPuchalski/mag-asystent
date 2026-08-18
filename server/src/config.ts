@@ -178,6 +178,13 @@ export const config = {
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
     syncMs: num(process.env.MSSQL_SYNC_MS, 60000, "MSSQL_SYNC_MS"),
     /**
+     * Limit pojedynczego zapytania do bazy Subiekta [ms]. Domyślne 15 s
+     * drivera było za krótkie dla odczytów wsadowych importu na obciążonej
+     * maszynie (0.53.1) — 30 s daje zapas, a dłużej znaczy, że baza naprawdę
+     * nie wyrabia i błąd jest właściwą odpowiedzią.
+     */
+    requestTimeoutMs: num(process.env.MSSQL_REQUEST_TIMEOUT_MS, 30000, "MSSQL_REQUEST_TIMEOUT_MS"),
+    /**
      * Dokumenty SPRZEDAŻY do dopasowywania zwrotów Allegro (0.53.0).
      *
      * FS i PA z tej samej listy kodów co wyżej, więc wartości pewne. Sprzedaż
@@ -197,19 +204,21 @@ export const config = {
      * Kolumna `dok__Dokument` z numerem obcym/oryginalnym dokumentu.
      * Integracje sprzedażowe zwykle wpisują tam numer zamówienia — jeśli tak
      * jest i tu, dopasowanie zwrotu do dokumentu staje się jednoznaczne.
-     * Domyślna nazwa to [WERYFIKUJ] (nasz opis struktury jej nie wymienia);
-     * gdy kolumny nie ma, import ponawia zapytanie bez niej i melduje
+     * ISTNIENIE kolumny potwierdzone w opisie struktury 1.8731.31.6933
+     * (`dok_NrPelnyOryg`, varchar 30); [WERYFIKUJ] zostaje tylko to, czy
+     * integracja faktycznie wpisuje tam numer Allegro. Gdy kolumny nie ma
+     * (inna wersja bazy), import ponawia zapytanie bez niej i melduje
      * w /api/health. Puste = świadoma rezygnacja z tego sygnału.
      */
     sprzedazNrOrygColumn: process.env.MSSQL_SPRZEDAZ_NR_ORYG_COLUMN ?? "dok_NrPelnyOryg",
     /**
      * Kolumna `dok__Dokument` z uwagami — drugi kandydat na miejsce, gdzie
-     * integracja zostawia numer zamówienia Allegro. Domyślnie PUSTA (wyłączona):
-     * które pole faktycznie niesie numer, ustala się na własnej bazie
-     * ([WERYFIKUJ], DEPLOY §6). Dopasowanie bez tego sygnału degraduje do
-     * nakładki pozycji + ręcznego wyboru, nie do awarii.
+     * integracja zostawia numer zamówienia Allegro. Domyślnie `dok_Uwagi`
+     * (varchar 500) — istnienie potwierdzone w tym samym opisie struktury
+     * (0.53.1; wcześniej pusta z ostrożności). Dopasowanie bez tego sygnału
+     * degraduje do nakładki pozycji + ręcznego wyboru, nie do awarii.
      */
-    sprzedazUwagiColumn: process.env.MSSQL_SPRZEDAZ_UWAGI_COLUMN ?? "",
+    sprzedazUwagiColumn: process.env.MSSQL_SPRZEDAZ_UWAGI_COLUMN ?? "dok_Uwagi",
   },
 
   /**

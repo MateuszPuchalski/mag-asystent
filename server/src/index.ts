@@ -22,6 +22,7 @@ import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import {
+  bladImportuSprzedazy,
   brakDostepuDoMagazynow,
   brakKolumnSprzedazy,
   brakKolumnyZrealizowano,
@@ -82,6 +83,9 @@ export async function buildApp() {
          pozycjach; konto Allegro niesparowane wysypuje każdy skan etykiety.
          Oba stany wyglądają na ekranie jak „zwroty nie działają". */
       brakKolumnSprzedazy,
+      /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty dopasowują
+         na danych z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
+      bladImportuSprzedazy,
       problemAllegro(),
       /* Zdjęcia: brak dostępu do źródła wygląda dokładnie tak samo jak
          kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by

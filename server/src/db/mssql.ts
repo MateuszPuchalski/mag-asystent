@@ -21,6 +21,11 @@ function poolConfig(): sql.config {
     database: c.database,
     user: c.user,
     password: c.password,
+    /* Limit pojedynczego zapytania. Domyślne 15 s drivera nigdy nie było tu
+       świadomą decyzją, a import to odczyt wsadowy: samo tw_Stan potrafi mieć
+       sto tysięcy wierszy i na obciążonej maszynie 15 s bywa za mało —
+       wdrożenie 0.53.0 ścinało tak odczyt sprzedaży (0.53.1). */
+    requestTimeout: c.requestTimeoutMs,
     options: {
       encrypt: c.encrypt,
       trustServerCertificate: c.trustServerCertificate,
