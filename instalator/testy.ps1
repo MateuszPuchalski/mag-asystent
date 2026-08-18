@@ -741,7 +741,7 @@ Sprawdz "biała lista wertis.env nie zna kluczy od kont" {
         stoją dziś także na liście kluczy NIEPRZEPISYWANYCH z istniejącego
         pliku — czyli dokładnie tam, gdzie mają stać.
     #>
-    $zrodlo = Get-Content (Join-Path $PSScriptRoot "uslugi.ps1") -Raw
+    $zrodlo = Get-Content (Join-Path $zrodlo "uslugi.ps1") -Raw
     $m = [regex]::Match($zrodlo, '(?s)\$kolejnosc = @\((.*?)\r?\n\s*\)')
     Zaloz $m.Success "nie znalazłem definicji `$kolejnosc w uslugi.ps1"
     foreach ($klucz in @("ADMIN_HASLO", "ADMIN_LOGIN", "WERTIS_ADMIN")) {
@@ -1165,6 +1165,77 @@ Sprawdz "nieudane pobranie APK nie przerywa aktualizacji" {
     # kolektory na starej wersji, czyli tam, gdzie byly przed 0.52.0
     Zaloz ($galazKod -match '\[void\]\(Get-WertisApk') `
         "wynik Get-WertisApk nie moze rozstrzygac o powodzeniu aktualizacji"
+}
+
+# ── Suma kontrolna z pliku .sha256 (0.52.5) ─────────────────────────────────
+
+Write-Host "Get-WertisSumaZPliku"
+
+$script:sumaWzor = "f5a36ce80529a8a19068c804dea2af58015f671b7e064dd23e0a50968704a969"
+
+function Nowy-PlikSumy {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Tresc)
+    $plik = Join-Path $env:TEMP ("wertis-suma-" + [guid]::NewGuid() + ".sha256")
+    Set-Content -Path $plik -Value $Tresc -Encoding ASCII -NoNewline
+    return $plik
+}
+
+Sprawdz "czyta sume z formatu sha256sum" {
+    $plik = Nowy-PlikSumy "$script:sumaWzor  wertis-kolektor-0.52.5.apk`n"
+    try {
+        Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq $script:sumaWzor)
+    } finally { Remove-Item $plik -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "sama suma, bez nazwy pliku, tez przechodzi" {
+    $plik = Nowy-PlikSumy $script:sumaWzor
+    try {
+        Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq $script:sumaWzor)
+    } finally { Remove-Item $plik -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "wielkie litery schodza do malych" {
+    # `Get-FileHash` zwraca wielkimi, porownanie ma byc na jednym poziomie
+    $plik = Nowy-PlikSumy $script:sumaWzor.ToUpperInvariant()
+    try {
+        Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq $script:sumaWzor)
+    } finally { Remove-Item $plik -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "kod bajtu zamiast sumy nie przechodzi za sume" {
+    # DOKLADNIE ta usterka: `.sha256` przychodzil jako tablica bajtow, a "102"
+    # to kod znaku "f". Instalator przerywal wtedy na poprawnym APK.
+    $plik = Nowy-PlikSumy "102"
+    try {
+        Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq "") "liczba nie jest suma SHA-256"
+    } finally { Remove-Item $plik -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "za krotka suma nie przechodzi" {
+    $plik = Nowy-PlikSumy $script:sumaWzor.Substring(0, 63)
+    try {
+        Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq "")
+    } finally { Remove-Item $plik -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "pusty plik daje pusta sume, nie wyjatek" {
+    $plik = Nowy-PlikSumy ""
+    try {
+        Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq "")
+    } finally { Remove-Item $plik -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "brak pliku daje pusta sume" {
+    $plik = Join-Path $env:TEMP ("wertis-nie-ma-" + [guid]::NewGuid() + ".sha256")
+    Zaloz ((Get-WertisSumaZPliku -Sciezka $plik) -eq "")
+}
+
+Sprawdz "Get-WertisApk czyta sume z pliku, nie z tresci odpowiedzi" {
+    # `$odp.Content` bywa tablica bajtow; `-OutFile` nie ma tego problemu
+    $kod = Get-Content (Join-Path $zrodlo "uslugi.ps1") -Raw
+    $apk = $kod.Substring($kod.IndexOf("function Get-WertisApk"))
+    Zaloz ($apk -match 'sha256"\s+-OutFile') "suma ma jechac do pliku"
+    Zaloz (-not ($apk -match '\$odp\.Content')) "tresc odpowiedzi nie moze byc zrodlem sumy"
 }
 
 # ── Wynik ───────────────────────────────────────────────────────────────────

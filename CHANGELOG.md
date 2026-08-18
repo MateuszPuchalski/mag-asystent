@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.52.5 — 18 sierpnia 2026
+
+**Instalator odrzucał poprawne APK z powodu własnego błędu w czytaniu sumy
+kontrolnej.** Zgłoszenie z wdrożenia brzmiało tak, jak brzmi podmieniony plik:
+
+```
+APK kolektora - SUMA KONTROLNA SIE NIE ZGADZA. Przerywam.
+        oczekiwana: 102
+        otrzymana:  f5a36ce80529a8a19068c804dea2af58015f671b7e064dd23e0a50968704a969
+```
+
+Pobrany plik był w porządku — ta druga suma zgadza się co do znaku z tym, co
+GitHub podaje dla `wertis-kolektor-0.52.4.apk`. Zepsuta była pierwsza. GitHub
+wystawia `.sha256` jako `application/octet-stream`, więc `Invoke-WebRequest`
+zwracał treść **tablicą bajtów**, a nie tekstem. Rozbicie takiej tablicy po
+białych znakach dawało jej pierwszy element, czyli `102` — kod znaku `f`,
+pierwszej litery sumy.
+
+Suma jedzie teraz do pliku (`-OutFile`) i czyta ją nowa `Get-WertisSumaZPliku`,
+której typ zawartości nie dotyczy. Doszła kontrola kształtu: 64 znaki
+szesnastkowe albo nic. To celowe — suma, która nie wygląda jak suma, jest
+gorsza od jej braku, bo braku nikt nie pomyli z weryfikacją, a śmieć odrzuca
+poprawny plik razem ze złym. Gdy plik sumy przyjdzie w takim stanie, instalator
+mówi o tym osobnym ostrzeżeniem i wypisuje sumę policzoną na miejscu.
+
+Osiem asercji w `instalator/testy.ps1`, w tym ta z `102` wprost. Wszystkie
+działają bez sieci, na plikach zapisanych na dysku.
+
+**[wymaga działania]** Na serwerze uruchom ponownie `-Aktualizuj`. Poprzedni
+przebieg skasował pobrane APK jako niezgodne, więc plik trzeba ściągnąć raz
+jeszcze — tym razem skończy się wpisem „APK kolektora gotowy dla kolektorow".
+
+---
+
 ## 0.52.4 — 18 sierpnia 2026
 
 **Instrukcja klucza podpisu nie mówiła, skąd wziąć `keytool`.** Zgłoszenie
