@@ -51,6 +51,12 @@ base64 do sekretu `WERTIS_KEYSTORE_B64` oraz zdanie, że pytania kreatora
 o tożsamość w certyfikacie nie mają znaczenia technicznego. Bez nich człowiek
 zatrzymywał się dwa kroki dalej, przy tej samej ścianie.
 
+Wariant **bashowy** stoi obok PowerShellowego, bo instrukcja zakładała dotąd
+jedną powłokę: `base64 -w0`, wywołanie `keytool` z Android Studio pełną ścieżką
+w Git Bashu i ostrzeżenie, żeby nie podawać hasła przełącznikiem `-storepass` —
+zostaje wtedy w historii powłoki. Składnia sprawdzona uruchomieniem, nie
+z pamięci: powstaje magazyn PKCS12 z kluczem `wertis` i podpisem SHA384withRSA.
+
 **[wymaga działania]** Nic. Sama dokumentacja.
 
 ---

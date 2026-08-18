@@ -297,11 +297,30 @@ Pytania kreatora dotyczą tożsamości w certyfikacie i **nie mają znaczenia
 technicznego** — liczy się wyłącznie sam klucz. Hasło zapisz od razu tam, gdzie
 trzymasz resztę haseł firmy: drugi raz nikt go nie pokaże.
 
+W Git Bashu ta sama komenda działa bez zmian, a `keytool` z Android Studio
+woła się pełną ścieżką w cudzysłowie:
+
+```bash
+"/c/Program Files/Android/Android Studio/jbr/bin/keytool" -genkeypair -v \
+  -keystore wertis.keystore -alias wertis -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Powstaje magazyn PKCS12 z jednym kluczem `wertis`, podpisem SHA384withRSA
+i ważnością 10 000 dni.
+
 Sekret dla CI to ten sam plik zakodowany base64:
+
+```bash
+base64 -w0 wertis.keystore > klucz.txt      # bash
+```
 
 ```powershell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("wertis.keystore")) > klucz.txt
 ```
+
+> **Nie podawaj hasła w wierszu poleceń** (`-storepass`), jeśli nie musisz.
+> Zostaje w historii powłoki, a to jest plik czytelny dla każdego, kto ma to
+> konto. Bez tego przełącznika `keytool` zapyta o hasło i nie wypisze go.
 
 Zawartość `klucz.txt` idzie do sekretu `WERTIS_KEYSTORE_B64` w ustawieniach
 repozytorium, obok trzech pozostałych: `WERTIS_KEYSTORE_HASLO`,
