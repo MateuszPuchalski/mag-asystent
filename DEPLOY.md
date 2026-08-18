@@ -263,6 +263,11 @@ cd android
 `wertis-kolektor-apk` z gałęzi `main`. Build debugowy dostaje losowy klucz przy
 każdym biegu CI, więc zainstalowany na urządzeniu wyłącza samoaktualizację.
 
+CI publikuje ten sam plik jako **wydanie GitHuba** pod tagiem `v<wersja>` —
+i to stamtąd bierze go instalator przy `-Aktualizuj`. Bez czterech sekretów
+podpisu krok wydania jest pomijany, żaden APK nie powstaje, a instalator
+wypisuje wtedy ostrzeżenie o nieudanym pobraniu.
+
 **Podpis wydania jest od 0.52.0 warunkiem aktualizacji, nie ozdobą.** Android
 odmawia instalacji aktualizacji podpisanej innym kluczem niż zainstalowana
 aplikacja. Build debugowy z CI dostaje losowy klucz przy każdym biegu, więc

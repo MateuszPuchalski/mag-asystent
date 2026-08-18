@@ -16,6 +16,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Zapis potrzebny wyłącznie do utworzenia wydania z APK (krok na końcu).
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: android
@@ -84,3 +87,33 @@ jobs:
         with:
           name: wertis-kolektor-apk
           path: wydanie/*
+
+      # ── Wydanie na GitHubie (0.52.2) ────────────────────────────────────
+      # TEN KROK JEST WARUNKIEM DZIAŁANIA CAŁEJ AKTUALIZACJI KOLEKTORÓW,
+      # i jego brak był usterką 0.52.0. Instalator bierze APK z
+      # `releases/latest/download` (`Get-WertisApk` w instalator/uslugi.ps1),
+      # a artefakt Actions leży zupełnie gdzie indziej: wygasa po 90 dniach
+      # i nie da się go pobrać bez zalogowania do GitHuba. Producent i odbiorca
+      # celowały w dwa różne miejsca, więc `-Aktualizuj` kończył się
+      # ostrzeżeniem „Nie udalo sie pobrac APK kolektora".
+      #
+      # Wydanie powstaje NA KAŻDĄ WERSJĘ, nie na ręczny tag. Serwer aktualizuje
+      # się z gałęzi `main` i zaraz potem pyta o APK w numerze, który właśnie
+      # zbudował — wydanie robione ręcznie i z opóźnieniem znaczyłoby okno,
+      # w którym plik po prostu nie istnieje.
+      - name: Wydanie na GitHubie
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          wersja=$(node -p "require('./package.json').version")
+          tag="v$wersja"
+          # `|| true` jest tu potrzebne: ten sam numer wersji potrafi wejść na
+          # main drugi raz (poprawka scalenia), a istniejący tag ma wtedy
+          # dostać nowy plik, nie wywalić builda
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
+            --title "WERTIS $wersja" \
+            --notes "APK kolektora $wersja. Opis zmian: CHANGELOG.md" \
+            --latest
+          gh release upload "$tag" wydanie/* --clobber
