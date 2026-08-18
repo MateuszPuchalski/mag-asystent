@@ -12,6 +12,11 @@ on:
     paths: ["android/**", "package.json", ".github/workflows/android.yml"]
   pull_request:
     paths: ["android/**", "package.json", ".github/workflows/android.yml"]
+  # Ręczne uruchomienie — po to, żeby dało się zbudować wydanie BEZ wymyślania
+  # zmiany w kodzie. Potrzebne dokładnie raz na instalację: po dodaniu sekretów
+  # podpisu nie ma czego wypchnąć, a bez biegu nie powstanie ani APK, ani
+  # wydanie, z którego bierze go instalator.
+  workflow_dispatch:
 
 jobs:
   build:
@@ -51,7 +56,7 @@ jobs:
       # rzeczą odróżniającą aktualizację WERTIS od dowolnego APK podanego
       # kolektorowi z sieci magazynu — patrz DEPLOY.md §5.
       - name: Klucz podpisu
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           KLUCZ_B64: ${{ secrets.WERTIS_KEYSTORE_B64 }}
         run: |
@@ -63,7 +68,7 @@ jobs:
           echo "WERTIS_KEYSTORE=$RUNNER_TEMP/wertis.keystore" >> "$GITHUB_ENV"
 
       - name: APK wydania
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.WERTIS_KEYSTORE != ''
         env:
           WERTIS_KEYSTORE_HASLO: ${{ secrets.WERTIS_KEYSTORE_HASLO }}
           WERTIS_KLUCZ_ALIAS: ${{ secrets.WERTIS_KLUCZ_ALIAS }}
@@ -73,7 +78,7 @@ jobs:
       # Nazwa pliku niesie wersję, bo po niej rozpoznaje ją serwer
       # (`server/src/services/aktualizacja.ts`) — nie po zawartości APK.
       - name: Nazwa z wersją i suma kontrolna
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.WERTIS_KEYSTORE != ''
         working-directory: ${{ github.workspace }}
         run: |
           wersja=$(node -p "require('./package.json').version")
@@ -82,7 +87,7 @@ jobs:
           cd wydanie && sha256sum "wertis-kolektor-$wersja.apk" > "wertis-kolektor-$wersja.apk.sha256"
 
       - name: Artefakt APK wydania
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.WERTIS_KEYSTORE != ''
         uses: actions/upload-artifact@v4
         with:
           name: wertis-kolektor-apk
@@ -102,7 +107,7 @@ jobs:
       # zbudował — wydanie robione ręcznie i z opóźnieniem znaczyłoby okno,
       # w którym plik po prostu nie istnieje.
       - name: Wydanie na GitHubie
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.WERTIS_KEYSTORE != ''
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.WERTIS_KEYSTORE != ''
         working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

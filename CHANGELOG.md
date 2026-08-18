@@ -33,6 +33,47 @@ historii nie przepisujemy.
 
 ---
 
+## 0.52.4 — 18 sierpnia 2026
+
+**Instrukcja klucza podpisu nie mówiła, skąd wziąć `keytool`.** Zgłoszenie
+z wdrożenia: `keytool: command not found`. Polecenie przychodzi z JDK, a na
+serwerze WERTIS jest sam Node — więc na tej maszynie nie mogło zadziałać ani
+razu, a instrukcja stała w sekcji, którą wykonuje się właśnie tam.
+
+Sekcja mówi teraz trzy rzeczy, których brakowało. Że klucz **nie jest serwerowi
+do niczego potrzebny** — trafia do sekretów repozytorium, a podpisuje nim CI,
+więc robi się go na dowolnej maszynie z Javą. Że JDK instaluje jedno polecenie
+`winget`, a przy Android Studio `keytool` już jest, tylko poza `PATH`. I że po
+instalacji trzeba otworzyć nowy terminal.
+
+Doszło też to, co dalej blokowało: gotowe polecenie zamieniające keystore na
+base64 do sekretu `WERTIS_KEYSTORE_B64` oraz zdanie, że pytania kreatora
+o tożsamość w certyfikacie nie mają znaczenia technicznego. Bez nich człowiek
+zatrzymywał się dwa kroki dalej, przy tej samej ścianie.
+
+Doszło też **gdzie** te sekrety wpisać — ścieżka w ustawieniach repozytorium
+i pełny adres, bo instrukcja wymieniała cztery nazwy i milczała o miejscu.
+Razem z tabelą, co dokładnie wkleić w każdy z nich, i z regułą, której te nazwy
+wprost nie zdradzają: **oba hasła muszą być identyczne**, bo magazyn PKCS12
+nie obsługuje osobnego hasła klucza. Na końcu sprawdzian: artefakt
+`wertis-kolektor-apk` i wydanie `v<wersja>` w zakładce Releases.
+
+`android.yml` dostał przy okazji **ręczne uruchomienie** (`workflow_dispatch`).
+Potrzebne dokładnie raz na instalację i właśnie w tym momencie: po dodaniu
+sekretów podpisu nie ma czego wypchnąć, a bez biegu nie powstanie ani APK, ani
+wydanie, z którego bierze go instalator. Warunki kroków wydania przyjmują teraz
+każdy bieg na `main`, który nie jest sprawdzeniem PR-a.
+
+Wariant **bashowy** stoi obok PowerShellowego, bo instrukcja zakładała dotąd
+jedną powłokę: `base64 -w0`, wywołanie `keytool` z Android Studio pełną ścieżką
+w Git Bashu i ostrzeżenie, żeby nie podawać hasła przełącznikiem `-storepass` —
+zostaje wtedy w historii powłoki. Składnia sprawdzona uruchomieniem, nie
+z pamięci: powstaje magazyn PKCS12 z kluczem `wertis` i podpisem SHA384withRSA.
+
+**[wymaga działania]** Nic. Sama dokumentacja.
+
+---
+
 ## 0.52.3 — 18 sierpnia 2026
 
 **Audyt przestał tonąć we własnym szumie.** Eksport śladu audytowego
