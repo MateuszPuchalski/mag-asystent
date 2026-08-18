@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane" — **200 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **200 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -23,14 +23,20 @@ albo dowolna maszyna z Android Studio.
 
 ### Najpierw sprawdź, czy w ogóle musisz
 
-**Gotowy APK wychodzi z CI.** Workflow `android.yml` buduje go przy każdej
-zmianie i wystawia jako artefakt:
+**Gotowy APK wychodzi z CI**, i są dwa różne. Wybór nie jest kwestią wygody.
 
-> Actions → **Android** → ostatni zielony bieg → **Artifacts** →
-> `wertis-kolektor-debug-apk`
+| artefakt | kiedy powstaje | do czego |
+|---|---|---|
+| `wertis-kolektor-debug-apk` | każdy bieg, także z PR | praca nad kodem, emulator |
+| `wertis-kolektor-apk` | tylko push na `main` | **kolektory na hali** |
 
-Do wgrania na kolektory to wystarcza i **nie wymaga ani Javy, ani Android SDK**.
-Build lokalny ma sens przy pracy nad kodem aplikacji, nie przy wdrożeniu.
+> Actions → **Android** → ostatni zielony bieg → **Artifacts**
+
+**Na kolektory idzie wyłącznie ten drugi.** Build debugowy jest podpisywany
+kluczem, który runner CI losuje przy każdym biegu. Zainstalowany na urządzeniu
+wyłącza samoaktualizację z serwera: kolejny APK ma inny podpis, więc Android
+odmówi instalacji. Pobranie artefaktu **nie wymaga ani Javy, ani Android SDK**;
+build lokalny ma sens przy pracy nad kodem, nie przy wdrożeniu.
 
 ### Czego wymaga build lokalny
 
@@ -64,6 +70,13 @@ WERTIS_KEYSTORE=/sciezka/wertis.keystore WERTIS_KEYSTORE_HASLO=... \
 WERTIS_KLUCZ_ALIAS=wertis WERTIS_KLUCZ_HASLO=... \
 ./gradlew :app:assembleRelease
 ```
+
+**Wydanie nie jest minifikowane.** R8 i `shrinkResources` są wyłączone
+w `app/build.gradle.kts`. Reguły `proguard-rules.pro` nie przeszły nigdy
+żadnego builda wydania, a Retrofit i kotlinx.serialization łamią się po
+minifikacji dopiero w czasie działania. Plik jedzie sam na całą halę, więc do
+czasu sprawdzenia zminifikowanego APK na fizycznym kolektorze zostaje pełny.
+Rozmiar nie jest tu ceną: transfer idzie po sieci magazynu, nie przez sklep.
 
 Zamiast zmiennych te same wartości przyjmuje plik `local.properties`
 w katalogu `android/`, w polach `wertis.keystore`, `wertis.keystore.haslo`, `wertis.klucz.alias`

@@ -418,7 +418,7 @@ W kartotece stoi `A02-02-02`.
 
 ## Konta, sesje i uprawnienia
 
-### S51 — cztery role
+### S51 — trzy role na czterech kontach
 
 Zaloguj się kolejno jako `jan.k`, `ewa.b`, `biuro.test` i `admin.test`. Hasło
 jest jedno dla wszystkich kont: `wertis12345`.

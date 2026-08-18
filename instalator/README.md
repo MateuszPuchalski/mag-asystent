@@ -17,8 +17,18 @@ W oknie **uruchomionym jako administrator**:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
 ```
 
-Zatrzymuje usługi, pobiera nową wersję, buduje i uruchamia z powrotem.
-**Nie zadaje ani jednego pytania.**
+Zatrzymuje usługi, pobiera nową wersję, buduje, **ściąga APK dla kolektorów**
+i uruchamia z powrotem. **Nie zadaje ani jednego pytania.**
+
+APK ląduje w `server\data\apk` pod nazwą niosącą wersję. Stamtąd rozdają go
+kolektory: pytają o nowe wydanie przy otwarciu aplikacji i instalują je same
+(`DEPLOY.md` §5). Instalator sprząta przy okazji starsze pliki.
+
+> **Nieudane pobranie APK nie przerywa aktualizacji.** Serwer wstaje i pracuje,
+> a kolektory zostają na wersji, którą mają. Wypisane zostaje ostrzeżenie ze
+> ścieżką, do której plik można dołożyć ręką. Zatrzymywanie aktualizacji firmy
+> przez plik, którego nikt w tej minucie nie potrzebuje, kosztowałoby więcej
+> niż jego brak.
 
 > **`-ExecutionPolicy Bypass` nie jest ozdobnikiem.** Windows domyślnie odmawia
 > uruchamiania plików `.ps1` (`running scripts is disabled on this system`).
@@ -32,9 +42,12 @@ Zatrzymuje usługi, pobiera nową wersję, buduje i uruchamia z powrotem.
 
 Podgląd bez zmieniania czegokolwiek — ten sam wiersz z `-DryRun`.
 
-Nie dotyka: bazy aplikacji (`server\data`), konta SQL ani GRANT-ów,
-`wertis.env`, konfiguracji Subiekta, kont użytkowników, reguły zapory
-i rejestracji usług w NSSM.
+Nie dotyka: bazy aplikacji, konta SQL ani GRANT-ów, `wertis.env`, konfiguracji
+Subiekta, kont użytkowników, reguły zapory i rejestracji usług w NSSM.
+
+W `server\data` rusza **jedno miejsce**: katalog `apk`. Kładzie tam APK dla
+kolektorów w wersji, którą właśnie zbudował, i kasuje starsze. Baza, zdjęcia
+i raporty w sąsiednich katalogach zostają nietknięte.
 
 > **Dlaczego osobny tryb.** Pełny przebieg instalatora też aktualizuje kod.
 > Robi przy tym jednak jeszcze siedem innych rzeczy. Pyta o Subiekta, przelicza
@@ -68,6 +81,7 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 |---|---|
 | *(brak)* | pełna instalacja z kreatorem i kontem SQL |
 | `-Demo` | instalacja pilotażowa: dane demonstracyjne, **Subiekt nietknięty** (Etap 0 z `DEPLOY.md` §6) |
+| `-Aktualizuj` | wgrywa nową wersję kodu i APK dla kolektorów; nie pyta o nic i nie rusza konfiguracji |
 | `-TylkoKonfiguracja` | sam kreator na działającej instalacji — do zmiany ustawień albo dokończenia po nieudanym podłączeniu |
 | `-DryRun` | wypisuje, co by zrobił, i **nie zmienia niczego**; nie zadaje pytań |
 | `-Odinstaluj` | zdejmuje usługi, regułę zapory i katalog; **Subiekta nie rusza** — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md) |
@@ -202,7 +216,7 @@ albo `curl`-em (`DEPLOY.md` §5a).
 ## Czego instalator NIE robi
 
 - **Nie zakłada kont pracowników.** Powstaje jedno konto administratora (wyżej);
-  magazynierów, brygadzistów i biuro zakłada się z kolektora (`DEPLOY.md` §5a).
+  magazynierów i biuro zakłada się z kolektora (`DEPLOY.md` §5a).
 - **Nie buduje workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — exe
   buduje się osobno wg `sfera-worker/README.md`. Gdy `wertis-sfera-worker.exe`
   leży już w `<katalog>\sfera-worker\`, instalator pyta o włączenie i rejestruje
@@ -346,11 +360,13 @@ notepad .\WERTIS-Instalator.ps1
 Get-FileHash .\WERTIS-Instalator.ps1 -Algorithm SHA256
 ```
 
-Instalator sięga do **trzech** adresów i żadnego innego:
+Instalator sięga do **czterech** adresów i żadnego innego:
 
 - `github.com/MateuszPuchalski/mag-asystent.git` — kod aplikacji,
 - `nodejs.org` — instalator Node (suma kontrolna sprawdzana, patrz niżej),
-- `nssm.cc` — opakowanie usług Windows.
+- `nssm.cc` — opakowanie usług Windows,
+- `github.com/MateuszPuchalski/mag-asystent/releases` — APK dla kolektorów
+  (od 0.52.0, wyłącznie przy `-Aktualizuj`).
 
 **Kiedy zacząć się naprawdę martwić.** Jeśli w pliku zobaczysz długi ciąg
 base64, `Invoke-Expression`, `IEX (New-Object Net.WebClient).DownloadString(...)`,
@@ -375,12 +391,13 @@ na siedemdziesiąt to fałszywka; dwadzieścia silników to nie fałszywka.
 
 ### Sumy kontrolne pobieranych plików
 
-Instalator ściąga dwa pliki i **uruchamia je z uprawnieniami administratora**.
+Instalator ściąga trzy pliki, a dwa z nich **uruchamia z uprawnieniami
+administratora**.
 Do sierpnia 2026 robił to bez żadnej weryfikacji — czyli przejęcie DNS w sieci
 klienta wystarczyło, żeby maszyna wykonała cudzy kod jako SYSTEM. **To była
 realna dziura**, w odróżnieniu od detekcji heurystycznej opisanej wyżej.
 
-Dziś obie pozycje mają sprawdzaną sumę SHA-256 **przed uruchomieniem**:
+Dziś każda pozycja ma sprawdzaną sumę SHA-256 **przed użyciem**:
 
 - **Node** — suma z oficjalnego `SHASUMS256.txt` na nodejs.org; niezgodność
   przerywa instalację.
@@ -393,6 +410,11 @@ Dziś obie pozycje mają sprawdzaną sumę SHA-256 **przed uruchomieniem**:
   gwarancją, że **od tamtej chwili plik się nie zmienił**. Podmiana zatrzyma
   instalację u klienta, a w CI **zatrzyma budowę**. Niedostępne `nssm.cc` jest
   odróżniane od niezgodnej sumy i samo w sobie CI nie psuje.
+
+- **APK kolektora** — suma z pliku `.sha256` leżącego obok wydania. Plik jedzie
+  pod nazwą tymczasową i dostaje właściwą dopiero po zgodnej sumie. Serwer
+  wystawia go kolektorom w tej samej sekundzie, w której go zobaczy, więc
+  pobranie w połowie nie ma prawa wyglądać na gotowe.
 
 ## Znane ograniczenia
 

@@ -39,7 +39,14 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
 4. **Zapis** — wyłącznie zadanie `set_location` do `sfera_queue`. Żadnego MM,
    żadnego `waiting_for_doc`.
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
-   czego rozkładać.
+   czego rozkładać. Nie zamknie się jednak, dopóki wisi nieodpowiedziana
+   notatka biura — bramka stoi w tej funkcji, a nie tylko przy przycisku.
+6. **Zakończenie z ręki** (`zakonczDostawe`) — przycisk ZAKOŃCZ DOSTAWĘ
+   pokazuje najpierw, co powstanie. Braki ilościowe pojadą do dostawcy jako
+   wyjątek „zła ilość", a pozycje nietknięte zostaną pominięte.
+7. **Korekta ilości** (`korygujIlosc`) — poprawka pomyłki w liczeniu, dopóki
+   faktura jest otwarta. Ustawia liczbę bezwzględną, nie różnicę, i nie tworzy
+   ani zadania w kolejce, ani wyjątku.
 
 ## 2. Przesunięcie stanu między magazynami
 
@@ -106,8 +113,10 @@ Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykona
    Może też podpowiadać lokalizacje towarów o podobnym symbolu.
 2. **Korekta po przesunięciu.** Pomyłkowej lokalizacji nie trzeba cofać —
    wystarczy zeskanować właściwą półkę (dlatego mechanizm COFNIJ i jego karencja
-   zostały usunięte). Ale pomyłkowego przesunięcia odkręcić się nie da — to
-   wymagałoby drugiego, odwrotnego.
+   zostały usunięte). Pomyłkową ILOŚĆ poprawia od 0.45.0 przycisk POPRAW ILOŚĆ:
+   podaje się liczbę całkowitą, a status pozycji przelicza się z niej sam. Ale
+   pomyłkowego przesunięcia odkręcić się nie da — to wymagałoby drugiego,
+   odwrotnego.
 3. **Świeżość snapshotu.** Pozycje dostawy to snapshot z chwili
    otwarcia; korekta dokumentu przez księgowość w trakcie pracy nie dochodzi.
    Świadomy kompromis (postęp się nie rozjeżdża), ale przydałby się sygnał

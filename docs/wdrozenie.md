@@ -12,8 +12,8 @@ zanim zrobi się następny krok.
 
 ## Dlaczego etapami
 
-Aplikacja zapisuje do bazy firmy JEDNĄ rzecz: pole lokalizacji na kartotece.
-Jest odwracalne wyłącznie z kopii zapasowej.
+Aplikacja zapisuje do bazy firmy DWA pola kartoteki: lokalizację i podstawowy
+kod kreskowy (od 0.37.0). Oba są odwracalne wyłącznie z kopii zapasowej.
 Etapy istnieją po to, żeby każdy błąd wyszedł tam, gdzie kosztuje jedno
 zapytanie, a nie tam, gdzie kosztuje dzień pracy magazynu.
 
@@ -56,6 +56,10 @@ nietknięty.
 
 **Bramka:** magazynier przeszedł pełną ścieżkę na kolektorze. Zeskanował towar,
 zobaczył kartę, zapisał lokalizację.
+
+**Druga bramka, od 0.52.0:** kolektor po restarcie sam zaproponował wersję
+z serwera i zainstalował ją bez `adb`. Wymaga trzech rzeczy przygotowanych
+wcześniej — patrz sekcja o APK niżej.
 
 **Wycofanie:** deinstalacja (`DEPLOY.md` §8). Subiekt zostaje nietknięty,
 bo ten etap nic do niego nie zapisał. Na maszynie zostaje jednak więcej, niż
@@ -149,6 +153,46 @@ Cofnięcie już wykonanych wymaga kopii zapasowej.
 
 Bramek nie ma. Zostaje bieżąca obsługa z `DEPLOY.md` §7: nocna kopia,
 rekoncyliacja, przegląd `/api/health`.
+
+---
+
+## APK kolektora — trzy rzeczy przed pierwszym wdrożeniem
+
+Od 0.52.0 kolektory aktualizują się same, z serwera WERTIS. Instalator kładzie
+plik w `server\data\apk`, urządzenia pytają o niego przy otwarciu aplikacji.
+Bez trzech rzeczy poniżej ta droga nie zadziała, a dowiesz się o tym dopiero
+przy pierwszej aktualizacji.
+
+**1. Podpis wydania i kopia klucza.** Android odrzuca aktualizację podpisaną
+innym kluczem niż zainstalowana aplikacja. Klucz robi się raz i nie leży
+w repozytorium (`DEPLOY.md` §5).
+
+> **Kopia klucza jest równie ważna jak kopia bazy.** Bez niej żaden przyszły
+> APK nie zainstaluje się nad obecnym, a jedynym wyjściem zostaje obejście
+> wszystkich kolektorów z osobna.
+
+**2. Jednorazowa reinstalacja floty.** Urządzenia z buildem debugowym mają inny
+podpis i odmówią aktualizacji. Każde trzeba odinstalować i zainstalować od
+nowa, a to kasuje adres serwera, listę ostatnio skanowanych i **bufor offline**.
+
+Kolejność na urządzenie:
+
+1. Sprawdź, że bufor offline nie ma nic do wysłania.
+2. Odinstaluj aplikację.
+3. Zainstaluj wydanie podpisane własnym kluczem.
+4. Podaj adres serwera na ekranie startowym.
+
+Rób to po zmianie, urządzenie po urządzeniu. Każda kolejna aktualizacja wchodzi
+już po wierzchu i niczego nie kasuje.
+
+**3. Zgoda „Instalowanie nieznanych aplikacji".** Android pyta o nią raz, per
+urządzenie; kolektor sam prowadzi do właściwego ekranu. Gdy MDM tego zabrania,
+aplikacja powie to wprost i nie pobierze nic — wtedy aktualizacje idą przez MDM,
+jak przed 0.52.0. **Sprawdź profil MDM, zanim ruszysz reinstalację floty.**
+
+**Nazwa pliku niesie wersję** (`wertis-kolektor-0.52.0.apk`) i po niej serwer
+rozpoznaje, co ma do wydania. Plik o innej nazwie jest po cichu pomijany, więc
+literówka wygląda jak brak aktualizacji, a nie jak błąd.
 
 ## Dołączenie workera Sfery (dokumenty MM) — osobna ścieżka, te same reguły
 

@@ -203,10 +203,15 @@ if ($Odinstaluj) {
 # zmiany czegoś, co działa — i siedem pytań do człowieka, który chciał tylko
 # wgrać nową wersję.
 #
-# CZEGO TA GAŁĄŹ NIE ROBI, wprost: nie tyka bazy aplikacji (`server\data`),
-# konta SQL ani GRANT-ów, `wertis.env`, kont użytkowników, reguły zapory
-# i rejestracji usług w NSSM. Wszystko to już istnieje — instalacja, której
-# się nie stawia od nowa, nie potrzebuje niczego z tej listy.
+# CZEGO TA GAŁĄŹ NIE ROBI, wprost: nie tyka bazy aplikacji, konta SQL ani
+# GRANT-ów, `wertis.env`, kont użytkowników, reguły zapory i rejestracji usług
+# w NSSM. Wszystko to już istnieje — instalacja, której się nie stawia od nowa,
+# nie potrzebuje niczego z tej listy.
+#
+# W `server\data` rusza JEDNO miejsce i od 0.52.0: katalog `apk`, do którego
+# ląduje APK dla kolektorów. Baza i zdjęcia w sąsiednich katalogach zostają
+# nietknięte — gdyby ta lista kiedyś urosła, tamto zdanie wyżej przestanie być
+# prawdą i trzeba je zmienić razem z kodem.
 #
 # Usługi stoją przez CAŁY czas budowania, a nie tylko przy podmianie plików.
 # `npm ci` kasuje `node_modules`, więc działający worker traciłby moduły

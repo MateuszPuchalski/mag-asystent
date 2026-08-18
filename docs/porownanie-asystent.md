@@ -30,9 +30,9 @@ w cenniku.
 
 **Co proponujemy.** WERTIS przejmuje **przyjęcie dostawy i wyszukiwanie towaru** —
 dwie ścieżki, które w naszej firmie są codzienne i na których rozkładanie jest
-zarazem sprawdzaniem faktury. WERTIS zapisuje do Subiekta **wyłącznie jedną
-rzecz**: pole lokalizacji na kartotece. Zero tworzenia dokumentów, zero
-modyfikacji stanów.
+zarazem sprawdzaniem faktury. WERTIS zapisuje do Subiekta **dwa pola
+kartoteki**: lokalizację i podstawowy kod kreskowy (od 0.37.0). Zero tworzenia
+dokumentów, zero modyfikacji stanów.
 
 **Czego to nie zastępuje.** Po odjęciu funkcji nieużywanych zostają **dwie
 realne**: **inwentaryzacja** i **przesunięcia magazynowe (MM)**. Przesunięcie
@@ -156,7 +156,7 @@ wykonuje pracę wykonywaną w tej firmie.
 | Skan EAN → gdzie leży towar | **jest** | **jest** |
 | Skan etykiety regału → co na nim stoi | brak danych | **jest** |
 | Towar w wielu lokalizacjach naraz | brak danych | **jest** |
-| Zdjęcia towaru na kartotece | **jest** | **—** |
+| Zdjęcia towaru na kartotece | **jest** | **jest**, wyłączone do czasu wpisania `ZDJECIA_*` w `wertis.env` |
 | Edycja i zakładanie kartotek z kolektora | **jest** | **—** *świadomie: WERTIS nie tworzy danych w Subiekcie* |
 | Zamienniki wycięte z opisu kartoteki | brak danych | **jest** |
 | Stany skorygowane o operacje czekające w kolejce | brak danych | **jest** |
@@ -174,6 +174,7 @@ wykonuje pracę wykonywaną w tej firmie.
 | Raport kolizji kodów kreskowych dla biura | brak danych | **jest** |
 | Nocna rekoncyliacja (4 kontrole, alert tylko przy rozjeździe) | brak danych | **jest** |
 | Raport przeslotowania (co przenieść do strefy złotej) | brak danych | **jest** |
+| Kolektor **sam** pobiera nową wersję z serwera w sieci magazynu | brak danych | **jest** |
 
 > **„brak danych" znaczy dokładnie tyle, ile mówi** — materiały producenta tego
 > nie opisują, a my tego nie sprawdziliśmy. To nie jest ukryte „nie ma".
@@ -286,7 +287,7 @@ inaczej zgłoszenie problemu karałoby zgłaszającego i nikt by go nie zgłasza
 | Licencja | roczna, weryfikowana przez serwer licencyjny producenta | brak |
 | Wsparcie | producent | **brak — serwis po stronie firmy** |
 | Zmiana pod własny proces | przez producenta | własny kod |
-| Zapis do Subiekta | tworzy dokumenty magazynowe | **wyłącznie pole lokalizacji** |
+| Zapis do Subiekta | tworzy dokumenty magazynowe | **dwa pola kartoteki: lokalizacja i kod kreskowy** |
 
 ### Ryzyka po stronie WERTIS — wprost
 
@@ -300,7 +301,7 @@ inaczej zgłoszenie problemu karałoby zgłaszającego i nikt by go nie zgłasza
    (`server/src/adapters/sfera.ts`), ale sam zapis wykonuje osobny proces na
    Windows. Do czasu jego uruchomienia MM wystawia biuro ręcznie.
 3. **Brak testów automatycznych na granicy do Subiekta.** Logika jest pokryta
-   (153 testy serwera, 92 testy modułu wspólnego kolektora), ale adaptery do
+   (650 testów serwera, 200 testów modułu wspólnego kolektora), ale adaptery do
    MSSQL i Sfery weryfikuje dziś tylko przejście ręczne.
 4. **Nie ma umowy wsparcia.** Przy Asystencie awarię zgłasza się producentowi.
    Tu nie ma komu.
@@ -384,12 +385,16 @@ WORKER_SIM_ERRORS=1 npm run dev # losowe błędy zapisu: czerwona pastylka + PON
 
 ### Kolektor
 
-APK powstaje w CI — artefakt `wertis-kolektor-debug-apk` w zakładce Actions,
-w zadaniu `build`. Instalacja:
+APK powstaje w CI, w zadaniu `build`. Są dwa artefakty:
+`wertis-kolektor-debug-apk` do pracy nad kodem i `wertis-kolektor-apk`
+(podpisany, z gałęzi `main`) na urządzenia. Instalacja pierwszej sztuki:
 
 ```bash
-adb install -r app-debug.apk
+adb install -r wertis-kolektor-0.52.0.apk
 ```
+
+**Kolejnych wersji nie wgrywa się ręcznie.** Plik kładzie na serwerze
+instalator, a kolektory proponują go same przy otwarciu aplikacji.
 
 Adres serwera wpisuje się **na ekranie startowym** aplikacji
 (`ZMIEŃ ADRES SERWERA`): `http://<IP-serwera-w-LAN>:3001`. Na emulatorze
@@ -406,8 +411,8 @@ cd android
 ### Kontrole jakości
 
 ```bash
-npm -w server test                    # 153 testy serwera
-./android/gradlew -p android :core:test   # 92 testy modułu wspólnego
+npm -w server test                    # 650 testów serwera
+./android/gradlew -p android :core:test   # 200 testów modułu wspólnego
 python3 tools/docs_check.py           # spójność dokumentacji z kodem
 python3 tools/kt_imports_check.py     # importy i nawiasy w kodzie kolektora
 ```
@@ -425,7 +430,10 @@ WERTIS to projekt młody. Uczciwy obraz:
 importowy, wyszukiwanie i karta towaru, podgląd regału,
 wyjątki ze zdjęciami i eksportem CSV, kolejka zapisów z ponawianiem, konta
 imienne z hasłem, praca offline, raport kolizji kodów, nocna rekoncyliacja,
-raport przeslotowania.
+raport przeslotowania, notatki biura do dostawy z obowiązkową odpowiedzią,
+korekta ilości odłożonej, podgląd biura z zakładką ANALIZA, import zbiórek
+z Sellasist z kandydatami do strefy złotej oraz aktualizacja kolektora
+z serwera.
 
 **Jest, za przełącznikiem:** przesunięcia magazynowe (MM) — kolektor je zbiera
 i kolejkuje, dokument tworzy worker Sfery (`sfera-worker/`); `SFERA_WORKER`
