@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.52.2 — 18 sierpnia 2026
+
+**Poprawka: APK nie trafiał tam, skąd instalator go bierze.** Zgłoszenie
+z serwera po `-Aktualizuj`: „Nie udalo sie pobrac APK kolektora
+(wertis-kolektor-0.52.1.apk)". Serwer działał dalej, kolektory zostały na
+swojej wersji — ostrzeżenie zachowało się dokładnie tak, jak miało.
+
+Przyczyna jest po naszej stronie i była w 0.52.0 od pierwszego dnia. Instalator
+pobiera plik z `releases/latest/download`, a CI wystawiało go **wyłącznie jako
+artefakt Actions**. To dwa różne miejsca: artefakt wygasa po 90 dniach i nie da
+się go pobrać bez zalogowania do GitHuba. Producent i odbiorca celowały obok
+siebie, więc pobranie nie miało prawa się udać ani razu.
+
+Doszedł krok tworzący **wydanie na każdą wersję** wchodzącą na `main`, z APK
+i plikiem sumy kontrolnej. Nie na ręczny tag: serwer aktualizuje się z `main`
+i zaraz potem pyta o APK w numerze, który właśnie zbudował. Wydanie robione
+ręcznie i z opóźnieniem znaczyłoby okno, w którym plik po prostu nie istnieje.
+
+Skutek uboczny wart wiedzy: `instalator.yml` reaguje na zdarzenie wydania, więc
+do tego samego wydania dołączy się instalator Windows. Jedno wydanie na wersję
+niesie od teraz oba artefakty.
+
+**Druga przyczyna tego samego objawu, do zrobienia ręką:** bez sekretu
+`WERTIS_KEYSTORE_B64` krok wydania jest pomijany z ostrzeżeniem w logu i żaden
+podpisany APK nie powstaje. Dopóki sekrety nie są ustawione, wydanie będzie
+puste, a instalator dalej wypisze to samo ostrzeżenie — tym razem zgodnie
+z prawdą.
+
+**[wymaga działania]** Ustawić cztery sekrety podpisu (`DEPLOY.md` §5), jeśli
+jeszcze ich nie ma. Poza tym zwykła aktualizacja serwera. Bez nowego APK —
+kod aplikacji się nie zmienił.
+
+---
+
 ## 0.52.1 — 18 sierpnia 2026
 
 **Dokumentacja doprowadzona do stanu kodu.** Siedem wydań weszło w krótkim
