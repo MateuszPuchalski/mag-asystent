@@ -159,19 +159,25 @@ albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2
 ### Pierwsze konto — bez niego kolektor nie wpuści
 
 Ekran startowy jest twardą bramką: bez konta nie ma jak podpisać operacji, więc
-nie ma przejścia dalej. `npm run seed` zakłada dlatego **jedno konto o roli
-`admin`** — login `admin`, hasło z `ADMIN_HASLO` albo wylosowane i wypisane raz:
+nie ma przejścia dalej. **W trybie `seeded` konto jest od razu**: start API na
+pustej bazie sam zakłada konto demo — login `admin`, hasło `admin` (0.53.2).
+Kolektor i `/biuro` logują się nim bez żadnego kroku ręcznego.
+
+Konto demo powstaje wyłącznie przy `SGT_MODE=seeded` i wyłącznie w bazie bez
+żadnego konta z loginem. Na produkcji (`mssql`) nie powstaje nigdy, a w demo
+z własnymi kontami nie wraca. To odwrócenie (decyzją właściciela) dawnej
+reguły „żadnych stałych haseł demo": ogrodzeniem jest tryb, nie hasło.
+
+Inne hasło w demo ustawia `npm run seed` przez `ADMIN_HASLO` (bez zmiennej —
+losowane i wypisane raz):
 
 ```
 [seed] konto admina: login=admin hasło=4m9E0gfK806DVm07
 [seed] hasło wylosowane i pokazane RAZ — wpisz ADMIN_HASLO, żeby je ustalić.
 ```
 
-Stałego hasła demo nie ma świadomie. Reguła „żadnych domyślnych haseł"
-([`DEPLOY.md`](DEPLOY.md) §5a) obowiązuje też tutaj: wyjątek „tylko na dev"
-jest dokładnie tym, który jedzie potem na produkcję. Zmienną
-`ADMIN_HASLO` czyta **wyłącznie skrypt seeda**, nigdy serwer — na produkcji nie
-znaczy nic. Drugi przebieg konta nie dubluje i nie rusza hasła.
+Zmienną `ADMIN_HASLO` czyta **wyłącznie skrypt seeda**, nigdy serwer — na
+produkcji nie znaczy nic. Drugi przebieg konta nie dubluje i nie rusza hasła.
 
 U klienta to samo konto zakłada instalator, pytając instalującego o hasło.
 
