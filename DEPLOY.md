@@ -344,6 +344,9 @@ z `.github/workflows/android.yml`. Sekretu nie da się później podejrzeć —
 tylko nadpisać, więc hasło musi być zapisane gdzie indziej.
 
 Po dodaniu czwartego sekretu wystarczy dowolna zmiana wchodząca na `main`.
+Bez zmiany w kodzie odpala się to ręcznie: **Actions → Android → Run workflow
+→ gałąź `main`**. Przycisk pojawia się dopiero, gdy workflow z tym wyzwalaczem
+jest już na `main` — GitHub czyta go stamtąd, nie z gałęzi.
 Że zadziałało, poznasz po dwóch rzeczach: bieg **Android** wystawi artefakt
 `wertis-kolektor-apk`, a w zakładce Releases pojawi się wydanie `v<wersja>`
 z plikami `.apk` i `.apk.sha256`. Dopiero wtedy `-Aktualizuj` na serwerze

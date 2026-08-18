@@ -58,6 +58,12 @@ wprost nie zdradzają: **oba hasła muszą być identyczne**, bo magazyn PKCS12
 nie obsługuje osobnego hasła klucza. Na końcu sprawdzian: artefakt
 `wertis-kolektor-apk` i wydanie `v<wersja>` w zakładce Releases.
 
+`android.yml` dostał przy okazji **ręczne uruchomienie** (`workflow_dispatch`).
+Potrzebne dokładnie raz na instalację i właśnie w tym momencie: po dodaniu
+sekretów podpisu nie ma czego wypchnąć, a bez biegu nie powstanie ani APK, ani
+wydanie, z którego bierze go instalator. Warunki kroków wydania przyjmują teraz
+każdy bieg na `main`, który nie jest sprawdzeniem PR-a.
+
 Wariant **bashowy** stoi obok PowerShellowego, bo instrukcja zakładała dotąd
 jedną powłokę: `base64 -w0`, wywołanie `keytool` z Android Studio pełną ścieżką
 w Git Bashu i ostrzeżenie, żeby nie podawać hasła przełącznikiem `-storepass` —
