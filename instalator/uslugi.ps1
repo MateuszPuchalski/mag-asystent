@@ -220,6 +220,30 @@ function Test-WertisSuma {
     return $true
 }
 
+function Get-WertisSumaZPliku {
+    <#
+        .SYNOPSIS
+        Czyta SHA-256 z pliku `.sha256`. Pusty wynik = nie da sie jej ustalic.
+        .DESCRIPTION
+        Format jest ten, ktory produkuje `sha256sum`: suma, biale znaki, nazwa
+        pliku. Czytamy Z PLIKU, bo tresc pobrana z sieci potrafi przyjsc jako
+        tablica bajtow i wtedy pierwszy "wyraz" to kod znaku, nie suma.
+
+        Wynik przechodzi kontrole ksztaltu - 64 znaki szesnastkowe. Suma, ktora
+        nie wyglada jak suma, jest gorsza od jej braku: braku nikt nie pomyli
+        z weryfikacja, a smiecia porownanie odrzuci razem z dobrym plikiem.
+    #>
+    param([Parameter(Mandatory)][string]$Sciezka)
+
+    if (-not (Test-Path $Sciezka)) { return "" }
+    $tresc = Get-Content -Path $Sciezka -Raw -ErrorAction SilentlyContinue
+    if (-not $tresc) { return "" }
+    $token = @($tresc -split '\s+' | Where-Object { $_ })
+    if ($token.Count -eq 0) { return "" }
+    if ($token[0] -notmatch '^[0-9a-fA-F]{64}$') { return "" }
+    return $token[0].ToLowerInvariant()
+}
+
 function Test-Administrator {
     if (-not $IsWindows -and $null -ne $IsWindows) { return $false }
     $tozsamosc = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -660,12 +684,23 @@ function Get-WertisApk {
         return $false
     }
 
+    # Suma jedzie DO PLIKU, a nie przez tresc odpowiedzi. GitHub podaje
+    # `.sha256` jako application/octet-stream, wiec PowerShell zwracal tam
+    # tablice bajtow - a `-split` na tablicy bral pierwszy element i dawal
+    # "102", czyli kod znaku "f". Instalator porownywal wtedy poprawny APK
+    # z liczba i przerywal z komunikatem o podmienionym pliku.
     $sumaOczekiwana = ""
+    $plikSumy = "$cel.sha256.czesc"
     try {
-        $odp = Invoke-WebRequest -Uri "$Zrodlo/$nazwa.sha256" -UseBasicParsing -ErrorAction Stop
-        $sumaOczekiwana = ($odp.Content -split '\s+')[0]
+        Invoke-WebRequest -Uri "$Zrodlo/$nazwa.sha256" -OutFile $plikSumy -UseBasicParsing -ErrorAction Stop
+        $sumaOczekiwana = Get-WertisSumaZPliku -Sciezka $plikSumy
+        if (-not $sumaOczekiwana) {
+            Write-Uwaga "Plik sumy kontrolnej $nazwa.sha256 ma nieoczekiwana tresc."
+        }
     } catch {
         Write-Uwaga "Brak pliku sumy kontrolnej dla $nazwa."
+    } finally {
+        Remove-Item $plikSumy -Force -ErrorAction SilentlyContinue
     }
 
     if (-not (Test-WertisSuma -Sciezka $tymczasowy -Oczekiwana $sumaOczekiwana -Opis "APK kolektora")) {
