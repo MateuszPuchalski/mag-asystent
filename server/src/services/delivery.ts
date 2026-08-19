@@ -1025,12 +1025,20 @@ export function podgladZakonczenia(deliveryId: number): PodsumowanieZakonczenia 
 export function zakonczDostawe(
   deliveryId: number,
   user: string
-): PodsumowanieZakonczenia | { error: string } {
+): PodsumowanieZakonczenia | { error: string; kod?: string } {
   const d = db()
     .prepare("SELECT status, sgt_dok_id AS dokId FROM delivery WHERE id = ?")
     .get(deliveryId) as { status: string; dokId: number } | undefined;
   if (!d) return { error: "Nie znaleziono dostawy" };
-  if (d.status !== "open") return { error: "Ta dostawa jest już zamknięta" };
+  /* `kod` jest tu po to, żeby kolektor rozpoznał TĘ odmowę bez czytania
+     polskiego zdania — treść komunikatu wolno poprawić, znaczenie nie.
+     Odmowa jest zwyczajna, nie wyjątkowa: dostawa domyka się SAMA po ostatniej
+     pozycji (`closeIfComplete`), więc przycisk zakończenia regularnie trafia
+     na dokument już zamknięty. Ekran ma wtedy wrócić na listę, a nie zawisnąć
+     z błędem — stan docelowy jest przecież osiągnięty. */
+  if (d.status !== "open") {
+    return { error: "Ta dostawa jest już zamknięta", kod: "juz_zamknieta" };
+  }
 
   /* Odmowa NAZYWA powód i cytuje pytanie. „Nie można zamknąć" bez treści
      notatki kazałoby szukać jej gdzie indziej — a szuka się jej wtedy,

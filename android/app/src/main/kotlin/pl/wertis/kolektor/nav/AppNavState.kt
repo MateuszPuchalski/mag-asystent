@@ -102,6 +102,21 @@ class AppNavState(private val recentStore: RecentStore) {
         go(Screen.DELIVERY_LINES)
     }
 
+    /**
+     * Wyjście z ZAKOŃCZONEJ dostawy: na listę dokumentów i bez kontekstu pracy.
+     *
+     * Osobno od `goBack()`, bo `deliveryId` czyta `opisPracy()` — pytanie
+     * „przejąć pracę?" i ślad w audycie. Po domknięciu dostawy nie ma już
+     * czego przejmować, a pole trzymane dalej meldowałoby pracę, której nie
+     * ma. Zwykły `goBack()` tego pola NIE zeruje i nie powinien: z ekranu
+     * pozycji wchodzi się w kartę towaru, która przy powrocie tego kontekstu
+     * potrzebuje.
+     */
+    fun zakonczonaDostawa() {
+        deliveryId = null
+        go(Screen.DELIVERY_DOCS)
+    }
+
     fun openLocation(code: String) {
         _locCode.value = code.trim().uppercase()
         _screen.value = Screen.LOCATION

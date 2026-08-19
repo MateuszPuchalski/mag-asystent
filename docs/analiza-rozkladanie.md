@@ -43,7 +43,10 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
    notatka biura — bramka stoi w tej funkcji, a nie tylko przy przycisku.
 6. **Zakończenie z ręki** (`zakonczDostawe`) — przycisk ZAKOŃCZ DOSTAWĘ
    pokazuje najpierw, co powstanie. Braki ilościowe pojadą do dostawcy jako
-   wyjątek „zła ilość", a pozycje nietknięte zostaną pominięte.
+   wyjątek „zła ilość", a pozycje nietknięte zostaną pominięte. Przycisk jest
+   dla dostawy OTWARTEJ; po domknięciu z punktu 5 kolektor pokazuje w jego
+   miejscu wyjście na listę. Odmowa „już zamknięta" niesie kod `juz_zamknieta`
+   i też prowadzi na listę — cel jest wtedy osiągnięty (0.54.0).
 7. **Korekta ilości** (`korygujIlosc`) — poprawka pomyłki w liczeniu, dopóki
    faktura jest otwarta. Ustawia liczbę bezwzględną, nie różnicę, i nie tworzy
    ani zadania w kolejce, ani wyjątku.

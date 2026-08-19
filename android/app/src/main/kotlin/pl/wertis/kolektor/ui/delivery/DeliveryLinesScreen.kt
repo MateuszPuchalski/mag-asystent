@@ -58,6 +58,7 @@ import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
+import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.KorektaBody
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.offline.PendingOp
@@ -529,24 +530,61 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     },
                 )
 
-                /* Zakończenie dostawy. Przycisk otwiera PODGLĄD, nie zapis —
-                   wyjątek „zła ilość" jedzie do protokołu rozbieżności, czyli
-                   do dostawcy, więc nie ma prawa powstać z jednego dotknięcia
-                   bez pokazania, co powstanie. */
-                OutlineButton(
-                    "ZAKOŃCZ DOSTAWĘ",
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = WIcons.Check,
-                    onClick = {
-                        scope.launch {
-                            try {
-                                zakonczenie = apiCall { graph.api.deliveryZakonczenie(id) }
-                            } catch (e: Exception) {
-                                graph.effects.toast(e.message ?: "Nie udało się policzyć podsumowania")
+                /* Dostawa ZAMKNIĘTA — stan końcowy zamiast przycisku, który
+                   musiałby odmówić. Domknięcie dzieje się SAMO po ostatniej
+                   pozycji (`closeIfComplete` na serwerze), więc to nie jest
+                   rzadki przypadek brzegowy, tylko najczęstsze zakończenie
+                   pracy: człowiek odkłada ostatnią sztukę i dostawa jest już
+                   zamknięta, zanim sięgnie po przycisk.
+
+                   Do 0.54.0 ekran tego nie wiedział — `status` przychodził
+                   w danych i nie był czytany. „ZAKOŃCZ DOSTAWĘ" stało dalej,
+                   dostawało 400 „Ta dostawa jest już zamknięta", a powrót na
+                   listę leżał wyłącznie na ścieżce sukcesu. Objaw ze
+                   zgłoszenia: dostawa zamknięta, ekran nie do opuszczenia. */
+                if (v.status != "open") {
+                    Text(
+                        "DOSTAWA ZAKOŃCZONA",
+                        fontFamily = BarlowCond,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 15.sp,
+                        color = Success,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Text(
+                        "Nie ma tu już czego rozkładać.",
+                        fontSize = 12.sp,
+                        color = InkMute,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                    PrimaryButton(
+                        "WRÓĆ DO LISTY DOSTAW",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = WIcons.Check,
+                        onClick = { graph.nav.zakonczonaDostawa() },
+                    )
+                } else {
+                    /* Zakończenie dostawy. Przycisk otwiera PODGLĄD, nie zapis —
+                       wyjątek „zła ilość" jedzie do protokołu rozbieżności, czyli
+                       do dostawcy, więc nie ma prawa powstać z jednego dotknięcia
+                       bez pokazania, co powstanie. */
+                    OutlineButton(
+                        "ZAKOŃCZ DOSTAWĘ",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = WIcons.Check,
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    zakonczenie = apiCall { graph.api.deliveryZakonczenie(id) }
+                                } catch (e: Exception) {
+                                    graph.effects.toast(
+                                        e.message ?: "Nie udało się policzyć podsumowania"
+                                    )
+                                }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
 
@@ -673,10 +711,22 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         graph.effects.flashSuccess(
                             "Dostawa zakończona · ${wynik.braki.size} zgłoszeń"
                         )
-                        graph.nav.goBack()
+                        graph.nav.zakonczonaDostawa()
                     } catch (e: Exception) {
-                        graph.feedback.beep(false)
-                        graph.effects.toast(e.message ?: "Nie udało się zakończyć dostawy")
+                        /* „Już zamknięta" NIE jest porażką: stan docelowy jest
+                           osiągnięty, tylko domknął ktoś inny albo automat
+                           między wczytaniem ekranu a naciśnięciem przycisku.
+                           Odpowiedź prowadzi więc tam, dokąd człowiek zmierzał
+                           — na listę — bez dźwięku błędu. Rozpoznanie po
+                           `kod`, nie po treści: zdanie wolno poprawiać. */
+                        if (e is ApiError && e.kod == "juz_zamknieta") {
+                            zakonczenie = null
+                            graph.effects.toast("Ta dostawa była już zakończona")
+                            graph.nav.zakonczonaDostawa()
+                        } else {
+                            graph.feedback.beep(false)
+                            graph.effects.toast(e.message ?: "Nie udało się zakończyć dostawy")
+                        }
                     } finally {
                         busy = false
                     }
