@@ -48,6 +48,8 @@ export interface ZwrotAllegro {
   status: string | null;
   utworzono: string | null;
   kupujacyLogin: string | null;
+  /** Identyfikator kupującego — jedyny pewny klucz do wątku wiadomości. */
+  kupujacyId: string | null;
   kupujacyEmail: string | null;
   pozycje: PozycjaZwrotuAllegro[];
   paczki: PaczkaZwrotu[];
@@ -65,6 +67,7 @@ export interface PozycjaZamowieniaAllegro {
 export interface ZamowienieAllegro {
   id: string;
   kupujacyLogin: string | null;
+  kupujacyId: string | null;
   kupujacyEmail: string | null;
   pozycje: PozycjaZamowieniaAllegro[];
 }
@@ -86,6 +89,28 @@ export interface WatekAllegro {
   wiadomosci: WiadomoscAllegro[];
 }
 
+/** Czym rozpoznajemy kupującego w liście wątków. */
+export interface KupujacyRef {
+  login: string | null;
+  id: string | null;
+}
+
+/**
+ * Wynik szukania wątku — z licznikami, nie samym `null`.
+ *
+ * „Nie znalazłem" ma dwie zupełnie różne przyczyny: klient naprawdę nie pisał
+ * albo rozmowa jest starsza niż to, co przejrzeliśmy. Bez tych liczb ekran
+ * nie umiałby ich rozróżnić, a właśnie na tym poległa pierwsza wersja.
+ */
+export interface SzukanieWatku {
+  watek: WatekAllegro | null;
+  przejrzanych: number;
+  /** Data ostatniej wiadomości w najstarszym przejrzanym wątku. */
+  najstarszaData: string | null;
+  /** Czy lista wątków się skończyła (przejrzano wszystko, co konto ma). */
+  wyczerpano: boolean;
+}
+
 export interface AllegroAdapter {
   /**
    * Zwroty, których KTÓRAKOLWIEK paczka nosi ten numer — po `parcels.waybill`
@@ -98,13 +123,16 @@ export interface AllegroAdapter {
   /** Zamówienie (checkout-form) — źródło `externalId` pozycji; `null` gdy brak. */
   zamowienie(orderId: string): Promise<ZamowienieAllegro | null>;
   /**
-   * Wątek Centrum wiadomości z danym kupującym; `null` gdy nie ma korespondencji.
+   * Wątek Centrum wiadomości z danym kupującym.
    *
    * Czytane NA ŻĄDANIE i NIE zapisywane u nas: to prywatna rozmowa z klientem,
    * która ma jedno miejsce prawdy — Allegro. Kopia w naszej bazie starzałaby
    * się po pierwszej odpowiedzi i mnożyła dane osobowe bez potrzeby.
+   *
+   * `odKiedy` (ISO) ogranicza przeszukiwanie: lista wątków jest posortowana od
+   * najnowszej rozmowy, więc schodzimy tylko do rozmów z okolic zwrotu.
    */
-  watekKupujacego(login: string): Promise<WatekAllegro | null>;
+  watekKupujacego(kto: KupujacyRef, odKiedy: string | null): Promise<SzukanieWatku>;
 }
 
 /**

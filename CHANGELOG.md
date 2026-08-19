@@ -33,6 +33,30 @@ historii nie przepisujemy.
 
 ---
 
+## 0.56.6 — 19 sierpnia 2026
+
+**Rozmowa z klientem znajdowana po identyfikatorze, nie po loginie.**
+Karta zwrotu pokazywała „brak korespondencji" także wtedy, gdy wątek
+w Allegro istniał i był świeży.
+
+Przyczyna siedzi w liście wątków. Allegro MASKUJE tam rozmówcę:
+w `interlocutor.login` stoi `client:44300444`, a nie login kupującego
+z zamówienia. Porównanie loginu z zamówieniem nie trafiało więc nigdy —
+niezależnie od tego, ile stron przejrzeliśmy.
+
+Zwrot zapamiętuje teraz `buyer.id`, a szukanie porównuje każdy
+identyfikator rozmówcy z każdym, który mamy. Zwroty założone wcześniej
+dostają identyfikator z zapamiętanej odpowiedzi Allegro przy starcie —
+nie trzeba ich zakładać od nowa.
+
+Zmienił się też zasięg szukania. Wcześniej sztywne sto najnowszych
+rozmów, dziś: schodzimy do miesiąca przed zwrotem, z limitem stron jako
+bezpiecznikiem. Klient pisze zwykle PRZED odesłaniem paczki.
+
+Gdy wątku nie ma, ekran mówi ile rozmów przejrzał i do jakiej daty.
+„Klient nie pisał" i „nie doszedłem tak głęboko" to dwie różne
+odpowiedzi, a poprzednia wersja pokazywała je identycznie.
+
 ## 0.56.5 — 19 sierpnia 2026
 
 **Powód zwrotu wreszcie na karcie — i rozmowa z klientem obok niego.**

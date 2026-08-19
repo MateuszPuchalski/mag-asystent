@@ -3,9 +3,10 @@ import { allegroUserAgent } from "./allegro.js";
 import { wazneBearer } from "../services/allegro-token.js";
 import type {
   AllegroAdapter,
+  KupujacyRef,
   PaczkaZwrotu,
   PozycjaZwrotuAllegro,
-  WatekAllegro,
+  SzukanieWatku,
   WiadomoscAllegro,
   ZamowienieAllegro,
   ZwrotAllegro,
@@ -32,12 +33,22 @@ import type {
 const TIMEOUT_MS = 10_000;
 
 /**
- * Ile stron listy wątków przeglądamy w poszukiwaniu rozmowy z kupującym
- * (20 wątków na stronę — to maksimum Allegro). Pięć stron to sto najnowszych
- * rozmów: wystarcza dla klienta, który właśnie odesłał paczkę, i nie zamienia
- * jednego kliknięcia w przewijanie całej historii konta.
+ * Twardy limit stron listy wątków (20 wątków na stronę — maksimum Allegro).
+ *
+ * Normalnie przeszukiwanie kończy DATA: schodzimy do rozmów starszych niż
+ * zwrot i przestajemy. Ten limit jest bezpiecznikiem na konto z ogromną
+ * korespondencją, żeby jedno kliknięcie nie ciągnęło tysiąca stron.
  */
-const STRON_WATKOW = 5;
+const STRON_WATKOW = 50;
+
+/**
+ * Ile dni przed zwrotem jeszcze nas interesuje rozmowa.
+ *
+ * Klient pisze zwykle PRZED odesłaniem paczki — o wadzie, o wymianie, o
+ * zgodzie na zwrot. Miesiąc zapasu obejmuje typową historię takiej sprawy,
+ * a nie każe schodzić przez lata rozmów konta.
+ */
+const DNI_WSTECZ = 30;
 
 /** URL listy zwrotów filtrowanej jednym z pól paczki. */
 export function urlZwrotow(
@@ -156,6 +167,7 @@ export function mapujZwrot(json: unknown): ZwrotAllegro {
     status: tekst(z.status),
     utworzono: tekst(z.createdAt),
     kupujacyLogin: tekst(buyer.login),
+    kupujacyId: tekst(buyer.id),
     kupujacyEmail: tekst(buyer.email),
     pozycje,
     paczki,
@@ -171,6 +183,7 @@ export function mapujZamowienie(json: unknown): ZamowienieAllegro {
   return {
     id: tekst(z.id) ?? "",
     kupujacyLogin: tekst(buyer.login),
+    kupujacyId: tekst(buyer.id),
     kupujacyEmail: tekst(buyer.email),
     pozycje: lineItems.map((li) => {
       const l = (li ?? {}) as Record<string, unknown>;
@@ -236,6 +249,56 @@ export function mapujWiadomosci(json: unknown, mojLogin: string | null): Wiadomo
       zalacznikow: Array.isArray(w.attachments) ? w.attachments.length : 0,
     };
   });
+}
+
+/**
+ * Identyfikator rozmówcy sprowadzony do postaci porównywalnej.
+ *
+ * Lista wątków MASKUJE kupującego: w `interlocutor.login` siedzi `client:44300444`,
+ * a nie login, który zna zamówienie. Odcinamy więc przedrostek przed dwukropkiem
+ * i porównujemy bez wielkości liter. Na tym poległa pierwsza wersja szukania:
+ * login z zamówienia nigdy nie trafiał w zamaskowany login wątku.
+ */
+export function normalizujRef(v: unknown): string | null {
+  const t = tekst(v);
+  if (!t) return null;
+  const bezPrzedrostka = t.includes(":") ? t.slice(t.lastIndexOf(":") + 1) : t;
+  const czysty = bezPrzedrostka.trim().toLowerCase();
+  return czysty === "" ? null : czysty;
+}
+
+/**
+ * Czy ten wątek jest rozmową z naszym kupującym.
+ *
+ * Porównujemy KAŻDY identyfikator rozmówcy z KAŻDYM, jaki mamy ze zwrotu —
+ * bo Allegro raz podaje login, raz zamaskowane id, i nie ma gwarancji, które
+ * z nich zobaczymy w danym wątku.
+ */
+export function pasujeRozmowca(rozmowca: Record<string, unknown>, kto: KupujacyRef): boolean {
+  const jego = [normalizujRef(rozmowca.login), normalizujRef(rozmowca.id)].filter(
+    (v): v is string => v !== null
+  );
+  const nasze = [normalizujRef(kto.login), normalizujRef(kto.id)].filter(
+    (v): v is string => v !== null
+  );
+  return jego.some((j) => nasze.includes(j));
+}
+
+/**
+ * Dokąd wstecz schodzimy — data zwrotu minus zapas, jako znacznik czasu.
+ * Brak lub śmieci w dacie dają `NaN`, co znaczy „bez granicy": wtedy
+ * przeszukiwanie zatrzyma dopiero twardy limit stron.
+ */
+export function granicaSzukania(odKiedy: string | null): number {
+  const t = odKiedy ? Date.parse(odKiedy) : NaN;
+  return Number.isFinite(t) ? t - DNI_WSTECZ * 86_400_000 : NaN;
+}
+
+/** Czy zeszliśmy już poniżej granicy dat (lista jest malejąca po dacie). */
+export function poNajstarszej(najstarszaData: string | null, granica: number): boolean {
+  if (!Number.isFinite(granica) || !najstarszaData) return false;
+  const t = Date.parse(najstarszaData);
+  return Number.isFinite(t) && t < granica;
 }
 
 export class HttpAllegroAdapter implements AllegroAdapter {
@@ -335,35 +398,55 @@ export class HttpAllegroAdapter implements AllegroAdapter {
     return json === null ? null : mapujZamowienie(json);
   }
 
-  async watekKupujacego(login: string): Promise<WatekAllegro | null> {
-    /* Allegro nie ma filtru „wątek z tym loginem": trzeba przejść listę.
-       Korespondencja z klientem, który właśnie odesłał paczkę, jest świeża,
-       więc idziemy od najnowszych i po STRON_WATKOW stronach odpuszczamy —
-       zamiast przewijać kilka lat rozmów przy każdym kliknięciu. */
+  async watekKupujacego(kto: KupujacyRef, odKiedy: string | null): Promise<SzukanieWatku> {
+    /* Allegro nie ma filtru „wątek z tym kupującym": trzeba przejść listę.
+       Lista jest posortowana od najświeższej rozmowy, więc schodzimy w dół
+       do granicy dat wokół zwrotu i tam przestajemy — a licznik przejrzanych
+       wątków wraca na ekran, żeby „brak korespondencji" dało się odróżnić od
+       „nie doszedłem tak głęboko". */
+    const granica = granicaSzukania(odKiedy);
+    let przejrzanych = 0;
+    let najstarszaData: string | null = null;
+
     for (let strona = 0; strona < STRON_WATKOW; strona++) {
       const json = (await this.zapytaj(
         urlWatkow(config.allegro.apiUrl, strona * 20)
       )) as Record<string, unknown> | null;
       const watki = Array.isArray(json?.threads) ? (json.threads as unknown[]) : [];
-      if (watki.length === 0) return null;
+      if (watki.length === 0) {
+        return { watek: null, przejrzanych, najstarszaData, wyczerpano: true };
+      }
 
       for (const t of watki) {
         const w = (t ?? {}) as Record<string, unknown>;
+        przejrzanych++;
+        const data = tekst(w.lastMessageDateTime);
+        if (data) najstarszaData = data;
+
         const rozmowca = (w.interlocutor ?? {}) as Record<string, unknown>;
-        const jego = tekst(rozmowca.login);
-        if (!jego || jego.toLowerCase() !== login.trim().toLowerCase()) continue;
+        if (!pasujeRozmowca(rozmowca, kto)) continue;
         const threadId = tekst(w.id);
         if (!threadId) continue;
-        const wiadomosci = await this.zapytaj(
-          urlWiadomosci(config.allegro.apiUrl, threadId)
-        );
+
+        const wiadomosci = await this.zapytaj(urlWiadomosci(config.allegro.apiUrl, threadId));
         return {
-          threadId,
-          interlokutor: jego,
-          wiadomosci: mapujWiadomosci(wiadomosci, null),
+          watek: {
+            threadId,
+            interlokutor: tekst(rozmowca.login) ?? tekst(rozmowca.id),
+            wiadomosci: mapujWiadomosci(wiadomosci, null),
+          },
+          przejrzanych,
+          najstarszaData,
+          wyczerpano: false,
         };
       }
+
+      /* Krótsza strona niż limit znaczy koniec listy — dalej nie ma czego czytać. */
+      if (watki.length < 20) {
+        return { watek: null, przejrzanych, najstarszaData, wyczerpano: true };
+      }
+      if (poNajstarszej(najstarszaData, granica)) break;
     }
-    return null;
+    return { watek: null, przejrzanych, najstarszaData, wyczerpano: false };
   }
 }

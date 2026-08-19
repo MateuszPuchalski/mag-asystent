@@ -498,6 +498,10 @@ CREATE TABLE IF NOT EXISTS zwrot (
   waybill           TEXT NOT NULL,
   status_allegro    TEXT,              -- status z API, informacyjnie
   kupujacy_login    TEXT,
+  -- Identyfikator kupującego z Allegro. Po NIM, a nie po loginie, odnajduje
+  -- się wątek Centrum wiadomości: lista wątków podaje rozmówcę zamaskowanym
+  -- `client:44300444`, więc porównanie po loginie z zamówienia nie trafia (0.56.6).
+  kupujacy_id       TEXT,
   kupujacy_email    TEXT,
   utworzono_allegro TEXT,              -- createdAt zwrotu w Allegro (ISO)
   -- Maszyna stanów Etapu 1; Etap 2 DOPISZE wartości (np. korekta_w_kolejce,

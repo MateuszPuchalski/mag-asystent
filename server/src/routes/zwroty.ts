@@ -143,8 +143,16 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     try {
-      const { login, watek } = await watekZwrotu(Number(req.params.id));
-      return { login, watek };
+      const { login, szukanie } = await watekZwrotu(Number(req.params.id));
+      /* Ekran dostaje też liczniki: „przejrzano N rozmów" odróżnia klienta,
+         który nie pisał, od rozmowy starszej niż zasięg szukania. */
+      return {
+        login,
+        watek: szukanie?.watek ?? null,
+        przejrzanych: szukanie?.przejrzanych ?? 0,
+        najstarszaData: szukanie?.najstarszaData ?? null,
+        wyczerpano: szukanie?.wyczerpano ?? false,
+      };
     } catch (e) {
       if (e instanceof BladZwrotu) return reply.code(e.kod).send({ error: e.message });
       /* Najczęstsza przyczyna: aplikacja bez uprawnienia do Centrum wiadomości.

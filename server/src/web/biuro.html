@@ -2014,11 +2014,11 @@ function rysujSzczegolZwrotu(z) {
 
   /* Rozmowa z klientem NIE jedzie z kartą — dociąga ją klik. Karta odświeża
      się co 30 s, a wątek to dwa dodatkowe zapytania do Allegro. */
-  if (!z.kupujacyLogin) {
+  if (!z.kupujacyLogin && !z.kupujacyId) {
     $("zwrotWiadomosci").innerHTML = "";
   } else if (zwrotIdWatku !== z.id) {
     $("zwrotWiadomosci").innerHTML = `<h2>WIADOMOŚCI OD KLIENTA</h2>
-      <button class="akcja cichy" data-wiadomosci>POKAŻ ROZMOWĘ Z ${esc(z.kupujacyLogin)}</button>`;
+      <button class="akcja cichy" data-wiadomosci>POKAŻ ROZMOWĘ Z ${esc(z.kupujacyLogin || z.kupujacyId)}</button>`;
   }
 
   if (z.dokument) {
@@ -2067,8 +2067,18 @@ async function pokazWiadomosci(id) {
     zwrotIdWatku = id;
     const w = d.watek;
     if (!w || !w.wiadomosci.length) {
+      /* „Nie znalazłem" ma dwie różne przyczyny: klient nie pisał albo rozmowa
+         jest starsza niż to, co przejrzeliśmy. Liczniki z serwera rozstrzygają
+         to na ekranie — bez nich biuro nie wie, czy szukać dalej ręcznie. */
+      const doKiedy = d.najstarszaData
+        ? ` (do ${esc(d.najstarszaData.slice(0, 10))})`
+        : "";
+      const zasieg = d.wyczerpano
+        ? "To wszystkie rozmowy na koncie."
+        : "Starsze rozmowy są poza zasięgiem — sprawdź w Centrum wiadomości.";
       cel.innerHTML = `<h2>WIADOMOŚCI OD KLIENTA</h2>
-        <p class="mute">Brak korespondencji z ${esc(d.login || "kupującym")} w ostatnich rozmowach.
+        <p class="mute">Brak rozmowy z ${esc(d.login || "kupującym")}.
+        Przejrzano ${d.przejrzanych || 0} wątków${doKiedy}. ${zasieg}
         <a href="https://allegro.pl/moje-allegro/wiadomosci" target="_blank" rel="noopener">OTWÓRZ CENTRUM WIADOMOŚCI →</a></p>`;
       return;
     }

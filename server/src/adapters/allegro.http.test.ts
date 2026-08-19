@@ -1,10 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  granicaSzukania,
   mapujPowod,
   mapujWiadomosci,
   mapujZamowienie,
   mapujZwrot,
+  normalizujRef,
+  pasujeRozmowca,
+  poNajstarszej,
   rodzinaKoncowki,
   urlZamowienia,
   urlWatkow,
@@ -148,4 +152,42 @@ test("URL wątków trzyma limit Allegro i nie przyjmuje ujemnego offsetu", () =>
     urlWiadomosci("https://api.allegro.pl", "a/b"),
     "https://api.allegro.pl/messaging/threads/a%2Fb/messages"
   );
+});
+
+test("rozmówca wątku: zamaskowany login trafia w identyfikator kupującego", () => {
+  /* Lista wątków podaje `client:44300444`, a zamówienie — login. Szukanie po
+     samym loginie nie trafiało NIGDY i to była przyczyna „braku
+     korespondencji" przy zwrotach, w których rozmowa istniała. */
+  assert.equal(normalizujRef("client:44300444"), "44300444");
+  assert.equal(normalizujRef("  Jan_Wraca "), "jan_wraca");
+  assert.equal(normalizujRef(""), null);
+  assert.equal(normalizujRef(42), null);
+
+  const kto = { login: "jan_wraca", id: "44300444" };
+  assert.equal(pasujeRozmowca({ login: "client:44300444" }, kto), true);
+  assert.equal(pasujeRozmowca({ login: "JAN_WRACA" }, kto), true);
+  assert.equal(pasujeRozmowca({ id: "44300444" }, kto), true);
+  assert.equal(pasujeRozmowca({ login: "client:99999999" }, kto), false);
+  // zwrot bez kupującego nie ma prawa „pasować" do pierwszego lepszego wątku
+  assert.equal(pasujeRozmowca({ login: "client:1" }, { login: null, id: null }), false);
+});
+
+test("granica szukania: miesiąc przed zwrotem, śmieci w dacie znoszą granicę", () => {
+  const zwrot = "2026-08-19T10:00:00Z";
+  const granica = granicaSzukania(zwrot);
+  assert.equal(new Date(granica).toISOString().slice(0, 10), "2026-07-20");
+  // rozmowa z dnia zwrotu jest w zasięgu, sprzed pół roku — już nie
+  assert.equal(poNajstarszej(zwrot, granica), false);
+  assert.equal(poNajstarszej("2026-02-01T00:00:00Z", granica), true);
+  // bez daty zwrotu szukanie ogranicza wyłącznie twardy limit stron
+  assert.equal(Number.isNaN(granicaSzukania(null)), true);
+  assert.equal(Number.isNaN(granicaSzukania("nie-data")), true);
+  assert.equal(poNajstarszej("2020-01-01T00:00:00Z", granicaSzukania(null)), false);
+  assert.equal(poNajstarszej(null, granica), false);
+});
+
+test("mapowanie niesie identyfikator kupującego — klucz do wątku wiadomości", () => {
+  assert.equal(mapujZwrot({ buyer: { login: "jan", id: "44300444" } }).kupujacyId, "44300444");
+  assert.equal(mapujZwrot({ buyer: { login: "jan" } }).kupujacyId, null);
+  assert.equal(mapujZamowienie({ buyer: { id: "44300444" } }).kupujacyId, "44300444");
 });
