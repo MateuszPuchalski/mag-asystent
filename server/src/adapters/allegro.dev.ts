@@ -1,4 +1,9 @@
-import type { AllegroAdapter, ZamowienieAllegro, ZwrotAllegro } from "./allegro.js";
+import type {
+  AllegroAdapter,
+  WatekAllegro,
+  ZamowienieAllegro,
+  ZwrotAllegro,
+} from "./allegro.js";
 
 /* ── DEV — fikcyjne zwroty Allegro (zero sieci) ──────────────────────────────
    Lustro DevSferaAdapter: cały przepływ zwrotów działa end-to-end bez konta
@@ -130,6 +135,43 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
   },
 };
 
+/**
+ * Fikcyjne wątki Centrum wiadomości — po loginie kupującego. Jeden klient
+ * ma rozmowę, drugi nie: karta zwrotu musi pokazywać oba stany.
+ */
+const WATKI: Record<string, WatekAllegro> = {
+  jan_wraca: {
+    threadId: "dev-thread-1",
+    interlokutor: "jan_wraca",
+    wiadomosci: [
+      {
+        id: "dev-msg-1",
+        odKupujacego: true,
+        autor: "jan_wraca",
+        tresc: "Dzień dobry, zamówiłem końcówkę 3/8, a w paczce jest 1/4. Odsyłam.",
+        at: dniTemu(4),
+        zalacznikow: 1,
+      },
+      {
+        id: "dev-msg-2",
+        odKupujacego: false,
+        autor: "wertis",
+        tresc: "Dzień dobry, przepraszamy za pomyłkę. Prosimy o odesłanie — zwrot środków po sprawdzeniu towaru.",
+        at: dniTemu(4),
+        zalacznikow: 0,
+      },
+      {
+        id: "dev-msg-3",
+        odKupujacego: true,
+        autor: "jan_wraca",
+        tresc: "Nadane, numer przesyłki DEVWB0001.",
+        at: dniTemu(3),
+        zalacznikow: 0,
+      },
+    ],
+  },
+};
+
 export class DevAllegroAdapter implements AllegroAdapter {
   async szukajZwrotowPoWaybill(waybill: string): Promise<ZwrotAllegro[]> {
     const kod = waybill.trim();
@@ -144,5 +186,9 @@ export class DevAllegroAdapter implements AllegroAdapter {
 
   async zamowienie(orderId: string): Promise<ZamowienieAllegro | null> {
     return ZAMOWIENIA[orderId] ?? null;
+  }
+
+  async watekKupujacego(login: string): Promise<WatekAllegro | null> {
+    return WATKI[login.trim().toLowerCase()] ?? null;
   }
 }

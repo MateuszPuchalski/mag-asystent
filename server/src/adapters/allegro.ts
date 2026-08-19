@@ -69,6 +69,23 @@ export interface ZamowienieAllegro {
   pozycje: PozycjaZamowieniaAllegro[];
 }
 
+export interface WiadomoscAllegro {
+  id: string;
+  /** Kto napisał: `kupujacy` albo `my` (sprzedawca). */
+  odKupujacego: boolean;
+  autor: string | null;
+  tresc: string;
+  at: string | null;
+  /** Ile załączników niesie wiadomość — treści plików nie pobieramy. */
+  zalacznikow: number;
+}
+
+export interface WatekAllegro {
+  threadId: string;
+  interlokutor: string | null;
+  wiadomosci: WiadomoscAllegro[];
+}
+
 export interface AllegroAdapter {
   /**
    * Zwroty, których KTÓRAKOLWIEK paczka nosi ten numer — po `parcels.waybill`
@@ -80,6 +97,14 @@ export interface AllegroAdapter {
   zwrot(id: string): Promise<ZwrotAllegro | null>;
   /** Zamówienie (checkout-form) — źródło `externalId` pozycji; `null` gdy brak. */
   zamowienie(orderId: string): Promise<ZamowienieAllegro | null>;
+  /**
+   * Wątek Centrum wiadomości z danym kupującym; `null` gdy nie ma korespondencji.
+   *
+   * Czytane NA ŻĄDANIE i NIE zapisywane u nas: to prywatna rozmowa z klientem,
+   * która ma jedno miejsce prawdy — Allegro. Kopia w naszej bazie starzałaby
+   * się po pierwszej odpowiedzi i mnożyła dane osobowe bez potrzeby.
+   */
+  watekKupujacego(login: string): Promise<WatekAllegro | null>;
 }
 
 /**

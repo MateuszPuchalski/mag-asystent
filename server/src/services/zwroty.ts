@@ -1,5 +1,9 @@
 import { db, nowIso, transaction } from "../db/db.js";
-import { allegroAdapter, type ZwrotAllegro } from "../adapters/allegro.js";
+import {
+  allegroAdapter,
+  type AllegroAdapter,
+  type ZwrotAllegro,
+} from "../adapters/allegro.js";
 import { logEvent } from "./events.js";
 
 /* ── Zwroty Allegro — serwis (Etap 1) ────────────────────────────────────────
@@ -160,7 +164,12 @@ export async function utworzZeSkanu(kod: string, autor: string): Promise<WynikSk
       })),
     };
   }
-  const zwrot = await utworzZAllegro(znalezione[0], waybill, autor);
+  /* Lista zwrotów jest STRESZCZENIEM: powody zwrotu i komentarze kupującego
+     niesie dopiero szczegół pojedynczego zwrotu. Bez tego dociągnięcia karta
+     miała kolumnę POWÓD pustą przy każdym prawdziwym zwrocie (0.56.5).
+     Nieudany szczegół degraduje do danych z listy — zwrot ma powstać. */
+  const pelny = (await allegroAdapter().zwrot(znalezione[0].id)) ?? znalezione[0];
+  const zwrot = await utworzZAllegro(pelny, waybill, autor);
   return { rodzaj: "utworzony", zwrot };
 }
 
@@ -726,6 +735,26 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
   };
   if (!z.sgt_dok_id) szczegol.kandydaciDokumentu = kandydaciDokumentu(id);
   return szczegol;
+}
+
+// ── Wiadomości z klientem (Centrum wiadomości Allegro) ──────────────────────
+
+/**
+ * Wątek rozmowy z kupującym — czytany NA ŻĄDANIE, prosto z Allegro.
+ *
+ * Świadomie NIE zapisujemy go u siebie: rozmowa toczy się dalej po ocenie
+ * towaru, więc kopia starzałaby się od pierwszej odpowiedzi, a przy okazji
+ * mnożyła dane osobowe w naszej bazie. Karta pokazuje to, co Allegro ma
+ * TERAZ, albo uczciwie mówi, że korespondencji nie ma.
+ */
+export async function watekZwrotu(zwrotId: number): Promise<{
+  login: string | null;
+  watek: Awaited<ReturnType<AllegroAdapter["watekKupujacego"]>>;
+}> {
+  const z = wierszZwrotu(zwrotId);
+  if (!z.kupujacy_login) return { login: null, watek: null };
+  const watek = await allegroAdapter().watekKupujacego(z.kupujacy_login);
+  return { login: z.kupujacy_login, watek };
 }
 
 // ── Pomocnicze ──────────────────────────────────────────────────────────────

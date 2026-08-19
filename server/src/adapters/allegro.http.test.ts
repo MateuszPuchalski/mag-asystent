@@ -2,10 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mapujPowod,
+  mapujWiadomosci,
   mapujZamowienie,
   mapujZwrot,
   rodzinaKoncowki,
   urlZamowienia,
+  urlWatkow,
+  urlWiadomosci,
   urlZwrotow,
   urlZwrotu,
 } from "./allegro.http.js";
@@ -104,4 +107,45 @@ test("rodzina końcówki rozdziela wersje zasobów — beta zwrotów nie zmienia
   assert.equal(rodzinaKoncowki(urlZwrotu("https://api.allegro.pl", "r-1")), "customer-returns");
   assert.equal(rodzinaKoncowki(urlZamowienia("https://api.allegro.pl", "o-1")), "checkout-forms");
   assert.equal(rodzinaKoncowki("https://api.allegro.pl/me"), "inne");
+});
+
+test("powód zwrotu: kod tłumaczony na polski, NONE to brak powodu", () => {
+  /* Allegro daje `reason: { type, userComment }` — kod, nie zdanie. Biuro
+     czyta kartę w pośpiechu, więc kod znany tłumaczymy, nieznany pokazujemy
+     surowo (nigdy nie ukrywamy), a NONE znaczy „klient nie podał powodu". */
+  assert.deepEqual(
+    mapujPowod({ reason: { type: "NOT_AS_DESCRIBED", userComment: "Niewłaściwy kolor." } }),
+    { powod: "Niezgodny z opisem", opis: "Niewłaściwy kolor." }
+  );
+  assert.deepEqual(mapujPowod({ reason: { type: "NONE", userComment: "" } }), {
+    powod: null,
+    opis: null,
+  });
+  assert.equal(mapujPowod({ reason: { type: "KOD_KTOREGO_NIE_ZNAMY" } }).powod, "KOD_KTOREGO_NIE_ZNAMY");
+});
+
+test("wiadomości: strona rozmowy z roli autora, brak roli → login rozmówcy", () => {
+  const w = mapujWiadomosci(
+    {
+      messages: [
+        { id: "m1", author: { login: "klient", role: "BUYER" }, text: "Odsyłam", createdAt: "2026-08-19T10:00:00Z", attachments: [{}] },
+        { id: "m2", author: { login: "wertis", role: "SELLER" }, text: "Przyjęliśmy" },
+      ],
+    },
+    "wertis"
+  );
+  assert.equal(w[0].odKupujacego, true);
+  assert.equal(w[0].zalacznikow, 1);
+  assert.equal(w[1].odKupujacego, false);
+  // pusty wątek nie wywraca mapowania
+  assert.deepEqual(mapujWiadomosci({}, null), []);
+});
+
+test("URL wątków trzyma limit Allegro i nie przyjmuje ujemnego offsetu", () => {
+  assert.equal(urlWatkow("https://api.allegro.pl", 0), "https://api.allegro.pl/messaging/threads?limit=20&offset=0");
+  assert.match(urlWatkow("https://api.allegro.pl", -5), /offset=0$/);
+  assert.equal(
+    urlWiadomosci("https://api.allegro.pl", "a/b"),
+    "https://api.allegro.pl/messaging/threads/a%2Fb/messages"
+  );
 });

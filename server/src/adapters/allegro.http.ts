@@ -5,6 +5,8 @@ import type {
   AllegroAdapter,
   PaczkaZwrotu,
   PozycjaZwrotuAllegro,
+  WatekAllegro,
+  WiadomoscAllegro,
   ZamowienieAllegro,
   ZwrotAllegro,
 } from "./allegro.js";
@@ -29,6 +31,14 @@ import type {
 
 const TIMEOUT_MS = 10_000;
 
+/**
+ * Ile stron listy wątków przeglądamy w poszukiwaniu rozmowy z kupującym
+ * (20 wątków na stronę — to maksimum Allegro). Pięć stron to sto najnowszych
+ * rozmów: wystarcza dla klienta, który właśnie odesłał paczkę, i nie zamienia
+ * jednego kliknięcia w przewijanie całej historii konta.
+ */
+const STRON_WATKOW = 5;
+
 /** URL listy zwrotów filtrowanej jednym z pól paczki. */
 export function urlZwrotow(
   apiUrl: string,
@@ -46,11 +56,44 @@ export function urlZamowienia(apiUrl: string, orderId: string): string {
   return `${apiUrl}/order/checkout-forms/${encodeURIComponent(orderId)}`;
 }
 
+/** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
+export function urlWatkow(apiUrl: string, offset: number): string {
+  return `${apiUrl}/messaging/threads?limit=20&offset=${Math.max(0, Math.trunc(offset))}`;
+}
+
+export function urlWiadomosci(apiUrl: string, threadId: string): string {
+  return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}/messages`;
+}
+
 const tekst = (v: unknown): string | null =>
   typeof v === "string" && v.trim() !== "" ? v : null;
 
 const liczba = (v: unknown, def: number): number =>
   typeof v === "number" && Number.isFinite(v) ? v : def;
+
+/**
+ * Kody powodów zwrotu → zdania po polsku.
+ *
+ * Allegro zwraca `reason.type` jako KOD (`NOT_AS_DESCRIBED`), a biuro czyta
+ * kartę zwrotu w pośpiechu. Słownik pokrywa kody spotkane w praktyce; kod
+ * spoza słownika NIE JEST ukrywany — pokazujemy go surowo i dopisujemy tu
+ * przy pierwszym wystąpieniu. `NONE` znaczy „klient nie podał powodu" i jest
+ * pustką, nie wartością.
+ */
+export const POWODY_ZWROTU: Record<string, string> = {
+  NOT_AS_DESCRIBED: "Niezgodny z opisem",
+  DAMAGED: "Uszkodzony",
+  DEFECTIVE: "Wadliwy",
+  INCOMPLETE: "Niekompletny",
+  WRONG_ITEM: "Nie ten towar",
+  WRONG_SIZE: "Zły rozmiar",
+  BETTER_PRICE: "Lepsza cena gdzie indziej",
+  NO_LONGER_NEEDED: "Już niepotrzebny",
+  CHANGED_MIND: "Rezygnacja z zakupu",
+  ORDERED_BY_MISTAKE: "Zamówiony przez pomyłkę",
+  DID_NOT_ARRIVE_ON_TIME: "Nie dotarł na czas",
+  OTHER: "Inny powód",
+};
 
 /**
  * Powód zwrotu z pozycji — obie znane postacie naraz.
@@ -60,12 +103,20 @@ export function mapujPowod(item: Record<string, unknown>): { powod: string | nul
   const r = item.reason;
   if (r && typeof r === "object") {
     const ro = r as Record<string, unknown>;
+    const kod = tekst(ro.type) ?? tekst(ro.name);
+    /* `NONE` to jawne „bez powodu" — pokazywanie go jako powodu byłoby
+       kłamstwem w drugą stronę niż pusta kolumna. */
+    const powod = kod && kod !== "NONE" ? (POWODY_ZWROTU[kod] ?? kod) : null;
     return {
-      powod: tekst(ro.name) ?? tekst(ro.type) ?? null,
+      powod,
       opis: tekst(ro.userComment) ?? tekst(item.userComment) ?? null,
     };
   }
-  return { powod: tekst(r), opis: tekst(item.userComment) };
+  const kod = tekst(r);
+  return {
+    powod: kod && kod !== "NONE" ? (POWODY_ZWROTU[kod] ?? kod) : null,
+    opis: tekst(item.userComment),
+  };
 }
 
 /** Zwrot kliencki z JSON-a API → typ domenowy. Defensywne na każdym polu. */
@@ -159,6 +210,33 @@ export function rodzinaKoncowki(url: string): string {
 /* Nauczone nagłówki. Cache w pamięci procesu — 406 zdarza się raz, przy
    pierwszym zapytaniu po starcie, a nie przy każdym skanie etykiety. */
 const dzialajacyAccept = new Map<string, string>();
+
+/** Wiadomości wątku → typ domenowy. Defensywne na każdym polu. */
+export function mapujWiadomosci(json: unknown, mojLogin: string | null): WiadomoscAllegro[] {
+  const lista = Array.isArray((json as Record<string, unknown>)?.messages)
+    ? ((json as Record<string, unknown>).messages as unknown[])
+    : [];
+  return lista.map((m) => {
+    const w = (m ?? {}) as Record<string, unknown>;
+    const autor = (w.author ?? {}) as Record<string, unknown>;
+    const login = tekst(autor.login);
+    /* Kto pisał: Allegro podaje rolę autora (`BUYER`/`SELLER`), a gdy jej nie
+       ma — rozstrzyga login rozmówcy. Zła strona rozmowy to gorzej niż brak
+       etykiety, więc przy niepewności zostaje `false` (czyli „my"). */
+    const rola = tekst(autor.role);
+    const odKupujacego = rola
+      ? rola.toUpperCase() === "BUYER"
+      : !!login && !!mojLogin && login !== mojLogin;
+    return {
+      id: tekst(w.id) ?? "",
+      odKupujacego,
+      autor: login,
+      tresc: tekst(w.text) ?? tekst(w.content) ?? "",
+      at: tekst(w.createdAt),
+      zalacznikow: Array.isArray(w.attachments) ? w.attachments.length : 0,
+    };
+  });
+}
 
 export class HttpAllegroAdapter implements AllegroAdapter {
   private async zapytaj(url: string): Promise<unknown | null> {
@@ -255,5 +333,37 @@ export class HttpAllegroAdapter implements AllegroAdapter {
   async zamowienie(orderId: string): Promise<ZamowienieAllegro | null> {
     const json = await this.zapytaj(urlZamowienia(config.allegro.apiUrl, orderId));
     return json === null ? null : mapujZamowienie(json);
+  }
+
+  async watekKupujacego(login: string): Promise<WatekAllegro | null> {
+    /* Allegro nie ma filtru „wątek z tym loginem": trzeba przejść listę.
+       Korespondencja z klientem, który właśnie odesłał paczkę, jest świeża,
+       więc idziemy od najnowszych i po STRON_WATKOW stronach odpuszczamy —
+       zamiast przewijać kilka lat rozmów przy każdym kliknięciu. */
+    for (let strona = 0; strona < STRON_WATKOW; strona++) {
+      const json = (await this.zapytaj(
+        urlWatkow(config.allegro.apiUrl, strona * 20)
+      )) as Record<string, unknown> | null;
+      const watki = Array.isArray(json?.threads) ? (json.threads as unknown[]) : [];
+      if (watki.length === 0) return null;
+
+      for (const t of watki) {
+        const w = (t ?? {}) as Record<string, unknown>;
+        const rozmowca = (w.interlocutor ?? {}) as Record<string, unknown>;
+        const jego = tekst(rozmowca.login);
+        if (!jego || jego.toLowerCase() !== login.trim().toLowerCase()) continue;
+        const threadId = tekst(w.id);
+        if (!threadId) continue;
+        const wiadomosci = await this.zapytaj(
+          urlWiadomosci(config.allegro.apiUrl, threadId)
+        );
+        return {
+          threadId,
+          interlokutor: jego,
+          wiadomosci: mapujWiadomosci(wiadomosci, null),
+        };
+      }
+    }
+    return null;
   }
 }

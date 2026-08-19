@@ -245,3 +245,35 @@ test("zwrot ręczny nie ma zamówienia — sekcja zostaje pusta, nie zmyślona",
   const reczny = Z.utworzReczny("BEZ-ZAMOWIENIA-1", "Test");
   assert.deepEqual(reczny.pozycjeZamowienia, []);
 });
+
+// ── Powód zwrotu i rozmowa z klientem (0.56.5) ─────────────────────────────
+
+test("skan dociąga SZCZEGÓŁ zwrotu — powód i komentarz klienta trafiają na kartę", async () => {
+  /* Lista zwrotów jest streszczeniem bez powodów; bez dociągnięcia szczegółu
+     kolumna POWÓD była pusta przy każdym prawdziwym zwrocie. */
+  kartotekiDev();
+  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
+  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  assert.equal(w.zwrot.pozycje[0].powod, "Niezgodny z opisem");
+  assert.equal(w.zwrot.pozycje[0].powodOpis, "Miała być końcówka 3/8, jest 1/4");
+});
+
+test("wątek wiadomości: jest dla klienta z korespondencją, null dla reszty", async () => {
+  kartotekiDev();
+  const zJanem = await Z.utworzZeSkanu("DEVWB0001", "Test");
+  if (zJanem.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  const w1 = await Z.watekZwrotu(zJanem.zwrot.id);
+  assert.equal(w1.login, "jan_wraca");
+  assert.equal(w1.watek?.wiadomosci.length, 3);
+  assert.equal(w1.watek?.wiadomosci[0].odKupujacego, true);
+
+  const zEwa = await Z.utworzZeSkanu("DEVTW0002", "Test");
+  if (zEwa.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  const w2 = await Z.watekZwrotu(zEwa.zwrot.id);
+  assert.equal(w2.watek, null, "brak rozmowy to poprawna odpowiedź, nie błąd");
+
+  // zwrot ręczny nie ma kupującego — pytanie o wątek nie ma kogo dotyczyć
+  const reczny = Z.utworzReczny("BEZ-KLIENTA-1", "Test");
+  const w3 = await Z.watekZwrotu(reczny.id);
+  assert.deepEqual(w3, { login: null, watek: null });
+});

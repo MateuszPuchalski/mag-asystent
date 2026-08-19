@@ -881,8 +881,10 @@ z Allegro (scenariusze S67–S69).
 
 1. **Rejestracja aplikacji** na <https://developer.allegro.pl> (konto
    sprzedawcy firmy): *Moje aplikacje → Nowa aplikacja*, typ **„urządzenie”**
-   (device flow — bez adresu przekierowania). Uprawnienie tylko
-   `allegro:api:orders:read`. Po rejestracji kliknij **„Wygeneruj nagłówek
+   (device flow — bez adresu przekierowania). Uprawnienia:
+   `allegro:api:orders:read` (wymagane) oraz `allegro:api:messaging`, jeśli
+   karta zwrotu ma pokazywać rozmowę z klientem. Bez tego drugiego wszystko
+   działa, a przycisk „POKAŻ ROZMOWĘ" mówi, czego brakuje. Po rejestracji kliknij **„Wygeneruj nagłówek
    User-Agent”** — Allegro wymaga tego nagłówka w każdym żądaniu, a jego
    brak grozi zablokowaniem klucza. Zapisz wszystko do `wertis.env`:
 

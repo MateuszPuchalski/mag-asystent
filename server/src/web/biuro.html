@@ -97,6 +97,14 @@
   }
   .wyjatek { margin-top: 5px; font-size: 12px; }
   .wyjatek img { max-width: 120px; border-radius: 6px; margin-top: 4px; display: block; }
+
+  /* Rozmowa z klientem: strona nadawcy niesie tu całe znaczenie, więc
+     odróżnia ją wcięcie i tło, nie sama etykieta z imieniem. */
+  .wiad { border-radius: 9px; padding: 8px 11px; margin: 6px 0; max-width: 78%; }
+  .wiad.klient { background: var(--amber-bg); border: 1px solid var(--amber); }
+  .wiad.my { background: #f1f1ef; border: 1px solid var(--border); margin-left: auto; }
+  .wiad .kto { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); margin-bottom: 3px; }
+  .wiad .tresc { white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -191,6 +199,7 @@
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
       <table id="zwrotPozycje" style="margin-top:10px"></table>
       <div id="zwrotZamowienie" style="margin-top:14px"></div>
+      <div id="zwrotWiadomosci" style="margin-top:14px"></div>
       <div id="zwrotDodajPozycje" style="margin-top:10px" hidden>
         <h2>DOPISZ POZYCJĘ (ZWROT RĘCZNY)</h2>
         <div class="filtry">
@@ -1822,6 +1831,9 @@ async function odswiez() {
 let otwartyZwrot = null;
 let stanAllegro = null;
 let parowanieTrwa = false;
+/* Dla którego zwrotu wątek jest już na ekranie — bez tego odświeżenie karty
+   co 30 s kasowałoby otwartą rozmowę i kazało klikać od nowa. */
+let zwrotIdWatku = null;
 
 const DECYZJE_ZWROTU = [
   ["pelnowartosciowy", "PEŁNOWARTOŚCIOWY", "ok"],
@@ -1919,6 +1931,7 @@ function otworzZwrot(id) {
 
 function zamknijZwrot() {
   otwartyZwrot = null;
+  zwrotIdWatku = null;
   $("zwrotSzczegol").hidden = true;
   $("zwrotSkanKarta").hidden = false;
   $("zwrotListaKarta").hidden = false;
@@ -1999,6 +2012,15 @@ function rysujSzczegolZwrotu(z) {
     $("zwrotZamowienie").innerHTML = "";
   }
 
+  /* Rozmowa z klientem NIE jedzie z kartą — dociąga ją klik. Karta odświeża
+     się co 30 s, a wątek to dwa dodatkowe zapytania do Allegro. */
+  if (!z.kupujacyLogin) {
+    $("zwrotWiadomosci").innerHTML = "";
+  } else if (zwrotIdWatku !== z.id) {
+    $("zwrotWiadomosci").innerHTML = `<h2>WIADOMOŚCI OD KLIENTA</h2>
+      <button class="akcja cichy" data-wiadomosci>POKAŻ ROZMOWĘ Z ${esc(z.kupujacyLogin)}</button>`;
+  }
+
   if (z.dokument) {
     $("zwrotDokument").innerHTML = `<h2>DOKUMENT SPRZEDAŻY</h2>
       <p><span class="b">${esc(z.dokument.numer || z.dokument.dokId)}</span>
@@ -2035,6 +2057,36 @@ function rysujSzczegolZwrotu(z) {
       <a href="${esc(z.linkPanel)}" target="_blank" rel="noopener">OTWÓRZ PANEL ZWROTÓW →</a>
     </p>
     ${srodki}`;
+}
+
+async function pokazWiadomosci(id) {
+  const cel = $("zwrotWiadomosci");
+  cel.innerHTML = '<h2>WIADOMOŚCI OD KLIENTA</h2><p class="mute">Pytam Allegro…</p>';
+  try {
+    const d = await (await api(`/api/biuro/zwroty/${id}/wiadomosci`)).json();
+    zwrotIdWatku = id;
+    const w = d.watek;
+    if (!w || !w.wiadomosci.length) {
+      cel.innerHTML = `<h2>WIADOMOŚCI OD KLIENTA</h2>
+        <p class="mute">Brak korespondencji z ${esc(d.login || "kupującym")} w ostatnich rozmowach.
+        <a href="https://allegro.pl/moje-allegro/wiadomosci" target="_blank" rel="noopener">OTWÓRZ CENTRUM WIADOMOŚCI →</a></p>`;
+      return;
+    }
+    cel.innerHTML = `<h2>WIADOMOŚCI OD KLIENTA (${w.wiadomosci.length})</h2>
+      <p class="mute" style="margin-bottom:6px">Rozmowa z ${esc(w.interlokutor || d.login || "")} — czytana na żywo z Allegro.
+        <a href="https://allegro.pl/moje-allegro/wiadomosci" target="_blank" rel="noopener">ODPOWIEDZ W ALLEGRO →</a></p>
+      <div style="display:flex;flex-direction:column">${
+        w.wiadomosci.map((m) => `<div class="wiad ${m.odKupujacego ? "klient" : "my"}">
+            <div class="kto">${m.odKupujacego ? esc(m.autor || "KLIENT") : "MY"}${
+              m.at ? " · " + esc(m.at.slice(0, 16).replace("T", " ")) : ""
+            }${m.zalacznikow ? ` · ${m.zalacznikow} zał.` : ""}</div>
+            <div class="tresc">${esc(m.tresc)}</div>
+          </div>`).join("")
+      }</div>`;
+  } catch (e) {
+    cel.innerHTML = `<h2>WIADOMOŚCI OD KLIENTA</h2>
+      <p><span class="badge err">${esc(e.message)}</span></p>`;
+  }
 }
 
 async function akcjaZwrotu(fn) {
@@ -2253,6 +2305,9 @@ $("zwrotPozycje").addEventListener("click", (e) => {
   akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/pozycje/${b.dataset.poz}/decyzja`, {
     method: "POST", body: JSON.stringify({ decyzja: b.dataset.dec, notatka }),
   }));
+});
+$("zwrotWiadomosci").addEventListener("click", (e) => {
+  if (e.target.closest("[data-wiadomosci]")) pokazWiadomosci(otwartyZwrot);
 });
 $("zwrotDokument").addEventListener("click", (e) => {
   const w = e.target.closest("[data-wybierz]");
