@@ -232,9 +232,13 @@ Linia z wyjątkiem nie trzyma dostawy otwartej. Postęp liczy ją jako domknięt
 `FZ 9003` od HUSQVARNA jest rozłożona w całości i zamknięta. Ma wypełniony numer
 przesyłki oraz odpowiedź `nie` o protokole kuriera.
 
-Po otwarciu tej dostawy w kolektorze **nie ma przycisku „ZAKOŃCZ DOSTAWĘ"**.
-Na jego miejscu stoi napis `DOSTAWA ZAKOŃCZONA` i przycisk `WRÓĆ DO LISTY
-DOSTAW`. Przycisk ma wracać na listę dokumentów.
+Po otwarciu tej dostawy w kolektorze **nie ma przycisku „ZAKOŃCZ DOSTAWĘ"**
+w stopce pod listą. Zamiast tego **u góry ekranu** stoi napis `DOSTAWA
+ZAKOŃCZONA` i przycisk `WRÓĆ DO LISTY DOSTAW`.
+
+Ten przycisk ma wracać na listę dokumentów i ma być widoczny **bez
+przewijania**. Stan końcowy stoi u góry właśnie dlatego: to jedyne wyjście
+z zamkniętej dostawy.
 
 To jest bramka na usterkę z 0.54.0. Dostawa domyka się sama po ostatniej
 pozycji, więc przycisk zakończenia trafiał na dokument już zamknięty. Serwer
