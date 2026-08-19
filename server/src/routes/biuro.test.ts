@@ -136,7 +136,9 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      nadal obowiązuje. W 0.50.0 lista urosła o import zbiórek i reguły strefy
      złotej, w 0.53.0 — o zwroty Allegro (skan, wybór kandydata, decyzje,
      pozycja ręczna, stempel środków, parowanie konta, dopasowanie dokumentu),
-     w 0.56.0 — o logo dostawcy (wgranie i skasowanie).
+     w 0.56.0 — o logo dostawcy (wgranie i skasowanie), w 0.57.0 — o zamknięcie
+     wyjątku przez biuro (trasa istniała od dawna, ale jej jedynym klientem był
+     kolektor: reklamację prowadziło biuro, a domykał ją magazynier na hali).
      Wszystkie te zapisy dotyczą danych, których NIE MA w Subiekcie, stoją za
      rolą biuro|admin i żaden nie rusza dostaw, stanów ani sfera_queue.
 
@@ -152,10 +154,10 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    11,
-    "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek " +
-      "i sześć zapisów zwrotów Allegro (skan, utworzenie, decyzja, pozycja " +
-      "ręczna, środki, parowanie) — nic ponadto"
+    12,
+    "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
+      "zamknięcie wyjątku i sześć zapisów zwrotów Allegro (skan, utworzenie, " +
+      "decyzja, pozycja ręczna, środki, parowanie) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
@@ -180,6 +182,19 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      wyłącznie PNG, a loga przychodzą też jako SVG i WebP. Bez `<canvas>`
      panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową. */
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
+  assert.match(html, /problems\/\$\{id\}\/resolve/, "biuro zamyka wyjątek");
+});
+
+test("lista dostaw sygnalizuje wyjątki", () => {
+  /* Pasek postępu tego NIE powie i powiedzieć nie może: wyjątek liczy się jako
+     pozycja domknięta (D8). Bez osobnego sygnału dostawa z trzema reklamacjami
+     wygląda w biurze dokładnie jak bezproblemowa — zielony pasek 100%. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /d\.wyjatkiOtwarte/, "wiersz listy czyta licznik wyjątków");
+  assert.match(html, /badge err">\$\{d\.wyjatkiOtwarte\}/, "licznik jako plakietka błędu");
 });
 
 test("żądania BEZ CIAŁA nie deklarują typu treści", () => {

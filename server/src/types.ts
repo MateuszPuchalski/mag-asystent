@@ -122,6 +122,14 @@ export interface DeliveryDocument {
   /** Identyfikator kontrahenta z Subiekta; `null`, gdy dokument nie ma płatnika. */
   khId: number | null;
   /**
+   * Ile NIEROZWIĄZANYCH wyjątków wisi na tym dokumencie (0.57.0).
+   *
+   * Pasek postępu tego nie powie i powiedzieć nie może: wyjątek liczy się jako
+   * pozycja domknięta (D8). Bez tej liczby dostawa z trzema reklamacjami
+   * wygląda w biurze dokładnie jak bezproblemowa.
+   */
+  wyjatkiOtwarte: number;
+  /**
    * Czy ten dostawca ma wgrane logo (0.56.0).
    *
    * Flaga, a nie „spróbuj i zobacz": lista dwudziestu dokumentów pytałaby

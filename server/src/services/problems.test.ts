@@ -160,6 +160,30 @@ test("każda kategoria pozycji odpada bez wskazanej pozycji", () => {
   }
 });
 
+test("licznik wyjątków liczy ZGŁOSZENIA, nie linie, i tylko nierozwiązane", () => {
+  /* Panel biura był na wyjątki ślepy: wyjątek liczy się jako pozycja domknięta
+     (D8), więc dostawa z reklamacjami pokazywała zielony pasek 100%. */
+  const a = zglos({ typ: "qty_mismatch", lineId, qty: 1 });
+  const b = zglos({ typ: "missing_item", lineId, qty: 2 });
+  assert.ok(!("error" in a) && !("error" in b));
+
+  const dokId = (
+    db().prepare("SELECT sgt_dok_id AS d FROM delivery WHERE id = ?").get(deliveryId) as { d: number }
+  ).d;
+  assert.equal(
+    P.wyjatkiOtwarteWgDokumentu([dokId]).get(dokId),
+    2,
+    "dwa zgłoszenia na jednej pozycji to dwie sprawy, nie jedna"
+  );
+
+  P.resolveProblem((a as { id: number }).id, "załatwione", "Ewa z biura");
+  assert.equal(P.wyjatkiOtwarteWgDokumentu([dokId]).get(dokId), 1, "rozwiązany wypada z licznika");
+
+  // dokument bez wyjątków nie pojawia się w mapie wcale
+  assert.equal(P.wyjatkiOtwarteWgDokumentu([dokId + 999]).size, 0);
+  assert.equal(P.wyjatkiOtwarteWgDokumentu([]).size, 0);
+});
+
 test("artykuł niezamówiony odpada, gdy ktoś przypnie go do pozycji", () => {
   const r = zglos({ typ: "extra_item", lineId, qty: 1, symObcy: "K-1099" });
   assert.ok("error" in r, "kategoria dostawy przeszła na pozycji");

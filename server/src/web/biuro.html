@@ -639,7 +639,15 @@ function rysujDostawy() {
         <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
         <td>${esc(d.dostawca)}</td>
         <td class="mute">${esc(d.dataWyst)}</td>
-        <td>${statusDostawy(d)}</td>
+        <td>${statusDostawy(d)}${
+          /* Licznik wyjątków STOI OBOK statusu, a pasek postępu zostaje bez
+             zmian. Wyjątek liczy się jako pozycja domknięta (D8) i tak ma
+             zostać — zmieniamy sygnał, nie arytmetykę. Bez tej plakietki
+             dostawa z trzema reklamacjami wyglądała jak bezproblemowa. */
+          d.wyjatkiOtwarte
+            ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
+            : ""
+        }</td>
         <td><div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
             <span class="mute">${d.linesDone}/${total} poz.</span></td>
         <td style="white-space:nowrap"><button class="akcja cichy" data-dok="${d.dokId}">POZYCJE</button></td>
@@ -791,12 +799,18 @@ function statusPozycji(s) {
 const formatIlosc = (n) => String(Math.round(Number(n) * 1000) / 1000);
 
 function wyjatek(p) {
+  /* „OTWARTY" pisany WPROST. Wcześniej brak plakietki „rozwiązany" trzeba było
+     zinterpretować jako otwarty — a brak czegoś nie jest komunikatem. */
   return `<div class="wyjatek">
     <span class="badge err">${esc(p.typLabel || p.typ)}</span>
-    ${p.qty != null ? `policzone: ${esc(formatIlosc(p.qty))}` : ""}
+    ${p.symObcy ? `<b>${esc(p.symObcy)}</b>` : ""}
+    ${p.qty != null ? `policzone: ${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""}` : ""}
+    ${p.zamiastIlosc != null ? `· zamiast ${esc(formatIlosc(p.zamiastIlosc))}` : ""}
     ${p.opis ? esc(p.opis) : ""}
     <span class="mute">${esc(p.createdBy || "")} ${esc(stempelLokalny(p.createdAt))}</span>
-    ${p.resolvedAt ? '<span class="badge ok">rozwiązany</span>' : ""}
+    ${p.resolvedAt
+      ? `<span class="badge ok">rozwiązany</span>${p.resolvedNote ? ` <span class="mute">${esc(p.resolvedNote)}</span>` : ""}`
+      : `<span class="badge err">OTWARTY</span> <button class="akcja cichy" data-rozwiaz="${p.id}">ROZWIĄŻ</button>`}
     ${p.hasPhoto ? `<span data-foto="${p.id}"></span>` : ""}
   </div>`;
 }
@@ -898,6 +912,28 @@ async function przywrocDostawe(dokId) {
   } catch (e) { alert(e.message); return false; }
 }
 
+/**
+ * Zamknięcie wyjątku przez BIURO (0.57.0).
+ *
+ * Trasa istniała od dawna i działała — ale jej jedynym klientem był kolektor,
+ * więc reklamację prowadziło biuro, a domykał ją magazynier na hali. Notatka
+ * jest opcjonalna i idzie do `resolvedNote`, czyli tam, skąd czyta ją protokół.
+ *
+ * `prompt`, jak przy zamykaniu poza WERTIS — ta strona nie ma builda ani
+ * własnych okien dialogowych i nie zamierza ich dostać.
+ */
+async function rozwiazWyjatek(id) {
+  const note = prompt("Jak to załatwiono? (opcjonalnie — wpis trafia do protokołu)");
+  if (note === null) return false;
+  try {
+    await api(`/api/problems/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ note: note.trim() }),
+    });
+    return true;
+  } catch (e) { alert(e.message); return false; }
+}
+
 function rysujReklamacje(problemy) {
   const wgDok = new Map();
   for (const p of problemy) {
@@ -907,16 +943,22 @@ function rysujReklamacje(problemy) {
   }
   const rows = [...wgDok.entries()].map(([dok, lista]) => {
     const dId = lista.find((p) => p.deliveryId != null)?.deliveryId;
+    /* Komplet danych, nie skrót. Serwer wysyła `qtyDok`, `opis`, `createdAt`
+       i `symObcy` od dawna — panel je wyrzucał, więc biuro dzwoniło na halę
+       po rzeczy, które miało na ekranie. */
     const wiersze = lista.map((p) => `
-      <div>· <b>${esc(p.typLabel || p.typ)}</b> — ${esc(p.sym || "")} ${esc(p.name || "")}
-        ${p.qty != null ? `(policzone: ${p.qty})` : ""}
+      <div class="wyjatek">· <b>${esc(p.typLabel || p.typ)}</b> — ${esc(p.sym || p.symObcy || "")} ${esc(p.name || "")}
+        ${p.qty != null ? `<b>policzone ${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""} ${esc(p.unit || "")}</b>` : ""}
         ${p.hasPhoto ? "📷" : ""}
-        <span class="mute">${esc(p.createdBy || "")}</span></div>`).join("");
+        ${p.opis ? `<div class="mute">${esc(p.opis)}</div>` : ""}
+        <span class="mute">${esc(p.createdBy || "")} · ${esc(stempelLokalny(p.createdAt))}</span>
+        <button class="akcja cichy" data-rozwiaz="${p.id}">ROZWIĄŻ</button></div>`).join("");
     const akcje = dId != null
       ? `<button class="akcja" data-formularz="${dId}" data-nr="${esc(dok)}">FORMULARZ</button>
          <button class="akcja cichy" data-csv="${dId}" data-nr="${esc(dok)}">CSV</button>`
       : "";
-    return `<tr><td class="b">${esc(dok)}</td><td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
+    return `<tr><td class="b">${esc(dok)}<div class="mute">${lista.length} ${lista.length === 1 ? "wyjątek" : "wyjątki"}</div></td>
+      <td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
   }).join("");
   $("reklamacje").innerHTML =
     "<tr><th>DOKUMENT</th><th>WYJĄTKI</th><th></th></tr>" +
@@ -2260,6 +2302,12 @@ $("reklamacje").addEventListener("click", (e) => {
   const c = e.target.closest("[data-csv]");
   if (c) return pobierz(`/api/delivery/${c.dataset.csv}/problems.csv`,
     `reklamacja-${c.dataset.nr.replace(/[^\w-]+/g, "_")}.csv`);
+  const r = e.target.closest("[data-rozwiaz]");
+  if (r) {
+    return rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
+      if (ok) odswiezDostawy();
+    });
+  }
 });
 $("dostawy").addEventListener("click", (e) => {
   const w = e.target.closest("[data-dok]");
@@ -2284,6 +2332,21 @@ $("szczegolNaglowek").addEventListener("click", (e) => {
   const o = e.target.closest("[data-przywroc]");
   if (o) przywrocDostawe(Number(o.dataset.przywroc)).then((ok) => { if (ok) zamknijDokument(); });
 });
+/* Zamykanie wyjątku działa w OBU miejscach, w których wyjątek widać:
+   w wierszu pozycji i w sekcji „poza pozycjami dokumentu". Delegacja na
+   kontenerze, bo wiersze przerysowują się po każdym odświeżeniu. */
+for (const kontener of ["szczegolLinie", "szczegolBezLinii"]) {
+  $(kontener).addEventListener("click", (e) => {
+    const r = e.target.closest("[data-rozwiaz]");
+    if (r) {
+      rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
+        // `ostatniSzczegol` wyzerowane, bo inaczej odświeżenie uzna, że nic
+        // się nie zmieniło, i nie przerysuje tabeli
+        if (ok) { ostatniSzczegol = ""; odswiezSzczegol(); }
+      });
+    }
+  });
+}
 $("wrocDoListy").addEventListener("click", zamknijDokument);
 // panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
 document.addEventListener("keydown", (e) => {

@@ -70,6 +70,35 @@ export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
  */
 const ZAKRES_DOSTAWA: ReadonlySet<string> = new Set<string>(["extra_item"]);
 
+/**
+ * Ile NIEROZWIĄZANYCH wyjątków ma każdy z podanych dokumentów (0.57.0).
+ *
+ * Jedno zapytanie na całą listę dostaw, nie jedno na wiersz. Powstało, bo
+ * panel biura był na wyjątki ŚLEPY: wyjątek liczy się jako pozycja domknięta
+ * (D8, świadomie), więc dostawa z trzema reklamacjami pokazywała zielony pasek
+ * 100% i wyglądała jak bezproblemowa.
+ *
+ * Liczymy wyjątki, nie linie: dwa zgłoszenia na jednej pozycji to dwie sprawy
+ * do załatwienia, a nie jedna.
+ */
+export function wyjatkiOtwarteWgDokumentu(
+  dokIds: ReadonlyArray<number>
+): Map<number, number> {
+  const czyste = [...new Set(dokIds.filter((d) => Number.isFinite(d) && d > 0))];
+  if (czyste.length === 0) return new Map();
+  const luki = czyste.map(() => "?").join(",");
+  const wiersze = db()
+    .prepare(
+      `SELECT d.sgt_dok_id AS dokId, COUNT(*) AS ile
+         FROM problem p
+         JOIN delivery d ON d.id = p.delivery_id
+        WHERE p.resolved_at IS NULL AND d.sgt_dok_id IN (${luki})
+        GROUP BY d.sgt_dok_id`
+    )
+    .all(...czyste) as Array<{ dokId: number; ile: number }>;
+  return new Map(wiersze.map((w) => [w.dokId, w.ile]));
+}
+
 /** Etykieta typu; nieznany klucz pokazujemy surowo, zamiast udawać, że go znamy. */
 export const etykietaTypu = (typ: string): string =>
   PROBLEM_TYPES_LABELS[typ as ProblemType] ?? typ;
