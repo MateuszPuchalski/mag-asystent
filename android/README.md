@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **200 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **205 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (11 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -205,6 +205,25 @@ przed którą ta pozycja broni.
       kontekstu pracy,
 - [ ] miniatura towaru stoi po LEWEJ, przy symbolu, także po rozwinięciu
       wiersza; po prawej nie ma już drugiego zdjęcia.
+
+**Wybrana pozycja — układ po przebudowie** (0.57.0)
+
+- [ ] rozwinięta pozycja ma nagłówek z kafelkiem zdjęcia, symbolem i ✕,
+- [ ] ✕ zwija pozycję; powtórny tap w pasek robi to samo,
+- [ ] pod nagłówkiem są DWA kafle: biały ze stepperem, ciemny z adresem,
+- [ ] adres w ciemnym kaflu czyta się z odległości ramienia,
+- [ ] „lub wpisz…" w ciemnym kaflu otwiera pole ręcznego wpisu,
+- [ ] przy wyłączonym wpisie ręcznym zostaje samo „skanuj regał",
+- [ ] `−` i `+` są trafialne w rękawicy i szarzeją na krańcach zakresu,
+- [ ] nie ma już przycisków „INNA ILOŚĆ" ani „ANULUJ",
+- [ ] „POPRAW ILOŚĆ (N)" jest tam, gdzie było — pod „PROBLEMEM".
+
+**Kategorie problemu zależne od zakresu** (0.57.0)
+
+- [ ] „PROBLEM" na pozycji pokazuje CZTERY kategorie, „Zła ilość" pierwsza,
+- [ ] „ZGŁOŚ PROBLEM DOSTAWY" pokazuje JEDNĄ, od razu wybraną,
+- [ ] nie da się zgłosić „Artykułu niezamówionego" na konkretnej pozycji,
+- [ ] nie da się zgłosić „Złej ilości" bez wskazania pozycji.
 
 **Logo dostawcy na liście dostaw** (0.56.0)
 

@@ -36,18 +36,27 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
    Zero dialogu potwierdzającego, zero tapnięć i **zero podmieniania ekranu**.
    Lista zostaje widoczna, bo to na niej widać, ile jeszcze zostało w kartonie.
    Wcześniej wchodziła tu pełnoekranowa karta, która listę gasiła.
+
+   Rozwinięty wiersz ma od 0.57.0 nagłówek z ✕ i **dwa kafle**: biały ze
+   stepperem ilości i stanem na hali, ciemny z adresem i podpowiedzią skanu.
+   Po lewej to, co magazynier ustawia; po prawej to, dokąd towar idzie.
 4. **Zapis** — wyłącznie zadanie `set_location` do `sfera_queue`. Żadnego MM,
    żadnego `waiting_for_doc`.
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
    czego rozkładać. Nie zamknie się jednak, dopóki wisi nieodpowiedziana
    notatka biura — bramka stoi w tej funkcji, a nie tylko przy przycisku.
-6. **Zakończenie z ręki** (`zakonczDostawe`) — przycisk ZAKOŃCZ DOSTAWĘ
+6. **Wyjątek** (`raiseProblem`) — kategoria zna swój ZAKRES (0.57.0). Cztery
+   dotyczą pozycji: zła ilość, brak w przesyłce, uszkodzone, błędny artykuł.
+   Jedna dotyczy dostawy: artykuł niezamówiony, czyli towar spoza dokumentu.
+   Walidacja działa w obie strony, więc kategoria dostawy nie przypnie się do
+   pozycji ani odwrotnie.
+7. **Zakończenie z ręki** (`zakonczDostawe`) — przycisk ZAKOŃCZ DOSTAWĘ
    pokazuje najpierw, co powstanie. Braki ilościowe pojadą do dostawcy jako
    wyjątek „zła ilość", a pozycje nietknięte zostaną pominięte. Przycisk jest
    dla dostawy OTWARTEJ; po domknięciu z punktu 5 kolektor pokazuje w jego
    miejscu wyjście na listę. Odmowa „już zamknięta" niesie kod `juz_zamknieta`
    i też prowadzi na listę — cel jest wtedy osiągnięty (0.54.0).
-7. **Korekta ilości** (`korygujIlosc`) — poprawka pomyłki w liczeniu, dopóki
+8. **Korekta ilości** (`korygujIlosc`) — poprawka pomyłki w liczeniu, dopóki
    faktura jest otwarta. Ustawia liczbę bezwzględną, nie różnicę, i nie tworzy
    ani zadania w kolejce, ani wyjątku.
 

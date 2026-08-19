@@ -8,7 +8,7 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
-import { raiseProblem } from "./problems.js";
+import { raiseProblem, wyjatkiOtwarteWgDokumentu } from "./problems.js";
 import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js";
 import { aliasKodu } from "./ean-alias.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
@@ -90,6 +90,7 @@ export function listDocuments(days = 14): DeliveryDocument[] {
   /* Jedno zapytanie na CAŁĄ listę, nie jedno na wiersz — kolektor dostaje
      gotową odpowiedź „czy pytać o logo" i nie strzela w serwer serią 404. */
   const zLogo = ktorzyMajaLogo(docs.map((d) => d.kh_id ?? 0));
+  const wyjatki = wyjatkiOtwarteWgDokumentu(docs.map((d) => d.dok_id));
 
   return docs.map((d) => {
     const p = byDoc.get(d.dok_id);
@@ -102,6 +103,7 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       dostawca: d.dostawca ?? "",
       khId: d.kh_id ?? null,
       maLogo: d.kh_id != null && zLogo.has(d.kh_id),
+      wyjatkiOtwarte: wyjatki.get(d.dok_id) ?? 0,
       positions,
       /** dokument w buforze jest normalnie dostępny do pracy (D1) */
       wBuforze: !!d.w_buforze,

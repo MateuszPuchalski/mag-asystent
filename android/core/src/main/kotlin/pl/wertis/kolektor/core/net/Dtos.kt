@@ -490,6 +490,8 @@ data class DeliveryDocument(
      * inaczej o dwadzieścia obrazów, z których większość nie istnieje.
      */
     val maLogo: Boolean = false,
+    /** Nierozwiązane wyjątki na tym dokumencie — pasek postępu ich nie pokaże (D8). */
+    val wyjatkiOtwarte: Int = 0,
     val positions: Int = 0,
     /** Dokument w buforze SGT — nadal można na nim pracować. */
     val wBuforze: Boolean = false,
