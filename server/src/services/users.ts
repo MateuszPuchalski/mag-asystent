@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { db, nowIso } from "../db/db.js";
+import { config } from "../config.js";
 
 /* ── Konta pracowników (plan §7) ────────────────────────────────────────────
    Dotąd tożsamością był dowolny łańcuch wpisany na kolektorze i wysłany
@@ -190,6 +191,39 @@ export function brakKont(): boolean {
       .prepare("SELECT COUNT(*) n FROM app_user WHERE login IS NOT NULL AND active = 1")
       .get() as { n: number }
   ).n === 0;
+}
+
+/**
+ * Konto demo `admin`/`admin` — wyłącznie tryb seeded, wyłącznie pusta baza.
+ *
+ * ŚWIADOME ODWRÓCENIE decyzji z `db/seed.ts` („stałego hasła demo świadomie
+ * nie ma") — decyzją właściciela (0.53.2), tym samym trybem co odwrócenie
+ * przy raporcie wydajności w 0.48.0. Uzasadnienie tamtej zasady brzmiało
+ * „wyjątek tylko-na-dev jedzie potem na produkcję"; tutaj ogrodzeniem jest
+ * TRYB, nie dyscyplina: `SGT_MODE=seeded` nie ma prawa działać na produkcji
+ * (odmawia go instalator, seed scenariuszy i SFERA_WORKER), więc konto nie
+ * ma którędy pojechać. Przy `mssql` ta funkcja nie robi nic.
+ *
+ * Hasło „admin" łamie HASLO_MIN — celowo i tylko tu: `createUser` długości
+ * nie waliduje (walidacja siedzi w trasach), więc polityka 8 znaków dla kont
+ * zakładanych ręcznie zostaje nietknięta.
+ *
+ * Woła to WYŁĄCZNIE `main()` API — nie `buildApp()` (testy tras budują
+ * aplikację i sprawdzają bootstrap „pierwsze konto bez sesji", które by tu
+ * znikło) i nie `migrate()` (zakładanie kont nie jest migracją schematu,
+ * a migracje uruchamia też worker i produkcja).
+ *
+ * `brakKont()` jako bramka znaczy też: instalacja demo, w której ktoś już
+ * założył własne konta, nie dostaje z powrotem admina — ziarno wchodzi raz,
+ * do pustej bazy, jak `ziarnoStrefyZlotej`.
+ */
+export function ziarnoKontaDemo(): void {
+  if (config.sgtMode !== "seeded" || !brakKont()) return;
+  createUser("Administrator (demo)", "admin", "admin", "admin");
+  console.log(
+    "[seed] KONTO DEMO: login=admin hasło=admin — istnieje tylko dlatego, " +
+      "że SGT_MODE=seeded. Kolektor i /biuro logują się nim od razu."
+  );
 }
 
 /* ── Migracja historii ──────────────────────────────────────────────────────

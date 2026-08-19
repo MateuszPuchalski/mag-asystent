@@ -16,6 +16,7 @@ import { authRoutes } from "./routes/auth.js";
 import { audytRoutes } from "./routes/audyt.js";
 import { analizaRoutes } from "./routes/analiza.js";
 import { statystykiAudytu } from "./services/audyt.js";
+import { ziarnoKontaDemo } from "./services/users.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
@@ -175,6 +176,10 @@ export async function buildApp() {
 
 async function main() {
   db(); // migracja schematu przy starcie
+  /* Konto demo admin/admin — tylko seeded, tylko pusta baza. Tu, nie
+     w buildApp(): testy tras sprawdzają bootstrap „pierwsze konto bez
+     sesji", który by przy gotowym koncie zniknął. */
+  ziarnoKontaDemo();
   zamelduj("api");
 
   // SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy

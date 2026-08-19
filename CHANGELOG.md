@@ -33,6 +33,25 @@ historii nie przepisujemy.
 
 ---
 
+## 0.53.2 — 18 sierpnia 2026
+
+**Tryb demo loguje się od razu: konto `admin`/`admin` powstaje samo.** Start
+API przy `SGT_MODE=seeded` na bazie bez żadnego konta z loginem zakłada konto
+demo (rola `admin`) i mówi o tym w logu. Dotąd świeże demo witało ekranem
+logowania, do którego nie istniały żadne dane — konto zakładał dopiero
+`npm run seed` (hasło z `ADMIN_HASLO` albo wylosowane i wypisane raz), a kto
+przegapił tę jedną linię konsoli, zostawał przed zamkniętą bramką.
+
+To ŚWIADOME ODWRÓCENIE decyzji „żadnych stałych haseł demo" — decyzją
+właściciela, tym samym trybem co odwrócenie przy raporcie wydajności
+w 0.48.0. Tamta zasada broniła przed wyjątkiem „tylko na dev", który jedzie
+potem na produkcję; tutaj ogrodzeniem jest TRYB, nie dyscyplina: `seeded`
+nie ma prawa działać na produkcji, a przy `mssql` ziarno nie robi nic.
+Nie wraca też w demo z własnymi kontami — wchodzi wyłącznie do pustej bazy.
+Polityka minimum 8 znaków dla kont zakładanych ręcznie zostaje bez zmian.
+
+Zwykły PATCH: produkcyjne wdrożenie tej zmiany nie widzi wcale.
+
 ## 0.53.1 — 18 sierpnia 2026
 
 **Aktualizacja 0.53.0 kładła API na starcie — import sprzedaży nie udźwignął

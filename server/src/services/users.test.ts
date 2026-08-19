@@ -133,3 +133,35 @@ test("zdarzenie bez nazwy zostaje NIEPRZYPISANE, nie zgadywane", () => {
   assert.equal(w.zalozonychKont, 1);
   assert.equal(w.nieprzypisanych, 1, "puste zostaje z user_ref = NULL");
 });
+
+/* ── Konto demo admin/admin (0.53.2) ─────────────────────────────────────── */
+
+test("seeded + pusta baza: powstaje admin/admin i da się nim zalogować", async () => {
+  const { config } = await import("../config.js");
+  assert.equal(config.sgtMode, "seeded", "test zakłada domyślny tryb demo");
+  U.ziarnoKontaDemo();
+  const konto = U.userByLogin("admin");
+  assert.ok(konto, "konto demo miało powstać");
+  assert.equal(konto!.role, "admin");
+  // pełna ścieżka logowania — hasło krótsze niż HASLO_MIN jest tu ŚWIADOME
+  const { zaloguj } = await import("./auth.js");
+  assert.ok(zaloguj("admin", "admin", null), "login admin/admin ma działać");
+});
+
+test("istniejące konto z loginem zamyka ziarno — niczego nie dokłada i nie rusza", () => {
+  U.createUser("Własne Konto", "magazynier", "wlasne", "tajnehaslo");
+  U.ziarnoKontaDemo();
+  assert.equal(U.userByLogin("admin"), null, "admin nie ma prawa powstać obok kont użytkownika");
+});
+
+test("w trybie mssql ziarno nie robi nic — stałe hasło nie jedzie na produkcję", async () => {
+  const { config } = await import("../config.js");
+  const tryb = config.sgtMode;
+  try {
+    (config as { sgtMode: string }).sgtMode = "mssql";
+    U.ziarnoKontaDemo();
+    assert.equal(U.userByLogin("admin"), null);
+  } finally {
+    (config as { sgtMode: string }).sgtMode = tryb;
+  }
+});

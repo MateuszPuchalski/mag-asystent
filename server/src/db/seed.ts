@@ -43,9 +43,15 @@ const MAG_ARCHIWUM = 93;
 
    U klienta to samo konto zakłada instalator, pytając instalującego o hasło.
    Tutaj hasło bierze się z `ADMIN_HASLO`, a bez tej zmiennej jest LOSOWANE
-   i wypisywane raz. Stałego hasła demo świadomie nie ma: `DEPLOY.md` mówi
+   i wypisywane raz. Stałego hasła demo świadomie nie było: `DEPLOY.md` mówi
    „żadnych domyślnych haseł", a wyjątek „tylko na dev" jest dokładnie tym
    wyjątkiem, który jedzie potem na produkcję.
+
+   OD 0.53.2 tryb seeded MA jednak konto demo admin/admin — zakłada je start
+   API na pustej bazie (`ziarnoKontaDemo`, services/users.ts), decyzją
+   właściciela odwracającą powyższe; ogrodzeniem jest tam tryb, nie hasło.
+   Ten seed dalej rządzi kontem, gdy ktoś chce INNEGO hasła (`ADMIN_HASLO`)
+   — a jeśli konto demo już jest, `userByLogin` niżej po prostu je zostawia.
 
    `ADMIN_HASLO` czyta WYŁĄCZNIE ten skrypt, nigdy serwer — więc zmienna nie
    znaczy nic na produkcji, nawet gdyby tam trafiła.                          */
