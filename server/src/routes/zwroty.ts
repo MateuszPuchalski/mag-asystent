@@ -18,6 +18,7 @@ import {
   utworzReczny,
   utworzZAllegroId,
   utworzZeSkanu,
+  watekZwrotu,
   zapiszDecyzje,
   zdejmijDokument,
 } from "../services/zwroty.js";
@@ -134,6 +135,23 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       };
     }
   );
+
+  /* Wiadomości czytamy DOPIERO na kliknięcie, nie przy każdym odświeżeniu
+     karty: karta odświeża się co 30 s, a rozmowa z klientem to dwa dodatkowe
+     zapytania do Allegro. Rzadkie pytanie nie ma prawa obciążać częstego. */
+  app.get<{ Params: { id: string } }>("/api/biuro/zwroty/:id/wiadomosci", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    try {
+      const { login, watek } = await watekZwrotu(Number(req.params.id));
+      return { login, watek };
+    } catch (e) {
+      if (e instanceof BladZwrotu) return reply.code(e.kod).send({ error: e.message });
+      /* Najczęstsza przyczyna: aplikacja bez uprawnienia do Centrum wiadomości.
+         Komunikat z adaptera mówi wtedy, co dodać na developer.allegro.pl. */
+      return reply.code(502).send({ error: (e as Error).message });
+    }
+  });
 
   app.get<{ Params: { id: string } }>("/api/biuro/zwroty/:id", async (req, reply) => {
     const nie = odmowa();

@@ -33,6 +33,38 @@ historii nie przepisujemy.
 
 ---
 
+## 0.56.5 — 19 sierpnia 2026
+
+**Powód zwrotu wreszcie na karcie — i rozmowa z klientem obok niego.**
+Kolumna POWÓD była pusta przy każdym prawdziwym zwrocie, choć klient go
+podawał.
+
+Wina leżała w tym, którą odpowiedź Allegro czytaliśmy. Skan szuka zwrotu
+na LIŚCIE (`/order/customer-returns?parcels.waybill=…`), a lista jest
+streszczeniem: bez powodów i bez komentarzy kupującego. Te niesie dopiero
+szczegół pojedynczego zwrotu. Skan dociąga go teraz po znalezieniu paczki;
+nieudany szczegół degraduje do danych z listy, bo zwrot ma powstać.
+
+Powód przychodzi KODEM (`NOT_AS_DESCRIBED`), więc karta tłumaczy go na
+zdanie po polsku. Kod spoza słownika pokazujemy surowo — nigdy nie
+ukrywamy tego, czego nie znamy — a `NONE` znaczy „klient nie podał
+powodu" i zostaje pustką.
+
+**Rozmowa z klientem** to nowa sekcja karty: wątek z Centrum wiadomości
+Allegro, dymkami, ze stroną nadawcy widoczną na pierwszy rzut oka.
+Trzy decyzje warte odnotowania:
+
+- czytamy NA KLIKNIĘCIE, nie z kartą — karta odświeża się co 30 s, a wątek
+  to dwa dodatkowe zapytania do Allegro;
+- NIE zapisujemy rozmowy u siebie: toczy się dalej po ocenie towaru, więc
+  kopia starzałaby się od pierwszej odpowiedzi i mnożyła dane osobowe;
+- odpowiada się w Allegro (link obok) — wysyłanie wiadomości z WERTIS to
+  osobna decyzja, nie skutek uboczny podglądu.
+
+**[wymaga działania]** Rozmowa wymaga uprawnienia `allegro:api:messaging`
+na aplikacji (developer.allegro.pl) i ponownego sparowania konta. Bez tego
+reszta zwrotów działa bez zmian, a przycisk mówi, czego brakuje.
+
 ## 0.56.4 — 19 sierpnia 2026
 
 **Karta zwrotu pokazuje CAŁE zamówienie, nie tylko to, co wraca.** Nowa
