@@ -481,6 +481,15 @@ data class DeliveryDocument(
     val nrPelny: String = "",
     val dataWyst: String = "",
     val dostawca: String = "",
+    /** Identyfikator kontrahenta z Subiekta; `null`, gdy dokument nie ma płatnika. */
+    val khId: Long? = null,
+    /**
+     * Czy ten dostawca ma wgrane logo (0.56.0).
+     *
+     * Flaga, a nie „spróbuj i zobacz": lista dwudziestu dokumentów pytałaby
+     * inaczej o dwadzieścia obrazów, z których większość nie istnieje.
+     */
+    val maLogo: Boolean = false,
     val positions: Int = 0,
     /** Dokument w buforze SGT — nadal można na nim pracować. */
     val wBuforze: Boolean = false,

@@ -175,7 +175,12 @@ const otwarta = (metoda: string, sciezka: string): boolean =>
  * z częstotliwością rysowania ekranu, a odpowiedź „nie ma" jest normalna.
  * Sam brak czegoś nie wystarcza — inaczej lista zjadłaby cały audyt odrzuceń.
  */
-const BEZ_AUDYTU_404: ReadonlyArray<RegExp> = [/^\/api\/products\/\d+\/zdjecie$/];
+const BEZ_AUDYTU_404: ReadonlyArray<RegExp> = [
+  /^\/api\/products\/\d+\/zdjecie$/,
+  // Logo dostawcy (0.56.0) — ten sam profil: wiersz listy dostaw pyta o nie
+  // przy każdym rysowaniu, a większość dostawców logo nie ma i mieć nie musi.
+  /^\/api\/dostawcy\/\d+\/logo$/,
+];
 
 const odczytBezAudytu = (sciezka: string): boolean =>
   BEZ_AUDYTU_404.some((wzorzec) => wzorzec.test(sciezka));

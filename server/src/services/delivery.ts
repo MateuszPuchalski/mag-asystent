@@ -11,6 +11,7 @@ import { recordEanConflict } from "./ean.js";
 import { raiseProblem } from "./problems.js";
 import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js";
 import { aliasKodu } from "./ean-alias.js";
+import { ktorzyMajaLogo } from "./logo-dostawcy.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -86,6 +87,9 @@ export function listDocuments(days = 14): DeliveryDocument[] {
     .all() as Array<{ deliveryId: number; dokId: number; total: number; done: number; status: string }>;
   const byDoc = new Map(progress.map((p) => [p.dokId, p]));
   const pozycje = subiekt.countPositionsByDoc();
+  /* Jedno zapytanie na CAŁĄ listę, nie jedno na wiersz — kolektor dostaje
+     gotową odpowiedź „czy pytać o logo" i nie strzela w serwer serią 404. */
+  const zLogo = ktorzyMajaLogo(docs.map((d) => d.kh_id ?? 0));
 
   return docs.map((d) => {
     const p = byDoc.get(d.dok_id);
@@ -96,6 +100,8 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       nrPelny: d.nr_pelny,
       dataWyst: d.data_wyst,
       dostawca: d.dostawca ?? "",
+      khId: d.kh_id ?? null,
+      maLogo: d.kh_id != null && zLogo.has(d.kh_id),
       positions,
       /** dokument w buforze jest normalnie dostępny do pracy (D1) */
       wBuforze: !!d.w_buforze,

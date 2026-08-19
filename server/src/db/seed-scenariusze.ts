@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { db, transaction } from "./db.js";
@@ -205,6 +206,9 @@ export const KATALOG: Scenariusz[] = [
   { id: "S67", obszar: "zwroty", tytul: "Zwrot dopasowany jednoznacznie (numer zamówienia na FS)", wejscie: "/biuro → ZWROTY → skan DEVWB0001" },
   { id: "S68", obszar: "zwroty", tytul: "Dwa kandydujące paragony — wybór ręczny; etykieta przewoźnika doręczającego", wejscie: "/biuro → ZWROTY → skan DEVTW0002" },
   { id: "S69", obszar: "zwroty", tytul: "Pozycja zwrotu spoza kartoteki i etykieta nieznana Allegro", wejscie: "/biuro → ZWROTY → skan DEVWB0003, potem dowolny inny kod" },
+
+  // ── logo dostawcy ──
+  { id: "S70", obszar: "dostawa", tytul: "Dostawca z logo i dostawca bez logo", wejscie: "zakładka DOSTAWY, potem /biuro → DOSTAWCY" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -440,6 +444,7 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.dokumentyWz = wz.dokumentow;
     licz.pozycjeWz = wz.pozycji;
     licz.sprzedaz = sprzedazDemo();
+    logoDostawcow();
   })();
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
@@ -561,6 +566,8 @@ interface DokumentSc {
   dostawca: string;
   dniWstecz: number;
   magId: number;
+  /** Identyfikator kontrahenta — po nim przypina się logo dostawcy (S70). */
+  khId?: number;
   wBuforze?: boolean;
   /** `[tw_id, ilość]`; ten sam towar wolno podać dwa razy (S26). */
   pozycje: Array<[number, number]>;
@@ -572,12 +579,12 @@ const TYP_DOSTAWY = etykietyDostaw()[0] ?? "FZ";
 const DOKUMENTY: DokumentSc[] = [
   // S20, S02, S27 — dostawa nietknięta; jedna pozycja bez adresu, jedna z trio EAN
   {
-    dokId: 9_001, typ: TYP_DOSTAWY, dostawca: "FALON-TECH", dniWstecz: 0, magId: MAG,
+    dokId: 9_001, typ: TYP_DOSTAWY, dostawca: "FALON-TECH", dniWstecz: 0, magId: MAG, khId: 8_001,
     pozycje: [[900_003, 12], [900_006, 8], [900_011, 24], [900_012, 18]],
   },
   // S21, S32 — dostawa w toku ze wszystkimi statusami linii
   {
-    dokId: 9_002, typ: TYP_DOSTAWY, dostawca: "STIHL Polska", dniWstecz: 1, magId: MAG,
+    dokId: 9_002, typ: TYP_DOSTAWY, dostawca: "STIHL Polska", dniWstecz: 1, magId: MAG, khId: 8_002,
     pozycje: [
       [900_036, 6], [900_037, 6], [900_038, 6], [900_039, 6], [900_040, 6], [900_044, 6],
     ],
@@ -621,11 +628,34 @@ const DOK_DROBNICA: DokumentSc = {
   pozycje: DROBNICA.map((t, i) => [t.twId, 1 + (i % 12)] as [number, number]),
 };
 
+/* ── S70: logo dostawcy ─────────────────────────────────────────────────────
+   FALON-TECH (`kh_id` 8001) ma logo, STIHL Polska (8002) nie — żeby na jednej
+   liście dostaw dało się zobaczyć OBA warianty wiersza: kafelek z logo i ten
+   dotychczasowy, z ikoną stanu.
+
+   Obraz to najmniejszy poprawny PNG, 1×1. Chodzi o ŚCIEŻKĘ, a nie o ładny
+   rysunek: seed ma dowieść, że kolumna, trasa, flaga `maLogo` i wiersz w
+   kolektorze spinają się w całość.                                          */
+const LOGO_PNG_1X1 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+function logoDostawcow(): void {
+  const obraz = Buffer.from(LOGO_PNG_1X1, "base64");
+  const etag = createHash("sha1").update(obraz).digest("hex");
+  const teraz = new Date().toISOString();
+  db()
+    .prepare(
+      `INSERT OR REPLACE INTO dostawca_logo(kh_id, nazwa, obraz, bajtow, etag, dodane_at, dodane_by)
+       VALUES (?,?,?,?,?,?,?)`
+    )
+    .run(8_001, "FALON-TECH", obraz, obraz.length, etag, teraz, "seed");
+}
+
 function dokumenty(): { dokumentow: number; dostaw: number; linii: number; idDostaw: Map<number, number> } {
   const d = db();
   const insDok = d.prepare(
-    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
-     VALUES (?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, kh_id, w_buforze)
+     VALUES (?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
 
@@ -639,6 +669,7 @@ function dokumenty(): { dokumentow: number; dostaw: number; linii: number; idDos
       data,
       dok.magId,
       dok.dostawca,
+      dok.khId ?? null,
       dok.wBuforze ? 1 : 0
     );
     for (const [twId, ilosc] of dok.pozycje) insPoz.run(dok.dokId, twId, ilosc);

@@ -33,6 +33,57 @@ historii nie przepisujemy.
 
 ---
 
+## 0.56.0 — 19 sierpnia 2026
+
+**Logo dostawcy: biuro wgrywa, magazynier widzi na liście dostaw.** Wiersz
+dokumentu pokazuje je po lewej, w miejscu szarego kafelka. Firmę poznaje się
+wtedy wzrokiem, zanim przeczyta się numer faktury.
+
+Zgłoszenie przyszło z jedną uwagą, która przesądziła o całym projekcie:
+*„niektóre loga są webp, niektóre svg"*. Serwer nie umie przerabiać obrazów
+i **nie będzie** — ma dwie zależności i zero modułów natywnych, a rasteryzacja
+SVG znaczyłaby moduł natywny na maszynie z Subiektem. Kolektor rysuje przez
+`BitmapFactory`, który SVG nie zna.
+
+Konwerter jednak już był, tylko nikt na niego nie patrzył: **panel biura to
+przeglądarka**, a ta rysuje SVG, WebP, PNG i JPEG natywnie. Wybrany plik idzie
+więc na `<canvas>` i wychodzi jako jeden PNG o jednym boku, ZANIM cokolwiek
+pojedzie na serwer. Serwer i kolektor nigdy nie dowiadują się, że SVG istnieje,
+i żadna ze stron nie dostała nowej zależności.
+
+Po stronie serwera zostaje rola strażnika: sprawdzamy BAJTY, nie deklarację.
+Obraz bez sygnatury PNG nie przeszedł przez tę konwersję i jest odrzucany
+z powodem — zamiast wylądować w bazie i zniknąć dopiero na ekranie
+magazyniera, najdalej od miejsca, w którym dałoby się zrozumieć dlaczego.
+
+**Logo wiąże się z identyfikatorem kontrahenta, nie z nazwą.** `kh_Id` stało
+dotąd w złączeniu zapytania o dokumenty i było natychmiast wyrzucane — teraz
+jedzie do read-modelu. Nie kosztowało to ani jednego nowego uprawnienia SQL,
+a rozwiązuje problem, który panel ma już przy szablonach druku: ta sama firma
+potrafi wystąpić pod dwoma napisami, bo symbol w Subiekcie wolno poprawić.
+
+**Kafelek stanu ustępuje miejsca.** Dotąd niósł kolor i ikonę stanu dostawy,
+ale ta sama informacja stoi w wierszu jeszcze trzy razy: pasek postępu, prawa
+kolumna („done/total" kontra „N poz.") i pastylka „DO ZAMKNIĘCIA". Czwarte
+powtórzenie nie było warte jedynego miejsca, w którym da się pokazać, KTO to
+przywiózł. Dostawca bez logo dostaje kafelek dokładnie taki jak dotąd.
+
+**Lista pyta o logo tylko wtedy, gdy jest o co pytać.** Serwer podaje w wierszu
+flagę `maLogo`, więc kolektor nie strzela serią zapytań o obrazy, których nie
+ma. Do tego 404 z tej trasy nie idzie do dziennika — ta sama lekcja, po której
+0.52.3 wyciszyło zapytania o zdjęcia kartotek: 355 wpisów na tysiąc przykryło
+wtedy pięć prawdziwych odmów.
+
+Nowa zakładka **DOSTAWCY** w `/biuro` pokazuje firmy z dokumentów dostaw, także
+te bez logo — bo pytanie brzmi „komu jeszcze brakuje", a nie „co już wgrano".
+Scenariusz **S70** stawia oba warianty wiersza obok siebie i niesie dwie bramki:
+trzy formaty pliku oraz czysty dziennik.
+
+**[wymaga działania]** Nowy APK kolektora. Od 0.52.0 bierze go z serwera sam.
+Logo nie ma żadnej konfiguracji — działa od razu po aktualizacji.
+
+---
+
 ## 0.55.0 — 19 sierpnia 2026
 
 **Układ ekranu dostawy — trzy poprawki ze zrzutu z hali.** Wszystkie dotyczą

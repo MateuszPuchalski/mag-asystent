@@ -206,6 +206,13 @@ przed którą ta pozycja broni.
 - [ ] miniatura towaru stoi po LEWEJ, przy symbolu, także po rozwinięciu
       wiersza; po prawej nie ma już drugiego zdjęcia.
 
+**Logo dostawcy na liście dostaw** (0.56.0)
+
+- [ ] dostawca z wgranym logo ma je po LEWEJ stronie wiersza,
+- [ ] dostawca bez logo ma tam dotychczasowy kafelek z ikoną i kolorem stanu,
+- [ ] logo nie jest przycięte do kwadratu — wąskie mieści się w całości,
+- [ ] wejście na listę NIE zostawia w dzienniku wpisów o brakującym logo.
+
 **Korekta ilości odłożonej**
 
 - [ ] „POPRAW ILOŚĆ (N)" jest w rozwiniętej pozycji, pod „INNĄ ILOŚCIĄ",

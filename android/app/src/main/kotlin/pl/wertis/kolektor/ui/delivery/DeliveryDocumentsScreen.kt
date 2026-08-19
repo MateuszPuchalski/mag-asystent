@@ -150,12 +150,12 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             )
         }
-        dostawy.forEach { d -> DocRow(d) { open(d) } }
+        dostawy.forEach { d -> DocRow(graph, d) { open(d) } }
     }
 }
 
 @Composable
-private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
+private fun DocRow(graph: AppGraph, d: DeliveryDocument, onClick: () -> Unit) {
     val stan = stanDokumentu(d)
     val complete = stan == StanDokumentu.UKONCZONY
     /* Komplet pozycji przy OTWARTEJ dostawie to czynność, nie ukończenie —
@@ -174,31 +174,49 @@ private fun DocRow(d: DeliveryDocument, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(
-                    when {
-                        complete -> Success.copy(alpha = 0.15f)
-                        // bursztyn = czynność, ta sama reguła co na karcie towaru:
-                        // dokument na górze listy ma mówić, DLACZEGO tam jest
-                        wToku -> AmberBg
-                        else -> Secondary
-                    }
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                if (complete) WIcons.Check else WIcons.Box,
-                contentDescription = null,
-                tint = when {
-                    complete -> Success
-                    wToku -> AmberInk
-                    else -> Ink
-                },
-                modifier = Modifier.size(20.dp),
-            )
+        /* Kafelek stanu — i JEDNOCZEŚNIE miejsce na logo dostawcy (0.56.0).
+           Logo je zastępuje, gdy dostawca je ma, bo stan czyta się z tego
+           wiersza jeszcze trzy razy: z paska postępu, z prawej kolumny
+           („done/total" kontra „N poz.") i z pastylki „DO ZAMKNIĘCIA".
+           Czwarte powtórzenie tej samej informacji nie było warte jedynego
+           miejsca, w którym da się pokazać, KTO to przywiózł. */
+        val kafelekStanu: @Composable () -> Unit = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        when {
+                            complete -> Success.copy(alpha = 0.15f)
+                            // bursztyn = czynność, ta sama reguła co na karcie towaru:
+                            // dokument na górze listy ma mówić, DLACZEGO tam jest
+                            wToku -> AmberBg
+                            else -> Secondary
+                        }
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (complete) WIcons.Check else WIcons.Box,
+                    contentDescription = null,
+                    tint = when {
+                        complete -> Success
+                        wToku -> AmberInk
+                        else -> Ink
+                    },
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        /* O logo pytamy WYŁĄCZNIE, gdy serwer powiedział, że jest. Inaczej
+           lista dwudziestu dokumentów wystrzeliłaby dwadzieścia 404 przy
+           każdym wejściu — dokładnie ten błąd dał w dzienniku produkcyjnym
+           355 wpisów na tysiąc i przykrył nimi pięć prawdziwych odmów. */
+        val khId = d.khId
+        if (d.maLogo && khId != null) {
+            LogoDostawcy(graph, khId, 40.dp, zamiast = kafelekStanu)
+        } else {
+            kafelekStanu()
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
