@@ -59,19 +59,22 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 ┌──────────▼──────────────────────────────────────────────────┐
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
-│  SQLite (node:sqlite, WAL) — 23 tabele:                      │
+│  SQLite (node:sqlite, WAL) — 29 tabel:                       │
 │    delivery + delivery_line   rozkładanie faktur zakupu      │
 │    delivery_note              notatki biura do dostawy       │
 │    problem, ean_conflict      wyjątki                        │
 │    ean_alias                  kody nadane w WERTIS           │
 │    zdjecie_cache              zdjęcia kartotek z Subiekta    │
+│    dostawca_logo              logo dostawcy wgrane w biurze  │
 │    zbiorka, strefa_regula     rotacja i strefa złota         │
+│    zwrot + zwrot_pozycja      zwroty Allegro                 │
+│    allegro_token              parowanie konta Allegro        │
 │    app_user, device_session   tożsamość (§7)                 │
 │    sfera_queue                kolejka zapisów do Subiekta    │
 │    events                     audyt — każdy skan i decyzja   │
 │    process_state              meldunki procesów (api|worker|sfera)
 │    counters, magazyn_widocznosc                              │
-│    sgt_*                      READ-MODEL Subiekta (7 tabel)  │
+│    sgt_*                      READ-MODEL Subiekta (9 tabel)  │
 └──────────┬───────────────┬───────────────┬──────────────────┘
            │ ta sama baza SQLite            │ odczyt co 60 s
 ┌──────────▼──────────┐    │    ┌───────────▼──────────────────┐

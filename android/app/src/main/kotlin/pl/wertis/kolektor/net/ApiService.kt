@@ -96,6 +96,14 @@ interface ApiService {
         @Header("If-None-Match") etag: String? = null,
     ): Response<ResponseBody>
 
+    /** Logo dostawcy (0.56.0) — ten sam kontrakt co zdjęcie: strumień + ETag. */
+    @Streaming
+    @GET("api/dostawcy/{khId}/logo")
+    suspend fun logoDostawcy(
+        @Path("khId") khId: Long,
+        @Header("If-None-Match") etag: String? = null,
+    ): Response<ResponseBody>
+
     @POST("api/products/{id}/location")
     suspend fun setLocation(
         @Path("id") id: Long,

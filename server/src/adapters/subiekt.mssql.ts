@@ -142,6 +142,10 @@ interface DokRow {
   data_wyst: string;
   dok_MagId: number;
   dostawca: string | null;
+  /* Identyfikator kontrahenta — do 0.56.0 stał w JOIN-ie i był wyrzucany.
+     Po nim, a nie po nazwie, przypina się logo dostawcy: symbol w Subiekcie
+     wolno poprawić, a ta sama firma potrafi wystąpić pod dwoma napisami. */
+  kh_id: number | null;
   w_buforze: number;
 }
 interface PozRow {
@@ -488,6 +492,7 @@ export async function importFromMssql(): Promise<ImportStats> {
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
                 d.dok_MagId,
                 ISNULL(k.kh_Symbol, '') AS dostawca,
+                k.kh_Id AS kh_id,
                 ${c.bufferExpr} AS w_buforze
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
@@ -542,8 +547,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
   );
   const insDok = d.prepare(
-    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
-     VALUES (?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, kh_id, w_buforze)
+     VALUES (?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare(
     "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
@@ -605,6 +610,7 @@ export async function importFromMssql(): Promise<ImportStats> {
         doc.data_wyst,
         doc.dok_MagId,
         doc.dostawca ?? "",
+        doc.kh_id ?? null,
         doc.w_buforze ? 1 : 0
       );
     }

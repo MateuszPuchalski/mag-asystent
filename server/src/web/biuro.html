@@ -125,6 +125,7 @@
     <button data-widok="nadzor">STAN SYSTEMU</button>
     <button data-widok="dziennik">DZIENNIK</button>
     <button data-widok="analiza">ANALIZA</button>
+    <button data-widok="dostawcy">DOSTAWCY</button>
   </nav>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
@@ -425,6 +426,27 @@
       <p class="mute" id="wynikStrefy"></p>
     </section>
   </div>
+
+  <!-- ── DOSTAWCY ────────────────────────────────────────────────────────── -->
+  <div id="widokDostawcy" hidden style="display:grid;gap:20px">
+    <section class="card">
+      <h2>LOGO DOSTAWCÓW</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
+        dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
+        zanim przeczyta się numer dokumentu.
+      </p>
+      <p class="mute" style="margin-bottom:10px">
+        Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
+        Przeglądarka zmniejszy go i przerobi na jeden format, zanim cokolwiek
+        pojedzie na serwer. Lista poniżej pokazuje dostawców z dokumentów
+        dostaw, także tych bez logo.
+      </p>
+      <input type="file" id="plikLogo" accept="image/*,.svg" hidden>
+      <p class="mute" id="wynikLogo"></p>
+      <table id="dostawcy"></table>
+    </section>
+  </div>
 </main>
 
 <script>
@@ -488,6 +510,7 @@ function wyloguj() {
   // jest jedyne miejsce, w którym wolno je zwolnić
   for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);
   zdjecia.clear();
+  zwolnijLogoUrl();
   kolejkaFoto.length = 0;
   sesjaPodgladu++;
   zamknijDokument();
@@ -530,6 +553,7 @@ function pokaz(nowy) {
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
+  $("widokDostawcy").hidden = nowy !== "dostawcy";
   for (const b of document.querySelectorAll("nav.zakladki button")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
@@ -537,6 +561,7 @@ function pokaz(nowy) {
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
   if (nowy === "analiza") odswiezAnalize();
+  if (nowy === "dostawcy") odswiezDostawcow();
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -1059,6 +1084,126 @@ async function wyslijZbiorki(plik) {
     await odswiezKandydatow();
   } catch (e) {
     $("wynikImportu").textContent = `Import odrzucony: ${e.message}`;
+  }
+}
+
+/* ── Logo dostawców ──────────────────────────────────────────────────────────
+   CAŁA obsługa formatów siedzi TUTAJ i to jest sedno tej funkcji.
+
+   Loga przychodzą w czym popadnie — webp, svg, png, jpg. Serwer nie ma czym
+   ich przerabiać (dwie zależności, zero modułów natywnych) i nie będzie miał;
+   kolektor rysuje przez `BitmapFactory`, który nie zna SVG. Ale konwerter już
+   tu jest: przeglądarka rysuje wszystkie te formaty natywnie, więc `<canvas>`
+   zamienia dowolny z nich na JEDEN PNG o jednym boku. Serwer i kolektor nigdy
+   nie dowiadują się, że SVG istnieje.                                        */
+
+const LOGO_BOK = 128;
+let dostawcyLista = [];
+/* Blob-URL-e podglądów. Zwalniamy je przy każdym przerysowaniu — inaczej
+   dwadzieścia wejść na zakładkę zostawia dwadzieścia kompletów w pamięci. */
+let logoUrl = new Map();
+
+function zwolnijLogoUrl() {
+  for (const u of logoUrl.values()) URL.revokeObjectURL(u);
+  logoUrl = new Map();
+}
+
+/** Dowolny obraz → PNG `LOGO_BOK`×`LOGO_BOK`, proporcje i przezroczystość bez zmian. */
+function naPng(plik) {
+  return new Promise((resolve, reject) => {
+    const czyt = new FileReader();
+    czyt.onerror = () => reject(new Error("Nie udało się odczytać pliku"));
+    czyt.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("To nie jest obraz, który przeglądarka umie otworzyć"));
+      img.onload = () => {
+        /* SVG bez atrybutów width/height zgłasza wymiar 0 i narysowałby się
+           jako nic. Wtedy przyjmujemy kwadrat docelowy — lepiej logo lekko
+           rozciągnięte niż pusty obrazek bez śladu, dlaczego jest pusty. */
+        const w = img.naturalWidth || LOGO_BOK;
+        const h = img.naturalHeight || LOGO_BOK;
+        const skala = Math.min(LOGO_BOK / w, LOGO_BOK / h);
+        const dw = Math.max(1, Math.round(w * skala));
+        const dh = Math.max(1, Math.round(h * skala));
+
+        const c = document.createElement("canvas");
+        c.width = LOGO_BOK;
+        c.height = LOGO_BOK;
+        const ctx = c.getContext("2d");
+        // BEZ wypełniania tła: logo bywa przezroczyste, a biały kwadrat pod
+        // nim wyglądałby na kolektorze jak naklejka na ciemnym wierszu
+        ctx.drawImage(img, (LOGO_BOK - dw) / 2, (LOGO_BOK - dh) / 2, dw, dh);
+        resolve(c.toDataURL("image/png"));
+      };
+      img.src = czyt.result;
+    };
+    czyt.readAsDataURL(plik);
+  });
+}
+
+function rysujDostawcow() {
+  zwolnijLogoUrl();
+  const wiersze = dostawcyLista.map((d) => `<tr>
+    <td style="width:56px" id="logo-${d.khId}">${d.maLogo ? "…" : ""}</td>
+    <td><b>${esc(d.nazwa)}</b></td>
+    <td class="mute">${d.dokumentow} dok.</td>
+    <td><button class="akcja cichy" data-logo="${d.khId}">${d.maLogo ? "ZMIEŃ" : "WGRAJ"}</button></td>
+    <td>${d.maLogo ? `<button class="akcja cichy" data-logo-usun="${d.khId}">✕</button>` : ""}</td>
+  </tr>`);
+  $("dostawcy").innerHTML = wiersze.length
+    ? `<tr><th></th><th>DOSTAWCA</th><th>DOKUMENTY</th><th></th><th></th></tr>${wiersze.join("")}`
+    : '<tr><td class="mute">Nie ma jeszcze dokumentów dostaw — nie ma czego opisać logo</td></tr>';
+  for (const d of dostawcyLista) if (d.maLogo) dolozLogo(d.khId);
+}
+
+async function dolozLogo(khId) {
+  try {
+    // `api()` rzuca na każdym !ok, w tym na 404 — brak logo obsługuje `catch`
+    const odp = await api(`/api/dostawcy/${khId}/logo`);
+    const url = URL.createObjectURL(await odp.blob());
+    logoUrl.set(khId, url);
+    const kom = $(`logo-${khId}`);
+    if (kom) kom.innerHTML = `<img src="${url}" alt="" style="width:40px;height:40px;object-fit:contain">`;
+  } catch {
+    const kom = $(`logo-${khId}`);
+    if (kom) kom.textContent = "";
+  }
+}
+
+async function odswiezDostawcow() {
+  try {
+    dostawcyLista = (await (await api("/api/biuro/dostawcy")).json()).dostawcy;
+    rysujDostawcow();
+  } catch (e) {
+    $("wynikLogo").textContent = e.message;
+  }
+}
+
+async function wyslijLogo(khId, plik) {
+  const d = dostawcyLista.find((x) => x.khId === khId);
+  $("wynikLogo").textContent = `Przetwarzam ${plik.name}…`;
+  try {
+    const logoBase64 = await naPng(plik);
+    await api(`/api/biuro/dostawcy/${khId}/logo`, {
+      method: "PUT",
+      body: JSON.stringify({ nazwa: d?.nazwa ?? "", logoBase64 }),
+    });
+    $("wynikLogo").textContent = `Logo dla ${d?.nazwa ?? khId} zapisane.`;
+    await odswiezDostawcow();
+  } catch (e) {
+    $("wynikLogo").textContent = `Nie zapisano: ${e.message}`;
+  }
+}
+
+async function usunLogo(khId) {
+  const d = dostawcyLista.find((x) => x.khId === khId);
+  if (!confirm(`Usunąć logo dostawcy ${d?.nazwa ?? khId}?`)) return;
+  try {
+    await api(`/api/biuro/dostawcy/${khId}/logo`, { method: "DELETE" });
+    $("wynikLogo").textContent = "Logo usunięte.";
+    await odswiezDostawcow();
+  } catch (e) {
+    $("wynikLogo").textContent = `Nie usunięto: ${e.message}`;
   }
 }
 
@@ -1968,6 +2113,24 @@ $("wgrajZbiorki").addEventListener("click", () => $("plikZbiorek").click());
 $("plikZbiorek").addEventListener("change", (e) => {
   const plik = e.target.files?.[0];
   if (plik) wyslijZbiorki(plik);
+  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
+});
+/* Który dostawca czeka na plik — `<input type="file">` jest jeden na całą
+   tabelę, bo dialog systemowy i tak obsługuje jeden wybór naraz. */
+let logoDla = null;
+$("dostawcy").addEventListener("click", (e) => {
+  const wgraj = e.target.closest("[data-logo]");
+  if (wgraj) {
+    logoDla = Number(wgraj.dataset.logo);
+    $("plikLogo").click();
+    return;
+  }
+  const usun = e.target.closest("[data-logo-usun]");
+  if (usun) usunLogo(Number(usun.dataset.logoUsun));
+});
+$("plikLogo").addEventListener("change", (e) => {
+  const plik = e.target.files?.[0];
+  if (plik && logoDla != null) wyslijLogo(logoDla, plik);
   e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
 });
 $("csvKandydatow").addEventListener("click", () =>

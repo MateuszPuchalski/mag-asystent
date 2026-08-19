@@ -479,6 +479,11 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   prowadzi do szczegółu.
 - Trzy zakładki. **DOSTAWY I REKLAMACJE** — postęp per dokument oraz
   nierozwiązane wyjątki; protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
+- **DOSTAWCY** (0.56.0): logo firmy wgrywane raz, widoczne potem po lewej
+  stronie wiersza na liście dostaw w kolektorze. Plik może być w dowolnym
+  formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
+  cokolwiek pojedzie na serwer. Logo wiąże się z identyfikatorem kontrahenta
+  z Subiekta, więc przeżywa poprawkę nazwy. Bez konfiguracji: działa od razu.
 - **Wejście w fakturę** (0.36.0): kliknięcie wiersza pokazuje jej pozycje —
   zdjęcie kartoteki, ile odłożono z ilu, adres, status, kto odłożył i kiedy.
   Rozjazd adresu jest wyróżniony, a zgłoszony wyjątek siedzi w wierszu swojej
@@ -539,7 +544,8 @@ server/                    backend (Fastify + SQLite + worker)
                            aktualizacja (APK dla kolektorów)
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8), auth, magazyny, audyt,
-                           analiza, zbiorki, biuro, aktualizacja (APK)
+                           analiza, zbiorki, biuro, aktualizacja (APK),
+                           dostawcy (logo)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   data/zdjecia/            CACHE zdjęć kartotek z Subiekta — wolno skasować
   data/apk/                APK dla kolektorów — kładzie go instalator

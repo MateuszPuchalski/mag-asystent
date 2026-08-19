@@ -604,3 +604,21 @@ Skan `DEVWB0003` zakłada zwrot, którego pozycja ma sygnaturę spoza kartoteki 
 
 Skan dowolnego innego kodu kończy się komunikatem „Allegro nie zna tej
 etykiety" i przyciskiem założenia zwrotu ręcznego.
+
+### S70 — dostawca z logo i dostawca bez logo
+
+`FALON-TECH` ma wgrane logo, `STIHL Polska` nie ma. Oba dokumenty stoją na tej
+samej liście dostaw, więc widać oba warianty wiersza obok siebie.
+
+Po lewej stronie wiersza `FALON-TECH` jest logo. Po lewej stronie wiersza
+`STIHL Polska` zostaje dotychczasowy kafelek z ikoną i kolorem stanu.
+
+W `/biuro` → **DOSTAWCY** obaj są na liście. `FALON-TECH` ma podgląd logo
+i przyciski `ZMIEŃ` oraz `✕`, `STIHL Polska` ma sam przycisk `WGRAJ`.
+
+Bramka formatów: wgraj plik **SVG**, potem **WEBP**, potem **PNG**. Każdy ma
+się zapisać i wyglądać na liście tak samo — przeglądarka przerabia je na jeden
+format przed wysyłką. Serwer przyjmuje wyłącznie PNG i to jest celowe.
+
+Bramka audytu: otwórz listę dostaw kilka razy i sprawdź dziennik. Zapytania
+o logo, którego nie ma, **nie mogą** zostawiać w nim wpisów.

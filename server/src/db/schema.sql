@@ -135,6 +135,10 @@ CREATE TABLE IF NOT EXISTS sgt_dokument (
   data_wyst  TEXT NOT NULL,                     -- ISO date
   mag_id     INTEGER NOT NULL,                  -- magazyn skutku: MAG (tryb A) | MGP | Zwroty
   dostawca   TEXT,
+  -- Identyfikator kontrahenta z Subiekta. Po nim, a nie po nazwie, przypina
+  -- się logo dostawcy (0.56.0): symbol wolno w Subiekcie poprawić, a ta sama
+  -- firma potrafi wystąpić pod dwoma napisami. NULL = dokument bez płatnika.
+  kh_id      INTEGER,
   w_buforze  INTEGER NOT NULL DEFAULT 0
 );
 
@@ -374,6 +378,28 @@ CREATE TABLE IF NOT EXISTS zdjecie_cache (
   blad       TEXT                  -- zdanie o BŁĘDZIE, nigdy o braku zdjęcia
 );
 CREATE INDEX IF NOT EXISTS ix_zdjecie_uzyto ON zdjecie_cache(uzyto_at);
+
+-- Logo dostawcy (0.56.0). Wgrywane ręcznie w panelu biura, pokazywane po lewej
+-- stronie wiersza na liście dostaw w kolektorze.
+--
+-- OBRAZ SIEDZI W BAZIE, a nie na dysku obok zdjęć kartotek — i to jest różnica
+-- celowa. Zdjęcia są CACHE'M ściąganym z Subiekta: wolno je skasować, bo
+-- odtworzą się same, więc mają katalog i eviction. Logo nikt nie odtworzy —
+-- ktoś je raz znalazł i wgrał. Należy do kopii bazy, nie do cache'u.
+--
+-- Klucz to `kh_Id` z Subiekta, nie nazwa. Symbol kontrahenta wolno poprawić,
+-- a ta sama firma potrafi wystąpić pod dwoma napisami; identyfikator przeżywa
+-- jedno i drugie. Obraz jest ZAWSZE PNG — normalizuje go przeglądarka przy
+-- wgrywaniu, bo serwer nie ma czym przerabiać obrazów i mieć nie będzie.
+CREATE TABLE IF NOT EXISTS dostawca_logo (
+  kh_id     INTEGER PRIMARY KEY,
+  nazwa     TEXT NOT NULL,      -- symbol z chwili wgrania, do pokazania w panelu
+  obraz     BLOB NOT NULL,
+  bajtow    INTEGER NOT NULL,
+  etag      TEXT NOT NULL,      -- sha1 treści — po nim idzie 304
+  dodane_at TEXT NOT NULL,
+  dodane_by TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS process_state (
   name       TEXT PRIMARY KEY,   -- 'api' | 'worker' | 'sfera' (worker MM, sfera-worker/)

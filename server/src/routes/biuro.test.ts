@@ -135,7 +135,8 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      Reguła nie zniknęła, tylko dostała jawną listę — bo pilnuje czegoś, co
      nadal obowiązuje. W 0.50.0 lista urosła o import zbiórek i reguły strefy
      złotej, w 0.53.0 — o zwroty Allegro (skan, wybór kandydata, decyzje,
-     pozycja ręczna, stempel środków, parowanie konta, dopasowanie dokumentu).
+     pozycja ręczna, stempel środków, parowanie konta, dopasowanie dokumentu),
+     w 0.56.0 — o logo dostawcy (wgranie i skasowanie).
      Wszystkie te zapisy dotyczą danych, których NIE MA w Subiekcie, stoją za
      rolą biuro|admin i żaden nie rusza dostaw, stanów ani sfera_queue.
 
@@ -158,13 +159,15 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    2,
-    "PUT to komplet reguł strefy złotej i ręczny wybór dokumentu zwrotu"
+    3,
+    "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu " +
+      "i wgranie logo dostawcy"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    2,
-    "DELETE to odpięcie dokumentu zwrotu i rozłączenie konta Allegro"
+    3,
+    "DELETE to odpięcie dokumentu zwrotu, rozłączenie konta Allegro " +
+      "i skasowanie logo dostawcy"
   );
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
@@ -172,6 +175,11 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /dokument\/\$\{dokId\}\/otworz/, "droga powrotna");
   assert.match(html, /zbiorki\/import/, "import zbiórek z Sellasist");
   assert.match(html, /zwroty\/skan/, "skan etykiety zwrotu Allegro");
+  assert.match(html, /biuro\/dostawcy\/\$\{khId\}\/logo/, "wgranie logo dostawcy");
+  /* Konwersja formatów MUSI zostać po stronie przeglądarki: serwer przyjmuje
+     wyłącznie PNG, a loga przychodzą też jako SVG i WebP. Bez `<canvas>`
+     panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową. */
+  assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
 });
 
 test("podgląd pokazuje, kto odłożył pozycję", () => {

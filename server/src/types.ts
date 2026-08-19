@@ -119,6 +119,17 @@ export interface DeliveryDocument {
   nrPelny: string;
   dataWyst: string;
   dostawca: string;
+  /** Identyfikator kontrahenta z Subiekta; `null`, gdy dokument nie ma płatnika. */
+  khId: number | null;
+  /**
+   * Czy ten dostawca ma wgrane logo (0.56.0).
+   *
+   * Flaga, a nie „spróbuj i zobacz": lista dwudziestu dokumentów pytałaby
+   * inaczej o dwadzieścia obrazów, z których większość nie istnieje. Ten sam
+   * błąd przy zdjęciach kartotek dał 355 wpisów 404 na tysiąc w dzienniku
+   * produkcyjnym i przykrył nimi pięć prawdziwych odmów.
+   */
+  maLogo: boolean;
   positions: number;
   /** Dokument w buforze SGT — nadal można na nim pracować (D1). */
   wBuforze: boolean;

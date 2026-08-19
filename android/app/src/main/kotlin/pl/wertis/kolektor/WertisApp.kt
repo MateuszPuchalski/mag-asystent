@@ -18,6 +18,7 @@ import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SessionRepository
 import pl.wertis.kolektor.data.SetupRepository
 import pl.wertis.kolektor.data.SettingsRepository
+import pl.wertis.kolektor.data.LogoRepository
 import pl.wertis.kolektor.data.ZdjeciaRepository
 import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
@@ -73,6 +74,7 @@ class AppGraph(context: Context) {
     val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
     val zdjeciaRepo = ZdjeciaRepository(context, api)
+    val logoRepo = LogoRepository(context, api)
     /* Bierze `apiClient`, a nie `api`: pobranie APK musi iść tą samą drogą co
        reszta wywołań, żeby złapać podmianę adresu serwera z ustawień. */
     val aktualizacja = AktualizacjaRepository(context, apiClient)

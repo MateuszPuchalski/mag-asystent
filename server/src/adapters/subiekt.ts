@@ -32,6 +32,8 @@ export interface RawDocument {
   data_wyst: string;
   mag_id: number;
   dostawca: string;
+  /** Identyfikator kontrahenta z Subiekta; `null`, gdy dokument nie ma płatnika. */
+  kh_id: number | null;
   w_buforze: number;
 }
 export interface RawPosition {

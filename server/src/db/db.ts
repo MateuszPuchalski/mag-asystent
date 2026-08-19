@@ -147,6 +147,10 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery", "kurier_protokol", "TEXT");
   addColumn("delivery", "przesylka_at", "TEXT");
   addColumn("delivery", "przesylka_by", "TEXT");
+  /* Klucz kontrahenta pod logo dostawcy (0.56.0). Read-model odświeża się
+     w całości przy każdej synchronizacji, więc kolumna wypełni się sama —
+     ale musi ISTNIEĆ, zanim adapter spróbuje do niej pisać. */
+  addColumn("sgt_dokument", "kh_id", "INTEGER");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
