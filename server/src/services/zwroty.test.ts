@@ -30,7 +30,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar"]) {
+  for (const t of ["zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -221,4 +221,27 @@ test("lista filtruje po statusie i szuka po waybill/loginie", async () => {
   const wiersz = Z.listaZwrotow({ szukaj: "DEVWB0001" })[0];
   assert.equal(wiersz.pozycji, 2);
   assert.equal(wiersz.ocenionych, 0);
+});
+
+// ── Całe zamówienie na karcie zwrotu (0.56.4) ──────────────────────────────
+
+test("karta zwrotu niesie CAŁE zamówienie ze znacznikiem, co wraca", async () => {
+  kartotekiDev();
+  const w = await Z.utworzZeSkanu("DEVTW0002", "Test");
+  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+
+  const zam = w.zwrot.pozycjeZamowienia;
+  assert.equal(zam.length, 2, "zamówienie miało dwie pozycje, wraca jedna");
+  const wracajaca = zam.find((p) => p.zwracana);
+  const zostajaca = zam.find((p) => !p.zwracana);
+  assert.equal(wracajaca?.symbol, "TEST-ROTUJACY");
+  assert.equal(zostajaca?.externalId, "TEST-LINIA-DONE");
+  // kartoteka dopasowana tak samo jak przy pozycjach zwrotu
+  assert.equal(zostajaca?.twId, 900_037);
+  assert.equal(zostajaca?.ilosc, 3);
+});
+
+test("zwrot ręczny nie ma zamówienia — sekcja zostaje pusta, nie zmyślona", () => {
+  const reczny = Z.utworzReczny("BEZ-ZAMOWIENIA-1", "Test");
+  assert.deepEqual(reczny.pozycjeZamowienia, []);
 });

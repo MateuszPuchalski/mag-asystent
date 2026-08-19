@@ -33,6 +33,29 @@ historii nie przepisujemy.
 
 ---
 
+## 0.56.4 — 19 sierpnia 2026
+
+**Karta zwrotu pokazuje CAŁE zamówienie, nie tylko to, co wraca.** Nowa
+sekcja wylicza wszystkie pozycje zamówienia i znakuje je: WRACA albo
+zostaje u klienta.
+
+Pytanie „co on jeszcze z tym kupił" zapada przy każdej ocenie towaru.
+Czy wraca komplet, czy jedna rzecz z zestawu? Czy pasująca część została
+u kupującego? Odpowiedź wymagała dotąd otwarcia panelu Allegro obok —
+a decyzja o zwrocie zapadała w oderwaniu od zamówienia.
+
+Dane nie kosztują ani jednego dodatkowego zapytania: zamówienie i tak
+pobieramy przy skanie, żeby wyciągnąć z niego sygnatury pozycji. Dotąd
+resztę odpowiedzi wyrzucaliśmy. Teraz ląduje w `zwrot_zam_pozycja` jako
+SNAPSHOT z chwili skanu — oferta potrafi zmienić nazwę albo zniknąć,
+a karta ma pokazywać, co kupiono wtedy.
+
+Zwroty ręczne i zwroty bez zamówienia nie mają tu wierszy, więc karta
+ukrywa sekcję zamiast pokazywać pustą tabelę. Zwroty założone przed tą
+wersją zostają bez zamówienia — nie zmyślamy im historii.
+
+Zwykły PATCH; instalacji bez Allegro zmiana nie dotyczy wcale.
+
 ## 0.56.3 — 19 sierpnia 2026
 
 **Skan etykiety zwrotu kończył się błędem 406 — pytaliśmy Allegro o złą

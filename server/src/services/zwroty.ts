@@ -51,6 +51,17 @@ export interface PozycjaZwrotu {
   notatka: string | null;
 }
 
+export interface PozycjaZamowienia {
+  offerId: string | null;
+  nazwa: string;
+  externalId: string | null;
+  twId: number | null;
+  symbol: string | null;
+  ilosc: number;
+  /** Czy TA pozycja wraca w zwrocie — reszta została u klienta. */
+  zwracana: boolean;
+}
+
 export interface KandydatDokumentu {
   dokId: number;
   numer: string;
@@ -79,6 +90,8 @@ export interface SzczegolZwrotu {
   zwrotSrodkow: { at: string; przez: string } | null;
   linkPanel: string;
   pozycje: PozycjaZwrotu[];
+  /** Całe zamówienie ze snapshotu; puste przy zwrocie ręcznym. */
+  pozycjeZamowienia: PozycjaZamowienia[];
   /** Tylko gdy dopasowanie='brak' — posortowani malejąco po punktach. */
   kandydaciDokumentu?: KandydatDokumentu[];
 }
@@ -243,6 +256,25 @@ async function utworzZAllegro(
           p.ilosc,
           p.powod,
           p.powodOpis
+        );
+      }
+
+      /* CAŁE zamówienie, nie tylko to, co wraca. Biuro pyta „co klient
+         zamawiał razem z tym" — czy odesłał komplet, czy jedną rzecz
+         z zestawu. Zamówienie i tak już pobraliśmy po sygnatury, więc to
+         zapis tego, co mamy w ręku, a nie dodatkowe zapytanie do Allegro. */
+      const insZam = d.prepare(
+        `INSERT INTO zwrot_zam_pozycja(zwrot_id, offer_id, nazwa, external_id, tw_id, ilosc)
+         VALUES (?,?,?,?,?,?)`
+      );
+      for (const p of zamowienie?.pozycje ?? []) {
+        insZam.run(
+          id,
+          p.offerId,
+          p.nazwa,
+          p.externalId,
+          p.externalId ? dopasujKartoteke(p.externalId) : null,
+          p.ilosc
         );
       }
     })();
@@ -629,6 +661,32 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
     decyzja_przez: string | null; notatka: string | null;
   }>;
 
+  /* Zwracane oferty — po nich znakujemy wiersze zamówienia. Zbiór, nie
+     pętla po tablicy: zamówienie potrafi mieć kilkanaście pozycji. */
+  const zwracaneOferty = new Set(
+    pozycje.map((p) => p.offer_id).filter((o): o is string => !!o)
+  );
+  const pozycjeZamowienia = (
+    db()
+      .prepare(
+        `SELECT p.offer_id, p.nazwa, p.external_id, p.tw_id, t.symbol, p.ilosc
+         FROM zwrot_zam_pozycja p LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
+         WHERE p.zwrot_id = ? ORDER BY p.id`
+      )
+      .all(id) as Array<{
+      offer_id: string | null; nazwa: string; external_id: string | null;
+      tw_id: number | null; symbol: string | null; ilosc: number;
+    }>
+  ).map((p) => ({
+    offerId: p.offer_id,
+    nazwa: p.nazwa,
+    externalId: p.external_id,
+    twId: p.tw_id,
+    symbol: p.symbol,
+    ilosc: p.ilosc,
+    zwracana: !!p.offer_id && zwracaneOferty.has(p.offer_id),
+  }));
+
   const szczegol: SzczegolZwrotu = {
     id: z.id,
     allegroReturnId: z.allegro_return_id,
@@ -649,6 +707,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
       ? { at: z.zwrot_srodkow_at, przez: z.zwrot_srodkow_przez ?? "?" }
       : null,
     linkPanel: LINK_PANELU_ZWROTOW,
+    pozycjeZamowienia,
     pozycje: pozycje.map((p) => ({
       id: p.id,
       offerId: p.offer_id,
