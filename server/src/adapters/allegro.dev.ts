@@ -115,6 +115,9 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
     kupujacyEmail: "ewa.oddaje@example.com",
     pozycje: [
       { offerId: "of-3", nazwa: "Szybkorotujący poza strefą złotą — oferta Allegro", externalId: "TEST-ROTUJACY", ilosc: 1 },
+      /* Pozycja, która NIE wraca — sekcja „całe zamówienie" ma pokazywać
+         także to, co zostało u klienta (S68). */
+      { offerId: "of-9", nazwa: "Pozycja odłożona w całości — oferta Allegro", externalId: "TEST-LINIA-DONE", ilosc: 3 },
     ],
   },
   "dev-ord-3": {

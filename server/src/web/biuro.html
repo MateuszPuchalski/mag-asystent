@@ -190,6 +190,7 @@
       <button class="akcja cichy" id="zwrotWroc">← WSZYSTKIE ZWROTY</button>
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
       <table id="zwrotPozycje" style="margin-top:10px"></table>
+      <div id="zwrotZamowienie" style="margin-top:14px"></div>
       <div id="zwrotDodajPozycje" style="margin-top:10px" hidden>
         <h2>DOPISZ POZYCJĘ (ZWROT RĘCZNY)</h2>
         <div class="filtry">
@@ -1975,6 +1976,28 @@ function rysujSzczegolZwrotu(z) {
 
   // dopisywanie pozycji: tylko zwrot ręczny i tylko przed rozliczeniem
   $("zwrotDodajPozycje").hidden = !(z.allegroReturnId == null && !zamkniety);
+
+  /* Całe zamówienie: co jeszcze klient kupił przy okazji. Wiersz wracający
+     jest zaznaczony — biuro widzi od razu, czy wraca komplet, czy jedna
+     rzecz z zestawu, i co zostało u kupującego. */
+  const zam = z.pozycjeZamowienia || [];
+  if (zam.length) {
+    const wraca = zam.filter((p) => p.zwracana).length;
+    $("zwrotZamowienie").innerHTML = `<h2>CAŁE ZAMÓWIENIE (${zam.length} poz., wraca ${wraca})</h2>
+      <p class="mute" style="margin-bottom:6px">Co klient kupił w tym zamówieniu — pozycje bez znacznika zostały u niego.</p>
+      <table>${
+        "<tr><th></th><th>TOWAR</th><th>ILOŚĆ</th></tr>" +
+        zam.map((p) => `<tr${p.zwracana ? "" : ' class="mute"'}>
+            <td style="white-space:nowrap">${p.zwracana
+              ? '<span class="badge amber">WRACA</span>'
+              : '<span class="badge mute2">zostaje</span>'}</td>
+            <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span> · ` : ""}${esc(p.nazwa)}</td>
+            <td class="b">${p.ilosc}</td>
+          </tr>`).join("")
+      }</table>`;
+  } else {
+    $("zwrotZamowienie").innerHTML = "";
+  }
 
   if (z.dokument) {
     $("zwrotDokument").innerHTML = `<h2>DOKUMENT SPRZEDAŻY</h2>

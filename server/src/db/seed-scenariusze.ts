@@ -485,6 +485,10 @@ function wyczysc(): void {
        `dev-ret-`, żeby ponowne uruchomienie wracało do punktu wyjścia także
        w zakładce ZWROTY. Zwroty ręczne z innych etykiet zostają. */
     d.prepare(
+      `DELETE FROM zwrot_zam_pozycja WHERE zwrot_id IN
+         (SELECT id FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%')`
+    ).run();
+    d.prepare(
       `DELETE FROM zwrot_pozycja WHERE zwrot_id IN
          (SELECT id FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%')`
     ).run();

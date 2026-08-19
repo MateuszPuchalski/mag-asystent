@@ -577,3 +577,27 @@ CREATE TABLE IF NOT EXISTS sgt_sprzedaz_pozycja (
 CREATE INDEX IF NOT EXISTS ix_sprzedaz_poz_dok ON sgt_sprzedaz_pozycja(dok_id);
 -- dopasowanie zwrotu pyta „które dokumenty mają TEN towar"
 CREATE INDEX IF NOT EXISTS ix_sprzedaz_poz_tw ON sgt_sprzedaz_pozycja(tw_id);
+
+-- Pozycje ZAMÓWIENIA, z którego przyszedł zwrot (0.56.4).
+-- Biuro pyta „co klient zamawiał razem z tym, co wraca": czy odesłał całość,
+-- czy jedną rzecz z kompletu, czy część zestawu została u niego. Bez tego
+-- decyzja o zwrocie zapada w oderwaniu od zamówienia, a odpowiedź wymagała
+-- otwarcia panelu Allegro obok.
+--
+-- OSOBNA tabela, nie kolumna JSON na `zwrot`: to lista wierszy, którą się
+-- czyta wierszami i łączy z kartoteką po `tw_id`. Dane są SNAPSHOTEM z chwili
+-- skanu — oferta potrafi zmienić nazwę albo zniknąć, a karta zwrotu ma
+-- pokazywać, co kupiono wtedy.
+--
+-- Zwrot ręczny i zwrot bez `allegro_order_id` po prostu nie mają tu wierszy;
+-- karta ukrywa wtedy całą sekcję zamiast pokazywać pustą tabelę.
+CREATE TABLE IF NOT EXISTS zwrot_zam_pozycja (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  zwrot_id    INTEGER NOT NULL REFERENCES zwrot(id),
+  offer_id    TEXT,                -- po nim poznajemy, która pozycja WRACA
+  nazwa       TEXT NOT NULL,       -- nazwa oferty (snapshot)
+  external_id TEXT,                -- sygnatura sprzedawcy = symbol kartoteki
+  tw_id       INTEGER,             -- dopasowana kartoteka; NULL = spoza katalogu
+  ilosc       REAL NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_zam_poz ON zwrot_zam_pozycja(zwrot_id);

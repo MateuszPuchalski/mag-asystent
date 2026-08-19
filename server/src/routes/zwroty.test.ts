@@ -30,7 +30,7 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of [
-    "zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz",
+    "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz",
     "sgt_towar", "events", "device_session", "app_user",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
