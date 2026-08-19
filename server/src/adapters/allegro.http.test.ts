@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapujPowod, mapujZamowienie, mapujZwrot, urlZwrotow } from "./allegro.http.js";
+import {
+  mapujPowod,
+  mapujZamowienie,
+  mapujZwrot,
+  rodzinaKoncowki,
+  urlZamowienia,
+  urlZwrotow,
+  urlZwrotu,
+} from "./allegro.http.js";
 import { allegroUserAgent } from "./allegro.js";
 import { config } from "../config.js";
 import { czyOdswiezyc } from "../services/allegro-token.js";
@@ -84,4 +92,16 @@ test("odświeżenie tokena: 5 minut zapasu i odporność na śmieci w dacie", ()
   assert.equal(czyOdswiezyc("2026-08-18T13:00:00Z", teraz), false);
   assert.equal(czyOdswiezyc("2026-08-18T12:04:00Z", teraz), true); // mniej niż zapas
   assert.equal(czyOdswiezyc("nie-data", teraz), true); // uszkodzony wiersz → odśwież
+});
+
+test("rodzina końcówki rozdziela wersje zasobów — beta zwrotów nie zmienia zamówień", () => {
+  /* 406 na zwrotach klienckich (zasób w becie) nie ma prawa przestawić
+     nagłówka zamówieniom, które chodzą po public.v1. */
+  assert.equal(
+    rodzinaKoncowki(urlZwrotow("https://api.allegro.pl", "parcels.waybill", "X1")),
+    "customer-returns"
+  );
+  assert.equal(rodzinaKoncowki(urlZwrotu("https://api.allegro.pl", "r-1")), "customer-returns");
+  assert.equal(rodzinaKoncowki(urlZamowienia("https://api.allegro.pl", "o-1")), "checkout-forms");
+  assert.equal(rodzinaKoncowki("https://api.allegro.pl/me"), "inne");
 });

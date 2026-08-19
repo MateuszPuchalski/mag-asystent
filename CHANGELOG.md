@@ -33,6 +33,29 @@ historii nie przepisujemy.
 
 ---
 
+## 0.56.3 — 19 sierpnia 2026
+
+**Skan etykiety zwrotu kończył się błędem 406 — pytaliśmy Allegro o złą
+wersję zasobu.** Pierwsze prawdziwe zapytanie po sparowaniu konta wracało
+z `NotAcceptableException` i zdaniem „Please check 'Accept' request header".
+
+Wersja zasobu siedzi w Allegro w nagłówku `Accept` i NIE jest jedna dla
+całego API: zasoby stabilne biorą `public.v1`, a zwroty klienckie chodzą
+w becie, czyli `beta.v1`. Zapytanie nagłówkiem z niewłaściwej półki nie
+zwraca pustej listy, tylko właśnie 406.
+
+Zamiast wpisać betę na sztywno, adapter NEGOCJUJE wersję: próbuje kolejno
+znanych nagłówków, a działający zapamiętuje osobno dla każdej rodziny
+końcówek (`customer-returns`, `checkout-forms`). Dzięki temu wypromowanie
+zwrotów do wersji stabilnej — albo wejście kolejnej bety przy Etapie 2 —
+nie wymaga niczyjej interwencji, a jedna beta nie przestawia wersji
+wszystkim pozostałym zapytaniom. Koszt to jedno dodatkowe zapytanie raz po
+starcie procesu, nie przy każdym skanie.
+
+Zwykły PATCH; instalacji bez Allegro zmiana nie dotyczy wcale.
+
+---
+
 ## 0.56.2 — 19 sierpnia 2026
 
 **Cztery czynności w panelu biura nie działały — wszystkie z tego samego

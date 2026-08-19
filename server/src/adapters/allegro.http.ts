@@ -11,7 +11,11 @@ import type {
 
 /* ── Allegro — implementacja HTTP ────────────────────────────────────────────
    Globalny `fetch` (Node ≥22.5), zero zależności. Nagłówki wg dokumentacji:
-   `Accept: application/vnd.allegro.public.v1+json` + Bearer z serwisu tokena.
+   Accept + Bearer z serwisu tokena. WERSJA ZASOBU SIEDZI W NAGŁÓWKU `Accept`
+   i NIE jest jedna dla całego API: zasoby stabilne biorą `public.v1`, zasoby
+   w becie (m.in. zwroty klienckie) — `beta.v1`. Zły nagłówek to 406
+   NotAcceptableException, a nie pusty wynik, więc `zapytaj` próbuje obu
+   i zapamiętuje działający dla danej rodziny końcówek.
 
    Budowa URL-i i mapowanie JSON→typy są CZYSTYMI funkcjami eksportowanymi
    osobno — to jedyna logika tego pliku i jedyne, co da się przetestować bez
@@ -131,46 +135,97 @@ export function mapujZamowienie(json: unknown): ZamowienieAllegro {
   };
 }
 
+/**
+ * Wersje zasobów w nagłówku `Accept`. Kolejność jest istotna: pytamy najpierw
+ * o zasób stabilny, a `beta.v1` jest zapasem dla końcówek, których Allegro
+ * jeszcze nie wypromowało (zwroty klienckie w chwili pisania). Odwrotna
+ * kolejność kazałaby stabilnym zasobom chodzić bez potrzeby przez betę.
+ */
+const AKCEPTY = [
+  "application/vnd.allegro.public.v1+json",
+  "application/vnd.allegro.beta.v1+json",
+] as const;
+
+/**
+ * Rodzina końcówki — pierwszy segment ścieżki po `/order/`, np.
+ * `customer-returns`. Po niej zapamiętujemy działający nagłówek: jedna beta
+ * nie ma prawa przestawiać wersji wszystkim pozostałym zapytaniom.
+ */
+export function rodzinaKoncowki(url: string): string {
+  const m = /\/order\/([^/?]+)/.exec(url);
+  return m ? m[1] : "inne";
+}
+
+/* Nauczone nagłówki. Cache w pamięci procesu — 406 zdarza się raz, przy
+   pierwszym zapytaniu po starcie, a nie przy każdym skanie etykiety. */
+const dzialajacyAccept = new Map<string, string>();
+
 export class HttpAllegroAdapter implements AllegroAdapter {
   private async zapytaj(url: string): Promise<unknown | null> {
     const bearer = await wazneBearer();
-    let odp: Response;
-    try {
-      odp = await fetch(url, {
-        headers: {
-          accept: "application/vnd.allegro.public.v1+json",
-          authorization: `Bearer ${bearer}`,
-          /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
-             zablokowaniem klucza API (ekran po rejestracji aplikacji). */
-          "user-agent": allegroUserAgent(),
-        },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch (e) {
-      /* Timeout i DNS to najczęstsze awarie — komunikat ma mówić, CO sprawdzić,
-         bo „fetch failed" na ekranie biura nie prowadzi donikąd. */
-      throw new Error(
-        `Brak połączenia z Allegro (${config.allegro.apiUrl}) — sprawdź internet ` +
-          `na serwerze. (${e instanceof Error ? e.message : e})`
-      );
+    const rodzina = rodzinaKoncowki(url);
+    const znany = dzialajacyAccept.get(rodzina);
+    const doProbowania = znany ? [znany] : [...AKCEPTY];
+
+    let ostatnia406 = "";
+    for (const accept of doProbowania) {
+      let odp: Response;
+      try {
+        odp = await fetch(url, {
+          headers: {
+            accept,
+            authorization: `Bearer ${bearer}`,
+            /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
+               zablokowaniem klucza API (ekran po rejestracji aplikacji). */
+            "user-agent": allegroUserAgent(),
+          },
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+      } catch (e) {
+        /* Timeout i DNS to najczęstsze awarie — komunikat ma mówić, CO sprawdzić,
+           bo „fetch failed" na ekranie biura nie prowadzi donikąd. */
+        throw new Error(
+          `Brak połączenia z Allegro (${config.allegro.apiUrl}) — sprawdź internet ` +
+            `na serwerze. (${e instanceof Error ? e.message : e})`
+        );
+      }
+
+      /* 406 = zła WERSJA zasobu, nie zły token ani brak danych. Próbujemy
+         kolejnego nagłówka zamiast pokazywać biuru surowy błąd Allegro. */
+      if (odp.status === 406) {
+        ostatnia406 = await odp.text().catch(() => "");
+        dzialajacyAccept.delete(rodzina);
+        continue;
+      }
+
+      if (odp.status === 404) return null;
+      if (odp.status === 401) {
+        throw new Error(
+          "Allegro odrzuciło token (401) — sparuj konto ponownie: /biuro → ZWROTY → KONTO ALLEGRO."
+        );
+      }
+      if (odp.status === 403) {
+        throw new Error(
+          "Brak uprawnienia do zwrotów klienckich (403) — aplikacja na developer.allegro.pl " +
+            "musi mieć scope allegro:api:orders:read."
+        );
+      }
+      if (!odp.ok) {
+        const tresc = await odp.text().catch(() => "");
+        throw new Error(`Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`);
+      }
+
+      dzialajacyAccept.set(rodzina, accept);
+      return odp.json();
     }
-    if (odp.status === 404) return null;
-    if (odp.status === 401) {
-      throw new Error(
-        "Allegro odrzuciło token (401) — sparuj konto ponownie: /biuro → ZWROTY → KONTO ALLEGRO."
-      );
-    }
-    if (odp.status === 403) {
-      throw new Error(
-        "Brak uprawnienia do zwrotów klienckich (403) — aplikacja na developer.allegro.pl " +
-          "musi mieć scope allegro:api:orders:read."
-      );
-    }
-    if (!odp.ok) {
-      const tresc = await odp.text().catch(() => "");
-      throw new Error(`Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`);
-    }
-    return odp.json();
+
+    /* Żaden ze znanych nagłówków nie przeszedł. Zapamiętany nagłówek mógł się
+       zdezaktualizować (Allegro wypromowało zasób), więc kasujemy go wyżej
+       i mówimy wprost, czego spróbowaliśmy. */
+    throw new Error(
+      `Allegro nie akceptuje żadnej znanej wersji zasobu (406) dla ${rodzina}. ` +
+        `Próbowano: ${doProbowania.join(", ")}. ${ostatnia406.slice(0, 200)}`
+    );
   }
 
   async szukajZwrotowPoWaybill(waybill: string): Promise<ZwrotAllegro[]> {
