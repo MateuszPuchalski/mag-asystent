@@ -138,7 +138,8 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      pozycja ręczna, stempel środków, parowanie konta, dopasowanie dokumentu),
      w 0.56.0 — o logo dostawcy (wgranie i skasowanie), w 0.57.0 — o zamknięcie
      wyjątku przez biuro (trasa istniała od dawna, ale jej jedynym klientem był
-     kolektor: reklamację prowadziło biuro, a domykał ją magazynier na hali).
+     kolektor: reklamację prowadziło biuro, a domykał ją magazynier na hali)
+     oraz o potwierdzenie odczytu odpowiedzi na notatkę.
      Wszystkie te zapisy dotyczą danych, których NIE MA w Subiekcie, stoją za
      rolą biuro|admin i żaden nie rusza dostaw, stanów ani sfera_queue.
 
@@ -154,10 +155,11 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    12,
+    13,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku i sześć zapisów zwrotów Allegro (skan, utworzenie, " +
-      "decyzja, pozycja ręczna, środki, parowanie) — nic ponadto"
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i sześć zapisów " +
+      "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
+      "parowanie) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
@@ -195,6 +197,27 @@ test("lista dostaw sygnalizuje wyjątki", () => {
   );
   assert.match(html, /d\.wyjatkiOtwarte/, "wiersz listy czyta licznik wyjątków");
   assert.match(html, /badge err">\$\{d\.wyjatkiOtwarte\}/, "licznik jako plakietka błędu");
+});
+
+test("pasek stanu niesie licznik odpowiedzi na notatki", () => {
+  /* Pasek widać z KAŻDEJ zakładki i to jest cały sens tego sygnału: do 0.57.0
+     odpowiedź widać było wyłącznie po wejściu w tę konkretną dostawę, a biuro
+     nie miało powodu tam wracać. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /odpowiedziNaNotatki\.length/, "pasek stanu czyta licznik");
+  assert.match(html, /biuro\/notatki\/odpowiedzi/, "licznik ma własną trasę za sesją");
+  /* Licznik jedzie przez `api()`, nie przez gołe `fetch` — i to jest cała
+     różnica: `api()` dokłada `x-session`. Gdyby ktoś dołożył ten licznik do
+     `/api/health` (trasa z listy BEZ_SESJI, wołana tu gołym `fetch`), dane
+     biura wystawiłyby się każdemu bez logowania. */
+  assert.match(html, /api\("\/api\/biuro\/notatki\/odpowiedzi"\)/);
+  assert.ok(
+    !/fetch\("\/api\/biuro\/notatki\/odpowiedzi"/.test(html),
+    "licznik odpowiedzi musi iść przez api(), czyli za sesją"
+  );
 });
 
 test("żądania BEZ CIAŁA nie deklarują typu treści", () => {

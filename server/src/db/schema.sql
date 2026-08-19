@@ -271,7 +271,11 @@ CREATE TABLE IF NOT EXISTS delivery_note (
   -- NULL = nikt jeszcze nie odpowiedział; to ta wartość trzyma dostawę otwartą
   odpowiedz  TEXT,
   odp_at     TEXT,
-  odp_by     TEXT
+  odp_by     TEXT,
+  -- NULL = biuro jeszcze nie widziało odpowiedzi (0.57.0). Stan trzymamy
+  -- W BAZIE, nie w przeglądarce: biuro to dwa biurka, a licznik z localStorage
+  -- pokazywałby każdemu co innego i wracałby po wyczyszczeniu przeglądarki.
+  odp_widziana_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_note_dok ON delivery_note(sgt_dok_id);
 -- lista „czeka na odpowiedź" jest odpytywana przy każdym domknięciu dostawy
