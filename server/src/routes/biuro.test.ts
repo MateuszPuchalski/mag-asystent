@@ -182,6 +182,45 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
 });
 
+test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
+  /* Zgłoszenie z biura: „Nie usunięto: Bad Request" przy kasowaniu logo.
+     Wina była w `api()`, wspólnym opakowaniu WSZYSTKICH wywołań panelu:
+     `content-type: application/json` jechał zawsze, także bez ciała. Domyślny
+     parser Fastify odrzuca taką parę (FST_ERR_CTP_EMPTY_JSON_BODY, 400), więc
+     martwe były cztery czynności naraz — a trzy z nich milczały miesiącami,
+     bo robi się je raz na jakiś czas.
+
+     Bramka pilnuje SAMEJ REGUŁY, nie jednego przycisku: nagłówek musi stać za
+     sprawdzeniem `opts.body`. Test na trasie by tego nie złapał, bo `inject`
+     nie wysyła nagłówków przeglądarki — i dokładnie dlatego usterka przeszła
+     przez komplet testów tras. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  /* Zasięg zawężony do SAMEJ `api()`. Panel ma dwa surowe `fetch` — logowanie
+     i skan zwrotu — i tam nagłówek bezwarunkowy jest słuszny, bo oba wysyłają
+     ciało. Bramka o szerokości całego pliku wywalałaby się na poprawnym
+     kodzie, a taka uczy tylko obchodzenia jej. */
+  const od = html.indexOf("async function api(");
+  const api = html.slice(od, html.indexOf("\n}\n", od));
+  assert.ok(od > 0 && api.includes("await fetch"), "nie znalazłem ciała api()");
+  assert.ok(
+    /opts\.body !== undefined/.test(api),
+    "`content-type` w api() musi zależeć od obecności ciała"
+  );
+  assert.ok(
+    !/headers:\s*\{\s*"content-type"/.test(api),
+    "nagłówek nie ma prawa wrócić do bezwarunkowego obiektu"
+  );
+
+  // czworo wywołań, które ta reguła utrzymuje przy życiu
+  assert.match(html, /dokument\/\$\{dokId\}\/otworz`,\s*\{\s*method:\s*"POST"/);
+  assert.match(html, /zwroty\/\$\{otwartyZwrot\}\/dokument`,\s*\{\s*method:\s*"DELETE"/);
+  assert.match(html, /"\/api\/biuro\/allegro",\s*\{\s*method:\s*"DELETE"/);
+  assert.match(html, /dostawcy\/\$\{khId\}\/logo`,\s*\{\s*method:\s*"DELETE"/);
+});
+
 test("podgląd pokazuje, kto odłożył pozycję", () => {
   /* `done_by` i `done_at` leżały w bazie od 0.17.0 bez ani jednego czytelnika.
      Wyleciałyby z widoku niezauważone przy pierwszym porządkowaniu tabeli. */
