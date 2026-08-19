@@ -605,6 +605,23 @@ Skan `DEVWB0003` zakłada zwrot, którego pozycja ma sygnaturę spoza kartoteki 
 Skan dowolnego innego kodu kończy się komunikatem „Allegro nie zna tej
 etykiety" i przyciskiem założenia zwrotu ręcznego.
 
+### S69a — korekta i MM na bufor jednym kliknięciem
+
+Zwrot z S67 z OBIEMA pozycjami oznaczonymi jako pełnowartościowe. Panel
+KOREKTA + MM NA BUFOR pokazuje wtedy przycisk. Kliknięcie zakłada JEDNO
+zadanie kolejki (`korekta_zwrot`), a nie dwa.
+
+Efekt w trybie demo: stan magazynu sprzedaży nie zmienia się ani o sztukę,
+bo korekta go dodaje, a MM zabiera. Zeskanowany towar ląduje na magazynie
+zwrotów. Karta pokazuje oba numery: korekty i MM.
+
+Po zleceniu decyzji nie da się już zmienić. Odmowa jest zamierzona —
+dokumenty poszły na treść z chwili kliknięcia.
+
+Cztery przypadki, w których zamiast przycisku stoi zdanie o przeszkodzie.
+Pozycja bez decyzji. Brak dopasowanego dokumentu. Pozycja pełnowartościowa
+bez rozpoznanej kartoteki. Zwrot bez ani jednej pozycji pełnowartościowej.
+
 ### S70 — dostawca z logo i dostawca bez logo
 
 `FALON-TECH` ma wgrane logo, `STIHL Polska` nie ma. Oba dokumenty stoją na tej

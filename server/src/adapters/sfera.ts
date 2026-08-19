@@ -24,6 +24,13 @@
  *   //   eksponuje pola lokalizacji — UPDATE tw__Towar SET tw_Lokalizacja=@v
  *   //   osobnym loginem z GRANT UPDATE wyłącznie na tę kolumnę.
  *
+ * createKorektaZwrotu (Etap 2 zwrotów):
+ *   var kor = sfera.DokumentyHandloweManager.DodajKorekte(dokId);  // KFS/KPA
+ *   foreach (p in pozycje) kor.Pozycje[...].IloscPoKorekcie -= p.qty;
+ *   kor.Zapisz();
+ *   // …a zaraz po niej MM z magazynu sprzedaży na bufor zwrotowy. Gdy MM
+ *   // padnie, korekta jest USUWANA (kor.Usun()) — patrz kontrakt niżej.
+ *
  * createMM (MGP→MAG):
  *   var mm = sfera.DokumentyMagazynoweManager.DodajMM();
  *   mm.MagazynZrodlowy = magFrom; mm.MagazynDocelowy = magTo;
@@ -37,6 +44,39 @@ export interface MmItem {
   twId: number;
   qty: number;
 }
+
+/**
+ * Zlecenie „korekta sprzedaży + MM na bufor zwrotowy" — jedna operacja.
+ *
+ * Pozycje są te same dla obu dokumentów: korekta zdejmuje je ze sprzedaży
+ * (stan wraca do magazynu, z którego wyszły), a MM od razu przesuwa je na
+ * bufor zwrotowy. Rozdzielenie tego na dwa zadania kolejki dałoby stan,
+ * w którym korekta jest wystawiona, a towar leży w magazynie głównym jako
+ * sprzedawalny — czyli sprzedany drugi raz, zanim ktokolwiek go obejrzał.
+ */
+export interface ZlecenieKorekty {
+  /** Dokument sprzedaży w Subiekcie (dok_Id) — FS albo PA. */
+  dokId: number;
+  typ: "FS" | "PA";
+  /** Magazyn, z którego towar wyszedł — źródło MM na bufor. */
+  magZrodlowy: number;
+  /** Bufor zwrotowy — MAG_ID_ZWROTY. */
+  magZwrotow: number;
+  pozycje: MmItem[];
+}
+
+/** Numery obu dokumentów — trafiają do `sfera_queue.wynik_json`. */
+export interface WynikKorekty {
+  korektaNumer: string;
+  mmNumer: string;
+}
+
+/**
+ * Typy zadań kolejki, które wykonuje WORKER SFERY (proces C#), a nie worker
+ * Node. Jedna lista dla obu stron: `pickTask` w Node ma ich nie dotykać przy
+ * SFERA_WORKER=1, a `sfera-worker/sql/*.sql` bierze dokładnie te same.
+ */
+export const TYPY_SFERY = ["mm", "korekta_zwrot"] as const;
 
 export interface SferaAdapter {
   /** Ustaw pole lokalizacji na kartotece towaru (spec §5.2). */
@@ -54,4 +94,13 @@ export interface SferaAdapter {
    * zwróć numer dokumentu MM (spec §5.3 / §9).
    */
   createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string>;
+  /**
+   * Korekta dokumentu sprzedaży ORAZ MM na bufor zwrotowy — atomowo.
+   *
+   * „Atomowo" znaczy tu: gdy MM się nie uda, korekta zostaje USUNIĘTA, a całe
+   * zadanie kończy się błędem. Subiekt nie ma transakcji obejmującej dwa
+   * dokumenty, więc nie ma innej drogi niż wycofanie ręką implementacji —
+   * i dlatego to JEDNA metoda, a nie dwa zadania kolejki.
+   */
+  createKorektaZwrotu(zlecenie: ZlecenieKorekty): Promise<WynikKorekty>;
 }

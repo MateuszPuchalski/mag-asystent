@@ -1,6 +1,6 @@
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
-import type { MmItem, SferaAdapter } from "../adapters/sfera.js";
+import { TYPY_SFERY, type MmItem, type SferaAdapter, type ZlecenieKorekty } from "../adapters/sfera.js";
 import { logEvent } from "../services/events.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
@@ -37,21 +37,23 @@ const inBuffer = (docId: number): boolean => {
 
 export function pickTask(): Task | undefined {
   const now = nowIso();
-  /* Przy SFERA_WORKER=1 zadania `mm` wykonuje osobny proces (sfera-worker/) —
-     ten worker ma ich NIE DOTYKAĆ, inaczej oznaczy je jako error padającym
-     adapterem SQL, zanim worker Sfery zdąży je wziąć. Celowo `type <> 'mm'`,
-     a nie `type = 'set_location'`: zadanie nieznanego typu nadal bierze Node
-     i kończy czytelnym błędem „Nieznany typ zadania", zamiast wisieć w ciszy. */
-  const bezMm = config.sferaWorker ? 1 : 0;
+  /* Przy SFERA_WORKER=1 zadania dokumentowe (`mm`, `korekta_zwrot`) wykonuje
+     osobny proces (sfera-worker/) — ten worker ma ich NIE DOTYKAĆ, inaczej
+     oznaczy je jako error padającym adapterem SQL, zanim worker Sfery zdąży
+     je wziąć. Celowo wykluczamy LISTĘ typów, a nie wybieramy `set_location`:
+     zadanie nieznanego typu nadal bierze Node i kończy czytelnym błędem
+     „Nieznany typ zadania", zamiast wisieć w ciszy. */
+  const bezSfery = config.sferaWorker ? 1 : 0;
+  const listaSfery = TYPY_SFERY.map(() => "?").join(",");
   // najpierw waiting_for_doc gotowe do ponowienia
   const waiting = db()
     .prepare(
       `SELECT id,type,payload,attempts,source_doc_id,tw_id,created_by,created_by_ref FROM sfera_queue
        WHERE status='waiting_for_doc' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-         AND (? = 0 OR type <> 'mm')
+         AND (? = 0 OR type NOT IN (${listaSfery}))
        ORDER BY id LIMIT 1`
     )
-    .get(now, bezMm) as Task | undefined;
+    .get(now, bezSfery, ...TYPY_SFERY) as Task | undefined;
   if (waiting) {
     if (waiting.source_doc_id && inBuffer(waiting.source_doc_id)) {
       db()
@@ -65,10 +67,10 @@ export function pickTask(): Task | undefined {
     .prepare(
       `SELECT id,type,payload,attempts,source_doc_id,tw_id,created_by,created_by_ref FROM sfera_queue
        WHERE status='pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-         AND (? = 0 OR type <> 'mm')
+         AND (? = 0 OR type NOT IN (${listaSfery}))
        ORDER BY id LIMIT 1`
     )
-    .get(now, bezMm) as Task | undefined;
+    .get(now, bezSfery, ...TYPY_SFERY) as Task | undefined;
 }
 
 /**
@@ -118,6 +120,10 @@ export function oznaczBlad(task: Task, msg: string): void {
  * zadanie zamiast stać.
  */
 export function czekaNaDokument(task: Task): boolean {
+  /* WYŁĄCZNIE `mm`. Korekta zwrotu też nosi `source_doc_id`, ale wskazuje
+     dokument SPRZEDAŻY — a bufor jest znany tylko dla `sgt_dokument`
+     (read-model dostaw). Sprawdzanie go tam dawałoby zawsze „nie w buforze",
+     czyli pozór reguły; lepiej, żeby reguły nie było wprost. */
   if (task.type !== "mm" || !task.source_doc_id || !inBuffer(task.source_doc_id)) return false;
   db()
     .prepare("UPDATE sfera_queue SET status='waiting_for_doc', next_attempt_at=? WHERE id=?")
@@ -136,23 +142,34 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
       throw new Error("Zapis Sfery nieudany — kartoteka w edycji (Subiekt)");
     }
     let docNo: string | null = null;
+    /* Zadanie tworzące DWA dokumenty nie mieści się w `sgt_doc_number` —
+       wynik strukturalny idzie obok, do `wynik_json` (patrz schema.sql). */
+    let wynik: unknown = null;
     if (task.type === "set_location") {
       await sfera.applySetLocation(payload.twId, payload.newValue);
     } else if (task.type === "set_ean") {
       await sfera.applySetEan(payload.twId, payload.ean);
     } else if (task.type === "mm") {
       docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
+    } else if (task.type === "korekta_zwrot") {
+      const w = await sfera.createKorektaZwrotu(payload as ZlecenieKorekty);
+      wynik = w;
+      /* W kolumnie z numerem ląduje KOREKTA: to jej numer biuro podaje
+         klientowi i księgowości. Numer MM stoi w wyniku obok. */
+      docNo = w.korektaNumer;
     } else {
       throw new Error("Nieznany typ zadania: " + task.type);
     }
     db()
-      .prepare("UPDATE sfera_queue SET status='done', sgt_doc_number=?, processed_at=? WHERE id=?")
-      .run(docNo, nowIso(), task.id);
+      .prepare(
+        "UPDATE sfera_queue SET status='done', sgt_doc_number=?, wynik_json=?, processed_at=? WHERE id=?"
+      )
+      .run(docNo, wynik === null ? null : JSON.stringify(wynik), nowIso(), task.id);
     /* Sukces też jest zdarzeniem. `location_set` mówi tylko, że człowiek
        POPROSIŁ; dopiero to mówi, że zapis naprawdę wszedł do bazy firmy i o
        której. Bez tej pary audyt umie odpowiedzieć „chciał", ale nie „stało
        się" — a różnica między nimi jest właśnie tym, o co pyta reklamacja. */
-    zdarzenieZadania(task, "queue_applied", { docNo, proby: task.attempts });
+    zdarzenieZadania(task, "queue_applied", { docNo, wynik, proby: task.attempts });
     console.log(`[worker] #${task.id} OK ${task.type}${docNo ? " · MM " + docNo : ""}`);
   } catch (e) {
     oznaczBlad(task, e instanceof Error ? e.message : String(e));

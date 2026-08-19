@@ -1,10 +1,21 @@
-# Worker Sfery — dokumenty MM (C#/.NET)
+# Worker Sfery — dokumenty w Subiekcie (C#/.NET)
 
 Trzeci proces WERTIS, obok `wertis-api` i `wertis-worker`. Czyta tę samą
-tabelę `sfera_queue` w SQLite i wykonuje **wyłącznie zadania `mm`** —
-dokumenty przesunięcia magazynowego — przez COM Sfery Subiekta GT.
+tabelę `sfera_queue` w SQLite i wykonuje **zadania dokumentowe** przez COM
+Sfery Subiekta GT:
+
+| typ zadania | co powstaje |
+|---|---|
+| `mm` | dokument przesunięcia magazynowego |
+| `korekta_zwrot` | korekta sprzedaży ORAZ MM na magazyn zwrotów — atomowo |
+
 `set_location` zostaje w workerze Node (bezpośredni UPDATE jednej kolumny,
 Sfera do niego niepotrzebna).
+
+**Atomowo** znaczy: gdy MM się nie uda, korekta zostaje usunięta. Subiekt nie
+ma transakcji obejmującej dwa dokumenty, więc wycofanie robi ten kod ręką.
+Gdy nie uda się i wycofanie, zadanie kończy się błędem mówiącym wprost, że
+korektę trzeba usunąć w Subiekcie przed ponowieniem.
 
 Dlaczego MM nie da się zrobić SQL-em i dlaczego to osobny proces — spec §9
 oraz [`docs/architektura.md`](../docs/architektura.md). Kontrakt wywołań,
@@ -16,9 +27,9 @@ z którego wynika ten kod: [`server/src/adapters/sfera.ts`](../server/src/adapte
 |---|---|
 | Windows z zainstalowanym Subiektem GT | COM Sfery jest biblioteką lokalną |
 | **licencja Sfery** do Subiekta GT | bez niej COM nie wystartuje |
-| konto operatora Subiekta z prawem wystawiania MM | to użytkownik Subiekta, nie login SQL |
+| konto operatora Subiekta z prawem wystawiania MM i korekt | to użytkownik Subiekta, nie login SQL |
 | dostęp do `C:\wertis\server\data\wertis.db` | wspólna kolejka z API i workerem Node |
-| `SFERA_WORKER=1` w `wertis.env` | inaczej zadania `mm` bierze worker Node — proces odmawia startu, żeby nie było dwóch wykonawców |
+| `SFERA_WORKER=1` w `wertis.env` | inaczej zadania dokumentowe bierze worker Node — proces odmawia startu, żeby nie było dwóch wykonawców |
 
 ## Budowa i wdrożenie
 
@@ -73,6 +84,10 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
    nazwy właściwości magazynów i pozycji.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora —
    decyzja domyślna: wykonany (sens operacji to „towar sprzedawalny").
+6. Wystawienie korekty do istniejącego dokumentu
+   (`DokumentyHandloweManager.DodajKorekte(dokId)`), sposób adresowania
+   pozycji (`Pozycje.SzukajTowar`) i pole ilości po korekcie.
+7. Usunięcie korekty (`Usun()`) — to ono wycofuje operację, gdy MM padnie.
 
 Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa.
 

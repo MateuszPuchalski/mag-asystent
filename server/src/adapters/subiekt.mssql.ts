@@ -177,6 +177,7 @@ interface SprzedazRow {
   data_wyst: string;
   kontrahent: string | null;
   uwagi: string | null;
+  mag_id: number | null;
 }
 
 export interface ImportStats {
@@ -395,7 +396,8 @@ async function pobierzSprzedaz(
                 ${nrOryg} AS nr_oryg,
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
                 ISNULL(k.kh_Symbol, '') AS kontrahent,
-                ${uwagi} AS uwagi
+                ${uwagi} AS uwagi,
+                d.dok_MagId AS mag_id
          FROM dok__Dokument d WITH (NOLOCK)
          LEFT JOIN kh__Kontrahent k WITH (NOLOCK) ON k.kh_Id = d.dok_PlatnikId
          WHERE ${typFilter} AND ${oknoFilter}`
@@ -561,8 +563,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_zam_pozycja(dok_id, tw_id, ilosc, zreal) VALUES (?,?,?,?)"
   );
   const insSprzedaz = d.prepare(
-    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi)
-     VALUES (?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi, mag_id)
+     VALUES (?,?,?,?,?,?,?,?)`
   );
   const insSprzedazPoz = d.prepare(
     "INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
@@ -639,7 +641,11 @@ export async function importFromMssql(): Promise<ImportStats> {
         s.nr_oryg || null,
         s.data_wyst,
         s.kontrahent ?? "",
-        s.uwagi || null
+        s.uwagi || null,
+        /* Magazyn sprzedaży — źródło MM na bufor zwrotowy (0.57.0). Sprzedaż
+           nie zawsze idzie z magazynu głównego, a MM z niewłaściwego magazynu
+           to brak stanu i zadanie w błędzie. */
+        s.mag_id ?? null
       );
     }
     for (const p of sprzedazPozycje) {

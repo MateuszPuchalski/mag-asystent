@@ -136,9 +136,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      nadal obowiązuje. W 0.50.0 lista urosła o import zbiórek i reguły strefy
      złotej, w 0.53.0 — o zwroty Allegro (skan, wybór kandydata, decyzje,
      pozycja ręczna, stempel środków, parowanie konta, dopasowanie dokumentu),
-     w 0.56.0 — o logo dostawcy (wgranie i skasowanie).
-     Wszystkie te zapisy dotyczą danych, których NIE MA w Subiekcie, stoją za
-     rolą biuro|admin i żaden nie rusza dostaw, stanów ani sfera_queue.
+     w 0.56.0 — o logo dostawcy (wgranie i skasowanie), w 0.57.0 — o zlecenie
+     korekty zwrotu z MM na bufor.
+
+     To ostatnie ZMIENIA regułę i dlatego jest wypisane osobno: pierwszy zapis
+     z tej strony, który trafia do `sfera_queue`, czyli do bazy firmy. Reszta
+     dotyczy danych, których w Subiekcie nie ma. Wspólne zostaje to, co
+     naprawdę pilnuje ta lista: rola biuro|admin, jawne kliknięcie i zero
+     zapisu przy samym PATRZENIU na ekran.
 
      Zakazany jest wciąż `POST /api/delivery/documents/:dokId/open`: różni się
      od trasy podglądu o jeden człon ścieżki i zwróciłby to samo, a kosztem
@@ -152,10 +157,10 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    11,
+    12,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek " +
-      "i sześć zapisów zwrotów Allegro (skan, utworzenie, decyzja, pozycja " +
-      "ręczna, środki, parowanie) — nic ponadto"
+      "i siedem zapisów zwrotów Allegro (skan, utworzenie, decyzja, pozycja " +
+      "ręczna, środki, parowanie, korekta z MM) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

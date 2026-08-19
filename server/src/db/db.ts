@@ -157,6 +157,12 @@ function migrate(database: DatabaseSync) {
      wywracałoby się na nieznanej kolumnie. */
   addColumn("zwrot", "kupujacy_id", "TEXT");
   dosypIdKupujacego(database);
+  /* Etap 2 zwrotów (0.57.0): korekta + MM na bufor. `zwrot` i `sfera_queue`
+     stoją u klienta od dawna, a `sgt_sprzedaz` odświeża się w całości przy
+     imporcie — ale kolumna musi ISTNIEĆ, zanim import spróbuje do niej pisać. */
+  addColumn("zwrot", "korekta_queue_id", "INTEGER");
+  addColumn("sfera_queue", "wynik_json", "TEXT");
+  addColumn("sgt_sprzedaz", "mag_id", "INTEGER");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
@@ -327,6 +333,18 @@ function naLoginIHaslo(database: DatabaseSync) {
 
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */
 export const nowIso = () => new Date().toISOString();
+
+/** Kolejny numer korekty sprzedaży (dev; w prod numeruje Subiekt). */
+export function nextKorektaNumber(typ: "FS" | "PA"): string {
+  const d = db();
+  const row = d
+    .prepare("UPDATE counters SET value = value + 1 WHERE name='korekta' RETURNING value")
+    .get() as { value: number };
+  /* Nazewnictwo jak w Subiekcie: korekta faktury to KFS, korekta paragonu
+     to KPA. Numer jest atrapą — liczy się to, że karta zwrotu pokazuje ten
+     sam kształt, co pokaże produkcja. */
+  return `${typ === "PA" ? "KPA" : "KFS"} ${row.value}/07/2026`;
+}
 
 /** Kolejny numer dokumentu MM (dev; w prod nadaje Subiekt). */
 export function nextMmNumber(): string {

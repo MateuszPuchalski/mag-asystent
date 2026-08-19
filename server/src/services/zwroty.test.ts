@@ -30,7 +30,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar"]) {
+  for (const t of ["zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sfera_queue"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -45,14 +45,29 @@ function dokument(
   dokId: number,
   typ: string,
   dniTemu: number,
-  opcje: { nrOryg?: string; kontrahent?: string; uwagi?: string; pozycje: Array<[number, number]> }
+  opcje: {
+    nrOryg?: string;
+    kontrahent?: string;
+    uwagi?: string;
+    magId?: number | null;
+    pozycje: Array<[number, number]>;
+  }
 ): void {
   const data = new Date(Date.now() - dniTemu * 86_400_000).toISOString().slice(0, 10);
   db()
     .prepare(
-      "INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi) VALUES (?,?,?,?,?,?,?)"
+      "INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi, mag_id) VALUES (?,?,?,?,?,?,?,?)"
     )
-    .run(dokId, typ, `${typ} ${dokId}/08/2026`, opcje.nrOryg ?? null, data, opcje.kontrahent ?? "", opcje.uwagi ?? null);
+    .run(
+      dokId,
+      typ,
+      `${typ} ${dokId}/08/2026`,
+      opcje.nrOryg ?? null,
+      data,
+      opcje.kontrahent ?? "",
+      opcje.uwagi ?? null,
+      opcje.magId === undefined ? 1 : opcje.magId
+    );
   const ins = db().prepare("INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
   for (const [tw, il] of opcje.pozycje) ins.run(dokId, tw, il);
 }
@@ -280,4 +295,119 @@ test("wątek wiadomości: szukany po identyfikatorze kupującego, nie po loginie
   const reczny = Z.utworzReczny("BEZ-KLIENTA-1", "Test");
   const w3 = await Z.watekZwrotu(reczny.id);
   assert.deepEqual(w3, { login: null, szukanie: null });
+});
+
+// ── Etap 2: korekta + MM na bufor ───────────────────────────────────────────
+
+/** Zwrot dev-ret-1 doprowadzony do stanu „można wystawić dokumenty". */
+async function zwrotGotowyDoKorekty(): Promise<number> {
+  kartotekiDev();
+  dokument(101, "FS", 5, { nrOryg: "dev-ord-1", magId: 7, pozycje: [[900_036, 1], [900_037, 2]] });
+  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
+  if (w.rodzaj !== "utworzony") throw new Error("oczekiwano utworzenia");
+  for (const p of w.zwrot.pozycje) Z.zapiszDecyzje(w.zwrot.id, p.id, "pelnowartosciowy", null, "Test");
+  return w.zwrot.id;
+}
+
+test("korekta idzie na dokument sprzedaży, MM z magazynu sprzedaży na bufor", async () => {
+  /* Magazyn ŹRÓDŁOWY bierze się z dokumentu, nie z „głównego": sprzedaż nie
+     zawsze wychodzi z jedynki, a MM z niewłaściwego magazynu to brak stanu
+     i zadanie w błędzie. */
+  const id = await zwrotGotowyDoKorekty();
+  const z = Z.wystawDokumenty(id, "Test");
+  assert.equal(z.dokumenty.stan, "w_kolejce");
+
+  const zadanie = db()
+    .prepare("SELECT type, payload, source_doc_id FROM sfera_queue WHERE id = ?")
+    .get(z.dokumenty.queueId) as { type: string; payload: string; source_doc_id: number };
+  assert.equal(zadanie.type, "korekta_zwrot");
+  assert.equal(zadanie.source_doc_id, 101);
+  const p = JSON.parse(zadanie.payload);
+  assert.equal(p.dokId, 101);
+  assert.equal(p.typ, "FS");
+  assert.equal(p.magZrodlowy, 7);
+  assert.equal(p.magZwrotow, 3);
+  assert.deepEqual(p.pozycje, [{ twId: 900_036, qty: 1 }, { twId: 900_037, qty: 2 }]);
+});
+
+test("drugie kliknięcie NIE zleca drugiej korekty", async () => {
+  /* Dubel korekty to pieniądze oddane dwa razy — dwa okna biura albo dwa
+     kliknięcia w to samo miejsce nie mogą go zrobić. */
+  const id = await zwrotGotowyDoKorekty();
+  const pierwszy = Z.wystawDokumenty(id, "Test").dokumenty.queueId;
+  const drugi = Z.wystawDokumenty(id, "Test").dokumenty.queueId;
+  assert.equal(drugi, pierwszy);
+  const ile = db()
+    .prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='korekta_zwrot'")
+    .get() as { n: number };
+  assert.equal(ile.n, 1);
+});
+
+test("na korektę idą TYLKO pozycje pełnowartościowe", async () => {
+  kartotekiDev();
+  dokument(101, "FS", 5, { nrOryg: "dev-ord-1", pozycje: [[900_036, 1], [900_037, 2]] });
+  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
+  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  Z.zapiszDecyzje(w.zwrot.id, w.zwrot.pozycje[0].id, "pelnowartosciowy", null, "Test");
+  Z.zapiszDecyzje(w.zwrot.id, w.zwrot.pozycje[1].id, "do_zniszczenia", null, "Test");
+
+  const z = Z.wystawDokumenty(w.zwrot.id, "Test");
+  const p = JSON.parse(
+    (db().prepare("SELECT payload FROM sfera_queue WHERE id = ?").get(z.dokumenty.queueId) as
+      { payload: string }).payload
+  );
+  assert.deepEqual(p.pozycje, [{ twId: 900_036, qty: 1 }], "zniszczenie nie wraca na stan");
+});
+
+test("bez dokumentu, bez decyzji i bez kartoteki — przycisk mówi CZEGO brakuje", async () => {
+  kartotekiDev();
+  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
+  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  assert.match(w.zwrot.dokumenty.przeszkoda ?? "", /decyzja/i);
+  assert.throws(() => Z.wystawDokumenty(w.zwrot.id, "Test"), /decyzja/i);
+
+  for (const p of w.zwrot.pozycje) Z.zapiszDecyzje(w.zwrot.id, p.id, "pelnowartosciowy", null, "Test");
+  assert.match(Z.szczegolZwrotu(w.zwrot.id).dokumenty.przeszkoda ?? "", /dokument sprzedaży/i);
+});
+
+test("pozycja pełnowartościowa bez kartoteki ZATRZYMUJE całość", async () => {
+  /* Korekta na część zwrotu i pieniądze za całość to najgorszy możliwy wynik,
+     bo nikt tego później nie zauważy — więc brakująca kartoteka blokuje. */
+  kartotekiDev();
+  dokument(101, "FS", 5, { nrOryg: "dev-ord-3", pozycje: [[900_036, 1]] });
+  const w = await Z.utworzZeSkanu("DEVWB0003", "Test"); // sygnatura spoza kartoteki
+  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  Z.zapiszDecyzje(w.zwrot.id, w.zwrot.pozycje[0].id, "pelnowartosciowy", null, "Test");
+  Z.ustawDokument(w.zwrot.id, 101, "Test");
+
+  assert.match(Z.szczegolZwrotu(w.zwrot.id).dokumenty.przeszkoda ?? "", /kartotek/i);
+  assert.throws(() => Z.wystawDokumenty(w.zwrot.id, "Test"), /kartotek/i);
+});
+
+test("po zleceniu dokumentów decyzji i dokumentu już się nie zmienia", async () => {
+  const id = await zwrotGotowyDoKorekty();
+  const pozycjaId = Z.szczegolZwrotu(id).pozycje[0].id;
+  Z.wystawDokumenty(id, "Test");
+  assert.throws(() => Z.zapiszDecyzje(id, pozycjaId, "reklamacja", null, "Test"), /zlecone/i);
+  assert.throws(() => Z.zdejmijDokument(id, "Test"), /zlecone/i);
+});
+
+test("numery obu dokumentów wracają na kartę z wiersza kolejki", async () => {
+  /* Karta czyta stan PRZEZ kolejkę, nie z kopii na zwrocie — inaczej po
+     ponowieniu miałaby drugą, nieaktualną prawdę. */
+  const id = await zwrotGotowyDoKorekty();
+  const queueId = Z.wystawDokumenty(id, "Test").dokumenty.queueId;
+  db()
+    .prepare("UPDATE sfera_queue SET status='done', sgt_doc_number=?, wynik_json=? WHERE id=?")
+    .run("KFS 9/08/2026", JSON.stringify({ korektaNumer: "KFS 9/08/2026", mmNumer: "MM 77/08/2026" }), queueId);
+
+  const d = Z.szczegolZwrotu(id).dokumenty;
+  assert.equal(d.stan, "wystawione");
+  assert.equal(d.korektaNumer, "KFS 9/08/2026");
+  assert.equal(d.mmNumer, "MM 77/08/2026");
+
+  db().prepare("UPDATE sfera_queue SET status='error', error_msg=? WHERE id=?").run("Kartoteka w edycji", queueId);
+  const bledny = Z.szczegolZwrotu(id).dokumenty;
+  assert.equal(bledny.stan, "blad");
+  assert.equal(bledny.blad, "Kartoteka w edycji");
 });

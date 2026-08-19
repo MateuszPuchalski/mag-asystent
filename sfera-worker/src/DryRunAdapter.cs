@@ -18,4 +18,13 @@ public sealed class DryRunAdapter : ISferaAdapter
             $"[sfera] DRY-RUN: MM {magFrom}->{magTo}, pozycji {items.Count} — dokument NIE powstaje");
         return $"MM DRY-RUN/{_licznik}";
     }
+
+    public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
+    {
+        _licznik++;
+        Console.WriteLine(
+            $"[sfera] DRY-RUN: korekta {z.Typ} do dok. {z.DokId} + MM {z.MagZrodlowy}->{z.MagZwrotow}, " +
+            $"pozycji {z.Pozycje.Count} — dokumenty NIE powstają");
+        return new WynikKorekty($"K{z.Typ} DRY-RUN/{_licznik}", $"MM DRY-RUN/{_licznik}");
+    }
 }
