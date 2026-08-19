@@ -33,6 +33,21 @@ historii nie przepisujemy.
 
 ---
 
+## 0.56.1 — 19 sierpnia 2026
+
+**Żądania do Allegro niosą nagłówek User-Agent — zanim Allegro zablokuje
+klucz za jego brak.** Ekran po rejestracji aplikacji na developer.allegro.pl
+mówi wprost: nagłówek jest obowiązkowy w każdym żądaniu, a brak prawidłowego
+grozi zablokowaniem klucza API. Nasza integracja wysyłała dotąd domyślny
+nagłówek fetcha — czyli dokładnie ten „nieprawidłowy".
+
+Wartość z przycisku „Wygeneruj nagłówek User-Agent" wkleja się w nowy klucz
+`ALLEGRO_USER_AGENT` (DEPLOY §6a). Puste pole nie zostawia dziury: fallback
+`WERTIS/<wersja>` przedstawia się po imieniu, nigdy gołym „node". Nagłówek
+idzie na wszystkie trzy końcówki: API, token i parowanie device flow.
+
+Zwykły PATCH; instalacji bez Allegro ta zmiana nie dotyczy wcale.
+
 ## 0.56.0 — 19 sierpnia 2026
 
 **Logo dostawcy: biuro wgrywa, magazynier widzi na liście dostaw.** Wiersz

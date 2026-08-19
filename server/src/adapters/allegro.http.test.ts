@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mapujPowod, mapujZamowienie, mapujZwrot, urlZwrotow } from "./allegro.http.js";
+import { allegroUserAgent } from "./allegro.js";
+import { config } from "../config.js";
 import { czyOdswiezyc } from "../services/allegro-token.js";
 
 /* ── Allegro HTTP — czyste funkcje ───────────────────────────────────────────
@@ -61,6 +63,20 @@ test("zamówienie niesie sygnaturę sprzedawcy (offer.external.id)", () => {
   });
   assert.equal(zam.pozycje[0].externalId, "SYM-123");
   assert.equal(zam.pozycje[0].offerId, "of-9");
+});
+
+test("User-Agent: wygenerowany z env wygrywa, fallback nazywa nas po imieniu", () => {
+  /* Allegro grozi blokadą klucza za brak prawidłowego nagłówka — domyślne
+     „node" z fetcha nie ma prawa wyjść na zewnątrz. */
+  const bylo = config.allegro.userAgent;
+  try {
+    (config.allegro as { userAgent: string }).userAgent = "";
+    assert.match(allegroUserAgent(), /^WERTIS\/\d+\.\d+\.\d+/);
+    (config.allegro as { userAgent: string }).userAgent = "Wygenerowany/1.0 (abc123)";
+    assert.equal(allegroUserAgent(), "Wygenerowany/1.0 (abc123)");
+  } finally {
+    (config.allegro as { userAgent: string }).userAgent = bylo;
+  }
 });
 
 test("odświeżenie tokena: 5 minut zapasu i odporność na śmieci w dacie", () => {
