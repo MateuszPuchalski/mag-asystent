@@ -146,6 +146,55 @@ test("zła ilość bez pozycji z dokumentu odpada", () => {
   assert.match((r as { error: string }).error, /dokument/i);
 });
 
+/* ── Zakres kategorii (0.57.0) ────────────────────────────────────────────────
+   Reguła działa w OBIE strony i to jest tu sedno. Do 0.57.0 stała tylko jej
+   połowa, i tylko dla „złej ilości" — więc „artykuł niezamówiony", z definicji
+   towar SPOZA dokumentu, dawało się przypiąć do dowolnej pozycji faktury
+   i ustawić jej status `problem`.                                            */
+
+test("każda kategoria pozycji odpada bez wskazanej pozycji", () => {
+  for (const typ of ["qty_mismatch", "missing_item", "damaged", "wrong_item"] as const) {
+    const r = zglos({ typ, qty: 1, photoBase64: "x", symObcy: "K-1", zamiastIlosc: 1 });
+    assert.ok("error" in r, `${typ} przeszło bez pozycji`);
+    assert.match((r as { error: string }).error, /pozycj/i, `${typ}: odmowa ma nazwać powód`);
+  }
+});
+
+test("licznik wyjątków liczy ZGŁOSZENIA, nie linie, i tylko nierozwiązane", () => {
+  /* Panel biura był na wyjątki ślepy: wyjątek liczy się jako pozycja domknięta
+     (D8), więc dostawa z reklamacjami pokazywała zielony pasek 100%. */
+  const a = zglos({ typ: "qty_mismatch", lineId, qty: 1 });
+  const b = zglos({ typ: "missing_item", lineId, qty: 2 });
+  assert.ok(!("error" in a) && !("error" in b));
+
+  const dokId = (
+    db().prepare("SELECT sgt_dok_id AS d FROM delivery WHERE id = ?").get(deliveryId) as { d: number }
+  ).d;
+  assert.equal(
+    P.wyjatkiOtwarteWgDokumentu([dokId]).get(dokId),
+    2,
+    "dwa zgłoszenia na jednej pozycji to dwie sprawy, nie jedna"
+  );
+
+  P.resolveProblem((a as { id: number }).id, "załatwione", "Ewa z biura");
+  assert.equal(P.wyjatkiOtwarteWgDokumentu([dokId]).get(dokId), 1, "rozwiązany wypada z licznika");
+
+  // dokument bez wyjątków nie pojawia się w mapie wcale
+  assert.equal(P.wyjatkiOtwarteWgDokumentu([dokId + 999]).size, 0);
+  assert.equal(P.wyjatkiOtwarteWgDokumentu([]).size, 0);
+});
+
+test("artykuł niezamówiony odpada, gdy ktoś przypnie go do pozycji", () => {
+  const r = zglos({ typ: "extra_item", lineId, qty: 1, symObcy: "K-1099" });
+  assert.ok("error" in r, "kategoria dostawy przeszła na pozycji");
+  assert.match((r as { error: string }).error, /dostaw/i);
+
+  // ta sama kategoria BEZ pozycji przechodzi — i nie rusza żadnej linii
+  const ok = zglos({ typ: "extra_item", qty: 1, symObcy: "K-1099" });
+  assert.ok(!("error" in ok), JSON.stringify(ok));
+  assert.notEqual(status(lineId), "problem", "zgłoszenie dostawy nie tyka pozycji");
+});
+
 test("ilość z dokumentu zapisuje się jako snapshot, nie odczyt na żywo", () => {
   /* Fakturę w Subiekcie da się poprawić po zgłoszeniu. Protokół dla dostawcy
      ma pokazywać, co widzieliśmy przy palecie, a nie stan po korekcie. */

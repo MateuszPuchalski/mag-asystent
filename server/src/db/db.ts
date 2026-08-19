@@ -151,13 +151,15 @@ function migrate(database: DatabaseSync) {
      w całości przy każdej synchronizacji, więc kolumna wypełni się sama —
      ale musi ISTNIEĆ, zanim adapter spróbuje do niej pisać. */
   addColumn("sgt_dokument", "kh_id", "INTEGER");
+  /* Sygnał dla biura, że odpowiedź na notatkę już przyszła (0.57.0). */
+  addColumn("delivery_note", "odp_widziana_at", "TEXT");
   /* Identyfikator kupującego przy zwrocie (0.56.6). `CREATE TABLE IF NOT
      EXISTS` nie dokłada kolumny do tabeli, która już istnieje — a `zwrot`
      stoi u klienta od 0.53.0. Bez tej linii wyszukiwanie wątku wiadomości
      wywracałoby się na nieznanej kolumnie. */
   addColumn("zwrot", "kupujacy_id", "TEXT");
   dosypIdKupujacego(database);
-  /* Etap 2 zwrotów (0.57.0): korekta + MM na bufor. `zwrot` i `sfera_queue`
+  /* Etap 2 zwrotów (0.58.0): korekta + MM na bufor. `zwrot` i `sfera_queue`
      stoją u klienta od dawna, a `sgt_sprzedaz` odświeża się w całości przy
      imporcie — ale kolumna musi ISTNIEĆ, zanim import spróbuje do niej pisać. */
   addColumn("zwrot", "korekta_queue_id", "INTEGER");

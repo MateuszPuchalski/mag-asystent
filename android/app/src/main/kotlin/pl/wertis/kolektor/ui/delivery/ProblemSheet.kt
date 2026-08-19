@@ -104,8 +104,6 @@ fun ProblemSheet(
     graph: AppGraph,
     deliveryId: Long,
     line: DeliveryLineView?,
-    /** Typ wybrany z góry (skrót „INNA ILOŚĆ") — oszczędza szukanie kafla. */
-    initialType: ProblemType? = null,
     /** Numer przesyłki zapisany wcześniej na tej dostawie; null = jeszcze nie pytano. */
     nrPrzesylkiZapisany: String? = null,
     onDone: () -> Unit,
@@ -114,7 +112,11 @@ fun ProblemSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var type by remember { mutableStateOf(initialType) }
+    val dozwoloneTypy = remember(line?.id) { ProblemType.dozwolone(dlaPozycji = line != null) }
+    /* Gdy zakres zostawia JEDNĄ kategorię (zgłoszenie dostawy), wybieramy ją
+       z góry — wybór z jednego elementu nie jest wyborem. Kafel zostaje na
+       ekranie, zaznaczony: człowiek ma widzieć, co zgłasza, a nie zgadywać. */
+    var type by remember { mutableStateOf(dozwoloneTypy.singleOrNull()) }
     var qty by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var photoFile by remember { mutableStateOf<File?>(null) }
@@ -302,8 +304,14 @@ fun ProblemSheet(
             Text("Zgłoszenie dotyczy całej dostawy.", fontSize = 12.5.sp, color = InkSoft)
         }
 
-        // typy jako duże kafle — rękawica trafia w 48dp, nie w listę rozwijaną
-        ProblemType.entries.chunked(2).forEach { row ->
+        /* Kafle zależne od ZAKRESU (0.57.0). Do tej wersji rysowały się wszystkie
+           pięć niezależnie od tego, co zgłaszamy — i wychodziło to bokiem w obie
+           strony: na pozycji stał „Artykuł niezamówiony" (towar SPOZA
+           dokumentu), a przy zgłoszeniu dostawy stała „Zła ilość", kafel MARTWY,
+           bo serwer odmawiał go od zawsze.
+
+           Kafle jako duże cele — rękawica trafia w 48 dp, nie w listę rozwijaną. */
+        dozwoloneTypy.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { t ->
                     TypeTile(t, selected = t == chosen, modifier = Modifier.weight(1f)) { type = t }

@@ -87,6 +87,10 @@
      nie może się domknąć — musi się odróżniać od tej już zamkniętej. */
   .karta-notatka { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
   .karta-notatka.czeka { border-color: var(--amber); background: var(--amber-bg); }
+  /* Odpowiedź, której biuro jeszcze nie widziało — zielona, bo to dobra
+     wiadomość: pytanie doczekało się odpowiedzi. „czeka" zostaje bursztynowe,
+     bo tam wciąż ktoś jest coś winien. */
+  .karta-notatka.nowa { border-color: var(--ok); background: var(--ok-bg); }
   .karta-notatka .odp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
   #szczegolLinie td.kolFoto { width: 56px; }
   .foto, .brakfoto { width: 48px; height: 48px; border-radius: 6px; display: block; }
@@ -164,6 +168,18 @@
       <p class="mute">Zdjęte z listy rozkładania decyzją biura. Towar odłożono
         bez tej aplikacji, więc nie ma z tego ani jednego skanu.</p>
       <table id="pozaWertis"></table>
+    </section>
+
+    <!-- Odpowiedzi na notatki (0.57.0). Karta chowa się, gdy nie ma na co
+         patrzeć — pusty blok „brak odpowiedzi" byłby szumem na ekranie,
+         który biuro ma przed sobą cały dzień. -->
+    <section class="card" id="kartaOdpowiedzi" hidden>
+      <h2>ODPOWIEDZI NA NOTATKI</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Magazynier odpowiedział na pytanie z notatki. Po przeczytaniu naciśnij
+        PRZECZYTANE — sygnał zgaśnie także na drugim biurku.
+      </p>
+      <table id="odpowiedzi"></table>
     </section>
 
     <section class="card" id="kartaReklamacji">
@@ -489,6 +505,8 @@ let kto = localStorage.getItem("wertis.kto") || "";
 let widok = localStorage.getItem("wertis.widok") || "dostawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
+/** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
+let odpowiedziNaNotatki = [];
 /** Czy serwer w ogóle ma skąd brać zdjęcia kartotek (ustawiane z /api/health). */
 let zdjeciaWlaczone = false;
 
@@ -615,6 +633,15 @@ function rysujStan(health, kolejka) {
     kafle.push(`<span class="badge ${n ? "err" : "ok"}" data-do="nadzor">
       ${n ? n + " rozjazdów" : "bez rozjazdów"}</span>`);
   }
+  /* Odpowiedzi na notatki (0.57.0). Sygnał stoi TUTAJ, bo pasek widać
+     z każdej zakładki, a biuro i tak patrzy w to miejsce po inne alarmy.
+     Bez niego odpowiedź widać było wyłącznie po wejściu w tę konkretną
+     dostawę — a nie było powodu tam wracać. */
+  if (odpowiedziNaNotatki.length) {
+    const n = odpowiedziNaNotatki.length;
+    kafle.push(`<span class="badge amber" data-do="dostawy">
+      ${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span>`);
+  }
   $("stan").innerHTML = kafle.join(" ");
 }
 
@@ -640,7 +667,15 @@ function rysujDostawy() {
         <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
         <td>${esc(d.dostawca)}</td>
         <td class="mute">${esc(d.dataWyst)}</td>
-        <td>${statusDostawy(d)}</td>
+        <td>${statusDostawy(d)}${
+          /* Licznik wyjątków STOI OBOK statusu, a pasek postępu zostaje bez
+             zmian. Wyjątek liczy się jako pozycja domknięta (D8) i tak ma
+             zostać — zmieniamy sygnał, nie arytmetykę. Bez tej plakietki
+             dostawa z trzema reklamacjami wyglądała jak bezproblemowa. */
+          d.wyjatkiOtwarte
+            ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
+            : ""
+        }</td>
         <td><div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
             <span class="mute">${d.linesDone}/${total} poz.</span></td>
         <td style="white-space:nowrap"><button class="akcja cichy" data-dok="${d.dokId}">POZYCJE</button></td>
@@ -674,6 +709,7 @@ function otworzDokument(dokId) {
   ostatniSzczegol = "";
   $("kartaDostaw").hidden = true;
   $("kartaReklamacji").hidden = true;
+  $("kartaOdpowiedzi").hidden = true;
   $("szczegol").hidden = false;
   $("szczegolNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
   $("szczegolLinie").innerHTML = "";
@@ -688,6 +724,7 @@ function zamknijDokument() {
   $("szczegol").hidden = true;
   $("kartaDostaw").hidden = false;
   $("kartaReklamacji").hidden = false;
+  rysujOdpowiedzi();
   odswiezDostawy();
 }
 
@@ -792,12 +829,18 @@ function statusPozycji(s) {
 const formatIlosc = (n) => String(Math.round(Number(n) * 1000) / 1000);
 
 function wyjatek(p) {
+  /* „OTWARTY" pisany WPROST. Wcześniej brak plakietki „rozwiązany" trzeba było
+     zinterpretować jako otwarty — a brak czegoś nie jest komunikatem. */
   return `<div class="wyjatek">
     <span class="badge err">${esc(p.typLabel || p.typ)}</span>
-    ${p.qty != null ? `policzone: ${esc(formatIlosc(p.qty))}` : ""}
+    ${p.symObcy ? `<b>${esc(p.symObcy)}</b>` : ""}
+    ${p.qty != null ? `policzone: ${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""}` : ""}
+    ${p.zamiastIlosc != null ? `· zamiast ${esc(formatIlosc(p.zamiastIlosc))}` : ""}
     ${p.opis ? esc(p.opis) : ""}
     <span class="mute">${esc(p.createdBy || "")} ${esc(stempelLokalny(p.createdAt))}</span>
-    ${p.resolvedAt ? '<span class="badge ok">rozwiązany</span>' : ""}
+    ${p.resolvedAt
+      ? `<span class="badge ok">rozwiązany</span>${p.resolvedNote ? ` <span class="mute">${esc(p.resolvedNote)}</span>` : ""}`
+      : `<span class="badge err">OTWARTY</span> <button class="akcja cichy" data-rozwiaz="${p.id}">ROZWIĄŻ</button>`}
     ${p.hasPhoto ? `<span data-foto="${p.id}"></span>` : ""}
   </div>`;
 }
@@ -813,12 +856,13 @@ function wyjatek(p) {
  */
 function notatki(d) {
   const lista = (d.notatki || []).map((n) => `
-    <div class="karta-notatka${n.odpowiedz ? "" : " czeka"}">
+    <div class="karta-notatka${n.odpowiedz ? (n.odpWidzianaAt ? "" : " nowa") : " czeka"}">
       <div>${esc(n.tresc)}</div>
       <div class="mute">${esc(n.createdBy)} · ${esc(stempelLokalny(n.createdAt))}</div>
       ${n.odpowiedz
         ? `<div class="odp"><b>Odpowiedź:</b> ${esc(n.odpowiedz)}
-             <div class="mute">${esc(n.odpBy)} · ${esc(stempelLokalny(n.odpAt))}</div></div>`
+             <div class="mute">${esc(n.odpBy)} · ${esc(stempelLokalny(n.odpAt))}</div>
+             ${n.odpWidzianaAt ? "" : `<button class="akcja cichy" data-przeczytane="${n.id}">PRZECZYTANE</button>`}</div>`
         : '<div class="mute"><b>Czeka na odpowiedź</b> — dostawa się nie domknie, dopóki jej nie ma.</div>'}
     </div>`).join("");
   return `<h2 style="margin-top:18px">NOTATKI DO DOSTAWY</h2>
@@ -899,6 +943,60 @@ async function przywrocDostawe(dokId) {
   } catch (e) { alert(e.message); return false; }
 }
 
+/* ── Odpowiedzi na notatki (0.57.0) ──────────────────────────────────────── */
+
+function rysujOdpowiedzi() {
+  const lista = odpowiedziNaNotatki;
+  $("kartaOdpowiedzi").hidden = lista.length === 0 || otwartyDok != null;
+  if (!lista.length) return;
+  $("odpowiedzi").innerHTML =
+    "<tr><th>DOKUMENT</th><th>PYTANIE I ODPOWIEDŹ</th><th></th></tr>" +
+    lista.map((o) => `<tr>
+      <td class="b">${esc(o.nrPelny || "—")}</td>
+      <td>
+        <div class="mute">${esc(o.tresc)}</div>
+        <div><b>${esc(o.odpowiedz)}</b></div>
+        <div class="mute">${esc(o.odpBy || "")} · ${esc(stempelLokalny(o.odpAt))}</div>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="akcja cichy" data-otworz-dok="${o.dokId}">POZYCJE</button>
+        <button class="akcja" data-przeczytane="${o.id}">PRZECZYTANE</button>
+      </td>
+    </tr>`).join("");
+}
+
+/** Potwierdzenie odczytu. Powtórka z drugiego biurka jest nieszkodliwa. */
+async function oznaczPrzeczytane(id) {
+  try {
+    await api(`/api/biuro/notatki/${id}/przeczytane`, { method: "POST", body: JSON.stringify({}) });
+    odpowiedziNaNotatki = odpowiedziNaNotatki.filter((o) => o.id !== id);
+    rysujOdpowiedzi();
+    odswiezStan();
+  } catch (e) { alert(e.message); }
+}
+
+/**
+ * Zamknięcie wyjątku przez BIURO (0.57.0).
+ *
+ * Trasa istniała od dawna i działała — ale jej jedynym klientem był kolektor,
+ * więc reklamację prowadziło biuro, a domykał ją magazynier na hali. Notatka
+ * jest opcjonalna i idzie do `resolvedNote`, czyli tam, skąd czyta ją protokół.
+ *
+ * `prompt`, jak przy zamykaniu poza WERTIS — ta strona nie ma builda ani
+ * własnych okien dialogowych i nie zamierza ich dostać.
+ */
+async function rozwiazWyjatek(id) {
+  const note = prompt("Jak to załatwiono? (opcjonalnie — wpis trafia do protokołu)");
+  if (note === null) return false;
+  try {
+    await api(`/api/problems/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ note: note.trim() }),
+    });
+    return true;
+  } catch (e) { alert(e.message); return false; }
+}
+
 function rysujReklamacje(problemy) {
   const wgDok = new Map();
   for (const p of problemy) {
@@ -908,16 +1006,22 @@ function rysujReklamacje(problemy) {
   }
   const rows = [...wgDok.entries()].map(([dok, lista]) => {
     const dId = lista.find((p) => p.deliveryId != null)?.deliveryId;
+    /* Komplet danych, nie skrót. Serwer wysyła `qtyDok`, `opis`, `createdAt`
+       i `symObcy` od dawna — panel je wyrzucał, więc biuro dzwoniło na halę
+       po rzeczy, które miało na ekranie. */
     const wiersze = lista.map((p) => `
-      <div>· <b>${esc(p.typLabel || p.typ)}</b> — ${esc(p.sym || "")} ${esc(p.name || "")}
-        ${p.qty != null ? `(policzone: ${p.qty})` : ""}
+      <div class="wyjatek">· <b>${esc(p.typLabel || p.typ)}</b> — ${esc(p.sym || p.symObcy || "")} ${esc(p.name || "")}
+        ${p.qty != null ? `<b>policzone ${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""} ${esc(p.unit || "")}</b>` : ""}
         ${p.hasPhoto ? "📷" : ""}
-        <span class="mute">${esc(p.createdBy || "")}</span></div>`).join("");
+        ${p.opis ? `<div class="mute">${esc(p.opis)}</div>` : ""}
+        <span class="mute">${esc(p.createdBy || "")} · ${esc(stempelLokalny(p.createdAt))}</span>
+        <button class="akcja cichy" data-rozwiaz="${p.id}">ROZWIĄŻ</button></div>`).join("");
     const akcje = dId != null
       ? `<button class="akcja" data-formularz="${dId}" data-nr="${esc(dok)}">FORMULARZ</button>
          <button class="akcja cichy" data-csv="${dId}" data-nr="${esc(dok)}">CSV</button>`
       : "";
-    return `<tr><td class="b">${esc(dok)}</td><td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
+    return `<tr><td class="b">${esc(dok)}<div class="mute">${lista.length} ${lista.length === 1 ? "wyjątek" : "wyjątki"}</div></td>
+      <td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
   }).join("");
   $("reklamacje").innerHTML =
     "<tr><th>DOKUMENT</th><th>WYJĄTKI</th><th></th></tr>" +
@@ -1774,10 +1878,16 @@ async function otworzFormularz(deliveryId, nrDok) {
    powodu, żeby robiła to co pół minuty w tle. */
 async function odswiezStan() {
   try {
-    const [h, q] = await Promise.all([
+    /* Licznik odpowiedzi jedzie WŁASNĄ trasą za sesją, a nie w `/api/health`:
+       health stoi na liście BEZ_SESJI, więc dane biura wystawiłby każdemu
+       bez logowania. */
+    const [h, q, odp] = await Promise.all([
       (await fetch("/api/health")).json(),
       (await api("/api/queue")).json(),
+      (await api("/api/biuro/notatki/odpowiedzi")).json().catch(() => ({ odpowiedzi: [] })),
     ]);
+    odpowiedziNaNotatki = odp.odpowiedzi || [];
+    rysujOdpowiedzi();
     rysujStan(h, q);
     return { h, q };
   } catch (e) { console.warn(e); return {}; }
@@ -2307,12 +2417,24 @@ $("zapiszFirme").addEventListener("click", zapiszFirme);
 $("szukajDziennik").addEventListener("click", szukajDziennik);
 $("csvDziennik").addEventListener("click", () =>
   pobierz(`/api/events/csv?${paramyDziennika()}`, "wertis-audyt.csv"));
+$("odpowiedzi").addEventListener("click", (e) => {
+  const p = e.target.closest("[data-przeczytane]");
+  if (p) return oznaczPrzeczytane(Number(p.dataset.przeczytane));
+  const d = e.target.closest("[data-otworz-dok]");
+  if (d) return otworzDokument(Number(d.dataset.otworzDok));
+});
 $("reklamacje").addEventListener("click", (e) => {
   const f = e.target.closest("[data-formularz]");
   if (f) return otworzFormularz(Number(f.dataset.formularz), f.dataset.nr);
   const c = e.target.closest("[data-csv]");
   if (c) return pobierz(`/api/delivery/${c.dataset.csv}/problems.csv`,
     `reklamacja-${c.dataset.nr.replace(/[^\w-]+/g, "_")}.csv`);
+  const r = e.target.closest("[data-rozwiaz]");
+  if (r) {
+    return rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
+      if (ok) odswiezDostawy();
+    });
+  }
 });
 $("dostawy").addEventListener("click", (e) => {
   const w = e.target.closest("[data-dok]");
@@ -2332,11 +2454,33 @@ $("pozaWertis").addEventListener("click", (e) => {
 $("szczegolNaglowek").addEventListener("click", (e) => {
   const n = e.target.closest("[data-notatka]");
   if (n) return dodajNotatke(Number(n.dataset.notatka));
+  const p = e.target.closest("[data-przeczytane]");
+  if (p) {
+    return oznaczPrzeczytane(Number(p.dataset.przeczytane)).then(() => {
+      ostatniSzczegol = "";
+      odswiezSzczegol();
+    });
+  }
   const z = e.target.closest("[data-zamknij-poza]");
   if (z) oznaczPozaWertis(Number(z.dataset.zamknijPoza), z.dataset.nr);
   const o = e.target.closest("[data-przywroc]");
   if (o) przywrocDostawe(Number(o.dataset.przywroc)).then((ok) => { if (ok) zamknijDokument(); });
 });
+/* Zamykanie wyjątku działa w OBU miejscach, w których wyjątek widać:
+   w wierszu pozycji i w sekcji „poza pozycjami dokumentu". Delegacja na
+   kontenerze, bo wiersze przerysowują się po każdym odświeżeniu. */
+for (const kontener of ["szczegolLinie", "szczegolBezLinii"]) {
+  $(kontener).addEventListener("click", (e) => {
+    const r = e.target.closest("[data-rozwiaz]");
+    if (r) {
+      rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
+        // `ostatniSzczegol` wyzerowane, bo inaczej odświeżenie uzna, że nic
+        // się nie zmieniło, i nie przerysuje tabeli
+        if (ok) { ostatniSzczegol = ""; odswiezSzczegol(); }
+      });
+    }
+  });
+}
 $("wrocDoListy").addEventListener("click", zamknijDokument);
 // panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
 document.addEventListener("keydown", (e) => {

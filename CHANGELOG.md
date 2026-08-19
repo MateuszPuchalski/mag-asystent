@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.57.0 — 19 sierpnia 2026
+## 0.58.0 — 19 sierpnia 2026
 
 **Zwroty, Etap 2: korekta sprzedaży i MM na bufor jednym kliknięciem.**
 [wymaga działania] Dokumenty powstają w Subiekcie, więc ta funkcja żyje
@@ -69,6 +69,74 @@ się nie zmienia — dokumenty poszły na treść z chwili kliknięcia.
 
 Strona biura po raz pierwszy zapisuje coś do `sfera_queue`, czyli do bazy
 firmy. Test pilnujący listy jej zapisów wypisuje to teraz osobno.
+
+---
+
+## 0.57.0 — 19 sierpnia 2026
+
+Cztery zmiany wokół jednej rzeczy: **co się dzieje, gdy coś idzie nie tak**.
+
+**Wybrana pozycja przebudowana.** Panel odkładania urósł do dziewięciu sekcji
+jedna pod drugą i spychał przyciski poza ekran. Teraz jest nagłówek z ✕
+i **dwa kafle**: biały ze stepperem i stanem na hali, ciemny z adresem
+i podpowiedzią skanu. Podział jest treścią, nie ozdobą — po lewej to, co
+magazynier USTAWIA, po prawej to, dokąd IDZIE.
+
+Adres schodzi z 28 na 24 sp. To jedyne miejsce, gdzie makieta odwraca
+wcześniejszą decyzję („z lokalizacją idzie się do regału i czyta ją z odległości
+ramienia") — rekompensatą jest biel na ciemnym zamiast bursztynu na kremowym,
+bo kontrast rośnie mocniej, niż spada rozmiar. Kroki `−`/`+` **zostają 48 dp**,
+nie 40 z makiety: cele dotyku są regułą całej aplikacji, kupioną pracą
+w rękawicy. Liczba i jednostka rozdzielone, bo „192 szt" w 30 sp nie mieści się
+między dwoma celami 48 dp na połowie szerokości.
+
+`ANULUJ` znika — przejmuje go ✕ w nagłówku. Był ostatnim przyciskiem długiej
+kolumny, czyli najdalej od miejsca, w którym człowiek trzyma wzrok.
+
+**Kategorie problemu znają wreszcie swój zakres.** Arkusz rysował wszystkie
+pięć bez względu na to, co się zgłasza. Na pozycji stał „Artykuł niezamówiony",
+czyli z definicji towar SPOZA dokumentu, po którego wybraniu arkusz żądał
+ręcznego numeru katalogowego mimo widocznego symbolu pozycji. A przy zgłoszeniu
+dostawy stała „Zła ilość" — kafel **martwy**, bo serwer odmawiał go od zawsze.
+
+Pozycja dostaje cztery kategorie, dostawa jedną. Walidacja działa teraz w OBIE
+strony, a druga jej połowa jest nowa i zamyka dziurę: „artykuł niezamówiony"
+dawało się przypiąć do dowolnej pozycji faktury i ustawić jej status `problem`.
+Skrót `INNA ILOŚĆ` zniknął razem ze swoim powodem — „Zła ilość" stoi teraz
+PIERWSZA wśród czterech kafli, więc skrót oszczędzał już tylko jedno tapnięcie.
+
+**Panel biura przestał być ślepy na wyjątki.** Wyjątek liczy się jako pozycja
+domknięta (D8, świadomie), więc dostawa z trzema reklamacjami pokazywała
+**zielony pasek 100%** i wyglądała jak bezproblemowa. Wiersz listy dostaw ma
+teraz licznik nierozwiązanych wyjątków; pasek postępu zostaje bez zmian —
+zmieniamy sygnał, nie arytmetykę.
+
+Karta reklamacji pokazuje datę, opis i ilość z dokumentu, a szczegół dodatkowo
+numer katalogowy, „zamiast" i notatkę rozwiązania. Po stronie serwera nie
+zmieniło się nic: te pola przychodziły od dawna i były wyrzucane.
+
+I rzecz, która wyglądała na odwróconą: **biuro może wreszcie zamknąć wyjątek**.
+Trasa istniała, działała i logowała — ale jej jedynym klientem był kolektor,
+więc reklamację prowadziło biuro, a domykał ją magazynier na hali.
+
+**Odpowiedź na notatkę wraca do biura sama.** Dotąd widać ją było wyłącznie po
+wejściu w tę konkretną dostawę — a biuro nie miało powodu tam wracać. Pasek
+stanu, widoczny z każdej zakładki, pokazuje teraz licznik odpowiedzi;
+na zakładce DOSTAWY stoi karta z pytaniem, odpowiedzią i przyciskiem
+`PRZECZYTANE`.
+
+Stan „przeczytane" siedzi **w bazie, nie w przeglądarce**: biuro to dwa biurka,
+a licznik z `localStorage` pokazywałby każdemu co innego i wracał po
+wyczyszczeniu przeglądarki. Powtórne kliknięcie z drugiego biurka jest
+nieszkodliwe i nie dubluje wpisu w audycie.
+
+Bez powiadomień systemowych przeglądarki: wymagają bezpiecznego kontekstu,
+a panel chodzi po LAN-ie po zwykłym HTTP. Okienko działałoby tylko na
+instalacjach z HTTPS, czyli losowo — sygnał w pasku działa zawsze.
+
+**[wymaga działania]** Nowy APK kolektora. Od 0.52.0 bierze go z serwera sam.
+
+---
 
 ## 0.56.6 — 19 sierpnia 2026
 

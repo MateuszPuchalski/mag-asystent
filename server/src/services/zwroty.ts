@@ -672,7 +672,7 @@ export function stanDokumentow(z: WierszZwrotu): StanDokumentow {
   };
 }
 
-/** `wynik_json` bywa pusty (zadanie sprzed 0.57.0) i uszkodzony (ręczna edycja). */
+/** `wynik_json` bywa pusty (zadanie sprzed 0.58.0) i uszkodzony (ręczna edycja). */
 function odczytajWynik(json: string | null): { korektaNumer?: string; mmNumer?: string } | null {
   if (!json) return null;
   try {

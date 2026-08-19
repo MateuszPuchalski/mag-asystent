@@ -479,6 +479,14 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   prowadzi do szczegółu.
 - Trzy zakładki. **DOSTAWY I REKLAMACJE** — postęp per dokument oraz
   nierozwiązane wyjątki; protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
+- **Wyjątki widać z listy** (0.57.0): wiersz dostawy niesie licznik
+  nierozwiązanych zgłoszeń. Pasek postępu ich nie pokaże i pokazać nie może —
+  wyjątek liczy się jako pozycja domknięta. Biuro może też **zamknąć wyjątek**
+  z notatką, która trafia do protokołu.
+- **Odpowiedź na notatkę wraca sama** (0.57.0): pasek stanu pokazuje licznik
+  nieprzeczytanych odpowiedzi. Karta na zakładce DOSTAWY niesie pytanie,
+  odpowiedź i przycisk PRZECZYTANE. Stan „przeczytane" siedzi w bazie, więc
+  gaśnie także na drugim biurku.
 - **DOSTAWCY** (0.56.0): logo firmy wgrywane raz, widoczne potem po lewej
   stronie wiersza na liście dostaw w kolektorze. Plik może być w dowolnym
   formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
@@ -522,7 +530,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 200 testów jednostkowych; buduje się bez Android SDK
+                           + 205 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 11 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

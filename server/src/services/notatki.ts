@@ -29,13 +29,21 @@ export interface Notatka {
   odpowiedz: string | null;
   odpAt: string | null;
   odpBy: string | null;
+  /** `null` = biuro jeszcze nie widziało odpowiedzi (0.57.0). */
+  odpWidzianaAt: string | null;
+}
+
+/** Odpowiedź czekająca na oczy biura — z numerem dokumentu, żeby dało się wejść. */
+export interface OdpowiedzDoPrzeczytania extends Notatka {
+  nrPelny: string | null;
 }
 
 const nowIso = () => new Date().toISOString();
 
 const SELECT = `
   SELECT id, sgt_dok_id AS dokId, tresc, created_at AS createdAt, created_by AS createdBy,
-         odpowiedz, odp_at AS odpAt, odp_by AS odpBy
+         odpowiedz, odp_at AS odpAt, odp_by AS odpBy,
+         odp_widziana_at AS odpWidzianaAt
   FROM delivery_note`;
 
 /** Wszystkie notatki dokumentu, od najstarszej — kolejność jest rozmową. */
@@ -113,4 +121,51 @@ export function odpowiedzNaNotatke(
     .run(o, nowIso(), user, noteId);
   logEvent("delivery_note_answered", user, null, { noteId, dokId: n.dokId });
   return { ok: true };
+}
+
+/* ── Odpowiedź wraca do biura (0.57.0) ───────────────────────────────────────
+   Do tej wersji odpowiedź widać było WYŁĄCZNIE po wejściu w tę konkretną
+   dostawę. Biuro zadawało pytanie i nie miało skąd wiedzieć, że przyszła
+   odpowiedź — ani powodu wracać akurat do tego dokumentu. Notatka wymusza
+   odpowiedź, żeby pytanie nie zginęło; ten sygnał domyka tę samą pętlę z drugiej
+   strony.                                                                     */
+
+/**
+ * Odpowiedzi, których biuro jeszcze nie widziało — najstarsze pierwsze.
+ *
+ * Kolejność jest treścią: najdłużej czekające wymaga uwagi najpilniej, a lista
+ * ma się czytać jak kolejka, nie jak dziennik.
+ */
+export function odpowiedziNieprzeczytane(): OdpowiedzDoPrzeczytania[] {
+  return db()
+    .prepare(
+      `SELECT n.id, n.sgt_dok_id AS dokId, n.tresc,
+              n.created_at AS createdAt, n.created_by AS createdBy,
+              n.odpowiedz, n.odp_at AS odpAt, n.odp_by AS odpBy,
+              n.odp_widziana_at AS odpWidzianaAt,
+              d.nr_pelny AS nrPelny
+         FROM delivery_note n
+         LEFT JOIN sgt_dokument d ON d.dok_id = n.sgt_dok_id
+        WHERE n.odpowiedz IS NOT NULL AND n.odp_widziana_at IS NULL
+        ORDER BY n.odp_at`
+    )
+    .all() as unknown as OdpowiedzDoPrzeczytania[];
+}
+
+/**
+ * Biuro potwierdza, że odpowiedź przeczytało. `false` = nie było czego gasić.
+ *
+ * Idempotentne: powtórne kliknięcie na drugim biurku nie jest błędem, tylko
+ * spóźnieniem — i nie ma prawa niczego zepsuć ani zdublować w audycie.
+ */
+export function oznaczOdpowiedzPrzeczytana(id: number, user: string): boolean {
+  const r = db()
+    .prepare(
+      `UPDATE delivery_note SET odp_widziana_at = ?
+        WHERE id = ? AND odpowiedz IS NOT NULL AND odp_widziana_at IS NULL`
+    )
+    .run(nowIso(), id);
+  if (!r.changes) return false;
+  logEvent("notatka_odpowiedz_przeczytana", user, null, { notatkaId: id });
+  return true;
 }

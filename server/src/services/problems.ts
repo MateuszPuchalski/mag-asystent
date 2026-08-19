@@ -60,6 +60,45 @@ export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
   ean_conflict: "Kolizja EAN",
 };
 
+/**
+ * Zakres kategorii — lustro `ZakresProblemu` w `:core` (0.57.0).
+ *
+ * Kategoria spoza tej listy dotyczy POZYCJI. Zapisujemy tu wyjątki od reguły,
+ * a nie całą tabelę, bo nowy typ ma domyślnie wymagać pozycji — to bezpieczna
+ * strona pomyłki: wyjątek bez wskazanej pozycji nie mówi dostawcy, czego
+ * dotyczy, więc protokół wychodzi pusty.
+ */
+const ZAKRES_DOSTAWA: ReadonlySet<string> = new Set<string>(["extra_item"]);
+
+/**
+ * Ile NIEROZWIĄZANYCH wyjątków ma każdy z podanych dokumentów (0.57.0).
+ *
+ * Jedno zapytanie na całą listę dostaw, nie jedno na wiersz. Powstało, bo
+ * panel biura był na wyjątki ŚLEPY: wyjątek liczy się jako pozycja domknięta
+ * (D8, świadomie), więc dostawa z trzema reklamacjami pokazywała zielony pasek
+ * 100% i wyglądała jak bezproblemowa.
+ *
+ * Liczymy wyjątki, nie linie: dwa zgłoszenia na jednej pozycji to dwie sprawy
+ * do załatwienia, a nie jedna.
+ */
+export function wyjatkiOtwarteWgDokumentu(
+  dokIds: ReadonlyArray<number>
+): Map<number, number> {
+  const czyste = [...new Set(dokIds.filter((d) => Number.isFinite(d) && d > 0))];
+  if (czyste.length === 0) return new Map();
+  const luki = czyste.map(() => "?").join(",");
+  const wiersze = db()
+    .prepare(
+      `SELECT d.sgt_dok_id AS dokId, COUNT(*) AS ile
+         FROM problem p
+         JOIN delivery d ON d.id = p.delivery_id
+        WHERE p.resolved_at IS NULL AND d.sgt_dok_id IN (${luki})
+        GROUP BY d.sgt_dok_id`
+    )
+    .all(...czyste) as Array<{ dokId: number; ile: number }>;
+  return new Map(wiersze.map((w) => [w.dokId, w.ile]));
+}
+
 /** Etykieta typu; nieznany klucz pokazujemy surowo, zamiast udawać, że go znamy. */
 export const etykietaTypu = (typ: string): string =>
   PROBLEM_TYPES_LABELS[typ as ProblemType] ?? typ;
@@ -156,9 +195,20 @@ export function raiseProblem(
   if (SYM_OBCY_REQUIRED.has(input.typ) && !input.symObcy?.trim()) {
     return { error: "Podaj numer katalogowy artykułu spoza dokumentu" };
   }
-  if (input.typ === "qty_mismatch" && !input.lineId) {
-    // „zła ilość" mówi o pozycji Z DOKUMENTU — bez niej nie ma z czym porównać
-    return { error: "Zła ilość dotyczy pozycji z dokumentu" };
+  /* ZAKRES W OBIE STRONY (0.57.0). Do tej wersji stała tu tylko połowa reguły
+     i tylko dla „złej ilości". Druga połowa jest nowa i to ona zamyka dziurę:
+     „artykuł niezamówiony" — z definicji towar SPOZA dokumentu — dawało się
+     przypiąć do dowolnej pozycji faktury i ustawić jej status `problem`. */
+  const dotyczyDostawy = ZAKRES_DOSTAWA.has(input.typ);
+  if (!dotyczyDostawy && !input.lineId) {
+    return {
+      error: `„${etykietaTypu(input.typ)}" dotyczy pozycji z dokumentu — wskaż ją`,
+    };
+  }
+  if (dotyczyDostawy && input.lineId) {
+    return {
+      error: `„${etykietaTypu(input.typ)}" dotyczy całej dostawy, nie pojedynczej pozycji`,
+    };
   }
 
   /* Snapshot ilości z dokumentu. Odczyt „na żywo" przy druku protokołu

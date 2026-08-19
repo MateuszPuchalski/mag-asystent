@@ -278,7 +278,11 @@ CREATE TABLE IF NOT EXISTS delivery_note (
   -- NULL = nikt jeszcze nie odpowiedział; to ta wartość trzyma dostawę otwartą
   odpowiedz  TEXT,
   odp_at     TEXT,
-  odp_by     TEXT
+  odp_by     TEXT,
+  -- NULL = biuro jeszcze nie widziało odpowiedzi (0.57.0). Stan trzymamy
+  -- W BAZIE, nie w przeglądarce: biuro to dwa biurka, a licznik z localStorage
+  -- pokazywałby każdemu co innego i wracałby po wyczyszczeniu przeglądarki.
+  odp_widziana_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_note_dok ON delivery_note(sgt_dok_id);
 -- lista „czeka na odpowiedź" jest odpytywana przy każdym domknięciu dostawy
@@ -585,7 +589,7 @@ CREATE TABLE IF NOT EXISTS sgt_sprzedaz (
   uwagi      TEXT,                    -- kolumna z MSSQL_SPRZEDAZ_UWAGI_COLUMN; NULL gdy pominięta
   -- Magazyn, z którego towar wyszedł. To ON jest źródłem MM na bufor zwrotowy:
   -- korekta oddaje stan tam, skąd sprzedano, a nie zawsze jest to magazyn
-  -- główny. NULL (import sprzed 0.57.0) → fallback na MAG_ID_MAG.
+  -- główny. NULL (import sprzed 0.58.0) → fallback na MAG_ID_MAG.
   mag_id     INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_sprzedaz_data ON sgt_sprzedaz(data_wyst);

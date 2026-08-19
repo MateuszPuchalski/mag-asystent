@@ -9,7 +9,12 @@ import {
   listaZamknietychPozaWertis,
   zamknijPozaWertis,
 } from "../services/delivery.js";
-import { dodajNotatke, notatkiDokumentu } from "../services/notatki.js";
+import {
+  dodajNotatke,
+  notatkiDokumentu,
+  odpowiedziNieprzeczytane,
+  oznaczOdpowiedzPrzeczytana,
+} from "../services/notatki.js";
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
@@ -148,6 +153,45 @@ export async function biuroRoutes(app: FastifyInstance) {
   app.get<{ Params: { dokId: string } }>(
     "/api/biuro/dokument/:dokId/notatki",
     async (req) => ({ notatki: notatkiDokumentu(Number(req.params.dokId)) })
+  );
+
+  /* ── Odpowiedzi na notatki wracają do biura (0.57.0) ──────────────────────
+     Bramka lekka (biuro|admin), bez `autoryzuj()`: to potwierdzenie odczytu,
+     a nie orzeczenie o pracy. Wpis `privileged` przy każdym odświeżeniu paska
+     stanu byłby szumem w dzienniku — dokładnie tym, który 0.52.3 z niego
+     usuwało.
+
+     Licznik jedzie TĄ trasą, a nie przez `/api/health`: health stoi na liście
+     `BEZ_SESJI`, więc dane biura wystawiłby każdemu bez logowania. */
+  const ORZEKAJACY = ["biuro", "admin"];
+
+  function odmowa(): { kod: number; error: string } | null {
+    const s = sesjaZadania();
+    if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
+    if (!ORZEKAJACY.includes(s.user.role)) {
+      return { kod: 403, error: "Notatki do dostaw prowadzi biuro" };
+    }
+    return null;
+  }
+
+  app.get("/api/biuro/notatki/odpowiedzi", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { odpowiedzi: odpowiedziNieprzeczytane() };
+  });
+
+  app.post<{ Params: { id: string } }>(
+    "/api/biuro/notatki/:id/przeczytane",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const s = sesjaZadania();
+      const bylo = oznaczOdpowiedzPrzeczytana(Number(req.params.id), s?.user.name ?? "?");
+      /* Powtórka z drugiego biurka to spóźnienie, nie błąd — odpowiadamy
+         spokojnie, zamiast straszyć czerwonym komunikatem kogoś, kto
+         zobaczył tę samą rzecz sekundę później. */
+      return { ok: true, zmienione: bylo };
+    }
   );
 
   /* Do 0.26.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service

@@ -642,7 +642,7 @@ export async function importFromMssql(): Promise<ImportStats> {
         s.data_wyst,
         s.kontrahent ?? "",
         s.uwagi || null,
-        /* Magazyn sprzedaży — źródło MM na bufor zwrotowy (0.57.0). Sprzedaż
+        /* Magazyn sprzedaży — źródło MM na bufor zwrotowy (0.58.0). Sprzedaż
            nie zawsze idzie z magazynu głównego, a MM z niewłaściwego magazynu
            to brak stanu i zadanie w błędzie. */
         s.mag_id ?? null

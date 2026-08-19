@@ -177,3 +177,62 @@ test("ślad w audycie po obu stronach rozmowy", () => {
   assert.deepEqual(typy.map((t) => t.type), ["delivery_note_added", "delivery_note_answered"]);
   assert.deepEqual(typy.map((t) => t.user_id), ["Ewa z biura", "Jan z hali"]);
 });
+
+/* ── Odpowiedź wraca do biura (0.57.0) ────────────────────────────────────────
+   Notatka wymusza odpowiedź, żeby pytanie nie zginęło. Ten sygnał domyka tę
+   samą pętlę z drugiej strony: do 0.57.0 odpowiedź widać było wyłącznie po
+   wejściu w tę konkretną dostawę, a biuro nie miało powodu tam wracać.       */
+
+test("notatka BEZ odpowiedzi nie trafia do biura", () => {
+  // czeka na magazyniera, nie na biuro — mieszanie tych dwóch kolejek
+  // zamieniłoby sygnał w listę wszystkiego, co otwarte
+  N.dodajNotatke(DOK, "Dosłali?", "Ewa z biura");
+  assert.equal(N.odpowiedziNieprzeczytane().length, 0);
+});
+
+test("odpowiedź czeka na oczy biura i gaśnie po przeczytaniu", () => {
+  const n = N.dodajNotatke(DOK, "Dosłali?", "Ewa z biura") as { id: number };
+  N.odpowiedzNaNotatke(n.id, "Tak, dwie sztuki", "Jan z hali");
+
+  const czekaja = N.odpowiedziNieprzeczytane();
+  assert.equal(czekaja.length, 1);
+  assert.equal(czekaja[0].odpowiedz, "Tak, dwie sztuki");
+  assert.equal(czekaja[0].tresc, "Dosłali?", "pytanie jedzie razem z odpowiedzią");
+
+  assert.equal(N.oznaczOdpowiedzPrzeczytana(n.id, "Ewa z biura"), true);
+  assert.equal(N.odpowiedziNieprzeczytane().length, 0);
+});
+
+test("powtórne oznaczenie to spóźnienie, nie błąd — i nie dubluje audytu", () => {
+  // dwa biurka patrzą na ten sam licznik; drugie kliknięcie ma być nieszkodliwe
+  const n = N.dodajNotatke(DOK, "Sprawdź?", "Ewa z biura") as { id: number };
+  N.odpowiedzNaNotatke(n.id, "Sprawdzone", "Jan z hali");
+  assert.equal(N.oznaczOdpowiedzPrzeczytana(n.id, "Ewa z biura"), true);
+  assert.equal(N.oznaczOdpowiedzPrzeczytana(n.id, "Ala z biura"), false);
+
+  const ile = (
+    db()
+      .prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'notatka_odpowiedz_przeczytana'")
+      .get() as { n: number }
+  ).n;
+  assert.equal(ile, 1, "jeden odczyt, jeden wpis");
+});
+
+test("najdłużej czekająca odpowiedź jest pierwsza", () => {
+  // lista ma się czytać jak kolejka, nie jak dziennik
+  const a = N.dodajNotatke(DOK, "Pierwsze", "Ewa z biura") as { id: number };
+  const b = N.dodajNotatke(DOK, "Drugie", "Ewa z biura") as { id: number };
+  N.odpowiedzNaNotatke(b.id, "Odpowiedź na drugie", "Jan z hali");
+  db()
+    .prepare("UPDATE delivery_note SET odp_at = '2020-01-01T00:00:00.000Z' WHERE id = ?")
+    .run(a.id);
+  N.odpowiedzNaNotatke(a.id, "Odpowiedź na pierwsze", "Jan z hali");
+  db()
+    .prepare("UPDATE delivery_note SET odp_at = '2020-01-01T00:00:00.000Z' WHERE id = ?")
+    .run(a.id);
+
+  assert.deepEqual(
+    N.odpowiedziNieprzeczytane().map((o) => o.tresc),
+    ["Pierwsze", "Drugie"]
+  );
+});
