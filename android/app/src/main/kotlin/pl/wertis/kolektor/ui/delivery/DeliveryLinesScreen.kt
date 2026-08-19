@@ -77,6 +77,7 @@ import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
+import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
@@ -970,16 +971,34 @@ private fun LineRow(
                ruch pod kciukiem, przed którym broni się reszta tego ekranu.
                Nie jest to „szary kwadrat, którego unikamy w listach": rysunek
                stał tu od zawsze, zmienia się wyłącznie jego obwódka. */
+            /* Rozwinięty wiersz dostaje kafelek 44 dp na białym tle — nagłówek
+               karty z makiety. Oczekujący zostaje przy 36 dp: tam liczy się
+               gęstość listy, a nie okazałość jednej pozycji. */
+            val bokMiniatury = if (rozwiniety) 44.dp else 36.dp
             val ikonaPudelka: @Composable () -> Unit = {
-                Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                    Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(18.dp))
+                Box(
+                    Modifier
+                        .size(bokMiniatury)
+                        .then(
+                            if (rozwiniety) {
+                                Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(CardWhite)
+                                    .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(20.dp))
                 }
             }
             if (!zwiniety) {
                 MiniaturaTowaru(
                     graph,
                     line.twId,
-                    36.dp,
+                    bokMiniatury,
                     // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
                     zamiast = if (problem) null else ikonaPudelka,
                 )
@@ -988,13 +1007,18 @@ private fun LineRow(
                 Text(
                     line.sym,
                     fontFamily = BarlowCond,
-                    fontWeight = FontWeight.Bold,
-                    /* 18 sp, nie 15 — symbol jest tym, po czym magazynier
-                       rozpoznaje towar przy regale, i ma być czytelny z ręki
-                       trzymającej karton. Zwinięty zostaje mały: pasek ma tam
+                    fontWeight = if (rozwiniety) FontWeight.ExtraBold else FontWeight.Bold,
+                    /* Symbol jest tym, po czym magazynier rozpoznaje towar przy
+                       regale, i ma być czytelny z ręki trzymającej karton.
+                       Rozwinięty dostaje 20 sp jako nagłówek karty, oczekujący
+                       18 sp. Zwinięty zostaje mały: pasek ma tam
                        `heightIn(min = 34.dp)`, żeby dziesięć pozycji drobnicy
                        mieściło się bez przewijania. */
-                    fontSize = if (zwiniety) 13.sp else 18.sp,
+                    fontSize = when {
+                        zwiniety -> 13.sp
+                        rozwiniety -> 20.sp
+                        else -> 18.sp
+                    },
                     color = if (zwiniety) InkMute else Ink,
                     textDecoration = if (zwiniety) TextDecoration.LineThrough else null,
                 )
@@ -1002,17 +1026,40 @@ private fun LineRow(
                 // po nim magazynier rozpoznaje towar przy regale.
                 if (!zwiniety) {
                     Text(line.name, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        if (problem) {
-                            "ZGŁOSZONY PROBLEM · ${iloscZJednostka(line.qtyDoc, line.unit)}"
-                        } else {
-                            iloscZJednostka(line.qtyDoc, line.unit) +
-                                if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else ""
-                        },
-                        fontSize = 11.sp,
-                        fontWeight = if (problem) FontWeight.Bold else FontWeight.Normal,
-                        color = if (problem) Destructive else InkMute,
-                    )
+                    /* Linia ilości znika z nagłówka po ROZWINIĘCIU: ta sama
+                       liczba stoi wtedy 30 sp niżej, w kaflu. Zostaje przy
+                       pozycji oczekującej i przy zgłoszonym problemie — tam
+                       kafla nie ma. */
+                    if (!rozwiniety || problem) {
+                        Text(
+                            if (problem) {
+                                "ZGŁOSZONY PROBLEM · ${iloscZJednostka(line.qtyDoc, line.unit)}"
+                            } else {
+                                iloscZJednostka(line.qtyDoc, line.unit) +
+                                    if (line.status == "partial") " · odłożono ${formatQty(line.qtyDone)}" else ""
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = if (problem) FontWeight.Bold else FontWeight.Normal,
+                            color = if (problem) Destructive else InkMute,
+                        )
+                    }
+                }
+            }
+            /* ✕ zamiast „ANULUJ" na dole panelu (0.57.0). Zwinięcie było dotąd
+               ostatnim przyciskiem długiej kolumny, czyli najdalej od miejsca,
+               w którym człowiek trzyma wzrok. Powtórny tap w pasek działa jak
+               działał — to jest droga druga, nie zamiennik. */
+            if (rozwiniety) {
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(CardWhite)
+                        .border(1.dp, CardBorder, RoundedCornerShape(50))
+                        .clickable(onClick = onTap),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(WIcons.Close, contentDescription = "Zwiń pozycję", tint = InkSoft, modifier = Modifier.size(16.dp))
                 }
             }
             /* LOKALIZACJA JAKO PASTYLKA, nie jako fragment linijki metadanych.
@@ -1050,7 +1097,6 @@ private fun LineRow(
                     onProblem = onProblem,
                     onPrzesun = onPrzesun,
                     onKorekta = onKorekta,
-                    onCancel = onCancel,
                     czesc = czesc,
                     onCzesc = onCzesc,
                 )
@@ -1137,93 +1183,148 @@ private fun PanelOdkladania(
     /** Ile sztuk z tej pozycji idzie na półkę; `null` = cała reszta. */
     czesc: Double?,
     onCzesc: (Double?) -> Unit,
-    onCancel: () -> Unit,
 ) {
     var manual by remember(line.id) { mutableStateOf("") }
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        /* DWA KAFLE OBOK SIEBIE (0.57.0, wg makiety). Wcześniej te same treści
+           stały jedna pod drugą w czterech osobnych wierszach: ilość z adresem,
+           „na hali", podpowiedź skanu i osobny link ręcznego wpisu. Panel rósł
+           w dół i spychał przyciski poza ekran.
+
+           Podział jest treścią, nie ozdobą: po lewej to, co magazynier USTAWIA,
+           po prawej to, dokąd IDZIE. */
+        val zostalo = line.qtyDoc - line.qtyDone
+        val ile = (czesc ?: zostalo).coerceIn(1.0, zostalo.coerceAtLeast(1.0))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            /* Ile sztuk idzie TERAZ. Domyślnie cała reszta, bo tak wygląda
-               większość odłożeń — częściowe jest wyjątkiem i ma kosztować
-               dotknięcie, nie odwrotnie. Minus i plus zamiast pola: rękawica
-               na klawiaturze numerycznej to trzy pomyłki na dziesięć wpisów,
-               a różnice są tu małe („3 z 10 leży na wierzchu"). */
-            val zostalo = line.qtyDoc - line.qtyDone
-            val ile = (czesc ?: zostalo).coerceIn(1.0, zostalo.coerceAtLeast(1.0))
-            KrokIlosci("−", ile > 1.0) { onCzesc((ile - 1).coerceAtLeast(1.0)) }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    iloscZJednostka(ile, line.unit),
-                    fontFamily = BarlowCond,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 32.sp,
-                    color = Ink,
-                )
+            /* KAFEL BIAŁY — ile sztuk idzie TERAZ. Domyślnie cała reszta, bo
+               tak wygląda większość odłożeń; częściowe jest wyjątkiem i ma
+               kosztować dotknięcie, nie odwrotnie. Minus i plus zamiast pola:
+               rękawica na klawiaturze numerycznej to trzy pomyłki na dziesięć
+               wpisów, a różnice są tu małe („3 z 10 leży na wierzchu"). */
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(CardWhite)
+                    .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    KrokIlosci("−", ile > 1.0) { onCzesc((ile - 1).coerceAtLeast(1.0)) }
+                    /* Liczba i jednostka OSOBNO, jak na makiecie. Jeden napis
+                       „192 szt" w 30 sp nie mieści się między dwoma celami
+                       48 dp na połowie szerokości ekranu — a celów nie
+                       zmniejszamy, bo to reguła pracy w rękawicy. */
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Text(
+                            formatQty(ile),
+                            fontFamily = BarlowCond,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 30.sp,
+                            color = Ink,
+                            maxLines = 1,
+                        )
+                        Text(
+                            " ${jednostka(line.unit)}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkMute,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                    KrokIlosci("+", ile < zostalo) { onCzesc(ile + 1) }
+                }
                 // „z 10" pojawia się WYŁĄCZNIE przy odłożeniu częściowym —
                 // przy pełnym byłoby powtórzeniem tej samej liczby obok siebie
                 if (ile < zostalo) {
-                    Text(
-                        "z ${formatQty(zostalo)} · reszta zostaje",
-                        fontSize = 11.sp,
-                        color = InkMute,
-                    )
+                    Text("z ${formatQty(zostalo)} · reszta zostaje", fontSize = 11.sp, color = InkMute)
                 }
-            }
-            KrokIlosci("+", ile < zostalo) { onCzesc(ile + 1) }
-            Text(
-                /* Przy pozycji odkładanej po kawałku pokazujemy adres, pod
-                   którym reszta partii już leży — a nie pustkę ze snapshotu. */
-                "→ ${adresWiersza(line.locExpected, line.locActual) ?: "BRAK LOKALIZACJI"}",
-                fontFamily = BarlowCond,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 28.sp,
-                color = AmberInk,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        /* Stan przy półce odpowiada na pytanie, które magazynier zadaje sobie
-           z kartonem w ręce: „czy tego już tam coś leży". Rozbieżność widać
-           dopiero tutaj — pusty regał przy stanie 40 znaczy, że poprzednia
-           dostawa nie została rozłożona albo poszła gdzie indziej.
+                /* Stan przy półce odpowiada na pytanie, które magazynier zadaje
+                   sobie z kartonem w ręce: „czy tego już tam coś leży".
+                   Rozbieżność widać dopiero tutaj — pusty regał przy stanie 40
+                   znaczy, że poprzednia dostawa nie została rozłożona albo
+                   poszła gdzie indziej.
 
-           Przy dostawie krajowej towar figuruje na MAG od ZAKSIĘGOWANIA
-           dokumentu, więc ta liczba zawiera już niesioną partię — i mówimy
-           o tym wprost, zamiast zostawiać człowieka z zagadką arytmetyczną. */
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                "na hali ${formatQty(line.stanMag)}",
-                fontFamily = BarlowCond,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = Ink,
-            )
-            if (stanZawieraDostawe) {
-                Text("(z tą dostawą)", fontSize = 11.sp, color = InkMute)
-            }
-            if (line.stanMgp > 0) {
+                   Przy dostawie krajowej towar figuruje na MAG od ZAKSIĘGOWANIA
+                   dokumentu, więc ta liczba zawiera już niesioną partię —
+                   i mówimy o tym wprost, zamiast zostawiać człowieka z zagadką
+                   arytmetyczną. */
                 Text(
-                    "· w przyjęciach ${formatQty(line.stanMgp)}",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AmberInk,
+                    buildString {
+                        append("na hali ${formatQty(line.stanMag)}")
+                        if (stanZawieraDostawe) append(" z tą dostawą")
+                        if (line.stanMgp > 0) append(" · w przyjęciach ${formatQty(line.stanMgp)}")
+                    },
+                    fontSize = 11.sp,
+                    color = InkMute,
                 )
             }
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(WIcons.Pin, null, tint = InkSoft, modifier = Modifier.size(18.dp))
-            Text("zeskanuj etykietę lokalizacji", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = InkSoft)
+
+            /* KAFEL CIEMNY — dokąd to idzie. Adres schodzi z 28 sp na 24 sp
+               i to jedyne miejsce, gdzie makieta odwraca wcześniejszą decyzję
+               („z lokalizacją idzie się do regału i czyta ją z odległości
+               ramienia"). Rekompensatą jest BIEL NA CIEMNYM zamiast bursztynu
+               na kremowym: kontrast rośnie mocniej, niż spada rozmiar. Kto
+               będzie to kiedyś „poprawiał", niech zmieni oba naraz. */
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Ink)
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    /* Przy pozycji odkładanej po kawałku pokazujemy adres, pod
+                       którym reszta partii już leży — a nie pustkę ze snapshotu. */
+                    adresWiersza(line.locExpected, line.locActual) ?: "BRAK LOKALIZACJI",
+                    fontFamily = BarlowCond,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 24.sp,
+                    color = CardWhite,
+                    maxLines = 1,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Icon(WIcons.Pin, null, tint = Amber, modifier = Modifier.size(13.dp))
+                    /* Ręczny wpis wchodzi TUTAJ, jako druga połowa zdania —
+                       zniszczona etykieta nie może blokować pozycji. Człon
+                       „lub wpisz…" pojawia się wyłącznie, gdy serwer na to
+                       pozwala (`allowManual`); inaczej zostaje samo polecenie
+                       skanu i nikt nie szuka wyjścia, którego nie ma. */
+                    Text(
+                        if (allowManual && !manualOpen) "skanuj regał lub " else "skanuj regał",
+                        fontSize = 10.5.sp,
+                        color = CardWhite.copy(alpha = 0.75f),
+                    )
+                    if (allowManual && !manualOpen) {
+                        Text(
+                            "wpisz…",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Amber,
+                            modifier = Modifier.clickable(onClick = onManualOpen),
+                        )
+                    }
+                }
+            }
         }
         /* Kod, którego kartoteka nie znała, zeskanowany chwilę temu w tej
            dostawie (0.37.0). Propozycja pojawia się TYLKO tutaj i tylko gdy
@@ -1246,38 +1347,27 @@ private fun PanelOdkladania(
         /* Zniszczona etykieta nie może blokować pozycji — ta sama furtka co na
            ekranie zmiany lokalizacji, za tym samym przełącznikiem serwera
            (allowManual). Wpisany kod idzie DOKŁADNIE tą samą ścieżką co skan
-           (putaway), więc rozjazd z kartoteką dalej pyta człowieka. */
-        if (allowManual) {
-            if (!manualOpen) {
-                Text(
-                    "Wpisz lokalizację ręcznie…",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AmberDark,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // pełny wiersz i 48 dp — łokieć w rękawicy, nie kursor
-                        .heightIn(min = 48.dp)
-                        .clickable(onClick = onManualOpen)
-                        .wrapContentHeight(),
-                )
-            } else {
-                // fokus od razu — otwarcie pola nie wymaga drugiego tapnięcia
-                val fokus = remember { FocusRequester() }
-                LaunchedEffect(line.id) { fokus.requestFocus() }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        WertisTextField(
-                            value = manual,
-                            onValueChange = { manual = it.uppercase() },
-                            placeholder = "np. E08-03-01",
-                            modifier = Modifier.weight(1f).focusRequester(fokus),
-                            onDone = { onRecznie(manual) },
-                        )
-                        PrimaryButton("OK") { onRecznie(manual) }
-                    }
-                    Text("Bez spacji · ręczne wpisywanie = ryzyko literówek", fontSize = 11.sp, color = InkMute)
+           (putaway), więc rozjazd z kartoteką dalej pyta człowieka.
+
+           WEJŚCIE przeniosło się do ciemnego kafla („lub wpisz…"), bo tam stoi
+           zdanie o lokalizacji. Tu zostaje samo POLE — pojawia się dopiero po
+           otwarciu i nie zajmuje wiersza, gdy nikt go nie potrzebuje. */
+        if (allowManual && manualOpen) {
+            // fokus od razu — otwarcie pola nie wymaga drugiego tapnięcia
+            val fokus = remember { FocusRequester() }
+            LaunchedEffect(line.id) { fokus.requestFocus() }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WertisTextField(
+                        value = manual,
+                        onValueChange = { manual = it.uppercase() },
+                        placeholder = "np. E08-03-01",
+                        modifier = Modifier.weight(1f).focusRequester(fokus),
+                        onDone = { onRecznie(manual) },
+                    )
+                    PrimaryButton("OK") { onRecznie(manual) }
                 }
+                Text("Bez spacji · ręczne wpisywanie = ryzyko literówek", fontSize = 11.sp, color = InkMute)
             }
         }
         /* Sam PROBLEM, na pełną szerokość. Skrót „INNA ILOŚĆ" zniknął w 0.57.0
@@ -1293,7 +1383,7 @@ private fun PanelOdkladania(
             onClick = onProblem,
         )
         /* Poprawka WŁASNEJ pomyłki w liczeniu, nie zgłoszenie do dostawcy —
-           i dlatego stoi osobno, pod „INNĄ ILOŚCIĄ". Pozycja bez ani jednej
+           i dlatego stoi osobno, pod „PROBLEMEM". Pozycja bez ani jednej
            odłożonej sztuki nie ma czego poprawiać: tam drogą jest zwykłe
            odłożenie. Przy zgłoszonym wyjątku serwer i tak odmówi, więc nie
            dajemy przycisku, który obiecuje coś, czego nie zrobi. */
@@ -1311,7 +1401,10 @@ private fun PanelOdkladania(
         onPrzesun?.let {
             OutlineButton("PRZESUŃ NA HALĘ", modifier = Modifier.fillMaxWidth(), onClick = it)
         }
-        OutlineButton("ANULUJ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+        /* „ANULUJ" zniknął w 0.57.0 — przejął go ✕ w nagłówku karty. Był
+           ostatnim przyciskiem długiej kolumny, czyli najdalej od miejsca,
+           w którym człowiek trzyma wzrok, i najbliżej „PRZESUŃ NA HALĘ",
+           z którym nie ma nic wspólnego. */
     }
 }
 
