@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { WERSJA } from "../wersja.js";
 import { HttpAllegroAdapter } from "./allegro.http.js";
 import { DevAllegroAdapter } from "./allegro.dev.js";
 
@@ -79,6 +80,16 @@ export interface AllegroAdapter {
   zwrot(id: string): Promise<ZwrotAllegro | null>;
   /** Zamówienie (checkout-form) — źródło `externalId` pozycji; `null` gdy brak. */
   zamowienie(orderId: string): Promise<ZamowienieAllegro | null>;
+}
+
+/**
+ * User-Agent do KAŻDEGO żądania (auth i API) — Allegro wymaga go wprost,
+ * a brak prawidłowego nagłówka grozi zablokowaniem klucza. Wartość
+ * wygenerowaną na developer.allegro.pl wkleja się w `ALLEGRO_USER_AGENT`;
+ * fallback identyfikuje nas nazwą i wersją, nigdy domyślnym „node".
+ */
+export function allegroUserAgent(): string {
+  return config.allegro.userAgent || `WERTIS/${WERSJA}`;
 }
 
 /**

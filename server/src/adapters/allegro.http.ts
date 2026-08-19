@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { allegroUserAgent } from "./allegro.js";
 import { wazneBearer } from "../services/allegro-token.js";
 import type {
   AllegroAdapter,
@@ -139,6 +140,9 @@ export class HttpAllegroAdapter implements AllegroAdapter {
         headers: {
           accept: "application/vnd.allegro.public.v1+json",
           authorization: `Bearer ${bearer}`,
+          /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
+             zablokowaniem klucza API (ekran po rejestracji aplikacji). */
+          "user-agent": allegroUserAgent(),
         },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });

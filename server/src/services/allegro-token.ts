@@ -1,6 +1,6 @@
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
-import { allegroTryb } from "../adapters/allegro.js";
+import { allegroTryb, allegroUserAgent } from "../adapters/allegro.js";
 import { logEvent } from "./events.js";
 
 /* ── Token OAuth konta Allegro — persystencja, odświeżanie, parowanie ────────
@@ -78,7 +78,8 @@ async function endpointTokena(params: URLSearchParams): Promise<Record<string, u
   try {
     odp = await fetch(`${config.allegro.authUrl}/token?${params}`, {
       method: "POST",
-      headers: { authorization: basic() },
+      // User-Agent obowiązkowy wg Allegro także na endpointach auth
+      headers: { authorization: basic(), "user-agent": allegroUserAgent() },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (e) {
@@ -182,6 +183,7 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
       headers: {
         authorization: basic(),
         "content-type": "application/x-www-form-urlencoded",
+        "user-agent": allegroUserAgent(),
       },
       body: new URLSearchParams({ client_id: config.allegro.clientId }),
       signal: AbortSignal.timeout(TIMEOUT_MS),

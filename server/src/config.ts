@@ -238,6 +238,15 @@ export const config = {
   allegro: {
     clientId: process.env.ALLEGRO_CLIENT_ID ?? "",
     clientSecret: process.env.ALLEGRO_CLIENT_SECRET ?? "",
+    /**
+     * Nagłówek User-Agent do KAŻDEGO żądania (auth i API). Allegro wymaga go
+     * wprost — ekran po rejestracji aplikacji ostrzega, że brak prawidłowego
+     * nagłówka może skończyć się ZABLOKOWANIEM klucza. Wklej tu wartość
+     * z przycisku „Wygeneruj nagłówek User-Agent" na developer.allegro.pl.
+     * Puste = rozsądny fallback `WERTIS/<wersja>` — działa, ale wygenerowany
+     * identyfikuje aplikację jednoznacznie i jego użycie jest bezpieczniejsze.
+     */
+    userAgent: process.env.ALLEGRO_USER_AGENT ?? "",
     /** 1 = środowisko testowe allegro.pl.allegrosandbox.pl. */
     sandbox: process.env.ALLEGRO_SANDBOX === "1",
     /**

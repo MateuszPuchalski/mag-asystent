@@ -881,12 +881,15 @@ z Allegro (scenariusze S67–S69).
 
 1. **Rejestracja aplikacji** na <https://developer.allegro.pl> (konto
    sprzedawcy firmy): *Moje aplikacje → Nowa aplikacja*, typ **„urządzenie”**
-   (device flow — bez adresu przekierowania). Zapisz `client_id`
-   i `client_secret` do `wertis.env`:
+   (device flow — bez adresu przekierowania). Uprawnienie tylko
+   `allegro:api:orders:read`. Po rejestracji kliknij **„Wygeneruj nagłówek
+   User-Agent”** — Allegro wymaga tego nagłówka w każdym żądaniu, a jego
+   brak grozi zablokowaniem klucza. Zapisz wszystko do `wertis.env`:
 
    ```
    export ALLEGRO_CLIENT_ID=...
    export ALLEGRO_CLIENT_SECRET=...
+   export ALLEGRO_USER_AGENT=...
    ```
 
 2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` →
