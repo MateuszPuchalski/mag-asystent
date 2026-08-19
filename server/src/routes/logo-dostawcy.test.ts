@@ -120,6 +120,28 @@ test("kasowanie działa, a kasowanie nieistniejącego to 404", async () => {
   assert.equal(znowu.statusCode, 404);
 });
 
+test("pusta treść zadeklarowana jako JSON to 400 — tak działa Fastify", () => {
+  /* NIE jest to bramka na naszą poprawkę, bo ta siedzi po stronie panelu
+     (`api()` w biuro.html). Jest to ZAPIS FAKTU, którego nikt nie zna
+     z pamięci, a który przebrał się za błąd w logo: panel wysyłał
+     `content-type: application/json` przy żądaniu bez ciała, domyślny parser
+     Fastify odrzucał to jako FST_ERR_CTP_EMPTY_JSON_BODY, a biuro widziało
+     gołe „Bad Request".
+
+     `app.inject` bez tego nagłówka przechodzi — i dlatego komplet testów tras
+     świecił na zielono przy funkcji, której nie dało się użyć. */
+  return app
+    .inject({
+      method: "DELETE",
+      url: "/api/biuro/dostawcy/508/logo",
+      headers: { ...naglowki("biuro"), "content-type": "application/json" },
+    })
+    .then((r) => {
+      assert.equal(r.statusCode, 400);
+      assert.equal(r.json().error, "Bad Request", "dokładnie ten napis zobaczyło biuro");
+    });
+});
+
 // ── Odczyt przez kolektor ───────────────────────────────────────────────────
 
 test("zwraca PNG z ETagiem, typem i długością", async () => {
