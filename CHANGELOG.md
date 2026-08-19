@@ -33,6 +33,89 @@ historii nie przepisujemy.
 
 ---
 
+## 0.55.0 — 19 sierpnia 2026
+
+**Układ ekranu dostawy — trzy poprawki ze zrzutu z hali.** Wszystkie dotyczą
+tego, gdzie oko szuka informacji, a ręka przycisku.
+
+**Zdjęcie stoi po lewej także w wierszu rozwiniętym.** Dotąd wędrowało: przy
+pozycji oczekującej było przy symbolu, a po rozwinięciu przeskakiwało na drugi
+koniec paska, w rozmiarze 56 dp. Powód był kiedyś prawdziwy — zdjęcie miało nie
+sąsiadować z pastylką adresu. Tylko że w rozwiniętym wierszu pastylki NIE MA,
+bo adres krzyczy 28 sp w panelu odkładania tuż niżej. Zostawała sama
+niespójność: ta sama pozycja pokazywała zdjęcie w dwóch różnych miejscach.
+Teraz stoi w jednym, a lewy slot 36 dp i tak był na nie przygotowany —
+zajmował go rysunek pudełka o tym samym rozmiarze.
+
+**Symbol towaru urósł z 15 na 18 sp.** To po nim magazynier rozpoznaje towar
+przy regale i ma być czytelny z ręki trzymającej karton. Pozycja zwinięta
+zostaje na 13 sp: jej pasek jest o połowę niższy po to, żeby dziesięć pozycji
+drobnicy zmieściło się bez przewijania.
+
+**„ZGŁOŚ PROBLEM DOSTAWY" i „ZAKOŃCZ DOSTAWĘ" zjechały POD listę.** Stały nad
+nią, czyli przed pracą, którą opisują. Lista jest kontrolą kompletności, więc
+dojście do zakończenia ma prowadzić wzrokiem przez to, co jeszcze zostało
+w kartonie. Nagłówek zostaje tym, po co się na ten ekran wchodzi: postęp,
+podpowiedź o skanie i pole szukania.
+
+Stan **„DOSTAWA ZAKOŃCZONA"** celowo został u góry. Na zamkniętej dostawie to
+jedyne wyjście z ekranu, a schowanie go pod pozycjami przywróciłoby usterkę
+naprawioną dzień wcześniej w 0.54.0 — dostawę dało się zamknąć, ale nie dało
+się z niej wyjść.
+
+Scenariusz S24 i checklisty w `android/README.md` mówią teraz, gdzie te rzeczy
+stoją, a nie tylko jak działają. Zdanie „na jego miejscu stoi WRÓĆ DO LISTY
+DOSTAW" przestało być prawdziwe i zniknęło.
+
+**[wymaga działania]** Nowy APK kolektora. Od 0.52.0 bierze go z serwera sam.
+
+---
+
+## 0.54.0 — 18 sierpnia 2026
+
+**Zakończona dostawa nie wypuszczała z ekranu.** Zgłoszenie z hali: *„klikam
+zakończ dostawę, dostawa zostaje zamknięta, ale nie następuje wyjście do listy
+dostaw"*. Kolektor pokazywał wtedy „Ta dostawa jest już zamknięta" — czyli
+odmowę serwera, a nie potwierdzenie zapisu.
+
+Przyczyna nie leżała w samym zamykaniu. **Dostawa domyka się sama**, gdy
+ostatnia pozycja zostaje rozstrzygnięta; robi to `closeIfComplete` po każdym
+odłożeniu. Człowiek odkłada ostatnią sztukę, dostawa jest już zamknięta,
+a przycisk „ZAKOŃCZ DOSTAWĘ" stoi dalej i czeka na kliknięcie, po którym może
+już tylko dostać odmowę. To nie był rzadki przypadek brzegowy, tylko
+**najczęstsze zakończenie pracy w tej aplikacji**.
+
+Na ekranie pozycji dostawy złożyły się na to dwie osobne usterki. Pole `status`
+przychodziło z serwera i **nie było czytane ani razu**, więc przycisk nie miał
+żadnego warunku widoczności. A powrót na listę leżał wyłącznie na ścieżce
+sukcesu — każda odmowa kończyła się samym komunikatem i ekranem bez wyjścia.
+
+Ekran czyta teraz status. Na dostawie zamkniętej zamiast przycisku stoi stan
+końcowy: `DOSTAWA ZAKOŃCZONA` i `WRÓĆ DO LISTY DOSTAW`. Człowiek nie ma już jak
+nacisnąć przycisku skazanego na odmowę.
+
+Odmowa i tak może przyjść — dostawę potrafi domknąć drugi kolektor między
+wczytaniem ekranu a naciśnięciem. Serwer nazywa ją teraz kodem
+`juz_zamknieta`, a kolektor po tym kodzie **wraca na listę zamiast zawisnąć**.
+Rozpoznanie po kodzie, nie po treści komunikatu: zdanie dla człowieka wolno
+poprawiać, znaczenie odmowy nie. Ten stan nie jest porażką — dostawa JEST
+zamknięta, więc nie ma prawa kończyć się dźwiękiem błędu.
+
+Przy okazji `deliveryId` przestaje kłamać. Wyjście z zakończonej dostawy zeruje
+kontekst pracy, więc pytanie „przejąć pracę?" i ślad w audycie nie meldują już
+„dostawa #N" po czymś, czego nie ma. Zwykły powrót tego pola **nie** czyści —
+z ekranu pozycji wchodzi się w kartę towaru, która przy powrocie tego kontekstu
+potrzebuje.
+
+Scenariusz S24 („dostawa zamknięta") dostał opis tego, co ekran ma pokazać —
+obszar zakończenia dostawy stał dotąd bez ani jednej bramki, co CHANGELOG 0.52.1
+wypisał jako jawny dług.
+
+**[wymaga działania]** Nowy APK kolektora. Od 0.52.0 bierze go z serwera sam —
+wystarczy `-Aktualizuj` na serwerze i potwierdzenie na urządzeniu.
+
+---
+
 ## 0.53.2 — 18 sierpnia 2026
 
 **Tryb demo loguje się od razu: konto `admin`/`admin` powstaje samo.** Start

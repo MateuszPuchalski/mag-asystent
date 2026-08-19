@@ -58,6 +58,7 @@ import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
+import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.KorektaBody
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.offline.PendingOp
@@ -518,35 +519,40 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                     )
                 }
 
-                // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
-                OutlineButton(
-                    "ZGŁOŚ PROBLEM DOSTAWY",
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = WIcons.Alert,
-                    onClick = {
-                        problemFor = null
-                        problemOpen = true
-                    },
-                )
+                /* Dostawa ZAMKNIĘTA — stan końcowy zamiast przycisku, który
+                   musiałby odmówić. Domknięcie dzieje się SAMO po ostatniej
+                   pozycji (`closeIfComplete` na serwerze), więc to nie jest
+                   rzadki przypadek brzegowy, tylko najczęstsze zakończenie
+                   pracy: człowiek odkłada ostatnią sztukę i dostawa jest już
+                   zamknięta, zanim sięgnie po przycisk.
 
-                /* Zakończenie dostawy. Przycisk otwiera PODGLĄD, nie zapis —
-                   wyjątek „zła ilość" jedzie do protokołu rozbieżności, czyli
-                   do dostawcy, więc nie ma prawa powstać z jednego dotknięcia
-                   bez pokazania, co powstanie. */
-                OutlineButton(
-                    "ZAKOŃCZ DOSTAWĘ",
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = WIcons.Check,
-                    onClick = {
-                        scope.launch {
-                            try {
-                                zakonczenie = apiCall { graph.api.deliveryZakonczenie(id) }
-                            } catch (e: Exception) {
-                                graph.effects.toast(e.message ?: "Nie udało się policzyć podsumowania")
-                            }
-                        }
-                    },
-                )
+                   Do 0.54.0 ekran tego nie wiedział — `status` przychodził
+                   w danych i nie był czytany. „ZAKOŃCZ DOSTAWĘ" stało dalej,
+                   dostawało 400 „Ta dostawa jest już zamknięta", a powrót na
+                   listę leżał wyłącznie na ścieżce sukcesu. Objaw ze
+                   zgłoszenia: dostawa zamknięta, ekran nie do opuszczenia. */
+                if (v.status != "open") {
+                    Text(
+                        "DOSTAWA ZAKOŃCZONA",
+                        fontFamily = BarlowCond,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 15.sp,
+                        color = Success,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Text(
+                        "Nie ma tu już czego rozkładać.",
+                        fontSize = 12.sp,
+                        color = InkMute,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                    PrimaryButton(
+                        "WRÓĆ DO LISTY DOSTAW",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = WIcons.Check,
+                        onClick = { graph.nav.zakonczonaDostawa() },
+                    )
+                }
             }
         }
 
@@ -629,6 +635,59 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 )
             }
         }
+
+        /* STOPKA — oba przyciski dostawy stoją POD listą, a nie nad nią.
+           Zgłoszenie z hali i decyzja użytkownika: zakończenie ma leżeć za
+           wszystkim, co jeszcze nie zostało zeskanowane. Lista jest kontrolą
+           kompletności, więc dojście do przycisku prowadzi wzrokiem przez to,
+           co zostało — a przycisk przestaje kusić na starcie pracy.
+
+           Stan „DOSTAWA ZAKOŃCZONA" celowo ZOSTAJE w szapce. Na zamkniętej
+           dostawie to jedyne wyjście z ekranu i schowanie go pod pozycjami
+           przywróciłoby usterkę naprawioną w 0.54.0: dostawa zamknięta, ekran
+           nie do opuszczenia bez przewijania.
+
+           Stopka doklejona ZA `items` nie rusza indeksów przewijania —
+           `animateScrollToItem(indeksAktywnej + 1)` wyżej dalej liczy jedną
+           szapkę przed listą. */
+        item(key = "stopka") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
+                OutlineButton(
+                    "ZGŁOŚ PROBLEM DOSTAWY",
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = WIcons.Alert,
+                    onClick = {
+                        problemFor = null
+                        problemOpen = true
+                    },
+                )
+
+                /* Zakończenie dostawy. Przycisk otwiera PODGLĄD, nie zapis —
+                   wyjątek „zła ilość" jedzie do protokołu rozbieżności, czyli
+                   do dostawcy, więc nie ma prawa powstać z jednego dotknięcia
+                   bez pokazania, co powstanie. Na dostawie zamkniętej go nie
+                   ma: mógłby już tylko dostać odmowę (0.54.0). */
+                if (v.status == "open") {
+                    OutlineButton(
+                        "ZAKOŃCZ DOSTAWĘ",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = WIcons.Check,
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    zakonczenie = apiCall { graph.api.deliveryZakonczenie(id) }
+                                } catch (e: Exception) {
+                                    graph.effects.toast(
+                                        e.message ?: "Nie udało się policzyć podsumowania"
+                                    )
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
     }
 
     notatkaOtwarta?.let { n ->
@@ -673,10 +732,22 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         graph.effects.flashSuccess(
                             "Dostawa zakończona · ${wynik.braki.size} zgłoszeń"
                         )
-                        graph.nav.goBack()
+                        graph.nav.zakonczonaDostawa()
                     } catch (e: Exception) {
-                        graph.feedback.beep(false)
-                        graph.effects.toast(e.message ?: "Nie udało się zakończyć dostawy")
+                        /* „Już zamknięta" NIE jest porażką: stan docelowy jest
+                           osiągnięty, tylko domknął ktoś inny albo automat
+                           między wczytaniem ekranu a naciśnięciem przycisku.
+                           Odpowiedź prowadzi więc tam, dokąd człowiek zmierzał
+                           — na listę — bez dźwięku błędu. Rozpoznanie po
+                           `kod`, nie po treści: zdanie wolno poprawiać. */
+                        if (e is ApiError && e.kod == "juz_zamknieta") {
+                            zakonczenie = null
+                            graph.effects.toast("Ta dostawa była już zakończona")
+                            graph.nav.zakonczonaDostawa()
+                        } else {
+                            graph.feedback.beep(false)
+                            graph.effects.toast(e.message ?: "Nie udało się zakończyć dostawy")
+                        }
                     } finally {
                         busy = false
                     }
@@ -895,9 +966,15 @@ private fun LineRow(
             }
 
             /* Miniatura W PASKU, po lewej stronie symbolu — zgłoszenie
-               z magazynu. Rozwinięty wiersz ma już swoją (56 dp, w miejscu
-               pastylki), a decyzja „czy to ten towar" zapada WCZEŚNIEJ:
-               przy szukaniu pozycji wzrokiem po liście, zanim ręka sięgnie.
+               z magazynu. Zdjęcie stoi tu w KAŻDYM trybie poza zwiniętym, więc
+               rozwinięcie wiersza nie przenosi go na drugi koniec ekranu.
+
+               Do 0.55.0 było inaczej: rozwinięty wiersz dostawał 56 dp po
+               prawej, w miejscu pastylki adresu, żeby zdjęcie z nią nie
+               sąsiadowało. Ten argument przestał obowiązywać — pastylki
+               w rozwiniętym wierszu nie ma, bo adres krzyczy 28 sp w panelu
+               niżej. Zostawała sama niespójność: ta sama pozycja pokazywała
+               zdjęcie w dwóch różnych miejscach, zależnie od rozwinięcia.
 
                Wiersz zwinięty jej nie dostaje. Pozycja jest odłożona, więc
                rozpoznawanie towaru nic już nie wnosi, a pasek jest o połowę
@@ -914,7 +991,7 @@ private fun LineRow(
                     Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(18.dp))
                 }
             }
-            if (!zwiniety && !rozwiniety) {
+            if (!zwiniety) {
                 MiniaturaTowaru(
                     graph,
                     line.twId,
@@ -922,21 +999,18 @@ private fun LineRow(
                     // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
                     zamiast = if (problem) null else ikonaPudelka,
                 )
-            } else if (rozwiniety) {
-                /* Rozwinięty wiersz ZOSTAJE z rysunkiem pudełka. Jego zdjęcie
-                   stoi na drugim końcu paska, w miejscu pastylki adresu, więc
-                   te dwa elementy nie sąsiadują i powtórzenia nie widać.
-                   Ukrycie ikony wymagałoby tu wiedzy „czy zdjęcie jest" po tej
-                   stronie wiersza — czyli drugiego odczytu tylko po to, żeby
-                   nie narysować 18 dp szarości. */
-                ikonaPudelka()
             }
             Column(Modifier.weight(1f)) {
                 Text(
                     line.sym,
                     fontFamily = BarlowCond,
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (zwiniety) 13.sp else 15.sp,
+                    /* 18 sp, nie 15 — symbol jest tym, po czym magazynier
+                       rozpoznaje towar przy regale, i ma być czytelny z ręki
+                       trzymającej karton. Zwinięty zostaje mały: pasek ma tam
+                       `heightIn(min = 34.dp)`, żeby dziesięć pozycji drobnicy
+                       mieściło się bez przewijania. */
+                    fontSize = if (zwiniety) 13.sp else 18.sp,
                     color = if (zwiniety) InkMute else Ink,
                     textDecoration = if (zwiniety) TextDecoration.LineThrough else null,
                 )
@@ -962,15 +1036,13 @@ private fun LineRow(
                informacja, po którą sięga oko — a nagłówki alejek, które kiedyś
                ją dublowały, zniknęły.
 
-               Rozwinięty wiersz wymienia pastylkę na zdjęcie: adres i tak
-               krzyczy 28 sp w panelu odkładania niżej, a wątpliwość, którą
-               zdjęcie rozstrzyga („czy to na pewno TEN towar?"), pojawia się
-               dokładnie w chwili brania kartonu do ręki. */
+               Rozwinięty wiersz nie ma pastylki i nie dostaje w jej miejsce
+               nic: adres krzyczy 28 sp w panelu odkładania tuż niżej, a zdjęcie
+               stoi po lewej, przy symbolu. */
             // adres FAKTYCZNY, gdy pozycja już gdzieś poszła — patrz `adresWiersza`
             if (!rozwiniety) {
                 LokPastylka(adresWiersza(line.locExpected, line.locActual), przygaszona = zwiniety)
             }
-            else MiniaturaTowaru(graph, line.twId, 56.dp)
         }
 
         if (rozwiniety) {

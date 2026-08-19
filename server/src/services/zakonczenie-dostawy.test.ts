@@ -162,7 +162,26 @@ test("drugie zakończenie odmawia zamiast zdublować wyjątki", () => {
   D.zakonczDostawe(id, "Jan z hali");
   const drugie = D.zakonczDostawe(id, "Jan z hali");
   assert.ok("error" in drugie);
+  assert.equal(drugie.kod, "juz_zamknieta", "kolektor rozpoznaje odmowę po kodzie");
   assert.equal(P.listUnresolved().length, 1, "jedna praca, jeden wyjątek");
+});
+
+/* Ta droga, a nie podwójne kliknięcie, jest przyczyną zgłoszenia z produkcji:
+   „dostawa zostaje zamknięta, ale nie następuje wyjście do listy dostaw".
+   Ostatnie odłożenie domyka dostawę SAMO (`closeIfComplete`), więc przycisk
+   zakończenia trafia na dokument zamknięty sekundę wcześniej — przez tę samą
+   osobę, bez żadnego drugiego kolektora w tle. */
+test("dostawa domknięta po ostatnim odłożeniu odmawia z kodem, nie zdaniem", () => {
+  const id = dostawa([{ dok: 10, odlozone: 10, status: "done" }]);
+  D.closeIfComplete(id, "Jan z hali");
+  const stan = db().prepare("SELECT status FROM delivery WHERE id=?").get(id) as {
+    status: string;
+  };
+  assert.equal(stan.status, "done", "założenie testu: domknęła się sama");
+
+  const r = D.zakonczDostawe(id, "Jan z hali");
+  assert.ok("error" in r);
+  assert.equal(r.kod, "juz_zamknieta");
 });
 
 test("zakończenie zostawia ślad w audycie z liczbami", () => {

@@ -195,7 +195,16 @@ przed którą ta pozycja broni.
       bufor zamykał całą pozycję),
 - [ ] „ZAKOŃCZ DOSTAWĘ" pokazuje najpierw podsumowanie, dopiero potem zapisuje,
 - [ ] pozycja odłożona częściowo trafia do zgłoszeń „zła ilość",
-- [ ] pozycja nietknięta jest POMINIĘTA i NIE trafia do dostawcy.
+- [ ] pozycja nietknięta jest POMINIĘTA i NIE trafia do dostawcy,
+- [ ] „ZGŁOŚ PROBLEM DOSTAWY" i „ZAKOŃCZ DOSTAWĘ" leżą POD listą pozycji,
+      za ostatnim wierszem,
+- [ ] po odłożeniu OSTATNIEJ pozycji przycisk zakończenia znika ze stopki,
+- [ ] wtedy NA GÓRZE ekranu staje „WRÓĆ DO LISTY DOSTAW",
+- [ ] to wyjście widać BEZ przewijania — zamkniętą dostawę da się opuścić od razu,
+- [ ] ten przycisk wraca na listę dokumentów i nie zostawia po sobie
+      kontekstu pracy,
+- [ ] miniatura towaru stoi po LEWEJ, przy symbolu, także po rozwinięciu
+      wiersza; po prawej nie ma już drugiego zdjęcia.
 
 **Korekta ilości odłożonej**
 

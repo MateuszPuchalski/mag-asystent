@@ -119,6 +119,7 @@ fun HttpException.toApiError(): ApiError {
     var available: Double? = null
     var powod: String? = null
     var eanPrzed: String? = null
+    var kod: String? = null
     try {
         val raw = response()?.errorBody()?.string()
         if (!raw.isNullOrBlank()) {
@@ -127,6 +128,7 @@ fun HttpException.toApiError(): ApiError {
             available = body.available
             powod = body.powod
             eanPrzed = body.eanPrzed
+            kod = body.kod
         }
     } catch (_: Exception) {
         /* brak treści / nie-JSON */
@@ -136,6 +138,6 @@ fun HttpException.toApiError(): ApiError {
         // odmowa nadania kodu niesie POWÓD, bo `podmiana` i `zajety` prowadzą
         // w przeciwne strony: pierwszą da się przejść, drugiej nie
         powod != null -> EanOdmowa(status, msg, powod, eanPrzed)
-        else -> ApiError(status, msg)
+        else -> ApiError(status, msg, kod)
     }
 }

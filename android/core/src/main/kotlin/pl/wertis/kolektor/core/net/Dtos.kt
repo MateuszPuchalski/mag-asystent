@@ -466,6 +466,8 @@ data class ApiErrorBody(
     val eanPrzed: String? = null,
     /** Symbol kartoteki, która ten kod już ma. */
     val symKolidujacy: String? = null,
+    /** Znaczenie odmowy dla ekranu, np. `juz_zamknieta` przy dostawie (0.54.0). */
+    val kod: String? = null,
 )
 
 /* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ──────────────────────

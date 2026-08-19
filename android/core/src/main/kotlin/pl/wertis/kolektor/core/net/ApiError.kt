@@ -4,7 +4,13 @@ package pl.wertis.kolektor.core.net
    Lustro web/src/lib/api.ts:ApiError. Kluczowy niezmiennik bufora offline:
    „błąd sieci” = KAŻDY wyjątek, który NIE jest ApiError (offline.ts).        */
 
-open class ApiError(val status: Int, message: String) : Exception(message)
+/**
+ * Błąd z serwera. `kod` niesie ZNACZENIE odmowy tam, gdzie ekran musi ją
+ * rozpoznać — treść komunikatu jest dla człowieka i wolno ją poprawiać, więc
+ * rozgałęzianie po niej psuje się przy pierwszej zmianie stylu.
+ */
+open class ApiError(val status: Int, message: String, val kod: String? = null) :
+    Exception(message)
 
 /** MM: 409 z polem `available` — przekroczono dostępny stan MGP. */
 class MmConflict(status: Int, message: String, val available: Double) : ApiError(status, message)
