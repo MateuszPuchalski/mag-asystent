@@ -146,6 +146,31 @@ test("zła ilość bez pozycji z dokumentu odpada", () => {
   assert.match((r as { error: string }).error, /dokument/i);
 });
 
+/* ── Zakres kategorii (0.57.0) ────────────────────────────────────────────────
+   Reguła działa w OBIE strony i to jest tu sedno. Do 0.57.0 stała tylko jej
+   połowa, i tylko dla „złej ilości" — więc „artykuł niezamówiony", z definicji
+   towar SPOZA dokumentu, dawało się przypiąć do dowolnej pozycji faktury
+   i ustawić jej status `problem`.                                            */
+
+test("każda kategoria pozycji odpada bez wskazanej pozycji", () => {
+  for (const typ of ["qty_mismatch", "missing_item", "damaged", "wrong_item"] as const) {
+    const r = zglos({ typ, qty: 1, photoBase64: "x", symObcy: "K-1", zamiastIlosc: 1 });
+    assert.ok("error" in r, `${typ} przeszło bez pozycji`);
+    assert.match((r as { error: string }).error, /pozycj/i, `${typ}: odmowa ma nazwać powód`);
+  }
+});
+
+test("artykuł niezamówiony odpada, gdy ktoś przypnie go do pozycji", () => {
+  const r = zglos({ typ: "extra_item", lineId, qty: 1, symObcy: "K-1099" });
+  assert.ok("error" in r, "kategoria dostawy przeszła na pozycji");
+  assert.match((r as { error: string }).error, /dostaw/i);
+
+  // ta sama kategoria BEZ pozycji przechodzi — i nie rusza żadnej linii
+  const ok = zglos({ typ: "extra_item", qty: 1, symObcy: "K-1099" });
+  assert.ok(!("error" in ok), JSON.stringify(ok));
+  assert.notEqual(status(lineId), "problem", "zgłoszenie dostawy nie tyka pozycji");
+});
+
 test("ilość z dokumentu zapisuje się jako snapshot, nie odczyt na żywo", () => {
   /* Fakturę w Subiekcie da się poprawić po zgłoszeniu. Protokół dla dostawcy
      ma pokazywać, co widzieliśmy przy palecie, a nie stan po korekcie. */

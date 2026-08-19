@@ -120,10 +120,16 @@ test("wyjątek na liście nierozwiązanych podpisuje swoją ilość", () => {
 test("wyjątek bez pozycji dostawy nie wywraca zapytania", () => {
   // złączenia są LEWE: zgłoszenie luzem nie ma pozycji ani kartoteki
   const id = dostawa();
-  // `missing_item` nie wymaga zdjęcia ani pozycji — zgłasza się je o czymś,
-  // czego w przesyłce NIE MA, więc nie ma też wiersza dostawy do wskazania
+  /* Nośnikiem jest `extra_item`, bo od 0.57.0 to JEDYNA kategoria o zakresie
+     całej dostawy. Wcześniej stał tu `missing_item` z uzasadnieniem, że „nie
+     ma wiersza dostawy do wskazania" — a to było nieporozumienie: pozycja,
+     która nie przyjechała, ma swój wiersz z dokumentu i ilością odłożoną zero.
+     Bez wskazania jej protokół dla dostawcy nie mówił, CZEGO brakuje.
+
+     Sam cel testu zostaje bez zmian: sprawdzamy, że wyjątek bez pozycji nie
+     wywraca lewych złączeń i że jednostka wraca pusta. */
   const r = P.raiseProblem(
-    { deliveryId: id, typ: "missing_item", qty: 1, opis: "brakuje całej palety" },
+    { deliveryId: id, typ: "extra_item", qty: 1, symObcy: "K-9999", opis: "doszło luzem" },
     "Jan"
   );
   assert.ok(!("error" in r), `zgłoszenie odrzucone: ${JSON.stringify(r)}`);

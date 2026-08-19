@@ -10,7 +10,18 @@ package pl.wertis.kolektor.core.problem
 
    Reguły „co jest wymagane" żyją tutaj (SDK-free, testowalne) i są lustrem
    walidacji serwera — kolektor nie wysyła zgłoszenia, o którym z góry wiadomo,
-   że serwer je odrzuci; magazynier ma dostać komunikat od razu, w alejce.     */
+   że serwer je odrzuci; magazynier ma dostać komunikat od razu, w alejce.
+
+   Od 0.57.0 każdy typ zna też swój ZAKRES. Do tej pory arkusz rysował wszystkie
+   pięć kategorii niezależnie od tego, czy zgłasza się pozycję, czy dostawę —
+   i wychodziło to bokiem w obie strony. Na pozycji stał „Artykuł niezamówiony",
+   czyli z definicji towar SPOZA dokumentu, po którego wybraniu arkusz żądał
+   ręcznego numeru katalogowego mimo widocznego symbolu wybranej pozycji.
+   A przy zgłoszeniu dostawy stała „Zła ilość" — kafel MARTWY, bo serwer
+   odmawiał go od zawsze.                                                      */
+
+/** Czy kategoria opisuje JEDNĄ pozycję dokumentu, czy całą dostawę. */
+enum class ZakresProblemu { POZYCJA, DOSTAWA }
 
 enum class ProblemType(
     /** Klucz protokołu — musi się zgadzać z PROBLEM_TYPES na serwerze. */
@@ -23,14 +34,41 @@ enum class ProblemType(
      * ma linii, z której dałoby się go odczytać.
      */
     val symObcyRequired: Boolean = false,
+    /**
+     * Gdzie ta kategoria ma sens. `DOSTAWA` znaczy „nie ma pozycji, do której
+     * dałoby się to przypiąć" — nie „można i tak, i tak".
+     */
+    val zakres: ZakresProblemu = ZakresProblemu.POZYCJA,
 ) {
-    WRONG_ITEM("wrong_item", "Błędny artykuł", photoRequired = true, symObcyRequired = true),
+    /* KOLEJNOŚĆ JEST TREŚCIĄ, nie porządkiem alfabetycznym. „Zła ilość" stoi
+       pierwsza, bo rozbieżność ilościowa to najczęstszy wyjątek — i bo w 0.57.0
+       zniknął skrót „INNA ILOŚĆ", który dawał jej własny przycisk w panelu
+       odkładania. Przesunięcie jej dalej cofa tamtą zmianę bez zapowiedzi. */
+    QTY_MISMATCH("qty_mismatch", "Zła ilość"),
     MISSING_ITEM("missing_item", "Brak w przesyłce"),
     DAMAGED("damaged", "Uszkodzone w transporcie", photoRequired = true),
-    QTY_MISMATCH("qty_mismatch", "Zła ilość"),
-    EXTRA_ITEM("extra_item", "Artykuł niezamówiony", symObcyRequired = true);
+    WRONG_ITEM("wrong_item", "Błędny artykuł", photoRequired = true, symObcyRequired = true),
+    EXTRA_ITEM(
+        "extra_item",
+        "Artykuł niezamówiony",
+        symObcyRequired = true,
+        zakres = ZakresProblemu.DOSTAWA,
+    );
 
     companion object {
+        /**
+         * Kategorie do pokazania, zależnie od tego, co zgłaszamy.
+         *
+         * Kolejność zachowana z deklaracji enuma — patrz komentarz wyżej.
+         * Dla dostawy zostaje dziś dokładnie jedna kategoria i to jest wynik
+         * świadomej decyzji: uszkodzenie ma być przypięte do pozycji, żeby
+         * protokół dla dostawcy wiedział, CZEGO dotyczy.
+         */
+        fun dozwolone(dlaPozycji: Boolean): List<ProblemType> {
+            val szukany = if (dlaPozycji) ZakresProblemu.POZYCJA else ZakresProblemu.DOSTAWA
+            return entries.filter { it.zakres == szukany }
+        }
+
         /**
          * Etykieta do listy wyjątków. Zna też klucze sprzed 0.21.0, bo stare
          * zgłoszenia zostają w bazie na zawsze — historii się nie kasuje —
@@ -73,8 +111,14 @@ fun problemBlocker(
     // ilość jest wymagana w KAŻDEJ kategorii — formularz żąda jej wszędzie
     qty == null || qty < 0 -> "Podaj ilość"
     type.symObcyRequired && symObcy.isNullOrBlank() -> "Podaj numer katalogowy tego artykułu"
-    // „zła ilość" mówi o pozycji Z DOKUMENTU — bez niej nie ma z czym porównać
-    type == ProblemType.QTY_MISMATCH && lineId == null -> "Zła ilość dotyczy pozycji z dokumentu"
+    /* Zakres w OBIE strony. Do 0.57.0 stała tu tylko połowa tej reguły i tylko
+       dla „złej ilości" — więc „artykuł niezamówiony" dawało się przypiąć do
+       pozycji faktury, z którą nie miał nic wspólnego, i ustawić jej status
+       „problem". */
+    type.zakres == ZakresProblemu.POZYCJA && lineId == null ->
+        "„${type.label}” dotyczy pozycji z dokumentu — wybierz ją z listy"
+    type.zakres == ZakresProblemu.DOSTAWA && lineId != null ->
+        "„${type.label}” dotyczy całej dostawy — zgłoś to przyciskiem pod listą"
     type == ProblemType.DAMAGED && nrPrzesylki.isNullOrBlank() -> "Podaj numer przesyłki"
     else -> null
 }

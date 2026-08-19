@@ -74,7 +74,6 @@ import pl.wertis.kolektor.core.net.NotatkaDostawy
 import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
-import pl.wertis.kolektor.core.problem.ProblemType
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
@@ -197,8 +196,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     /** Zgłoszenie wyjątku; `line` = null → problem całej dostawy (D8). */
     var problemFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
     var problemOpen by remember(id) { mutableStateOf(false) }
-    /** Typ wstępnie wybrany w arkuszu wyjątku (skrót „INNA ILOŚĆ"). */
-    var problemType by remember(id) { mutableStateOf<ProblemType?>(null) }
     var busy by remember { mutableStateOf(false) }
     /** Otwarte przesunięcie stanu na halę (skrót z wiersza kontenera). */
     var przesunFor by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
@@ -610,15 +607,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         problemOpen = true
                     },
                     onPrzesun = magZrodlowy?.let { { przesunFor = line } },
-                    onQtyIssue = {
-                        problemFor = line
-                        // od 0.21.0 „inna ilość" to jedna kategoria z formularza:
-                        // magazynier podaje, ile faktycznie przyszło, a serwer
-                        // zapisuje przy tym ilość z dokumentu — nikt nie zgaduje,
-                        // czy „za mało" znaczyło brak, czy niedowóz
-                        problemType = ProblemType.QTY_MISMATCH
-                        problemOpen = true
-                    },
                     onCancel = { zwolnij(line) },
                     onKorekta = { korektaDla = line },
                     czesc = czesc,
@@ -820,14 +808,12 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             graph = graph,
             deliveryId = id,
             line = problemFor,
-            initialType = problemType,
             // numer przesyłki pytamy RAZ na dostawę — jeśli już go zapisano,
             // arkusz o niego nie pyta, bo przesyłka jest jedna
             nrPrzesylkiZapisany = view?.nrPrzesylki,
             onDone = {
                 problemOpen = false
                 problemFor = null
-                problemType = null
                 active = null
                 czesc = null
                 reload++
@@ -835,7 +821,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             onCancel = {
                 problemOpen = false
                 problemFor = null
-                problemType = null
             },
         )
     }
@@ -907,7 +892,6 @@ private fun LineRow(
     onNadajEan: () -> Unit,
     onTap: () -> Unit,
     onProblem: () -> Unit,
-    onQtyIssue: () -> Unit,
     onPrzesun: (() -> Unit)?,
     /** Poprawienie liczby już odłożonych sztuk — patrz `PanelOdkladania`. */
     onKorekta: () -> Unit,
@@ -1064,7 +1048,6 @@ private fun LineRow(
                     nieznanyKod = nieznanyKod,
                     onNadajEan = onNadajEan,
                     onProblem = onProblem,
-                    onQtyIssue = onQtyIssue,
                     onPrzesun = onPrzesun,
                     onKorekta = onKorekta,
                     onCancel = onCancel,
@@ -1147,7 +1130,6 @@ private fun PanelOdkladania(
     nieznanyKod: String?,
     onNadajEan: () -> Unit,
     onProblem: () -> Unit,
-    onQtyIssue: () -> Unit,
     /** null = dostawa księgowana wprost na halę, nie ma czego przesuwać. */
     onPrzesun: (() -> Unit)?,
     /** Poprawienie liczby już odłożonych sztuk (0.45.0). */
@@ -1298,13 +1280,18 @@ private fun PanelOdkladania(
                 }
             }
         }
-        // Rozkładanie JEST sprawdzaniem faktury i liczy się KAŻDĄ pozycję, więc
-        // rozbieżność ilościowa to najczęstszy wyjątek — zasługuje na własny
-        // przycisk, a nie na szukanie kafla wśród pięciu kategorii.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlineButton("INNA ILOŚĆ", modifier = Modifier.weight(1f), onClick = onQtyIssue)
-            OutlineButton("PROBLEM", modifier = Modifier.weight(1f), danger = true, onClick = onProblem)
-        }
+        /* Sam PROBLEM, na pełną szerokość. Skrót „INNA ILOŚĆ" zniknął w 0.57.0
+           razem ze swoim powodem: dawał własny przycisk najczęstszemu wyjątkowi,
+           żeby nie szukać go wśród PIĘCIU kafli. Kafli dla pozycji są teraz
+           cztery, a „Zła ilość" stoi PIERWSZA — skrót oszczędzał więc już tylko
+           jedno tapnięcie, kosztem drugiego przycisku w miejscu, w którym każdy
+           zabiera wzrok. */
+        OutlineButton(
+            "PROBLEM",
+            modifier = Modifier.fillMaxWidth(),
+            danger = true,
+            onClick = onProblem,
+        )
         /* Poprawka WŁASNEJ pomyłki w liczeniu, nie zgłoszenie do dostawcy —
            i dlatego stoi osobno, pod „INNĄ ILOŚCIĄ". Pozycja bez ani jednej
            odłożonej sztuki nie ma czego poprawiać: tam drogą jest zwykłe

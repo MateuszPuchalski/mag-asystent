@@ -60,6 +60,16 @@ export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
   ean_conflict: "Kolizja EAN",
 };
 
+/**
+ * Zakres kategorii — lustro `ZakresProblemu` w `:core` (0.57.0).
+ *
+ * Kategoria spoza tej listy dotyczy POZYCJI. Zapisujemy tu wyjątki od reguły,
+ * a nie całą tabelę, bo nowy typ ma domyślnie wymagać pozycji — to bezpieczna
+ * strona pomyłki: wyjątek bez wskazanej pozycji nie mówi dostawcy, czego
+ * dotyczy, więc protokół wychodzi pusty.
+ */
+const ZAKRES_DOSTAWA: ReadonlySet<string> = new Set<string>(["extra_item"]);
+
 /** Etykieta typu; nieznany klucz pokazujemy surowo, zamiast udawać, że go znamy. */
 export const etykietaTypu = (typ: string): string =>
   PROBLEM_TYPES_LABELS[typ as ProblemType] ?? typ;
@@ -156,9 +166,20 @@ export function raiseProblem(
   if (SYM_OBCY_REQUIRED.has(input.typ) && !input.symObcy?.trim()) {
     return { error: "Podaj numer katalogowy artykułu spoza dokumentu" };
   }
-  if (input.typ === "qty_mismatch" && !input.lineId) {
-    // „zła ilość" mówi o pozycji Z DOKUMENTU — bez niej nie ma z czym porównać
-    return { error: "Zła ilość dotyczy pozycji z dokumentu" };
+  /* ZAKRES W OBIE STRONY (0.57.0). Do tej wersji stała tu tylko połowa reguły
+     i tylko dla „złej ilości". Druga połowa jest nowa i to ona zamyka dziurę:
+     „artykuł niezamówiony" — z definicji towar SPOZA dokumentu — dawało się
+     przypiąć do dowolnej pozycji faktury i ustawić jej status `problem`. */
+  const dotyczyDostawy = ZAKRES_DOSTAWA.has(input.typ);
+  if (!dotyczyDostawy && !input.lineId) {
+    return {
+      error: `„${etykietaTypu(input.typ)}" dotyczy pozycji z dokumentu — wskaż ją`,
+    };
+  }
+  if (dotyczyDostawy && input.lineId) {
+    return {
+      error: `„${etykietaTypu(input.typ)}" dotyczy całej dostawy, nie pojedynczej pozycji`,
+    };
   }
 
   /* Snapshot ilości z dokumentu. Odczyt „na żywo" przy druku protokołu
