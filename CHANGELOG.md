@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.56.2 — 19 sierpnia 2026
+## 0.56.3 — 19 sierpnia 2026
 
 **Skan etykiety zwrotu kończył się błędem 406 — pytaliśmy Allegro o złą
 wersję zasobu.** Pierwsze prawdziwe zapytanie po sparowaniu konta wracało
@@ -53,6 +53,51 @@ wszystkim pozostałym zapytaniom. Koszt to jedno dodatkowe zapytanie raz po
 starcie procesu, nie przy każdym skanie.
 
 Zwykły PATCH; instalacji bez Allegro zmiana nie dotyczy wcale.
+
+---
+
+## 0.56.2 — 19 sierpnia 2026
+
+**Cztery czynności w panelu biura nie działały — wszystkie z tego samego
+powodu.** Zgłoszenie brzmiało wąsko: kasowanie logo dostawcy kończy się
+komunikatem „Nie usunięto: Bad Request".
+
+Wina nie leżała w logo, tylko w `api()` — wspólnym opakowaniu wszystkich
+wywołań panelu. Nagłówek `content-type: application/json` jechał **zawsze**,
+także przy żądaniach bez treści. Domyślny parser Fastify odrzuca taką parę
+u siebie i odpowiada 400 z polem `error: "Bad Request"` — czyli dokładnie tym
+napisem, który zobaczyło biuro.
+
+Martwe były przez to cztery rzeczy naraz, a trzy z nich milczały miesiącami,
+bo robi się je raz na jakiś czas:
+
+- cofnięcie zamknięcia „poza WERTIS" (od 0.40.0),
+- odpięcie dokumentu od zwrotu (od 0.53.0),
+- rozłączenie konta Allegro (od 0.53.0),
+- skasowanie logo dostawcy (od 0.56.0).
+
+Logo tylko wyprowadziło usterkę na światło, bo kasowanie robi się od razu po
+wgraniu — reszta czekała na swoją rzadką okazję.
+
+Nagłówek jedzie teraz **tylko wtedy, gdy jest co opisywać**. Serwera nie
+rozluźniamy: komunikat bez treści nie ma prawa deklarować typu treści,
+a własny parser przyjmujący pustkę działałby globalnie i przepuszczał do
+procedur obsługi żądania, które dziś odbijają się od bramki.
+
+**Dlaczego komplet testów tras tego nie złapał.** `app.inject` nie wysyła
+nagłówków przeglądarki, więc serwer nie miał czego parsować i trasa
+odpowiadała 200. Testy odtwarzały wywołanie, ale nie odtwarzały **żądania** —
+a cała usterka siedziała w nagłówku. Bramka stoi teraz na samej regule
+w `api()`, nie na jednym przycisku, i sprawdzono, że wywala się na kodzie
+sprzed poprawki. Obok niej test zapisujący samo zachowanie Fastify, żeby ta
+pułapka miała w repo swoje nazwisko.
+
+**[wymaga działania]** Sam `-Aktualizuj` na serwerze. **Nowy APK NIE jest
+potrzebny** — zmiana dotyczy wyłącznie strony biura. Restart usług jest
+konieczny i następuje sam: `biuro.html` wczytuje się raz przy starcie, nie
+przy każdym żądaniu.
+
+---
 
 ## 0.56.1 — 19 sierpnia 2026
 

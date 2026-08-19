@@ -482,10 +482,20 @@ let ostatnieRozjazdy = null;
 let zdjeciaWlaczone = false;
 
 async function api(sciezka, opts = {}) {
-  const r = await fetch(sciezka, {
-    ...opts,
-    headers: { "content-type": "application/json", "x-session": token, ...(opts.headers || {}) },
-  });
+  /* `content-type` TYLKO wtedy, gdy jest co opisywać. Nagłówek wysyłany zawsze
+     wywracał każde żądanie BEZ CIAŁA: domyślny parser Fastify odrzuca pustą
+     treść zadeklarowaną jako JSON (FST_ERR_CTP_EMPTY_JSON_BODY, 400), a panel
+     pokazywał wtedy gołe „Bad Request". Martwe były przez to cztery czynności
+     naraz — cofnięcie zamknięcia „poza WERTIS", odpięcie dokumentu od zwrotu,
+     rozłączenie konta Allegro i skasowanie logo dostawcy.
+
+     Kusi, żeby to uprościć z powrotem do jednego obiektu. Nie upraszczaj:
+     komunikat bez treści nie ma prawa deklarować typu treści. */
+  const naglowki = { "x-session": token, ...(opts.headers || {}) };
+  if (opts.body !== undefined && !naglowki["content-type"]) {
+    naglowki["content-type"] = "application/json";
+  }
+  const r = await fetch(sciezka, { ...opts, headers: naglowki });
   if (r.status === 401) {
     wyloguj();
     throw new Error("Sesja wygasła — zaloguj się ponownie");
