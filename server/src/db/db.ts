@@ -151,6 +151,12 @@ function migrate(database: DatabaseSync) {
      w całości przy każdej synchronizacji, więc kolumna wypełni się sama —
      ale musi ISTNIEĆ, zanim adapter spróbuje do niej pisać. */
   addColumn("sgt_dokument", "kh_id", "INTEGER");
+  /* Identyfikator kupującego przy zwrocie (0.56.6). `CREATE TABLE IF NOT
+     EXISTS` nie dokłada kolumny do tabeli, która już istnieje — a `zwrot`
+     stoi u klienta od 0.53.0. Bez tej linii wyszukiwanie wątku wiadomości
+     wywracałoby się na nieznanej kolumnie. */
+  addColumn("zwrot", "kupujacy_id", "TEXT");
+  dosypIdKupujacego(database);
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
@@ -230,6 +236,29 @@ function usunSesjeRozkladania(database: DatabaseSync) {
   // pośredniego, więc API i worker mogą je wykonać w dowolnym przeplocie
   database.exec("DROP TABLE IF EXISTS putaway_items");
   database.exec("DROP TABLE IF EXISTS putaway_sessions");
+}
+
+/**
+ * Uzupełnia `zwrot.kupujacy_id` w zwrotach sprzed 0.56.6.
+ *
+ * Zwroty założone wcześniej mają pustą kolumnę, więc szukanie wątku
+ * wiadomości nie miałoby dla nich czego użyć. Identyfikator siedzi jednak
+ * w zapamiętanej odpowiedzi Allegro (`surowe_json`) — wyciągamy go stamtąd
+ * raz, zamiast kazać biuru zakładać te zwroty od nowa. Brak `json_extract`
+ * w SQLite tylko zostawia kolumnę pustą; migracja nie zatrzyma startu.
+ */
+function dosypIdKupujacego(database: DatabaseSync) {
+  try {
+    database.exec(
+      `UPDATE zwrot
+          SET kupujacy_id = json_extract(surowe_json, '$.buyer.id')
+        WHERE kupujacy_id IS NULL
+          AND surowe_json IS NOT NULL
+          AND json_extract(surowe_json, '$.buyer.id') IS NOT NULL`
+    );
+  } catch {
+    /* Pusto — zwrot bez identyfikatora dalej szuka wątku po loginie. */
+  }
 }
 
 /**

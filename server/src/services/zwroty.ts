@@ -1,7 +1,7 @@
 import { db, nowIso, transaction } from "../db/db.js";
 import {
   allegroAdapter,
-  type AllegroAdapter,
+  type SzukanieWatku,
   type ZwrotAllegro,
 } from "../adapters/allegro.js";
 import { logEvent } from "./events.js";
@@ -86,6 +86,8 @@ export interface SzczegolZwrotu {
   status: string;
   statusAllegro: string | null;
   kupujacyLogin: string | null;
+  /** Identyfikator kupującego — po nim znajduje się wątek wiadomości. */
+  kupujacyId: string | null;
   kupujacyEmail: string | null;
   utworzonoAllegro: string | null;
   utworzonoAt: string;
@@ -118,6 +120,7 @@ interface WierszZwrotu {
   status: string;
   status_allegro: string | null;
   kupujacy_login: string | null;
+  kupujacy_id: string | null;
   kupujacy_email: string | null;
   utworzono_allegro: string | null;
   utworzono_at: string;
@@ -232,9 +235,10 @@ async function utworzZAllegro(
       const wynik = d
         .prepare(
           `INSERT INTO zwrot(allegro_return_id, allegro_order_id, referencja, waybill,
-                             status_allegro, kupujacy_login, kupujacy_email, utworzono_allegro,
+                             status_allegro, kupujacy_login, kupujacy_id, kupujacy_email,
+                             utworzono_allegro,
                              status, surowe_json, utworzono_at, utworzono_przez)
-           VALUES (?,?,?,?,?,?,?,?, 'nowy', ?,?,?)`
+           VALUES (?,?,?,?,?,?,?,?,?, 'nowy', ?,?,?)`
         )
         .run(
           z.id,
@@ -243,6 +247,7 @@ async function utworzZAllegro(
           waybill,
           z.status,
           z.kupujacyLogin ?? zamowienie?.kupujacyLogin ?? null,
+          z.kupujacyId ?? zamowienie?.kupujacyId ?? null,
           z.kupujacyEmail ?? zamowienie?.kupujacyEmail ?? null,
           z.utworzono,
           JSON.stringify(z.surowe ?? null),
@@ -705,6 +710,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
     status: z.status,
     statusAllegro: z.status_allegro,
     kupujacyLogin: z.kupujacy_login,
+    kupujacyId: z.kupujacy_id,
     kupujacyEmail: z.kupujacy_email,
     utworzonoAllegro: z.utworzono_allegro,
     utworzonoAt: z.utworzono_at,
@@ -749,12 +755,17 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
  */
 export async function watekZwrotu(zwrotId: number): Promise<{
   login: string | null;
-  watek: Awaited<ReturnType<AllegroAdapter["watekKupujacego"]>>;
+  szukanie: SzukanieWatku | null;
 }> {
   const z = wierszZwrotu(zwrotId);
-  if (!z.kupujacy_login) return { login: null, watek: null };
-  const watek = await allegroAdapter().watekKupujacego(z.kupujacy_login);
-  return { login: z.kupujacy_login, watek };
+  /* Login i identyfikator NARAZ, bo lista wątków maskuje rozmówcę: w
+     `interlocutor.login` siedzi `client:44300444`, a nie login z zamówienia.
+     Szukanie po samym loginie nie trafiało nigdy — stąd „brak korespondencji"
+     przy zwrotach, w których rozmowa istniała. */
+  const kto = { login: z.kupujacy_login, id: z.kupujacy_id };
+  if (!kto.login && !kto.id) return { login: null, szukanie: null };
+  const szukanie = await allegroAdapter().watekKupujacego(kto, z.utworzono_allegro);
+  return { login: z.kupujacy_login ?? z.kupujacy_id, szukanie };
 }
 
 // ── Pomocnicze ──────────────────────────────────────────────────────────────

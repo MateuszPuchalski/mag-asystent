@@ -1,9 +1,12 @@
 import type {
   AllegroAdapter,
+  KupujacyRef,
+  SzukanieWatku,
   WatekAllegro,
   ZamowienieAllegro,
   ZwrotAllegro,
 } from "./allegro.js";
+import { normalizujRef } from "./allegro.http.js";
 
 /* ── DEV — fikcyjne zwroty Allegro (zero sieci) ──────────────────────────────
    Lustro DevSferaAdapter: cały przepływ zwrotów działa end-to-end bez konta
@@ -33,6 +36,7 @@ function zwroty(): ZwrotAllegro[] {
       status: "DELIVERED",
       utworzono: dniTemu(3),
       kupujacyLogin: "jan_wraca",
+      kupujacyId: "44300001",
       kupujacyEmail: "jan.wraca@example.com",
       pozycje: [
         {
@@ -62,6 +66,7 @@ function zwroty(): ZwrotAllegro[] {
       status: "CREATED",
       utworzono: dniTemu(1),
       kupujacyLogin: "ewa_oddaje",
+      kupujacyId: "44300002",
       kupujacyEmail: "ewa.oddaje@example.com",
       pozycje: [
         {
@@ -85,6 +90,7 @@ function zwroty(): ZwrotAllegro[] {
       status: "CREATED",
       utworzono: dniTemu(5),
       kupujacyLogin: "firma_x",
+      kupujacyId: "44300003",
       kupujacyEmail: null,
       pozycje: [
         {
@@ -108,6 +114,7 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
   "dev-ord-1": {
     id: "dev-ord-1",
     kupujacyLogin: "jan_wraca",
+    kupujacyId: "44300001",
     kupujacyEmail: "jan.wraca@example.com",
     pozycje: [
       { offerId: "of-1", nazwa: "Pozycja jeszcze nietknięta — oferta Allegro", externalId: "TEST-LINIA-TODO", ilosc: 1 },
@@ -117,6 +124,7 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
   "dev-ord-2": {
     id: "dev-ord-2",
     kupujacyLogin: "ewa_oddaje",
+    kupujacyId: "44300002",
     kupujacyEmail: "ewa.oddaje@example.com",
     pozycje: [
       { offerId: "of-3", nazwa: "Szybkorotujący poza strefą złotą — oferta Allegro", externalId: "TEST-ROTUJACY", ilosc: 1 },
@@ -128,6 +136,7 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
   "dev-ord-3": {
     id: "dev-ord-3",
     kupujacyLogin: "firma_x",
+    kupujacyId: "44300003",
     kupujacyEmail: null,
     pozycje: [
       { offerId: "of-4", nazwa: "Artykuł sprzedany poza kartoteką WERTIS", externalId: "SPOZA-KATALOGU", ilosc: 1 },
@@ -136,13 +145,16 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
 };
 
 /**
- * Fikcyjne wątki Centrum wiadomości — po loginie kupującego. Jeden klient
- * ma rozmowę, drugi nie: karta zwrotu musi pokazywać oba stany.
+ * Fikcyjne wątki Centrum wiadomości — po IDENTYFIKATORZE kupującego, bo tak
+ * to działa naprawdę: prawdziwa lista wątków maskuje rozmówcę jako
+ * `client:44300444` i loginu z zamówienia w niej nie ma. Klucz po loginie
+ * ukryłby właśnie ten błąd. Jeden klient ma rozmowę, dwaj nie — karta zwrotu
+ * musi pokazywać oba stany.
  */
 const WATKI: Record<string, WatekAllegro> = {
-  jan_wraca: {
+  "44300001": {
     threadId: "dev-thread-1",
-    interlokutor: "jan_wraca",
+    interlokutor: "client:44300001",
     wiadomosci: [
       {
         id: "dev-msg-1",
@@ -188,7 +200,17 @@ export class DevAllegroAdapter implements AllegroAdapter {
     return ZAMOWIENIA[orderId] ?? null;
   }
 
-  async watekKupujacego(login: string): Promise<WatekAllegro | null> {
-    return WATKI[login.trim().toLowerCase()] ?? null;
+  async watekKupujacego(kto: KupujacyRef, _odKiedy: string | null): Promise<SzukanieWatku> {
+    const klucze = [normalizujRef(kto.id), normalizujRef(kto.login)].filter(
+      (v): v is string => v !== null
+    );
+    const watek = klucze.map((k) => WATKI[k]).find((w) => w !== undefined) ?? null;
+    /* Dev ma stałą, malutką listę — zawsze przechodzimy ją w całości. */
+    return {
+      watek,
+      przejrzanych: Object.keys(WATKI).length,
+      najstarszaData: null,
+      wyczerpano: true,
+    };
   }
 }

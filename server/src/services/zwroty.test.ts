@@ -258,22 +258,26 @@ test("skan dociąga SZCZEGÓŁ zwrotu — powód i komentarz klienta trafiają n
   assert.equal(w.zwrot.pozycje[0].powodOpis, "Miała być końcówka 3/8, jest 1/4");
 });
 
-test("wątek wiadomości: jest dla klienta z korespondencją, null dla reszty", async () => {
+test("wątek wiadomości: szukany po identyfikatorze kupującego, nie po loginie", async () => {
+  /* Lista wątków Allegro maskuje rozmówcę (`client:44300444`), więc wątek
+     dev też stoi pod identyfikatorem. Gdyby serwis szukał samym loginem —
+     jak przed 0.56.6 — ten test pokazałby „brak korespondencji". */
   kartotekiDev();
   const zJanem = await Z.utworzZeSkanu("DEVWB0001", "Test");
   if (zJanem.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
   const w1 = await Z.watekZwrotu(zJanem.zwrot.id);
   assert.equal(w1.login, "jan_wraca");
-  assert.equal(w1.watek?.wiadomosci.length, 3);
-  assert.equal(w1.watek?.wiadomosci[0].odKupujacego, true);
+  assert.equal(w1.szukanie?.watek?.wiadomosci.length, 3);
+  assert.equal(w1.szukanie?.watek?.wiadomosci[0].odKupujacego, true);
 
   const zEwa = await Z.utworzZeSkanu("DEVTW0002", "Test");
   if (zEwa.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
   const w2 = await Z.watekZwrotu(zEwa.zwrot.id);
-  assert.equal(w2.watek, null, "brak rozmowy to poprawna odpowiedź, nie błąd");
+  assert.equal(w2.szukanie?.watek, null, "brak rozmowy to poprawna odpowiedź, nie błąd");
+  assert.ok((w2.szukanie?.przejrzanych ?? 0) > 0, "licznik mówi, ile rozmów przejrzano");
 
   // zwrot ręczny nie ma kupującego — pytanie o wątek nie ma kogo dotyczyć
   const reczny = Z.utworzReczny("BEZ-KLIENTA-1", "Test");
   const w3 = await Z.watekZwrotu(reczny.id);
-  assert.deepEqual(w3, { login: null, watek: null });
+  assert.deepEqual(w3, { login: null, szukanie: null });
 });
