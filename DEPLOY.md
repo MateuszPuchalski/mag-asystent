@@ -401,6 +401,30 @@ już po wierzchu i niczego nie kasuje.
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
+### Play Protect blokuje instalację / aktualizację
+
+Przy instalacji APK spoza Sklepu Play Google Play Protect potrafi pokazać
+„Aplikacja została zablokowana, aby chronić urządzenie — Play Protect nie zna
+aplikacji tego dewelopera". **To nie jest werdykt o aplikacji**: Google mówi
+tylko tyle, że nie zna naszego klucza podpisu. Każdy APK instalowany z własnego
+serwera dostaje ten komunikat — także po podbiciu wersji, bo skan wraca przy
+każdej aktualizacji.
+
+Kolejność działań:
+
+1. Rozwiń **„Więcej szczegółów"** w tym samym oknie — często kryje się tam
+   przycisk **„Zainstaluj mimo to"**. Jeden klik i po sprawie.
+2. Okno z samym OK to twarda blokada nowszych wersji Play Protect. Wyłącz
+   wtedy skan: **Sklep Play → ikona konta (prawy górny róg) → Play Protect →
+   zębatka → „Skanuj aplikacje za pomocą Play Protect"**. Ponów aktualizację
+   z ekranu kolektora. Na dedykowanych kolektorach zostaw skan wyłączony —
+   urządzenie i tak instaluje wyłącznie WERTIS z własnego serwera. Włączony
+   skan wracałby z blokadą przy każdym wydaniu. Na pytanie o wysłanie
+   aplikacji do weryfikacji odpowiedz „Nie wysyłaj".
+3. Flota pod MDM (SOTI / Zebra / Honeywell) ma prościej: instalacja w trybie
+   device owner omija Play Protect w całości. To kolejny powód, dla którego
+   pierwsza instalacja idzie tamtędy.
+
 ## 5a. Konta pracowników i hasła (plan §7)
 
 Bez kont kolektor nie ma czym podpisać operacji. Ekran startowy prosi o login
