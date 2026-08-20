@@ -278,3 +278,37 @@ test("śmieci w nagłówku nie wywracają ścieżki", async () => {
     assert.equal(a.ref, null, zly);
   }
 });
+
+/* ── Nazwa z nagłówka `x-user` ────────────────────────────────────────────── */
+
+test("nazwisko z polskimi znakami wraca w całości", async () => {
+  /* Kolektor MUSI kodować tę wartość procentowo: OkHttp odmawia wysłania
+     nagłówka z jakimkolwiek znakiem spoza ` `–`~` i robi to wyjątkiem
+     z wątku dyspozytora, czyli wywrotką aplikacji. Nazwisko „Błażej"
+     zabijało kolektor przy pierwszym żądaniu po zalogowaniu (0.60.3).
+
+     Dekodujemy tutaj, bo ta wartość idzie do `events.user_id` — do dziennika
+     audytu. Okrojone „Blazej" byłoby stratą danych, nie kosmetyką. */
+  const { userOf } = await import("../context.js");
+  assert.equal(userOf(zadanie({ "x-user": "B%C5%82a%C5%BCej" })), "Błażej");
+  assert.equal(
+    userOf(zadanie({ "x-user": "Za%C5%BC%C3%B3%C5%82%C4%87 g%C4%99%C5%9Bl%C4%85 ja%C5%BA%C5%84" })),
+    "Zażółć gęślą jaźń"
+  );
+});
+
+test("nazwa bez kodowania działa jak dotąd", async () => {
+  // wstecz: starszy APK wysyła czyste ASCII i nie wolno mu tego zepsuć
+  const { userOf } = await import("../context.js");
+  assert.equal(userOf(zadanie({ "x-user": "Jan Kowalski" })), "Jan Kowalski");
+  assert.equal(userOf(zadanie({})), "anonim");
+});
+
+test("uszkodzona sekwencja procentowa NIE wywraca żądania", async () => {
+  /* `decodeURIComponent("%zz")` rzuca `URIError`. Nagłówek przychodzi
+     z zewnątrz, więc obowiązuje tu ta sama zasada, przez którą ta poprawka
+     powstała — tyle że po naszej stronie drutu. */
+  const { userOf } = await import("../context.js");
+  assert.equal(userOf(zadanie({ "x-user": "%zz" })), "%zz");
+  assert.equal(userOf(zadanie({ "x-user": "100%" })), "100%");
+});

@@ -14,6 +14,7 @@ import pl.wertis.kolektor.core.net.ApiErrorBody
 import pl.wertis.kolektor.core.net.EanOdmowa
 import pl.wertis.kolektor.core.net.MmConflict
 import pl.wertis.kolektor.core.net.WertisJson
+import pl.wertis.kolektor.core.net.naglowekHttp
 import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -54,11 +55,23 @@ class IdentityHeaderInterceptor(
     private val sessionToken: () -> String?,
     private val deviceId: String,
 ) : Interceptor {
+    /*
+     * KAŻDA wartość idzie przez `naglowekHttp`, nie tylko nazwisko.
+     *
+     * OkHttp rzuca `IllegalArgumentException` przy pierwszym znaku spoza
+     * ` `–`~`, a leci to z wątku dyspozytora, gdzie nikt tego nie łapie —
+     * czyli aplikacja ginie. Tak właśnie wywracał się każdy magazynier
+     * z polską literą w nazwie konta (0.60.3).
+     *
+     * `deviceId` to UUID, a token to hex, więc dziś są bezpieczne. Ale
+     * interceptor, który MOŻE rzucić wyjątkiem, jest bombą z opóźnionym
+     * zapłonem i nie ma powodu zostawiać jej uzbrojonej.
+     */
     override fun intercept(chain: Interceptor.Chain): Response {
         val req = chain.request()
-        val b = req.newBuilder().header("x-device", deviceId)
-        sessionToken()?.let { b.header("x-session", it) }
-        if (req.header("x-user") == null) b.header("x-user", currentUser())
+        val b = req.newBuilder().header("x-device", naglowekHttp(deviceId))
+        sessionToken()?.let { b.header("x-session", naglowekHttp(it)) }
+        if (req.header("x-user") == null) b.header("x-user", naglowekHttp(currentUser()))
         return chain.proceed(b.build())
     }
 }

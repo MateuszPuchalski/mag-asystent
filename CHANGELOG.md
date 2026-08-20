@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.60.3 — 20 sierpnia 2026
+
+**Kolektor ginął przy nazwisku z polską literą.** Magazynier logował się
+poprawnie, po czym aplikacja natychmiast się zamykała. Z `adb logcat -b crash`:
+
+```
+FATAL EXCEPTION: OkHttp Dispatcher
+java.lang.IllegalArgumentException: Unexpected char 0x142 at 1 in x-user value: Błażej
+```
+
+`0x142` to `ł`. OkHttp przepuszcza w wartości nagłówka wyłącznie znaki
+` `–`~` i przy każdym innym rzuca wyjątkiem. Leciał on z wątku dyspozytora,
+gdzie nikt go nie łapał — aplikacja nie odmawiała połączenia, tylko ginęła.
+
+Zasięg był szerszy, niż wyglądał. Nagłówek `x-user` dokleja się do **każdego**
+żądania, a jego wartość to nazwa konta z serwera. Wywracał się więc każdy
+magazynier z ł, ż, ó, ę, ą, ś, ć, ń albo ź w nazwie — przy pierwszym żądaniu
+po zalogowaniu. To samo dotyczyło odtwarzania bufora offline, który przekazuje
+nazwisko autora tym samym nagłówkiem.
+
+Wartość jedzie teraz **zakodowana procentowo w UTF-8**, a serwer odkodowuje ją
+w `userOf()`. Nie okrajamy ogonków, bo ta nazwa ląduje w `events.user_id`,
+czyli w dzienniku audytu — „Blazej" byłby stratą danych, nie kosmetyką.
+
+Kodowanie stosuje teraz **każdy** nagłówek doklejany przez kolektor, także
+`x-device` i `x-session`. Te dwa niosą UUID i hex, więc dziś są bezpieczne —
+ale interceptor, który może rzucić wyjątkiem, jest bombą z opóźnionym
+zapłonem.
+
+Zgodność w obie strony: stara nazwa ASCII nie zawiera procentu, więc przechodzi
+przez dekodowanie bez zmian. Jedyne okno to **nowy APK na starym serwerze** —
+do aktualizacji serwera dziennik pokazywałby wtedy `B%C5%82a%C5%BCej`. Serwer
+i APK jadą w tym samym wydaniu, więc wystarczy nie rozdzielać aktualizacji.
+
 ## 0.60.2 — 20 sierpnia 2026
 
 **Koniec z okienkami przeglądarki.** Notatka do decyzji wyskakiwała jako
