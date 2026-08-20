@@ -33,6 +33,33 @@ historii nie przepisujemy.
 
 ---
 
+## 0.60.4 — 20 sierpnia 2026
+
+**Kolektor odzyskuje serwer po przejściu pod inny punkt dostępowy.** Z hali:
+„nie mogę się połączyć, wystarczyło rozłączyć i połączyć Wi-Fi". Ręczne
+rozłączenie robiło dokładnie to, czego brakowało w kodzie.
+
+Po przeskoku między punktami dostępowymi gniazda otwarte do poprzedniego AP
+zostają w puli OkHttp. Z pozoru są żywe: pakiet wychodzi, odpowiedź nie wraca,
+a żądanie stoi do timeoutu odczytu. Ekran wygląda wtedy jak zerwana łączność,
+choć sieć jest.
+
+Kolektor porzuca teraz te gniazda przy każdej zmianie sieci — także wtedy, gdy
+Android nie zgłasza nowej sieci, a zmieniają się same adresy. Tak właśnie
+wygląda przejście między AP tej samej sieci. Porzucane są wyłącznie połączenia
+bezczynne, więc żądanie w locie nie urywa się w połowie.
+
+Przy zmianie adresu serwera w ustawieniach dzieje się to samo. Stary adres ma
+stare gniazda i nie mają one nic wspólnego z nowym serwerem.
+
+Ekran startowy przestał też wymagać ludzkiej ręki. Komunikat „Nie widzę
+serwera" wisiał, dopóki ktoś nie nacisnął ponowienia; teraz kolektor wyjęty
+z kieszeni w zasięgu sam sprawdza serwer jeszcze raz.
+
+`DEPLOY.md` §4 opisuje, jak ustawić kilka punktów dostępowych. Jest tam też
+pułapka zapory: reguła z `remoteip=localsubnet` odcina kolektory z drugiej
+podsieci, choć z zewnątrz wygląda to na jedną sieć.
+
 ## 0.60.3 — 20 sierpnia 2026
 
 **Kolektor ginął przy nazwisku z polską literą.** Magazynier logował się

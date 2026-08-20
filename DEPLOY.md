@@ -243,6 +243,64 @@ netsh advfirewall firewall add rule name="WERTIS kolektor" dir=in action=allow p
 Kolektory łączą się z `http://mag.wertis.local:3001`. HTTPS nie jest wymagane —
 kolektor działa po zwykłym HTTP w LAN.
 
+### Kilka punktów dostępowych w hali
+
+Magazyn rzadko ma jeden punkt dostępowy. Ustawienie, które działa, wygląda tak:
+
+- **jedna nazwa sieci (SSID) na wszystkich AP** — telefon przechodzi między
+  nimi bez pytania człowieka;
+- **jedna podsieć** — adres serwera nie zmienia się po przejściu;
+- **to samo hasło i to samo pasmo** na każdym AP.
+
+Sprawdzenie zajmuje minutę. Na kolektorze otwórz szczegóły połączenia Wi-Fi
+i porównaj jego adres IP z adresem serwera. Zgodne trzy pierwsze liczby (np.
+`192.168.10.*`) znaczą wspólną podsieć.
+
+**Gdy sieci są osobne, zapora je odetnie.** Reguła wyżej ma `remoteip=localsubnet`,
+czyli wpuszcza wyłącznie własną podsieć serwera. Kolektor z drugiej podsieci
+dostanie ciszę, choć „ta sama sieć" wygląda z zewnątrz na jedną. Do wyboru są
+dwie drogi:
+
+1. **Zepnij AP w jedną podsieć** (most, nie osobny DHCP) — zalecane, bo znika
+   też pytanie o trasowanie.
+2. Albo **rozszerz regułę zapory** o drugą podsieć:
+
+```bash
+netsh advfirewall firewall set rule name="WERTIS kolektor" new remoteip=192.168.10.0/24,192.168.20.0/24
+```
+
+Sama aplikacja radzi sobie z przeskokiem AP od 0.60.4: przy zmianie sieci
+porzuca gniazda otwarte do poprzedniego punktu. Wcześniej trzeba było ręcznie
+rozłączyć i połączyć Wi-Fi.
+
+### Sieć gościnna: adres jest, serwera nie ma
+
+Objaw myli, bo wszystko wygląda poprawnie. Kolektor łączy się z drugą siecią,
+dostaje adres z tej samej puli, ma internet — a serwera nie widzi. Brama
+i DNS też się zgadzają, więc „to przecież ta sama sieć".
+
+Przyczyną jest **izolacja klientów**: punkt dostępowy blokuje ruch między
+urządzeniami tej sieci. Domyślnie tak działają sieci gościnne. Adres i internet
+są, dostępu do niczego w LAN-ie nie ma.
+
+Rozpoznanie w dwóch krokach:
+
+1. Porównaj adres **urządzenia** z adresem serwera. Pole „Brama" nie nadaje
+   się do tego — na obu sieciach bywa takie samo.
+2. Z przeglądarki kolektora otwórz `http://<IP-serwera>:3001/api/setup`,
+   raz na każdej sieci.
+
+Adres z tej samej puli, a strona otwiera się tylko na jednej sieci — to jest
+izolacja. Do wyboru:
+
+- **wyłącz izolację klientów przy tym SSID-zie** („AP isolation",
+  „Client isolation", „Guest mode") — gdy sieć ma obsługiwać kolektory;
+- **zostaw izolację i trzymaj kolektory na sieci magazynowej** — gdy sieć ma
+  pozostać gościnna.
+
+Aplikacja tego nie obejdzie i nie ma takiego ustawienia. Serwer stoi pod jednym
+adresem, a kolektor pyta o ten sam adres na każdej sieci.
+
 ## 5. Kolektory — natywna aplikacja Android (APK)
 
 Kolektor to natywny klient z [`android/`](android/README.md) — czysty klient

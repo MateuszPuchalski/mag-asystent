@@ -126,6 +126,10 @@ class AppGraph(context: Context) {
     )
 
     init {
+        /* Przeskok między punktami dostępowymi w hali zostawia w puli OkHttp
+           gniazda do poprzedniego AP — z pozoru żywe, w praktyce nieme.
+           Bez tego magazynier ratował się rozłączeniem i połączeniem Wi-Fi. */
+        connectivity.onZmianaSieci = { apiClient.zerwijPolaczenia() }
         wireOfflineFlush(context, offlineQueue, connectivity, appScope)
         // nierozwiązane wyjątki od razu przy starcie (D8) — inaczej nikt ich nie ruszy
         problemsRepo.refresh()

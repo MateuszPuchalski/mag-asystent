@@ -102,6 +102,22 @@ class ApiClient(
         .addInterceptor(IdentityHeaderInterceptor(currentUser, sessionToken, deviceId))
         .build()
 
+    /**
+     * Wyrzuca z puli połączenia otwarte do POPRZEDNIEJ drogi sieciowej.
+     *
+     * Po przeskoku między punktami dostępowymi gniazda do starego AP zostają
+     * w puli jako z pozoru żywe: pakiet wychodzi, odpowiedź nie wraca, a żądanie
+     * stoi do timeoutu odczytu — czyli dziesięć sekund na każdą próbę. Ekran
+     * wygląda wtedy jak zerwana łączność, choć sieć jest.
+     *
+     * `evictAll` zamyka WYŁĄCZNIE połączenia bezczynne, więc żądanie w locie
+     * nie zostaje przerwane w połowie. Następne otworzy świeże gniazdo — to
+     * samo, co dawało ręczne rozłączenie i połączenie Wi-Fi.
+     */
+    fun zerwijPolaczenia() {
+        runCatching { okHttp.connectionPool.evictAll() }
+    }
+
     val service: ApiService = Retrofit.Builder()
         .baseUrl("http://wertis.invalid/") // zawsze nadpisywany przez HostSelectionInterceptor
         .client(okHttp)
@@ -111,6 +127,8 @@ class ApiClient(
 
     fun setBaseUrl(url: String) {
         hostSelection.baseUrl = url.toHttpUrlOrNull()
+        // stary adres ma też stare gniazda — z nowym serwerem nie mają nic wspólnego
+        zerwijPolaczenia()
     }
 }
 
