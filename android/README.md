@@ -296,10 +296,11 @@ przed którą ta pozycja broni.
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
 - [ ] kafel ilości i kafel lokalizacji mają **tę samą wysokość**, także gdy
       biały niesie linijkę „reszta zostaje",
-- [ ] stan systemu inny niż ilość z dokumentu daje pasek z różnicą,
-- [ ] nadwyżka jest bursztynowa, niedobór czerwony,
-- [ ] pozycja o zgodnych liczbach NIE ma tego paska (wskaźnik zapalony bez
-      powodu przestaje być czytany).
+- [ ] linijka „na hali N" dostaje strzałkę, gdy stan różni się od dokumentu,
+- [ ] nadwyżka jest bursztynowa i ma ▲, niedobór czerwony i ma ▼,
+- [ ] przy zgodnych liczbach linijka jest szara i bez strzałki (wskaźnik
+      zapalony bez powodu przestaje być czytany),
+- [ ] przy liczbie w kaflu nie ma „szt."; metry i komplety zostają.
 
 **Kreator kont i rola admina**
 

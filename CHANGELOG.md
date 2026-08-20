@@ -33,6 +33,23 @@ historii nie przepisujemy.
 
 ---
 
+## 0.63.0 — 20 sierpnia 2026
+
+**Wskaźnik rozbieżności wraca na linijkę stanu.** Wersja 0.62.0 dokładała
+osobny pasek z własnym zdaniem („ponad dokument 19 szt."). Mówił to samo dwa
+razy: liczba stanu i ilość z dokumentu stoją tuż obok siebie, więc różnicę
+widać, zamiast ją czytać.
+
+Zostaje sam sygnał. Linijka „na hali 219 z tą dostawą" dostaje strzałkę
+i kolor: ▲ bursztynowe przy nadwyżce, ▼ czerwone przy niedoborze. Przy
+zgodnych liczbach zostaje szara i bez strzałki, dokładnie jak dotąd. Reguła
+liczenia się nie zmienia — nadal jest w `:core` z siedmioma testami.
+
+**Przy liczbie w kaflu znika „szt.".** Sztuki są domyślne i widać je w każdym
+wierszu listy, więc podpis pod trzydziestopunktową cyfrą nie niósł nic. Metry,
+litry i komplety ZOSTAJĄ: tam sama liczba zmienia znaczenie, a pomyłka kosztuje
+odcięcie złej długości.
+
 ## 0.62.0 — 20 sierpnia 2026
 
 **Wskaźnik rozbieżności w rozwiniętej pozycji.** Ze zgłoszenia: „jeśli ilość

@@ -1248,13 +1248,19 @@ private fun PanelOdkladania(
                             color = Ink,
                             maxLines = 1,
                         )
-                        Text(
-                            " ${jednostka(line.unit)}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkMute,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                        )
+                        /* „szt." przy liczbie nie niesie nic: sztuki są
+                           domyślne i widać je w każdym wierszu listy. Metry,
+                           litry i komplety ZOSTAJĄ — tam sama liczba zmienia
+                           znaczenie, a pomyłka kosztuje odcięcie złej długości. */
+                        if (line.unit.isNotBlank() && jednostka(line.unit) != "szt.") {
+                            Text(
+                                " ${jednostka(line.unit)}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = InkMute,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
                     }
                     KrokIlosci("+", ile < zostalo) { onCzesc(ile + 1) }
                 }
@@ -1273,21 +1279,13 @@ private fun PanelOdkladania(
                    dokumentu, więc ta liczba zawiera już niesioną partię —
                    i mówimy o tym wprost, zamiast zostawiać człowieka z zagadką
                    arytmetyczną. */
-                Text(
-                    buildString {
-                        append("na hali ${formatQty(line.stanMag)}")
-                        if (stanZawieraDostawe) append(" z tą dostawą")
-                        if (line.stanMgp > 0) append(" · w przyjęciach ${formatQty(line.stanMgp)}")
-                    },
-                    fontSize = 11.sp,
-                    color = InkMute,
-                )
+                /* WSKAŹNIK ROZBIEŻNOŚCI (0.63.0) — na TEJ linijce, nie obok.
+                   Osobny pasek z własnym zdaniem („ponad dokument 19 szt.")
+                   mówił to samo dwa razy: liczba stanu i ilość z dokumentu
+                   stoją tuż obok siebie, więc różnicę widać, zamiast ją
+                   czytać. Zostaje sam sygnał — strzałka i kolor.
 
-                /* WSKAŹNIK ROZBIEŻNOŚCI (0.62.0). Do tej pory stan i ilość
-                   z dokumentu stały obok siebie jako dwie liczby, a odejmowanie
-                   zostawało w głowie człowieka stojącego przy regale.
-
-                   Regułę liczy `:core` — razem z tym, z którym magazynem wolno
+                   Regułę liczy `:core`, razem z tym, z którym magazynem wolno
                    się porównywać. Tutaj zostaje wyłącznie rysowanie. */
                 val rozbieznosc = rozbieznoscStanu(
                     qtyDoc = line.qtyDoc,
@@ -1295,40 +1293,27 @@ private fun PanelOdkladania(
                     stanMgp = line.stanMgp,
                     stanZawieraDostawe = stanZawieraDostawe,
                 )
-                if (rozbieznosc != null) {
-                    val niedobor = rozbieznosc.kierunek == KierunekRozbieznosci.NIEDOBOR
-                    /* Niedobór na czerwono, nadwyżka na bursztynie. Nadwyżka jest
-                       informacją („leży już zapas"), niedobór ostrzeżeniem
-                       („system widzi mniej, niż mówi dokument"). Ten sam kolor
-                       kazałby dopiero czytać, co się właśnie stało. */
-                    val barwa = if (niedobor) Destructive else AmberInk
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (niedobor) Destructive.copy(alpha = 0.10f) else AmberBg)
-                            .padding(horizontal = 7.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Text(
-                            if (niedobor) "▼" else "▲",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = barwa,
-                        )
-                        Text(
-                            /* Liczba, nie samo „nie zgadza się" — bez niej
-                               człowiek odejmuje w pamięci przy regale. */
-                            (if (niedobor) "brakuje " else "ponad dokument ") +
-                                "${formatQty(rozbieznosc.roznica)} ${jednostka(line.unit)}",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = barwa,
-                            maxLines = 1,
-                        )
-                    }
-                }
+                val niedobor = rozbieznosc?.kierunek == KierunekRozbieznosci.NIEDOBOR
+                Text(
+                    buildString {
+                        // strzałka PRZED liczbą, bo dotyczy całego zdania
+                        if (rozbieznosc != null) append(if (niedobor) "▼ " else "▲ ")
+                        append("na hali ${formatQty(line.stanMag)}")
+                        if (stanZawieraDostawe) append(" z tą dostawą")
+                        if (line.stanMgp > 0) append(" · w przyjęciach ${formatQty(line.stanMgp)}")
+                    },
+                    fontSize = 11.sp,
+                    /* Niedobór czerwony, nadwyżka bursztynowa, zgodność bez
+                       zmian. Nadwyżka informuje („leży już zapas"), niedobór
+                       ostrzega („system widzi mniej, niż mówi dokument") —
+                       jeden kolor na oba kazałby dopiero czytać, co zaszło. */
+                    fontWeight = if (rozbieznosc != null) FontWeight.SemiBold else FontWeight.Normal,
+                    color = when {
+                        rozbieznosc == null -> InkMute
+                        niedobor -> Destructive
+                        else -> AmberInk
+                    },
+                )
             }
 
             /* KAFEL CIEMNY — dokąd to idzie. Adres schodzi z 28 sp na 24 sp
