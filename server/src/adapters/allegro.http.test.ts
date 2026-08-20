@@ -12,6 +12,8 @@ import {
   rodzinaKoncowki,
   urlZamowienia,
   urlWatkow,
+  urlDyskusji,
+  mapujDyskusje,
   urlWiadomosci,
   urlZwrotow,
   urlZwrotu,
@@ -110,7 +112,29 @@ test("rodzina końcówki rozdziela wersje zasobów — beta zwrotów nie zmienia
   );
   assert.equal(rodzinaKoncowki(urlZwrotu("https://api.allegro.pl", "r-1")), "customer-returns");
   assert.equal(rodzinaKoncowki(urlZamowienia("https://api.allegro.pl", "o-1")), "checkout-forms");
+  // dyskusje (`/sale/issues`, beta) i wątki mają WŁASNE rodziny — beta jednej
+  // nie przestawia wersji drugiej
+  assert.equal(rodzinaKoncowki(urlDyskusji("https://api.allegro.pl", 0)), "issues");
+  assert.equal(rodzinaKoncowki(urlWatkow("https://api.allegro.pl", 0)), "threads");
   assert.equal(rodzinaKoncowki("https://api.allegro.pl/me"), "inne");
+});
+
+test("dyskusje: mapowanie defensywne — typ, klient i temat z różnych gniazd", () => {
+  const lista = mapujDyskusje({
+    issues: [
+      {
+        id: "i-1", type: "CLAIM", status: "NEW", subject: "Pęknięta obudowa",
+        buyer: { login: "ewa" }, order: { id: "o-9" }, createdAt: "2026-08-19T10:00:00Z",
+      },
+      { id: "i-2", name: "Pytanie o śrubę" }, // szczątkowy kształt — NULL-e, nie wyjątek
+    ],
+  });
+  assert.equal(lista[0].typ, "CLAIM");
+  assert.equal(lista[0].kupujacyLogin, "ewa");
+  assert.equal(lista[0].orderId, "o-9");
+  assert.equal(lista[1].temat, "Pytanie o śrubę");
+  assert.equal(lista[1].status, null);
+  assert.deepEqual(mapujDyskusje({}), [], "brak listy = pusta odpowiedź, nie błąd");
 });
 
 test("powód zwrotu: kod tłumaczony na polski, NONE to brak powodu", () => {

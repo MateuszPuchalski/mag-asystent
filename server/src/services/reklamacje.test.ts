@@ -83,6 +83,20 @@ test("rozpatrzenie jest jednorazowe i schodzi z listy otwartych", () => {
   assert.throws(() => R.rozpatrzReklamacje(pozycjaId, "moze", null, "Biuro"), /Nieznany wynik|już rozpatrzona/);
 });
 
+test("półka reklamacyjna: zapis, normalizacja, zdjęcie i trwałość po rozpatrzeniu", () => {
+  const pozycjaId = zwrotZReklamacja(2, "W-POLKA");
+  R.ustawPolke(pozycjaId, " rek-01 ", "Biuro");
+  assert.equal(R.listaReklamacji()[0].polka, "REK-01", "trim + upper — skan i wpis się spotykają");
+  // pusta wartość = zdjęcie z półki, nie zapis pustki
+  R.ustawPolke(pozycjaId, "  ", "Biuro");
+  assert.equal(R.listaReklamacji()[0].polka, null);
+  R.ustawPolke(pozycjaId, "REK-02", "Biuro");
+  // rozpatrzenie NIE czyści półki — historia mówi, skąd towar zszedł
+  R.rozpatrzReklamacje(pozycjaId, "odrzucona", null, "Biuro");
+  assert.equal(R.listaReklamacji({ rozpatrzone: true })[0].polka, "REK-02");
+  assert.throws(() => R.ustawPolke(pozycjaId + 999, "X", "Biuro"), /nie istnieje/);
+});
+
 test("raport zlicza proces w jednym miejscu", () => {
   zwrotZReklamacja(20, "PO-TERMINIE");
   const r = R.raportZwrotow();

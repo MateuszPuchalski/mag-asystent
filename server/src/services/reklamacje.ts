@@ -38,6 +38,8 @@ export interface WierszReklamacji {
   rozpatrzonoAt: string | null;
   rozpatrzonoPrzez: string | null;
   reklNotatka: string | null;
+  /** Półka, na której fizycznie leży reklamowany towar; null = nie odłożono. */
+  polka: string | null;
 }
 
 const DZIEN_MS = 86_400_000;
@@ -62,7 +64,7 @@ export function listaReklamacji(opts: { rozpatrzone?: boolean } = {}): WierszRek
     .prepare(
       `SELECT p.id AS pozycja_id, p.zwrot_id, p.nazwa, p.external_id, p.ilosc,
               p.powod, p.powod_opis, p.notatka,
-              p.rekl_wynik, p.rekl_at, p.rekl_przez, p.rekl_notatka,
+              p.rekl_wynik, p.rekl_at, p.rekl_przez, p.rekl_notatka, p.rekl_polka,
               z.referencja, z.waybill, z.kupujacy_login, z.utworzono_allegro, z.utworzono_at
        FROM zwrot_pozycja p JOIN zwrot z ON z.id = p.zwrot_id
        WHERE p.decyzja = 'reklamacja' AND ${filtr}
@@ -94,6 +96,7 @@ export function listaReklamacji(opts: { rozpatrzone?: boolean } = {}): WierszRek
       rozpatrzonoAt: (w.rekl_at as string) ?? null,
       rozpatrzonoPrzez: (w.rekl_przez as string) ?? null,
       reklNotatka: (w.rekl_notatka as string) ?? null,
+      polka: (w.rekl_polka as string) ?? null,
     };
   });
   // otwarte: najpilniejsze na górze; rozpatrzone: najświeższe na górze
@@ -124,6 +127,25 @@ export function rozpatrzReklamacje(
     .prepare("UPDATE zwrot_pozycja SET rekl_wynik=?, rekl_at=?, rekl_przez=?, rekl_notatka=? WHERE id=?")
     .run(wynik, nowIso(), autor, notatka, pozycjaId);
   logEvent("reklamacja_rozpatrzona", autor, p.tw_id, { pozycjaId, wynik, notatka });
+}
+
+/**
+ * Półka reklamacyjna (Etap 6) — GDZIE leży towar, dopóki sprawa trwa.
+ *
+ * Ewidencja w aplikacji, nie ruch w Subiekcie: reklamowany towar nie jest na
+ * stanie (korekta go nie objęła), więc MM nie miałoby czego przesuwać. Pusta
+ * wartość zdejmuje z półki. Rozpatrzenie NIE czyści pola — historia ma mówić,
+ * skąd towar zszedł.
+ */
+export function ustawPolke(pozycjaId: number, polka: string | null, autor: string): void {
+  const p = db()
+    .prepare("SELECT id, tw_id, decyzja FROM zwrot_pozycja WHERE id = ?")
+    .get(pozycjaId) as { id: number; tw_id: number | null; decyzja: string | null } | undefined;
+  if (!p) throw new BladZwrotu(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.decyzja !== "reklamacja") throw new BladZwrotu(400, "Ta pozycja nie jest reklamacją");
+  const wartosc = polka?.trim().toUpperCase() || null;
+  db().prepare("UPDATE zwrot_pozycja SET rekl_polka=? WHERE id=?").run(wartosc, pozycjaId);
+  logEvent("reklamacja_polka", autor, p.tw_id, { pozycjaId, polka: wartosc });
 }
 
 // ── Raport procesu zwrotów ──────────────────────────────────────────────────

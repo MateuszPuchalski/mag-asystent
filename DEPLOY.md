@@ -963,6 +963,14 @@ Częstotliwość ustawia `ALLEGRO_POLL_MS` (domyślnie 5 minut; `0` wyłącza).
 Skutek uboczny jest celowy: regularne odpytywanie odświeża token, więc
 parowanie nie wygasa po miesiącach bez skanów.
 
+Od 0.68.0 reklamacja ma **półkę** — pole „gdzie fizycznie leży towar" na
+liście reklamacji i karcie zwrotu. To ewidencja w aplikacji, nie ruch
+w Subiekcie: reklamowany towar nie jest na stanie, więc MM nie miałoby czego
+przesuwać. Obok stoi podgląd **dyskusji i reklamacji z Allegro**
+(`GET /sale/issues`) — na kliknięcie, bez zapisu u nas. Wymaga uprawnienia
+do dyskusji przy rejestracji aplikacji (`allegro:api:disputes`); bez niego
+przycisk mówi, czego brakuje.
+
 Zwrot środków dałoby się zautomatyzować w całości: Allegro ma
 `POST /payments/refunds` (scope płatności), a prowizja wraca wtedy sama.
 Świadomie tego NIE robimy — pieniędzmi rusza człowiek; notatka zostaje tu,

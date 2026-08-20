@@ -172,6 +172,7 @@ function migrate(database: DatabaseSync) {
   addColumn("zwrot_pozycja", "rekl_at", "TEXT");
   addColumn("zwrot_pozycja", "rekl_przez", "TEXT");
   addColumn("zwrot_pozycja", "rekl_notatka", "TEXT");
+  addColumn("zwrot_pozycja", "rekl_polka", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);

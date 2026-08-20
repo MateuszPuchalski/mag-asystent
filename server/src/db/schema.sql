@@ -581,7 +581,12 @@ CREATE TABLE IF NOT EXISTS zwrot_pozycja (
   rekl_wynik    TEXT,
   rekl_at       TEXT,
   rekl_przez    TEXT,
-  rekl_notatka  TEXT
+  rekl_notatka  TEXT,
+  -- Półka reklamacyjna (Etap 6): GDZIE fizycznie leży reklamowany towar,
+  -- dopóki sprawa trwa. Ewidencja w aplikacji, nie ruch w Subiekcie — towar
+  -- reklamowany nie jest na stanie (korekta go nie objęła), więc MM nie ma
+  -- czego przesuwać. Zostaje po rozpatrzeniu: historia mówi, skąd zszedł.
+  rekl_polka    TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_poz ON zwrot_pozycja(zwrot_id);
 

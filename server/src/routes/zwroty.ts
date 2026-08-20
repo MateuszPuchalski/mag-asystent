@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { config } from "../config.js";
-import { allegroTryb } from "../adapters/allegro.js";
+import { allegroAdapter, allegroTryb } from "../adapters/allegro.js";
 import {
   rozlacz,
   rozpocznijParowanie,
@@ -23,7 +23,7 @@ import {
   zapiszDecyzje,
   zdejmijDokument,
 } from "../services/zwroty.js";
-import { listaReklamacji, raportZwrotow, rozpatrzReklamacje } from "../services/reklamacje.js";
+import { listaReklamacji, raportZwrotow, rozpatrzReklamacje, ustawPolke } from "../services/reklamacje.js";
 import { brakujacePaczki } from "../services/zapowiedzi.js";
 
 /* ── Zwroty Allegro — trasy biura ────────────────────────────────────────────
@@ -275,6 +275,32 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return { zapowiedzi: brakujacePaczki() };
+  });
+
+  /* Półka reklamacyjna (Etap 6) — gdzie fizycznie leży towar sprawy. */
+  app.put<{ Params: { pid: string }; Body: { polka?: string } }>(
+    "/api/biuro/zwroty/reklamacje/:pid/polka",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zBledem(reply, () => {
+        ustawPolke(Number(req.params.pid), req.body?.polka ?? null, autor());
+        return { reklamacje: listaReklamacji() };
+      });
+    }
+  );
+
+  /* Dyskusje i reklamacje z panelu Allegro (Etap 6) — sam odczyt, na żądanie
+     kliknięcia; nic z tego nie zapisujemy, jedno miejsce prawdy to Allegro. */
+  app.get("/api/biuro/zwroty/dyskusje", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    try {
+      return { dyskusje: await allegroAdapter().listaDyskusji() };
+    } catch (e) {
+      /* Awaria integracji (sieć, token) to nie 500 serwera — jak przy skanie. */
+      return reply.code(502).send({ error: (e as Error).message });
+    }
   });
 
   // ── Konto Allegro (device flow) ───────────────────────────────────────────

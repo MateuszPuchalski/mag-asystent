@@ -1,5 +1,6 @@
 import type {
   AllegroAdapter,
+  DyskusjaAllegro,
   KupujacyRef,
   SzukanieWatku,
   WatekAllegro,
@@ -190,6 +191,31 @@ export class DevAllegroAdapter implements AllegroAdapter {
     return zwroty().filter((z) =>
       z.paczki.some((p) => p.waybill === kod || p.transportingWaybill === kod)
     );
+  }
+
+  async listaDyskusji(): Promise<DyskusjaAllegro[]> {
+    /* Dwie fikcyjne sprawy — rozmowa i formalna reklamacja — żeby sekcja
+       w biurze miała oba typy do pokazania. */
+    return [
+      {
+        id: "dev-issue-1",
+        typ: "DISCUSSION",
+        status: "ONGOING",
+        temat: "Pytanie o brakującą śrubę w zestawie",
+        kupujacyLogin: "jan_wraca",
+        orderId: "dev-ord-1",
+        utworzono: dniTemu(2),
+      },
+      {
+        id: "dev-issue-2",
+        typ: "CLAIM",
+        status: "NEW",
+        temat: "Reklamacja: pęknięta obudowa po tygodniu",
+        kupujacyLogin: "ewa_oddaje",
+        orderId: "dev-ord-2",
+        utworzono: dniTemu(1),
+      },
+    ];
   }
 
   async listaZwrotowKlienta(odKiedy: string | null): Promise<ZwrotAllegro[]> {
