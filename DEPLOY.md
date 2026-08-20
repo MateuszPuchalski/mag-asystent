@@ -1045,6 +1045,81 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    „do zniszczenia". Sprawdź, że korekta objęła pozycję, a RW zdjęło ją
    z magazynu sprzedaży.
 
+## 6b. Środowisko dev obok produkcji
+
+Magazyn pracuje na produkcji, a rozwój nie może czekać na wolny wieczór.
+Instancja dev stoi na TEJ SAMEJ maszynie: własny katalog, port, usługi, baza
+i dane demo. Z produkcją dzieli wyłącznie procesor i dysk.
+
+### Instalacja
+
+```bash
+.\wertis-instalator.ps1 -Dev -Katalog C:\wertis-dev -Port 3002
+```
+
+Przełącznik `-Dev` robi cztery rzeczy naraz i każda jest bezpiecznikiem:
+
+1. **Usługi z sufiksem**: `wertis-api-dev`, `wertis-worker-dev`. Bez sufiksu
+   druga instalacja PRZESTAWIŁABY usługi produkcyjne na katalog dev.
+2. **Własna reguła zapory** z portem w nazwie — reguła produkcji zostaje
+   nietknięta.
+3. **Dane demo, wymuszone**: `SGT_MODE=seeded`, seed towarów i katalog
+   scenariuszy S1–S71. Rozwój nie czyta produkcyjnej bazy i nie pisze do
+   Subiekta.
+4. **Pusty kanał APK**: instancja dev nie proponuje kolektorom żadnej
+   aktualizacji. Powód jest twardy — patrz ostrzeżenie niżej.
+
+Bramka odmawia `-Dev` na porcie 3001 i w katalogu `C:\wertis`. To nie jest
+nadgorliwość: każda z tych pomyłek kończy się rozstrojoną produkcją.
+
+### Urządzenie testowe
+
+Jedno urządzenie na stałe wskazane na dev: w aplikacji, na ekranie startowym,
+adres `http://<IP-serwera>:3002`. Górny pasek pokazuje wtedy czerwoną
+pastylkę **DEV** na każdym ekranie. Biuro pod `:3002/biuro` ma czerwony kafel
+w pasku stanu. Pomylenie instancji ma być widoczne, nie możliwe do
+przeoczenia.
+
+Buildy testowe wgrywa się przez `adb install` (debug z Android Studio) albo
+ręcznie wrzuconym plikiem do `C:\wertis-dev\server\data\apk\`.
+
+**NIE przełączaj kolektorów produkcyjnych na adres dev.** Oba wydania
+podpisuje ten sam klucz, więc Android pozwoli zainstalować testowy APK —
+a odinstalować nowszej wersji już nie: system odmawia obniżenia numeru.
+Kolektor produkcyjny po takiej wycieczce wraca do pracy dopiero po
+odinstalowaniu aplikacji i utracie bufora offline.
+
+### Aktualizacja dev
+
+```bash
+.\wertis-instalator.ps1 -Aktualizuj -Dev -Katalog C:\wertis-dev -Port 3002 [-Galaz <gałąź>]
+```
+
+`-Galaz` pozwala instancji dev chodzić z gałęzi roboczej, zanim zmiana trafi
+do `main`. Produkcję aktualizuje się jak dotąd — bez `-Dev`.
+
+### Praca z repo, bez usług
+
+Do zmian serwerowych wygodniejszy bywa proces w konsoli niż usługa:
+
+```bash
+cd C:\wertis-dev
+npm run dev        # API + worker, przeładowanie przy zmianie pliku
+```
+
+Konfigurację czyta z `wertis.env` w katalogu roboczym; inną ścieżkę wskazuje
+`WERTIS_ENV_FILE`.
+
+### Czego pilnować
+
+- **Bazy dev nie wolno podłożyć produkcji.** Migracje schematu są
+  jednokierunkowe (same `addColumn`) — baza dotknięta przez nowszy build nie
+  wróci pod starszy.
+- Sprawdzenie, na co się patrzy: `http://localhost:3002/api/health` →
+  `srodowisko: "dev"`, `mode: "seeded"`. Produkcja mówi `produkcja` i `mssql`.
+- Worker Sfery nie istnieje w dev i to jest poprawne — dane demo obsługuje
+  wbudowany adapter zapisu.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

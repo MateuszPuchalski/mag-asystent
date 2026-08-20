@@ -430,4 +430,16 @@ class DtosTest {
         val nieznany = WertisJson.decodeFromString<KoszSkan>("""{"nieznany":true}""")
         assertTrue(nieznany.nieznany)
     }
+
+    @Test fun `HealthResponse - stary serwer bez pola srodowisko czyta sie jako produkcja`() {
+        /* Etykieta instancji doszla w 0.69.0. Kolektor rysuje z niej pastylke
+           DEV, wiec domyslna MUSI byc "produkcja" — inaczej starszy serwer
+           wygladalby na urzadzeniu jak srodowisko testowe. */
+        val stary = WertisJson.decodeFromString<HealthResponse>("""{"wersja":"0.68.0"}""")
+        assertEquals("produkcja", stary.srodowisko)
+        val dev = WertisJson.decodeFromString<HealthResponse>(
+            """{"wersja":"0.69.0","srodowisko":"dev","ok":true,"mode":"seeded"}"""
+        )
+        assertEquals("dev", dev.srodowisko)
+    }
 }

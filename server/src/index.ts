@@ -108,6 +108,10 @@ export async function buildApp() {
          aktualizacji: `git pull` przestawia serwer, ale APK na kolektorze
          zostaje stary do czasu rozesłania przez MDM. */
       wersja: WERSJA,
+      /* Etykieta instancji (0.69.0). Trasa jest bez sesji i tak ma być:
+         etykieta nie jest daną biura, a ostrzeżenie „to jest dev" musi być
+         widoczne PRZED zalogowaniem — właśnie wtedy człowiek myli serwery. */
+      srodowisko: config.srodowisko,
       mode: config.sgtMode,
       sferaMode: config.sferaMode,
       // skąd wzięła się konfiguracja — pierwsze pytanie przy „u mnie nie działa"

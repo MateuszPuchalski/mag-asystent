@@ -135,15 +135,18 @@ data class PrzesuniecieResponse(
 )
 
 /**
- * `/api/health` — tu interesuje nas WYŁĄCZNIE wersja serwera.
+ * `/api/health` — kolektor czyta stąd DWA pola i tak ma zostać.
  *
- * Reszta pól (tryb, worker, problemy) zostaje po stronie serwera; kolektor
- * pokazuje numer obok własnego, bo rozjazd „serwer nowszy niż APK" to
- * najczęstsze pytanie po aktualizacji — `git pull` przestawia serwer od razu,
- * a APK czeka na rozesłanie przez MDM.
+ * `wersja` — numer obok własnego, bo rozjazd „serwer nowszy niż APK" to
+ * najczęstsze pytanie po aktualizacji. `srodowisko` — etykieta instancji
+ * (0.69.0): serwer dev obok produkcji różni się tylko portem w adresie,
+ * a portu nikt nie czyta, więc pastylka na górnym pasku musi. Domyślna
+ * „produkcja" obsługuje też starszy serwer, który pola jeszcze nie wysyła.
+ *
+ * Reszta pól (tryb, worker, problemy) zostaje po stronie serwera.
  */
 @Serializable
-data class HealthResponse(val wersja: String = "")
+data class HealthResponse(val wersja: String = "", val srodowisko: String = "produkcja")
 
 @Serializable
 data class WidocznoscRequest(val ukryte: List<Long>)
