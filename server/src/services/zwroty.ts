@@ -15,7 +15,7 @@ import { odhaczZapowiedz, zapowiedzDlaWaybilla } from "./zapowiedzi.js";
    Zwrot środków jest półautomatyczny: link do panelu + stempel ręką.
 
    Etap 2 dokłada JEDEN przycisk: korekta sprzedaży plus MM na bufor zwrotowy,
-   jednym zadaniem kolejki (`korekta_zwrot`). Etap 5 (0.66.0) dołącza do tego
+   jednym zadaniem kolejki (`korekta_zwrot`). Etap 5 (0.67.0) dołącza do tego
    zadania pozycje `do_zniszczenia`: wchodzą na korektę (klient oddał towar,
    sprzedaż koryguje się w całości) i od razu schodzą dokumentem RW — na bufor
    jadą dalej wyłącznie pozycje `pelnowartosciowy`. Reklamacja i do_wyjasnienia
@@ -788,7 +788,7 @@ export function wystawDokumenty(zwrotId: number, autor: string): SzczegolZwrotu 
         magZrodlowy,
         magZwrotow: config.magId.ZWROTY,
         pozycje: pozycje.map((p) => ({ twId: p.twId, qty: p.ilosc })),
-        /* Zniszczone tylko, gdy są — zadanie bez nich wygląda jak przed 0.66.0
+        /* Zniszczone tylko, gdy są — zadanie bez nich wygląda jak przed 0.67.0
            i starszy worker Sfery wykona je bez zmian. */
         ...(pozycjeZniszczone.length > 0
           ? { pozycjeZniszczone: pozycjeZniszczone.map((p) => ({ twId: p.twId, qty: p.ilosc })) }

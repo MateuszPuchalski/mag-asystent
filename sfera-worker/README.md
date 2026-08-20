@@ -7,7 +7,7 @@ Sfery Subiekta GT:
 | typ zadania | co powstaje |
 |---|---|
 | `mm` | dokument przesunięcia magazynowego |
-| `korekta_zwrot` | korekta sprzedaży, MM na magazyn zwrotów oraz (0.66.0) RW dla pozycji zniszczonych — atomowo |
+| `korekta_zwrot` | korekta sprzedaży, MM na magazyn zwrotów oraz (0.67.0) RW dla pozycji zniszczonych — atomowo |
 
 `set_location` zostaje w workerze Node (bezpośredni UPDATE jednej kolumny,
 Sfera do niego niepotrzebna).

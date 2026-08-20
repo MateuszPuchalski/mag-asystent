@@ -24,7 +24,7 @@
  *   //   eksponuje pola lokalizacji — UPDATE tw__Towar SET tw_Lokalizacja=@v
  *   //   osobnym loginem z GRANT UPDATE wyłącznie na tę kolumnę.
  *
- * createKorektaZwrotu (Etap 2 zwrotów, RW dla zniszczonych od 0.66.0):
+ * createKorektaZwrotu (Etap 2 zwrotów, RW dla zniszczonych od 0.67.0):
  *   var kor = sfera.DokumentyHandloweManager.DodajKorekte(dokId);  // KFS/KPA
  *   foreach (p in pozycje + pozycjeZniszczone) kor.Pozycje[...].IloscPoKorekcie -= p.qty;
  *   kor.Zapisz();
@@ -71,7 +71,7 @@ export interface ZlecenieKorekty {
    * z pełnowartościowymi (klient oddał towar — sprzedaż trzeba skorygować),
    * ale zamiast MM na bufor od razu schodzi po nich RW z magazynu sprzedaży:
    * zniszczony towar nie ma być sprzedawalny ani chwili, a bez RW wisiałby
-   * na stanie jako duch. Pole opcjonalne — zadania sprzed 0.66.0 go nie mają.
+   * na stanie jako duch. Pole opcjonalne — zadania sprzed 0.67.0 go nie mają.
    */
   pozycjeZniszczone?: MmItem[];
 }

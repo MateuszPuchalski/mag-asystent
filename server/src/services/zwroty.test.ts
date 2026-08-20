@@ -329,7 +329,7 @@ test("korekta idzie na dokument sprzedaży, MM z magazynu sprzedaży na bufor", 
   assert.equal(p.magZwrotow, 3);
   assert.deepEqual(p.pozycje, [{ twId: 900_036, qty: 1 }, { twId: 900_037, qty: 2 }]);
   /* Bez pozycji zniszczonych klucza w payloadzie NIE MA — zadanie wygląda
-     jak sprzed 0.66.0 i starszy worker Sfery wykona je bez zmian. */
+     jak sprzed 0.67.0 i starszy worker Sfery wykona je bez zmian. */
   assert.ok(!("pozycjeZniszczone" in p));
 });
 
@@ -347,7 +347,7 @@ test("drugie kliknięcie NIE zleca drugiej korekty", async () => {
 });
 
 test("zniszczone jadą OSOBNĄ sekcją payloadu: korekta + RW, bez MM na bufor", async () => {
-  /* Do 0.66.0 zniszczenie wypadało z dokumentów w ogóle — towar znikał bez
+  /* Do 0.67.0 zniszczenie wypadało z dokumentów w ogóle — towar znikał bez
      śladu magazynowego. Teraz wchodzi na korektę (klient oddał towar) i od
      razu schodzi RW; na bufor zwrotowy dalej NIE jedzie. */
   kartotekiDev();
@@ -368,7 +368,7 @@ test("zniszczone jadą OSOBNĄ sekcją payloadu: korekta + RW, bez MM na bufor",
 });
 
 test("zwrot w całości zniszczony też wystawia dokumenty", async () => {
-  /* Przed 0.66.0 taki zwrot był ślepym zaułkiem: przycisk mówił „żadna
+  /* Przed 0.67.0 taki zwrot był ślepym zaułkiem: przycisk mówił „żadna
      pozycja nie jest pełnowartościowa" i korekta nie powstawała wcale. */
   kartotekiDev();
   dokument(101, "FS", 5, { nrOryg: "dev-ord-1", pozycje: [[900_036, 1], [900_037, 2]] });

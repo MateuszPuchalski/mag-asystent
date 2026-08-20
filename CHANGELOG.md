@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.66.0 — 20 sierpnia 2026
+## 0.67.0 — 20 sierpnia 2026
 
 **Zniszczony towar przestaje znikać bez śladu.** Decyzja „do zniszczenia" była
 ślepym zaułkiem: pozycja nie wchodziła na korektę, więc towar nigdy nie wracał
@@ -57,6 +57,29 @@ Wywołanie RW przez Sferę (`DodajRW()`) jest szkicem `[WERYFIKUJ]` jak korekta
 i MM — nowa pozycja na checkliście DEPLOY §6a i w README workera. W dev
 RW dostaje atrapę numeru (`RW n/07/2026`), karta zwrotu pokazuje go obok
 korekty i MM, a pozycje w tabeli mówią, dokąd każda pojedzie po korekcie.
+
+## 0.66.0 — 20 sierpnia 2026
+
+**Wyszukiwarka w dostawie uciszała skaner.** Ze zgłoszenia: „wyszukałem produkt
+i nie mogę nadać lokalizacji ani zatwierdzić skanem, bo tekst input jest
+aktywny".
+
+Tak działa `WedgeKeySource`: skaner kolektora jest klawiaturą, więc zbiera
+znaki wyłącznie wtedy, gdy nie ma ich gdzie wpisać. Pole tekstowe z fokusem
+przejmuje znaki i skan trafia do pola zamiast na regał. Reguła jest słuszna —
+bez niej hasło z klawiatury sprzętowej poleciałoby do wyszukiwarki towarów —
+ale pole filtra nie oddawało fokusu nawet po schowaniu klawiatury. Kolektor
+wyglądał więc na zepsuty: klawiatury nie widać, a skan nie robi nic.
+
+Trzy poprawki, każda na inną drogę wyjścia:
+
+- **„Gotowe" oddaje fokus**, nie tylko chowa klawiaturę. Dotyczy WSZYSTKICH
+  pól w aplikacji, bo pułapka była wspólna.
+- **Wybranie pozycji oddaje fokus.** Filtr jest drogą do pozycji, a nie trybem
+  pracy: po jej wskazaniu idzie się do regału.
+- **Pasek „Skaner milczy, dopóki piszesz" z przyciskiem GOTOWE.** Sama
+  podpowiedź nie wystarcza — „gotowe" na klawiaturze ekranowej trzeba
+  najpierw znaleźć, a robi się to w rękawicy.
 
 ## 0.65.0 — 20 sierpnia 2026
 

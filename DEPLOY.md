@@ -931,7 +931,7 @@ pozycję: pełnowartościowy / reklamacja / do wyjaśnienia / do zniszczenia.
 Zwrot środków jest półautomatyczny: link do panelu Allegro + potwierdzenie ręką.
 
 Po decyzjach jedno kliknięcie zleca **dokumenty zwrotu jednym zadaniem
-kolejki**: korektę sprzedaży, MM na magazyn zwrotów i — od 0.66.0 — RW dla
+kolejki**: korektę sprzedaży, MM na magazyn zwrotów i — od 0.67.0 — RW dla
 pozycji zniszczonych. Korekta obejmuje pozycje **pełnowartościowe
 i zniszczone** (klient oddał towar, sprzedaż koryguje się w całości); na bufor
 jadą tylko pełnowartościowe, zniszczone od razu schodzą dokumentem RW.
@@ -1031,7 +1031,7 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
 6. **Magazyn sprzedaży** trafia do read-modelu z `dok_MagId` i to on jest
    źródłem MM. Sprawdź, czy sprzedaż firmy naprawdę wychodzi z tego magazynu,
    z którego ma wracać towar.
-7. **RW dla pozycji zniszczonych** (0.66.0) — wywołanie
+7. **RW dla pozycji zniszczonych** (0.67.0) — wywołanie
    `DokumentyMagazynoweManager.DodajRW()` jest szkicem jak korekta i MM.
    Pierwsze RW rób na kopii bazy, na zwrocie próbnym z jedną pozycją
    „do zniszczenia". Sprawdź, że korekta objęła pozycję, a RW zdjęło ją

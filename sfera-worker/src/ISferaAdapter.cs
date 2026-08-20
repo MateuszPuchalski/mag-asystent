@@ -5,9 +5,9 @@ public sealed record MmItem(int TwId, double Qty);
 
 /// <summary>
 /// Zlecenie korekty zwrotu — lustro ZlecenieKorekty z sfera.ts.
-/// PozycjeZniszczone (0.66.0): wchodzą na korektę razem z Pozycje, ale zamiast
+/// PozycjeZniszczone (0.67.0): wchodzą na korektę razem z Pozycje, ale zamiast
 /// MM na bufor od razu schodzą dokumentem RW z magazynu sprzedaży. Pusta lista
-/// = zadanie sprzed 0.66.0 albo zwrot bez zniszczeń.
+/// = zadanie sprzed 0.67.0 albo zwrot bez zniszczeń.
 /// </summary>
 public sealed record ZlecenieKorekty(
     int DokId, string Typ, int MagZrodlowy, int MagZwrotow,

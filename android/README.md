@@ -308,6 +308,10 @@ przed którą ta pozycja broni.
 - [ ] pozycja z nadmiarem jest odłożona, nie wraca do roboty.
 - [ ] logo dostawcy na liście dostaw jest szersze niż wysokie,
 - [ ] wiersz bez logo ma kafelek stanu w tym samym miejscu i nie przeskakuje.
+- [ ] po wpisaniu czegoś w filtr dostawy widać pasek „Skaner milczy",
+- [ ] GOTOWE oddaje fokus i skan znów działa,
+- [ ] wybranie pozycji z filtra samo oddaje fokus,
+- [ ] po tym da się nadać lokalizację skanem regału.
 
 **Kreator kont i rola admina**
 

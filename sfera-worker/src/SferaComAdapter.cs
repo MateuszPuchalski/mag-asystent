@@ -74,7 +74,7 @@ public sealed class SferaComAdapter : ISferaAdapter
     }
 
     /// <summary>
-    /// RW dla pozycji zniszczonych (0.66.0) — rozchód z magazynu sprzedaży,
+    /// RW dla pozycji zniszczonych (0.67.0) — rozchód z magazynu sprzedaży,
     /// zaraz po korekcie, która te sztuki na stan oddała.
     /// </summary>
     private static string DodajRw(dynamic su, int magId, IReadOnlyList<MmItem> items)
