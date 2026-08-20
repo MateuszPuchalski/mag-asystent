@@ -33,6 +33,23 @@ historii nie przepisujemy.
 
 ---
 
+## 0.60.2 — 20 sierpnia 2026
+
+**Koniec z okienkami przeglądarki.** Notatka do decyzji wyskakiwała jako
+systemowe „Komunikat ze strony localhost" — okno z innego świata, zasłaniające
+kontekst i głuche na język wizualny strony. To samo robiły potwierdzenia
+i błędy.
+
+Wszystkie `prompt`/`confirm`/`alert` zastąpił jeden natywny `<dialog>`
+w stylu WERTIS (Esc, fokus i przyciemnienie tła za darmo, nadal zero builda)
+oraz toast na błędy. Dialogi mówią teraz PEŁNYM kontekstem: tytuł nazywa
+decyzję, przycisk nazywa skutek („ZAPISZ DECYZJĘ", „ZAMKNIJ — NA HALĘ"),
+a operacje niszczące mają czerwony przycisk.
+
+Przy okazji naprawiona pułapka: ANULUJ przy notatce do decyzji ZAPISYWAŁ
+decyzję bez notatki. Teraz przerywa całą operację — przycisk „nie" nie ma
+prawa robić połowy „tak".
+
 ## 0.60.1 — 20 sierpnia 2026
 
 **Licznik odpowiedzi na notatki prowadzi tam, gdzie obiecuje.** Sygnał
