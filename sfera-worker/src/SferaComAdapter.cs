@@ -38,7 +38,9 @@ public sealed class SferaComAdapter : ISferaAdapter
 
         try
         {
-            return DodajMm(Sesja(), magFrom, magTo, items).Numer;
+            // rzut na object — argument `dynamic` zrobiłby z wywołania wiązanie
+            // dynamiczne i krotka wynikowa straciłaby nazwane pola (CS8133)
+            return DodajMm((object)Sesja(), magFrom, magTo, items).Numer;
         }
         catch
         {
@@ -50,10 +52,14 @@ public sealed class SferaComAdapter : ISferaAdapter
     /// <summary>
     /// MM jako (dokument, numer) — korekta zwrotu potrzebuje UCHWYTU, żeby móc
     /// wycofać MM, gdy padnie RW stojące dalej w łańcuchu.
+    /// Parametr sesji jest `object` ŚWIADOMIE: argument `dynamic` czyni całe
+    /// wywołanie dynamicznym, a krotki z takiego wywołania nie da się
+    /// dekonstruować (CS8133) — i traci nazwy pól w locie.
     /// </summary>
     private static (dynamic Dok, string Numer) DodajMm(
-        dynamic su, int magFrom, int magTo, IReadOnlyList<MmItem> items)
+        object sesja, int magFrom, int magTo, IReadOnlyList<MmItem> items)
     {
+        dynamic su = sesja;
         /* [WERYFIKUJ] nazwa managera i metody — kontrakt sfera.ts podaje
            DokumentyMagazynoweManager.DodajMM(); w nowszych wersjach Sfery
            bywa SuDokumentyManager z typem dokumentu w argumencie. */
@@ -77,8 +83,9 @@ public sealed class SferaComAdapter : ISferaAdapter
     /// RW dla pozycji zniszczonych (0.67.0) — rozchód z magazynu sprzedaży,
     /// zaraz po korekcie, która te sztuki na stan oddała.
     /// </summary>
-    private static string DodajRw(dynamic su, int magId, IReadOnlyList<MmItem> items)
+    private static string DodajRw(object sesja, int magId, IReadOnlyList<MmItem> items)
     {
+        dynamic su = sesja;
         /* [WERYFIKUJ] nazwa metody RW — kontrakt sfera.ts podaje
            DokumentyMagazynoweManager.DodajRW(); dok_Typ RW = 13. */
         dynamic rw = su.DokumentyMagazynoweManager.DodajRW();
@@ -129,9 +136,9 @@ public sealed class SferaComAdapter : ISferaAdapter
             try
             {
                 if (z.Pozycje.Count > 0)
-                    (mmDok, nrMm) = DodajMm(su, z.MagZrodlowy, z.MagZwrotow, z.Pozycje);
+                    (mmDok, nrMm) = DodajMm((object)su, z.MagZrodlowy, z.MagZwrotow, z.Pozycje);
                 string nrRw = z.PozycjeZniszczone.Count > 0
-                    ? DodajRw(su, z.MagZrodlowy, z.PozycjeZniszczone)
+                    ? DodajRw((object)su, z.MagZrodlowy, z.PozycjeZniszczone)
                     : "";
                 return new WynikKorekty(nrKorekty, nrMm, nrRw);
             }
