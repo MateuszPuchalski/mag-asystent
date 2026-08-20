@@ -76,7 +76,7 @@ lista wariantów rosłaby o każdy przypadek gramatyczny z osobna.
 | **zbiórka** | pobranie towaru pod zamówienie klienta, z eksportu Sellasist; nie mylić z kompletacją | |
 | **korekta ilości** | poprawienie liczby odłożonych sztuk przed zamknięciem faktury; na kolektorze przycisk POPRAW ILOŚĆ | |
 | **notatka biura** | pytanie dopisane do dostawy, wymagające odpowiedzi przed jej domknięciem; nie mylić z opisem przy wyjątku | |
-| **odpowiedź na notatkę** | wraca do biura sygnałem w pasku stanu; „przeczytane" jest stanem w bazie, nie w przeglądarce | |
+| **odpowiedź na notatkę** | wraca do biura sygnałem w pasku stanu, który prowadzi do karty; „przeczytane" jest stanem w bazie, nie w przeglądarce | |
 | **zakres wyjątku** | czy kategoria dotyczy pozycji dokumentu, czy całej dostawy; nie mylić z jego stanem otwarty–rozwiązany | |
 | **aktualizacja kolektora** | wymiana APK na urządzeniu; „aktualizacja" bez określenia myli się z aktualizacją serwera | |
 | **podpis wydania** | klucz, którym podpisany jest APK; bez tego samego klucza Android odrzuca aktualizację | |
