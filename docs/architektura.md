@@ -322,6 +322,12 @@ Do lipca 2026 „użytkownik" był dowolnym łańcuchem wpisywanym na kolektorze
 i wysyłanym w `X-User`. Każdy mógł podać się za kogokolwiek, a `events.user_id`
 zbierał warianty tej samej osoby.
 
+`X-User` został jako podpowiedź dla instalacji bez badge'ów. Od 0.60.3 jego
+wartość jedzie **zakodowana procentowo w UTF-8**, bo OkHttp odmawia wysłania
+nagłówka ze znakiem spoza zakresu ASCII drukowalnego. Serwer odkodowuje ją
+w `userOf()`. Powód jest twardy: bez tego kolektor ginął przy nazwisku
+z polską literą.
+
 Dziś: **login i hasło → token sesji urządzenia**. Hasło leży w `app_user`
 wyłącznie jako hasz (scrypt, sól per konto, porównanie stałoczasowe), minimum
 osiem znaków, bez wymagań na klasy znaków.

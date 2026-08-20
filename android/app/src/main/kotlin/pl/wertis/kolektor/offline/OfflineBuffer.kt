@@ -20,6 +20,7 @@ import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.MeldunekOdrzuconych
 import pl.wertis.kolektor.core.net.OdrzuconaOperacja
 import pl.wertis.kolektor.core.net.WertisJson
+import pl.wertis.kolektor.core.net.naglowekHttp
 import pl.wertis.kolektor.core.offline.OfflineQueue
 import pl.wertis.kolektor.core.offline.OpReporter
 import pl.wertis.kolektor.core.offline.OpSender
@@ -70,7 +71,7 @@ class ApiOpSender(private val api: ApiService) : OpSender {
                 api.setLocation(
                     requireNotNull(op.productId),
                     requireNotNull(op.setLocation),
-                    asUser = op.user,
+                    asUser = naglowekHttp(op.user),
                     bufferedUser = op.userRef?.toString(),
                 ).queueId
             PendingOp.OpKind.PUTAWAY -> {
@@ -79,7 +80,7 @@ class ApiOpSender(private val api: ApiService) : OpSender {
                     p.deliveryId,
                     p.lineId,
                     p.body,
-                    asUser = op.user,
+                    asUser = naglowekHttp(op.user),
                     bufferedUser = op.userRef?.toString(),
                 ).queueId
             }

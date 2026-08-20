@@ -21,7 +21,35 @@ function header(req: FastifyRequest, name: string): string | null {
  * dowodem tożsamości, tylko deklaracją.
  */
 export function userOf(req: FastifyRequest): string {
-  return currentUserName() ?? header(req, "x-user") ?? "anonim";
+  return currentUserName() ?? dekodujNazwe(header(req, "x-user")) ?? "anonim";
+}
+
+/**
+ * Nazwa z nagłówka — kodowana procentowo od 0.60.3.
+ *
+ * Kolektor musi ją kodować, bo OkHttp odmawia wysłania nagłówka z jakimkolwiek
+ * znakiem spoza ` `–`~` i robi to WYJĄTKIEM, który zabijał aplikację przy
+ * nazwisku „Błażej". Kodowanie procentowe UTF-8 wybrano zamiast okrajania
+ * ogonków, bo ta wartość ląduje w `events.user_id`, czyli w dzienniku audytu.
+ *
+ * Trzy rzeczy, których to celowo NIE robi:
+ *
+ * 1. Nie dekoduje wszystkiego w `header()` — ten czyta też `x-session`
+ *    i `x-device`, których nikt nie koduje, a hurtowe dekodowanie procentów
+ *    tworzyłoby nową klasę niespodzianek.
+ * 2. Nie wywraca żądania przy uszkodzonej sekwencji (`%zz` to `URIError`).
+ *    Wartość przychodzi z zewnątrz — czyli obowiązuje ta sama zasada, przez
+ *    którą ta poprawka w ogóle powstała, tyle że po naszej stronie drutu.
+ * 3. Nie wymaga kodowania: stara nazwa ASCII nie zawiera procentu, więc
+ *    przechodzi tędy bez zmian. Starszy APK działa z nowym serwerem.
+ */
+function dekodujNazwe(surowa: string | null): string | null {
+  if (surowa == null || !surowa.includes("%")) return surowa;
+  try {
+    return decodeURIComponent(surowa);
+  } catch {
+    return surowa;
+  }
 }
 
 export interface Autor {
