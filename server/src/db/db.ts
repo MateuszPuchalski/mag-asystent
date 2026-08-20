@@ -355,6 +355,15 @@ export function nextKorektaNumber(typ: "FS" | "PA"): string {
   return `${typ === "PA" ? "KPA" : "KFS"} ${row.value}/07/2026`;
 }
 
+/** Kolejny numer RW — rozchód zniszczonych zwrotów (dev; w prod nadaje Subiekt). */
+export function nextRwNumber(): string {
+  const d = db();
+  const row = d
+    .prepare("UPDATE counters SET value = value + 1 WHERE name='rw' RETURNING value")
+    .get() as { value: number };
+  return `RW ${row.value}/07/2026`;
+}
+
 /** Kolejny numer dokumentu MM (dev; w prod nadaje Subiekt). */
 export function nextMmNumber(): string {
   const d = db();

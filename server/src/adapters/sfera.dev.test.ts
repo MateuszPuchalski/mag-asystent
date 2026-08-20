@@ -67,6 +67,35 @@ test("korekta oddaje stan magazynowi sprzedaży, MM zabiera go na bufor", async 
   assert.match(paragon.korektaNumer, /^KPA /, "paragon dostaje korektę paragonu");
 });
 
+test("zniszczone: korekta oddaje, RW zdejmuje — bufor ich nie widzi (Etap 5)", async () => {
+  const w = await adapter.createKorektaZwrotu({
+    dokId: 101,
+    typ: "FS",
+    magZrodlowy: 1,
+    magZwrotow: 3,
+    pozycje: [{ twId: 5, qty: 1 }],
+    pozycjeZniszczone: [{ twId: 5, qty: 2 }],
+  });
+  /* Pełnowartościowa sztuka jedzie na bufor; dwie zniszczone wchodzą korektą
+     i od razu schodzą RW — netto magazyn sprzedaży bez zmian, bufor +1. */
+  assert.equal(stan(1), 10);
+  assert.equal(stan(3), 1);
+  assert.match(w.rwNumer ?? "", /^RW /);
+
+  /* Zwrot w całości zniszczony: bez MM (pusty numer), z RW. */
+  const samoRw = await adapter.createKorektaZwrotu({
+    dokId: 101,
+    typ: "FS",
+    magZrodlowy: 1,
+    magZwrotow: 3,
+    pozycje: [],
+    pozycjeZniszczone: [{ twId: 5, qty: 1 }],
+  });
+  assert.equal(samoRw.mmNumer, "");
+  assert.ok(samoRw.rwNumer);
+  assert.equal(stan(3), 1, "bufor nie urósł — zniszczone tam nie jadą");
+});
+
 test("nieznany dokument sprzedaży nie rusza stanów", async () => {
   await assert.rejects(
     adapter.createKorektaZwrotu({

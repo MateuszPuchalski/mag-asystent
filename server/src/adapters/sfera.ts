@@ -24,12 +24,15 @@
  *   //   eksponuje pola lokalizacji — UPDATE tw__Towar SET tw_Lokalizacja=@v
  *   //   osobnym loginem z GRANT UPDATE wyłącznie na tę kolumnę.
  *
- * createKorektaZwrotu (Etap 2 zwrotów):
+ * createKorektaZwrotu (Etap 2 zwrotów, RW dla zniszczonych od 0.67.0):
  *   var kor = sfera.DokumentyHandloweManager.DodajKorekte(dokId);  // KFS/KPA
- *   foreach (p in pozycje) kor.Pozycje[...].IloscPoKorekcie -= p.qty;
+ *   foreach (p in pozycje + pozycjeZniszczone) kor.Pozycje[...].IloscPoKorekcie -= p.qty;
  *   kor.Zapisz();
- *   // …a zaraz po niej MM z magazynu sprzedaży na bufor zwrotowy. Gdy MM
- *   // padnie, korekta jest USUWANA (kor.Usun()) — patrz kontrakt niżej.
+ *   // …po niej MM (pełnowartościowe → bufor) oraz RW (zniszczone, z magazynu
+ *   // sprzedaży): var rw = sfera.DokumentyMagazynoweManager.DodajRW();
+ *   // rw.Magazyn = magZrodlowy; rw.Pozycje.Dodaj(twId).IloscJm = qty; rw.Zapisz();
+ *   // Rollback ŁAŃCUCHOWY: pad RW usuwa MM i korektę, pad MM usuwa korektę
+ *   // (Usun()) — patrz kontrakt niżej.
  *
  * createMM (MGP→MAG):
  *   var mm = sfera.DokumentyMagazynoweManager.DodajMM();
@@ -63,12 +66,23 @@ export interface ZlecenieKorekty {
   /** Bufor zwrotowy — MAG_ID_ZWROTY. */
   magZwrotow: number;
   pozycje: MmItem[];
+  /**
+   * Pozycje z decyzją „do zniszczenia" (Etap 5). Korekta obejmuje je RAZEM
+   * z pełnowartościowymi (klient oddał towar — sprzedaż trzeba skorygować),
+   * ale zamiast MM na bufor od razu schodzi po nich RW z magazynu sprzedaży:
+   * zniszczony towar nie ma być sprzedawalny ani chwili, a bez RW wisiałby
+   * na stanie jako duch. Pole opcjonalne — zadania sprzed 0.67.0 go nie mają.
+   */
+  pozycjeZniszczone?: MmItem[];
 }
 
-/** Numery obu dokumentów — trafiają do `sfera_queue.wynik_json`. */
+/** Numery dokumentów — trafiają do `sfera_queue.wynik_json`. */
 export interface WynikKorekty {
   korektaNumer: string;
+  /** Pusty string, gdy zlecenie nie miało pozycji pełnowartościowych (samo zniszczenie). */
   mmNumer: string;
+  /** Numer RW; brak = zlecenie nie miało pozycji zniszczonych. */
+  rwNumer?: string;
 }
 
 /**

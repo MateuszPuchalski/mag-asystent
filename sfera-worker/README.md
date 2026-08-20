@@ -7,15 +7,16 @@ Sfery Subiekta GT:
 | typ zadania | co powstaje |
 |---|---|
 | `mm` | dokument przesunięcia magazynowego |
-| `korekta_zwrot` | korekta sprzedaży ORAZ MM na magazyn zwrotów — atomowo |
+| `korekta_zwrot` | korekta sprzedaży, MM na magazyn zwrotów oraz (0.67.0) RW dla pozycji zniszczonych — atomowo |
 
 `set_location` zostaje w workerze Node (bezpośredni UPDATE jednej kolumny,
 Sfera do niego niepotrzebna).
 
-**Atomowo** znaczy: gdy MM się nie uda, korekta zostaje usunięta. Subiekt nie
-ma transakcji obejmującej dwa dokumenty, więc wycofanie robi ten kod ręką.
-Gdy nie uda się i wycofanie, zadanie kończy się błędem mówiącym wprost, że
-korektę trzeba usunąć w Subiekcie przed ponowieniem.
+**Atomowo** znaczy: gdy któreś ogniwo padnie, wszystko przed nim zostaje
+usunięte — pad RW wycofuje MM i korektę, pad MM wycofuje korektę. Subiekt nie
+ma transakcji obejmującej kilka dokumentów, więc wycofanie robi ten kod ręką.
+Gdy nie uda się i wycofanie, zadanie kończy się błędem wymieniającym Z IMIENIA
+dokumenty do ręcznego usunięcia w Subiekcie przed ponowieniem.
 
 Dlaczego MM nie da się zrobić SQL-em i dlaczego to osobny proces — spec §9
 oraz [`docs/architektura.md`](../docs/architektura.md). Kontrakt wywołań,
@@ -87,7 +88,10 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 6. Wystawienie korekty do istniejącego dokumentu
    (`DokumentyHandloweManager.DodajKorekte(dokId)`), sposób adresowania
    pozycji (`Pozycje.SzukajTowar`) i pole ilości po korekcie.
-7. Usunięcie korekty (`Usun()`) — to ono wycofuje operację, gdy MM padnie.
+7. Usunięcie dokumentu (`Usun()`) — na nim stoi wycofanie łańcucha, gdy
+   dalsze ogniwo padnie.
+8. RW dla pozycji zniszczonych (`DokumentyMagazynoweManager.DodajRW()`,
+   właściwość magazynu) — pierwsze RW na kopii bazy, na zwrocie próbnym.
 
 Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa.
 

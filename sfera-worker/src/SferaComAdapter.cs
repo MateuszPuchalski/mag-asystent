@@ -38,30 +38,65 @@ public sealed class SferaComAdapter : ISferaAdapter
 
         try
         {
-            var su = Sesja();
-            /* [WERYFIKUJ] nazwa managera i metody — kontrakt sfera.ts podaje
-               DokumentyMagazynoweManager.DodajMM(); w nowszych wersjach Sfery
-               bywa SuDokumentyManager z typem dokumentu w argumencie. */
-            dynamic mm = su.DokumentyMagazynoweManager.DodajMM();
-            mm.MagazynZrodlowyId = magFrom;   // [WERYFIKUJ] nazwy właściwości magazynów
-            mm.MagazynDocelowyId = magTo;
-            foreach (var it in items)
-            {
-                dynamic p = mm.Pozycje.Dodaj(it.TwId);   // [WERYFIKUJ] dodawanie pozycji po tw_Id
-                p.IloscJm = it.Qty;
-            }
-            /* Decyzja domyślna: MM powstaje WYKONANE, nie w buforze — sens
-               operacji to „towar sprzedawalny na hali". [WERYFIKUJ] na etapie 2
-               (docs/wdrozenie.md); jeśli firma woli bufor, tu jest to jedno
-               wywołanie do zmiany. */
-            mm.Zapisz();                                  // [WERYFIKUJ]
-            return (string)mm.NumerPelny;                 // [WERYFIKUJ] → sgt_doc_number
+            // rzut na object — argument `dynamic` zrobiłby z wywołania wiązanie
+            // dynamiczne i krotka wynikowa straciłaby nazwane pola (CS8133)
+            return DodajMm((object)Sesja(), magFrom, magTo, items).Numer;
         }
         catch
         {
             ZamknijSesje();
             throw;
         }
+    }
+
+    /// <summary>
+    /// MM jako (dokument, numer) — korekta zwrotu potrzebuje UCHWYTU, żeby móc
+    /// wycofać MM, gdy padnie RW stojące dalej w łańcuchu.
+    /// Parametr sesji jest `object` ŚWIADOMIE: argument `dynamic` czyni całe
+    /// wywołanie dynamicznym, a krotki z takiego wywołania nie da się
+    /// dekonstruować (CS8133) — i traci nazwy pól w locie.
+    /// </summary>
+    private static (dynamic Dok, string Numer) DodajMm(
+        object sesja, int magFrom, int magTo, IReadOnlyList<MmItem> items)
+    {
+        dynamic su = sesja;
+        /* [WERYFIKUJ] nazwa managera i metody — kontrakt sfera.ts podaje
+           DokumentyMagazynoweManager.DodajMM(); w nowszych wersjach Sfery
+           bywa SuDokumentyManager z typem dokumentu w argumencie. */
+        dynamic mm = su.DokumentyMagazynoweManager.DodajMM();
+        mm.MagazynZrodlowyId = magFrom;   // [WERYFIKUJ] nazwy właściwości magazynów
+        mm.MagazynDocelowyId = magTo;
+        foreach (var it in items)
+        {
+            dynamic p = mm.Pozycje.Dodaj(it.TwId);   // [WERYFIKUJ] dodawanie pozycji po tw_Id
+            p.IloscJm = it.Qty;
+        }
+        /* Decyzja domyślna: MM powstaje WYKONANE, nie w buforze — sens
+           operacji to „towar sprzedawalny na hali". [WERYFIKUJ] na etapie 2
+           (docs/wdrozenie.md); jeśli firma woli bufor, tu jest to jedno
+           wywołanie do zmiany. */
+        mm.Zapisz();                                  // [WERYFIKUJ]
+        return (mm, (string)mm.NumerPelny);           // [WERYFIKUJ] → sgt_doc_number
+    }
+
+    /// <summary>
+    /// RW dla pozycji zniszczonych (0.67.0) — rozchód z magazynu sprzedaży,
+    /// zaraz po korekcie, która te sztuki na stan oddała.
+    /// </summary>
+    private static string DodajRw(object sesja, int magId, IReadOnlyList<MmItem> items)
+    {
+        dynamic su = sesja;
+        /* [WERYFIKUJ] nazwa metody RW — kontrakt sfera.ts podaje
+           DokumentyMagazynoweManager.DodajRW(); dok_Typ RW = 13. */
+        dynamic rw = su.DokumentyMagazynoweManager.DodajRW();
+        rw.MagazynId = magId;                         // [WERYFIKUJ] właściwość magazynu RW
+        foreach (var it in items)
+        {
+            dynamic p = rw.Pozycje.Dodaj(it.TwId);    // [WERYFIKUJ]
+            p.IloscJm = it.Qty;
+        }
+        rw.Zapisz();                                  // [WERYFIKUJ]
+        return (string)rw.NumerPelny;                 // [WERYFIKUJ]
     }
 
     public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
@@ -78,43 +113,58 @@ public sealed class SferaComAdapter : ISferaAdapter
                kontrakt sfera.ts podaje DokumentyHandloweManager.DodajKorekte(dokId);
                nazwa managera i metody zależy od wersji Sfery. */
             dynamic korekta = su.DokumentyHandloweManager.DodajKorekte(z.DokId);
-            foreach (var it in z.Pozycje)
+            foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
             {
                 /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie
                    nie DODAJE wierszy — zmienia ilość po korekcie na wierszach
-                   dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ po tw_Id. */
+                   dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ po tw_Id.
+                   Zniszczone wchodzą na korektę RAZEM z pełnowartościowymi:
+                   klient oddał towar, sprzedaż koryguje się w całości. */
                 dynamic p = korekta.Pozycje.SzukajTowar(it.TwId);
                 p.IloscPoKorekcie = p.Ilosc - it.Qty;
             }
             korekta.Zapisz();                                 // [WERYFIKUJ]
             string nrKorekty = (string)korekta.NumerPelny;    // [WERYFIKUJ]
 
-            /* Druga połowa TEJ SAMEJ operacji. Gdy MM padnie, korekta MUSI
-               zniknąć: inaczej klient dostał pieniądze, a towar leży
-               w magazynie sprzedaży jako sprzedawalny — czyli do sprzedania
-               drugi raz, zanim ktokolwiek go obejrzał. */
+            /* Dalsze ogniwa TEJ SAMEJ operacji: MM (pełnowartościowe → bufor)
+               i RW (zniszczone schodzą ze stanu). Gdy którekolwiek padnie,
+               wszystko przed nim MUSI zniknąć: korekta bez MM zostawia towar
+               sprzedawalny w magazynie sprzedaży, korekta+MM bez RW zostawia
+               zniszczone sztuki na stanie jako duchy. */
+            dynamic? mmDok = null;
+            string nrMm = "";
             try
             {
-                return new WynikKorekty(nrKorekty, CreateMM(z.MagZrodlowy, z.MagZwrotow, z.Pozycje));
+                if (z.Pozycje.Count > 0)
+                    (mmDok, nrMm) = DodajMm((object)su, z.MagZrodlowy, z.MagZwrotow, z.Pozycje);
+                string nrRw = z.PozycjeZniszczone.Count > 0
+                    ? DodajRw((object)su, z.MagZrodlowy, z.PozycjeZniszczone)
+                    : "";
+                return new WynikKorekty(nrKorekty, nrMm, nrRw);
             }
-            catch (Exception mmBlad)
+            catch (Exception blad)
             {
-                string? wycofanieBlad = null;
+                /* Wycofanie idzie od końca łańcucha; każdy nieusunięty dokument
+                   trafia do komunikatu z IMIENIA, bo to jego człowiek będzie
+                   musiał usunąć ręką przed ponowieniem. */
+                var nieWycofane = new List<string>();
+                if (mmDok is not null)
+                {
+                    try { mmDok.Usun(); }                     // [WERYFIKUJ]
+                    catch { nieWycofane.Add($"MM {nrMm}"); }
+                }
                 try { korekta.Usun(); }                       // [WERYFIKUJ]
-                catch (Exception e) { wycofanieBlad = e.Message; }
+                catch { nieWycofane.Add($"korekta {nrKorekty}"); }
 
-                /* Dwa różne komunikaty, bo to dwa różne stany magazynu.
-                   Wycofana korekta = nic się nie stało, PONÓW jest bezpieczny.
-                   Niewycofana = w Subiekcie stoi korekta bez MM i człowiek
-                   musi ją usunąć RĘKĄ, zanim cokolwiek ponowi. */
-                throw wycofanieBlad is null
+                throw nieWycofane.Count == 0
                     ? new InvalidOperationException(
-                        $"MM na bufor zwrotowy nie powstało — korekta {nrKorekty} została wycofana. " +
-                        $"Przyczyna: {mmBlad.Message}", mmBlad)
+                        $"Dokumenty zwrotu nie powstały w całości — korekta {nrKorekty}" +
+                        (nrMm.Length > 0 ? $" i MM {nrMm}" : "") +
+                        $" zostały wycofane, PONÓW jest bezpieczny. Przyczyna: {blad.Message}", blad)
                     : new InvalidOperationException(
-                        $"MM nie powstało, a korekty {nrKorekty} NIE UDAŁO SIĘ wycofać — usuń ją " +
-                        $"w Subiekcie RĘCZNIE przed ponowieniem. MM: {mmBlad.Message}; " +
-                        $"wycofanie: {wycofanieBlad}", mmBlad);
+                        $"Dokumenty zwrotu nie powstały w całości, a wycofanie NIE OBJĘŁO: " +
+                        $"{string.Join(", ", nieWycofane)} — usuń je w Subiekcie RĘCZNIE przed " +
+                        $"ponowieniem. Przyczyna: {blad.Message}", blad);
             }
         }
         catch

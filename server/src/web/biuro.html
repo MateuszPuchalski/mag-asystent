@@ -2451,46 +2451,55 @@ function rysujDokumentyZwrotu(z) {
   const cel = $("zwrotDokumenty");
   if (!d) { cel.innerHTML = ""; return; }
 
-  const lista = d.pozycje.length
-    ? `<table style="margin-bottom:8px"><tr><th>TOWAR</th><th>ILOŚĆ</th></tr>${
-        d.pozycje.map((p) => `<tr><td>${esc(p.nazwa)}</td><td class="b">${p.ilosc}</td></tr>`).join("")
-      }</table>`
+  /* Jedna tabela dla obu strumieni: pełnowartościowe jadą na bufor (MM),
+     zniszczone schodzą RW — dokąd trafia każda pozycja, mówi kolumna. */
+  const zniszczone = d.pozycjeZniszczone || [];
+  const wiersze = d.pozycje
+    .map((p) => `<tr><td>${esc(p.nazwa)}</td><td class="b">${p.ilosc}</td><td class="mute">MM na bufor</td></tr>`)
+    .concat(zniszczone.map((p) =>
+      `<tr><td>${esc(p.nazwa)}</td><td class="b">${p.ilosc}</td><td><span class="badge err">RW — zniszczenie</span></td></tr>`))
+    .join("");
+  const lista = wiersze
+    ? `<table style="margin-bottom:8px"><tr><th>TOWAR</th><th>ILOŚĆ</th><th>PO KOREKCIE</th></tr>${wiersze}</table>`
     : "";
 
   if (d.stan === "wystawione") {
-    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+    cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
       <p><span class="badge ok">WYSTAWIONE</span>
         <span class="b">${esc(d.korektaNumer || "—")}</span>
         <span class="mute">korekta</span>
-        <span class="b" style="margin-left:10px">${esc(d.mmNumer || "—")}</span>
-        <span class="mute">MM na bufor zwrotowy</span></p>${lista}`;
+        ${d.mmNumer ? `<span class="b" style="margin-left:10px">${esc(d.mmNumer)}</span>
+          <span class="mute">MM na bufor zwrotowy</span>` : ""}
+        ${d.rwNumer ? `<span class="b" style="margin-left:10px">${esc(d.rwNumer)}</span>
+          <span class="mute">RW — zniszczenie</span>` : ""}</p>${lista}`;
     return;
   }
   if (d.stan === "blad") {
     /* Błąd zapisu do bazy firmy pokazujemy w całości: to zdanie z Subiekta
        albo ze Sfery i tylko ono mówi, co poprawić przed PONÓW. */
-    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+    cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
       <p><span class="badge err">ZAPIS NIEUDANY</span> ${esc(d.blad || "")}</p>
       <p class="mute">Ponowienie stoi w kolejce zapisów (zakładka KOLEJKA), razem z historią prób.</p>${lista}`;
     return;
   }
   if (d.stan === "w_kolejce") {
-    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+    cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
       <p><span class="badge amber">W KOLEJCE</span>
         <span class="mute">zadanie #${d.queueId} — dokumenty wystawia worker Sfery</span></p>${lista}`;
     return;
   }
   if (d.przeszkoda) {
-    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+    cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
       <p class="mute">${esc(d.przeszkoda)}.</p>`;
     return;
   }
-  cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+  cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
     <p class="mute" style="margin-bottom:8px">
-      Jedno kliknięcie wystawia korektę do dokumentu <b>${esc(z.dokument ? (z.dokument.numer || z.dokument.dokId) : "")}</b>
-      i przesuwa towar na bufor zwrotowy. Idą wyłącznie pozycje pełnowartościowe.
+      Jedno kliknięcie wystawia korektę do dokumentu <b>${esc(z.dokument ? (z.dokument.numer || z.dokument.dokId) : "")}</b>.
+      Pozycje pełnowartościowe jadą MM na bufor zwrotowy, zniszczone od razu
+      schodzą dokumentem RW.
     </p>${lista}
-    <button class="akcja" data-dokumenty>WYSTAW KOREKTĘ + MM</button>`;
+    <button class="akcja" data-dokumenty>WYSTAW DOKUMENTY</button>`;
 }
 
 /* Sekcja KOSZ — dopiero po ZLECENIU dokumentów: kosz wiąże się z korektą
@@ -2500,6 +2509,9 @@ function rysujKoszZwrotu(z) {
   const cel = $("zwrotKosz");
   const d = z.dokumenty;
   if (!d || d.stan === "brak") { cel.innerHTML = ""; return; }
+  /* Zwrot bez pozycji pełnowartościowych (samo zniszczenie) nie ma czego
+     wozić na halę — sekcja kosza tylko by odsyłała do błędu przypięcia. */
+  if (!z.kosz && (!d.pozycje || d.pozycje.length === 0)) { cel.innerHTML = ""; return; }
   if (z.kosz) {
     cel.innerHTML = `<h2>KOSZ ZWROTOWY</h2>
       <p><span class="b">${esc(z.kosz.kod)}</span> ${badgeKosza(z.kosz.status)}
