@@ -301,6 +301,13 @@ przed którą ta pozycja broni.
 - [ ] przy zgodnych liczbach linijka jest szara i bez strzałki (wskaźnik
       zapalony bez powodu przestaje być czytany),
 - [ ] przy liczbie w kaflu nie ma „szt."; metry i komplety zostają.
+- [ ] `+` ponad ilość z faktury pyta raz i mówi o zgłoszeniu do biura,
+- [ ] po potwierdzeniu licznik idzie dalej bez kolejnych pytań,
+- [ ] ANULUJ zostawia liczbę z faktury i niczego nie zapisuje,
+- [ ] po zamknięciu dostawy nadmiar jest w wyjątkach w `/biuro`,
+- [ ] pozycja z nadmiarem jest odłożona, nie wraca do roboty.
+- [ ] logo dostawcy na liście dostaw jest szersze niż wysokie,
+- [ ] wiersz bez logo ma kafelek stanu w tym samym miejscu i nie przeskakuje.
 
 **Kreator kont i rola admina**
 

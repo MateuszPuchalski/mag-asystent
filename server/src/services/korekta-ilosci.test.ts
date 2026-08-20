@@ -94,12 +94,20 @@ test("korekta ustawia wartość BEZWZGLĘDNĄ, nie różnicę", () => {
 
 /* ── granice ──────────────────────────────────────────────────────────────── */
 
-test("nie da się odłożyć więcej, niż stoi na dokumencie", () => {
+test("korekta PONAD dokument przechodzi — od 0.64.0 nadmiar jest dozwolony", () => {
+  /* Do 0.64.0 stała tu odmowa „więcej nie da się odłożyć". Zniknęła razem
+     z dopuszczeniem nadmiaru przy odkładaniu, i musiała: skoro `+` wolno
+     przekroczyć fakturę, to jedyną drogą wyjścia z omyłkowego nadmiaru byłoby
+     zgłoszenie wyjątku — czyli reklamacja wystawiona dostawcy za własną
+     pomyłkę w liczeniu.
+
+     Nadmiar nie ginie po cichu: zgłoszenie do biura powstaje przy zamknięciu
+     dostawy (`zglosNadmiary`), a nie tutaj. */
   const l = linia(7);
   const r = D.korygujIlosc(l, 11, "Jan z hali");
-  assert.ok("error" in r);
-  assert.match(r.error, /10/, "komunikat podaje liczbę z dokumentu");
-  assert.equal(stanLinii(l).qty, 7, "odmowa niczego nie zmienia");
+  assert.ok(!("error" in r), "korekta ponad dokument ma przejść");
+  assert.equal(stanLinii(l).qty, 11);
+  assert.equal(stanLinii(l).status, "done", "nadmiar domyka pozycję, nie otwiera jej");
 });
 
 test("ujemna ilość odpada", () => {

@@ -1201,7 +1201,15 @@ private fun PanelOdkladania(
            Podział jest treścią, nie ozdobą: po lewej to, co magazynier USTAWIA,
            po prawej to, dokąd IDZIE. */
         val zostalo = line.qtyDoc - line.qtyDone
-        val ile = (czesc ?: zostalo).coerceIn(1.0, zostalo.coerceAtLeast(1.0))
+        /* Górnej granicy nie ma od 0.64.0 — nadmiar ponad fakturę jest
+           dozwolony. Bramką jest przycisk `+`, nie `coerceIn`: przekroczenie
+           wymaga jednego potwierdzenia, a potem licznik idzie swobodnie. */
+        val ile = (czesc ?: zostalo).coerceAtLeast(1.0)
+        /* Pytanie zadajemy RAZ NA POZYCJĘ. Przy każdym kroku byłoby karą za
+           liczenie sztuk, a przy zerowej liczbie pytań przypadkowe dotknięcie
+           `+` wysyłałoby dostawcy reklamację. */
+        var nadmiarOk by remember(line.id) { mutableStateOf(false) }
+        var pytaONadmiar by remember(line.id) { mutableStateOf(false) }
         /* `IntrinsicSize.Min` na wierszu plus `fillMaxHeight` na obu kaflach:
            oba dostają wysokość WYŻSZEGO z nich. Bez tego biały rósł o linijkę
            „z 10 · reszta zostaje" albo „w przyjęciach", a ciemny zostawał
@@ -1262,12 +1270,23 @@ private fun PanelOdkladania(
                             )
                         }
                     }
-                    KrokIlosci("+", ile < zostalo) { onCzesc(ile + 1) }
+                    KrokIlosci("+", true) {
+                        if (ile >= zostalo && !nadmiarOk) pytaONadmiar = true
+                        else onCzesc(ile + 1)
+                    }
                 }
                 // „z 10" pojawia się WYŁĄCZNIE przy odłożeniu częściowym —
                 // przy pełnym byłoby powtórzeniem tej samej liczby obok siebie
                 if (ile < zostalo) {
                     Text("z ${formatQty(zostalo)} · reszta zostaje", fontSize = 11.sp, color = InkMute)
+                } else if (ile > zostalo) {
+                    // stan, którego nie widać nigdzie indziej, a zmienia skutek zapisu
+                    Text(
+                        "o ${formatQty(ile - zostalo.coerceAtLeast(0.0))} ponad fakturę",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Destructive,
+                    )
                 }
                 /* Stan przy półce odpowiada na pytanie, które magazynier zadaje
                    sobie z kartonem w ręce: „czy tego już tam coś leży".
@@ -1364,6 +1383,47 @@ private fun PanelOdkladania(
                             color = Amber,
                             modifier = Modifier.clickable(onClick = onManualOpen),
                         )
+                    }
+                }
+            }
+        }
+
+        /* POTWIERDZENIE NADMIARU (0.64.0). Pasek pod kaflami, nie okno na pół
+           ekranu: pytanie dotyczy liczby, która stoi tuż wyżej, więc ma być
+           widoczne RAZEM z nią. Ta sama zasada co przy rozjeździe adresu.
+
+           Mówimy wprost, co się stanie po zamknięciu dostawy — zgoda na coś,
+           czego skutku nie widać, nie jest zgodą. */
+        if (pytaONadmiar) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Destructive.copy(alpha = 0.08f))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Na fakturze jest ${formatQty(line.qtyDoc)}. Po zakończeniu " +
+                        "dostawy biuro dostanie zgłoszenie nadmiaru.",
+                    fontSize = 12.sp,
+                    color = Ink,
+                    lineHeight = 16.sp,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    /* Zgoda jest przyciskiem GŁÓWNYM, bo to ona jest odpowiedzią
+                       na pytanie „ile naprawdę przyjechało". Odmowa zostaje
+                       obrysowana — cofa do liczby z faktury i niczego nie psuje. */
+                    PrimaryButton("ODŁÓŻ WIĘCEJ", modifier = Modifier.weight(1f)) {
+                        nadmiarOk = true
+                        pytaONadmiar = false
+                        onCzesc(ile + 1)
+                    }
+                    OutlineButton("ANULUJ", modifier = Modifier.weight(1f)) {
+                        pytaONadmiar = false
                     }
                 }
             }

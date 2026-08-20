@@ -164,6 +164,17 @@ export interface RaiseProblemInput {
   zamiastIlosc?: number | null;
   opis?: string | null;
   photoBase64?: string | null;
+  /**
+   * Zostaw linii jej dotychczasowy status zamiast ustawiać `problem`.
+   *
+   * Jedyny klient to automatyczne zgłoszenie NADMIARU przy zamknięciu dostawy
+   * (0.64.0). Tam towar fizycznie leży na półce, więc pozycja JEST odłożona —
+   * przestawienie jej na `problem` kazałoby magazynierowi wrócić do roboty,
+   * której nie ma. Nadmiar jest sprawą biura wobec dostawcy, nie zadaniem hali.
+   *
+   * Pomija też `closeIfComplete`: wywołanie idzie już Z WNĘTRZA zamykania.
+   */
+  zachowajStatusLinii?: boolean;
 }
 
 /**
@@ -260,7 +271,7 @@ export function raiseProblem(
   );
 
   // linia z problemem wypada z rutyny — nie blokuje zamknięcia reszty dostawy
-  if (input.lineId) {
+  if (input.lineId && !input.zachowajStatusLinii) {
     db().prepare("UPDATE delivery_line SET status='problem' WHERE id=?").run(input.lineId);
     // jeśli to była ostatnia otwarta pozycja, dostawa domyka się tak samo jak
     // po zwykłym odłożeniu — wyjątek żyje dalej na liście nierozwiązanych
