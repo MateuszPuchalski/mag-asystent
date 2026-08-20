@@ -27,7 +27,15 @@ beforeEach(() => {
   }
 });
 
-const dniTemu = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+/*
+ * Sekunda zapasu ponad pełne dni — i to nie jest kosmetyka. Bez niej wpis
+ * „dzień temu" i `Date.now()` wewnątrz `listaReklamacji` potrafią wypaść
+ * W TEJ SAMEJ MILISEKUNDZIE (SQLite na szybkim runnerze), a wtedy
+ * `floor(13 dni − 0)` daje 13 zamiast oczekiwanych 12. Test padał losowo,
+ * mniej więcej raz na kilkadziesiąt przebiegów CI. Sekunda nie zmienia
+ * żadnej innej asercji: reszta sprawdza porządek i flagi, nie pełne dni.
+ */
+const dniTemu = (n: number) => new Date(Date.now() - n * 86_400_000 - 1000).toISOString();
 
 function zwrotZReklamacja(allegroDniTemu: number | null, waybill: string): number {
   const d = db();
@@ -65,8 +73,8 @@ test("lista: najpilniejsze na górze, po terminie oznaczone", () => {
   assert.deepEqual(lista.map((r) => r.waybill), ["STARA", "PILNA", "SWIEZA"]);
   assert.equal(lista[0].poTerminie, true);
   assert.equal(lista[1].poTerminie, false);
-  // zwrot ręczny bez daty Allegro liczy od przyjęcia skanem (dzień temu:
-  // zostało 13 dni minus chwila, a floor mówi uczciwie „12 pełnych dni")
+  // zwrot ręczny bez daty Allegro liczy od przyjęcia skanem (dzień i sekundę
+  // temu: zostało niecałe 13 dni, a floor mówi uczciwie „12 pełnych dni")
   zwrotZReklamacja(null, "RECZNY");
   assert.equal(R.listaReklamacji().find((r) => r.waybill === "RECZNY")!.dniDoTerminu, 12);
 });
