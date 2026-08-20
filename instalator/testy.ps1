@@ -1078,9 +1078,16 @@ Sprawdz "zatrzymuje DOKŁADNIE te usługi, które potem uruchamia" {
     # Pierwsza wersja stopowała dwie, a startowała trzy: `wertis-sfera`
     # przechodziła aktualizację na chodzie i mogła pisać do SQLite w trakcie
     # migracji schematu. Asymetria wyszła dopiero na wydruku z produkcji.
-    foreach ($u in @("wertis-api", "wertis-worker", "wertis-sfera")) {
-        Zaloz ($galazKod -match [regex]::Escape($u)) "gałąź nie zatrzymuje $u"
-    }
+    #
+    # Od 0.69.0 obie strony biorą JEDNĄ listę z Get-WertisInstancja — asercja
+    # pilnuje więc wspólnego źródła, a nie literalnych nazw: rozjazd stop/start
+    # wymagałby teraz dwóch RÓŻNYCH list, czyli widocznej zmiany w kodzie.
+    Zaloz ($galazKod -match '\$doZatrzymania\s*=\s*\$instancja\.Uslugi') `
+        "stopowana lista ma iść z Get-WertisInstancja"
+    Zaloz ($galazKod -match 'Restart-WertisUslugi -Uslugi \$instancja\.Uslugi') `
+        "startowana lista ma iść z tego samego źródła co stopowana"
+    Zaloz (-not ($galazKod -match 'Restart-WertisUslugi(?!\s+-Uslugi)')) `
+        "wywołanie bez -Uslugi wystartowałoby produkcyjną trójkę na instancji dev"
 }
 
 Sprawdz "zatrzymuje usługi PRZED budowaniem" {

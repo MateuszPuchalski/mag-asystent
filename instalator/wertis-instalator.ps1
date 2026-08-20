@@ -252,7 +252,7 @@ if ($Aktualizuj) {
 
     $wersjaPrzed = Get-WertisWersja -Katalog $Katalog
 
-    # Ta sama trójka co w `Restart-WertisUslugi`, i to nie jest kosmetyka.
+    # Ta sama lista co przy starcie — z `Get-WertisInstancja`, nie z pamięci.
     # Pierwsza wersja zatrzymywała dwie usługi, a uruchamiała trzy: `wertis-sfera`
     # przechodziła całą aktualizację na chodzie. Nie jest procesem Node, więc
     # `npm ci` jej nie dotyka — ale pisze do SQLite przez kolejkę zadań MM,
