@@ -1300,23 +1300,24 @@ function historiaPobran(): { dokumentow: number; pozycji: number } {
 function sprzedazDemo(): number {
   const d = db();
   const insDok = d.prepare(
-    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi)
-     VALUES (?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi, mag_id)
+     VALUES (?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare(
     "INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
   );
 
   // S67 — FS z numerem zamówienia Allegro w numerze obcym: dopasowanie auto
-  insDok.run(DOK_SPRZ_OD, "FS", `FS ${DOK_SPRZ_OD}/${mmrrrr(dzien(-10))}`, "dev-ord-1", dzien(-10), "ALLEGRO", null);
+  // Magazyn sprzedaży wprost: to on jest źródłem MM na bufor zwrotowy (Etap 2).
+  insDok.run(DOK_SPRZ_OD, "FS", `FS ${DOK_SPRZ_OD}/${mmrrrr(dzien(-10))}`, "dev-ord-1", dzien(-10), "ALLEGRO", null, config.magId.MAG);
   insPoz.run(DOK_SPRZ_OD, 900_036, 1); // TEST-LINIA-TODO
   insPoz.run(DOK_SPRZ_OD, 900_037, 2); // TEST-LINIA-DONE
 
   /* S68 — DWA paragony z tym samym towarem, żaden bez numeru zamówienia nie
      wygrywa sam: szczegół zwrotu pokazuje kandydatów i czeka na wybór ręką. */
-  insDok.run(DOK_SPRZ_OD + 1, "PA", `PA ${DOK_SPRZ_OD + 1}/${mmrrrr(dzien(-12))}`, null, dzien(-12), "DETAL", null);
+  insDok.run(DOK_SPRZ_OD + 1, "PA", `PA ${DOK_SPRZ_OD + 1}/${mmrrrr(dzien(-12))}`, null, dzien(-12), "DETAL", null, config.magId.MAG);
   insPoz.run(DOK_SPRZ_OD + 1, 900_029, 1); // TEST-ROTUJACY
-  insDok.run(DOK_SPRZ_OD + 2, "PA", `PA ${DOK_SPRZ_OD + 2}/${mmrrrr(dzien(-20))}`, null, dzien(-20), "DETAL", null);
+  insDok.run(DOK_SPRZ_OD + 2, "PA", `PA ${DOK_SPRZ_OD + 2}/${mmrrrr(dzien(-20))}`, null, dzien(-20), "DETAL", null, config.magId.MAG);
   insPoz.run(DOK_SPRZ_OD + 2, 900_029, 1);
 
   return 3;

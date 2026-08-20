@@ -8,7 +8,7 @@
 SELECT q.id, q.type, q.payload, q.attempts, q.source_doc_id, q.tw_id,
        q.created_by, q.created_by_ref
 FROM sfera_queue q
-WHERE q.type = 'mm'
+WHERE q.type IN ('mm', 'korekta_zwrot')
   AND q.status = 'waiting_for_doc'
   AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= @now)
   AND NOT EXISTS (

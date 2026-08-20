@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.58.0 — 19 sierpnia 2026
+
+**Zwroty, Etap 2: korekta sprzedaży i MM na bufor jednym kliknięciem.**
+[wymaga działania] Dokumenty powstają w Subiekcie, więc ta funkcja żyje
+dopiero z wdrożonym workerem Sfery (DEPLOY §6, etap 2) i poprawnym
+`MAG_ID_ZWROTY`.
+
+Do tej pory karta zwrotu kończyła się na decyzji i stemplu zwrotu środków.
+Korektę i przesunięcie towaru robiło biuro ręcznie w Subiekcie, przepisując
+z ekranu numer dokumentu i pozycje. Teraz robi to jeden przycisk.
+
+**Jedno zadanie kolejki, nie dwa.** Korekta i MM idą razem jako
+`korekta_zwrot`. Rozdzielenie ich dałoby chwilę, w której korekta jest
+wystawiona, a towar leży w magazynie sprzedaży jako sprzedawalny — czyli
+do sprzedania drugi raz, zanim ktokolwiek go obejrzał. Gdy MM padnie,
+korekta jest usuwana; gdy nie uda się i to, zadanie mówi wprost, że trzeba
+ją usunąć w Subiekcie przed ponowieniem.
+
+**Na dokumenty idą wyłącznie pozycje pełnowartościowe** — towar wracający
+do sprzedaży. Reklamacja, zniszczenie i pozycje do wyjaśnienia zostają poza
+korektą, bo stan reklamacyjny w magazynie głównym byłby stanem nie do
+sprzedania. Pozycja pełnowartościowa BEZ rozpoznanej kartoteki zatrzymuje
+całość, zamiast wypaść po cichu: korekta na część zwrotu przy pieniądzach
+za całość to błąd, którego nikt później nie zauważy.
+
+**Magazyn źródłowy bierze się z dokumentu sprzedaży** (`dok_MagId`), nie
+z magazynu głównego. Sprzedaż nie zawsze wychodzi z jedynki, a MM
+z niewłaściwego magazynu to brak stanu i zadanie w błędzie.
+
+**Numery obu dokumentów karta czyta przez wiersz kolejki**, nie z kopii na
+zwrocie. Kopia rozjeżdżałaby się przy pierwszym ponowieniu, a ponowienie
+i tak klika się w kolejce zapisów. Po zleceniu decyzji ani dokumentu już
+się nie zmienia — dokumenty poszły na treść z chwili kliknięcia.
+
+Strona biura po raz pierwszy zapisuje coś do `sfera_queue`, czyli do bazy
+firmy. Test pilnujący listy jej zapisów wypisuje to teraz osobno.
+
+---
+
 ## 0.57.0 — 19 sierpnia 2026
 
 Cztery zmiany wokół jednej rzeczy: **co się dzieje, gdy coś idzie nie tak**.

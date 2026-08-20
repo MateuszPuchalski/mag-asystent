@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace WertisSferaWorker;
 
-/* ── Zapis MM przez COM Sfery — KAŻDE wywołanie COM to [WERYFIKUJ] ───────────
+/* ── Zapis dokumentów przez COM Sfery — KAŻDE wywołanie COM to [WERYFIKUJ] ───
    Ten plik jest jedynym miejscem, które rozmawia ze Sferą, i JEDYNYM plikiem,
    który trzeba poprawić po ustaleniach na maszynie testowej. Szkic wywołań
    pochodzi z kontraktu w server/src/adapters/sfera.ts; nazwy ProgID, właściwości
@@ -56,6 +56,66 @@ public sealed class SferaComAdapter : ISferaAdapter
                wywołanie do zmiany. */
             mm.Zapisz();                                  // [WERYFIKUJ]
             return (string)mm.NumerPelny;                 // [WERYFIKUJ] → sgt_doc_number
+        }
+        catch
+        {
+            ZamknijSesje();
+            throw;
+        }
+    }
+
+    public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new InvalidOperationException(
+                "COM Sfery działa wyłącznie na Windows z zainstalowanym Subiektem GT. " +
+                "Do przebiegu próbnego bez Sfery służy flaga --dry-run.");
+
+        try
+        {
+            var su = Sesja();
+            /* [WERYFIKUJ] wystawienie korekty do istniejącego dokumentu —
+               kontrakt sfera.ts podaje DokumentyHandloweManager.DodajKorekte(dokId);
+               nazwa managera i metody zależy od wersji Sfery. */
+            dynamic korekta = su.DokumentyHandloweManager.DodajKorekte(z.DokId);
+            foreach (var it in z.Pozycje)
+            {
+                /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie
+                   nie DODAJE wierszy — zmienia ilość po korekcie na wierszach
+                   dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ po tw_Id. */
+                dynamic p = korekta.Pozycje.SzukajTowar(it.TwId);
+                p.IloscPoKorekcie = p.Ilosc - it.Qty;
+            }
+            korekta.Zapisz();                                 // [WERYFIKUJ]
+            string nrKorekty = (string)korekta.NumerPelny;    // [WERYFIKUJ]
+
+            /* Druga połowa TEJ SAMEJ operacji. Gdy MM padnie, korekta MUSI
+               zniknąć: inaczej klient dostał pieniądze, a towar leży
+               w magazynie sprzedaży jako sprzedawalny — czyli do sprzedania
+               drugi raz, zanim ktokolwiek go obejrzał. */
+            try
+            {
+                return new WynikKorekty(nrKorekty, CreateMM(z.MagZrodlowy, z.MagZwrotow, z.Pozycje));
+            }
+            catch (Exception mmBlad)
+            {
+                string? wycofanieBlad = null;
+                try { korekta.Usun(); }                       // [WERYFIKUJ]
+                catch (Exception e) { wycofanieBlad = e.Message; }
+
+                /* Dwa różne komunikaty, bo to dwa różne stany magazynu.
+                   Wycofana korekta = nic się nie stało, PONÓW jest bezpieczny.
+                   Niewycofana = w Subiekcie stoi korekta bez MM i człowiek
+                   musi ją usunąć RĘKĄ, zanim cokolwiek ponowi. */
+                throw wycofanieBlad is null
+                    ? new InvalidOperationException(
+                        $"MM na bufor zwrotowy nie powstało — korekta {nrKorekty} została wycofana. " +
+                        $"Przyczyna: {mmBlad.Message}", mmBlad)
+                    : new InvalidOperationException(
+                        $"MM nie powstało, a korekty {nrKorekty} NIE UDAŁO SIĘ wycofać — usuń ją " +
+                        $"w Subiekcie RĘCZNIE przed ponowieniem. MM: {mmBlad.Message}; " +
+                        $"wycofanie: {wycofanieBlad}", mmBlad);
+            }
         }
         catch
         {

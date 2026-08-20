@@ -31,7 +31,7 @@ beforeEach(() => {
   const d = db();
   for (const t of [
     "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "sgt_sprzedaz_pozycja", "sgt_sprzedaz",
-    "sgt_towar", "events", "device_session", "app_user",
+    "sgt_towar", "sfera_queue", "events", "device_session", "app_user",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -65,6 +65,7 @@ const TRASY = [
   { method: "GET" as const, url: "/api/biuro/zwroty" },
   { method: "GET" as const, url: "/api/biuro/zwroty/1" },
   { method: "POST" as const, url: "/api/biuro/zwroty/1/zwrot-srodkow" },
+  { method: "POST" as const, url: "/api/biuro/zwroty/1/dokumenty" },
   { method: "GET" as const, url: "/api/biuro/allegro/status" },
 ];
 
@@ -218,4 +219,48 @@ test("status konta Allegro w trybie dev mówi wprost: adapter fikcyjny", async (
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().stan, "dev");
   assert.equal(r.json().tryb, "dev");
+});
+
+test("korekta z MM: zlecenie jednym POST-em, potem karta odmawia zmian", async () => {
+  /* Cała ścieżka Etapu 2 przez HTTP: decyzje → zlecenie dokumentów → zadanie
+     w kolejce. Ostatni krok jest tu najważniejszy — po zleceniu decyzja NIE
+     wraca do edycji, bo korekta poszła na treść z chwili kliknięcia. */
+  const token = zalogowany("biuro");
+  const naglowki = { "x-session": token };
+
+  let r = await app.inject({
+    method: "POST", url: "/api/biuro/zwroty/skan", payload: { kod: "DEVWB0001" }, headers: naglowki,
+  });
+  const zwrot = r.json().zwrot;
+  for (const p of zwrot.pozycje) {
+    await app.inject({
+      method: "POST",
+      url: `/api/biuro/zwroty/${zwrot.id}/pozycje/${p.id}/decyzja`,
+      payload: { decyzja: "pelnowartosciowy" },
+      headers: naglowki,
+    });
+  }
+
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/zwroty/${zwrot.id}/dokumenty`, headers: naglowki,
+  });
+  assert.equal(r.statusCode, 200);
+  const dok = r.json().zwrot.dokumenty;
+  assert.equal(dok.stan, "w_kolejce");
+  assert.equal(dok.pozycje.length, 2);
+
+  const zadanie = db()
+    .prepare("SELECT type, created_by FROM sfera_queue WHERE id = ?")
+    .get(dok.queueId) as { type: string; created_by: string };
+  assert.equal(zadanie.type, "korekta_zwrot");
+  assert.match(zadanie.created_by, /biuro/, "autor zlecenia idzie z sesji");
+
+  r = await app.inject({
+    method: "POST",
+    url: `/api/biuro/zwroty/${zwrot.id}/pozycje/${zwrot.pozycje[0].id}/decyzja`,
+    payload: { decyzja: "reklamacja" },
+    headers: naglowki,
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /zlecone/i);
 });

@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 function dodaj(
-  type: "mm" | "set_location",
+  type: "mm" | "set_location" | "korekta_zwrot",
   twId: number | null,
   opts: { status?: string; nextAt?: string | null } = {}
 ): number {
@@ -120,4 +120,17 @@ test("najstarsze odblokowane mm wychodzi pierwsze (ORDER BY id)", () => {
   const pierwsze = dodaj("mm", 1);
   dodaj("mm", 2);
   assert.equal(pickPending()?.id, pierwsze);
+});
+test("worker Sfery bierze też korektę zwrotu, a guard lokalizacji jej nie dotyczy", () => {
+  /* `korekta_zwrot` powstaje z wielu pozycji, więc nie ma jednego `tw_id`
+     i guard „adres przed sprzedawalnością" jej nie obejmuje. To poprawne:
+     korekta nie czyni towaru sprzedawalnym — zabiera go na bufor zwrotowy. */
+  const lokalizacja = dodaj("set_location", 900_036);
+  const korekta = dodaj("korekta_zwrot", null);
+  assert.equal(pickPending()?.id, korekta, "czekanie na zapis adresu nie ma tu sensu");
+
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(korekta);
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(lokalizacja);
+  const czekajaca = dodaj("korekta_zwrot", null, { status: "waiting_for_doc" });
+  assert.equal(pickWaiting()?.id, czekajaca);
 });

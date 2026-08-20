@@ -4,15 +4,20 @@ import {
   type SzukanieWatku,
   type ZwrotAllegro,
 } from "../adapters/allegro.js";
+import { config } from "../config.js";
+import { enqueueKorektaZwrotu } from "./queue.js";
 import { logEvent } from "./events.js";
 
-/* ── Zwroty Allegro — serwis (Etap 1) ────────────────────────────────────────
+/* ── Zwroty Allegro — serwis ─────────────────────────────────────────────────
    Skan etykiety → rekord zwrotu z danymi z Allegro → decyzje pracownika per
    pozycja → automatyczne dopasowanie dokumentu sprzedaży (FS/PA) z Subiekta.
    Zwrot środków jest półautomatyczny: link do panelu + stempel ręką.
 
-   Etap 1 NICZEGO nie zapisuje do Subiekta. Korekta i MM na magazyn zwrotów
-   to Etap 2 — dlatego status jest otwartym słownikiem (patrz schema.sql).
+   Etap 2 dokłada JEDEN przycisk: korekta sprzedaży plus MM na bufor zwrotowy,
+   jednym zadaniem kolejki (`korekta_zwrot`). Na oba dokumenty idą WYŁĄCZNIE
+   pozycje z decyzją `pelnowartosciowy` — czyli towar, który wraca do sprzedaży.
+   Reklamacja i zniszczenie dostaną własną ścieżkę: korekta na towar, którego
+   nikt jeszcze nie rozpatrzył, zostawiałaby w magazynie stan nie do sprzedania.
 
    DECYZJA JEST PER POZYCJA, nie per zwrot: jedna paczka miewa artykuł
    pełnowartościowy i uszkodzony naraz, a decyzja per paczka wymuszałaby
@@ -100,6 +105,8 @@ export interface SzczegolZwrotu {
   pozycjeZamowienia: PozycjaZamowienia[];
   /** Tylko gdy dopasowanie='brak' — posortowani malejąco po punktach. */
   kandydaciDokumentu?: KandydatDokumentu[];
+  /** Korekta + MM na bufor: co pojedzie, co już powstało, co blokuje. */
+  dokumenty: StanDokumentow;
 }
 
 export type WynikSkanu =
@@ -129,6 +136,7 @@ interface WierszZwrotu {
   sgt_dok_numer: string | null;
   sgt_dok_typ: string | null;
   dopasowanie: string;
+  korekta_queue_id: number | null;
   zwrot_srodkow_at: string | null;
   zwrot_srodkow_przez: string | null;
 }
@@ -474,7 +482,7 @@ export function dopasujDokument(zwrotId: number, autor: string): void {
 /** Ręczny wybór dokumentu z kandydatów (albo poprawka po pomyłce auto). */
 export function ustawDokument(zwrotId: number, dokId: number, autor: string): SzczegolZwrotu {
   const z = wierszZwrotu(zwrotId);
-  zabronPoRozliczeniu(z);
+  zabronZmian(z);
   const dok = db()
     .prepare("SELECT nr_pelny, typ FROM sgt_sprzedaz WHERE dok_id = ?")
     .get(dokId) as { nr_pelny: string; typ: string } | undefined;
@@ -496,7 +504,7 @@ export function ustawDokument(zwrotId: number, dokId: number, autor: string): Sz
 /** Cofnięcie dopasowania — pomyłki się zdarzają, audyt trzyma historię. */
 export function zdejmijDokument(zwrotId: number, autor: string): SzczegolZwrotu {
   const z = wierszZwrotu(zwrotId);
-  zabronPoRozliczeniu(z);
+  zabronZmian(z);
   db()
     .prepare(
       "UPDATE zwrot SET sgt_dok_id=NULL, sgt_dok_numer=NULL, sgt_dok_typ=NULL, dopasowanie='brak' WHERE id=?"
@@ -519,10 +527,9 @@ export function zapiszDecyzje(
     throw new BladZwrotu(400, `Nieznana decyzja „${decyzja}” — dozwolone: ${DECYZJE.join(", ")}`);
   }
   const z = wierszZwrotu(zwrotId);
-  /* Decyzję MOŻNA zmieniać do rozliczenia — pomyłki przy ocenie towaru się
-     zdarzają, a historia zmian i tak siedzi w events. Po rozliczeniu stop:
-     pieniądze oddano na podstawie tego, co było na ekranie. */
-  zabronPoRozliczeniu(z);
+  /* Decyzję MOŻNA zmieniać, dopóki nic z niej nie wynikło — pomyłki przy
+     ocenie towaru się zdarzają, a historia zmian i tak siedzi w events. */
+  zabronZmian(z);
   const poz = db()
     .prepare("SELECT id, tw_id FROM zwrot_pozycja WHERE id = ? AND zwrot_id = ?")
     .get(pozycjaId, zwrotId) as { id: number; tw_id: number | null } | undefined;
@@ -546,7 +553,7 @@ export function dodajPozycjeReczna(
   autor: string
 ): SzczegolZwrotu {
   const z = wierszZwrotu(zwrotId);
-  zabronPoRozliczeniu(z);
+  zabronZmian(z);
   if (!(ilosc > 0)) throw new BladZwrotu(400, "Ilość musi być dodatnia");
   const t = db()
     .prepare("SELECT tw_id, symbol, nazwa FROM sgt_towar WHERE tw_id = ?")
@@ -581,11 +588,182 @@ export function oznaczZwrotSrodkow(zwrotId: number, autor: string): SzczegolZwro
   return szczegolZwrotu(zwrotId);
 }
 
+// ── Etap 2: korekta sprzedaży + MM na bufor zwrotowy ────────────────────────
+
+/** Decyzja, przy której towar wraca do sprzedaży — jedyna objęta korektą. */
+const DECYZJA_NA_KOREKTE: Decyzja = "pelnowartosciowy";
+
+export interface PozycjaDoKorekty {
+  pozycjaId: number;
+  nazwa: string;
+  twId: number;
+  ilosc: number;
+}
+
+export interface StanDokumentow {
+  /** brak (nie zlecono) | w_kolejce | wystawione | blad */
+  stan: "brak" | "w_kolejce" | "wystawione" | "blad";
+  queueId: number | null;
+  korektaNumer: string | null;
+  mmNumer: string | null;
+  blad: string | null;
+  /** Co pojedzie (albo pojechało) na oba dokumenty. */
+  pozycje: PozycjaDoKorekty[];
+  /**
+   * Dlaczego przycisku NIE można kliknąć; `null` = można.
+   *
+   * Zdanie, nie flaga: biuro ma na ekranie przeczytać, czego brakuje, zamiast
+   * klikać wyszarzony przycisk i zgadywać.
+   */
+  przeszkoda: string | null;
+}
+
+/** Pozycje pełnowartościowe z rozpoznaną kartoteką — treść obu dokumentów. */
+function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
+  return db()
+    .prepare(
+      `SELECT id AS pozycjaId, nazwa, tw_id AS twId, ilosc
+         FROM zwrot_pozycja
+        WHERE zwrot_id = ? AND decyzja = ? AND tw_id IS NOT NULL
+        ORDER BY id`
+    )
+    .all(zwrotId, DECYZJA_NA_KOREKTE) as unknown as PozycjaDoKorekty[];
+}
+
+/**
+ * Stan obu dokumentów — czytany PRZEZ wiersz kolejki, nie z kopii na zwrocie.
+ *
+ * Numery i błąd mieszkają w `sfera_queue`, bo tam je pisze worker i tam biuro
+ * klika PONÓW. Skopiowanie ich na `zwrot` dałoby drugą prawdę, która rozjeżdża
+ * się przy pierwszym ponowieniu.
+ */
+export function stanDokumentow(z: WierszZwrotu): StanDokumentow {
+  const pozycje = pozycjeDoKorekty(z.id);
+  const q = z.korekta_queue_id
+    ? (db()
+        .prepare("SELECT id, status, sgt_doc_number, wynik_json, error_msg FROM sfera_queue WHERE id = ?")
+        .get(z.korekta_queue_id) as
+        | { id: number; status: string; sgt_doc_number: string | null; wynik_json: string | null; error_msg: string | null }
+        | undefined)
+    : undefined;
+
+  if (q) {
+    const wynik = odczytajWynik(q.wynik_json);
+    const stan = q.status === "done" ? "wystawione" : q.status === "error" ? "blad" : "w_kolejce";
+    return {
+      stan,
+      queueId: q.id,
+      korektaNumer: wynik?.korektaNumer ?? q.sgt_doc_number,
+      mmNumer: wynik?.mmNumer ?? null,
+      blad: q.status === "error" ? q.error_msg : null,
+      pozycje,
+      przeszkoda: "Dokumenty już zlecone — stan i ponowienie są w kolejce zapisów",
+    };
+  }
+
+  return {
+    stan: "brak",
+    queueId: null,
+    korektaNumer: null,
+    mmNumer: null,
+    blad: null,
+    pozycje,
+    przeszkoda: przeszkodaWystawienia(z, pozycje),
+  };
+}
+
+/** `wynik_json` bywa pusty (zadanie sprzed 0.58.0) i uszkodzony (ręczna edycja). */
+function odczytajWynik(json: string | null): { korektaNumer?: string; mmNumer?: string } | null {
+  if (!json) return null;
+  try {
+    const w = JSON.parse(json);
+    return w && typeof w === "object" ? w : null;
+  } catch {
+    return null;
+  }
+}
+
+function przeszkodaWystawienia(z: WierszZwrotu, pozycje: PozycjaDoKorekty[]): string | null {
+  if (z.status === "nowy") return "Najpierw decyzja przy każdej pozycji";
+  if (!z.sgt_dok_id) return "Najpierw dopasuj dokument sprzedaży (FS/PA)";
+  /* Pozycja pełnowartościowa BEZ kartoteki zatrzymuje całość, a nie wypada po
+     cichu: korekta na część zwrotu i pieniądze za całość to najgorszy możliwy
+     wynik, bo nikt tego później nie zauważy. */
+  const bezKartoteki = db()
+    .prepare(
+      "SELECT nazwa FROM zwrot_pozycja WHERE zwrot_id = ? AND decyzja = ? AND tw_id IS NULL"
+    )
+    .all(z.id, DECYZJA_NA_KOREKTE) as Array<{ nazwa: string }>;
+  if (bezKartoteki.length > 0) {
+    return `Pozycja bez rozpoznanej kartoteki: ${bezKartoteki.map((p) => p.nazwa).join(", ")}`;
+  }
+  if (pozycje.length === 0) {
+    return "Żadna pozycja nie jest pełnowartościowa — korekta obejmuje tylko towar wracający do sprzedaży";
+  }
+  return null;
+}
+
+/**
+ * Zlecenie korekty sprzedaży i MM na bufor — JEDNYM kliknięciem, JEDNYM
+ * zadaniem kolejki.
+ *
+ * Idempotentne: drugie kliknięcie (albo drugie okno biura) nie zleca dokumentów
+ * po raz drugi, tylko oddaje ten sam zwrot. Duplikat korekty to pieniądze
+ * oddane dwa razy, więc to nie jest wygoda, tylko zabezpieczenie.
+ */
+export function wystawDokumenty(zwrotId: number, autor: string): SzczegolZwrotu {
+  const z = wierszZwrotu(zwrotId);
+  if (z.korekta_queue_id) return szczegolZwrotu(zwrotId);
+
+  const pozycje = pozycjeDoKorekty(zwrotId);
+  const przeszkoda = przeszkodaWystawienia(z, pozycje);
+  if (przeszkoda) throw new BladZwrotu(400, przeszkoda);
+
+  const d = db();
+  /* Magazyn sprzedaży, nie „główny": korekta oddaje stan tam, skąd towar
+     wyszedł, i stamtąd musi ruszyć MM. Dokument mógł już wypaść z okna
+     read-modelu — wtedy zostaje magazyn główny, bo to jedyna wiedza, jaką
+     mamy, a zadanie z pustym magazynem nie ma szans wejść. */
+  const sprzedaz = d
+    .prepare("SELECT mag_id FROM sgt_sprzedaz WHERE dok_id = ?")
+    .get(z.sgt_dok_id) as { mag_id: number | null } | undefined;
+  const magZrodlowy = sprzedaz?.mag_id ?? config.magId.MAG;
+
+  let queueId = 0;
+  transaction(d, () => {
+    queueId = enqueueKorektaZwrotu(
+      {
+        dokId: z.sgt_dok_id as number,
+        typ: z.sgt_dok_typ === "PA" ? "PA" : "FS",
+        magZrodlowy,
+        magZwrotow: config.magId.ZWROTY,
+        pozycje: pozycje.map((p) => ({ twId: p.twId, qty: p.ilosc })),
+      },
+      {
+        createdBy: autor,
+        sourceDocId: z.sgt_dok_id,
+        label: `Korekta ${z.sgt_dok_numer ?? z.sgt_dok_id} + MM na zwroty`,
+        detail: `Zwrot ${z.referencja ?? z.waybill}, pozycji ${pozycje.length}`,
+      }
+    );
+    d.prepare("UPDATE zwrot SET korekta_queue_id=? WHERE id=?").run(queueId, zwrotId);
+  })();
+
+  logEvent("zwrot_dokumenty", autor, null, {
+    zwrotId,
+    queueId,
+    dokId: z.sgt_dok_id,
+    magZrodlowy,
+    pozycji: pozycje.length,
+  });
+  return szczegolZwrotu(zwrotId);
+}
+
 /**
  * Status jest POCHODNĄ danych, nie osobną decyzją:
  *   wszystkie pozycje z decyzją → `oceniony`; + stempel środków → `rozliczony`.
- * `do_wyjasnienia` świadomie NIE blokuje `oceniony` — zablokuje dopiero
- * korektę w Etapie 2 (korekta zejdzie z pozycji rozstrzygniętych).
+ * `do_wyjasnienia` świadomie NIE blokuje `oceniony` — nie wejdzie za to na
+ * korektę, bo ta bierze wyłącznie pozycje pełnowartościowe.
  */
 function przeliczStatus(zwrotId: number): void {
   const d = db();
@@ -722,6 +900,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
       ? { at: z.zwrot_srodkow_at, przez: z.zwrot_srodkow_przez ?? "?" }
       : null,
     linkPanel: LINK_PANELU_ZWROTOW,
+    dokumenty: stanDokumentow(z),
     pozycjeZamowienia,
     pozycje: pozycje.map((p) => ({
       id: p.id,
@@ -786,8 +965,21 @@ function wierszZwrotu(id: number): WierszZwrotu {
   return z;
 }
 
-function zabronPoRozliczeniu(z: WierszZwrotu): void {
+/**
+ * Dwa momenty, po których zwrotu się już nie przestawia.
+ *
+ * Rozliczenie — pieniądze oddano na podstawie tego, co było na ekranie.
+ * Zlecenie dokumentów — korekta i MM idą na TREŚĆ z chwili kliknięcia, więc
+ * zmiana decyzji albo dokumentu po zleceniu rozjeżdżałaby kartę z Subiektem.
+ */
+function zabronZmian(z: WierszZwrotu): void {
   if (z.status === "rozliczony") {
     throw new BladZwrotu(400, "Zwrot jest rozliczony — środki oddano na podstawie tych decyzji");
+  }
+  if (z.korekta_queue_id) {
+    throw new BladZwrotu(
+      400,
+      "Korekta i MM są już zlecone — zmiana treści rozjechałaby kartę zwrotu z Subiektem"
+    );
   }
 }

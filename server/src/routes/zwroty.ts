@@ -19,6 +19,7 @@ import {
   utworzZAllegroId,
   utworzZeSkanu,
   watekZwrotu,
+  wystawDokumenty,
   zapiszDecyzje,
   zdejmijDokument,
 } from "../services/zwroty.js";
@@ -216,6 +217,16 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return zBledem(reply, () => ({ zwrot: zdejmijDokument(Number(req.params.id), autor()) }));
+  });
+
+  /* Korekta + MM na bufor — jedno kliknięcie, jedno zadanie kolejki.
+     POST, nie PUT: to nie jest ustawienie pola, tylko zlecenie zapisu do bazy
+     firmy. Idempotencję pilnuje serwis (`zwrot.korekta_queue_id`), bo dubel
+     korekty znaczy pieniądze oddane dwa razy. */
+  app.post<{ Params: { id: string } }>("/api/biuro/zwroty/:id/dokumenty", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zBledem(reply, () => ({ zwrot: wystawDokumenty(Number(req.params.id), autor()) }));
   });
 
   app.post<{ Params: { id: string } }>("/api/biuro/zwroty/:id/zwrot-srodkow", async (req, reply) => {

@@ -3,8 +3,9 @@ using Microsoft.Data.Sqlite;
 
 namespace WertisSferaWorker;
 
-/* ── Cykl życia zadania mm — LUSTRO server/src/worker/kolejka.ts ─────────────
-   Ten proces obsługuje WYŁĄCZNIE type='mm'. Statusy, próby, backoff i wpisy
+/* ── Cykl życia zadań dokumentowych — LUSTRO server/src/worker/kolejka.ts ────
+   Ten proces obsługuje WYŁĄCZNIE zadania tworzące dokumenty w Subiekcie:
+   type='mm' oraz type='korekta_zwrot' (lista TYPY_SFERY w sfera.ts). Statusy, próby, backoff i wpisy
    audytowe odwzorowują workera Node co do wartości — kolektor, biuro, stock.ts
    i rekoncyliacja czytają jedną kolejkę i nie mogą widzieć dwóch dialektów.
 
@@ -78,32 +79,59 @@ public static class Queue
         try
         {
             var payload = JsonDocument.Parse(z.Payload).RootElement;
-            var magFrom = payload.GetProperty("magFrom").GetInt32();
-            var magTo = payload.GetProperty("magTo").GetInt32();
-            var pozycje = payload.GetProperty("items").EnumerateArray()
-                .Select(it => new MmItem(it.GetProperty("twId").GetInt32(), it.GetProperty("qty").GetDouble()))
-                .ToList();
 
             // COM POZA transakcją SQLite — zapis do Subiekta potrafi trwać,
             // a otwarta blokada zapisu wstrzymałaby API i workera Node.
-            var docNo = sfera.CreateMM(magFrom, magTo, pozycje);
+            var (docNo, wynikJson) = z.Typ switch
+            {
+                "mm" => (RobMm(payload, sfera), (string?)null),
+                "korekta_zwrot" => RobKorekte(payload, sfera),
+                _ => throw new InvalidOperationException("Nieznany typ zadania: " + z.Typ),
+            };
 
             Db.Transakcja(db, () =>
             {
                 Db.Exec(db,
-                    "UPDATE sfera_queue SET status='done', sgt_doc_number=@nr, processed_at=@at WHERE id=@id",
-                    ("@nr", docNo), ("@at", Db.NowIso()), ("@id", z.Id));
+                    "UPDATE sfera_queue SET status='done', sgt_doc_number=@nr, wynik_json=@w, processed_at=@at WHERE id=@id",
+                    ("@nr", docNo), ("@w", (object?)wynikJson), ("@at", Db.NowIso()), ("@id", z.Id));
                 /* Sukces też jest zdarzeniem: `mm_queued`/`przesuniecie` mówią,
                    że człowiek POPROSIŁ; dopiero to mówi, że dokument naprawdę
                    powstał i pod jakim numerem (lustro kolejka.ts). */
                 Zdarzenie(db, z, "queue_applied", $"{{\"docNo\":{Json(docNo)},\"proby\":{z.Proby}}}");
             });
-            Console.WriteLine($"[sfera] #{z.Id} OK mm · MM {docNo}");
+            Console.WriteLine($"[sfera] #{z.Id} OK {z.Typ} · {docNo}");
         }
         catch (Exception e)
         {
             OznaczBlad(db, z, e.Message);
         }
+    }
+
+    private static List<MmItem> Pozycje(JsonElement tablica)
+        => tablica.EnumerateArray()
+            .Select(it => new MmItem(it.GetProperty("twId").GetInt32(), it.GetProperty("qty").GetDouble()))
+            .ToList();
+
+    private static string RobMm(JsonElement payload, ISferaAdapter sfera)
+        => sfera.CreateMM(
+            payload.GetProperty("magFrom").GetInt32(),
+            payload.GetProperty("magTo").GetInt32(),
+            Pozycje(payload.GetProperty("items")));
+
+    /* Korekta oddaje DWA numery, a kolumna jest jedna: w sgt_doc_number ląduje
+       numer korekty (to jego szuka biuro i księgowość), numer MM idzie obok
+       w wynik_json. Kształt JSON-a lustrzany do WynikKorekty w sfera.ts —
+       karta zwrotu czyta ten sam obiekt bez względu na to, który worker pisał. */
+    private static (string, string?) RobKorekte(JsonElement payload, ISferaAdapter sfera)
+    {
+        var w = sfera.CreateKorektaZwrotu(new ZlecenieKorekty(
+            payload.GetProperty("dokId").GetInt32(),
+            payload.GetProperty("typ").GetString() ?? "FS",
+            payload.GetProperty("magZrodlowy").GetInt32(),
+            payload.GetProperty("magZwrotow").GetInt32(),
+            Pozycje(payload.GetProperty("pozycje"))));
+        var json = $"{{\"korektaNumer\":{Json(w.KorektaNumer)},\"mmNumer\":{Json(w.MmNumer)}}}";
+        return (w.KorektaNumer, json);
     }
 
     /// <summary>Retry z backoffem; po wyczerpaniu prób terminalny error (lustro oznaczBlad).</summary>
@@ -137,7 +165,7 @@ public static class Queue
     }
 
     /// <summary>
-    /// Odzysk po padnięciu w trakcie zapisu: mm zastane w 'processing' NIE
+    /// Odzysk po padnięciu w trakcie zapisu: zadanie zastane w 'processing' NIE
     /// wraca automatycznie do pending — COM mógł zdążyć z Zapisz(), a SQLite
     /// nie, i ponowienie zdublowałoby dokument ze skutkiem magazynowym.
     /// Człowiek sprawdza w Subiekcie i decyduje (ścieżka PONÓW już istnieje).
@@ -149,7 +177,7 @@ public static class Queue
         {
             cmd.CommandText =
                 @"SELECT id, type, payload, attempts, source_doc_id, tw_id, created_by, created_by_ref
-                  FROM sfera_queue WHERE type='mm' AND status='processing' ORDER BY id";
+                  FROM sfera_queue WHERE type IN ('mm', 'korekta_zwrot') AND status='processing' ORDER BY id";
             using var r = cmd.ExecuteReader();
             while (r.Read())
                 przerwane.Add(new Zadanie(
@@ -163,7 +191,7 @@ public static class Queue
         {
             const string blad =
                 "Worker Sfery przerwany w trakcie zapisu — SPRAWDŹ w Subiekcie, " +
-                "czy MM powstał, zanim klikniesz PONÓW (ryzyko duplikatu)";
+                "czy dokument powstał, zanim klikniesz PONÓW (ryzyko duplikatu)";
             Db.Transakcja(db, () =>
             {
                 Db.Exec(db,
@@ -171,7 +199,7 @@ public static class Queue
                     ("@e", blad), ("@at", Db.NowIso()), ("@id", z.Id));
                 Zdarzenie(db, z, "queue_failed", $"{{\"proby\":{z.Proby},\"blad\":{Json(blad)}}}");
             });
-            Console.WriteLine($"[sfera] #{z.Id} zastane w 'processing' po restarcie → error (możliwy duplikat MM)");
+            Console.WriteLine($"[sfera] #{z.Id} zastane w 'processing' po restarcie → error (możliwy duplikat dokumentu)");
         }
     }
 

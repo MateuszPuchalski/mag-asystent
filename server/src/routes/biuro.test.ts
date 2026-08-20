@@ -139,9 +139,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      w 0.56.0 — o logo dostawcy (wgranie i skasowanie), w 0.57.0 — o zamknięcie
      wyjątku przez biuro (trasa istniała od dawna, ale jej jedynym klientem był
      kolektor: reklamację prowadziło biuro, a domykał ją magazynier na hali)
-     oraz o potwierdzenie odczytu odpowiedzi na notatkę.
-     Wszystkie te zapisy dotyczą danych, których NIE MA w Subiekcie, stoją za
-     rolą biuro|admin i żaden nie rusza dostaw, stanów ani sfera_queue.
+     oraz o potwierdzenie odczytu odpowiedzi na notatkę. W 0.58.0 doszło
+     zlecenie korekty zwrotu z MM na bufor.
+
+     To ostatnie ZMIENIA regułę i dlatego jest wypisane osobno: pierwszy zapis
+     z tej strony, który trafia do `sfera_queue`, czyli do bazy firmy. Reszta
+     dotyczy danych, których w Subiekcie nie ma. Wspólne zostaje to, co
+     naprawdę pilnuje ta lista: rola biuro|admin, jawne kliknięcie i zero
+     zapisu przy samym PATRZENIU na ekran.
 
      Zakazany jest wciąż `POST /api/delivery/documents/:dokId/open`: różni się
      od trasy podglądu o jeden człon ścieżki i zwróciłby to samo, a kosztem
@@ -155,11 +160,11 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    13,
+    14,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i sześć zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i siedem zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
-      "parowanie) — nic ponadto"
+      "parowanie, korekta z MM) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

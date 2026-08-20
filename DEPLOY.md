@@ -830,10 +830,11 @@ Po dniu pracy
 `/api/health` w polu `zdjecia` poda, ile zdjęć wpadło do cache'u i jak duże
 było największe — dopiero na tych liczbach dobiera się `ZDJECIA_MAX_KB`.
 
-**Etap 2 — dokumenty MM przez Sferę (worker gotowy w `sfera-worker/`):**
+**Etap 2 — dokumenty przez Sferę (worker gotowy w `sfera-worker/`):**
 
 Osobny proces C#/.NET czytający tę samą tabelę `sfera_queue` i wykonujący
-**wyłącznie zadania `mm`**. Wymaga: licencji Sfery, Windows z Subiektem GT
+**wyłącznie zadania dokumentowe**: `mm` oraz `korekta_zwrot` (korekta
+sprzedaży z MM na magazyn zwrotów — §6a). Wymaga: licencji Sfery, Windows z Subiektem GT
 (COM jest lokalny) i konta operatora Subiekta z prawem wystawiania MM.
 Kompletna instrukcja: [`sfera-worker/README.md`](sfera-worker/README.md).
 Kolejność — **wszystko najpierw na KOPII bazy**:
@@ -847,7 +848,7 @@ Kolejność — **wszystko najpierw na KOPII bazy**:
    `SFERA_OPERATOR_HASLO`. Zarejestruj usługę `wertis-sfera` (instalator
    z `-TylkoKonfiguracja` zrobi to sam, gdy exe leży na miejscu — albo §3).
    Zrestartuj WSZYSTKIE usługi: przełącznik zmienia też zachowanie workera
-   Node (przestaje dotykać zadań `mm`).
+   Node (przestaje dotykać zadań dokumentowych).
 4. Przebieg próbny: `wertis-sfera-worker.exe --dry-run` — pętla, heartbeat
    i audyt działają, dokumenty NIE powstają (`sgt_doc_number` dostaje
    `MM DRY-RUN/n`).
@@ -863,15 +864,22 @@ Bramki odbioru (bufor, guard kolejności, odporność na restart) —
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i przesunięcia
 stanu przez workera Sfery.
 
-## 6a. Zwroty Allegro (Etap 1 — rejestr i decyzje)
+## 6a. Zwroty Allegro (rejestr, decyzje, korekta z MM)
 
 Zakładka ZWROTY ALLEGRO w `/biuro`. Skan etykiety zwrotnej pobiera z Allegro
 dane kupującego, powód i pozycje, po czym zakłada rekord zwrotu. Aplikacja
 sama dopasowuje dokument sprzedaży (FS/PA) z Subiekta. Decyzje zapadają per
 pozycję: pełnowartościowy / reklamacja / do wyjaśnienia / do zniszczenia.
 Zwrot środków jest półautomatyczny: link do panelu Allegro + potwierdzenie ręką.
-**Ten etap niczego nie zapisuje do Subiekta** — korekty i MM na magazyn
-zwrotów to Etap 2.
+
+Po decyzjach jedno kliknięcie zleca **korektę sprzedaży wraz z MM na magazyn
+zwrotów** — jednym zadaniem kolejki, nie dwoma. Na oba dokumenty idą wyłącznie
+pozycje **pełnowartościowe**, czyli towar wracający do sprzedaży. Reklamacja,
+zniszczenie i pozycje do wyjaśnienia zostają poza korektą.
+
+Wymaga wdrożonego workera Sfery (§6, etap 2) i poprawnego `MAG_ID_ZWROTY`.
+Bez workera zadanie ląduje w błędzie z czytelnym zdaniem, a dokumenty wystawia
+biuro ręcznie w Subiekcie — reszta karty zwrotu działa normalnie.
 
 Domyślnie funkcja jest **wyłączona** (puste `ALLEGRO_CLIENT_ID`), a w trybie
 demo (`SGT_MODE=seeded`) działa na fikcyjnych zwrotach bez kontaktu
@@ -930,6 +938,12 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    403, dodaj uprawnienie do zamówień przy rejestracji aplikacji.
 4. **Kształt pola powodu zwrotu** w odpowiedzi customer-returns — mapowanie
    przyjmuje znane warianty, nieznany daje pustą kolumnę POWÓD (nie błąd).
+5. **Wystawianie korekty przez Sferę** — wywołania COM są szkicem
+   z `sfera-worker/src/SferaComAdapter.cs` i noszą `[WERYFIKUJ]`. Pierwszą
+   korektę rób na KOPII bazy, na dokumencie próbnym.
+6. **Magazyn sprzedaży** trafia do read-modelu z `dok_MagId` i to on jest
+   źródłem MM. Sprawdź, czy sprzedaż firmy naprawdę wychodzi z tego magazynu,
+   z którego ma wracać towar.
 
 ## 7. Backup i utrzymanie
 

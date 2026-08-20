@@ -14,7 +14,12 @@ CREATE TABLE IF NOT EXISTS sfera_queue (
   status         TEXT NOT NULL DEFAULT 'pending', -- pending|processing|waiting_for_doc|done|error|cancelled
   attempts       INTEGER NOT NULL DEFAULT 0,
   error_msg      TEXT,
-  sgt_doc_number TEXT,                          -- nr MM po utworzeniu (zwrotnie)
+  sgt_doc_number TEXT,                          -- nr dokumentu po utworzeniu (zwrotnie)
+  -- Zadanie, które tworzy WIĘCEJ NIŻ JEDEN dokument, nie mieści się w jednej
+  -- kolumnie z numerem. `korekta_zwrot` wystawia korektę i MM naraz, a karta
+  -- zwrotu pokazuje oba numery — stąd wynik strukturalny obok. JSON, jak
+  -- `payload`: kształt zależy od typu zadania i nie jest niczyim kluczem.
+  wynik_json     TEXT,
   label          TEXT,                          -- etykieta dla kolektora
   detail         TEXT,                          -- opis dla kolektora
   tw_id          INTEGER,                       -- powiązany towar (dla korekty stanów)
@@ -183,6 +188,8 @@ CREATE TABLE IF NOT EXISTS counters (
   value INTEGER NOT NULL
 );
 INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
+-- licznik korekt sprzedaży (dev — w prod numeruje Subiekt)
+INSERT OR IGNORE INTO counters(name, value) VALUES ('korekta', 12);
 
 -- ── Rozkładanie dostaw (redesign v2.0) ─────────────────────────────────────
 -- Jednostką pracy jest DOKUMENT, nie sesja (D2). Rozkładanie zapisuje WYŁĄCZNIE
@@ -508,11 +515,13 @@ CREATE TABLE IF NOT EXISTS zwrot (
   kupujacy_id       TEXT,
   kupujacy_email    TEXT,
   utworzono_allegro TEXT,              -- createdAt zwrotu w Allegro (ISO)
-  -- Maszyna stanów Etapu 1; Etap 2 DOPISZE wartości (np. korekta_w_kolejce,
-  -- zakonczony) — dlatego status jest otwartym tekstem, nie CHECK-iem.
+  -- Maszyna stanów zwrotu. Otwarty tekst, nie CHECK — kolejne etapy dopisują
+  -- wartości, a stara baza nie ma prawa odrzucić wiersza z nowym stanem.
   --   nowy       = przyjęty skanem, czeka na ocenę towaru
   --   oceniony   = każda pozycja ma decyzję
   --   rozliczony = oceniony + odnotowany zwrot środków
+  -- Stan DOKUMENTÓW (korekta + MM) NIE jest tu trzymany: wynika z wiersza
+  -- kolejki wskazanego przez `korekta_queue_id`.
   status            TEXT NOT NULL DEFAULT 'nowy',
   -- Dokument źródłowy sprzedaży w Subiekcie. Numer i typ obok id ŚWIADOMIE:
   -- read-model sgt_sprzedaz jest oknem czasowym i wiersz może z niego wypaść,
@@ -521,6 +530,11 @@ CREATE TABLE IF NOT EXISTS zwrot (
   sgt_dok_numer     TEXT,
   sgt_dok_typ       TEXT,              -- FS | PA (sprzedaż idzie OBIEMA drogami)
   dopasowanie       TEXT NOT NULL DEFAULT 'brak',  -- brak | auto | reczne
+  -- Zadanie „korekta + MM na bufor" w sfera_queue (Etap 2). JEDNA kolumna,
+  -- bo status, numery dokumentów i błąd czyta się PRZEZ NIĄ z wiersza kolejki.
+  -- Kopiowanie ich tutaj dałoby drugą prawdę, która rozjeżdża się przy każdym
+  -- ponowieniu — a kolejka i tak jest miejscem, w którym biuro klika PONÓW.
+  korekta_queue_id  INTEGER REFERENCES sfera_queue(id),
   -- Zwrot środków jest PÓŁAUTOMATYCZNY: link do panelu Allegro + stempel ręką.
   -- Wywołań payments API nie ma — pieniądze rusza człowiek.
   zwrot_srodkow_at  TEXT,
@@ -572,7 +586,11 @@ CREATE TABLE IF NOT EXISTS sgt_sprzedaz (
   nr_oryg    TEXT,
   data_wyst  TEXT NOT NULL,           -- ISO date
   kontrahent TEXT,                    -- kh_Symbol płatnika
-  uwagi      TEXT                     -- kolumna z MSSQL_SPRZEDAZ_UWAGI_COLUMN; NULL gdy pominięta
+  uwagi      TEXT,                    -- kolumna z MSSQL_SPRZEDAZ_UWAGI_COLUMN; NULL gdy pominięta
+  -- Magazyn, z którego towar wyszedł. To ON jest źródłem MM na bufor zwrotowy:
+  -- korekta oddaje stan tam, skąd sprzedano, a nie zawsze jest to magazyn
+  -- główny. NULL (import sprzed 0.58.0) → fallback na MAG_ID_MAG.
+  mag_id     INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_sprzedaz_data ON sgt_sprzedaz(data_wyst);
 

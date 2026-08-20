@@ -228,6 +228,7 @@
         <table id="zwrotTowarWyniki"></table>
       </div>
       <div id="zwrotDokument" style="margin-top:14px"></div>
+      <div id="zwrotDokumenty" style="margin-top:14px"></div>
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
     </section>
 
@@ -2154,6 +2155,8 @@ function rysujSzczegolZwrotu(z) {
       : '<p class="mute">Brak kandydatów w oknie sprzedaży — dokument można będzie wskazać, gdy pojawi się w imporcie.</p>');
   }
 
+  rysujDokumentyZwrotu(z);
+
   const srodki = z.zwrotSrodkow
     ? `<span class="badge ok">ŚRODKI ODDANE</span>
        <span class="mute">${esc(z.zwrotSrodkow.przez)} · ${esc(z.zwrotSrodkow.at.slice(0, 16).replace("T", " "))}</span>`
@@ -2167,6 +2170,56 @@ function rysujSzczegolZwrotu(z) {
       <a href="${esc(z.linkPanel)}" target="_blank" rel="noopener">OTWÓRZ PANEL ZWROTÓW →</a>
     </p>
     ${srodki}`;
+}
+
+/* Panel „KOREKTA + MM NA BUFOR" (Etap 2). Jeden przycisk zleca OBA dokumenty
+   jednym zadaniem kolejki — rozdzielenie ich dałoby chwilę, w której korekta
+   jest wystawiona, a towar leży w magazynie sprzedaży jako sprzedawalny. */
+function rysujDokumentyZwrotu(z) {
+  const d = z.dokumenty;
+  const cel = $("zwrotDokumenty");
+  if (!d) { cel.innerHTML = ""; return; }
+
+  const lista = d.pozycje.length
+    ? `<table style="margin-bottom:8px"><tr><th>TOWAR</th><th>ILOŚĆ</th></tr>${
+        d.pozycje.map((p) => `<tr><td>${esc(p.nazwa)}</td><td class="b">${p.ilosc}</td></tr>`).join("")
+      }</table>`
+    : "";
+
+  if (d.stan === "wystawione") {
+    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+      <p><span class="badge ok">WYSTAWIONE</span>
+        <span class="b">${esc(d.korektaNumer || "—")}</span>
+        <span class="mute">korekta</span>
+        <span class="b" style="margin-left:10px">${esc(d.mmNumer || "—")}</span>
+        <span class="mute">MM na bufor zwrotowy</span></p>${lista}`;
+    return;
+  }
+  if (d.stan === "blad") {
+    /* Błąd zapisu do bazy firmy pokazujemy w całości: to zdanie z Subiekta
+       albo ze Sfery i tylko ono mówi, co poprawić przed PONÓW. */
+    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+      <p><span class="badge err">ZAPIS NIEUDANY</span> ${esc(d.blad || "")}</p>
+      <p class="mute">Ponowienie stoi w kolejce zapisów (zakładka KOLEJKA), razem z historią prób.</p>${lista}`;
+    return;
+  }
+  if (d.stan === "w_kolejce") {
+    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+      <p><span class="badge amber">W KOLEJCE</span>
+        <span class="mute">zadanie #${d.queueId} — dokumenty wystawia worker Sfery</span></p>${lista}`;
+    return;
+  }
+  if (d.przeszkoda) {
+    cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+      <p class="mute">${esc(d.przeszkoda)}.</p>`;
+    return;
+  }
+  cel.innerHTML = `<h2>KOREKTA + MM NA BUFOR</h2>
+    <p class="mute" style="margin-bottom:8px">
+      Jedno kliknięcie wystawia korektę do dokumentu <b>${esc(z.dokument ? (z.dokument.numer || z.dokument.dokId) : "")}</b>
+      i przesuwa towar na bufor zwrotowy. Idą wyłącznie pozycje pełnowartościowe.
+    </p>${lista}
+    <button class="akcja" data-dokumenty>WYSTAW KOREKTĘ + MM</button>`;
 }
 
 async function pokazWiadomosci(id) {
@@ -2470,6 +2523,12 @@ $("zwrotDokument").addEventListener("click", (e) => {
   }));
   const o = e.target.closest("[data-odepnij]");
   if (o) return akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokument`, { method: "DELETE" }));
+});
+$("zwrotDokumenty").addEventListener("click", (e) => {
+  if (!e.target.closest("[data-dokumenty]")) return;
+  if (!confirm("Wystawić korektę i MM na bufor zwrotowy? Po zleceniu nie zmienisz już decyzji ani dokumentu.")) return;
+  // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
+  akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokumenty`, { method: "POST", body: "{}" }));
 });
 $("zwrotRozliczenie").addEventListener("click", (e) => {
   if (e.target.closest("[data-srodki]")) {
