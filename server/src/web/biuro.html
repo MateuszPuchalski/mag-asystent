@@ -170,6 +170,22 @@
   .wiad.my { background: var(--secondary); border: 1px solid var(--border); margin-left: auto; }
   .wiad .kto { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); margin-bottom: 3px; }
   .wiad .tresc { white-space: pre-wrap; }
+
+  /* ── Własne okno dialogowe i toast — zamiast prompt/confirm/alert ─────────
+     Systemowe okno („Komunikat ze strony…") wygląda jak z innej aplikacji
+     i ignoruje cały język wizualny. <dialog> jest natywny (Esc, fokus,
+     przyciemnienie), więc nadal zero builda i zero zależności. */
+  /* `margin: auto` wraca jawnie — globalny reset (* { margin: 0 }) zabija
+     natywne wyśrodkowanie elementu <dialog>. */
+  dialog { margin: auto; border: 1px solid var(--card-border); border-radius: 14px; padding: 18px 20px; max-width: 440px; width: calc(100% - 40px); box-shadow: 0 10px 32px rgba(42, 42, 44, 0.25); background: var(--card); color: var(--ink); }
+  dialog::backdrop { background: rgba(42, 42, 44, 0.45); }
+  dialog textarea { width: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; font: inherit; resize: vertical; margin-top: 8px; }
+  dialog textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
+  dialog .dialogAkcje { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  button.akcja.grozny { background: var(--err); color: #fff; }
+  button.akcja.grozny:hover { background: #9c3232; }
+  #toasty { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 50; }
+  .toast { background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 16px; font-size: 13px; box-shadow: 0 6px 20px rgba(42, 42, 44, 0.35); max-width: 520px; }
 </style>
 </head>
 <body>
@@ -585,6 +601,47 @@
    kadrowym. Dlatego podstawa prawna stoi NAD tabelą, na stałe, bez zwijania —
    a serwer wysyła ją w odpowiedzi, żeby nie dała się pominąć. */
 const $ = (id) => document.getElementById(id);
+
+/* ── Własne okna zamiast dialogów przeglądarki ────────────────────────────────
+   `prompt`/`confirm`/`alert` były świadomą oszczędnością małej strony — do
+   chwili, gdy proces zwrotów dołożył notatki i potwierdzenia w środku pracy.
+   Systemowe okno zasłania kontekst, wygląda jak z innej aplikacji i nie umie
+   wyglądać jak WERTIS. Jeden <dialog> i toast zastępują je wszystkie. */
+function otworzDialog({ tytul, opis = "", pole = false, przyklad = "", potwierdz = "ZAPISZ", grozny = false }) {
+  return new Promise((resolve) => {
+    const d = $("dialogW");
+    d.innerHTML = `
+      <h2>${esc(tytul)}</h2>
+      ${opis ? `<p class="mute">${esc(opis)}</p>` : ""}
+      ${pole ? `<textarea id="dialogPole" rows="3" placeholder="${esc(przyklad)}"></textarea>` : ""}
+      <div class="dialogAkcje">
+        <button class="akcja cichy" data-nie>ANULUJ</button>
+        <button class="akcja${grozny ? " grozny" : ""}" data-tak>${esc(potwierdz)}</button>
+      </div>`;
+    d.querySelector("[data-nie]").onclick = () => d.close("");
+    d.querySelector("[data-tak]").onclick = () => d.close("tak");
+    /* Esc = natywny cancel = returnValue "" — ta sama droga co ANULUJ. */
+    d.onclose = () => {
+      const tak = d.returnValue === "tak";
+      resolve(pole ? (tak ? d.querySelector("#dialogPole").value : null) : tak);
+    };
+    d.showModal();
+    if (pole) d.querySelector("#dialogPole").focus();
+  });
+}
+/** Pytanie z polem tekstowym → treść albo `null` przy ANULUJ/Esc. */
+const zapytaj = (o) => otworzDialog({ ...o, pole: true });
+/** Potwierdzenie → true/false. `grozny: true` barwi przycisk na czerwono. */
+const potwierdz = (o) => otworzDialog(o);
+
+/** Komunikat nieblokujący — błędy operacji, których nie pokazuje żaden panel. */
+function toast(tekst) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = tekst;
+  $("toasty").appendChild(t);
+  setTimeout(() => t.remove(), 6000);
+}
 /* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
    słownika — trzecią obok serwera i kolektora, jedyną bez testu. Dopisanie
    typu na serwerze zostawiało tu surowy klucz na wydruku dla dostawcy. */
@@ -962,16 +1019,14 @@ function notatki(d) {
     <button class="akcja cichy" data-notatka="${d.dokId}">+ DODAJ NOTATKĘ</button>`;
 }
 
-/**
- * Nowa notatka. `prompt`, jak przy zamykaniu poza WERTIS — strona nie ma builda
- * ani frameworka, a treść i tak waliduje serwer.
- */
+/** Nowa notatka. Treść i tak waliduje serwer — okno tylko pyta. */
 async function dodajNotatke(dokId) {
-  const tresc = prompt(
-    "Notatka dla rozkładającego.\n\n" +
-    "Na tę notatkę trzeba będzie ODPOWIEDZIEĆ, żeby zamknąć dostawę.\n" +
-    "np. „Dostawca dosyła brakujące 3 szt W32-0203 — sprawdź, czy są w paczce”"
-  );
+  const tresc = await zapytaj({
+    tytul: "NOTATKA DLA ROZKŁADAJĄCEGO",
+    opis: "Na tę notatkę trzeba będzie odpowiedzieć, żeby zamknąć dostawę.",
+    przyklad: "np. „Dostawca dosyła brakujące 3 szt W32-0203 — sprawdź, czy są w paczce”",
+    potwierdz: "DODAJ NOTATKĘ",
+  });
   if (tresc === null) return;
   try {
     await api(`/api/biuro/dokument/${dokId}/notatka`, {
@@ -980,7 +1035,7 @@ async function dodajNotatke(dokId) {
     });
     ostatniSzczegol = "";           // wymuś przerysowanie panelu
     await odswiezSzczegol();
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message); }
 }
 
 /* ── Rozłożone poza WERTIS ──────────────────────────────────────────────────
@@ -1007,16 +1062,18 @@ function rysujPozaWertis(lista) {
 /**
  * Zdjęcie dostawy z listy pracy.
  *
- * `prompt` zamiast własnego arkusza i to jest świadome: strona nie ma builda
- * ani frameworka, a modal z polem tekstowym byłby tu pierwszym własnym
- * komponentem. Powód i tak waliduje serwer — puste okno kończy się czytelnym
- * błędem, nie cichym zapisem.
+ * Do 0.60.1 pytał o powód `prompt` — świadoma oszczędność, która przestała
+ * wystarczać, gdy okien zrobiło się osiem. Powód i tak waliduje serwer:
+ * pusty kończy się czytelnym błędem, nie cichym zapisem.
  */
 async function oznaczPozaWertis(dokId, nrPelny) {
-  const powod = prompt(
-    `Dostawa ${nrPelny} zniknie z listy rozkładania.\n\n` +
-    "Dlaczego? (np. „rozłożone starą aplikacją przed wdrożeniem WERTIS”)"
-  );
+  const powod = await zapytaj({
+    tytul: "ROZŁOŻONE POZA WERTIS",
+    opis: `Dostawa ${nrPelny} zniknie z listy rozkładania. Dlaczego?`,
+    przyklad: "np. „rozłożone starą aplikacją przed wdrożeniem WERTIS”",
+    potwierdz: "ZAMKNIJ DOSTAWĘ",
+    grozny: true,
+  });
   if (powod === null) return;                  // ANULUJ to nie jest pusty powód
   try {
     await api(`/api/biuro/dokument/${dokId}/zamknij`, {
@@ -1024,7 +1081,7 @@ async function oznaczPozaWertis(dokId, nrPelny) {
       body: JSON.stringify({ powod }),
     });
     zamknijDokument();
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message); }
 }
 
 /** Zwraca `true`, gdy przywrócenie przeszło — wołający decyduje, co odświeżyć. */
@@ -1032,7 +1089,7 @@ async function przywrocDostawe(dokId) {
   try {
     await api(`/api/biuro/dokument/${dokId}/otworz`, { method: "POST" });
     return true;
-  } catch (e) { alert(e.message); return false; }
+  } catch (e) { toast(e.message); return false; }
 }
 
 /* ── Odpowiedzi na notatki (0.57.0) ──────────────────────────────────────── */
@@ -1064,7 +1121,7 @@ async function oznaczPrzeczytane(id) {
     odpowiedziNaNotatki = odpowiedziNaNotatki.filter((o) => o.id !== id);
     rysujOdpowiedzi();
     odswiezStan();
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message); }
 }
 
 /**
@@ -1074,11 +1131,13 @@ async function oznaczPrzeczytane(id) {
  * więc reklamację prowadziło biuro, a domykał ją magazynier na hali. Notatka
  * jest opcjonalna i idzie do `resolvedNote`, czyli tam, skąd czyta ją protokół.
  *
- * `prompt`, jak przy zamykaniu poza WERTIS — ta strona nie ma builda ani
- * własnych okien dialogowych i nie zamierza ich dostać.
  */
 async function rozwiazWyjatek(id) {
-  const note = prompt("Jak to załatwiono? (opcjonalnie — wpis trafia do protokołu)");
+  const note = await zapytaj({
+    tytul: "ZAMKNIĘCIE WYJĄTKU",
+    opis: "Jak to załatwiono? Wpis jest opcjonalny i trafia do protokołu.",
+    potwierdz: "ZAMKNIJ WYJĄTEK",
+  });
   if (note === null) return false;
   try {
     await api(`/api/problems/${id}/resolve`, {
@@ -1086,7 +1145,7 @@ async function rozwiazWyjatek(id) {
       body: JSON.stringify({ note: note.trim() }),
     });
     return true;
-  } catch (e) { alert(e.message); return false; }
+  } catch (e) { toast(e.message); return false; }
 }
 
 function rysujReklamacje(problemy) {
@@ -1414,7 +1473,13 @@ async function wyslijLogo(khId, plik) {
 
 async function usunLogo(khId) {
   const d = dostawcyLista.find((x) => x.khId === khId);
-  if (!confirm(`Usunąć logo dostawcy ${d?.nazwa ?? khId}?`)) return;
+  const zgoda = await potwierdz({
+    tytul: "USUNIĘCIE LOGA",
+    opis: `Logo dostawcy ${d?.nazwa ?? khId} zniknie z listy dostaw na kolektorach.`,
+    potwierdz: "USUŃ",
+    grozny: true,
+  });
+  if (!zgoda) return;
   try {
     await api(`/api/biuro/dostawcy/${khId}/logo`, { method: "DELETE" });
     $("wynikLogo").textContent = "Logo usunięte.";
@@ -1960,7 +2025,9 @@ async function otworzFormularz(deliveryId, nrDok) {
     <button class="drukuj" onclick="print()">DRUKUJ</button>
     ${tresc}
     ${aneksZdjec(zdjecia)}
-    </body></html>`);
+    <dialog id="dialogW"></dialog>
+<div id="toasty"></div>
+</body></html>`);
   w.document.close();
 }
 
@@ -2457,7 +2524,7 @@ async function pokazWiadomosci(id) {
 
 async function akcjaZwrotu(fn) {
   try { await fn(); await odswiezSzczegolZwrotu(); }
-  catch (e) { alert(e.message); }
+  catch (e) { toast(e.message); }
 }
 
 async function szukajTowaruDoZwrotu() {
@@ -2507,7 +2574,7 @@ async function rozpocznijParowanieAllegro() {
       i przepisz kod: <span style="font-size:22px;font-weight:700;letter-spacing:3px">${esc(d.userCode)}</span>`;
     $("allegroAkcje").innerHTML = '<span class="mute">Czekam na potwierdzenie w Allegro…</span>';
     pollParowania();
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message); }
 }
 
 async function pollParowania() {
@@ -2526,7 +2593,7 @@ async function pollParowania() {
     $("allegroAkcje").innerHTML = '<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>';
   } catch (e) {
     parowanieTrwa = false;
-    alert(e.message);
+    toast(e.message);
     odswiezZwroty();
   }
 }
@@ -2688,6 +2755,8 @@ for (const kontener of ["szczegolLinie", "szczegolBezLinii"]) {
 $("wrocDoListy").addEventListener("click", zamknijDokument);
 // panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
 document.addEventListener("keydown", (e) => {
+  // Esc w otwartym dialogu zamyka DIALOG (natywnie) — nie kartę pod nim
+  if ($("dialogW").open) return;
   if (e.key === "Escape") { zamknijDokument(); if (otwartyZwrot != null) { zamknijZwrot(); odswiezZwroty(); } }
 });
 
@@ -2706,13 +2775,24 @@ $("zwrotLista").addEventListener("click", (e) => {
 $("zwrotWroc").addEventListener("click", () => { zamknijZwrot(); odswiezZwroty(); });
 $("zwrotFiltrStatus").addEventListener("change", odswiezZwroty);
 $("zwrotSzukajLista").addEventListener("input", odswiezZwroty);
-$("zwrotPozycje").addEventListener("click", (e) => {
+$("zwrotPozycje").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-poz]");
   if (!b) return;
   /* Notatka tylko przy decyzjach „coś jest nie tak" — pełnowartościowy nie ma
-     czego wyjaśniać, a okienko przy każdym kliku nauczyłoby ludzi klikać OK. */
-  const notatka = b.dataset.dec === "pelnowartosciowy"
-    ? null : (prompt("Notatka (opcjonalna):", "") || null);
+     czego wyjaśniać, a okienko przy każdym kliku nauczyłoby ludzi klikać OK.
+     ANULUJ przerywa CAŁĄ decyzję (do 0.60.1 zapisywał ją bez notatki —
+     przycisk „nie" nie ma prawa robić połowy „tak"). */
+  let notatka = null;
+  if (b.dataset.dec !== "pelnowartosciowy") {
+    const nazwa = DECYZJE_ZWROTU.find(([k]) => k === b.dataset.dec)?.[1] ?? b.dataset.dec;
+    notatka = await zapytaj({
+      tytul: `DECYZJA: ${nazwa}`,
+      opis: "Notatka do decyzji — opcjonalna, widzi ją karta zwrotu i audyt.",
+      potwierdz: "ZAPISZ DECYZJĘ",
+    });
+    if (notatka === null) return;
+    notatka = notatka.trim() || null;
+  }
   akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/pozycje/${b.dataset.poz}/decyzja`, {
     method: "POST", body: JSON.stringify({ decyzja: b.dataset.dec, notatka }),
   }));
@@ -2728,16 +2808,21 @@ $("zwrotDokument").addEventListener("click", (e) => {
   const o = e.target.closest("[data-odepnij]");
   if (o) return akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokument`, { method: "DELETE" }));
 });
-$("zwrotDokumenty").addEventListener("click", (e) => {
+$("zwrotDokumenty").addEventListener("click", async (e) => {
   if (!e.target.closest("[data-dokumenty]")) return;
-  if (!confirm("Wystawić korektę i MM na bufor zwrotowy? Po zleceniu nie zmienisz już decyzji ani dokumentu.")) return;
+  const zgoda = await potwierdz({
+    tytul: "KOREKTA + MM NA BUFOR",
+    opis: "Po zleceniu nie zmienisz już decyzji ani dokumentu.",
+    potwierdz: "WYSTAW DOKUMENTY",
+  });
+  if (!zgoda) return;
   // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
   akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokumenty`, { method: "POST", body: "{}" }));
 });
 $("zwrotKosz").addEventListener("click", (e) => {
   if (e.target.closest("[data-kosz-przypnij]")) {
     const kod = $("zwrotKoszKod").value.trim();
-    if (!kod) return alert("Zeskanuj albo wpisz kod kosza");
+    if (!kod) return toast("Zeskanuj albo wpisz kod kosza");
     akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/kosz`, {
       method: "POST", body: JSON.stringify({ kod }),
     }));
@@ -2756,24 +2841,34 @@ $("zwrotKosz").addEventListener("keydown", (e) => {
 $("koszeLista").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-zamknij-kosz]");
   if (!b) return;
-  if (!confirm("Zamknąć kosz? Od tej chwili dokłada się do NOWEGO kosza, a ten jedzie na halę.")) return;
+  const zgoda = await potwierdz({
+    tytul: "ZAMKNIĘCIE KOSZA",
+    opis: "Od tej chwili dokłada się do nowego kosza, a ten jedzie na halę.",
+    potwierdz: "ZAMKNIJ — NA HALĘ",
+  });
+  if (!zgoda) return;
   try {
     // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
     await api(`/api/biuro/kosze/${b.dataset.zamknijKosz}/zamknij`, { method: "POST", body: "{}" });
     await odswiezEtap3();
-  } catch (err) { alert(err.message); }
+  } catch (err) { toast(err.message); }
 });
 $("reklamacjeLista").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-rekl]");
   if (!b) return;
-  const notatka = prompt(`Reklamacja ${b.dataset.wynik.toUpperCase()} — notatka dla audytu (opcjonalna):`, "");
+  const notatka = await zapytaj({
+    tytul: `REKLAMACJA ${b.dataset.wynik.toUpperCase()}`,
+    opis: "Notatka dla audytu — opcjonalna. Rozpatrzenia nie da się cofnąć.",
+    potwierdz: b.dataset.wynik === "uznana" ? "UZNAJ" : "ODRZUĆ",
+    grozny: b.dataset.wynik === "odrzucona",
+  });
   if (notatka === null) return; // Anuluj = brak decyzji, nie decyzja bez notatki
   try {
     await api(`/api/biuro/zwroty/reklamacje/${b.dataset.rekl}`, {
       method: "POST", body: JSON.stringify({ wynik: b.dataset.wynik, notatka: notatka || undefined }),
     });
     await odswiezEtap3();
-  } catch (err) { alert(err.message); }
+  } catch (err) { toast(err.message); }
 });
 $("zwrotRozliczenie").addEventListener("click", (e) => {
   if (e.target.closest("[data-srodki]")) {
@@ -2795,10 +2890,16 @@ $("zwrotTowarWyniki").addEventListener("click", (e) => {
     $("zwrotSzukajTowar").value = "";
   });
 });
-$("allegroAkcje").addEventListener("click", (e) => {
+$("allegroAkcje").addEventListener("click", async (e) => {
   if (e.target.closest("[data-polacz]")) return rozpocznijParowanieAllegro();
   if (e.target.closest("[data-rozlacz]")) {
-    if (!confirm("Rozłączyć konto Allegro? Skan etykiet przestanie działać do ponownego parowania.")) return;
+    const zgoda = await potwierdz({
+      tytul: "ROZŁĄCZENIE KONTA ALLEGRO",
+      opis: "Skan etykiet przestanie działać do ponownego parowania.",
+      potwierdz: "ROZŁĄCZ",
+      grozny: true,
+    });
+    if (!zgoda) return;
     akcjaZwrotu(async () => { await api("/api/biuro/allegro", { method: "DELETE" }); odswiezZwroty(); });
   }
 });
@@ -2807,5 +2908,7 @@ setInterval(() => { if (token) odswiez(); }, 30_000);
 
 if (token) start();
 </script>
+<dialog id="dialogW"></dialog>
+<div id="toasty"></div>
 </body>
 </html>
