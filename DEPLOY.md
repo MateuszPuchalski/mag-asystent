@@ -243,6 +243,36 @@ netsh advfirewall firewall add rule name="WERTIS kolektor" dir=in action=allow p
 Kolektory łączą się z `http://mag.wertis.local:3001`. HTTPS nie jest wymagane —
 kolektor działa po zwykłym HTTP w LAN.
 
+### Kilka punktów dostępowych w hali
+
+Magazyn rzadko ma jeden punkt dostępowy. Ustawienie, które działa, wygląda tak:
+
+- **jedna nazwa sieci (SSID) na wszystkich AP** — telefon przechodzi między
+  nimi bez pytania człowieka;
+- **jedna podsieć** — adres serwera nie zmienia się po przejściu;
+- **to samo hasło i to samo pasmo** na każdym AP.
+
+Sprawdzenie zajmuje minutę. Na kolektorze otwórz szczegóły połączenia Wi-Fi
+i porównaj jego adres IP z adresem serwera. Zgodne trzy pierwsze liczby (np.
+`192.168.10.*`) znaczą wspólną podsieć.
+
+**Gdy sieci są osobne, zapora je odetnie.** Reguła wyżej ma `remoteip=localsubnet`,
+czyli wpuszcza wyłącznie własną podsieć serwera. Kolektor z drugiej podsieci
+dostanie ciszę, choć „ta sama sieć" wygląda z zewnątrz na jedną. Do wyboru są
+dwie drogi:
+
+1. **Zepnij AP w jedną podsieć** (most, nie osobny DHCP) — zalecane, bo znika
+   też pytanie o trasowanie.
+2. Albo **rozszerz regułę zapory** o drugą podsieć:
+
+```bash
+netsh advfirewall firewall set rule name="WERTIS kolektor" new remoteip=192.168.10.0/24,192.168.20.0/24
+```
+
+Sama aplikacja radzi sobie z przeskokiem AP od 0.60.4: przy zmianie sieci
+porzuca gniazda otwarte do poprzedniego punktu. Wcześniej trzeba było ręcznie
+rozłączyć i połączyć Wi-Fi.
+
 ## 5. Kolektory — natywna aplikacja Android (APK)
 
 Kolektor to natywny klient z [`android/`](android/README.md) — czysty klient

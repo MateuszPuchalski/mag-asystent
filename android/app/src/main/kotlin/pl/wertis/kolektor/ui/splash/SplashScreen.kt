@@ -75,6 +75,7 @@ private enum class StanSerwera { SPRAWDZAM, PUSTY, MA_KONTA, NIEOSIAGALNY }
 fun SplashScreen(graph: AppGraph) {
     val stan by graph.session.state.collectAsStateWithLifecycle()
     val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
+    val online by graph.connectivity.online.collectAsStateWithLifecycle()
     var login by remember { mutableStateOf(graph.session.ostatniLogin ?: "") }
     var haslo by remember { mutableStateOf("") }
     var blad by remember { mutableStateOf<String?>(null) }
@@ -106,7 +107,10 @@ fun SplashScreen(graph: AppGraph) {
     // założył — bo z samego 401 nie da się odróżnić „system dopiero powstaje"
     // od „pomyliłeś hasło". Powtarzane po każdej zmianie adresu, bo to
     // pierwsze pytanie, na które nowy serwer musi umieć odpowiedzieć.
-    LaunchedEffect(proba, ustawienia.serverUrl) {
+    /* `online` jest kluczem RÓWNIE ważnym co adres: bez niego ekran „Nie widzę
+       serwera" zostawał na zawsze, dopóki ktoś nie nacisnął ponowienia. Kolektor
+       wyjęty z kieszeni w zasięgu innego AP ma odzyskać serwer sam. */
+    LaunchedEffect(proba, ustawienia.serverUrl, online) {
         // znany werdykt od razu — „Sprawdzam serwer…" tylko przy pierwszym
         // pytaniu w życiu procesu; rewalidacja i tak biegnie niżej
         stanSerwera = when (graph.setup.znanyWerdykt()) {
