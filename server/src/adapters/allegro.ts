@@ -118,6 +118,12 @@ export interface AllegroAdapter {
    * (etykieta spoza Allegro), nie błąd.
    */
   szukajZwrotowPoWaybill(waybill: string): Promise<ZwrotAllegro[]>;
+  /**
+   * Zwroty zarejestrowane przez klientów od danej chwili (`createdAt.gte`),
+   * najświeższe naprzód — paliwo tickera zapowiedzi (Etap 4). `odKiedy` null
+   * znaczy „bez granicy": bierz, ile paginacja pozwoli.
+   */
+  listaZwrotowKlienta(odKiedy: string | null): Promise<ZwrotAllegro[]>;
   /** Szczegół zwrotu po id; `null` gdy nie istnieje. */
   zwrot(id: string): Promise<ZwrotAllegro | null>;
   /** Zamówienie (checkout-form) — źródło `externalId` pozycji; `null` gdy brak. */

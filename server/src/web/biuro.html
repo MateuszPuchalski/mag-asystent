@@ -327,6 +327,18 @@
       <div id="zwrotSkanWynik" style="margin-top:8px"></div>
     </section>
 
+    <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
+         upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
+         tabela „wszystko w porządku" byłaby szumem nad listą zwrotów. -->
+    <section class="card" id="brakujaceKarta" hidden>
+      <h2>BRAKUJĄCE PACZKI</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Klient zgłosił zwrot w Allegro, a paczka wciąż nie dojechała.
+        Sprawdź numer w panelu przewoźnika albo napisz do klienta.
+      </p>
+      <table id="brakujaceLista"></table>
+    </section>
+
     <section class="card" id="zwrotListaKarta">
       <h2>ZWROTY</h2>
       <div class="filtry">
@@ -2137,15 +2149,33 @@ async function odswiezZwroty() {
    z zakładką i żadne z nich nie jest na ścieżce krytycznej skanu. */
 async function odswiezEtap3() {
   try {
-    const [k, r, rap] = await Promise.all([
+    const [k, r, rap, zap] = await Promise.all([
       (await api("/api/biuro/kosze")).json(),
       (await api("/api/biuro/zwroty/reklamacje")).json(),
       (await api("/api/biuro/zwroty/raport")).json(),
+      (await api("/api/biuro/zwroty/zapowiedzi")).json(),
     ]);
     rysujKosze(k.kosze || []);
     rysujReklamacje(r.reklamacje || []);
     rysujRaportZwrotow(rap.raport);
+    rysujBrakujace(zap.zapowiedzi || []);
   } catch (e) { console.warn(e); }
+}
+
+/* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
+   zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
+function rysujBrakujace(lista) {
+  const karta = $("brakujaceKarta");
+  karta.hidden = otwartyZwrot != null || lista.length === 0;
+  $("brakujaceLista").innerHTML = lista.length
+    ? "<tr><th>CZEKA</th><th>ZWROT</th><th>KLIENT</th><th>NUMERY PACZEK</th></tr>" +
+      lista.map((z) => `<tr>
+          <td><span class="badge err">${z.dniOdZgloszenia ?? "?"} dni</span></td>
+          <td class="b">${esc(z.referencja || "—")}</td>
+          <td>${esc(z.kupujacyLogin || "—")}</td>
+          <td class="mute">${z.waybills.map(esc).join("<br>") || "—"}</td>
+        </tr>`).join("")
+    : "";
 }
 
 function badgeKosza(status) {
@@ -2198,6 +2228,8 @@ function rysujRaportZwrotow(r) {
     [r.kosze.zamkniete, "koszy na hali"],
     [r.reklamacje.otwarte, "reklamacji otwartych"],
     [r.reklamacje.poTerminie, "reklamacji po terminie", r.reklamacje.poTerminie > 0],
+    [r.zapowiedzi.oczekujace, "zapowiedzianych zwrotów"],
+    [r.zapowiedzi.brakujace, "paczek brakujących", r.zapowiedzi.brakujace > 0],
     [r.medianaGodzinDoRozliczenia == null ? "—" : r.medianaGodzinDoRozliczenia + " h",
       "mediana skan→rozliczenie (30 dni)"],
   ];
@@ -2266,6 +2298,7 @@ function otworzZwrot(id) {
   // W zwrot, nie dodatek nad listą
   $("zwrotSzczegol").hidden = false;
   $("zwrotSkanKarta").hidden = true;
+  $("brakujaceKarta").hidden = true;
   $("zwrotListaKarta").hidden = true;
   $("koszeKarta").hidden = true;
   $("reklamacjeKarta").hidden = true;

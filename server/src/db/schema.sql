@@ -687,3 +687,27 @@ CREATE TABLE IF NOT EXISTS zwrot_zam_pozycja (
   ilosc       REAL NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_zam_poz ON zwrot_zam_pozycja(zwrot_id);
+
+-- Zapowiedzi zwrotów (Etap 4). Klient rejestruje zwrot w Allegro dużo
+-- wcześniej, niż paczka dojedzie — ticker ściąga te zgłoszenia w tle, więc
+-- skan etykiety trafia w znany zwrot bez przeszukiwania API, a zgłoszenia
+-- bez paczki widać jako „brakujące paczki" zamiast nie istnieć wcale.
+--
+-- To DROGOWSKAZ, nie kopia zwrotu: pozycje, powody i pełny JSON przynosi
+-- dopiero skan (GET szczegółu, jak dotąd). Trzymamy wyłącznie to, czym
+-- panel brakujących paczek podpisuje wiersz i czym skan znajduje zgłoszenie.
+CREATE TABLE IF NOT EXISTS zwrot_zapowiedz (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  allegro_return_id TEXT NOT NULL UNIQUE, -- klucz upsertu — ticker widuje ten sam zwrot wielokrotnie
+  referencja        TEXT,                 -- numer, po którym biuro odnajdzie sprawę w panelu
+  kupujacy_login    TEXT,
+  utworzono_allegro TEXT,                 -- od tej daty liczą się dni oczekiwania na paczkę
+  -- WSZYSTKIE numery paczek zgłoszenia (waybill + transportingWaybill) jako
+  -- tablica JSON — skan porównuje przez json_each, bo etykieta u drzwi nosi
+  -- którykolwiek z nich.
+  waybills          TEXT NOT NULL DEFAULT '[]',
+  status            TEXT NOT NULL DEFAULT 'oczekuje', -- oczekuje | dotarl
+  zwrot_id          INTEGER REFERENCES zwrot(id),     -- zwrot przyjęty skanem
+  widziano_at       TEXT NOT NULL         -- ostatni raz w odpowiedzi API (diagnostyka tickera)
+);
+CREATE INDEX IF NOT EXISTS ix_zapowiedz_status ON zwrot_zapowiedz(status);

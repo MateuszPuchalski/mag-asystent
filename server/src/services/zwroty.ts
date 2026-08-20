@@ -7,6 +7,7 @@ import {
 import { config } from "../config.js";
 import { enqueueKorektaZwrotu } from "./queue.js";
 import { logEvent } from "./events.js";
+import { odhaczZapowiedz, zapowiedzDlaWaybilla } from "./zapowiedzi.js";
 
 /* ── Zwroty Allegro — serwis ─────────────────────────────────────────────────
    Skan etykiety → rekord zwrotu z danymi z Allegro → decyzje pracownika per
@@ -32,7 +33,13 @@ export const DECYZJE = [
 export type Decyzja = (typeof DECYZJE)[number];
 
 /** Panel zwrotów sprzedawcy. Link per zwrot jest [WERYFIKUJ] — lista + numer
-    referencyjny wystarczą pracownikowi niezależnie od redesignów Allegro. */
+    referencyjny wystarczą pracownikowi niezależnie od redesignów Allegro.
+
+    Allegro umie też zwrot środków wprost z API (`POST /payments/refunds`,
+    scope płatności) — prowizja wraca wtedy automatycznie, bez wniosku.
+    ŚWIADOMIE nie wdrożone: pieniędzmi rusza człowiek (decyzja właściciela,
+    2026-08); ta notatka jest po to, żeby przyszła automatyzacja nie zaczynała
+    od odkrywania, że się da. */
 export const LINK_PANELU_ZWROTOW = "https://salescenter.allegro.com/returns";
 
 /** Okno szukania dokumentu względem daty zwrotu [dni]. */
@@ -161,6 +168,15 @@ export async function utworzZeSkanu(kod: string, autor: string): Promise<WynikSk
     .prepare("SELECT id FROM zwrot WHERE waybill = ? ORDER BY id LIMIT 1")
     .get(waybill) as { id: number } | undefined;
   if (znany) return { rodzaj: "istniejacy", zwrot: szczegolZwrotu(znany.id) };
+
+  /* Szybka ścieżka (Etap 4): ticker zapowiedzi mógł już widzieć to zgłoszenie
+     — wtedy wystarczy jeden GET szczegółu zamiast dwóch przeszukiwań listy.
+     Nietrafiony szczegół (zgłoszenie wycofane) spada na zwykłe szukanie. */
+  const zapowiedz = zapowiedzDlaWaybilla(waybill);
+  if (zapowiedz) {
+    const pelny = await allegroAdapter().zwrot(zapowiedz.allegroReturnId);
+    if (pelny) return { rodzaj: "utworzony", zwrot: await utworzZAllegro(pelny, waybill, autor) };
+  }
 
   const znalezione = await allegroAdapter().szukajZwrotowPoWaybill(waybill);
   if (znalezione.length === 0) return { rodzaj: "brak" };
@@ -316,6 +332,9 @@ async function utworzZAllegro(
   }
 
   dopasujDokument(id, autor);
+  /* Paczka dojechała — zgłoszenie schodzi z listy brakujących. Jedno miejsce
+     łapie każdą drogę utworzenia: skan, wybór z kandydatów, szybką ścieżkę. */
+  odhaczZapowiedz(z.id, id);
   logEvent("zwrot_utworzony", autor, null, {
     zwrotId: id,
     waybill,

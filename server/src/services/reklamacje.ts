@@ -2,6 +2,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { BladZwrotu } from "./zwroty.js";
+import { liczbyZapowiedzi } from "./zapowiedzi.js";
 
 /* ── Ścieżka reklamacyjna z priorytetem wg terminu (Etap 3) ──────────────────
    Pozycja z decyzją `reklamacja` staje się sprawą z TERMINEM: ustawowe 14 dni
@@ -132,6 +133,8 @@ export interface RaportZwrotow {
   dokumenty: { wKolejce: number; wystawione: number; bledy: number };
   kosze: { otwarte: number; zamkniete: number; rozlozone30dni: number };
   reklamacje: { otwarte: number; poTerminie: number; rozpatrzone30dni: number };
+  /** Zgłoszenia z Allegro czekające na paczkę; `brakujace` = dłużej niż próg (Etap 4). */
+  zapowiedzi: { oczekujace: number; brakujace: number };
   /** Mediana godzin od przyjęcia skanem do rozliczenia (30 dni); null = brak danych. */
   medianaGodzinDoRozliczenia: number | null;
 }
@@ -187,6 +190,7 @@ export function raportZwrotow(): RaportZwrotow {
         "SELECT COUNT(*) AS n FROM zwrot_pozycja WHERE rekl_at >= datetime('now', '-30 days')"
       ),
     },
+    zapowiedzi: liczbyZapowiedzi(),
     medianaGodzinDoRozliczenia: mediana,
   };
 }

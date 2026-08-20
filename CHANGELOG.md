@@ -33,6 +33,34 @@ historii nie przepisujemy.
 
 ---
 
+## 0.65.0 — 20 sierpnia 2026
+
+**System wie o zwrocie, zanim paczka dojedzie.** Klient rejestruje zwrot
+w Allegro dniami przed nadaniem, a WERTIS dowiadywał się o sprawie dopiero od
+skanu etykiety. Teraz serwer co pięć minut (`ALLEGRO_POLL_MS`; `0` wyłącza)
+ściąga zapowiedzi zwrotów z `GET /order/customer-returns` i trzyma je jako
+drogowskazy: numer referencyjny, login, numery paczek.
+
+**Karta BRAKUJĄCE PACZKI.** Zgłoszenie czekające na paczkę dłużej niż
+`BRAKUJACA_PACZKA_DNI` (domyślnie 3) pojawia się nad listą zwrotów — z dniami
+oczekiwania i numerami do sprawdzenia u przewoźnika. Do tej pory zwrot
+zgłoszony, a niedostarczony, NIE ISTNIAŁ w żadnym widoku: nikt nie wiedział,
+że powinien czekać na paczkę. Karta znika, gdy nie ma o czym mówić; liczby
+weszły też do karty RAPORT.
+
+**Skan trafia w znane zgłoszenie.** Etykieta pasująca do zapowiedzi kończy się
+jednym zapytaniem o szczegół zamiast dwóch przeszukiwań listy, a przyjęcie
+odhacza zgłoszenie — każdą drogą: skan, wybór z kandydatów, szybka ścieżka.
+
+**Token przestaje umierać z nudów.** Refresh token Allegro wygasał po
+miesiącach bez użycia (DEPLOY §6a) — regularny przebieg tickera odświeża go
+przy okazji. Ticker startuje z `main()`, nie z `buildApp()`: testy tras nie
+strzelają do Allegro; w trybie http rusza dopiero po sparowaniu konta.
+
+W DEPLOY stanęła też notatka o świadomie NIEwdrożonej automatyzacji: Allegro
+umie zwrot środków z API (`POST /payments/refunds`, prowizja wraca sama),
+ale pieniędzmi rusza człowiek — to decyzja właściciela, nie brak wiedzy.
+
 ## 0.64.0 — 20 sierpnia 2026
 
 **Można odłożyć więcej, niż jest na fakturze.** Ze zgłoszenia: „dodaj

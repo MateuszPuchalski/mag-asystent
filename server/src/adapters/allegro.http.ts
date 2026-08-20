@@ -67,6 +67,16 @@ export function urlZamowienia(apiUrl: string, orderId: string): string {
   return `${apiUrl}/order/checkout-forms/${encodeURIComponent(orderId)}`;
 }
 
+/**
+ * URL strony listy zwrotów dla tickera zapowiedzi. `createdAt.gte` odcina to,
+ * co już znamy, a paginacja idzie setkami — jedna strona pokrywa tydzień
+ * zwrotów nawet w szczycie.
+ */
+export function urlListyZwrotow(apiUrl: string, odKiedy: string | null, offset: number): string {
+  const filtr = odKiedy ? `&createdAt.gte=${encodeURIComponent(odKiedy)}` : "";
+  return `${apiUrl}/order/customer-returns?limit=100&offset=${Math.max(0, Math.trunc(offset))}${filtr}`;
+}
+
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
 export function urlWatkow(apiUrl: string, offset: number): string {
   return `${apiUrl}/messaging/threads?limit=20&offset=${Math.max(0, Math.trunc(offset))}`;
@@ -384,6 +394,21 @@ export class HttpAllegroAdapter implements AllegroAdapter {
         const zm = mapujZwrot(z);
         if (!wyniki.some((w) => w.id === zm.id)) wyniki.push(zm);
       }
+    }
+    return wyniki;
+  }
+
+  async listaZwrotowKlienta(odKiedy: string | null): Promise<ZwrotAllegro[]> {
+    /* Twardy limit stron to bezpiecznik na pierwsze uruchomienie bez granicy
+       dat — tysiąc zwrotów wystarcza na każdy realny poślizg tickera. */
+    const wyniki: ZwrotAllegro[] = [];
+    for (let strona = 0; strona < 10; strona++) {
+      const json = (await this.zapytaj(
+        urlListyZwrotow(config.allegro.apiUrl, odKiedy, strona * 100)
+      )) as Record<string, unknown> | null;
+      const lista = Array.isArray(json?.customerReturns) ? json.customerReturns : [];
+      for (const z of lista) wyniki.push(mapujZwrot(z));
+      if (lista.length < 100) break;
     }
     return wyniki;
   }
