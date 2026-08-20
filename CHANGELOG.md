@@ -64,6 +64,15 @@ wolno przekroczyć fakturę, korekta musi umieć to samo; inaczej jedyną drogą
 wyjścia z omyłkowego nadmiaru byłaby reklamacja wystawiona za własną pomyłkę
 w liczeniu.
 
+**Logo dostawcy na liście dostaw jest większe.** Slot był kwadratem 40 dp,
+a logotypy prawie nigdy nie są kwadratami — to szerokie paski z nazwą firmy.
+`ContentScale.Fit` skalował je więc do kilkunastu punktów wysokości.
+
+Slot ma teraz 64 dp szerokości przy tej samej wysokości. Rośnie samo logo,
+a wiersz nie, więc lista nie traci ani jednej pozycji na ekranie. Kafelek stanu
+zostaje kwadratem wyśrodkowanym w tym slocie: oba warianty MUSZĄ mieć ten sam
+rozmiar, inaczej wiersz przeskakiwałby w bok w chwili doczytania logo.
+
 ## 0.63.0 — 20 sierpnia 2026
 
 **Wskaźnik rozbieżności wraca na linijkę stanu.** Wersja 0.62.0 dokładała

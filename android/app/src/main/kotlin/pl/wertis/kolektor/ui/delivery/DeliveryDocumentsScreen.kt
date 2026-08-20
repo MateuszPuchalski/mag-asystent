@@ -68,6 +68,16 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    mieszkają na tej zakładce, a nie za osobnym przyciskiem, którego nikt by
    nie znalazł. Sekcja znika, gdy koszy nie ma.                               */
 
+
+/**
+ * Szerokość slotu na logo dostawcy w wierszu listy dostaw.
+ *
+ * Szerszy niż wysoki, bo logotypy są szerokie — patrz komentarz przy
+ * `kafelekStanu`. Jedna stała, bo używają jej OBA warianty slotu i rozjazd
+ * między nimi przesuwałby wiersz w bok przy doczytaniu logo.
+ */
+private val SLOT_LOGO = 64.dp
+
 @Composable
 fun DeliveryDocumentsScreen(graph: AppGraph) {
     val scope = rememberCoroutineScope()
@@ -202,32 +212,47 @@ private fun DocRow(graph: AppGraph, d: DeliveryDocument, onClick: () -> Unit) {
            („done/total" kontra „N poz.") i z pastylki „DO ZAMKNIĘCIA".
            Czwarte powtórzenie tej samej informacji nie było warte jedynego
            miejsca, w którym da się pokazać, KTO to przywiózł. */
+        /* SLOT jest szerszy niż wysoki (0.64.0) i to jest cała zmiana rozmiaru
+           logo. Logotypy prawie nigdy nie są kwadratami — to szerokie paski
+           z nazwą firmy — więc w kwadracie 40 dp `Fit` skalował je do
+           kilkunastu punktów wysokości. Szerszy slot daje więcej logo BEZ
+           wydłużania wiersza, czyli bez zabierania liście jednej pozycji.
+
+           Kafelek stanu zostaje kwadratem 40 dp, wyśrodkowanym w tym slocie:
+           slot musi mieć ten sam rozmiar dla obu wariantów, inaczej wiersz
+           przeskoczyłby w bok w chwili doczytania logo. */
         val kafelekStanu: @Composable () -> Unit = {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        when {
-                            complete -> Success.copy(alpha = 0.15f)
-                            // bursztyn = czynność, ta sama reguła co na karcie towaru:
-                            // dokument na górze listy ma mówić, DLACZEGO tam jest
-                            wToku -> AmberBg
-                            else -> Secondary
-                        }
-                    ),
+                modifier = Modifier.size(width = SLOT_LOGO, height = 40.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    if (complete) WIcons.Check else WIcons.Box,
-                    contentDescription = null,
-                    tint = when {
-                        complete -> Success
-                        wToku -> AmberInk
-                        else -> Ink
-                    },
-                    modifier = Modifier.size(20.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            when {
+                                complete -> Success.copy(alpha = 0.15f)
+                                // bursztyn = czynność, ta sama reguła co na karcie
+                                // towaru: dokument na górze listy ma mówić, DLACZEGO
+                                // tam jest
+                                wToku -> AmberBg
+                                else -> Secondary
+                            }
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (complete) WIcons.Check else WIcons.Box,
+                        contentDescription = null,
+                        tint = when {
+                            complete -> Success
+                            wToku -> AmberInk
+                            else -> Ink
+                        },
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
         /* O logo pytamy WYŁĄCZNIE, gdy serwer powiedział, że jest. Inaczej
@@ -236,7 +261,7 @@ private fun DocRow(graph: AppGraph, d: DeliveryDocument, onClick: () -> Unit) {
            355 wpisów na tysiąc i przykrył nimi pięć prawdziwych odmów. */
         val khId = d.khId
         if (d.maLogo && khId != null) {
-            LogoDostawcy(graph, khId, 40.dp, zamiast = kafelekStanu)
+            LogoDostawcy(graph, khId, 40.dp, szerokosc = SLOT_LOGO, zamiast = kafelekStanu)
         } else {
             kafelekStanu()
         }

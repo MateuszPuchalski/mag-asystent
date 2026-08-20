@@ -306,6 +306,8 @@ przed którą ta pozycja broni.
 - [ ] ANULUJ zostawia liczbę z faktury i niczego nie zapisuje,
 - [ ] po zamknięciu dostawy nadmiar jest w wyjątkach w `/biuro`,
 - [ ] pozycja z nadmiarem jest odłożona, nie wraca do roboty.
+- [ ] logo dostawcy na liście dostaw jest szersze niż wysokie,
+- [ ] wiersz bez logo ma kafelek stanu w tym samym miejscu i nie przeskakuje.
 
 **Kreator kont i rola admina**
 

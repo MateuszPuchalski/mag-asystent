@@ -41,13 +41,24 @@ fun LogoDostawcy(
     khId: Long,
     bok: Dp,
     modifier: Modifier = Modifier,
+    /**
+     * Szerokość slotu; domyślnie kwadrat.
+     *
+     * Rozdzielone od wysokości w 0.64.0, bo logo dostawcy prawie nigdy nie jest
+     * kwadratem — to zwykle szeroki pasek z nazwą firmy. W kwadracie 40 dp
+     * `ContentScale.Fit` skalował je do wysokości kilkunastu punktów i stąd
+     * brało się „mogłoby być trochę większe". Szerszy slot daje więcej logo
+     * BEZ wydłużania wiersza, czyli bez zabierania listy jednej pozycji.
+     */
+    szerokosc: Dp = bok,
     zamiast: (@Composable () -> Unit)? = null,
 ) {
     var logo by remember(khId) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     // stały mnożnik zamiast LocalDensity — klucz cache'a dekodowania nie może
-    // zależeć od ekranu, na którym akurat rysujemy
-    val px = bok.value.toInt() * 3
+    // zależeć od ekranu, na którym akurat rysujemy. Liczymy z DŁUŻSZEGO boku,
+    // bo to on rozstrzyga, ile pikseli naprawdę widać.
+    val px = maxOf(bok.value, szerokosc.value).toInt() * 3
 
     LaunchedEffect(khId) {
         val bajty = graph.logoRepo.logo(khId)
@@ -67,9 +78,11 @@ fun LogoDostawcy(
         contentDescription = "Logo dostawcy",
         contentScale = ContentScale.Fit,
         modifier = modifier
-            .size(bok)
+            .size(width = szerokosc, height = bok)
             .clip(RoundedCornerShape(10.dp))
-            .padding(3.dp),
+            // 2 dp zamiast 3: przy szerokim slocie każdy punkt oddechu to
+            // punkt mniej logo, a przezroczyste tło i tak nie dotyka krawędzi
+            .padding(2.dp),
     )
 }
 
