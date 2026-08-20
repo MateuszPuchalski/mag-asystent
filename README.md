@@ -316,6 +316,13 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   szarym tekstem, bo idą w rozmowę z dostawcą. `+` nigdy nie rozdziela:
   w opisach łączy części zestawu, więc podział podałby pół kompletu jako
   pełnoprawny zamiennik.
+
+  **Lista bez nagłówka też się liczy** (0.61.0). Część kartotek ma w opisie sam
+  ciąg `S11100 // G74050 // MF381350`, bez słowa „Zamiennik". Podwójny ukośnik
+  w prozie się nie zdarza, więc sam w sobie jest sygnałem. Tryb bez nagłówka
+  jest węższy: wymaga `//`, bierze tylko tokeny z cyfrą i milczy przy jednym
+  trafieniu, bo numer modelu bywa naszym symbolem. Numery obce z takiej listy
+  nie powstają — bez nagłówka nie wiadomo, czym są.
 - Zmiana lokalizacji: **skan półki przy otwartej karcie** — przy jednym adresie
   zastępuje od razu, przy ≥2 pyta arkuszem zastąp/dodaj/zastąp jedną. Walidacje
   bez spacji i długości. Pomyłkę poprawia się skanem właściwej półki — nie ma

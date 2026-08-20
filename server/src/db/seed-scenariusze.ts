@@ -209,6 +209,7 @@ export const KATALOG: Scenariusz[] = [
 
   // ── logo dostawcy ──
   { id: "S70", obszar: "dostawa", tytul: "Dostawca z logo i dostawca bez logo", wejscie: "zakładka DOSTAWY, potem /biuro → DOSTAWCY" },
+  { id: "S71", obszar: "karta", tytul: "Zamienniki wypisane bez nagłówka", wejscie: "karta TEST-ZAMIENNIK-LISTA" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -303,6 +304,20 @@ const TOWARY: TowarSc[] = [
     stany: [[MAG, 15]],
   },
   { twId: 900_020, symbol: "TEST-ZAMIENNIK-B", nazwa: "Sprzęgło odśrodkowe — zamiennik naszej kartoteki", ean: "5900000000020", lok: "E05-02-04", stany: [[MAG, 2]] },
+  /* S71 — lista bez nagłówka (0.61.0). Opis nie mówi „Zamiennik", niesie sam
+     ciąg po `//`. Trzeci człon jest obcy i ma po cichu odpaść: bez nagłówka
+     nie wiadomo, czy to zamiennik, czy numer modelu. */
+  {
+    twId: 900_066,
+    symbol: "TEST-ZAMIENNIK-LISTA",
+    nazwa: "Filtr powietrza z listą zamienników bez nagłówka",
+    ean: "5900000000066",
+    lok: "E05-02-05",
+    opis: "Filtr powietrza. TEST-LISTA-A // TEST-LISTA-B // OEM-7766-YY",
+    stany: [[MAG, 9]],
+  },
+  { twId: 900_067, symbol: "TEST-LISTA-A", nazwa: "Filtr powietrza — pierwszy z listy", ean: "5900000000067", lok: "E05-02-06", stany: [[MAG, 4]] },
+  { twId: 900_068, symbol: "TEST-LISTA-B", nazwa: "Filtr powietrza — drugi z listy", ean: "5900000000068", lok: "E05-02-07", stany: [[MAG, 1]] },
   // S18 — stan we wszystkich magazynach naraz; ARCH zostaje pusty i ukryty
   {
     twId: 900_021,

@@ -130,6 +130,38 @@ const TABELA: Array<{
     po: "opis bez etykiety nie daje NIC, choćby zawierał symbol z kartoteki",
   },
   {
+    opis: "S11100 // G74050 // MF381350",
+    sym: "W80-0101",
+    maSymbole: ["S11100", "G74050", "MF381350"],
+    znane: ["S11100", "G74050", "MF381350"],
+    obce: [],
+    po: "sama lista po // jest listą, choć nikt jej nie podpisał",
+  },
+  {
+    opis: "Filtr powietrza do pilarki. S11100 // G74050 // MF381350",
+    sym: "W80-0102",
+    maSymbole: ["S11100", "G74050", "MF381350"],
+    znane: ["S11100", "G74050", "MF381350"],
+    obce: [],
+    po: "proza przed listą nie przeszkadza i sama nie trafia do wyniku",
+  },
+  {
+    opis: "Pasuje do modeli 340 // 345 // 350",
+    sym: "W80-0103",
+    maSymbole: ["340"],
+    znane: [],
+    obce: [],
+    po: "jedno trafienie bez nagłówka to za mało — numer modelu bywa naszym symbolem",
+  },
+  {
+    opis: "ex1003 // FTC335 // 8R77-01",
+    sym: "W80-0803",
+    maSymbole: ["ex1003", "8R77-01"],
+    znane: ["ex1003", "8R77-01"],
+    obce: [],
+    po: "bez nagłówka nierozpoznane numery NIE idą do obcych — nie wiadomo, czym są",
+  },
+  {
     opis: "",
     sym: "W00-0000",
     maSymbole: [],
@@ -153,6 +185,19 @@ test("kandydaci obejmują każdy szczebel podziału, żeby baza mogła rozstrzyg
   assert.ok(k.includes("FTC212 / EX1095"), "cały kawałek przed podziałem po ukośniku");
   assert.ok(k.includes("EX1095"), "część po podziale");
   assert.ok(k.includes("OLEJ-MIX-0,5L"), "symbol z przecinkiem w środku");
+});
+
+test("bez etykiety kandydatami są tylko tokeny wyglądające na numer", () => {
+  /* Cały opis idzie wtedy do rozbioru, więc bez tego zawężenia limit
+     kandydatów zjadałyby wyrazy prozy, zanim dojdzie do symboli. */
+  const k = kandydaciZamiennikow("Filtr powietrza do pilarki. S11100 // G74050", "W1");
+  assert.ok(k.includes("S11100") && k.includes("G74050"), "symbole zostają");
+  assert.ok(!k.some((t) => /^[A-Za-z]+$/.test(t)), `wyraz prozy w kandydatach: ${k}`);
+});
+
+test("opis bez // nie uruchamia trybu domyślnego", () => {
+  // przecinek i spacja dzielą prozę — lista bez nagłówka byłaby na nich zgadywaniem
+  assert.deepEqual(kandydaciZamiennikow("S11100, G74050 i jeszcze MF381350", "W1"), []);
 });
 
 test("własny symbol nigdy nie jest kandydatem", () => {
@@ -188,7 +233,9 @@ test("na pełnej kartotece parser znajduje setki zamienników, nie zero i nie ws
   /* Przedział, nie liczba dokładna: opis jest polem swobodnym, a `products.json`
      bywa odświeżany. Regres parsera (zero trafień) i rozjazd w drugą stronę
      (wzorzec przepuszczający numery OEM) wychodzą oba, a zmiana danych o 10%
-     nie psuje testu bez powodu. Pomiar z 2026-07-26: 393 kartoteki. */
+     nie psuje testu bez powodu. Pomiar z 2026-07-26: 393 kartoteki; po
+     dopuszczeniu list bez etykiety (0.61.0) jest ich 491, z czego 69 to
+     kartoteki, w których wcześniej sekcja była pusta. */
   assert.ok(
     zKlikalnym > 250 && zKlikalnym < 600,
     `kartotek z klikalnym zamiennikiem: ${zKlikalnym} — poza spodziewanym przedziałem`

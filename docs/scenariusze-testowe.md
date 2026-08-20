@@ -667,3 +667,17 @@ format przed wysyłką. Serwer przyjmuje wyłącznie PNG i to jest celowe.
 
 Bramka audytu: otwórz listę dostaw kilka razy i sprawdź dziennik. Zapytania
 o logo, którego nie ma, **nie mogą** zostawiać w nim wpisów.
+
+### S71 — zamienniki wypisane bez nagłówka
+
+`TEST-ZAMIENNIK-LISTA` ma w opisie sam ciąg po podwójnym ukośniku, bez słowa
+„Zamiennik". Tak wygląda część prawdziwych kartotek i do 0.61.0 sekcja była
+przy nich pusta.
+
+Sekcja **Zamienniki i opis** ma pokazać `TEST-LISTA-A` oraz `TEST-LISTA-B`
+jako klikalne wiersze ze stanem. `OEM-7766-YY` ma zniknąć bez śladu — bez
+nagłówka nie wiadomo, czy to zamiennik, czy numer modelu, więc nie trafia
+nawet do numerów obcych.
+
+Kontrola drugiej strony: `TEST-ZNAKI` nie ma w opisie podwójnego ukośnika
+i jego sekcja ma pozostać taka jak dotąd.
