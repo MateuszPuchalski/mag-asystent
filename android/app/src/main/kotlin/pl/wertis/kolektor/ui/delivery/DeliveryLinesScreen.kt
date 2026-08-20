@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -158,6 +159,12 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
     /** Filtr listy pozycji — patrz komentarz przy `widoczne`. */
     var szukane by rememberSaveable(id) { mutableStateOf("") }
+
+    /* Fokus pola filtra jest STANEM EKRANU, nie szczegółem pola: dopóki go
+       ma, `WedgeKeySource` nie zbiera znaków i skaner milczy. Ekran musi więc
+       umieć o tym powiedzieć i umieć fokus oddać. */
+    var szukaneMaFokus by remember(id) { mutableStateOf(false) }
+    val fokusEkranu = LocalFocusManager.current
 
     /** Linia oczekująca na skan lokalizacji (drugi skan). */
     var active by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
@@ -418,6 +425,13 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        zawsze 1. Rozbicie jej na osobne elementy wymagałoby liczenia ich tutaj,
        a taki licznik rozjeżdża się po cichu przy pierwszej dołożonej sekcji. */
     val listState = rememberLazyListState()
+    /* Wybranie pozycji ODDAJE FOKUS pola filtra. Filtr jest drogą do pozycji,
+       a nie trybem pracy: po jej wskazaniu magazynier idzie do regału i skanuje,
+       więc pole nie ma prawa dalej uciszać skanera. Dotknięcie wiersza samo
+       fokusu nie zabiera — Compose zostawia go tam, gdzie był. */
+    LaunchedEffect(active?.id) {
+        if (active?.id != null) fokusEkranu.clearFocus()
+    }
     val indeksAktywnej = active?.let { a -> uporzadkowane.indexOfFirst { it.id == a.id } } ?: -1
     /* Także gdy panel ROŚNIE (pytanie o rozjazd, pole ręcznego wpisu) —
        bez tego dodatkowa treść uciekała pod dolną krawędź bez korekty. */
@@ -496,14 +510,39 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
                 /* Pole filtra pod podpowiedzią o skanie, a nie nad nią: skan
                    zostaje drogą pierwszą i ma być pierwszy także wzrokiem.
-                   Bez `imeAction` szukania — lista zawęża się przy pisaniu,
-                   więc nie ma czego zatwierdzać. */
+                   Lista zawęża się przy pisaniu, więc „gotowe" niczego nie
+                   zatwierdza — ODDAJE FOKUS, a to jest tu cała rzecz. */
                 WertisTextField(
                     value = szukane,
                     onValueChange = { szukane = it },
                     placeholder = "Szukaj w dostawie: symbol albo nazwa…",
                     leadingIcon = WIcons.Search,
+                    onFokus = { szukaneMaFokus = it },
                 )
+                /* SKANER MILCZY, DOPÓKI PISZESZ — i człowiek ma o tym wiedzieć
+                   (0.66.0). `WedgeKeySource` zbiera znaki wyłącznie wtedy, gdy
+                   nie ma ich gdzie wpisać, więc pole z fokusem ucisza skaner.
+                   Bez tego paska kolektor wyglądał na zepsuty: klawiatura
+                   schowana, a skan towaru i regału nie robi nic.
+
+                   Przycisk, nie sama podpowiedź: „gotowe" na klawiaturze
+                   ekranowej trzeba najpierw znaleźć, a robi się to w rękawicy. */
+                if (szukaneMaFokus) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            "Skaner milczy, dopóki piszesz",
+                            fontSize = 11.sp,
+                            color = AmberInk,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlineButton("GOTOWE") { fokusEkranu.clearFocus() }
+                    }
+                }
                 if (szukaneN.isNotEmpty()) {
                     Text(
                         if (uporzadkowane.isEmpty()) {
