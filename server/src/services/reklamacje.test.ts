@@ -22,7 +22,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "kosz", "sfera_queue"]) {
+  for (const t of ["kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot_zapowiedz", "zwrot", "kosz", "sfera_queue"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -90,5 +90,6 @@ test("raport zlicza proces w jednym miejscu", () => {
   assert.equal(r.reklamacje.otwarte, 1);
   assert.equal(r.reklamacje.poTerminie, 1);
   assert.equal(r.kosze.otwarte, 0);
+  assert.deepEqual(r.zapowiedzi, { oczekujace: 0, brakujace: 0 }, "bez przebiegu tickera zapowiedzi milczą");
   assert.equal(r.medianaGodzinDoRozliczenia, null, "bez rozliczonych zwrotów mediana uczciwie milczy");
 });

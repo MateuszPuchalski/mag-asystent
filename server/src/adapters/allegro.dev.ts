@@ -192,6 +192,13 @@ export class DevAllegroAdapter implements AllegroAdapter {
     );
   }
 
+  async listaZwrotowKlienta(odKiedy: string | null): Promise<ZwrotAllegro[]> {
+    const granica = odKiedy ? Date.parse(odKiedy) : NaN;
+    return zwroty().filter(
+      (z) => !Number.isFinite(granica) || Date.parse(z.utworzono ?? "") >= granica
+    );
+  }
+
   async zwrot(id: string): Promise<ZwrotAllegro | null> {
     return zwroty().find((z) => z.id === id) ?? null;
   }

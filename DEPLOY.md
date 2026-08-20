@@ -950,6 +950,19 @@ Równolegle działa **ścieżka reklamacyjna**: pozycje z decyzją „reklamacja
 stoją na liście sortowanej po dniach do terminu ustawowego
 (`REKLAMACJA_DNI`, domyślnie 14). Karta RAPORT zbiera liczby całego procesu.
 
+Od 0.65.0 serwer **sam ściąga zapowiedzi zwrotów** — zgłoszenia klientów
+z Allegro, zanim paczka dojedzie. Skan etykiety trafia wtedy w znane
+zgłoszenie jednym zapytaniem, a zgłoszenia czekające na paczkę dłużej niż
+`BRAKUJACA_PACZKA_DNI` (domyślnie 3) widać na karcie **BRAKUJĄCE PACZKI**.
+Częstotliwość ustawia `ALLEGRO_POLL_MS` (domyślnie 5 minut; `0` wyłącza).
+Skutek uboczny jest celowy: regularne odpytywanie odświeża token, więc
+parowanie nie wygasa po miesiącach bez skanów.
+
+Zwrot środków dałoby się zautomatyzować w całości: Allegro ma
+`POST /payments/refunds` (scope płatności), a prowizja wraca wtedy sama.
+Świadomie tego NIE robimy — pieniędzmi rusza człowiek; notatka zostaje tu,
+żeby przyszła decyzja nie zaczynała od odkrywania możliwości.
+
 Domyślnie funkcja jest **wyłączona** (puste `ALLEGRO_CLIENT_ID`), a w trybie
 demo (`SGT_MODE=seeded`) działa na fikcyjnych zwrotach bez kontaktu
 z Allegro (scenariusze S67–S69).

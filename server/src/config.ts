@@ -277,6 +277,18 @@ export const config = {
      * do tej daty. Env zostaje na wypadek własnych, krótszych zobowiązań.
      */
     reklamacjaDni: num(process.env.REKLAMACJA_DNI, 14, "REKLAMACJA_DNI"),
+    /**
+     * Co ile ms ticker ściąga z Allegro zapowiedzi zwrotów (Etap 4).
+     * 0 = wyłączone. Skutek uboczny jest celowy: regularne użycie tokena
+     * odświeża go, więc refresh token nie umiera po miesiącach ciszy.
+     */
+    pollMs: num(process.env.ALLEGRO_POLL_MS, 300_000, "ALLEGRO_POLL_MS"),
+    /**
+     * Po ilu dniach od zgłoszenia zwrot bez zeskanowanej paczki uznaje się
+     * za „brakującą paczkę". Trzy dni to typowy czas doręczenia krajowego —
+     * wcześniej alarm byłby szumem o paczkach, które po prostu jadą.
+     */
+    brakujacaDni: num(process.env.BRAKUJACA_PACZKA_DNI, 3, "BRAKUJACA_PACZKA_DNI"),
   },
 
   /**

@@ -33,6 +33,7 @@ import {
   lastImport,
 } from "./adapters/subiekt.mssql.js";
 import { problemAllegro } from "./services/allegro-token.js";
+import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
@@ -196,6 +197,10 @@ async function main() {
       );
     }, config.mssql.syncMs);
   }
+
+  /* Zapowiedzi zwrotów z Allegro — w main(), nie w buildApp(): testy tras
+     budują aplikację i nie mają prawa uruchamiać pętli sięgającej do API. */
+  uruchomTickerZapowiedzi();
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });
