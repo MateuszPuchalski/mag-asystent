@@ -169,9 +169,9 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    3,
-    "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu " +
-      "i wgranie logo dostawcy"
+    4,
+    "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
+      "wgranie logo dostawcy i półka reklamacyjna"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,

@@ -149,4 +149,15 @@ test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => 
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: biuro });
   assert.equal(r.statusCode, 200);
   assert.deepEqual(r.json().zapowiedzi, []);
+  // półka reklamacyjna i dyskusje Allegro (Etap 6) — bramka biura
+  r = await app.inject({
+    method: "PUT", url: "/api/biuro/zwroty/reklamacje/1/polka",
+    payload: { polka: "REK-01" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/dyskusje", headers: biuro });
+  assert.equal(r.statusCode, 200);
+  const dyskusje = r.json().dyskusje;
+  assert.equal(dyskusje.length, 2, "adapter dev daje rozmowę i formalną reklamację");
+  assert.ok(dyskusje.some((y: { typ: string }) => y.typ === "CLAIM"));
 });

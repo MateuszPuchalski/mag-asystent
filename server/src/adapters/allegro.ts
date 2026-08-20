@@ -89,6 +89,22 @@ export interface WatekAllegro {
   wiadomosci: WiadomoscAllegro[];
 }
 
+/**
+ * Dyskusja albo reklamacja klienta z Allegro (`/sale/issues`, Etap 6).
+ * Sam ODCZYT: sprawa toczy się w panelu Allegro, my ją tylko pokazujemy,
+ * żeby biuro wiedziało o zgłoszeniu bez logowania się do panelu co godzinę.
+ */
+export interface DyskusjaAllegro {
+  id: string;
+  /** DISCUSSION | CLAIM — rozmowa czy formalna reklamacja. */
+  typ: string | null;
+  status: string | null;
+  temat: string | null;
+  kupujacyLogin: string | null;
+  orderId: string | null;
+  utworzono: string | null;
+}
+
 /** Czym rozpoznajemy kupującego w liście wątków. */
 export interface KupujacyRef {
   login: string | null;
@@ -124,6 +140,11 @@ export interface AllegroAdapter {
    * znaczy „bez granicy": bierz, ile paginacja pozwoli.
    */
   listaZwrotowKlienta(odKiedy: string | null): Promise<ZwrotAllegro[]>;
+  /**
+   * Dyskusje i reklamacje klientów (`/sale/issues`) — na żądanie, bez zapisu
+   * u nas: jedno miejsce prawdy to panel Allegro (Etap 6).
+   */
+  listaDyskusji(): Promise<DyskusjaAllegro[]>;
   /** Szczegół zwrotu po id; `null` gdy nie istnieje. */
   zwrot(id: string): Promise<ZwrotAllegro | null>;
   /** Zamówienie (checkout-form) — źródło `externalId` pozycji; `null` gdy brak. */

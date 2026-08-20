@@ -67,6 +67,8 @@ export interface PozycjaZwrotu {
   decyzjaAt: string | null;
   decyzjaPrzez: string | null;
   notatka: string | null;
+  /** Półka reklamacyjna — gdzie fizycznie leży towar tej pozycji (Etap 6). */
+  reklPolka: string | null;
 }
 
 export interface PozycjaZamowienia {
@@ -898,7 +900,8 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
   const pozycje = db()
     .prepare(
       `SELECT p.id, p.offer_id, p.nazwa, p.external_id, p.tw_id, t.symbol, p.ilosc,
-              p.powod, p.powod_opis, p.decyzja, p.decyzja_at, p.decyzja_przez, p.notatka
+              p.powod, p.powod_opis, p.decyzja, p.decyzja_at, p.decyzja_przez, p.notatka,
+              p.rekl_polka
        FROM zwrot_pozycja p LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
        WHERE p.zwrot_id = ? ORDER BY p.id`
     )
@@ -906,7 +909,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
     id: number; offer_id: string | null; nazwa: string; external_id: string | null;
     tw_id: number | null; symbol: string | null; ilosc: number; powod: string | null;
     powod_opis: string | null; decyzja: string | null; decyzja_at: string | null;
-    decyzja_przez: string | null; notatka: string | null;
+    decyzja_przez: string | null; notatka: string | null; rekl_polka: string | null;
   }>;
 
   /* Zwracane oferty — po nich znakujemy wiersze zamówienia. Zbiór, nie
@@ -973,6 +976,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
       decyzjaAt: p.decyzja_at,
       decyzjaPrzez: p.decyzja_przez,
       notatka: p.notatka,
+      reklPolka: p.rekl_polka,
     })),
   };
   if (!z.sgt_dok_id) szczegol.kandydaciDokumentu = kandydaciDokumentu(id);

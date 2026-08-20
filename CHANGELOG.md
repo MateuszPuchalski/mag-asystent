@@ -33,6 +33,25 @@ historii nie przepisujemy.
 
 ---
 
+## 0.68.0 — 20 sierpnia 2026
+
+**Reklamacja dostaje półkę.** Towar w sprawie reklamacyjnej leżał „gdzieś" —
+wiedza o miejscu mieszkała w głowach. Na liście reklamacji i karcie zwrotu
+stoi teraz pole PÓŁKA (np. `REK-01`): wpis normalizowany jak skan
+(trim + wielkie litery), puste pole zdejmuje z półki, a rozpatrzenie sprawy
+półki NIE czyści — historia ma mówić, skąd towar zszedł.
+
+To ewidencja w aplikacji, nie ruch w Subiekcie — świadomie: reklamowany towar
+nie jest na stanie (korekta obejmuje pełnowartościowe i zniszczone), więc MM
+nie miałoby czego przesuwać. Zmiana półki zostawia ślad w dzienniku.
+
+**Dyskusje i reklamacje Allegro na podgląd.** W zakładce REKLAMACJE przycisk
+POBIERZ Z ALLEGRO pokazuje otwarte dyskusje i formalne reklamacje klientów
+(`GET /sale/issues`, zasób w becie — negocjacja Accept per rodzina końcówki
+obejmuje teraz też `/sale/` i `/messaging/`). Sam odczyt, na kliknięcie:
+sprawy toczą się w panelu Allegro i nic z nich nie zapisujemy u nas.
+W dev — dwie fikcyjne sprawy, rozmowa i reklamacja.
+
 ## 0.67.0 — 20 sierpnia 2026
 
 **Zniszczony towar przestaje znikać bez śladu.** Decyzja „do zniszczenia" była

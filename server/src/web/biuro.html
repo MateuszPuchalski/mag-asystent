@@ -371,6 +371,15 @@
         reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
       </p>
       <table id="reklamacjeLista"></table>
+      <div style="margin-top:14px">
+        <h2>DYSKUSJE I REKLAMACJE ALLEGRO</h2>
+        <p class="mute" style="margin-bottom:6px">
+          Sprawy toczą się w panelu Allegro — tu jest podgląd na kliknięcie,
+          żeby nic nie czekało niezauważone.
+        </p>
+        <button class="akcja cichy" id="dyskusjePobierz">POBIERZ Z ALLEGRO</button>
+        <table id="dyskusjeLista" style="margin-top:8px"></table>
+      </div>
     </section>
 
     <section class="card" id="raportZwrotowKarta">
@@ -2201,7 +2210,7 @@ function rysujKosze(kosze) {
 
 function rysujReklamacje(lista) {
   $("reklamacjeLista").innerHTML = lista.length
-    ? "<tr><th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th></th></tr>" +
+    ? "<tr><th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th>PÓŁKA</th><th></th></tr>" +
       lista.map((r) => `<tr${r.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
           <td class="b">${r.poTerminie
             ? `<span class="badge err">${-r.dniDoTerminu} dni PO TERMINIE</span>`
@@ -2209,12 +2218,40 @@ function rysujReklamacje(lista) {
           <td>${esc(r.referencja || r.waybill)}<div class="mute">${esc(r.kupujacyLogin || "")}</div></td>
           <td>${esc(r.nazwa)}${r.symbol ? `<div class="mute">${esc(r.symbol)}</div>` : ""}</td>
           <td class="mute">${esc(r.powod || "—")}${r.powodOpis ? `<div>${esc(r.powodOpis)}</div>` : ""}</td>
+          <td style="white-space:nowrap">${r.polka ? `<span class="badge amber">${esc(r.polka)}</span>` : ""}
+            <button class="akcja cichy" data-rekl-polka="${r.pozycjaId}" style="font-size:11px;padding:4px 8px">${r.polka ? "ZMIEŃ" : "PÓŁKA"}</button></td>
           <td style="white-space:nowrap">
             <button class="akcja cichy" data-rekl="${r.pozycjaId}" data-wynik="uznana">UZNANA</button>
             <button class="akcja cichy" data-rekl="${r.pozycjaId}" data-wynik="odrzucona">ODRZUCONA</button>
           </td>
         </tr>`).join("")
     : '<tr><td class="mute">Żadna reklamacja nie czeka na rozpatrzenie.</td></tr>';
+}
+
+/* Dyskusje i reklamacje z panelu Allegro — na KLIKNIĘCIE, nie z odświeżaniem
+   karty: to żywe zapytanie do API, a odświeżanie co 30 s biegałoby do
+   Allegro bez pytania. Jedno miejsce prawdy zostaje w panelu. */
+async function pobierzDyskusje() {
+  const cel = $("dyskusjeLista");
+  cel.innerHTML = '<tr><td class="mute">Pobieram z Allegro…</td></tr>';
+  try {
+    const d = await (await api("/api/biuro/zwroty/dyskusje")).json();
+    const lista = d.dyskusje || [];
+    cel.innerHTML = lista.length
+      ? "<tr><th>TYP</th><th>STATUS</th><th>KLIENT</th><th>TEMAT</th><th>DATA</th></tr>" +
+        lista.map((y) => `<tr>
+            <td>${y.typ === "CLAIM"
+              ? '<span class="badge err">REKLAMACJA</span>'
+              : '<span class="badge mute2">DYSKUSJA</span>'}</td>
+            <td class="mute">${esc(y.status || "—")}</td>
+            <td>${esc(y.kupujacyLogin || "—")}</td>
+            <td>${esc(y.temat || "—")}${y.orderId ? `<div class="mute">zam. ${esc(y.orderId)}</div>` : ""}</td>
+            <td class="mute">${esc((y.utworzono || "").slice(0, 10))}</td>
+          </tr>`).join("")
+      : '<tr><td class="mute">Brak otwartych dyskusji i reklamacji w Allegro.</td></tr>';
+  } catch (e) {
+    cel.innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
 }
 
 function rysujRaportZwrotow(r) {
@@ -2361,6 +2398,7 @@ function rysujSzczegolZwrotu(z) {
       <td class="b" style="white-space:nowrap">${p.ilosc}</td>
       <td>${esc(p.powod || "—")}${p.powodOpis ? `<br><span class="mute">„${esc(p.powodOpis)}”</span>` : ""}</td>
       <td>${decyzje}${p.notatka ? `<div class="mute">notatka: ${esc(p.notatka)}</div>` : ""}
+          ${p.reklPolka ? `<div><span class="badge amber">PÓŁKA ${esc(p.reklPolka)}</span></div>` : ""}
           ${p.decyzjaPrzez ? `<div class="mute">${esc(p.decyzjaPrzez)} · ${esc((p.decyzjaAt || "").slice(0, 16).replace("T", " "))}</div>` : ""}</td>
     </tr>`;
   }).join("");
@@ -2898,7 +2936,25 @@ $("koszeLista").addEventListener("click", async (e) => {
     await odswiezEtap3();
   } catch (err) { toast(err.message); }
 });
+$("dyskusjePobierz").addEventListener("click", pobierzDyskusje);
 $("reklamacjeLista").addEventListener("click", async (e) => {
+  const polkaBtn = e.target.closest("[data-rekl-polka]");
+  if (polkaBtn) {
+    const polka = await zapytaj({
+      tytul: "PÓŁKA REKLAMACYJNA",
+      opis: "Gdzie fizycznie leży ten towar, dopóki sprawa trwa. Puste pole zdejmuje z półki.",
+      przyklad: "np. REK-01",
+      potwierdz: "ZAPISZ",
+    });
+    if (polka === null) return;
+    try {
+      await api(`/api/biuro/zwroty/reklamacje/${polkaBtn.dataset.reklPolka}/polka`, {
+        method: "PUT", body: JSON.stringify({ polka }),
+      });
+      await odswiezEtap3();
+    } catch (err) { toast(err.message); }
+    return;
+  }
   const b = e.target.closest("[data-rekl]");
   if (!b) return;
   const notatka = await zapytaj({

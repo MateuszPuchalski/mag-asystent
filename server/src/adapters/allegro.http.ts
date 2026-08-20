@@ -3,6 +3,7 @@ import { allegroUserAgent } from "./allegro.js";
 import { wazneBearer } from "../services/allegro-token.js";
 import type {
   AllegroAdapter,
+  DyskusjaAllegro,
   KupujacyRef,
   PaczkaZwrotu,
   PozycjaZwrotuAllegro,
@@ -75,6 +76,35 @@ export function urlZamowienia(apiUrl: string, orderId: string): string {
 export function urlListyZwrotow(apiUrl: string, odKiedy: string | null, offset: number): string {
   const filtr = odKiedy ? `&createdAt.gte=${encodeURIComponent(odKiedy)}` : "";
   return `${apiUrl}/order/customer-returns?limit=100&offset=${Math.max(0, Math.trunc(offset))}${filtr}`;
+}
+
+/** URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1). */
+export function urlDyskusji(apiUrl: string, offset: number): string {
+  return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
+}
+
+/**
+ * Dyskusja/reklamacja z JSON-a `/sale/issues` → typ domenowy. Zasób jest
+ * w becie i nazwy pól bywają zagnieżdżone różnie — każde pole ma listę
+ * znanych miejsc, a nieznany kształt daje NULL-e, nie wyjątek.
+ */
+export function mapujDyskusje(json: unknown): DyskusjaAllegro[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(root.issues) ? root.issues : [];
+  return lista.map((it) => {
+    const i = (it ?? {}) as Record<string, unknown>;
+    const buyer = (i.buyer ?? {}) as Record<string, unknown>;
+    const order = (i.order ?? {}) as Record<string, unknown>;
+    return {
+      id: tekst(i.id) ?? "",
+      typ: tekst(i.type),
+      status: tekst(i.status),
+      temat: tekst(i.subject) ?? tekst(i.title) ?? tekst(i.name),
+      kupujacyLogin: tekst(buyer.login),
+      orderId: tekst(order.id) ?? tekst(i.orderId),
+      utworzono: tekst(i.createdAt),
+    };
+  });
 }
 
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
@@ -221,12 +251,13 @@ const AKCEPTY = [
 ] as const;
 
 /**
- * Rodzina końcówki — pierwszy segment ścieżki po `/order/`, np.
- * `customer-returns`. Po niej zapamiętujemy działający nagłówek: jedna beta
- * nie ma prawa przestawiać wersji wszystkim pozostałym zapytaniom.
+ * Rodzina końcówki — pierwszy segment ścieżki po `/order/`, `/sale/` albo
+ * `/messaging/`, np. `customer-returns` czy `issues`. Po niej zapamiętujemy
+ * działający nagłówek: jedna beta (dziś `/sale/issues`) nie ma prawa
+ * przestawiać wersji wszystkim pozostałym zapytaniom.
  */
 export function rodzinaKoncowki(url: string): string {
-  const m = /\/order\/([^/?]+)/.exec(url);
+  const m = /\/(?:order|sale|messaging)\/([^/?]+)/.exec(url);
   return m ? m[1] : "inne";
 }
 
@@ -411,6 +442,13 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       if (lista.length < 100) break;
     }
     return wyniki;
+  }
+
+  async listaDyskusji(): Promise<DyskusjaAllegro[]> {
+    /* Jedna strona setki wystarcza na widok „co się dzieje" — biuro klika
+       po świeże sprawy, a pełne archiwum ma panel Allegro. */
+    const json = await this.zapytaj(urlDyskusji(config.allegro.apiUrl, 0));
+    return json === null ? [] : mapujDyskusje(json);
   }
 
   async zwrot(id: string): Promise<ZwrotAllegro | null> {
