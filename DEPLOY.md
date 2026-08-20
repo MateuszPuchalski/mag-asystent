@@ -273,6 +273,34 @@ Sama aplikacja radzi sobie z przeskokiem AP od 0.60.4: przy zmianie sieci
 porzuca gniazda otwarte do poprzedniego punktu. Wcześniej trzeba było ręcznie
 rozłączyć i połączyć Wi-Fi.
 
+### Sieć gościnna: adres jest, serwera nie ma
+
+Objaw myli, bo wszystko wygląda poprawnie. Kolektor łączy się z drugą siecią,
+dostaje adres z tej samej puli, ma internet — a serwera nie widzi. Brama
+i DNS też się zgadzają, więc „to przecież ta sama sieć".
+
+Przyczyną jest **izolacja klientów**: punkt dostępowy blokuje ruch między
+urządzeniami tej sieci. Domyślnie tak działają sieci gościnne. Adres i internet
+są, dostępu do niczego w LAN-ie nie ma.
+
+Rozpoznanie w dwóch krokach:
+
+1. Porównaj adres **urządzenia** z adresem serwera. Pole „Brama" nie nadaje
+   się do tego — na obu sieciach bywa takie samo.
+2. Z przeglądarki kolektora otwórz `http://<IP-serwera>:3001/api/setup`,
+   raz na każdej sieci.
+
+Adres z tej samej puli, a strona otwiera się tylko na jednej sieci — to jest
+izolacja. Do wyboru:
+
+- **wyłącz izolację klientów przy tym SSID-zie** („AP isolation",
+  „Client isolation", „Guest mode") — gdy sieć ma obsługiwać kolektory;
+- **zostaw izolację i trzymaj kolektory na sieci magazynowej** — gdy sieć ma
+  pozostać gościnna.
+
+Aplikacja tego nie obejdzie i nie ma takiego ustawienia. Serwer stoi pod jednym
+adresem, a kolektor pyta o ten sam adres na każdej sieci.
+
 ## 5. Kolektory — natywna aplikacja Android (APK)
 
 Kolektor to natywny klient z [`android/`](android/README.md) — czysty klient
