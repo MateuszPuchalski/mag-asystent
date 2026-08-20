@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **213 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **220 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (12 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -294,6 +294,12 @@ przed którą ta pozycja broni.
       spodem,
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
+- [ ] kafel ilości i kafel lokalizacji mają **tę samą wysokość**, także gdy
+      biały niesie linijkę „reszta zostaje",
+- [ ] stan systemu inny niż ilość z dokumentu daje pasek z różnicą,
+- [ ] nadwyżka jest bursztynowa, niedobór czerwony,
+- [ ] pozycja o zgodnych liczbach NIE ma tego paska (wskaźnik zapalony bez
+      powodu przestaje być czytany).
 
 **Kreator kont i rola admina**
 

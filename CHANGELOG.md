@@ -33,6 +33,32 @@ historii nie przepisujemy.
 
 ---
 
+## 0.62.0 — 20 sierpnia 2026
+
+**Wskaźnik rozbieżności w rozwiniętej pozycji.** Ze zgłoszenia: „jeśli ilość
+z dostawy różni się z ilością na magazynie, dodaj jakiś indykator". Do tej pory
+obie liczby stały obok siebie, a odejmowanie zostawało w głowie człowieka
+stojącego przy regale.
+
+Pasek pod stanem podaje **różnicę wraz z kierunkiem**. Nadwyżka jest
+informacją: przy regale leży już zapas sprzed tej dostawy. Niedobór jest
+ostrzeżeniem: system widzi mniej, niż mówi dokument, więc towar zszedł, zanim
+ktokolwiek go rozłożył. Kolory są dwa, bo znaczenia są dwa.
+
+Z którym magazynem wolno się porównywać, rozstrzyga sposób zaksięgowania.
+Dostawa krajowa idzie wprost na MAG, więc stan hali zawiera już niesioną
+partię. Kontener stoi na MGP do przesunięcia, więc partia siedzi tam, a hala
+mówi tylko o zapasie sprzed dostawy. Porównanie z niewłaściwym magazynem
+zapalałoby wskaźnik przy prawie każdej pozycji.
+
+Reguła mieszka w `:core` i ma siedem testów, w tym trzy pilnujące przypadków,
+w których wskaźnik ma MILCZEĆ. Wskaźnik zapalony bez powodu przestaje być
+czytany, a wtedy nie działa także wtedy, gdy coś naprawdę się nie zgadza.
+
+**Kafle ilości i lokalizacji mają wspólną wysokość.** Biały rósł o linijkę
+„reszta zostaje" albo „w przyjęciach", a ciemny zostawał niższy — dwa kafle
+tej samej rangi wyglądały jak kafel i przypis.
+
 ## 0.61.0 — 20 sierpnia 2026
 
 **Zamienniki wypisane bez nagłówka są wreszcie klikalne.** Ze zgłoszenia:
