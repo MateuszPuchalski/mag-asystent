@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.61.0 — 20 sierpnia 2026
+
+**Zamienniki wypisane bez nagłówka są wreszcie klikalne.** Ze zgłoszenia:
+opis kartoteki niesie `S11100 // G74050 // MF381350`, a sekcja zamienników
+świeci pustką.
+
+Parser wymagał etykiety — „Zamiennik:", „Zamiennie:", „Zastępuje:", „ZAM:".
+Bez niej nie miał od czego zacząć i nie zwracał niczego. Opis złożony z samej
+listy trafiał więc w próżnię, choć czytelny jest dla każdego człowieka.
+
+Podwójny ukośnik jest teraz sygnałem sam w sobie. W prozie się nie zdarza,
+a stawia go ktoś, kto wypisuje listę. Tryb bez etykiety jest jednak celowo
+węższy od zwykłego:
+
+- wymaga `//` — na przecinku czy ukośniku lista bez nagłówka byłaby
+  zgadywaniem;
+- kandydatem jest tylko token z cyfrą i bez spacji, więc proza nie zjada
+  limitu przed symbolami;
+- potrzebne są dwa trafienia w kartotece, bo numer modelu bywa naszym
+  symbolem;
+- numery obce z takiej listy nie powstają — bez nagłówka nie wiadomo, czy to
+  zamienniki, czy modele.
+
+Opis z etykietą działa dokładnie jak dotąd. Na pełnej kartotece liczba kartotek
+z klikalnym zamiennikiem rośnie z 422 do **491**; te 69 to karty, na których
+sekcja była wcześniej pusta.
+
+Zmiana jest w całości po stronie serwera. Kolektor rysował te wiersze
+poprawnie od zawsze, tylko nie miał czego rysować.
+
 ## 0.60.4 — 20 sierpnia 2026
 
 **Kolektor odzyskuje serwer po przejściu pod inny punkt dostępowy.** Z hali:

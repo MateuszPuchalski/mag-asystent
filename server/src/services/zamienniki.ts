@@ -17,7 +17,14 @@
 
    Kierunek jest tylko jeden: czytamy TEN opis. Jeśli kartoteka B wymienia A,
    a A nie wymienia B, to na karcie A nie pokazujemy nic — sekcja ma być
-   odczytem opisu, nie wnioskiem serwera o tym, co się z czym zamienia.       */
+   odczytem opisu, nie wnioskiem serwera o tym, co się z czym zamienia.
+
+   LISTA BEZ ETYKIETY (0.61.0). Część kartotek nie ma żadnego nagłówka, tylko
+   sam ciąg `S11100 // G74050 // MF381350`. Do 0.61.0 dawało to PUSTĄ sekcję,
+   bo bez etykiety parser nie miał od czego zacząć. Teraz `//` samo w sobie
+   jest sygnałem: w prozie się nie zdarza, a postawił je człowiek, który
+   wypisywał listę. Tryb bez etykiety jest jednak WĘŻSZY od zwykłego i opisuje
+   go `TRYB_DOMYSLNY` niżej.                                                  */
 
 /**
  * Etykiety otwierające listę.
@@ -65,6 +72,29 @@ const NUMER = /^[A-Za-z0-9][A-Za-z0-9.\-*+/,]{2,23}$/;
 /** Zapora na patologiczny opis — nie budujemy zapytania z setką symboli. */
 const LIMIT_KANDYDATOW = 60;
 
+/* ── TRYB_DOMYSLNY: lista bez etykiety ───────────────────────────────────────
+   Włącza się WYŁĄCZNIE wtedy, gdy etykiet nie ma w opisie ani jednej. Opis
+   z etykietą zachowuje się dokładnie jak dotąd — nie ma tu zmiany zachowania
+   dla danych, które już działały.
+
+   Trzy zawężenia, każde z powodu:
+
+   1. Wymagany `//`. Przecinek i ukośnik dzielą prozę i numery katalogowe,
+      więc na nich lista bez nagłówka byłaby zgadywaniem. Podwójny ukośnik
+      jest znakiem świadomej decyzji piszącego.
+   2. Kandydatem jest tylko token WYGLĄDAJĄCY na numer — z cyfrą i bez spacji.
+      Bez tego cały opis idzie do zapytania słowo po słowie i limit zjadają
+      wyrazy prozy, zanim dojdzie do symboli. Ceną jest symbol ze spacją
+      (`LT 4S3`), którego ten tryb nie znajdzie; z etykietą znajduje go dalej.
+   3. Potrzebne są co najmniej DWA trafienia w kartotece i nie powstają żadne
+      numery obce. Bez nagłówka nie wiadomo, czy to lista zamienników, czy
+      modeli — pojedyncze trafienie bywa przypadkiem, a szary tekst obcych
+      byłby zgadywaniem podanym jako fakt. */
+const MIN_TRAFIEN_BEZ_ETYKIETY = 2;
+
+/** Kandydat w trybie bez etykiety: kształt numeru i przynajmniej jedna cyfra. */
+const NUMEROWY = /^(?=[^]*\d)[A-Za-z0-9][A-Za-z0-9.\-*+/,]{2,23}$/;
+
 /** Obcina przyklejoną interpunkcję, zostawiając znaki obecne w symbolach. */
 function oczysc(token: string): string {
   return token.trim().replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9*+]+$/, "");
@@ -90,6 +120,19 @@ function segmenty(desc: string): string[] {
     if (seg.trim()) out.push(seg);
   }
   return out;
+}
+
+/**
+ * Segmenty do rozbioru wraz z trybem, w jakim powstały.
+ *
+ * `zEtykiety === false` znaczy „cały opis, bo ktoś wypisał listę po `//`
+ * i nie podpisał jej" — wtedy obowiązują zawężenia z `TRYB_DOMYSLNY`.
+ */
+function segmentyZTrybem(desc: string): { segmenty: string[]; zEtykiety: boolean } {
+  const zEtykiet = segmenty(desc);
+  if (zEtykiet.length > 0) return { segmenty: zEtykiet, zEtykiety: true };
+  if (!desc.includes("//")) return { segmenty: [], zEtykiety: false };
+  return { segmenty: [desc], zEtykiety: false };
 }
 
 /** Wszystkie fragmenty ze wszystkich szczebli drabiny — bez rozstrzygania. */
@@ -141,11 +184,13 @@ function obliczKandydatow(desc: string, wlasnySymbol: string): string[] {
   const wlasny = wlasnySymbol.trim().toUpperCase();
   const out: string[] = [];
   const widziane = new Set<string>();
-  for (const seg of segmenty(desc)) {
+  const { segmenty: czesci, zEtykiety } = segmentyZTrybem(desc);
+  for (const seg of czesci) {
     const surowe: string[] = [];
     fragmenty(seg, 0, surowe);
     for (const t of surowe) {
       const klucz = t.toUpperCase();
+      if (!zEtykiety && !NUMEROWY.test(t)) continue;
       if (klucz === wlasny || widziane.has(klucz)) continue;
       widziane.add(klucz);
       out.push(t);
@@ -239,7 +284,8 @@ export function podzielZamienniki(
   const widzianeZnane = new Set<string>();
   const widzianeObce = new Set<string>();
 
-  for (const seg of segmenty(desc)) {
+  const { segmenty: czesci, zEtykiety } = segmentyZTrybem(desc);
+  for (const seg of czesci) {
     for (const kawalek of seg.split(DRABINA[0])) {
       if (!kawalek.trim()) continue;
       const rozbior = rozbierz(kawalek, 1, wlasny, wKartotece, (s) => {
@@ -248,7 +294,8 @@ export function podzielZamienniki(
         widzianeZnane.add(klucz);
         znane.push(s);
       });
-      for (const kandydat of rozbior.obce) {
+      // bez etykiety numery obce nie powstają — patrz `TRYB_DOMYSLNY`
+      for (const kandydat of zEtykiety ? rozbior.obce : []) {
         if (!NUMER.test(kandydat) || !/\d/.test(kandydat)) continue;
         const klucz = kandydat.toUpperCase();
         if (klucz === wlasny || widzianeObce.has(klucz) || widzianeZnane.has(klucz)) continue;
@@ -257,5 +304,8 @@ export function podzielZamienniki(
       }
     }
   }
+  /* Jedno trafienie w liście bez nagłówka bywa zbiegiem okoliczności: numer
+     modelu potrafi wyglądać jak nasz symbol. Dwa to już wypisana lista. */
+  if (!zEtykiety && znane.length < MIN_TRAFIEN_BEZ_ETYKIETY) return { znane: [], obce: [] };
   return { znane, obce };
 }
