@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -52,7 +54,9 @@ import pl.wertis.kolektor.ui.product.EanSheet
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.StatusLinii
 import pl.wertis.kolektor.core.delivery.TrybWiersza
+import pl.wertis.kolektor.core.delivery.KierunekRozbieznosci
 import pl.wertis.kolektor.core.delivery.adresWiersza
+import pl.wertis.kolektor.core.delivery.rozbieznoscStanu
 import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
 import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
@@ -1198,8 +1202,12 @@ private fun PanelOdkladania(
            po prawej to, dokąd IDZIE. */
         val zostalo = line.qtyDoc - line.qtyDone
         val ile = (czesc ?: zostalo).coerceIn(1.0, zostalo.coerceAtLeast(1.0))
+        /* `IntrinsicSize.Min` na wierszu plus `fillMaxHeight` na obu kaflach:
+           oba dostają wysokość WYŻSZEGO z nich. Bez tego biały rósł o linijkę
+           „z 10 · reszta zostaje" albo „w przyjęciach", a ciemny zostawał
+           niższy — dwa kafle tej samej rangi wyglądały jak kafel i przypis. */
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             /* KAFEL BIAŁY — ile sztuk idzie TERAZ. Domyślnie cała reszta, bo
@@ -1210,6 +1218,7 @@ private fun PanelOdkladania(
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(14.dp))
                     .background(CardWhite)
                     .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
@@ -1273,6 +1282,53 @@ private fun PanelOdkladania(
                     fontSize = 11.sp,
                     color = InkMute,
                 )
+
+                /* WSKAŹNIK ROZBIEŻNOŚCI (0.62.0). Do tej pory stan i ilość
+                   z dokumentu stały obok siebie jako dwie liczby, a odejmowanie
+                   zostawało w głowie człowieka stojącego przy regale.
+
+                   Regułę liczy `:core` — razem z tym, z którym magazynem wolno
+                   się porównywać. Tutaj zostaje wyłącznie rysowanie. */
+                val rozbieznosc = rozbieznoscStanu(
+                    qtyDoc = line.qtyDoc,
+                    stanMag = line.stanMag,
+                    stanMgp = line.stanMgp,
+                    stanZawieraDostawe = stanZawieraDostawe,
+                )
+                if (rozbieznosc != null) {
+                    val niedobor = rozbieznosc.kierunek == KierunekRozbieznosci.NIEDOBOR
+                    /* Niedobór na czerwono, nadwyżka na bursztynie. Nadwyżka jest
+                       informacją („leży już zapas"), niedobór ostrzeżeniem
+                       („system widzi mniej, niż mówi dokument"). Ten sam kolor
+                       kazałby dopiero czytać, co się właśnie stało. */
+                    val barwa = if (niedobor) Destructive else AmberInk
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (niedobor) Destructive.copy(alpha = 0.10f) else AmberBg)
+                            .padding(horizontal = 7.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Text(
+                            if (niedobor) "▼" else "▲",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = barwa,
+                        )
+                        Text(
+                            /* Liczba, nie samo „nie zgadza się" — bez niej
+                               człowiek odejmuje w pamięci przy regale. */
+                            (if (niedobor) "brakuje " else "ponad dokument ") +
+                                "${formatQty(rozbieznosc.roznica)} ${jednostka(line.unit)}",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = barwa,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
 
             /* KAFEL CIEMNY — dokąd to idzie. Adres schodzi z 28 sp na 24 sp
@@ -1284,6 +1340,7 @@ private fun PanelOdkladania(
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(14.dp))
                     .background(Ink)
                     .padding(10.dp),
