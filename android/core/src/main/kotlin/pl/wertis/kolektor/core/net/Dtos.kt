@@ -857,3 +857,59 @@ data class MeldunekOdrzuconych(val operacje: List<OdrzuconaOperacja> = emptyList
 
 @Serializable
 data class MeldunekPrzyjety(val przyjeto: Int = 0)
+
+/* ── Kosze zwrotowe (Etap 3 zwrotów Allegro) — lustro routes/kosze.ts ─────── */
+
+@Serializable
+data class KoszRow(
+    val id: Long,
+    val kod: String,
+    val status: String = "",
+    val zwrotow: Int = 0,
+    val pozycji: Int = 0,
+    val odlozonych: Int = 0,
+)
+
+@Serializable
+data class KoszeResponse(val kosze: List<KoszRow> = emptyList())
+
+@Serializable
+data class KoszPozycja(
+    val id: Long,
+    val twId: Long,
+    val symbol: String = "",
+    val nazwa: String = "",
+    val ilosc: Double = 0.0,
+    val status: String = "todo",
+    /** Adres ŻYWY z kartoteki (serwer koryguje o kolejkę) — nie snapshot. */
+    val lokOczekiwana: String? = null,
+    val lokFaktyczna: String? = null,
+    val mmStatus: String? = null,
+)
+
+@Serializable
+data class KoszView(
+    val id: Long,
+    val kod: String,
+    val status: String = "",
+    val pozycje: List<KoszPozycja> = emptyList(),
+    val odlozonych: Int = 0,
+)
+
+@Serializable
+data class KoszResponse(val kosz: KoszView)
+
+/** Wynik skanu towaru w koszu: pozycja ALBO uczciwe „nie z tego kosza". */
+@Serializable
+data class KoszSkan(
+    val pozycjaId: Long? = null,
+    val poza: Boolean = false,
+    val symbol: String = "",
+    val nieznany: Boolean = false,
+)
+
+@Serializable
+data class OdlozKoszBody(val lokalizacja: String, val recznie: Boolean = false)
+
+@Serializable
+data class OdlozKoszResponse(val ok: Boolean = true, val mismatch: Boolean = false)

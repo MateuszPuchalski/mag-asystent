@@ -399,4 +399,35 @@ class DtosTest {
         val r = WertisJson.decodeFromString(SetupResponse.serializer(), json)
         assertEquals(true, r.potrzebne)
     }
+
+    @Test fun `KoszView - lustro routes kosze, brak adresu to null a nie awaria`() {
+        val json = """
+            {"kosz":{"id":4,"kod":"KZ-07","status":"zamkniety","odlozonych":1,
+             "zwroty":[{"id":9,"referencja":"ZW-1","waybill":"W1"}],
+             "pozycje":[
+               {"id":11,"zwrotId":9,"twId":900036,"symbol":"TEST","nazwa":"Piła","ilosc":2,
+                "status":"done","lokOczekiwana":"A01-02-03","lokFaktyczna":"A01-02-03",
+                "mmStatus":null,"mmNumer":null},
+               {"id":12,"zwrotId":9,"twId":900037,"symbol":"","nazwa":"Bez adresu","ilosc":1,
+                "status":"todo"}]}}
+        """.trimIndent()
+        val k = WertisJson.decodeFromString<KoszResponse>(json).kosz
+        assertEquals("KZ-07", k.kod)
+        assertEquals(2, k.pozycje.size)
+        assertEquals("A01-02-03", k.pozycje[0].lokFaktyczna)
+        // serwer pomija pola null (`explicitNulls=false` po obu stronach) —
+        // pozycja bez adresu MUSI się zdekodować, bo to codzienny przypadek
+        assertNull(k.pozycje[1].lokOczekiwana)
+        assertEquals("todo", k.pozycje[1].status)
+    }
+
+    @Test fun `KoszSkan - trzy rozlaczne odpowiedzi jednego endpointu`() {
+        val trafiony = WertisJson.decodeFromString<KoszSkan>("""{"pozycjaId":11}""")
+        assertEquals(11L, trafiony.pozycjaId)
+        val obcy = WertisJson.decodeFromString<KoszSkan>("""{"poza":true,"symbol":"OBCY"}""")
+        assertTrue(obcy.poza)
+        assertNull(obcy.pozycjaId)
+        val nieznany = WertisJson.decodeFromString<KoszSkan>("""{"nieznany":true}""")
+        assertTrue(nieznany.nieznany)
+    }
 }

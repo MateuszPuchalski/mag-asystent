@@ -29,6 +29,7 @@ class AppNavState(private val recentStore: RecentStore) {
     val curId: Long? get() = _curId.value
     /** Tryb A: otwarta faktura zakupu (dokument = jednostka pracy). */
     @Volatile var deliveryId: Long? = null; private set
+    @Volatile var koszId: Long? = null; private set
 
     /* locCode jest obserwowalny z DOKŁADNIE tego samego powodu co `curId`
        wyżej — i był to ten sam błąd, tylko nienaprawiony. Skan regału przy
@@ -100,6 +101,17 @@ class AppNavState(private val recentStore: RecentStore) {
     fun openDelivery(id: Long) {
         deliveryId = id
         go(Screen.DELIVERY_LINES)
+    }
+
+    fun openKosz(id: Long) {
+        koszId = id
+        go(Screen.KOSZ_LINES)
+    }
+
+    /** Wyjście z ROZŁOŻONEGO kosza — jak `zakonczonaDostawa`, ten sam powód. */
+    fun zakonczonyKosz() {
+        koszId = null
+        go(Screen.DELIVERY_DOCS)
     }
 
     /**

@@ -622,6 +622,34 @@ Cztery przypadki, w których zamiast przycisku stoi zdanie o przeszkodzie.
 Pozycja bez decyzji. Brak dopasowanego dokumentu. Pozycja pełnowartościowa
 bez rozpoznanej kartoteki. Zwrot bez ani jednej pozycji pełnowartościowej.
 
+### S69b — kosz zwrotowy: od przypięcia po automatyczne cofnięcie bufora
+
+Ciąg dalszy S69a. Po zleceniu dokumentów karta zwrotu pokazuje sekcję
+KOSZ ZWROTOWY. Wpisz kod (np. `KZ-01`) i kliknij PRZYPNIJ — kosz powstaje
+przy pierwszym użyciu kodu. Karta KOSZE ZWROTOWE pokazuje go jako otwarty.
+
+Przycisk ZAMKNIJ — NA HALĘ działa dopiero, gdy dokumenty weszły do
+Subiekta. Zadanie korekty w błędzie blokuje zamknięcie z czytelnym zdaniem.
+
+Na kolektorze zamknięty kosz stoi nad listą faktur na zakładce DOSTAWY.
+Wejście otwiera listę pozycji w kolejności alejkowej. Skan towaru wskazuje
+pozycję, skan regału ją odkłada. Towar spoza kosza dostaje odmowę.
+
+Po ostatniej pozycji zostaje przycisk ZAKOŃCZ — COFNIJ BUFOR. Kolejka
+dostaje MM ze zwrotów na magazyn główny, po jednym na pozycję. Nikt przy
+komputerze niczego nie wystawia. Kod kosza wraca do obiegu.
+
+### S69c — reklamacje wg terminu i raport procesu
+
+Pozycja z decyzją „reklamacja" trafia na kartę REKLAMACJE. Lista sortuje
+się po dniach do terminu ustawowego (14 dni od zgłoszenia w Allegro),
+a wiersze po terminie są czerwone. UZNANA / ODRZUCONA pyta o notatkę
+i zdejmuje wiersz z listy. Rozpatrzenie jest jednorazowe.
+
+Karta RAPORT PROCESU ZWROTÓW pokazuje kafle: stany zwrotów, dokumenty
+w kolejce i w błędzie, kosze, reklamacje po terminie oraz medianę czasu
+od skanu do rozliczenia.
+
 ### S70 — dostawca z logo i dostawca bez logo
 
 `FALON-TECH` ma wgrane logo, `STIHL Polska` nie ma. Oba dokumenty stoją na tej

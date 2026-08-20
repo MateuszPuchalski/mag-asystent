@@ -165,6 +165,13 @@ function migrate(database: DatabaseSync) {
   addColumn("zwrot", "korekta_queue_id", "INTEGER");
   addColumn("sfera_queue", "wynik_json", "TEXT");
   addColumn("sgt_sprzedaz", "mag_id", "INTEGER");
+  /* Etap 3 zwrotów (0.59.0): kosze i ścieżka reklamacyjna. Nowe tabele idą
+     z CREATE TABLE IF NOT EXISTS; tu tylko kolumny w tabelach zastanych. */
+  addColumn("zwrot", "kosz_id", "INTEGER");
+  addColumn("zwrot_pozycja", "rekl_wynik", "TEXT");
+  addColumn("zwrot_pozycja", "rekl_at", "TEXT");
+  addColumn("zwrot_pozycja", "rekl_przez", "TEXT");
+  addColumn("zwrot_pozycja", "rekl_notatka", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);

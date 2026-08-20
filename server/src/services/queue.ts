@@ -67,7 +67,7 @@ export interface AudytLokalizacji {
    */
   locsPrzed: string;
   /** Z którego ekranu wyszła zmiana. Pierwsze pytanie przy analizie. */
-  zrodlo: "karta" | "dostawa" | "przesuniecie";
+  zrodlo: "karta" | "dostawa" | "przesuniecie" | "kosz";
   /** Intencja człowieka — tylko z karty towaru (`add` | `replace` | `remove`). */
   akcja?: string;
   /** Kod, który człowiek podał — tylko z karty towaru. */

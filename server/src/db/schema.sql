@@ -535,6 +535,11 @@ CREATE TABLE IF NOT EXISTS zwrot (
   -- Kopiowanie ich tutaj dałoby drugą prawdę, która rozjeżdża się przy każdym
   -- ponowieniu — a kolejka i tak jest miejscem, w którym biuro klika PONÓW.
   korekta_queue_id  INTEGER REFERENCES sfera_queue(id),
+  -- Kosz zwrotowy, w którym fizycznie leży towar tego zwrotu (Etap 3).
+  -- Wiązanie per ZWROT, nie per pozycja: do kosza idą pozycje pełnowartościowe
+  -- razem z korektą, a rozdzielanie jednego zwrotu na kilka koszy mnożyłoby
+  -- pytanie „gdzie to leży" bez żadnej korzyści.
+  kosz_id           INTEGER REFERENCES kosz(id),
   -- Zwrot środków jest PÓŁAUTOMATYCZNY: link do panelu Allegro + stempel ręką.
   -- Wywołań payments API nie ma — pieniądze rusza człowiek.
   zwrot_srodkow_at  TEXT,
@@ -567,9 +572,64 @@ CREATE TABLE IF NOT EXISTS zwrot_pozycja (
   decyzja       TEXT,
   decyzja_at    TEXT,
   decyzja_przez TEXT,
-  notatka       TEXT                 -- swobodna notatka do decyzji (opcjonalna)
+  notatka       TEXT,                -- swobodna notatka do decyzji (opcjonalna)
+  -- Rozpatrzenie reklamacji (Etap 3). Puste = reklamacja OTWARTA — to na
+  -- pustych liczy się priorytet wg dni do terminu ustawowego. Wynik jest
+  -- otwartym tekstem (uznana | odrzucona), z tego samego powodu co statusy.
+  rekl_wynik    TEXT,
+  rekl_at       TEXT,
+  rekl_przez    TEXT,
+  rekl_notatka  TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_poz ON zwrot_pozycja(zwrot_id);
+
+-- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
+-- Kosz zastępuje papierową kartkę wożoną z towarem: biuro przypina zwroty do
+-- kosza skanem jego kodu, zamyka go, a magazynier na kolektorze rozkłada
+-- zawartość i tym samym zwalnia bufor (MM ZWROTY→MAG idzie samo).
+--
+-- Kod kosza WRACA DO OBIEGU: etykieta na fizycznym koszu jest wielorazowa,
+-- więc unikalność obowiązuje tylko wśród koszy nierozłożonych — stąd indeks
+-- częściowy zamiast UNIQUE na kolumnie.
+CREATE TABLE IF NOT EXISTS kosz (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  kod           TEXT NOT NULL,
+  -- otwarty   = biuro dokłada zwroty
+  -- zamkniety = gotowy do rozłożenia, widoczny na kolektorze
+  -- rozlozony = rozłożony, bufor cofnięty; kod wolny do ponownego użycia
+  status        TEXT NOT NULL DEFAULT 'otwarty',
+  utworzono_at  TEXT NOT NULL,
+  utworzono_przez TEXT NOT NULL,
+  zamknieto_at  TEXT,
+  zamknieto_przez TEXT,
+  rozlozono_at  TEXT,
+  rozlozono_przez TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod) WHERE status <> 'rozlozony';
+
+-- Pozycje kosza — SNAPSHOT z chwili zamknięcia: to, co fizycznie leży w koszu
+-- (pozycje pełnowartościowe zwrotów kosza, te same, które poszły na korektę).
+-- Snapshot danych DOKUMENTU chroni pracę magazyniera przed późniejszą zmianą;
+-- ADRES snapshotem nie jest — liczy się żywy, jak przy dostawach (lekcja
+-- z `adresyOczekiwane` w services/delivery.ts).
+CREATE TABLE IF NOT EXISTS kosz_pozycja (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
+  zwrot_id      INTEGER NOT NULL REFERENCES zwrot(id),
+  tw_id         INTEGER NOT NULL,
+  symbol        TEXT NOT NULL,
+  nazwa         TEXT NOT NULL,
+  ilosc         REAL NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'todo',  -- todo | done
+  lok_faktyczna TEXT,                          -- zeskanowana przy odkładaniu (fakt)
+  odlozono_at   TEXT,
+  odlozono_przez TEXT,
+  -- Zadanie MM ZWROTY→MAG cofające bufor dla TEJ pozycji. Jednopozycyjne MM
+  -- świadomie: guard „adres przed sprzedawalnością" w obu workerach porządkuje
+  -- zadania po tw_id, a MM wielopozycyjne wypadałoby spod niego.
+  mm_queue_id   INTEGER REFERENCES sfera_queue(id)
+);
+CREATE INDEX IF NOT EXISTS ix_kosz_poz ON kosz_pozycja(kosz_id);
 
 -- ── Read-model sprzedaży (FS/PA) do dopasowywania zwrotów ───────────────────
 -- OSOBNE tabele, nie kolejne typy w sgt_dokument — ten sam argument co przy

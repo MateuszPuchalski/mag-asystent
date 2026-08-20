@@ -36,6 +36,7 @@ import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryLinesScreen
+import pl.wertis.kolektor.ui.kosze.KoszScreen
 import pl.wertis.kolektor.ui.problems.ProblemsBanner
 import pl.wertis.kolektor.ui.problems.ProblemsScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
@@ -157,6 +158,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.QUEUE -> QueueScreen(graph)
                 Screen.DELIVERY_DOCS -> DeliveryDocumentsScreen(graph)
                 Screen.DELIVERY_LINES -> DeliveryLinesScreen(graph)
+                Screen.KOSZ_LINES -> KoszScreen(graph)
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)

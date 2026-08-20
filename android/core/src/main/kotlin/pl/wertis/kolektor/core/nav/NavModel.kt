@@ -9,6 +9,8 @@ enum class Screen {
     // rozkładanie: dokument jest jednostką pracy — także dla kontenerów z MGP,
     // po których zostaje jeszcze przesunięcie stanu (arkusz, nie ekran)
     DELIVERY_DOCS, DELIVERY_LINES,
+    // rozkładanie ZWROTÓW z kosza — lista koszy mieszka na DELIVERY_DOCS
+    KOSZ_LINES,
     LOCATION, SETTINGS,
     // wyjątki: nierozwiązane zgłoszenia + kolizje EAN do naprawy w kartotece
     PROBLEMS,
@@ -20,6 +22,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.PRODUCT to Screen.HOME,
     Screen.SCAN_LOC to Screen.PRODUCT,
     Screen.DELIVERY_LINES to Screen.DELIVERY_DOCS,
+    Screen.KOSZ_LINES to Screen.DELIVERY_DOCS,
     Screen.LOCATION to Screen.HOME,
     Screen.SETTINGS to Screen.HOME,
     Screen.PROBLEMS to Screen.HOME,
@@ -40,6 +43,7 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.QUEUE to "KOLEJKA SFERY",
     Screen.DELIVERY_DOCS to "DOSTAWY",
     Screen.DELIVERY_LINES to "DOSTAWA",
+    Screen.KOSZ_LINES to "KOSZ ZWROTÓW",
     Screen.LOCATION to "LOKALIZACJA",
     Screen.SETTINGS to "USTAWIENIA",
     Screen.PROBLEMS to "WYJĄTKI",
