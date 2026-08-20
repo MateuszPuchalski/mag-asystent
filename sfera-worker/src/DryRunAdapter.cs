@@ -24,7 +24,10 @@ public sealed class DryRunAdapter : ISferaAdapter
         _licznik++;
         Console.WriteLine(
             $"[sfera] DRY-RUN: korekta {z.Typ} do dok. {z.DokId} + MM {z.MagZrodlowy}->{z.MagZwrotow}, " +
-            $"pozycji {z.Pozycje.Count} — dokumenty NIE powstają");
-        return new WynikKorekty($"K{z.Typ} DRY-RUN/{_licznik}", $"MM DRY-RUN/{_licznik}");
+            $"pozycji {z.Pozycje.Count}, zniszczonych {z.PozycjeZniszczone.Count} — dokumenty NIE powstają");
+        return new WynikKorekty(
+            $"K{z.Typ} DRY-RUN/{_licznik}",
+            z.Pozycje.Count > 0 ? $"MM DRY-RUN/{_licznik}" : "",
+            z.PozycjeZniszczone.Count > 0 ? $"RW DRY-RUN/{_licznik}" : "");
     }
 }

@@ -15,10 +15,12 @@ import { odhaczZapowiedz, zapowiedzDlaWaybilla } from "./zapowiedzi.js";
    Zwrot środków jest półautomatyczny: link do panelu + stempel ręką.
 
    Etap 2 dokłada JEDEN przycisk: korekta sprzedaży plus MM na bufor zwrotowy,
-   jednym zadaniem kolejki (`korekta_zwrot`). Na oba dokumenty idą WYŁĄCZNIE
-   pozycje z decyzją `pelnowartosciowy` — czyli towar, który wraca do sprzedaży.
-   Reklamacja i zniszczenie dostaną własną ścieżkę: korekta na towar, którego
-   nikt jeszcze nie rozpatrzył, zostawiałaby w magazynie stan nie do sprzedania.
+   jednym zadaniem kolejki (`korekta_zwrot`). Etap 5 (0.66.0) dołącza do tego
+   zadania pozycje `do_zniszczenia`: wchodzą na korektę (klient oddał towar,
+   sprzedaż koryguje się w całości) i od razu schodzą dokumentem RW — na bufor
+   jadą dalej wyłącznie pozycje `pelnowartosciowy`. Reklamacja i do_wyjasnienia
+   zostają poza dokumentami: korekta na towar, którego nikt nie rozpatrzył,
+   zostawiałaby w magazynie stan nie do sprzedania.
 
    DECYZJA JEST PER POZYCJA, nie per zwrot: jedna paczka miewa artykuł
    pełnowartościowy i uszkodzony naraz, a decyzja per paczka wymuszałaby
@@ -612,8 +614,10 @@ export function oznaczZwrotSrodkow(zwrotId: number, autor: string): SzczegolZwro
 
 // ── Etap 2: korekta sprzedaży + MM na bufor zwrotowy ────────────────────────
 
-/** Decyzja, przy której towar wraca do sprzedaży — jedyna objęta korektą. */
+/** Decyzja, przy której towar wraca do sprzedaży — na korektę ORAZ MM na bufor. */
 const DECYZJA_NA_KOREKTE: Decyzja = "pelnowartosciowy";
+/** Decyzja, przy której towar schodzi RW — na korektę, ale NIE na bufor (Etap 5). */
+const DECYZJA_NA_RW: Decyzja = "do_zniszczenia";
 
 export interface PozycjaDoKorekty {
   pozycjaId: number;
@@ -628,9 +632,13 @@ export interface StanDokumentow {
   queueId: number | null;
   korektaNumer: string | null;
   mmNumer: string | null;
+  /** Numer RW dla pozycji zniszczonych; null = zwrot ich nie miał (Etap 5). */
+  rwNumer: string | null;
   blad: string | null;
-  /** Co pojedzie (albo pojechało) na oba dokumenty. */
+  /** Pozycje pełnowartościowe — korekta + MM na bufor. */
   pozycje: PozycjaDoKorekty[];
+  /** Pozycje do zniszczenia — korekta + RW, na bufor nie jadą. */
+  pozycjeZniszczone: PozycjaDoKorekty[];
   /**
    * Dlaczego przycisku NIE można kliknąć; `null` = można.
    *
@@ -640,9 +648,7 @@ export interface StanDokumentow {
   przeszkoda: string | null;
 }
 
-/** Pozycje pełnowartościowe z rozpoznaną kartoteką — treść obu dokumentów.
-    Eksport dla koszy: do kosza idzie fizycznie DOKŁADNIE ten sam zestaw. */
-export function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
+function pozycjeZDecyzja(zwrotId: number, decyzja: Decyzja): PozycjaDoKorekty[] {
   return db()
     .prepare(
       `SELECT id AS pozycjaId, nazwa, tw_id AS twId, ilosc
@@ -650,7 +656,18 @@ export function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
         WHERE zwrot_id = ? AND decyzja = ? AND tw_id IS NOT NULL
         ORDER BY id`
     )
-    .all(zwrotId, DECYZJA_NA_KOREKTE) as unknown as PozycjaDoKorekty[];
+    .all(zwrotId, decyzja) as unknown as PozycjaDoKorekty[];
+}
+
+/** Pozycje pełnowartościowe z rozpoznaną kartoteką — korekta + MM na bufor.
+    Eksport dla koszy: do kosza idzie fizycznie DOKŁADNIE ten sam zestaw. */
+export function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
+  return pozycjeZDecyzja(zwrotId, DECYZJA_NA_KOREKTE);
+}
+
+/** Pozycje do zniszczenia z kartoteką — wchodzą na korektę i od razu schodzą RW. */
+export function pozycjeDoZniszczenia(zwrotId: number): PozycjaDoKorekty[] {
+  return pozycjeZDecyzja(zwrotId, DECYZJA_NA_RW);
 }
 
 /**
@@ -662,6 +679,7 @@ export function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
  */
 export function stanDokumentow(z: WierszZwrotu): StanDokumentow {
   const pozycje = pozycjeDoKorekty(z.id);
+  const pozycjeZniszczone = pozycjeDoZniszczenia(z.id);
   const q = z.korekta_queue_id
     ? (db()
         .prepare("SELECT id, status, sgt_doc_number, wynik_json, error_msg FROM sfera_queue WHERE id = ?")
@@ -677,9 +695,11 @@ export function stanDokumentow(z: WierszZwrotu): StanDokumentow {
       stan,
       queueId: q.id,
       korektaNumer: wynik?.korektaNumer ?? q.sgt_doc_number,
-      mmNumer: wynik?.mmNumer ?? null,
+      mmNumer: wynik?.mmNumer || null,
+      rwNumer: wynik?.rwNumer || null,
       blad: q.status === "error" ? q.error_msg : null,
       pozycje,
+      pozycjeZniszczone,
       przeszkoda: "Dokumenty już zlecone — stan i ponowienie są w kolejce zapisów",
     };
   }
@@ -689,14 +709,16 @@ export function stanDokumentow(z: WierszZwrotu): StanDokumentow {
     queueId: null,
     korektaNumer: null,
     mmNumer: null,
+    rwNumer: null,
     blad: null,
     pozycje,
-    przeszkoda: przeszkodaWystawienia(z, pozycje),
+    pozycjeZniszczone,
+    przeszkoda: przeszkodaWystawienia(z, pozycje, pozycjeZniszczone),
   };
 }
 
 /** `wynik_json` bywa pusty (zadanie sprzed 0.58.0) i uszkodzony (ręczna edycja). */
-function odczytajWynik(json: string | null): { korektaNumer?: string; mmNumer?: string } | null {
+function odczytajWynik(json: string | null): { korektaNumer?: string; mmNumer?: string; rwNumer?: string } | null {
   if (!json) return null;
   try {
     const w = JSON.parse(json);
@@ -706,22 +728,26 @@ function odczytajWynik(json: string | null): { korektaNumer?: string; mmNumer?: 
   }
 }
 
-function przeszkodaWystawienia(z: WierszZwrotu, pozycje: PozycjaDoKorekty[]): string | null {
+function przeszkodaWystawienia(
+  z: WierszZwrotu,
+  pozycje: PozycjaDoKorekty[],
+  pozycjeZniszczone: PozycjaDoKorekty[]
+): string | null {
   if (z.status === "nowy") return "Najpierw decyzja przy każdej pozycji";
   if (!z.sgt_dok_id) return "Najpierw dopasuj dokument sprzedaży (FS/PA)";
-  /* Pozycja pełnowartościowa BEZ kartoteki zatrzymuje całość, a nie wypada po
-     cichu: korekta na część zwrotu i pieniądze za całość to najgorszy możliwy
-     wynik, bo nikt tego później nie zauważy. */
+  /* Pozycja idąca na dokumenty BEZ kartoteki zatrzymuje całość, a nie wypada
+     po cichu: korekta na część zwrotu i pieniądze za całość to najgorszy
+     możliwy wynik, bo nikt tego później nie zauważy. */
   const bezKartoteki = db()
     .prepare(
-      "SELECT nazwa FROM zwrot_pozycja WHERE zwrot_id = ? AND decyzja = ? AND tw_id IS NULL"
+      "SELECT nazwa FROM zwrot_pozycja WHERE zwrot_id = ? AND decyzja IN (?, ?) AND tw_id IS NULL"
     )
-    .all(z.id, DECYZJA_NA_KOREKTE) as Array<{ nazwa: string }>;
+    .all(z.id, DECYZJA_NA_KOREKTE, DECYZJA_NA_RW) as Array<{ nazwa: string }>;
   if (bezKartoteki.length > 0) {
     return `Pozycja bez rozpoznanej kartoteki: ${bezKartoteki.map((p) => p.nazwa).join(", ")}`;
   }
-  if (pozycje.length === 0) {
-    return "Żadna pozycja nie jest pełnowartościowa — korekta obejmuje tylko towar wracający do sprzedaży";
+  if (pozycje.length === 0 && pozycjeZniszczone.length === 0) {
+    return "Żadna pozycja nie idzie na dokumenty — korekta obejmuje towar pełnowartościowy i zniszczony";
   }
   return null;
 }
@@ -739,7 +765,8 @@ export function wystawDokumenty(zwrotId: number, autor: string): SzczegolZwrotu 
   if (z.korekta_queue_id) return szczegolZwrotu(zwrotId);
 
   const pozycje = pozycjeDoKorekty(zwrotId);
-  const przeszkoda = przeszkodaWystawienia(z, pozycje);
+  const pozycjeZniszczone = pozycjeDoZniszczenia(zwrotId);
+  const przeszkoda = przeszkodaWystawienia(z, pozycje, pozycjeZniszczone);
   if (przeszkoda) throw new BladZwrotu(400, przeszkoda);
 
   const d = db();
@@ -761,12 +788,17 @@ export function wystawDokumenty(zwrotId: number, autor: string): SzczegolZwrotu 
         magZrodlowy,
         magZwrotow: config.magId.ZWROTY,
         pozycje: pozycje.map((p) => ({ twId: p.twId, qty: p.ilosc })),
+        /* Zniszczone tylko, gdy są — zadanie bez nich wygląda jak przed 0.66.0
+           i starszy worker Sfery wykona je bez zmian. */
+        ...(pozycjeZniszczone.length > 0
+          ? { pozycjeZniszczone: pozycjeZniszczone.map((p) => ({ twId: p.twId, qty: p.ilosc })) }
+          : {}),
       },
       {
         createdBy: autor,
         sourceDocId: z.sgt_dok_id,
-        label: `Korekta ${z.sgt_dok_numer ?? z.sgt_dok_id} + MM na zwroty`,
-        detail: `Zwrot ${z.referencja ?? z.waybill}, pozycji ${pozycje.length}`,
+        label: `Korekta ${z.sgt_dok_numer ?? z.sgt_dok_id}${pozycje.length ? " + MM na zwroty" : ""}${pozycjeZniszczone.length ? " + RW zniszczonych" : ""}`,
+        detail: `Zwrot ${z.referencja ?? z.waybill}, pozycji ${pozycje.length + pozycjeZniszczone.length}`,
       }
     );
     d.prepare("UPDATE zwrot SET korekta_queue_id=? WHERE id=?").run(queueId, zwrotId);
@@ -778,6 +810,7 @@ export function wystawDokumenty(zwrotId: number, autor: string): SzczegolZwrotu 
     dokId: z.sgt_dok_id,
     magZrodlowy,
     pozycji: pozycje.length,
+    zniszczonych: pozycjeZniszczone.length,
   });
   return szczegolZwrotu(zwrotId);
 }

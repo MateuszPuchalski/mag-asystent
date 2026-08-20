@@ -33,6 +33,31 @@ historii nie przepisujemy.
 
 ---
 
+## 0.66.0 — 20 sierpnia 2026
+
+**Zniszczony towar przestaje znikać bez śladu.** Decyzja „do zniszczenia" była
+ślepym zaułkiem: pozycja nie wchodziła na korektę, więc towar nigdy nie wracał
+na stan — a fizycznie lądował w koszu na śmieci bez żadnego dokumentu. Stan
+i papier mówiły co innego.
+
+**Korekta obejmuje teraz pozycje pełnowartościowe I zniszczone.** Klient oddał
+towar, więc sprzedaż koryguje się w całości — to rozszerzenie decyzji z 0.58.0
+(„korekta tylko pełnowartościowe"), świadome: bez wejścia na stan RW nie
+miałoby czego zdjąć. Na bufor zwrotowy dalej jadą wyłącznie pełnowartościowe;
+zniszczone od razu schodzą dokumentem **RW** z magazynu sprzedaży. Netto stan
+bez zmian, ale z dokumentem.
+
+**Wszystko jednym zadaniem kolejki, z wycofaniem łańcuchowym.** Pad RW usuwa
+MM i korektę, pad MM usuwa korektę; gdy wycofanie też padnie, błąd wymienia
+z imienia dokumenty do ręcznego usunięcia. Zadanie bez pozycji zniszczonych
+wygląda identycznie jak przed tą wersją — starszy worker Sfery wykona je bez
+zmian. Zwrot w całości zniszczony też wystawia dokumenty (dotąd: żadnych).
+
+Wywołanie RW przez Sferę (`DodajRW()`) jest szkicem `[WERYFIKUJ]` jak korekta
+i MM — nowa pozycja na checkliście DEPLOY §6a i w README workera. W dev
+RW dostaje atrapę numeru (`RW n/07/2026`), karta zwrotu pokazuje go obok
+korekty i MM, a pozycje w tabeli mówią, dokąd każda pojedzie po korekcie.
+
 ## 0.65.0 — 20 sierpnia 2026
 
 **System wie o zwrocie, zanim paczka dojedzie.** Klient rejestruje zwrot

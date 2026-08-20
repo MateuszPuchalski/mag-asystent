@@ -3,12 +3,19 @@ namespace WertisSferaWorker;
 /// <summary>Pozycja dokumentu MM — lustro MmItem z server/src/adapters/sfera.ts.</summary>
 public sealed record MmItem(int TwId, double Qty);
 
-/// <summary>Zlecenie korekty zwrotu — lustro ZlecenieKorekty z sfera.ts.</summary>
+/// <summary>
+/// Zlecenie korekty zwrotu — lustro ZlecenieKorekty z sfera.ts.
+/// PozycjeZniszczone (0.66.0): wchodzą na korektę razem z Pozycje, ale zamiast
+/// MM na bufor od razu schodzą dokumentem RW z magazynu sprzedaży. Pusta lista
+/// = zadanie sprzed 0.66.0 albo zwrot bez zniszczeń.
+/// </summary>
 public sealed record ZlecenieKorekty(
-    int DokId, string Typ, int MagZrodlowy, int MagZwrotow, IReadOnlyList<MmItem> Pozycje);
+    int DokId, string Typ, int MagZrodlowy, int MagZwrotow,
+    IReadOnlyList<MmItem> Pozycje, IReadOnlyList<MmItem> PozycjeZniszczone);
 
-/// <summary>Numery obu dokumentów — lustro WynikKorekty z sfera.ts.</summary>
-public sealed record WynikKorekty(string KorektaNumer, string MmNumer);
+/// <summary>Numery dokumentów — lustro WynikKorekty z sfera.ts.
+/// MmNumer/RwNumer puste, gdy odpowiedni dokument nie był potrzebny.</summary>
+public sealed record WynikKorekty(string KorektaNumer, string MmNumer, string RwNumer = "");
 
 /* Granica ZAPISU DOKUMENTÓW do Subiekta — odpowiednik SferaAdapter
    z server/src/adapters/sfera.ts, zawężony do operacji tego procesu.

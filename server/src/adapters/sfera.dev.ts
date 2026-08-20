@@ -1,4 +1,4 @@
-import { db, nextKorektaNumber, nextMmNumber, transaction } from "../db/db.js";
+import { db, nextKorektaNumber, nextMmNumber, nextRwNumber, transaction } from "../db/db.js";
 import type { MmItem, SferaAdapter, WynikKorekty, ZlecenieKorekty } from "./sfera.js";
 
 /**
@@ -34,6 +34,7 @@ export class DevSferaAdapter implements SferaAdapter {
   async createKorektaZwrotu(z: ZlecenieKorekty): Promise<WynikKorekty> {
     const d = db();
     let numery: WynikKorekty = { korektaNumer: "", mmNumer: "" };
+    const zniszczone = z.pozycjeZniszczone ?? [];
     const tx = transaction(d, () => {
       const sprzedaz = d
         .prepare("SELECT dok_id FROM sgt_sprzedaz WHERE dok_id = ?")
@@ -47,9 +48,17 @@ export class DevSferaAdapter implements SferaAdapter {
         zdejmijStan(it.twId, z.magZrodlowy, it.qty);
         dopiszStan(it.twId, z.magZwrotow, it.qty);
       }
+      for (const it of zniszczone) {
+        /* Zniszczone: korekta oddaje sztuki, RW od razu je zdejmuje — na
+           bufor nie jadą wcale. Netto zero, ale z dokumentem, dzięki któremu
+           stan i papier mówią to samo. */
+        dopiszStan(it.twId, z.magZrodlowy, it.qty);
+        zdejmijStan(it.twId, z.magZrodlowy, it.qty);
+      }
       numery = {
         korektaNumer: nextKorektaNumber(z.typ),
-        mmNumer: nextMmNumber(),
+        mmNumer: z.pozycje.length > 0 ? nextMmNumber() : "",
+        ...(zniszczone.length > 0 ? { rwNumer: nextRwNumber() } : {}),
       };
     });
     tx();

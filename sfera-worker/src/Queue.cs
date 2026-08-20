@@ -124,13 +124,21 @@ public static class Queue
        karta zwrotu czyta ten sam obiekt bez względu na to, który worker pisał. */
     private static (string, string?) RobKorekte(JsonElement payload, ISferaAdapter sfera)
     {
+        /* `pozycjeZniszczone` jest opcjonalne — zadanie sprzed 0.66.0 go nie ma
+           i MUSI się wykonać identycznie jak wtedy. */
+        var zniszczone = payload.TryGetProperty("pozycjeZniszczone", out var pz)
+            ? Pozycje(pz) : new List<MmItem>();
         var w = sfera.CreateKorektaZwrotu(new ZlecenieKorekty(
             payload.GetProperty("dokId").GetInt32(),
             payload.GetProperty("typ").GetString() ?? "FS",
             payload.GetProperty("magZrodlowy").GetInt32(),
             payload.GetProperty("magZwrotow").GetInt32(),
-            Pozycje(payload.GetProperty("pozycje"))));
-        var json = $"{{\"korektaNumer\":{Json(w.KorektaNumer)},\"mmNumer\":{Json(w.MmNumer)}}}";
+            Pozycje(payload.GetProperty("pozycje")),
+            zniszczone));
+        /* rwNumer tylko, gdy RW powstało — kształt lustrzany do WynikKorekty
+           w sfera.ts, żeby karta zwrotu czytała jeden obiekt od obu workerów. */
+        var rw = w.RwNumer.Length > 0 ? $",\"rwNumer\":{Json(w.RwNumer)}" : "";
+        var json = $"{{\"korektaNumer\":{Json(w.KorektaNumer)},\"mmNumer\":{Json(w.MmNumer)}{rw}}}";
         return (w.KorektaNumer, json);
     }
 

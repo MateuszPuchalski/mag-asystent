@@ -190,6 +190,8 @@ CREATE TABLE IF NOT EXISTS counters (
 INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
 -- licznik korekt sprzedaży (dev — w prod numeruje Subiekt)
 INSERT OR IGNORE INTO counters(name, value) VALUES ('korekta', 12);
+-- licznik RW zniszczonych zwrotów (dev — w prod numeruje Subiekt)
+INSERT OR IGNORE INTO counters(name, value) VALUES ('rw', 3);
 
 -- ── Rozkładanie dostaw (redesign v2.0) ─────────────────────────────────────
 -- Jednostką pracy jest DOKUMENT, nie sesja (D2). Rozkładanie zapisuje WYŁĄCZNIE

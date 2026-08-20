@@ -328,6 +328,9 @@ test("korekta idzie na dokument sprzedaży, MM z magazynu sprzedaży na bufor", 
   assert.equal(p.magZrodlowy, 7);
   assert.equal(p.magZwrotow, 3);
   assert.deepEqual(p.pozycje, [{ twId: 900_036, qty: 1 }, { twId: 900_037, qty: 2 }]);
+  /* Bez pozycji zniszczonych klucza w payloadzie NIE MA — zadanie wygląda
+     jak sprzed 0.66.0 i starszy worker Sfery wykona je bez zmian. */
+  assert.ok(!("pozycjeZniszczone" in p));
 });
 
 test("drugie kliknięcie NIE zleca drugiej korekty", async () => {
@@ -343,7 +346,10 @@ test("drugie kliknięcie NIE zleca drugiej korekty", async () => {
   assert.equal(ile.n, 1);
 });
 
-test("na korektę idą TYLKO pozycje pełnowartościowe", async () => {
+test("zniszczone jadą OSOBNĄ sekcją payloadu: korekta + RW, bez MM na bufor", async () => {
+  /* Do 0.66.0 zniszczenie wypadało z dokumentów w ogóle — towar znikał bez
+     śladu magazynowego. Teraz wchodzi na korektę (klient oddał towar) i od
+     razu schodzi RW; na bufor zwrotowy dalej NIE jedzie. */
   kartotekiDev();
   dokument(101, "FS", 5, { nrOryg: "dev-ord-1", pozycje: [[900_036, 1], [900_037, 2]] });
   const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
@@ -356,7 +362,28 @@ test("na korektę idą TYLKO pozycje pełnowartościowe", async () => {
     (db().prepare("SELECT payload FROM sfera_queue WHERE id = ?").get(z.dokumenty.queueId) as
       { payload: string }).payload
   );
-  assert.deepEqual(p.pozycje, [{ twId: 900_036, qty: 1 }], "zniszczenie nie wraca na stan");
+  assert.deepEqual(p.pozycje, [{ twId: 900_036, qty: 1 }], "na bufor tylko pełnowartościowe");
+  assert.deepEqual(p.pozycjeZniszczone, [{ twId: 900_037, qty: 2 }], "zniszczone na korektę i RW");
+  assert.equal(z.dokumenty.pozycjeZniszczone.length, 1, "karta widzi, co pójdzie na RW");
+});
+
+test("zwrot w całości zniszczony też wystawia dokumenty", async () => {
+  /* Przed 0.66.0 taki zwrot był ślepym zaułkiem: przycisk mówił „żadna
+     pozycja nie jest pełnowartościowa" i korekta nie powstawała wcale. */
+  kartotekiDev();
+  dokument(101, "FS", 5, { nrOryg: "dev-ord-1", pozycje: [[900_036, 1], [900_037, 2]] });
+  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
+  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
+  for (const poz of w.zwrot.pozycje) Z.zapiszDecyzje(w.zwrot.id, poz.id, "do_zniszczenia", null, "Test");
+
+  const z = Z.wystawDokumenty(w.zwrot.id, "Test");
+  assert.equal(z.dokumenty.stan, "w_kolejce");
+  const p = JSON.parse(
+    (db().prepare("SELECT payload FROM sfera_queue WHERE id = ?").get(z.dokumenty.queueId) as
+      { payload: string }).payload
+  );
+  assert.deepEqual(p.pozycje, []);
+  assert.equal(p.pozycjeZniszczone.length, 2);
 });
 
 test("bez dokumentu, bez decyzji i bez kartoteki — przycisk mówi CZEGO brakuje", async () => {
@@ -399,12 +426,17 @@ test("numery obu dokumentów wracają na kartę z wiersza kolejki", async () => 
   const queueId = Z.wystawDokumenty(id, "Test").dokumenty.queueId;
   db()
     .prepare("UPDATE sfera_queue SET status='done', sgt_doc_number=?, wynik_json=? WHERE id=?")
-    .run("KFS 9/08/2026", JSON.stringify({ korektaNumer: "KFS 9/08/2026", mmNumer: "MM 77/08/2026" }), queueId);
+    .run(
+      "KFS 9/08/2026",
+      JSON.stringify({ korektaNumer: "KFS 9/08/2026", mmNumer: "MM 77/08/2026", rwNumer: "RW 4/08/2026" }),
+      queueId
+    );
 
   const d = Z.szczegolZwrotu(id).dokumenty;
   assert.equal(d.stan, "wystawione");
   assert.equal(d.korektaNumer, "KFS 9/08/2026");
   assert.equal(d.mmNumer, "MM 77/08/2026");
+  assert.equal(d.rwNumer, "RW 4/08/2026");
 
   db().prepare("UPDATE sfera_queue SET status='error', error_msg=? WHERE id=?").run("Kartoteka w edycji", queueId);
   const bledny = Z.szczegolZwrotu(id).dokumenty;
