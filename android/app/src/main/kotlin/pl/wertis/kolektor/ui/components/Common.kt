@@ -102,6 +102,8 @@ fun WertisTextField(
     /** Maskowanie treści — hasło wpisuje się na hali, przy ludziach. */
     visualTransformation: VisualTransformation = VisualTransformation.None,
     onDone: () -> Unit = {},
+    /** Zmiana fokusu — ekran bywa musi wiedzieć, że skaner właśnie milczy. */
+    onFokus: (Boolean) -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     OutlinedTextField(
@@ -110,7 +112,10 @@ fun WertisTextField(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = MinTap)
-            .onFocusChanged { WedgeKeySource.ustawFokus(it.isFocused) },
+            .onFocusChanged {
+                WedgeKeySource.ustawFokus(it.isFocused)
+                onFokus(it.isFocused)
+            },
         placeholder = { Text(placeholder, color = InkMute) },
         leadingIcon = leadingIcon?.let { { Icon(it, null, tint = InkMute, modifier = Modifier.size(18.dp)) } },
         singleLine = true,
@@ -119,9 +124,16 @@ fun WertisTextField(
         visualTransformation = visualTransformation,
         /* Next przechodzi do pola niżej — formularz kilkupolowy bez zamykania
            i ponownego celowania w klawiaturę przy każdym polu. */
+        /* „Gotowe" ODDAJE FOKUS, nie tylko chowa klawiaturę (0.66.0).
+           W tej aplikacji pole z fokusem UCISZA SKANER — `WedgeKeySource`
+           zbiera znaki tylko wtedy, gdy nie ma ich gdzie wpisać. Pole, które
+           po „gotowe" trzyma fokus dalej, zostawia więc kolektor bez skanera,
+           przy schowanej klawiaturze i bez śladu, dlaczego nic nie działa.
+           Zgłoszenie z hali brzmiało dokładnie tak: „wyszukałem produkt i nie
+           mogę nadać lokalizacji ani zatwierdzić skanem". */
         keyboardActions = KeyboardActions(
-            onDone = { onDone() },
-            onSearch = { onDone() },
+            onDone = { onDone(); focusManager.clearFocus() },
+            onSearch = { onDone(); focusManager.clearFocus() },
             onNext = { focusManager.moveFocus(FocusDirection.Down) },
         ),
         colors = OutlinedTextFieldDefaults.colors(

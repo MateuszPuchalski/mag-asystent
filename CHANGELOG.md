@@ -33,6 +33,29 @@ historii nie przepisujemy.
 
 ---
 
+## 0.66.0 — 20 sierpnia 2026
+
+**Wyszukiwarka w dostawie uciszała skaner.** Ze zgłoszenia: „wyszukałem produkt
+i nie mogę nadać lokalizacji ani zatwierdzić skanem, bo tekst input jest
+aktywny".
+
+Tak działa `WedgeKeySource`: skaner kolektora jest klawiaturą, więc zbiera
+znaki wyłącznie wtedy, gdy nie ma ich gdzie wpisać. Pole tekstowe z fokusem
+przejmuje znaki i skan trafia do pola zamiast na regał. Reguła jest słuszna —
+bez niej hasło z klawiatury sprzętowej poleciałoby do wyszukiwarki towarów —
+ale pole filtra nie oddawało fokusu nawet po schowaniu klawiatury. Kolektor
+wyglądał więc na zepsuty: klawiatury nie widać, a skan nie robi nic.
+
+Trzy poprawki, każda na inną drogę wyjścia:
+
+- **„Gotowe" oddaje fokus**, nie tylko chowa klawiaturę. Dotyczy WSZYSTKICH
+  pól w aplikacji, bo pułapka była wspólna.
+- **Wybranie pozycji oddaje fokus.** Filtr jest drogą do pozycji, a nie trybem
+  pracy: po jej wskazaniu idzie się do regału.
+- **Pasek „Skaner milczy, dopóki piszesz" z przyciskiem GOTOWE.** Sama
+  podpowiedź nie wystarcza — „gotowe" na klawiaturze ekranowej trzeba
+  najpierw znaleźć, a robi się to w rękawicy.
+
 ## 0.65.0 — 20 sierpnia 2026
 
 **System wie o zwrocie, zanim paczka dojedzie.** Klient rejestruje zwrot
