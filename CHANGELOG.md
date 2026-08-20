@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.64.0 — 20 sierpnia 2026
+
+**Można odłożyć więcej, niż jest na fakturze.** Ze zgłoszenia: „dodaj
+możliwość zatwierdzenia większej ilości niż jest na fakturze, idzie to do biura
+jako problem po zakończeniu dostawy".
+
+Do tej wersji `+` zatrzymywał się na liczbie z dokumentu. Magazynier z nadmiarem
+na palecie miał do wyboru zgłoszenie wyjątku albo odłożenie części towaru poza
+systemem. Teraz licznik idzie dalej, po jednym potwierdzeniu.
+
+**Pytanie pada raz na pozycję.** Przy każdym kroku byłoby karą za liczenie
+sztuk; bez żadnego pytania przypadkowe dotknięcie `+` wysyłałoby dostawcy
+reklamację. Pasek mówi wprost, co się stanie po zamknięciu dostawy — zgoda na
+skutek, którego nie widać, nie jest zgodą.
+
+**Zgłoszenie powstaje przy domknięciu, nie przy odłożeniu.** Magazynier dokłada
+sztuki w dwóch podejściach albo poprawia się korektą, więc reklamacja wysłana
+przy pierwszym przekroczeniu opierałaby się na liczbie, która jeszcze się
+zmieniała. Obie drogi domknięcia prowadzą przez ten sam lej, więc dostawa
+zamknięta sama po ostatniej pozycji zgłasza nadmiar tak samo jak zamknięta
+przyciskiem.
+
+**Pozycja zostaje odłożona.** Status wyjątku odesłałby magazyniera do roboty,
+której nie ma: towar leży na półce. Nadmiar jest sprawą biura wobec dostawcy —
+ta sama reguła co D8, czytana z drugiej strony.
+
+Zniknęła też odmowa „więcej nie da się odłożyć" przy korekcie ilości. Skoro `+`
+wolno przekroczyć fakturę, korekta musi umieć to samo; inaczej jedyną drogą
+wyjścia z omyłkowego nadmiaru byłaby reklamacja wystawiona za własną pomyłkę
+w liczeniu.
+
 ## 0.63.0 — 20 sierpnia 2026
 
 **Wskaźnik rozbieżności wraca na linijkę stanu.** Wersja 0.62.0 dokładała

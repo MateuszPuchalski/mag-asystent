@@ -719,10 +719,82 @@ export function closeIfComplete(deliveryId: number, user: string): void {
       .get(deliveryId) as { n: number }
   ).n;
   if (left > 0) return;
-  db()
+  const zamkniete = db()
     .prepare("UPDATE delivery SET status='done', closed_at=? WHERE id=? AND status='open'")
     .run(nowIso(), deliveryId);
+  /* `changes === 0` znaczy „ktoś zamknął ją przed nami" — a ta funkcja bywa
+     wołana kilka razy pod rząd (odłożenie, `raiseProblem`, przycisk). Bez tej
+     bramki nadmiary zgłaszałyby się po kilka razy na tę samą dostawę. */
+  if (zamkniete.changes === 0) return;
+  zglosNadmiary(deliveryId, user);
   logEvent("delivery_done", user, null, { deliveryId });
+}
+
+/** Pozycja, której odłożono WIĘCEJ, niż jest na dokumencie. */
+export interface Nadmiar {
+  lineId: number;
+  sym: string;
+  nazwa: string;
+  qtyDoc: number;
+  qtyDone: number;
+  unit: string;
+}
+
+/**
+ * Pozycje z nadmiarem — CZYTA, niczego nie zapisuje.
+ *
+ * `LEFT JOIN` z tego samego powodu co w `otwarteLinie`: pozycja dostawy
+ * przeżywa zniknięcie kartoteki z read-modelu i nie wolno jej przez to zgubić.
+ */
+export function nadmiary(deliveryId: number): Nadmiar[] {
+  return (
+    db()
+      .prepare(
+        `SELECT l.id, l.tw_symbol, l.tw_nazwa, l.ilosc_dok, l.ilosc_odlozona, t.unit
+           FROM delivery_line l
+           LEFT JOIN sgt_towar t ON t.tw_id = l.tw_id
+          WHERE l.delivery_id = ? AND l.ilosc_odlozona > l.ilosc_dok
+          ORDER BY l.id`
+      )
+      .all(deliveryId) as unknown as WierszDoZamkniecia[]
+  ).map((l) => ({
+    lineId: l.id,
+    sym: l.tw_symbol,
+    nazwa: l.tw_nazwa,
+    qtyDoc: l.ilosc_dok,
+    qtyDone: l.ilosc_odlozona ?? 0,
+    unit: l.unit ?? "",
+  }));
+}
+
+/* -- Nadmiar idzie do biura sam (0.64.0) ------------------------------------
+   Ze zgłoszenia: „dodaj możliwość zatwierdzenia większej ilości niż jest na
+   fakturze, idzie to do biura jako problem po zakończeniu dostawy".
+
+   Zgłoszenie powstaje TUTAJ, przy domknięciu, a nie przy odłożeniu — i to jest
+   różnica praktyczna, nie kosmetyczna. Magazynier potrafi dołożyć sztuki
+   w dwóch podejściach albo poprawić się korektą; zgłoszenie wysłane przy
+   pierwszym przekroczeniu byłoby reklamacją opartą na liczbie, która jeszcze
+   się zmieniała.
+
+   Pozycja ZOSTAJE odłożona (`zachowajStatusLinii`). Towar leży na półce, więc
+   dla hali robota jest skończona; nadmiar jest sprawą biura wobec dostawcy.
+   To ta sama reguła co D8, czytana z drugiej strony.                          */
+function zglosNadmiary(deliveryId: number, user: string): void {
+  for (const n of nadmiary(deliveryId)) {
+    raiseProblem(
+      {
+        deliveryId,
+        lineId: n.lineId,
+        typ: "qty_mismatch",
+        // ilość FAKTYCZNA; `ilosc_dok` dokłada `raiseProblem` ze snapshotu linii
+        qty: n.qtyDone,
+        opis: `Nadmiar w dostawie: odłożono ${n.qtyDone} przy ${n.qtyDoc} z dokumentu`,
+        zachowajStatusLinii: true,
+      },
+      user
+    );
+  }
 }
 
 /* ── „Rozłożone poza WERTIS" ─────────────────────────────────────────────────
@@ -1158,9 +1230,11 @@ export function korygujIlosc(
   if (l.status === "problem") {
     return { error: "Pozycja ma zgłoszony wyjątek — najpierw rozwiąż go w wyjątkach" };
   }
-  if (qty > l.ilosc_dok) {
-    return { error: `Na dokumencie jest ${l.ilosc_dok} — więcej nie da się odłożyć` };
-  }
+  /* Do 0.64.0 stała tu odmowa „więcej nie da się odłożyć". Zniknęła razem
+     z dopuszczeniem nadmiaru przy odkładaniu: skoro `+` wolno przekroczyć
+     fakturę, to korekta MUSI umieć to samo. Inaczej jedyną drogą wyjścia
+     z omyłkowego nadmiaru byłoby zgłoszenie wyjątku, czyli reklamacja
+     wystawiona za własną pomyłkę w liczeniu. */
 
   const przed = l.ilosc_odlozona ?? 0;
   const status = qty >= l.ilosc_dok ? "done" : qty > 0 ? "partial" : "todo";
