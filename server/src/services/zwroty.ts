@@ -107,6 +107,8 @@ export interface SzczegolZwrotu {
   kandydaciDokumentu?: KandydatDokumentu[];
   /** Korekta + MM na bufor: co pojedzie, co już powstało, co blokuje. */
   dokumenty: StanDokumentow;
+  /** Kosz zwrotowy, w którym leży towar; null przed przypięciem (Etap 3). */
+  kosz: { id: number; kod: string; status: string } | null;
 }
 
 export type WynikSkanu =
@@ -137,6 +139,7 @@ interface WierszZwrotu {
   sgt_dok_typ: string | null;
   dopasowanie: string;
   korekta_queue_id: number | null;
+  kosz_id: number | null;
   zwrot_srodkow_at: string | null;
   zwrot_srodkow_przez: string | null;
 }
@@ -618,8 +621,9 @@ export interface StanDokumentow {
   przeszkoda: string | null;
 }
 
-/** Pozycje pełnowartościowe z rozpoznaną kartoteką — treść obu dokumentów. */
-function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
+/** Pozycje pełnowartościowe z rozpoznaną kartoteką — treść obu dokumentów.
+    Eksport dla koszy: do kosza idzie fizycznie DOKŁADNIE ten sam zestaw. */
+export function pozycjeDoKorekty(zwrotId: number): PozycjaDoKorekty[] {
   return db()
     .prepare(
       `SELECT id AS pozycjaId, nazwa, tw_id AS twId, ilosc
@@ -901,6 +905,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
       : null,
     linkPanel: LINK_PANELU_ZWROTOW,
     dokumenty: stanDokumentow(z),
+    kosz: koszZwrotu(z.kosz_id),
     pozycjeZamowienia,
     pozycje: pozycje.map((p) => ({
       id: p.id,
@@ -957,6 +962,16 @@ export class BladZwrotu extends Error {
   ) {
     super(wiadomosc);
   }
+}
+
+/* Zapytanie wprost, nie import z kosze.ts — tamten moduł importuje stąd
+   `pozycjeDoKorekty` i odwrotny import domknąłby cykl. */
+function koszZwrotu(koszId: number | null): { id: number; kod: string; status: string } | null {
+  if (!koszId) return null;
+  const k = db().prepare("SELECT id, kod, status FROM kosz WHERE id = ?").get(koszId) as
+    | { id: number; kod: string; status: string }
+    | undefined;
+  return k ?? null;
 }
 
 function wierszZwrotu(id: number): WierszZwrotu {

@@ -33,6 +33,42 @@ historii nie przepisujemy.
 
 ---
 
+## 0.59.0 — 20 sierpnia 2026
+
+**Zwroty, Etap 3: cyfrowe kosze, rozkładanie na kolektorze i bufor, który
+cofa się sam.** Do tego ścieżka reklamacyjna z priorytetem wg terminu
+ustawowego i raport całego procesu. [wymaga działania] Nowy APK kolektora —
+od 0.52.0 kolektory biorą go z serwera same.
+
+**Koniec papierowej kartki.** Po wystawieniu korekty i MM biuro skanuje
+etykietę kosza na karcie zwrotu — kosz powstaje przy pierwszym użyciu kodu,
+rejestru nie ma. Zamknięcie kosza robi SNAPSHOT zawartości i wysyła go na
+halę. Zamknąć nie da się, dopóki dokumenty nie weszły do Subiekta: kosz
+z zadaniem w błędzie skończyłby się cofnięciem bufora, na którym towaru
+nigdy nie było.
+
+**Rozkładanie na kolektorze** mieszka na zakładce DOSTAWY, nad fakturami —
+bo to też rozkładanie. Gramatyka skanu ta sama, co przy dostawach: towar
+wskazuje pozycję (cudzy dostaje „nie z tego kosza"), regał ją odkłada.
+Lista jest alejkowa, adres oczekiwany ŻYWY — z kartoteki skorygowanej
+o kolejkę, jak przy dostawach, nie z zamrożonego snapshotu.
+
+**Bufor cofa się sam.** Zakończenie rozkładania kolejkuje MM ze zwrotów na
+magazyn główny — po jednym na pozycję, z tw_id, żeby guard „adres przed
+sprzedawalnością" widział każdy towar. Zapis nowego adresu z odkładania
+zawsze staje w kolejce przed MM tego samego towaru. To był krok 9 procesu:
+dotąd ktoś przy komputerze musiał pamiętać o dokumencie cofającym.
+
+**Reklamacje z zegarem.** Pozycje z decyzją „reklamacja" stoją na liście
+sortowanej po dniach do terminu (`REKLAMACJA_DNI`, domyślnie ustawowe 14
+od zgłoszenia w Allegro). Wiersze po terminie są czerwone. Rozpatrzenie
+(uznana/odrzucona, z notatką) jest jednorazowe — klient dostał odpowiedź.
+
+**Raport procesu** zbiera na jednej karcie: stany zwrotów, dokumenty
+w kolejce i w błędzie, kosze, reklamacje po terminie i medianę czasu od
+skanu do rozliczenia. Mediana zamiast średniej — jeden zwrot czekający
+miesiąc na klienta nie zamazuje typowego tempa.
+
 ## 0.58.0 — 19 sierpnia 2026
 
 **Zwroty, Etap 2: korekta sprzedaży i MM na bufor jednym kliknięciem.**

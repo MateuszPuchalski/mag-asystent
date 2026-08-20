@@ -229,6 +229,7 @@
       </div>
       <div id="zwrotDokument" style="margin-top:14px"></div>
       <div id="zwrotDokumenty" style="margin-top:14px"></div>
+      <div id="zwrotKosz" style="margin-top:14px"></div>
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
     </section>
 
@@ -257,6 +258,29 @@
           <input id="zwrotSzukajLista" placeholder="etykieta / login / numer zwrotu"></div>
       </div>
       <table id="zwrotLista"></table>
+    </section>
+
+    <section class="card" id="koszeKarta">
+      <h2>KOSZE ZWROTOWE</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
+        jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
+      </p>
+      <table id="koszeLista"></table>
+    </section>
+
+    <section class="card" id="reklamacjeKarta">
+      <h2>REKLAMACJE · PRIORYTET WG TERMINU</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
+        reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
+      </p>
+      <table id="reklamacjeLista"></table>
+    </section>
+
+    <section class="card" id="raportZwrotowKarta">
+      <h2>RAPORT PROCESU ZWROTÓW</h2>
+      <div class="kafle" id="raportZwrotowKafle"></div>
     </section>
 
     <section class="card" id="kontoAllegroKarta">
@@ -1970,7 +1994,79 @@ async function odswiezZwroty() {
     stanAllegro = d.allegro || null;
     rysujZwroty(d.zwroty || []);
     rysujKontoAllegro();
+    await odswiezEtap3();
   } catch (e) { console.warn(e); }
+}
+
+/* Kosze, reklamacje i raport — jedna funkcja, bo odświeżają się razem
+   z zakładką i żadne z nich nie jest na ścieżce krytycznej skanu. */
+async function odswiezEtap3() {
+  try {
+    const [k, r, rap] = await Promise.all([
+      (await api("/api/biuro/kosze")).json(),
+      (await api("/api/biuro/zwroty/reklamacje")).json(),
+      (await api("/api/biuro/zwroty/raport")).json(),
+    ]);
+    rysujKosze(k.kosze || []);
+    rysujReklamacje(r.reklamacje || []);
+    rysujRaportZwrotow(rap.raport);
+  } catch (e) { console.warn(e); }
+}
+
+function badgeKosza(status) {
+  if (status === "otwarty") return '<span class="badge amber">OTWARTY</span>';
+  if (status === "zamkniety") return '<span class="badge ok">NA HALĘ</span>';
+  return '<span class="badge mute2">ROZŁOŻONY</span>';
+}
+
+function rysujKosze(kosze) {
+  $("koszeLista").innerHTML = kosze.length
+    ? "<tr><th>KOD</th><th>STATUS</th><th>ZWROTÓW</th><th>POSTĘP</th><th></th></tr>" +
+      kosze.map((k) => `<tr>
+          <td class="b">${esc(k.kod)}</td>
+          <td>${badgeKosza(k.status)}</td>
+          <td>${k.zwrotow}</td>
+          <td class="mute">${k.status === "otwarty" ? "—" : `${k.odlozonych}/${k.pozycji} poz.`}</td>
+          <td>${k.status === "otwarty"
+            ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
+            : ""}</td>
+        </tr>`).join("")
+    : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
+}
+
+function rysujReklamacje(lista) {
+  $("reklamacjeLista").innerHTML = lista.length
+    ? "<tr><th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th></th></tr>" +
+      lista.map((r) => `<tr${r.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
+          <td class="b">${r.poTerminie
+            ? `<span class="badge err">${-r.dniDoTerminu} dni PO TERMINIE</span>`
+            : `${r.dniDoTerminu} dni`}</td>
+          <td>${esc(r.referencja || r.waybill)}<div class="mute">${esc(r.kupujacyLogin || "")}</div></td>
+          <td>${esc(r.nazwa)}${r.symbol ? `<div class="mute">${esc(r.symbol)}</div>` : ""}</td>
+          <td class="mute">${esc(r.powod || "—")}${r.powodOpis ? `<div>${esc(r.powodOpis)}</div>` : ""}</td>
+          <td style="white-space:nowrap">
+            <button class="akcja cichy" data-rekl="${r.pozycjaId}" data-wynik="uznana">UZNANA</button>
+            <button class="akcja cichy" data-rekl="${r.pozycjaId}" data-wynik="odrzucona">ODRZUCONA</button>
+          </td>
+        </tr>`).join("")
+    : '<tr><td class="mute">Żadna reklamacja nie czeka na rozpatrzenie.</td></tr>';
+}
+
+function rysujRaportZwrotow(r) {
+  if (!r) { $("raportZwrotowKafle").innerHTML = ""; return; }
+  const kafle = [
+    [r.zwroty.nowe, "nowych zwrotów"],
+    [r.zwroty.ocenione, "ocenionych"],
+    [r.zwroty.rozliczone, "rozliczonych"],
+    [r.dokumenty.wKolejce, "dokumentów w kolejce"],
+    [r.dokumenty.bledy, "dokumentów w błędzie", r.dokumenty.bledy > 0],
+    [r.kosze.zamkniete, "koszy na hali"],
+    [r.reklamacje.otwarte, "reklamacji otwartych"],
+    [r.reklamacje.poTerminie, "reklamacji po terminie", r.reklamacje.poTerminie > 0],
+    [r.medianaGodzinDoRozliczenia == null ? "—" : r.medianaGodzinDoRozliczenia + " h",
+      "mediana skan→rozliczenie (30 dni)"],
+  ];
+  $("raportZwrotowKafle").innerHTML = kafle.map(([v, opis, zle]) => kafel(v, opis, !!zle)).join("");
 }
 
 function rysujZwroty(zwroty) {
@@ -2036,6 +2132,9 @@ function otworzZwrot(id) {
   $("zwrotSzczegol").hidden = false;
   $("zwrotSkanKarta").hidden = true;
   $("zwrotListaKarta").hidden = true;
+  $("koszeKarta").hidden = true;
+  $("reklamacjeKarta").hidden = true;
+  $("raportZwrotowKarta").hidden = true;
   $("kontoAllegroKarta").hidden = true;
   odswiezSzczegolZwrotu();
 }
@@ -2046,6 +2145,9 @@ function zamknijZwrot() {
   $("zwrotSzczegol").hidden = true;
   $("zwrotSkanKarta").hidden = false;
   $("zwrotListaKarta").hidden = false;
+  $("koszeKarta").hidden = false;
+  $("reklamacjeKarta").hidden = false;
+  $("raportZwrotowKarta").hidden = false;
   $("kontoAllegroKarta").hidden = false;
   $("zwrotTowarWyniki").innerHTML = "";
 }
@@ -2156,6 +2258,7 @@ function rysujSzczegolZwrotu(z) {
   }
 
   rysujDokumentyZwrotu(z);
+  rysujKoszZwrotu(z);
 
   const srodki = z.zwrotSrodkow
     ? `<span class="badge ok">ŚRODKI ODDANE</span>
@@ -2220,6 +2323,28 @@ function rysujDokumentyZwrotu(z) {
       i przesuwa towar na bufor zwrotowy. Idą wyłącznie pozycje pełnowartościowe.
     </p>${lista}
     <button class="akcja" data-dokumenty>WYSTAW KOREKTĘ + MM</button>`;
+}
+
+/* Sekcja KOSZ — dopiero po ZLECENIU dokumentów: kosz wiąże się z korektą
+   i MM, więc wcześniej nie ma czego wiązać. Pole przyjmuje skaner USB
+   (Enter kończy skan) i wpis ręczny. */
+function rysujKoszZwrotu(z) {
+  const cel = $("zwrotKosz");
+  const d = z.dokumenty;
+  if (!d || d.stan === "brak") { cel.innerHTML = ""; return; }
+  if (z.kosz) {
+    cel.innerHTML = `<h2>KOSZ ZWROTOWY</h2>
+      <p><span class="b">${esc(z.kosz.kod)}</span> ${badgeKosza(z.kosz.status)}
+        ${z.kosz.status === "otwarty"
+          ? '<button class="akcja cichy" data-kosz-odepnij style="margin-left:8px">ODEPNIJ</button>'
+          : ""}</p>`;
+    return;
+  }
+  cel.innerHTML = `<h2>KOSZ ZWROTOWY</h2>
+    <p class="mute" style="margin-bottom:6px">Włóż towar do kosza i zeskanuj jego etykietę —
+      zamknięty kosz pojedzie na halę razem z listą do rozłożenia.</p>
+    <input id="zwrotKoszKod" placeholder="kod kosza" size="16">
+    <button class="akcja cichy" data-kosz-przypnij>PRZYPNIJ</button>`;
 }
 
 async function pokazWiadomosci(id) {
@@ -2529,6 +2654,47 @@ $("zwrotDokumenty").addEventListener("click", (e) => {
   if (!confirm("Wystawić korektę i MM na bufor zwrotowy? Po zleceniu nie zmienisz już decyzji ani dokumentu.")) return;
   // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
   akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokumenty`, { method: "POST", body: "{}" }));
+});
+$("zwrotKosz").addEventListener("click", (e) => {
+  if (e.target.closest("[data-kosz-przypnij]")) {
+    const kod = $("zwrotKoszKod").value.trim();
+    if (!kod) return alert("Zeskanuj albo wpisz kod kosza");
+    akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/kosz`, {
+      method: "POST", body: JSON.stringify({ kod }),
+    }));
+  }
+  if (e.target.closest("[data-kosz-odepnij]")) {
+    akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/kosz`, { method: "DELETE" }));
+  }
+});
+$("zwrotKosz").addEventListener("keydown", (e) => {
+  // skaner USB kończy Enterem — skan etykiety od razu przypina
+  if (e.key === "Enter" && e.target.id === "zwrotKoszKod") {
+    e.preventDefault();
+    e.target.closest("section, div").querySelector("[data-kosz-przypnij]")?.click();
+  }
+});
+$("koszeLista").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-zamknij-kosz]");
+  if (!b) return;
+  if (!confirm("Zamknąć kosz? Od tej chwili dokłada się do NOWEGO kosza, a ten jedzie na halę.")) return;
+  try {
+    // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
+    await api(`/api/biuro/kosze/${b.dataset.zamknijKosz}/zamknij`, { method: "POST", body: "{}" });
+    await odswiezEtap3();
+  } catch (err) { alert(err.message); }
+});
+$("reklamacjeLista").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-rekl]");
+  if (!b) return;
+  const notatka = prompt(`Reklamacja ${b.dataset.wynik.toUpperCase()} — notatka dla audytu (opcjonalna):`, "");
+  if (notatka === null) return; // Anuluj = brak decyzji, nie decyzja bez notatki
+  try {
+    await api(`/api/biuro/zwroty/reklamacje/${b.dataset.rekl}`, {
+      method: "POST", body: JSON.stringify({ wynik: b.dataset.wynik, notatka: notatka || undefined }),
+    });
+    await odswiezEtap3();
+  } catch (err) { alert(err.message); }
 });
 $("zwrotRozliczenie").addEventListener("click", (e) => {
   if (e.target.closest("[data-srodki]")) {

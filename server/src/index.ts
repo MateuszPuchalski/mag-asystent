@@ -23,6 +23,7 @@ import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
+import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuSprzedazy,
   brakDostepuDoMagazynow,
@@ -170,6 +171,7 @@ export async function buildApp() {
   await app.register(zbiorkiRoutes);
   await app.register(dostawcyRoutes);
   await app.register(zwrotyRoutes);
+  await app.register(koszeRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();

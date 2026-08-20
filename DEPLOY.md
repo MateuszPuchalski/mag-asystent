@@ -881,6 +881,17 @@ Wymaga wdrożonego workera Sfery (§6, etap 2) i poprawnego `MAG_ID_ZWROTY`.
 Bez workera zadanie ląduje w błędzie z czytelnym zdaniem, a dokumenty wystawia
 biuro ręcznie w Subiekcie — reszta karty zwrotu działa normalnie.
 
+Dalej proces przejmują **cyfrowe kosze** (0.59.0). Biuro przypina zwroty do
+kosza skanem jego etykiety i zamyka kosz. Magazynier na kolektorze (zakładka
+DOSTAWY) rozkłada zawartość skanami: towar wskazuje pozycję, regał ją
+odkłada. Zakończenie rozkładania **samo** kolejkuje MM ze zwrotów na
+magazyn główny — dokument cofający bufor nie wymaga nikogo przy komputerze.
+Kody koszy są wielorazowe; kosz powstaje przy pierwszym skanie etykiety.
+
+Równolegle działa **ścieżka reklamacyjna**: pozycje z decyzją „reklamacja"
+stoją na liście sortowanej po dniach do terminu ustawowego
+(`REKLAMACJA_DNI`, domyślnie 14). Karta RAPORT zbiera liczby całego procesu.
+
 Domyślnie funkcja jest **wyłączona** (puste `ALLEGRO_CLIENT_ID`), a w trybie
 demo (`SGT_MODE=seeded`) działa na fikcyjnych zwrotach bez kontaktu
 z Allegro (scenariusze S67–S69).

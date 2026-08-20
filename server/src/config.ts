@@ -269,6 +269,16 @@ export const config = {
         : "https://api.allegro.pl"),
   },
 
+  zwroty: {
+    /**
+     * Ile dni od zgłoszenia ma firma na odpowiedź w sprawie reklamacji.
+     * Ustawowy termin to 14 dni (rękojmia/niezgodność z umową) — po nim
+     * reklamację uznaje się milcząco, więc priorytet listy liczy się właśnie
+     * do tej daty. Env zostaje na wypadek własnych, krótszych zobowiązań.
+     */
+    reklamacjaDni: num(process.env.REKLAMACJA_DNI, 14, "REKLAMACJA_DNI"),
+  },
+
   /**
    * Kartoteka demo dla `npm run seed`. Leżała pod `web/public/data`, bo
    * serwowała ją skasowana już PWA — po usunięciu aplikacji webowej to są

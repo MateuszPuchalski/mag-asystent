@@ -140,7 +140,8 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      wyjątku przez biuro (trasa istniała od dawna, ale jej jedynym klientem był
      kolektor: reklamację prowadziło biuro, a domykał ją magazynier na hali)
      oraz o potwierdzenie odczytu odpowiedzi na notatkę. W 0.58.0 doszło
-     zlecenie korekty zwrotu z MM na bufor.
+     zlecenie korekty zwrotu z MM na bufor, w 0.59.0 — kosze zwrotowe
+     (przypięcie do kosza, zamknięcie kosza) i rozpatrzenie reklamacji.
 
      To ostatnie ZMIENIA regułę i dlatego jest wypisane osobno: pierwszy zapis
      z tej strony, który trafia do `sfera_queue`, czyli do bazy firmy. Reszta
@@ -160,11 +161,11 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    14,
+    17,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i siedem zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i dziesięć zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
-      "parowanie, korekta z MM) — nic ponadto"
+      "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
@@ -174,9 +175,9 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    3,
-    "DELETE to odpięcie dokumentu zwrotu, rozłączenie konta Allegro " +
-      "i skasowanie logo dostawcy"
+    4,
+    "DELETE to odpięcie dokumentu zwrotu, odpięcie kosza, rozłączenie " +
+      "konta Allegro i skasowanie logo dostawcy"
   );
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");

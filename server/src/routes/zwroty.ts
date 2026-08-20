@@ -23,6 +23,7 @@ import {
   zapiszDecyzje,
   zdejmijDokument,
 } from "../services/zwroty.js";
+import { listaReklamacji, raportZwrotow, rozpatrzReklamacje } from "../services/reklamacje.js";
 
 /* ── Zwroty Allegro — trasy biura ────────────────────────────────────────────
    Wszystko za bramką ról biuro|admin (wzorzec zbiorki.ts): zwrot wiąże się
@@ -233,6 +234,38 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return zBledem(reply, () => ({ zwrot: oznaczZwrotSrodkow(Number(req.params.id), autor()) }));
+  });
+
+  // ── Reklamacje i raport ───────────────────────────────────────────────────
+  /* Ścieżki statyczne (`/reklamacje`, `/raport`) wygrywają w routerze
+     z parametryczną `/:id` — Fastify dopasowuje segment stały przed parametrem. */
+
+  app.get<{ Querystring: { rozpatrzone?: string } }>(
+    "/api/biuro/zwroty/reklamacje",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return { reklamacje: listaReklamacji({ rozpatrzone: req.query.rozpatrzone === "1" }) };
+    }
+  );
+
+  app.post<{ Params: { pid: string }; Body: { wynik?: string; notatka?: string } }>(
+    "/api/biuro/zwroty/reklamacje/:pid",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      if (!req.body?.wynik) return reply.code(400).send({ error: "Brak pola wynik" });
+      return zBledem(reply, () => {
+        rozpatrzReklamacje(Number(req.params.pid), req.body!.wynik!, req.body?.notatka?.trim() || null, autor());
+        return { reklamacje: listaReklamacji() };
+      });
+    }
+  );
+
+  app.get("/api/biuro/zwroty/raport", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { raport: raportZwrotow() };
   });
 
   // ── Konto Allegro (device flow) ───────────────────────────────────────────

@@ -4,6 +4,11 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.AktualizacjaResponse
 import pl.wertis.kolektor.core.net.KorektaBody
+import pl.wertis.kolektor.core.net.KoszResponse
+import pl.wertis.kolektor.core.net.KoszSkan
+import pl.wertis.kolektor.core.net.KoszeResponse
+import pl.wertis.kolektor.core.net.OdlozKoszBody
+import pl.wertis.kolektor.core.net.OdlozKoszResponse
 import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
@@ -218,6 +223,22 @@ interface ApiService {
     /* ── Faza 2: wyjątki (D8) ────────────────────────────────────────────── */
 
     /** Lista pytana przy starcie — wyjątek bez ekranu przestaje istnieć. */
+    // ── Kosze zwrotowe (Etap 3): rozkładanie zwrotów z kosza ─────────────
+    @GET("api/kosze")
+    suspend fun kosze(): KoszeResponse
+
+    @GET("api/kosze/{id}")
+    suspend fun kosz(@Path("id") id: Long): KoszResponse
+
+    @POST("api/kosze/{id}/skan")
+    suspend fun koszSkan(@Path("id") id: Long, @Body body: ScanBody): KoszSkan
+
+    @POST("api/kosze/pozycje/{id}/odloz")
+    suspend fun koszOdloz(@Path("id") id: Long, @Body body: OdlozKoszBody): OdlozKoszResponse
+
+    @POST("api/kosze/{id}/zakoncz")
+    suspend fun koszZakoncz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
     @GET("api/problems/unresolved")
     suspend fun unresolvedProblems(): ProblemsResponse
 
