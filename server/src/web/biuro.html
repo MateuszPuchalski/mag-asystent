@@ -52,6 +52,10 @@
 
   /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
   .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--cien); }
+  /* Ślad po kliknięciu kafla w pasku stanu. Samo przewinięcie do karty, która
+     akurat była już widoczna, jest nieodróżnialne od braku reakcji — a to była
+     dokładnie treść zgłoszenia. Znika samo, bo nie niesie żadnego stanu. */
+  .card.wskazana { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg), var(--cien); }
 
   /* Etykieta sekcji — ta sama co nagłówki list na kolektorze:
      11px, gruba, rozstrzelona, InkSoft. Mniejsza od treści, bo podpisuje
@@ -199,13 +203,31 @@
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
   <div id="widokDostawy" style="display:grid;gap:20px">
-    <!-- Pozycje jednego dokumentu. Zasłania obie karty poniżej, zamiast
-         doklejać się pod nimi: to jest wejście W dokument, nie dodatek obok. -->
+    <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
+         się pod nimi: to jest wejście W dokument, nie dodatek obok. -->
     <section class="card" id="szczegol" hidden>
       <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
       <div id="szczegolNaglowek" style="margin-top:12px"></div>
       <table id="szczegolLinie"></table>
       <div id="szczegolBezLinii"></div>
+    </section>
+
+    <!-- Odpowiedzi na notatki. Karta chowa się, gdy nie ma na co patrzeć —
+         pusty blok „brak odpowiedzi" byłby szumem na ekranie, który biuro ma
+         przed sobą cały dzień.
+
+         KOLEJNOŚĆ NIE JEST PRZYPADKOWA (0.60.1). Karta stoi NAD tabelą dostaw,
+         bo tabela bywa na kilkadziesiąt wierszy i wszystko pod nią wypada ekran
+         niżej. Tak właśnie zgubiła się w 0.57.0: licznik w pasku stanu świecił,
+         a biuro nie miało jak trafić do odpowiedzi. Ukryta karta nie kosztuje
+         ani piksela, więc w spokojny dzień ta kolejność niczego nie psuje. -->
+    <section class="card" id="kartaOdpowiedzi" hidden>
+      <h2>ODPOWIEDZI NA NOTATKI</h2>
+      <p class="mute" style="margin-bottom:10px">
+        Magazynier odpowiedział na pytanie z notatki. Po przeczytaniu naciśnij
+        PRZECZYTANE — sygnał zgaśnie także na drugim biurku.
+      </p>
+      <table id="odpowiedzi"></table>
     </section>
 
     <section class="card" id="kartaDostaw">
@@ -225,18 +247,6 @@
       <p class="mute">Zdjęte z listy rozkładania decyzją biura. Towar odłożono
         bez tej aplikacji, więc nie ma z tego ani jednego skanu.</p>
       <table id="pozaWertis"></table>
-    </section>
-
-    <!-- Odpowiedzi na notatki (0.57.0). Karta chowa się, gdy nie ma na co
-         patrzeć — pusty blok „brak odpowiedzi" byłby szumem na ekranie,
-         który biuro ma przed sobą cały dzień. -->
-    <section class="card" id="kartaOdpowiedzi" hidden>
-      <h2>ODPOWIEDZI NA NOTATKI</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Magazynier odpowiedział na pytanie z notatki. Po przeczytaniu naciśnij
-        PRZECZYTANE — sygnał zgaśnie także na drugim biurku.
-      </p>
-      <table id="odpowiedzi"></table>
     </section>
 
     <section class="card" id="kartaReklamacji">
@@ -678,6 +688,7 @@ function pokaz(nowy) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
   if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
+  if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
   if (nowy === "analiza") odswiezAnalize();
@@ -720,7 +731,7 @@ function rysujStan(health, kolejka) {
      dostawę — a nie było powodu tam wracać. */
   if (odpowiedziNaNotatki.length) {
     const n = odpowiedziNaNotatki.length;
-    kafle.push(`<span class="badge amber" data-do="dostawy">
+    kafle.push(`<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi">
       ${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span>`);
   }
   $("stan").innerHTML = kafle.join(" ");
@@ -2543,7 +2554,18 @@ document.querySelector("nav.zakladki").addEventListener("click", (e) => {
 });
 $("stan").addEventListener("click", (e) => {
   const b = e.target.closest("[data-do]");
-  if (b) pokaz(b.dataset.do);
+  if (!b) return;
+  pokaz(b.dataset.do);
+  /* `data-cel` jest opcjonalny i mają go tylko te kafle, które prowadzą na
+     zakładkę OGLĄDANĄ WŁAŚNIE PRZEZ BIURO. Dla nich samo `pokaz()` nic nie
+     zmienia na ekranie, a szukana karta bywa ekran niżej — dokładnie tak
+     zgubił się licznik odpowiedzi na notatki. Kafle bez celu (wszystkie
+     z NADZORU) działają jak dotąd, bo tam zmiana zakładki jest widoczna. */
+  const cel = b.dataset.cel && $(b.dataset.cel);
+  if (!cel || cel.hidden) return;
+  cel.scrollIntoView({ block: "start", behavior: "smooth" });
+  cel.classList.add("wskazana");
+  setTimeout(() => cel.classList.remove("wskazana"), 2000);
 });
 $("dniMetryk").addEventListener("change", odswiezNadzor);
 $("dniAnalizy").addEventListener("change", odswiezAnalize);

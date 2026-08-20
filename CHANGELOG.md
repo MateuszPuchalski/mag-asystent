@@ -33,6 +33,26 @@ historii nie przepisujemy.
 
 ---
 
+## 0.60.1 — 20 sierpnia 2026
+
+**Licznik odpowiedzi na notatki prowadzi tam, gdzie obiecuje.** Sygnał
+z 0.57.0 świecił poprawnie, ale odpowiedzi nie dało się znaleźć. Karta
+`ODPOWIEDZI NA NOTATKI` stała pod tabelą dostaw, czyli ekran niżej. Kliknięcie
+kafla wołało przełączenie na zakładkę, na której biuro już było — nie działo
+się więc nic widocznego.
+
+Karta przeniosła się **nad** tabelę dostaw. Ukryta, gdy nie ma odpowiedzi, nie
+zajmuje w spokojny dzień ani piksela. Kafel paska stanu przewija do niej
+i podświetla ją na dwie sekundy. Podświetlenie nie jest ozdobą: przewinięcie do
+karty już widocznej wygląda tak samo jak brak reakcji.
+
+Przy okazji wejście na zakładkę DOSTAWY odświeża tę kartę — tak samo jak
+wejście na NADZÓR odświeża metryki. Dotąd zależało to od tego, czy ktoś
+wcześniej wchodził w dokument.
+
+Bez zmian po stronie serwera. Trasy, dane i stan „przeczytane" w bazie
+działały od 0.57.0.
+
 ## 0.60.0 — 20 sierpnia 2026
 
 **Biuro wygląda jak kolektor.** Strona `/biuro` dostała język wizualny hali:

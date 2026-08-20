@@ -226,6 +226,28 @@ test("pasek stanu niesie licznik odpowiedzi na notatki", () => {
   );
 });
 
+test("licznik prowadzi do karty, a karta stoi nad tabelą dostaw", () => {
+  /* Zgłoszenie z 20 sierpnia: „mam na górze zaznaczone odpowiedź na notatkę,
+     ale nie wiem gdzie ta odpowiedź jest, jak klikam w licznik też nic się nie
+     dzieje". Sygnał był poprawny, dane były na miejscu — zawiodła DROGA do
+     nich. Karta stała pod tabelą dostaw, a ta bywa na kilkadziesiąt wierszy;
+     kafel wołał zaś tylko przełączenie na zakładkę, na której biuro już było.
+
+     Stąd dwie asercje, których nie da się spełnić przypadkiem: kolejność
+     sekcji w dokumencie i przewijanie do celu. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.ok(
+    html.indexOf('id="kartaOdpowiedzi"') < html.indexOf('id="kartaDostaw"'),
+    "karta odpowiedzi ma stać NAD tabelą dostaw — pod nią wypada poza ekran"
+  );
+  assert.match(html, /data-do="dostawy" data-cel="kartaOdpowiedzi"/, "kafel wskazuje cel");
+  assert.match(html, /dataset\.cel/, "obsługa paska czyta cel kafla");
+  assert.match(html, /scrollIntoView/, "kliknięcie licznika ma doprowadzić do karty");
+});
+
 test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
   /* Zgłoszenie z biura: „Nie usunięto: Bad Request" przy kasowaniu logo.
      Wina była w `api()`, wspólnym opakowaniu WSZYSTKICH wywołań panelu:

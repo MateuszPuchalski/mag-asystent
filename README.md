@@ -484,9 +484,9 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   wyjątek liczy się jako pozycja domknięta. Biuro może też **zamknąć wyjątek**
   z notatką, która trafia do protokołu.
 - **Odpowiedź na notatkę wraca sama** (0.57.0): pasek stanu pokazuje licznik
-  nieprzeczytanych odpowiedzi. Karta na zakładce DOSTAWY niesie pytanie,
-  odpowiedź i przycisk PRZECZYTANE. Stan „przeczytane" siedzi w bazie, więc
-  gaśnie także na drugim biurku.
+  nieprzeczytanych odpowiedzi. Kliknięcie licznika **prowadzi do karty**. Karta
+  stoi nad tabelą dostaw i niesie pytanie, odpowiedź i przycisk PRZECZYTANE.
+  Stan „przeczytane" siedzi w bazie, więc gaśnie także na drugim biurku.
 - **DOSTAWCY** (0.56.0): logo firmy wgrywane raz, widoczne potem po lewej
   stronie wiersza na liście dostaw w kolektorze. Plik może być w dowolnym
   formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
