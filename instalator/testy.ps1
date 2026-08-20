@@ -1078,9 +1078,16 @@ Sprawdz "zatrzymuje DOKŁADNIE te usługi, które potem uruchamia" {
     # Pierwsza wersja stopowała dwie, a startowała trzy: `wertis-sfera`
     # przechodziła aktualizację na chodzie i mogła pisać do SQLite w trakcie
     # migracji schematu. Asymetria wyszła dopiero na wydruku z produkcji.
-    foreach ($u in @("wertis-api", "wertis-worker", "wertis-sfera")) {
-        Zaloz ($galazKod -match [regex]::Escape($u)) "gałąź nie zatrzymuje $u"
-    }
+    #
+    # Od 0.69.0 obie strony biorą JEDNĄ listę z Get-WertisInstancja — asercja
+    # pilnuje więc wspólnego źródła, a nie literalnych nazw: rozjazd stop/start
+    # wymagałby teraz dwóch RÓŻNYCH list, czyli widocznej zmiany w kodzie.
+    Zaloz ($galazKod -match '\$doZatrzymania\s*=\s*\$instancja\.Uslugi') `
+        "stopowana lista ma iść z Get-WertisInstancja"
+    Zaloz ($galazKod -match 'Restart-WertisUslugi -Uslugi \$instancja\.Uslugi') `
+        "startowana lista ma iść z tego samego źródła co stopowana"
+    Zaloz (-not ($galazKod -match 'Restart-WertisUslugi(?!\s+-Uslugi)')) `
+        "wywołanie bez -Uslugi wystartowałoby produkcyjną trójkę na instancji dev"
 }
 
 Sprawdz "zatrzymuje usługi PRZED budowaniem" {
@@ -1236,6 +1243,63 @@ Sprawdz "Get-WertisApk czyta sume z pliku, nie z tresci odpowiedzi" {
     $apk = $kod.Substring($kod.IndexOf("function Get-WertisApk"))
     Zaloz ($apk -match 'sha256"\s+-OutFile') "suma ma jechac do pliku"
     Zaloz (-not ($apk -match '\$odp\.Content')) "tresc odpowiedzi nie moze byc zrodlem sumy"
+}
+
+# ── Get-WertisInstancja: dev obok produkcji ─────────────────────────────────
+# Te asercje pilnują jednej rzeczy: instancja dev NIE ZNA nazw produkcyjnych.
+# Register-WertisUsluga przy istniejącej nazwie przekonfigurowuje, więc wspólna
+# nazwa znaczy przestawioną produkcję — najdroższa możliwa pomyłka instalatora.
+
+Write-Host ""
+Write-Host "Get-WertisInstancja"
+
+Sprawdz "produkcja: trzy znane uslugi i regula bez portu w nazwie" {
+    $i = Get-WertisInstancja -Port 3001 -Katalog "C:\wertis"
+    Zaloz ($i.Uslugi.Count -eq 3)
+    Zaloz ($i.Uslugi -contains "wertis-api") "brak wertis-api"
+    Zaloz ($i.Zapora -eq "WERTIS kolektor") "istniejace produkcje maja regule pod ta nazwa"
+    Zaloz ($i.Bledy.Count -eq 0)
+    Zaloz ($i.Srodowisko -eq "")
+}
+
+Sprawdz "dev nie zna ANI JEDNEJ nazwy produkcyjnej" {
+    $i = Get-WertisInstancja -Dev -Port 3002 -Katalog "C:\wertis-dev"
+    foreach ($u in @("wertis-api", "wertis-worker", "wertis-sfera")) {
+        Zaloz (-not ($i.Uslugi -contains $u)) "dev widzi produkcyjna usluge $u"
+    }
+    Zaloz ($i.Uslugi -contains "wertis-api-dev")
+    Zaloz ($i.Uslugi -contains "wertis-worker-dev")
+}
+
+Sprawdz "dev bez wertis-sfera — seeded zabrania workera Sfery" {
+    $i = Get-WertisInstancja -Dev -Port 3002 -Katalog "C:\wertis-dev"
+    Zaloz ($i.Uslugi.Count -eq 2)
+    Zaloz ($i.Srodowisko -eq "dev")
+}
+
+Sprawdz "regula zapory dev niesie port, wiec nie zjada produkcyjnej" {
+    $i = Get-WertisInstancja -Dev -Port 3002 -Katalog "C:\wertis-dev"
+    Zaloz ($i.Zapora -like "*3002*") "nazwa reguly musi zawierac port"
+    Zaloz ($i.Zapora -ne "WERTIS kolektor")
+}
+
+Sprawdz "dev na porcie 3001 odmawia" {
+    $i = Get-WertisInstancja -Dev -Port 3001 -Katalog "C:\wertis-dev"
+    Zaloz ($i.Bledy.Count -ge 1) "port produkcji ma byc odmowa, nie ostrzezeniem"
+}
+
+Sprawdz "dev w katalogu produkcyjnym odmawia, takze z ukosnikiem na koncu" {
+    $a = Get-WertisInstancja -Dev -Port 3002 -Katalog "C:\wertis"
+    $b = Get-WertisInstancja -Dev -Port 3002 -Katalog "C:\WERTIS\"
+    Zaloz ($a.Bledy.Count -ge 1)
+    Zaloz ($b.Bledy.Count -ge 1) "wielkosc liter i ukosnik nie moga otwierac furtki"
+}
+
+Sprawdz "SRODOWISKO jest na bialej liscie Publish-WertisKonfiguracja" {
+    # bez tego wpis kreatora nie trafi do pliku i dev wstanie jako produkcja
+    $kod = Get-Content (Join-Path $zrodlo "uslugi.ps1") -Raw
+    $publish = $kod.Substring($kod.IndexOf("function Publish-WertisKonfiguracja"))
+    Zaloz ($publish.Substring(0, $publish.IndexOf("Read-WertisEnv")) -match '"SRODOWISKO"')
 }
 
 # ── Wynik ───────────────────────────────────────────────────────────────────

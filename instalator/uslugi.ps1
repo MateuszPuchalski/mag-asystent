@@ -488,6 +488,9 @@ function Publish-WertisKonfiguracja {
         "ZDJECIA_CACHE_MB", "ZDJECIA_TTL_H", "ZDJECIA_BRAK_TTL_H", "ZDJECIA_BLAD_TTL_MIN",
         # strefa do wyświetlania godzin (baza zostaje w UTC)
         "STREFA_CZASU",
+        # etykieta instancji (dev obok produkcji, 0.69.0) — /api/health ją
+        # zwraca, biuro i kolektor rysują z niej ostrzeżenie
+        "SRODOWISKO",
         "PORT"
     )
     $poprzednie = Read-WertisEnv -Sciezka $plik
@@ -581,6 +584,55 @@ function Publish-WertisKonfiguracja {
                 Write-Uwaga "Usunięto $klucz usługi $usluga - przykrywałoby wertis.env."
             }
         }
+    }
+}
+
+function Get-WertisInstancja {
+    <#
+        .SYNOPSIS
+        Nazwy usług, reguły zapory i etykieta środowiska dla jednej instancji.
+
+        .DESCRIPTION
+        Powstało dla instancji dev obok produkcji (0.69.0). Do tej wersji nazwy
+        usług i reguły zapory były zaszyte w wywołaniach, więc druga instalacja
+        PRZESTAWIAŁA usługi produkcyjne (Register-WertisUsluga przy istniejącej
+        nazwie przekonfigurowuje), a -Odinstaluj kasował produkcyjną trójkę.
+
+        Reguła zapory dostaje port w nazwie tylko wtedy, gdy port jest
+        niedomyślny — istniejące produkcje mają regułę "WERTIS kolektor"
+        i zmiana nazwy dla portu 3001 zostawiłaby na maszynach martwy duplikat.
+
+        `Bledy` to lista odmów do wypisania: -Dev na porcie produkcyjnym albo
+        w katalogu produkcyjnym to prawie na pewno pomyłka człowieka, który
+        zapomniał jednego parametru — i taka pomyłka kończyłaby się dokładnie
+        tym rozstrojeniem produkcji, przed którym ten przełącznik broni.
+    #>
+    param([switch]$Dev, [int]$Port = 3001, [string]$Katalog = "C:\wertis")
+    $zapora = if ($Port -eq 3001) { "WERTIS kolektor" } else { "WERTIS kolektor (port $Port)" }
+    if (-not $Dev) {
+        return @{
+            Sufiks     = ""
+            Uslugi     = @("wertis-api", "wertis-worker", "wertis-sfera")
+            Zapora     = $zapora
+            Srodowisko = ""
+            Bledy      = @()
+        }
+    }
+    $bledy = @()
+    if ($Port -eq 3001) {
+        $bledy += "-Dev na porcie 3001 zderzy sie z produkcja. Podaj inny port, np. -Port 3002."
+    }
+    if ($Katalog.TrimEnd('\') -ieq "C:\wertis") {
+        $bledy += "-Dev w katalogu C:\wertis nadpisalby produkcje. Podaj inny, np. -Katalog C:\wertis-dev."
+    }
+    return @{
+        Sufiks     = "-dev"
+        # bez wertis-sfera: dev chodzi na danych demo, a serwer odmawia startu
+        # przy SFERA_WORKER=1 razem z SGT_MODE=seeded (bledyKonfiguracji)
+        Uslugi     = @("wertis-api-dev", "wertis-worker-dev")
+        Zapora     = $zapora
+        Srodowisko = "dev"
+        Bledy      = $bledy
     }
 }
 

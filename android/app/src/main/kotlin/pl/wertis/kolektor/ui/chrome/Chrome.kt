@@ -69,6 +69,8 @@ import pl.wertis.kolektor.ui.theme.Success
 fun TopBar(
     screen: Screen,
     user: String,
+    /** Serwer potwierdził, że NIE jest produkcją — patrz `AppRoot`. */
+    dev: Boolean = false,
     summary: QueueSummary?,
     onOpenQueue: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -89,6 +91,28 @@ fun TopBar(
             fontSize = 18.sp,
             modifier = Modifier.padding(horizontal = 10.dp),
         )
+        /* Pastylka DEV (0.69.0) — na pasku widocznym z KAŻDEGO ekranu.
+           Urządzenie testowe wskazane na serwer dev różni się od produkcyjnego
+           wyłącznie adresem w ustawieniach, których nikt nie ogląda w pracy.
+           Bez tego znacznika ktoś kiedyś rozłoży prawdziwą dostawę na danych
+           demo — i wyjdzie to dopiero przy palecie, której system nie widzi. */
+        if (dev) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Destructive)
+                    .padding(horizontal = 9.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    "DEV",
+                    color = CardWhite,
+                    fontFamily = BarlowCond,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.sp,
+                )
+            }
+            Box(Modifier.size(6.dp))
+        }
         Text(
             SCREEN_TITLES[screen] ?: "",
             color = CardWhite,

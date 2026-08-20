@@ -784,6 +784,14 @@ function rysujStan(health, kolejka) {
      o brakującej kartotece, choć brakuje ustawienia. */
   if (health) zdjeciaWlaczone = !!health.zdjecia;
   const kafle = [];
+  /* Etykieta instancji (0.69.0). PIERWSZY kafel i czerwony, bo odpowiada na
+     pytanie zadawane PRZED każdym innym: „czy ja na pewno patrzę na właściwy
+     serwer". Dwie instancje na jednej maszynie różnią się tylko portem
+     w pasku adresu — a portu nikt nie czyta. Na produkcji kafla nie ma wcale:
+     stały napis „PRODUKCJA" byłby szumem, który uczy ignorować kolor. */
+  if (health && health.srodowisko && health.srodowisko !== "produkcja") {
+    kafle.push(`<span class="badge err">⚠ ${esc(health.srodowisko).toUpperCase()} · to nie jest produkcja</span>`);
+  }
   const zle = health && health.ok === false;
   kafle.push(`<span class="badge ${zle ? "err" : "ok"}" data-do="nadzor">
       ${zle ? "⚠ " : "✓ "}serwer ${esc(health?.wersja || "")} · ${esc(health?.mode || "")}</span>`);

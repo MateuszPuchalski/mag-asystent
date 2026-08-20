@@ -253,6 +253,16 @@ test("wysyłka z bufora offline przechodzi — inaczej praca znika", async () =>
    Tutaj asercja dotyczy tego, co widzi KLIENT: pól, po których kolektor i
    podgląd biura poznawały tryb, nie ma w odpowiedziach.                      */
 
+test("/api/health niesie etykietę środowiska — domyślnie „produkcja”", async () => {
+  /* Etykieta istnieje dla instancji dev obok produkcji (0.69.0): biuro
+     i kolektor rysują z niej ostrzeżenie, a trasa jest bez sesji ŚWIADOMIE —
+     „to jest dev" musi być widoczne przed zalogowaniem, bo właśnie wtedy
+     człowiek myli serwery. Test przybija też wartość domyślną: instalacja
+     bez SRODOWISKO w env ma mówić „produkcja", nie milczeć. */
+  const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
+  assert.equal(h.srodowisko, "produkcja");
+});
+
 test("/api/health i /api/setup nie znają pola adminMode", async () => {
   const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
   assert.equal(h.adminMode, undefined, "kolektor nie ma czego zobaczyć");

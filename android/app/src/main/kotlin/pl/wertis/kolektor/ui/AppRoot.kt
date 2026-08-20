@@ -86,13 +86,21 @@ fun AppRoot(graph: AppGraph) {
     /* Wersja serwera — raz na start aplikacji i po każdej zmianie adresu.
        Nie w pętli: numer zmienia się przy restarcie usługi, nie co sekundę,
        a pasek na dole ekranu nie jest powodem do ruchu w sieci. */
-    val wersjaSerwera by produceState<String?>(null, ustawienia.serverUrl) {
+    val zdrowieSerwera by produceState<pl.wertis.kolektor.core.net.HealthResponse?>(
+        null,
+        ustawienia.serverUrl,
+    ) {
         value = try {
-            apiCall { graph.api.health() }.wersja
+            apiCall { graph.api.health() }
         } catch (_: Exception) {
             null
         }
     }
+    val wersjaSerwera = zdrowieSerwera?.wersja
+    /* Etykieta instancji (0.69.0). `null` z sieci znaczy „nie wiem" i wtedy
+       pastylki NIE ma — pokazana na oślep przy martwym Wi-Fi wołałaby „dev"
+       o produkcji. Rysuje się wyłącznie z potwierdzonej odpowiedzi serwera. */
+    val srodowiskoDev = zdrowieSerwera?.srodowisko?.let { it != "produkcja" } == true
 
     /* Pytanie o nowy APK — PRZED wszystkimi wcześniejszymi wyjściami z tej
        funkcji, więc pada także wtedy, gdy nikt nie jest zalogowany.
@@ -135,6 +143,7 @@ fun AppRoot(graph: AppGraph) {
         TopBar(
             screen = screen,
             user = stan.osoba ?: "?",
+            dev = srodowiskoDev,
             summary = queue?.summary,
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },

@@ -10,6 +10,11 @@ Polecenia — instalacja, usługi, zapytania — mieszkają w [`DEPLOY.md`](../D
 Ten dokument mówi, **w jakiej kolejności** ich użyć i **co ma być prawdą**,
 zanim zrobi się następny krok.
 
+
+Etapy niżej prowadzą PRODUKCJĘ na prawdziwe dane. Stałe środowisko dev
+obok produkcji — do rozwoju, gdy magazyn już pracuje — opisuje DEPLOY.md,
+rozdział „Środowisko dev obok produkcji".
+
 ## Dlaczego etapami
 
 Aplikacja zapisuje do bazy firmy DWA pola kartoteki: lokalizację i podstawowy

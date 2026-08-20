@@ -207,7 +207,8 @@ curl -s http://localhost:3001/api/queue -H "x-session: $TOKEN"
 **Produkcja i wdrożenie w firmie (on-premise): [`DEPLOY.md`](DEPLOY.md).**
 Instalator Windows, usługi NSSM, sieć i zapora, APK na kolektorach (pierwsza
 instalacja przez MDM, kiosk),
-etapy przejścia na MSSQL i Sferę, backup — wszystko tam.
+etapy przejścia na MSSQL i Sferę, backup — wszystko tam. Od 0.69.0 także
+**środowisko dev obok produkcji** (instalator z `-Dev`, rozdział 6b).
 
 Parametry (env, dev):
 
@@ -537,7 +538,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 220 testów jednostkowych; buduje się bez Android SDK
+                           + 221 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 12 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

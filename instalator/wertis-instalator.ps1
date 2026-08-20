@@ -39,6 +39,12 @@
     w wertis.env, konfiguracji Subiekta ani kont użytkowników — nie zadaje
     też ani jednego pytania.
 
+.PARAMETER Dev
+    Druga, ROZWOJOWA instancja obok produkcji: usługi z sufiksem -dev, dane
+    demo, pusty kanał APK (dev niczego kolektorom nie proponuje) i etykieta
+    SRODOWISKO=dev widoczna w biurze i na kolektorze. Wymaga -Katalog innego
+    niż C:\wertis i -Port innego niż 3001. Produkcji nie dotyka.
+
 .PARAMETER Odinstaluj
     Zdejmuje usługi, regułę zapory i katalog aplikacji. NIE rusza Subiekta,
     loginu SQL, rejestru ani Node'a z Gitem — pełna lista na końcu przebiegu.
@@ -60,6 +66,10 @@
     Wgrywa nową wersję na działającą instalację. Baza i konta nietknięte.
 
 .EXAMPLE
+    .\wertis-instalator.ps1 -Dev -Katalog C:\wertis-dev -Port 3002
+    Środowisko dev obok produkcji: dane demo, własne usługi, własny port.
+
+.EXAMPLE
     .\wertis-instalator.ps1 -Odinstaluj -DryRun
     Wypisuje, co zniknęłoby przy deinstalacji. Niczego nie usuwa.
 #>
@@ -70,6 +80,7 @@ param(
     [string]$Galaz = "main",
     [int]$Port = 3001,
     [switch]$Demo,
+    [switch]$Dev,
     [switch]$TylkoKonfiguracja,
     [switch]$DryRun,
     [switch]$Odinstaluj,
@@ -91,6 +102,19 @@ $katalogSkryptu = Split-Path -Parent $MyInvocation.MyCommand.Path
 # MODULY-KONIEC
 
 $script:WertisDryRun = [bool]$DryRun
+
+# ── Instancja: produkcja albo dev (0.69.0) ──────────────────────────────────
+# Nazwy usług i reguły zapory idą z jednego miejsca. Bramka odmawia od razu,
+# bo -Dev z domyślnym portem/katalogiem ROZSTROIŁBY produkcję — dokładnie
+# temu ten przełącznik ma zapobiegać.
+$instancja = Get-WertisInstancja -Dev:$Dev -Port $Port -Katalog $Katalog
+if (@($instancja.Bledy).Count -gt 0) {
+    foreach ($b in $instancja.Bledy) { Write-Blad $b }
+    exit 1
+}
+# Dev znaczy dane demo: rozwój nie ma prawa pisać do Subiekta ani czytać
+# produkcyjnej bazy. Kto chce inaczej, stawia instancję ręcznie wg DEPLOY.md.
+if ($Dev) { $Demo = $true }
 
 # Ustawienia zbierane po drodze; na końcu idą w dwa miejsca naraz
 # (wertis.env + środowisko obu usług) przez Publish-WertisKonfiguracja.
@@ -121,9 +145,9 @@ if (-not (Test-Administrator)) {
 # etapem instalacji i nie wolno mu się z nimi przepleść.
 
 if ($Odinstaluj) {
-    Write-Krok "Deinstalacja WERTIS"
-    Write-Info "Zniknie: usługi wertis-api, wertis-worker i wertis-sfera (jeśli jest),"
-    Write-Info "reguła zapory 'WERTIS kolektor' oraz katalog $Katalog."
+    Write-Krok "Deinstalacja WERTIS$(if ($Dev) { ' (instancja dev)' })"
+    Write-Info "Zniknie: usługi $($instancja.Uslugi -join ', '),"
+    Write-Info "reguła zapory '$($instancja.Zapora)' oraz katalog $Katalog."
     Write-Host ""
     if ($UsunDane) {
         Write-Uwaga "-UsunDane: ślad audytowy i zdjęcia problemów zostaną SKASOWANE."
@@ -162,8 +186,8 @@ if ($Odinstaluj) {
 
     # Kolejność wymuszona przez Windows — patrz komentarz nad funkcjami
     # w uslugi.ps1. nssm.exe leży w kasowanym katalogu, więc idzie przed nim.
-    Remove-WertisUslugi -Nssm (Join-Path $Katalog "tools\nssm.exe")
-    Remove-WertisRegulaZapory
+    Remove-WertisUslugi -Nssm (Join-Path $Katalog "tools\nssm.exe") -Uslugi $instancja.Uslugi
+    Remove-WertisRegulaZapory -Nazwa $instancja.Zapora
     $plan = Remove-WertisKatalog -Katalog $Katalog -UsunDane:$UsunDane
 
     Write-Naglowek "Odinstalowane"
@@ -228,14 +252,14 @@ if ($Aktualizuj) {
 
     $wersjaPrzed = Get-WertisWersja -Katalog $Katalog
 
-    # Ta sama trójka co w `Restart-WertisUslugi`, i to nie jest kosmetyka.
+    # Ta sama lista co przy starcie — z `Get-WertisInstancja`, nie z pamięci.
     # Pierwsza wersja zatrzymywała dwie usługi, a uruchamiała trzy: `wertis-sfera`
     # przechodziła całą aktualizację na chodzie. Nie jest procesem Node, więc
     # `npm ci` jej nie dotyka — ale pisze do SQLite przez kolejkę zadań MM,
     # a aktualizacja bywa zmianą SCHEMATU tej bazy. Zapis w trakcie migracji to
     # najgorszy moment, jaki można wybrać. Nieobecna usługa (wdrożenie bez Sfery)
     # jest normą i przechodzi bez słowa — dokładnie jak przy restarcie.
-    $doZatrzymania = @("wertis-api", "wertis-worker", "wertis-sfera")
+    $doZatrzymania = $instancja.Uslugi
     Write-Krok "Zatrzymanie usług"
     if (-not (Test-DryRun "Zatrzymałbym usługi: $($doZatrzymania -join ', ').")) {
         foreach ($u in $doZatrzymania) {
@@ -257,7 +281,7 @@ if ($Aktualizuj) {
             # Usługi zostały zatrzymane — bez tego magazyn stoi, a nikt nie wie
             # dlaczego. Wracamy do stanu sprzed próby, zanim zgłosimy błąd.
             Write-Info "Przywracam usługi na POPRZEDNIEJ wersji."
-            Restart-WertisUslugi
+            Restart-WertisUslugi -Uslugi $instancja.Uslugi
             exit 1
         }
         Write-Ok "Kod pobrany."
@@ -286,12 +310,19 @@ if ($Aktualizuj) {
     # ma wstac z plikiem juz na miejscu, zeby pierwszy kolektor, ktory zapyta,
     # dostal komplet, a nie 404 sprzed sekundy.
     Write-Krok "APK kolektora"
-    if (-not (Test-DryRun "Pobralbym wertis-kolektor-$wersjaPo.apk do server\data\apk.")) {
+    if ($Dev) {
+        # Świadomie NIC. Katalog apk/ instancji dev zostaje pusty, więc
+        # GET /api/aktualizacja nie ma czego proponować — dev nie jest kanałem
+        # dystrybucji. Kolektor produkcyjny omyłkowo wskazany na dev nie
+        # dostanie propozycji buildu, z którego nie ma powrotu (Android
+        # odmawia obniżenia wersji). Build testowy wgrywa się przez adb.
+        Write-Info "Instancja dev nie serwuje APK - katalog apk/ zostaje pusty."
+    } elseif (-not (Test-DryRun "Pobralbym wertis-kolektor-$wersjaPo.apk do server\data\apk.")) {
         [void](Get-WertisApk -Katalog $Katalog -Wersja $wersjaPo)
     }
 
     Write-Krok "Uruchamianie usług"
-    Restart-WertisUslugi
+    Restart-WertisUslugi -Uslugi $instancja.Uslugi
     $health = Test-WertisHealth -Port $Port
 
     Write-Naglowek "Aktualizacja zakonczona"
@@ -370,13 +401,13 @@ if (-not $TylkoKonfiguracja) {
     Write-Krok "Usługi Windows"
     $nssm = Get-WertisNssm -Katalog $Katalog
     $node = if (Test-DryRun) { "node.exe" } else { (Get-Command node).Source }
-    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-api" -Aplikacja $node -Katalog $Katalog `
+    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-api$($instancja.Sufiks)" -Aplikacja $node -Katalog $Katalog `
         -Skrypt (Join-Path $Katalog "server\dist\index.js")
-    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-worker" -Aplikacja $node -Katalog $Katalog `
+    Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-worker$($instancja.Sufiks)" -Aplikacja $node -Katalog $Katalog `
         -Skrypt (Join-Path $Katalog "server\dist\worker\worker.js")
 
     Write-Krok "Sieć"
-    Add-WertisRegulaZapory -Port $Port
+    Add-WertisRegulaZapory -Port $Port -Nazwa $instancja.Zapora
 } else {
     $nssm = Join-Path $Katalog "tools\nssm.exe"
 }
@@ -716,15 +747,27 @@ if ($podlaczacDoSubiekta) {
         Pop-Location
         Write-Ok "Baza demo zasilona."
     }
+    if ($Dev) {
+        # Katalog scenariuszy S1-S71 z docs/scenariusze-testowe.md — po to jest
+        # dev: każdy przypadek brzegowy gotowy do obejrzenia, bez wyklikiwania.
+        if (-not (Test-DryRun "Uruchomiłbym npm run seed:scenariusze.")) {
+            Push-Location $Katalog
+            & npm run seed:scenariusze
+            Pop-Location
+            Write-Ok "Scenariusze testowe zasilone."
+        }
+    }
 }
 
 # ═══ Publikacja konfiguracji i start ════════════════════════════════════════
 
 Write-Krok "Zapis konfiguracji"
-Publish-WertisKonfiguracja -Katalog $Katalog -Ustawienia $ustawienia -Nssm $nssm -Port $Port
+if ($instancja.Srodowisko) { $ustawienia.SRODOWISKO = $instancja.Srodowisko }
+Publish-WertisKonfiguracja -Katalog $Katalog -Ustawienia $ustawienia -Nssm $nssm -Port $Port `
+    -Uslugi $instancja.Uslugi
 
 Write-Krok "Uruchamianie usług"
-Restart-WertisUslugi
+Restart-WertisUslugi -Uslugi $instancja.Uslugi
 
 $health = Test-WertisHealth -Port $Port
 

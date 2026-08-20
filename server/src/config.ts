@@ -36,6 +36,16 @@ export const config = {
   dbPath:
     process.env.DB_PATH ?? path.resolve(__dirname, "../data/wertis.db"),
 
+  /**
+   * Etykieta instancji — „produkcja" albo nazwa środowiska (np. „dev").
+   *
+   * Wolny tekst BEZ walidacji, bo to etykieta, nie tryb: nie zmienia żadnego
+   * zachowania serwera. Zmienia zachowanie LUDZI — biuro i kolektor rysują
+   * z niej ostrzeżenie, żeby nikt nie pomylił instancji dev z produkcją,
+   * gdy obie chodzą na tej samej maszynie (DEPLOY.md, dev obok produkcji).
+   */
+  srodowisko: process.env.SRODOWISKO ?? "produkcja",
+
   /** Źródło danych Subiekta: 'seeded' (SQLite z magmat.xlsx) lub 'mssql' (produkcja). */
   sgtMode: (process.env.SGT_MODE ?? "seeded") as "seeded" | "mssql",
 

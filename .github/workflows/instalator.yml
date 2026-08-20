@@ -99,6 +99,17 @@ jobs:
       - name: Przebieg probny (-DryRun)
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Katalog "$env:RUNNER_TEMP\wertis-proba"
 
+      - name: Przebieg probny instancji dev (-Dev -DryRun)
+        run: .\dist\WERTIS-Instalator.ps1 -DryRun -Dev -Katalog "$env:RUNNER_TEMP\wertis-dev-proba" -Port 3002
+
+      # Bramka -Dev MUSI odmowic na porcie produkcji — takze w przebiegu
+      # probnym, bo to pomylka konfiguracji, nie krok wykonawczy.
+      - name: Bramka -Dev odmawia portu 3001
+        run: |
+          .\dist\WERTIS-Instalator.ps1 -DryRun -Dev -Katalog "$env:RUNNER_TEMP\wertis-dev-zle"
+          if ($LASTEXITCODE -eq 0) { throw "-Dev na porcie 3001 mial odmowic" }
+          exit 0
+
       - name: Przebieg probny wariantu demo
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Demo -Katalog "$env:RUNNER_TEMP\wertis-demo"
 

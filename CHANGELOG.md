@@ -33,6 +33,32 @@ historii nie przepisujemy.
 
 ---
 
+## 0.69.0 — 20 sierpnia 2026
+
+**Środowisko dev obok produkcji.** Magazyn pracuje na produkcji, a rozwój
+przestaje na nią czyhać: instalator dostał przełącznik `-Dev`, który stawia
+drugą, w pełni odseparowaną instancję na tej samej maszynie.
+
+Do tej wersji drugiej instalacji nie dało się zrobić bezpiecznie. Nazwy usług
+NSSM były zaszyte, więc ponowna instalacja PRZESTAWIAŁA usługi produkcyjne na
+nowy katalog. Reguła zapory miała jedną nazwę, więc port drugiej instancji
+zostawał zamknięty. Kanał APK był wspólny — kolektor wskazany na dev dostałby
+propozycję testowego buildu, z którego nie ma powrotu, bo Android odmawia
+obniżenia wersji.
+
+`-Dev` rozbraja wszystkie trzy naraz: usługi z sufiksem `-dev`, reguła zapory
+z portem w nazwie, katalog `apk/` celowo pusty. Dane wyłącznie demo — seed
+towarów plus katalog scenariuszy S1–S71. Bramka odmawia `-Dev` na porcie 3001
+i w katalogu produkcyjnym, bo każda z tych pomyłek kończy się rozstrojoną
+produkcją. **[wymaga działania]** tylko dla chętnych: instalacja jedną
+komendą, DEPLOY.md rozdział 6b.
+
+Żeby nikt nie pomylił instancji, obie strony mówią, czym są. `/api/health`
+niesie etykietę `srodowisko`; biuro na instancji dev pokazuje czerwony kafel
+w pasku stanu, a kolektor — czerwoną pastylkę DEV na górnym pasku każdego
+ekranu. Na produkcji nie zmienia się ani piksel: stały napis „PRODUKCJA"
+uczyłby ignorować kolor.
+
 ## 0.68.0 — 20 sierpnia 2026
 
 **Reklamacja dostaje półkę.** Towar w sprawie reklamacyjnej leżał „gdzieś" —
