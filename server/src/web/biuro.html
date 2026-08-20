@@ -9,72 +9,129 @@
      przy każdym otwarciu. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232A2A2C'/%3E%3Cpath d='M5 10h4l2 8 2-8h3l2 8 2-8h4l-4 14h-4l-1.5-6-1.5 6H9z' fill='%23F7A600'/%3E%3C/svg%3E">
 <style>
-  /* Kolorystyka WERTIS: amber #F7A600, grafit #2A2A2C, papier #F6F5F2 */
+  /* ── Język wizualny WERTIS — LUSTRO kolektora ──────────────────────────────
+     Tokeny przepisane 1:1 z android/ui/theme/Color.kt, fonty to TE SAME pliki
+     Barlow, którymi rysuje kolektor (trasa /biuro/fonty/*). Biuro i hala mają
+     wyglądać jak jedna aplikacja: człowiek przechodzący między ekranami nie
+     powinien uczyć się dwóch systemów znaczeń kolorów i wag. */
+  @font-face { font-family: Barlow; font-weight: 400; src: url('/biuro/fonty/barlow_regular.ttf') format('truetype'); font-display: swap; }
+  @font-face { font-family: Barlow; font-weight: 600; src: url('/biuro/fonty/barlow_semibold.ttf') format('truetype'); font-display: swap; }
+  @font-face { font-family: Barlow; font-weight: 700; src: url('/biuro/fonty/barlow_bold.ttf') format('truetype'); font-display: swap; }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('/biuro/fonty/barlowcondensed_bold.ttf') format('truetype'); font-display: swap; }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('/biuro/fonty/barlowcondensed_extrabold.ttf') format('truetype'); font-display: swap; }
   :root {
-    --amber: #F7A600; --amber-bg: #FDF3DC; --amber-ink: #8a5b00;
-    --ink: #2A2A2C; --ink-soft: #5c5c60; --ink-mute: #9a9aa0;
-    --paper: #F6F5F2; --card: #ffffff; --border: #e3e1dc;
-    --ok: #1f8a4c; --ok-bg: #e4f3ea; --err: #c62828; --err-bg: #fdeaea;
+    --amber: #F7A600; --amber-dark: #D98E00; --amber-ink: #B87C00;
+    --amber-bg: #FFF3D6; --amber-line: #F0D9A6;
+    --ink: #2A2A2C; --ink-soft: #55555B; --ink-mute: #6B6B71;
+    --paper: #F6F5F2; --card: #FFFFFF; --secondary: #EDEBE4;
+    --border: #E7E4DC; --card-border: #EDEBE4;
+    --ok: #4C9A52; --ok-bg: #E6F1E7; --err: #B33A3A; --err-bg: #F8E9E9;
+    /* cień cardSurface (elewacja 3dp, tinta grafitem — nie czernią) */
+    --cien: 0 2px 8px rgba(42, 42, 44, 0.10);
+    --font-sans: Barlow, system-ui, "Segoe UI", sans-serif;
+    --font-cond: "Barlow Condensed", "Arial Narrow", Barlow, system-ui, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; }
   /* `main` ma display:grid, a styl autora wygrywa z arkuszem przeglądarki —
      bez tej reguły atrybut hidden przestaje cokolwiek ukrywać */
   [hidden] { display: none !important; }
-  body { background: var(--paper); color: var(--ink); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
-  header { background: var(--ink); color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
-  header b { color: var(--amber); letter-spacing: 2px; }
-  header .kto { margin-left: auto; font-size: 12px; color: #bbb; }
-  header button { background: none; border: 1px solid #555; color: #ccc; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
-  main { max-width: 1080px; margin: 20px auto; padding: 0 16px; display: grid; gap: 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-  h2 { font-size: 13px; letter-spacing: 1.5px; color: var(--ink-soft); margin-bottom: 10px; }
+  body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--font-sans); }
+  /* linki w kolorze akcentu, nie przeglądarkowym błękicie spoza palety */
+  a { color: var(--amber-ink); font-weight: 600; }
+  a:hover { color: var(--amber-dark); }
+
+  /* Pasek górny = TopBar kolektora: grafit, marka bursztynem w kondensacie. */
+  header { background: var(--ink); color: #fff; min-height: 52px; padding: 8px 20px; display: flex; align-items: center; gap: 14px; }
+  header b { color: var(--amber); font: 800 20px/1 var(--font-cond); letter-spacing: 1.5px; }
+  header > span { font: 600 15px/1 var(--font-cond); letter-spacing: .5px; color: #fff; }
+  header .kto { margin-left: auto; font: 600 12px var(--font-sans); color: #bbb; letter-spacing: .3px; }
+  header button { background: none; border: 1px solid #555; color: #ccc; border-radius: 999px; padding: 4px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
+  header button:hover { border-color: var(--amber); color: var(--amber); }
+
+  main { max-width: 1080px; margin: 20px auto; padding: 0 16px; display: grid; gap: 16px; }
+
+  /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--cien); }
+
+  /* Etykieta sekcji — ta sama co nagłówki list na kolektorze:
+     11px, gruba, rozstrzelona, InkSoft. Mniejsza od treści, bo podpisuje
+     sekcję, a nie z nią konkuruje. */
+  h2 { font: 700 11px/1.4 var(--font-sans); letter-spacing: 1.2px; color: var(--ink-soft); margin-bottom: 10px; text-transform: uppercase; }
+
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); padding: 6px 8px; border-bottom: 2px solid var(--border); }
-  td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { text-align: left; font: 600 11px var(--font-sans); letter-spacing: 1px; color: var(--ink-mute); padding: 6px 8px; border-bottom: 2px solid var(--border); }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
   tr:last-child td { border-bottom: none; }
-  .b { font-weight: 700; }
+  /* wiersz-wejście (klikalny) mówi to najazdem, jak dotknięcie na kolektorze */
+  tr[data-dok]:hover td, tr[data-zwrot]:hover td { background: var(--paper); }
+
+  /* Wyróżnienia liczbowe i identyfikatory — kondensat, jak tytuły wierszy
+     na kolektorze (symbol 17sp BarlowCond Bold). */
+  .b { font: 700 15px/1.35 var(--font-cond); letter-spacing: .2px; }
   .mute { color: var(--ink-mute); font-size: 12px; }
-  .badge { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
+
+  /* Pastylki stanu — zaokrąglone do pełna, kondensat, pary kolorów z hali:
+     zieleń Success, bursztyn AmberBg/AmberInk, czerwień Destructive. */
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px; text-transform: uppercase; }
   .badge.ok { background: var(--ok-bg); color: var(--ok); }
   .badge.amber { background: var(--amber-bg); color: var(--amber-ink); }
   .badge.err { background: var(--err-bg); color: var(--err); }
-  .badge.mute2 { background: #ededed; color: var(--ink-soft); }
-  .pasek { height: 6px; background: var(--border); border-radius: 6px; overflow: hidden; width: 120px; }
+  .badge.mute2 { background: var(--secondary); color: var(--ink-soft); }
+
+  .pasek { height: 6px; background: var(--secondary); border-radius: 6px; overflow: hidden; width: 120px; }
   .pasek i { display: block; height: 6px; background: var(--amber); }
   .pasek.done i { background: var(--ok); }
-  button.akcja { background: var(--ink); color: #fff; border: 0; border-radius: 7px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
-  button.akcja.cichy { background: #fff; color: var(--ink); border: 1px solid var(--border); }
+
+  /* Przyciski = PrimaryButton / OutlineButton kolektora: akcja główna jest
+     BURSZTYNOWA z grafitowym napisem (nie odwrotnie — tak odróżnia się od
+     paska górnego), cicha to biel z obrysem. */
+  button.akcja { background: var(--amber); color: var(--ink); border: 0; border-radius: 12px; padding: 8px 16px; font: 800 13px var(--font-sans); letter-spacing: .3px; cursor: pointer; box-shadow: var(--cien); }
+  button.akcja:hover { background: var(--amber-dark); }
+  button.akcja.cichy { background: var(--card); color: var(--ink); border: 1.5px solid rgba(42, 42, 44, 0.55); font-weight: 700; box-shadow: none; }
+  button.akcja.cichy:hover { background: var(--secondary); }
   button.akcja + button.akcja { margin-left: 6px; }
+
   #login { max-width: 380px; margin: 80px auto; }
-  #login input { width: 100%; font-size: 18px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; }
+  #login input { width: 100%; font-size: 18px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; margin: 8px 0; font-family: inherit; }
   #login .blad { color: var(--err); font-size: 13px; min-height: 18px; }
   .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); }
-  input.szukaj { border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; width: 240px; margin-bottom: 10px; }
+  input.szukaj { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; width: 240px; margin-bottom: 10px; font-family: inherit; }
+  /* fokus pola = bursztynowa ramka WertisTextField */
+  input:focus, select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
   /* ── Zakładki ──────────────────────────────────────────────────────────────
      Podgląd urósł z dwóch kart do czterech obszarów. Jedna kolumna kart
      kazałaby biuru przewijać stronę w poszukiwaniu kolejki, a to jest ekran,
-     na który zagląda się w pośpiechu („czy coś się nie zapisało?"). */
-  nav.zakladki { display: flex; gap: 6px; flex-wrap: wrap; }
+     na który zagląda się w pośpiechu („czy coś się nie zapisało?").
+
+     Wygląd = TabBar kolektora: biała listwa, zakładka aktywna dostaje
+     bursztynową pigułkę i AmberInk — nie odwrócone kolory. */
+  nav.zakladki { display: flex; gap: 4px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 6px; box-shadow: var(--cien); }
   nav.zakladki button {
-    background: none; border: 1px solid var(--border); border-radius: 8px;
-    padding: 7px 14px; font: inherit; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+    background: none; border: 0; border-radius: 999px;
+    padding: 8px 16px; font: 600 14px var(--font-cond); letter-spacing: .5px;
+    color: var(--ink-soft); cursor: pointer;
   }
-  nav.zakladki button[aria-current="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  nav.zakladki button:hover { background: var(--paper); }
+  nav.zakladki button[aria-current="true"] { background: var(--amber-bg); color: var(--amber-ink); font-weight: 800; }
 
   /* Pasek stanu stoi NAD zakładkami i widać go z każdej z nich — bo pytanie
      „czy zapisy wchodzą do Subiekta" nie należy do żadnej jednej zakładki. */
   #stan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   #stan .badge { cursor: pointer; }
+
+  /* Kafle metryk: liczba w kondensacie (headlineMedium kolektora), opis pod
+     spodem jak etykieta sekcji. Liczba nosi znaczenie, opis tylko podpisuje. */
   .kafle { display: flex; gap: 12px; flex-wrap: wrap; }
-  .kafel { flex: 1 1 150px; border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
-  .kafel .liczba { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .kafel { flex: 1 1 150px; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px 14px; box-shadow: var(--cien); }
+  .kafel .liczba { font: 800 30px/1.1 var(--font-cond); }
   .kafel .liczba.zle { color: var(--err); }
   .kafel .opis { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
+
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 10px; }
   .filtry label { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); display: block; }
   .filtry input, .filtry select {
-    border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; font: inherit;
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; font: inherit; background: var(--card);
   }
   code.payload { font-size: 11px; color: var(--ink-soft); word-break: break-all; }
 
@@ -85,7 +142,7 @@
   #dostawy tr[data-dok] { cursor: pointer; }
   /* Notatka czekająca na odpowiedź jest jedynym powodem, dla którego dostawa
      nie może się domknąć — musi się odróżniać od tej już zamkniętej. */
-  .karta-notatka { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+  .karta-notatka { border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
   .karta-notatka.czeka { border-color: var(--amber); background: var(--amber-bg); }
   /* Odpowiedź, której biuro jeszcze nie widziało — zielona, bo to dobra
      wiadomość: pytanie doczekało się odpowiedzi. „czeka" zostaje bursztynowe,
@@ -93,20 +150,20 @@
   .karta-notatka.nowa { border-color: var(--ok); background: var(--ok-bg); }
   .karta-notatka .odp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
   #szczegolLinie td.kolFoto { width: 56px; }
-  .foto, .brakfoto { width: 48px; height: 48px; border-radius: 6px; display: block; }
+  .foto, .brakfoto { width: 48px; height: 48px; border-radius: 10px; display: block; }
   .foto { object-fit: cover; border: 1px solid var(--border); }
   .brakfoto {
     border: 1px dashed var(--border); color: var(--ink-mute); font-size: 9px;
     display: flex; align-items: center; justify-content: center; text-align: center;
   }
   .wyjatek { margin-top: 5px; font-size: 12px; }
-  .wyjatek img { max-width: 120px; border-radius: 6px; margin-top: 4px; display: block; }
+  .wyjatek img { max-width: 120px; border-radius: 10px; margin-top: 4px; display: block; }
 
   /* Rozmowa z klientem: strona nadawcy niesie tu całe znaczenie, więc
      odróżnia ją wcięcie i tło, nie sama etykieta z imieniem. */
-  .wiad { border-radius: 9px; padding: 8px 11px; margin: 6px 0; max-width: 78%; }
-  .wiad.klient { background: var(--amber-bg); border: 1px solid var(--amber); }
-  .wiad.my { background: #f1f1ef; border: 1px solid var(--border); margin-left: auto; }
+  .wiad { border-radius: 12px; padding: 8px 11px; margin: 6px 0; max-width: 78%; }
+  .wiad.klient { background: var(--amber-bg); border: 1px solid var(--amber-line); }
+  .wiad.my { background: var(--secondary); border: 1px solid var(--border); margin-left: auto; }
   .wiad .kto { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); margin-bottom: 3px; }
   .wiad .tresc { white-space: pre-wrap; }
 </style>

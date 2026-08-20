@@ -33,6 +33,31 @@ historii nie przepisujemy.
 
 ---
 
+## 0.60.0 — 20 sierpnia 2026
+
+**Biuro wygląda jak kolektor.** Strona `/biuro` dostała język wizualny hali:
+te same tokeny kolorów (lustro `ui/theme/Color.kt`), te same fonty Barlow
+i Barlow Condensed — dosłownie TE SAME pliki, kopiowane z zasobów Androida
+i serwowane z własnego serwera (`/biuro/fonty/*`). Link do Google Fonts nie
+wchodził w grę: biuro pracuje w LAN-ie bez wyjścia w świat.
+
+Hierarchia informacji przepisana z kolektora, nie wymyślona od nowa:
+
+- karty jak `cardSurface` — biel, promień 14, cienka ramka pod miękkim
+  cieniem tintowanym grafitem;
+- etykiety sekcji małe i rozstrzelone NAD treścią — podpisują, nie
+  konkurują; identyfikatory i liczby w kondensacie, jak symbole na hali;
+- zakładka aktywna to bursztynowa pigułka z AmberInk (wzór TabBara),
+  nie odwrócone kolory;
+- akcja główna jest BURSZTYNOWA z grafitowym napisem (PrimaryButton),
+  cicha to biel z obrysem (OutlineButton) — przycisk mówi wagą, nie tylko
+  miejscem;
+- pastylki stanu w parach kolorów z kolektora: zieleń Success, bursztyn
+  AmberBg/AmberInk, czerwień Destructive; pola dostają bursztynowy fokus.
+
+Człowiek przechodzący między kolektorem a biurem widzi jedną aplikację —
+kolor i waga znaczą wszędzie to samo.
+
 ## 0.59.0 — 20 sierpnia 2026
 
 **Zwroty, Etap 3: cyfrowe kosze, rozkładanie na kolektorze i bufor, który
