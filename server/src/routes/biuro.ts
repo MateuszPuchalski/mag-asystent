@@ -47,6 +47,24 @@ export async function biuroRoutes(app: FastifyInstance) {
 
   app.get("/biuro", async (_req, reply) => reply.type("text/html; charset=utf-8").send(html));
 
+  /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
+     Androida). Serwowane z własnego serwera, bo biuro pracuje w LAN-ie bez
+     wyjścia w świat: link do Google Fonts dawałby pustą czcionkę i timeout.
+     Wczytane raz przy rejestracji, jak sam HTML; tydzień cache'u, bo plik
+     zmienia się wyłącznie z wydaniem, a wydanie restartuje usługę. */
+  for (const plik of [
+    "barlow_regular.ttf",
+    "barlow_semibold.ttf",
+    "barlow_bold.ttf",
+    "barlowcondensed_bold.ttf",
+    "barlowcondensed_extrabold.ttf",
+  ]) {
+    const font = fs.readFileSync(path.join(__dirname, "../web/fonty", plik));
+    app.get(`/biuro/fonty/${plik}`, async (_req, reply) =>
+      reply.type("font/ttf").header("cache-control", "public, max-age=604800").send(font)
+    );
+  }
+
   // korzeń przekierowuje do podglądu: adres `http://serwer:3001` w pasku
   // przeglądarki biura ma pokazać COŚ, a nie 404
   app.get("/", async (_req, reply) => reply.redirect("/biuro"));
