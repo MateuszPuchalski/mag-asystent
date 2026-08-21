@@ -486,8 +486,12 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - **Pasek stanu widać z każdej zakładki**: wersja i tryb serwera, czy worker
   żyje, ile zadań stoi w błędzie, ile rozjazdów zna rekoncyliacja. Kliknięcie
   prowadzi do szczegółu.
-- Trzy zakładki. **DOSTAWY I REKLAMACJE** — postęp per dokument oraz
-  nierozwiązane wyjątki; protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
+- **Zakładki w trzech grupach** (0.74.1), bo mają różny rytm pracy.
+  PRACA (dostawy, zwroty) otwiera się kilkanaście razy dziennie.
+  WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
+  USTAWIENIA (dostawcy) raz na kilka tygodni.
+- **DOSTAWY I REKLAMACJE** — postęp per dokument oraz nierozwiązane wyjątki;
+  protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
 - **Wyjątki widać z listy** (0.57.0): wiersz dostawy niesie licznik
   nierozwiązanych zgłoszeń. Pasek postępu ich nie pokaże i pokazać nie może —
   wyjątek liczy się jako pozycja domknięta. Biuro może też **zamknąć wyjątek**
