@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.76.0 — 21 sierpnia 2026
+
+**Ustawienia biura wychodzą z paska zakładek za zębatkę.** Do tej wersji
+DOSTAWCY stali w pasku jako osobna grupa z jedną pastylką — i ważyli w rzędzie
+tyle samo co DOSTAWY, choć biuro wchodzi tam raz na kilka tygodni. Logo
+dostawcy wgrywa się raz i wraca do tego ekranu wtedy, gdy dojdzie nowy
+kontrahent. To jest konfiguracja, nie zakładka pracy.
+
+Zębatka stoi w nagłówku, obok „Wyloguj", czyli tam, gdzie już mieszka to, co
+dotyczy całej sesji, a nie jednego widoku. Otwiera DOSTAWCÓW wprost, bez menu:
+rozwijana lista z jedną pozycją byłaby żartem. Menu jest drogą rozwoju na
+moment, w którym dołączą import zbiórek i reguły strefy złotej — dziś schowane
+pod ANALIZĄ, czyli konfiguracja pod raportem.
+
+**Grupy w pasku rozdziela teraz kreska.** Sam odstęp (18 px) był za słaby przy
+4 px między przyciskami w grupie i kazał czytać podpisy, żeby wiedzieć, gdzie
+kończy się PRACA. Kreska pokazuje się tylko wtedy, gdy grupy stoją w jednym
+rzędzie — po zawinięciu wyglądałaby na błąd renderowania.
+
+Mechanizm został jeden: zębatka niesie ten sam atrybut `data-widok`, co
+zakładki, więc obsługuje ją ta sama delegacja kliknięcia i ta sama pętla
+`aria-current`. Sama świeci na bursztynowo, gdy DOSTAWCY są otwarci — w pasku
+nie świeci wtedy nic i to jest prawda, bo żadna zakładka pracy nie jest
+otwarta. Widok, jego dane i uprawnienia zostały nietknięte: zmieniło się
+wejście, nie miejsce docelowe.
+
+Panel jest czytany raz przy starcie, więc **zmianę widać po restarcie usługi**.
+APK bez zmian.
+
+---
+
 ## 0.75.0 — 21 sierpnia 2026
 
 **Trzecia zakładka kolektora: ROZKŁADANIE ZWROTÓW.** Do tej wersji aplikacja
