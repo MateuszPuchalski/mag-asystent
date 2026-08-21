@@ -180,6 +180,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
     "DELETE to odpięcie dokumentu zwrotu, odpięcie kosza, rozłączenie " +
       "konta Allegro i skasowanie logo dostawcy"
   );
+  /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
+     są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
+     wyjątków dostawy: `rysujReklamacje` istniało w dwóch egzemplarzach, bo
+     zwroty dostały własną listę reklamacji o tej samej nazwie (0.59.0). */
+  const nazwy = [...html.matchAll(/^function\s+([\w$]+)\s*\(/gm)].map((m) => m[1]);
+  const zdublowane = nazwy.filter((n, i) => nazwy.indexOf(n) !== i);
+  assert.deepEqual(zdublowane, [], "funkcje o tej samej nazwie przesłaniają się nawzajem");
+
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
   assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
   assert.match(html, /dokument\/\$\{dokId\}\/zamknij/, "zamknięcie poza WERTIS");
