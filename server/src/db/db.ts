@@ -173,6 +173,7 @@ function migrate(database: DatabaseSync) {
   addColumn("zwrot_pozycja", "rekl_przez", "TEXT");
   addColumn("zwrot_pozycja", "rekl_notatka", "TEXT");
   addColumn("zwrot_pozycja", "rekl_polka", "TEXT");
+  addColumn("zwrot_zapowiedz", "status_allegro", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);

@@ -74,9 +74,63 @@ test("zgłoszenie zwrotu przyjętego PRZED przebiegiem rodzi się jako dotarłe"
   assert.equal(zap.status, "dotarl");
 });
 
-test("liczby do raportu: oczekujące i brakujące osobno", async () => {
+test("liczby do raportu: oczekujące, alarmy i doręczone-nieprzyjęte osobno", async () => {
   await Z.odswiezZapowiedzi();
   const l = Z.liczbyZapowiedzi();
   assert.equal(l.oczekujace, 3);
-  assert.ok(l.brakujace >= 1 && l.brakujace < 3, "alarmem jest stare zgłoszenie, nie wczorajsze");
+  /* dev-ret-1 jest DELIVERED (paczka u nas, nikt nie skanował), dev-ret-3
+     jedzie piąty dzień — oba alarmują. dev-ret-2 nadano wczoraj: cisza. */
+  assert.equal(l.brakujace, 2);
+  assert.equal(l.doreczoneNieprzyjete, 1);
+});
+
+test("status Allegro rozstrzyga stan zgłoszenia; nieznany nie chowa paczki", () => {
+  for (const s of ["FINISHED", "FINISHED_APT", "REJECTED", "COMMISSION_REFUNDED",
+                   "COMMISSION_REFUND_CLAIMED", "WAREHOUSE_DELIVERED", "WAREHOUSE_VERIFICATION"]) {
+    assert.equal(Z.stanZgloszenia(s), "zamknieta", s);
+  }
+  assert.equal(Z.stanZgloszenia("DELIVERED"), "doreczona");
+  assert.equal(Z.stanZgloszenia(" delivered "), "doreczona", "wielkość liter i spacje nie decydują");
+  for (const s of ["CREATED", "IN_TRANSIT", "NOWY_STATUS_Z_PRZYSZLOSCI", "", null]) {
+    assert.equal(Z.stanZgloszenia(s), "w_drodze", String(s));
+  }
+});
+
+test("sprawa zamknięta w panelu Allegro schodzi z listy sama", async () => {
+  /* To był fałszywy alarm z produkcji: zwrot zgłoszony 10 sierpnia, doręczony,
+     rozliczony w panelu — a karta pokazywała „11 dni bez paczki", bo nikt go
+     u nas nie skanował i nie czytaliśmy statusu z Allegro. */
+  await Z.odswiezZapowiedzi();
+  assert.ok(Z.brakujacePaczki().some((b) => b.referencja === "ZW-DEV-0003"));
+  db()
+    .prepare("UPDATE zwrot_zapowiedz SET status_allegro='FINISHED' WHERE allegro_return_id='dev-ret-3'")
+    .run();
+  assert.ok(!Z.brakujacePaczki().some((b) => b.referencja === "ZW-DEV-0003"));
+  assert.equal(Z.liczbyZapowiedzi().oczekujace, 2, "zamknięta sprawa nie jest już naszą pracą");
+});
+
+test("doręczona paczka alarmuje NATYCHMIAST, bez czekania na próg", async () => {
+  await Z.odswiezZapowiedzi();
+  // dev-ret-2 nadano wczoraj — poniżej progu, więc na liście go nie ma…
+  assert.ok(!Z.brakujacePaczki().some((b) => b.referencja === "ZW-DEV-0002"));
+  db()
+    .prepare("UPDATE zwrot_zapowiedz SET status_allegro='DELIVERED' WHERE allegro_return_id='dev-ret-2'")
+    .run();
+  // …a gdy przewoźnik dostarczył, paczka leży u nas nieprzyjęta i próg nie ma nic do rzeczy
+  const lista = Z.brakujacePaczki();
+  assert.ok(lista.some((b) => b.referencja === "ZW-DEV-0002"));
+  assert.equal(lista[0].stan, "doreczona", "doręczone stoją nad tymi w drodze");
+});
+
+test("SCHOWAJ zdejmuje zgłoszenie z listy raz i tylko raz", async () => {
+  await Z.odswiezZapowiedzi();
+  const cel = Z.brakujacePaczki().find((b) => b.referencja === "ZW-DEV-0003")!;
+  assert.equal(Z.pominZapowiedz(cel.id, "Biuro"), true);
+  assert.ok(!Z.brakujacePaczki().some((b) => b.id === cel.id));
+  assert.equal(Z.pominZapowiedz(cel.id, "Biuro"), false, "drugie kliknięcie nie ma czego chować");
+  assert.equal(Z.pominZapowiedz(999_999, "Biuro"), false);
+  /* Schowanie NIE blokuje przyjęcia: paczka może się jednak znaleźć, a skan
+     szuka po numerze przesyłki, nie po stanie wiersza. */
+  const w = await Zw.utworzZeSkanu("DEVWB0003", "Test");
+  assert.equal(w.rodzaj, "utworzony");
 });
