@@ -2240,7 +2240,7 @@ function rysujBrakujace(lista) {
           <td>${z.stan === "doreczona"
             ? '<span class="badge err">DORĘCZONA · NIE PRZYJĘTA</span>'
             : '<span class="badge amber">W DRODZE</span>'}
-              ${z.statusAllegro ? `<div class="mute">${esc(z.statusAllegro)}</div>` : ""}</td>
+              <div class="mute">${z.statusAllegro ? esc(z.statusAllegro) : "status jeszcze niepobrany"}</div></td>
           <td class="b">${z.dniOdZgloszenia ?? "?"} dni</td>
           <td class="b">${esc(z.referencja || "—")}</td>
           <td>${esc(z.kupujacyLogin || "—")}</td>
