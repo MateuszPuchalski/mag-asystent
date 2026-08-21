@@ -161,11 +161,12 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    17,
+    18,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i dziesięć zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i jedenaście zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
-      "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja) — nic ponadto"
+      "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja, " +
+      "schowanie zapowiedzi) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

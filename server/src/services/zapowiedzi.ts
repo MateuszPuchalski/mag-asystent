@@ -2,6 +2,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { allegroAdapter } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
+import { logEvent } from "./events.js";
 import type { ZwrotAllegro } from "../adapters/allegro.js";
 
 /* ── Zapowiedzi zwrotów (Etap 4) ─────────────────────────────────────────────
@@ -23,6 +24,48 @@ const PIERWSZY_PRZEBIEG_DNI = 14;
 /** Zakładka okna kolejnego przebiegu — API filtruje po createdAt, nie po zmianach. */
 const ZAKLADKA_DNI = 1;
 
+/**
+ * Co Allegro sądzi o zgłoszeniu — trzy odpowiedzi, bo trzy różne działania.
+ *
+ *   zamknieta  sprawa skończona ALBO towar pojechał do magazynu Allegro;
+ *              nie czekamy na nic i nie ma o czym alarmować
+ *   doreczona  przewoźnik dostarczył, a u nas NIKT tego nie zeskanował —
+ *              paczka leży gdzieś w firmie nieprzyjęta; alarm natychmiast
+ *   w_drodze   jeszcze jedzie (albo status nieznany) — alarm dopiero po progu
+ *
+ * Statusy własne Allegro (`GET /order/customer-returns`): CREATED, IN_TRANSIT,
+ * DELIVERED, FINISHED, FINISHED_APT, REJECTED, COMMISSION_REFUND_CLAIMED,
+ * COMMISSION_REFUNDED, WAREHOUSE_DELIVERED, WAREHOUSE_VERIFICATION.
+ */
+export type StanZgloszenia = "zamknieta" | "doreczona" | "w_drodze";
+
+/* Sprawy, na które nie czekamy. FINISHED/REJECTED mówią to wprost. Statusy
+   COMMISSION_* znaczą, że pieniądze już się rozliczyły — na zwrocie 2905/2026
+   (10 sierpnia 2026) prowizja wróciła po zakończonym zwrocie i to właśnie taki
+   zwrot wisiał u nas jako „brakująca paczka" jedenaście dni. WAREHOUSE_* to
+   towar dostarczony do magazynu ALLEGRO, czyli nie do nas — też nie czekamy. */
+const STATUSY_ZAMKNIETE = new Set([
+  "FINISHED", "FINISHED_APT", "REJECTED",
+  "COMMISSION_REFUND_CLAIMED", "COMMISSION_REFUNDED",
+  "WAREHOUSE_DELIVERED", "WAREHOUSE_VERIFICATION",
+]);
+
+/** Przewoźnik dostarczył do NAS — od tej chwili brak skanu jest alarmem. */
+const STATUSY_DORECZONE = new Set(["DELIVERED"]);
+
+/**
+ * Stan zgłoszenia z surowego statusu Allegro. Nieznany status (nowa wartość,
+ * pusty odczyt) daje `w_drodze` ŚWIADOMIE: lepiej pokazać zgłoszenie, które
+ * nie wymaga uwagi, niż ukryć paczkę, która naprawdę zaginęła. Czysta funkcja
+ * — eksport dla testów.
+ */
+export function stanZgloszenia(statusAllegro: string | null): StanZgloszenia {
+  const s = (statusAllegro ?? "").trim().toUpperCase();
+  if (STATUSY_ZAMKNIETE.has(s)) return "zamknieta";
+  if (STATUSY_DORECZONE.has(s)) return "doreczona";
+  return "w_drodze";
+}
+
 export interface WierszZapowiedzi {
   id: number;
   referencja: string | null;
@@ -30,6 +73,10 @@ export interface WierszZapowiedzi {
   zgloszono: string | null;
   waybills: string[];
   dniOdZgloszenia: number | null;
+  /** Dlaczego wiersz jest na liście — steruje kolorem i pilnością w biurze. */
+  stan: StanZgloszenia;
+  /** Surowy status z Allegro — na ekranie obok, żeby dało się zweryfikować regułę. */
+  statusAllegro: string | null;
 }
 
 function wszystkieWaybille(z: ZwrotAllegro): string[] {
@@ -64,11 +111,13 @@ export async function odswiezZapowiedzi(): Promise<number> {
   const teraz = nowIso();
   const upsert = d.prepare(
     `INSERT INTO zwrot_zapowiedz(allegro_return_id, referencja, kupujacy_login,
-                                 utworzono_allegro, waybills, status, zwrot_id, widziano_at)
-     VALUES (?,?,?,?,?,?,?,?)
+                                 utworzono_allegro, waybills, status, status_allegro,
+                                 zwrot_id, widziano_at)
+     VALUES (?,?,?,?,?,?,?,?,?)
      ON CONFLICT(allegro_return_id) DO UPDATE SET
        referencja=excluded.referencja, kupujacy_login=excluded.kupujacy_login,
        utworzono_allegro=excluded.utworzono_allegro, waybills=excluded.waybills,
+       status_allegro=excluded.status_allegro,
        widziano_at=excluded.widziano_at`
   );
   const znanyZwrot = d.prepare("SELECT id FROM zwrot WHERE allegro_return_id = ?");
@@ -89,6 +138,9 @@ export async function odswiezZapowiedzi(): Promise<number> {
       z.utworzono,
       JSON.stringify(wszystkieWaybille(z)),
       zwrot ? "dotarl" : "oczekuje",
+      /* Status z Allegro nadpisujemy przy KAŻDYM przebiegu — to on decyduje,
+         czy zgłoszenie dalej jest alarmem, a zmienia się bez naszego udziału. */
+      z.status,
       zwrot?.id ?? null,
       teraz
     );
@@ -119,44 +171,88 @@ export function odhaczZapowiedz(allegroReturnId: string, zwrotId: number): void 
     .run(zwrotId, allegroReturnId);
 }
 
+/** Wszystkie zgłoszenia wciąż oczekujące — z klasyfikacją i wiekiem. */
+function oczekujace(): WierszZapowiedzi[] {
+  const wiersze = db()
+    .prepare(
+      `SELECT id, referencja, kupujacy_login, utworzono_allegro, waybills, status_allegro
+       FROM zwrot_zapowiedz WHERE status='oczekuje'
+       ORDER BY utworzono_allegro LIMIT 200`
+    )
+    .all() as Array<Record<string, unknown>>;
+  return wiersze.map((w) => {
+    const zgloszono = (w.utworzono_allegro as string) ?? null;
+    const t = zgloszono ? Date.parse(zgloszono) : NaN;
+    const statusAllegro = (w.status_allegro as string) ?? null;
+    return {
+      id: w.id as number,
+      referencja: (w.referencja as string) ?? null,
+      kupujacyLogin: (w.kupujacy_login as string) ?? null,
+      zgloszono,
+      waybills: JSON.parse((w.waybills as string) || "[]") as string[],
+      dniOdZgloszenia: Number.isFinite(t) ? Math.floor((Date.now() - t) / DZIEN_MS) : null,
+      stan: stanZgloszenia(statusAllegro),
+      statusAllegro,
+    };
+  });
+}
+
 /**
- * Zgłoszenia czekające na paczkę dłużej niż próg — treść panelu „brakujące
- * paczki". Świeże zgłoszenia (paczka pewnie jeszcze jedzie) odsiewa próg,
- * nie lista: alarm o paczce nadanej wczoraj byłby szumem.
+ * Treść panelu „brakujące paczki" — DWA różne alarmy, nie jeden.
+ *
+ * Paczka DORĘCZONA, której nikt u nas nie zeskanował, leży gdzieś w firmie
+ * nieprzyjęta i jest alarmem od razu — próg dni jej nie dotyczy. Zgłoszenie
+ * wciąż w drodze to zwykłe czekanie i alarmem staje się dopiero po progu,
+ * bo inaczej lista wypełniłaby się paczkami nadanymi wczoraj.
+ *
+ * Sprawy, które Allegro uważa za zamknięte, nie trafiają tu wcale: to one
+ * zrobiły z tej karty listę fałszywych alarmów zaraz po wdrożeniu (zwroty
+ * rozliczone w panelu, zanim aplikacja w ogóle o nich wiedziała).
  */
 export function brakujacePaczki(): WierszZapowiedzi[] {
   const prog = Date.now() - config.zwroty.brakujacaDni * DZIEN_MS;
-  const wiersze = db()
-    .prepare(
-      `SELECT id, referencja, kupujacy_login, utworzono_allegro, waybills
-       FROM zwrot_zapowiedz WHERE status='oczekuje'
-       ORDER BY utworzono_allegro LIMIT 100`
-    )
-    .all() as Array<Record<string, unknown>>;
-  return wiersze
-    .map((w) => {
-      const zgloszono = (w.utworzono_allegro as string) ?? null;
-      const t = zgloszono ? Date.parse(zgloszono) : NaN;
-      return {
-        id: w.id as number,
-        referencja: (w.referencja as string) ?? null,
-        kupujacyLogin: (w.kupujacy_login as string) ?? null,
-        zgloszono,
-        waybills: JSON.parse((w.waybills as string) || "[]") as string[],
-        dniOdZgloszenia: Number.isFinite(t) ? Math.floor((Date.now() - t) / DZIEN_MS) : null,
-      };
+  return oczekujace()
+    .filter((w) => {
+      if (w.stan === "zamknieta") return false;
+      if (w.stan === "doreczona") return true;
+      return w.zgloszono === null || Date.parse(w.zgloszono) <= prog;
     })
-    .filter((w) => w.zgloszono === null || Date.parse(w.zgloszono) <= prog);
+    /* Doręczone na górze: tam paczka jest już fizycznie u nas, a wiersz niżej
+       mówi tylko, że kurier jeszcze jedzie. */
+    .sort((a, b) => Number(b.stan === "doreczona") - Number(a.stan === "doreczona"));
+}
+
+/**
+ * Zdjęcie zgłoszenia z listy ręką — sprawa załatwiona poza aplikacją albo
+ * paczka, która nigdy nie dojedzie. Decyzja człowieka, więc zostaje w audycie;
+ * zwrot da się mimo to przyjąć skanem, bo szybka ścieżka pyta o numer paczki,
+ * nie o status wiersza. `false` = nie ma czego pomijać (wołający robi 404).
+ */
+export function pominZapowiedz(id: number, autor: string): boolean {
+  const w = db()
+    .prepare("SELECT allegro_return_id FROM zwrot_zapowiedz WHERE id = ? AND status = 'oczekuje'")
+    .get(id) as { allegro_return_id: string } | undefined;
+  if (!w) return false;
+  db().prepare("UPDATE zwrot_zapowiedz SET status='pominieta' WHERE id=?").run(id);
+  logEvent("zapowiedz_pominieta", autor, null, { id, allegroReturnId: w.allegro_return_id });
+  return true;
 }
 
 /** Liczby do raportu procesu: ile zgłoszeń czeka, ile z nich to już alarm. */
-export function liczbyZapowiedzi(): { oczekujace: number; brakujace: number } {
-  const oczekujace = (
-    db().prepare("SELECT COUNT(*) AS n FROM zwrot_zapowiedz WHERE status='oczekuje'").get() as {
-      n: number;
-    }
-  ).n;
-  return { oczekujace, brakujace: brakujacePaczki().length };
+export function liczbyZapowiedzi(): {
+  oczekujace: number;
+  brakujace: number;
+  doreczoneNieprzyjete: number;
+} {
+  /* „Oczekujące" liczy tylko te, na które NAPRAWDĘ czekamy — zgłoszenie
+     zamknięte w panelu Allegro nie jest naszą pracą, choć wiersz jeszcze stoi. */
+  const czekajace = oczekujace().filter((w) => w.stan !== "zamknieta");
+  const alarmy = brakujacePaczki();
+  return {
+    oczekujace: czekajace.length,
+    brakujace: alarmy.length,
+    doreczoneNieprzyjete: alarmy.filter((w) => w.stan === "doreczona").length,
+  };
 }
 
 /**

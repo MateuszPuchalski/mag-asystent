@@ -24,7 +24,7 @@ import {
   zdejmijDokument,
 } from "../services/zwroty.js";
 import { listaReklamacji, raportZwrotow, rozpatrzReklamacje, ustawPolke } from "../services/reklamacje.js";
-import { brakujacePaczki } from "../services/zapowiedzi.js";
+import { brakujacePaczki, pominZapowiedz } from "../services/zapowiedzi.js";
 
 /* ── Zwroty Allegro — trasy biura ────────────────────────────────────────────
    Wszystko za bramką ról biuro|admin (wzorzec zbiorki.ts): zwrot wiąże się
@@ -276,6 +276,19 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return { zapowiedzi: brakujacePaczki() };
   });
+
+  /* Zdjęcie zgłoszenia z listy ręką — sprawa załatwiona poza aplikacją. */
+  app.post<{ Params: { id: string } }>(
+    "/api/biuro/zwroty/zapowiedzi/:id/pomin",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      if (!pominZapowiedz(Number(req.params.id), autor())) {
+        return reply.code(404).send({ error: "Nie ma takiego oczekującego zgłoszenia" });
+      }
+      return { zapowiedzi: brakujacePaczki() };
+    }
+  );
 
   /* Półka reklamacyjna (Etap 6) — gdzie fizycznie leży towar sprawy. */
   app.put<{ Params: { pid: string }; Body: { polka?: string } }>(

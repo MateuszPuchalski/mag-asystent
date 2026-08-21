@@ -713,7 +713,15 @@ CREATE TABLE IF NOT EXISTS zwrot_zapowiedz (
   -- tablica JSON — skan porównuje przez json_each, bo etykieta u drzwi nosi
   -- którykolwiek z nich.
   waybills          TEXT NOT NULL DEFAULT '[]',
-  status            TEXT NOT NULL DEFAULT 'oczekuje', -- oczekuje | dotarl
+  --   oczekuje  = czekamy na paczkę (albo na decyzję człowieka)
+  --   dotarl    = zwrot przyjęty skanem u nas
+  --   pominieta = człowiek zdjął zgłoszenie z listy (sprawa załatwiona poza aplikacją)
+  status            TEXT NOT NULL DEFAULT 'oczekuje',
+  -- Status zwrotu PO STRONIE ALLEGRO (CREATED, IN_TRANSIT, DELIVERED, FINISHED,
+  -- REJECTED, COMMISSION_*, WAREHOUSE_*). Bez niego panel „brakujące paczki"
+  -- nie odróżniał sprawy zamkniętej w panelu od paczki, która naprawdę nie
+  -- dojechała — i pokazywał alarm dla zwrotów rozliczonych tygodnie temu.
+  status_allegro    TEXT,
   zwrot_id          INTEGER REFERENCES zwrot(id),     -- zwrot przyjęty skanem
   widziano_at       TEXT NOT NULL         -- ostatni raz w odpowiedzi API (diagnostyka tickera)
 );
