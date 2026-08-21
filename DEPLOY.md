@@ -980,6 +980,11 @@ zamknięte (`FINISHED`, `REJECTED`, zwrot prowizji, magazyn Allegro), schodzą
 z listy same. Przycisk SCHOWAJ zdejmuje pojedyncze zgłoszenie ręką — do spraw
 załatwionych poza aplikacją; ślad zostaje w dzienniku.
 
+Statusy zgłoszeń, które wciąż czekają na paczkę, ticker odświeża od 0.73.0
+POJEDYNCZO po identyfikatorze, najwyżej 25 na przebieg. Lista zwrotów filtruje
+po dacie utworzenia, więc sprawa sprzed miesiąca nigdy nie wróciłaby w oknie
+przyrostowym — a jej status w Allegro zmienia się dalej.
+
 Od 0.68.0 reklamacja ma **półkę** — pole „gdzie fizycznie leży towar" na
 liście reklamacji i karcie zwrotu. To ewidencja w aplikacji, nie ruch
 w Subiekcie: reklamowany towar nie jest na stanie, więc MM nie miałoby czego

@@ -33,6 +33,27 @@ historii nie przepisujemy.
 
 ---
 
+## 0.73.0 — 21 sierpnia 2026
+
+**Poprawka do 0.70.0: stare zgłoszenia nigdy nie dostawały statusu.** Ze
+zgłoszenia z produkcji: zwrot 29YN/2026 doręczony 10 sierpnia i rozliczony
+12-go wisiał na liście jako „W DRODZE, 15 dni". Obietnica z 0.70.0 — „sprawy
+zamknięte schodzą z listy same" — działała wyłącznie dla zgłoszeń świeżych.
+
+Powód siedział w oknie tickera. Lista zwrotów filtruje po dacie UTWORZENIA,
+a okno zaczyna się dzień przed najnowszym znanym zgłoszeniem. Sprawa sprzed
+dwóch tygodni nigdy w tym oknie nie wraca, więc jej `status_allegro` zostawał
+pusty od migracji — a pusty status znaczy „w drodze", bo tak ma być bezpiecznie.
+
+**Ticker odświeża teraz oczekujące zgłoszenia po identyfikatorze**, najwyżej
+25 na przebieg, od najdawniej widzianych. Zaległość po wdrożeniu rozkłada się
+na kilka przebiegów zamiast wystrzelić setką zapytań naraz, a zwrot, którego
+Allegro już nie zna, dostaje tylko nowy znacznik czasu i wraca na koniec
+kolejki. Odkrycie nowych zgłoszeń zostaje przy tanim oknie przyrostowym.
+
+**Brak statusu jest teraz widoczny.** Wiersz bez odczytanego statusu pisze
+wprost „status jeszcze niepobrany" zamiast milczeć — właśnie to milczenie
+kazało zgadywać, czy reguła nie działa, czy nie ma czego czytać.
 ## 0.72.1 — 21 sierpnia 2026
 
 **Świeży kolektor trafia w serwer bez wpisywania adresu.** Fabryczną wartością

@@ -25,6 +25,21 @@ const PIERWSZY_PRZEBIEG_DNI = 14;
 const ZAKLADKA_DNI = 1;
 
 /**
+ * Ile oczekujących zgłoszeń odświeżamy PO ID w jednym przebiegu.
+ *
+ * Lista zwrotów filtruje po dacie UTWORZENIA, więc zgłoszenie sprzed miesiąca
+ * nigdy nie wraca w oknie przyrostowym — a jego status w Allegro zmienia się
+ * dalej. Bez tego kroku zwrot doręczony i rozliczony wisiał u nas jako
+ * „w drodze" bez końca (zgłoszenie z produkcji, 29YN/2026). Sufit jest po to,
+ * żeby zaległość z wdrożenia rozłożyła się na kilka przebiegów zamiast
+ * wystrzelić setką zapytań naraz.
+ */
+const ODSWIEZ_NA_PRZEBIEG = 25;
+
+/** Po ilu godzinach status oczekującego zgłoszenia uznajemy za nieświeży. */
+const SWIEZOSC_H = 1;
+
+/**
  * Co Allegro sądzi o zgłoszeniu — trzy odpowiedzi, bo trzy różne działania.
  *
  *   zamknieta  sprawa skończona ALBO towar pojechał do magazynu Allegro;
@@ -149,6 +164,43 @@ export async function odswiezZapowiedzi(): Promise<number> {
 }
 
 /**
+ * Odświeżenie statusów zgłoszeń, które wciąż czekają na paczkę.
+ *
+ * Pyta o KAŻDE z osobna (`GET /order/customer-returns/{id}`), bo lista tego
+ * nie pokaże: filtruje po dacie utworzenia, a te zgłoszenia są starsze niż
+ * okno przyrostowe. Zwrot, którego Allegro już nie zna, dostaje tylko nowy
+ * znacznik `widziano_at` — wraca na koniec kolejki zamiast blokować ją co
+ * pięć minut. Zwraca liczbę odświeżonych — do logu tickera.
+ */
+export async function odswiezStatusyOczekujacych(): Promise<number> {
+  const d = db();
+  const prog = new Date(Date.now() - SWIEZOSC_H * 3_600_000).toISOString();
+  const wiersze = d
+    .prepare(
+      `SELECT id, allegro_return_id FROM zwrot_zapowiedz
+        WHERE status='oczekuje' AND widziano_at < ?
+        ORDER BY widziano_at LIMIT ?`
+    )
+    .all(prog, ODSWIEZ_NA_PRZEBIEG) as Array<{ id: number; allegro_return_id: string }>;
+
+  const zapisz = d.prepare(
+    "UPDATE zwrot_zapowiedz SET status_allegro=?, waybills=?, widziano_at=? WHERE id=?"
+  );
+  const tylkoZnacznik = d.prepare("UPDATE zwrot_zapowiedz SET widziano_at=? WHERE id=?");
+  let odswiezonych = 0;
+  for (const w of wiersze) {
+    const z = await allegroAdapter().zwrot(w.allegro_return_id);
+    if (!z) {
+      tylkoZnacznik.run(nowIso(), w.id);
+      continue;
+    }
+    zapisz.run(z.status, JSON.stringify(wszystkieWaybille(z)), nowIso(), w.id);
+    odswiezonych++;
+  }
+  return odswiezonych;
+}
+
+/**
  * Zgłoszenie, którego którakolwiek paczka nosi ten numer — szybka ścieżka
  * skanu: jeden GET szczegółu zamiast dwóch przeszukiwań listy po polach paczki.
  */
@@ -267,8 +319,12 @@ export function uruchomTickerZapowiedzi(): void {
     const stan = stanPolaczenia().stan;
     if (stan !== "dev" && stan !== "polaczone") return;
     odswiezZapowiedzi()
-      .then((nowych) => {
+      .then(async (nowych) => {
         if (nowych > 0) console.log(`[zapowiedzi] nowych zgłoszeń zwrotu: ${nowych}`);
+        /* Po nowych — statusy tych, które wciąż czekają. Kolejność jest bez
+           znaczenia, ale jedno `catch` na oba kroki wystarcza. */
+        const odswiezonych = await odswiezStatusyOczekujacych();
+        if (odswiezonych > 0) console.log(`[zapowiedzi] odświeżonych statusów: ${odswiezonych}`);
       })
       .catch((e) =>
         console.error("[zapowiedzi] przebieg nieudany:", e instanceof Error ? e.message : e)

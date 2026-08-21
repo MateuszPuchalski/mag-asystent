@@ -122,6 +122,60 @@ test("doręczona paczka alarmuje NATYCHMIAST, bez czekania na próg", async () =
   assert.equal(lista[0].stan, "doreczona", "doręczone stoją nad tymi w drodze");
 });
 
+test("stare zgłoszenie dostaje status po id — lista przyrostowa go nie pokaże", async () => {
+  /* Zgłoszenie z produkcji 29YN/2026: zwrot doręczony 10 sierpnia i rozliczony
+     12-go wisiał u nas jako „w drodze" bez końca. Lista zwrotów filtruje po
+     dacie UTWORZENIA, więc okno przyrostowe nigdy po niego nie wróciło,
+     a status został pusty z migracji. */
+  await Z.odswiezZapowiedzi();
+  const d = db();
+  d.prepare(
+    "UPDATE zwrot_zapowiedz SET status_allegro=NULL, widziano_at='2020-01-01T00:00:00.000Z'"
+  ).run();
+  /* Bez statusu wszystko wygląda na „w drodze", więc alarmują te powyżej progu
+     (dev-ret-1 i dev-ret-3); wczorajsze dev-ret-2 wciąż grzecznie czeka. */
+  assert.equal(Z.brakujacePaczki().length, 2);
+
+  assert.equal(await Z.odswiezStatusyOczekujacych(), 3);
+  const statusy = d
+    .prepare("SELECT allegro_return_id AS id, status_allegro AS s FROM zwrot_zapowiedz ORDER BY id")
+    .all() as Array<{ id: string; s: string | null }>;
+  // wiersze z SQLite mają null-prototype — porównujemy zwykłe obiekty
+  assert.deepEqual(statusy.map((r) => ({ id: r.id, s: r.s })), [
+    { id: "dev-ret-1", s: "DELIVERED" },
+    { id: "dev-ret-2", s: "CREATED" },
+    { id: "dev-ret-3", s: "CREATED" },
+  ]);
+
+  // świeżo odświeżonych nie pytamy drugi raz w kółko
+  assert.equal(await Z.odswiezStatusyOczekujacych(), 0);
+});
+
+test("odświeżenie zdejmuje z listy zwrot zamknięty w Allegro", async () => {
+  await Z.odswiezZapowiedzi();
+  const d = db();
+  // zgłoszenie sprzed wdrożenia: status pusty, dawno niewidziane
+  d.prepare(
+    `UPDATE zwrot_zapowiedz SET status_allegro=NULL, widziano_at='2020-01-01T00:00:00.000Z'
+      WHERE allegro_return_id='dev-ret-3'`
+  ).run();
+  assert.ok(Z.brakujacePaczki().some((b) => b.referencja === "ZW-DEV-0003"));
+  /* Adapter dev odda dla tego zwrotu status CREATED, więc żeby zmierzyć samo
+     zejście z listy, podmieniamy odpowiedź na sprawę zamkniętą. */
+  const adapter = (await import("../adapters/allegro.js")).allegroAdapter();
+  const oryginal = adapter.zwrot.bind(adapter);
+  adapter.zwrot = async (id: string) => {
+    const z = await oryginal(id);
+    return z && id === "dev-ret-3" ? { ...z, status: "FINISHED" } : z;
+  };
+  try {
+    assert.equal(await Z.odswiezStatusyOczekujacych(), 1);
+  } finally {
+    adapter.zwrot = oryginal;
+  }
+  assert.ok(!Z.brakujacePaczki().some((b) => b.referencja === "ZW-DEV-0003"));
+});
+
 test("SCHOWAJ zdejmuje zgłoszenie z listy raz i tylko raz", async () => {
   await Z.odswiezZapowiedzi();
   const cel = Z.brakujacePaczki().find((b) => b.referencja === "ZW-DEV-0003")!;
