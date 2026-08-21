@@ -397,8 +397,8 @@ adb install -r wertis-kolektor-0.52.0.apk
 instalator, a kolektory proponują go same przy otwarciu aplikacji.
 
 Adres serwera wpisuje się **na ekranie startowym** aplikacji
-(`ZMIEŃ ADRES SERWERA`): `http://<IP-serwera-w-LAN>:3001`. Na emulatorze
-domyślne `http://10.0.2.2:3001` działa bez zmian.
+(`ZMIEŃ ADRES SERWERA`): `http://<IP-serwera-w-LAN>:3001`. Fabrycznie stoi tam
+serwer magazynu; na emulatorze trzeba wpisać `http://10.0.2.2:3001`.
 
 Build z własnej maszyny wymaga Android SDK:
 
