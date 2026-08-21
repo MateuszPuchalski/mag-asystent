@@ -190,6 +190,11 @@ export interface ImportStats {
   zamPozycje: number;
   sprzedaz: number;
   sprzedazPozycje: number;
+  /* Przyjęcia na regał zwrotów. Obie liczby stoją tu po to, żeby dało się
+     odróżnić „dziś nie było przesunięć" od „dokumenty są, pozycji nie ma" —
+     na ekranie kolektora oba wyglądają tak samo, a znaczą co innego. */
+  mm: number;
+  mmPozycje: number;
   at: string;
 }
 
@@ -249,6 +254,29 @@ export let bladImportuSprzedazy: string | null = null;
  * ZWROTY na kolektorze pokazuje to, co widziała przy poprzedniej synchronizacji.
  */
 export let bladImportuMm: string | null = null;
+
+/**
+ * Dokumenty MM weszły, pozycji nie ma ani jednej.
+ *
+ * Dokładnie ten stan wystąpił po wdrożeniu 0.75.0 i był NIEWIDOCZNY: kolektor
+ * pokazywał kosze z zerem pozycji, co wygląda jak spokojny dzień bez zwrotów.
+ * Zero pozycji przy niezerowej liczbie dokumentów nie zdarza się naturalnie —
+ * przesunięcie bez pozycji nie ma po co powstać.
+ */
+export function zdaniePrzyjecBezPozycji(mm: number, mmPozycje: number): string | null {
+  if (mm === 0 || mmPozycje > 0) return null;
+  return (
+    `Import widzi ${mm} przesunięć MM na regał zwrotów, ale ZERO ich pozycji — ` +
+    "kosze na kolektorze będą puste. Sprawdź kolumnę łączącą pozycje " +
+    "z dokumentem magazynowym (ob_DokMagId, DEPLOY §6a)."
+  );
+}
+
+/** To samo zdanie na danych ostatniego importu — wersja dla `/api/health`. */
+export function przyjeciaBezPozycji(): string | null {
+  if (config.sgtMode !== "mssql" || !lastImport) return null;
+  return zdaniePrzyjecBezPozycji(lastImport.mm, lastImport.mmPozycje);
+}
 
 interface MagRow {
   mag_Id: number;
@@ -392,6 +420,40 @@ interface MmZwrotRow {
   mag_z: number | null;
   mag_do: number | null;
 }
+interface MmPozRow {
+  dok_id: number;
+  ob_TowId: number;
+  ob_IloscMag: number;
+  symbol: string | null;
+  nazwa: string | null;
+}
+
+/**
+ * Zapytanie o pozycje przesunięcia MM.
+ *
+ * Wydzielone jak `budujFiltrySprzedazy` — po to, żeby JEDNĄ rzecz, która się
+ * tu psuje, dało się sprawdzić testem bez serwera MSSQL. Ta rzecz to kolumna
+ * łącząca: MM jest dokumentem MAGAZYNOWYM, więc pozycje wiszą na
+ * `ob_DokMagId`. Do 0.75.1 stało tu `ob_DokHanId` przepisane z zapytania
+ * o sprzedaż — kolumna dokumentu HANDLOWEGO, której MM nie ma. JOIN nie łapał
+ * ani jednego wiersza, a każdy kosz na kolektorze pokazywał zero pozycji.
+ *
+ * POTWIERDZONE na bazie firmy (sierpień 2026): pozycje MM mają `ob_DokHanId`
+ * ustawione na NULL, a `ob_DokMagId` na identyfikator przesunięcia.
+ *
+ * `LEFT JOIN tw__Towar` niesie symbol i nazwę wprost z Subiekta. Importer
+ * kartotek pomija towary zablokowane, a na regale zwrotów leży właśnie towar
+ * wycofany ze sprzedaży — bez tego snapshotu pozycja miałaby w koszu sam
+ * identyfikator zamiast nazwy.
+ */
+export function zapytaniePozycjiMm(gdzie: string): string {
+  return `SELECT p.ob_DokMagId AS dok_id, p.ob_TowId, p.ob_IloscMag,
+                 t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa
+          FROM dok_Pozycja p WITH (NOLOCK)
+          JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokMagId
+          LEFT JOIN tw__Towar t WITH (NOLOCK) ON t.tw_Id = p.ob_TowId
+          WHERE ${gdzie}`;
+}
 
 /**
  * Przesunięcia MM NA regał zwrotów — dokumenty, których numery magazyn pisze
@@ -405,7 +467,7 @@ interface MmZwrotRow {
  */
 async function pobierzMmZwrotow(
   pool: sql.ConnectionPool
-): Promise<{ mm: MmZwrotRow[]; mmPozycje: PozRow[] }> {
+): Promise<{ mm: MmZwrotRow[]; mmPozycje: MmPozRow[] }> {
   const c = config.mssql;
   const cutoff = new Date(Date.now() - c.mmZwrotyDniWstecz * 86400_000)
     .toISOString()
@@ -430,14 +492,7 @@ async function pobierzMmZwrotow(
   ).recordset;
   if (mm.length === 0) return { mm, mmPozycje: [] };
 
-  const mmPozycje = (
-    await req().query<PozRow>(
-      `SELECT p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag
-       FROM dok_Pozycja p WITH (NOLOCK)
-       JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId
-       WHERE ${gdzie}`
-    )
-  ).recordset;
+  const mmPozycje = (await req().query<MmPozRow>(zapytaniePozycjiMm(gdzie))).recordset;
   return { mm, mmPozycje };
 }
 
@@ -604,7 +659,7 @@ export async function importFromMssql(): Promise<ImportStats> {
   /* Przyjęcia na regał zwrotów — ta sama degradacja co sprzedaż. Zakładka
      ZWROTY na kolektorze woli wczorajszą listę niż pustą. */
   let mm: MmZwrotRow[] = [];
-  let mmPozycje: PozRow[] = [];
+  let mmPozycje: MmPozRow[] = [];
   let mmOk = false;
   try {
     ({ mm, mmPozycje } = await pobierzMmZwrotow(pool));
@@ -656,7 +711,7 @@ export async function importFromMssql(): Promise<ImportStats> {
      VALUES (?,?,?,?,?,?)`
   );
   const insMmPoz = d.prepare(
-    "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+    "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa) VALUES (?,?,?,?,?)"
   );
 
   const apply = transaction(d, () => {
@@ -758,9 +813,18 @@ export async function importFromMssql(): Promise<ImportStats> {
         m.mag_do ?? null
       );
     }
+    /* BEZ filtra `knownTw` — świadomie, inaczej niż przy sprzedaży. Towar
+       zablokowany w kartotece nie wchodzi do importu, ale FIZYCZNIE leży
+       w koszu i magazynier musi go odłożyć. Pominięcie wiersza dawało kosz
+       krótszy niż papier przy nim, w dodatku bez śladu. */
     for (const p of mmPozycje) {
-      if (!knownTw.has(p.ob_TowId)) continue;
-      insMmPoz.run(p.ob_DokHanId, p.ob_TowId, Math.abs(p.ob_IloscMag ?? 0));
+      insMmPoz.run(
+        p.dok_id,
+        p.ob_TowId,
+        Math.abs(p.ob_IloscMag ?? 0),
+        p.symbol ?? "",
+        p.nazwa ?? ""
+      );
     }
   });
   apply();
@@ -774,13 +838,16 @@ export async function importFromMssql(): Promise<ImportStats> {
     zamPozycje: zamPozycje.length,
     sprzedaz: sprzedaz.length,
     sprzedazPozycje: sprzedazPozycje.length,
+    mm: mm.length,
+    mmPozycje: mmPozycje.length,
     at: nowIso(),
   };
   console.log(
     `[mssql] import: towary=${lastImport.towary}, stany=${lastImport.stany}, ` +
       `dokumenty=${lastImport.dokumenty}, pozycje=${lastImport.pozycje}, ` +
       `zamowienia=${lastImport.zamowienia}, zamPozycje=${lastImport.zamPozycje}, ` +
-      `sprzedaz=${lastImport.sprzedaz}, sprzedazPozycje=${lastImport.sprzedazPozycje}`
+      `sprzedaz=${lastImport.sprzedaz}, sprzedazPozycje=${lastImport.sprzedazPozycje}, ` +
+      `mm=${lastImport.mm}, mmPozycje=${lastImport.mmPozycje}`
   );
   return lastImport;
 }

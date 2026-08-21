@@ -128,7 +128,12 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
 
   const pozycje = d
     .prepare(
-      `SELECT p.tw_id, p.ilosc, COALESCE(t.symbol, '') AS symbol, COALESCE(t.nazwa, '') AS nazwa
+      /* Kartoteka ma pierwszeństwo, bo bywa poprawiana po wystawieniu
+         dokumentu. Snapshot z MM jest drugi i ratuje towar ZABLOKOWANY
+         w Subiekcie: takiego importer kartotek nie zna, a leży w koszu. */
+      `SELECT p.tw_id, p.ilosc,
+              COALESCE(NULLIF(t.symbol, ''), p.symbol, '') AS symbol,
+              COALESCE(NULLIF(t.nazwa, ''), p.nazwa, '') AS nazwa
        FROM sgt_mm_zwrot_pozycja p
        LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
        WHERE p.dok_id = ? ORDER BY p.id`

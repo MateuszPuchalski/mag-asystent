@@ -46,6 +46,7 @@ import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.BarlowCond
+import pl.wertis.kolektor.ui.theme.Destructive
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
@@ -176,12 +177,16 @@ fun PrzyjeciaScreen(graph: AppGraph) {
 @Composable
 private fun PrzyjecieRowView(p: PrzyjecieRow, onClick: () -> Unit) {
     val zrobione = p.stan == "rozlozony" || p.stan == "poza_aplikacja"
+    /* Dokument bez pozycji nie ma czego otworzyć — kliknięcie kończyłoby się
+       czerwonym komunikatem, który wygląda na awarię kolektora, a jest brakiem
+       danych z importu. Wiersz mówi to wprost i nie zaprasza w ślepy zaułek. */
+    val puste = p.pozycji == 0
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .cardSurface()
             .heightIn(min = 56.dp)
-            .clickable(enabled = !zrobione, onClick = onClick)
+            .clickable(enabled = !zrobione && !puste, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -220,9 +225,10 @@ private fun PrzyjecieRowView(p: PrzyjecieRow, onClick: () -> Unit) {
             opisStanu(p),
             fontSize = 13.sp,
             fontWeight = if (p.stan == "w_rozkladaniu") FontWeight.Bold else FontWeight.Normal,
-            color = when (p.stan) {
-                "rozlozony" -> Success
-                "w_rozkladaniu" -> Amber
+            color = when {
+                p.stan == "rozlozony" -> Success
+                p.stan == "w_rozkladaniu" -> Amber
+                puste -> Destructive
                 else -> InkSoft
             },
         )
@@ -230,10 +236,13 @@ private fun PrzyjecieRowView(p: PrzyjecieRow, onClick: () -> Unit) {
 }
 
 /** Krótkie zdanie po prawej stronie wiersza — stan pracy, nie stan dokumentu. */
-private fun opisStanu(p: PrzyjecieRow): String = when (p.stan) {
-    "rozlozony" -> "ROZŁOŻONY"
-    "poza_aplikacja" -> "poza aplikacją"
-    "w_rozkladaniu" -> "${p.odlozonych}/${p.pozycji} poz."
+private fun opisStanu(p: PrzyjecieRow): String = when {
+    p.stan == "rozlozony" -> "ROZŁOŻONY"
+    p.stan == "poza_aplikacja" -> "poza aplikacją"
+    p.stan == "w_rozkladaniu" -> "${p.odlozonych}/${p.pozycji} poz."
+    /* Dokument bez pozycji: kartka przy koszu jest, towaru na liście nie ma.
+       Winny jest import, nie magazynier — i tak ma to brzmieć. */
+    p.pozycji == 0 -> "0 poz. — sprawdź import"
     else -> "do rozłożenia"
 }
 

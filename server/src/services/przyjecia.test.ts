@@ -46,9 +46,14 @@ beforeEach(() => {
     `INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
      VALUES (?, 'MM 1209/MAG/2026', '1209', '2026-08-18', 1, 3)`
   ).run(DOK);
-  const poz = d.prepare("INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
-  poz.run(DOK, 900_036, 3);
-  poz.run(DOK, 900_037, 1);
+  const poz = d.prepare(
+    `INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa)
+     VALUES (?,?,?,?,?)`
+  );
+  poz.run(DOK, 900_036, 3, "TEST-LINIA-TODO", "Pozycja nietknięta");
+  poz.run(DOK, 900_037, 1, "TEST-LINIA-DONE", "Pozycja odłożona");
+  /* Towar ZABLOKOWANY w Subiekcie: dokument go niesie, kartoteki nie ma. */
+  poz.run(DOK, 900_099, 2, "TEST-WYCOFANY", "Towar wycofany ze sprzedaży");
 });
 
 test("numer z kartki: sama liczba, cały numer i śmieci", () => {
@@ -67,7 +72,7 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
   assert.equal(kosz.mmNumer, "1209");
   assert.deepEqual(
     kosz.pozycje.map((p) => [p.symbol, p.ilosc]),
-    [["TEST-LINIA-TODO", 3], ["TEST-LINIA-DONE", 1]]
+    [["TEST-LINIA-TODO", 3], ["TEST-LINIA-DONE", 1], ["TEST-WYCOFANY", 2]]
   );
   assert.equal(kosz.pozycje[0].zwrotId, null, "pozycja nie pochodzi ze zwrotu");
 
@@ -75,6 +80,21 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
   const drugi = P.otworzPrzyjecie("MM 1209/MAG/2026", "Ewa");
   assert.equal(drugi.id, kosz.id);
   assert.equal((db().prepare("SELECT COUNT(*) AS n FROM kosz").get() as { n: number }).n, 1);
+});
+
+test("towar bez kartoteki zostaje w koszu i niesie nazwę z dokumentu", () => {
+  /* Regresja 0.75.1. Import kartotek pomija towar zablokowany
+     (`tw_Zablokowany = 0` w zapytaniu), a na regale zwrotów leży właśnie towar
+     wycofany ze sprzedaży. Pominięcie takiej pozycji dawało kosz KRÓTSZY niż
+     papier przy nim — w dodatku bez śladu, że czegoś brakuje. */
+  const kosz = P.otworzPrzyjecie("1209", "Jan");
+  const wycofany = kosz.pozycje.find((p) => p.symbol === "TEST-WYCOFANY");
+  assert.ok(wycofany, "pozycja spoza kartoteki nie może wypaść z kosza");
+  assert.equal(wycofany.nazwa, "Towar wycofany ze sprzedaży");
+  assert.equal(wycofany.lokOczekiwana, null, "kartoteki nie ma, więc nie ma adresu");
+  // odłożenie działa: magazynier wskazuje półkę palcem, bo skan nie ma czego trafić
+  K.odlozPozycje(wycofany.id, "C09-09-09", "Jan");
+  assert.equal(P.listaPrzyjec()[0].odlozonych, 1);
 });
 
 test("nieznany numer mówi CO sprawdzić, zamiast milczeć", () => {
@@ -90,6 +110,7 @@ test("ZAKOŃCZ na koszu z dokumentu NIE wystawia żadnego dokumentu", () => {
   // pierwsza wraca na SWOJĄ półkę, druga ląduje gdzie indziej
   K.odlozPozycje(kosz.pozycje[0].id, kosz.pozycje[0].lokOczekiwana ?? "A01-02-03", "Jan");
   K.odlozPozycje(kosz.pozycje[1].id, "C09-09-09", "Jan");
+  K.odlozPozycje(kosz.pozycje[2].id, "C09-09-10", "Jan");
 
   const rozlozony = K.zakonczKosz(kosz.id, "Jan");
   assert.equal(rozlozony.status, "rozlozony");
@@ -101,13 +122,16 @@ test("ZAKOŃCZ na koszu z dokumentu NIE wystawia żadnego dokumentu", () => {
   const loc = db()
     .prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='set_location'")
     .get() as { n: number };
-  assert.equal(loc.n, 1, "adres zapisany tylko dla przeniesionego towaru");
+  /* Dwa, nie trzy: pierwsza pozycja wróciła na WŁASNĄ półkę i nie ma czego
+     prostować. Drugi zapis dotyczy towaru bez kartoteki w read-modelu —
+     zablokowana kartoteka też dostaje adres, bo towar naprawdę tam leży. */
+  assert.equal(loc.n, 2, "adres zapisany tylko dla przeniesionego towaru");
 });
 
 test("lista zna stan pracy, a admin zdejmuje dokument sprzed wdrożenia", () => {
   assert.deepEqual(
     P.listaPrzyjec().map((p) => [p.numer, p.stan, p.pozycji]),
-    [["1209", "nietkniety", 2]]
+    [["1209", "nietkniety", 3]]
   );
 
   const kosz = P.otworzPrzyjecie("1209", "Jan");

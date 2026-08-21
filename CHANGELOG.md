@@ -33,6 +33,43 @@ historii nie przepisujemy.
 
 ---
 
+## 0.75.1 — 21 sierpnia 2026
+
+**Każdy kosz na regale zwrotów pokazywał 0 pozycji.** Zgłoszenie z hali
+pierwszego dnia po wdrożeniu 0.75.0: dokument `MM 1240/MAG/2026` ma w Subiekcie
+sześć pozycji, a kolektor twierdzi, że kosz jest pusty. Dotyczyło to wszystkich
+koszy, nie jednego.
+
+Zapytanie o pozycje MM zostało przepisane z zapytania o sprzedaż i łączyło się
+kolumną dokumentu **handlowego** (`ob_DokHanId`). MM jest dokumentem
+**magazynowym** — na jego pozycjach ta kolumna jest NULL, a identyfikator niesie
+`ob_DokMagId`. Potwierdzone zapytaniem na bazie firmy; reguła i zapytanie stoją
+teraz w `docs/subiekt-gt-struktura.md`. Dokument handlowy łączy się przez
+`ob_DokHanId`, magazynowy przez `ob_DokMagId`.
+
+**Gorsza połowa tej pomyłki: pusty wynik nie miał jak o sobie powiedzieć.**
+Zero pozycji przy sześciu dokumentach wyglądało na ekranie identycznie jak
+spokojny dzień bez zwrotów. `/api/health` liczy teraz przesunięcia i ich pozycje
+(`lastSync.mm`, `lastSync.mmPozycje`), a gdy dokumenty są bez pozycji — mówi to
+zdaniem i nazywa kolumnę do sprawdzenia. Przy okazji na listę `problemy`
+trafiła awaria odczytu MM, której 0.75.0 nie zgłaszała wcale.
+
+**Towar zablokowany w kartotece zostaje w koszu.** Import kartotek pomija
+pozycje z `tw_Zablokowany = 1`, a na regale zwrotów leży głównie towar wycofany
+ze sprzedaży — czyli dokładnie ten. Do tej wersji taka pozycja wypadała z kosza
+po cichu, więc lista na kolektorze bywała krótsza niż zawartość kosza. Nazwę
+bierze teraz wprost z dokumentu MM.
+
+Dwie rzeczy do wiedzenia o takiej pozycji: skan kodem jej nie znajdzie, bo
+aplikacja nie zna tej kartoteki — magazynier wskazuje ją palcem. Odłożenie
+zapisze adres także na zablokowanej kartotece, i tak ma być: towar naprawdę
+leży na tej półce.
+
+**Wiersz przyjęcia bez pozycji nie udaje pracy do zrobienia.** Pisze „0 poz. —
+sprawdź import" i nie da się w niego wejść. Wcześniej zapraszał w kliknięcie
+kończące się czerwonym komunikatem, co wygląda na awarię kolektora, a jest
+brakiem danych.
+
 ## 0.75.0 — 21 sierpnia 2026
 
 **Trzecia zakładka kolektora: ROZKŁADANIE ZWROTÓW.** Do tej wersji aplikacja

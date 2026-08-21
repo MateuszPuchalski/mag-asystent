@@ -1029,6 +1029,18 @@ jest wtedy pusta, a `/api/health` niesie zdanie o przyczynie.
 | `MM_ZWROTY_DNI_WSTECZ` | `30` | okno importu przesunięć na regał zwrotów — tyle, ile filtr w Subiekcie |
 | `DOK_TYP_MM` | `9` | typ dokumentu przesunięcia międzymagazynowego |
 
+Gdy kosz na kolektorze pokazuje **0 pozycji**, odpowiedź stoi w `/api/health`.
+`lastSync.mm` i `lastSync.mmPozycje` mówią, ile dokumentów i ile ich pozycji
+weszło, a lista `problemy` nazywa przyczynę. Zero pozycji przy niezerowej
+liczbie dokumentów zawsze znaczy zepsuty odczyt — przesunięcie bez pozycji nie
+ma po co powstać.
+
+Towar **zablokowany w kartotece** Subiekta wchodzi do kosza od 0.75.1, choć
+importu kartotek nie przechodzi. Na regale zwrotów leży głównie towar wycofany
+ze sprzedaży, a fizycznie trzeba go odłożyć. Nazwę bierze wtedy wprost
+z dokumentu, skanowanie kodem nie zadziała (kartoteki nie ma w aplikacji), więc
+magazynier wskazuje pozycję palcem. Adres zapisze się i na takiej kartotece.
+
 Dokumenty sprzed wdrożenia, których towar dawno leży na regałach, zdejmuje
 z listy **admin** akcją „już rozłożony". Magazynier jej nie ma: to decyzja
 o pominięciu pracy, nie sposób jej wykonania.
@@ -1106,13 +1118,13 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    Pierwsze RW rób na kopii bazy, na zwrocie próbnym z jedną pozycją
    „do zniszczenia". Sprawdź, że korekta objęła pozycję, a RW zdjęło ją
    z magazynu sprzedaży.
-8. **Która kolumna niesie magazyn DOCELOWY przesunięcia MM** (0.75.0). Import
-   przyjmuje `dok_OdbiorcaId` i tak opisuje to
-   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md), ale nie jest
-   to potwierdzone na bazie firmy. Sprawdź na własnym MM na regał zwrotów:
-   `SELECT dok_NrPelny, dok_MagId, dok_OdbiorcaId FROM dok__Dokument WHERE dok_Typ = 9 ORDER BY dok_Id DESC`.
-   Pomyłka daje **pustą listę przyjęć** — nie złe dane, bo warunek po prostu
-   nikogo nie łapie.
+8. **Kolumny przesunięcia MM** (0.75.0) — na bazie firmy POTWIERDZONE
+   w sierpniu 2026 i zostawione tu dla innych wdrożeń. Magazyn docelowy niesie
+   `dok_OdbiorcaId`, a pozycje wiszą na `ob_DokMagId` (nie na `ob_DokHanId`,
+   który dla dokumentu magazynowego jest NULL). Zapytania sprawdzające stoją
+   w [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md). Pomyłka
+   w którejkolwiek daje **pustą listę albo puste kosze** — nie złe dane, bo
+   warunek po prostu nikogo nie łapie. Od 0.75.1 mówi o tym `/api/health`.
 
 ## 6b. Środowisko dev obok produkcji
 

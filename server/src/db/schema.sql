@@ -726,7 +726,12 @@ CREATE TABLE IF NOT EXISTS sgt_mm_zwrot_pozycja (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   dok_id INTEGER NOT NULL REFERENCES sgt_mm_zwrot(dok_id),
   tw_id  INTEGER NOT NULL,
-  ilosc  REAL NOT NULL
+  ilosc  REAL NOT NULL,
+  -- Snapshot z dokumentu (0.75.1). Kartoteka zablokowana w Subiekcie nie wchodzi
+  -- do importu, a taki towar leży na regale zwrotów najczęściej — bez tych
+  -- dwóch kolumn pozycja miałaby w koszu identyfikator zamiast nazwy.
+  symbol TEXT NOT NULL DEFAULT '',
+  nazwa  TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS ix_mm_zwrot_poz_dok ON sgt_mm_zwrot_pozycja(dok_id);
 

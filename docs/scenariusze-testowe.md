@@ -691,7 +691,9 @@ u góry ma napisać ROZKŁADANIE ZWROTÓW, a lista pokazać wszystkie trzy
 z datą, liczbą pozycji i stanem „do rozłożenia".
 
 Wpisz w pole u góry `1209` i zatwierdź. Ma się otworzyć kosz z pozycjami
-dokumentu. Wpisanie pełnego numeru `MM 1209/MAG/2026` ma dać **ten sam**
+dokumentu — w tym pozycja `TEST-ZABLOKOWANY`, której nie ma w kartotece.
+Tak wygląda towar wycofany ze sprzedaży: nazwę niesie dokument, skan kodem jej
+nie znajdzie, odkłada się ją wskazaniem palcem. Wpisanie pełnego numeru `MM 1209/MAG/2026` ma dać **ten sam**
 kosz, nie drugi — sprawdź, że lista dalej ma trzy wiersze.
 
 Odłóż pozycje skanem regału i kliknij **ZAKOŃCZ — KOSZ ROZŁOŻONY**. Sedno
