@@ -434,7 +434,7 @@ interface MmPozRow {
  * Wydzielone jak `budujFiltrySprzedazy` — po to, żeby JEDNĄ rzecz, która się
  * tu psuje, dało się sprawdzić testem bez serwera MSSQL. Ta rzecz to kolumna
  * łącząca: MM jest dokumentem MAGAZYNOWYM, więc pozycje wiszą na
- * `ob_DokMagId`. Do 0.75.1 stało tu `ob_DokHanId` przepisane z zapytania
+ * `ob_DokMagId`. Do 0.76.1 stało tu `ob_DokHanId` przepisane z zapytania
  * o sprzedaż — kolumna dokumentu HANDLOWEGO, której MM nie ma. JOIN nie łapał
  * ani jednego wiersza, a każdy kosz na kolektorze pokazywał zero pozycji.
  *

@@ -1035,7 +1035,7 @@ weszło, a lista `problemy` nazywa przyczynę. Zero pozycji przy niezerowej
 liczbie dokumentów zawsze znaczy zepsuty odczyt — przesunięcie bez pozycji nie
 ma po co powstać.
 
-Towar **zablokowany w kartotece** Subiekta wchodzi do kosza od 0.75.1, choć
+Towar **zablokowany w kartotece** Subiekta wchodzi do kosza od 0.76.1, choć
 importu kartotek nie przechodzi. Na regale zwrotów leży głównie towar wycofany
 ze sprzedaży, a fizycznie trzeba go odłożyć. Nazwę bierze wtedy wprost
 z dokumentu, skanowanie kodem nie zadziała (kartoteki nie ma w aplikacji), więc
@@ -1124,7 +1124,7 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    który dla dokumentu magazynowego jest NULL). Zapytania sprawdzające stoją
    w [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md). Pomyłka
    w którejkolwiek daje **pustą listę albo puste kosze** — nie złe dane, bo
-   warunek po prostu nikogo nie łapie. Od 0.75.1 mówi o tym `/api/health`.
+   warunek po prostu nikogo nie łapie. Od 0.76.1 mówi o tym `/api/health`.
 
 ## 6b. Środowisko dev obok produkcji
 

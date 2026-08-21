@@ -179,7 +179,7 @@ function migrate(database: DatabaseSync) {
      z Subiekta, a nie kod nadany w biurze. NULL = kosz złożony w aplikacji. */
   addColumn("kosz", "mm_dok_id", "INTEGER");
   addColumn("kosz", "mm_numer", "TEXT");
-  /* 0.75.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
+  /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");

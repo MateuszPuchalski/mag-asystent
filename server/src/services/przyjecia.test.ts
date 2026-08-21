@@ -83,7 +83,7 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
 });
 
 test("towar bez kartoteki zostaje w koszu i niesie nazwę z dokumentu", () => {
-  /* Regresja 0.75.1. Import kartotek pomija towar zablokowany
+  /* Regresja 0.76.1. Import kartotek pomija towar zablokowany
      (`tw_Zablokowany = 0` w zapytaniu), a na regale zwrotów leży właśnie towar
      wycofany ze sprzedaży. Pominięcie takiej pozycji dawało kosz KRÓTSZY niż
      papier przy nim — w dodatku bez śladu, że czegoś brakuje. */

@@ -90,7 +90,7 @@ test("dokument nierozliczonego zwrotu wchodzi OBOK okna sprzedaży", () => {
   assert.equal(budujFiltrySprzedazy([2, 21], []).oknoFilter, "d.dok_DataWyst >= @cutoff");
 });
 
-/* ── Pozycje przesunięcia MM (0.75.1) ────────────────────────────────────────
+/* ── Pozycje przesunięcia MM (0.76.1) ────────────────────────────────────────
    Test na jedną kolumnę, bo przez nią zakładka ZWROTY nie działała u klienta:
    pozycje MM wiszą na dokumencie MAGAZYNOWYM. Kolumna dokumentu handlowego
    zwraca pustkę — nie błąd, więc nic o sobie nie mówi.                       */

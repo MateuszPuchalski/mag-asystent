@@ -214,18 +214,15 @@ test("lista dostaw sygnalizuje wyjątki", () => {
   assert.match(html, /badge err">\$\{d\.wyjatkiOtwarte\}/, "licznik jako plakietka błędu");
 });
 
-test("każda zakładka leży w swojej grupie — żadnej sieroty w pasku", () => {
-  /* Zakładki dostały grupy z podpisami (0.74.1), bo sześć pastylek o równej
-     wadze kłamało o tym, jak się ich używa: dostawy i zwroty biuro otwiera
-     kilkanaście razy dziennie, dziennik i analizę wtedy, gdy czegoś szuka.
+test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
+  /* Zakładki dostały grupy (0.74.1), a w 0.76.0 z paska wyszły USTAWIENIA:
+     grupa z jedną pastylką `DOSTAWCY` ważyła w rzędzie tyle samo co DOSTAWY,
+     choć biuro wchodzi tam raz na kilka tygodni.
 
-     Ta zmiana ma dokładnie jedną cichą drogę do zepsucia: przycisk, który
-     przy przenoszeniu wypadł POZA `div.grupa`. Wygląda wtedy prawie normalnie
-     — klika się, widok się otwiera — tyle że stoi bez podpisu i bez grupy,
-     czyli dokładnie tak, jak wyglądał pasek przed tą zmianą.
-
-     Sam mechanizm jest tu nietknięty i to jest zamierzone: obsługa kliknięcia
-     szuka `button[data-widok]`, nie miejsca w rzędzie. */
+     Ta zmiana ma dwie ciche drogi do zepsucia i test pilnuje obu. Pierwsza to
+     przycisk, który przy przenoszeniu wypadł POZA `div.grupa`: klika się,
+     widok się otwiera, tyle że stoi bez podpisu i bez grupy — czyli dokładnie
+     tak, jak wyglądał pasek przed 0.74.1. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
@@ -235,15 +232,13 @@ test("każda zakładka leży w swojej grupie — żadnej sieroty w pasku", () =>
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "zwroty", "nadzor", "dziennik", "analiza", "dostawcy"],
-    "komplet zakładek i ich kolejność"
+    ["dostawy", "zwroty", "nadzor", "dziennik", "analiza"],
+    "w pasku tylko zakładki pracy — dostawcy tu nie wracają"
   );
 
-  /* Każdy przycisk MUSI siedzieć w `div.grupa-btny`. Dopasowanie idzie po
-     ZAWARTOŚCI tego kontenera, nie po rozbiciu paska na grupy: rozbicie
-     przepuszczało przycisk stojący PO zamknięciu ostatniej grupy, czyli
-     dokładnie tę sierotę, przed którą ten test miał bronić.
-
+  /* Dopasowanie idzie po ZAWARTOŚCI `grupa-btny`, nie po rozbiciu paska na
+     grupy: rozbicie przepuszczało przycisk stojący PO zamknięciu ostatniej
+     grupy, czyli dokładnie tę sierotę, przed którą ten test miał bronić.
      `grupa-btny` nie zawiera zagnieżdżonych `div`, więc leniwe `</div>`
      zatrzymuje się na własnym zamknięciu. */
   const wGrupach = [...nav.matchAll(/<div class="grupa-btny">([\s\S]*?)<\/div>/g)]
@@ -256,8 +251,25 @@ test("każda zakładka leży w swojej grupie — żadnej sieroty w pasku", () =>
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
-    3,
-    "trzy grupy, każda podpisana"
+    2,
+    "dwie grupy, każda podpisana"
+  );
+
+  /* Druga cicha droga: widok zostaje w pliku, ale przestaje do niego cokolwiek
+     prowadzić. Wtedy wszystko wygląda dobrze — po prostu nie da się już wejść
+     w DOSTAWCÓW. Zębatka jest jedynym wejściem, więc musi być dokładnie jedna
+     i musi nieść ten sam `data-widok`, po którym działa cały mechanizm. */
+  const zebatki = [...html.matchAll(/<button id="ustawienia"[\s\S]*?>/g)];
+  assert.equal(zebatki.length, 1, "jedna zębatka w nagłówku");
+  assert.match(zebatki[0][0], /data-widok="dostawcy"/, "zębatka prowadzi do dostawców");
+  assert.match(zebatki[0][0], /aria-label="Ustawienia"/, "ikona bez napisu musi mieć nazwę");
+
+  /* Delegacja kliknięcia MUSI stać poza `nav` — zębatka jest w nagłówku,
+     a przy dawnym `nav.zakladki` byłaby klikalna i bez skutku. */
+  assert.doesNotMatch(
+    html,
+    /querySelector\("nav\.zakladki"\)\.addEventListener/,
+    "obsługa kliknięcia nie może być przypięta do samego paska"
   );
 });
 

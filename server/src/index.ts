@@ -93,7 +93,7 @@ export async function buildApp() {
          na danych z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
       bladImportuSprzedazy,
       /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
-         pracuje na danych sprzed awarii. Do 0.75.1 tego zdania na liście
+         pracuje na danych sprzed awarii. Do 0.76.1 tego zdania na liście
          brakowało, więc awaria nie miała jak wypłynąć. */
       bladImportuMm,
       /* Groźniejszy od awarii jest pusty wynik: dokumenty są, pozycji zero,
