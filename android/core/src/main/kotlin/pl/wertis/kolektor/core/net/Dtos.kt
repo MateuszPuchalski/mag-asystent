@@ -542,6 +542,15 @@ data class DeliveryLineView(
      */
     val stanMag: Double = 0.0,
     val stanMgp: Double = 0.0,
+    /**
+     * Podpowiedź przeslotowania — ta sama, którą niesie karta towaru (0.71.0).
+     *
+     * Przy odkładaniu trafia w moment decyzji: człowiek stoi z towarem w ręce
+     * i właśnie wybiera półkę. `null` znaczy „nie ma czego radzić" — towar
+     * rotuje wolno, leży już w strefie złotej albo o jego regale nie ma
+     * reguły. Starszy serwer tego pola nie wysyła i to też jest `null`.
+     */
+    val zlotaStrefa: ZlotaStrefa? = null,
 )
 
 @Serializable

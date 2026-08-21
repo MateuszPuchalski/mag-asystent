@@ -12,6 +12,7 @@ import { raiseProblem, wyjatkiOtwarteWgDokumentu } from "./problems.js";
 import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js";
 import { aliasKodu } from "./ean-alias.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
+import { adnotacjaStrefy } from "./zbiorki.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -442,6 +443,13 @@ export function getDelivery(id: number): DeliveryView | undefined {
         stanMgp: stany.get(r.tw_id)?.mgp ?? 0,
         /** litera alejki — nagłówek sekcji na liście */
         aisle: oczekiwany ? String(oczekiwany)[0] : null,
+        /* Podpowiedź przeslotowania — ta sama, którą niesie karta towaru.
+           W pętli po pozycjach ŚWIADOMIE: `adnotacjaStrefy` czyta mapę
+           w pamięci (cache kandydatów z TTL 10 min), więc jest O(1). Gdyby
+           kiedykolwiek zaczęła dotykać bazy, to miejsce zamieni się w N+1
+           na trzydziestu pozycjach — wtedy trzeba wariantu zbiorczego,
+           wzorem `adresyOczekiwane` wyżej. */
+        zlotaStrefa: adnotacjaStrefy(r.tw_id) ?? undefined,
       };
     })
     .sort(porownajAlejkowo);

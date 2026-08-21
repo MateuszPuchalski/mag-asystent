@@ -230,7 +230,27 @@ fun ProductScreen(graph: AppGraph) {
             }
         }
 
-        FaktyCard(p)
+        /* Wejście w dostawę z karty towaru (0.70.0). Dwa kroki, bo takie są
+           reguły: dokument trzeba najpierw OTWORZYĆ (`openDelivery` po stronie
+           serwera zakłada wiersze rozkładania i melduje pracę), a dopiero
+           potem można wskazać w nim pozycję.
+
+           `p.id` to kartoteka — i to jej szukamy na liście, nie identyfikatora
+           wiersza. Wiersza jeszcze nie ma w chwili kliknięcia; powstaje razem
+           z otwarciem dokumentu, o linijkę wyżej.
+
+           Odmowa serwera (dokument w buforze, cudza praca) idzie w toast, jak
+           przy wejściu z listy dostaw — ta sama ścieżka, ten sam komunikat. */
+        FaktyCard(p) { d ->
+            scope.launch {
+                try {
+                    val r = apiCall { graph.api.openDelivery(d.dokId) }
+                    graph.nav.openDelivery(r.deliveryId, zaznaczTwId = p.id)
+                } catch (e: Exception) {
+                    graph.effects.toast(e.message ?: "Nie udało się otworzyć dostawy")
+                }
+            }
+        }
 
         /* Lokalizacje pozostałe — pierwsza siedzi w nagłówku. Przy towarze bez
            ani jednego adresu cały rząd znika: „+ DODAJ" przeniósł się wtedy do

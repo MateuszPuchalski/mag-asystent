@@ -58,6 +58,7 @@ import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.KierunekRozbieznosci
 import pl.wertis.kolektor.core.delivery.adresWiersza
 import pl.wertis.kolektor.core.delivery.rozbieznoscStanu
+import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
 import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
@@ -182,6 +183,33 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * na następną byłaby cichą pomyłką co do ilości.
      */
     var czesc by remember(id) { mutableStateOf<Double?>(null) }
+
+    /* WEJŚCIE Z KARTY TOWARU (0.71.0). Człowiek kliknął „W dostawie …" na
+       karcie, więc wskazał już konkretny towar — szukanie go drugi raz na
+       liście trzydziestu pozycji byłoby karą za trafny klik.
+
+       Znacznik KONSUMUJEMY (zerujemy) przy pierwszym udanym wejściu: bez tego
+       powrót z karty towaru na tę samą dostawę zaznaczałby pozycję ponownie,
+       nadpisując to, co magazynier wybrał w międzyczasie.
+
+       Przy `view == null` wychodzimy BEZ konsumpcji — lista jeszcze nie
+       przyszła, a znacznik ma doczekać jej przyjścia. */
+    LaunchedEffect(view) {
+        val cel = graph.nav.pendingLineTwId ?: return@LaunchedEffect
+        val lines = view?.lines ?: return@LaunchedEffect
+        graph.nav.pendingLineTwId = null
+        val kandydaci = lines.filter { it.twId == cel }
+        /* Ten sam towar potrafi stać w dokumencie w DWÓCH wierszach (scenariusz
+           S26). Otwieramy ten, przy którym jest co robić — wiersz odłożony
+           albo z wyjątkiem nie jest odpowiedzią na „chcę to odłożyć". */
+        val wybrana = kandydaci.firstOrNull {
+            it.status == StatusLinii.TODO || it.status == StatusLinii.PARTIAL
+        } ?: kandydaci.firstOrNull()
+        if (wybrana != null) {
+            active = wybrana
+            czesc = null
+        }
+    }
     /** Kolizja EAN — operacja stoi, aż użytkownik wybierze (D7). */
     var conflict by remember(id) { mutableStateOf<List<EanCandidate>?>(null) }
     /** Rozjazd lokalizacji — pytamy PRZED zapisem, nigdy po (§4.3). */
@@ -1424,6 +1452,40 @@ private fun PanelOdkladania(
                         )
                     }
                 }
+            }
+        }
+
+        /* PODPOWIEDŹ PRZESLOTOWANIA (0.71.0) — ta sama linia, co na karcie
+           towaru, i celowo TEN SAM tekst z `:core`. Dwa zdania o tej samej
+           rzeczy rozjechałyby się przy pierwszej poprawce jednego z nich.
+
+           Miejsce jest lepsze niż na karcie: tam odpowiada na pytanie, którego
+           nikt nie zadał, a tutaj trafia w moment wyboru półki — człowiek stoi
+           z towarem w ręce. Stoi POD kaflem adresu, bo dotyczy właśnie jego. */
+        line.zlotaStrefa?.let { z ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AmberBg)
+                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Icon(
+                    WIcons.Pin,
+                    null,
+                    tint = AmberInk,
+                    modifier = Modifier.size(15.dp).padding(top = 1.dp),
+                )
+                Text(
+                    liniaZlotaStrefa(z),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmberInk,
+                    lineHeight = 16.sp,
+                    maxLines = 2,
+                )
             }
         }
 

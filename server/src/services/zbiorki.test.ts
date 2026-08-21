@@ -21,6 +21,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-zb
 let db: typeof import("../db/db.js").db;
 let Z: typeof import("./zbiorki.js");
 let S: typeof import("./strefa-zlota.js");
+let D: typeof import("./delivery.js");
 /** Ziarno reguł, odtwarzane przed każdym testem — testy edycji je nadpisują. */
 let ziarno: Array<{ alejka?: string; od?: string; do?: string; poziomy: string }>;
 
@@ -28,6 +29,7 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
   Z = await import("./zbiorki.js");
   S = await import("./strefa-zlota.js");
+  D = await import("./delivery.js");
   ziarno = S.regulyStrefy().map((r) => ({
     ...(r.alejka ? { alejka: r.alejka } : {}),
     ...(r.od ? { od: r.od } : {}),
@@ -38,8 +40,9 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  d.prepare("DELETE FROM zbiorka").run();
-  d.prepare("DELETE FROM sgt_towar").run();
+  for (const t of ["zbiorka", "sgt_towar", "delivery_line", "delivery"]) {
+    d.prepare(`DELETE FROM ${t}`).run();
+  }
   S.zapiszReguly(ziarno);
   Z.zresetujKandydatow();
 });
@@ -245,4 +248,58 @@ test("walidacja reguły łapie każdy sposób na bezsens", () => {
   assert.match(S.bladReguly({ od: "D01", do: "E05", poziomy: "2" })!, /jednej alejce/);
   assert.match(S.bladReguly({ alejka: "A", poziomy: "" })!, /Podaj poziomy/);
   assert.match(S.bladReguly({ alejka: "A", poziomy: "2,x" })!, /liczby/);
+});
+
+/* ── Ta sama podpowiedź na pozycji dostawy (0.70.0) ─────────────────────────
+   Magazynier stoi z towarem w ręce i WŁAŚNIE wybiera półkę — to lepszy moment
+   na „ten jedzie do strefy złotej" niż zaglądanie na kartę. Pilnujemy dwóch
+   rzeczy naraz: że podpowiedź dochodzi na pozycję i że NIE dochodzi tam,
+   gdzie karta też by jej nie pokazała.                                       */
+
+/** Dostawa z jedną pozycją na podany towar; zwraca `deliveryId`. */
+let kolejnyDok = 7001;
+function dostawaZPozycja(twId: number, sym: string): number {
+  const d = db();
+  // własny numer dokumentu na wywołanie — `delivery.sgt_dok_id` jest UNIQUE
+  const dokId = kolejnyDok++;
+  const id = Number(
+    d
+      .prepare(
+        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, status, opened_at, source_mag_id)
+         VALUES (?, ?, 'open', ?, 1)`
+      )
+      .run(dokId, `FZ ${dokId}/MAG/08/2026`, new Date().toISOString()).lastInsertRowid
+  );
+  d.prepare(
+    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok,
+                               ilosc_odlozona, status)
+     VALUES (?,?,?,?,5,0,'todo')`
+  ).run(id, twId, sym, `Towar ${sym}`);
+  return id;
+}
+
+test("pozycja dostawy niesie tę samą podpowiedź strefy co karta towaru", () => {
+  towar(1, "SZYBKI", null, "A01-01-05");
+  towar(2, "WOLNY", null, "A01-01-05");
+  zbiorka(1, "2026-08-10", 10);
+  zbiorka(2, "2026-08-10", 1);
+
+  const szybki = D.getDelivery(dostawaZPozycja(1, "SZYBKI"));
+  assert.deepEqual(szybki?.lines[0].zlotaStrefa, Z.adnotacjaStrefy(1) ?? undefined,
+    "pozycja i karta muszą mówić DOKŁADNIE to samo");
+  assert.equal(szybki?.lines[0].zlotaStrefa?.zbiorekNaDzien, 10);
+
+  const wolny = D.getDelivery(dostawaZPozycja(2, "WOLNY"));
+  assert.equal(wolny?.lines[0].zlotaStrefa, undefined,
+    "towar poniżej progu nie dostaje podpowiedzi — ani tu, ani na karcie");
+});
+
+test("brak danych o zbiórkach nie dokłada pola do pozycji", () => {
+  /* Świeża instalacja i instancja demo nie mają ani jednej zbiórki. Pole ma
+     wtedy ZNIKNĄĆ z JSON-a, a nie przyjść jako zero — „zbierany 0×/dzień"
+     brzmiałoby jak zmierzony fakt, a nie jak brak pomiaru. */
+  towar(1, "BEZ-DANYCH", null, "A01-01-05");
+  const v = D.getDelivery(dostawaZPozycja(1, "BEZ-DANYCH"));
+  assert.equal(v?.lines[0].zlotaStrefa, undefined);
+  assert.ok(!("zlotaStrefa" in JSON.parse(JSON.stringify(v!.lines[0]))));
 });
