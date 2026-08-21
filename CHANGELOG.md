@@ -33,6 +33,52 @@ historii nie przepisujemy.
 
 ---
 
+## 0.75.0 — 21 sierpnia 2026
+
+**Trzecia zakładka kolektora: ROZKŁADANIE ZWROTÓW.** Do tej wersji aplikacja
+znała jeden obieg zwrotów — ten własny, z koszami pod kodem `KZ-01`. Magazyn
+pracuje jednak inaczej i robi to od lat: biuro składa koszyk, wystawia
+w Subiekcie przesunięcie MM z magazynu głównego na regał zwrotów, a numer tego
+dokumentu pisze **odręcznie na kartce** przypiętej do kosza. Kosz jedzie na
+halę z liczbą `1209` na kartce i to ona jest jednostką pracy.
+
+Zakładka ZWROTY wchodzi w ten obieg zamiast zapraszać do nowego. Pole u góry
+przyjmuje numer z kartki — ze skanera i z klawiatury, samą liczbę albo cały
+`MM 1209/MAG/2026`. Zawartość kosza bierze się **z pozycji dokumentu MM**,
+nie z tego, co ktoś do niego dorzucił w aplikacji. Drugi skan tej samej kartki
+otwiera ten sam kosz, więc dwa kolektory przy jednym koszu nie zrobią dwóch.
+
+**Kolektor NIE wystawia dokumentu powrotnego.** To najważniejsze zdanie tego
+wydania. Przesunięcie na regał zrobiło biuro przed przywiezieniem kosza,
+a powrotne (ZWR→MAG) zrobi po rozłożeniu. Zadanie w kolejce znaczyłoby ten sam
+towar przesunięty drugi raz, więc `ZAKOŃCZ` na koszu z dokumentu zostawia
+`sfera_queue` bez zadania MM. Zapisuje wyłącznie adresy półek — i tylko dla
+towaru, który zmienił miejsce.
+
+**Dwa obiegi stoją teraz obok siebie i jest to decyzja, nie przeoczenie.**
+Kosze składane w aplikacji dalej kolejkują MM po rozłożeniu, bo tam nikt
+wcześniej żadnego dokumentu nie wystawił. Kosze z dokumentu nie kolejkują nic.
+Rozstrzyga o tym kolumna `kosz.mm_dok_id`, a nie domysł na ekranie. Kosze
+z aplikacji zjechały przy okazji z zakładki DOSTAWY do drugiej sekcji zakładki
+ZWROTY: jedno miejsce na jedną robotę, a DOSTAWY wracają do samych faktur.
+
+**[wymaga działania] Importer czyta teraz dokumenty MM.** Do zapytań dochodzi
+`dok__Dokument` z `dok_Typ = 9`, którego odbiorcą jest magazyn zwrotów, w oknie
+`MM_ZWROTY_DNI_WSTECZ` (domyślnie 30 dni — tyle, ile filtr w Subiekcie). Login
+odczytowy musi widzieć te dokumenty i ich pozycje. Bez tego odczytu reszta
+aplikacji pracuje normalnie, lista przyjęć jest pusta, a `/api/health` niesie
+zdanie o przyczynie.
+
+Kolumna niosąca magazyn docelowy MM (`dok_OdbiorcaId`) nosi `[WERYFIKUJ]` —
+opisuje ją tak dokumentacja struktury, ale nie potwierdzono jej na bazie firmy.
+Pomyłka daje pustą listę przyjęć, nie złe dane. Zapytanie sprawdzające stoi
+w DEPLOY §6a.
+
+**Zaległość sprzed wdrożenia zdejmuje admin.** Dokumenty, których towar dawno
+leży na regałach, znikają z listy akcją „już rozłożony". Magazynier jej nie ma:
+to decyzja o pominięciu pracy, nie sposób jej wykonania. Ślad zostaje
+w dzienniku.
+
 ## 0.74.1 — 21 sierpnia 2026
 
 **Zakładki biura w trzech grupach.** Sześć pastylek stało w jednym rzędzie,

@@ -600,6 +600,8 @@ CREATE INDEX IF NOT EXISTS ix_zwrot_poz ON zwrot_pozycja(zwrot_id);
 -- częściowy zamiast UNIQUE na kolumnie.
 CREATE TABLE IF NOT EXISTS kosz (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- Kod kosza. Dla koszy z Subiekta to LICZBA z numeru MM napisana na kartce
+  -- („1209"), dla koszy składanych w aplikacji — kod nadany przez biuro.
   kod           TEXT NOT NULL,
   -- otwarty   = biuro dokłada zwroty
   -- zamkniety = gotowy do rozłożenia, widoczny na kolektorze
@@ -622,7 +624,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod) WHERE status 
 CREATE TABLE IF NOT EXISTS kosz_pozycja (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
-  zwrot_id      INTEGER NOT NULL REFERENCES zwrot(id),
+  -- NULL = kosz z dokumentu MM (0.75.0): pozycja pochodzi z przesunięcia
+  -- wystawionego w Subiekcie, a nie ze zwrotu przypiętego w aplikacji.
+  zwrot_id      INTEGER REFERENCES zwrot(id),
   tw_id         INTEGER NOT NULL,
   symbol        TEXT NOT NULL,
   nazwa         TEXT NOT NULL,
@@ -694,6 +698,48 @@ CREATE TABLE IF NOT EXISTS zwrot_zam_pozycja (
   ilosc       REAL NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_zam_poz ON zwrot_zam_pozycja(zwrot_id);
+
+-- ── Przyjęcia na regał zwrotów (MM z Subiekta) ──────────────────────────────
+-- Prawdziwy obieg magazynu jest starszy niż ta aplikacja: biuro składa koszyk
+-- ze zwróconym towarem, wystawia w Subiekcie przesunięcie MM z magazynu
+-- głównego NA regał zwrotów i pisze numer tego dokumentu ODRĘCZNIE na kartce
+-- przypiętej do kosza („1209"). Kosz jedzie na halę, magazynier rozkłada
+-- zawartość na regały, a dokument powrotny (ZWR→MAG) wystawia biuro.
+--
+-- Read-model, nie prawda: wipe+insert przy każdym imporcie, dokładnie jak
+-- sgt_sprzedaz. Aplikacja czyta stąd WYŁĄCZNIE listę „co jest w koszu".
+CREATE TABLE IF NOT EXISTS sgt_mm_zwrot (
+  dok_id    INTEGER PRIMARY KEY,
+  nr_pelny  TEXT NOT NULL,           -- „MM 1240/MAG/2026"
+  -- Sama liczba z numeru — TO ONA jest napisana na kartce przy koszu i po niej
+  -- magazynier odnajduje dokument. Wyliczana przy imporcie, żeby wyszukiwanie
+  -- nie parsowało numeru przy każdym skanie.
+  numer     TEXT NOT NULL,
+  data_wyst TEXT NOT NULL,           -- ISO date
+  mag_z     INTEGER,                 -- dok_MagId — magazyn źródłowy (główny)
+  mag_do    INTEGER                  -- dok_OdbiorcaId — magazyn docelowy (zwroty)
+);
+CREATE INDEX IF NOT EXISTS ix_mm_zwrot_numer ON sgt_mm_zwrot(numer);
+CREATE INDEX IF NOT EXISTS ix_mm_zwrot_data ON sgt_mm_zwrot(data_wyst);
+
+CREATE TABLE IF NOT EXISTS sgt_mm_zwrot_pozycja (
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  dok_id INTEGER NOT NULL REFERENCES sgt_mm_zwrot(dok_id),
+  tw_id  INTEGER NOT NULL,
+  ilosc  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_mm_zwrot_poz_dok ON sgt_mm_zwrot_pozycja(dok_id);
+
+-- Przyjęcie uznane za rozłożone POZA aplikacją. Pierwszego dnia po wdrożeniu
+-- lista niesie dokumenty sprzed niej — towar z nich dawno leży na regałach,
+-- ale aplikacja nie ma skąd tego wiedzieć. Zdejmuje je z listy admin, ręką,
+-- ze śladem kto i kiedy. Osobna tabela, bo to NIE jest kosz: nie ma pozycji,
+-- nikt go nie rozkładał i nie ma czego pokazywać na kolektorze.
+CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
+  dok_id INTEGER PRIMARY KEY,
+  at     TEXT NOT NULL,
+  przez  TEXT NOT NULL
+);
 
 -- Zapowiedzi zwrotów (Etap 4). Klient rejestruje zwrot w Allegro dużo
 -- wcześniej, niż paczka dojedzie — ticker ściąga te zgłoszenia w tle, więc

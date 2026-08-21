@@ -60,9 +60,17 @@ import pl.wertis.kolektor.ui.theme.cardSurface
                     cudzy towar dostaje uczciwe „nie z tego kosza"),
      skan REGAŁU  → odkłada wskazaną pozycję pod ten adres.
 
-   Po ostatniej pozycji zostaje jeden przycisk: ZAKOŃCZ. To on cofa bufor —
-   serwer kolejkuje MM ZWROTY→MAG per pozycja i nikt przy komputerze niczego
-   nie pilnuje. Ekran świadomie NIE ma korekt ilości ani wyjątków: ilości
+   Po ostatniej pozycji zostaje jeden przycisk: ZAKOŃCZ. Robi on jedno z dwóch,
+   zależnie od tego, SKĄD kosz pochodzi:
+
+     kosz z aplikacji (Etap 3) → kolejkuje MM ZWROTY→MAG per pozycja i cofa
+                                 bufor bez nikogo przy komputerze,
+     kosz z dokumentu (0.75.0) → nie wystawia NICZEGO. Przesunięcie na regał
+                                 zrobiło biuro przed przywiezieniem kosza,
+                                 a powrotne zrobi po rozłożeniu.
+
+   Przycisk mówi to wprost, bo obietnica bez pokrycia byłaby gorsza niż jej
+   brak. Ekran świadomie NIE ma korekt ilości ani wyjątków: ilości
    rozstrzygnęła ocena zwrotu w biurze, a kosz tylko je roznosi.              */
 
 @Composable
@@ -186,12 +194,17 @@ fun KoszScreen(graph: AppGraph) {
             }
         }
 
+        val zDokumentu = k.mmNumer != null
         if (doZrobienia == 0 && k.status == "zamkniety") {
-            PrimaryButton("ZAKOŃCZ — COFNIJ BUFOR", tall = true, modifier = Modifier.fillMaxWidth()) {
+            val napis = if (zDokumentu) "ZAKOŃCZ — KOSZ ROZŁOŻONY" else "ZAKOŃCZ — COFNIJ BUFOR"
+            PrimaryButton(napis, tall = true, modifier = Modifier.fillMaxWidth()) {
                 scope.launch {
                     try {
                         apiCall { graph.api.koszZakoncz(id) }
-                        graph.effects.toast("Kosz rozłożony — MM na magazyn główny w kolejce")
+                        graph.effects.toast(
+                            if (zDokumentu) "Kosz ${k.kod} rozłożony — dokument powrotny wystawia biuro"
+                            else "Kosz rozłożony — MM na magazyn główny w kolejce"
+                        )
                         graph.nav.zakonczonyKosz()
                     } catch (e: Exception) {
                         graph.effects.toast(e.message ?: "Nie udało się zakończyć")
@@ -200,7 +213,12 @@ fun KoszScreen(graph: AppGraph) {
             }
         }
         if (k.status == "rozlozony") {
-            Text("Kosz rozłożony — bufor cofnięty automatycznie.", fontSize = 13.sp, color = InkMute)
+            Text(
+                if (zDokumentu) "Kosz rozłożony. Dokument powrotny (ZWR→MAG) wystawia biuro."
+                else "Kosz rozłożony — bufor cofnięty automatycznie.",
+                fontSize = 13.sp,
+                color = InkMute,
+            )
         }
     }
 }

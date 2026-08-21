@@ -104,6 +104,7 @@ function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  zwrotNieobowiazkowyWKoszu(database);
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
@@ -174,6 +175,10 @@ function migrate(database: DatabaseSync) {
   addColumn("zwrot_pozycja", "rekl_notatka", "TEXT");
   addColumn("zwrot_pozycja", "rekl_polka", "TEXT");
   addColumn("zwrot_zapowiedz", "status_allegro", "TEXT");
+  /* Kosz z dokumentu MM (0.75.0): numer z kartki wskazuje przesunięcie
+     z Subiekta, a nie kod nadany w biurze. NULL = kosz złożony w aplikacji. */
+  addColumn("kosz", "mm_dok_id", "INTEGER");
+  addColumn("kosz", "mm_numer", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
@@ -248,6 +253,60 @@ function bezBrygadzisty(database: DatabaseSync) {
  * którą jednocześnie trzyma otwartą worker, kosztowałaby bez żadnego zysku.
  * To ten sam wybór co przy 0.17.0 (`koszyk`, `mm_ilosc`, `mm_queue_id`).
  */
+/**
+ * `kosz_pozycja.zwrot_id` przestaje być obowiązkowe (0.75.0).
+ *
+ * Kosz z dokumentu MM nie ma zwrotu przypiętego w aplikacji — pozycje niesie
+ * przesunięcie wystawione w Subiekcie. DRUGA przebudowa tabeli w tym repo
+ * (pierwsza: `naLoginIHaslo`) i z tego samego powodu: SQLite nie umie zdjąć
+ * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
+ */
+function zwrotNieobowiazkowyWKoszu(database: DatabaseSync) {
+  const wymagany = () =>
+    (
+      database.prepare("PRAGMA table_info(kosz_pozycja)").all() as Array<{
+        name: string;
+        notnull: number;
+      }>
+    ).some((c) => c.name === "zwrot_id" && c.notnull === 1);
+  if (!wymagany()) return;
+
+  /* Klucze obce schodzą PRZED transakcją — w transakcji `PRAGMA foreign_keys`
+     jest ignorowane po cichu (ta sama pułapka co przy `naLoginIHaslo`). */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      if (!wymagany()) return; // drugi proces mógł zdążyć pierwszy
+      database.exec(`
+        CREATE TABLE kosz_pozycja_nowa (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
+          zwrot_id      INTEGER REFERENCES zwrot(id),
+          tw_id         INTEGER NOT NULL,
+          symbol        TEXT NOT NULL,
+          nazwa         TEXT NOT NULL,
+          ilosc         REAL NOT NULL,
+          status        TEXT NOT NULL DEFAULT 'todo',
+          lok_faktyczna TEXT,
+          odlozono_at   TEXT,
+          odlozono_przez TEXT,
+          mm_queue_id   INTEGER REFERENCES sfera_queue(id)
+        );
+        INSERT INTO kosz_pozycja_nowa(id, kosz_id, zwrot_id, tw_id, symbol, nazwa, ilosc,
+                                      status, lok_faktyczna, odlozono_at, odlozono_przez, mm_queue_id)
+          SELECT id, kosz_id, zwrot_id, tw_id, symbol, nazwa, ilosc,
+                 status, lok_faktyczna, odlozono_at, odlozono_przez, mm_queue_id
+            FROM kosz_pozycja;
+        DROP TABLE kosz_pozycja;
+        ALTER TABLE kosz_pozycja_nowa RENAME TO kosz_pozycja;
+        CREATE INDEX IF NOT EXISTS ix_kosz_poz ON kosz_pozycja(kosz_id);
+      `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
 function usunSesjeRozkladania(database: DatabaseSync) {
   // `IF EXISTS` załatwia idempotencję w całości: to dwa DROP-y bez stanu
   // pośredniego, więc API i worker mogą je wykonać w dowolnym przeplocie

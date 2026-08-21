@@ -211,6 +211,17 @@ export const config = {
      */
     sprzedazDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 90, "DOK_SPRZEDAZ_DNI_WSTECZ"),
     /**
+     * Ile dni wstecz czytać przesunięcia MM NA regał zwrotów — dokumenty,
+     * których numery magazyn pisze na koszach. Domyślne 30 dni to okno,
+     * którego biuro używa w Subiekcie („ostatnie 30 dni" na liście przyjęć).
+     */
+    mmZwrotyDniWstecz: num(process.env.MM_ZWROTY_DNI_WSTECZ, 30, "MM_ZWROTY_DNI_WSTECZ"),
+    /**
+     * `dok_Typ` przesunięcia międzymagazynowego. Wartość z oficjalnego opisu
+     * struktury (9-MM), ta sama lista co pozostałe kody dokumentów.
+     */
+    dokTypMM: num(process.env.DOK_TYP_MM, 9, "DOK_TYP_MM"),
+    /**
      * Kolumna `dok__Dokument` z numerem obcym/oryginalnym dokumentu.
      * Integracje sprzedażowe zwykle wpisują tam numer zamówienia — jeśli tak
      * jest i tu, dopasowanie zwrotu do dokumentu staje się jednoznaczne.

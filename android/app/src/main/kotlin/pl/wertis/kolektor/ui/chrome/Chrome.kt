@@ -193,24 +193,36 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
     }
 }
 
-/* ── Dolny pasek: SKAN · DOSTAWY · WSTECZ ────────────────────────────────────
+/* ── Dolny pasek: SKAN · DOSTAWY · ZWROTY · WSTECZ ───────────────────────────
    WSTECZ stoi PO PRAWEJ, bo kolektor trzyma się w prawej dłoni i tam ląduje
    kciuk. Wcześniej był w lewym górnym rogu — najdalszym punkcie ekranu od
    kciuka przy dowolnym chwycie.
 
    MIEJSCE NA WSTECZ JEST ZAREZERWOWANE ZAWSZE, także gdy nie ma dokąd wracać.
-   Inaczej SKAN i DOSTAWY przeskakiwałyby w bok przy każdym wejściu
-   w podekran, a te dwa przyciski trafia się z pamięci, nie wzrokiem —
-   przesuwający się cel to wciśnięcie sąsiada.                                 */
+   Inaczej zakładki przeskakiwałyby w bok przy każdym wejściu w podekran,
+   a trafia się je z pamięci, nie wzrokiem — przesuwający się cel to
+   wciśnięcie sąsiada.
+
+   ZWROTY doszły jako trzecia zakładka w 0.75.0. Wcześniej kosze mieszkały
+   w DOSTAWACH, bo „to też rozkładanie" — ale magazynier szukał ich pod cudzą
+   nazwą, a rozkładanie zwrotów urosło do codziennej roboty z własnym
+   dokumentem z Subiekta.                                                      */
 
 /** Szerokość slotu WSTECZ — stała, bo rezerwacja miejsca jest tu całym sensem. */
 private val BackSlot = 76.dp
 
 @Composable
-fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -> Unit, onBack: () -> Unit) {
-    val putawayActive =
-        screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES || screen == Screen.KOSZ_LINES
-    val homeActive = !putawayActive && screen != Screen.QUEUE
+fun TabBar(
+    screen: Screen,
+    hasBack: Boolean,
+    onHome: () -> Unit,
+    onPutaway: () -> Unit,
+    onZwroty: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES
+    val zwrotyActive = screen == Screen.PRZYJECIA || screen == Screen.KOSZ_LINES
+    val homeActive = !putawayActive && !zwrotyActive && screen != Screen.QUEUE
 
     Row(
         modifier = Modifier
@@ -222,6 +234,7 @@ fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -
     ) {
         TabItem("SKAN", WIcons.Scan, homeActive, Modifier.weight(1f), onHome)
         TabItem("DOSTAWY", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
+        TabItem("ZWROTY", WIcons.Box, zwrotyActive, Modifier.weight(1f), onZwroty)
         if (hasBack) {
             BackTab(Modifier.width(BackSlot), onBack)
         } else {
@@ -234,9 +247,9 @@ fun TabBar(screen: Screen, hasBack: Boolean, onHome: () -> Unit, onPutaway: () -
 /**
  * WSTECZ — wizualnie odrębny od zakładek, bo robi co innego.
  *
- * SKAN i DOSTAWY PRZEŁĄCZAJĄ tryb pracy i mają stan „aktywny"; WSTECZ
- * cofa o krok i stanu nie ma. Gdyby wyglądał jak trzecia zakładka, człowiek
- * szukałby w nim trzeciego trybu.
+ * Zakładki PRZEŁĄCZAJĄ tryb pracy i mają stan „aktywny"; WSTECZ cofa o krok
+ * i stanu nie ma. Gdyby wyglądał jak kolejna zakładka, człowiek szukałby
+ * w nim kolejnego trybu.
  */
 @Composable
 private fun BackTab(modifier: Modifier, onClick: () -> Unit) {

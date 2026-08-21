@@ -40,7 +40,6 @@ import pl.wertis.kolektor.core.delivery.stanDokumentu
 import pl.wertis.kolektor.core.delivery.uporzadkujDokumenty
 import pl.wertis.kolektor.core.net.DeliveryDocument
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
-import pl.wertis.kolektor.core.net.KoszRow
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -63,10 +62,10 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    Dokumenty w buforze SGT są normalnie dostępne do pracy (D1) — rozkładanie nie
    czeka na księgowość. Ukończone schodzą na dół i szarzeją, ale nie znikają.
 
-   Nad fakturami stoją KOSZE ZWROTOWE (Etap 3 zwrotów Allegro): zamknięte
-   przez biuro kosze z towarem do rozłożenia. To też rozkładanie — dlatego
-   mieszkają na tej zakładce, a nie za osobnym przyciskiem, którego nikt by
-   nie znalazł. Sekcja znika, gdy koszy nie ma.                               */
+   Kosze zwrotowe stały tu od 0.59.0 („to też rozkładanie"), a w 0.75.0
+   wyprowadziły się na WŁASNĄ zakładkę ZWROTY. Powód: magazynier szukał ich
+   pod cudzą nazwą, a rozkładanie zwrotów ma dziś własny dokument z Subiekta
+   i własny rytm pracy. Ta zakładka wróciła do samych faktur.                 */
 
 
 /**
@@ -100,16 +99,6 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
             } catch (e: Exception) {
                 graph.effects.toast(e.message ?: "Nie udało się otworzyć dostawy")
             }
-        }
-    }
-
-    /* Kosze zwrotowe dociągane OBOK dostaw, nie w jednej odpowiedzi: to inna
-       domena i inny rytm — awaria jednej listy nie ma zabierać drugiej. */
-    val kosze by produceState(emptyList<KoszRow>(), reload) {
-        value = try {
-            apiCall { graph.api.kosze() }.kosze
-        } catch (_: Exception) {
-            value
         }
     }
 
@@ -149,16 +138,6 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (kosze.isNotEmpty()) {
-            Text(
-                "KOSZE ZWROTOWE · DO ROZŁOŻENIA",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                color = InkSoft,
-            )
-            kosze.forEach { k -> KoszRowView(k) { graph.nav.openKosz(k.id) } }
-        }
         Text(
             "FAKTURY ZAKUPU · OSTATNIE ${r.dniWstecz} DNI",
             fontSize = 11.sp,
@@ -364,37 +343,3 @@ private fun ProgressBar(done: Int, total: Int, complete: Boolean) {
     }
 }
 
-@Composable
-private fun KoszRowView(k: KoszRow, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .cardSurface()
-            .heightIn(min = 56.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(AmberBg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(WIcons.Box, contentDescription = null, tint = AmberInk, modifier = Modifier.size(22.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text("KOSZ ${k.kod}", fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Ink)
-            Text(
-                "zwroty Allegro · ${k.zwrotow} zwr.",
-                fontSize = 12.sp,
-                color = InkMute,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Text("${k.odlozonych}/${k.pozycji} poz.", fontSize = 13.sp, color = InkSoft)
-    }
-}

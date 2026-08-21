@@ -1,6 +1,11 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import {
+  listaPrzyjec,
+  otworzPrzyjecie,
+  oznaczRozlozonePozaAplikacja,
+} from "../services/przyjecia.js";
+import {
   BladKosza,
   koszPoKodzie,
   koszeDlaKolektora,
@@ -125,5 +130,33 @@ export async function koszeRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { id: string } }>("/api/kosze/:id/zakoncz", async (req, reply) =>
     zBledem(reply, () => ({ kosz: zakonczKosz(Number(req.params.id), autor()) }))
+  );
+
+  // ── Przyjęcia na regał zwrotów (kosze z dokumentu MM) ─────────────────────
+
+  app.get("/api/przyjecia", async () => ({ przyjecia: listaPrzyjec() }));
+
+  /* Otwarcie kosza NUMEREM Z KARTKI — magazynier podchodzi z koszem i czyta
+     to, co ktoś napisał długopisem. Numer, nie id: id nie ma na kartce. */
+  app.post<{ Body: { numer?: string } }>("/api/przyjecia/otworz", async (req, reply) =>
+    zBledem(reply, () => ({ kosz: otworzPrzyjecie(req.body?.numer ?? "", autor()) }))
+  );
+
+  /* „Już rozłożony" — tylko admin. To jedyny sposób zdjęcia z listy pracy,
+     której aplikacja nie widziała (dokumenty sprzed wdrożenia), więc nie ma
+     prawa być dostępny przy każdym kolektorze. */
+  app.post<{ Params: { dokId: string } }>(
+    "/api/przyjecia/:dokId/poza-aplikacja",
+    async (req, reply) => {
+      const s = sesjaZadania();
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      if (s.user.role !== "admin") {
+        return reply.code(403).send({ error: "Zdjęcie przyjęcia z listy wykonuje admin" });
+      }
+      return zBledem(reply, () => {
+        oznaczRozlozonePozaAplikacja(Number(req.params.dokId), autor());
+        return { przyjecia: listaPrzyjec() };
+      });
+    }
   );
 }

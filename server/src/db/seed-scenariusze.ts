@@ -50,6 +50,8 @@ export const DOK_OD = 9_001;
 export const DOK_WZ_OD = 20_001;
 /** Pierwszy `dok_id` dokumentów sprzedaży (FS/PA) pod zwroty Allegro. */
 export const DOK_SPRZ_OD = 30_001;
+/** Przyjęcia na regał zwrotów (MM z Subiekta) — kosze z kartką na hali. */
+export const DOK_MM_OD = 41_200;
 
 /**
  * Symbol wydania z magazynu w read-modelu `sgt_*`.
@@ -210,6 +212,9 @@ export const KATALOG: Scenariusz[] = [
   // ── logo dostawcy ──
   { id: "S70", obszar: "dostawa", tytul: "Dostawca z logo i dostawca bez logo", wejscie: "zakładka DOSTAWY, potem /biuro → DOSTAWCY" },
   { id: "S71", obszar: "karta", tytul: "Zamienniki wypisane bez nagłówka", wejscie: "karta TEST-ZAMIENNIK-LISTA" },
+
+  // ── rozkładanie zwrotów z regału ──
+  { id: "S72", obszar: "zwroty", tytul: "Kosz z kartką: numer MM otwiera przyjęcie, ZAKOŃCZ nie wystawia dokumentu", wejscie: "kolektor → zakładka ZWROTY → numer 1209" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -417,6 +422,7 @@ export interface Podsumowanie {
   dokumentyWz: number;
   pozycjeWz: number;
   sprzedaz: number;
+  przyjecia: number;
 }
 
 /**
@@ -437,7 +443,7 @@ export function zbudujScenariusze(): Podsumowanie {
   const licz = {
     towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
     konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
-    sprzedaz: 0,
+    sprzedaz: 0, przyjecia: 0,
   };
 
   const wszystkieTowary = [...TOWARY, ...DROBNICA];
@@ -459,6 +465,7 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.dokumentyWz = wz.dokumentow;
     licz.pozycjeWz = wz.pozycji;
     licz.sprzedaz = sprzedazDemo();
+    licz.przyjecia = przyjeciaDemo();
     logoDostawcow();
   })();
 
@@ -496,6 +503,15 @@ function wyczysc(): void {
 
     d.prepare("DELETE FROM sgt_sprzedaz_pozycja WHERE dok_id >= ?").run(DOK_SPRZ_OD);
     d.prepare("DELETE FROM sgt_sprzedaz WHERE dok_id >= ?").run(DOK_SPRZ_OD);
+    /* Kosze z dokumentu i same dokumenty — w tej kolejności, bo kosz wskazuje
+       przyjęcie, a jego pozycje wskazują kosz. */
+    d.prepare(
+      "DELETE FROM kosz_pozycja WHERE kosz_id IN (SELECT id FROM kosz WHERE mm_dok_id >= ?)"
+    ).run(DOK_MM_OD);
+    d.prepare("DELETE FROM kosz WHERE mm_dok_id >= ?").run(DOK_MM_OD);
+    d.prepare("DELETE FROM przyjecie_pominiete WHERE dok_id >= ?").run(DOK_MM_OD);
+    d.prepare("DELETE FROM sgt_mm_zwrot_pozycja WHERE dok_id >= ?").run(DOK_MM_OD);
+    d.prepare("DELETE FROM sgt_mm_zwrot WHERE dok_id >= ?").run(DOK_MM_OD);
     /* Zwroty założone z adaptera dev (skan DEVWB…) — kasowane po znaczniku
        `dev-ret-`, żeby ponowne uruchomienie wracało do punktu wyjścia także
        w zakładce ZWROTY. Zwroty ręczne z innych etykiet zostają. */
@@ -1338,6 +1354,43 @@ function sprzedazDemo(): number {
   return 3;
 }
 
+/**
+ * Przyjęcia na regał zwrotów — kosze, których numer magazyn nosi na kartce.
+ *
+ * Numery wzorowane na prawdziwych („MM 1240/MAG/2026"), bo to po nich
+ * magazynier szuka kosza i tak samo wygląda pole na kolektorze.
+ */
+function przyjeciaDemo(): number {
+  const d = db();
+  const insDok = d.prepare(
+    `INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+     VALUES (?,?,?,?,?,?)`
+  );
+  const insPoz = d.prepare(
+    "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+  );
+  const kosze: Array<[number, number, Array<[number, number]>]> = [
+    // [dok_id, dni temu, [[tw_id, ilość], …]]
+    [DOK_MM_OD, -1, [[900_036, 1], [900_037, 2], [900_029, 1]]],
+    [DOK_MM_OD + 5, -3, [[900_029, 2]]],
+    // kosz sprzed wdrożenia — na nim admin ćwiczy „JUŻ ROZŁOŻONY"
+    [DOK_MM_OD + 9, -12, [[900_036, 3], [900_037, 1]]],
+  ];
+  for (const [dokId, dni, pozycje] of kosze) {
+    const numer = String(dokId - DOK_MM_OD + 1200);
+    insDok.run(
+      dokId,
+      `MM ${numer}/MAG/${new Date().getFullYear()}`,
+      numer,
+      dzien(dni),
+      config.magId.MAG,
+      config.magId.ZWROTY
+    );
+    for (const [twId, ilosc] of pozycje) insPoz.run(dokId, twId, ilosc);
+  }
+  return kosze.length;
+}
+
 function zdjecia(): void {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   fs.mkdirSync(dir, { recursive: true });
@@ -1361,6 +1414,7 @@ function wypisz(licz: Podsumowanie): void {
   );
   console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
   console.log(`[scenariusze] sprzedaż pod zwroty Allegro: dokumentów=${licz.sprzedaz}`);
+  console.log(`[scenariusze] przyjęcia na regał zwrotów (kosze z kartką): ${licz.przyjecia}`);
   console.log("");
   let obszar = "";
   for (const s of KATALOG) {
