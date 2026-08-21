@@ -486,10 +486,12 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - **Pasek stanu widać z każdej zakładki**: wersja i tryb serwera, czy worker
   żyje, ile zadań stoi w błędzie, ile rozjazdów zna rekoncyliacja. Kliknięcie
   prowadzi do szczegółu.
-- **Zakładki w trzech grupach** (0.74.1), bo mają różny rytm pracy.
+- **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
   PRACA (dostawy, zwroty) otwiera się kilkanaście razy dziennie.
   WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
-  USTAWIENIA (dostawcy) raz na kilka tygodni.
+- **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Dziś prowadzi
+  do DOSTAWCÓW. Konfiguracja nie jest zakładką pracy i nie ma ważyć tyle,
+  co dostawy.
 - **DOSTAWY I REKLAMACJE** — postęp per dokument oraz nierozwiązane wyjątki;
   protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
 - **Wyjątki widać z listy** (0.57.0): wiersz dostawy niesie licznik

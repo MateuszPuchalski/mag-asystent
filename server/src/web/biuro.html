@@ -47,6 +47,12 @@
   header .kto { margin-left: auto; font: 600 12px var(--font-sans); color: #bbb; letter-spacing: .3px; }
   header button { background: none; border: 1px solid #555; color: #ccc; border-radius: 999px; padding: 4px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
   header button:hover { border-color: var(--amber); color: var(--amber); }
+  /* Zębatka: cel dotyku kwadratowy i nie mniejszy niż sąsiedni „Wyloguj",
+     inaczej ikona byłaby trudniejsza do trafienia niż napis obok niej.
+     Stan aktywny to ten sam bursztyn co zakładka w pasku — bo to JEST
+     wskaźnik bieżącego widoku, tylko postawiony poza paskiem. */
+  header button.ikona { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 999px; }
+  header button.ikona[aria-current="true"] { border-color: var(--amber); color: var(--amber); background: rgba(247, 166, 0, .18); }
 
   main { max-width: 1080px; margin: 20px auto; padding: 0 16px; display: grid; gap: 16px; }
 
@@ -110,11 +116,18 @@
 
      Wygląd = TabBar kolektora: biała listwa, zakładka aktywna dostaje
      bursztynową pigułkę i AmberInk — nie odwrócone kolory. */
-  /* Odstęp MIĘDZY grupami (18 px) jest wyraźnie większy niż między przyciskami
-     w grupie (4 px) — inaczej podpis opisywałby grupę, której granicy nie
-     widać. `align-items: flex-start`, żeby grupa o dwóch przyciskach nie
-     rozciągała się do wysokości trzyprzyciskowej. */
-  nav.zakladki { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 6px 10px 8px; box-shadow: var(--cien); }
+  /* Odstęp MIĘDZY grupami (24 px + kreska + 24 px) jest wielokrotnie większy
+     niż między przyciskami w grupie (4 px). Od 0.76.0 granicę niesie też
+     pionowa kreska: sam odstęp kazał czytać podpisy, żeby wiedzieć, gdzie
+     kończy się jedna grupa. `align-items: flex-start`, żeby grupa o dwóch
+     przyciskach nie rozciągała się do wysokości trzyprzyciskowej. */
+  nav.zakladki { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 6px 10px 8px; box-shadow: var(--cien); }
+  /* Kreska tylko wtedy, gdy grupy stoją w JEDNYM rzędzie. Po zawinięciu
+     zostałaby pionową krechą na początku nowej linii, czyli czymś, co wygląda
+     na błąd renderowania. Poniżej tej szerokości rozdział niesie sam odstęp. */
+  @media (min-width: 760px) {
+    nav.zakladki .grupa + .grupa { border-left: 1px solid var(--border); padding-left: 24px; }
+  }
   /* Grupa zawija się W CAŁOŚCI: panel bywa otwarty na wąskim oknie obok
      Subiekta, a podpis, który został sam nad pustym miejscem, byłby gorszy
      niż brak podpisu. */
@@ -205,6 +218,24 @@
 <header>
   <b>WERTIS</b> <span>Podgląd biura</span>
   <span class="kto" id="kto"></span>
+  <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). Do 0.75.0 DOSTAWCY stali w pasku
+       zakładek jako trzecia grupa — jedna pastylka o tej samej wadze co
+       DOSTAWY, choć biuro wchodzi tam raz na kilka tygodni. Konfiguracja nie
+       jest zakładką pracy, więc idzie tam, gdzie już mieszka to, co dotyczy
+       całej sesji, a nie jednego widoku: obok „kto" i „Wyloguj".
+
+       `data-widok` nie jest tu ozdobą — wpina zębatkę w TEN SAM mechanizm,
+       który obsługuje pasek: jedna delegacja kliknięcia i jedna pętla
+       `aria-current`. Dwie byłyby dwoma miejscami do zapomnienia. -->
+  <button id="ustawienia" class="ikona" data-widok="dostawcy"
+          title="Ustawienia" aria-label="Ustawienia" hidden>
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+         stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
   <button id="wyloguj" hidden>Wyloguj</button>
 </header>
 <main id="login" class="card">
@@ -221,11 +252,14 @@
 
 <main id="panel" hidden>
   <div id="stan"></div>
-  <!-- ZAKŁADKI W GRUPACH (0.74.1). Do tej wersji stało tu sześć pastylek
-       o równej wadze, a to nieprawda o tym, jak się ich używa: dostawy
-       i zwroty biuro otwiera po kilkanaście razy dziennie, dziennik i analizę
-       wtedy, gdy czegoś szuka, a dostawców raz na kilka tygodni. Rząd równych
+  <!-- ZAKŁADKI W GRUPACH (0.74.1, rozdział i wyprowadzenie ustawień 0.76.0).
+       Wcześniej stało tu sześć pastylek o równej wadze, a to nieprawda o tym,
+       jak się ich używa: dostawy i zwroty biuro otwiera po kilkanaście razy
+       dziennie, a dziennik i analizę wtedy, gdy czegoś szuka. Rząd równych
        przycisków kazał czytać całą szóstkę przy każdym wejściu.
+
+       W pasku zostają WYŁĄCZNIE zakładki, do których biuro wraca w ciągu dnia.
+       Dostawcy wyszli za zębatkę w nagłówku — patrz `#ustawienia`.
 
        `data-widok` zostaje NIETKNIĘTE — i to jest cała sztuczka tej zmiany.
        Obsługa kliknięcia i pętla ustawiająca `aria-current` szukają przycisków
@@ -245,15 +279,6 @@
         <button data-widok="nadzor">STAN SYSTEMU</button>
         <button data-widok="dziennik">DZIENNIK</button>
         <button data-widok="analiza">ANALIZA</button>
-      </div>
-    </div>
-    <!-- Jedna pozycja to nie przeoczenie: ANALIZA niesie dziś import zbiórek
-         i reguły strefy złotej, czyli konfigurację schowaną pod raportem.
-         Ta grupa jest miejscem, do którego to kiedyś trafi. -->
-    <div class="grupa">
-      <span class="grupa-nazwa">Ustawienia</span>
-      <div class="grupa-btny">
-        <button data-widok="dostawcy">DOSTAWCY</button>
       </div>
     </div>
   </nav>
@@ -769,7 +794,7 @@ function wyloguj() {
   parowanieTrwa = false;
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
-  $("panel").hidden = true; $("wyloguj").hidden = true;
+  $("panel").hidden = true; $("wyloguj").hidden = true; $("ustawienia").hidden = true;
   $("login").hidden = false; $("kto").textContent = "";
 }
 
@@ -805,7 +830,10 @@ function pokaz(nowy) {
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
   $("widokDostawcy").hidden = nowy !== "dostawcy";
-  for (const b of document.querySelectorAll("nav.zakladki button")) {
+  /* Selektor celowo NIE jest zawężony do paska: od 0.76.0 jeden z przycisków
+     z `data-widok` (zębatka ustawień) stoi w nagłówku, poza `nav`. Przy starym
+     selektorze świeciłby na stałe albo wcale. */
+  for (const b of document.querySelectorAll("button[data-widok]")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
   if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
@@ -2812,6 +2840,7 @@ function start() {
   $("login").hidden = true;
   $("panel").hidden = false;
   $("wyloguj").hidden = false;
+  $("ustawienia").hidden = false;
   $("kto").textContent = kto;
   wczytajFirme();
   pokaz(widok);
@@ -2825,7 +2854,11 @@ for (const id of ["poleLogin", "poleHaslo"]) {
 }
 $("wyloguj").addEventListener("click", wyloguj);
 $("szukaj").addEventListener("input", rysujDostawy);
-document.querySelector("nav.zakladki").addEventListener("click", (e) => {
+/* Delegacja siedzi na dokumencie, nie na `nav`: przyciski widoków stoją od
+   0.76.0 w dwóch miejscach (pasek i zębatka w nagłówku), a `data-widok` jest
+   jedyną rzeczą, która je łączy. Przypięcie do `nav` zostawiłoby zębatkę
+   martwą — klikalną i bez skutku. */
+document.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-widok]");
   if (b) pokaz(b.dataset.widok);
 });
