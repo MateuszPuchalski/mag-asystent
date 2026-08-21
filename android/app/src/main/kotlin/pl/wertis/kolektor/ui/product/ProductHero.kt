@@ -11,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,12 +22,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.core.net.ProductCard
+import pl.wertis.kolektor.core.net.WDostawie
 import pl.wertis.kolektor.core.product.liniaWDostawie
 import pl.wertis.kolektor.core.product.liniaZamowione
 import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.ui.components.WIcons
+import pl.wertis.kolektor.ui.components.MinTap
 import pl.wertis.kolektor.ui.theme.AmberBgSoft
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
@@ -190,13 +193,17 @@ fun ProductHero(
  *
  * Obie linie stoją na jednej powierzchni, a rozróżnia je tusz i ikona:
  * bursztyn przy dostawie (jest co zrobić), szarość przy zamówieniu (nie ma).
- * Karta jest NIEKLIKALNA i to jest decyzja, nie niedoróbka — wejście
- * w dokument z karty towaru otwierałoby rozkładanie jako skutek uboczny
- * zwykłego zaglądania na kartę, bez zamiaru magazyniera. Numer dokumentu
- * w zupełności wystarcza, żeby znaleźć paletę.
+ *
+ * KLIKALNA JEST JEDNA LINIA, NIE KARTA (0.70.0). Do tej wersji nie klikało się
+ * tu nic, z zapisanym powodem: wejście w dokument z karty otwierałoby
+ * rozkładanie jako skutek uboczny zwykłego zaglądania. Powód był dobry, ale
+ * dotyczył CAŁEJ powierzchni — dotknięcie gdziekolwiek na karcie faktów jest
+ * przypadkiem, a dotknięcie wiersza „W dostawie" z szewronem po prawej jest
+ * zamiarem. Zamiar zostawiamy, przypadek nadal nie istnieje: linia zamówienia
+ * i linia przeslotowania klikalne NIE są, bo nie ma dokąd nimi pójść.
  */
 @Composable
-fun FaktyCard(p: ProductCard) {
+fun FaktyCard(p: ProductCard, onDostawa: ((WDostawie) -> Unit)? = null) {
     if (p.wDostawie.isEmpty() && p.zamowione.isEmpty() && p.zlotaStrefa == null) return
     Column(
         modifier = Modifier
@@ -212,7 +219,13 @@ fun FaktyCard(p: ProductCard) {
             FaktLinia(WIcons.Pin, AmberInk, liniaZlotaStrefa(z), FontWeight.SemiBold)
         }
         p.wDostawie.forEach { d ->
-            FaktLinia(WIcons.Clock, AmberInk, liniaWDostawie(d, p.unit), FontWeight.SemiBold)
+            FaktLinia(
+                WIcons.Clock,
+                AmberInk,
+                liniaWDostawie(d, p.unit),
+                FontWeight.SemiBold,
+                onTap = onDostawa?.let { { it(d) } },
+            )
         }
         p.zamowione.forEach { z ->
             FaktLinia(WIcons.Box, InkSoft, liniaZamowione(z, p.unit), FontWeight.Medium)
@@ -239,12 +252,41 @@ fun FaktyCard(p: ProductCard) {
  * ktoś już się o niego potknął.
  */
 @Composable
-private fun FaktLinia(ikona: ImageVector, tint: Color, tekst: String, waga: FontWeight) {
+private fun FaktLinia(
+    ikona: ImageVector,
+    tint: Color,
+    tekst: String,
+    waga: FontWeight,
+    /** `null` = linia jest samym faktem; niepusty robi z niej wejście. */
+    onTap: (() -> Unit)? = null,
+) {
     Row(
-        verticalAlignment = Alignment.Top,
+        modifier = Modifier
+            .fillMaxWidth()
+            /* Cel dotyku 48 dp obowiązuje TAKŻE tutaj — reguła całej aplikacji,
+               kupiona pracą w rękawicy. Linia faktu jest niższa, więc wysokość
+               dokłada `heightIn`, a nie powiększona czcionka. */
+            .let { if (onTap != null) it.heightIn(min = MinTap).clickable(onClick = onTap) else it },
+        verticalAlignment = if (onTap != null) Alignment.CenterVertically else Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Icon(ikona, null, tint = tint, modifier = Modifier.size(15.dp).padding(top = 1.dp))
-        Text(tekst, fontSize = 12.sp, fontWeight = waga, color = tint, lineHeight = 16.sp, maxLines = 2)
+        Text(
+            tekst,
+            fontSize = 12.sp,
+            fontWeight = waga,
+            color = tint,
+            lineHeight = 16.sp,
+            maxLines = 2,
+            modifier = if (onTap != null) Modifier.weight(1f) else Modifier,
+        )
+        /* Szewron jest tu jedyną różnicą widoczną z odległości ręki — bez
+           niego linia klikalna i nieklikalna wyglądają identycznie, a wtedy
+           nikt nie wie, że jest w co dotknąć. */
+        if (onTap != null) {
+            // ten sam szewron co w sekcjach zwijanych, obrócony w prawo:
+            // „tu się wchodzi" — dokładnie jak przy `CollapsibleSection`
+            Icon(WIcons.Chevron, null, tint = tint, modifier = Modifier.size(16.dp).rotate(-90f))
+        }
     }
 }

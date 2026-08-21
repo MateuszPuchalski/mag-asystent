@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.70.0 — 20 sierpnia 2026
+
+**Z karty towaru wprost do jego pozycji w dostawie.** Linia „W dostawie 6 szt
+— FZ 214/07/2026" jest teraz klikalna: otwiera dokument i od razu rozwija
+pozycję TEGO towaru. Do tej wersji trzeba było zapamiętać numer dokumentu,
+wyjść na listę dostaw, znaleźć go i odszukać pozycję wśród trzydziestu innych.
+
+Klikalna jest **jedna linia, nie cała karta** — i to jest ta sama decyzja, co
+wcześniej, tylko czytana dokładniej. Karta faktów była nieklikalna z zapisanym
+powodem: wejście w dokument nie ma być skutkiem ubocznym zaglądania na kartę.
+Powód dotyczył jednak całej powierzchni. Dotknięcie gdziekolwiek jest
+przypadkiem, a dotknięcie wiersza z szewronem po prawej jest zamiarem. Linia
+zamówienia i linia przeslotowania klikalne nie są, bo nie ma dokąd nimi pójść.
+
+Wskazujemy kartotekę, nie wiersz dostawy: wiersz powstaje dopiero przy
+otwarciu dokumentu, więc w chwili kliknięcia jeszcze go nie ma. Gdy ten sam
+towar stoi w dokumencie w dwóch wierszach, otwiera się ten, przy którym jest
+co robić.
+
+**Wolumen zbierania przy rozkładaniu.** Pozycja dostawy niesie tę samą
+podpowiedź, którą znała karta towaru: „Zbierany 12×/dzień — przenieś do strefy
+złotej (poziom 2 albo 3)". Miejsce jest tu lepsze niż na karcie — magazynier
+stoi z towarem w ręce i WŁAŚNIE wybiera półkę, więc rada trafia w moment
+decyzji, a nie w moment zaglądania.
+
+Tekst pochodzi z tej samej funkcji w `:core`, co na karcie. Dwa zdania o tej
+samej rzeczy rozjechałyby się przy pierwszej poprawce jednego z nich.
+
+Odczyt jest O(1) z cache'u zbiórek, więc trzydzieści pozycji nie kosztuje
+trzydziestu zapytań — agregacja chodzi raz na dziesięć minut. Przy braku
+danych o zbiórkach (świeża instalacja, instancja demo) pole po prostu znika
+z odpowiedzi: „zbierany 0×/dzień" brzmiałoby jak zmierzony fakt, a nie jak
+brak pomiaru.
+
 ## 0.69.0 — 20 sierpnia 2026
 
 **Środowisko dev obok produkcji.** Magazyn pracuje na produkcji, a rozwój

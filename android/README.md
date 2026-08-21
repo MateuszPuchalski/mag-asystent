@@ -294,6 +294,11 @@ przed którą ta pozycja broni.
       spodem,
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
+- [ ] linia „W dostawie …" na karcie towaru ma szewron i jest klikalna,
+- [ ] klik otwiera dostawę z ROZWINIĘTĄ pozycją tego towaru,
+- [ ] linia zamówienia i linia przeslotowania szewronu NIE mają,
+- [ ] pozycja szybko rotująca ma pod kaflami radę o strefie złotej,
+- [ ] ta rada brzmi identycznie jak na karcie towaru.
 - [ ] kafel ilości i kafel lokalizacji mają **tę samą wysokość**, także gdy
       biały niesie linijkę „reszta zostaje",
 - [ ] linijka „na hali N" dostaje strzałkę, gdy stan różni się od dokumentu,

@@ -46,6 +46,21 @@ class AppNavState(private val recentStore: RecentStore) {
     /** Skan-tekst z fallbacku, który dał wiele wyników — Home podstawia do wyszukiwarki. */
     @Volatile var pendingSearch: String? = null
 
+    /**
+     * Towar do zaznaczenia po wejściu na listę pozycji dostawy (0.70.0).
+     *
+     * Ten sam wzorzec co `pendingSearch`: parametr wejściowy ekranu podany
+     * przez wołającego i KONSUMOWANY przy wejściu. Nie da się go przekazać
+     * inaczej, bo aktywna pozycja jest stanem composable'a
+     * (`remember(id)` w `DeliveryLinesScreen`), a nie polem nawigacji.
+     *
+     * Wskazujemy `twId`, nie `lineId`, i to jest decyzja: wiersz dostawy
+     * powstaje dopiero przy OTWARCIU dokumentu, więc w chwili kliknięcia na
+     * karcie towaru jeszcze go nie ma. Kartoteka jest tu jedynym trwałym
+     * identyfikatorem.
+     */
+    @Volatile var pendingLineTwId: Long? = null
+
     fun backTargetOf(s: Screen): Screen? = backTarget(s, queueReturn)
 
     fun go(screen: Screen) {
@@ -98,8 +113,14 @@ class AppNavState(private val recentStore: RecentStore) {
      */
     fun openScanLoc() = go(Screen.SCAN_LOC)
 
-    fun openDelivery(id: Long) {
+    /**
+     * @param zaznaczTwId towar, którego pozycja ma być otwarta od razu.
+     *   Wchodzi tędy wejście z karty towaru („W dostawie …"), gdzie człowiek
+     *   wskazał konkretny towar i nie chce go szukać drugi raz na liście.
+     */
+    fun openDelivery(id: Long, zaznaczTwId: Long? = null) {
         deliveryId = id
+        pendingLineTwId = zaznaczTwId
         go(Screen.DELIVERY_LINES)
     }
 

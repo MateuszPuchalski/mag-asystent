@@ -75,7 +75,20 @@ export interface ProductCard {
    * leży POZA strefą złotą — czyli gdy jest co zrobić. Pole addytywne: stare
    * APK je ignorują (`ignoreUnknownKeys`).
    */
-  zlotaStrefa?: { zbiorekNaDzien: number; poziomy: string };
+  zlotaStrefa?: ZlotaStrefa;
+}
+
+/**
+ * Podpowiedź przeslotowania — ile razy dziennie towar jest zbierany i na które
+ * poziomy regału powinien zjechać.
+ *
+ * Nazwany typ, a nie kształt wpisany w dwóch miejscach: od 0.70.0 czyta go
+ * także pozycja dostawy (`DeliveryLineView`), a rozjazd między kopiami
+ * znaczyłby, że kolektor mówi to samo dwoma różnymi zdaniami.
+ */
+export interface ZlotaStrefa {
+  zbiorekNaDzien: number;
+  poziomy: string;
 }
 
 /**
@@ -185,6 +198,18 @@ export interface DeliveryLineView {
   stanMgp: number;
   /** Litera alejki (nagłówek sekcji listy) albo null przy braku lokalizacji. */
   aisle: string | null;
+  /**
+   * Ta sama podpowiedź przeslotowania, którą niesie karta towaru (0.70.0).
+   *
+   * Przy odkładaniu jest bardziej na miejscu niż na karcie: człowiek stoi
+   * z towarem w ręce i WŁAŚNIE wybiera półkę, więc „ten jedzie do strefy
+   * złotej" trafia w moment decyzji, a nie w moment zaglądania.
+   *
+   * Obecne tylko dla kandydatów — górne 15% rotacji z adresem poza strefą.
+   * Odczyt jest O(1) z cache'u `zbiorki.ts`, więc trzydzieści pozycji nie
+   * kosztuje trzydziestu zapytań; agregacja chodzi raz na dziesięć minut.
+   */
+  zlotaStrefa?: ZlotaStrefa;
 }
 
 export interface DeliveryView {
