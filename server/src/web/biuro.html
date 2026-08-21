@@ -110,7 +110,20 @@
 
      Wygląd = TabBar kolektora: biała listwa, zakładka aktywna dostaje
      bursztynową pigułkę i AmberInk — nie odwrócone kolory. */
-  nav.zakladki { display: flex; gap: 4px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 6px; box-shadow: var(--cien); }
+  /* Odstęp MIĘDZY grupami (18 px) jest wyraźnie większy niż między przyciskami
+     w grupie (4 px) — inaczej podpis opisywałby grupę, której granicy nie
+     widać. `align-items: flex-start`, żeby grupa o dwóch przyciskach nie
+     rozciągała się do wysokości trzyprzyciskowej. */
+  nav.zakladki { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 6px 10px 8px; box-shadow: var(--cien); }
+  /* Grupa zawija się W CAŁOŚCI: panel bywa otwarty na wąskim oknie obok
+     Subiekta, a podpis, który został sam nad pustym miejscem, byłby gorszy
+     niż brak podpisu. */
+  nav.zakladki .grupa { display: flex; flex-direction: column; gap: 2px; }
+  nav.zakladki .grupa-btny { display: flex; gap: 4px; flex-wrap: wrap; }
+  nav.zakladki .grupa-nazwa {
+    padding: 0 8px; font: 700 10px var(--font-cond); letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--ink-mute);
+  }
   nav.zakladki button {
     background: none; border: 0; border-radius: 999px;
     padding: 8px 16px; font: 600 14px var(--font-cond); letter-spacing: .5px;
@@ -208,13 +221,41 @@
 
 <main id="panel" hidden>
   <div id="stan"></div>
+  <!-- ZAKŁADKI W GRUPACH (0.74.1). Do tej wersji stało tu sześć pastylek
+       o równej wadze, a to nieprawda o tym, jak się ich używa: dostawy
+       i zwroty biuro otwiera po kilkanaście razy dziennie, dziennik i analizę
+       wtedy, gdy czegoś szuka, a dostawców raz na kilka tygodni. Rząd równych
+       przycisków kazał czytać całą szóstkę przy każdym wejściu.
+
+       `data-widok` zostaje NIETKNIĘTE — i to jest cała sztuczka tej zmiany.
+       Obsługa kliknięcia i pętla ustawiająca `aria-current` szukają przycisków
+       po tym atrybucie, a nie po miejscu w rzędzie, więc rusza się układ,
+       nie mechanizm. -->
   <nav class="zakladki">
-    <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
-    <button data-widok="zwroty">ZWROTY ALLEGRO</button>
-    <button data-widok="nadzor">STAN SYSTEMU</button>
-    <button data-widok="dziennik">DZIENNIK</button>
-    <button data-widok="analiza">ANALIZA</button>
-    <button data-widok="dostawcy">DOSTAWCY</button>
+    <div class="grupa">
+      <span class="grupa-nazwa">Praca</span>
+      <div class="grupa-btny">
+        <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
+        <button data-widok="zwroty">ZWROTY ALLEGRO</button>
+      </div>
+    </div>
+    <div class="grupa">
+      <span class="grupa-nazwa">Wgląd</span>
+      <div class="grupa-btny">
+        <button data-widok="nadzor">STAN SYSTEMU</button>
+        <button data-widok="dziennik">DZIENNIK</button>
+        <button data-widok="analiza">ANALIZA</button>
+      </div>
+    </div>
+    <!-- Jedna pozycja to nie przeoczenie: ANALIZA niesie dziś import zbiórek
+         i reguły strefy złotej, czyli konfigurację schowaną pod raportem.
+         Ta grupa jest miejscem, do którego to kiedyś trafi. -->
+    <div class="grupa">
+      <span class="grupa-nazwa">Ustawienia</span>
+      <div class="grupa-btny">
+        <button data-widok="dostawcy">DOSTAWCY</button>
+      </div>
+    </div>
   </nav>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
