@@ -338,6 +338,7 @@
         w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
       </p>
       <table id="brakujaceLista"></table>
+      <div id="brakujaceTicker" style="margin-top:8px;font-size:12px"></div>
     </section>
 
     <section class="card" id="zwrotListaKarta">
@@ -2225,15 +2226,25 @@ async function odswiezEtap3() {
     rysujKosze(k.kosze || []);
     rysujReklamacjeZwrotow(r.reklamacje || []);
     rysujRaportZwrotow(rap.raport);
-    rysujBrakujace(zap.zapowiedzi || []);
+    rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
   } catch (e) { console.warn(e); }
 }
 
 /* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
-function rysujBrakujace(lista) {
+function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
   karta.hidden = otwartyZwrot != null || lista.length === 0;
+  /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
+     ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
+  $("brakujaceTicker").innerHTML = !ticker
+    ? '<span class="mute">Statusy nie były jeszcze odświeżane — pierwszy przebieg po restarcie serwera.</span>'
+    : `<span class="mute">Ostatnie odświeżenie statusów: ${esc(stempelLokalny(ticker.at))}
+         · odświeżono ${ticker.odswiezonych}${ticker.doOdswiezenia
+           ? ` · czeka jeszcze ${ticker.doOdswiezenia}` : ""}</span>
+       ${ticker.bledow
+         ? `<div><span class="badge err">ALLEGRO ODMAWIA</span> ${esc(ticker.ostatniBlad || "")}</div>`
+         : ""}`;
   $("brakujaceLista").innerHTML = lista.length
     ? "<tr><th>STAN</th><th>CZEKA</th><th>ZWROT</th><th>KLIENT</th><th>NUMERY PACZEK</th><th></th></tr>" +
       lista.map((z) => `<tr>

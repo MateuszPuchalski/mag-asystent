@@ -980,6 +980,12 @@ zamknięte (`FINISHED`, `REJECTED`, zwrot prowizji, magazyn Allegro), schodzą
 z listy same. Przycisk SCHOWAJ zdejmuje pojedyncze zgłoszenie ręką — do spraw
 załatwionych poza aplikacją; ślad zostaje w dzienniku.
 
+Pod tabelą stoi ślad ostatniego odświeżania: kiedy było, ile zgłoszeń
+dostało status i ile jeszcze czeka. Gdy Allegro odmawia — wygasły token, brak
+uprawnienia — widnieje tam czerwone `ALLEGRO ODMAWIA` z treścią błędu.
+To pierwsze miejsce do sprawdzenia, gdy wiersz uparcie mówi „status jeszcze
+niepobrany".
+
 Statusy zgłoszeń, które wciąż czekają na paczkę, ticker odświeża od 0.73.0
 POJEDYNCZO po identyfikatorze, najwyżej 25 na przebieg. Lista zwrotów filtruje
 po dacie utworzenia, więc sprawa sprzed miesiąca nigdy nie wróciłaby w oknie

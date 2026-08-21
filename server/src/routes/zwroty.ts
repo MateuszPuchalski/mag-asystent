@@ -24,7 +24,7 @@ import {
   zdejmijDokument,
 } from "../services/zwroty.js";
 import { listaReklamacji, raportZwrotow, rozpatrzReklamacje, ustawPolke } from "../services/reklamacje.js";
-import { brakujacePaczki, pominZapowiedz } from "../services/zapowiedzi.js";
+import { brakujacePaczki, pominZapowiedz, stanOdswiezania } from "../services/zapowiedzi.js";
 
 /* ── Zwroty Allegro — trasy biura ────────────────────────────────────────────
    Wszystko za bramką ról biuro|admin (wzorzec zbiorki.ts): zwrot wiąże się
@@ -274,7 +274,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
   app.get("/api/biuro/zwroty/zapowiedzi", async (_req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return { zapowiedzi: brakujacePaczki() };
+    /* Ślad tickera jedzie razem z listą: pytanie „czemu ten wiersz nie ma
+       statusu" musi mieć odpowiedź NA TYM ekranie, nie w logu serwera. */
+    return { zapowiedzi: brakujacePaczki(), ticker: stanOdswiezania() };
   });
 
   /* Zdjęcie zgłoszenia z listy ręką — sprawa załatwiona poza aplikacją. */
