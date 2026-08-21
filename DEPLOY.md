@@ -1041,6 +1041,17 @@ ze sprzedaży, a fizycznie trzeba go odłożyć. Nazwę bierze wtedy wprost
 z dokumentu, skanowanie kodem nie zadziała (kartoteki nie ma w aplikacji), więc
 magazynier wskazuje pozycję palcem. Adres zapisze się i na takiej kartotece.
 
+Otwarty kosz pokazuje od 0.77.0 to samo co rozkładana dostawa. Zdjęcie towaru,
+ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazynów
+z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
+zostało jeszcze na regale zwrotów.
+
+Pozycję, której w koszu fizycznie nie ma, magazynier **pomija z powodem**
+(„nie ma w koszu", „uszkodzony", „obcy towar" albo własny). Pominięcie nie
+blokuje zakończenia, a dla biura jest sygnałem, że kosz wrócił niekompletny —
+powód stoi przy pozycji i w dzienniku. Pominięta pozycja **nie dostaje MM**:
+w koszu WERTIS bufor cofa się tylko za towar, który naprawdę wrócił na halę.
+
 Dokumenty sprzed wdrożenia, których towar dawno leży na regałach, zdejmuje
 z listy **admin** akcją „już rozłożony". Magazynier jej nie ma: to decyzja
 o pominięciu pracy, nie sposób jej wykonania.

@@ -3,6 +3,9 @@ import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import { adresyOczekiwane, porownajAlejkowo, validateDeliveryLocation } from "./delivery.js";
+import { stanyNiezerowe, type StanMagazynu } from "./magazyny.js";
+import { adnotacjaStrefy } from "./zbiorki.js";
+import type { ZlotaStrefa } from "../types.js";
 import { aliasKodu } from "./ean-alias.js";
 import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
@@ -54,10 +57,24 @@ export interface PozycjaKosza {
   nazwa: string;
   ilosc: number;
   status: string;
+  /** Jednostka z kartoteki (`szt.`, `kpl.`) — kolektor przestaje zgadywać. */
+  unit: string;
+  /**
+   * Gdzie ten towar jeszcze leży — magazyny z niezerowym stanem, malejąco.
+   *
+   * Przy zwrocie to pytanie pada częściej niż przy dostawie: towar wraca
+   * pojedynczo i bywa wycofany ze sprzedaży, więc „na regale zwrotów zostały
+   * jeszcze 3" rozstrzyga, czy kosz jest już rozniesiony w całości.
+   */
+  stany: StanMagazynu[];
+  /** Podpowiedź przeslotowania — ta sama, którą niesie karta towaru. */
+  zlotaStrefa?: ZlotaStrefa;
   /** Adres ŻYWY z kartoteki skorygowany o kolejkę — nie snapshot. */
   lokOczekiwana: string | null;
   lokFaktyczna: string | null;
   odlozonoPrzez: string | null;
+  /** Dlaczego pozycja została pominięta; null poza statusem `skipped`. */
+  powod: string | null;
   /** Stan zadania MM cofającego bufor; null przed zakończeniem kosza. */
   mmStatus: string | null;
   mmNumer: string | null;
@@ -270,7 +287,12 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     )
     .all(koszId) as Array<Record<string, unknown>>;
 
-  const adresy = adresyOczekiwane(wiersze.map((w) => w.tw_id as number));
+  /* Komplet jednym zapytaniem na każdą z trzech rzeczy — kosz odświeża się
+     po KAŻDYM odłożeniu, więc pytanie per wiersz zjadałoby budżet trasy. */
+  const twIds = wiersze.map((w) => w.tw_id as number);
+  const adresy = adresyOczekiwane(twIds);
+  const jednostki = subiekt.jednostkiDlaTowarow(twIds);
+  const stany = stanyNiezerowe(twIds);
   const pozycje: PozycjaKosza[] = wiersze.map((w) => ({
     id: w.id as number,
     zwrotId: w.zwrot_id as number,
@@ -279,11 +301,21 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     nazwa: w.nazwa as string,
     ilosc: w.ilosc as number,
     status: w.status as string,
+    unit: jednostki.get(w.tw_id as number) ?? "",
+    stany: stany.get(w.tw_id as number) ?? [],
+    /* W pętli po pozycjach jak przy dostawach: `adnotacjaStrefy` czyta mapę
+       w pamięci, więc jest O(1). Gdyby zaczęła dotykać bazy, to miejsce
+       zamieni się w N+1 — wtedy trzeba wariantu zbiorczego. */
+    ...(() => {
+      const a = adnotacjaStrefy(w.tw_id as number);
+      return a ? { zlotaStrefa: a } : {};
+    })(),
     /* Pozycja tknięta pokazuje SWÓJ zapis — to, co człowiek zrobił; reszta
        adres żywy. Ten sam podział co `adresLinii` przy dostawach. */
     lokOczekiwana: (w.lok_faktyczna as string) ?? adresy.get(w.tw_id as number) ?? null,
     lokFaktyczna: (w.lok_faktyczna as string) ?? null,
     odlozonoPrzez: (w.odlozono_przez as string) ?? null,
+    powod: (w.powod as string) ?? null,
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
@@ -383,8 +415,13 @@ export function odlozPozycje(
     );
   }
 
+  /* `powod=NULL` cofa pominięcie: magazynier, który jednak znalazł towar,
+     ma go po prostu odłożyć, a nie szukać osobnego „cofnij". */
   db()
-    .prepare("UPDATE kosz_pozycja SET status='done', lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?")
+    .prepare(
+      `UPDATE kosz_pozycja SET status='done', powod=NULL,
+              lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?`
+    )
     .run(code, nowIso(), autor, pozycjaId);
 
   if (recznie) logEvent("manual_entry", autor, twId, { code, kind: "LOC", zrodlo: "kosz" });
@@ -402,6 +439,52 @@ export function odlozPozycje(
   return { ok: true, mismatch };
 }
 
+/** Powody pominięcia, które kolektor podaje z listy; „inny" niesie wpis ręczny. */
+export const POWODY_POMINIECIA = ["nie ma w koszu", "uszkodzony", "obcy towar"] as const;
+
+/**
+ * Pominięcie pozycji, której magazynier nie ma jak odłożyć.
+ *
+ * Do 0.77.0 jedyną drogą było zostawienie kosza nierozłożonego — jedna
+ * pozycja bez towaru blokowała ZAKOŃCZ, a razem z nim cały obieg. Kosz
+ * wracał wtedy do biura bez żadnego śladu, CZEGO w nim zabrakło.
+ *
+ * Powód jest OBOWIĄZKOWY, bo to jedyna treść tego zgłoszenia: biuro dostanie
+ * kosz niekompletny i musi wiedzieć, czy szukać towaru, czy reklamacji.
+ * Idempotentne — drugi klik na tej samej pozycji zmienia wyłącznie powód.
+ */
+export function pominPozycjeKosza(
+  pozycjaId: number,
+  powod: string,
+  autor: string
+): { ok: true } {
+  const tresc = (powod ?? "").trim().slice(0, 200);
+  if (!tresc) throw new BladKosza(400, "Podaj powód pominięcia — biuro dostanie kosz niekompletny");
+
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  const kosz = wierszKosza(p.kosz_id as number);
+  if (kosz.status !== "zamkniety") {
+    throw new BladKosza(400, "Kosz nie jest w rozkładaniu — otwarty dokłada, rozłożony skończył");
+  }
+  if (p.status === "done") {
+    throw new BladKosza(400, "Pozycja jest odłożona — pomijanie dotyczy towaru, którego nie ma");
+  }
+
+  d.prepare("UPDATE kosz_pozycja SET status='skipped', powod=? WHERE id=?").run(tresc, pozycjaId);
+  logEvent("kosz_pozycja_pominieta", autor, p.tw_id as number, {
+    koszId: kosz.id,
+    kod: kosz.kod,
+    pozycjaId,
+    symbol: p.symbol,
+    powod: tresc,
+  });
+  return { ok: true };
+}
+
 /**
  * Zakończenie rozkładania: bufor cofa się SAM.
  *
@@ -416,10 +499,15 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const pozycje = db()
     .prepare("SELECT id, tw_id, symbol, ilosc, status FROM kosz_pozycja WHERE kosz_id = ?")
     .all(koszId) as Array<{ id: number; tw_id: number; symbol: string; ilosc: number; status: string }>;
-  const braki = pozycje.filter((p) => p.status !== "done");
+  /* Pominięta jest stanem KOŃCOWYM, tak samo jak przy dostawach. Blokowanie
+     nią zakończenia karałoby zgłaszającego brak — a wtedy nikt by go nie
+     zgłaszał i kosz wracałby do biura bez śladu, czego zabrakło. */
+  const braki = pozycje.filter((p) => p.status !== "done" && p.status !== "skipped");
   if (braki.length > 0) {
     throw new BladKosza(400, `Nieodłożone pozycje: ${braki.map((b) => b.symbol || b.tw_id).join(", ")}`);
   }
+  const odlozone = pozycje.filter((p) => p.status === "done");
+  const pominiete = pozycje.length - odlozone.length;
 
   const d = db();
   /* Kosz z dokumentu MM (0.75.0) NIE kolejkuje niczego. Przesunięcie na regał
@@ -435,6 +523,7 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
         koszId,
         kod: kosz.kod,
         pozycji: pozycje.length,
+        pominietych: pominiete,
         mmDokId: kosz.mm_dok_id,
       });
     })();
@@ -442,7 +531,10 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   }
 
   transaction(d, () => {
-    for (const p of pozycje) {
+    /* MM wyłącznie dla ODŁOŻONYCH. Pominięta pozycja nigdzie fizycznie nie
+       pojechała, więc przesunięcie na nią zdejmowałoby z bufora towar, który
+       dalej leży na regale zwrotów — albo którego nie ma wcale. */
+    for (const p of odlozone) {
       const queueId = enqueueMM(config.magId.ZWROTY, config.magId.MAG, [{ twId: p.tw_id, qty: p.ilosc }], {
         createdBy: autor,
         twId: p.tw_id,
@@ -453,7 +545,12 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
     }
     d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
       .run(nowIso(), autor, koszId);
-    logEvent("kosz_rozlozony", autor, null, { koszId, kod: kosz.kod, pozycji: pozycje.length });
+    logEvent("kosz_rozlozony", autor, null, {
+      koszId,
+      kod: kosz.kod,
+      pozycji: pozycje.length,
+      pominietych: pominiete,
+    });
   })();
   return szczegolKosza(koszId);
 }

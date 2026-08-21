@@ -128,6 +128,21 @@ test("ZAKOŃCZ na koszu z dokumentu NIE wystawia żadnego dokumentu", () => {
   assert.equal(loc.n, 2, "adres zapisany tylko dla przeniesionego towaru");
 });
 
+test("kosz z dokumentu z pominiętą pozycją też kończy się bez zadania", () => {
+  /* Pominięcie nie zmienia najważniejszej reguły przyjęć: dokument powrotny
+     wystawia biuro. Gdyby zakończenie z pominiętą pozycją poszło inną gałęzią,
+     wróciłby błąd z 0.75.0 — przesunięcie wystawione drugi raz. */
+  const kosz = P.otworzPrzyjecie("1209", "Jan");
+  K.odlozPozycje(kosz.pozycje[0].id, kosz.pozycje[0].lokOczekiwana ?? "A01-02-03", "Jan");
+  K.odlozPozycje(kosz.pozycje[1].id, "C09-09-09", "Jan");
+  K.pominPozycjeKosza(kosz.pozycje[2].id, "nie ma w koszu", "Jan");
+
+  const rozlozony = K.zakonczKosz(kosz.id, "Jan");
+  assert.equal(rozlozony.status, "rozlozony");
+  const mm = db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number };
+  assert.equal(mm.n, 0, "żadnego MM z kolektora — ani za odłożoną, ani za pominiętą");
+});
+
 test("lista zna stan pracy, a admin zdejmuje dokument sprzed wdrożenia", () => {
   assert.deepEqual(
     P.listaPrzyjec().map((p) => [p.numer, p.stan, p.pozycji]),

@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.77.0 — 21 sierpnia 2026
+
+**Otwarty kosz zwrotów mówi teraz tyle, co rozkładana dostawa.** Do tej wersji
+wiersz kosza niósł symbol, nazwę, ilość i adres — i nic więcej. Przy zwrocie to
+za mało: towar wraca pojedynczo, bywa wycofany ze sprzedaży, a pytanie „co to
+właściwie jest i gdzie tego jeszcze mam" pada częściej niż przy dostawie.
+
+Wiersz dostał **zdjęcie z kartoteki** (powiększa się dotknięciem), ilość
+z prawdziwą jednostką zamiast wpisanego „szt." i pastylkę adresu — tę samą,
+która stoi na dostawach. Pod wskazaną pozycją rozwija się panel: adres wielkim
+drukiem, **stany wszystkich magazynów z niezerowym stanem** („MAG 12 · ZWR 3")
+i podpowiedź strefy złotej. Druga liczba jest tu najważniejsza — mówi, ile
+z tego towaru zostało jeszcze na regale zwrotów.
+
+**Pozycję, której w koszu nie ma, można pominąć z powodem.** Wcześniej
+blokowała ZAKOŃCZ, a razem z nim cały obieg: kosz wracał do biura nierozłożony
+i bez śladu, CZEGO w nim zabrakło. Teraz magazynier wybiera powód — „nie ma
+w koszu", „uszkodzony", „obcy towar" albo własny — i kończy pracę. Powód stoi
+przy pozycji i w dzienniku.
+
+**Pominięta pozycja NIE dostaje MM.** Kosz WERTIS cofa bufor przesunięciem za
+każdą pozycję, ale wyłącznie za tę, która naprawdę wróciła na halę.
+Przesunięcie pominiętej zdejmowałoby z bufora towar, którego nikt nie ruszył.
+Odłożenie pozycji wcześniej pominiętej cofa pominięcie samo — kto znalazł
+towar, po prostu go odkłada.
+
+Czego tu świadomie nie ma: **ilości częściowych**. Przy zwrocie sztuki idą na
+jedną półkę, a licznik − / + kosztowałby dotknięcie przy każdej pozycji, żeby
+obsłużyć przypadek, który się nie zdarza. Rozkładanie dostaw zostaje przy nim
+bez zmian.
+
 ## 0.76.1 — 21 sierpnia 2026
 
 **Każdy kosz na regale zwrotów pokazywał 0 pozycji.** Zgłoszenie z hali

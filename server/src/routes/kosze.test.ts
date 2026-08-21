@@ -171,6 +171,39 @@ test("przyjęcia: hala otwiera numerem z kartki, zdejmuje z listy tylko admin", 
   assert.equal(r.json().przyjecia[0].stan, "poza_aplikacja");
 });
 
+test("pominięcie pozycji: przez HTTP, z powodem, i nie blokuje zakończenia", async () => {
+  const biuro = zalogowany("biuro");
+  const magazynier = zalogowany("magazynier");
+  const { koszId } = await zwrotWKoszu(biuro);
+  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
+
+  // powód jest treścią zgłoszenia — bez niego trasa odmawia
+  let r = await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${kosz.pozycje[0].id}/pomin`, payload: {}, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 400);
+
+  r = await app.inject({
+    method: "POST",
+    url: `/api/kosze/pozycje/${kosz.pozycje[0].id}/pomin`,
+    payload: { powod: "nie ma w koszu" },
+    headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+
+  await app.inject({
+    method: "POST",
+    url: `/api/kosze/pozycje/${kosz.pozycje[1].id}/odloz`,
+    payload: { lokalizacja: "B01-01-01" },
+    headers: magazynier,
+  });
+  r = await app.inject({ method: "POST", url: `/api/kosze/${koszId}/zakoncz`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+  const pominieta = r.json().kosz.pozycje.find((p: { status: string }) => p.status === "skipped");
+  assert.equal(pominieta.powod, "nie ma w koszu");
+});
+
 test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => {
   const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");

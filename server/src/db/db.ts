@@ -181,6 +181,8 @@ function migrate(database: DatabaseSync) {
   addColumn("kosz", "mm_numer", "TEXT");
   /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
+  /* 0.77.0 — powód pominięcia pozycji kosza (status `skipped`). */
+  addColumn("kosz_pozycja", "powod", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
   naLoginIHaslo(database);

@@ -696,7 +696,12 @@ Tak wygląda towar wycofany ze sprzedaży: nazwę niesie dokument, skan kodem je
 nie znajdzie, odkłada się ją wskazaniem palcem. Wpisanie pełnego numeru `MM 1209/MAG/2026` ma dać **ten sam**
 kosz, nie drugi — sprawdź, że lista dalej ma trzy wiersze.
 
-Odłóż pozycje skanem regału i kliknij **ZAKOŃCZ — KOSZ ROZŁOŻONY**. Sedno
+Wskaż pozycję. Panel pod nią ma pokazać adres wielkim drukiem, stany
+magazynów („MAG 12 · ZWR 3") i — gdy kartoteka ma zdjęcie — miniaturę w wierszu.
+Pozycję `TEST-ZABLOKOWANY` **pomiń** z powodem „nie ma w koszu": ma zejść
+z listy pracy, zostać z czerwonym podpisem i przestać blokować zakończenie.
+
+Odłóż resztę skanem regału i kliknij **ZAKOŃCZ — KOSZ ROZŁOŻONY**. Sedno
 tego scenariusza: `SELECT * FROM sfera_queue WHERE type='mm'` ma zostać
 **puste**. Przesunięcie na regał zrobiło biuro przed przywiezieniem kosza,
 powrotne zrobi po rozłożeniu; dokument z kolektora byłby tym samym towarem

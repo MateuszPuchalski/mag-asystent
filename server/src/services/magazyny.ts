@@ -97,6 +97,40 @@ function obliczListeMagazynow(): Magazyn[] {
  * powtarzanie jej w tym zestawieniu byłoby dublowaniem tej samej liczby
  * w dwóch miejscach.
  */
+/** Gdzie towar jeszcze leży — jedna liczba na magazyn, do wiersza kosza. */
+export interface StanMagazynu {
+  kod: string;
+  stan: number;
+}
+
+/**
+ * Stany niezerowe dla listy towarów, gotowe do pokazania przy półce.
+ *
+ * Różni się od `magazynyTowaru` dwiema rzeczami i obie są celowe. Bierze
+ * KOMPLET jednym zapytaniem, bo kosz odświeża się po każdym odłożeniu.
+ * I nie odsiewa magazynów z rolą: przy rozkładaniu zwrotu odpowiedź „na regale
+ * zwrotów zostały jeszcze 3" jest ważniejsza od wszystkich pozostałych.
+ *
+ * Ukryte przez biuro odpadają tak samo jak na karcie towaru — reguła
+ * widoczności ma jednego właściciela.
+ */
+export function stanyNiezerowe(twIds: number[]): Map<number, StanMagazynu[]> {
+  const widoczne = new Map(listaMagazynow().filter((m) => !m.ukryty).map((m) => [m.magId, m]));
+  const out = new Map<number, StanMagazynu[]>();
+  for (const [twId, wiersze] of subiekt.stanyNiezeroweDlaTowarow(twIds)) {
+    const lista = wiersze
+      .flatMap((w) => {
+        const m = widoczne.get(w.magId);
+        return m ? [{ kod: m.kod, stan: w.stan }] : [];
+      })
+      /* Malejąco po stanie — pierwsze pytanie brzmi „gdzie tego jeszcze
+         najwięcej", tak samo jak na karcie towaru. */
+      .sort((a, b) => b.stan - a.stan || a.kod.localeCompare(b.kod, "pl"));
+    if (lista.length > 0) out.set(twId, lista);
+  }
+  return out;
+}
+
 export function magazynyTowaru(twId: number): MagazynStan[] {
   const widoczne = new Map(
     listaMagazynow()

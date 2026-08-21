@@ -12,6 +12,7 @@ import {
   listaKoszy,
   odepnijZwrot,
   odlozPozycje,
+  pominPozycjeKosza,
   przypnijZwrot,
   skanTowaruKosza,
   szczegolKosza,
@@ -126,6 +127,14 @@ export async function koszeRoutes(app: FastifyInstance) {
       zBledem(reply, () =>
         odlozPozycje(Number(req.params.id), req.body?.lokalizacja ?? "", autor(), !!req.body?.recznie)
       )
+  );
+
+  /* Pominięcie pozycji, której w koszu nie ma. Ta sama bramka co odkładanie —
+     to decyzja magazyniera stojącego przy koszu, nie biura. */
+  app.post<{ Params: { id: string }; Body: { powod?: string } }>(
+    "/api/kosze/pozycje/:id/pomin",
+    async (req, reply) =>
+      zBledem(reply, () => pominPozycjeKosza(Number(req.params.id), req.body?.powod ?? "", autor()))
   );
 
   app.post<{ Params: { id: string } }>("/api/kosze/:id/zakoncz", async (req, reply) =>

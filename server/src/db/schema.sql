@@ -631,10 +631,14 @@ CREATE TABLE IF NOT EXISTS kosz_pozycja (
   symbol        TEXT NOT NULL,
   nazwa         TEXT NOT NULL,
   ilosc         REAL NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'todo',  -- todo | done
+  status        TEXT NOT NULL DEFAULT 'todo',  -- todo | done | skipped
   lok_faktyczna TEXT,                          -- zeskanowana przy odkładaniu (fakt)
   odlozono_at   TEXT,
   odlozono_przez TEXT,
+  -- Dlaczego pozycji nie odłożono (0.77.0). Nazwa statusu `skipped` jest ta
+  -- sama co w delivery_line, bo to ten sam byt: praca zdjęta z rutyny z podaną
+  -- przyczyną. Pominięta pozycja NIE dostaje MM — nigdzie nie pojechała.
+  powod         TEXT,
   -- Zadanie MM ZWROTY→MAG cofające bufor dla TEJ pozycji. Jednopozycyjne MM
   -- świadomie: guard „adres przed sprzedawalnością" w obu workerach porządkuje
   -- zadania po tw_id, a MM wielopozycyjne wypadałoby spod niego.
