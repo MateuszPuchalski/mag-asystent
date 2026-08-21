@@ -40,11 +40,15 @@ interface WierszKosza {
   utworzono_przez: string;
   zamknieto_at: string | null;
   rozlozono_at: string | null;
+  /** Dokument MM, z którego kosz powstał; NULL = kosz złożony w aplikacji. */
+  mm_dok_id: number | null;
+  mm_numer: string | null;
 }
 
 export interface PozycjaKosza {
   id: number;
-  zwrotId: number;
+  /** NULL przy koszu z dokumentu MM — pozycja nie pochodzi ze zwrotu. */
+  zwrotId: number | null;
   twId: number;
   symbol: string;
   nazwa: string;
@@ -69,6 +73,12 @@ export interface SzczegolKosza {
   zwroty: Array<{ id: number; referencja: string | null; waybill: string }>;
   pozycje: PozycjaKosza[];
   odlozonych: number;
+  /**
+   * Numer przesunięcia MM z Subiekta, gdy kosz powstał z dokumentu; NULL =
+   * kosz złożony w aplikacji. Kolektor po tym pozna, że po ZAKOŃCZ nie ma
+   * żadnego dokumentu do obiecywania — ten wystawia biuro.
+   */
+  mmNumer: string | null;
 }
 
 export interface WierszListyKoszy {
@@ -284,6 +294,7 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     )
   );
   return {
+    mmNumer: kosz.mm_numer ?? null,
     id: kosz.id,
     kod: kosz.kod,
     status: kosz.status,
@@ -408,6 +419,25 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   }
 
   const d = db();
+  /* Kosz z dokumentu MM (0.75.0) NIE kolejkuje niczego. Przesunięcie na regał
+     zwrotów wystawiło już biuro, a dokument powrotny (ZWR→MAG) też wystawia
+     biuro — kolektor zapisał adresy i to jest cała jego rola. Zakolejkowanie
+     MM tutaj znaczyłoby dokument wystawiony DRUGI raz, na towar, który nikomu
+     się nie przesuwał. */
+  if (kosz.mm_dok_id != null) {
+    transaction(d, () => {
+      d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
+        .run(nowIso(), autor, koszId);
+      logEvent("kosz_rozlozony", autor, null, {
+        koszId,
+        kod: kosz.kod,
+        pozycji: pozycje.length,
+        mmDokId: kosz.mm_dok_id,
+      });
+    })();
+    return szczegolKosza(koszId);
+  }
+
   transaction(d, () => {
     for (const p of pozycje) {
       const queueId = enqueueMM(config.magId.ZWROTY, config.magId.MAG, [{ twId: p.tw_id, qty: p.ilosc }], {

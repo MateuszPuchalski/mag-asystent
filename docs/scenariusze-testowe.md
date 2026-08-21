@@ -631,7 +631,8 @@ przy pierwszym użyciu kodu. Karta KOSZE ZWROTOWE pokazuje go jako otwarty.
 Przycisk ZAMKNIJ — NA HALĘ działa dopiero, gdy dokumenty weszły do
 Subiekta. Zadanie korekty w błędzie blokuje zamknięcie z czytelnym zdaniem.
 
-Na kolektorze zamknięty kosz stoi nad listą faktur na zakładce DOSTAWY.
+Na kolektorze zamknięty kosz stoi na zakładce ZWROTY, w sekcji
+KOSZE Z APLIKACJI — pod listą przyjęć z regału zwrotów.
 Wejście otwiera listę pozycji w kolejności alejkowej. Skan towaru wskazuje
 pozycję, skan regału ją odkłada. Towar spoza kosza dostaje odmowę.
 
@@ -681,3 +682,28 @@ nawet do numerów obcych.
 
 Kontrola drugiej strony: `TEST-ZNAKI` nie ma w opisie podwójnego ukośnika
 i jego sekcja ma pozostać taka jak dotąd.
+
+### S72 — rozkładanie zwrotów z regału, czyli kosz z kartką
+
+Ziarno scenariuszy zakłada trzy przesunięcia MM na regał zwrotów: `1200`,
+`1205` i `1209`. Na kolektorze otwórz trzecią zakładkę **ZWROTY**. Pasek
+u góry ma napisać ROZKŁADANIE ZWROTÓW, a lista pokazać wszystkie trzy
+z datą, liczbą pozycji i stanem „do rozłożenia".
+
+Wpisz w pole u góry `1209` i zatwierdź. Ma się otworzyć kosz z pozycjami
+dokumentu. Wpisanie pełnego numeru `MM 1209/MAG/2026` ma dać **ten sam**
+kosz, nie drugi — sprawdź, że lista dalej ma trzy wiersze.
+
+Odłóż pozycje skanem regału i kliknij **ZAKOŃCZ — KOSZ ROZŁOŻONY**. Sedno
+tego scenariusza: `SELECT * FROM sfera_queue WHERE type='mm'` ma zostać
+**puste**. Przesunięcie na regał zrobiło biuro przed przywiezieniem kosza,
+powrotne zrobi po rozłożeniu; dokument z kolektora byłby tym samym towarem
+przesuniętym drugi raz. Zadania `set_location` mają natomiast powstać — dla
+towaru, który zmienił miejsce.
+
+Bramka roli: na wierszu przyjęcia akcja **JUŻ ROZŁOŻONY** należy do admina.
+Na koncie magazyniera trasa `POST /api/przyjecia/:dokId/poza-aplikacja` ma
+odpowiedzieć 403.
+
+Nieznany numer: wpisz `999`. Komunikat ma mówić, czego szukać — kartki albo
+synchronizacji z Subiektem — a nie samego „nie znaleziono".

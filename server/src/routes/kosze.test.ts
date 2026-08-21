@@ -31,6 +31,7 @@ beforeEach(() => {
   const d = db();
   for (const t of [
     "kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "kosz",
+    "przyjecie_pominiete", "sgt_mm_zwrot_pozycja", "sgt_mm_zwrot",
     "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sfera_queue",
     "events", "device_session", "app_user",
   ]) {
@@ -130,6 +131,44 @@ test("pełny przepływ: kosz na karcie, zamknięcie, rozkładanie, cofnięcie bu
   // autor zadań MM = magazynier z sesji, nie biuro
   const autorzy = db().prepare("SELECT DISTINCT created_by FROM sfera_queue WHERE type='mm'").all() as Array<{ created_by: string }>;
   assert.deepEqual(autorzy.map((a) => a.created_by), ["Ktoś magazynier"]);
+});
+
+test("przyjęcia: hala otwiera numerem z kartki, zdejmuje z listy tylko admin", async () => {
+  const magazynier = zalogowany("magazynier");
+  const admin = zalogowany("admin");
+  const d = db();
+  d.prepare(
+    `INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+     VALUES (41209, 'MM 1209/MAG/2026', '1209', '2026-08-18', 1, 3)`
+  ).run();
+  d.prepare("INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc) VALUES (41209, 900036, 2)").run();
+
+  let r = await app.inject({ method: "GET", url: "/api/przyjecia", headers: magazynier });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().przyjecia[0].numer, "1209");
+
+  // numer z kartki, nie identyfikator z bazy
+  r = await app.inject({
+    method: "POST", url: "/api/przyjecia/otworz", payload: { numer: "1209" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().kosz.mmNumer, "1209");
+
+  r = await app.inject({
+    method: "POST", url: "/api/przyjecia/otworz", payload: { numer: "999" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 404);
+
+  // „już rozłożony" to decyzja admina — magazynier jej nie ma
+  r = await app.inject({
+    method: "POST", url: "/api/przyjecia/41209/poza-aplikacja", payload: {}, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({
+    method: "POST", url: "/api/przyjecia/41209/poza-aplikacja", payload: {}, headers: admin,
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().przyjecia[0].stan, "poza_aplikacja");
 });
 
 test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => {

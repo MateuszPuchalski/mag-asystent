@@ -2,6 +2,7 @@ import sql from "mssql";
 import { db, nowIso, transaction } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
+import { numerKosza } from "../services/przyjecia.js";
 import { symbolTypu } from "./typy-dokumentow.js";
 
 /**
@@ -242,6 +243,13 @@ export let brakKolumnSprzedazy: string | null = null;
  */
 export let bladImportuSprzedazy: string | null = null;
 
+/**
+ * Odczyt przesunięć MM na regał zwrotów padł — zdanie do `/api/health`.
+ * Degraduje tak samo jak sprzedaż: zostaje ostatni udany odczyt, a zakładka
+ * ZWROTY na kolektorze pokazuje to, co widziała przy poprzedniej synchronizacji.
+ */
+export let bladImportuMm: string | null = null;
+
 interface MagRow {
   mag_Id: number;
   mag_Symbol: string;
@@ -377,6 +385,62 @@ async function pobierzZamowienia(
  * synchronizacji — stany i lokalizacje są ważniejsze — więc drugie podejście
  * idzie bez obu, a przyczyna melduje się w /api/health (wzorzec `zdZrealColumn`).
  */
+interface MmZwrotRow {
+  dok_Id: number;
+  dok_NrPelny: string;
+  data_wyst: string;
+  mag_z: number | null;
+  mag_do: number | null;
+}
+
+/**
+ * Przesunięcia MM NA regał zwrotów — dokumenty, których numery magazyn pisze
+ * odręcznie na koszach („1209").
+ *
+ * Kierunek bierzemy z dwóch kolumn opisanych w docs/subiekt-gt-struktura.md:
+ * `dok_MagId` to magazyn ŹRÓDŁOWY, a `dok_OdbiorcaId` „dla MM oznacza
+ * identyfikator magazynu" docelowego — i to po nim filtrujemy. `[WERYFIKUJ]`
+ * na własnej bazie: pomyłka w tę stronę daje pustą listę przyjęć, a nie złe
+ * dane, bo nic stąd nie idzie do zapisu.
+ */
+async function pobierzMmZwrotow(
+  pool: sql.ConnectionPool
+): Promise<{ mm: MmZwrotRow[]; mmPozycje: PozRow[] }> {
+  const c = config.mssql;
+  const cutoff = new Date(Date.now() - c.mmZwrotyDniWstecz * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+  const gdzie =
+    "d.dok_Typ = @typ AND d.dok_OdbiorcaId = @magZwrotow AND d.dok_DataWyst >= @cutoff";
+  const req = () =>
+    pool
+      .request()
+      .input("typ", sql.Int, c.dokTypMM)
+      .input("magZwrotow", sql.Int, config.magId.ZWROTY)
+      .input("cutoff", sql.VarChar, cutoff);
+
+  const mm = (
+    await req().query<MmZwrotRow>(
+      `SELECT d.dok_Id, d.dok_NrPelny,
+              CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst,
+              d.dok_MagId AS mag_z, d.dok_OdbiorcaId AS mag_do
+       FROM dok__Dokument d WITH (NOLOCK)
+       WHERE ${gdzie}`
+    )
+  ).recordset;
+  if (mm.length === 0) return { mm, mmPozycje: [] };
+
+  const mmPozycje = (
+    await req().query<PozRow>(
+      `SELECT p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag
+       FROM dok_Pozycja p WITH (NOLOCK)
+       JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId
+       WHERE ${gdzie}`
+    )
+  ).recordset;
+  return { mm, mmPozycje };
+}
+
 async function pobierzSprzedaz(
   pool: sql.ConnectionPool
 ): Promise<{ sprzedaz: SprzedazRow[]; sprzedazPozycje: PozRow[] }> {
@@ -537,6 +601,24 @@ export async function importFromMssql(): Promise<ImportStats> {
     console.warn(`[mssql] ${bladImportuSprzedazy}`);
   }
 
+  /* Przyjęcia na regał zwrotów — ta sama degradacja co sprzedaż. Zakładka
+     ZWROTY na kolektorze woli wczorajszą listę niż pustą. */
+  let mm: MmZwrotRow[] = [];
+  let mmPozycje: PozRow[] = [];
+  let mmOk = false;
+  try {
+    ({ mm, mmPozycje } = await pobierzMmZwrotow(pool));
+    mmOk = true;
+    bladImportuMm = null;
+  } catch (e) {
+    bladImportuMm =
+      "Odczyt przesunięć MM na regał zwrotów nie powiódł się — zakładka ZWROTY " +
+      "pokazuje dane z ostatniej udanej synchronizacji. Sprawdź MAG_ID_ZWROTY " +
+      "i kolumnę dok_OdbiorcaId (DEPLOY §6a). " +
+      `Przyczyna: ${e instanceof Error ? e.message : e}`;
+    console.warn(`[mssql] ${bladImportuMm}`);
+  }
+
   // ── wpis do read-modelu sgt_* (wzorzec wipe+insert z seed.ts) ─────────────
   const d = db();
   const knownTw = new Set(towary.map((t) => t.tw_Id));
@@ -569,6 +651,13 @@ export async function importFromMssql(): Promise<ImportStats> {
   const insSprzedazPoz = d.prepare(
     "INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
   );
+  const insMm = d.prepare(
+    `INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+     VALUES (?,?,?,?,?,?)`
+  );
+  const insMmPoz = d.prepare(
+    "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+  );
 
   const apply = transaction(d, () => {
     /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy.
@@ -578,6 +667,7 @@ export async function importFromMssql(): Promise<ImportStats> {
        sgt_sprzedaz* czyszczone tylko przy udanym odczycie — patrz `sprzedazOk`. */
     for (const t of [
       ...(sprzedazOk ? ["sgt_sprzedaz_pozycja", "sgt_sprzedaz"] : []),
+      ...(mmOk ? ["sgt_mm_zwrot_pozycja", "sgt_mm_zwrot"] : []),
       "sgt_zam_pozycja", "sgt_zamowienie",
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
@@ -654,6 +744,23 @@ export async function importFromMssql(): Promise<ImportStats> {
          bazy, a dopasowanie zwrotu porównuje „ile sprzedano" z „ile wraca" —
          obie liczby mają być dodatnie. */
       insSprzedazPoz.run(p.ob_DokHanId, p.ob_TowId, Math.abs(p.ob_IloscMag ?? 0));
+    }
+
+    for (const m of mm) {
+      insMm.run(
+        m.dok_Id,
+        m.dok_NrPelny,
+        /* Sama liczba z numeru — TO ONA jest napisana na kartce przy koszu.
+           Liczona przy imporcie, żeby skan nie parsował numeru za każdym razem. */
+        numerKosza(m.dok_NrPelny),
+        m.data_wyst,
+        m.mag_z ?? null,
+        m.mag_do ?? null
+      );
+    }
+    for (const p of mmPozycje) {
+      if (!knownTw.has(p.ob_TowId)) continue;
+      insMmPoz.run(p.ob_DokHanId, p.ob_TowId, Math.abs(p.ob_IloscMag ?? 0));
     }
   });
   apply();

@@ -906,6 +906,13 @@ data class KoszView(
     val status: String = "",
     val pozycje: List<KoszPozycja> = emptyList(),
     val odlozonych: Int = 0,
+    /**
+     * Numer przesunięcia MM z Subiekta, gdy kosz powstał z dokumentu.
+     * NULL = kosz złożony w aplikacji, czyli ten, po którym ZAKOŃCZ kolejkuje
+     * MM cofające bufor. Przy koszu z dokumentu kolektor nie obiecuje żadnego
+     * dokumentu — powrotny wystawia biuro.
+     */
+    val mmNumer: String? = null,
 )
 
 @Serializable
@@ -919,6 +926,28 @@ data class KoszSkan(
     val symbol: String = "",
     val nieznany: Boolean = false,
 )
+
+/* ── Przyjęcia na regał zwrotów (kosze z dokumentu MM) ────────────────────── */
+
+@Serializable
+data class PrzyjecieRow(
+    val dokId: Long,
+    /** Liczba z numeru — ta napisana odręcznie na kartce przy koszu. */
+    val numer: String,
+    val nrPelny: String = "",
+    val data: String = "",
+    val pozycji: Int = 0,
+    /** nietkniety | w_rozkladaniu | rozlozony | poza_aplikacja */
+    val stan: String = "nietkniety",
+    val koszId: Long? = null,
+    val odlozonych: Int = 0,
+)
+
+@Serializable
+data class PrzyjeciaResponse(val przyjecia: List<PrzyjecieRow> = emptyList())
+
+@Serializable
+data class OtworzPrzyjecieBody(val numer: String)
 
 @Serializable
 data class OdlozKoszBody(val lokalizacja: String, val recznie: Boolean = false)

@@ -5,6 +5,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.AktualizacjaResponse
 import pl.wertis.kolektor.core.net.KorektaBody
 import pl.wertis.kolektor.core.net.KoszResponse
+import pl.wertis.kolektor.core.net.OtworzPrzyjecieBody
+import pl.wertis.kolektor.core.net.PrzyjeciaResponse
 import pl.wertis.kolektor.core.net.KoszSkan
 import pl.wertis.kolektor.core.net.KoszeResponse
 import pl.wertis.kolektor.core.net.OdlozKoszBody
@@ -238,6 +240,20 @@ interface ApiService {
 
     @POST("api/kosze/{id}/zakoncz")
     suspend fun koszZakoncz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
+    // ── Przyjęcia na regał zwrotów: kosze z dokumentu MM (0.75.0) ─────────
+    @GET("api/przyjecia")
+    suspend fun przyjecia(): PrzyjeciaResponse
+
+    /** Otwarcie kosza NUMEREM Z KARTKI — id nie ma na kartce, numer ma. */
+    @POST("api/przyjecia/otworz")
+    suspend fun przyjecieOtworz(@Body body: OtworzPrzyjecieBody): KoszResponse
+
+    @POST("api/przyjecia/{dokId}/poza-aplikacja")
+    suspend fun przyjeciePozaAplikacja(
+        @Path("dokId") dokId: Long,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): PrzyjeciaResponse
 
     @GET("api/problems/unresolved")
     suspend fun unresolvedProblems(): ProblemsResponse

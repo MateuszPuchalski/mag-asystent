@@ -64,7 +64,9 @@ REMOVED = [
     "PUTAWAY_DOCS",
     "PUTAWAY_SESSION",
     "walkMode",
-    "13 ekran",
+    # „13 ekran" stało tu od 0.22.0, gdy sesja rozkładania zabrała ekran
+    # i liczba wróciła do dwunastu. W 0.75.0 kolektor ma trzynasty naprawdę
+    # (zakładka ZWROTY), więc token przestał znaczyć „usunięty byt".
     # Blokady pozycji i rola brygadzisty — wycięte w 0.47.0. Jedną dostawę
     # rozkłada tu jedna osoba, więc lock nie rozstrzygał żadnego sporu, a rola
     # istniała głównie po to, żeby móc cudzą pozycję odebrać. Tokeny są

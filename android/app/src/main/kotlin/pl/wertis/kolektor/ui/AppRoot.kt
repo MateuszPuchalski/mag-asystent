@@ -37,6 +37,7 @@ import pl.wertis.kolektor.ui.product.ProductScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryLinesScreen
 import pl.wertis.kolektor.ui.kosze.KoszScreen
+import pl.wertis.kolektor.ui.zwroty.PrzyjeciaScreen
 import pl.wertis.kolektor.ui.problems.ProblemsBanner
 import pl.wertis.kolektor.ui.problems.ProblemsScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
@@ -167,6 +168,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.QUEUE -> QueueScreen(graph)
                 Screen.DELIVERY_DOCS -> DeliveryDocumentsScreen(graph)
                 Screen.DELIVERY_LINES -> DeliveryLinesScreen(graph)
+                Screen.PRZYJECIA -> PrzyjeciaScreen(graph)
                 Screen.KOSZ_LINES -> KoszScreen(graph)
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
@@ -183,6 +185,7 @@ fun AppRoot(graph: AppGraph) {
             hasBack = graph.nav.backTargetOf(screen) != null,
             onHome = { graph.nav.go(Screen.HOME) },
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
+            onZwroty = { graph.nav.go(Screen.PRZYJECIA) },
             onBack = { graph.nav.goBack() },
         )
         WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera) {

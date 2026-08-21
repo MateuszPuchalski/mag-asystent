@@ -132,7 +132,7 @@ class AppNavState(private val recentStore: RecentStore) {
     /** Wyjście z ROZŁOŻONEGO kosza — jak `zakonczonaDostawa`, ten sam powód. */
     fun zakonczonyKosz() {
         koszId = null
-        go(Screen.DELIVERY_DOCS)
+        go(Screen.PRZYJECIA)
     }
 
     /**

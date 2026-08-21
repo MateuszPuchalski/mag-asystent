@@ -838,6 +838,7 @@ bazie. Przejdź tę tabelę przed pierwszą pracą na produkcji:
 | `DOK_DNI_WSTECZ` | okno importu i zakres listy dostaw | nic nie ginie — niedokończone dostawy zostają mimo okna |
 | `MSSQL_ZD_ZREAL_COLUMN` | ilość już odebrana z zamówienia | zawyżone ilości na karcie towaru |
 | `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
+| `MM_ZWROTY_DNI_WSTECZ` | okno importu przesunięć na regał zwrotów (§6a) | starszy kosz z kartką nie otworzy się numerem |
 
 Gdy kolumny ilości zrealizowanej nie ma wcale (patrz Etap 1 wyżej), zostaw
 wartość pustą. Karta towaru opisze wtedy ilość jako oszacowanie, a `/api/health`
@@ -954,7 +955,7 @@ biuro ręcznie w Subiekcie — reszta karty zwrotu działa normalnie.
 
 Dalej proces przejmują **cyfrowe kosze** (0.59.0). Biuro przypina zwroty do
 kosza skanem jego etykiety i zamyka kosz. Magazynier na kolektorze (zakładka
-DOSTAWY) rozkłada zawartość skanami: towar wskazuje pozycję, regał ją
+ZWROTY, druga sekcja) rozkłada zawartość skanami: towar wskazuje pozycję, regał ją
 odkłada. Zakończenie rozkładania **samo** kolejkuje MM ze zwrotów na
 magazyn główny — dokument cofający bufor nie wymaga nikogo przy komputerze.
 Kody koszy są wielorazowe; kosz powstaje przy pierwszym skanie etykiety.
@@ -998,6 +999,39 @@ przesuwać. Obok stoi podgląd **dyskusji i reklamacji z Allegro**
 (`GET /sale/issues`) — na kliknięcie, bez zapisu u nas. Wymaga uprawnienia
 do dyskusji przy rejestracji aplikacji (`allegro:api:disputes`); bez niego
 przycisk mówi, czego brakuje.
+
+### Rozkładanie zwrotów z regału (zakładka ZWROTY, 0.75.0)
+
+Ta zakładka obsługuje obieg **starszy niż aplikacja** i nie miesza się z tym
+opisanym wyżej. W firmie wygląda on tak:
+
+1. Biuro składa koszyk ze zwróconym towarem i wystawia w Subiekcie
+   przesunięcie **MM z magazynu głównego na regał zwrotów**
+   (`MM 1240/MAG/2026`).
+2. Numer tego dokumentu — samą liczbę — ktoś pisze **odręcznie na kartce**
+   przypiętej do kosza: `1209`.
+3. Kosz jedzie na halę, magazynier wpisuje albo skanuje ten numer na
+   kolektorze i rozkłada zawartość na regały.
+4. Dokument powrotny (ZWR→MAG) wystawia **biuro**, nie kolektor.
+
+Kolektor w tym obiegu **nie wystawia żadnego dokumentu** — zapisuje wyłącznie
+adresy półek. Punkt 4 jest w całości robotą biura i tak ma zostać: przesunięcie
+zrobione drugi raz zabrałoby ze stanu towar, który nigdzie nie pojechał.
+
+Zawartość kosza bierze się z **pozycji dokumentu MM**, więc zakładka wymaga
+odczytu dokumentów magazynowych. Importer dokłada do zapytań jedno nowe:
+`dok__Dokument` z `dok_Typ = 9` (MM), którego **odbiorcą jest magazyn zwrotów**.
+Gdy tego odczytu zabraknie, reszta aplikacji pracuje normalnie — lista przyjęć
+jest wtedy pusta, a `/api/health` niesie zdanie o przyczynie.
+
+| ustawienie | domyślnie | co ustala |
+|---|---|---|
+| `MM_ZWROTY_DNI_WSTECZ` | `30` | okno importu przesunięć na regał zwrotów — tyle, ile filtr w Subiekcie |
+| `DOK_TYP_MM` | `9` | typ dokumentu przesunięcia międzymagazynowego |
+
+Dokumenty sprzed wdrożenia, których towar dawno leży na regałach, zdejmuje
+z listy **admin** akcją „już rozłożony". Magazynier jej nie ma: to decyzja
+o pominięciu pracy, nie sposób jej wykonania.
 
 Zwrot środków dałoby się zautomatyzować w całości: Allegro ma
 `POST /payments/refunds` (scope płatności), a prowizja wraca wtedy sama.
@@ -1072,6 +1106,13 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    Pierwsze RW rób na kopii bazy, na zwrocie próbnym z jedną pozycją
    „do zniszczenia". Sprawdź, że korekta objęła pozycję, a RW zdjęło ją
    z magazynu sprzedaży.
+8. **Która kolumna niesie magazyn DOCELOWY przesunięcia MM** (0.75.0). Import
+   przyjmuje `dok_OdbiorcaId` i tak opisuje to
+   [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md), ale nie jest
+   to potwierdzone na bazie firmy. Sprawdź na własnym MM na regał zwrotów:
+   `SELECT dok_NrPelny, dok_MagId, dok_OdbiorcaId FROM dok__Dokument WHERE dok_Typ = 9 ORDER BY dok_Id DESC`.
+   Pomyłka daje **pustą listę przyjęć** — nie złe dane, bo warunek po prostu
+   nikogo nie łapie.
 
 ## 6b. Środowisko dev obok produkcji
 
