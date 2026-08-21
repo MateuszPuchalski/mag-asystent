@@ -33,6 +33,30 @@ historii nie przepisujemy.
 
 ---
 
+## 0.72.1 — 21 sierpnia 2026
+
+**Świeży kolektor trafia w serwer bez wpisywania adresu.** Fabryczną wartością
+było `http://10.0.2.2:3001` — alias hosta z EMULATORA Androida, który na
+fizycznym kolektorze nie znaczy nic. Pierwsze uruchomienie kończyło się więc
+ekranem „Nie widzę serwera" i wpisywaniem adresu z palca, na każdym urządzeniu
+z osobna.
+
+Teraz stoi tam adres serwera produkcyjnego. Emulator zszedł do roli przypadku
+szczególnego: tam adres wpisuje się ręcznie.
+
+Zmiana dotyczy **wyłącznie urządzeń instalowanych od zera**. Kolektor, który
+ma już zapisany adres, trzyma go w swoich ustawieniach i niczego nie zauważy.
+
+**[wymaga działania] Przeprowadzka serwera pod inny adres wymaga zmiany stałej
+`DEFAULT_SERVER_URL` w kolektorze i nowego wydania APK.** Urządzenia już
+pracujące przeprowadzki nie zauważą, więc pomyłka wyjdzie dopiero przy
+pierwszej instalacji od zera — czyli długo później i bez oczywistego związku
+z przyczyną. Adres trzyma rezerwacja DHCP opisana w `DEPLOY.md` §4.
+
+Pole „ZMIEŃ ADRES SERWERA" na ekranie startowym ZOSTAJE. Adres bywa inny na
+emulatorze, na instancji dev i po każdej przeprowadzce, a wtedy jest jedyną
+drogą wyjścia z ekranu, na którym nie da się ani zalogować, ani założyć konta.
+
 ## 0.72.0 — 21 sierpnia 2026
 
 **Zdjęcia towarów na karcie zwrotu.** Biuro ocenia towar z paczki w ręku,

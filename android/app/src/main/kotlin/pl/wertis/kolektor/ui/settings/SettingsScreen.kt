@@ -146,7 +146,7 @@ fun SettingsScreen(graph: AppGraph) {
         SectionLabel("Serwer WERTIS")
         SectionCard {
             Text(
-                "Adres serwera aplikacji (API). Emulator: http://10.0.2.2:3001, kolektor: adres w sieci magazynu.",
+                "Adres serwera aplikacji (API). Fabrycznie serwer magazynu; emulator: http://10.0.2.2:3001.",
                 fontSize = 11.sp,
                 color = InkMute,
             )

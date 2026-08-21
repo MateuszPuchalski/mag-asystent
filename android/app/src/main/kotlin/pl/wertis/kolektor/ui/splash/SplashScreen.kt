@@ -61,12 +61,15 @@ import pl.wertis.kolektor.ui.theme.Paper
 
    ADRES SERWERA JEST TUTAJ, A NIE TYLKO W USTAWIENIACH — i to nie jest
    duplikat wygody. Ustawienia wiszą pod paskiem górnym, a paska nie ma przed
-   zalogowaniem; świeża instalacja startuje z adresem emulatora
-   (`10.0.2.2`), który na fizycznym kolektorze nie znaczy nic. Bez tego pola
-   pierwsze uruchomienie na sprzęcie kończyło się ekranem, z którego NIE DA SIĘ
-   wyjść: zalogować się nie można (kont jeszcze nie ma), kont założyć nie
-   można (przycisk pojawia się dopiero po odpowiedzi serwera), a adresu zmienić
-   nie można (Ustawienia za bramką sesji).                                    */
+   zalogowaniem, więc instalacja, która nie trafi w serwer, kończy się ekranem
+   BEZ WYJŚCIA: zalogować się nie można (kont jeszcze nie ma), kont założyć
+   nie można (przycisk pojawia się dopiero po odpowiedzi serwera), a adresu
+   zmienić nie można (Ustawienia za bramką sesji).
+
+   Od 0.72.1 adres fabryczny wskazuje serwer produkcyjny, więc świeża
+   instalacja w sieci magazynu dochodzi do logowania sama. To pole zostaje
+   mimo to: adres bywa inny na emulatorze, na instancji dev i po każdej
+   przeprowadzce serwera, a wtedy jest jedyną drogą wyjścia.                  */
 
 /** Co wiemy o serwerze pod aktualnym adresem. */
 private enum class StanSerwera { SPRAWDZAM, PUSTY, MA_KONTA, NIEOSIAGALNY }
@@ -294,8 +297,8 @@ private fun AdresSerwera(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        "W sieci magazynu: http://<IP-serwera>:3001. Adres 10.0.2.2 działa " +
-            "wyłącznie w emulatorze — na kolektorze wskazuje w pustkę.",
+        "Fabrycznie wpisany jest serwer magazynu. Inny adres podaje się jako " +
+            "http://<IP>:3001; w emulatorze hostem jest 10.0.2.2.",
         fontSize = 11.sp,
         color = InkMute,
         textAlign = TextAlign.Center,
