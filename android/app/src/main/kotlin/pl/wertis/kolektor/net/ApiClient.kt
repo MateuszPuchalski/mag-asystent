@@ -14,6 +14,7 @@ import pl.wertis.kolektor.core.net.ApiErrorBody
 import pl.wertis.kolektor.core.net.EanOdmowa
 import pl.wertis.kolektor.core.net.MmConflict
 import pl.wertis.kolektor.core.net.WertisJson
+import pl.wertis.kolektor.core.net.dlugiePobranie
 import pl.wertis.kolektor.core.net.naglowekHttp
 import retrofit2.HttpException
 import retrofit2.Retrofit
@@ -76,6 +77,38 @@ class IdentityHeaderInterceptor(
     }
 }
 
+/* ── Limit czasu zależny od trasy (0.71.1) ───────────────────────────────────
+   Ze zgłoszenia: „pobieranie jest bardzo wolne i dostaję timeout". Winne nie
+   było ani łącze, ani kod pobierania — kolektor czyta strumieniem, a serwer
+   strumieniem wysyła. Winny był JEDEN limit opisujący dwie różne sytuacje.
+
+   `readTimeout` niżej wynosi 10 s i ma wynosić: ekrany odpytują serwer co
+   1,5–2 s, więc dziesięć sekund ciszy przy kilku kilobajtach JSON-a znaczy
+   „sieci nie ma" i kolektor ma to wykryć od razu, stojąc przy regale.
+
+   Tym samym klientem szło jednak APK ważące kilkanaście megabajtów, gdzie
+   dziesięć sekund bez bajtu jest normalne — Wi-Fi w hali bywa obciążone,
+   a przeskok między punktami dostępowymi robi dokładnie taką przerwę.
+
+   Podnosimy więc limit TYLKO tam, gdzie leci plik. Odwrotna droga (dłuższy
+   limit globalnie) naprawiłaby rzecz zdarzającą się raz na wydanie kosztem
+   rzeczy używanej co dwie sekundy.
+
+   Świadomie BEZ `callTimeout`: całkowity limit na kilkanaście megabajtów przez
+   słabe Wi-Fi to zgadywanie, ile wolno trwać czemuś, co i tak pokazuje postęp
+   człowiekowi. Limit ma pilnować MILCZENIA łącza, nie długości pobierania. */
+private const val SEKUND_DLUGIE_POBRANIE = 60
+
+class LimityCzasuInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val req = chain.request()
+        if (!dlugiePobranie(req.url.encodedPath)) return chain.proceed(req)
+        return chain
+            .withReadTimeout(SEKUND_DLUGIE_POBRANIE, TimeUnit.SECONDS)
+            .proceed(req)
+    }
+}
+
 class ApiClient(
     currentUser: () -> String,
     sessionToken: () -> String?,
@@ -100,6 +133,12 @@ class ApiClient(
         .apply { cacheDir?.let { cache(Cache(File(it, "wertis_http"), 20L * 1024 * 1024)) } }
         .addInterceptor(hostSelection)
         .addInterceptor(IdentityHeaderInterceptor(currentUser, sessionToken, deviceId))
+        /* PO `hostSelection`, bo dopiero on wpisuje prawdziwy adres — przed nim
+           w żądaniu stoi atrapa `http://wertis.invalid/`. Sama ŚCIEŻKA jest co
+           prawda ta sama przed i po przepisaniu, ale zależność od kolejności,
+           która akurat działa, jest zależnością do złamania przy pierwszej
+           zmianie w tamtym interceptorze. */
+        .addInterceptor(LimityCzasuInterceptor())
         .build()
 
     /**

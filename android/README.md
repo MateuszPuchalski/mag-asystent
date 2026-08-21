@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **221 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK — **227 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (12 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -294,6 +294,8 @@ przed którą ta pozycja broni.
       spodem,
 - [ ] aparat w arkuszu PROBLEM działa,
 - [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
+- [ ] pobranie aktualizacji kończy się w hali, nie tylko przy biurku,
+- [ ] wyłączone Wi-Fi nadal daje SZYBKI komunikat o braku sieci,
 - [ ] linia „W dostawie …" na karcie towaru ma szewron i jest klikalna,
 - [ ] klik otwiera dostawę z ROZWINIĘTĄ pozycją tego towaru,
 - [ ] linia zamówienia i linia przeslotowania szewronu NIE mają,
