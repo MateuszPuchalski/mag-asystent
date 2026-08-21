@@ -373,7 +373,10 @@ export function odlozPozycje(
       {
         createdBy: autor,
         twId,
-        label: "Lokalizacja · " + (t?.symbol ?? twId),
+        /* Symbol z kosza, gdy kartoteki nie znamy: towar zablokowany
+           w Subiekcie nie wchodzi do importu, a biuro czytające kolejkę ma
+           zobaczyć symbol z dokumentu, nie goły identyfikator. */
+        label: "Lokalizacja · " + (t?.symbol || (p.symbol as string) || twId),
         detail: `${code} (kosz ${kosz.kod})`,
       },
       { locsPrzed: t?.lokalizacja ?? "", zrodlo: "kosz" }

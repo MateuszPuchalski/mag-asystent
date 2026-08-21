@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { budujFiltryDokumentow, budujFiltrySprzedazy } from "./subiekt.mssql.js";
+import {
+  budujFiltryDokumentow,
+  budujFiltrySprzedazy,
+  zapytaniePozycjiMm,
+  zdaniePrzyjecBezPozycji,
+} from "./subiekt.mssql.js";
 
 /* ── Które dokumenty trafiają na listę rozkładania ──────────────────────────
    Dwie reguły, obie łatwe do napisania odwrotnie i obie kosztowne, gdy się to
@@ -83,4 +88,35 @@ test("dokument nierozliczonego zwrotu wchodzi OBOK okna sprzedaży", () => {
   const { oknoFilter } = budujFiltrySprzedazy([2, 21], [901]);
   assert.equal(oknoFilter, "(d.dok_DataWyst >= @cutoff OR d.dok_Id IN (901))");
   assert.equal(budujFiltrySprzedazy([2, 21], []).oknoFilter, "d.dok_DataWyst >= @cutoff");
+});
+
+/* ── Pozycje przesunięcia MM (0.76.1) ────────────────────────────────────────
+   Test na jedną kolumnę, bo przez nią zakładka ZWROTY nie działała u klienta:
+   pozycje MM wiszą na dokumencie MAGAZYNOWYM. Kolumna dokumentu handlowego
+   zwraca pustkę — nie błąd, więc nic o sobie nie mówi.                       */
+
+test("pozycje MM łączą się przez dokument magazynowy, nie handlowy", () => {
+  const sql = zapytaniePozycjiMm("d.dok_Typ = @typ");
+  assert.match(sql, /ON d\.dok_Id = p\.ob_DokMagId/);
+  assert.doesNotMatch(sql, /ob_DokHanId/);
+  assert.match(sql, /WHERE d\.dok_Typ = @typ/);
+});
+
+test("nazwa towaru idzie z dokumentu, żeby kartoteka zablokowana nie znikła", () => {
+  const sql = zapytaniePozycjiMm("1=1");
+  assert.match(sql, /LEFT JOIN tw__Towar/);
+  assert.match(sql, /tw_Symbol AS symbol/);
+  assert.match(sql, /tw_Nazwa AS nazwa/);
+});
+
+test("dokumenty bez pozycji mówią o sobie, zamiast wyglądać na spokojny dzień", () => {
+  /* Przesunięcie bez pozycji nie ma po co powstać, więc taki wynik zawsze
+     znaczy zepsuty odczyt — i musi się o tym dowiedzieć wdrażający, a nie
+     magazynier stojący z koszem przy pustym ekranie. */
+  const zdanie = zdaniePrzyjecBezPozycji(6, 0);
+  assert.match(zdanie ?? "", /6 przesunięć/);
+  assert.match(zdanie ?? "", /ob_DokMagId/);
+  // dzień bez przesunięć i normalny import milczą
+  assert.equal(zdaniePrzyjecBezPozycji(0, 0), null);
+  assert.equal(zdaniePrzyjecBezPozycji(6, 18), null);
 });

@@ -25,12 +25,14 @@ import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
+  bladImportuMm,
   bladImportuSprzedazy,
   brakDostepuDoMagazynow,
   brakKolumnSprzedazy,
   brakKolumnyZrealizowano,
   importFromMssql,
   lastImport,
+  przyjeciaBezPozycji,
 } from "./adapters/subiekt.mssql.js";
 import { problemAllegro } from "./services/allegro-token.js";
 import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
@@ -90,6 +92,13 @@ export async function buildApp() {
       /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty dopasowują
          na danych z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
       bladImportuSprzedazy,
+      /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
+         pracuje na danych sprzed awarii. Do 0.76.1 tego zdania na liście
+         brakowało, więc awaria nie miała jak wypłynąć. */
+      bladImportuMm,
+      /* Groźniejszy od awarii jest pusty wynik: dokumenty są, pozycji zero,
+         a kosz z zerem pozycji na kolektorze wygląda jak dzień bez zwrotów. */
+      przyjeciaBezPozycji(),
       problemAllegro(),
       /* Zdjęcia: brak dostępu do źródła wygląda dokładnie tak samo jak
          kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by

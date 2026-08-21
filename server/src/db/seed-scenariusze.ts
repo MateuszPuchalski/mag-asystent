@@ -1367,11 +1367,15 @@ function przyjeciaDemo(): number {
      VALUES (?,?,?,?,?,?)`
   );
   const insPoz = d.prepare(
-    "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+    `INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa)
+     VALUES (?,?,?,?,?)`
   );
   const kosze: Array<[number, number, Array<[number, number]>]> = [
     // [dok_id, dni temu, [[tw_id, ilość], …]]
-    [DOK_MM_OD, -1, [[900_036, 1], [900_037, 2], [900_029, 1]]],
+    /* Trzecia pozycja pierwszego kosza (900_099) NIE MA kartoteki w ziarnie —
+       tak wygląda towar zablokowany w Subiekcie, a właśnie taki najczęściej
+       wraca na regał zwrotów. Kosz ma go pokazać z nazwą ze snapshotu. */
+    [DOK_MM_OD, -1, [[900_036, 1], [900_037, 2], [900_099, 1]]],
     [DOK_MM_OD + 5, -3, [[900_029, 2]]],
     // kosz sprzed wdrożenia — na nim admin ćwiczy „JUŻ ROZŁOŻONY"
     [DOK_MM_OD + 9, -12, [[900_036, 3], [900_037, 1]]],
@@ -1386,7 +1390,18 @@ function przyjeciaDemo(): number {
       config.magId.MAG,
       config.magId.ZWROTY
     );
-    for (const [twId, ilosc] of pozycje) insPoz.run(dokId, twId, ilosc);
+    for (const [twId, ilosc] of pozycje) {
+      const t = d.prepare("SELECT symbol, nazwa FROM sgt_towar WHERE tw_id = ?").get(twId) as
+        | { symbol: string; nazwa: string }
+        | undefined;
+      insPoz.run(
+        dokId,
+        twId,
+        ilosc,
+        t?.symbol ?? "TEST-ZABLOKOWANY",
+        t?.nazwa ?? "Towar wycofany ze sprzedaży (kartoteka zablokowana)"
+      );
+    }
   }
   return kosze.length;
 }

@@ -29,7 +29,7 @@ Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`.
 | `tw__Towar` (dwa podkreślenia) | `tw_Id`, `tw_Symbol`, `tw_Nazwa`, `tw_PodstKodKresk`, `tw_JednMiary`, `tw_Opis`, `tw_Zablokowany`, `tw_Pole1..8` |
 | `tw_Stan` | `st_TowId`, `st_MagId`, `st_Stan`, `st_StanRez` (PK: `st_TowId`+`st_MagId`) |
 | `dok__Dokument` | `dok_Id`, `dok_Typ`, `dok_NrPelny`, `dok_NrPelnyOryg` (varchar 30, numer dokumentu oryginalnego — integracje wpisują tu numer obcy), `dok_Uwagi` (varchar 500), `dok_DataWyst`, `dok_MagId`, `dok_PlatnikId`, `dok_Status` |
-| `dok_Pozycja` | `ob_DokHanId` (→ `dok_Id`), `ob_TowId` (→ `tw_Id`), `ob_IloscMag` |
+| `dok_Pozycja` | `ob_DokHanId` (→ `dok_Id` dokumentu **handlowego**), `ob_DokMagId` (→ `dok_Id` dokumentu **magazynowego**), `ob_TowId` (→ `tw_Id`), `ob_IloscMag` |
 | `kh__Kontrahent` | `kh_Id`, `kh_Symbol` |
 | `sl_Magazyn` | `mag_Id`, `mag_Symbol`, `mag_Nazwa` — nazwy magazynów na karcie towaru |
 
@@ -341,7 +341,28 @@ struktura używa dwóch pól magazynowych:
 - `dok_MagId` — magazyn **źródłowy**,
 - `dok_OdbiorcaId` — „dla MM oznacza identyfikator magazynu" (docelowy).
 
-Typ dokumentu MM to `dok_Typ = 9`.
+Typ dokumentu MM to `dok_Typ = 9`. Obie kolumny magazynowe są **potwierdzone
+na bazie firmy** — po nich chodzi import przyjęć na regał zwrotów (0.75.0).
+
+### Pozycje MM wiszą na `ob_DokMagId`, nie na `ob_DokHanId`
+
+To kosztowało wydanie. Pozycje dokumentu MAGAZYNOWEGO mają `ob_DokHanId`
+ustawione na **NULL** — dokumentu handlowego po prostu nie ma. Zapytanie
+przepisane ze sprzedaży nie zwracało błędu, tylko **pustkę**, więc każdy kosz
+na kolektorze pokazywał zero pozycji i wyglądało to na dzień bez zwrotów.
+
+Sprawdzone na produkcji (sierpień 2026) tym zapytaniem:
+
+```sql
+SELECT TOP 20 p.ob_Id, p.ob_DokHanId, p.ob_DokMagId, p.ob_TowId, p.ob_IloscMag
+FROM dok_Pozycja p
+JOIN dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+WHERE d.dok_Typ = 9 ORDER BY d.dok_Id DESC;
+```
+
+Wynik: kolumna `ob_DokHanId` pusta w każdym wierszu, `ob_DokMagId` z numerem
+przesunięcia. Reguła: dokument handlowy (FZ, FS, ZD) łączy się przez
+`ob_DokHanId`, magazynowy (MM, PZ, RW) przez `ob_DokMagId`.
 
 ## Audyt kolizji kodów — założenie klasyfikatora skanów
 
