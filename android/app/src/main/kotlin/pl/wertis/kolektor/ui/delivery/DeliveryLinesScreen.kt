@@ -184,7 +184,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      */
     var czesc by remember(id) { mutableStateOf<Double?>(null) }
 
-    /* WEJŚCIE Z KARTY TOWARU (0.70.0). Człowiek kliknął „W dostawie …" na
+    /* WEJŚCIE Z KARTY TOWARU (0.71.0). Człowiek kliknął „W dostawie …" na
        karcie, więc wskazał już konkretny towar — szukanie go drugi raz na
        liście trzydziestu pozycji byłoby karą za trafny klik.
 
@@ -1455,7 +1455,7 @@ private fun PanelOdkladania(
             }
         }
 
-        /* PODPOWIEDŹ PRZESLOTOWANIA (0.70.0) — ta sama linia, co na karcie
+        /* PODPOWIEDŹ PRZESLOTOWANIA (0.71.0) — ta sama linia, co na karcie
            towaru, i celowo TEN SAM tekst z `:core`. Dwa zdania o tej samej
            rzeczy rozjechałyby się przy pierwszej poprawce jednego z nich.
 

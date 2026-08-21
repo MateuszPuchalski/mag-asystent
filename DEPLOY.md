@@ -963,6 +963,15 @@ Częstotliwość ustawia `ALLEGRO_POLL_MS` (domyślnie 5 minut; `0` wyłącza).
 Skutek uboczny jest celowy: regularne odpytywanie odświeża token, więc
 parowanie nie wygasa po miesiącach bez skanów.
 
+Od 0.70.0 karta czyta **status zwrotu po stronie Allegro** i rozróżnia dwa
+alarmy. Czerwony „DORĘCZONA · NIE PRZYJĘTA" znaczy, że przewoźnik dostarczył,
+a u nas nikt nie zeskanował — paczka leży gdzieś w firmie. Taki wiersz pojawia
+się natychmiast, bez czekania na próg dni. Żółty „W DRODZE" to zwykłe
+oczekiwanie i alarmuje dopiero po progu. Sprawy, które Allegro uważa za
+zamknięte (`FINISHED`, `REJECTED`, zwrot prowizji, magazyn Allegro), schodzą
+z listy same. Przycisk SCHOWAJ zdejmuje pojedyncze zgłoszenie ręką — do spraw
+załatwionych poza aplikacją; ślad zostaje w dzienniku.
+
 Od 0.68.0 reklamacja ma **półkę** — pole „gdzie fizycznie leży towar" na
 liście reklamacji i karcie zwrotu. To ewidencja w aplikacji, nie ruch
 w Subiekcie: reklamowany towar nie jest na stanie, więc MM nie miałoby czego

@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.70.0 — 20 sierpnia 2026
+## 0.71.0 — 21 sierpnia 2026
 
 **Z karty towaru wprost do jego pozycji w dostawie.** Linia „W dostawie 6 szt
 — FZ 214/07/2026" jest teraz klikalna: otwiera dokument i od razu rozwija
@@ -66,6 +66,34 @@ trzydziestu zapytań — agregacja chodzi raz na dziesięć minut. Przy braku
 danych o zbiórkach (świeża instalacja, instancja demo) pole po prostu znika
 z odpowiedzi: „zbierany 0×/dzień" brzmiałoby jak zmierzony fakt, a nie jak
 brak pomiaru.
+## 0.70.0 — 21 sierpnia 2026
+
+**Karta BRAKUJĄCE PACZKI pokazywała alarmy dla zwrotów rozliczonych tygodnie
+temu.** Ze zgłoszenia z produkcji: zwrot 2905/2026 wisiał jako „11 dni bez
+paczki", choć Allegro miało go za doręczony 11 sierpnia i rozliczony 13-go.
+Nikt nie skanował tej etykiety u nas, bo sprawę załatwiono w panelu — a to
+jedyny sygnał, jaki karta znała.
+
+**Zapowiedź zna teraz status zwrotu po stronie Allegro.** Ticker zapisuje go
+przy każdym przebiegu, więc lista widzi to samo co panel. Sprawy zamknięte
+(`FINISHED`, `FINISHED_APT`, `REJECTED`, zwrot prowizji, magazyn Allegro)
+schodzą z listy same. Nieznany status ŚWIADOMIE zostaje na liście: lepiej
+pokazać zgłoszenie bez pracy niż ukryć paczkę, która naprawdę zaginęła.
+
+**Dwa alarmy zamiast jednego, bo to dwa różne problemy.** „DORĘCZONA · NIE
+PRZYJĘTA" znaczy, że paczka jest fizycznie u nas i nikt jej nie przyjął —
+alarm natychmiast, bez progu dni, i na górze listy. „W DRODZE" to czekanie na
+kuriera i alarmuje dopiero po `BRAKUJACA_PACZKA_DNI`. Do tej wersji jedno i
+drugie wyglądało identycznie, więc pilne ginęło wśród cierpliwego.
+
+**Przycisk SCHOWAJ na wierszu.** Zgłoszenie załatwione poza aplikacją znika
+z listy decyzją człowieka, ze śladem w dzienniku. Schowanie nie blokuje
+przyjęcia: skan szuka po numerze przesyłki, nie po stanie wiersza, więc
+odnaleziona paczka wchodzi normalnie.
+
+Karta raportu dostała kafel „doręczonych, nieprzyjętych", a surowy status
+z Allegro stoi na ekranie obok każdego wiersza — regułę da się sprawdzić,
+nie tylko jej zaufać.
 
 ## 0.69.0 — 20 sierpnia 2026
 

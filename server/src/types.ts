@@ -82,7 +82,7 @@ export interface ProductCard {
  * Podpowiedź przeslotowania — ile razy dziennie towar jest zbierany i na które
  * poziomy regału powinien zjechać.
  *
- * Nazwany typ, a nie kształt wpisany w dwóch miejscach: od 0.70.0 czyta go
+ * Nazwany typ, a nie kształt wpisany w dwóch miejscach: od 0.71.0 czyta go
  * także pozycja dostawy (`DeliveryLineView`), a rozjazd między kopiami
  * znaczyłby, że kolektor mówi to samo dwoma różnymi zdaniami.
  */
@@ -199,7 +199,7 @@ export interface DeliveryLineView {
   /** Litera alejki (nagłówek sekcji listy) albo null przy braku lokalizacji. */
   aisle: string | null;
   /**
-   * Ta sama podpowiedź przeslotowania, którą niesie karta towaru (0.70.0).
+   * Ta sama podpowiedź przeslotowania, którą niesie karta towaru (0.71.0).
    *
    * Przy odkładaniu jest bardziej na miejscu niż na karcie: człowiek stoi
    * z towarem w ręce i WŁAŚNIE wybiera półkę, więc „ten jedzie do strefy

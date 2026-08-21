@@ -112,6 +112,10 @@ test("raport zlicza proces w jednym miejscu", () => {
   assert.equal(r.reklamacje.otwarte, 1);
   assert.equal(r.reklamacje.poTerminie, 1);
   assert.equal(r.kosze.otwarte, 0);
-  assert.deepEqual(r.zapowiedzi, { oczekujace: 0, brakujace: 0 }, "bez przebiegu tickera zapowiedzi milczą");
+  assert.deepEqual(
+    r.zapowiedzi,
+    { oczekujace: 0, brakujace: 0, doreczoneNieprzyjete: 0 },
+    "bez przebiegu tickera zapowiedzi milczą"
+  );
   assert.equal(r.medianaGodzinDoRozliczenia, null, "bez rozliczonych zwrotów mediana uczciwie milczy");
 });

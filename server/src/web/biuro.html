@@ -333,8 +333,9 @@
     <section class="card" id="brakujaceKarta" hidden>
       <h2>BRAKUJĄCE PACZKI</h2>
       <p class="mute" style="margin-bottom:8px">
-        Klient zgłosił zwrot w Allegro, a paczka wciąż nie dojechała.
-        Sprawdź numer w panelu przewoźnika albo napisz do klienta.
+        Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
+        paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
+        w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
       </p>
       <table id="brakujaceLista"></table>
     </section>
@@ -2185,12 +2186,17 @@ function rysujBrakujace(lista) {
   const karta = $("brakujaceKarta");
   karta.hidden = otwartyZwrot != null || lista.length === 0;
   $("brakujaceLista").innerHTML = lista.length
-    ? "<tr><th>CZEKA</th><th>ZWROT</th><th>KLIENT</th><th>NUMERY PACZEK</th></tr>" +
+    ? "<tr><th>STAN</th><th>CZEKA</th><th>ZWROT</th><th>KLIENT</th><th>NUMERY PACZEK</th><th></th></tr>" +
       lista.map((z) => `<tr>
-          <td><span class="badge err">${z.dniOdZgloszenia ?? "?"} dni</span></td>
+          <td>${z.stan === "doreczona"
+            ? '<span class="badge err">DORĘCZONA · NIE PRZYJĘTA</span>'
+            : '<span class="badge amber">W DRODZE</span>'}
+              ${z.statusAllegro ? `<div class="mute">${esc(z.statusAllegro)}</div>` : ""}</td>
+          <td class="b">${z.dniOdZgloszenia ?? "?"} dni</td>
           <td class="b">${esc(z.referencja || "—")}</td>
           <td>${esc(z.kupujacyLogin || "—")}</td>
           <td class="mute">${z.waybills.map(esc).join("<br>") || "—"}</td>
+          <td><button class="akcja cichy" data-pomin="${z.id}">SCHOWAJ</button></td>
         </tr>`).join("")
     : "";
 }
@@ -2275,6 +2281,8 @@ function rysujRaportZwrotow(r) {
     [r.reklamacje.poTerminie, "reklamacji po terminie", r.reklamacje.poTerminie > 0],
     [r.zapowiedzi.oczekujace, "zapowiedzianych zwrotów"],
     [r.zapowiedzi.brakujace, "paczek brakujących", r.zapowiedzi.brakujace > 0],
+    [r.zapowiedzi.doreczoneNieprzyjete, "doręczonych, nieprzyjętych",
+      r.zapowiedzi.doreczoneNieprzyjete > 0],
     [r.medianaGodzinDoRozliczenia == null ? "—" : r.medianaGodzinDoRozliczenia + " h",
       "mediana skan→rozliczenie (30 dni)"],
   ];
@@ -2929,6 +2937,25 @@ $("zwrotKosz").addEventListener("keydown", (e) => {
     e.target.closest("section, div").querySelector("[data-kosz-przypnij]")?.click();
   }
 });
+/* SCHOWAJ na brakującej paczce — decyzja człowieka, że sprawa jest załatwiona
+   poza aplikacją. Pyta, bo wiersz znika z listy na dobre; zwrot da się mimo to
+   przyjąć skanem, więc pomyłka nie blokuje niczego. */
+$("brakujaceLista").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-pomin]");
+  if (!b) return;
+  const zgoda = await potwierdz({
+    tytul: "SCHOWAJ ZGŁOSZENIE",
+    opis: "Zniknie z listy brakujących paczek. Zrób to, gdy sprawa została załatwiona poza aplikacją.",
+    potwierdz: "SCHOWAJ",
+  });
+  if (!zgoda) return;
+  try {
+    // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
+    await api(`/api/biuro/zwroty/zapowiedzi/${b.dataset.pomin}/pomin`, { method: "POST", body: "{}" });
+    await odswiezEtap3();
+  } catch (err) { toast(err.message); }
+});
+
 $("koszeLista").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-zamknij-kosz]");
   if (!b) return;

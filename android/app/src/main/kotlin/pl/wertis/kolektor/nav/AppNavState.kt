@@ -47,7 +47,7 @@ class AppNavState(private val recentStore: RecentStore) {
     @Volatile var pendingSearch: String? = null
 
     /**
-     * Towar do zaznaczenia po wejściu na listę pozycji dostawy (0.70.0).
+     * Towar do zaznaczenia po wejściu na listę pozycji dostawy (0.71.0).
      *
      * Ten sam wzorzec co `pendingSearch`: parametr wejściowy ekranu podany
      * przez wołającego i KONSUMOWANY przy wejściu. Nie da się go przekazać

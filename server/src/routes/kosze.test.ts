@@ -149,6 +149,11 @@ test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => 
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: biuro });
   assert.equal(r.statusCode, 200);
   assert.deepEqual(r.json().zapowiedzi, []);
+  // schowanie zapowiedzi (0.70.0) — bramka biura, a nieznane id to 404, nie 500
+  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/1/pomin", payload: {}, headers: magazynier });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/1/pomin", payload: {}, headers: biuro });
+  assert.equal(r.statusCode, 404);
   // półka reklamacyjna i dyskusje Allegro (Etap 6) — bramka biura
   r = await app.inject({
     method: "PUT", url: "/api/biuro/zwroty/reklamacje/1/polka",

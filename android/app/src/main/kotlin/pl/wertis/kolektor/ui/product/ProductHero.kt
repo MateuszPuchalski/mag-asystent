@@ -194,7 +194,7 @@ fun ProductHero(
  * Obie linie stoją na jednej powierzchni, a rozróżnia je tusz i ikona:
  * bursztyn przy dostawie (jest co zrobić), szarość przy zamówieniu (nie ma).
  *
- * KLIKALNA JEST JEDNA LINIA, NIE KARTA (0.70.0). Do tej wersji nie klikało się
+ * KLIKALNA JEST JEDNA LINIA, NIE KARTA (0.71.0). Do tej wersji nie klikało się
  * tu nic, z zapisanym powodem: wejście w dokument z karty otwierałoby
  * rozkładanie jako skutek uboczny zwykłego zaglądania. Powód był dobry, ale
  * dotyczył CAŁEJ powierzchni — dotknięcie gdziekolwiek na karcie faktów jest
