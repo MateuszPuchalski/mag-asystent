@@ -19,6 +19,7 @@ import {
   szczegolKosza,
   szukajWKoszach,
   zakonczKosz,
+  zalatwPominiecie,
   zamknijKosz,
 } from "../services/kosze.js";
 import { szczegolZwrotu } from "../services/zwroty.js";
@@ -92,6 +93,20 @@ export async function koszeRoutes(app: FastifyInstance) {
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return { pominiete: pominietePozycje() };
   });
+
+  /* Zamknięcie sprawy pominięcia — bramka BIURA, bo to decyzja o tym, że
+     sprawa jest wyjaśniona, a nie o tym, co leży w koszu. */
+  app.post<{ Params: { id: string }; Body: { notatka?: string } }>(
+    "/api/biuro/kosze/pominiete/:id/zalatwione",
+    async (req, reply) => {
+      const nie = odmowaBiuro();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zBledem(reply, () => {
+        zalatwPominiecie(Number(req.params.id), autor(), req.body?.notatka ?? "");
+        return { pominiete: pominietePozycje() };
+      });
+    }
+  );
 
   app.get<{ Querystring: { q?: string } }>("/api/biuro/kosze/szukaj", async (req, reply) => {
     const nie = odmowaBiuro();

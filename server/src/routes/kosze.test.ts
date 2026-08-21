@@ -246,6 +246,43 @@ test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async
   // jedna litera to nie zapytanie — odmowa zamiast wyrzucenia całej tabeli
   r = await app.inject({ method: "GET", url: "/api/biuro/kosze/szukaj?q=T", headers: biuro });
   assert.equal(r.statusCode, 400);
+
+  /* ZAŁATWIONE zdejmuje sprawę z listy pracy, ale NIE z kosza: pominięcie
+     zostaje, bo hala naprawdę zgłosiła brak. Bez tego rozróżnienia biuro
+     mogłoby zamknąć sprawę i stracić ślad, że kosz wrócił niekompletny. */
+  const pozycjaId = p[0].pozycjaId;
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/pominiete/${pozycjaId}/zalatwione`,
+    payload: { notatka: "znalazło się na regale" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 403, "to decyzja biura, nie hali");
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/pominiete/${pozycjaId}/zalatwione`,
+    payload: { notatka: "znalazło się na regale" }, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(r.json().pominiete, [], "sprawa schodzi z listy pracy");
+
+  // drugie kliknięcie nic nie psuje, a pozycja dalej jest pominięta w koszu
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/pominiete/${pozycjaId}/zalatwione`,
+    payload: {}, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200);
+  r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
+  const wKoszu = r.json().kosz.pozycje.find((x: { id: number }) => x.id === pozycjaId);
+  assert.equal(wKoszu.status, "skipped");
+  assert.equal(wKoszu.zalatwioneNotatka, "znalazło się na regale");
+
+  // odłożenie tej samej pozycji kasuje i pominięcie, i jego zamknięcie
+  await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${pozycjaId}/odloz`,
+    payload: { lokalizacja: "B02-02-02" }, headers: magazynier,
+  });
+  r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
+  const po = r.json().kosz.pozycje.find((x: { id: number }) => x.id === pozycjaId);
+  assert.equal(po.status, "done");
+  assert.equal(po.zalatwioneAt, null);
 });
 
 test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => {

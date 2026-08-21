@@ -328,6 +328,9 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     lokFaktyczna: (w.lok_faktyczna as string) ?? null,
     odlozonoPrzez: (w.odlozono_przez as string) ?? null,
     powod: (w.powod as string) ?? null,
+    zalatwioneAt: (w.zalatwione_at as string) ?? null,
+    zalatwionePrzez: (w.zalatwione_przez as string) ?? null,
+    zalatwioneNotatka: (w.zalatwione_notatka as string) ?? null,
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
@@ -432,6 +435,7 @@ export function odlozPozycje(
   db()
     .prepare(
       `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL,
+              zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL,
               lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?`
     )
     .run(code, nowIso(), autor, pozycjaId);
@@ -486,8 +490,13 @@ export function pominPozycjeKosza(
     throw new BladKosza(400, "Pozycja jest odłożona — pomijanie dotyczy towaru, którego nie ma");
   }
 
-  d.prepare("UPDATE kosz_pozycja SET status='skipped', powod=?, pominieto_at=? WHERE id=?")
-    .run(tresc, nowIso(), pozycjaId);
+  /* Pominięcie ZERUJE załatwienie: skoro hala zgłasza brak drugi raz, sprawa
+     wraca na listę biura, choćby ktoś zamknął ją wcześniej. */
+  d.prepare(
+    `UPDATE kosz_pozycja SET status='skipped', powod=?, pominieto_at=?,
+            zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL
+     WHERE id=?`
+  ).run(tresc, nowIso(), pozycjaId);
   logEvent("kosz_pozycja_pominieta", autor, p.tw_id as number, {
     koszId: kosz.id,
     kod: kosz.kod,
@@ -608,6 +617,7 @@ export function pominietePozycje(): PominietaPozycja[] {
        FROM kosz_pozycja p
        JOIN kosz k ON k.id = p.kosz_id
        WHERE p.status = 'skipped'
+         AND p.zalatwione_at IS NULL
          AND (k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-30 days'))
        ORDER BY COALESCE(p.pominieto_at, k.zamknieto_at, k.utworzono_at)`
     )
@@ -693,4 +703,46 @@ export function szukajWKoszach(fraza: string): ZnalezionaPozycja[] {
     powod: (w.powod as string) ?? null,
     kiedy: (w.kiedy as string) ?? null,
   }));
+}
+
+/**
+ * Zamknięcie sprawy pominiętej pozycji — decyzja BIURA, nie hali.
+ *
+ * Pominięcie zostaje pominięciem: hala zgłosiła, że towaru nie ma, i tego się
+ * nie przepisuje. Zmienia się tylko to, czy sprawa wisi na liście pracy.
+ * Bez tego przycisku lista rosłaby w nieskończoność, aż przestano by ją
+ * czytać — a wtedy nowe zgłoszenie ginęłoby wśród załatwionych.
+ *
+ * Notatka jest DOBROWOLNA, odwrotnie niż powód pominięcia. Powód to jedyna
+ * treść zgłoszenia i bez niego nie ma o czym rozmawiać; tutaj najczęstszym
+ * zakończeniem jest „znalazło się", a wymuszanie zdania na każde kliknięcie
+ * kosztowałoby więcej, niż warte jest to zdanie.
+ */
+export function zalatwPominiecie(
+  pozycjaId: number,
+  autor: string,
+  notatka = ""
+): { ok: true } {
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.status !== "skipped") {
+    throw new BladKosza(400, "Załatwia się POMINIĘCIE — ta pozycja nie jest pominięta");
+  }
+  if (p.zalatwione_at) return { ok: true }; // drugie kliknięcie nic nie zmienia
+
+  const tresc = String(notatka ?? "").trim().slice(0, 200);
+  d.prepare(
+    "UPDATE kosz_pozycja SET zalatwione_at=?, zalatwione_przez=?, zalatwione_notatka=? WHERE id=?"
+  ).run(nowIso(), autor, tresc || null, pozycjaId);
+  logEvent("kosz_pominiecie_zalatwione", autor, p.tw_id as number, {
+    pozycjaId,
+    koszId: p.kosz_id,
+    symbol: p.symbol,
+    powod: p.powod,
+    notatka: tresc,
+  });
+  return { ok: true };
 }

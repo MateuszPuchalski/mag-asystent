@@ -142,6 +142,9 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      oraz o potwierdzenie odczytu odpowiedzi na notatkę. W 0.58.0 doszło
      zlecenie korekty zwrotu z MM na bufor, w 0.59.0 — kosze zwrotowe
      (przypięcie do kosza, zamknięcie kosza) i rozpatrzenie reklamacji.
+     W 0.77.0 doszło ZAŁATWIENIE POMINIĘCIA: hala zgłasza brak towaru, a biuro
+     zamyka sprawę. To zapis w naszej bazie, nie w Subiekcie, i wymaga
+     kliknięcia — mieści się więc w regule, choć powiększa listę.
 
      To ostatnie ZMIENIA regułę i dlatego jest wypisane osobno: pierwszy zapis
      z tej strony, który trafia do `sfera_queue`, czyli do bazy firmy. Reszta
@@ -161,12 +164,12 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    18,
+    19,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i jedenaście zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i dwanaście zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
       "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja, " +
-      "schowanie zapowiedzi) — nic ponadto"
+      "schowanie zapowiedzi, załatwienie pominięcia) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
@@ -200,6 +203,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową. */
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
   assert.match(html, /problems\/\$\{id\}\/resolve/, "biuro zamyka wyjątek");
+  assert.match(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "biuro zamyka sprawę pominięcia");
 });
 
 test("lista dostaw sygnalizuje wyjątki", () => {

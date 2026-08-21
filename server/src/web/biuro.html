@@ -2388,7 +2388,7 @@ function rysujPominiete(lista) {
   if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
   $("pominieteLista").innerHTML =
     `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>CZEKA</th><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD</th></tr>" +
+    "<th>CZEKA</th><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD</th><th></th></tr>" +
     lista.map((p) => `<tr>
         ${kolFoto(p.twId)}
         <td class="b" style="white-space:nowrap">${p.dni > 0
@@ -2399,6 +2399,7 @@ function rysujPominiete(lista) {
         <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}</td>
         <td class="b" style="white-space:nowrap">${p.ilosc}</td>
         <td><span class="badge amber">${esc(p.powod || "bez powodu")}</span></td>
+        <td><button class="akcja cichy" data-zalatw="${p.pozycjaId}">ZAŁATWIONE</button></td>
       </tr>`).join("");
   dolozZdjeciaListy(lista, "pominieteLista", "sesjaPominietych");
 }
@@ -2497,8 +2498,15 @@ async function pokazPodgladKosza(id, cichy) {
 /** Jedno zdanie o pozycji: co się z nią stało i kto to zrobił. */
 function stanPozycjiKosza(p) {
   if (p.status === "skipped") {
+    /* Załatwienie NIE kasuje pominięcia — dopisuje się do niego. Kosz na
+       zawsze zostaje niekompletny, zmienia się tylko to, czy sprawa wisi. */
+    const zamkniete = p.zalatwioneAt
+      ? `<div class="mute">załatwione${p.zalatwionePrzez ? ` · ${esc(p.zalatwionePrzez)}` : ""}${
+          p.zalatwioneNotatka ? `<br>„${esc(p.zalatwioneNotatka)}”` : ""
+        }</div>`
+      : "";
     return `<span class="badge amber">POMINIĘTA</span>
-      <div class="mute">„${esc(p.powod || "bez powodu")}”</div>`;
+      <div class="mute">„${esc(p.powod || "bez powodu")}”</div>${zamkniete}`;
   }
   if (p.status === "done") {
     /* Stan MM mówi, czy bufor NAPRAWDĘ się cofnął w Subiekcie. Kolejka zapisów
@@ -3286,6 +3294,29 @@ $("brakujaceLista").addEventListener("click", async (e) => {
     // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
     await api(`/api/biuro/zwroty/zapowiedzi/${b.dataset.pomin}/pomin`, { method: "POST", body: "{}" });
     await odswiezEtap3();
+  } catch (err) { toast(err.message); }
+});
+
+/* Zamknięcie sprawy pominięcia. Notatka jest dobrowolna — najczęstszym
+   zakończeniem jest „znalazło się", a wymuszanie zdania przy każdym kliknięciu
+   kosztowałoby więcej, niż warte jest to zdanie. */
+$("pominieteLista").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-zalatw]");
+  if (!b) return;
+  const notatka = await potwierdz({
+    tytul: "SPRAWA ZAŁATWIONA",
+    opis: "Pozycja zostaje pominięta — to fakt z hali. Znika tylko z listy pracy.",
+    pole: true,
+    przyklad: "np. znalazło się na regale / reklamacja u kuriera / korekta dokumentu",
+    potwierdz: "ZAŁATWIONE",
+  });
+  if (notatka === null) return;
+  try {
+    const d = await api(`/api/biuro/kosze/pominiete/${b.dataset.zalatw}/zalatwione`, {
+      method: "POST",
+      body: JSON.stringify({ notatka }),
+    });
+    rysujPominiete((await d.json()).pominiete || []);
   } catch (err) { toast(err.message); }
 });
 

@@ -640,6 +640,12 @@ CREATE TABLE IF NOT EXISTS kosz_pozycja (
   -- przyczyną. Pominięta pozycja NIE dostaje MM — nigdzie nie pojechała.
   powod         TEXT,
   pominieto_at  TEXT,                          -- kiedy; po tym liczy się wiek sprawy
+  -- Zamknięcie sprawy przez BIURO (0.77.0). Pozycja zostaje pominięta — to
+  -- fakt z hali i historii się nie przepisuje — ale znika z listy pracy.
+  -- Notatka mówi, czym się skończyło: znaleziony, reklamowany, skorygowany.
+  zalatwione_at TEXT,
+  zalatwione_przez TEXT,
+  zalatwione_notatka TEXT,
   -- Zadanie MM ZWROTY→MAG cofające bufor dla TEJ pozycji. Jednopozycyjne MM
   -- świadomie: guard „adres przed sprzedawalnością" w obu workerach porządkuje
   -- zadania po tw_id, a MM wielopozycyjne wypadałoby spod niego.

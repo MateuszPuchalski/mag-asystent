@@ -186,6 +186,9 @@ function migrate(database: DatabaseSync) {
   /* Kiedy pominięto — bez tego lista pominięć w biurze nie umie powiedzieć,
      która sprawa czeka najdłużej, a to jest jej cała treść. */
   addColumn("kosz_pozycja", "pominieto_at", "TEXT");
+  addColumn("kosz_pozycja", "zalatwione_at", "TEXT");
+  addColumn("kosz_pozycja", "zalatwione_przez", "TEXT");
+  addColumn("kosz_pozycja", "zalatwione_notatka", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
   naLoginIHaslo(database);

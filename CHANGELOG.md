@@ -76,6 +76,13 @@ kartę, na której najdłużej czekające sprawy są na górze. Pominięcie zamk
 w jednym koszu byłoby wiedzą, do której nikt nie zagląda; tu jest listą pracy:
 szukać dalej, reklamować u przewoźnika czy poprawić dokument.
 
+Pominięcie zamyka się przyciskiem **ZAŁATWIONE** z dobrowolną notatką
+(„znalazło się", „reklamacja u kuriera", „korekta dokumentu"). Sprawa schodzi
+z listy pracy, ale pominięcie ZOSTAJE przy pozycji — hala naprawdę zgłosiła
+brak i tego się nie przepisuje. W podglądzie kosza widać jedno pod drugim:
+powód pominięcia i to, czym się skończyło. Ponowne zgłoszenie braku otwiera
+sprawę na nowo, a odłożenie towaru kasuje jedno i drugie.
+
 Obok stoi **szukanie towaru w koszach** — po symbolu, nazwie albo kodzie
 kreskowym. Odpowiada na pytanie zadawane po fakcie: „w którym koszu to
 jechało i gdzie hala to odłożyła". Szuka po snapshocie z kosza, bo to on mówi,
