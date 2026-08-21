@@ -154,7 +154,8 @@ ustawienia trzyma jeden plik `wertis.env` dla obu procesów
 w dev nie tyka się go wcale, a tryb `seeded` nie potrzebuje ani jednej zmiennej.
 
 Kolektor: build APK w [`android/`](android/README.md) (`./gradlew :app:assembleDebug`
-albo artefakt z CI), w aplikacji ustaw adres serwera (emulator: `http://10.0.2.2:3001`).
+albo artefakt z CI). Adres serwera fabrycznie wskazuje magazyn; na emulatorze
+wpisz `http://10.0.2.2:3001`.
 
 ### Pierwsze konto — bez niego kolektor nie wpuści
 
@@ -187,8 +188,8 @@ z loginem. Procedurę `curl` i zakładanie reszty kont podaje
 [`DEPLOY.md`](DEPLOY.md) §5a.
 
 Na ekranie startowym kolektora są dwa pola — login i hasło — więc emulator bez
-skanera wystarczy. Domyślny adres serwera (`http://10.0.2.2:3001`) jest już
-ustawiony na localhost hosta.
+skanera wystarczy. Adres fabryczny wskazuje serwer magazynu, więc na emulatorze
+trzeba go zmienić na `http://10.0.2.2:3001`.
 
 **Konto jest potrzebne także do grzebania curlem.** API wymaga nagłówka
 `x-session` na każdej trasie poza sześcioma: `GET /api/health`, `GET /api/setup`,

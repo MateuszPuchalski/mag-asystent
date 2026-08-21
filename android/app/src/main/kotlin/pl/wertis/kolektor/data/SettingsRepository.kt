@@ -18,8 +18,25 @@ data class AppSettings(
     val batteryAssist: Boolean = true, // podpowiedź hot-swap przy niskiej baterii
 ) {
     companion object {
-        /** 10.0.2.2 = localhost hosta z emulatora; na kolektorze ustaw adres LAN. */
-        const val DEFAULT_SERVER_URL = "http://10.0.2.2:3001"
+/**
+         * Adres serwera na świeżej instalacji (0.72.1).
+         *
+         * Do tej wersji stało tu `10.0.2.2` — alias hosta Z EMULATORA, który
+         * na fizycznym kolektorze nie znaczy nic. Pierwsze uruchomienie
+         * kończyło się więc ekranem „Nie widzę serwera" i wpisywaniem adresu
+         * z palca, na każdym urządzeniu z osobna.
+         *
+         * PRZEPROWADZKA SERWERA WYMAGA ZMIANY TUTAJ. Adres trzyma rezerwacja
+         * DHCP (`DEPLOY.md` §4) i dopóki ona stoi, ta stała jest prawdziwa.
+         * Gdyby serwer dostał inny adres, urządzenia już skonfigurowane nic
+         * nie zauważą — mają swój `serverUrl` w ustawieniach — więc pomyłka
+         * wyjdzie dopiero przy pierwszej instalacji od zera, czyli długo po
+         * przeprowadzce i bez oczywistego związku z nią.
+         *
+         * Emulator jest przypadkiem szczególnym: tam adresem hosta jest
+         * `http://10.0.2.2:3001` i wpisuje się go ręcznie.
+         */
+        const val DEFAULT_SERVER_URL = "http://192.168.1.49:3001"
     }
 }
 

@@ -89,7 +89,8 @@ i `wertis.klucz.haslo`. Plik jest poza gitem. Skąd wziąć klucz: `DEPLOY.md` �
 
 1. W katalogu głównym repo: `npm install && npm run seed && npm run dev` (API na `:3001`).
 2. Adres serwera:
-   - emulator: `http://10.0.2.2:3001` (domyślne, nic nie trzeba robić),
+   - emulator: `http://10.0.2.2:3001` — wpisz go, adres fabryczny wskazuje
+     serwer magazynu,
    - fizyczny kolektor: `http://<IP-serwera-w-LAN>:3001` — wpisz go na
      **ekranie startowym** (`ZMIEŃ ADRES SERWERA`). Ustawienia siedzą pod
      paskiem górnym, a paska nie ma przed zalogowaniem, więc na świeżej
@@ -414,8 +415,11 @@ przed którą ta pozycja broni.
 - [ ] pusty serwer: ekran startowy proponuje ZAŁÓŻ KONTA obok pól logowania,
 - [ ] kreator zakłada całą listę i pokazuje loginy, nigdy haseł,
 - [ ] po wyjściu z kreatora ta sama instalacja prosi już o logowanie,
-- [ ] świeża instalacja z adresem fabrycznym `10.0.2.2` pokazuje „Nie widzę
-      serwera pod adresem…" i ROZWINIĘTE pole adresu,
+- [ ] świeża instalacja w sieci magazynu **łączy się bez wpisywania adresu**
+      (od 0.72.1 fabryczny wskazuje serwer produkcyjny),
+- [ ] instalacja z BŁĘDNYM adresem nadal pokazuje „Nie widzę serwera" i
+      ROZWINIĘTE pole adresu,
+- [ ] to jedyna droga wyjścia z tego ekranu i nie wolno jej stracić,
 - [ ] nie pokazuje samych pól logowania bez wyjścia (bez konta nie dało się
       z tego ekranu wyjść),
 - [ ] wpisz właściwy adres LAN i naciśnij ZAPISZ I SPRAWDŹ,

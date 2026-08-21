@@ -453,9 +453,12 @@ już po wierzchu i niczego nie kasuje.
   `http://mag.wertis.local:3001` albo `http://<IP-serwera>:3001`. Ustawienia
   są za bramką sesji, więc przed pierwszym zalogowaniem tamtędy nie wejdziesz;
   po zalogowaniu ten sam adres zmienia się w **Ustawienia → Serwer WERTIS**.
-- Fabryczna wartość to `http://10.0.2.2:3001` — alias hosta **w emulatorze**.
-  Na fizycznym kolektorze nie wskazuje na nic, więc dopóki jej nie zmienisz,
-  ekran startowy pokazuje „Nie widzę serwera pod adresem…".
+- Fabryczna wartość od 0.72.1 to **adres serwera produkcyjnego**, więc świeża
+  instalacja w sieci magazynu dochodzi do logowania bez wpisywania czegokolwiek.
+  Trzyma ją rezerwacja DHCP z §4; **przeprowadzka serwera pod inny adres wymaga
+  zmiany stałej `DEFAULT_SERVER_URL` w kolektorze i nowego wydania APK**.
+  Urządzenia już skonfigurowane mają własny adres w ustawieniach i przeprowadzki
+  nie zauważą, więc pomyłka wyjdzie dopiero przy pierwszej instalacji od zera.
 
 Checklist smoke-test i szczegóły integracji skanerów: [`android/README.md`](android/README.md).
 
