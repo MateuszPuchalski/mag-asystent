@@ -183,6 +183,9 @@ function migrate(database: DatabaseSync) {
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
   /* 0.77.0 — powód pominięcia pozycji kosza (status `skipped`). */
   addColumn("kosz_pozycja", "powod", "TEXT");
+  /* Kiedy pominięto — bez tego lista pominięć w biurze nie umie powiedzieć,
+     która sprawa czeka najdłużej, a to jest jej cała treść. */
+  addColumn("kosz_pozycja", "pominieto_at", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
   naLoginIHaslo(database);

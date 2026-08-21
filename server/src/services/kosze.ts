@@ -431,7 +431,7 @@ export function odlozPozycje(
      ma go po prostu odłożyć, a nie szukać osobnego „cofnij". */
   db()
     .prepare(
-      `UPDATE kosz_pozycja SET status='done', powod=NULL,
+      `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL,
               lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?`
     )
     .run(code, nowIso(), autor, pozycjaId);
@@ -486,7 +486,8 @@ export function pominPozycjeKosza(
     throw new BladKosza(400, "Pozycja jest odłożona — pomijanie dotyczy towaru, którego nie ma");
   }
 
-  d.prepare("UPDATE kosz_pozycja SET status='skipped', powod=? WHERE id=?").run(tresc, pozycjaId);
+  d.prepare("UPDATE kosz_pozycja SET status='skipped', powod=?, pominieto_at=? WHERE id=?")
+    .run(tresc, nowIso(), pozycjaId);
   logEvent("kosz_pozycja_pominieta", autor, p.tw_id as number, {
     koszId: kosz.id,
     kod: kosz.kod,
@@ -565,4 +566,131 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
     });
   })();
   return szczegolKosza(koszId);
+}
+
+/* ── Wgląd biura: co zostało pominięte i gdzie jechał towar ──────────────────
+   Dwa pytania, które biuro zadaje po fakcie, a na które karta kosza sama nie
+   odpowiada: „czego zabrakło" i „w którym koszu to było". Pierwsze jest listą
+   pracy, drugie wyszukiwaniem — oba czytają tę samą tabelę pozycji.          */
+
+export interface PominietaPozycja {
+  pozycjaId: number;
+  koszId: number;
+  kod: string;
+  /** Numer przesunięcia MM; null = kosz złożony w aplikacji. */
+  mmNumer: string | null;
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ilosc: number;
+  powod: string;
+  at: string | null;
+  /** Ile dni sprawa czeka; liczone od pominięcia, a nie od powstania kosza. */
+  dni: number;
+}
+
+/**
+ * Pominięte pozycje ze WSZYSTKICH koszy — lista pracy biura.
+ *
+ * Pominięcie znaczy „tego towaru nie było", więc ktoś musi rozstrzygnąć: szukać
+ * dalej, reklamować u przewoźnika czy poprawić dokument. Do 0.78.0 widać to
+ * było wyłącznie po otwarciu konkretnego kosza, czyli praktycznie wcale.
+ *
+ * Okno jest takie samo jak na liście koszy i z tego samego powodu: lista służy
+ * PRACY, historię trzyma audyt. Kosz nierozłożony zostaje niezależnie od wieku,
+ * bo jego sprawa wciąż jest otwarta.
+ */
+export function pominietePozycje(): PominietaPozycja[] {
+  const wiersze = db()
+    .prepare(
+      `SELECT p.id AS pozycja_id, p.kosz_id, p.tw_id, p.symbol, p.nazwa, p.ilosc,
+              p.powod, p.pominieto_at, k.kod, k.mm_numer, k.status AS kosz_status
+       FROM kosz_pozycja p
+       JOIN kosz k ON k.id = p.kosz_id
+       WHERE p.status = 'skipped'
+         AND (k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-30 days'))
+       ORDER BY COALESCE(p.pominieto_at, k.zamknieto_at, k.utworzono_at)`
+    )
+    .all() as Array<Record<string, unknown>>;
+
+  const teraz = Date.now();
+  return wiersze.map((w) => {
+    const at = (w.pominieto_at as string) ?? null;
+    return {
+      pozycjaId: w.pozycja_id as number,
+      koszId: w.kosz_id as number,
+      kod: w.kod as string,
+      mmNumer: (w.mm_numer as string) ?? null,
+      twId: w.tw_id as number,
+      symbol: w.symbol as string,
+      nazwa: w.nazwa as string,
+      ilosc: w.ilosc as number,
+      powod: (w.powod as string) ?? "",
+      at,
+      /* Pominięcia sprzed 0.78.0 nie mają znacznika — zero zamiast zgadywania,
+         bo wymyślona liczba dni wyglądałaby dokładnie jak prawdziwa. */
+      dni: at ? Math.floor((teraz - Date.parse(at)) / 86_400_000) : 0,
+    };
+  });
+}
+
+export interface ZnalezionaPozycja {
+  koszId: number;
+  kod: string;
+  mmNumer: string | null;
+  koszStatus: string;
+  symbol: string;
+  nazwa: string;
+  ilosc: number;
+  status: string;
+  lokFaktyczna: string | null;
+  powod: string | null;
+  kiedy: string | null;
+}
+
+/**
+ * „W którym koszu jechał ten towar?" — po symbolu, nazwie albo kodzie kreskowym.
+ *
+ * Pytanie pada, gdy towar zniknął między regałem a Subiektem albo gdy klient
+ * dopomina się o zwrot. Bez tego biuro mogło tylko otwierać kosze po kolei.
+ *
+ * Szuka po SNAPSHOCIE z kosza (symbol i nazwa zapisane przy zamknięciu), bo to
+ * on mówi, co naprawdę w koszu leżało — kartoteka mogła się od tego czasu
+ * zmienić albo zostać zablokowana. EAN dochodzi z kartoteki, bo w koszu go nie
+ * ma, a magazynier ma go pod ręką na opakowaniu.
+ */
+export function szukajWKoszach(fraza: string): ZnalezionaPozycja[] {
+  const q = (fraza ?? "").trim();
+  if (q.length < 2) throw new BladKosza(400, "Podaj co najmniej dwa znaki — symbol, nazwę albo kod kreskowy");
+  const like = `%${q.toUpperCase()}%`;
+
+  const wiersze = db()
+    .prepare(
+      `SELECT p.kosz_id, p.symbol, p.nazwa, p.ilosc, p.status, p.lok_faktyczna, p.powod,
+              COALESCE(p.odlozono_at, p.pominieto_at) AS kiedy,
+              k.kod, k.mm_numer, k.status AS kosz_status
+       FROM kosz_pozycja p
+       JOIN kosz k ON k.id = p.kosz_id
+       LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
+       WHERE UPPER(p.symbol) LIKE @like
+          OR UPPER(p.nazwa) LIKE @like
+          OR (t.ean <> '' AND t.ean = @dokladnie)
+       ORDER BY k.id DESC, p.id
+       LIMIT 100`
+    )
+    .all({ like, dokladnie: q }) as Array<Record<string, unknown>>;
+
+  return wiersze.map((w) => ({
+    koszId: w.kosz_id as number,
+    kod: w.kod as string,
+    mmNumer: (w.mm_numer as string) ?? null,
+    koszStatus: w.kosz_status as string,
+    symbol: w.symbol as string,
+    nazwa: w.nazwa as string,
+    ilosc: w.ilosc as number,
+    status: w.status as string,
+    lokFaktyczna: (w.lok_faktyczna as string) ?? null,
+    powod: (w.powod as string) ?? null,
+    kiedy: (w.kiedy as string) ?? null,
+  }));
 }

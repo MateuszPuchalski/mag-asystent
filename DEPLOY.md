@@ -1049,6 +1049,9 @@ zostało jeszcze na regale zwrotów.
 Biuro sprawdza zawartość kosza w `/biuro` → ZWROTY ALLEGRO, karta KOSZE
 ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
 i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
+Pole SZUKAJ TOWARU W KOSZACH odpowiada na pytanie „w którym koszu to jechało"
+— po symbolu, nazwie albo kodzie kreskowym. Wszystkie pominięcia zbiera
+osobna karta POMINIĘTE POZYCJE, sortowana od najdłużej czekających.
 
 Pozycję, której w koszu fizycznie nie ma, magazynier **pomija z powodem**
 („nie ma w koszu", „uszkodzony", „obcy towar" albo własny). Pominięcie nie

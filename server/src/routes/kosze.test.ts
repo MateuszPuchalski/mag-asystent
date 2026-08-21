@@ -204,6 +204,50 @@ test("pominięcie pozycji: przez HTTP, z powodem, i nie blokuje zakończenia", a
   assert.equal(pominieta.powod, "nie ma w koszu");
 });
 
+test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async () => {
+  const biuro = zalogowany("biuro");
+  const magazynier = zalogowany("magazynier");
+  const { koszId } = await zwrotWKoszu(biuro);
+  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
+  await app.inject({
+    method: "POST",
+    url: `/api/kosze/pozycje/${kosz.pozycje[0].id}/pomin`,
+    payload: { powod: "nie ma w koszu" },
+    headers: magazynier,
+  });
+
+  /* Trasa stała nie może wpaść w `/:id` — inaczej „pominiete" poszłoby do
+     `szczegolKosza(NaN)` i wróciło 404 zamiast listy. */
+  let r = await app.inject({ method: "GET", url: "/api/biuro/kosze/pominiete", headers: magazynier });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({ method: "GET", url: "/api/biuro/kosze/pominiete", headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  const p = r.json().pominiete;
+  assert.equal(p.length, 1);
+  assert.equal(p[0].powod, "nie ma w koszu");
+  assert.equal(p[0].kod, "KZ-07");
+  assert.equal(typeof p[0].dni, "number");
+
+  // szukanie po symbolu ze snapshotu kosza
+  r = await app.inject({
+    method: "GET", url: "/api/biuro/kosze/szukaj?q=TEST-LINIA", headers: biuro,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().znalezione.length, 2, "obie pozycje kosza niosą ten symbol");
+
+  // kod kreskowy z kartoteki — w koszu go nie ma, więc dochodzi JOIN-em
+  r = await app.inject({
+    method: "GET", url: "/api/biuro/kosze/szukaj?q=5900000000037", headers: biuro,
+  });
+  assert.equal(r.json().znalezione.length, 1);
+  assert.equal(r.json().znalezione[0].symbol, "TEST-LINIA-DONE");
+
+  // jedna litera to nie zapytanie — odmowa zamiast wyrzucenia całej tabeli
+  r = await app.inject({ method: "GET", url: "/api/biuro/kosze/szukaj?q=T", headers: biuro });
+  assert.equal(r.statusCode, 400);
+});
+
 test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => {
   const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");

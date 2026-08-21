@@ -71,6 +71,20 @@ pastylkę, a podgląd zaczyna się od zdania **KOSZ NIEKOMPLETNY** wraz z powode
 przy pozycji. Przy okazji lista rozróżnia teraz kosze złożone w aplikacji od
 tych z przesunięcia MM — te drugie podpisuje numerem dokumentu.
 
+Do kompletu biuro dostało **listę pominięć ze wszystkich koszy** — osobną
+kartę, na której najdłużej czekające sprawy są na górze. Pominięcie zamknięte
+w jednym koszu byłoby wiedzą, do której nikt nie zagląda; tu jest listą pracy:
+szukać dalej, reklamować u przewoźnika czy poprawić dokument.
+
+Obok stoi **szukanie towaru w koszach** — po symbolu, nazwie albo kodzie
+kreskowym. Odpowiada na pytanie zadawane po fakcie: „w którym koszu to
+jechało i gdzie hala to odłożyła". Szuka po snapshocie z kosza, bo to on mówi,
+co w koszu naprawdę leżało, nawet gdy kartoteka zdążyła się zmienić.
+
+Pozycja odłożona pokazuje wreszcie **stan swojego MM**. Kolejka zapisów
+wychwytywała błędy od zawsze, ale globalnie — nie dawało się powiedzieć,
+czy bufor cofnął się dla TEGO kosza.
+
 Czego tu świadomie nie ma: **ilości częściowych**. Przy zwrocie sztuki idą na
 jedną półkę, a licznik − / + kosztowałby dotknięcie przy każdej pozycji, żeby
 obsłużyć przypadek, który się nie zdarza. Rozkładanie dostaw zostaje przy nim

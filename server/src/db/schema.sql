@@ -639,6 +639,7 @@ CREATE TABLE IF NOT EXISTS kosz_pozycja (
   -- sama co w delivery_line, bo to ten sam byt: praca zdjęta z rutyny z podaną
   -- przyczyną. Pominięta pozycja NIE dostaje MM — nigdzie nie pojechała.
   powod         TEXT,
+  pominieto_at  TEXT,                          -- kiedy; po tym liczy się wiek sprawy
   -- Zadanie MM ZWROTY→MAG cofające bufor dla TEJ pozycji. Jednopozycyjne MM
   -- świadomie: guard „adres przed sprzedawalnością" w obu workerach porządkuje
   -- zadania po tw_id, a MM wielopozycyjne wypadałoby spod niego.

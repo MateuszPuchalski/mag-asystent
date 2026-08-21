@@ -430,8 +430,23 @@
         jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
         Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
       </p>
+      <div class="filtry" style="margin-bottom:10px">
+        <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
+          <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
+      </div>
+      <div id="koszWyniki"></div>
       <table id="koszeLista"></table>
       <div id="koszPodglad" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card" id="pominieteKarta" hidden>
+      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
+        szukać dalej, reklamować u przewoźnika czy poprawić dokument.
+        Najdłużej czekające są na górze.
+      </p>
+      <table id="pominieteLista"></table>
     </section>
 
     <section class="card" id="reklamacjeKarta">
@@ -2288,13 +2303,15 @@ async function odswiezZwroty() {
    z zakładką i żadne z nich nie jest na ścieżce krytycznej skanu. */
 async function odswiezEtap3() {
   try {
-    const [k, r, rap, zap] = await Promise.all([
+    const [k, r, rap, zap, pom] = await Promise.all([
       (await api("/api/biuro/kosze")).json(),
       (await api("/api/biuro/zwroty/reklamacje")).json(),
       (await api("/api/biuro/zwroty/raport")).json(),
       (await api("/api/biuro/zwroty/zapowiedzi")).json(),
+      (await api("/api/biuro/kosze/pominiete")).json(),
     ]);
     rysujKosze(k.kosze || []);
+    rysujPominiete(pom.pominiete || []);
     rysujReklamacjeZwrotow(r.reklamacje || []);
     rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
@@ -2361,6 +2378,65 @@ function rysujKosze(kosze) {
   else if (koszPodgladId != null) pokazPodgladKosza(koszPodgladId, true);
 }
 
+/* ── Pominięte pozycje ze wszystkich koszy ───────────────────────────────────
+   To jest LISTA PRACY, nie historia: każdy wiersz znaczy towar, którego nie
+   było, i czeka na decyzję człowieka. Sortowanie po wieku jest treścią —
+   sprawa sprzed tygodnia kosztuje więcej niż wczorajsza.                     */
+
+function rysujPominiete(lista) {
+  $("pominieteKarta").hidden = lista.length === 0;
+  if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
+  $("pominieteLista").innerHTML =
+    `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+    "<th>CZEKA</th><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD</th></tr>" +
+    lista.map((p) => `<tr>
+        ${kolFoto(p.twId)}
+        <td class="b" style="white-space:nowrap">${p.dni > 0
+          ? `${p.dni} dni`
+          : '<span class="mute">dziś</span>'}</td>
+        <td><span class="b">${esc(p.kod)}</span>${p.mmNumer
+          ? `<div class="mute">MM ${esc(p.mmNumer)}</div>` : ""}</td>
+        <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}</td>
+        <td class="b" style="white-space:nowrap">${p.ilosc}</td>
+        <td><span class="badge amber">${esc(p.powod || "bez powodu")}</span></td>
+      </tr>`).join("");
+  dolozZdjeciaListy(lista, "pominieteLista", "sesjaPominietych");
+}
+
+/* ── „W którym koszu jechał ten towar?" ──────────────────────────────────────
+   Pytanie pada po fakcie: towar zniknął albo klient dopomina się o zwrot.
+   Szukanie idzie po SNAPSHOCIE z kosza, więc odpowiada na pytanie o to, co
+   w koszu naprawdę leżało — nawet gdy kartoteka zdążyła się zmienić.         */
+
+async function szukajWKoszach(q) {
+  const cel = $("koszWyniki");
+  if (q.trim().length < 2) { cel.innerHTML = ""; return; }
+  try {
+    const d = await (await api(`/api/biuro/kosze/szukaj?q=${encodeURIComponent(q.trim())}`)).json();
+    const lista = d.znalezione || [];
+    cel.innerHTML = !lista.length
+      ? `<p class="mute">Nic w koszach nie pasuje do „${esc(q.trim())}".</p>`
+      : `<p class="mute" style="margin-bottom:4px">Znalezione w koszach: ${lista.length}</p>
+         <table style="margin-bottom:12px">
+          <tr><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>GDZIE</th><th>KIEDY</th></tr>` +
+        lista.map((z) => `<tr>
+            <td><span class="b">${esc(z.kod)}</span> ${badgeKosza(z.koszStatus)}${z.mmNumer
+              ? `<div class="mute">MM ${esc(z.mmNumer)}</div>` : ""}</td>
+            <td>${z.symbol ? `<span class="b">${esc(z.symbol)}</span><br>` : ""}${esc(z.nazwa)}</td>
+            <td class="b">${z.ilosc}</td>
+            <td>${z.status === "skipped"
+              ? `<span class="badge amber">POMINIĘTA</span><div class="mute">„${esc(z.powod || "")}”</div>`
+              : z.lokFaktyczna
+                ? `<span class="badge ok">${esc(z.lokFaktyczna)}</span>`
+                : '<span class="mute">czeka na hali</span>'}</td>
+            <td class="mute" style="white-space:nowrap">${z.kiedy
+              ? esc(z.kiedy.slice(0, 16).replace("T", " ")) : "—"}</td>
+          </tr>`).join("") + "</table>";
+  } catch (e) {
+    cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
+  }
+}
+
 /* ── Podgląd zawartości kosza ────────────────────────────────────────────────
    Biuro widziało dotąd sam licznik „3/6 poz." i nie miało jak sprawdzić, CO
    w koszu leży ani gdzie hala to odłożyła. Przy pominięciu (0.77.0) było to
@@ -2425,27 +2501,40 @@ function stanPozycjiKosza(p) {
       <div class="mute">„${esc(p.powod || "bez powodu")}”</div>`;
   }
   if (p.status === "done") {
+    /* Stan MM mówi, czy bufor NAPRAWDĘ się cofnął w Subiekcie. Kolejka zapisów
+       pokazuje błędy globalnie, ale nie wiąże ich z koszem — a to jest właśnie
+       pytanie, które biuro zadaje przy tej pozycji. */
+    const mm = p.mmNumer
+      ? `<div class="mute">MM ${esc(p.mmNumer)}</div>`
+      : p.mmStatus === "error"
+        ? '<div><span class="badge err">MM W BŁĘDZIE</span></div>'
+        : p.mmStatus
+          ? `<div class="mute">MM: ${esc(p.mmStatus)}</div>`
+          : "";
     return `<span class="badge ok">ODŁOŻONA</span>${p.odlozonoPrzez
-      ? `<div class="mute">${esc(p.odlozonoPrzez)}</div>` : ""}`;
+      ? `<div class="mute">${esc(p.odlozonoPrzez)}</div>` : ""}${mm}`;
   }
   return '<span class="mute">czeka na hali</span>';
 }
 
-/* Zdjęcia w podglądzie — własny licznik sesji, bo lista koszy odświeża się
-   swoim rytmem i nie ma prawa dorysować zdjęć do zwiniętego już panelu. */
-let sesjaKosza = 0;
-function dolozZdjeciaKosza(pozycje) {
+/* Zdjęcia w tabelach koszy. Każda tabela ma WŁASNY licznik sesji: odświeżają
+   się różnym rytmem, a zdjęcie dorysowane do zwiniętego już panelu trafiłoby
+   w nieistniejącą komórkę. */
+const sesjeFoto = {};
+function dolozZdjeciaListy(wiersze, tabela, klucz) {
   if (!zdjeciaWlaczone) return;
-  const moja = ++sesjaKosza;
-  const aktualne = () => moja === sesjaKosza;
+  const moja = (sesjeFoto[klucz] = (sesjeFoto[klucz] || 0) + 1);
+  const aktualne = () => moja === sesjeFoto[klucz];
   zakolejkuj(
-    pozycje.filter((p) => p.twId != null).map((p) => ({
-      klucz: `t${p.twId}`, url: `/api/products/${p.twId}/zdjecie`,
-      sel: `#koszPodglad td.kolFoto[data-tw="${p.twId}"]`, klasa: "foto",
+    wiersze.filter((w) => w.twId != null).map((w) => ({
+      klucz: `t${w.twId}`, url: `/api/products/${w.twId}/zdjecie`,
+      sel: `#${tabela} td.kolFoto[data-tw="${w.twId}"]`, klasa: "foto",
     })),
     aktualne
   );
 }
+
+const dolozZdjeciaKosza = (pozycje) => dolozZdjeciaListy(pozycje, "koszPodglad", "sesjaKosza");
 
 function rysujReklamacjeZwrotow(lista) {
   $("reklamacjeLista").innerHTML = lista.length
@@ -2582,6 +2671,7 @@ function otworzZwrot(id) {
   $("brakujaceKarta").hidden = true;
   $("zwrotListaKarta").hidden = true;
   $("koszeKarta").hidden = true;
+  $("pominieteKarta").hidden = true;
   $("reklamacjeKarta").hidden = true;
   $("raportZwrotowKarta").hidden = true;
   $("kontoAllegroKarta").hidden = true;
@@ -2595,6 +2685,9 @@ function zamknijZwrot() {
   $("zwrotSkanKarta").hidden = false;
   $("zwrotListaKarta").hidden = false;
   $("koszeKarta").hidden = false;
+  /* Karta pominięć wraca tylko wtedy, gdy MA co pokazać — pusta byłaby
+     nagłówkiem bez treści, a odświeżenie i tak rozstrzygnie to za chwilę. */
+  $("pominieteKarta").hidden = !$("pominieteLista").innerHTML;
   $("reklamacjeKarta").hidden = false;
   $("raportZwrotowKarta").hidden = false;
   $("kontoAllegroKarta").hidden = false;
@@ -3194,6 +3287,15 @@ $("brakujaceLista").addEventListener("click", async (e) => {
     await api(`/api/biuro/zwroty/zapowiedzi/${b.dataset.pomin}/pomin`, { method: "POST", body: "{}" });
     await odswiezEtap3();
   } catch (err) { toast(err.message); }
+});
+
+/* Szukanie po wpisaniu, z odczekaniem — pole reaguje na literę, nie na Enter,
+   bo biuro szuka „na wyczucie" i poprawia frazę w locie. */
+let koszSzukajTimer = null;
+$("koszSzukaj").addEventListener("input", (e) => {
+  clearTimeout(koszSzukajTimer);
+  const q = e.target.value;
+  koszSzukajTimer = setTimeout(() => szukajWKoszach(q), 250);
 });
 
 $("koszPodglad").addEventListener("click", (e) => {

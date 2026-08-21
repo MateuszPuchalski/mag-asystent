@@ -446,4 +446,6 @@ test("podgląd kosza w biurze czyta tę samą trasę, co karta zwrotu", () => {
   assert.match(html, /koszPodglad/, "panel podglądu");
   assert.match(html, /KOSZ NIEKOMPLETNY/, "pominięcia widoczne dla biura");
   assert.match(html, /stanPozycjiKosza/, "stan pozycji jednym zdaniem");
+  assert.match(html, /pominieteKarta/, "lista pominięć jako karta pracy");
+  assert.match(html, /koszSzukaj/, "szukanie towaru w koszach");
 });

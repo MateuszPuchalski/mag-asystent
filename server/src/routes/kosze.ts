@@ -12,10 +12,12 @@ import {
   listaKoszy,
   odepnijZwrot,
   odlozPozycje,
+  pominietePozycje,
   pominPozycjeKosza,
   przypnijZwrot,
   skanTowaruKosza,
   szczegolKosza,
+  szukajWKoszach,
   zakonczKosz,
   zamknijKosz,
 } from "../services/kosze.js";
@@ -80,6 +82,21 @@ export async function koszeRoutes(app: FastifyInstance) {
     const nie = odmowaBiuro();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return { kosze: listaKoszy() };
+  });
+
+  /* Pominięte pozycje ze wszystkich koszy — lista pracy biura, nie historia.
+     Stoi PRZED `/:id` świadomie: router i tak przedkłada segment stały nad
+     parametr, ale czytelnik nie ma obowiązku tego wiedzieć. */
+  app.get("/api/biuro/kosze/pominiete", async (_req, reply) => {
+    const nie = odmowaBiuro();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { pominiete: pominietePozycje() };
+  });
+
+  app.get<{ Querystring: { q?: string } }>("/api/biuro/kosze/szukaj", async (req, reply) => {
+    const nie = odmowaBiuro();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zBledem(reply, () => ({ znalezione: szukajWKoszach(req.query?.q ?? "") }));
   });
 
   app.get<{ Params: { id: string } }>("/api/biuro/kosze/:id", async (req, reply) => {
