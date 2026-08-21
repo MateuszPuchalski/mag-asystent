@@ -33,6 +33,27 @@ historii nie przepisujemy.
 
 ---
 
+## 0.74.1 — 21 sierpnia 2026
+
+**Zakładki biura w trzech grupach.** Sześć pastylek stało w jednym rzędzie,
+wszystkie o równej wadze — a to nieprawda o tym, jak się ich używa. Dostawy
+i zwroty biuro otwiera po kilkanaście razy dziennie, dziennik i analizę wtedy,
+gdy czegoś szuka, dostawców raz na kilka tygodni. Ze zgłoszenia: DZIENNIK
+i ANALIZA nie powinny stać obok ZWROTÓW ALLEGRO.
+
+Grupy noszą teraz podpisy: **PRACA**, **WGLĄD** i **USTAWIENIA**. Kosztuje to
+jedną linijkę wysokości i mówi wprost to, czego sam odstęp nie powie — po co
+się w daną zakładkę wchodzi.
+
+USTAWIENIA z jedną pozycją to nie przeoczenie. ANALIZA niesie dziś import CSV
+zbiórek i reguły strefy złotej, czyli konfigurację schowaną pod raportem;
+ta grupa jest miejscem, do którego to kiedyś trafi. Przeniesienia teraz nie
+robimy, bo to osobna zmiana i osobne ryzyko.
+
+Sam mechanizm jest nietknięty: obsługa kliknięcia szuka przycisków po
+`data-widok`, a nie po miejscu w rzędzie, więc ruszył się układ, nie działanie.
+Zapamiętana zakładka przeżywa aktualizację.
+
 ## 0.74.0 — 21 sierpnia 2026
 
 **Jedno zgłoszenie w błędzie zatrzymywało odświeżanie wszystkich.** Pętla

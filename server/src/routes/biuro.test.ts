@@ -214,6 +214,53 @@ test("lista dostaw sygnalizuje wyjątki", () => {
   assert.match(html, /badge err">\$\{d\.wyjatkiOtwarte\}/, "licznik jako plakietka błędu");
 });
 
+test("każda zakładka leży w swojej grupie — żadnej sieroty w pasku", () => {
+  /* Zakładki dostały grupy z podpisami (0.74.1), bo sześć pastylek o równej
+     wadze kłamało o tym, jak się ich używa: dostawy i zwroty biuro otwiera
+     kilkanaście razy dziennie, dziennik i analizę wtedy, gdy czegoś szuka.
+
+     Ta zmiana ma dokładnie jedną cichą drogę do zepsucia: przycisk, który
+     przy przenoszeniu wypadł POZA `div.grupa`. Wygląda wtedy prawie normalnie
+     — klika się, widok się otwiera — tyle że stoi bez podpisu i bez grupy,
+     czyli dokładnie tak, jak wyglądał pasek przed tą zmianą.
+
+     Sam mechanizm jest tu nietknięty i to jest zamierzone: obsługa kliknięcia
+     szuka `button[data-widok]`, nie miejsca w rzędzie. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const nav = html.slice(html.indexOf('<nav class="zakladki">'), html.indexOf("</nav>"));
+
+  const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
+  assert.deepEqual(
+    widoki,
+    ["dostawy", "zwroty", "nadzor", "dziennik", "analiza", "dostawcy"],
+    "komplet zakładek i ich kolejność"
+  );
+
+  /* Każdy przycisk MUSI siedzieć w `div.grupa-btny`. Dopasowanie idzie po
+     ZAWARTOŚCI tego kontenera, nie po rozbiciu paska na grupy: rozbicie
+     przepuszczało przycisk stojący PO zamknięciu ostatniej grupy, czyli
+     dokładnie tę sierotę, przed którą ten test miał bronić.
+
+     `grupa-btny` nie zawiera zagnieżdżonych `div`, więc leniwe `</div>`
+     zatrzymuje się na własnym zamknięciu. */
+  const wGrupach = [...nav.matchAll(/<div class="grupa-btny">([\s\S]*?)<\/div>/g)]
+    .flatMap((m) => [...m[1].matchAll(/data-widok="(\w+)"/g)].map((x) => x[1]));
+  assert.deepEqual(
+    [...wGrupach].sort(),
+    [...widoki].sort(),
+    "żaden przycisk poza grupą — sierota wygląda prawie normalnie i tylko test ją złapie"
+  );
+
+  assert.equal(
+    (nav.match(/class="grupa-nazwa"/g) ?? []).length,
+    3,
+    "trzy grupy, każda podpisana"
+  );
+});
+
 test("pasek stanu niesie licznik odpowiedzi na notatki", () => {
   /* Pasek widać z KAŻDEJ zakładki i to jest cały sens tego sygnału: do 0.57.0
      odpowiedź widać było wyłącznie po wejściu w tę konkretną dostawę, a biuro
