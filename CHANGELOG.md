@@ -60,6 +60,35 @@ zwrotów: tabela wyjątków nie miała się czym wypełnić, a karta reklamacji
 zwrotowych bywała nadpisywana wierszami z zupełnie innego ekranu. Zwrotowa
 nazywa się teraz `rysujReklamacjeZwrotow`, a nowy test pilnuje, żeby żadna
 nazwa funkcji nie powtórzyła się na stronie po raz drugi.
+## 0.71.1 — 21 sierpnia 2026
+
+**Pobieranie aktualizacji przerywało się timeoutem.** Z hali: „pobieranie jest
+bardzo wolne i dostaję timeout". Winne nie było ani łącze, ani kod pobierania —
+kolektor czyta strumieniem buforem 64 kB, a serwer strumieniem wysyła. Winny
+był jeden limit czasu opisujący dwie zupełnie różne sytuacje.
+
+Cała aplikacja chodzi na jednym kliencie HTTP z limitem odczytu **10 sekund**.
+Ta wartość jest celowa: ekrany odpytują serwer co 1,5–2 sekundy, więc dziesięć
+sekund ciszy przy kilku kilobajtach JSON-a naprawdę znaczy „sieci nie ma".
+Kolektor ma to wykryć od razu, stojąc przy regale.
+
+Tym samym klientem szło jednak APK ważące ponad osiem megabajtów. Tam dziesięć
+sekund bez bajtu nie znaczy nic złego — Wi-Fi w hali bywa obciążone,
+a przeskok między punktami dostępowymi robi dokładnie taką przerwę.
+
+Limit jest teraz **zależny od trasy**: minuta dla pliku APK, dotychczasowe
+dziesięć sekund dla wszystkiego innego. Odwrotna droga — dłuższy limit
+globalnie — naprawiłaby rzecz zdarzającą się raz na wydanie kosztem rzeczy
+używanej co dwie sekundy.
+
+Reguła siedzi w `:core` z sześcioma testami, w tym takim, który pilnuje
+DRUGIEJ strony: trasy odpytywane co dwie sekundy mają zostać przy krótkim
+limicie. Ta pomyłka psułaby się cicho.
+
+**[wymaga działania]** Kolektor, na którym pobieranie się urywa, **nie
+zaktualizuje się tą poprawką sam** — to ta sama funkcja, która nie działa.
+Pierwszy raz trzeba wgrać APK przez `adb install` albo z bliska, przy dobrym
+zasięgu. Kolejne wydania pójdą już normalnie.
 
 ## 0.71.0 — 21 sierpnia 2026
 
