@@ -59,6 +59,18 @@ Przesunięcie pominiętej zdejmowałoby z bufora towar, którego nikt nie ruszy�
 Odłożenie pozycji wcześniej pominiętej cofa pominięcie samo — kto znalazł
 towar, po prostu go odkłada.
 
+**Biuro widzi zawartość kosza, nie sam licznik.** Karta KOSZE ZWROTOWE
+pokazywała dotąd „3/6 poz." i tyle — żeby sprawdzić, CO w koszu leży i gdzie
+hala to odłożyła, trzeba było zapytać kogoś na hali. Kliknięcie wiersza
+rozwija teraz podgląd: towar ze zdjęciem, ilość, adres odłożenia i stan każdej
+pozycji. Podgląd czyta tę samą trasę co karta zwrotu, więc obie strony patrzą
+na ten sam kosz.
+
+Kosz z pominięciem woła o uwagę: wiersz na liście dostaje bursztynową
+pastylkę, a podgląd zaczyna się od zdania **KOSZ NIEKOMPLETNY** wraz z powodem
+przy pozycji. Przy okazji lista rozróżnia teraz kosze złożone w aplikacji od
+tych z przesunięcia MM — te drugie podpisuje numerem dokumentu.
+
 Czego tu świadomie nie ma: **ilości częściowych**. Przy zwrocie sztuki idą na
 jedną półkę, a licznik − / + kosztowałby dotknięcie przy każdej pozycji, żeby
 obsłużyć przypadek, który się nie zdarza. Rozkładanie dostaw zostaje przy nim

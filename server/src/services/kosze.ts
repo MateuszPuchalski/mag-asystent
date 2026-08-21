@@ -105,6 +105,14 @@ export interface WierszListyKoszy {
   zwrotow: number;
   pozycji: number;
   odlozonych: number;
+  /**
+   * Ile pozycji hala pominęła (0.77.0) — dla biura to jedyny sygnał, że kosz
+   * wrócił NIEKOMPLETNY. Bez tej liczby „3/6 poz." wyglądałoby jak praca
+   * w toku, a nie jak sprawa do wyjaśnienia.
+   */
+  pominietych: number;
+  /** Numer przesunięcia MM; null = kosz złożony w aplikacji, nie z dokumentu. */
+  mmNumer: string | null;
   utworzonoAt: string;
   zamknietoAt: string | null;
 }
@@ -251,7 +259,9 @@ export function listaKoszy(): WierszListyKoszy[] {
       `SELECT k.id, k.kod, k.status, k.utworzono_at, k.zamknieto_at,
               (SELECT COUNT(*) FROM zwrot z WHERE z.kosz_id = k.id) AS zwrotow,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
-              (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych
+              (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
+              (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='skipped') AS pominietych,
+              k.mm_numer
        FROM kosz k
        WHERE k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-14 days')
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
@@ -264,6 +274,8 @@ export function listaKoszy(): WierszListyKoszy[] {
     zwrotow: w.zwrotow as number,
     pozycji: w.pozycji as number,
     odlozonych: w.odlozonych as number,
+    pominietych: w.pominietych as number,
+    mmNumer: (w.mm_numer as string) ?? null,
     utworzonoAt: w.utworzono_at as string,
     zamknietoAt: (w.zamknieto_at as string) ?? null,
   }));

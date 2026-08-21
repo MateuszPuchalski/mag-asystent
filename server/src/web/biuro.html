@@ -428,8 +428,10 @@
       <p class="mute" style="margin-bottom:8px">
         Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
         jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
+        Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
       </p>
       <table id="koszeLista"></table>
+      <div id="koszPodglad" style="margin-top:12px"></div>
     </section>
 
     <section class="card" id="reklamacjeKarta">
@@ -2338,17 +2340,111 @@ function badgeKosza(status) {
 
 function rysujKosze(kosze) {
   $("koszeLista").innerHTML = kosze.length
-    ? "<tr><th>KOD</th><th>STATUS</th><th>ZWROTÓW</th><th>POSTĘP</th><th></th></tr>" +
-      kosze.map((k) => `<tr>
+    ? "<tr><th>KOD</th><th>STATUS</th><th>ZAWARTOŚĆ</th><th>POSTĘP</th><th></th></tr>" +
+      kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
           <td class="b">${esc(k.kod)}</td>
           <td>${badgeKosza(k.status)}</td>
-          <td>${k.zwrotow}</td>
-          <td class="mute">${k.status === "otwarty" ? "—" : `${k.odlozonych}/${k.pozycji} poz.`}</td>
+          <td class="mute">${k.mmNumer
+            ? `przesunięcie MM ${esc(k.mmNumer)}`
+            : `${k.zwrotow} zwr.`}</td>
+          <td class="mute">${k.status === "otwarty" ? "—" : `${k.odlozonych}/${k.pozycji} poz.`}
+            ${k.pominietych
+              ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>`
+              : ""}</td>
           <td>${k.status === "otwarty"
             ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
             : ""}</td>
         </tr>`).join("")
     : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
+  // podgląd otwartego kosza odświeża się razem z listą, bez mrugania
+  if (koszPodgladId != null && !kosze.some((k) => k.id === koszPodgladId)) zamknijPodgladKosza();
+  else if (koszPodgladId != null) pokazPodgladKosza(koszPodgladId, true);
+}
+
+/* ── Podgląd zawartości kosza ────────────────────────────────────────────────
+   Biuro widziało dotąd sam licznik „3/6 poz." i nie miało jak sprawdzić, CO
+   w koszu leży ani gdzie hala to odłożyła. Przy pominięciu (0.77.0) było to
+   już nie tylko niewygodne, ale mylące: kosz wracał niekompletny, a ekran
+   pokazywał zwykły postęp.
+
+   Podgląd czyta tę samą trasę co karta zwrotu (`/api/biuro/kosze/:id`), więc
+   nie ma tu drugiego źródła prawdy o zawartości.                              */
+
+let koszPodgladId = null;
+
+function zamknijPodgladKosza() {
+  koszPodgladId = null;
+  $("koszPodglad").innerHTML = "";
+}
+
+async function pokazPodgladKosza(id, cichy) {
+  const cel = $("koszPodglad");
+  koszPodgladId = id;
+  if (!cichy) cel.innerHTML = '<p class="mute">Wczytuję zawartość kosza…</p>';
+  try {
+    const k = (await (await api(`/api/biuro/kosze/${id}`)).json()).kosz;
+    if (koszPodgladId !== id) return; // ktoś w międzyczasie otworzył inny
+    const zrodlo = k.mmNumer
+      ? `z przesunięcia MM ${esc(k.mmNumer)} — dokument powrotny wystawia biuro`
+      : `${k.zwroty.length} zwr. przypiętych w aplikacji`;
+    const pominiete = k.pozycje.filter((p) => p.status === "skipped");
+    cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
+        KOSZ ${esc(k.kod)} ${badgeKosza(k.status)}
+        <button class="akcja cichy" data-kosz-zamknij-podglad style="margin-left:auto">ZWIŃ</button>
+      </h2>
+      <p class="mute" style="margin-bottom:8px">${zrodlo}</p>
+      ${pominiete.length
+        ? `<p><span class="badge amber">KOSZ NIEKOMPLETNY</span>
+             hala pominęła ${pominiete.length} poz. — powód przy wierszu niżej</p>`
+        : ""}
+      <table>${
+        `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+        "<th>TOWAR</th><th>ILOŚĆ</th><th>ADRES</th><th>STAN</th></tr>" +
+        k.pozycje.map((p) => `<tr>
+            ${kolFoto(p.twId)}
+            <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}</td>
+            <td class="b" style="white-space:nowrap">${p.ilosc}${p.unit ? ` ${esc(p.unit)}` : ""}</td>
+            <td style="white-space:nowrap">${p.lokFaktyczna
+              ? `<span class="badge ok">${esc(p.lokFaktyczna)}</span>`
+              : p.lokOczekiwana
+                ? `<span class="mute">${esc(p.lokOczekiwana)}</span>`
+                : '<span class="mute">—</span>'}</td>
+            <td>${stanPozycjiKosza(p)}</td>
+          </tr>`).join("")
+      }</table>`;
+    dolozZdjeciaKosza(k.pozycje);
+  } catch (e) {
+    cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
+  }
+}
+
+/** Jedno zdanie o pozycji: co się z nią stało i kto to zrobił. */
+function stanPozycjiKosza(p) {
+  if (p.status === "skipped") {
+    return `<span class="badge amber">POMINIĘTA</span>
+      <div class="mute">„${esc(p.powod || "bez powodu")}”</div>`;
+  }
+  if (p.status === "done") {
+    return `<span class="badge ok">ODŁOŻONA</span>${p.odlozonoPrzez
+      ? `<div class="mute">${esc(p.odlozonoPrzez)}</div>` : ""}`;
+  }
+  return '<span class="mute">czeka na hali</span>';
+}
+
+/* Zdjęcia w podglądzie — własny licznik sesji, bo lista koszy odświeża się
+   swoim rytmem i nie ma prawa dorysować zdjęć do zwiniętego już panelu. */
+let sesjaKosza = 0;
+function dolozZdjeciaKosza(pozycje) {
+  if (!zdjeciaWlaczone) return;
+  const moja = ++sesjaKosza;
+  const aktualne = () => moja === sesjaKosza;
+  zakolejkuj(
+    pozycje.filter((p) => p.twId != null).map((p) => ({
+      klucz: `t${p.twId}`, url: `/api/products/${p.twId}/zdjecie`,
+      sel: `#koszPodglad td.kolFoto[data-tw="${p.twId}"]`, klasa: "foto",
+    })),
+    aktualne
+  );
 }
 
 function rysujReklamacjeZwrotow(lista) {
@@ -3100,9 +3196,22 @@ $("brakujaceLista").addEventListener("click", async (e) => {
   } catch (err) { toast(err.message); }
 });
 
+$("koszPodglad").addEventListener("click", (e) => {
+  if (e.target.closest("[data-kosz-zamknij-podglad]")) zamknijPodgladKosza();
+});
+
 $("koszeLista").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-zamknij-kosz]");
-  if (!b) return;
+  if (!b) {
+    /* Kliknięcie wiersza otwiera podgląd; drugie w ten sam wiersz go zwija —
+       to samo dotknięcie, dwa kierunki, bez osobnego przycisku w tabeli. */
+    const wiersz = e.target.closest("[data-kosz]");
+    if (!wiersz) return;
+    const id = Number(wiersz.dataset.kosz);
+    if (koszPodgladId === id) zamknijPodgladKosza();
+    else await pokazPodgladKosza(id);
+    return;
+  }
   const zgoda = await potwierdz({
     tytul: "ZAMKNIĘCIE KOSZA",
     opis: "Od tej chwili dokłada się do nowego kosza, a ten jedzie na halę.",

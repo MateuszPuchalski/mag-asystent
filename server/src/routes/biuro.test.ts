@@ -432,3 +432,18 @@ test("pusty powód odpada na trasie, a nie dopiero w bazie", async () => {
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /powód/i);
 });
+
+test("podgląd kosza w biurze czyta tę samą trasę, co karta zwrotu", () => {
+  /* Zawartość kosza ma JEDNO źródło prawdy. Gdyby podgląd liczył pozycje po
+     swojemu — z listy koszy albo z osobnej trasy — biuro i hala zaczęłyby
+     widzieć różne kosze, a rozjazd wyszedłby dopiero przy sporze o brakujący
+     towar. Ten test pilnuje, że panel pyta `/api/biuro/kosze/:id`. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /api\/biuro\/kosze\/\$\{id\}/, "podgląd pyta o szczegół kosza");
+  assert.match(html, /koszPodglad/, "panel podglądu");
+  assert.match(html, /KOSZ NIEKOMPLETNY/, "pominięcia widoczne dla biura");
+  assert.match(html, /stanPozycjiKosza/, "stan pozycji jednym zdaniem");
+});

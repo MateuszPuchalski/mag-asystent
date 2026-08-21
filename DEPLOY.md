@@ -1046,6 +1046,10 @@ ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazyn
 z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
 zostało jeszcze na regale zwrotów.
 
+Biuro sprawdza zawartość kosza w `/biuro` → ZWROTY ALLEGRO, karta KOSZE
+ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
+i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
+
 Pozycję, której w koszu fizycznie nie ma, magazynier **pomija z powodem**
 („nie ma w koszu", „uszkodzony", „obcy towar" albo własny). Pominięcie nie
 blokuje zakończenia, a dla biura jest sygnałem, że kosz wrócił niekompletny —
