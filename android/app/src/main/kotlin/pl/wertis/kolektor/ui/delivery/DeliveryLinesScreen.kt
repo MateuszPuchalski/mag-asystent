@@ -88,6 +88,7 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
 import pl.wertis.kolektor.ui.components.LoadingRow
+import pl.wertis.kolektor.ui.components.LokPastylka
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WIcons
@@ -1202,28 +1203,6 @@ private fun KrokIlosci(znak: String, aktywny: Boolean, onClick: () -> Unit) {
 }
 
 /** Docelowa półka pozycji; brak adresu jest wyróżniony, bo wymaga decyzji. */
-@Composable
-private fun LokPastylka(code: String?, przygaszona: Boolean) {
-    val brak = code == null
-    val wyroznij = brak && !przygaszona
-    Text(
-        code ?: "BRAK",
-        fontFamily = BarlowCond,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = if (przygaszona) 12.sp else 15.sp,
-        color = when {
-            przygaszona -> InkMute
-            brak -> AmberInk
-            else -> Ink
-        },
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .border(1.5.dp, if (wyroznij) AmberLine else CardBorder, RoundedCornerShape(50))
-            .background(if (wyroznij) AmberBg else CardWhite)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    )
-}
-
 /** Zawartość rozwiniętego wiersza: dokąd i ile, plus wyjścia awaryjne. */
 @Composable
 private fun PanelOdkladania(

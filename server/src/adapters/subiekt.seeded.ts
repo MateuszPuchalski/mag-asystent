@@ -451,6 +451,35 @@ export class SeededSubiektAdapter {
    * KAŻDYM odłożeniu, więc pytanie o stan per wiersz zjadłoby dokładnie ten
    * budżet, który przed chwilą odzyskaliśmy na innych trasach.
    */
+  /**
+   * Stany NIEZEROWE we wszystkich magazynach, kompletem dla listy towarów.
+   *
+   * Lustro `stanyDlaTowarow` z jedną różnicą: nie zawęża do magazynów z rolą.
+   * Przy koszu zwrotowym to właśnie role są najciekawsze — towar stoi teraz na
+   * regale zwrotów, a wraca na główny — więc filtr po `MAG_ID_*` odcinałby
+   * odpowiedź na pytanie „ile tego jeszcze zostało do rozniesienia".
+   *
+   * Zerowe stany odpadają w SQL, bo magazyn bez towaru nie jest odpowiedzią
+   * na żadne pytanie zadawane przy półce.
+   */
+  stanyNiezeroweDlaTowarow(twIds: number[]): Map<number, Array<{ magId: number; stan: number }>> {
+    const out = new Map<number, Array<{ magId: number; stan: number }>>();
+    if (twIds.length === 0) return out;
+    const dziury = twIds.map(() => "?").join(",");
+    const rows = db()
+      .prepare(
+        `SELECT tw_id, mag_id, stan FROM sgt_stan
+         WHERE tw_id IN (${dziury}) AND stan <> 0`
+      )
+      .all(...twIds) as unknown as Array<{ tw_id: number; mag_id: number; stan: number }>;
+    for (const r of rows) {
+      const lista = out.get(r.tw_id) ?? [];
+      lista.push({ magId: r.mag_id, stan: r.stan });
+      out.set(r.tw_id, lista);
+    }
+    return out;
+  }
+
   stanyDlaTowarow(twIds: number[]): Map<number, { mag: number; mgp: number }> {
     const out = new Map<number, { mag: number; mgp: number }>();
     if (twIds.length === 0) return out;

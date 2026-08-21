@@ -65,6 +65,7 @@ import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberDark
 import pl.wertis.kolektor.ui.theme.AmberInk
+import pl.wertis.kolektor.ui.theme.AmberLine
 import pl.wertis.kolektor.ui.theme.BarlowCond
 import androidx.compose.ui.text.style.TextDecoration
 import pl.wertis.kolektor.ui.theme.BorderCol
@@ -456,3 +457,36 @@ fun LocChip(
 
 /* `formatQty` mieszka w :core (core/text/Qty.kt) — teksty karty towaru
    formatują ilości same, a testowalne są wyłącznie tam. */
+
+/**
+ * Pastylka adresu półki — ten sam napis przy dostawie i przy koszu zwrotowym.
+ *
+ * Mieszkała w `DeliveryLinesScreen` do 0.77.0, kiedy kosz dostał pełne
+ * rozkładanie. Dwie kopie tego samego adresu rozjechałyby się przy pierwszej
+ * poprawce, a ręce magazyniera czytają go tak samo na obu ekranach.
+ *
+ * Brak adresu jest TREŚCIĄ, nie pustką: półkę wybiera wtedy człowiek, więc
+ * „BRAK" świeci bursztynem zamiast milczeć. W wierszu przygaszonym (pozycja
+ * zrobiona) ta zachęta jest już nieaktualna i pastylka gaśnie.
+ */
+@Composable
+fun LokPastylka(code: String?, przygaszona: Boolean) {
+    val brak = code == null
+    val wyroznij = brak && !przygaszona
+    Text(
+        code ?: "BRAK",
+        fontFamily = BarlowCond,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = if (przygaszona) 12.sp else 15.sp,
+        color = when {
+            przygaszona -> InkMute
+            brak -> AmberInk
+            else -> Ink
+        },
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.5.dp, if (wyroznij) AmberLine else CardBorder, RoundedCornerShape(50))
+            .background(if (wyroznij) AmberBg else CardWhite)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}

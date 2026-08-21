@@ -886,6 +886,13 @@ data class KoszRow(
 data class KoszeResponse(val kosze: List<KoszRow> = emptyList())
 
 @Serializable
+data class StanMagazynu(
+    /** Kod magazynu z Subiekta — ten sam napis, który biuro widzi u siebie. */
+    val kod: String = "",
+    val stan: Double = 0.0,
+)
+
+@Serializable
 data class KoszPozycja(
     val id: Long,
     val twId: Long,
@@ -893,6 +900,19 @@ data class KoszPozycja(
     val nazwa: String = "",
     val ilosc: Double = 0.0,
     val status: String = "todo",
+    /** Jednostka z kartoteki; pusta = starszy serwer, `jednostka()` da „szt.". */
+    val unit: String = "",
+    /**
+     * Gdzie ten towar jeszcze leży — magazyny z niezerowym stanem, malejąco.
+     *
+     * Przy zwrocie pytanie pada częściej niż przy dostawie: „na regale zwrotów
+     * zostały jeszcze 3" mówi, czy kosz jest rozniesiony w całości.
+     */
+    val stany: List<StanMagazynu> = emptyList(),
+    /** Podpowiedź przeslotowania — ta sama, którą niesie karta towaru. */
+    val zlotaStrefa: ZlotaStrefa? = null,
+    /** Powód pominięcia; niepusty wyłącznie przy statusie `skipped`. */
+    val powod: String? = null,
     /** Adres ŻYWY z kartoteki (serwer koryguje o kolejkę) — nie snapshot. */
     val lokOczekiwana: String? = null,
     val lokFaktyczna: String? = null,
@@ -954,3 +974,7 @@ data class OdlozKoszBody(val lokalizacja: String, val recznie: Boolean = false)
 
 @Serializable
 data class OdlozKoszResponse(val ok: Boolean = true, val mismatch: Boolean = false)
+
+/** Pominięcie pozycji, której w koszu nie ma. Powód jest treścią zgłoszenia. */
+@Serializable
+data class PominKoszBody(val powod: String)

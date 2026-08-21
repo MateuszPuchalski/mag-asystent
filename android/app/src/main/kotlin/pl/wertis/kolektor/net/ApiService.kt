@@ -11,6 +11,7 @@ import pl.wertis.kolektor.core.net.KoszSkan
 import pl.wertis.kolektor.core.net.KoszeResponse
 import pl.wertis.kolektor.core.net.OdlozKoszBody
 import pl.wertis.kolektor.core.net.OdlozKoszResponse
+import pl.wertis.kolektor.core.net.PominKoszBody
 import pl.wertis.kolektor.core.net.LoginBody
 import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
@@ -237,6 +238,9 @@ interface ApiService {
 
     @POST("api/kosze/pozycje/{id}/odloz")
     suspend fun koszOdloz(@Path("id") id: Long, @Body body: OdlozKoszBody): OdlozKoszResponse
+
+    @POST("api/kosze/pozycje/{id}/pomin")
+    suspend fun koszPomin(@Path("id") id: Long, @Body body: PominKoszBody): OdlozKoszResponse
 
     @POST("api/kosze/{id}/zakoncz")
     suspend fun koszZakoncz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse

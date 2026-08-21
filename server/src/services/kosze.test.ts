@@ -32,7 +32,8 @@ beforeEach(() => {
   const d = db();
   for (const t of [
     "kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "kosz",
-    "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sfera_queue",
+    "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sgt_stan", "sgt_magazyn",
+    "sfera_queue",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -48,6 +49,19 @@ beforeEach(() => {
   const poz = d.prepare("INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (101,?,?)");
   poz.run(900_036, 1);
   poz.run(900_037, 2);
+
+  /* Magazyny i stany — do linijki „gdzie tego jeszcze jest" pod pozycją kosza.
+     ZWR jest tu najciekawszy: to z niego rozkładany towar właśnie schodzi. */
+  const mag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
+  mag.run(1, "MAG", "Główny");
+  mag.run(2, "MGP", "Przyjęcia");
+  mag.run(3, "ZWR", "Regał zwrotów");
+  mag.run(9, "SERW", "Serwis");
+  const stan = d.prepare("INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,0)");
+  stan.run(900_036, 1, 12);
+  stan.run(900_036, 3, 3);
+  stan.run(900_036, 2, 0); // zerowy — nie ma prawa wejść na listę
+  stan.run(900_037, 9, 4);
 });
 
 /** Zwrot z wystawionymi dokumentami — punkt startu Etapu 3. */
@@ -170,4 +184,66 @@ test("zakończenie odmawia, dopóki cokolwiek leży w koszu", async () => {
   const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
   assert.throws(() => K.zakonczKosz(kosz.id, "Magazynier"), /Nieodłożone pozycje/);
+});
+
+/* ── Pełne rozkładanie kosza (0.77.0) ────────────────────────────────────────
+   Kosz zwrotowy dostał to, co linia dostawy: jednostkę, stany magazynów
+   i podpowiedź strefy. Do tego POMIŃ — bo pozycja, której w koszu nie ma,
+   blokowała wcześniej zakończenie i cały obieg.                             */
+
+test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+
+  const p = kosz.pozycje.find((x) => x.twId === 900_036);
+  assert.ok(p);
+  assert.deepEqual(
+    p.stany.map((s) => [s.kod, s.stan]),
+    [["MAG", 12], ["ZWR", 3]],
+    "magazyn ze stanem zero nie jest odpowiedzią na żadne pytanie przy półce"
+  );
+  // magazyn bez roli też się liczy — towar bywa u serwisu
+  const drugi = kosz.pozycje.find((x) => x.twId === 900_037);
+  assert.deepEqual(drugi?.stany.map((s) => s.kod), ["SERW"]);
+});
+
+test("pominięcie: powód obowiązkowy, ZAKOŃCZ przechodzi, MM tylko dla odłożonych", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  assert.equal(kosz.pozycje.length, 2);
+
+  assert.throws(() => K.pominPozycjeKosza(kosz.pozycje[0].id, "  ", "Magazynier"), /Podaj powód/);
+
+  K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
+  K.pominPozycjeKosza(kosz.pozycje[1].id, "nie ma w koszu", "Magazynier");
+  // idempotentne — drugi klik zmienia najwyżej powód
+  K.pominPozycjeKosza(kosz.pozycje[1].id, "uszkodzony", "Magazynier");
+
+  const rozlozony = K.zakonczKosz(kosz.id, "Magazynier");
+  assert.equal(rozlozony.status, "rozlozony");
+  const pominieta = rozlozony.pozycje.find((p) => p.status === "skipped");
+  assert.equal(pominieta?.powod, "uszkodzony");
+
+  /* Sedno: MM cofa bufor tylko dla towaru, który NAPRAWDĘ wrócił na halę.
+     Przesunięcie pominiętej pozycji zdejmowałoby z bufora coś, czego nikt
+     nie ruszył — a to ten sam błąd co dokument wystawiony drugi raz. */
+  const mm = db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number };
+  assert.equal(mm.n, 1, "jedno MM: za odłożoną pozycję, nie za pominiętą");
+});
+
+test("odłożenie cofa pominięcie — znaleziony towar nie wymaga odklikiwania", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+
+  K.pominPozycjeKosza(kosz.pozycje[0].id, "nie ma w koszu", "Magazynier");
+  K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
+
+  const po = K.szczegolKosza(kosz.id).pozycje.find((p) => p.id === kosz.pozycje[0].id);
+  assert.equal(po?.status, "done");
+  assert.equal(po?.powod, null, "powód znika razem z pominięciem");
+  // odłożonej nie da się pominąć — pomijanie dotyczy towaru, którego nie ma
+  assert.throws(() => K.pominPozycjeKosza(kosz.pozycje[0].id, "uszkodzony", "X"), /odłożona/);
 });

@@ -33,6 +33,70 @@ historii nie przepisujemy.
 
 ---
 
+## 0.77.0 — 21 sierpnia 2026
+
+**Otwarty kosz zwrotów mówi teraz tyle, co rozkładana dostawa.** Do tej wersji
+wiersz kosza niósł symbol, nazwę, ilość i adres — i nic więcej. Przy zwrocie to
+za mało: towar wraca pojedynczo, bywa wycofany ze sprzedaży, a pytanie „co to
+właściwie jest i gdzie tego jeszcze mam" pada częściej niż przy dostawie.
+
+Wiersz dostał **zdjęcie z kartoteki** (powiększa się dotknięciem), ilość
+z prawdziwą jednostką zamiast wpisanego „szt." i pastylkę adresu — tę samą,
+która stoi na dostawach. Pod wskazaną pozycją rozwija się panel: adres wielkim
+drukiem, **stany wszystkich magazynów z niezerowym stanem** („MAG 12 · ZWR 3")
+i podpowiedź strefy złotej. Druga liczba jest tu najważniejsza — mówi, ile
+z tego towaru zostało jeszcze na regale zwrotów.
+
+**Pozycję, której w koszu nie ma, można pominąć z powodem.** Wcześniej
+blokowała ZAKOŃCZ, a razem z nim cały obieg: kosz wracał do biura nierozłożony
+i bez śladu, CZEGO w nim zabrakło. Teraz magazynier wybiera powód — „nie ma
+w koszu", „uszkodzony", „obcy towar" albo własny — i kończy pracę. Powód stoi
+przy pozycji i w dzienniku.
+
+**Pominięta pozycja NIE dostaje MM.** Kosz WERTIS cofa bufor przesunięciem za
+każdą pozycję, ale wyłącznie za tę, która naprawdę wróciła na halę.
+Przesunięcie pominiętej zdejmowałoby z bufora towar, którego nikt nie ruszył.
+Odłożenie pozycji wcześniej pominiętej cofa pominięcie samo — kto znalazł
+towar, po prostu go odkłada.
+
+**Biuro widzi zawartość kosza, nie sam licznik.** Karta KOSZE ZWROTOWE
+pokazywała dotąd „3/6 poz." i tyle — żeby sprawdzić, CO w koszu leży i gdzie
+hala to odłożyła, trzeba było zapytać kogoś na hali. Kliknięcie wiersza
+rozwija teraz podgląd: towar ze zdjęciem, ilość, adres odłożenia i stan każdej
+pozycji. Podgląd czyta tę samą trasę co karta zwrotu, więc obie strony patrzą
+na ten sam kosz.
+
+Kosz z pominięciem woła o uwagę: wiersz na liście dostaje bursztynową
+pastylkę, a podgląd zaczyna się od zdania **KOSZ NIEKOMPLETNY** wraz z powodem
+przy pozycji. Przy okazji lista rozróżnia teraz kosze złożone w aplikacji od
+tych z przesunięcia MM — te drugie podpisuje numerem dokumentu.
+
+Do kompletu biuro dostało **listę pominięć ze wszystkich koszy** — osobną
+kartę, na której najdłużej czekające sprawy są na górze. Pominięcie zamknięte
+w jednym koszu byłoby wiedzą, do której nikt nie zagląda; tu jest listą pracy:
+szukać dalej, reklamować u przewoźnika czy poprawić dokument.
+
+Pominięcie zamyka się przyciskiem **ZAŁATWIONE** z dobrowolną notatką
+(„znalazło się", „reklamacja u kuriera", „korekta dokumentu"). Sprawa schodzi
+z listy pracy, ale pominięcie ZOSTAJE przy pozycji — hala naprawdę zgłosiła
+brak i tego się nie przepisuje. W podglądzie kosza widać jedno pod drugim:
+powód pominięcia i to, czym się skończyło. Ponowne zgłoszenie braku otwiera
+sprawę na nowo, a odłożenie towaru kasuje jedno i drugie.
+
+Obok stoi **szukanie towaru w koszach** — po symbolu, nazwie albo kodzie
+kreskowym. Odpowiada na pytanie zadawane po fakcie: „w którym koszu to
+jechało i gdzie hala to odłożyła". Szuka po snapshocie z kosza, bo to on mówi,
+co w koszu naprawdę leżało, nawet gdy kartoteka zdążyła się zmienić.
+
+Pozycja odłożona pokazuje wreszcie **stan swojego MM**. Kolejka zapisów
+wychwytywała błędy od zawsze, ale globalnie — nie dawało się powiedzieć,
+czy bufor cofnął się dla TEGO kosza.
+
+Czego tu świadomie nie ma: **ilości częściowych**. Przy zwrocie sztuki idą na
+jedną półkę, a licznik − / + kosztowałby dotknięcie przy każdej pozycji, żeby
+obsłużyć przypadek, który się nie zdarza. Rozkładanie dostaw zostaje przy nim
+bez zmian.
+
 ## 0.76.1 — 21 sierpnia 2026
 
 **Każdy kosz na regale zwrotów pokazywał 0 pozycji.** Zgłoszenie z hali

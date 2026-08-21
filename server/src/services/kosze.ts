@@ -3,6 +3,9 @@ import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import { adresyOczekiwane, porownajAlejkowo, validateDeliveryLocation } from "./delivery.js";
+import { stanyNiezerowe, type StanMagazynu } from "./magazyny.js";
+import { adnotacjaStrefy } from "./zbiorki.js";
+import type { ZlotaStrefa } from "../types.js";
 import { aliasKodu } from "./ean-alias.js";
 import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
@@ -54,10 +57,24 @@ export interface PozycjaKosza {
   nazwa: string;
   ilosc: number;
   status: string;
+  /** Jednostka z kartoteki (`szt.`, `kpl.`) — kolektor przestaje zgadywać. */
+  unit: string;
+  /**
+   * Gdzie ten towar jeszcze leży — magazyny z niezerowym stanem, malejąco.
+   *
+   * Przy zwrocie to pytanie pada częściej niż przy dostawie: towar wraca
+   * pojedynczo i bywa wycofany ze sprzedaży, więc „na regale zwrotów zostały
+   * jeszcze 3" rozstrzyga, czy kosz jest już rozniesiony w całości.
+   */
+  stany: StanMagazynu[];
+  /** Podpowiedź przeslotowania — ta sama, którą niesie karta towaru. */
+  zlotaStrefa?: ZlotaStrefa;
   /** Adres ŻYWY z kartoteki skorygowany o kolejkę — nie snapshot. */
   lokOczekiwana: string | null;
   lokFaktyczna: string | null;
   odlozonoPrzez: string | null;
+  /** Dlaczego pozycja została pominięta; null poza statusem `skipped`. */
+  powod: string | null;
   /** Stan zadania MM cofającego bufor; null przed zakończeniem kosza. */
   mmStatus: string | null;
   mmNumer: string | null;
@@ -88,6 +105,14 @@ export interface WierszListyKoszy {
   zwrotow: number;
   pozycji: number;
   odlozonych: number;
+  /**
+   * Ile pozycji hala pominęła (0.77.0) — dla biura to jedyny sygnał, że kosz
+   * wrócił NIEKOMPLETNY. Bez tej liczby „3/6 poz." wyglądałoby jak praca
+   * w toku, a nie jak sprawa do wyjaśnienia.
+   */
+  pominietych: number;
+  /** Numer przesunięcia MM; null = kosz złożony w aplikacji, nie z dokumentu. */
+  mmNumer: string | null;
   utworzonoAt: string;
   zamknietoAt: string | null;
 }
@@ -234,7 +259,9 @@ export function listaKoszy(): WierszListyKoszy[] {
       `SELECT k.id, k.kod, k.status, k.utworzono_at, k.zamknieto_at,
               (SELECT COUNT(*) FROM zwrot z WHERE z.kosz_id = k.id) AS zwrotow,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
-              (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych
+              (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
+              (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='skipped') AS pominietych,
+              k.mm_numer
        FROM kosz k
        WHERE k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-14 days')
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
@@ -247,6 +274,8 @@ export function listaKoszy(): WierszListyKoszy[] {
     zwrotow: w.zwrotow as number,
     pozycji: w.pozycji as number,
     odlozonych: w.odlozonych as number,
+    pominietych: w.pominietych as number,
+    mmNumer: (w.mm_numer as string) ?? null,
     utworzonoAt: w.utworzono_at as string,
     zamknietoAt: (w.zamknieto_at as string) ?? null,
   }));
@@ -270,7 +299,12 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     )
     .all(koszId) as Array<Record<string, unknown>>;
 
-  const adresy = adresyOczekiwane(wiersze.map((w) => w.tw_id as number));
+  /* Komplet jednym zapytaniem na każdą z trzech rzeczy — kosz odświeża się
+     po KAŻDYM odłożeniu, więc pytanie per wiersz zjadałoby budżet trasy. */
+  const twIds = wiersze.map((w) => w.tw_id as number);
+  const adresy = adresyOczekiwane(twIds);
+  const jednostki = subiekt.jednostkiDlaTowarow(twIds);
+  const stany = stanyNiezerowe(twIds);
   const pozycje: PozycjaKosza[] = wiersze.map((w) => ({
     id: w.id as number,
     zwrotId: w.zwrot_id as number,
@@ -279,11 +313,24 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     nazwa: w.nazwa as string,
     ilosc: w.ilosc as number,
     status: w.status as string,
+    unit: jednostki.get(w.tw_id as number) ?? "",
+    stany: stany.get(w.tw_id as number) ?? [],
+    /* W pętli po pozycjach jak przy dostawach: `adnotacjaStrefy` czyta mapę
+       w pamięci, więc jest O(1). Gdyby zaczęła dotykać bazy, to miejsce
+       zamieni się w N+1 — wtedy trzeba wariantu zbiorczego. */
+    ...(() => {
+      const a = adnotacjaStrefy(w.tw_id as number);
+      return a ? { zlotaStrefa: a } : {};
+    })(),
     /* Pozycja tknięta pokazuje SWÓJ zapis — to, co człowiek zrobił; reszta
        adres żywy. Ten sam podział co `adresLinii` przy dostawach. */
     lokOczekiwana: (w.lok_faktyczna as string) ?? adresy.get(w.tw_id as number) ?? null,
     lokFaktyczna: (w.lok_faktyczna as string) ?? null,
     odlozonoPrzez: (w.odlozono_przez as string) ?? null,
+    powod: (w.powod as string) ?? null,
+    zalatwioneAt: (w.zalatwione_at as string) ?? null,
+    zalatwionePrzez: (w.zalatwione_przez as string) ?? null,
+    zalatwioneNotatka: (w.zalatwione_notatka as string) ?? null,
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
@@ -383,8 +430,14 @@ export function odlozPozycje(
     );
   }
 
+  /* `powod=NULL` cofa pominięcie: magazynier, który jednak znalazł towar,
+     ma go po prostu odłożyć, a nie szukać osobnego „cofnij". */
   db()
-    .prepare("UPDATE kosz_pozycja SET status='done', lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?")
+    .prepare(
+      `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL,
+              zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL,
+              lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?`
+    )
     .run(code, nowIso(), autor, pozycjaId);
 
   if (recznie) logEvent("manual_entry", autor, twId, { code, kind: "LOC", zrodlo: "kosz" });
@@ -402,6 +455,58 @@ export function odlozPozycje(
   return { ok: true, mismatch };
 }
 
+/** Powody pominięcia, które kolektor podaje z listy; „inny" niesie wpis ręczny. */
+export const POWODY_POMINIECIA = ["nie ma w koszu", "uszkodzony", "obcy towar"] as const;
+
+/**
+ * Pominięcie pozycji, której magazynier nie ma jak odłożyć.
+ *
+ * Do 0.77.0 jedyną drogą było zostawienie kosza nierozłożonego — jedna
+ * pozycja bez towaru blokowała ZAKOŃCZ, a razem z nim cały obieg. Kosz
+ * wracał wtedy do biura bez żadnego śladu, CZEGO w nim zabrakło.
+ *
+ * Powód jest OBOWIĄZKOWY, bo to jedyna treść tego zgłoszenia: biuro dostanie
+ * kosz niekompletny i musi wiedzieć, czy szukać towaru, czy reklamacji.
+ * Idempotentne — drugi klik na tej samej pozycji zmienia wyłącznie powód.
+ */
+export function pominPozycjeKosza(
+  pozycjaId: number,
+  powod: string,
+  autor: string
+): { ok: true } {
+  const tresc = (powod ?? "").trim().slice(0, 200);
+  if (!tresc) throw new BladKosza(400, "Podaj powód pominięcia — biuro dostanie kosz niekompletny");
+
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  const kosz = wierszKosza(p.kosz_id as number);
+  if (kosz.status !== "zamkniety") {
+    throw new BladKosza(400, "Kosz nie jest w rozkładaniu — otwarty dokłada, rozłożony skończył");
+  }
+  if (p.status === "done") {
+    throw new BladKosza(400, "Pozycja jest odłożona — pomijanie dotyczy towaru, którego nie ma");
+  }
+
+  /* Pominięcie ZERUJE załatwienie: skoro hala zgłasza brak drugi raz, sprawa
+     wraca na listę biura, choćby ktoś zamknął ją wcześniej. */
+  d.prepare(
+    `UPDATE kosz_pozycja SET status='skipped', powod=?, pominieto_at=?,
+            zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL
+     WHERE id=?`
+  ).run(tresc, nowIso(), pozycjaId);
+  logEvent("kosz_pozycja_pominieta", autor, p.tw_id as number, {
+    koszId: kosz.id,
+    kod: kosz.kod,
+    pozycjaId,
+    symbol: p.symbol,
+    powod: tresc,
+  });
+  return { ok: true };
+}
+
 /**
  * Zakończenie rozkładania: bufor cofa się SAM.
  *
@@ -416,10 +521,15 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const pozycje = db()
     .prepare("SELECT id, tw_id, symbol, ilosc, status FROM kosz_pozycja WHERE kosz_id = ?")
     .all(koszId) as Array<{ id: number; tw_id: number; symbol: string; ilosc: number; status: string }>;
-  const braki = pozycje.filter((p) => p.status !== "done");
+  /* Pominięta jest stanem KOŃCOWYM, tak samo jak przy dostawach. Blokowanie
+     nią zakończenia karałoby zgłaszającego brak — a wtedy nikt by go nie
+     zgłaszał i kosz wracałby do biura bez śladu, czego zabrakło. */
+  const braki = pozycje.filter((p) => p.status !== "done" && p.status !== "skipped");
   if (braki.length > 0) {
     throw new BladKosza(400, `Nieodłożone pozycje: ${braki.map((b) => b.symbol || b.tw_id).join(", ")}`);
   }
+  const odlozone = pozycje.filter((p) => p.status === "done");
+  const pominiete = pozycje.length - odlozone.length;
 
   const d = db();
   /* Kosz z dokumentu MM (0.75.0) NIE kolejkuje niczego. Przesunięcie na regał
@@ -435,6 +545,7 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
         koszId,
         kod: kosz.kod,
         pozycji: pozycje.length,
+        pominietych: pominiete,
         mmDokId: kosz.mm_dok_id,
       });
     })();
@@ -442,7 +553,10 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   }
 
   transaction(d, () => {
-    for (const p of pozycje) {
+    /* MM wyłącznie dla ODŁOŻONYCH. Pominięta pozycja nigdzie fizycznie nie
+       pojechała, więc przesunięcie na nią zdejmowałoby z bufora towar, który
+       dalej leży na regale zwrotów — albo którego nie ma wcale. */
+    for (const p of odlozone) {
       const queueId = enqueueMM(config.magId.ZWROTY, config.magId.MAG, [{ twId: p.tw_id, qty: p.ilosc }], {
         createdBy: autor,
         twId: p.tw_id,
@@ -453,7 +567,182 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
     }
     d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
       .run(nowIso(), autor, koszId);
-    logEvent("kosz_rozlozony", autor, null, { koszId, kod: kosz.kod, pozycji: pozycje.length });
+    logEvent("kosz_rozlozony", autor, null, {
+      koszId,
+      kod: kosz.kod,
+      pozycji: pozycje.length,
+      pominietych: pominiete,
+    });
   })();
   return szczegolKosza(koszId);
+}
+
+/* ── Wgląd biura: co zostało pominięte i gdzie jechał towar ──────────────────
+   Dwa pytania, które biuro zadaje po fakcie, a na które karta kosza sama nie
+   odpowiada: „czego zabrakło" i „w którym koszu to było". Pierwsze jest listą
+   pracy, drugie wyszukiwaniem — oba czytają tę samą tabelę pozycji.          */
+
+export interface PominietaPozycja {
+  pozycjaId: number;
+  koszId: number;
+  kod: string;
+  /** Numer przesunięcia MM; null = kosz złożony w aplikacji. */
+  mmNumer: string | null;
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ilosc: number;
+  powod: string;
+  at: string | null;
+  /** Ile dni sprawa czeka; liczone od pominięcia, a nie od powstania kosza. */
+  dni: number;
+}
+
+/**
+ * Pominięte pozycje ze WSZYSTKICH koszy — lista pracy biura.
+ *
+ * Pominięcie znaczy „tego towaru nie było", więc ktoś musi rozstrzygnąć: szukać
+ * dalej, reklamować u przewoźnika czy poprawić dokument. Do 0.78.0 widać to
+ * było wyłącznie po otwarciu konkretnego kosza, czyli praktycznie wcale.
+ *
+ * Okno jest takie samo jak na liście koszy i z tego samego powodu: lista służy
+ * PRACY, historię trzyma audyt. Kosz nierozłożony zostaje niezależnie od wieku,
+ * bo jego sprawa wciąż jest otwarta.
+ */
+export function pominietePozycje(): PominietaPozycja[] {
+  const wiersze = db()
+    .prepare(
+      `SELECT p.id AS pozycja_id, p.kosz_id, p.tw_id, p.symbol, p.nazwa, p.ilosc,
+              p.powod, p.pominieto_at, k.kod, k.mm_numer, k.status AS kosz_status
+       FROM kosz_pozycja p
+       JOIN kosz k ON k.id = p.kosz_id
+       WHERE p.status = 'skipped'
+         AND p.zalatwione_at IS NULL
+         AND (k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-30 days'))
+       ORDER BY COALESCE(p.pominieto_at, k.zamknieto_at, k.utworzono_at)`
+    )
+    .all() as Array<Record<string, unknown>>;
+
+  const teraz = Date.now();
+  return wiersze.map((w) => {
+    const at = (w.pominieto_at as string) ?? null;
+    return {
+      pozycjaId: w.pozycja_id as number,
+      koszId: w.kosz_id as number,
+      kod: w.kod as string,
+      mmNumer: (w.mm_numer as string) ?? null,
+      twId: w.tw_id as number,
+      symbol: w.symbol as string,
+      nazwa: w.nazwa as string,
+      ilosc: w.ilosc as number,
+      powod: (w.powod as string) ?? "",
+      at,
+      /* Pominięcia sprzed 0.78.0 nie mają znacznika — zero zamiast zgadywania,
+         bo wymyślona liczba dni wyglądałaby dokładnie jak prawdziwa. */
+      dni: at ? Math.floor((teraz - Date.parse(at)) / 86_400_000) : 0,
+    };
+  });
+}
+
+export interface ZnalezionaPozycja {
+  koszId: number;
+  kod: string;
+  mmNumer: string | null;
+  koszStatus: string;
+  symbol: string;
+  nazwa: string;
+  ilosc: number;
+  status: string;
+  lokFaktyczna: string | null;
+  powod: string | null;
+  kiedy: string | null;
+}
+
+/**
+ * „W którym koszu jechał ten towar?" — po symbolu, nazwie albo kodzie kreskowym.
+ *
+ * Pytanie pada, gdy towar zniknął między regałem a Subiektem albo gdy klient
+ * dopomina się o zwrot. Bez tego biuro mogło tylko otwierać kosze po kolei.
+ *
+ * Szuka po SNAPSHOCIE z kosza (symbol i nazwa zapisane przy zamknięciu), bo to
+ * on mówi, co naprawdę w koszu leżało — kartoteka mogła się od tego czasu
+ * zmienić albo zostać zablokowana. EAN dochodzi z kartoteki, bo w koszu go nie
+ * ma, a magazynier ma go pod ręką na opakowaniu.
+ */
+export function szukajWKoszach(fraza: string): ZnalezionaPozycja[] {
+  const q = (fraza ?? "").trim();
+  if (q.length < 2) throw new BladKosza(400, "Podaj co najmniej dwa znaki — symbol, nazwę albo kod kreskowy");
+  const like = `%${q.toUpperCase()}%`;
+
+  const wiersze = db()
+    .prepare(
+      `SELECT p.kosz_id, p.symbol, p.nazwa, p.ilosc, p.status, p.lok_faktyczna, p.powod,
+              COALESCE(p.odlozono_at, p.pominieto_at) AS kiedy,
+              k.kod, k.mm_numer, k.status AS kosz_status
+       FROM kosz_pozycja p
+       JOIN kosz k ON k.id = p.kosz_id
+       LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
+       WHERE UPPER(p.symbol) LIKE @like
+          OR UPPER(p.nazwa) LIKE @like
+          OR (t.ean <> '' AND t.ean = @dokladnie)
+       ORDER BY k.id DESC, p.id
+       LIMIT 100`
+    )
+    .all({ like, dokladnie: q }) as Array<Record<string, unknown>>;
+
+  return wiersze.map((w) => ({
+    koszId: w.kosz_id as number,
+    kod: w.kod as string,
+    mmNumer: (w.mm_numer as string) ?? null,
+    koszStatus: w.kosz_status as string,
+    symbol: w.symbol as string,
+    nazwa: w.nazwa as string,
+    ilosc: w.ilosc as number,
+    status: w.status as string,
+    lokFaktyczna: (w.lok_faktyczna as string) ?? null,
+    powod: (w.powod as string) ?? null,
+    kiedy: (w.kiedy as string) ?? null,
+  }));
+}
+
+/**
+ * Zamknięcie sprawy pominiętej pozycji — decyzja BIURA, nie hali.
+ *
+ * Pominięcie zostaje pominięciem: hala zgłosiła, że towaru nie ma, i tego się
+ * nie przepisuje. Zmienia się tylko to, czy sprawa wisi na liście pracy.
+ * Bez tego przycisku lista rosłaby w nieskończoność, aż przestano by ją
+ * czytać — a wtedy nowe zgłoszenie ginęłoby wśród załatwionych.
+ *
+ * Notatka jest DOBROWOLNA, odwrotnie niż powód pominięcia. Powód to jedyna
+ * treść zgłoszenia i bez niego nie ma o czym rozmawiać; tutaj najczęstszym
+ * zakończeniem jest „znalazło się", a wymuszanie zdania na każde kliknięcie
+ * kosztowałoby więcej, niż warte jest to zdanie.
+ */
+export function zalatwPominiecie(
+  pozycjaId: number,
+  autor: string,
+  notatka = ""
+): { ok: true } {
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.status !== "skipped") {
+    throw new BladKosza(400, "Załatwia się POMINIĘCIE — ta pozycja nie jest pominięta");
+  }
+  if (p.zalatwione_at) return { ok: true }; // drugie kliknięcie nic nie zmienia
+
+  const tresc = String(notatka ?? "").trim().slice(0, 200);
+  d.prepare(
+    "UPDATE kosz_pozycja SET zalatwione_at=?, zalatwione_przez=?, zalatwione_notatka=? WHERE id=?"
+  ).run(nowIso(), autor, tresc || null, pozycjaId);
+  logEvent("kosz_pominiecie_zalatwione", autor, p.tw_id as number, {
+    pozycjaId,
+    koszId: p.kosz_id,
+    symbol: p.symbol,
+    powod: p.powod,
+    notatka: tresc,
+  });
+  return { ok: true };
 }

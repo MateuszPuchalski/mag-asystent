@@ -12,10 +12,14 @@ import {
   listaKoszy,
   odepnijZwrot,
   odlozPozycje,
+  pominietePozycje,
+  pominPozycjeKosza,
   przypnijZwrot,
   skanTowaruKosza,
   szczegolKosza,
+  szukajWKoszach,
   zakonczKosz,
+  zalatwPominiecie,
   zamknijKosz,
 } from "../services/kosze.js";
 import { szczegolZwrotu } from "../services/zwroty.js";
@@ -81,6 +85,35 @@ export async function koszeRoutes(app: FastifyInstance) {
     return { kosze: listaKoszy() };
   });
 
+  /* Pominięte pozycje ze wszystkich koszy — lista pracy biura, nie historia.
+     Stoi PRZED `/:id` świadomie: router i tak przedkłada segment stały nad
+     parametr, ale czytelnik nie ma obowiązku tego wiedzieć. */
+  app.get("/api/biuro/kosze/pominiete", async (_req, reply) => {
+    const nie = odmowaBiuro();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { pominiete: pominietePozycje() };
+  });
+
+  /* Zamknięcie sprawy pominięcia — bramka BIURA, bo to decyzja o tym, że
+     sprawa jest wyjaśniona, a nie o tym, co leży w koszu. */
+  app.post<{ Params: { id: string }; Body: { notatka?: string } }>(
+    "/api/biuro/kosze/pominiete/:id/zalatwione",
+    async (req, reply) => {
+      const nie = odmowaBiuro();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zBledem(reply, () => {
+        zalatwPominiecie(Number(req.params.id), autor(), req.body?.notatka ?? "");
+        return { pominiete: pominietePozycje() };
+      });
+    }
+  );
+
+  app.get<{ Querystring: { q?: string } }>("/api/biuro/kosze/szukaj", async (req, reply) => {
+    const nie = odmowaBiuro();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zBledem(reply, () => ({ znalezione: szukajWKoszach(req.query?.q ?? "") }));
+  });
+
   app.get<{ Params: { id: string } }>("/api/biuro/kosze/:id", async (req, reply) => {
     const nie = odmowaBiuro();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
@@ -126,6 +159,14 @@ export async function koszeRoutes(app: FastifyInstance) {
       zBledem(reply, () =>
         odlozPozycje(Number(req.params.id), req.body?.lokalizacja ?? "", autor(), !!req.body?.recznie)
       )
+  );
+
+  /* Pominięcie pozycji, której w koszu nie ma. Ta sama bramka co odkładanie —
+     to decyzja magazyniera stojącego przy koszu, nie biura. */
+  app.post<{ Params: { id: string }; Body: { powod?: string } }>(
+    "/api/kosze/pozycje/:id/pomin",
+    async (req, reply) =>
+      zBledem(reply, () => pominPozycjeKosza(Number(req.params.id), req.body?.powod ?? "", autor()))
   );
 
   app.post<{ Params: { id: string } }>("/api/kosze/:id/zakoncz", async (req, reply) =>

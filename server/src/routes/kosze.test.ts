@@ -171,6 +171,120 @@ test("przyjęcia: hala otwiera numerem z kartki, zdejmuje z listy tylko admin", 
   assert.equal(r.json().przyjecia[0].stan, "poza_aplikacja");
 });
 
+test("pominięcie pozycji: przez HTTP, z powodem, i nie blokuje zakończenia", async () => {
+  const biuro = zalogowany("biuro");
+  const magazynier = zalogowany("magazynier");
+  const { koszId } = await zwrotWKoszu(biuro);
+  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
+
+  // powód jest treścią zgłoszenia — bez niego trasa odmawia
+  let r = await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${kosz.pozycje[0].id}/pomin`, payload: {}, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 400);
+
+  r = await app.inject({
+    method: "POST",
+    url: `/api/kosze/pozycje/${kosz.pozycje[0].id}/pomin`,
+    payload: { powod: "nie ma w koszu" },
+    headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+
+  await app.inject({
+    method: "POST",
+    url: `/api/kosze/pozycje/${kosz.pozycje[1].id}/odloz`,
+    payload: { lokalizacja: "B01-01-01" },
+    headers: magazynier,
+  });
+  r = await app.inject({ method: "POST", url: `/api/kosze/${koszId}/zakoncz`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+  const pominieta = r.json().kosz.pozycje.find((p: { status: string }) => p.status === "skipped");
+  assert.equal(pominieta.powod, "nie ma w koszu");
+});
+
+test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async () => {
+  const biuro = zalogowany("biuro");
+  const magazynier = zalogowany("magazynier");
+  const { koszId } = await zwrotWKoszu(biuro);
+  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
+  await app.inject({
+    method: "POST",
+    url: `/api/kosze/pozycje/${kosz.pozycje[0].id}/pomin`,
+    payload: { powod: "nie ma w koszu" },
+    headers: magazynier,
+  });
+
+  /* Trasa stała nie może wpaść w `/:id` — inaczej „pominiete" poszłoby do
+     `szczegolKosza(NaN)` i wróciło 404 zamiast listy. */
+  let r = await app.inject({ method: "GET", url: "/api/biuro/kosze/pominiete", headers: magazynier });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({ method: "GET", url: "/api/biuro/kosze/pominiete", headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  const p = r.json().pominiete;
+  assert.equal(p.length, 1);
+  assert.equal(p[0].powod, "nie ma w koszu");
+  assert.equal(p[0].kod, "KZ-07");
+  assert.equal(typeof p[0].dni, "number");
+
+  // szukanie po symbolu ze snapshotu kosza
+  r = await app.inject({
+    method: "GET", url: "/api/biuro/kosze/szukaj?q=TEST-LINIA", headers: biuro,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().znalezione.length, 2, "obie pozycje kosza niosą ten symbol");
+
+  // kod kreskowy z kartoteki — w koszu go nie ma, więc dochodzi JOIN-em
+  r = await app.inject({
+    method: "GET", url: "/api/biuro/kosze/szukaj?q=5900000000037", headers: biuro,
+  });
+  assert.equal(r.json().znalezione.length, 1);
+  assert.equal(r.json().znalezione[0].symbol, "TEST-LINIA-DONE");
+
+  // jedna litera to nie zapytanie — odmowa zamiast wyrzucenia całej tabeli
+  r = await app.inject({ method: "GET", url: "/api/biuro/kosze/szukaj?q=T", headers: biuro });
+  assert.equal(r.statusCode, 400);
+
+  /* ZAŁATWIONE zdejmuje sprawę z listy pracy, ale NIE z kosza: pominięcie
+     zostaje, bo hala naprawdę zgłosiła brak. Bez tego rozróżnienia biuro
+     mogłoby zamknąć sprawę i stracić ślad, że kosz wrócił niekompletny. */
+  const pozycjaId = p[0].pozycjaId;
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/pominiete/${pozycjaId}/zalatwione`,
+    payload: { notatka: "znalazło się na regale" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 403, "to decyzja biura, nie hali");
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/pominiete/${pozycjaId}/zalatwione`,
+    payload: { notatka: "znalazło się na regale" }, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(r.json().pominiete, [], "sprawa schodzi z listy pracy");
+
+  // drugie kliknięcie nic nie psuje, a pozycja dalej jest pominięta w koszu
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/pominiete/${pozycjaId}/zalatwione`,
+    payload: {}, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200);
+  r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
+  const wKoszu = r.json().kosz.pozycje.find((x: { id: number }) => x.id === pozycjaId);
+  assert.equal(wKoszu.status, "skipped");
+  assert.equal(wKoszu.zalatwioneNotatka, "znalazło się na regale");
+
+  // odłożenie tej samej pozycji kasuje i pominięcie, i jego zamknięcie
+  await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${pozycjaId}/odloz`,
+    payload: { lokalizacja: "B02-02-02" }, headers: magazynier,
+  });
+  r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
+  const po = r.json().kosz.pozycje.find((x: { id: number }) => x.id === pozycjaId);
+  assert.equal(po.status, "done");
+  assert.equal(po.zalatwioneAt, null);
+});
+
 test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => {
   const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");
