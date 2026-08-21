@@ -176,6 +176,38 @@ test("odświeżenie zdejmuje z listy zwrot zamknięty w Allegro", async () => {
   assert.ok(!Z.brakujacePaczki().some((b) => b.referencja === "ZW-DEV-0003"));
 });
 
+test("jedno zgłoszenie w błędzie nie zatrzymuje całej partii", async () => {
+  /* Bez łapania błędu per zgłoszenie pierwszy zwrot kończący się wyjątkiem
+     przerywał przebieg i CAŁA reszta nigdy nie dostawała statusu — a na
+     ekranie wyglądało to jak „ticker nie działa". */
+  await Z.odswiezZapowiedzi();
+  const d = db();
+  d.prepare(
+    "UPDATE zwrot_zapowiedz SET status_allegro=NULL, widziano_at='2020-01-01T00:00:00.000Z'"
+  ).run();
+
+  const adapter = (await import("../adapters/allegro.js")).allegroAdapter();
+  const oryginal = adapter.zwrot.bind(adapter);
+  adapter.zwrot = async (id: string) => {
+    if (id === "dev-ret-1") throw new Error("Brak uprawnienia do zwrotów klienckich (403)");
+    return oryginal(id);
+  };
+  try {
+    assert.equal(await Z.odswiezStatusyOczekujacych(), 2, "dwa pozostałe mimo błędu pierwszego");
+  } finally {
+    adapter.zwrot = oryginal;
+  }
+
+  const t = Z.stanOdswiezania()!;
+  assert.equal(t.bledow, 1);
+  assert.match(t.ostatniBlad ?? "", /403/);
+  assert.equal(t.doOdswiezenia, 1, "wiersz w błędzie wciąż czeka na status");
+  /* Znacznik czasu zostaje nietknięty, więc ten sam wiersz wraca przy kolejnym
+     przebiegu — błąd Allegro bywa chwilowy. */
+  assert.equal(await Z.odswiezStatusyOczekujacych(), 1);
+  assert.equal(Z.stanOdswiezania()!.doOdswiezenia, 0);
+});
+
 test("SCHOWAJ zdejmuje zgłoszenie z listy raz i tylko raz", async () => {
   await Z.odswiezZapowiedzi();
   const cel = Z.brakujacePaczki().find((b) => b.referencja === "ZW-DEV-0003")!;

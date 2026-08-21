@@ -188,16 +188,64 @@ export async function odswiezStatusyOczekujacych(): Promise<number> {
   );
   const tylkoZnacznik = d.prepare("UPDATE zwrot_zapowiedz SET widziano_at=? WHERE id=?");
   let odswiezonych = 0;
+  let bledow = 0;
+  let ostatniBlad: string | null = null;
   for (const w of wiersze) {
-    const z = await allegroAdapter().zwrot(w.allegro_return_id);
-    if (!z) {
-      tylkoZnacznik.run(nowIso(), w.id);
-      continue;
+    try {
+      const z = await allegroAdapter().zwrot(w.allegro_return_id);
+      if (!z) {
+        /* Allegro nie zna już tego zwrotu. Znacznik przesuwamy, żeby wrócił
+           na koniec kolejki zamiast zajmować miejsce co pięć minut. */
+        tylkoZnacznik.run(nowIso(), w.id);
+        continue;
+      }
+      zapisz.run(z.status, JSON.stringify(wszystkieWaybille(z)), nowIso(), w.id);
+      odswiezonych++;
+    } catch (e) {
+      /* JEDNO zgłoszenie nie ma prawa zatrzymać całej partii. Bez tego łapania
+         pierwszy zwrot kończący się błędem (403, timeout, awaria Allegro)
+         przerywał przebieg i cała reszta NIGDY nie dostawała statusu — a wygląda
+         to identycznie jak „ticker nie działa". Znacznika tu NIE ruszamy:
+         błąd bywa chwilowy i ten sam wiersz ma wrócić przy kolejnym przebiegu. */
+      bledow++;
+      ostatniBlad = e instanceof Error ? e.message : String(e);
     }
-    zapisz.run(z.status, JSON.stringify(wszystkieWaybille(z)), nowIso(), w.id);
-    odswiezonych++;
   }
+  stanTickera = {
+    at: nowIso(),
+    odswiezonych,
+    bledow,
+    ostatniBlad,
+    doOdswiezenia: (
+      d
+        .prepare(
+          "SELECT COUNT(*) AS n FROM zwrot_zapowiedz WHERE status='oczekuje' AND status_allegro IS NULL"
+        )
+        .get() as { n: number }
+    ).n,
+  };
   return odswiezonych;
+}
+
+/**
+ * Ślad ostatniego przebiegu odświeżania — na ekran biura.
+ *
+ * Bez niego pytanie „czemu ten wiersz wciąż nie ma statusu" nie ma jak dostać
+ * odpowiedzi: nie widać ani czy ticker w ogóle chodzi, ani czy Allegro
+ * odmawia. `doOdswiezenia` mówi wprost, ile zgłoszeń czeka jeszcze w kolejce.
+ */
+export interface StanTickera {
+  at: string;
+  odswiezonych: number;
+  bledow: number;
+  ostatniBlad: string | null;
+  doOdswiezenia: number;
+}
+
+let stanTickera: StanTickera | null = null;
+
+export function stanOdswiezania(): StanTickera | null {
+  return stanTickera;
 }
 
 /**

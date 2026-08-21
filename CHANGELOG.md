@@ -33,6 +33,27 @@ historii nie przepisujemy.
 
 ---
 
+## 0.74.0 — 21 sierpnia 2026
+
+**Jedno zgłoszenie w błędzie zatrzymywało odświeżanie wszystkich.** Pętla
+z 0.73.0 pytała Allegro o każde oczekujące zgłoszenie po kolei, ale bez
+osłony na pojedynczą awarię. Pierwszy zwrot kończący się wyjątkiem — 403,
+timeout, chwilowa awaria po stronie Allegro — przerywał cały przebieg, więc
+reszta NIGDY nie dostawała statusu. Co gorsza, wyglądało to dokładnie tak
+samo jak „ticker nie działa": wiersze uparcie pisały „status jeszcze
+niepobrany" i nic więcej.
+
+Każde zgłoszenie ma teraz własną osłonę. Wiersz w błędzie zostaje ze starym
+znacznikiem czasu, więc wraca przy następnym przebiegu — awaria bywa chwilowa
+i nie ma powodu karać go godziną kwarantanny.
+
+**Widać, czy odświeżanie w ogóle chodzi.** Pod tabelą brakujących paczek
+stoi teraz linijka: kiedy było ostatnie odświeżanie, ile zgłoszeń dostało
+status, ile jeszcze czeka. Gdy Allegro odmawia, jest tam czerwone
+`ALLEGRO ODMAWIA` z treścią błędu. Do tej wersji jedyną drogą do tej
+odpowiedzi był log serwera, a pytanie „czemu ten wiersz nie ma statusu"
+padało na ekranie biura.
+
 ## 0.73.0 — 21 sierpnia 2026
 
 **Poprawka do 0.70.0: stare zgłoszenia nigdy nie dostawały statusu.** Ze
