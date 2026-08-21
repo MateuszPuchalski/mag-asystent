@@ -153,7 +153,7 @@
      bo tam wciąż ktoś jest coś winien. */
   .karta-notatka.nowa { border-color: var(--ok); background: var(--ok-bg); }
   .karta-notatka .odp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
-  #szczegolLinie td.kolFoto { width: 56px; }
+  td.kolFoto { width: 56px; }
   .foto, .brakfoto { width: 48px; height: 48px; border-radius: 10px; display: block; }
   .foto { object-fit: cover; border: 1px solid var(--border); }
   .brakfoto {
@@ -1767,6 +1767,7 @@ const ROWNOLEGLE = 3;
 
 function dolozZdjecia(d) {
   const moja = ++sesjaPodgladu;
+  const aktualne = () => moja === sesjaPodgladu;
   const zadania = [];
   for (const l of d.lines) {
     if (zdjeciaWlaczone) {
@@ -1777,42 +1778,90 @@ function dolozZdjecia(d) {
   }
   for (const p of d.problemyBezLinii) if (p.hasPhoto) zadania.push(zadanieDowodu(p));
 
+  zakolejkuj(zadania, aktualne);
+}
+
+/* Wspólne wejście do kolejki dla wszystkich ekranów ze zdjęciami. Zadanie
+   niesie ze sobą pytanie „czy warto jeszcze pobierać" — bo ekran, z którego
+   pochodzi, mógł się w międzyczasie przerysować albo zniknąć. */
+function zakolejkuj(zadania, aktualne) {
   for (const z of zadania) {
     if (zdjecia.has(z.klucz)) { wstawZdjecie(z, zdjecia.get(z.klucz)); continue; }
-    kolejkaFoto.push({ ...z, sesja: moja });
+    kolejkaFoto.push({ ...z, aktualne });
   }
   while (pobieraczy < ROWNOLEGLE && kolejkaFoto.length) pobieracz();
 }
+
+/* Zdjęcia towarów na karcie zwrotu: pozycje wracające ORAZ całe zamówienie.
+   Biuro ocenia towar z paczki w ręku — obrazek kartoteki mówi od razu, czy to
+   ta sama rzecz, zanim ktokolwiek przeczyta symbol. */
+function dolozZdjeciaZwrotu(z) {
+  if (!zdjeciaWlaczone) return;
+  const moja = ++sesjaZwrotu;
+  const aktualne = () => moja === sesjaZwrotu;
+  const zadania = [];
+  const dodaj = (twId, tabela) => {
+    if (twId == null) return;
+    zadania.push({ klucz: `t${twId}`, url: `/api/products/${twId}/zdjecie`,
+                   sel: `#${tabela} td.kolFoto[data-tw="${twId}"]`, klasa: "foto" });
+  };
+  for (const p of z.pozycje) dodaj(p.twId, "zwrotPozycje");
+  for (const p of z.pozycjeZamowienia || []) dodaj(p.twId, "zwrotZamowienie");
+  zakolejkuj(zadania, aktualne);
+}
+
+/* To samo na liście reklamacji — odświeża się własnym rytmem (co 30 s razem
+   z zakładką), więc ma osobny licznik sesji. */
+function dolozZdjeciaReklamacji(lista) {
+  if (!zdjeciaWlaczone) return;
+  const moja = ++sesjaReklamacji;
+  const aktualne = () => moja === sesjaReklamacji;
+  zakolejkuj(
+    lista.filter((r) => r.twId != null).map((r) => ({
+      klucz: `t${r.twId}`, url: `/api/products/${r.twId}/zdjecie`,
+      sel: `#reklamacjeLista td.kolFoto[data-tw="${r.twId}"]`, klasa: "foto",
+    })),
+    aktualne
+  );
+}
+
+/** Pusta komórka na zdjęcie; wypełni ją kolejka. Bez kartoteki nie ma czego pytać. */
+const kolFoto = (twId) =>
+  !zdjeciaWlaczone ? "" : `<td class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}></td>`;
 
 const zadanieDowodu = (p) => ({
   klucz: `p${p.id}`, url: `/api/problems/${p.id}/photo`,
   sel: `#szczegol [data-foto="${p.id}"]`, klasa: "",
 });
 
+/* Osobne liczniki, bo karta zwrotu i lista reklamacji przerysowują się
+   niezależnie od siebie i od podglądu dostawy. */
+let sesjaZwrotu = 0;
+let sesjaReklamacji = 0;
+
 async function pobieracz() {
   pobieraczy++;
   while (kolejkaFoto.length) {
     const z = kolejkaFoto.shift();
     // zadanie z poprzedniego dokumentu albo z poprzedniego przerysowania
-    if (z.sesja !== sesjaPodgladu) continue;
+    if (!z.aktualne()) continue;
     let url = zdjecia.get(z.klucz);
     if (url === undefined) {
       try { url = URL.createObjectURL(await (await api(z.url)).blob()); }
       catch { url = null; }
       zdjecia.set(z.klucz, url);
     }
-    if (z.sesja !== sesjaPodgladu) continue;
+    if (!z.aktualne()) continue;
     wstawZdjecie(z, url);
   }
   pobieraczy--;
 }
 
 function wstawZdjecie(z, url) {
-  const cel = document.querySelector(z.sel);
-  if (!cel) return;
-  cel.innerHTML = url
+  const tresc = url
     ? `<img class="${z.klasa}" src="${url}" alt="">`
     : z.klasa ? '<div class="brakfoto">bez zdjęcia</div>' : "";
+  for (const cel of document.querySelectorAll(z.sel)) cel.innerHTML = tresc;
 }
 
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
@@ -2174,7 +2223,7 @@ async function odswiezEtap3() {
       (await api("/api/biuro/zwroty/zapowiedzi")).json(),
     ]);
     rysujKosze(k.kosze || []);
-    rysujReklamacje(r.reklamacje || []);
+    rysujReklamacjeZwrotow(r.reklamacje || []);
     rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || []);
   } catch (e) { console.warn(e); }
@@ -2222,10 +2271,12 @@ function rysujKosze(kosze) {
     : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
 }
 
-function rysujReklamacje(lista) {
+function rysujReklamacjeZwrotow(lista) {
   $("reklamacjeLista").innerHTML = lista.length
-    ? "<tr><th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th>PÓŁKA</th><th></th></tr>" +
+    ? `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+      "<th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th>PÓŁKA</th><th></th></tr>" +
       lista.map((r) => `<tr${r.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
+          ${kolFoto(r.twId)}
           <td class="b">${r.poTerminie
             ? `<span class="badge err">${-r.dniDoTerminu} dni PO TERMINIE</span>`
             : `${r.dniDoTerminu} dni`}</td>
@@ -2240,6 +2291,7 @@ function rysujReklamacje(lista) {
           </td>
         </tr>`).join("")
     : '<tr><td class="mute">Żadna reklamacja nie czeka na rozpatrzenie.</td></tr>';
+  dolozZdjeciaReklamacji(lista);
 }
 
 /* Dyskusje i reklamacje z panelu Allegro — na KLIKNIĘCIE, nie z odświeżaniem
@@ -2408,6 +2460,7 @@ function rysujSzczegolZwrotu(z) {
           `<button class="akcja ${p.decyzja === kod ? "" : "cichy"}" data-poz="${p.id}" data-dec="${kod}"
              style="margin:2px 4px 2px 0;font-size:11px;padding:4px 8px">${opis}</button>`).join("");
     return `<tr>
+      ${kolFoto(p.twId)}
       <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}
           ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}
           ${p.externalId && !p.symbol ? `<span class="mute">sygnatura: ${esc(p.externalId)}</span>` : ""}</td>
@@ -2419,8 +2472,10 @@ function rysujSzczegolZwrotu(z) {
     </tr>`;
   }).join("");
   $("zwrotPozycje").innerHTML =
-    "<tr><th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD ZWROTU</th><th>DECYZJA</th></tr>" +
-    (rows || '<tr><td colspan="4" class="mute">Bez pozycji — dopisz je niżej</td></tr>');
+    `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+    "<th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD ZWROTU</th><th>DECYZJA</th></tr>" +
+    (rows ||
+      `<tr><td colspan="${zdjeciaWlaczone ? 5 : 4}" class="mute">Bez pozycji — dopisz je niżej</td></tr>`);
 
   // dopisywanie pozycji: tylko zwrot ręczny i tylko przed rozliczeniem
   $("zwrotDodajPozycje").hidden = !(z.allegroReturnId == null && !zamkniety);
@@ -2434,8 +2489,9 @@ function rysujSzczegolZwrotu(z) {
     $("zwrotZamowienie").innerHTML = `<h2>CAŁE ZAMÓWIENIE (${zam.length} poz., wraca ${wraca})</h2>
       <p class="mute" style="margin-bottom:6px">Co klient kupił w tym zamówieniu — pozycje bez znacznika zostały u niego.</p>
       <table>${
-        "<tr><th></th><th>TOWAR</th><th>ILOŚĆ</th></tr>" +
+        `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}<th></th><th>TOWAR</th><th>ILOŚĆ</th></tr>` +
         zam.map((p) => `<tr${p.zwracana ? "" : ' class="mute"'}>
+            ${kolFoto(p.twId)}
             <td style="white-space:nowrap">${p.zwracana
               ? '<span class="badge amber">WRACA</span>'
               : '<span class="badge mute2">zostaje</span>'}</td>
@@ -2481,6 +2537,9 @@ function rysujSzczegolZwrotu(z) {
 
   rysujDokumentyZwrotu(z);
   rysujKoszZwrotu(z);
+  /* Zdjęcia dociągają się PO narysowaniu karty: obrazek nie może opóźniać
+     decyzji na ekranie, a kolejka wypełni komórki, gdy przyjdą. */
+  dolozZdjeciaZwrotu(z);
 
   const srodki = z.zwrotSrodkow
     ? `<span class="badge ok">ŚRODKI ODDANE</span>

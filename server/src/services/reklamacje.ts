@@ -25,6 +25,8 @@ export interface WierszReklamacji {
   kupujacyLogin: string | null;
   nazwa: string;
   symbol: string | null;
+  /** Kartoteka — po niej biuro dociąga zdjęcie towaru; NULL = towar spoza katalogu. */
+  twId: number | null;
   ilosc: number;
   powod: string | null;
   powodOpis: string | null;
@@ -62,7 +64,7 @@ export function listaReklamacji(opts: { rozpatrzone?: boolean } = {}): WierszRek
   const filtr = opts.rozpatrzone ? "p.rekl_wynik IS NOT NULL" : "p.rekl_wynik IS NULL";
   const wiersze = db()
     .prepare(
-      `SELECT p.id AS pozycja_id, p.zwrot_id, p.nazwa, p.external_id, p.ilosc,
+      `SELECT p.id AS pozycja_id, p.zwrot_id, p.nazwa, p.external_id, p.tw_id, p.ilosc,
               p.powod, p.powod_opis, p.notatka,
               p.rekl_wynik, p.rekl_at, p.rekl_przez, p.rekl_notatka, p.rekl_polka,
               z.referencja, z.waybill, z.kupujacy_login, z.utworzono_allegro, z.utworzono_at
@@ -84,6 +86,7 @@ export function listaReklamacji(opts: { rozpatrzone?: boolean } = {}): WierszRek
       kupujacyLogin: (w.kupujacy_login as string) ?? null,
       nazwa: w.nazwa as string,
       symbol: (w.external_id as string) ?? null,
+      twId: (w.tw_id as number) ?? null,
       ilosc: w.ilosc as number,
       powod: (w.powod as string) ?? null,
       powodOpis: (w.powod_opis as string) ?? null,
@@ -156,7 +159,7 @@ export interface RaportZwrotow {
   kosze: { otwarte: number; zamkniete: number; rozlozone30dni: number };
   reklamacje: { otwarte: number; poTerminie: number; rozpatrzone30dni: number };
   /** Zgłoszenia z Allegro czekające na paczkę; `brakujace` = dłużej niż próg (Etap 4). */
-  zapowiedzi: { oczekujace: number; brakujace: number };
+  zapowiedzi: { oczekujace: number; brakujace: number; doreczoneNieprzyjete: number };
   /** Mediana godzin od przyjęcia skanem do rozliczenia (30 dni); null = brak danych. */
   medianaGodzinDoRozliczenia: number | null;
 }

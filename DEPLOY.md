@@ -869,6 +869,11 @@ Miniatura na karcie towaru wymaga APK w wersji **0.30.0 lub nowszej**.
 Serwer wyda zdjęcia od razu po restarcie, starszy kolektor nie ma ich gdzie
 narysować.
 
+Ta sama funkcja rysuje od 0.72.0 miniatury na **karcie zwrotu Allegro**
+(pozycje wracające i całe zamówienie) oraz na **liście reklamacji**. Nic tu
+nie trzeba włączać osobno: gdy `ZDJECIA_ZRODLO` jest ustawione, kolumna
+pojawia się sama, a bez niej znika razem z nagłówkiem.
+
 **Zdjęcie dodane w Subiekcie pojawia się z opóźnieniem** i to jest projektowe.
 Serwer pamięta „ta kartoteka zdjęcia nie ma" przez `ZDJECIA_BRAK_TTL_H`
 (12 godzin), a kolektor przez dobę. Inaczej setki kartotek bez zdjęcia

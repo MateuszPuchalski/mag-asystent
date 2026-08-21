@@ -33,6 +33,34 @@ historii nie przepisujemy.
 
 ---
 
+## 0.72.0 — 21 sierpnia 2026
+
+**Zdjęcia towarów na karcie zwrotu.** Biuro ocenia towar z paczki w ręku,
+a na ekranie miało dotąd sam symbol i nazwę oferty. Miniatura kartoteki mówi
+od razu, czy w kartonie leży to samo, co klient kupił — zanim ktokolwiek
+przeczyta sygnaturę. Kolumna doszła w trzech miejscach zakładki ZWROTY
+ALLEGRO: przy pozycjach wracających, przy CAŁYM ZAMÓWIENIU i na liście
+reklamacji.
+
+Zero nowej maszynerii: to ta sama kolejka, która od 0.30.0 rysuje zdjęcia
+w podglądzie dostawy — z cache'em, limitem trzech równoległych pobrań
+i pamięcią o kartotekach bez zdjęcia. Kolumna pokazuje się tylko wtedy, gdy
+`ZDJECIA_ZRODLO` jest ustawione; bez źródła znika razem z nagłówkiem.
+Pozycja spoza kartoteki nie ma czego pokazać i zostaje pusta.
+
+Przy okazji kolejka nauczyła się dwóch rzeczy. Pilnowanie „czy ten ekran
+jeszcze istnieje" jest teraz pytaniem zadawanym per zadanie, bo ekranów ze
+zdjęciami jest kilka i każdy odświeża się własnym rytmem. Ten sam towar
+w dwóch wierszach dostaje zdjęcie w obu — wcześniej trafiał je tylko pierwszy.
+
+**Naprawa: lista wyjątków dostawy była pusta.** W jednym pliku strony żyły
+DWIE funkcje `rysujReklamacje` — dostawowa i zwrotowa, dodana w 0.59.0.
+Druga deklaracja przesłania pierwszą, więc zakładka DOSTAWY wołała renderer
+zwrotów: tabela wyjątków nie miała się czym wypełnić, a karta reklamacji
+zwrotowych bywała nadpisywana wierszami z zupełnie innego ekranu. Zwrotowa
+nazywa się teraz `rysujReklamacjeZwrotow`, a nowy test pilnuje, żeby żadna
+nazwa funkcji nie powtórzyła się na stronie po raz drugi.
+
 ## 0.71.0 — 21 sierpnia 2026
 
 **Z karty towaru wprost do jego pozycji w dostawie.** Linia „W dostawie 6 szt
