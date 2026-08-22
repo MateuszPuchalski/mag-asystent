@@ -33,6 +33,59 @@ historii nie przepisujemy.
 
 ---
 
+## 0.84.0 — 22 sierpnia 2026
+
+**Biuro widzi, kto rozłożył kosz i o której.** Dane leżały w bazie od
+pierwszego zakończenia — `zakonczKosz` zapisuje nazwisko i znacznik czasu — ale
+nie miały drogi na ekran. Biuro pytało „kto to zrobił" i szło po odpowiedź do
+dziennika audytowego, czyli tam, gdzie szuka się rzeczy podejrzanych, a nie
+zwykłych.
+
+Lista KOSZE ZWROTOWE dostaje kolumnę **ROZŁOŻYŁ**: nazwisko, pod nim godzina.
+Podgląd kosza pokazuje cały cykl życia jedną linią — kto zamknął i kto
+rozłożył. To dwie różne odpowiedzi na dwa różne pytania: lista mówi rzutem oka
+„czy zrobione i przez kogo", podgląd mówi przy sprawie „co się z tym działo".
+
+Kosz nierozłożony ma w kolumnie **myślnik, nie pustkę**. Pusta komórka wygląda
+na brak danych, a to jest odpowiedź „jeszcze nikt". Po COFNIJ ZAKOŃCZENIE ślad
+znika razem z rozłożeniem: nazwisko, które by zostało, mówiłoby o pracy,
+której w tej chwili nie ma.
+
+Przy okazji dwie rzeczy w tym samym rejonie. Pozycja odłożona pokazywała
+nazwisko bez godziny — czyli pół odpowiedzi na to samo pytanie; teraz niesie
+oba. A wyszukiwarka towaru w koszach formatowała datę własnym cięciem napisu,
+z pominięciem strefy — dwie metody formatowania w jednym pliku rozjeżdżają się
+o godzinę prędzej czy później.
+
+**Na kolektorze ZAKOŃCZ przeniósł się nad listę.** Przy koszu na dwadzieścia
+pozycji magazynier odkładał ostatnią rzecz i musiał przewinąć przez całą
+zrobioną robotę, żeby domknąć pracę — kciukiem, w rękawicy, z koszem w drugiej
+ręce.
+
+Reguła z dostaw zostaje w mocy i to ona rozstrzygnęła kształt tej zmiany.
+Zakończenie pojawia się dokładnie tak jak dotąd: dopiero gdy nie ma już nic do
+odłożenia. Zmienia się miejsce, nie warunek — więc dalej nie ma jak kusić na
+starcie pracy.
+
+Samo przestawienie przycisku nad listę odwróciłoby tylko kierunek przewijania:
+ostatnie odłożenie zostawia listę tam, gdzie stał palec. Dlatego szapka
+**wychodzi spod przewijania** — pasek stoi, lista przewija się pod nim.
+Dorzucenie zamiast tego skoku na górę odbierałoby przewinięcie w chwili,
+w której człowiek sprawdza wzrokiem właśnie zwinięty wiersz.
+
+Nagłówek dopisuje przy komplecie słowo **KOMPLET** na zielono. „ODŁOŻONE 12/12"
+wymaga porównania dwóch liczb, a jedno słowo czyta się z odległości ramienia.
+Kosz z pominięciem go nie dostaje, bo kompletem nie jest.
+
+COFNIJ ZAKOŃCZENIE **zostaje pod listą** i to nie jest przeoczenie. Zdanie
+o stanie kosza idzie do szapki, bo bez niego ekran nie odpowiada, dlaczego nic
+się na nim nie da zrobić. Ale sam przycisk to droga powrotna z pomyłki, a nie
+wyjście z ekranu — od tego jest WSTECZ w pasku zakładek. Przypięty u góry byłby
+najbardziej rzucającą się w oczy rzeczą na ekranie, na którym poprawnym ruchem
+jest odejście.
+
+---
+
 ## 0.83.0 — 22 sierpnia 2026
 **Panel biura przestał siedzieć w kolumnie pośrodku ekranu.** Układ nie zmienił
 się od pierwszej wersji: `main` miał szerokość 1080 px, a każdy widok był jedną

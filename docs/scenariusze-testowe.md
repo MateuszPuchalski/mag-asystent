@@ -754,7 +754,14 @@ magazynów („MAG 12 · ZWR 3") i — gdy kartoteka ma zdjęcie — miniaturę 
 Pozycję `TEST-ZABLOKOWANY` **pomiń** z powodem „nie ma w koszu": ma zejść
 z listy pracy, zostać z czerwonym podpisem i przestać blokować zakończenie.
 
-Odłóż resztę skanem regału i kliknij **ZAKOŃCZ — KOSZ ROZŁOŻONY**. Sedno
+Odłóż resztę skanem regału. Gdy nie ma już nic do odłożenia, przycisk
+**ZAKOŃCZ** ma stanąć NAD listą, w pasku, który się nie przewija.
+
+Sprawdź to przy koszu przewiniętym do ostatniej pozycji: domknięcie pracy nie
+ma wymagać przewijania w żadną stronę. Nagłówek ma wtedy dopisać KOMPLET.
+Kosz z pominięciem tego słowa nie dostaje.
+
+Kliknij **ZAKOŃCZ — KOSZ ROZŁOŻONY**. Sedno
 tego scenariusza: `SELECT * FROM sfera_queue WHERE type='mm'` ma zostać
 **puste**. Przesunięcie na regał zrobiło biuro przed przywiezieniem kosza,
 powrotne zrobi po rozłożeniu; dokument z kolektora byłby tym samym towarem
@@ -771,6 +778,11 @@ Przycisk **PÓŹNIEJ — NA KONIEC LISTY** zsuwa pozycję na dół, zostawiając
 w stanie „czeka". ZAKOŃCZ ma jej nadal nie przepuścić. Po zakończeniu kosza
 przycisk **COFNIJ ZAKOŃCZENIE** ma go otworzyć z powrotem, z pozycjami
 w stanie sprzed kliknięcia.
+
+Biuro po rozłożeniu. W `/biuro` → ZWROTY ALLEGRO kolumna **ROZŁOŻYŁ** ma
+pokazać nazwisko i godzinę, a podgląd kosza — cały cykl życia: kto zamknął,
+kto rozłożył. Kliknij COFNIJ ZAKOŃCZENIE: kolumna ma wrócić do myślnika.
+Nazwisko, które zostałoby po cofnięciu, mówiłoby o pracy, której już nie ma.
 
 Bramka roli: na wierszu przyjęcia akcja **JUŻ ROZŁOŻONY** należy do admina.
 Na koncie magazyniera trasa `POST /api/przyjecia/:dokId/poza-aplikacja` ma

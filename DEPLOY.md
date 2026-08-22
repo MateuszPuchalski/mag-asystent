@@ -1118,6 +1118,13 @@ ze sprzedaży, a fizycznie trzeba go odłożyć. Nazwę bierze wtedy wprost
 z dokumentu, skanowanie kodem nie zadziała (kartoteki nie ma w aplikacji), więc
 magazynier wskazuje pozycję palcem. Adres zapisze się i na takiej kartotece.
 
+Przycisk kończący rozkładanie stoi od 0.84.0 **nad listą**, w pasku, który się
+nie przewija. Pojawia się dokładnie tak jak dotąd — dopiero gdy nie ma już nic
+do odłożenia — więc nie kusi na starcie pracy. Zmieniło się miejsce, nie
+warunek: przy koszu na dwadzieścia pozycji domknięcie pracy nie wymaga już
+przewinięcia przez całą robotę, która została zrobiona. Nagłówek dopisuje
+wtedy słowo KOMPLET, a kosz z pominięciem go nie dostaje.
+
 Otwarty kosz pokazuje od 0.77.0 to samo co rozkładana dostawa. Zdjęcie towaru,
 ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazynów
 z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
@@ -1126,6 +1133,11 @@ zostało jeszcze na regale zwrotów.
 Biuro sprawdza zawartość kosza w `/biuro` → ZWROTY ALLEGRO, karta KOSZE
 ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
 i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
+
+Od 0.84.0 lista niesie kolumnę **ROZŁOŻYŁ**: nazwisko i godzinę. Podgląd
+pokazuje cały cykl życia kosza — kto go zamknął i kto rozłożył, z godzinami.
+Kosz jeszcze nierozłożony ma w tej kolumnie myślnik, a po COFNIJ ZAKOŃCZENIE
+ślad znika, bo kosz wrócił do rozkładania i nie jest rozłożony przez nikogo.
 Pole SZUKAJ TOWARU W KOSZACH odpowiada na pytanie „w którym koszu to jechało"
 — po symbolu, nazwie albo kodzie kreskowym. Wszystkie pominięcia zbiera
 osobna karta POMINIĘTE POZYCJE, sortowana od najdłużej czekających. Przycisk

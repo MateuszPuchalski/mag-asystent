@@ -42,7 +42,9 @@ interface WierszKosza {
   utworzono_at: string;
   utworzono_przez: string;
   zamknieto_at: string | null;
+  zamknieto_przez: string | null;
   rozlozono_at: string | null;
+  rozlozono_przez: string | null;
   /** Dokument MM, z którego kosz powstał; NULL = kosz złożony w aplikacji. */
   mm_dok_id: number | null;
   mm_numer: string | null;
@@ -73,6 +75,12 @@ export interface PozycjaKosza {
   lokOczekiwana: string | null;
   lokFaktyczna: string | null;
   odlozonoPrzez: string | null;
+  /** Kiedy odłożona (0.84.0). Sama osoba to pół odpowiedzi na to samo pytanie. */
+  odlozonoAt: string | null;
+  /** Sprawa pominięcia zamknięta przez biuro (0.77.0). */
+  zalatwioneAt: string | null;
+  zalatwionePrzez: string | null;
+  zalatwioneNotatka: string | null;
   /** Dlaczego pozycja została pominięta; null poza statusem `skipped`. */
   powod: string | null;
   /** Odłożona na PÓŹNIEJ — zjeżdża na koniec listy, ale zostaje do zrobienia. */
@@ -88,7 +96,10 @@ export interface SzczegolKosza {
   status: string;
   utworzonoAt: string;
   zamknietoAt: string | null;
+  zamknietoPrzez: string | null;
   rozlozonoAt: string | null;
+  /** Kto rozłożył (0.84.0) — patrz komentarz przy `WierszListyKoszy`. */
+  rozlozonoPrzez: string | null;
   zwroty: Array<{ id: number; referencja: string | null; waybill: string }>;
   pozycje: PozycjaKosza[];
   odlozonych: number;
@@ -117,6 +128,16 @@ export interface WierszListyKoszy {
   mmNumer: string | null;
   utworzonoAt: string;
   zamknietoAt: string | null;
+  zamknietoPrzez: string | null;
+  /**
+   * Kto i kiedy rozłożył kosz (0.84.0). Dane leżały w bazie od pierwszego
+   * zakończenia, ale nie miały drogi na ekran — biuro pytało „kto to zrobił"
+   * i szło po odpowiedź do dziennika. NULL do chwili zakończenia, i znowu
+   * NULL po COFNIJ ZAKOŃCZENIE: kosz, który wrócił do rozkładania, nie jest
+   * rozłożony przez nikogo.
+   */
+  rozlozonoAt: string | null;
+  rozlozonoPrzez: string | null;
 }
 
 /** Kod z etykiety kosza — po trim/upper, żeby skan i wpis ręczny się spotkały. */
@@ -258,7 +279,8 @@ export function listaKoszy(): WierszListyKoszy[] {
   /* Rozłożone tylko świeże: lista służy pracy, historię trzyma audyt. */
   const wiersze = db()
     .prepare(
-      `SELECT k.id, k.kod, k.status, k.utworzono_at, k.zamknieto_at,
+      `SELECT k.id, k.kod, k.status, k.utworzono_at,
+              k.zamknieto_at, k.zamknieto_przez, k.rozlozono_at, k.rozlozono_przez,
               (SELECT COUNT(*) FROM zwrot z WHERE z.kosz_id = k.id) AS zwrotow,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
@@ -280,6 +302,9 @@ export function listaKoszy(): WierszListyKoszy[] {
     mmNumer: (w.mm_numer as string) ?? null,
     utworzonoAt: w.utworzono_at as string,
     zamknietoAt: (w.zamknieto_at as string) ?? null,
+    zamknietoPrzez: (w.zamknieto_przez as string) ?? null,
+    rozlozonoAt: (w.rozlozono_at as string) ?? null,
+    rozlozonoPrzez: (w.rozlozono_przez as string) ?? null,
   }));
 }
 
@@ -329,6 +354,7 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     lokOczekiwana: (w.lok_faktyczna as string) ?? adresy.get(w.tw_id as number) ?? null,
     lokFaktyczna: (w.lok_faktyczna as string) ?? null,
     odlozonoPrzez: (w.odlozono_przez as string) ?? null,
+    odlozonoAt: (w.odlozono_at as string) ?? null,
     powod: (w.powod as string) ?? null,
     pozniejAt: (w.pozniej_at as string) ?? null,
     zalatwioneAt: (w.zalatwione_at as string) ?? null,
@@ -385,7 +411,9 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     status: kosz.status,
     utworzonoAt: kosz.utworzono_at,
     zamknietoAt: kosz.zamknieto_at,
+    zamknietoPrzez: kosz.zamknieto_przez,
     rozlozonoAt: kosz.rozlozono_at,
+    rozlozonoPrzez: kosz.rozlozono_przez,
     zwroty,
     pozycje,
     odlozonych: pozycje.filter((p) => p.status === "done").length,
