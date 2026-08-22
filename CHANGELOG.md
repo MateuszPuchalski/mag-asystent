@@ -33,6 +33,72 @@ historii nie przepisujemy.
 
 ---
 
+## 0.81.0 — 22 sierpnia 2026
+
+**Panel biura przestał siedzieć w kolumnie pośrodku ekranu.** Układ nie zmienił
+się od pierwszej wersji: `main` miał szerokość 1080 px, a każdy widok był jedną
+kolumną kart. Na monitorze 1920 px dwie trzecie szerokości było pustym
+marginesem, a zakładka ZWROTY miała jedenaście kart jedna pod drugą.
+
+Karty układają się teraz w tyle kolumn, ile mieści okno. **Progów rozdzielczości
+nie ma** — liczba kolumn wychodzi z arytmetyki siatki, więc nie ma czego
+utrzymywać przy następnym monitorze. Laptop dostaje jedną kolumnę na pełną
+szerokość, 1920 px dwie, 2560 px trzy. Panel otwarty na pół ekranu obok
+Subiekta zagęszcza się sam.
+
+Szerokość kolumny dobrana jest pod TREŚĆ, nie pod ekran: tabela zwrotów ma
+sześć kolumn i poniżej 44 rem zaczyna się zawijać. Klasy „karta na dwie
+kolumny" świadomie nie ma — przy trzech kolumnach zostawiała trzecią pustą,
+bo karty rozpięte na dwie nie mają się z czym sparować.
+
+**Pasek stanu i zakładki są przyklejone.** Przewinięcie listy dostaw nie zabiera
+z ekranu ani nawigacji, ani alarmu o kolejce w błędzie — a to jest jedyny powód,
+dla którego ten pasek w ogóle stoi na górze. Jego wysokość jest MIERZONA, nie
+wpisana: nagłówek zawija się na wąskim oknie, a pasek stanu rośnie o kafle
+alarmów. Od tej liczby zależy też `scroll-margin-top`, więc karta, do której
+prowadzi kliknięcie kafla, nie wjeżdża pod pasek.
+
+`main` musiał przy okazji przestać być siatką. Element `position: sticky` będący
+elementem siatki dostaje obszar dokładnie własnej wysokości, więc nie ma zakresu
+ruchu i po prostu się nie przykleja. Siatką jest teraz każdy widok osobno.
+
+**Tabele mają własne przewijanie**, a listy o nieograniczonej długości —
+ograniczoną wysokość z przyklejonym nagłówkiem kolumn. Jedna dostawa na
+siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
+Zakładka DZIENNIK zeszła przez to z 3700 px do 850 px, czyli mieści się
+w oknie razem z filtrami.
+
+**Karta WGLĄD** zbiera na zakładce ZWROTY raport procesu, statystyki, czasy
+obsługi i konto Allegro. Domyślnie rozwinięty jest sam raport. Zwinięta sekcja
+NIE PYTA SERWERA — to nie jest chowanie pikseli: raport szedł dotąd w każdym
+trzydziestosekundowym cyklu odświeżania, a statystyki i czasy to osobne
+żądania liczące do stu osiemdziesięciu dni wstecz.
+
+Wybór zapamiętuje przeglądarka. Jeden wyjątek jest twardy: rozerwane parowanie
+z Allegro otwiera sekcję KONTO ALLEGRO samo. Skan etykiety wtedy nie zadziała,
+a to nie jest rzecz do odkrycia przez rozwijanie sekcji. Alarm się nie chowa.
+
+**Szczegół staje obok listy.** Wejście w zwrot albo w dostawę ukrywało dotąd
+wszystkie karty rodzeństwa — biuro traciło listę, nad którą pracowało, i po
+powrocie wracało na jej górę. Na oknie szerszym niż 1280 px lista zostaje po
+lewej, szczegół stoi obok niej z własnym przewijaniem, a otwarty wiersz jest
+podświetlony. Na węższym oknie zostaje zachowanie sprzed tej wersji: dwie
+kolumny nie mieszczą się na laptopie obok siebie.
+
+Widoczność kart rodzeństwa liczy się teraz w JEDNYM miejscu na widok, zamiast
+w dwóch listach identyfikatorów wypisanych z ręki. Te dwie listy zdążyły się
+już rozjechać: zamknięcie zwrotu nie przywracało karty brakujących paczek.
+
+Zagęszczenie: `td` z 9 na 6 px, karta z 16/18 na 12/14, `h2` z 10 na 7.
+Wysokość przycisków i pól zostaje bez zmian — to są cele kliknięcia i one nie
+są miejscem na oszczędności. Akapity objaśniające dostały granicę 74 znaków
+w wierszu, bo karta rozciągnięta na 900 px daje wiersz nieczytelny.
+
+Sprawdzone w Chromium na ośmiu szerokościach od 900 do 3440 px, na wszystkich
+pięciu zakładkach: żadna nie rozpycha strony w poziomie.
+
+---
+
 ## 0.80.0 — 22 sierpnia 2026
 
 **Biuro widzi wreszcie, ile towar STOI.** Zwroty miały dwie karty liczb:

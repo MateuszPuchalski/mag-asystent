@@ -691,6 +691,40 @@ blokuje — decyzja należy do pracodawcy — a sam raport niesie tę informacj�
 w polu `podstawaPrawna`. Techniczny audyt „kto zmienił lokalizację" to **co
 innego** i nie wymaga wstrzymania.
 
+## 5b. Panel biura — układ ekranu (0.81.0)
+
+Do 0.80.0 treść panelu siedziała w kolumnie 1080 px pośrodku ekranu. Na
+monitorze 1920 px dwie trzecie szerokości było pustym marginesem, a zakładka
+ZWROTY ALLEGRO miała jedenaście kart jedna pod drugą.
+
+Od 0.81.0 karty układają się w tyle kolumn, ile mieści okno. Progów
+rozdzielczości nie ma — liczba kolumn wychodzi z arytmetyki siatki. Laptop
+dostaje jedną kolumnę na pełną szerokość, monitor 1920 px dwie, 2560 px trzy.
+Panel otwarty na pół ekranu obok Subiekta zagęszcza się sam.
+
+Pasek stanu i zakładki są **przyklejone do góry**. Przewinięcie długiej listy
+nie zabiera z ekranu ani nawigacji, ani alarmu o kolejce w błędzie.
+
+Każda tabela ma własne przewijanie, a listy o nieograniczonej długości mają
+ograniczoną wysokość z przyklejonym nagłówkiem kolumn. Jedna dostawa na
+siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
+
+**Karta WGLĄD** na zakładce ZWROTY zbiera raport procesu, statystyki, czasy
+obsługi i stan konta Allegro. Domyślnie rozwinięty jest sam raport, reszta
+czeka zwinięta. Zwinięta sekcja **nie pyta serwera** — to nie jest chowanie
+pikseli, tylko oszczędność żądań: raport szedł dotąd w każdym
+trzydziestosekundowym cyklu odświeżania.
+
+Wybór, co jest rozwinięte, zapamiętuje przeglądarka. Jeden wyjątek: gdy
+parowanie z Allegro jest rozerwane, sekcja KONTO ALLEGRO otwiera się sama.
+Skan etykiety wtedy nie zadziała, a to nie jest rzecz do odkrycia przez
+rozwijanie sekcji.
+
+**Szczegół obok listy.** Wejście w zwrot albo w dostawę na oknie szerszym niż
+1280 px zostawia listę widoczną po lewej, a szczegół stawia obok niej. Otwarty
+wiersz jest podświetlony. Na węższym oknie szczegół zasłania listę,
+jak wcześniej — dwie kolumny nie mieszczą się na laptopie obok siebie.
+
 ## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
 > **Test na wersji edu (bez Sfery):** kompletna instrukcja krok po kroku —
