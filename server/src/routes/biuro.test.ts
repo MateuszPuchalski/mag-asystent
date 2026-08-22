@@ -481,3 +481,94 @@ test("podgląd kosza w biurze czyta tę samą trasę, co karta zwrotu", () => {
   assert.match(html, /pominieteKarta/, "lista pominięć jako karta pracy");
   assert.match(html, /koszSzukaj/, "szukanie towaru w koszach");
 });
+
+test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
+  /* Prompt eksperta stał do 0.85.0 na PYTANIACH, reguły strefy na ANALIZIE,
+     a dane firmy w środku karty REKLAMACJE. Wspólne dla nich jest to, że
+     ustawia się je razy kilka w roku, a pion zabierały codziennie.
+
+     Test celuje w POŁOŻENIE, bo nic innego go nie trzyma: pola mają te same
+     `id` co przedtem, więc zapis działałby tak samo z powrotem wklejony na
+     zakładkę pracy — i nikt by tego nie zauważył do następnego zrzutu ekranu. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const wycinek = (od: string, doo: string) => {
+    const a = html.indexOf(od);
+    assert.notEqual(a, -1, `brak ${od}`);
+    const b = html.indexOf(doo, a);
+    assert.notEqual(b, -1, `brak ${doo} po ${od}`);
+    return html.slice(a, b);
+  };
+  const ustawienia = wycinek('id="widokDostawcy"', "</main>");
+  for (const pole of ["pytaniaPrompt", "pytaniaFakty", "reguly", "firmaNazwa", "dostawcy"]) {
+    assert.ok(ustawienia.includes(`id="${pole}"`), `${pole} należy do ustawień`);
+  }
+
+  const pytania = wycinek('id="widokPytania"', 'id="widokNadzor"');
+  assert.ok(!pytania.includes('id="pytaniaPrompt"'), "prompt zszedł z zakładki pracy");
+  const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
+  assert.ok(!analiza.includes('id="reguly"'), "reguły zeszły z ANALIZY");
+  assert.ok(analiza.includes("Ustawieniach"), "ANALIZA mówi, gdzie ustawia się reguły");
+  const dostawy = wycinek('id="widokDostawy"', 'id="widokZwroty"');
+  assert.ok(!dostawy.includes('id="firmaNazwa"'), "dane firmy zeszły z REKLAMACJI");
+});
+
+test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
+  /* Siatka układa karty w kolejności dokumentu, więc kolejność w HTML JEST
+     kolejnością na ekranie. Nic w JS jej nie pilnuje — przestawienie sekcji
+     przy następnej zmianie przeszłoby bez śladu. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const przed = (a: string, b: string, czemu: string) => {
+    const ia = html.indexOf(`id="${a}"`);
+    const ib = html.indexOf(`id="${b}"`);
+    assert.ok(ia !== -1 && ib !== -1, `${a} albo ${b} nie istnieje`);
+    assert.ok(ia < ib, czemu);
+  };
+  przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
+  przed("pytaniaListaKarta", "pytaniaWklejkaKarta", "lista pytań przed wklejką z poczty");
+});
+
+test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
+  /* Ikona bez bloku obok siebie jest przyciskiem, który nic nie robi, a blok
+     bez ikony jest tekstem, którego nie da się otworzyć. Delegacja szuka
+     bloku jako NASTĘPNEGO rodzeństwa nagłówka, więc obie połówki muszą
+     istnieć w równej liczbie — i w tej samej karcie. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const ikony = html.match(/class="info"/g) ?? [];
+  const bloki = html.match(/class="objasnienie"/g) ?? [];
+  assert.ok(ikony.length >= 15, `ikon objaśnień: ${ikony.length}`);
+  assert.equal(ikony.length, bloki.length, "każda ikona ma swój blok");
+  assert.match(
+    html,
+    /<\/h2>\s*<div class="objasnienie" hidden>/,
+    "blok stoi bezpośrednio po nagłówku — inaczej delegacja go nie znajdzie"
+  );
+  assert.match(html, /h2 \.info/, "ikona ma własny styl");
+});
+
+test("zwinięta sekcja statystyk pytań nie pyta serwera", () => {
+  /* Cała oszczędność tej zmiany polega na tym, że zwinięte statystyki NIE
+     jadą po dane przy każdym wejściu na zakładkę. Gdyby wywołanie wróciło
+     obok `dociagnijWglad`, sekcja dalej byłaby zwinięta i nikt by nie
+     zauważył — poza serwerem, który dostaje żądanie kilkanaście razy dziennie. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /SEKCJE_WGLADU = \[[^\]]*"pytaniaStatystyki"/s, "sekcja w rejestrze");
+  assert.match(html, /pytaniaStatystyki: \["pytaniaKafle"/, "wiadomo, czym ją wypełnić");
+  const wejscie = html.match(/if \(nowy === "pytania"\).*/)?.[0] ?? "";
+  assert.ok(wejscie.includes("dociagnijWglad"), "wejście na zakładkę dociąga warunkowo");
+  assert.ok(
+    !wejscie.includes("odswiezStatystykiPytan()"),
+    "wejście na zakładkę NIE pobiera statystyk bezwarunkowo"
+  );
+});

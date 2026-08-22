@@ -712,10 +712,37 @@ STATYSTYKI, odśwież stronę: mają zostać rozwinięte. Zwiń wszystko i zosta
 zakładkę otwartą na minutę — w narzędziach przeglądarki nie mają lecieć
 żądania o raport, statystyki ani czasy. Zwinięta sekcja nie pyta serwera.
 
+Ta sama reguła obowiązuje statystyki na zakładce PYTANIA KLIENTÓW. Wejdź na
+nią przy zwiniętej sekcji: ma polecieć żądanie o listę pytań i **żadne**
+o statystyki. Rozwiń sekcję — dane mają dojść od razu, jednym żądaniem, nie
+dwoma. Podwójne żądanie znaczy, że przywrócenie układu wzięto za kliknięcie.
+
+Kliknij ikonę **i** przy nagłówku dowolnej karty. Objaśnienie ma się rozwinąć
+pod nagłówkiem i zwinąć przy drugim kliknięciu. Po odświeżeniu strony ma być
+znowu schowane — stanu objaśnień świadomie nie pamiętamy.
+
 Kliknij wiersz zwrotu przy szerokim oknie: lista ma zostać po lewej, a karta
 zwrotu stanąć obok niej, z podświetlonym wierszem. Zwęź okno poniżej 1280 px
 przy otwartym zwrocie — szczegół ma zasłonić listę. Rozszerz z powrotem: ma
 wrócić układ dwukolumnowy, bez odświeżania strony.
+
+### S69g — konfiguracja za zębatką
+
+Kliknij ikonę koła zębatego w prawym górnym rogu panelu. Widok ustawień ma
+mieć cztery karty: **PROMPT EKSPERTA I FAKTY FIRMOWE**, **DANE FIRMY DO
+FORMULARZY DOSTAWCÓW**, **REGUŁY STREFY ZŁOTEJ** i **LOGO DOSTAWCÓW**.
+
+Sprawdź, że żadnej z nich nie ma na zakładkach pracy. Prompt nie stoi na
+PYTANIACH, reguły nie stoją na ANALIZIE, a dane firmy nie stoją w karcie
+REKLAMACJE. Zakładka ANALIZA ma za to zdanie mówiące, gdzie te reguły są.
+
+Zmień coś w FAKTACH i zapisz. Wiersz pod przyciskiem ma pokazać datę i osobę.
+Ta sama trasa na koncie biura ma odpowiedzieć 403 — prompt i fakty zmienia
+wyłącznie admin, a mówi to serwer, nie przeglądarka.
+
+Wejdź na PYTANIA i na ANALIZĘ z otwartymi narzędziami przeglądarki. Żadna
+z nich nie ma już pytać o `pytania/prompt` ani o `strefa` — te dwa żądania
+lecą dopiero po wejściu w ustawienia.
 
 ### S70 — dostawca z logo i dostawca bez logo
 
