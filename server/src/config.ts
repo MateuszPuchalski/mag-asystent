@@ -290,6 +290,36 @@ export const config = {
         : "https://api.allegro.pl"),
   },
 
+  /**
+   * Pytania klientów (0.79.0) — szkic odpowiedzi pisze model językowy.
+   *
+   * `provider` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM, jak `allegro.clientId`:
+   * puste wynika z `SGT_MODE` (seeded → `dev`, mssql → funkcji nie ma), a
+   * zakładka PYTANIA KLIENTÓW mówi wtedy wprost, co dopisać do wertis.env.
+   *
+   * Dwaj dostawcy, bo właściciel ma dziś konto u jednego z nich i zmiana nie
+   * może wymagać przebudowy: obaj przyjmują obraz (screenshot pytania) i obaj
+   * mówią zwykłym HTTPS-em, więc kosztem jest jedna gałąź w `services/ai.ts`,
+   * nie druga zależność.
+   *
+   * Klucz mieszka w env, a NIE w bazie — inaczej niż token Allegro, który
+   * odświeżenie wymienia na nowy. Klucz API jest stały i nadaje go człowiek.
+   */
+  ai: {
+    /** "" (wg SGT_MODE) | dev | anthropic | openai. */
+    provider: (process.env.AI_PROVIDER ?? "") as "" | "dev" | "anthropic" | "openai",
+    anthropicKey: process.env.ANTHROPIC_API_KEY ?? "",
+    openaiKey: process.env.OPENAI_API_KEY ?? "",
+    /** Puste = domyślny model dostawcy. Env zostaje, żeby zmiana modelu nie wymagała wydania. */
+    model: process.env.AI_MODEL ?? "",
+    /**
+     * Ile czekamy na odpowiedź modelu. Minuta, nie dziesięć sekund jak przy
+     * Allegro: odpowiedź z obrazem i rozumowaniem trwa dziesiątki sekund,
+     * a ticker liczy szkice w tle — nikt nie patrzy na zegarek.
+     */
+    timeoutMs: num(process.env.AI_TIMEOUT_MS, 60_000, "AI_TIMEOUT_MS"),
+  },
+
   zwroty: {
     /**
      * Ile dni od zgłoszenia ma firma na odpowiedź w sprawie reklamacji.
@@ -593,6 +623,20 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      a wymuszony jawnie znaczy, że ktoś liczy na prawdziwe API. */
   if (c.allegro.mode === "http" && !c.allegro.clientId) {
     bledy.push("ALLEGRO_MODE=http wymaga ALLEGRO_CLIENT_ID i ALLEGRO_CLIENT_SECRET.");
+  }
+  /* Dostawca AI bez klucza to ten sam błąd co client_id bez sekretu: start
+     przechodzi, a wywala się dopiero przy pierwszym szkicu — czyli gdy ktoś
+     przy panelu czeka na odpowiedź dla klienta. */
+  if (!["", "dev", "anthropic", "openai"].includes(c.ai.provider)) {
+    bledy.push(
+      `AI_PROVIDER=${c.ai.provider} — dozwolone: puste (wg SGT_MODE), dev, anthropic, openai.`,
+    );
+  }
+  if (c.ai.provider === "anthropic" && !c.ai.anthropicKey) {
+    bledy.push("AI_PROVIDER=anthropic wymaga ANTHROPIC_API_KEY (console.anthropic.com).");
+  }
+  if (c.ai.provider === "openai" && !c.ai.openaiKey) {
+    bledy.push("AI_PROVIDER=openai wymaga OPENAI_API_KEY (platform.openai.com).");
   }
   if (c.mssql.dokTypFS === c.mssql.dokTypPA) {
     bledy.push(

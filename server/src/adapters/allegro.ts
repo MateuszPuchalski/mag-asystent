@@ -105,6 +105,42 @@ export interface DyskusjaAllegro {
   utworzono: string | null;
 }
 
+/**
+ * Nagłówek wątku z listy Centrum wiadomości (`/messaging/threads`).
+ *
+ * Sama lista — BEZ wiadomości. Pobranie treści to osobne zapytanie na wątek,
+ * więc synchronizacja pytań schodzi listą w dół i czyta tylko te rozmowy,
+ * które są świeższe niż to, co już znamy.
+ */
+export interface WatekNaglowek {
+  threadId: string;
+  /** Zamaskowany rozmówca (`client:44300444`) — Allegro loginu tu nie podaje. */
+  interlokutor: string | null;
+  ostatniaWiadomoscAt: string | null;
+  /** Flaga `read` z listy; `null` gdy zasób jej nie niesie ([WERYFIKUJ]). */
+  przeczytany: boolean | null;
+  /** Oferta, której wątek dotyczy — gdy Allegro ją podaje (bywa pusta). */
+  ofertaId: string | null;
+  ofertaTytul: string | null;
+}
+
+/**
+ * Nasza oferta z `/sale/offers` — kontekst doboru części i ŹRÓDŁO LINKU,
+ * który klient dostaje w odpowiedzi. Bez tego szkic mówiłby „mamy to
+ * w ofercie" i kazał klientowi szukać samemu.
+ */
+export interface OfertaAllegro {
+  offerId: string;
+  nazwa: string;
+  /** Cena z walutą, gotowa do wklejenia w zdanie („39,90 PLN"); null gdy brak. */
+  cena: string | null;
+  /** `offer.external.id` — symbol kartoteki nadany przez integrację sprzedażową. */
+  externalId: string | null;
+  dostepnych: number | null;
+  /** Adres aukcji — składamy go MY, API go nie zwraca. */
+  url: string;
+}
+
 /** Czym rozpoznajemy kupującego w liście wątków. */
 export interface KupujacyRef {
   login: string | null;
@@ -160,7 +196,37 @@ export interface AllegroAdapter {
    * najnowszej rozmowy, więc schodzimy tylko do rozmów z okolic zwrotu.
    */
   watekKupujacego(kto: KupujacyRef, odKiedy: string | null): Promise<SzukanieWatku>;
+
+  /* ── Pytania klientów (0.79.0) ─────────────────────────────────────────────
+     Wątki są tu ŹRÓDŁEM PRACY, nie ciekawostką przy zwrocie, więc czytamy je
+     inaczej: listą od najświeższej i tylko do znanej daty. Snapshot pytania
+     zostaje u nas (rejestr naszej pracy), pełna rozmowa dalej mieszka
+     w Allegro i czyta się ją na kliknięcie.                                  */
+
+  /**
+   * Nagłówki wątków od najświeższego. `odKiedy` (ISO) zatrzymuje schodzenie,
+   * gdy lista zejdzie poniżej tej daty — null znaczy „bez granicy", wtedy
+   * hamuje dopiero `maxStron`.
+   */
+  listaWatkow(odKiedy: string | null, maxStron?: number): Promise<WatekNaglowek[]>;
+  /** Wiadomości jednego wątku, od najstarszej. */
+  wiadomosciWatku(threadId: string): Promise<WiadomoscAllegro[]>;
+  /** Wysyła naszą odpowiedź do wątku. */
+  wyslijWiadomosc(threadId: string, tekst: string): Promise<void>;
+  /** Odhacza wątek jako przeczytany — żeby panel Allegro nie świecił po naszej odpowiedzi. */
+  oznaczPrzeczytany(threadId: string): Promise<void>;
+  /** Nasze aktywne oferty pasujące do frazy — linki do wklejenia w odpowiedź. */
+  szukajOfert(fraza: string): Promise<OfertaAllegro[]>;
 }
+
+/**
+ * Maksymalna długość wiadomości w Centrum wiadomości.
+ *
+ * Allegro tnie dłuższe albo odrzuca żądanie — a odrzucenie PO kliknięciu
+ * „wyślij" znaczy, że biuro myśli, że odpowiedziało. Sprawdzamy więc u siebie,
+ * zanim cokolwiek poleci. Wartość ostrożna; [WERYFIKUJ] na sandboxie.
+ */
+export const LIMIT_WIADOMOSCI = 2000;
 
 /**
  * User-Agent do KAŻDEGO żądania (auth i API) — Allegro wymaga go wprost,

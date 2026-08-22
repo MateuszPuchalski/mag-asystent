@@ -2,12 +2,15 @@ import type {
   AllegroAdapter,
   DyskusjaAllegro,
   KupujacyRef,
+  OfertaAllegro,
   SzukanieWatku,
   WatekAllegro,
+  WatekNaglowek,
+  WiadomoscAllegro,
   ZamowienieAllegro,
   ZwrotAllegro,
 } from "./allegro.js";
-import { normalizujRef } from "./allegro.http.js";
+import { normalizujRef, urlOferty } from "./allegro.http.js";
 
 /* ── DEV — fikcyjne zwroty Allegro (zero sieci) ──────────────────────────────
    Lustro DevSferaAdapter: cały przepływ zwrotów działa end-to-end bez konta
@@ -185,7 +188,153 @@ const WATKI: Record<string, WatekAllegro> = {
   },
 };
 
+/* ── Pytania klientów (0.79.0) ───────────────────────────────────────────────
+   Cztery wątki, każdy sprawdza co innego w synchronizacji i w szkicu:
+     dev-pyt-1  dobór części, towar JEST w kartotece (TEST-LINIA-TODO)
+     dev-pyt-2  dobór części, towaru NIE MA — pytanie o braku w ofercie
+     dev-pyt-3  ostatnia wiadomość jest OD NAS → pytanie NIE powstaje
+     dev-pyt-4  wysyłka zagraniczna — szkic musi sięgnąć po fakty firmowe,
+                bo kosztu wysyłki do Chorwacji nie ma skąd zgadnąć           */
+
+interface WatekPytania {
+  naglowek: WatekNaglowek;
+  wiadomosci: WiadomoscAllegro[];
+}
+
+const WATKI_PYTAN: WatekPytania[] = [
+  {
+    naglowek: {
+      threadId: "dev-pyt-1",
+      interlokutor: "client:44300101",
+      ostatniaWiadomoscAt: dniTemu(1),
+      przeczytany: false,
+      ofertaId: "of-1",
+      ofertaTytul: "Pozycja jeszcze nietknięta — oferta Allegro",
+    },
+    wiadomosci: [
+      {
+        id: "dev-pyt-msg-1",
+        odKupujacego: true,
+        autor: "client:44300101",
+        tresc:
+          "Dzień dobry, mam kosiarkę spalinową model T375 i szukam pasującej " +
+          "końcówki 3/8. Czy ta pozycja będzie pasować i jaki to symbol?",
+        at: dniTemu(1),
+        zalacznikow: 0,
+      },
+    ],
+  },
+  {
+    naglowek: {
+      threadId: "dev-pyt-2",
+      interlokutor: "client:44300102",
+      ostatniaWiadomoscAt: dniTemu(2),
+      przeczytany: false,
+      ofertaId: null,
+      ofertaTytul: null,
+    },
+    wiadomosci: [
+      {
+        id: "dev-pyt-msg-2",
+        odKupujacego: true,
+        autor: "client:44300102",
+        tresc:
+          "Witam, czy mają Państwo cewkę zapłonową do kosiarki marki, której " +
+          "nie ma w Państwa ofercie — model ZZZ-9999?",
+        at: dniTemu(2),
+        zalacznikow: 0,
+      },
+    ],
+  },
+  {
+    naglowek: {
+      threadId: "dev-pyt-3",
+      interlokutor: "client:44300103",
+      ostatniaWiadomoscAt: dniTemu(3),
+      przeczytany: true,
+      ofertaId: "of-3",
+      ofertaTytul: "Szybkorotujący poza strefą złotą — oferta Allegro",
+    },
+    wiadomosci: [
+      {
+        id: "dev-pyt-msg-3a",
+        odKupujacego: true,
+        autor: "client:44300103",
+        tresc: "Czy towar jest dostępny od ręki?",
+        at: dniTemu(4),
+        zalacznikow: 0,
+      },
+      {
+        id: "dev-pyt-msg-3b",
+        odKupujacego: false,
+        autor: "wertis",
+        tresc: "Dzień dobry, tak — wysyłka tego samego dnia roboczego.",
+        at: dniTemu(3),
+        zalacznikow: 0,
+      },
+    ],
+  },
+  {
+    naglowek: {
+      threadId: "dev-pyt-4",
+      interlokutor: "client:44300104",
+      ostatniaWiadomoscAt: dniTemu(1),
+      przeczytany: false,
+      ofertaId: "of-3",
+      ofertaTytul: "Szybkorotujący poza strefą złotą — oferta Allegro",
+    },
+    wiadomosci: [
+      {
+        id: "dev-pyt-msg-4",
+        odKupujacego: true,
+        autor: "client:44300104",
+        tresc:
+          "witam czy można wysłać do Chorwacji i na kiedy by było i jaki koszt " +
+          "wysyłki oczywiście płatność z góry",
+        at: dniTemu(1),
+        zalacznikow: 0,
+      },
+    ],
+  },
+];
+
+/** Nasze fikcyjne oferty — zestrojone z kartoteką scenariuszy (seed-scenariusze). */
+const OFERTY_DEV: Array<Omit<OfertaAllegro, "url">> = [
+  {
+    offerId: "of-1",
+    nazwa: "Pozycja jeszcze nietknięta — oferta Allegro",
+    cena: "39,90 PLN",
+    externalId: "TEST-LINIA-TODO",
+    dostepnych: 10,
+  },
+  {
+    offerId: "of-2",
+    nazwa: "Pozycja odłożona w całości — oferta Allegro",
+    cena: "19,90 PLN",
+    externalId: "TEST-LINIA-DONE",
+    dostepnych: 10,
+  },
+  {
+    offerId: "of-3",
+    nazwa: "Szybkorotujący poza strefą złotą — oferta Allegro",
+    cena: "59,00 PLN",
+    externalId: "TEST-ROTUJACY",
+    dostepnych: 60,
+  },
+];
+
 export class DevAllegroAdapter implements AllegroAdapter {
+  /**
+   * Wiadomości DOPISANE przez `wyslijWiadomosc` i odhaczone wątki.
+   *
+   * Stan w pamięci instancji, nie w module: testy biorą świeży adapter przez
+   * `zresetujAdapterAllegro()`, więc wysyłka z jednego testu nie może
+   * wyciekać do następnego. W demo singleton żyje przez proces, czyli
+   * dokładnie tak długo, jak trzeba, żeby zobaczyć własną odpowiedź w wątku.
+   */
+  private dopisane = new Map<string, WiadomoscAllegro[]>();
+  private odhaczone = new Set<string>();
+
   async szukajZwrotowPoWaybill(waybill: string): Promise<ZwrotAllegro[]> {
     const kod = waybill.trim();
     return zwroty().filter((z) =>
@@ -245,5 +394,64 @@ export class DevAllegroAdapter implements AllegroAdapter {
       najstarszaData: null,
       wyczerpano: true,
     };
+  }
+
+  // ── Pytania klientów ───────────────────────────────────────────────────────
+
+  async listaWatkow(odKiedy: string | null, _maxStron = 10): Promise<WatekNaglowek[]> {
+    const granica = odKiedy ? Date.parse(odKiedy) : NaN;
+    return WATKI_PYTAN.map((w) => this.naglowekZeStanem(w))
+      .filter(
+        (n) =>
+          !Number.isFinite(granica) ||
+          Date.parse(n.ostatniaWiadomoscAt ?? "") >= granica
+      )
+      .sort((a, b) =>
+        (b.ostatniaWiadomoscAt ?? "").localeCompare(a.ostatniaWiadomoscAt ?? "")
+      );
+  }
+
+  /** Nagłówek z naniesionym stanem w pamięci (odhaczenie, data naszej odpowiedzi). */
+  private naglowekZeStanem(w: WatekPytania): WatekNaglowek {
+    const dopisane = this.dopisane.get(w.naglowek.threadId) ?? [];
+    const ostatnia = dopisane[dopisane.length - 1];
+    return {
+      ...w.naglowek,
+      ostatniaWiadomoscAt: ostatnia?.at ?? w.naglowek.ostatniaWiadomoscAt,
+      przeczytany: this.odhaczone.has(w.naglowek.threadId) ? true : w.naglowek.przeczytany,
+    };
+  }
+
+  async wiadomosciWatku(threadId: string): Promise<WiadomoscAllegro[]> {
+    const watek = WATKI_PYTAN.find((w) => w.naglowek.threadId === threadId);
+    const bazowe = watek ? watek.wiadomosci : (WATKI[threadId]?.wiadomosci ?? []);
+    return [...bazowe, ...(this.dopisane.get(threadId) ?? [])];
+  }
+
+  async wyslijWiadomosc(threadId: string, tekst: string): Promise<void> {
+    const lista = this.dopisane.get(threadId) ?? [];
+    lista.push({
+      id: `dev-wyslana-${threadId}-${lista.length + 1}`,
+      odKupujacego: false,
+      autor: "wertis",
+      tresc: tekst,
+      at: new Date().toISOString(),
+      zalacznikow: 0,
+    });
+    this.dopisane.set(threadId, lista);
+  }
+
+  async oznaczPrzeczytany(threadId: string): Promise<void> {
+    this.odhaczone.add(threadId);
+  }
+
+  async szukajOfert(fraza: string): Promise<OfertaAllegro[]> {
+    const szukane = fraza.trim().toLowerCase();
+    if (szukane === "") return [];
+    return OFERTY_DEV.filter(
+      (o) =>
+        o.nazwa.toLowerCase().includes(szukane) ||
+        (o.externalId ?? "").toLowerCase().includes(szukane)
+    ).map((o) => ({ ...o, url: urlOferty(o.offerId, false) }));
   }
 }

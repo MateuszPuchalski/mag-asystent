@@ -164,18 +164,21 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    19,
+    24,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę i dwanaście zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, dwanaście zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
       "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja, " +
-      "schowanie zapowiedzi, załatwienie pominięcia) — nic ponadto"
+      "schowanie zapowiedzi, załatwienie pominięcia) i pięć zapisów pytań " +
+      "klientów (synchronizacja, wklejka, szkic, wysyłka odpowiedzi, " +
+      "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) — nic ponadto"
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    4,
+    6,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
-      "wgranie logo dostawcy i półka reklamacyjna"
+      "wgranie logo dostawcy, półka reklamacyjna oraz prompt eksperta " +
+      "i fakty firmowe (0.79.0)"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
@@ -204,6 +207,25 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
   assert.match(html, /problems\/\$\{id\}\/resolve/, "biuro zamyka wyjątek");
   assert.match(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "biuro zamyka sprawę pominięcia");
+  /* Odpowiedź do klienta wysyła CZŁOWIEK i to się nie zmienia. Model pisze
+     szkic, biuro go czyta i klika — automatycznej wysyłki tu nie ma i test
+     pilnuje, żeby nie weszła bokiem. */
+  assert.match(html, /pytania\/\$\{id\}\/wyslij/, "wysyłka odpowiedzi po kliknięciu");
+  assert.match(html, /WYŚLIJ PRZEZ ALLEGRO/, "wysyłka jest jawnym przyciskiem");
+  assert.match(html, /potwierdz\(\{[\s\S]{0,200}WYSŁANIE ODPOWIEDZI DO KLIENTA/, "wysyłka za potwierdzeniem");
+});
+
+test("kopiowanie odpowiedzi ma zejście awaryjne bez HTTPS", () => {
+  /* `navigator.clipboard` istnieje wyłącznie w bezpiecznym kontekście, a panel
+     biura chodzi po LAN-ie pod gołym http — czyli dokładnie tam, gdzie tego
+     API nie ma. Bez `execCommand` przycisk KOPIUJ byłby martwy na produkcji
+     i żywy w każdym teście przeglądarkowym. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /navigator\.clipboard\.writeText/, "droga główna");
+  assert.match(html, /document\.execCommand\("copy"\)/, "zejście awaryjne bez HTTPS");
 });
 
 test("lista dostaw sygnalizuje wyjątki", () => {
@@ -236,7 +258,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "zwroty", "nadzor", "dziennik", "analiza"],
+    ["dostawy", "zwroty", "pytania", "nadzor", "dziennik", "analiza"],
     "w pasku tylko zakładki pracy — dostawcy tu nie wracają"
   );
 

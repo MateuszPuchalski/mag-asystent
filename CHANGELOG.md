@@ -33,6 +33,73 @@ historii nie przepisujemy.
 
 ---
 
+## 0.79.0 — 22 sierpnia 2026
+
+**Pytania klientów o dobór części dostały własną zakładkę — ze szkicem
+odpowiedzi.** Dotąd była to praca POZA aplikacją: screenshot pytania z poczty
+szedł do zewnętrznego czata skonfigurowanego jako ekspert od części, a gotowa
+odpowiedź wracała przez schowek. Aplikacja, która zna kartotekę, stany
+i zamienniki, nie brała w tym udziału.
+
+Teraz bierze. Zakładka **PYTANIA KLIENTÓW** ściąga pytania z Centrum wiadomości
+Allegro, przygotowuje szkic odpowiedzi z linkami do naszych aukcji i po
+akceptacji człowieka wysyła ją do klienta.
+
+Cztery rzeczy, które decydują o tym, czy to naprawdę oszczędza czas:
+
+- **Szkic czeka gotowy.** Liczy go ticker w tle razem z synchronizacją, więc
+  otwarte pytanie ma odpowiedź do przeczytania, a nie przycisk „wygeneruj”.
+- **Karty towarów stoją obok pola odpowiedzi** — zdjęcie kartoteki, stan,
+  półka, cena i link do aukcji. Dobór weryfikuje się okiem, bez przełączania
+  do Subiekta; przycisk WSTAW LINK dokleja adres w miejscu kursora.
+- **Fakty firmowe są osobnym polem.** Cennik wysyłek zagranicznych, terminy
+  i zasady płatności wpisuje admin, i to jedyne źródło, z którego model może
+  je podać. Zgadnięty koszt wysyłki do Chorwacji jest gorszy niż jego brak.
+- **Po wysłaniu panel otwiera następne pytanie**, aż licznik przy zakładce
+  zejdzie do zera.
+
+Aplikacja przy tym **uczy się z wysłanych odpowiedzi**, nie z własnych
+zgadywanek: poprawione odpowiedzi wracają jako wzór stylu, a potwierdzone pary
+maszyna→część jako tabela `dopasowanie` — jedno i drugie zapisuje się dopiero
+przy wysyłce, czyli po akceptacji człowieka.
+
+Statystyki odpowiadają na pytanie właściciela: o co klienci pytają najczęściej,
+w jakich kategoriach, jak długo czekają na odpowiedź, ile szkiców idzie bez
+poprawki — i **o jaki towar pytali, a nie było czego sprzedać**. Ta ostatnia
+lista jest najtańszym researchem asortymentu, jaki firma może mieć.
+
+Odpowiedź wysyła **człowiek** i to się nie zmienia. Model pisze szkic, biuro go
+czyta, poprawia i klika. Automatycznej wysyłki nie ma i pilnuje tego test.
+
+Pytania spoza Allegro (screenshot z poczty) wchodzą przez wklejkę — Ctrl+V
+w zakładce. **Obrazu nie zapisujemy**: zostaje wyłącznie przepisana treść
+pytania. To dane osobowe klienta, a wartość ma sama treść.
+
+**[wymaga działania]** — trzy rzeczy przy wdrożeniu:
+
+1. **Klucz modelu w `wertis.env`.** `AI_PROVIDER=anthropic` (albo `openai`)
+   plus `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`. Bez tego funkcja jest
+   wyłączona, a zakładka mówi wprost, co dopisać. Serwer bez klucza przy
+   ustawionym dostawcy NIE wystartuje — lepiej twardy błąd przy starcie niż
+   przy pierwszym pytaniu klienta. Szczegóły i wybór modelu:
+   sekcja „Pytania klientów” w `wertis.env.example`.
+2. **Nowe uprawnienia aplikacji Allegro i PONOWNE PAROWANIE KONTA.** Ta
+   funkcja czyta i pisze w Centrum wiadomości oraz czyta nasze oferty:
+   `allegro:api:messaging` i `allegro:api:sale:offers:read`. Dopisanie ich na
+   developer.allegro.pl nie wystarcza — token wydany pod stary zakres sam się
+   nie rozszerzy, więc konto trzeba sparować ponownie
+   (/biuro → ZWROTY → KONTO ALLEGRO). Bez tego pierwsze odświeżenie kończy się
+   błędem 403, a komunikat wskazuje brakujące uprawnienie po nazwie.
+3. **Decyzja o prywatności należy do właściciela.** Treść pytań klientów
+   (i wklejone obrazy) trafia do zewnętrznego dostawcy modelu. Funkcja jest
+   domyślnie wyłączona właśnie dlatego, że tej decyzji nie podejmuje
+   aktualizacja.
+
+Nowe tabele (`pytanie`, `ai_config`, `dopasowanie`) zakłada migracja przy
+starcie — nic do zrobienia ręką. Częstotliwość ściągania pytań dzieli pokrętło
+z zapowiedziami zwrotów (`ALLEGRO_POLL_MS`): to ta sama praca w tle na tym
+samym koncie.
+
 ## 0.78.1 — 22 sierpnia 2026
 
 **Wskazana pozycja kosza i panel odkładania to znowu jedna karta.** Ze

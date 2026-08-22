@@ -562,13 +562,15 @@ server/                    backend (Fastify + SQLite + worker)
                            dokumentu dla biura — sam odczyt),
                            queue, locations, events, notatki (do dostaw),
                            zamienniki + zamowienia-towaru (karta towaru),
+                           pytania + ai (pytania klientów: szkice odpowiedzi
+                           o dobór części, model językowy za `fetch`),
                            raporty + reslot (analiza), zbiorki + strefa-zlota
                            (rotacja z Sellasist),
                            aktualizacja (APK dla kolektorów)
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8), auth, magazyny, audyt,
                            analiza, zbiorki, biuro, aktualizacja (APK),
-                           dostawcy (logo)
+                           dostawcy (logo), pytania (pytania klientów)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   data/zdjecia/            CACHE zdjęć kartotek z Subiekta — wolno skasować
   data/apk/                APK dla kolektorów — kładzie go instalator

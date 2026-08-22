@@ -788,3 +788,89 @@ CREATE TABLE IF NOT EXISTS zwrot_zapowiedz (
   widziano_at       TEXT NOT NULL         -- ostatni raz w odpowiedzi API (diagnostyka tickera)
 );
 CREATE INDEX IF NOT EXISTS ix_zapowiedz_status ON zwrot_zapowiedz(status);
+
+-- ── Pytania klientów (0.79.0) ───────────────────────────────────────────────
+-- Klient pyta „czy ta część pasuje do mojej kosiarki". Odpowiedź wymaga
+-- kartoteki, stanu, zamienników i linku do naszej aukcji — czyli dokładnie
+-- tego, co ten serwer już wie. Szkic pisze model językowy, wysyła CZŁOWIEK.
+--
+-- Ta tabela to REJESTR NASZEJ PRACY, nie lustro wątku: prywatna rozmowa
+-- z klientem ma jedno miejsce prawdy w Allegro i czyta się ją na kliknięcie
+-- (ta sama zasada co przy `watekKupujacego`). Zostaje snapshot pytania, nasz
+-- szkic, nasza odpowiedź i klasyfikacja — bo statystyki „o co pytają" i
+-- historia „co odpowiedzieliśmy" muszą przeżyć zniknięcie wątku, tak jak
+-- nazwa oferty przeżywa je w `zwrot_pozycja`.
+CREATE TABLE IF NOT EXISTS pytanie (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  zrodlo         TEXT NOT NULL,        -- allegro | wklejka (screenshot z poczty)
+  thread_id      TEXT,                 -- NULL przy wklejce — nie ma dokąd odpisać
+  -- Identyfikator OSTATNIEJ wiadomości kupującego, na którą odpowiadamy.
+  -- UNIQUE czyni synchronizację idempotentną (ten sam wątek wraca w każdym
+  -- przebiegu tickera), a NOWE pytanie w starym wątku dostaje NOWY wiersz.
+  -- Wklejki mają tu NULL i nie kolidują — SQLite dopuszcza wiele NULL-i
+  -- w kolumnie UNIQUE.
+  wiadomosc_id   TEXT UNIQUE,
+  kupujacy_login TEXT,
+  oferta_id      TEXT,                 -- kontekst wątku, gdy Allegro go podaje
+  oferta_tytul   TEXT,
+  tresc          TEXT,                 -- pytanie: snapshot z wątku albo transkrypcja ze screenshota
+  otrzymano_at   TEXT,                 -- data wiadomości; przy wklejce chwila wklejenia
+  --   nowe      = czeka na szkic (albo szkic się nie udał)
+  --   szkic     = szkic gotowy, czeka na człowieka
+  --   wyslane   = odpowiedź poszła do klienta
+  --   zamkniete = załatwione poza aplikacją (skopiowane, odpisane w panelu)
+  --   pominiete = zdjęte z listy bez odpowiedzi
+  status         TEXT NOT NULL DEFAULT 'nowe',
+  szkic_ai       TEXT,                 -- SUROWY szkic modelu — bez niego nie da się zmierzyć, ile poprawiamy
+  szkic_at       TEXT,
+  odpowiedz      TEXT,                 -- treść po redakcji biura / wysłana
+  wyslano_at     TEXT,
+  odpowiedzial   TEXT,
+  edytowano      INTEGER NOT NULL DEFAULT 0,  -- 1 = człowiek zmienił szkic przed wysłaniem
+  kategoria      TEXT,                 -- dobor-czesci | dostawa-wysylka | stan-zamowienia | reklamacja | inne
+  -- Model urządzenia wyłuskany z pytania („kosiarka T375”) — klucz tabeli
+  -- `dopasowanie`. Bez niego każde kolejne pytanie o tę samą maszynę
+  -- zaczynałoby się od zera.
+  urzadzenie     TEXT,
+  -- Dopasowane kartoteki jako JSON [{twId, symbol}] — statystyki czytają je
+  -- przez json_each. Osobna tabela byłaby uczciwsza, ale to dane POCHODNE
+  -- z jednego wiersza i nikt nie pyta o nie inaczej niż razem z pytaniem.
+  produkty_json  TEXT NOT NULL DEFAULT '[]',
+  -- 1/0/NULL — czy pytana część jest w naszej ofercie. Lista zer to
+  -- najtańszy research asortymentu, jaki firma może mieć.
+  w_ofercie      INTEGER,
+  utworzono_at   TEXT NOT NULL,
+  utworzono_przez TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pytanie_status ON pytanie(status, id);
+CREATE INDEX IF NOT EXISTS ix_pytanie_thread ON pytanie(thread_id);
+CREATE INDEX IF NOT EXISTS ix_pytanie_otrzymano ON pytanie(otrzymano_at);
+
+-- Prompt ekspercki i fakty firmowe. JEDEN wiersz (wzorzec `allegro_token`):
+-- to DANE redagowane w panelu przez właściciela, nie konfiguracja z env.
+-- Fakty (cennik wysyłek zagranicznych, terminy, zasady płatności) są tu
+-- osobno, bo model nie ma ich skąd zgadnąć, a zgadnięty koszt wysyłki do
+-- Chorwacji jest gorszy niż brak odpowiedzi.
+CREATE TABLE IF NOT EXISTS ai_config (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),
+  prompt          TEXT NOT NULL DEFAULT '',
+  fakty           TEXT NOT NULL DEFAULT '',
+  zmieniono_at    TEXT,
+  zmieniono_przez TEXT
+);
+
+-- Potwierdzone dopasowania maszyna → część. Rośnie WYŁĄCZNIE przy wysłanej
+-- odpowiedzi, czyli po akceptacji człowieka: zapis przy samym szkicu
+-- utrwalałby zgadywanie modelu. Dzięki temu drugie pytanie o tę samą
+-- kosiarkę dostaje odpowiedź pewną, nie zgadywaną od nowa.
+CREATE TABLE IF NOT EXISTS dopasowanie (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  urzadzenie      TEXT NOT NULL COLLATE NOCASE,
+  symbol          TEXT NOT NULL COLLATE NOCASE,
+  tw_id           INTEGER,             -- NULL, gdy symbol spoza kartoteki
+  pytanie_id      INTEGER REFERENCES pytanie(id),  -- skąd wiemy
+  potwierdzono_at TEXT NOT NULL,
+  potwierdzono_przez TEXT NOT NULL,
+  UNIQUE (urzadzenie, symbol)
+);
+CREATE INDEX IF NOT EXISTS ix_dopasowanie_urzadzenie ON dopasowanie(urzadzenie);

@@ -5,9 +5,11 @@ import type {
   AllegroAdapter,
   DyskusjaAllegro,
   KupujacyRef,
+  OfertaAllegro,
   PaczkaZwrotu,
   PozycjaZwrotuAllegro,
   SzukanieWatku,
+  WatekNaglowek,
   WiadomoscAllegro,
   ZamowienieAllegro,
   ZwrotAllegro,
@@ -114,6 +116,37 @@ export function urlWatkow(apiUrl: string, offset: number): string {
 
 export function urlWiadomosci(apiUrl: string, threadId: string): string {
   return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}/messages`;
+}
+
+/** Wysyłka odpowiedzi do wątku (POST). [WERYFIKUJ] kształt ciała na sandboxie. */
+export function urlWyslijWiadomosc(apiUrl: string, threadId: string): string {
+  return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}/messages`;
+}
+
+/** Odhaczenie wątku jako przeczytany (PUT). [WERYFIKUJ]. */
+export function urlOznaczPrzeczytany(apiUrl: string, threadId: string): string {
+  return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}`;
+}
+
+/**
+ * URL szukania w NASZYCH ofertach. Filtr `name` jest podłańcuchowy, a
+ * `publication.status=ACTIVE` odcina zakończone aukcje: link do wygaszonej
+ * oferty w odpowiedzi dla klienta jest gorszy niż brak linku.
+ */
+export function urlOfert(apiUrl: string, fraza: string, offset = 0): string {
+  return (
+    `${apiUrl}/sale/offers?name=${encodeURIComponent(fraza)}` +
+    `&publication.status=ACTIVE&limit=20&offset=${Math.max(0, Math.trunc(offset))}`
+  );
+}
+
+/**
+ * Adres aukcji dla klienta. API zwraca sam identyfikator — adres składamy MY,
+ * bo to on ląduje w odpowiedzi i musi działać po wklejeniu w przeglądarkę.
+ */
+export function urlOferty(offerId: string, sandbox: boolean): string {
+  const host = sandbox ? "https://allegro.pl.allegrosandbox.pl" : "https://allegro.pl";
+  return `${host}/oferta/${encodeURIComponent(offerId)}`;
 }
 
 const tekst = (v: unknown): string | null =>
@@ -293,6 +326,67 @@ export function mapujWiadomosci(json: unknown, mojLogin: string | null): Wiadomo
 }
 
 /**
+ * Nagłówki wątków z listy → typy domenowe.
+ *
+ * Zasób podaje kontekst oferty raz jako `offer`, raz jako `subject` z tytułem
+ * i niczym więcej — a bywa, że nie podaje go wcale. Każde pole ma listę
+ * znanych miejsc, nieznany kształt daje NULL-e: wątek bez tytułu oferty jest
+ * pytaniem, na które da się odpowiedzieć, a wyjątek zatrzymałby całą
+ * synchronizację przez jeden dziwny wiersz.
+ */
+export function mapujWatki(json: unknown): WatekNaglowek[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(root.threads) ? root.threads : [];
+  return lista.map((t) => {
+    const w = (t ?? {}) as Record<string, unknown>;
+    const rozmowca = (w.interlocutor ?? {}) as Record<string, unknown>;
+    const oferta = (w.offer ?? {}) as Record<string, unknown>;
+    return {
+      threadId: tekst(w.id) ?? "",
+      interlokutor: tekst(rozmowca.login) ?? tekst(rozmowca.id),
+      ostatniaWiadomoscAt: tekst(w.lastMessageDateTime),
+      przeczytany: typeof w.read === "boolean" ? w.read : null,
+      ofertaId: tekst(oferta.id) ?? tekst(w.offerId),
+      ofertaTytul: tekst(oferta.name) ?? tekst(w.subject),
+    };
+  });
+}
+
+/** Cena oferty jako gotowy tekst („39,90 PLN"); null, gdy zasób jej nie niesie. */
+export function cenaOferty(sellingMode: unknown): string | null {
+  const s = (sellingMode ?? {}) as Record<string, unknown>;
+  const p = (s.price ?? {}) as Record<string, unknown>;
+  const kwota = tekst(p.amount);
+  if (!kwota) return null;
+  const waluta = tekst(p.currency);
+  return waluta ? `${kwota} ${waluta}` : kwota;
+}
+
+/** Nasze oferty z `/sale/offers` → typy domenowe. Defensywne na każdym polu. */
+export function mapujOferty(json: unknown, sandbox: boolean): OfertaAllegro[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(root.offers) ? root.offers : [];
+  return lista
+    .map((o) => {
+      const of = (o ?? {}) as Record<string, unknown>;
+      const external = (of.external ?? {}) as Record<string, unknown>;
+      const stock = (of.stock ?? {}) as Record<string, unknown>;
+      const offerId = tekst(of.id) ?? "";
+      return {
+        offerId,
+        nazwa: tekst(of.name) ?? "(bez nazwy)",
+        cena: cenaOferty(of.sellingMode),
+        externalId: tekst(external.id),
+        dostepnych: typeof stock.available === "number" ? stock.available : null,
+        url: urlOferty(offerId, sandbox),
+      };
+    })
+    /* Oferta bez identyfikatora nie ma linku, a link jest jedynym powodem,
+       dla którego w ogóle o nie pytamy. */
+    .filter((o) => o.offerId !== "");
+}
+
+/**
  * Identyfikator rozmówcy sprowadzony do postaci porównywalnej.
  *
  * Lista wątków MASKUJE kupującego: w `interlocutor.login` siedzi `client:44300444`,
@@ -342,8 +436,28 @@ export function poNajstarszej(najstarszaData: string | null, granica: number): b
   return Number.isFinite(t) && t < granica;
 }
 
+/**
+ * Które uprawnienie wymienić w komunikacie 403.
+ *
+ * Rozjazd uprawnień jest PIERWSZĄ awarią każdego wdrożenia — token wydany pod
+ * stary zakres nie rozszerzy się sam. Zdanie „dodaj scope X" prowadzi do
+ * naprawy; gołe 403 nie prowadzi donikąd, a rodzin końcówek mamy już cztery.
+ */
+export function scopeDlaUrl(url: string): string {
+  if (url.includes("/messaging/")) return "allegro:api:messaging";
+  if (url.includes("/sale/offers")) return "allegro:api:sale:offers:read";
+  if (url.includes("/sale/issues")) return "allegro:api:disputes";
+  return "allegro:api:orders:read";
+}
+
 export class HttpAllegroAdapter implements AllegroAdapter {
-  private async zapytaj(url: string): Promise<unknown | null> {
+  private async zapytaj(
+    url: string,
+    /* Do 0.79.0 ten klient tylko CZYTAŁ. Wysyłka odpowiedzi klientowi jest
+       pierwszym zapisem — te same nagłówki i ta sama nauka `Accept`, więc
+       metoda i ciało doszły jako opcje zamiast drugiej funkcji obok. */
+    opcje: { metoda?: "POST" | "PUT"; body?: unknown } = {}
+  ): Promise<unknown | null> {
     const bearer = await wazneBearer();
     const rodzina = rodzinaKoncowki(url);
     const znany = dzialajacyAccept.get(rodzina);
@@ -354,13 +468,18 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       let odp: Response;
       try {
         odp = await fetch(url, {
+          method: opcje.metoda ?? "GET",
           headers: {
             accept,
             authorization: `Bearer ${bearer}`,
             /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
                zablokowaniem klucza API (ekran po rejestracji aplikacji). */
             "user-agent": allegroUserAgent(),
+            /* Tylko przy ciele — pusty `content-type` przy GET-cie bywa
+               powodem odrzucenia u ostrożnych bramek. */
+            ...(opcje.body === undefined ? {} : { "content-type": "application/json" }),
           },
+          body: opcje.body === undefined ? undefined : JSON.stringify(opcje.body),
           signal: AbortSignal.timeout(TIMEOUT_MS),
         });
       } catch (e) {
@@ -388,8 +507,9 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       }
       if (odp.status === 403) {
         throw new Error(
-          "Brak uprawnienia do zwrotów klienckich (403) — aplikacja na developer.allegro.pl " +
-            "musi mieć scope allegro:api:orders:read."
+          `Brak uprawnienia (403) — aplikacja na developer.allegro.pl musi mieć scope ` +
+            `${scopeDlaUrl(url)}. Po dodaniu uprawnienia sparuj konto ponownie: ` +
+            "token wydany pod stary zakres sam się nie rozszerzy."
         );
       }
       if (!odp.ok) {
@@ -398,7 +518,16 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       }
 
       dzialajacyAccept.set(rodzina, accept);
-      return odp.json();
+      /* 204 i puste ciało to poprawna odpowiedź na PUT/POST — `json()` na
+         pustce rzuca, a odhaczenie wątku niczego nie zwraca. */
+      if (odp.status === 204) return null;
+      const surowa = await odp.text();
+      if (surowa.trim() === "") return null;
+      try {
+        return JSON.parse(surowa);
+      } catch {
+        return null;
+      }
     }
 
     /* Żaden ze znanych nagłówków nie przeszedł. Zapamiętany nagłówek mógł się
@@ -511,5 +640,56 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       if (poNajstarszej(najstarszaData, granica)) break;
     }
     return { watek: null, przejrzanych, najstarszaData, wyczerpano: false };
+  }
+
+  // ── Pytania klientów (0.79.0) ──────────────────────────────────────────────
+
+  async listaWatkow(odKiedy: string | null, maxStron = 10): Promise<WatekNaglowek[]> {
+    /* Lista jest malejąca po dacie ostatniej wiadomości, więc schodzimy do
+       `odKiedy` i przestajemy — synchronizacja co pięć minut czyta wtedy
+       jedną stronę, a nie całą korespondencję konta. Bez granicy (pierwsze
+       uruchomienie) hamuje `maxStron`. */
+    const granica = odKiedy ? Date.parse(odKiedy) : NaN;
+    const wyniki: WatekNaglowek[] = [];
+    for (let strona = 0; strona < Math.max(1, maxStron); strona++) {
+      const json = await this.zapytaj(urlWatkow(config.allegro.apiUrl, strona * 20));
+      const watki = mapujWatki(json);
+      if (watki.length === 0) break;
+      for (const w of watki) wyniki.push(w);
+
+      if (watki.length < 20) break;
+      const najstarsza = watki[watki.length - 1]?.ostatniaWiadomoscAt ?? null;
+      if (Number.isFinite(granica) && najstarsza) {
+        const t = Date.parse(najstarsza);
+        if (Number.isFinite(t) && t < granica) break;
+      }
+    }
+    return wyniki;
+  }
+
+  async wiadomosciWatku(threadId: string): Promise<WiadomoscAllegro[]> {
+    const json = await this.zapytaj(urlWiadomosci(config.allegro.apiUrl, threadId));
+    return json === null ? [] : mapujWiadomosci(json, null);
+  }
+
+  async wyslijWiadomosc(threadId: string, tekstWiadomosci: string): Promise<void> {
+    await this.zapytaj(urlWyslijWiadomosc(config.allegro.apiUrl, threadId), {
+      metoda: "POST",
+      body: { text: tekstWiadomosci },
+    });
+  }
+
+  async oznaczPrzeczytany(threadId: string): Promise<void> {
+    await this.zapytaj(urlOznaczPrzeczytany(config.allegro.apiUrl, threadId), {
+      metoda: "PUT",
+      body: { read: true },
+    });
+  }
+
+  async szukajOfert(fraza: string): Promise<OfertaAllegro[]> {
+    /* Jedna strona dwudziestu wystarcza: to kontekst dla modelu i lista
+       linków dla człowieka, nie przegląd asortymentu. */
+    const json = await this.zapytaj(urlOfert(config.allegro.apiUrl, fraza, 0));
+    return json === null ? [] : mapujOferty(json, config.allegro.sandbox);
   }
 }
