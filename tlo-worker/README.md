@@ -121,18 +121,31 @@ Przy zagraconym tle lepszy jest **isnet-general-use** (około 176 MB). Wskazuje
 się go kluczem `TLO_MODEL`, bez przebudowy exe. Oba mają wejście 320 × 320
 i to samo przetwarzanie wstępne, więc podmiana jest naprawdę podmianą pliku.
 
-## `[WERYFIKUJ]` — do potwierdzenia na pobranym pliku
+## Co ustalono na pobranym pliku — 22 sierpnia 2026
 
-Wszystko, co dotyczy modelu, siedzi w jednym pliku
-[`src/UsuwanieTla.cs`](src/UsuwanieTla.cs) i jest oznaczone `[WERYFIKUJ]`
-(konwencja repo — wartość do potwierdzenia na własnym systemie):
+Cztery pozycje `[WERYFIKUJ]` z 0.88.0 są zamknięte. Sprawdzono je na pliku
+`u2netp.onnx` o sumie `sha256 309c8469…f4ddd8`.
 
-1. Nazwa i kształt wejścia (u2netp: `input`, 1 × 3 × 320 × 320, NCHW float32).
-2. Który tensor wyjściowy jest maską. U^2-Net oddaje siedem map (`d0`…`d6`);
-   pierwsza jest tą właściwą, reszta to wyjścia pośrednie warstw.
-3. Czy wyjście przeszło już przez sigmoidę. Eksporty z `rembg` — tak.
-4. Adres pobrania i suma kontrolna modelu w [`build.ps1`](build.ps1).
+| pytanie | odpowiedź |
+|---|---|
+| nazwa i kształt wejścia | `input.1` (**nie** `input`), 1 × 3 × 320 × 320, NCHW float32 |
+| który tensor jest maską | wyjść jest siedem, maską jest **pierwsze**, kształt 1 × 1 × 320 × 320 |
+| czy jest sigmoida | jest — siedem operacji `Sigmoid` na końcu grafu, wartości 0…1 |
+| adres i suma modelu | wpisane w [`build.ps1`](build.ps1) razem z historią sprawdzenia |
 
-Jakość wycięcia na **towarze magazynowym** jest osobnym `[WERYFIKUJ]`. Model
-uczono na zdjęciach ogólnych, nie na częściach do kosiarek. Dlatego w kolektorze
-stoi przycisk „ZOSTAW TŁO", a model da się podmienić jednym plikiem.
+Nazwa wejścia okazała się inna, niż zakładał komentarz. Kod jej nie wpisuje na
+sztywno — bierze ją z metadanych sesji — więc podmiana modelu na `isnet` nadal
+nie wymaga zmiany w `UsuwanieTla.cs`.
+
+Suma kontrolna potwierdzona trzema niezależnymi odczytami: pobranie na maszynie
+wdrożeniowej, pobranie z innej maszyny i innej sieci, oraz `md5`, które `rembg`
+deklaruje w swoim źródle (`rembg/sessions/u2netp.py`). Dowodzi to, że pobrane
+bajty są dokładnie tymi, które publikuje wydawca — nie tego, że sam model jest
+dobry.
+
+## `[WERYFIKUJ]` — co zostaje
+
+Jakość wycięcia na **towarze magazynowym**. Model uczono na zdjęciach ogólnych,
+nie na częściach do kosiarek, i tego nie rozstrzygnie żaden plik `.onnx` — tylko
+zdjęcia zrobione w hali. Dlatego w kolektorze stoi przycisk „ZOSTAW TŁO",
+a model podmienia się jednym kluczem `TLO_MODEL`.

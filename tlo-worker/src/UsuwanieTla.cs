@@ -14,11 +14,14 @@ namespace WertisTloWorker;
    kilku megabajtów, którego nie da się sensownie przeglądać ani różnicować.
    Pobiera go `build.ps1`, adres i suma kontrolna stoją w README.
 
-   [WERYFIKUJ] — do potwierdzenia na pliku, który naprawdę pobrano:
-     1. Nazwa i kształt wejścia (u2netp: `input`, 1×3×320×320, NCHW float32).
-     2. Który wyjściowy tensor jest maską. U²-Net oddaje SIEDEM map (d0…d6);
-        pierwsza jest tą właściwą, reszta to wyjścia pośrednie warstw.
-     3. Czy wyjście przeszło już przez sigmoidę. Eksporty z rembg — tak.        */
+   USTALONE 22.08.2026 na pobranym pliku (u2netp.onnx, sha256 309c8469…f4ddd8):
+     1. Wejście nazywa się `input.1`, NIE `input`, kształt 1×3×320×320 NCHW
+        float32. Nazwy NIE wpisujemy na sztywno — bierzemy ją z metadanych
+        sesji, więc podmiana modelu na isnet nie wymaga tu zmiany.
+     2. Wyjść jest SIEDEM (d0…d6). Pierwsze ma kształt 1×1×320×320 i to ono
+        jest maską; rembg bierze dokładnie to samo (`ort_outs[0][:, 0]`).
+     3. Sigmoida JEST w grafie — siedem operacji `Sigmoid` na jego końcu, po
+        jednej na wyjście. Wartości przychodzą więc już z zakresu 0…1.        */
 
 public sealed class UsuwanieTla : IDisposable
 {
