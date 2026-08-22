@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { config, bledyKonfiguracji } from "./config.js";
+import { config, bledyKonfiguracji, bezpiecznaWartosc } from "./config.js";
 
 /* Kody Subiekta jako test, nie jako komentarz.
    ─────────────────────────────────────────────────────────────────────────
@@ -204,4 +204,51 @@ test("okno listy dostaw: 14 dni domyślnie", () => {
   // Ta sama liczba stała wcześniej ZASZYTA w trasie `/api/delivery/documents`
   // i w nagłówku kolektora, więc `DOK_DNI_WSTECZ` rządziło tylko importem.
   assert.equal(config.mssql.dokDniWstecz, 14);
+});
+
+/* Komunikat o błędnej konfiguracji nie przepisuje sekretu na dysk
+   ─────────────────────────────────────────────────────────────────────────
+   Z produkcji (0.84.1): klucz Anthropic trafił do `AI_PROVIDER` zamiast do
+   `ANTHROPIC_API_KEY` — te pola sąsiadują ze sobą w `wertis.env.example`.
+   Serwer odmówił startu i wypisał WARTOŚĆ zmiennej do komunikatu, a NSSM
+   podnosił go w pętli, dopisując kolejną kopię klucza do dziennika przy
+   każdym obiegu. Klucz trzeba było unieważnić.
+
+   Test pilnuje dwóch rzeczy naraz, bo jedna bez drugiej jest bezużyteczna:
+   sekret ma NIE trafić do komunikatu, a komunikat ma dalej mówić, co zrobić.
+   Sama maska zostawiłaby człowieka z „coś jest źle" i bez wskazówki.        */
+
+test("wartość wyglądająca na klucz API nie trafia do komunikatu", () => {
+  for (const klucz of ["sk-ant-api03-TAJNE", "sk-TAJNE", "Bearer TAJNE"]) {
+    const bezpieczna = bezpiecznaWartosc(klucz);
+    assert.ok(!bezpieczna.includes("TAJNE"), `sekret przeciekł: ${bezpieczna}`);
+    assert.match(bezpieczna, /klucz API/, "maska ma powiedzieć, CO to było");
+  }
+});
+
+test("literówkę w nazwie trybu dalej widać w całości", () => {
+  // Maska bez tego byłaby lekiem gorszym od choroby: „antropic" trzeba
+  // zobaczyć, żeby zauważyć brakującą literę.
+  assert.equal(bezpiecznaWartosc("antropic"), "antropic");
+  assert.equal(bezpiecznaWartosc(""), "");
+});
+
+test("długa wartość spoza listy prefiksów też schodzi pod maskę", () => {
+  /* Nie każdy sekret zaczyna się od `sk-`. Nazwa trybu ma najwyżej kilka
+     znaków, więc wszystko dłuższe jest już podejrzane — a pierwsze dwanaście
+     znaków wystarcza, żeby rozpoznać, co człowiek wkleił. */
+  const dlugi = "x".repeat(120);
+  const bezpieczna = bezpiecznaWartosc(dlugi);
+  assert.ok(bezpieczna.length < 40);
+  assert.match(bezpieczna, /120 znaków/);
+});
+
+test("błąd AI_PROVIDER mówi, gdzie NAPRAWDĘ wpisuje się klucz", () => {
+  const zly = structuredClone(config) as typeof config;
+  (zly.ai as { provider: string }).provider = "sk-ant-api03-TAJNE";
+  const bledy = bledyKonfiguracji(zly);
+  const o = bledy.find((b) => b.startsWith("AI_PROVIDER="));
+  assert.ok(o, "brak zdania o AI_PROVIDER");
+  assert.ok(!o.includes("TAJNE"), "komunikat wyniósł sekret");
+  assert.match(o, /ANTHROPIC_API_KEY/, "bez tej wskazówki człowiek wklei klucz drugi raz");
 });

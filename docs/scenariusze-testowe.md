@@ -577,6 +577,19 @@ Zakładka ZWROTY w `/biuro` (rola biuro albo admin). W trybie demo
 (`SGT_MODE=seeded`) pracuje adapter dev — fikcyjne zwroty bez kontaktu
 z Allegro, zestrojone z dokumentami sprzedaży z tego seedu.
 
+### S66a — nic nie pobiera się samo
+
+Zaraz po starcie serwera karta **BRAKUJĄCE PACZKI** ma być pusta, a pod nią
+zdanie „Jeszcze nic nie pobrano". W dzienniku serwera nie ma ani jednego wpisu
+`[zapowiedzi]` i `[pytania]`. Odczekaj minutę: ma się nie zmienić nic.
+
+Od 0.85.0 pobiera CZŁOWIEK. Kliknij **POBIERZ Z ALLEGRO** na karcie ZWROTY —
+toast ma powiedzieć, ile zgłoszeń przyszło, a lista przestać być pusta.
+Cichy przycisk kazałby klikać drugi raz „bo chyba nie zadziałało".
+
+Ta sama reguła dotyczy pytań klientów: przycisk **ODŚWIEŻ Z ALLEGRO** na ich
+karcie. Oba pobierania gasi i włącza jedno pokrętło `ALLEGRO_POLL_MS`.
+
 ### S67 — zwrot dopasowany jednoznacznie
 
 Skan `DEVWB0001` zakłada zwrot z dwiema pozycjami (`TEST-LINIA-TODO`,

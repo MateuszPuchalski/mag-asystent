@@ -24,7 +24,12 @@ import {
   zdejmijDokument,
 } from "../services/zwroty.js";
 import { listaReklamacji, raportZwrotow, rozpatrzReklamacje, ustawPolke } from "../services/reklamacje.js";
-import { brakujacePaczki, pominZapowiedz, stanOdswiezania } from "../services/zapowiedzi.js";
+import {
+  brakujacePaczki,
+  pobierzZapowiedzi,
+  pominZapowiedz,
+  stanOdswiezania,
+} from "../services/zapowiedzi.js";
 import { oknoDni, statystykiZwrotow } from "../services/statystyki-zwrotow.js";
 import { czasyZwrotow } from "../services/czasy-zwrotow.js";
 
@@ -302,6 +307,23 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     /* Ślad tickera jedzie razem z listą: pytanie „czemu ten wiersz nie ma
        statusu" musi mieć odpowiedź NA TYM ekranie, nie w logu serwera. */
     return { zapowiedzi: brakujacePaczki(), ticker: stanOdswiezania() };
+  });
+
+  /* Pobranie zgłoszeń z Allegro NA ŻĄDANIE (0.85.0). Ścieżka statyczna stoi
+     przed `/:id/pomin`, więc `odswiez` nie zostanie wzięte za identyfikator.
+
+     Tę samą robotę wykonywał wcześniej wyłącznie ticker. Od tej wersji domyślnie
+     nie chodzi żaden — pobiera człowiek, kiedy tego potrzebuje. */
+  app.post("/api/biuro/zwroty/zapowiedzi/odswiez", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    try {
+      return await pobierzZapowiedzi();
+    } catch (e) {
+      /* Odmowa Allegro (wygasły token, brak uprawnienia) ma dojść do człowieka,
+         który kliknął — w logu serwera nikt jej nie szuka, stojąc przy panelu. */
+      return reply.code(502).send({ error: e instanceof Error ? e.message : String(e) });
+    }
   });
 
   /* Zdjęcie zgłoszenia z listy ręką — sprawa załatwiona poza aplikacją. */

@@ -356,23 +356,39 @@ export function liczbyZapowiedzi(): {
 }
 
 /**
+ * Jedno pobranie z Allegro: nowe zgłoszenia plus statusy tych, które czekają.
+ *
+ * Ta sama funkcja obsługuje przycisk w biurze i (gdy ktoś włączy interwał)
+ * ticker. Dwie kopie tej roboty rozjechałyby się przy pierwszej zmianie
+ * jednej z nich, a objawem byłoby „przycisk pobiera co innego niż tło".
+ */
+export async function pobierzZapowiedzi(): Promise<{ nowych: number; statusow: number }> {
+  const nowych = await odswiezZapowiedzi();
+  /* Po nowych — statusy tych, które wciąż czekają. Kolejność jest bez
+     znaczenia, ale jedno miejsce na błąd wystarcza. */
+  const statusow = await odswiezStatusyOczekujacych();
+  return { nowych, statusow };
+}
+
+/**
  * Pętla tickera — wołana z `main()`, nigdy z `buildApp()` (testy tras nie
  * mają prawa strzelać do Allegro). Przebieg tylko przy sensownym stanie
  * konta: dev zawsze, http dopiero po sparowaniu — inaczej log zapełniałby
- * się co pięć minut błędem o brakującym tokenie.
+ * się błędem o brakującym tokenie przy każdym obiegu.
+ *
+ * Od 0.85.0 interwał jest domyślnie WYŁĄCZONY (`ALLEGRO_POLL_MS=0`), a pobiera
+ * przycisk w biurze. Ta funkcja zostaje dla instalacji, które wolą tło —
+ * wystarczy wpisać liczbę milisekund.
  */
 export function uruchomTickerZapowiedzi(): void {
   if (config.zwroty.pollMs <= 0) return;
   const przebieg = () => {
     const stan = stanPolaczenia().stan;
     if (stan !== "dev" && stan !== "polaczone") return;
-    odswiezZapowiedzi()
-      .then(async (nowych) => {
+    pobierzZapowiedzi()
+      .then(({ nowych, statusow }) => {
         if (nowych > 0) console.log(`[zapowiedzi] nowych zgłoszeń zwrotu: ${nowych}`);
-        /* Po nowych — statusy tych, które wciąż czekają. Kolejność jest bez
-           znaczenia, ale jedno `catch` na oba kroki wystarcza. */
-        const odswiezonych = await odswiezStatusyOczekujacych();
-        if (odswiezonych > 0) console.log(`[zapowiedzi] odświeżonych statusów: ${odswiezonych}`);
+        if (statusow > 0) console.log(`[zapowiedzi] odświeżonych statusów: ${statusow}`);
       })
       .catch((e) =>
         console.error("[zapowiedzi] przebieg nieudany:", e instanceof Error ? e.message : e)

@@ -372,11 +372,27 @@ test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => 
   assert.equal(r.statusCode, 403);
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: biuro });
   assert.equal(r.statusCode, 200);
-  assert.deepEqual(r.json().zapowiedzi, []);
-  // schowanie zapowiedzi (0.70.0) — bramka biura, a nieznane id to 404, nie 500
-  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/1/pomin", payload: {}, headers: magazynier });
+  assert.deepEqual(r.json().zapowiedzi, [], "nic nie pobiera się samo — to jest teza 0.85.0");
+
+  /* ...a pobranie Z RĘKI przynosi zgłoszenia. Te dwie asercje mają sens
+     WYŁĄCZNIE razem: pierwsza pilnuje, że tło milczy, druga — że przycisk
+     naprawdę działa. Sama pierwsza przeszłaby też przy trasie zepsutej na
+     głucho, czyli w stanie, w którym karta BRAKUJĄCE PACZKI nigdy nic nie
+     pokaże i nikt się nie dowie dlaczego. */
+  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/odswiez", headers: magazynier });
+  assert.equal(r.statusCode, 403, "pobiera biuro, nie hala");
+  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/odswiez", headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.ok(r.json().nowych > 0, "adapter dev ma zgłoszenia — przycisk musi je przynieść");
+
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: biuro });
+  assert.ok(r.json().zapowiedzi.length > 0, "po pobraniu lista przestaje być pusta");
+  /* Schowanie zapowiedzi (0.70.0) — bramka biura, a nieznane id to 404, nie 500.
+     Id musi być NAPRAWDĘ nieznane: od 0.85.0 pobranie wyżej zakłada zgłoszenia,
+     więc `1` jest już zajęte i test sprawdzałby coś innego, niż zamierzał. */
+  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/999999/pomin", payload: {}, headers: magazynier });
   assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/1/pomin", payload: {}, headers: biuro });
+  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/999999/pomin", payload: {}, headers: biuro });
   assert.equal(r.statusCode, 404);
   // półka reklamacyjna i dyskusje Allegro (Etap 6) — bramka biura
   r = await app.inject({
