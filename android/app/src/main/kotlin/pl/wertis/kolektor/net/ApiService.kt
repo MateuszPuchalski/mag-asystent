@@ -242,6 +242,15 @@ interface ApiService {
     @POST("api/kosze/pozycje/{id}/pomin")
     suspend fun koszPomin(@Path("id") id: Long, @Body body: PominKoszBody): OdlozKoszResponse
 
+    @POST("api/kosze/pozycje/{id}/pozniej")
+    suspend fun koszPozniej(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
+    @POST("api/kosze/pozycje/{id}/cofnij")
+    suspend fun koszCofnijPozycje(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
+    @POST("api/kosze/{id}/cofnij-zakonczenie")
+    suspend fun koszCofnijZakonczenie(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
     @POST("api/kosze/{id}/zakoncz")
     suspend fun koszZakoncz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
 

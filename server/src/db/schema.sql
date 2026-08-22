@@ -646,6 +646,15 @@ CREATE TABLE IF NOT EXISTS kosz_pozycja (
   zalatwione_at TEXT,
   zalatwione_przez TEXT,
   zalatwione_notatka TEXT,
+  -- Zadanie zapisu ADRESU z tego odłożenia (0.79.0). Trzymane po to, żeby
+  -- cofnięcie pomyłki wiedziało, czy adres zdążył pójść do Subiekta: zadanie
+  -- oczekujące da się anulować, zapisanego nie cofa już aplikacja.
+  loc_queue_id  INTEGER REFERENCES sfera_queue(id),
+  -- „Wrócę do tego" (0.79.0): pozycja zjeżdża na KONIEC listy, zachowując stan
+  -- `todo`. To co innego niż pominięcie — towar jest w koszu, tylko nie teraz.
+  -- Znacznik czasu, nie flaga, bo dwie odłożone na później mają zachować
+  -- kolejność między sobą.
+  pozniej_at    TEXT,
   -- Zadanie MM ZWROTY→MAG cofające bufor dla TEJ pozycji. Jednopozycyjne MM
   -- świadomie: guard „adres przed sprzedawalnością" w obu workerach porządkuje
   -- zadania po tw_id, a MM wielopozycyjne wypadałoby spod niego.

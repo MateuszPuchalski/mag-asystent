@@ -189,6 +189,8 @@ function migrate(database: DatabaseSync) {
   addColumn("kosz_pozycja", "zalatwione_at", "TEXT");
   addColumn("kosz_pozycja", "zalatwione_przez", "TEXT");
   addColumn("kosz_pozycja", "zalatwione_notatka", "TEXT");
+  addColumn("kosz_pozycja", "loc_queue_id", "INTEGER");
+  addColumn("kosz_pozycja", "pozniej_at", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
   naLoginIHaslo(database);
