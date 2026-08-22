@@ -23,6 +23,7 @@ process.env.ZDJECIA_BLAD_TTL_MIN = "5";
 
 let db: typeof import("../db/db.js").db;
 let Z: typeof import("./zdjecia.js");
+let W: typeof import("./zdjecia-wlasne.js");
 
 /** Same nagłówki — `rozpoznajMime` czyta pierwsze bajty, reszta jest nieistotna. */
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
@@ -31,10 +32,12 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 before(async () => {
   ({ db } = await import("../db/db.js"));
   Z = await import("./zdjecia.js");
+  W = await import("./zdjecia-wlasne.js");
 });
 
 beforeEach(() => {
   db().prepare("DELETE FROM zdjecie_cache").run();
+  db().prepare("DELETE FROM zdjecie_wlasne").run();
   db()
     .prepare(
       `INSERT OR REPLACE INTO sgt_towar(tw_id, symbol, nazwa, ean, lokalizacja)
@@ -233,4 +236,77 @@ test("nieznany towar nie zakłada wpisu ani nie pyta źródła", async () => {
 
 test("nazwa pliku z bazy nie wyprowadza odczytu poza katalog", () => {
   assert.equal(Z.sciezkaZdjecia("../../../etc/passwd"), null);
+});
+
+// ── Zdjęcie dodane z kolektora ma pierwszeństwo (0.88.0) ────────────────────
+
+/* To jest cała zapasowa droga funkcji dodawania zdjęć: magazynier robi zdjęcie
+   i widzi je na karcie NATYCHMIAST, niezależnie od tego, czy baza firmy ma
+   GRANT INSERT i czy worker zdążył wykonać zadanie. Dokładnie tak `ean_alias`
+   niesie kod kreskowy mimo nieudanego `set_ean`. */
+test("własne zdjęcie wygrywa ze źródłem i NIE pyta bazy firmy", async () => {
+  W.zapiszWlasne({
+    twId: 1, obraz: PNG, mime: "image/png", tloUsuniete: true,
+    dodaneBy: "Jan", dodaneByRef: null,
+  });
+  const z = zrodlo(JPEG);
+  const w = await Z.zapewnijZdjecie(1, z.fn);
+  assert.equal(z.ile(), 0, "źródła nie ma po co pytać — mamy zdjęcie, które sami zrobiliśmy");
+  assert.ok(w?.plik);
+  assert.equal(w?.mime, "image/png");
+  assert.equal(fs.readFileSync(path.join(Z.katalogZdjec(), w!.plik!)).length, PNG.length);
+});
+
+/* Plik w cache'u wolno skasować — sprzątaczka robi to po przekroczeniu limitu.
+   Źródłem prawdy jest wiersz w bazie, więc odtworzenie ma być samoczynne. */
+test("skasowany plik cache'u odtwarza się z bazy, bez pytania źródła", async () => {
+  W.zapiszWlasne({
+    twId: 1, obraz: PNG, mime: "image/png", tloUsuniete: true,
+    dodaneBy: "Jan", dodaneByRef: null,
+  });
+  const z = zrodlo(JPEG);
+  const pierwszy = await Z.zapewnijZdjecie(1, z.fn);
+  fs.unlinkSync(path.join(Z.katalogZdjec(), pierwszy!.plik!));
+  const drugi = await Z.zapewnijZdjecie(1, z.fn);
+  assert.equal(z.ile(), 0);
+  assert.ok(drugi?.plik && Z.sciezkaZdjecia(drugi.plik));
+});
+
+/* Karta jest odpytywana przy każdym wejściu, a odpowiedzią bywa samo 304.
+   Czytanie przy tym blobu z bazy znaczyłoby setki kilobajtów na odpowiedź
+   o rozmiarze nagłówka — dokładnie ten koszt, którego cały ten cache unika.
+   Mierzymy to jedynym sposobem, jaki cokolwiek dowodzi: plik na dysku nie ma
+   prawa zostać przepisany drugi raz. */
+test("drugie wejście na kartę NIE przepisuje pliku własnego zdjęcia", async () => {
+  W.zapiszWlasne({
+    twId: 1, obraz: PNG, mime: "image/png", tloUsuniete: true,
+    dodaneBy: "Jan", dodaneByRef: null,
+  });
+  const z = zrodlo(JPEG);
+  const w = await Z.zapewnijZdjecie(1, z.fn);
+  const sciezka = path.join(Z.katalogZdjec(), w!.plik!);
+  const pierwszyZapis = fs.statSync(sciezka).mtimeMs;
+
+  // znacznik cofnięty, żeby ponowny zapis był widoczny mimo rozdzielczości zegara
+  fs.utimesSync(sciezka, new Date(pierwszyZapis - 5000), new Date(pierwszyZapis - 5000));
+  const przed = fs.statSync(sciezka).mtimeMs;
+
+  await Z.zapewnijZdjecie(1, z.fn);
+  assert.equal(fs.statSync(sciezka).mtimeMs, przed, "plik jest aktualny — nie ma po co czytać blobu");
+});
+
+/* Po udanym zapisie do Subiekta kopia zapasowa schodzi — i od tej chwili karta
+   ma znowu chodzić do źródła. Bez tego poprawka zdjęcia zrobiona później
+   w Subiekcie nigdy nie dotarłaby na kolektor. */
+test("po zdjęciu kopii zapasowej karta wraca do źródła", async () => {
+  W.zapiszWlasne({
+    twId: 1, obraz: PNG, mime: "image/png", tloUsuniete: true,
+    dodaneBy: "Jan", dodaneByRef: null,
+  });
+  const z = zrodlo(JPEG);
+  await Z.zapewnijZdjecie(1, z.fn);
+  W.oznaczWSubiekcie(1);
+  db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = 1").run();
+  await Z.zapewnijZdjecie(1, z.fn);
+  assert.equal(z.ile(), 1);
 });

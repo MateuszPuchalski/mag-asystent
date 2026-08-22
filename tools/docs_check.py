@@ -170,7 +170,10 @@ LICZEBNIKI = {
 # Znacznik otwierający akapit — taka jest konwencja tego dokumentu. Wystąpienie
 # w środku zdania (jak w samej preambule) NIE jest pozycją do ustalenia.
 ZNACZNIK_RE = re.compile(r"^`\[WERYFIKUJ\]`", re.MULTILINE)
-DEKLARACJA_RE = re.compile(r"takich rzeczy zostały (\w+)")
+# Dwie formy, bo polszczyzna wymaga innej przy trzech, a innej przy sześciu:
+# „zostały trzy", ale „zostało sześć". Zamknięcie regexu na jednej z nich
+# kazałoby wybierać między zielonym testem a poprawnym zdaniem.
+DEKLARACJA_RE = re.compile(r"takich rzeczy (?:zostały|zostało) (\w+)")
 
 
 def sprawdz_licznik_weryfikuj() -> int:

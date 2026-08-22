@@ -201,5 +201,13 @@ export function buildProductCard(
       const a = adnotacjaStrefy(twId);
       return a ? { zlotaStrefa: a } : {};
     })(),
+    /* Czy TA instalacja przyjmuje zdjęcia z kolektora (0.88.0).
+       Pole karty, nie osobna trasa konfiguracji, i to z jednego powodu:
+       przycisk „+" ma się pojawiać dokładnie tam, gdzie kolektor już i tak
+       pyta o dane. Osobne pobranie znaczyłoby cache, TTL i stan „jeszcze nie
+       wiem" na ekranie, na którym pusty slot jest i tak. Starszy serwer pola
+       nie wysyła, a `false` po stronie kolektora chowa przycisk — czyli
+       zachowanie sprzed tej wersji. */
+    mozeDodacZdjecie: config.zdjecia.dodawanie !== "",
   };
 }

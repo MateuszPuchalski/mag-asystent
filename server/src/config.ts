@@ -457,6 +457,83 @@ export const config = {
      * objaw „aplikacja zamarła", którego nikt nie skojarzy ze zdjęciami.
      */
     bladTtlMin: num(process.env.ZDJECIA_BLAD_TTL_MIN, 5, "ZDJECIA_BLAD_TTL_MIN"),
+
+    /* ── Dodawanie zdjęcia z kolektora (0.88.0) ──────────────────────────────
+       Do 0.87.0 zdjęcia były WYŁĄCZNIE do odczytu i tak to opisywała
+       `docs/subiekt-gt-struktura.md`. Ten klucz tę granicę przesuwa — trzeci
+       raz po lokalizacji (spec §5.2) i kodzie kreskowym (0.37.0), a pierwszy
+       raz INSERT-em, nie zmianą jednej kolumny.
+
+       JEDEN KLUCZ, nie dwa, i to z tego samego powodu co przy `ZDJECIA_ZRODLO`
+       wyżej: jest zarazem wyłącznikiem i wyborem miejsca zapisu. Osobny
+       przełącznik „włączone" i osobny „gdzie" mogłyby się rozjechać ze sobą,
+       a objawem rozjazdu byłby przycisk, który nie robi nic.                  */
+
+    /**
+     * `""` (nie da się dodać) | `wertis` (zdjęcie zostaje u nas) |
+     * `subiekt` (dodatkowo wchodzi do kartoteki).
+     *
+     * Domyślnie puste i to nie jest ostrożność na zapas. `subiekt` żąda
+     * `GRANT INSERT` na tabelę zdjęć, a takiego prawa nie nadaje się dlatego,
+     * że ktoś zaktualizował aplikację. Przy `wertis` zdjęcie i tak widać na
+     * karcie — leży w bazie WERTIS, tak jak `ean_alias` niesie kod kreskowy
+     * mimo nieudanego `set_ean`.
+     */
+    dodawanie: (process.env.ZDJECIA_DODAWANIE ?? "") as "" | "wertis" | "subiekt",
+    /**
+     * [WERYFIKUJ] kolumna sumy kontrolnej (`zd_CRC` w `tw_ZdjecieTw`).
+     *
+     * PUSTE ZNACZY „nie wpisujemy jej wcale" i to jest wartość domyślna.
+     * Algorytmu, którym Subiekt liczy tę sumę, repozytorium NIE ZNA — wpisanie
+     * własnej liczby byłoby zgadywaniem, a wynik zgadywania siedziałby w bazie
+     * firmy. Czy Subiekt znosi `NULL`, rozstrzyga kartoteka próbna (DEPLOY §6).
+     */
+    kolumnaCrc: process.env.ZDJECIA_KOLUMNA_CRC ?? "",
+    /**
+     * Ile kilobajtów wolno przyjąć od kolektora.
+     *
+     * Osobno od `maxKb` (2048), bo to inny kierunek i inny nadawca. `maxKb`
+     * broni się przed kartoteką ze skanem 20 MB, której nikt nie kontroluje;
+     * tutaj nadawcą jest nasz własny kolektor, który zdjęcie ZMNIEJSZA przed
+     * wysyłką (`PhotoCapture`, 1600 px). Przekroczenie tej liczby znaczy więc,
+     * że coś poszło z pominięciem kolektora — i wtedy odmowa jest odpowiedzią
+     * właściwą, a nie utrudnieniem.
+     */
+    uploadMaxKb: num(process.env.ZDJECIA_UPLOAD_MAX_KB, 512, "ZDJECIA_UPLOAD_MAX_KB"),
+    /**
+     * Ile minut żyje podgląd między wysłaniem zdjęcia a jego zatwierdzeniem.
+     *
+     * Człowiek ogląda wycięte tło kilkanaście sekund. Kwadrans to zapas na
+     * przerwane połączenie i na kolektor odłożony na regał w połowie roboty —
+     * po tym czasie wiersz kasuje się sam, bo nikt do niego nie wróci.
+     */
+    podgladMin: num(process.env.ZDJECIA_PODGLAD_MIN, 15, "ZDJECIA_PODGLAD_MIN"),
+  },
+
+  /**
+   * Usuwanie tła ze zdjęcia wgrywanego z kolektora (0.88.0).
+   *
+   * OSOBNY PROCES, nie biblioteka. Model działa na runtime ONNX, czyli na
+   * module natywnym — a serwer WERTIS ma dwie zależności i zero modułów
+   * natywnych, i to jest reguła powtórzona w `db/db.ts`, `services/zdjecia.ts`
+   * i `services/logo-dostawcy.ts`. Wzorzec na taki przypadek repozytorium już
+   * ma: `sfera-worker/` to trzeci proces, domyślnie wyłączony, a bez niego
+   * reszta systemu działa i mówi wprost, czego brakuje.
+   *
+   * PUSTE `TLO_URL` = funkcja wyłączona. Podgląd pokazuje wtedy zdjęcie
+   * z tłem i mówi o tym magazynierowi; nie jest to awaria i nie udaje jej.
+   */
+  tlo: {
+    /** Adres usługi `wertis-tlo`, np. `http://127.0.0.1:8791`. Puste = bez usługi. */
+    url: process.env.TLO_URL ?? "",
+    /**
+     * Ile milisekund czekamy na wycięcie tła.
+     *
+     * Człowiek stoi przy regale i patrzy na kręcące się kółko, więc ta liczba
+     * jest granicą cierpliwości, nie granicą modelu. Po jej upływie podgląd
+     * pokazuje zdjęcie z tłem — gorzej, ale od razu.
+     */
+    timeoutMs: num(process.env.TLO_TIMEOUT_MS, 20_000, "TLO_TIMEOUT_MS"),
   },
 
   /**
@@ -622,6 +699,56 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (c.zdjecia.zrodlo === "plik" && !c.zdjecia.katalog) {
     bledy.push("ZDJECIA_ZRODLO=plik wymaga ZDJECIA_KATALOG — katalogu ze zdjęciami.");
+  }
+  /* Zapis zdjęcia do Subiekta (0.88.0). Objaw pomyłki byłby tu gorszy niż
+     pusty slot: magazynier robi zdjęcie, widzi je na karcie — bo leży w bazie
+     WERTIS — a do kartoteki nic nie wchodzi, bo zadanie ląduje w błędzie.
+     Praca wygląda na wykonaną i nikt nie sprawdza kolejki. Dlatego niepełna
+     konfiguracja zatrzymuje start, zamiast czekać na pierwsze zadanie. */
+  if (!["", "wertis", "subiekt"].includes(c.zdjecia.dodawanie)) {
+    bledy.push(
+      `ZDJECIA_DODAWANIE=${bezpiecznaWartosc(c.zdjecia.dodawanie)} — dozwolone: ` +
+        "puste (bez dodawania), wertis, subiekt.",
+    );
+  }
+  if (c.zdjecia.dodawanie === "subiekt") {
+    if (c.zdjecia.zrodlo !== "blob") {
+      bledy.push(
+        "ZDJECIA_DODAWANIE=subiekt wymaga ZDJECIA_ZRODLO=blob — dopisujemy wiersz do tej " +
+          "samej tabeli, z której czytamy, a przy źródle plikowym nie ma jej gdzie szukać.",
+      );
+    }
+    if (c.sgtMode === "seeded") {
+      bledy.push(
+        "ZDJECIA_DODAWANIE=subiekt wymaga SGT_MODE=mssql — w trybie demo nie ma bazy " +
+          "Subiekta, do której dałoby się zdjęcie dopisać. Zostaw ZDJECIA_DODAWANIE=wertis.",
+      );
+    }
+    if (!c.zdjecia.tabela) {
+      bledy.push(
+        "ZDJECIA_DODAWANIE=subiekt wymaga ZDJECIA_TABELA — INSERT musi nazwać tabelę wprost " +
+          "(dla tej bazy tw_ZdjecieTw). Zapis do samej kartoteki tw__Towar nie wchodzi w grę.",
+      );
+    }
+    if (!c.zdjecia.kolumnaKlucza) {
+      bledy.push(
+        "ZDJECIA_DODAWANIE=subiekt wymaga ZDJECIA_KOLUMNA_KLUCZA — bez niej wiersz nie wskaże kartoteki.",
+      );
+    }
+    /* Bez kolumny „główne" pierwszy dopisany wiersz nigdy nie byłby zdjęciem
+       głównym, a odczyt bierze WŁAŚNIE główne. Zdjęcie wchodziłoby do Subiekta
+       i nie pokazywało się ani tam, ani na karcie po zsynchronizowaniu. */
+    if (!c.zdjecia.kolumnaGlowne) {
+      bledy.push(
+        "ZDJECIA_DODAWANIE=subiekt wymaga ZDJECIA_KOLUMNA_GLOWNE — nowe zdjęcie kartoteki " +
+          "bez zdjęć musi stać się głównym, inaczej odczyt go nie znajdzie.",
+      );
+    }
+  }
+  if (c.tlo.url && !/^https?:\/\//.test(c.tlo.url)) {
+    bledy.push(
+      `TLO_URL=${bezpiecznaWartosc(c.tlo.url)} — ma być adresem http(s), np. http://127.0.0.1:8791.`,
+    );
   }
   /* Kolektor pamięta własny „brak zdjęcia" przez 24 h i na tym stoi obietnica
      „dodane dziś, widoczne jutro". Dłuższa pamięć serwera unieważnia ją po

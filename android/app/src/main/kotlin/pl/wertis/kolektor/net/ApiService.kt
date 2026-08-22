@@ -52,9 +52,14 @@ import pl.wertis.kolektor.core.net.SearchResponse
 import pl.wertis.kolektor.core.net.SetEanBody
 import pl.wertis.kolektor.core.net.SetLocationBody
 import pl.wertis.kolektor.core.net.SetupResponse
+import pl.wertis.kolektor.core.net.ZdjecieWstepneBody
+import pl.wertis.kolektor.core.net.ZdjecieWstepneResponse
+import pl.wertis.kolektor.core.net.ZdjecieZapisBody
+import pl.wertis.kolektor.core.net.ZdjecieZapisResponse
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -103,6 +108,28 @@ interface ApiService {
         @Path("id") id: Long,
         @Header("If-None-Match") etag: String? = null,
     ): Response<ResponseBody>
+
+    /* ── Dodanie zdjęcia kartoteki (0.88.0) ─────────────────────────────────
+       Dwa kroki: `wstepne` robi podgląd, `zapiszZdjecie` zatwierdza. Trzeci
+       wywołanie kasuje porzucony podgląd, żeby nie czekał na wygaśnięcie. */
+
+    @POST("api/products/{id}/zdjecie/wstepne")
+    suspend fun zdjecieWstepne(
+        @Path("id") id: Long,
+        @Body body: ZdjecieWstepneBody,
+    ): ZdjecieWstepneResponse
+
+    @POST("api/products/{id}/zdjecie")
+    suspend fun zapiszZdjecie(
+        @Path("id") id: Long,
+        @Body body: ZdjecieZapisBody,
+    ): ZdjecieZapisResponse
+
+    @DELETE("api/products/{id}/zdjecie/wstepne/{podgladId}")
+    suspend fun porzucPodgladZdjecia(
+        @Path("id") id: Long,
+        @Path("podgladId") podgladId: String,
+    ): OkResponse
 
     /** Logo dostawcy (0.56.0) — ten sam kontrakt co zdjęcie: strumień + ETag. */
     @Streaming

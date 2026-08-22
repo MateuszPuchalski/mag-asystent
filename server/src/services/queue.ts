@@ -112,6 +112,34 @@ export function enqueueSetEan(
 }
 
 /**
+ * Zadanie dopisania zdjęcia do kartoteki (0.88.0) wraz z wpisem do audytu.
+ *
+ * TRZECIA rzecz, którą aplikacja zapisuje do bazy firmy, i pierwsza dopisywana
+ * WIERSZEM. Kosztuje nowe uprawnienie (`GRANT INSERT` na tabelę zdjęć); bez
+ * niego zadanie ląduje w błędzie, a zdjęcie i tak widać na karcie — leży
+ * w `zdjecie_wlasne`, tak jak kod kreskowy leży w `ean_alias`.
+ *
+ * Payload to SAM `twId`. Bajty zostają w bazie, bo kolumna `payload` jest
+ * czytana przy każdym obrocie pętli workera — 300 kB w niej to 300 kB odczytu
+ * co sekundę, przez cały czas życia zadania.
+ */
+export function enqueueSetZdjecie(
+  twId: number,
+  base: EnqueueBase,
+  audyt: { bajtow: number; tloUsuniete: boolean; zrodlo: "aparat" | "galeria" }
+): number {
+  const queueId = insert("set_zdjecie", { twId }, base);
+  logEvent(
+    "zdjecie_dodane",
+    base.createdBy,
+    twId,
+    { bajtow: audyt.bajtow, tloUsuniete: audyt.tloUsuniete, zrodlo: audyt.zrodlo, queueId },
+    base.createdByRef ?? currentUserRef()
+  );
+  return queueId;
+}
+
+/**
  * Zadanie zmiany lokalizacji (spec §5.2) wraz z wpisem do audytu.
  *
  * Zdarzenie powstaje TUTAJ, a nie w miejscach wywołania, i to jest decyzja

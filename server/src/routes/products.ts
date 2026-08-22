@@ -4,7 +4,17 @@ import { autorOperacji, subiekt, userOf } from "../context.js";
 import { sciezkaZdjecia, zapewnijZdjecie } from "../services/zdjecia.js";
 import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
-import { enqueueSetEan, enqueueSetLocation } from "../services/queue.js";
+import { enqueueSetEan, enqueueSetLocation, enqueueSetZdjecie } from "../services/queue.js";
+import {
+  bajtyZeZdjecia,
+  dodawanieWlaczone,
+  podglad,
+  przypiszZadanie,
+  usunPodglad,
+  zapiszPodglad,
+  zapiszWlasne,
+} from "../services/zdjecia-wlasne.js";
+import { tloWlaczone, usunTlo } from "../adapters/tlo.js";
 import { aliasKodu, bladKodu, ktoMaTenKod, zapiszAlias, zdejmijAlias } from "../services/ean-alias.js";
 import { recordEanConflict } from "../services/ean.js";
 import { logEvent, productHistory } from "../services/events.js";
@@ -362,6 +372,152 @@ export async function productRoutes(app: FastifyInstance) {
       .header("content-length", String(fs.statSync(plik).size))
       .send(fs.createReadStream(plik));
   });
+
+  /* ── Dodanie zdjęcia z kolektora (0.88.0) ──────────────────────────────────
+     DWA KROKI, BO WYCINANIE TŁA BYWA NIEUDANE. Pierwszy robi podgląd, drugi
+     zapisuje. Zdjęcie regału z pięcioma kartonami wygląda dla modelu tak samo
+     jak zdjęcie noża i bez kroku „obejrzyj" wchodziłoby do kartoteki w Subiekcie,
+     a odkręcić mogłoby to wyłącznie biuro.
+
+     Base64 w JSON, nie multipart — tak samo jak logo dostawcy i zdjęcia dowodowe.
+     Serwer nie ma pluginu multipart i nie ma powodu go dostawać dla jednej trasy. */
+
+  /**
+   * Krok 1: zdjęcie idzie na serwer, wraca podgląd bez tła.
+   *
+   * Nic tu jeszcze NIE jest zapisane na stałe i nic nie jedzie do Subiekta.
+   * Odpowiedź niesie `tlo`, żeby kolektor mógł powiedzieć wprost, czy tło
+   * naprawdę zniknęło — magazynier ma wiedzieć, na co patrzy.
+   */
+  app.post<{ Params: { twId: string }; Body: { zdjecie?: string } }>(
+    "/api/products/:twId/zdjecie/wstepne",
+    async (req, reply) => {
+      if (!dodawanieWlaczone()) {
+        return reply.code(409).send({ error: "Dodawanie zdjęć jest w tej instalacji wyłączone" });
+      }
+      const twId = Number(req.params.twId);
+      if (!subiekt.getProductById(twId)) {
+        return reply.code(404).send({ error: "Nie znaleziono towaru" });
+      }
+
+      const bajty = bajtyZeZdjecia(req.body?.zdjecie ?? "");
+      if (!bajty.ok) return reply.code(400).send({ error: bajty.error });
+
+      /* Awaria usługi tła NIE przerywa dodawania zdjęcia. Człowiek stoi przy
+         regale i ma w ręku towar; „spróbuj później" byłoby tu odpowiedzią
+         gorszą niż zdjęcie z tłem. Powód jedzie w `powod`, żeby dało się go
+         zobaczyć bez zaglądania w logi serwera. */
+      let bezTla: Buffer | null = null;
+      let powod: string | null = tloWlaczone()
+        ? null
+        : "Usuwanie tła nie jest w tej instalacji włączone.";
+      try {
+        bezTla = await usunTlo(bajty.obraz, bajty.mime);
+        if (!bezTla && tloWlaczone()) {
+          /* Usługa obejrzała zdjęcie i nie znalazła na nim przedmiotu — kadr
+             regału wygląda właśnie tak. To odpowiedź, nie awaria, i człowiek
+             ma ją usłyszeć w tych słowach. */
+          powod = "Na zdjęciu nie widać pojedynczego przedmiotu — tło zostaje.";
+        }
+      } catch (e) {
+        powod = e instanceof Error ? e.message : String(e);
+      }
+
+      const podgladId = zapiszPodglad(twId, bajty.obraz, bajty.mime, bezTla);
+      return {
+        podgladId,
+        tlo: bezTla ? "usuniete" : "zostawione",
+        /* Kolektor rysuje podgląd z TEGO base64, nie pobiera go osobną trasą:
+           obraz i tak przed chwilą przez tę sieć przejechał, a druga runda
+           przez Wi-Fi hali kosztowałaby kolejne sekundy patrzenia w kółko. */
+        png: (bezTla ?? bajty.obraz).toString("base64"),
+        mime: bezTla ? "image/png" : bajty.mime,
+        ...(powod ? { powod } : {}),
+      };
+    }
+  );
+
+  /**
+   * Krok 2: zatwierdzenie. `zTlem` = człowiek wybrał „ZOSTAW TŁO".
+   *
+   * Zdjęcie ląduje w bazie WERTIS ZAWSZE i od razu widać je na karcie. Zadanie
+   * do Subiekta powstaje tylko przy `ZDJECIA_DODAWANIE=subiekt` — bez tego
+   * (i bez `GRANT INSERT`) funkcja nadal działa, po prostu kończy się u nas.
+   */
+  app.post<{
+    Params: { twId: string };
+    Body: { podgladId?: string; zTlem?: boolean; zrodlo?: "aparat" | "galeria" };
+  }>(
+    "/api/products/:twId/zdjecie",
+    async (req, reply) => {
+      if (!dodawanieWlaczone()) {
+        return reply.code(409).send({ error: "Dodawanie zdjęć jest w tej instalacji wyłączone" });
+      }
+      const twId = Number(req.params.twId);
+      const p = subiekt.getProductById(twId);
+      if (!p) return reply.code(404).send({ error: "Nie znaleziono towaru" });
+
+      const w = podglad(String(req.body?.podgladId ?? ""), twId);
+      if (!w) {
+        /* Podgląd wygasł albo już go użyto. Zdanie mówi, co zrobić — „nie
+           znaleziono" bez wskazówki zostawia człowieka przy regale bez wyjścia. */
+        return reply.code(410).send({
+          error: "Podgląd zdjęcia wygasł. Zrób zdjęcie jeszcze raz.",
+        });
+      }
+
+      const zTlem = req.body?.zTlem === true || w.bezTla === null;
+      const obraz = zTlem ? w.oryginal : (w.bezTla as Buffer);
+      const mime = zTlem ? w.mime : "image/png";
+
+      /* Skąd wzięło się zdjęcie — aparat czy galeria. Wpływu na przetwarzanie
+         nie ma żadnego; jest pierwszym pytaniem przy analizie „dlaczego te
+         zdjęcia wychodzą źle", bo kadr z galerii bywa zrzutem ekranu. */
+      const zrodlo = req.body?.zrodlo === "galeria" ? "galeria" : "aparat";
+      const autor = autorOperacji(req);
+      const { etag, bajtow } = zapiszWlasne({
+        twId,
+        obraz,
+        mime,
+        tloUsuniete: !zTlem,
+        dodaneBy: autor.nazwa,
+        dodaneByRef: autor.ref,
+      });
+      usunPodglad(w.id, twId);
+
+      let queueId: number | null = null;
+      if (config.zdjecia.dodawanie === "subiekt") {
+        queueId = enqueueSetZdjecie(
+          twId,
+          {
+            createdBy: autor.nazwa,
+            createdByRef: autor.ref,
+            twId,
+            label: "Zdjęcie · " + p.symbol,
+            detail: `${Math.round(bajtow / 1024)} kB, tło ${zTlem ? "zostawione" : "usunięte"}`,
+          },
+          { bajtow, tloUsuniete: !zTlem, zrodlo }
+        );
+        przypiszZadanie(twId, queueId);
+      } else {
+        /* Bez zapisu do Subiekta zdarzenie i tak musi powstać: bez niego karta
+           milczałaby o tym, skąd wzięło się zdjęcie i kto je zrobił. */
+        logEvent("zdjecie_dodane", autor.nazwa, twId, {
+          bajtow,
+          tloUsuniete: !zTlem,
+          zrodlo,
+          queueId: null,
+        }, autor.ref);
+      }
+      return { queueId, etag, bajtow, wSubiekcie: config.zdjecia.dodawanie === "subiekt" };
+    }
+  );
+
+  /** „JESZCZE RAZ" — porzucony podgląd znika od razu, nie po kwadransie. */
+  app.delete<{ Params: { twId: string; id: string } }>(
+    "/api/products/:twId/zdjecie/wstepne/:id",
+    async (req) => ({ ok: true, usunieto: usunPodglad(req.params.id, Number(req.params.twId)) })
+  );
 }
 
 function describeLoc(body: LocBody, current: string[]): string {

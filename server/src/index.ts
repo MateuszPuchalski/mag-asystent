@@ -40,6 +40,8 @@ import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { uruchomTickerPytan } from "./services/pytania.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
+import { brakDostepuDoTla } from "./adapters/tlo.js";
+import { statystykiWlasnych } from "./services/zdjecia-wlasne.js";
 import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
 import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
@@ -106,6 +108,10 @@ export async function buildApp() {
          kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by
          nie skojarzył, że przyczyną jest brak GRANT-u albo zły katalog. */
       brakDostepuDoZdjec,
+      /* Usuwanie tła: gdy usługa nie odpowiada, zdjęcia zapisują się z tłem —
+         czyli tak samo, jak gdy magazynier sam wybrał „ZOSTAW TŁO". Różnicy
+         nie widać nigdzie poza tym zdaniem. */
+      brakDostepuDoTla,
       /* Kod dostawy bez nazwy nie zatrzymuje pracy, więc nie jest błędem
          konfiguracji — ale dokumenty chodzą wtedy po ekranie jako `TYP-7`
          i ktoś powinien to dokończyć. Bez tej linii nie miałoby to gdzie
@@ -146,6 +152,11 @@ export async function buildApp() {
       /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
          z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
       ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),
+      /* Zdjęcia zrobione kolektorem, które NIE WESZŁY jeszcze do Subiekta.
+         Liczba rosnąca z dnia na dzień znaczy, że zadania `set_zdjecie` stoją
+         w błędzie — a objawu nie widać nigdzie indziej, bo karta pokazuje
+         zdjęcie z naszej kopii i wygląda poprawnie. */
+      ...(config.zdjecia.dodawanie ? { zdjeciaWlasne: statystykiWlasnych() } : {}),
       ...(config.sgtMode === "mssql" ? { lastSync: lastImport } : {}),
       ...(problemy.length ? { problemy } : {}),
     };

@@ -105,6 +105,52 @@ data class SetEanBody(
     val potwierdzone: Boolean? = null,
 )
 
+/* ── Dodanie zdjęcia kartoteki (0.88.0) ──────────────────────────────────────
+   DWA KROKI, bo wycinanie tła bywa nieudane i człowiek ma zobaczyć wynik,
+   ZANIM cokolwiek trafi do kartoteki w Subiekcie. Powód i cała reguła —
+   `core/product/DodanieZdjecia.kt`.                                          */
+
+/** Krok 1: zdjęcie jedzie na serwer (base64 bez nagłówka `data:`). */
+@Serializable
+data class ZdjecieWstepneBody(val zdjecie: String)
+
+/**
+ * Odpowiedź kroku 1 — podgląd do obejrzenia.
+ *
+ * `png` niesie OBRAZ, nie adres: przejechał przez tę sieć przed chwilą,
+ * a drugie pobranie przez Wi-Fi hali to kolejne sekundy patrzenia w kółko.
+ */
+@Serializable
+data class ZdjecieWstepneResponse(
+    val podgladId: String = "",
+    /** `usuniete` albo `zostawione` — mówi wprost, na co człowiek patrzy. */
+    val tlo: String = "zostawione",
+    val png: String = "",
+    val mime: String = "image/jpeg",
+    /** Dlaczego tła nie usunięto. Puste = usunięto. */
+    val powod: String? = null,
+) {
+    val tloUsuniete: Boolean get() = tlo == "usuniete"
+}
+
+/** Krok 2: zatwierdzenie. `zTlem` = człowiek wybrał „ZOSTAW TŁO". */
+@Serializable
+data class ZdjecieZapisBody(
+    val podgladId: String,
+    val zTlem: Boolean,
+    /** `aparat` albo `galeria` — do analizy „dlaczego te zdjęcia wychodzą źle". */
+    val zrodlo: String,
+)
+
+@Serializable
+data class ZdjecieZapisResponse(
+    val queueId: Long? = null,
+    val etag: String = "",
+    val bajtow: Long = 0,
+    /** Czy zdjęcie pojedzie też do kartoteki w Subiekcie. */
+    val wSubiekcie: Boolean = false,
+)
+
 
 /**
  * Przesunięcie stanu między magazynami.
@@ -220,6 +266,14 @@ data class ProductCard(
      * liczy — decyduje serwer; kolektor tylko rysuje linię w faktach.
      */
     val zlotaStrefa: ZlotaStrefa? = null,
+    /**
+     * Czy serwer tej instalacji przyjmuje zdjęcia z kolektora (0.88.0).
+     *
+     * `false` domyślnie i to jest ODPOWIEDŹ, nie brak danych: starszy serwer
+     * pola nie wysyła, a przycisk „+" na pustym slocie kończyłby się wtedy
+     * odmową, której magazynier nie ma jak zrozumieć.
+     */
+    val mozeDodacZdjecie: Boolean = false,
 )
 
 /** Adnotacja przeslotowania: jak często towar jest zbierany i dokąd ma trafić. */
