@@ -333,7 +333,11 @@ export const config = {
      * 0 = wyłączone. Skutek uboczny jest celowy: regularne użycie tokena
      * odświeża go, więc refresh token nie umiera po miesiącach ciszy.
      */
-    pollMs: num(process.env.ALLEGRO_POLL_MS, 300_000, "ALLEGRO_POLL_MS"),
+    /* 0 = pobiera CZŁOWIEK przyciskiem (0.85.0). Ruch w tle na cudzym serwisie
+       jest decyzją właściciela, nie ustawieniem domyślnym — a przy blokadach
+       anty-botowych Allegro to ruch, którego nikt nie zamawiał. Liczba
+       milisekund wraca do zachowania sprzed tej wersji. */
+    pollMs: num(process.env.ALLEGRO_POLL_MS, 0, "ALLEGRO_POLL_MS"),
     /**
      * Po ilu dniach od zgłoszenia zwrot bez zeskanowanej paczki uznaje się
      * za „brakującą paczkę". Trzy dni to typowy czas doręczenia krajowego —

@@ -33,6 +33,51 @@ historii nie przepisujemy.
 
 ---
 
+## 0.85.0 — 22 sierpnia 2026
+
+**Allegro odpytuje się teraz PRZYCISKIEM, nie samo.**
+
+Biuro dostało od Allegro stronę „Zostałeś zablokowany" z adnotacją, że w tej
+samej sieci operuje robot. Aplikacja nie scrapuje `allegro.pl` — cały ruch idzie
+przez `api.allegro.pl` z tokenem OAuth, czyli sankcjonowaną integracją. Ale dwa
+tickery odpytywały API co pięć minut, a od 0.80.0 dzielą jedno pokrętło, więc
+każde tyknięcie kosztowało więcej wywołań niż przed zakładką PYTANIA.
+
+`ALLEGRO_POLL_MS` stoi od tej wersji domyślnie na **zerze**. Zapowiedzi zwrotów
+pobiera przycisk **POBIERZ Z ALLEGRO** na karcie ZWROTY, pytania klientów —
+**ODŚWIEŻ Z ALLEGRO** na ich karcie, który istnieje od 0.80.0. Liczba
+milisekund przywraca pobieranie w tle.
+
+To jest właściwe ustawienie domyślne niezależnie od tamtej blokady. Ruch w tle
+na cudzym serwisie jest decyzją właściciela firmy, a nie czymś, co aplikacja
+postanawia za niego przy instalacji.
+
+Przycisk stoi na karcie ZWROTY, a **nie** na BRAKUJĄCYCH PACZKACH, choć to tam
+lądują wyniki. Tamta karta chowa się, gdy nie ma czego pokazać — czyli dokładnie
+wtedy, gdy człowiek chce sprawdzić, czy coś nowego przyszło.
+
+Toast po kliknięciu mówi, co przyszło („Nowych zgłoszeń: 3 · odświeżonych
+statusów: 0" albo „Allegro nie ma nic nowego"). Cichy przycisk kazałby klikać
+drugi raz na wszelki wypadek, czyli robiłby dokładnie to, czego ta zmiana ma
+uniknąć.
+
+**Token na tym nie traci** i to było jedyne realne ryzyko. Refresh Allegro żyje
+kwartał i odnawia się przy KAŻDYM użyciu, a skan etykiety zwrotu też go używa —
+trzy miesiące bez ani jednego zwrotu nie są scenariuszem tej firmy. Zdanie
+w DEPLOY, że „regularne odpytywanie odświeża token", było prawdziwe, gdy ticker
+był jedynym stałym rozmówcą; teraz jest sprostowane.
+
+Ticker i przycisk wołają JEDNĄ funkcję (`pobierzZapowiedzi`). Dwie kopie tej
+roboty rozjechałyby się przy pierwszej zmianie jednej z nich, a objawem byłoby
+„przycisk pobiera co innego niż tło".
+
+Test trasy sprawdza obie połówki naraz: po starcie lista jest pusta i taka
+zostaje, a po kliknięciu przestaje być pusta. Sama pierwsza asercja przeszłaby
+też przy trasie zepsutej na głucho — czyli w stanie, w którym karta BRAKUJĄCE
+PACZKI nigdy nic nie pokaże i nikt się nie dowie dlaczego.
+
+---
+
 ## 0.84.1 — 22 sierpnia 2026
 
 **Komunikat o błędnej konfiguracji przestał przepisywać sekrety na dysk.**

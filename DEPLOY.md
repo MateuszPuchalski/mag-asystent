@@ -1041,13 +1041,23 @@ jako praca. Odstęp od zamknięcia kosza byłby miarą nieuczciwą: mierzyłby
 głównie to, jak długo kosz czekał na kogokolwiek. Karałby wtedy człowieka za
 sięgnięcie po najstarszą robotę. Próbka poniżej 20 pozycji nie dostaje wyniku.
 
-Od 0.65.0 serwer **sam ściąga zapowiedzi zwrotów** — zgłoszenia klientów
-z Allegro, zanim paczka dojedzie. Skan etykiety trafia wtedy w znane
-zgłoszenie jednym zapytaniem, a zgłoszenia czekające na paczkę dłużej niż
-`BRAKUJACA_PACZKA_DNI` (domyślnie 3) widać na karcie **BRAKUJĄCE PACZKI**.
-Częstotliwość ustawia `ALLEGRO_POLL_MS` (domyślnie 5 minut; `0` wyłącza).
-Skutek uboczny jest celowy: regularne odpytywanie odświeża token, więc
-parowanie nie wygasa po miesiącach bez skanów.
+Aplikacja czyta **zapowiedzi zwrotów** — zgłoszenia klientów z Allegro, zanim
+paczka dojedzie. Skan etykiety trafia wtedy w znane zgłoszenie jednym
+zapytaniem, a zgłoszenia czekające na paczkę dłużej niż `BRAKUJACA_PACZKA_DNI`
+(domyślnie 3) widać na karcie **BRAKUJĄCE PACZKI**.
+
+**Od 0.85.0 pobiera to CZŁOWIEK**, przyciskiem POBIERZ Z ALLEGRO na karcie
+ZWROTY. Do 0.84.1 robił to ticker co pięć minut. Ruch w tle na cudzym serwisie
+jest decyzją właściciela, nie ustawieniem domyślnym — a Allegro potrafi
+blokować sieć, z której idzie ruch wyglądający na automat.
+
+Przycisk stoi na karcie ZWROTY, nie na BRAKUJĄCYCH PACZKACH, bo tamta chowa
+się, gdy nie ma czego pokazać. To jest właśnie chwila, w której chce się
+sprawdzić, czy coś przyszło.
+
+Kto woli tło, wpisuje liczbę milisekund w `ALLEGRO_POLL_MS` (`0` = ręcznie,
+i to jest domyślne). Token na tym nie ucierpi: refresh Allegro żyje kwartał
+i odnawia się przy KAŻDYM użyciu, a skan etykiety zwrotu też go używa.
 
 Od 0.70.0 karta czyta **status zwrotu po stronie Allegro** i rozróżnia dwa
 alarmy. Czerwony „DORĘCZONA · NIE PRZYJĘTA" znaczy, że przewoźnik dostarczył,
@@ -1390,9 +1400,11 @@ jedyne źródło, z którego model może je podać klientowi — czego tam nie m
 tego nie poda. Pusta karta znaczy szkice, które przy pytaniu o wysyłkę do
 Chorwacji napiszą „sprawdzimy i odpiszemy" zamiast konkretu.
 
-Częstotliwość ściągania pytań dzieli pokrętło z zapowiedziami zwrotów
-(`ALLEGRO_POLL_MS`, domyślnie 5 minut) — to ta sama praca w tle na tym samym
-koncie.
+Pytania ściąga przycisk **ODŚWIEŻ Z ALLEGRO** na karcie PYTANIA.
+
+Pokrętło `ALLEGRO_POLL_MS` dzieli z zapowiedziami zwrotów i od 0.85.0 stoi
+domyślnie na zerze. To ta sama praca na tym samym koncie, więc i jedna decyzja
+o tym, czy cokolwiek chodzi samo.
 
 ## 7. Backup i utrzymanie
 

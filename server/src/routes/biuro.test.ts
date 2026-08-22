@@ -164,14 +164,20 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    24,
+    25,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, dwanaście zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, TRZYNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
       "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja, " +
-      "schowanie zapowiedzi, załatwienie pominięcia) i pięć zapisów pytań " +
-      "klientów (synchronizacja, wklejka, szkic, wysyłka odpowiedzi, " +
-      "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) — nic ponadto"
+      "schowanie zapowiedzi, załatwienie pominięcia oraz POBRANIE ZAPOWIEDZI " +
+      "z 0.85.0) i pięć zapisów pytań klientów (synchronizacja, wklejka, " +
+      "szkic, wysyłka odpowiedzi, zamknięcie/pominięcie — dwa ostatnie jedną " +
+      "pętlą) — nic ponadto.\n\n" +
+      "Dwudziesty piąty POST przyszedł z przeniesienia pobierania zapowiedzi " +
+      "z tickera na przycisk: interwał jest od 0.85.0 domyślnie wyłączony, " +
+      "więc ktoś musi tę robotę zlecić ręką. Liczba rośnie tu ŚWIADOMIE i to " +
+      "jedyny sposób, w jaki wolno ją podnosić — sam zapis nie jest nowym " +
+      "prawem strony, tylko przeniesieniem pracy, którą serwer robił sam."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

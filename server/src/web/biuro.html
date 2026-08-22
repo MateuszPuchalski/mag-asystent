@@ -591,6 +591,10 @@
           </select></div>
         <div><label for="zwrotSzukajLista">SZUKAJ</label>
           <input id="zwrotSzukajLista" placeholder="etykieta / login / numer zwrotu"></div>
+        <!-- Przycisk stoi TUTAJ, a nie na karcie BRAKUJĄCE PACZKI, bo tamta
+             chowa się, gdy nie ma czego pokazać — a to jest właśnie chwila,
+             w której chce się sprawdzić, czy coś nowego przyszło. -->
+        <div><button class="akcja cichy" id="zapowiedziPobierz">POBIERZ Z ALLEGRO</button></div>
       </div>
       <table id="zwrotLista"></table>
     </section>
@@ -2792,7 +2796,9 @@ function rysujBrakujace(lista, ticker) {
   /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
      ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
   $("brakujaceTicker").innerHTML = !ticker
-    ? '<span class="mute">Statusy nie były jeszcze odświeżane — pierwszy przebieg po restarcie serwera.</span>'
+    /* Od 0.85.0 nic nie pobiera samo, więc „nie było przebiegu" nie jest już
+       stanem przejściowym po restarcie — to zdanie musi wskazać przycisk. */
+    ? '<span class="mute">Jeszcze nic nie pobrano — kliknij POBIERZ Z ALLEGRO na karcie ZWROTY.</span>'
     : `<span class="mute">Ostatnie odświeżenie statusów: ${esc(stempelLokalny(ticker.at))}
          · odświeżono ${ticker.odswiezonych}${ticker.doOdswiezenia
            ? ` · czeka jeszcze ${ticker.doOdswiezenia}` : ""}</span>
@@ -4170,6 +4176,29 @@ $("koszeLista").addEventListener("click", async (e) => {
   } catch (err) { toast(err.message); }
 });
 $("dyskusjePobierz").addEventListener("click", pobierzDyskusje);
+
+/* Pobranie zapowiedzi zwrotów Z RĘKI (0.85.0). Do tej wersji robił to wyłącznie
+   ticker co pięć minut; teraz interwał jest domyślnie wyłączony, a pobiera
+   człowiek — więc przycisk MUSI powiedzieć, co przyszło. Cichy przycisk kazałby
+   klikać drugi raz „bo chyba nie zadziałało". */
+$("zapowiedziPobierz").addEventListener("click", async () => {
+  const b = $("zapowiedziPobierz");
+  b.disabled = true;
+  const napis = b.textContent;
+  b.textContent = "POBIERAM…";
+  try {
+    const d = await (await api("/api/biuro/zwroty/zapowiedzi/odswiez", { method: "POST", body: "{}" })).json();
+    toast(d.nowych || d.statusow
+      ? `Nowych zgłoszeń: ${d.nowych} · odświeżonych statusów: ${d.statusow}`
+      : "Allegro nie ma nic nowego");
+    await odswiezZwroty();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    b.disabled = false;
+    b.textContent = napis;
+  }
+});
 $("reklamacjeLista").addEventListener("click", async (e) => {
   const polkaBtn = e.target.closest("[data-rekl-polka]");
   if (polkaBtn) {
