@@ -30,12 +30,22 @@
     --cien: 0 2px 8px rgba(42, 42, 44, 0.10);
     --font-sans: Barlow, system-ui, "Segoe UI", sans-serif;
     --font-cond: "Barlow Condensed", "Arial Narrow", Barlow, system-ui, sans-serif;
+    /* Jeden odstęp na całą stronę — między kartami, wokół nich i w siatce.
+       `clamp` zamiast liczby, bo panel bywa otwarty na pół ekranu obok
+       Subiekta: na wąskim oknie gęstość rośnie sama, bez media query. */
+    --luz: clamp(10px, 0.8vw, 16px);
+    /* Bazowa szerokość kolumny kart. 44 rem dobrane pod TREŚĆ, nie pod ekran:
+       tabela zwrotów ma sześć kolumn i poniżej tej szerokości zaczyna się
+       zawijać. Wynik wychodzi z arytmetyki `auto-fit`, bez ani jednego progu:
+       laptop dostaje jedną kolumnę na pełną szerokość, monitor 1920 — dwie,
+       2560 — trzy. */
+    --kol: 44rem;
   }
   * { box-sizing: border-box; margin: 0; }
   /* `main` ma display:grid, a styl autora wygrywa z arkuszem przeglądarki —
      bez tej reguły atrybut hidden przestaje cokolwiek ukrywać */
   [hidden] { display: none !important; }
-  body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--font-sans); }
+  body { background: var(--paper); color: var(--ink); font: 14px/1.45 var(--font-sans); }
   /* linki w kolorze akcentu, nie przeglądarkowym błękicie spoza palety */
   a { color: var(--amber-ink); font-weight: 600; }
   a:hover { color: var(--amber-dark); }
@@ -56,8 +66,90 @@
 
   main { max-width: 1080px; margin: 20px auto; padding: 0 16px; display: grid; gap: 16px; }
 
+  /* ── Panel: cała szerokość okna i przyklejony chrome ───────────────────────
+     Do 0.82.0 treść siedziała w kolumnie 1080 px pośrodku ekranu — na monitorze
+     1920 px dwie trzecie szerokości było pustym marginesem, a zakładka ZWROTY
+     miała jedenaście kart jedna pod drugą.
+
+     `display: block`, a NIE grid, i to jest tu rzecz nieoczywista: element
+     `position: sticky` będący grid itemem dostaje obszar siatki dokładnie
+     własnej wysokości, więc nie ma zakresu ruchu i po prostu się nie przykleja.
+     Siatką jest każdy widok osobno (`.widok`), nie kontener. Reguła `main`
+     wyżej zostaje dla `#login`, które dalej ma być wąskim pudełkiem. */
+  main#panel { max-width: none; margin: 0; padding: 0 clamp(10px, 1.2vw, 24px) 28px; display: block; }
+
+  /* Pasek stanu i zakładki jadą ze stroną. Przewinięcie listy dostaw nie ma
+     prawa zabierać z ekranu ani nawigacji, ani alarmu o kolejce w błędzie —
+     to jest jedyny powód, dla którego ten pasek w ogóle stoi na górze. */
+  header { position: sticky; top: 0; z-index: 30; }
+  #chrome {
+    position: sticky; top: var(--hGora, 52px); z-index: 20;
+    background: var(--paper); padding: var(--luz) 0 10px;
+    /* Miękka krawędź zamiast kreski: kreska wisiałaby też przy scrollTop = 0,
+       czyli wtedy, gdy nic jeszcze nie wjechało pod pasek. */
+    box-shadow: 0 10px 12px -10px rgba(42, 42, 44, .18);
+  }
+  #chrome #stan { margin-bottom: 8px; }
+
+  /* Karta, do której prowadzi kliknięcie kafla w pasku stanu (`scrollIntoView`)
+     albo `focus()` po przełączeniu zakładki, wjechałaby POD przyklejony pasek.
+     `scroll-margin-top` liczy się z wysokości mierzonej w JS, bo nagłówek
+     zawija się na wąskim oknie, a pasek stanu rośnie o kafle alarmów. */
+  #panel * { scroll-margin-top: calc(var(--hChrome, 130px) + 10px); }
+
+  /* ── Widok jako siatka kart ────────────────────────────────────────────────
+     `auto-fit` + `minmax` daje 1/2/3/4 kolumny wprost z szerokości okna,
+     bez kaskady media queries. `min(100%, --kol)` jest tu obowiązkowe:
+     bez niego pojedyncza kolumna 30rem rozpycha okno węższe niż 30rem
+     i strona dostaje poziomy pasek przewijania.
+
+     `min-width: 0` na dzieciach jest drugą rzeczą, bez której to nie działa:
+     grid item ma domyślnie `min-width: auto`, więc szeroka tabela rozsadza
+     kolumnę i wraz z nią cały układ. Jedna linia decyduje o wszystkim.
+
+     `align-items: start` — inaczej każda karta w rzędzie rośnie do wysokości
+     najwyższej sąsiadki i siatka robi się dziurawa. */
+  .widok {
+    display: grid; gap: var(--luz); align-items: start; margin-top: var(--luz);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--kol)), 1fr));
+  }
+  .widok > * { min-width: 0; }
+  /* Jedna karta na widok — siatka nie ma czego układać. */
+  #widokDziennik, #widokDostawcy { grid-template-columns: 1fr; }
+
+  /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
+     jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
+     bezpieczne w każdej szerokości i nie potrzebuje żadnego zapytania.
+
+     Klasy „na dwie kolumny" tu NIE MA świadomie. `span 2` w siatce
+     jednokolumnowej tworzy niejawną drugą kolumnę i wypycha treść poza ekran,
+     a przy trzech kolumnach zostawia trzecią pustą, bo karty rozpięte na dwie
+     nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
+  .widok > .pelna { grid-column: 1 / -1; }
+
+  @media (min-width: 1280px) {
+
+    /* ── Szczegół OBOK listy ─────────────────────────────────────────────────
+       Ten sam próg co `SZEROKO` w skrypcie — jeden literał na dwa miejsca.
+       Poniżej niego szczegół zasłania listę, jak przed 0.83.0: dwie kolumny
+       po 30 rem nie mieszczą się na laptopie obok siebie.
+
+       Panel szczegółu jedzie ze stroną i ma WŁASNE przewijanie, więc długa
+       lista pozycji faktury nie każe przewijać całej strony, żeby wrócić do
+       listy dokumentów. `overscroll-behavior` zatrzymuje przewijanie na jego
+       końcu, zamiast przerzucać je na stronę. */
+    .widok.zSzczegolem { grid-template-columns: minmax(30rem, 38rem) 1fr; }
+    .widok.zSzczegolem > .card { grid-column: 1; }
+    .widok.zSzczegolem > .szczegol {
+      grid-column: 2; grid-row: 1 / span 50;
+      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
+      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      overflow: auto; overscroll-behavior: contain;
+    }
+  }
+
   /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
-  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--cien); }
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--cien); }
   /* Ślad po kliknięciu kafla w pasku stanu. Samo przewinięcie do karty, która
      akurat była już widoczna, jest nieodróżnialne od braku reakcji — a to była
      dokładnie treść zgłoszenia. Znika samo, bo nie niesie żadnego stanu. */
@@ -66,23 +158,66 @@
   /* Etykieta sekcji — ta sama co nagłówki list na kolektorze:
      11px, gruba, rozstrzelona, InkSoft. Mniejsza od treści, bo podpisuje
      sekcję, a nie z nią konkuruje. */
-  h2 { font: 700 11px/1.4 var(--font-sans); letter-spacing: 1.2px; color: var(--ink-soft); margin-bottom: 10px; text-transform: uppercase; }
+  h2 { font: 700 11px/1.4 var(--font-sans); letter-spacing: 1.2px; color: var(--ink-soft); margin-bottom: 7px; text-transform: uppercase; }
 
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font: 600 11px var(--font-sans); letter-spacing: 1px; color: var(--ink-mute); padding: 6px 8px; border-bottom: 2px solid var(--border); }
-  td { padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  /* ── Ramka tabeli ──────────────────────────────────────────────────────────
+     Poziomo ZAWSZE: tabela o ośmiu kolumnach nie ma jak zmieścić się w kolumnie
+     siatki i bez własnego przewijania rozsadziłaby kartę.
+
+     Pionowo tylko tam, gdzie lista bywa długa. Bez tego jedna dostawa na
+     siedemdziesiąt pozycji wypycha WSZYSTKO poniżej poza ekran — czyli robi
+     dokładnie to, przed czym cała ta przebudowa ma bronić. */
+  .tabelaBox { overflow-x: auto; overscroll-behavior-x: contain; max-width: 100%; }
+  /* Tabele rysowane DOPIERO na żądanie (podgląd kosza, dokumenty i rozliczenie
+     zwrotu) nie istnieją w chwili owijania, więc przewijanie dostają ich
+     kontenery. */
+  #koszPodglad, #zwrotDokument, #zwrotDokumenty, #zwrotKosz,
+  #zwrotRozliczenie, #zwrotZamowienie, #koszWyniki, #pytanieTowary { overflow-x: auto; }
+  .tabelaBox.wysoka { max-height: min(52vh, 34rem); overflow-y: auto; }
+  /* Nagłówek przyklejony TYLKO w pudle z własnym przewijaniem pionowym —
+     inaczej przykleiłby się do okna i przejechał przez sąsiednie karty.
+     Selektor celuje w `tr:first-child th`, a NIE w `thead th`, bo strona
+     nigdzie nie emituje `<thead>`: nagłówki to zwykłe `<tr><th>` wstawiane
+     przez `innerHTML`, więc parser wkłada je do niejawnego `<tbody>`. */
+  .tabelaBox.wysoka tr:first-child th {
+    position: sticky; top: 0; z-index: 1; background: var(--card);
+    /* `border-collapse: collapse` oddaje obramowanie tabeli, nie komórce,
+       więc kreska odjeżdża razem z wierszem. Cień zostaje na miejscu. */
+    border-bottom: 0; box-shadow: inset 0 -2px 0 var(--border);
+  }
+  th { text-align: left; font: 600 11px var(--font-sans); letter-spacing: 1px; color: var(--ink-mute); padding: 5px 8px; border-bottom: 2px solid var(--border); }
+  /* 6 px zamiast 9 — przy dwudziestu wierszach to 120 px, czyli różnica
+     między „lista mieści się w oknie" a „lista wypycha wszystko pod ekran".
+     Numery przesyłek i EAN-y nie mają spacji, więc `overflow-wrap` broni
+     kolumny przed jednym długim ciągiem ustawiającym jej szerokość. */
+  /* `break-word`, a nie `anywhere`: to drugie łamie także tam, gdzie miejsce
+     jeszcze jest, i robiło z „FZ 9007/08/2026" dwa wiersze. Łamiemy dopiero
+     wtedy, gdy pojedynczy wyraz sam nie mieści się w kolumnie. */
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: break-word; }
   tr:last-child td { border-bottom: none; }
   /* wiersz-wejście (klikalny) mówi to najazdem, jak dotknięcie na kolektorze */
   tr[data-dok]:hover td, tr[data-zwrot]:hover td { background: var(--paper); }
+  /* Wiersz, którego szczegół stoi obok listy (tryb szeroki od 0.83.0). */
+  tr.aktywny td { background: var(--amber-bg); box-shadow: inset 3px 0 0 var(--amber); }
 
   /* Wyróżnienia liczbowe i identyfikatory — kondensat, jak tytuły wierszy
      na kolektorze (symbol 17sp BarlowCond Bold). */
   .b { font: 700 15px/1.35 var(--font-cond); letter-spacing: .2px; }
   .mute { color: var(--ink-mute); font-size: 12px; }
+  /* Karta rozciągnięta na 700 px daje 140 znaków w wierszu, a to pogorszenie
+     czytelności, nie korzyść z szerokiego ekranu. Akapity objaśniające mają
+     własną granicę — tabele i kafle jej nie mają i mieć nie powinny. */
+  p.mute, .card > p { max-width: 74ch; }
 
   /* Pastylki stanu — zaokrąglone do pełna, kondensat, pary kolorów z hali:
      zieleń Success, bursztyn AmberBg/AmberInk, czerwień Destructive. */
-  .badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px; text-transform: uppercase; }
+  /* `nowrap`: pastylka to JEDNO słowo znaczeniowe. Złamana na „NIETK / NIĘTA"
+     przestaje być pastylką i zaczyna wyglądać na usterkę — a w wąskiej kolumnie
+     master–detail łamała się regularnie. Wąska kolumna ma przewijać tabelę,
+     nie rozrywać etykiety. */
+  .badge { display: inline-block; white-space: nowrap; border-radius: 999px; padding: 2px 10px; font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px; text-transform: uppercase; }
   .badge.ok { background: var(--ok-bg); color: var(--ok); }
   .badge.amber { background: var(--amber-bg); color: var(--amber-ink); }
   .badge.err { background: var(--err-bg); color: var(--err); }
@@ -121,7 +256,7 @@
      pionowa kreska: sam odstęp kazał czytać podpisy, żeby wiedzieć, gdzie
      kończy się jedna grupa. `align-items: flex-start`, żeby grupa o dwóch
      przyciskach nie rozciągała się do wysokości trzyprzyciskowej. */
-  nav.zakladki { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 6px 10px 8px; box-shadow: var(--cien); }
+  nav.zakladki { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 4px 10px 6px; box-shadow: var(--cien); }
   /* Kreska tylko wtedy, gdy grupy stoją w JEDNYM rzędzie. Po zawinięciu
      zostałaby pionową krechą na początku nowej linii, czyli czymś, co wygląda
      na błąd renderowania. Poniżej tej szerokości rozdział niesie sam odstęp. */
@@ -137,9 +272,12 @@
     padding: 0 8px; font: 700 10px var(--font-cond); letter-spacing: 1.2px;
     text-transform: uppercase; color: var(--ink-mute);
   }
+  /* 7/14 zamiast 8/16 — cel kliknięcia zostaje przy 31 px wysokości, a pasek
+     jest teraz przyklejony, więc każdy odzyskany piksel liczy się podwójnie:
+     raz na sobie, drugi raz na wszystkim, co pod nim stoi. */
   nav.zakladki button {
     background: none; border: 0; border-radius: 999px;
-    padding: 8px 16px; font: 600 14px var(--font-cond); letter-spacing: .5px;
+    padding: 7px 14px; font: 600 14px var(--font-cond); letter-spacing: .5px;
     color: var(--ink-soft); cursor: pointer;
   }
   nav.zakladki button:hover { background: var(--paper); }
@@ -152,13 +290,34 @@
 
   /* Kafle metryk: liczba w kondensacie (headlineMedium kolektora), opis pod
      spodem jak etykieta sekcji. Liczba nosi znaczenie, opis tylko podpisuje. */
-  .kafle { display: flex; gap: 12px; flex-wrap: wrap; }
-  .kafel { flex: 1 1 150px; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px 14px; box-shadow: var(--cien); }
-  .kafel .liczba { font: 800 30px/1.1 var(--font-cond); }
+  .kafle { display: flex; gap: 8px; flex-wrap: wrap; }
+  .kafel { flex: 1 1 130px; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--cien); }
+  .kafel .liczba { font: 800 26px/1.05 var(--font-cond); }
   .kafel .liczba.zle { color: var(--err); }
   .kafel .opis { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
 
-  .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 10px; }
+  .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
+
+  /* ── Sekcja zwijana ────────────────────────────────────────────────────────
+     Ten sam wzorzec, co „DANE FIRMY DO FORMULARZY" niżej — natywny <details>,
+     bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo, a strona nie ma
+     kroku budowania, w którym dałoby się to dorobić taniej.
+
+     Nagłówek zachowuje się jak `h2` sekcji: strzałka zamiast domyślnego
+     trójkąta przeglądarki, bo tamten ma własny kolor i własny rozmiar. */
+  details.zwijana { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
+  details.zwijana > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  details.zwijana > summary::-webkit-details-marker { display: none; }
+  details.zwijana > summary h2 { margin-bottom: 0; }
+  details.zwijana > summary::before { content: "▸"; color: var(--amber-ink); font-size: 12px; transition: transform .12s; }
+  details.zwijana[open] > summary::before { transform: rotate(90deg); }
+  details.zwijana[open] > summary { margin-bottom: 8px; }
+  details.zwijana > summary:hover h2 { color: var(--amber-ink); }
+  /* Zdanie w zwiniętym nagłówku mówi, czego się spodziewać po otwarciu.
+     Liczb tam nie ma świadomie — pokazanie ich wymagałoby pobrania danych,
+     czyli zniszczenia całej oszczędności. */
+  details.zwijana > summary .podpis { margin-left: auto; font-size: 11px; color: var(--ink-mute); }
+  details.zwijana[open] > summary .podpis { display: none; }
   .filtry label { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); display: block; }
   .filtry input, .filtry select {
     border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; font: inherit; background: var(--card);
@@ -172,7 +331,7 @@
   #dostawy tr[data-dok] { cursor: pointer; }
   /* Notatka czekająca na odpowiedź jest jedynym powodem, dla którego dostawa
      nie może się domknąć — musi się odróżniać od tej już zamkniętej. */
-  .karta-notatka { border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
+  .karta-notatka { border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; margin: 5px 0; }
   .karta-notatka.czeka { border-color: var(--amber); background: var(--amber-bg); }
   /* Odpowiedź, której biuro jeszcze nie widziało — zielona, bo to dobra
      wiadomość: pytanie doczekało się odpowiedzi. „czeka" zostaje bursztynowe,
@@ -251,6 +410,13 @@
 </main>
 
 <main id="panel" hidden>
+  <!-- Pasek stanu i zakładki w jednym przyklejonym bloku (0.83.0). Wrapper
+       stoi NA ZEWNĄTRZ paska zakładek, i to nie jest wybór estetyczny:
+       `biuro.test.ts` czyta zawartość paska jako wycinek tekstu między jego
+       znacznikiem otwierającym a zamykającym, więc owinięcie go od środka
+       zabrałoby testowi grunt. Z tego samego powodu nie wolno tu wpisać tych
+       znaczników dosłownie — pierwsze wystąpienie w pliku wygrywa. -->
+  <div id="chrome">
   <div id="stan"></div>
   <!-- ZAKŁADKI W GRUPACH (0.74.1, rozdział i wyprowadzenie ustawień 0.76.0).
        Wcześniej stało tu sześć pastylek o równej wadze, a to nieprawda o tym,
@@ -287,12 +453,13 @@
       </div>
     </div>
   </nav>
+  </div>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
-  <div id="widokDostawy" style="display:grid;gap:20px">
+  <div id="widokDostawy" class="widok">
     <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
          się pod nimi: to jest wejście W dokument, nie dodatek obok. -->
-    <section class="card" id="szczegol" hidden>
+    <section class="card pelna szczegol" id="szczegol" hidden>
       <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
       <div id="szczegolNaglowek" style="margin-top:12px"></div>
       <table id="szczegolLinie"></table>
@@ -361,10 +528,10 @@
   </div>
 
   <!-- ── ZWROTY ALLEGRO ──────────────────────────────────────────────────── -->
-  <div id="widokZwroty" hidden style="display:grid;gap:20px">
+  <div id="widokZwroty" class="widok" hidden>
     <!-- Szczegół zwrotu — zasłania karty poniżej (wzorzec #szczegol dostaw):
          to jest wejście W zwrot, nie dodatek obok listy. -->
-    <section class="card" id="zwrotSzczegol" hidden>
+    <section class="card pelna szczegol" id="zwrotSzczegol" hidden>
       <button class="akcja cichy" id="zwrotWroc">← WSZYSTKIE ZWROTY</button>
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
       <table id="zwrotPozycje" style="margin-top:10px"></table>
@@ -472,18 +639,23 @@
       </div>
     </section>
 
-    <section class="card" id="raportZwrotowKarta">
-      <h2>RAPORT PROCESU ZWROTÓW</h2>
-      <div class="kafle" id="raportZwrotowKafle"></div>
-    </section>
+    <!-- ── WGLĄD ────────────────────────────────────────────────────────────
+         Cztery karty liczb zajmowały tyle pionu co cała praca razem wzięta,
+         a otwiera się je kilka razy w tygodniu, nie kilkanaście razy dziennie.
+         Zwinięte z jednego powodu: praca ma zostać na wierzchu.
 
-    <!-- Raport wyżej mówi, JAK IDZIE ROBOTA. Ta karta mówi, CO WRACA — inne
-         pytanie, więc inna karta, a nie kolejne kafle w tamtej. -->
-    <section class="card" id="statystykiKarta">
-      <h2>STATYSTYKI ZWROTÓW · CO WRACA NAJCZĘŚCIEJ</h2>
-      <div class="filtry" style="margin-bottom:10px">
+         Zwinięcie nie jest tu chowaniem pikseli — sekcja zamknięta NIE PYTA
+         serwera. Statystyki i czasy to osobne żądania, a raport leciał dotąd
+         w każdym trzydziestosekundowym cyklu odświeżania.
+
+         Selektor okna stoi NAD sekcjami, nie w środku statystyk: rządzi
+         dwiema z nich, a schowany w jednej byłby nieosiągalny po jej
+         zwinięciu. -->
+    <section class="card pelna" id="wgladKarta">
+      <h2>WGLĄD · RAPORT, STATYSTYKI, CZASY</h2>
+      <div class="filtry">
         <div>
-          <label for="dniStatystyk">OKNO</label>
+          <label for="dniStatystyk">OKNO ANALIZY</label>
           <select id="dniStatystyk">
             <option value="30">30 dni</option>
             <option value="90" selected>90 dni</option>
@@ -491,6 +663,16 @@
           </select>
         </div>
       </div>
+
+    <details class="zwijana" id="raportZwrotowKarta">
+      <summary><h2>RAPORT PROCESU ZWROTÓW</h2></summary>
+      <div class="kafle" id="raportZwrotowKafle"></div>
+    </details>
+
+    <!-- Raport wyżej mówi, JAK IDZIE ROBOTA. Ta sekcja mówi, CO WRACA — inne
+         pytanie, więc osobna sekcja, a nie kolejne kafle w tamtej. -->
+    <details class="zwijana" id="statystykiKarta">
+      <summary><h2>STATYSTYKI ZWROTÓW · CO WRACA NAJCZĘŚCIEJ</h2></summary>
       <table id="statystykiProdukty"></table>
       <p class="mute" id="statystykiUwaga" style="margin-top:6px"></p>
 
@@ -510,12 +692,42 @@
         wobec pojedynczej osoby bez sprawdzenia sprawy.
       </p>
       <table id="statystykiKupujacy"></table>
-    </section>
+    </details>
 
-    <section class="card" id="kontoAllegroKarta">
-      <h2>KONTO ALLEGRO</h2>
+    <!-- Trzecie pytanie o zwroty. RAPORT mówi, ile czego jest; STATYSTYKI —
+         co wraca; ta sekcja — JAK DŁUGO to trwa. Osobna, bo osobne pytanie,
+         ale okno dzieli ze statystykami: obie czyta się razem. -->
+    <details class="zwijana" id="czasyKarta">
+      <summary><h2>CZASY OBSŁUGI ZWROTU · ILE TOWAR STOI</h2></summary>
+      <p class="mute" id="czasyWstep" style="margin-bottom:10px"></p>
+      <div class="kafle" id="czasyOdcinki"></div>
+
+      <h2 style="margin-top:18px">CAŁA DROGA PER TYDZIEŃ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Wysokość słupka to mediana godzin od przyjęcia do półki. Tydzień bez
+        zakończonych zwrotów zostaje na osi pusty, zamiast znikać.
+      </p>
+      <div id="czasyTygodnie" style="margin-top:6px"></div>
+
+      <h2 style="margin-top:18px">CO STOI TERAZ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Mediana wyżej liczy się z rzeczy SKOŃCZONYCH, więc sprawa stojąca trzeci
+        tydzień nie ma na nią wpływu, dopóki ktoś jej nie domknie. Tu widać ją
+        od razu. Kliknięcie wiersza otwiera kosz albo zwrot.
+      </p>
+      <table id="czasyKosze"></table>
+      <table id="czasyZwroty" style="margin-top:10px"></table>
+
+      <h2 style="margin-top:18px">TEMPO ROZKŁADANIA PER OSOBA</h2>
+      <p class="mute" id="czasyPodstawa" style="margin-bottom:8px"></p>
+      <table id="czasyLudzie"></table>
+    </details>
+
+    <details class="zwijana" id="kontoAllegroKarta">
+      <summary><h2>KONTO ALLEGRO</h2></summary>
       <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
       <div id="allegroAkcje"></div>
+    </details>
     </section>
   </div>
 
@@ -528,9 +740,9 @@
        Kolejność kart odpowiada kolejności pracy: najpierw to, co czeka
        (szczegół zasłania resztę, jak przy dostawach i zwrotach), potem wklejka
        dla pytań spoza Allegro, potem wgląd. -->
-  <div id="widokPytania" hidden style="display:grid;gap:20px">
+  <div id="widokPytania" class="widok" hidden>
     <!-- Szczegół pytania — wejście W sprawę, nie dodatek obok listy. -->
-    <section class="card" id="pytanieSzczegol" hidden>
+    <section class="card pelna szczegol" id="pytanieSzczegol" hidden>
       <button class="akcja cichy" id="pytanieWroc">← WSZYSTKIE PYTANIA</button>
       <div id="pytanieNaglowek" style="margin-top:12px"></div>
 
@@ -552,7 +764,7 @@
 
     <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
          wzorzec karty KONTO ALLEGRO przy pustym client_id. -->
-    <section class="card" id="pytaniaBaner" hidden>
+    <section class="card pelna" id="pytaniaBaner" hidden>
       <h2>SZKICE AI</h2>
       <div id="pytaniaBanerTresc" class="mute"></div>
     </section>
@@ -652,7 +864,7 @@
   </div>
 
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
-  <div id="widokNadzor" hidden style="display:grid;gap:20px">
+  <div id="widokNadzor" class="widok" hidden>
     <section class="card">
       <h2>METRYKI · LICZBY, KTÓRE MÓWIĄ CO ZROBIĆ</h2>
       <div class="filtry">
@@ -717,7 +929,7 @@
   </div>
 
   <!-- ── DZIENNIK ────────────────────────────────────────────────────────── -->
-  <div id="widokDziennik" hidden style="display:grid;gap:20px">
+  <div id="widokDziennik" class="widok" hidden>
     <section class="card">
       <h2>ŚLAD AUDYTOWY</h2>
       <p class="mute" style="margin-bottom:10px">
@@ -741,7 +953,7 @@
   </div>
 
   <!-- ── ANALIZA ─────────────────────────────────────────────────────────── -->
-  <div id="widokAnaliza" hidden style="display:grid;gap:20px">
+  <div id="widokAnaliza" class="widok" hidden>
     <section class="card">
       <h2>ANALIZA ŚLADU AUDYTOWEGO</h2>
       <div class="filtry">
@@ -780,7 +992,7 @@
       <table id="wydajnosc"></table>
     </section>
 
-    <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+    <div class="pelna" style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
       <section class="card">
         <h2>NAJCZĘŚCIEJ SZUKANE</h2>
         <table id="szukaneTop"></table>
@@ -840,7 +1052,7 @@
   </div>
 
   <!-- ── DOSTAWCY ────────────────────────────────────────────────────────── -->
-  <div id="widokDostawcy" hidden style="display:grid;gap:20px">
+  <div id="widokDostawcy" class="widok" hidden>
     <section class="card">
       <h2>LOGO DOSTAWCÓW</h2>
       <p class="mute" style="margin-bottom:10px">
@@ -1104,7 +1316,7 @@ function rysujDostawy() {
     .map((d) => {
       const total = d.linesTotal || d.positions;
       const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-      return `<tr data-dok="${d.dokId}">
+      return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""}>
         <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
         <td>${esc(d.dostawca)}</td>
         <td class="mute">${esc(d.dataWyst)}</td>
@@ -1145,13 +1357,23 @@ let sesjaPodgladu = 0;
    i mrugając zdjęciami. */
 let ostatniSzczegol = "";
 
+/* Ta sama zasada co przy zwrotach: wąsko szczegół zasłania, szeroko staje
+   obok listy. Reklamacje schodzą w OBU trybach — nie są kontekstem tej
+   faktury, tylko osobną kolejką pracy. */
+function ustawRodzenstwoDostaw() {
+  const otwarty = otwartyDok != null;
+  $("kartaDostaw").hidden = otwarty && !trybSzeroki();
+  $("kartaReklamacji").hidden = otwarty;
+  rysujOdpowiedzi();            // ma własną regułę pustki
+  $("widokDostawy").classList.toggle("zSzczegolem", otwarty);
+  zaznaczWiersz("dostawy", "dok", otwartyDok);
+}
+
 function otworzDokument(dokId) {
   otwartyDok = dokId;
   ostatniSzczegol = "";
-  $("kartaDostaw").hidden = true;
-  $("kartaReklamacji").hidden = true;
-  $("kartaOdpowiedzi").hidden = true;
   $("szczegol").hidden = false;
+  ustawRodzenstwoDostaw();
   $("szczegolNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
   $("szczegolLinie").innerHTML = "";
   $("szczegolBezLinii").innerHTML = "";
@@ -1163,9 +1385,7 @@ function zamknijDokument() {
   otwartyDok = null;
   sesjaPodgladu++;              // to, co jeszcze leci, ma nie trafić do DOM
   $("szczegol").hidden = true;
-  $("kartaDostaw").hidden = false;
-  $("kartaReklamacji").hidden = false;
-  rysujOdpowiedzi();
+  ustawRodzenstwoDostaw();
   odswiezDostawy();
 }
 
@@ -1388,7 +1608,11 @@ async function przywrocDostawe(dokId) {
 
 function rysujOdpowiedzi() {
   const lista = odpowiedziNaNotatki;
-  $("kartaOdpowiedzi").hidden = lista.length === 0 || otwartyDok != null;
+  /* Przy otwartym dokumencie karta znika tylko wtedy, gdy szczegół ZASŁANIA
+     listę. W trybie szerokim lista stoi obok i licznik odpowiedzi ma prawo
+     stać nad nią — to on jest drogą do notatki czekającej na odpowiedź. */
+  $("kartaOdpowiedzi").hidden =
+    lista.length === 0 || (otwartyDok != null && !trybSzeroki());
   if (!lista.length) return;
   $("odpowiedzi").innerHTML =
     "<tr><th>DOKUMENT</th><th>PYTANIE I ODPOWIEDŹ</th><th></th></tr>" +
@@ -2428,8 +2652,12 @@ async function odswiez() {
   if (widok === "dostawy") {
     // przy otwartym dokumencie lista i reklamacje są schowane — odpytywanie ich
     // byłoby pracą dla nikogo, a biuro chce widzieć postęp TEJ faktury na żywo
-    if (otwartyDok != null) await odswiezSzczegol();
-    else await odswiezDostawy();
+    if (otwartyDok != null) {
+      await odswiezSzczegol();
+      /* W trybie szerokim lista stoi obok szczegółu — postęp innych faktur
+         ma być widać na żywo, tak samo jak postęp tej otwartej. */
+      if (trybSzeroki()) await odswiezDostawy();
+    } else await odswiezDostawy();
   } else if (widok === "zwroty") await odswiezZwroty();
   else if (widok === "pytania") await odswiezPytania();
   else if (widok === "nadzor") await odswiezNadzor();
@@ -2476,7 +2704,13 @@ function badgeZwrotu(s) {
 }
 
 async function odswiezZwroty() {
-  if (otwartyZwrot != null) return odswiezSzczegolZwrotu();
+  if (otwartyZwrot != null) {
+    await odswiezSzczegolZwrotu();
+    /* Wąsko: listy nie widać, więc nie ma czego odświeżać. Szeroko stoi obok
+       otwartego zwrotu i musi żyć — ale bez `odswiezEtap3()` niżej, bo koszy,
+       reklamacji ani wglądu i tak wtedy nie widać w żadnym trybie. */
+    if (!trybSzeroki()) return;
+  }
   try {
     const q = new URLSearchParams();
     if ($("zwrotFiltrStatus").value) q.set("status", $("zwrotFiltrStatus").value);
@@ -2486,7 +2720,7 @@ async function odswiezZwroty() {
     stanAllegro = d.allegro || null;
     rysujZwroty(d.zwroty || []);
     rysujKontoAllegro();
-    await odswiezEtap3();
+    if (otwartyZwrot == null) await odswiezEtap3();
   } catch (e) { console.warn(e); }
 }
 
@@ -2494,29 +2728,67 @@ async function odswiezZwroty() {
    z zakładką i żadne z nich nie jest na ścieżce krytycznej skanu. */
 async function odswiezEtap3() {
   try {
+    /* Raport wypadł z bezwarunkowego `Promise.all`, bo ten cykl chodzi CO
+       30 SEKUND — zwinięta sekcja nie ma prawa kosztować żądania. Reszta to
+       karty pracy: te są widoczne zawsze i pytamy o nie zawsze. */
+    const chceRaport = $("raportZwrotowKarta").open;
     const [k, r, rap, zap, pom] = await Promise.all([
       (await api("/api/biuro/kosze")).json(),
       (await api("/api/biuro/zwroty/reklamacje")).json(),
-      (await api("/api/biuro/zwroty/raport")).json(),
+      chceRaport ? (await api("/api/biuro/zwroty/raport")).json() : null,
       (await api("/api/biuro/zwroty/zapowiedzi")).json(),
       (await api("/api/biuro/kosze/pominiete")).json(),
     ]);
     rysujKosze(k.kosze || []);
     rysujPominiete(pom.pominiete || []);
-    /* Statystyki mają własne okno i własny rytm — tu tylko pierwsze wypełnienie,
-       żeby karta nie stała pusta po wejściu w zakładkę. */
-    if (!$("statystykiProdukty").innerHTML) odswiezStatystyki();
+    /* Statystyki i czasy mają własne okno i własny rytm — tu tylko pierwsze
+       wypełnienie sekcji, która AKURAT JEST rozwinięta. */
+    dociagnijWglad("statystykiKarta");
+    dociagnijWglad("czasyKarta");
     rysujReklamacjeZwrotow(r.reklamacje || []);
-    rysujRaportZwrotow(rap.raport);
+    if (rap) rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
   } catch (e) { console.warn(e); }
+}
+
+/* ── Sekcje wglądu: pamięć i leniwe pobieranie ──────────────────────────────
+   Zwinięta sekcja NIE PYTA serwera — to jest cały sens jej zwinięcia. Stan
+   otwarcia siedzi w localStorage obok `wertis.widok`, bo to ta sama klasa
+   decyzji: układ ekranu, nie dane.
+
+   RAPORT zostaje otwarty domyślnie. To jeden rząd kafli i puls procesu;
+   zwinięcie go oszczędziłoby jedno tanie żądanie kosztem jedynego wskaźnika
+   „jak idzie robota". Kto go nie chce, zwija raz i tak zostaje. */
+const SEKCJE_WGLADU = ["raportZwrotowKarta", "statystykiKarta", "czasyKarta", "kontoAllegroKarta"];
+const WGLAD_DOMYSLNIE = ["raportZwrotowKarta"];
+
+/** Otwarte sekcje jako jeden porównywalny napis — klucz i wartość w jednym. */
+const stanWgladu = () => JSON.stringify(SEKCJE_WGLADU.filter((x) => $(x).open));
+
+function wczytajWglad() {
+  let otwarte;
+  try { otwarte = JSON.parse(localStorage.getItem("wertis.wglad")); } catch { /* nieczytelne = domyślne */ }
+  if (!Array.isArray(otwarte)) otwarte = WGLAD_DOMYSLNIE;
+  for (const id of SEKCJE_WGLADU) $(id).open = otwarte.includes(id);
+  /* Zapis TEGO, co faktycznie ustawiliśmy — także przy pierwszym uruchomieniu,
+     gdy w pamięci nic nie było. Bez tego nasłuch niżej nie miałby z czym
+     porównać przywróconego układu i wziąłby go za kliknięcie. */
+  localStorage.setItem("wertis.wglad", stanWgladu());
+}
+
+/** Otwarta i pusta sekcja ma się wypełnić — od razu, nie po najbliższym cyklu. */
+function dociagnijWglad(id) {
+  if (!$(id).open) return;
+  if (id === "statystykiKarta" && !$("statystykiProdukty").innerHTML) odswiezStatystyki();
+  if (id === "czasyKarta" && !$("czasyOdcinki").innerHTML) odswiezCzasy();
+  if (id === "raportZwrotowKarta" && !$("raportZwrotowKafle").innerHTML) odswiezEtap3();
 }
 
 /* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
 function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
-  karta.hidden = otwartyZwrot != null || lista.length === 0;
+  karta.hidden = lista.length === 0 || (otwartyZwrot != null && !trybSzeroki());
   /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
      ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
   $("brakujaceTicker").innerHTML = !ticker
@@ -2793,6 +3065,9 @@ async function pobierzDyskusje() {
    dowym odświeżeniu listy byłoby pracą dla nikogo.                           */
 
 async function odswiezStatystyki() {
+  /* Zwinięta sekcja nie tylko nie zajmuje pikseli — nie kosztuje też
+     przeliczenia stu osiemdziesięciu dni po stronie serwera. */
+  if (!$("statystykiKarta").open) return;
   try {
     const dni = $("dniStatystyk").value;
     const d = await (await api(`/api/biuro/zwroty/statystyki?dni=${dni}`)).json();
@@ -2868,6 +3143,115 @@ function rysujStatystyki(s) {
         </tr>`).join("");
 }
 
+/* ── Czasy obsługi zwrotu ────────────────────────────────────────────────────
+   Karta czyta się z góry na dół jak zdanie: ILE TO TRWA (kafle) → CZY IDZIE
+   W DOBRĄ STRONĘ (wykres) → CO STOI TERAZ (listy) → KTO ROZKŁADA (tempo).   */
+
+/**
+ * Godziny po ludzku: minuty pod godziną, doby powyżej dwóch dni.
+ *
+ * Miejsce po przecinku tylko poniżej dziesięciu godzin — przy „26,0 h" ta zero
+ * niczego nie mówi, a przy „2,5 h" mówi wszystko.
+ */
+function czasH(h) {
+  if (h == null) return "—";
+  if (h < 1) return `${Math.round(h * 60)} min`;
+  if (h < 10) return `${h.toFixed(1).replace(".", ",")} h`;
+  if (h < 48) return `${Math.round(h)} h`;
+  const dni = Math.floor(h / 24);
+  return `${dni} dni ${Math.round(h - dni * 24)} h`;
+}
+
+/**
+ * Kafel odcinka. Mediana dużą czcionką, p90 i próbka pod spodem.
+ *
+ * Pusty odcinek pokazuje POWÓD, nie sam myślnik: „—" bez wyjaśnienia wygląda
+ * jak awaria karty, a najczęściej znaczy po prostu, że w tym oknie nic się
+ * na tym odcinku nie skończyło.
+ */
+function kafelCzasu(o) {
+  const dol = o.ile
+    ? `p90 ${esc(czasH(o.p90H))} · ${o.ile} ${o.ile === 1 ? "raz" : "razy"}`
+    : esc(o.czemuPusto);
+  return `<div class="kafel" style="flex:1 1 210px">
+    <div class="liczba">${esc(czasH(o.medianaH))}</div>
+    <div class="opis">${esc(o.nazwa)}</div>
+    <div class="opis" style="text-transform:none;letter-spacing:0;margin-top:6px">${dol}</div>
+  </div>`;
+}
+
+async function odswiezCzasy() {
+  if (!$("czasyKarta").open) return;
+  try {
+    const dni = $("dniStatystyk").value;
+    const d = await (await api(`/api/biuro/zwroty/czasy?dni=${dni}`)).json();
+    rysujCzasy(d.czasy);
+  } catch (e) {
+    $("czasyOdcinki").innerHTML = `<p class="badge err">${esc(e.message)}</p>`;
+  }
+}
+
+function rysujCzasy(c) {
+  $("czasyWstep").textContent =
+    `Mediana i p90 z tego, co skończyło się w ostatnich ${c.dni} dniach — nie z tego, `
+    + "co w tym czasie przyszło. Inaczej sprawy jeszcze niedokończone, czyli te "
+    + "najwolniejsze, nigdy nie weszłyby do wyniku.";
+  $("czasyOdcinki").innerHTML = c.odcinki.map(kafelCzasu).join("");
+
+  $("czasyTygodnie").innerHTML = slupkiSvg(
+    c.tygodnie.map((t) => ({
+      ile: Math.round(t.medianaH ?? 0),
+      podpis: "t" + t.tydzien.slice(-2),
+      tytul: `tydzień ${t.tydzien} — mediana godzin z ${t.ile} zwrotów`,
+    })),
+    c.tygodnie.length > 12 ? 4 : 1
+  );
+
+  /* Progi bursztynu. Dobrane tak, żeby kolor NIE trafiał na każdy wiersz:
+     lista i tak idzie od najstarszej sprawy, więc kolejność niesie ciężar,
+     a badge ma znaczyć „ta przekroczyła linię". Bursztyn wszędzie to bursztyn
+     nigdzie. Kosz: doba (kosz z wieczora rozłożony rano jest normą). Zwrot:
+     dwa tygodnie — tyle wystarcza na ocenę, dokumenty i przelew. */
+  $("czasyKosze").innerHTML = !c.teraz.kosze.length
+    ? '<tr><td class="mute">Żaden kosz nie czeka na rozłożenie.</td></tr>'
+    : "<tr><th>KOSZ CZEKA</th><th>OD</th><th>POZYCJI</th><th>DO ZROBIENIA</th></tr>" +
+      c.teraz.kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
+          <td class="b">${esc(k.kod)}</td>
+          <td>${k.godzin >= 24 ? `<span class="badge amber">${esc(czasH(k.godzin))}</span>` : esc(czasH(k.godzin))}</td>
+          <td class="mute">${k.pozycji}</td>
+          <td class="b">${k.doZrobienia}</td>
+        </tr>`).join("");
+
+  $("czasyZwroty").innerHTML = !c.teraz.zwroty.length
+    ? '<tr><td class="mute">Żaden zwrot nie czeka na domknięcie.</td></tr>'
+    : "<tr><th>ZWROT CZEKA</th><th>OD</th><th>NA CO</th></tr>" +
+      c.teraz.zwroty.map((z) => `<tr data-zwrot="${z.id}" style="cursor:pointer">
+          <td class="b">${esc(z.referencja || z.waybill)}</td>
+          <td>${z.godzin >= 24 * 14 ? `<span class="badge amber">${esc(czasH(z.godzin))}</span>` : esc(czasH(z.godzin))}</td>
+          <td class="mute">${esc(z.etap)}</td>
+        </tr>`).join("");
+
+  /* „0 min" przy trzynastu pozycjach wygląda na awarię, a znaczy tyle, że
+     między odłożeniami były przerwy dłuższe niż kwadrans. Mówimy to słowami,
+     zamiast zostawiać zero do interpretacji. */
+  $("czasyPodstawa").textContent = c.podstawaPrawna;
+  $("czasyLudzie").innerHTML = !c.ludzie.length
+    ? '<tr><td class="mute">Nikt nie odkładał pozycji w tym oknie.</td></tr>'
+    : "<tr><th>OSOBA</th><th>POZYCJI</th><th>CZAS CIĄGŁEJ PRACY</th><th>TEMPO</th></tr>" +
+      c.ludzie.map((l) => `<tr>
+          <td class="b">${esc(l.kto)}</td>
+          <td>${l.pozycji}</td>
+          <td class="mute">${l.minutyAktywne > 0
+            ? `${l.minutyAktywne} min`
+            : '<span title="Przerwy dłuższe niż 15 minut nie liczą się jako praca ciągła.">brak ciągłej serii</span>'}</td>
+          <td>${l.tempo == null
+            /* Mała próbka NIE dostaje liczby — tempo z pięciu pozycji jest
+               szumem, a postawione w tabeli obok wyniku wygląda na wynik. */
+            ? `<span class="mute">próbka poniżej ${c.progWiarygodnosci} poz.</span>`
+            : `<span class="b">${esc(l.tempo.toFixed(1).replace(".", ","))}</span> poz./h`}</td>
+        </tr>`).join("");
+}
+
 function rysujRaportZwrotow(r) {
   if (!r) { $("raportZwrotowKafle").innerHTML = ""; return; }
   const kafle = [
@@ -2890,7 +3274,9 @@ function rysujRaportZwrotow(r) {
 }
 
 function rysujZwroty(zwroty) {
-  const rows = zwroty.map((z) => `<tr data-zwrot="${z.id}" style="cursor:pointer">
+  /* Wiersz otwartego zwrotu jest zaznaczony, bo w trybie szerokim lista stoi
+     OBOK szczegółu i bez tego nie widać, który wiersz się właśnie ogląda. */
+  const rows = zwroty.map((z) => `<tr data-zwrot="${z.id}"${z.id === otwartyZwrot ? ' class="aktywny"' : ""} style="cursor:pointer">
       <td class="b">${esc(z.referencja || z.waybill)}</td>
       <td>${esc(z.kupujacyLogin || "—")}</td>
       <td class="mute">${esc((z.utworzonoAt || "").slice(0, 10))}</td>
@@ -2945,20 +3331,55 @@ async function utworzZwrot(body) {
   otworzZwrot(d.zwrot.id);
 }
 
+/* ── Wejście w zwrot: zasłonić czy postawić obok ─────────────────────────────
+   Do 0.82.0 wejście w zwrot ukrywało wszystkie karty rodzeństwa. Na wąskim
+   oknie to jedyne sensowne zachowanie i tak zostaje. Na szerokim było stratą:
+   biuro traciło listę, nad którą pracowało, i po powrocie wracało na jej górę.
+
+   Próg jest JEDEN i wspólny z arkuszem stylów — patrz `@media (min-width:
+   1280px)` przy `.zSzczegolem`. Dwa progi zamiast jednego to dwa miejsca do
+   rozjazdu przy pierwszym strojeniu. */
+const SZEROKO = window.matchMedia("(min-width: 1280px)");
+const trybSzeroki = () => SZEROKO.matches;
+
+/* Co zostaje obok otwartego zwrotu. NIE cała zakładka: przy otwartym zwrocie
+   kontekstem jest kolejka zwrotów i skaner następnej etykiety, a nie kosze,
+   reklamacje i statystyki. Te chowają się w obu trybach. */
+const PRZY_ZWROCIE = ["zwrotSkanKarta", "zwrotListaKarta", "brakujaceKarta"];
+const KARTY_ZWROTOW = [
+  "zwrotSkanKarta", "brakujaceKarta", "zwrotListaKarta", "koszeKarta",
+  "pominieteKarta", "reklamacjeKarta", "wgladKarta",
+];
+
+function ustawRodzenstwoZwrotu() {
+  const otwarty = otwartyZwrot != null;
+  const zostaje = otwarty && trybSzeroki() ? PRZY_ZWROCIE : [];
+  for (const id of KARTY_ZWROTOW) $(id).hidden = otwarty && !zostaje.includes(id);
+  /* Dwie karty mają WŁASNĄ regułę pustki i ona jest nadrzędna — pusta karta
+     jest nagłówkiem bez treści. */
+  if (!$("brakujaceLista").innerHTML) $("brakujaceKarta").hidden = true;
+  if (!$("pominieteLista").innerHTML) $("pominieteKarta").hidden = true;
+  $("widokZwroty").classList.toggle("zSzczegolem", otwarty);
+  zaznaczWiersz("zwrotLista", "zwrot", otwartyZwrot);
+}
+
+/**
+ * Zaznaczenie wiersza, którego szczegół stoi obok listy.
+ *
+ * Klasę ustawia też `rysujZwroty` przy przerysowaniu, ale wejście w zwrot
+ * listy NIE przerysowuje — bez tego wiersz zapalałby się dopiero po
+ * najbliższym cyklu odświeżania, czyli do trzydziestu sekund później.
+ */
+function zaznaczWiersz(tabelaId, klucz, id) {
+  for (const tr of $(tabelaId).querySelectorAll(`tr[data-${klucz}]`)) {
+    tr.classList.toggle("aktywny", id != null && Number(tr.dataset[klucz]) === id);
+  }
+}
+
 function otworzZwrot(id) {
   otwartyZwrot = id;
-  // szczegół ZASŁANIA karty poniżej (wzorzec #szczegol dostaw) — to wejście
-  // W zwrot, nie dodatek nad listą
   $("zwrotSzczegol").hidden = false;
-  $("zwrotSkanKarta").hidden = true;
-  $("brakujaceKarta").hidden = true;
-  $("zwrotListaKarta").hidden = true;
-  $("koszeKarta").hidden = true;
-  $("pominieteKarta").hidden = true;
-  $("reklamacjeKarta").hidden = true;
-  $("raportZwrotowKarta").hidden = true;
-  $("statystykiKarta").hidden = true;
-  $("kontoAllegroKarta").hidden = true;
+  ustawRodzenstwoZwrotu();
   odswiezSzczegolZwrotu();
 }
 
@@ -2966,18 +3387,17 @@ function zamknijZwrot() {
   otwartyZwrot = null;
   zwrotIdWatku = null;
   $("zwrotSzczegol").hidden = true;
-  $("zwrotSkanKarta").hidden = false;
-  $("zwrotListaKarta").hidden = false;
-  $("koszeKarta").hidden = false;
-  /* Karta pominięć wraca tylko wtedy, gdy MA co pokazać — pusta byłaby
-     nagłówkiem bez treści, a odświeżenie i tak rozstrzygnie to za chwilę. */
-  $("pominieteKarta").hidden = !$("pominieteLista").innerHTML;
-  $("reklamacjeKarta").hidden = false;
-  $("raportZwrotowKarta").hidden = false;
-  $("statystykiKarta").hidden = false;
-  $("kontoAllegroKarta").hidden = false;
+  ustawRodzenstwoZwrotu();
   $("zwrotTowarWyniki").innerHTML = "";
 }
+
+/* Zmiana szerokości okna przy otwartym szczególe ma przełączyć tryb, a nie
+   zostawić układ z poprzedniego. Oba drill-downy naraz, bo `otwartyDok`
+   i `otwartyZwrot` żyją na różnych zakładkach i mogą być otwarte równocześnie. */
+SZEROKO.addEventListener("change", () => {
+  ustawRodzenstwoZwrotu();
+  ustawRodzenstwoDostaw();
+});
 
 async function odswiezSzczegolZwrotu() {
   if (otwartyZwrot == null) return;
@@ -3274,6 +3694,14 @@ function rysujKontoAllegro() {
     akcje.push('<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>');
     akcje.push('<span class="mute" style="margin-left:8px">parowanie wykonuje admin</span>');
   }
+  /* ALARM SIĘ NIE CHOWA. Sekcja jest domyślnie zwinięta, ale rozerwane
+     parowanie znaczy, że skan etykiety nie zadziała — a to nie jest rzecz do
+     odkrycia przez rozwinięcie sekcji. Otwieramy ją wtedy sami, raz:
+     `open` ustawione ręką biura zostaje, bo zapis do localStorage idzie
+     dopiero ze zdarzenia `toggle`, a to jest właśnie ten przypadek. */
+  if (s.stan !== "polaczone" && s.stan !== "dev" && s.stan !== "wylaczone") {
+    $("kontoAllegroKarta").open = true;
+  }
   $("allegroAkcje").innerHTML = akcje.join(" ");
 }
 
@@ -3310,6 +3738,23 @@ async function pollParowania() {
   }
 }
 
+/* ── Wysokość przyklejonego chrome'u ─────────────────────────────────────────
+   Nie jest to kosmetyka: od niej zależy `top` paska zakładek ORAZ
+   `scroll-margin-top` kart, do których prowadzi kliknięcie kafla w pasku stanu
+   i `focus()` po przełączeniu zakładki. Sztywna liczba rozjechałaby się
+   pierwszego dnia — nagłówek zawija się na wąskim oknie, a pasek stanu rośnie
+   o kafel „ŚRODOWISKO" i o licznik odpowiedzi na notatki.
+
+   Pętli zwrotnej tu nie ma: zmiana `--hGora` przesuwa `#chrome`, nie zmienia
+   jego wysokości. */
+function mierzChrome() {
+  const gora = document.querySelector("header").offsetHeight;
+  const pasek = $("chrome").offsetHeight;
+  const s = document.documentElement.style;
+  s.setProperty("--hGora", gora + "px");
+  s.setProperty("--hChrome", gora + pasek + "px");
+}
+
 function start() {
   $("login").hidden = true;
   $("panel").hidden = false;
@@ -3317,9 +3762,51 @@ function start() {
   $("ustawienia").hidden = false;
   $("kto").textContent = kto;
   wczytajFirme();
+  wczytajWglad();
+  /* `toggle` nie bąbelkuje, więc delegacja na dokumencie tu nie zadziała. */
+  for (const id of SEKCJE_WGLADU) {
+    $(id).addEventListener("toggle", () => {
+      /* `open` ustawione z kodu też wywołuje `toggle` — i to ASYNCHRONICZNIE,
+         więc przeniesienie nasłuchu za `wczytajWglad()` nie wystarcza. Tym,
+         co odróżnia przywrócenie układu od kliknięcia, jest fakt, że przy
+         przywróceniu NIC się nie zmieniło. Bez tego porównania strona pytała
+         o raport dwa razy przy każdym wejściu na zakładkę. */
+      const teraz = stanWgladu();
+      if (teraz === localStorage.getItem("wertis.wglad")) return;
+      localStorage.setItem("wertis.wglad", teraz);
+      dociagnijWglad(id);
+    });
+  }
   pokaz(widok);
+  /* Po odsłonięciu panelu, bo `offsetHeight` schowanego elementu to zero. */
+  mierzChrome();
+  for (const el of [document.querySelector("header"), $("chrome")]) {
+    new ResizeObserver(mierzChrome).observe(el);
+  }
   odswiezDostawy();
   odswiezStan();
+}
+
+/* ── Ramki tabel ─────────────────────────────────────────────────────────────
+   Każda tabela panelu dostaje pudełko z własnym przewijaniem. Robimy to raz
+   w JS, bo `<table>` jest CELEM `innerHTML` w kilkudziesięciu miejscach —
+   wrapper dopisany w HTML byłby czterdziestoma miejscami do zapomnienia przy
+   pierwszej nowej liście. Przeniesienie węzła nie rusza ani `id`, ani nasłuchów:
+   te wiszą na samych elementach `<table>`, nie na rodzicu.
+
+   `wysoka` dostają listy o nieograniczonej długości. Reszta ma sam poziom —
+   krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
+const TABELE_DLUGIE = new Set([
+  "dostawy", "zwrotLista", "koszeLista", "dziennik", "reklamacjeLista", "pominieteLista",
+  "kolejka", "kandydaci", "dostawcy", "statystykiProdukty", "wydajnosc",
+  "szczegolLinie", "zwrotPozycje", "brakujaceLista", "reklamacje",
+  "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
+]);
+for (const t of document.querySelectorAll("#panel table")) {
+  const box = document.createElement("div");
+  box.className = "tabelaBox" + (TABELE_DLUGIE.has(t.id) ? " wysoka" : "");
+  t.replaceWith(box);
+  box.appendChild(t);
 }
 
 $("zaloguj").addEventListener("click", zaloguj);
@@ -3599,7 +4086,31 @@ $("pominieteLista").addEventListener("click", async (e) => {
 
 /* Szukanie po wpisaniu, z odczekaniem — pole reaguje na literę, nie na Enter,
    bo biuro szuka „na wyczucie" i poprawia frazę w locie. */
-$("dniStatystyk").addEventListener("change", odswiezStatystyki);
+/* Jedno okno na dwie sekcje: statystyki produktowe i czasy czyta się razem,
+   a dwa przełączniki obok siebie kazałyby pilnować, czy pokazują to samo.
+   Dlatego selektor stoi NAD nimi, w nagłówku karty WGLĄD — schowany w jednej
+   z sekcji byłby nieosiągalny po jej zwinięciu. */
+$("dniStatystyk").addEventListener("change", () => {
+  /* Sekcja zwinięta nie liczy się na zapas, ale nie może też zostać z liczbami
+     dla poprzedniego okna. Czyszczenie sprawia, że otwarcie pobierze na nowo. */
+  if (!$("statystykiKarta").open) $("statystykiProdukty").innerHTML = "";
+  if (!$("czasyKarta").open) $("czasyOdcinki").innerHTML = "";
+  odswiezStatystyki();
+  odswiezCzasy();
+});
+
+
+
+/* Wiersz „co stoi teraz" prowadzi TAM, gdzie się z tym coś robi: kosz do jego
+   podglądu (z przewinięciem, bo stoi w innej karcie), zwrot na jego kartę. */
+$("czasyKarta").addEventListener("click", async (e) => {
+  const z = e.target.closest("[data-zwrot]");
+  if (z) return otworzZwrot(Number(z.dataset.zwrot));
+  const k = e.target.closest("[data-kosz]");
+  if (!k) return;
+  await pokazPodgladKosza(Number(k.dataset.kosz));
+  $("koszPodglad").scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 let koszSzukajTimer = null;
 $("koszSzukaj").addEventListener("input", (e) => {

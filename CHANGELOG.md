@@ -33,6 +33,114 @@ historii nie przepisujemy.
 
 ---
 
+## 0.83.0 — 22 sierpnia 2026
+**Panel biura przestał siedzieć w kolumnie pośrodku ekranu.** Układ nie zmienił
+się od pierwszej wersji: `main` miał szerokość 1080 px, a każdy widok był jedną
+kolumną kart. Na monitorze 1920 px dwie trzecie szerokości było pustym
+marginesem, a zakładka ZWROTY miała jedenaście kart jedna pod drugą.
+
+Karty układają się teraz w tyle kolumn, ile mieści okno. **Progów rozdzielczości
+nie ma** — liczba kolumn wychodzi z arytmetyki siatki, więc nie ma czego
+utrzymywać przy następnym monitorze. Laptop dostaje jedną kolumnę na pełną
+szerokość, 1920 px dwie, 2560 px trzy. Panel otwarty na pół ekranu obok
+Subiekta zagęszcza się sam.
+
+Szerokość kolumny dobrana jest pod TREŚĆ, nie pod ekran: tabela zwrotów ma
+sześć kolumn i poniżej 44 rem zaczyna się zawijać. Klasy „karta na dwie
+kolumny" świadomie nie ma — przy trzech kolumnach zostawiała trzecią pustą,
+bo karty rozpięte na dwie nie mają się z czym sparować.
+
+**Pasek stanu i zakładki są przyklejone.** Przewinięcie listy dostaw nie zabiera
+z ekranu ani nawigacji, ani alarmu o kolejce w błędzie — a to jest jedyny powód,
+dla którego ten pasek w ogóle stoi na górze. Jego wysokość jest MIERZONA, nie
+wpisana: nagłówek zawija się na wąskim oknie, a pasek stanu rośnie o kafle
+alarmów. Od tej liczby zależy też `scroll-margin-top`, więc karta, do której
+prowadzi kliknięcie kafla, nie wjeżdża pod pasek.
+
+`main` musiał przy okazji przestać być siatką. Element `position: sticky` będący
+elementem siatki dostaje obszar dokładnie własnej wysokości, więc nie ma zakresu
+ruchu i po prostu się nie przykleja. Siatką jest teraz każdy widok osobno.
+
+**Tabele mają własne przewijanie**, a listy o nieograniczonej długości —
+ograniczoną wysokość z przyklejonym nagłówkiem kolumn. Jedna dostawa na
+siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
+Zakładka DZIENNIK zeszła przez to z 3700 px do 850 px, czyli mieści się
+w oknie razem z filtrami.
+
+**Karta WGLĄD** zbiera na zakładce ZWROTY raport procesu, statystyki, czasy
+obsługi i konto Allegro. Domyślnie rozwinięty jest sam raport. Zwinięta sekcja
+NIE PYTA SERWERA — to nie jest chowanie pikseli: raport szedł dotąd w każdym
+trzydziestosekundowym cyklu odświeżania, a statystyki i czasy to osobne
+żądania liczące do stu osiemdziesięciu dni wstecz.
+
+Wybór zapamiętuje przeglądarka. Jeden wyjątek jest twardy: rozerwane parowanie
+z Allegro otwiera sekcję KONTO ALLEGRO samo. Skan etykiety wtedy nie zadziała,
+a to nie jest rzecz do odkrycia przez rozwijanie sekcji. Alarm się nie chowa.
+
+**Szczegół staje obok listy.** Wejście w zwrot albo w dostawę ukrywało dotąd
+wszystkie karty rodzeństwa — biuro traciło listę, nad którą pracowało, i po
+powrocie wracało na jej górę. Na oknie szerszym niż 1280 px lista zostaje po
+lewej, szczegół stoi obok niej z własnym przewijaniem, a otwarty wiersz jest
+podświetlony. Na węższym oknie zostaje zachowanie sprzed tej wersji: dwie
+kolumny nie mieszczą się na laptopie obok siebie.
+
+Widoczność kart rodzeństwa liczy się teraz w JEDNYM miejscu na widok, zamiast
+w dwóch listach identyfikatorów wypisanych z ręki. Te dwie listy zdążyły się
+już rozjechać: zamknięcie zwrotu nie przywracało karty brakujących paczek.
+
+Zagęszczenie: `td` z 9 na 6 px, karta z 16/18 na 12/14, `h2` z 10 na 7.
+Wysokość przycisków i pól zostaje bez zmian — to są cele kliknięcia i one nie
+są miejscem na oszczędności. Akapity objaśniające dostały granicę 74 znaków
+w wierszu, bo karta rozciągnięta na 900 px daje wiersz nieczytelny.
+
+Zakładka PYTANIA KLIENTÓW z 0.80.0 dostała ten sam układ przy scaleniu —
+zostawienie jej w jednej wąskiej kolumnie obok pięciu płynnych byłoby
+konfliktem rozwiązanym w połowie.
+
+Sprawdzone w Chromium na ośmiu szerokościach od 900 do 3440 px, na wszystkich
+sześciu zakładkach: żadna nie rozpycha strony w poziomie.
+
+## 0.82.0 — 22 sierpnia 2026
+
+**Biuro widzi wreszcie, ile towar STOI.** Zwroty miały dwie karty liczb:
+RAPORT mówił, ile czego jest, STATYSTYKI — co wraca najczęściej. Żadna nie
+odpowiadała na pytanie, które przelicza się wprost na pieniądze: jak długo
+zwrócony towar jest niesprzedawalny.
+
+Nowa karta **CZASY OBSŁUGI ZWROTU** mierzy pięć odcinków drogi, każdy medianą
+i p90. Cała droga to przyjęcie → półka. Odcinki składowe: przyjęcie → ocena,
+ocena → zamknięcie kosza oraz zamknięcie kosza → półka, czyli sam czas
+rozłożenia. Osobno idzie przyjęcie → zwrot środków. Okno 30/90/180 dni dzieli
+ze statystykami produktowymi.
+
+**Okno liczy się od zdarzenia KOŃCZĄCEGO odcinek**, nie od przyjęcia paczki.
+Karta odpowiada więc na pytanie „ile trwało to, co się w tym oknie skończyło".
+Liczenie od przyjęcia wypychałoby ze statystyki sprawy niedokończone, czyli
+z definicji najwolniejsze, i proces wyglądałby na szybszy, niż jest.
+
+Ceną tego wyboru jest to, że rzeczy stojące nie ruszają mediany. Dlatego karta
+niesie sekcję **CO STOI TERAZ**: kosze czekające na rozłożenie i zwroty bez
+domknięcia, od najstarszej sprawy, z nazwanym etapem. Kliknięcie wiersza
+otwiera kosz albo kartę zwrotu. Mediana mówi o przeszłości, tamta lista
+o dzisiaj — dopiero razem nie kłamią.
+
+Odcinek bez danych pokazuje POWÓD zamiast samego myślnika. Najczęstszy jest
+jeden: kosze z dokumentu MM nie mają przypiętego zwrotu, więc do całej drogi
+nie wchodzą. Pusty kafel bez tego zdania wygląda jak awaria karty.
+
+Na dole stoi **tempo rozkładania per osoba** — monitoring pracowniczy z tą samą
+podstawą prawną co raport wydajności na zakładce ANALIZA, wysyłaną przez serwer
+razem z danymi. Miarą jest czas aktywny z `services/raporty.ts`, w którym
+przerwy dłuższe niż 15 minut nie liczą się jako praca.
+
+Odstęp od zamknięcia kosza byłby miarą nieuczciwą: mierzyłby głównie to, jak
+długo kosz czekał na kogokolwiek, i karałby człowieka za sięgnięcie po
+najstarszą robotę. Próbka poniżej 20 pozycji nie dostaje liczby.
+
+Nowa trasa `GET /api/biuro/zwroty/czasy?dni=90` pod bramką biura. Nic nie
+zmienia się w bazie ani na kolektorze — to sam odczyt ze znaczników, które
+aplikacja i tak zapisywała.
+
 ## 0.81.0 — 22 sierpnia 2026
 
 **Listy zwrotów odpowiadają wreszcie na pytanie „co jeszcze zostało".** Trzy

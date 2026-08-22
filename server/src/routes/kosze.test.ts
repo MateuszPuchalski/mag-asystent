@@ -342,6 +342,18 @@ test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => 
   // nieznane okno nie wywraca trasy, tylko wraca do domyślnego
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki?dni=abc", headers: biuro });
   assert.equal(r.json().statystyki.dni, 90);
+  /* Czasy obsługi (0.82.0) — ta sama bramka. Odpowiedź na pustej bazie ma być
+     KOMPLETNA: pięć odcinków, każdy z wyjaśnieniem, dlaczego jest pusty, i
+     podstawa prawna monitoringu przy tempie ludzi. */
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/czasy", headers: magazynier });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/czasy?dni=30", headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  const czasy = r.json().czasy;
+  assert.equal(czasy.dni, 30);
+  assert.equal(czasy.odcinki.length, 5);
+  assert.ok(czasy.odcinki.every((o: { czemuPusto: string | null }) => o.czemuPusto));
+  assert.match(czasy.podstawaPrawna, /Kodeks pracy/);
   // brakujące paczki (Etap 4) — ta sama bramka biura, pusta lista bez przebiegu tickera
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: magazynier });
   assert.equal(r.statusCode, 403);

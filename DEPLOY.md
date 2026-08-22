@@ -691,6 +691,40 @@ blokuje — decyzja należy do pracodawcy — a sam raport niesie tę informacj�
 w polu `podstawaPrawna`. Techniczny audyt „kto zmienił lokalizację" to **co
 innego** i nie wymaga wstrzymania.
 
+## 5b. Panel biura — układ ekranu (0.83.0)
+
+Do 0.82.0 treść panelu siedziała w kolumnie 1080 px pośrodku ekranu. Na
+monitorze 1920 px dwie trzecie szerokości było pustym marginesem, a zakładka
+ZWROTY ALLEGRO miała jedenaście kart jedna pod drugą.
+
+Od 0.83.0 karty układają się w tyle kolumn, ile mieści okno. Progów
+rozdzielczości nie ma — liczba kolumn wychodzi z arytmetyki siatki. Laptop
+dostaje jedną kolumnę na pełną szerokość, monitor 1920 px dwie, 2560 px trzy.
+Panel otwarty na pół ekranu obok Subiekta zagęszcza się sam.
+
+Pasek stanu i zakładki są **przyklejone do góry**. Przewinięcie długiej listy
+nie zabiera z ekranu ani nawigacji, ani alarmu o kolejce w błędzie.
+
+Każda tabela ma własne przewijanie, a listy o nieograniczonej długości mają
+ograniczoną wysokość z przyklejonym nagłówkiem kolumn. Jedna dostawa na
+siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
+
+**Karta WGLĄD** na zakładce ZWROTY zbiera raport procesu, statystyki, czasy
+obsługi i stan konta Allegro. Domyślnie rozwinięty jest sam raport, reszta
+czeka zwinięta. Zwinięta sekcja **nie pyta serwera** — to nie jest chowanie
+pikseli, tylko oszczędność żądań: raport szedł dotąd w każdym
+trzydziestosekundowym cyklu odświeżania.
+
+Wybór, co jest rozwinięte, zapamiętuje przeglądarka. Jeden wyjątek: gdy
+parowanie z Allegro jest rozerwane, sekcja KONTO ALLEGRO otwiera się sama.
+Skan etykiety wtedy nie zadziała, a to nie jest rzecz do odkrycia przez
+rozwijanie sekcji.
+
+**Szczegół obok listy.** Wejście w zwrot albo w dostawę na oknie szerszym niż
+1280 px zostawia listę widoczną po lewej, a szczegół stawia obok niej. Otwarty
+wiersz jest podświetlony. Na węższym oknie szczegół zasłania listę,
+jak wcześniej — dwie kolumny nie mieszczą się na laptopie obok siebie.
+
 ## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
 > **Test na wersji edu (bez Sfery):** kompletna instrukcja krok po kroku —
@@ -974,6 +1008,38 @@ i jest jedyną liczbą mówiącą, czy z produktem jest problem. Mianownik pocho
 z read-modelu sprzedaży, więc sięga tylko `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie
 90 dni). Dla dłuższego okna wskaźnika NIE MA — zamiast zawyżonego ilorazu
 widnieje myślnik i zdanie z wyjaśnieniem.
+
+Od 0.82.0 niżej stoi karta **CZASY OBSŁUGI ZWROTU**. Odpowiada na trzecie
+pytanie o zwroty: nie ile czego jest i nie co wraca, tylko jak długo towar
+stoi, zanim wróci na półkę.
+
+Pięć odcinków drogi, każdy z medianą i p90. Cała droga to przyjęcie → półka. Odcinki składowe: przyjęcie → ocena,
+ocena → zamknięcie kosza, zamknięcie kosza → półka (czyli czas rozłożenia).
+Osobno idzie przyjęcie → zwrot środków. Okno dzieli ze statystykami
+produktowymi.
+
+Okno liczy się od zdarzenia KOŃCZĄCEGO odcinek, nie od przyjęcia paczki. Karta
+odpowiada więc na pytanie „ile trwało to, co się w tym oknie skończyło".
+Liczenie od przyjęcia wypychałoby ze statystyki sprawy jeszcze niedokończone,
+czyli z definicji najwolniejsze, i proces wyglądałby na szybszy, niż jest.
+
+Ceną tego wyboru jest to, że rzeczy stojące nadal nie mają wpływu na medianę.
+Dlatego karta niesie sekcję **CO STOI TERAZ** — kosze czekające na rozłożenie
+i zwroty bez domknięcia, od najstarszej sprawy, z nazwanym etapem. Kliknięcie
+wiersza otwiera kosz albo kartę zwrotu.
+
+Odcinek bez danych pokazuje POWÓD zamiast samego myślnika. Najczęstszy powód
+jest jeden: kosze z dokumentu MM (§6a wyżej) nie mają przypiętego zwrotu.
+Do „całej drogi" więc nie wchodzą — liczy się dla nich sam czas rozłożenia.
+
+Na dole karty stoi **tempo rozkładania per osoba**. To monitoring pracowniczy
+w rozumieniu Kodeksu pracy. Podstawa prawna jest ta sama co przy raporcie
+wydajności na zakładce ANALIZA i tak samo jedzie z danymi z serwera.
+
+Miarą jest czas aktywny, w którym przerwy dłuższe niż 15 minut nie liczą się
+jako praca. Odstęp od zamknięcia kosza byłby miarą nieuczciwą: mierzyłby
+głównie to, jak długo kosz czekał na kogokolwiek. Karałby wtedy człowieka za
+sięgnięcie po najstarszą robotę. Próbka poniżej 20 pozycji nie dostaje wyniku.
 
 Od 0.65.0 serwer **sam ściąga zapowiedzi zwrotów** — zgłoszenia klientów
 z Allegro, zanim paczka dojedzie. Skan etykiety trafia wtedy w znane

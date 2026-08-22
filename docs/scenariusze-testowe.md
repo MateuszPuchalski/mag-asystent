@@ -666,6 +666,44 @@ byłaby zawyżona, a po niej ktoś mógłby wycofać dobrze sprzedający się to
 Wykres tygodni ma mieć słupki także dla tygodni BEZ zwrotów — oś czasu bez
 dziur. Lista kupujących pokazuje wyłącznie loginy z więcej niż jednym zwrotem.
 
+### S69e — czasy obsługi zwrotu i uczciwa pustka
+
+Karta **CZASY OBSŁUGI ZWROTU** stoi pod statystykami. Na świeżym ziarnie jest
+PUSTA i to jest właściwy pierwszy widok do sprawdzenia. Każdy z pięciu kafli
+ma pokazać myślnik ORAZ zdanie, dlaczego nie ma liczby. Sam myślnik wyglądałby
+jak awaria karty.
+
+Kafel PRZYJĘCIE → PÓŁKA mówi wprost rzecz, która myli najczęściej: kosze
+z dokumentu MM nie mają przypiętego zwrotu, więc do całej drogi nie wchodzą.
+
+Przejdź teraz S67–S69, żeby zwrot przeszedł drogę od skanu do półki. Kafle
+mają dostać liczby, a sekcja CO STOI TERAZ — wiersze kosza czekającego na
+rozłożenie i zwrotu bez domknięcia, od najstarszej sprawy. Kliknięcie wiersza
+kosza otwiera jego podgląd, kliknięcie wiersza zwrotu — kartę zwrotu.
+
+Tabela tempa per osoba ma nieść podstawę prawną monitoringu NAD sobą i nie
+pokazywać liczby przy próbce mniejszej niż 20 pozycji.
+
+### S69f — układ panelu w różnych szerokościach
+
+Otwórz `/biuro` i zwężaj okno od pełnego ekranu do połowy. Karty mają
+przechodzić z trzech kolumn na dwie i na jedną **płynnie**, bez skoku układu
+i bez poziomego paska przewijania. Ten pasek na dole strony to usterka, nie
+efekt uboczny.
+
+Przewiń długą listę: pasek stanu i zakładki mają zostać na górze. Kliknij kafel
+w pasku stanu — karta docelowa ma stanąć POD paskiem, w całości widoczna.
+
+Na zakładce ZWROTY karta **WGLĄD** ma mieć rozwinięty sam RAPORT. Rozwiń
+STATYSTYKI, odśwież stronę: mają zostać rozwinięte. Zwiń wszystko i zostaw
+zakładkę otwartą na minutę — w narzędziach przeglądarki nie mają lecieć
+żądania o raport, statystyki ani czasy. Zwinięta sekcja nie pyta serwera.
+
+Kliknij wiersz zwrotu przy szerokim oknie: lista ma zostać po lewej, a karta
+zwrotu stanąć obok niej, z podświetlonym wierszem. Zwęź okno poniżej 1280 px
+przy otwartym zwrocie — szczegół ma zasłonić listę. Rozszerz z powrotem: ma
+wrócić układ dwukolumnowy, bez odświeżania strony.
+
 ### S70 — dostawca z logo i dostawca bez logo
 
 `FALON-TECH` ma wgrane logo, `STIHL Polska` nie ma. Oba dokumenty stoją na tej
