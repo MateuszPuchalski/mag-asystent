@@ -33,6 +33,59 @@ historii nie przepisujemy.
 
 ---
 
+## 0.81.0 — 22 sierpnia 2026
+
+**Listy zwrotów odpowiadają wreszcie na pytanie „co jeszcze zostało".** Trzy
+zmiany o kolejności pracy, wszystkie z jednego zgłoszenia z hali: robota już
+wykonana zajmowała miejsce roboty do wykonania. Za nimi dwie o samym wierszu
+kosza — ilość i symbol towaru, czyli to, co magazynier czyta, stojąc z rzeczą
+w ręce.
+
+**Rozłożone kosze schodzą na dół listy przyjęć.** O kolejności rozstrzygała
+sama data z dokumentu, więc kosz rozłożony wczoraj stał nad tym, który dziś
+przyjechał na halę. Rozłożone i zdjęte ręką z listy zostają — magazynier ma
+widzieć, że dokument jest znany i zrobiony, zamiast szukać go w nieskończoność
+— ale stoją POD tym, co czeka. Wewnątrz obu grup data dalej rządzi.
+
+**W otwartym koszu odłożona pozycja zjeżdża na koniec listy.** Zwinięty pasek
+zrobionej pozycji dalej zajmuje ekran, więc przy koszu na dwadzieścia pozycji
+do roboty trzeba się było PRZEWIJAĆ przez robotę już wykonaną. Lista ma teraz
+trzy grupy: czekające w kolejności alejkowej, odłożone „na później" i zrobione.
+Te ostatnie stoją w kolejności wykonania, czyli ostatnio tknięta jest na samym
+dole — tam, gdzie się jej szuka, wracając po COFNIJ. Pominięta liczy się jako
+zrobiona: to praca zdjęta z rutyny, a nie towar czekający na półkę.
+
+To ta sama decyzja, którą rozkładanie dostaw podjęło w 0.35.0, i płaci się za
+nią tym samym: wiersze skaczą po każdym zapisie. Skok kosztuje mniej niż
+przewijanie, bo następną pozycję bierze się SKANEM, a skan trafia w towar po
+symbolu, nie w miejsce na ekranie.
+
+Kolejność liczy SERWER, nie kolektor. Tę samą listę czyta panel biura, a dwa
+niezależne sortowania rozjechałyby się przy pierwszej zmianie jednego z nich —
+objawem byłoby „biuro czyta co innego, niż ja mam na ekranie".
+
+**Po odłożeniu kolektor sam wskazuje kolejny przedmiot** — i robi to OD RAZU,
+nie dopiero z powracającą listą. Między jednym a drugim mieści się skan
+następnego regału, a trafiał on w pozycję właśnie odłożoną: zamiast odłożyć
+kolejny towar, poprawiał adres poprzedniego. Odległość między półkami jest
+krótsza niż runda do serwera i z powrotem. Tak samo zachowują się POMIŃ
+i PÓŹNIEJ — jedno i drugie zdejmuje pozycję z drogi, więc jedno i drugie
+pokazuje następną zamiast pustego ekranu.
+
+**Ilość inna niż jedna sztuka dostaje bursztynową pastylkę.** Zwrot wraca
+pojedynczo, więc oko czyta wiersz jak „jedna rzecz na jedną półkę" i idzie
+dalej — a przy „3 szt." zostawia dwie w koszu. Kosz zamyka się z licznikiem
+POZYCJI, nie sztuk, więc taka pomyłka wychodzi dopiero przy inwentaryzacji.
+Pastylka, a nie sam kolor: bursztynem świeci obok pozycja bez adresu, a dwa
+znaczenia jednej barwy nie niosłyby żadnego — kształt odróżnia je bez czytania.
+Wiersz zrobiony zostaje przygaszonym paskiem, ale liczbę dalej na nim widać, bo
+to po niej sprawdza się kompletność kosza.
+
+**Symbol wskazanego towaru urósł do 22 sp.** To jego szuka się wzrokiem, mając
+towar w ręce i pytanie „czy to na pewno ten"; czyta się go z odległości
+ramienia, tak samo jak adres w panelu niżej. Pozostałe wiersze zostają przy
+17 sp, bo cała lista w tym rozmiarze przestałaby mieścić się na ekranie.
+
 ## 0.80.0 — 22 sierpnia 2026
 
 **Pytania klientów o dobór części dostały własną zakładkę — ze szkicem

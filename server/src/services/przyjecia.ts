@@ -53,11 +53,18 @@ export function numerZKartki(raw: string): string {
   return numerKosza(String(raw ?? "").trim());
 }
 
+/** Stany, w których przy przyjęciu nie ma już nic do zrobienia. */
+const ZROBIONE = new Set(["rozlozony", "poza_aplikacja"]);
+
 /**
  * Przyjęcia z okna importu wraz ze stanem pracy po naszej stronie.
  *
  * Rozłożone i zdjęte ręką zostają na liście — magazynier ma widzieć, że
- * dokument jest znany i zrobiony, zamiast szukać go w nieskończoność.
+ * dokument jest znany i zrobiony, zamiast szukać go w nieskończoność. Od
+ * 0.81.0 stoją POD resztą: lista jest pracą do wykonania, a nie archiwum,
+ * i zrobiony kosz sprzed tygodnia nie ma prawa stać nad tym, który dziś
+ * przyjechał na halę. Wewnątrz obu grup zostaje kolejność z zapytania
+ * (najnowsze na górze), więc nic poza tą jedną rzeczą się nie przesuwa.
  */
 export function listaPrzyjec(): WierszPrzyjecia[] {
   const wiersze = db()
@@ -75,7 +82,7 @@ export function listaPrzyjec(): WierszPrzyjecia[] {
     )
     .all() as Array<Record<string, unknown>>;
 
-  return wiersze.map((w) => {
+  const lista = wiersze.map((w) => {
     const koszStatus = (w.kosz_status as string) ?? null;
     const stan = w.pominiete
       ? "poza_aplikacja"
@@ -95,6 +102,10 @@ export function listaPrzyjec(): WierszPrzyjecia[] {
       odlozonych: (w.odlozonych as number) ?? 0,
     };
   });
+  /* Sortowanie STABILNE (tak działa `Array.prototype.sort` w V8), więc
+     „zrobione na dół" jest jedyną zmianą kolejności — data wystawienia
+     dalej rządzi wewnątrz grupy. */
+  return lista.sort((a, b) => Number(ZROBIONE.has(a.stan)) - Number(ZROBIONE.has(b.stan)));
 }
 
 /**

@@ -365,3 +365,44 @@ test("cofnięcie pominięcia przywraca pozycję do pracy", async () => {
   assert.equal(wrocila?.status, "todo");
   assert.equal(wrocila?.powod, null, "powód znika razem z pominięciem");
 });
+
+test("odłożona pozycja zjeżdża na koniec listy, kolejna zostaje na górze", async () => {
+  /* Lista kosza odpowiada na jedno pytanie: „co jeszcze zostało". Zwinięty
+     pasek zrobionej pozycji dalej zajmuje ekran, więc przy koszu na dwadzieścia
+     pozycji do roboty trzeba było PRZEWIJAĆ przez robotę już wykonaną. Ta sama
+     lekcja, którą rozkładanie dostaw odrobiło w 0.35.0. */
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const [pierwsza, druga] = kosz.pozycje;
+
+  K.odlozPozycje(pierwsza.id, "A01-02-03", "Magazynier");
+  const po = K.szczegolKosza(kosz.id);
+  assert.deepEqual(
+    po.pozycje.map((p) => [p.id, p.status]),
+    [[druga.id, "todo"], [pierwsza.id, "done"]],
+    "odłożona schodzi pod czekającą, mimo kolejności alejkowej"
+  );
+
+  /* Pominięta też jest zrobiona — jedna grupa na dole, w kolejności
+     wykonania, żeby ostatnio tknięta stała tam, gdzie szuka się jej,
+     wracając po cofnięcie. Znaczniki czasu wpisujemy ręką: dwa wywołania
+     w tej samej milisekundzie dałyby remis i test mierzyłby zegar,
+     a nie regułę. */
+  K.pominPozycjeKosza(druga.id, "nie ma w koszu", "Magazynier");
+  const d = db();
+  d.prepare("UPDATE kosz_pozycja SET odlozono_at='2026-08-22T10:00:00.000Z' WHERE id=?").run(pierwsza.id);
+  d.prepare("UPDATE kosz_pozycja SET pominieto_at='2026-08-22T09:00:00.000Z' WHERE id=?").run(druga.id);
+  assert.deepEqual(
+    K.szczegolKosza(kosz.id).pozycje.map((p) => p.id),
+    [druga.id, pierwsza.id],
+    "wcześniej tknięta stoi wyżej"
+  );
+
+  // cofnięcie odłożenia przywraca pozycję na trasę, czyli NAD zrobione
+  K.cofnijPozycje(pierwsza.id, "Magazynier");
+  assert.deepEqual(
+    K.szczegolKosza(kosz.id).pozycje.map((p) => [p.id, p.status]),
+    [[pierwsza.id, "todo"], [druga.id, "skipped"]]
+  );
+});
