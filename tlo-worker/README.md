@@ -45,6 +45,22 @@ ze źródłem u wydawcy. Wpisana suma pilnuje każdego następnego budowania.
 Odmowa przychodzi **po** `dotnet publish`, czyli po kilku minutach. Inaczej się
 nie da: żeby policzyć sumę pliku, trzeba go najpierw pobrać.
 
+**Bez .NET 8 SDK ten skrypt nie ruszy.** Instalacja na Windowsie:
+
+```powershell
+winget install Microsoft.DotNet.SDK.8
+```
+
+Potem otwórz **nowe** okno PowerShella (instalator zmienia `PATH`, bieżąca sesja
+go nie widzi) i sprawdź `dotnet --version` — ma wyjść `8.x`.
+
+Pobierając ręcznie, weź **SDK**, nie Runtime, i wariant **Windows x64 `.exe`**.
+Plik `.pkg` jest instalatorem macOS i na Windowsie się nie otworzy.
+
+SDK idzie na maszynę dewelopera, **nie na serwer firmy**. Po to jest
+`--self-contained`: gotowy exe niesie runtime w sobie, więc pod `C:\wertis\`
+nie trzeba instalować niczego.
+
 Buduje się **z repozytorium na maszynie dewelopera**, nigdy w `C:\wertis\tlo-worker`
 — to katalog docelowy na serwerze firmy.
 

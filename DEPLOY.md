@@ -940,8 +940,10 @@ sprzedaży z MM na magazyn zwrotów — §6a). Wymaga: licencji Sfery, Windows z
 Kompletna instrukcja: [`sfera-worker/README.md`](sfera-worker/README.md).
 Kolejność — **wszystko najpierw na KOPII bazy**:
 
-1. Zbuduj exe (`sfera-worker\build.ps1`, maszyna z .NET 8 SDK) i skopiuj do
-   `C:\wertis\sfera-worker\`.
+1. Zbuduj exe na maszynie z .NET 8 SDK (`winget install Microsoft.DotNet.SDK.8`,
+   potem NOWE okno PowerShella). Z korzenia repozytorium wykonaj
+   `powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\build.ps1`.
+   Skopiuj wynik do `C:\wertis\sfera-worker\`.
 2. Przejdź listę `[WERYFIKUJ]` z `sfera-worker/README.md` — ProgID, logowanie
    operatora, model dodawania MM. Wszystko siedzi w jednym pliku
    `src/SferaComAdapter.cs`.
@@ -973,7 +975,8 @@ Etap jest **niezależny od etapu 2** i nie wymaga Sfery. Wymaga za to
 
 Kolejność — **wszystko najpierw na KOPII bazy**:
 
-1. Zbuduj exe na maszynie z .NET 8 SDK. Z korzenia repozytorium wykonaj
+1. Zbuduj exe na maszynie z .NET 8 SDK (`winget install Microsoft.DotNet.SDK.8`,
+   potem NOWE okno PowerShella — instalator zmienia `PATH`). Z korzenia repozytorium wykonaj
    `powershell -NoProfile -ExecutionPolicy Bypass -File tlo-worker\build.ps1`,
    a z katalogu `tlo-worker` to samo z `-File build.ps1`. Bez `Bypass` Windows
    odmawia. Nie buduj w `C:\wertis\tlo-worker`.
