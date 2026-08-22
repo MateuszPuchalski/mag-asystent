@@ -973,9 +973,12 @@ Etap jest **niezależny od etapu 2** i nie wymaga Sfery. Wymaga za to
 
 Kolejność — **wszystko najpierw na KOPII bazy**:
 
-1. Zbuduj exe (`tlo-worker\build.ps1`, maszyna z .NET 8 SDK). Skrypt pobierze
-   model i przy pierwszym uruchomieniu odmówi. Porównaj wypisaną sumę
-   kontrolną ze źródłem u wydawcy i wpisz ją do skryptu.
+1. Zbuduj exe na maszynie z .NET 8 SDK. Z korzenia repozytorium wykonaj
+   `powershell -NoProfile -ExecutionPolicy Bypass -File tlo-worker\build.ps1`,
+   a z katalogu `tlo-worker` to samo z `-File build.ps1`. Bez `Bypass` Windows
+   odmawia. Nie buduj w `C:\wertis\tlo-worker`.
+   Skrypt pobierze model i przy pierwszym uruchomieniu **odmówi**. Porównaj
+   wypisaną sumę kontrolną ze źródłem u wydawcy i wpisz ją do skryptu.
 2. Skopiuj cały katalog `publish` do `C:\wertis\tlo-worker\`. Zarejestruj
    usługę `wertis-tlo` (nssm albo §3).
 3. Dopisz do `wertis.env`: `TLO_URL=http://127.0.0.1:8791`.

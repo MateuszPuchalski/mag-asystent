@@ -21,6 +21,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # UTF-8 bez BOM Windows PowerShell 5.1 czyta jako ANSI, a to NIE kończy
+      # się na krzakach w komunikacie — kończy się błędem składni. Myślnik `—`
+      # to bajty E2 80 94; czytane jako ANSI ostatni z nich (0x94) jest prawym
+      # cudzysłowem drukarskim, który PowerShell przyjmuje jako ogranicznik
+      # napisu. Napis zamyka się w środku zdania i skrypt przestaje się parsować.
+      #
+      # Ten plik BOM ma i działa. Bramka dochodzi po tym, jak identyczny skrypt
+      # w tlo-worker/ pojechał bez BOM-u i nie dał się uruchomić u klienta
+      # (0.88.1) — nic tego nie pilnowało po tej stronie repozytorium.
+      - name: Kodowanie skryptów (UTF-8 z BOM)
+        run: |
+          bledy=0
+          for f in sfera-worker/*.ps1; do
+            if [ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" != "efbbbf" ]; then
+              echo "BRAK BOM: $f"
+              bledy=$((bledy+1))
+            fi
+          done
+          [ "$bledy" -eq 0 ] || exit 1
+          echo "Wszystkie skrypty maja UTF-8 BOM."
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
