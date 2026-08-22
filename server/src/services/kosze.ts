@@ -75,6 +75,8 @@ export interface PozycjaKosza {
   odlozonoPrzez: string | null;
   /** Dlaczego pozycja została pominięta; null poza statusem `skipped`. */
   powod: string | null;
+  /** Odłożona na PÓŹNIEJ — zjeżdża na koniec listy, ale zostaje do zrobienia. */
+  pozniejAt: string | null;
   /** Stan zadania MM cofającego bufor; null przed zakończeniem kosza. */
   mmStatus: string | null;
   mmNumer: string | null;
@@ -328,18 +330,24 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     lokFaktyczna: (w.lok_faktyczna as string) ?? null,
     odlozonoPrzez: (w.odlozono_przez as string) ?? null,
     powod: (w.powod as string) ?? null,
+    pozniejAt: (w.pozniej_at as string) ?? null,
     zalatwioneAt: (w.zalatwione_at as string) ?? null,
     zalatwionePrzez: (w.zalatwione_przez as string) ?? null,
     zalatwioneNotatka: (w.zalatwione_notatka as string) ?? null,
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
-  pozycje.sort((a, b) =>
-    porownajAlejkowo(
+  /* Kolejność alejkowa, ale pozycje odłożone NA PÓŹNIEJ lądują za resztą —
+     w kolejności odkładania, więc dwa kolejne „później" nie zamieniają się
+     miejscami. To jedyny sposób, w jaki magazynier steruje tą listą. */
+  pozycje.sort((a, b) => {
+    if (!a.pozniejAt !== !b.pozniejAt) return a.pozniejAt ? 1 : -1;
+    if (a.pozniejAt && b.pozniejAt) return a.pozniejAt.localeCompare(b.pozniejAt);
+    return porownajAlejkowo(
       { locExpected: a.lokOczekiwana, sym: a.symbol },
       { locExpected: b.lokOczekiwana, sym: b.symbol }
-    )
-  );
+    );
+  });
   return {
     mmNumer: kosz.mm_numer ?? null,
     id: kosz.id,
@@ -399,7 +407,14 @@ export function odlozPozycje(
   if (kosz.status !== "zamkniety") {
     throw new BladKosza(400, "Kosz nie jest w rozkładaniu — otwarty dokłada, rozłożony skończył");
   }
-  if (p.status === "done") throw new BladKosza(400, "Pozycja jest już odłożona");
+  /* Pozycja odłożona daje się POPRAWIĆ — to nie jest to samo co cofnięcie.
+     Zły regał zeskanowany pomyłkowo prostuje się skanem właściwego: nowy adres
+     nadpisuje stary i w koszu, i w kartotece. Odmowa zostawiałaby magazyniera
+     z towarem na złej półce i bez wyjścia, bo COFNIJ po zapisie do Subiekta
+     jest zamknięte. Dopóki kosz jest w rozkładaniu, poprawianie własnej
+     pomyłki nie wymaga niczyjej zgody — tak samo jak korekta ilości przy
+     dostawie. */
+  const poprawka = p.status === "done";
 
   const code = lokalizacja.trim().toUpperCase();
   const locErr = validateDeliveryLocation(code);
@@ -411,10 +426,11 @@ export function odlozPozycje(
 
   const t = subiekt.getProductById(twId);
   const current = parseLocs(t?.lokalizacja);
+  let locQueueId: number | null = null;
   if (current[0] !== code) {
     // towar wraca na INNĄ półkę niż zna kartoteka → nowy adres pickingowy
     const newLocs = Array.from(new Set([code, ...current.slice(1)]));
-    enqueueSetLocation(
+    locQueueId = enqueueSetLocation(
       twId,
       newLocs.join(" ").slice(0, config.locFieldLimit),
       {
@@ -434,25 +450,228 @@ export function odlozPozycje(
      ma go po prostu odłożyć, a nie szukać osobnego „cofnij". */
   db()
     .prepare(
-      `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL,
+      `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL, pozniej_at=NULL,
               zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL,
-              lok_faktyczna=?, odlozono_at=?, odlozono_przez=? WHERE id=?`
+              lok_faktyczna=?, odlozono_at=?, odlozono_przez=?, loc_queue_id=? WHERE id=?`
     )
-    .run(code, nowIso(), autor, pozycjaId);
+    .run(code, nowIso(), autor, locQueueId, pozycjaId);
 
   if (recznie) logEvent("manual_entry", autor, twId, { code, kind: "LOC", zrodlo: "kosz" });
-  logEvent("kosz_putaway", autor, twId, {
+  logEvent(poprawka ? "kosz_putaway_poprawka" : "kosz_putaway", autor, twId, {
     koszId: kosz.id,
     pozycjaId,
     qty: p.ilosc,
     location: code,
     expected: oczekiwany,
+    ...(poprawka ? { poprzedni: (p.lok_faktyczna as string) ?? null } : {}),
   });
   if (mismatch) {
     // częstotliwość per lokalizacja = ten sam raport przepełnionych gniazd
     logEvent("location_mismatch", autor, twId, { pozycjaId, expected: oczekiwany, actual: code, zrodlo: "kosz" });
   }
   return { ok: true, mismatch };
+}
+
+/* ── Cofanie pomyłek (0.79.0) ────────────────────────────────────────────────
+   Rozkładanie to praca w rękawicy, przy koszu, jedną ręką — pomyłka jest
+   normalnym elementem tej pracy, nie wyjątkiem. Do 0.79.0 kolektor nie miał
+   ani jednej drogi powrotnej: zły skan regału zamykał pozycję na zawsze,
+   a przedwczesne ZAKOŃCZ — cały kosz.
+
+   Granica jest jedna i przechodzi przez SUBIEKTA. Dopóki zapis czeka
+   w kolejce, aplikacja go anuluje i cofa wszystko bez śladu w bazie firmy.
+   Gdy zapis już poszedł, cofnięcia NIE MA: aplikacja nie ma prawa udawać, że
+   dokument albo adres w Subiekcie nie istnieje. Zostaje wtedy droga wprzód —
+   poprawienie adresu kolejnym skanem (`odlozPozycje` na pozycji odłożonej)
+   albo dokument z biura.                                                     */
+
+/**
+ * Zadanie kolejki da się jeszcze anulować — czyli nie dotknęło Subiekta.
+ *
+ * `null` znaczy „nie było zadania" i jest równie dobre jak anulowane: przy
+ * odkładaniu na własną półkę zapis adresu w ogóle nie powstaje.
+ */
+function anulujJesliCzeka(queueId: number | null | undefined, coTo: string): void {
+  if (queueId == null) return;
+  const d = db();
+  const z = d.prepare("SELECT status FROM sfera_queue WHERE id = ?").get(queueId) as
+    | { status: string }
+    | undefined;
+  if (!z || z.status === "cancelled") return;
+  if (z.status !== "pending") {
+    throw new BladKosza(
+      400,
+      `${coTo} jest już w Subiekcie (${z.status}) — tego aplikacja nie cofnie. ` +
+        "Popraw skanem właściwego regału albo dokumentem w biurze."
+    );
+  }
+  d.prepare(
+    "UPDATE sfera_queue SET status='cancelled', processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?"
+  ).run(queueId);
+}
+
+/**
+ * Cofnięcie ODŁOŻENIA pozycji — pomyłka przy skanie regału.
+ *
+ * Bez bramki roli, wzorem korekty ilości przy dostawie: to poprawianie
+ * WŁASNEJ pomyłki w trakcie pracy, nie orzeczenie o niczym. Ślad z nazwiskiem
+ * i oboma adresami zostaje w dzienniku.
+ */
+export function cofnijOdlozenie(pozycjaId: number, autor: string): SzczegolKosza {
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.status !== "done") throw new BladKosza(400, "Ta pozycja nie jest odłożona");
+  const kosz = wierszKosza(p.kosz_id as number);
+  if (kosz.status !== "zamkniety") {
+    throw new BladKosza(400, "Kosz jest już zakończony — najpierw cofnij zakończenie");
+  }
+
+  anulujJesliCzeka(p.loc_queue_id as number | null, "Zapis adresu");
+  transaction(d, () => {
+    d.prepare(
+      `UPDATE kosz_pozycja SET status='todo', lok_faktyczna=NULL,
+              odlozono_at=NULL, odlozono_przez=NULL, loc_queue_id=NULL WHERE id=?`
+    ).run(pozycjaId);
+    logEvent("kosz_putaway_cofniete", autor, p.tw_id as number, {
+      koszId: kosz.id,
+      pozycjaId,
+      symbol: p.symbol,
+      byloNa: p.lok_faktyczna,
+    });
+  })();
+  return szczegolKosza(kosz.id);
+}
+
+/** Cofnięcie POMINIĘCIA — pozycja wraca do pracy, bez śladu po powodzie. */
+export function cofnijPominiecie(pozycjaId: number, autor: string): SzczegolKosza {
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.status !== "skipped") throw new BladKosza(400, "Ta pozycja nie jest pominięta");
+  const kosz = wierszKosza(p.kosz_id as number);
+  if (kosz.status !== "zamkniety") {
+    throw new BladKosza(400, "Kosz jest już zakończony — najpierw cofnij zakończenie");
+  }
+
+  d.prepare(
+    `UPDATE kosz_pozycja SET status='todo', powod=NULL, pominieto_at=NULL,
+            zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL
+     WHERE id=?`
+  ).run(pozycjaId);
+  logEvent("kosz_pominiecie_cofniete", autor, p.tw_id as number, {
+    koszId: kosz.id,
+    pozycjaId,
+    symbol: p.symbol,
+    bylPowod: p.powod,
+  });
+  return szczegolKosza(kosz.id);
+}
+
+/**
+ * Cofnięcie ZAKOŃCZENIA kosza — kliknięte za wcześnie albo nie na tym koszu.
+ *
+ * Kosz wraca do rozkładania, a pozycje zostają tam, gdzie były: odłożone
+ * odłożonymi, pominięte pominiętymi. Cofa się STAN KOSZA, nie cudzą pracę.
+ *
+ * Kosz z dokumentu MM nie kolejkuje niczego, więc cofa się zawsze. Kosz
+ * WERTIS ma po jednym MM na pozycję i tu obowiązuje granica Subiekta:
+ * wszystkie muszą jeszcze czekać w kolejce. Jedno przetworzone MM znaczy stan
+ * już przesunięty i cofnięcie zostawiłoby aplikację w niezgodzie z bazą firmy.
+ */
+export function cofnijZakonczenie(koszId: number, autor: string): SzczegolKosza {
+  const kosz = wierszKosza(koszId);
+  if (kosz.status !== "rozlozony") throw new BladKosza(400, "Ten kosz nie jest zakończony");
+
+  const d = db();
+  const pozycje = d
+    .prepare("SELECT id, symbol, mm_queue_id FROM kosz_pozycja WHERE kosz_id = ?")
+    .all(koszId) as Array<{ id: number; symbol: string; mm_queue_id: number | null }>;
+
+  /* Najpierw SPRAWDZAMY wszystkie zadania, dopiero potem anulujemy. Inaczej
+     odmowa przy trzeciej pozycji zostawiłaby dwa MM anulowane, a kosz nadal
+     zakończony — stan gorszy niż przed kliknięciem. */
+  for (const p of pozycje) {
+    if (p.mm_queue_id == null) continue;
+    const z = d.prepare("SELECT status FROM sfera_queue WHERE id = ?").get(p.mm_queue_id) as
+      | { status: string }
+      | undefined;
+    if (z && z.status !== "pending" && z.status !== "cancelled") {
+      throw new BladKosza(
+        400,
+        `MM na ${p.symbol || p.id} jest już w Subiekcie (${z.status}) — zakończenia nie cofnie ` +
+          "aplikacja. Dokument odwrotny wystawia biuro."
+      );
+    }
+  }
+
+  transaction(d, () => {
+    for (const p of pozycje) anulujJesliCzeka(p.mm_queue_id, "MM");
+    d.prepare("UPDATE kosz_pozycja SET mm_queue_id=NULL WHERE kosz_id=?").run(koszId);
+    d.prepare(
+      "UPDATE kosz SET status='zamkniety', rozlozono_at=NULL, rozlozono_przez=NULL WHERE id=?"
+    ).run(koszId);
+    logEvent("kosz_zakonczenie_cofniete", autor, null, {
+      koszId,
+      kod: kosz.kod,
+      pozycji: pozycje.length,
+      mmAnulowanych: pozycje.filter((p) => p.mm_queue_id != null).length,
+    });
+  })();
+  return szczegolKosza(koszId);
+}
+
+/**
+ * „Wrócę do tego" — pozycja zjeżdża na koniec listy i tyle.
+ *
+ * To NIE jest pominięcie i różnica jest istotna dla biura: pominięcie znaczy
+ * „tego towaru w koszu nie ma" i trafia na listę spraw do wyjaśnienia, a to
+ * znaczy tylko „nie teraz" — regał zastawiony, towar na dnie kosza, po drodze
+ * coś pilniejszego. Kosz nadal czeka na tę pozycję i ZAKOŃCZ jej nie przepuści.
+ *
+ * Znacznik czasu zamiast flagi: druga pozycja odłożona na później staje ZA
+ * pierwszą, a ponowne kliknięcie tej samej przesuwa ją na sam koniec.
+ */
+export function przesunNaKoniec(pozycjaId: number, autor: string): SzczegolKosza {
+  const d = db();
+  const p = d.prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | Record<string, unknown>
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.status !== "todo") {
+    throw new BladKosza(400, "Na koniec listy odkłada się pozycję, która wciąż czeka");
+  }
+  const kosz = wierszKosza(p.kosz_id as number);
+  if (kosz.status !== "zamkniety") throw new BladKosza(400, "Kosz nie jest w rozkładaniu");
+
+  d.prepare("UPDATE kosz_pozycja SET pozniej_at=? WHERE id=?").run(nowIso(), pozycjaId);
+  logEvent("kosz_pozycja_na_pozniej", autor, p.tw_id as number, {
+    koszId: kosz.id,
+    pozycjaId,
+    symbol: p.symbol,
+  });
+  return szczegolKosza(kosz.id);
+}
+
+/**
+ * Jedno „cofnij" na pozycję — serwer sam wie, co cofa.
+ *
+ * Magazynier nie ma obowiązku pamiętać, czy pomylił się przy odkładaniu, czy
+ * przy pomijaniu; widzi jeden przycisk i klika. Rozróżnienie jest tu, a nie
+ * w kolektorze, bo stan pozycji zna baza.
+ */
+export function cofnijPozycje(pozycjaId: number, autor: string): SzczegolKosza {
+  const p = db().prepare("SELECT status FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
+    | { status: string }
+    | undefined;
+  if (!p) throw new BladKosza(404, `Pozycja ${pozycjaId} nie istnieje`);
+  return p.status === "skipped"
+    ? cofnijPominiecie(pozycjaId, autor)
+    : cofnijOdlozenie(pozycjaId, autor);
 }
 
 /** Powody pominięcia, które kolektor podaje z listy; „inny" niesie wpis ręczny. */

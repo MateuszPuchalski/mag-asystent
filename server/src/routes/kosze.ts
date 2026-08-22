@@ -7,6 +7,8 @@ import {
 } from "../services/przyjecia.js";
 import {
   BladKosza,
+  cofnijPozycje,
+  cofnijZakonczenie,
   koszPoKodzie,
   koszeDlaKolektora,
   listaKoszy,
@@ -14,6 +16,7 @@ import {
   odlozPozycje,
   pominietePozycje,
   pominPozycjeKosza,
+  przesunNaKoniec,
   przypnijZwrot,
   skanTowaruKosza,
   szczegolKosza,
@@ -167,6 +170,24 @@ export async function koszeRoutes(app: FastifyInstance) {
     "/api/kosze/pozycje/:id/pomin",
     async (req, reply) =>
       zBledem(reply, () => pominPozycjeKosza(Number(req.params.id), req.body?.powod ?? "", autor()))
+  );
+
+  /* Cofanie pomyłek. Bez bramki roli — tak samo jak korekta ilości przy
+     dostawie: to poprawianie WŁASNEJ pracy w jej trakcie, a nie orzeczenie.
+     Jedna trasa na pozycję, bo magazynier nie ma obowiązku pamiętać, czy
+     pomylił się przy odkładaniu, czy przy pomijaniu — serwer to widzi. */
+  /* „Wrócę do tego" — regał zastawiony albo towar na dnie kosza. Pozycja
+     zjeżdża na koniec listy i nadal czeka; to NIE jest pominięcie. */
+  app.post<{ Params: { id: string } }>("/api/kosze/pozycje/:id/pozniej", async (req, reply) =>
+    zBledem(reply, () => ({ kosz: przesunNaKoniec(Number(req.params.id), autor()) }))
+  );
+
+  app.post<{ Params: { id: string } }>("/api/kosze/pozycje/:id/cofnij", async (req, reply) =>
+    zBledem(reply, () => ({ kosz: cofnijPozycje(Number(req.params.id), autor()) }))
+  );
+
+  app.post<{ Params: { id: string } }>("/api/kosze/:id/cofnij-zakonczenie", async (req, reply) =>
+    zBledem(reply, () => ({ kosz: cofnijZakonczenie(Number(req.params.id), autor()) }))
   );
 
   app.post<{ Params: { id: string } }>("/api/kosze/:id/zakoncz", async (req, reply) =>

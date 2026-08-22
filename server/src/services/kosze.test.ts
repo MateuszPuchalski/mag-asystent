@@ -144,7 +144,19 @@ test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", a
     .all() as Array<{ id: number; tw_id: number }>;
   assert.deepEqual(setLoc.map((s) => s.tw_id), [900_037]);
 
-  assert.throws(() => K.odlozPozycje(zAdresem.id, "A01-02-03", "Magazynier"), /już odłożona/);
+  /* Do 0.79.0 stała tu odmowa „pozycja jest już odłożona". Zniknęła razem
+     z dopuszczeniem POPRAWKI: zły regał zeskanowany pomyłkowo prostuje się
+     skanem właściwego, bo COFNIJ po zapisie do Subiekta jest zamknięte,
+     a magazynier nie może zostać z towarem na złej półce i bez wyjścia. */
+  K.odlozPozycje(zAdresem.id, "D04-04-04", "Magazynier");
+  const poprawiona = K.szczegolKosza(kosz.id).pozycje.find((x) => x.id === zAdresem.id);
+  assert.equal(poprawiona?.lokFaktyczna, "D04-04-04", "nowy adres nadpisuje stary");
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='set_location'").get() as { n: number }).n,
+    2,
+    "poprawka to DRUGI zapis adresu — kartoteka musi się dowiedzieć o zmianie"
+  );
+
   assert.throws(() => K.zakonczKosz(0, "Magazynier"), /nie istnieje/);
 
   const rozlozony = K.zakonczKosz(kosz.id, "Magazynier");
@@ -246,4 +258,110 @@ test("odłożenie cofa pominięcie — znaleziony towar nie wymaga odklikiwania"
   assert.equal(po?.powod, null, "powód znika razem z pominięciem");
   // odłożonej nie da się pominąć — pomijanie dotyczy towaru, którego nie ma
   assert.throws(() => K.pominPozycjeKosza(kosz.pozycje[0].id, "uszkodzony", "X"), /odłożona/);
+});
+
+/* ── Cofanie pomyłek i „wrócę do tego" (0.79.0) ──────────────────────────────
+   Granica przechodzi przez SUBIEKTA: dopóki zapis czeka w kolejce, aplikacja
+   cofa wszystko bez śladu; po zapisie nie cofa nic i mówi to wprost.        */
+
+test("cofnięcie odłożenia anuluje zapis adresu, dopóki ten czeka w kolejce", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const p = kosz.pozycje.find((x) => x.twId === 900_037)!; // bez adresu w kartotece
+
+  K.odlozPozycje(p.id, "B02-01-01", "Magazynier");
+  K.cofnijOdlozenie(p.id, "Magazynier");
+
+  const po = K.szczegolKosza(kosz.id).pozycje.find((x) => x.id === p.id);
+  assert.equal(po?.status, "todo", "pozycja wraca do pracy");
+  assert.equal(po?.lokFaktyczna, null, "adres znika razem z odłożeniem");
+  const q = db()
+    .prepare("SELECT status FROM sfera_queue WHERE type='set_location'")
+    .all() as Array<{ status: string }>;
+  assert.deepEqual(q.map((x) => x.status), ["cancelled"], "zapis do Subiekta anulowany");
+});
+
+test("po zapisie adresu do Subiekta cofnięcie odmawia i mówi, co zrobić", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const p = kosz.pozycje.find((x) => x.twId === 900_037)!;
+
+  K.odlozPozycje(p.id, "B02-01-01", "Magazynier");
+  // worker zabrał zadanie i zapisał je w bazie firmy
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+
+  assert.throws(() => K.cofnijOdlozenie(p.id, "Magazynier"), /już w Subiekcie/);
+  // droga wyjścia zostaje: poprawka adresu kolejnym skanem
+  K.odlozPozycje(p.id, "C03-03-03", "Magazynier");
+  assert.equal(
+    K.szczegolKosza(kosz.id).pozycje.find((x) => x.id === p.id)?.lokFaktyczna,
+    "C03-03-03"
+  );
+});
+
+test("cofnięcie zakończenia: anuluje MM w kolejce, odmawia po zapisie", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "C01-01-01", "Magazynier");
+  K.zakonczKosz(kosz.id, "Magazynier");
+
+  /* Sprawdzenie WSZYSTKICH zadań przed anulowaniem czegokolwiek: jedno MM
+     przetworzone ma zablokować całość, a nie zostawić połowy anulowanej. */
+  const mm = db().prepare("SELECT id FROM sfera_queue WHERE type='mm'").all() as Array<{ id: number }>;
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(mm[0].id);
+  assert.throws(() => K.cofnijZakonczenie(kosz.id, "Magazynier"), /już w Subiekcie/);
+  assert.equal(K.szczegolKosza(kosz.id).status, "rozlozony", "kosz nie ruszył się z miejsca");
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='cancelled'").get() as { n: number }).n,
+    0,
+    "żadne MM nie zostało anulowane przy odmowie"
+  );
+
+  db().prepare("UPDATE sfera_queue SET status='pending' WHERE id=?").run(mm[0].id);
+  const cofniety = K.cofnijZakonczenie(kosz.id, "Magazynier");
+  assert.equal(cofniety.status, "zamkniety", "kosz wraca do rozkładania");
+  assert.equal(cofniety.pozycje.every((p) => p.status === "done"), true, "praca zostaje");
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='cancelled'").get() as { n: number }).n,
+    mm.length,
+    "wszystkie MM anulowane"
+  );
+});
+
+test("odłożenie na PÓŹNIEJ zsuwa pozycję na koniec listy, bez pomijania jej", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const pierwsza = kosz.pozycje[0];
+
+  const po = K.przesunNaKoniec(pierwsza.id, "Magazynier");
+  assert.equal(po.pozycje[po.pozycje.length - 1].id, pierwsza.id, "zjeżdża na sam koniec");
+  const zsunieta = po.pozycje.find((x) => x.id === pierwsza.id);
+  assert.equal(zsunieta?.status, "todo", "to nie jest pominięcie — kosz nadal jej czeka");
+  assert.ok(zsunieta?.pozniejAt, "znacznik czasu trzyma kolejność między odłożonymi");
+
+  // ZAKOŃCZ nadal jej nie przepuszcza
+  assert.throws(() => K.zakonczKosz(kosz.id, "Magazynier"), /Nieodłożone pozycje/);
+  // odłożenie kasuje znacznik i przywraca porządek alejkowy
+  K.odlozPozycje(pierwsza.id, "A01-02-03", "Magazynier");
+  assert.equal(
+    K.szczegolKosza(kosz.id).pozycje.find((x) => x.id === pierwsza.id)?.pozniejAt,
+    null
+  );
+});
+
+test("cofnięcie pominięcia przywraca pozycję do pracy", async () => {
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const p = kosz.pozycje[0];
+
+  K.pominPozycjeKosza(p.id, "nie ma w koszu", "Magazynier");
+  const po = K.cofnijPozycje(p.id, "Magazynier"); // jedno „cofnij" — serwer wie, co cofa
+  const wrocila = po.pozycje.find((x) => x.id === p.id);
+  assert.equal(wrocila?.status, "todo");
+  assert.equal(wrocila?.powod, null, "powód znika razem z pominięciem");
 });

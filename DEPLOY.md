@@ -1066,6 +1066,13 @@ osobna karta POMINIĘTE POZYCJE, sortowana od najdłużej czekających. Przycisk
 ZAŁATWIONE zdejmuje sprawę z tej listy i zapisuje notatkę; sama pozycja
 zostaje w koszu pominięta, bo tak było naprawdę.
 
+Od 0.79.0 każdą pomyłkę da się cofnąć: COFNIJ ODŁOŻENIE, COFNIJ POMINIĘCIE
+i COFNIJ ZAKOŃCZENIE. Granica jest jedna — dopóki zapis czeka w kolejce,
+aplikacja go anuluje; po wejściu do Subiekta odmawia i mówi, co zrobić zamiast
+tego. Zły regał prostuje się wtedy skanem właściwego, bo pozycja odłożona daje
+się poprawić. Przycisk PÓŹNIEJ zsuwa pozycję na koniec listy, nie robiąc z niej
+pominięcia.
+
 Pozycję, której w koszu fizycznie nie ma, magazynier **pomija z powodem**
 („nie ma w koszu", „uszkodzony", „obcy towar" albo własny). Pominięcie nie
 blokuje zakończenia, a dla biura jest sygnałem, że kosz wrócił niekompletny —
