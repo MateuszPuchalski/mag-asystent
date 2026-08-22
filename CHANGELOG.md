@@ -33,6 +33,50 @@ historii nie przepisujemy.
 
 ---
 
+## 0.87.0 — 22 sierpnia 2026
+
+**Logo dostawcy wchodzi do panelu biura i przestaje być znaczkiem na
+kolektorze.** Dwie zmiany z jednego zgłoszenia: „dodajcie loga do wglądu
+biura" i „na liście dostaw logo jest za małe, jakby miało za duży margines".
+Druga okazała się usterką, nie sprawą gustu.
+
+**Skąd brał się margines.** Panel zapisywał każde logo wyśrodkowane
+w KWADRACIE 128×128, a logotyp jest zwykle szerokim paskiem z nazwą firmy —
+więc dwie trzecie zapisanego obrazu to przezroczyste powietrze. Kolektor skaluje
+obraz w całości, razem z tym powietrzem, i dlatego poszerzenie slotu w 0.64.0
+nie dało nic widocznego: rósł margines, nie logo.
+
+Teraz panel **przycina obraz do samego znaku** przed wysyłką i zapisuje go
+z dłuższym bokiem 256 px zamiast 128 px, bo kolektor rysuje go dziś większy.
+Loga wgrane wcześniej leżą w bazie takie, jakie były — serwer nie ma czym ich
+przerobić i nie będzie miał — więc **kolektor przycina je sam przy
+dekodowaniu**, raz na logo. Biuro nie musi wgrywać niczego od nowa, choć przy
+najstarszych plikach warto: przycięcie z oryginału jest ostrzejsze niż
+z miniatury.
+
+Tniemy WYŁĄCZNIE przezroczystość. Logo na białym prostokącie (zwykły JPG)
+zostaje, jak jest: „prawie biały" piksel bywa częścią znaku, a obcięcie go
+byłoby zniekształceniem cudzego logotypu. Sama arytmetyka ramki mieszka
+w module `:core` i ma dziewięć testów — pomyłka o jeden piksel przy krawędzi
+obcina literę, a moduł `:app` testów nie ma.
+
+Slot w wierszu listy dostaw rośnie przy okazji z 64 dp do 84 dp. Dwadzieścia
+punktów zabiera nazwie dostawcy w środkowej kolumnie i to jest świadoma
+wymiana: logo odpowiada na pytanie „kto to przywiózł" szybciej niż napis,
+a napis zostaje pod nim.
+
+Limit wagi pliku rośnie przy okazji z 64 kB do 128 kB — obraz o dłuższym boku
+256 px waży więcej. Panel sam zmniejsza logo, dopóki się w tym limicie nie
+zmieści, więc zdjęcie szyldu wgrane zamiast logotypu też przejdzie: odmowa
+„wgraj jeszcze raz przez panel" byłaby przy nim ślepym zaułkiem, bo panel
+właśnie to zrobił.
+
+**W panelu biura logo stoi teraz w trzech miejscach:** przy dostawcy w tabeli
+dostaw, w nagłówku otwartego dokumentu i — jak dotąd — na liście za zębatką,
+gdzie się je wgrywa. Obraz pobiera się RAZ na kontrahenta i jest wspólny dla
+wszystkich trzech widoków; panel pyta o niego wyłącznie wtedy, gdy serwer
+powiedział, że logo istnieje.
+
 ## 0.86.0 — 22 sierpnia 2026
 
 **Konfiguracja zeszła z zakładek pracy za ikonę ustawień.**

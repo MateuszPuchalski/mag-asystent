@@ -9,6 +9,7 @@ import {
   pozycjeSnapshotu,
   TERMINAL_LINE,
 } from "./delivery.js";
+import { ktorzyMajaLogo } from "./logo-dostawcy.js";
 import { listByDelivery } from "./problems.js";
 import type { ProblemView } from "../types.js";
 
@@ -60,6 +61,10 @@ export interface PodgladDokumentu {
   nrPelny: string;
   typ: string;
   dostawca: string;
+  /** Płatnik z dokumentu — po nim panel sięga po logo. `null` = dokument bez kontrahenta. */
+  khId: number | null;
+  /** Czy dla tego płatnika wgrano logo. Panel pyta o obraz WYŁĄCZNIE wtedy. */
+  maLogo: boolean;
   dataWyst: string;
   wBuforze: boolean;
   wPrzyjeciach: boolean;
@@ -138,6 +143,11 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
     nrPelny: doc.nr_pelny,
     typ: doc.typ,
     dostawca: doc.dostawca ?? "",
+    khId: doc.kh_id ?? null,
+    /* Ta sama para pól co na liście dostaw (`listDocuments`), z tego samego
+       powodu: panel ma wiedzieć, czy w ogóle pytać o obraz. Żądanie „na wszelki
+       wypadek" kończy się serią 404 w dzienniku — lekcja z 0.56.0. */
+    maLogo: doc.kh_id != null && ktorzyMajaLogo([doc.kh_id]).size > 0,
     dataWyst: doc.data_wyst,
     wBuforze: !!doc.w_buforze,
     wPrzyjeciach: doc.mag_id !== config.magId.MAG,

@@ -19,9 +19,14 @@ import { logEvent } from "./events.js";
    odrzucany, zamiast wylądować w bazie jako obraz, którego kolektor nie
    narysuje.                                                                  */
 
-/** Bok 128 px po konwersji waży kilka kB; 64 kB to już sygnał, że coś poszło
- *  inną drogą niż `<canvas>` w panelu. */
-const MAX_BAJTOW = 64 * 1024;
+/** Logo po konwersji waży kilka kB; 128 kB to już sygnał, że coś poszło inną
+ *  drogą niż `<canvas>` w panelu.
+ *
+ *  Limit podniesiony z 64 kB w 0.87.0 razem z dłuższym bokiem obrazu (128 →
+ *  256 px). Panel zmniejsza obraz sam, dopóki się nie zmieści, więc ta liczba
+ *  nie jest już granicą, o którą człowiek może się potknąć — jest granicą dla
+ *  wpisu, który przyszedł z pominięciem panelu. */
+const MAX_BAJTOW = 128 * 1024;
 
 const nowIso = () => new Date().toISOString();
 

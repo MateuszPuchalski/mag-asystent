@@ -248,3 +248,27 @@ test("podgląd otwartej dostawy nie kasuje niczego ze snapshotu", () => {
   P.podgladDokumentu(DOK);
   assert.equal(ile("delivery_line"), przed);
 });
+
+test("podgląd niesie płatnika i flagę logo — panel wie, czy pytać o obraz", () => {
+  /* Panel biura rysuje logo dostawcy przy dokumencie tak samo jak kolektor
+     w swojej liście. Bez tej pary pól musiałby strzelać po obraz „na wszelki
+     wypadek" i zbierać serię 404 — dokładnie ten błąd dał w 0.56.0 355 wpisów
+     w dzienniku produkcyjnym na tysiąc. */
+  const d = db();
+  d.prepare("DELETE FROM dostawca_logo").run();
+  d.prepare("UPDATE sgt_dokument SET kh_id = 4100 WHERE dok_id = ?").run(DOK);
+  assert.equal(P.podgladDokumentu(DOK)?.khId, 4100);
+  assert.equal(P.podgladDokumentu(DOK)?.maLogo, false, "nie ma logo, nie ma o co pytać");
+
+  d.prepare(
+    `INSERT INTO dostawca_logo(kh_id, nazwa, obraz, bajtow, etag, dodane_at, dodane_by)
+     VALUES (4100, 'Dostawca sp. z o.o.', X'89504E470D0A1A0A', 8, 'etag', '2026-08-22T10:00:00.000Z', 'Test')`
+  ).run();
+  assert.equal(P.podgladDokumentu(DOK)?.maLogo, true);
+
+  // dokument bez płatnika nie ma do czego przypiąć logo
+  d.prepare("UPDATE sgt_dokument SET kh_id = NULL WHERE dok_id = ?").run(DOK);
+  assert.equal(P.podgladDokumentu(DOK)?.khId, null);
+  assert.equal(P.podgladDokumentu(DOK)?.maLogo, false);
+  d.prepare("DELETE FROM dostawca_logo").run();
+});

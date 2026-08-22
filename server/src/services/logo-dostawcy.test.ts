@@ -83,7 +83,8 @@ test("puste logo to odmowa, nie pusty wpis", () => {
 
 test("za duże logo odmawia z powodem, zamiast ciąć w ciszy", () => {
   // Nagłówek PNG, reszta wypełniona — chodzi o rozmiar, nie o treść.
-  const wielkie = Buffer.concat([Buffer.from(PNG, "base64"), Buffer.alloc(70 * 1024)]);
+  // 140 kB przy limicie 128 kB (od 0.87.0; wcześniej 64 kB).
+  const wielkie = Buffer.concat([Buffer.from(PNG, "base64"), Buffer.alloc(140 * 1024)]);
   const r = L.zapiszLogo(7006, "X", wielkie.toString("base64"), "Ewa z biura");
   assert.equal(r.ok, false);
   assert.match(r.ok === false ? r.error : "", /kB/, "odmowa ma podać rozmiar i limit");
