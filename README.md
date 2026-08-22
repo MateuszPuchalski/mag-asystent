@@ -16,7 +16,7 @@ każdy do swojej roli:
   wykresy operacji, rytm dostaw, szukane bez wyniku, zdrowie urządzeń
   i wydajność per osoba (z podstawą prawną monitoringu). Od 0.50.0 także
   import zbiórek z Sellasist i kandydaci do strefy złotej z edytorem reguł
-  strefy. Dostawca z własnym drukiem
+  strefy, a od 0.87.0 przy dostawcy stoi jego logo. Dostawca z własnym drukiem
   reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
   bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
   na kolektorze.
@@ -545,7 +545,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 227 testów jednostkowych; buduje się bez Android SDK
+                           + 236 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

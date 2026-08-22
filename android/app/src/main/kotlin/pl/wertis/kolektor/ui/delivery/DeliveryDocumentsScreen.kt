@@ -74,8 +74,15 @@ import pl.wertis.kolektor.ui.theme.cardSurface
  * Szerszy niż wysoki, bo logotypy są szerokie — patrz komentarz przy
  * `kafelekStanu`. Jedna stała, bo używają jej OBA warianty slotu i rozjazd
  * między nimi przesuwałby wiersz w bok przy doczytaniu logo.
+ *
+ * 84 dp od 0.87.0. Poszerzenie z 0.64.0 nie dało wtedy nic widocznego, bo
+ * obraz był kwadratem z przezroczystym powietrzem i to ono rosło zamiast
+ * logo; dopiero przycinanie (`core/delivery/LogoRamka.kt`) sprawia, że każdy
+ * dołożony punkt szerokości jest punktem logotypu. Dwadzieścia punktów zabiera
+ * je nazwie dostawcy w środkowej kolumnie i to jest świadoma wymiana: logo
+ * odpowiada na to samo pytanie szybciej niż napis, a napis zostaje pod nim.
  */
-private val SLOT_LOGO = 64.dp
+private val SLOT_LOGO = 84.dp
 
 @Composable
 fun DeliveryDocumentsScreen(graph: AppGraph) {

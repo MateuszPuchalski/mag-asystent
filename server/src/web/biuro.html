@@ -1185,13 +1185,20 @@
         <p class="mute" style="margin-bottom:10px">
           Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
           dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
-          zanim przeczyta się numer dokumentu.
+          zanim przeczyta się numer dokumentu. To samo logo stoi przy dostawcy
+          w tabeli dostaw tego panelu i w nagłówku otwartego dokumentu.
         </p>
         <p class="mute" style="margin-bottom:10px">
           Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
-          Przeglądarka zmniejszy go i przerobi na jeden format, zanim cokolwiek
-          pojedzie na serwer. Lista poniżej pokazuje dostawców z dokumentów
-          dostaw, także tych bez logo.
+          Przeglądarka zmniejszy go, obetnie przezroczysty margines i przerobi
+          na jeden format, zanim cokolwiek pojedzie na serwer. Lista poniżej
+          pokazuje dostawców z dokumentów dostaw, także tych bez logo.
+        </p>
+        <p class="mute" style="margin-bottom:10px">
+          <b>Logo wgrane przed 0.87.0 warto wgrać jeszcze raz.</b> Zapisywaliśmy
+          je wtedy w kwadracie, więc szeroki logotyp miał nad sobą i pod sobą
+          przezroczyste powietrze — i to ono, a nie logo, rosło na ekranie
+          kolektora.
         </p>
       </div>
       <input type="file" id="plikLogo" accept="image/*,.svg" hidden>
@@ -1315,7 +1322,7 @@ function wyloguj() {
   // jest jedyne miejsce, w którym wolno je zwolnić
   for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);
   zdjecia.clear();
-  zwolnijLogoUrl();
+  zwolnijLoga();
   kolejkaFoto.length = 0;
   sesjaPodgladu++;
   zamknijDokument();
@@ -1451,7 +1458,7 @@ function rysujDostawy() {
       const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
       return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""}>
         <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
-        <td>${esc(d.dostawca)}</td>
+        <td>${slotLogo(d.khId, d.maLogo, 24, 60, true)}${esc(d.dostawca)}</td>
         <td class="mute">${esc(d.dataWyst)}</td>
         <td>${statusDostawy(d)}${
           /* Licznik wyjątków STOI OBOK statusu, a pasek postępu zostaje bez
@@ -1470,6 +1477,11 @@ function rysujDostawy() {
   $("dostawy").innerHTML =
     "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>DATA</th><th>STATUS</th><th>POSTĘP</th><th></th></tr>" +
     (rows || '<tr><td colspan="6" class="mute">Brak dostaw w oknie importu</td></tr>');
+  /* Logo dokłada się PO wstawieniu wierszy i osobnym żądaniem na kontrahenta.
+     Biuro czyta tę tabelę tak samo jak magazynier swoją listę — firmę poznaje
+     wzrokiem, zanim przeczyta numer — a jedno logo starcza na wszystkie
+     dokumenty tego dostawcy, bo blob-URL jest wspólny. */
+  dolozLoga();
 }
 
 /* ── Pozycje jednego dokumentu ────────────────────────────────────────────────
@@ -1561,7 +1573,7 @@ function rysujSzczegol(d) {
       ${d.wBuforze ? '<span class="badge amber">bufor</span>' : ""}
       ${d.wPrzyjeciach ? '<span class="badge amber">w przyjęciach</span>' : ""}
       ${statusDostawy(d)}</div>
-    <div class="mute">${esc(d.dostawca)} · ${esc(d.dataWyst)}</div>
+    <div class="mute">${slotLogo(d.khId, d.maLogo, 28, 72)}${esc(d.dostawca)} · ${esc(d.dataWyst)}</div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
       <span class="mute">${d.progress.done}/${d.progress.total} poz.${
@@ -1586,6 +1598,7 @@ function rysujSzczegol(d) {
     : "";
 
   dolozZdjecia(d);
+  dolozLoga();
 }
 
 function wierszPozycji(l) {
@@ -2018,21 +2031,109 @@ async function wyslijZbiorki(plik) {
    ich przerabiać (dwie zależności, zero modułów natywnych) i nie będzie miał;
    kolektor rysuje przez `BitmapFactory`, który nie zna SVG. Ale konwerter już
    tu jest: przeglądarka rysuje wszystkie te formaty natywnie, więc `<canvas>`
-   zamienia dowolny z nich na JEDEN PNG o jednym boku. Serwer i kolektor nigdy
-   nie dowiadują się, że SVG istnieje.                                        */
+   zamienia dowolny z nich na JEDEN PNG przycięty do samego znaku. Serwer
+   i kolektor nigdy nie dowiadują się, że SVG istnieje.                       */
 
-const LOGO_BOK = 128;
+/**
+ * Dłuższy bok zapisywanego logo w pikselach.
+ *
+ * 256 zamiast 128 od 0.87.0: kolektor rysuje logo szerzej, niż rysował w 0.56.0,
+ * a obraz 128 px rozciągnięty na 80 dp ekranu o gęstości ×3 jest już rozmyty.
+ * Waga rośnie o kilka kB przy limicie 64 kB, więc płaci za to tylko baza.
+ */
+const LOGO_BOK = 256;
+/** Roboczy bok przed przycięciem — tyle wystarczy, żeby znaleźć granice logo. */
+const LOGO_BOK_ROBOCZY = 512;
+/** Poniżej tej przezroczystości piksel uznajemy za pusty (0–255). */
+const LOGO_PROG_ALFA = 8;
+/* Ile znaków może mieć `data:`-URL, żeby po dekodowaniu zmieścić się w limicie
+   serwera (128 kB, `MAX_BAJTOW` w services/logo-dostawcy.ts). Base64 puchnie
+   o jedną trzecią, a margines bierze się z nagłówka `data:image/png;base64,`. */
+const LOGO_MAX_ZNAKOW = Math.floor(120 * 1024 * 4 / 3);
 let dostawcyLista = [];
-/* Blob-URL-e podglądów. Zwalniamy je przy każdym przerysowaniu — inaczej
-   dwadzieścia wejść na zakładkę zostawia dwadzieścia kompletów w pamięci. */
-let logoUrl = new Map();
+/* Blob-URL-e logo: JEDEN na kontrahenta, na całe życie karty.
+   Do 0.87.0 zwalnialiśmy je przy każdym przerysowaniu listy dostawców — wtedy
+   logo oglądała wyłącznie ta jedna tabela. Dziś to samo logo rysuje się także
+   w liście dostaw i w panelu szczegółu, więc zwolnienie URL-a pod jednym
+   widokiem gasiło obraz w dwóch pozostałych. Kilkanaście plików po parę kB
+   zostaje w pamięci do przeładowania strony — taniej niż pobierać je po trzy
+   razy przy każdym kliknięciu w dokument. */
+const logoUrl = new Map();
+const logoWToku = new Map();
 
-function zwolnijLogoUrl() {
-  for (const u of logoUrl.values()) URL.revokeObjectURL(u);
-  logoUrl = new Map();
+/** Blob-URL logo albo `null`, gdy dostawca go nie ma. Pobiera RAZ na kontrahenta. */
+function logoDostawcy(khId) {
+  if (logoUrl.has(khId)) return Promise.resolve(logoUrl.get(khId));
+  if (logoWToku.has(khId)) return logoWToku.get(khId);
+  const robota = api(`/api/dostawcy/${khId}/logo`)
+    .then(async (odp) => {
+      const url = URL.createObjectURL(await odp.blob());
+      logoUrl.set(khId, url);
+      return url;
+    })
+    // `api()` rzuca na każdym !ok, w tym na 404 — brak logo to nie awaria
+    .catch(() => {
+      logoUrl.set(khId, null);
+      return null;
+    })
+    .finally(() => logoWToku.delete(khId));
+  logoWToku.set(khId, robota);
+  return robota;
 }
 
-/** Dowolny obraz → PNG `LOGO_BOK`×`LOGO_BOK`, proporcje i przezroczystość bez zmian. */
+/**
+ * Puste miejsce na logo w dowolnym widoku — wypełnia je `dolozLoga`.
+ *
+ * Miejsce ma WYMIARY od razu, jeszcze przed obrazem: inaczej wiersz podskakuje
+ * w chwili doczytania logo, a tabela dostaw przerysowuje się co dziesięć sekund.
+ *
+ * `rezerwuj` trzyma tę samą szerokość TAKŻE dla dostawcy bez logo. W tabeli
+ * jest to konieczne — inaczej nazwy zaczynałyby się w dwóch różnych miejscach
+ * i kolumna przestałaby się czytać jednym spojrzeniem w dół. W nagłówku
+ * pojedynczego dokumentu nie ma czego wyrównywać, więc puste miejsce byłoby
+ * tam samą dziurą.
+ */
+function slotLogo(khId, maLogo, wys, szer, rezerwuj = false) {
+  if (!maLogo || !khId) {
+    return rezerwuj
+      ? `<span style="display:inline-block;width:${szer}px;margin-right:6px"></span>`
+      : "";
+  }
+  return `<span data-logo-slot="${khId}" style="display:inline-block;vertical-align:middle;` +
+    `width:${szer}px;height:${wys}px;margin-right:6px"></span>`;
+}
+
+/** Wstawia obrazy do slotów, które jeszcze ich nie mają. */
+async function dolozLoga() {
+  const sloty = [...document.querySelectorAll("[data-logo-slot]")].filter((s) => !s.dataset.gotowe);
+  for (const s of sloty) {
+    const khId = Number(s.dataset.logoSlot);
+    s.dataset.gotowe = "1";
+    const url = await logoDostawcy(khId);
+    if (!url) continue;
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    img.style.cssText = "width:100%;height:100%;object-fit:contain;object-position:left center";
+    s.replaceChildren(img);
+  }
+}
+
+/**
+ * Dowolny obraz → PNG PRZYCIĘTY DO SAMEGO LOGA, dłuższy bok `LOGO_BOK`.
+ *
+ * Przycięcie jest tu najważniejsze i powstało ze zgłoszenia „logo za małe na
+ * liście dostaw". Do 0.87.0 rysowaliśmy każde logo wyśrodkowane w KWADRACIE
+ * 128×128 — a logotypy są szerokimi paskami z nazwą firmy, więc taki kwadrat
+ * to w dwóch trzecich przezroczyste powietrze. Kolektor dostawał obraz, którego
+ * nie miał jak powiększyć: szerszy slot skalował się do wysokości kwadratu,
+ * czyli razem z tym powietrzem. Poszerzanie slotu nic nie dawało i stąd brało
+ * się wrażenie „za duży margines".
+ *
+ * Teraz płótno ma dokładnie wymiary widocznej treści. Przezroczystość zostaje
+ * przezroczystością — tła nie wypełniamy, bo biały prostokąt wyglądałby na
+ * kolektorze jak naklejka.
+ */
 function naPng(plik) {
   return new Promise((resolve, reject) => {
     const czyt = new FileReader();
@@ -2042,22 +2143,33 @@ function naPng(plik) {
       img.onerror = () => reject(new Error("To nie jest obraz, który przeglądarka umie otworzyć"));
       img.onload = () => {
         /* SVG bez atrybutów width/height zgłasza wymiar 0 i narysowałby się
-           jako nic. Wtedy przyjmujemy kwadrat docelowy — lepiej logo lekko
+           jako nic. Wtedy przyjmujemy bok roboczy — lepiej logo lekko
            rozciągnięte niż pusty obrazek bez śladu, dlaczego jest pusty. */
-        const w = img.naturalWidth || LOGO_BOK;
-        const h = img.naturalHeight || LOGO_BOK;
-        const skala = Math.min(LOGO_BOK / w, LOGO_BOK / h);
-        const dw = Math.max(1, Math.round(w * skala));
-        const dh = Math.max(1, Math.round(h * skala));
+        const w = img.naturalWidth || LOGO_BOK_ROBOCZY;
+        const h = img.naturalHeight || LOGO_BOK_ROBOCZY;
+        /* Najpierw kopia robocza, dopiero z niej czytamy piksele: plik
+           z aparatu potrafi mieć 4000 px boku, a `getImageData` na takim
+           obrazie to 64 MB przepisane po nic. */
+        const skalaR = Math.min(1, LOGO_BOK_ROBOCZY / Math.max(w, h));
+        const rw = Math.max(1, Math.round(w * skalaR));
+        const rh = Math.max(1, Math.round(h * skalaR));
+        const robocze = document.createElement("canvas");
+        robocze.width = rw;
+        robocze.height = rh;
+        robocze.getContext("2d").drawImage(img, 0, 0, rw, rh);
 
-        const c = document.createElement("canvas");
-        c.width = LOGO_BOK;
-        c.height = LOGO_BOK;
-        const ctx = c.getContext("2d");
-        // BEZ wypełniania tła: logo bywa przezroczyste, a biały kwadrat pod
-        // nim wyglądałby na kolektorze jak naklejka na ciemnym wierszu
-        ctx.drawImage(img, (LOGO_BOK - dw) / 2, (LOGO_BOK - dh) / 2, dw, dh);
-        resolve(c.toDataURL("image/png"));
+        const ramka = ramkaWidoczna(robocze) || { x: 0, y: 0, w: rw, h: rh };
+        /* Logotyp to zwykle płaska grafika i w PNG waży kilka kB. Ale bywa
+           wgrywane zdjęcie szyldu — takie 256 px potrafi przekroczyć limit
+           serwera, a odmowa „wgraj przez panel" byłaby wtedy ślepym zaułkiem:
+           panel WŁAŚNIE to zrobił. Więc zmniejszamy, aż się zmieści. */
+        let bok = LOGO_BOK;
+        let png = przeskaluj(robocze, ramka, bok);
+        while (png.length > LOGO_MAX_ZNAKOW && bok > 64) {
+          bok = Math.round(bok / 2);
+          png = przeskaluj(robocze, ramka, bok);
+        }
+        resolve(png);
       };
       img.src = czyt.result;
     };
@@ -2065,10 +2177,51 @@ function naPng(plik) {
   });
 }
 
+/** Wycinek `ramka` z płótna roboczego, przeskalowany do `bok` na dłuższym boku. */
+function przeskaluj(robocze, ramka, bok) {
+  const skala = Math.min(1, bok / Math.max(ramka.w, ramka.h));
+  const dw = Math.max(1, Math.round(ramka.w * skala));
+  const dh = Math.max(1, Math.round(ramka.h * skala));
+  const c = document.createElement("canvas");
+  c.width = dw;
+  c.height = dh;
+  // BEZ wypełniania tła: logo bywa przezroczyste, a biały prostokąt pod nim
+  // wyglądałby na kolektorze jak naklejka na jasnym wierszu
+  c.getContext("2d").drawImage(robocze, ramka.x, ramka.y, ramka.w, ramka.h, 0, 0, dw, dh);
+  return c.toDataURL("image/png");
+}
+
+/**
+ * Prostokąt zajęty przez widoczne piksele; `null`, gdy obraz jest cały pusty.
+ *
+ * Obraz bez ANI JEDNEGO widocznego piksela zwraca `null`, a wtedy zapisujemy
+ * go w całości — pusty plik jest wtedy tym, co człowiek wybrał, i lepiej, żeby
+ * to zobaczył, niż żeby aplikacja po cichu zapisała jeden przezroczysty piksel.
+ */
+function ramkaWidoczna(plotno) {
+  let dane;
+  try {
+    dane = plotno.getContext("2d").getImageData(0, 0, plotno.width, plotno.height).data;
+  } catch {
+    return null;                       // obraz z innego źródła — czytać nie wolno
+  }
+  let x1 = plotno.width, y1 = plotno.height, x2 = -1, y2 = -1;
+  for (let y = 0; y < plotno.height; y++) {
+    for (let x = 0; x < plotno.width; x++) {
+      if (dane[(y * plotno.width + x) * 4 + 3] <= LOGO_PROG_ALFA) continue;
+      if (x < x1) x1 = x;
+      if (x > x2) x2 = x;
+      if (y < y1) y1 = y;
+      if (y > y2) y2 = y;
+    }
+  }
+  if (x2 < 0) return null;
+  return { x: x1, y: y1, w: x2 - x1 + 1, h: y2 - y1 + 1 };
+}
+
 function rysujDostawcow() {
-  zwolnijLogoUrl();
   const wiersze = dostawcyLista.map((d) => `<tr>
-    <td style="width:56px" id="logo-${d.khId}">${d.maLogo ? "…" : ""}</td>
+    <td style="width:76px">${slotLogo(d.khId, d.maLogo, 30, 72)}</td>
     <td><b>${esc(d.nazwa)}</b></td>
     <td class="mute">${d.dokumentow} dok.</td>
     <td><button class="akcja cichy" data-logo="${d.khId}">${d.maLogo ? "ZMIEŃ" : "WGRAJ"}</button></td>
@@ -2077,21 +2230,20 @@ function rysujDostawcow() {
   $("dostawcy").innerHTML = wiersze.length
     ? `<tr><th></th><th>DOSTAWCA</th><th>DOKUMENTY</th><th></th><th></th></tr>${wiersze.join("")}`
     : '<tr><td class="mute">Nie ma jeszcze dokumentów dostaw — nie ma czego opisać logo</td></tr>';
-  for (const d of dostawcyLista) if (d.maLogo) dolozLogo(d.khId);
+  dolozLoga();
 }
 
-async function dolozLogo(khId) {
-  try {
-    // `api()` rzuca na każdym !ok, w tym na 404 — brak logo obsługuje `catch`
-    const odp = await api(`/api/dostawcy/${khId}/logo`);
-    const url = URL.createObjectURL(await odp.blob());
-    logoUrl.set(khId, url);
-    const kom = $(`logo-${khId}`);
-    if (kom) kom.innerHTML = `<img src="${url}" alt="" style="width:40px;height:40px;object-fit:contain">`;
-  } catch {
-    const kom = $(`logo-${khId}`);
-    if (kom) kom.textContent = "";
-  }
+/** Zwolnienie kompletu — jedyne miejsce to wylogowanie, tak jak przy zdjęciach. */
+function zwolnijLoga() {
+  for (const u of logoUrl.values()) if (u) URL.revokeObjectURL(u);
+  logoUrl.clear();
+}
+
+/** Podmiana i skasowanie muszą wyrzucić stary obraz — inaczej wisi do F5. */
+function zapomnijLogo(khId) {
+  const stary = logoUrl.get(khId);
+  if (stary) URL.revokeObjectURL(stary);
+  logoUrl.delete(khId);
 }
 
 async function odswiezDostawcow() {
@@ -2113,6 +2265,7 @@ async function wyslijLogo(khId, plik) {
       body: JSON.stringify({ nazwa: d?.nazwa ?? "", logoBase64 }),
     });
     $("wynikLogo").textContent = `Logo dla ${d?.nazwa ?? khId} zapisane.`;
+    zapomnijLogo(khId);
     await odswiezDostawcow();
   } catch (e) {
     $("wynikLogo").textContent = `Nie zapisano: ${e.message}`;
@@ -2131,6 +2284,7 @@ async function usunLogo(khId) {
   try {
     await api(`/api/biuro/dostawcy/${khId}/logo`, { method: "DELETE" });
     $("wynikLogo").textContent = "Logo usunięte.";
+    zapomnijLogo(khId);
     await odswiezDostawcow();
   } catch (e) {
     $("wynikLogo").textContent = `Nie usunięto: ${e.message}`;

@@ -17,6 +17,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.delivery.ramkaWidoczna
+import pl.wertis.kolektor.core.delivery.wartoPrzyciac
 
 /* ── Logo dostawcy w wierszu listy dostaw (0.56.0) ───────────────────────────
    Bliźniak `MiniaturaTowaru`, z dwiema różnicami, i obie wynikają z tego, czym
@@ -27,6 +29,15 @@ import pl.wertis.kolektor.AppGraph
       przycięte do kwadratu traci dokładnie tę część, po której się je poznaje.
    2. Oddech dookoła. Logo ma zwykle przezroczyste tło i własny margines
       wewnętrzny bliski zeru; bez tej ramki dotykałoby krawędzi kafelka.
+
+   Od 0.87.0 dochodzi trzecia rzecz: PRZYCINAMY PRZEZROCZYSTY MARGINES. Panel
+   biura zapisywał do tej pory każde logo wyśrodkowane w kwadracie 128×128,
+   a logotyp jest szerokim paskiem — więc `Fit` skalował do ekranu głównie
+   powietrze i żadne poszerzanie slotu tego nie ruszało. Nowy panel zapisuje
+   obraz już przycięty, ale loga wgrane wcześniej leżą w bazie takie, jakie
+   były, a serwer nie ma czym ich przerobić. Kolektor robi to więc sam, raz na
+   logo, przy dekodowaniu — reguła i jej arytmetyka stoją w `:core`
+   (`core/delivery/LogoRamka.kt`), bo tam da się je przetestować.
 
    Zastępstwo (`zamiast`) rysuje się TAKŻE w trakcie pobierania, a nie dopiero
    po potwierdzeniu braku — inaczej wiersz mignąłby pustką, zanim cokolwiek się
@@ -80,9 +91,10 @@ fun LogoDostawcy(
         modifier = modifier
             .size(width = szerokosc, height = bok)
             .clip(RoundedCornerShape(10.dp))
-            // 2 dp zamiast 3: przy szerokim slocie każdy punkt oddechu to
-            // punkt mniej logo, a przezroczyste tło i tak nie dotyka krawędzi
-            .padding(2.dp),
+            // 1 dp zamiast 2: obraz jest już przycięty do samego logo, więc
+            // każdy punkt oddechu to punkt mniej znaku. Zero nie wchodzi —
+            // logo z ramką w swoim projekcie dotykałoby wtedy krawędzi wiersza
+            .padding(1.dp),
     )
 }
 
@@ -96,5 +108,22 @@ private fun dekoduj(bajty: ByteArray, px: Int): android.graphics.Bitmap? = runCa
     var probka = 1
     while (miary.outWidth / probka > px * 2 && miary.outHeight / probka > px * 2) probka *= 2
     val opcje = android.graphics.BitmapFactory.Options().apply { inSampleSize = probka }
-    android.graphics.BitmapFactory.decodeByteArray(bajty, 0, bajty.size, opcje)
+    android.graphics.BitmapFactory.decodeByteArray(bajty, 0, bajty.size, opcje)?.let(::przytnijPuste)
 }.getOrNull()
+
+/**
+ * Zdejmuje przezroczysty margines — powód stoi w nagłówku pliku.
+ *
+ * Robi się to RAZ na logo, bo wynik siada w `zdekodowane`. Jedno przejście po
+ * pikselach obrazu 128 px to ułamek tego, co kosztowało samo dekodowanie.
+ */
+private fun przytnijPuste(bmp: android.graphics.Bitmap): android.graphics.Bitmap {
+    val szer = bmp.width
+    val wys = bmp.height
+    if (szer <= 0 || wys <= 0) return bmp
+    val piksele = IntArray(szer * wys)
+    bmp.getPixels(piksele, 0, szer, 0, 0, szer, wys)
+    val ramka = ramkaWidoczna(piksele, szer, wys) ?: return bmp
+    if (!wartoPrzyciac(ramka, szer, wys)) return bmp
+    return android.graphics.Bitmap.createBitmap(bmp, ramka.x, ramka.y, ramka.szer, ramka.wys)
+}
