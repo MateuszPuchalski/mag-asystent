@@ -33,8 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.81.0 — 22 sierpnia 2026
-
+## 0.83.0 — 22 sierpnia 2026
 **Panel biura przestał siedzieć w kolumnie pośrodku ekranu.** Układ nie zmienił
 się od pierwszej wersji: `main` miał szerokość 1080 px, a każdy widok był jedną
 kolumną kart. Na monitorze 1920 px dwie trzecie szerokości było pustym
@@ -94,12 +93,14 @@ Wysokość przycisków i pól zostaje bez zmian — to są cele kliknięcia i on
 są miejscem na oszczędności. Akapity objaśniające dostały granicę 74 znaków
 w wierszu, bo karta rozciągnięta na 900 px daje wiersz nieczytelny.
 
+Zakładka PYTANIA KLIENTÓW z 0.80.0 dostała ten sam układ przy scaleniu —
+zostawienie jej w jednej wąskiej kolumnie obok pięciu płynnych byłoby
+konfliktem rozwiązanym w połowie.
+
 Sprawdzone w Chromium na ośmiu szerokościach od 900 do 3440 px, na wszystkich
-pięciu zakładkach: żadna nie rozpycha strony w poziomie.
+sześciu zakładkach: żadna nie rozpycha strony w poziomie.
 
----
-
-## 0.80.0 — 22 sierpnia 2026
+## 0.82.0 — 22 sierpnia 2026
 
 **Biuro widzi wreszcie, ile towar STOI.** Zwroty miały dwie karty liczb:
 RAPORT mówił, ile czego jest, STATYSTYKI — co wraca najczęściej. Żadna nie
@@ -140,7 +141,125 @@ Nowa trasa `GET /api/biuro/zwroty/czasy?dni=90` pod bramką biura. Nic nie
 zmienia się w bazie ani na kolektorze — to sam odczyt ze znaczników, które
 aplikacja i tak zapisywała.
 
----
+## 0.81.0 — 22 sierpnia 2026
+
+**Listy zwrotów odpowiadają wreszcie na pytanie „co jeszcze zostało".** Trzy
+zmiany o kolejności pracy, wszystkie z jednego zgłoszenia z hali: robota już
+wykonana zajmowała miejsce roboty do wykonania. Za nimi dwie o samym wierszu
+kosza — ilość i symbol towaru, czyli to, co magazynier czyta, stojąc z rzeczą
+w ręce.
+
+**Rozłożone kosze schodzą na dół listy przyjęć.** O kolejności rozstrzygała
+sama data z dokumentu, więc kosz rozłożony wczoraj stał nad tym, który dziś
+przyjechał na halę. Rozłożone i zdjęte ręką z listy zostają — magazynier ma
+widzieć, że dokument jest znany i zrobiony, zamiast szukać go w nieskończoność
+— ale stoją POD tym, co czeka. Wewnątrz obu grup data dalej rządzi.
+
+**W otwartym koszu odłożona pozycja zjeżdża na koniec listy.** Zwinięty pasek
+zrobionej pozycji dalej zajmuje ekran, więc przy koszu na dwadzieścia pozycji
+do roboty trzeba się było PRZEWIJAĆ przez robotę już wykonaną. Lista ma teraz
+trzy grupy: czekające w kolejności alejkowej, odłożone „na później" i zrobione.
+Te ostatnie stoją w kolejności wykonania, czyli ostatnio tknięta jest na samym
+dole — tam, gdzie się jej szuka, wracając po COFNIJ. Pominięta liczy się jako
+zrobiona: to praca zdjęta z rutyny, a nie towar czekający na półkę.
+
+To ta sama decyzja, którą rozkładanie dostaw podjęło w 0.35.0, i płaci się za
+nią tym samym: wiersze skaczą po każdym zapisie. Skok kosztuje mniej niż
+przewijanie, bo następną pozycję bierze się SKANEM, a skan trafia w towar po
+symbolu, nie w miejsce na ekranie.
+
+Kolejność liczy SERWER, nie kolektor. Tę samą listę czyta panel biura, a dwa
+niezależne sortowania rozjechałyby się przy pierwszej zmianie jednego z nich —
+objawem byłoby „biuro czyta co innego, niż ja mam na ekranie".
+
+**Po odłożeniu kolektor sam wskazuje kolejny przedmiot** — i robi to OD RAZU,
+nie dopiero z powracającą listą. Między jednym a drugim mieści się skan
+następnego regału, a trafiał on w pozycję właśnie odłożoną: zamiast odłożyć
+kolejny towar, poprawiał adres poprzedniego. Odległość między półkami jest
+krótsza niż runda do serwera i z powrotem. Tak samo zachowują się POMIŃ
+i PÓŹNIEJ — jedno i drugie zdejmuje pozycję z drogi, więc jedno i drugie
+pokazuje następną zamiast pustego ekranu.
+
+**Ilość inna niż jedna sztuka dostaje bursztynową pastylkę.** Zwrot wraca
+pojedynczo, więc oko czyta wiersz jak „jedna rzecz na jedną półkę" i idzie
+dalej — a przy „3 szt." zostawia dwie w koszu. Kosz zamyka się z licznikiem
+POZYCJI, nie sztuk, więc taka pomyłka wychodzi dopiero przy inwentaryzacji.
+Pastylka, a nie sam kolor: bursztynem świeci obok pozycja bez adresu, a dwa
+znaczenia jednej barwy nie niosłyby żadnego — kształt odróżnia je bez czytania.
+Wiersz zrobiony zostaje przygaszonym paskiem, ale liczbę dalej na nim widać, bo
+to po niej sprawdza się kompletność kosza.
+
+**Symbol wskazanego towaru urósł do 22 sp.** To jego szuka się wzrokiem, mając
+towar w ręce i pytanie „czy to na pewno ten"; czyta się go z odległości
+ramienia, tak samo jak adres w panelu niżej. Pozostałe wiersze zostają przy
+17 sp, bo cała lista w tym rozmiarze przestałaby mieścić się na ekranie.
+
+## 0.80.0 — 22 sierpnia 2026
+
+**Pytania klientów o dobór części dostały własną zakładkę — ze szkicem
+odpowiedzi.** Dotąd była to praca POZA aplikacją: screenshot pytania z poczty
+szedł do zewnętrznego czata skonfigurowanego jako ekspert od części, a gotowa
+odpowiedź wracała przez schowek. Aplikacja, która zna kartotekę, stany
+i zamienniki, nie brała w tym udziału.
+
+Teraz bierze. Zakładka **PYTANIA KLIENTÓW** ściąga pytania z Centrum wiadomości
+Allegro, przygotowuje szkic odpowiedzi z linkami do naszych aukcji i po
+akceptacji człowieka wysyła ją do klienta.
+
+Cztery rzeczy, które decydują o tym, czy to naprawdę oszczędza czas:
+
+- **Szkic czeka gotowy.** Liczy go ticker w tle razem z synchronizacją, więc
+  otwarte pytanie ma odpowiedź do przeczytania, a nie przycisk „wygeneruj”.
+- **Karty towarów stoją obok pola odpowiedzi** — zdjęcie kartoteki, stan,
+  półka, cena i link do aukcji. Dobór weryfikuje się okiem, bez przełączania
+  do Subiekta; przycisk WSTAW LINK dokleja adres w miejscu kursora.
+- **Fakty firmowe są osobnym polem.** Cennik wysyłek zagranicznych, terminy
+  i zasady płatności wpisuje admin, i to jedyne źródło, z którego model może
+  je podać. Zgadnięty koszt wysyłki do Chorwacji jest gorszy niż jego brak.
+- **Po wysłaniu panel otwiera następne pytanie**, aż licznik przy zakładce
+  zejdzie do zera.
+
+Aplikacja przy tym **uczy się z wysłanych odpowiedzi**, nie z własnych
+zgadywanek: poprawione odpowiedzi wracają jako wzór stylu, a potwierdzone pary
+maszyna→część jako tabela `dopasowanie` — jedno i drugie zapisuje się dopiero
+przy wysyłce, czyli po akceptacji człowieka.
+
+Statystyki odpowiadają na pytanie właściciela: o co klienci pytają najczęściej,
+w jakich kategoriach, jak długo czekają na odpowiedź, ile szkiców idzie bez
+poprawki — i **o jaki towar pytali, a nie było czego sprzedać**. Ta ostatnia
+lista jest najtańszym researchem asortymentu, jaki firma może mieć.
+
+Odpowiedź wysyła **człowiek** i to się nie zmienia. Model pisze szkic, biuro go
+czyta, poprawia i klika. Automatycznej wysyłki nie ma i pilnuje tego test.
+
+Pytania spoza Allegro (screenshot z poczty) wchodzą przez wklejkę — Ctrl+V
+w zakładce. **Obrazu nie zapisujemy**: zostaje wyłącznie przepisana treść
+pytania. To dane osobowe klienta, a wartość ma sama treść.
+
+**[wymaga działania]** — trzy rzeczy przy wdrożeniu:
+
+1. **Klucz modelu w `wertis.env`.** `AI_PROVIDER=anthropic` (albo `openai`)
+   plus `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`. Bez tego funkcja jest
+   wyłączona, a zakładka mówi wprost, co dopisać. Serwer bez klucza przy
+   ustawionym dostawcy NIE wystartuje — lepiej twardy błąd przy starcie niż
+   przy pierwszym pytaniu klienta. Szczegóły i wybór modelu:
+   sekcja „Pytania klientów” w `wertis.env.example`.
+2. **Nowe uprawnienia aplikacji Allegro i PONOWNE PAROWANIE KONTA.** Ta
+   funkcja czyta i pisze w Centrum wiadomości oraz czyta nasze oferty:
+   `allegro:api:messaging` i `allegro:api:sale:offers:read`. Dopisanie ich na
+   developer.allegro.pl nie wystarcza — token wydany pod stary zakres sam się
+   nie rozszerzy, więc konto trzeba sparować ponownie
+   (/biuro → ZWROTY → KONTO ALLEGRO). Bez tego pierwsze odświeżenie kończy się
+   błędem 403, a komunikat wskazuje brakujące uprawnienie po nazwie.
+3. **Decyzja o prywatności należy do właściciela.** Treść pytań klientów
+   (i wklejone obrazy) trafia do zewnętrznego dostawcy modelu. Funkcja jest
+   domyślnie wyłączona właśnie dlatego, że tej decyzji nie podejmuje
+   aktualizacja.
+
+Nowe tabele (`pytanie`, `ai_config`, `dopasowanie`) zakłada migracja przy
+starcie — nic do zrobienia ręką. Częstotliwość ściągania pytań dzieli pokrętło
+z zapowiedziami zwrotów (`ALLEGRO_POLL_MS`): to ta sama praca w tle na tym
+samym koncie.
 
 ## 0.79.0 — 22 sierpnia 2026
 

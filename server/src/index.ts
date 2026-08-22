@@ -23,6 +23,7 @@ import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
+import { pytaniaRoutes } from "./routes/pytania.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
@@ -36,6 +37,7 @@ import {
 } from "./adapters/subiekt.mssql.js";
 import { problemAllegro } from "./services/allegro-token.js";
 import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
+import { uruchomTickerPytan } from "./services/pytania.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
@@ -185,6 +187,7 @@ export async function buildApp() {
   await app.register(zbiorkiRoutes);
   await app.register(dostawcyRoutes);
   await app.register(zwrotyRoutes);
+  await app.register(pytaniaRoutes);
   await app.register(koszeRoutes);
   await app.register(aktualizacjaRoutes);
 
@@ -214,6 +217,10 @@ async function main() {
   /* Zapowiedzi zwrotów z Allegro — w main(), nie w buildApp(): testy tras
      budują aplikację i nie mają prawa uruchamiać pętli sięgającej do API. */
   uruchomTickerZapowiedzi();
+  /* Pytania klientów (0.80.0) — ten sam powód i ten sam interwał: praca w tle
+     na tym samym koncie Allegro, plus szkice, żeby otwarte pytanie miało
+     odpowiedź gotową, a nie przycisk „wygeneruj” i czekanie. */
+  uruchomTickerPytan();
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

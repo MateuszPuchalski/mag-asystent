@@ -162,3 +162,38 @@ test("lista zna stan pracy, a admin zdejmuje dokument sprzed wdrożenia", () => 
   assert.equal(P.listaPrzyjec()[0].stan, "poza_aplikacja");
   assert.throws(() => P.oznaczRozlozonePozaAplikacja(999_999, "Admin"), /nie istnieje/);
 });
+
+test("rozłożone przyjęcia schodzą pod te, które czekają", () => {
+  /* Lista jest pracą do wykonania, nie archiwum. Kosz rozłożony wczoraj stał
+     nad tym, który dziś przyjechał na halę, bo o kolejności rozstrzygała sama
+     data wystawienia dokumentu. */
+  const d = db();
+  d.prepare(
+    `INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+     VALUES (?, 'MM 1210/MAG/2026', '1210', '2026-08-20', 1, 3)`
+  ).run(DOK + 1);
+  d.prepare(
+    "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa) VALUES (?,?,?,?,?)"
+  ).run(DOK + 1, 900_037, 1, "TEST-LINIA-DONE", "Pozycja odłożona");
+
+  // punkt wyjścia: rozstrzyga data wystawienia, nowszy dokument na górze
+  assert.deepEqual(P.listaPrzyjec().map((p) => p.numer), ["1210", "1209"]);
+
+  const kosz = P.otworzPrzyjecie("1210", "Jan");
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "C01-01-01", "Jan");
+  K.zakonczKosz(kosz.id, "Jan");
+
+  assert.deepEqual(
+    P.listaPrzyjec().map((p) => [p.numer, p.stan]),
+    [["1209", "nietkniety"], ["1210", "rozlozony"]],
+    "rozłożony schodzi pod czekający, choć jest nowszy"
+  );
+
+  /* Wewnątrz grupy data dalej rządzi — sortowanie zrobionych na dół jest
+     jedyną zmianą kolejności, jaką ta lista wprowadza. */
+  P.oznaczRozlozonePozaAplikacja(DOK, "Admin");
+  assert.deepEqual(
+    P.listaPrzyjec().map((p) => [p.numer, p.stan]),
+    [["1210", "rozlozony"], ["1209", "poza_aplikacja"]]
+  );
+});

@@ -282,7 +282,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     }
   );
 
-  /* Czasy obsługi (0.80.0) — trzecie pytanie o zwroty: nie „jak idzie robota"
+  /* Czasy obsługi (0.82.0) — trzecie pytanie o zwroty: nie „jak idzie robota"
      i nie „co wraca", tylko JAK DŁUGO towar stoi, zanim wróci na półkę.
      To samo okno co statystyki produktowe, bo obie karty czyta się razem. */
   app.get<{ Querystring: { dni?: string } }>(

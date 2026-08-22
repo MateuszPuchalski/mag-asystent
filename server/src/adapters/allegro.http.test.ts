@@ -17,6 +17,13 @@ import {
   urlWiadomosci,
   urlZwrotow,
   urlZwrotu,
+  urlOfert,
+  urlOferty,
+  urlWyslijWiadomosc,
+  urlOznaczPrzeczytany,
+  mapujWatki,
+  mapujOferty,
+  scopeDlaUrl,
 } from "./allegro.http.js";
 import { allegroUserAgent } from "./allegro.js";
 import { config } from "../config.js";
@@ -214,4 +221,110 @@ test("mapowanie niesie identyfikator kupującego — klucz do wątku wiadomości
   assert.equal(mapujZwrot({ buyer: { login: "jan", id: "44300444" } }).kupujacyId, "44300444");
   assert.equal(mapujZwrot({ buyer: { login: "jan" } }).kupujacyId, null);
   assert.equal(mapujZamowienie({ buyer: { id: "44300444" } }).kupujacyId, "44300444");
+});
+
+/* ── Pytania klientów (0.80.0) ─────────────────────────────────────────────── */
+
+test("URL ofert: fraza kodowana, filtr aktywnych publikacji zawsze obecny", () => {
+  const url = urlOfert("https://api.allegro.pl", "cewka & zapłon", 20);
+  assert.match(url, /name=cewka%20%26%20zap%C5%82on/);
+  assert.match(url, /publication\.status=ACTIVE/);
+  assert.match(url, /offset=20/);
+  /* Ujemny offset to błąd wołającego, nie powód na 400 z Allegro. */
+  assert.match(urlOfert("https://api.allegro.pl", "x", -5), /offset=0/);
+});
+
+test("adres aukcji zależy od środowiska — sandbox ma własną domenę", () => {
+  assert.equal(urlOferty("123", false), "https://allegro.pl/oferta/123");
+  assert.match(urlOferty("123", true), /allegrosandbox\.pl\/oferta\/123$/);
+});
+
+test("URL wysyłki i odhaczenia wątku kodują identyfikator", () => {
+  assert.equal(
+    urlWyslijWiadomosc("https://api.allegro.pl", "a/b"),
+    "https://api.allegro.pl/messaging/threads/a%2Fb/messages"
+  );
+  assert.equal(
+    urlOznaczPrzeczytany("https://api.allegro.pl", "a b"),
+    "https://api.allegro.pl/messaging/threads/a%20b"
+  );
+});
+
+test("mapowanie wątków: pełny JSON trafia na swoje miejsca", () => {
+  const [w] = mapujWatki({
+    threads: [
+      {
+        id: "t-1",
+        interlocutor: { login: "client:44300444" },
+        lastMessageDateTime: "2026-08-20T10:00:00Z",
+        read: false,
+        offer: { id: "of-9", name: "Cewka zapłonowa" },
+      },
+    ],
+  });
+  assert.equal(w.threadId, "t-1");
+  assert.equal(w.interlokutor, "client:44300444");
+  assert.equal(w.ostatniaWiadomoscAt, "2026-08-20T10:00:00Z");
+  assert.equal(w.przeczytany, false);
+  assert.equal(w.ofertaId, "of-9");
+  assert.equal(w.ofertaTytul, "Cewka zapłonowa");
+});
+
+test("mapowanie wątków: brak pól daje NULL-e, nie wyjątek", () => {
+  const [w] = mapujWatki({ threads: [{ id: "t-2" }] });
+  assert.equal(w.threadId, "t-2");
+  assert.equal(w.interlokutor, null);
+  assert.equal(w.ofertaId, null);
+  assert.equal(w.ofertaTytul, null);
+  /* `read` nieobecne to „nie wiem", a nie „nieprzeczytany" — inaczej panel
+     twierdziłby coś, czego API nie powiedziało. */
+  assert.equal(w.przeczytany, null);
+  assert.deepEqual(mapujWatki({}), []);
+  assert.deepEqual(mapujWatki(null), []);
+});
+
+test("mapowanie ofert: cena z walutą, sygnatura i stan; oferta bez id wypada", () => {
+  const oferty = mapujOferty(
+    {
+      offers: [
+        {
+          id: "of-1",
+          name: "Cewka zapłonowa NAC T375",
+          sellingMode: { price: { amount: "39.90", currency: "PLN" } },
+          external: { id: "W80-2005" },
+          stock: { available: 7 },
+        },
+        { name: "Oferta bez identyfikatora" },
+      ],
+    },
+    false
+  );
+  assert.equal(oferty.length, 1);
+  assert.equal(oferty[0].cena, "39.90 PLN");
+  assert.equal(oferty[0].externalId, "W80-2005");
+  assert.equal(oferty[0].dostepnych, 7);
+  assert.equal(oferty[0].url, "https://allegro.pl/oferta/of-1");
+});
+
+test("mapowanie ofert: śmieci dają pustą listę, nie wyjątek", () => {
+  assert.deepEqual(mapujOferty({ offers: "nie tablica" }, false), []);
+  assert.deepEqual(mapujOferty(null, false), []);
+  const [o] = mapujOferty({ offers: [{ id: "x" }] }, false);
+  assert.equal(o.cena, null);
+  assert.equal(o.externalId, null);
+  assert.equal(o.dostepnych, null);
+});
+
+test("komunikat 403 wskazuje uprawnienie właściwe dla końcówki", () => {
+  /* Rozjazd scope'ów jest pierwszą awarią wdrożenia — zdanie ma prowadzić
+     do naprawy, a nie mówić o zamówieniach przy wysyłce wiadomości. */
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/messaging/threads/1/messages"), "allegro:api:messaging");
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/offers?name=x"), "allegro:api:sale:offers:read");
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues"), "allegro:api:disputes");
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/order/customer-returns"), "allegro:api:orders:read");
+});
+
+test("rodzina końcówki obejmuje nowe ścieżki — nauka Accept ich nie miesza", () => {
+  assert.equal(rodzinaKoncowki(urlOfert("https://api.allegro.pl", "x")), "offers");
+  assert.equal(rodzinaKoncowki(urlWyslijWiadomosc("https://api.allegro.pl", "t")), "threads");
 });

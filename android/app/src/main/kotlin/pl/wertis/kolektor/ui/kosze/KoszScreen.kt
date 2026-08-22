@@ -116,14 +116,21 @@ fun KoszScreen(graph: AppGraph) {
         adres = p?.lokOczekiwana ?: ""
     }
 
+    /* Kolejny przedmiot do wzięcia z kosza. Serwer trzyma pozycje zrobione na
+       końcu listy, więc PIERWSZA czekająca jest zarazem najbliższym regałem na
+       trasie — po tym jednym założeniu poznaje się, że kolejność listy i to
+       wskazanie muszą pochodzić z jednego miejsca. */
+    fun nastepna(k: KoszView?, pomijajac: Long? = null): KoszPozycja? =
+        k?.pozycje?.firstOrNull { it.status == "todo" && it.id != pomijajac }
+
     LaunchedEffect(id, reload) {
         try {
             val k = apiCall { graph.api.kosz(id) }.kosz
             kosz = k
-            // domyślnie wskazana pierwsza nieodłożona — lista jest alejkowa,
-            // więc to zarazem najbliższy regał na trasie
+            // domyślnie wskazana pierwsza nieodłożona; wskazanie zrobione ręką
+            // (albo przez `nastepna` po odłożeniu) zostaje, dopóki jest co robić
             if (wybrana == null || k.pozycje.none { it.id == wybrana && it.status == "todo" }) {
-                wybierz(k.pozycje.firstOrNull { it.status == "todo" })
+                wybierz(nastepna(k))
             }
         } catch (e: Exception) {
             graph.effects.toast(e.message ?: "Nie udało się wczytać kosza")
@@ -135,6 +142,12 @@ fun KoszScreen(graph: AppGraph) {
             try {
                 apiCall { graph.api.koszOdloz(pozycjaId, OdlozKoszBody(kod, recznie)) }
                 graph.feedback.beep(true)
+                /* Wskazanie przeskakuje OD RAZU, nie dopiero z powracającą listą.
+                   Między jednym a drugim mieści się skan następnego regału,
+                   a trafiłby w pozycję właśnie odłożoną — czyli POPRAWIŁBY jej
+                   adres zamiast odłożyć kolejny towar. Odległość między półkami
+                   jest krótsza niż runda do serwera i z powrotem. */
+                wybierz(nastepna(kosz, pomijajac = pozycjaId))
                 reload++
             } catch (e: Exception) {
                 graph.feedback.beep(false)
@@ -163,6 +176,9 @@ fun KoszScreen(graph: AppGraph) {
             try {
                 apiCall { graph.api.koszPomin(pozycjaId, PominKoszBody(powod)) }
                 pomijana = null
+                // pominięcie kończy pracę na tej pozycji tak samo jak odłożenie,
+                // więc i tu wskazujemy kolejny przedmiot bez czekania na listę
+                wybierz(nastepna(kosz, pomijajac = pozycjaId))
                 reload++
             } catch (e: Exception) {
                 graph.effects.toast(e.message ?: "Nie udało się pominąć pozycji")
@@ -246,7 +262,10 @@ fun KoszScreen(graph: AppGraph) {
                     akcjaNaPozycji("odłożyć na później") {
                         apiCall { graph.api.koszPozniej(p.id) }
                     }
-                    wybierz(null)
+                    /* Ta pozycja czeka dalej, tylko na końcu listy — wskazujemy
+                       więc następną, a nie nic. Pusty ekran po „później" kazał
+                       szukać kolejnego towaru palcem. */
+                    wybierz(nastepna(kosz, pomijajac = p.id))
                 },
                 onCofnij = {
                     akcjaNaPozycji("cofnąć") { apiCall { graph.api.koszCofnijPozycje(p.id) } }
@@ -386,11 +405,20 @@ private fun PozycjaRow(
                 MiniaturaTowaru(graph, p.twId, bok, powieksz = wskazana, zamiast = ikonaPudelka)
             }
             Column(Modifier.weight(1f)) {
+                /* Symbol WSKAZANEJ pozycji rośnie do 22 sp. To jego się szuka
+                   wzrokiem, mając towar w ręce i pytanie „czy to na pewno ten" —
+                   a czyta się go z odległości ramienia, tak samo jak adres
+                   w panelu niżej. Reszta wierszy zostaje przy 17 sp, bo pełna
+                   lista w tym rozmiarze przestałaby mieścić się na ekranie. */
                 Text(
                     p.symbol.ifEmpty { p.nazwa },
                     fontFamily = BarlowCond,
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (zwiniety) 14.sp else 17.sp,
+                    fontSize = when {
+                        zwiniety -> 14.sp
+                        wskazana -> 22.sp
+                        else -> 17.sp
+                    },
                     color = if (zwiniety) InkMute else Ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -422,11 +450,42 @@ private fun PozycjaRow(
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
+                /* ILOŚĆ INNA NIŻ JEDNA to tutaj wyjątek i tak ma wyglądać.
+                   Zwrot wraca pojedynczo, więc oko czyta wiersz jak „jedna rzecz
+                   na jedną półkę" i idzie dalej — a przy „3 szt." zostawia dwie
+                   w koszu. Pomyłka wychodzi wtedy dopiero przy inwentaryzacji,
+                   bo kosz zamyka się z licznikiem POZYCJI, nie sztuk.
+
+                   Pastylka zamiast samego koloru: pozycja bez adresu świeci
+                   bursztynem obok, a dwa różne znaczenia jednej barwy nie
+                   niosłyby żadnego. Kształt odróżnia je bez czytania. */
+                val wyjatkowaIlosc = p.ilosc != 1.0
                 Text(
                     iloscZJednostka(p.ilosc, p.unit),
-                    fontSize = if (zwiniety) 12.sp else 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (zwiniety) InkMute else Ink,
+                    fontFamily = if (wyjatkowaIlosc) BarlowCond else null,
+                    fontSize = when {
+                        zwiniety -> 12.sp
+                        wyjatkowaIlosc -> 18.sp
+                        else -> 14.sp
+                    },
+                    fontWeight = if (wyjatkowaIlosc) FontWeight.ExtraBold else FontWeight.Bold,
+                    color = when {
+                        zwiniety -> InkMute
+                        wyjatkowaIlosc -> AmberInk
+                        else -> Ink
+                    },
+                    /* Wiersz zwinięty pastylki nie dostaje: praca jest zrobiona,
+                       a pasek ma zostać paskiem. Liczba zostaje na nim widoczna,
+                       bo to po niej sprawdza się kompletność kosza. */
+                    modifier = if (wyjatkowaIlosc && !zwiniety) {
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .border(1.5.dp, AmberLine, RoundedCornerShape(50))
+                            .background(AmberBg)
+                            .padding(horizontal = 10.dp, vertical = 3.dp)
+                    } else {
+                        Modifier
+                    },
                 )
                 /* Adres, pod który towar MA trafić — a po odłożeniu ten faktyczny.
                    Wskazana pozycja pastylki NIE dostaje: ten sam adres stoi
