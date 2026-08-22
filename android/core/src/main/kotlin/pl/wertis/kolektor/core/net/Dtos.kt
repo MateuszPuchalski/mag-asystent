@@ -913,6 +913,8 @@ data class KoszPozycja(
     val zlotaStrefa: ZlotaStrefa? = null,
     /** Powód pominięcia; niepusty wyłącznie przy statusie `skipped`. */
     val powod: String? = null,
+    /** Odłożona na PÓŹNIEJ — stoi na końcu listy, ale wciąż czeka na odłożenie. */
+    val pozniejAt: String? = null,
     /** Adres ŻYWY z kartoteki (serwer koryguje o kolejkę) — nie snapshot. */
     val lokOczekiwana: String? = null,
     val lokFaktyczna: String? = null,

@@ -143,6 +143,21 @@ fun KoszScreen(graph: AppGraph) {
         }
     }
 
+    /* Trzy drogi powrotne z jednej pomyłki. `apiCall` zwraca kosz po zmianie,
+       więc ekran nie musi się przeładowywać osobnym żądaniem. */
+    fun akcjaNaPozycji(nazwa: String, wywolanie: suspend () -> Unit) {
+        scope.launch {
+            try {
+                wywolanie()
+                graph.feedback.beep(true)
+                reload++
+            } catch (e: Exception) {
+                graph.feedback.beep(false)
+                graph.effects.toast(e.message ?: "Nie udało się $nazwa")
+            }
+        }
+    }
+
     fun pomin(pozycjaId: Long, powod: String) {
         scope.launch {
             try {
@@ -227,7 +242,18 @@ fun KoszScreen(graph: AppGraph) {
                 onAdres = { adres = it },
                 onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), recznie = true) },
                 onPomin = { pomijana = p },
-                onClick = { if (p.status != "done") wybierz(p) },
+                onPozniej = {
+                    akcjaNaPozycji("odłożyć na później") {
+                        apiCall { graph.api.koszPozniej(p.id) }
+                    }
+                    wybierz(null)
+                },
+                onCofnij = {
+                    akcjaNaPozycji("cofnąć") { apiCall { graph.api.koszCofnijPozycje(p.id) } }
+                },
+                /* Pozycja ODŁOŻONA też daje się wskazać — inaczej nie byłoby
+                   jak cofnąć złego skanu ani poprawić adresu. */
+                onClick = { wybierz(p) },
             )
         }
 
@@ -267,6 +293,20 @@ fun KoszScreen(graph: AppGraph) {
                 fontSize = 13.sp,
                 color = InkMute,
             )
+            /* ZAKOŃCZ kliknięty za wcześnie albo nie na tym koszu. Serwer
+               przepuści to tylko wtedy, gdy MM jeszcze czekają w kolejce —
+               po zapisie do Subiekta odmówi i powie dlaczego. */
+            OutlineButton("COFNIJ ZAKOŃCZENIE", modifier = Modifier.fillMaxWidth()) {
+                scope.launch {
+                    try {
+                        apiCall { graph.api.koszCofnijZakonczenie(id) }
+                        graph.effects.toast("Kosz wrócił do rozkładania")
+                        reload++
+                    } catch (e: Exception) {
+                        graph.effects.toast(e.message ?: "Nie udało się cofnąć")
+                    }
+                }
+            }
         }
     }
 
@@ -290,6 +330,8 @@ private fun PozycjaRow(
     onAdres: (String) -> Unit,
     onOdloz: () -> Unit,
     onPomin: () -> Unit,
+    onPozniej: () -> Unit,
+    onCofnij: () -> Unit,
     onClick: () -> Unit,
 ) {
     val done = p.status == "done"
@@ -356,6 +398,17 @@ private fun PozycjaRow(
                 if (!zwiniety) {
                     Text(p.nazwa, fontSize = 12.sp, color = InkMute, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                /* „Na później" mówi, DLACZEGO ta pozycja stoi na końcu listy.
+                   Bez tego zdania wyglądałaby na przeoczoną. */
+                if (p.pozniejAt != null && !done && !pominieta) {
+                    Text(
+                        "na później — czeka na końcu listy",
+                        fontSize = 12.sp,
+                        color = AmberInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 /* Powód pominięcia stoi PRZY pozycji, nie w osobnym wykazie: to
                    jedyna treść tego zgłoszenia i ma być widoczna bez szukania. */
                 if (pominieta) {
@@ -392,6 +445,8 @@ private fun PozycjaRow(
                 onAdres = onAdres,
                 onOdloz = onOdloz,
                 onPomin = onPomin,
+                onPozniej = onPozniej,
+                onCofnij = onCofnij,
             )
         }
     }
@@ -414,7 +469,11 @@ private fun PanelPozycji(
     onAdres: (String) -> Unit,
     onOdloz: () -> Unit,
     onPomin: () -> Unit,
+    onPozniej: () -> Unit,
+    onCofnij: () -> Unit,
 ) {
+    val done = p.status == "done"
+    val pominieta = p.status == "skipped"
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -423,7 +482,11 @@ private fun PanelPozycji(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            if (p.status == "skipped") "POMINIĘTA — ODŁOŻENIE COFNIE POMINIĘCIE" else "ODŁÓŻ NA",
+            when {
+                pominieta -> "POMINIĘTA — ODŁOŻENIE COFNIE POMINIĘCIE"
+                done -> "ODŁOŻONA — MOŻESZ POPRAWIĆ ADRES ALBO COFNĄĆ"
+                else -> "ODŁÓŻ NA"
+            },
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
@@ -459,8 +522,23 @@ private fun PanelPozycji(
             leadingIcon = WIcons.Scan,
             onDone = onOdloz,
         )
-        PrimaryButton("ODŁÓŻ TUTAJ", enabled = adres.isNotBlank(), modifier = Modifier.fillMaxWidth(), onClick = onOdloz)
-        if (p.status != "skipped") {
+        PrimaryButton(
+            if (done) "POPRAW — ODŁÓŻ TUTAJ" else "ODŁÓŻ TUTAJ",
+            enabled = adres.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onOdloz,
+        )
+        /* Drogi powrotne. Pozycja zrobiona ma COFNIJ, pozycja czekająca —
+           PÓŹNIEJ i POMIŃ. Te dwa ostatnie znaczą co innego i dlatego stoją
+           osobno: „później" zostawia pracę w koszu, „pomiń" oddaje ją biuru. */
+        if (done || pominieta) {
+            OutlineButton(
+                if (pominieta) "COFNIJ POMINIĘCIE" else "COFNIJ ODŁOŻENIE",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onCofnij,
+            )
+        } else {
+            OutlineButton("PÓŹNIEJ — NA KONIEC LISTY", modifier = Modifier.fillMaxWidth(), onClick = onPozniej)
             OutlineButton("POMIŃ — NIE MA CZEGO ODŁOŻYĆ", modifier = Modifier.fillMaxWidth(), onClick = onPomin)
         }
     }

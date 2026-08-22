@@ -223,7 +223,7 @@ test("mapowanie niesie identyfikator kupującego — klucz do wątku wiadomości
   assert.equal(mapujZamowienie({ buyer: { id: "44300444" } }).kupujacyId, "44300444");
 });
 
-/* ── Pytania klientów (0.79.0) ─────────────────────────────────────────────── */
+/* ── Pytania klientów (0.80.0) ─────────────────────────────────────────────── */
 
 test("URL ofert: fraza kodowana, filtr aktywnych publikacji zawsze obecny", () => {
   const url = urlOfert("https://api.allegro.pl", "cewka & zapłon", 20);

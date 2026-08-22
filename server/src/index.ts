@@ -217,7 +217,7 @@ async function main() {
   /* Zapowiedzi zwrotów z Allegro — w main(), nie w buildApp(): testy tras
      budują aplikację i nie mają prawa uruchamiać pętli sięgającej do API. */
   uruchomTickerZapowiedzi();
-  /* Pytania klientów (0.79.0) — ten sam powód i ten sam interwał: praca w tle
+  /* Pytania klientów (0.80.0) — ten sam powód i ten sam interwał: praca w tle
      na tym samym koncie Allegro, plus szkice, żeby otwarte pytanie miało
      odpowiedź gotową, a nie przycisk „wygeneruj” i czekanie. */
   uruchomTickerPytan();

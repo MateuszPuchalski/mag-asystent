@@ -291,7 +291,7 @@ export const config = {
   },
 
   /**
-   * Pytania klientów (0.79.0) — szkic odpowiedzi pisze model językowy.
+   * Pytania klientów (0.80.0) — szkic odpowiedzi pisze model językowy.
    *
    * `provider` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM, jak `allegro.clientId`:
    * puste wynika z `SGT_MODE` (seeded → `dev`, mssql → funkcji nie ma), a

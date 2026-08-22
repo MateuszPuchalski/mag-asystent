@@ -133,6 +133,43 @@ test("pełny przepływ: kosz na karcie, zamknięcie, rozkładanie, cofnięcie bu
   assert.deepEqual(autorzy.map((a) => a.created_by), ["Ktoś magazynier"]);
 });
 
+test("cofanie i odkładanie na później przez HTTP — bez bramki roli", async () => {
+  const biuro = zalogowany("biuro");
+  const magazynier = zalogowany("magazynier");
+  const { koszId } = await zwrotWKoszu(biuro);
+  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
+  const pierwsza = kosz.pozycje[0].id;
+
+  // „później" — pozycja zjeżdża na koniec, ale wciąż czeka
+  let r = await app.inject({ method: "POST", url: `/api/kosze/pozycje/${pierwsza}/pozniej`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+  const poZsunieciu = r.json().kosz.pozycje;
+  assert.equal(poZsunieciu[poZsunieciu.length - 1].id, pierwsza);
+  assert.equal(poZsunieciu[poZsunieciu.length - 1].status, "todo");
+
+  // odłożenie i cofnięcie tą samą trasą — serwer rozpoznaje, co cofa
+  await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${pierwsza}/odloz`,
+    payload: { lokalizacja: "B01-01-01" }, headers: magazynier,
+  });
+  r = await app.inject({ method: "POST", url: `/api/kosze/pozycje/${pierwsza}/cofnij`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().kosz.pozycje.find((p: { id: number }) => p.id === pierwsza).status, "todo");
+
+  // zakończenie i jego cofnięcie
+  for (const p of kosz.pozycje) {
+    await app.inject({
+      method: "POST", url: `/api/kosze/pozycje/${p.id}/odloz`,
+      payload: { lokalizacja: "B01-01-01" }, headers: magazynier,
+    });
+  }
+  await app.inject({ method: "POST", url: `/api/kosze/${koszId}/zakoncz`, headers: magazynier });
+  r = await app.inject({ method: "POST", url: `/api/kosze/${koszId}/cofnij-zakonczenie`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().kosz.status, "zamkniety");
+});
+
 test("przyjęcia: hala otwiera numerem z kartki, zdejmuje z listy tylko admin", async () => {
   const magazynier = zalogowany("magazynier");
   const admin = zalogowany("admin");

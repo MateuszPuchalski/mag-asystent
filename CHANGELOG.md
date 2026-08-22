@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.79.0 — 22 sierpnia 2026
+## 0.80.0 — 22 sierpnia 2026
 
 **Pytania klientów o dobór części dostały własną zakładkę — ze szkicem
 odpowiedzi.** Dotąd była to praca POZA aplikacją: screenshot pytania z poczty
@@ -99,6 +99,39 @@ Nowe tabele (`pytanie`, `ai_config`, `dopasowanie`) zakłada migracja przy
 starcie — nic do zrobienia ręką. Częstotliwość ściągania pytań dzieli pokrętło
 z zapowiedziami zwrotów (`ALLEGRO_POLL_MS`): to ta sama praca w tle na tym
 samym koncie.
+
+## 0.79.0 — 22 sierpnia 2026
+
+**Rozkładanie zwrotów ma wreszcie drogi powrotne.** Praca w rękawicy, przy
+koszu, jedną ręką — pomyłka jest normalnym elementem tej roboty, nie wyjątkiem.
+Do tej wersji kolektor nie miał ani jednej: zły skan regału zamykał pozycję na
+zawsze, a przedwczesne ZAKOŃCZ — cały kosz.
+
+**COFNIJ ODŁOŻENIE** przywraca pozycję do pracy i kasuje adres. **COFNIJ
+POMINIĘCIE** robi to samo z pozycją oddaną biuru. **COFNIJ ZAKOŃCZENIE**
+otwiera z powrotem kosz zamknięty za wcześnie; pozycje zostają tam, gdzie były,
+bo cofa się stan kosza, a nie cudzą pracę. Wszystko bez bramki roli — to
+poprawianie WŁASNEJ pomyłki w jej trakcie, tak samo jak korekta ilości przy
+dostawie. Ślad z nazwiskiem zostaje w dzienniku.
+
+**Granica przechodzi przez Subiekta i jest twarda.** Dopóki zapis czeka
+w kolejce, aplikacja go anuluje i cofa wszystko bez śladu w bazie firmy. Gdy
+zapis już poszedł, cofnięcia NIE MA — aplikacja nie ma prawa udawać, że adres
+albo dokument w Subiekcie nie istnieje. Mówi wtedy wprost, co zrobić zamiast
+tego. Przy koszu WERTIS sprawdzane są WSZYSTKIE zadania MM przed anulowaniem
+któregokolwiek: jedno przetworzone blokuje całość, żeby nie zostawić połowy
+anulowanej przy koszu nadal zakończonym.
+
+Stąd druga zmiana: **pozycja odłożona daje się POPRAWIĆ**. Zły regał prostuje
+się skanem właściwego — nowy adres nadpisuje stary w koszu i w kartotece. Bez
+tego odmowa cofnięcia zostawiałaby magazyniera z towarem na złej półce i bez
+wyjścia.
+
+**PÓŹNIEJ — NA KONIEC LISTY.** Regał zastawiony, towar na dnie kosza, coś
+pilniejszego po drodze. Pozycja zjeżdża na koniec i nadal czeka: to NIE jest
+pominięcie i nie trafia na listę spraw biura. ZAKOŃCZ jej nie przepuści.
+Znacznik czasu zamiast flagi, więc druga odłożona staje za pierwszą, a ponowne
+kliknięcie przesuwa na sam koniec.
 
 ## 0.78.1 — 22 sierpnia 2026
 

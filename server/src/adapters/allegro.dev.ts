@@ -188,7 +188,7 @@ const WATKI: Record<string, WatekAllegro> = {
   },
 };
 
-/* ── Pytania klientów (0.79.0) ───────────────────────────────────────────────
+/* ── Pytania klientów (0.80.0) ───────────────────────────────────────────────
    Cztery wątki, każdy sprawdza co innego w synchronizacji i w szkicu:
      dev-pyt-1  dobór części, towar JEST w kartotece (TEST-LINIA-TODO)
      dev-pyt-2  dobór części, towaru NIE MA — pytanie o braku w ofercie

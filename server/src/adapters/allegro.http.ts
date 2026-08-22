@@ -453,7 +453,7 @@ export function scopeDlaUrl(url: string): string {
 export class HttpAllegroAdapter implements AllegroAdapter {
   private async zapytaj(
     url: string,
-    /* Do 0.79.0 ten klient tylko CZYTAŁ. Wysyłka odpowiedzi klientowi jest
+    /* Do 0.80.0 ten klient tylko CZYTAŁ. Wysyłka odpowiedzi klientowi jest
        pierwszym zapisem — te same nagłówki i ta sama nauka `Accept`, więc
        metoda i ciało doszły jako opcje zamiast drugiej funkcji obok. */
     opcje: { metoda?: "POST" | "PUT"; body?: unknown } = {}
@@ -642,7 +642,7 @@ export class HttpAllegroAdapter implements AllegroAdapter {
     return { watek: null, przejrzanych, najstarszaData, wyczerpano: false };
   }
 
-  // ── Pytania klientów (0.79.0) ──────────────────────────────────────────────
+  // ── Pytania klientów (0.80.0) ──────────────────────────────────────────────
 
   async listaWatkow(odKiedy: string | null, maxStron = 10): Promise<WatekNaglowek[]> {
     /* Lista jest malejąca po dacie ostatniej wiadomości, więc schodzimy do

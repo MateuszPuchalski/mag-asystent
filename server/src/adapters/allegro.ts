@@ -197,7 +197,7 @@ export interface AllegroAdapter {
    */
   watekKupujacego(kto: KupujacyRef, odKiedy: string | null): Promise<SzukanieWatku>;
 
-  /* ── Pytania klientów (0.79.0) ─────────────────────────────────────────────
+  /* ── Pytania klientów (0.80.0) ─────────────────────────────────────────────
      Wątki są tu ŹRÓDŁEM PRACY, nie ciekawostką przy zwrocie, więc czytamy je
      inaczej: listą od najświeższej i tylko do znanej daty. Snapshot pytania
      zostaje u nas (rejestr naszej pracy), pełna rozmowa dalej mieszka

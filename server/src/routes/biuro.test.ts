@@ -178,7 +178,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
     6,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
       "wgranie logo dostawcy, półka reklamacyjna oraz prompt eksperta " +
-      "i fakty firmowe (0.79.0)"
+      "i fakty firmowe (0.80.0)"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,

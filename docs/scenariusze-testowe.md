@@ -723,6 +723,17 @@ powrotne zrobi po rozłożeniu; dokument z kolektora byłby tym samym towarem
 przesuniętym drugi raz. Zadania `set_location` mają natomiast powstać — dla
 towaru, który zmienił miejsce.
 
+Drogi powrotne (0.79.0). Wskaż odłożoną pozycję — panel ma dać **COFNIJ
+ODŁOŻENIE**; po cofnięciu pozycja wraca do pracy, adres znika, a zadanie
+`set_location` w kolejce ma status `cancelled`. Przestaw to zadanie ręcznie na
+`done` i spróbuj cofnąć drugi raz: aplikacja ma odmówić i wskazać poprawę
+skanem właściwego regału. Ta poprawa ma zadziałać i nadpisać adres.
+
+Przycisk **PÓŹNIEJ — NA KONIEC LISTY** zsuwa pozycję na dół, zostawiając ją
+w stanie „czeka". ZAKOŃCZ ma jej nadal nie przepuścić. Po zakończeniu kosza
+przycisk **COFNIJ ZAKOŃCZENIE** ma go otworzyć z powrotem, z pozycjami
+w stanie sprzed kliknięcia.
+
 Bramka roli: na wierszu przyjęcia akcja **JUŻ ROZŁOŻONY** należy do admina.
 Na koncie magazyniera trasa `POST /api/przyjecia/:dokId/poza-aplikacja` ma
 odpowiedzieć 403.
