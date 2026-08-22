@@ -271,6 +271,11 @@
       <div class="grupa-btny">
         <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
         <button data-widok="zwroty">ZWROTY ALLEGRO</button>
+        <!-- Licznik w nawiasie, nie osobna ikona: pytanie klienta czeka na
+             odpowiedź jak nieprzeczytana wiadomość, więc zakładka ma mówić
+             ILE, zanim ktokolwiek na nią kliknie. Pusty `span`, dopóki
+             pytań nie ma — nawias „(0)" byłby szumem. -->
+        <button data-widok="pytania">PYTANIA KLIENTÓW <span id="pytaniaLicznik"></span></button>
       </div>
     </div>
     <div class="grupa">
@@ -511,6 +516,138 @@
       <h2>KONTO ALLEGRO</h2>
       <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
       <div id="allegroAkcje"></div>
+    </section>
+  </div>
+
+  <!-- ── PYTANIA KLIENTÓW ────────────────────────────────────────────────────
+       Odpowiadanie na pytania o dobór części było dotąd pracą poza aplikacją:
+       screenshot z poczty szedł do zewnętrznego czata, a odpowiedź wracała
+       przez schowek. Ta zakładka zamyka pętlę tam, gdzie i tak jest kartoteka,
+       stan i zamienniki.
+
+       Kolejność kart odpowiada kolejności pracy: najpierw to, co czeka
+       (szczegół zasłania resztę, jak przy dostawach i zwrotach), potem wklejka
+       dla pytań spoza Allegro, potem wgląd. -->
+  <div id="widokPytania" hidden style="display:grid;gap:20px">
+    <!-- Szczegół pytania — wejście W sprawę, nie dodatek obok listy. -->
+    <section class="card" id="pytanieSzczegol" hidden>
+      <button class="akcja cichy" id="pytanieWroc">← WSZYSTKIE PYTANIA</button>
+      <div id="pytanieNaglowek" style="margin-top:12px"></div>
+
+      <h2 style="margin-top:16px">ROZMOWA</h2>
+      <div id="pytanieRozmowa"></div>
+
+      <h2 style="margin-top:18px">ODPOWIEDŹ</h2>
+      <p class="mute" style="margin-bottom:6px" id="pytanieSzkicInfo"></p>
+      <textarea id="pytanieOdpowiedz" rows="9" style="width:100%"></textarea>
+      <div id="pytanieAkcje" style="margin-top:10px"></div>
+
+      <h2 style="margin-top:18px">DOPASOWANE TOWARY</h2>
+      <p class="mute" style="margin-bottom:8px">
+        To samo, co dostał model. Kliknięcie „WSTAW LINK" dokleja adres aukcji
+        do odpowiedzi w miejscu kursora.
+      </p>
+      <div id="pytanieTowary"></div>
+    </section>
+
+    <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
+         wzorzec karty KONTO ALLEGRO przy pustym client_id. -->
+    <section class="card" id="pytaniaBaner" hidden>
+      <h2>SZKICE AI</h2>
+      <div id="pytaniaBanerTresc" class="mute"></div>
+    </section>
+
+    <section class="card" id="pytaniaWklejkaKarta">
+      <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
+        wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
+        przepisana treść pytania.
+      </p>
+      <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
+        placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
+      <div style="margin-top:8px">
+        <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
+        <span class="mute" id="pytaniaWklejkaStan"></span>
+      </div>
+    </section>
+
+    <section class="card" id="pytaniaListaKarta">
+      <h2>PYTANIA · DO ODPOWIEDZI</h2>
+      <div class="filtry" style="margin-bottom:10px">
+        <div>
+          <label for="pytaniaFiltrStatus">STATUS</label>
+          <select id="pytaniaFiltrStatus">
+            <option value="">Do odpowiedzi (nowe i szkice)</option>
+            <option value="wyslane">Wysłane</option>
+            <option value="zamkniete">Zamknięte</option>
+            <option value="pominiete">Pominięte</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="akcja" id="pytaniaOdswiez">ODŚWIEŻ Z ALLEGRO</button>
+        </div>
+      </div>
+      <table id="pytaniaLista"></table>
+    </section>
+
+    <section class="card" id="pytaniaStatystykiKarta">
+      <h2>STATYSTYKI · O CO PYTAJĄ KLIENCI</h2>
+      <div class="filtry" style="margin-bottom:10px">
+        <div>
+          <label for="pytaniaDni">OKNO</label>
+          <select id="pytaniaDni">
+            <option value="30">30 dni</option>
+            <option value="90" selected>90 dni</option>
+            <option value="180">180 dni</option>
+          </select>
+        </div>
+      </div>
+      <div class="kafle" id="pytaniaKafle"></div>
+
+      <h2 style="margin-top:18px">NAJCZĘŚCIEJ PYTANE TOWARY</h2>
+      <table id="pytaniaProdukty"></table>
+
+      <h2 style="margin-top:18px">KATEGORIE PYTAŃ</h2>
+      <div class="kafle" id="pytaniaKategorie"></div>
+
+      <h2 style="margin-top:18px">PYTANIA PER TYDZIEŃ</h2>
+      <div id="pytaniaTygodnie" style="margin-top:6px"></div>
+
+      <h2 style="margin-top:18px">PYTALI O TOWAR SPOZA NASZEJ OFERTY</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Ktoś chciał kupić, a nie było czego sprzedać. To najtańszy research
+        asortymentu, jaki firma ma.
+      </p>
+      <table id="pytaniaPozaOferta"></table>
+    </section>
+
+    <section class="card" id="pytaniaKonfiguracjaKarta">
+      <h2>PROMPT EKSPERTA I FAKTY FIRMOWE</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Zmienia wyłącznie admin. Prompt opisuje, KIM jest doradca i jak pisze.
+        Fakty to jedyne źródło prawdy o wysyłce, terminach i płatnościach —
+        czego tu nie ma, tego model nie poda klientowi.
+      </p>
+      <details id="pytaniaKonfiguracja">
+        <summary>Pokaż i edytuj</summary>
+        <div style="margin-top:10px">
+          <label for="pytaniaPrompt">PROMPT EKSPERTA</label>
+          <textarea id="pytaniaPrompt" rows="8" style="width:100%"></textarea>
+          <div style="margin-top:6px">
+            <button class="akcja" id="pytaniaZapiszPrompt">ZAPISZ PROMPT</button>
+          </div>
+
+          <label for="pytaniaFakty" style="margin-top:14px;display:block">FAKTY FIRMOWE</label>
+          <textarea id="pytaniaFakty" rows="8" style="width:100%"
+            placeholder="Wysyłka zagraniczna: …&#10;Czas wysyłki: …&#10;Płatności: …"></textarea>
+          <div style="margin-top:6px">
+            <button class="akcja" id="pytaniaZapiszFakty">ZAPISZ FAKTY</button>
+          </div>
+          <p class="mute" id="pytaniaKonfiguracjaStan" style="margin-top:8px"></p>
+        </div>
+      </details>
     </section>
   </div>
 
@@ -876,8 +1013,10 @@ function pokaz(nowy) {
      samego powodu stan panelu NIE idzie do localStorage. */
   zamknijDokument();
   zamknijZwrot();
+  zamknijPytanie();
   $("widokDostawy").hidden = nowy !== "dostawy";
   $("widokZwroty").hidden = nowy !== "zwroty";
+  $("widokPytania").hidden = nowy !== "pytania";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
@@ -889,6 +1028,7 @@ function pokaz(nowy) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
   if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
+  if (nowy === "pytania") { odswiezPytania(); odswiezStatystykiPytan(); wczytajKonfiguracjePytan(); }
   if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
@@ -2291,7 +2431,23 @@ async function odswiez() {
     if (otwartyDok != null) await odswiezSzczegol();
     else await odswiezDostawy();
   } else if (widok === "zwroty") await odswiezZwroty();
+  else if (widok === "pytania") await odswiezPytania();
   else if (widok === "nadzor") await odswiezNadzor();
+  /* Licznik na zakładce chodzi ZAWSZE, nie tylko przy otwartej zakładce —
+     w tym cała jego wartość: biuro ma zobaczyć nowe pytanie, siedząc na
+     dostawach. Osobna, tania trasa, żeby nie ciągnąć listy dla jednej liczby. */
+  await odswiezLicznikPytan();
+}
+
+/** Licznik pytań w nawiasie przy zakładce; pusto, gdy nie ma nic do zrobienia. */
+async function odswiezLicznikPytan() {
+  try {
+    const d = await (await api("/api/biuro/pytania/licznik")).json();
+    $("pytaniaLicznik").textContent = d.otwartych > 0 ? `(${d.otwartych})` : "";
+  } catch {
+    /* Licznik jest ozdobą paska, nie treścią — jego awaria nie ma prawa
+       przerywać odświeżania właściwej zakładki. */
+  }
 }
 
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
@@ -3548,6 +3704,506 @@ $("allegroAkcje").addEventListener("click", async (e) => {
     akcjaZwrotu(async () => { await api("/api/biuro/allegro", { method: "DELETE" }); odswiezZwroty(); });
   }
 });
+
+/* ── Pytania klientów ────────────────────────────────────────────────────────
+   Ta zakładka ma jeden cel: doprowadzić skrzynkę do zera. Stąd trzy zabiegi,
+   które wyglądają na drobiazgi, a są całą jej wartością:
+
+     • szkic JUŻ JEST, kiedy pytanie się otwiera (liczy go ticker w tle),
+     • karty towarów stoją obok pola odpowiedzi, więc dobór weryfikuje się
+       okiem, bez przełączania do Subiekta,
+     • po wysłaniu panel sam otwiera następne pytanie.
+
+   Odpowiedź wysyła CZŁOWIEK i to się nie zmienia: model pisze szkic, biuro
+   go czyta i poprawia. Automatyczna wysyłka wymagałaby zaufania, którego
+   nikt tu nie deklarował.                                                    */
+
+let otwartePytanie = null;
+/** Rozmowa dociągana raz na otwarcie — odświeżenie co 30 s nie ma jej kasować. */
+let pytanieIdRozmowy = null;
+/** Czy w polu odpowiedzi są niezapisane zmiany — chroni je przed odświeżeniem. */
+let odpowiedzRuszona = false;
+
+const STATUSY_PYTAN = {
+  nowe: ['<span class="badge mute2">NOWE</span>', "czeka na szkic"],
+  szkic: ['<span class="badge amber">SZKIC GOTOWY</span>', "do sprawdzenia"],
+  wyslane: ['<span class="badge ok">WYSŁANE</span>', ""],
+  zamkniete: ['<span class="badge mute2">ZAMKNIĘTE</span>', ""],
+  pominiete: ['<span class="badge mute2">POMINIĘTE</span>', ""],
+};
+
+const KATEGORIE_PYTAN = {
+  "dobor-czesci": "dobór części",
+  "dostawa-wysylka": "dostawa i wysyłka",
+  "stan-zamowienia": "stan zamówienia",
+  reklamacja: "reklamacja",
+  inne: "inne",
+  nieokreślone: "nieokreślone",
+};
+
+const badgePytania = (s) => (STATUSY_PYTAN[s] || STATUSY_PYTAN.nowe)[0];
+
+function zamknijPytanie() {
+  otwartePytanie = null;
+  pytanieIdRozmowy = null;
+  odpowiedzRuszona = false;
+  $("pytanieSzczegol").hidden = true;
+  for (const id of KARTY_LISTY_PYTAN) {
+    /* Baner stanu AI ma własną regułę widoczności — przy działającym modelu
+       zostaje schowany, bo nie ma czego ogłaszać. */
+    $(id).hidden = id === "pytaniaBaner" && $(id).dataset.pusty === "1";
+  }
+}
+
+/* Karty, które szczegół ZASŁANIA. Jedna lista zamiast dwóch pętli: przy
+   dwóch kopiach karta dopisana jutro zostaje widoczna pod otwartym pytaniem
+   i nikt tego nie zauważy, dopóki ktoś nie przewinie ekranu. */
+const KARTY_LISTY_PYTAN = [
+  "pytaniaBaner", "pytaniaWklejkaKarta", "pytaniaListaKarta",
+  "pytaniaStatystykiKarta", "pytaniaKonfiguracjaKarta",
+];
+
+async function odswiezPytania() {
+  /* Otwarte pytanie NIE odświeża się co 30 s i to jest świadome. Zwrot
+     odświeża, bo pracuje przy nim kilka osób naraz; pytanie jest tekstem,
+     który się nie zmienia, dopóki ktoś na nie nie odpowie. Za to szczegół
+     dobiera kontekst — czyli pyta Allegro o nasze oferty — więc cykliczne
+     odpytywanie byłoby czterema zapytaniami do API co pół minuty przez cały
+     czas, gdy biuro redaguje jedno zdanie. Ekran po akcji odświeżają same
+     akcje (`odswiezSzczegolPytania`). */
+  if (otwartePytanie != null) return;
+  try {
+    const q = new URLSearchParams();
+    if ($("pytaniaFiltrStatus").value) q.set("status", $("pytaniaFiltrStatus").value);
+    const d = await (await api(`/api/biuro/pytania?${q}`)).json();
+    rysujBanerAi(d.ai);
+    rysujListePytan(d.pytania);
+    $("pytaniaLicznik").textContent = d.otwartych > 0 ? `(${d.otwartych})` : "";
+  } catch (e) {
+    $("pytaniaLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+/* Baner pokazuje się TYLKO wtedy, gdy jest co powiedzieć: przy działającym
+   modelu byłby stałym zdaniem o tym, że wszystko jest w porządku. */
+function rysujBanerAi(ai) {
+  const pokaz = ai.tryb !== "anthropic" && ai.tryb !== "openai";
+  $("pytaniaBaner").hidden = !pokaz;
+  $("pytaniaBaner").dataset.pusty = pokaz ? "0" : "1";
+  $("pytaniaBanerTresc").innerHTML =
+    `<span class="badge ${ai.tryb === "wylaczone" ? "err" : "amber"}">` +
+    `${esc(ai.tryb.toUpperCase())}</span> ${esc(ai.opis)}`;
+}
+
+function rysujListePytan(lista) {
+  $("pytaniaLista").innerHTML = !lista.length
+    ? '<tr><td class="mute">Nic nie czeka na odpowiedź. Skrzynka na zero.</td></tr>'
+    : "<tr><th>STATUS</th><th>KLIENT</th><th>OFERTA</th><th>PYTANIE</th><th>WIEK</th><th></th></tr>" +
+      lista.map((p) => `<tr>
+          <td style="white-space:nowrap">${badgePytania(p.status)}</td>
+          <td>${esc(p.kupujacyLogin || (p.zrodlo === "wklejka" ? "(wklejka)" : "—"))}</td>
+          <td class="mute">${esc(p.ofertaTytul || "—")}</td>
+          <td>${esc((p.tresc || "").slice(0, 120))}${(p.tresc || "").length > 120 ? "…" : ""}</td>
+          <td class="mute" style="white-space:nowrap">${esc(wiekPytania(p.otrzymanoAt))}</td>
+          <td><button class="akcja cichy" data-pytanie="${p.id}">OTWÓRZ</button></td>
+        </tr>`).join("");
+}
+
+/** Wiek pytania słowami — „3 dni" mówi o pilności więcej niż data z godziną. */
+function wiekPytania(at) {
+  if (!at) return "—";
+  const ms = Date.now() - Date.parse(at.replace(" ", "T") + (at.endsWith("Z") ? "" : "Z"));
+  if (!Number.isFinite(ms)) return "—";
+  const godzin = Math.floor(ms / 3_600_000);
+  if (godzin < 1) return "przed chwilą";
+  if (godzin < 24) return `${godzin} godz.`;
+  return `${Math.floor(godzin / 24)} dni`;
+}
+
+async function otworzPytanie(id) {
+  otwartePytanie = id;
+  pytanieIdRozmowy = null;
+  odpowiedzRuszona = false;
+  for (const k of KARTY_LISTY_PYTAN) $(k).hidden = true;
+  $("pytanieSzczegol").hidden = false;
+  await odswiezSzczegolPytania();
+  pokazRozmowe(id);
+}
+
+async function odswiezSzczegolPytania() {
+  const id = otwartePytanie;
+  try {
+    const d = await (await api(`/api/biuro/pytania/${id}`)).json();
+    if (otwartePytanie !== id) return; // biuro zdążyło przejść dalej
+    rysujSzczegolPytania(d);
+  } catch (e) {
+    $("pytanieNaglowek").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+function rysujSzczegolPytania(d) {
+  const p = d.pytanie;
+  const kat = p.kategoria ? `<span class="badge mute2">${esc(KATEGORIE_PYTAN[p.kategoria] || p.kategoria)}</span>` : "";
+  const poza = p.wOfercie === false ? '<span class="badge err">poza naszą ofertą</span>' : "";
+  $("pytanieNaglowek").innerHTML = `
+    <div>${badgePytania(p.status)} ${kat} ${poza}</div>
+    <div style="margin-top:6px"><span class="b">${esc(p.kupujacyLogin || "(wklejka z poczty)")}</span>
+      ${p.ofertaTytul ? ` · ${esc(p.ofertaTytul)}` : ""}</div>
+    <div class="mute" style="margin-top:4px">Pytanie sprzed: ${esc(wiekPytania(p.otrzymanoAt))}
+      ${p.urzadzenie ? ` · urządzenie: ${esc(p.urzadzenie)}` : ""}</div>`;
+
+  /* Pola odpowiedzi NIE ruszamy, gdy człowiek w nim pisze — odświeżenie co
+     30 s zjadałoby poprawki w połowie zdania. */
+  if (!odpowiedzRuszona) $("pytanieOdpowiedz").value = p.odpowiedz || "";
+
+  $("pytanieSzkicInfo").textContent =
+    p.status === "wyslane"
+      ? `Wysłane${p.wyslanoAt ? " " + p.wyslanoAt : ""} przez ${p.odpowiedzial || "?"}.`
+      : p.szkicAi
+        ? (p.edytowano ? "Szkic modelu po Twojej poprawce." : "Szkic modelu — przeczytaj i popraw, zanim wyślesz.")
+        : "Szkicu jeszcze nie ma. Kliknij GENERUJ SZKIC AI.";
+
+  const wyslane = p.status === "wyslane";
+  $("pytanieAkcje").innerHTML = [
+    `<button class="akcja" id="pytanieGeneruj">${p.szkicAi ? "PRZELICZ SZKIC" : "GENERUJ SZKIC AI"}</button>`,
+    wyslane ? "" : '<button class="akcja" id="pytanieZapisz">ZAPISZ</button>',
+    wyslane || !p.threadId ? "" : '<button class="akcja" id="pytanieWyslij">WYŚLIJ PRZEZ ALLEGRO</button>',
+    '<button class="akcja cichy" id="pytanieKopiuj">KOPIUJ</button>',
+    wyslane ? "" : '<button class="akcja cichy" id="pytanieZamknij">ZAŁATWIONE POZA APLIKACJĄ</button>',
+    wyslane ? "" : '<button class="akcja cichy" id="pytaniePomin">POMIŃ</button>',
+  ].join(" ");
+
+  rysujTowaryPytania(d.kartoteki || [], d.oferty || []);
+}
+
+function rysujTowaryPytania(kartoteki, oferty) {
+  const ofertaDla = (symbol) =>
+    oferty.find((o) => (o.externalId || "").toLowerCase() === (symbol || "").toLowerCase());
+
+  if (!kartoteki.length && !oferty.length) {
+    $("pytanieTowary").innerHTML =
+      '<p class="mute">Nic nie pasuje do tego pytania w kartotece ani w naszych aukcjach.</p>';
+    return;
+  }
+
+  const wiersze = kartoteki.map((k) => {
+    const o = ofertaDla(k.symbol);
+    return `<tr>
+      ${kolFoto(k.twId)}
+      <td><span class="b">${esc(k.symbol)}</span><br>${esc(k.nazwa)}
+        ${k.zamienniki.length ? `<div class="mute">zamiennie: ${esc(k.zamienniki.join(", "))}</div>` : ""}</td>
+      <td class="b" style="white-space:nowrap">${k.stan} szt.</td>
+      <td class="mute">${esc(k.lokalizacje.join(", ") || "—")}</td>
+      <td>${o ? `${esc(o.cena || "")}<br><a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a>` : '<span class="mute">brak aukcji</span>'}</td>
+      <td>${o ? `<button class="akcja cichy" data-wstaw="${esc(o.url)}">WSTAW LINK</button>` : ""}</td>
+    </tr>`;
+  });
+
+  /* Aukcje bez dopasowanej kartoteki też mają wartość: klient pyta o towar,
+     który sprzedajemy, a którego nie umiemy znaleźć w symbolach. */
+  const sieroty = oferty.filter(
+    (o) => !kartoteki.some((k) => (k.symbol || "").toLowerCase() === (o.externalId || "").toLowerCase())
+  );
+  for (const o of sieroty) {
+    wiersze.push(`<tr>
+      ${kolFoto(null)}
+      <td>${esc(o.nazwa)}<div class="mute">tylko aukcja, bez dopasowanej kartoteki</div></td>
+      <td class="mute">${o.dostepnych == null ? "—" : o.dostepnych + " szt."}</td>
+      <td class="mute">—</td>
+      <td>${esc(o.cena || "")}<br><a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a></td>
+      <td><button class="akcja cichy" data-wstaw="${esc(o.url)}">WSTAW LINK</button></td>
+    </tr>`);
+  }
+
+  $("pytanieTowary").innerHTML =
+    `<table id="pytanieTowaryTabela"><tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+    "<th>TOWAR</th><th>STAN</th><th>PÓŁKA</th><th>AUKCJA</th><th></th></tr>" +
+    wiersze.join("") + "</table>";
+  dolozZdjeciaListy(kartoteki, "pytanieTowaryTabela", "sesjaPytan");
+}
+
+/** Rozmowa z Allegro — na żądanie, jak przy zwrotach: to prywatna korespondencja. */
+async function pokazRozmowe(id) {
+  if (pytanieIdRozmowy === id) return;
+  $("pytanieRozmowa").innerHTML = '<p class="mute">Wczytuję rozmowę…</p>';
+  try {
+    const d = await (await api(`/api/biuro/pytania/${id}/wiadomosci`)).json();
+    if (otwartePytanie !== id) return;
+    pytanieIdRozmowy = id;
+    const wiadomosci = d.watek?.wiadomosci || [];
+    $("pytanieRozmowa").innerHTML = !wiadomosci.length
+      ? '<p class="mute">Pytanie z wklejki — pełnej rozmowy nie ma po naszej stronie.</p>'
+      : '<div style="display:flex;flex-direction:column">' +
+        wiadomosci.map((w) => `<div class="wiad ${w.odKupujacego ? "klient" : "my"}">
+            <div class="kto">${w.odKupujacego ? esc(w.autor || "KLIENT") : "MY"}${
+              w.at ? " · " + esc(w.at.slice(0, 16).replace("T", " ")) : ""
+            }${w.zalacznikow ? ` · ${w.zalacznikow} zał.` : ""}</div>
+            <div class="tresc">${esc(w.tresc)}</div>
+          </div>`).join("") + "</div>";
+  } catch (e) {
+    $("pytanieRozmowa").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+/** Wspólna obudowa akcji: błąd na toast, potem odświeżenie szczegółu. */
+async function akcjaPytania(fn) {
+  try {
+    await fn();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/** Po wysłaniu/zamknięciu — następne pytanie albo powrót do pustej listy. */
+async function przejdzDalej(wynik) {
+  odpowiedzRuszona = false;
+  if (wynik.nastepneId) {
+    toast("Następne pytanie");
+    await otworzPytanie(wynik.nastepneId);
+  } else {
+    toast("Skrzynka pusta ✓");
+    zamknijPytanie();
+    await odswiezPytania();
+  }
+  await odswiezLicznikPytan();
+}
+
+/* ── Wklejka ze schowka ──────────────────────────────────────────────────────
+   Nasłuch stoi na dokumencie, bo obraz wkleja się „gdzieś na stronie", a nie
+   w konkretne pole — dokładnie tak, jak człowiek to robi dziś w czacie. */
+document.addEventListener("paste", (e) => {
+  if (widok !== "pytania" || otwartePytanie != null) return;
+  const obraz = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+  if (!obraz) return;
+  e.preventDefault();
+  const plik = obraz.getAsFile();
+  if (!plik) return;
+  const czytnik = new FileReader();
+  czytnik.onload = () => wyslijWklejke({ obraz: String(czytnik.result) });
+  czytnik.readAsDataURL(plik);
+});
+
+async function wyslijWklejke(dane) {
+  $("pytaniaWklejkaStan").textContent = "Pytam model…";
+  try {
+    const d = await (await api("/api/biuro/pytania/wklejka", {
+      method: "POST", body: JSON.stringify(dane),
+    })).json();
+    $("pytaniaWklejkaStan").textContent = "";
+    $("pytaniaWklejkaTekst").value = "";
+    await otworzPytanie(d.pytanie.id);
+  } catch (e) {
+    $("pytaniaWklejkaStan").textContent = "";
+    toast(e.message);
+  }
+}
+
+/* ── Statystyki pytań ──────────────────────────────────────────────────────── */
+
+async function odswiezStatystykiPytan() {
+  try {
+    const d = await (await api(`/api/biuro/pytania/statystyki?dni=${$("pytaniaDni").value}`)).json();
+    rysujStatystykiPytan(d.statystyki);
+  } catch (e) {
+    $("pytaniaProdukty").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+function rysujStatystykiPytan(s) {
+  const udzial = s.wyslanych > 0 ? Math.round((s.bezEdycji / s.wyslanych) * 100) : null;
+  $("pytaniaKafle").innerHTML = [
+    kafel(s.wyslanych, `odpowiedzi wysłanych w ${s.dni} dniach`),
+    kafel(s.medianaGodzin == null ? "—" : `${s.medianaGodzin} godz.`, "mediana czasu odpowiedzi"),
+    /* Niski udział nie jest porażką — znaczy, że człowiek dokłada wiedzę,
+       której model nie ma. Dlatego bez czerwieni. */
+    kafel(udzial == null ? "—" : `${udzial}%`, "wysłanych bez poprawki szkicu"),
+    kafel(s.pozaOferta.length, "pytań o towar spoza oferty", s.pozaOferta.length > 0),
+  ].join("");
+
+  $("pytaniaProdukty").innerHTML = !s.produkty.length
+    ? '<tr><td class="mute">Brak dopasowanych towarów w tym oknie.</td></tr>'
+    : `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}<th>TOWAR</th><th>PYTAŃ</th></tr>` +
+      s.produkty.map((p) => `<tr>
+          ${kolFoto(p.twId)}
+          <td><span class="b">${esc(p.symbol)}</span>${p.nazwa ? `<br>${esc(p.nazwa)}` : ""}
+            ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}</td>
+          <td class="b">${p.pytan}</td>
+        </tr>`).join("");
+  dolozZdjeciaListy(s.produkty, "pytaniaProdukty", "sesjaStatystykPytan");
+
+  $("pytaniaKategorie").innerHTML = !s.kategorie.length
+    ? '<p class="mute">Brak pytań w tym oknie.</p>'
+    : s.kategorie.map((k) => kafel(k.ile, KATEGORIE_PYTAN[k.kategoria] || k.kategoria)).join("");
+
+  $("pytaniaTygodnie").innerHTML = slupkiSvg(
+    s.tygodnie.map((t) => ({ ile: t.ile, podpis: "t" + t.tydzien.slice(-2), tytul: `tydzień ${t.tydzien}` })),
+    s.tygodnie.length > 12 ? 4 : 1
+  );
+
+  $("pytaniaPozaOferta").innerHTML = !s.pozaOferta.length
+    ? '<tr><td class="mute">Nikt nie pytał o towar spoza oferty w tym oknie.</td></tr>'
+    : "<tr><th>KIEDY</th><th>PYTANIE</th></tr>" +
+      s.pozaOferta.map((p) => `<tr>
+          <td class="mute" style="white-space:nowrap">${esc(wiekPytania(p.otrzymanoAt))}</td>
+          <td>${esc((p.tresc || "").slice(0, 200))}</td>
+        </tr>`).join("");
+}
+
+/* ── Prompt i fakty ────────────────────────────────────────────────────────── */
+
+async function wczytajKonfiguracjePytan() {
+  try {
+    const d = await (await api("/api/biuro/pytania/prompt")).json();
+    $("pytaniaPrompt").value = d.konfiguracja.prompt;
+    $("pytaniaFakty").value = d.konfiguracja.fakty;
+    $("pytaniaKonfiguracjaStan").textContent = d.konfiguracja.zmienionoAt
+      ? `Ostatnia zmiana: ${d.konfiguracja.zmienionoAt} · ${d.konfiguracja.zmienionoPrzez}`
+      : "Nic tu jeszcze nie wpisano — model pracuje na ustawieniach domyślnych.";
+  } catch (e) {
+    $("pytaniaKonfiguracjaStan").textContent = e.message;
+  }
+}
+
+/* ── Zdarzenia zakładki ────────────────────────────────────────────────────── */
+
+$("pytaniaLista").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pytanie]");
+  if (b) otworzPytanie(Number(b.dataset.pytanie));
+});
+$("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPytania(); });
+$("pytaniaFiltrStatus").addEventListener("change", odswiezPytania);
+$("pytaniaDni").addEventListener("change", odswiezStatystykiPytan);
+$("pytaniaOdswiez").addEventListener("click", async () => {
+  $("pytaniaOdswiez").disabled = true;
+  try {
+    const d = await (await api("/api/biuro/pytania/odswiez", { method: "POST", body: "{}" })).json();
+    toast(`Nowych pytań: ${d.nowych} · przejrzano rozmów: ${d.przejrzanychWatkow} · szkiców: ${d.szkicow}`);
+    await odswiezPytania();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    $("pytaniaOdswiez").disabled = false;
+  }
+});
+$("pytaniaZapytajAi").addEventListener("click", () => {
+  const tekst = $("pytaniaWklejkaTekst").value.trim();
+  if (!tekst) return toast("Wpisz treść pytania albo wklej screenshot");
+  wyslijWklejke({ tekst });
+});
+$("pytanieOdpowiedz").addEventListener("input", () => { odpowiedzRuszona = true; });
+
+$("pytanieTowary").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-wstaw]");
+  if (!b) return;
+  /* Wstawienie w miejscu KURSORA, nie na koniec: link ma trafić w zdanie,
+     które człowiek właśnie pisze. */
+  const pole = $("pytanieOdpowiedz");
+  const od = pole.selectionStart ?? pole.value.length;
+  const do_ = pole.selectionEnd ?? pole.value.length;
+  pole.value = pole.value.slice(0, od) + b.dataset.wstaw + pole.value.slice(do_);
+  pole.focus();
+  pole.selectionStart = pole.selectionEnd = od + b.dataset.wstaw.length;
+  odpowiedzRuszona = true;
+});
+
+$("pytanieAkcje").addEventListener("click", async (e) => {
+  const id = otwartePytanie;
+  if (id == null) return;
+  const tresc = () => $("pytanieOdpowiedz").value;
+
+  if (e.target.closest("#pytanieGeneruj")) {
+    $("pytanieSzkicInfo").textContent = "Model pisze szkic…";
+    return akcjaPytania(async () => {
+      await api(`/api/biuro/pytania/${id}/generuj`, { method: "POST", body: "{}" });
+      odpowiedzRuszona = false;
+      await odswiezSzczegolPytania();
+    });
+  }
+
+  if (e.target.closest("#pytanieZapisz")) {
+    return akcjaPytania(async () => {
+      await api(`/api/biuro/pytania/${id}`, {
+        method: "PUT", body: JSON.stringify({ odpowiedz: tresc() }),
+      });
+      odpowiedzRuszona = false;
+      toast("Zapisano");
+      await odswiezSzczegolPytania();
+    });
+  }
+
+  if (e.target.closest("#pytanieWyslij")) {
+    const zgoda = await potwierdz({
+      tytul: "WYSŁANIE ODPOWIEDZI DO KLIENTA",
+      opis: tresc().slice(0, 400),
+      potwierdz: "WYŚLIJ",
+    });
+    if (!zgoda) return;
+    return akcjaPytania(async () => {
+      const d = await (await api(`/api/biuro/pytania/${id}/wyslij`, {
+        method: "POST", body: JSON.stringify({ odpowiedz: tresc() }),
+      })).json();
+      await przejdzDalej(d);
+    });
+  }
+
+  if (e.target.closest("#pytanieKopiuj")) return kopiujOdpowiedz(tresc());
+
+  for (const [selektor, sciezka] of [["#pytanieZamknij", "zamknij"], ["#pytaniePomin", "pomin"]]) {
+    if (e.target.closest(selektor)) {
+      return akcjaPytania(async () => {
+        const d = await (await api(`/api/biuro/pytania/${id}/${sciezka}`, {
+          method: "POST", body: "{}",
+        })).json();
+        await przejdzDalej(d);
+      });
+    }
+  }
+});
+
+/**
+ * Kopiowanie do schowka z zejściem awaryjnym.
+ *
+ * `navigator.clipboard` wymaga bezpiecznego kontekstu, a panel biura chodzi
+ * po LAN-ie pod gołym http — czyli dokładnie tam, gdzie tego API nie ma.
+ * Bez zejścia awaryjnego przycisk byłby martwy na produkcji i żywy w testach.
+ */
+async function kopiujOdpowiedz(tekst) {
+  try {
+    await navigator.clipboard.writeText(tekst);
+    toast("Skopiowano do schowka");
+    return;
+  } catch {
+    /* Zejście niżej — stara droga działa bez HTTPS. */
+  }
+  const pole = document.createElement("textarea");
+  pole.value = tekst;
+  pole.style.position = "fixed";
+  pole.style.opacity = "0";
+  document.body.appendChild(pole);
+  pole.select();
+  const udalo = document.execCommand("copy");
+  pole.remove();
+  toast(udalo ? "Skopiowano do schowka" : "Nie udało się skopiować — zaznacz treść i skopiuj ręcznie");
+}
+
+for (const [przycisk, pole, sciezka] of [
+  ["pytaniaZapiszPrompt", "pytaniaPrompt", "prompt"],
+  ["pytaniaZapiszFakty", "pytaniaFakty", "fakty"],
+]) {
+  $(przycisk).addEventListener("click", async () => {
+    try {
+      /* Rola nie jest znana przeglądarce — przycisk widzą wszyscy, a odmowę
+         wypowiada serwer. Ten sam wzorzec co przy parowaniu konta Allegro. */
+      await api(`/api/biuro/pytania/${sciezka}`, {
+        method: "PUT", body: JSON.stringify({ [sciezka]: $(pole).value }),
+      });
+      toast("Zapisano");
+      await wczytajKonfiguracjePytan();
+    } catch (e) {
+      toast(e.message);
+    }
+  });
+}
 
 setInterval(() => { if (token) odswiez(); }, 30_000);
 

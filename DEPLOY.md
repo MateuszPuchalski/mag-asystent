@@ -1239,6 +1239,83 @@ Konfigurację czyta z `wertis.env` w katalogu roboczym; inną ścieżkę wskazuj
 - Worker Sfery nie istnieje w dev i to jest poprawne — dane demo obsługuje
   wbudowany adapter zapisu.
 
+## 6c. Pytania klientów (szkice odpowiedzi o dobór części)
+
+Zakładka PYTANIA KLIENTÓW w `/biuro`. Aplikacja ściąga pytania z Centrum
+wiadomości Allegro i przygotowuje szkic odpowiedzi z kartoteki, stanów,
+zamienników i linków do naszych aukcji. Po akceptacji człowieka wysyła ją do
+klienta. Pytania spoza Allegro (screenshot z poczty) wchodzą przez wklejkę.
+
+**Odpowiedź wysyła zawsze człowiek.** Model pisze szkic, biuro czyta, poprawia
+i klika. Automatycznej wysyłki nie ma.
+
+Włączenie ma **trzy kroki i żadnego nie da się pominąć**:
+
+1. **Uprawnienia aplikacji Allegro.** Na developer.allegro.pl dodaj do swojej
+   aplikacji `allegro:api:messaging` (Centrum wiadomości — odczyt i zapis)
+   oraz `allegro:api:sale:offers:read` (nasze oferty). Zwroty z §6a tych
+   uprawnień nie wymagały.
+
+2. **PONOWNE PAROWANIE KONTA.** To krok, o który najłatwiej się potknąć: token
+   wydany pod stary zakres uprawnień **sam się nie rozszerzy**. Po dodaniu
+   uprawnień wejdź w `/biuro` → ZWROTY ALLEGRO → KONTO ALLEGRO, rozłącz konto
+   i sparuj je jeszcze raz. Bez tego pierwsze odświeżenie pytań kończy się
+   błędem 403 — komunikat wskazuje wtedy brakujące uprawnienie po nazwie.
+
+3. **Klucz modelu w `wertis.env`.** Dwaj dostawcy do wyboru:
+
+   ```ini
+   export AI_PROVIDER=anthropic
+   export ANTHROPIC_API_KEY=sk-ant-...
+   ```
+
+   albo
+
+   ```ini
+   export AI_PROVIDER=openai
+   export OPENAI_API_KEY=sk-...
+   ```
+
+   Model musi obsługiwać obrazy, inaczej wklejony screenshot pytania nie
+   zadziała. Domyślne (`claude-opus-5` i `gpt-4o`) obsługują; własny wybór
+   wpisuje się w `AI_MODEL`. Po zmianie pliku **zrestartuj `wertis-api`**.
+
+   Serwer z ustawionym `AI_PROVIDER` i pustym kluczem **nie wystartuje** —
+   celowo: twardy błąd przy starcie jest tańszy niż awaria przy pierwszym
+   pytaniu klienta.
+
+Bez konfiguracji funkcja jest wyłączona, a zakładka mówi wprost, co dopisać.
+W `SGT_MODE=seeded` działa doradca DEV: odpowiedzi fikcyjne, składane
+z kontekstu, bez wychodzenia w internet — do pokazu i do testów.
+
+### Zanim włączysz: dwie decyzje właściciela
+
+- **Prywatność.** Treść pytania klienta (a przy wklejce — obraz ze schowka)
+  wychodzi do zewnętrznego dostawcy modelu. Samego obrazu nie zapisujemy
+  u siebie: zostaje wyłącznie przepisana treść pytania. To decyzja właściciela
+  firmy i dlatego funkcja jest domyślnie wyłączona.
+- **Koszt.** Szkice liczą się w tle dla każdego nowego pytania, także tego,
+  na które nikt nie odpowie. Przy kilkunastu pytaniach dziennie to grosze,
+  ale kwota rośnie z ruchem, a nie z liczbą kliknięć.
+
+### Pierwsze uruchomienie
+
+Pierwsza synchronizacja schodzi płycej niż kolejne — bierze około
+sześćdziesięciu najświeższych rozmów, żeby nie zrobić listy setek „pytań",
+na które dawno odpowiedziano. Zrób ją **pod nadzorem**: wejdź w zakładkę,
+kliknij ODŚWIEŻ Z ALLEGRO i przeczytaj pierwsze szkice, zanim cokolwiek
+wyślesz.
+
+Zaraz potem wypełnij **FAKTY FIRMOWE** (karta na dole zakładki, zmienia
+admin): cennik wysyłek zagranicznych, czas wysyłki, zasady płatności. To
+jedyne źródło, z którego model może je podać klientowi — czego tam nie ma,
+tego nie poda. Pusta karta znaczy szkice, które przy pytaniu o wysyłkę do
+Chorwacji napiszą „sprawdzimy i odpiszemy" zamiast konkretu.
+
+Częstotliwość ściągania pytań dzieli pokrętło z zapowiedziami zwrotów
+(`ALLEGRO_POLL_MS`, domyślnie 5 minut) — to ta sama praca w tle na tym samym
+koncie.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
