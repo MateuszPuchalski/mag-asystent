@@ -37,16 +37,24 @@ $publish = Join-Path $katalog "publish"
 # tam modele mają stałe adresy i podane sumy. Większy `isnet-general-use`
 # (~176 MB) radzi sobie lepiej z zagraconym tłem; wskazuje się go kluczem
 # TLO_MODEL w wertis.env, bez przebudowy.
-$modelUrl = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"  # [WERYFIKUJ]
+$modelUrl = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"
 
-# [WERYFIKUJ] — SUMA JEST PUSTA I TO JEST STAN ZAMIERZONY.
+# USTALONE 22 sierpnia 2026, przy pierwszym budowaniu usługi.
 #
-# Repozytorium nie zna sumy pliku, którego nie zawiera. Wpisanie tu liczby
-# „z pamięci" byłoby gorsze niż jej brak: sprawdzenie przechodziłoby, nie
-# sprawdzając niczego. Pierwsza osoba budująca wydanie pobiera model, PORÓWNUJE
-# sumę ze źródłem u wydawcy i wpisuje ją tutaj — od tej chwili pilnuje jej
-# każdy kolejny build. Do tego czasu skrypt odmawia i mówi, czego brakuje.
-$modelSha = ""
+# Do 0.88.2 ta wartość była PUSTA i skrypt odmawiał — celowo. Repozytorium nie
+# znało sumy pliku, którego nie zawiera, a liczba wpisana „z pamięci" byłaby
+# gorsza niż jej brak: sprawdzenie przechodziłoby, nie sprawdzając niczego.
+#
+# Jak ją potwierdzono — trzy niezależne odczyty, wszystkie zgodne:
+#   1. pobranie na maszynie wdrożeniowej (Windows)      SHA256 309c8469…f4ddd8
+#   2. pobranie z innej maszyny i innej sieci           SHA256 309c8469…f4ddd8
+#   3. rembg, rembg/sessions/u2netp.py                  md5:8e83ca70e441ab06c318d82300c84806
+#      — MD5 pliku z punktu 2 jest identyczne z tym, co deklaruje wydawca.
+#
+# CZEGO TO NIE DOWODZI: że sam model jest bezpieczny albo dobry. Dowodzi tylko,
+# że pobrane bajty są DOKŁADNIE tymi, które rembg publikuje. Zaufanie do samego
+# rembg jest osobną decyzją i została podjęta przy wyborze modelu.
+$modelSha = "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8"
 
 dotnet publish (Join-Path $katalog "WertisTloWorker.csproj") `
     -c Release -r win-x64 --self-contained `

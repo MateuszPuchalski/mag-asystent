@@ -33,6 +33,57 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.3 — 22 sierpnia 2026
+
+<!-- docs_check: historia -->
+**Suma kontrolna modelu jest ustalona, a cztery `[WERYFIKUJ]` z 0.88.0 —
+zamknięte.** Wszystko na pliku, który naprawdę pobrano, a nie na założeniu.
+
+### Suma kontrolna
+
+`build.ps1` odmawiał budowania, bo `$modelSha` było puste. Tak miało być: liczba
+wpisana z pamięci przechodziłaby sprawdzenie, nie sprawdzając niczego.
+
+Wartość potwierdzono **trzema niezależnymi odczytami**:
+
+| źródło | wynik |
+|---|---|
+| pobranie na maszynie wdrożeniowej | `sha256 309c8469…f4ddd8` |
+| pobranie z innej maszyny i innej sieci | `sha256 309c8469…f4ddd8` |
+| `rembg`, plik `rembg/sessions/u2netp.py` | `md5:8e83ca70e441ab06c318d82300c84806` |
+
+Trzeci wpis jest tym, który rozstrzyga: to suma **deklarowana przez wydawcę**
+w jego własnym źródle, a MD5 pobranego pliku jest z nią identyczne.
+
+Dowodzi to, że pobrane bajty są dokładnie tymi, które rembg publikuje. NIE
+dowodzi, że model jest dobry ani bezpieczny — zaufanie do rembg jest osobną
+decyzją i zapadło przy wyborze modelu.
+
+### Nazwa wejścia była inna, niż zakładał komentarz
+
+Model odpytany wprost odpowiedział na wszystkie cztery pytania:
+
+| pytanie | odpowiedź |
+|---|---|
+| nazwa i kształt wejścia | `input.1` — **nie** `input` — 1 × 3 × 320 × 320 NCHW |
+| który tensor jest maską | wyjść siedem, maską pierwsze, 1 × 1 × 320 × 320 |
+| czy jest sigmoida | siedem operacji `Sigmoid` na końcu grafu |
+| adres i suma modelu | wpisane w `build.ps1` |
+
+Jedna z tych odpowiedzi różni się od tego, co zakładał komentarz w kodzie:
+wejście nazywa się `input.1`. Nie wymagało to poprawki, bo `UsuwanieTla.cs`
+nigdy nie wpisywał tej nazwy na sztywno — bierze ją z metadanych sesji.
+Gdyby wpisywał, model odmówiłby pracy przy pierwszym zdjęciu, a objawem byłby
+wyjątek w usłudze, nie błąd budowania.
+
+### Co zostaje do sprawdzenia
+
+Jakość wycięcia na **towarze magazynowym**. Tego nie rozstrzygnie żaden plik
+`.onnx` — tylko zdjęcia zrobione w hali. Dlatego w kolektorze stoi przycisk
+„ZOSTAW TŁO", a model podmienia się jednym kluczem `TLO_MODEL`.
+
+---
+
 ## 0.88.2 — 22 sierpnia 2026
 
 <!-- docs_check: historia -->
