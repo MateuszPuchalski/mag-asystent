@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.84.1 — 22 sierpnia 2026
+
+**Komunikat o błędnej konfiguracji przestał przepisywać sekrety na dysk.**
+
+Zgłoszenie z produkcji: po aktualizacji API nie wstało, a `nssm restart`
+odpowiadał `SERVICE_PAUSED`. Przyczyna była prosta — klucz Anthropic trafił do
+`AI_PROVIDER` zamiast do `ANTHROPIC_API_KEY`. Te dwa pola sąsiadują ze sobą
+w `wertis.env.example` i pomyłka przy wklejaniu jest naturalna.
+
+Gorsze było to, co zrobiła z nią aplikacja. Walidator wypisał WARTOŚĆ zmiennej
+do komunikatu błędu, NSSM podnosił usługę w pętli (`AppExit Default Restart`),
+a każdy obieg dopisywał kolejną kopię klucza do `logs\wertis-api.err.log`.
+Klucz trzeba było unieważnić.
+
+Od tej wersji wartość wyglądająca na klucz API nie trafia do komunikatu —
+zamiast niej stoi zdanie, że to wygląda na klucz, oraz wskazówka, w które pole
+klucz naprawdę się wpisuje. Maska nie jest jednak lekiem gorszym od choroby:
+krótkie wartości widać w całości, bo literówki w `antropic` nie da się zauważyć
+inaczej niż na oczy. Pod maskę schodzi też każda wartość dłuższa niż
+dwadzieścia kilka znaków — nie każdy sekret zaczyna się od `sk-`, a nazwa
+trybu nigdy nie jest długa.
+
+Ta sama reguła objęła `ALLEGRO_MODE`, `ZDJECIA_ZRODLO` i `SGT_MODE`. Trzy
+testy pilnują obu połówek naraz: sekret ma nie przeciec, a komunikat ma dalej
+mówić, co zrobić — sama maska zostawiłaby człowieka z „coś jest źle".
+
+DEPLOY §7 dostał wpis o stanie `SERVICE_PAUSED`: to nie jest wstrzymana usługa,
+tylko throttling NSSM-a po natychmiastowym wyjściu procesu. Wraz z jedną
+komendą, która pokazuje przyczynę z pominięciem NSSM-a, i przypomnieniem, żeby
+przy błędzie konfiguracji NAJPIERW zatrzymać usługi — pętla restartów mnoży
+w dzienniku to, co akurat wypisał serwer.
+
+---
+
 ## 0.84.0 — 22 sierpnia 2026
 
 **Biuro widzi, kto rozłożył kosz i o której.** Dane leżały w bazie od

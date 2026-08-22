@@ -496,9 +496,43 @@ export const config = {
  * a w usłudze NSSM z `AppExit Default Restart` kończyła się pętlą restartów bez
  * śladu w logu.
  */
+/**
+ * Prefiksy, po których poznaje się klucz API wklejony nie w to pole.
+ *
+ * Lista jest krótka i taka ma zostać: rozpoznajemy DWA formaty, których ta
+ * aplikacja używa, a wszystko dłuższe niż nazwa trybu i tak schodzi pod
+ * maskę regułą niżej.
+ */
+const PREFIKSY_KLUCZY = ["sk-ant-", "sk-", "Bearer "];
+
+/**
+ * Wartość zmiennej środowiskowej bezpieczna do wypisania w komunikacie błędu.
+ *
+ * Powód jest z produkcji (0.84.1): ktoś wkleił klucz Anthropic do
+ * `AI_PROVIDER` zamiast do `ANTHROPIC_API_KEY` — pola sąsiadują ze sobą
+ * w `wertis.env.example`. Serwer odmówił startu i wypisał wartość zmiennej
+ * do komunikatu, NSSM podniósł go automatycznie, a każdy obieg pętli dopisał
+ * kolejną kopię klucza do `logs\wertis-api.err.log`. Klucz trzeba było
+ * unieważnić.
+ *
+ * Komunikat o błędnej konfiguracji ma powiedzieć CO jest nie tak, a nie
+ * przepisać sekret na dysk. Wartość dłuższa niż jakakolwiek dozwolona nazwa
+ * trybu nie niesie już informacji diagnostycznej — literówkę widać w pierwszych
+ * znakach, a reszta to tylko materiał do wycieku.
+ */
+export function bezpiecznaWartosc(v: string): string {
+  if (PREFIKSY_KLUCZY.some((p) => v.startsWith(p))) {
+    return "(ukryte — ta wartość wygląda na klucz API, a nie na nazwę trybu)";
+  }
+  return v.length <= 24 ? v : `${v.slice(0, 12)}… (${v.length} znaków)`;
+}
+
 function assertMode(name: string, value: string, allowed: readonly string[]): void {
   if (!allowed.includes(value)) {
-    throw new Error(`${name}=${value} — nieobsługiwana wartość. Dozwolone: ${allowed.join(" | ")}.`);
+    throw new Error(
+      `${name}=${bezpiecznaWartosc(value)} — nieobsługiwana wartość. ` +
+        `Dozwolone: ${allowed.join(" | ")}.`
+    );
   }
 }
 assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
@@ -552,7 +586,7 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      dokładnie tak samo jak zła nazwa kolumny. */
   if (!["", "blob", "plik"].includes(c.zdjecia.zrodlo)) {
     bledy.push(
-      `ZDJECIA_ZRODLO=${c.zdjecia.zrodlo} — dozwolone: puste (bez zdjęć), blob, plik.`,
+      `ZDJECIA_ZRODLO=${bezpiecznaWartosc(c.zdjecia.zrodlo)} — dozwolone: puste (bez zdjęć), blob, plik.`,
     );
   }
   if (c.zdjecia.zrodlo === "blob") {
@@ -616,7 +650,7 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (!["", "dev", "http"].includes(c.allegro.mode)) {
     bledy.push(
-      `ALLEGRO_MODE=${c.allegro.mode} — dozwolone: puste (wg SGT_MODE), dev, http.`,
+      `ALLEGRO_MODE=${bezpiecznaWartosc(c.allegro.mode)} — dozwolone: puste (wg SGT_MODE), dev, http.`,
     );
   }
   /* Tryb http bez poświadczeń aplikacji nie ma jak zapytać o cokolwiek —
@@ -629,7 +663,9 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      przy panelu czeka na odpowiedź dla klienta. */
   if (!["", "dev", "anthropic", "openai"].includes(c.ai.provider)) {
     bledy.push(
-      `AI_PROVIDER=${c.ai.provider} — dozwolone: puste (wg SGT_MODE), dev, anthropic, openai.`,
+      `AI_PROVIDER=${bezpiecznaWartosc(c.ai.provider)} — dozwolone: ` +
+        "puste (wg SGT_MODE), dev, anthropic, openai. " +
+        "Klucz API wpisuje się w ANTHROPIC_API_KEY albo OPENAI_API_KEY.",
     );
   }
   if (c.ai.provider === "anthropic" && !c.ai.anthropicKey) {

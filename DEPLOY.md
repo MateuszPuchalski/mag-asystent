@@ -1459,6 +1459,22 @@ obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
   wolno; po zamknięciu reklamacji stare zdjęcia można archiwizować ręcznie.
 - **Logi:** `C:\wertis\logs\` (rotacja przez NSSM). Błędy zapisu Sfery widać
   też na kolektorze (czerwona pastylka + PONÓW).
+- **Usługa w stanie `SERVICE_PAUSED`.** To nie jest wstrzymana usługa, tylko
+  odpowiedź NSSM-a: proces zakończył się szybciej niż próg `AppThrottle`
+  (domyślnie 1,5 s), więc NSSM przestał go podnosić. Znaczy to, że serwer
+  wywala się natychmiast po starcie, a `nssm restart` będzie zwracał to samo,
+  dopóki przyczyna zostaje.
+
+  Przyczynę widać najszybciej z pominięciem NSSM-a:
+
+  ```powershell
+  cd C:\wertis
+  node server\dist\index.js
+  ```
+
+  Zanim zaczniesz naprawiać — **zatrzymaj usługi**. `AppExit Default Restart`
+  podnosi je w pętli, a każdy obieg dopisuje kolejną kopię komunikatu do
+  dziennika. Przy błędzie konfiguracji to potrafi być kopia sekretu.
 - **„Tryb seeded, chociaż w `wertis.env` stoi `mssql`".** Konfigurację przykryła
   zmienna środowiskowa usługi — środowisko ma nad plikiem pierwszeństwo.
   `/api/health` wypisuje wtedy przykryte klucze w `configPrzykryte` i zgłasza
