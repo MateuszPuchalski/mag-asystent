@@ -1,4 +1,4 @@
-# Budowa usługi usuwania tła: jeden samowystarczalny exe dla Windows x64
+﻿# Budowa usługi usuwania tła: jeden samowystarczalny exe dla Windows x64
 # plus plik modelu obok niego.
 #
 # Wymaga .NET 8 SDK — na maszynie dewelopera, NIE u klienta. Ta sama reguła
@@ -9,7 +9,22 @@
 # kontrolną. Bez sprawdzenia sumy byłby to plik z internetu uruchamiany
 # na maszynie z bazą Subiekta.
 #
-# Użycie:  powershell -File tlo-worker\build.ps1
+# ŚCIEŻKA JEST WZGLĘDNA WOBEC KATALOGU, W KTÓRYM STOISZ. Sam skrypt liczy swój
+# katalog z $MyInvocation i działa z dowolnego miejsca — myli się tylko to, co
+# podasz do -File. Stąd obie drogi wypisane wprost:
+#
+# Użycie:  powershell -NoProfile -ExecutionPolicy Bypass -File tlo-worker\build.ps1
+#          powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
+#          (pierwsze z korzenia repozytorium, drugie z katalogu tlo-worker)
+#
+# -ExecutionPolicy Bypass NIE JEST OZDOBNIKIEM. Windows domyślnie odmawia
+# uruchomienia skryptu pobranego z sieci — „running scripts is disabled on this
+# system". Bypass dotyczy TEGO JEDNEGO uruchomienia; polityka systemowa zostaje
+# nietknięta. Ta sama reguła i to samo zdanie co w instalator/README.md.
+#
+# NIE buduj w C:\wertis\tlo-worker — to katalog docelowy na serwerze firmy,
+# a nie miejsce pracy. Build idzie z repozytorium na maszynie dewelopera.
+#
 # Wynik:   tlo-worker\publish\wertis-tlo-worker.exe
 #          tlo-worker\publish\model\u2netp.onnx
 #          → skopiuj CAŁY katalog publish do C:\wertis\tlo-worker\
@@ -68,4 +83,4 @@ if ($suma -ne $modelSha.ToLower()) {
 
 Write-Host ""
 Write-Host "Gotowe: $(Join-Path $publish 'wertis-tlo-worker.exe')"
-Write-Host "Skopiuj CAŁY katalog publish do C:\wertis\tlo-worker\ — DEPLOY.md §6, etap 3."
+Write-Host "Skopiuj CAŁY katalog publish do C:\wertis\tlo-worker\ — DEPLOY.md §6, etap 2a."

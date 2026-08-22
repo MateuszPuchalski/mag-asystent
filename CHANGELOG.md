@@ -33,6 +33,70 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.1 — 22 sierpnia 2026
+
+<!-- docs_check: historia -->
+**Skrypt budujący usługę tła przestaje mylić osobę, która go uruchamia.** Trzy
+usterki wyszły przy pierwszym budowaniu na Windowsie, godzinę po scaleniu
+0.88.0. Żadna nie dotyczy kodu — wszystkie dotyczą tego, co człowiek widzi.
+
+### Skrypt, którego nie dało się URUCHOMIĆ
+
+`tlo-worker/build.ps1` pojechał **bez BOM-u**, a `sfera-worker/build.ps1` go ma.
+Windows PowerShell 5.1 czyta UTF-8 bez BOM jako ANSI — i to nie kończy się na
+krzakach w komunikacie. Kończy się **błędem składni**:
+
+```
+The string is missing the terminator: ".
+```
+
+Mechanizm jest wart zapamiętania, bo wygląda niewinnie. Myślnik `—` to w UTF-8
+bajty `E2 80 94`. Czytane jako ANSI dają trzy znaki, z których ostatni — bajt
+`0x94` — jest **prawym cudzysłowem drukarskim** `”`. PowerShell przyjmuje
+cudzysłowy drukarskie jako ogranicznik napisu, więc napis zamyka się na
+myślniku, a reszta linii przestaje się parsować.
+
+Skutek: każdy myślnik i każdy polski cudzysłów WEWNĄTRZ napisu to bomba
+zegarowa. Poza napisem, w komentarzu, byłby tylko brzydki.
+
+Instalator ma tę bramkę od dawna, ale liczy **wyłącznie** `instalator\*.ps1`.
+Nowy katalog nie był objęty niczym i przeszedł przez CI zielono. Sprawdzenie
+dochodzi teraz do `tlo-worker.yml` **oraz** do `sfera-worker.yml` — tamten plik
+BOM ma, ale nic go nie pilnowało.
+
+### Odesłanie do rozdziału, w którym nic nie ma
+
+README i skrypt odsyłały do „DEPLOY.md §6, **etap 3**". Usługa tła to **etap 2a**;
+etap 3 to „pełny obieg" i nie ma w nim ani słowa o `wertis-tlo`.
+
+### Cztery słowa, bez których Windows odmawia
+
+Polecenia budowania nie miały `-ExecutionPolicy Bypass`, więc kończyły się
+zdaniem „running scripts is disabled on this system". Repozytorium przerabiało
+to już raz — przy instalatorze — i wtedy `-ExecutionPolicy Bypass` trafiło
+**wprost do każdego polecenia** w jego instrukcji. Nowy katalog powtórzył
+pominięcie od zera.
+
+Bypass dotyczy tego jednego uruchomienia; polityka systemowa zostaje nietknięta.
+To samo zdanie stoi teraz w `tlo-worker/README.md`, co w `instalator/README.md`.
+
+### „The argument does not exist"
+
+`powershell -File tlo-worker\build.ps1` jest napisane dla korzenia repozytorium,
+ale nigdzie tego nie mówiło — a człowiek naturalnie wchodzi najpierw do katalogu,
+który widzi w nazwie, i dostaje odmowę. Sam skrypt liczy swój katalog
+z `$MyInvocation` i działa z dowolnego miejsca; myliła **wyłącznie instrukcja**.
+
+Obie drogi są teraz wypisane wprost, razem z ostrzeżeniem, żeby nie budować
+w `C:\wertis\tlo-worker` — to katalog docelowy, nie miejsce pracy.
+
+Przy okazji ostrzeżenie o odmowie sumy kontrolnej przeniosło się **nad** blok
+z poleceniami. Przychodzi po kilku minutach `dotnet publish` i bez uprzedzenia
+wygląda jak awaria buildu, a jest krokiem procedury. Wcześniej nie dało się —
+żeby policzyć sumę pliku, trzeba go najpierw pobrać.
+
+---
+
 ## 0.88.0 — 22 sierpnia 2026
 
 **Magazynier dodaje zdjęcie kartoteki z kolektora.** Do 0.87.0 kartoteka bez
