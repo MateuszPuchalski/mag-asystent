@@ -337,12 +337,42 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
-  /* Kolejność alejkowa, ale pozycje odłożone NA PÓŹNIEJ lądują za resztą —
-     w kolejności odkładania, więc dwa kolejne „później" nie zamieniają się
-     miejscami. To jedyny sposób, w jaki magazynier steruje tą listą. */
+  /* ── Kolejność listy kosza ────────────────────────────────────────────────
+     Trzy grupy, od tego, co jeszcze do zrobienia, po to, co już zrobione:
+
+       1. pozycje CZEKAJĄCE w kolejności alejkowej — to trasa przez halę,
+       2. odłożone NA PÓŹNIEJ, w kolejności klikania „później",
+       3. ZROBIONE (odłożone i pominięte) w kolejności wykonania.
+
+     Grupa trzecia zjeżdża na dół od 0.81.0 i to jest ta sama decyzja, którą
+     rozkładanie dostaw podjęło w 0.35.0: zwinięty pasek dalej zajmuje ekran,
+     więc przy koszu na dwadzieścia pozycji do roboty trzeba się PRZEWIJAĆ
+     przez robotę już wykonaną. Lista przestaje wtedy odpowiadać na jedyne
+     pytanie, które magazynier jej zadaje — „co jeszcze zostało".
+
+     Znacznik czasu zamiast flagi (jak przy „później"), więc ostatnio odłożona
+     stoi na samym końcu — tam, gdzie szuka się jej, żeby cofnąć zły skan.
+
+     Sortujemy TU, a nie na kolektorze, bo tę samą listę czyta panel biura
+     (`/api/biuro/kosze/:id`). Dwa niezależne sortowania rozjechałyby się przy
+     pierwszej zmianie jednego z nich — powód i cena tej zasady stoją przy
+     `porownajAlejkowo` w services/delivery.ts.                              */
+  const zrobionaAt = new Map(
+    wiersze.map((w) => [
+      w.id as number,
+      ((w.odlozono_at as string) ?? (w.pominieto_at as string) ?? "") as string,
+    ])
+  );
+  const grupa = (p: PozycjaKosza): number => (p.status === "todo" ? (p.pozniejAt ? 1 : 0) : 2);
   pozycje.sort((a, b) => {
-    if (!a.pozniejAt !== !b.pozniejAt) return a.pozniejAt ? 1 : -1;
-    if (a.pozniejAt && b.pozniejAt) return a.pozniejAt.localeCompare(b.pozniejAt);
+    if (grupa(a) !== grupa(b)) return grupa(a) - grupa(b);
+    if (grupa(a) === 2) {
+      const kiedy = (zrobionaAt.get(a.id) ?? "").localeCompare(zrobionaAt.get(b.id) ?? "");
+      if (kiedy !== 0) return kiedy;
+    } else if (a.pozniejAt && b.pozniejAt) {
+      const kiedy = a.pozniejAt.localeCompare(b.pozniejAt);
+      if (kiedy !== 0) return kiedy;
+    }
     return porownajAlejkowo(
       { locExpected: a.lokOczekiwana, sym: a.symbol },
       { locExpected: b.lokOczekiwana, sym: b.symbol }
