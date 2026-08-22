@@ -330,6 +330,8 @@ private fun PozycjaRow(
     onAdres: (String) -> Unit,
     onOdloz: () -> Unit,
     onPomin: () -> Unit,
+    onPozniej: () -> Unit,
+    onCofnij: () -> Unit,
     onClick: () -> Unit,
 ) {
     val done = p.status == "done"
@@ -443,6 +445,8 @@ private fun PozycjaRow(
                 onAdres = onAdres,
                 onOdloz = onOdloz,
                 onPomin = onPomin,
+                onPozniej = onPozniej,
+                onCofnij = onCofnij,
             )
         }
     }
