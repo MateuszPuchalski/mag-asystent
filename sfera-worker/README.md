@@ -34,9 +34,27 @@ z którego wynika ten kod: [`server/src/adapters/sfera.ts`](../server/src/adapte
 
 ## Budowa i wdrożenie
 
+**Bez .NET 8 SDK ten skrypt nie ruszy.** Instalacja na Windowsie:
+
 ```powershell
-# maszyna z .NET 8 SDK (deweloper — NIE serwer firmy):
-powershell -File sfera-worker\build.ps1
+winget install Microsoft.DotNet.SDK.8
+```
+
+Potem otwórz **nowe** okno PowerShella (instalator zmienia `PATH`, bieżąca sesja
+go nie widzi) i sprawdź `dotnet --version` — ma wyjść `8.x`.
+
+Pobierając ręcznie, weź **SDK**, nie Runtime, i wariant **Windows x64 `.exe`**.
+Plik `.pkg` jest instalatorem macOS i na Windowsie się nie otworzy.
+
+SDK idzie na maszynę dewelopera, **nie na serwer firmy**. Po to jest
+`--self-contained`: gotowy exe niesie runtime w sobie, więc pod `C:\wertis\`
+nie trzeba instalować niczego.
+
+```powershell
+# maszyna z .NET 8 SDK (deweloper — NIE serwer firmy).
+# Ścieżka jest względna wobec katalogu, w którym stoisz — stąd dwie drogi:
+powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\build.ps1  # z korzenia repo
+powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1                # z katalogu sfera-worker
 # → sfera-worker\publish\wertis-sfera-worker.exe (samowystarczalny, win-x64)
 
 # serwer firmy:

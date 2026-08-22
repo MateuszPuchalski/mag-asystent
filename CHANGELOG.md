@@ -33,6 +33,32 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.2 — 22 sierpnia 2026
+
+<!-- docs_check: historia -->
+**Instrukcje obu workerów mówią wreszcie, skąd wziąć .NET SDK.** Trzecie
+potknięcie tego samego wdrożenia i znowu nie w kodzie: README obu usług żądały
+„maszyny z .NET 8 SDK", ale ani jedno nie mówiło, jak go zainstalować.
+
+Skutek był konkretny: pobrany plik `.pkg` — czyli instalator **macOS**, który
+na Windowsie nie otwiera się wcale. `android/README.md` podaje przy JDK gotową
+linijkę `winget` od dawna; workery nie podawały niczego.
+
+Teraz podają — razem z trzema rzeczami, które przy ręcznym pobieraniu decydują:
+bierze się **SDK**, nie Runtime, wariant **Windows x64 `.exe`**, i otwiera się
+**nowe** okno PowerShella, bo instalator zmienia `PATH` i bieżąca sesja go nie
+widzi. Do tego zdanie, którego brakowało najbardziej: SDK idzie na maszynę
+dewelopera, a nie na serwer firmy — po to jest `--self-contained`.
+
+### Przy okazji: `sfera-worker` miał tę samą usterkę co `tlo-worker`
+
+Polecenie budowania workera Sfery nie miało `-ExecutionPolicy Bypass` ani
+informacji, z którego katalogu je uruchomić. Dokładnie to, co 0.88.1 poprawiło
+po drugiej stronie repozytorium — tylko że tam potknął się człowiek, a tu nikt
+jeszcze nie zdążył. Obie instrukcje wyglądają teraz tak samo.
+
+---
+
 ## 0.88.1 — 22 sierpnia 2026
 
 <!-- docs_check: historia -->
