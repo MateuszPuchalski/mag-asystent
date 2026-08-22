@@ -37,9 +37,22 @@ się przeglądać ani różnicować. Tak samo jest z AAR-em Honeywella w kolekto
 
 ## Budowa i wdrożenie
 
+**Przy pierwszym budowaniu skrypt odmówi — i to jest krok procedury, nie awaria.**
+Suma kontrolna modelu jest w nim pusta, bo repozytorium nie zna sumy pliku,
+którego nie zawiera. Skrypt pobiera model, wypisuje jego sumę i każe ją porównać
+ze źródłem u wydawcy. Wpisana suma pilnuje każdego następnego budowania.
+
+Odmowa przychodzi **po** `dotnet publish`, czyli po kilku minutach. Inaczej się
+nie da: żeby policzyć sumę pliku, trzeba go najpierw pobrać.
+
+Buduje się **z repozytorium na maszynie dewelopera**, nigdy w `C:\wertis\tlo-worker`
+— to katalog docelowy na serwerze firmy.
+
 ```powershell
-# maszyna z .NET 8 SDK (deweloper — NIE serwer firmy):
-powershell -File tlo-worker\build.ps1
+# maszyna z .NET 8 SDK (deweloper — NIE serwer firmy).
+# Ścieżka jest względna wobec katalogu, w którym stoisz — stąd dwie drogi:
+powershell -File tlo-worker\build.ps1   # z korzenia repozytorium
+powershell -File build.ps1               # z katalogu tlo-worker
 # → tlo-worker\publish\wertis-tlo-worker.exe  (samowystarczalny, win-x64)
 # → tlo-worker\publish\model\u2netp.onnx
 
@@ -51,12 +64,7 @@ nssm install wertis-tlo C:\wertis\tlo-worker\wertis-tlo-worker.exe
 #  4. zrestartuj usługę wertis-api (czyta ten sam plik konfiguracji)
 ```
 
-Kolejność i bramki wdrożenia — [`DEPLOY.md`](../DEPLOY.md) §6, etap 3.
-
-**Przy pierwszym budowaniu skrypt odmówi.** Suma kontrolna modelu jest w nim
-pusta, bo repozytorium nie zna sumy pliku, którego nie zawiera. Skrypt pobiera
-model, wypisuje jego sumę i każe ją porównać ze źródłem u wydawcy. Wpisana suma
-pilnuje każdego następnego budowania.
+Kolejność i bramki wdrożenia — [`DEPLOY.md`](../DEPLOY.md) §6, etap 2a.
 
 ## Konfiguracja — ten sam `wertis.env` co pozostałe procesy
 

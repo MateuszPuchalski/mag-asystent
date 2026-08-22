@@ -20,6 +20,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # UTF-8 bez BOM Windows PowerShell 5.1 czyta jako ANSI, więc polskie
+      # znaki w komunikatach skryptu zamieniają się w krzaki na ekranie osoby,
+      # która ma tę usługę zbudować. Wyszło to na pierwszym wdrożeniu 0.88.0:
+      # `build.ps1` pojechał bez BOM-u, a odmowa sumy kontrolnej — jedyne
+      # zdanie, które ten skrypt naprawdę musi przekazać — była nieczytelna.
+      #
+      # Instalator ma tę samą bramkę od dawna (instalator.yml), ale liczy
+      # WYŁĄCZNIE `instalator\*.ps1`. Ten katalog nie był objęty niczym.
+      - name: Kodowanie skryptów (UTF-8 z BOM)
+        run: |
+          bledy=0
+          for f in tlo-worker/*.ps1; do
+            if [ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" != "efbbbf" ]; then
+              echo "BRAK BOM: $f"
+              bledy=$((bledy+1))
+            fi
+          done
+          [ "$bledy" -eq 0 ] || exit 1
+          echo "Wszystkie skrypty maja UTF-8 BOM."
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"

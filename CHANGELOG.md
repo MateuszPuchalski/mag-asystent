@@ -33,6 +33,47 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.1 — 22 sierpnia 2026
+
+<!-- docs_check: historia -->
+**Skrypt budujący usługę tła przestaje mylić osobę, która go uruchamia.** Trzy
+usterki wyszły przy pierwszym budowaniu na Windowsie, godzinę po scaleniu
+0.88.0. Żadna nie dotyczy kodu — wszystkie dotyczą tego, co człowiek widzi.
+
+### Krzaki zamiast komunikatu
+
+`tlo-worker/build.ps1` pojechał **bez BOM-u**, a `sfera-worker/build.ps1` go ma.
+Windows PowerShell 5.1 czyta UTF-8 bez BOM jako ANSI, więc polskie znaki
+w komunikatach zamieniają się w krzaki. Trafiło to w najgorsze możliwe miejsce:
+w odmowę sumy kontrolnej, czyli w jedyne zdanie, które ten skrypt naprawdę musi
+przekazać.
+
+Instalator ma tę bramkę od dawna, ale liczy **wyłącznie** `instalator\*.ps1`.
+Nowy katalog nie był objęty niczym i przeszedł przez CI zielono. Sprawdzenie
+dochodzi teraz do `tlo-worker.yml`.
+
+### Odesłanie do rozdziału, w którym nic nie ma
+
+README i skrypt odsyłały do „DEPLOY.md §6, **etap 3**". Usługa tła to **etap 2a**;
+etap 3 to „pełny obieg" i nie ma w nim ani słowa o `wertis-tlo`.
+
+### „The argument does not exist"
+
+`powershell -File tlo-worker\build.ps1` jest napisane dla korzenia repozytorium,
+ale nigdzie tego nie mówiło — a człowiek naturalnie wchodzi najpierw do katalogu,
+który widzi w nazwie, i dostaje odmowę. Sam skrypt liczy swój katalog
+z `$MyInvocation` i działa z dowolnego miejsca; myliła **wyłącznie instrukcja**.
+
+Obie drogi są teraz wypisane wprost, razem z ostrzeżeniem, żeby nie budować
+w `C:\wertis\tlo-worker` — to katalog docelowy, nie miejsce pracy.
+
+Przy okazji ostrzeżenie o odmowie sumy kontrolnej przeniosło się **nad** blok
+z poleceniami. Przychodzi po kilku minutach `dotnet publish` i bez uprzedzenia
+wygląda jak awaria buildu, a jest krokiem procedury. Wcześniej nie dało się —
+żeby policzyć sumę pliku, trzeba go najpierw pobrać.
+
+---
+
 ## 0.88.0 — 22 sierpnia 2026
 
 **Magazynier dodaje zdjęcie kartoteki z kolektora.** Do 0.87.0 kartoteka bez
