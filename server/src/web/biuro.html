@@ -115,7 +115,7 @@
   }
   .widok > * { min-width: 0; }
   /* Jedna karta na widok — siatka nie ma czego układać. */
-  #widokDziennik, #widokDostawcy { grid-template-columns: 1fr; }
+  #widokDziennik { grid-template-columns: 1fr; }
 
   /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
      jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
@@ -159,6 +159,27 @@
      11px, gruba, rozstrzelona, InkSoft. Mniejsza od treści, bo podpisuje
      sekcję, a nie z nią konkuruje. */
   h2 { font: 700 11px/1.4 var(--font-sans); letter-spacing: 1.2px; color: var(--ink-soft); margin-bottom: 7px; text-transform: uppercase; }
+
+  /* ── Objaśnienie za ikoną (0.86.0) ─────────────────────────────────────────
+     Prawie każda karta miała pod nagłówkiem akapit tłumaczący, co ta karta
+     robi. Tekst czyta się RAZ, a pion zabierał na okrągło — na laptopie suma
+     tych akapitów spychała pracę pod krawędź ekranu.
+
+     Kasowanie ich byłoby stratą: niosą wiedzę, której nie ma nigdzie indziej,
+     a nowa osoba przy biurku dostaje ją właśnie stąd. Więc tekst zostaje,
+     tylko schodzi o jedno kliknięcie niżej.
+
+     Stanu NIE pamiętamy świadomie. Objaśnienie otwiera się, gdy ktoś go
+     potrzebuje, i znika przy następnym wejściu — inaczej jedno kliknięcie
+     z ciekawości zostawiałoby akapit na ekranie na zawsze. */
+  h2 .info {
+    display: inline-grid; place-items: center; width: 16px; height: 16px; padding: 0;
+    margin-left: 4px; vertical-align: -3px; border: 1px solid var(--border);
+    border-radius: 999px; background: none; color: var(--ink-mute); cursor: pointer;
+    font: 700 10px/1 var(--font-sans); text-transform: none;
+  }
+  h2 .info:hover { border-color: var(--amber); color: var(--amber-ink); }
+  h2 .info[aria-expanded="true"] { border-color: var(--amber); color: var(--amber-ink); background: var(--amber-bg); }
 
   table { width: 100%; border-collapse: collapse; }
 
@@ -299,9 +320,8 @@
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
 
   /* ── Sekcja zwijana ────────────────────────────────────────────────────────
-     Ten sam wzorzec, co „DANE FIRMY DO FORMULARZY" niżej — natywny <details>,
-     bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo, a strona nie ma
-     kroku budowania, w którym dałoby się to dorobić taniej.
+     Natywny <details>, bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo,
+     a strona nie ma kroku budowania, w którym dałoby się to dorobić taniej.
 
      Nagłówek zachowuje się jak `h2` sekcji: strzałka zamiast domyślnego
      trójkąta przeglądarki, bo tamten ma własny kolor i własny rozmiar. */
@@ -318,6 +338,9 @@
      czyli zniszczenia całej oszczędności. */
   details.zwijana > summary .podpis { margin-left: auto; font-size: 11px; color: var(--ink-mute); }
   details.zwijana[open] > summary .podpis { display: none; }
+  /* Sekcja zwinięta jako CAŁA treść karty (statystyki pytań): kreska u góry
+     wypadłaby wtedy tuż pod krawędzią karty i udawała pustą sekcję nad sobą. */
+  .card > details.zwijana:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
   .filtry label { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); display: block; }
   .filtry input, .filtry select {
     border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; font: inherit; background: var(--card);
@@ -476,11 +499,14 @@
          a biuro nie miało jak trafić do odpowiedzi. Ukryta karta nie kosztuje
          ani piksela, więc w spokojny dzień ta kolejność niczego nie psuje. -->
     <section class="card" id="kartaOdpowiedzi" hidden>
-      <h2>ODPOWIEDZI NA NOTATKI</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Magazynier odpowiedział na pytanie z notatki. Po przeczytaniu naciśnij
-        PRZECZYTANE — sygnał zgaśnie także na drugim biurku.
-      </p>
+      <h2>ODPOWIEDZI NA NOTATKI <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Magazynier odpowiedział na pytanie z notatki. Po przeczytaniu naciśnij
+          PRZECZYTANE — sygnał zgaśnie także na drugim biurku.
+        </p>
+      </div>
       <table id="odpowiedzi"></table>
     </section>
 
@@ -489,6 +515,29 @@
       <input class="szukaj" id="szukaj" placeholder="szukaj: numer albo dostawca">
       <table id="dostawy"></table>
       <p class="odswiezono" id="odswiezono"></p>
+    </section>
+
+    <!-- REKLAMACJE STOJĄ PRZED „POZA WERTIS" (0.86.0). Tu są wyjątki czekające
+         na człowieka, tam dokumenty już zamknięte. Kolejność w kodzie jest
+         kolejnością na ekranie, bo siatka układa karty po DOM — archiwum
+         wypychało pracę o komórkę niżej w każdy dzień, w którym coś zdjęto
+         z listy.
+
+         Dane firmy do formularzy wyjechały stąd za zębatkę. Wypełnia się je
+         raz na przeglądarkę, a wydruk protokołu czyta pola po id i nie
+         obchodzi go, w którym widoku stoją. -->
+    <section class="card" id="kartaReklamacji">
+      <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          FORMULARZ otwiera protokół do wydruku (ze zdjęciami dowodowymi). Dostawca
+          z własnym drukiem reklamacyjnym (GEKO, PARTNER) dostaje SWÓJ formularz —
+          rozpoznanie idzie po nazwie dostawcy z dokumentu. CSV pobiera te same
+          dane do arkusza (średnik + BOM, Excel PL).
+        </p>
+      </div>
+      <table id="reklamacje"></table>
     </section>
 
     <!-- Dostawy zdjęte z listy pracy. Osobna karta, a nie wiersze wyszarzone
@@ -501,29 +550,6 @@
       <p class="mute">Zdjęte z listy rozkładania decyzją biura. Towar odłożono
         bez tej aplikacji, więc nie ma z tego ani jednego skanu.</p>
       <table id="pozaWertis"></table>
-    </section>
-
-    <section class="card" id="kartaReklamacji">
-      <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI</h2>
-      <p class="mute" style="margin-bottom:10px">
-        FORMULARZ otwiera protokół do wydruku (ze zdjęciami dowodowymi). Dostawca
-        z własnym drukiem reklamacyjnym (GEKO, PARTNER) dostaje SWÓJ formularz —
-        rozpoznanie idzie po nazwie dostawcy z dokumentu. CSV pobiera te same
-        dane do arkusza (średnik + BOM, Excel PL).
-      </p>
-      <table id="reklamacje"></table>
-      <details style="margin-top:12px">
-        <summary class="mute">DANE FIRMY DO FORMULARZY DOSTAWCÓW (zapisywane w tej przeglądarce)</summary>
-        <div class="filtry" style="margin-top:8px">
-          <div><label for="firmaNazwa">NAZWA FIRMY</label><input id="firmaNazwa" size="26"></div>
-          <div><label for="firmaNip">NIP</label><input id="firmaNip" size="12"></div>
-          <div><label for="firmaAdres">ADRES</label><input id="firmaAdres" size="30"></div>
-          <div><label for="firmaMiejscowosc">MIEJSCOWOŚĆ</label><input id="firmaMiejscowosc" size="14"></div>
-          <div><label for="firmaOsoba">OSOBA KONTAKTOWA</label><input id="firmaOsoba" size="18"></div>
-          <div><label for="firmaTelefon">TELEFON</label><input id="firmaTelefon" size="12"></div>
-          <div><button class="akcja" id="zapiszFirme">ZAPISZ</button></div>
-        </div>
-      </details>
     </section>
   </div>
 
@@ -555,12 +581,15 @@
     </section>
 
     <section class="card" id="zwrotSkanKarta">
-      <h2>SKAN ETYKIETY ZWROTU</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
-        Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
-        doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
-      </p>
+      <h2>SKAN ETYKIETY ZWROTU <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
+          Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
+          doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
+        </p>
+      </div>
       <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:320px">
       <div id="zwrotSkanWynik" style="margin-top:8px"></div>
     </section>
@@ -569,12 +598,15 @@
          upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
          tabela „wszystko w porządku" byłaby szumem nad listą zwrotów. -->
     <section class="card" id="brakujaceKarta" hidden>
-      <h2>BRAKUJĄCE PACZKI</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
-        paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
-        w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
-      </p>
+      <h2>BRAKUJĄCE PACZKI <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
+          paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
+          w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
+        </p>
+      </div>
       <table id="brakujaceLista"></table>
       <div id="brakujaceTicker" style="margin-top:8px;font-size:12px"></div>
     </section>
@@ -600,12 +632,15 @@
     </section>
 
     <section class="card" id="koszeKarta">
-      <h2>KOSZE ZWROTOWE</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
-        jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
-        Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
-      </p>
+      <h2>KOSZE ZWROTOWE <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
+          jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
+          Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
+        </p>
+      </div>
       <div class="filtry" style="margin-bottom:10px">
         <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
           <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
@@ -616,21 +651,27 @@
     </section>
 
     <section class="card" id="pominieteKarta" hidden>
-      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
-        szukać dalej, reklamować u przewoźnika czy poprawić dokument.
-        Najdłużej czekające są na górze.
-      </p>
+      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
+          szukać dalej, reklamować u przewoźnika czy poprawić dokument.
+          Najdłużej czekające są na górze.
+        </p>
+      </div>
       <table id="pominieteLista"></table>
     </section>
 
     <section class="card" id="reklamacjeKarta">
-      <h2>REKLAMACJE · PRIORYTET WG TERMINU</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
-        reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
-      </p>
+      <h2>REKLAMACJE · PRIORYTET WG TERMINU <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
+          reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
+        </p>
+      </div>
       <table id="reklamacjeLista"></table>
       <div style="margin-top:14px">
         <h2>DYSKUSJE I REKLAMACJE ALLEGRO</h2>
@@ -773,21 +814,6 @@
       <div id="pytaniaBanerTresc" class="mute"></div>
     </section>
 
-    <section class="card" id="pytaniaWklejkaKarta">
-      <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
-        wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
-        przepisana treść pytania.
-      </p>
-      <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
-        placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
-      <div style="margin-top:8px">
-        <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
-        <span class="mute" id="pytaniaWklejkaStan"></span>
-      </div>
-    </section>
-
     <section class="card" id="pytaniaListaKarta">
       <h2>PYTANIA · DO ODPOWIEDZI</h2>
       <div class="filtry" style="margin-bottom:10px">
@@ -808,61 +834,63 @@
       <table id="pytaniaLista"></table>
     </section>
 
-    <section class="card" id="pytaniaStatystykiKarta">
-      <h2>STATYSTYKI · O CO PYTAJĄ KLIENCI</h2>
-      <div class="filtry" style="margin-bottom:10px">
-        <div>
-          <label for="pytaniaDni">OKNO</label>
-          <select id="pytaniaDni">
-            <option value="30">30 dni</option>
-            <option value="90" selected>90 dni</option>
-            <option value="180">180 dni</option>
-          </select>
-        </div>
+    <!-- Wklejka STOI POD LISTĄ (0.86.0). Pytanie z poczty jest ścieżką
+         poboczną, a lista pracą główną — na laptopie z jedną kolumną wklejka
+         zsuwała listę pod krawędź ekranu. Nasłuch wklejania siedzi na
+         dokumencie, więc Ctrl+V działa w całej zakładce niezależnie od tego,
+         gdzie stoi karta. -->
+    <section class="card" id="pytaniaWklejkaKarta">
+      <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ <button class="info"
+        type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
+          wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
+          przepisana treść pytania.
+        </p>
       </div>
-      <div class="kafle" id="pytaniaKafle"></div>
-
-      <h2 style="margin-top:18px">NAJCZĘŚCIEJ PYTANE TOWARY</h2>
-      <table id="pytaniaProdukty"></table>
-
-      <h2 style="margin-top:18px">KATEGORIE PYTAŃ</h2>
-      <div class="kafle" id="pytaniaKategorie"></div>
-
-      <h2 style="margin-top:18px">PYTANIA PER TYDZIEŃ</h2>
-      <div id="pytaniaTygodnie" style="margin-top:6px"></div>
-
-      <h2 style="margin-top:18px">PYTALI O TOWAR SPOZA NASZEJ OFERTY</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Ktoś chciał kupić, a nie było czego sprzedać. To najtańszy research
-        asortymentu, jaki firma ma.
-      </p>
-      <table id="pytaniaPozaOferta"></table>
+      <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
+        placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
+      <div style="margin-top:8px">
+        <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
+        <span class="mute" id="pytaniaWklejkaStan"></span>
+      </div>
     </section>
 
-    <section class="card" id="pytaniaKonfiguracjaKarta">
-      <h2>PROMPT EKSPERTA I FAKTY FIRMOWE</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Zmienia wyłącznie admin. Prompt opisuje, KIM jest doradca i jak pisze.
-        Fakty to jedyne źródło prawdy o wysyłce, terminach i płatnościach —
-        czego tu nie ma, tego model nie poda klientowi.
-      </p>
-      <details id="pytaniaKonfiguracja">
-        <summary>Pokaż i edytuj</summary>
-        <div style="margin-top:10px">
-          <label for="pytaniaPrompt">PROMPT EKSPERTA</label>
-          <textarea id="pytaniaPrompt" rows="8" style="width:100%"></textarea>
-          <div style="margin-top:6px">
-            <button class="akcja" id="pytaniaZapiszPrompt">ZAPISZ PROMPT</button>
+    <!-- Statystyki zwinięte wzorem WGLĄDU ze ZWROTÓW (0.83.0). To jest wgląd
+         tygodniowy na zakładce, do której biuro wchodzi kilkanaście razy
+         dziennie — i sekcja zamknięta NIE PYTA serwera. -->
+    <section class="card" id="pytaniaStatystykiKarta">
+      <details class="zwijana" id="pytaniaStatystyki">
+        <summary><h2>STATYSTYKI · O CO PYTAJĄ KLIENCI</h2>
+          <span class="podpis">o co pytają i czego nie mamy</span></summary>
+        <div class="filtry" style="margin-bottom:10px">
+          <div>
+            <label for="pytaniaDni">OKNO</label>
+            <select id="pytaniaDni">
+              <option value="30">30 dni</option>
+              <option value="90" selected>90 dni</option>
+              <option value="180">180 dni</option>
+            </select>
           </div>
-
-          <label for="pytaniaFakty" style="margin-top:14px;display:block">FAKTY FIRMOWE</label>
-          <textarea id="pytaniaFakty" rows="8" style="width:100%"
-            placeholder="Wysyłka zagraniczna: …&#10;Czas wysyłki: …&#10;Płatności: …"></textarea>
-          <div style="margin-top:6px">
-            <button class="akcja" id="pytaniaZapiszFakty">ZAPISZ FAKTY</button>
-          </div>
-          <p class="mute" id="pytaniaKonfiguracjaStan" style="margin-top:8px"></p>
         </div>
+        <div class="kafle" id="pytaniaKafle"></div>
+
+        <h2 style="margin-top:18px">NAJCZĘŚCIEJ PYTANE TOWARY</h2>
+        <table id="pytaniaProdukty"></table>
+
+        <h2 style="margin-top:18px">KATEGORIE PYTAŃ</h2>
+        <div class="kafle" id="pytaniaKategorie"></div>
+
+        <h2 style="margin-top:18px">PYTANIA PER TYDZIEŃ</h2>
+        <div id="pytaniaTygodnie" style="margin-top:6px"></div>
+
+        <h2 style="margin-top:18px">PYTALI O TOWAR SPOZA NASZEJ OFERTY</h2>
+        <p class="mute" style="margin-bottom:8px">
+          Ktoś chciał kupić, a nie było czego sprzedać. To najtańszy research
+          asortymentu, jaki firma ma.
+        </p>
+        <table id="pytaniaPozaOferta"></table>
       </details>
     </section>
   </div>
@@ -897,32 +925,41 @@
     </section>
 
     <section class="card">
-      <h2>KOLEJKA ZAPISÓW DO SUBIEKTA</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Zadanie w błędzie znaczy, że magazynier zrobił swoje, a do bazy firmy nic
-        nie weszło. Ponawia się je <b>na kolektorze</b> — ta strona tylko czyta.
-      </p>
+      <h2>KOLEJKA ZAPISÓW DO SUBIEKTA <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Zadanie w błędzie znaczy, że magazynier zrobił swoje, a do bazy firmy nic
+          nie weszło. Ponawia się je <b>na kolektorze</b> — ta strona tylko czyta.
+        </p>
+      </div>
       <div class="kafle" id="kafleKolejki"></div>
       <table id="kolejka" style="margin-top:12px"></table>
     </section>
 
     <section class="card">
-      <h2>REKONCYLIACJA · CZY SUBIEKT MA TO, CO ZAPISALIŚMY</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Porównuje adres w Subiekcie z ostatnim udanym zapisem oraz wyławia zadania,
-        o których wszyscy zapomnieli. Pusty wynik to wynik dobry.
-      </p>
+      <h2>REKONCYLIACJA · CZY SUBIEKT MA TO, CO ZAPISALIŚMY <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Porównuje adres w Subiekcie z ostatnim udanym zapisem oraz wyławia zadania,
+          o których wszyscy zapomnieli. Pusty wynik to wynik dobry.
+        </p>
+      </div>
       <button class="akcja" id="sprawdzRozjazdy">SPRAWDŹ TERAZ</button>
       <button class="akcja cichy" id="csvRozjazdy" hidden>CSV</button>
       <table id="rozjazdy" style="margin-top:12px"></table>
     </section>
 
     <section class="card">
-      <h2>KOLIZJE KODÓW KRESKOWYCH</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Jeden kod na kilku kartotekach zatrzymuje pracę w alejce. Ta lista mówi,
-        które poprawić najpierw — licznik to liczba zatrzymań.
-      </p>
+      <h2>KOLIZJE KODÓW KRESKOWYCH <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Jeden kod na kilku kartotekach zatrzymuje pracę w alejce. Ta lista mówi,
+          które poprawić najpierw — licznik to liczba zatrzymań.
+        </p>
+      </div>
       <table id="kolizje"></table>
     </section>
 
@@ -935,11 +972,14 @@
   <!-- ── DZIENNIK ────────────────────────────────────────────────────────── -->
   <div id="widokDziennik" class="widok" hidden>
     <section class="card">
-      <h2>ŚLAD AUDYTOWY</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Każdy skan, każda decyzja i każdy błąd — z osobą, urządzeniem i czasem.
-        Kto pobierze CSV, sam trafia do śladu.
-      </p>
+      <h2>ŚLAD AUDYTOWY <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Każdy skan, każda decyzja i każdy błąd — z osobą, urządzeniem i czasem.
+          Kto pobierze CSV, sam trafia do śladu.
+        </p>
+      </div>
       <div class="filtry">
         <div><label for="fOd">OD</label><input type="date" id="fOd"></div>
         <div><label for="fDo">DO</label><input type="date" id="fDo"></div>
@@ -1018,13 +1058,16 @@
     </section>
 
     <section class="card">
-      <h2>STREFA ZŁOTA — KANDYDACI DO PRZENIESIENIA</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane
-        bierzemy z eksportu zbiórek (Sellasist, CSV) — wgranie tego samego
-        okresu drugi raz niczego nie zdubluje. Kandydat dostaje też adnotację
-        na karcie towaru w kolektorze.
-      </p>
+      <h2>STREFA ZŁOTA — KANDYDACI DO PRZENIESIENIA <button class="info"
+        type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane
+          bierzemy z eksportu zbiórek (Sellasist, CSV) — wgranie tego samego
+          okresu drugi raz niczego nie zdubluje. Kandydat dostaje też adnotację
+          na karcie towaru w kolektorze.
+        </p>
+      </div>
       <div class="filtry">
         <div>
           <button class="akcja" id="wgrajZbiorki">WGRAJ CSV ZBIÓREK</button>
@@ -1035,41 +1078,122 @@
       <p class="mute" id="wynikImportu"></p>
       <p class="mute" id="oknoKandydatow" style="margin-bottom:6px"></p>
       <table id="kandydaci"></table>
+      <!-- Drogowskaz, a nie ozdoba: reguły wyjechały stąd za zębatkę w 0.86.0,
+           a lista kandydatów jest ich jedynym widocznym skutkiem. Bez tego
+           zdania pusta lista wygląda na awarię zamiast na brak reguł. -->
+      <p class="mute" style="margin-top:10px">
+        Które poziomy regałów są „złote", ustawia się w <b>Ustawieniach</b> —
+        ikona koła zębatego w prawym górnym rogu.
+      </p>
+    </section>
+
+  </div>
+
+  <!-- ── USTAWIENIA (za zębatką) ───────────────────────────────────────────
+       Do 0.85.0 stało tu jedno logo dostawców, a konfiguracja rozłaziła się
+       po zakładkach pracy: prompt eksperta na PYTANIACH, reguły strefy na
+       ANALIZIE, dane firmy w środku karty REKLAMACJE. Każda z nich zabierała
+       pion tam, gdzie liczy się rytm dnia, a otwiera się je razy kilka w roku.
+
+       Wspólne kryterium: to są rzeczy ustawiane RAZ i obowiązujące wszystkich,
+       nie sprawy do załatwienia. Kolejność wewnątrz — od najczęściej
+       dotykanej do najrzadszej.
+
+       Widok zachował id `widokDostawcy`, bo tak nazywa go zębatka i pamięć
+       ostatniego widoku w przeglądarce. Przemianowanie id kosztowałoby
+       migrację localStorage za zero zysku dla człowieka. -->
+  <div id="widokDostawcy" class="widok" hidden>
+    <!-- Zapis wymaga roli admin i mówi o tym serwer, nie przeglądarka: rola
+         nie jest tu znana, więc przycisk widzą wszyscy, a odmowę wypowiada
+         trasa. Pola stoją jawnie — w widoku ustawień nie ma czego chować. -->
+    <section class="card" id="pytaniaKonfiguracjaKarta">
+      <h2>PROMPT EKSPERTA I FAKTY FIRMOWE <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Zmienia wyłącznie admin. Prompt opisuje, KIM jest doradca i jak pisze.
+          Fakty to jedyne źródło prawdy o wysyłce, terminach i płatnościach —
+          czego tu nie ma, tego model nie poda klientowi.
+        </p>
+      </div>
+      <label for="pytaniaPrompt">PROMPT EKSPERTA</label>
+      <textarea id="pytaniaPrompt" rows="8" style="width:100%"></textarea>
+      <div style="margin-top:6px">
+        <button class="akcja" id="pytaniaZapiszPrompt">ZAPISZ PROMPT</button>
+      </div>
+
+      <label for="pytaniaFakty" style="margin-top:14px;display:block">FAKTY FIRMOWE</label>
+      <textarea id="pytaniaFakty" rows="8" style="width:100%"
+        placeholder="Wysyłka zagraniczna: …&#10;Czas wysyłki: …&#10;Płatności: …"></textarea>
+      <div style="margin-top:6px">
+        <button class="akcja" id="pytaniaZapiszFakty">ZAPISZ FAKTY</button>
+      </div>
+      <p class="mute" id="pytaniaKonfiguracjaStan" style="margin-top:8px"></p>
+    </section>
+
+    <!-- Jedyna karta na tym widoku zapisywana w przeglądarce, nie na serwerze:
+         protokół reklamacyjny drukuje się z tego stanowiska i tu też stoi jego
+         nagłówek. Nazwa w tytule karty mówi o tym wprost, bo dwa biurka mają
+         dwa niezależne komplety. -->
+    <section class="card">
+      <h2>DANE FIRMY DO FORMULARZY DOSTAWCÓW <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Nagłówek protokołu reklamacyjnego drukowanego z karty REKLAMACJE.
+          Zapisuje się w tej przeglądarce, więc drugie biurko ma własny komplet.
+        </p>
+      </div>
+      <div class="filtry">
+        <div><label for="firmaNazwa">NAZWA FIRMY</label><input id="firmaNazwa" size="26"></div>
+        <div><label for="firmaNip">NIP</label><input id="firmaNip" size="12"></div>
+        <div><label for="firmaAdres">ADRES</label><input id="firmaAdres" size="30"></div>
+        <div><label for="firmaMiejscowosc">MIEJSCOWOŚĆ</label><input id="firmaMiejscowosc" size="14"></div>
+        <div><label for="firmaOsoba">OSOBA KONTAKTOWA</label><input id="firmaOsoba" size="18"></div>
+        <div><label for="firmaTelefon">TELEFON</label><input id="firmaTelefon" size="12"></div>
+        <div><button class="akcja" id="zapiszFirme">ZAPISZ</button></div>
+      </div>
     </section>
 
     <section class="card">
-      <h2>REGUŁY STREFY ZŁOTEJ</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
-        drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
-        nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
-        wiem" to nie „nie". Zapis podmienia komplet reguł i od razu przelicza
-        kandydatów.
-      </p>
+      <h2>REGUŁY STREFY ZŁOTEJ <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
+          drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
+          nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
+          wiem" to nie „nie". Zapis podmienia komplet reguł i od razu przelicza
+          kandydatów.
+        </p>
+      </div>
       <table id="reguly"></table>
       <div class="filtry" style="margin-top:8px">
         <div><button class="akcja cichy" id="dodajRegule">+ REGUŁA</button></div>
         <div><button class="akcja" id="zapiszStrefe">ZAPISZ REGUŁY</button></div>
       </div>
       <p class="mute" id="wynikStrefy"></p>
+      <p class="mute" style="margin-top:6px">
+        Kandydatów do przeniesienia pokazuje zakładka <b>ANALIZA</b>.
+      </p>
     </section>
-  </div>
 
-  <!-- ── DOSTAWCY ────────────────────────────────────────────────────────── -->
-  <div id="widokDostawcy" class="widok" hidden>
     <section class="card">
-      <h2>LOGO DOSTAWCÓW</h2>
-      <p class="mute" style="margin-bottom:10px">
-        Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
-        dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
-        zanim przeczyta się numer dokumentu.
-      </p>
-      <p class="mute" style="margin-bottom:10px">
-        Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
-        Przeglądarka zmniejszy go i przerobi na jeden format, zanim cokolwiek
-        pojedzie na serwer. Lista poniżej pokazuje dostawców z dokumentów
-        dostaw, także tych bez logo.
-      </p>
+      <h2>LOGO DOSTAWCÓW <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
+          dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
+          zanim przeczyta się numer dokumentu.
+        </p>
+        <p class="mute" style="margin-bottom:10px">
+          Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
+          Przeglądarka zmniejszy go i przerobi na jeden format, zanim cokolwiek
+          pojedzie na serwer. Lista poniżej pokazuje dostawców z dokumentów
+          dostaw, także tych bez logo.
+        </p>
+      </div>
       <input type="file" id="plikLogo" accept="image/*,.svg" hidden>
       <p class="mute" id="wynikLogo"></p>
       <table id="dostawcy"></table>
@@ -1244,12 +1368,17 @@ function pokaz(nowy) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
   if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
-  if (nowy === "pytania") { odswiezPytania(); odswiezStatystykiPytan(); wczytajKonfiguracjePytan(); }
+  /* Statystyki pytań dociągają się TYLKO rozwinięte — zwinięta sekcja nie
+     pyta serwera, tak samo jak WGLĄD na zwrotach. */
+  if (nowy === "pytania") { odswiezPytania(); dociagnijWglad("pytaniaStatystyki"); }
   if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
   if (nowy === "analiza") odswiezAnalize();
-  if (nowy === "dostawcy") odswiezDostawcow();
+  /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
+     Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
+     przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
+  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); }
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -1827,10 +1956,9 @@ async function odswiezAnalize() {
   } catch (e) {
     $("kafleAnalizy").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
   }
-  // strefa złota żyje na tej samej zakładce, ale ma własne trasy — i własny
-  // try/catch, żeby błąd jednej sekcji nie gasił drugiej
+  // kandydaci mają własną trasę — i własny try/catch, żeby błąd jednej sekcji
+  // nie gasił drugiej. Reguły, którymi się ich liczy, stoją za zębatką.
   odswiezKandydatow();
-  odswiezStrefe();
 }
 
 /* ── Strefa złota: kandydaci i reguły ────────────────────────────────────────
@@ -2763,7 +2891,10 @@ async function odswiezEtap3() {
    RAPORT zostaje otwarty domyślnie. To jeden rząd kafli i puls procesu;
    zwinięcie go oszczędziłoby jedno tanie żądanie kosztem jedynego wskaźnika
    „jak idzie robota". Kto go nie chce, zwija raz i tak zostaje. */
-const SEKCJE_WGLADU = ["raportZwrotowKarta", "statystykiKarta", "czasyKarta", "kontoAllegroKarta"];
+const SEKCJE_WGLADU = [
+  "raportZwrotowKarta", "statystykiKarta", "czasyKarta", "kontoAllegroKarta",
+  "pytaniaStatystyki",
+];
 const WGLAD_DOMYSLNIE = ["raportZwrotowKarta"];
 
 /** Otwarte sekcje jako jeden porównywalny napis — klucz i wartość w jednym. */
@@ -2780,12 +2911,22 @@ function wczytajWglad() {
   localStorage.setItem("wertis.wglad", stanWgladu());
 }
 
+/* Czym się wypełnia sekcja i po czym poznać, że jest jeszcze pusta. Mapa,
+   a nie drabinka `if`-ów: przy piątej sekcji lista czyta się szybciej niż
+   ciąg warunków, a dopisanie szóstej jest jednym wierszem. Sekcja spoza mapy
+   nie pobiera niczego i to jest poprawne — nie każda ma co dociągać. */
+const ZRODLA_WGLADU = {
+  raportZwrotowKarta: ["raportZwrotowKafle", () => odswiezEtap3()],
+  statystykiKarta: ["statystykiProdukty", () => odswiezStatystyki()],
+  czasyKarta: ["czasyOdcinki", () => odswiezCzasy()],
+  pytaniaStatystyki: ["pytaniaKafle", () => odswiezStatystykiPytan()],
+};
+
 /** Otwarta i pusta sekcja ma się wypełnić — od razu, nie po najbliższym cyklu. */
 function dociagnijWglad(id) {
   if (!$(id).open) return;
-  if (id === "statystykiKarta" && !$("statystykiProdukty").innerHTML) odswiezStatystyki();
-  if (id === "czasyKarta" && !$("czasyOdcinki").innerHTML) odswiezCzasy();
-  if (id === "raportZwrotowKarta" && !$("raportZwrotowKafle").innerHTML) odswiezEtap3();
+  const zrodlo = ZRODLA_WGLADU[id];
+  if (zrodlo && !$(zrodlo[0]).innerHTML) zrodlo[1]();
 }
 
 /* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
@@ -3826,7 +3967,7 @@ function start() {
    krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
 const TABELE_DLUGIE = new Set([
   "dostawy", "zwrotLista", "koszeLista", "dziennik", "reklamacjeLista", "pominieteLista",
-  "kolejka", "kandydaci", "dostawcy", "statystykiProdukty", "wydajnosc",
+  "kolejka", "kandydaci", "dostawcy", "statystykiProdukty", "wydajnosc", "reguly",
   "szczegolLinie", "zwrotPozycje", "brakujaceLista", "reklamacje",
   "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
 ]);
@@ -3850,6 +3991,21 @@ $("szukaj").addEventListener("input", rysujDostawy);
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-widok]");
   if (b) pokaz(b.dataset.widok);
+});
+
+/* Objaśnienia kart: jedna delegacja na siedemnaście ikon. Blok z tekstem jest
+   NASTĘPNYM rodzeństwem nagłówka, więc ikona nie potrzebuje ani `id`, ani
+   `data-cel` — dopisanie osiemnastej karty to sam HTML.
+
+   `aria-expanded` niesie stan dla czytnika ekranu i dla CSS naraz, więc nie
+   ma drugiego miejsca, w którym prawda o otwarciu mogłaby się rozjechać. */
+document.addEventListener("click", (e) => {
+  const i = e.target.closest("h2 .info");
+  if (!i) return;
+  const blok = i.closest("h2").nextElementSibling;
+  if (!blok || !blok.classList.contains("objasnienie")) return;
+  blok.hidden = !blok.hidden;
+  i.setAttribute("aria-expanded", String(!blok.hidden));
 });
 $("stan").addEventListener("click", (e) => {
   const b = e.target.closest("[data-do]");
@@ -4322,7 +4478,7 @@ function zamknijPytanie() {
    i nikt tego nie zauważy, dopóki ktoś nie przewinie ekranu. */
 const KARTY_LISTY_PYTAN = [
   "pytaniaBaner", "pytaniaWklejkaKarta", "pytaniaListaKarta",
-  "pytaniaStatystykiKarta", "pytaniaKonfiguracjaKarta",
+  "pytaniaStatystykiKarta",
 ];
 
 async function odswiezPytania() {

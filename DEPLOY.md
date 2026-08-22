@@ -1394,8 +1394,9 @@ na które dawno odpowiedziano. Zrób ją **pod nadzorem**: wejdź w zakładkę,
 kliknij ODŚWIEŻ Z ALLEGRO i przeczytaj pierwsze szkice, zanim cokolwiek
 wyślesz.
 
-Zaraz potem wypełnij **FAKTY FIRMOWE** (karta na dole zakładki, zmienia
-admin): cennik wysyłek zagranicznych, czas wysyłki, zasady płatności. To
+Zaraz potem wypełnij **FAKTY FIRMOWE**. Od 0.86.0 karta stoi w ustawieniach —
+ikona koła zębatego w prawym górnym rogu panelu, obok „Wyloguj". Zmienia je
+admin: cennik wysyłek zagranicznych, czas wysyłki, zasady płatności. To
 jedyne źródło, z którego model może je podać klientowi — czego tam nie ma,
 tego nie poda. Pusta karta znaczy szkice, które przy pytaniu o wysyłkę do
 Chorwacji napiszą „sprawdzimy i odpiszemy" zamiast konkretu.

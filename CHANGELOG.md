@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.86.0 — 22 sierpnia 2026
+
+**Konfiguracja zeszła z zakładek pracy za ikonę ustawień.**
+
+Prompt eksperta i fakty firmowe zajmowały pół ekranu na zakładce PYTANIA
+KLIENTÓW, do której biuro wchodzi kilkanaście razy dziennie. Zmienia je
+wyłącznie admin i robi to razy kilka w roku. Ten sam problem miały reguły
+strefy złotej na ANALIZIE i dane firmy w środku karty REKLAMACJE.
+
+Wszystkie trzy stoją teraz za **zębatką** w prawym górnym rogu, obok logo
+dostawców, które mieszkało tam od 0.76.0. Kryterium jest jedno: rzecz
+ustawiana raz i obowiązująca wszystkich nie jest sprawą do załatwienia,
+więc nie zabiera miejsca sprawom, które nią są.
+
+Pobierają się dopiero po wejściu w ustawienia. Do 0.85.0 prompt jechał przy
+każdym wejściu na PYTANIA, a reguły przy każdym wejściu na ANALIZĘ.
+
+**Objaśnienia kart schowane za ikoną „i".** Prawie każda karta miała pod
+nagłówkiem akapit tłumaczący, co robi. Tekst czyta się raz, a pion zabierał
+codziennie — suma tych akapitów spychała pracę pod krawędź ekranu. Teraz
+otwiera je kliknięcie ikony przy nagłówku. Kasowanie ich byłoby stratą:
+niosą wiedzę, której nie ma nigdzie indziej, a nowa osoba dostaje ją stąd.
+
+Podstawa prawna monitoringu na ANALIZIE i klauzula o danych osobowych
+w statystykach zwrotów **zostają na wierzchu**. To nie są objaśnienia.
+
+**Statystyki pytań zwinięte**, wzorem WGLĄDU ze zwrotów. Zwinięta sekcja nie
+pyta serwera — zakładka PYTANIA mieści się teraz na laptopie bez przewijania.
+
+**Kolejność kart za priorytetem.** Na DOSTAWACH reklamacje stoją przed
+zamkniętymi dostawami, na PYTANIACH lista przed wklejką z poczty. Siatka
+układa karty w kolejności dokumentu, więc kolejność w kodzie jest kolejnością
+na ekranie — i pilnują jej teraz testy.
+
 ## 0.85.0 — 22 sierpnia 2026
 
 **Allegro odpytuje się teraz PRZYCISKIEM, nie samo.**
