@@ -33,6 +33,18 @@ historii nie przepisujemy.
 
 ---
 
+## 0.78.1 — 22 sierpnia 2026
+
+**Wskazana pozycja kosza i panel odkładania to znowu jedna karta.** Ze
+zgłoszenia z hali: symbol towaru stał w jednym prostokącie, a adres, na który
+ma pójść, w drugim — oko musiało wiązać jedno z drugim przez szczelinę między
+kartami, choć to jest jedna myśl: „ten towar idzie na tę półkę".
+
+Wiersz działa teraz dokładnie jak rozwinięty wiersz dostawy: wspólne tło,
+wspólna obwódka, panel wcięty pod nagłówkiem. Przy okazji znika pastylka
+adresu ze wskazanego wiersza — ten sam adres krzyczy oczko niżej w 28 sp,
+a dwa razy tego samego nie czyta się lepiej. Ta reguła też jest z dostaw.
+
 ## 0.78.0 — 22 sierpnia 2026
 
 **Biuro widzi wreszcie, KTÓRE produkty wracają.** Karta RAPORT liczy przebieg

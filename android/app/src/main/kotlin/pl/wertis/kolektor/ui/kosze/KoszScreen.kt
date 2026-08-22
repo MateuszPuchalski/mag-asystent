@@ -219,16 +219,16 @@ fun KoszScreen(graph: AppGraph) {
         )
         k.pozycje.forEach { p ->
             val wskazana = p.id == wybrana && k.status == "zamkniety"
-            PozycjaRow(graph, p, wskazana) { if (p.status != "done") wybierz(p) }
-            if (wskazana) {
-                PanelPozycji(
-                    p = p,
-                    adres = adres,
-                    onAdres = { adres = it },
-                    onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), recznie = true) },
-                    onPomin = { pomijana = p },
-                )
-            }
+            PozycjaRow(
+                graph = graph,
+                p = p,
+                wskazana = wskazana,
+                adres = adres,
+                onAdres = { adres = it },
+                onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), recznie = true) },
+                onPomin = { pomijana = p },
+                onClick = { if (p.status != "done") wybierz(p) },
+            )
         }
 
         if (doZrobienia == 0 && k.status == "zamkniety") {
@@ -282,13 +282,26 @@ fun KoszScreen(graph: AppGraph) {
    dziesięć pozycji drobnicy zmieściło się na ekranie bez przewijania.        */
 
 @Composable
-private fun PozycjaRow(graph: AppGraph, p: KoszPozycja, wskazana: Boolean, onClick: () -> Unit) {
+private fun PozycjaRow(
+    graph: AppGraph,
+    p: KoszPozycja,
+    wskazana: Boolean,
+    adres: String,
+    onAdres: (String) -> Unit,
+    onOdloz: () -> Unit,
+    onPomin: () -> Unit,
+    onClick: () -> Unit,
+) {
     val done = p.status == "done"
     val pominieta = p.status == "skipped"
     val zwiniety = done || (pominieta && !wskazana)
     val bok = if (wskazana) 44.dp else 36.dp
 
-    Row(
+    /* JEDNA KARTA na wskazaną pozycję i jej panel — dokładnie jak rozwinięty
+       wiersz dostawy (`LineRow`). Dwie osobne karty rozrywały to, co jest
+       jedną myślą: „ten towar idzie na tę półkę". Oko musiało wtedy wiązać
+       symbol z adresem przez szczelinę między kartami. */
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .cardSurface(
@@ -296,70 +309,90 @@ private fun PozycjaRow(graph: AppGraph, p: KoszPozycja, wskazana: Boolean, onCli
                 borderColor = if (wskazana) AmberLine else CardBorder,
             )
             .then(if (wskazana) Modifier.border(2.dp, Amber, RoundedCornerShape(12.dp)) else Modifier)
-            .heightIn(min = if (zwiniety) 34.dp else 52.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = if (zwiniety) 4.dp else 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .clickable(onClick = onClick),
     ) {
-        /* Ikona STANU zostaje zawsze — niesie „odłożone" albo „pominięte",
-           czego zdjęcie nie zastąpi. Rysunek pudełka ustępuje miniaturze, bo
-           nie niesie nic ponad „towar", a zdjęcie mówi KTÓRY towar. */
-        when {
-            pominieta -> Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(18.dp))
-            done -> Icon(WIcons.Check, null, tint = Success, modifier = Modifier.size(14.dp))
-        }
-        if (!zwiniety) {
-            /* Rysunek pudełka zajmuje TYLE SAMO miejsca co miniatura, więc
-               wiersz nie przeskakuje w bok w chwili doczytania zdjęcia. */
-            val ikonaPudelka: @Composable () -> Unit = {
-                Box(
-                    Modifier
-                        .size(bok)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(CardWhite)
-                        .border(1.dp, CardBorder, RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(WIcons.Box, null, tint = Ink, modifier = Modifier.size(bok / 2))
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = if (zwiniety) 34.dp else 52.dp)
+                .padding(horizontal = 12.dp, vertical = if (zwiniety) 4.dp else 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            /* Ikona STANU zostaje zawsze — niesie „odłożone" albo „pominięte",
+               czego zdjęcie nie zastąpi. Rysunek pudełka ustępuje miniaturze, bo
+               nie niesie nic ponad „towar", a zdjęcie mówi KTÓRY towar. */
+            when {
+                pominieta -> Icon(WIcons.Alert, null, tint = Destructive, modifier = Modifier.size(18.dp))
+                done -> Icon(WIcons.Check, null, tint = Success, modifier = Modifier.size(14.dp))
             }
-            MiniaturaTowaru(graph, p.twId, bok, powieksz = wskazana, zamiast = ikonaPudelka)
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                p.symbol.ifEmpty { p.nazwa },
-                fontFamily = BarlowCond,
-                fontWeight = FontWeight.Bold,
-                fontSize = if (zwiniety) 14.sp else 17.sp,
-                color = if (zwiniety) InkMute else Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
             if (!zwiniety) {
-                Text(p.nazwa, fontSize = 12.sp, color = InkMute, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                /* Rysunek pudełka zajmuje TYLE SAMO miejsca co miniatura, więc
+                   wiersz nie przeskakuje w bok w chwili doczytania zdjęcia. */
+                val ikonaPudelka: @Composable () -> Unit = {
+                    Box(
+                        Modifier
+                            .size(bok)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(CardWhite)
+                            .border(1.dp, CardBorder, RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(WIcons.Box, null, tint = Ink, modifier = Modifier.size(bok / 2))
+                    }
+                }
+                MiniaturaTowaru(graph, p.twId, bok, powieksz = wskazana, zamiast = ikonaPudelka)
             }
-            /* Powód pominięcia stoi PRZY pozycji, nie w osobnym wykazie: to
-               jedyna treść tego zgłoszenia i ma być widoczna bez szukania. */
-            if (pominieta) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    "pominięta — ${p.powod ?: "bez powodu"}",
-                    fontSize = 12.sp,
-                    color = Destructive,
+                    p.symbol.ifEmpty { p.nazwa },
+                    fontFamily = BarlowCond,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (zwiniety) 14.sp else 17.sp,
+                    color = if (zwiniety) InkMute else Ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!zwiniety) {
+                    Text(p.nazwa, fontSize = 12.sp, color = InkMute, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                /* Powód pominięcia stoi PRZY pozycji, nie w osobnym wykazie: to
+                   jedyna treść tego zgłoszenia i ma być widoczna bez szukania. */
+                if (pominieta) {
+                    Text(
+                        "pominięta — ${p.powod ?: "bez powodu"}",
+                        fontSize = 12.sp,
+                        color = Destructive,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    iloscZJednostka(p.ilosc, p.unit),
+                    fontSize = if (zwiniety) 12.sp else 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (zwiniety) InkMute else Ink,
+                )
+                /* Adres, pod który towar MA trafić — a po odłożeniu ten faktyczny.
+                   Wskazana pozycja pastylki NIE dostaje: ten sam adres stoi
+                   oczko niżej w 28 sp i dwa razy tego samego nie czyta się lepiej.
+                   Ta sama reguła co przy rozwiniętym wierszu dostawy. */
+                if (!wskazana) {
+                    LokPastylka(p.lokFaktyczna ?: p.lokOczekiwana, przygaszona = zwiniety)
+                }
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                iloscZJednostka(p.ilosc, p.unit),
-                fontSize = if (zwiniety) 12.sp else 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (zwiniety) InkMute else Ink,
+
+        if (wskazana) {
+            PanelPozycji(
+                p = p,
+                adres = adres,
+                onAdres = onAdres,
+                onOdloz = onOdloz,
+                onPomin = onPomin,
             )
-            /* Adres, pod który towar MA trafić — a po odłożeniu ten faktyczny. */
-            LokPastylka(p.lokFaktyczna ?: p.lokOczekiwana, przygaszona = zwiniety)
         }
     }
 }
@@ -368,7 +401,11 @@ private fun PozycjaRow(graph: AppGraph, p: KoszPozycja, wskazana: Boolean, onCli
    Wszystko, czego magazynier potrzebuje STOJĄC z towarem w ręce: gdzie to
    ma iść, gdzie tego jeszcze jest i czy nie warto przenieść na lepszą półkę.
    Niżej dwa wyjścia: wpisanie adresu ręką (zniszczona etykieta nie może
-   blokować pozycji) i pominięcie z powodem.                                  */
+   blokować pozycji) i pominięcie z powodem.
+
+   Rysuje się WEWNĄTRZ karty wiersza, więc nie ma własnego tła ani obwódki —
+   samo wcięcie i odstęp od dołu. Osobna karta rozrywała jedną myśl na dwie
+   i to było widać gołym okiem.                                              */
 
 @Composable
 private fun PanelPozycji(
@@ -381,8 +418,8 @@ private fun PanelPozycji(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .cardSurface(background = CardWhite, borderColor = AmberLine)
-            .padding(12.dp),
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
