@@ -964,6 +964,17 @@ Równolegle działa **ścieżka reklamacyjna**: pozycje z decyzją „reklamacja
 stoją na liście sortowanej po dniach do terminu ustawowego
 (`REKLAMACJA_DNI`, domyślnie 14). Karta RAPORT zbiera liczby całego procesu.
 
+Od 0.78.0 pod raportem stoi karta **STATYSTYKI ZWROTÓW**. Pokazuje, które
+produkty wracają najczęściej, decyzje biura w sztukach, zwroty per tydzień
+i kupujących z więcej niż jednym zwrotem. Okno wybiera się na miejscu:
+30, 90 albo 180 dni.
+
+Kolumna WSKAŹNIK dzieli zwrócone sztuki przez sprzedane w tym samym oknie
+i jest jedyną liczbą mówiącą, czy z produktem jest problem. Mianownik pochodzi
+z read-modelu sprzedaży, więc sięga tylko `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie
+90 dni). Dla dłuższego okna wskaźnika NIE MA — zamiast zawyżonego ilorazu
+widnieje myślnik i zdanie z wyjaśnieniem.
+
 Od 0.65.0 serwer **sam ściąga zapowiedzi zwrotów** — zgłoszenia klientów
 z Allegro, zanim paczka dojedzie. Skan etykiety trafia wtedy w znane
 zgłoszenie jednym zapytaniem, a zgłoszenia czekające na paczkę dłużej niż

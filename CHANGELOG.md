@@ -33,6 +33,44 @@ historii nie przepisujemy.
 
 ---
 
+## 0.78.0 — 22 sierpnia 2026
+
+**Biuro widzi wreszcie, KTÓRE produkty wracają.** Karta RAPORT liczy przebieg
+procesu: ile zwrotów jest nowych, ile dokumentów czeka w kolejce, jaka jest
+mediana czasu do rozliczenia. Żadna z tych liczb nie odpowiada na pytanie
+właściciela — a odpowiedź siedziała w bazie od pierwszego zwrotu.
+
+Nowa karta **STATYSTYKI ZWROTÓW** stoi pod raportem i ma okno 30, 90 albo
+180 dni. Tabela produktów pokazuje trzy miary obok siebie: ile razy towar
+wrócił, ile sztuk i **wskaźnik zwrotów** — zwrócone dzielone przez sprzedane
+w tym samym oknie. Dopiero ta trzecia liczba mówi, czy jest problem: sprzedany
+tysiąc razy i zwrócony dziesięć to norma, sprzedany dwadzieścia i zwrócony
+dziesięć to wada opisu albo towaru.
+
+**Wskaźnik woli zamilknąć, niż skłamać.** Mianownik bierze się ze sprzedaży
+w read-modelu, a ta sięga tylko okna importu (`DOK_SPRZEDAZ_DNI_WSTECZ`,
+domyślnie 90 dni). Przy oknie 180 dni licznik byłby pełny, a mianownik nie —
+iloraz wyszedłby zawyżony i ktoś mógłby po nim wycofać dobrze sprzedający się
+towar. W takim wypadku kolumna pokazuje myślnik, a pod tabelą stoi zdanie
+dlaczego. Zero sprzedaży w oknie też nie daje „100% zwrotów": towar mógł
+zostać sprzedany wcześniej, a wrócić teraz.
+
+Pod tabelą trzy przekroje: **decyzje biura** (ile sztuk wraca do sprzedaży,
+ile w reklamację, ile na zniszczenie), **zwroty per tydzień** i **kupujący
+z więcej niż jednym zwrotem**. Wykres tygodni pokazuje też tygodnie PUSTE —
+bez nich sąsiadami stawałyby się tygodnie odległe o miesiąc, a przerwa
+wyglądałaby jak równy rytm.
+
+Lista kupujących jest zestawieniem danych osobowych i karta mówi to wprost:
+służy wykrywaniu nadużyć, nie ocenianiu klientów. Wchodzą na nią wyłącznie
+loginy z więcej niż jednym zwrotem — pojedynczy zwrot to normalne zakupy.
+Zakres danych się nie zmienia, login widać na każdej karcie zwrotu; nowe jest
+zestawienie i dlatego ma podpis o celu.
+
+Towar bez dopasowanej kartoteki NIE wypada ze statystyki — liczy się po nazwie
+oferty i dostaje znacznik „poza kartoteką". Cicha strata takich pozycji
+zafałszowałaby obraz akurat tam, gdzie najczęściej jest problem.
+
 ## 0.77.0 — 21 sierpnia 2026
 
 **Otwarty kosz zwrotów mówi teraz tyle, co rozkładana dostawa.** Do tej wersji
