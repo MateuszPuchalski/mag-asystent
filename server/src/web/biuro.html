@@ -472,6 +472,41 @@
       <div class="kafle" id="raportZwrotowKafle"></div>
     </section>
 
+    <!-- Raport wyżej mówi, JAK IDZIE ROBOTA. Ta karta mówi, CO WRACA — inne
+         pytanie, więc inna karta, a nie kolejne kafle w tamtej. -->
+    <section class="card" id="statystykiKarta">
+      <h2>STATYSTYKI ZWROTÓW · CO WRACA NAJCZĘŚCIEJ</h2>
+      <div class="filtry" style="margin-bottom:10px">
+        <div>
+          <label for="dniStatystyk">OKNO</label>
+          <select id="dniStatystyk">
+            <option value="30">30 dni</option>
+            <option value="90" selected>90 dni</option>
+            <option value="180">180 dni</option>
+          </select>
+        </div>
+      </div>
+      <table id="statystykiProdukty"></table>
+      <p class="mute" id="statystykiUwaga" style="margin-top:6px"></p>
+
+      <h2 style="margin-top:18px">DECYZJE BIURA</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Ile ze zwróconego towaru wraca do sprzedaży, a ile schodzi ze stanu.
+      </p>
+      <div class="kafle" id="statystykiDecyzje"></div>
+
+      <h2 style="margin-top:18px">ZWROTY PER TYDZIEŃ</h2>
+      <div id="statystykiTygodnie" style="margin-top:6px"></div>
+
+      <h2 style="margin-top:18px">KUPUJĄCY Z WIĘCEJ NIŻ JEDNYM ZWROTEM</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Zestawienie służy wykrywaniu nadużyć i tylko temu. To dane osobowe
+        kupujących — nie używa się go do oceniania klientów ani do decyzji
+        wobec pojedynczej osoby bez sprawdzenia sprawy.
+      </p>
+      <table id="statystykiKupujacy"></table>
+    </section>
+
     <section class="card" id="kontoAllegroKarta">
       <h2>KONTO ALLEGRO</h2>
       <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
@@ -2312,6 +2347,9 @@ async function odswiezEtap3() {
     ]);
     rysujKosze(k.kosze || []);
     rysujPominiete(pom.pominiete || []);
+    /* Statystyki mają własne okno i własny rytm — tu tylko pierwsze wypełnienie,
+       żeby karta nie stała pusta po wejściu w zakładkę. */
+    if (!$("statystykiProdukty").innerHTML) odswiezStatystyki();
     rysujReklamacjeZwrotow(r.reklamacje || []);
     rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
@@ -2593,6 +2631,87 @@ async function pobierzDyskusje() {
   }
 }
 
+/* ── Statystyki zwrotów ──────────────────────────────────────────────────────
+   Odświeżają się WŁASNYM rytmem, nie razem z resztą zakładki: to jedyna karta
+   z własnym oknem czasu, a przeliczanie 180 dni przy każdym trzydziestosekun-
+   dowym odświeżeniu listy byłoby pracą dla nikogo.                           */
+
+async function odswiezStatystyki() {
+  try {
+    const dni = $("dniStatystyk").value;
+    const d = await (await api(`/api/biuro/zwroty/statystyki?dni=${dni}`)).json();
+    rysujStatystyki(d.statystyki);
+  } catch (e) {
+    $("statystykiProdukty").innerHTML =
+      `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+/** Wskaźnik jako procent; myślnik, gdy nie ma go z czego policzyć. */
+const procent = (w) => (w == null ? "—" : `${(w * 100).toFixed(1).replace(".", ",")}%`);
+
+function rysujStatystyki(s) {
+  const zdj = zdjeciaWlaczone;
+  $("statystykiProdukty").innerHTML = !s.produkty.length
+    ? '<tr><td class="mute">Brak zwrotów w tym oknie.</td></tr>'
+    : `<tr>${zdj ? "<th></th>" : ""}` +
+      "<th>TOWAR</th><th>ZWROTÓW</th><th>SZTUK</th><th>SPRZEDANYCH</th><th>WSKAŹNIK</th></tr>" +
+      s.produkty.map((p) => `<tr>
+          ${kolFoto(p.twId)}
+          <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}
+            ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}</td>
+          <td class="b">${p.zwrotow}</td>
+          <td>${p.sztuk}</td>
+          <td class="mute">${p.sprzedanych == null ? "—" : p.sprzedanych}</td>
+          <td>${p.wskaznik == null
+            ? '<span class="mute">—</span>'
+            /* Bursztyn od 10%: to nie jest próg z ustawy, tylko wartość, przy
+               której warto spojrzeć na ofertę. Czerwieni nie ma świadomie —
+               wysoki wskaźnik bywa cechą kategorii, nie wadą towaru. */
+            : p.wskaznik >= 0.1
+              ? `<span class="badge amber">${procent(p.wskaznik)}</span>`
+              : procent(p.wskaznik)}</td>
+        </tr>`).join("");
+  dolozZdjeciaListy(s.produkty, "statystykiProdukty", "sesjaStatystyk");
+
+  /* Uczciwość mianownika mówi się WPROST, zamiast pokazywać myślniki bez
+     wyjaśnienia: sprzedaż w read-modelu sięga tylko okna importu. */
+  $("statystykiUwaga").textContent =
+    s.dni > s.sprzedazOkno
+      ? `Wskaźnika nie liczę dla okna ${s.dni} dni — sprzedaż w bazie sięga ${s.sprzedazOkno} dni wstecz, `
+        + "więc iloraz wyszedłby zawyżony."
+      : `Wskaźnik = zwrócone sztuki ÷ sprzedane w tym samym oknie (${s.dni} dni).`;
+
+  const OPISY = {
+    pelnowartosciowy: "wraca do sprzedaży",
+    reklamacja: "w reklamacji",
+    do_wyjasnienia: "do wyjaśnienia",
+    do_zniszczenia: "na zniszczenie",
+    nieocenione: "jeszcze nieocenione",
+  };
+  $("statystykiDecyzje").innerHTML = !s.decyzje.length
+    ? '<p class="mute">Brak pozycji w tym oknie.</p>'
+    : s.decyzje.map((d) => kafel(
+        `${d.sztuk} szt.`,
+        `${OPISY[d.decyzja] || d.decyzja} (${d.pozycji} poz.)`,
+        d.decyzja === "do_zniszczenia" && d.sztuk > 0
+      )).join("");
+
+  $("statystykiTygodnie").innerHTML = slupkiSvg(
+    s.tygodnie.map((t) => ({ ile: t.ile, podpis: "t" + t.tydzien.slice(-2), tytul: `tydzień ${t.tydzien}` })),
+    s.tygodnie.length > 12 ? 4 : 1
+  );
+
+  $("statystykiKupujacy").innerHTML = !s.kupujacy.length
+    ? '<tr><td class="mute">Nikt nie zwrócił więcej niż raz w tym oknie.</td></tr>'
+    : "<tr><th>LOGIN</th><th>ZWROTÓW</th><th>SZTUK</th></tr>" +
+      s.kupujacy.map((k) => `<tr>
+          <td class="b">${esc(k.login)}</td>
+          <td>${k.zwrotow}</td>
+          <td class="mute">${k.sztuk}</td>
+        </tr>`).join("");
+}
+
 function rysujRaportZwrotow(r) {
   if (!r) { $("raportZwrotowKafle").innerHTML = ""; return; }
   const kafle = [
@@ -2682,6 +2801,7 @@ function otworzZwrot(id) {
   $("pominieteKarta").hidden = true;
   $("reklamacjeKarta").hidden = true;
   $("raportZwrotowKarta").hidden = true;
+  $("statystykiKarta").hidden = true;
   $("kontoAllegroKarta").hidden = true;
   odswiezSzczegolZwrotu();
 }
@@ -2698,6 +2818,7 @@ function zamknijZwrot() {
   $("pominieteKarta").hidden = !$("pominieteLista").innerHTML;
   $("reklamacjeKarta").hidden = false;
   $("raportZwrotowKarta").hidden = false;
+  $("statystykiKarta").hidden = false;
   $("kontoAllegroKarta").hidden = false;
   $("zwrotTowarWyniki").innerHTML = "";
 }
@@ -3322,6 +3443,8 @@ $("pominieteLista").addEventListener("click", async (e) => {
 
 /* Szukanie po wpisaniu, z odczekaniem — pole reaguje na literę, nie na Enter,
    bo biuro szuka „na wyczucie" i poprawia frazę w locie. */
+$("dniStatystyk").addEventListener("change", odswiezStatystyki);
+
 let koszSzukajTimer = null;
 $("koszSzukaj").addEventListener("input", (e) => {
   clearTimeout(koszSzukajTimer);

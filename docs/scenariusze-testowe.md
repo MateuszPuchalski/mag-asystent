@@ -651,6 +651,21 @@ Karta RAPORT PROCESU ZWROTÓW pokazuje kafle: stany zwrotów, dokumenty
 w kolejce i w błędzie, kosze, reklamacje po terminie oraz medianę czasu
 od skanu do rozliczenia.
 
+### S69d — statystyki zwrotów i uczciwy wskaźnik
+
+Karta **STATYSTYKI ZWROTÓW** stoi pod raportem. Po skanie kilku etykiet
+(S67–S69) tabela ma pokazać towary z liczbą zwrotów i sztuk, a pozycja spoza
+kartoteki — znacznik POZA KARTOTEKĄ zamiast zniknąć z listy.
+
+Sedno tego scenariusza to kolumna WSKAŹNIK. Przy oknie 90 dni liczy się ze
+sprzedaży w read-modelu. Przełącz okno na **180 dni**: wskaźnik ma zamilknąć
+w całej kolumnie, a pod tabelą ma stanąć zdanie, że sprzedaż sięga tylko
+90 dni wstecz. Liczba wyliczona z pełnego licznika i niepełnego mianownika
+byłaby zawyżona, a po niej ktoś mógłby wycofać dobrze sprzedający się towar.
+
+Wykres tygodni ma mieć słupki także dla tygodni BEZ zwrotów — oś czasu bez
+dziur. Lista kupujących pokazuje wyłącznie loginy z więcej niż jednym zwrotem.
+
 ### S70 — dostawca z logo i dostawca bez logo
 
 `FALON-TECH` ma wgrane logo, `STIHL Polska` nie ma. Oba dokumenty stoją na tej

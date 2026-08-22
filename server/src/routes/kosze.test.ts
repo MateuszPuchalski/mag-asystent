@@ -296,6 +296,15 @@ test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => 
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/raport", headers: biuro });
   assert.equal(r.statusCode, 200);
   assert.equal(typeof r.json().raport.zwroty.razem30dni, "number");
+  // statystyki produktowe (0.78.0) — ta sama bramka, okno z zapytania
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki", headers: magazynier });
+  assert.equal(r.statusCode, 403);
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki?dni=30", headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().statystyki.dni, 30);
+  // nieznane okno nie wywraca trasy, tylko wraca do domyślnego
+  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki?dni=abc", headers: biuro });
+  assert.equal(r.json().statystyki.dni, 90);
   // brakujące paczki (Etap 4) — ta sama bramka biura, pusta lista bez przebiegu tickera
   r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: magazynier });
   assert.equal(r.statusCode, 403);
