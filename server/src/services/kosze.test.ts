@@ -308,6 +308,14 @@ test("cofnięcie zakończenia: anuluje MM w kolejce, odmawia po zapisie", async 
   for (const p of kosz.pozycje) K.odlozPozycje(p.id, "C01-01-01", "Magazynier");
   K.zakonczKosz(kosz.id, "Magazynier");
 
+  /* Ślad rozłożenia jedzie na ekran biura — patrz test niżej. Tu sprawdzamy
+     drugą połowę tej samej reguły: kosz cofnięty NIE jest rozłożony przez
+     nikogo. Nazwisko, które zostałoby po cofnięciu, byłoby gorsze niż jego
+     brak — mówiłoby o pracy, której w tej chwili nie ma. */
+  const poZakonczeniu = K.szczegolKosza(kosz.id);
+  assert.equal(poZakonczeniu.rozlozonoPrzez, "Magazynier");
+  assert.ok(poZakonczeniu.rozlozonoAt);
+
   /* Sprawdzenie WSZYSTKICH zadań przed anulowaniem czegokolwiek: jedno MM
      przetworzone ma zablokować całość, a nie zostawić połowy anulowanej. */
   const mm = db().prepare("SELECT id FROM sfera_queue WHERE type='mm'").all() as Array<{ id: number }>;
@@ -324,6 +332,9 @@ test("cofnięcie zakończenia: anuluje MM w kolejce, odmawia po zapisie", async 
   const cofniety = K.cofnijZakonczenie(kosz.id, "Magazynier");
   assert.equal(cofniety.status, "zamkniety", "kosz wraca do rozkładania");
   assert.equal(cofniety.pozycje.every((p) => p.status === "done"), true, "praca zostaje");
+  assert.equal(cofniety.rozlozonoPrzez, null, "ślad rozłożenia znika razem z rozłożeniem");
+  assert.equal(cofniety.rozlozonoAt, null);
+  assert.equal(K.listaKoszy()[0].rozlozonoPrzez, null, "lista biura mówi to samo co szczegół");
   assert.equal(
     (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='cancelled'").get() as { n: number }).n,
     mm.length,

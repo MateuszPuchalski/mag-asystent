@@ -231,50 +231,48 @@ fun KoszScreen(graph: AppGraph) {
     val pominietych = k.pozycje.count { it.status == "skipped" }
     val odlozonych = k.pozycje.size - doZrobienia - pominietych
 
+    /* Ekran rozpada się na DWIE części i na tym polega cała ta zmiana: szapka
+       stoi, lista przewija się pod nią.
+
+       Wcześniej wszystko jechało w jednej przewijanej kolumnie, a ZAKOŃCZ leżał
+       pod ostatnią pozycją. Kosz na dwadzieścia pozycji znaczył wtedy: odłóż
+       ostatnią rzecz i przewiń jeszcze pół listy, żeby domknąć pracę — kciukiem,
+       w rękawicy, z koszem w drugiej ręce.
+
+       Samo przestawienie bloku NAD `forEach` odwróciłoby tylko kierunek tego
+       przewijania. Ostatnie odłożenie zostawia listę tam, gdzie stał palec, więc
+       przycisk pojawiłby się NAD widocznym obszarem — a dorzucenie do tego
+       przewinięcia na górę odbiera je dokładnie w chwili, w której człowiek
+       sprawdza wzrokiem właśnie zwinięty wiersz. Dlatego zakończenie nie wędruje
+       wewnątrz przewijanej treści, tylko WYCHODZI spod przewijania.
+
+       Reguła z dostaw zostaje w mocy (stopka w `DeliveryLinesScreen`, lekcja
+       z 0.54.0): dopóki JEST CO ROBIĆ, zakończenia na ekranie nie ma w ogóle,
+       więc nie ma jak kusić na starcie pracy. Zmienia się miejsce, nie warunek. */
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(12.dp),
+            .padding(horizontal = 12.dp)
+            .padding(top = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        /* Licznik przy komplecie mówi to SŁOWEM. „ODŁOŻONE 12/12" wymaga
+           porównania dwóch liczb, „KOMPLET" czyta się z odległości ramienia —
+           ta sama decyzja co przy pasku postępu dostawy. Kosz z pominięciem
+           tego słowa NIE dostaje, bo kompletem nie jest: wraca do biura
+           niepełny i nagłówek nie ma prawa temu przeczyć. */
+        val komplet = doZrobienia == 0 && pominietych == 0
         Text(
             buildString {
                 append("KOSZ ${k.kod} · ODŁOŻONE $odlozonych/${k.pozycje.size}")
                 if (pominietych > 0) append(" · POMINIĘTE $pominietych")
+                if (komplet) append(" · KOMPLET")
             },
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
-            color = InkSoft,
+            color = if (komplet) Success else InkSoft,
         )
-        k.pozycje.forEach { p ->
-            val wskazana = p.id == wybrana && k.status == "zamkniety"
-            PozycjaRow(
-                graph = graph,
-                p = p,
-                wskazana = wskazana,
-                adres = adres,
-                onAdres = { adres = it },
-                onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), recznie = true) },
-                onPomin = { pomijana = p },
-                onPozniej = {
-                    akcjaNaPozycji("odłożyć na później") {
-                        apiCall { graph.api.koszPozniej(p.id) }
-                    }
-                    /* Ta pozycja czeka dalej, tylko na końcu listy — wskazujemy
-                       więc następną, a nie nic. Pusty ekran po „później" kazał
-                       szukać kolejnego towaru palcem. */
-                    wybierz(nastepna(kosz, pomijajac = p.id))
-                },
-                onCofnij = {
-                    akcjaNaPozycji("cofnąć") { apiCall { graph.api.koszCofnijPozycje(p.id) } }
-                },
-                /* Pozycja ODŁOŻONA też daje się wskazać — inaczej nie byłoby
-                   jak cofnąć złego skanu ani poprawić adresu. */
-                onClick = { wybierz(p) },
-            )
-        }
 
         if (doZrobienia == 0 && k.status == "zamkniety") {
             val zDokumentu = k.mmNumer != null
@@ -305,6 +303,11 @@ fun KoszScreen(graph: AppGraph) {
                 }
             }
         }
+
+        /* Stan końcowy zostaje W SZAPCE, a cofnięcie go NIE. Na koszu rozłożonym
+           wszystkie wiersze są zwinięte i wyglądają identycznie, więc bez tego
+           zdania ekran nie odpowiada na jedyne pytanie, jakie się tu zadaje:
+           „dlaczego nic tu nie mogę zrobić". */
         if (k.status == "rozlozony") {
             Text(
                 if (k.mmNumer != null) "Kosz rozłożony. Dokument powrotny (ZWR→MAG) wystawia biuro."
@@ -312,17 +315,68 @@ fun KoszScreen(graph: AppGraph) {
                 fontSize = 13.sp,
                 color = InkMute,
             )
-            /* ZAKOŃCZ kliknięty za wcześnie albo nie na tym koszu. Serwer
-               przepuści to tylko wtedy, gdy MM jeszcze czekają w kolejce —
+        }
+
+        /* Jedyna przewijana część ekranu. Odstęp MUSI być powtórzony: `spacedBy`
+           kolumny zewnętrznej rozdziela już tylko szapkę od listy, a nie wiersze
+           między sobą. Dolne wcięcie stoi PO `verticalScroll`, więc jedzie
+           z treścią i daje ostatniemu wierszowi oddech, zamiast zostawiać pusty
+           pasek nad krawędzią. */
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            k.pozycje.forEach { p ->
+                val wskazana = p.id == wybrana && k.status == "zamkniety"
+                PozycjaRow(
+                    graph = graph,
+                    p = p,
+                    wskazana = wskazana,
+                    adres = adres,
+                    onAdres = { adres = it },
+                    onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), recznie = true) },
+                    onPomin = { pomijana = p },
+                    onPozniej = {
+                        akcjaNaPozycji("odłożyć na później") {
+                            apiCall { graph.api.koszPozniej(p.id) }
+                        }
+                        /* Ta pozycja czeka dalej, tylko na końcu listy — wskazujemy
+                           więc następną, a nie nic. Pusty ekran po „później" kazał
+                           szukać kolejnego towaru palcem. */
+                        wybierz(nastepna(kosz, pomijajac = p.id))
+                    },
+                    onCofnij = {
+                        akcjaNaPozycji("cofnąć") { apiCall { graph.api.koszCofnijPozycje(p.id) } }
+                    },
+                    /* Pozycja ODŁOŻONA też daje się wskazać — inaczej nie byłoby
+                       jak cofnąć złego skanu ani poprawić adresu. */
+                    onClick = { wybierz(p) },
+                )
+            }
+
+            /* COFNIJ ZAKOŃCZENIE zostaje POD listą i to jest ta sama myśl, dla
+               której zakończenie dostawy leży w stopce: droga powrotna ma leżeć
+               ZA dowodem, że kosz naprawdę jest rozłożony. Wyjściem z ekranu ona
+               nie jest — od tego jest WSTECZ w pasku zakładek — a przypięta
+               u góry byłaby najbardziej rzucającą się w oczy rzeczą na ekranie,
+               na którym poprawnym ruchem jest odejście.
+
+               Serwer przepuści ją tylko wtedy, gdy MM jeszcze czekają w kolejce;
                po zapisie do Subiekta odmówi i powie dlaczego. */
-            OutlineButton("COFNIJ ZAKOŃCZENIE", modifier = Modifier.fillMaxWidth()) {
-                scope.launch {
-                    try {
-                        apiCall { graph.api.koszCofnijZakonczenie(id) }
-                        graph.effects.toast("Kosz wrócił do rozkładania")
-                        reload++
-                    } catch (e: Exception) {
-                        graph.effects.toast(e.message ?: "Nie udało się cofnąć")
+            if (k.status == "rozlozony") {
+                OutlineButton("COFNIJ ZAKOŃCZENIE", modifier = Modifier.fillMaxWidth()) {
+                    scope.launch {
+                        try {
+                            apiCall { graph.api.koszCofnijZakonczenie(id) }
+                            graph.effects.toast("Kosz wrócił do rozkładania")
+                            reload++
+                        } catch (e: Exception) {
+                            graph.effects.toast(e.message ?: "Nie udało się cofnąć")
+                        }
                     }
                 }
             }

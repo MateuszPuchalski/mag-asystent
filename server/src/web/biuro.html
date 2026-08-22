@@ -2821,9 +2821,14 @@ function badgeKosza(status) {
   return '<span class="badge mute2">ROZŁOŻONY</span>';
 }
 
+/* Kolumna ROZŁOŻYŁ: osoba nad godziną, jak KTO ODŁOŻYŁ przy pozycjach dostawy.
+   Kosz nierozłożony dostaje MYŚLNIK, nie pustkę — pusta komórka wygląda na brak
+   danych, a to jest odpowiedź „jeszcze nikt". Ślad znika sam po COFNIJ
+   ZAKOŃCZENIE, bo serwer kasuje oba pola: kolumna nie zostaje z nazwiskiem
+   przy koszu, który wrócił do rozkładania. */
 function rysujKosze(kosze) {
   $("koszeLista").innerHTML = kosze.length
-    ? "<tr><th>KOD</th><th>STATUS</th><th>ZAWARTOŚĆ</th><th>POSTĘP</th><th></th></tr>" +
+    ? "<tr><th>KOD</th><th>STATUS</th><th>ZAWARTOŚĆ</th><th>POSTĘP</th><th>ROZŁOŻYŁ</th><th></th></tr>" +
       kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
           <td class="b">${esc(k.kod)}</td>
           <td>${badgeKosza(k.status)}</td>
@@ -2834,6 +2839,9 @@ function rysujKosze(kosze) {
             ${k.pominietych
               ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>`
               : ""}</td>
+          <td>${k.rozlozonoPrzez
+            ? `${esc(k.rozlozonoPrzez)}<div class="mute">${esc(stempelLokalny(k.rozlozonoAt))}</div>`
+            : '<span class="mute">—</span>'}</td>
           <td>${k.status === "otwarty"
             ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
             : ""}</td>
@@ -2897,7 +2905,11 @@ async function szukajWKoszach(q) {
                 ? `<span class="badge ok">${esc(z.lokFaktyczna)}</span>`
                 : '<span class="mute">czeka na hali</span>'}</td>
             <td class="mute" style="white-space:nowrap">${z.kiedy
-              ? esc(z.kiedy.slice(0, 16).replace("T", " ")) : "—"}</td>
+              /* Przez `stempelLokalny`, nie własnym cięciem napisu: strefa jest
+                 tu istotna (znacznik z bazy jest w UTC), a druga metoda
+                 formatowania w tym samym pliku prędzej czy później rozjedzie
+                 się z pierwszą o godzinę. */
+              ? esc(stempelLokalny(z.kiedy)) : "—"}</td>
           </tr>`).join("") + "</table>";
   } catch (e) {
     cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
@@ -2931,11 +2943,19 @@ async function pokazPodgladKosza(id, cichy) {
       ? `z przesunięcia MM ${esc(k.mmNumer)} — dokument powrotny wystawia biuro`
       : `${k.zwroty.length} zwr. przypiętych w aplikacji`;
     const pominiete = k.pozycje.filter((p) => p.status === "skipped");
+    /* Cykl życia kosza jedną linią. Lista odpowiada rzutem oka „czy zrobione
+       i przez kogo"; podgląd odpowiada przy sprawie „co się z tym działo".
+       Kosz otwarty nie pokazuje niczego, bo nic się jeszcze nie stało. */
+    const etapy = [
+      k.zamknietoPrzez && `zamknął ${esc(k.zamknietoPrzez)} · ${esc(stempelLokalny(k.zamknietoAt))}`,
+      k.rozlozonoPrzez && `rozłożył ${esc(k.rozlozonoPrzez)} · ${esc(stempelLokalny(k.rozlozonoAt))}`,
+    ].filter(Boolean);
     cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
         KOSZ ${esc(k.kod)} ${badgeKosza(k.status)}
         <button class="akcja cichy" data-kosz-zamknij-podglad style="margin-left:auto">ZWIŃ</button>
       </h2>
       <p class="mute" style="margin-bottom:8px">${zrodlo}</p>
+      ${etapy.length ? `<p class="mute" style="margin-bottom:8px">${etapy.join(" → ")}</p>` : ""}
       ${pominiete.length
         ? `<p><span class="badge amber">KOSZ NIEKOMPLETNY</span>
              hala pominęła ${pominiete.length} poz. — powód przy wierszu niżej</p>`
@@ -2986,7 +3006,9 @@ function stanPozycjiKosza(p) {
           ? `<div class="mute">MM: ${esc(p.mmStatus)}</div>`
           : "";
     return `<span class="badge ok">ODŁOŻONA</span>${p.odlozonoPrzez
-      ? `<div class="mute">${esc(p.odlozonoPrzez)}</div>` : ""}${mm}`;
+      ? `<div class="mute">${esc(p.odlozonoPrzez)}${p.odlozonoAt
+          ? ` · ${esc(stempelLokalny(p.odlozonoAt))}` : ""}</div>`
+      : ""}${mm}`;
   }
   return '<span class="mute">czeka na hali</span>';
 }

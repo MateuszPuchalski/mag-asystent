@@ -131,6 +131,19 @@ test("pełny przepływ: kosz na karcie, zamknięcie, rozkładanie, cofnięcie bu
   // autor zadań MM = magazynier z sesji, nie biuro
   const autorzy = db().prepare("SELECT DISTINCT created_by FROM sfera_queue WHERE type='mm'").all() as Array<{ created_by: string }>;
   assert.deepEqual(autorzy.map((a) => a.created_by), ["Ktoś magazynier"]);
+
+  /* Biuro widzi, KTO rozłożył — i musi to być hala, nie biuro, które kosz
+     zamykało. Te dwie osoby to dwie różne role w tym samym koszu i pomylenie
+     ich byłoby błędem, którego oko nie złapie: nazwisko na ekranie wyglądałoby
+     tak samo poprawnie. */
+  r = await app.inject({ method: "GET", url: "/api/biuro/kosze", headers: biuro });
+  const wiersz = r.json().kosze.find((x: { id: number }) => x.id === koszId);
+  assert.equal(wiersz.rozlozonoPrzez, "Ktoś magazynier");
+  assert.ok(wiersz.rozlozonoAt, "lista niesie też godzinę");
+  assert.equal(wiersz.zamknietoPrzez, "Ktoś biuro", "zamykało biuro — inna osoba, inna kolumna");
+
+  r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
+  assert.equal(r.json().kosz.rozlozonoPrzez, "Ktoś magazynier", "szczegół mówi to samo co lista");
 });
 
 test("cofanie i odkładanie na później przez HTTP — bez bramki roli", async () => {
