@@ -414,6 +414,51 @@ CREATE TABLE IF NOT EXISTS dostawca_logo (
   dodane_by TEXT NOT NULL
 );
 
+-- Zdjęcie kartoteki DODANE Z KOLEKTORA (0.88.0).
+--
+-- OBRAZ SIEDZI W BAZIE, nie w data/zdjecia, i to jest ta sama różnica co przy
+-- `dostawca_logo` obok. `zdjecie_cache` jest CACHE'M: wolno go skasować, bo
+-- odtworzy się z Subiekta. Tego nikt nie odtworzy — ktoś stanął przy regale
+-- z towarem w ręku i zrobił zdjęcie. Należy do kopii bazy, nie do cache'u.
+--
+-- Wiersz jest zarazem ZAPASOWĄ DROGĄ. Kartę rysuje się z niego natychmiast po
+-- zapisie, niezależnie od tego, czy baza firmy ma `GRANT INSERT` i czy worker
+-- zdążył wykonać zadanie — dokładnie tak `ean_alias` niesie kod kreskowy mimo
+-- nieudanego `set_ean`. Znika dopiero wtedy, gdy zapis do Subiekta NAPRAWDĘ
+-- wszedł; od tej chwili źródłem jest znowu Subiekt.
+CREATE TABLE IF NOT EXISTS zdjecie_wlasne (
+  tw_id          INTEGER PRIMARY KEY,
+  obraz          BLOB NOT NULL,
+  mime           TEXT NOT NULL,
+  bajtow         INTEGER NOT NULL,
+  etag           TEXT NOT NULL,      -- sha1 treści — po nim idzie 304
+  tlo_usuniete   INTEGER NOT NULL,   -- 0 = człowiek wybrał „ZOSTAW TŁO"
+  dodane_at      TEXT NOT NULL,
+  dodane_by      TEXT NOT NULL,      -- nazwa z chwili zapisu (snapshot)
+  dodane_by_ref  INTEGER,            -- konto — po nim wiąże audyt
+  queue_id       INTEGER,            -- zadanie set_zdjecie; NULL = zapis wyłączony
+  w_subiekcie_at TEXT                -- NULL = do kartoteki jeszcze nie weszło
+);
+
+-- Podgląd między zrobieniem zdjęcia a jego zatwierdzeniem (0.88.0).
+--
+-- Istnieje, bo wycięcie tła bywa nieudane i człowiek ma je zobaczyć, ZANIM
+-- cokolwiek trafi do bazy firmy. Trzymamy obie wersje: wyciętą i oryginał —
+-- przycisk „ZOSTAW TŁO" musi mieć co zapisać bez drugiego przesyłania zdjęcia
+-- przez Wi-Fi hali.
+--
+-- Wiersz żyje minuty (ZDJECIA_PODGLAD_MIN) i kasuje się sam. Bez tego jeden
+-- porzucony kadr zostawałby w bazie na zawsze, a jest ich tyle, ile prób.
+CREATE TABLE IF NOT EXISTS zdjecie_podglad (
+  id           TEXT PRIMARY KEY,     -- losowy, nadany przez serwer
+  tw_id        INTEGER NOT NULL,
+  bez_tla      BLOB,                 -- NULL = usługa tła nie działa albo odmówiła
+  oryginal     BLOB NOT NULL,
+  mime         TEXT NOT NULL,        -- typ ORYGINAŁU; wycięte tło jest zawsze PNG
+  utworzone_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_zdjecie_podglad_czas ON zdjecie_podglad(utworzone_at);
+
 CREATE TABLE IF NOT EXISTS process_state (
   name       TEXT PRIMARY KEY,   -- 'api' | 'worker' | 'sfera' (worker MM, sfera-worker/)
   pid        INTEGER NOT NULL,

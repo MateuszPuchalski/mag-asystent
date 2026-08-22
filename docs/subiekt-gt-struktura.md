@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzy.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało sześć.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -568,9 +568,60 @@ co innego, a wtedy odpowiedzi szuka się tą samą drogą:
 | ścieżka do pliku w polu tekstowym | żaden | `ZDJECIA_ZRODLO=plik`, `ZDJECIA_KATALOG` |
 | OLE / RTF / nic | — | funkcja zostaje wyłączona, wynik dopisujemy tutaj jako obalony |
 
+## Dopisanie zdjęcia do kartoteki — 0.88.0
+
+Do 0.87.0 zdjęcia były **tylko do odczytu**. Od 0.88.0 magazynier może dodać
+zdjęcie z kolektora, a zadanie `set_zdjecie` dopisuje wiersz do `tw_ZdjecieTw`.
+
+```sql
+INSERT INTO tw_ZdjecieTw (zd_IdTowar, zd_Zdjecie, zd_Glowne)
+VALUES (@id, @obraz, @glowne);
+```
+
+Nazwy kolumn biorą się z tej samej konfiguracji, co odczyt. Zapytanie składa
+`budujZapytanieInsert` w [`server/src/adapters/sfera.sql.ts`](../server/src/adapters/sfera.sql.ts).
+
+`zd_Glowne` dostaje `1` **tylko wtedy**, gdy kartoteka nie ma jeszcze żadnego
+zdjęcia. Liczymy je w tej samej transakcji co `INSERT`. Dwa wiersze oznaczone
+jako główne dałyby odczyt raz jednego zdjęcia, raz drugiego — i ETag skaczący
+przy każdym wejściu na kartę.
+
+Funkcja jest domyślnie **wyłączona**. Włącza ją `ZDJECIA_DODAWANIE=subiekt`
+i **ósmy grant**:
+
+```sql
+GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;
+```
+
+Bez tego grantu zdjęcie nadal działa. Leży wtedy w bazie WERTIS i widać je na
+karcie towaru. Zadanie stoi w kolejce z błędem, który podaje gotowe polecenie.
+To ta sama droga zapasowa, którą `ean_alias` niesie kod kreskowy.
+
+### Czego to nie rozstrzyga
+
+Trzy rzeczy sprawdza się na **kartotece próbnej**, przed produkcją
+([`DEPLOY.md`](../DEPLOY.md) §6).
+
+`[WERYFIKUJ]` **czy Subiekt znosi pusty `zd_CRC`**. Algorytmu tej sumy
+kontrolnej nie znamy. Domyślnie nie wpisujemy tej kolumny wcale, bo własna
+liczba byłaby zgadywaniem zapisanym do bazy firmy. Gdy okaże się wymagana,
+jej nazwę podaje się kluczem `ZDJECIA_KOLUMNA_CRC`.
+
+`[WERYFIKUJ]` **jak podgląd Subiekta rysuje przezroczystość**. Zapisujemy PNG
+z kanałem alfa. Możliwy jest czarny prostokąt zamiast wyciętego przedmiotu.
+Poprawką byłby biały podkład nakładany przed zapisem — jedna funkcja
+w `sfera.sql.ts`.
+
+`[WERYFIKUJ]` **czy trzeba dotknąć `tw_Zmiana.zt_ZmianaZdjecie`**. Kolumna
+istnieje i niesie datę zmiany zdjęcia, ale nikt jej dotąd nie zapisywał.
+
 ## Zasada nadrzędna
 
-Zapis do bazy Subiekta ogranicza się do **jednej rzeczy**: pola lokalizacji na
-`tw__Towar`. Zdjęcia są **tylko odczytywane**. Zero `INSERT` do tabel
-dokumentów, zero modyfikacji stanów, zero ingerencji w numerację — dokumenty MM
-tworzy Sfera (COM) albo import EPP, nigdy bezpośredni SQL.
+Zapis do bazy Subiekta ogranicza się do **trzech rzeczy**. Są to pole
+lokalizacji i podstawowy kod kreskowy na `tw__Towar` oraz wiersz zdjęcia
+w `tw_ZdjecieTw`. Wszystkie trzy wymagają osobnego, wąskiego grantu, a dwie
+ostatnie są domyślnie wyłączone.
+
+Poza nimi zapisu nie ma. Zero `INSERT` do tabel dokumentów, zero modyfikacji
+stanów, zero ingerencji w numerację. Dokumenty MM tworzy Sfera (COM) albo
+import EPP, nigdy bezpośredni SQL.

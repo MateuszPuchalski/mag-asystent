@@ -33,6 +33,119 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.0 — 22 sierpnia 2026
+
+**Magazynier dodaje zdjęcie kartoteki z kolektora.** Do 0.87.0 kartoteka bez
+zdjęcia pokazywała na karcie szary kwadrat z ikoną pudełka i nic więcej.
+Człowiek stał przy regale z towarem w ręku, widział, że zdjęcia nie ma, i nie
+miał czym tego naprawić — jedyną drogą było „powiedz biuru". Ta sama ślepa
+uliczka, którą 0.37.0 zlikwidowało dla kodów kreskowych.
+
+Teraz pusty slot jest przyciskiem. Dotknięcie otwiera aparat albo galerię,
+zdjęcie jedzie na serwer, tam osobna usługa wycina tło, a magazynier ogląda
+wynik i dopiero wtedy zapisuje.
+
+**[wymaga działania — opcjonalne]** Funkcja jest **domyślnie wyłączona**
+i niczego nie zmienia, dopóki nikt nie ustawi `ZDJECIA_DODAWANIE`. Uruchomienie
+w pełnym zakresie wymaga trzech rzeczy: nowej usługi `wertis-tlo`, **ósmego
+`GRANT`** i nowego APK. Komplet: [`DEPLOY.md`](DEPLOY.md) §6, etap 2a.
+
+### Pierwszy raz dopisujemy wiersz do bazy firmy
+
+`docs/subiekt-gt-struktura.md` mówił dotąd wprost: zdjęcia są tylko do odczytu,
+zero `INSERT` do tabel Subiekta. To zdanie przestaje być prawdziwe i zostało
+w dokumencie poprawione, a nie przemilczane.
+
+Granica zapisu rozszerza się trzeci raz — po lokalizacji (spec §5.2) i kodzie
+kreskowym (0.37.0) — ale po raz pierwszy o **dopisanie wiersza**, nie o zmianę
+jednej kolumny istniejącego. Kosztuje to osobne uprawnienie:
+
+```sql
+GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;
+```
+
+Nadaje je instalator uruchomiony z `-ZdjeciaZapis`, i tylko z nim. Takiego prawa
+nie daje się komuś dlatego, że zaktualizował aplikację.
+
+`zd_Glowne` dostaje `1` wyłącznie wtedy, gdy kartoteka nie ma jeszcze żadnego
+zdjęcia — liczone w tej samej transakcji co `INSERT`. Dwa wiersze oznaczone jako
+główne dawałyby przy odczycie raz jedno zdjęcie, raz drugie, czyli ETag skaczący
+przy każdym wejściu na kartę i kolektory pobierające obraz w kółko. To ta sama
+pułapka, przez którą `ZDJECIA_KOLUMNA_KOLEJNOSC` jest obowiązkowe od 0.30.0.
+
+### Bez ósmego grantu funkcja NIE przestaje działać
+
+Zapisane zdjęcie ląduje najpierw w bazie WERTIS i karta rysuje je stamtąd
+natychmiast — niezależnie od tego, czy zapis do Subiekta jest włączony, czy
+zadanie w kolejce już się wykonało. Dokładnie tak `ean_alias` niesie kod
+kreskowy mimo nieudanego `set_ean`.
+
+Kopia znika dopiero po UDANYM zapisie do kartoteki. Od tej chwili źródłem jest
+znowu Subiekt, więc poprawka zdjęcia zrobiona później w biurze dociera na
+kolektor normalną drogą. Ile zdjęć czeka na wejście do Subiekta, pokazuje
+`/api/health` w polu `zdjeciaWlasne`; liczba rosnąca z dnia na dzień jest
+jedynym objawem zadań stojących w błędzie — karta wygląda wtedy poprawnie.
+
+### Czwarty proces, bo model nie mieści się w serwerze
+
+Wycinanie tła robi model open source na runtime ONNX, czyli moduł natywny.
+Serwer WERTIS ma dwie zależności i zero modułów natywnych — nie z upodobania,
+tylko dlatego, że stoi na maszynie, na której biuro wystawia faktury, i ma się
+dać zainstalować bez kompilatora. Ta sama reguła nie pozwala mu skalować zdjęć
+kartotek ani przerabiać logotypów dostawców.
+
+Repozytorium miało już na to wzorzec: `sfera-worker/` jest trzecim procesem,
+samowystarczalnym exe pod `nssm`, domyślnie wyłączonym. `tlo-worker/` jest
+czwartym i działa tak samo. Bez niego zdjęcia zapisują się **z tłem**, a kolektor
+mówi o tym wprost — funkcja robi mniej, nie przestaje działać.
+
+Domyślny model to `u2netp` (Apache-2.0, ~4,7 MB). Nie leży w repozytorium, tak
+samo jak AAR Honeywella: pobiera go `build.ps1` i sprawdza sumę kontrolną.
+Przy pierwszym budowaniu skrypt **odmawia** — suma nie jest jeszcze ustalona,
+a wpisanie liczby z pamięci dałoby weryfikację pozorną.
+
+### Dlaczego człowiek ogląda wynik przed zapisem
+
+Zdjęcie regału z pięcioma kartonami wygląda dla modelu tak samo jak zdjęcie
+noża. Wycięcie bywa nieudane, a nieudane zdjęcie w kartotece Subiekta odkręca
+już tylko biuro.
+
+Dlatego droga ma dwa kroki. Pierwszy robi podgląd i nie zapisuje niczego, drugi
+zatwierdza. W podglądzie stoją trzy przyciski: ZAPISZ, ZOSTAW TŁO (dla towaru,
+którego model nie umiał wyciąć) i JESZCZE RAZ. „ZOSTAW TŁO" pojawia się
+wyłącznie wtedy, gdy tło naprawdę usunięto — przycisk proponujący wybór między
+dwiema identycznymi wersjami zdjęcia jest gorszy niż jego brak.
+
+Podgląd stoi na szachownicy, nie na białym tle arkusza. Wycięte zdjęcie na
+białym wygląda identycznie jak zdjęcie na białym stole, więc człowiek nie miałby
+po czym poznać, czy tło zniknęło.
+
+### „+" pojawia się po POTWIERDZONYM braku, nie w trakcie ładowania
+
+Do tej pory „nie wiadomo jeszcze" i „zdjęcia nie ma" były w kolektorze jednym
+stanem — dla rysowania szarego kwadratu to bez różnicy. Przy przycisku różnica
+jest cała: bez niej „+" mignąłby przy każdym wejściu na kartę, także na
+kartotece, która zdjęcie MA, i przesuwałby cel dotyku pod kciukiem. Slot
+zachowuje przy tym stały rozmiar we wszystkich stanach, tak jak od 0.30.0.
+
+Galeria idzie przez systemowy wybierak, więc **nie dochodzi żadne uprawnienie**
+w manifeście. Aplikacja potrzebuje jednego pliku wskazanego ręką, a nie dostępu
+do wszystkich zdjęć z urządzenia. Aparat jak dotąd nie wymaga uprawnienia
+`CAMERA` — kadr robi `ACTION_IMAGE_CAPTURE`.
+
+Ta operacja świadomie **nie działa offline** i arkusz mówi to wprost. Bufor
+plikowy niesie meldunki, nie obrazy, a wycięcie tła i tak wymaga serwera.
+
+### Zdjęcie kartoteki jedzie ostrzej niż dowodowe
+
+Dowód do reklamacji ma pokazać rozbity karton i druk na etykiecie; 1280 px
+i jakość 70 wystarczają. Zdjęcie kartoteki idzie do modelu, który tnie po
+krawędziach przedmiotu, a artefakty JPEG-a robią z krawędzi strzępy — i te
+strzępy zostają w obrazie na zawsze, także po wejściu do Subiekta. Stąd 1600 px
+i jakość 85 na tej jednej drodze.
+
+---
+
 ## 0.87.0 — 22 sierpnia 2026
 
 **Logo dostawcy wchodzi do panelu biura i przestaje być znaczkiem na

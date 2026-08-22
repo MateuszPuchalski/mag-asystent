@@ -8,8 +8,10 @@ każdy do swojej roli:
   Kotlin/Compose): skan sprzętowy (Honeywell DataCollection + Zebra DataWedge),
   trwały offline (bufor plikowy JSON + WorkManager), kiosk przez Android
   lock-task/MDM. Od 0.52.0 **aktualizuje się sam z serwera WERTIS**: plik leży
-  w sieci magazynu, a kolektor proponuje go przy otwarciu aplikacji. Wdrożenie:
-  [`DEPLOY.md`](DEPLOY.md) §5.
+  w sieci magazynu, a kolektor proponuje go przy otwarciu aplikacji. Od 0.88.0
+  **magazynier dodaje z niego zdjęcie kartoteki**: dotyka pustego slotu na
+  karcie towaru, robi zdjęcie albo wybiera je z galerii, a serwer wycina tło.
+  Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5 i §6 etap 2a.
 - **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
   kolejka zapisów, rekoncyliacja i ślad audytowy. Od 0.48.0 zakładka ANALIZA:
@@ -57,6 +59,7 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 | Baza aplikacji | SQLite (wbudowany `node:sqlite`, zero modułów natywnych) — kolejka, sesje, events (spec §7) |
 | Worker zapisu | osobny proces Node, pętla poll, retry/backoff, `waiting_for_doc` (spec §9) |
 | Worker Sfery (`sfera-worker/`) | C#/.NET 8 · COM Sfery — dokumenty MM na produkcji, opcjonalny ([README](sfera-worker/README.md)) |
+| Usługa tła (`tlo-worker/`) | C#/.NET 8 · ONNX Runtime · SkiaSharp — wycina tło ze zdjęcia dodanego z kolektora, opcjonalna ([README](tlo-worker/README.md)) |
 
 Kolorystyka WERTIS: amber `#F7A600`, grafit `#2A2A2C`, papier `#F6F5F2`.
 Strefa przyjęć nazywa się **MGP**.
@@ -545,7 +548,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 236 testów jednostkowych; buduje się bez Android SDK
+                           + 242 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

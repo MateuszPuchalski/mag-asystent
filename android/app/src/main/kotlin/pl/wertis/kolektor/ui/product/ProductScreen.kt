@@ -131,6 +131,11 @@ fun ProductScreen(graph: AppGraph) {
     var przesun by remember(id) { mutableStateOf<Zrodlo?>(null) }
     /** Arkusz nadania kodu kreskowego (0.37.0). */
     var eanOtwarty by remember(id) { mutableStateOf(false) }
+    /** Arkusz dodania zdjęcia kartoteki (0.88.0). */
+    var zdjecieOtwarte by remember(id) { mutableStateOf(false) }
+    /* Licznik, nie flaga: po zapisie slot ma pobrać zdjęcie od nowa, a drugie
+       zdjęcie tej samej kartoteki musi zadziałać tak samo jak pierwsze. */
+    var zdjecieOdswiez by remember(id) { mutableStateOf(0) }
 
     val p = poll.data
 
@@ -198,7 +203,16 @@ fun ProductScreen(graph: AppGraph) {
             p,
             onPrzesunZMgp = { przesun = Zrodlo(null, "MGP", p.mgp.stan - p.mgp.pendingOut) },
             onEan = { eanOtwarty = true },
-            zdjecie = { ZdjecieKartoteki(graph, p.id) },
+            zdjecie = {
+                ZdjecieKartoteki(
+                    graph,
+                    p.id,
+                    odswiez = zdjecieOdswiez,
+                    /* `null` chowa „+". Starszy serwer pola nie wysyła, więc
+                       przycisk nie pojawia się tam, gdzie funkcji nie ma. */
+                    onDodaj = if (p.mozeDodacZdjecie) ({ zdjecieOtwarte = true }) else null,
+                )
+            },
         ) {
             /* Pastylka adresu pickingowego. Ograniczona szerokość, żeby długi
                kod nie zepchnął liczby 44 sp — adresy mieszczą się w dziewięciu
@@ -446,6 +460,25 @@ fun ProductScreen(graph: AppGraph) {
                    teraz, przez alias. Komunikat mówi wprost o tej różnicy,
                    zamiast udawać, że kartoteka zmieniła się natychmiast. */
                 graph.effects.toast("Kod nadany — skan działa od razu, kartoteka po zapisie")
+            },
+        )
+    }
+
+    if (zdjecieOtwarte) {
+        ZdjecieSheet(
+            graph = graph,
+            twId = p.id,
+            sym = p.sym,
+            nazwa = p.name,
+            onClose = { zdjecieOtwarte = false },
+            onZapisano = {
+                zdjecieOtwarte = false
+                zdjecieOdswiez++
+                /* Ta sama różnica co przy kodzie kreskowym: zdjęcie widać na
+                   karcie od razu, bo leży w bazie WERTIS, a do kartoteki
+                   w Subiekcie wchodzi dopiero po workerze. Komunikat mówi o tym
+                   wprost, zamiast udawać, że kartoteka zmieniła się natychmiast. */
+                graph.effects.toast("Zdjęcie zapisane — na karcie od razu, w kartotece po zapisie")
             },
         )
     }

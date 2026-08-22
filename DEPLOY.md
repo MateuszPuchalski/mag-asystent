@@ -962,6 +962,43 @@ Kolejność — **wszystko najpierw na KOPII bazy**:
 Bramki odbioru (bufor, guard kolejności, odporność na restart) —
 [`docs/wdrozenie.md`](docs/wdrozenie.md), sekcja „Dołączenie workera Sfery".
 
+**Etap 2a — zdjęcia kartotek dodawane z kolektora (opcjonalny, 0.88.0):**
+
+Magazynier dotyka pustego slotu na karcie towaru, robi zdjęcie albo wybiera je
+z galerii, a serwer wycina tło. Człowiek ogląda wynik przed zapisem.
+Instrukcja usługi: [`tlo-worker/README.md`](tlo-worker/README.md).
+
+Etap jest **niezależny od etapu 2** i nie wymaga Sfery. Wymaga za to
+**ósmego grantu** — pierwszego prawa dopisywania wiersza do bazy firmy.
+
+Kolejność — **wszystko najpierw na KOPII bazy**:
+
+1. Zbuduj exe (`tlo-worker\build.ps1`, maszyna z .NET 8 SDK). Skrypt pobierze
+   model i przy pierwszym uruchomieniu odmówi. Porównaj wypisaną sumę
+   kontrolną ze źródłem u wydawcy i wpisz ją do skryptu.
+2. Skopiuj cały katalog `publish` do `C:\wertis\tlo-worker\`. Zarejestruj
+   usługę `wertis-tlo` (nssm albo §3).
+3. Dopisz do `wertis.env`: `TLO_URL=http://127.0.0.1:8791`.
+4. Włącz dodawanie zdjęć. `ZDJECIA_DODAWANIE=wertis` zostawia je w bazie
+   WERTIS; `ZDJECIA_DODAWANIE=subiekt` wysyła je do kartoteki.
+5. Przy `subiekt` nadaj ósmy grant. Zrobi to instalator z przełącznikiem
+   `-ZdjeciaZapis`, albo wykonaj w SSMS:
+   `GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;`
+6. Zrestartuj usługę `wertis-api`. Wgraj kolektorom APK 0.88.0 lub nowsze.
+7. **Jedna** kartoteka próbna. Dodaj jedno zdjęcie z kolektora.
+8. Otwórz tę kartotekę w Subiekcie, zakładka „Opis". Sprawdź trzy rzeczy:
+   zdjęcie jest, rysuje się poprawnie i nie ma pod nim czarnego prostokąta.
+
+Punkt 8 jest **bramką, nie formalnością**. Przezroczystość i suma kontrolna
+`zd_CRC` są `[WERYFIKUJ]` — powody w
+[`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md), rozdział
+„Dopisanie zdjęcia do kartoteki".
+
+Bez usługi `wertis-tlo` funkcja nadal działa. Zdjęcia zapisują się wtedy z tłem,
+a kolektor mówi o tym wprost. Bez ósmego grantu zdjęcie zostaje w bazie WERTIS
+i widać je na karcie, a zadanie stoi w kolejce z czytelnym błędem.
+`GET /api/health` liczy takie zdjęcia w polu `zdjeciaWlasne`.
+
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i przesunięcia
 stanu przez workera Sfery.
 

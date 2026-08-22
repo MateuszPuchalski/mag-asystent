@@ -5,6 +5,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { pobierzZeZrodla, type ZdjecieZrodlo } from "../adapters/zdjecia.sgt.js";
+import { metaWlasnego, wlasneZdjecie } from "./zdjecia-wlasne.js";
 
 /* ── Cache zdjęć kartotek ────────────────────────────────────────────────────
    LENIWY CACHE PRZELOTOWY, nigdy import masowy — i to jest decyzja, nie
@@ -140,6 +141,33 @@ function dotknij(twId: number): void {
 export type Zrodlo = (twId: number, symbol: string) => Promise<ZdjecieZrodlo | null>;
 
 /**
+ * Wpis cache'u dla zdjęcia dodanego z kolektora — z plikiem odtwarzanym z bazy.
+ *
+ * Obraz leży w `zdjecie_wlasne` (BLOB), ale trasa `GET /api/products/:id/zdjecie`
+ * strumieniuje PLIK i ma tak zostać: 150 kB przez `reply.send(bufor)` trzyma
+ * całość w pamięci procesu, a kolektorów jest kilka. Plik odtwarzamy więc na
+ * żądanie i sprzątaczka cache'u wolno go skasować — odtworzy się przy następnym
+ * wejściu na kartę, bo źródłem prawdy jest wiersz w bazie.
+ */
+function zCacheWlasnego(w: NonNullable<ReturnType<typeof metaWlasnego>>): WpisZdjecia {
+  const nazwa = `t${w.twId}.${rozszerzenie(w.mime)}`;
+  const stary = wpis(w.twId);
+  const aktualny = stary?.etag === w.etag && stary?.plik === nazwa && sciezkaZdjecia(nazwa) !== null;
+  if (aktualny) {
+    dotknij(w.twId);
+    return wpis(w.twId) as WpisZdjecia;
+  }
+
+  /* Obraz czytamy DOPIERO TERAZ. Wejście na kartę, które skończy się na 304,
+     nie ma prawa ruszyć blobu — patrz `metaWlasnego`. */
+  const pelne = wlasneZdjecie(w.twId);
+  if (!pelne) return wpis(w.twId) as WpisZdjecia;
+  fs.writeFileSync(path.join(katalogZdjec(), nazwa), pelne.obraz);
+  zapamietaj(w.twId, { plik: nazwa, mime: pelne.mime, bajtow: pelne.bajtow, etag: pelne.etag });
+  return wpis(w.twId) as WpisZdjecia;
+}
+
+/**
  * Zdjęcie towaru z cache'u, pobrane ze źródła gdy trzeba.
  *
  * Zwraca wpis (także taki z `plik = null`, czyli „potwierdzony brak zdjęcia")
@@ -154,6 +182,18 @@ export async function zapewnijZdjecie(
   twId: number,
   zrodloFn: Zrodlo = pobierzZeZrodla
 ): Promise<WpisZdjecia | null> {
+  /* ZDJĘCIE DODANE Z KOLEKTORA MA PIERWSZEŃSTWO i nie pyta źródła o nic.
+     To jest cała zapasowa droga tej funkcji: magazynier robi zdjęcie i widzi
+     je na karcie natychmiast — niezależnie od tego, czy baza firmy ma
+     GRANT INSERT i czy worker zdążył wykonać zadanie. Dokładnie tak `ean_alias`
+     niesie kod kreskowy mimo nieudanego `set_ean`.
+
+     Sprawdzenie stoi PRZED wyłącznikiem źródła, bo instalacja bez zdjęć
+     w Subiekcie (`ZDJECIA_ZRODLO` puste) też ma prawo pokazać zdjęcie, które
+     sama zrobiła. Wpis znika dopiero po udanym zapisie do Subiekta. */
+  const wlasne = metaWlasnego(twId);
+  if (wlasne) return zCacheWlasnego(wlasne);
+
   if (config.zdjecia.zrodlo === "") return null;
 
   const c = config.zdjecia;

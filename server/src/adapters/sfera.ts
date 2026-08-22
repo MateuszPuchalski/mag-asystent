@@ -104,6 +104,21 @@ export interface SferaAdapter {
    */
   applySetEan(twId: number, ean: string): Promise<void>;
   /**
+   * Dopisz zdjęcie do kartoteki — `tw_ZdjecieTw` (0.88.0).
+   *
+   * TRZECIE i najdalej idące rozszerzenie granicy zapisu: pierwsze, które
+   * DODAJE WIERSZ, a nie zmienia jednej kolumny istniejącego. Do 0.87.0
+   * `docs/subiekt-gt-struktura.md` opisywał zdjęcia jako wyłącznie do odczytu.
+   *
+   * Powód jest ten sam co przy kodzie kreskowym: magazynier stoi przy regale
+   * z towarem, którego kartoteka nie ma zdjęcia, i nie ma czym tego naprawić.
+   *
+   * Zadanie zna sam `twId` — bajty leżą w `zdjecie_wlasne`. Kolumna `payload`
+   * kolejki jest czytana przy każdym obrocie pętli workera i 300 kB w niej to
+   * 300 kB odczytu co sekundę.
+   */
+  applySetZdjecie(twId: number): Promise<void>;
+  /**
    * Utwórz dokument MM (magazyn źródłowy → docelowy), przesuń pozycje,
    * zwróć numer dokumentu MM (spec §5.3 / §9).
    */

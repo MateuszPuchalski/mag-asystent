@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Usługa usuwania tła: CZWARTY proces WERTIS (obok wertis-api,
+       wertis-worker i wertis-sfera). Przyjmuje jedno zdjęcie po HTTP
+       z pętli lokalnej i oddaje PNG z przezroczystością.
+
+       Dlaczego osobny proces, a nie biblioteka w serwerze — README.md
+       i server/src/adapters/tlo.ts. Najkrócej: model chodzi na runtime ONNX,
+       czyli na module natywnym, a serwer WERTIS ma dwie zależności i zero
+       modułów natywnych, bo stoi na maszynie z Subiektem i ma się dać
+       zainstalować bez kompilatora. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>wertis-tlo-worker</AssemblyName>
+    <RootNamespace>WertisTloWorker</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Jak w workerze Sfery: daty i ścieżki składamy ręcznie, więc ICU tylko
+         powiększałoby exe. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Dwie zależności, obie na licencji MIT — i to był warunek wyboru, nie
+         zbieg okoliczności. Wdrożenie idzie do firmy, więc biblioteka graficzna
+         z licencją dzieloną wg przychodu (ImageSharp) odpadła, a windowsowy
+         System.Drawing.Common zabrałby możliwość uruchomienia czegokolwiek
+         w CI i na maszynie dewelopera z Linuksem. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <!-- Natywna Skia dla Linuksa: WYŁĄCZNIE po to, żeby `dotnet run` i testy
+         działały na maszynie dewelopera i w CI. Wydanie idzie na win-x64
+         i bierze natywkę windowsową z pakietu głównego. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
+  </ItemGroup>
+
+</Project>

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -22,12 +23,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.product.StanSlotu
+import pl.wertis.kolektor.core.product.pokazacDodanie
 import pl.wertis.kolektor.data.dekodujDo
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.CardBorder
+import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
 
 /* ── Zdjęcie kartoteki na karcie towaru (0.30.0) ─────────────────────────────
@@ -57,27 +63,74 @@ private suspend fun miniaturaZCache(bajty: ByteArray, twId: Long, px: Int): andr
     return dekodujDo(bajty, px)?.also { zdekodowane.put(klucz, it) }
 }
 
+/**
+ * Wyrzucenie zdekodowanych miniatur JEDNEGO towaru (0.88.0).
+ *
+ * Po dodaniu zdjęcia z kolektora `ZdjeciaRepository` zapomina plik i wpis, ale
+ * TA mapa żyje w pamięci procesu i nie wie o niczym. Bez tego wywołania karta
+ * rysowałaby starą miniaturę — a po dodaniu pierwszego zdjęcia „stara" znaczy
+ * ikonę pudełka — do końca życia aplikacji.
+ *
+ * Kasujemy po prefiksie klucza, bo ten sam towar bywa zdekodowany w kilku
+ * rozmiarach: 220 px na karcie i po jednym na każdy bok miniatury w listach.
+ */
+fun zapomnijMiniature(twId: Long) {
+    val prefiks = "$twId:"
+    for (klucz in zdekodowane.snapshot().keys) {
+        if (klucz.startsWith(prefiks)) zdekodowane.remove(klucz)
+    }
+}
+
+/**
+ * @param odswiez licznik podbijany po dodaniu zdjęcia — wymusza ponowne
+ *   pobranie bez wychodzenia z karty. Bez niego `LaunchedEffect(twId)` nie
+ *   wystrzeliłby drugi raz i slot zostałby pusty aż do powrotu na kartę.
+ * @param onDodaj dotknięcie PUSTEGO slotu. `null` = ta instalacja nie przyjmuje
+ *   zdjęć z kolektora i slot zachowuje się jak przed 0.88.0.
+ */
 @Composable
-fun ZdjecieKartoteki(graph: AppGraph, twId: Long) {
+fun ZdjecieKartoteki(
+    graph: AppGraph,
+    twId: Long,
+    odswiez: Int = 0,
+    onDodaj: (() -> Unit)? = null,
+) {
     var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
     var miniatura by remember(twId) { mutableStateOf<android.graphics.Bitmap?>(null) }
     var pelnyEkran by remember(twId) { mutableStateOf(false) }
+    /* Trzeci stan, dopisany w 0.88.0. Do tej pory `miniatura == null` znaczyło
+       naraz „jeszcze nie wiem" i „zdjęcia nie ma" — dla samego rysowania szarego
+       kwadratu to bez różnicy, ale przycisk „+" musi się pojawić DOPIERO po
+       potwierdzonym braku. Inaczej mignąłby przy każdym wejściu na kartę, także
+       na kartotece, która zdjęcie ma, i przesuwał cel dotyku pod kciukiem.
+       Reguła i jej test siedzą w `:core` (`DodanieZdjecia.kt`). */
+    var stan by remember(twId) { mutableStateOf(StanSlotu.LADOWANIE) }
 
     /* Pobranie RAZ na wejście na kartę, nie w cyklu odświeżania karty (2 s).
        Repozytorium i tak nie ruszy sieci, gdy plik jest świeży — ale nie ma
        powodu wołać go kilkanaście razy na minutę. */
-    LaunchedEffect(twId) {
+    LaunchedEffect(twId, odswiez) {
+        stan = StanSlotu.LADOWANIE
         val dane = graph.zdjeciaRepo.zdjecie(twId)
         bajty = dane
         miniatura = dane?.let { miniaturaZCache(it, twId, MINIATURA_PX) }
+        stan = if (miniatura != null) StanSlotu.ZDJECIE else StanSlotu.BRAK
     }
+
+    val dodanie = if (pokazacDodanie(stan, onDodaj != null)) onDodaj else null
 
     Box(
         modifier = Modifier
             .size(BOK_DP.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(CardBorder.copy(alpha = 0.25f))
-            .then(if (miniatura != null) Modifier.clickable { pelnyEkran = true } else Modifier),
+            .then(
+                when {
+                    miniatura != null -> Modifier.clickable { pelnyEkran = true }
+                    dodanie != null -> Modifier.clickable(onClick = dodanie)
+                    else -> Modifier
+                }
+            ),
         contentAlignment = Alignment.Center,
     ) {
         val bmp = miniatura
@@ -93,6 +146,19 @@ fun ZdjecieKartoteki(graph: AppGraph, twId: Long) {
                na kartę, a migotanie w rogu nagłówka byłoby ruchem, który nic
                nie znaczy. */
             Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(26.dp))
+            /* „+" DOKLEJONY do slotu, nie zamiast ikony i nie obok niego.
+               Slot ma stały rozmiar we wszystkich stanach — to reguła z nagłówka
+               tego pliku — a osobny przycisk pod nagłówkiem zabierałby wiersz
+               ekranu na czynność wykonywaną raz na kartotekę. */
+            if (dodanie != null) {
+                Text(
+                    "+",
+                    color = Ink,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 6.dp, bottom = 2.dp),
+                )
+            }
         }
     }
 

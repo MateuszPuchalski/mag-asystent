@@ -130,6 +130,23 @@ class ZdjeciaRepository(context: Context, private val api: ApiService) {
         }
     }
 
+    /**
+     * Zapomnij WSZYSTKO o zdjęciu tego towaru (0.88.0).
+     *
+     * Wołane po dodaniu zdjęcia z kolektora. Bez tego karta rysowałaby stary
+     * stan aż do wygaśnięcia negatywu — a negatyw („ta kartoteka zdjęcia nie
+     * ma") trzyma się DOBĘ. Magazynier zobaczyłby więc własne zdjęcie nazajutrz.
+     *
+     * Kasujemy wpis, nie oznaczamy go jako nieświeży: po zapisie serwer ma nowe
+     * bajty i nowy ETag, więc rewalidacja i tak skończyłaby się pobraniem.
+     */
+    suspend fun zapomnij(twId: Long): Unit = mutex.withLock {
+        wPamieci.remove(twId)
+        indeks.remove(twId)
+        withContext(Dispatchers.IO) { plik(twId).delete() }
+        store()
+    }
+
     private fun zapamietajWPamieci(twId: Long, bajty: ByteArray) {
         wPamieci[twId] = bajty
         while (wPamieci.size > PAMIEC_SZTUK) {

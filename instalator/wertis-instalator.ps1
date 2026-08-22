@@ -53,6 +53,12 @@
     Tylko z -Odinstaluj: kasuje też ślad audytowy i zdjęcia problemów.
     Bez tego przełącznika `server\data` zostaje przeniesiony obok katalogu.
 
+.PARAMETER ZdjeciaZapis
+    Pozwala magazynierowi DODAĆ zdjęcie kartoteki z kolektora — prosto do
+    Subiekta. Wymaga `GRANT INSERT` na tabelę zdjęć i dlatego jest osobnym
+    przełącznikiem: to jedyne miejsce, w którym aplikacja dopisuje wiersz do
+    bazy firmy. Bez niego zdjęć z kolektora nie da się dodać w ogóle.
+
 .EXAMPLE
     .\wertis-instalator.ps1
     Pełna instalacja z kreatorem.
@@ -85,7 +91,8 @@ param(
     [switch]$DryRun,
     [switch]$Odinstaluj,
     [switch]$UsunDane,
-    [switch]$Aktualizuj
+    [switch]$Aktualizuj,
+    [switch]$ZdjeciaZapis
 )
 
 $ErrorActionPreference = "Stop"
@@ -621,6 +628,16 @@ if ($podlaczacDoSubiekta) {
         $ustawienia.ZDJECIA_KOLUMNA_GLOWNE   = "zd_Glowne"
         $ustawienia.ZDJECIA_KOLUMNA_KOLEJNOSC = "zd_Id"
         Write-Info "Miniatura pojawi się na karcie towaru po wgraniu APK w wersji 0.30.0 lub nowszej."
+        if ($ZdjeciaZapis) {
+            # Jedyne miejsce, w którym ta aplikacja DOPISUJE wiersz do bazy
+            # firmy. Osobny przełącznik, bo takiego prawa nie nadaje się
+            # dlatego, że ktoś zaktualizował instalator.
+            $ustawienia.ZDJECIA_DODAWANIE = "subiekt"
+            Write-Ok "Magazynier będzie mógł dodać zdjęcie z kolektora - trafi do kartoteki."
+            Write-Info "To wymaga prawa dopisywania wierszy do tw_ZdjecieTw - nadaję je niżej."
+        } else {
+            Write-Info "Dodawanie zdjęć z kolektora WYŁĄCZONE (włącza je -ZdjeciaZapis)."
+        }
     } else {
         # ŚWIADOMIE nie zerujemy tu ZDJECIA_ZRODLO. Wykrycie nie odróżnia „nie ma
         # tabeli" od „nie dało się sprawdzić", a scalanie pliku nie rusza kluczy,
@@ -636,8 +653,11 @@ if ($podlaczacDoSubiekta) {
     $haslo = New-WertisHaslo
     # -Zdjecia rozstrzyga o SIÓDMYM grancie. Nadanie go na bazie bez tej tabeli
     # wywala CAŁY skrypt (jeden ExecuteNonQuery) i zostawia konto bez uprawnień.
+    # Prawo dopisywania wierszy wchodzi WYŁĄCZNIE razem z -ZdjeciaZapis i tylko
+    # wtedy, gdy tabela zdjęć w tej bazie istnieje.
+    $zapisZdjec = [bool]($ZdjeciaZapis -and $zdjecia.Jest)
     $skrypt = Get-WertisSkryptUprawnien -Baza $baza -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN `
-        -Login $login -Haslo $haslo -Zdjecia $zdjecia.Jest
+        -Login $login -Haslo $haslo -Zdjecia $zdjecia.Jest -ZapisZdjec $zapisZdjec
     $plikSkryptu = Join-Path $Katalog "nadaj-uprawnienia-wertis.sql"
 
     $zalozone = $false
@@ -658,7 +678,8 @@ if ($podlaczacDoSubiekta) {
                 # zameldowałby sukces.
                 $upr = @(Get-WertisUprawnienia -Polaczenie $polaczenie -Login $login)
                 $ocena = Test-WertisUprawnienia -Uprawnienia $upr `
-                    -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN -Zdjecia $zdjecia.Jest
+                    -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN -Zdjecia $zdjecia.Jest `
+                    -ZapisZdjec $zapisZdjec
                 if ($ocena.Ok) {
                     # Granty sprawdziliśmy połączeniem ADMINISTRATORA — to mówi,
                     # co konto może, a nie czy da się na nie zalogować. Hasło

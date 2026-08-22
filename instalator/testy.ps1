@@ -258,9 +258,48 @@ Sprawdz "prawa zapisu to DOKLADNIE kolumny z listy i nic wiecej" {
     # drugą kolumnę po stronie serwera i nikt tego testu nie ruszył, bo
     # instalatora też nikt nie ruszył — a objawem była odmowa uprawnienia na
     # produkcji, długo po „udanej" instalacji.
-    $oczekiwane = @(Get-WertisKolumnyZapisu -KolumnaLokalizacji "tw_Pole3").Count
+    $oczekiwane = @(Get-WertisKolumnyZapisu -KolumnaLokalizacji "tw_Pole3").Count +
+                  @(Get-WertisTabeleZapisuWierszy).Count
     $zapisy = ([regex]::Matches($skrypt, "GRANT (INSERT|UPDATE|DELETE)")).Count
     Zaloz ($zapisy -eq $oczekiwane) "grantow zapisu jest $zapisy, ma byc $oczekiwane"
+}
+
+Sprawdz "domyslnie NIE nadajemy prawa dopisywania wierszy" {
+    # Do 0.87.0 aplikacja nie dopisywala do bazy firmy ani jednego wiersza.
+    # Zdjecie z kolektora (0.88.0) jest pierwszym wyjatkiem i ma wejsc DOPIERO
+    # wtedy, gdy ktos tego zazadal — nie dlatego, ze zaktualizowal aplikacje.
+    Zaloz (-not ($skrypt -match "GRANT INSERT")) "GRANT INSERT wchodzi bez zadania"
+}
+
+Sprawdz "wlaczony zapis zdjec dodaje GRANT INSERT na tabele zdjec" {
+    $zZapisem = Get-WertisSkryptUprawnien -Baza "T" -KolumnaLokalizacji "tw_Pole3" `
+        -Haslo "x" -ZapisZdjec $true
+    Zaloz ($zZapisem -match "GRANT INSERT ON dbo\.tw_ZdjecieTw") "brak grantu na dopisywanie zdjec"
+    # Jedna tabela i ani jedna wiecej — INSERT gdziekolwiek indziej to inna
+    # funkcja, ktorej nikt nie zamawial.
+    $ile = ([regex]::Matches($zZapisem, "GRANT INSERT")).Count
+    Zaloz ($ile -eq 1) "GRANT INSERT jest $ile razy, ma byc raz"
+    Zaloz (-not ($zZapisem -match "GRANT INSERT ON dbo\.dok__Dokument")) "prawo zapisu dokumentow"
+}
+
+Sprawdz "prog odrzuca komplet BEZ prawa dopisywania zdjec" {
+    # Objawem braku tego grantu jest zadanie set_zdjecie w bledzie — a karta
+    # towaru i tak pokazuje zdjecie, bo lezy w bazie WERTIS. Bez tego progu
+    # nikt by sie nie dowiedzial, ze do kartoteki nic nie wchodzi.
+    $ile = @(Get-WertisTabeleOdczytu -Zdjecia $true).Count
+    $upr = @(1..$ile | ForEach-Object {
+        [pscustomobject]@{ permission_name = "SELECT"; state_desc = "GRANT"; obiekt = "tabela$_"; kolumna = $null }
+    })
+    $upr += @(Get-WertisKolumnyZapisu -KolumnaLokalizacji "tw_Pole3" | ForEach-Object {
+        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw__Towar"; kolumna = $_.Kolumna }
+    })
+    $bez = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -ZapisZdjec $true
+    Zaloz (-not $bez.Ok) "prog przepuszcza brak prawa dopisywania zdjec"
+    Zaloz ($bez.BrakujaceWiersze -contains "tw_ZdjecieTw") "komunikat nie nazywa brakujacej tabeli"
+
+    # Ta sama instalacja BEZ wlaczonego zapisu zdjec jest kompletna.
+    $wylaczony = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3"
+    Zaloz $wylaczony.Ok "prog zada grantu, ktorego swiadomie nie nadajemy"
 }
 
 Sprawdz "nadaje prawo zapisu do kodu kreskowego" {

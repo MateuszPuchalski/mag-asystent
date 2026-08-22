@@ -566,6 +566,31 @@ function Get-WertisKolumnyZapisu {
     )
 }
 
+function Get-WertisTabeleZapisuWierszy {
+    <#
+        .SYNOPSIS
+        Tabele, do których konto ma prawo DOPISYWANIA WIERSZY. Nic poza nimi.
+        .DESCRIPTION
+        Jedno wejście dla skryptu grantów i dla progu sprawdzenia — z tego
+        samego powodu, dla którego istnieją `Get-WertisTabeleOdczytu`
+        i `Get-WertisKolumnyZapisu`. Liczba nadawanych grantów i liczba
+        oczekiwanych rozjechały się w tym repozytorium już trzy razy.
+
+        Do 0.87.0 lista była PUSTA i to nie był przypadek: aplikacja zmieniała
+        w bazie firmy dwie kolumny kartoteki i nie dopisywała ani jednego
+        wiersza. Zdjęcie dodawane z kolektora (0.88.0) jest pierwszym wyjątkiem
+        i wchodzi tylko wtedy, gdy ktoś tego zażądał — `ZDJECIA_DODAWANIE=subiekt`.
+
+        Bez tego grantu funkcja NIE PRZESTAJE działać: zdjęcie zostaje w bazie
+        WERTIS i widać je na karcie towaru. Do kartoteki w Subiekcie nie wchodzi.
+    #>
+    param([bool]$ZapisZdjec = $false)
+    if (-not $ZapisZdjec) { return @() }
+    return @(
+        @{ Tabela = "tw_ZdjecieTw"; Po = "zdjęcia kartotek dodawane z kolektora (0.88.0)" }
+    )
+}
+
 function Get-WertisZdjeciaKartotek {
     <#
         .SYNOPSIS
@@ -663,7 +688,11 @@ function Get-WertisSkryptUprawnien {
         [string]$Login = "wertis",
         [Parameter(Mandatory)][string]$Haslo,
         # $false, gdy w bazie nie ma tabeli zdjęć — patrz Get-WertisZdjeciaKartotek
-        [bool]$Zdjecia = $true
+        [bool]$Zdjecia = $true,
+        # $true dopiero przy ZDJECIA_DODAWANIE=subiekt — patrz
+        # Get-WertisTabeleZapisuWierszy. Domyślnie NIE nadajemy prawa
+        # dopisywania wierszy do bazy firmy.
+        [bool]$ZapisZdjec = $false
     )
     [void](Assert-BezpiecznyIdentyfikator -Nazwa $KolumnaLokalizacji -Opis "kolumna lokalizacji")
     [void](Assert-BezpiecznyIdentyfikator -Nazwa $Login -Opis "login")
@@ -679,6 +708,13 @@ function Get-WertisSkryptUprawnien {
     $zapisy = (Get-WertisKolumnyZapisu -KolumnaLokalizacji $KolumnaLokalizacji | ForEach-Object {
         "GRANT UPDATE ON dbo.tw__Towar ({0}) TO [{1}];   -- {2}" -f $_.Kolumna, $Login, $_.Po
     }) -join "`n"
+    # Dopisywanie WIERSZY — pusta lista, dopóki nikt nie włączył zapisu zdjęć.
+    $wiersze = (Get-WertisTabeleZapisuWierszy -ZapisZdjec $ZapisZdjec | ForEach-Object {
+        "GRANT INSERT ON dbo.{0} TO [{1}];   -- {2}" -f $_.Tabela, $Login, $_.Po
+    }) -join "`n"
+    if ($wiersze) {
+        $wiersze = "`n-- DOPISYWANIE WIERSZY: wyłącznie tabela zdjęć kartotek.`n$wiersze"
+    }
 
     return @"
 USE [$bazaEsc];
@@ -705,6 +741,7 @@ $granty
 -- ZAPIS: DWIE kolumny kartoteki i ani jedna więcej. Dokumenty, flagi i stany
 -- pozostają dla tego loginu tylko do odczytu.
 $zapisy
+$wiersze
 "@
 }
 
@@ -809,7 +846,9 @@ function Test-WertisUprawnienia {
         [Parameter(Mandatory)][string]$KolumnaLokalizacji,
         # musi być TĄ SAMĄ wartością, co przy budowie skryptu — inaczej próg
         # żąda grantu, którego świadomie nie nadaliśmy
-        [bool]$Zdjecia = $true
+        [bool]$Zdjecia = $true,
+        # jak wyżej, dla prawa dopisywania wierszy (0.88.0)
+        [bool]$ZapisZdjec = $false
     )
     $select = @($Uprawnienia | Where-Object { $_.permission_name -eq "SELECT" -and $_.state_desc -eq "GRANT" })
     $update = @($Uprawnienia | Where-Object { $_.permission_name -eq "UPDATE" -and $_.state_desc -eq "GRANT" })
@@ -840,6 +879,18 @@ function Test-WertisUprawnienia {
         jeden) i za każdym razem objawem było zdanie o niezgodnych
         uprawnieniach po POPRAWNEJ instalacji.
     #>
+    <#
+        Dopisywanie wierszy (0.88.0). Lista jest pusta, dopóki nikt nie włączył
+        zapisu zdjęć — i wtedy ta pętla nie żąda niczego. Liczby tu NIE
+        WPISYWAĆ, z tego samego powodu co wyżej.
+    #>
+    $insert = @($Uprawnienia | Where-Object { $_.permission_name -eq "INSERT" -and $_.state_desc -eq "GRANT" })
+    $oczekiwaneWiersze = @(Get-WertisTabeleZapisuWierszy -ZapisZdjec $ZapisZdjec)
+    $brakujaceWiersze = @($oczekiwaneWiersze | Where-Object {
+        $tab = $_.Tabela
+        -not @($insert | Where-Object { $_.obiekt -eq $tab })
+    })
+
     $wymagane = @(Get-WertisTabeleOdczytu -Zdjecia $Zdjecia).Count
     return [pscustomobject]@{
         TabeleOdczytu   = $select.Count
@@ -849,7 +900,13 @@ function Test-WertisUprawnienia {
         # a nie tylko „coś jest nie tak z uprawnieniami"
         BrakujaceZapisy = @($brakujaceZapisy | ForEach-Object { $_.Kolumna })
         KolumnyZapisu   = $oczekiwaneZapisy.Count
+        # nazwy tabel, do których zabrakło prawa dopisywania wierszy
+        BrakujaceWiersze = @($brakujaceWiersze | ForEach-Object { $_.Tabela })
+        TabeleZapisuWierszy = $oczekiwaneWiersze.Count
         ZapisDokumentow = $zapisDok.Count
-        Ok              = ($select.Count -ge $wymagane -and $brakujaceZapisy.Count -eq 0 -and $zapisDok.Count -eq 0)
+        Ok              = ($select.Count -ge $wymagane -and
+                           $brakujaceZapisy.Count -eq 0 -and
+                           $brakujaceWiersze.Count -eq 0 -and
+                           $zapisDok.Count -eq 0)
     }
 }

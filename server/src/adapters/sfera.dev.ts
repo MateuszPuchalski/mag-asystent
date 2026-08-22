@@ -1,5 +1,6 @@
 import { db, nextKorektaNumber, nextMmNumber, nextRwNumber, transaction } from "../db/db.js";
 import type { MmItem, SferaAdapter, WynikKorekty, ZlecenieKorekty } from "./sfera.js";
+import { oznaczWSubiekcie, wlasneZdjecie } from "../services/zdjecia-wlasne.js";
 
 /**
  * DEV — „zapis Sfery" realizowany jako mutacja tabel sgt_* (SQLite).
@@ -20,6 +21,22 @@ export class DevSferaAdapter implements SferaAdapter {
   async applySetEan(twId: number, ean: string): Promise<void> {
     const res = db().prepare("UPDATE sgt_towar SET ean = ? WHERE tw_id = ?").run(ean, twId);
     if (res.changes === 0) throw new Error(`Nie znaleziono towaru tw_id=${twId}`);
+  }
+
+  /**
+   * Dodanie zdjęcia do kartoteki (0.88.0).
+   *
+   * W trybie demo nie ma bazy Subiekta ani tabeli `tw_ZdjecieTw`, więc jedynym
+   * skutkiem jest ODDANIE ZDJĘCIA CACHE'OWI: wiersz w `zdjecie_wlasne` znika,
+   * a kolejne wejście na kartę pyta źródła. Konfiguracja pilnuje, żeby przy
+   * SGT_MODE=seeded stało ZDJECIA_DODAWANIE=wertis i to zadanie w ogóle nie
+   * powstało — ta metoda jest tu po to, żeby kontrakt był kompletny, a nie
+   * po to, żeby czymkolwiek udawać zapis do Subiekta.
+   */
+  async applySetZdjecie(twId: number): Promise<void> {
+    if (!wlasneZdjecie(twId)) return;
+    oznaczWSubiekcie(twId);
+    db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = ?").run(twId);
   }
 
   /**

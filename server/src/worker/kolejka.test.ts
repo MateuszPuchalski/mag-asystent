@@ -37,6 +37,9 @@ const padajacy = (msg = "Kartoteka w edycji"): SferaAdapter => ({
   applySetEan: async () => {
     throw new Error(msg);
   },
+  applySetZdjecie: async () => {
+    throw new Error(msg);
+  },
   createMM: async () => {
     throw new Error(msg);
   },
@@ -48,6 +51,7 @@ const padajacy = (msg = "Kartoteka w edycji"): SferaAdapter => ({
 const udany = (): SferaAdapter => ({
   applySetLocation: async () => {},
   applySetEan: async () => {},
+  applySetZdjecie: async () => {},
   createMM: async () => "MM 1/2026",
   createKorektaZwrotu: async () => ({ korektaNumer: "KFS 1/2026", mmNumer: "MM 1/2026" }),
 });
@@ -119,6 +123,7 @@ test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async ()
     applySetEan: async (twId, ean) => {
       zapisane.push([twId, ean]);
     },
+    applySetZdjecie: async () => {},
     createMM: async () => "MM 1/2026",
     createKorektaZwrotu: async () => ({ korektaNumer: "KFS 1/2026", mmNumer: "MM 1/2026" }),
   };
@@ -128,6 +133,32 @@ test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async ()
     adapter,
   );
   assert.deepEqual(zapisane, [[1, "5901234123457"]]);
+  assert.equal(stan(id).status, "done");
+});
+
+test("zdjęcie kartoteki trafia do adaptera, nie w gałąź nieznanego typu", async () => {
+  /* `set_zdjecie` to TRZECI typ zapisu do bazy firmy (0.88.0) i pierwszy, który
+     DODAJE WIERSZ. Bez tego testu literówka w dyspozytorze wyglądałaby jak
+     „nieznany typ zadania" — zadanie w błędzie po trzech próbach — a magazynier
+     i tak widziałby zdjęcie na karcie, bo leży w bazie WERTIS. Objawu nie
+     byłoby więc nigdzie poza kolejką. */
+  const payload = { twId: 1 };
+  const zapisane: number[] = [];
+  const adapter: SferaAdapter = {
+    applySetLocation: async () => {},
+    applySetEan: async () => {},
+    applySetZdjecie: async (twId) => {
+      zapisane.push(twId);
+    },
+    createMM: async () => "MM 1/2026",
+    createKorektaZwrotu: async () => ({ korektaNumer: "KFS 1/2026", mmNumer: "MM 1/2026" }),
+  };
+  const id = dodajZadanie("set_zdjecie", payload);
+  await K.przetworzZadanie(
+    { id, type: "set_zdjecie", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null, ...AUDYT },
+    adapter,
+  );
+  assert.deepEqual(zapisane, [1]);
   assert.equal(stan(id).status, "done");
 });
 

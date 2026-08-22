@@ -1,0 +1,27 @@
+# Bramka usługi usuwania tła (tlo-worker/).
+#
+# Modelu nie ma w repozytorium i nie ma go w CI, więc bramkujemy to, co
+# bramkować się da: że projekt się KOMPILUJE. Ta sama granica i ten sam powód
+# co przy workerze Sfery, gdzie COM nie istnieje poza Windows z Subiektem.
+#
+# Osobny workflow, nie krok w server.yml: zmiana wyłącznie w serwerze nie ma
+# budować C#, a zmiana w C# nie ma uruchamiać testów Node.
+name: Usługa tła
+
+on:
+  push:
+    branches: [main]
+    paths: ["tlo-worker/**", ".github/workflows/tlo-worker.yml"]
+  pull_request:
+    paths: ["tlo-worker/**", ".github/workflows/tlo-worker.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Kompilacja
+        run: dotnet build tlo-worker/WertisTloWorker.csproj -c Release

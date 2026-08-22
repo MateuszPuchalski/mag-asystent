@@ -3,6 +3,7 @@ import { db } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 import type { MmItem, SferaAdapter } from "./sfera.js";
+import { oznaczWSubiekcie, wlasneZdjecie } from "../services/zdjecia-wlasne.js";
 
 /**
  * Zapis „plan B" ze spec §9 — bezpośredni UPDATE w bazie MSSQL Subiekta GT,
@@ -40,6 +41,62 @@ function opiszBlad(e: unknown, kolumna: string): string {
     `na bazie podmiotu: GRANT UPDATE ON dbo.tw__Towar (${kolumna}) TO wertis; ` +
     `— potem PONÓW to zadanie. Komunikat serwera SQL: ${tresc}`
   );
+}
+
+/** Ta sama zamiana dla INSERT-u zdjęcia — inne prawo, więc inne polecenie. */
+function opiszBladZdjecia(e: unknown, tabela: string): string {
+  const tresc = e instanceof Error ? e.message : String(e);
+  if (!/permission was denied|odmowa|denied/i.test(tresc)) return tresc;
+  return (
+    `Konto SQL nie ma prawa dopisywania do tabeli ${tabela}. Wykonaj w SSMS ` +
+    `na bazie podmiotu: GRANT INSERT ON dbo.${tabela} TO wertis; ` +
+    `— potem PONÓW to zadanie. Zdjęcie NIE ZGINĘŁO: leży w bazie WERTIS ` +
+    `i widać je na karcie towaru. Komunikat serwera SQL: ${tresc}`
+  );
+}
+
+/**
+ * Treść INSERT-u dopisującego zdjęcie do kartoteki.
+ *
+ * WYDZIELONE, bo to JEDYNA logika tego modułu dająca się przetestować bez
+ * serwera MSSQL — ten sam powód, dla którego osobno stoi `budujZapytanieBlob`
+ * w `zdjecia.sgt.ts`. Wszystkie nazwy są `[WERYFIKUJ]` i przechodzą przez
+ * `assertSafeColumn`: pochodzą z pliku konfiguracyjnego, czyli z wejścia.
+ *
+ * `zd_Glowne` NIE JEST tu na sztywno. Kartoteka może mieć kilka zdjęć, a odczyt
+ * bierze główne; nowe ma być główne WYŁĄCZNIE wtedy, gdy żadnego jeszcze nie ma.
+ * Rozstrzyga to `@glowne`, wyliczone przez wołającego w tej samej transakcji —
+ * dwa zdjęcia oznaczone jako główne dałyby ETag skaczący przy każdym odczycie.
+ *
+ * Kolumna sumy kontrolnej wchodzi tylko wtedy, gdy ktoś ją nazwał. Algorytmu
+ * `zd_CRC` repozytorium NIE ZNA, a własna liczba w tej kolumnie byłaby
+ * zgadywaniem zapisanym do bazy firmy.
+ */
+export function budujZapytanieInsert(opts: {
+  tabela: string;
+  kolumna: string;
+  klucz: string;
+  glowne: string;
+  crc?: string;
+}): string {
+  const t = assertSafeColumn(opts.tabela);
+  const k = assertSafeColumn(opts.kolumna);
+  const klucz = assertSafeColumn(opts.klucz);
+  const glowne = assertSafeColumn(opts.glowne);
+  const kolumny = [klucz, k, glowne];
+  const wartosci = ["@id", "@obraz", "@glowne"];
+  if (opts.crc) {
+    kolumny.push(assertSafeColumn(opts.crc));
+    wartosci.push("@crc");
+  }
+  return `INSERT INTO ${t} (${kolumny.join(", ")}) VALUES (${wartosci.join(", ")})`;
+}
+
+/** Ile zdjęć ma już ta kartoteka — od tego zależy `zd_Glowne` nowego wiersza. */
+export function budujZapytanieLiczby(opts: { tabela: string; klucz: string }): string {
+  const t = assertSafeColumn(opts.tabela);
+  const klucz = assertSafeColumn(opts.klucz);
+  return `SELECT COUNT(*) AS ile FROM ${t} WHERE ${klucz} = @id`;
 }
 
 export class SqlSferaAdapter implements SferaAdapter {
@@ -91,6 +148,68 @@ export class SqlSferaAdapter implements SferaAdapter {
       throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
     }
     db().prepare("UPDATE sgt_towar SET ean = ? WHERE tw_id = ?").run(ean, twId);
+  }
+
+  /**
+   * Dopisanie zdjęcia do kartoteki (0.88.0).
+   *
+   * Bajty bierzemy z `zdjecie_wlasne`, nie z payloadu zadania — patrz komentarz
+   * przy `applySetZdjecie` w `sfera.ts`.
+   *
+   * `zd_Glowne` liczymy W TEJ SAMEJ TRANSAKCJI co INSERT. Dwa kolektory
+   * dodające zdjęcia dwóch różnych towarów nie przeszkadzają sobie, ale dwa
+   * zadania na TEN SAM towar bez transakcji mogłyby oznaczyć dwa wiersze jako
+   * główne — a wtedy odczyt zwraca raz jedno, raz drugie i ETag skacze przy
+   * każdym wejściu na kartę.
+   *
+   * PNG jedzie do bazy Z PRZEZROCZYSTOŚCIĄ. Jak podgląd Subiekta rysuje kanał
+   * alfa — [WERYFIKUJ] na kartotece próbnej PRZED produkcją (DEPLOY §6).
+   */
+  async applySetZdjecie(twId: number): Promise<void> {
+    const c = config.zdjecia;
+    const wlasne = wlasneZdjecie(twId);
+    if (!wlasne) {
+      /* Zdjęcie zniknęło między zakolejkowaniem a wykonaniem — ktoś je podmienił
+         i zadanie tamtego zapisu zrobi to samo. Cichy sukces jest tu poprawny:
+         błąd kazałby człowiekowi ponawiać coś, co jest już nieaktualne. */
+      return;
+    }
+
+    const pool = await mssqlPool();
+    const trans = pool.transaction();
+    await trans.begin();
+    try {
+      const ile = await trans
+        .request()
+        .input("id", sql.Int, twId)
+        .query(budujZapytanieLiczby({ tabela: c.tabela, klucz: c.kolumnaKlucza }));
+      const pierwsze = Number(ile.recordset[0]?.ile ?? 0) === 0;
+
+      const zapytanie = budujZapytanieInsert({
+        tabela: c.tabela,
+        kolumna: c.kolumna,
+        klucz: c.kolumnaKlucza,
+        glowne: c.kolumnaGlowne,
+        crc: c.kolumnaCrc || undefined,
+      });
+      const req = trans
+        .request()
+        .input("id", sql.Int, twId)
+        .input("obraz", sql.VarBinary(sql.MAX), wlasne.obraz)
+        .input("glowne", sql.Bit, pierwsze);
+      if (c.kolumnaCrc) req.input("crc", sql.Int, null);
+      await req.query(zapytanie);
+      await trans.commit();
+    } catch (e) {
+      await trans.rollback().catch(() => undefined);
+      throw new Error(opiszBladZdjecia(e, c.tabela));
+    }
+
+    /* Wiersz w WERTIS znika DOPIERO TERAZ — od tej chwili źródłem jest znowu
+       Subiekt. Cache zdjęcia kasujemy razem z nim, bo plik na dysku niesie
+       jeszcze naszą kopię i bez tego karta pokazywałaby ją do końca TTL. */
+    oznaczWSubiekcie(twId);
+    db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = ?").run(twId);
   }
 
   async createKorektaZwrotu(): Promise<never> {

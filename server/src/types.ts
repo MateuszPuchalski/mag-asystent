@@ -76,6 +76,15 @@ export interface ProductCard {
    * APK je ignorują (`ignoreUnknownKeys`).
    */
   zlotaStrefa?: ZlotaStrefa;
+  /**
+   * Czy ta instalacja przyjmuje zdjęcia kartotek z kolektora (0.88.0).
+   *
+   * Na karcie, a nie w osobnej trasie konfiguracji: przycisk „+" ma się
+   * pojawiać tam, gdzie kolektor już i tak pyta o dane. Pole addytywne —
+   * stare APK je ignorują, a nowe APK przy starym serwerze widzi `false`
+   * i chowa przycisk, czyli zachowuje się jak przed tą wersją.
+   */
+  mozeDodacZdjecie: boolean;
 }
 
 /**
