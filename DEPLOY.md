@@ -975,6 +975,38 @@ z read-modelu sprzedaży, więc sięga tylko `DOK_SPRZEDAZ_DNI_WSTECZ` (domyśln
 90 dni). Dla dłuższego okna wskaźnika NIE MA — zamiast zawyżonego ilorazu
 widnieje myślnik i zdanie z wyjaśnieniem.
 
+Od 0.80.0 niżej stoi karta **CZASY OBSŁUGI ZWROTU**. Odpowiada na trzecie
+pytanie o zwroty: nie ile czego jest i nie co wraca, tylko jak długo towar
+stoi, zanim wróci na półkę.
+
+Pięć odcinków drogi, każdy z medianą i p90. Cała droga to przyjęcie → półka. Odcinki składowe: przyjęcie → ocena,
+ocena → zamknięcie kosza, zamknięcie kosza → półka (czyli czas rozłożenia).
+Osobno idzie przyjęcie → zwrot środków. Okno dzieli ze statystykami
+produktowymi.
+
+Okno liczy się od zdarzenia KOŃCZĄCEGO odcinek, nie od przyjęcia paczki. Karta
+odpowiada więc na pytanie „ile trwało to, co się w tym oknie skończyło".
+Liczenie od przyjęcia wypychałoby ze statystyki sprawy jeszcze niedokończone,
+czyli z definicji najwolniejsze, i proces wyglądałby na szybszy, niż jest.
+
+Ceną tego wyboru jest to, że rzeczy stojące nadal nie mają wpływu na medianę.
+Dlatego karta niesie sekcję **CO STOI TERAZ** — kosze czekające na rozłożenie
+i zwroty bez domknięcia, od najstarszej sprawy, z nazwanym etapem. Kliknięcie
+wiersza otwiera kosz albo kartę zwrotu.
+
+Odcinek bez danych pokazuje POWÓD zamiast samego myślnika. Najczęstszy powód
+jest jeden: kosze z dokumentu MM (§6a wyżej) nie mają przypiętego zwrotu.
+Do „całej drogi" więc nie wchodzą — liczy się dla nich sam czas rozłożenia.
+
+Na dole karty stoi **tempo rozkładania per osoba**. To monitoring pracowniczy
+w rozumieniu Kodeksu pracy. Podstawa prawna jest ta sama co przy raporcie
+wydajności na zakładce ANALIZA i tak samo jedzie z danymi z serwera.
+
+Miarą jest czas aktywny, w którym przerwy dłuższe niż 15 minut nie liczą się
+jako praca. Odstęp od zamknięcia kosza byłby miarą nieuczciwą: mierzyłby
+głównie to, jak długo kosz czekał na kogokolwiek. Karałby wtedy człowieka za
+sięgnięcie po najstarszą robotę. Próbka poniżej 20 pozycji nie dostaje wyniku.
+
 Od 0.65.0 serwer **sam ściąga zapowiedzi zwrotów** — zgłoszenia klientów
 z Allegro, zanim paczka dojedzie. Skan etykiety trafia wtedy w znane
 zgłoszenie jednym zapytaniem, a zgłoszenia czekające na paczkę dłużej niż

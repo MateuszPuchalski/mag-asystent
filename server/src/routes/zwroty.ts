@@ -26,6 +26,7 @@ import {
 import { listaReklamacji, raportZwrotow, rozpatrzReklamacje, ustawPolke } from "../services/reklamacje.js";
 import { brakujacePaczki, pominZapowiedz, stanOdswiezania } from "../services/zapowiedzi.js";
 import { oknoDni, statystykiZwrotow } from "../services/statystyki-zwrotow.js";
+import { czasyZwrotow } from "../services/czasy-zwrotow.js";
 
 /* ── Zwroty Allegro — trasy biura ────────────────────────────────────────────
    Wszystko za bramką ról biuro|admin (wzorzec zbiorki.ts): zwrot wiąże się
@@ -278,6 +279,18 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       const nie = odmowa();
       if (nie) return reply.code(nie.kod).send({ error: nie.error });
       return { statystyki: statystykiZwrotow(oknoDni(req.query?.dni)) };
+    }
+  );
+
+  /* Czasy obsługi (0.80.0) — trzecie pytanie o zwroty: nie „jak idzie robota"
+     i nie „co wraca", tylko JAK DŁUGO towar stoi, zanim wróci na półkę.
+     To samo okno co statystyki produktowe, bo obie karty czyta się razem. */
+  app.get<{ Querystring: { dni?: string } }>(
+    "/api/biuro/zwroty/czasy",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return { czasy: czasyZwrotow(oknoDni(req.query?.dni)) };
     }
   );
 

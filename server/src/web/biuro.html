@@ -507,6 +507,35 @@
       <table id="statystykiKupujacy"></table>
     </section>
 
+    <!-- Trzecie pytanie o zwroty. RAPORT mówi, ile czego jest; STATYSTYKI —
+         co wraca; ta karta — JAK DŁUGO to trwa. Osobna, bo osobne pytanie,
+         ale okno dzieli ze statystykami: obie czyta się razem. -->
+    <section class="card" id="czasyKarta">
+      <h2>CZASY OBSŁUGI ZWROTU · ILE TOWAR STOI</h2>
+      <p class="mute" id="czasyWstep" style="margin-bottom:10px"></p>
+      <div class="kafle" id="czasyOdcinki"></div>
+
+      <h2 style="margin-top:18px">CAŁA DROGA PER TYDZIEŃ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Wysokość słupka to mediana godzin od przyjęcia do półki. Tydzień bez
+        zakończonych zwrotów zostaje na osi pusty, zamiast znikać.
+      </p>
+      <div id="czasyTygodnie" style="margin-top:6px"></div>
+
+      <h2 style="margin-top:18px">CO STOI TERAZ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Mediana wyżej liczy się z rzeczy SKOŃCZONYCH, więc sprawa stojąca trzeci
+        tydzień nie ma na nią wpływu, dopóki ktoś jej nie domknie. Tu widać ją
+        od razu. Kliknięcie wiersza otwiera kosz albo zwrot.
+      </p>
+      <table id="czasyKosze"></table>
+      <table id="czasyZwroty" style="margin-top:10px"></table>
+
+      <h2 style="margin-top:18px">TEMPO ROZKŁADANIA PER OSOBA</h2>
+      <p class="mute" id="czasyPodstawa" style="margin-bottom:8px"></p>
+      <table id="czasyLudzie"></table>
+    </section>
+
     <section class="card" id="kontoAllegroKarta">
       <h2>KONTO ALLEGRO</h2>
       <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
@@ -2349,7 +2378,7 @@ async function odswiezEtap3() {
     rysujPominiete(pom.pominiete || []);
     /* Statystyki mają własne okno i własny rytm — tu tylko pierwsze wypełnienie,
        żeby karta nie stała pusta po wejściu w zakładkę. */
-    if (!$("statystykiProdukty").innerHTML) odswiezStatystyki();
+    if (!$("statystykiProdukty").innerHTML) { odswiezStatystyki(); odswiezCzasy(); }
     rysujReklamacjeZwrotow(r.reklamacje || []);
     rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
@@ -2712,6 +2741,114 @@ function rysujStatystyki(s) {
         </tr>`).join("");
 }
 
+/* ── Czasy obsługi zwrotu ────────────────────────────────────────────────────
+   Karta czyta się z góry na dół jak zdanie: ILE TO TRWA (kafle) → CZY IDZIE
+   W DOBRĄ STRONĘ (wykres) → CO STOI TERAZ (listy) → KTO ROZKŁADA (tempo).   */
+
+/**
+ * Godziny po ludzku: minuty pod godziną, doby powyżej dwóch dni.
+ *
+ * Miejsce po przecinku tylko poniżej dziesięciu godzin — przy „26,0 h" ta zero
+ * niczego nie mówi, a przy „2,5 h" mówi wszystko.
+ */
+function czasH(h) {
+  if (h == null) return "—";
+  if (h < 1) return `${Math.round(h * 60)} min`;
+  if (h < 10) return `${h.toFixed(1).replace(".", ",")} h`;
+  if (h < 48) return `${Math.round(h)} h`;
+  const dni = Math.floor(h / 24);
+  return `${dni} dni ${Math.round(h - dni * 24)} h`;
+}
+
+/**
+ * Kafel odcinka. Mediana dużą czcionką, p90 i próbka pod spodem.
+ *
+ * Pusty odcinek pokazuje POWÓD, nie sam myślnik: „—" bez wyjaśnienia wygląda
+ * jak awaria karty, a najczęściej znaczy po prostu, że w tym oknie nic się
+ * na tym odcinku nie skończyło.
+ */
+function kafelCzasu(o) {
+  const dol = o.ile
+    ? `p90 ${esc(czasH(o.p90H))} · ${o.ile} ${o.ile === 1 ? "raz" : "razy"}`
+    : esc(o.czemuPusto);
+  return `<div class="kafel" style="flex:1 1 210px">
+    <div class="liczba">${esc(czasH(o.medianaH))}</div>
+    <div class="opis">${esc(o.nazwa)}</div>
+    <div class="opis" style="text-transform:none;letter-spacing:0;margin-top:6px">${dol}</div>
+  </div>`;
+}
+
+async function odswiezCzasy() {
+  try {
+    const dni = $("dniStatystyk").value;
+    const d = await (await api(`/api/biuro/zwroty/czasy?dni=${dni}`)).json();
+    rysujCzasy(d.czasy);
+  } catch (e) {
+    $("czasyOdcinki").innerHTML = `<p class="badge err">${esc(e.message)}</p>`;
+  }
+}
+
+function rysujCzasy(c) {
+  $("czasyWstep").textContent =
+    `Mediana i p90 z tego, co skończyło się w ostatnich ${c.dni} dniach — nie z tego, `
+    + "co w tym czasie przyszło. Inaczej sprawy jeszcze niedokończone, czyli te "
+    + "najwolniejsze, nigdy nie weszłyby do wyniku.";
+  $("czasyOdcinki").innerHTML = c.odcinki.map(kafelCzasu).join("");
+
+  $("czasyTygodnie").innerHTML = slupkiSvg(
+    c.tygodnie.map((t) => ({
+      ile: Math.round(t.medianaH ?? 0),
+      podpis: "t" + t.tydzien.slice(-2),
+      tytul: `tydzień ${t.tydzien} — mediana godzin z ${t.ile} zwrotów`,
+    })),
+    c.tygodnie.length > 12 ? 4 : 1
+  );
+
+  /* Progi bursztynu. Dobrane tak, żeby kolor NIE trafiał na każdy wiersz:
+     lista i tak idzie od najstarszej sprawy, więc kolejność niesie ciężar,
+     a badge ma znaczyć „ta przekroczyła linię". Bursztyn wszędzie to bursztyn
+     nigdzie. Kosz: doba (kosz z wieczora rozłożony rano jest normą). Zwrot:
+     dwa tygodnie — tyle wystarcza na ocenę, dokumenty i przelew. */
+  $("czasyKosze").innerHTML = !c.teraz.kosze.length
+    ? '<tr><td class="mute">Żaden kosz nie czeka na rozłożenie.</td></tr>'
+    : "<tr><th>KOSZ CZEKA</th><th>OD</th><th>POZYCJI</th><th>DO ZROBIENIA</th></tr>" +
+      c.teraz.kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
+          <td class="b">${esc(k.kod)}</td>
+          <td>${k.godzin >= 24 ? `<span class="badge amber">${esc(czasH(k.godzin))}</span>` : esc(czasH(k.godzin))}</td>
+          <td class="mute">${k.pozycji}</td>
+          <td class="b">${k.doZrobienia}</td>
+        </tr>`).join("");
+
+  $("czasyZwroty").innerHTML = !c.teraz.zwroty.length
+    ? '<tr><td class="mute">Żaden zwrot nie czeka na domknięcie.</td></tr>'
+    : "<tr><th>ZWROT CZEKA</th><th>OD</th><th>NA CO</th></tr>" +
+      c.teraz.zwroty.map((z) => `<tr data-zwrot="${z.id}" style="cursor:pointer">
+          <td class="b">${esc(z.referencja || z.waybill)}</td>
+          <td>${z.godzin >= 24 * 14 ? `<span class="badge amber">${esc(czasH(z.godzin))}</span>` : esc(czasH(z.godzin))}</td>
+          <td class="mute">${esc(z.etap)}</td>
+        </tr>`).join("");
+
+  /* „0 min" przy trzynastu pozycjach wygląda na awarię, a znaczy tyle, że
+     między odłożeniami były przerwy dłuższe niż kwadrans. Mówimy to słowami,
+     zamiast zostawiać zero do interpretacji. */
+  $("czasyPodstawa").textContent = c.podstawaPrawna;
+  $("czasyLudzie").innerHTML = !c.ludzie.length
+    ? '<tr><td class="mute">Nikt nie odkładał pozycji w tym oknie.</td></tr>'
+    : "<tr><th>OSOBA</th><th>POZYCJI</th><th>CZAS CIĄGŁEJ PRACY</th><th>TEMPO</th></tr>" +
+      c.ludzie.map((l) => `<tr>
+          <td class="b">${esc(l.kto)}</td>
+          <td>${l.pozycji}</td>
+          <td class="mute">${l.minutyAktywne > 0
+            ? `${l.minutyAktywne} min`
+            : '<span title="Przerwy dłuższe niż 15 minut nie liczą się jako praca ciągła.">brak ciągłej serii</span>'}</td>
+          <td>${l.tempo == null
+            /* Mała próbka NIE dostaje liczby — tempo z pięciu pozycji jest
+               szumem, a postawione w tabeli obok wyniku wygląda na wynik. */
+            ? `<span class="mute">próbka poniżej ${c.progWiarygodnosci} poz.</span>`
+            : `<span class="b">${esc(l.tempo.toFixed(1).replace(".", ","))}</span> poz./h`}</td>
+        </tr>`).join("");
+}
+
 function rysujRaportZwrotow(r) {
   if (!r) { $("raportZwrotowKafle").innerHTML = ""; return; }
   const kafle = [
@@ -2802,6 +2939,7 @@ function otworzZwrot(id) {
   $("reklamacjeKarta").hidden = true;
   $("raportZwrotowKarta").hidden = true;
   $("statystykiKarta").hidden = true;
+  $("czasyKarta").hidden = true;
   $("kontoAllegroKarta").hidden = true;
   odswiezSzczegolZwrotu();
 }
@@ -2819,6 +2957,7 @@ function zamknijZwrot() {
   $("reklamacjeKarta").hidden = false;
   $("raportZwrotowKarta").hidden = false;
   $("statystykiKarta").hidden = false;
+  $("czasyKarta").hidden = false;
   $("kontoAllegroKarta").hidden = false;
   $("zwrotTowarWyniki").innerHTML = "";
 }
@@ -3443,7 +3582,20 @@ $("pominieteLista").addEventListener("click", async (e) => {
 
 /* Szukanie po wpisaniu, z odczekaniem — pole reaguje na literę, nie na Enter,
    bo biuro szuka „na wyczucie" i poprawia frazę w locie. */
-$("dniStatystyk").addEventListener("change", odswiezStatystyki);
+/* Jedno okno na dwie karty: statystyki produktowe i czasy czyta się razem,
+   a dwa przełączniki obok siebie kazałyby pilnować, czy pokazują to samo. */
+$("dniStatystyk").addEventListener("change", () => { odswiezStatystyki(); odswiezCzasy(); });
+
+/* Wiersz „co stoi teraz" prowadzi TAM, gdzie się z tym coś robi: kosz do jego
+   podglądu (z przewinięciem, bo stoi w innej karcie), zwrot na jego kartę. */
+$("czasyKarta").addEventListener("click", async (e) => {
+  const z = e.target.closest("[data-zwrot]");
+  if (z) return otworzZwrot(Number(z.dataset.zwrot));
+  const k = e.target.closest("[data-kosz]");
+  if (!k) return;
+  await pokazPodgladKosza(Number(k.dataset.kosz));
+  $("koszPodglad").scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 let koszSzukajTimer = null;
 $("koszSzukaj").addEventListener("input", (e) => {

@@ -33,6 +33,49 @@ historii nie przepisujemy.
 
 ---
 
+## 0.80.0 — 22 sierpnia 2026
+
+**Biuro widzi wreszcie, ile towar STOI.** Zwroty miały dwie karty liczb:
+RAPORT mówił, ile czego jest, STATYSTYKI — co wraca najczęściej. Żadna nie
+odpowiadała na pytanie, które przelicza się wprost na pieniądze: jak długo
+zwrócony towar jest niesprzedawalny.
+
+Nowa karta **CZASY OBSŁUGI ZWROTU** mierzy pięć odcinków drogi, każdy medianą
+i p90. Cała droga to przyjęcie → półka. Odcinki składowe: przyjęcie → ocena,
+ocena → zamknięcie kosza oraz zamknięcie kosza → półka, czyli sam czas
+rozłożenia. Osobno idzie przyjęcie → zwrot środków. Okno 30/90/180 dni dzieli
+ze statystykami produktowymi.
+
+**Okno liczy się od zdarzenia KOŃCZĄCEGO odcinek**, nie od przyjęcia paczki.
+Karta odpowiada więc na pytanie „ile trwało to, co się w tym oknie skończyło".
+Liczenie od przyjęcia wypychałoby ze statystyki sprawy niedokończone, czyli
+z definicji najwolniejsze, i proces wyglądałby na szybszy, niż jest.
+
+Ceną tego wyboru jest to, że rzeczy stojące nie ruszają mediany. Dlatego karta
+niesie sekcję **CO STOI TERAZ**: kosze czekające na rozłożenie i zwroty bez
+domknięcia, od najstarszej sprawy, z nazwanym etapem. Kliknięcie wiersza
+otwiera kosz albo kartę zwrotu. Mediana mówi o przeszłości, tamta lista
+o dzisiaj — dopiero razem nie kłamią.
+
+Odcinek bez danych pokazuje POWÓD zamiast samego myślnika. Najczęstszy jest
+jeden: kosze z dokumentu MM nie mają przypiętego zwrotu, więc do całej drogi
+nie wchodzą. Pusty kafel bez tego zdania wygląda jak awaria karty.
+
+Na dole stoi **tempo rozkładania per osoba** — monitoring pracowniczy z tą samą
+podstawą prawną co raport wydajności na zakładce ANALIZA, wysyłaną przez serwer
+razem z danymi. Miarą jest czas aktywny z `services/raporty.ts`, w którym
+przerwy dłuższe niż 15 minut nie liczą się jako praca.
+
+Odstęp od zamknięcia kosza byłby miarą nieuczciwą: mierzyłby głównie to, jak
+długo kosz czekał na kogokolwiek, i karałby człowieka za sięgnięcie po
+najstarszą robotę. Próbka poniżej 20 pozycji nie dostaje liczby.
+
+Nowa trasa `GET /api/biuro/zwroty/czasy?dni=90` pod bramką biura. Nic nie
+zmienia się w bazie ani na kolektorze — to sam odczyt ze znaczników, które
+aplikacja i tak zapisywała.
+
+---
+
 ## 0.79.0 — 22 sierpnia 2026
 
 **Rozkładanie zwrotów ma wreszcie drogi powrotne.** Praca w rękawicy, przy
