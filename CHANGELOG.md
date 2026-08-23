@@ -33,6 +33,44 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.4 — 22 sierpnia 2026
+
+<!-- docs_check: historia -->
+**`ZDJECIA_DODAWANIE=subiekt` przestaje wyglądać na równorzędny wybór — bo nie
+jest.** Instrukcja wdrożenia stawiała `wertis` i `subiekt` obok siebie, jakby
+różniły się tylko miejscem zapisu. Różnią się warunkami wstępnymi, a cena
+pomyłki jest wysoka: **API nie wstaje**.
+
+### Co się stało
+
+`subiekt` zakłada, że na instalacji działa już ODCZYT zdjęć — `ZDJECIA_ZRODLO=blob`
+wraz z nazwami tabeli i kolumn, przy `SGT_MODE=mssql`. Bez kompletu `config.ts`
+rzuca przy starcie i proces ginie. NSSM melduje wtedy `SERVICE_PAUSED`, co brzmi
+jak awaria usługi, a jest odmową konfiguracji.
+
+Instalator włącza odczyt zdjęć TYLKO wtedy, gdy w bazie firmy jest tabela
+`tw_ZdjecieTw`. Na instalacji bez zdjęć wykonanie punktu 4 z DEPLOY kładło więc
+`wertis-api` — instrukcją, nie kodem.
+
+### Odmowa mówi teraz, co wpisać zamiast
+
+Komunikat kończył się na diagnozie. Czyta się go z logu usługi, która właśnie
+nie wstała, najczęściej pod presją i na cudzej maszynie — „czego brakuje" bez
+„co wpisać zamiast" zostawia człowieka przy zgaszonym API.
+
+Dochodzi więc droga wyjścia: `ZDJECIA_DODAWANIE=wertis` działa zawsze, bez
+odczytu zdjęć i bez ósmego grantu. Zdjęcia widać na kolektorze od razu, a do
+kartoteki przenosi się je później — bez zmian w kolektorze.
+
+### Czego NIE zmieniono
+
+Samej bramki. Odmowa startu przy niepełnej konfiguracji to reguła całego tego
+repozytorium — `ZDJECIA_ZRODLO=blob` bez `ZDJECIA_KOLUMNA` zachowuje się tak od
+0.30.0 — i jest słuszna. Cicha zła konfiguracja przy ZAPISIE do bazy firmy
+byłaby gorsza niż głośna odmowa. Winna była instrukcja, nie bramka.
+
+---
+
 ## 0.88.3 — 22 sierpnia 2026
 
 <!-- docs_check: historia -->
