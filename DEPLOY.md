@@ -985,8 +985,20 @@ Kolejność — **wszystko najpierw na KOPII bazy**:
 2. Skopiuj cały katalog `publish` do `C:\wertis\tlo-worker\`. Zarejestruj
    usługę `wertis-tlo` (nssm albo §3).
 3. Dopisz do `wertis.env`: `TLO_URL=http://127.0.0.1:8791`.
-4. Włącz dodawanie zdjęć. `ZDJECIA_DODAWANIE=wertis` zostawia je w bazie
-   WERTIS; `ZDJECIA_DODAWANIE=subiekt` wysyła je do kartoteki.
+4. Włącz dodawanie zdjęć. **Zacznij od `ZDJECIA_DODAWANIE=wertis`** — ten tryb
+   działa zawsze i niczego więcej nie wymaga. Zdjęcie leży w bazie WERTIS
+   i widać je na karcie towaru.
+
+   > **`ZDJECIA_DODAWANIE=subiekt` NIE jest równorzędnym wyborem.** Zakłada,
+   > że na tej instalacji działa już ODCZYT zdjęć: `ZDJECIA_ZRODLO=blob` wraz
+   > z `ZDJECIA_TABELA`, `ZDJECIA_KOLUMNA_KLUCZA` i `ZDJECIA_KOLUMNA_GLOWNE`,
+   > przy `SGT_MODE=mssql`. Bez kompletu **serwer ODMAWIA STARTU** — to nie
+   > jest „funkcja nie zadziała", tylko `wertis-api` nie wstaje, a NSSM melduje
+   > `SERVICE_PAUSED`. Instalator włącza odczyt tylko wtedy, gdy w bazie jest
+   > tabela `tw_ZdjecieTw`, więc na instalacji bez zdjęć ten klucz kładzie API.
+   > Powód odmowy stoi w logu `C:\wertis\logs\wertis-api.err.log`, a wycofanie
+   > jest jednolinijkowe: wyczyść klucz i zrestartuj usługę.
+
 5. Przy `subiekt` nadaj ósmy grant. Zrobi to instalator z przełącznikiem
    `-ZdjeciaZapis`, albo wykonaj w SSMS:
    `GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;`

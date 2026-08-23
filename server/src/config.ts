@@ -713,9 +713,15 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (c.zdjecia.dodawanie === "subiekt") {
     if (c.zdjecia.zrodlo !== "blob") {
+      /* Zdanie kończy się DROGĄ WYJŚCIA, nie samą diagnozą. Ten błąd czyta się
+         z logu usługi, która właśnie nie wstała — najczęściej rano, pod presją,
+         na cudzej maszynie. „Czego brakuje" bez „co wpisać zamiast" zostawia
+         człowieka przy zgaszonym API. */
       bledy.push(
         "ZDJECIA_DODAWANIE=subiekt wymaga ZDJECIA_ZRODLO=blob — dopisujemy wiersz do tej " +
-          "samej tabeli, z której czytamy, a przy źródle plikowym nie ma jej gdzie szukać.",
+          "samej tabeli, z której czytamy, a przy źródle plikowym nie ma jej gdzie szukać. " +
+          "Nie masz włączonego odczytu zdjęć? Wpisz ZDJECIA_DODAWANIE=wertis — zdjęcia " +
+          "będą działać na kolektorze, tylko nie wejdą do kartoteki.",
       );
     }
     if (c.sgtMode === "seeded") {
