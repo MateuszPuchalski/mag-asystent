@@ -18,6 +18,26 @@ export const envFile = loadEnvFile();
  * wpisany na kolektorach. Obie awarie wyglądają jak „aplikacja nie działa"
  * i żadna nie prowadzi do literówki w pliku.
  */
+/**
+ * Adres URL z odwrotnymi ukośnikami wyprostowany na zwykłe.
+ *
+ * POWSTAŁO Z WDROŻENIA, KTÓRE POŁOŻYŁO MAGAZYN. Ktoś wpisał
+ * `TLO_URL=http:\\127.0.0.1:8791`, serwer odmówił startu, a `wertis-api`
+ * i `wertis-worker` przestały wstawać. Objawem na ekranie było
+ * `SERVICE_PAUSED` z NSSM — nikt nie kojarzy tego z ukośnikiem.
+ *
+ * Ta pomyłka jest na Windowsie NATURALNA, a nie niedbała: w tym samym pliku
+ * konfiguracyjnym KAŻDA inna wartość ze znakiem podziału używa `\` — bo są to
+ * ścieżki (`C:\wertis`, `ZDJECIA_KATALOG=D:\zdjecia`, `TLO_MODEL`). Ręka
+ * pisze dalej to samo.
+ *
+ * Prostujemy, zamiast odmawiać, bo `\` w adresie hosta NIE MA żadnego innego
+ * możliwego znaczenia — przeglądarki robią dokładnie to samo od zawsze.
+ * Bramka zostaje: adres bez `http://` albo `https://` nadal zatrzymuje start.
+ * Naprawiamy pomyłkę jednoznaczną, nie zgadujemy przy niejednoznacznej.
+ */
+export const prostujUkosniki = (v: string): string => v.replace(/\\/g, "/");
+
 const num = (v: string | undefined, def: number, name?: string) => {
   if (v === undefined || v === "") return def;
   const n = Number(v);
@@ -524,8 +544,14 @@ export const config = {
    * z tłem i mówi o tym magazynierowi; nie jest to awaria i nie udaje jej.
    */
   tlo: {
-    /** Adres usługi `wertis-tlo`, np. `http://127.0.0.1:8791`. Puste = bez usługi. */
-    url: process.env.TLO_URL ?? "",
+    /**
+     * Adres usługi `wertis-tlo`, np. `http://127.0.0.1:8791`. Puste = bez usługi.
+     *
+     * Odwrotne ukośniki prostujemy — na Windowsie to pomyłka naturalna, a nie
+     * niedbała (patrz `prostujUkosniki`). Adres bez schematu nadal zatrzymuje
+     * start; tam nie ma czego prostować.
+     */
+    url: prostujUkosniki(process.env.TLO_URL ?? ""),
     /**
      * Ile milisekund czekamy na wycięcie tła.
      *
