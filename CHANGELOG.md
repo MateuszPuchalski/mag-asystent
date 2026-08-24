@@ -33,6 +33,47 @@ historii nie przepisujemy.
 
 ---
 
+## 0.88.5 — 23 sierpnia 2026
+
+<!-- docs_check: historia -->
+**Odwrotny ukośnik w `TLO_URL` przestaje kłaść magazyn.** W `wertis.env`
+wpisano `TLO_URL=http:\\127.0.0.1:8791`. Serwer odmówił startu, `wertis-api`
+i `wertis-worker` przestały wstawać, a na ekranie było `SERVICE_PAUSED`
+z NSSM — objaw, którego nikt nie kojarzy z ukośnikiem.
+
+### Ta pomyłka jest na Windowsie naturalna
+
+W tym samym pliku konfiguracyjnym **każda inna wartość ze znakiem podziału
+używa `\`** — bo są to ścieżki: `C:\wertis`, `ZDJECIA_KATALOG=D:\zdjecia`,
+`TLO_MODEL=C:\wertis\tlo-worker\model\…`. Ręka pisze dalej to samo i nie
+ma w tym niedbałości.
+
+Prostujemy więc ukośniki przy odczycie klucza. `\` w adresie hosta **nie ma
+żadnego innego możliwego znaczenia** — przeglądarki robią dokładnie to samo
+od zawsze. Naprawiamy pomyłkę jednoznaczną; przy niejednoznacznej nadal nie
+zgadujemy.
+
+### Bramka zostaje
+
+Adres **bez schematu** (`127.0.0.1:8791`) nadal zatrzymuje start — tam nie ma
+czego prostować, a ciche przyjęcie znaczyłoby usługę tła wołaną pod adresem,
+którego nie da się otworzyć, i nikt by się o tym nie dowiedział.
+
+Pilnują tego dwa nowe pliki testów. `tlo-url.test.ts` sprawdza, że wersja
+z odwrotnymi ukośnikami **nie rzuca przy imporcie** i że adres da się potem
+złożyć przez `new URL`. `tlo-url-bramka.test.ts` uruchamia `config.ts`
+w OSOBNYCH procesach — odmowa jest zdarzeniem przy imporcie, więc inaczej się
+jej nie zmierzy — i potwierdza, że schemat nadal jest wymagany.
+
+### Czego ta wersja NIE zmienia
+
+Filozofii głośnej odmowy. Rozważano zdegradowanie złego `TLO_URL` do wpisu
+w `problemy` z `/api/health` — bo jedynym skutkiem jest „zdjęcia zapisują się
+z tłem", a to nie jest powód, żeby zatrzymywać halę. Właściciel wybrał węższą
+poprawkę: naprawiamy konkretną literówkę, reguła zostaje nietknięta.
+
+---
+
 ## 0.88.4 — 22 sierpnia 2026
 
 <!-- docs_check: historia -->
