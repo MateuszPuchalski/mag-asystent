@@ -108,7 +108,7 @@ export function dostepneW(magId: number, twId: number): number {
  * lista siedzi w karcie odświeżanej co 2 s, a wiersz, który przeskakuje pod
  * kciukiem, to dotknięcie w zły towar.
  */
-function zamiennikiZOpisu(
+export function zamiennikiZOpisu(
   adapter: SubiektAdapter,
   desc: string,
   symbol: string

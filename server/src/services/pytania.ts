@@ -5,7 +5,12 @@ import { logEvent } from "./events.js";
 import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import type { OfertaAllegro, WiadomoscAllegro } from "../adapters/allegro.js";
-import { kandydaciZamiennikow } from "./zamienniki.js";
+import { dostepneW, zamiennikiZOpisu } from "./stock.js";
+import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
+import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
+import type { ProductRow, Zamienniki } from "../types.js";
+import type { ZamowioneUDostawcy } from "./zamowienia-towaru.js";
+import type { WDostawie } from "./dostawy-towaru.js";
 import {
   aiTryb,
   generujOdpowiedz,
@@ -324,9 +329,24 @@ export interface TrafienieKartoteki {
   twId: number;
   symbol: string;
   nazwa: string;
+  ean: string;
+  /**
+   * Stan magazynu głównego SKORYGOWANY o kolejkę zapisów — to samo, co widzi
+   * kolektor na karcie towaru. Surowy stan z read-modelu potrafi kłamać przez
+   * kilka minut po przesunięciu, a klientowi odpisuje się raz.
+   */
   stan: number;
   lokalizacje: string[];
-  zamienniki: string[];
+  /**
+   * Zamienniki ROZSTRZYGNIĘTE kartoteką: `znane` mamy u siebie, `obce` to cudze
+   * numery katalogowe. Do 0.89.0 szła stąd płaska lista kandydatów i nie było
+   * jak odróżnić „mamy zamiennik" od „klient podał numer, którego nie znamy".
+   */
+  zamienniki: Zamienniki;
+  /** Zamówione u dostawcy i jeszcze nieprzyjęte — „nie mamy, ale będzie". */
+  zamowione: ZamowioneUDostawcy[];
+  /** Przyjechało i czeka na rozłożenie — fizycznie jest, na półce jeszcze nie. */
+  wDostawie: WDostawie[];
 }
 
 /**
@@ -342,7 +362,7 @@ export interface TrafienieKartoteki {
 function szukajKartotek(frazy: string[], symbole: string[] = []): TrafienieKartoteki[] {
   const znalezione = new Map<number, TrafienieKartoteki>();
 
-  const dodaj = (twId: number, symbol: string, nazwa: string, stan: number, locs: string[]) => {
+  const dodaj = (twId: number, p: ProductRow) => {
     if (znalezione.has(twId) || znalezione.size >= KARTOTEK_W_KONTEKSCIE) return;
     /* Opis kartoteki nosi zamienniki („Zamiennie: …") i jest jedynym
        miejscem, gdzie wiedza o pasowaniu już u nas jest — `ProductRow` go
@@ -352,11 +372,17 @@ function szukajKartotek(frazy: string[], symbole: string[] = []): TrafienieKarto
       | undefined;
     znalezione.set(twId, {
       twId,
-      symbol,
-      nazwa,
-      stan,
-      lokalizacje: locs,
-      zamienniki: kandydaciZamiennikow(opis?.opis ?? "", symbol).slice(0, 8),
+      symbol: p.sym,
+      nazwa: p.name,
+      ean: p.ean,
+      /* Ta sama korekta o kolejkę, którą liczy karta towaru — nie surowe
+         `p.mag`. Osiem kartotek to osiem zapytań do LOKALNEGO SQLite; żadne
+         z nich nie dotyka Allegro, a to jest tu jedyny reglamentowany zasób. */
+      stan: dostepneW(config.magId.MAG, twId),
+      lokalizacje: p.locs,
+      zamienniki: zamiennikiZOpisu(subiekt, opis?.opis ?? "", p.sym),
+      zamowione: zamowioneUDostawcy(twId),
+      wDostawie: nierozlozoneZDostaw(twId),
     });
   };
 
@@ -364,20 +390,26 @@ function szukajKartotek(frazy: string[], symbole: string[] = []): TrafienieKarto
      twarde dopasowanie, a nie trafienie po słowach. */
   for (const symbol of symbole) {
     for (const p of subiekt.getProductsBySymbols([symbol])) {
-      dodaj(p.id, p.sym, p.name, p.mag, p.locs);
+      dodaj(p.id, p);
     }
   }
   for (const fraza of frazy) {
     if (znalezione.size >= KARTOTEK_W_KONTEKSCIE) break;
     for (const p of subiekt.szukajZFurtka(fraza, KARTOTEK_W_KONTEKSCIE).wyniki) {
-      dodaj(p.id, p.sym, p.name, p.mag, p.locs);
+      dodaj(p.id, p);
     }
   }
   return [...znalezione.values()];
 }
 
 /** Potwierdzone wcześniej pary maszyna→część dla fraz z pytania. */
-function znanaDopasowania(frazy: string[]): Array<{ urzadzenie: string; symbol: string }> {
+/** Potwierdzona para „ta maszyna → ten symbol", zbudowana z wysłanych odpowiedzi. */
+export interface ZnaneDopasowanie {
+  urzadzenie: string;
+  symbol: string;
+}
+
+function znanaDopasowania(frazy: string[]): ZnaneDopasowanie[] {
   if (frazy.length === 0) return [];
   const pytajniki = frazy.map(() => "?").join(",");
   return db()
@@ -406,6 +438,22 @@ export interface Kontekst {
   tekst: string;
   kartoteki: TrafienieKartoteki[];
   oferty: OfertaAllegro[];
+  /**
+   * Powód, dla którego lista aukcji jest pusta — albo `null`, gdy pusta jest
+   * zgodnie z prawdą.
+   *
+   * Model dostawał to zdanie od 0.80.0, człowiek nie dostawał go wcale: panel
+   * pisał „Nic nie pasuje" i wtedy, gdy Allegro odpowiedziało, i wtedy, gdy
+   * padło. To dwie różne odpowiedzi dla klienta — „nie mamy" wolno napisać,
+   * „nie sprawdziliśmy" trzeba sprawdzić.
+   */
+  bladOfert: string | null;
+  /** Frazy, po których szukaliśmy — bez nich zły dobór jest nie do wyjaśnienia. */
+  frazy: string[];
+  /** Potwierdzone pary urządzenie→symbol użyte w tym szkicu. */
+  dopasowania: ZnaneDopasowanie[];
+  /** Co odpowiadaliśmy wcześniej na pytania o tę samą ofertę. */
+  poprzednie: PrzykladOdpowiedzi[];
 }
 
 /**
@@ -451,9 +499,35 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
   } else {
     linie.push("\nKARTOTEKI (nasz asortyment):");
     for (const k of kartoteki) {
-      const zam = k.zamienniki.length ? ` | zamienniki: ${k.zamienniki.join(", ")}` : "";
+      const zam = k.zamienniki.znane.length
+        ? ` | mamy zamienniki: ${k.zamienniki.znane.map((z) => z.sym).join(", ")}`
+        : "";
+      /* Obce numery katalogowe podajemy modelowi ODDZIELNIE i z etykietą, bo
+         to numery CUDZE — wolno po nich rozpoznać część, nie wolno ich
+         sprzedać jako naszych. */
+      const obce = k.zamienniki.obce.length
+        ? ` | pasuje do numerów obcych: ${k.zamienniki.obce.slice(0, 8).join(", ")}`
+        : "";
       const lok = k.lokalizacje.length ? ` | półka: ${k.lokalizacje.join(", ")}` : "";
-      linie.push(`- SYMBOL: ${k.symbol} | ${k.nazwa} | stan: ${k.stan} szt.${lok}${zam}`);
+      const ean = k.ean ? ` | EAN: ${k.ean}` : "";
+      linie.push(`- SYMBOL: ${k.symbol} | ${k.nazwa}${ean} | stan: ${k.stan} szt.${lok}${zam}${obce}`);
+
+      /* „Nie mamy" i „nie mamy, ale przyjdzie" to dla klienta dwie różne
+         odpowiedzi — a do 0.89.0 model nie miał skąd wziąć tej drugiej.
+         Termin podajemy tylko wtedy, gdy baza go zna: obiecana data, której
+         nikt nie potwierdził, jest gorsza od jej braku. */
+      for (const z of k.zamowione.slice(0, 2)) {
+        const kiedy = z.termin ? `termin ${z.termin}` : "termin nieznany";
+        linie.push(
+          `    ZAMÓWIONE U DOSTAWCY: ${z.ilosc} szt., ${kiedy} (${z.dostawca || "dostawca nieznany"})` +
+            `${z.szacunek ? " — ilość szacunkowa" : ""}`
+        );
+      }
+      for (const d of k.wDostawie.slice(0, 2)) {
+        linie.push(
+          `    PRZYJECHAŁO, NIEROZŁOŻONE: ${d.ilosc} szt. z ${d.nrPelny} (${d.dataWyst})`
+        );
+      }
     }
   }
 
@@ -485,7 +559,7 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
     for (const o of poprzednie) linie.push(`- „${o.pytanie.slice(0, 160)}" → ${o.odpowiedz}`);
   }
 
-  return { tekst: linie.join("\n"), kartoteki, oferty };
+  return { tekst: linie.join("\n"), kartoteki, oferty, bladOfert, frazy, dopasowania, poprzednie };
 }
 
 /* ── Szkic ───────────────────────────────────────────────────────────────── */

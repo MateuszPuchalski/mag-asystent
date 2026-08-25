@@ -178,6 +178,13 @@ export async function pytaniaRoutes(app: FastifyInstance) {
           zdjecieUrl: `/api/products/${k.twId}/zdjecie`,
         })),
         oferty: kontekst.oferty,
+        /* Reszta kontekstu szła dotąd WYŁĄCZNIE do modelu. Człowiek ma prawo
+           wiedzieć to samo: czego szukaliśmy, co już potwierdziliśmy i czy
+           pusta lista aukcji znaczy „nie mamy", czy „nie udało się sprawdzić". */
+        bladOfert: kontekst.bladOfert,
+        frazy: kontekst.frazy,
+        dopasowania: kontekst.dopasowania,
+        poprzednie: kontekst.poprzednie,
       };
     });
   });

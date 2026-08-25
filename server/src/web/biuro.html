@@ -315,6 +315,9 @@
   .kafel { flex: 1 1 130px; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--cien); }
   .kafel .liczba { font: 800 26px/1.05 var(--font-cond); }
   .kafel .liczba.zle { color: var(--err); }
+  /* Ten sam sens co wyżej, ale poza kaflem: liczba, która ma zapalić się na
+     czerwono w zwykłym akapicie (licznik znaków odpowiedzi). */
+  .zle { color: var(--err); }
   .kafel .opis { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
 
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
@@ -791,12 +794,20 @@
       <button class="akcja cichy" id="pytanieWroc">← WSZYSTKIE PYTANIA</button>
       <div id="pytanieNaglowek" style="margin-top:12px"></div>
 
-      <h2 style="margin-top:16px">ROZMOWA</h2>
+      <!-- PYTANIE stoi nad rozmową i pochodzi z NASZEJ bazy. Rozmowa jedzie
+           z Allegro na żądanie, więc gdy Allegro milczy albo pytanie przyszło
+           z wklejki, to jest jedyne miejsce, w którym widać, o co klient pyta.
+           Do 0.89.0 nie było go na ekranie wcale. -->
+      <h2 style="margin-top:16px">PYTANIE</h2>
+      <div id="pytanieTresc" class="wiad klient" style="max-width:none"></div>
+
+      <h2 style="margin-top:18px">ROZMOWA</h2>
       <div id="pytanieRozmowa"></div>
 
       <h2 style="margin-top:18px">ODPOWIEDŹ</h2>
       <p class="mute" style="margin-bottom:6px" id="pytanieSzkicInfo"></p>
       <textarea id="pytanieOdpowiedz" rows="9" style="width:100%"></textarea>
+      <div id="pytanieLicznikZnakow" class="mute" style="margin-top:4px"></div>
       <div id="pytanieAkcje" style="margin-top:10px"></div>
 
       <h2 style="margin-top:18px">DOPASOWANE TOWARY</h2>
@@ -805,6 +816,10 @@
         do odpowiedzi w miejscu kursora.
       </p>
       <div id="pytanieTowary"></div>
+
+      <!-- Czym model dysponował poza kartoteką. Zwinięte: materiał na wypadek
+           wątpliwości przy doborze, nie lektura do każdej odpowiedzi. -->
+      <details class="zwijana" id="pytanieWiedza" hidden></details>
     </section>
 
     <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
@@ -3720,6 +3735,7 @@ function zamknijZwrot() {
 SZEROKO.addEventListener("change", () => {
   ustawRodzenstwoZwrotu();
   ustawRodzenstwoDostaw();
+  ustawRodzenstwoPytania();
 });
 
 async function odswiezSzczegolZwrotu() {
@@ -4595,6 +4611,22 @@ let otwartePytanie = null;
 let pytanieIdRozmowy = null;
 /** Czy w polu odpowiedzi są niezapisane zmiany — chroni je przed odświeżeniem. */
 let odpowiedzRuszona = false;
+/** Surowy szkic modelu — do przywrócenia, gdy poprawka wyszła gorzej. */
+let szkicDoPrzywrocenia = "";
+
+/* Allegro tnie wiadomość na 2000 znaków. Do 0.89.0 dowiadywał się o tym
+   dopiero serwer, po kliknięciu WYŚLIJ — czyli po napisaniu całości. */
+const LIMIT_WIADOMOSCI_ALLEGRO = 2000;
+
+function licznikZnakow() {
+  const n = ($("pytanieOdpowiedz").value || "").length;
+  const cel = $("pytanieLicznikZnakow");
+  const zaDlugie = n > LIMIT_WIADOMOSCI_ALLEGRO;
+  cel.className = zaDlugie ? "zle" : "mute";
+  cel.textContent = zaDlugie
+    ? `${n} / ${LIMIT_WIADOMOSCI_ALLEGRO} znaków — Allegro nie przyjmie tej wiadomości.`
+    : `${n} / ${LIMIT_WIADOMOSCI_ALLEGRO} znaków`;
+}
 
 const STATUSY_PYTAN = {
   nowe: ['<span class="badge mute2">NOWE</span>', "czeka na szkic"],
@@ -4619,12 +4651,7 @@ function zamknijPytanie() {
   otwartePytanie = null;
   pytanieIdRozmowy = null;
   odpowiedzRuszona = false;
-  $("pytanieSzczegol").hidden = true;
-  for (const id of KARTY_LISTY_PYTAN) {
-    /* Baner stanu AI ma własną regułę widoczności — przy działającym modelu
-       zostaje schowany, bo nie ma czego ogłaszać. */
-    $(id).hidden = id === "pytaniaBaner" && $(id).dataset.pusty === "1";
-  }
+  ustawRodzenstwoPytania();
 }
 
 /* Karty, które szczegół ZASŁANIA. Jedna lista zamiast dwóch pętli: przy
@@ -4634,6 +4661,32 @@ const KARTY_LISTY_PYTAN = [
   "pytaniaBaner", "pytaniaWklejkaKarta", "pytaniaListaKarta",
   "pytaniaStatystykiKarta",
 ];
+
+/* Co zostaje obok otwartego pytania na szerokim ekranie: sama kolejka.
+   Wklejka i statystyki chowają się w obu trybach — przy redagowaniu
+   odpowiedzi kontekstem jest lista spraw, a nie skrzynka wejściowa z poczty. */
+const PRZY_PYTANIU = ["pytaniaListaKarta"];
+
+/**
+ * Zasłonić listę czy postawić szczegół obok niej.
+ *
+ * Zakładka dostała klasę `szczegol` przy scaleniu 0.80.0, ale nigdy nie
+ * dostawała `zSzczegolem`, więc otwarte pytanie chowało kolejkę nawet na
+ * 3440 px — inaczej niż DOSTAWY i ZWROTY. Ten sam próg, ta sama reguła.
+ */
+function ustawRodzenstwoPytania() {
+  const otwarte = otwartePytanie != null;
+  const zostaje = otwarte && trybSzeroki() ? PRZY_PYTANIU : [];
+  for (const id of KARTY_LISTY_PYTAN) {
+    /* Baner ma własną regułę pustki i ona jest nadrzędna — przy działającym
+       modelu i sparowanym koncie nie ma czego ogłaszać. */
+    const pusty = id === "pytaniaBaner" && $(id).dataset.pusty === "1";
+    $(id).hidden = pusty || (otwarte && !zostaje.includes(id));
+  }
+  $("pytanieSzczegol").hidden = !otwarte;
+  $("widokPytania").classList.toggle("zSzczegolem", otwarte);
+  zaznaczWiersz("pytaniaLista", "pytanie", otwartePytanie);
+}
 
 async function odswiezPytania() {
   /* Otwarte pytanie NIE odświeża się co 30 s i to jest świadome. Zwrot
@@ -4648,7 +4701,7 @@ async function odswiezPytania() {
     const q = new URLSearchParams();
     if ($("pytaniaFiltrStatus").value) q.set("status", $("pytaniaFiltrStatus").value);
     const d = await (await api(`/api/biuro/pytania?${q}`)).json();
-    rysujBanerAi(d.ai);
+    rysujBanerPytan(d.ai, d.allegro);
     rysujListePytan(d.pytania);
     $("pytaniaLicznik").textContent = d.otwartych > 0 ? `(${d.otwartych})` : "";
   } catch (e) {
@@ -4657,21 +4710,41 @@ async function odswiezPytania() {
 }
 
 /* Baner pokazuje się TYLKO wtedy, gdy jest co powiedzieć: przy działającym
-   modelu byłby stałym zdaniem o tym, że wszystko jest w porządku. */
-function rysujBanerAi(ai) {
-  const pokaz = ai.tryb !== "anthropic" && ai.tryb !== "openai";
-  $("pytaniaBaner").hidden = !pokaz;
-  $("pytaniaBaner").dataset.pusty = pokaz ? "0" : "1";
-  $("pytaniaBanerTresc").innerHTML =
-    `<span class="badge ${ai.tryb === "wylaczone" ? "err" : "amber"}">` +
-    `${esc(ai.tryb.toUpperCase())}</span> ${esc(ai.opis)}`;
+   modelu i sparowanym koncie byłby stałym zdaniem, że wszystko jest w porządku.
+   Od 0.89.0 mówi też o Allegro — WYŚLIJ PRZEZ ALLEGRO zależy od tokenu, a
+   zakładka nie miała jak o tym uprzedzić: człowiek dowiadywał się dopiero
+   z błędu, po napisaniu całej odpowiedzi. */
+function rysujBanerPytan(ai, allegro) {
+  const zleAi = ai.tryb !== "anthropic" && ai.tryb !== "openai";
+  const zleAllegro = allegro && allegro.stan !== "polaczone" && allegro.stan !== "dev";
+  $("pytaniaBaner").hidden = !zleAi && !zleAllegro;
+  $("pytaniaBaner").dataset.pusty = zleAi || zleAllegro ? "0" : "1";
+
+  const wiersze = [];
+  if (zleAi) {
+    wiersze.push(
+      `<div><span class="badge ${ai.tryb === "wylaczone" ? "err" : "amber"}">` +
+        `${esc(ai.tryb.toUpperCase())}</span> ${esc(ai.opis)}</div>`
+    );
+  } else if (ai.model) {
+    /* Który model odpowiada, widać wyłącznie wtedy, gdy baner i tak stoi z
+       innego powodu — inaczej byłby tym stałym zdaniem o porządku. */
+    wiersze.push(`<div class="mute">Szkice pisze: ${esc(ai.model)}</div>`);
+  }
+  if (zleAllegro) {
+    wiersze.push(
+      '<div><span class="badge err">ALLEGRO</span> Konto niesparowane — ' +
+        "wysyłka odpowiedzi nie zadziała. Sparuj w ZWROTY → KONTO ALLEGRO."
+    );
+  }
+  $("pytaniaBanerTresc").innerHTML = wiersze.join("");
 }
 
 function rysujListePytan(lista) {
   $("pytaniaLista").innerHTML = !lista.length
     ? '<tr><td class="mute">Nic nie czeka na odpowiedź. Skrzynka na zero.</td></tr>'
     : "<tr><th>STATUS</th><th>KLIENT</th><th>OFERTA</th><th>PYTANIE</th><th>WIEK</th><th></th></tr>" +
-      lista.map((p) => `<tr>
+      lista.map((p) => `<tr data-pytanie="${p.id}"${p.id === otwartePytanie ? ' class="aktywny"' : ""} style="cursor:pointer">
           <td style="white-space:nowrap">${badgePytania(p.status)}</td>
           <td>${esc(p.kupujacyLogin || (p.zrodlo === "wklejka" ? "(wklejka)" : "—"))}</td>
           <td class="mute">${esc(p.ofertaTytul || "—")}</td>
@@ -4696,8 +4769,7 @@ async function otworzPytanie(id) {
   otwartePytanie = id;
   pytanieIdRozmowy = null;
   odpowiedzRuszona = false;
-  for (const k of KARTY_LISTY_PYTAN) $(k).hidden = true;
-  $("pytanieSzczegol").hidden = false;
+  ustawRodzenstwoPytania();
   await odswiezSzczegolPytania();
   pokazRozmowe(id);
 }
@@ -4721,8 +4793,13 @@ function rysujSzczegolPytania(d) {
     <div>${badgePytania(p.status)} ${kat} ${poza}</div>
     <div style="margin-top:6px"><span class="b">${esc(p.kupujacyLogin || "(wklejka z poczty)")}</span>
       ${p.ofertaTytul ? ` · ${esc(p.ofertaTytul)}` : ""}</div>
-    <div class="mute" style="margin-top:4px">Pytanie sprzed: ${esc(wiekPytania(p.otrzymanoAt))}
+    <div class="mute" style="margin-top:4px"><span title="${esc(stempelLokalny(p.otrzymanoAt))}"
+      >Pytanie sprzed: ${esc(wiekPytania(p.otrzymanoAt))}</span>
       ${p.urzadzenie ? ` · urządzenie: ${esc(p.urzadzenie)}` : ""}</div>`;
+
+  /* Snapshot pytania z NASZEJ bazy — jedyne miejsce, w którym widać treść,
+     gdy pytanie przyszło z wklejki albo Allegro nie odpowiada. */
+  $("pytanieTresc").textContent = p.tresc || "(pusta treść pytania)";
 
   /* Pola odpowiedzi NIE ruszamy, gdy człowiek w nim pisze — odświeżenie co
      30 s zjadałoby poprawki w połowie zdania. */
@@ -4735,6 +4812,8 @@ function rysujSzczegolPytania(d) {
         ? (p.edytowano ? "Szkic modelu po Twojej poprawce." : "Szkic modelu — przeczytaj i popraw, zanim wyślesz.")
         : "Szkicu jeszcze nie ma. Kliknij GENERUJ SZKIC AI.";
 
+  licznikZnakow();
+
   const wyslane = p.status === "wyslane";
   $("pytanieAkcje").innerHTML = [
     `<button class="akcja" id="pytanieGeneruj">${p.szkicAi ? "PRZELICZ SZKIC" : "GENERUJ SZKIC AI"}</button>`,
@@ -4742,29 +4821,77 @@ function rysujSzczegolPytania(d) {
     wyslane || !p.threadId ? "" : '<button class="akcja" id="pytanieWyslij">WYŚLIJ PRZEZ ALLEGRO</button>',
     '<button class="akcja cichy" id="pytanieKopiuj">KOPIUJ</button>',
     wyslane ? "" : '<button class="akcja cichy" id="pytanieZamknij">ZAŁATWIONE POZA APLIKACJĄ</button>',
+    wyslane || !p.szkicAi || !p.edytowano
+      ? ""
+      : '<button class="akcja cichy" id="pytaniePrzywroc">PRZYWRÓĆ SZKIC</button>',
     wyslane ? "" : '<button class="akcja cichy" id="pytaniePomin">POMIŃ</button>',
   ].join(" ");
+  szkicDoPrzywrocenia = p.szkicAi || "";
 
-  rysujTowaryPytania(d.kartoteki || [], d.oferty || []);
+  rysujTowaryPytania(d.kartoteki || [], d.oferty || [], p.produkty || [], d.bladOfert || null);
+  rysujWiedzePytania(d);
 }
 
-function rysujTowaryPytania(kartoteki, oferty) {
+function rysujTowaryPytania(kartoteki, oferty, wybraneModelu, bladOfert) {
   const ofertaDla = (symbol) =>
     oferty.find((o) => (o.externalId || "").toLowerCase() === (symbol || "").toLowerCase());
+  /* Symbole, które wskazał MODEL. To one trafiają do tabeli `dopasowanie`
+     przy wysyłce, więc człowiek ma je widzieć, zanim je zatwierdzi. */
+  const wybrane = new Set((wybraneModelu || []).map((x) => (x.symbol || "").toLowerCase()));
+
+  /* Awaria pobierania aukcji NIE może wyglądać jak „nie mamy tego". Pierwsze
+     wolno napisać klientowi, drugie trzeba najpierw sprawdzić. */
+  const ostrzezenie = bladOfert
+    ? `<p class="zle" style="margin-bottom:8px">Nie udało się sprawdzić naszych aukcji
+        (${esc(bladOfert)}). Lista poniżej może być niepełna — nie odpisuj „nie mamy”,
+        dopóki tego nie sprawdzisz.</p>`
+    : "";
 
   if (!kartoteki.length && !oferty.length) {
     $("pytanieTowary").innerHTML =
-      '<p class="mute">Nic nie pasuje do tego pytania w kartotece ani w naszych aukcjach.</p>';
+      ostrzezenie +
+      (bladOfert
+        ? ""
+        : '<p class="mute">Nic nie pasuje do tego pytania w kartotece ani w naszych aukcjach.</p>');
     return;
   }
 
   const wiersze = kartoteki.map((k) => {
     const o = ofertaDla(k.symbol);
+    const wskazany = wybrane.has((k.symbol || "").toLowerCase())
+      ? ' <span class="badge amber">WSKAZANY W ODPOWIEDZI</span>'
+      : "";
+    /* Zamienniki rozstrzygnięte kartoteką: „mamy" wolno obiecać klientowi,
+       cudzy numer katalogowy służy tylko do rozpoznania części. */
+    const znane = (k.zamienniki?.znane || []).map((z) => z.sym);
+    const obce = k.zamienniki?.obce || [];
+    const zamienniki =
+      (znane.length ? `<div class="mute">mamy zamiennie: ${esc(znane.join(", "))}</div>` : "") +
+      (obce.length ? `<div class="mute">nr obce: ${esc(obce.slice(0, 6).join(", "))}</div>` : "");
+
+    /* Druga połowa odpowiedzi „nie mamy": kiedy będzie. Bez tego biuro
+       odpisuje „brak" na towar, który jedzie i ma termin. */
+    const wDrodze = (k.zamowione || [])
+      .slice(0, 2)
+      .map(
+        (z) => `<div class="mute">w drodze: ${z.ilosc} szt.${
+          z.termin ? ` · ${esc(z.termin)}` : " · termin nieznany"
+        }</div>`
+      )
+      .join("");
+    const nierozlozone = (k.wDostawie || [])
+      .slice(0, 2)
+      .map((d) => `<div class="mute">przyjechało, nierozłożone: ${d.ilosc} szt.</div>`)
+      .join("");
+
     return `<tr>
       ${kolFoto(k.twId)}
-      <td><span class="b">${esc(k.symbol)}</span><br>${esc(k.nazwa)}
-        ${k.zamienniki.length ? `<div class="mute">zamiennie: ${esc(k.zamienniki.join(", "))}</div>` : ""}</td>
-      <td class="b" style="white-space:nowrap">${k.stan} szt.</td>
+      <td><span class="b">${esc(k.symbol)}</span>${wskazany}<br>${esc(k.nazwa)}
+        ${k.ean ? `<div class="mute">EAN ${esc(k.ean)}</div>` : ""}
+        ${zamienniki}</td>
+      <td class="b" style="white-space:nowrap">${k.stan} szt.${wDrodze}${nierozlozone}${
+        o && o.dostepnych != null ? `<div class="mute">na aukcji: ${o.dostepnych}</div>` : ""
+      }</td>
       <td class="mute">${esc(k.lokalizacje.join(", ") || "—")}</td>
       <td>${o ? `${esc(o.cena || "")}<br><a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a>` : '<span class="mute">brak aukcji</span>'}</td>
       <td>${o ? `<button class="akcja cichy" data-wstaw="${esc(o.url)}">WSTAW LINK</button>` : ""}</td>
@@ -4788,10 +4915,61 @@ function rysujTowaryPytania(kartoteki, oferty) {
   }
 
   $("pytanieTowary").innerHTML =
+    ostrzezenie +
     `<table id="pytanieTowaryTabela"><tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
     "<th>TOWAR</th><th>STAN</th><th>PÓŁKA</th><th>AUKCJA</th><th></th></tr>" +
     wiersze.join("") + "</table>";
   dolozZdjeciaListy(kartoteki, "pytanieTowaryTabela", "sesjaPytan");
+}
+
+/**
+ * Czym model dysponował poza kartoteką: po czym szukaliśmy, co już
+ * potwierdziliśmy i co odpowiadaliśmy wcześniej na tę ofertę.
+ *
+ * Zwinięte, bo to materiał do sprawdzenia PRZY WĄTPLIWOŚCI, a nie przy każdej
+ * odpowiedzi — a pion ekranu na tej zakładce jest walutą (0.86.0).
+ */
+function rysujWiedzePytania(d) {
+  const czesci = [];
+
+  if ((d.dopasowania || []).length) {
+    czesci.push(
+      "<h2>POTWIERDZONE WCZEŚNIEJ</h2><table><tr><th>URZĄDZENIE</th><th>SYMBOL</th></tr>" +
+        d.dopasowania
+          .map((x) => `<tr><td>${esc(x.urzadzenie)}</td><td class="b">${esc(x.symbol)}</td></tr>`)
+          .join("") +
+        "</table>"
+    );
+  }
+
+  if ((d.poprzednie || []).length) {
+    czesci.push(
+      "<h2>CO ODPOWIADALIŚMY NA TĘ OFERTĘ</h2>" +
+        d.poprzednie
+          .map(
+            (o) => `<div class="wiad klient" style="max-width:none"><div class="kto">PYTANIE</div>
+              <div class="tresc">${esc(o.pytanie)}</div></div>
+              <div class="wiad my" style="max-width:none;margin-left:0"><div class="kto">NASZA ODPOWIEDŹ</div>
+              <div class="tresc">${esc(o.odpowiedz)}</div></div>`
+          )
+          .join("")
+    );
+  }
+
+  if ((d.frazy || []).length) {
+    czesci.push(
+      `<h2>SZUKALIŚMY PO</h2><p class="mute">${esc(d.frazy.join(" · "))}</p>`
+    );
+  }
+
+  const cel = $("pytanieWiedza");
+  if (!czesci.length) {
+    cel.hidden = true;
+    return;
+  }
+  cel.hidden = false;
+  cel.innerHTML =
+    "<summary><h2>SKĄD TO DOPASOWANIE</h2></summary>" + czesci.join("");
 }
 
 /** Rozmowa z Allegro — na żądanie, jak przy zwrotach: to prywatna korespondencja. */
@@ -4962,7 +5140,7 @@ $("pytaniaZapytajAi").addEventListener("click", () => {
   if (!tekst) return toast("Wpisz treść pytania albo wklej screenshot");
   wyslijWklejke({ tekst });
 });
-$("pytanieOdpowiedz").addEventListener("input", () => { odpowiedzRuszona = true; });
+$("pytanieOdpowiedz").addEventListener("input", () => { odpowiedzRuszona = true; licznikZnakow(); });
 
 $("pytanieTowary").addEventListener("click", (e) => {
   const b = e.target.closest("[data-wstaw]");
@@ -4976,6 +5154,7 @@ $("pytanieTowary").addEventListener("click", (e) => {
   pole.focus();
   pole.selectionStart = pole.selectionEnd = od + b.dataset.wstaw.length;
   odpowiedzRuszona = true;
+  licznikZnakow();
 });
 
 $("pytanieAkcje").addEventListener("click", async (e) => {
@@ -4990,6 +5169,15 @@ $("pytanieAkcje").addEventListener("click", async (e) => {
       odpowiedzRuszona = false;
       await odswiezSzczegolPytania();
     });
+  }
+
+  if (e.target.closest("#pytaniePrzywroc")) {
+    /* Powrót do surowego szkicu modelu. Bez zapisu — poprawka bywa gorsza od
+       oryginału, ale decyzję i tak zatwierdza ZAPISZ albo WYŚLIJ. */
+    $("pytanieOdpowiedz").value = szkicDoPrzywrocenia;
+    odpowiedzRuszona = true;
+    licznikZnakow();
+    return toast("Przywrócono szkic modelu");
   }
 
   if (e.target.closest("#pytanieZapisz")) {

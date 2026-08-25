@@ -43,12 +43,12 @@ beforeEach(() => {
   zresetujAdapterAllegro();
 });
 
-function towar(twId: number, sym: string, nazwa: string, opis = ""): void {
+function towar(twId: number, sym: string, nazwa: string, opis = "", ean = ""): void {
   db()
     .prepare(
-      "INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, opis, lokalizacja) VALUES (?,?,?,'',?,'')"
+      "INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, opis, lokalizacja) VALUES (?,?,?,?,?,'')"
     )
-    .run(twId, sym, nazwa, opis);
+    .run(twId, sym, nazwa, ean, opis);
   db().prepare("INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,1,5,0)").run(twId);
 }
 
@@ -270,6 +270,50 @@ test("potwierdzone dopasowanie wraca do kontekstu następnego pytania", async ()
   const k = await P.kontekstPytania(p);
   assert.match(k.tekst, /DOPASOWANIA POTWIERDZONE WCZEŚNIEJ/);
   assert.match(k.tekst, /T375 → TEST-LINIA-TODO/);
+});
+
+/* „Nie mamy" i „nie mamy, ale przyjdzie" to dla klienta dwie różne odpowiedzi.
+   Do 0.89.0 kontekst pytania niósł sam stan, więc druga była nie do napisania —
+   choć serwer liczył ją od dawna na karcie towaru. */
+test("kartoteka w kontekście niesie EAN, towar w drodze i zamienniki rozstrzygnięte", async () => {
+  towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", "", "5900000000036");
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  const k = await P.kontekstPytania(p);
+  const trafienie = k.kartoteki.find((x) => x.symbol === "TEST-LINIA-TODO")!;
+
+  assert.ok(trafienie, "kartoteka z aukcji ma trafić do kontekstu");
+  assert.equal(trafienie.ean, "5900000000036", "EAN bywa jedynym, co klient podaje");
+  assert.ok(Array.isArray(trafienie.zamowione));
+  assert.ok(Array.isArray(trafienie.wDostawie));
+  /* Podział na nasze i cudze, nie płaska lista kandydatów: „mamy zamiennik"
+     wolno obiecać, cudzego numeru katalogowego nie sprzedajemy. */
+  assert.ok(Array.isArray(trafienie.zamienniki.znane));
+  assert.ok(Array.isArray(trafienie.zamienniki.obce));
+});
+
+/* Kontekst szedł do 0.89.0 WYŁĄCZNIE do modelu — panel dostawał sam tekst
+   promptu, którego nie pokazywał. Te pola są po to, żeby człowiek widział to
+   samo co model: po czym szukaliśmy i co już potwierdziliśmy. */
+test("kontekst wystawia frazy i potwierdzone dopasowania osobnymi polami", async () => {
+  towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta");
+  db()
+    .prepare(
+      `INSERT INTO dopasowanie (urzadzenie, symbol, tw_id, potwierdzono_at, potwierdzono_przez)
+       VALUES ('T375','TEST-LINIA-TODO',900036,datetime('now'),'anna')`
+    )
+    .run();
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  const k = await P.kontekstPytania(p);
+
+  assert.ok(k.frazy.includes("T375"), "frazy szukania mają wyjść na zewnątrz");
+  assert.equal(k.dopasowania.length, 1);
+  assert.equal(k.dopasowania[0].urzadzenie, "T375");
+  assert.equal(k.dopasowania[0].symbol, "TEST-LINIA-TODO");
+  /* Adapter dev nie chodzi po sieci, więc pusta lista aukcji znaczy tu
+     „nie mamy", a nie „nie sprawdziliśmy" — i to musi być rozróżnialne. */
+  assert.equal(k.bladOfert, null);
 });
 
 test("prompt i fakty zapisują się osobno i nie kasują się nawzajem", () => {
