@@ -180,6 +180,23 @@
       border-top: 1px solid var(--border); padding-top: 11px; margin-top: 10px;
     }
 
+    /* Dostawy dostają ten sam trójpodział: lista dokumentów, pozycje na
+       środku, dostawca z notatkami po prawej. Kolumna środkowa jest szersza
+       niż przy pytaniach, bo niesie tabelę na pięć kolumn, nie tekst. */
+    #widokDostawy.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 20rem; }
+    #widokDostawy.zSzczegolem > .kontekst {
+      grid-column: 3; grid-row: 1 / span 50;
+      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
+      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      overflow: auto; overscroll-behavior: contain;
+    }
+    #widokDostawy.zSzczegolem > .szczegol {
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #widokDostawy.zSzczegolem > .szczegol > #wrocDoListy { align-self: flex-start; }
+    #widokDostawy.zSzczegolem .sprawa-tresc {
+      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+    }
   }
 
   /* ── Zwarte warianty list z zakładki PYTANIA ────────────────────────────────
@@ -565,8 +582,20 @@
     <section class="card pelna szczegol" id="szczegol" hidden>
       <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
       <div id="szczegolNaglowek" style="margin-top:12px"></div>
-      <table id="szczegolLinie"></table>
-      <div id="szczegolBezLinii"></div>
+      <div class="sprawa-tresc">
+        <table id="szczegolLinie"></table>
+        <div id="szczegolBezLinii"></div>
+      </div>
+    </section>
+
+    <!-- KONTEKST dostawy: kto ją przysłał, o co pytaliśmy halę i co z nią
+         zrobić. Do 0.92.0 wszystko to siedziało w nagłówku NAD tabelą pozycji,
+         więc notatka wypadała z ekranu, gdy tylko dokument miał więcej niż
+         kilkanaście wierszy — a to jest rozmowa, na którą czeka domknięcie. -->
+    <section class="card pelna kontekst" id="dostawaKontekst" hidden>
+      <div id="dostawaDostawca"></div>
+      <div id="dostawaNotatki" style="margin-top:14px"></div>
+      <div id="dostawaAkcja" style="margin-top:14px"></div>
     </section>
 
     <!-- Odpowiedzi na notatki. Karta chowa się, gdy nie ma na co patrzeć —
@@ -1565,10 +1594,46 @@ function statusDostawy(d) {
   return '<span class="badge mute2">NIETKNIĘTA</span>';
 }
 
+/**
+ * Lista dostaw w dwóch wariantach — z tego samego powodu co kolejka pytań
+ * (0.91.0). Sześć kolumn mieści się w karcie na całą szerokość, ale nie
+ * w szynie 21 rem: status z licznikiem wyjątków uciekał poza krawędź karty.
+ */
 function rysujDostawy() {
   const q = $("szukaj").value.trim().toLowerCase();
-  const rows = dokumenty
-    .filter((d) => !q || d.nrPelny.toLowerCase().includes(q) || (d.dostawca || "").toLowerCase().includes(q))
+  const wSzynie = otwartyDok != null && trybSzeroki();
+  const pasujace = dokumenty
+    .filter((d) => !q || d.nrPelny.toLowerCase().includes(q) || (d.dostawca || "").toLowerCase().includes(q));
+
+  if (wSzynie) {
+    $("dostawy").innerHTML =
+      pasujace.map((d) => {
+        const total = d.linesTotal || d.positions;
+        const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
+        return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
+          <td class="sprawaWiersz">
+            <span class="sprawaGora">
+              <span class="b">${esc(d.nrPelny)}</span>
+              <span class="mute">${esc(d.dataWyst)}</span>
+            </span>
+            <span class="sprawaTemat">${esc(d.dostawca)}</span>
+            <span class="sprawaStopka">${statusDostawy(d)}${
+              d.wyjatkiOtwarte
+                ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
+                : ""
+            }</span>
+            <span style="display:flex; align-items:center; gap:8px; margin-top:6px">
+              <span class="pasek${frac >= 100 ? " done" : ""}" style="width:auto; flex:1"><i style="width:${frac}%"></i></span>
+              <span class="mute" style="white-space:nowrap">${d.linesDone}/${total} poz.</span>
+            </span>
+          </td>
+        </tr>`;
+      }).join("") || '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
+    dolozLoga();
+    return;
+  }
+
+  const rows = pasujace
     .map((d) => {
       const total = d.linesTotal || d.positions;
       const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
@@ -1625,6 +1690,10 @@ function ustawRodzenstwoDostaw() {
   const otwarty = otwartyDok != null;
   $("kartaDostaw").hidden = otwarty && !trybSzeroki();
   $("kartaReklamacji").hidden = otwarty;
+  /* Kontekst żyje i ginie razem z dokumentem — pusta trzecia strefa przy
+     zamkniętej dostawie byłaby nagłówkiem bez treści. */
+  $("dostawaKontekst").hidden = !otwarty;
+  rysujDostawy();               // wariant listy zależy od tego, co ustawiamy tu
   rysujOdpowiedzi();            // ma własną regułę pustki
   $("widokDostawy").classList.toggle("zSzczegolem", otwarty);
   zaznaczWiersz("dostawy", "dok", otwartyDok);
@@ -1638,6 +1707,7 @@ function otworzDokument(dokId) {
   $("szczegolNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
   $("szczegolLinie").innerHTML = "";
   $("szczegolBezLinii").innerHTML = "";
+  for (const id of ["dostawaDostawca", "dostawaNotatki", "dostawaAkcja"]) $(id).innerHTML = "";
   odswiezSzczegol();
 }
 
@@ -1684,20 +1754,26 @@ function rysujSzczegol(d) {
       : `<button class="akcja cichy" style="margin-top:8px"
                  data-zamknij-poza="${d.dokId}" data-nr="${esc(d.nrPelny)}"
          >ROZŁOŻONE POZA WERTIS</button>`;
+  /* Numer dokumentu JEST tytułem sprawy — dostaje stopień tytułu, tak jak
+     temat oferty przy pytaniach klientów. */
   $("szczegolNaglowek").innerHTML = `
-    <div class="b" style="font-size:16px">${esc(d.nrPelny)}
+    <div class="temat">${esc(d.nrPelny)}
       ${d.wBuforze ? '<span class="badge amber">bufor</span>' : ""}
       ${d.wPrzyjeciach ? '<span class="badge amber">w przyjęciach</span>' : ""}
       ${statusDostawy(d)}</div>
-    <div class="mute">${slotLogo(d.khId, d.maLogo, 28, 72)}${esc(d.dostawca)} · ${esc(d.dataWyst)}</div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
       <span class="mute">${d.progress.done}/${d.progress.total} poz.${
         d.progress.problems ? ` · ${d.progress.problems} z wyjątkiem` : ""}</span>
     </div>
-    ${prognoza}
-    ${akcja}
-    ${notatki(d)}`;
+    ${prognoza}`;
+
+  $("dostawaDostawca").innerHTML = `
+    <h2>DOSTAWCA</h2>
+    <div class="mute">${slotLogo(d.khId, d.maLogo, 28, 72)}${esc(d.dostawca)}</div>
+    <div class="mute" style="margin-top:4px">Dokument z ${esc(d.dataWyst)}</div>`;
+  $("dostawaNotatki").innerHTML = notatki(d);
+  $("dostawaAkcja").innerHTML = akcja;
 
   const kolumn = zdjeciaWlaczone ? 6 : 5;
   $("szczegolLinie").innerHTML =
@@ -4398,7 +4474,9 @@ $("pozaWertis").addEventListener("click", (e) => {
   const w = e.target.closest("[data-dok]");
   if (w) otworzDokument(Number(w.dataset.dok));
 });
-$("szczegolNaglowek").addEventListener("click", (e) => {
+/* Notatki i decyzja o dostawie mieszkają od 0.92.0 w strefie kontekstu,
+   nie w nagłówku — delegacja idzie za nimi. */
+$("dostawaKontekst").addEventListener("click", (e) => {
   const n = e.target.closest("[data-notatka]");
   if (n) return dodajNotatke(Number(n.dataset.notatka));
   const p = e.target.closest("[data-przeczytane]");
