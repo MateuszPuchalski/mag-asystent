@@ -563,6 +563,68 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   assert.ok(wCss.includes(wJs), `próg ${wJs} ze skryptu musi istnieć w arkuszu`);
 });
 
+test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", () => {
+  /* Od 0.94.0 zakładki wglądu — STAN SYSTEMU, DZIENNIK, ANALIZA — mają jedną
+     strefę i pasek filtrów, zamiast wyglądać dokładnie jak zakładki pracy.
+
+     Ten test pilnuje reguły, a nie samego istnienia paska. PASEK NAD KARTAMI
+     OBIECUJE, ŻE RZĄDZI CAŁYM WIDOKIEM. Przy dzienniku i analizie to prawda:
+     każda kontrolka zmienia wszystko, co niżej. Przy stanie systemu prawdą
+     NIE jest — OKNO dotyczy wyłącznie metryk, bo kolejka zapisów, kolizje
+     kodów i stan serwera mówią o TERAZ i żaden zakres dni ich nie rusza.
+     Dlatego STAN SYSTEMU paska nie ma, a jego OKNO siedzi w karcie metryk.
+
+     Wyniesienie go „dla spójności" byłoby regresją, która nie wygląda na
+     regresję: układ zrobiłby się równiejszy, a interfejs zacząłby kłamać. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const wycinek = (od: string, doo: string) => {
+    const a = html.indexOf(od);
+    assert.notEqual(a, -1, `brak ${od}`);
+    const b = html.indexOf(doo, a);
+    assert.notEqual(b, -1, `brak ${doo} po ${od}`);
+    return html.slice(a, b);
+  };
+
+  for (const w of ["widokNadzor", "widokDziennik", "widokAnaliza"]) {
+    assert.match(html, new RegExp(`id="${w}" class="widok wglad"`),
+      `${w} jest zakładką wglądu, nie pracy`);
+  }
+
+  /* Pasek to CHROM, nie treść — i dlatego nie nosi klasy `card`. Nosił ją
+     w pierwszym podejściu i przegrywał specyficznością z regułą `.card`
+     stojącą niżej w arkuszu: renderował się jako biała płachta z cieniem,
+     przy analizie prawie pusta. */
+  assert.ok(!/class="[^"]*card[^"]*pasekFiltrow/.test(html),
+    "pasek filtrów nie jest kartą");
+
+  const dziennik = wycinek('id="widokDziennik"', 'id="widokAnaliza"');
+  const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
+  for (const [nazwa, widok, pola] of [
+    ["dziennik", dziennik, ["fOd", "fDo", "fTyp", "fTw", "fDev", "fLimit",
+                            "szukajDziennik", "csvDziennik"]],
+    ["analiza", analiza, ["dniAnalizy", "csvAnalizy"]],
+  ] as [string, string, string[]][]) {
+    const pasek = widok.indexOf('class="pelna pasekFiltrow"');
+    assert.notEqual(pasek, -1, `${nazwa} ma pasek filtrów`);
+    assert.ok(pasek < widok.indexOf('<section class="card"'),
+      `pasek ${nazwa} stoi NAD kartami, nie w środku pierwszej`);
+    const koniec = widok.indexOf("</section>", pasek);
+    for (const pole of pola) {
+      const gdzie = widok.indexOf(`id="${pole}"`);
+      assert.ok(gdzie > pasek && gdzie < koniec,
+        `${pole} rządzi całą zakładką ${nazwa}, więc mieszka w pasku`);
+    }
+  }
+
+  const nadzor = wycinek('id="widokNadzor"', 'id="widokDziennik"');
+  assert.ok(!nadzor.includes("pasekFiltrow"),
+    "STAN SYSTEMU nie ma paska — nie ma filtra, który rządziłby całą zakładką");
+  assert.ok(nadzor.includes('id="dniMetryk"'), "OKNO metryk zostaje przy metrykach");
+});
+
 test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja jedzie z blokiem", () => {
   /* Od 0.93.0 zakładka ZWROTY rozkłada się jak PYTANIA i DOSTAWY: kolejka,
      ocena pozycji, kontekst sprawy. Ten test pilnuje DWÓCH rzeczy, bo przy

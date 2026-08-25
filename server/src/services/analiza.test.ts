@@ -99,6 +99,36 @@ test("rozłożenie linii to JEDNA pozycja, choć emituje dwa zdarzenia", () => {
   assert.equal(a.dni.reduce((s, d) => s + d.pozycje, 0), 2, "dubel zawyżałby pracę całej hali");
 });
 
+test("wiersz z nieczytelnym payloadem nie kładzie raportów", () => {
+  /* `json_extract` na uszkodzonym payloadzie NIE zwraca NULL — wywala całe
+     zapytanie błędem „malformed JSON". Reguła `bezDubli` czyta z payloadu
+     `$.zrodlo` przy każdym zdarzeniu lokalizacji, więc jeden taki wiersz
+     w oknie kładł metryki, analizę i eksport CSV pięćsetką. Wystarczyło,
+     żeby okno sięgnęło dnia, w którym wiersz powstał: `days=7` przechodziło,
+     `days=90` nie.
+
+     Warunek nie jest hipotetyczny — scenariusz S59 sadzi dokładnie taki
+     wiersz (`{ucięty payload`), żeby sprawdzić, czy HISTORIA KARTY się na
+     nim nie wywraca. Karta miała osłonę, raporty nie.
+
+     Wiersz nie do odczytania liczy się jak wiersz bez `zrodlo`, czyli jako
+     zmiana z karty — ta sama zasada, co dla danych sprzed wprowadzenia
+     pola. Stąd DWIE pozycje, nie jedna. */
+  db()
+    .prepare(
+      `INSERT INTO events(type, tw_id, payload, user_id, device_id, user_ref, created_at)
+       VALUES ('location_set', NULL, '{ucięty payload', 'test', NULL, NULL, ?)`
+    )
+    .run(przedGodzinami(2));
+  zdarzenie({ typ: "location_set", czas: przedGodzinami(3), payload: { zrodlo: "karta" } });
+
+  const a = A.analiza(7);
+  assert.equal(a.dni.reduce((s, d) => s + d.pozycje, 0), 2,
+    "nieczytelny payload liczy się jak brak `zrodlo`");
+  assert.ok(A.metrics(7), "metryki czytają te same zdarzenia i też mają przejść");
+  assert.ok(A.raportWydajnosci(7), "wydajność per osoba używa tej samej reguły");
+});
+
 test("rozkład godzin liczy operacje PRACY, nie każde zdarzenie", () => {
   zdarzenie({ typ: "putaway_line_done", czas: przedGodzinami(1) });
   zdarzenie({ typ: "search", czas: przedGodzinami(1), payload: { q: "x" } });

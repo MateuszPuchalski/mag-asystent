@@ -33,6 +33,46 @@ historii nie przepisujemy.
 
 ---
 
+## 0.94.0 — 25 sierpnia 2026
+
+**Zakładki wglądu przestały udawać zakładki pracy.** STAN SYSTEMU, DZIENNIK
+i ANALIZA nie mają kolejki, bo nie ma tu spraw do wzięcia — jest jedna
+powierzchnia do czytania. Do tej wersji wyglądały jednak identycznie jak
+dostawy czy zwroty: ten sam stos białych kart na tej samej siatce.
+
+**Karty przestały się rozciągać.** Karta w rzędzie siatki rosła do wysokości
+najwyższej sąsiadki. REKONCYLIACJA to jeden przycisk, a stała obok kolejki na
+kilkanaście wierszy — i miała pod tym przyciskiem trzysta pikseli pustej
+bieli. To wyglądało na usterkę, nie na układ. Teraz karta jest tak wysoka, jak
+jej treść.
+
+**Tytuł bloku jest tytułem.** Nagłówek karty to było 10 px wersalikami —
+stopień słuszny na zakładce pracy, gdzie podpisuje sprawę stojącą obok i ma
+z nią nie konkurować. We wglądzie sprawy nie ma: bloki SĄ treścią. Podnagłówki
+w środku bloku zostają ciche.
+
+**Filtry wyszły z pierwszej karty do własnego pasma.** Osiem kontrolek
+dziennika i wybór okna analizy rządzą całym widokiem, a stojąc wewnątrz karty
+obiecywały, że dotyczą tylko jej. Pasek przykleja się pod zakładkami, więc
+przy tysiącu wierszy dziennika zmiana zakresu nie wymaga przewijania na samą
+górę. Nie jest kartą, tylko pasmem na papierze — filtry to chrom, nie treść.
+
+**STAN SYSTEMU paska NIE dostał, i to jest decyzja, nie przeoczenie.** Jego
+OKNO dotyczy wyłącznie metryk: kolejka zapisów, rekoncyliacja, kolizje kodów
+i stan serwera mówią o teraz i żaden zakres dni ich nie zmienia. Pasek nad
+kartami obiecywałby, że filtruje całą zakładkę — a filtrowałby jedną kartę.
+**Od tej wersji pilnuje tego test**, bo wyniesienie tamtego OKNA „dla
+spójności" wyrównałoby układ i zarazem kazałoby interfejsowi kłamać.
+
+**Naprawione przy okazji: jeden nieczytelny wiersz śladu kładł oba raporty.**
+Reguła odsiewająca dublowane zdarzenia lokalizacji czyta źródło z payloadu,
+a `json_extract` na uszkodzonym payloadzie nie zwraca pustki — przerywa całe
+zapytanie. Wystarczyło, żeby okno sięgnęło dnia, w którym taki wiersz powstał:
+`ANALIZA` i `STAN SYSTEMU` na 90 dniach odpowiadały błędem serwera, razem
+z eksportem CSV. Na 7 dniach działało, więc usterka nie rzucała się w oczy.
+Wiersz nie do odczytania liczy się teraz jak wiersz bez zapisanego źródła,
+czyli jako zmiana z karty — tak samo jak dane sprzed wprowadzenia tego pola.
+
 ## 0.93.0 — 25 sierpnia 2026
 
 **Zwroty domykają komplet zakładek pracy w trzech strefach.** Kolejka zwrotów

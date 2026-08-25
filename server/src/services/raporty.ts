@@ -33,9 +33,28 @@ const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location
  * Wpisy sprzed tej zmiany nie mają `zrodlo` i są zmianami z karty — wtedy tylko
  * ona je emitowała. Stąd `IS NULL` w warunku, a nie pominięcie starych danych.
  */
+/*
+ * Źródło zdarzenia — z payloadu, który NIE MUSI być poprawnym JSON-em.
+ *
+ * `json_extract` na uszkodzonym payloadzie nie zwraca NULL: wywala CAŁE
+ * zapytanie błędem „malformed JSON". Jeden taki wiersz w oknie kładł więc
+ * metryki, analizę i eksport CSV — a nie kartę, na której nikt tego nie
+ * szukał. Scenariusz S59 sadzi dokładnie taki wiersz („{ucięty payload")
+ * i pilnuje, żeby historia karty się na nim nie wywróciła; raporty tej
+ * osłony nie miały, więc `/api/metrics?days=90` i `/api/analiza?days=90`
+ * odpowiadały pięćsetką, gdy tylko okno sięgnęło tamtego dnia.
+ *
+ * Wiersz nie do odczytania liczy się tak samo jak wiersz bez `zrodlo`,
+ * czyli jako zmiana z karty. To ta sama zasada, co dla danych sprzed
+ * wprowadzenia pola — nie zgadujemy pochodzenia, którego nie zapisano.
+ */
+const zrodloZdarzenia = (alias: string) =>
+  `CASE WHEN json_valid(${alias}payload)
+        THEN json_extract(${alias}payload,'$.zrodlo') END`;
+
 const bezDubli = (alias: string) => `(${alias}type NOT IN ('location_set','location_removed')
-       OR json_extract(${alias}payload,'$.zrodlo') IS NULL
-       OR json_extract(${alias}payload,'$.zrodlo') = 'karta')`;
+       OR ${zrodloZdarzenia(alias)} IS NULL
+       OR ${zrodloZdarzenia(alias)} = 'karta')`;
 
 /* ── Cztery liczby warte mierzenia (plan §10) ───────────────────────────────
    `events` wystarczał do zapisu, nie do pomiaru. Te cztery metryki mają

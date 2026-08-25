@@ -244,6 +244,53 @@
   }
   .towarDol { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 
+  /* ── Zakładki wglądu: jedna strefa i pasek filtrów ──────────────────────────
+     STAN SYSTEMU, DZIENNIK i ANALIZA nie mają kolejki — nie ma tu spraw do
+     wzięcia, jest jedna powierzchnia do czytania. Do 0.94.0 wyglądały jednak
+     dokładnie jak zakładki pracy: ten sam stos białych kart na tej samej
+     siatce. Dwie rzeczy to psuły.
+
+     PIERWSZA: karty w jednym rzędzie siatki ROZCIĄGAJĄ SIĘ do wysokości
+     najwyższej sąsiadki. Karta REKONCYLIACJA to jeden przycisk, a stała obok
+     kolejki na kilkanaście wierszy — i miała pod tym przyciskiem trzysta
+     pikseli pustej bieli. To wygląda na usterkę, nie na układ. `start`
+     zdejmuje rozciąganie: karta jest tak wysoka, jak jej treść.
+
+     DRUGA: nagłówek karty to 10 px wersalikami. Na zakładce pracy to stopień
+     słuszny, bo PODPISUJE sprawę stojącą obok i ma z nią nie konkurować.
+     Tutaj sprawy nie ma — bloki SĄ treścią, więc ich tytuły muszą być
+     tytułami. Selektor bierze wyłącznie nagłówek będący bezpośrednim
+     dzieckiem karty; podnagłówki w środku (ETYKIETY DO PRZEDRUKU, OPERACJE
+     PER DZIEŃ) siedzą głębiej i zostają ciche. */
+  .widok.wglad { align-items: start; }
+  .widok.wglad section.card > h2 {
+    font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px;
+    color: var(--ink); margin-bottom: 11px;
+  }
+
+  /* Pasek filtrów — własne pasmo NAD treścią, nie pole w środku pierwszej
+     karty. Filtry zakładki wglądu rządzą CAŁYM widokiem, a stojąc wewnątrz
+     karty udawały, że rządzą tylko nią. Zostaje przyklejony pod chromem, bo
+     przy tysiącu wierszy dziennika zmiana zakresu wymagała przewinięcia na
+     samą górę. `z-index` niżej niż pasek zakładek (20) i nagłówek (30). */
+  .pasekFiltrow {
+    position: sticky; top: calc(var(--hChrome, 130px) - var(--luz)); z-index: 10;
+    /* PASMO, nie karta — i dlatego element nie nosi klasy `card`. Pierwsza
+       wersja ją nosiła i przy analizie, gdzie filtry to jeden wybór okna
+       i jeden przycisk, dawała metr pustej bieli z cieniem; biała płachta
+       bez treści czyta się jak coś, czego nie wczytano. Filtry są chromem,
+       nie treścią: papier pod spodem, kreska od dołu, zero cienia.
+       Papier jest nieprzezroczysty świadomie — pasek stoi przyklejony,
+       więc treść ma pod nim ZNIKAĆ, a nie prześwitywać. */
+    background: var(--paper); border-bottom: 1px solid var(--border);
+    /* Górne dopełnienie MUSI pokryć `--luz` odjęty wyżej. Pasek przykleja
+       się o ten luz WYŻEJ niż kończy się chrom — świadomie, żeby papier
+       zasłonił szparę, przez którą inaczej przejeżdżałaby treść. Bez tego
+       dopełnienia etykieta „OKNO" wjeżdża pod pasek zakładek i ucina się. */
+    padding: calc(var(--luz) + 6px) 2px 10px;
+  }
+  .pasekFiltrow .filtry { margin: 0; }
+
   /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
   .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--cien); }
   /* Ślad po kliknięciu kafla w pasku stanu. Samo przewinięcie do karty, która
@@ -1078,9 +1125,14 @@
   </div>
 
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
-  <div id="widokNadzor" class="widok" hidden>
+  <div id="widokNadzor" class="widok wglad" hidden>
     <section class="card">
       <h2>METRYKI · LICZBY, KTÓRE MÓWIĄ CO ZROBIĆ</h2>
+      <!-- OKNO zostaje TUTAJ, a nie w pasku filtrów jak przy dzienniku
+           i analizie. Zakres dotyczy wyłącznie metryk: kolejka zapisów,
+           rekoncyliacja, kolizje kodów i stan serwera mówią o TERAZ i żaden
+           zakres dni ich nie zmienia. Pasek nad kartami obiecywałby, że
+           filtruje całą zakładkę — a filtrowałby jedną kartę. -->
       <div class="filtry">
         <div>
           <label for="dniMetryk">OKNO</label>
@@ -1152,16 +1204,11 @@
   </div>
 
   <!-- ── DZIENNIK ────────────────────────────────────────────────────────── -->
-  <div id="widokDziennik" class="widok" hidden>
-    <section class="card">
-      <h2>ŚLAD AUDYTOWY <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Każdy skan, każda decyzja i każdy błąd — z osobą, urządzeniem i czasem.
-          Kto pobierze CSV, sam trafia do śladu.
-        </p>
-      </div>
+  <div id="widokDziennik" class="widok wglad" hidden>
+    <!-- Osiem kontrolek, które rządzą CAŁYM widokiem — i jedna tabela pod
+         nimi. Stały dotąd w środku karty, między objaśnieniem a wynikami,
+         czyli wyglądały jak jeszcze jeden wiersz treści. -->
+    <section class="pelna pasekFiltrow">
       <div class="filtry">
         <div><label for="fOd">OD</label><input type="date" id="fOd"></div>
         <div><label for="fDo">DO</label><input type="date" id="fDo"></div>
@@ -1173,15 +1220,28 @@
         <div><button class="akcja" id="szukajDziennik">SZUKAJ</button></div>
         <div><button class="akcja cichy" id="csvDziennik">CSV</button></div>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>ŚLAD AUDYTOWY <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Każdy skan, każda decyzja i każdy błąd — z osobą, urządzeniem i czasem.
+          Kto pobierze CSV, sam trafia do śladu.
+        </p>
+      </div>
       <p class="mute" id="licznikDziennik"></p>
       <table id="dziennik"></table>
     </section>
   </div>
 
   <!-- ── ANALIZA ─────────────────────────────────────────────────────────── -->
-  <div id="widokAnaliza" class="widok" hidden>
-    <section class="card">
-      <h2>ANALIZA ŚLADU AUDYTOWEGO</h2>
+  <div id="widokAnaliza" class="widok wglad" hidden>
+    <!-- OKNO rządzi CAŁĄ zakładką: kafle, oba wykresy, wydajność per osoba,
+         wyszukiwania i urządzenia liczą się z tego samego zakresu. Stojąc
+         w pierwszej karcie obiecywało, że dotyczy tylko jej. -->
+    <section class="pelna pasekFiltrow">
       <div class="filtry">
         <div>
           <label for="dniAnalizy">OKNO</label>
@@ -1193,6 +1253,10 @@
         </div>
         <div><button class="akcja cichy" id="csvAnalizy">POBIERZ CSV</button></div>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>ANALIZA ŚLADU AUDYTOWEGO</h2>
       <div class="kafle" id="kafleAnalizy"></div>
       <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
         <div>
