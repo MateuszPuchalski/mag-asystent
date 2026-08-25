@@ -158,7 +158,15 @@
   /* Etykieta sekcji — ta sama co nagłówki list na kolektorze:
      11px, gruba, rozstrzelona, InkSoft. Mniejsza od treści, bo podpisuje
      sekcję, a nie z nią konkuruje. */
-  h2 { font: 700 11px/1.4 var(--font-sans); letter-spacing: 1.2px; color: var(--ink-soft); margin-bottom: 7px; text-transform: uppercase; }
+  h2 { font: 700 10px/1.4 var(--font-cond); letter-spacing: 1.4px; color: var(--ink-mute); margin-bottom: 7px; text-transform: uppercase; }
+
+  /* ── Dwa stopnie, których panel nie miał ────────────────────────────────────
+     Skala kończyła się na 15 px (`.b`, symbol towaru), więc nic na ekranie nie
+     było ani TYTUŁEM sprawy, ani TREŚCIĄ do czytania — wątek klienta czytało
+     się w rozmiarze komórki tabeli. Etykieta wyżej właśnie ucichła; te dwie
+     klasy są drugą połową tej samej zmiany. */
+  .temat { font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px; color: var(--ink); }
+  .czytanie { font-size: 15px; line-height: 1.6; }
 
   /* ── Objaśnienie za ikoną (0.86.0) ─────────────────────────────────────────
      Prawie każda karta miała pod nagłówkiem akapit tłumaczący, co ta karta
@@ -269,6 +277,8 @@
      więc jedyne poprawnie wyglądające pole stało w oknie dialogowym. */
   textarea { font: inherit; border: 1px solid var(--border); border-radius: 12px;
              padding: 8px 10px; resize: vertical; }
+  /* Pole, którego treść trafia do klienta, dostaje rozmiar do CZYTANIA. */
+  #pytanieOdpowiedz { font-size: 15px; line-height: 1.6; }
   /* fokus pola = bursztynowa ramka WertisTextField */
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
@@ -339,7 +349,7 @@
   details.zwijana > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; }
   details.zwijana > summary::-webkit-details-marker { display: none; }
   details.zwijana > summary h2 { margin-bottom: 0; }
-  details.zwijana > summary::before { content: "▸"; color: var(--amber-ink); font-size: 12px; transition: transform .12s; }
+  details.zwijana > summary::before { content: "▸"; color: var(--ink-mute); font-size: 12px; transition: transform .12s; }
   details.zwijana[open] > summary::before { transform: rotate(90deg); }
   details.zwijana[open] > summary { margin-bottom: 8px; }
   details.zwijana > summary:hover h2 { color: var(--amber-ink); }
@@ -387,7 +397,7 @@
   .wiad.klient { background: var(--amber-bg); border: 1px solid var(--amber-line); }
   .wiad.my { background: var(--secondary); border: 1px solid var(--border); margin-left: auto; }
   .wiad .kto { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); margin-bottom: 3px; }
-  .wiad .tresc { white-space: pre-wrap; }
+  .wiad .tresc { white-space: pre-wrap; font-size: 15px; line-height: 1.6; }
 
   /* ── Własne okno dialogowe i toast — zamiast prompt/confirm/alert ─────────
      Systemowe okno („Komunikat ze strony…") wygląda jak z innej aplikacji
@@ -401,6 +411,9 @@
      co dotyczy pola W DIALOGU. */
   dialog textarea { width: 100%; margin-top: 8px; }
   dialog .dialogAkcje { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  button.akcja:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+  button.akcja:disabled:hover { background: var(--amber); }
+  button.akcja.cichy:disabled:hover { background: var(--card); }
   button.akcja.grozny { background: var(--err); color: #fff; }
   button.akcja.grozny:hover { background: #9c3232; }
   #toasty { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 50; }
@@ -4798,7 +4811,9 @@ function wiekPytania(at) {
   const godzin = Math.floor(ms / 3_600_000);
   if (godzin < 1) return "przed chwilą";
   if (godzin < 24) return `${godzin} godz.`;
-  return `${Math.floor(godzin / 24)} dni`;
+  const dni = Math.floor(godzin / 24);
+  /* „1 dni" na karcie sprawy wygląda jak usterka i nią jest. */
+  return dni === 1 ? "1 dzień" : `${dni} dni`;
 }
 
 async function otworzPytanie(id) {
@@ -4826,12 +4841,15 @@ function rysujSzczegolPytania(d) {
   const p = d.pytanie;
   const kat = p.kategoria ? `<span class="badge mute2">${esc(KATEGORIE_PYTAN[p.kategoria] || p.kategoria)}</span>` : "";
   const poza = p.wOfercie === false ? '<span class="badge err">poza naszą ofertą</span>' : "";
+  /* TEMAT sprawy stoi osobno i w stopniu tytułu. Do 0.90.0 tytuł oferty jechał
+     w jednej linii z loginem, tym samym pismem co reszta — więc sprawa nie
+     miała na ekranie nazwy, tylko wiersz danych. */
+  const temat = p.ofertaTytul || (p.zrodlo === "wklejka" ? "Pytanie z poczty" : "Pytanie bez oferty");
   $("pytanieNaglowek").innerHTML = `
     <div>${badgePytania(p.status)} ${kat} ${poza}</div>
-    <div style="margin-top:6px"><span class="b">${esc(p.kupujacyLogin || "(wklejka z poczty)")}</span>
-      ${p.ofertaTytul ? ` · ${esc(p.ofertaTytul)}` : ""}</div>
-    <div class="mute" style="margin-top:4px"><span title="${esc(stempelLokalny(p.otrzymanoAt))}"
-      >Pytanie sprzed: ${esc(wiekPytania(p.otrzymanoAt))}</span>
+    <div class="temat" style="margin-top:7px">${esc(temat)}</div>
+    <div class="mute" style="margin-top:5px">${esc(p.kupujacyLogin || "(wklejka z poczty)")}
+      · <span title="${esc(stempelLokalny(p.otrzymanoAt))}">${esc(wiekPytania(p.otrzymanoAt))}</span>
       ${p.urzadzenie ? ` · urządzenie: ${esc(p.urzadzenie)}` : ""}</div>`;
 
   /* Snapshot pytania z NASZEJ bazy — jedyne miejsce, w którym widać treść,
@@ -4846,8 +4864,8 @@ function rysujSzczegolPytania(d) {
   if (cudza) {
     $("pytanieProwadzi").innerHTML =
       `<span class="badge amber">UWAGA</span> Tę sprawę prowadzi <span class="b">${esc(p.prowadzi)}</span>` +
-      `${p.prowadziAt ? ` od ${esc(wiekPytania(p.prowadziAt))}` : ""}. ` +
-      "Odezwij się do tej osoby, zanim odpiszesz — klient zobaczy obie odpowiedzi.";
+      `${p.prowadziAt ? ` od ${esc(wiekPytania(p.prowadziAt))}` : ""}` +
+      " · odezwij się do tej osoby, zanim odpiszesz — klient zobaczy obie odpowiedzi.";
   }
 
   /* Pola odpowiedzi NIE ruszamy, gdy człowiek w nim pisze — odświeżenie co
@@ -4865,8 +4883,8 @@ function rysujSzczegolPytania(d) {
 
   const wyslane = p.status === "wyslane";
   $("pytanieAkcje").innerHTML = [
-    `<button class="akcja" id="pytanieGeneruj">${p.szkicAi ? "PRZELICZ SZKIC" : "GENERUJ SZKIC AI"}</button>`,
-    wyslane ? "" : '<button class="akcja" id="pytanieZapisz">ZAPISZ</button>',
+    `<button class="akcja cichy" id="pytanieGeneruj">${p.szkicAi ? "PRZELICZ SZKIC" : "GENERUJ SZKIC AI"}</button>`,
+    wyslane ? "" : '<button class="akcja cichy" id="pytanieZapisz">ZAPISZ</button>',
     wyslane || !p.threadId ? "" : '<button class="akcja" id="pytanieWyslij">WYŚLIJ PRZEZ ALLEGRO</button>',
     '<button class="akcja cichy" id="pytanieKopiuj">KOPIUJ</button>',
     wyslane ? "" : '<button class="akcja cichy" id="pytanieZamknij">ZAŁATWIONE POZA APLIKACJĄ</button>',
