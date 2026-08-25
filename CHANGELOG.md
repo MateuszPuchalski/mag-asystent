@@ -33,6 +33,30 @@ historii nie przepisujemy.
 
 ---
 
+## 0.92.0 — 25 sierpnia 2026
+
+**Dostawy dostały ten sam trójpodział co pytania klientów.** Lista dokumentów
+po lewej, pozycje na środku, dostawca z notatkami po prawej — każda strefa
+z własnym przewijaniem.
+
+**Notatki wyszły z nagłówka.** Siedziały nad tabelą pozycji, więc przy
+dokumencie na kilkadziesiąt wierszy wypadały z ekranu razem z przyciskiem
+dodania kolejnej. A to jest rozmowa z halą, na którą czeka domknięcie
+dostawy — i przycisk zdjęcia dostawy z listy pracy, czyli decyzja, nie
+element czytania pozycji. Jedno i drugie stoi teraz w strefie kontekstu,
+zawsze widoczne, niezależnie od długości dokumentu.
+
+**Numer dokumentu jest tytułem sprawy** i dostaje stopień tytułu, tak jak
+temat oferty przy pytaniach.
+
+**Lista dostaw ma wariant zwarty.** Sześć kolumn mieści się w karcie na całą
+szerokość, ale nie w szynie: status z licznikiem wyjątków uciekał poza
+krawędź. W szynie ten sam wiersz stoi w czterech linijkach — numer z datą,
+dostawca, stan, pasek postępu.
+
+Poniżej progu, przy którym kolumny się nie mieszczą, wszystko wraca do układu
+sprzed zmiany.
+
 ## 0.91.0 — 25 sierpnia 2026
 
 **Wątek klienta stanął na środku.** Zakładka PYTANIA KLIENTÓW rozkłada się na
