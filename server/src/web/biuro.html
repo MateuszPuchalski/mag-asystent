@@ -146,7 +146,63 @@
       max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
       overflow: auto; overscroll-behavior: contain;
     }
+
+    /* ── Konsola pytań: kolejka · sprawa · kontekst ──────────────────────────
+       Trzy niezależnie przewijane strefy zamiast jednego pionowego stosu.
+       Zgłoszenie brzmiało „wątek klienta powinien być na środku" — tu środek
+       dostaje najwięcej szerokości, a kolejka i kontekst schodzą do szyn.
+
+       Trzecia kolumna jest węższa od pierwszej, bo niesie kafelki towaru,
+       a nie tabelę: lista pytań musi pomieścić temat oferty w dwóch wierszach. */
+    #widokPytania.zSzczegolem { grid-template-columns: 22rem minmax(0, 1fr) 21rem; }
+    #widokPytania.zSzczegolem > .kontekst {
+      grid-column: 3; grid-row: 1 / span 50;
+      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
+      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      overflow: auto; overscroll-behavior: contain;
+    }
+    /* Sprawa jest kolumną: przewija się ROZMOWA, a pole odpowiedzi zostaje na
+       dole. Przy dłuższym wątku odpowiedź uciekała pod krawędź ekranu i biuro
+       skakało między tym, co klient napisał, a tym, co pisze samo. */
+    #widokPytania.zSzczegolem > .szczegol {
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    /* Dzieci kolumny rozciągają się na jej szerokość — przycisk powrotu nie ma
+       być pasem przez cały ekran. */
+    #widokPytania.zSzczegolem > .szczegol > #pytanieWroc { align-self: flex-start; }
+    #widokPytania.zSzczegolem .sprawa-tresc {
+      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+    }
+    /* Miara wiersza. Na monitorze 1920 px kolumna sprawy ma ponad 1100 px,
+       a wiersz tej długości czyta się źle niezależnie od stopnia pisma. */
+    #widokPytania.zSzczegolem .sprawa-tresc > * { max-width: 62rem; }
+    #widokPytania.zSzczegolem .dok-odpowiedzi {
+      border-top: 1px solid var(--border); padding-top: 11px; margin-top: 10px;
+    }
+
   }
+
+  /* ── Zwarte warianty list z zakładki PYTANIA ────────────────────────────────
+     Kolejka w szynie i kartoteka w kontekście nie mieszczą się w kolumnach
+     tabeli: 22 rem i 21 rem to nie 44 rem, dla których projektowano tamte
+     nagłówki. Oba układy pakują wiersz w jedną komórkę i łamią go w pionie. */
+  .sprawaWiersz { display: block; padding: 9px 6px; }
+  .sprawaGora { display: flex; align-items: baseline; gap: 8px; }
+  .sprawaGora .b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sprawaGora .mute { margin-left: auto; white-space: nowrap; }
+  .sprawaTemat {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; color: var(--ink-soft); font-size: 13px; margin-top: 2px;
+  }
+  .sprawaStopka { display: flex; align-items: center; gap: 7px; margin-top: 6px; }
+
+  .towarKafel { display: block; }
+  .towarGora { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  .towarFakty {
+    display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 6px;
+    font-size: 12px; color: var(--ink-mute);
+  }
+  .towarDol { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 
   /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
   .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--cien); }
@@ -820,19 +876,35 @@
            z Allegro na żądanie, więc gdy Allegro milczy albo pytanie przyszło
            z wklejki, to jest jedyne miejsce, w którym widać, o co klient pyta.
            Do 0.89.0 nie było go na ekranie wcale. -->
-      <h2 style="margin-top:16px">PYTANIE</h2>
-      <div id="pytanieTresc" class="wiad klient" style="max-width:none"></div>
+      <!-- Rozmowa PRZEWIJA SIĘ, odpowiedź zostaje na dole. Przy dłuższym wątku
+           pole odpowiedzi uciekało pod krawędź ekranu, więc biuro przewijało
+           w górę i w dół między tym, co klient napisał, a tym, co pisze samo. -->
+      <div class="sprawa-tresc">
+        <!-- PYTANIE stoi nad rozmową i pochodzi z NASZEJ bazy. Rozmowa jedzie
+             z Allegro na żądanie, więc gdy Allegro milczy albo pytanie przyszło
+             z wklejki, to jest jedyne miejsce, w którym widać, o co klient pyta.
+             Do 0.89.0 nie było go na ekranie wcale. -->
+        <h2 style="margin-top:16px">PYTANIE</h2>
+        <div id="pytanieTresc" class="wiad klient" style="max-width:none"></div>
 
-      <h2 style="margin-top:18px">ROZMOWA</h2>
-      <div id="pytanieRozmowa"></div>
+        <h2 style="margin-top:18px">ROZMOWA</h2>
+        <div id="pytanieRozmowa"></div>
+      </div>
 
-      <h2 style="margin-top:18px">ODPOWIEDŹ</h2>
-      <p class="mute" style="margin-bottom:6px" id="pytanieSzkicInfo"></p>
-      <textarea id="pytanieOdpowiedz" rows="9" style="width:100%"></textarea>
-      <div id="pytanieLicznikZnakow" class="mute" style="margin-top:4px"></div>
-      <div id="pytanieAkcje" style="margin-top:10px"></div>
+      <div class="dok-odpowiedzi">
+        <h2>ODPOWIEDŹ</h2>
+        <p class="mute" style="margin-bottom:6px" id="pytanieSzkicInfo"></p>
+        <textarea id="pytanieOdpowiedz" rows="7" style="width:100%"></textarea>
+        <div id="pytanieLicznikZnakow" class="mute" style="margin-top:4px"></div>
+        <div id="pytanieAkcje" style="margin-top:10px"></div>
+      </div>
+    </section>
 
-      <h2 style="margin-top:18px">DOPASOWANE TOWARY</h2>
+    <!-- KONTEKST sprawy w osobnej strefie. Do 0.91.0 siedział pod odpowiedzią
+         w tej samej kolumnie, więc weryfikacja doboru wymagała przewinięcia
+         wątku w dół, a potem z powrotem w górę do pola odpowiedzi. -->
+    <section class="card pelna kontekst" id="pytanieKontekst" hidden>
+      <h2>DOPASOWANE TOWARY</h2>
       <p class="mute" style="margin-bottom:8px">
         To samo, co dostał model. Kliknięcie „WSTAW LINK" dokleja adres aukcji
         do odpowiedzi w miejscu kursora.
@@ -4661,6 +4733,8 @@ let odpowiedzRuszona = false;
 let szkicDoPrzywrocenia = "";
 /** Dla którego pytania historia klienta jest już wczytana. */
 let pytanieIdKlienta = null;
+/** Ostatnia lista z serwera — do przerysowania przy zmianie wariantu kolejki. */
+let ostatniaListaPytan = [];
 
 /* Allegro tnie wiadomość na 2000 znaków. Do 0.89.0 dowiadywał się o tym
    dopiero serwer, po kliknięciu WYŚLIJ — czyli po napisaniu całości. */
@@ -4732,7 +4806,14 @@ function ustawRodzenstwoPytania() {
     $(id).hidden = pusty || (otwarte && !zostaje.includes(id));
   }
   $("pytanieSzczegol").hidden = !otwarte;
+  /* Kontekst żyje i ginie razem ze sprawą — pusta trzecia kolumna przy
+     zamkniętej sprawie byłaby nagłówkiem bez treści. */
+  $("pytanieKontekst").hidden = !otwarte;
   $("widokPytania").classList.toggle("zSzczegolem", otwarte);
+  /* Kolejka ma dwa warianty (tabela / szyna) i wariant zależy OD TEGO, co
+     robimy tutaj — więc przerysowanie należy do tej funkcji, nie do
+     odświeżania z serwera, które przy otwartej sprawie w ogóle nie chodzi. */
+  rysujListePytan(ostatniaListaPytan);
   zaznaczWiersz("pytaniaLista", "pytanie", otwartePytanie);
 }
 
@@ -4750,6 +4831,7 @@ async function odswiezPytania() {
     if ($("pytaniaFiltrStatus").value) q.set("status", $("pytaniaFiltrStatus").value);
     const d = await (await api(`/api/biuro/pytania?${q}`)).json();
     rysujBanerPytan(d.ai, d.allegro);
+    ostatniaListaPytan = d.pytania;
     rysujListePytan(d.pytania);
     ustawLicznikPytan(d);
   } catch (e) {
@@ -4788,19 +4870,52 @@ function rysujBanerPytan(ai, allegro) {
   $("pytaniaBanerTresc").innerHTML = wiersze.join("");
 }
 
+/**
+ * Kolejka spraw w dwóch wariantach — i to nie jest ozdoba.
+ *
+ * Przy zamkniętej sprawie karta ma całą szerokość i tabela z kolumnami czyta
+ * się najlepiej. Przy otwartej kolejka schodzi do szyny 22 rem, gdzie siedem
+ * kolumn nie ma prawa się zmieścić: tekst pytania wychodził poza kartę
+ * i był PRZYCINANY. W szynie ten sam wiersz stoi więc w trzech linijkach.
+ *
+ * Oba warianty zostają wierszem `tr[data-pytanie]`, bo po tym działa i
+ * delegacja kliknięcia, i zaznaczanie wiersza.
+ */
 function rysujListePytan(lista) {
-  $("pytaniaLista").innerHTML = !lista.length
-    ? '<tr><td class="mute">Nic nie czeka na odpowiedź. Skrzynka na zero.</td></tr>'
-    : "<tr><th>STATUS</th><th>KLIENT</th><th>OFERTA</th><th>PYTANIE</th><th>PROWADZI</th><th>WIEK</th><th></th></tr>" +
-      lista.map((p) => `<tr data-pytanie="${p.id}"${p.id === otwartePytanie ? ' class="aktywny"' : ""} style="cursor:pointer">
-          <td style="white-space:nowrap">${badgePytania(p.status)}</td>
-          <td>${esc(p.kupujacyLogin || (p.zrodlo === "wklejka" ? "(wklejka)" : "—"))}</td>
-          <td class="mute">${esc(p.ofertaTytul || "—")}</td>
-          <td>${esc((p.tresc || "").slice(0, 120))}${(p.tresc || "").length > 120 ? "…" : ""}</td>
-          <td class="mute" style="white-space:nowrap">${esc(p.prowadzi || "—")}</td>
-          <td class="mute" style="white-space:nowrap">${esc(wiekPytania(p.otrzymanoAt))}</td>
-          <td><button class="akcja cichy" data-pytanie="${p.id}">OTWÓRZ</button></td>
-        </tr>`).join("");
+  if (!lista.length) {
+    $("pytaniaLista").innerHTML =
+      '<tr><td class="mute">Nic nie czeka na odpowiedź. Skrzynka na zero.</td></tr>';
+    return;
+  }
+  const wSzynie = otwartePytanie != null && trybSzeroki();
+  const wiersz = (p, tresc) =>
+    `<tr data-pytanie="${p.id}"${p.id === otwartePytanie ? ' class="aktywny"' : ""} style="cursor:pointer">${tresc}</tr>`;
+
+  if (wSzynie) {
+    $("pytaniaLista").innerHTML = lista.map((p) => wiersz(p, `
+      <td class="sprawaWiersz">
+        <span class="sprawaGora">
+          <span class="b">${esc(p.kupujacyLogin || (p.zrodlo === "wklejka" ? "(wklejka)" : "—"))}</span>
+          <span class="mute">${esc(wiekPytania(p.otrzymanoAt))}</span>
+        </span>
+        <span class="sprawaTemat">${esc(p.ofertaTytul || (p.tresc || "").slice(0, 90) || "—")}</span>
+        <span class="sprawaStopka">${badgePytania(p.status)}${
+          p.prowadzi ? `<span class="mute">${esc(p.prowadzi)}</span>` : ""
+        }</span>
+      </td>`)).join("");
+    return;
+  }
+
+  $("pytaniaLista").innerHTML =
+    "<tr><th>STATUS</th><th>KLIENT</th><th>OFERTA</th><th>PYTANIE</th><th>PROWADZI</th><th>WIEK</th><th></th></tr>" +
+    lista.map((p) => wiersz(p, `
+        <td style="white-space:nowrap">${badgePytania(p.status)}</td>
+        <td>${esc(p.kupujacyLogin || (p.zrodlo === "wklejka" ? "(wklejka)" : "—"))}</td>
+        <td class="mute">${esc(p.ofertaTytul || "—")}</td>
+        <td>${esc((p.tresc || "").slice(0, 120))}${(p.tresc || "").length > 120 ? "…" : ""}</td>
+        <td class="mute" style="white-space:nowrap">${esc(p.prowadzi || "—")}</td>
+        <td class="mute" style="white-space:nowrap">${esc(wiekPytania(p.otrzymanoAt))}</td>
+        <td><button class="akcja cichy" data-pytanie="${p.id}">OTWÓRZ</button></td>`)).join("");
 }
 
 /** Wiek pytania słowami — „3 dni" mówi o pilności więcej niż data z godziną. */
@@ -4954,17 +5069,30 @@ function rysujTowaryPytania(kartoteki, oferty, wybraneModelu, bladOfert) {
       .map((d) => `<div class="mute">przyjechało, nierozłożone: ${d.ilosc} szt.</div>`)
       .join("");
 
+    /* Wszystko o towarze w JEDNEJ komórce. Kontekst stoi w szynie 21 rem,
+       a pięć kolumn nie ma prawa się tam zmieścić — wcześniejsza tabela
+       uciekała poza krawędź karty i ucinała cenę razem z aukcją.
+       Kolumna zdjęcia zostaje osobna, bo dokładarka zdjęć celuje w `td.kolFoto`. */
     return `<tr>
       ${kolFoto(k.twId)}
-      <td><span class="b">${esc(k.symbol)}</span>${wskazany}<br>${esc(k.nazwa)}
+      <td class="towarKafel">
+        <span class="towarGora"><span class="b">${esc(k.symbol)}</span>${wskazany}</span>
+        <span class="mute" style="display:block">${esc(k.nazwa)}</span>
+        <span class="towarFakty">
+          <span><b>${k.stan}</b> szt.</span>
+          <span>${esc(k.lokalizacje.join(", ") || "bez półki")}</span>
+          ${o && o.dostepnych != null ? `<span>na aukcji: ${o.dostepnych}</span>` : ""}
+        </span>
+        ${wDrodze}${nierozlozone}${zamienniki}
         ${k.ean ? `<div class="mute">EAN ${esc(k.ean)}</div>` : ""}
-        ${zamienniki}</td>
-      <td class="b" style="white-space:nowrap">${k.stan} szt.${wDrodze}${nierozlozone}${
-        o && o.dostepnych != null ? `<div class="mute">na aukcji: ${o.dostepnych}</div>` : ""
-      }</td>
-      <td class="mute">${esc(k.lokalizacje.join(", ") || "—")}</td>
-      <td>${o ? `${esc(o.cena || "")}<br><a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a>` : '<span class="mute">brak aukcji</span>'}</td>
-      <td>${o ? `<button class="akcja cichy" data-wstaw="${esc(o.url)}">WSTAW LINK</button>` : ""}</td>
+        <span class="towarDol">
+          ${o
+            ? `<span class="b">${esc(o.cena || "")}</span>
+               <a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a>
+               <button class="akcja cichy" data-wstaw="${esc(o.url)}" style="margin-left:auto">WSTAW LINK</button>`
+            : '<span class="mute">brak aukcji</span>'}
+        </span>
+      </td>
     </tr>`;
   });
 
@@ -4976,19 +5104,24 @@ function rysujTowaryPytania(kartoteki, oferty, wybraneModelu, bladOfert) {
   for (const o of sieroty) {
     wiersze.push(`<tr>
       ${kolFoto(null)}
-      <td>${esc(o.nazwa)}<div class="mute">tylko aukcja, bez dopasowanej kartoteki</div></td>
-      <td class="mute">${o.dostepnych == null ? "—" : o.dostepnych + " szt."}</td>
-      <td class="mute">—</td>
-      <td>${esc(o.cena || "")}<br><a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a></td>
-      <td><button class="akcja cichy" data-wstaw="${esc(o.url)}">WSTAW LINK</button></td>
+      <td class="towarKafel">
+        <span style="display:block">${esc(o.nazwa)}</span>
+        <span class="mute" style="display:block">tylko aukcja, bez dopasowanej kartoteki</span>
+        <span class="towarFakty">
+          <span>${o.dostepnych == null ? "stan nieznany" : "na aukcji: " + o.dostepnych}</span>
+        </span>
+        <span class="towarDol">
+          <span class="b">${esc(o.cena || "")}</span>
+          <a href="${esc(o.url)}" target="_blank" rel="noopener">aukcja</a>
+          <button class="akcja cichy" data-wstaw="${esc(o.url)}" style="margin-left:auto">WSTAW LINK</button>
+        </span>
+      </td>
     </tr>`);
   }
 
   $("pytanieTowary").innerHTML =
     ostrzezenie +
-    `<table id="pytanieTowaryTabela"><tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>TOWAR</th><th>STAN</th><th>PÓŁKA</th><th>AUKCJA</th><th></th></tr>" +
-    wiersze.join("") + "</table>";
+    `<table id="pytanieTowaryTabela">` + wiersze.join("") + "</table>";
   dolozZdjeciaListy(kartoteki, "pytanieTowaryTabela", "sesjaPytan");
 }
 

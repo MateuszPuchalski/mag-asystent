@@ -533,6 +533,36 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
   przed("pytaniaListaKarta", "pytaniaWklejkaKarta", "lista pytań przed wklejką z poczty");
 });
 
+test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
+  /* Od 0.91.0 zakładka PYTANIA rozkłada się na kolejkę, sprawę i kontekst.
+     Żeby kontekst mógł być TRZECIĄ KOLUMNĄ siatki, musi być rodzeństwem
+     szczegółu wewnątrz `#widokPytania` — wsunięty do środka karty sprawy
+     wygląda tak samo w kodzie, a na ekranie wraca pod odpowiedź. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const widok = html.slice(
+    html.indexOf('id="widokPytania"'),
+    html.indexOf('id="widokNadzor"')
+  );
+  const szczegol = widok.indexOf('id="pytanieSzczegol"');
+  const kontekst = widok.indexOf('id="pytanieKontekst"');
+  const konsczegolu = widok.indexOf("</section>", szczegol);
+  assert.ok(szczegol !== -1 && kontekst !== -1, "obie strefy istnieją");
+  assert.ok(kontekst > konsczegolu, "kontekst jest OBOK sprawy, nie w jej środku");
+  assert.match(html, /#widokPytania\.zSzczegolem \{ grid-template-columns:/,
+    "trzy kolumny opisane jedną regułą");
+
+  /* Próg stoi w DWÓCH miejscach — w arkuszu i w skrypcie — i nic go nie
+     pilnowało. Rozjazd nie wywraca niczego głośno: szczegół po prostu
+     zasłania kolejkę na jednej szerokości okna i nikt nie wie dlaczego. */
+  const wCss = [...html.matchAll(/@media \(min-width: (\d+)px\)/g)].map((m) => m[1]);
+  const wJs = html.match(/matchMedia\("\(min-width: (\d+)px\)"\)/)?.[1];
+  assert.ok(wJs, "skrypt zna próg");
+  assert.ok(wCss.includes(wJs), `próg ${wJs} ze skryptu musi istnieć w arkuszu`);
+});
+
 test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   /* Ikona bez bloku obok siebie jest przyciskiem, który nic nie robi, a blok
      bez ikony jest tekstem, którego nie da się otworzyć. Delegacja szuka

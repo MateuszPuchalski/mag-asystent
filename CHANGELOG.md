@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.91.0 — 25 sierpnia 2026
+
+**Wątek klienta stanął na środku.** Zakładka PYTANIA KLIENTÓW rozkłada się na
+trzy niezależnie przewijane strefy: kolejka spraw po lewej, sprawa na środku,
+kontekst po prawej. Do tej wersji wszystko stało w jednej kolumnie jedno pod
+drugim, więc weryfikacja doboru części wymagała przewinięcia wątku w dół,
+a potem z powrotem w górę do pola odpowiedzi.
+
+**Rozmowa przewija się, odpowiedź zostaje na dole.** Przy dłuższym wątku pole
+odpowiedzi uciekało pod krawędź ekranu i biuro skakało między tym, co klient
+napisał, a tym, co pisze samo. Teraz rozmowa ma własne przewijanie, a pole
+odpowiedzi stoi pod nią na stałe.
+
+**Kolejka i kontekst dostały układ zwarty.** Siedmiokolumnowa tabela pytań
+mieści się w karcie na całą szerokość, ale nie w szynie — tekst pytania
+wychodził poza kartę i był przycinany. W szynie ten sam wiersz stoi w trzech
+linijkach: klient z wiekiem, temat oferty, stan sprawy. Tak samo kartoteka
+w kontekście: zamiast pięciu kolumn, z których cena i aukcja uciekały poza
+krawędź, jest kafelek z ceną i przyciskiem wstawienia linku.
+
+**Miara wiersza.** Na monitorze dwudziestocalowym kolumna sprawy ma ponad
+tysiąc stu pikseli, a wiersz tej długości czyta się źle niezależnie od stopnia
+pisma. Treść ma teraz górną granicę szerokości.
+
+Poniżej progu, przy którym kolumny się nie mieszczą, wszystko wraca do układu
+sprzed zmiany: sprawa zasłania kolejkę, a kontekst schodzi pod nią. Próg jest
+ten sam, którego zakładka używała dotąd, i **od tej wersji pilnuje go test** —
+stał w dwóch miejscach naraz, w arkuszu i w skrypcie, a rozjazd objawiłby się
+tylko na jednej szerokości okna.
+
 ## 0.90.0 — 25 sierpnia 2026
 
 **Panel biura odzyskał hierarchię.** Zgłoszenie brzmiało „zero hierarchii, wątek
