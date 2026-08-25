@@ -325,6 +325,53 @@ test("prompt i fakty zapisują się osobno i nie kasują się nawzajem", () => {
   assert.equal(k.zmienionoPrzez, "admin");
 });
 
+
+/* ── Historia klienta i prowadzenie sprawy ─────────────────────────────────── */
+
+test("historia klienta zbiera jego wcześniejsze pytania, a wklejka nie ma po czym szukać", async () => {
+  await P.synchronizujPytania("test");
+  const lista = P.listaPytan({ limit: 50 });
+  const p = lista.find((x) => x.threadId === "dev-pyt-1")!;
+  const inne = lista.find((x) => x.threadId === "dev-pyt-2")!;
+  /* Oba pytania temu samemu loginowi — dopiero wtedy historia ma sens. */
+  db().prepare("UPDATE pytanie SET kupujacy_login = 'klient-x' WHERE id IN (?,?)").run(p.id, inne.id);
+
+  const h = P.historiaKlienta(p.id);
+  assert.equal(h.login, "klient-x");
+  assert.equal(h.pytania.length, 1, "bieżąca sprawa nie jest własną historią");
+  assert.equal(h.pytania[0].id, inne.id);
+
+  const zWklejki = await P.pytanieZWklejki({ tekst: "Czy pasuje do kosiarki?" }, "biuro");
+  const pusta = P.historiaKlienta(zWklejki.id);
+  assert.equal(pusta.login, null);
+  assert.deepEqual(pusta.pytania, []);
+});
+
+/* Panel biura ma regułę „zero zapisu przy samym PATRZENIU" (routes/biuro.test.ts),
+   więc prowadzącego stempluje PRACA nad sprawą, nie jej otwarcie. */
+test("sprawę zajmuje redakcja odpowiedzi, a wysłanie ją zwalnia", async () => {
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  assert.equal(p.prowadzi, null, "samo pobranie pytania nikogo nie zajmuje");
+
+  const po = P.zapiszOdpowiedz(p.id, "Tak, ta część pasuje.", "anna");
+  assert.equal(po.prowadzi, "anna");
+  assert.ok(po.prowadziAt);
+
+  const wynik = await P.wyslijOdpowiedz(p.id, "anna");
+  assert.equal(wynik.pytanie.status, "wyslane");
+  assert.equal(wynik.pytanie.prowadzi, null, "zamknięta sprawa nikogo nie zajmuje");
+});
+
+test("liczniki rozdzielają czekające na szkic od gotowych do sprawdzenia", async () => {
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 })[0];
+  P.zapiszOdpowiedz(p.id, "Szkic po ręce.", "anna");
+  const l = P.licznikiPytan();
+  assert.equal(l.nowe + l.szkice, P.licznikOtwartych());
+  assert.ok(l.szkice >= 1);
+});
+
 /* ── Statystyki ────────────────────────────────────────────────────────────── */
 
 test("statystyki liczą produkty, kategorie, udział bez edycji i braki w ofercie", async () => {

@@ -15,6 +15,9 @@ import {
   pytanieZWklejki,
   statystykiPytan,
   synchronizujPytania,
+  historiaKlienta,
+  licznikiPytan,
+  stempelProwadzi,
   szczegolPytania,
   wyslijOdpowiedz,
   zapiszFakty,
@@ -87,6 +90,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
         ai: stanAI(),
         allegro: stanPolaczenia(),
         otwartych: licznikOtwartych(),
+        ...licznikiPytan(),
       };
     }
   );
@@ -97,7 +101,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
   app.get("/api/biuro/pytania/licznik", async (_req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return { otwartych: licznikOtwartych() };
+    return { otwartych: licznikOtwartych(), ...licznikiPytan() };
   });
 
   // ── Synchronizacja i wklejka ──────────────────────────────────────────────
@@ -189,6 +193,15 @@ export async function pytaniaRoutes(app: FastifyInstance) {
     });
   });
 
+  /* Historia klienta — osobno i na klik. Wpięcie jej w szczegół dołożyłoby
+     dwa zapytania do każdego otwarcia sprawy, a potrzebna jest przy części
+     z nich: wtedy, gdy login coś mówi. */
+  app.get<{ Params: { id: string } }>("/api/biuro/pytania/:id/klient", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zBledem(reply, () => ({ historia: historiaKlienta(Number(req.params.id)) }));
+  });
+
   /* Rozmowa czytana NA ŻĄDANIE i nietrzymana u nas — ta sama zasada co przy
      zwrotach: prywatna korespondencja ma jedno miejsce prawdy w Allegro. */
   app.get<{ Params: { id: string } }>("/api/biuro/pytania/:id/wiadomosci", async (req, reply) => {
@@ -207,9 +220,14 @@ export async function pytaniaRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/api/biuro/pytania/:id/generuj", async (req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return zIntegracja(reply, async () => ({
-      pytanie: await generujSzkic(Number(req.params.id), autor()),
-    }));
+    return zIntegracja(reply, async () => {
+      /* Policzenie szkicu DLA JEDNEJ sprawy jest pracą nad nią, więc stempluje
+         prowadzącego. Zbiorcze `dogenerujSzkice` (ticker, ODŚWIEŻ) tego nie
+         robi — patrz `stempelProwadzi`. */
+      const pytanie = await generujSzkic(Number(req.params.id), autor());
+      stempelProwadzi(pytanie.id, autor());
+      return { pytanie: szczegolPytania(pytanie.id) };
+    });
   });
 
   app.put<{ Params: { id: string }; Body: { odpowiedz?: string } }>(
@@ -218,7 +236,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
       const nie = odmowa();
       if (nie) return reply.code(nie.kod).send({ error: nie.error });
       return zBledem(reply, () => ({
-        pytanie: zapiszOdpowiedz(Number(req.params.id), req.body?.odpowiedz ?? ""),
+        pytanie: zapiszOdpowiedz(Number(req.params.id), req.body?.odpowiedz ?? "", autor()),
       }));
     }
   );
@@ -232,7 +250,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
         /* Treść z ekranu zapisujemy PRZED wysyłką: inaczej poprawka wpisana
            i niezapisana poszłaby do klienta w starej wersji. */
         if (req.body?.odpowiedz !== undefined) {
-          zapiszOdpowiedz(Number(req.params.id), req.body.odpowiedz);
+          zapiszOdpowiedz(Number(req.params.id), req.body.odpowiedz, autor());
         }
         const wynik = await wyslijOdpowiedz(Number(req.params.id), autor());
         return { ...wynik, otwartych: licznikOtwartych() };

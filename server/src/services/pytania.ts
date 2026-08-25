@@ -71,6 +71,9 @@ export interface Pytanie {
   urzadzenie: string | null;
   produkty: Array<{ twId: number | null; symbol: string }>;
   wOfercie: boolean | null;
+  /** Kto wziął sprawę — znacznik dla reszty biura, nie blokada. */
+  prowadzi: string | null;
+  prowadziAt: string | null;
 }
 
 /** Ile ostatnich poprawionych odpowiedzi pokazujemy modelowi jako wzór stylu. */
@@ -107,6 +110,8 @@ function zWiersza(w: Record<string, unknown>): Pytanie {
     edytowano: (w.edytowano as number) === 1,
     kategoria: tekstLubNull(w.kategoria),
     urzadzenie: tekstLubNull(w.urzadzenie),
+    prowadzi: tekstLubNull(w.prowadzi),
+    prowadziAt: tekstLubNull(w.prowadzi_at),
     produkty,
     wOfercie: w.w_ofercie == null ? null : (w.w_ofercie as number) === 1,
   };
@@ -143,6 +148,25 @@ export function licznikOtwartych(): number {
     .prepare("SELECT COUNT(*) AS ile FROM pytanie WHERE status IN ('nowe','szkic')")
     .get() as { ile: number };
   return w.ile;
+}
+
+/**
+ * Otwarte Z PODZIAŁEM na „czeka na szkic" i „szkic gotowy".
+ *
+ * Sama suma zlewa dwa różne stany pracy. Od 0.85.0 nic nie liczy szkiców
+ * w tle, a ręczne ODŚWIEŻ bierze najwyżej pięć — więc przy dziesięciu nowych
+ * pytaniach reszta zostaje bez szkicu i licznik nie ma jak tego powiedzieć.
+ */
+export function licznikiPytan(): { nowe: number; szkice: number } {
+  const w = db()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN status = 'nowe'  THEN 1 ELSE 0 END) AS nowe,
+         SUM(CASE WHEN status = 'szkic' THEN 1 ELSE 0 END) AS szkice
+       FROM pytanie`
+    )
+    .get() as { nowe: number | null; szkice: number | null };
+  return { nowe: w.nowe ?? 0, szkice: w.szkice ?? 0 };
 }
 
 /** Najstarsze otwarte pytanie poza wskazanym — tryb „skrzynka do zera". */
@@ -562,6 +586,90 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
   return { tekst: linie.join("\n"), kartoteki, oferty, bladOfert, frazy, dopasowania, poprzednie };
 }
 
+/* ── Historia klienta ────────────────────────────────────────────────────────
+   Ten sam login pisze drugi raz częściej, niż się wydaje — a odpowiedź brzmi
+   inaczej, gdy widać, że tydzień temu coś zwrócił albo pytał o tę samą część.
+   Czytane NA KLIK, osobną trasą: otwarcie sprawy ma być tanie, a te dwa
+   zapytania są potrzebne tylko przy wątpliwości.                             */
+
+export interface PytanieHistorii {
+  id: number;
+  otrzymanoAt: string | null;
+  tresc: string;
+  odpowiedz: string | null;
+  status: string;
+  ofertaTytul: string | null;
+}
+
+export interface ZwrotHistorii {
+  id: number;
+  referencja: string | null;
+  status: string;
+  utworzonoAt: string | null;
+  pozycji: number;
+}
+
+export interface HistoriaKlienta {
+  login: string | null;
+  pytania: PytanieHistorii[];
+  zwroty: ZwrotHistorii[];
+}
+
+/** Ile wstecz pokazujemy — tyle, ile mieści się w karcie bez przewijania. */
+const HISTORII_KLIENTA = 10;
+
+/**
+ * Co ten kupujący już u nas załatwiał.
+ *
+ * Pytanie z wklejki nie ma loginu i to jest poprawny wynik pusty, nie błąd:
+ * screenshot z poczty nie niesie tożsamości kupującego z Allegro.
+ */
+export function historiaKlienta(id: number): HistoriaKlienta {
+  const p = wiersz(id);
+  const login = (p.kupujacy_login as string | null) ?? null;
+  if (!login) return { login: null, pytania: [], zwroty: [] };
+
+  const pytania = db()
+    .prepare(
+      `SELECT id, otrzymano_at, tresc, odpowiedz, status, oferta_tytul
+       FROM pytanie
+       WHERE kupujacy_login = ? AND id <> ?
+       ORDER BY otrzymano_at DESC, id DESC LIMIT ?`
+    )
+    .all(login, id, HISTORII_KLIENTA) as Array<Record<string, unknown>>;
+
+  /* Zwroty tego samego loginu — z licznikiem pozycji, bo „zwrot" bez liczby
+     rzeczy nie mówi, czy wróciła jedna uszczelka, czy cała paczka. */
+  const zwroty = db()
+    .prepare(
+      `SELECT z.id, z.referencja, z.status, z.utworzono_at,
+              (SELECT COUNT(*) FROM zwrot_pozycja p WHERE p.zwrot_id = z.id) AS pozycji
+       FROM zwrot z
+       WHERE z.kupujacy_login = ?
+       ORDER BY z.utworzono_at DESC LIMIT ?`
+    )
+    .all(login, HISTORII_KLIENTA) as Array<Record<string, unknown>>;
+
+  return {
+    login,
+    pytania: pytania.map((r) => ({
+      id: Number(r.id),
+      otrzymanoAt: (r.otrzymano_at as string) ?? null,
+      tresc: (r.tresc as string) ?? "",
+      odpowiedz: (r.odpowiedz as string) ?? null,
+      status: (r.status as string) ?? "nowe",
+      ofertaTytul: (r.oferta_tytul as string) ?? null,
+    })),
+    zwroty: zwroty.map((r) => ({
+      id: Number(r.id),
+      referencja: (r.referencja as string) ?? null,
+      status: (r.status as string) ?? "",
+      utworzonoAt: (r.utworzono_at as string) ?? null,
+      pozycji: Number(r.pozycji ?? 0),
+    })),
+  };
+}
+
 /* ── Szkic ───────────────────────────────────────────────────────────────── */
 
 /** Ostatnie odpowiedzi POPRAWIONE ręką — wzór stylu dla modelu. */
@@ -718,10 +826,12 @@ export async function pytanieZWklejki(w: Wklejka, autor: string): Promise<Pytani
 
 /* ── Redakcja i wysyłka ──────────────────────────────────────────────────── */
 
-export function zapiszOdpowiedz(id: number, tresc: string): Pytanie {
+export function zapiszOdpowiedz(id: number, tresc: string, autor?: string): Pytanie {
   const p = szczegolPytania(id);
   const nowa = tresc.trim();
   if (nowa === "") throw new BladPytania("Odpowiedź nie może być pusta");
+  /* Redakcja odpowiedzi JEST wzięciem sprawy — reszta biura ma to widzieć. */
+  if (autor) stempelProwadzi(id, autor);
   db()
     .prepare(
       `UPDATE pytanie SET odpowiedz = ?, edytowano = ?,
@@ -781,7 +891,8 @@ export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikW
 
   db()
     .prepare(
-      `UPDATE pytanie SET status = 'wyslane', wyslano_at = datetime('now'), odpowiedzial = ?
+      `UPDATE pytanie SET status = 'wyslane', wyslano_at = datetime('now'), odpowiedzial = ?,
+              prowadzi = NULL, prowadzi_at = NULL
        WHERE id = ?`
     )
     .run(autor, id);
@@ -800,9 +911,39 @@ export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikW
 export function zmienStatus(id: number, status: "zamkniete" | "pominiete", autor: string): WynikWysylki {
   const p = szczegolPytania(id);
   if (p.status === "wyslane") throw new BladPytania("Odpowiedź już poszła — nie ma czego zamykać", 409);
-  db().prepare("UPDATE pytanie SET status = ?, odpowiedzial = ? WHERE id = ?").run(status, autor, id);
+  db()
+    .prepare(
+      "UPDATE pytanie SET status = ?, odpowiedzial = ?, prowadzi = NULL, prowadzi_at = NULL WHERE id = ?"
+    )
+    .run(status, autor, id);
   logEvent(`pytanie_${status}`, autor, null, { id });
   return { pytanie: szczegolPytania(id), nastepneId: nastepneOtwarte(id) };
+}
+
+/**
+ * Kto prowadzi sprawę — stemplowane PRACĄ nad nią, nie jej otwarciem.
+ *
+ * Panel biura ma twardą regułę od 0.18.0: żadnego zapisu przy samym PATRZENIU
+ * na ekran (patrz `routes/biuro.test.ts` i zakaz `POST .../open`). Znacznik
+ * prowadzącego nie jest od niej wyjątkiem, więc nie stawia własnego przycisku
+ * ani nie strzela przy wejściu w sprawę: nazwisko pojawia się wtedy, gdy ktoś
+ * policzy szkic albo zapisze odpowiedź, czyli przy zapisie, który i tak
+ * następuje. Kto tylko zajrzał, niczego nie zajmuje.
+ *
+ * Stempluje TYLKO praca nad jedną sprawą — nie zbiorcze liczenie szkiców.
+ * Ticker liczy je pod nazwą procesu, a ODŚWIEŻ hurtem po pięć: jedno wstawiłoby
+ * do kolumny nazwę usługi, drugie zajęłoby pięć spraw komuś, kto kliknął
+ * „sprawdź, co przyszło".
+ *
+ * ZNACZNIK, nie zamek. Twarda blokada w kilkuosobowym biurze przeszkadza
+ * częściej, niż pomaga — ktoś wychodzi na obiad z otwartą sprawą i nikt jej
+ * nie dokończy. Ostrzeżenie na ekranie wystarcza, żeby dwie osoby nie pisały
+ * równolegle, a ostatni pracujący po prostu podmienia nazwisko.
+ */
+export function stempelProwadzi(id: number, autor: string): void {
+  db()
+    .prepare("UPDATE pytanie SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
+    .run(autor, id);
 }
 
 /* ── Ticker ──────────────────────────────────────────────────────────────── */

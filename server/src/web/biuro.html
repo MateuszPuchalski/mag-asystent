@@ -793,6 +793,7 @@
     <section class="card pelna szczegol" id="pytanieSzczegol" hidden>
       <button class="akcja cichy" id="pytanieWroc">← WSZYSTKIE PYTANIA</button>
       <div id="pytanieNaglowek" style="margin-top:12px"></div>
+      <p id="pytanieProwadzi" style="margin-top:8px" hidden></p>
 
       <!-- PYTANIE stoi nad rozmową i pochodzi z NASZEJ bazy. Rozmowa jedzie
            z Allegro na żądanie, więc gdy Allegro milczy albo pytanie przyszło
@@ -820,6 +821,13 @@
       <!-- Czym model dysponował poza kartoteką. Zwinięte: materiał na wypadek
            wątpliwości przy doborze, nie lektura do każdej odpowiedzi. -->
       <details class="zwijana" id="pytanieWiedza" hidden></details>
+
+      <!-- Co ten kupujący już u nas załatwiał. Zwinięte i pobierane dopiero
+           po otwarciu: dwa zapytania warte są tylko wtedy, gdy login coś mówi. -->
+      <details class="zwijana" id="pytanieKlient" hidden>
+        <summary><h2>HISTORIA KLIENTA</h2><span class="podpis">pytania i zwroty tego loginu</span></summary>
+        <div id="pytanieKlientTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
     </section>
 
     <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
@@ -2969,10 +2977,27 @@ async function odswiez() {
 }
 
 /** Licznik pytań w nawiasie przy zakładce; pusto, gdy nie ma nic do zrobienia. */
+/**
+ * Licznik przy zakładce z podziałem na „gotowe" i „czeka na szkic".
+ *
+ * Sama suma zlewa dwa różne stany: sprawę do przeczytania i sprawę, dla
+ * której nikt jeszcze nie policzył szkicu. Od 0.85.0 ta druga grupa rośnie
+ * sama — ręczne ODŚWIEŻ liczy najwyżej pięć szkiców naraz.
+ */
+function ustawLicznikPytan(d) {
+  const gotowe = d.szkice ?? 0;
+  const czekaja = d.nowe ?? 0;
+  const cel = $("pytaniaLicznik");
+  cel.textContent = (d.otwartych ?? 0) > 0 ? `(${d.otwartych})` : "";
+  cel.title = (d.otwartych ?? 0) > 0
+    ? `${gotowe} ze szkicem do sprawdzenia · ${czekaja} czeka na szkic`
+    : "";
+}
+
 async function odswiezLicznikPytan() {
   try {
     const d = await (await api("/api/biuro/pytania/licznik")).json();
-    $("pytaniaLicznik").textContent = d.otwartych > 0 ? `(${d.otwartych})` : "";
+    ustawLicznikPytan(d);
   } catch {
     /* Licznik jest ozdobą paska, nie treścią — jego awaria nie ma prawa
        przerywać odświeżania właściwej zakładki. */
@@ -4613,6 +4638,8 @@ let pytanieIdRozmowy = null;
 let odpowiedzRuszona = false;
 /** Surowy szkic modelu — do przywrócenia, gdy poprawka wyszła gorzej. */
 let szkicDoPrzywrocenia = "";
+/** Dla którego pytania historia klienta jest już wczytana. */
+let pytanieIdKlienta = null;
 
 /* Allegro tnie wiadomość na 2000 znaków. Do 0.89.0 dowiadywał się o tym
    dopiero serwer, po kliknięciu WYŚLIJ — czyli po napisaniu całości. */
@@ -4703,7 +4730,7 @@ async function odswiezPytania() {
     const d = await (await api(`/api/biuro/pytania?${q}`)).json();
     rysujBanerPytan(d.ai, d.allegro);
     rysujListePytan(d.pytania);
-    $("pytaniaLicznik").textContent = d.otwartych > 0 ? `(${d.otwartych})` : "";
+    ustawLicznikPytan(d);
   } catch (e) {
     $("pytaniaLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
   }
@@ -4743,12 +4770,13 @@ function rysujBanerPytan(ai, allegro) {
 function rysujListePytan(lista) {
   $("pytaniaLista").innerHTML = !lista.length
     ? '<tr><td class="mute">Nic nie czeka na odpowiedź. Skrzynka na zero.</td></tr>'
-    : "<tr><th>STATUS</th><th>KLIENT</th><th>OFERTA</th><th>PYTANIE</th><th>WIEK</th><th></th></tr>" +
+    : "<tr><th>STATUS</th><th>KLIENT</th><th>OFERTA</th><th>PYTANIE</th><th>PROWADZI</th><th>WIEK</th><th></th></tr>" +
       lista.map((p) => `<tr data-pytanie="${p.id}"${p.id === otwartePytanie ? ' class="aktywny"' : ""} style="cursor:pointer">
           <td style="white-space:nowrap">${badgePytania(p.status)}</td>
           <td>${esc(p.kupujacyLogin || (p.zrodlo === "wklejka" ? "(wklejka)" : "—"))}</td>
           <td class="mute">${esc(p.ofertaTytul || "—")}</td>
           <td>${esc((p.tresc || "").slice(0, 120))}${(p.tresc || "").length > 120 ? "…" : ""}</td>
+          <td class="mute" style="white-space:nowrap">${esc(p.prowadzi || "—")}</td>
           <td class="mute" style="white-space:nowrap">${esc(wiekPytania(p.otrzymanoAt))}</td>
           <td><button class="akcja cichy" data-pytanie="${p.id}">OTWÓRZ</button></td>
         </tr>`).join("");
@@ -4768,6 +4796,7 @@ function wiekPytania(at) {
 async function otworzPytanie(id) {
   otwartePytanie = id;
   pytanieIdRozmowy = null;
+  pytanieIdKlienta = null;
   odpowiedzRuszona = false;
   ustawRodzenstwoPytania();
   await odswiezSzczegolPytania();
@@ -4801,6 +4830,18 @@ function rysujSzczegolPytania(d) {
      gdy pytanie przyszło z wklejki albo Allegro nie odpowiada. */
   $("pytanieTresc").textContent = p.tresc || "(pusta treść pytania)";
 
+  /* Kto przy tym siedzi. Ostrzeżenie, nie zamek: dwie odpowiedzi na jedno
+     pytanie zobaczy klient, ale zablokowana sprawa kogoś, kto wyszedł na
+     obiad, blokuje pracę całego biura. */
+  const cudza = p.prowadzi && p.prowadzi !== kto && p.status !== "wyslane";
+  $("pytanieProwadzi").hidden = !cudza;
+  if (cudza) {
+    $("pytanieProwadzi").innerHTML =
+      `<span class="badge amber">UWAGA</span> Tę sprawę prowadzi <span class="b">${esc(p.prowadzi)}</span>` +
+      `${p.prowadziAt ? ` od ${esc(wiekPytania(p.prowadziAt))}` : ""}. ` +
+      "Odezwij się do tej osoby, zanim odpiszesz — klient zobaczy obie odpowiedzi.";
+  }
+
   /* Pola odpowiedzi NIE ruszamy, gdy człowiek w nim pisze — odświeżenie co
      30 s zjadałoby poprawki w połowie zdania. */
   if (!odpowiedzRuszona) $("pytanieOdpowiedz").value = p.odpowiedz || "";
@@ -4830,6 +4871,9 @@ function rysujSzczegolPytania(d) {
 
   rysujTowaryPytania(d.kartoteki || [], d.oferty || [], p.produkty || [], d.bladOfert || null);
   rysujWiedzePytania(d);
+  /* Wklejka z poczty nie niesie loginu, więc historii nie ma po czym szukać —
+     karta bez treści byłaby nagłówkiem obiecującym coś, czego nie ma. */
+  $("pytanieKlient").hidden = !p.kupujacyLogin;
 }
 
 function rysujTowaryPytania(kartoteki, oferty, wybraneModelu, bladOfert) {
@@ -4970,6 +5014,75 @@ function rysujWiedzePytania(d) {
   cel.hidden = false;
   cel.innerHTML =
     "<summary><h2>SKĄD TO DOPASOWANIE</h2></summary>" + czesci.join("");
+}
+
+/**
+ * Historia klienta — pobierana przy ROZWINIĘCIU, nie przy otwarciu pytania.
+ *
+ * Poza mapą `ZRODLA_WGLADU`, bo tamta kluczuje po „treść jest pusta", a ta
+ * karta zmienia zawartość z każdą sprawą: przy drugim pytaniu warunek byłby
+ * już nieprawdziwy i biuro oglądałoby historię poprzedniego klienta.
+ */
+async function pokazHistorieKlienta() {
+  const id = otwartePytanie;
+  if (id == null || !$("pytanieKlient").open || pytanieIdKlienta === id) return;
+  pytanieIdKlienta = id;
+  $("pytanieKlientTresc").innerHTML = '<p class="mute">Wczytuję…</p>';
+  try {
+    const d = await (await api(`/api/biuro/pytania/${id}/klient`)).json();
+    if (otwartePytanie !== id) return;
+    rysujHistorieKlienta(d.historia);
+  } catch (e) {
+    pytanieIdKlienta = null;
+    $("pytanieKlientTresc").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+function rysujHistorieKlienta(h) {
+  if (!h.login) {
+    $("pytanieKlientTresc").innerHTML =
+      '<p class="mute">Pytanie z wklejki — nie niesie loginu kupującego, więc historii nie ma po czym szukać.</p>';
+    return;
+  }
+  const czesci = [];
+
+  if (h.pytania.length) {
+    czesci.push(
+      "<h2>WCZEŚNIEJSZE PYTANIA</h2><table><tr><th>KIEDY</th><th>OFERTA</th><th>PYTANIE</th><th>NASZA ODPOWIEDŹ</th></tr>" +
+        h.pytania
+          .map(
+            (x) => `<tr>
+              <td class="mute" style="white-space:nowrap">${esc(wiekPytania(x.otrzymanoAt))}</td>
+              <td class="mute">${esc(x.ofertaTytul || "—")}</td>
+              <td>${esc((x.tresc || "").slice(0, 120))}</td>
+              <td class="mute">${esc((x.odpowiedz || "—").slice(0, 160))}</td>
+            </tr>`
+          )
+          .join("") +
+        "</table>"
+    );
+  }
+
+  if (h.zwroty.length) {
+    czesci.push(
+      "<h2>ZWROTY TEGO KLIENTA</h2><table><tr><th>REFERENCJA</th><th>STATUS</th><th>POZYCJI</th><th>KIEDY</th></tr>" +
+        h.zwroty
+          .map(
+            (z) => `<tr data-zwrot-histori="${z.id}">
+              <td class="b">${esc(z.referencja || "—")}</td>
+              <td>${esc(z.status)}</td>
+              <td>${z.pozycji}</td>
+              <td class="mute" style="white-space:nowrap">${esc((z.utworzonoAt || "").slice(0, 10))}</td>
+            </tr>`
+          )
+          .join("") +
+        "</table>"
+    );
+  }
+
+  $("pytanieKlientTresc").innerHTML = czesci.length
+    ? czesci.join("")
+    : `<p class="mute">${esc(h.login)} pisze do nas pierwszy raz i niczego nie zwracał.</p>`;
 }
 
 /** Rozmowa z Allegro — na żądanie, jak przy zwrotach: to prywatna korespondencja. */
@@ -5121,6 +5234,8 @@ $("pytaniaLista").addEventListener("click", (e) => {
   if (b) otworzPytanie(Number(b.dataset.pytanie));
 });
 $("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPytania(); });
+/* Rozwinięcie karty jest pytaniem o dane — zwinięta nie rusza serwera. */
+$("pytanieKlient").addEventListener("toggle", pokazHistorieKlienta);
 $("pytaniaFiltrStatus").addEventListener("change", odswiezPytania);
 $("pytaniaDni").addEventListener("change", odswiezStatystykiPytan);
 $("pytaniaOdswiez").addEventListener("click", async () => {
