@@ -563,6 +563,45 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   assert.ok(wCss.includes(wJs), `próg ${wJs} ze skryptu musi istnieć w arkuszu`);
 });
 
+test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja jedzie z blokiem", () => {
+  /* Od 0.93.0 zakładka ZWROTY rozkłada się jak PYTANIA i DOSTAWY: kolejka,
+     ocena pozycji, kontekst sprawy. Ten test pilnuje DWÓCH rzeczy, bo przy
+     dostawach (0.92.0) obie dały się złamać po cichu.
+
+     PIERWSZA: kontekst musi być RODZEŃSTWEM szczegółu, nie jego dzieckiem.
+     Wsunięty do środka karty sprawy wygląda w kodzie tak samo, a na ekranie
+     wraca pod tabelę pozycji — czyli dokładnie tam, skąd go zabraliśmy.
+
+     DRUGA: delegacja kliknięć musi siedzieć NA PRZENIESIONYM BLOKU. Przy
+     dostawach delegacja stała na `#szczegolNaglowek` — akurat na elemencie,
+     który przyciski opuściły — i przestała działać, nie zmieniając wyglądu
+     ani nie wywalając żadnego testu. Blok z przyciskami nosi swój nasłuch
+     ze sobą; wtedy przenosiny w HTML niczego nie urywają. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const widok = html.slice(
+    html.indexOf('id="widokZwroty"'),
+    html.indexOf('id="widokPytania"')
+  );
+  const szczegol = widok.indexOf('id="zwrotSzczegol"');
+  const kontekst = widok.indexOf('id="zwrotKontekst"');
+  assert.ok(szczegol !== -1 && kontekst !== -1, "obie strefy istnieją");
+  assert.ok(kontekst > widok.indexOf("</section>", szczegol),
+    "kontekst stoi OBOK sprawy, nie w jej środku");
+  assert.match(html, /#widokZwroty\.zSzczegolem \{ grid-template-columns:/,
+    "trzy kolumny opisane jedną regułą");
+
+  for (const blok of ["zwrotDokument", "zwrotWiadomosci", "zwrotKosz", "zwrotRozliczenie"]) {
+    assert.ok(widok.includes(`id="${blok}"`), `${blok} istnieje w zakładce`);
+    assert.ok(widok.indexOf(`id="${blok}"`) > kontekst,
+      `${blok} mieszka w kontekście, a nie w sprawie`);
+    assert.ok(html.includes(`$("${blok}").addEventListener`),
+      `${blok} ma własną delegację — inaczej przenosiny urywają przyciski`);
+  }
+});
+
 test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   /* Ikona bez bloku obok siebie jest przyciskiem, który nic nie robi, a blok
      bez ikony jest tekstem, którego nie da się otworzyć. Delegacja szuka

@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.93.0 — 25 sierpnia 2026
+
+**Zwroty domykają komplet zakładek pracy w trzech strefach.** Kolejka zwrotów
+po lewej, ocena pozycji na środku, sprawa dookoła po prawej — każda strefa
+z własnym przewijaniem.
+
+**Środek to jedna robota: ocenić towar z paczki.** Zostały tam pozycje
+z decyzjami, dopisywanie pozycji zwrotu ręcznego i tabela dokumentów, które
+z tych decyzji wychodzą. Zdjęcia kartoteki zostają przy wierszach, bo decyzję
+podejmuje się z paczką w ręku.
+
+**Do kontekstu poszło to, co sprawę otacza:** dokument sprzedaży, rozmowa
+z klientem, kosz zwrotowy i zwrot środków. Wszystkie cztery stały dotąd
+w jednym pionowym stosie pod tabelą pozycji, więc przy zwrocie na kilka
+pozycji przycisk zwrotu środków wypadał z ekranu — a to jest ostatni krok
+całej sprawy.
+
+**Kandydaci na dokument sprzedaży są kafelkami, nie tabelą.** Sześć kolumn
+mieści się w karcie na całą szerokość, ale nie w szynie kontekstu: ucinało
+kontrahenta w połowie, a powód dopasowania — jedyną przesłankę do wyboru —
+zjadało w całości.
+
+**Lista zwrotów ma wariant zwarty**, jak listy dostaw i pytań: numer z datą,
+kupujący, a pod spodem status z licznikiem pozycji i numerem dokumentu.
+
+**Decyzja odświeża też kolejkę obok.** Do tej wersji szło samo odświeżenie
+karty zwrotu i to wystarczało, bo listy przy otwartym zwrocie nie było widać.
+W trzech strefach kolejka stoi tuż obok nagłówka: po decyzji nagłówek mówił
+„OCENIONY", a wiersz obok „NOWY · 1/3 poz." — dwie sprzeczne prawdy na jednym
+ekranie. Zapytanie jest lokalne i nie idzie do Allegro.
+
+**Potwierdzenie zwrotu środków przestało być bursztynowe.** Bursztyn znaczy
+„to jest ta jedna rzecz do zrobienia tutaj", a odkąd strefy stoją obok siebie,
+świecił obok przycisku wystawienia dokumentów. Ten przycisk tylko odnotowuje
+zwrot środków wykonany w panelu Allegro.
+
+Poniżej progu, przy którym kolumny się nie mieszczą, wszystko wraca do układu
+sprzed zmiany: sprawa zasłania kolejkę, a kontekst schodzi pod nią.
+
 ## 0.92.0 — 25 sierpnia 2026
 
 **Dostawy dostały ten sam trójpodział co pytania klientów.** Lista dokumentów

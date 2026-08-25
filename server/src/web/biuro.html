@@ -197,6 +197,25 @@
     #widokDostawy.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
+
+    /* Zwroty na tym samym trójpodziale: kolejka zwrotów, ocena pozycji na
+       środku, sprawa dookoła po prawej. Kolumna kontekstu jest tu SZERSZA
+       niż przy dostawach, bo niesie kandydatów na dokument sprzedaży —
+       a to jest wybór z kilku wierszy, nie jedna nazwa dostawcy. */
+    #widokZwroty.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 22rem; }
+    #widokZwroty.zSzczegolem > .kontekst {
+      grid-column: 3; grid-row: 1 / span 50;
+      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
+      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      overflow: auto; overscroll-behavior: contain;
+    }
+    #widokZwroty.zSzczegolem > .szczegol {
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #widokZwroty.zSzczegolem > .szczegol > #zwrotWroc { align-self: flex-start; }
+    #widokZwroty.zSzczegolem .sprawa-tresc {
+      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+    }
   }
 
   /* ── Zwarte warianty list z zakładki PYTANIA ────────────────────────────────
@@ -211,7 +230,11 @@
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
     overflow: hidden; color: var(--ink-soft); font-size: 13px; margin-top: 2px;
   }
-  .sprawaStopka { display: flex; align-items: center; gap: 7px; margin-top: 6px; }
+  /* Stopka ŁAMIE SIĘ, zamiast ściskać elementy. W szynie 21 rem plakietka
+     „OCENIONY · CZEKA NA ŚRODKI" zjada całą linię, a licznik pozycji i numer
+     dokumentu rozpadały się wtedy w środku — „3/3" nad „poz.". */
+  .sprawaStopka { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; margin-top: 6px; }
+  .sprawaStopka > .mute { white-space: nowrap; }
 
   .towarKafel { display: block; }
   .towarGora { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
@@ -669,22 +692,36 @@
     <section class="card pelna szczegol" id="zwrotSzczegol" hidden>
       <button class="akcja cichy" id="zwrotWroc">← WSZYSTKIE ZWROTY</button>
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
-      <table id="zwrotPozycje" style="margin-top:10px"></table>
-      <div id="zwrotZamowienie" style="margin-top:14px"></div>
-      <div id="zwrotWiadomosci" style="margin-top:14px"></div>
-      <div id="zwrotDodajPozycje" style="margin-top:10px" hidden>
-        <h2>DOPISZ POZYCJĘ (ZWROT RĘCZNY)</h2>
-        <div class="filtry">
-          <div><label for="zwrotSzukajTowar">TOWAR (symbol / EAN / nazwa)</label>
-            <input id="zwrotSzukajTowar" size="28"></div>
-          <div><label for="zwrotIloscTowar">ILOŚĆ</label>
-            <input id="zwrotIloscTowar" size="5" inputmode="decimal" value="1"></div>
-          <div><button class="akcja cichy" id="zwrotSzukajTowarBtn">SZUKAJ</button></div>
+      <!-- ŚRODEK to jedna robota: ocenić każdą pozycję z paczki, dopisać to,
+           czego Allegro nie zgłosiło, i wystawić z tego dokumenty. Zdjęcia
+           towaru zostają tutaj — decyzję podejmuje się z paczką w ręku, więc
+           obrazek kartoteki musi być przy wierszu, a nie w szynie obok. -->
+      <div class="sprawa-tresc">
+        <table id="zwrotPozycje" style="margin-top:10px"></table>
+        <div id="zwrotDodajPozycje" style="margin-top:10px" hidden>
+          <h2>DOPISZ POZYCJĘ (ZWROT RĘCZNY)</h2>
+          <div class="filtry">
+            <div><label for="zwrotSzukajTowar">TOWAR (symbol / EAN / nazwa)</label>
+              <input id="zwrotSzukajTowar" size="28"></div>
+            <div><label for="zwrotIloscTowar">ILOŚĆ</label>
+              <input id="zwrotIloscTowar" size="5" inputmode="decimal" value="1"></div>
+            <div><button class="akcja cichy" id="zwrotSzukajTowarBtn">SZUKAJ</button></div>
+          </div>
+          <table id="zwrotTowarWyniki"></table>
         </div>
-        <table id="zwrotTowarWyniki"></table>
+        <div id="zwrotZamowienie" style="margin-top:14px"></div>
+        <div id="zwrotDokumenty" style="margin-top:14px"></div>
       </div>
-      <div id="zwrotDokument" style="margin-top:14px"></div>
-      <div id="zwrotDokumenty" style="margin-top:14px"></div>
+    </section>
+
+    <!-- KONTEKST zwrotu: do czego ten zwrot należy, co pisze klient, gdzie
+         pojechał towar i czym się rzecz kończy. Do 0.93.0 wszystko to stało
+         w jednym pionowym stosie POD tabelą pozycji — przy zwrocie na kilka
+         pozycji przycisk zwrotu środków wypadał z ekranu, a to jest ostatni
+         krok całej sprawy. Blok żyje i ginie razem ze szczegółem. -->
+    <section class="card pelna kontekst" id="zwrotKontekst" hidden>
+      <div id="zwrotDokument"></div>
+      <div id="zwrotWiadomosci" style="margin-top:14px"></div>
       <div id="zwrotKosz" style="margin-top:14px"></div>
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
     </section>
@@ -3805,7 +3842,34 @@ function rysujRaportZwrotow(r) {
   $("raportZwrotowKafle").innerHTML = kafle.map(([v, opis, zle]) => kafel(v, opis, !!zle)).join("");
 }
 
+/* Ostatnia lista z serwera. Wariant rysowania zależy od tego, czy zwrot jest
+   otwarty, a wejście w zwrot NIE odpytuje listy — bez tej pamięci szyna
+   przerysowałaby się dopiero przy najbliższym cyklu, czyli pół minuty później. */
+let zwrotyLista = [];
+
 function rysujZwroty(zwroty) {
+  zwrotyLista = zwroty;
+
+  /* Szyna: siedem kolumn nie mieści się w 21 rem, więc wiersz łamie się w pionie
+     — numer z datą, kupujący, a pod spodem status z oceną i dokumentem. */
+  if (otwartyZwrot != null && trybSzeroki()) {
+    $("zwrotLista").innerHTML =
+      zwroty.map((z) => `<tr data-zwrot="${z.id}"${z.id === otwartyZwrot ? ' class="aktywny"' : ""} style="cursor:pointer">
+        <td class="sprawaWiersz">
+          <span class="sprawaGora">
+            <span class="b">${esc(z.referencja || z.waybill)}</span>
+            <span class="mute">${esc((z.utworzonoAt || "").slice(0, 10))}</span>
+          </span>
+          <span class="sprawaTemat">${esc(z.kupujacyLogin || "kupujący nieznany")}</span>
+          <span class="sprawaStopka">${badgeZwrotu(z.status)}
+            <span class="mute">${z.ocenionych}/${z.pozycji} poz.</span>
+            <span class="mute">${
+              z.dokumentNumer ? esc(z.dokumentNumer) : "bez dokumentu"}</span></span>
+        </td>
+      </tr>`).join("") || '<tr><td class="mute">Brak zwrotów</td></tr>';
+    return;
+  }
+
   /* Wiersz otwartego zwrotu jest zaznaczony, bo w trybie szerokim lista stoi
      OBOK szczegółu i bez tego nie widać, który wiersz się właśnie ogląda. */
   const rows = zwroty.map((z) => `<tr data-zwrot="${z.id}"${z.id === otwartyZwrot ? ' class="aktywny"' : ""} style="cursor:pointer">
@@ -3891,7 +3955,11 @@ function ustawRodzenstwoZwrotu() {
      jest nagłówkiem bez treści. */
   if (!$("brakujaceLista").innerHTML) $("brakujaceKarta").hidden = true;
   if (!$("pominieteLista").innerHTML) $("pominieteKarta").hidden = true;
+  /* Kontekst żyje i ginie razem ze zwrotem — pusta trzecia strefa przy
+     zamkniętym zwrocie byłaby nagłówkiem bez treści. */
+  $("zwrotKontekst").hidden = !otwarty;
   $("widokZwroty").classList.toggle("zSzczegolem", otwarty);
+  rysujZwroty(zwrotyLista);     // wariant listy zależy od tego, co ustawiamy tu
   zaznaczWiersz("zwrotLista", "zwrot", otwartyZwrot);
 }
 
@@ -3911,6 +3979,17 @@ function zaznaczWiersz(tabelaId, klucz, id) {
 function otworzZwrot(id) {
   otwartyZwrot = id;
   $("zwrotSzczegol").hidden = false;
+  /* Treść poprzedniego zwrotu schodzi z ekranu OD RAZU. Bez tego kontekst
+     stoi z dokumentem, koszem i rozliczeniem tamtej sprawy, dopóki nie
+     wróci odpowiedź serwera — a to są bloki z przyciskami. */
+  for (const blok of ["zwrotPozycje", "zwrotZamowienie", "zwrotDokumenty",
+                      "zwrotDokument", "zwrotWiadomosci", "zwrotKosz",
+                      "zwrotRozliczenie"]) $(blok).innerHTML = "";
+  $("zwrotNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
+  /* Wątek dociąga się na klik i pamięta, dla którego zwrotu go pobrano.
+     Skoro blok właśnie wyczyściliśmy, ta pamięć musi zejść razem z nim —
+     inaczej powrót do TEGO SAMEGO zwrotu zostawia puste miejsce po rozmowie. */
+  zwrotIdWatku = null;
   ustawRodzenstwoZwrotu();
   odswiezSzczegolZwrotu();
 }
@@ -4029,16 +4108,25 @@ function rysujSzczegolZwrotu(z) {
       </p>`;
   } else {
     const kandydaci = z.kandydaciDokumentu || [];
+    /* Kandydat jako KAFEL, nie wiersz na sześć kolumn. Blok stoi w szynie
+       kontekstu (22 rem) — tam „DOKUMENT · DATA · KONTRAHENT · PUNKTY ·
+       DLACZEGO" ucinało się w połowie kontrahenta, a powód dopasowania,
+       czyli jedyna przesłanka do wyboru, nie mieścił się wcale. */
     $("zwrotDokument").innerHTML = "<h2>DOKUMENT SPRZEDAŻY · KANDYDACI</h2>" + (kandydaci.length
-      ? "<table><tr><th>DOKUMENT</th><th>DATA</th><th>KONTRAHENT</th><th>PUNKTY</th><th>DLACZEGO</th><th></th></tr>" +
-        kandydaci.map((k) => `<tr>
-            <td class="b">${esc(k.numer)} <span class="badge mute2">${esc(k.typ)}</span></td>
-            <td class="mute">${esc(k.data)}</td>
-            <td>${esc(k.kontrahent || "—")}</td>
-            <td class="b">${k.punkty}</td>
-            <td class="mute">${esc(k.powody.join("; ") || "bliskość daty")}</td>
-            <td>${zamkniety ? "" : `<button class="akcja cichy" data-wybierz="${k.dokId}">WYBIERZ</button>`}</td>
-          </tr>`).join("") + "</table>"
+      ? "<table>" +
+        kandydaci.map((k) => `<tr><td class="towarKafel">
+            <span class="towarGora">
+              <span class="b">${esc(k.numer)}</span>
+              <span class="badge mute2">${esc(k.typ)}</span>
+              <span class="mute" style="margin-left:auto">${k.punkty} pkt</span>
+            </span>
+            <span class="towarFakty">
+              <span>${esc(k.data)}</span><span>${esc(k.kontrahent || "—")}</span>
+            </span>
+            <span class="towarFakty">${esc(k.powody.join("; ") || "bliskość daty")}</span>
+            ${zamkniety ? "" : `<span class="towarDol">
+              <button class="akcja cichy" data-wybierz="${k.dokId}">WYBIERZ</button></span>`}
+          </td></tr>`).join("") + "</table>"
       : '<p class="mute">Brak kandydatów w oknie sprzedaży — dokument można będzie wskazać, gdy pojawi się w imporcie.</p>');
   }
 
@@ -4052,7 +4140,11 @@ function rysujSzczegolZwrotu(z) {
     ? `<span class="badge ok">ŚRODKI ODDANE</span>
        <span class="mute">${esc(z.zwrotSrodkow.przez)} · ${esc(z.zwrotSrodkow.at.slice(0, 16).replace("T", " "))}</span>`
     : (z.status === "oceniony"
-        ? '<button class="akcja" data-srodki>ODDANO ŚRODKI W PANELU</button>'
+        /* CICHY, nie bursztynowy. Bursztyn znaczy „to jest ta jedna rzecz do
+           zrobienia tutaj" — a tą rzeczą jest WYSTAW DOKUMENTY na środku.
+           Ten przycisk tylko ODNOTOWUJE zwrot środków wykonany w panelu
+           Allegro; dwa bursztyny obok siebie kazałyby wybierać między nimi. */
+        ? '<button class="akcja cichy" data-srodki>ODDANO ŚRODKI W PANELU</button>'
         : '<span class="mute">Najpierw decyzja przy każdej pozycji — potem zwrot środków.</span>');
   $("zwrotRozliczenie").innerHTML = `<h2>ZWROT ŚRODKÓW (PANEL ALLEGRO)</h2>
     <p class="mute" style="margin-bottom:8px">
@@ -4188,7 +4280,13 @@ async function pokazWiadomosci(id) {
 }
 
 async function akcjaZwrotu(fn) {
-  try { await fn(); await odswiezSzczegolZwrotu(); }
+  /* `odswiezZwroty` odświeża szczegół, a POTEM — tylko w trybie szerokim —
+     listę obok. Do 0.93.0 szło tu samo odświeżenie szczegółu i to wystarczało,
+     bo listy przy otwartym zwrocie nie było widać. W trzech strefach kolejka
+     stoi TUŻ OBOK nagłówka: po decyzji nagłówek mówił „OCENIONY", a wiersz
+     dwa centymetry w lewo dalej „NOWY · 1/3 poz." — dwie sprzeczne prawdy
+     na jednym ekranie. Zapytanie jest lokalne (SQLite), nie idzie do Allegro. */
+  try { await fn(); await odswiezZwroty(); }
   catch (e) { toast(e.message); }
 }
 
