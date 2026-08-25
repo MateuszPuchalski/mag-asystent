@@ -262,8 +262,15 @@
   #login .blad { color: var(--err); font-size: 13px; min-height: 18px; }
   .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); }
   input.szukaj { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; width: 240px; margin-bottom: 10px; font-family: inherit; }
+  /* Pola wielowierszowe dziedziczą krój strony i wygląd pozostałych pól.
+     Bez tego przeglądarka daje `textarea` domyślny monospace bez ramki — a
+     redaguje się w nich ODPOWIEDZI DO KLIENTÓW, treść pytania z poczty oraz
+     prompt eksperta. Reguła istniała dotąd wyłącznie dla `dialog textarea`,
+     więc jedyne poprawnie wyglądające pole stało w oknie dialogowym. */
+  textarea { font: inherit; border: 1px solid var(--border); border-radius: 12px;
+             padding: 8px 10px; resize: vertical; }
   /* fokus pola = bursztynowa ramka WertisTextField */
-  input:focus, select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
   /* ── Zakładki ──────────────────────────────────────────────────────────────
      Podgląd urósł z dwóch kart do czterech obszarów. Jedna kolumna kart
@@ -390,8 +397,9 @@
      natywne wyśrodkowanie elementu <dialog>. */
   dialog { margin: auto; border: 1px solid var(--card-border); border-radius: 14px; padding: 18px 20px; max-width: 440px; width: calc(100% - 40px); box-shadow: 0 10px 32px rgba(42, 42, 44, 0.25); background: var(--card); color: var(--ink); }
   dialog::backdrop { background: rgba(42, 42, 44, 0.45); }
-  dialog textarea { width: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; font: inherit; resize: vertical; margin-top: 8px; }
-  dialog textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
+  /* Reszta wyglądu przyszła regułą `textarea` wyżej — tu zostaje tylko to,
+     co dotyczy pola W DIALOGU. */
+  dialog textarea { width: 100%; margin-top: 8px; }
   dialog .dialogAkcje { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   button.akcja.grozny { background: var(--err); color: #fff; }
   button.akcja.grozny:hover { background: #9c3232; }

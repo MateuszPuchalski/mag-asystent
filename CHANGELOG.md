@@ -33,6 +33,24 @@ historii nie przepisujemy.
 
 ---
 
+## 0.89.1 — 25 sierpnia 2026
+
+**Odpowiedzi do klientów przestały się pisać maszynowym krojem.** Reguła
+`font: inherit` obowiązywała w panelu wyłącznie dla pola w oknie dialogowym,
+więc cztery pola wielowierszowe poza nim renderowała przeglądarka: domyślnym
+monospace'em, bez ramki i bez zaokrąglenia, jakich używa reszta panelu.
+
+Najgorzej wypadało pole odpowiedzi na zakładce PYTANIA KLIENTÓW. Tekst, który
+klient czyta potem na Allegro, redagowało się w kroju, w którym nigdy się nie
+pokaże — więc długość akapitu i łamanie wierszy na ekranie nie mówiły nic
+o tym, jak wiadomość wygląda naprawdę. Ten sam los miały treść pytania
+wklejana z poczty oraz prompt eksperta i fakty firmowe w ustawieniach.
+
+Wygląd pola jest teraz jeden dla całego panelu, a pierścień bursztynowy przy
+zaznaczeniu obowiązuje tak samo jak przy zwykłych polach jednowierszowych.
+Reguła dla pola w dialogu została odchudzona do tego, co dotyczy wyłącznie
+dialogu: szerokości i odstępu z góry.
+
 ## 0.89.0 — 25 sierpnia 2026
 
 **Zakładka PYTANIA KLIENTÓW przestała być formularzem, a zaczęła być
