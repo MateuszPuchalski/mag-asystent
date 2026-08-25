@@ -33,6 +33,44 @@ historii nie przepisujemy.
 
 ---
 
+## 0.90.0 — 25 sierpnia 2026
+
+**Panel biura odzyskał hierarchię.** Zgłoszenie brzmiało „zero hierarchii, wątek
+klienta powinien być na środku" i miało pokrycie w wartościach, nie w guście.
+Etykieta sekcji była tym samym pismem co treść i opisywała **wszystko** —
+pytanie klienta tak samo jak statystyki. Skala kończyła się na piętnastu
+pikselach symbolu towaru, więc nic na ekranie nie było ani tytułem sprawy,
+ani tekstem do czytania.
+
+**Etykieta cichnie, treść rośnie.** Nagłówki sekcji schodzą do dziesięciu
+pikseli pisma wąskiego w kolorze przygaszonym — nazywają sekcję, zamiast z nią
+konkurować. W drugą stronę idą dwa stopnie, których panel nie miał wcale:
+**temat sprawy** i **rozmiar do czytania**. Tytuł oferty stoi teraz osobno,
+w stopniu tytułu; wcześniej jechał w jednej linii z loginem, tym samym pismem
+co reszta, więc sprawa nie miała na ekranie nazwy — tylko wiersz danych.
+
+Rozmowa z klientem i pole odpowiedzi czytają się w piętnastu pikselach
+z interlinią jeden i sześć dziesiątych. Do tej wersji wątek czytało się
+w rozmiarze komórki tabeli, a to jest tekst, nad którym siedzi się minutami.
+
+**Bursztyn odzyskuje znaczenie.** Był w logo, zakładkach, plakietkach,
+przyciskach, odnośnikach, ramkach i pierścieniu zaznaczenia — kolor, który
+wskazuje wszystko, nie wskazuje niczego. Na karcie sprawy trzy sąsiadujące
+przyciski świeciły nim naraz. Zostaje przy **jednej akcji głównej**: wysłaniu
+odpowiedzi do klienta. Przeliczenie szkicu i zapis to kroki po drodze i mają
+wygląd drugorzędny. Strzałka sekcji zwijanej też przestaje być bursztynowa.
+
+**Przycisk zablokowany wreszcie na to wygląda.** Kod używał atrybutu
+`disabled`, a arkusz stylów nie miał dla niego ani jednej reguły — przycisk,
+którego nie da się kliknąć, wyglądał identycznie jak czynny.
+
+Przy okazji dwie usterki widoczne gołym okiem: karta sprawy pisała **„1 dni"**,
+a ostrzeżenie o cudzej sprawie — **„od 1 godz.. Odezwij się"** z dwiema
+kropkami, bo licznik wieku sam kończy się kropką.
+
+Zmiana jest wyłącznie wizualna. Układ, struktura strony i zapisy zostają
+nietknięte — przebudowa układu idzie osobno.
+
 ## 0.89.1 — 25 sierpnia 2026
 
 **Odpowiedzi do klientów przestały się pisać maszynowym krojem.** Reguła
