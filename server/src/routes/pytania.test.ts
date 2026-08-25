@@ -150,6 +150,13 @@ test("pełny przepływ: odśwież → szkic → poprawka → wysyłka → nastę
   assert.ok(kartoteki.some((k: { symbol: string }) => k.symbol === "TEST-LINIA-TODO"));
   assert.equal(kartoteki[0].zdjecieUrl, `/api/products/${kartoteki[0].twId}/zdjecie`);
   assert.ok(szczegol.json().oferty.length > 0);
+  /* Panel ma dostać to samo, co model: po czym szukaliśmy i czy pusta lista
+     aukcji znaczy „nie mamy", czy „nie udało się sprawdzić". Bez `bladOfert`
+     ekran pisał „nic nie pasuje" także wtedy, gdy Allegro padło. */
+  assert.ok(Array.isArray(szczegol.json().frazy) && szczegol.json().frazy.length > 0);
+  assert.ok(Array.isArray(szczegol.json().dopasowania));
+  assert.ok(Array.isArray(szczegol.json().poprzednie));
+  assert.equal(szczegol.json().bladOfert, null);
 
   const rozmowa = await app.inject({
     method: "GET", url: `/api/biuro/pytania/${p.id}/wiadomosci`, headers: naglowki,

@@ -599,6 +599,9 @@ CREATE TABLE IF NOT EXISTS zwrot (
 CREATE INDEX IF NOT EXISTS ix_zwrot_status ON zwrot(status, id);
 -- skan sprawdza najpierw, czy etykieta już ma rekord — przy każdym skanie
 CREATE INDEX IF NOT EXISTS ix_zwrot_waybill ON zwrot(waybill);
+-- Ten sam powód co przy pytaniach (0.89.0): klient pytający o część bywa tym
+-- samym, który tydzień temu coś zwrócił, i to zmienia treść odpowiedzi.
+CREATE INDEX IF NOT EXISTS ix_zwrot_kupujacy ON zwrot(kupujacy_login);
 
 CREATE TABLE IF NOT EXISTS zwrot_pozycja (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -894,11 +897,21 @@ CREATE TABLE IF NOT EXISTS pytanie (
   -- najtańszy research asortymentu, jaki firma może mieć.
   w_ofercie      INTEGER,
   utworzono_at   TEXT NOT NULL,
-  utworzono_przez TEXT NOT NULL
+  utworzono_przez TEXT NOT NULL,
+  -- Kto wziął sprawę i kiedy (0.89.0). Przy kilku osobach w biurze dwie
+  -- odpowiedzi na to samo pytanie to nie teoria — a Allegro pokaże klientowi
+  -- obie. To ZNACZNIK, nie blokada: pole zwalnia się przy wysłaniu i przy
+  -- zamknięciu, a cudzej sprawy nikt nie musi odbijać, żeby ją dokończyć.
+  prowadzi       TEXT,
+  prowadzi_at    TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_pytanie_status ON pytanie(status, id);
 CREATE INDEX IF NOT EXISTS ix_pytanie_thread ON pytanie(thread_id);
 CREATE INDEX IF NOT EXISTS ix_pytanie_otrzymano ON pytanie(otrzymano_at);
+-- Historia klienta (0.89.0). Kupujący, który pisze drugi raz, zwykle pisze
+-- w tej samej sprawie — a odpowiedź „jak pisaliśmy wcześniej" wymaga
+-- znalezienia tamtej rozmowy. Bez indeksu szło to pełnym skanem tabeli.
+CREATE INDEX IF NOT EXISTS ix_pytanie_kupujacy ON pytanie(kupujacy_login);
 
 -- Prompt ekspercki i fakty firmowe. JEDEN wiersz (wzorzec `allegro_token`):
 -- to DANE redagowane w panelu przez właściciela, nie konfiguracja z env.

@@ -1462,6 +1462,19 @@ Pokrętło `ALLEGRO_POLL_MS` dzieli z zapowiedziami zwrotów i od 0.85.0 stoi
 domyślnie na zerze. To ta sama praca na tym samym koncie, więc i jedna decyzja
 o tym, czy cokolwiek chodzi samo.
 
+### Kilka osób w skrzynce (0.89.0)
+
+Lista pytań ma kolumnę **PROWADZI**, a wejście w sprawę, którą ktoś już wziął,
+wita ostrzeżenie z nazwiskiem. To znacznik, nie blokada — sprawy nie trzeba
+odbijać, żeby ją dokończyć. Klient i tak zobaczy każdą wysłaną odpowiedź.
+Jedyną obroną przed dwiema jest to, żeby ludzie się widzieli.
+
+Nazwisko pojawia się, gdy ktoś **policzy szkic dla tej sprawy albo zapisze
+odpowiedź**. Samo otwarcie pytania nie zajmuje niczego — panel biura nie
+zapisuje przy patrzeniu na ekran. Wysłanie i zamknięcie sprawę zwalniają.
+
+Nic tu nie trzeba ustawiać. Kolumny w bazie zakłada aktualizacja przy starcie.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

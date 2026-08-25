@@ -43,12 +43,12 @@ beforeEach(() => {
   zresetujAdapterAllegro();
 });
 
-function towar(twId: number, sym: string, nazwa: string, opis = ""): void {
+function towar(twId: number, sym: string, nazwa: string, opis = "", ean = ""): void {
   db()
     .prepare(
-      "INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, opis, lokalizacja) VALUES (?,?,?,'',?,'')"
+      "INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, opis, lokalizacja) VALUES (?,?,?,?,?,'')"
     )
-    .run(twId, sym, nazwa, opis);
+    .run(twId, sym, nazwa, ean, opis);
   db().prepare("INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,1,5,0)").run(twId);
 }
 
@@ -272,6 +272,50 @@ test("potwierdzone dopasowanie wraca do kontekstu następnego pytania", async ()
   assert.match(k.tekst, /T375 → TEST-LINIA-TODO/);
 });
 
+/* „Nie mamy" i „nie mamy, ale przyjdzie" to dla klienta dwie różne odpowiedzi.
+   Do 0.89.0 kontekst pytania niósł sam stan, więc druga była nie do napisania —
+   choć serwer liczył ją od dawna na karcie towaru. */
+test("kartoteka w kontekście niesie EAN, towar w drodze i zamienniki rozstrzygnięte", async () => {
+  towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", "", "5900000000036");
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  const k = await P.kontekstPytania(p);
+  const trafienie = k.kartoteki.find((x) => x.symbol === "TEST-LINIA-TODO")!;
+
+  assert.ok(trafienie, "kartoteka z aukcji ma trafić do kontekstu");
+  assert.equal(trafienie.ean, "5900000000036", "EAN bywa jedynym, co klient podaje");
+  assert.ok(Array.isArray(trafienie.zamowione));
+  assert.ok(Array.isArray(trafienie.wDostawie));
+  /* Podział na nasze i cudze, nie płaska lista kandydatów: „mamy zamiennik"
+     wolno obiecać, cudzego numeru katalogowego nie sprzedajemy. */
+  assert.ok(Array.isArray(trafienie.zamienniki.znane));
+  assert.ok(Array.isArray(trafienie.zamienniki.obce));
+});
+
+/* Kontekst szedł do 0.89.0 WYŁĄCZNIE do modelu — panel dostawał sam tekst
+   promptu, którego nie pokazywał. Te pola są po to, żeby człowiek widział to
+   samo co model: po czym szukaliśmy i co już potwierdziliśmy. */
+test("kontekst wystawia frazy i potwierdzone dopasowania osobnymi polami", async () => {
+  towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta");
+  db()
+    .prepare(
+      `INSERT INTO dopasowanie (urzadzenie, symbol, tw_id, potwierdzono_at, potwierdzono_przez)
+       VALUES ('T375','TEST-LINIA-TODO',900036,datetime('now'),'anna')`
+    )
+    .run();
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  const k = await P.kontekstPytania(p);
+
+  assert.ok(k.frazy.includes("T375"), "frazy szukania mają wyjść na zewnątrz");
+  assert.equal(k.dopasowania.length, 1);
+  assert.equal(k.dopasowania[0].urzadzenie, "T375");
+  assert.equal(k.dopasowania[0].symbol, "TEST-LINIA-TODO");
+  /* Adapter dev nie chodzi po sieci, więc pusta lista aukcji znaczy tu
+     „nie mamy", a nie „nie sprawdziliśmy" — i to musi być rozróżnialne. */
+  assert.equal(k.bladOfert, null);
+});
+
 test("prompt i fakty zapisują się osobno i nie kasują się nawzajem", () => {
   P.zapiszPrompt("Jesteś doradcą.", "admin");
   P.zapiszFakty("Wysyłka do Chorwacji: 60 zł.", "admin");
@@ -279,6 +323,53 @@ test("prompt i fakty zapisują się osobno i nie kasują się nawzajem", () => {
   assert.equal(k.prompt, "Jesteś doradcą.");
   assert.equal(k.fakty, "Wysyłka do Chorwacji: 60 zł.");
   assert.equal(k.zmienionoPrzez, "admin");
+});
+
+
+/* ── Historia klienta i prowadzenie sprawy ─────────────────────────────────── */
+
+test("historia klienta zbiera jego wcześniejsze pytania, a wklejka nie ma po czym szukać", async () => {
+  await P.synchronizujPytania("test");
+  const lista = P.listaPytan({ limit: 50 });
+  const p = lista.find((x) => x.threadId === "dev-pyt-1")!;
+  const inne = lista.find((x) => x.threadId === "dev-pyt-2")!;
+  /* Oba pytania temu samemu loginowi — dopiero wtedy historia ma sens. */
+  db().prepare("UPDATE pytanie SET kupujacy_login = 'klient-x' WHERE id IN (?,?)").run(p.id, inne.id);
+
+  const h = P.historiaKlienta(p.id);
+  assert.equal(h.login, "klient-x");
+  assert.equal(h.pytania.length, 1, "bieżąca sprawa nie jest własną historią");
+  assert.equal(h.pytania[0].id, inne.id);
+
+  const zWklejki = await P.pytanieZWklejki({ tekst: "Czy pasuje do kosiarki?" }, "biuro");
+  const pusta = P.historiaKlienta(zWklejki.id);
+  assert.equal(pusta.login, null);
+  assert.deepEqual(pusta.pytania, []);
+});
+
+/* Panel biura ma regułę „zero zapisu przy samym PATRZENIU" (routes/biuro.test.ts),
+   więc prowadzącego stempluje PRACA nad sprawą, nie jej otwarcie. */
+test("sprawę zajmuje redakcja odpowiedzi, a wysłanie ją zwalnia", async () => {
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  assert.equal(p.prowadzi, null, "samo pobranie pytania nikogo nie zajmuje");
+
+  const po = P.zapiszOdpowiedz(p.id, "Tak, ta część pasuje.", "anna");
+  assert.equal(po.prowadzi, "anna");
+  assert.ok(po.prowadziAt);
+
+  const wynik = await P.wyslijOdpowiedz(p.id, "anna");
+  assert.equal(wynik.pytanie.status, "wyslane");
+  assert.equal(wynik.pytanie.prowadzi, null, "zamknięta sprawa nikogo nie zajmuje");
+});
+
+test("liczniki rozdzielają czekające na szkic od gotowych do sprawdzenia", async () => {
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 })[0];
+  P.zapiszOdpowiedz(p.id, "Szkic po ręce.", "anna");
+  const l = P.licznikiPytan();
+  assert.equal(l.nowe + l.szkice, P.licznikOtwartych());
+  assert.ok(l.szkice >= 1);
 });
 
 /* ── Statystyki ────────────────────────────────────────────────────────────── */

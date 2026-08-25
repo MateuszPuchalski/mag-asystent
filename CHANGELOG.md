@@ -33,6 +33,73 @@ historii nie przepisujemy.
 
 ---
 
+## 0.89.0 — 25 sierpnia 2026
+
+**Zakładka PYTANIA KLIENTÓW przestała być formularzem, a zaczęła być
+stanowiskiem pracy.** Serwer liczył od 0.80.0 znacznie więcej, niż panel
+rysował, a najcenniejsze dane magazynowe nie wchodziły do kontekstu wcale.
+
+**Treści pytania NIE BYŁO na ekranie.** Szczegół nie używał jej ani razu:
+pytanie widać było na liście, obcięte do 120 znaków, albo w ROZMOWIE — a ta
+jedzie z Allegro osobnym zapytaniem. Przy wklejce ze screenshota transkrypcja
+nie pojawiała się nigdzie, a gdy Allegro nie odpowiadało, zostawał pusty
+prostokąt, choć treść leżała w naszej bazie. Teraz stoi nad rozmową i pochodzi
+stąd, gdzie zawsze była.
+
+**„Nie mamy" to nie to samo co „nie sprawdziliśmy".** Awaria pobierania aukcji
+dawała komunikat „Nic nie pasuje" — zdanie, które biuro mogło w dobrej wierze
+przepisać klientowi. Powód niepowodzenia szedł dotąd wyłącznie do modelu;
+teraz panel mówi wprost, że lista jest niepełna, i odradza odpisywanie „brak".
+
+**Termin dostawy w odpowiedzi dla klienta.** Kontekst niósł sam stan, więc
+„nie mamy, ale przyjdzie 20.08" było odpowiedzią nie do napisania — mimo że
+karta towaru liczy to od dawna. Kartoteka przy pytaniu niesie teraz towar
+zamówiony u dostawcy wraz z terminem, towar przyjęty i jeszcze nierozłożony,
+EAN, stan skorygowany o kolejkę zapisów oraz zamienniki **rozstrzygnięte
+kartoteką**: nasz symbol wolno klientowi obiecać, cudzy numer katalogowy służy
+wyłącznie do rozpoznania części. Wszystko z naszej bazy — ani jednego
+wywołania Allegro więcej, bo po blokadzie z 0.85.0 to jedyny zasób, którego
+trzeba tu pilnować.
+
+**Widać, skąd wzięło się dopasowanie.** Po czym szukaliśmy, co potwierdziliśmy
+wcześniej i co odpowiadaliśmy na pytania o tę samą ofertę — wszystko to szło
+do modelu i ginęło. Stoi w zwijanej sekcji, razem ze znacznikiem przy
+pozycjach, które wskazał MODEL. To one trafiają do bazy dopasowań przy
+wysyłce, więc człowiek zatwierdzał je dotąd w ciemno.
+
+**HISTORIA KLIENTA.** Ten sam login pisze drugi raz częściej, niż się wydaje,
+a odpowiedź brzmi inaczej, gdy widać, że tydzień temu coś zwracał. Karta jest
+zwinięta i pyta serwer dopiero po rozwinięciu — otwarcie sprawy ma zostać
+tanie. Zwroty i pytania po loginie kupującego dostały indeksy; dotąd szło to
+pełnym skanem tabeli.
+
+**Kto prowadzi sprawę.** Przy kilku osobach w biurze dwie odpowiedzi na jedno
+pytanie to nie teoria, a klient zobaczy obie. Kolumna na liście mówi, kto
+sprawę wziął; wejście w cudzą wita ostrzeżenie z nazwiskiem i czasem.
+
+To jest ZNACZNIK, nie zamek — i nie stawia własnego przycisku. Nazwisko
+stempluje **praca**: policzenie szkicu dla tej jednej sprawy albo zapisanie
+odpowiedzi. Otwarcie ekranu nie zapisuje niczego, bo panel biura ma tę regułę
+od 0.18.0 i ta zmiana nie jest od niej wyjątkiem. Zbiorcze liczenie szkiców
+też nie stempluje: ticker wstawiłby nazwę usługi, a ODŚWIEŻ zająłby pięć
+spraw komuś, kto chciał tylko sprawdzić, co przyszło. Wysłanie i zamknięcie
+zwalniają sprawę.
+
+**Licznik przy zakładce rozróżnia dwa stany.** Suma zlewała sprawę gotową do
+przeczytania ze sprawą, dla której nikt jeszcze nie policzył szkicu — a od
+0.85.0 ta druga grupa rośnie sama, bo ręczne ODŚWIEŻ liczy najwyżej pięć
+szkiców naraz. Podpowiedź pod kursorem podaje oba.
+
+**Drobiazgi z tej samej rodziny.** Licznik znaków wobec limitu Allegro (2000)
+— dotąd limit egzekwował serwer PO napisaniu całości. PRZYWRÓĆ SZKIC, gdy
+poprawka wyszła gorzej od oryginału. Stan konta Allegro na banerze, bo WYŚLIJ
+od niego zależy, a zakładka nie miała jak uprzedzić. Dokładna data pytania
+pod kursorem.
+
+**Układ.** Zakładka nigdy nie dostawała klasy układu dwukolumnowego, więc
+otwarte pytanie chowało kolejkę nawet na ekranie 3440 px — inaczej niż
+DOSTAWY i ZWROTY. Ten sam próg, ta sama reguła, wiersz listy zaznaczony.
+
 ## 0.88.5 — 23 sierpnia 2026
 
 <!-- docs_check: historia -->

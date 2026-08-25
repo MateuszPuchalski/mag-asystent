@@ -5,7 +5,12 @@ import { logEvent } from "./events.js";
 import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import type { OfertaAllegro, WiadomoscAllegro } from "../adapters/allegro.js";
-import { kandydaciZamiennikow } from "./zamienniki.js";
+import { dostepneW, zamiennikiZOpisu } from "./stock.js";
+import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
+import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
+import type { ProductRow, Zamienniki } from "../types.js";
+import type { ZamowioneUDostawcy } from "./zamowienia-towaru.js";
+import type { WDostawie } from "./dostawy-towaru.js";
 import {
   aiTryb,
   generujOdpowiedz,
@@ -66,6 +71,9 @@ export interface Pytanie {
   urzadzenie: string | null;
   produkty: Array<{ twId: number | null; symbol: string }>;
   wOfercie: boolean | null;
+  /** Kto wziął sprawę — znacznik dla reszty biura, nie blokada. */
+  prowadzi: string | null;
+  prowadziAt: string | null;
 }
 
 /** Ile ostatnich poprawionych odpowiedzi pokazujemy modelowi jako wzór stylu. */
@@ -102,6 +110,8 @@ function zWiersza(w: Record<string, unknown>): Pytanie {
     edytowano: (w.edytowano as number) === 1,
     kategoria: tekstLubNull(w.kategoria),
     urzadzenie: tekstLubNull(w.urzadzenie),
+    prowadzi: tekstLubNull(w.prowadzi),
+    prowadziAt: tekstLubNull(w.prowadzi_at),
     produkty,
     wOfercie: w.w_ofercie == null ? null : (w.w_ofercie as number) === 1,
   };
@@ -138,6 +148,25 @@ export function licznikOtwartych(): number {
     .prepare("SELECT COUNT(*) AS ile FROM pytanie WHERE status IN ('nowe','szkic')")
     .get() as { ile: number };
   return w.ile;
+}
+
+/**
+ * Otwarte Z PODZIAŁEM na „czeka na szkic" i „szkic gotowy".
+ *
+ * Sama suma zlewa dwa różne stany pracy. Od 0.85.0 nic nie liczy szkiców
+ * w tle, a ręczne ODŚWIEŻ bierze najwyżej pięć — więc przy dziesięciu nowych
+ * pytaniach reszta zostaje bez szkicu i licznik nie ma jak tego powiedzieć.
+ */
+export function licznikiPytan(): { nowe: number; szkice: number } {
+  const w = db()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN status = 'nowe'  THEN 1 ELSE 0 END) AS nowe,
+         SUM(CASE WHEN status = 'szkic' THEN 1 ELSE 0 END) AS szkice
+       FROM pytanie`
+    )
+    .get() as { nowe: number | null; szkice: number | null };
+  return { nowe: w.nowe ?? 0, szkice: w.szkice ?? 0 };
 }
 
 /** Najstarsze otwarte pytanie poza wskazanym — tryb „skrzynka do zera". */
@@ -324,9 +353,24 @@ export interface TrafienieKartoteki {
   twId: number;
   symbol: string;
   nazwa: string;
+  ean: string;
+  /**
+   * Stan magazynu głównego SKORYGOWANY o kolejkę zapisów — to samo, co widzi
+   * kolektor na karcie towaru. Surowy stan z read-modelu potrafi kłamać przez
+   * kilka minut po przesunięciu, a klientowi odpisuje się raz.
+   */
   stan: number;
   lokalizacje: string[];
-  zamienniki: string[];
+  /**
+   * Zamienniki ROZSTRZYGNIĘTE kartoteką: `znane` mamy u siebie, `obce` to cudze
+   * numery katalogowe. Do 0.89.0 szła stąd płaska lista kandydatów i nie było
+   * jak odróżnić „mamy zamiennik" od „klient podał numer, którego nie znamy".
+   */
+  zamienniki: Zamienniki;
+  /** Zamówione u dostawcy i jeszcze nieprzyjęte — „nie mamy, ale będzie". */
+  zamowione: ZamowioneUDostawcy[];
+  /** Przyjechało i czeka na rozłożenie — fizycznie jest, na półce jeszcze nie. */
+  wDostawie: WDostawie[];
 }
 
 /**
@@ -342,7 +386,7 @@ export interface TrafienieKartoteki {
 function szukajKartotek(frazy: string[], symbole: string[] = []): TrafienieKartoteki[] {
   const znalezione = new Map<number, TrafienieKartoteki>();
 
-  const dodaj = (twId: number, symbol: string, nazwa: string, stan: number, locs: string[]) => {
+  const dodaj = (twId: number, p: ProductRow) => {
     if (znalezione.has(twId) || znalezione.size >= KARTOTEK_W_KONTEKSCIE) return;
     /* Opis kartoteki nosi zamienniki („Zamiennie: …") i jest jedynym
        miejscem, gdzie wiedza o pasowaniu już u nas jest — `ProductRow` go
@@ -352,11 +396,17 @@ function szukajKartotek(frazy: string[], symbole: string[] = []): TrafienieKarto
       | undefined;
     znalezione.set(twId, {
       twId,
-      symbol,
-      nazwa,
-      stan,
-      lokalizacje: locs,
-      zamienniki: kandydaciZamiennikow(opis?.opis ?? "", symbol).slice(0, 8),
+      symbol: p.sym,
+      nazwa: p.name,
+      ean: p.ean,
+      /* Ta sama korekta o kolejkę, którą liczy karta towaru — nie surowe
+         `p.mag`. Osiem kartotek to osiem zapytań do LOKALNEGO SQLite; żadne
+         z nich nie dotyka Allegro, a to jest tu jedyny reglamentowany zasób. */
+      stan: dostepneW(config.magId.MAG, twId),
+      lokalizacje: p.locs,
+      zamienniki: zamiennikiZOpisu(subiekt, opis?.opis ?? "", p.sym),
+      zamowione: zamowioneUDostawcy(twId),
+      wDostawie: nierozlozoneZDostaw(twId),
     });
   };
 
@@ -364,20 +414,26 @@ function szukajKartotek(frazy: string[], symbole: string[] = []): TrafienieKarto
      twarde dopasowanie, a nie trafienie po słowach. */
   for (const symbol of symbole) {
     for (const p of subiekt.getProductsBySymbols([symbol])) {
-      dodaj(p.id, p.sym, p.name, p.mag, p.locs);
+      dodaj(p.id, p);
     }
   }
   for (const fraza of frazy) {
     if (znalezione.size >= KARTOTEK_W_KONTEKSCIE) break;
     for (const p of subiekt.szukajZFurtka(fraza, KARTOTEK_W_KONTEKSCIE).wyniki) {
-      dodaj(p.id, p.sym, p.name, p.mag, p.locs);
+      dodaj(p.id, p);
     }
   }
   return [...znalezione.values()];
 }
 
 /** Potwierdzone wcześniej pary maszyna→część dla fraz z pytania. */
-function znanaDopasowania(frazy: string[]): Array<{ urzadzenie: string; symbol: string }> {
+/** Potwierdzona para „ta maszyna → ten symbol", zbudowana z wysłanych odpowiedzi. */
+export interface ZnaneDopasowanie {
+  urzadzenie: string;
+  symbol: string;
+}
+
+function znanaDopasowania(frazy: string[]): ZnaneDopasowanie[] {
   if (frazy.length === 0) return [];
   const pytajniki = frazy.map(() => "?").join(",");
   return db()
@@ -406,6 +462,22 @@ export interface Kontekst {
   tekst: string;
   kartoteki: TrafienieKartoteki[];
   oferty: OfertaAllegro[];
+  /**
+   * Powód, dla którego lista aukcji jest pusta — albo `null`, gdy pusta jest
+   * zgodnie z prawdą.
+   *
+   * Model dostawał to zdanie od 0.80.0, człowiek nie dostawał go wcale: panel
+   * pisał „Nic nie pasuje" i wtedy, gdy Allegro odpowiedziało, i wtedy, gdy
+   * padło. To dwie różne odpowiedzi dla klienta — „nie mamy" wolno napisać,
+   * „nie sprawdziliśmy" trzeba sprawdzić.
+   */
+  bladOfert: string | null;
+  /** Frazy, po których szukaliśmy — bez nich zły dobór jest nie do wyjaśnienia. */
+  frazy: string[];
+  /** Potwierdzone pary urządzenie→symbol użyte w tym szkicu. */
+  dopasowania: ZnaneDopasowanie[];
+  /** Co odpowiadaliśmy wcześniej na pytania o tę samą ofertę. */
+  poprzednie: PrzykladOdpowiedzi[];
 }
 
 /**
@@ -451,9 +523,35 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
   } else {
     linie.push("\nKARTOTEKI (nasz asortyment):");
     for (const k of kartoteki) {
-      const zam = k.zamienniki.length ? ` | zamienniki: ${k.zamienniki.join(", ")}` : "";
+      const zam = k.zamienniki.znane.length
+        ? ` | mamy zamienniki: ${k.zamienniki.znane.map((z) => z.sym).join(", ")}`
+        : "";
+      /* Obce numery katalogowe podajemy modelowi ODDZIELNIE i z etykietą, bo
+         to numery CUDZE — wolno po nich rozpoznać część, nie wolno ich
+         sprzedać jako naszych. */
+      const obce = k.zamienniki.obce.length
+        ? ` | pasuje do numerów obcych: ${k.zamienniki.obce.slice(0, 8).join(", ")}`
+        : "";
       const lok = k.lokalizacje.length ? ` | półka: ${k.lokalizacje.join(", ")}` : "";
-      linie.push(`- SYMBOL: ${k.symbol} | ${k.nazwa} | stan: ${k.stan} szt.${lok}${zam}`);
+      const ean = k.ean ? ` | EAN: ${k.ean}` : "";
+      linie.push(`- SYMBOL: ${k.symbol} | ${k.nazwa}${ean} | stan: ${k.stan} szt.${lok}${zam}${obce}`);
+
+      /* „Nie mamy" i „nie mamy, ale przyjdzie" to dla klienta dwie różne
+         odpowiedzi — a do 0.89.0 model nie miał skąd wziąć tej drugiej.
+         Termin podajemy tylko wtedy, gdy baza go zna: obiecana data, której
+         nikt nie potwierdził, jest gorsza od jej braku. */
+      for (const z of k.zamowione.slice(0, 2)) {
+        const kiedy = z.termin ? `termin ${z.termin}` : "termin nieznany";
+        linie.push(
+          `    ZAMÓWIONE U DOSTAWCY: ${z.ilosc} szt., ${kiedy} (${z.dostawca || "dostawca nieznany"})` +
+            `${z.szacunek ? " — ilość szacunkowa" : ""}`
+        );
+      }
+      for (const d of k.wDostawie.slice(0, 2)) {
+        linie.push(
+          `    PRZYJECHAŁO, NIEROZŁOŻONE: ${d.ilosc} szt. z ${d.nrPelny} (${d.dataWyst})`
+        );
+      }
     }
   }
 
@@ -485,7 +583,91 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
     for (const o of poprzednie) linie.push(`- „${o.pytanie.slice(0, 160)}" → ${o.odpowiedz}`);
   }
 
-  return { tekst: linie.join("\n"), kartoteki, oferty };
+  return { tekst: linie.join("\n"), kartoteki, oferty, bladOfert, frazy, dopasowania, poprzednie };
+}
+
+/* ── Historia klienta ────────────────────────────────────────────────────────
+   Ten sam login pisze drugi raz częściej, niż się wydaje — a odpowiedź brzmi
+   inaczej, gdy widać, że tydzień temu coś zwrócił albo pytał o tę samą część.
+   Czytane NA KLIK, osobną trasą: otwarcie sprawy ma być tanie, a te dwa
+   zapytania są potrzebne tylko przy wątpliwości.                             */
+
+export interface PytanieHistorii {
+  id: number;
+  otrzymanoAt: string | null;
+  tresc: string;
+  odpowiedz: string | null;
+  status: string;
+  ofertaTytul: string | null;
+}
+
+export interface ZwrotHistorii {
+  id: number;
+  referencja: string | null;
+  status: string;
+  utworzonoAt: string | null;
+  pozycji: number;
+}
+
+export interface HistoriaKlienta {
+  login: string | null;
+  pytania: PytanieHistorii[];
+  zwroty: ZwrotHistorii[];
+}
+
+/** Ile wstecz pokazujemy — tyle, ile mieści się w karcie bez przewijania. */
+const HISTORII_KLIENTA = 10;
+
+/**
+ * Co ten kupujący już u nas załatwiał.
+ *
+ * Pytanie z wklejki nie ma loginu i to jest poprawny wynik pusty, nie błąd:
+ * screenshot z poczty nie niesie tożsamości kupującego z Allegro.
+ */
+export function historiaKlienta(id: number): HistoriaKlienta {
+  const p = wiersz(id);
+  const login = (p.kupujacy_login as string | null) ?? null;
+  if (!login) return { login: null, pytania: [], zwroty: [] };
+
+  const pytania = db()
+    .prepare(
+      `SELECT id, otrzymano_at, tresc, odpowiedz, status, oferta_tytul
+       FROM pytanie
+       WHERE kupujacy_login = ? AND id <> ?
+       ORDER BY otrzymano_at DESC, id DESC LIMIT ?`
+    )
+    .all(login, id, HISTORII_KLIENTA) as Array<Record<string, unknown>>;
+
+  /* Zwroty tego samego loginu — z licznikiem pozycji, bo „zwrot" bez liczby
+     rzeczy nie mówi, czy wróciła jedna uszczelka, czy cała paczka. */
+  const zwroty = db()
+    .prepare(
+      `SELECT z.id, z.referencja, z.status, z.utworzono_at,
+              (SELECT COUNT(*) FROM zwrot_pozycja p WHERE p.zwrot_id = z.id) AS pozycji
+       FROM zwrot z
+       WHERE z.kupujacy_login = ?
+       ORDER BY z.utworzono_at DESC LIMIT ?`
+    )
+    .all(login, HISTORII_KLIENTA) as Array<Record<string, unknown>>;
+
+  return {
+    login,
+    pytania: pytania.map((r) => ({
+      id: Number(r.id),
+      otrzymanoAt: (r.otrzymano_at as string) ?? null,
+      tresc: (r.tresc as string) ?? "",
+      odpowiedz: (r.odpowiedz as string) ?? null,
+      status: (r.status as string) ?? "nowe",
+      ofertaTytul: (r.oferta_tytul as string) ?? null,
+    })),
+    zwroty: zwroty.map((r) => ({
+      id: Number(r.id),
+      referencja: (r.referencja as string) ?? null,
+      status: (r.status as string) ?? "",
+      utworzonoAt: (r.utworzono_at as string) ?? null,
+      pozycji: Number(r.pozycji ?? 0),
+    })),
+  };
 }
 
 /* ── Szkic ───────────────────────────────────────────────────────────────── */
@@ -644,10 +826,12 @@ export async function pytanieZWklejki(w: Wklejka, autor: string): Promise<Pytani
 
 /* ── Redakcja i wysyłka ──────────────────────────────────────────────────── */
 
-export function zapiszOdpowiedz(id: number, tresc: string): Pytanie {
+export function zapiszOdpowiedz(id: number, tresc: string, autor?: string): Pytanie {
   const p = szczegolPytania(id);
   const nowa = tresc.trim();
   if (nowa === "") throw new BladPytania("Odpowiedź nie może być pusta");
+  /* Redakcja odpowiedzi JEST wzięciem sprawy — reszta biura ma to widzieć. */
+  if (autor) stempelProwadzi(id, autor);
   db()
     .prepare(
       `UPDATE pytanie SET odpowiedz = ?, edytowano = ?,
@@ -707,7 +891,8 @@ export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikW
 
   db()
     .prepare(
-      `UPDATE pytanie SET status = 'wyslane', wyslano_at = datetime('now'), odpowiedzial = ?
+      `UPDATE pytanie SET status = 'wyslane', wyslano_at = datetime('now'), odpowiedzial = ?,
+              prowadzi = NULL, prowadzi_at = NULL
        WHERE id = ?`
     )
     .run(autor, id);
@@ -726,9 +911,39 @@ export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikW
 export function zmienStatus(id: number, status: "zamkniete" | "pominiete", autor: string): WynikWysylki {
   const p = szczegolPytania(id);
   if (p.status === "wyslane") throw new BladPytania("Odpowiedź już poszła — nie ma czego zamykać", 409);
-  db().prepare("UPDATE pytanie SET status = ?, odpowiedzial = ? WHERE id = ?").run(status, autor, id);
+  db()
+    .prepare(
+      "UPDATE pytanie SET status = ?, odpowiedzial = ?, prowadzi = NULL, prowadzi_at = NULL WHERE id = ?"
+    )
+    .run(status, autor, id);
   logEvent(`pytanie_${status}`, autor, null, { id });
   return { pytanie: szczegolPytania(id), nastepneId: nastepneOtwarte(id) };
+}
+
+/**
+ * Kto prowadzi sprawę — stemplowane PRACĄ nad nią, nie jej otwarciem.
+ *
+ * Panel biura ma twardą regułę od 0.18.0: żadnego zapisu przy samym PATRZENIU
+ * na ekran (patrz `routes/biuro.test.ts` i zakaz `POST .../open`). Znacznik
+ * prowadzącego nie jest od niej wyjątkiem, więc nie stawia własnego przycisku
+ * ani nie strzela przy wejściu w sprawę: nazwisko pojawia się wtedy, gdy ktoś
+ * policzy szkic albo zapisze odpowiedź, czyli przy zapisie, który i tak
+ * następuje. Kto tylko zajrzał, niczego nie zajmuje.
+ *
+ * Stempluje TYLKO praca nad jedną sprawą — nie zbiorcze liczenie szkiców.
+ * Ticker liczy je pod nazwą procesu, a ODŚWIEŻ hurtem po pięć: jedno wstawiłoby
+ * do kolumny nazwę usługi, drugie zajęłoby pięć spraw komuś, kto kliknął
+ * „sprawdź, co przyszło".
+ *
+ * ZNACZNIK, nie zamek. Twarda blokada w kilkuosobowym biurze przeszkadza
+ * częściej, niż pomaga — ktoś wychodzi na obiad z otwartą sprawą i nikt jej
+ * nie dokończy. Ostrzeżenie na ekranie wystarcza, żeby dwie osoby nie pisały
+ * równolegle, a ostatni pracujący po prostu podmienia nazwisko.
+ */
+export function stempelProwadzi(id: number, autor: string): void {
+  db()
+    .prepare("UPDATE pytanie SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
+    .run(autor, id);
 }
 
 /* ── Ticker ──────────────────────────────────────────────────────────────── */

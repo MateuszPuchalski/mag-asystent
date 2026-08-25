@@ -120,6 +120,12 @@ function migrate(database: DatabaseSync) {
   addColumn("delivery", "powod_zamkniecia", "TEXT");
   // telemetria: który egzemplarz kolektora wygenerował zdarzenie
   addColumn("events", "device_id", "TEXT");
+  /* Kto prowadzi pytanie klienta (0.89.0). Tabela `pytanie` istnieje od
+     0.80.0, więc kolumny muszą dojść migracją — bazy z tamtego wydania nie
+     przechodzą przez CREATE TABLE. Nullowalne: sprawa bez prowadzącego jest
+     stanem normalnym, nie brakiem danych. */
+  addColumn("pytanie", "prowadzi", "TEXT");
+  addColumn("pytanie", "prowadzi_at", "TEXT");
   /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot
      tego, co aplikacja wtedy wiedziała, i jedyny ślad po zdarzeniach sprzed
      kont. Obok dochodzi `user_ref` wskazujące na app_user. Historii się nie
