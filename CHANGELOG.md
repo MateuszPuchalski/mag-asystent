@@ -33,6 +33,34 @@ historii nie przepisujemy.
 
 ---
 
+## 0.95.0 — 25 sierpnia 2026
+
+**Zakładki wjechały do ciemnego paska.** Stały dotąd pod nagłówkiem, we
+własnej białej karcie — trzecie pasmo chromu nad treścią, obok paska stanu.
+Panel bywa otwarty na laptopie obok Subiekta i ten pion był najdroższą rzeczą
+na ekranie: **chrom schudł ze 159 do 95 pikseli**, czyli sprawa zaczyna się
+o sześćdziesiąt kilka pikseli wyżej, na każdej zakładce.
+
+**Podpisy grup zostają**, i to jest decyzja, nie przeoczenie. Makiety
+zastępowały je samym separatorem, ale „Praca" i „Wgląd" to słownik całej
+przebudowy: pierwsza trójka daje trzy strefy z kolejką, druga jedną z paskiem
+filtrów. Sam separator mówi tylko, że grupy są dwie. W ciemnym pasku podpis
+stoi w tej samej linii co pastylki, a nie nad nimi — inaczej nagłówek urósłby
+o drugi wiersz i oddał połowę tego, po co zakładki tam pojechały.
+
+**Podtytuł „Podgląd biura" pokazuje się już tylko przed zalogowaniem.** Mówi
+to samo, co podświetlona pastylka, a w jednym rzędzie z sześcioma innymi
+zabierał szerokość, której na laptopie nie ma.
+
+**Kto · ustawienia · wyloguj zawijają się razem.** Każde z nich było osobnym
+dzieckiem nagłówka, więc gdy zakładki zajęły cały rząd, „Wyloguj" spadał do
+drugiego wiersza sam, zostawiając nad sobą zębatkę.
+
+Mechanizm się nie zmienia: `data-widok` zostaje nietknięte, więc obsługa
+kliknięcia i podświetlenie bieżącej zakładki szukają przycisków po atrybucie,
+a nie po miejscu w drzewie. Przyklejone szyny kontekstu i pasek filtrów liczą
+się z wysokości mierzonej w JS, więc same zeszły w górę razem z chromem.
+
 ## 0.94.0 — 25 sierpnia 2026
 
 **Zakładki wglądu przestały udawać zakładki pracy.** STAN SYSTEMU, DZIENNIK

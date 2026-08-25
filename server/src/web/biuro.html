@@ -51,10 +51,11 @@
   a:hover { color: var(--amber-dark); }
 
   /* Pasek górny = TopBar kolektora: grafit, marka bursztynem w kondensacie. */
-  header { background: var(--ink); color: #fff; min-height: 52px; padding: 8px 20px; display: flex; align-items: center; gap: 14px; }
+  header { background: var(--ink); color: #fff; min-height: 52px; padding: 8px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   header b { color: var(--amber); font: 800 20px/1 var(--font-cond); letter-spacing: 1.5px; }
   header > span { font: 600 15px/1 var(--font-cond); letter-spacing: .5px; color: #fff; }
-  header .kto { margin-left: auto; font: 600 12px var(--font-sans); color: #bbb; letter-spacing: .3px; }
+  header .sesja { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  header .kto { font: 600 12px var(--font-sans); color: #bbb; letter-spacing: .3px; }
   header button { background: none; border: 1px solid #555; color: #ccc; border-radius: 999px; padding: 4px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
   header button:hover { border-color: var(--amber); color: var(--amber); }
   /* Zębatka: cel dotyku kwadratowy i nie mniejszy niż sąsiedni „Wyloguj",
@@ -89,7 +90,10 @@
        czyli wtedy, gdy nic jeszcze nie wjechało pod pasek. */
     box-shadow: 0 10px 12px -10px rgba(42, 42, 44, .18);
   }
-  #chrome #stan { margin-bottom: 8px; }
+  /* Od 0.95.0 `#chrome` niesie WYŁĄCZNIE pasek stanu — zakładki pojechały do
+     nagłówka. Odstęp pod paskiem był odstępem PRZED zakładkami; bez nich
+     zostałby pustym pasmem papieru nad pierwszą kartą. */
+  #chrome #stan { margin-bottom: 0; }
 
   /* Karta, do której prowadzi kliknięcie kafla w pasku stanu (`scrollIntoView`)
      albo `focus()` po przełączeniu zakładki, wjechałaby POD przyklejony pasek.
@@ -464,7 +468,37 @@
   nav.zakladki button:hover { background: var(--paper); }
   nav.zakladki button[aria-current="true"] { background: var(--amber-bg); color: var(--amber-ink); font-weight: 800; }
 
-  /* Pasek stanu stoi NAD zakładkami i widać go z każdej z nich — bo pytanie
+  /* ── Ten sam pasek na ciemnym tle (0.95.0) ─────────────────────────────────
+     Zakładki wjechały do nagłówka, więc karta pod nimi znika: tło, ramka,
+     promień i cień były po to, żeby pasek odcinał się od papieru. W ciemnym
+     nagłówku odcina go sam nagłówek.
+
+     Podpis grupy stoi INLINE przed pastylkami — kolumna z 0.74.1 dawała
+     drugi wiersz w nagłówku i zjadała połowę odzyskanego pionu. Zawijanie
+     zostaje sensowne: `.grupa` nadal zawija się w całości, tyle że w poziomie,
+     więc podpis nigdy nie zostaje sam nad pustym miejscem.
+
+     Barwy pastylek są z ciemnego paska, nie z papieru: szary tekst, biel na
+     najechaniu, a bieżąca zakładka PEŁNYM bursztynem z grafitowym napisem —
+     na papierze wystarczała bursztynowa poświata, tutaj zginęłaby w czerni. */
+  header nav.zakladki {
+    background: none; border: 0; border-radius: 0; box-shadow: none;
+    padding: 0; gap: 14px; align-items: center;
+  }
+  header nav.zakladki .grupa { flex-direction: row; align-items: center; gap: 5px; }
+  header nav.zakladki .grupa-nazwa { padding: 0; color: #8B8B92; }
+  header nav.zakladki button { color: #B9B9BD; }
+  header nav.zakladki button:hover { background: rgba(255, 255, 255, .09); color: #fff; }
+  header nav.zakladki button[aria-current="true"] {
+    background: var(--amber); color: var(--ink); font-weight: 800;
+  }
+  /* Kreska między grupami musi być widoczna na grafitze — `--border` to barwa
+     papieru i na czerni jest niewidzialna. */
+  @media (min-width: 760px) {
+    header nav.zakladki .grupa + .grupa { border-left-color: #4A4A4E; padding-left: 18px; }
+  }
+
+  /* Pasek stanu stoi NAD treścią i widać go z każdej zakładki — bo pytanie
      „czy zapisy wchodzą do Subiekta" nie należy do żadnej jednej zakładki. */
   #stan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   #stan .badge { cursor: pointer; }
@@ -565,63 +599,25 @@
 </head>
 <body>
 <header>
-  <b>WERTIS</b> <span>Podgląd biura</span>
-  <span class="kto" id="kto"></span>
-  <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). Do 0.75.0 DOSTAWCY stali w pasku
-       zakładek jako trzecia grupa — jedna pastylka o tej samej wadze co
-       DOSTAWY, choć biuro wchodzi tam raz na kilka tygodni. Konfiguracja nie
-       jest zakładką pracy, więc idzie tam, gdzie już mieszka to, co dotyczy
-       całej sesji, a nie jednego widoku: obok „kto" i „Wyloguj".
+  <b>WERTIS</b> <span id="podtytul">Podgląd biura</span>
+  <!-- ZAKŁADKI W CIEMNYM PASKU (0.95.0). Do 0.94.0 stały pod nagłówkiem, we
+       własnej białej karcie — trzecie pasmo chromu nad treścią, obok paska
+       stanu. Panel bywa otwarty na laptopie obok Subiekta i ten pion był
+       najdroższą rzeczą na ekranie: kosztował ~55 px NA KAŻDEJ zakładce,
+       zabranych sprawie, którą się właśnie czyta.
 
-       `data-widok` nie jest tu ozdobą — wpina zębatkę w TEN SAM mechanizm,
-       który obsługuje pasek: jedna delegacja kliknięcia i jedna pętla
-       `aria-current`. Dwie byłyby dwoma miejscami do zapomnienia. -->
-  <button id="ustawienia" class="ikona" data-widok="dostawcy"
-          title="Ustawienia" aria-label="Ustawienia" hidden>
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-         stroke="currentColor" stroke-width="2" stroke-linecap="round"
-         stroke-linejoin="round" aria-hidden="true" focusable="false">
-      <circle cx="12" cy="12" r="3"></circle>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-    </svg>
-  </button>
-  <button id="wyloguj" hidden>Wyloguj</button>
-</header>
-<main id="login" class="card">
-  <h2>LOGOWANIE</h2>
-  <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada admin albo biuro —
-     patrz DEPLOY §5a.</p>
-  <!-- `autocomplete` włączony celowo: to komputer w biurze, a menedżer haseł
-       jest tu sojusznikiem — inaczej hasło ląduje na kartce pod klawiaturą -->
-  <input id="poleLogin" placeholder="login" autocomplete="username" autofocus>
-  <input id="poleHaslo" type="password" placeholder="hasło" autocomplete="current-password">
-  <div class="blad" id="loginBlad"></div>
-  <button class="akcja" id="zaloguj">ZALOGUJ</button>
-</main>
+       PODPISY GRUP ZOSTAJĄ, i to jest decyzja, nie przeoczenie. Makiety
+       zastępowały je samym separatorem, ale „Praca" i „Wgląd" to słownik
+       całej przebudowy: pierwsza trójka daje trzy strefy z kolejką, druga
+       jedną z paskiem filtrów. Sam separator mówi, że grupy są dwie, i nic
+       poza tym. W ciemnym pasku podpis stoi INLINE przed pastylkami, a nie
+       nad nimi — inaczej nagłówek urósłby o drugi wiersz i oddał połowę
+       tego, po co zakładki tu przyjechały.
 
-<main id="panel" hidden>
-  <!-- Pasek stanu i zakładki w jednym przyklejonym bloku (0.83.0). Wrapper
-       stoi NA ZEWNĄTRZ paska zakładek, i to nie jest wybór estetyczny:
-       `biuro.test.ts` czyta zawartość paska jako wycinek tekstu między jego
-       znacznikiem otwierającym a zamykającym, więc owinięcie go od środka
-       zabrałoby testowi grunt. Z tego samego powodu nie wolno tu wpisać tych
-       znaczników dosłownie — pierwsze wystąpienie w pliku wygrywa. -->
-  <div id="chrome">
-  <div id="stan"></div>
-  <!-- ZAKŁADKI W GRUPACH (0.74.1, rozdział i wyprowadzenie ustawień 0.76.0).
-       Wcześniej stało tu sześć pastylek o równej wadze, a to nieprawda o tym,
-       jak się ich używa: dostawy i zwroty biuro otwiera po kilkanaście razy
-       dziennie, a dziennik i analizę wtedy, gdy czegoś szuka. Rząd równych
-       przycisków kazał czytać całą szóstkę przy każdym wejściu.
-
-       W pasku zostają WYŁĄCZNIE zakładki, do których biuro wraca w ciągu dnia.
-       Dostawcy wyszli za zębatkę w nagłówku — patrz `#ustawienia`.
-
-       `data-widok` zostaje NIETKNIĘTE — i to jest cała sztuczka tej zmiany.
-       Obsługa kliknięcia i pętla ustawiająca `aria-current` szukają przycisków
-       po tym atrybucie, a nie po miejscu w rzędzie, więc rusza się układ,
-       nie mechanizm. -->
-  <nav class="zakladki">
+       Reszta jak w 0.74.1: `data-widok` NIETKNIĘTE, więc obsługa kliknięcia
+       i pętla `aria-current` szukają przycisków po atrybucie, nie po miejscu
+       w drzewie. Rusza się układ, nie mechanizm. -->
+  <nav class="zakladki" hidden>
     <div class="grupa">
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
@@ -643,6 +639,52 @@
       </div>
     </div>
   </nav>
+  <!-- Kto · ustawienia · wyloguj zawijają się RAZEM. Do 0.95.0 każde z nich
+       było osobnym dzieckiem nagłówka z `margin-left:auto` na pierwszym, więc
+       gdy zakładki zajęły cały rząd, „Wyloguj" spadał do drugiego wiersza SAM,
+       zostawiając nad sobą zębatkę. Grupa zawija się w komplecie. -->
+  <div class="sesja">
+    <span class="kto" id="kto"></span>
+    <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). Do 0.75.0 DOSTAWCY stali w pasku
+         zakładek jako trzecia grupa — jedna pastylka o tej samej wadze co
+         DOSTAWY, choć biuro wchodzi tam raz na kilka tygodni. Konfiguracja nie
+         jest zakładką pracy, więc idzie tam, gdzie już mieszka to, co dotyczy
+         całej sesji, a nie jednego widoku: obok „kto" i „Wyloguj".
+
+         `data-widok` nie jest tu ozdobą — wpina zębatkę w TEN SAM mechanizm,
+         który obsługuje pasek: jedna delegacja kliknięcia i jedna pętla
+         `aria-current`. Dwie byłyby dwoma miejscami do zapomnienia. -->
+    <button id="ustawienia" class="ikona" data-widok="dostawcy"
+            title="Ustawienia" aria-label="Ustawienia" hidden>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+    <button id="wyloguj" hidden>Wyloguj</button>
+  </div>
+</header>
+<main id="login" class="card">
+  <h2>LOGOWANIE</h2>
+  <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada admin albo biuro —
+     patrz DEPLOY §5a.</p>
+  <!-- `autocomplete` włączony celowo: to komputer w biurze, a menedżer haseł
+       jest tu sojusznikiem — inaczej hasło ląduje na kartce pod klawiaturą -->
+  <input id="poleLogin" placeholder="login" autocomplete="username" autofocus>
+  <input id="poleHaslo" type="password" placeholder="hasło" autocomplete="current-password">
+  <div class="blad" id="loginBlad"></div>
+  <button class="akcja" id="zaloguj">ZALOGUJ</button>
+</main>
+
+<main id="panel" hidden>
+  <!-- Przyklejony pasek stanu (0.83.0). Do 0.94.0 stały tu razem z nim
+       zakładki; od 0.95.0 pojechały do nagłówka i został sam alarm o kolejce.
+       Wrapper zostaje mimo to: to on jest przyklejony i to on rysuje miękką
+       krawędź pod chromem, a `#stan` przerysowuje się z serwera. -->
+  <div id="chrome">
+  <div id="stan"></div>
   </div>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
@@ -1472,6 +1514,10 @@
    kadrowym. Dlatego podstawa prawna stoi NAD tabelą, na stałe, bez zwijania —
    a serwer wysyła ją w odpowiedzi, żeby nie dała się pominąć. */
 const $ = (id) => document.getElementById(id);
+/* Pasek zakładek szuka się po KLASIE, nie po id — i tak ma zostać. Wycinek
+   z `biuro.test.ts` zaczyna się od literału `<nav class="zakladki"`, więc id
+   wstawione przed klasą rozjechałoby test o rzecz czysto kosmetyczną. */
+const zakladki = () => document.querySelector("nav.zakladki");
 
 /* ── Własne okna zamiast dialogów przeglądarki ────────────────────────────────
    `prompt`/`confirm`/`alert` były świadomą oszczędnością małej strony — do
@@ -1577,6 +1623,10 @@ function wyloguj() {
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
   $("panel").hidden = true; $("wyloguj").hidden = true; $("ustawienia").hidden = true;
+  /* Zakładki mieszkają od 0.95.0 w nagłówku, czyli POZA `#panel` — samo
+     schowanie panelu już ich nie zdejmuje. Podtytuł wraca: na ekranie
+     logowania nie ma zakładek, które mówiłyby, co to za strona. */
+  zakladki().hidden = true; $("podtytul").hidden = false;
   $("login").hidden = false; $("kto").textContent = "";
 }
 
@@ -4455,6 +4505,10 @@ function start() {
   $("panel").hidden = false;
   $("wyloguj").hidden = false;
   $("ustawienia").hidden = false;
+  /* Podtytuł schodzi, gdy wjeżdżają zakładki: „Podgląd biura" mówi to samo,
+     co podświetlona pastylka, a w jednym rzędzie z sześcioma innymi zabiera
+     szerokość, której na laptopie nie ma. */
+  zakladki().hidden = false; $("podtytul").hidden = true;
   $("kto").textContent = kto;
   wczytajFirme();
   wczytajWglad();

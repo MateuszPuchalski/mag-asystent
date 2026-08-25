@@ -259,7 +259,15 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-  const nav = html.slice(html.indexOf('<nav class="zakladki">'), html.indexOf("</nav>"));
+  /* Wycinek bierze się po ZNACZNIKU OTWIERAJĄCYM, nie po jego dosłownej
+     treści. Do 0.95.0 stał tu literał `<nav class="zakladki">` i wystarczyło,
+     że pasek dostał `hidden` — potrzebne, odkąd mieszka w nagłówku, czyli
+     poza `#panel`, i samo schowanie panelu przestało go zdejmować z ekranu
+     logowania — a test przestawał znajdować cokolwiek. Padał wtedy na
+     wszystkim naraz, nie mówiąc, co się zmieniło. */
+  const otwarcie = html.match(/<nav class="zakladki"[^>]*>/);
+  assert.ok(otwarcie, "pasek zakładek istnieje i nosi swoją klasę");
+  const nav = html.slice(otwarcie.index!, html.indexOf("</nav>"));
 
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
@@ -303,6 +311,35 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
     /querySelector\("nav\.zakladki"\)\.addEventListener/,
     "obsługa kliknięcia nie może być przypięta do samego paska"
   );
+});
+
+test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", () => {
+  /* Od 0.95.0 zakładki stoją w ciemnym nagłówku, a nie we własnej białej
+     karcie pod nim. Chodziło o pion: trzecie pasmo chromu kosztowało ~60 px
+     NA KAŻDEJ zakładce, a panel bywa otwarty na laptopie obok Subiekta.
+
+     Przeprowadzka wyniosła pasek POZA `#panel` i to jest jej jedyny haczyk.
+     Cała reszta chromu sesji chowa się, bo `#panel` dostaje `hidden`; pasek
+     stojący w nagłówku nie schowa się od tego NIGDY. Bez własnego `hidden`
+     w znaczniku i bez odsłonięcia w `start()` sześć pastylek świeciłoby nad
+     formularzem logowania — klikalnych, prowadzących do pustych widoków. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const otwarcie = html.match(/<nav class="zakladki"[^>]*>/);
+  assert.ok(otwarcie, "pasek zakładek istnieje");
+  assert.ok(otwarcie.index! < html.indexOf("</header>"),
+    "pasek stoi w nagłówku — po to wyjechał z osobnego pasma");
+  assert.ok(otwarcie.index! < html.indexOf('id="chrome"'),
+    "pasek nie wrócił do `#chrome`, gdzie został sam pasek stanu");
+  assert.match(otwarcie[0], /\bhidden\b/,
+    "pasek startuje schowany — `#panel` już go nie zasłania");
+
+  for (const [co, po] of [["hidden = false", "zalogowaniu"], ["hidden = true", "wylogowaniu"]]) {
+    assert.ok(html.includes(`zakladki().${co}`),
+      `pasek zmienia widoczność po ${po}`);
+  }
 });
 
 test("pasek stanu niesie licznik odpowiedzi na notatki", () => {
