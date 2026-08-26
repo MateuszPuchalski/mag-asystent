@@ -1570,6 +1570,27 @@ zapisuje przy patrzeniu na ekran. Wysłanie i zamknięcie sprawę zwalniają.
 
 Nic tu nie trzeba ustawiać. Kolumny w bazie zakłada aktualizacja przy starcie.
 
+## 6d. Sprawy — jedna kolejka obsługi klienta (0.108.0)
+
+Zakładka SPRAWY zbiera otwarte pytania, zwroty, dyskusje i reklamacje
+w jedną listę „co mam teraz zrobić?". Na górze stoją sprawy z ustawowym
+terminem: reklamacje i CLAIM-y, przeterminowane najpierw. Dalej lista
+układa się od najstarszych. Chipy nad tabelą filtrują po typie sprawy.
+
+Klik w OTWÓRZ prowadzi do szczegółu sprawy na jej dotychczasowej
+zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
+w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
+(BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
+
+W kontekście pytania i zwrotu jest zwijana sekcja POWIĄZANE SPRAWY.
+Pokazuje ciąg jednego problemu: to samo zamówienie, potem ten sam login.
+Dane jadą dopiero po rozwinięciu sekcji, jak przy historii klienta.
+
+Nowe trasy `/api/biuro/sprawy*` wyłącznie czytają. Zapisy zostają przy
+rejestrach źródłowych i ich dotychczasowych trasach. Zakładki ZWROTY
+ALLEGRO i PYTANIA KLIENTÓW na razie zostają. W następnym wydaniu ich
+karty przeprowadzą się do SPRAW, a same zakładki znikną.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

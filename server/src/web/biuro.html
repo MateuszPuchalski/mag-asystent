@@ -826,6 +826,10 @@
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
         <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
+        <!-- Jedna kolejka czterech rejestrów obsługi klienta (0.108.0):
+             pytania, zwroty, dyskusje i reklamacje w jednym rytmie pracy.
+             W następnym wydaniu ta zakładka zastąpi dwie poniższe. -->
+        <button data-widok="sprawy">SPRAWY <span id="sprawyLicznik" class="tabLicznik"></span></button>
         <!-- Ta sama pigułka co przy pytaniach, z tego samego powodu: reklamacja
              po terminie i nieobsłużona dyskusja czekają jak nieprzeczytana
              wiadomość. Rozbicie liczby niesie `title` — pigułka mówi ILE,
@@ -1018,6 +1022,49 @@
     </section>
   </div>
 
+  <!-- ── SPRAWY — jedna kolejka obsługi klienta (0.108.0) ─────────────────── -->
+  <!-- Cztery rejestry (pytania, zwroty, dyskusje, reklamacje) w JEDNEJ liście
+       „co mam teraz zrobić?". Osią pracy jest sprawa, nie klient: karta
+       klienta (360) jest drugim poziomem, otwieranym klikiem w login.
+       Klik w sprawę prowadzi do istniejących szczegółów na ich zakładkach —
+       w następnym wydaniu tamte karty przeprowadzą się tutaj. -->
+  <div id="widokSprawy" class="widok" hidden>
+    <!-- Klient 360 — zasłania kolejkę (wzorzec #szczegol): wejście W klienta,
+         nie dodatek obok listy. Wyłącznie odczyt i nawigacja. -->
+    <section class="card pelna szczegol" id="klientSzczegol" hidden>
+      <div class="sprawaSzyna">
+        <button class="akcja cichy" id="klientWroc">← WSZYSTKIE SPRAWY</button>
+      </div>
+      <div id="klientNaglowek" style="margin-top:10px"></div>
+      <div id="klientAktywne" style="margin-top:14px"></div>
+      <div id="klientHistoria" style="margin-top:14px"></div>
+    </section>
+
+    <section class="card" id="kolejkaSprawKarta">
+      <h2>SPRAWY KLIENTÓW <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Wszystkie otwarte sprawy czterech rejestrów w jednej kolejce:
+          pytania, zwroty, dyskusje Allegro i reklamacje. Na górze sprawy
+          z ustawowym terminem (reklamacja, CLAIM), potem najstarsze.
+          Klik otwiera sprawę; klik w login klienta otwiera jego kartę
+          ze wszystkimi sprawami. Wiersz (BEZ LOGINU) zbiera wklejki
+          z poczty i zwroty ręczne — sprawy bez konta Allegro.
+        </p>
+      </div>
+      <p id="sprawyPodsumowanie" style="margin-bottom:9px"></p>
+      <div class="czipy" id="sprawyCzipy">
+        <button class="czip" data-rodzaj="" aria-pressed="true">Wszystkie</button>
+        <button class="czip" data-rodzaj="pytanie" aria-pressed="false">Pytania</button>
+        <button class="czip" data-rodzaj="zwrot" aria-pressed="false">Zwroty</button>
+        <button class="czip" data-rodzaj="dyskusja" aria-pressed="false">Dyskusje</button>
+        <button class="czip" data-rodzaj="reklamacja" aria-pressed="false">Reklamacje</button>
+      </div>
+      <table id="sprawyLista" style="margin-top:10px"></table>
+    </section>
+  </div>
+
   <!-- ── ZWROTY ALLEGRO ──────────────────────────────────────────────────── -->
   <div id="widokZwroty" class="widok" hidden>
     <!-- Szczegół zwrotu — zasłania karty poniżej (wzorzec #szczegol dostaw):
@@ -1077,6 +1124,11 @@
       <!-- Wzorzec zwrotów tego kupującego. Stoi NAD rozliczeniem, bo to jest
            rzecz, którą warto wiedzieć PRZED oddaniem środków, a nie po. -->
       <div id="zwrotKlient" style="margin-top:14px"></div>
+      <!-- Ten sam klocek co przy pytaniu (0.108.0) — ciąg jednej sprawy. -->
+      <details class="zwijana" id="zwrotPowiazane" style="margin-top:14px">
+        <summary><h2>POWIĄZANE SPRAWY</h2><span class="podpis">to samo zamówienie i ten sam klient</span></summary>
+        <div id="zwrotPowiazaneTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
       <div id="zwrotWiadomosci" style="margin-top:14px"></div>
       <div id="zwrotKosz" style="margin-top:14px"></div>
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
@@ -1364,6 +1416,15 @@
       <details class="zwijana" id="pytaniePrzesylki" hidden>
         <summary><h2>PRZESYŁKI KLIENTA</h2><span class="podpis">ostatnie zamówienia i status wysyłki</span></summary>
         <div id="pytaniePrzesylkiTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
+
+      <!-- Ciąg jednej sprawy (0.108.0): zwrot, dyskusja i reklamacja bywają
+           odsłonami tego samego problemu, choć Allegro trzyma je osobno.
+           Pobierane po otwarciu, jak historia klienta — powiązania liczy
+           serwer z tych kluczy, które już są (zamówienie, login). -->
+      <details class="zwijana" id="pytaniePowiazane" hidden>
+        <summary><h2>POWIĄZANE SPRAWY</h2><span class="podpis">to samo zamówienie i ten sam klient</span></summary>
+        <div id="pytaniePowiazaneTresc"><p class="mute">Wczytuję…</p></div>
       </details>
     </section>
 
@@ -2140,7 +2201,9 @@ function pokaz(nowy) {
   zamknijDokument();
   zamknijZwrot();
   zamknijPytanie();
+  zamknijKlienta360();
   $("widokDostawy").hidden = nowy !== "dostawy";
+  $("widokSprawy").hidden = nowy !== "sprawy";
   $("widokZwroty").hidden = nowy !== "zwroty";
   $("widokPytania").hidden = nowy !== "pytania";
   $("widokNadzor").hidden = nowy !== "nadzor";
@@ -2153,6 +2216,7 @@ function pokaz(nowy) {
   for (const b of document.querySelectorAll("button[data-widok]")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
+  if (nowy === "sprawy") odswiezSprawy();
   if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
   /* Statystyki pytań dociągają się TYLKO rozwinięte — zwinięta sekcja nie
      pyta serwera, tak samo jak WGLĄD na zwrotach. */
@@ -4150,7 +4214,8 @@ async function odswiez() {
          ma być widać na żywo, tak samo jak postęp tej otwartej. */
       if (kolejkaZostaje()) await odswiezDostawy();
     } else await odswiezDostawy();
-  } else if (widok === "zwroty") await odswiezZwroty();
+  } else if (widok === "sprawy") await odswiezSprawy();
+  else if (widok === "zwroty") await odswiezZwroty();
   else if (widok === "pytania") await odswiezPytania();
   else if (widok === "nadzor") await odswiezNadzor();
   /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
@@ -4277,9 +4342,212 @@ async function odswiezLicznikZwrotow() {
   }
 }
 
-/** Oba liczniki naraz — pigułki chodzą ZAWSZE, niezależnie od zakładki. */
+/**
+ * Pigułka przy SPRAWACH — jedna liczba wszystkich otwartych spraw czterech
+ * rejestrów, z rozbiciem w dymku (ten sam wzorzec co pigułki obok). Po
+ * terminie ma własne zdanie w dymku, bo to ono każe kliknąć od razu.
+ */
+function ustawLicznikSpraw(d) {
+  const cel = $("sprawyLicznik");
+  const otwartych = d.otwartych ?? 0;
+  cel.textContent = otwartych > 0 ? String(otwartych) : "";
+  cel.title = otwartych > 0
+    ? `${d.pytaniaOtwarte ?? 0} pytań · ${d.zwrotyOtwarte ?? 0} zwrotów · `
+      + `${(d.dyskusjeNowe ?? 0) + (d.dyskusjeWToku ?? 0)} dyskusji · `
+      + `${d.reklamacjeOtwarte ?? 0} reklamacji`
+      + ((d.poTerminie ?? 0) > 0 ? ` · ${d.poTerminie} PO TERMINIE` : "")
+    : "";
+}
+
+async function odswiezLicznikSpraw() {
+  try {
+    ustawLicznikSpraw(await (await api("/api/biuro/sprawy/licznik")).json());
+  } catch {
+    /* jak wyżej: pigułka nie ma prawa wywrócić cyklu odświeżania */
+  }
+}
+
+/** Wszystkie liczniki naraz — pigułki chodzą ZAWSZE, niezależnie od zakładki. */
 async function odswiezLiczniki() {
-  await Promise.all([odswiezLicznikPytan(), odswiezLicznikZwrotow()]);
+  await Promise.all([odswiezLicznikPytan(), odswiezLicznikZwrotow(), odswiezLicznikSpraw()]);
+}
+
+/* ── Sprawy — jedna kolejka czterech rejestrów (0.108.0) ─────────────────────
+   Osią pracy jest SPRAWA: kolejka odpowiada na „co mam teraz zrobić?",
+   a karta klienta (360) jest drugim poziomem, otwieranym klikiem w login.
+   Kolejka wyłącznie CZYTA — mutacje zostały przy rejestrach źródłowych.
+   W tym wydaniu klik w sprawę skacze do szczegółu na jego macierzystej
+   zakładce; w następnym szczegóły przeprowadzą się tutaj, a zakładki
+   ZWROTY i PYTANIA znikną. */
+let sprawyFiltr = "";
+/* false = karta klienta zamknięta; obiekt {login} = otwarta. Obiekt zamiast
+   samego loginu, bo login bywa NULL-em z sensem: kubełek spraw bez konta. */
+let otwartyKlient360 = false;
+
+function plakietkaSprawy(rodzaj) {
+  if (rodzaj === "pytanie") return '<span class="badge amber">PYTANIE</span>';
+  if (rodzaj === "zwrot") return '<span class="badge ok">ZWROT</span>';
+  if (rodzaj === "reklamacja") return '<span class="badge err">REKLAMACJA</span>';
+  return '<span class="badge mute2">DYSKUSJA</span>';
+}
+
+function terminSprawy(s) {
+  if (s.dniDoTerminu == null) return '<span class="mute">—</span>';
+  if (s.poTerminie) return `<span class="badge err">${-s.dniDoTerminu} dni PO TERMINIE</span>`;
+  return `za ${s.dniDoTerminu} dni`;
+}
+
+/* Jeden renderer wierszy dla kolejki i karty klienta — różnią się tylko
+   kolumną KLIENT, która u klienta powtarzałaby nagłówek. */
+function wierszeSpraw(lista, zKlientem) {
+  const naglowek = `<tr><th>TYP</th><th>TERMIN</th>${zKlientem ? "<th>KLIENT</th>" : ""}` +
+    `<th>SPRAWA</th><th>WIEK</th><th>PROWADZI</th><th></th></tr>`;
+  return naglowek + lista.map((s) => `<tr${s.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
+      <td>${plakietkaSprawy(s.rodzaj)}</td>
+      <td class="b">${terminSprawy(s)}</td>
+      ${zKlientem ? `<td><button class="akcja cichy" data-klient360="${esc(s.klient ?? "")}"
+        style="font-size:11px;padding:3px 8px">${esc(s.klient || "(BEZ LOGINU)")}</button></td>` : ""}
+      <td>${esc(s.tytul || "—")}${s.orderId ? `<div class="mute">zam. ${esc(s.orderId)}</div>` : ""}</td>
+      <td class="mute">${esc(wiekPytania(s.kiedy))}</td>
+      <td class="mute">${esc(s.prowadzi || "—")}</td>
+      <td><button class="akcja" data-sprawa-rodzaj="${s.rodzaj}" data-sprawa-id="${s.id}"
+        ${s.zwrotId ? `data-sprawa-zwrot="${s.zwrotId}"` : ""}>OTWÓRZ</button></td>
+    </tr>`).join("");
+}
+
+function rysujSprawy(lista) {
+  $("sprawyLista").innerHTML = lista.length
+    ? wierszeSpraw(lista, true)
+    : '<tr><td class="mute">Żadna sprawa nie czeka na obsługę.</td></tr>';
+  /* Podsumowanie liczy z tej samej listy, którą widać — nie z osobnego
+     zapytania, które mogłoby pokazać inne liczby niż tabela pod spodem. */
+  const ile = (r) => lista.filter((s) => s.rodzaj === r).length;
+  const poTerminie = lista.filter((s) => s.poTerminie).length;
+  $("sprawyPodsumowanie").innerHTML = lista.length
+    ? `Otwartych spraw: <b>${lista.length}</b> — pytań ${ile("pytanie")},
+       zwrotów ${ile("zwrot")}, dyskusji ${ile("dyskusja")}, reklamacji ${ile("reklamacja")}` +
+      (poTerminie ? ` · <span class="badge err">${poTerminie} PO TERMINIE</span>` : "")
+    : "";
+}
+
+async function odswiezSprawy() {
+  if (otwartyKlient360 !== false) return odswiezKlienta360();
+  try {
+    const q = sprawyFiltr ? `?rodzaj=${encodeURIComponent(sprawyFiltr)}` : "";
+    const d = await (await api(`/api/biuro/sprawy${q}`)).json();
+    rysujSprawy(d.sprawy || []);
+  } catch (e) {
+    $("sprawyLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+/**
+ * Klik w sprawę z kolejki albo z karty klienta. Reklamacja otwiera swój
+ * ZWROT — nie ma własnego szczegółu, bo jej akcje (uznaj, odrzuć, półka)
+ * mieszkają przy pozycji zwrotu i tam mają zostać.
+ */
+function otworzSprawe(rodzaj, id, zwrotId) {
+  if (rodzaj === "pytanie") { pokaz("pytania"); otworzPytanie(id); return; }
+  pokaz("zwroty");
+  if (rodzaj === "dyskusja") otworzDyskusje(id);
+  else otworzZwrot(rodzaj === "reklamacja" ? zwrotId : id);
+}
+
+function otworzKlienta360(login) {
+  otwartyKlient360 = { login: login || null };
+  $("klientNaglowek").innerHTML = '<p class="mute">Wczytuję…</p>';
+  $("klientAktywne").innerHTML = "";
+  $("klientHistoria").innerHTML = "";
+  ustawWidokSpraw();
+  odswiezKlienta360();
+}
+
+function zamknijKlienta360() {
+  otwartyKlient360 = false;
+  ustawWidokSpraw();
+}
+
+/** Dokładnie jedna z dwóch kart widoku spraw na ekranie: kolejka albo klient. */
+function ustawWidokSpraw() {
+  const wKliencie = otwartyKlient360 !== false;
+  $("klientSzczegol").hidden = !wKliencie;
+  $("kolejkaSprawKarta").hidden = wKliencie;
+}
+
+async function odswiezKlienta360() {
+  if (otwartyKlient360 === false) return;
+  const login = otwartyKlient360.login;
+  try {
+    const q = login ? `?login=${encodeURIComponent(login)}` : "";
+    const d = await (await api(`/api/biuro/sprawy/klient${q}`)).json();
+    if (otwartyKlient360 === false || otwartyKlient360.login !== login) return;
+    rysujKlienta360(d);
+  } catch (e) {
+    $("klientNaglowek").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+function rysujKlienta360(d) {
+  $("klientNaglowek").innerHTML = `
+    <div class="temat">${esc(d.login || "SPRAWY BEZ LOGINU")}</div>
+    <div class="mute" style="margin-top:5px">${d.login
+      ? `otwartych spraw: ${d.aktywne.length} · w historii: ${d.historia.length}`
+      : "wklejki z poczty i zwroty ręczne — sprawy bez konta Allegro"}</div>`;
+  $("klientAktywne").innerHTML = `<h2>AKTYWNE SPRAWY</h2>` +
+    (d.aktywne.length
+      ? `<table>${wierszeSpraw(d.aktywne, false)}</table>`
+      : '<p class="mute">Nic nie czeka na obsługę.</p>');
+  $("klientHistoria").innerHTML = `<h2>HISTORIA</h2>` +
+    (d.historia.length
+      ? `<table>${wierszeSpraw(d.historia, false)}</table>`
+      : '<p class="mute">Brak zamkniętych spraw.</p>');
+}
+
+/* ── Powiązane sprawy — ciąg jednego problemu (0.108.0) ──────────────────────
+   Zwrot, dyskusja i reklamacja bywają odsłonami tej samej historii, choć
+   Allegro trzyma je osobno. Serwer składa powiązania z kluczy, które już
+   są: najpierw to samo zamówienie (mocny dowód), potem ten sam login
+   (podpisany słabiej). Pobierane PO OTWARCIU, jak historia klienta. */
+function rysujPowiazane(cel, d) {
+  const sekcja = (tytul, lista) => lista.length
+    ? `<div class="mute" style="margin:8px 0 4px">${tytul}</div><table>${wierszeSpraw(lista, false)}</table>`
+    : "";
+  $(cel).innerHTML =
+    sekcja("TO SAMO ZAMÓWIENIE", d.zamowienie || []) +
+      sekcja("TEN SAM KLIENT — inne otwarte sprawy", d.klient || []) ||
+    '<p class="mute">Brak powiązanych spraw.</p>';
+}
+
+let pytanieIdPowiazan = null;
+async function pokazPowiazanePytania() {
+  const id = otwartePytanie;
+  if (id == null || !$("pytaniePowiazane").open || pytanieIdPowiazan === id) return;
+  pytanieIdPowiazan = id;
+  $("pytaniePowiazaneTresc").innerHTML = '<p class="mute">Wczytuję…</p>';
+  try {
+    const d = await (await api(`/api/biuro/sprawy/powiazane?rodzaj=pytanie&id=${id}`)).json();
+    if (otwartePytanie !== id) return;
+    rysujPowiazane("pytaniePowiazaneTresc", d);
+  } catch (e) {
+    pytanieIdPowiazan = null;
+    $("pytaniePowiazaneTresc").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+let zwrotIdPowiazan = null;
+async function pokazPowiazaneZwrotu() {
+  const id = otwartyZwrot;
+  if (id == null || !$("zwrotPowiazane").open || zwrotIdPowiazan === id) return;
+  zwrotIdPowiazan = id;
+  $("zwrotPowiazaneTresc").innerHTML = '<p class="mute">Wczytuję…</p>';
+  try {
+    const d = await (await api(`/api/biuro/sprawy/powiazane?rodzaj=zwrot&id=${id}`)).json();
+    if (otwartyZwrot !== id) return;
+    rysujPowiazane("zwrotPowiazaneTresc", d);
+  } catch (e) {
+    zwrotIdPowiazan = null;
+    $("zwrotPowiazaneTresc").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
 }
 
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
@@ -4811,7 +5079,10 @@ function rysujSzczegolDyskusji(y, zwrot) {
         : ""}
     </div>
     <p class="mute" style="margin-top:6px">
-      klient <b>${esc(y.kupujacyLogin || "nieznany")}</b>
+      klient ${y.kupujacyLogin
+        ? `<button class="akcja cichy" data-klient360="${esc(y.kupujacyLogin)}"
+            style="font-size:11px;padding:2px 8px">${esc(y.kupujacyLogin)} →</button>`
+        : "<b>nieznany</b>"}
       ${y.statusAllegro ? ` · status Allegro: ${esc(y.statusAllegro)}` : ""}
       ${y.prowadzi ? ` · prowadzi <b>${esc(y.prowadzi)}</b>` : ""}
       ${y.wyslanoAt ? ` · ostatnia odpowiedź ${esc(stempelLokalny(y.wyslanoAt))} (${esc(y.odpowiedzial || "?")})` : ""}
@@ -5411,6 +5682,7 @@ function otworzZwrot(id) {
      Skoro blok właśnie wyczyściliśmy, ta pamięć musi zejść razem z nim —
      inaczej powrót do TEGO SAMEGO zwrotu zostawia puste miejsce po rozmowie. */
   zwrotIdWatku = null;
+  zwrotIdPowiazan = null;
   ustawRodzenstwoZwrotu();
   odswiezSzczegolZwrotu();
 }
@@ -5461,7 +5733,10 @@ function rysujSzczegolZwrotu(z) {
     </div>
     <p class="mute" style="margin-top:6px">
       etykieta <b>${esc(z.waybill)}</b>
-      · kupujący <b>${esc(z.kupujacyLogin || "nieznany")}</b>${z.kupujacyEmail ? ` (${esc(z.kupujacyEmail)})` : ""}
+      · kupujący ${z.kupujacyLogin
+        ? `<button class="akcja cichy" data-klient360="${esc(z.kupujacyLogin)}"
+            style="font-size:11px;padding:2px 8px">${esc(z.kupujacyLogin)} →</button>`
+        : "<b>nieznany</b>"}${z.kupujacyEmail ? ` (${esc(z.kupujacyEmail)})` : ""}
       ${z.utworzonoAllegro ? ` · zgłoszony w Allegro ${esc(z.utworzonoAllegro.slice(0, 10))}` : ""}
       · przyjęty ${esc(z.utworzonoAt.slice(0, 10))} przez ${esc(z.utworzonoPrzez)}
     </p>`;
@@ -6826,6 +7101,7 @@ async function otworzPytanie(id) {
   pytanieIdRozmowy = null;
   pytanieIdKlienta = null;
   pytanieIdPrzesylek = null;
+  pytanieIdPowiazan = null;
   odpowiedzRuszona = false;
   ustawRodzenstwoPytania();
   await odswiezSzczegolPytania();
@@ -6859,7 +7135,10 @@ function rysujSzczegolPytania(d) {
   $("pytanieNaglowek").innerHTML = `
     <div>${badgePytania(p.status)} ${kat} ${poza}</div>
     <div class="temat" style="margin-top:7px">${esc(temat)}</div>
-    <div class="mute" style="margin-top:5px">${esc(p.kupujacyLogin || "(wklejka z poczty)")}
+    <div class="mute" style="margin-top:5px">${p.kupujacyLogin
+      ? `<button class="akcja cichy" data-klient360="${esc(p.kupujacyLogin)}"
+          style="font-size:11px;padding:2px 8px">${esc(p.kupujacyLogin)} →</button>`
+      : "(wklejka z poczty)"}
       · <span title="${esc(stempelLokalny(p.otrzymanoAt))}">${esc(wiekPytania(p.otrzymanoAt))}</span>
       ${p.urzadzenie ? ` · urządzenie: ${esc(p.urzadzenie)}` : ""}</div>
     ${oferta ? `<div class="mute" style="margin-top:5px">
@@ -6944,6 +7223,8 @@ function rysujSzczegolPytania(d) {
   $("pytanieKlient").hidden = !p.kupujacyLogin;
   /* Przesyłki jak historia klienta: bez loginu nie ma czego szukać. */
   $("pytaniePrzesylki").hidden = !p.kupujacyLogin;
+  /* Powiązania idą po loginie (pytanie nie zna zamówienia) — ta sama zasada. */
+  $("pytaniePowiazane").hidden = !p.kupujacyLogin;
 }
 
 function rysujTowaryPytania(kartoteki, oferty, wybraneModelu, bladOfert) {
@@ -7182,6 +7463,27 @@ function rysujHistorieKlienta(h) {
               <td>${esc(y.status)}</td>
               <td>${esc(y.temat || "—")}</td>
               <td class="mute" style="white-space:nowrap">${esc((y.utworzonoAllegro || "").slice(0, 10))}</td>
+            </tr>`
+          )
+          .join("") +
+        "</table>"
+    );
+  }
+
+  /* Czwarty rejestr (0.108.0): reklamacja tego klienta była dotąd jedyną
+     rzeczą niewidoczną przy odpowiadaniu — a zmienia ton bardziej niż zwrot. */
+  if (h.reklamacje && h.reklamacje.length) {
+    czesci.push(
+      "<h2>REKLAMACJE TEGO KLIENTA</h2><table><tr><th>TOWAR</th><th>WYNIK</th><th>TERMIN</th></tr>" +
+        h.reklamacje
+          .map(
+            (r) => `<tr>
+              <td>${esc(r.nazwa)}</td>
+              <td>${r.wynik ? esc(r.wynik.toUpperCase()) : '<span class="badge amber">OTWARTA</span>'}</td>
+              <td class="mute" style="white-space:nowrap">${r.wynik ? "—"
+                : r.poTerminie
+                  ? `<span class="badge err">${-r.dniDoTerminu} dni PO TERMINIE</span>`
+                  : `za ${r.dniDoTerminu} dni`}</td>
             </tr>`
           )
           .join("") +
@@ -7487,6 +7789,61 @@ $("pytaniaLista").addEventListener("click", (e) => {
 });
 $("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPytania(); });
 /* Rozwinięcie karty jest pytaniem o dane — zwinięta nie rusza serwera. */
+/* ── Sprawy: nasłuchy (0.108.0) ──────────────────────────────────────────────
+   Wszystko z poziomu SEKCJI (wzorzec z testu delegacji): kolejka, karta
+   klienta i konteksty spraw. Wejście do Klienta 360 z nagłówka sprawy
+   przełącza zakładkę — karta mieszka na SPRAWACH. */
+$("kolejkaSprawKarta").addEventListener("click", (e) => {
+  const czip = e.target.closest("button[data-rodzaj]");
+  if (czip) {
+    sprawyFiltr = czip.dataset.rodzaj;
+    for (const c of $("sprawyCzipy").querySelectorAll(".czip")) {
+      c.setAttribute("aria-pressed", String(c === czip));
+    }
+    odswiezSprawy();
+    return;
+  }
+  const klient = e.target.closest("button[data-klient360]");
+  if (klient) return otworzKlienta360(klient.dataset.klient360);
+  const sprawa = e.target.closest("button[data-sprawa-rodzaj]");
+  if (sprawa) {
+    otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),
+      Number(sprawa.dataset.sprawaZwrot || 0) || null);
+  }
+});
+
+$("klientSzczegol").addEventListener("click", (e) => {
+  if (e.target.closest("#klientWroc")) return zamknijKlienta360();
+  const sprawa = e.target.closest("button[data-sprawa-rodzaj]");
+  if (sprawa) {
+    otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),
+      Number(sprawa.dataset.sprawaZwrot || 0) || null);
+  }
+});
+
+/** Klik w login gdziekolwiek w sprawie → karta klienta na zakładce SPRAWY. */
+function klikKlienta360(e) {
+  const b = e.target.closest("button[data-klient360]");
+  if (!b) return;
+  pokaz("sprawy");
+  otworzKlienta360(b.dataset.klient360);
+}
+$("pytanieSzczegol").addEventListener("click", klikKlienta360);
+$("zwrotSzczegol").addEventListener("click", klikKlienta360);
+$("dyskusjaSzczegol").addEventListener("click", klikKlienta360);
+
+/** Klik w powiązaną sprawę z kontekstu — ta sama droga co z kolejki. */
+function klikPowiazanejSprawy(e) {
+  const sprawa = e.target.closest("button[data-sprawa-rodzaj]");
+  if (!sprawa) return;
+  otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),
+    Number(sprawa.dataset.sprawaZwrot || 0) || null);
+}
+$("pytanieKontekst").addEventListener("click", klikPowiazanejSprawy);
+$("zwrotKontekst").addEventListener("click", klikPowiazanejSprawy);
+$("pytaniePowiazane").addEventListener("toggle", pokazPowiazanePytania);
+$("zwrotPowiazane").addEventListener("toggle", pokazPowiazaneZwrotu);
+
 $("pytanieKlient").addEventListener("toggle", pokazHistorieKlienta);
 $("pytaniePrzesylki").addEventListener("toggle", pokazPrzesylki);
 $("pytaniePrzesylki").addEventListener("click", (e) => {
