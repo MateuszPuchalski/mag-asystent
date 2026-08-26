@@ -33,6 +33,23 @@ historii nie przepisujemy.
 
 ---
 
+## 0.101.1 — 26 sierpnia 2026
+
+**Poprawka wpisu, nie kodu.** Wydanie 0.101.0 zamyka warstwę treści i ostatnią
+makietę; ta pozycja prostuje jedno zdanie, które poszło z 0.100.0.
+
+**Wpis o `versionCode` nie jest pozycją [wymaga działania].** Mówił „zbuduj
+nowy APK po tej zmianie", a budować niczego nie trzeba: workflow `android.yml`
+chodzi na każdą zmianę `package.json`, podpisuje APK i wystawia go jako wydanie
+na GitHubie. Wydania `v0.100.0` i `v0.101.0` powstały same, z plikami
+`wertis-kolektor-0.100.0.apk` i `.sha256` w środku.
+
+Znacznik **[wymaga działania]** ma jedno zadanie: powiedzieć, co zrobić poza
+`git pull`. Fałszywa pozycja kosztuje więcej niż brakująca — kto raz sprawdzi,
+że nie ma czego robić, przestaje ufać pozostałym. Sama zmiana wzoru zostaje
+opisana, bo jest prawdziwa i była konieczna: bez niej serwer odrzuciłby plik
+`wertis-kolektor-0.100.0.apk` po samej nazwie.
+
 ## 0.101.0 — 26 sierpnia 2026
 
 **Kontekst przestał spadać pod sprawę na wąskim oknie.** Ostatnia nietknięta
@@ -119,15 +136,16 @@ którą wnosi się na rozmowę handlową.
 „jeden przy stu" nie wyglądał jak zero — i przez to samo zero też rysowało
 kreskę. Pusty tor jest jedyną rzeczą, którą można odczytać jako „nic".
 
-**[wymaga działania] Numer wersji APK zmienił wzór.** `versionCode` liczył się
-jako `major × 10 000 + minor × 100 + patch`, więc setny minor dawał 10 000 —
+**Numer wersji APK zmienił wzór.** `versionCode` liczył się jako
+`major × 10 000 + minor × 100 + patch`, więc setny minor dawał 10 000 —
 dokładnie tyle, co przyszłe `1.0.0`. Gorzej: serwer odrzucał plik z członem
 powyżej 99, czyli `wertis-kolektor-0.100.0.apk` przestałby być widoczny dla
 kolektorów **bez ani jednego błędu w logu**. Zapas podniesiony do 999 po obu
 stronach naraz — w `android/app/build.gradle.kts` i w `services/aktualizacja.ts`.
 Nowe kody są większe od wszystkich starych (0.99.0: 9 900 → 99 000), więc
-urządzenia w terenie przyjmą aktualizację normalnie. **Zbuduj nowy APK po tej
-zmianie**: plik zbudowany przed nią niesie stary, niższy `versionCode`.
+urządzenia w terenie przyjmą aktualizację normalnie. Nic nie trzeba robić
+ręcznie: workflow `android.yml` chodzi na każdą zmianę `package.json`
+i wystawia podpisany APK jako wydanie na GitHubie.
 
 **Ziarno scenariuszy: osiem domkniętych dostaw zamiast jednej.** Jedna, u
 jednego dostawcy, w jednym tygodniu, wystarczała do opisania POJEDYNCZEJ
