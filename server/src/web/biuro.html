@@ -684,14 +684,15 @@
   }
   /* Licznik jako PIGUŁKA, nie nawias. „(3)" w ciemnym pasku czyta się jak
      część nazwy zakładki; pigułka odcina się od niej i mówi „tyle spraw
-     czeka". Pusta, gdy nie ma nic — zero w kółku to szum, nie sygnał. */
-  header nav.zakladki #pytaniaLicznik:not(:empty) {
+     czeka". Pusta, gdy nie ma nic — zero w kółku to szum, nie sygnał.
+     Klasa wspólna, nie id: tę samą pigułkę noszą PYTANIA i ZWROTY. */
+  header nav.zakladki .tabLicznik:not(:empty) {
     display: inline-grid; place-items: center; min-width: 18px; height: 18px;
     margin-left: 6px; padding: 0 5px; border-radius: 999px;
     background: var(--amber); color: var(--ink);
     font: 800 11px/1 var(--font-sans); letter-spacing: 0;
   }
-  header nav.zakladki button[aria-current="true"] #pytaniaLicznik:not(:empty) {
+  header nav.zakladki button[aria-current="true"] .tabLicznik:not(:empty) {
     background: var(--ink); color: var(--amber);
   }
 
@@ -825,12 +826,16 @@
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
         <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
-        <button data-widok="zwroty">ZWROTY ALLEGRO</button>
+        <!-- Ta sama pigułka co przy pytaniach, z tego samego powodu: reklamacja
+             po terminie i nieobsłużona dyskusja czekają jak nieprzeczytana
+             wiadomość. Rozbicie liczby niesie `title` — pigułka mówi ILE,
+             dymek CZEGO. -->
+        <button data-widok="zwroty">ZWROTY ALLEGRO <span id="zwrotyLicznik" class="tabLicznik"></span></button>
         <!-- Licznik w nawiasie, nie osobna ikona: pytanie klienta czeka na
              odpowiedź jak nieprzeczytana wiadomość, więc zakładka ma mówić
              ILE, zanim ktokolwiek na nią kliknie. Pusty `span`, dopóki
              pytań nie ma — nawias „(0)" byłby szumem. -->
-        <button data-widok="pytania">PYTANIA KLIENTÓW <span id="pytaniaLicznik"></span></button>
+        <button data-widok="pytania">PYTANIA KLIENTÓW <span id="pytaniaLicznik" class="tabLicznik"></span></button>
       </div>
     </div>
     <div class="grupa">
@@ -1172,15 +1177,35 @@
         </p>
       </div>
       <table id="reklamacjeLista"></table>
-      <div style="margin-top:14px">
-        <h2>DYSKUSJE I REKLAMACJE ALLEGRO</h2>
-        <p class="mute" style="margin-bottom:6px">
-          Sprawy toczą się w panelu Allegro — tu jest podgląd na kliknięcie,
-          żeby nic nie czekało niezauważone.
+    </section>
+
+    <!-- Dyskusje i reklamacje z panelu Allegro — od tej wersji REJESTR pracy,
+         nie podgląd na kliknięcie. Odpowiada się nadal w panelu Allegro
+         (API nie daje treści wiadomości); tu jest kolejka z terminem dla
+         CLAIM, właściciel sprawy, notatka z ustaleń i link do zwrotu tej
+         samej paczki — żeby nic nie czekało niezauważone i żeby dwie osoby
+         nie prowadziły tej samej sprawy. -->
+    <section class="card" id="dyskusjeKarta">
+      <h2>DYSKUSJE I REKLAMACJE ALLEGRO <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Rozmowa z klientem toczy się w panelu Allegro i tam się odpowiada.
+          Tu widać, które sprawy czekają, kto którą prowadzi i ile dni zostało
+          do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu schodzą
+          z listy przy pobraniu same.
         </p>
-        <button class="akcja cichy" id="dyskusjePobierz">POBIERZ Z ALLEGRO</button>
-        <table id="dyskusjeLista" style="margin-top:8px"></table>
       </div>
+      <div class="czipy" id="dyskusjeCzipy">
+        <button class="czip" data-status="" aria-pressed="true">Do obsłużenia</button>
+        <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
+        <button class="czip" data-status="w_toku" aria-pressed="false">W toku</button>
+        <button class="czip" data-status="zamknieta" aria-pressed="false">Zamknięte</button>
+        <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
+      </div>
+      <table id="dyskusjeLista" style="margin-top:8px"></table>
+      <button class="akcja cichy" id="dyskusjePobierz" style="margin-top:10px">POBIERZ Z ALLEGRO</button>
+      <div id="dyskusjeTicker" style="margin-top:8px;font-size:12px"></div>
     </section>
 
     <!-- Konto Allegro ZOSTAJE w zakładce zwrotów, choć trzy karty liczb obok
@@ -4075,10 +4100,10 @@ async function odswiez() {
   } else if (widok === "zwroty") await odswiezZwroty();
   else if (widok === "pytania") await odswiezPytania();
   else if (widok === "nadzor") await odswiezNadzor();
-  /* Licznik na zakładce chodzi ZAWSZE, nie tylko przy otwartej zakładce —
-     w tym cała jego wartość: biuro ma zobaczyć nowe pytanie, siedząc na
-     dostawach. Osobna, tania trasa, żeby nie ciągnąć listy dla jednej liczby. */
-  await odswiezLicznikPytan();
+  /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
+     w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
+     reklamację, siedząc na dostawach. Osobne, tanie trasy. */
+  await odswiezLiczniki();
 }
 
 /** Licznik pytań w nawiasie przy zakładce; pusto, gdy nie ma nic do zrobienia. */
@@ -4175,6 +4200,35 @@ async function odswiezLicznikPytan() {
   }
 }
 
+/**
+ * Pigułka przy ZWROTACH — liczy to, co CZEKA na człowieka: reklamacje po
+ * terminie i nieobsłużone dyskusje. Reklamacje przed terminem zostają poza
+ * liczbą świadomie — mają swój zegar w karcie i pigułka z nimi krzyczałaby
+ * codziennie o sprawach, które jeszcze się nie palą.
+ */
+function ustawLicznikZwrotow(d) {
+  const razem = (d.reklamacjePoTerminie ?? 0) + (d.dyskusjeNowe ?? 0);
+  const cel = $("zwrotyLicznik");
+  cel.textContent = razem > 0 ? String(razem) : "";
+  cel.title = razem > 0
+    ? `${d.reklamacjePoTerminie ?? 0} reklamacji po terminie · ${d.dyskusjeNowe ?? 0} nowych dyskusji Allegro`
+    : "";
+}
+
+async function odswiezLicznikZwrotow() {
+  try {
+    const d = await (await api("/api/biuro/zwroty/licznik")).json();
+    ustawLicznikZwrotow(d);
+  } catch {
+    /* jak wyżej: pigułka nie ma prawa wywrócić cyklu odświeżania */
+  }
+}
+
+/** Oba liczniki naraz — pigułki chodzą ZAWSZE, niezależnie od zakładki. */
+async function odswiezLiczniki() {
+  await Promise.all([odswiezLicznikPytan(), odswiezLicznikZwrotow()]);
+}
+
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
    Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
    (ocena towaru, dopasowanie dokumentu, stempel środków), nie operacja z hali,
@@ -4253,6 +4307,10 @@ async function odswiezEtap3() {
     rysujReklamacjeZwrotow(r.reklamacje || []);
     if (rap) rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
+    /* Dyskusje jadą z tym samym cyklem, ale POZA wspólnym Promise.all: lista
+       rysuje się z lokalnego rejestru, a jej awaria nie ma prawa zabrać
+       ekranu koszom i reklamacjom. */
+    await odswiezDyskusje();
   } catch (e) { console.warn(e); }
 }
 
@@ -4548,7 +4606,7 @@ const dolozZdjeciaKosza = (pozycje) => dolozZdjeciaListy(pozycje, "koszPodglad",
 function rysujReklamacjeZwrotow(lista) {
   $("reklamacjeLista").innerHTML = lista.length
     ? `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-      "<th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th>PÓŁKA</th><th></th></tr>" +
+      "<th>TERMIN</th><th>ZWROT</th><th>TOWAR</th><th>POWÓD</th><th>PÓŁKA</th><th>PROWADZI</th><th></th></tr>" +
       lista.map((r) => `<tr${r.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
           ${kolFoto(r.twId)}
           <td class="b">${r.poTerminie
@@ -4559,6 +4617,9 @@ function rysujReklamacjeZwrotow(lista) {
           <td class="mute">${esc(r.powod || "—")}${r.powodOpis ? `<div>${esc(r.powodOpis)}</div>` : ""}</td>
           <td style="white-space:nowrap">${r.polka ? `<span class="badge amber">${esc(r.polka)}</span>` : ""}
             <button class="akcja cichy" data-rekl-polka="${r.pozycjaId}" style="font-size:11px;padding:4px 8px">${r.polka ? "ZMIEŃ" : "PÓŁKA"}</button></td>
+          <td style="white-space:nowrap">${r.prowadzi
+            ? esc(r.prowadzi)
+            : `<button class="akcja cichy" data-rekl-prowadzi="${r.pozycjaId}" style="font-size:11px;padding:4px 8px">PROWADZĘ</button>`}</td>
           <td style="white-space:nowrap">
             <button class="akcja cichy" data-rekl="${r.pozycjaId}" data-wynik="uznana">UZNANA</button>
             <button class="akcja cichy" data-rekl="${r.pozycjaId}" data-wynik="odrzucona">ODRZUCONA</button>
@@ -4568,29 +4629,88 @@ function rysujReklamacjeZwrotow(lista) {
   dolozZdjeciaReklamacji(lista);
 }
 
-/* Dyskusje i reklamacje z panelu Allegro — na KLIKNIĘCIE, nie z odświeżaniem
-   karty: to żywe zapytanie do API, a odświeżanie co 30 s biegałoby do
-   Allegro bez pytania. Jedno miejsce prawdy zostaje w panelu. */
-async function pobierzDyskusje() {
-  const cel = $("dyskusjeLista");
-  cel.innerHTML = '<tr><td class="mute">Pobieram z Allegro…</td></tr>';
+/* Dyskusje i reklamacje z panelu Allegro — od tej wersji lista rysuje się
+   z NASZEGO rejestru i odświeża razem z zakładką (to lokalne zapytanie, nie
+   bieganie do Allegro). Do API idzie dopiero przycisk POBIERZ Z ALLEGRO. */
+let dyskusjeFiltr = "";
+
+function badgeDyskusji(status) {
+  if (status === "nowa") return '<span class="badge amber">NOWA</span>';
+  if (status === "w_toku") return '<span class="badge ok">W TOKU</span>';
+  if (status === "pominieta") return '<span class="badge mute2">POMINIĘTA</span>';
+  return '<span class="badge mute2">ZAMKNIĘTA</span>';
+}
+
+function rysujDyskusje(lista, sync) {
+  const otwarta = (y) => y.status === "nowa" || y.status === "w_toku";
+  $("dyskusjeLista").innerHTML = lista.length
+    ? "<tr><th>TYP</th><th>TERMIN</th><th>SPRAWA</th><th>KLIENT</th><th>TEMAT</th><th>PROWADZI</th><th></th></tr>" +
+      lista.map((y) => `<tr${y.poTerminie && otwarta(y) ? ' style="background:var(--err-bg)"' : ""}>
+          <td>${y.typ === "CLAIM"
+            ? '<span class="badge err">REKLAMACJA</span>'
+            : '<span class="badge mute2">DYSKUSJA</span>'}</td>
+          <td class="b">${y.dniDoTerminu == null ? '<span class="mute">—</span>'
+            : y.poTerminie
+              ? `<span class="badge err">${-y.dniDoTerminu} dni PO TERMINIE</span>`
+              : `${y.dniDoTerminu} dni`}</td>
+          <td>${badgeDyskusji(y.status)}<div class="mute">${esc(y.statusAllegro || "")}</div></td>
+          <td>${esc(y.kupujacyLogin || "—")}</td>
+          <td>${esc(y.temat || "—")}
+            ${y.zwrotId
+              ? `<div><button class="akcja cichy" data-dysk-zwrot="${y.zwrotId}" style="font-size:11px;padding:3px 8px">ZWROT →</button></div>`
+              : y.orderId ? `<div class="mute">zam. ${esc(y.orderId)}</div>` : ""}
+            ${y.notatka ? `<div class="mute">✎ ${esc(y.notatka.slice(0, 120))}</div>` : ""}</td>
+          <td class="mute">${esc(y.prowadzi || "—")}</td>
+          <td style="white-space:nowrap">
+            <button class="akcja cichy" data-dysk-notatka="${y.id}" style="font-size:11px;padding:4px 8px">NOTATKA</button>
+            ${otwarta(y) ? `
+              ${y.status === "nowa" ? `<button class="akcja cichy" data-dysk-status="w_toku" data-dysk="${y.id}">PROWADZĘ</button>` : ""}
+              <button class="akcja cichy" data-dysk-status="zamknieta" data-dysk="${y.id}">ZAMKNIJ</button>
+              <button class="akcja cichy" data-dysk-status="pominieta" data-dysk="${y.id}">POMIŃ</button>`
+            : ""}
+          </td>
+        </tr>`).join("")
+    : `<tr><td class="mute">${dyskusjeFiltr === "" || dyskusjeFiltr === "nowa" || dyskusjeFiltr === "w_toku"
+        ? "Żadna dyskusja nie czeka na obsługę."
+        : "Nic tu nie ma."}</td></tr>`;
+  /* Ślad pobrania jak przy zapowiedziach: zdanie o braku pobrania jest
+     treścią — bez niego pusta lista wygląda jak „Allegro nic nie ma". */
+  $("dyskusjeTicker").innerHTML = sync
+    ? `Ostatnio pobrano: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
+       · zamkniętych w panelu ${sync.zamknietychPrzezAllegro} · przejrzano ${sync.przejrzanych}`
+    : "Jeszcze nic nie pobrano od uruchomienia serwera — kliknij POBIERZ Z ALLEGRO.";
+}
+
+async function odswiezDyskusje() {
   try {
-    const d = await (await api("/api/biuro/zwroty/dyskusje")).json();
-    const lista = d.dyskusje || [];
-    cel.innerHTML = lista.length
-      ? "<tr><th>TYP</th><th>STATUS</th><th>KLIENT</th><th>TEMAT</th><th>DATA</th></tr>" +
-        lista.map((y) => `<tr>
-            <td>${y.typ === "CLAIM"
-              ? '<span class="badge err">REKLAMACJA</span>'
-              : '<span class="badge mute2">DYSKUSJA</span>'}</td>
-            <td class="mute">${esc(y.status || "—")}</td>
-            <td>${esc(y.kupujacyLogin || "—")}</td>
-            <td>${esc(y.temat || "—")}${y.orderId ? `<div class="mute">zam. ${esc(y.orderId)}</div>` : ""}</td>
-            <td class="mute">${esc((y.utworzono || "").slice(0, 10))}</td>
-          </tr>`).join("")
-      : '<tr><td class="mute">Brak otwartych dyskusji i reklamacji w Allegro.</td></tr>';
+    const q = dyskusjeFiltr ? `?status=${encodeURIComponent(dyskusjeFiltr)}` : "";
+    const d = await (await api(`/api/biuro/dyskusje${q}`)).json();
+    rysujDyskusje(d.dyskusje || [], d.synchronizacja);
   } catch (e) {
-    cel.innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+    $("dyskusjeLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+/* Przycisk MUSI powiedzieć, co przyszło — ten sam wzorzec co POBIERZ przy
+   zapowiedziach: cichy przycisk kazałby klikać drugi raz „bo chyba nie
+   zadziałało". */
+async function pobierzDyskusjeZAllegro() {
+  const b = $("dyskusjePobierz");
+  b.disabled = true;
+  const napis = b.textContent;
+  b.textContent = "POBIERAM…";
+  try {
+    const d = await (await api("/api/biuro/dyskusje/odswiez", { method: "POST", body: "{}" })).json();
+    toast(d.nowych || d.zamknietychPrzezAllegro
+      ? `Nowych spraw: ${d.nowych} · zamkniętych w panelu: ${d.zamknietychPrzezAllegro}`
+      : "Allegro nie ma nic nowego");
+    await odswiezDyskusje();
+    await odswiezLiczniki();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    b.disabled = false;
+    b.textContent = napis;
   }
 }
 
@@ -5249,7 +5369,21 @@ function rysujSzczegolZwrotu(z) {
      milczy przy zwrocie bez loginu — zero nie znaczyłoby wtedy „nie zwracał",
      tylko „nie wiemy, kto to". */
   const kl = z.kupujacyStat;
-  $("zwrotKlient").innerHTML = kl
+  /* Sprawy z panelu Allegro do TEGO zamówienia — przed oddaniem środków
+     trzeba wiedzieć, że klient równolegle prowadzi dyskusję albo formalną
+     reklamację. Wiersz otwartej sprawy to ostrzeżenie, zamkniętej — historia. */
+  const dyskusjeZwrotu = (z.dyskusje || []).length
+    ? `<h2 style="margin-top:14px">SPRAWY ALLEGRO DO TEGO ZAMÓWIENIA</h2>` +
+      z.dyskusje.map((y) => `<div style="margin-top:6px">
+          ${y.typ === "CLAIM"
+            ? '<span class="badge err">REKLAMACJA</span>'
+            : '<span class="badge mute2">DYSKUSJA</span>'}
+          ${y.status === "nowa" || y.status === "w_toku"
+            ? '<span class="badge amber">OTWARTA</span>' : ""}
+          ${esc(y.temat || "")}
+        </div>`).join("")
+    : "";
+  $("zwrotKlient").innerHTML = (kl
     ? `<h2>TEN KLIENT</h2>
        <div class="kafle">
          ${kafel(kl.zwrotow12m,
@@ -5263,7 +5397,7 @@ function rysujSzczegolZwrotu(z) {
          oddaniem środków. Nie są oceną klienta — zasadna reklamacja też się
          tu liczy.
        </p>`
-    : "";
+    : "") + dyskusjeZwrotu;
 }
 
 /* Panel „KOREKTA + MM NA BUFOR" (Etap 2). Jeden przycisk zleca OBA dokumenty
@@ -5970,7 +6104,47 @@ $("koszeLista").addEventListener("click", async (e) => {
     await odswiezEtap3();
   } catch (err) { toast(err.message); }
 });
-$("dyskusjePobierz").addEventListener("click", pobierzDyskusje);
+$("dyskusjePobierz").addEventListener("click", pobierzDyskusjeZAllegro);
+/* Czipy jak przy zwrotach: filtr to stan ekranu, więc przełączenie od razu
+   przerysowuje listę z lokalnego rejestru. */
+$("dyskusjeCzipy").addEventListener("click", async (e) => {
+  const czip = e.target.closest(".czip");
+  if (!czip) return;
+  dyskusjeFiltr = czip.dataset.status;
+  for (const c of $("dyskusjeCzipy").querySelectorAll(".czip")) {
+    c.setAttribute("aria-pressed", c === czip ? "true" : "false");
+  }
+  await odswiezDyskusje();
+});
+$("dyskusjeLista").addEventListener("click", async (e) => {
+  const doZwrotu = e.target.closest("[data-dysk-zwrot]");
+  if (doZwrotu) return otworzZwrot(Number(doZwrotu.dataset.dyskZwrot));
+  const notatkaBtn = e.target.closest("[data-dysk-notatka]");
+  if (notatkaBtn) {
+    const notatka = await zapytaj({
+      tytul: "NOTATKA DO SPRAWY",
+      opis: "Ustalenia z panelu Allegro — rozmowa zostaje tam, notatka tu. Zapis bierze sprawę na Ciebie.",
+      potwierdz: "ZAPISZ",
+    });
+    if (notatka === null) return;
+    try {
+      await api(`/api/biuro/dyskusje/${notatkaBtn.dataset.dyskNotatka}/notatka`, {
+        method: "PUT", body: JSON.stringify({ notatka }),
+      });
+      await odswiezDyskusje();
+    } catch (err) { toast(err.message); }
+    return;
+  }
+  const b = e.target.closest("[data-dysk-status]");
+  if (!b) return;
+  try {
+    await api(`/api/biuro/dyskusje/${b.dataset.dysk}/status`, {
+      method: "POST", body: JSON.stringify({ status: b.dataset.dyskStatus }),
+    });
+    await odswiezDyskusje();
+    await odswiezLiczniki();
+  } catch (err) { toast(err.message); }
+});
 
 /* Pobranie zapowiedzi zwrotów Z RĘKI (0.85.0). Do tej wersji robił to wyłącznie
    ticker co pięć minut; teraz interwał jest domyślnie wyłączony, a pobiera
@@ -5995,6 +6169,18 @@ $("zapowiedziPobierz").addEventListener("click", async () => {
   }
 });
 $("reklamacjeLista").addEventListener("click", async (e) => {
+  /* Jawne przejęcie sprawy — reklamacja nie ma przed werdyktem zapisu treści,
+     przy którym nazwisko pojawiłoby się samo (jak przy pytaniach). */
+  const prowadziBtn = e.target.closest("[data-rekl-prowadzi]");
+  if (prowadziBtn) {
+    try {
+      await api(`/api/biuro/zwroty/reklamacje/${prowadziBtn.dataset.reklProwadzi}/prowadzi`, {
+        method: "POST", body: "{}",
+      });
+      await odswiezEtap3();
+    } catch (err) { toast(err.message); }
+    return;
+  }
   const polkaBtn = e.target.closest("[data-rekl-polka]");
   if (polkaBtn) {
     const polka = await zapytaj({
@@ -6632,6 +6818,27 @@ function rysujHistorieKlienta(h) {
               <td>${esc(z.status)}</td>
               <td>${z.pozycji}</td>
               <td class="mute" style="white-space:nowrap">${esc((z.utworzonoAt || "").slice(0, 10))}</td>
+            </tr>`
+          )
+          .join("") +
+        "</table>"
+    );
+  }
+
+  /* Trzeci rejestr tego samego loginu: otwarta dyskusja zmienia ton
+     odpowiedzi na pytanie tak samo, jak leżący u nas zwrot. */
+  if (h.dyskusje && h.dyskusje.length) {
+    czesci.push(
+      "<h2>DYSKUSJE ALLEGRO TEGO KLIENTA</h2><table><tr><th>TYP</th><th>STATUS</th><th>TEMAT</th><th>KIEDY</th></tr>" +
+        h.dyskusje
+          .map(
+            (y) => `<tr>
+              <td>${y.typ === "CLAIM"
+                ? '<span class="badge err">REKLAMACJA</span>'
+                : '<span class="badge mute2">DYSKUSJA</span>'}</td>
+              <td>${esc(y.status)}</td>
+              <td>${esc(y.temat || "—")}</td>
+              <td class="mute" style="white-space:nowrap">${esc((y.utworzonoAllegro || "").slice(0, 10))}</td>
             </tr>`
           )
           .join("") +

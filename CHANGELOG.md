@@ -33,6 +33,48 @@ historii nie przepisujemy.
 
 ---
 
+## 0.103.0 — 26 sierpnia 2026
+
+**Dyskusje i reklamacje Allegro są rejestrem pracy biura, nie podglądem.**
+Do tej pory sekcja na zakładce ZWROTY pobierała listę spraw z Allegro na
+kliknięcie i nic z tego nie zostawało: sprawa bez właściciela i bez statusu
+potrafiła czekać niezauważona aż do terminu ustawowego, a przy dwóch biurkach
+dwie osoby brały tę samą. Teraz POBIERZ Z ALLEGRO zapisuje sprawy do lokalnej
+tabeli `dyskusja` (ten sam wzorzec co pytania klientów): lista pokazuje status
+naszej pracy (nowa → w toku → zamknięta/pominięta), prowadzącego, notatkę
+z ustaleń i powiązany zwrot po numerze zamówienia. Formalna reklamacja (CLAIM)
+dostaje termin ustawowy liczony tą samą arytmetyką co reklamacje ze zwrotów
+i idzie na górę listy. Sprawa zamknięta w panelu Allegro schodzi z worklisty
+sama przy najbliższym pobraniu, podpisana przez `allegro` — licznik nie kłamie
+o sprawach dawno rozstrzygniętych.
+
+**Odpowiada się nadal w panelu Allegro** — `GET /sale/issues` nie zwraca
+treści wiadomości, więc rozmowa ma jedno miejsce prawdy tam. U nas zostaje
+to, czego panel Allegro nie daje: kolejka, właściciel, termin i notatka.
+Ticker pobierania dzieli `ALLEGRO_POLL_MS` z zapowiedziami i pytaniami,
+domyślnie wyłączony. Uprawnienie bez zmian (`allegro:api:disputes`).
+
+**Reklamacje ze zwrotów mają prowadzącego.** Ten sam znacznik co przy
+pytaniach (0.89.0) i z tego samego powodu: dwie osoby w biurze potrafiły
+rozpatrywać tę samą sprawę. Nazwisko pojawia się przy odłożeniu na półkę albo
+po kliknięciu PROWADZĘ — reklamacja, inaczej niż pytanie, nie ma przed
+werdyktem zapisu treści, przy którym pojawiłoby się samo. Rozpatrzenie
+zdejmuje znacznik; kto rozstrzygnął, dalej mówi stempel rozpatrzenia.
+
+**Zakładka ZWROTY nosi pigułkę uwagi** jak PYTANIA KLIENTÓW: reklamacje po
+terminie plus nieobsłużone dyskusje, z rozbiciem w dymku. Biuro widzi
+czekającą sprawę, siedząc na dostawach.
+
+**Kontekst klienta w jednym miejscu.** Karta historii przy pytaniu i szczegół
+zwrotu pokazują teraz także dyskusje tego samego kupującego — trzy rejestry
+jednego loginu składa jeden serwis (`kontekstKlienta`), zamiast trzech kopii
+tych samych zapytań. Szczegół zwrotu ostrzega o otwartej sprawie Allegro do
+tego samego zamówienia, zanim ktoś odda środki.
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu: nowa tabela zakłada
+się sama przy starcie, stary podgląd znika razem ze swoją trasą
+(`GET /api/biuro/zwroty/dyskusje` — jedynym klientem był panel).
+
 ## 0.102.1 — 26 sierpnia 2026
 
 **Pytania z Allegro nie wchodziły w ogóle.** Zgłoszenie z produkcji: „nie

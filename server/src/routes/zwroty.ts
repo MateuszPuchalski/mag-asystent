@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { config } from "../config.js";
-import { allegroAdapter, allegroTryb } from "../adapters/allegro.js";
+import { allegroTryb } from "../adapters/allegro.js";
 import {
   rozlacz,
   rozpocznijParowanie,
@@ -23,7 +23,14 @@ import {
   zapiszDecyzje,
   zdejmijDokument,
 } from "../services/zwroty.js";
-import { listaReklamacji, raportZwrotow, rozpatrzReklamacje, ustawPolke } from "../services/reklamacje.js";
+import {
+  listaReklamacji,
+  raportZwrotow,
+  rozpatrzReklamacje,
+  stempelProwadziReklamacji,
+  ustawPolke,
+} from "../services/reklamacje.js";
+import { licznikDyskusji } from "../services/dyskusje.js";
 import {
   brakujacePaczki,
   pobierzZapowiedzi,
@@ -352,17 +359,40 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     }
   );
 
-  /* Dyskusje i reklamacje z panelu Allegro (Etap 6) — sam odczyt, na żądanie
-     kliknięcia; nic z tego nie zapisujemy, jedno miejsce prawdy to Allegro. */
-  app.get("/api/biuro/zwroty/dyskusje", async (_req, reply) => {
+  /* Dyskusje z panelu Allegro mają od tej wersji WŁASNY rejestr i własne
+     trasy (`routes/dyskusje.ts`) — podgląd na kliknięcie zastąpiła kolejka
+     z właścicielem sprawy. Stary GET /api/biuro/zwroty/dyskusje zszedł razem
+     z nim: panel jest jedynym klientem i przeszedł na nowe trasy. */
+
+  /* Znacznik prowadzącego JAWNYM przyciskiem — reklamacja, inaczej niż
+     pytanie, nie ma przed werdyktem zapisu treści, przy którym nazwisko
+     pojawiłoby się samo. */
+  app.post<{ Params: { pid: string } }>(
+    "/api/biuro/zwroty/reklamacje/:pid/prowadzi",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zBledem(reply, () => {
+        stempelProwadziReklamacji(Number(req.params.pid), autor());
+        return { reklamacje: listaReklamacji() };
+      });
+    }
+  );
+
+  /* Licznik uwagi dla zakładki ZWROTY — odpytywany co 30 s razem z licznikiem
+     pytań, więc celowo tani: dwa COUNT-y zamiast raportu procesu. Ścieżka
+     statyczna przed `/:id` — ta sama zasada pierwszeństwa co wyżej. */
+  app.get("/api/biuro/zwroty/licznik", async (_req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    try {
-      return { dyskusje: await allegroAdapter().listaDyskusji() };
-    } catch (e) {
-      /* Awaria integracji (sieć, token) to nie 500 serwera — jak przy skanie. */
-      return reply.code(502).send({ error: (e as Error).message });
-    }
+    const otwarte = listaReklamacji();
+    const dyskusje = licznikDyskusji();
+    return {
+      reklamacjeOtwarte: otwarte.length,
+      reklamacjePoTerminie: otwarte.filter((r) => r.poTerminie).length,
+      dyskusjeNowe: dyskusje.nowe,
+      dyskusjeClaimyPoTerminie: dyskusje.claimyPoTerminie,
+    };
   });
 
   // ── Konto Allegro (device flow) ───────────────────────────────────────────

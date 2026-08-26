@@ -400,9 +400,16 @@ test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => 
     payload: { polka: "REK-01" }, headers: magazynier,
   });
   assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/dyskusje", headers: biuro });
+  /* Dyskusje mają od tej wersji WŁASNY rejestr: najpierw pobranie z Allegro
+     do lokalnej tabeli, potem lista z niej. Sprawa zamknięta w panelu
+     (trzecia w adapterze dev) schodzi z worklisty automatem przy pobraniu. */
+  r = await app.inject({ method: "POST", url: "/api/biuro/dyskusje/odswiez", payload: {}, headers: magazynier });
+  assert.equal(r.statusCode, 403, "pobiera biuro, nie hala");
+  r = await app.inject({ method: "POST", url: "/api/biuro/dyskusje/odswiez", payload: {}, headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "GET", url: "/api/biuro/dyskusje", headers: biuro });
   assert.equal(r.statusCode, 200);
   const dyskusje = r.json().dyskusje;
-  assert.equal(dyskusje.length, 2, "adapter dev daje rozmowę i formalną reklamację");
+  assert.equal(dyskusje.length, 2, "rozmowa i formalna reklamacja czekają; sprawa CLOSED zeszła sama");
   assert.ok(dyskusje.some((y: { typ: string }) => y.typ === "CLAIM"));
 });

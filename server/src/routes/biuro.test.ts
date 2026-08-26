@@ -164,27 +164,29 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    25,
+    28,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, TRZYNAŚCIE zapisów " +
+      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
       "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja, " +
-      "schowanie zapowiedzi, załatwienie pominięcia oraz POBRANIE ZAPOWIEDZI " +
-      "z 0.85.0) i pięć zapisów pytań klientów (synchronizacja, wklejka, " +
-      "szkic, wysyłka odpowiedzi, zamknięcie/pominięcie — dwa ostatnie jedną " +
-      "pętlą) — nic ponadto.\n\n" +
-      "Dwudziesty piąty POST przyszedł z przeniesienia pobierania zapowiedzi " +
-      "z tickera na przycisk: interwał jest od 0.85.0 domyślnie wyłączony, " +
-      "więc ktoś musi tę robotę zlecić ręką. Liczba rośnie tu ŚWIADOMIE i to " +
-      "jedyny sposób, w jaki wolno ją podnosić — sam zapis nie jest nowym " +
-      "prawem strony, tylko przeniesieniem pracy, którą serwer robił sam."
+      "schowanie zapowiedzi, załatwienie pominięcia, POBRANIE ZAPOWIEDZI " +
+      "z 0.85.0 oraz PRZEJĘCIE REKLAMACJI), pięć zapisów pytań klientów " +
+      "(synchronizacja, wklejka, szkic, wysyłka odpowiedzi, " +
+      "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) i dwa zapisy " +
+      "dyskusji Allegro (pobranie do rejestru, zmiana statusu) — nic ponadto.\n\n" +
+      "Trzy ostatnie POST-y przyszły z rejestru dyskusji: pobranie spraw " +
+      "z Allegro do naszej tabeli, status naszej pracy nad sprawą i jawne " +
+      "przejęcie reklamacji (reklamacja nie ma przed werdyktem zapisu treści, " +
+      "przy którym nazwisko pojawiłoby się samo). Liczba rośnie tu ŚWIADOMIE " +
+      "i to jedyny sposób, w jaki wolno ją podnosić — każdy z tych zapisów " +
+      "wymaga kliknięcia i żaden nie dzieje się przy samym patrzeniu."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    6,
+    7,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
-      "wgranie logo dostawcy, półka reklamacyjna oraz prompt eksperta " +
-      "i fakty firmowe (0.80.0)"
+      "wgranie logo dostawcy, półka reklamacyjna, notatka do dyskusji " +
+      "Allegro oraz prompt eksperta i fakty firmowe (0.80.0)"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
@@ -219,6 +221,28 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /pytania\/\$\{id\}\/wyslij/, "wysyłka odpowiedzi po kliknięciu");
   assert.match(html, /WYŚLIJ PRZEZ ALLEGRO/, "wysyłka jest jawnym przyciskiem");
   assert.match(html, /potwierdz\(\{[\s\S]{0,200}WYSŁANIE ODPOWIEDZI DO KLIENTA/, "wysyłka za potwierdzeniem");
+});
+
+test("dyskusje Allegro są rejestrem pracy, nie podglądem na kliknięcie", () => {
+  /* Do 0.102 sekcja dyskusji była żywym zapytaniem do Allegro bez śladu
+     w bazie — sprawa bez właściciela czekała niezauważona aż do terminu
+     ustawowego. Rejestr lokalny zmienia trzy rzeczy i ten test ich pilnuje:
+     lista rysuje się z NASZEJ tabeli, sprawa ma status i prowadzącego,
+     a zakładka ZWROTY dostała pigułkę uwagi jak PYTANIA. Odpowiada się
+     nadal w panelu Allegro — trasy wysyłki tu nie ma i nie może wejść bokiem. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /id="dyskusjeKarta"/, "dyskusje mają własną kartę pracy");
+  assert.match(html, /api\(`\/api\/biuro\/dyskusje\$\{q\}`\)/, "lista czyta lokalny rejestr za sesją");
+  assert.match(html, /"\/api\/biuro\/dyskusje\/odswiez"/, "pobranie z Allegro jest jawnym przyciskiem");
+  assert.match(html, /data-dysk-status/, "status sprawy zmienia kliknięcie");
+  assert.match(html, /dyskusje\/\$\{[^}]+\}\/notatka/, "notatka z ustaleń zostaje u nas");
+  assert.ok(!/dyskusje\/[^"'`]*\/wyslij/.test(html), "wysyłki odpowiedzi do dyskusji nie ma — rozmowa toczy się w panelu");
+  assert.match(html, /id="zwrotyLicznik" class="tabLicznik"/, "pigułka uwagi na zakładce ZWROTY");
+  assert.match(html, /"\/api\/biuro\/zwroty\/licznik"/, "pigułka ma własną tanią trasę");
+  assert.match(html, /data-rekl-prowadzi/, "jawne przejęcie reklamacji przyciskiem");
 });
 
 test("kopiowanie odpowiedzi ma zejście awaryjne bez HTTPS", () => {

@@ -105,6 +105,32 @@ test("półka reklamacyjna: zapis, normalizacja, zdjęcie i trwałość po rozpa
   assert.throws(() => R.ustawPolke(pozycjaId + 999, "X", "Biuro"), /nie istnieje/);
 });
 
+test("prowadzący: półka i jawny stempel biorą sprawę, rozpatrzenie ją zwalnia", () => {
+  const pozycjaId = zwrotZReklamacja(2, "W-PROWADZI");
+  assert.equal(R.listaReklamacji()[0].prowadzi, null, "sprawa bez prowadzącego to stan normalny");
+
+  R.stempelProwadziReklamacji(pozycjaId, "Ala");
+  assert.equal(R.listaReklamacji()[0].prowadzi, "Ala");
+  // znacznik, nie zamek — ostatni pracujący podmienia nazwisko
+  R.ustawPolke(pozycjaId, "REK-01", "Ola");
+  assert.equal(R.listaReklamacji()[0].prowadzi, "Ola", "odłożenie na półkę JEST prowadzeniem sprawy");
+
+  R.rozpatrzReklamacje(pozycjaId, "uznana", null, "Ola");
+  assert.equal(
+    R.listaReklamacji({ rozpatrzone: true })[0].prowadzi,
+    null,
+    "sprawa zamknięta nie jest niczyją robotą — kto rozstrzygnął, mówi rekl_przez"
+  );
+  assert.throws(() => R.stempelProwadziReklamacji(pozycjaId, "Jan"), /już rozpatrzona/);
+  assert.throws(() => R.stempelProwadziReklamacji(pozycjaId + 999, "Jan"), /nie istnieje/);
+});
+
+test("limit listy jest opcją z sufitem, nie twardym cięciem na 200", () => {
+  for (let i = 0; i < 5; i++) zwrotZReklamacja(i, `W-LIMIT-${i}`);
+  assert.equal(R.listaReklamacji({ limit: 3 }).length, 3);
+  assert.equal(R.listaReklamacji().length, 5, "domyślne 200 obejmuje wszystko poniżej sufitu");
+});
+
 test("raport zlicza proces w jednym miejscu", () => {
   zwrotZReklamacja(20, "PO-TERMINIE");
   const r = R.raportZwrotow();

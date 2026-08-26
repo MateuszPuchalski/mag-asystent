@@ -343,8 +343,10 @@ export class DevAllegroAdapter implements AllegroAdapter {
   }
 
   async listaDyskusji(): Promise<DyskusjaAllegro[]> {
-    /* Dwie fikcyjne sprawy — rozmowa i formalna reklamacja — żeby sekcja
-       w biurze miała oba typy do pokazania. */
+    /* Trzy fikcyjne sprawy — rozmowa, formalna reklamacja i sprawa już
+       zamknięta w panelu. Numery zamówień celowo te same co w `zwroty()`:
+       rejestr dyskusji ma pokazać powiązanie ze zwrotem po seedzie, a trzecia
+       sprawa ćwiczy auto-zamknięcie po statusie Allegro. */
     return [
       {
         id: "dev-issue-1",
@@ -363,6 +365,15 @@ export class DevAllegroAdapter implements AllegroAdapter {
         kupujacyLogin: "ewa_oddaje",
         orderId: "dev-ord-2",
         utworzono: dniTemu(1),
+      },
+      {
+        id: "dev-issue-3",
+        typ: "DISCUSSION",
+        status: "CLOSED",
+        temat: "Rozstrzygnięte: zwrot kosztów wysyłki",
+        kupujacyLogin: "firma_x",
+        orderId: "dev-ord-3",
+        utworzono: dniTemu(6),
       },
     ];
   }

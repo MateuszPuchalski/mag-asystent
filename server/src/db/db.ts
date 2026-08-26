@@ -199,6 +199,11 @@ function migrate(database: DatabaseSync) {
   addColumn("kosz_pozycja", "pozniej_at", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
+  /* Kto prowadzi reklamację. `zwrot_pozycja` stoi u klienta od 0.53.0, więc
+     kolumny muszą dojść migracją — jak `pytanie.prowadzi` (0.89.0), z tego
+     samego powodu i z tą samą naturą znacznika, nie blokady. */
+  addColumn("zwrot_pozycja", "rekl_prowadzi", "TEXT");
+  addColumn("zwrot_pozycja", "rekl_prowadzi_at", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
