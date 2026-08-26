@@ -331,20 +331,50 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
     "utf8"
   );
 
-  for (const [widok, sekcja] of [
-    ["pytania", "pytanieSzczegol"],
-    ["dostawy", "szczegol"],
-    ["zwroty", "zwrotSzczegol"],
-  ]) {
-    assert.ok(
-      !new RegExp(`\\$\\("${widok === "pytania" ? "pytanieAkcje" : "szczegolNaglowek"}"\\)\\.addEventListener\\("click"`).test(html),
-      `delegacja ${widok} nie może wisieć na rzędzie przycisków`
+  /* Nasłuch, który wymienia POJEMNIKI WEWNĘTRZNE z nazwy, jest zaproszeniem do
+     tego błędu przy każdej kolejnej zmianie układu: dołożenie trzeciego bloku
+     nie wywala niczego, tylko cicho go pomija. Delegacja ma siedzieć na SEKCJI
+     sprawy — ona przeżyje przenosiny w środku. */
+  const zakazane = [
+    "pytanieAkcje",         // rząd przycisków pod polem odpowiedzi (0.96.0)
+    "szczegolNaglowek",     // nagłówek dostawy — stąd wyjechały notatki (0.92.0)
+    "szczegolLinie",        // tabela pozycji — wyjątki wyszły nad nią (0.97.0)
+    "szczegolBezLinii",
+  ];
+  for (const id of zakazane) {
+    assert.doesNotMatch(
+      html,
+      new RegExp(`\\$\\("${id}"\\)\\.addEventListener\\("click"`),
+      `delegacja nie może wisieć na \`${id}\` — to pojemnik w środku sprawy`
     );
-    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
   }
 
-  assert.match(html, /\$\("pytanieSzczegol"\)\.addEventListener\("click"/,
-    "sprawa pytania deleguje z poziomu sekcji, nie rzędu");
+  /* DWA wzorce są bezpieczne i oba tu występują.
+
+     PYTANIA i DOSTAWY delegują z poziomu sekcji: ich przyciski wędrują między
+     blokami, więc nasłuch musi stać nad nimi wszystkimi.
+
+     ZWROTY robią inaczej i też dobrze: każdy blok kontekstu — dokument, kosz,
+     rozliczenie, wiadomości — niesie WŁASNY nasłuch, więc przeniesienie bloku
+     zabiera nasłuch ze sobą. Tak przeszły przeprowadzkę w 0.93.0.
+
+     Niebezpieczny jest wyłącznie trzeci wzorzec, wypisany wyżej: nasłuch na
+     pojemniku, który jest jednym z kilku wymiennych wnętrz sprawy. */
+  for (const sekcja of ["pytanieSzczegol", "szczegol"]) {
+    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
+    assert.match(
+      html,
+      new RegExp(`\\$\\("${sekcja}"\\)\\.addEventListener\\("click"`),
+      `${sekcja} deleguje z poziomu sekcji, nie z pojemnika w środku`
+    );
+  }
+  for (const blok of ["zwrotDokument", "zwrotKosz", "zwrotRozliczenie", "zwrotWiadomosci"]) {
+    assert.match(
+      html,
+      new RegExp(`\\$\\("${blok}"\\)\\.addEventListener\\("click"`),
+      `${blok} niesie własny nasłuch i przenosi go ze sobą`
+    );
+  }
 });
 
 test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", () => {

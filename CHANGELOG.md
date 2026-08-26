@@ -33,6 +33,47 @@ historii nie przepisujemy.
 
 ---
 
+## 0.97.0 — 26 sierpnia 2026
+
+**Dostawy dostały warstwę treści**, tak jak pytania w 0.96.0.
+
+**Kolejka mówi, ile pracy stoi.** Nagłówek to „DO ROZŁOŻENIA" z liczbą
+dokumentów i pozycji za nimi. „Cztery faktury" i „cztery faktury na sto
+osiemnaście pozycji" to dwie różne wiadomości o dniu, który przed kimś stoi.
+
+**Czipy zamiast trzech kart.** W toku · Zamknięte · Poza WERTIS. Ostatnie
+stało dotąd własną kartą na dole zakładki i biuro trafiało tam przypadkiem;
+jako trzeci stan tej samej kolejki jest tam, gdzie się go szuka.
+
+**Jeden kształt wiersza zamiast dwóch.** Lista miała postać tabeli na sześć
+kolumn przy zamkniętym dokumencie i wiersza łamanego w pionie po otwarciu.
+Tabela była ciasna wszędzie poniżej pełnej szerokości: data łamała się na dwie
+linie, nazwa dostawcy na trzy. Wiersz zwarty niesie dokładnie to samo, a pasek
+postępu podkreśla go na całej szerokości.
+
+**Wyjątki wyszły na górę sprawy.** Tabela na trzydzieści cztery wiersze
+zawiera zwykle dwa, przy których ktoś czeka na decyzję — i stały w niej
+wymieszane z resztą, rozpoznawalne po plakietce w czwartej kolumnie. Teraz
+mają własną sekcję nad pozostałymi pozycjami, a zgłoszenie magazyniera dostaje
+własną linię na całą szerokość zamiast komórki na dwie piąte tabeli.
+
+**Dostawca niesie trzy liczby.** Ile dostaw w tym roku, jaki udział pozycji
+z wyjątkiem i mediana czasu rozłożenia — liczone z naszych tabel, nie
+z Subiekta. Biuro rozstrzyga wyjątek, patrząc na jedną pozycję jednej faktury,
+i bez nich nie ma z czego wiedzieć, czy niedobór u tego dostawcy zdarza się co
+drugi raz, czy pierwszy raz w tym roku. To jest cała różnica między
+„policzyć ponownie" a „reklamować".
+
+**Notatki są rozmową.** Pytanie biura bursztynowym dymkiem, odpowiedź z hali
+szarym — te same dymki, którymi czyta się wątek klienta. Dotąd obie strony
+siedziały w jednym prostokącie, a odpowiedź zaczynała się od słowa
+„Odpowiedź:", bo inaczej nie dało się poznać, gdzie kończy się pytanie.
+
+**Poprawione: nagłówek wyjątków liczył pozycje, a nazywał je wyjątkami.** Po
+zamknięciu zgłoszenia dalej pisał „2 wyjątki" przy jednym otwartym. Teraz
+nagłówek liczy pozycje, a plakietka otwarte wyjątki — i gaśnie na zielono,
+gdy nic już nie czeka na decyzję.
+
 ## 0.96.0 — 25 sierpnia 2026
 
 **Zakładka pytań dostała treść, nie samą powłokę.** Wydania 0.89.1 → 0.95.0
