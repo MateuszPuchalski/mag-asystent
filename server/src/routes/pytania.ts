@@ -222,7 +222,12 @@ export async function pytaniaRoutes(app: FastifyInstance) {
       const p = szczegolPytania(Number(req.params.id));
       if (!p.threadId) return { watek: null, zrodlo: p.zrodlo };
       return {
-        watek: { threadId: p.threadId, wiadomosci: await allegroAdapter().wiadomosciWatku(p.threadId) },
+        watek: {
+          threadId: p.threadId,
+          /* Login kupującego jedzie razem z pytaniem od 0.80.0 — bez niego
+             rozmowa bez ról autora wyświetlała się w całości jako nasza. */
+          wiadomosci: await allegroAdapter().wiadomosciWatku(p.threadId, p.kupujacyLogin),
+        },
         zrodlo: p.zrodlo,
       };
     });

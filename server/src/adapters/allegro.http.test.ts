@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import {
   granicaSzukania,
   mapujPowod,
@@ -159,7 +161,7 @@ test("powód zwrotu: kod tłumaczony na polski, NONE to brak powodu", () => {
   assert.equal(mapujPowod({ reason: { type: "KOD_KTOREGO_NIE_ZNAMY" } }).powod, "KOD_KTOREGO_NIE_ZNAMY");
 });
 
-test("wiadomości: strona rozmowy z roli autora, brak roli → login rozmówcy", () => {
+test("wiadomości: strona rozmowy z roli autora", () => {
   const w = mapujWiadomosci(
     {
       messages: [
@@ -167,13 +169,92 @@ test("wiadomości: strona rozmowy z roli autora, brak roli → login rozmówcy",
         { id: "m2", author: { login: "wertis", role: "SELLER" }, text: "Przyjęliśmy" },
       ],
     },
-    "wertis"
+    "klient"
   );
   assert.equal(w[0].odKupujacego, true);
   assert.equal(w[0].zalacznikow, 1);
   assert.equal(w[1].odKupujacego, false);
   // pusty wątek nie wywraca mapowania
   assert.deepEqual(mapujWiadomosci({}, null), []);
+});
+
+test("wiadomości BEZ roli autora: stronę rozmowy rozstrzyga login rozmówcy", () => {
+  /* USTERKA 0.102.1, i to jest test, którego wtedy zabrakło.
+
+     Test wyżej nazywał się do tej wersji „…brak roli → login rozmówcy" i tej
+     ścieżki NIE WYKONYWAŁ: obie wiadomości miały `role`, a jedyne wywołanie
+     bez roli to pusty obiekt, który wraca pustą listą. Nazwa obiecywała
+     pokrycie, którego nie było.
+
+     Kosztowało to całą zakładkę: oba wywołania `mapujWiadomosci` przekazywały
+     `mojLogin: null`, więc gałąź po loginie była martwym kodem. Na koncie,
+     na którym Allegro nie podaje `author.role`, KAŻDA wiadomość liczyła się
+     jako nasza, `ostatniaSeriaKupujacego` zwracało `null` dla każdego wątku
+     i nie importowało się nic — przy sześćdziesięciu przejrzanych rozmowach,
+     bez jednego błędu.
+
+     Adapter dev tego nie łapie z natury: trzyma gotowe `WiadomoscAllegro`
+     i przez to mapowanie nie przechodzi. Ta funkcja pracuje WYŁĄCZNIE na
+     prawdziwym Allegro, więc test jednostkowy jest jej jedynym strażnikiem. */
+  const bezRol = {
+    messages: [
+      { id: "m1", author: { login: "klient_jan" }, text: "Czy pasuje do MS 170?" },
+      { id: "m2", author: { login: "wertis" }, text: "Tak, pasuje." },
+      { id: "m3", author: { login: "klient_jan" }, text: "To poproszę." },
+    ],
+  };
+
+  const zLoginem = mapujWiadomosci(bezRol, "klient_jan");
+  assert.equal(zLoginem[0].odKupujacego, true, "rozmówca to kupujący");
+  assert.equal(zLoginem[1].odKupujacego, false, "my to nie rozmówca");
+  assert.equal(zLoginem[2].odKupujacego, true);
+
+  /* Bez loginu rozmówcy zostaje bezpieczny domyślny wybór: „my". Pomyłka w tę
+     stronę chowa pytanie i widać ją w liczniku przejrzanych rozmów; w drugą
+     kazałaby biuru odpisywać na własne zdania. */
+  const bezNiczego = mapujWiadomosci(bezRol, null);
+  assert.deepEqual(
+    bezNiczego.map((w) => w.odKupujacego),
+    [false, false, false],
+    "bez roli I bez loginu wszystko zostaje po naszej stronie"
+  );
+
+  /* Rola ma pierwszeństwo nad loginem — gdy Allegro ją poda, login nie ma nic
+     do rzeczy, także wtedy, gdy przekazaliśmy zły. */
+  const zRola = mapujWiadomosci(
+    { messages: [{ id: "m1", author: { login: "klient_jan", role: "SELLER" }, text: "x" }] },
+    "klient_jan"
+  );
+  assert.equal(zRola[0].odKupujacego, false, "rola bije login");
+});
+
+test("żadne wywołanie mapowania wiadomości nie gubi rozmówcy", () => {
+  /* Test jednostkowy wyżej pilnuje SAMEJ funkcji i przechodził przez całą
+     usterkę 0.102.1 — bo usterka siedziała w WYWOŁANIACH: oba przekazywały
+     `null` zamiast rozmówcy, więc gałąź po loginie była martwa.
+
+     Funkcji tej nie da się złapać testem integracyjnym: adapter dev trzyma
+     gotowe `WiadomoscAllegro` i przez mapowanie nie przechodzi, a klient HTTP
+     nie ma tu atrapy `fetch`. Zostaje sprawdzenie ŹRÓDŁA — ten sam zabieg, co
+     przy delegacji przycisków w `routes/biuro.test.ts`, i z tego samego
+     powodu: pomyłka nie wywraca niczego głośno, tylko cicho gasi zakładkę. */
+  const zrodlo = fs.readFileSync(
+    path.resolve(import.meta.dirname, "./allegro.http.ts"),
+    "utf8"
+  );
+  const wywolania = [...zrodlo.matchAll(/mapujWiadomosci\(([^)]*)\)/g)]
+    .map((m) => m[1].trim())
+    /* Deklaracja funkcji łapie się tym samym wzorcem — odsiewamy ją po typie. */
+    .filter((a) => !a.includes("unknown"));
+  assert.ok(wywolania.length >= 2, "oba wywołania stoją w tym pliku");
+  for (const argumenty of wywolania) {
+    assert.doesNotMatch(
+      argumenty,
+      /,\s*null\s*$/,
+      `mapujWiadomosci(${argumenty}) gubi rozmówcę — bez niego wątek bez ról ` +
+        "autora w całości liczy się jako nasz i pytanie nigdy nie wejdzie"
+    );
+  }
 });
 
 test("URL wątków trzyma limit Allegro i nie przyjmuje ujemnego offsetu", () => {

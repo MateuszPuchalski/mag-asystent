@@ -232,6 +232,27 @@ export const zapiszFakty = (tresc: string, autor: string) => zapiszPole("fakty",
 export interface WynikSynchronizacji {
   nowych: number;
   przejrzanychWatkow: number;
+  /**
+   * DLACZEGO wątek nie dał pytania — rozbicie, którego brak kosztował całą
+   * zakładkę (0.102.1).
+   *
+   * `continue` w pętli łykał trzy zupełnie różne sytuacje i wszystkie trzy
+   * wyglądały na ekranie tak samo: zero. Wątek domknięty naszą odpowiedzią to
+   * POPRAWNE pominięcie, wątek bez ani jednej sparsowanej wiadomości to zły
+   * kształt odpowiedzi, a wątek, w którym wszystko uznano za nasze — usterka
+   * rozpoznawania stron rozmowy. Przy sześćdziesięciu przejrzanych rozmowach
+   * i zerze nowych nie było jak zgadnąć, na którą się patrzy.
+   */
+  pominiete: {
+    /** Odpowiedź Allegro nie miała wiadomości, których dałoby się użyć. */
+    bezWiadomosci: number;
+    /** Ostatnie słowo należy do nas — nie ma na co odpisywać. */
+    zakonczonyNaszaOdpowiedzia: number;
+    /** Pytanie wyszło, ale mamy je od wcześniejszego przebiegu. */
+    juzZnane: number;
+    /** Wątek bez identyfikatora — nie ma czego pobrać ani dokąd odpisać. */
+    bezIdentyfikatora: number;
+  };
 }
 
 /**
@@ -300,11 +321,25 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
   );
 
   let nowych = 0;
+  let bezWiadomosci = 0;
+  let zakonczonyNaszaOdpowiedzia = 0;
+  let juzZnane = 0;
+  let bezIdentyfikatora = 0;
   for (const watek of watki) {
-    if (!watek.threadId) continue;
-    const wiadomosci = await adapter.wiadomosciWatku(watek.threadId);
+    if (!watek.threadId) {
+      bezIdentyfikatora++;
+      continue;
+    }
+    const wiadomosci = await adapter.wiadomosciWatku(watek.threadId, watek.interlokutor);
+    if (wiadomosci.length === 0) {
+      bezWiadomosci++;
+      continue;
+    }
     const seria = ostatniaSeriaKupujacego(wiadomosci);
-    if (!seria || seria.tresc === "") continue;
+    if (!seria || seria.tresc === "") {
+      zakonczonyNaszaOdpowiedzia++;
+      continue;
+    }
 
     const wynik = wstaw.run(
       watek.threadId,
@@ -316,7 +351,13 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
       seria.at ?? watek.ostatniaWiadomoscAt,
       autor
     );
+    /* Czwarty powód zera i najczęstszy w normalnej pracy: wątek dał pytanie,
+       tylko że to samo, które mamy od poprzedniego przebiegu (`INSERT OR
+       IGNORE` po `wiadomosc_id`). Bez tego kubełka „przejrzano 2, nowych 0"
+       nie miałoby żadnego dopowiedzenia — czyli dokładnie ta cisza, którą to
+       rozbicie ma usunąć. Cztery kubełki plus `nowych` domykają rachunek. */
     if (wynik.changes > 0) nowych++;
+    else juzZnane++;
   }
 
   if (nowych > 0) {
@@ -328,13 +369,18 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
      o ludziach. Ale skrzynka na zero wygląda identycznie, gdy nic nie
      przyszło, i gdy od wczoraj nikt nie pytał Allegro — a to dwie zupełnie
      różne sytuacje. */
+  /* Pięć kubełków plus `nowych` domyka liczbę przejrzanych rozmów — i test
+     tego pilnuje. Szósty powód dopisany bez uzupełnienia tej sumy zepsuje
+     rachunek głośno, zamiast po cichu wrócić do zera bez wyjaśnienia. */
+  const pominiete = { bezWiadomosci, zakonczonyNaszaOdpowiedzia, juzZnane, bezIdentyfikatora };
   stanSynchronizacji = {
     at: nowIso(),
     przez: autor,
     nowych,
     przejrzanychWatkow: watki.length,
+    pominiete,
   };
-  return { nowych, przejrzanychWatkow: watki.length };
+  return { nowych, przejrzanychWatkow: watki.length, pominiete };
 }
 
 /**
@@ -351,6 +397,7 @@ export interface StanSynchronizacjiPytan {
   przez: string;
   nowych: number;
   przejrzanychWatkow: number;
+  pominiete: WynikSynchronizacji["pominiete"];
 }
 
 let stanSynchronizacji: StanSynchronizacjiPytan | null = null;

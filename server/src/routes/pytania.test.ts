@@ -283,6 +283,63 @@ test("ślad pobrania zostaje także wtedy, gdy nic nie przyszło", async () => {
   assert.ok(poDrugim.przejrzanychWatkow > 0);
 });
 
+test("zero nowych mówi, DLACZEGO — rozbicie pominięć", async () => {
+  /* Usterka 0.102.1 wyglądała na ekranie tak: „przejrzano 60 rozmów, nowych 0"
+     i nic więcej. Trzy różne sytuacje dawały ten sam widok, więc nie dało się
+     odróżnić poprawnej skrzynki na zero od zakładki, która cicho odrzuca
+     wszystko. Rozbicie jest jedyną rzeczą, która je rozdziela. */
+  const naglowki = { "x-session": zalogowany("biuro") };
+  const odswiez = async () =>
+    (await app.inject({
+      method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: naglowki,
+    })).json();
+
+  const pierwsze = await odswiez();
+  assert.ok(pierwsze.pominiete, "rozbicie jedzie z wynikiem");
+  /* Ziarno dev ma wątek domknięty naszą odpowiedzią — trzy z czterech wchodzą,
+     czwarty jest pominięty POPRAWNIE i to musi być widać jako osobny powód. */
+  assert.ok(
+    pierwsze.pominiete.zakonczonyNaszaOdpowiedzia > 0,
+    "wątek z ostatnim słowem po naszej stronie liczy się osobno"
+  );
+  assert.equal(pierwsze.pominiete.bezWiadomosci, 0, "adapter dev oddaje czytelne wątki");
+
+  /* DRUGI przebieg: te same wątki, nic nowego. Bez kubełka „już mamy" ekran
+     pokazywałby „przejrzano N, nowych 0" i ANI SŁOWA więcej — czyli tę samą
+     ciszę, którą to rozbicie ma usunąć. Rachunek musi się domknąć. */
+  const drugie = await odswiez();
+  assert.equal(drugie.nowych, 0, "drugi przebieg nie ma czego dodać");
+  assert.ok(drugie.pominiete.juzZnane > 0, "znane pytania mają swój kubełek, a nie giną w zerze");
+
+  /* Rachunek musi się DOMKNĄĆ — to jest właściwy niezmiennik, a nie związek
+     z poprzednim przebiegiem (baza jest wspólna dla testów w tym pliku, więc
+     „ile weszło przed chwilą" zależy od sąsiadów). Każdy przejrzany wątek
+     wpada dokładnie do jednego kubełka; gdyby doszedł piąty powód i nikt nie
+     dopisał go tutaj, ta suma przestałaby się zgadzać i test by o tym
+     powiedział. */
+  for (const przebieg of [pierwsze, drugie]) {
+    const suma =
+      przebieg.nowych +
+      przebieg.pominiete.juzZnane +
+      przebieg.pominiete.zakonczonyNaszaOdpowiedzia +
+      przebieg.pominiete.bezWiadomosci +
+      przebieg.pominiete.bezIdentyfikatora;
+    assert.equal(suma, przebieg.przejrzanychWatkow, "kubełki domykają przejrzane rozmowy");
+  }
+
+  /* Rozbicie ma dojechać aż na ekran — trasa licznika jest tą, z której panel
+     czyta linijkę pod przyciskiem. */
+  const licznik = await app.inject({
+    method: "GET", url: "/api/biuro/pytania/licznik", headers: naglowki,
+  });
+  const sync = licznik.json().synchronizacja;
+  assert.ok(sync.pominiete, "ślad pobrania niesie rozbicie, nie tylko liczby");
+  /* Ślad trzyma OSTATNI przebieg, czyli `drugie` — nie pierwszy. Ekran ma
+     mówić o tym, co stało się przy ostatnim kliknięciu, a nie o historii. */
+  assert.deepEqual(sync.pominiete, drugie.pominiete, "ślad niesie rozbicie ostatniego przebiegu");
+  assert.equal(sync.nowych, drugie.nowych);
+});
+
 test("nieznane pytanie to 404, nie 500", async () => {
   const r = await app.inject({
     method: "GET", url: "/api/biuro/pytania/9999", headers: { "x-session": zalogowany("biuro") },

@@ -4122,8 +4122,36 @@ function ustawOstatniePobranie(sync) {
   $("pytaniaOstatniePobranie").innerHTML = sync
     ? `Ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
        · przejrzano ${sync.przejrzanychWatkow}
-       ${esc(odmiana(sync.przejrzanychWatkow, ["rozmowę", "rozmowy", "rozmów"]))}`
+       ${esc(odmiana(sync.przejrzanychWatkow, ["rozmowę", "rozmowy", "rozmów"]))}${
+         czemuNicNieWeszlo(sync)}`
     : "Jeszcze nic nie pobrano od uruchomienia serwera — kliknij ODŚWIEŻ Z ALLEGRO.";
+}
+
+/**
+ * Dopowiedzenie do zera: DLACZEGO żaden z przejrzanych wątków nie dał pytania.
+ *
+ * Milczy, gdy coś weszło — przy nowych pytaniach rozbicie pominięć jest
+ * ciekawostką, nie odpowiedzią. Odzywa się dokładnie wtedy, gdy ekran pokazuje
+ * zero przy niezerowej liczbie przejrzanych rozmów, bo to jest chwila, w której
+ * nie wiadomo, czy panel działa poprawnie, czy cicho odrzuca wszystko.
+ *
+ * Dwa powody znaczą co innego i muszą być rozróżnione. „Kończą się naszą
+ * odpowiedzią" to POPRAWNY stan skrzynki na zero. „Bez wiadomości" znaczy, że
+ * Allegro oddaje wątki, z których nie umiemy nic wyjąć — czyli usterkę.
+ */
+function czemuNicNieWeszlo(sync) {
+  const p = sync.pominiete;
+  if (sync.nowych > 0 || !p || !sync.przejrzanychWatkow) return "";
+  const czesci = [];
+  if (p.juzZnane) czesci.push(`${p.juzZnane} już mamy`);
+  if (p.zakonczonyNaszaOdpowiedzia) {
+    czesci.push(`${p.zakonczonyNaszaOdpowiedzia} kończy się naszą odpowiedzią`);
+  }
+  /* Pogrubione, bo to jedyny powód z tej trójki, który znaczy USTERKĘ:
+     Allegro oddaje wątki, z których nie umiemy nic wyjąć. */
+  const nieczytelne = (p.bezWiadomosci ?? 0) + (p.bezIdentyfikatora ?? 0);
+  if (nieczytelne) czesci.push(`<b>${nieczytelne} bez czytelnych wiadomości</b>`);
+  return czesci.length ? ` — ${czesci.join(", ")}` : "";
 }
 
 /** Godzina przy dzisiejszej dacie, data i godzina przy starszej. */

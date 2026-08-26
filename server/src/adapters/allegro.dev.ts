@@ -422,7 +422,11 @@ export class DevAllegroAdapter implements AllegroAdapter {
     };
   }
 
-  async wiadomosciWatku(threadId: string): Promise<WiadomoscAllegro[]> {
+  /* `rozmowca` adapterowi dev jest niepotrzebny: trzyma gotowe `WiadomoscAllegro`
+     z ustawionym `odKupujacego` i nie przechodzi przez `mapujWiadomosci`.
+     Parametr stoi w sygnaturze dla zgodności z interfejsem — i to właśnie ta
+     różnica sprawiła, że usterka z 0.102.1 nie miała jak wyjść w demo. */
+  async wiadomosciWatku(threadId: string, _rozmowca?: string | null): Promise<WiadomoscAllegro[]> {
     const watek = WATKI_PYTAN.find((w) => w.naglowek.threadId === threadId);
     const bazowe = watek ? watek.wiadomosci : (WATKI[threadId]?.wiadomosci ?? []);
     return [...bazowe, ...(this.dopisane.get(threadId) ?? [])];

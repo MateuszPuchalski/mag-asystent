@@ -299,7 +299,16 @@ export function rodzinaKoncowki(url: string): string {
 const dzialajacyAccept = new Map<string, string>();
 
 /** Wiadomości wątku → typ domenowy. Defensywne na każdym polu. */
-export function mapujWiadomosci(json: unknown, mojLogin: string | null): WiadomoscAllegro[] {
+/**
+ * Wiadomości wątku → typy domenowe.
+ *
+ * Drugi parametr to login ROZMÓWCY (kupującego) z nagłówka wątku, a nie nasz
+ * własny. Do 0.102.1 nazywał się `mojLogin` i porównanie szło odwrotnie —
+ * ale naszego loginu ten kod nigdy nie znał, więc oba wywołania przekazywały
+ * `null` i gałąź była martwa. Rozmówcę mamy zawsze: jedzie z listą wątków
+ * i z samym pytaniem.
+ */
+export function mapujWiadomosci(json: unknown, rozmowca: string | null): WiadomoscAllegro[] {
   const lista = Array.isArray((json as Record<string, unknown>)?.messages)
     ? ((json as Record<string, unknown>).messages as unknown[])
     : [];
@@ -308,12 +317,15 @@ export function mapujWiadomosci(json: unknown, mojLogin: string | null): Wiadomo
     const autor = (w.author ?? {}) as Record<string, unknown>;
     const login = tekst(autor.login);
     /* Kto pisał: Allegro podaje rolę autora (`BUYER`/`SELLER`), a gdy jej nie
-       ma — rozstrzyga login rozmówcy. Zła strona rozmowy to gorzej niż brak
-       etykiety, więc przy niepewności zostaje `false` (czyli „my"). */
+       ma — rozstrzyga login rozmówcy: autor RÓWNY rozmówcy to kupujący.
+       Zła strona rozmowy jest gorsza niż brak etykiety, więc przy niepewności
+       zostaje `false` (czyli „my"): pomyłka w tę stronę chowa pytanie i widać
+       ją w liczniku przejrzanych rozmów, a w drugą kazałaby biuru odpisywać
+       na własne zdania. */
     const rola = tekst(autor.role);
     const odKupujacego = rola
       ? rola.toUpperCase() === "BUYER"
-      : !!login && !!mojLogin && login !== mojLogin;
+      : !!login && !!rozmowca && login === rozmowca;
     return {
       id: tekst(w.id) ?? "",
       odKupujacego,
@@ -625,7 +637,10 @@ export class HttpAllegroAdapter implements AllegroAdapter {
           watek: {
             threadId,
             interlokutor: tekst(rozmowca.login) ?? tekst(rozmowca.id),
-            wiadomosci: mapujWiadomosci(wiadomosci, null),
+            /* Rozmówcę mamy tu pod ręką — i to on rozstrzyga stronę rozmowy,
+               gdy Allegro nie poda roli autora. Do 0.102.1 leciało tu `null`
+               i cała rozmowa wychodziła „nasza". */
+            wiadomosci: mapujWiadomosci(wiadomosci, tekst(rozmowca.login) ?? null),
           },
           przejrzanych,
           najstarszaData,
@@ -667,9 +682,9 @@ export class HttpAllegroAdapter implements AllegroAdapter {
     return wyniki;
   }
 
-  async wiadomosciWatku(threadId: string): Promise<WiadomoscAllegro[]> {
+  async wiadomosciWatku(threadId: string, rozmowca?: string | null): Promise<WiadomoscAllegro[]> {
     const json = await this.zapytaj(urlWiadomosci(config.allegro.apiUrl, threadId));
-    return json === null ? [] : mapujWiadomosci(json, null);
+    return json === null ? [] : mapujWiadomosci(json, rozmowca ?? null);
   }
 
   async wyslijWiadomosc(threadId: string, tekstWiadomosci: string): Promise<void> {
