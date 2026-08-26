@@ -6,6 +6,7 @@ import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import type { OfertaAllegro, WiadomoscAllegro } from "../adapters/allegro.js";
 import { dostepneW, zamiennikiZOpisu } from "./stock.js";
+import { stanyNiezerowe } from "./magazyny.js";
 import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
 import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
 import type { ProductRow, Zamienniki } from "../types.js";
@@ -1021,14 +1022,41 @@ export function oknoDniPytan(raw: unknown): number {
 
 export interface StatystykiPytan {
   dni: number;
-  produkty: Array<{ twId: number | null; symbol: string; nazwa: string; pytan: number }>;
+  produkty: Array<{
+    twId: number | null;
+    symbol: string;
+    nazwa: string;
+    pytan: number;
+    /** Ile leży na magazynach widocznych dla biura; null = towar spoza kartoteki. */
+    stan: number | null;
+    jednostka: string | null;
+  }>;
   kategorie: Array<{ kategoria: string; ile: number }>;
   tygodnie: Array<{ tydzien: string; ile: number }>;
   /** Mediana czasu od pytania do wysłanej odpowiedzi, w godzinach. */
   medianaGodzin: number | null;
   wyslanych: number;
   bezEdycji: number;
-  pozaOferta: Array<{ id: number; tresc: string; otrzymanoAt: string | null }>;
+  pozaOferta: Array<{
+    id: number;
+    tresc: string;
+    otrzymanoAt: string | null;
+    /** Model maszyny wyłuskany z pytania — bez niego lista to sam wolny tekst. */
+    urzadzenie: string | null;
+  }>;
+  /** Dopasowania potwierdzone ręką w tym oknie — praca, która zostaje na potem. */
+  potwierdzonychDopasowan: number;
+  /**
+   * Tydzień szczytowy i jego tło, pod zdanie interpretujące. `null`, gdy próbka
+   * jest za cienka, żeby cokolwiek twierdzić — patrz `wyliczSzczyt`.
+   */
+  szczyt: { tydzien: string; ile: number; medianaPozostalych: number; kategoria: string | null } | null;
+  /**
+   * Najświeższe pytanie, które zestawienie obejmuje. Pasek filtrów pisze z tego
+   * „Dane do…": zegar serwera powiedziałby tylko, że zapytanie właśnie poszło,
+   * a to zdanie ma mówić, czy synchronizacja z Allegro stoi.
+   */
+  daneDo: string | null;
   /** Kto odpisywał w tym oknie — pod filtr OSOBA w pasku ANALIZY. */
   osoby: string[];
   /** Wybrana osoba albo `null`. Karta mówi wtedy, czego filtr NIE obejmuje. */
@@ -1078,6 +1106,37 @@ export function statystykiPytan(dni: number, osoba?: string | null): StatystykiP
     symbol: (w.symbol as string) ?? "",
     nazwa: w.nazwa as string,
     pytan: w.pytan as number,
+  }));
+
+  /* Ile tego leży — kolumna STAN przy najczęściej pytanych towarach. Bez niej
+     lista mówi „pytają o to dwadzieścia razy" i nie mówi, czy jest co sprzedać;
+     to dwa różne wnioski zakupowe. `stanyNiezerowe` bierze KOMPLET jednym
+     zapytaniem i pomija magazyny ukryte przez biuro — reguła widoczności ma
+     jednego właściciela i nie kopiujemy jej tutaj. */
+  const stany = stanyNiezerowe(produkty.flatMap((p) => (p.twId == null ? [] : [p.twId])));
+  const jednostki = new Map(
+    produkty.flatMap((p) => (p.twId == null ? [] : [[p.twId, null as string | null]]))
+  );
+  if (jednostki.size > 0) {
+    for (const w of d
+      .prepare(
+        `SELECT tw_id, unit FROM sgt_towar
+          WHERE tw_id IN (${[...jednostki.keys()].map(() => "?").join(",")})`
+      )
+      .all(...[...jednostki.keys()]) as Array<{ tw_id: number; unit: string }>) {
+      jednostki.set(w.tw_id, w.unit);
+    }
+  }
+  const produktyZeStanem = produkty.map((p) => ({
+    ...p,
+    /* Towar spoza kartoteki dostaje `null`, nie zero: „nie mamy ani sztuki"
+       i „nie wiemy, o czym mowa" to dwie różne odpowiedzi, a zero mówi
+       pierwszą z nich w sytuacji drugiej. */
+    stan:
+      p.twId == null
+        ? null
+        : (stany.get(p.twId) ?? []).reduce((suma, m) => suma + m.stan, 0),
+    jednostka: p.twId == null ? null : (jednostki.get(p.twId) ?? "szt."),
   }));
 
   const kategorie = d
@@ -1160,7 +1219,7 @@ export function statystykiPytan(dni: number, osoba?: string | null): StatystykiP
   const pozaOferta = (
     d
       .prepare(
-        `SELECT id, tresc, otrzymano_at FROM pytanie
+        `SELECT id, tresc, otrzymano_at, urzadzenie FROM pytanie
          WHERE w_ofercie = 0 AND otrzymano_at >= datetime('now', ?)
          ORDER BY otrzymano_at DESC LIMIT 20`
       )
@@ -1169,11 +1228,32 @@ export function statystykiPytan(dni: number, osoba?: string | null): StatystykiP
     id: w.id as number,
     tresc: w.tresc as string,
     otrzymanoAt: tekstLubNull(w.otrzymano_at),
+    urzadzenie: tekstLubNull(w.urzadzenie),
   }));
+
+  /* Potwierdzone dopasowania maszyna→część. Ma AUTORA (`potwierdzono_przez`),
+     więc jako jedyny z przekrojów produktowych wchodzi pod filtr OSOBA —
+     w odróżnieniu od pytań, które przychodzą od klientów i autora po naszej
+     stronie nie mają. To praca, która zostaje: każde kolejne pytanie o tę samą
+     maszynę zaczyna się od gotowej odpowiedzi, a nie od zera. */
+  const dopasowania = d
+    .prepare(
+      `SELECT COUNT(*) AS ile FROM dopasowanie
+        WHERE potwierdzono_at >= datetime('now', ?)${kto ? " AND potwierdzono_przez = ?" : ""}`
+    )
+    .get(...(zOsoba(odKiedy) as never[])) as { ile: number };
+
+  const daneDo = tekstLubNull(
+    (
+      d.prepare("SELECT MAX(otrzymano_at) AS ost FROM pytanie").get() as {
+        ost: string | null;
+      }
+    ).ost
+  );
 
   return {
     dni,
-    produkty,
+    produkty: produktyZeStanem,
     kategorie,
     tygodnie,
     medianaGodzin,
@@ -1182,5 +1262,57 @@ export function statystykiPytan(dni: number, osoba?: string | null): StatystykiP
     pozaOferta,
     osoby,
     osoba: kto,
+    potwierdzonychDopasowan: dopasowania.ile,
+    szczyt: wyliczSzczyt(tygodnie, odKiedy),
+    daneDo,
+  };
+}
+
+/**
+ * Tydzień szczytowy i jego tło — materiał na jedno zdanie pod wykresem.
+ *
+ * Makieta pisze tu zdanie w rodzaju „szczyt zbiega się z sezonem kosiarek".
+ * Drugiej połowy takiego zdania NIE DA SIĘ policzyć: „sezon kosiarek" jest
+ * sądem człowieka, a nie liczbą w bazie, i wypisanie go z automatu byłoby
+ * zmyśleniem podanym w tonie wniosku. Zwracamy więc same fakty, które wykres
+ * i tak pokazuje, a zdanie składa z nich strona.
+ *
+ * `null` przy próbce zbyt cienkiej, żeby cokolwiek twierdzić — mniej niż trzy
+ * tygodnie albo szczyt nieodstający od reszty. Zdanie „szczyt jest w W31,
+ * a w pozostałych tygodniach jest tyle samo" nie jest obserwacją, tylko szumem
+ * w miejscu, w którym czytelnik spodziewa się wniosku.
+ */
+function wyliczSzczyt(
+  tygodnie: Array<{ tydzien: string; ile: number }>,
+  odKiedy: string
+): StatystykiPytan["szczyt"] {
+  if (tygodnie.length < 3) return null;
+  const szczyt = tygodnie.reduce((a, b) => (b.ile > a.ile ? b : a));
+  if (szczyt.ile === 0) return null;
+
+  const reszta = tygodnie.filter((t) => t !== szczyt).map((t) => t.ile).sort((a, b) => a - b);
+  const mediana =
+    reszta.length % 2 === 1
+      ? reszta[(reszta.length - 1) / 2]
+      : (reszta[reszta.length / 2 - 1] + reszta[reszta.length / 2]) / 2;
+  /* Próg 1,5×: niżej to normalne falowanie tygodnia, a nie szczyt. */
+  if (mediana > 0 && szczyt.ile < mediana * 1.5) return null;
+
+  const wiodaca = db()
+    .prepare(
+      `SELECT COALESCE(NULLIF(kategoria, ''), 'nieokreślone') AS kategoria, COUNT(*) AS ile
+         FROM pytanie
+        WHERE otrzymano_at >= datetime('now', ?) AND strftime('%Y-%W', otrzymano_at) = ?
+        GROUP BY kategoria ORDER BY ile DESC LIMIT 1`
+    )
+    .get(odKiedy, szczyt.tydzien) as { kategoria: string; ile: number } | undefined;
+
+  return {
+    tydzien: szczyt.tydzien,
+    ile: szczyt.ile,
+    medianaPozostalych: Math.round(mediana * 10) / 10,
+    /* Kategoria wchodzi do zdania tylko wtedy, gdy naprawdę DOMINUJE w tym
+       tygodniu. Przy rozkładzie po równo „wiodąca" jest artefaktem sortowania. */
+    kategoria: wiodaca && wiodaca.ile * 2 > szczyt.ile ? wiodaca.kategoria : null,
   };
 }

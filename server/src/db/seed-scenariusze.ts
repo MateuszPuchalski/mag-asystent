@@ -219,6 +219,8 @@ export const KATALOG: Scenariusz[] = [
   // ── pytania klientów ──
   { id: "S73", obszar: "pytania", tytul: "Skrzynka w trzech stanach: bez szkicu, szkic po poprawce, wysłane", wejscie: "/biuro → PYTANIA KLIENTÓW" },
   { id: "S74", obszar: "pytania", tytul: "Pytanie o towar spoza oferty — jedyne źródło listy braków", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\"" },
+  { id: "S75", obszar: "pytania", tytul: "Wykres tygodni, słupki proporcji i zdanie o szczycie — pytania rozłożone na dwa miesiące", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\" → okno 90 dni" },
+  { id: "S76", obszar: "zwroty", tytul: "Wgląd w zwroty stoi w ANALIZIE, nie w zakładce pracy", wejscie: "/biuro → ANALIZA → zakres „zwroty\"" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -1489,6 +1491,68 @@ function pytaniaDemo(): number {
       produkty: [], wOfercie: 0,
       prowadzi: null, wyslaneMinut: -4260, odpowiedzial: "Ewa Bąk",
     },
+    /* ── Tło pod ANALIZĘ (0.99.0) ────────────────────────────────────────────
+       Cztery pytania wyżej stoją w jednym tygodniu i opisują STANY sprawy —
+       to ich zadanie. Wykres tygodni, słupki proporcji i zdanie o szczycie
+       potrzebują czegoś innego: rozrzutu w czasie i różnych towarów. Bez tego
+       zakładka pokazywała jeden słupek i cztery jednakowe paski, czyli nie
+       dawało się zobaczyć, czy w ogóle działa. Ta sama luka, przez którą
+       skrzynka pytań stała pusta do 0.96.0. */
+    {
+      msg: "dev-msg-0005", login: "client:44112097", minut: -14_400,
+      oferta: "GAŹNIK DO STIHL MS 180 GAŹNIK ZAMA DO PIŁY STIHL 017 018 MS170 MS180 FILTR",
+      tresc: "Dzień dobry, czy do MS 180 pasuje ten sam gaźnik co do 170? Piła z 2016 roku.",
+      status: "wyslane",
+      szkic: "Dzień dobry, tak — te modele mają wspólny gaźnik. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, tak — MS 170 i MS 180 mają wspólny gaźnik Zama C1Q-S57B. Pozdrawiamy, WERTIS",
+      edytowano: 1, kategoria: "dobor-czesci", urzadzenie: "STIHL MS 180",
+      produkty: [{ twId: 900_003, symbol: "TEST-TRIO-1" }], wOfercie: 1,
+      prowadzi: null, wyslaneMinut: -14_100, odpowiedzial: "Jan Kowalski",
+    },
+    {
+      msg: "dev-msg-0006", login: "client:44251880", minut: -24_000,
+      oferta: "OLEJ BRIGGS STRATTON 0,6L SAE30 KOSIARKI AGREGATU TRAKTORKA CZTEROSUWOWYCH",
+      tresc: "Czy ten olej nadaje się do agregatu prądotwórczego, czy tylko do kosiarki?",
+      status: "wyslane",
+      szkic: "Dzień dobry, nadaje się także do agregatów. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, nadaje się także do agregatów czterosuwowych. Pozdrawiamy, WERTIS",
+      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: null,
+      produkty: [{ twId: 900_017, symbol: "TEST-ULAMEK" }], wOfercie: 1,
+      prowadzi: null, wyslaneMinut: -23_940, odpowiedzial: "Ewa Bąk",
+    },
+    {
+      msg: "dev-msg-0007", login: "client:44380022", minut: -33_600,
+      oferta: null,
+      tresc: "Potrzebuję rozrusznika linkowego do agregatu Loncin G200F. Da się zamówić?",
+      status: "wyslane",
+      szkic: "Dzień dobry, nie prowadzimy części do Loncin. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, nie prowadzimy części do Loncin. Pozdrawiamy, WERTIS",
+      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: "Loncin G200F",
+      produkty: [], wOfercie: 0,
+      prowadzi: null, wyslaneMinut: -33_540, odpowiedzial: "Jan Kowalski",
+    },
+    {
+      msg: "dev-msg-0008", login: "client:44300104", minut: -46_000,
+      oferta: "ŚWIECA ZAPŁONOWA do kosiarek i agregatów — trio EAN",
+      tresc: "Jaki jest odstęp elektrod w tej świecy? Instrukcja podaje 0,7 mm.",
+      status: "wyslane",
+      szkic: "Dzień dobry, odstęp fabryczny to 0,7 mm. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, odstęp fabryczny to 0,7 mm i tak jest ustawiona. Pozdrawiamy, WERTIS",
+      edytowano: 1, kategoria: "dobor-czesci", urzadzenie: null,
+      produkty: [{ twId: 900_003, symbol: "TEST-TRIO-1" }], wOfercie: 1,
+      prowadzi: null, wyslaneMinut: -45_900, odpowiedzial: "Ewa Bąk",
+    },
+    {
+      msg: "dev-msg-0009", login: "client:44112097", minut: -60_000,
+      oferta: null,
+      tresc: "Szukam gaźnika do pilarki Stihl MS 181 C-BE, oznaczenie C1Q-S137. Jest na stanie?",
+      status: "wyslane",
+      szkic: "Dzień dobry, nie mamy tego gaźnika. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, nie mamy tego gaźnika w ofercie. Pozdrawiamy, WERTIS",
+      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: "STIHL MS 181 C-BE",
+      produkty: [], wOfercie: 0,
+      prowadzi: null, wyslaneMinut: -59_940, odpowiedzial: "Jan Kowalski",
+    },
   ];
 
   for (const p of pytania) {
@@ -1505,14 +1569,26 @@ function pytaniaDemo(): number {
     );
   }
 
-  /* Jedno potwierdzone dopasowanie maszyna→część, żeby sekcja „skąd to
-     dopasowanie" miała co pokazać poza samymi frazami. */
-  d.prepare(
+  /* Potwierdzone dopasowania maszyna→część. Pierwsze jest tu od 0.96.0, żeby
+     sekcja „skąd to dopasowanie" miała co pokazać poza samymi frazami; reszta
+     doszła w 0.99.0 pod kafel „potwierdzonych dopasowań" w ANALIZIE. Kafel
+     liczący zawsze jeden nie pokazuje, czy działa — ani czy działa filtr
+     OSOBA, który jako jedyny z przekrojów produktowych go obejmuje. Stąd dwa
+     nazwiska i różne daty. */
+  const dopasuj = d.prepare(
     `INSERT OR IGNORE INTO dopasowanie(urzadzenie, symbol, tw_id, pytanie_id,
                                        potwierdzono_at, potwierdzono_przez)
      VALUES (?,?,?,(SELECT id FROM pytanie WHERE wiadomosc_id = ?),?,?)`
-  ).run("STIHL MS 170", "TEST-TRIO-1", 900_003, "dev-msg-0003",
-        chwila(-2800), "Jan Kowalski");
+  );
+  for (const [urzadzenie, symbol, twId, msg, minut, kto] of [
+    ["STIHL MS 170", "TEST-TRIO-1", 900_003, "dev-msg-0003", -2800, "Jan Kowalski"],
+    ["STIHL MS 180", "TEST-TRIO-1", 900_003, "dev-msg-0005", -14_050, "Jan Kowalski"],
+    ["STIHL MS 180", "TEST-KOLIZJA-A", 900_001, "dev-msg-0005", -14_040, "Jan Kowalski"],
+    ["NAC LS46-127", "TEST-ULAMEK", 900_017, "dev-msg-0004", -4200, "Ewa Bąk"],
+    ["BRIGGS 550E", "TEST-ULAMEK", 900_017, "dev-msg-0006", -23_900, "Ewa Bąk"],
+  ] as Array<[string, string, number, string, number, string]>) {
+    dopasuj.run(urzadzenie, symbol, twId, msg, chwila(minut), kto);
+  }
 
   return pytania.length;
 }

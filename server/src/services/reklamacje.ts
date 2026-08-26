@@ -162,6 +162,12 @@ export interface RaportZwrotow {
   zapowiedzi: { oczekujace: number; brakujace: number; doreczoneNieprzyjete: number };
   /** Mediana godzin od przyjęcia skanem do rozliczenia (30 dni); null = brak danych. */
   medianaGodzinDoRozliczenia: number | null;
+  /**
+   * Najświeższy zwrot, który raport obejmuje. Pasek ANALIZY pisze z tego
+   * „Dane do…" — zegar serwera powiedziałby tylko, że zapytanie właśnie
+   * poszło, a to zdanie ma mówić, czy zwroty w ogóle dochodzą.
+   */
+  daneDo: string | null;
 }
 
 /**
@@ -217,5 +223,8 @@ export function raportZwrotow(): RaportZwrotow {
     },
     zapowiedzi: liczbyZapowiedzi(),
     medianaGodzinDoRozliczenia: mediana,
+    daneDo:
+      (d.prepare("SELECT MAX(utworzono_at) AS ost FROM zwrot").get() as { ost: string | null })
+        .ost ?? null,
   };
 }

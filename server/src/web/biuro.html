@@ -300,6 +300,21 @@
   }
   .segment button[aria-pressed="true"] + button { border-left-color: var(--ink); }
 
+  /* ── Słupek w komórce tabeli ────────────────────────────────────────────────
+     Liczba w kolumnie mówi „trzydzieści cztery" i nie mówi, czy to dużo.
+     Odpowiedź na to drugie pytanie jest w tabeli — w pierwszym wierszu — ale
+     żeby ją dostać, trzeba porównać cyfry oczami. Słupek robi to porównanie za
+     czytelnika i nic poza tym: skala jest ZAWSZE względem największej wartości
+     w tej tabeli, więc pełny tor znaczy „to jest ten największy", a nie żadną
+     wartość bezwzględną.
+
+     Liczba ZOSTAJE pod słupkiem. Sam pasek mówi o proporcji i milczy o skali;
+     tabela, w której nie da się odczytać wartości, przestaje być tabelą. */
+  .slupek { height: 6px; background: var(--secondary); border-radius: 6px; overflow: hidden; }
+  .slupek i { display: block; height: 6px; background: var(--amber); }
+  /* Kolumna ze słupkiem nie ma prawa się zwężać do szerokości liczby. */
+  td.zeSlupkiem { width: 120px; }
+
   /* ── Czipy: filtr, który widać bez rozwijania ───────────────────────────────
      `<select>` chowa pozostałe możliwości za kliknięciem i nie mówi, ile ich
      jest. Przy trzech stanach skrzynki to strata: biuro ma wiedzieć, że
@@ -1057,96 +1072,16 @@
       </div>
     </section>
 
-    <!-- ── WGLĄD ────────────────────────────────────────────────────────────
-         Cztery karty liczb zajmowały tyle pionu co cała praca razem wzięta,
-         a otwiera się je kilka razy w tygodniu, nie kilkanaście razy dziennie.
-         Zwinięte z jednego powodu: praca ma zostać na wierzchu.
-
-         Zwinięcie nie jest tu chowaniem pikseli — sekcja zamknięta NIE PYTA
-         serwera. Statystyki i czasy to osobne żądania, a raport leciał dotąd
-         w każdym trzydziestosekundowym cyklu odświeżania.
-
-         Selektor okna stoi NAD sekcjami, nie w środku statystyk: rządzi
-         dwiema z nich, a schowany w jednej byłby nieosiągalny po jej
-         zwinięciu. -->
-    <section class="card pelna" id="wgladKarta">
-      <h2>WGLĄD · RAPORT, STATYSTYKI, CZASY</h2>
-      <div class="filtry">
-        <div>
-          <label for="dniStatystyk">OKNO ANALIZY</label>
-          <select id="dniStatystyk">
-            <option value="30">30 dni</option>
-            <option value="90" selected>90 dni</option>
-            <option value="180">180 dni</option>
-          </select>
-        </div>
-      </div>
-
-    <details class="zwijana" id="raportZwrotowKarta">
-      <summary><h2>RAPORT PROCESU ZWROTÓW</h2></summary>
-      <div class="kafle" id="raportZwrotowKafle"></div>
-    </details>
-
-    <!-- Raport wyżej mówi, JAK IDZIE ROBOTA. Ta sekcja mówi, CO WRACA — inne
-         pytanie, więc osobna sekcja, a nie kolejne kafle w tamtej. -->
-    <details class="zwijana" id="statystykiKarta">
-      <summary><h2>STATYSTYKI ZWROTÓW · CO WRACA NAJCZĘŚCIEJ</h2></summary>
-      <table id="statystykiProdukty"></table>
-      <p class="mute" id="statystykiUwaga" style="margin-top:6px"></p>
-
-      <h2 style="margin-top:18px">DECYZJE BIURA</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Ile ze zwróconego towaru wraca do sprzedaży, a ile schodzi ze stanu.
-      </p>
-      <div class="kafle" id="statystykiDecyzje"></div>
-
-      <h2 style="margin-top:18px">ZWROTY PER TYDZIEŃ</h2>
-      <div id="statystykiTygodnie" style="margin-top:6px"></div>
-
-      <h2 style="margin-top:18px">KUPUJĄCY Z WIĘCEJ NIŻ JEDNYM ZWROTEM</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Zestawienie służy wykrywaniu nadużyć i tylko temu. To dane osobowe
-        kupujących — nie używa się go do oceniania klientów ani do decyzji
-        wobec pojedynczej osoby bez sprawdzenia sprawy.
-      </p>
-      <table id="statystykiKupujacy"></table>
-    </details>
-
-    <!-- Trzecie pytanie o zwroty. RAPORT mówi, ile czego jest; STATYSTYKI —
-         co wraca; ta sekcja — JAK DŁUGO to trwa. Osobna, bo osobne pytanie,
-         ale okno dzieli ze statystykami: obie czyta się razem. -->
-    <details class="zwijana" id="czasyKarta">
-      <summary><h2>CZASY OBSŁUGI ZWROTU · ILE TOWAR STOI</h2></summary>
-      <p class="mute" id="czasyWstep" style="margin-bottom:10px"></p>
-      <div class="kafle" id="czasyOdcinki"></div>
-
-      <h2 style="margin-top:18px">CAŁA DROGA PER TYDZIEŃ</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Wysokość słupka to mediana godzin od przyjęcia do półki. Tydzień bez
-        zakończonych zwrotów zostaje na osi pusty, zamiast znikać.
-      </p>
-      <div id="czasyTygodnie" style="margin-top:6px"></div>
-
-      <h2 style="margin-top:18px">CO STOI TERAZ</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Mediana wyżej liczy się z rzeczy SKOŃCZONYCH, więc sprawa stojąca trzeci
-        tydzień nie ma na nią wpływu, dopóki ktoś jej nie domknie. Tu widać ją
-        od razu. Kliknięcie wiersza otwiera kosz albo zwrot.
-      </p>
-      <table id="czasyKosze"></table>
-      <table id="czasyZwroty" style="margin-top:10px"></table>
-
-      <h2 style="margin-top:18px">TEMPO ROZKŁADANIA PER OSOBA</h2>
-      <p class="mute" id="czasyPodstawa" style="margin-bottom:8px"></p>
-      <table id="czasyLudzie"></table>
-    </details>
-
+    <!-- Konto Allegro ZOSTAJE w zakładce zwrotów, choć trzy karty liczb obok
+         niego pojechały do ANALIZY w 0.99.0. To nie wgląd, tylko stan
+         POŁĄCZENIA: gdy token wygasa, przestaje działać skan i pobieranie
+         zapowiedzi, czyli praca na tej zakładce. Jej miejsce jest przy tej
+         pracy, nie przy liczbach o niej. -->
     <details class="zwijana" id="kontoAllegroKarta">
       <summary><h2>KONTO ALLEGRO</h2></summary>
       <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
       <div id="allegroAkcje"></div>
     </details>
-    </section>
   </div>
 
   <!-- ── PYTANIA KLIENTÓW ────────────────────────────────────────────────────
@@ -1429,6 +1364,7 @@
           <select id="zakresAnalizy">
             <option value="audyt">Ślad audytowy</option>
             <option value="pytania">Pytania klientów</option>
+            <option value="zwroty">Zwroty</option>
           </select>
         </div>
         <!-- OSOBA dotyczy WYŁĄCZNIE pytań: ślad audytowy ma własny rozbiór per
@@ -1439,7 +1375,17 @@
           <label for="osobaAnalizy">OSOBA</label>
           <select id="osobaAnalizy"><option value="">Wszyscy</option></select>
         </div>
+        <!-- CSV ma tylko ślad audytowy — pytania i zwroty nie mają trasy
+             eksportu. Przycisk, który przy jednym zakresie pobiera plik
+             z innego, jest gorszy od przycisku, którego nie ma. -->
         <div><button class="akcja cichy" id="csvAnalizy">POBIERZ CSV</button></div>
+        <!-- „Dane do…" — DO KTÓREJ CHWILI zestawienie sięga, liczone
+             z najświeższego rekordu, nie z zegara serwera. Zegar powiedziałby
+             tylko, że zapytanie właśnie poszło; ta data mówi, czy dane w ogóle
+             dochodzą. Cichnie, gdy nie ma z czego jej policzyć. -->
+        <div id="daneDoPole" style="margin-left:auto;align-self:flex-end">
+          <span class="mute" id="daneDo"></span>
+        </div>
       </div>
     </section>
 
@@ -1451,19 +1397,25 @@
 
          Własnego `<select>` z oknem już nie niosą: rządzi nim pasek filtrów
          nad kartami, tak jak zakresem śladu audytowego. -->
-    <section class="card zakresPytania" hidden>
+    <section class="card pelna zakresPytania" hidden>
       <h2>O CO PYTAJĄ KLIENCI</h2>
       <div class="kafle" id="pytaniaKafle"></div>
       <p id="pytaniaZakresOsoby" style="margin-top:8px"></p>
 
       <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
         <div>
-          <h2>NAJCZĘŚCIEJ PYTANE TOWARY</h2>
+          <h2>NAJCZĘŚCIEJ PYTANE TOWARY <span class="mute" id="pytaniaOknoTowarow"></span></h2>
           <table id="pytaniaProdukty"></table>
         </div>
         <div>
-          <h2>PYTANIA PER TYDZIEŃ</h2>
+          <!-- Przypis mówi o czymś, co kod robi od 0.96.0, a czego nie widać:
+               tygodnie idą Z KALENDARZA, nie z danych. Bez tego zdania pusty
+               słupek czyta się jak dziura w zestawieniu, a jest informacją —
+               w tym tygodniu nikt nie zapytał. -->
+          <h2>PYTANIA PER TYDZIEŃ
+            <span class="mute">· tydzień z zerem zostaje na osi</span></h2>
           <div id="pytaniaTygodnie" style="margin-top:6px"></div>
+          <p class="mute" id="pytaniaSzczyt" style="margin-top:12px"></p>
         </div>
       </div>
 
@@ -1471,13 +1423,100 @@
       <div class="kafle" id="pytaniaKategorie"></div>
     </section>
 
-    <section class="card zakresPytania" hidden>
-      <h2>PYTALI O TOWAR SPOZA NASZEJ OFERTY</h2>
+    <section class="card pelna zakresPytania" hidden>
+      <h2>PYTALI O TOWAR SPOZA NASZEJ OFERTY
+        <span class="mute" id="pytaniaPozaOfertaIle"></span></h2>
       <p class="mute" style="margin-bottom:8px">
         Ktoś chciał kupić, a nie było czego sprzedać. To najtańszy research
         asortymentu, jaki firma ma.
       </p>
       <table id="pytaniaPozaOferta"></table>
+      <!-- Ta sama klauzula co przy KUPUJĄCY Z WIĘCEJ NIŻ JEDNYM ZWROTEM i przy
+           TEN KLIENT: zestawienie z cudzych słów mówi, DO CZEGO jest, zanim
+           ktoś użyje go do czegoś innego. Tu treści są dosłownymi cytatami
+           z Centrum wiadomości, więc powód jest tym mocniejszy. -->
+      <p class="mute" style="margin-top:14px">
+        Treści pytań pochodzą z Centrum wiadomości Allegro. Zestawienie służy
+        decyzjom zakupowym, nie ocenie klientów.
+      </p>
+    </section>
+
+    <!-- ── ZAKRES: ZWROTY ──────────────────────────────────────────────────
+         Trzy karty przyjechały tu z zakładki ZWROTY w 0.99.0 — dokładnie tą
+         samą drogą, którą statystyki pytań przeszły w 0.96.0. Stały tam jako
+         `<details>` z własnym oknem, czyli wgląd doklejony do kolejki pracy,
+         wbrew podziałowi, który pasek zakładek ogłasza od 0.74.1.
+
+         Przestały być zwijane, bo zwinięcie miało tam sens: chowało wgląd,
+         żeby praca została na wierzchu. Tutaj wgląd JEST treścią zakładki —
+         zwinięta karta chowałaby to, po co ktoś tu wszedł. -->
+    <section class="card pelna zakresZwroty" id="raportZwrotowKarta" hidden>
+      <h2>RAPORT PROCESU ZWROTÓW · STAN TERAZ</h2>
+      <!-- Jedyna karta ANALIZY, której OKNO nie dotyczy, i mówi to wprost.
+           `raportZwrotow()` miesza STAN („otwarte", „w kolejce") z OKNEM
+           („razem 30 dni", „rozpatrzone 30 dni") — przycięcie go czipem
+           obiecywałoby filtr, którego ta funkcja nie zna. Zdanie kosztuje
+           wiersz; cicha niezgodność między czipem a liczbą kosztuje zaufanie
+           do wszystkich pozostałych liczb na tej zakładce. -->
+      <p class="mute" style="margin-bottom:8px">
+        Liczby stanu — ile czego jest w tej chwili. Czip OKNA ich nie przycina;
+        rządzi kartami niżej.
+      </p>
+      <div class="kafle" id="raportZwrotowKafle"></div>
+    </section>
+
+    <!-- Raport wyżej mówi, JAK IDZIE ROBOTA. Ta sekcja mówi, CO WRACA — inne
+         pytanie, więc osobna sekcja, a nie kolejne kafle w tamtej. -->
+    <section class="card pelna zakresZwroty" id="statystykiKarta" hidden>
+      <h2>STATYSTYKI ZWROTÓW · CO WRACA NAJCZĘŚCIEJ</h2>
+      <table id="statystykiProdukty"></table>
+      <p class="mute" id="statystykiUwaga" style="margin-top:6px"></p>
+
+      <h2 style="margin-top:18px">DECYZJE BIURA</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Ile ze zwróconego towaru wraca do sprzedaży, a ile schodzi ze stanu.
+      </p>
+      <div class="kafle" id="statystykiDecyzje"></div>
+
+      <h2 style="margin-top:18px">ZWROTY PER TYDZIEŃ</h2>
+      <div id="statystykiTygodnie" style="margin-top:6px"></div>
+
+      <h2 style="margin-top:18px">KUPUJĄCY Z WIĘCEJ NIŻ JEDNYM ZWROTEM</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Zestawienie służy wykrywaniu nadużyć i tylko temu. To dane osobowe
+        kupujących — nie używa się go do oceniania klientów ani do decyzji
+        wobec pojedynczej osoby bez sprawdzenia sprawy.
+      </p>
+      <table id="statystykiKupujacy"></table>
+    </section>
+
+    <!-- Trzecie pytanie o zwroty. RAPORT mówi, ile czego jest; STATYSTYKI —
+         co wraca; ta sekcja — JAK DŁUGO to trwa. Osobna, bo osobne pytanie,
+         ale okno dzieli ze statystykami: obie czyta się razem. -->
+    <section class="card pelna zakresZwroty" id="czasyKarta" hidden>
+      <h2>CZASY OBSŁUGI ZWROTU · ILE TOWAR STOI</h2>
+      <p class="mute" id="czasyWstep" style="margin-bottom:10px"></p>
+      <div class="kafle" id="czasyOdcinki"></div>
+
+      <h2 style="margin-top:18px">CAŁA DROGA PER TYDZIEŃ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Wysokość słupka to mediana godzin od przyjęcia do półki. Tydzień bez
+        zakończonych zwrotów zostaje na osi pusty, zamiast znikać.
+      </p>
+      <div id="czasyTygodnie" style="margin-top:6px"></div>
+
+      <h2 style="margin-top:18px">CO STOI TERAZ</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Mediana wyżej liczy się z rzeczy SKOŃCZONYCH, więc sprawa stojąca trzeci
+        tydzień nie ma na nią wpływu, dopóki ktoś jej nie domknie. Tu widać ją
+        od razu. Kliknięcie wiersza otwiera kosz albo zwrot.
+      </p>
+      <table id="czasyKosze"></table>
+      <table id="czasyZwroty" style="margin-top:10px"></table>
+
+      <h2 style="margin-top:18px">TEMPO ROZKŁADANIA PER OSOBA</h2>
+      <p class="mute" id="czasyPodstawa" style="margin-bottom:8px"></p>
+      <table id="czasyLudzie"></table>
     </section>
 
     <section class="card zakresAudyt">
@@ -1488,6 +1527,7 @@
           <h2>OPERACJE PER DZIEŃ</h2>
           <p class="mute" style="margin-bottom:6px">Wykonane pozycje — dni według zegara magazynu.</p>
           <div id="wykresDni"></div>
+          <p class="mute" id="audytSzczyt" style="margin-top:12px"></p>
         </div>
         <div>
           <h2>ROZKŁAD PO GODZINACH</h2>
@@ -2518,6 +2558,56 @@ function rysujMetryki(m) {
    siedzą na każdym słupku, tylko na najwyższym; resztę mówi dymek `title`.  */
 
 /**
+ * Komórka tabeli ze słupkiem proporcji. `max` to największa wartość W TEJ
+ * TABELI — pełny tor znaczy „to jest ten największy", nie żadną wartość
+ * bezwzględną. Liczba zostaje pod słupkiem: pasek mówi o proporcji i milczy
+ * o skali, a tabela bez odczytywalnych wartości przestaje być tabelą.
+ */
+function komorkaSlupka(ile, max) {
+  const proc = max > 0 ? Math.max(2, Math.round((ile / max) * 100)) : 0;
+  return `<td class="zeSlupkiem">
+    <div class="slupek"><i style="width:${proc}%"></i></div>
+    <div class="mute" style="margin-top:3px">${ile}</div>
+  </td>`;
+}
+
+/**
+ * Zdanie o szczycie — z FAKTÓW, nie z interpretacji.
+ *
+ * Makieta pisze pod wykresem zdanie w rodzaju „szczyt zbiega się z sezonem
+ * kosiarek". Drugiej połowy takiego zdania nie da się policzyć: to sąd
+ * człowieka, a nie liczba w bazie. Serwer zwraca więc sam szczyt i medianę
+ * reszty (`wyliczSzczyt` w services/pytania.ts), a gdy próbka jest za cienka,
+ * żeby cokolwiek twierdzić — `null`, i wtedy zdania po prostu nie ma.
+ * Milczenie jest lepsze od zdania, które brzmi jak wniosek, a jest szumem.
+ */
+function zdanieOSzczycie(szczyt, co, nazwijOs, rzeczownik, ogon) {
+  if (!szczyt) return "";
+  const ile = szczyt[co];
+  const razy = szczyt.medianaPozostalych > 0
+    ? (ile / szczyt.medianaPozostalych).toFixed(1).replace(".", ",")
+    : null;
+  /* Bez porównania zdanie mówi tylko, gdzie jest najwyższy słupek — a to widać
+     bez zdania. Gdy mediana reszty wynosi zero, ilorazu nie ma, więc mówimy
+     wprost, ile ta mediana wynosi. NIE „w pozostałych nie było nic": mediana
+     zero znaczy, że połowa okresów jest pusta, a nie że wszystkie — przy
+     dziewięciu pytaniach w sześciu tygodniach z dziewięćdziesięciu dni jedno
+     i drugie jest prawdą o czym innym. */
+  return `Szczyt ${esc(nazwijOs)} — ${ile} ${esc(rzeczownik)}${
+    razy
+      ? `, czyli ${razy}× mediana pozostałych (${liczbaPl(szczyt.medianaPozostalych)})`
+      : ", przy medianie 0 w pozostałych"
+  }.${ogon || ""}`;
+}
+
+/** Liczba po polsku: przecinek dziesiętny, bez zbędnego „,0". */
+const liczbaPl = (n) =>
+  n == null ? "—" : String(Number.isInteger(n) ? n : n).replace(".", ",");
+
+/** Dzień jako „26.08" — tak, jak w makiecie i jak czyta go człowiek. */
+const dzienSkrot = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
+
+/**
  * Słupki jednej serii. `etykietaCo` przerzedza podpisy osi — przy 90 dniach
  * podpis pod każdym słupkiem byłby nieczytelną kaszą.
  */
@@ -2545,13 +2635,21 @@ function slupkiSvg(dane, etykietaCo) {
          font-size="10" font-weight="700" fill="var(--ink-soft)">${max}</text>` : "";
     return slupek + podpis + wartosc;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img">
+  /* `max-width` jest tu obowiązkowe, nie kosmetyczne. SVG skaluje się w CAŁOŚCI
+     — razem z wysokością i z rozmiarem podpisów osi — więc wykres wpuszczony
+     w kartę na całą szerokość ekranu urósłby do czterystu pikseli wysokości
+     i podpisów wielkości nagłówka. Wykres jednej serii ma być paskiem pod
+     tekstem, nie plakatem: dalej niż tu rośnie już tylko pusta biel między
+     słupkami. Do 0.99.0 wszystkie pięć wykresów stało w wąskich kolumnach
+     i ograniczenie nie było potrzebne. */
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto" role="img">
     <line x1="0" y1="${H - DOL}" x2="${W}" y2="${H - DOL}" stroke="var(--border)" stroke-width="1"/>
     ${czesci.join("")}
   </svg>`;
 }
 
 function rysujAnalize(a) {
+  ustawDaneDo(a.daneDo);
   const r = a.rytm;
   $("kafleAnalizy").innerHTML = [
     kafel(a.dni.reduce((s, d) => s + d.pozycje, 0), `pozycji w oknie ${a.days} dni`, false),
@@ -2564,6 +2662,12 @@ function rysujAnalize(a) {
   $("wykresDni").innerHTML = slupkiSvg(
     a.dni.map((d) => ({ ile: d.pozycje, podpis: d.data.slice(5), tytul: d.data })),
     a.days > 30 ? 14 : a.days > 7 ? 7 : 1
+  );
+  $("audytSzczyt").innerHTML = zdanieOSzczycie(
+    a.szczyt,
+    "pozycje",
+    a.szczyt ? dzienSkrot(a.szczyt.data) : "",
+    odmiana(a.szczyt?.pozycje ?? 0, ["pozycja", "pozycje", "pozycji"])
   );
   $("wykresGodzin").innerHTML = slupkiSvg(
     a.godziny.map((ile, g) => ({ ile, podpis: String(g), tytul: `godzina ${g}:00` })),
@@ -2584,9 +2688,11 @@ function rysujAnalize(a) {
       `<tr><td class="mute" colspan="5">+ ${w.nieprzypisanychZdarzen} zdarzeń bez konta — nie doklejamy ich nikomu</td></tr>` : "");
 
   const listaSzukan = (el, lista, pusto) => {
+    const max = Math.max(...lista.map((t) => t.ile), 0);
     $(el).innerHTML =
       "<tr><th>ZAPYTANIE</th><th>RAZY</th></tr>" +
-      (lista.map((t) => `<tr><td class="b">${esc(t.q)}</td><td>${t.ile}</td></tr>`).join("") ||
+      (lista.map((t) =>
+        `<tr><td class="b">${esc(t.q)}</td>${komorkaSlupka(t.ile, max)}</tr>`).join("") ||
         `<tr><td colspan="2" class="mute">${pusto}</td></tr>`);
   };
   listaSzukan("szukaneTop", a.szukania.top, "Nikt nic nie szukał");
@@ -2614,21 +2720,55 @@ const zakresAnalizy = () => $("zakresAnalizy").value;
    czip spoza zbioru wyglądałby na wybrany, a serwer liczyłby swoje domyślne
    i kafel mówiłby „w 90 dniach" przy zaznaczonym „7 dni". Tak było przez
    pierwszą godzinę życia tego paska. */
-const OKNA_ANALIZY = { audyt: [7, 30, 90], pytania: [30, 90, 180] };
+const OKNA_ANALIZY = { audyt: [7, 30, 90], pytania: [30, 90, 180], zwroty: [30, 90, 180] };
 
-/** Pokazuje karty wybranego zakresu i chowa drugi — bez pobierania danych. */
+/** Które okno wybrać, gdy poprzednie nie mieści się w nowym zakresie. */
+const OKNO_DOMYSLNE = { audyt: 7, pytania: 90, zwroty: 90 };
+
+/** Zakresy, które mają trasę CSV. Reszta chowa przycisk zamiast pobierać cudzy plik. */
+const ZAKRESY_Z_CSV = ["audyt"];
+
+/** Pokazuje karty wybranego zakresu i chowa pozostałe — bez pobierania danych. */
 function ustawZakresAnalizy() {
-  const pytania = zakresAnalizy() === "pytania";
-  for (const el of $("widokAnaliza").querySelectorAll(".zakresAudyt")) el.hidden = pytania;
-  for (const el of $("widokAnaliza").querySelectorAll(".zakresPytania")) el.hidden = !pytania;
-  $("osobaAnalizyPole").hidden = !pytania;
+  const zakres = zakresAnalizy();
+  /* Jedna klasa na zakres, jedna pętla: przy dwóch zakresach para „hidden =
+     pytania / hidden = !pytania" jeszcze się czytała, przy trzech byłaby
+     drabinką negacji, w której czwarty zakres łatwo pominąć po cichu. */
+  for (const z of Object.keys(OKNA_ANALIZY)) {
+    const klasa = "zakres" + z[0].toUpperCase() + z.slice(1);
+    for (const el of $("widokAnaliza").querySelectorAll("." + klasa)) el.hidden = z !== zakres;
+  }
+  /* OSOBA dotyczy WYŁĄCZNIE pytań. Ślad audytowy ma własny rozbiór per osoba
+     w karcie WYDAJNOŚĆ, a zwroty nie mają autora po naszej stronie — pytanie
+     przychodzi od klienta i zwrot też. */
+  $("osobaAnalizyPole").hidden = zakres !== "pytania";
+  $("csvAnalizy").hidden = !ZAKRESY_Z_CSV.includes(zakres);
 
-  const okna = OKNA_ANALIZY[pytania ? "pytania" : "audyt"];
-  // wybór zostaje, gdy nowy zakres go zna; inaczej środkowe okno obu list
-  if (!okna.includes(dniAnalizy)) dniAnalizy = okna[pytania ? 1 : 0];
+  const okna = OKNA_ANALIZY[zakres];
+  // wybór zostaje, gdy nowy zakres go zna; inaczej domyślne okno tego zakresu
+  if (!okna.includes(dniAnalizy)) dniAnalizy = OKNO_DOMYSLNE[zakres];
   $("oknoAnalizy").innerHTML = okna.map((d) =>
     `<button class="czip" data-dni="${d}" aria-pressed="${d === dniAnalizy}">${d} dni</button>`
   ).join("");
+}
+
+/**
+ * „Dane do…" w pasku filtrów — DO KTÓREJ CHWILI sięga to, na co patrzysz.
+ *
+ * Liczone z najświeższego rekordu w zestawieniu, nie z zegara. Zegar serwera
+ * mówiłby zawsze „przed chwilą", niezależnie od tego, czy synchronizacja
+ * z Allegro stanęła wczoraj. Milczy, gdy nie ma z czego policzyć — pusty
+ * zakres i tak powie o sobie kartami.
+ */
+function ustawDaneDo(at) {
+  const d = at ? new Date(at) : null;
+  /* Bez sekund i bez roku: „Dane do 25.08, 14:20". Pełny znacznik z sekundami
+     jest do diagnostyki i tam zostaje (pasek stanu, ticker zapowiedzi). Tutaj
+     odpowiada się na pytanie „czy to jest świeże", a sekundy w nim nie pomagają
+     — za to wydłużają wiersz, który ma zmieścić się obok czterech filtrów. */
+  $("daneDo").textContent = d && !isNaN(d)
+    ? `Dane do ${dzienSkrot(dataLokalna(at))}, ${dwaZnaki(d.getHours())}:${dwaZnaki(d.getMinutes())}`
+    : "";
 }
 
 async function odswiezAnalize() {
@@ -2637,6 +2777,7 @@ async function odswiezAnalize() {
      statystyki pytań za zwinięciem do 0.96.0: nie pobiera się danych, na
      które nikt nie patrzy. Zmienił się mechanizm, nie reguła. */
   if (zakresAnalizy() === "pytania") return odswiezStatystykiPytan();
+  if (zakresAnalizy() === "zwroty") return odswiezAnalizeZwrotow();
 
   try {
     rysujAnalize(await (await api(`/api/analiza?days=${dniAnalizy}`)).json());
@@ -2646,6 +2787,30 @@ async function odswiezAnalize() {
   // kandydaci mają własną trasę — i własny try/catch, żeby błąd jednej sekcji
   // nie gasił drugiej. Reguły, którymi się ich liczy, stoją za zębatką.
   odswiezKandydatow();
+}
+
+/**
+ * Zakres ZWROTY — trzy karty, trzy trasy, jedno okno z paska.
+ *
+ * Raport procesu leci OSOBNO od dwóch pozostałych, bo jako jedyny nie zna
+ * okna: `raportZwrotow()` miesza stan z oknem i przycięcie go czipem byłoby
+ * obietnicą filtra, którego ta funkcja nie ma (karta mówi to wprost).
+ *
+ * Każda karta ma własny `catch`. Trzy trasy w jednym `try` znaczyłyby, że
+ * padnięcie najrzadziej używanej gasi dwie pozostałe — a to są trzy odrębne
+ * pytania i każde ma prawo dostać odpowiedź niezależnie.
+ */
+async function odswiezAnalizeZwrotow() {
+  try {
+    const d = await (await api("/api/biuro/zwroty/raport")).json();
+    rysujRaportZwrotow(d.raport);
+    ustawDaneDo(d.raport?.daneDo ?? null);
+  } catch (e) {
+    $("raportZwrotowKafle").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
+    ustawDaneDo(null);
+  }
+  await odswiezStatystyki();
+  await odswiezCzasy();
 }
 
 /* ── Strefa złota: kandydaci i reguły ────────────────────────────────────────
@@ -3739,9 +3904,11 @@ async function odswiezZwroty() {
 async function odswiezEtap3() {
   try {
     /* Raport wypadł z bezwarunkowego `Promise.all`, bo ten cykl chodzi CO
-       30 SEKUND — zwinięta sekcja nie ma prawa kosztować żądania. Reszta to
-       karty pracy: te są widoczne zawsze i pytamy o nie zawsze. */
-    const chceRaport = $("raportZwrotowKarta").open;
+       30 SEKUND, a od 0.99.0 karta raportu stoi w ANALIZIE — na zakładce
+       ZWROTÓW nie ma jej wcale. Pytamy o niego tylko wtedy, gdy ktoś na niego
+       PATRZY; głowa szyny bierze `poTerminie` z ostatniej odpowiedzi i milczy,
+       dopóki żadnej nie było (`podsumujZwroty`). */
+    const chceRaport = widok === "analiza" && zakresAnalizy() === "zwroty";
     const [k, r, rap, zap, pom] = await Promise.all([
       (await api("/api/biuro/kosze")).json(),
       (await api("/api/biuro/zwroty/reklamacje")).json(),
@@ -3751,10 +3918,6 @@ async function odswiezEtap3() {
     ]);
     rysujKosze(k.kosze || []);
     rysujPominiete(pom.pominiete || []);
-    /* Statystyki i czasy mają własne okno i własny rytm — tu tylko pierwsze
-       wypełnienie sekcji, która AKURAT JEST rozwinięta. */
-    dociagnijWglad("statystykiKarta");
-    dociagnijWglad("czasyKarta");
     rysujReklamacjeZwrotow(r.reklamacje || []);
     if (rap) rysujRaportZwrotow(rap.raport);
     rysujBrakujace(zap.zapowiedzi || [], zap.ticker || null);
@@ -3766,13 +3929,12 @@ async function odswiezEtap3() {
    otwarcia siedzi w localStorage obok `wertis.widok`, bo to ta sama klasa
    decyzji: układ ekranu, nie dane.
 
-   RAPORT zostaje otwarty domyślnie. To jeden rząd kafli i puls procesu;
-   zwinięcie go oszczędziłoby jedno tanie żądanie kosztem jedynego wskaźnika
-   „jak idzie robota". Kto go nie chce, zwija raz i tak zostaje. */
-const SEKCJE_WGLADU = [
-  "raportZwrotowKarta", "statystykiKarta", "czasyKarta", "kontoAllegroKarta",
-];
-const WGLAD_DOMYSLNIE = ["raportZwrotowKarta"];
+   Od 0.99.0 została tu JEDNA sekcja: raport, statystyki i czasy pojechały do
+   ANALIZY, gdzie wgląd jest treścią zakładki, a nie doczepką do pracy. Cały
+   ten mechanizm zostaje dla konta Allegro i dla następnej sekcji, która się
+   tu pojawi — kosztuje kilkanaście wierszy i pamięta układ między wejściami. */
+const SEKCJE_WGLADU = ["kontoAllegroKarta"];
+const WGLAD_DOMYSLNIE = [];
 
 /** Otwarte sekcje jako jeden porównywalny napis — klucz i wartość w jednym. */
 const stanWgladu = () => JSON.stringify(SEKCJE_WGLADU.filter((x) => $(x).open));
@@ -3792,11 +3954,7 @@ function wczytajWglad() {
    a nie drabinka `if`-ów: przy piątej sekcji lista czyta się szybciej niż
    ciąg warunków, a dopisanie szóstej jest jednym wierszem. Sekcja spoza mapy
    nie pobiera niczego i to jest poprawne — nie każda ma co dociągać. */
-const ZRODLA_WGLADU = {
-  raportZwrotowKarta: ["raportZwrotowKafle", () => odswiezEtap3()],
-  statystykiKarta: ["statystykiProdukty", () => odswiezStatystyki()],
-  czasyKarta: ["czasyOdcinki", () => odswiezCzasy()],
-};
+const ZRODLA_WGLADU = {};
 
 /** Otwarta i pusta sekcja ma się wypełnić — od razu, nie po najbliższym cyklu. */
 function dociagnijWglad(id) {
@@ -4110,11 +4268,8 @@ async function pobierzDyskusje() {
    dowym odświeżeniu listy byłoby pracą dla nikogo.                           */
 
 async function odswiezStatystyki() {
-  /* Zwinięta sekcja nie tylko nie zajmuje pikseli — nie kosztuje też
-     przeliczenia stu osiemdziesięciu dni po stronie serwera. */
-  if (!$("statystykiKarta").open) return;
   try {
-    const dni = $("dniStatystyk").value;
+    const dni = dniAnalizy;
     const d = await (await api(`/api/biuro/zwroty/statystyki?dni=${dni}`)).json();
     rysujStatystyki(d.statystyki);
   } catch (e) {
@@ -4128,6 +4283,7 @@ const procent = (w) => (w == null ? "—" : `${(w * 100).toFixed(1).replace(".",
 
 function rysujStatystyki(s) {
   const zdj = zdjeciaWlaczone;
+  const maxZwrotow = Math.max(...s.produkty.map((p) => p.zwrotow), 0);
   $("statystykiProdukty").innerHTML = !s.produkty.length
     ? '<tr><td class="mute">Brak zwrotów w tym oknie.</td></tr>'
     : `<tr>${zdj ? "<th></th>" : ""}` +
@@ -4136,7 +4292,7 @@ function rysujStatystyki(s) {
           ${kolFoto(p.twId)}
           <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}
             ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}</td>
-          <td class="b">${p.zwrotow}</td>
+          ${komorkaSlupka(p.zwrotow, maxZwrotow)}
           <td>${p.sztuk}</td>
           <td class="mute">${p.sprzedanych == null ? "—" : p.sprzedanych}</td>
           <td>${p.wskaznik == null
@@ -4226,9 +4382,8 @@ function kafelCzasu(o) {
 }
 
 async function odswiezCzasy() {
-  if (!$("czasyKarta").open) return;
   try {
-    const dni = $("dniStatystyk").value;
+    const dni = dniAnalizy;
     const d = await (await api(`/api/biuro/zwroty/czasy?dni=${dni}`)).json();
     rysujCzasy(d.czasy);
   } catch (e) {
@@ -4444,9 +4599,13 @@ const trybSzeroki = () => SZEROKO.matches;
    kontekstem jest kolejka zwrotów i skaner następnej etykiety, a nie kosze,
    reklamacje i statystyki. Te chowają się w obu trybach. */
 const PRZY_ZWROCIE = ["zwrotListaKarta", "brakujaceKarta"];
+/* `wgladKarta` wypadła stąd w 0.99.0 razem z przenosinami trzech kart liczb
+   do ANALIZY. Id, którego nie ma w znaczniku, wywala `$(id).hidden` na `null`
+   i gasi CAŁĄ zakładkę — tak, jak stało się przy pierwszym uruchomieniu tej
+   przeprowadzki. Lista musi kończyć przenosiny razem z nimi. */
 const KARTY_ZWROTOW = [
   "brakujaceKarta", "zwrotListaKarta", "koszeKarta",
-  "pominieteKarta", "reklamacjeKarta", "wgladKarta",
+  "pominieteKarta", "reklamacjeKarta", "kontoAllegroKarta",
 ];
 
 function ustawRodzenstwoZwrotu() {
@@ -5331,28 +5490,30 @@ $("pominieteLista").addEventListener("click", async (e) => {
 
 /* Szukanie po wpisaniu, z odczekaniem — pole reaguje na literę, nie na Enter,
    bo biuro szuka „na wyczucie" i poprawia frazę w locie. */
-/* Jedno okno na dwie sekcje: statystyki produktowe i czasy czyta się razem,
-   a dwa przełączniki obok siebie kazałyby pilnować, czy pokazują to samo.
-   Dlatego selektor stoi NAD nimi, w nagłówku karty WGLĄD — schowany w jednej
-   z sekcji byłby nieosiągalny po jej zwinięciu. */
-$("dniStatystyk").addEventListener("change", () => {
-  /* Sekcja zwinięta nie liczy się na zapas, ale nie może też zostać z liczbami
-     dla poprzedniego okna. Czyszczenie sprawia, że otwarcie pobierze na nowo. */
-  if (!$("statystykiKarta").open) $("statystykiProdukty").innerHTML = "";
-  if (!$("czasyKarta").open) $("czasyOdcinki").innerHTML = "";
-  odswiezStatystyki();
-  odswiezCzasy();
-});
+/* `#dniStatystyk` zniknął w 0.99.0 razem z kartą WGLĄD. Oknem rządzi teraz
+   czip OKNO w pasku ANALIZY — jeden przełącznik na całą zakładkę zamiast
+   drugiego, schowanego w nagłówku przeniesionej karty. To było jedyne miejsce
+   w panelu, w którym okno dublowało się w dwóch kontrolkach. */
 
 
 
 /* Wiersz „co stoi teraz" prowadzi TAM, gdzie się z tym coś robi: kosz do jego
-   podglądu (z przewinięciem, bo stoi w innej karcie), zwrot na jego kartę. */
-$("czasyKarta").addEventListener("click", async (e) => {
+   podglądu, zwrot na jego kartę. Od 0.99.0 obie te rzeczy stoją w INNEJ
+   ZAKŁADCE niż tabela, z której się w nie klika — karta czasów pojechała do
+   ANALIZY, a kosze i zwroty zostały w pracy. Wiersz musi więc najpierw
+   przełączyć zakładkę; bez tego klik gasł bez śladu, bo `#koszPodglad`
+   przewijał się w schowanym widoku.
+
+   Nasłuch siedzi na `#widokAnaliza`, nie na `#czasyKarta`. Ta karta właśnie
+   przyjechała z innej zakładki i przy następnej przeprowadzce zabrałaby
+   nasłuch ze sobą albo go zgubiła — piąty raz z rzędu ta sama usterka
+   (0.92.0, 0.96.0, 0.97.0, 0.98.0). Zakładka stoi w miejscu. */
+$("widokAnaliza").addEventListener("click", async (e) => {
   const z = e.target.closest("[data-zwrot]");
-  if (z) return otworzZwrot(Number(z.dataset.zwrot));
+  if (z) { pokaz("zwroty"); return otworzZwrot(Number(z.dataset.zwrot)); }
   const k = e.target.closest("[data-kosz]");
   if (!k) return;
+  pokaz("zwroty");
   await pokazPodgladKosza(Number(k.dataset.kosz));
   $("koszPodglad").scrollIntoView({ behavior: "smooth", block: "center" });
 });
@@ -6166,35 +6327,68 @@ function uzupelnijOsoby(osoby) {
   cel.value = osoby.includes(bylo) ? bylo : "";
 }
 
+/**
+ * Kolumna STAN przy najczęściej pytanym towarze.
+ *
+ * Lista mówiła dotąd „pytają o to dwadzieścia razy" i nie mówiła, czy jest co
+ * sprzedać — a to dwa różne wnioski zakupowe. `null` (towar spoza kartoteki)
+ * daje MYŚLNIK, nie zero: „nie mamy ani sztuki" i „nie wiemy, o czym mowa" to
+ * dwie różne odpowiedzi, a zero mówiłoby pierwszą w sytuacji drugiej.
+ */
+function stanTowaruWKomorce(p) {
+  if (p.stan == null) return '<span class="mute">—</span>';
+  const ile = `${liczbaPl(p.stan)} ${esc(p.jednostka || "szt.")}`;
+  return p.stan > 0 ? `<span class="b">${ile}</span>` : `<span class="badge err">${ile}</span>`;
+}
+
 function rysujStatystykiPytan(s) {
+  ustawDaneDo(s.daneDo);
   const udzial = s.wyslanych > 0 ? Math.round((s.bezEdycji / s.wyslanych) * 100) : null;
   $("pytaniaKafle").innerHTML = [
-    kafel(s.wyslanych, `odpowiedzi wysłanych w ${s.dni} dniach`),
+    kafel(s.wyslanych,
+      `${odmiana(s.wyslanych, ["odpowiedź wysłana", "odpowiedzi wysłane", "odpowiedzi wysłanych"])
+       } w ${s.dni} dniach`),
     kafel(s.medianaGodzin == null ? "—" : `${s.medianaGodzin} godz.`, "mediana czasu odpowiedzi"),
     /* Niski udział nie jest porażką — znaczy, że człowiek dokłada wiedzę,
        której model nie ma. Dlatego bez czerwieni. */
     kafel(udzial == null ? "—" : `${udzial}%`, "wysłanych bez poprawki szkicu"),
-    kafel(s.pozaOferta.length, "pytań o towar spoza oferty", s.pozaOferta.length > 0),
+    /* Jedyna liczba na tej karcie, która mówi o WIEDZY, a nie o tempie:
+       potwierdzona para maszyna→część zostaje i skraca każde następne pytanie
+       o tę samą maszynę. Bez czerwieni — zero znaczy „nikt nic nie potwierdził
+       w tym oknie", a to bywa normalne przy spokojnym tygodniu. */
+    kafel(s.potwierdzonychDopasowan,
+      odmiana(s.potwierdzonychDopasowan,
+        ["potwierdzone dopasowanie", "potwierdzone dopasowania", "potwierdzonych dopasowań"])),
+    kafel(s.pozaOferta.length,
+      `${odmiana(s.pozaOferta.length, ["pytanie", "pytania", "pytań"])} o towar spoza oferty`,
+      s.pozaOferta.length > 0),
   ].join("");
 
-  /* Przy wybranej osobie karta mówi WPROST, co filtr obejmuje. Trzy pierwsze
-     kafle da się komuś przypisać, bo powstają przy wysłaniu odpowiedzi.
-     Pytania przychodzą od klientów i autora po naszej stronie nie mają —
+  /* Przy wybranej osobie karta mówi WPROST, co filtr obejmuje. Cztery pierwsze
+     kafle da się komuś przypisać, bo powstają przy CZYNNOŚCI: trzy przy
+     wysłaniu odpowiedzi, czwarty przy potwierdzeniu dopasowania. Pytania
+     przychodzą od klientów i autora po naszej stronie nie mają —
      „najczęściej pytane towary Ewy" byłoby liczbą bez desygnatu. */
   $("pytaniaZakresOsoby").innerHTML = s.osoba
     ? `<span class="mute">Filtr <b>${esc(s.osoba)}</b> obejmuje wysłane odpowiedzi,
-       ich medianę i udział bez poprawki. Towary, kategorie, tygodnie i braki
-       liczą się dla całego biura — pytania nie mają autora po naszej stronie.</span>`
+       ich medianę, udział bez poprawki i potwierdzone dopasowania. Towary,
+       kategorie, tygodnie i braki liczą się dla całego biura — pytania nie mają
+       autora po naszej stronie.</span>`
     : "";
 
+  $("pytaniaOknoTowarow").textContent = `· ${s.dni} dni`;
+  /* Skala słupków JEST tabelą: największa liczba w tym oknie, nie żaden próg
+     z góry. Lista jest posortowana malejąco, więc to zawsze pierwszy wiersz. */
+  const maxPytan = Math.max(...s.produkty.map((p) => p.pytan), 0);
   $("pytaniaProdukty").innerHTML = !s.produkty.length
     ? '<tr><td class="mute">Brak dopasowanych towarów w tym oknie.</td></tr>'
-    : `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}<th>TOWAR</th><th>PYTAŃ</th></tr>` +
+    : `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}<th>TOWAR</th><th>PYTAŃ</th><th>STAN</th></tr>` +
       s.produkty.map((p) => `<tr>
           ${kolFoto(p.twId)}
           <td><span class="b">${esc(p.symbol)}</span>${p.nazwa ? `<br>${esc(p.nazwa)}` : ""}
             ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}</td>
-          <td class="b">${p.pytan}</td>
+          ${komorkaSlupka(p.pytan, maxPytan)}
+          <td>${stanTowaruWKomorce(p)}</td>
         </tr>`).join("");
   dolozZdjeciaListy(s.produkty, "pytaniaProdukty", "sesjaStatystykPytan");
 
@@ -6206,13 +6400,25 @@ function rysujStatystykiPytan(s) {
     s.tygodnie.map((t) => ({ ile: t.ile, podpis: "t" + t.tydzien.slice(-2), tytul: `tydzień ${t.tydzien}` })),
     s.tygodnie.length > 12 ? 4 : 1
   );
+  $("pytaniaSzczyt").innerHTML = zdanieOSzczycie(
+    s.szczyt,
+    "ile",
+    s.szczyt ? "w tygodniu " + s.szczyt.tydzien.slice(-2) : "",
+    odmiana(s.szczyt?.ile ?? 0, ["pytanie", "pytania", "pytań"]),
+    s.szczyt?.kategoria
+      ? ` Przeważały pytania: <b>${esc(KATEGORIE_PYTAN[s.szczyt.kategoria] || s.szczyt.kategoria)}</b>.`
+      : ""
+  );
 
+  $("pytaniaPozaOfertaIle").textContent = s.pozaOferta.length
+    ? `· ${s.pozaOferta.length} w oknie` : "";
   $("pytaniaPozaOferta").innerHTML = !s.pozaOferta.length
     ? '<tr><td class="mute">Nikt nie pytał o towar spoza oferty w tym oknie.</td></tr>'
-    : "<tr><th>KIEDY</th><th>PYTANIE</th></tr>" +
+    : "<tr><th>KIEDY</th><th>PYTANIE</th><th>URZĄDZENIE</th></tr>" +
       s.pozaOferta.map((p) => `<tr>
           <td class="mute" style="white-space:nowrap">${esc(wiekPytania(p.otrzymanoAt))}</td>
           <td>${esc((p.tresc || "").slice(0, 200))}</td>
+          <td class="b">${p.urzadzenie ? esc(p.urzadzenie) : '<span class="mute">—</span>'}</td>
         </tr>`).join("");
 }
 
