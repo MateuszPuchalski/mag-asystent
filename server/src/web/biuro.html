@@ -158,9 +158,8 @@
     .widok.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
-    #widokPytania.zSzczegolem,
     #widokDostawy.zSzczegolem,
-    #widokZwroty.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr); }
+    #widokSprawy.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr); }
   }
 
   /* ── Szuflada kontekstu ────────────────────────────────────────────────────
@@ -224,15 +223,13 @@
       overflow: auto; overscroll-behavior: contain;
     }
 
-    /* ── Konsola pytań: kolejka · sprawa · kontekst ──────────────────────────
-       Trzy niezależnie przewijane strefy zamiast jednego pionowego stosu.
-       Zgłoszenie brzmiało „wątek klienta powinien być na środku" — tu środek
-       dostaje najwięcej szerokości, a kolejka i kontekst schodzą do szyn.
-
-       Trzecia kolumna jest węższa od pierwszej, bo niesie kafelki towaru,
-       a nie tabelę: lista pytań musi pomieścić temat oferty w dwóch wierszach. */
-    #widokPytania.zSzczegolem { grid-template-columns: 22rem minmax(0, 1fr) 21rem; }
-    #widokPytania.zSzczegolem > .kontekst {
+    /* ── Konsola spraw: kolejka · sprawa · kontekst ──────────────────────────
+       Trzy niezależnie przewijane strefy zamiast jednego pionowego stosu;
+       od 0.109.0 jedna reguła dla pytań, zwrotów i dyskusji — wszystkie
+       mieszkają w #widokSprawy. Geometria po zwrotach (kontekst 22 rem),
+       bo kontekst niesie i kandydatów na dokument, i kartotekę. */
+    #widokSprawy.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 22rem; }
+    #widokSprawy.zSzczegolem > .kontekst {
       grid-column: 3; grid-row: 1 / span 50;
       position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
       max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
@@ -241,18 +238,18 @@
     /* Sprawa jest kolumną: przewija się ROZMOWA, a pole odpowiedzi zostaje na
        dole. Przy dłuższym wątku odpowiedź uciekała pod krawędź ekranu i biuro
        skakało między tym, co klient napisał, a tym, co pisze samo. */
-    #widokPytania.zSzczegolem > .szczegol {
+    #widokSprawy.zSzczegolem > .szczegol {
       display: flex; flex-direction: column; overflow: hidden;
     }
     /* Dzieci kolumny rozciągają się na jej szerokość — przycisk powrotu nie ma
        być pasem przez cały ekran. */
-    #widokPytania.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
-    #widokPytania.zSzczegolem .sprawa-tresc {
+    #widokSprawy.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
+    #widokSprawy.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
     /* Miara wiersza. Na monitorze 1920 px kolumna sprawy ma ponad 1100 px,
        a wiersz tej długości czyta się źle niezależnie od stopnia pisma. */
-    #widokPytania.zSzczegolem .sprawa-tresc > * { max-width: 62rem; }
+    #widokSprawy.zSzczegolem .sprawa-tresc > * { max-width: 62rem; }
     /* Tytuł sprawy bierze szerokość, akcje zdejmujące ją trzymają się prawej
      i nie zawijają pojedynczo — para wychodzi na drugą linię w komplecie. */
   #pytanieGora { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-top: 12px; }
@@ -274,7 +271,7 @@
     border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
   }
 
-  #widokPytania.zSzczegolem .dok-odpowiedzi {
+  #widokSprawy.zSzczegolem .dok-odpowiedzi {
       border-top: 1px solid var(--border); padding-top: 11px; margin-top: 10px;
     }
 
@@ -296,24 +293,6 @@
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
 
-    /* Zwroty na tym samym trójpodziale: kolejka zwrotów, ocena pozycji na
-       środku, sprawa dookoła po prawej. Kolumna kontekstu jest tu SZERSZA
-       niż przy dostawach, bo niesie kandydatów na dokument sprzedaży —
-       a to jest wybór z kilku wierszy, nie jedna nazwa dostawcy. */
-    #widokZwroty.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 22rem; }
-    #widokZwroty.zSzczegolem > .kontekst {
-      grid-column: 3; grid-row: 1 / span 50;
-      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
-      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
-      overflow: auto; overscroll-behavior: contain;
-    }
-    #widokZwroty.zSzczegolem > .szczegol {
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    #widokZwroty.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
-    #widokZwroty.zSzczegolem .sprawa-tresc {
-      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
-    }
   }
 
   /* ── Zwarte warianty list z zakładki PYTANIA ────────────────────────────────
@@ -826,20 +805,12 @@
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
         <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
-        <!-- Jedna kolejka czterech rejestrów obsługi klienta (0.108.0):
-             pytania, zwroty, dyskusje i reklamacje w jednym rytmie pracy.
-             W następnym wydaniu ta zakładka zastąpi dwie poniższe. -->
+        <!-- Jedna kolejka czterech rejestrów obsługi klienta (0.108.0);
+             od 0.109.0 JEDYNA zakładka tej pracy — ZWROTY ALLEGRO i PYTANIA
+             KLIENTÓW zwinęły się tutaj decyzją właściciela. Pigułka mówi ILE
+             czeka, dymek CZEGO — pytanie klienta i przeterminowana reklamacja
+             czekają jak nieprzeczytana wiadomość. -->
         <button data-widok="sprawy">SPRAWY <span id="sprawyLicznik" class="tabLicznik"></span></button>
-        <!-- Ta sama pigułka co przy pytaniach, z tego samego powodu: reklamacja
-             po terminie i nieobsłużona dyskusja czekają jak nieprzeczytana
-             wiadomość. Rozbicie liczby niesie `title` — pigułka mówi ILE,
-             dymek CZEGO. -->
-        <button data-widok="zwroty">ZWROTY ALLEGRO <span id="zwrotyLicznik" class="tabLicznik"></span></button>
-        <!-- Licznik w nawiasie, nie osobna ikona: pytanie klienta czeka na
-             odpowiedź jak nieprzeczytana wiadomość, więc zakładka ma mówić
-             ILE, zanim ktokolwiek na nią kliknie. Pusty `span`, dopóki
-             pytań nie ma — nawias „(0)" byłby szumem. -->
-        <button data-widok="pytania">PYTANIA KLIENTÓW <span id="pytaniaLicznik" class="tabLicznik"></span></button>
       </div>
     </div>
     <div class="grupa">
@@ -1063,10 +1034,11 @@
       </div>
       <table id="sprawyLista" style="margin-top:10px"></table>
     </section>
-  </div>
 
-  <!-- ── ZWROTY ALLEGRO ──────────────────────────────────────────────────── -->
-  <div id="widokZwroty" class="widok" hidden>
+    <!-- ── Karty zwrotów (do 0.108.0 osobna zakładka ZWROTY ALLEGRO) ────────
+         Przeprowadzka 0.109.0: zakładki ZWROTY i PYTANIA zwinęły się do
+         SPRAW decyzją właściciela. Karty i identyfikatory zostały bez zmian —
+         zmieniło się tylko to, w którym widoku stoją. -->
     <!-- Szczegół zwrotu — zasłania karty poniżej (wzorzec #szczegol dostaw):
          to jest wejście W zwrot, nie dodatek obok listy. -->
     <section class="card pelna szczegol" id="zwrotSzczegol" hidden>
@@ -1304,18 +1276,14 @@
       <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
       <div id="allegroAkcje"></div>
     </details>
-  </div>
 
-  <!-- ── PYTANIA KLIENTÓW ────────────────────────────────────────────────────
-       Odpowiadanie na pytania o dobór części było dotąd pracą poza aplikacją:
-       screenshot z poczty szedł do zewnętrznego czata, a odpowiedź wracała
-       przez schowek. Ta zakładka zamyka pętlę tam, gdzie i tak jest kartoteka,
-       stan i zamienniki.
+    <!-- ── Karty pytań (do 0.108.0 osobna zakładka PYTANIA KLIENTÓW) ───────
+         Odpowiadanie na pytania o dobór części było dotąd pracą poza
+         aplikacją: screenshot z poczty szedł do zewnętrznego czata,
+         a odpowiedź wracała przez schowek. Te karty zamykają pętlę tam,
+         gdzie i tak jest kartoteka, stan i zamienniki.
+         Przeprowadzka 0.109.0 — jak wyżej: karty bez zmian, widok jeden. -->
 
-       Kolejność kart odpowiada kolejności pracy: najpierw to, co czeka
-       (szczegół zasłania resztę, jak przy dostawach i zwrotach), potem wklejka
-       dla pytań spoza Allegro, potem wgląd. -->
-  <div id="widokPytania" class="widok" hidden>
     <!-- Szczegół pytania — wejście W sprawę, nie dodatek obok listy. -->
     <section class="card pelna szczegol" id="pytanieSzczegol" hidden>
       <!-- Rząd wyjścia i wejścia: po lewej wyjście ZE sprawy, po prawej
@@ -2112,6 +2080,9 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
 let widok = localStorage.getItem("wertis.widok") || "dostawy";
+/* Zakładki ZWROTY i PYTANIA zwinęły się do SPRAW (0.109.0). Zapamiętana
+   stara wartość otwierałaby widok, którego już nie ma — czyli pusty panel. */
+if (widok === "zwroty" || widok === "pytania") widok = "sprawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
@@ -2204,8 +2175,6 @@ function pokaz(nowy) {
   zamknijKlienta360();
   $("widokDostawy").hidden = nowy !== "dostawy";
   $("widokSprawy").hidden = nowy !== "sprawy";
-  $("widokZwroty").hidden = nowy !== "zwroty";
-  $("widokPytania").hidden = nowy !== "pytania";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
@@ -2216,11 +2185,9 @@ function pokaz(nowy) {
   for (const b of document.querySelectorAll("button[data-widok]")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
-  if (nowy === "sprawy") odswiezSprawy();
-  if (nowy === "zwroty") { odswiezZwroty(); $("zwrotSkan").focus(); }
-  /* Statystyki pytań dociągają się TYLKO rozwinięte — zwinięta sekcja nie
-     pyta serwera, tak samo jak WGLĄD na zwrotach. */
-  if (nowy === "pytania") odswiezPytania();
+  /* Praca ze zwrotem ZACZYNA się od zeskanowania etykiety — skaner dostaje
+     focus przy wejściu, jak na dawnej zakładce ZWROTY. */
+  if (nowy === "sprawy") { odswiezSprawy(); $("zwrotSkan").focus(); }
   if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
@@ -4215,8 +4182,6 @@ async function odswiez() {
       if (kolejkaZostaje()) await odswiezDostawy();
     } else await odswiezDostawy();
   } else if (widok === "sprawy") await odswiezSprawy();
-  else if (widok === "zwroty") await odswiezZwroty();
-  else if (widok === "pytania") await odswiezPytania();
   else if (widok === "nadzor") await odswiezNadzor();
   /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
      w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
@@ -4224,30 +4189,17 @@ async function odswiez() {
   await odswiezLiczniki();
 }
 
-/** Licznik pytań w nawiasie przy zakładce; pusto, gdy nie ma nic do zrobienia. */
 /**
- * Licznik przy zakładce z podziałem na „gotowe" i „czeka na szkic".
- *
- * Sama suma zlewa dwa różne stany: sprawę do przeczytania i sprawę, dla
- * której nikt jeszcze nie policzył szkicu. Od 0.85.0 ta druga grupa rośnie
- * sama — ręczne ODŚWIEŻ liczy najwyżej pięć szkiców naraz.
+ * Podsumowanie NAD skrzynką pytań — „ile" i „ile z nich model już policzył"
+ * to dwie różne rzeczy: pierwsza mówi o pracy, druga o tym, ile z niej da
+ * się wziąć od razu. Przy zerze MILCZY — zdanie o pustej skrzynce mówi
+ * wiersz listy niżej. Od 0.109.0 karmione payloadem licznika SPRAW, nie
+ * osobną trasą: pigułka na zakładce została jedna.
  */
 function ustawLicznikPytan(d) {
   const gotowe = d.szkice ?? 0;
-  const czekaja = d.nowe ?? 0;
-  const otwarte = d.otwartych ?? 0;
-  const cel = $("pytaniaLicznik");
-  cel.textContent = otwarte > 0 ? String(otwarte) : "";
-  cel.title = otwarte > 0 ? `${gotowe} ze szkicem do sprawdzenia · ${czekaja} czeka na szkic` : "";
-
-  /* Ten sam rozbiór, ale NAD listą i na stałe. Do 0.96.0 mieszkał wyłącznie
-     w `title` licznika, czyli pokazywał się po najechaniu na zakładkę, na
-     której się właśnie stoi — nikt tam kursora nie trzyma. „Ile" i „ile
-     z nich model już policzył" to dwie różne rzeczy: pierwsza mówi o pracy,
-     druga o tym, ile z niej da się wziąć od razu. */
-  /* Przy zerze podsumowanie MILCZY. Zdanie o pustej skrzynce mówi wiersz
-     listy niżej i mówi je dokładnie tam, gdzie stałyby sprawy — dwa razy to
-     samo, dwa centymetry od siebie, czyta się jak usterka. */
+  const czekaja = d.pytaniaNowe ?? 0;
+  const otwarte = d.pytaniaOtwarte ?? 0;
   $("pytaniaPodsumowanie").innerHTML = otwarte > 0
     ? `<span class="temat">${otwarte}</span>
        <span class="mute">${gotowe} ze szkicem · ${czekaja} czeka na szkic</span>`
@@ -4307,41 +4259,6 @@ function stempelKrotki(at) {
     : `${dzienSkrot(dataLokalna(at))}, ${godzina}`;
 }
 
-async function odswiezLicznikPytan() {
-  try {
-    const d = await (await api("/api/biuro/pytania/licznik")).json();
-    ustawLicznikPytan(d);
-    ustawOstatniePobranie(d.synchronizacja);
-  } catch {
-    /* Licznik jest ozdobą paska, nie treścią — jego awaria nie ma prawa
-       przerywać odświeżania właściwej zakładki. */
-  }
-}
-
-/**
- * Pigułka przy ZWROTACH — liczy to, co CZEKA na człowieka: reklamacje po
- * terminie i nieobsłużone dyskusje. Reklamacje przed terminem zostają poza
- * liczbą świadomie — mają swój zegar w karcie i pigułka z nimi krzyczałaby
- * codziennie o sprawach, które jeszcze się nie palą.
- */
-function ustawLicznikZwrotow(d) {
-  const razem = (d.reklamacjePoTerminie ?? 0) + (d.dyskusjeNowe ?? 0);
-  const cel = $("zwrotyLicznik");
-  cel.textContent = razem > 0 ? String(razem) : "";
-  cel.title = razem > 0
-    ? `${d.reklamacjePoTerminie ?? 0} reklamacji po terminie · ${d.dyskusjeNowe ?? 0} nowych dyskusji Allegro`
-    : "";
-}
-
-async function odswiezLicznikZwrotow() {
-  try {
-    const d = await (await api("/api/biuro/zwroty/licznik")).json();
-    ustawLicznikZwrotow(d);
-  } catch {
-    /* jak wyżej: pigułka nie ma prawa wywrócić cyklu odświeżania */
-  }
-}
-
 /**
  * Pigułka przy SPRAWACH — jedna liczba wszystkich otwartych spraw czterech
  * rejestrów, z rozbiciem w dymku (ten sam wzorzec co pigułki obok). Po
@@ -4361,15 +4278,21 @@ function ustawLicznikSpraw(d) {
 
 async function odswiezLicznikSpraw() {
   try {
-    ustawLicznikSpraw(await (await api("/api/biuro/sprawy/licznik")).json());
+    const d = await (await api("/api/biuro/sprawy/licznik")).json();
+    ustawLicznikSpraw(d);
+    /* Ten sam payload karmi podsumowanie skrzynki i ślad synchronizacji —
+       jedna trasa zamiast trzech w każdym cyklu. */
+    ustawLicznikPytan(d);
+    ustawOstatniePobranie(d.synchronizacjaPytan);
   } catch {
-    /* jak wyżej: pigułka nie ma prawa wywrócić cyklu odświeżania */
+    /* Licznik jest ozdobą paska, nie treścią — jego awaria nie ma prawa
+       przerywać odświeżania właściwej zakładki. */
   }
 }
 
-/** Wszystkie liczniki naraz — pigułki chodzą ZAWSZE, niezależnie od zakładki. */
+/** Licznik chodzi ZAWSZE, niezależnie od zakładki — w tym cała jego wartość. */
 async function odswiezLiczniki() {
-  await Promise.all([odswiezLicznikPytan(), odswiezLicznikZwrotow(), odswiezLicznikSpraw()]);
+  await odswiezLicznikSpraw();
 }
 
 /* ── Sprawy — jedna kolejka czterech rejestrów (0.108.0) ─────────────────────
@@ -4430,8 +4353,7 @@ function rysujSprawy(lista) {
     : "";
 }
 
-async function odswiezSprawy() {
-  if (otwartyKlient360 !== false) return odswiezKlienta360();
+async function odswiezKolejkeSpraw() {
   try {
     const q = sprawyFiltr ? `?rodzaj=${encodeURIComponent(sprawyFiltr)}` : "";
     const d = await (await api(`/api/biuro/sprawy${q}`)).json();
@@ -4442,36 +4364,50 @@ async function odswiezSprawy() {
 }
 
 /**
+ * Cykl 30 s odświeża tylko to, co WIDAĆ — reguły przejęte z dawnych
+ * zakładek: otwarty zwrot i dyskusja odświeżają się (pracuje przy nich
+ * kilka osób), otwarte pytanie świadomie NIE (odswiezPytania sam milczy,
+ * gdy sprawa otwarta — uzasadnienie przy tamtej funkcji), karta klienta
+ * odświeża siebie, a bez niczego otwartego chodzi kolejka i karty pod nią.
+ */
+async function odswiezSprawy() {
+  if (otwartyZwrot != null || otwartaDyskusja != null) return odswiezZwroty();
+  if (otwartePytanie != null) return odswiezPytania();
+  if (otwartyKlient360 !== false) return odswiezKlienta360();
+  await odswiezKolejkeSpraw();
+  await odswiezZwroty();
+  await odswiezPytania();
+}
+
+/**
  * Klik w sprawę z kolejki albo z karty klienta. Reklamacja otwiera swój
  * ZWROT — nie ma własnego szczegółu, bo jej akcje (uznaj, odrzuć, półka)
  * mieszkają przy pozycji zwrotu i tam mają zostać.
  */
 function otworzSprawe(rodzaj, id, zwrotId) {
-  if (rodzaj === "pytanie") { pokaz("pytania"); otworzPytanie(id); return; }
-  pokaz("zwroty");
+  if (rodzaj === "pytanie") { otworzPytanie(id); return; }
   if (rodzaj === "dyskusja") otworzDyskusje(id);
   else otworzZwrot(rodzaj === "reklamacja" ? zwrotId : id);
 }
 
 function otworzKlienta360(login) {
+  /* Karta klienta to widok ponad sprawami — wejście w nią zamyka otwartą
+     sprawę. W drugą stronę jest odwrotnie: otwarcie sprawy z karty ZOSTAWIA
+     `otwartyKlient360`, żeby przycisk powrotu wiedział, dokąd wracać. */
+  zamknijZwrot();
+  zamknijDyskusje();
+  zamknijPytanie();
   otwartyKlient360 = { login: login || null };
   $("klientNaglowek").innerHTML = '<p class="mute">Wczytuję…</p>';
   $("klientAktywne").innerHTML = "";
   $("klientHistoria").innerHTML = "";
-  ustawWidokSpraw();
+  ustawRodzenstwoSpraw();
   odswiezKlienta360();
 }
 
 function zamknijKlienta360() {
   otwartyKlient360 = false;
-  ustawWidokSpraw();
-}
-
-/** Dokładnie jedna z dwóch kart widoku spraw na ekranie: kolejka albo klient. */
-function ustawWidokSpraw() {
-  const wKliencie = otwartyKlient360 !== false;
-  $("klientSzczegol").hidden = !wKliencie;
-  $("kolejkaSprawKarta").hidden = wKliencie;
+  ustawRodzenstwoSpraw();
 }
 
 async function odswiezKlienta360() {
@@ -5027,22 +4963,23 @@ let dyskusjaZalacznik = null; // {nazwa, mime, dane} — jedzie w body wysyłki
 const LIMIT_DYSKUSJI = 2000;
 
 function otworzDyskusje(id) {
-  /* Dwa szczegóły naraz nie istnieją — wejście w sprawę zamyka zwrot. */
+  /* Dwa szczegóły naraz nie istnieją — wejście w sprawę zamyka pozostałe. */
   if (otwartyZwrot != null) zamknijZwrot();
+  zamknijPytanie();
   otwartaDyskusja = id;
   dyskusjaZalacznik = null;
   $("dyskusjaOdpowiedz").value = "";
   $("dyskusjaNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
   $("dyskusjaRozmowa").innerHTML = "";
   rysujZalacznikDyskusji();
-  ustawRodzenstwoZwrotu();
+  ustawRodzenstwoSpraw();
   odswiezSzczegolDyskusji(true);
 }
 
 function zamknijDyskusje() {
   otwartaDyskusja = null;
   dyskusjaZalacznik = null;
-  ustawRodzenstwoZwrotu();
+  ustawRodzenstwoSpraw();
 }
 
 /**
@@ -5630,26 +5567,58 @@ const KARTY_ZWROTOW = [
   "pominieteKarta", "reklamacjeKarta", "dyskusjeKarta", "kontoAllegroKarta",
 ];
 
-function ustawRodzenstwoZwrotu() {
-  const otwarty = otwartyZwrot != null;
-  /* Szczegół dyskusji (0.104.0) zasłania karty tak samo jak szczegół zwrotu —
-     to drugie „wejście W sprawę" na tej zakładce. Oba naraz nie istnieją:
-     otwarcie jednego zamyka drugie. */
-  const zSzczegolem = otwarty || otwartaDyskusja != null;
-  const zostaje = otwarty && kolejkaZostaje() ? PRZY_ZWROCIE : [];
-  for (const id of KARTY_ZWROTOW) $(id).hidden = zSzczegolem && !zostaje.includes(id);
-  /* Dwie karty mają WŁASNĄ regułę pustki i ona jest nadrzędna — pusta karta
-     jest nagłówkiem bez treści. */
-  if (!$("brakujaceLista").innerHTML) $("brakujaceKarta").hidden = true;
-  if (!$("pominieteLista").innerHTML) $("pominieteKarta").hidden = true;
-  /* Kontekst żyje i ginie razem ze zwrotem — pusta trzecia strefa przy
-     zamkniętym zwrocie byłaby nagłówkiem bez treści. */
-  $("zwrotKontekst").hidden = !otwarty;
-  $("dyskusjaSzczegol").hidden = otwartaDyskusja == null;
-  $("widokZwroty").classList.toggle("zSzczegolem", otwarty);
-  ustawPasmoSzuflady("widokZwroty", otwarty);
-  rysujZwroty(zwrotyLista);     // wariant listy zależy od tego, co ustawiamy tu
+/**
+ * JEDNO rodzeństwo dla całego widoku SPRAW (0.109.0) — tabela stanów zamiast
+ * trzech kopii if-ów (`ustawRodzenstwoZwrotu`, `ustawRodzenstwoPytania`
+ * i przełącznik karty klienta), które po scaleniu zakładek nadeptywałyby
+ * sobie na `zSzczegolem` jednego wspólnego widoku.
+ *
+ * Zasady: naraz otwarta jest najwyżej JEDNA sprawa (zwrot, dyskusja albo
+ * pytanie); karta klienta widnieje tylko bez otwartej sprawy, ale jej STAN
+ * przeżywa wejście w sprawę — przycisk powrotu wraca wtedy do klienta, nie
+ * do kolejki. Obok otwartej sprawy na szerokim ekranie zostaje jej własna
+ * kolejka (wariant szyny), jak przed przeprowadzką.
+ */
+function ustawRodzenstwoSpraw() {
+  const zwrot = otwartyZwrot != null;
+  const dyskusja = otwartaDyskusja != null;
+  const pytanie = otwartePytanie != null;
+  const wSprawie = zwrot || dyskusja || pytanie;
+  const klient = !wSprawie && otwartyKlient360 !== false;
+  const zostaje = kolejkaZostaje() ? (zwrot ? PRZY_ZWROCIE : pytanie ? PRZY_PYTANIU : []) : [];
+
+  for (const id of KARTY_SPRAW) {
+    /* Karty z WŁASNĄ regułą pustki — pusta karta jest nagłówkiem bez treści. */
+    const pusta =
+      (id === "pytaniaBaner" && $(id).dataset.pusty === "1") ||
+      (id === "brakujaceKarta" && !$("brakujaceLista").innerHTML) ||
+      (id === "pominieteKarta" && !$("pominieteLista").innerHTML);
+    $(id).hidden = pusta || ((wSprawie || klient) && !zostaje.includes(id));
+  }
+
+  $("klientSzczegol").hidden = !klient;
+  $("zwrotSzczegol").hidden = !zwrot;
+  /* Kontekst żyje i ginie razem ze sprawą — pusta trzecia strefa przy
+     zamkniętej sprawie byłaby nagłówkiem bez treści. */
+  $("zwrotKontekst").hidden = !zwrot;
+  $("dyskusjaSzczegol").hidden = !dyskusja;
+  $("pytanieSzczegol").hidden = !pytanie;
+  $("pytanieKontekst").hidden = !pytanie;
+  /* Trójpodział tylko dla spraw z kontekstem — dyskusja i karta klienta są
+     kartami pełnej szerokości, jak przed scaleniem. */
+  $("widokSprawy").classList.toggle("zSzczegolem", zwrot || pytanie);
+  ustawPasmoSzuflady("widokSprawy", zwrot || pytanie);
+
+  /* Dokąd prowadzi wyjście ze sprawy — do karty klienta, gdy sprawę otwarto
+     z niej; inaczej do wspólnej kolejki. */
+  const wroc = otwartyKlient360 !== false ? "← SPRAWY KLIENTA" : "← KOLEJKA SPRAW";
+  for (const id of ["zwrotWroc", "pytanieWroc", "dyskusjaWroc"]) $(id).textContent = wroc;
+
+  /* Warianty list (tabela / szyna) zależą OD TEGO, co ustawiamy tutaj. */
+  rysujZwroty(zwrotyLista);
   zaznaczWiersz("zwrotLista", "zwrot", otwartyZwrot);
+  rysujListePytan(ostatniaListaPytan);
+  zaznaczWiersz("pytaniaLista", "pytanie", otwartePytanie);
 }
 
 /**
@@ -5666,9 +5635,11 @@ function zaznaczWiersz(tabelaId, klucz, id) {
 }
 
 function otworzZwrot(id) {
-  /* Dwa szczegóły naraz nie istnieją — wejście w zwrot zamyka sprawę. */
+  /* Dwa szczegóły naraz nie istnieją — wejście w zwrot zamyka pozostałe.
+     Stan `otwartyKlient360` celowo ZOSTAJE: to pamięć drogi powrotu. */
   otwartaDyskusja = null;
   dyskusjaZalacznik = null;
+  zamknijPytanie();
   otwartyZwrot = id;
   $("zwrotSzczegol").hidden = false;
   /* Treść poprzedniego zwrotu schodzi z ekranu OD RAZU. Bez tego kontekst
@@ -5683,7 +5654,7 @@ function otworzZwrot(id) {
      inaczej powrót do TEGO SAMEGO zwrotu zostawia puste miejsce po rozmowie. */
   zwrotIdWatku = null;
   zwrotIdPowiazan = null;
-  ustawRodzenstwoZwrotu();
+  ustawRodzenstwoSpraw();
   odswiezSzczegolZwrotu();
 }
 
@@ -5691,7 +5662,7 @@ function zamknijZwrot() {
   otwartyZwrot = null;
   zwrotIdWatku = null;
   $("zwrotSzczegol").hidden = true;
-  ustawRodzenstwoZwrotu();
+  ustawRodzenstwoSpraw();
   $("zwrotTowarWyniki").innerHTML = "";
 }
 
@@ -5705,9 +5676,8 @@ function zamknijZwrot() {
    przy przeładowaniu strony. */
 for (const prog of [SZEROKO, SREDNIO]) {
   prog.addEventListener("change", () => {
-    ustawRodzenstwoZwrotu();
+    ustawRodzenstwoSpraw();
     ustawRodzenstwoDostaw();
-    ustawRodzenstwoPytania();
   });
 }
 
@@ -6441,7 +6411,10 @@ document.addEventListener("keydown", (e) => {
      i sprawę pod nią naraz — a to jest wyjście z pracy, nie z panelu obok. */
   if (szufladaW) return ustawSzuflade(szufladaW, false);
   zamknijDokument();
-  if (otwartyZwrot != null) { zamknijZwrot(); odswiezZwroty(); }
+  if (otwartyZwrot != null) { zamknijZwrot(); odswiezZwroty(); return; }
+  if (otwartaDyskusja != null) return zamknijDyskusje();
+  if (otwartePytanie != null) { zamknijPytanie(); odswiezPytania(); return; }
+  if (otwartyKlient360 !== false) return zamknijKlienta360();
 });
 
 /* ── Szuflada kontekstu (0.101.0) ────────────────────────────────────────────
@@ -6473,7 +6446,7 @@ $("zwrotLista").addEventListener("click", (e) => {
   const w = e.target.closest("[data-zwrot]");
   if (w) otworzZwrot(Number(w.dataset.zwrot));
 });
-$("zwrotWroc").addEventListener("click", () => { zamknijZwrot(); odswiezZwroty(); });
+$("zwrotWroc").addEventListener("click", () => { zamknijZwrot(); odswiezZwroty(); odswiezSprawy(); });
 $("zwrotyCzipy").addEventListener("click", (e) => {
   const b = e.target.closest("[data-status]");
   if (!b) return;
@@ -6616,10 +6589,10 @@ $("pominieteLista").addEventListener("click", async (e) => {
    (0.92.0, 0.96.0, 0.97.0, 0.98.0). Zakładka stoi w miejscu. */
 $("widokAnaliza").addEventListener("click", async (e) => {
   const z = e.target.closest("[data-zwrot]");
-  if (z) { pokaz("zwroty"); return otworzZwrot(Number(z.dataset.zwrot)); }
+  if (z) { pokaz("sprawy"); return otworzZwrot(Number(z.dataset.zwrot)); }
   const k = e.target.closest("[data-kosz]");
   if (!k) return;
-  pokaz("zwroty");
+  pokaz("sprawy");
   await pokazPodgladKosza(Number(k.dataset.kosz));
   $("koszPodglad").scrollIntoView({ behavior: "smooth", block: "center" });
 });
@@ -6704,7 +6677,7 @@ $("dyskusjeLista").addEventListener("click", async (e) => {
 });
 
 /* Szczegół dyskusji (0.104.0) — wyjście, szkic, załącznik, wysyłka. */
-$("dyskusjaWroc").addEventListener("click", zamknijDyskusje);
+$("dyskusjaWroc").addEventListener("click", () => { zamknijDyskusje(); odswiezSprawy(); });
 $("dyskusjaNaglowek").addEventListener("click", (e) => {
   const doZwrotu = e.target.closest("[data-dysk-zwrot]");
   if (doZwrotu) return otworzZwrot(Number(doZwrotu.dataset.dyskZwrot));
@@ -6921,7 +6894,7 @@ function zamknijPytanie() {
   otwartePytanie = null;
   pytanieIdRozmowy = null;
   odpowiedzRuszona = false;
-  ustawRodzenstwoPytania();
+  ustawRodzenstwoSpraw();
 }
 
 /* Karty, które szczegół ZASŁANIA. Jedna lista zamiast dwóch pętli: przy
@@ -6930,6 +6903,11 @@ function zamknijPytanie() {
 const KARTY_LISTY_PYTAN = [
   "pytaniaBaner", "pytaniaWklejkaKarta", "pytaniaListaKarta",
 ];
+
+/* Wszystkie karty scalonego widoku SPRAW — jedna lista dla jednego
+   rodzeństwa. Ten sam powód co przy KARTY_ZWROTOW: karta spoza listy
+   stałaby na ekranie obok otwartej sprawy jako jedyna, która nie schodzi. */
+const KARTY_SPRAW = ["kolejkaSprawKarta", ...KARTY_ZWROTOW, ...KARTY_LISTY_PYTAN];
 
 /* Co zostaje obok otwartego pytania na szerokim ekranie: sama kolejka.
    Wklejka i statystyki chowają się w obu trybach — przy redagowaniu
@@ -6948,27 +6926,6 @@ const PRZY_PYTANIU = ["pytaniaListaKarta"];
  * dostawała `zSzczegolem`, więc otwarte pytanie chowało kolejkę nawet na
  * 3440 px — inaczej niż DOSTAWY i ZWROTY. Ten sam próg, ta sama reguła.
  */
-function ustawRodzenstwoPytania() {
-  const otwarte = otwartePytanie != null;
-  const zostaje = otwarte && kolejkaZostaje() ? PRZY_PYTANIU : [];
-  for (const id of KARTY_LISTY_PYTAN) {
-    /* Baner ma własną regułę pustki i ona jest nadrzędna — przy działającym
-       modelu i sparowanym koncie nie ma czego ogłaszać. */
-    const pusty = id === "pytaniaBaner" && $(id).dataset.pusty === "1";
-    $(id).hidden = pusty || (otwarte && !zostaje.includes(id));
-  }
-  $("pytanieSzczegol").hidden = !otwarte;
-  /* Kontekst żyje i ginie razem ze sprawą — pusta trzecia kolumna przy
-     zamkniętej sprawie byłaby nagłówkiem bez treści. */
-  $("pytanieKontekst").hidden = !otwarte;
-  $("widokPytania").classList.toggle("zSzczegolem", otwarte);
-  ustawPasmoSzuflady("widokPytania", otwarte);
-  /* Kolejka ma dwa warianty (tabela / szyna) i wariant zależy OD TEGO, co
-     robimy tutaj — więc przerysowanie należy do tej funkcji, nie do
-     odświeżania z serwera, które przy otwartej sprawie w ogóle nie chodzi. */
-  rysujListePytan(ostatniaListaPytan);
-  zaznaczWiersz("pytaniaLista", "pytanie", otwartePytanie);
-}
 
 async function odswiezPytania() {
   /* Otwarte pytanie NIE odświeża się co 30 s i to jest świadome. Zwrot
@@ -7097,13 +7054,16 @@ function wiekPytania(at) {
 }
 
 async function otworzPytanie(id) {
+  /* Jak przy zwrocie: pozostałe sprawy schodzą, pamięć klienta zostaje. */
+  zamknijZwrot();
+  zamknijDyskusje();
   otwartePytanie = id;
   pytanieIdRozmowy = null;
   pytanieIdKlienta = null;
   pytanieIdPrzesylek = null;
   pytanieIdPowiazan = null;
   odpowiedzRuszona = false;
-  ustawRodzenstwoPytania();
+  ustawRodzenstwoSpraw();
   await odswiezSzczegolPytania();
   pokazRozmowe(id);
 }
@@ -7600,7 +7560,7 @@ async function przejdzDalej(wynik) {
     zamknijPytanie();
     await odswiezPytania();
   }
-  await odswiezLicznikPytan();
+  await odswiezLicznikSpraw();
 }
 
 /* ── Wklejka ze schowka ──────────────────────────────────────────────────────
@@ -7610,7 +7570,7 @@ document.addEventListener("paste", (e) => {
   /* Druga gałąź (0.104.0): przy otwartej sprawie dyskusji wklejony obraz
      staje się ZAŁĄCZNIKIEM odpowiedzi — trzyma się w zmiennej do wysyłki,
      niczego nie zapisuje i nie transkrybuje. */
-  if (widok === "zwroty" && otwartaDyskusja != null) {
+  if (widok === "sprawy" && otwartaDyskusja != null) {
     const obraz = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
     if (!obraz) return;
     e.preventDefault();
@@ -7618,7 +7578,7 @@ document.addEventListener("paste", (e) => {
     if (plik) przyjmijPlikDyskusji(plik);
     return;
   }
-  if (widok !== "pytania" || otwartePytanie != null) return;
+  if (widok !== "sprawy" || otwartePytanie != null) return;
   const obraz = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
   if (!obraz) return;
   e.preventDefault();
@@ -7787,7 +7747,7 @@ $("pytaniaLista").addEventListener("click", (e) => {
   const b = e.target.closest("[data-pytanie]");
   if (b) otworzPytanie(Number(b.dataset.pytanie));
 });
-$("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPytania(); });
+$("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPytania(); odswiezSprawy(); });
 /* Rozwinięcie karty jest pytaniem o dane — zwinięta nie rusza serwera. */
 /* ── Sprawy: nasłuchy (0.108.0) ──────────────────────────────────────────────
    Wszystko z poziomu SEKCJI (wzorzec z testu delegacji): kolejka, karta
@@ -7825,7 +7785,6 @@ $("klientSzczegol").addEventListener("click", (e) => {
 function klikKlienta360(e) {
   const b = e.target.closest("button[data-klient360]");
   if (!b) return;
-  pokaz("sprawy");
   otworzKlienta360(b.dataset.klient360);
 }
 $("pytanieSzczegol").addEventListener("click", klikKlienta360);
