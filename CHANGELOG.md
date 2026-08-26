@@ -33,6 +33,38 @@ historii nie przepisujemy.
 
 ---
 
+## 0.107.0 — 26 sierpnia 2026
+
+**Trzy skargi z jednego dnia pracy na pytaniach klientów.**
+
+- **Rozmowa czytała się od końca.** Allegro potrafi oddać wątek od najnowszej
+  wiadomości, a my braliśmy listę tak, jak przyszła. Poza wyglądem psuło to
+  coś gorszego: synchronizacja brała za „ostatnią wiadomość klienta" tę
+  najstarszą, więc na worklistę trafiało pytanie sprzed tygodni zamiast
+  bieżącego. Wiadomości wątków i dyskusji są teraz sortowane rosnąco po
+  dacie u nas, niezależnie od kolejności z API; wiadomość bez daty ląduje na
+  końcu, w kolejności z API.
+- **Aukcja, o którą pyta klient, wchodzi do sprawy.** Kupujący klika PYTANIE
+  przy konkretnej ofercie i Allegro wpina ją w tę wiadomość
+  (`relatedObject`) — a my czytaliśmy wyłącznie nagłówek wątku, czyli
+  pierwszą sprawę, jaką ten klient kiedykolwiek zgłosił. Przy stałym kliencie
+  to zupełnie inny towar. Teraz oferta idzie z wiadomości (nagłówek wątku
+  zostaje jako zapas), aplikacja dociąga jej szczegóły i pokazuje je
+  w nagłówku sprawy: symbol, cena, dostępność, link. Symbol z aukcji
+  (`external.id`) prowadzi też szukanie w kartotece i stoi osobnym akapitem
+  w kontekście szkicu. Oferta zakończona nie znika po cichu — panel i model
+  dostają „aukcji już nie ma, dopytaj klienta" zamiast zgadywania.
+- **Szkic AI przestał powstawać sam.** Do tej wersji model pisał odpowiedź do
+  każdego pobranego pytania, także do tych, których nikt nie otworzy — to
+  rachunek u dostawcy AI za nic. Domyślnie odświeżenie tylko pobiera sprawy,
+  a szkic powstaje po kliknięciu **GENERUJ** przy konkretnym pytaniu. Kto
+  woli mieć gotowe od ręki, włącza w karcie AI przełącznik **„Licz szkice
+  automatycznie, bez pytania"** — należy do admina, bo to on płaci za model.
+
+Bez zmian w kolektorze, bez nowych uprawnień Allegro i bez działania przy
+wdrożeniu. Ustawienie automatycznego szkicu startuje **wyłączone** — także
+tam, gdzie szkice liczyły się dotąd same.
+
 ## 0.106.0 — 26 sierpnia 2026
 
 **Allegro zablokowało adres IP w trakcie parowania konta** („Zostałeś

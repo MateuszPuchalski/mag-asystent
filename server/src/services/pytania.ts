@@ -196,6 +196,12 @@ export function nastepneOtwarte(pomijajac: number): number | null {
 export interface KonfiguracjaAI {
   prompt: string;
   fakty: string;
+  /**
+   * Czy model ma liczyć szkice SAM — przy pobraniu pytań i w tickerze
+   * (0.107.0). Domyślnie WYŁĄCZONE: model pisze wtedy, gdy człowiek o to
+   * poprosi przyciskiem. Ręczny GENERUJ omija tę bramkę zawsze.
+   */
+  autoSzkic: boolean;
   zmienionoAt: string | null;
   zmienionoPrzez: string | null;
 }
@@ -207,6 +213,7 @@ export function pobierzKonfiguracje(): KonfiguracjaAI {
   return {
     prompt: (w?.prompt as string) ?? "",
     fakty: (w?.fakty as string) ?? "",
+    autoSzkic: (w?.auto_szkic as number) === 1,
     zmienionoAt: tekstLubNull(w?.zmieniono_at),
     zmienionoPrzez: tekstLubNull(w?.zmieniono_przez),
   };
@@ -229,6 +236,22 @@ function zapiszPole(pole: "prompt" | "fakty", tresc: string, autor: string): Kon
 
 export const zapiszPrompt = (tresc: string, autor: string) => zapiszPole("prompt", tresc, autor);
 export const zapiszFakty = (tresc: string, autor: string) => zapiszPole("fakty", tresc, autor);
+
+/** Przełącznik automatycznych szkiców — osobno, bo to flaga, nie tekst. */
+export function zapiszAutoSzkic(wlaczone: boolean, autor: string): KonfiguracjaAI {
+  db()
+    .prepare(
+      `INSERT INTO ai_config (id, auto_szkic, zmieniono_at, zmieniono_przez)
+       VALUES (1, ?, datetime('now'), ?)
+       ON CONFLICT(id) DO UPDATE SET
+         auto_szkic = excluded.auto_szkic,
+         zmieniono_at = excluded.zmieniono_at,
+         zmieniono_przez = excluded.zmieniono_przez`
+    )
+    .run(wlaczone ? 1 : 0, autor);
+  logEvent("pytanie_konfiguracja", autor, null, { pole: "auto_szkic", wlaczone });
+  return pobierzKonfiguracje();
+}
 
 /* ── Synchronizacja z Allegro ────────────────────────────────────────────── */
 
@@ -288,7 +311,7 @@ export function odKiedySync(): string | null {
  */
 export function ostatniaSeriaKupujacego(
   wiadomosci: WiadomoscAllegro[]
-): { id: string; tresc: string; at: string | null } | null {
+): { id: string; tresc: string; at: string | null; ofertaId: string | null } | null {
   const ostatnia = wiadomosci[wiadomosci.length - 1];
   if (!ostatnia || !ostatnia.odKupujacego) return null;
 
@@ -304,6 +327,10 @@ export function ostatniaSeriaKupujacego(
       .filter((t) => t !== "")
       .join("\n"),
     at: ostatnia.at,
+    /* Aukcja z ostatniej wiadomości serii, która ją niesie. Allegro podpina
+       ją do WIADOMOŚCI, więc pytanie o inny produkt w tym samym wątku
+       wskazuje inną ofertę — liczy się ta, o którą klient pyta TERAZ. */
+    ofertaId: seria.map((w) => w.ofertaId).filter((o): o is string => !!o).at(-1) ?? null,
   };
 }
 
@@ -348,7 +375,11 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
       watek.threadId,
       seria.id,
       watek.interlokutor,
-      watek.ofertaId,
+      /* Wiadomość wie lepiej niż nagłówek wątku: lista wątków bywa bez
+         aukcji, a `relatedObject` przy wiadomości jest dokładnie tym, o co
+         klient pyta. Tytuł zostaje z nagłówka — nazwę oferty i tak
+         dociągamy przy budowaniu kontekstu (jedna aukcja, jedno pytanie). */
+      seria.ofertaId ?? watek.ofertaId,
       watek.ofertaTytul,
       seria.tresc,
       seria.at ?? watek.ostatniaWiadomoscAt,
@@ -578,6 +609,14 @@ export interface Kontekst {
    */
   przesylki: PrzesylkiKlienta | null;
   bladPrzesylek: string | null;
+  /**
+   * Aukcja, do której Allegro podpięło pytanie (0.107.0).
+   *
+   * Najmocniejszy trop w całym kontekście: mówi wprost, o który produkt
+   * chodzi, zamiast zgadywania z treści. `null` gdy pytanie jej nie niesie
+   * (wklejka) albo oferta się skończyła.
+   */
+  oferta: OfertaAllegro | null;
 }
 
 /**
@@ -591,7 +630,20 @@ export interface Kontekst {
  * zamiast wyjątku wchodzi zdanie o tym, czego zabrakło.
  */
 export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
-  const frazy = frazySzukania(p.tresc, p.ofertaTytul);
+  /* NAJPIERW aukcja, o którą klient pyta. Gdy Allegro podpięło pytanie do
+     oferty, nie ma czego zgadywać: znamy nazwę, cenę i — co najważniejsze —
+     sygnaturę sprzedawcy (`external.id`), która trafia prosto w kartotekę.
+     Awaria pobrania degraduje do zgadywania z treści, jak dotąd. */
+  let oferta: OfertaAllegro | null = null;
+  if (p.ofertaId) {
+    try {
+      oferta = await allegroAdapter().oferta(p.ofertaId);
+    } catch {
+      /* Cicho: zaraz i tak szukamy po frazach, a szkic bez aukcji jest
+         gorszy, ale użyteczny — brak szkicu nie jest użyteczny wcale. */
+    }
+  }
+  const frazy = frazySzukania(p.tresc, oferta?.nazwa ?? p.ofertaTytul);
 
   /* Aukcje PRZED kartoteką, choć w odpowiedzi stoją po niej. Powód jest
      jeden: sygnatura z aukcji trafia w kartotekę pewniej niż jakiekolwiek
@@ -611,12 +663,30 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
     bladOfert = e instanceof Error ? e.message : String(e);
   }
 
-  const kartoteki = szukajKartotek(
-    frazy,
-    oferty.map((o) => o.externalId).filter((s): s is string => !!s)
-  );
+  /* Sygnatura z PODPIĘTEJ aukcji idzie na początek listy symboli: to jest
+     odpowiedź na pytanie „o co klient pyta", a nie kandydat z szukania. */
+  const symbole = [
+    ...(oferta?.externalId ? [oferta.externalId] : []),
+    ...oferty.map((o) => o.externalId).filter((s): s is string => !!s),
+  ];
+  const kartoteki = szukajKartotek(frazy, symbole);
 
   const linie: string[] = ["KONTEKST Z MAGAZYNU — dane wewnętrzne, nie cytuj ich wprost."];
+
+  if (oferta) {
+    linie.push(
+      `\nPYTANIE DOTYCZY TEJ AUKCJI (Allegro podpięło ją do wiadomości — to o NIĄ pyta klient):` +
+        `\n- ${oferta.nazwa}${oferta.cena ? ` | ${oferta.cena}` : ""}` +
+        `${oferta.externalId ? ` | symbol: ${oferta.externalId}` : ""}` +
+        `${oferta.dostepnych !== null ? ` | dostępnych: ${oferta.dostepnych} szt.` : ""}` +
+        `\n  ${oferta.url}`
+    );
+  } else if (p.ofertaId) {
+    linie.push(
+      "\nAUKCJA PYTANIA: Allegro podało jej identyfikator, ale oferty już nie ma " +
+        "(zakończona). Nie zgaduj, o który produkt chodzi — dopytaj klienta."
+    );
+  }
 
   if (kartoteki.length === 0) {
     linie.push("\nKARTOTEKI: nic nie pasuje do tego pytania w naszej kartotece.");
@@ -720,7 +790,7 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
   return {
     tekst: linie.join("\n"),
     kartoteki, oferty, bladOfert, frazy, dopasowania, poprzednie,
-    przesylki, bladPrzesylek,
+    przesylki, bladPrzesylek, oferta,
   };
 }
 
@@ -1028,6 +1098,11 @@ export function stempelProwadzi(id: number, autor: string): void {
 /** Szkice dla wszystkiego, co ich nie ma. Zwraca liczbę policzonych. */
 export async function dogenerujSzkice(autor: string, limit = 20): Promise<number> {
   if (aiTryb() === "wylaczone") return 0;
+  /* Zbiorcze liczenie szkiców jest OPCJĄ i domyślnie jest wyłączone
+     (0.107.0). Model pisze wtedy, gdy człowiek o to poprosi — a nie przy
+     każdym pobraniu pytań. Ręczny GENERUJ woła `generujSzkic` wprost, więc
+     tej bramki nie dotyka i działa zawsze. */
+  if (!pobierzKonfiguracje().autoSzkic) return 0;
   const czekajace = db()
     .prepare("SELECT id FROM pytanie WHERE status = 'nowe' ORDER BY id ASC LIMIT ?")
     .all(limit) as Array<{ id: number }>;

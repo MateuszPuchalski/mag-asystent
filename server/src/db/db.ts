@@ -213,6 +213,11 @@ function migrate(database: DatabaseSync) {
   addColumn("dyskusja", "edytowano", "INTEGER NOT NULL DEFAULT 0");
   addColumn("dyskusja", "wyslano_at", "TEXT");
   addColumn("dyskusja", "odpowiedzial", "TEXT");
+  /* Przełącznik automatycznych szkiców (0.107.0). `ai_config` stoi u klienta
+     od 0.80.0, więc kolumna musi dojść migracją. Domyślne 0 znaczy, że po
+     aktualizacji szkice przestają powstawać same — świadomie, bo o to
+     poprosił właściciel. */
+  addColumn("ai_config", "auto_szkic", "INTEGER NOT NULL DEFAULT 0");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);

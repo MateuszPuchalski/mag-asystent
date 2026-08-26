@@ -1890,6 +1890,15 @@
       <div style="margin-top:6px">
         <button class="akcja" id="pytaniaZapiszFakty">ZAPISZ FAKTY</button>
       </div>
+      <label style="margin-top:14px;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" id="pytaniaAutoSzkic">
+        <span>Licz szkice automatycznie, bez pytania</span>
+      </label>
+      <p class="mute" style="margin-top:4px">
+        Wyłączone: szkic powstaje po kliknięciu GENERUJ przy konkretnym pytaniu.
+        Włączone: model pisze sam przy każdym pobraniu pytań — także do tych,
+        których nikt nie otworzy.
+      </p>
       <p class="mute" id="pytaniaKonfiguracjaStan" style="margin-top:8px"></p>
     </section>
 
@@ -6841,13 +6850,27 @@ function rysujSzczegolPytania(d) {
   /* TEMAT sprawy stoi osobno i w stopniu tytułu. Do 0.90.0 tytuł oferty jechał
      w jednej linii z loginem, tym samym pismem co reszta — więc sprawa nie
      miała na ekranie nazwy, tylko wiersz danych. */
-  const temat = p.ofertaTytul || (p.zrodlo === "wklejka" ? "Pytanie z poczty" : "Pytanie bez oferty");
+  /* Aukcja, do której Allegro podpięło pytanie (0.107.0). Ma pierwszeństwo
+     przed tytułem ze snapshotu: nazwa jest świeża, a obok stoi symbol,
+     cena i stan — czyli to, czego biuro szuka, zanim zacznie pisać. */
+  const oferta = d.oferta || null;
+  const temat = oferta?.nazwa || p.ofertaTytul
+    || (p.zrodlo === "wklejka" ? "Pytanie z poczty" : "Pytanie bez oferty");
   $("pytanieNaglowek").innerHTML = `
     <div>${badgePytania(p.status)} ${kat} ${poza}</div>
     <div class="temat" style="margin-top:7px">${esc(temat)}</div>
     <div class="mute" style="margin-top:5px">${esc(p.kupujacyLogin || "(wklejka z poczty)")}
       · <span title="${esc(stempelLokalny(p.otrzymanoAt))}">${esc(wiekPytania(p.otrzymanoAt))}</span>
-      ${p.urzadzenie ? ` · urządzenie: ${esc(p.urzadzenie)}` : ""}</div>`;
+      ${p.urzadzenie ? ` · urządzenie: ${esc(p.urzadzenie)}` : ""}</div>
+    ${oferta ? `<div class="mute" style="margin-top:5px">
+      <span class="badge amber">PYTANIE O TĘ AUKCJĘ</span>
+      ${oferta.externalId ? `<span class="b">${esc(oferta.externalId)}</span> · ` : ""}
+      ${oferta.cena ? `${esc(oferta.cena)} · ` : ""}
+      ${oferta.dostepnych != null ? `dostępnych ${oferta.dostepnych} szt. · ` : ""}
+      <a href="${esc(oferta.url)}" target="_blank" rel="noopener">otwórz aukcję →</a>
+    </div>` : (p.ofertaId ? `<div class="mute" style="margin-top:5px">
+      <span class="badge mute2">AUKCJA ZAKOŃCZONA</span> pytanie dotyczyło oferty, której już nie ma
+    </div>` : "")}`;
 
   /* Snapshot pytania z NASZEJ bazy — jedyne miejsce, w którym widać treść,
      gdy pytanie przyszło z wklejki albo Allegro nie odpowiada. */
@@ -7447,6 +7470,7 @@ async function wczytajKonfiguracjePytan() {
     const d = await (await api("/api/biuro/pytania/prompt")).json();
     $("pytaniaPrompt").value = d.konfiguracja.prompt;
     $("pytaniaFakty").value = d.konfiguracja.fakty;
+    $("pytaniaAutoSzkic").checked = d.konfiguracja.autoSzkic === true;
     $("pytaniaKonfiguracjaStan").textContent = d.konfiguracja.zmienionoAt
       ? `Ostatnia zmiana: ${d.konfiguracja.zmienionoAt} · ${d.konfiguracja.zmienionoPrzez}`
       : "Nic tu jeszcze nie wpisano — model pracuje na ustawieniach domyślnych.";
@@ -7639,6 +7663,20 @@ async function kopiujOdpowiedz(tekst) {
   pole.remove();
   toast(udalo ? "Skopiowano do schowka" : "Nie udało się skopiować — zaznacz treść i skopiuj ręcznie");
 }
+
+/* Przełącznik zapisuje się od razu po kliknięciu — bez osobnego ZAPISZ,
+   bo to jedna flaga, a nie tekst do zredagowania. */
+$("pytaniaAutoSzkic").addEventListener("change", async () => {
+  try {
+    await api("/api/biuro/pytania/auto-szkic", {
+      method: "PUT", body: JSON.stringify({ autoSzkic: $("pytaniaAutoSzkic").checked }),
+    });
+    toast($("pytaniaAutoSzkic").checked ? "Szkice będą liczone same" : "Szkice tylko na żądanie");
+  } catch (e) {
+    toast(e.message);
+  }
+  await wczytajKonfiguracjePytan();
+});
 
 for (const [przycisk, pole, sciezka] of [
   ["pytaniaZapiszPrompt", "pytaniaPrompt", "prompt"],

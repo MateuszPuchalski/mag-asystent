@@ -68,6 +68,7 @@ const TRASY = [
   { method: "POST" as const, url: "/api/biuro/pytania/wklejka", body: { tekst: "x" } },
   { method: "GET" as const, url: "/api/biuro/pytania/1" },
   { method: "POST" as const, url: "/api/biuro/pytania/1/generuj", body: {} },
+  { method: "PUT" as const, url: "/api/biuro/pytania/auto-szkic", body: { autoSzkic: true } },
 ];
 
 test("bez sesji 401 na każdej trasie", async () => {
@@ -119,9 +120,50 @@ test("prompt i fakty: biuro czyta, ale zmienia wyłącznie admin", async () => {
   assert.match(po.json().konfiguracja.fakty, /Chorwacji/);
 });
 
+test("automatyczny szkic: domyślnie milczy, włącza go admin (0.107.0)", async () => {
+  /* Model pisał do KAŻDEGO pobranego pytania, także do tych, których nikt
+     nie otworzy — rachunek u dostawcy AI za nic. Domyślnie więc odświeżenie
+     tylko pobiera sprawy, a przełącznik należy do admina: to on płaci za
+     model, biuro klika GENERUJ przy konkretnym pytaniu. */
+  const biuro = zalogowany("biuro");
+  const admin = zalogowany("admin");
+
+  const bezSzkicow = await app.inject({
+    method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: { "x-session": biuro },
+  });
+  assert.equal(bezSzkicow.json().nowych, 3);
+  assert.equal(bezSzkicow.json().szkicow, 0, "domyślnie żaden szkic nie powstaje sam");
+
+  const odmowa = await app.inject({
+    method: "PUT", url: "/api/biuro/pytania/auto-szkic",
+    payload: { autoSzkic: true }, headers: { "x-session": biuro },
+  });
+  assert.equal(odmowa.statusCode, 403);
+  assert.match(odmowa.json().error, /admin/);
+
+  const zapis = await app.inject({
+    method: "PUT", url: "/api/biuro/pytania/auto-szkic",
+    payload: { autoSzkic: true }, headers: { "x-session": admin },
+  });
+  assert.equal(zapis.statusCode, 200);
+  assert.equal(zapis.json().konfiguracja.autoSzkic, true);
+
+  const zeSzkicami = await app.inject({
+    method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: { "x-session": biuro },
+  });
+  assert.equal(zeSzkicami.json().szkicow, 3, "po włączeniu ticker dogania zaległe pytania");
+});
+
 test("pełny przepływ: odśwież → szkic → poprawka → wysyłka → następne pytanie", async () => {
   const token = zalogowany("biuro");
   const naglowki = { "x-session": token };
+
+  /* Szkice mają tu być gotowe od razu, więc włączamy je jawnie — od 0.107.0
+     to wybór biura, nie zachowanie domyślne. */
+  await app.inject({
+    method: "PUT", url: "/api/biuro/pytania/auto-szkic",
+    payload: { autoSzkic: true }, headers: { "x-session": zalogowany("admin") },
+  });
 
   const odswiez = await app.inject({
     method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: naglowki,
@@ -129,8 +171,8 @@ test("pełny przepływ: odśwież → szkic → poprawka → wysyłka → nastę
   assert.equal(odswiez.statusCode, 200);
   /* Wątek zakończony naszą odpowiedzią nie jest pytaniem — trzy z czterech. */
   assert.equal(odswiez.json().nowych, 3);
-  /* Szkice liczą się od razu po synchronizacji: otwarte pytanie ma mieć
-     odpowiedź gotową, a nie przycisk „wygeneruj" i czekanie. */
+  /* Z włączonym automatem szkice liczą się od razu po synchronizacji:
+     otwarte pytanie ma mieć odpowiedź gotową, a nie przycisk i czekanie. */
   assert.equal(odswiez.json().szkicow, 3);
   assert.equal(odswiez.json().otwartych, 3);
 
@@ -157,6 +199,9 @@ test("pełny przepływ: odśwież → szkic → poprawka → wysyłka → nastę
   assert.ok(Array.isArray(szczegol.json().dopasowania));
   assert.ok(Array.isArray(szczegol.json().poprzednie));
   assert.equal(szczegol.json().bladOfert, null);
+  /* Aukcja, o którą klient pyta, jedzie osobno od wyników szukania — panel
+     stawia ją w nagłówku sprawy, żeby biuro nie odpowiadało o innym towarze. */
+  assert.equal(szczegol.json().oferta.externalId, "TEST-LINIA-TODO");
 
   const rozmowa = await app.inject({
     method: "GET", url: `/api/biuro/pytania/${p.id}/wiadomosci`, headers: naglowki,
