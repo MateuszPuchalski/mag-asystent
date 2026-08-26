@@ -1290,6 +1290,31 @@ z Allegro (scenariusze S67–S69).
 
 3. **Sandbox** (opcjonalnie, do prób): osobna rejestracja na
    <https://developer.allegro.pl.allegrosandbox.pl> i `ALLEGRO_SANDBOX=1`.
+
+#### Gdy Allegro pokaże stronę „Zostałeś zablokowany"
+
+Endpointy parowania stoją na `allegro.pl`, czyli za tym samym zabezpieczeniem
+co sklep. Zablokowany adres IP dostaje wtedy stronę zamiast danych. Panel
+mówi o tym wprost, a odpytywanie zatrzymuje przycisk PRZERWIJ.
+
+Co zrobić po kolei:
+
+1. Kliknij PRZERWIJ albo zamknij zakładkę panelu. Bez pytania z przeglądarki
+   serwer nie wysyła do Allegro nic.
+2. Odczekaj kilkanaście minut. Ponawianie w kółko przedłuża blokadę.
+3. Uzupełnij `ALLEGRO_USER_AGENT` i zrestartuj `wertis-api`.
+4. Sparuj konto ponownie, ale link potwierdzenia otwórz z innej sieci.
+   Najprościej z telefonu po danych komórkowych.
+5. Nie otwieraj linku przez pulpit zdalny na serwerze. Wychodzi wtedy adres
+   serwera, czyli ten, który Allegro właśnie zablokowało.
+6. Gdy blokada wraca, użyj formularza „wyślij nam wiadomość" z tej strony.
+   To jedyna oficjalna droga zdjęcia blokady z adresu.
+
+Adres, z którego wychodzi serwer, sprawdzisz poleceniem
+`Invoke-RestMethod https://api.ipify.org` w PowerShellu. Adres biura pokaże
+strona <https://ifconfig.me> otwarta w przeglądarce. Ten sam adres w obu
+miejscach znaczy, że serwer i biuro dzielą łącze — wtedy link potwierdzenia
+zawsze otwieraj z telefonu.
    Token nie przeżywa zmiany środowiska — po przełączeniu paruj ponownie.
 
 Import z MSSQL zaczyna też zaciągać dokumenty sprzedaży (FS i PA, okno
