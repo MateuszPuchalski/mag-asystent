@@ -22,6 +22,7 @@ import {
   stempelProwadzi,
   szczegolPytania,
   wyslijOdpowiedz,
+  zapiszAutoSzkic,
   zapiszFakty,
   zapiszOdpowiedz,
   zapiszPrompt,
@@ -170,6 +171,18 @@ export async function pytaniaRoutes(app: FastifyInstance) {
     return { konfiguracja: zapiszPrompt(req.body?.prompt ?? "", autor()) };
   });
 
+  /* Automatyczne szkice to OPCJA, domyślnie wyłączona (0.107.0) — a że
+     decyduje o tym, ile model pisze bez pytania człowieka, przestawia ją
+     wyłącznie admin, jak prompt i fakty. */
+  app.put<{ Body: { autoSzkic?: boolean } }>(
+    "/api/biuro/pytania/auto-szkic",
+    async (req, reply) => {
+      const nie = odmowa(["admin"]);
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return { konfiguracja: zapiszAutoSzkic(req.body?.autoSzkic === true, autor()) };
+    }
+  );
+
   app.put<{ Body: { fakty?: string } }>("/api/biuro/pytania/fakty", async (req, reply) => {
     const nie = odmowa(["admin"]);
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
@@ -205,6 +218,9 @@ export async function pytaniaRoutes(app: FastifyInstance) {
            co dostał model, razem z uczciwym powodem ewentualnej pustki. */
         przesylki: kontekst.przesylki,
         bladPrzesylek: kontekst.bladPrzesylek,
+        /* Aukcja podpięta do pytania (0.107.0) — człowiek ma widzieć to samo,
+           co model: o który produkt klient pyta. */
+        oferta: kontekst.oferta,
       };
     });
   });

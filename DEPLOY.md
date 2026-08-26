@@ -1507,15 +1507,34 @@ parametr `sort`, dopasowanie `buyer.id` do maski `client:NNN` z wątków.
 Gdy paczka jedzie z etykietą spoza integracji Allegro, lista przesyłek jest
 pusta — panel mówi wtedy „jeszcze nie nadane", co jest stanem, nie awarią.
 
+### Aukcja, o którą pyta klient (0.107.0)
+
+Kupujący zwykle klika PYTANIE przy konkretnej ofercie. Allegro wpina ją w tę
+wiadomość, więc od 0.107.0 aplikacja bierze aukcję stamtąd, nie z nagłówka
+wątku. Różnica jest widoczna przy stałym kliencie: nagłówek wątku pamięta
+pierwszą sprawę sprzed miesięcy, czyli zwykle inny towar.
+
+Nagłówek sprawy pokazuje wtedy plakietkę **PYTANIE O TĘ AUKCJĘ** z symbolem,
+ceną, dostępnością i linkiem. Symbol z aukcji prowadzi też szukanie
+w kartotece — trafia pewniej niż nazwa. Aukcja zakończona daje plakietkę
+**AUKCJA ZAKOŃCZONA**, a model dostaje polecenie „dopytaj klienta" zamiast
+zgadywania po opisie.
+
+Rozmowa w panelu układa się od najstarszej wiadomości. Kolejność zwracana
+przez Allegro nie jest umową, więc sortujemy ją u siebie po dacie.
+
 ### Zanim włączysz: dwie decyzje właściciela
 
 - **Prywatność.** Treść pytania klienta (a przy wklejce — obraz ze schowka)
   wychodzi do zewnętrznego dostawcy modelu. Samego obrazu nie zapisujemy
   u siebie: zostaje wyłącznie przepisana treść pytania. To decyzja właściciela
   firmy i dlatego funkcja jest domyślnie wyłączona.
-- **Koszt.** Szkice liczą się w tle dla każdego nowego pytania, także tego,
-  na które nikt nie odpowie. Przy kilkunastu pytaniach dziennie to grosze,
-  ale kwota rośnie z ruchem, a nie z liczbą kliknięć.
+- **Koszt.** Od 0.107.0 szkic powstaje po kliknięciu GENERUJ przy konkretnym
+  pytaniu. Rachunek rośnie wtedy z liczbą kliknięć, nie z ruchem w skrzynce.
+  Kto woli mieć odpowiedzi gotowe od ręki, włącza w karcie AI przełącznik
+  **„Licz szkice automatycznie, bez pytania"**. Wtedy model pisze do każdego
+  pobranego pytania, także tego, na które nikt nie odpowie. Przełącznik należy
+  do admina, bo to on płaci za model.
 
 ### Pierwsze uruchomienie
 

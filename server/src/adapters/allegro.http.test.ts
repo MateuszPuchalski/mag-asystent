@@ -34,6 +34,8 @@ import {
   mapujSledzenie,
   mapujWatki,
   mapujOferty,
+  mapujOferte,
+  urlOfertyPoId,
   scopeDlaUrl,
 } from "./allegro.http.js";
 import { allegroUserAgent } from "./allegro.js";
@@ -586,4 +588,76 @@ test("brak ALLEGRO_USER_AGENT to zdanie w /api/health, nie cisza", () => {
     (config.allegro as { userAgent: string }).userAgent = bylUA;
     (config.allegro as { mode: string }).mode = bylTryb;
   }
+});
+
+test("rozmowa wraca od najstarszej, niezależnie od kolejności z API (0.107.0)", () => {
+  /* Skarga z panelu: „kolejność wiadomości w czacie jest odwrócona".
+     Centrum wiadomości potrafi oddać wątek od najnowszej, a my braliśmy
+     listę tak, jak przyszła. Poza wyglądem psuło to synchronizację pytań:
+     za „ostatnią wiadomość klienta" robiła się ta sprzed tygodni. */
+  const w = mapujWiadomosci(
+    {
+      messages: [
+        { id: "nowa", author: { role: "BUYER" }, text: "trzecia", createdAt: "2026-08-20T12:00:00Z" },
+        { id: "stara", author: { role: "BUYER" }, text: "pierwsza", createdAt: "2026-08-18T09:00:00Z" },
+        { id: "srodek", author: { role: "SELLER" }, text: "druga", createdAt: "2026-08-19T09:00:00Z" },
+      ],
+    },
+    null
+  );
+  assert.deepEqual(w.map((m) => m.id), ["stara", "srodek", "nowa"]);
+
+  /* Wiadomość bez daty nie ma jak trafić w oś czasu — ląduje na końcu,
+     w kolejności z API, zamiast udawać najstarszą. */
+  const zBrakiem = mapujWiadomosciDyskusji({
+    messages: [
+      { id: "bez-daty", author: { role: "BUYER" }, text: "?" },
+      { id: "z-data", author: { role: "BUYER" }, text: "!", createdAt: "2026-08-19T09:00:00Z" },
+    ],
+  });
+  assert.deepEqual(zBrakiem.map((m) => m.id), ["z-data", "bez-daty"]);
+});
+
+test("wiadomość niesie aukcję, o którą pyta klient (0.107.0)", () => {
+  /* Kupujący klika PYTANIE przy konkretnej ofercie i Allegro wpina ją
+     w `relatedObject` TEJ wiadomości — wątek zna tylko pierwszą sprawę,
+     jaką klient kiedykolwiek zgłosił. Bez tego pola biuro odpowiadało
+     o cudzym towarze, a szkic AI szukał symbolu nie tej aukcji. */
+  const w = mapujWiadomosci(
+    {
+      messages: [
+        { id: "m1", author: { role: "BUYER" }, text: "Pasuje do Stihl?", relatedObject: { type: "OFFER", id: "1122" } },
+        { id: "m2", author: { role: "BUYER" }, text: "A ta?", offer: { id: "3344" } },
+        { id: "m3", author: { role: "BUYER" }, text: "Reklamacja", relatedObject: { type: "ORDER", id: "zam-9" } },
+      ],
+    },
+    null
+  );
+  assert.equal(w[0].ofertaId, "1122", "relatedObject typu OFFER to aukcja pytania");
+  assert.equal(w[1].ofertaId, "3344", "starszy kształt `offer.id` też czytamy");
+  assert.equal(w[2].ofertaId, null, "powiązanie z zamówieniem to nie oferta");
+});
+
+test("oferta po id: link, cena i symbol z naszego magazynu (0.107.0)", () => {
+  assert.equal(
+    urlOfertyPoId("https://api.allegro.pl", "11 22/33"),
+    "https://api.allegro.pl/sale/offers/11%2022%2F33"
+  );
+  const o = mapujOferte(
+    {
+      id: "1122",
+      name: "Nóż kosiarki 51 cm",
+      sellingMode: { price: { amount: "89.00", currency: "PLN" } },
+      external: { id: "NK-51" },
+      stock: { available: 7 },
+    },
+    false
+  );
+  assert.equal(o?.externalId, "NK-51", "symbol z Subiekta prowadzi do towaru");
+  assert.equal(o?.cena, "89.00 PLN");
+  assert.equal(o?.dostepnych, 7);
+  assert.match(o?.url ?? "", /1122/);
+  /* Oferta zdjęta ze sprzedaży wraca bez id — wtedy NULL, nie pusta karta. */
+  assert.equal(mapujOferte({}, false), null);
+  assert.equal(mapujOferte(null, false), null);
 });

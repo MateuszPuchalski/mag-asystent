@@ -117,6 +117,14 @@ export interface WiadomoscAllegro {
   at: string | null;
   /** Ile załączników niesie wiadomość — treści plików nie pobieramy. */
   zalacznikow: number;
+  /**
+   * Oferta, której wiadomość dotyczy (`relatedObject`).
+   *
+   * Allegro podpina aukcję do WIADOMOŚCI, nie do wątku — a to jest
+   * najmocniejszy trop w całym pytaniu: mówi wprost, o który produkt chodzi,
+   * zamiast zgadywania z treści. Nagłówek wątku bywa jej pozbawiony.
+   */
+  ofertaId: string | null;
 }
 
 export interface WatekAllegro {
@@ -281,6 +289,13 @@ export interface AllegroAdapter {
   oznaczPrzeczytany(threadId: string): Promise<void>;
   /** Nasze aktywne oferty pasujące do frazy — linki do wklejenia w odpowiedź. */
   szukajOfert(fraza: string): Promise<OfertaAllegro[]>;
+  /**
+   * Jedna NASZA oferta po identyfikatorze — dla pytania, które Allegro
+   * podpięło do konkretnej aukcji. `null` gdy oferty już nie ma (zakończona
+   * albo cudza). Symbol z `external.id` trafia prosto w kartotekę, więc to
+   * pewniejszy trop niż jakiekolwiek szukanie po nazwie.
+   */
+  oferta(offerId: string): Promise<OfertaAllegro | null>;
 
   /* ── Dyskusje i reklamacje — rozmowa i odpowiedź (0.104.0) ─────────────────
      Identyfikator sprawy to id z `/sale/issues` użyte wprost w ścieżkach

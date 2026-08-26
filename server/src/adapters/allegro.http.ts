@@ -246,10 +246,33 @@ export function urlZalacznikaDyskusji(apiUrl: string): string {
  * pomyłka w tę stronę chowa cudze zdanie, w drugą kazałaby odpowiadać na
  * własne (ten sam kierunek co przy wątkach, allegro.ts).
  */
+/**
+ * Rozmowa POSORTOWANA od najstarszej.
+ *
+ * Kolejność zwracana przez API nie jest umową — Centrum wiadomości potrafi
+ * oddać wątek od najnowszej. Panel rysował go wtedy odwrotnie (ostatnie
+ * zdanie klienta na górze), a synchronizacja pytań brała za „ostatnią
+ * wiadomość" tę NAJSTARSZĄ — czyli pytanie sprzed tygodni. Sortujemy
+ * u siebie; wiadomość bez daty zostaje na końcu, w kolejności z API.
+ */
+function odNajstarszej<T extends { at: string | null }>(lista: T[]): T[] {
+  return lista
+    .map((w, i) => ({ w, i, t: w.at ? Date.parse(w.at) : NaN }))
+    .sort((a, b) => {
+      const aMa = Number.isFinite(a.t);
+      const bMa = Number.isFinite(b.t);
+      if (aMa && bMa) return a.t - b.t || a.i - b.i;
+      if (aMa) return -1;
+      if (bMa) return 1;
+      return a.i - b.i;
+    })
+    .map((x) => x.w);
+}
+
 export function mapujWiadomosciDyskusji(json: unknown): WiadomoscDyskusji[] {
   const root = (json ?? {}) as Record<string, unknown>;
   const lista = Array.isArray(root.messages) ? root.messages : [];
-  return lista.map((it) => {
+  return odNajstarszej(lista.map((it) => {
     const m = (it ?? {}) as Record<string, unknown>;
     const author = (m.author ?? {}) as Record<string, unknown>;
     const zal = (m.attachment ?? null) as Record<string, unknown> | null;
@@ -265,7 +288,37 @@ export function mapujWiadomosciDyskusji(json: unknown): WiadomoscDyskusji[] {
         ? { nazwa: tekst(zal.fileName) ?? tekst(zal.name), url: tekst(zal.url) }
         : null,
     };
-  });
+  }));
+}
+
+/** Jedna nasza oferta po id — aukcja podpięta do pytania klienta. */
+export function urlOfertyPoId(apiUrl: string, offerId: string): string {
+  return `${apiUrl}/sale/offers/${encodeURIComponent(offerId)}`;
+}
+
+/**
+ * Szczegół oferty → typ domenowy. Osobno od `mapujOferty` (lista wyników
+ * szukania), bo zasób pojedynczej oferty ma inny, bogatszy kształt —
+ * a interesuje nas z niego dokładnie to samo, co przy szukaniu.
+ */
+export function mapujOferte(json: unknown, sandbox: boolean): OfertaAllegro | null {
+  const o = (json ?? {}) as Record<string, unknown>;
+  const id = tekst(o.id);
+  if (!id) return null;
+  const external = (o.external ?? {}) as Record<string, unknown>;
+  const sellingMode = (o.sellingMode ?? {}) as Record<string, unknown>;
+  const price = (sellingMode.price ?? {}) as Record<string, unknown>;
+  const stock = (o.stock ?? {}) as Record<string, unknown>;
+  const kwota = tekst(price.amount);
+  const waluta = tekst(price.currency);
+  return {
+    offerId: id,
+    nazwa: tekst(o.name) ?? "(bez nazwy)",
+    cena: kwota ? `${kwota}${waluta ? ` ${waluta}` : ""}` : null,
+    externalId: tekst(external.id),
+    dostepnych: typeof stock.available === "number" ? stock.available : null,
+    url: urlOferty(id, sandbox),
+  };
 }
 
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
@@ -471,10 +524,16 @@ export function mapujWiadomosci(json: unknown, rozmowca: string | null): Wiadomo
   const lista = Array.isArray((json as Record<string, unknown>)?.messages)
     ? ((json as Record<string, unknown>).messages as unknown[])
     : [];
-  return lista.map((m) => {
+  return odNajstarszej(lista.map((m) => {
     const w = (m ?? {}) as Record<string, unknown>;
     const autor = (w.author ?? {}) as Record<string, unknown>;
     const login = tekst(autor.login);
+    /* Aukcja, o którą klient pyta. Allegro podpina ją do WIADOMOŚCI
+       (`relatedObject`), nie do nagłówka wątku — a to najmocniejszy trop
+       w całym pytaniu: mówi wprost, o który produkt chodzi. */
+    const powiazane = (w.relatedObject ?? {}) as Record<string, unknown>;
+    const ofertaWiadomosci = (w.offer ?? {}) as Record<string, unknown>;
+    const typPowiazania = (tekst(powiazane.type) ?? "").toUpperCase();
     /* Kto pisał: Allegro podaje rolę autora (`BUYER`/`SELLER`), a gdy jej nie
        ma — rozstrzyga login rozmówcy: autor RÓWNY rozmówcy to kupujący.
        Zła strona rozmowy jest gorsza niż brak etykiety, więc przy niepewności
@@ -492,8 +551,11 @@ export function mapujWiadomosci(json: unknown, rozmowca: string | null): Wiadomo
       tresc: tekst(w.text) ?? tekst(w.content) ?? "",
       at: tekst(w.createdAt),
       zalacznikow: Array.isArray(w.attachments) ? w.attachments.length : 0,
+      ofertaId:
+        (typPowiazania === "OFFER" ? tekst(powiazane.id) : null) ??
+        tekst(ofertaWiadomosci.id),
     };
-  });
+  }));
 }
 
 /**
@@ -870,6 +932,13 @@ export class HttpAllegroAdapter implements AllegroAdapter {
        linków dla człowieka, nie przegląd asortymentu. */
     const json = await this.zapytaj(urlOfert(config.allegro.apiUrl, fraza, 0));
     return json === null ? [] : mapujOferty(json, config.allegro.sandbox);
+  }
+
+  async oferta(offerId: string): Promise<OfertaAllegro | null> {
+    /* 404 (oferta zakończona albo cudza) to poprawna odpowiedź „nie ma",
+       nie awaria — pytanie o starą aukcję ma dalej dostać szkic. */
+    const json = await this.zapytaj(urlOfertyPoId(config.allegro.apiUrl, offerId));
+    return json === null ? null : mapujOferte(json, config.allegro.sandbox);
   }
 
   // ── Dyskusje: rozmowa i odpowiedź (0.104.0) ────────────────────────────────

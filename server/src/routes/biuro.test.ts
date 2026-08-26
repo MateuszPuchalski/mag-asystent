@@ -183,10 +183,12 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    7,
+    8,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
       "wgranie logo dostawcy, półka reklamacyjna, notatka do dyskusji " +
-      "Allegro oraz prompt eksperta i fakty firmowe (0.80.0)"
+      "Allegro, prompt eksperta i fakty firmowe (0.80.0) oraz przełącznik " +
+      "automatycznego szkicu AI (0.107.0) — ten ostatni po to, by biuro " +
+      "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
@@ -960,4 +962,20 @@ test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
   );
   assert.match(html, /id="allegroPrzerwij"/, "czekanie da się przerwać bez przeładowania strony");
   assert.match(html, /stronę blokady/, "panel mówi, co zrobić, gdy Allegro zablokuje adres");
+});
+
+test("pytania: oferta z wiadomości i szkic AI jako wybór biura (0.107.0)", () => {
+  /* Dwie skargi z jednego dnia. Pierwsza: nagłówek sprawy pokazywał tytuł
+     wątku, a klient pyta o KONKRETNĄ aukcję — ta jedzie w `relatedObject`
+     wiadomości, nie w wątku. Druga: model pisał szkice do wszystkiego, co
+     przyszło z synchronizacji, także do spraw, których nikt nie otworzy.
+     Domyślnie ma milczeć, a biuro włącza go świadomie przełącznikiem. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /id="pytaniaAutoSzkic"/, "przełącznik automatycznego szkicu w karcie AI");
+  assert.match(html, /pytania\/auto-szkic/, "przełącznik zapisuje się od razu, bez ZAPISZ");
+  assert.match(html, /PYTANIE O TĘ AUKCJĘ/, "nagłówek sprawy nazywa aukcję z wiadomości");
+  assert.match(html, /AUKCJA ZAKOŃCZONA/, "znikła oferta to stan do pokazania, nie pusty nagłówek");
 });

@@ -927,6 +927,10 @@ CREATE TABLE IF NOT EXISTS ai_config (
   id              INTEGER PRIMARY KEY CHECK (id = 1),
   prompt          TEXT NOT NULL DEFAULT '',
   fakty           TEXT NOT NULL DEFAULT '',
+  -- Czy model liczy szkice SAM (ticker, pobranie pytań). Domyślnie 0: szkic
+  -- powstaje na żądanie człowieka. Automat kosztuje wywołania modelu przy
+  -- każdym pobraniu i produkuje szkice do pytań, których nikt nie otworzy.
+  auto_szkic      INTEGER NOT NULL DEFAULT 0,
   zmieniono_at    TEXT,
   zmieniono_przez TEXT
 );

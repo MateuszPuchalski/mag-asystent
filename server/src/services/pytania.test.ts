@@ -81,9 +81,9 @@ test("kontekst wątku niesie tytuł oferty do dopasowania kartoteki", async () =
 
 test("seria wiadomości klienta pod rząd skleja się w jedno pytanie", () => {
   const seria = P.ostatniaSeriaKupujacego([
-    { id: "1", odKupujacego: false, autor: "my", tresc: "W czym pomóc?", at: null, zalacznikow: 0 },
-    { id: "2", odKupujacego: true, autor: "k", tresc: "Dzień dobry", at: null, zalacznikow: 0 },
-    { id: "3", odKupujacego: true, autor: "k", tresc: "mam kosiarkę T375", at: "x", zalacznikow: 0 },
+    { id: "1", odKupujacego: false, autor: "my", tresc: "W czym pomóc?", at: null, zalacznikow: 0, ofertaId: null },
+    { id: "2", odKupujacego: true, autor: "k", tresc: "Dzień dobry", at: null, zalacznikow: 0, ofertaId: null },
+    { id: "3", odKupujacego: true, autor: "k", tresc: "mam kosiarkę T375", at: "x", zalacznikow: 0, ofertaId: null },
   ]);
   /* Identyfikatorem jest OSTATNIA wiadomość — to na nią odpowiadamy i to ona
      rozstrzyga o idempotencji. */
@@ -91,7 +91,7 @@ test("seria wiadomości klienta pod rząd skleja się w jedno pytanie", () => {
   assert.equal(seria?.tresc, "Dzień dobry\nmam kosiarkę T375");
   assert.equal(
     P.ostatniaSeriaKupujacego([
-      { id: "1", odKupujacego: false, autor: "my", tresc: "gotowe", at: null, zalacznikow: 0 },
+      { id: "1", odKupujacego: false, autor: "my", tresc: "gotowe", at: null, zalacznikow: 0, ofertaId: null },
     ]),
     null
   );
@@ -160,11 +160,23 @@ test("symbol spoza kartoteki zostaje w produktach z pustym tw_id", () => {
   assert.deepEqual(P.szczegolPytania(id).produkty, [{ twId: null, symbol: "NIEZNANY-1" }]);
 });
 
-test("dogenerujSzkice liczy szkice dla wszystkiego, co czeka", async () => {
+test("hurtowe szkice idą wyłącznie za zgodą biura (0.107.0)", async () => {
+  /* Do 0.106.0 model pisał sam do każdego pobranego pytania — także do tych,
+     których nikt nigdy nie otworzy. To koszt u dostawcy AI za nic, więc
+     domyślnie milczy: szkic powstaje po kliknięciu GENERUJ przy konkretnej
+     sprawie. Kto chce mieć gotowe od ręki, włącza przełącznik w karcie AI. */
   await P.synchronizujPytania("test");
+  assert.equal(await P.dogenerujSzkice("ticker"), 0, "domyślnie ticker nic nie liczy");
+  assert.equal(P.listaPytan({ status: "nowe" }).length, 3, "pytania czekają nietknięte");
+
+  assert.equal(P.zapiszAutoSzkic(true, "test").autoSzkic, true);
   assert.equal(await P.dogenerujSzkice("ticker"), 3);
   assert.equal(P.listaPytan({ status: "nowe" }).length, 0);
-  assert.equal(await P.dogenerujSzkice("ticker"), 0);
+  assert.equal(await P.dogenerujSzkice("ticker"), 0, "drugi przebieg nie dubluje");
+
+  /* Wyłączenie zatrzymuje ticker, ale nie kasuje tego, co już napisane. */
+  assert.equal(P.zapiszAutoSzkic(false, "test").autoSzkic, false);
+  assert.equal(P.listaPytan({ status: "szkic" }).length, 3);
 });
 
 /* ── Redakcja i wysyłka ────────────────────────────────────────────────────── */
@@ -181,6 +193,7 @@ test("„bez edycji” znaczy dosłownie szkic co do znaku", async () => {
 test("wysyłka zmienia status, dopisuje wiadomość do wątku i wskazuje następne", async () => {
   towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta");
   await P.synchronizujPytania("test");
+  P.zapiszAutoSzkic(true, "test");
   await P.dogenerujSzkice("test");
   const id = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!.id;
 
@@ -197,6 +210,7 @@ test("wysyłka zmienia status, dopisuje wiadomość do wątku i wskazuje następ
 
 test("wysyłka drugi raz jest odmawiana, nie powtarzana", async () => {
   await P.synchronizujPytania("test");
+  P.zapiszAutoSzkic(true, "test");
   await P.dogenerujSzkice("test");
   const id = P.listaPytan({ limit: 50 })[0].id;
   await P.wyslijOdpowiedz(id, "anna");
@@ -377,6 +391,7 @@ test("liczniki rozdzielają czekające na szkic od gotowych do sprawdzenia", asy
 test("statystyki liczą produkty, kategorie, udział bez edycji i braki w ofercie", async () => {
   towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta");
   await P.synchronizujPytania("test");
+  P.zapiszAutoSzkic(true, "test");
   await P.dogenerujSzkice("test");
   for (const p of P.listaPytan({ limit: 50 })) {
     if (p.threadId) await P.wyslijOdpowiedz(p.id, "anna");
@@ -443,4 +458,58 @@ test("kontekst: wklejka z pytaniem o paczkę mówi uczciwie o braku loginu", asy
   assert.match(k.tekst, /bez loginu kupującego/);
   assert.match(k.tekst, /NIE zgaduj/);
   assert.equal(k.przesylki, null);
+});
+
+/* ── Aukcja podpięta do pytania ────────────────────────────────────────────── */
+
+test("pytanie zna aukcję z WIADOMOŚCI, nie tylko z nagłówka wątku (0.107.0)", async () => {
+  /* Klient klika PYTANIE przy konkretnej ofercie i Allegro wpina ją w tę
+     wiadomość (`relatedObject`). Wątek zna wyłącznie pierwszą sprawę, jaką
+     ten klient kiedykolwiek zgłosił — przy stałym kliencie to zupełnie inny
+     towar. Do 0.106.0 braliśmy nagłówek wątku i biuro odpowiadało o czymś
+     innym, niż widzi kupujący. Nagłówek zostaje jako zapasowe źródło. */
+  await P.synchronizujPytania("test");
+  const lista = P.listaPytan({ limit: 50 });
+
+  const zWiadomosci = lista.find((x) => x.threadId === "dev-pyt-1")!;
+  assert.equal(zWiadomosci.ofertaId, "of-1", "aukcja z wiadomości klienta");
+
+  const zNaglowka = lista.find((x) => x.threadId === "dev-pyt-4")!;
+  assert.equal(zNaglowka.ofertaId, "of-3", "wiadomość bez aukcji — bierzemy wątek");
+});
+
+test("kontekst szkicu prowadzi symbolem z podpiętej aukcji (0.107.0)", async () => {
+  /* Sygnatura sprzedawcy (`external.id`) trafia w kartotekę pewniej niż
+     jakiekolwiek szukanie po nazwie — dlatego stoi na początku listy symboli
+     i osobnym akapitem w kontekście. Bez tego model zgadywał z treści. */
+  towar(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta");
+  await P.synchronizujPytania("test");
+  const p = P.szczegolPytania(P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!.id);
+
+  const k = await P.kontekstPytania(p);
+  assert.equal(k.oferta?.externalId, "TEST-LINIA-TODO");
+  assert.match(k.tekst, /PYTANIE DOTYCZY TEJ AUKCJI/);
+  assert.ok(
+    k.kartoteki.some((x) => x.symbol === "TEST-LINIA-TODO"),
+    "symbol z aukcji wciąga właściwą kartotekę"
+  );
+});
+
+test("aukcja zdjęta ze sprzedaży: kontekst każe dopytać, nie zgadywać (0.107.0)", async () => {
+  /* Identyfikator jest, oferty już nie ma. Najgorsze, co model może zrobić,
+     to napisać o dowolnym podobnym towarze — kupujący dostałby cenę czegoś
+     innego. Więc mówimy mu wprost: dopytaj. */
+  const id = Number(
+    db()
+      .prepare(
+        `INSERT INTO pytanie
+           (zrodlo, tresc, otrzymano_at, status, produkty_json, oferta_id, utworzono_at, utworzono_przez)
+         VALUES ('allegro','Czy to pasuje?',datetime('now'),'nowe','[]','of-nie-ma',datetime('now'),'test')`
+      )
+      .run().lastInsertRowid
+  );
+
+  const k = await P.kontekstPytania(P.szczegolPytania(id));
+  assert.equal(k.oferta, null);
+  assert.match(k.tekst, /oferty już nie ma/);
 });

@@ -171,6 +171,7 @@ const WATKI: Record<string, WatekAllegro> = {
         tresc: "Dzień dobry, zamówiłem końcówkę 3/8, a w paczce jest 1/4. Odsyłam.",
         at: dniTemu(4),
         zalacznikow: 1,
+        ofertaId: null,
       },
       {
         id: "dev-msg-2",
@@ -179,6 +180,7 @@ const WATKI: Record<string, WatekAllegro> = {
         tresc: "Dzień dobry, przepraszamy za pomyłkę. Prosimy o odesłanie — zwrot środków po sprawdzeniu towaru.",
         at: dniTemu(4),
         zalacznikow: 0,
+        ofertaId: null,
       },
       {
         id: "dev-msg-3",
@@ -187,6 +189,7 @@ const WATKI: Record<string, WatekAllegro> = {
         tresc: "Nadane, numer przesyłki DEVWB0001.",
         at: dniTemu(3),
         zalacznikow: 0,
+        ofertaId: null,
       },
     ],
   },
@@ -225,6 +228,9 @@ const WATKI_PYTAN: WatekPytania[] = [
           "końcówki 3/8. Czy ta pozycja będzie pasować i jaki to symbol?",
         at: dniTemu(1),
         zalacznikow: 0,
+        /* Aukcja przy WIADOMOŚCI, nie tylko w nagłówku wątku — tak podpina ją
+           Allegro i to jest najmocniejszy trop w pytaniu o dobór części. */
+        ofertaId: "of-1",
       },
     ],
   },
@@ -247,6 +253,7 @@ const WATKI_PYTAN: WatekPytania[] = [
           "nie ma w Państwa ofercie — model ZZZ-9999?",
         at: dniTemu(2),
         zalacznikow: 0,
+        ofertaId: null,
       },
     ],
   },
@@ -267,6 +274,7 @@ const WATKI_PYTAN: WatekPytania[] = [
         tresc: "Czy towar jest dostępny od ręki?",
         at: dniTemu(4),
         zalacznikow: 0,
+        ofertaId: null,
       },
       {
         id: "dev-pyt-msg-3b",
@@ -275,6 +283,7 @@ const WATKI_PYTAN: WatekPytania[] = [
         tresc: "Dzień dobry, tak — wysyłka tego samego dnia roboczego.",
         at: dniTemu(3),
         zalacznikow: 0,
+        ofertaId: null,
       },
     ],
   },
@@ -297,6 +306,7 @@ const WATKI_PYTAN: WatekPytania[] = [
           "wysyłki oczywiście płatność z góry",
         at: dniTemu(1),
         zalacznikow: 0,
+        ofertaId: null,
       },
     ],
   },
@@ -456,6 +466,7 @@ export class DevAllegroAdapter implements AllegroAdapter {
       tresc: tekst,
       at: new Date().toISOString(),
       zalacznikow: 0,
+      ofertaId: null,
     });
     this.dopisane.set(threadId, lista);
   }
@@ -472,6 +483,11 @@ export class DevAllegroAdapter implements AllegroAdapter {
         o.nazwa.toLowerCase().includes(szukane) ||
         (o.externalId ?? "").toLowerCase().includes(szukane)
     ).map((o) => ({ ...o, url: urlOferty(o.offerId, false) }));
+  }
+
+  async oferta(offerId: string): Promise<OfertaAllegro | null> {
+    const o = OFERTY_DEV.find((x) => x.offerId === offerId);
+    return o ? { ...o, url: urlOferty(o.offerId, false) } : null;
   }
 
   // ── Dyskusje: rozmowa i odpowiedź (0.104.0) ────────────────────────────────
