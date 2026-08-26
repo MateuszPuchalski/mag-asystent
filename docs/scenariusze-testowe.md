@@ -847,8 +847,29 @@ PRZYWRÓĆ SZKIC — on wraca do wersji surowej i sygnał ma się wtedy zapalić
 mediany czasu odpowiedzi w statystykach.
 
 Otwórz pierwszą sprawę na oknie szerszym niż 1280 px. Zakładka ma rozłożyć się
-na trzy strefy: kolejka po lewej, wątek na środku, kontekst po prawej. Zwęź
-okno poniżej progu — sprawa ma zasłonić kolejkę, a kontekst zejść pod nią.
+na trzy strefy: kolejka po lewej, wątek na środku, kontekst po prawej.
+
+**Pasma szerokości są od 0.101.0 trzy i każde zachowuje się inaczej.** Zwężaj
+okno i sprawdzaj po kolei.
+
+Poniżej **1280 px** trzy strefy się nie mieszczą, ale kolejka zostaje: wchodzi
+pasmo z szufladą. Kolejka po lewej, sprawa obok niej, a kontekst chowa się za
+przyciskiem **KONTEKST** w rzędzie nad tytułem. Kliknij go — panel wjeżdża
+z prawej i przyciemnia to, co pod nim.
+
+Panel ma **trzy wyjścia** i każde trzeba sprawdzić osobno: przycisk ZAMKNIJ
+w jego głowie, kliknięcie w przyciemnienie i klawisz Escape. Escape ma zamknąć
+SAMĄ SZUFLADĘ — sprawa zostaje otwarta. Drugi Escape dopiero z niej wychodzi.
+
+Poniżej **1024 px** wraca zachowanie sprzed 0.101.0: sprawa zasłania kolejkę,
+a kontekst schodzi pod nią i przycisku KONTEKST nie ma.
+
+Rozszerz okno z powrotem powyżej 1280 px przy wysuniętej szufladzie. Panel ma
+zgasnąć sam, a kontekst wrócić jako trzecia kolumna — wysunięta szuflada
+zasłaniałaby wtedy kolumnę, którą sama pokazuje.
+
+To samo obowiązuje na **DOSTAWACH** i **ZWROTACH**: powłoka trzech stref jest
+wspólna, więc szuflada też.
 
 ### S74 — pytanie o towar spoza oferty
 

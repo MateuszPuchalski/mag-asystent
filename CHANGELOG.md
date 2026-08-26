@@ -33,6 +33,54 @@ historii nie przepisujemy.
 
 ---
 
+## 0.101.0 — 26 sierpnia 2026
+
+**Kontekst przestał spadać pod sprawę na wąskim oknie.** Ostatnia nietknięta
+makieta — `Waski` — rysowała trzecią strefę jako szufladę wywoływaną
+przyciskiem. To ona wchodzi tym wydaniem.
+
+**Pasma szerokości są trzy, a były dwa.** Powyżej 1280 px bez zmian: kolejka,
+sprawa, kontekst obok siebie. Poniżej 1024 px bez zmian: sprawa zasłania
+wszystko. Między nimi jest nowe pasmo, w którym **kolejka zostaje widoczna**,
+sprawa stoi obok niej, a kontekst chowa się za przyciskiem KONTEKST.
+
+**To jest ten laptop obok Subiekta, który kod cytuje od 0.83.0.** Trzy strefy
+na 1180 px zepchnęłyby kolumnę wątku poniżej miary, przy której da się czytać;
+zasłonięcie kolejki było stratą odwrotną — biuro traciło z oczu listę, nad
+którą pracuje, i po powrocie wracało na jej górę. Z trzech stref kontekst jest
+najrzadziej potrzebny: do dopasowanego towaru albo notatki zagląda się raz na
+sprawę, a wątek i kolejkę ma się przed oczami cały czas.
+
+**Szuflada ma trzy wyjścia:** przycisk ZAMKNIJ w jej głowie, kliknięcie
+w przyciemnienie i Escape. Escape zamyka SAMĄ szufladę i na tym kończy —
+jeden klawisz zdejmujący szufladę i sprawę pod nią naraz byłby wyjściem
+z pracy, a nie z panelu obok niej.
+
+**Wszystkie trzy zakładki spraw**, nie tylko pytania z makiety. Powłoka trzech
+stref jest wspólna od 0.93.0, więc ta sama czynność ma się zachowywać tak samo
+w PYTANIACH, DOSTAWACH i ZWROTACH.
+
+**Bez licznika przy napisie KONTEKST**, choć makieta go rysuje. Liczyłby co
+innego na każdej zakładce: dopasowane towary przy pytaniu, notatki przy
+dostawie, kandydatów na dokument przy zwrocie. Jedna pigułka o trzech
+znaczeniach jest gorsza od braku pigułki.
+
+**Przyciemnienie obejmuje też kolejkę**, choć makieta zostawia ją jasną.
+Kliknięcie obok panelu zamyka panel — to jedna reguła zamiast dwóch, a szeroki
+lewy margines szuflady jest najbliższym miejscem, w które trafi mysz.
+
+**Poprawione przy okazji: kolejka rysowała się wariantem szerokim w wąskiej
+szynie.** Warunek wyboru wariantu pytał o próg trzech stref, a pyta naprawdę
+o to, czy sprawa ZASŁANIA listę — i ta odpowiedź zmienia się na 1024 px, nie
+na 1280. Ten sam błąd dotyczył odświeżania kolejki i licznika odpowiedzi nad
+listą dostaw: wszystkie trzy zachowywały się tak, jakby listy nie było widać,
+a widać ją. `trybSzeroki()` ustąpiło miejsca `kolejkaZostaje()`.
+
+**Test progów pilnuje teraz kompletu.** Znał jeden literał `matchMedia` i brał
+z pliku pierwsze dopasowanie. Drugi próg wpisany tylko do skryptu dawałby
+szufladę bez stylów, czyli kontekst znikający bez śladu na jednej szerokości
+okna — sprawdzone, że test to łapie.
+
 ## 0.100.0 — 26 sierpnia 2026
 
 **Czwarty zakres ANALIZY: dostawy.** Warstwa treści jest tym samym skończona

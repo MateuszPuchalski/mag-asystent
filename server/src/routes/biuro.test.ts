@@ -658,13 +658,60 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   assert.match(html, /#widokPytania\.zSzczegolem \{ grid-template-columns:/,
     "trzy kolumny opisane jedną regułą");
 
-  /* Próg stoi w DWÓCH miejscach — w arkuszu i w skrypcie — i nic go nie
+  /* Progi stoją w DWÓCH miejscach — w arkuszu i w skrypcie — i nic ich nie
      pilnowało. Rozjazd nie wywraca niczego głośno: szczegół po prostu
-     zasłania kolejkę na jednej szerokości okna i nikt nie wie dlaczego. */
+     zasłania kolejkę na jednej szerokości okna i nikt nie wie dlaczego.
+
+     Do 0.101.0 próg był jeden i test brał z HTML PIERWSZE dopasowanie. Od
+     0.101.0 są dwa — 1280 px dla trzech stref i 1024 px dla pasma, w którym
+     kontekst jest szufladą — więc sprawdzamy KOMPLET: drugi próg wpisany
+     tylko do skryptu dawałby szufladę bez stylów, czyli kontekst znikający
+     bez śladu na jednej szerokości okna. */
   const wCss = [...html.matchAll(/@media \(min-width: (\d+)px\)/g)].map((m) => m[1]);
-  const wJs = html.match(/matchMedia\("\(min-width: (\d+)px\)"\)/)?.[1];
-  assert.ok(wJs, "skrypt zna próg");
-  assert.ok(wCss.includes(wJs), `próg ${wJs} ze skryptu musi istnieć w arkuszu`);
+  const wJs = [...html.matchAll(/matchMedia\("\(min-width: (\d+)px\)"\)/g)].map((m) => m[1]);
+  assert.ok(wJs.length >= 2, "skrypt zna oba progi — trzy strefy i pasmo szuflady");
+  for (const prog of wJs) {
+    assert.ok(wCss.includes(prog), `próg ${prog} ze skryptu musi istnieć w arkuszu`);
+  }
+});
+
+test("kontekst ma szufladę na wąskim oknie, a szuflada ma trzy wyjścia", () => {
+  /* Od 0.101.0 kontekst nie spada już pod sprawę poniżej 1280 px — wjeżdża
+     jako szuflada z prawej, a kolejka zostaje widoczna obok sprawy. Makieta
+     `Waski` rysuje to dla PYTAŃ; powłoka trzech stref jest wspólna od 0.93.0,
+     więc szuflada obejmuje wszystkie trzy zakładki spraw. Ten test pilnuje
+     rzeczy, które da się złamać po cichu, przestawiając układ.
+
+     TRZY WYJŚCIA, bo panel zasłania sprawę: przycisk w jego głowie, klik
+     w przyciemnienie i Escape. Wysunięty panel bez widocznego wyjścia czyta
+     się jak coś, co się zacięło, a mysz nie zgadnie dwóch pozostałych dróg. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  /* Liczymy ZNACZNIK, nie selektor: `data-szuflada>` kończy atrybut, więc nie
+     łapie ani `data-szuflada-zamknij`, ani `[data-szuflada]` z obsługi kliknięć. */
+  assert.equal((html.match(/data-szuflada>/g) ?? []).length, 3,
+    "przycisk KONTEKST stoi w każdej z trzech spraw");
+  assert.equal((html.match(/data-szuflada-zamknij>/g) ?? []).length, 3,
+    "i każda szuflada ma własne ZAMKNIJ");
+  assert.match(html, /id="szufladaCien"/, "przyciemnienie istnieje");
+
+  /* Klasy są UMOWĄ między arkuszem a skryptem: pasmo ustawia jedna, stan
+     wysunięcia druga. Skasowanie którejkolwiek po jednej stronie zostawia
+     szufladę, która nigdy się nie pokaże albo nigdy nie schowa. */
+  for (const klasa of ["zSzuflada", "szufladaOtwarta"]) {
+    assert.ok(html.includes(`.widok.${klasa}`) || html.includes(`.${klasa}`),
+      `${klasa} opisana w arkuszu`);
+    assert.ok(html.includes(`"${klasa}"`), `${klasa} ustawiana w skrypcie`);
+  }
+
+  /* Escape musi zdejmować NAJWYŻSZĄ warstwę i na tym kończyć. Bez wyjścia
+     z obsługi jeden klawisz zamykałby szufladę i sprawę pod nią naraz —
+     czyli wychodził z pracy, a nie z panelu obok niej. */
+  assert.match(html, /if \(szufladaW\) return ustawSzuflade\(szufladaW, false\);/,
+    "Escape zamyka szufladę i nie leci dalej do zamknięcia sprawy");
 });
 
 test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", () => {
