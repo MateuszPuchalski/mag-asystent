@@ -252,8 +252,11 @@ test("dyskusje Allegro: rejestr pracy i cała sprawa w aplikacji", () => {
     "wysyłka do dyskusji za potwierdzeniem"
   );
   assert.match(html, /Rozmowa niedostępna przez API/, "degradacja do panelu, gdy API nie zna sprawy");
-  assert.match(html, /id="zwrotyLicznik" class="tabLicznik"/, "pigułka uwagi na zakładce ZWROTY");
-  assert.match(html, /"\/api\/biuro\/zwroty\/licznik"/, "pigułka ma własną tanią trasę");
+  /* Od 0.109.0 pigułka jest JEDNA, na zakładce SPRAWY — dawne pigułki
+     ZWROTÓW i PYTAŃ zniknęły razem z zakładkami. Trasa dalej celowo tania:
+     licznik składany z liczników per-typ, żadnego czwartego COUNT-a. */
+  assert.match(html, /id="sprawyLicznik" class="tabLicznik"/, "pigułka uwagi na zakładce SPRAWY");
+  assert.match(html, /\/api\/biuro\/sprawy\/licznik/, "pigułka ma własną tanią trasę");
   assert.match(html, /data-rekl-prowadzi/, "jawne przejęcie reklamacji przyciskiem");
 });
 
@@ -308,9 +311,11 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "sprawy", "zwroty", "pytania", "nadzor", "dziennik", "analiza"],
-    "w pasku tylko zakładki pracy — dostawcy tu nie wracają. SPRAWY (0.108.0) " +
-      "stoją PRZED dwiema zakładkami, które w następnym wydaniu zastąpią"
+    ["dostawy", "sprawy", "nadzor", "dziennik", "analiza"],
+    "w pasku tylko zakładki pracy — dostawcy tu nie wracają. ZWROTY ALLEGRO " +
+      "i PYTANIA KLIENTÓW zwinęły się do SPRAW (0.109.0) decyzją właściciela: " +
+      "cztery rejestry obsługi klienta to jedna praca, nie dwie zakładki. " +
+      "DOSTAWY I REKLAMACJE zostają — to inna domena (dostawcy, nie klienci)"
   );
 
   /* Dopasowanie idzie po ZAWARTOŚCI `grupa-btny`, nie po rozbiciu paska na
@@ -647,12 +652,12 @@ test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
     assert.ok(ustawienia.includes(`id="${pole}"`), `${pole} należy do ustawień`);
   }
 
-  const pytania = wycinek('id="widokPytania"', 'id="widokNadzor"');
-  assert.ok(!pytania.includes('id="pytaniaPrompt"'), "prompt zszedł z zakładki pracy");
+  const sprawy = wycinek('id="widokSprawy"', 'id="widokNadzor"');
+  assert.ok(!sprawy.includes('id="pytaniaPrompt"'), "prompt zszedł z zakładki pracy");
   const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
   assert.ok(!analiza.includes('id="reguly"'), "reguły zeszły z ANALIZY");
   assert.ok(analiza.includes("Ustawieniach"), "ANALIZA mówi, gdzie ustawia się reguły");
-  const dostawy = wycinek('id="widokDostawy"', 'id="widokZwroty"');
+  const dostawy = wycinek('id="widokDostawy"', 'id="widokSprawy"');
   assert.ok(!dostawy.includes('id="firmaNazwa"'), "dane firmy zeszły z REKLAMACJI");
 });
 
@@ -672,19 +677,22 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
   };
   przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
   przed("pytaniaListaKarta", "pytaniaWklejkaKarta", "lista pytań przed wklejką z poczty");
+  przed("kolejkaSprawKarta", "zwrotListaKarta",
+    "wspólna kolejka spraw przed kartami per-typ — to ona jest głównym miejscem pracy (0.109.0)");
 });
 
 test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
-  /* Od 0.91.0 zakładka PYTANIA rozkłada się na kolejkę, sprawę i kontekst.
-     Żeby kontekst mógł być TRZECIĄ KOLUMNĄ siatki, musi być rodzeństwem
-     szczegółu wewnątrz `#widokPytania` — wsunięty do środka karty sprawy
-     wygląda tak samo w kodzie, a na ekranie wraca pod odpowiedź. */
+  /* Od 0.91.0 sprawa pytania rozkłada się na kolejkę, sprawę i kontekst;
+     od 0.109.0 wszystko mieszka w scalonym `#widokSprawy`. Żeby kontekst
+     mógł być TRZECIĄ KOLUMNĄ siatki, musi być rodzeństwem szczegółu —
+     wsunięty do środka karty sprawy wygląda tak samo w kodzie, a na
+     ekranie wraca pod odpowiedź. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
   const widok = html.slice(
-    html.indexOf('id="widokPytania"'),
+    html.indexOf('id="widokSprawy"'),
     html.indexOf('id="widokNadzor"')
   );
   const szczegol = widok.indexOf('id="pytanieSzczegol"');
@@ -692,8 +700,8 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   const konsczegolu = widok.indexOf("</section>", szczegol);
   assert.ok(szczegol !== -1 && kontekst !== -1, "obie strefy istnieją");
   assert.ok(kontekst > konsczegolu, "kontekst jest OBOK sprawy, nie w jej środku");
-  assert.match(html, /#widokPytania\.zSzczegolem \{ grid-template-columns:/,
-    "trzy kolumny opisane jedną regułą");
+  assert.match(html, /#widokSprawy\.zSzczegolem \{ grid-template-columns:/,
+    "trzy kolumny opisane jedną regułą — wspólną dla pytań i zwrotów");
 
   /* Progi stoją w DWÓCH miejscach — w arkuszu i w skrypcie — i nic ich nie
      pilnowało. Rozjazd nie wywraca niczego głośno: szczegół po prostu
@@ -840,16 +848,18 @@ test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja stoi na sekcji", () 
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
+  /* Wycinek do PYTANIOWEGO szczegółu — od 0.109.0 karty zwrotów i pytań
+     mieszkają w jednym `#widokSprawy`, więc granicą jest następna sprawa. */
   const widok = html.slice(
-    html.indexOf('id="widokZwroty"'),
-    html.indexOf('id="widokPytania"')
+    html.indexOf('id="widokSprawy"'),
+    html.indexOf('id="pytanieSzczegol"')
   );
   const szczegol = widok.indexOf('id="zwrotSzczegol"');
   const kontekst = widok.indexOf('id="zwrotKontekst"');
   assert.ok(szczegol !== -1 && kontekst !== -1, "obie strefy istnieją");
   assert.ok(kontekst > widok.indexOf("</section>", szczegol),
     "kontekst stoi OBOK sprawy, nie w jej środku");
-  assert.match(html, /#widokZwroty\.zSzczegolem \{ grid-template-columns:/,
+  assert.match(html, /#widokSprawy\.zSzczegolem \{ grid-template-columns:/,
     "trzy kolumny opisane jedną regułą");
 
   for (const blok of ["zwrotDokument", "zwrotKlient", "zwrotWiadomosci", "zwrotKosz", "zwrotRozliczenie"]) {

@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.109.0 — 26 sierpnia 2026
+
+**SPRAWY są teraz jedynym oknem obsługi klienta.** Karty dawnych zakładek
+ZWROTY ALLEGRO i PYTANIA KLIENTÓW przeprowadziły się w całości do SPRAW,
+a same zakładki znikły. To domknięcie decyzji z 0.108.0: cztery rejestry,
+jedna kolejka, jedno okno.
+
+- **Wszystko w jednym widoku.** Skaner zwrotów, kosze, pominięte,
+  zapowiedzi, reklamacje, dyskusje, skrzynka pytań, wklejka i konto Allegro
+  stoją teraz pod wspólną kolejką spraw. Identyfikatory kart i tras bez
+  zmian — zmieniło się tylko to, w którym widoku stoją.
+- **Sprawy otwierają się na miejscu.** Klik w kolejce, w karcie klienta
+  i w powiązanych sprawach nie przełącza już zakładek. Przycisk powrotu
+  mówi, dokąd wraca: „← SPRAWY KLIENTA", gdy sprawę otwarto z karty
+  klienta, inaczej „← KOLEJKA SPRAW". Escape schodzi warstwami: szuflada,
+  sprawa, karta klienta.
+- **Jedno rodzeństwo zamiast trzech.** Widocznością kart i sekcji rządzi
+  jedna funkcja z tabelą stanów — dwie osobne (zwroty i pytania)
+  nadeptywałyby sobie na wspólny widok. Naraz otwarta jest najwyżej jedna
+  sprawa; obok niej na szerokim ekranie zostaje jej własna kolejka.
+- **Jedna pigułka, jedna trasa w cyklu.** Licznik SPRAW karmi też
+  podsumowanie skrzynki pytań i ślad synchronizacji — trzy zapytania
+  licznikowe co pół minuty zeszły do jednego. Stare trasy `/licznik`
+  zostają dla zgodności.
+- **Zapamiętana zakładka przeżywa przeprowadzkę.** Zapisane w przeglądarce
+  „zwroty" albo „pytania" otwiera SPRAWY zamiast pustego panelu.
+
+Bez zmian w kolektorze, bez nowych uprawnień Allegro i bez działania przy
+wdrożeniu.
+
 ## 0.108.0 — 26 sierpnia 2026
 
 **SPRAWY: jedna kolejka obsługi klienta.** Pytania, zwroty, dyskusje Allegro

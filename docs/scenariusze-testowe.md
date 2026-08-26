@@ -712,7 +712,7 @@ STATYSTYKI, odśwież stronę: mają zostać rozwinięte. Zwiń wszystko i zosta
 zakładkę otwartą na minutę — w narzędziach przeglądarki nie mają lecieć
 żądania o raport, statystyki ani czasy. Zwinięta sekcja nie pyta serwera.
 
-Ta sama reguła obowiązuje statystyki na zakładce PYTANIA KLIENTÓW. Wejdź na
+Ta sama reguła obowiązuje statystyki pytań na zakładce SPRAWY. Wejdź na
 nią przy zwiniętej sekcji: ma polecieć żądanie o listę pytań i **żadne**
 o statystyki. Rozwiń sekcję — dane mają dojść od razu, jednym żądaniem, nie
 dwoma. Podwójne żądanie znaczy, że przywrócenie układu wzięto za kliknięcie.
@@ -819,7 +819,7 @@ w stanie „czeka". ZAKOŃCZ ma jej nadal nie przepuścić. Po zakończeniu kosz
 przycisk **COFNIJ ZAKOŃCZENIE** ma go otworzyć z powrotem, z pozycjami
 w stanie sprzed kliknięcia.
 
-Biuro po rozłożeniu. W `/biuro` → ZWROTY ALLEGRO kolumna **ROZŁOŻYŁ** ma
+Biuro po rozłożeniu. W `/biuro` → SPRAWY kolumna **ROZŁOŻYŁ** ma
 pokazać nazwisko i godzinę, a podgląd kosza — cały cykl życia: kto zamknął,
 kto rozłożył. Kliknij COFNIJ ZAKOŃCZENIE: kolumna ma wrócić do myślnika.
 Nazwisko, które zostałoby po cofnięciu, mówiłoby o pracy, której już nie ma.
@@ -834,7 +834,7 @@ synchronizacji z Subiektem — a nie samego „nie znaleziono".
 ### S73 — skrzynka pytań w trzech stanach
 
 Ziarno zakłada trzy sprawy w skrzynce, po jednej na każdy stan, którym szyna
-się różni. Wejdź w `/biuro` → **PYTANIA KLIENTÓW**.
+się różni. Wejdź w `/biuro` → **SPRAWY**, karta skrzynki pytań.
 
 `client:44112097` czeka na szkic — nie ma odpowiedzi i nie ma dopasowanych
 towarów. To sprawa, którą model dopiero policzy.

@@ -695,7 +695,7 @@ innego** i nie wymaga wstrzymania.
 
 Do 0.82.0 treść panelu siedziała w kolumnie 1080 px pośrodku ekranu. Na
 monitorze 1920 px dwie trzecie szerokości było pustym marginesem, a zakładka
-ZWROTY ALLEGRO miała jedenaście kart jedna pod drugą.
+zwrotów miała jedenaście kart jedna pod drugą.
 
 Od 0.83.0 karty układają się w tyle kolumn, ile mieści okno. Progów
 rozdzielczości nie ma — liczba kolumn wychodzi z arytmetyki siatki. Laptop
@@ -1022,7 +1022,8 @@ stanu przez workera Sfery.
 
 ## 6a. Zwroty Allegro (rejestr, decyzje, korekta z MM)
 
-Zakładka ZWROTY ALLEGRO w `/biuro`. Skan etykiety zwrotnej pobiera z Allegro
+Karty zwrotów na zakładce SPRAWY w `/biuro` (do 0.108.0 osobna zakładka
+ZWROTY ALLEGRO). Skan etykiety zwrotnej pobiera z Allegro
 dane kupującego, powód i pozycje, po czym zakłada rekord zwrotu. Aplikacja
 sama dopasowuje dokument sprzedaży (FS/PA) z Subiekta. Decyzje zapadają per
 pozycję: pełnowartościowy / reklamacja / do wyjaśnienia / do zniszczenia.
@@ -1225,7 +1226,7 @@ ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazyn
 z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
 zostało jeszcze na regale zwrotów.
 
-Biuro sprawdza zawartość kosza w `/biuro` → ZWROTY ALLEGRO, karta KOSZE
+Biuro sprawdza zawartość kosza w `/biuro` → SPRAWY, karta KOSZE
 ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
 i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
 
@@ -1283,7 +1284,7 @@ z Allegro (scenariusze S67–S69).
    ```
 
 2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` →
-   ZWROTY ALLEGRO → KONTO ALLEGRO → POŁĄCZ (rola **admin**). Strona pokaże
+   SPRAWY → KONTO ALLEGRO → POŁĄCZ (rola **admin**). Strona pokaże
    kod i link — otwórz go na zalogowanym koncie sprzedawcy i potwierdź.
    Token zapisuje się w bazie aplikacji i odświeża sam. Wygasa dopiero po
    ~3 miesiącach nieużywania — wtedy `/api/health` każe sparować ponownie.
@@ -1439,7 +1440,8 @@ Konfigurację czyta z `wertis.env` w katalogu roboczym; inną ścieżkę wskazuj
 
 ## 6c. Pytania klientów (szkice odpowiedzi o dobór części)
 
-Zakładka PYTANIA KLIENTÓW w `/biuro`. Aplikacja ściąga pytania z Centrum
+Karty pytań na zakładce SPRAWY w `/biuro` (do 0.108.0 osobna zakładka
+PYTANIA KLIENTÓW). Aplikacja ściąga pytania z Centrum
 wiadomości Allegro i przygotowuje szkic odpowiedzi z kartoteki, stanów,
 zamienników i linków do naszych aukcji. Po akceptacji człowieka wysyła ją do
 klienta. Pytania spoza Allegro (screenshot z poczty) wchodzą przez wklejkę.
@@ -1456,7 +1458,7 @@ Włączenie ma **trzy kroki i żadnego nie da się pominąć**:
 
 2. **PONOWNE PAROWANIE KONTA.** To krok, o który najłatwiej się potknąć: token
    wydany pod stary zakres uprawnień **sam się nie rozszerzy**. Po dodaniu
-   uprawnień wejdź w `/biuro` → ZWROTY ALLEGRO → KONTO ALLEGRO, rozłącz konto
+   uprawnień wejdź w `/biuro` → SPRAWY → KONTO ALLEGRO, rozłącz konto
    i sparuj je jeszcze raz. Bez tego pierwsze odświeżenie pytań kończy się
    błędem 403 — komunikat wskazuje wtedy brakujące uprawnienie po nazwie.
 
@@ -1587,9 +1589,10 @@ Pokazuje ciąg jednego problemu: to samo zamówienie, potem ten sam login.
 Dane jadą dopiero po rozwinięciu sekcji, jak przy historii klienta.
 
 Nowe trasy `/api/biuro/sprawy*` wyłącznie czytają. Zapisy zostają przy
-rejestrach źródłowych i ich dotychczasowych trasach. Zakładki ZWROTY
-ALLEGRO i PYTANIA KLIENTÓW na razie zostają. W następnym wydaniu ich
-karty przeprowadzą się do SPRAW, a same zakładki znikną.
+rejestrach źródłowych i ich dotychczasowych trasach. Od 0.109.0 SPRAWY są
+jedyną zakładką tej pracy: karty dawnych zakładek ZWROTY ALLEGRO i PYTANIA
+KLIENTÓW przeprowadziły się tutaj w całości, a same zakładki znikły.
+Wszystkie identyfikatory kart i tras zostały bez zmian.
 
 ## 7. Backup i utrzymanie
 
