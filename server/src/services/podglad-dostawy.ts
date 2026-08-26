@@ -77,6 +77,23 @@ export interface PodgladDokumentu {
    * kliknięcie dalej.
    */
   zamkniecie: { kto: string; at: string; powod: string } | null;
+  /**
+   * Jak zwykle wygląda praca z TYM dostawcą — trzy liczby z naszych własnych
+   * tabel, nie z Subiekta.
+   *
+   * Biuro rozstrzyga wyjątek, patrząc na jedną pozycję jednej faktury, i nie
+   * ma z czego wiedzieć, czy niedobór u tego dostawcy zdarza się co drugi raz,
+   * czy pierwszy raz w tym roku. To jest dokładnie ta różnica, po której
+   * decyduje się między „policzyć ponownie" a „reklamować".
+   */
+  dostawcaStat: {
+    /** Dostawy tego dostawcy otwarte w WERTIS w tym roku kalendarzowym. */
+    dostawWRoku: number;
+    /** Udział pozycji z wyjątkiem we wszystkich pozycjach — `null` przy zerze. */
+    udzialWyjatkow: number | null;
+    /** Mediana czasu otwarcie → domknięcie, w dniach. `null` bez domkniętych. */
+    medianaDni: number | null;
+  } | null;
   /** Notatki biura do tego dokumentu — panel pokazuje je razem z pozycjami. */
   notatki: Notatka[];
   /**
@@ -157,10 +174,72 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
       d && d.status === "external"
         ? { kto: d.closed_by, at: d.closed_at, powod: d.powod }
         : null,
+    dostawcaStat: doc.dostawca ? statystykiDostawcy(doc.dostawca) : null,
     zrodlo: d && !bezSnapshotu ? "snapshot" : "podglad",
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     lines,
     problemyBezLinii: d ? listByDelivery(d.id).filter((p) => p.lineId == null) : [],
+  };
+}
+
+/**
+ * Trzy liczby o dostawcy, liczone z NASZYCH tabel.
+ *
+ * Dopasowanie idzie po `delivery.dostawca`, a nie po `kh_id`: `delivery` nosi
+ * nazwę przepisaną w chwili otwarcia i to jedyne, co mamy dla dostaw sprzed
+ * wprowadzenia płatnika. Nazwa bywa niestabilna w Subiekcie, ale skutkiem jest
+ * najwyżej rozdzielona historia, a nie liczba policzona komuś innemu.
+ *
+ * `external` NIE wchodzi do mediany — dostawa zamknięta poza WERTIS nie ma
+ * czasu rozłożenia, bo nikt jej tutaj nie rozkładał. Wchodzi za to do liczby
+ * dostaw w roku: przyszła i ktoś się nią zajął.
+ */
+export function statystykiDostawcy(
+  dostawca: string
+): PodgladDokumentu["dostawcaStat"] {
+  const d = db();
+  const rok = new Date().getFullYear();
+
+  const wRoku = d
+    .prepare(
+      "SELECT COUNT(*) AS ile FROM delivery WHERE dostawca = ? AND opened_at >= ?"
+    )
+    .get(dostawca, `${rok}-01-01`) as { ile: number };
+
+  const linie = d
+    .prepare(
+      `SELECT COUNT(*) AS wszystkie,
+              SUM(CASE WHEN l.status = 'problem' THEN 1 ELSE 0 END) AS zWyjatkiem
+         FROM delivery_line l JOIN delivery dd ON dd.id = l.delivery_id
+        WHERE dd.dostawca = ?`
+    )
+    .get(dostawca) as { wszystkie: number; zWyjatkiem: number | null };
+
+  const dni = (
+    d
+      .prepare(
+        `SELECT (julianday(closed_at) - julianday(opened_at)) AS dni
+           FROM delivery
+          WHERE dostawca = ? AND status = 'done' AND closed_at IS NOT NULL
+          ORDER BY dni`
+      )
+      .all(dostawca) as Array<{ dni: number }>
+  )
+    .map((w) => w.dni)
+    .filter((n) => Number.isFinite(n) && n >= 0);
+
+  return {
+    dostawWRoku: wRoku.ile,
+    udzialWyjatkow: linie.wszystkie
+      ? Math.round(((linie.zWyjatkiem ?? 0) / linie.wszystkie) * 1000) / 10
+      : null,
+    medianaDni: dni.length
+      ? Math.round(
+          (dni.length % 2 === 1
+            ? dni[(dni.length - 1) / 2]
+            : (dni[dni.length / 2 - 1] + dni[dni.length / 2]) / 2) * 10
+        ) / 10
+      : null,
   };
 }
 

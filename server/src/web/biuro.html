@@ -771,6 +771,8 @@
       <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
       <div id="szczegolNaglowek" style="margin-top:12px"></div>
       <div class="sprawa-tresc">
+        <!-- Wyjątki NAD tabelą pozycji: to po nie biuro wchodzi w dokument. -->
+        <div id="szczegolWyjatki"></div>
         <table id="szczegolLinie"></table>
         <div id="szczegolBezLinii"></div>
       </div>
@@ -808,8 +810,23 @@
     </section>
 
     <section class="card" id="kartaDostaw">
-      <h2>DOSTAWY · STATUS ROZKŁADANIA</h2>
-      <input class="szukaj" id="szukaj" placeholder="szukaj: numer albo dostawca">
+      <!-- DO ROZŁOŻENIA, nie „STATUS ROZKŁADANIA". Nagłówek niesie liczbę
+           dokumentów i pozycji, które za nimi stoją: „cztery faktury" i „cztery
+           faktury na sto osiemnaście pozycji" to dwie różne wiadomości o dniu,
+           który przed kimś stoi, a druga nie kosztuje ani jednego zapytania —
+           liczby są w danych, które lista i tak dostaje. -->
+      <h2>DO ROZŁOŻENIA</h2>
+      <p id="dostawyPodsumowanie" style="margin-bottom:9px"></p>
+      <!-- Czipy zamiast trzech osobnych kart. „Poza WERTIS" stało dotąd własną
+           kartą na dole zakładki i biuro trafiało tam przypadkiem; jako trzeci
+           stan tej samej kolejki jest tam, gdzie się go szuka — obok pytania
+           „co jeszcze jest z tym dokumentem". -->
+      <div class="czipy" id="dostawyCzipy">
+        <button class="czip" data-stan="praca" aria-pressed="true">W toku</button>
+        <button class="czip" data-stan="done" aria-pressed="false">Zamknięte</button>
+        <button class="czip" data-stan="external" aria-pressed="false">Poza WERTIS</button>
+      </div>
+      <input class="szukaj" id="szukaj" style="margin-top:10px" placeholder="szukaj: numer albo dostawca">
       <table id="dostawy"></table>
       <p class="odswiezono" id="odswiezono"></p>
     </section>
@@ -1871,69 +1888,91 @@ function statusDostawy(d) {
  * (0.91.0). Sześć kolumn mieści się w karcie na całą szerokość, ale nie
  * w szynie 21 rem: status z licznikiem wyjątków uciekał poza krawędź karty.
  */
+/* Wybrany czip kolejki dostaw: `praca` (nietknięte i w toku), `done`,
+   `external`. Trzeci czyta INNĄ listę — dostawy zdjęte poza WERTIS nie są
+   stanem dokumentu w oknie importu, tylko osobnym zapisem naszej bazy. */
+let filtrDostaw = "praca";
+let pozaWertisLista = [];
+
+/** Ile dokumentów i pozycji za nimi stoi — nagłówek szyny liczy z tego, co widać. */
+function podsumujDostawy(lista) {
+  const pozycji = lista.reduce((n, d) => n + (d.linesTotal || d.positions || 0), 0);
+  const slowo = (n, a, b, c) => (n === 1 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? b : c);
+  $("dostawyPodsumowanie").innerHTML = lista.length
+    ? `<span class="temat">${lista.length}</span>
+       <span class="mute">${slowo(lista.length, "dokument", "dokumenty", "dokumentów")}
+       · ${pozycji} ${slowo(pozycji, "pozycja", "pozycje", "pozycji")}</span>`
+    : "";
+}
+
 function rysujDostawy() {
   const q = $("szukaj").value.trim().toLowerCase();
-  const wSzynie = otwartyDok != null && trybSzeroki();
-  const pasujace = dokumenty
-    .filter((d) => !q || d.nrPelny.toLowerCase().includes(q) || (d.dostawca || "").toLowerCase().includes(q));
+  const pasuje = (nr, kto) => !q || nr.toLowerCase().includes(q) || (kto || "").toLowerCase().includes(q);
 
-  if (wSzynie) {
-    $("dostawy").innerHTML =
-      pasujace.map((d) => {
-        const total = d.linesTotal || d.positions;
-        const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-        return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
-          <td class="sprawaWiersz">
-            <span class="sprawaGora">
-              <span class="b">${esc(d.nrPelny)}</span>
-              <span class="mute">${esc(d.dataWyst)}</span>
-            </span>
-            <span class="sprawaTemat">${esc(d.dostawca)}</span>
-            <span class="sprawaStopka">${statusDostawy(d)}${
-              d.wyjatkiOtwarte
-                ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
-                : ""
-            }</span>
-            <span style="display:flex; align-items:center; gap:8px; margin-top:6px">
-              <span class="pasek${frac >= 100 ? " done" : ""}" style="width:auto; flex:1"><i style="width:${frac}%"></i></span>
-              <span class="mute" style="white-space:nowrap">${d.linesDone}/${total} poz.</span>
-            </span>
-          </td>
-        </tr>`;
-      }).join("") || '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
+  /* „Poza WERTIS" idzie z własnego źródła i ma własny wiersz: numer, dostawca
+     oraz kto i dlaczego zdjął dokument z listy. Postępu nie ma czego rysować —
+     nikt tego tutaj nie rozkładał i to jest cała treść tego stanu. */
+  if (filtrDostaw === "external") {
+    const lista = pozaWertisLista.filter((d) => pasuje(d.nrPelny, d.dostawca));
+    podsumujDostawy([]);
+    $("dostawy").innerHTML = lista.map((d) => `
+      <tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
+        <td class="sprawaWiersz">
+          <span class="sprawaGora">
+            <span class="b">${esc(d.nrPelny)}</span>
+            <span class="mute">${esc(d.dataWyst)}</span>
+          </span>
+          <span class="sprawaTemat">${esc(d.dostawca)}</span>
+          <span class="sprawaStopka"><span class="stan"><i></i>Poza WERTIS</span>
+            <span class="mute">${esc(d.zamknietaBy)}</span></span>
+          <span class="mute" style="display:block;margin-top:4px">${esc(d.powod)}</span>
+        </td>
+      </tr>`).join("") || '<tr><td class="mute">Nic nie zdjęto z listy w tym oknie</td></tr>';
     dolozLoga();
     return;
   }
 
-  const rows = pasujace
-    .map((d) => {
-      const total = d.linesTotal || d.positions;
-      const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-      return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""}>
-        <td class="b">${esc(d.nrPelny)}${d.wBuforze ? ' <span class="badge amber">bufor</span>' : ""}</td>
-        <td>${slotLogo(d.khId, d.maLogo, 24, 60, true)}${esc(d.dostawca)}</td>
-        <td class="mute">${esc(d.dataWyst)}</td>
-        <td>${statusDostawy(d)}${
-          /* Licznik wyjątków STOI OBOK statusu, a pasek postępu zostaje bez
-             zmian. Wyjątek liczy się jako pozycja domknięta (D8) i tak ma
-             zostać — zmieniamy sygnał, nie arytmetykę. Bez tej plakietki
-             dostawa z trzema reklamacjami wyglądała jak bezproblemowa. */
-          d.wyjatkiOtwarte
-            ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
-            : ""
-        }</td>
-        <td><div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
-            <span class="mute">${d.linesDone}/${total} poz.</span></td>
-        <td style="white-space:nowrap"><button class="akcja cichy" data-dok="${d.dokId}">POZYCJE</button></td>
-      </tr>`;
-    }).join("");
+  const pasujace = dokumenty
+    .filter((d) => (filtrDostaw === "done" ? d.status === "done" : d.status !== "done"))
+    .filter((d) => pasuje(d.nrPelny, d.dostawca));
+  podsumujDostawy(pasujace);
+
+  /* JEDEN WARIANT WIERSZA, nie dwa. Do 0.97.0 lista miała postać tabeli na
+     sześć kolumn przy zamkniętym dokumencie i wiersz łamany w pionie po
+     otwarciu. Tabela była ciasna wszędzie poniżej pełnej szerokości ekranu:
+     przy dwóch kolumnach siatki „2026-08-26" łamało się na dwie linie, a nazwa
+     dostawcy na trzy. Wiersz zwarty niesie DOKŁADNIE to samo — numer, wiek,
+     dostawcę, liczbę pozycji, postęp, stan i wyjątki — więc drugi wariant
+     został po tym, że kiedyś nie było pierwszego.
+
+     Zniknął z nim przycisk POZYCJE (cały wiersz otwiera dokument od 0.83.0)
+     i logo dostawcy, które przeniosło się do kontekstu sprawy — tam stoi przy
+     nazwie, dużo większe, i mówi to samo. */
   $("dostawy").innerHTML =
-    "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>DATA</th><th>STATUS</th><th>POSTĘP</th><th></th></tr>" +
-    (rows || '<tr><td colspan="6" class="mute">Brak dostaw w oknie importu</td></tr>');
-  /* Logo dokłada się PO wstawieniu wierszy i osobnym żądaniem na kontrahenta.
-     Biuro czyta tę tabelę tak samo jak magazynier swoją listę — firmę poznaje
-     wzrokiem, zanim przeczyta numer — a jedno logo starcza na wszystkie
-     dokumenty tego dostawcy, bo blob-URL jest wspólny. */
+      pasujace.map((d) => {
+        const total = d.linesTotal || d.positions;
+        const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
+        /* Pasek postępu jako PODKREŚLENIE wiersza, nie kolumna obok licznika.
+           Zajmuje całą szerokość i czyta się jednym rzutem oka przez całą
+           kolejkę — a licznik schodzi do stopki, gdzie i tak stoi wszystko,
+           co się o dokumencie mówi zdaniem. */
+        return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
+          <td class="sprawaWiersz">
+            <span class="sprawaGora">
+              <span class="b">${esc(d.nrPelny)}</span>
+              <span class="mute">${esc(wiekPytania(d.dataWyst))}</span>
+            </span>
+            <span class="sprawaTemat">${esc(d.dostawca)} · ${total} poz.</span>
+            <span class="pasek${frac >= 100 ? " done" : ""}" style="width:auto;display:block;margin-top:7px"><i style="width:${frac}%"></i></span>
+            <span class="sprawaStopka">${statusDostawy(d)}
+              <span class="mute">${d.linesDone}/${total} odłożone</span>${
+              d.wyjatkiOtwarte
+                ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
+                : ""
+            }</span>
+          </td>
+        </tr>`;
+      }).join("") || '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
   dolozLoga();
 }
 
@@ -1979,7 +2018,9 @@ function otworzDokument(dokId) {
   $("szczegolNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
   $("szczegolLinie").innerHTML = "";
   $("szczegolBezLinii").innerHTML = "";
-  for (const id of ["dostawaDostawca", "dostawaNotatki", "dostawaAkcja"]) $(id).innerHTML = "";
+  for (const id of ["dostawaDostawca", "dostawaNotatki", "dostawaAkcja", "szczegolWyjatki"]) {
+    $(id).innerHTML = "";
+  }
   odswiezSzczegol();
 }
 
@@ -2040,19 +2081,74 @@ function rysujSzczegol(d) {
     </div>
     ${prognoza}`;
 
+  /* Trzy liczby o dostawcy stoją PRZY wyjątku, który się właśnie rozstrzyga.
+     Biuro patrzy na jedną pozycję jednej faktury i bez nich nie ma z czego
+     wiedzieć, czy niedobór u tego dostawcy zdarza się co drugi raz, czy
+     pierwszy raz w tym roku — a to jest cała różnica między „policzyć
+     ponownie" a „reklamować". */
+  const st = d.dostawcaStat;
   $("dostawaDostawca").innerHTML = `
     <h2>DOSTAWCA</h2>
-    <div class="mute">${slotLogo(d.khId, d.maLogo, 28, 72)}${esc(d.dostawca)}</div>
-    <div class="mute" style="margin-top:4px">Dokument z ${esc(d.dataWyst)}</div>`;
+    <div style="display:flex;gap:10px;align-items:center">
+      ${slotLogo(d.khId, d.maLogo, 34, 84)}
+      <span>
+        <span class="b" style="display:block">${esc(d.dostawca)}</span>
+        <span class="mute">${st && st.dostawWRoku
+          ? `${st.dostawWRoku} ${st.dostawWRoku === 1 ? "dostawa" : "dostaw"} w tym roku`
+          : "pierwsza dostawa w WERTIS"}</span>
+      </span>
+    </div>
+    ${st && (st.udzialWyjatkow != null || st.medianaDni != null) ? `
+      <div class="kafle" style="margin-top:10px">
+        ${kafel(st.udzialWyjatkow == null ? "—" : `${String(st.udzialWyjatkow).replace(".", ",")}%`,
+                "pozycji z wyjątkiem", (st.udzialWyjatkow ?? 0) > 5)}
+        ${kafel(st.medianaDni == null ? "—" : `${String(st.medianaDni).replace(".", ",")} dn.`,
+                "mediana rozłożenia")}
+      </div>` : ""}
+    <div class="mute" style="margin-top:8px">Dokument z ${esc(d.dataWyst)}</div>`;
   $("dostawaNotatki").innerHTML = notatki(d);
   $("dostawaAkcja").innerHTML = akcja;
 
+  /* POZYCJE WYMAGAJĄCE BIURA STOJĄ OSOBNO I NA GÓRZE.
+     Tabela na trzydzieści cztery wiersze zawiera zwykle dwa, przy których
+     ktoś czeka na decyzję — i do 0.97.0 stały w niej wymieszane z resztą,
+     rozpoznawalne po czerwonej plakietce w czwartej kolumnie. Biuro wchodzi
+     w dokument WŁAŚNIE po nie; reszta jest dowodem, że praca idzie.
+
+     Podział liczy się z tego samego pola, po którym rysuje się status —
+     `problem` znaczy „magazynier zgłosił i odłożył sprawę". */
   const kolumn = zdjeciaWlaczone ? 6 : 5;
+  const naglowek = `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
+    "<th>TOWAR</th><th>ILOŚĆ</th><th>LOKALIZACJA</th><th>STATUS</th><th>KTO ODŁOŻYŁ</th></tr>";
+  const wyjatkowe = d.lines.filter((l) => l.status === "problem");
+  const reszta = d.lines.filter((l) => l.status !== "problem");
+
+  /* Nagłówek liczy POZYCJE, plakietka liczy OTWARTE WYJĄTKI — i to są dwie
+     różne liczby. Pozycja zostaje tutaj także po zamknięciu zgłoszenia, bo
+     dalej nie jest odłożona; plakietka gaśnie, bo nic już nie czeka na
+     decyzję. Jedna liczba na oba pytania mówiła „2 wyjątki" przy jednym
+     otwartym, zaraz po kliknięciu ROZWIĄŻ. Ten sam licznik co w szynie. */
+  const otwarteWyjatki = wyjatkowe
+    .reduce((n, l) => n + l.problemy.filter((x) => !x.resolvedAt).length, 0);
+  $("szczegolWyjatki").innerHTML = wyjatkowe.length
+    ? `<h2>POZYCJE WYMAGAJĄCE BIURA · ${wyjatkowe.length}${
+         otwarteWyjatki
+           ? ` <span class="badge err">${otwarteWyjatki} ${
+               otwarteWyjatki === 1 ? "otwarty wyjątek" : "otwartych wyjątków"}</span>`
+           : ' <span class="badge ok">wyjątki zamknięte</span>'
+       }</h2>
+       <table>${naglowek}${wyjatkowe.map(wierszPozycji).join("")}</table>`
+    : "";
+
   $("szczegolLinie").innerHTML =
-    `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>TOWAR</th><th>ILOŚĆ</th><th>LOKALIZACJA</th><th>STATUS</th><th>KTO ODŁOŻYŁ</th></tr>" +
-    (d.lines.map(wierszPozycji).join("") ||
-      `<tr><td colspan="${kolumn}" class="mute">Dokument nie ma pozycji do rozłożenia</td></tr>`);
+    (wyjatkowe.length
+      ? `<tr><th colspan="${kolumn}" style="padding-top:16px">POZOSTAŁE POZYCJE · ${reszta.length}</th></tr>`
+      : "") +
+    naglowek +
+    (reszta.map(wierszPozycji).join("") ||
+      `<tr><td colspan="${kolumn}" class="mute">${
+        wyjatkowe.length ? "Poza wyjątkami nie ma pozycji" : "Dokument nie ma pozycji do rozłożenia"
+      }</td></tr>`);
 
   /* Wyjątki bez linii to towar SPOZA dokumentu — nie mają w której pozycji
      usiąść, a schowanie ich byłoby zgubieniem zgłoszenia. */
@@ -2078,14 +2174,23 @@ function wierszPozycji(l) {
     : '<span class="mute">—</span>';
   return `<tr>
     ${zdjeciaWlaczone ? `<td class="kolFoto" data-tw="${l.twId}"></td>` : ""}
-    <td><span class="b">${esc(l.sym)}</span><div class="mute">${esc(l.name)}</div>
-        ${l.problemy.map(wyjatek).join("")}</td>
+    <td><span class="b">${esc(l.sym)}</span><div class="mute">${esc(l.name)}</div></td>
     <td>${esc(formatIlosc(l.qtyDone))}/${esc(formatIlosc(l.qtyDoc))}
         <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div></td>
     <td>${adres}</td>
     <td>${statusPozycji(l.status)}</td>
     <td>${kto}</td>
-  </tr>`;
+  </tr>${
+    /* Wyjątek dostaje WŁASNY wiersz na całą szerokość, a nie komórkę TOWAR.
+       Wciśnięty do komórki na dwie piąte tabeli łamał się na cztery linie
+       i wypychał sąsiednie kolumny w górę — wiersz wyglądał na rozjechany,
+       a zgłoszenie magazyniera było najgorzej czytelną rzeczą w tabeli, choć
+       to po nie biuro tu wchodzi. */
+    l.problemy.length
+      ? `<tr><td colspan="${zdjeciaWlaczone ? 6 : 5}" style="padding-top:0">
+           ${l.problemy.map(wyjatek).join("")}</td></tr>`
+      : ""
+  }`;
 }
 
 function statusPozycji(s) {
@@ -2125,20 +2230,32 @@ function wyjatek(p) {
  * wyróżniona, bo to ona trzyma dostawę otwartą — i to jest jedyny powód,
  * dla którego rozkładający nie może skończyć.
  */
+/*
+ * Notatki jako ROZMOWA, nie karta z doklejoną odpowiedzią.
+ *
+ * To jest wymiana zdań między biurem a halą i tak ma wyglądać: pytanie biura
+ * bursztynowym dymkiem po lewej, odpowiedź z hali szarym po prawej — te same
+ * dymki, którymi od 0.89.0 czyta się wątek klienta. Do 0.97.0 obie strony
+ * siedziały w jednym prostokącie, a odpowiedź zaczynała się od słowa
+ * „Odpowiedź:", bo inaczej nie dało się poznać, gdzie kończy się pytanie.
+ */
 function notatki(d) {
   const lista = (d.notatki || []).map((n) => `
-    <div class="karta-notatka${n.odpowiedz ? (n.odpWidzianaAt ? "" : " nowa") : " czeka"}">
-      <div>${esc(n.tresc)}</div>
-      <div class="mute">${esc(n.createdBy)} · ${esc(stempelLokalny(n.createdAt))}</div>
-      ${n.odpowiedz
-        ? `<div class="odp"><b>Odpowiedź:</b> ${esc(n.odpowiedz)}
-             <div class="mute">${esc(n.odpBy)} · ${esc(stempelLokalny(n.odpAt))}</div>
-             ${n.odpWidzianaAt ? "" : `<button class="akcja cichy" data-przeczytane="${n.id}">PRZECZYTANE</button>`}</div>`
-        : '<div class="mute"><b>Czeka na odpowiedź</b> — dostawa się nie domknie, dopóki jej nie ma.</div>'}
-    </div>`).join("");
-  return `<h2 style="margin-top:18px">NOTATKI DO DOSTAWY</h2>
+    <div class="wiad klient" style="max-width:none">
+      <div class="kto">${esc(n.createdBy)} · ${esc(stempelLokalny(n.createdAt))}</div>
+      <div class="tresc">${esc(n.tresc)}</div>
+    </div>
+    ${n.odpowiedz
+      ? `<div class="wiad my" style="max-width:none">
+           <div class="kto">${esc(n.odpBy)} · ${esc(stempelLokalny(n.odpAt))}</div>
+           <div class="tresc">${esc(n.odpowiedz)}</div>
+           ${n.odpWidzianaAt ? "" : `<button class="akcja cichy" data-przeczytane="${n.id}" style="margin-top:7px">PRZECZYTANE</button>`}
+         </div>`
+      : `<p class="mute" style="margin:2px 0 8px"><b>Czeka na odpowiedź</b> —
+           dostawa się nie domknie, dopóki jej nie ma.</p>`}`).join("");
+  return `<h2 style="margin-top:18px">NOTATKA DO HALI</h2>
     ${lista || '<p class="mute">Brak notatek.</p>'}
-    <button class="akcja cichy" data-notatka="${d.dokId}">+ DODAJ NOTATKĘ</button>`;
+    <button class="akcja cichy" data-notatka="${d.dokId}" style="margin-top:10px">+ DODAJ NOTATKĘ</button>`;
 }
 
 /** Nowa notatka. Treść i tak waliduje serwer — okno tylko pyta. */
@@ -2165,6 +2282,10 @@ async function dodajNotatke(dokId) {
    sugerowałaby, że to zwykły element ekranu — a to jest wyjątek i ma tak
    wyglądać: pojawia się dopiero, gdy ktoś z niego skorzystał.               */
 function rysujPozaWertis(lista) {
+  /* Lista jedzie też do szyny, pod czip „Poza WERTIS" (0.97.0). Karta zostaje
+     dla trybu wąskiego i dla akcji PRZYWRÓĆ, której nie da się sensownie
+     wcisnąć w wiersz szyny. */
+  pozaWertisLista = lista;
   $("kartaPozaWertis").hidden = lista.length === 0;
   if (!lista.length) return;
   $("pozaWertis").innerHTML =
@@ -4729,6 +4850,15 @@ for (const id of ["poleLogin", "poleHaslo"]) {
 }
 $("wyloguj").addEventListener("click", wyloguj);
 $("szukaj").addEventListener("input", rysujDostawy);
+$("dostawyCzipy").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-stan]");
+  if (!b) return;
+  filtrDostaw = b.dataset.stan;
+  for (const c of $("dostawyCzipy").querySelectorAll(".czip")) {
+    c.setAttribute("aria-pressed", String(c === b));
+  }
+  rysujDostawy();
+});
 /* Delegacja siedzi na dokumencie, nie na `nav`: przyciski widoków stoją od
    0.76.0 w dwóch miejscach (pasek i zębatka w nagłówku), a `data-widok` jest
    jedyną rzeczą, która je łączy. Przypięcie do `nav` zostawiłoby zębatkę
@@ -4879,21 +5009,26 @@ $("dostawaKontekst").addEventListener("click", (e) => {
   const o = e.target.closest("[data-przywroc]");
   if (o) przywrocDostawe(Number(o.dataset.przywroc)).then((ok) => { if (ok) zamknijDokument(); });
 });
-/* Zamykanie wyjątku działa w OBU miejscach, w których wyjątek widać:
-   w wierszu pozycji i w sekcji „poza pozycjami dokumentu". Delegacja na
-   kontenerze, bo wiersze przerysowują się po każdym odświeżeniu. */
-for (const kontener of ["szczegolLinie", "szczegolBezLinii"]) {
-  $(kontener).addEventListener("click", (e) => {
-    const r = e.target.closest("[data-rozwiaz]");
-    if (r) {
-      rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
-        // `ostatniSzczegol` wyzerowane, bo inaczej odświeżenie uzna, że nic
-        // się nie zmieniło, i nie przerysuje tabeli
-        if (ok) { ostatniSzczegol = ""; odswiezSzczegol(); }
-      });
-    }
-  });
-}
+/* Zamykanie wyjątku działa WSZĘDZIE, gdzie wyjątek widać, i dlatego nasłuch
+   siedzi na CAŁEJ sekcji sprawy, a nie na wyliczonych kontenerach.
+
+   Do 0.97.0 stała tu pętla po dwóch nazwach — „w wierszu pozycji" i „poza
+   pozycjami dokumentu" — a 0.97.0 dołożyło trzecie miejsce: POZYCJE
+   WYMAGAJĄCE BIURA na górze sprawy. Lista nazw jest zaproszeniem do tego
+   błędu przy każdej kolejnej zmianie układu; sekcja przeżyje je wszystkie.
+   To ta sama usterka, co przy dostawach w 0.92.0 i przy pytaniach w 0.96.0,
+   i za każdym razem wygląda tak samo: przycisk klika się bez skutku, a testy
+   i zrzut ekranu są zielone. */
+$("szczegol").addEventListener("click", (e) => {
+  const r = e.target.closest("[data-rozwiaz]");
+  if (r) {
+    rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
+      // `ostatniSzczegol` wyzerowane, bo inaczej odświeżenie uzna, że nic
+      // się nie zmieniło, i nie przerysuje tabeli
+      if (ok) { ostatniSzczegol = ""; odswiezSzczegol(); }
+    });
+  }
+});
 $("wrocDoListy").addEventListener("click", zamknijDokument);
 // panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
 document.addEventListener("keydown", (e) => {
