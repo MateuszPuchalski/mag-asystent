@@ -33,6 +33,53 @@ historii nie przepisujemy.
 
 ---
 
+## 0.98.0 — 26 sierpnia 2026
+
+**Zwroty dostały warstwę treści**, po pytaniach (0.96.0) i dostawach (0.97.0).
+
+**Skan wszedł do głowy kolejki.** Pole na numer etykiety stało dotąd własną
+kartą nad listą, a lista drugą pod nią. To jedna czynność w dwóch kartach:
+skanujesz, żeby coś na tej liście otworzyć. Teraz karta jest jedna — nagłówek,
+licznik, skan, czipy, lista. „POBIERZ Z ALLEGRO" zeszło pod listę i ucichło.
+
+**Czipy zamiast listy rozwijanej.** Do oceny · Czeka na środki · Rozliczone ·
+Wszystkie. Zakładka otwiera się na „Do oceny", czyli na pracy; poprzedni wybór
+startował od „wszystkie" i pokazywał archiwum razem z tym, co czeka.
+
+**Wiersz szyny ma kropkę stanu, nie pigułkę.** Pigułka w każdym z kilkunastu
+wierszy robiła z listy szachownicę i kolor przestawał cokolwiek znaczyć.
+Pigułka zostaje na nagłówku sprawy, gdzie jest jedna.
+
+**Pozycja zwrotu jest kartą.** Symbol, ilość i nazwa, plakietka powodu po
+prawej, pod nimi cytat klienta i pasek czterech decyzji. Powód opisowy —
+zdanie, które kupujący napisał sam — siedział dotąd w kolumnie tabeli i ginął
+w niej. To jedyne zdanie w całej sprawie, które mówi, CO SIĘ STAŁO.
+
+**Wybrana decyzja jest grafitowa, nie bursztynowa.** Zwrot na trzy pozycje dawał
+trzy bursztynowe przyciski plus bursztynową akcję główną. Grafit to w tym
+panelu „stan wybrany w segmencie"; bursztyn zostaje dla tego, co się klika.
+
+**Blok zamówienia pokazuje resztę, nie całość.** Dotąd wypisywał wszystkie
+pozycje zamówienia z plakietkami WRACA i zostaje — czyli powtarzał drobniej to,
+co stoi wyżej jako karty. Pytanie brzmi „czy wraca komplet, czy jedna rzecz
+z zestawu", więc odpowiada teraz sama lista tego, co u klienta zostało.
+
+**TEN KLIENT: dwie liczby i zdanie o tym, czym one są.** Zwroty w dwunastu
+miesiącach i ile z nich to reklamacje. Bez zdania ramującego licznik reklamacji
+czyta się jak nota wystawiona człowiekowi. Sekcja milczy przy zwrocie ręcznym —
+zero nie znaczyłoby wtedy „nie zwracał", tylko „nie wiemy, kto to".
+
+**Rozliczenie zbiera oba końce sprawy.** „OCEŃ I ZLEĆ KOREKTĘ" przeszło ze
+środka sprawy do kontekstu, do pary ze stemplem oddanych środków — tak jak
+domknięcie dostawy od 0.92.0. Pod tabelą został spis tego, co pójdzie na
+korektę: przycisk pyta, ta lista odpowiada.
+
+**Poprawione: przenosiny przycisku nie urwały mu nasłuchu.** Ta sama usterka
+zdarzyła się w 0.92.0, 0.96.0 i 0.97.0 — delegacja zostawała na pojemniku,
+który przycisk właśnie opuścił, a martwy przycisk wygląda jak żywy. Zwroty
+przeszły więc na nasłuch na SEKCJI, jak pytania i dostawy, a test regresji
+dopisał sobie oba porzucone pojemniki.
+
 ## 0.97.0 — 26 sierpnia 2026
 
 **Dostawy dostały warstwę treści**, tak jak pytania w 0.96.0.
