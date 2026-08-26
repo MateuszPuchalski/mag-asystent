@@ -33,6 +33,38 @@ historii nie przepisujemy.
 
 ---
 
+## 0.111.0 — 26 sierpnia 2026
+
+**Panel, który naprawia, nie tylko patrzy.** Przegląd dojrzałości pokazał
+jeden wzorzec: miejsca, w których problem widać, nie były miejscami,
+w których da się go naprawić. Do tego garść porządków.
+
+- **Kolejka błędów z przyciskami.** STAN SYSTEMU dostał PONÓW przy zadaniu
+  w błędzie i ANULUJ przy oczekującym — te same trasy, których używa
+  kolektor. Zapis do Subiekta rusza z biurka, bez chodzenia po urządzenie.
+- **Dwie operacje ratunkowe zeszły z DEPLOY.md na przyciski.** PEŁNY RESYNC
+  Z SUBIEKTA i ODŚWIEŻ BRAKUJĄCE ZDJĘCIA stoją w karcie SERWER, oba za
+  groźnym potwierdzeniem.
+- **KONTA I SESJE w ustawieniach.** Reset hasła, włączenie/wyłączenie konta
+  i — po raz pierwszy — wgląd w sesje (urządzenie, ostatnio widziane) oraz
+  WYLOGUJ WSZĘDZIE: przycisk na zgubiony kolektor. Dotąd wszystko to było
+  poleceniami curl; mutacje przechodzą wyłącznie adminowi (odmowę
+  wypowiada serwer). Nowe trasy: `GET /api/users/:id/sesje`,
+  `POST /api/users/:id/wyloguj`.
+- **DZIENNIK filtruje po osobie.** „Co robił wczoraj Jan" przestało wymagać
+  CSV i Excela — trasa umiała to od dawna, brakowało kontrolki.
+- **Kulejący cykl ma jeden znacznik.** Pięć niemych `console.warn`
+  w odświeżaczach zastąpił wspólny sygnał w pasku stanu: mówi, że
+  odświeżanie nie doszło i gdzie, gaśnie przy pierwszym czystym przebiegu.
+- **Porządki:** jedna lista ról zamiast czterech kopii; `WORKER_SIM_ERRORS`
+  zatrzymuje start na produkcji (symulacja błędów kolejki wyglądałaby jak
+  awaria Sfery); `ALLOW_MANUAL_LOC` trafił do `wertis.env.example`;
+  DEPLOY.md wskazuje JEDNĄ drogę aktualizacji (instalator, ręczna
+  sekwencja tylko awaryjnie); zdanie o pokryciu testami w porównaniu
+  urealnione; nowy `CLAUDE.md` z zasadami pracy w repo.
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu.
+
 ## 0.110.0 — 26 sierpnia 2026
 
 **Klient nie przestaje pisać dlatego, że biuro ma jego sprawę na ekranie.**

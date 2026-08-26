@@ -1758,16 +1758,16 @@ obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
   `server/src/services/strefa-zlota.ts` — regały bez reguły trafiają na osobną,
   czwartą listę, zamiast po cichu wpaść do złego kubełka.
 
-- **Aktualizacja aplikacji:**
+- **Aktualizacja aplikacji** — jedną drogą, instalatorem:
 
-  ```bash
-  cd /c/wertis
-  git pull
-  npm ci
-  npm run build
-  nssm restart wertis-api
-  nssm restart wertis-worker
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
   ```
+
+  Instalator ma `-DryRun` i wraca na poprzednią wersję po nieudanym
+  `git pull`. Ręczna sekwencja (`git pull; npm ci; npm run build; restart
+  usług) jest wyłącznie zejściem awaryjnym, gdy instalator sam zawiedzie —
+  nie ma żadnego z jego zabezpieczeń.
 
   **Kolektory biorą nowy APK z serwera** — plik kładzie tam `-Aktualizuj`,
   a urządzenia proponują aktualizację przy otwarciu aplikacji (sekcja 5).

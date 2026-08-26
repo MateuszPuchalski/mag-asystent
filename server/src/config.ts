@@ -608,7 +608,20 @@ export const config = {
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
     pollMs: num(process.env.WORKER_POLL_MS, 1200, "WORKER_POLL_MS"),
-    simErrors: process.env.WORKER_SIM_ERRORS === "1",
+    /* Symulacja losowych porażek kolejki jest narzędziem developerskim —
+       włączona na produkcji (mssql) wyglądałaby jak awaria Sfery i nikt by
+       nie zgadł, że to zmienna środowiskowa. Twardy błąd startu, jak przy
+       ALLEGRO_POLL_MS: tańszy niż tydzień szukania ducha. */
+    simErrors: (() => {
+      const wlaczone = process.env.WORKER_SIM_ERRORS === "1";
+      if (wlaczone && (process.env.SGT_MODE ?? "seeded") === "mssql") {
+        throw new Error(
+          "WORKER_SIM_ERRORS=1 przy SGT_MODE=mssql — symulacja błędów kolejki " +
+            "nie może chodzić na produkcji. Usuń zmienną z wertis.env."
+        );
+      }
+      return wlaczone;
+    })(),
     // backoff dla retry (spec §9): 5s / 30s / 2min
     backoffMs: [5000, 30000, 120000],
     maxAttempts: 3,

@@ -170,3 +170,44 @@ test("listę kont widzą biuro i admin, hala nie", async () => {
   const hala = await app.inject({ method: "GET", url: "/api/users", headers: jako("magazynier").headers });
   assert.equal(hala.statusCode, 403);
 });
+
+/* ── Sesje konta (0.111.0) ─────────────────────────────────────────────────── */
+
+test("sesje ogląda i tnie wyłącznie admin; cięcie unieważnia od zaraz", async () => {
+  const admin = jako("admin");
+  const biuro = jako("biuro");
+  const magazynier = jako("magazynier");
+
+  /* Biuro nie zagląda w cudze sesje — ta sama bramka co odbieranie hasła. */
+  const odmowa = await app.inject({
+    method: "GET", url: `/api/users/${magazynier.userId}/sesje`, headers: biuro.headers,
+  });
+  assert.equal(odmowa.statusCode, 403);
+
+  const sesje = await app.inject({
+    method: "GET", url: `/api/users/${magazynier.userId}/sesje`, headers: admin.headers,
+  });
+  assert.equal(sesje.statusCode, 200);
+  assert.equal(sesje.json().sesje.length, 1, "zalogowany kolektor widnieje na liście");
+  assert.equal(sesje.json().sesje[0].deviceId, "kolektor-7");
+  assert.ok(sesje.json().sesje[0].lastSeen, "last_seen wreszcie do czegoś służy");
+
+  /* Zgubiony kolektor: wyloguj wszędzie i sesja przestaje przechodzić. */
+  const wyloguj = await app.inject({
+    method: "POST", url: `/api/users/${magazynier.userId}/wyloguj`,
+    payload: {}, headers: admin.headers,
+  });
+  assert.equal(wyloguj.statusCode, 200);
+  assert.equal(wyloguj.json().sesji, 1, "panel mówi ILE ucięto, nie tylko ok");
+
+  const poCieciu = await app.inject({
+    method: "GET", url: "/api/users", headers: magazynier.headers,
+  });
+  assert.equal(poCieciu.statusCode, 401, "ucięta sesja nie przechodzi żadną trasą");
+
+  /* Audyt notuje decyzję z liczbą sesji. */
+  const wpis = db()
+    .prepare("SELECT payload FROM events WHERE type = 'user_wylogowany_wszedzie'")
+    .get() as { payload: string };
+  assert.match(wpis.payload, /"sesji":1/);
+});

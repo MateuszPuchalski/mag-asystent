@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { ROLE_BIUROWE } from "../services/users.js";
 import { analiza, type AnalizaAudytu } from "../services/raporty.js";
 import { analizaDostaw } from "../services/podglad-dostawy.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
@@ -13,7 +14,9 @@ import { sesjaZadania } from "../context.js";
    zalogowanemu. Analiza niesie raport wydajności per osoba, czyli monitoring
    pracowniczy — czyta go biuro, nie hala.                                     */
 
-const CZYTAJACY = ["biuro", "admin"];
+/* Jedno źródło listy (services/users.ts) — czwarta ręczna kopia ról była
+   zapalnikiem, przed którym kod ostrzegał w trzech miejscach naraz. */
+const CZYTAJACY = ROLE_BIUROWE;
 
 /** Okno przycinane do trzech wartości, które oferuje selektor strony. */
 function dniZQuery(v: string | undefined): number {

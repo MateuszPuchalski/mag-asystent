@@ -456,8 +456,10 @@ podjęcia od nowa, a nie luka do zasypania.
    to decyzja i obowiązek pracodawcy. Techniczny audyt „kto zmienił lokalizację"
    to co innego i nie podlega tym wymogom.
 
-**Czego nie pokrywają testy:** tras HTTP, adapterów do Subiekta i całego modułu
-aplikacji Android. Weryfikacja tych warstw opiera się dziś na checkliście
+**Czego nie pokrywają testy:** adapterów do żywego Subiekta (tryb `mssql`
+i wywołania Sfery — znaczniki `[WERYFIKUJ]`) oraz modułu `:app` aplikacji
+Android. Trasy HTTP i serwisy mają dziś gęste pokrycie (`routes/*.test.ts`,
+`services/*.test.ts`); weryfikacja kolektora opiera się na checkliście
 przejścia ręcznego na sprzęcie (`android/README.md`).
 
 ---

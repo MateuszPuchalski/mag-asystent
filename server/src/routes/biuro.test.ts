@@ -164,7 +164,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    30,
+    36,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -175,9 +175,15 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) i cztery zapisy " +
       "dyskusji Allegro (pobranie do rejestru, zmiana statusu, szkic, " +
       "wysyłka odpowiedzi) — nic ponadto.\n\n" +
-      "Dwa ostatnie POST-y (0.104.0) domykają proces dyskusji w aplikacji: " +
+      "Dwa POST-y z 0.104.0 domykają proces dyskusji w aplikacji: " +
       "GENERUJ liczy szkic, WYŚLIJ posyła odpowiedź do sprawy w Allegro — " +
-      "oba za jawnym kliknięciem, wysyłka dodatkowo za potwierdzeniem. " +
+      "oba za jawnym kliknięciem, wysyłka dodatkowo za potwierdzeniem.\n\n" +
+      "Sześć POST-ów z 0.111.0 to panel, który NAPRAWIA, nie tylko patrzy: " +
+      "PONÓW/ANULUJ kolejki (jedno wywołanie o dwóch trasach — te same, " +
+      "których używa kolektor), RESYNC i ODŚWIEŻENIE ZDJĘĆ w karcie SERWER " +
+      "(oba za groźnym potwierdzeniem) oraz trzy mutacje kont admina " +
+      "(reset hasła, włącz/wyłącz, wyloguj wszędzie) — dotąd dostępne " +
+      "wyłącznie przez curl. " +
       "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
       "podnosić — żaden zapis nie dzieje się przy samym patrzeniu."
   );
@@ -1052,4 +1058,27 @@ test("świeżość sprawy: puls z naszej bazy i wysyłka za zgodą po dopisku (0
     !/setInterval[^)]*wiadomosci/.test(html),
     "rozmowy nadal nie odpytują się cyklicznie — świeżość nie może wrócić rytmem maszyny"
   );
+});
+
+test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0)", () => {
+  /* Miejsce, w którym problem widać, musi być miejscem, w którym da się go
+     naprawić. Kolejka błędów dostała PONÓW/ANULUJ (te same trasy co
+     kolektor), karta SERWER dwie operacje ratunkowe zza DEPLOY.md, a karta
+     KONTA I SESJE kładzie kres administrowaniu kontami przez curl. Odmowę
+     roli wypowiada serwer (konwencja ustawień) — panel roli nie zna. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /data-kolejka-ponow/, "błąd kolejki ponawia się z panelu");
+  assert.match(html, /data-kolejka-anuluj/, "oczekujące zadanie da się anulować");
+  assert.match(html, /id="serwerResync"/, "resync zszedł z DEPLOY.md na przycisk");
+  assert.match(html, /id="serwerZdjecia"/, "odświeżenie zdjęć też");
+  assert.match(html, /id="kontaKarta"/, "karta kont w ustawieniach");
+  assert.match(html, /data-konto-wyloguj/, "zgubiony kolektor ma swój przycisk");
+  assert.match(html, /\$\("widokNadzor"\)\.addEventListener\("click"/, "nadzór deleguje z sekcji");
+  assert.match(html, /\$\("kontaKarta"\)\.addEventListener\("click"/, "konta delegują z sekcji");
+  assert.match(html, /id="fOsoba"/, "dziennik filtruje po osobie, nie tylko urządzeniu");
+  assert.match(html, /id="cyklBlad"/, "kulejący cykl ma jeden znacznik zamiast niemych console.warn");
+  assert.ok(!/console\.warn\(e\)/.test(html), "nieme połykanie błędów cyklu zniknęło");
 });

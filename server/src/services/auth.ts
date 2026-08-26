@@ -154,6 +154,43 @@ export function wyloguj(token: string): void {
   db().prepare("UPDATE device_session SET revoked_at = ? WHERE token = ?").run(nowIso(), token);
 }
 
+/* ── Sesje konta — wgląd i cięcie (0.111.0) ──────────────────────────────────
+   `last_seen` było zbierane od zawsze i nigdzie nie pokazywane, a jedyną
+   drogą unieważnienia sesji zgubionego kolektora był curl na `:id/active`.
+   Karta KONTA I SESJE w panelu czyta stąd; „wyloguj wszędzie" tnie wszystkie
+   naraz — sesje się nie kasują (revoked_at, jak przy zwykłym wylogowaniu),
+   żeby ślad „co było zalogowane" przetrwał decyzję.                          */
+
+export interface SesjaKonta {
+  deviceId: string | null;
+  createdAt: string;
+  lastSeen: string | null;
+}
+
+export function sesjeUzytkownika(userId: number): SesjaKonta[] {
+  const rows = db()
+    .prepare(
+      `SELECT device_id, created_at, last_seen FROM device_session
+       WHERE user_id = ? AND revoked_at IS NULL
+       ORDER BY last_seen DESC, created_at DESC`
+    )
+    .all(userId) as Array<Record<string, unknown>>;
+  return rows.map((r) => ({
+    deviceId: (r.device_id as string) ?? null,
+    createdAt: r.created_at as string,
+    lastSeen: (r.last_seen as string) ?? null,
+  }));
+}
+
+/** Zwraca liczbę uciętych sesji — panel ma powiedzieć ILE, nie tylko „ok". */
+export function wylogujWszedzie(userId: number): number {
+  return Number(
+    db()
+      .prepare("UPDATE device_session SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+      .run(nowIso(), userId).changes
+  );
+}
+
 /* ── Operacje uprzywilejowane ───────────────────────────────────────────────
    Rozstrzyga sama ROLA zalogowanego konta. Do sierpnia 2026 dochodził PIN,
    bo plakietkę dawało się pożyczyć („weź moją, mam ręce w oleju") — hasła się
