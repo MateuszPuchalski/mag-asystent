@@ -1,4 +1,5 @@
 import { db, nowIso } from "../db/db.js";
+import { uruchomTakt } from "./takt.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
@@ -617,20 +618,13 @@ export async function generujSzkicDyskusji(id: number, autor: string): Promise<D
  * dostroiło. Domyślnie zero — pobiera człowiek, kiedy tego potrzebuje.
  */
 export function uruchomTickerDyskusji(): void {
-  if (config.zwroty.pollMs <= 0) return;
-  const przebieg = () => {
+  /* Rytm dyktuje wspólny takt (services/takt.ts) — uzasadnienie tamże. */
+  uruchomTakt("dyskusje", config.zwroty.pollMs, async () => {
     /* Ten sam strażnik co w tickerach zapowiedzi i pytań: bez sparowanego
        konta przebieg tylko zapełniałby log błędem o brakującym tokenie. */
     const stan = stanPolaczenia().stan;
     if (stan !== "dev" && stan !== "polaczone") return;
-    synchronizujDyskusje("ticker")
-      .then(({ nowych }) => {
-        if (nowych > 0) console.log(`[dyskusje] nowych spraw z Allegro: ${nowych}`);
-      })
-      .catch((e) =>
-        console.error("[dyskusje] przebieg nieudany:", e instanceof Error ? e.message : e)
-      );
-  };
-  przebieg();
-  setInterval(przebieg, config.zwroty.pollMs);
+    const { nowych } = await synchronizujDyskusje("ticker");
+    if (nowych > 0) console.log(`[dyskusje] nowych spraw z Allegro: ${nowych}`);
+  });
 }

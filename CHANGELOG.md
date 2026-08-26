@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.109.1 — 26 sierpnia 2026
+
+**Utwardzenie użycia API Allegro po audycie.** Domyślny profil ruchu był
+bezpieczny; poprawki zamykają wektory, które jedną literówką w `wertis.env`
+zmieniłyby go w maszynowy — czyli w sygnaturę, która już raz skończyła się
+blokadą adresu IP.
+
+- **Podłoga na `ALLEGRO_POLL_MS`.** Wartość dodatnia poniżej minuty
+  zatrzymuje start serwera ze zdaniem o minimum. To niemal na pewno
+  literówka (sekundy zamiast milisekund), a skutkiem byłyby trzy pętle
+  bijące w Allegro co ułamek sekundy. Zero (domyślne, tło wyłączone)
+  działa jak dotąd.
+- **Wspólny takt trzech pętli tła** (zapowiedzi, pytania, dyskusje):
+  startują w różnych sekundach, a każdy odstęp ma rozrzut ±10%. Równy,
+  zegarowy rytm z jednego adresu wygląda dla anti-bota jak automat —
+  rozrzut zdejmuje tę sygnaturę, nie psując przewidywalności.
+- **Respekt dla 429.** Odpowiedź „za dużo zapytań" jest teraz rozpoznawana
+  (osobna klasa błędu, odczyt `Retry-After`) zamiast lecieć jako surowy
+  kod. Ponowień nadal NIE MA — pętla tła wydłuża następny przebieg o tyle,
+  ile prosi Allegro, hurtowe szkice przerywają się od razu, a człowiek
+  dostaje zdanie „spróbuj za N s". Ta sama gałąź na logowaniu (apex).
+
+Audyt potwierdził też rzeczy, których NIE trzeba było zmieniać: jeden punkt
+wyjścia z User-Agentem i timeoutem, zero automatycznych ponowień, twarde
+sufity stron we wszystkich listach, rozmowy czytane na klik, przyciski
+synchronizacji już blokujące się na czas trwania.
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu (domyślne `0` dla
+`ALLEGRO_POLL_MS` nietknięte).
+
 ## 0.109.0 — 26 sierpnia 2026
 
 **SPRAWY są teraz jedynym oknem obsługi klienta.** Karty dawnych zakładek

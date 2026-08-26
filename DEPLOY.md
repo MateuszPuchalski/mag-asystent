@@ -1112,8 +1112,12 @@ się, gdy nie ma czego pokazać. To jest właśnie chwila, w której chce się
 sprawdzić, czy coś przyszło.
 
 Kto woli tło, wpisuje liczbę milisekund w `ALLEGRO_POLL_MS` (`0` = ręcznie,
-i to jest domyślne). Token na tym nie ucierpi: refresh Allegro żyje kwartał
-i odnawia się przy KAŻDYM użyciu, a skan etykiety zwrotu też go używa.
+i to jest domyślne). Minimum to `60000` — mniejsza wartość dodatnia
+zatrzymuje start serwera, bo to niemal na pewno literówka. Od 0.109.1 trzy pętle tła
+startują w różnych sekundach, a każdy odstęp ma rozrzut ±10%. Równy,
+zegarowy rytm z jednego adresu wygląda dla Allegro jak automat. Token na tym
+nie ucierpi: refresh Allegro żyje kwartał i odnawia się przy KAŻDYM użyciu,
+a skan etykiety zwrotu też go używa.
 
 Od 0.70.0 karta czyta **status zwrotu po stronie Allegro** i rozróżnia dwa
 alarmy. Czerwony „DORĘCZONA · NIE PRZYJĘTA" znaczy, że przewoźnik dostarczył,
@@ -1291,6 +1295,10 @@ z Allegro (scenariusze S67–S69).
 
 3. **Sandbox** (opcjonalnie, do prób): osobna rejestracja na
    <https://developer.allegro.pl.allegrosandbox.pl> i `ALLEGRO_SANDBOX=1`.
+
+Osobno od blokady: odpowiedź **429** znaczy „za dużo zapytań w krótkim
+czasie". Aplikacja jej nie ponawia. Pętle tła same wydłużają wtedy odstęp
+o tyle, ile prosi Allegro, a przy pracy ręcznej wystarczy chwilę odczekać.
 
 #### Gdy Allegro pokaże stronę „Zostałeś zablokowany"
 

@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { allegroUserAgent } from "./allegro.js";
+import { BladLimituAllegro, allegroUserAgent, retryAfterMs } from "./allegro.js";
 import { wazneBearer } from "../services/allegro-token.js";
 import type {
   AllegroAdapter,
@@ -750,6 +750,16 @@ export class HttpAllegroAdapter implements AllegroAdapter {
             "token wydany pod stary zakres sam się nie rozszerzy."
         );
       }
+      if (odp.status === 429) {
+        /* Limit zapytań. Bez ponowienia — ale z klasą, po której takt
+           tickerów wie, ile odczekać, a człowiek dostaje zdanie, nie kod. */
+        const poIluMs = retryAfterMs(odp.headers.get("retry-after"), Date.now());
+        throw new BladLimituAllegro(
+          "Allegro prosi o przerwę (429) — za dużo zapytań w krótkim czasie." +
+            (poIluMs !== null ? ` Spróbuj za ${Math.ceil(poIluMs / 1000)} s.` : ""),
+          poIluMs
+        );
+      }
       if (!odp.ok) {
         const tresc = await odp.text().catch(() => "");
         throw new Error(`Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`);
@@ -1021,6 +1031,14 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       throw new Error(
         `Wgranie załącznika nie doszło do Allegro — sprawdź internet na serwerze. ` +
           `(${e instanceof Error ? e.message : e})`
+      );
+    }
+    if (odp.status === 429) {
+      const poIluMs = retryAfterMs(odp.headers.get("retry-after"), Date.now());
+      throw new BladLimituAllegro(
+        "Allegro prosi o przerwę (429) przy wgrywaniu załącznika." +
+          (poIluMs !== null ? ` Spróbuj za ${Math.ceil(poIluMs / 1000)} s.` : ""),
+        poIluMs
       );
     }
     if (!odp.ok) {

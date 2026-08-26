@@ -38,6 +38,25 @@ export const envFile = loadEnvFile();
  */
 export const prostujUkosniki = (v: string): string => v.replace(/\\/g, "/");
 
+/**
+ * Podłoga na interwał tickerów Allegro. Wartość dodatnia poniżej minuty to
+ * niemal na pewno literówka (sekundy zamiast milisekund) — a skutkiem są
+ * TRZY pętle (zapowiedzi, pytania, dyskusje) bijące w Allegro równym,
+ * maszynowym rytmem z jednego adresu. Dokładnie taka sygnatura skończyła
+ * się w sierpniu 2026 blokadą IP przy parowaniu. Twardy błąd przy starcie
+ * jest tańszy niż blokada — ta sama zasada co przy pustym kluczu AI.
+ */
+const POLL_ALLEGRO_MIN_MS = 60_000;
+export const pollAllegro = (ms: number): number => {
+  if (ms > 0 && ms < POLL_ALLEGRO_MIN_MS) {
+    throw new Error(
+      `ALLEGRO_POLL_MS=${ms} — minimum to ${POLL_ALLEGRO_MIN_MS} ms (minuta), ` +
+        "a 0 wyłącza pobieranie w tle. Popraw w wertis.env."
+    );
+  }
+  return ms;
+};
+
 const num = (v: string | undefined, def: number, name?: string) => {
   if (v === undefined || v === "") return def;
   const n = Number(v);
@@ -357,7 +376,7 @@ export const config = {
        jest decyzją właściciela, nie ustawieniem domyślnym — a przy blokadach
        anty-botowych Allegro to ruch, którego nikt nie zamawiał. Liczba
        milisekund wraca do zachowania sprzed tej wersji. */
-    pollMs: num(process.env.ALLEGRO_POLL_MS, 0, "ALLEGRO_POLL_MS"),
+    pollMs: pollAllegro(num(process.env.ALLEGRO_POLL_MS, 0, "ALLEGRO_POLL_MS")),
     /**
      * Po ilu dniach od zgłoszenia zwrot bez zeskanowanej paczki uznaje się
      * za „brakującą paczkę". Trzy dni to typowy czas doręczenia krajowego —

@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { allegroAdapter } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import { logEvent } from "./events.js";
+import { uruchomTakt } from "./takt.js";
 import type { ZwrotAllegro } from "../adapters/allegro.js";
 
 /* ── Zapowiedzi zwrotów (Etap 4) ─────────────────────────────────────────────
@@ -381,19 +382,15 @@ export async function pobierzZapowiedzi(): Promise<{ nowych: number; statusow: n
  * wystarczy wpisać liczbę milisekund.
  */
 export function uruchomTickerZapowiedzi(): void {
-  if (config.zwroty.pollMs <= 0) return;
-  const przebieg = () => {
+  /* Rytm dyktuje wspólny takt (services/takt.ts): rozrzut ±10%, przesunięty
+     start i respekt dla 429 — trzy tickery nie mogą bić w Allegro równym,
+     zegarowym rytmem z jednego adresu. Błąd limitu ma DOLECIEĆ do taktu,
+     więc przebieg nie łyka go sam. */
+  uruchomTakt("zapowiedzi", config.zwroty.pollMs, async () => {
     const stan = stanPolaczenia().stan;
     if (stan !== "dev" && stan !== "polaczone") return;
-    pobierzZapowiedzi()
-      .then(({ nowych, statusow }) => {
-        if (nowych > 0) console.log(`[zapowiedzi] nowych zgłoszeń zwrotu: ${nowych}`);
-        if (statusow > 0) console.log(`[zapowiedzi] odświeżonych statusów: ${statusow}`);
-      })
-      .catch((e) =>
-        console.error("[zapowiedzi] przebieg nieudany:", e instanceof Error ? e.message : e)
-      );
-  };
-  przebieg();
-  setInterval(przebieg, config.zwroty.pollMs);
+    const { nowych, statusow } = await pobierzZapowiedzi();
+    if (nowych > 0) console.log(`[zapowiedzi] nowych zgłoszeń zwrotu: ${nowych}`);
+    if (statusow > 0) console.log(`[zapowiedzi] odświeżonych statusów: ${statusow}`);
+  });
 }

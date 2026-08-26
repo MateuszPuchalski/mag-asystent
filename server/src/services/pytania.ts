@@ -1,11 +1,12 @@
 import { db, nowIso } from "../db/db.js";
+import { uruchomTakt } from "./takt.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
 import { kontekstKlienta, type KontekstKlienta } from "./klienci.js";
 import { blokPrzesylek, czyPytaOWysylke, przesylkiKupujacego } from "./przesylki.js";
 import type { PrzesylkiKlienta } from "./przesylki.js";
-import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
+import { BladLimituAllegro, allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import type { OfertaAllegro, WiadomoscAllegro } from "../adapters/allegro.js";
 import { dostepneW, zamiennikiZOpisu } from "./stock.js";
@@ -1113,7 +1114,10 @@ export async function dogenerujSzkice(autor: string, limit = 20): Promise<number
       await generujSzkic(id, autor);
       policzonych++;
     } catch (e) {
-      /* Awaria modelu na jednym pytaniu nie ma prawa zatrzymać reszty ani
+      /* Limit Allegro przerywa CAŁY hurt — kolejne pytania uderzyłyby w ten
+         sam limit, a takt ma się dowiedzieć, ile odczekać. */
+      if (e instanceof BladLimituAllegro) throw e;
+      /* Inna awaria (model, jedna oferta) nie ma prawa zatrzymać reszty ani
          przebiegu. Wiersz zostaje w `nowe`, więc panel pokaże przy nim
          przycisk GENERUJ i człowiek spróbuje ręką. */
       console.error(`[pytania] szkic dla #${id} nieudany:`, e instanceof Error ? e.message : e);
@@ -1131,8 +1135,8 @@ export async function dogenerujSzkice(autor: string, limit = 20): Promise<number
  * dostroiło, a dołożyłoby drugie miejsce do pomylenia.
  */
 export function uruchomTickerPytan(): void {
-  if (config.zwroty.pollMs <= 0) return;
-  const przebieg = () => {
+  /* Rytm dyktuje wspólny takt (services/takt.ts) — uzasadnienie tamże. */
+  uruchomTakt("pytania", config.zwroty.pollMs, async () => {
     /* Przebieg tylko przy sensownym stanie konta — dev zawsze, http dopiero
        po sparowaniu. Bez tego log zapełniałby się co pięć minut błędem
        o brakującym tokenie na instalacji, która pytań w ogóle nie używa
@@ -1141,18 +1145,11 @@ export function uruchomTickerPytan(): void {
     if (stan !== "dev" && stan !== "polaczone") return;
     /* Bez modelu zostaje sama synchronizacja: lista czekających pytań ma
        wartość także wtedy, gdy szkiców nie ma kto napisać. */
-    synchronizujPytania("ticker")
-      .then(async ({ nowych }) => {
-        if (nowych > 0) console.log(`[pytania] nowych pytań klientów: ${nowych}`);
-        const szkicow = await dogenerujSzkice("ticker");
-        if (szkicow > 0) console.log(`[pytania] szkiców przygotowanych: ${szkicow}`);
-      })
-      .catch((e) =>
-        console.error("[pytania] przebieg nieudany:", e instanceof Error ? e.message : e)
-      );
-  };
-  przebieg();
-  setInterval(przebieg, config.zwroty.pollMs);
+    const { nowych } = await synchronizujPytania("ticker");
+    if (nowych > 0) console.log(`[pytania] nowych pytań klientów: ${nowych}`);
+    const szkicow = await dogenerujSzkice("ticker");
+    if (szkicow > 0) console.log(`[pytania] szkiców przygotowanych: ${szkicow}`);
+  });
 }
 
 /* ── Statystyki ──────────────────────────────────────────────────────────── */
