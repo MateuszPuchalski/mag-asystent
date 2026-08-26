@@ -33,6 +33,54 @@ historii nie przepisujemy.
 
 ---
 
+## 0.96.0 — 25 sierpnia 2026
+
+**Zakładka pytań dostała treść, nie samą powłokę.** Wydania 0.89.1 → 0.95.0
+przeniosły istniejące bloki do nowego układu; makiety przeprojektowywały też
+to, co jest w środku, i tej połowy nie robił żaden etap. To pierwsze wydanie
+warstwy treści.
+
+**Skrzynka mówi, ile i czego.** Nagłówek szyny to teraz liczba spraw
+z rozbiciem na te ze szkicem i te, które dopiero czekają na model. Liczby
+przychodziły od dawna — trasa licznika je zwraca — i lądowały wyłącznie
+w dymku pod kursorem, czyli tam, gdzie nikt go nie trzyma.
+
+**Filtr to czipy, nie lista rozwijana.** Przy trzech stanach wyliczenie ich
+jest krótsze niż schowanie. Doszedł stan „wszystkie", którego wcześniej nie
+dało się wybrać: brak filtra znaczył worklistę, a archiwum było poza zasięgiem.
+
+**Stan sprawy to kropka i słowo.** Wypełniona pigułka zostaje dla wyjątków —
+„poza ofertą", „po terminie". Pięć pigułek w wierszu przestaje być sygnałem.
+
+**Widać, kto napisał odpowiedź.** Bursztynowa szyna przy krawędzi pola znaczy
+„tego nie napisał człowiek" i gaśnie przy pierwszym wpisanym znaku.
+Przywrócenie szkicu zapala ją z powrotem. Dotąd mówiło o tym jedno zdanie nad
+polem, które czyta się raz i przestaje.
+
+**Przyciski rozeszły się na trzy miejsca.** Stało ich siedem w jednym rzędzie
+pod polem: „POMIŃ" sąsiadowało z „WYŚLIJ PRZEZ ALLEGRO", czyli wyjście ze
+sprawy z jej domknięciem. Teraz przy tytule stoi to, co sprawę zdejmuje, przy
+etykiecie ODPOWIEDŹ to, co podmienia tekst, a pod polem to, co robi się
+z tekstem gotowym. Doszedł skrót **Ctrl+Enter** do wysłania.
+
+**Statystyki wyprowadziły się na ANALIZĘ** — pod nowy filtr ZAKRES. Zakładki
+pracy zostają czystą kolejką spraw, zgodnie z podziałem, który pasek zakładek
+ogłasza od 0.74.1. Doszedł filtr OSOBA; karta mówi wprost, czego on nie
+obejmuje, bo pytania przychodzą od klientów i autora po naszej stronie nie
+mają. Okno jest czipami i **zależy od zakresu** — ślad audytowy mierzy się od
+tygodnia, pytania od miesiąca.
+
+**Pusta skrzynka przestała wyglądać jak awaria.** To najczęstszy stan tej
+zakładki w spokojny dzień, a pokazywał trzy karty z samymi zerami: trzy strefy
+włączają się dopiero przy otwartej sprawie, więc przy zerze nie było czego
+otworzyć. Teraz zostaje zdanie o pustej skrzynce i wklejka z poczty.
+
+**[wymaga działania] Ziarno scenariuszy zakłada teraz cztery pytania.** Do tej
+wersji nie zakładało ani jednego, więc zakładki nie dało się obejrzeć w demo
+z treścią — od 0.91.0 nikt jej takiej nie widział. Po `git pull` przebuduj
+dane demo: `npm run seed:scenariusze`. Na bazie produkcyjnej seed się nie
+uruchamia i nic tam nie zmienia.
+
 ## 0.95.0 — 25 sierpnia 2026
 
 **Zakładki wjechały do ciemnego paska.** Stały dotąd pod nagłówkiem, we

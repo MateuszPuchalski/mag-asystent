@@ -134,11 +134,18 @@ export function listaPytan(opcje: { status?: string; limit?: number } = {}): Pyt
   /* Domyślnie WORKLISTA, nie archiwum: pytanie odpowiedziane schodzi z oczu,
      bo lista ma pokazywać robotę do zrobienia. Filtr statusu daje wgląd
      w resztę, gdy ktoś szuka konkretnej sprawy. */
-  const sql = opcje.status
-    ? "SELECT * FROM pytanie WHERE status = ? ORDER BY otrzymano_at DESC, id DESC LIMIT ?"
-    : `SELECT * FROM pytanie WHERE status IN ('nowe','szkic')
-       ORDER BY otrzymano_at DESC, id DESC LIMIT ?`;
-  const args = opcje.status ? [opcje.status, limit] : [limit];
+  /* `wszystkie` to trzeci tryb, nie status: pokazuje archiwum razem z pracą,
+     pod czip „Wszystkie" ze skrzynki (0.96.0). BRAK filtra dalej znaczy
+     worklistę — i to zostaje domyślne, bo tak zachowuje się każde wejście
+     na zakładkę. */
+  const wszystko = opcje.status === "wszystkie";
+  const sql = wszystko
+    ? "SELECT * FROM pytanie ORDER BY otrzymano_at DESC, id DESC LIMIT ?"
+    : opcje.status
+      ? "SELECT * FROM pytanie WHERE status = ? ORDER BY otrzymano_at DESC, id DESC LIMIT ?"
+      : `SELECT * FROM pytanie WHERE status IN ('nowe','szkic')
+         ORDER BY otrzymano_at DESC, id DESC LIMIT ?`;
+  const args = !wszystko && opcje.status ? [opcje.status, limit] : [limit];
   return (db().prepare(sql).all(...args) as Array<Record<string, unknown>>).map(zWiersza);
 }
 
@@ -1022,6 +1029,10 @@ export interface StatystykiPytan {
   wyslanych: number;
   bezEdycji: number;
   pozaOferta: Array<{ id: number; tresc: string; otrzymanoAt: string | null }>;
+  /** Kto odpisywał w tym oknie — pod filtr OSOBA w pasku ANALIZY. */
+  osoby: string[];
+  /** Wybrana osoba albo `null`. Karta mówi wtedy, czego filtr NIE obejmuje. */
+  osoba: string | null;
 }
 
 /**
@@ -1032,9 +1043,20 @@ export interface StatystykiPytan {
  * najtańszy research asortymentu, jaki firma może mieć — ktoś już chciał
  * kupić, a my nie mieliśmy co sprzedać.
  */
-export function statystykiPytan(dni: number): StatystykiPytan {
+/*
+ * Filtr OSOBA obejmuje WYŁĄCZNIE to, co da się komuś przypisać: wysłane
+ * odpowiedzi, ich medianę czasu i udział szkiców bez poprawki. Pytania
+ * przychodzą od klientów i nie mają autora po naszej stronie, dopóki ktoś
+ * na nie nie odpisze — „najczęściej pytane towary per osoba" byłoby liczbą
+ * bez desygnatu. Te przekroje zostają globalne, a karta mówi o tym wprost.
+ */
+export function statystykiPytan(dni: number, osoba?: string | null): StatystykiPytan {
   const d = db();
   const odKiedy = `-${dni} days`;
+  const kto = osoba?.trim() || null;
+  const iOsoba = kto ? " AND odpowiedzial = ?" : "";
+  /** Parametry zapytania przypisywalnego: okno, a po nim osoba, jeśli wybrana. */
+  const zOsoba = (...a: unknown[]) => (kto ? [...a, kto] : a);
 
   const produkty = (
     d
@@ -1099,10 +1121,10 @@ export function statystykiPytan(dni: number): StatystykiPytan {
         `SELECT (julianday(wyslano_at) - julianday(otrzymano_at)) * 24 AS godzin
          FROM pytanie
          WHERE status = 'wyslane' AND zrodlo = 'allegro'
-           AND otrzymano_at IS NOT NULL AND wyslano_at >= datetime('now', ?)
+           AND otrzymano_at IS NOT NULL AND wyslano_at >= datetime('now', ?)${iOsoba}
          ORDER BY godzin`
       )
-      .all(odKiedy) as Array<{ godzin: number }>
+      .all(...(zOsoba(odKiedy) as never[])) as Array<{ godzin: number }>
   )
     .map((w) => w.godzin)
     .filter((g) => Number.isFinite(g) && g >= 0);
@@ -1118,9 +1140,22 @@ export function statystykiPytan(dni: number): StatystykiPytan {
   const wysylki = d
     .prepare(
       `SELECT COUNT(*) AS wyslanych, SUM(CASE WHEN edytowano = 0 THEN 1 ELSE 0 END) AS bez
-       FROM pytanie WHERE status = 'wyslane' AND wyslano_at >= datetime('now', ?)`
+       FROM pytanie WHERE status = 'wyslane' AND wyslano_at >= datetime('now', ?)${iOsoba}`
     )
-    .get(odKiedy) as { wyslanych: number; bez: number | null };
+    .get(...(zOsoba(odKiedy) as never[])) as { wyslanych: number; bez: number | null };
+
+  /* Kto w tym oknie odpisywał — listę podaje serwer, bo tylko on to wie.
+     Pusta przy oknie bez wysyłek i wtedy filtr w pasku nie ma czego oferować. */
+  const osoby = (
+    d
+      .prepare(
+        `SELECT DISTINCT odpowiedzial FROM pytanie
+          WHERE odpowiedzial IS NOT NULL AND status = 'wyslane'
+            AND wyslano_at >= datetime('now', ?)
+          ORDER BY odpowiedzial`
+      )
+      .all(odKiedy) as Array<{ odpowiedzial: string }>
+  ).map((w) => w.odpowiedzial);
 
   const pozaOferta = (
     d
@@ -1145,5 +1180,7 @@ export function statystykiPytan(dni: number): StatystykiPytan {
     wyslanych: wysylki.wyslanych,
     bezEdycji: wysylki.bez ?? 0,
     pozaOferta,
+    osoby,
+    osoba: kto,
   };
 }

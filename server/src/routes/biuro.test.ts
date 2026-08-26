@@ -313,6 +313,40 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   );
 });
 
+test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () => {
+  /* TRZECI raz ta sama usterka, więc trzeci raz jest ostatni.
+
+     W 0.92.0 delegacja dostaw została na `#szczegolNaglowek` — dokładnie na
+     elemencie, który przyciski opuściły. W 0.93.0 to samo groziło zwrotom.
+     W 0.96.0 przyciski sprawy rozeszły się na trzy miejsca (przy tytule, przy
+     etykiecie ODPOWIEDŹ, pod polem), a nasłuch dalej wisiał na `#pytanieAkcje`
+     — czyli na rzędzie, z którego cztery z nich wyszły. PRZELICZ SZKIC,
+     PRZYWRÓĆ SZKIC, ZAŁATWIONE POZA APLIKACJĄ i POMIŃ klikały się bez skutku.
+
+     Wygląd był bez zarzutu, wszystkie 974 testy przechodziły, a zrzut ekranu
+     niczego nie pokazywał — bo martwy przycisk wygląda jak żywy. Jedyne, co to
+     łapie, to nasłuch na POJEMNIKU, który przetrwa przenosiny w środku. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  for (const [widok, sekcja] of [
+    ["pytania", "pytanieSzczegol"],
+    ["dostawy", "szczegol"],
+    ["zwroty", "zwrotSzczegol"],
+  ]) {
+    assert.ok(
+      !new RegExp(`\\$\\("${widok === "pytania" ? "pytanieAkcje" : "szczegolNaglowek"}"\\)\\.addEventListener\\("click"`).test(html),
+      `delegacja ${widok} nie może wisieć na rzędzie przycisków`
+    );
+    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
+  }
+
+  assert.match(html, /\$\("pytanieSzczegol"\)\.addEventListener\("click"/,
+    "sprawa pytania deleguje z poziomu sekcji, nie rzędu");
+});
+
 test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", () => {
   /* Od 0.95.0 zakładki stoją w ciemnym nagłówku, a nie we własnej białej
      karcie pod nim. Chodziło o pion: trzecie pasmo chromu kosztowało ~60 px
@@ -642,11 +676,20 @@ test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", ()
   for (const [nazwa, widok, pola] of [
     ["dziennik", dziennik, ["fOd", "fDo", "fTyp", "fTw", "fDev", "fLimit",
                             "szukajDziennik", "csvDziennik"]],
-    ["analiza", analiza, ["dniAnalizy", "csvAnalizy"]],
+    /* Od 0.96.0 pasek analizy niesie też ZAKRES i OSOBĘ, a OKNO jest czipami,
+       nie `<select>`-em — stąd `oknoAnalizy` zamiast `dniAnalizy`. Reguła
+       została ta sama: w pasku stoi to, co rządzi całym widokiem. ZAKRES
+       rządzi nim najdosłowniej ze wszystkiego — decyduje, które karty w ogóle
+       są na ekranie. */
+    ["analiza", analiza, ["oknoAnalizy", "zakresAnalizy", "osobaAnalizy", "csvAnalizy"]],
   ] as [string, string, string[]][]) {
     const pasek = widok.indexOf('class="pelna pasekFiltrow"');
     assert.notEqual(pasek, -1, `${nazwa} ma pasek filtrów`);
-    assert.ok(pasek < widok.indexOf('<section class="card"'),
+    /* Prefiks, nie pełny literał: od 0.96.0 karty analizy noszą obok `card`
+       także `zakresPytania`/`zakresAudyt`, więc `<section class="card">`
+       w tym widoku nie występuje już wcale — a `indexOf` zwracał wtedy -1
+       i asercja przechodziła przez przypadek w drugą stronę. */
+    assert.ok(pasek < widok.indexOf('<section class="card'),
       `pasek ${nazwa} stoi NAD kartami, nie w środku pierwszej`);
     const koniec = widok.indexOf("</section>", pasek);
     for (const pole of pola) {
@@ -722,21 +765,33 @@ test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   assert.match(html, /h2 \.info/, "ikona ma własny styl");
 });
 
-test("zwinięta sekcja statystyk pytań nie pyta serwera", () => {
-  /* Cała oszczędność tej zmiany polega na tym, że zwinięte statystyki NIE
-     jadą po dane przy każdym wejściu na zakładkę. Gdyby wywołanie wróciło
-     obok `dociagnijWglad`, sekcja dalej byłaby zwinięta i nikt by nie
-     zauważył — poza serwerem, który dostaje żądanie kilkanaście razy dziennie. */
+test("statystyki pytań nie jadą po dane, gdy nikt na nie nie patrzy", () => {
+  /* REGUŁA ZOSTAJE, MECHANIZM SIĘ ZMIENIŁ — i to jest cała treść tej zmiany.
+
+     Do 0.95.0 statystyki były zwijaną sekcją na zakładce PYTANIA, a oszczędność
+     polegała na tym, że zwinięta NIE jechała po dane przy każdym wejściu na
+     zakładkę pracy. W 0.96.0 przeniosły się na ANALIZĘ, pod filtr ZAKRES:
+     zakładki pracy zostają czystą kolejką spraw, zgodnie z podziałem, który
+     pasek zakładek ogłasza od 0.74.1.
+
+     Reguła obowiązuje dalej, tylko spełnia ją co innego. Wejście na PYTANIA
+     nie tyka już statystyk wcale, a ANALIZA pobiera WYŁĄCZNIE wybrany zakres —
+     ślad audytowy albo pytania, nigdy oba naraz. Gdyby `odswiezAnalize`
+     przestało rozgałęziać się na zakresie, każde wejście na ANALIZĘ ciągnęłoby
+     dwa komplety danych i nikt by tego nie zobaczył poza serwerem. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-  assert.match(html, /SEKCJE_WGLADU = \[[^\]]*"pytaniaStatystyki"/s, "sekcja w rejestrze");
-  assert.match(html, /pytaniaStatystyki: \["pytaniaKafle"/, "wiadomo, czym ją wypełnić");
+
   const wejscie = html.match(/if \(nowy === "pytania"\).*/)?.[0] ?? "";
-  assert.ok(wejscie.includes("dociagnijWglad"), "wejście na zakładkę dociąga warunkowo");
   assert.ok(
-    !wejscie.includes("odswiezStatystykiPytan()"),
-    "wejście na zakładkę NIE pobiera statystyk bezwarunkowo"
+    !wejscie.includes("Statystyk") && !wejscie.includes("statystyk"),
+    "wejście na zakładkę pracy nie tyka statystyk — one mieszkają na ANALIZIE"
   );
+
+  assert.match(html, /function odswiezAnalize\(\)[\s\S]*?zakresAnalizy\(\) === "pytania"[\s\S]*?return odswiezStatystykiPytan\(\)/,
+    "ANALIZA pobiera tylko wybrany zakres, nie oba naraz");
+  assert.match(html, /class="card zakresPytania"/, "karty pytań znają swój zakres");
+  assert.match(html, /class="card zakresAudyt"/, "karty śladu audytowego też");
 });
