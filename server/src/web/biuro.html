@@ -131,6 +131,79 @@
      nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
   .widok > .pelna { grid-column: 1 / -1; }
 
+  /* ── PASMO ŚREDNIE: szyna zostaje, kontekst chowa się do szuflady ─────────
+     Między 1024 a 1280 px trzy strefy obok siebie się nie mieszczą — kolumna
+     sprawy schodziłaby poniżej miary, przy której da się czytać wątek. Ale
+     zasłanianie kolejki, czyli to, co panel robił poniżej 1280 px do 0.101.0,
+     jest w tym paśmie stratą: biuro traci z oczu listę, nad którą pracuje,
+     i po powrocie wraca na jej górę.
+
+     Rozwiązanie z makiety `Waski`: zostają DWIE strefy, a trzecia wjeżdża na
+     żądanie jako szuflada z prawej. Kontekst jest z tych trzech najrzadziej
+     potrzebny — do dopasowanego towaru albo notatki zagląda się raz na sprawę,
+     a wątek i kolejkę ma się przed oczami cały czas.
+
+     Reguły stoją PRZED blokiem 1280 px i mają z nim równą specyficzność, więc
+     powyżej progu wygrywa tamten — kolejnością w źródle, nie `!important`. */
+  @media (min-width: 1024px) {
+    .widok.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) 1fr; }
+    .widok.zSzczegolem > .card { grid-column: 1; }
+    .widok.zSzczegolem > .szczegol {
+      grid-column: 2; grid-row: 1 / span 50;
+      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
+      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .widok.zSzczegolem > .szczegol > .sprawaSzyna { align-self: stretch; }
+    .widok.zSzczegolem .sprawa-tresc {
+      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+    }
+    #widokPytania.zSzczegolem,
+    #widokDostawy.zSzczegolem,
+    #widokZwroty.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr); }
+  }
+
+  /* ── Szuflada kontekstu ────────────────────────────────────────────────────
+     Dwie klasy, bo to dwie różne rzeczy: `zSzuflada` mówi, że jesteśmy
+     w paśmie, w którym kontekst JEST szufladą, a `szufladaOtwarta` — czy
+     akurat jest wysunięta. Obie ustawia skrypt, żeby stan otwarcia nie musiał
+     żyć w arkuszu, a pasmo nie musiało się dublować w dwóch miejscach.
+
+     Panel jest `fixed`, nie `sticky`: ma zasłonić sprawę, a nie zabrać jej
+     szerokość — o to całe w tym chodzi. `--hChrome` trzyma go pod nagłówkiem
+     i paskiem stanu, żeby zakładki zostały klikalne. */
+  .widok.zSzuflada > .kontekst { display: none; }
+  .widok.zSzuflada.szufladaOtwarta > .kontekst {
+    display: block;
+    position: fixed; top: var(--hChrome, 130px); right: 0; bottom: 0;
+    width: min(24rem, 92vw); z-index: 40;
+    border-radius: 0; border-right: 0; border-top: 0; border-bottom: 0;
+    box-shadow: -12px 0 28px rgba(42, 42, 44, .16);
+    overflow: auto; overscroll-behavior: contain;
+  }
+  /* Cień jest JEDEN na całą stronę i leży poza widokami — trzy kopie, po jednej
+     na zakładkę, znaczyłyby trzy miejsca do zapomnienia przy czwartej. */
+  #szufladaCien {
+    position: fixed; inset: var(--hChrome, 130px) 0 0 0; z-index: 39;
+    background: rgba(42, 42, 44, .28);
+  }
+  /* Przycisk wywołujący istnieje tylko tam, gdzie kontekst jest szufladą.
+     Poza pasmem kontekst stoi na ekranie sam — przycisk otwierałby coś, co
+     już widać, albo nie robił nic. */
+  .widok:not(.zSzuflada) .szufladaPrzycisk { display: none; }
+  .sprawaSzyna { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sprawaSzyna .szufladaPrzycisk { margin-left: auto; }
+  /* Głowa szuflady istnieje tylko w szufladzie — poza pasmem kontekst jest
+     kolumną i nie ma czego zamykać. */
+  .szufladaGlowa { display: none; }
+  .widok.zSzuflada.szufladaOtwarta > .kontekst > .szufladaGlowa {
+    display: flex; align-items: center; gap: 10px;
+    position: sticky; top: 0; z-index: 1;
+    margin: -12px -14px 10px; padding: 10px 14px;
+    background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  .szufladaGlowa button { margin-left: auto; }
+
   @media (min-width: 1280px) {
 
     /* ── Szczegół OBOK listy ─────────────────────────────────────────────────
@@ -173,7 +246,7 @@
     }
     /* Dzieci kolumny rozciągają się na jej szerokość — przycisk powrotu nie ma
        być pasem przez cały ekran. */
-    #widokPytania.zSzczegolem > .szczegol > #pytanieWroc { align-self: flex-start; }
+    #widokPytania.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
     #widokPytania.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
@@ -218,7 +291,7 @@
     #widokDostawy.zSzczegolem > .szczegol {
       display: flex; flex-direction: column; overflow: hidden;
     }
-    #widokDostawy.zSzczegolem > .szczegol > #wrocDoListy { align-self: flex-start; }
+    #widokDostawy.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
     #widokDostawy.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
@@ -237,7 +310,7 @@
     #widokZwroty.zSzczegolem > .szczegol {
       display: flex; flex-direction: column; overflow: hidden;
     }
-    #widokZwroty.zSzczegolem > .szczegol > #zwrotWroc { align-self: flex-start; }
+    #widokZwroty.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
     #widokZwroty.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
     }
@@ -822,7 +895,18 @@
     <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
          się pod nimi: to jest wejście W dokument, nie dodatek obok. -->
     <section class="card pelna szczegol" id="szczegol" hidden>
-      <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
+      <!-- Rząd wyjścia i wejścia: po lewej wyjście ZE sprawy, po prawej
+           wejście w jej kontekst. Przycisk KONTEKST widać tylko w paśmie,
+           w którym kontekst jest szufladą — poza nim stoi na ekranie sam.
+
+           Bez licznika przy napisie, choć makieta go rysuje. Liczyłby co
+           innego na każdej z trzech zakładek: dopasowane towary przy pytaniu,
+           notatki przy dostawie, kandydatów na dokument przy zwrocie. Jedna
+           pigułka o trzech znaczeniach jest gorsza od braku pigułki. -->
+      <div class="sprawaSzyna">
+        <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
+        <button class="akcja cichy szufladaPrzycisk" data-szuflada>KONTEKST →</button>
+      </div>
       <div id="szczegolNaglowek" style="margin-top:12px"></div>
       <div class="sprawa-tresc">
         <!-- Wyjątki NAD tabelą pozycji: to po nie biuro wchodzi w dokument. -->
@@ -837,6 +921,14 @@
          więc notatka wypadała z ekranu, gdy tylko dokument miał więcej niż
          kilkanaście wierszy — a to jest rozmowa, na którą czeka domknięcie. -->
     <section class="card pelna kontekst" id="dostawaKontekst" hidden>
+      <!-- Głowa szuflady: widoczna TYLKO wtedy, gdy kontekst jest wysunięty.
+           Escape i klik w cień też zamykają, ale wysunięty panel bez widocznego
+           wyjścia czyta się jak coś, co się zacięło — a mysz nie ma jak zgadnąć
+           dwóch pozostałych dróg. -->
+      <div class="szufladaGlowa">
+        <h2 style="margin:0">KONTEKST SPRAWY</h2>
+        <button class="akcja cichy" data-szuflada-zamknij>ZAMKNIJ</button>
+      </div>
       <div id="dostawaDostawca"></div>
       <div id="dostawaNotatki" style="margin-top:14px"></div>
       <div id="dostawaAkcja" style="margin-top:14px"></div>
@@ -926,7 +1018,18 @@
     <!-- Szczegół zwrotu — zasłania karty poniżej (wzorzec #szczegol dostaw):
          to jest wejście W zwrot, nie dodatek obok listy. -->
     <section class="card pelna szczegol" id="zwrotSzczegol" hidden>
-      <button class="akcja cichy" id="zwrotWroc">← WSZYSTKIE ZWROTY</button>
+      <!-- Rząd wyjścia i wejścia: po lewej wyjście ZE sprawy, po prawej
+           wejście w jej kontekst. Przycisk KONTEKST widać tylko w paśmie,
+           w którym kontekst jest szufladą — poza nim stoi na ekranie sam.
+
+           Bez licznika przy napisie, choć makieta go rysuje. Liczyłby co
+           innego na każdej z trzech zakładek: dopasowane towary przy pytaniu,
+           notatki przy dostawie, kandydatów na dokument przy zwrocie. Jedna
+           pigułka o trzech znaczeniach jest gorsza od braku pigułki. -->
+      <div class="sprawaSzyna">
+        <button class="akcja cichy" id="zwrotWroc">← WSZYSTKIE ZWROTY</button>
+        <button class="akcja cichy szufladaPrzycisk" data-szuflada>KONTEKST →</button>
+      </div>
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
       <!-- ŚRODEK to jedna robota: ocenić każdą pozycję z paczki, dopisać to,
            czego Allegro nie zgłosiło, i wystawić z tego dokumenty. Zdjęcia
@@ -957,6 +1060,14 @@
          pozycji przycisk zwrotu środków wypadał z ekranu, a to jest ostatni
          krok całej sprawy. Blok żyje i ginie razem ze szczegółem. -->
     <section class="card pelna kontekst" id="zwrotKontekst" hidden>
+      <!-- Głowa szuflady: widoczna TYLKO wtedy, gdy kontekst jest wysunięty.
+           Escape i klik w cień też zamykają, ale wysunięty panel bez widocznego
+           wyjścia czyta się jak coś, co się zacięło — a mysz nie ma jak zgadnąć
+           dwóch pozostałych dróg. -->
+      <div class="szufladaGlowa">
+        <h2 style="margin:0">KONTEKST SPRAWY</h2>
+        <button class="akcja cichy" data-szuflada-zamknij>ZAMKNIJ</button>
+      </div>
       <div id="zwrotDokument"></div>
       <!-- Wzorzec zwrotów tego kupującego. Stoi NAD rozliczeniem, bo to jest
            rzecz, którą warto wiedzieć PRZED oddaniem środków, a nie po. -->
@@ -1096,7 +1207,18 @@
   <div id="widokPytania" class="widok" hidden>
     <!-- Szczegół pytania — wejście W sprawę, nie dodatek obok listy. -->
     <section class="card pelna szczegol" id="pytanieSzczegol" hidden>
-      <button class="akcja cichy" id="pytanieWroc">← WSZYSTKIE PYTANIA</button>
+      <!-- Rząd wyjścia i wejścia: po lewej wyjście ZE sprawy, po prawej
+           wejście w jej kontekst. Przycisk KONTEKST widać tylko w paśmie,
+           w którym kontekst jest szufladą — poza nim stoi na ekranie sam.
+
+           Bez licznika przy napisie, choć makieta go rysuje. Liczyłby co
+           innego na każdej z trzech zakładek: dopasowane towary przy pytaniu,
+           notatki przy dostawie, kandydatów na dokument przy zwrocie. Jedna
+           pigułka o trzech znaczeniach jest gorsza od braku pigułki. -->
+      <div class="sprawaSzyna">
+        <button class="akcja cichy" id="pytanieWroc">← WSZYSTKIE PYTANIA</button>
+        <button class="akcja cichy szufladaPrzycisk" data-szuflada>KONTEKST →</button>
+      </div>
       <!-- Akcje ZDEJMUJĄCE sprawę z listy stoją przy jej tytule, nie w rzędzie
            pod polem odpowiedzi. Tam sąsiadowały z WYŚLIJ i ZAPISZ, czyli
            z rzeczami, które sprawę POSUWAJĄ — siedem przycisków w dwóch
@@ -1149,6 +1271,14 @@
          w tej samej kolumnie, więc weryfikacja doboru wymagała przewinięcia
          wątku w dół, a potem z powrotem w górę do pola odpowiedzi. -->
     <section class="card pelna kontekst" id="pytanieKontekst" hidden>
+      <!-- Głowa szuflady: widoczna TYLKO wtedy, gdy kontekst jest wysunięty.
+           Escape i klik w cień też zamykają, ale wysunięty panel bez widocznego
+           wyjścia czyta się jak coś, co się zacięło — a mysz nie ma jak zgadnąć
+           dwóch pozostałych dróg. -->
+      <div class="szufladaGlowa">
+        <h2 style="margin:0">KONTEKST SPRAWY</h2>
+        <button class="akcja cichy" data-szuflada-zamknij>ZAMKNIJ</button>
+      </div>
       <h2>DOPASOWANE TOWARY</h2>
       <p class="mute" style="margin-bottom:8px">
         To samo, co dostał model. Kliknięcie „WSTAW LINK" dokleja adres aukcji
@@ -1641,6 +1771,11 @@
 
   </div>
 
+  <!-- Przyciemnienie pod wysuniętą szufladą. Stoi POZA widokami, bo jest
+       jedno na całą stronę; kopia w każdej zakładce byłaby trzecim miejscem
+       do zapomnienia przy czwartej. Klik zamyka — tak samo jak Escape. -->
+  <div id="szufladaCien" hidden></div>
+
   <!-- ── USTAWIENIA (za zębatką) ───────────────────────────────────────────
        Do 0.85.0 stało tu jedno logo dostawców, a konfiguracja rozłaziła się
        po zakładkach pracy: prompt eksperta na PYTANIACH, reguły strefy na
@@ -2125,7 +2260,7 @@ let ostatniSzczegol = "";
    faktury, tylko osobną kolejką pracy. */
 function ustawRodzenstwoDostaw() {
   const otwarty = otwartyDok != null;
-  $("kartaDostaw").hidden = otwarty && !trybSzeroki();
+  $("kartaDostaw").hidden = otwarty && !kolejkaZostaje();
   $("kartaReklamacji").hidden = otwarty;
   /* Kontekst żyje i ginie razem z dokumentem — pusta trzecia strefa przy
      zamkniętej dostawie byłaby nagłówkiem bez treści. */
@@ -2133,6 +2268,7 @@ function ustawRodzenstwoDostaw() {
   rysujDostawy();               // wariant listy zależy od tego, co ustawiamy tu
   rysujOdpowiedzi();            // ma własną regułę pustki
   $("widokDostawy").classList.toggle("zSzczegolem", otwarty);
+  ustawPasmoSzuflady("widokDostawy", otwarty);
   zaznaczWiersz("dostawy", "dok", otwartyDok);
 }
 
@@ -2469,7 +2605,7 @@ function rysujOdpowiedzi() {
      listę. W trybie szerokim lista stoi obok i licznik odpowiedzi ma prawo
      stać nad nią — to on jest drogą do notatki czekającej na odpowiedź. */
   $("kartaOdpowiedzi").hidden =
-    lista.length === 0 || (otwartyDok != null && !trybSzeroki());
+    lista.length === 0 || (otwartyDok != null && !kolejkaZostaje());
   if (!lista.length) return;
   $("odpowiedzi").innerHTML =
     "<tr><th>DOKUMENT</th><th>PYTANIE I ODPOWIEDŹ</th><th></th></tr>" +
@@ -3928,7 +4064,7 @@ async function odswiez() {
       await odswiezSzczegol();
       /* W trybie szerokim lista stoi obok szczegółu — postęp innych faktur
          ma być widać na żywo, tak samo jak postęp tej otwartej. */
-      if (trybSzeroki()) await odswiezDostawy();
+      if (kolejkaZostaje()) await odswiezDostawy();
     } else await odswiezDostawy();
   } else if (widok === "zwroty") await odswiezZwroty();
   else if (widok === "pytania") await odswiezPytania();
@@ -4020,7 +4156,7 @@ async function odswiezZwroty() {
     /* Wąsko: listy nie widać, więc nie ma czego odświeżać. Szeroko stoi obok
        otwartego zwrotu i musi żyć — ale bez `odswiezEtap3()` niżej, bo koszy,
        reklamacji ani wglądu i tak wtedy nie widać w żadnym trybie. */
-    if (!trybSzeroki()) return;
+    if (!kolejkaZostaje()) return;
   }
   try {
     const q = new URLSearchParams();
@@ -4103,7 +4239,7 @@ function dociagnijWglad(id) {
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
 function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
-  karta.hidden = lista.length === 0 || (otwartyZwrot != null && !trybSzeroki());
+  karta.hidden = lista.length === 0 || (otwartyZwrot != null && !kolejkaZostaje());
   /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
      ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
   $("brakujaceTicker").innerHTML = !ticker
@@ -4645,7 +4781,7 @@ function rysujZwroty(zwroty) {
 
   /* Szyna: siedem kolumn nie mieści się w 21 rem, więc wiersz łamie się w pionie
      — numer z datą, kupujący, a pod spodem status z oceną i dokumentem. */
-  if (otwartyZwrot != null && trybSzeroki()) {
+  if (otwartyZwrot != null && kolejkaZostaje()) {
     $("zwrotLista").innerHTML =
       zwroty.map((z) => `<tr data-zwrot="${z.id}"${z.id === otwartyZwrot ? ' class="aktywny"' : ""} style="cursor:pointer">
         <td class="sprawaWiersz">
@@ -4725,11 +4861,65 @@ async function utworzZwrot(body) {
    oknie to jedyne sensowne zachowanie i tak zostaje. Na szerokim było stratą:
    biuro traciło listę, nad którą pracowało, i po powrocie wracało na jej górę.
 
-   Próg jest JEDEN i wspólny z arkuszem stylów — patrz `@media (min-width:
-   1280px)` przy `.zSzczegolem`. Dwa progi zamiast jednego to dwa miejsca do
-   rozjazdu przy pierwszym strojeniu. */
+   Progi są wspólne z arkuszem stylów — patrz `@media (min-width: 1280px)`
+   i `@media (min-width: 1024px)`. Każdy literał stoi w dwóch miejscach naraz
+   i pilnuje tego test; rozjazd nie wywraca niczego głośno, tylko przestawia
+   układ na jednej szerokości okna. */
 const SZEROKO = window.matchMedia("(min-width: 1280px)");
-const trybSzeroki = () => SZEROKO.matches;
+
+/* Drugi próg, ten sam warunek co blok `@media (min-width: 1024px)` w arkuszu.
+   Między nim a 1280 px stoi PASMO ŚREDNIE: kolejka zostaje obok sprawy, a
+   kontekst schodzi do szuflady wywoływanej przyciskiem. Poniżej 1024 px
+   zostaje zachowanie sprzed 0.101.0 — sprawa zasłania wszystko. */
+const SREDNIO = window.matchMedia("(min-width: 1024px)");
+/** Czy kontekst jest w tym paśmie szufladą, a nie trzecią kolumną. */
+const wSzufladzie = () => SREDNIO.matches && !SZEROKO.matches;
+
+/**
+ * Czy kolejka zostaje widoczna OBOK otwartej sprawy.
+ *
+ * Zastąpiło `kolejkaZostaje()` w 0.101.0 i to nie jest przemianowanie. Każde
+ * pytanie, które kod zadawał przez tamten próg, brzmiało naprawdę „czy sprawa
+ * ZASŁANIA listę" — czy odświeżać kolejkę, czy rysować ją wariantem zwartym,
+ * czy zostawić nad nią licznik odpowiedzi. Odpowiedź zmieniła się na 1024 px,
+ * nie na 1280: w paśmie średnim lista stoi obok, choć trzech stref już nie ma.
+ * Trzymanie starego progu dawało kolejkę odświeżaną i rysowaną tak, jakby jej
+ * nie było widać — a widać ją.
+ */
+const kolejkaZostaje = () => SREDNIO.matches;
+
+/* Która zakładka ma wysuniętą szufladę; `null` = żadna. Trzyma się ID widoku,
+   nie samego `true`, bo sprawy na dwóch zakładkach bywają otwarte naraz
+   (`otwartyDok` i `otwartyZwrot` żyją niezależnie) i szuflada jednej nie ma
+   prawa świecić nad drugą. */
+let szufladaW = null;
+
+function ustawSzuflade(widokId, otwarta) {
+  szufladaW = otwarta ? widokId : null;
+  for (const el of document.querySelectorAll(".widok")) {
+    el.classList.toggle("szufladaOtwarta", el.id === szufladaW);
+  }
+  $("szufladaCien").hidden = szufladaW == null;
+}
+
+/**
+ * Klasa pasma na widoku + sprzątanie stanu szuflady.
+ *
+ * Wołana z każdego `ustawRodzenstwo*` i przy zmianie szerokości okna, bo
+ * odpowiada na pytanie „czy kontekst jest tu szufladą" — a to zmienia się
+ * i przy otwarciu sprawy, i przy przeciągnięciu krawędzi okna.
+ *
+ * Wysunięta szuflada gaśnie, gdy przestaje być szufladą: powyżej 1280 px
+ * kontekst staje się kolumną i wysunięty panel zasłaniałby ją samą sobą,
+ * a poniżej 1024 px wraca pod sprawę. Zamknięta sprawa też ją gasi — panel
+ * bez sprawy nie ma czego pokazywać.
+ */
+function ustawPasmoSzuflady(widokId, sprawaOtwarta) {
+  const el = $(widokId);
+  const szuflada = sprawaOtwarta && wSzufladzie();
+  el.classList.toggle("zSzuflada", szuflada);
+  if (!szuflada && szufladaW === widokId) ustawSzuflade(widokId, false);
+}
 
 /* Co zostaje obok otwartego zwrotu. NIE cała zakładka: przy otwartym zwrocie
    kontekstem jest kolejka zwrotów i skaner następnej etykiety, a nie kosze,
@@ -4746,7 +4936,7 @@ const KARTY_ZWROTOW = [
 
 function ustawRodzenstwoZwrotu() {
   const otwarty = otwartyZwrot != null;
-  const zostaje = otwarty && trybSzeroki() ? PRZY_ZWROCIE : [];
+  const zostaje = otwarty && kolejkaZostaje() ? PRZY_ZWROCIE : [];
   for (const id of KARTY_ZWROTOW) $(id).hidden = otwarty && !zostaje.includes(id);
   /* Dwie karty mają WŁASNĄ regułę pustki i ona jest nadrzędna — pusta karta
      jest nagłówkiem bez treści. */
@@ -4756,6 +4946,7 @@ function ustawRodzenstwoZwrotu() {
      zamkniętym zwrocie byłaby nagłówkiem bez treści. */
   $("zwrotKontekst").hidden = !otwarty;
   $("widokZwroty").classList.toggle("zSzczegolem", otwarty);
+  ustawPasmoSzuflady("widokZwroty", otwarty);
   rysujZwroty(zwrotyLista);     // wariant listy zależy od tego, co ustawiamy tu
   zaznaczWiersz("zwrotLista", "zwrot", otwartyZwrot);
 }
@@ -4801,12 +4992,19 @@ function zamknijZwrot() {
 
 /* Zmiana szerokości okna przy otwartym szczególe ma przełączyć tryb, a nie
    zostawić układ z poprzedniego. Oba drill-downy naraz, bo `otwartyDok`
-   i `otwartyZwrot` żyją na różnych zakładkach i mogą być otwarte równocześnie. */
-SZEROKO.addEventListener("change", () => {
-  ustawRodzenstwoZwrotu();
-  ustawRodzenstwoDostaw();
-  ustawRodzenstwoPytania();
-});
+   i `otwartyZwrot` żyją na różnych zakładkach i mogą być otwarte równocześnie.
+
+   OBA progi, nie tylko górny: od 0.101.0 pasm są trzy, a przeciągnięcie
+   krawędzi okna przez 1024 px zmienia układ dokładnie tak samo jak przez
+   1280 px. Jeden nasłuch mniej znaczyłby, że jedna z granic działa tylko
+   przy przeładowaniu strony. */
+for (const prog of [SZEROKO, SREDNIO]) {
+  prog.addEventListener("change", () => {
+    ustawRodzenstwoZwrotu();
+    ustawRodzenstwoDostaw();
+    ustawRodzenstwoPytania();
+  });
+}
 
 async function odswiezSzczegolZwrotu() {
   if (otwartyZwrot == null) return;
@@ -5488,7 +5686,30 @@ $("wrocDoListy").addEventListener("click", zamknijDokument);
 document.addEventListener("keydown", (e) => {
   // Esc w otwartym dialogu zamyka DIALOG (natywnie) — nie kartę pod nim
   if ($("dialogW").open) return;
-  if (e.key === "Escape") { zamknijDokument(); if (otwartyZwrot != null) { zamknijZwrot(); odswiezZwroty(); } }
+  if (e.key !== "Escape") return;
+  /* KOLEJNOŚĆ MA ZNACZENIE: Escape zamyka NAJWYŻSZĄ warstwę, czyli szufladę,
+     i na tym kończy. Bez tego `return` jeden klawisz zdejmowałby szufladę
+     i sprawę pod nią naraz — a to jest wyjście z pracy, nie z panelu obok. */
+  if (szufladaW) return ustawSzuflade(szufladaW, false);
+  zamknijDokument();
+  if (otwartyZwrot != null) { zamknijZwrot(); odswiezZwroty(); }
+});
+
+/* ── Szuflada kontekstu (0.101.0) ────────────────────────────────────────────
+   Nasłuch na DOKUMENCIE, nie na trzech sprawach z osobna. Przycisk stoi
+   w rzędzie wyjścia każdej z nich, a rzędy te przebudowują się przy każdym
+   rysowaniu sprawy — nasłuch przypięty do rzędu urywałby się dokładnie tak,
+   jak urywał się w 0.92.0, 0.96.0, 0.97.0 i 0.98.0. Który widok otwieramy,
+   mówi `closest(".widok")`, więc jedna obsługa starcza na trzy zakładki
+   i wystarczy na czwartą. */
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-szuflada-zamknij]") || e.target.id === "szufladaCien") {
+    return ustawSzuflade(szufladaW, false);
+  }
+  const b = e.target.closest("[data-szuflada]");
+  if (!b) return;
+  const widok = b.closest(".widok");
+  if (widok) ustawSzuflade(widok.id, szufladaW !== widok.id);
 });
 
 /* ── Zwroty Allegro — zdarzenia ── */
@@ -5882,7 +6103,7 @@ const PRZY_PYTANIU = ["pytaniaListaKarta"];
  */
 function ustawRodzenstwoPytania() {
   const otwarte = otwartePytanie != null;
-  const zostaje = otwarte && trybSzeroki() ? PRZY_PYTANIU : [];
+  const zostaje = otwarte && kolejkaZostaje() ? PRZY_PYTANIU : [];
   for (const id of KARTY_LISTY_PYTAN) {
     /* Baner ma własną regułę pustki i ona jest nadrzędna — przy działającym
        modelu i sparowanym koncie nie ma czego ogłaszać. */
@@ -5894,6 +6115,7 @@ function ustawRodzenstwoPytania() {
      zamkniętej sprawie byłaby nagłówkiem bez treści. */
   $("pytanieKontekst").hidden = !otwarte;
   $("widokPytania").classList.toggle("zSzczegolem", otwarte);
+  ustawPasmoSzuflady("widokPytania", otwarte);
   /* Kolejka ma dwa warianty (tabela / szyna) i wariant zależy OD TEGO, co
      robimy tutaj — więc przerysowanie należy do tej funkcji, nie do
      odświeżania z serwera, które przy otwartej sprawie w ogóle nie chodzi. */
@@ -5982,7 +6204,7 @@ function rysujListePytan(lista) {
     $("pytaniaLista").innerHTML = `<tr><td class="mute">${nic}</td></tr>`;
     return;
   }
-  const wSzynie = otwartePytanie != null && trybSzeroki();
+  const wSzynie = otwartePytanie != null && kolejkaZostaje();
   const wiersz = (p, tresc) =>
     `<tr data-pytanie="${p.id}"${p.id === otwartePytanie ? ' class="aktywny"' : ""} style="cursor:pointer">${tresc}</tr>`;
 
