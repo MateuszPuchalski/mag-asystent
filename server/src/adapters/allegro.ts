@@ -209,8 +209,17 @@ export interface AllegroAdapter {
    * hamuje dopiero `maxStron`.
    */
   listaWatkow(odKiedy: string | null, maxStron?: number): Promise<WatekNaglowek[]>;
-  /** Wiadomości jednego wątku, od najstarszej. */
-  wiadomosciWatku(threadId: string): Promise<WiadomoscAllegro[]>;
+  /**
+   * Wiadomości jednego wątku, od najstarszej.
+   *
+   * `rozmowca` to login kupującego z nagłówka wątku i jest tu POTRZEBNY, a nie
+   * pomocniczy: Allegro nie zawsze podaje `author.role` przy wiadomości, a bez
+   * roli jedyne, po czym da się poznać stronę rozmowy, jest właśnie login.
+   * Pominięty (albo `null`) znaczy „nie wiem" — wtedy wiadomość bez roli liczy
+   * się jako NASZA, bo pomyłka w tę stronę tylko chowa pytanie, a w drugą
+   * kazałaby nam odpisywać na własne zdania.
+   */
+  wiadomosciWatku(threadId: string, rozmowca?: string | null): Promise<WiadomoscAllegro[]>;
   /** Wysyła naszą odpowiedź do wątku. */
   wyslijWiadomosc(threadId: string, tekst: string): Promise<void>;
   /** Odhacza wątek jako przeczytany — żeby panel Allegro nie świecił po naszej odpowiedzi. */

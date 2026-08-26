@@ -33,6 +33,51 @@ historii nie przepisujemy.
 
 ---
 
+## 0.102.1 — 26 sierpnia 2026
+
+**Pytania z Allegro nie wchodziły w ogóle.** Zgłoszenie z produkcji: „nie
+pobiera zapytań, mailowo normalnie przychodzą". Panel po kliknięciu ODŚWIEŻ
+pokazywał **„nowych 0 · przejrzano 60 rozmów"** — czyli token działał,
+uprawnienie było, lista wątków wracała, a odpadał każdy z sześćdziesięciu.
+
+**Przyczyna: martwa ścieżka rozpoznawania stron rozmowy.** Kto pisał, ustala
+się najpierw po `author.role`, a gdy Allegro jej nie poda — po loginie
+rozmówcy. Ta druga ścieżka była nieosiągalna, bo **oba wywołania przekazywały
+`null`** zamiast loginu. Na koncie bez ról każda wiadomość liczyła się jako
+NASZA, więc żaden wątek nie kończył się pytaniem klienta i nie importowało się
+nic — bez jednego błędu w logu.
+
+**Login kupującego był pod ręką przez cały czas** — jedzie z listą wątków jako
+`interlokutor` i z samym pytaniem jako `kupujacyLogin`. Naprawa to przekazanie
+go tam, gdzie zawsze miał trafiać.
+
+**Dlaczego nie wyszło wcześniej.** Adapter dev trzyma gotowe wiadomości
+z ustawioną stroną rozmowy i przez to mapowanie w ogóle nie przechodzi — więc
+demo i scenariusze nie miały jak tej funkcji dotknąć. A test, który miał jej
+pilnować, nazywał się „brak roli → login rozmówcy" i **tej ścieżki nie
+wykonywał**: obie wiadomości w nim miały rolę. Nazwa obiecywała pokrycie,
+którego nie było.
+
+**To samo dotyczyło podglądu rozmowy.** Wątek otwarty z karty pytania też
+mapował się bez loginu, więc na koncie bez ról cała korespondencja
+wyświetlałaby się jako nasza.
+
+**Zero mówi teraz, DLACZEGO.** Jedno `continue` łykało pięć różnych sytuacji
+i wszystkie wyglądały na ekranie tak samo. Linijka pod przyciskiem dopowiada
+je, gdy nic nie weszło: „przejrzano 60 rozmów — 58 już mamy, 2 kończą się naszą
+odpowiedzią". Wątki, z których nie da się nic wyjąć, idą pogrubione — bo to
+jedyny z tych powodów, który znaczy usterkę, a nie poprawną skrzynkę na zero.
+
+**Rachunek się domyka i test tego pilnuje:** nowe plus pięć powodów pominięcia
+równa się liczbie przejrzanych rozmów. Szósty powód dopisany bez uzupełnienia
+sumy zepsuje test głośno, zamiast po cichu wrócić do zera bez wyjaśnienia.
+
+**Strażnik na wywołania.** Samego mapowania nie da się złapać testem
+integracyjnym — adapter dev go omija, a klient HTTP nie ma atrapy `fetch`.
+Doszło więc sprawdzenie ŹRÓDŁA: żadne wywołanie nie może przekazać `null`
+zamiast rozmówcy. Ten sam zabieg, co przy delegacji przycisków, i z tego samego
+powodu — pomyłka nie wywraca niczego głośno, tylko cicho gasi zakładkę.
+
 ## 0.102.0 — 26 sierpnia 2026
 
 **Skrzynka na zero mówi teraz, KIEDY ostatnio pytaliśmy Allegro.** Ostatnia
