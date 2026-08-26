@@ -634,7 +634,12 @@ CREATE TABLE IF NOT EXISTS zwrot_pozycja (
   -- dopóki sprawa trwa. Ewidencja w aplikacji, nie ruch w Subiekcie — towar
   -- reklamowany nie jest na stanie (korekta go nie objęła), więc MM nie ma
   -- czego przesuwać. Zostaje po rozpatrzeniu: historia mówi, skąd zszedł.
-  rekl_polka    TEXT
+  rekl_polka    TEXT,
+  -- Kto prowadzi reklamację i od kiedy. Ten sam powód co `pytanie.prowadzi`
+  -- (0.89.0): przy dwóch biurkach dwie osoby potrafią rozpatrywać tę samą
+  -- sprawę. ZNACZNIK, nie blokada — zwalnia się przy rozpatrzeniu.
+  rekl_prowadzi    TEXT,
+  rekl_prowadzi_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_poz ON zwrot_pozycja(zwrot_id);
 
@@ -941,3 +946,43 @@ CREATE TABLE IF NOT EXISTS dopasowanie (
   UNIQUE (urzadzenie, symbol)
 );
 CREATE INDEX IF NOT EXISTS ix_dopasowanie_urzadzenie ON dopasowanie(urzadzenie);
+
+-- ── Dyskusje i reklamacje z panelu Allegro ──────────────────────────────────
+-- Do tej pory dyskusje były podglądem na kliknięcie: nic nie zostawało, więc
+-- sprawa bez wyznaczonego właściciela potrafiła czekać niezauważona aż do
+-- terminu ustawowego. Ta tabela to REJESTR NASZEJ PRACY (ten sam wzorzec co
+-- `pytanie`): sama rozmowa toczy się w panelu Allegro i tam się odpowiada —
+-- `/sale/issues` nie zwraca treści wiadomości, więc lustro wątku nie jest
+-- nawet możliwe. Zostaje kolejka, właściciel sprawy, notatka z ustaleń
+-- i powiązanie ze zwrotem po numerze zamówienia.
+CREATE TABLE IF NOT EXISTS dyskusja (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  allegro_id        TEXT NOT NULL UNIQUE, -- klucz upsertu — sync widuje tę samą sprawę wielokrotnie
+  typ               TEXT,                 -- DISCUSSION | CLAIM (reklamacja ma termin ustawowy)
+  status_allegro    TEXT,                 -- surowy status z /sale/issues (jak zwrot_zapowiedz.status_allegro)
+  --   nowa      = nikt jej jeszcze nie wziął
+  --   w_toku    = ktoś prowadzi sprawę w panelu Allegro
+  --   zamknieta = rozstrzygnięta (przez nas albo automatem po statusie Allegro)
+  --   pominieta = zdjęta z listy bez rozstrzygnięcia w aplikacji
+  status            TEXT NOT NULL DEFAULT 'nowa',
+  temat             TEXT,
+  kupujacy_login    TEXT,
+  order_id          TEXT,                 -- checkout-form id — most do zwrot.allegro_order_id
+  utworzono_allegro TEXT,                 -- od tej daty liczy się termin ustawowy dla CLAIM
+  zwrot_id          INTEGER REFERENCES zwrot(id), -- dopasowany przy sync po order_id
+  notatka           TEXT,                 -- ustalenia biura (treść rozmowy zostaje w Allegro)
+  -- Kto wziął sprawę i kiedy — ZNACZNIK, nie blokada (wzorzec `pytanie`).
+  prowadzi          TEXT,
+  prowadzi_at       TEXT,
+  zamknieto_at      TEXT,
+  zamknieto_przez   TEXT,                 -- login biura albo 'allegro' (auto-zamknięcie po statusie)
+  widziano_at       TEXT NOT NULL,        -- ostatni raz w odpowiedzi API (diagnostyka synchronizacji)
+  utworzono_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_dyskusja_status ON dyskusja(status, id);
+-- Ten sam powód co ix_zwrot_kupujacy: klient z otwartą dyskusją bywa tym
+-- samym, który pyta o część albo właśnie coś zwrócił.
+CREATE INDEX IF NOT EXISTS ix_dyskusja_kupujacy ON dyskusja(kupujacy_login);
+-- Zwrot przyjęty skanem PO pojawieniu się dyskusji musi ją odnaleźć po
+-- numerze zamówienia — bez indeksu szłoby to pełnym skanem przy każdym sync.
+CREATE INDEX IF NOT EXISTS ix_dyskusja_order ON dyskusja(order_id);

@@ -1137,9 +1137,28 @@ przyrostowym — a jej status w Allegro zmienia się dalej.
 Od 0.68.0 reklamacja ma **półkę** — pole „gdzie fizycznie leży towar" na
 liście reklamacji i karcie zwrotu. To ewidencja w aplikacji, nie ruch
 w Subiekcie: reklamowany towar nie jest na stanie, więc MM nie miałoby czego
-przesuwać. Obok stoi podgląd **dyskusji i reklamacji z Allegro**
-(`GET /sale/issues`) — na kliknięcie, bez zapisu u nas. Wymaga uprawnienia
-do dyskusji przy rejestracji aplikacji (`allegro:api:disputes`); bez niego
+przesuwać. Od 0.103.0 lista reklamacji pokazuje też, **kto prowadzi sprawę**.
+Znacznik działa jak przy pytaniach klientów: to informacja dla reszty biura,
+nie blokada. Nazwisko pojawia się przy odłożeniu na półkę albo po kliknięciu
+PROWADZĘ, a rozpatrzenie je zdejmuje.
+
+Obok stoi karta **DYSKUSJE I REKLAMACJE ALLEGRO**. Do 0.102 była podglądem
+na kliknięcie, bez zapisu u nas. Od 0.103.0 to **rejestr pracy biura**, ten
+sam wzorzec co pytania klientów. Przycisk POBIERZ Z ALLEGRO zapisuje sprawy
+z `GET /sale/issues` do lokalnej tabeli. Lista pokazuje status naszej pracy,
+prowadzącego, notatkę z ustaleń i powiązany zwrot (po numerze zamówienia).
+
+Formalna reklamacja (CLAIM) dostaje termin ustawowy liczony jak przy
+reklamacjach ze zwrotów. Zakładka ZWROTY nosi licznik spraw, które czekają.
+
+**Odpowiada się nadal w panelu Allegro** — `GET /sale/issues` nie zwraca
+treści wiadomości, więc rozmowa ma jedno miejsce prawdy tam. U nas zostaje
+to, czego panel Allegro nie daje: kolejka, właściciel i termin.
+Sprawa zamknięta w panelu schodzi z listy sama przy najbliższym pobraniu.
+
+Pobieranie może też chodzić w tle: ticker dzieli interwał `ALLEGRO_POLL_MS`
+z zapowiedziami i pytaniami, domyślnie zero — pobiera człowiek. Uprawnienie
+bez zmian: `allegro:api:disputes` przy rejestracji aplikacji; bez niego
 przycisk mówi, czego brakuje.
 
 ### Rozkładanie zwrotów z regału (zakładka ZWROTY, 0.75.0)

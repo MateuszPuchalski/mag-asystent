@@ -24,6 +24,7 @@ import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { pytaniaRoutes } from "./routes/pytania.js";
+import { dyskusjeRoutes } from "./routes/dyskusje.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
@@ -38,6 +39,7 @@ import {
 import { problemAllegro } from "./services/allegro-token.js";
 import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { uruchomTickerPytan } from "./services/pytania.js";
+import { uruchomTickerDyskusji } from "./services/dyskusje.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { brakDostepuDoTla } from "./adapters/tlo.js";
@@ -199,6 +201,7 @@ export async function buildApp() {
   await app.register(dostawcyRoutes);
   await app.register(zwrotyRoutes);
   await app.register(pytaniaRoutes);
+  await app.register(dyskusjeRoutes);
   await app.register(koszeRoutes);
   await app.register(aktualizacjaRoutes);
 
@@ -232,6 +235,9 @@ async function main() {
      na tym samym koncie Allegro, plus szkice, żeby otwarte pytanie miało
      odpowiedź gotową, a nie przycisk „wygeneruj” i czekanie. */
   uruchomTickerPytan();
+  /* Dyskusje i reklamacje Allegro — ten sam powód i ten sam interwał: rejestr
+     spraw ma schodzić z kolejki sam, gdy panel Allegro je zamyka. */
+  uruchomTickerDyskusji();
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

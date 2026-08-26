@@ -2,6 +2,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
+import { kontekstKlienta, type KontekstKlienta } from "./klienci.js";
 import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import type { OfertaAllegro, WiadomoscAllegro } from "../adapters/allegro.js";
@@ -681,82 +682,21 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
    Czytane NA KLIK, osobną trasą: otwarcie sprawy ma być tanie, a te dwa
    zapytania są potrzebne tylko przy wątpliwości.                             */
 
-export interface PytanieHistorii {
-  id: number;
-  otrzymanoAt: string | null;
-  tresc: string;
-  odpowiedz: string | null;
-  status: string;
-  ofertaTytul: string | null;
-}
-
-export interface ZwrotHistorii {
-  id: number;
-  referencja: string | null;
-  status: string;
-  utworzonoAt: string | null;
-  pozycji: number;
-}
-
-export interface HistoriaKlienta {
-  login: string | null;
-  pytania: PytanieHistorii[];
-  zwroty: ZwrotHistorii[];
-}
-
-/** Ile wstecz pokazujemy — tyle, ile mieści się w karcie bez przewijania. */
-const HISTORII_KLIENTA = 10;
-
 /**
  * Co ten kupujący już u nas załatwiał.
  *
  * Pytanie z wklejki nie ma loginu i to jest poprawny wynik pusty, nie błąd:
  * screenshot z poczty nie niesie tożsamości kupującego z Allegro.
+ *
+ * Sam podgląd mieszka w `klienci.ts` (`kontekstKlienta`) — od kiedy patrzą
+ * na niego trzy karty naraz (pytania, zwroty, dyskusje), pisanie tych zapytań
+ * osobno w każdym module gwarantowałoby ich rozjazd. Tu zostaje cienka
+ * nakładka wiążąca kontekst z konkretnym pytaniem.
  */
-export function historiaKlienta(id: number): HistoriaKlienta {
+export function historiaKlienta(id: number): KontekstKlienta {
   const p = wiersz(id);
   const login = (p.kupujacy_login as string | null) ?? null;
-  if (!login) return { login: null, pytania: [], zwroty: [] };
-
-  const pytania = db()
-    .prepare(
-      `SELECT id, otrzymano_at, tresc, odpowiedz, status, oferta_tytul
-       FROM pytanie
-       WHERE kupujacy_login = ? AND id <> ?
-       ORDER BY otrzymano_at DESC, id DESC LIMIT ?`
-    )
-    .all(login, id, HISTORII_KLIENTA) as Array<Record<string, unknown>>;
-
-  /* Zwroty tego samego loginu — z licznikiem pozycji, bo „zwrot" bez liczby
-     rzeczy nie mówi, czy wróciła jedna uszczelka, czy cała paczka. */
-  const zwroty = db()
-    .prepare(
-      `SELECT z.id, z.referencja, z.status, z.utworzono_at,
-              (SELECT COUNT(*) FROM zwrot_pozycja p WHERE p.zwrot_id = z.id) AS pozycji
-       FROM zwrot z
-       WHERE z.kupujacy_login = ?
-       ORDER BY z.utworzono_at DESC LIMIT ?`
-    )
-    .all(login, HISTORII_KLIENTA) as Array<Record<string, unknown>>;
-
-  return {
-    login,
-    pytania: pytania.map((r) => ({
-      id: Number(r.id),
-      otrzymanoAt: (r.otrzymano_at as string) ?? null,
-      tresc: (r.tresc as string) ?? "",
-      odpowiedz: (r.odpowiedz as string) ?? null,
-      status: (r.status as string) ?? "nowe",
-      ofertaTytul: (r.oferta_tytul as string) ?? null,
-    })),
-    zwroty: zwroty.map((r) => ({
-      id: Number(r.id),
-      referencja: (r.referencja as string) ?? null,
-      status: (r.status as string) ?? "",
-      utworzonoAt: (r.utworzono_at as string) ?? null,
-      pozycji: Number(r.pozycji ?? 0),
-    })),
-  };
+  return kontekstKlienta(login, { pytanieId: id });
 }
 
 /* ── Szkic ───────────────────────────────────────────────────────────────── */

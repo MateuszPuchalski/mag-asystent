@@ -132,6 +132,12 @@ export interface SzczegolZwrotu {
   dokumenty: StanDokumentow;
   /** Kosz zwrotowy, w którym leży towar; null przed przypięciem (Etap 3). */
   kosz: { id: number; kod: string; status: string } | null;
+  /**
+   * Otwarte i zamknięte sprawy z panelu Allegro do TEGO zamówienia. Dopasowanie
+   * po `zwrot_id` LUB po numerze zamówienia — dyskusja potrafi pojawić się
+   * przed skanem paczki i wtedy wiązanie ma dopiero najbliższy sync.
+   */
+  dyskusje: Array<{ id: number; typ: string | null; status: string; temat: string | null }>;
 }
 
 export type WynikSkanu =
@@ -974,6 +980,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
     kupujacyStat: statystykiKupujacego(z.kupujacy_login),
     dokumenty: stanDokumentow(z),
     kosz: koszZwrotu(z.kosz_id),
+    dyskusje: dyskusjeZwrotu(z.id, z.allegro_order_id),
     pozycjeZamowienia,
     pozycje: pozycje.map((p) => ({
       id: p.id,
@@ -1070,6 +1077,28 @@ function koszZwrotu(koszId: number | null): { id: number; kod: string; status: s
     | { id: number; kod: string; status: string }
     | undefined;
   return k ?? null;
+}
+
+/* Zapytanie wprost z tego samego powodu co `koszZwrotu`: `dyskusje.ts`
+   importuje stąd typy zwrotu przez `reklamacje.ts` i odwrotny import
+   domknąłby cykl. Dopasowanie po wiązaniu ORAZ po numerze zamówienia —
+   sprawa sprzed skanu paczki ma `zwrot_id` NULL do najbliższego syncu. */
+function dyskusjeZwrotu(
+  zwrotId: number,
+  orderId: string | null
+): Array<{ id: number; typ: string | null; status: string; temat: string | null }> {
+  return db()
+    .prepare(
+      `SELECT id, typ, status, temat FROM dyskusja
+       WHERE zwrot_id = ? OR (order_id IS NOT NULL AND order_id = ?)
+       ORDER BY id DESC LIMIT 10`
+    )
+    .all(zwrotId, orderId) as Array<{
+    id: number;
+    typ: string | null;
+    status: string;
+    temat: string | null;
+  }>;
 }
 
 function wierszZwrotu(id: number): WierszZwrotu {

@@ -42,6 +42,9 @@ export interface WierszReklamacji {
   reklNotatka: string | null;
   /** Półka, na której fizycznie leży reklamowany towar; null = nie odłożono. */
   polka: string | null;
+  /** Kto wziął sprawę — znacznik dla reszty biura, nie blokada (wzorzec pytań). */
+  prowadzi: string | null;
+  prowadziAt: string | null;
 }
 
 const DZIEN_MS = 86_400_000;
@@ -60,19 +63,25 @@ export function terminReklamacji(
   };
 }
 
-export function listaReklamacji(opts: { rozpatrzone?: boolean } = {}): WierszReklamacji[] {
+export function listaReklamacji(
+  opts: { rozpatrzone?: boolean; limit?: number } = {}
+): WierszReklamacji[] {
   const filtr = opts.rozpatrzone ? "p.rekl_wynik IS NOT NULL" : "p.rekl_wynik IS NULL";
+  /* Domyślne 200 zostaje (tyle mieści ekran z zapasem), ale sufit jest teraz
+     opcją — raport i eksport nie mają powodu ucinać ogona listy. */
+  const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
   const wiersze = db()
     .prepare(
       `SELECT p.id AS pozycja_id, p.zwrot_id, p.nazwa, p.external_id, p.tw_id, p.ilosc,
               p.powod, p.powod_opis, p.notatka,
               p.rekl_wynik, p.rekl_at, p.rekl_przez, p.rekl_notatka, p.rekl_polka,
+              p.rekl_prowadzi, p.rekl_prowadzi_at,
               z.referencja, z.waybill, z.kupujacy_login, z.utworzono_allegro, z.utworzono_at
        FROM zwrot_pozycja p JOIN zwrot z ON z.id = p.zwrot_id
        WHERE p.decyzja = 'reklamacja' AND ${filtr}
-       ORDER BY p.id DESC LIMIT 200`
+       ORDER BY p.id DESC LIMIT ?`
     )
-    .all() as Array<Record<string, unknown>>;
+    .all(limit) as Array<Record<string, unknown>>;
 
   const teraz = Date.now();
   const lista = wiersze.map((w) => {
@@ -100,6 +109,8 @@ export function listaReklamacji(opts: { rozpatrzone?: boolean } = {}): WierszRek
       rozpatrzonoPrzez: (w.rekl_przez as string) ?? null,
       reklNotatka: (w.rekl_notatka as string) ?? null,
       polka: (w.rekl_polka as string) ?? null,
+      prowadzi: (w.rekl_prowadzi as string) ?? null,
+      prowadziAt: (w.rekl_prowadzi_at as string) ?? null,
     };
   });
   // otwarte: najpilniejsze na górze; rozpatrzone: najświeższe na górze
@@ -126,10 +137,42 @@ export function rozpatrzReklamacje(
      a jej ślad zostaje w audycie. */
   if (p.rekl_wynik) throw new BladZwrotu(400, `Reklamacja jest już rozpatrzona (${p.rekl_wynik})`);
 
+  /* Rozpatrzenie ZWALNIA prowadzącego (jak wysłanie odpowiedzi przy
+     pytaniach): sprawa zamknięta nie jest niczyją robotą, a kto rozstrzygnął,
+     mówi `rekl_przez`. */
   db()
-    .prepare("UPDATE zwrot_pozycja SET rekl_wynik=?, rekl_at=?, rekl_przez=?, rekl_notatka=? WHERE id=?")
+    .prepare(
+      `UPDATE zwrot_pozycja
+          SET rekl_wynik=?, rekl_at=?, rekl_przez=?, rekl_notatka=?,
+              rekl_prowadzi=NULL, rekl_prowadzi_at=NULL
+        WHERE id=?`
+    )
     .run(wynik, nowIso(), autor, notatka, pozycjaId);
   logEvent("reklamacja_rozpatrzona", autor, p.tw_id, { pozycjaId, wynik, notatka });
+}
+
+/**
+ * Kto prowadzi reklamację — ZNACZNIK, nie zamek (doktryna `stempelProwadzi`
+ * z pytań). Reklamacja, inaczej niż pytanie, nie ma przed werdyktem żadnego
+ * zapisu treści, przy którym nazwisko pojawiłoby się samo — dlatego obok
+ * stempli przy okazji (półka) istnieje jawny przycisk PROWADZĘ. Rozpatrzenie
+ * czyści znacznik.
+ */
+export function stempelProwadziReklamacji(pozycjaId: number, autor: string): void {
+  const p = db()
+    .prepare("SELECT id, tw_id, decyzja, rekl_wynik FROM zwrot_pozycja WHERE id = ?")
+    .get(pozycjaId) as
+    | { id: number; tw_id: number | null; decyzja: string | null; rekl_wynik: string | null }
+    | undefined;
+  if (!p) throw new BladZwrotu(404, `Pozycja ${pozycjaId} nie istnieje`);
+  if (p.decyzja !== "reklamacja") throw new BladZwrotu(400, "Ta pozycja nie jest reklamacją");
+  if (p.rekl_wynik) throw new BladZwrotu(400, `Reklamacja jest już rozpatrzona (${p.rekl_wynik})`);
+  db()
+    .prepare(
+      "UPDATE zwrot_pozycja SET rekl_prowadzi=?, rekl_prowadzi_at=datetime('now') WHERE id=?"
+    )
+    .run(autor, pozycjaId);
+  logEvent("reklamacja_prowadzi", autor, p.tw_id, { pozycjaId });
 }
 
 /**
@@ -147,7 +190,15 @@ export function ustawPolke(pozycjaId: number, polka: string | null, autor: strin
   if (!p) throw new BladZwrotu(404, `Pozycja ${pozycjaId} nie istnieje`);
   if (p.decyzja !== "reklamacja") throw new BladZwrotu(400, "Ta pozycja nie jest reklamacją");
   const wartosc = polka?.trim().toUpperCase() || null;
-  db().prepare("UPDATE zwrot_pozycja SET rekl_polka=? WHERE id=?").run(wartosc, pozycjaId);
+  /* Odkładanie na półkę JEST prowadzeniem sprawy — nazwisko pojawia się przy
+     zapisie, który i tak następuje (zasada „bez zapisu przy samym patrzeniu"). */
+  db()
+    .prepare(
+      `UPDATE zwrot_pozycja
+          SET rekl_polka=?, rekl_prowadzi=?, rekl_prowadzi_at=datetime('now')
+        WHERE id=?`
+    )
+    .run(wartosc, autor, pozycjaId);
   logEvent("reklamacja_polka", autor, p.tw_id, { pozycjaId, polka: wartosc });
 }
 

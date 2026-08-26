@@ -63,9 +63,11 @@ function zalogowany(rola: Rola): string {
 const TRASY = [
   { method: "POST" as const, url: "/api/biuro/zwroty/skan", body: { kod: "X" } },
   { method: "GET" as const, url: "/api/biuro/zwroty" },
+  { method: "GET" as const, url: "/api/biuro/zwroty/licznik" },
   { method: "GET" as const, url: "/api/biuro/zwroty/1" },
   { method: "POST" as const, url: "/api/biuro/zwroty/1/zwrot-srodkow" },
   { method: "POST" as const, url: "/api/biuro/zwroty/1/dokumenty" },
+  { method: "POST" as const, url: "/api/biuro/zwroty/reklamacje/1/prowadzi", body: {} },
   { method: "GET" as const, url: "/api/biuro/allegro/status" },
 ];
 
@@ -263,4 +265,52 @@ test("korekta z MM: zlecenie jednym POST-em, potem karta odmawia zmian", async (
   });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /zlecone/i);
+});
+
+test("licznik uwagi i jawne przejęcie reklamacji przez HTTP", async () => {
+  const biuro = { "x-session": zalogowany("biuro") };
+
+  // reklamacja po terminie + świeża — pigułka liczy tylko przeterminowane
+  const d = db();
+  const zwrot = d
+    .prepare(
+      `INSERT INTO zwrot(waybill, status, utworzono_allegro, utworzono_at, utworzono_przez)
+       VALUES ('WB-LICZ', 'oceniony', ?, ?, 'Test')`
+    )
+    .run(
+      new Date(Date.now() - 20 * 86_400_000).toISOString(),
+      new Date().toISOString()
+    );
+  const pozycja = d
+    .prepare(
+      `INSERT INTO zwrot_pozycja(zwrot_id, nazwa, ilosc, decyzja)
+       VALUES (?, 'Uszkodzona piła', 1, 'reklamacja')`
+    )
+    .run(Number(zwrot.lastInsertRowid));
+  const pozycjaId = Number(pozycja.lastInsertRowid);
+
+  let r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/licznik", headers: biuro });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json(), {
+    reklamacjeOtwarte: 1,
+    reklamacjePoTerminie: 1,
+    dyskusjeNowe: 0,
+    dyskusjeClaimyPoTerminie: 0,
+  });
+
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/zwroty/reklamacje/${pozycjaId}/prowadzi`,
+    payload: {}, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200);
+  const wiersz = r.json().reklamacje.find(
+    (x: { pozycjaId: number }) => x.pozycjaId === pozycjaId
+  );
+  assert.match(wiersz.prowadzi, /biuro/, "nazwisko z sesji, jak przy zleceniu korekty");
+
+  r = await app.inject({
+    method: "POST", url: "/api/biuro/zwroty/reklamacje/999999/prowadzi",
+    payload: {}, headers: biuro,
+  });
+  assert.equal(r.statusCode, 404);
 });
