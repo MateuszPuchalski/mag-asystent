@@ -340,6 +340,8 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
     "szczegolNaglowek",     // nagłówek dostawy — stąd wyjechały notatki (0.92.0)
     "szczegolLinie",        // tabela pozycji — wyjątki wyszły nad nią (0.97.0)
     "szczegolBezLinii",
+    "zwrotPozycje",         // lista pozycji zwrotu (0.98.0)
+    "zwrotDokumenty",       // blok korekty — stąd wyszło OCEŃ I ZLEĆ (0.98.0)
   ];
   for (const id of zakazane) {
     assert.doesNotMatch(
@@ -349,30 +351,21 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
     );
   }
 
-  /* DWA wzorce są bezpieczne i oba tu występują.
+  /* Bezpieczny wzorzec jest już tylko JEDEN: delegacja z poziomu sekcji.
 
-     PYTANIA i DOSTAWY delegują z poziomu sekcji: ich przyciski wędrują między
-     blokami, więc nasłuch musi stać nad nimi wszystkimi.
-
-     ZWROTY robią inaczej i też dobrze: każdy blok kontekstu — dokument, kosz,
-     rozliczenie, wiadomości — niesie WŁASNY nasłuch, więc przeniesienie bloku
-     zabiera nasłuch ze sobą. Tak przeszły przeprowadzkę w 0.93.0.
-
-     Niebezpieczny jest wyłącznie trzeci wzorzec, wypisany wyżej: nasłuch na
-     pojemniku, który jest jednym z kilku wymiennych wnętrz sprawy. */
-  for (const sekcja of ["pytanieSzczegol", "szczegol"]) {
+     Zwroty trzymały się do 0.97.0 innego — każdy blok kontekstu niósł własny
+     nasłuch, więc przeniesienie bloku zabierało nasłuch ze sobą. Działało,
+     dopóki wędrowały BLOKI. W 0.98.0 wywędrował sam przycisk: „OCEŃ I ZLEĆ
+     KOREKTĘ" przeszło ze sprawy (`#zwrotDokumenty`) do kontekstu
+     (`#zwrotRozliczenie`) i zostawiło nasłuch za sobą. Ten wzorzec broni
+     jedynie przed przeprowadzką całego bloku, a nie przed przeprowadzką
+     przycisku — dlatego zwroty dołączyły do sekcji. */
+  for (const sekcja of ["pytanieSzczegol", "szczegol", "zwrotSzczegol", "zwrotKontekst"]) {
     assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
     assert.match(
       html,
       new RegExp(`\\$\\("${sekcja}"\\)\\.addEventListener\\("click"`),
       `${sekcja} deleguje z poziomu sekcji, nie z pojemnika w środku`
-    );
-  }
-  for (const blok of ["zwrotDokument", "zwrotKosz", "zwrotRozliczenie", "zwrotWiadomosci"]) {
-    assert.match(
-      html,
-      new RegExp(`\\$\\("${blok}"\\)\\.addEventListener\\("click"`),
-      `${blok} niesie własny nasłuch i przenosi go ze sobą`
     );
   }
 });
@@ -735,7 +728,7 @@ test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", ()
   assert.ok(nadzor.includes('id="dniMetryk"'), "OKNO metryk zostaje przy metrykach");
 });
 
-test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja jedzie z blokiem", () => {
+test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja stoi na sekcji", () => {
   /* Od 0.93.0 zakładka ZWROTY rozkłada się jak PYTANIA i DOSTAWY: kolejka,
      ocena pozycji, kontekst sprawy. Ten test pilnuje DWÓCH rzeczy, bo przy
      dostawach (0.92.0) obie dały się złamać po cichu.
@@ -744,11 +737,11 @@ test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja jedzie z blokiem", (
      Wsunięty do środka karty sprawy wygląda w kodzie tak samo, a na ekranie
      wraca pod tabelę pozycji — czyli dokładnie tam, skąd go zabraliśmy.
 
-     DRUGA: delegacja kliknięć musi siedzieć NA PRZENIESIONYM BLOKU. Przy
-     dostawach delegacja stała na `#szczegolNaglowek` — akurat na elemencie,
-     który przyciski opuściły — i przestała działać, nie zmieniając wyglądu
-     ani nie wywalając żadnego testu. Blok z przyciskami nosi swój nasłuch
-     ze sobą; wtedy przenosiny w HTML niczego nie urywają. */
+     DRUGA: delegacja kliknięć musi siedzieć NAD wszystkimi blokami. Do 0.97.0
+     wisiała na samych blokach i to wystarczało, dopóki wędrowały bloki.
+     W 0.98.0 wywędrował sam przycisk — „OCEŃ I ZLEĆ KOREKTĘ" przeszło ze
+     sprawy do kontekstu i zostawiło nasłuch za sobą, czyli powtórzyło usterkę
+     dostaw z 0.92.0. Nasłuch na SEKCJI przeżywa jedno i drugie. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
@@ -765,13 +758,15 @@ test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja jedzie z blokiem", (
   assert.match(html, /#widokZwroty\.zSzczegolem \{ grid-template-columns:/,
     "trzy kolumny opisane jedną regułą");
 
-  for (const blok of ["zwrotDokument", "zwrotWiadomosci", "zwrotKosz", "zwrotRozliczenie"]) {
+  for (const blok of ["zwrotDokument", "zwrotKlient", "zwrotWiadomosci", "zwrotKosz", "zwrotRozliczenie"]) {
     assert.ok(widok.includes(`id="${blok}"`), `${blok} istnieje w zakładce`);
     assert.ok(widok.indexOf(`id="${blok}"`) > kontekst,
       `${blok} mieszka w kontekście, a nie w sprawie`);
-    assert.ok(html.includes(`$("${blok}").addEventListener`),
-      `${blok} ma własną delegację — inaczej przenosiny urywają przyciski`);
   }
+  assert.ok(html.includes('$("zwrotKontekst").addEventListener'),
+    "kontekst deleguje z poziomu sekcji — przycisk może wędrować między blokami");
+  assert.ok(html.includes('$("zwrotSzczegol").addEventListener'),
+    "sprawa deleguje z poziomu sekcji");
 });
 
 test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {

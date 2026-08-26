@@ -116,6 +116,18 @@ export interface SzczegolZwrotu {
   pozycjeZamowienia: PozycjaZamowienia[];
   /** Tylko gdy dopasowanie='brak' — posortowani malejąco po punktach. */
   kandydaciDokumentu?: KandydatDokumentu[];
+  /**
+   * Ile ten kupujący złożył zwrotów i ile z nich skończyło się reklamacją.
+   *
+   * `null` przy zwrocie bez loginu — czyli przy ręcznym, założonym ze skanu
+   * etykiety, której Allegro nie zna. Zero jest wtedy nieprawdą, a nie
+   * informacją: nie wiemy, ile ten człowiek zwracał, bo nie wiemy, kto to.
+   *
+   * Liczby służą wykrywaniu WZORCA przed oddaniem środków, nie ocenie
+   * klienta — i karta mówi to wprost, bo bez tego zdania licznik reklamacji
+   * czyta się jak nota.
+   */
+  kupujacyStat: { zwrotow12m: number; reklamacji: number } | null;
   /** Korekta + MM na bufor: co pojedzie, co już powstało, co blokuje. */
   dokumenty: StanDokumentow;
   /** Kosz zwrotowy, w którym leży towar; null przed przypięciem (Etap 3). */
@@ -959,6 +971,7 @@ export function szczegolZwrotu(id: number): SzczegolZwrotu {
       ? { at: z.zwrot_srodkow_at, przez: z.zwrot_srodkow_przez ?? "?" }
       : null,
     linkPanel: LINK_PANELU_ZWROTOW,
+    kupujacyStat: statystykiKupujacego(z.kupujacy_login),
     dokumenty: stanDokumentow(z),
     kosz: koszZwrotu(z.kosz_id),
     pozycjeZamowienia,
@@ -1006,6 +1019,35 @@ export async function watekZwrotu(zwrotId: number): Promise<{
   if (!kto.login && !kto.id) return { login: null, szukanie: null };
   const szukanie = await allegroAdapter().watekKupujacego(kto, z.utworzono_allegro);
   return { login: z.kupujacy_login ?? z.kupujacy_id, szukanie };
+}
+
+/**
+ * Dwie liczby o kupującym, liczone z naszych tabel.
+ *
+ * Dopasowanie po `kupujacy_login`, na którym stoi indeks `ix_zwrot_kupujacy`.
+ * Okno dwunastu miesięcy, a nie „od zawsze": wzorzec sprzed trzech lat nie
+ * mówi nic o tym, co zrobić z paczką leżącą teraz na stole.
+ *
+ * Reklamacje liczą się po DECYZJI biura, nie po powodzie podanym przez
+ * klienta. Powód jest deklaracją kupującego; decyzja jest tym, co z niej
+ * wyszło po obejrzeniu towaru — i tylko ona coś o wzorcu mówi.
+ */
+export function statystykiKupujacego(
+  login: string | null
+): SzczegolZwrotu["kupujacyStat"] {
+  if (!login) return null;
+  const d = db();
+  const ile = (sql: string): number => (d.prepare(sql).get(login) as { n: number }).n;
+  return {
+    zwrotow12m: ile(
+      `SELECT COUNT(*) AS n FROM zwrot
+        WHERE kupujacy_login = ? AND utworzono_at >= datetime('now', '-12 months')`
+    ),
+    reklamacji: ile(
+      `SELECT COUNT(*) AS n FROM zwrot_pozycja p JOIN zwrot z ON z.id = p.zwrot_id
+        WHERE z.kupujacy_login = ? AND p.decyzja = 'reklamacja'`
+    ),
+  };
 }
 
 // ── Pomocnicze ──────────────────────────────────────────────────────────────

@@ -261,6 +261,45 @@
   .sprawaStopka { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; margin-top: 6px; }
   .sprawaStopka > .mute { white-space: nowrap; }
 
+  /* ── Pozycja zwrotu jako KARTA ──────────────────────────────────────────────
+     Wiersz tabeli mieścił cytat klienta w kolumnie „POWÓD ZWROTU" obok trzech
+     innych — a to jest jedyne zdanie, które tłumaczy, dlaczego ta rzecz do nas
+     wróciła, i po nim zapada decyzja. Karta daje mu własny blok. */
+  .pozycjaZwrotu {
+    border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .pozycjaZwrotu .gora { display: flex; align-items: flex-start; gap: 10px; }
+  .pozycjaZwrotu .gora .rosnie { flex: 1; min-width: 0; }
+  .powodKlienta {
+    background: var(--secondary); border-radius: 10px; padding: 9px 11px;
+    margin-top: 9px; font-size: 14px; line-height: 1.55; color: var(--ink-soft);
+  }
+
+  /* ── Segment: jedna decyzja z kilku ─────────────────────────────────────────
+     Wybrana decyzja jest GRAFITOWA, nie bursztynowa. Bursztyn znaczy „to jest
+     ta jedna rzecz do zrobienia tutaj", a zwrot na trzy pozycje dawał trzy
+     bursztynowe pigułki plus bursztynową akcję główną — cztery wołania
+     o uwagę, z których tylko jedno było wezwaniem do działania.
+
+     Przyciski sklejone w jeden pasek, bo to jest WYBÓR JEDNEJ Z CZTERECH,
+     a nie cztery osobne akcje. Poniżej 30 rem pasek łamie się na dwa rzędy;
+     `flex-wrap` zamiast przewijania, bo ucięta decyzja jest gorsza niż
+     zawinięta. */
+  .segment { display: flex; flex-wrap: wrap; gap: 0; margin-top: 10px; }
+  .segment button {
+    background: var(--card); border: 1px solid var(--border); border-right-width: 0;
+    padding: 7px 12px; font: 600 12px var(--font-cond); letter-spacing: .4px;
+    color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+  }
+  .segment button:first-child { border-radius: 999px 0 0 999px; padding-left: 15px; }
+  .segment button:last-child { border-radius: 0 999px 999px 0; border-right-width: 1px; padding-right: 15px; }
+  .segment button:hover { background: var(--paper); color: var(--ink); }
+  .segment button[aria-pressed="true"] {
+    background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700;
+  }
+  .segment button[aria-pressed="true"] + button { border-left-color: var(--ink); }
+
   /* ── Czipy: filtr, który widać bez rozwijania ───────────────────────────────
      `<select>` chowa pozostałe możliwości za kliknięciem i nie mówi, ile ich
      jest. Przy trzech stanach skrzynki to strata: biuro ma wiedzieć, że
@@ -879,7 +918,8 @@
            towaru zostają tutaj — decyzję podejmuje się z paczką w ręku, więc
            obrazek kartoteki musi być przy wierszu, a nie w szynie obok. -->
       <div class="sprawa-tresc">
-        <table id="zwrotPozycje" style="margin-top:10px"></table>
+        <h2 style="margin-top:14px">CO WRÓCIŁO · DECYZJA PER POZYCJA</h2>
+        <div id="zwrotPozycje"></div>
         <div id="zwrotDodajPozycje" style="margin-top:10px" hidden>
           <h2>DOPISZ POZYCJĘ (ZWROT RĘCZNY)</h2>
           <div class="filtry">
@@ -903,24 +943,14 @@
          krok całej sprawy. Blok żyje i ginie razem ze szczegółem. -->
     <section class="card pelna kontekst" id="zwrotKontekst" hidden>
       <div id="zwrotDokument"></div>
+      <!-- Wzorzec zwrotów tego kupującego. Stoi NAD rozliczeniem, bo to jest
+           rzecz, którą warto wiedzieć PRZED oddaniem środków, a nie po. -->
+      <div id="zwrotKlient" style="margin-top:14px"></div>
       <div id="zwrotWiadomosci" style="margin-top:14px"></div>
       <div id="zwrotKosz" style="margin-top:14px"></div>
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
     </section>
 
-    <section class="card" id="zwrotSkanKarta">
-      <h2>SKAN ETYKIETY ZWROTU <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
-          Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
-          doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
-        </p>
-      </div>
-      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:320px">
-      <div id="zwrotSkanWynik" style="margin-top:8px"></div>
-    </section>
 
     <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
          upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
@@ -940,23 +970,38 @@
     </section>
 
     <section class="card" id="zwrotListaKarta">
-      <h2>ZWROTY</h2>
-      <div class="filtry">
-        <div><label for="zwrotFiltrStatus">STATUS</label>
-          <select id="zwrotFiltrStatus">
-            <option value="">wszystkie</option>
-            <option value="nowy">nowe — czekają na ocenę</option>
-            <option value="oceniony">ocenione — czekają na środki</option>
-            <option value="rozliczony">rozliczone</option>
-          </select></div>
-        <div><label for="zwrotSzukajLista">SZUKAJ</label>
-          <input id="zwrotSzukajLista" placeholder="etykieta / login / numer zwrotu"></div>
-        <!-- Przycisk stoi TUTAJ, a nie na karcie BRAKUJĄCE PACZKI, bo tamta
-             chowa się, gdy nie ma czego pokazać — a to jest właśnie chwila,
-             w której chce się sprawdzić, czy coś nowego przyszło. -->
-        <div><button class="akcja cichy" id="zapowiedziPobierz">POBIERZ Z ALLEGRO</button></div>
+      <!-- SKAN I KOLEJKA W JEDNEJ KARCIE (0.98.0). Do tej wersji stały osobno,
+           a przy otwartym zwrocie obie zostawały w szynie — dwa nagłówki
+           mówiące o tej samej kolejce, jeden nad drugim. Praca ze zwrotem
+           ZACZYNA się od zeskanowania etykiety na paczce, więc pole stoi
+           w głowie kolejki, tam gdzie wzrok i tak ląduje. -->
+      <h2>ZWROTY <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+          Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
+          Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
+          doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
+        </p>
       </div>
+      <p id="zwrotyPodsumowanie" style="margin-bottom:9px"></p>
+      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:100%">
+      <div id="zwrotSkanWynik" style="margin-top:8px"></div>
+
+      <div class="czipy" id="zwrotyCzipy" style="margin-top:10px">
+        <button class="czip" data-status="nowy" aria-pressed="true">Do oceny</button>
+        <button class="czip" data-status="oceniony" aria-pressed="false">Czeka na środki</button>
+        <button class="czip" data-status="rozliczony" aria-pressed="false">Rozliczone</button>
+        <button class="czip" data-status="" aria-pressed="false">Wszystkie</button>
+      </div>
+      <input class="szukaj" id="zwrotSzukajLista" style="margin-top:8px"
+             placeholder="szukaj: etykieta / login / numer zwrotu">
       <table id="zwrotLista"></table>
+      <!-- Pobranie zapowiedzi stoi POD listą i jest ciche: bursztyn zostaje dla
+           akcji na sprawie. Tu, a nie na karcie BRAKUJĄCE PACZKI, bo tamta
+           chowa się, gdy nie ma czego pokazać — a to jest właśnie chwila,
+           w której chce się sprawdzić, czy coś nowego przyszło. -->
+      <button class="akcja cichy" id="zapowiedziPobierz" style="margin-top:10px">POBIERZ Z ALLEGRO</button>
     </section>
 
     <section class="card" id="koszeKarta">
@@ -2430,6 +2475,16 @@ function rysujReklamacje(problemy) {
    Cele stoją obok liczb, bo liczba bez celu nie mówi, czy jest źle. `p95`
    powyżej 300 ms znaczy, że ludzie zaczynają skanować podwójnie, a podwójny
    skan przy liczeniu pozycji to błąd ILOŚCIOWY na fakturze. */
+/* Polska odmiana przez liczbę — „1 zwroty" pod kaflem czyta się jak usterka
+   danych, a nie jak liczba. Reguła: 1 → pojedyncza, 2–4 → mnoga, reszta →
+   dopełniacz, z wyjątkiem nastek (12, 13, 14 idą do dopełniacza). */
+function odmiana(n, [jeden, kilka, wiele]) {
+  const a = Math.abs(n) % 100;
+  if (n === 1) return jeden;
+  if (a >= 12 && a <= 14) return wiele;
+  return Math.abs(n) % 10 >= 2 && Math.abs(n) % 10 <= 4 ? kilka : wiele;
+}
+
 function kafel(liczba, opis, zle) {
   return `<div class="kafel"><div class="liczba${zle ? " zle" : ""}">${esc(liczba)}</div>
           <div class="opis">${esc(opis)}</div></div>`;
@@ -3191,10 +3246,14 @@ function dolozZdjeciaZwrotu(z) {
   const moja = ++sesjaZwrotu;
   const aktualne = () => moja === sesjaZwrotu;
   const zadania = [];
-  const dodaj = (twId, tabela) => {
+  /* Selektor NIE wymienia znacznika: pozycje zwrotu są kartami (`<span>`),
+     a reszta zamówienia dalej tabelą (`<td>`). Wspólna jest klasa `kolFoto`
+     i to po niej celujemy — inaczej przy przejściu na karty zdjęcia zniknęłyby
+     po cichu, bo `td.kolFoto` nie pasowałoby do niczego. */
+  const dodaj = (twId, gdzie) => {
     if (twId == null) return;
     zadania.push({ klucz: `t${twId}`, url: `/api/products/${twId}/zdjecie`,
-                   sel: `#${tabela} td.kolFoto[data-tw="${twId}"]`, klasa: "foto" });
+                   sel: `#${gdzie} .kolFoto[data-tw="${twId}"]`, klasa: "foto" });
   };
   for (const p of z.pozycje) dodaj(p.twId, "zwrotPozycje");
   for (const p of z.pozycjeZamowienia || []) dodaj(p.twId, "zwrotZamowienie");
@@ -3219,6 +3278,13 @@ function dolozZdjeciaReklamacji(lista) {
 /** Pusta komórka na zdjęcie; wypełni ją kolejka. Bez kartoteki nie ma czego pytać. */
 const kolFoto = (twId) =>
   !zdjeciaWlaczone ? "" : `<td class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}></td>`;
+
+/* To samo poza tabelą — pozycje zwrotu są od 0.98.0 kartami, a `<td>` poza
+   `<table>` parser wyrzuca. Klasa `kolFoto` zostaje, bo po niej celuje kolejka
+   zdjęć; zmienia się wyłącznie znacznik. */
+const kolFotoZwrotu = (twId) =>
+  !zdjeciaWlaczone ? "" : `<span class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}
+    style="display:block;width:48px;flex:none"></span>`;
 
 const zadanieDowodu = (p) => ({
   klucz: `p${p.id}`, url: `/api/problems/${p.id}/photo`,
@@ -3637,6 +3703,16 @@ function badgeZwrotu(s) {
   return '<span class="badge mute2">NOWY · DO OCENY</span>';
 }
 
+/* Ten sam stan, ale w SZYNIE: kropka i słowo zamiast pigułki. Szyna pokazuje
+   kilkanaście wierszy naraz i pigułka w każdym z nich robi z listy szachownicę
+   — kolor przestaje cokolwiek znaczyć. Pigułka zostaje na nagłówku sprawy,
+   gdzie jest jedna. Ta sama reguła zadziałała przy pytaniach (0.96.0). */
+function stanZwrotu(s) {
+  if (s === "rozliczony") return '<span class="stan zrobione"><i></i>Rozliczony</span>';
+  if (s === "oceniony") return '<span class="stan gotowy"><i></i>Czeka na środki</span>';
+  return '<span class="stan"><i></i>Do oceny</span>';
+}
+
 async function odswiezZwroty() {
   if (otwartyZwrot != null) {
     await odswiezSzczegolZwrotu();
@@ -3647,7 +3723,7 @@ async function odswiezZwroty() {
   }
   try {
     const q = new URLSearchParams();
-    if ($("zwrotFiltrStatus").value) q.set("status", $("zwrotFiltrStatus").value);
+    if (filtrZwrotow) q.set("status", filtrZwrotow);
     const szukaj = $("zwrotSzukajLista").value.trim();
     if (szukaj) q.set("szukaj", szukaj);
     const d = await (await api(`/api/biuro/zwroty?${q}`)).json();
@@ -4221,7 +4297,13 @@ function rysujCzasy(c) {
         </tr>`).join("");
 }
 
+/* Ostatni raport z serwera — po niego sięga licznik „po terminie" w głowie
+   szyny. `null`, dopóki `odswiezEtap3()` nie przejdzie ani razu; wtedy głowa
+   mówi samo „do oceny" zamiast zmyślać zero. */
+let ostatniRaportZwrotow = null;
+
 function rysujRaportZwrotow(r) {
+  ostatniRaportZwrotow = r;
   if (!r) { $("raportZwrotowKafle").innerHTML = ""; return; }
   const kafle = [
     [r.zwroty.nowe, "nowych zwrotów"],
@@ -4247,8 +4329,28 @@ function rysujRaportZwrotow(r) {
    przerysowałaby się dopiero przy najbliższym cyklu, czyli pół minuty później. */
 let zwrotyLista = [];
 
+/* Wybrany czip kolejki zwrotów. Domyślnie „nowy" — czyli to, co czeka na
+   ocenę; poprzedni `<select>` startował od „wszystkie" i pokazywał archiwum
+   razem z pracą. Zakładka pracy ma otwierać się na pracy. */
+let filtrZwrotow = "nowy";
+
+/** Głowa szyny: ile czeka na ocenę i ile reklamacji jest po terminie. */
+function podsumujZwroty() {
+  /* Licznik liczy się Z WCZYTANEJ LISTY, nie z raportu: `odswiezEtap3()` nie
+     chodzi przy otwartym zwrocie (0.93.0), więc raport byłby nieświeży
+     dokładnie wtedy, gdy szyna stoi obok sprawy. */
+  const doOceny = zwrotyLista.filter((z) => z.status === "nowy").length;
+  const poTerminie = ostatniRaportZwrotow?.reklamacje?.poTerminie ?? null;
+  $("zwrotyPodsumowanie").innerHTML = doOceny || poTerminie
+    ? `<span class="temat">${doOceny}</span>
+       <span class="mute">do oceny${
+         poTerminie ? ` · <b>${poTerminie}</b> po terminie` : ""}</span>`
+    : '<span class="mute">Nic nie czeka na ocenę.</span>';
+}
+
 function rysujZwroty(zwroty) {
   zwrotyLista = zwroty;
+  podsumujZwroty();
 
   /* Szyna: siedem kolumn nie mieści się w 21 rem, więc wiersz łamie się w pionie
      — numer z datą, kupujący, a pod spodem status z oceną i dokumentem. */
@@ -4261,7 +4363,7 @@ function rysujZwroty(zwroty) {
             <span class="mute">${esc((z.utworzonoAt || "").slice(0, 10))}</span>
           </span>
           <span class="sprawaTemat">${esc(z.kupujacyLogin || "kupujący nieznany")}</span>
-          <span class="sprawaStopka">${badgeZwrotu(z.status)}
+          <span class="sprawaStopka">${stanZwrotu(z.status)}
             <span class="mute">${z.ocenionych}/${z.pozycji} poz.</span>
             <span class="mute">${
               z.dokumentNumer ? esc(z.dokumentNumer) : "bez dokumentu"}</span></span>
@@ -4341,9 +4443,9 @@ const trybSzeroki = () => SZEROKO.matches;
 /* Co zostaje obok otwartego zwrotu. NIE cała zakładka: przy otwartym zwrocie
    kontekstem jest kolejka zwrotów i skaner następnej etykiety, a nie kosze,
    reklamacje i statystyki. Te chowają się w obu trybach. */
-const PRZY_ZWROCIE = ["zwrotSkanKarta", "zwrotListaKarta", "brakujaceKarta"];
+const PRZY_ZWROCIE = ["zwrotListaKarta", "brakujaceKarta"];
 const KARTY_ZWROTOW = [
-  "zwrotSkanKarta", "brakujaceKarta", "zwrotListaKarta", "koszeKarta",
+  "brakujaceKarta", "zwrotListaKarta", "koszeKarta",
   "pominieteKarta", "reklamacjeKarta", "wgladKarta",
 ];
 
@@ -4383,8 +4485,8 @@ function otworzZwrot(id) {
      stoi z dokumentem, koszem i rozliczeniem tamtej sprawy, dopóki nie
      wróci odpowiedź serwera — a to są bloki z przyciskami. */
   for (const blok of ["zwrotPozycje", "zwrotZamowienie", "zwrotDokumenty",
-                      "zwrotDokument", "zwrotWiadomosci", "zwrotKosz",
-                      "zwrotRozliczenie"]) $(blok).innerHTML = "";
+                      "zwrotDokument", "zwrotKlient", "zwrotWiadomosci",
+                      "zwrotKosz", "zwrotRozliczenie"]) $(blok).innerHTML = "";
   $("zwrotNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
   /* Wątek dociąga się na klik i pamięta, dla którego zwrotu go pobrano.
      Skoro blok właśnie wyczyściliśmy, ta pamięć musi zejść razem z nim —
@@ -4438,30 +4540,40 @@ function rysujSzczegolZwrotu(z) {
       · przyjęty ${esc(z.utworzonoAt.slice(0, 10))} przez ${esc(z.utworzonoPrzez)}
     </p>`;
 
-  const rows = z.pozycje.map((p) => {
+  /* Pozycja jako KARTA, nie wiersz na cztery kolumny. Cytat klienta dostaje
+     własny blok: to jedyne zdanie tłumaczące, dlaczego ta rzecz wróciła, i po
+     nim zapada decyzja — a stało w komórce obok symbolu, ilości i przycisków. */
+  $("zwrotPozycje").innerHTML = z.pozycje.map((p) => {
+    const wybrana = DECYZJE_ZWROTU.find(([k]) => k === p.decyzja);
     const decyzje = zamkniety
-      ? (DECYZJE_ZWROTU.find(([k]) => k === p.decyzja)
-          ? `<span class="badge ${DECYZJE_ZWROTU.find(([k]) => k === p.decyzja)[2]}">${esc(DECYZJE_ZWROTU.find(([k]) => k === p.decyzja)[1])}</span>` : "—")
-      : DECYZJE_ZWROTU.map(([kod, opis]) =>
-          `<button class="akcja ${p.decyzja === kod ? "" : "cichy"}" data-poz="${p.id}" data-dec="${kod}"
-             style="margin:2px 4px 2px 0;font-size:11px;padding:4px 8px">${opis}</button>`).join("");
-    return `<tr>
-      ${kolFoto(p.twId)}
-      <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}
-          ${p.twId == null ? '<br><span class="badge err">poza kartoteką</span>' : ""}
-          ${p.externalId && !p.symbol ? `<span class="mute">sygnatura: ${esc(p.externalId)}</span>` : ""}</td>
-      <td class="b" style="white-space:nowrap">${p.ilosc}</td>
-      <td>${esc(p.powod || "—")}${p.powodOpis ? `<br><span class="mute">„${esc(p.powodOpis)}”</span>` : ""}</td>
-      <td>${decyzje}${p.notatka ? `<div class="mute">notatka: ${esc(p.notatka)}</div>` : ""}
-          ${p.reklPolka ? `<div><span class="badge amber">PÓŁKA ${esc(p.reklPolka)}</span></div>` : ""}
-          ${p.decyzjaPrzez ? `<div class="mute">${esc(p.decyzjaPrzez)} · ${esc((p.decyzjaAt || "").slice(0, 16).replace("T", " "))}</div>` : ""}</td>
-    </tr>`;
-  }).join("");
-  $("zwrotPozycje").innerHTML =
-    `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD ZWROTU</th><th>DECYZJA</th></tr>" +
-    (rows ||
-      `<tr><td colspan="${zdjeciaWlaczone ? 5 : 4}" class="mute">Bez pozycji — dopisz je niżej</td></tr>`);
+      ? (wybrana ? `<span class="badge ${wybrana[2]}">${esc(wybrana[1])}</span>` : "—")
+      : `<div class="segment">${DECYZJE_ZWROTU.map(([kod, opis]) =>
+          `<button data-poz="${p.id}" data-dec="${kod}"
+             aria-pressed="${p.decyzja === kod}">${opis}</button>`).join("")}</div>`;
+    return `<div class="pozycjaZwrotu">
+      <div class="gora">
+        ${kolFotoZwrotu(p.twId)}
+        <div class="rosnie">
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            ${p.symbol ? `<span class="b">${esc(p.symbol)}</span>` : ""}
+            <span class="mute">${p.ilosc} szt.</span>
+            ${p.twId == null ? '<span class="badge err">poza kartoteką</span>' : ""}
+          </div>
+          <div class="mute" style="margin-top:2px">${esc(p.nazwa)}${
+            p.externalId && !p.symbol ? ` · sygnatura ${esc(p.externalId)}` : ""}</div>
+        </div>
+        ${p.powod ? `<span class="badge mute2">${esc(p.powod)}</span>` : ""}
+      </div>
+      ${p.powodOpis ? `<div class="powodKlienta">„${esc(p.powodOpis)}”</div>` : ""}
+      ${decyzje}
+      ${p.notatka ? `<div class="mute" style="margin-top:7px">notatka: ${esc(p.notatka)}</div>` : ""}
+      ${p.reklPolka ? `<div style="margin-top:6px"><span class="badge amber">PÓŁKA ${esc(p.reklPolka)}</span></div>` : ""}
+      ${p.decyzjaPrzez
+        ? `<div class="mute" style="margin-top:6px">${esc(p.decyzjaPrzez)} · ${
+            esc((p.decyzjaAt || "").slice(0, 16).replace("T", " "))}</div>`
+        : ""}
+    </div>`;
+  }).join("") || '<p class="mute">Bez pozycji — dopisz je niżej.</p>';
 
   // dopisywanie pozycji: tylko zwrot ręczny i tylko przed rozliczeniem
   $("zwrotDodajPozycje").hidden = !(z.allegroReturnId == null && !zamkniety);
@@ -4469,24 +4581,28 @@ function rysujSzczegolZwrotu(z) {
   /* Całe zamówienie: co jeszcze klient kupił przy okazji. Wiersz wracający
      jest zaznaczony — biuro widzi od razu, czy wraca komplet, czy jedna
      rzecz z zestawu, i co zostało u kupującego. */
-  const zam = z.pozycjeZamowienia || [];
-  if (zam.length) {
-    const wraca = zam.filter((p) => p.zwracana).length;
-    $("zwrotZamowienie").innerHTML = `<h2>CAŁE ZAMÓWIENIE (${zam.length} poz., wraca ${wraca})</h2>
-      <p class="mute" style="margin-bottom:6px">Co klient kupił w tym zamówieniu — pozycje bez znacznika zostały u niego.</p>
+  /* RESZTA ZAMÓWIENIA, czyli to, co u klienta ZOSTAŁO. Do 0.98.0 blok pokazywał
+     całe zamówienie z plakietkami WRACA/zostaje — czyli powtarzał pozycje
+     wypisane wyżej jako karty, tylko drobniej. Odpowiedź, po którą biuro tu
+     sięga, brzmi „czy wraca komplet, czy jedna rzecz z zestawu", a na nią
+     odpowiada sama lista tego, co nie wróciło. */
+  const zostalo = (z.pozycjeZamowienia || []).filter((p) => !p.zwracana);
+  if (zostalo.length) {
+    $("zwrotZamowienie").innerHTML = `<h2>RESZTA ZAMÓWIENIA (NIE WRÓCIŁA)</h2>
       <table>${
-        `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}<th></th><th>TOWAR</th><th>ILOŚĆ</th></tr>` +
-        zam.map((p) => `<tr${p.zwracana ? "" : ' class="mute"'}>
+        `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}<th>TOWAR</th><th>ILOŚĆ</th></tr>` +
+        zostalo.map((p) => `<tr>
             ${kolFoto(p.twId)}
-            <td style="white-space:nowrap">${p.zwracana
-              ? '<span class="badge amber">WRACA</span>'
-              : '<span class="badge mute2">zostaje</span>'}</td>
             <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span> · ` : ""}${esc(p.nazwa)}</td>
             <td class="b">${p.ilosc}</td>
           </tr>`).join("")
       }</table>`;
   } else {
-    $("zwrotZamowienie").innerHTML = "";
+    /* Puste znaczy dwie różne rzeczy i trzeba je rozróżnić: wraca komplet
+       zamówienia albo snapshotu zamówienia w ogóle nie ma (zwrot ręczny). */
+    $("zwrotZamowienie").innerHTML = (z.pozycjeZamowienia || []).length
+      ? '<h2>RESZTA ZAMÓWIENIA</h2><p class="mute">Wraca całe zamówienie.</p>'
+      : "";
   }
 
   /* Rozmowa z klientem NIE jedzie z kartą — dociąga ją klik. Karta odświeża
@@ -4536,23 +4652,65 @@ function rysujSzczegolZwrotu(z) {
      decyzji na ekranie, a kolejka wypełni komórki, gdy przyjdą. */
   dolozZdjeciaZwrotu(z);
 
+  /* ROZLICZENIE zbiera OBA końce sprawy w jednym miejscu: zlecenie korekty
+     i odnotowanie oddanych pieniędzy. Do 0.98.0 pierwsze stało na środku pod
+     tabelą, drugie tutaj — dwa kroki tej samej rzeczy w dwóch strefach.
+     Bursztyn dostaje ten, który się KLIKA w WERTIS; stempel środków tylko
+     odnotowuje przelew zrobiony w panelu Allegro i zostaje cichy. */
+  /* Uwaga na `brak`: to NIE jest „nie ma czego zlecać", tylko „jeszcze nie
+     zlecone". Gotowość odróżnia od niegotowości `przeszkoda` — zdanie z
+     serwera o tym, czego brakuje (decyzji, dokumentu sprzedaży). Jest
+     przeszkoda: piszemy ją. Nie ma: pokazujemy przycisk. */
+  const dokumentyStan = z.dokumenty?.stan ?? "brak";
+  const zlecenie = dokumentyStan === "wystawione"
+    ? '<p><span class="badge ok">KOREKTA WYSTAWIONA</span></p>'
+    : dokumentyStan === "w_kolejce"
+      ? `<p><span class="badge amber">W KOLEJCE</span>
+           <span class="mute">zadanie #${z.dokumenty.queueId}</span></p>`
+      : dokumentyStan === "blad"
+        ? `<p><span class="badge err">ZAPIS NIEUDANY</span>
+             <span class="mute">ponowienie stoi w kolejce zapisów</span></p>`
+        : z.dokumenty?.przeszkoda
+          ? `<p class="mute">${esc(z.dokumenty.przeszkoda)}.</p>`
+          : '<button class="akcja" data-dokumenty style="width:100%">OCEŃ I ZLEĆ KOREKTĘ</button>';
+
   const srodki = z.zwrotSrodkow
     ? `<span class="badge ok">ŚRODKI ODDANE</span>
        <span class="mute">${esc(z.zwrotSrodkow.przez)} · ${esc(z.zwrotSrodkow.at.slice(0, 16).replace("T", " "))}</span>`
     : (z.status === "oceniony"
-        /* CICHY, nie bursztynowy. Bursztyn znaczy „to jest ta jedna rzecz do
-           zrobienia tutaj" — a tą rzeczą jest WYSTAW DOKUMENTY na środku.
-           Ten przycisk tylko ODNOTOWUJE zwrot środków wykonany w panelu
-           Allegro; dwa bursztyny obok siebie kazałyby wybierać między nimi. */
-        ? '<button class="akcja cichy" data-srodki>ODDANO ŚRODKI W PANELU</button>'
+        ? '<button class="akcja cichy" data-srodki style="width:100%;margin-top:7px">ODDANO ŚRODKI W PANELU</button>'
         : '<span class="mute">Najpierw decyzja przy każdej pozycji — potem zwrot środków.</span>');
-  $("zwrotRozliczenie").innerHTML = `<h2>ZWROT ŚRODKÓW (PANEL ALLEGRO)</h2>
-    <p class="mute" style="margin-bottom:8px">
+
+  $("zwrotRozliczenie").innerHTML = `<h2>ROZLICZENIE</h2>
+    ${zlecenie}
+    <p class="mute" style="margin:8px 0">
       Pieniądze oddaje się w panelu Allegro — odszukaj zwrot po numerze
       <b>${esc(z.referencja || z.waybill)}</b>, wykonaj zwrot środków i potwierdź tutaj.
       <a href="${esc(z.linkPanel)}" target="_blank" rel="noopener">OTWÓRZ PANEL ZWROTÓW →</a>
     </p>
     ${srodki}`;
+
+  /* TEN KLIENT — dwa liczniki i zdanie o tym, czym one są. Bez zdania licznik
+     reklamacji czyta się jak nota wystawiona człowiekowi; z nim jest tym, czym
+     ma być: sygnałem o wzorcu, sprawdzanym ZANIM oddamy pieniądze. Sekcja
+     milczy przy zwrocie bez loginu — zero nie znaczyłoby wtedy „nie zwracał",
+     tylko „nie wiemy, kto to". */
+  const kl = z.kupujacyStat;
+  $("zwrotKlient").innerHTML = kl
+    ? `<h2>TEN KLIENT</h2>
+       <div class="kafle">
+         ${kafel(kl.zwrotow12m,
+           odmiana(kl.zwrotow12m, ["zwrot", "zwroty", "zwrotów"]) + " · 12 mies.")}
+         ${kafel(kl.reklamacji,
+           odmiana(kl.reklamacji, ["reklamacja", "reklamacje", "reklamacji"]),
+           kl.reklamacji > 0)}
+       </div>
+       <p class="mute" style="margin-top:8px">
+         Liczby mówią o WZORCU i są tu po to, żeby dało się go zobaczyć przed
+         oddaniem środków. Nie są oceną klienta — zasadna reklamacja też się
+         tu liczy.
+       </p>`
+    : "";
 }
 
 /* Panel „KOREKTA + MM NA BUFOR" (Etap 2). Jeden przycisk zleca OBA dokumenty
@@ -4600,18 +4758,19 @@ function rysujDokumentyZwrotu(z) {
         <span class="mute">zadanie #${d.queueId} — dokumenty wystawia worker Sfery</span></p>${lista}`;
     return;
   }
-  if (d.przeszkoda) {
-    cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
-      <p class="mute">${esc(d.przeszkoda)}.</p>`;
-    return;
-  }
-  cel.innerHTML = `<h2>DOKUMENTY ZWROTU</h2>
+  /* Przeszkoda MILCZY tutaj od 0.98.0: zdanie „najpierw dopasuj dokument"
+     mówi, czego brakuje PRZYCISKOWI, a przycisk stoi w rozliczeniu. Dopóki
+     stały razem, jedno zdanie w dwóch strefach było powtórką. */
+  if (d.przeszkoda) { cel.innerHTML = ""; return; }
+  /* Sam PRZYCISK zjechał do sekcji ROZLICZENIE w kontekście (0.98.0), do pary
+     ze stemplem zwrotu środków — tak jak „domknij dostawę" od 0.92.0. Tutaj
+     zostaje to, co przycisk WYJAŚNIA: co dokładnie pojedzie na korektę. */
+  cel.innerHTML = `<h2>CO PÓJDZIE NA KOREKTĘ</h2>
     <p class="mute" style="margin-bottom:8px">
-      Jedno kliknięcie wystawia korektę do dokumentu <b>${esc(z.dokument ? (z.dokument.numer || z.dokument.dokId) : "")}</b>.
+      Korekta do dokumentu <b>${esc(z.dokument ? (z.dokument.numer || z.dokument.dokId) : "")}</b>.
       Pozycje pełnowartościowe jadą MM na bufor zwrotowy, zniszczone od razu
-      schodzą dokumentem RW.
-    </p>${lista}
-    <button class="akcja" data-dokumenty>WYSTAW DOKUMENTY</button>`;
+      schodzą dokumentem RW. Zlecenie stoi w rozliczeniu, po prawej.
+    </p>${lista}`;
 }
 
 /* Sekcja KOSZ — dopiero po ZLECENIU dokumentów: kosz wiąże się z korektą
@@ -5050,9 +5209,22 @@ $("zwrotLista").addEventListener("click", (e) => {
   if (w) otworzZwrot(Number(w.dataset.zwrot));
 });
 $("zwrotWroc").addEventListener("click", () => { zamknijZwrot(); odswiezZwroty(); });
-$("zwrotFiltrStatus").addEventListener("change", odswiezZwroty);
+$("zwrotyCzipy").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-status]");
+  if (!b) return;
+  filtrZwrotow = b.dataset.status;
+  for (const c of $("zwrotyCzipy").querySelectorAll(".czip")) {
+    c.setAttribute("aria-pressed", String(c === b));
+  }
+  odswiezZwroty();
+});
 $("zwrotSzukajLista").addEventListener("input", odswiezZwroty);
-$("zwrotPozycje").addEventListener("click", async (e) => {
+/* Nasłuchy zwrotów wiszą na SEKCJACH, nie na blokach w środku. Bloki
+   przebudowują się przy każdym rysowaniu, a przyciski wędrują między nimi —
+   „OCEŃ I ZLEĆ KOREKTĘ" przeszło w 0.98.0 ze sprawy do kontekstu. Nasłuch na
+   pojemniku, który przycisk właśnie opuścił, klika się bez skutku przy
+   zielonych testach (0.92.0, 0.96.0, 0.97.0). Sekcja stoi w miejscu. */
+$("zwrotSzczegol").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-poz]");
   if (!b) return;
   /* Notatka tylko przy decyzjach „coś jest nie tak" — pełnowartościowy nie ma
@@ -5074,10 +5246,10 @@ $("zwrotPozycje").addEventListener("click", async (e) => {
     method: "POST", body: JSON.stringify({ decyzja: b.dataset.dec, notatka }),
   }));
 });
-$("zwrotWiadomosci").addEventListener("click", (e) => {
+$("zwrotKontekst").addEventListener("click", (e) => {
   if (e.target.closest("[data-wiadomosci]")) pokazWiadomosci(otwartyZwrot);
 });
-$("zwrotDokument").addEventListener("click", (e) => {
+$("zwrotKontekst").addEventListener("click", (e) => {
   const w = e.target.closest("[data-wybierz]");
   if (w) return akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokument`, {
     method: "PUT", body: JSON.stringify({ dokId: Number(w.dataset.wybierz) }),
@@ -5085,7 +5257,7 @@ $("zwrotDokument").addEventListener("click", (e) => {
   const o = e.target.closest("[data-odepnij]");
   if (o) return akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokument`, { method: "DELETE" }));
 });
-$("zwrotDokumenty").addEventListener("click", async (e) => {
+$("zwrotKontekst").addEventListener("click", async (e) => {
   if (!e.target.closest("[data-dokumenty]")) return;
   const zgoda = await potwierdz({
     tytul: "KOREKTA + MM NA BUFOR",
@@ -5096,7 +5268,7 @@ $("zwrotDokumenty").addEventListener("click", async (e) => {
   // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
   akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/dokumenty`, { method: "POST", body: "{}" }));
 });
-$("zwrotKosz").addEventListener("click", (e) => {
+$("zwrotKontekst").addEventListener("click", (e) => {
   if (e.target.closest("[data-kosz-przypnij]")) {
     const kod = $("zwrotKoszKod").value.trim();
     if (!kod) return toast("Zeskanuj albo wpisz kod kosza");
@@ -5108,7 +5280,7 @@ $("zwrotKosz").addEventListener("click", (e) => {
     akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/kosz`, { method: "DELETE" }));
   }
 });
-$("zwrotKosz").addEventListener("keydown", (e) => {
+$("zwrotKontekst").addEventListener("keydown", (e) => {
   // skaner USB kończy Enterem — skan etykiety od razu przypina
   if (e.key === "Enter" && e.target.id === "zwrotKoszKod") {
     e.preventDefault();
@@ -5278,7 +5450,7 @@ $("reklamacjeLista").addEventListener("click", async (e) => {
     await odswiezEtap3();
   } catch (err) { toast(err.message); }
 });
-$("zwrotRozliczenie").addEventListener("click", (e) => {
+$("zwrotKontekst").addEventListener("click", (e) => {
   if (e.target.closest("[data-srodki]")) {
     // puste `{}` świadomie: nagłówek json bez treści Fastify odrzuca (400)
     akcjaZwrotu(() => api(`/api/biuro/zwroty/${otwartyZwrot}/zwrot-srodkow`, { method: "POST", body: "{}" }));
