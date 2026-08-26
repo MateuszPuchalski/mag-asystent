@@ -36,7 +36,7 @@ import {
   lastImport,
   przyjeciaBezPozycji,
 } from "./adapters/subiekt.mssql.js";
-import { problemAllegro } from "./services/allegro-token.js";
+import { problemAllegro, problemUserAgenta } from "./services/allegro-token.js";
 import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { uruchomTickerPytan } from "./services/pytania.js";
 import { uruchomTickerDyskusji } from "./services/dyskusje.js";
@@ -106,6 +106,10 @@ export async function buildApp() {
          a kosz z zerem pozycji na kolektorze wygląda jak dzień bez zwrotów. */
       przyjeciaBezPozycji(),
       problemAllegro(),
+      /* Brak własnego User-Agenta grozi zablokowaniem klucza przez Allegro
+         (ostrzeżenie z ekranu rejestracji aplikacji), a objawia się dopiero
+         blokadą — czyli wtedy, gdy jest już za późno na spokojną naprawę. */
+      problemUserAgenta(),
       /* Zdjęcia: brak dostępu do źródła wygląda dokładnie tak samo jak
          kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by
          nie skojarzył, że przyczyną jest brak GRANT-u albo zły katalog. */

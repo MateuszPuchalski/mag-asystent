@@ -33,6 +33,49 @@ historii nie przepisujemy.
 
 ---
 
+## 0.106.0 — 26 sierpnia 2026
+
+**Allegro zablokowało adres IP w trakcie parowania konta** („Zostałeś
+zablokowany", powód: ruch szybszy niż człowiek / robot w tej samej sieci).
+Analiza wskazała jedno miejsce: **endpointy parowania stoją na apeksie
+`allegro.pl`**, czyli za tym samym zabezpieczeniem co sklep — a nie na
+`api.allegro.pl`. Odpytywanie stanu parowania było więc jedynym ruchem tej
+aplikacji, który widzi anti-bot sklepu, i wyglądało dokładnie jak maszyna:
+przeglądarka pytała co 3 s, serwer trzymał podłogę 5 s, więc żądanie leciało
+co ~6 sekund równym rytmem przez całe życie kodu. Zostawiona zakładka
+wysyłała tak kilkaset żądań z jednego adresu w godzinę.
+
+**Co się zmienia:**
+
+- **Odstęp rośnie z czasem czekania**: 5 s przez pierwszą minutę, 10 s do
+  trzeciej, potem 20 s. Człowiek potwierdza kod w kilkanaście sekund; cisza
+  po trzech minutach znaczy, że odszedł od komputera — pytanie co pięć sekund
+  przez pół godziny niczego wtedy nie przyspiesza. Rytm dyktuje teraz serwer
+  (`nastepnyPollMs`), nie sztywna liczba w przeglądarce, a podłoga 5 s
+  obowiązuje nawet gdyby Allegro podało mniej.
+- **Drugi klik POŁĄCZ nie startuje drugiej pętli.** Do tej wersji każde
+  kliknięcie wysyłało nowe żądanie o kod i uruchamiało kolejne, równoległe
+  odpytywanie — trzy kliknięcia dawały potrójny rytm. Teraz serwer oddaje tę
+  samą, wciąż ważną sesję, a strona pilnuje jednej pętli.
+- **PRZERWIJ** obok „Czekam na potwierdzenie…". Do tej pory jedynym wyjściem
+  było przeładowanie strony.
+- **Strona blokady rozpoznana jako blokada.** Zamiast błędu parsowania JSON-a
+  (bo przyszedł HTML) panel mówi, co się stało i co zrobić: przerwać, odczekać,
+  otworzyć link z innej sieci — np. z telefonu po danych komórkowych.
+- **[wymaga działania] Brak `ALLEGRO_USER_AGENT` widać w STANIE SYSTEMU.**
+  Allegro wymaga własnego nagłówka i ostrzega, że jego brak grozi
+  zablokowaniem klucza — a aplikacja nie mówiła o tym nic, aż do blokady.
+  Wygeneruj nagłówek na developer.allegro.pl, wpisz do `wertis.env`
+  (`ALLEGRO_USER_AGENT=`) i zrestartuj `wertis-api`.
+
+DEPLOY.md §6 dostał krótką instrukcję „Gdy Allegro pokaże stronę
+«Zostałeś zablokowany»", razem ze sposobem sprawdzenia własnego adresu IP.
+
+Sprawdzone przy okazji i **wykluczone** jako przyczyny: aplikacja nigdzie nie
+pobiera stron allegro.pl (linki do aukcji to sam tekst), cykl odświeżania
+panelu co 30 s czyta wyłącznie SQLite, tickery w tle są domyślnie wyłączone,
+a pętli ponowień po błędach nie ma w ogóle.
+
 ## 0.105.0 — 26 sierpnia 2026
 
 **„Kiedy dojdzie moja paczka?" — odpowiedź bez panelu Allegro.** Aplikacja

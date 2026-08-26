@@ -940,3 +940,24 @@ test("przesyłki klienta: sekcja na klik i szybki guzik statusu (0.105.0)", () =
   assert.match(html, /data-wstaw-status/, "wstawienie statusu jest jawnym przyciskiem");
   assert.match(html, /jeszcze nie nadane/, "zamówienie bez paczki to stan, nie błąd");
 });
+
+test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
+  /* Endpoint parowania stoi na apeksie allegro.pl — tym samym hoście co
+     sklep — więc to jedyne odpytywanie z tej strony, które widzi anti-bot
+     Allegro. Blokada adresu IP w sierpniu 2026 przyszła dokładnie w trakcie
+     parowania. Trzy rzeczy mają tu zostać: JEDNA pętla zamiast wielu (drugi
+     klik POŁĄCZ nie startuje kolejnej), rytm dyktowany przez serwer zamiast
+     sztywnych trzech sekund, i jawne wyjście z czekania. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /if \(parowanieTrwa\) return;/, "drugi klik nie startuje drugiej pętli");
+  assert.match(html, /d\.nastepnyPollMs \?\? 5000/, "rytm odpytywania dyktuje serwer");
+  assert.ok(
+    !/setTimeout\(pollParowania,\s*3000\)/.test(html),
+    "sztywne 3 s wróciły — to one zbudowały ślad maszyny"
+  );
+  assert.match(html, /id="allegroPrzerwij"/, "czekanie da się przerwać bez przeładowania strony");
+  assert.match(html, /stronę blokady/, "panel mówi, co zrobić, gdy Allegro zablokuje adres");
+});

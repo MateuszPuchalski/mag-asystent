@@ -5827,15 +5827,40 @@ function rysujKontoAllegro() {
 }
 
 async function rozpocznijParowanieAllegro() {
+  /* Drugi klik NIE startuje drugiej pętli. Dwie pętle to podwojony rytm
+     żądań do allegro.pl — a endpoint parowania stoi na tym samym hoście co
+     sklep, więc liczy go anti-bot. Serwer i tak oddaje ten sam kod. */
+  if (parowanieTrwa) return;
+  parowanieTrwa = true;
   try {
     const d = await (await api("/api/biuro/allegro/parowanie", { method: "POST", body: "{}" })).json();
-    parowanieTrwa = true;
     $("allegroStan").innerHTML = `Na SWOIM zalogowanym koncie Allegro otwórz
       <a href="${esc(d.link)}" target="_blank" rel="noopener">link potwierdzenia</a>
-      i przepisz kod: <span style="font-size:22px;font-weight:700;letter-spacing:3px">${esc(d.userCode)}</span>`;
-    $("allegroAkcje").innerHTML = '<span class="mute">Czekam na potwierdzenie w Allegro…</span>';
+      i przepisz kod: <span style="font-size:22px;font-weight:700;letter-spacing:3px">${esc(d.userCode)}</span>
+      <div class="mute" style="margin-top:8px">
+        Gdy Allegro pokaże stronę blokady, nie klikaj w kółko. Kliknij PRZERWIJ,
+        odczekaj kilkanaście minut i otwórz link z innej sieci — najprościej
+        z telefonu po danych komórkowych. Nie otwieraj go przez pulpit zdalny
+        na serwerze: wychodzi wtedy adres, który Allegro właśnie zablokowało.
+      </div>`;
+    $("allegroAkcje").innerHTML =
+      '<span class="mute">Czekam na potwierdzenie w Allegro…</span> ' +
+      '<button class="akcja cichy" id="allegroPrzerwij">PRZERWIJ</button>';
     pollParowania();
-  } catch (e) { toast(e.message); }
+  } catch (e) {
+    parowanieTrwa = false;
+    toast(e.message);
+    odswiezZwroty();
+  }
+}
+
+/* Zatrzymanie odpytywania. Nie ma tu żadnego żądania do serwera i nie musi
+   być: bez pytania z przeglądarki serwer do Allegro nic nie wysyła, a kod
+   sam wygaśnie. Zamknięcie zakładki działa tak samo — tylko ten przycisk
+   mówi o tym wprost. */
+function przerwijParowanie() {
+  parowanieTrwa = false;
+  odswiezZwroty();
 }
 
 async function pollParowania() {
@@ -5843,7 +5868,9 @@ async function pollParowania() {
   try {
     const d = await (await api("/api/biuro/allegro/parowanie")).json();
     if (d.stan === "czekam" || d.stan === "brak") {
-      setTimeout(pollParowania, 3000);
+      /* Rytm dyktuje SERWER: rośnie z czasem czekania, żeby zostawiona
+         zakładka nie pytała równo co trzy sekundy przez godzinę. */
+      setTimeout(pollParowania, d.nastepnyPollMs ?? 5000);
       return;
     }
     parowanieTrwa = false;
@@ -6523,6 +6550,7 @@ $("zwrotTowarWyniki").addEventListener("click", (e) => {
 });
 $("allegroAkcje").addEventListener("click", async (e) => {
   if (e.target.closest("[data-polacz]")) return rozpocznijParowanieAllegro();
+  if (e.target.closest("#allegroPrzerwij")) return przerwijParowanie();
   if (e.target.closest("[data-rozlacz]")) {
     const zgoda = await potwierdz({
       tytul: "ROZŁĄCZENIE KONTA ALLEGRO",

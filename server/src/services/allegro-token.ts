@@ -21,6 +21,52 @@ import { logEvent } from "./events.js";
 const ZAPAS_MS = 5 * 60_000; // odświeżamy 5 min przed wygaśnięciem
 const TIMEOUT_MS = 10_000;
 
+/* ── Rytm parowania a anti-bot Allegro (0.106.0) ─────────────────────────────
+   Endpointy OAuth stoją na APEKSIE `allegro.pl`, czyli za tym samym edge'em,
+   co sklep — nie na `api.allegro.pl`. Odpytywanie stanu parowania jest więc
+   jedynym ruchem tej aplikacji o dużej częstotliwości, który widzi anti-bot
+   sklepu. Zostawiona zakładka potrafiła wysyłać żądanie co ~6 sekund przez
+   całe życie kodu (godzina), równym, nieludzkim rytmem z jednego adresu IP —
+   i tak właśnie wygląda robot. Stąd podłoga odstępu i zwalnianie z czasem. */
+
+/** Minimalny odstęp między odpytaniami, także gdyby Allegro podało mniej. */
+const PODLOGA_PAROWANIA_MS = 5000;
+
+/** Zdanie dla człowieka, gdy zamiast danych przyszła strona blokady. */
+const KOMUNIKAT_BLOKADY =
+  "Allegro odpowiedziało stroną, nie danymi — najpewniej blokada anti-bot dla " +
+  "tego adresu IP. Przerwij parowanie na kilkanaście minut, a link potwierdzenia " +
+  "otwórz z innej sieci (np. z telefonu po danych komórkowych).";
+
+/**
+ * Odstęp między odpytaniami stanu parowania — rośnie z czasem czekania.
+ *
+ * Człowiek potwierdza kod w kilkanaście sekund. Cisza po trzech minutach
+ * znaczy, że odszedł od komputera albo utknął — pytanie co pięć sekund przez
+ * kolejne pół godziny niczego wtedy nie przyspiesza, a buduje dokładnie ten
+ * ślad, który anti-bot liczy jako maszynę.
+ */
+export function interwalParowania(czekaMs: number, bazaMs: number): number {
+  const baza = Math.max(bazaMs, PODLOGA_PAROWANIA_MS);
+  if (czekaMs < 60_000) return baza;
+  if (czekaMs < 180_000) return Math.max(baza, 10_000);
+  return Math.max(baza, 20_000);
+}
+
+/**
+ * Czy odpowiedź jest STRONĄ (anti-bot), a nie danymi.
+ *
+ * Zablokowany adres IP dostaje z apexu HTML „Zostałeś zablokowany" zamiast
+ * JSON-a. Bez tego rozpoznania parsowanie kończyło się błędem składni — czyli
+ * komunikatem, z którego nikt przy panelu nie odczyta, co się stało.
+ */
+export function czyStronaBlokady(contentType: string | null, tresc: string): boolean {
+  if ((contentType ?? "").includes("json")) return false;
+  const t = tresc.trim();
+  if (t === "") return false;
+  return !t.startsWith("{") && !t.startsWith("[");
+}
+
 interface WierszTokena {
   access_token: string;
   refresh_token: string;
@@ -88,7 +134,18 @@ async function endpointTokena(params: URLSearchParams): Promise<Record<string, u
         `(${e instanceof Error ? e.message : e})`
     );
   }
-  const json = (await odp.json().catch(() => ({}))) as Record<string, unknown>;
+  /* Tekstem, nie `odp.json()`: strona blokady ma być rozpoznana ZANIM
+     parsowanie wywali się na „<" z HTML-a. */
+  const surowa = await odp.text();
+  if (czyStronaBlokady(odp.headers.get("content-type"), surowa)) {
+    throw new Error(KOMUNIKAT_BLOKADY);
+  }
+  let json: Record<string, unknown> = {};
+  try {
+    json = JSON.parse(surowa) as Record<string, unknown>;
+  } catch {
+    /* Pusty obiekt znaczy „nie wiem" — rozstrzyga status niżej. */
+  }
   if (!odp.ok && typeof json.error !== "string") {
     throw new Error(`Allegro auth odpowiedziało ${odp.status}`);
   }
@@ -157,8 +214,10 @@ interface Parowanie {
   deviceCode: string;
   userCode: string;
   link: string;
-  /** Minimalny odstęp między odpytaniami [ms] — z odpowiedzi Allegro. */
+  /** Bazowy odstęp [ms]: z odpowiedzi Allegro (+ `slow_down`), z podłogą. */
   interwalMs: number;
+  /** Od kiedy czekamy — po tym rośnie odstęp (`interwalParowania`). */
+  startMs: number;
   wygasaMs: number;
   ostatniPollMs: number;
 }
@@ -175,6 +234,18 @@ export interface StartParowania {
 export async function rozpocznijParowanie(): Promise<StartParowania> {
   if (!config.allegro.clientId) {
     throw new Error("Zwroty Allegro są wyłączone — ustaw ALLEGRO_CLIENT_ID w wertis.env.");
+  }
+  /* Powtórne kliknięcie POŁĄCZ oddaje TĘ SAMĄ sesję. Kod z poprzedniej próby
+     jest wciąż ważny, a każde `POST /device` to kolejny strzał w apex
+     allegro.pl i — po stronie przeglądarki — kolejna równoległa pętla
+     odpytywania. Nowy kod dopiero po wygaśnięciu albo po PRZERWIJ. */
+  const trwajace = parowanie;
+  if (trwajace && Date.now() < trwajace.wygasaMs) {
+    return {
+      userCode: trwajace.userCode,
+      link: trwajace.link,
+      wygasaZaS: Math.max(0, Math.round((trwajace.wygasaMs - Date.now()) / 1000)),
+    };
   }
   let odp: Response;
   try {
@@ -194,6 +265,12 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
         `(${e instanceof Error ? e.message : e})`
     );
   }
+  const surowa = await odp.text();
+  /* Blokada anti-bot przychodzi jako HTML z kodem 4xx — rozpoznajemy ją PRZED
+     statusem, bo „403" nie mówi nikomu, że to WAF, a nie złe poświadczenia. */
+  if (czyStronaBlokady(odp.headers.get("content-type"), surowa)) {
+    throw new Error(KOMUNIKAT_BLOKADY);
+  }
   if (!odp.ok) {
     throw new Error(
       odp.status === 401
@@ -201,7 +278,7 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
         : `Allegro auth odpowiedziało ${odp.status}.`
     );
   }
-  const json = (await odp.json()) as Record<string, unknown>;
+  const json = JSON.parse(surowa) as Record<string, unknown>;
   const deviceCode = typeof json.device_code === "string" ? json.device_code : "";
   const userCode = typeof json.user_code === "string" ? json.user_code : "";
   const link =
@@ -216,7 +293,11 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
     deviceCode,
     userCode,
     link,
-    interwalMs: (typeof json.interval === "number" ? json.interval : 5) * 1000,
+    interwalMs: Math.max(
+      (typeof json.interval === "number" ? json.interval : 5) * 1000,
+      PODLOGA_PAROWANIA_MS
+    ),
+    startMs: Date.now(),
     wygasaMs: Date.now() + expiresS * 1000,
     ostatniPollMs: 0,
   };
@@ -225,15 +306,23 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
 
 export type StanParowania =
   | { stan: "brak" }
-  | { stan: "czekam"; userCode: string; link: string }
+  /** `nastepnyPollMs` — kiedy przeglądarka ma wrócić; rytm dyktuje serwer. */
+  | { stan: "czekam"; userCode: string; link: string; nastepnyPollMs: number }
   | { stan: "polaczone" }
   | { stan: "odmowa" }
   | { stan: "wygaslo" };
 
+const czekam = (p: Parowanie, zaMs: number): StanParowania => ({
+  stan: "czekam",
+  userCode: p.userCode,
+  link: p.link,
+  nastepnyPollMs: Math.max(1000, Math.round(zaMs)),
+});
+
 /**
- * Odpytanie stanu parowania. Front może pytać co 2–3 s jak wszędzie w /biuro —
- * throttling do `interval` Allegro siedzi TUTAJ, żeby limit nie zależał od
- * dyscypliny przeglądarki.
+ * Odpytanie stanu parowania. Throttling siedzi TUTAJ, żeby rytm nie zależał
+ * od dyscypliny przeglądarki — a od 0.106.0 serwer sam mówi, kiedy wrócić
+ * (`nastepnyPollMs`), i z czasem czekania zwalnia.
  */
 export async function sprawdzParowanie(autor: string): Promise<StanParowania> {
   const p = parowanie;
@@ -242,9 +331,9 @@ export async function sprawdzParowanie(autor: string): Promise<StanParowania> {
     parowanie = null;
     return { stan: "wygaslo" };
   }
-  if (Date.now() - p.ostatniPollMs < p.interwalMs) {
-    return { stan: "czekam", userCode: p.userCode, link: p.link };
-  }
+  const odstep = interwalParowania(Date.now() - p.startMs, p.interwalMs);
+  const odOstatniego = Date.now() - p.ostatniPollMs;
+  if (odOstatniego < odstep) return czekam(p, odstep - odOstatniego);
   p.ostatniPollMs = Date.now();
 
   const json = await endpointTokena(
@@ -270,10 +359,12 @@ export async function sprawdzParowanie(autor: string): Promise<StanParowania> {
   }
 
   const blad = typeof json.error === "string" ? json.error : "";
-  if (blad === "authorization_pending") return { stan: "czekam", userCode: p.userCode, link: p.link };
+  if (blad === "authorization_pending") return czekam(p, odstep);
   if (blad === "slow_down") {
+    /* Allegro prosi o zwolnienie — baza rośnie na stałe dla tej sesji
+       i kumuluje się z naszym własnym zwalnianiem z czasem. */
     p.interwalMs += 5000;
-    return { stan: "czekam", userCode: p.userCode, link: p.link };
+    return czekam(p, interwalParowania(Date.now() - p.startMs, p.interwalMs));
   }
   if (blad === "access_denied") {
     parowanie = null;
@@ -328,4 +419,22 @@ export function problemAllegro(): string | null {
     );
   }
   return null;
+}
+
+/**
+ * Brak własnego nagłówka User-Agent — osobne zdanie do /api/health.
+ *
+ * Nie doklejamy tego do `problemAllegro()`, bo tamto mówi o STANIE TOKENA,
+ * a to o konfiguracji. Allegro wymaga nagłówka wygenerowanego przy
+ * rejestracji aplikacji i ostrzega wprost, że jego brak grozi zablokowaniem
+ * klucza — a dotąd aplikacja nie mówiła o tym ani słowa, aż do blokady.
+ */
+export function problemUserAgenta(): string | null {
+  if (allegroTryb() !== "http") return null;
+  if (config.allegro.userAgent.trim() !== "") return null;
+  return (
+    "Brak ALLEGRO_USER_AGENT — Allegro wymaga własnego nagłówka i ostrzega, że " +
+    "jego brak grozi zablokowaniem klucza. Wygeneruj go na developer.allegro.pl, " +
+    "wpisz do wertis.env i zrestartuj wertis-api."
+  );
 }

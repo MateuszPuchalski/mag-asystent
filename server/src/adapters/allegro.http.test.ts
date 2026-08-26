@@ -38,7 +38,12 @@ import {
 } from "./allegro.http.js";
 import { allegroUserAgent } from "./allegro.js";
 import { config } from "../config.js";
-import { czyOdswiezyc } from "../services/allegro-token.js";
+import {
+  czyOdswiezyc,
+  czyStronaBlokady,
+  interwalParowania,
+  problemUserAgenta,
+} from "../services/allegro-token.js";
 
 /* ── Allegro HTTP — czyste funkcje ───────────────────────────────────────────
    Granicą testów jest adapter (jak przy Sferze): tras nie testuje się przez
@@ -529,4 +534,56 @@ test("przesyłki i śledzenie: oba kształty, śmieci dają pustkę, nie wyjąte
   assert.equal(zagniezdzony[0].at, "2026-08-26T08:00:00Z");
   assert.deepEqual(mapujSledzenie(null), []);
   assert.deepEqual(mapujSledzenie({ carriers: "śmieć" }), []);
+});
+
+/* ── Rytm parowania i anti-bot Allegro (0.106.0) ────────────────────────────
+   Endpointy OAuth stoją na apeksie `allegro.pl`, za tym samym edge'em co
+   sklep. Odpytywanie stanu parowania jest więc jedynym ruchem aplikacji,
+   który widzi anti-bot — i to on wygenerował blokadę adresu IP.            */
+
+test("parowanie: odstęp ma podłogę 5 s i rośnie z czasem czekania", () => {
+  // Allegro może podać `interval: 1` — my i tak nie schodzimy poniżej 5 s
+  assert.equal(interwalParowania(0, 1000), 5000);
+  assert.equal(interwalParowania(0, 5000), 5000);
+  // baza większa od podłogi zostaje bazą
+  assert.equal(interwalParowania(0, 8000), 8000);
+  /* Człowiek potwierdza kod w kilkanaście sekund. Cisza po minucie i po
+     trzech znaczy, że odszedł od komputera — pytanie co pięć sekund przez
+     kolejne pół godziny niczego nie przyspiesza, a buduje ślad maszyny. */
+  assert.equal(interwalParowania(61_000, 5000), 10_000);
+  assert.equal(interwalParowania(181_000, 5000), 20_000);
+  // `slow_down` z Allegro (baza + 5 s) kumuluje się z naszym zwalnianiem
+  assert.equal(interwalParowania(181_000, 25_000), 25_000);
+});
+
+test("strona blokady rozpoznana, zanim JSON.parse wywali się na HTML-u", () => {
+  const html = "<!doctype html><html><body>Zostałeś zablokowany.</body></html>";
+  assert.equal(czyStronaBlokady("text/html; charset=utf-8", html), true);
+  assert.equal(czyStronaBlokady(null, html), true, "bez nagłówka rozstrzyga kształt treści");
+  assert.equal(czyStronaBlokady("application/json", '{"error":"authorization_pending"}'), false);
+  assert.equal(czyStronaBlokady(null, '{"access_token":"x"}'), false);
+  // puste ciało to nie blokada — tak odpowiada część endpointów auth
+  assert.equal(czyStronaBlokady(null, "   "), false);
+});
+
+test("brak ALLEGRO_USER_AGENT to zdanie w /api/health, nie cisza", () => {
+  /* Allegro ostrzega przy rejestracji aplikacji, że brak własnego nagłówka
+     grozi zablokowaniem klucza. Do 0.106.0 aplikacja nie mówiła o tym nic —
+     objawem był dopiero blok, czyli moment, w którym jest już za późno. */
+  const bylUA = config.allegro.userAgent;
+  const bylTryb = config.allegro.mode;
+  try {
+    (config.allegro as { mode: string }).mode = "http";
+    (config.allegro as { userAgent: string }).userAgent = "";
+    assert.match(problemUserAgenta() ?? "", /ALLEGRO_USER_AGENT/);
+    (config.allegro as { userAgent: string }).userAgent = "Wygenerowany/1.0 (abc123)";
+    assert.equal(problemUserAgenta(), null);
+    // w trybie dev nikt do Allegro nie dzwoni — zdanie byłoby szumem
+    (config.allegro as { mode: string }).mode = "dev";
+    (config.allegro as { userAgent: string }).userAgent = "";
+    assert.equal(problemUserAgenta(), null);
+  } finally {
+    (config.allegro as { userAgent: string }).userAgent = bylUA;
+    (config.allegro as { mode: string }).mode = bylTryb;
+  }
 });
