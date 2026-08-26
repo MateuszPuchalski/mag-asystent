@@ -15,9 +15,11 @@ process.env.SGT_MODE = "seeded";
 
 let db: typeof import("../db/db.js").db;
 let D: typeof import("./dyskusje.js");
+let zresetujAdapterAllegro: typeof import("../adapters/allegro.js").zresetujAdapterAllegro;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
+  ({ zresetujAdapterAllegro } = await import("../adapters/allegro.js"));
   D = await import("./dyskusje.js");
 });
 
@@ -26,6 +28,9 @@ beforeEach(() => {
   for (const t of ["dyskusja", "zwrot_pozycja", "zwrot", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
+  /* Świeży adapter dev na każdy test — wysłana wiadomość z jednego testu nie
+     ma prawa pokazać się w rozmowie w następnym. */
+  zresetujAdapterAllegro();
 });
 
 const dniTemu = (n: number) => new Date(Date.now() - n * 86_400_000 - 1000).toISOString();
@@ -139,4 +144,141 @@ test("notatka bierze sprawę na piszącego; pusta zdejmuje treść, nie właści
   const pusta = D.szczegolDyskusji(sprawa.id);
   assert.equal(pusta.notatka, null);
   assert.equal(pusta.prowadzi, "Jan", "ostatni pracujący podmienia nazwisko — znacznik, nie zamek");
+});
+
+/* ── Rozmowa i odpowiedź (0.104.0) ─────────────────────────────────────────── */
+
+test("rozmowa: czytana z API na klik, nieznana sprawa uczciwie daje null", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  const sprawa = D.listaDyskusji().find((y) => y.allegroId === "dev-issue-1")!;
+  const wiadomosci = await D.wiadomosciDyskusji(sprawa.id);
+  assert.ok(wiadomosci && wiadomosci.length >= 2);
+  assert.equal(wiadomosci![0].odNas, false);
+
+  // sprawa spoza API dyskusji — rejestr działa, rozmowa degraduje do panelu
+  db()
+    .prepare(
+      `INSERT INTO dyskusja(allegro_id, typ, status, widziano_at, utworzono_at)
+       VALUES ('obca-sprawa', 'DISCUSSION', 'nowa', ?, ?)`
+    )
+    .run(dniTemu(0), dniTemu(0));
+  const obca = D.listaDyskusji().find((y) => y.allegroId === "obca-sprawa")!;
+  assert.equal(await D.wiadomosciDyskusji(obca.id), null);
+});
+
+test("zapis odpowiedzi: stempluje prowadzącego i liczy redakcję względem szkicu", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  const sprawa = D.listaDyskusji()[0];
+  assert.throws(() => D.zapiszOdpowiedzDyskusji(sprawa.id, "   ", "Ala"), /pusta/);
+
+  const szkic = await D.generujSzkicDyskusji(sprawa.id, "Ala");
+  assert.ok(szkic.szkicAi && szkic.odpowiedz === szkic.szkicAi);
+  assert.equal(szkic.edytowano, false);
+
+  // ta sama treść co szkic → bez redakcji; zmieniona → redakcja
+  assert.equal(D.zapiszOdpowiedzDyskusji(sprawa.id, szkic.szkicAi!, "Ola").edytowano, false);
+  const po = D.zapiszOdpowiedzDyskusji(sprawa.id, "Dzień dobry, dosyłamy śrubę M6.", "Ola");
+  assert.equal(po.edytowano, true);
+  assert.equal(po.prowadzi, "Ola", "pisanie odpowiedzi JEST braniem sprawy");
+});
+
+test("wysyłka: guardy zamknięcia, pustki i limitu — nic nie leci do Allegro", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  const sprawa = D.listaDyskusji()[0];
+
+  await assert.rejects(D.wyslijOdpowiedzDyskusji(sprawa.id, "Biuro"), /napisz odpowiedź/);
+
+  D.zapiszOdpowiedzDyskusji(sprawa.id, "x".repeat(2001), "Biuro");
+  await assert.rejects(D.wyslijOdpowiedzDyskusji(sprawa.id, "Biuro"), /limit Allegro/);
+
+  D.zmienStatusDyskusji(sprawa.id, "zamknieta", "Biuro");
+  await assert.rejects(D.wyslijOdpowiedzDyskusji(sprawa.id, "Biuro"), /zamknięta/);
+
+  // sprawa zamknięta PO STRONIE ALLEGRO — nasze zdanie zamiast ich błędu
+  const zamknietaAllegro = D.listaDyskusji({ status: "wszystkie" }).find(
+    (y) => y.statusAllegro === "CLOSED"
+  )!;
+  db()
+    .prepare("UPDATE dyskusja SET status='w_toku', odpowiedz='Dzień dobry' WHERE id = ?")
+    .run(zamknietaAllegro.id);
+  await assert.rejects(
+    D.wyslijOdpowiedzDyskusji(zamknietaAllegro.id, "Biuro"),
+    /Allegro zamknęło/
+  );
+});
+
+test("wysyłka: happy path — nowa idzie w toku, nadawca zostaje właścicielem", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  const sprawa = D.listaDyskusji().find((y) => y.allegroId === "dev-issue-1")!;
+  D.zapiszOdpowiedzDyskusji(sprawa.id, "Dzień dobry, dosyłamy brakującą śrubę.", "Ala");
+
+  const po = await D.wyslijOdpowiedzDyskusji(sprawa.id, "Ala");
+  assert.equal(po.status, "w_toku", "wysyłka nie zamyka sprawy — koniec ogłasza Allegro");
+  assert.ok(po.wyslanoAt);
+  assert.equal(po.odpowiedzial, "Ala");
+  assert.equal(po.prowadzi, "Ala", "prowadzi ZOSTAJE — to nadawca czeka teraz na klienta");
+  assert.ok(po.szkicAi === null || typeof po.szkicAi === "string", "szkic nie jest czyszczony");
+
+  const zdarzenie = db()
+    .prepare("SELECT COUNT(*) AS n FROM events WHERE type='dyskusja_wyslana'")
+    .get() as { n: number };
+  assert.equal(zdarzenie.n, 1);
+
+  // rozmowa w adapterze dev od razu niesie naszą wiadomość — pełna pętla
+  const wiadomosci = await D.wiadomosciDyskusji(sprawa.id);
+  const nasza = wiadomosci!.at(-1)!;
+  assert.equal(nasza.odNas, true);
+  assert.match(nasza.tresc, /śrubę/);
+});
+
+test("załącznik: MIME i rozmiar sprawdzane U NAS, wysłany jedzie z wiadomością", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  const sprawa = D.listaDyskusji().find((y) => y.allegroId === "dev-issue-2")!;
+  D.zapiszOdpowiedzDyskusji(sprawa.id, "W załączniku protokół oględzin.", "Biuro");
+
+  await assert.rejects(
+    D.wyslijOdpowiedzDyskusji(sprawa.id, "Biuro", {
+      nazwa: "wirus.exe", mime: "application/x-msdownload", dane: "QUJD",
+    }),
+    /dozwolone/
+  );
+  await assert.rejects(
+    D.wyslijOdpowiedzDyskusji(sprawa.id, "Biuro", {
+      nazwa: "za-duze.png", mime: "image/png", dane: "A".repeat(6 * 1024 * 1024),
+    }),
+    /limit to 4 MB/
+  );
+
+  const po = await D.wyslijOdpowiedzDyskusji(sprawa.id, "Biuro", {
+    nazwa: "protokol.pdf", mime: "application/pdf",
+    dane: "data:application/pdf;base64,JVBERi0xLjQ=",
+  });
+  assert.ok(po.wyslanoAt);
+  const wiadomosci = await D.wiadomosciDyskusji(sprawa.id);
+  assert.deepEqual(wiadomosci!.at(-1)!.zalacznik, { nazwa: "protokol.pdf", url: null });
+});
+
+test("szkic: kontekst niesie sprawę i zwrot, sprawa zamknięta nie dostaje szkicu", async () => {
+  // zwrot powiązany po numerze zamówienia — szkic ma go widzieć w kontekście
+  const z = db()
+    .prepare(
+      `INSERT INTO zwrot(allegro_order_id, waybill, status, utworzono_at, utworzono_przez)
+       VALUES ('dev-ord-1', 'DEVWB0001', 'oceniony', ?, 'Test')`
+    )
+    .run(dniTemu(0));
+  db()
+    .prepare(
+      `INSERT INTO zwrot_pozycja(zwrot_id, nazwa, ilosc, powod, decyzja)
+       VALUES (?, 'Zestaw montażowy', 1, 'Niekompletny', 'reklamacja')`
+    )
+    .run(Number(z.lastInsertRowid));
+  await D.synchronizujDyskusje("Biuro");
+
+  const sprawa = D.listaDyskusji().find((y) => y.allegroId === "dev-issue-1")!;
+  const szkic = await D.generujSzkicDyskusji(sprawa.id, "Ala");
+  assert.ok(szkic.szkicAi!.length > 0);
+  assert.equal(szkic.prowadzi, "Ala");
+
+  D.zmienStatusDyskusji(sprawa.id, "zamknieta", "Ala");
+  await assert.rejects(D.generujSzkicDyskusji(sprawa.id, "Ala"), /zamknięta/);
 });

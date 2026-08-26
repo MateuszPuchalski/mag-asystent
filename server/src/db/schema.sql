@@ -974,6 +974,17 @@ CREATE TABLE IF NOT EXISTS dyskusja (
   -- Kto wziął sprawę i kiedy — ZNACZNIK, nie blokada (wzorzec `pytanie`).
   prowadzi          TEXT,
   prowadzi_at       TEXT,
+  -- Odpowiedź w sprawie (0.104.0) — te same nazwy co w `pytanie`, z jedną
+  -- różnicą znaczenia: dyskusja to WIELE odpowiedzi, więc `wyslano_at` mówi
+  -- o OSTATNIEJ wysyłce, a pełny rejestr wysyłek niesie `events`
+  -- (dyskusja_wyslana). Sama rozmowa dalej mieszka w Allegro i czyta się ją
+  -- na kliknięcie — tu zostaje nasz szkic i nasza ostatnia odpowiedź.
+  szkic_ai          TEXT,                 -- SUROWY szkic modelu — miara, ile poprawiamy
+  szkic_at          TEXT,
+  odpowiedz         TEXT,                 -- treść po redakcji biura / ostatnio wysłana
+  edytowano         INTEGER NOT NULL DEFAULT 0, -- 1 = człowiek zmienił szkic przed wysłaniem
+  wyslano_at        TEXT,                 -- OSTATNIA wysyłka (pełna historia w events)
+  odpowiedzial      TEXT,
   zamknieto_at      TEXT,
   zamknieto_przez   TEXT,                 -- login biura albo 'allegro' (auto-zamknięcie po statusie)
   widziano_at       TEXT NOT NULL,        -- ostatni raz w odpowiedzi API (diagnostyka synchronizacji)

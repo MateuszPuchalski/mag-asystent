@@ -106,6 +106,25 @@ export interface DyskusjaAllegro {
 }
 
 /**
+ * Wiadomość w dyskusji/reklamacji (`/sale/disputes/{id}/messages`, 0.104.0).
+ *
+ * Rozmowa czytana NA ŻĄDANIE i nie zapisywana u nas — ta sama zasada co przy
+ * wątkach Centrum wiadomości. Zasób jest w becie, więc mapowanie defensywne.
+ */
+export interface WiadomoscDyskusji {
+  id: string;
+  /** `author.role === "SELLER"` — nasza wiadomość. */
+  odNas: boolean;
+  autorLogin: string | null;
+  /** BUYER | SELLER | ALLEGRO_ADVISOR — surowa rola z API ([WERYFIKUJ]). */
+  autorRola: string | null;
+  tresc: string;
+  at: string | null;
+  /** Załącznik wiadomości; url bywa pusty, wtedy zostaje sama nazwa. */
+  zalacznik: { nazwa: string | null; url: string | null } | null;
+}
+
+/**
  * Nagłówek wątku z listy Centrum wiadomości (`/messaging/threads`).
  *
  * Sama lista — BEZ wiadomości. Pobranie treści to osobne zapytanie na wątek,
@@ -226,6 +245,23 @@ export interface AllegroAdapter {
   oznaczPrzeczytany(threadId: string): Promise<void>;
   /** Nasze aktywne oferty pasujące do frazy — linki do wklejenia w odpowiedź. */
   szukajOfert(fraza: string): Promise<OfertaAllegro[]>;
+
+  /* ── Dyskusje i reklamacje — rozmowa i odpowiedź (0.104.0) ─────────────────
+     Identyfikator sprawy to id z `/sale/issues` użyte wprost w ścieżkach
+     `/sale/disputes/{id}` — założenie o wspólnej przestrzeni id jest
+     [WERYFIKUJ] na sandboxie. `null` z odczytu znaczy „rozmowa niedostępna
+     przez API" (404) i panel biura degraduje wtedy do linku do panelu
+     Allegro, zachowując cały rejestr z 0.103.0.                             */
+
+  /** Wiadomości sprawy, od najstarszej; `null` = niedostępne (404), `[]` = pusta. */
+  wiadomosciDyskusji(allegroId: string): Promise<WiadomoscDyskusji[] | null>;
+  /** Wysyła naszą odpowiedź do sprawy; opcjonalnie z wcześniej wgranym załącznikiem. */
+  wyslijWiadomoscDyskusji(allegroId: string, tekst: string, zalacznikId?: string): Promise<void>;
+  /**
+   * Wgrywa załącznik do użycia w wiadomości dyskusji — dwustopniowo
+   * (deklaracja + binaria), w całości wewnątrz adaptera. Zwraca id załącznika.
+   */
+  dodajZalacznikDyskusji(nazwaPliku: string, mime: string, daneBase64: string): Promise<string>;
 }
 
 /**
@@ -234,6 +270,9 @@ export interface AllegroAdapter {
  * Allegro tnie dłuższe albo odrzuca żądanie — a odrzucenie PO kliknięciu
  * „wyślij" znaczy, że biuro myśli, że odpowiedziało. Sprawdzamy więc u siebie,
  * zanim cokolwiek poleci. Wartość ostrożna; [WERYFIKUJ] na sandboxie.
+ *
+ * Ten sam limit obowiązuje wiadomości dyskusji (0.104.0) — osobna stała
+ * byłaby zgadywanką o zgadywance; [WERYFIKUJ] razem z kształtem body.
  */
 export const LIMIT_WIADOMOSCI = 2000;
 

@@ -11,6 +11,7 @@ import type {
   SzukanieWatku,
   WatekNaglowek,
   WiadomoscAllegro,
+  WiadomoscDyskusji,
   ZamowienieAllegro,
   ZwrotAllegro,
 } from "./allegro.js";
@@ -105,6 +106,50 @@ export function mapujDyskusje(json: unknown): DyskusjaAllegro[] {
       kupujacyLogin: tekst(buyer.login),
       orderId: tekst(order.id) ?? tekst(i.orderId),
       utworzono: tekst(i.createdAt),
+    };
+  });
+}
+
+/**
+ * URL-e rozmowy w dyskusji (`/sale/disputes/{id}/messages`) — GET czyta,
+ * POST wysyła naszą odpowiedź. Identyfikator sprawy bierzemy z `/sale/issues`
+ * przy założeniu wspólnej przestrzeni id — [WERYFIKUJ] na sandboxie; 404
+ * degraduje do „rozmowa niedostępna przez API", nie do awarii.
+ */
+export function urlWiadomosciDyskusji(apiUrl: string, id: string): string {
+  return `${apiUrl}/sale/disputes/${encodeURIComponent(id)}/messages`;
+}
+
+/** Deklaracja załącznika dyskusji (POST) — krok pierwszy z dwóch. [WERYFIKUJ]. */
+export function urlZalacznikaDyskusji(apiUrl: string): string {
+  return `${apiUrl}/sale/dispute-attachments`;
+}
+
+/**
+ * Wiadomości dyskusji z JSON-a → typ domenowy. Zasób w becie — każde pole ma
+ * listę znanych miejsc, a nieznany kształt daje NULL-e, nie wyjątek (ten sam
+ * kontrakt co `mapujDyskusje`). Brak roli liczy wiadomość jako NASZĄ:
+ * pomyłka w tę stronę chowa cudze zdanie, w drugą kazałaby odpowiadać na
+ * własne (ten sam kierunek co przy wątkach, allegro.ts).
+ */
+export function mapujWiadomosciDyskusji(json: unknown): WiadomoscDyskusji[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(root.messages) ? root.messages : [];
+  return lista.map((it) => {
+    const m = (it ?? {}) as Record<string, unknown>;
+    const author = (m.author ?? {}) as Record<string, unknown>;
+    const zal = (m.attachment ?? null) as Record<string, unknown> | null;
+    const rola = tekst(author.role);
+    return {
+      id: tekst(m.id) ?? "",
+      odNas: rola === null ? true : rola === "SELLER",
+      autorLogin: tekst(author.login),
+      autorRola: rola,
+      tresc: tekst(m.text) ?? tekst(m.message) ?? "",
+      at: tekst(m.createdAt),
+      zalacznik: zal
+        ? { nazwa: tekst(zal.fileName) ?? tekst(zal.name), url: tekst(zal.url) }
+        : null,
     };
   });
 }
@@ -458,6 +503,11 @@ export function poNajstarszej(najstarszaData: string | null, granica: number): b
 export function scopeDlaUrl(url: string): string {
   if (url.includes("/messaging/")) return "allegro:api:messaging";
   if (url.includes("/sale/offers")) return "allegro:api:sale:offers:read";
+  /* Dyskusje: odczyt spraw, rozmowa i załączniki — jedno uprawnienie.
+     [WERYFIKUJ] czy obejmuje też ZAPISY; jeśli nie, 403 i tak wskaże scope. */
+  if (url.includes("/sale/disputes") || url.includes("/sale/dispute-attachments")) {
+    return "allegro:api:disputes";
+  }
   if (url.includes("/sale/issues")) return "allegro:api:disputes";
   return "allegro:api:orders:read";
 }
@@ -706,5 +756,93 @@ export class HttpAllegroAdapter implements AllegroAdapter {
        linków dla człowieka, nie przegląd asortymentu. */
     const json = await this.zapytaj(urlOfert(config.allegro.apiUrl, fraza, 0));
     return json === null ? [] : mapujOferty(json, config.allegro.sandbox);
+  }
+
+  // ── Dyskusje: rozmowa i odpowiedź (0.104.0) ────────────────────────────────
+
+  async wiadomosciDyskusji(allegroId: string): Promise<WiadomoscDyskusji[] | null> {
+    /* NULL z 404 zostaje NULL-em, nie pustą listą: „sprawy nie ma pod tym id"
+       i „rozmowa jest pusta" to dwa różne zdania na ekranie biura. */
+    const json = await this.zapytaj(urlWiadomosciDyskusji(config.allegro.apiUrl, allegroId));
+    return json === null ? null : mapujWiadomosciDyskusji(json);
+  }
+
+  async wyslijWiadomoscDyskusji(
+    allegroId: string,
+    tekst: string,
+    zalacznikId?: string
+  ): Promise<void> {
+    /* Kształt ciała [WERYFIKUJ] na sandboxie — `text` + opcjonalne
+       `attachment.id`, jak w dokumentacji disputes. */
+    const wynik = await this.zapytaj(urlWiadomosciDyskusji(config.allegro.apiUrl, allegroId), {
+      metoda: "POST",
+      body: { text: tekst, ...(zalacznikId ? { attachment: { id: zalacznikId } } : {}) },
+    });
+    /* `zapytaj` mapuje 404 na null — przy ODCZYCIE to degradacja, przy
+       WYSYŁCE oznaczałoby, że biuro myśli, że odpowiedziało. Mówimy wprost. */
+    if (wynik === null) {
+      throw new Error(
+        "Allegro nie zna tej sprawy pod API dyskusji (404) — odpowiedz w panelu Allegro."
+      );
+    }
+  }
+
+  async dodajZalacznikDyskusji(
+    nazwaPliku: string,
+    mime: string,
+    daneBase64: string
+  ): Promise<string> {
+    /* Dwustopniowo wg wzorca disputes: najpierw deklaracja (nazwa + rozmiar),
+       potem binaria pod wskazany albo wyliczony adres. Pola odpowiedzi
+       deklaracji są [WERYFIKUJ] — czytamy defensywnie `id` i `location`. */
+    const dane = Buffer.from(daneBase64, "base64");
+    const deklaracja = (await this.zapytaj(urlZalacznikaDyskusji(config.allegro.apiUrl), {
+      metoda: "POST",
+      body: { fileName: nazwaPliku, size: dane.length },
+    })) as Record<string, unknown> | null;
+    const id =
+      typeof deklaracja?.id === "string" && deklaracja.id !== "" ? deklaracja.id : null;
+    if (!id) {
+      throw new Error(
+        "Allegro nie przyjęło deklaracji załącznika — odpowiedź bez identyfikatora."
+      );
+    }
+    const cel =
+      typeof deklaracja?.location === "string" && deklaracja.location !== ""
+        ? deklaracja.location
+        : `${urlZalacznikaDyskusji(config.allegro.apiUrl)}/${encodeURIComponent(id)}`;
+    await this.wgrajBinarne(cel, mime, dane);
+    return id;
+  }
+
+  /**
+   * Wgranie surowych binariów — poza `zapytaj`, bo tamto koduje ciało jako
+   * JSON i negocjuje `Accept`, a upload pliku potrzebuje dokładnie odwrotnie:
+   * `content-type` pliku i żadnej wersji zasobu. [WERYFIKUJ] metodę (PUT)
+   * i nagłówki na sandboxie.
+   */
+  private async wgrajBinarne(url: string, mime: string, dane: Buffer): Promise<void> {
+    let odp: Response;
+    try {
+      odp = await fetch(url, {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${await wazneBearer()}`,
+          "user-agent": allegroUserAgent(),
+          "content-type": mime,
+        },
+        body: new Uint8Array(dane),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (e) {
+      throw new Error(
+        `Wgranie załącznika nie doszło do Allegro — sprawdź internet na serwerze. ` +
+          `(${e instanceof Error ? e.message : e})`
+      );
+    }
+    if (!odp.ok) {
+      const tresc = await odp.text().catch(() => "");
+      throw new Error(`Allegro odrzuciło załącznik (${odp.status}): ${tresc.slice(0, 300)}`);
+    }
   }
 }

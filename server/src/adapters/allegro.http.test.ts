@@ -23,6 +23,9 @@ import {
   urlOferty,
   urlWyslijWiadomosc,
   urlOznaczPrzeczytany,
+  urlWiadomosciDyskusji,
+  urlZalacznikaDyskusji,
+  mapujWiadomosciDyskusji,
   mapujWatki,
   mapujOferty,
   scopeDlaUrl,
@@ -144,6 +147,49 @@ test("dyskusje: mapowanie defensywne — typ, klient i temat z różnych gniazd"
   assert.equal(lista[1].temat, "Pytanie o śrubę");
   assert.equal(lista[1].status, null);
   assert.deepEqual(mapujDyskusje({}), [], "brak listy = pusta odpowiedź, nie błąd");
+});
+
+test("rozmowa dyskusji: URL-e, rodzina i scope — pisownia się nie rozjeżdża", () => {
+  assert.equal(
+    urlWiadomosciDyskusji("https://api.allegro.pl", "i 1/x"),
+    "https://api.allegro.pl/sale/disputes/i%201%2Fx/messages",
+    "id sprawy jest enkodowane — śmieciowy znak nie rozetnie ścieżki"
+  );
+  assert.equal(
+    urlZalacznikaDyskusji("https://api.allegro.pl"),
+    "https://api.allegro.pl/sale/dispute-attachments"
+  );
+  /* Własna rodzina Accept: beta dyskusji nie przestawia wersji issues. */
+  assert.equal(rodzinaKoncowki(urlWiadomosciDyskusji("https://api.allegro.pl", "1")), "disputes");
+  /* 403 ma wskazać właściwe uprawnienie — bez tych gałęzi podpowiadałby
+     orders:read, czyli prowadził naprawę w złą stronę. */
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/disputes/1/messages"), "allegro:api:disputes");
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/dispute-attachments"), "allegro:api:disputes");
+});
+
+test("rozmowa dyskusji: mapowanie defensywne, brak roli liczy się jako NASZE", () => {
+  const lista = mapujWiadomosciDyskusji({
+    messages: [
+      {
+        id: "m-1", text: "Brakuje śruby", createdAt: "2026-08-20T10:00:00Z",
+        author: { login: "jan", role: "BUYER" },
+        attachment: { fileName: "foto.jpg", url: "https://x/foto" },
+      },
+      { id: "m-2", text: "Dosyłamy", author: { role: "SELLER" } },
+      /* Bez roli: pomyłka „nasze" tylko chowa cudze zdanie; pomyłka w drugą
+         stronę kazałaby odpowiadać na własne — ten sam kierunek co przy
+         wątkach Centrum wiadomości. */
+      { id: "m-3", text: "Kto to pisał?" },
+    ],
+  });
+  assert.equal(lista[0].odNas, false);
+  assert.equal(lista[0].autorLogin, "jan");
+  assert.deepEqual(lista[0].zalacznik, { nazwa: "foto.jpg", url: "https://x/foto" });
+  assert.equal(lista[1].odNas, true);
+  assert.equal(lista[2].odNas, true);
+  assert.equal(lista[2].autorRola, null);
+  assert.deepEqual(mapujWiadomosciDyskusji({}), [], "brak listy = pusto, nie wyjątek");
+  assert.deepEqual(mapujWiadomosciDyskusji(null), [], "null = pusto, nie wyjątek");
 });
 
 test("powód zwrotu: kod tłumaczony na polski, NONE to brak powodu", () => {

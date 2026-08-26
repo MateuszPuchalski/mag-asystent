@@ -7,6 +7,7 @@ import type {
   WatekAllegro,
   WatekNaglowek,
   WiadomoscAllegro,
+  WiadomoscDyskusji,
   ZamowienieAllegro,
   ZwrotAllegro,
 } from "./allegro.js";
@@ -469,4 +470,121 @@ export class DevAllegroAdapter implements AllegroAdapter {
         (o.externalId ?? "").toLowerCase().includes(szukane)
     ).map((o) => ({ ...o, url: urlOferty(o.offerId, false) }));
   }
+
+  // ── Dyskusje: rozmowa i odpowiedź (0.104.0) ────────────────────────────────
+
+  /* Ten sam wzorzec co `dopisane`: stan w instancji, nie w module, żeby
+     wysyłka z jednego testu nie wyciekała do następnego. */
+  private dyskusjeDopisane = new Map<string, WiadomoscDyskusji[]>();
+  private zalacznikiDyskusji = new Map<string, { nazwa: string; mime: string }>();
+
+  async wiadomosciDyskusji(allegroId: string): Promise<WiadomoscDyskusji[] | null> {
+    /* Trzy rozmowy zestrojone z `listaDyskusji()`; nieznane id → null —
+       demo ścieżki „rozmowa niedostępna przez API, otwórz panel". */
+    const bazowe = ROZMOWY_DYSKUSJI[allegroId];
+    if (!bazowe) return null;
+    return [...bazowe, ...(this.dyskusjeDopisane.get(allegroId) ?? [])];
+  }
+
+  async wyslijWiadomoscDyskusji(
+    allegroId: string,
+    tekst: string,
+    zalacznikId?: string
+  ): Promise<void> {
+    if (!ROZMOWY_DYSKUSJI[allegroId]) {
+      throw new Error(
+        "Allegro nie zna tej sprawy pod API dyskusji (404) — odpowiedz w panelu Allegro."
+      );
+    }
+    const lista = this.dyskusjeDopisane.get(allegroId) ?? [];
+    const zal = zalacznikId ? this.zalacznikiDyskusji.get(zalacznikId) : undefined;
+    lista.push({
+      id: `dev-dysk-wyslana-${allegroId}-${lista.length + 1}`,
+      odNas: true,
+      autorLogin: "wertis",
+      autorRola: "SELLER",
+      tresc: tekst,
+      at: new Date().toISOString(),
+      zalacznik: zal ? { nazwa: zal.nazwa, url: null } : null,
+    });
+    this.dyskusjeDopisane.set(allegroId, lista);
+  }
+
+  async dodajZalacznikDyskusji(
+    nazwaPliku: string,
+    mime: string,
+    _daneBase64: string
+  ): Promise<string> {
+    /* Walidacja rozmiaru i MIME należy do serwisu — adapter dev tylko wydaje
+       identyfikator, jak zrobiłby to prawdziwy Allegro. */
+    const id = `dev-zal-${this.zalacznikiDyskusji.size + 1}`;
+    this.zalacznikiDyskusji.set(id, { nazwa: nazwaPliku, mime });
+    return id;
+  }
 }
+
+/* Rozmowy dyskusji zestrojone z `listaDyskusji()`. Druga sprawa niesie głos
+   ALLEGRO_ADVISOR (trzecia rola w rozmowie), trzecia — naszą starą odpowiedź
+   w sprawie już zamkniętej. */
+const ROZMOWY_DYSKUSJI: Record<string, WiadomoscDyskusji[]> = {
+  "dev-issue-1": [
+    {
+      id: "dev-dysk-1-1",
+      odNas: false,
+      autorLogin: "jan_wraca",
+      autorRola: "BUYER",
+      tresc: "Dzień dobry, w zestawie brakuje śruby mocującej M6. Czy mogą Państwo dosłać?",
+      at: dniTemu(2),
+      zalacznik: null,
+    },
+    {
+      id: "dev-dysk-1-2",
+      odNas: false,
+      autorLogin: "jan_wraca",
+      autorRola: "BUYER",
+      tresc: "Dodaję zdjęcie zawartości pudełka.",
+      at: dniTemu(1),
+      zalacznik: { nazwa: "pudelko.jpg", url: null },
+    },
+  ],
+  "dev-issue-2": [
+    {
+      id: "dev-dysk-2-1",
+      odNas: false,
+      autorLogin: "ewa_oddaje",
+      autorRola: "BUYER",
+      tresc: "Obudowa pękła po tygodniu normalnego użytkowania. Żądam wymiany albo zwrotu.",
+      at: dniTemu(1),
+      zalacznik: null,
+    },
+    {
+      id: "dev-dysk-2-2",
+      odNas: false,
+      autorLogin: null,
+      autorRola: "ALLEGRO_ADVISOR",
+      tresc: "Prosimy sprzedawcę o ustosunkowanie się do reklamacji w terminie.",
+      at: dniTemu(1),
+      zalacznik: null,
+    },
+  ],
+  "dev-issue-3": [
+    {
+      id: "dev-dysk-3-1",
+      odNas: false,
+      autorLogin: "firma_x",
+      autorRola: "BUYER",
+      tresc: "Proszę o zwrot kosztów wysyłki zwrotnej.",
+      at: dniTemu(6),
+      zalacznik: null,
+    },
+    {
+      id: "dev-dysk-3-2",
+      odNas: true,
+      autorLogin: "wertis",
+      autorRola: "SELLER",
+      tresc: "Zwrot kosztów wykonany — przepraszamy za kłopot.",
+      at: dniTemu(5),
+      zalacznik: null,
+    },
+  ],
+};

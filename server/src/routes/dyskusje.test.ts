@@ -52,6 +52,10 @@ const TRASY = [
   { method: "GET" as const, url: "/api/biuro/dyskusje/1" },
   { method: "POST" as const, url: "/api/biuro/dyskusje/1/status", body: { status: "w_toku" } },
   { method: "PUT" as const, url: "/api/biuro/dyskusje/1/notatka", body: { notatka: "x" } },
+  { method: "GET" as const, url: "/api/biuro/dyskusje/1/wiadomosci" },
+  { method: "POST" as const, url: "/api/biuro/dyskusje/1/generuj", body: {} },
+  { method: "PUT" as const, url: "/api/biuro/dyskusje/1/odpowiedz", body: { odpowiedz: "x" } },
+  { method: "POST" as const, url: "/api/biuro/dyskusje/1/wyslij", body: { odpowiedz: "x" } },
 ];
 
 test("bez sesji 401 na każdej trasie", async () => {
@@ -126,4 +130,69 @@ test("pełny przepływ: pobierz → lista → status → notatka → licznik", a
     payload: { status: "zamknieta" }, headers: biuro,
   });
   assert.equal(r.statusCode, 409);
+});
+
+test("rozmowa i odpowiedź przez HTTP: wiadomości → generuj → wyślij z załącznikiem", async () => {
+  const biuro = { "x-session": zalogowany("biuro") };
+
+  let r = await app.inject({ method: "POST", url: "/api/biuro/dyskusje/odswiez", payload: {}, headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "GET", url: "/api/biuro/dyskusje", headers: biuro });
+  const sprawa = r.json().dyskusje.find(
+    (y: { allegroId: string }) => y.allegroId === "dev-issue-1"
+  );
+
+  r = await app.inject({
+    method: "GET", url: `/api/biuro/dyskusje/${sprawa.id}/wiadomosci`, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200);
+  assert.ok(r.json().wiadomosci.length >= 2, "adapter dev niesie rozmowę");
+
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/dyskusje/${sprawa.id}/generuj`, payload: {}, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.ok(r.json().dyskusja.szkicAi, "szkic zapisany na wierszu");
+
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/dyskusje/${sprawa.id}/wyslij`,
+    payload: {
+      odpowiedz: "Dzień dobry, dosyłamy brakującą śrubę M6.",
+      zalacznik: { nazwa: "foto.png", mime: "image/png", dane: "iVBORw0KGgo=" },
+    },
+    headers: biuro,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  const d = r.json().dyskusja;
+  assert.equal(d.status, "w_toku");
+  assert.equal(d.edytowano, true, "treść inna niż szkic = redakcja");
+  assert.ok(d.wyslanoAt);
+
+  // rozmowa od razu niesie naszą wiadomość — pełna pętla przez HTTP
+  r = await app.inject({
+    method: "GET", url: `/api/biuro/dyskusje/${sprawa.id}/wiadomosci`, headers: biuro,
+  });
+  const ostatnia = r.json().wiadomosci.at(-1);
+  assert.equal(ostatnia.odNas, true);
+
+  // sprawa niedostępna przez API dyskusji: null w treści, nie błąd
+  db()
+    .prepare(
+      `INSERT INTO dyskusja(allegro_id, typ, status, widziano_at, utworzono_at)
+       VALUES ('obca-sprawa', 'DISCUSSION', 'nowa', datetime('now'), datetime('now'))`
+    )
+    .run();
+  const obcaId = (db().prepare("SELECT id FROM dyskusja WHERE allegro_id='obca-sprawa'").get() as { id: number }).id;
+  r = await app.inject({
+    method: "GET", url: `/api/biuro/dyskusje/${obcaId}/wiadomosci`, headers: biuro,
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().wiadomosci, null);
+
+  // wysyłka do sprawy nieistniejącej w rejestrze — 404 z serwisu, nie 500
+  r = await app.inject({
+    method: "POST", url: "/api/biuro/dyskusje/999999/wyslij",
+    payload: { odpowiedz: "x" }, headers: biuro,
+  });
+  assert.equal(r.statusCode, 404);
 });
