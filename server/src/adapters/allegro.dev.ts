@@ -4,11 +4,14 @@ import type {
   KupujacyRef,
   OfertaAllegro,
   SzukanieWatku,
+  PrzesylkaZamowienia,
   WatekAllegro,
   WatekNaglowek,
   WiadomoscAllegro,
   WiadomoscDyskusji,
   ZamowienieAllegro,
+  ZamowienieKupujacego,
+  ZdarzenieSledzenia,
   ZwrotAllegro,
 } from "./allegro.js";
 import { normalizujRef, urlOferty } from "./allegro.http.js";
@@ -521,7 +524,119 @@ export class DevAllegroAdapter implements AllegroAdapter {
     this.zalacznikiDyskusji.set(id, { nazwa: nazwaPliku, mime });
     return id;
   }
+
+  // ── Przesyłki ostatnich zamówień (0.105.0) ─────────────────────────────────
+
+  async zamowieniaKupujacego(kto: KupujacyRef, limit = 3): Promise<ZamowienieKupujacego[]> {
+    const klucze = [normalizujRef(kto.login), normalizujRef(kto.id)].filter(
+      (k): k is string => k !== null
+    );
+    const wpis = ZAMOWIENIA_KUPUJACYCH.find((z) => klucze.includes(z.ref));
+    return (wpis?.zamowienia ?? []).slice(0, limit);
+  }
+
+  async przesylkiZamowienia(orderId: string): Promise<PrzesylkaZamowienia[]> {
+    return PRZESYLKI_DEV[orderId] ?? [];
+  }
+
+  async sledzeniePrzesylki(_przewoznikId: string, waybill: string): Promise<ZdarzenieSledzenia[]> {
+    return SLEDZENIE_DEV[waybill] ?? [];
+  }
 }
+
+/* Zamówienia i przesyłki zestrojone z wątkami pytań (`WATKI_PYTAN`):
+   44300101 (autor dev-pyt-1) ma zamówienie WYSŁANE ze śledzeniem i starsze
+   DORĘCZONE; 44300104 (dev-pyt-4 — pytanie o wysyłkę) ma zamówienie dopiero
+   W PRZYGOTOWANIU, bez paczek — demo uczciwego „jeszcze nie nadane". */
+const ZAMOWIENIA_KUPUJACYCH: Array<{ ref: string; zamowienia: ZamowienieKupujacego[] }> = [
+  {
+    ref: "44300101",
+    zamowienia: [
+      {
+        id: "dev-ship-ord-1",
+        kupionoAt: dniTemu(2),
+        status: "READY_FOR_PROCESSING",
+        wysylka: "SENT",
+        dostawaMetoda: "InPost Paczkomaty 24/7",
+        smart: true,
+        dostawaOd: null,
+        dostawaDo: null,
+        pozycje: [
+          { offerId: "of-1", nazwa: "Pozycja jeszcze nietknięta — oferta Allegro", externalId: "TEST-LINIA-TODO", ilosc: 1 },
+        ],
+      },
+      {
+        id: "dev-ship-ord-2",
+        kupionoAt: dniTemu(12),
+        status: "READY_FOR_PROCESSING",
+        wysylka: "PICKED_UP",
+        dostawaMetoda: "Kurier DPD",
+        smart: false,
+        dostawaOd: null,
+        dostawaDo: null,
+        pozycje: [
+          { offerId: "of-3", nazwa: "Szybkorotujący poza strefą złotą — oferta Allegro", externalId: "TEST-ROTUJACY", ilosc: 2 },
+        ],
+      },
+    ],
+  },
+  {
+    ref: "44300104",
+    zamowienia: [
+      {
+        id: "dev-ship-ord-3",
+        kupionoAt: dniTemu(1),
+        status: "READY_FOR_PROCESSING",
+        wysylka: "PROCESSING",
+        dostawaMetoda: "Kurier InPost",
+        smart: false,
+        dostawaOd: null,
+        dostawaDo: null,
+        pozycje: [
+          { offerId: "of-2", nazwa: "Pozycja odłożona w całości — oferta Allegro", externalId: "TEST-LINIA-DONE", ilosc: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    ref: "jan_wraca",
+    zamowienia: [
+      {
+        id: "dev-ord-1",
+        kupionoAt: dniTemu(3),
+        status: "READY_FOR_PROCESSING",
+        wysylka: "SENT",
+        dostawaMetoda: "InPost Paczkomaty 24/7",
+        smart: true,
+        dostawaOd: null,
+        dostawaDo: null,
+        pozycje: [
+          { offerId: "of-1", nazwa: "Pozycja jeszcze nietknięta — oferta Allegro", externalId: "TEST-LINIA-TODO", ilosc: 1 },
+        ],
+      },
+    ],
+  },
+];
+
+const PRZESYLKI_DEV: Record<string, PrzesylkaZamowienia[]> = {
+  "dev-ship-ord-1": [
+    { waybill: "DEVSHIP0101", przewoznikId: "INPOST", przewoznik: "InPost", nadanoAt: dniTemu(2) },
+  ],
+  "dev-ship-ord-2": [
+    { waybill: "DEVSHIP0102", przewoznikId: "DPD", przewoznik: "DPD", nadanoAt: dniTemu(11) },
+  ],
+  "dev-ord-1": [
+    { waybill: "DEVSHIP0001", przewoznikId: "INPOST", przewoznik: "InPost", nadanoAt: dniTemu(2) },
+  ],
+};
+
+const SLEDZENIE_DEV: Record<string, ZdarzenieSledzenia[]> = {
+  DEVSHIP0101: [
+    { kod: "SENT", opis: "Przesyłka nadana", at: dniTemu(2) },
+    { kod: "OUT_FOR_DELIVERY", opis: "Przesyłka w doręczeniu", at: dniTemu(0) },
+  ],
+  DEVSHIP0001: [{ kod: "SENT", opis: "Przesyłka nadana", at: dniTemu(2) }],
+};
 
 /* Rozmowy dyskusji zestrojone z `listaDyskusji()`. Druga sprawa niesie głos
    ALLEGRO_ADVISOR (trzecia rola w rozmowie), trzecia — naszą starą odpowiedź

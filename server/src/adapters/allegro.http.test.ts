@@ -26,6 +26,12 @@ import {
   urlWiadomosciDyskusji,
   urlZalacznikaDyskusji,
   mapujWiadomosciDyskusji,
+  urlZamowienKupujacego,
+  urlPrzesylekZamowienia,
+  urlSledzenia,
+  mapujZamowienieKupujacego,
+  mapujPrzesylki,
+  mapujSledzenie,
   mapujWatki,
   mapujOferty,
   scopeDlaUrl,
@@ -454,4 +460,73 @@ test("komunikat 403 wskazuje uprawnienie właściwe dla końcówki", () => {
 test("rodzina końcówki obejmuje nowe ścieżki — nauka Accept ich nie miesza", () => {
   assert.equal(rodzinaKoncowki(urlOfert("https://api.allegro.pl", "x")), "offers");
   assert.equal(rodzinaKoncowki(urlWyslijWiadomosc("https://api.allegro.pl", "t")), "threads");
+});
+
+test("przesyłki: URL-e kodowane, rodzina carriers osobno, scope orders:read", () => {
+  assert.equal(
+    urlZamowienKupujacego("https://api.allegro.pl", "jan wraca", 3),
+    "https://api.allegro.pl/order/checkout-forms?buyer.login=jan%20wraca&limit=3&sort=-updatedAt"
+  );
+  assert.equal(
+    urlPrzesylekZamowienia("https://api.allegro.pl", "ord/1"),
+    "https://api.allegro.pl/order/checkout-forms/ord%2F1/shipments"
+  );
+  assert.equal(
+    urlSledzenia("https://api.allegro.pl", "INPOST", "WB 1&x"),
+    "https://api.allegro.pl/order/carriers/INPOST/tracking?waybill=WB%201%26x"
+  );
+  /* Własna rodzina Accept — beta jednej końcówki nie przestawia drugiej. */
+  assert.equal(rodzinaKoncowki(urlSledzenia("https://api.allegro.pl", "INPOST", "X")), "carriers");
+  /* Śledzenie ma chodzić na już sparowanym orders:read — dopóki sandbox nie
+     powie inaczej, 403 ma wskazywać właśnie ten scope. */
+  assert.equal(
+    scopeDlaUrl("https://api.allegro.pl/order/carriers/INPOST/tracking?waybill=X"),
+    "allegro:api:orders:read"
+  );
+});
+
+test("zamówienie kupującego: mapowanie defensywne i ZERO adresu w wyniku", () => {
+  const z = mapujZamowienieKupujacego({
+    id: "ord-9", boughtAt: "2026-08-24T10:00:00Z", status: "READY_FOR_PROCESSING",
+    fulfillment: { status: "SENT" },
+    delivery: {
+      method: { id: "m1", name: "Kurier DPD" }, smart: true,
+      time: { from: "2026-08-26T08:00:00Z", to: "2026-08-27T16:00:00Z" },
+      /* Dane osobowe — mapper ma je ZOSTAWIĆ w JSON-ie, nie przenieść dalej. */
+      address: { street: "Polna 1", city: "Poznań", zipCode: "60-001" },
+      pickupPoint: { id: "PP1", name: "Paczkomat POZ01" },
+    },
+    lineItems: [{ offer: { id: "of-1", name: "Cewka", external: { id: "W32-0001" } }, quantity: 2 }],
+  });
+  assert.equal(z.wysylka, "SENT");
+  assert.equal(z.dostawaMetoda, "Kurier DPD");
+  assert.equal(z.smart, true);
+  assert.equal(z.dostawaOd, "2026-08-26T08:00:00Z");
+  assert.equal(z.pozycje[0].externalId, "W32-0001");
+  /* Asercja prywatności: żadne pole wyniku nie niesie adresu ani punktu. */
+  assert.ok(!JSON.stringify(z).includes("Polna"), "adres nie przechodzi przez mapper");
+  assert.ok(!JSON.stringify(z).includes("Paczkomat POZ01"), "punkt odbioru nie przechodzi");
+
+  const pusty = mapujZamowienieKupujacego({});
+  assert.equal(pusty.wysylka, null);
+  assert.equal(pusty.smart, false);
+  assert.deepEqual(pusty.pozycje, []);
+});
+
+test("przesyłki i śledzenie: oba kształty, śmieci dają pustkę, nie wyjątek", () => {
+  const p = mapujPrzesylki({
+    shipments: [{ waybill: "WB1", carrierId: "INPOST", carrierName: "InPost", createdAt: "2026-08-24T10:00:00Z" }],
+  });
+  assert.equal(p[0].przewoznikId, "INPOST");
+  assert.deepEqual(mapujPrzesylki({}), []);
+
+  const plaski = mapujSledzenie({ statuses: [{ status: "SENT", description: "Nadana", occurredAt: "2026-08-24T11:00:00Z" }] });
+  assert.equal(plaski[0].kod, "SENT");
+  const zagniezdzony = mapujSledzenie({
+    carriers: [{ trackingDetails: { statuses: [{ code: "OUT", description: "W doręczeniu", date: "2026-08-26T08:00:00Z" }] } }],
+  });
+  assert.equal(zagniezdzony[0].kod, "OUT");
+  assert.equal(zagniezdzony[0].at, "2026-08-26T08:00:00Z");
+  assert.deepEqual(mapujSledzenie(null), []);
+  assert.deepEqual(mapujSledzenie({ carriers: "śmieć" }), []);
 });

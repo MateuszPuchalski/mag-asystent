@@ -414,3 +414,33 @@ test("zakładka synchronizacji patrzy tylko na pytania z Allegro", async () => {
   db().prepare("DELETE FROM pytanie").run();
   assert.equal(P.odKiedySync(), null, "pusta baza = bez granicy dat");
 });
+
+/* ── Przesyłki w kontekście (0.105.0) ──────────────────────────────────────── */
+
+test("kontekst: pytanie o wysyłkę dostaje blok przesyłek, dobór części nie", async () => {
+  await P.synchronizujPytania("test");
+  const lista = P.listaPytan({ limit: 50 });
+
+  // dev-pyt-4: „czy można wysłać do Chorwacji…" — heurystyka trafia,
+  // a kupujący 44300104 ma zamówienie dopiero w przygotowaniu
+  const oWysylce = lista.find((x) => x.threadId === "dev-pyt-4")!;
+  const k = await P.kontekstPytania(oWysylce);
+  assert.match(k.tekst, /PRZESYŁKI OSTATNICH ZAMÓWIEŃ KLIENTA/);
+  assert.match(k.tekst, /W przygotowaniu/);
+  assert.ok(k.przesylki && k.przesylki.zamowienia.length === 1);
+  assert.equal(k.bladPrzesylek, null);
+
+  // dev-pyt-1: dobór części — ZERO strzałów o przesyłki, zero szumu w kontekście
+  const oCzesc = lista.find((x) => x.threadId === "dev-pyt-1")!;
+  const k2 = await P.kontekstPytania(oCzesc);
+  assert.ok(!/PRZESYŁKI/.test(k2.tekst), "pytanie o część nie ciągnie przesyłek");
+  assert.equal(k2.przesylki, null);
+});
+
+test("kontekst: wklejka z pytaniem o paczkę mówi uczciwie o braku loginu", async () => {
+  const p = await P.pytanieZWklejki({ tekst: "Gdzie jest moja paczka? Zamówiłem tydzień temu." }, "test");
+  const k = await P.kontekstPytania(p);
+  assert.match(k.tekst, /bez loginu kupującego/);
+  assert.match(k.tekst, /NIE zgaduj/);
+  assert.equal(k.przesylki, null);
+});

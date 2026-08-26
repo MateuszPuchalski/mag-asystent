@@ -1355,6 +1355,16 @@
         <summary><h2>HISTORIA KLIENTA</h2><span class="podpis">pytania i zwroty tego loginu</span></summary>
         <div id="pytanieKlientTresc"><p class="mute">Wczytuję…</p></div>
       </details>
+
+      <!-- Przesyłki ostatnich zamówień (0.105.0). Zwinięte i pobierane po
+           otwarciu — komplet danych to do ~7 zapytań do Allegro i należy się
+           tylko sprawom, w których ktoś naprawdę pyta o paczkę. WSTAW STATUS
+           wkleja gotowe zdanie z realnym statusem do odpowiedzi — szybka
+           droga obok szkicu AI, nie zamiast niego. -->
+      <details class="zwijana" id="pytaniePrzesylki" hidden>
+        <summary><h2>PRZESYŁKI KLIENTA</h2><span class="podpis">ostatnie zamówienia i status wysyłki</span></summary>
+        <div id="pytaniePrzesylkiTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
     </section>
 
     <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
@@ -6551,6 +6561,8 @@ const ustawSzyneSzkicu = (odModelu) =>
 let szkicDoPrzywrocenia = "";
 /** Dla którego pytania historia klienta jest już wczytana. */
 let pytanieIdKlienta = null;
+/** Dla którego pytania przesyłki są już wczytane (0.105.0). */
+let pytanieIdPrzesylek = null;
 /** Ostatnia lista z serwera — do przerysowania przy zmianie wariantu kolejki. */
 let ostatniaListaPytan = [];
 
@@ -6776,6 +6788,7 @@ async function otworzPytanie(id) {
   otwartePytanie = id;
   pytanieIdRozmowy = null;
   pytanieIdKlienta = null;
+  pytanieIdPrzesylek = null;
   odpowiedzRuszona = false;
   ustawRodzenstwoPytania();
   await odswiezSzczegolPytania();
@@ -6878,6 +6891,8 @@ function rysujSzczegolPytania(d) {
   /* Wklejka z poczty nie niesie loginu, więc historii nie ma po czym szukać —
      karta bez treści byłaby nagłówkiem obiecującym coś, czego nie ma. */
   $("pytanieKlient").hidden = !p.kupujacyLogin;
+  /* Przesyłki jak historia klienta: bez loginu nie ma czego szukać. */
+  $("pytaniePrzesylki").hidden = !p.kupujacyLogin;
 }
 
 function rysujTowaryPytania(kartoteki, oferty, wybraneModelu, bladOfert) {
@@ -7128,6 +7143,67 @@ function rysujHistorieKlienta(h) {
     : `<p class="mute">${esc(h.login)} pisze do nas pierwszy raz i niczego nie zwracał.</p>`;
 }
 
+/* ── Przesyłki klienta (0.105.0) ─────────────────────────────────────────────
+   Ten sam leniwy wzorzec co historia klienta: sekcja pobiera dopiero po
+   otwarciu, bo komplet danych to do ~7 zapytań do Allegro. WSTAW STATUS
+   wkleja gotowe zdanie z realnym statusem w miejsce kursora — szybka
+   odpowiedź na „gdzie moja paczka" bez czekania na model. */
+async function pokazPrzesylki() {
+  const id = otwartePytanie;
+  if (id == null || !$("pytaniePrzesylki").open || pytanieIdPrzesylek === id) return;
+  pytanieIdPrzesylek = id;
+  $("pytaniePrzesylkiTresc").innerHTML = '<p class="mute">Pytam Allegro o zamówienia…</p>';
+  try {
+    const d = await (await api(`/api/biuro/pytania/${id}/przesylki`)).json();
+    if (otwartePytanie !== id) return;
+    rysujPrzesylki(d.przesylki);
+  } catch (e) {
+    pytanieIdPrzesylek = null;
+    $("pytaniePrzesylkiTresc").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+/** Gotowe zdanie do odpowiedzi — z realnych danych, nigdy z domysłu. */
+function zdanieOStatusie(z) {
+  const kiedy = (z.kupionoAt || "").slice(0, 10);
+  const p = z.przesylki[0];
+  if (p && p.waybill) {
+    const kurier = p.przewoznik || p.przewoznikId || "przewoźnika";
+    const zdarzenie = p.ostatnieZdarzenie
+      ? ` — ostatni status: ${p.ostatnieZdarzenie.opis || p.ostatnieZdarzenie.kod} (${(p.ostatnieZdarzenie.at || "").slice(0, 10)})`
+      : "";
+    return `Państwa zamówienie z ${kiedy} zostało wysłane przez ${kurier}, numer przesyłki ${p.waybill}${zdarzenie}.`;
+  }
+  return `Państwa zamówienie z ${kiedy} jest w tej chwili ${(z.wysylkaOpis || "w realizacji").toLowerCase()} — numer przesyłki podamy zaraz po nadaniu.`;
+}
+
+function rysujPrzesylki(dane) {
+  if (!dane.zamowienia.length) {
+    $("pytaniePrzesylkiTresc").innerHTML =
+      '<p class="mute">Ten kupujący nie ma zamówień z ostatnich tygodni — dopytaj o numer zamówienia.</p>';
+    return;
+  }
+  $("pytaniePrzesylkiTresc").innerHTML = dane.zamowienia.map((z) => {
+    const pierwsza = z.pozycje[0]?.nazwa ?? "(bez pozycji)";
+    const wiecej = z.pozycje.length > 1 ? ` (+${z.pozycje.length - 1} poz.)` : "";
+    const p = z.przesylki[0];
+    const przesylka = p && p.waybill
+      ? `<div class="mute">${esc(p.przewoznik || p.przewoznikId || "przewoźnik nieznany")} · ${esc(p.waybill)}${
+          p.ostatnieZdarzenie
+            ? ` · ${esc(p.ostatnieZdarzenie.opis || p.ostatnieZdarzenie.kod || "")} (${esc((p.ostatnieZdarzenie.at || "").slice(0, 10))})`
+            : ""}</div>`
+      : '<div class="mute">jeszcze nie nadane</div>';
+    return `<div style="margin-top:8px;display:flex;gap:10px;align-items:start;flex-wrap:wrap">
+        <div class="rosnie">
+          <span class="b">${esc((z.kupionoAt || "").slice(0, 10))}</span> · ${esc(pierwsza)}${esc(wiecej)}
+          <span class="badge ${z.wysylka === "SENT" ? "amber" : z.wysylka === "PICKED_UP" ? "ok" : "mute2"}">${esc(z.wysylkaOpis || "status nieznany")}</span>
+          ${przesylka}
+        </div>
+        <button class="akcja cichy" data-wstaw-status="${esc(zdanieOStatusie(z))}">WSTAW STATUS</button>
+      </div>`;
+  }).join("");
+}
+
 /** Rozmowa z Allegro — na żądanie, jak przy zwrotach: to prywatna korespondencja. */
 async function pokazRozmowe(id) {
   if (pytanieIdRozmowy === id) return;
@@ -7360,6 +7436,12 @@ $("pytaniaLista").addEventListener("click", (e) => {
 $("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPytania(); });
 /* Rozwinięcie karty jest pytaniem o dane — zwinięta nie rusza serwera. */
 $("pytanieKlient").addEventListener("toggle", pokazHistorieKlienta);
+$("pytaniePrzesylki").addEventListener("toggle", pokazPrzesylki);
+$("pytaniePrzesylki").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-wstaw-status]");
+  if (!b) return;
+  wstawDoOdpowiedzi(b.dataset.wstawStatus);
+});
 /* Czip przełącza filtr i od razu odpytuje. `wszystkie` to BRAK parametru
    `status`, nie jego wartość — serwer bez filtra zwraca wszystko, łącznie
    z zamkniętymi i pominiętymi. */
@@ -7409,19 +7491,24 @@ $("pytanieOdpowiedz").addEventListener("keydown", (e) => {
   wyslij.click();
 });
 
-$("pytanieTowary").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-wstaw]");
-  if (!b) return;
-  /* Wstawienie w miejscu KURSORA, nie na koniec: link ma trafić w zdanie,
-     które człowiek właśnie pisze. */
+/* Wstawienie w miejscu KURSORA, nie na koniec: link albo status ma trafić
+   w zdanie, które człowiek właśnie pisze. Wspólne dla WSTAW LINK (aukcje)
+   i WSTAW STATUS (przesyłki, 0.105.0). */
+function wstawDoOdpowiedzi(tekst) {
   const pole = $("pytanieOdpowiedz");
   const od = pole.selectionStart ?? pole.value.length;
   const do_ = pole.selectionEnd ?? pole.value.length;
-  pole.value = pole.value.slice(0, od) + b.dataset.wstaw + pole.value.slice(do_);
+  pole.value = pole.value.slice(0, od) + tekst + pole.value.slice(do_);
   pole.focus();
-  pole.selectionStart = pole.selectionEnd = od + b.dataset.wstaw.length;
+  pole.selectionStart = pole.selectionEnd = od + tekst.length;
   odpowiedzRuszona = true;
   licznikZnakow();
+}
+
+$("pytanieTowary").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-wstaw]");
+  if (!b) return;
+  wstawDoOdpowiedzi(b.dataset.wstaw);
 });
 
 /* Delegacja siedzi na CAŁYM szczególe, nie na rzędzie przycisków pod polem.

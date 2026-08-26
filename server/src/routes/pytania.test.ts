@@ -346,3 +346,36 @@ test("nieznane pytanie to 404, nie 500", async () => {
   });
   assert.equal(r.statusCode, 404);
 });
+
+test("przesyłki klienta: bramka biura, dane z dev, wklejka daje uczciwą pustkę", async () => {
+  const magazynier = zalogowany("magazynier");
+  let r = await app.inject({
+    method: "GET", url: "/api/biuro/pytania/1/przesylki", headers: { "x-session": magazynier },
+  });
+  assert.equal(r.statusCode, 403, "przesyłki klienta czyta biuro, nie hala");
+  r = await app.inject({ method: "GET", url: "/api/biuro/pytania/1/przesylki" });
+  assert.equal(r.statusCode, 401);
+
+  const biuro = { "x-session": zalogowany("biuro") };
+  r = await app.inject({ method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  const lista = (await app.inject({ method: "GET", url: "/api/biuro/pytania?status=wszystkie", headers: biuro }))
+    .json().pytania;
+  const p = lista.find((x: { threadId: string | null }) => x.threadId === "dev-pyt-1");
+
+  r = await app.inject({ method: "GET", url: `/api/biuro/pytania/${p.id}/przesylki`, headers: biuro });
+  assert.equal(r.statusCode, 200, r.body);
+  const dane = r.json().przesylki;
+  assert.equal(dane.zamowienia.length, 2, "kupujący 44300101 ma dwa zamówienia w dev");
+  assert.equal(dane.zamowienia[0].przesylki[0].waybill, "DEVSHIP0101");
+
+  // wklejka nie niesie loginu — pustka jest odpowiedzią, nie błędem
+  r = await app.inject({
+    method: "POST", url: "/api/biuro/pytania/wklejka",
+    payload: { tekst: "Gdzie moja paczka?" }, headers: biuro,
+  });
+  const wklejka = r.json().pytanie;
+  r = await app.inject({ method: "GET", url: `/api/biuro/pytania/${wklejka.id}/przesylki`, headers: biuro });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json().przesylki.zamowienia, []);
+});

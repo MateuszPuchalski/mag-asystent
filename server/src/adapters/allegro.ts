@@ -72,6 +72,42 @@ export interface ZamowienieAllegro {
   pozycje: PozycjaZamowieniaAllegro[];
 }
 
+/* ── Przesyłki ostatnich zamówień (0.105.0) ──────────────────────────────────
+   „Kiedy dojdzie moja paczka" to jedno z najczęstszych pytań klientów — te
+   typy niosą dokładnie to, czym się na nie odpowiada: status wysyłki, kurier,
+   numer przesyłki i ostatnie zdarzenie śledzenia. ŚWIADOMIE bez adresu
+   dostawy i punktu odbioru: do odpowiedzi nie są potrzebne, a dane osobowe
+   nie mają czego szukać w pamięci procesu ani w kontekście modelu.          */
+
+export interface PrzesylkaZamowienia {
+  waybill: string | null;
+  /** carrierId z API (np. INPOST, DPD, ALLEGRO) — klucz do śledzenia. */
+  przewoznikId: string | null;
+  przewoznik: string | null;
+  nadanoAt: string | null;
+}
+
+export interface ZdarzenieSledzenia {
+  kod: string | null;
+  opis: string | null;
+  at: string | null;
+}
+
+export interface ZamowienieKupujacego {
+  id: string;
+  kupionoAt: string | null;
+  status: string | null;
+  /** fulfillment.status: NEW|PROCESSING|READY_FOR_SHIPMENT|SENT|PICKED_UP|CANCELLED… ([WERYFIKUJ] pełny zbiór). */
+  wysylka: string | null;
+  /** Nazwa metody dostawy — NIGDY adres ani punkt odbioru. */
+  dostawaMetoda: string | null;
+  smart: boolean;
+  /** Obiecane okno doręczenia (delivery.time), gdy API je poda ([WERYFIKUJ]). */
+  dostawaOd: string | null;
+  dostawaDo: string | null;
+  pozycje: PozycjaZamowieniaAllegro[];
+}
+
 export interface WiadomoscAllegro {
   id: string;
   /** Kto napisał: `kupujacy` albo `my` (sprzedawca). */
@@ -262,6 +298,18 @@ export interface AllegroAdapter {
    * (deklaracja + binaria), w całości wewnątrz adaptera. Zwraca id załącznika.
    */
   dodajZalacznikDyskusji(nazwaPliku: string, mime: string, daneBase64: string): Promise<string>;
+
+  /* ── Przesyłki ostatnich zamówień (0.105.0) ────────────────────────────────
+     Czytane NA ŻĄDANIE (szuflada kontekstu pytania, kontekst szkicu) i nigdy
+     nie zapisywane. `kto` bywa zamaskowany (`client:NNN` z listy wątków) —
+     implementacja HTTP obsługuje obie postaci.                              */
+
+  /** Ostatnie zamówienia kupującego, najświeższe naprzód; [] = brak/nieznany. */
+  zamowieniaKupujacego(kto: KupujacyRef, limit?: number): Promise<ZamowienieKupujacego[]>;
+  /** Paczki zamówienia — puste także przy wysyłce poza integracją Allegro. */
+  przesylkiZamowienia(orderId: string): Promise<PrzesylkaZamowienia[]>;
+  /** Historia śledzenia; [] = przewoźnik jeszcze nic nie zgłosił, nie błąd. */
+  sledzeniePrzesylki(przewoznikId: string, waybill: string): Promise<ZdarzenieSledzenia[]>;
 }
 
 /**

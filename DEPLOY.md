@@ -1461,6 +1461,27 @@ Bez konfiguracji funkcja jest wyłączona, a zakładka mówi wprost, co dopisać
 W `SGT_MODE=seeded` działa doradca DEV: odpowiedzi fikcyjne, składane
 z kontekstu, bez wychodzenia w internet — do pokazu i do testów.
 
+### Przesyłki klienta w odpowiedziach (0.105.0)
+
+Klienci często pytają „kiedy dojdzie paczka". Od 0.105.0 odpowiedź nie
+wymaga panelu Allegro. Aplikacja czyta ostatnie zamówienia kupującego
+z rodziny `/order/` — status wysyłki, kuriera, numer przesyłki i ostatnie
+zdarzenie śledzenia. Adresów dostawy nie pobiera i nie pokazuje.
+
+Dane wchodzą dwiema drogami. Pierwsza działa sama: gdy pytanie brzmi jak
+pytanie o wysyłkę, blok przesyłek trafia do kontekstu szkicu AI. Druga jest
+ręczna: sekcja PRZESYŁKI KLIENTA w kontekście sprawy, ładowana po otwarciu.
+Przycisk WSTAW STATUS wkleja do odpowiedzi gotowe zdanie z realnym statusem.
+
+**Bez nowych uprawnień i bez ponownego parowania.** Wszystkie trzy końcówki
+należą do już wymaganego `allegro:api:orders:read`. Uprawnienie
+`allegro:api:shipments:read` (WZA) NIE jest używane — zna tylko etykiety
+kupowane przez Allegro, więc można je zostawić odznaczone. Do sprawdzenia
+na własnym koncie ([WERYFIKUJ]): zakres i kształt odpowiedzi śledzenia,
+parametr `sort`, dopasowanie `buyer.id` do maski `client:NNN` z wątków.
+Gdy paczka jedzie z etykietą spoza integracji Allegro, lista przesyłek jest
+pusta — panel mówi wtedy „jeszcze nie nadane", co jest stanem, nie awarią.
+
 ### Zanim włączysz: dwie decyzje właściciela
 
 - **Prywatność.** Treść pytania klienta (a przy wklejce — obraz ze schowka)

@@ -33,6 +33,39 @@ historii nie przepisujemy.
 
 ---
 
+## 0.105.0 — 26 sierpnia 2026
+
+**„Kiedy dojdzie moja paczka?" — odpowiedź bez panelu Allegro.** Aplikacja
+czyta ostatnie zamówienia kupującego (status wysyłki po polsku, kurier,
+numer przesyłki, ostatnie zdarzenie śledzenia) z końcówek rodziny `/order/`
+— i podaje je dwiema drogami:
+
+- **automatycznie**: gdy pytanie brzmi jak pytanie o wysyłkę (heurystyka
+  słów + kategoria po klasyfikacji), blok przesyłek wchodzi do kontekstu
+  szkicu AI z twardą zasadą „statusy i daty dokładnie jak wyżej, terminu
+  doręczenia nie obiecuj". Pytanie o dobór części nie ciągnie żadnych
+  dodatkowych zapytań — bramka jest po to, żeby szkic nie dostawał szumu,
+  a Allegro zbędnych strzałów;
+- **ręcznie**: sekcja PRZESYŁKI KLIENTA w kontekście sprawy (ładowana
+  dopiero po otwarciu, jak historia klienta) z przyciskiem **WSTAW
+  STATUS** — jedno kliknięcie wkleja do odpowiedzi gotowe zdanie
+  z realnym statusem, w miejscu kursora, tym samym mechanizmem co
+  WSTAW LINK przy aukcjach.
+
+**Prywatność wprost:** adres dostawy i punkt odbioru nie przechodzą przez
+mapowanie w ogóle — pilnuje tego test. Do odpowiedzi wystarczy status,
+data, kurier i numer.
+
+**Bez nowych uprawnień i bez ponownego parowania.** Całość chodzi na już
+wymaganym `allegro:api:orders:read`; `allegro:api:shipments:read` (WZA)
+nie jest używane. Kupujący z wątków bywa maską `client:NNN` — adapter
+obsługuje obie postaci (filtr po loginie albo skan ostatnich 60 dni po
+`buyer.id`), a miejsca niepewne w becie są oznaczone `[WERYFIKUJ]`.
+Wysyłka etykietą spoza integracji Allegro daje uczciwe „jeszcze nie
+nadane", nie błąd.
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu.
+
 ## 0.104.0 — 26 sierpnia 2026
 
 **Dyskusje Allegro w całości w aplikacji.** 0.103.0 zrobiło z dyskusji

@@ -3,6 +3,7 @@ import { sesjaZadania } from "../context.js";
 import { allegroAdapter } from "../adapters/allegro.js";
 import { stanPolaczenia } from "../services/allegro-token.js";
 import { stanAI } from "../services/ai.js";
+import { przesylkiKupujacego } from "../services/przesylki.js";
 import {
   BladPytania,
   dogenerujSzkice,
@@ -200,7 +201,23 @@ export async function pytaniaRoutes(app: FastifyInstance) {
         frazy: kontekst.frazy,
         dopasowania: kontekst.dopasowania,
         poprzednie: kontekst.poprzednie,
+        /* Przesyłki z bramki kontekstu (0.105.0) — człowiek widzi to samo,
+           co dostał model, razem z uczciwym powodem ewentualnej pustki. */
+        przesylki: kontekst.przesylki,
+        bladPrzesylek: kontekst.bladPrzesylek,
       };
+    });
+  });
+
+  /* Przesyłki klienta — osobno i NA KLIK (szuflada kontekstu), jak historia
+     klienta: do ~7 strzałów do Allegro nie ma prawa jechać z każdym
+     otwarciem sprawy. Nic nie zapisujemy — status starzeje się w godziny. */
+  app.get<{ Params: { id: string } }>("/api/biuro/pytania/:id/przesylki", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zIntegracja(reply, async () => {
+      const p = szczegolPytania(Number(req.params.id));
+      return { przesylki: await przesylkiKupujacego(p.kupujacyLogin) };
     });
   });
 
