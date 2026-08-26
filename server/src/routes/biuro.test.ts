@@ -921,3 +921,22 @@ test("statystyki pytań nie jadą po dane, gdy nikt na nie nie patrzy", () => {
       `karty zakresu ${klasa} znają swój zakres`);
   }
 });
+
+test("przesyłki klienta: sekcja na klik i szybki guzik statusu (0.105.0)", () => {
+  /* „Kiedy dojdzie paczka" ma dwie drogi: automatyczną (blok w kontekście
+     szkicu — testują services/pytania.test.ts) i ręczną — tę sekcję.
+     Pilnujemy trzech rzeczy: dane jadą leniwie po otwarciu (do ~7 zapytań
+     do Allegro nie ma prawa jechać z każdym otwarciem sprawy), wstawienie
+     statusu to jawny przycisk, a strona nigdzie nie renderuje adresu
+     dostawy — do odpowiedzi wystarczy status, kurier i numer. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /id="pytaniePrzesylki"/, "sekcja przesyłek w szufladzie kontekstu");
+  assert.match(html, /PRZESYŁKI KLIENTA/, "nagłówek sekcji");
+  assert.match(html, /pytania\/\$\{id\}\/przesylki/, "dane jadą osobną trasą na klik");
+  assert.match(html, /addEventListener\("toggle", pokazPrzesylki\)/, "pobranie dopiero po otwarciu");
+  assert.match(html, /data-wstaw-status/, "wstawienie statusu jest jawnym przyciskiem");
+  assert.match(html, /jeszcze nie nadane/, "zamówienie bez paczki to stan, nie błąd");
+});

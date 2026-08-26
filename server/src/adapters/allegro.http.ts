@@ -8,11 +8,14 @@ import type {
   OfertaAllegro,
   PaczkaZwrotu,
   PozycjaZwrotuAllegro,
+  PrzesylkaZamowienia,
   SzukanieWatku,
   WatekNaglowek,
   WiadomoscAllegro,
   WiadomoscDyskusji,
   ZamowienieAllegro,
+  ZamowienieKupujacego,
+  ZdarzenieSledzenia,
   ZwrotAllegro,
 } from "./allegro.js";
 
@@ -69,6 +72,117 @@ export function urlZwrotu(apiUrl: string, id: string): string {
 
 export function urlZamowienia(apiUrl: string, orderId: string): string {
   return `${apiUrl}/order/checkout-forms/${encodeURIComponent(orderId)}`;
+}
+
+/* ── Przesyłki ostatnich zamówień (0.105.0) ──────────────────────────────────
+   Trzy końcówki rodziny /order/ — wszystkie na scope `allegro:api:orders:read`
+   ([WERYFIKUJ] dotyczy zwłaszcza śledzenia; jeśli sandbox odpowie 403,
+   scopeDlaUrl dostanie gałąź dla /order/carriers/).                          */
+
+/** Zamówienia po loginie kupującego. [WERYFIKUJ] parametr `sort`. */
+export function urlZamowienKupujacego(apiUrl: string, login: string, limit: number): string {
+  return (
+    `${apiUrl}/order/checkout-forms?buyer.login=${encodeURIComponent(login)}` +
+    `&limit=${Math.max(1, Math.trunc(limit))}&sort=-updatedAt`
+  );
+}
+
+/**
+ * Strona ostatnich zamówień — zejście dla ZAMASKOWANEGO rozmówcy
+ * (`client:NNN`): lista wątków nie daje loginu, więc zamówienia filtrujemy
+ * po stronie klienta po `buyer.id` (ten sam wzorzec co `watekKupujacego`).
+ */
+export function urlOstatnichZamowien(apiUrl: string, odKiedyIso: string, offset: number): string {
+  return (
+    `${apiUrl}/order/checkout-forms?updatedAt.gte=${encodeURIComponent(odKiedyIso)}` +
+    `&limit=100&offset=${Math.max(0, Math.trunc(offset))}&sort=-updatedAt`
+  );
+}
+
+export function urlPrzesylekZamowienia(apiUrl: string, orderId: string): string {
+  return `${apiUrl}/order/checkout-forms/${encodeURIComponent(orderId)}/shipments`;
+}
+
+export function urlSledzenia(apiUrl: string, przewoznikId: string, waybill: string): string {
+  return (
+    `${apiUrl}/order/carriers/${encodeURIComponent(przewoznikId)}/tracking` +
+    `?waybill=${encodeURIComponent(waybill)}`
+  );
+}
+
+/**
+ * Zamówienie kupującego → typ pod odpowiedź „kiedy dojdzie". CELOWO osobny
+ * mapper, nie rozszerzenie `mapujZamowienie`: tamten służy dopasowaniu
+ * zwrotów i ma zostać wąski. Ten NIE dotyka `delivery.address` ani
+ * `delivery.pickupPoint` — adres nie jest potrzebny do odpowiedzi o statusie,
+ * a dane osobowe nie mają czego szukać w kontekście modelu (test tego pilnuje).
+ */
+export function mapujZamowienieKupujacego(json: unknown): ZamowienieKupujacego {
+  const z = (json ?? {}) as Record<string, unknown>;
+  const fulfillment = (z.fulfillment ?? {}) as Record<string, unknown>;
+  const delivery = (z.delivery ?? {}) as Record<string, unknown>;
+  const method = (delivery.method ?? {}) as Record<string, unknown>;
+  const time = (delivery.time ?? {}) as Record<string, unknown>;
+  const lineItems = Array.isArray(z.lineItems) ? z.lineItems : [];
+  return {
+    id: tekst(z.id) ?? "",
+    kupionoAt: tekst(z.boughtAt) ?? tekst(z.updatedAt),
+    status: tekst(z.status),
+    wysylka: tekst(fulfillment.status),
+    dostawaMetoda: tekst(method.name),
+    smart: delivery.smart === true,
+    dostawaOd: tekst(time.from),
+    dostawaDo: tekst(time.to),
+    pozycje: lineItems.map((li) => {
+      const l = (li ?? {}) as Record<string, unknown>;
+      const offer = (l.offer ?? {}) as Record<string, unknown>;
+      const external = (offer.external ?? {}) as Record<string, unknown>;
+      return {
+        offerId: tekst(offer.id),
+        nazwa: tekst(offer.name) ?? "(bez nazwy)",
+        externalId: tekst(external.id),
+        ilosc: liczba(l.quantity, 1),
+      };
+    }),
+  };
+}
+
+/** Paczki zamówienia z `/shipments`. [WERYFIKUJ] nazwy pól na sandboxie. */
+export function mapujPrzesylki(json: unknown): PrzesylkaZamowienia[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(root.shipments) ? root.shipments : [];
+  return lista.map((it) => {
+    const s = (it ?? {}) as Record<string, unknown>;
+    return {
+      waybill: tekst(s.waybill),
+      przewoznikId: tekst(s.carrierId),
+      przewoznik: tekst(s.carrierName),
+      nadanoAt: tekst(s.createdAt),
+    };
+  });
+}
+
+/**
+ * Historia śledzenia. Przyjmuje OBA znane kształty (zagnieżdżony
+ * `carriers[0].trackingDetails.statuses` i płaski `statuses`) — zasób
+ * [WERYFIKUJ], a nieznany kształt daje pustą listę, nie wyjątek.
+ */
+export function mapujSledzenie(json: unknown): ZdarzenieSledzenia[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  let statuses: unknown[] = Array.isArray(root.statuses) ? root.statuses : [];
+  if (statuses.length === 0 && Array.isArray(root.carriers)) {
+    const pierwszy = (root.carriers[0] ?? {}) as Record<string, unknown>;
+    const details = (pierwszy.trackingDetails ?? {}) as Record<string, unknown>;
+    if (Array.isArray(details.statuses)) statuses = details.statuses;
+  }
+  return statuses.map((it) => {
+    const s = (it ?? {}) as Record<string, unknown>;
+    return {
+      kod: tekst(s.status) ?? tekst(s.code),
+      opis: tekst(s.description),
+      at: tekst(s.occurredAt) ?? tekst(s.date),
+    };
+  });
 }
 
 /**
@@ -844,5 +958,57 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       const tresc = await odp.text().catch(() => "");
       throw new Error(`Allegro odrzuciło załącznik (${odp.status}): ${tresc.slice(0, 300)}`);
     }
+  }
+
+  // ── Przesyłki ostatnich zamówień (0.105.0) ─────────────────────────────────
+
+  async zamowieniaKupujacego(kto: KupujacyRef, limit = 3): Promise<ZamowienieKupujacego[]> {
+    /* Dwie drogi, bo `kupujacy_login` przy pytaniach z wątków to MASKA
+       (`client:44300101`), nie login. Prawdziwy login idzie filtrem serwera;
+       maska — skanem ostatnich zamówień z porównaniem po `buyer.id`/`login`
+       (ten sam wzorzec co `watekKupujacego`, [WERYFIKUJ] czy istnieje filtr
+       `buyer.id=` — wtedy skan zniknie). */
+    const ref = normalizujRef(kto.login) ?? normalizujRef(kto.id);
+    if (!ref) return [];
+    const maskowany = (kto.login ?? "").includes(":") || normalizujRef(kto.login) === null;
+
+    if (!maskowany) {
+      const json = (await this.zapytaj(
+        urlZamowienKupujacego(config.allegro.apiUrl, kto.login!.trim(), limit)
+      )) as Record<string, unknown> | null;
+      const lista = Array.isArray(json?.checkoutForms) ? json.checkoutForms : [];
+      return lista.slice(0, limit).map(mapujZamowienieKupujacego);
+    }
+
+    /* Skan: 60 dni wstecz, najwyżej dwie strony — pytanie o przesyłkę dotyczy
+       świeżego zamówienia, a pełna historia konta to praca dla nikogo. */
+    const odKiedy = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const wyniki: ZamowienieKupujacego[] = [];
+    for (let strona = 0; strona < 2 && wyniki.length < limit; strona++) {
+      const json = (await this.zapytaj(
+        urlOstatnichZamowien(config.allegro.apiUrl, odKiedy, strona * 100)
+      )) as Record<string, unknown> | null;
+      const lista = Array.isArray(json?.checkoutForms) ? json.checkoutForms : [];
+      for (const z of lista) {
+        const buyer = ((z ?? {}) as Record<string, unknown>).buyer as
+          | Record<string, unknown>
+          | undefined;
+        if (buyer && pasujeRozmowca(buyer, kto) && wyniki.length < limit) {
+          wyniki.push(mapujZamowienieKupujacego(z));
+        }
+      }
+      if (lista.length < 100) break;
+    }
+    return wyniki;
+  }
+
+  async przesylkiZamowienia(orderId: string): Promise<PrzesylkaZamowienia[]> {
+    const json = await this.zapytaj(urlPrzesylekZamowienia(config.allegro.apiUrl, orderId));
+    return json === null ? [] : mapujPrzesylki(json);
+  }
+
+  async sledzeniePrzesylki(przewoznikId: string, waybill: string): Promise<ZdarzenieSledzenia[]> {
+    const json = await this.zapytaj(urlSledzenia(config.allegro.apiUrl, przewoznikId, waybill));
+    return json === null ? [] : mapujSledzenie(json);
   }
 }

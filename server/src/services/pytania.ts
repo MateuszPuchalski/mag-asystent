@@ -3,6 +3,8 @@ import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
 import { kontekstKlienta, type KontekstKlienta } from "./klienci.js";
+import { blokPrzesylek, czyPytaOWysylke, przesylkiKupujacego } from "./przesylki.js";
+import type { PrzesylkiKlienta } from "./przesylki.js";
 import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import type { OfertaAllegro, WiadomoscAllegro } from "../adapters/allegro.js";
@@ -568,6 +570,14 @@ export interface Kontekst {
   dopasowania: ZnaneDopasowanie[];
   /** Co odpowiadaliśmy wcześniej na pytania o tę samą ofertę. */
   poprzednie: PrzykladOdpowiedzi[];
+  /**
+   * Przesyłki ostatnich zamówień (0.105.0) — TYLKO gdy pytanie brzmi jak
+   * pytanie o wysyłkę; null = bramka nie zadziałała albo brak loginu.
+   * `bladPrzesylek` z tego samego powodu co `bladOfert`: „nie mamy danych"
+   * i „nie udało się sprawdzić" to dwie różne odpowiedzi dla klienta.
+   */
+  przesylki: PrzesylkiKlienta | null;
+  bladPrzesylek: string | null;
 }
 
 /**
@@ -673,7 +683,45 @@ export async function kontekstPytania(p: Pytanie): Promise<Kontekst> {
     for (const o of poprzednie) linie.push(`- „${o.pytanie.slice(0, 160)}" → ${o.odpowiedz}`);
   }
 
-  return { tekst: linie.join("\n"), kartoteki, oferty, bladOfert, frazy, dopasowania, poprzednie };
+  /* Przesyłki ostatnich zamówień (0.105.0) — za BRAMKĄ słów o wysyłce, nie
+     always-on: kontekst liczy się przy każdym szkicu tickera i każdym
+     otwarciu pytania, a komplet danych to do ~7 strzałów do Allegro. Pytanie
+     o dobór części nie ma z nich żadnego pożytku, za to szkic dostałby szum.
+     Kategoria łapie to, co heurystyce umknęło — przy PRZELICZ po pierwszej
+     klasyfikacji. */
+  let przesylki: PrzesylkiKlienta | null = null;
+  let bladPrzesylek: string | null = null;
+  const oWysylce =
+    czyPytaOWysylke(p.tresc) ||
+    p.kategoria === "dostawa-wysylka" ||
+    p.kategoria === "stan-zamowienia";
+  if (oWysylce) {
+    if (!p.kupujacyLogin) {
+      linie.push(
+        "\nPRZESYŁKI: pytanie przyszło bez loginu kupującego (wklejka) — " +
+          "statusu wysyłki nie znamy, NIE zgaduj."
+      );
+    } else {
+      try {
+        przesylki = await przesylkiKupujacego(p.kupujacyLogin);
+        for (const l of blokPrzesylek(przesylki)) linie.push(l);
+      } catch (e) {
+        /* Ta sama uczciwość co przy aukcjach: „nie sprawdziliśmy" to nie
+           „nie mamy" — model ma napisać, że sprawdzimy, nie zgadywać. */
+        bladPrzesylek = e instanceof Error ? e.message : String(e);
+        linie.push(
+          `\nSTATUS PRZESYŁEK: nie udało się pobrać (${bladPrzesylek}). ` +
+            "NIE zgaduj statusu ani dat — napisz klientowi, że sprawdzimy wysyłkę i odpiszemy."
+        );
+      }
+    }
+  }
+
+  return {
+    tekst: linie.join("\n"),
+    kartoteki, oferty, bladOfert, frazy, dopasowania, poprzednie,
+    przesylki, bladPrzesylek,
+  };
 }
 
 /* ── Historia klienta ────────────────────────────────────────────────────────
