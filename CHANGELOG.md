@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.104.0 — 26 sierpnia 2026
+
+**Dyskusje Allegro w całości w aplikacji.** 0.103.0 zrobiło z dyskusji
+rejestr pracy, ale rozmowa i odpowiedź nadal wymagały przejścia do panelu
+Allegro. Teraz przycisk OTWÓRZ na karcie dyskusji pokazuje pełną rozmowę
+(czytaną z API `/sale/disputes` na klik, bez zapisu u nas — ta sama zasada
+co przy wątkach pytań), a odpowiedź wysyła się prosto stąd, za
+potwierdzeniem. Wysyłka podbija sprawę z „nowa" na „w toku" i NIE zamyka
+jej — dyskusja to wiele odpowiedzi, a koniec ogłasza Allegro (sync
+auto-zamyka po statusie finalnym). Nadawca zostaje prowadzącym: to on czeka
+teraz na klienta.
+
+**Szkic pisze model — na jawne kliknięcie, bez automatu.** GENERUJ SZKIC
+składa kontekst sprawy: transkrypt rozmowy, powiązany zwrot z decyzjami
+biura (powód klienta, werdykt, półka), historię klienta i notatkę — i podaje
+gotową odpowiedź do redakcji. Świadomie bez tickera: wolumen jest mały,
+stawka wysoka (formalny CLAIM), a szkic starzeje się z każdą nową
+wiadomością klienta. Flaga redakcji (`edytowano`) liczy się jak przy
+pytaniach — miara „ile poprawiamy po modelu" działa od pierwszego dnia.
+
+**Załącznik do odpowiedzi.** Zdjęcie albo PDF (do 4 MB) dokłada się
+przyciskiem lub wklejeniem ze schowka przy otwartej sprawie. Plik jedzie
+do Allegro dwustopniowo (deklaracja + binaria) i NIE jest u nas zapisywany —
+ta sama zasada prywatności co przy screenshotach pytań.
+
+**Uczciwa degradacja zamiast założeń.** API dyskusji jest w becie i id
+sprawy z `/sale/issues` może nie pasować do `/sale/disputes` — wszystkie
+takie miejsca są oznaczone `[WERYFIKUJ]`. Gdy API nie zna sprawy, szczegół
+mówi „Rozmowa niedostępna przez API — otwórz panel Allegro", a rejestr
+z 0.103.0 działa dalej bez zmian. Przy 403 komunikat wskazuje brakujące
+uprawnienie z nazwy.
+
+Przy okazji: karta dyskusji dołączyła do listy kart chowanych przy otwartym
+szczególe zwrotu (w 0.103.0 jako jedyna zostawała na ekranie).
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu: nowe kolumny dochodzą
+migracją przy starcie, uprawnienie `allegro:api:disputes` było wnioskowane
+od 0.68.0.
+
 ## 0.103.0 — 26 sierpnia 2026
 
 **Dyskusje i reklamacje Allegro są rejestrem pracy biura, nie podglądem.**

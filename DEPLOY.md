@@ -1150,16 +1150,27 @@ prowadzącego, notatkę z ustaleń i powiązany zwrot (po numerze zamówienia).
 
 Formalna reklamacja (CLAIM) dostaje termin ustawowy liczony jak przy
 reklamacjach ze zwrotów. Zakładka ZWROTY nosi licznik spraw, które czekają.
-
-**Odpowiada się nadal w panelu Allegro** — `GET /sale/issues` nie zwraca
-treści wiadomości, więc rozmowa ma jedno miejsce prawdy tam. U nas zostaje
-to, czego panel Allegro nie daje: kolejka, właściciel i termin.
 Sprawa zamknięta w panelu schodzi z listy sama przy najbliższym pobraniu.
+
+Od 0.104.0 **cała sprawa toczy się w aplikacji**. Przycisk OTWÓRZ pokazuje
+rozmowę czytaną z API dyskusji (`/sale/disputes`) — na klik, bez zapisu
+u nas. Szkic odpowiedzi pisze model (przycisk GENERUJ SZKIC), z kontekstem
+sprawy: rozmowa, powiązany zwrot z decyzjami biura i historia klienta.
+Wysyłka idzie przyciskiem WYŚLIJ PRZEZ ALLEGRO, za potwierdzeniem.
+Do odpowiedzi można dodać załącznik (PNG, JPEG, WebP, PDF, do 4 MB) —
+plik jedzie do Allegro i nie zostaje u nas.
+
+Końcówki `/sale/disputes/...` są `[WERYFIKUJ]` na żywym koncie — zasób jest
+w becie. Gdy API nie zna sprawy, szczegół mówi „Rozmowa niedostępna przez
+API — otwórz panel Allegro", a rejestr (status, notatka, prowadzący) działa
+dalej. Nic się wtedy nie psuje — wraca stan z 0.103.0.
 
 Pobieranie może też chodzić w tle: ticker dzieli interwał `ALLEGRO_POLL_MS`
 z zapowiedziami i pytaniami, domyślnie zero — pobiera człowiek. Uprawnienie
 bez zmian: `allegro:api:disputes` przy rejestracji aplikacji; bez niego
-przycisk mówi, czego brakuje.
+przycisk mówi, czego brakuje. Jeśli okaże się, że ZAPIS wymaga szerszego
+zakresu, komunikat 403 wskaże go z nazwy — po dodaniu uprawnienia trzeba
+sparować konto ponownie (jak w §6c).
 
 ### Rozkładanie zwrotów z regału (zakładka ZWROTY, 0.75.0)
 

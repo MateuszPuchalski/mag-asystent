@@ -3,13 +3,18 @@ import { sesjaZadania } from "../context.js";
 import { stanPolaczenia } from "../services/allegro-token.js";
 import {
   BladDyskusji,
+  generujSzkicDyskusji,
   licznikDyskusji,
   listaDyskusji,
   stanSynchronizacjiDyskusji,
   synchronizujDyskusje,
   szczegolDyskusji,
+  wiadomosciDyskusji,
+  wyslijOdpowiedzDyskusji,
   zapiszNotatkeDyskusji,
+  zapiszOdpowiedzDyskusji,
   zmienStatusDyskusji,
+  type ZalacznikDyskusji,
 } from "../services/dyskusje.js";
 import { kontekstKlienta } from "../services/klienci.js";
 import { db } from "../db/db.js";
@@ -40,6 +45,19 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
     } catch (e) {
       if (e instanceof BladDyskusji) return reply.code(e.kod).send({ error: e.message });
       throw e;
+    }
+  }
+
+  /** Ta sama obsługa dla ścieżek dotykających Allegro albo modelu (wzorzec pytań). */
+  async function zIntegracja<T>(
+    reply: FastifyReply,
+    fn: () => Promise<T>
+  ): Promise<T | FastifyReply> {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof BladDyskusji) return reply.code(e.kod).send({ error: e.message });
+      return reply.code(502).send({ error: (e as Error).message });
     }
   }
 
@@ -131,4 +149,69 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
       }));
     }
   );
+
+  // ── Rozmowa i odpowiedź (0.104.0) ─────────────────────────────────────────
+
+  /* Rozmowa czytana z Allegro NA KLIK, bez zapisu u nas. `null` w odpowiedzi
+     to treść, nie błąd: znaczy „sprawa niedostępna przez API dyskusji"
+     i panel degraduje wtedy do linku do panelu Allegro. */
+  app.get<{ Params: { id: string } }>(
+    "/api/biuro/dyskusje/:id/wiadomosci",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zIntegracja(reply, async () => ({
+        wiadomosci: await wiadomosciDyskusji(Number(req.params.id)),
+      }));
+    }
+  );
+
+  app.post<{ Params: { id: string } }>("/api/biuro/dyskusje/:id/generuj", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zIntegracja(reply, async () => ({
+      dyskusja: await generujSzkicDyskusji(Number(req.params.id), autor()),
+    }));
+  });
+
+  /* Parytet serwera dla zapisu szkicu bez wysyłki — panel tego nie woła
+     (treść jedzie w body wysyłki, jak przy pytaniach), ale trasa domyka
+     kontrakt: każdy stan z ekranu da się osiągnąć przez API. */
+  app.put<{ Params: { id: string }; Body: { odpowiedz?: string } }>(
+    "/api/biuro/dyskusje/:id/odpowiedz",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zBledem(reply, () => ({
+        dyskusja: zapiszOdpowiedzDyskusji(
+          Number(req.params.id),
+          req.body?.odpowiedz ?? "",
+          autor()
+        ),
+      }));
+    }
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { odpowiedz?: string; zalacznik?: ZalacznikDyskusji };
+  }>("/api/biuro/dyskusje/:id/wyslij", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return zIntegracja(reply, async () => {
+      /* Poprawiona treść jedzie razem z wysyłką (wzorzec pytań): zapis
+         najpierw, żeby flaga redakcji i prowadzący stanęły przed wyjściem
+         wiadomości do klienta. */
+      if (req.body?.odpowiedz !== undefined) {
+        zapiszOdpowiedzDyskusji(Number(req.params.id), req.body.odpowiedz, autor());
+      }
+      return {
+        dyskusja: await wyslijOdpowiedzDyskusji(
+          Number(req.params.id),
+          autor(),
+          req.body?.zalacznik
+        ),
+      };
+    });
+  });
 }

@@ -204,6 +204,15 @@ function migrate(database: DatabaseSync) {
      samego powodu i z tą samą naturą znacznika, nie blokady. */
   addColumn("zwrot_pozycja", "rekl_prowadzi", "TEXT");
   addColumn("zwrot_pozycja", "rekl_prowadzi_at", "TEXT");
+  /* Odpowiedzi w dyskusjach Allegro (0.104.0). Tabela `dyskusja` stoi
+     u klienta od 0.103.0, więc kolumny muszą dojść migracją. Nazwy lustrzane
+     z `pytanie` — celowo: jedna para pojęć (szkic/odpowiedź) w całym biurze. */
+  addColumn("dyskusja", "szkic_ai", "TEXT");
+  addColumn("dyskusja", "szkic_at", "TEXT");
+  addColumn("dyskusja", "odpowiedz", "TEXT");
+  addColumn("dyskusja", "edytowano", "INTEGER NOT NULL DEFAULT 0");
+  addColumn("dyskusja", "wyslano_at", "TEXT");
+  addColumn("dyskusja", "odpowiedzial", "TEXT");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);

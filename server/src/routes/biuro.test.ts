@@ -164,7 +164,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    28,
+    30,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -172,14 +172,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "schowanie zapowiedzi, załatwienie pominięcia, POBRANIE ZAPOWIEDZI " +
       "z 0.85.0 oraz PRZEJĘCIE REKLAMACJI), pięć zapisów pytań klientów " +
       "(synchronizacja, wklejka, szkic, wysyłka odpowiedzi, " +
-      "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) i dwa zapisy " +
-      "dyskusji Allegro (pobranie do rejestru, zmiana statusu) — nic ponadto.\n\n" +
-      "Trzy ostatnie POST-y przyszły z rejestru dyskusji: pobranie spraw " +
-      "z Allegro do naszej tabeli, status naszej pracy nad sprawą i jawne " +
-      "przejęcie reklamacji (reklamacja nie ma przed werdyktem zapisu treści, " +
-      "przy którym nazwisko pojawiłoby się samo). Liczba rośnie tu ŚWIADOMIE " +
-      "i to jedyny sposób, w jaki wolno ją podnosić — każdy z tych zapisów " +
-      "wymaga kliknięcia i żaden nie dzieje się przy samym patrzeniu."
+      "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) i cztery zapisy " +
+      "dyskusji Allegro (pobranie do rejestru, zmiana statusu, szkic, " +
+      "wysyłka odpowiedzi) — nic ponadto.\n\n" +
+      "Dwa ostatnie POST-y (0.104.0) domykają proces dyskusji w aplikacji: " +
+      "GENERUJ liczy szkic, WYŚLIJ posyła odpowiedź do sprawy w Allegro — " +
+      "oba za jawnym kliknięciem, wysyłka dodatkowo za potwierdzeniem. " +
+      "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
+      "podnosić — żaden zapis nie dzieje się przy samym patrzeniu."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
@@ -223,13 +223,13 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /potwierdz\(\{[\s\S]{0,200}WYSŁANIE ODPOWIEDZI DO KLIENTA/, "wysyłka za potwierdzeniem");
 });
 
-test("dyskusje Allegro są rejestrem pracy, nie podglądem na kliknięcie", () => {
-  /* Do 0.102 sekcja dyskusji była żywym zapytaniem do Allegro bez śladu
-     w bazie — sprawa bez właściciela czekała niezauważona aż do terminu
-     ustawowego. Rejestr lokalny zmienia trzy rzeczy i ten test ich pilnuje:
-     lista rysuje się z NASZEJ tabeli, sprawa ma status i prowadzącego,
-     a zakładka ZWROTY dostała pigułkę uwagi jak PYTANIA. Odpowiada się
-     nadal w panelu Allegro — trasy wysyłki tu nie ma i nie może wejść bokiem. */
+test("dyskusje Allegro: rejestr pracy i cała sprawa w aplikacji", () => {
+  /* 0.103.0 zrobiło z dyskusji rejestr pracy (lista z NASZEJ tabeli, status,
+     prowadzący, pigułka uwagi na zakładce). 0.104.0 domknęło proces: rozmowę
+     czyta się i odpowiedź wysyła stąd, przez API dyskusji — przeskok do
+     panelu Allegro zostaje tylko degradacją, gdy API nie zna sprawy.
+     Wysyłka jest jawnym kliknięciem za potwierdzeniem, jak przy pytaniach —
+     automatycznej wysyłki nie ma i ten test pilnuje, żeby nie weszła bokiem. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
@@ -239,7 +239,17 @@ test("dyskusje Allegro są rejestrem pracy, nie podglądem na kliknięcie", () =
   assert.match(html, /"\/api\/biuro\/dyskusje\/odswiez"/, "pobranie z Allegro jest jawnym przyciskiem");
   assert.match(html, /data-dysk-status/, "status sprawy zmienia kliknięcie");
   assert.match(html, /dyskusje\/\$\{[^}]+\}\/notatka/, "notatka z ustaleń zostaje u nas");
-  assert.ok(!/dyskusje\/[^"'`]*\/wyslij/.test(html), "wysyłki odpowiedzi do dyskusji nie ma — rozmowa toczy się w panelu");
+  // cała sprawa w aplikacji (0.104.0)
+  assert.match(html, /id="dyskusjaSzczegol"/, "sprawa ma pełnoekranowy szczegół");
+  assert.match(html, /dyskusje\/\$\{[^}]+\}\/wiadomosci/, "rozmowa czytana z Allegro na klik");
+  assert.match(html, /dyskusje\/\$\{[^}]+\}\/generuj/, "szkic pisze model na jawne kliknięcie");
+  assert.match(html, /dyskusje\/\$\{[^}]+\}\/wyslij/, "odpowiedź wysyła się z aplikacji");
+  assert.match(
+    html,
+    /potwierdz\(\{[\s\S]{0,200}WYSŁANIE ODPOWIEDZI DO KLIENTA/,
+    "wysyłka do dyskusji za potwierdzeniem"
+  );
+  assert.match(html, /Rozmowa niedostępna przez API/, "degradacja do panelu, gdy API nie zna sprawy");
   assert.match(html, /id="zwrotyLicznik" class="tabLicznik"/, "pigułka uwagi na zakładce ZWROTY");
   assert.match(html, /"\/api\/biuro\/zwroty\/licznik"/, "pigułka ma własną tanią trasę");
   assert.match(html, /data-rekl-prowadzi/, "jawne przejęcie reklamacji przyciskiem");

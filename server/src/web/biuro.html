@@ -1082,6 +1082,41 @@
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
     </section>
 
+    <!-- SZCZEGÓŁ DYSKUSJI (0.104.0): cała sprawa w aplikacji — rozmowa
+         z Allegro czytana na klik, szkic modelu, odpowiedź i załącznik.
+         Idiom pytań (#pytanieSzczegol): rozmowa się przewija, pole odpowiedzi
+         zostaje na dole. Gdy API dyskusji nie zna sprawy (404), blok
+         odpowiedzi znika i zostaje zdanie z linkiem do panelu — rejestr
+         z 0.103.0 (status/notatka/prowadzi) działa wtedy dalej z listy. -->
+    <section class="card pelna szczegol" id="dyskusjaSzczegol" hidden>
+      <div class="sprawaSzyna">
+        <button class="akcja cichy" id="dyskusjaWroc">← WSZYSTKIE SPRAWY</button>
+      </div>
+      <div id="dyskusjaNaglowek" style="margin-top:12px"></div>
+      <div class="sprawa-tresc">
+        <h2 style="margin-top:16px">ROZMOWA W SPRAWIE</h2>
+        <div id="dyskusjaRozmowa"></div>
+      </div>
+      <div class="dok-odpowiedzi" id="dyskusjaOdpowiedzBlok">
+        <div id="dyskusjaOdpowiedzGora">
+          <h2>ODPOWIEDŹ</h2>
+          <span class="mute" id="dyskusjaSzkicInfo"></span>
+        </div>
+        <textarea id="dyskusjaOdpowiedz" rows="6" style="width:100%"></textarea>
+        <div id="dyskusjaZalacznikChip" class="mute" style="margin-top:6px"></div>
+        <div id="dyskusjaOdpowiedzDol" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <button class="akcja cichy" id="dyskusjaGeneruj">GENERUJ SZKIC</button>
+          <!-- Załącznik jako base64 w JSON (konwencja repo — bez multipartu);
+               plik NIE jest u nas zapisywany, jedzie do Allegro i znika. -->
+          <button class="akcja cichy" id="dyskusjaZalacznikBtn">DODAJ ZAŁĄCZNIK</button>
+          <input type="file" id="dyskusjaPlik" hidden
+                 accept="image/png,image/jpeg,image/webp,application/pdf">
+          <button class="akcja" id="dyskusjaWyslij">WYŚLIJ PRZEZ ALLEGRO</button>
+          <div id="dyskusjaLicznikZnakow" class="mute"></div>
+        </div>
+      </div>
+    </section>
+
 
     <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
          upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
@@ -1179,21 +1214,20 @@
       <table id="reklamacjeLista"></table>
     </section>
 
-    <!-- Dyskusje i reklamacje z panelu Allegro — od tej wersji REJESTR pracy,
-         nie podgląd na kliknięcie. Odpowiada się nadal w panelu Allegro
-         (API nie daje treści wiadomości); tu jest kolejka z terminem dla
-         CLAIM, właściciel sprawy, notatka z ustaleń i link do zwrotu tej
-         samej paczki — żeby nic nie czekało niezauważone i żeby dwie osoby
-         nie prowadziły tej samej sprawy. -->
+    <!-- Dyskusje i reklamacje Allegro — rejestr pracy (0.103.0), a od 0.104.0
+         CAŁA sprawa w aplikacji: OTWÓRZ pokazuje rozmowę z Allegro, szkic
+         pisze model, odpowiedź (z załącznikiem) wysyła się stąd. Kolejka
+         z terminem dla CLAIM, właściciel i notatka zostają jak były. -->
     <section class="card" id="dyskusjeKarta">
       <h2>DYSKUSJE I REKLAMACJE ALLEGRO <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
         <p class="mute" style="margin-bottom:8px">
-          Rozmowa z klientem toczy się w panelu Allegro i tam się odpowiada.
-          Tu widać, które sprawy czekają, kto którą prowadzi i ile dni zostało
-          do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu schodzą
-          z listy przy pobraniu same.
+          Kliknij OTWÓRZ, żeby przeczytać rozmowę i odpowiedzieć klientowi
+          prosto stąd — szkic przygotuje model, wysyłka idzie do Allegro.
+          Lista pokazuje, które sprawy czekają, kto którą prowadzi i ile dni
+          zostało do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu
+          schodzą z listy przy pobraniu same.
         </p>
       </div>
       <div class="czipy" id="dyskusjeCzipy">
@@ -4311,6 +4345,9 @@ async function odswiezEtap3() {
        rysuje się z lokalnego rejestru, a jej awaria nie ma prawa zabrać
        ekranu koszom i reklamacjom. */
     await odswiezDyskusje();
+    /* Otwarty szczegół sprawy odświeża nagłówek z tego samego cyklu; rozmowa
+       zostaje — dociąga się na wejściu i po wysyłce, nie co 30 sekund. */
+    if (otwartaDyskusja != null) await odswiezSzczegolDyskusji(false);
   } catch (e) { console.warn(e); }
 }
 
@@ -4357,7 +4394,8 @@ function dociagnijWglad(id) {
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
 function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
-  karta.hidden = lista.length === 0 || (otwartyZwrot != null && !kolejkaZostaje());
+  karta.hidden = lista.length === 0 || (otwartyZwrot != null && !kolejkaZostaje())
+    || otwartaDyskusja != null;
   /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
      ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
   $("brakujaceTicker").innerHTML = !ticker
@@ -4429,7 +4467,7 @@ function rysujKosze(kosze) {
    sprawa sprzed tygodnia kosztuje więcej niż wczorajsza.                     */
 
 function rysujPominiete(lista) {
-  $("pominieteKarta").hidden = lista.length === 0;
+  $("pominieteKarta").hidden = lista.length === 0 || otwartaDyskusja != null;
   if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
   $("pominieteLista").innerHTML =
     `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
@@ -4662,6 +4700,7 @@ function rysujDyskusje(lista, sync) {
             ${y.notatka ? `<div class="mute">✎ ${esc(y.notatka.slice(0, 120))}</div>` : ""}</td>
           <td class="mute">${esc(y.prowadzi || "—")}</td>
           <td style="white-space:nowrap">
+            <button class="akcja" data-dysk-otworz="${y.id}">OTWÓRZ</button>
             <button class="akcja cichy" data-dysk-notatka="${y.id}" style="font-size:11px;padding:4px 8px">NOTATKA</button>
             ${otwarta(y) ? `
               ${y.status === "nowa" ? `<button class="akcja cichy" data-dysk-status="w_toku" data-dysk="${y.id}">PROWADZĘ</button>` : ""}
@@ -4688,6 +4727,191 @@ async function odswiezDyskusje() {
     rysujDyskusje(d.dyskusje || [], d.synchronizacja);
   } catch (e) {
     $("dyskusjeLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+/* ── Szczegół dyskusji (0.104.0): rozmowa, szkic, wysyłka ────────────────────
+   Cała sprawa w aplikacji. Rozmowa jedzie z Allegro NA KLIK i nie jest
+   u nas zapisywana; szkic i odpowiedź żyją na wierszu rejestru. Załącznik
+   trzyma się w zmiennej do chwili wysyłki — nigdy w bazie. */
+let otwartaDyskusja = null;
+let dyskusjaZalacznik = null; // {nazwa, mime, dane} — jedzie w body wysyłki
+
+const LIMIT_DYSKUSJI = 2000;
+
+function otworzDyskusje(id) {
+  /* Dwa szczegóły naraz nie istnieją — wejście w sprawę zamyka zwrot. */
+  if (otwartyZwrot != null) zamknijZwrot();
+  otwartaDyskusja = id;
+  dyskusjaZalacznik = null;
+  $("dyskusjaOdpowiedz").value = "";
+  $("dyskusjaNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
+  $("dyskusjaRozmowa").innerHTML = "";
+  rysujZalacznikDyskusji();
+  ustawRodzenstwoZwrotu();
+  odswiezSzczegolDyskusji(true);
+}
+
+function zamknijDyskusje() {
+  otwartaDyskusja = null;
+  dyskusjaZalacznik = null;
+  ustawRodzenstwoZwrotu();
+}
+
+/**
+ * Nagłówek z rejestru + (na wejściu) rozmowa z Allegro. `zRozmowa=false`
+ * przy cyklu 30 s: odświeża liczby i status, nie szarpie API dyskusji.
+ */
+async function odswiezSzczegolDyskusji(zRozmowa) {
+  const id = otwartaDyskusja;
+  if (id == null) return;
+  try {
+    const d = await (await api(`/api/biuro/dyskusje/${id}`)).json();
+    if (otwartaDyskusja !== id) return;
+    rysujSzczegolDyskusji(d.dyskusja, d.zwrot);
+  } catch (e) {
+    $("dyskusjaNaglowek").innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+    return;
+  }
+  if (zRozmowa) await wczytajRozmoweDyskusji(id);
+}
+
+function rysujSzczegolDyskusji(y, zwrot) {
+  const otwartaSprawa = y.status === "nowa" || y.status === "w_toku";
+  $("dyskusjaNaglowek").innerHTML = `
+    <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
+      <span style="font-size:24px;font-weight:700">${esc(y.temat || "(bez tematu)")}</span>
+      ${y.typ === "CLAIM"
+        ? '<span class="badge err">REKLAMACJA</span>'
+        : '<span class="badge mute2">DYSKUSJA</span>'}
+      ${badgeDyskusji(y.status)}
+      ${y.dniDoTerminu != null
+        ? (y.poTerminie
+            ? `<span class="badge err">${-y.dniDoTerminu} dni PO TERMINIE</span>`
+            : `<span class="badge amber">${y.dniDoTerminu} dni do terminu</span>`)
+        : ""}
+    </div>
+    <p class="mute" style="margin-top:6px">
+      klient <b>${esc(y.kupujacyLogin || "nieznany")}</b>
+      ${y.statusAllegro ? ` · status Allegro: ${esc(y.statusAllegro)}` : ""}
+      ${y.prowadzi ? ` · prowadzi <b>${esc(y.prowadzi)}</b>` : ""}
+      ${y.wyslanoAt ? ` · ostatnia odpowiedź ${esc(stempelLokalny(y.wyslanoAt))} (${esc(y.odpowiedzial || "?")})` : ""}
+      ${zwrot ? ` · <button class="akcja cichy" data-dysk-zwrot="${zwrot.id}" style="font-size:11px;padding:3px 8px">ZWROT ${esc(zwrot.referencja || zwrot.waybill)} →</button>` : ""}
+    </p>
+    ${y.notatka ? `<p class="mute" style="margin-top:4px">✎ ${esc(y.notatka)}</p>` : ""}`;
+
+  /* Pole odpowiedzi dostaje treść z wiersza TYLKO gdy człowiek jeszcze nie
+     pisze — cykl 30 s nie ma prawa nadpisać tekstu pod rękami. */
+  const pole = $("dyskusjaOdpowiedz");
+  if (document.activeElement !== pole && pole.value.trim() === "" && y.odpowiedz) {
+    pole.value = y.odpowiedz;
+  }
+  $("dyskusjaSzkicInfo").textContent = y.szkicAi
+    ? (y.edytowano ? "szkic modelu po redakcji biura" : "szkic modelu — przeczytaj przed wysyłką")
+    : "";
+  /* Sprawa zamknięta nie przyjmuje odpowiedzi — blok znika w całości. */
+  $("dyskusjaOdpowiedzBlok").hidden = !otwartaSprawa;
+  policzZnakiDyskusji();
+}
+
+async function wczytajRozmoweDyskusji(id) {
+  const cel = $("dyskusjaRozmowa");
+  cel.innerHTML = '<p class="mute">Wczytuję rozmowę…</p>';
+  try {
+    const d = await (await api(`/api/biuro/dyskusje/${id}/wiadomosci`)).json();
+    if (otwartaDyskusja !== id) return;
+    if (d.wiadomosci === null) {
+      /* Degradacja z planu: API dyskusji nie zna sprawy — rejestr działa,
+         odpowiada się w panelu. Blok odpowiedzi znika, bo wysyłka padłaby
+         tym samym 404. */
+      cel.innerHTML =
+        '<p class="mute">Rozmowa niedostępna przez API — otwórz panel Allegro, ' +
+        "żeby ją przeczytać i odpowiedzieć. Rejestr sprawy (status, notatka, " +
+        "prowadzący) działa tu dalej.</p>";
+      $("dyskusjaOdpowiedzBlok").hidden = true;
+      return;
+    }
+    cel.innerHTML = d.wiadomosci.length
+      ? d.wiadomosci.map((m) => `<div class="wiad ${m.odNas ? "my" : "klient"}">
+            <div class="kto">${m.odNas
+              ? "MY"
+              : m.autorRola === "ALLEGRO_ADVISOR" ? "ALLEGRO" : esc(m.autorLogin || "KLIENT")}
+              ${m.at ? `<span class="mute"> · ${esc(stempelLokalny(m.at))}</span>` : ""}</div>
+            <div>${esc(m.tresc)}</div>
+            ${m.zalacznik
+              ? (m.zalacznik.url
+                  ? `<div><a href="${esc(m.zalacznik.url)}" target="_blank" rel="noopener">załącznik: ${esc(m.zalacznik.nazwa || "plik")}</a></div>`
+                  : `<div class="mute">[załącznik: ${esc(m.zalacznik.nazwa || "plik")}]</div>`)
+              : ""}
+          </div>`).join("")
+      : '<p class="mute">Klient nie napisał jeszcze wiadomości.</p>';
+  } catch (e) {
+    cel.innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
+function policzZnakiDyskusji() {
+  const znakow = $("dyskusjaOdpowiedz").value.trim().length;
+  const cel = $("dyskusjaLicznikZnakow");
+  cel.textContent = znakow ? `${znakow} / ${LIMIT_DYSKUSJI}` : "";
+  cel.classList.toggle("zle", znakow > LIMIT_DYSKUSJI);
+}
+
+function rysujZalacznikDyskusji() {
+  $("dyskusjaZalacznikChip").innerHTML = dyskusjaZalacznik
+    ? `📎 ${esc(dyskusjaZalacznik.nazwa)}
+       <button class="akcja cichy" id="dyskusjaZalacznikUsun" style="font-size:11px;padding:3px 8px">USUŃ</button>`
+    : "";
+}
+
+/** Plik → base64 w zmiennej. NIC nie jedzie na serwer przed wysyłką wiadomości. */
+function przyjmijPlikDyskusji(plik) {
+  const DOZWOLONE = ["image/png", "image/jpeg", "image/webp", "application/pdf"];
+  if (!DOZWOLONE.includes(plik.type)) {
+    return toast("Załącznik musi być PNG, JPEG, WebP albo PDF");
+  }
+  if (plik.size > 4 * 1024 * 1024) return toast("Załącznik ma ponad 4 MB — zmniejsz plik");
+  const czytnik = new FileReader();
+  czytnik.onload = () => {
+    dyskusjaZalacznik = { nazwa: plik.name, mime: plik.type, dane: String(czytnik.result) };
+    rysujZalacznikDyskusji();
+  };
+  czytnik.readAsDataURL(plik);
+}
+
+async function wyslijOdpowiedzDyskusji() {
+  const id = otwartaDyskusja;
+  if (id == null) return;
+  const tresc = $("dyskusjaOdpowiedz").value.trim();
+  const zgoda = await potwierdz({
+    tytul: "WYSŁANIE ODPOWIEDZI DO KLIENTA",
+    opis: "Odpowiedź pójdzie do sprawy w Allegro w imieniu firmy" +
+      (dyskusjaZalacznik ? ` razem z załącznikiem ${dyskusjaZalacznik.nazwa}` : "") + ".",
+    potwierdz: "WYŚLIJ",
+  });
+  if (!zgoda) return;
+  const b = $("dyskusjaWyslij");
+  b.disabled = true;
+  try {
+    await api(`/api/biuro/dyskusje/${id}/wyslij`, {
+      method: "POST",
+      body: JSON.stringify({
+        odpowiedz: tresc,
+        ...(dyskusjaZalacznik ? { zalacznik: dyskusjaZalacznik } : {}),
+      }),
+    });
+    toast("Odpowiedź poszła do Allegro ✓");
+    dyskusjaZalacznik = null;
+    rysujZalacznikDyskusji();
+    /* Rozmowa od razu z naszym bąbelkiem — potwierdzenie, że wiadomość
+       naprawdę weszła, a nie tylko toast. */
+    await odswiezSzczegolDyskusji(true);
+    await odswiezDyskusje();
+    await odswiezLiczniki();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    b.disabled = false;
   }
 }
 
@@ -5109,15 +5333,21 @@ const PRZY_ZWROCIE = ["zwrotListaKarta", "brakujaceKarta"];
    do ANALIZY. Id, którego nie ma w znaczniku, wywala `$(id).hidden` na `null`
    i gasi CAŁĄ zakładkę — tak, jak stało się przy pierwszym uruchomieniu tej
    przeprowadzki. Lista musi kończyć przenosiny razem z nimi. */
+/* `dyskusjeKarta` doszła w 0.103.0 — bez wpisu tutaj stałaby na ekranie obok
+   otwartego szczegółu zwrotu, jako jedyna karta, która nie schodzi. */
 const KARTY_ZWROTOW = [
   "brakujaceKarta", "zwrotListaKarta", "koszeKarta",
-  "pominieteKarta", "reklamacjeKarta", "kontoAllegroKarta",
+  "pominieteKarta", "reklamacjeKarta", "dyskusjeKarta", "kontoAllegroKarta",
 ];
 
 function ustawRodzenstwoZwrotu() {
   const otwarty = otwartyZwrot != null;
+  /* Szczegół dyskusji (0.104.0) zasłania karty tak samo jak szczegół zwrotu —
+     to drugie „wejście W sprawę" na tej zakładce. Oba naraz nie istnieją:
+     otwarcie jednego zamyka drugie. */
+  const zSzczegolem = otwarty || otwartaDyskusja != null;
   const zostaje = otwarty && kolejkaZostaje() ? PRZY_ZWROCIE : [];
-  for (const id of KARTY_ZWROTOW) $(id).hidden = otwarty && !zostaje.includes(id);
+  for (const id of KARTY_ZWROTOW) $(id).hidden = zSzczegolem && !zostaje.includes(id);
   /* Dwie karty mają WŁASNĄ regułę pustki i ona jest nadrzędna — pusta karta
      jest nagłówkiem bez treści. */
   if (!$("brakujaceLista").innerHTML) $("brakujaceKarta").hidden = true;
@@ -5125,6 +5355,7 @@ function ustawRodzenstwoZwrotu() {
   /* Kontekst żyje i ginie razem ze zwrotem — pusta trzecia strefa przy
      zamkniętym zwrocie byłaby nagłówkiem bez treści. */
   $("zwrotKontekst").hidden = !otwarty;
+  $("dyskusjaSzczegol").hidden = otwartaDyskusja == null;
   $("widokZwroty").classList.toggle("zSzczegolem", otwarty);
   ustawPasmoSzuflady("widokZwroty", otwarty);
   rysujZwroty(zwrotyLista);     // wariant listy zależy od tego, co ustawiamy tu
@@ -5145,6 +5376,9 @@ function zaznaczWiersz(tabelaId, klucz, id) {
 }
 
 function otworzZwrot(id) {
+  /* Dwa szczegóły naraz nie istnieją — wejście w zwrot zamyka sprawę. */
+  otwartaDyskusja = null;
+  dyskusjaZalacznik = null;
   otwartyZwrot = id;
   $("zwrotSzczegol").hidden = false;
   /* Treść poprzedniego zwrotu schodzi z ekranu OD RAZU. Bez tego kontekst
@@ -6117,6 +6351,8 @@ $("dyskusjeCzipy").addEventListener("click", async (e) => {
   await odswiezDyskusje();
 });
 $("dyskusjeLista").addEventListener("click", async (e) => {
+  const otworz = e.target.closest("[data-dysk-otworz]");
+  if (otworz) return otworzDyskusje(Number(otworz.dataset.dyskOtworz));
   const doZwrotu = e.target.closest("[data-dysk-zwrot]");
   if (doZwrotu) return otworzZwrot(Number(doZwrotu.dataset.dyskZwrot));
   const notatkaBtn = e.target.closest("[data-dysk-notatka]");
@@ -6145,6 +6381,47 @@ $("dyskusjeLista").addEventListener("click", async (e) => {
     await odswiezLiczniki();
   } catch (err) { toast(err.message); }
 });
+
+/* Szczegół dyskusji (0.104.0) — wyjście, szkic, załącznik, wysyłka. */
+$("dyskusjaWroc").addEventListener("click", zamknijDyskusje);
+$("dyskusjaNaglowek").addEventListener("click", (e) => {
+  const doZwrotu = e.target.closest("[data-dysk-zwrot]");
+  if (doZwrotu) return otworzZwrot(Number(doZwrotu.dataset.dyskZwrot));
+});
+$("dyskusjaOdpowiedz").addEventListener("input", policzZnakiDyskusji);
+$("dyskusjaGeneruj").addEventListener("click", async () => {
+  const id = otwartaDyskusja;
+  if (id == null) return;
+  const b = $("dyskusjaGeneruj");
+  b.disabled = true;
+  const napis = b.textContent;
+  b.textContent = "PISZĘ…";
+  try {
+    const d = await (await api(`/api/biuro/dyskusje/${id}/generuj`, { method: "POST", body: "{}" })).json();
+    if (otwartaDyskusja === id) {
+      $("dyskusjaOdpowiedz").value = d.dyskusja.odpowiedz || "";
+      rysujSzczegolDyskusji(d.dyskusja, null);
+    }
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    b.disabled = false;
+    b.textContent = napis;
+  }
+});
+$("dyskusjaZalacznikBtn").addEventListener("click", () => $("dyskusjaPlik").click());
+$("dyskusjaPlik").addEventListener("change", () => {
+  const plik = $("dyskusjaPlik").files?.[0];
+  if (plik) przyjmijPlikDyskusji(plik);
+  $("dyskusjaPlik").value = "";
+});
+$("dyskusjaZalacznikChip").addEventListener("click", (e) => {
+  if (e.target.closest("#dyskusjaZalacznikUsun")) {
+    dyskusjaZalacznik = null;
+    rysujZalacznikDyskusji();
+  }
+});
+$("dyskusjaWyslij").addEventListener("click", wyslijOdpowiedzDyskusji);
 
 /* Pobranie zapowiedzi zwrotów Z RĘKI (0.85.0). Do tej wersji robił to wyłącznie
    ticker co pięć minut; teraz interwał jest domyślnie wyłączony, a pobiera
@@ -6901,6 +7178,17 @@ async function przejdzDalej(wynik) {
    Nasłuch stoi na dokumencie, bo obraz wkleja się „gdzieś na stronie", a nie
    w konkretne pole — dokładnie tak, jak człowiek to robi dziś w czacie. */
 document.addEventListener("paste", (e) => {
+  /* Druga gałąź (0.104.0): przy otwartej sprawie dyskusji wklejony obraz
+     staje się ZAŁĄCZNIKIEM odpowiedzi — trzyma się w zmiennej do wysyłki,
+     niczego nie zapisuje i nie transkrybuje. */
+  if (widok === "zwroty" && otwartaDyskusja != null) {
+    const obraz = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+    if (!obraz) return;
+    e.preventDefault();
+    const plik = obraz.getAsFile();
+    if (plik) przyjmijPlikDyskusji(plik);
+    return;
+  }
   if (widok !== "pytania" || otwartePytanie != null) return;
   const obraz = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
   if (!obraz) return;

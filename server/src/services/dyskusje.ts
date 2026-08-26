@@ -1,9 +1,15 @@
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
-import { allegroAdapter } from "../adapters/allegro.js";
+import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
+import type { WiadomoscDyskusji } from "../adapters/allegro.js";
 import { stanPolaczenia } from "./allegro-token.js";
 import { terminReklamacji } from "./reklamacje.js";
+import { aiTryb, generujOdpowiedz, stanAI, zbudujSystem } from "./ai.js";
+import { pobierzKonfiguracje } from "./pytania.js";
+import { kontekstKlienta } from "./klienci.js";
+
+export type { WiadomoscDyskusji } from "../adapters/allegro.js";
 
 /* ── Dyskusje i reklamacje Allegro — rejestr pracy biura ─────────────────────
    Do tej pory sekcja dyskusji była podglądem na kliknięcie: przycisk pobierał
@@ -12,12 +18,12 @@ import { terminReklamacji } from "./reklamacje.js";
    czekać niezauważona aż do terminu ustawowego, a przy dwóch biurkach dwie
    osoby brały tę samą.
 
-   Ten moduł powtarza wzorzec `pytania.ts` z jedną istotną różnicą: NIE MA
-   ścieżki odpowiedzi. `/sale/issues` zwraca same nagłówki spraw (bez treści
-   wiadomości), więc rozmowa toczy się w panelu Allegro i tam się odpowiada.
-   Lokalnie zostaje to, czego panel Allegro nie daje: kolejka z priorytetem
-   wg terminu, właściciel sprawy, notatka z ustaleń i powiązanie ze zwrotem
-   po numerze zamówienia.                                                     */
+   Ten moduł powtarza wzorzec `pytania.ts`. Od 0.104.0 ma też ścieżkę
+   odpowiedzi: rozmowę czyta się i pisze przez `/sale/disputes` (sekcja
+   „Rozmowa i odpowiedź" niżej), więc sprawa od zgłoszenia do odpowiedzi
+   toczy się w aplikacji. Lokalnie zostaje to, czego panel Allegro nie daje:
+   kolejka z priorytetem wg terminu, właściciel sprawy, notatka z ustaleń,
+   powiązanie ze zwrotem po numerze zamówienia oraz nasz szkic i odpowiedź.  */
 
 /** Awaria pracy z dyskusją. `kod` niesie status HTTP dla trasy (wzorzec BladPytania). */
 export class BladDyskusji extends Error {
@@ -61,6 +67,14 @@ export interface Dyskusja {
   termin: string | null;
   dniDoTerminu: number | null;
   poTerminie: boolean;
+  /** Szkic modelu i nasza odpowiedź (0.104.0) — wzorzec pytań. */
+  szkicAi: string | null;
+  szkicAt: string | null;
+  odpowiedz: string | null;
+  edytowano: boolean;
+  /** OSTATNIA wysyłka — dyskusja to wiele odpowiedzi, historia w events. */
+  wyslanoAt: string | null;
+  odpowiedzial: string | null;
 }
 
 const tekstLubNull = (v: unknown): string | null =>
@@ -92,6 +106,12 @@ function zWiersza(w: Record<string, unknown>, teraz: number = Date.now()): Dysku
     termin: t?.termin ?? null,
     dniDoTerminu: t?.dniDoTerminu ?? null,
     poTerminie: t ? t.dniDoTerminu < 0 : false,
+    szkicAi: tekstLubNull(w.szkic_ai),
+    szkicAt: tekstLubNull(w.szkic_at),
+    odpowiedz: tekstLubNull(w.odpowiedz),
+    edytowano: (w.edytowano as number) === 1,
+    wyslanoAt: tekstLubNull(w.wyslano_at),
+    odpowiedzial: tekstLubNull(w.odpowiedzial),
   };
 }
 
@@ -340,6 +360,251 @@ export function zapiszNotatkeDyskusji(id: number, notatka: string, autor: string
     )
     .run(tresc, autor, id);
   logEvent("dyskusja_notatka", autor, null, { dyskusjaId: id, jest: tresc !== null });
+  return szczegolDyskusji(id);
+}
+
+/* ── Rozmowa i odpowiedź w sprawie (0.104.0) ─────────────────────────────────
+   Do tej wersji rejestr mówił, ŻE sprawa czeka — odpowiadało się w panelu
+   Allegro. Teraz rozmowę czyta się i pisze stąd, przez `/sale/disputes`.
+   Rozmowa dalej NIE jest zapisywana u nas (jedno miejsce prawdy, jak przy
+   wątkach pytań); zostaje nasz szkic, nasza ostatnia odpowiedź i ślad
+   wysyłek w `events`. Zasób jest w becie — 404 z API degraduje do zdania
+   „otwórz panel", nigdy do awarii rejestru.                                  */
+
+/** Rozmowa sprawy — na klik, bez zapisu; `null` = niedostępna przez API. */
+export async function wiadomosciDyskusji(id: number): Promise<WiadomoscDyskusji[] | null> {
+  const w = wiersz(id);
+  return allegroAdapter().wiadomosciDyskusji(w.allegro_id as string);
+}
+
+function zamknietaLokalnie(status: string): boolean {
+  return status === "zamknieta" || status === "pominieta";
+}
+
+export function zapiszOdpowiedzDyskusji(id: number, tresc: string, autor: string): Dyskusja {
+  const w = wiersz(id);
+  if (zamknietaLokalnie(w.status as string)) {
+    throw new BladDyskusji(
+      "Sprawa jest zamknięta — jeśli to pomyłka, przestaw ją najpierw na W TOKU",
+      409
+    );
+  }
+  const czysta = tresc.trim();
+  if (czysta === "") throw new BladDyskusji("Odpowiedź jest pusta");
+  /* Flaga redakcji liczona względem szkicu — dokładnie jak przy pytaniach:
+     miara „ile poprawiamy po modelu" wymaga nietkniętego `szkic_ai` obok. */
+  const szkic = (w.szkic_ai as string | null)?.trim() ?? null;
+  const edytowano = szkic !== null && czysta === szkic ? 0 : 1;
+  db()
+    .prepare(
+      `UPDATE dyskusja
+          SET odpowiedz = ?, edytowano = ?, prowadzi = ?, prowadzi_at = datetime('now')
+        WHERE id = ?`
+    )
+    .run(czysta, edytowano, autor, id);
+  return szczegolDyskusji(id);
+}
+
+export interface ZalacznikDyskusji {
+  nazwa: string;
+  mime: string;
+  /** Base64, z przedrostkiem `data:` albo bez — serwis go zdejmuje. */
+  dane: string;
+}
+
+/* Te same granice co przy wklejce pytań plus PDF: dowód w reklamacji bywa
+   dokumentem. Lista wklejki mówiła, co umie przeczytać MODEL; ta mówi, co
+   przyjmuje Allegro — [WERYFIKUJ] na sandboxie. */
+const MIME_ZALACZNIKOW = ["image/png", "image/jpeg", "image/webp", "application/pdf"];
+const MAX_ZALACZNIK_B = 4 * 1024 * 1024;
+
+function sprawdzZalacznik(z: ZalacznikDyskusji): { nazwa: string; mime: string; dane: string } {
+  if (!MIME_ZALACZNIKOW.includes(z.mime)) {
+    throw new BladDyskusji(
+      `Załącznik ${z.mime || "bez typu"} nie przejdzie — dozwolone: PNG, JPEG, WebP, PDF`
+    );
+  }
+  const dane = z.dane.replace(/^data:[^;]+;base64,/, "");
+  /* Rozmiar liczony PO dekodowaniu — limit mówi o pliku, nie o jego zapisie
+     w base64 (ten sam rachunek co przy wklejce, ~4/3 narzutu). */
+  const bajtow = Math.floor((dane.length * 3) / 4);
+  if (bajtow > MAX_ZALACZNIK_B) {
+    throw new BladDyskusji(
+      `Załącznik ma ~${Math.round(bajtow / 1024 / 1024)} MB — limit to 4 MB`
+    );
+  }
+  const nazwa = z.nazwa.trim() || "zalacznik";
+  return { nazwa, mime: z.mime, dane };
+}
+
+/**
+ * Wysyłka odpowiedzi do Allegro. Załącznik (opcjonalny) NIE jest u nas
+ * zapisywany — jedzie do Allegro i znika (ta sama zasada prywatności co
+ * przy screenshotach pytań). Wysyłka nie zamyka sprawy: dyskusja to wiele
+ * odpowiedzi, a koniec ogłasza Allegro (sync auto-zamyka po statusie).
+ */
+export async function wyslijOdpowiedzDyskusji(
+  id: number,
+  autor: string,
+  zalacznik?: ZalacznikDyskusji
+): Promise<Dyskusja> {
+  const w = wiersz(id);
+  if (zamknietaLokalnie(w.status as string)) {
+    throw new BladDyskusji(
+      "Sprawa jest zamknięta — jeśli to pomyłka, przestaw ją najpierw na W TOKU",
+      409
+    );
+  }
+  const statusAllegro = w.status_allegro as string | null;
+  if (statusAllegro && (FINALNE_STATUSY_ALLEGRO as readonly string[]).includes(statusAllegro)) {
+    /* Allegro i tak odrzuci — nasze zdanie jest lepsze od ich błędu. */
+    throw new BladDyskusji(`Allegro zamknęło tę sprawę (${statusAllegro})`, 409);
+  }
+  const tresc = ((w.odpowiedz as string | null) ?? "").trim();
+  if (tresc === "") {
+    throw new BladDyskusji("Najpierw wygeneruj albo napisz odpowiedź");
+  }
+  if (tresc.length > LIMIT_WIADOMOSCI) {
+    throw new BladDyskusji(
+      `Odpowiedź ma ${tresc.length} znaków — limit Allegro to ${LIMIT_WIADOMOSCI}`
+    );
+  }
+
+  const adapter = allegroAdapter();
+  let zalacznikId: string | undefined;
+  if (zalacznik) {
+    const gotowy = sprawdzZalacznik(zalacznik);
+    zalacznikId = await adapter.dodajZalacznikDyskusji(gotowy.nazwa, gotowy.mime, gotowy.dane);
+  }
+  await adapter.wyslijWiadomoscDyskusji(w.allegro_id as string, tresc, zalacznikId);
+
+  /* `prowadzi` ZOSTAJE na nadawcy (inaczej niż przy pytaniach): sprawa trwa
+     dalej i to nadawca czeka teraz na odpowiedź klienta. `szkic_ai` też
+     zostaje — to baza miary „ile poprawiamy po modelu". */
+  db()
+    .prepare(
+      `UPDATE dyskusja
+          SET wyslano_at = datetime('now'), odpowiedzial = ?,
+              prowadzi = ?, prowadzi_at = datetime('now'),
+              status = CASE WHEN status = 'nowa' THEN 'w_toku' ELSE status END
+        WHERE id = ?`
+    )
+    .run(autor, autor, id);
+  logEvent("dyskusja_wyslana", autor, null, {
+    dyskusjaId: id,
+    znakow: tresc.length,
+    edytowano: (w.edytowano as number) === 1,
+    zZalacznikiem: zalacznik !== undefined,
+    typ: (w.typ as string) ?? null,
+  });
+  return szczegolDyskusji(id);
+}
+
+/**
+ * Blok wiedzy dla modelu — odpowiednik `kontekstPytania`, ale o SPRAWIE:
+ * rozmowa, powiązany zwrot z decyzjami biura, historia klienta i notatka.
+ * Zwykły polski tekst, bo model czyta go jak człowiek nowy w firmie.
+ */
+function kontekstDyskusji(d: Dyskusja, wiadomosci: WiadomoscDyskusji[] | null): string {
+  const czesci: string[] = [];
+  czesci.push(
+    `SPRAWA: ${d.typ === "CLAIM" ? "REKLAMACJA (formalna, z terminem ustawowym)" : "DYSKUSJA"}` +
+      `${d.temat ? ` · temat: ${d.temat}` : ""}` +
+      `${d.statusAllegro ? ` · status Allegro: ${d.statusAllegro}` : ""}` +
+      `${d.dniDoTerminu !== null ? ` · dni do terminu ustawowego: ${d.dniDoTerminu}` : ""}`
+  );
+
+  if (wiadomosci === null) {
+    czesci.push(
+      "ROZMOWA W SPRAWIE: niedostępna przez API — masz tylko temat i dane zwrotu poniżej."
+    );
+  } else if (wiadomosci.length === 0) {
+    czesci.push("ROZMOWA W SPRAWIE: pusta — klient nie napisał jeszcze wiadomości.");
+  } else {
+    /* Ostatnie ~15 wiadomości wystarcza: starsze wątki nie zmieniają tego,
+       co trzeba odpisać TERAZ, a rozdęty kontekst rozmywa odpowiedź. */
+    const ostatnie = wiadomosci.slice(-15);
+    const linie = ostatnie.map((m) => {
+      const kto = m.odNas ? "MY" : m.autorRola === "ALLEGRO_ADVISOR" ? "ALLEGRO" : "KLIENT";
+      const zal = m.zalacznik ? ` [załącznik: ${m.zalacznik.nazwa ?? "plik"}]` : "";
+      return `${kto}: ${m.tresc}${zal}`;
+    });
+    czesci.push(`ROZMOWA W SPRAWIE (od najstarszej):\n${linie.join("\n")}`);
+  }
+
+  if (d.zwrotId) {
+    const z = db()
+      .prepare("SELECT referencja, status, waybill FROM zwrot WHERE id = ?")
+      .get(d.zwrotId) as { referencja: string | null; status: string; waybill: string } | undefined;
+    const pozycje = db()
+      .prepare(
+        `SELECT nazwa, ilosc, powod, powod_opis, decyzja, rekl_wynik, rekl_notatka, rekl_polka
+         FROM zwrot_pozycja WHERE zwrot_id = ?`
+      )
+      .all(d.zwrotId) as Array<Record<string, unknown>>;
+    const linie = pozycje.map((p) => {
+      const kawalki = [
+        `- ${p.nazwa} × ${p.ilosc}`,
+        p.powod ? `powód klienta: ${p.powod}${p.powod_opis ? ` (${p.powod_opis})` : ""}` : null,
+        p.decyzja ? `decyzja biura: ${p.decyzja}` : null,
+        p.rekl_wynik ? `werdykt reklamacji: ${p.rekl_wynik}` : null,
+        p.rekl_notatka ? `notatka werdyktu: ${p.rekl_notatka}` : null,
+        p.rekl_polka ? `towar leży na półce ${p.rekl_polka}` : null,
+      ].filter(Boolean);
+      return kawalki.join("; ");
+    });
+    czesci.push(
+      `POWIĄZANY ZWROT U NAS: ${z?.referencja ?? z?.waybill ?? d.zwrotId} · stan: ${z?.status ?? "?"}\n` +
+        (linie.length ? linie.join("\n") : "(bez pozycji)")
+    );
+  }
+
+  if (d.kupujacyLogin) {
+    const k = kontekstKlienta(d.kupujacyLogin, { dyskusjaId: d.id });
+    czesci.push(
+      `KLIENT ${d.kupujacyLogin}: wcześniejszych pytań ${k.pytania.length}, ` +
+        `zwrotów ${k.zwroty.length}, innych dyskusji ${k.dyskusje.length}.`
+    );
+  }
+
+  if (d.notatka) czesci.push(`NOTATKA BIURA (ustalenia): ${d.notatka}`);
+  return czesci.join("\n\n");
+}
+
+/**
+ * Szkic odpowiedzi w sprawie — na jawne kliknięcie, bez tickera. Wolumen jest
+ * mały, a stawka wysoka (formalny CLAIM); szkic starzeje się z każdą nową
+ * wiadomością klienta, więc automat produkowałby nieaktualne wersje na
+ * niezweryfikowanym jeszcze zasobie API.
+ */
+export async function generujSzkicDyskusji(id: number, autor: string): Promise<Dyskusja> {
+  if (aiTryb() === "wylaczone") {
+    throw new BladDyskusji(stanAI().opis, 400);
+  }
+  const d = szczegolDyskusji(id);
+  if (zamknietaLokalnie(d.status)) {
+    throw new BladDyskusji("Sprawa jest zamknięta — szkic nie ma komu odpowiedzieć", 409);
+  }
+  const wiadomosci = await allegroAdapter().wiadomosciDyskusji(d.allegroId);
+  const ostatniaKlienta = wiadomosci?.filter((m) => !m.odNas).at(-1)?.tresc ?? null;
+
+  const konfiguracja = pobierzKonfiguracje();
+  const wynik = await generujOdpowiedz({
+    /* Bez przykładów stylu pytań: rejestr dyskusji nie ma jeszcze własnego
+       korpusu wysłanych odpowiedzi, a wzorce z doboru części pasują tu słabo. */
+    system: zbudujSystem(konfiguracja.prompt, konfiguracja.fakty),
+    tekst: ostatniaKlienta ?? d.temat ?? "",
+    kontekst: kontekstDyskusji(d, wiadomosci),
+  });
+  db()
+    .prepare(
+      `UPDATE dyskusja
+          SET szkic_ai = ?, szkic_at = datetime('now'), odpowiedz = ?, edytowano = 0,
+              prowadzi = ?, prowadzi_at = datetime('now')
+        WHERE id = ?`
+    )
+    .run(wynik.odpowiedz, wynik.odpowiedz, autor, id);
+  logEvent("dyskusja_szkic", autor, null, { dyskusjaId: id, znakow: wynik.odpowiedz.length });
   return szczegolDyskusji(id);
 }
 
