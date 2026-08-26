@@ -342,6 +342,14 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
     "szczegolBezLinii",
     "zwrotPozycje",         // lista pozycji zwrotu (0.98.0)
     "zwrotDokumenty",       // blok korekty — stąd wyszło OCEŃ I ZLEĆ (0.98.0)
+    /* Trzy karty wglądu, które w 0.99.0 przejechały CAŁĄ ZAKŁADKĘ — ze
+       ZWROTÓW do ANALIZY. Nasłuch na karcie przeżyłby same przenosiny (jechał
+       z blokiem), ale nie przeżył CELU: klik w wiersz „co stoi teraz" otwiera
+       kosz, który został w zakładce pracy, więc obsługa musi stać nad kartą
+       i umieć przełączyć widok. */
+    "raportZwrotowKarta",
+    "statystykiKarta",
+    "czasyKarta",           // klik wiersza „co stoi teraz" (0.99.0)
   ];
   for (const id of zakazane) {
     assert.doesNotMatch(
@@ -360,7 +368,9 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
      (`#zwrotRozliczenie`) i zostawiło nasłuch za sobą. Ten wzorzec broni
      jedynie przed przeprowadzką całego bloku, a nie przed przeprowadzką
      przycisku — dlatego zwroty dołączyły do sekcji. */
-  for (const sekcja of ["pytanieSzczegol", "szczegol", "zwrotSzczegol", "zwrotKontekst"]) {
+  for (const sekcja of [
+    "pytanieSzczegol", "szczegol", "zwrotSzczegol", "zwrotKontekst", "widokAnaliza",
+  ]) {
     assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
     assert.match(
       html,
@@ -800,10 +810,11 @@ test("statystyki pytań nie jadą po dane, gdy nikt na nie nie patrzy", () => {
      pasek zakładek ogłasza od 0.74.1.
 
      Reguła obowiązuje dalej, tylko spełnia ją co innego. Wejście na PYTANIA
-     nie tyka już statystyk wcale, a ANALIZA pobiera WYŁĄCZNIE wybrany zakres —
-     ślad audytowy albo pytania, nigdy oba naraz. Gdyby `odswiezAnalize`
-     przestało rozgałęziać się na zakresie, każde wejście na ANALIZĘ ciągnęłoby
-     dwa komplety danych i nikt by tego nie zobaczył poza serwerem. */
+     nie tyka już statystyk wcale, a ANALIZA pobiera WYŁĄCZNIE wybrany zakres.
+     Gdyby `odswiezAnalize` przestało rozgałęziać się na zakresie, każde wejście
+     na ANALIZĘ ciągnęłoby komplet danych z każdego zakresu i nikt by tego nie
+     zobaczył poza serwerem. W 0.99.0 doszedł trzeci zakres — zwroty — więc
+     stawka tego rozgałęzienia urosła o trzy kolejne trasy. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
@@ -817,6 +828,15 @@ test("statystyki pytań nie jadą po dane, gdy nikt na nie nie patrzy", () => {
 
   assert.match(html, /function odswiezAnalize\(\)[\s\S]*?zakresAnalizy\(\) === "pytania"[\s\S]*?return odswiezStatystykiPytan\(\)/,
     "ANALIZA pobiera tylko wybrany zakres, nie oba naraz");
-  assert.match(html, /class="card zakresPytania"/, "karty pytań znają swój zakres");
-  assert.match(html, /class="card zakresAudyt"/, "karty śladu audytowego też");
+  assert.match(html, /function odswiezAnalize\(\)[\s\S]*?zakresAnalizy\(\) === "zwroty"[\s\S]*?return odswiezAnalizeZwrotow\(\)/,
+    "zakres zwrotów też ma własną gałąź, nie leci przy każdym wejściu");
+
+  /* Klasa zakresu, nie CAŁY atrybut `class`: układ karty (`pelna`) to inna
+     decyzja niż jej przynależność do zakresu i wolno ją zmieniać bez ruszania
+     tego testu. Do 0.99.0 wzorzec obejmował oba i wywrócił się na dopisaniu
+     jednego słowa, nie mówiąc nic o regule, której pilnuje. */
+  for (const klasa of ["zakresPytania", "zakresAudyt", "zakresZwroty"]) {
+    assert.match(html, new RegExp(`class="[^"]*\\b${klasa}\\b`),
+      `karty zakresu ${klasa} znają swój zakres`);
+  }
 });

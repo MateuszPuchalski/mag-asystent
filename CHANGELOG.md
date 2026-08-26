@@ -33,6 +33,76 @@ historii nie przepisujemy.
 
 ---
 
+## 0.99.0 — 26 sierpnia 2026
+
+**Analiza dostała warstwę treści i trzeci zakres.** Ostatnia zakładka po
+pytaniach (0.96.0), dostawach (0.97.0) i zwrotach (0.98.0).
+
+**Wgląd w zwroty wyprowadził się z zakładki pracy.** Raport procesu, statystyki
+i czasy obsługi były zwijanymi sekcjami na ZWROTACH, z własnym oknem. Teraz
+stoją w ANALIZIE pod zakresem „zwroty" — tą samą drogą, którą statystyki pytań
+przeszły w 0.96.0. Zakładka ZWROTY jest odtąd samą pracą: skan, kolejka, kosze,
+reklamacje, zapowiedzi. Konto Allegro zostaje przy niej, bo to stan połączenia,
+a nie liczba o pracy.
+
+**Okno przestało być w dwóch miejscach naraz.** Karta wglądu miała własny
+selektor okna obok czipów w pasku ANALIZY. To było jedyne miejsce w panelu,
+gdzie ta sama rzecz miała dwie kontrolki.
+
+**Słupki w tabelach.** Liczba w kolumnie mówi „trzydzieści cztery" i nie mówi,
+czy to dużo. Pasek robi porównanie z największą wartością w tej tabeli za
+czytelnika. Liczba zostaje pod paskiem — tabela bez odczytywalnych wartości
+przestaje być tabelą.
+
+**Do wydajności per osoba słupków nie ma i to jest decyzja.** Ta tabela jest
+monitoringiem pracowniczym, niesie podstawę prawną i osobne zdanie o tym, że
+zgłoszone wyjątki nie są miarą błędu. Pasek zamienia zestawienie w ranking
+i kasuje obie te ostrożności.
+
+**Zdanie interpretujące pod wykresami.** Który tydzień odstaje, ile razy wobec
+mediany pozostałych i jakie pytania w nim przeważały. Liczone, nie zmyślone:
+makieta pisała w tym miejscu o „sezonie kosiarek", a tego z bazy policzyć się
+nie da. Przy próbce zbyt cienkiej, żeby cokolwiek twierdzić, zdania po prostu
+nie ma — milczenie jest lepsze od zdania, które brzmi jak wniosek, a jest szumem.
+
+**„Dane do 26.08, 08:36" w pasku filtrów.** Liczone z najświeższego rekordu,
+nie z zegara serwera. Zegar mówiłby zawsze „przed chwilą", także wtedy, gdy
+synchronizacja z Allegro stanęła wczoraj.
+
+**Kolumna STAN przy najczęściej pytanych towarach.** Lista mówiła dotąd
+„pytają o to dwadzieścia razy" i nie mówiła, czy jest co sprzedać — a to dwa
+różne wnioski zakupowe. Towar spoza kartoteki ma myślnik, nie zero: „nie mamy
+ani sztuki" i „nie wiemy, o czym mowa" to dwie różne odpowiedzi.
+
+**Kolumna URZĄDZENIE przy pytaniach o towar spoza oferty.** Model maszyny był
+wyłuskiwany z pytania od dawna i nikt go w tej tabeli nie pokazywał.
+
+**Piąty kafel: potwierdzone dopasowania.** Jedyna liczba na tej karcie, która
+mówi o WIEDZY, a nie o tempie — potwierdzona para maszyna→część zostaje
+i skraca każde następne pytanie o tę samą maszynę. Ma autora, więc jako jedyny
+z przekrojów produktowych wchodzi pod filtr OSOBA.
+
+**Klauzula pod listą pytań spoza oferty.** Treści są dosłownymi cytatami
+z Centrum wiadomości — zestawienie mówi, do czego jest, zanim ktoś użyje go do
+czegoś innego.
+
+**Poprawione: wykres rozdymał się razem z kartą.** SVG skaluje się w całości,
+razem z wysokością i podpisami osi, więc wykres w karcie na pełną szerokość
+urósł do czterystu pikseli wysokości. Do 0.99.0 wszystkie pięć wykresów stało
+w wąskich kolumnach i nikt tego nie zobaczył.
+
+**Poprawione: przenosiny kart zgasiły zakładkę zwrotów.** Lista sterująca
+chowaniem kart przy otwartym zwrocie wskazywała na kartę, która właśnie
+wyjechała do ANALIZY — a `hidden` na `null` wywala całą zakładkę. Klik w wiersz
+„co stoi teraz" prowadzi teraz przez granicę zakładek: przełącza widok na
+ZWROTY i dopiero tam otwiera kosz albo sprawę.
+
+**Ziarno scenariuszy: dziewięć pytań zamiast czterech.** Cztery stały w jednym
+tygodniu i opisywały stany sprawy. Wykres tygodni, słupki proporcji i zdanie
+o szczycie potrzebują rozrzutu w czasie — bez niego nie dało się zobaczyć, czy
+w ogóle działają. Ta sama luka, przez którą skrzynka pytań stała pusta
+do 0.96.0. Doszły scenariusze S75 i S76.
+
 ## 0.98.0 — 26 sierpnia 2026
 
 **Zwroty dostały warstwę treści**, po pytaniach (0.96.0) i dostawach (0.97.0).

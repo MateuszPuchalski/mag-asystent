@@ -858,3 +858,45 @@ w kartotece, więc sprawa ma znacznik „poza ofertą".
 Wejdź w `/biuro` → **ANALIZA** i ustaw zakres na pytania klientów. Lista
 „pytali o towar spoza naszej oferty" ma pokazać ten wiersz z rozpoznanym
 urządzeniem. To jest najtańszy research asortymentu, jaki firma ma.
+
+### S75 — wykres tygodni, słupki i zdanie o szczycie
+
+Ziarno rozkłada dziewięć pytań na dwa miesiące, a nie na jeden dzień. Bez tego
+rozrzutu wykres tygodni pokazywał jeden słupek, a wszystkie paski proporcji
+w tabeli towarów były jednakowej długości.
+
+Wejdź w `/biuro` → **ANALIZA**, zakres pytania klientów, okno **90 dni**.
+
+Tabela „najczęściej pytane towary" ma mieć pasek przy każdej liczbie. Pasek
+najdłuższy należy do pierwszego wiersza — skalą jest największa wartość w tej
+tabeli, nie żaden próg z góry. Obok stoi kolumna **STAN**. Towar spoza
+kartoteki ma w niej myślnik, nie zero: to dwie różne odpowiedzi.
+
+Pod wykresem tygodni stoi zdanie o szczycie. Mówi, który tydzień odstaje i ile
+razy wobec mediany pozostałych. Sprawdź, czy liczba w zdaniu zgadza się
+z najwyższym słupkiem. Zdanie znika, gdy szczyt nie odstaje — to jest
+zamierzone, a nie brak danych.
+
+Przełącz okno na **30 dni**. Zdanie ma zniknąć albo się zmienić, bo próbka
+jest wtedy krótsza. Kafel „potwierdzonych dopasowań" ma spaść.
+
+Ustaw **OSOBA** na Jana Kowalskiego. Zmienić mają się cztery kafle: wysłane,
+mediana, udział bez poprawki i potwierdzone dopasowania. Tabela towarów,
+kategorie i tygodnie zostają dla całego biura — mówi o tym zdanie pod kaflami.
+
+### S76 — wgląd w zwroty stoi w analizie
+
+Do 0.99.0 raport procesu, statystyki i czasy obsługi były zwijanymi sekcjami
+na zakładce ZWROTY, z własnym oknem. Wgląd stał w zakładce pracy, wbrew
+podziałowi, który pasek zakładek ogłasza.
+
+Wejdź w `/biuro` → **ZWROTY**. Ma tu zostać sama praca: skan, kolejka, kosze,
+reklamacje, zapowiedzi i karta konta Allegro. Kart z liczbami nie ma.
+
+Wejdź w **ANALIZA** i ustaw zakres na zwroty. Trzy karty mają stać jedna pod
+drugą, rozwinięte. Czip OKNA rządzi statystykami i czasami; raport procesu
+mówi wprost, że jego nie dotyczy — liczy stan, nie okno.
+
+W karcie „czasy obsługi" kliknij wiersz w tabeli „co stoi teraz". Panel ma
+przełączyć się na zakładkę ZWROTY i otworzyć ten kosz albo ten zwrot. Kliknięcie
+prowadzi przez granicę zakładek i to jest cała trudność tej przeprowadzki.

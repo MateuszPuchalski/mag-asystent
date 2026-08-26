@@ -389,6 +389,17 @@ export interface AnalizaAudytu {
   }>;
   /** Raport per osoba — patrz obowiązek formalny przy `raportWydajnosci`. */
   wydajnosc: RaportWydajnosci;
+  /**
+   * Dzień szczytowy i jego tło, pod zdanie interpretujące nad wykresem.
+   * `null`, gdy próbka jest za cienka, żeby cokolwiek twierdzić.
+   */
+  szczyt: { data: string; pozycje: number; medianaPozostalych: number } | null;
+  /**
+   * Najświeższe zdarzenie, które zestawienie obejmuje. Pasek filtrów pisze
+   * z tego „Dane do…"; zegar serwera powiedziałby tylko, że zapytanie właśnie
+   * poszło, a to zdanie ma mówić, czy kolektory dosyłają.
+   */
+  daneDo: string | null;
 }
 
 /** Mediana z tablicy; null dla pustej — brak danych to nie zero. */
@@ -516,5 +527,34 @@ export function analiza(days = 7): AnalizaAudytu {
     szukania: { top, bezWynikow },
     urzadzenia,
     wydajnosc: raportWydajnosci(days),
+    szczyt: szczytDnia([...poDniu.values()]),
+    daneDo:
+      (d.prepare("SELECT MAX(created_at) AS ost FROM events").get() as { ost: string | null })
+        .ost ?? null,
+  };
+}
+
+/**
+ * Dzień szczytowy wobec mediany pozostałych — materiał na jedno zdanie.
+ *
+ * Ta sama zasada, co przy tygodniach pytań (`wyliczSzczyt`, services/pytania.ts):
+ * zwracamy FAKTY, a nie interpretację. Skąd szczyt się wziął, wie człowiek,
+ * który tam był; liczba wie tylko, że odstaje.
+ *
+ * `null` przy próbce krótszej niż trzy dni, przy samych zerach i wtedy, gdy
+ * szczyt nie odstaje od reszty — zdanie o szczycie, który niczym się nie
+ * wyróżnia, zajmuje miejsce wniosku, nie będąc nim.
+ */
+function szczytDnia(dni: DzienAnalizy[]): AnalizaAudytu["szczyt"] {
+  if (dni.length < 3) return null;
+  const szczyt = dni.reduce((a, b) => (b.pozycje > a.pozycje ? b : a));
+  if (szczyt.pozycje === 0) return null;
+  const reszta = mediana(dni.filter((x) => x !== szczyt).map((x) => x.pozycje));
+  if (reszta == null) return null;
+  if (reszta > 0 && szczyt.pozycje < reszta * 1.5) return null;
+  return {
+    data: szczyt.data,
+    pozycje: szczyt.pozycje,
+    medianaPozostalych: Math.round(reszta * 10) / 10,
   };
 }
