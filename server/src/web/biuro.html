@@ -1365,6 +1365,7 @@
             <option value="audyt">Ślad audytowy</option>
             <option value="pytania">Pytania klientów</option>
             <option value="zwroty">Zwroty</option>
+            <option value="dostawy">Dostawy</option>
           </select>
         </div>
         <!-- OSOBA dotyczy WYŁĄCZNIE pytań: ślad audytowy ma własny rozbiór per
@@ -1517,6 +1518,46 @@
       <h2 style="margin-top:18px">TEMPO ROZKŁADANIA PER OSOBA</h2>
       <p class="mute" id="czasyPodstawa" style="margin-bottom:8px"></p>
       <table id="czasyLudzie"></table>
+    </section>
+
+    <!-- ── ZAKRES: DOSTAWY ─────────────────────────────────────────────────
+         Czwarty zakres i jedyny, który nie powstał z przenosin. Trzy pozostałe
+         miały swoje liczby już policzone gdzie indziej; zakładka DOSTAWY nie
+         miała ANI JEDNEJ karty wglądu, a jedyne liczby o dostawcy stały
+         w kontekście otwartej faktury — po jednym dostawcy naraz.
+
+         Pytanie brzmi „U KOGO SĄ PROBLEMY" i do 0.100.0 panel odpowiadał na nie
+         tylko przez otwieranie faktur po kolei. -->
+    <section class="card pelna zakresDostawy" hidden>
+      <h2>DOSTAWY W OKNIE</h2>
+      <div class="kafle" id="dostawyKafle"></div>
+
+      <h2 style="margin-top:18px">DOSTAWCY · GDZIE SIĘ PSUJE</h2>
+      <!-- Sortowanie po UDZIALE, nie po liczbie dostaw, i to jest cała treść
+           tej tabeli. Dostawca z dwiema fakturami i połową pozycji do
+           wyjaśnienia jest ważniejszy od tego z czterdziestoma bez ani jednej;
+           kolejność po liczbie zepchnęłaby go na dół. -->
+      <p class="mute" style="margin-bottom:8px">
+        Najpierw ci z największym udziałem pozycji do wyjaśnienia, a nie ci
+        z największą liczbą dostaw. Mediana czasu liczy się z dostaw rozłożonych
+        u nas — te zdjęte poza WERTIS wchodzą do liczby, ale nie do czasu.
+      </p>
+      <table id="dostawyDostawcy"></table>
+    </section>
+
+    <section class="card pelna zakresDostawy" hidden>
+      <h2>NAJCZĘSTSZE WYJĄTKI</h2>
+      <p class="mute" style="margin-bottom:8px">
+        Liczone po dacie zgłoszenia, nie po dacie domknięcia dostawy. Otwarte
+        i rozwiązane osobno — to dwie różne wiadomości: ile się psuje i ile
+        biuro nadąża domykać.
+      </p>
+      <table id="dostawyWyjatki"></table>
+
+      <h2 style="margin-top:18px">DOSTAWY PER TYDZIEŃ
+        <span class="mute">· tydzień z zerem zostaje na osi</span></h2>
+      <div id="dostawyTygodnie" style="margin-top:6px"></div>
+      <p class="mute" id="dostawySzczyt" style="margin-top:12px"></p>
     </section>
 
     <section class="card zakresAudyt">
@@ -2563,11 +2604,14 @@ function rysujMetryki(m) {
  * bezwzględną. Liczba zostaje pod słupkiem: pasek mówi o proporcji i milczy
  * o skali, a tabela bez odczytywalnych wartości przestaje być tabelą.
  */
-function komorkaSlupka(ile, max) {
-  const proc = max > 0 ? Math.max(2, Math.round((ile / max) * 100)) : 0;
+function komorkaSlupka(ile, max, etykieta) {
+  /* Podłoga 2% jest po to, żeby wartość MAŁA, ale niezerowa, dalej rysowała
+     kreskę — inaczej „1 przy stu" wygląda jak zero. Samo zero nie ma prawa jej
+     dostać: pusty tor to jedyna rzecz, którą można odczytać jako „nic". */
+  const proc = max > 0 && ile > 0 ? Math.max(2, Math.round((ile / max) * 100)) : 0;
   return `<td class="zeSlupkiem">
     <div class="slupek"><i style="width:${proc}%"></i></div>
-    <div class="mute" style="margin-top:3px">${ile}</div>
+    <div class="mute" style="margin-top:3px">${esc(etykieta ?? ile)}</div>
   </td>`;
 }
 
@@ -2603,6 +2647,15 @@ function zdanieOSzczycie(szczyt, co, nazwijOs, rzeczownik, ogon) {
 /** Liczba po polsku: przecinek dziesiętny, bez zbędnego „,0". */
 const liczbaPl = (n) =>
   n == null ? "—" : String(Number.isInteger(n) ? n : n).replace(".", ",");
+
+/**
+ * Liczba dni z właściwą końcówką. Ułamek idzie do dopełniacza liczby
+ * pojedynczej — „1,2 dnia", nie „1,2 dni" — bo połowa dnia nie jest dniami.
+ */
+const dniPl = (n) =>
+  n == null
+    ? "—"
+    : `${liczbaPl(n)} ${Number.isInteger(n) ? odmiana(n, ["dzień", "dni", "dni"]) : "dnia"}`;
 
 /** Dzień jako „26.08" — tak, jak w makiecie i jak czyta go człowiek. */
 const dzienSkrot = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
@@ -2720,10 +2773,12 @@ const zakresAnalizy = () => $("zakresAnalizy").value;
    czip spoza zbioru wyglądałby na wybrany, a serwer liczyłby swoje domyślne
    i kafel mówiłby „w 90 dniach" przy zaznaczonym „7 dni". Tak było przez
    pierwszą godzinę życia tego paska. */
-const OKNA_ANALIZY = { audyt: [7, 30, 90], pytania: [30, 90, 180], zwroty: [30, 90, 180] };
+const OKNA_ANALIZY = {
+  audyt: [7, 30, 90], pytania: [30, 90, 180], zwroty: [30, 90, 180], dostawy: [30, 90, 180],
+};
 
 /** Które okno wybrać, gdy poprzednie nie mieści się w nowym zakresie. */
-const OKNO_DOMYSLNE = { audyt: 7, pytania: 90, zwroty: 90 };
+const OKNO_DOMYSLNE = { audyt: 7, pytania: 90, zwroty: 90, dostawy: 90 };
 
 /** Zakresy, które mają trasę CSV. Reszta chowa przycisk zamiast pobierać cudzy plik. */
 const ZAKRESY_Z_CSV = ["audyt"];
@@ -2778,6 +2833,7 @@ async function odswiezAnalize() {
      które nikt nie patrzy. Zmienił się mechanizm, nie reguła. */
   if (zakresAnalizy() === "pytania") return odswiezStatystykiPytan();
   if (zakresAnalizy() === "zwroty") return odswiezAnalizeZwrotow();
+  if (zakresAnalizy() === "dostawy") return odswiezAnalizeDostaw();
 
   try {
     rysujAnalize(await (await api(`/api/analiza?days=${dniAnalizy}`)).json());
@@ -2787,6 +2843,86 @@ async function odswiezAnalize() {
   // kandydaci mają własną trasę — i własny try/catch, żeby błąd jednej sekcji
   // nie gasił drugiej. Reguły, którymi się ich liczy, stoją za zębatką.
   odswiezKandydatow();
+}
+
+/**
+ * Zakres DOSTAWY — jedna trasa, dwie karty.
+ *
+ * Jedyny zakres, którego liczb nikt wcześniej nie liczył: `statystykiDostawcy`
+ * daje trzy liczby dla JEDNEGO dostawcy, na kartę otwartej faktury. Tutaj
+ * chodzi o zestawienie po wszystkich naraz — inaczej „u kogo są problemy"
+ * sprawdza się przez otwieranie faktur po kolei.
+ */
+async function odswiezAnalizeDostaw() {
+  try {
+    const d = (await (await api(`/api/biuro/dostawy/analiza?dni=${dniAnalizy}`)).json()).analiza;
+    rysujAnalizeDostaw(d);
+    ustawDaneDo(d.daneDo);
+  } catch (e) {
+    $("dostawyKafle").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
+    ustawDaneDo(null);
+  }
+}
+
+function rysujAnalizeDostaw(a) {
+  $("dostawyKafle").innerHTML = [
+    kafel(a.zamknietych,
+      `${odmiana(a.zamknietych, ["dostawa domknięta", "dostawy domknięte", "dostaw domkniętych"])
+       } w ${a.dni} dniach`),
+    kafel(a.pozycjiRozlozonych,
+      odmiana(a.pozycjiRozlozonych, ["pozycja rozłożona", "pozycje rozłożone", "pozycji rozłożonych"])),
+    kafel(a.medianaDni == null ? "—" : dniPl(a.medianaDni), "mediana czasu rozłożenia"),
+    /* Bursztyn od 10%: nie próg z ustawy, tylko wartość, przy której warto
+       spojrzeć na dostawcę. Ten sam próg co przy wskaźniku zwrotów. */
+    kafel(a.udzialWyjatkow == null ? "—" : `${liczbaPl(a.udzialWyjatkow)}%`,
+      "pozycji z wyjątkiem", a.udzialWyjatkow != null && a.udzialWyjatkow >= 10),
+    /* Bez czerwieni: zamknięcie poza WERTIS jest legalną drogą, nie wpadką.
+       Czerwony kafel robiłby z niej zarzut wobec tego, kto ją wybrał. */
+    kafel(a.pozaWertis, "z tego poza WERTIS"),
+  ].join("");
+
+  const maxUdzial = Math.max(...a.dostawcy.map((x) => x.udzialWyjatkow ?? 0), 0);
+  $("dostawyDostawcy").innerHTML = !a.dostawcy.length
+    ? '<tr><td class="mute">Żadna dostawa nie domknęła się w tym oknie.</td></tr>'
+    : "<tr><th>DOSTAWCA</th><th>DOSTAW</th><th>POZYCJI</th><th>Z WYJĄTKIEM</th><th>MEDIANA</th></tr>" +
+      a.dostawcy.map((x) => `<tr>
+          <td class="b">${esc(x.dostawca)}</td>
+          <td>${x.dostaw}</td>
+          <td class="mute">${x.pozycji}</td>
+          ${x.udzialWyjatkow == null
+            ? '<td><span class="mute">—</span></td>'
+            : komorkaSlupka(x.udzialWyjatkow, maxUdzial, `${liczbaPl(x.udzialWyjatkow)}%`)}
+          <td>${x.medianaDni == null
+            ? '<span class="mute">—</span>'
+            : esc(dniPl(x.medianaDni))}</td>
+        </tr>`).join("");
+
+  /* Skala słupków to największa liczba ZGŁOSZEŃ w tabeli, licząc obie kolumny
+     razem — inaczej dwie kolumny miałyby dwie różne skale i pasek „otwarte"
+     przy jednym typie byłby dłuższy od „rozwiązane" przy innym mimo mniejszej
+     liczby. Jedna skala na tabelę albo żadna. */
+  const maxWyjatkow = Math.max(
+    ...a.wyjatki.flatMap((w) => [w.otwartych, w.rozwiazanych]), 0
+  );
+  $("dostawyWyjatki").innerHTML = !a.wyjatki.length
+    ? '<tr><td class="mute">Nikt nie zgłosił wyjątku w tym oknie.</td></tr>'
+    : "<tr><th>WYJĄTEK</th><th>OTWARTE</th><th>ROZWIĄZANE</th></tr>" +
+      a.wyjatki.map((w) => `<tr>
+          <td class="b">${esc(w.nazwa)}</td>
+          ${komorkaSlupka(w.otwartych, maxWyjatkow)}
+          ${komorkaSlupka(w.rozwiazanych, maxWyjatkow)}
+        </tr>`).join("");
+
+  $("dostawyTygodnie").innerHTML = slupkiSvg(
+    a.tygodnie.map((t) => ({ ile: t.ile, podpis: "t" + t.tydzien.slice(-2), tytul: `tydzień ${t.tydzien}` })),
+    a.tygodnie.length > 12 ? 4 : 1
+  );
+  $("dostawySzczyt").innerHTML = zdanieOSzczycie(
+    a.szczyt,
+    "ile",
+    a.szczyt ? "w tygodniu " + a.szczyt.tydzien.slice(-2) : "",
+    odmiana(a.szczyt?.ile ?? 0, ["dostawa", "dostawy", "dostaw"])
+  );
 }
 
 /**

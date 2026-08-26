@@ -33,6 +33,62 @@ historii nie przepisujemy.
 
 ---
 
+## 0.100.0 — 26 sierpnia 2026
+
+**Czwarty zakres ANALIZY: dostawy.** Warstwa treści jest tym samym skończona
+na wszystkich sześciu zakładkach.
+
+**Jedyny zakres, który nie powstał z przenosin.** Pytania, zwroty i ślad
+audytowy miały swoje liczby policzone gdzie indziej — chodziło o to, żeby
+stanęły tam, gdzie ich miejsce. Zakładka DOSTAWY nie miała ani jednej karty
+wglądu, a jedyne liczby o dostawcy stały w kontekście otwartej faktury, po
+jednym dostawcy naraz.
+
+**Pytanie brzmi „u kogo się psuje".** Do tego wydania panel odpowiadał na nie
+przez otwieranie faktur po kolei i czytanie kafla dostawcy w każdej z osobna.
+
+**Tabela dostawców sortuje po UDZIALE, nie po liczbie dostaw.** Dostawca
+z dwiema fakturami i połową pozycji do wyjaśnienia jest ważniejszy od tego
+z czterdziestoma bez ani jednej. Kolejność po liczbie zepchnęłaby go na dół,
+czyli schowała dokładnie ten wniosek, po który się tu przychodzi.
+
+**Dostawa zdjęta poza WERTIS wchodzi do liczby, nie do mediany czasu.** Ta sama
+reguła co przy kaflu dostawcy: przyszła i ktoś się nią zajął, ale nikt jej
+tutaj nie rozkładał, więc nie ma czego zmierzyć. Kolumna mediany ma przy niej
+myślnik, a kafel „z tego poza WERTIS" nie jest czerwony — to legalna droga,
+nie wpadka.
+
+**Wyjątki liczą się po dacie zgłoszenia, nie po dacie domknięcia dostawy.**
+Zgłoszenie sprzed dwóch miesięcy na fakturze domkniętej wczoraj opisuje tamten
+tydzień. Otwarte i rozwiązane w osobnych kolumnach, ze wspólną skalą słupków:
+dwie skale robiłyby dłuższy pasek przy mniejszej liczbie.
+
+**Nowa trasa `/api/biuro/dostawy/analiza` stoi za bramką biura**, choć dane nie
+są imienne. Powód jest inny niż przy śladzie audytowym: to ocena kontrahenta,
+którą wnosi się na rozmowę handlową.
+
+**Poprawione: zerowa wartość rysowała kreskę.** Słupek miał podłogę 2%, żeby
+„jeden przy stu" nie wyglądał jak zero — i przez to samo zero też rysowało
+kreskę. Pusty tor jest jedyną rzeczą, którą można odczytać jako „nic".
+
+**[wymaga działania] Numer wersji APK zmienił wzór.** `versionCode` liczył się
+jako `major × 10 000 + minor × 100 + patch`, więc setny minor dawał 10 000 —
+dokładnie tyle, co przyszłe `1.0.0`. Gorzej: serwer odrzucał plik z członem
+powyżej 99, czyli `wertis-kolektor-0.100.0.apk` przestałby być widoczny dla
+kolektorów **bez ani jednego błędu w logu**. Zapas podniesiony do 999 po obu
+stronach naraz — w `android/app/build.gradle.kts` i w `services/aktualizacja.ts`.
+Nowe kody są większe od wszystkich starych (0.99.0: 9 900 → 99 000), więc
+urządzenia w terenie przyjmą aktualizację normalnie. **Zbuduj nowy APK po tej
+zmianie**: plik zbudowany przed nią niesie stary, niższy `versionCode`.
+
+**Ziarno scenariuszy: osiem domkniętych dostaw zamiast jednej.** Jedna, u
+jednego dostawcy, w jednym tygodniu, wystarczała do opisania POJEDYNCZEJ
+sprawy. Zestawienie potrzebuje czterech dostawców, sześciu tygodni i jednej
+dostawy zdjętej poza WERTIS — inaczej nie widać ani sortowania, ani reguły
+o medianie. Trzeci raz ta sama lekcja, po pytaniach w 0.96.0 i wykresie
+tygodni w 0.99.0: ekran zestawień trzeba zasiać inaczej niż ekran sprawy.
+Doszedł scenariusz S77.
+
 ## 0.99.0 — 26 sierpnia 2026
 
 **Analiza dostała warstwę treści i trzeci zakres.** Ostatnia zakładka po

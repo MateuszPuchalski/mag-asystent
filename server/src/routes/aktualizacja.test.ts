@@ -62,7 +62,7 @@ test("jeden plik: wersja z nazwy, rozmiar i suma z pliku", async () => {
   const r = await info();
   const j = r.json();
   assert.equal(j.wersja, "0.48.0");
-  assert.equal(j.kodWersji, 4800);
+  assert.equal(j.kodWersji, 48_000);
   assert.equal(j.bajtow, fs.statSync(p).size);
   assert.equal(j.sha256, crypto.createHash("sha256").update(UDAJE_APK).digest("hex"));
 });
@@ -99,11 +99,26 @@ test("pusty plik jest ignorowany", async () => {
   assert.equal((await info()).json().wersja, null);
 });
 
-test("człon wersji powyżej 99 jest odrzucany, a nie zwijany do sąsiedniej wersji", async () => {
-  // 0.47.100 i 0.48.0 dają ten sam kod — kolizja czytałaby się jako „ta sama
+test("człon wersji powyżej 999 jest odrzucany, a nie zwijany do sąsiedniej wersji", async () => {
+  // 0.47.1000 i 0.48.0 dają ten sam kod — kolizja czytałaby się jako „ta sama
   // wersja", czyli aktualizacja znikałaby po cichu
-  polozApk("wertis-kolektor-0.47.100.apk");
+  polozApk("wertis-kolektor-0.47.1000.apk");
   assert.equal((await info()).json().wersja, null);
+});
+
+test("setny minor ma swój kod, a nie kod następnego majora", async () => {
+  /* Granica przekroczona przy wydaniu 0.100.0 i to jest cały powód tego testu.
+     Przy zapasie 99 `0.100.0` dawało 10 000 — dokładnie tyle, co `1.0.0` —
+     a strażnik `minor > 99` odrzucał ten plik, więc kolektory przestałyby
+     widzieć aktualizację BEZ ANI JEDNEGO błędu. Wzór musi zostać zgodny
+     z `kodWersji` w `android/app/build.gradle.kts`; rozjazd znaczy, że serwer
+     poda plik, którego Android odmówi zainstalować. */
+  polozApk("wertis-kolektor-0.100.0.apk");
+  const j = (await info()).json();
+  assert.equal(j.wersja, "0.100.0");
+  assert.equal(j.kodWersji, 100_000, "setny minor ma własny kod");
+  assert.ok(j.kodWersji < 1_000_000, "i jest MNIEJSZY niż 1.0.0");
+  assert.ok(j.kodWersji > 99_000, "a WIĘKSZY niż 0.99.0 — Android przyjmie go jako nowszy");
 });
 
 test("obie trasy odpowiadają BEZ sesji", async () => {

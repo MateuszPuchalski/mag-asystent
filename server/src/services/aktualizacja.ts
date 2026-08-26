@@ -48,13 +48,21 @@ export function katalogApk(): string {
  * `versionCode` niż zainstalowany, więc serwer musi porządkować pliki tak samo,
  * jak zrobi to Android.
  *
- * Człon powyżej 99 odrzucamy. `0.47.100` i `0.48.0` dają ten sam wynik, a taka
- * kolizja czyta się jako „ta sama wersja" — czyli aktualizacja po cichu znika
+ * Człon powyżej 999 odrzucamy. Kolizja („0.47.1000" i „0.48.0" dawałyby ten sam
+ * wynik) czyta się jako „ta sama wersja", czyli aktualizacja po cichu znika
  * zamiast być błędna głośno.
+ *
+ * ZAPAS PODNIESIONY Z 99 DO 999 przy wydaniu 0.100.0 i to nie jest kosmetyka.
+ * Przy starym mnożniku `0.100.0` dawało 10 000 — dokładnie tyle, co `1.0.0` —
+ * a `0.101.0` przebijało `1.0.0`. Gorzej: ten strażnik odrzucał wtedy minor
+ * setny, więc plik `wertis-kolektor-0.100.0.apk` PRZESTAŁBY być widoczny dla
+ * kolektorów i aktualizacja zniknęłaby bez śladu. Nowe kody są większe od
+ * wszystkich starych (0.99.0: 9 900 → 99 000), więc Android przyjmuje je jako
+ * nowsze i przejście przez tę granicę niczego nie psuje.
  */
 export function kodWersji(major: number, minor: number, patch: number): number | null {
-  if (minor > 99 || patch > 99) return null;
-  return major * 10_000 + minor * 100 + patch;
+  if (minor > 999 || patch > 999) return null;
+  return major * 1_000_000 + minor * 1_000 + patch;
 }
 
 /* Suma z kilkunastu megabajtów liczona przy KAŻDYM pytaniu kolektora byłaby

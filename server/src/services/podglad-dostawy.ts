@@ -10,8 +10,8 @@ import {
   TERMINAL_LINE,
 } from "./delivery.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
-import { listByDelivery } from "./problems.js";
-import type { ProblemView } from "../types.js";
+import { listByDelivery, PROBLEM_TYPES_LABELS } from "./problems.js";
+import type { ProblemType, ProblemView } from "../types.js";
 
 /* ── Podgląd dokumentu dla biura (0.36.0) ────────────────────────────────────
    Podgląd pod `/biuro` pokazywał dostawy jako płaską tabelę z paskiem postępu.
@@ -241,6 +241,224 @@ export function statystykiDostawcy(
         ) / 10
       : null,
   };
+}
+
+/* ── Analiza dostaw (0.100.0) ────────────────────────────────────────────────
+   Czwarty zakres zakładki ANALIZA. Trzy pozostałe powstały z PRZENOSIN — ich
+   liczby były już gdzieś liczone i chodziło o to, żeby stanęły tam, gdzie
+   ich miejsce. Ten nie: zakładka DOSTAWY nie miała ani jednej karty wglądu,
+   a `statystykiDostawcy` wyżej liczy trzy liczby dla JEDNEGO dostawcy, na
+   potrzeby kontekstu otwartej sprawy.
+
+   Pytanie, na które ta funkcja odpowiada, brzmi „U KOGO SĄ PROBLEMY" — i dziś
+   panel nie umie na nie odpowiedzieć inaczej niż przez otwieranie faktur po
+   kolei i patrzenie na kafel dostawcy w każdej z osobna.
+
+   Wszystko z tabel, które już są: `delivery`, `delivery_line`, `problem`.  */
+
+export interface AnalizaDostaw {
+  dni: number;
+  /** Zamknięte W OKNIE — `done` i `external` razem, bo obie są załatwione. */
+  zamknietych: number;
+  /** Z tego zdjęte z listy bez ani jednego skanu. */
+  pozaWertis: number;
+  pozycjiRozlozonych: number;
+  /** Udział pozycji z wyjątkiem, w procentach; null bez pozycji w oknie. */
+  udzialWyjatkow: number | null;
+  /** Mediana dni od otwarcia do zamknięcia; null bez próbki. */
+  medianaDni: number | null;
+  dostawcy: Array<{
+    dostawca: string;
+    dostaw: number;
+    pozycji: number;
+    udzialWyjatkow: number | null;
+    medianaDni: number | null;
+  }>;
+  wyjatki: Array<{ typ: string; nazwa: string; otwartych: number; rozwiazanych: number }>;
+  tygodnie: Array<{ tydzien: string; ile: number }>;
+  szczyt: { tydzien: string; ile: number; medianaPozostalych: number } | null;
+  daneDo: string | null;
+}
+
+/** Mediana z tablicy liczb, zaokrąglona do dziesiątych; null dla pustej. */
+function medianaDni(liczby: number[]): number | null {
+  if (liczby.length === 0) return null;
+  const s = [...liczby].sort((a, b) => a - b);
+  const i = Math.floor(s.length / 2);
+  const m = s.length % 2 === 1 ? s[i] : (s[i - 1] + s[i]) / 2;
+  return Math.round(m * 10) / 10;
+}
+
+export function analizaDostaw(dni: number): AnalizaDostaw {
+  const d = db();
+  const odKiedy = `-${dni} days`;
+
+  /* `external` (rozłożone poza WERTIS) wchodzi do LICZBY dostaw, a nie do
+     mediany czasu — ta sama reguła i to samo uzasadnienie co przy
+     `statystykiDostawcy`: przyszła i ktoś się nią zajął, ale nikt jej tutaj
+     nie rozkładał, więc nie ma czasu rozłożenia do zmierzenia. */
+  const zamkniete = d
+    .prepare(
+      `SELECT status, (julianday(closed_at) - julianday(opened_at)) AS dni
+         FROM delivery
+        WHERE status IN ('done','external') AND closed_at >= datetime('now', ?)`
+    )
+    .all(odKiedy) as Array<{ status: string; dni: number }>;
+
+  const czasy = zamkniete
+    .filter((w) => w.status === "done")
+    .map((w) => w.dni)
+    .filter((n) => Number.isFinite(n) && n >= 0);
+
+  const linie = d
+    .prepare(
+      `SELECT COUNT(*) AS wszystkie,
+              SUM(CASE WHEN l.status = 'problem' THEN 1 ELSE 0 END) AS zWyjatkiem,
+              SUM(CASE WHEN l.status IN ('done','partial') THEN 1 ELSE 0 END) AS rozlozone
+         FROM delivery_line l JOIN delivery dd ON dd.id = l.delivery_id
+        WHERE dd.closed_at >= datetime('now', ?)`
+    )
+    .get(odKiedy) as {
+    wszystkie: number;
+    zWyjatkiem: number | null;
+    rozlozone: number | null;
+  };
+
+  /* Dostawcy JEDNYM zapytaniem, nie `statystykiDostawcy` w pętli. Ta pętla
+     robiłaby trzy zapytania na dostawcę, a przy dwudziestu dostawcach to
+     sześćdziesiąt zapytań na jedno wejście na zakładkę. Dopasowanie po
+     `delivery.dostawca` — nazwa przepisana w chwili otwarcia — dokładnie
+     tak samo jak wyżej, więc obie liczby mówią o tym samym zbiorze. */
+  const poDostawcy = d
+    .prepare(
+      `SELECT dd.dostawca AS dostawca,
+              COUNT(DISTINCT dd.id) AS dostaw,
+              COUNT(l.id) AS pozycji,
+              SUM(CASE WHEN l.status = 'problem' THEN 1 ELSE 0 END) AS zWyjatkiem
+         FROM delivery dd LEFT JOIN delivery_line l ON l.delivery_id = dd.id
+        WHERE dd.dostawca IS NOT NULL AND dd.closed_at >= datetime('now', ?)
+        GROUP BY dd.dostawca`
+    )
+    .all(odKiedy) as Array<{
+    dostawca: string;
+    dostaw: number;
+    pozycji: number;
+    zWyjatkiem: number | null;
+  }>;
+
+  const czasyDostawcy = new Map<string, number[]>();
+  for (const w of d
+    .prepare(
+      `SELECT dostawca, (julianday(closed_at) - julianday(opened_at)) AS dni
+         FROM delivery
+        WHERE dostawca IS NOT NULL AND status = 'done'
+          AND closed_at >= datetime('now', ?)`
+    )
+    .all(odKiedy) as Array<{ dostawca: string; dni: number }>) {
+    if (!Number.isFinite(w.dni) || w.dni < 0) continue;
+    czasyDostawcy.set(w.dostawca, [...(czasyDostawcy.get(w.dostawca) ?? []), w.dni]);
+  }
+
+  const dostawcy = poDostawcy
+    .map((w) => ({
+      dostawca: w.dostawca,
+      dostaw: w.dostaw,
+      pozycji: w.pozycji,
+      udzialWyjatkow: w.pozycji
+        ? Math.round(((w.zWyjatkiem ?? 0) / w.pozycji) * 1000) / 10
+        : null,
+      medianaDni: medianaDni(czasyDostawcy.get(w.dostawca) ?? []),
+    }))
+    /* Malejąco po UDZIALE wyjątków, nie po liczbie dostaw: karta odpowiada na
+       „u kogo są problemy", a dostawca z dwiema dostawami i połową pozycji do
+       wyjaśnienia jest ważniejszy od tego z czterdziestoma bez ani jednej. */
+    .sort((a, b) => (b.udzialWyjatkow ?? -1) - (a.udzialWyjatkow ?? -1) || b.dostaw - a.dostaw);
+
+  /* Wyjątki liczą się po DACIE ZGŁOSZENIA, nie po dacie zamknięcia dostawy:
+     zgłoszenie sprzed dwóch miesięcy na dostawie domkniętej wczoraj opisuje
+     tamten tydzień, nie ten. Otwarte i rozwiązane osobno, bo to dwie różne
+     wiadomości — ile się psuje i ile biuro nadąża domykać. */
+  const wyjatki = (
+    d
+      .prepare(
+        `SELECT typ,
+                SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS otwartych,
+                SUM(CASE WHEN resolved_at IS NOT NULL THEN 1 ELSE 0 END) AS rozwiazanych
+           FROM problem WHERE created_at >= datetime('now', ?)
+          GROUP BY typ ORDER BY COUNT(*) DESC`
+      )
+      .all(odKiedy) as Array<{ typ: string; otwartych: number | null; rozwiazanych: number | null }>
+  ).map((w) => ({
+    typ: w.typ,
+    nazwa: PROBLEM_TYPES_LABELS[w.typ as ProblemType] ?? w.typ,
+    otwartych: w.otwartych ?? 0,
+    rozwiazanych: w.rozwiazanych ?? 0,
+  }));
+
+  /* Tygodnie z KALENDARZA, nie z danych — tydzień bez ani jednej domkniętej
+     dostawy ma zostać na osi jako zero. Ten sam zabieg co przy pytaniach
+     i zwrotach; wykres z dziurami czyta się jako błąd danych. */
+  const liczby = new Map(
+    (
+      d
+        .prepare(
+          `SELECT strftime('%Y-%W', closed_at) AS tydzien, COUNT(*) AS ile
+             FROM delivery
+            WHERE status IN ('done','external') AND closed_at >= datetime('now', ?)
+            GROUP BY tydzien`
+        )
+        .all(odKiedy) as Array<{ tydzien: string; ile: number }>
+    ).map((w) => [w.tydzien, w.ile])
+  );
+  const tygodnie = (
+    d
+      .prepare(
+        `WITH RECURSIVE kalendarz(dzien) AS (
+           SELECT date('now', ?)
+           UNION ALL SELECT date(dzien, '+1 day') FROM kalendarz WHERE dzien < date('now')
+         )
+         SELECT DISTINCT strftime('%Y-%W', dzien) AS tydzien FROM kalendarz ORDER BY tydzien`
+      )
+      .all(odKiedy) as Array<{ tydzien: string }>
+  ).map((w) => ({ tydzien: w.tydzien, ile: liczby.get(w.tydzien) ?? 0 }));
+
+  return {
+    dni,
+    zamknietych: zamkniete.length,
+    pozaWertis: zamkniete.filter((w) => w.status === "external").length,
+    pozycjiRozlozonych: linie.rozlozone ?? 0,
+    udzialWyjatkow: linie.wszystkie
+      ? Math.round(((linie.zWyjatkiem ?? 0) / linie.wszystkie) * 1000) / 10
+      : null,
+    medianaDni: medianaDni(czasy),
+    dostawcy,
+    wyjatki,
+    tygodnie,
+    szczyt: szczytTygodnia(tygodnie),
+    daneDo:
+      (d.prepare("SELECT MAX(closed_at) AS ost FROM delivery").get() as { ost: string | null })
+        .ost ?? null,
+  };
+}
+
+/**
+ * Tydzień szczytowy wobec mediany pozostałych — materiał na jedno zdanie.
+ *
+ * Ta sama zasada i te same progi, co przy pytaniach (`wyliczSzczyt`,
+ * services/pytania.ts) i przy śladzie audytowym (`szczytDnia`,
+ * services/raporty.ts): zwracamy FAKTY, nie interpretację, a przy próbce zbyt
+ * cienkiej — `null`, i wtedy zdania nie ma wcale.
+ */
+function szczytTygodnia(
+  tygodnie: Array<{ tydzien: string; ile: number }>
+): AnalizaDostaw["szczyt"] {
+  if (tygodnie.length < 3) return null;
+  const szczyt = tygodnie.reduce((a, b) => (b.ile > a.ile ? b : a));
+  if (szczyt.ile === 0) return null;
+  const reszta = medianaDni(tygodnie.filter((t) => t !== szczyt).map((t) => t.ile));
+  if (reszta == null) return null;
+  if (reszta > 0 && szczyt.ile < reszta * 1.5) return null;
+  return { tydzien: szczyt.tydzien, ile: szczyt.ile, medianaPozostalych: reszta };
 }
 
 /**

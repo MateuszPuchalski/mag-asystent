@@ -221,6 +221,7 @@ export const KATALOG: Scenariusz[] = [
   { id: "S74", obszar: "pytania", tytul: "Pytanie o towar spoza oferty — jedyne źródło listy braków", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\"" },
   { id: "S75", obszar: "pytania", tytul: "Wykres tygodni, słupki proporcji i zdanie o szczycie — pytania rozłożone na dwa miesiące", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\" → okno 90 dni" },
   { id: "S76", obszar: "zwroty", tytul: "Wgląd w zwroty stoi w ANALIZIE, nie w zakładce pracy", wejscie: "/biuro → ANALIZA → zakres „zwroty\"" },
+  { id: "S77", obszar: "dostawy", tytul: "Analiza dostaw: u kogo się psuje, i dostawa zdjęta poza WERTIS", wejscie: "/biuro → ANALIZA → zakres „dostawy\"" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -430,6 +431,8 @@ export interface Podsumowanie {
   sprzedaz: number;
   przyjecia: number;
   pytania: number;
+  /** Domknięte dostawy historyczne pod zakres DOSTAWY w ANALIZIE (0.100.0). */
+  historiaDostaw: number;
 }
 
 /**
@@ -450,7 +453,7 @@ export function zbudujScenariusze(): Podsumowanie {
   const licz = {
     towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
     konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
-    sprzedaz: 0, przyjecia: 0, pytania: 0,
+    sprzedaz: 0, przyjecia: 0, pytania: 0, historiaDostaw: 0,
   };
 
   const wszystkieTowary = [...TOWARY, ...DROBNICA];
@@ -474,6 +477,7 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.sprzedaz = sprzedazDemo();
     licz.przyjecia = przyjeciaDemo();
     licz.pytania = pytaniaDemo();
+    licz.historiaDostaw = historiaDostaw();
     logoDostawcow();
   })();
 
@@ -851,6 +855,104 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
   }
 
   return { dostaw: idDostaw.size, linii, idDostaw };
+}
+
+/* ── Historia domkniętych dostaw (S77) ──────────────────────────────────────
+   Ziarno miało JEDNĄ domkniętą dostawę, u jednego dostawcy, w jednym tygodniu.
+   Do 0.99.0 nikomu to nie przeszkadzało: panel pokazywał dostawy po jednej,
+   w kontekście otwartej faktury. Zakres DOSTAWY w ANALIZIE (0.100.0) zadaje
+   pytanie „u kogo się psuje" — a na to jedna dostawa nie odpowiada wcale:
+   tabela dostawców miała jeden wiersz, wykres tygodni jeden słupek, a udziału
+   wyjątków nie dało się z niczym porównać.
+
+   Ta sama luka, przez którą skrzynka pytań stała pusta do 0.96.0, a wykres
+   tygodni pokazywał jeden słupek do 0.99.0. Trzeci raz ta sama lekcja: ekran
+   zestawień trzeba zasiać INACZEJ niż ekran pojedynczej sprawy.
+
+   Jedna z dostaw ma status `external` — zdjęta z listy bez ani jednego skanu.
+   Ma wejść do LICZBY dostaw i NIE wejść do mediany czasu, i to jest jedyny
+   sposób, żeby tę regułę zobaczyć na ekranie.                                */
+
+/** Pierwszy `dok_id` historycznych dostaw; sprząta je ten sam próg `DOK_OD`. */
+const DOK_HISTORIA_OD = 9_100;
+
+function historiaDostaw(): number {
+  const d = db();
+  const insDok = d.prepare(
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, w_buforze)
+     VALUES (?,?,?,?,?,?,0)`
+  );
+  const insDostawa = d.prepare(
+    `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, status,
+                          opened_at, closed_at, closed_by, powod_zamkniecia, source_mag_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
+  );
+  const insLinia = d.prepare(
+    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok,
+                               ilosc_odlozona, lok_oczekiwana, lok_faktyczna, status, done_at, done_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  );
+  const wszystkie = new Map([...TOWARY, ...DROBNICA].map((t) => [t.twId, t]));
+
+  /* [dostawca, dni wstecz, godzin rozkładania, pozycji, z wyjątkiem, poza WERTIS]
+     Udziały wyjątków dobrane tak, żeby tabela miała CO sortować: IMPORT
+     SHANGHAI wychodzi najgorzej mimo najmniejszej liczby dostaw i to jest
+     dokładnie wniosek, którego ta karta ma dostarczać. */
+  const HISTORIA: Array<[string, number, number, number, number, boolean]> = [
+    ["STIHL Polska", 6, 20, 8, 0, false],
+    ["STIHL Polska", 13, 26, 10, 1, false],
+    ["STIHL Polska", 27, 18, 6, 0, false],
+    ["HUSQVARNA", 9, 44, 12, 2, false],
+    ["HUSQVARNA", 21, 30, 9, 1, false],
+    ["IMPORT SHANGHAI", 16, 96, 6, 3, false],
+    ["IMPORT SHANGHAI", 34, 120, 4, 2, false],
+    ["FALON-TECH", 41, 0, 5, 0, true],
+  ];
+
+  const twIds = [...wszystkie.keys()].slice(0, 12);
+  let ile = 0;
+  HISTORIA.forEach(([dostawca, dniWstecz, godzin, pozycji, zWyjatkiem, poza], i) => {
+    const dokId = DOK_HISTORIA_OD + i;
+    const data = dzien(-dniWstecz);
+    const numer = `${TYP_DOSTAWY} ${dokId}/${mmrrrr(data)}`;
+    insDok.run(dokId, TYP_DOSTAWY, numer, data, MAG, dostawca);
+
+    const otwarto = chwila(-dniWstecz * 1440);
+    const id = Number(
+      insDostawa.run(
+        dokId, numer, dostawca, data,
+        poza ? "external" : "done",
+        otwarto,
+        chwila(-dniWstecz * 1440 + godzin * 60),
+        poza ? "Biuro (scenariusze)" : "Jan Kowalski",
+        /* Powód jest WYMAGANY przy zamknięciu poza WERTIS — to jedyna operacja
+           zdejmująca dostawę z listy bez skanu, więc pole „dlaczego" jest tu
+           całym dowodem. Ziarno bez niego opisywałoby stan nieosiągalny. */
+        poza ? "Rozłożone bezpośrednio z palety przy rampie" : null,
+        MAG
+      ).lastInsertRowid
+    );
+
+    for (let j = 0; j < pozycji; j++) {
+      const twId = twIds[j % twIds.length];
+      const t = wszystkie.get(twId);
+      const lok = (t?.lok ?? "").split(" ")[0] || null;
+      const problem = j < zWyjatkiem;
+      /* Dostawa zdjęta poza WERTIS nie ma ANI JEDNEGO skanu — jej pozycje
+         zostają `todo`. Wpisanie im `done` byłoby wpisaniem pracy, której nikt
+         w tej aplikacji nie wykonał, a to jest cała różnica między `external`
+         a `done` (patrz komentarz przy `delivery.status`). */
+      const status = poza ? "todo" : problem ? "problem" : "done";
+      insLinia.run(
+        id, twId, t?.symbol ?? String(twId), t?.nazwa ?? "", 4,
+        status === "done" ? 4 : 0, lok, status === "done" ? lok : null, status,
+        status === "done" ? chwila(-dniWstecz * 1440 + godzin * 30) : null,
+        status === "done" ? "Jan Kowalski" : null
+      );
+    }
+    ile++;
+  });
+  return ile;
 }
 
 /* ── Wyjątki ────────────────────────────────────────────────────────────────
@@ -1617,6 +1719,7 @@ function wypisz(licz: Podsumowanie): void {
   console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
   console.log(`[scenariusze] sprzedaż pod zwroty Allegro: dokumentów=${licz.sprzedaz}`);
   console.log(`[scenariusze] przyjęcia na regał zwrotów (kosze z kartką): ${licz.przyjecia}`);
+  console.log(`[scenariusze] domknięte dostawy historyczne (analiza dostaw): ${licz.historiaDostaw}`);
   console.log(`[scenariusze] pytania klientów w skrzynce: ${licz.pytania}`);
   console.log("");
   let obszar = "";

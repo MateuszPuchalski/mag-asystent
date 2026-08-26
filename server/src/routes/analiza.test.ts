@@ -44,8 +44,13 @@ function zalogowany(rola: Rola): string {
   return token;
 }
 
+/* Analiza dostaw (0.100.0) dzieli tę bramkę, choć jej dane nie są imienne.
+   Powód jest inny i wypisany przy trasie: karta odpowiada na „u którego
+   dostawcy jest problem", a to ocena kontrahenta, nie stan magazynu. */
+const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza"];
+
 test("bez sesji 401 — dane o ludziach nie mają prawa być otwarte", async () => {
-  for (const url of ["/api/analiza", "/api/analiza/csv"]) {
+  for (const url of CHRONIONE) {
     const r = await app.inject({ method: "GET", url });
     assert.equal(r.statusCode, 401, url);
   }
@@ -53,7 +58,7 @@ test("bez sesji 401 — dane o ludziach nie mają prawa być otwarte", async () 
 
 test("magazynier dostaje 403 — analiza jest dla biura", async () => {
   const token = zalogowany("magazynier");
-  for (const url of ["/api/analiza", "/api/analiza/csv"]) {
+  for (const url of CHRONIONE) {
     const r = await app.inject({ method: "GET", url, headers: { "x-session": token } });
     assert.equal(r.statusCode, 403, url);
   }
@@ -75,6 +80,34 @@ test("biuro dostaje komplet sekcji", async () => {
   assert.ok(a.szukania);
   assert.ok(Array.isArray(a.urzadzenia));
   assert.match(a.wydajnosc.podstawaPrawna, /Kodeks pracy/, "podstawa prawna jedzie z danymi");
+});
+
+test("analiza dostaw: komplet sekcji i własny zbiór okien", async () => {
+  const token = zalogowany("biuro");
+  const czytaj = async (q: string) =>
+    (
+      await app.inject({
+        method: "GET",
+        url: `/api/biuro/dostawy/analiza${q}`,
+        headers: { "x-session": token },
+      })
+    ).json().analiza;
+
+  const a = await czytaj("?dni=30");
+  assert.equal(a.dni, 30);
+  assert.ok(Array.isArray(a.dostawcy));
+  assert.ok(Array.isArray(a.wyjatki));
+  assert.ok(Array.isArray(a.tygodnie));
+  assert.ok("udzialWyjatkow" in a && "medianaDni" in a && "pozaWertis" in a);
+
+  /* Zbiór okien jest INNY niż przy śladzie audytowym i to jest cała treść tego
+     sprawdzenia: 7 dni jest tu poprawnym wejściem, a nie ma go w zbiorze, więc
+     trasa musi podstawić własne domyślne 90. Gdyby milcząco przyjęła 7, czip
+     „7 dni" w pasku wyglądałby na wybrany przy liczbach z innego okna —
+     dokładnie tak rozjechało się okno pytań w 0.96.0. */
+  assert.equal((await czytaj("?dni=7")).dni, 90, "okno spoza zbioru wraca do 90");
+  assert.equal((await czytaj("?dni=180")).dni, 180);
+  assert.equal((await czytaj("")).dni, 90, "brak parametru to też 90");
 });
 
 test("śmieciowe okno wraca do 7 dni, nie wywraca", async () => {
