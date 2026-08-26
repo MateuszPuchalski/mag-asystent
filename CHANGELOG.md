@@ -33,6 +33,31 @@ historii nie przepisujemy.
 
 ---
 
+## 0.102.0 — 26 sierpnia 2026
+
+**Skrzynka na zero mówi teraz, KIEDY ostatnio pytaliśmy Allegro.** Ostatnia
+rzecz z makiety `Stany`, której panel nie miał.
+
+**Zero na ekranie znaczyło dwie różne rzeczy naraz.** „Nic nie czeka na
+odpowiedź" wygląda identycznie, gdy dziś nikt nie napisał, i gdy od wczoraj
+nikt nie kliknął ODŚWIEŻ. Pierwsze jest dobrą wiadomością, drugie cichą awarią
+procesu — a rozróżnienia nie było jak zrobić.
+
+**Liczby z pobrania leciały w toast i ginęły razem z nim.** Po odświeżeniu
+strony nie zostawał po nich ślad. Teraz stoją pod przyciskiem: „Ostatnio: dziś
+14:02 · nowych 3 · przejrzano 12 rozmów".
+
+**Ślad powstaje ZAWSZE, także przy zerze nowych** — i to jest cała treść tej
+zmiany. Zdarzenie `pytanie_sync` w audycie leci dalej tylko przy nowych
+pytaniach i słusznie: przebieg bez zmian nie jest faktem o towarze ani
+o ludziach. Ale ekran biura pyta o co innego — „czy ktoś dziś w ogóle pytał" —
+i na to zdarzenie nie odpowiada.
+
+**W pamięci, nie w bazie**, dokładnie jak ślad tickera zapowiedzi zwrotów.
+Restart serwera kasuje go i to jest poprawne: „nie wiem, kiedy ostatnio
+pytaliśmy" jest wtedy prawdą, a nie brakiem danych do odzyskania. Zdanie
+wskazuje wtedy przycisk, zamiast milczeć.
+
 ## 0.101.1 — 26 sierpnia 2026
 
 **Poprawka wpisu, nie kodu.** Wydanie 0.101.0 zamyka warstwę treści i ostatnią

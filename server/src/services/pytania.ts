@@ -1,4 +1,4 @@
-import { db } from "../db/db.js";
+import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
@@ -322,7 +322,41 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
   if (nowych > 0) {
     logEvent("pytanie_sync", autor, null, { nowych, przejrzanychWatkow: watki.length });
   }
+  /* Ślad przebiegu zapisujemy ZAWSZE, także gdy nic nie przyszło — bo to
+     właśnie wtedy jest potrzebny. Zdarzenie w audycie leci tylko przy nowych
+     pytaniach i słusznie: przebieg bez zmian nie jest faktem o towarze ani
+     o ludziach. Ale skrzynka na zero wygląda identycznie, gdy nic nie
+     przyszło, i gdy od wczoraj nikt nie pytał Allegro — a to dwie zupełnie
+     różne sytuacje. */
+  stanSynchronizacji = {
+    at: nowIso(),
+    przez: autor,
+    nowych,
+    przejrzanychWatkow: watki.length,
+  };
   return { nowych, przejrzanychWatkow: watki.length };
+}
+
+/**
+ * Ślad ostatniego pobrania pytań z Allegro — na ekran biura.
+ *
+ * W PAMIĘCI, nie w bazie, dokładnie jak `stanOdswiezania` przy zapowiedziach
+ * zwrotów (`services/zapowiedzi.ts`). Restart serwera go kasuje i to jest
+ * poprawne: „nie wiem, kiedy ostatnio pytaliśmy" jest prawdą po restarcie,
+ * a nie brakiem danych do odzyskania. Tabela kosztowałaby migrację i zapis
+ * przy każdym przebiegu tickera za wiedzę, która i tak starzeje się w minuty.
+ */
+export interface StanSynchronizacjiPytan {
+  at: string;
+  przez: string;
+  nowych: number;
+  przejrzanychWatkow: number;
+}
+
+let stanSynchronizacji: StanSynchronizacjiPytan | null = null;
+
+export function stanSynchronizacjiPytan(): StanSynchronizacjiPytan | null {
+  return stanSynchronizacji;
 }
 
 /* ── Kontekst dla modelu ─────────────────────────────────────────────────── */

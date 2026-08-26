@@ -245,6 +245,44 @@ test("statystyki wracają w umówionym oknie, także na pustej bazie", async () 
   assert.deepEqual(r.json().statystyki.pozaOferta, []);
 });
 
+test("ślad pobrania zostaje także wtedy, gdy nic nie przyszło", async () => {
+  /* Skrzynka na zero wygląda IDENTYCZNIE w dwóch zupełnie różnych sytuacjach:
+     dziś nikt nie napisał, albo od wczoraj nikt nie pytał Allegro. Zdarzenie
+     w audycie ich nie rozróżnia i nie powinno — przebieg bez zmian nie jest
+     faktem o towarze ani o ludziach, więc `pytanie_sync` leci tylko przy
+     nowych pytaniach. Ślad przebiegu to co innego: stan w pamięci, który ma
+     powstać ZAWSZE, bo odpowiada na pytanie „czy ktoś dziś w ogóle pytał".
+
+     Ten test pilnuje właśnie tego drugiego pobrania — pierwsze zwraca nowe
+     pytania i ślad powstałby nawet przy starej regule. */
+  const naglowki = { "x-session": zalogowany("biuro") };
+  const czytaj = async () =>
+    (await app.inject({ method: "GET", url: "/api/biuro/pytania/licznik", headers: naglowki }))
+      .json().synchronizacja;
+
+  const pierwsze = await app.inject({
+    method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: naglowki,
+  });
+  assert.ok(pierwsze.json().nowych > 0, "pierwszy przebieg coś przynosi");
+  const poPierwszym = await czytaj();
+  assert.ok(poPierwszym, "ślad powstaje");
+  assert.equal(poPierwszym.nowych, pierwsze.json().nowych);
+  assert.ok(poPierwszym.przejrzanychWatkow > 0, "liczba przejrzanych rozmów jedzie ze śladem");
+
+  /* DRUGI przebieg na tych samych danych: `INSERT OR IGNORE` nie doda nic,
+     więc `nowych` wynosi zero — i dokładnie tu stara reguła gubiła ślad. */
+  const drugie = await app.inject({
+    method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: naglowki,
+  });
+  assert.equal(drugie.json().nowych, 0, "drugi przebieg nie ma czego dodać");
+  const poDrugim = await czytaj();
+  assert.ok(poDrugim,
+    "ślad zostaje MIMO zera — inaczej ekran nie odróżni pustej skrzynki od braku pobrania");
+  assert.equal(poDrugim.nowych, 0);
+  assert.ok(poDrugim.at >= poPierwszym.at, "znacznik czasu przesuwa się na drugi przebieg");
+  assert.ok(poDrugim.przejrzanychWatkow > 0);
+});
+
 test("nieznane pytanie to 404, nie 500", async () => {
   const r = await app.inject({
     method: "GET", url: "/api/biuro/pytania/9999", headers: { "x-session": zalogowany("biuro") },
