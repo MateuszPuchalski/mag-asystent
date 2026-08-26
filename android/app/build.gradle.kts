@@ -24,12 +24,19 @@ val wersjaMonorepo: String = run {
 /* Android wymaga rosnącej liczby całkowitej, inaczej instalacja nowszego APK
    nad starszym zostanie odrzucona jako „downgrade". Wyliczamy ją z numeru
    wersji, żeby nie było DRUGIEJ rzeczy do pamiętania przy wydaniu.
-   0.4.0 → 400, 1.2.3 → 10203. Zapas przy patchu i minorze: 99. */
+   0.4.0 → 4 000, 1.2.3 → 1 002 003. Zapas przy patchu i minorze: 999.
+
+   ZAPAS PODNIESIONY Z 99 przy wydaniu 0.100.0. Przy starym mnożniku setny minor
+   dawał 10 000 — dokładnie tyle, co `1.0.0` — a `0.101.0` przebijało `1.0.0`.
+   Serwer liczy to samo w `services/aktualizacja.ts` i OBA wzory muszą być
+   zgodne: rozjazd znaczy, że serwer poda kolektorowi plik, którego Android
+   odmówi zainstalować. Nowe kody są większe od wszystkich starych, więc
+   przejście przez tę granicę niczego nie psuje na urządzeniach w terenie. */
 val kodWersji: Int = run {
     val (major, minor, patch) = (wersjaMonorepo.substringBefore('-').split('.') + listOf("0", "0"))
         .take(3)
         .map { it.toIntOrNull() ?: 0 }
-    major * 10_000 + minor * 100 + patch
+    major * 1_000_000 + minor * 1_000 + patch
 }
 
 /* ── Podpis wydania (0.52.0) ────────────────────────────────────────────────

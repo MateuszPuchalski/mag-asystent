@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { analiza, type AnalizaAudytu } from "../services/raporty.js";
+import { analizaDostaw } from "../services/podglad-dostawy.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
 import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
@@ -20,6 +21,21 @@ function dniZQuery(v: string | undefined): number {
   return n === 30 || n === 90 ? n : 7;
 }
 
+/**
+ * Okno zakresu DOSTAWY — inny zbiór niż ślad audytowy i to jest zamierzone.
+ *
+ * Ślad mierzy TEMPO PRACY i sensownie patrzy się na niego od tygodnia. Dostawa
+ * przyjeżdża co kilka dni, więc tydzień bywa w niej pusty, a mediana czasu
+ * rozłożenia z dwóch faktur nie mówi nic. Ta lista MUSI zgadzać się z
+ * `OKNA_ANALIZY.dostawy` w `web/biuro.html` — czip spoza zbioru wyglądałby na
+ * wybrany, a trasa liczyłaby po cichu swoje domyślne. Dokładnie tak rozjechało
+ * się okno pytań w 0.96.0.
+ */
+function dniDostaw(v: string | undefined): number {
+  const n = Number(v);
+  return n === 30 || n === 180 ? n : 90;
+}
+
 export async function analizaRoutes(app: FastifyInstance) {
   function odmowa(): { kod: number; error: string } | null {
     const s = sesjaZadania();
@@ -34,6 +50,21 @@ export async function analizaRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return analiza(dniZQuery(req.query.days));
+  });
+
+  /**
+   * Analiza dostaw (0.100.0) — czwarty zakres zakładki.
+   *
+   * Ta sama bramka co ślad audytowy, choć dane nie są imienne. Karta odpowiada
+   * na pytanie „u którego dostawcy jest problem", a to jest ocena kontrahenta:
+   * wniesie się ją na rozmowę handlową, nie na halę. Trasa mieszka tu, a nie
+   * w `routes/biuro.ts`, właśnie dla tej bramki — tamten plik jej nie ma, bo
+   * pokazuje to, co i tak widać na liście dostaw.
+   */
+  app.get<{ Querystring: { dni?: string } }>("/api/biuro/dostawy/analiza", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { analiza: analizaDostaw(dniDostaw(req.query.dni)) };
   });
 
   app.get<{ Querystring: { days?: string } }>("/api/analiza/csv", async (req, reply) => {

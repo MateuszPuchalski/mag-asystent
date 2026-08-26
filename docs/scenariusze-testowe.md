@@ -900,3 +900,30 @@ mówi wprost, że jego nie dotyczy — liczy stan, nie okno.
 W karcie „czasy obsługi" kliknij wiersz w tabeli „co stoi teraz". Panel ma
 przełączyć się na zakładkę ZWROTY i otworzyć ten kosz albo ten zwrot. Kliknięcie
 prowadzi przez granicę zakładek i to jest cała trudność tej przeprowadzki.
+
+### S77 — analiza dostaw: u kogo się psuje
+
+Ziarno zakłada osiem domkniętych dostaw u czterech dostawców, rozłożonych na
+sześć tygodni. Do 0.99.0 domknięta dostawa była jedna — a jedna nie odpowiada
+na pytanie „u kogo są problemy" wcale.
+
+Wejdź w `/biuro` → **ANALIZA**, zakres **dostawy**, okno **90 dni**.
+
+Tabela „dostawcy" jest posortowana po **udziale** pozycji z wyjątkiem, a nie po
+liczbie dostaw. IMPORT SHANGHAI ma stać na górze mimo najmniejszej liczby
+dostaw — to jest wniosek, którego ta karta ma dostarczać. Kolejność po liczbie
+zepchnęłaby go na dół.
+
+FALON-TECH ma dostawę zdjętą **poza WERTIS**. Sprawdź dwie rzeczy: wchodzi do
+liczby dostaw i **nie wchodzi** do mediany czasu, więc kolumna MEDIANA ma przy
+nim myślnik. Nikt tej dostawy tutaj nie rozkładał, więc nie ma czego zmierzyć.
+
+Kafel „z tego poza WERTIS" ma pokazać jeden i **nie ma być czerwony**:
+zamknięcie poza WERTIS jest legalną drogą, nie wpadką.
+
+Tabela „najczęstsze wyjątki" liczy po dacie zgłoszenia, nie po dacie domknięcia
+dostawy. Otwarte i rozwiązane mają wspólną skalę słupków — inaczej pasek przy
+jednym typie byłby dłuższy od paska przy innym mimo mniejszej liczby.
+
+Przełącz okno na **30 dni**. Dostawcy sprzed miesiąca mają zniknąć z tabeli,
+a mediana i udziały przeliczyć się na krótszym oknie.
