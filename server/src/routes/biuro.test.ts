@@ -308,8 +308,9 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "zwroty", "pytania", "nadzor", "dziennik", "analiza"],
-    "w pasku tylko zakładki pracy — dostawcy tu nie wracają"
+    ["dostawy", "sprawy", "zwroty", "pytania", "nadzor", "dziennik", "analiza"],
+    "w pasku tylko zakładki pracy — dostawcy tu nie wracają. SPRAWY (0.108.0) " +
+      "stoją PRZED dwiema zakładkami, które w następnym wydaniu zastąpią"
   );
 
   /* Dopasowanie idzie po ZAWARTOŚCI `grupa-btny`, nie po rozbiciu paska na
@@ -978,4 +979,38 @@ test("pytania: oferta z wiadomości i szkic AI jako wybór biura (0.107.0)", () 
   assert.match(html, /pytania\/auto-szkic/, "przełącznik zapisuje się od razu, bez ZAPISZ");
   assert.match(html, /PYTANIE O TĘ AUKCJĘ/, "nagłówek sprawy nazywa aukcję z wiadomości");
   assert.match(html, /AUKCJA ZAKOŃCZONA/, "znikła oferta to stan do pokazania, nie pusty nagłówek");
+});
+
+test("sprawy: jedna kolejka czterech rejestrów, karta klienta drugim poziomem (0.108.0)", () => {
+  /* Osią pracy jest SPRAWA, nie klient: kolejka odpowiada na „co mam teraz
+     zrobić?" jedną listą pytań, zwrotów, dyskusji i reklamacji. Karta
+     klienta (360) otwiera się klikiem w login — z kolejki albo z nagłówka
+     otwartej sprawy. Wszystko tu wyłącznie CZYTA: liczniki POST/PUT/DELETE
+     wyżej pilnują, że zakładka nie przemyciła żadnego zapisu. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /id="kolejkaSprawKarta"/, "kolejka spraw jest kartą sekcji");
+  assert.match(html, /api\(`\/api\/biuro\/sprawy\$\{q\}`\)/, "kolejka czyta agregat przez api()");
+  assert.match(html, /id="sprawyLicznik" class="tabLicznik"/, "pigułka na zakładce");
+  assert.match(html, /\/api\/biuro\/sprawy\/licznik/, "pigułka ma własną tanią trasę");
+  assert.match(html, /BEZ LOGINU/, "sprawy bez konta Allegro mają kubełek, nie nicość");
+  assert.match(html, /data-klient360/, "login jest wejściem do karty klienta");
+  assert.match(
+    html,
+    /\$\("kolejkaSprawKarta"\)\.addEventListener\("click"/,
+    "kolejka deleguje z poziomu sekcji"
+  );
+  assert.match(
+    html,
+    /\$\("klientSzczegol"\)\.addEventListener\("click"/,
+    "karta klienta deleguje z poziomu sekcji"
+  );
+  /* Powiązania: ciąg jednego problemu (zwrot → dyskusja → reklamacja) widać
+     z kontekstu sprawy; pobierane leniwie, po otwarciu — jak historia. */
+  assert.match(html, /POWIĄZANE SPRAWY/, "kontekst pokazuje ciąg jednej sprawy");
+  assert.match(html, /addEventListener\("toggle", pokazPowiazanePytania\)/, "leniwie przy pytaniu");
+  assert.match(html, /addEventListener\("toggle", pokazPowiazaneZwrotu\)/, "leniwie przy zwrocie");
+  assert.match(html, /REKLAMACJE TEGO KLIENTA/, "historia klienta zna czwarty rejestr");
 });

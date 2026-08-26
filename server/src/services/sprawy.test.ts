@@ -1,0 +1,215 @@
+import { test, before, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+/* ── Sprawy — jedna kolejka czterech rejestrów ───────────────────────────────
+   Trzy rzeczy do upilnowania:
+
+   1. KOMPLETNOŚĆ. Predykaty otwartości są przepisane z serwisów per-typ —
+      test porównuje liczby z tamtymi serwisami, żeby status dopisany
+      w jednym miejscu nie schował spraw z głównej kolejki.
+   2. PILNOŚĆ. Ustawowy termin (reklamacja, CLAIM) bije wiek: przeterminowana
+      reklamacja stoi przed najstarszym pytaniem bez terminu.
+   3. POWIĄZANIA. To samo zamówienie łączy mocniej niż ten sam login —
+      i nigdy nie pokazujemy sprawy samej sobie.                              */
+
+process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-spr-")), "t.db");
+process.env.SGT_MODE = "seeded";
+
+let db: typeof import("../db/db.js").db;
+let S: typeof import("./sprawy.js");
+let P: typeof import("./pytania.js");
+let D: typeof import("./dyskusje.js");
+let R: typeof import("./reklamacje.js");
+
+before(async () => {
+  ({ db } = await import("../db/db.js"));
+  S = await import("./sprawy.js");
+  P = await import("./pytania.js");
+  D = await import("./dyskusje.js");
+  R = await import("./reklamacje.js");
+});
+
+beforeEach(() => {
+  const d = db();
+  for (const t of ["dyskusja", "pytanie", "zwrot_pozycja", "zwrot"]) {
+    d.prepare(`DELETE FROM ${t}`).run();
+  }
+});
+
+const teraz = () => new Date().toISOString();
+const dniTemu = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+function pytanie(login: string | null, status = "nowe", otrzymano = teraz()): number {
+  return Number(
+    db()
+      .prepare(
+        `INSERT INTO pytanie(zrodlo, kupujacy_login, tresc, otrzymano_at, status,
+           produkty_json, utworzono_at, utworzono_przez)
+         VALUES ('allegro', ?, 'Czy pasuje?', ?, ?, '[]', ?, 'Test')`
+      )
+      .run(login, otrzymano, status, teraz()).lastInsertRowid
+  );
+}
+
+function zwrot(login: string | null, status = "nowy", orderId: string | null = null): number {
+  return Number(
+    db()
+      .prepare(
+        `INSERT INTO zwrot(kupujacy_login, waybill, status, allegro_order_id,
+           utworzono_allegro, utworzono_at, utworzono_przez)
+         VALUES (?, 'WB-1', ?, ?, ?, ?, 'Test')`
+      )
+      .run(login, status, orderId, teraz(), teraz()).lastInsertRowid
+  );
+}
+
+function reklamacja(zwrotId: number, wynik: string | null = null): number {
+  return Number(
+    db()
+      .prepare(
+        `INSERT INTO zwrot_pozycja(zwrot_id, nazwa, ilosc, decyzja, decyzja_at,
+           decyzja_przez, rekl_wynik)
+         VALUES (?, 'Pęknięty nóż', 1, 'reklamacja', ?, 'Test', ?)`
+      )
+      .run(zwrotId, teraz(), wynik).lastInsertRowid
+  );
+}
+
+function dyskusja(
+  login: string | null,
+  opts: { typ?: string; status?: string; orderId?: string | null; od?: string } = {}
+): number {
+  return Number(
+    db()
+      .prepare(
+        `INSERT INTO dyskusja(allegro_id, typ, status, temat, kupujacy_login,
+           order_id, utworzono_allegro, widziano_at, utworzono_at)
+         VALUES (?, ?, ?, 'Temat', ?, ?, ?, ?, ?)`
+      )
+      .run(
+        `iss-${Math.floor(Math.random() * 1e9)}`,
+        opts.typ ?? "DISCUSSION",
+        opts.status ?? "nowa",
+        login,
+        opts.orderId ?? null,
+        opts.od ?? teraz(),
+        teraz(),
+        teraz()
+      ).lastInsertRowid
+  );
+}
+
+/* ── Kolejka ───────────────────────────────────────────────────────────────── */
+
+test("kolejka widzi cztery rejestry i tylko sprawy otwarte", () => {
+  pytanie("jan", "nowe");
+  pytanie("jan", "wyslane"); // zamknięta — poza kolejką
+  const z = zwrot("jan", "nowy");
+  reklamacja(z);
+  reklamacja(z, "uznana"); // rozpatrzona — poza kolejką
+  dyskusja("jan", { status: "w_toku" });
+  dyskusja("jan", { status: "zamknieta" });
+  zwrot("ewa", "rozliczony"); // terminalna — poza kolejką
+
+  const sprawy = S.listaSpraw();
+  assert.deepEqual(
+    sprawy.map((s) => s.rodzaj).sort(),
+    ["dyskusja", "pytanie", "reklamacja", "zwrot"],
+    "po jednej otwartej sprawie każdego rodzaju"
+  );
+  assert.ok(sprawy.every((s) => s.otwarta));
+  // filtr rodzaju zawęża, nie przemyca innych typów
+  assert.deepEqual(S.listaSpraw("pytanie").map((s) => s.rodzaj), ["pytanie"]);
+});
+
+test("liczby kolejki równe serwisom per-typ — predykaty nie mogą dryfować", () => {
+  pytanie("jan", "nowe");
+  pytanie("ala", "szkic");
+  const z = zwrot("jan", "oceniony");
+  reklamacja(z);
+  dyskusja("ola", { typ: "CLAIM", status: "nowa" });
+
+  const sprawy = S.listaSpraw();
+  const rodzajow = (r: string) => sprawy.filter((s) => s.rodzaj === r).length;
+  assert.equal(rodzajow("pytanie"), P.licznikOtwartych());
+  assert.equal(rodzajow("dyskusja"), D.licznikDyskusji().nowe + D.licznikDyskusji().wToku);
+  assert.equal(rodzajow("reklamacja"), R.listaReklamacji().length);
+  assert.equal(S.licznikSpraw().otwartych, sprawy.length, "pigułka = długość kolejki");
+});
+
+test("ustawowy termin bije wiek: przeterminowany CLAIM przed starym pytaniem", () => {
+  pytanie("jan", "nowe", dniTemu(30)); // najstarsza sprawa, ale bez zegara
+  dyskusja("ola", { typ: "CLAIM", status: "nowa", od: dniTemu(20) }); // po terminie 14 dni
+  const z = zwrot("ewa", "nowy");
+  reklamacja(z); // termin za ~14 dni
+
+  const sprawy = S.listaSpraw();
+  assert.equal(sprawy[0].rodzaj, "dyskusja", "przeterminowany CLAIM na szczycie");
+  assert.equal(sprawy[0].poTerminie, true);
+  assert.equal(sprawy[1].rodzaj, "reklamacja", "termin przyszły przed brakiem terminu");
+  assert.equal(sprawy[2].rodzaj, "pytanie");
+  assert.equal(sprawy[2].dniDoTerminu, null);
+});
+
+/* ── Klient 360 ────────────────────────────────────────────────────────────── */
+
+test("Klient 360: aktywne po pilności, historia od najnowszej, kubełek bez loginu", () => {
+  pytanie("jan", "nowe");
+  pytanie("jan", "wyslane", dniTemu(5));
+  pytanie("jan", "zamkniete", dniTemu(2));
+  const z = zwrot("jan", "rozliczony");
+  reklamacja(z, "odrzucona");
+  // sprawy bez loginu — wklejka i zwrot ręczny
+  pytanie(null, "nowe");
+  zwrot(null, "nowy");
+
+  const jan = S.sprawyKlienta("jan");
+  assert.equal(jan.aktywne.length, 1);
+  assert.equal(jan.historia.length, 4);
+  assert.ok(
+    Date.parse(jan.historia[0].kiedy!) >= Date.parse(jan.historia.at(-1)!.kiedy!),
+    "historia od najnowszej"
+  );
+
+  const kubelek = S.sprawyKlienta(null);
+  assert.deepEqual(
+    kubelek.aktywne.map((s) => s.rodzaj).sort(),
+    ["pytanie", "zwrot"],
+    "sprawy bez klienta nie giną — mają wspólny kubełek"
+  );
+});
+
+/* ── Powiązania ────────────────────────────────────────────────────────────── */
+
+test("powiązania: to samo zamówienie mocniej niż ten sam login, bez samej siebie", () => {
+  const z = zwrot("jan", "nowy", "zam-1");
+  const rekl = reklamacja(z);
+  const dysk = dyskusja("jan", { status: "w_toku", orderId: "zam-1" });
+  pytanie("jan", "nowe"); // ten sam login, inne (nieznane) zamówienie
+  dyskusja("jan", { status: "w_toku", orderId: "zam-2" }); // inny problem tego klienta
+  dyskusja("obcy", { status: "w_toku", orderId: "zam-9" }); // cudza sprawa — niewidoczna
+
+  const p = S.powiazaneSprawy("dyskusja", dysk);
+  assert.deepEqual(
+    p.zamowienie.map((s) => `${s.rodzaj}:${s.id}`).sort(),
+    [`reklamacja:${rekl}`, `zwrot:${z}`],
+    "ciąg jednego zamówienia: zwrot i jego reklamacja"
+  );
+  assert.ok(
+    p.zamowienie.every((s) => !(s.rodzaj === "dyskusja" && s.id === dysk)),
+    "sprawa nie jest powiązana sama ze sobą"
+  );
+  assert.deepEqual(
+    p.klient.map((s) => s.rodzaj).sort(),
+    ["dyskusja", "pytanie"],
+    "reszta spraw loginu osobno, bez dubli z zamówienia"
+  );
+
+  /* Reklamacja nie pokazuje zwrotu-rodzica jako powiązania — UI i tak
+     otwiera ją przez ten zwrot, więc to byłby link do samego siebie. */
+  const zRekl = S.powiazaneSprawy("reklamacja", rekl);
+  assert.ok(zRekl.zamowienie.every((s) => !(s.rodzaj === "zwrot" && s.id === z)));
+});

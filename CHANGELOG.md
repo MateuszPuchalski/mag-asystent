@@ -33,6 +33,39 @@ historii nie przepisujemy.
 
 ---
 
+## 0.108.0 — 26 sierpnia 2026
+
+**SPRAWY: jedna kolejka obsługi klienta.** Pytania, zwroty, dyskusje Allegro
+i reklamacje to w backendzie osobne rejestry — i tak zostaje. Ale biuro nie
+pracuje w czterech modułach: pyta „co mam teraz zrobić?". Nowa zakładka
+SPRAWY odpowiada jedną listą wszystkich otwartych spraw, posortowaną po
+pilności: najpierw ustawowy termin (reklamacje i CLAIM-y, przeterminowane na
+górze), potem najstarsze. Chipy filtrują po typie, pigułka na zakładce liczy
+wszystko naraz. Klik otwiera sprawę w jej dotychczasowym szczególe;
+reklamacja otwiera swój zwrot, bo tam mieszkają jej akcje.
+
+- **Karta klienta (360) jako drugi poziom.** Klik w login — z kolejki albo
+  z nagłówka otwartej sprawy (pytania, zwrotu, dyskusji) — otwiera kartę ze
+  wszystkimi sprawami tej osoby: aktywne po pilności, historia od
+  najnowszej. Sprawy bez konta Allegro (wklejki z poczty, zwroty ręczne)
+  mają wspólny kubełek (BEZ LOGINU), żeby nic nie ginęło poza kolejką.
+- **POWIĄZANE SPRAWY w kontekście.** Zwrot, dyskusja i reklamacja bywają
+  odsłonami jednego problemu, choć Allegro trzyma je osobno. Kontekst
+  pytania i zwrotu dostaje zwijaną sekcję z ciągiem sprawy: najpierw to
+  samo zamówienie (mocny dowód), potem ten sam login (podpisany słabiej).
+  Pobierane po otwarciu, jak historia klienta.
+- **Historia klienta zna czwarty rejestr.** Reklamacje tego loginu były
+  jedyną rzeczą niewidoczną przy odpowiadaniu — teraz stoją obok pytań,
+  zwrotów i dyskusji.
+- **Wyłącznie odczyt.** Nowe trasy (`/api/biuro/sprawy*`) tylko czytają;
+  mutacje zostają przy rejestrach źródłowych. Licznik zakładki jest
+  składany z liczników per-typ, żeby liczby nie mogły się rozjechać.
+
+Zakładki ZWROTY ALLEGRO i PYTANIA KLIENTÓW na razie zostają — w następnym
+wydaniu ich karty przeprowadzą się do SPRAW, a same zakładki znikną.
+Bez zmian w kolektorze, bez nowych uprawnień Allegro i bez działania przy
+wdrożeniu.
+
 ## 0.107.0 — 26 sierpnia 2026
 
 **Trzy skargi z jednego dnia pracy na pytaniach klientów.**
