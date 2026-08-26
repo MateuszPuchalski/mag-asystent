@@ -1024,3 +1024,32 @@ test("sprawy: jedna kolejka czterech rejestrów, karta klienta drugim poziomem (
   assert.match(html, /addEventListener\("toggle", pokazPowiazaneZwrotu\)/, "leniwie przy zwrocie");
   assert.match(html, /REKLAMACJE TEGO KLIENTA/, "historia klienta zna czwarty rejestr");
 });
+
+test("świeżość sprawy: puls z naszej bazy i wysyłka za zgodą po dopisku (0.110.0)", () => {
+  /* Klient nie przestaje pisać, bo biuro ma jego sprawę na ekranie. Panel
+     pilnuje dwóch rzeczy BEZ ruchu do Allegro (audyt 0.109.1): puls czyta
+     co cykl trasę /sprawy/klient (SQLite), a kontrola świeżości przy
+     wysyłce to jedno zapytanie serwera W MOMENCIE wysyłki. „Wyślij mimo to"
+     jest świadomym kliknięciem po pokazaniu dopisków — nigdy domysłem. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /id="pytanieAlarm"/, "miejsce alarmu w pytaniu");
+  assert.match(html, /id="zwrotAlarm"/, "miejsce alarmu w zwrocie");
+  assert.match(html, /id="dyskusjaAlarm"/, "miejsce alarmu w dyskusji");
+  assert.match(html, /KLIENT DOPISAŁ/, "dopisek nazwany wprost");
+  assert.match(html, /NOWA SPRAWA KLIENTA/, "nowa sprawa nazwana wprost");
+  assert.match(html, /data-pytanie-wymus/, "wysyłka mimo dopisku jest jawnym przyciskiem");
+  assert.match(html, /data-pokaz-nowe/, "dopisek czyta się na klik, nie w tle");
+  assert.match(html, /ostatniaWidzianaId/, "dyskusja wysyła punkt odniesienia z ekranu");
+  assert.match(
+    html,
+    /sprawy\/klient\?login=/,
+    "puls chodzi po naszej bazie — nie po Allegro"
+  );
+  assert.ok(
+    !/setInterval[^)]*wiadomosci/.test(html),
+    "rozmowy nadal nie odpytują się cyklicznie — świeżość nie może wrócić rytmem maszyny"
+  );
+});

@@ -57,6 +57,23 @@ export class BladPytania extends Error {
   }
 }
 
+/**
+ * Wysyłka zatrzymana, bo klient dopisał coś, czego biuro nie widziało.
+ * Osobna klasa z ŁADUNKIEM: trasa oddaje nowe wiadomości w 409, panel je
+ * pokazuje i pyta człowieka — „wyślij mimo to" jest świadomą decyzją,
+ * nie domysłem maszyny.
+ */
+export class BladSwiezosci extends BladPytania {
+  constructor(readonly wiadomosci: WiadomoscAllegro[]) {
+    super(
+      "Klient dopisał nową wiadomość po powstaniu tej odpowiedzi — przeczytaj ją, " +
+        "zanim wyślesz.",
+      409
+    );
+    this.name = "BladSwiezosci";
+  }
+}
+
 export interface Pytanie {
   id: number;
   zrodlo: string;
@@ -79,6 +96,10 @@ export interface Pytanie {
   /** Kto wziął sprawę — znacznik dla reszty biura, nie blokada. */
   prowadzi: string | null;
   prowadziAt: string | null;
+  /** Ostatnia znana wiadomość klienta — punkt odniesienia kontroli świeżości. */
+  wiadomoscId: string | null;
+  /** Klient dopisał po zarejestrowaniu sprawy (stempluje sync); NULL = świeża. */
+  nowaWiadomoscAt: string | null;
 }
 
 /** Ile ostatnich poprawionych odpowiedzi pokazujemy modelowi jako wzór stylu. */
@@ -117,6 +138,8 @@ function zWiersza(w: Record<string, unknown>): Pytanie {
     urzadzenie: tekstLubNull(w.urzadzenie),
     prowadzi: tekstLubNull(w.prowadzi),
     prowadziAt: tekstLubNull(w.prowadzi_at),
+    wiadomoscId: tekstLubNull(w.wiadomosc_id),
+    nowaWiadomoscAt: tekstLubNull(w.nowa_wiadomosc_at),
     produkty,
     wOfercie: w.w_ofercie == null ? null : (w.w_ofercie as number) === 1,
   };
@@ -258,6 +281,8 @@ export function zapiszAutoSzkic(wlaczone: boolean, autor: string): KonfiguracjaA
 
 export interface WynikSynchronizacji {
   nowych: number;
+  /** Dopiski klientów do spraw już OTWARTYCH — aktualizacja, nie nowy wiersz. */
+  dopisanych: number;
   przejrzanychWatkow: number;
   /**
    * DLACZEGO wątek nie dał pytania — rozbicie, którego brak kosztował całą
@@ -335,6 +360,23 @@ export function ostatniaSeriaKupujacego(
   };
 }
 
+/**
+ * Co klient dopisał PO wiadomości, na której stoi sprawa. NULL = świeżo.
+ * Gdy znanej wiadomości nie ma w pobranym oknie (bardzo stara sprawa),
+ * uczciwie oddajemy całą rozmowę — lepiej pokazać za dużo niż wysłać ślepo.
+ */
+export function noweOdKlienta(
+  wiadomosci: WiadomoscAllegro[],
+  znanaWiadomoscId: string | null
+): WiadomoscAllegro[] | null {
+  const seria = ostatniaSeriaKupujacego(wiadomosci);
+  if (!seria || seria.id === znanaWiadomoscId) return null;
+  const znana = znanaWiadomoscId
+    ? wiadomosci.findIndex((w) => w.id === znanaWiadomoscId)
+    : -1;
+  return znana >= 0 ? wiadomosci.slice(znana + 1) : wiadomosci;
+}
+
 /** Jeden przebieg synchronizacji: nowe pytania z Centrum wiadomości. */
 export async function synchronizujPytania(autor: string): Promise<WynikSynchronizacji> {
   const adapter = allegroAdapter();
@@ -351,7 +393,25 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
      VALUES ('allegro', ?, ?, ?, ?, ?, ?, ?, 'nowe', '[]', datetime('now'), ?)`
   );
 
+  const otwarteWatku = db().prepare(
+    `SELECT id, wiadomosc_id FROM pytanie
+     WHERE thread_id = ? AND status IN ('nowe','szkic')
+     ORDER BY id DESC LIMIT 1`
+  );
+  /* Dopisek klienta do OTWARTEJ sprawy aktualizuje jej wiersz, nie zakłada
+     drugiego: dwa otwarte pytania z jednego wątku to dwie osoby piszące
+     dwie odpowiedzi temu samemu klientowi. Szkic i odpowiedź zostają
+     NIETKNIĘTE — znika tylko domniemanie ich świeżości (stempel niżej),
+     a panel i wysyłka mają o tym powiedzieć człowiekowi. */
+  const dopisz = db().prepare(
+    `UPDATE pytanie SET wiadomosc_id = ?, tresc = ?, otrzymano_at = ?,
+            oferta_id = COALESCE(?, oferta_id),
+            nowa_wiadomosc_at = datetime('now')
+     WHERE id = ?`
+  );
+
   let nowych = 0;
+  let dopisanych = 0;
   let bezWiadomosci = 0;
   let zakonczonyNaszaOdpowiedzia = 0;
   let juzZnane = 0;
@@ -369,6 +429,18 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
     const seria = ostatniaSeriaKupujacego(wiadomosci);
     if (!seria || seria.tresc === "") {
       zakonczonyNaszaOdpowiedzia++;
+      continue;
+    }
+
+    const otwarta = otwarteWatku.get(watek.threadId) as
+      | { id: number; wiadomosc_id: string | null }
+      | undefined;
+    if (otwarta) {
+      if (otwarta.wiadomosc_id === seria.id) juzZnane++;
+      else {
+        dopisz.run(seria.id, seria.tresc, seria.at ?? watek.ostatniaWiadomoscAt, seria.ofertaId, otwarta.id);
+        dopisanych++;
+      }
       continue;
     }
 
@@ -395,8 +467,12 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
     else juzZnane++;
   }
 
-  if (nowych > 0) {
-    logEvent("pytanie_sync", autor, null, { nowych, przejrzanychWatkow: watki.length });
+  if (nowych > 0 || dopisanych > 0) {
+    logEvent("pytanie_sync", autor, null, {
+      nowych,
+      dopisanych,
+      przejrzanychWatkow: watki.length,
+    });
   }
   /* Ślad przebiegu zapisujemy ZAWSZE, także gdy nic nie przyszło — bo to
      właśnie wtedy jest potrzebny. Zdarzenie w audycie leci tylko przy nowych
@@ -412,10 +488,11 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
     at: nowIso(),
     przez: autor,
     nowych,
+    dopisanych,
     przejrzanychWatkow: watki.length,
     pominiete,
   };
-  return { nowych, przejrzanychWatkow: watki.length, pominiete };
+  return { nowych, dopisanych, przejrzanychWatkow: watki.length, pominiete };
 }
 
 /**
@@ -431,6 +508,7 @@ export interface StanSynchronizacjiPytan {
   at: string;
   przez: string;
   nowych: number;
+  dopisanych: number;
   przejrzanychWatkow: number;
   pominiete: WynikSynchronizacji["pominiete"];
 }
@@ -1011,7 +1089,11 @@ export interface WynikWysylki {
   nastepneId: number | null;
 }
 
-export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikWysylki> {
+export async function wyslijOdpowiedz(
+  id: number,
+  autor: string,
+  wymus = false
+): Promise<WynikWysylki> {
   const p = szczegolPytania(id);
   if (!p.threadId) {
     throw new BladPytania(
@@ -1028,6 +1110,21 @@ export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikW
   }
 
   const adapter = allegroAdapter();
+  /* KONTROLA ŚWIEŻOŚCI — jedyny moment, w którym nieświeżość realnie
+     kosztuje: odpowiedź na starą wersję pytania idzie do klienta i już nie
+     wraca. Jedno dodatkowe zapytanie do Allegro NA WYSYŁKĘ (nie w cyklu —
+     audyt 0.109.1 zdejmował właśnie rytmiczne odpytywanie). Awaria pobrania
+     degraduje do wysyłki bez kontroli: zatrzymanie odpowiedzi klientowi
+     przez chwilową czkawkę API byłoby gorsze niż brak tej kontroli. */
+  if (!wymus) {
+    let nowe: WiadomoscAllegro[] | null = null;
+    try {
+      nowe = noweOdKlienta(await adapter.wiadomosciWatku(p.threadId, p.kupujacyLogin), p.wiadomoscId);
+    } catch {
+      /* degradacja — patrz wyżej */
+    }
+    if (nowe) throw new BladSwiezosci(nowe);
+  }
   await adapter.wyslijWiadomosc(p.threadId, tresc);
   /* Wiadomość JUŻ POSZŁA. Nieudane odhaczenie wątku jest kosmetyką po stronie
      panelu Allegro — udawanie porażki kazałoby biuru wysłać to samo drugi raz. */
@@ -1040,7 +1137,7 @@ export async function wyslijOdpowiedz(id: number, autor: string): Promise<WynikW
   db()
     .prepare(
       `UPDATE pytanie SET status = 'wyslane', wyslano_at = datetime('now'), odpowiedzial = ?,
-              prowadzi = NULL, prowadzi_at = NULL
+              prowadzi = NULL, prowadzi_at = NULL, nowa_wiadomosc_at = NULL
        WHERE id = ?`
     )
     .run(autor, id);
@@ -1061,7 +1158,9 @@ export function zmienStatus(id: number, status: "zamkniete" | "pominiete", autor
   if (p.status === "wyslane") throw new BladPytania("Odpowiedź już poszła — nie ma czego zamykać", 409);
   db()
     .prepare(
-      "UPDATE pytanie SET status = ?, odpowiedzial = ?, prowadzi = NULL, prowadzi_at = NULL WHERE id = ?"
+      `UPDATE pytanie SET status = ?, odpowiedzial = ?, prowadzi = NULL, prowadzi_at = NULL,
+              nowa_wiadomosc_at = NULL
+       WHERE id = ?`
     )
     .run(status, autor, id);
   logEvent(`pytanie_${status}`, autor, null, { id });

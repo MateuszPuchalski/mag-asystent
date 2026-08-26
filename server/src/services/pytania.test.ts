@@ -513,3 +513,75 @@ test("aukcja zdjęta ze sprzedaży: kontekst każe dopytać, nie zgadywać (0.10
   assert.equal(k.oferta, null);
   assert.match(k.tekst, /oferty już nie ma/);
 });
+
+/* ── Świeżość sprawy (0.110.0) ─────────────────────────────────────────────── */
+
+test("dopisek klienta aktualizuje otwartą sprawę zamiast zakładać drugą", async () => {
+  /* Nowa wiadomość kupującego w wątku z OTWARTĄ sprawą dawała dotąd nowy
+     wiersz (INSERT po wiadomosc_id) — dwie osoby pisałyby dwie odpowiedzi
+     temu samemu klientowi. Symulacja: cofamy znaną wiadomość sprawy, więc
+     sync widzi w wątku „nowszą" — dokładnie tak wygląda dopisek. */
+  await P.synchronizujPytania("test");
+  const przed = P.listaPytan({ limit: 50 });
+  const sprawa = przed.find((x) => x.threadId === "dev-pyt-1")!;
+  db()
+    .prepare("UPDATE pytanie SET wiadomosc_id = 'starsza', odpowiedz = 'Szkic biura' WHERE id = ?")
+    .run(sprawa.id);
+
+  const wynik = await P.synchronizujPytania("test");
+  assert.equal(wynik.dopisanych, 1, "dopisek policzony osobno od nowych");
+  assert.equal(
+    P.listaPytan({ limit: 50 }).length,
+    przed.length,
+    "żadnego drugiego wiersza dla tego samego wątku"
+  );
+
+  const po = P.szczegolPytania(sprawa.id);
+  assert.ok(po.nowaWiadomoscAt, "sync stempluje dopisek");
+  assert.equal(po.odpowiedz, "Szkic biura", "szkic biura NIETKNIĘTY — zasada nienaruszalności");
+  assert.equal(po.status, sprawa.status, "status nie cofa się przez dopisek");
+  assert.notEqual(po.wiadomoscId, "starsza", "sprawa stoi już na nowej wiadomości");
+});
+
+test("wysyłka na nieświeżą rozmowę odmawia z dopiskami; wymus wysyła", async () => {
+  await P.synchronizujPytania("test");
+  P.zapiszAutoSzkic(true, "test");
+  await P.dogenerujSzkice("test");
+  const id = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!.id;
+  /* Sprawa myśli, że ostatnie słowo klienta to starsza wiadomość — a wątek
+     w Allegro ma nowszą. Dokładnie ten stan zostawia dopisek klienta. */
+  db().prepare("UPDATE pytanie SET wiadomosc_id = 'starsza' WHERE id = ?").run(id);
+
+  await assert.rejects(
+    () => P.wyslijOdpowiedz(id, "anna"),
+    (e: unknown) => {
+      assert.ok(e instanceof P.BladSwiezosci, "osobna klasa z ładunkiem, nie goły 400");
+      assert.equal((e as InstanceType<typeof P.BladSwiezosci>).kod, 409);
+      assert.ok((e as InstanceType<typeof P.BladSwiezosci>).wiadomosci.length > 0, "niesie dopiski");
+      return true;
+    }
+  );
+  assert.equal(P.szczegolPytania(id).status, "szkic", "odmowa niczego nie wysłała");
+
+  /* Świadoma decyzja człowieka: przeczytał i mimo to wysyła. */
+  const wynik = await P.wyslijOdpowiedz(id, "anna", true);
+  assert.equal(wynik.pytanie.status, "wyslane");
+  assert.equal(wynik.pytanie.nowaWiadomoscAt, null, "wysyłka gasi stempel dopisku");
+});
+
+test("noweOdKlienta: świeża sprawa milczy, dopisek wraca od znanej wiadomości", () => {
+  const w = (id: string, odKupujacego = true) => ({
+    id, odKupujacego, autor: "k", tresc: "x", at: null, zalacznikow: 0, ofertaId: null,
+  });
+  // ostatnia znana = ostatnia w wątku → świeżo
+  assert.equal(P.noweOdKlienta([w("a"), w("b")], "b"), null);
+  // wątek zakończony NASZĄ odpowiedzią → nie ma o czym mówić
+  assert.equal(P.noweOdKlienta([w("a"), w("nasza", false)], "a"), null);
+  // dopisek → wszystko PO znanej wiadomości
+  assert.deepEqual(
+    P.noweOdKlienta([w("a"), w("b"), w("c")], "a")!.map((m) => m.id),
+    ["b", "c"]
+  );
+  // znanej nie ma w oknie (bardzo stara sprawa) → uczciwie cała rozmowa
+  assert.equal(P.noweOdKlienta([w("a"), w("b")], "spoza-okna")!.length, 2);
+});

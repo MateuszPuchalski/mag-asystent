@@ -1055,6 +1055,7 @@
         <button class="akcja cichy szufladaPrzycisk" data-szuflada>KONTEKST →</button>
       </div>
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
+      <div id="zwrotAlarm"></div>
       <!-- ŚRODEK to jedna robota: ocenić każdą pozycję z paczki, dopisać to,
            czego Allegro nie zgłosiło, i wystawić z tego dokumenty. Zdjęcia
            towaru zostają tutaj — decyzję podejmuje się z paczką w ręku, więc
@@ -1117,6 +1118,7 @@
         <button class="akcja cichy" id="dyskusjaWroc">← WSZYSTKIE SPRAWY</button>
       </div>
       <div id="dyskusjaNaglowek" style="margin-top:12px"></div>
+      <div id="dyskusjaAlarm"></div>
       <div class="sprawa-tresc">
         <h2 style="margin-top:16px">ROZMOWA W SPRAWIE</h2>
         <div id="dyskusjaRozmowa"></div>
@@ -1308,6 +1310,7 @@
         <div id="pytanieAkcjeSprawy"></div>
       </div>
       <p id="pytanieProwadzi" style="margin-top:8px" hidden></p>
+      <div id="pytanieAlarm"></div>
 
       <!-- PYTANIE stoi nad rozmową i pochodzi z NASZEJ bazy. Rozmowa jedzie
            z Allegro na żądanie, więc gdy Allegro milczy albo pytanie przyszło
@@ -2109,7 +2112,14 @@ async function api(sciezka, opts = {}) {
     wyloguj();
     throw new Error("Sesja wygasła — zaloguj się ponownie");
   }
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Błąd ${r.status}`);
+  if (!r.ok) {
+    const dane = await r.json().catch(() => ({}));
+    const blad = new Error(dane.error || `Błąd ${r.status}`);
+    /* 409 świeżości niesie nowe wiadomości klienta — panel ma je POKAZAĆ,
+       a nie kazać ich szukać. Zwykłe błędy mają tu pusty obiekt. */
+    blad.dane = dane;
+    throw blad;
+  }
   return r;
 }
 
@@ -4371,8 +4381,17 @@ async function odswiezKolejkeSpraw() {
  * odświeża siebie, a bez niczego otwartego chodzi kolejka i karty pod nią.
  */
 async function odswiezSprawy() {
-  if (otwartyZwrot != null || otwartaDyskusja != null) return odswiezZwroty();
-  if (otwartePytanie != null) return odswiezPytania();
+  if (otwartyZwrot != null || otwartaDyskusja != null) {
+    await odswiezZwroty();
+    return sprawdzPuls();
+  }
+  if (otwartePytanie != null) {
+    await odswiezPytania();
+    /* Otwarte pytanie świadomie nie odświeża szczegółu (uzasadnienie przy
+       odswiezPytania) — ale puls klienta chodzi: to jedno tanie zapytanie
+       do NASZEJ bazy, nie do Allegro. */
+    return sprawdzPuls();
+  }
   if (otwartyKlient360 !== false) return odswiezKlienta360();
   await odswiezKolejkeSpraw();
   await odswiezZwroty();
@@ -4437,6 +4456,72 @@ function rysujKlienta360(d) {
     (d.historia.length
       ? `<table>${wierszeSpraw(d.historia, false)}</table>`
       : '<p class="mute">Brak zamkniętych spraw.</p>');
+}
+
+/* ── Puls klienta otwartej sprawy (0.110.0) ──────────────────────────────────
+   Klient nie przestaje pisać dlatego, że biuro ma jego sprawę na ekranie:
+   dopisuje wiadomości i zakłada nowe sprawy. Puls czyta co cykl NASZĄ bazę
+   (trasa /sprawy/klient — SQLite, zero ruchu do Allegro; audyt 0.109.1)
+   i porównuje ją z chwilą otwarcia sprawy. Różnica = baner w sprawie:
+   „KLIENT DOPISAŁ" (stempluje synchronizacja) albo „NOWA SPRAWA KLIENTA". */
+let puls = null; // {login, rodzaj, id, otwartych, nowaWiadomoscAt}
+
+const CEL_ALARMU = { pytanie: "pytanieAlarm", zwrot: "zwrotAlarm", dyskusja: "dyskusjaAlarm" };
+
+function wyczyscAlarmy() {
+  for (const id of Object.values(CEL_ALARMU)) $(id).innerHTML = "";
+}
+
+/** Punkt odniesienia z chwili otwarcia sprawy. Ponowne rysowanie TEJ SAMEJ
+    sprawy nie przestawia bazy — inaczej alarm znikałby przy każdym
+    odświeżeniu szczegółu, zanim ktokolwiek go przeczyta. */
+async function uzbrojPuls(login, rodzaj, id) {
+  if (puls && puls.rodzaj === rodzaj && puls.id === id) return;
+  puls = null;
+  wyczyscAlarmy();
+  if (!login) return;
+  try {
+    const d = await (await api(`/api/biuro/sprawy/klient?login=${encodeURIComponent(login)}`)).json();
+    const moja = (d.aktywne || []).find((x) => x.rodzaj === rodzaj && x.id === id);
+    puls = {
+      login, rodzaj, id,
+      otwartych: (d.aktywne || []).length,
+      nowaWiadomoscAt: moja?.nowaWiadomoscAt ?? null,
+    };
+  } catch {
+    /* puls to ozdoba czujności, nie treść — awaria nie ma prawa przeszkadzać */
+  }
+}
+
+async function sprawdzPuls() {
+  if (!puls) return;
+  const { login, rodzaj, id } = puls;
+  let d;
+  try {
+    d = await (await api(`/api/biuro/sprawy/klient?login=${encodeURIComponent(login)}`)).json();
+  } catch {
+    return; // jak wyżej
+  }
+  if (!puls || puls.rodzaj !== rodzaj || puls.id !== id) return; // sprawa się zmieniła
+  const aktywne = d.aktywne || [];
+  const czesci = [];
+
+  const moja = aktywne.find((x) => x.rodzaj === rodzaj && x.id === id);
+  if (rodzaj === "pytanie" && moja?.nowaWiadomoscAt && moja.nowaWiadomoscAt !== puls.nowaWiadomoscAt) {
+    czesci.push(`<span class="badge amber">KLIENT DOPISAŁ</span>
+      klient dopisał wiadomość po powstaniu tej sprawy
+      <button class="akcja cichy" data-pokaz-nowe="${esc(moja.nowaWiadomoscAt)}"
+        style="font-size:11px;padding:3px 8px">POKAŻ ROZMOWĘ</button>`);
+  }
+  if (aktywne.length > puls.otwartych) {
+    czesci.push(`<span class="badge amber">NOWA SPRAWA KLIENTA</span>
+      ${esc(login)} założył kolejną sprawę w trakcie tej
+      <button class="akcja cichy" data-klient360="${esc(login)}"
+        style="font-size:11px;padding:3px 8px">KARTA KLIENTA →</button>`);
+  }
+  $(CEL_ALARMU[rodzaj]).innerHTML = czesci.length
+    ? `<div class="mute" style="margin-top:8px">${czesci.join("<br>")}</div>`
+    : "";
 }
 
 /* ── Powiązane sprawy — ciąg jednego problemu (0.108.0) ──────────────────────
@@ -4958,6 +5043,9 @@ async function odswiezDyskusje() {
    u nas zapisywana; szkic i odpowiedź żyją na wierszu rejestru. Załącznik
    trzyma się w zmiennej do chwili wysyłki — nigdy w bazie. */
 let otwartaDyskusja = null;
+/* Ostatnia wiadomość dyskusji WIDZIANA na ekranie — punkt odniesienia
+   kontroli świeżości przy wysyłce (rejestr nie przechowuje rozmowy). */
+let dyskusjaOstatniaWidzianaId = null;
 let dyskusjaZalacznik = null; // {nazwa, mime, dane} — jedzie w body wysyłki
 
 const LIMIT_DYSKUSJI = 2000;
@@ -4967,6 +5055,7 @@ function otworzDyskusje(id) {
   if (otwartyZwrot != null) zamknijZwrot();
   zamknijPytanie();
   otwartaDyskusja = id;
+  dyskusjaOstatniaWidzianaId = null;
   dyskusjaZalacznik = null;
   $("dyskusjaOdpowiedz").value = "";
   $("dyskusjaNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
@@ -4977,6 +5066,7 @@ function otworzDyskusje(id) {
 }
 
 function zamknijDyskusje() {
+  if (puls?.rodzaj === "dyskusja") { puls = null; wyczyscAlarmy(); }
   otwartaDyskusja = null;
   dyskusjaZalacznik = null;
   ustawRodzenstwoSpraw();
@@ -5002,6 +5092,7 @@ async function odswiezSzczegolDyskusji(zRozmowa) {
 
 function rysujSzczegolDyskusji(y, zwrot) {
   const otwartaSprawa = y.status === "nowa" || y.status === "w_toku";
+  uzbrojPuls(y.kupujacyLogin, "dyskusja", y.id);
   $("dyskusjaNaglowek").innerHTML = `
     <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
       <span style="font-size:24px;font-weight:700">${esc(y.temat || "(bez tematu)")}</span>
@@ -5058,6 +5149,7 @@ async function wczytajRozmoweDyskusji(id) {
       $("dyskusjaOdpowiedzBlok").hidden = true;
       return;
     }
+    dyskusjaOstatniaWidzianaId = d.wiadomosci.at(-1)?.id ?? null;
     cel.innerHTML = d.wiadomosci.length
       ? d.wiadomosci.map((m) => `<div class="wiad ${m.odNas ? "my" : "klient"}">
             <div class="kto">${m.odNas
@@ -5124,9 +5216,14 @@ async function wyslijOdpowiedzDyskusji() {
       method: "POST",
       body: JSON.stringify({
         odpowiedz: tresc,
+        /* Kontrola świeżości (0.110.0): serwer porówna rozmowę z tym, co
+           ekran naprawdę pokazał. Bez rozmowy (degradacja 404) pola nie ma
+           i kontrola po prostu nie działa — uczciwie, nie blokująco. */
+        ...(dyskusjaOstatniaWidzianaId ? { ostatniaWidzianaId: dyskusjaOstatniaWidzianaId } : {}),
         ...(dyskusjaZalacznik ? { zalacznik: dyskusjaZalacznik } : {}),
       }),
     });
+    $("dyskusjaAlarm").innerHTML = "";
     toast("Odpowiedź poszła do Allegro ✓");
     dyskusjaZalacznik = null;
     rysujZalacznikDyskusji();
@@ -5136,7 +5233,15 @@ async function wyslijOdpowiedzDyskusji() {
     await odswiezDyskusje();
     await odswiezLiczniki();
   } catch (e) {
-    toast(e.message);
+    if (e.dane?.noweWiadomosci) {
+      /* Rozmowa przeładowuje się od razu — po przeczytaniu ponowne WYŚLIJ
+         przejdzie samo, bo punkt odniesienia przesunął się z ekranem.
+         Szkic w polu odpowiedzi zostaje nietknięty. */
+      $("dyskusjaAlarm").innerHTML = `<div class="mute" style="margin-top:8px">
+        <span class="badge amber">NOWA WIADOMOŚĆ W SPRAWIE</span> ${esc(e.message)}
+        Rozmowa poniżej jest już odświeżona — przeczytaj i kliknij WYŚLIJ ponownie.</div>`;
+      await wczytajRozmoweDyskusji(id);
+    } else toast(e.message);
   } finally {
     b.disabled = false;
   }
@@ -5659,6 +5764,7 @@ function otworzZwrot(id) {
 }
 
 function zamknijZwrot() {
+  if (puls?.rodzaj === "zwrot") { puls = null; wyczyscAlarmy(); }
   otwartyZwrot = null;
   zwrotIdWatku = null;
   $("zwrotSzczegol").hidden = true;
@@ -5693,6 +5799,7 @@ async function odswiezSzczegolZwrotu() {
 
 function rysujSzczegolZwrotu(z) {
   const zamkniety = z.status === "rozliczony";
+  uzbrojPuls(z.kupujacyLogin, "zwrot", z.id);
 
   $("zwrotNaglowek").innerHTML = `
     <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
@@ -6891,6 +6998,7 @@ const KATEGORIE_PYTAN = {
 const badgePytania = (s) => (STATUSY_PYTAN[s] || STATUSY_PYTAN.nowe)[0];
 
 function zamknijPytanie() {
+  if (puls?.rodzaj === "pytanie") { puls = null; wyczyscAlarmy(); }
   otwartePytanie = null;
   pytanieIdRozmowy = null;
   odpowiedzRuszona = false;
@@ -7180,6 +7288,7 @@ function rysujSzczegolPytania(d) {
   rysujWiedzePytania(d);
   /* Wklejka z poczty nie niesie loginu, więc historii nie ma po czym szukać —
      karta bez treści byłaby nagłówkiem obiecującym coś, czego nie ma. */
+  uzbrojPuls(p.kupujacyLogin, "pytanie", p.id);
   $("pytanieKlient").hidden = !p.kupujacyLogin;
   /* Przesyłki jak historia klienta: bez loginu nie ma czego szukać. */
   $("pytaniePrzesylki").hidden = !p.kupujacyLogin;
@@ -7541,6 +7650,37 @@ async function pokazRozmowe(id) {
 }
 
 /** Wspólna obudowa akcji: błąd na toast, potem odświeżenie szczegółu. */
+/**
+ * Wysyłka z KONTROLĄ ŚWIEŻOŚCI (0.110.0). 409 z ładunkiem znaczy: klient
+ * dopisał coś, czego biuro nie widziało — pokazujemy dopiski w sprawie
+ * i dajemy „WYŚLIJ MIMO TO". Serwer porównuje z wiadomością, na której
+ * stoi sprawa, więc zwykłe ponowienie bez `wymus` odbije się tak samo.
+ */
+async function wyslijPytanie(id, tresc, wymus) {
+  try {
+    const d = await (await api(`/api/biuro/pytania/${id}/wyslij`, {
+      method: "POST", body: JSON.stringify({ odpowiedz: tresc, wymus }),
+    })).json();
+    $("pytanieAlarm").innerHTML = "";
+    await przejdzDalej(d);
+  } catch (e) {
+    if (!e.dane?.noweWiadomosci) return toast(e.message);
+    const nowe = e.dane.noweWiadomosci;
+    $("pytanieAlarm").innerHTML = `<div class="mute" style="margin-top:8px">
+      <span class="badge amber">KLIENT DOPISAŁ</span> ${esc(e.message)}</div>` +
+      nowe.map((m) => `<div class="wiad ${m.odKupujacego ? "klient" : "my"}" style="margin-top:6px">
+        <div class="kto">${m.odKupujacego ? esc(m.autor || "KLIENT") : "MY"}
+          ${m.at ? `<span class="mute"> · ${esc(stempelLokalny(m.at))}</span>` : ""}</div>
+        <div>${esc(m.tresc)}</div>
+      </div>`).join("") +
+      `<div style="margin-top:8px">
+        <button class="akcja" data-pytanie-wymus>WYŚLIJ MIMO TO</button>
+        <span class="mute">albo popraw odpowiedź powyżej i wyślij ponownie</span>
+      </div>`;
+    /* Rozmowa w sprawie też ma pokazać dopisek — na klik, jak zawsze. */
+  }
+}
+
 async function akcjaPytania(fn) {
   try {
     await fn();
@@ -7788,6 +7928,19 @@ function klikKlienta360(e) {
   otworzKlienta360(b.dataset.klient360);
 }
 $("pytanieSzczegol").addEventListener("click", klikKlienta360);
+$("pytanieSzczegol").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pokaz-nowe]");
+  if (!b) return;
+  /* Dopisek przeczytany: rozmowa jedzie świeża (jedno zapytanie, na klik),
+     a baza pulsu przesuwa się na WARTOŚĆ Z BAZY niesioną przez przycisk —
+     alarm gaśnie do następnego dopisku, nie do następnego cyklu. */
+  const id = otwartePytanie;
+  if (id == null) return;
+  pytanieIdRozmowy = null;
+  pokazRozmowe(id);
+  if (puls) puls.nowaWiadomoscAt = b.dataset.pokazNowe || puls.nowaWiadomoscAt;
+  $("pytanieAlarm").innerHTML = "";
+});
 $("zwrotSzczegol").addEventListener("click", klikKlienta360);
 $("dyskusjaSzczegol").addEventListener("click", klikKlienta360);
 
@@ -7932,12 +8085,13 @@ $("pytanieSzczegol").addEventListener("click", async (e) => {
       potwierdz: "WYŚLIJ",
     });
     if (!zgoda) return;
-    return akcjaPytania(async () => {
-      const d = await (await api(`/api/biuro/pytania/${id}/wyslij`, {
-        method: "POST", body: JSON.stringify({ odpowiedz: tresc() }),
-      })).json();
-      await przejdzDalej(d);
-    });
+    return wyslijPytanie(id, tresc(), false);
+  }
+
+  /* Świadoma decyzja po przeczytaniu dopisku — przycisk JEST potwierdzeniem,
+     drugi dialog pytałby o to samo drugi raz. */
+  if (e.target.closest("[data-pytanie-wymus]")) {
+    return wyslijPytanie(id, tresc(), true);
   }
 
   if (e.target.closest("#pytanieKopiuj")) return kopiujOdpowiedz(tresc());

@@ -444,10 +444,28 @@ function sprawdzZalacznik(z: ZalacznikDyskusji): { nazwa: string; mime: string; 
  * przy screenshotach pytań). Wysyłka nie zamyka sprawy: dyskusja to wiele
  * odpowiedzi, a koniec ogłasza Allegro (sync auto-zamyka po statusie).
  */
+/**
+ * Wysyłka zatrzymana, bo w sprawie pojawiła się wiadomość, której panel nie
+ * pokazał. Punktem odniesienia jest OSTATNIA WIADOMOŚĆ WIDZIANA na ekranie
+ * (rejestr nie przechowuje rozmowy — prywatność, 0.104.0), więc id podaje
+ * przeglądarka. Brak punktu odniesienia = brak kontroli, nie blokada.
+ */
+export class BladSwiezosciDyskusji extends BladDyskusji {
+  constructor(readonly wiadomosci: WiadomoscDyskusji[]) {
+    super(
+      "W sprawie pojawiła się nowa wiadomość po napisaniu tej odpowiedzi — " +
+        "przeczytaj ją, zanim wyślesz.",
+      409
+    );
+    this.name = "BladSwiezosciDyskusji";
+  }
+}
+
 export async function wyslijOdpowiedzDyskusji(
   id: number,
   autor: string,
-  zalacznik?: ZalacznikDyskusji
+  zalacznik?: ZalacznikDyskusji,
+  opcje: { ostatniaWidzianaId?: string | null; wymus?: boolean } = {}
 ): Promise<Dyskusja> {
   const w = wiersz(id);
   if (zamknietaLokalnie(w.status as string)) {
@@ -472,6 +490,23 @@ export async function wyslijOdpowiedzDyskusji(
   }
 
   const adapter = allegroAdapter();
+  /* KONTROLA ŚWIEŻOŚCI jak przy pytaniach (services/pytania.ts): jedno
+     zapytanie NA WYSYŁKĘ, degradacja przy awarii pobrania, „wyślij mimo to"
+     jest świadomą decyzją człowieka. Bez id z panelu kontroli nie ma —
+     rozmowa mogła być niedostępna przez API (degradacja z 0.104.0). */
+  if (!opcje.wymus && opcje.ostatniaWidzianaId) {
+    let swieze: WiadomoscDyskusji[] | null = null;
+    try {
+      swieze = await adapter.wiadomosciDyskusji(w.allegro_id as string);
+    } catch {
+      /* degradacja — wysyłka ważniejsza niż kontrola */
+    }
+    if (swieze && swieze.length > 0) {
+      const znana = swieze.findIndex((m) => m.id === opcje.ostatniaWidzianaId);
+      const nowe = znana >= 0 ? swieze.slice(znana + 1) : swieze;
+      if (nowe.length > 0) throw new BladSwiezosciDyskusji(nowe);
+    }
+  }
   let zalacznikId: string | undefined;
   if (zalacznik) {
     const gotowy = sprawdzZalacznik(zalacznik);

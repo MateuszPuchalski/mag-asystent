@@ -6,6 +6,7 @@ import { stanAI } from "../services/ai.js";
 import { przesylkiKupujacego } from "../services/przesylki.js";
 import {
   BladPytania,
+  BladSwiezosci,
   dogenerujSzkice,
   generujSzkic,
   kontekstPytania,
@@ -73,6 +74,11 @@ export async function pytaniaRoutes(app: FastifyInstance) {
     try {
       return await fn();
     } catch (e) {
+      /* Świeżość niesie ŁADUNEK: panel ma pokazać, co klient dopisał —
+         sam kod 409 kazałby biuru zgadywać, o którą wiadomość chodzi. */
+      if (e instanceof BladSwiezosci) {
+        return reply.code(e.kod).send({ error: e.message, noweWiadomosci: e.wiadomosci });
+      }
       if (e instanceof BladPytania) return reply.code(e.kod).send({ error: e.message });
       return reply.code(502).send({ error: (e as Error).message });
     }
@@ -290,7 +296,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
     }
   );
 
-  app.post<{ Params: { id: string }; Body: { odpowiedz?: string } }>(
+  app.post<{ Params: { id: string }; Body: { odpowiedz?: string; wymus?: boolean } }>(
     "/api/biuro/pytania/:id/wyslij",
     async (req, reply) => {
       const nie = odmowa();
@@ -301,7 +307,11 @@ export async function pytaniaRoutes(app: FastifyInstance) {
         if (req.body?.odpowiedz !== undefined) {
           zapiszOdpowiedz(Number(req.params.id), req.body.odpowiedz, autor());
         }
-        const wynik = await wyslijOdpowiedz(Number(req.params.id), autor());
+        const wynik = await wyslijOdpowiedz(
+          Number(req.params.id),
+          autor(),
+          req.body?.wymus === true
+        );
         return { ...wynik, otwartych: licznikOtwartych() };
       });
     }

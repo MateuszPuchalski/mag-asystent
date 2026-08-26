@@ -33,6 +33,35 @@ historii nie przepisujemy.
 
 ---
 
+## 0.110.0 — 26 sierpnia 2026
+
+**Klient nie przestaje pisać dlatego, że biuro ma jego sprawę na ekranie.**
+Dotąd otwarta sprawa niczego o tym nie mówiła: dopisek klienta potrafił
+założyć DRUGĄ sprawę z tego samego wątku, a odpowiedź szła na starą wersję
+pytania. Trzy zmiany, wszystkie zgodne z audytem 0.109.1 — żadnego nowego
+odpytywania Allegro.
+
+- **Kontrola świeżości przy WYŚLIJ.** W chwili wysyłki serwer porównuje
+  rozmowę z tym, na czym stoi sprawa (jedno zapytanie NA WYSYŁKĘ, nie
+  w cyklu). Gdy klient dopisał — wysyłka staje (409), panel pokazuje
+  dopiski i przycisk WYŚLIJ MIMO TO. Przy dyskusjach punktem odniesienia
+  jest ostatnia wiadomość widziana na ekranie; po odświeżeniu rozmowy
+  ponowna wysyłka przechodzi sama. Awaria pobrania degraduje do wysyłki
+  bez kontroli — czkawka API nie może zatrzymać odpowiedzi klientowi.
+- **Dopisek aktualizuje sprawę, nie zakłada drugiej.** Synchronizacja,
+  widząc nową wiadomość kupującego w wątku z OTWARTĄ sprawą, aktualizuje
+  jej wiersz (treść, stempel „klient dopisał") zamiast tworzyć nowy.
+  Szkic i odpowiedź biura zostają NIETKNIĘTE — znika tylko domniemanie
+  ich świeżości. Rozbicie synchronizacji dostało kubełek „dopisane".
+- **Puls klienta w otwartej sprawie.** Co cykl (30 s) panel czyta NASZĄ
+  bazę — trasę `/sprawy/klient` — i pokazuje banery: KLIENT DOPISAŁ
+  (z przyciskiem POKAŻ ROZMOWĘ) i NOWA SPRAWA KLIENTA (z wejściem do
+  karty klienta). Zero ruchu do Allegro; opóźnienie dopisku = rytm
+  synchronizacji.
+
+Bez zmian w kolektorze, bez nowych uprawnień i bez działania przy
+wdrożeniu (nowa kolumna zakłada się sama przy starcie).
+
 ## 0.109.1 — 26 sierpnia 2026
 
 **Utwardzenie użycia API Allegro po audycie.** Domyślny profil ruchu był

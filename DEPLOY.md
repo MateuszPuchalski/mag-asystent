@@ -1567,6 +1567,18 @@ Pokrętło `ALLEGRO_POLL_MS` dzieli z zapowiedziami zwrotów i od 0.85.0 stoi
 domyślnie na zerze. To ta sama praca na tym samym koncie, więc i jedna decyzja
 o tym, czy cokolwiek chodzi samo.
 
+### Gdy klient dopisze w trakcie (0.110.0)
+
+Otwarta sprawa pilnuje dwóch rzeczy. Baner KLIENT DOPISAŁ mówi, że po
+zarejestrowaniu sprawy przyszła nowa wiadomość — POKAŻ ROZMOWĘ czyta ją
+na klik. Baner NOWA SPRAWA KLIENTA prowadzi do karty klienta. Oba banery
+czytają co pół minuty naszą bazę, nie Allegro.
+
+Wysyłka odpowiedzi ma kontrolę świeżości. Gdy klient dopisał coś, czego
+ekran nie pokazał, wysyłka staje i panel pokazuje dopiski. WYŚLIJ MIMO TO
+jest świadomą decyzją człowieka. Szkic odpowiedzi nigdy nie ginie przez
+dopisek klienta.
+
 ### Kilka osób w skrzynce (0.89.0)
 
 Lista pytań ma kolumnę **PROWADZI**, a wejście w sprawę, którą ktoś już wziął,
