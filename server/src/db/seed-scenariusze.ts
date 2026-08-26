@@ -215,6 +215,10 @@ export const KATALOG: Scenariusz[] = [
 
   // ── rozkładanie zwrotów z regału ──
   { id: "S72", obszar: "zwroty", tytul: "Kosz z kartką: numer MM otwiera przyjęcie, ZAKOŃCZ nie wystawia dokumentu", wejscie: "kolektor → zakładka ZWROTY → numer 1209" },
+
+  // ── pytania klientów ──
+  { id: "S73", obszar: "pytania", tytul: "Skrzynka w trzech stanach: bez szkicu, szkic po poprawce, wysłane", wejscie: "/biuro → PYTANIA KLIENTÓW" },
+  { id: "S74", obszar: "pytania", tytul: "Pytanie o towar spoza oferty — jedyne źródło listy braków", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\"" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -423,6 +427,7 @@ export interface Podsumowanie {
   pozycjeWz: number;
   sprzedaz: number;
   przyjecia: number;
+  pytania: number;
 }
 
 /**
@@ -443,7 +448,7 @@ export function zbudujScenariusze(): Podsumowanie {
   const licz = {
     towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
     konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
-    sprzedaz: 0, przyjecia: 0,
+    sprzedaz: 0, przyjecia: 0, pytania: 0,
   };
 
   const wszystkieTowary = [...TOWARY, ...DROBNICA];
@@ -466,6 +471,7 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.pozycjeWz = wz.pozycji;
     licz.sprzedaz = sprzedazDemo();
     licz.przyjecia = przyjeciaDemo();
+    licz.pytania = pytaniaDemo();
     logoDostawcow();
   })();
 
@@ -524,6 +530,13 @@ function wyczysc(): void {
          (SELECT id FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%')`
     ).run();
     d.prepare("DELETE FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%'").run();
+    /* Pytania scenariuszowe po przedrostku `dev-msg-`, tak samo jak zwroty
+       po `dev-ret-`. `dopasowanie` wskazuje na `pytanie`, więc idzie pierwsze. */
+    d.prepare(
+      `DELETE FROM dopasowanie WHERE pytanie_id IN
+         (SELECT id FROM pytanie WHERE wiadomosc_id LIKE 'dev-msg-%')`
+    ).run();
+    d.prepare("DELETE FROM pytanie WHERE wiadomosc_id LIKE 'dev-msg-%'").run();
 
     d.prepare("DELETE FROM sgt_stan WHERE tw_id >= ?").run(TW_OD);
     d.prepare("DELETE FROM sgt_towar WHERE tw_id >= ?").run(TW_OD);
@@ -1406,6 +1419,104 @@ function przyjeciaDemo(): number {
   return kosze.length;
 }
 
+/* ── Skrzynka pytań klientów (S73, S74) ──────────────────────────────────────
+ * Do 0.96.0 seed nie zakładał ANI JEDNEGO pytania, więc zakładka PYTANIA
+ * KLIENTÓW pokazywała w demo pustą skrzynkę i trzech stref nie dało się na
+ * niej obejrzeć — one włączają się dopiero przy otwartej sprawie. Ta sama
+ * pustka zdarza się w biurze w spokojny dzień; różnica polega na tym, że tam
+ * jest prawdą, a tu ukrywała pół zakładki przed każdym, kto ją sprawdzał.
+ *
+ * Trzy pytania pokrywają trzy stany, którymi szyna się różni: bez szkicu,
+ * ze szkicem po poprawce człowieka i wysłane. Czwarte pyta o towar, którego
+ * nie mamy — to jedyne źródło danych dla listy „pytali o towar spoza oferty".
+ */
+function pytaniaDemo(): number {
+  const d = db();
+  const wstaw = d.prepare(
+    `INSERT INTO pytanie(zrodlo, thread_id, wiadomosc_id, kupujacy_login,
+                         oferta_id, oferta_tytul, tresc, otrzymano_at, status,
+                         szkic_ai, szkic_at, odpowiedz, wyslano_at, odpowiedzial,
+                         edytowano, kategoria, urzadzenie, produkty_json,
+                         w_ofercie, utworzono_at, utworzono_przez, prowadzi, prowadzi_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  );
+
+  /* `wiadomosc_id` z przedrostkiem `dev-msg-` — po nim kasuje je `wyczysc()`,
+     tak samo jak zwroty po `dev-ret-`. Pytania wklejone ręcznie zostają. */
+  const pytania = [
+    {
+      // S73a — sprawa BEZ szkicu: stan „czeka na szkic", pusta szyna kontekstu
+      msg: "dev-msg-0001", login: "client:44112097", minut: -1440,
+      oferta: "GAŹNIK DO STIHL MS 180 GAŹNIK ZAMA DO PIŁY STIHL 017 018 MS170 MS180 FILTR",
+      tresc: "Dzień dobry, czy ten gaźnik pasuje do MS 170 z 2019 roku? I czy w komplecie jest filtr paliwa?",
+      status: "nowe", szkic: null, odpowiedz: null, edytowano: 0,
+      kategoria: "dobor-czesci", urzadzenie: "STIHL MS 170",
+      produkty: [], wOfercie: null, prowadzi: null,
+    },
+    {
+      // S73b — szkic PO poprawce człowieka: szyna szkicu ma być zgaszona
+      msg: "dev-msg-0002", login: "client:44251880", minut: -300,
+      oferta: "OLEJ BRIGGS STRATTON 0,6L SAE30 KOSIARKI AGREGATU TRAKTORKA CZTEROSUWOWYCH",
+      tresc: "Witam, ile takich olejów potrzeba na wymianę w kosiarce spalinowej? Starczy jedna butelka?",
+      status: "szkic",
+      szkic: "Dzień dobry, do wymiany w kosiarce spalinowej wystarcza jedna butelka 0,6 l. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, do typowej kosiarki spalinowej wystarcza jedna butelka 0,6 l — miska olejowa mieści zwykle 0,5–0,6 l. Pozdrawiamy, WERTIS",
+      edytowano: 1, kategoria: "dobor-czesci", urzadzenie: null,
+      produkty: [{ twId: 900_017, symbol: "TEST-ULAMEK" }], wOfercie: 1,
+      prowadzi: "Ewa Bąk",
+    },
+    {
+      // S73c — sprawa ZAŁATWIONA: liczy się do mediany czasu odpowiedzi
+      msg: "dev-msg-0003", login: "client:44300104", minut: -2880,
+      oferta: "ŚWIECA ZAPŁONOWA do kosiarek i agregatów — trio EAN",
+      tresc: "witam czy można wysłać do Chorwacji i na kiedy by było i jaki koszt wysyłki oczywiście płatność z góry",
+      status: "wyslane",
+      szkic: "Dzień dobry, tak, wysyłamy do Chorwacji. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, tak, wysyłamy do Chorwacji — paczka kurierska DPD, koszt 89 zł, czas dostawy 4–6 dni roboczych. Płatność z góry przelewem, wysyłka następnego dnia roboczego po zaksięgowaniu. Pozdrawiamy, WERTIS",
+      edytowano: 1, kategoria: "dostawa-wysylka", urzadzenie: null,
+      produkty: [{ twId: 900_003, symbol: "TEST-TRIO-1" }], wOfercie: 1,
+      prowadzi: null, wyslaneMinut: -2820, odpowiedzial: "Jan Kowalski",
+    },
+    {
+      // S74 — pytanie o towar SPOZA oferty: jedyne dane pod listę braków
+      msg: "dev-msg-0004", login: "client:44380022", minut: -4320,
+      oferta: null,
+      tresc: "Szukam noża do kosiarki NAC LS46-127 o długości 46 cm. Macie taki?",
+      status: "wyslane",
+      szkic: "Dzień dobry, niestety nie mamy tego noża w ofercie. Pozdrawiamy, WERTIS",
+      odpowiedz: "Dzień dobry, niestety nie mamy tego noża w ofercie. Pozdrawiamy, WERTIS",
+      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: "NAC LS46-127",
+      produkty: [], wOfercie: 0,
+      prowadzi: null, wyslaneMinut: -4260, odpowiedzial: "Ewa Bąk",
+    },
+  ];
+
+  for (const p of pytania) {
+    wstaw.run(
+      "allegro", `dev-thread-${p.msg.slice(-4)}`, p.msg, p.login,
+      null, p.oferta, p.tresc, chwila(p.minut), p.status,
+      p.szkic, p.szkic ? chwila(p.minut + 2) : null,
+      p.odpowiedz,
+      "wyslaneMinut" in p ? chwila(p.wyslaneMinut as number) : null,
+      "odpowiedzial" in p ? (p.odpowiedzial as string) : null,
+      p.edytowano, p.kategoria, p.urzadzenie, JSON.stringify(p.produkty),
+      p.wOfercie, chwila(p.minut), "Biuro (scenariusze)",
+      p.prowadzi, p.prowadzi ? chwila(p.minut + 5) : null
+    );
+  }
+
+  /* Jedno potwierdzone dopasowanie maszyna→część, żeby sekcja „skąd to
+     dopasowanie" miała co pokazać poza samymi frazami. */
+  d.prepare(
+    `INSERT OR IGNORE INTO dopasowanie(urzadzenie, symbol, tw_id, pytanie_id,
+                                       potwierdzono_at, potwierdzono_przez)
+     VALUES (?,?,?,(SELECT id FROM pytanie WHERE wiadomosc_id = ?),?,?)`
+  ).run("STIHL MS 170", "TEST-TRIO-1", 900_003, "dev-msg-0003",
+        chwila(-2800), "Jan Kowalski");
+
+  return pytania.length;
+}
+
 function zdjecia(): void {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   fs.mkdirSync(dir, { recursive: true });
@@ -1430,6 +1541,7 @@ function wypisz(licz: Podsumowanie): void {
   console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
   console.log(`[scenariusze] sprzedaż pod zwroty Allegro: dokumentów=${licz.sprzedaz}`);
   console.log(`[scenariusze] przyjęcia na regał zwrotów (kosze z kartką): ${licz.przyjecia}`);
+  console.log(`[scenariusze] pytania klientów w skrzynce: ${licz.pytania}`);
   console.log("");
   let obszar = "";
   for (const s of KATALOG) {

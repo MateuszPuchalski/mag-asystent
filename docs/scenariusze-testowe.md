@@ -830,3 +830,31 @@ odpowiedzieć 403.
 
 Nieznany numer: wpisz `999`. Komunikat ma mówić, czego szukać — kartki albo
 synchronizacji z Subiektem — a nie samego „nie znaleziono".
+
+### S73 — skrzynka pytań w trzech stanach
+
+Ziarno zakłada trzy sprawy w skrzynce, po jednej na każdy stan, którym szyna
+się różni. Wejdź w `/biuro` → **PYTANIA KLIENTÓW**.
+
+`client:44112097` czeka na szkic — nie ma odpowiedzi i nie ma dopasowanych
+towarów. To sprawa, którą model dopiero policzy.
+
+`client:44251880` ma szkic **po poprawce człowieka**. Sygnał autorstwa ma być
+zgaszony: tekst nie jest już tym, co napisał model. Porównaj z przyciskiem
+PRZYWRÓĆ SZKIC — on wraca do wersji surowej i sygnał ma się wtedy zapalić.
+
+`client:44300104` jest wysłana. Nie liczy się do skrzynki, ale wchodzi do
+mediany czasu odpowiedzi w statystykach.
+
+Otwórz pierwszą sprawę na oknie szerszym niż 1280 px. Zakładka ma rozłożyć się
+na trzy strefy: kolejka po lewej, wątek na środku, kontekst po prawej. Zwęź
+okno poniżej progu — sprawa ma zasłonić kolejkę, a kontekst zejść pod nią.
+
+### S74 — pytanie o towar spoza oferty
+
+`client:44380022` pytał o nóż do kosiarki NAC LS46-127. Nie mamy go
+w kartotece, więc sprawa ma znacznik „poza ofertą".
+
+Wejdź w `/biuro` → **ANALIZA** i ustaw zakres na pytania klientów. Lista
+„pytali o towar spoza naszej oferty" ma pokazać ten wiersz z rozpoznanym
+urządzeniem. To jest najtańszy research asortymentu, jaki firma ma.

@@ -140,10 +140,12 @@ export async function pytaniaRoutes(app: FastifyInstance) {
 
   // ── Statystyki i konfiguracja modelu ──────────────────────────────────────
 
-  app.get<{ Querystring: { dni?: string } }>("/api/biuro/pytania/statystyki", async (req, reply) => {
+  app.get<{ Querystring: { dni?: string; osoba?: string } }>("/api/biuro/pytania/statystyki", async (req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return { statystyki: statystykiPytan(oknoDniPytan(req.query.dni)) };
+    return {
+      statystyki: statystykiPytan(oknoDniPytan(req.query.dni), req.query.osoba),
+    };
   });
 
   app.get("/api/biuro/pytania/prompt", async (_req, reply) => {
