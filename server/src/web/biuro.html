@@ -1328,6 +1328,12 @@
            odpowiedź klientowi, nie pobranie poczty — dwa bursztyny obok
            siebie kazałyby wybierać między nimi. -->
       <button class="akcja cichy" id="pytaniaOdswiez" style="margin-top:10px">ODŚWIEŻ Z ALLEGRO</button>
+      <!-- Kiedy ostatnio pytaliśmy Allegro i co z tego wyszło. Do tej wersji
+           te liczby leciały w toast i ginęły razem z nim — po odświeżeniu
+           strony nie dało się odróżnić „dziś nikt nie napisał" od „nikt dziś
+           nie pobierał". Przy skrzynce na zero to JEDYNA rzecz, która te dwa
+           stany rozróżnia, a zero znaczy w nich co innego. -->
+      <p class="mute" id="pytaniaOstatniePobranie" style="margin-top:7px"></p>
     </section>
 
     <!-- Wklejka STOI POD LISTĄ (0.86.0). Pytanie z poczty jest ścieżką
@@ -4105,10 +4111,36 @@ function ustawLicznikPytan(d) {
     : "";
 }
 
+/**
+ * „Ostatnio: dziś 14:02 · nowych 3 · przejrzano 12 rozmów".
+ *
+ * Przed pierwszym pobraniem NIE milczy: zdanie o tym, że nic jeszcze nie
+ * pobrano, jest tu treścią, a nie jej brakiem — i wskazuje przycisk. Ten sam
+ * wzorzec co przy zapowiedziach zwrotów.
+ */
+function ustawOstatniePobranie(sync) {
+  $("pytaniaOstatniePobranie").innerHTML = sync
+    ? `Ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
+       · przejrzano ${sync.przejrzanychWatkow}
+       ${esc(odmiana(sync.przejrzanychWatkow, ["rozmowę", "rozmowy", "rozmów"]))}`
+    : "Jeszcze nic nie pobrano od uruchomienia serwera — kliknij ODŚWIEŻ Z ALLEGRO.";
+}
+
+/** Godzina przy dzisiejszej dacie, data i godzina przy starszej. */
+function stempelKrotki(at) {
+  const d = new Date(at);
+  if (isNaN(d)) return String(at ?? "");
+  const godzina = `${dwaZnaki(d.getHours())}:${dwaZnaki(d.getMinutes())}`;
+  return dataLokalna(at) === dataLokalna(new Date().toISOString())
+    ? `dziś ${godzina}`
+    : `${dzienSkrot(dataLokalna(at))}, ${godzina}`;
+}
+
 async function odswiezLicznikPytan() {
   try {
     const d = await (await api("/api/biuro/pytania/licznik")).json();
     ustawLicznikPytan(d);
+    ustawOstatniePobranie(d.synchronizacja);
   } catch {
     /* Licznik jest ozdobą paska, nie treścią — jego awaria nie ma prawa
        przerywać odświeżania właściwej zakładki. */
@@ -6140,6 +6172,7 @@ async function odswiezPytania() {
     ostatniaListaPytan = d.pytania;
     rysujListePytan(d.pytania);
     ustawLicznikPytan(d);
+    ustawOstatniePobranie(d.synchronizacja);
   } catch (e) {
     $("pytaniaLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
   }

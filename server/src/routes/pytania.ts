@@ -17,6 +17,7 @@ import {
   synchronizujPytania,
   historiaKlienta,
   licznikiPytan,
+  stanSynchronizacjiPytan,
   stempelProwadzi,
   szczegolPytania,
   wyslijOdpowiedz,
@@ -91,6 +92,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
         allegro: stanPolaczenia(),
         otwartych: licznikOtwartych(),
         ...licznikiPytan(),
+        synchronizacja: stanSynchronizacjiPytan(),
       };
     }
   );
@@ -101,7 +103,14 @@ export async function pytaniaRoutes(app: FastifyInstance) {
   app.get("/api/biuro/pytania/licznik", async (_req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return { otwartych: licznikOtwartych(), ...licznikiPytan() };
+    /* Ślad ostatniego pobrania jedzie i tutaj, nie tylko z pełną listą:
+       ta trasa chodzi co 30 s, więc zdanie „ostatnio pytaliśmy o 14:02"
+       starzeje się na ekranie samo, bez wchodzenia na zakładkę. */
+    return {
+      otwartych: licznikOtwartych(),
+      ...licznikiPytan(),
+      synchronizacja: stanSynchronizacjiPytan(),
+    };
   });
 
   // ── Synchronizacja i wklejka ──────────────────────────────────────────────
