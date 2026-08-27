@@ -487,9 +487,12 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
   sesji. Strona nie ma własnych uprawnień, a jedyny zapis poza logowaniem to
   zdjęcie dostawy z listy pracy (niżej) — zastrzeżone dla roli `biuro`.
-- **Pasek stanu widać z każdej zakładki**: wersja i tryb serwera, czy worker
-  żyje, ile zadań stoi w błędzie, ile rozjazdów zna rekoncyliacja. Kliknięcie
-  prowadzi do szczegółu.
+- **Pasek stanu to dwie ikony, widoczne z każdej zakładki** (0.114.0).
+  Ikona SYSTEM zmienia kolor: zielony — wszystko gra, bursztyn — działa, ale
+  kuleje, czerwień — coś stoi. Najechanie pokazuje pełne zdania: wersję i tryb
+  serwera, workera, kolejkę, rozjazdy i problemy z `/api/health`. Kliknięcie
+  prowadzi do STANU SYSTEMU. Ikona ALLEGRO mówi kolorem o stanie konta,
+  a kliknięcie otwiera kartę KONTO ALLEGRO i od razu zaczyna parowanie.
 - **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
   PRACA (dostawy, zwroty) otwiera się kilkanaście razy dziennie.
   WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.

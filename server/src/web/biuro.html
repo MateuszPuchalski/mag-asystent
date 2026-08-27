@@ -98,7 +98,24 @@
   /* Od 0.95.0 `#chrome` niesie WYŁĄCZNIE pasek stanu — zakładki pojechały do
      nagłówka. Odstęp pod paskiem był odstępem PRZED zakładkami; bez nich
      zostałby pustym pasmem papieru nad pierwszą kartą. */
+  #chrome { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
   #chrome #stan { margin-bottom: 0; }
+  /* Ikony stanu (0.114.0): kropka mówi kolorem, `title` zdaniami. Tooltip
+     natywny świadomie — panel biura to desktop z myszą (założenie repo),
+     a własny dymek to kolejny kawałek UI do utrzymania bez nowej informacji. */
+  .ikonaStanu {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--card);
+    padding: 4px 12px; font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px;
+    color: var(--ink-soft);
+  }
+  .ikonaStanu:hover { border-color: var(--amber); color: var(--ink); }
+  .ikonaStanu i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-soft); }
+  .ikonaStanu.ok i { background: var(--ok); }
+  .ikonaStanu.amber i { background: var(--amber); }
+  .ikonaStanu.err i { background: var(--err); }
+  /* Czerwień ma być widoczna kątem oka — sama kropka 10 px nie jest. */
+  .ikonaStanu.err { border-color: var(--err); background: var(--err-bg); color: var(--err); }
 
   /* Karta, do której prowadzi kliknięcie kafla w pasku stanu (`scrollIntoView`)
      albo `focus()` po przełączeniu zakładki, wjechałaby POD przyklejony pasek.
@@ -936,10 +953,19 @@
        Wrapper zostaje mimo to: to on jest przyklejony i to on rysuje miękką
        krawędź pod chromem, a `#stan` przerysowuje się z serwera. -->
   <div id="chrome">
+  <!-- Dwie ikony zamiast rzędu kafli (0.114.0). Rząd „serwer OK · worker OK ·
+       kolejka bez błędów" świecił na zielono cały dzień — pasek, który zawsze
+       coś mówi, uczy siebie nie czytać. Kolor odpowiada na jedyne pytanie
+       biura („czy coś się dzieje?"), a WSZYSTKO, co niosły kafle, jedzie
+       w tooltipie `title`. Ikona Allegro stoi tu, bo parowanie zaczynało się
+       trzy ekrany w głąb zakładki SPRAWY — właściciel go nie znajdował. -->
+  <button class="ikonaStanu" id="ikonaZdrowia" title="Czekam na pierwszy odczyt stanu…"><i></i>SYSTEM</button>
+  <button class="ikonaStanu" id="ikonaAllegro" title="Stan konta Allegro jeszcze nieznany"><i></i>ALLEGRO</button>
+  <!-- Zostają tylko plakietki-zdarzenia (odpowiedzi na notatki): to sygnał
+       roboczy z WŁASNĄ drogą (dostawy → karta odpowiedzi), nie zdrowie
+       systemu — zwinięcie go do ikony zdrowia zgubiłoby tę drogę drugi raz
+       (patrz zgłoszenie z 20 sierpnia w teście „licznik prowadzi do karty"). -->
   <div id="stan"></div>
-  <!-- Jeden znacznik na kulejący cykl odświeżania (0.111.0) — zamiast pięciu
-       niemych console.warn. Pusty, dopóki wszystko dochodzi. -->
-  <div id="cyklBlad"></div>
   </div>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
@@ -2313,53 +2339,125 @@ function pokaz(nowy) {
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
-   Cztery pytania, na które biuro odpowiada najczęściej, w jednym rzędzie:
-   czy serwer jest zdrowy, czy worker żyje, czy coś się nie zapisało i czy
-   Subiekt zgadza się z tym, co zapisaliśmy. Kliknięcie prowadzi do szczegółu. */
+   Od 0.114.0 jedna ikona zamiast rzędu kafli. Kafle odpowiadały na cztery
+   pytania naraz i ZAWSZE — także wtedy, gdy odpowiedź brzmiała „wszystko gra",
+   czyli przez większość dnia. Ikona odpowiada kolorem na jedno pytanie
+   („czy coś wymaga uwagi?"), a pełne zdania — te same, które stały na
+   kaflach, z etykietą instancji włącznie — jadą w `title` i po kliknięciu
+   w STAN SYSTEMU. Czerwień = coś stoi; bursztyn = działa, ale kuleje. */
+let ostatniHealth = null;
+let ostatniaKolejka = null;
+/* Kulejące odświeżenie z POPRZEDNIEGO przebiegu — `cyklKuleje` zeruje się
+   na końcu cyklu, a ikona musi pamiętać werdykt do następnego przerysowania. */
+let kulawyCykl = null;
+
 function rysujStan(health, kolejka) {
+  /* Ikona nie może mrugać na szaro, gdy JEDEN odczyt padnie — rysujemy
+     z ostatnich znanych danych, a o awarii cyklu mówi bursztyn niżej. */
+  ostatniHealth = health ?? ostatniHealth;
+  ostatniaKolejka = kolejka ?? ostatniaKolejka;
+  health = ostatniHealth; kolejka = ostatniaKolejka;
   /* `/api/health` niesie sekcję `zdjecia` TYLKO wtedy, gdy funkcja jest w ogóle
      włączona (`ZDJECIA_ZRODLO`). Na instalacji bez zdjęć kolumna z ramkami
      „bez zdjęcia" przy każdej pozycji byłaby czystym szumem — mówiłaby
      o brakującej kartotece, choć brakuje ustawienia. */
   if (health) zdjeciaWlaczone = !!health.zdjecia;
-  const kafle = [];
-  /* Etykieta instancji (0.69.0). PIERWSZY kafel i czerwony, bo odpowiada na
-     pytanie zadawane PRZED każdym innym: „czy ja na pewno patrzę na właściwy
-     serwer". Dwie instancje na jednej maszynie różnią się tylko portem
-     w pasku adresu — a portu nikt nie czyta. Na produkcji kafla nie ma wcale:
-     stały napis „PRODUKCJA" byłby szumem, który uczy ignorować kolor. */
-  if (health && health.srodowisko && health.srodowisko !== "produkcja") {
-    kafle.push(`<span class="badge err">⚠ ${esc(health.srodowisko).toUpperCase()} · to nie jest produkcja</span>`);
-  }
-  const zle = health && health.ok === false;
-  kafle.push(`<span class="badge ${zle ? "err" : "ok"}" data-do="nadzor">
-      ${zle ? "⚠ " : "✓ "}serwer ${esc(health?.wersja || "")} · ${esc(health?.mode || "")}</span>`);
+
+  const czerwone = [];
+  const bursztynowe = [];
+  const linie = [];
   if (health) {
+    /* Etykieta instancji (0.69.0) — PIERWSZA linia tooltipa, bo odpowiada na
+       pytanie zadawane przed każdym innym: „czy ja patrzę na właściwy
+       serwer". Nie barwi ikony: na stałej instalacji dev wieczna czerwień
+       uczyłaby ignorować kolor, czyli psuła jedyny sygnał, jaki ikona ma. */
+    if (health.srodowisko && health.srodowisko !== "produkcja") {
+      linie.push(`⚠ ${health.srodowisko.toUpperCase()} — to nie jest produkcja`);
+    }
     const w = health.worker || {};
-    kafle.push(`<span class="badge ${w.zyje ? "ok" : "err"}" data-do="nadzor">
-      worker ${w.zyje ? "pracuje" : "NIE ŻYJE"}</span>`);
+    linie.push(
+      `serwer ${health.wersja || "?"} · ${health.mode || "?"}` +
+      ` · worker ${w.zyje ? "pracuje" : "NIE ŻYJE"}`
+    );
+    if (!w.zyje) czerwone.push("worker");
+    if (health.ok === false) czerwone.push("serwer");
+  } else {
+    linie.push("Nie udało się pobrać stanu serwera — szczegóły w konsoli przeglądarki.");
+    bursztynowe.push("brak odczytu");
   }
   if (kolejka) {
     const s = kolejka.summary || {};
-    if (s.error) kafle.push(`<span class="badge err" data-do="nadzor">${s.error} zadań w błędzie</span>`);
-    else kafle.push('<span class="badge ok" data-do="nadzor">kolejka bez błędów</span>');
-    if (s.pending) kafle.push(`<span class="badge amber" data-do="nadzor">${s.pending} w drodze</span>`);
+    if (s.error) czerwone.push("kolejka");
+    /* `pending` to normalny stan przejściowy (zdjęcia w drodze) — jedzie
+       w tooltipie, ale nie barwi ikony, bo bursztyn przy każdym zapisie
+       nauczyłby biuro, że bursztyn nic nie znaczy. */
+    linie.push(
+      s.error
+        ? `kolejka: ${s.error} zadań w błędzie` + (s.pending ? ` · ${s.pending} w drodze` : "")
+        : `kolejka bez błędów` + (s.pending ? ` · ${s.pending} w drodze` : "")
+    );
   }
   if (ostatnieRozjazdy) {
     const n = ostatnieRozjazdy.rozjazdy.length;
-    kafle.push(`<span class="badge ${n ? "err" : "ok"}" data-do="nadzor">
-      ${n ? n + " rozjazdów" : "bez rozjazdów"}</span>`);
+    if (n) czerwone.push("rozjazdy");
+    linie.push(n ? `${n} rozjazdów z Subiektem` : "bez rozjazdów z Subiektem");
   }
-  /* Odpowiedzi na notatki (0.57.0). Sygnał stoi TUTAJ, bo pasek widać
-     z każdej zakładki, a biuro i tak patrzy w to miejsce po inne alarmy.
-     Bez niego odpowiedź widać było wyłącznie po wejściu w tę konkretną
-     dostawę — a nie było powodu tam wracać. */
-  if (odpowiedziNaNotatki.length) {
-    const n = odpowiedziNaNotatki.length;
-    kafle.push(`<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi">
-      ${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span>`);
+  /* Zdania z `problemy[]` w całości — to dla nich biuro najedzie na ikonę. */
+  for (const p of health?.problemy || []) { czerwone.push("problem"); linie.push(`⚠ ${p}`); }
+  /* Kulejący cykl (0.111.0, do 0.113.0 osobny znacznik `#cyklBlad`):
+     serwer może być zdrowy, a panel i tak pokazywać wczorajszość. */
+  if (kulawyCykl) {
+    bursztynowe.push("cykl");
+    linie.push(`Ostatnie odświeżenie nie doszło (${kulawyCykl}) — szczegóły w konsoli przeglądarki.`);
   }
-  $("stan").innerHTML = kafle.join(" ");
+
+  const ik = $("ikonaZdrowia");
+  ik.className = "ikonaStanu " + (czerwone.length ? "err" : bursztynowe.length ? "amber" : "ok");
+  /* Natywny `title` łamie wiersze po \n — jedno zdanie na linię. */
+  ik.title = linie.join("\n") + "\nKliknij: STAN SYSTEMU.";
+
+  /* Odpowiedzi na notatki (0.57.0) zostają plakietką OBOK ikon: mają własną
+     drogę (dostawy → karta odpowiedzi), a zgłoszenie z 20 sierpnia nauczyło,
+     że sygnał bez drogi do treści jest sygnałem zgubionym. */
+  const n = odpowiedziNaNotatki.length;
+  $("stan").innerHTML = n
+    ? `<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi">
+      ${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span>`
+    : "";
+
+  rysujIkoneAllegro();
+}
+
+/* Ikona Allegro obok ikony zdrowia. Osobna, bo Allegro ma osobny cykl życia
+   (parowanie, wygaśnięcie tokenu) i osobne wejście: klik prowadzi do karty
+   KONTO ALLEGRO — karta zostaje miejscem pracy, ikona jest tylko drzwiami. */
+function rysujIkoneAllegro() {
+  const ik = $("ikonaAllegro");
+  const s = stanAllegro;
+  let kolor = "";
+  let tip = "Stan konta Allegro jeszcze nieznany";
+  if (parowanieTrwa) {
+    kolor = "amber";
+    tip = "Parowanie w toku — kod czeka na potwierdzenie w Allegro.\nKliknij, aby wrócić do karty KONTO ALLEGRO.";
+  } else if (s) {
+    if (s.stan === "polaczone") {
+      kolor = "ok";
+      tip = `Połączone · środowisko ${s.srodowisko}` +
+        (s.wygasa ? `\nToken ważny do ${s.wygasa.slice(0, 16).replace("T", " ")} (odświeża się sam).` : "");
+    } else if (s.stan === "dev") {
+      tip = "Adapter dev — fikcyjne zwroty bez kontaktu z Allegro.";
+    } else if (s.stan === "wylaczone") {
+      tip = "Funkcja wyłączona — brak ALLEGRO_CLIENT_ID w wertis.env.";
+    } else {
+      kolor = "err";
+      tip = (s.stan === "zle_srodowisko"
+        ? `Token z innego środowiska niż ${s.srodowisko} — sparuj ponownie.`
+        : `Niepołączone — skan etykiety nie zadziała (środowisko ${s.srodowisko}).`) +
+        "\nKliknij, aby sparować — parowanie wykonuje admin.";
+    }
+  }
+  ik.className = "ikonaStanu" + (kolor ? " " + kolor : "");
+  ik.title = tip;
 }
 
 /* ── Dostawy ── */
@@ -4415,6 +4513,10 @@ async function odswiezStan() {
       (await api("/api/biuro/notatki/odpowiedzi")).json().catch(() => ({ odpowiedzi: [] })),
     ]);
     odpowiedziNaNotatki = odp.odpowiedzi || [];
+    /* Stan Allegro jedzie od 0.114.0 także w health — ikona w pasku ma być
+       aktualna z KAŻDEJ zakładki, nie dopiero po wejściu na SPRAWY. Zakładka
+       SPRAWY dalej nadpisuje świeższym odczytem z /api/biuro/zwroty. */
+    if (h.allegro) stanAllegro = h.allegro;
     rysujOdpowiedzi();
     rysujStan(h, q);
     return { h, q };
@@ -4454,19 +4556,17 @@ async function odswiezNadzor() {
 /* ── Sygnał kulejącego cyklu (0.111.0) ───────────────────────────────────────
    Pięć odświeżaczy łykało błędy w console.warn — słusznie nie wywracały
    cyklu, ale awaria wyglądała dla biura jak „nic nowego nie przyszło".
-   Jeden wspólny znacznik w pasku stanu zamiast pięciu czerwonych plam:
-   mówi, ŻE cykl kuleje i GDZIE, a gaśnie przy pierwszym czystym przebiegu. */
+   Od 0.114.0 werdykt nie ma własnego znacznika: wchodzi jako bursztyn
+   ikony zdrowia i zdanie w jej tooltipie, a gaśnie przy czystym przebiegu. */
 let cyklKuleje = null;
 function cichaAwaria(gdzie, e) {
   console.warn(`[${gdzie}]`, e);
   cyklKuleje = gdzie;
 }
 function pokazZdrowieCyklu() {
-  const cel = $("cyklBlad");
-  if (!cel) return;
-  cel.innerHTML = cyklKuleje
-    ? `<span class="badge err" title="Ostatnie odświeżenie nie doszło — szczegóły w konsoli przeglądarki">ODŚWIEŻANIE KULEJE · ${esc(cyklKuleje)}</span>`
-    : "";
+  kulawyCykl = cyklKuleje;
+  /* Przerysowanie z ostatnich znanych danych — `rysujStan` trzyma je sam. */
+  rysujStan(null, null);
 }
 
 async function odswiez() {
@@ -6484,6 +6584,7 @@ async function rozpocznijParowanieAllegro() {
      sklep, więc liczy go anti-bot. Serwer i tak oddaje ten sam kod. */
   if (parowanieTrwa) return;
   parowanieTrwa = true;
+  rysujIkoneAllegro();
   try {
     const d = await (await api("/api/biuro/allegro/parowanie", { method: "POST", body: "{}" })).json();
     $("allegroStan").innerHTML = `Na SWOIM zalogowanym koncie Allegro otwórz
@@ -6501,6 +6602,7 @@ async function rozpocznijParowanieAllegro() {
     pollParowania();
   } catch (e) {
     parowanieTrwa = false;
+    rysujIkoneAllegro();
     toast(e.message);
     odswiezZwroty();
   }
@@ -6512,6 +6614,7 @@ async function rozpocznijParowanieAllegro() {
    mówi o tym wprost. */
 function przerwijParowanie() {
   parowanieTrwa = false;
+  rysujIkoneAllegro();
   odswiezZwroty();
 }
 
@@ -6519,21 +6622,36 @@ async function pollParowania() {
   if (!parowanieTrwa) return;
   try {
     const d = await (await api("/api/biuro/allegro/parowanie")).json();
-    if (d.stan === "czekam" || d.stan === "brak") {
+    if (d.stan === "czekam") {
       /* Rytm dyktuje SERWER: rośnie z czasem czekania, żeby zostawiona
          zakładka nie pytała równo co trzy sekundy przez godzinę. */
       setTimeout(pollParowania, d.nastepnyPollMs ?? 5000);
       return;
     }
     parowanieTrwa = false;
-    if (d.stan === "polaczone") { odswiezZwroty(); return; }
+    if (d.stan === "brak") {
+      /* Sesja parowania żyje w PAMIĘCI procesu serwera — restart w trakcie
+         (typowo: wdrożenie) ją zjada i serwer uczciwie mówi „brak". Do
+         0.113.0 `brak` kręcił się tu jak `czekam`, w nieskończoność:
+         `parowanieTrwa` zostawało true, a guardy w rozpocznij/rysuj czyniły
+         guzik POŁĄCZ martwym aż do przeładowania strony. To był zgłoszony
+         „niedziałający guzik" — dlatego `brak` KOŃCZY pętlę i oddaje guzik. */
+      $("allegroStan").innerHTML = '<span class="badge err">SESJA PAROWANIA PRZEPADŁA</span> ' +
+        'najpewniej restart serwera w trakcie — zacznij od nowa.';
+      $("allegroAkcje").innerHTML = '<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>';
+      rysujIkoneAllegro();
+      return;
+    }
+    if (d.stan === "polaczone") { rysujIkoneAllegro(); odswiezZwroty(); return; }
     $("allegroStan").innerHTML = d.stan === "odmowa"
       ? '<span class="badge err">ODMOWA W ALLEGRO</span> spróbuj ponownie'
       : '<span class="badge err">KOD WYGASŁ</span> spróbuj ponownie';
     $("allegroAkcje").innerHTML = '<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>';
+    rysujIkoneAllegro();
   } catch (e) {
     parowanieTrwa = false;
     toast(e.message);
+    rysujIkoneAllegro();
     odswiezZwroty();
   }
 }
@@ -6651,7 +6769,25 @@ document.addEventListener("click", (e) => {
   blok.hidden = !blok.hidden;
   i.setAttribute("aria-expanded", String(!blok.hidden));
 });
-$("stan").addEventListener("click", (e) => {
+/* Delegacja z poziomu SEKCJI (#chrome), nie z plakietek w środku — plakietki
+   przerysowuje co pół minuty `rysujStan`, a nasłuch ma to przeżyć. */
+$("chrome").addEventListener("click", (e) => {
+  if (e.target.closest("#ikonaZdrowia")) return pokaz("nadzor");
+  if (e.target.closest("#ikonaAllegro")) {
+    /* Ikona to drzwi, karta KONTO ALLEGRO — miejsce pracy. Gdy stan woła
+       o parowanie, klik od razu je zaczyna: to była cała droga właściciela
+       („guzik do połączenia"), a rozpocznij… sam pilnuje podwójnego kliku
+       i sam pokaże 403, gdy klika ktoś bez roli admin. */
+    pokaz("sprawy");
+    const karta = $("kontoAllegroKarta");
+    karta.open = true;
+    karta.scrollIntoView({ block: "start", behavior: "smooth" });
+    const s = stanAllegro;
+    if (s && (s.stan === "niepolaczone" || s.stan === "zle_srodowisko")) {
+      rozpocznijParowanieAllegro();
+    }
+    return;
+  }
   const b = e.target.closest("[data-do]");
   if (!b) return;
   pokaz(b.dataset.do);

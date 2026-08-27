@@ -37,7 +37,7 @@ import {
   lastImport,
   przyjeciaBezPozycji,
 } from "./adapters/subiekt.mssql.js";
-import { problemAllegro, problemUserAgenta } from "./services/allegro-token.js";
+import { problemAllegro, problemUserAgenta, stanPolaczenia } from "./services/allegro-token.js";
 import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { uruchomTickerPytan } from "./services/pytania.js";
 import { uruchomTickerDyskusji } from "./services/dyskusje.js";
@@ -148,6 +148,11 @@ export async function buildApp() {
         mode: worker.sgtMode,
         widziany: worker.widziany,
       },
+      /* Stan konta Allegro dla ikony w pasku (0.114.0) — panel ma go widzieć
+         z każdej zakładki, a nie dopiero po odczycie listy zwrotów. Trasa jest
+         publiczna i to jest w porządku: payload to stan/środowisko/data
+         wygaśnięcia — bez loginu konta i bez tokenów. */
+      allegro: stanPolaczenia(),
       /* Pole addytywne — kolektor go nie deserializuje (Dtos.kt ignoruje
          nieznane pola), więc stare APK nie mają czego zepsuć. */
       ...(sfera ? { sfera: { zyje: sfera.zyje, mode: sfera.sgtMode, widziany: sfera.widziany } } : {}),
