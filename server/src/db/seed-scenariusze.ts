@@ -222,6 +222,7 @@ export const KATALOG: Scenariusz[] = [
   { id: "S75", obszar: "pytania", tytul: "Wykres tygodni, słupki proporcji i zdanie o szczycie — pytania rozłożone na dwa miesiące", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\" → okno 90 dni" },
   { id: "S76", obszar: "zwroty", tytul: "Wgląd w zwroty stoi w ANALIZIE, nie w zakładce pracy", wejscie: "/biuro → ANALIZA → zakres „zwroty\"" },
   { id: "S77", obszar: "dostawy", tytul: "Analiza dostaw: u kogo się psuje, i dostawa zdjęta poza WERTIS", wejscie: "/biuro → ANALIZA → zakres „dostawy\"" },
+  { id: "S78", obszar: "sprawy", tytul: "Jedna kolejka i dwie tafle: konsola SPRAW na wysokość okna", wejscie: "/biuro → SPRAWY" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────

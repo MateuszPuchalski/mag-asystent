@@ -45,6 +45,9 @@
        w dwóch miejscach to dwa miejsca do rozjazdu przy pierwszym strojeniu.
        Ten sam powód, dla którego progi szerokości mają jeden literał. */
     --brzeg: clamp(10px, 1.2vw, 24px);
+    /* Stopka strony. Konsola sięga do dolnej krawędzi okna, więc musi ją odjąć —
+       ten sam powód, dla którego margines boczny ma własną zmienną. */
+    --stopka: 28px;
   }
   * { box-sizing: border-box; margin: 0; }
   /* `main` ma display:grid, a styl autora wygrywa z arkuszem przeglądarki —
@@ -82,7 +85,7 @@
      własnej wysokości, więc nie ma zakresu ruchu i po prostu się nie przykleja.
      Siatką jest każdy widok osobno (`.widok`), nie kontener. Reguła `main`
      wyżej zostaje dla `#login`, które dalej ma być wąskim pudełkiem. */
-  main#panel { max-width: none; margin: 0; padding: 0 var(--brzeg) 28px; display: block; }
+  main#panel { max-width: none; margin: 0; padding: 0 var(--brzeg) var(--stopka); display: block; }
 
   /* Pasek stanu i zakładki jadą ze stroną. Przewinięcie listy dostaw nie ma
      prawa zabierać z ekranu ani nawigacji, ani alarmu o kolejce w błędzie —
@@ -153,6 +156,14 @@
      nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
   .widok > .pelna { grid-column: 1 / -1; }
 
+  /* Szyna rejestrów jest POJEMNIKIEM, nie kartą: poniżej 1024 px konsoli nie
+     ma, więc ma się rozsypać z powrotem na zwykły stos kart — a wtedy odstęp
+     między nimi musi zostać taki, jak między kartami zakładki. */
+  .rejestry { display: grid; gap: var(--luz); align-content: start; }
+  .rejestry > details.zwijana { border-top: 0; margin-top: 0; padding: 12px 14px;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
+    box-shadow: var(--cien); }
+
   /* ── PASMO ŚREDNIE: szyna zostaje, kontekst chowa się do szuflady ─────────
      Między 1024 a 1280 px trzy strefy obok siebie się nie mieszczą — kolumna
      sprawy schodziłaby poniżej miary, przy której da się czytać wątek. Ale
@@ -187,29 +198,41 @@
      się przy widocznym pasku przewijania), a tylko sięga o `--brzeg` szerzej
      w obie strony. */
   @media (min-width: 1024px) {
-    .widok.zSzczegolem {
+    .widok.konsola {
       gap: 0;
       margin-top: 0;
       margin-inline: calc(-1 * var(--brzeg));
+      margin-bottom: calc(-1 * var(--stopka));
+      /* Tło konsoli, nie kart: kolumna kolejki bywa krótsza od okna i pod nią
+         prześwitywał papier, przez co jedna tafla wyglądała na odciętą w pół
+         wysokości. Stanowisko jest jedno, więc i płaszczyzna jest jedna. */
+      background: var(--card);
+      /* WYSOKOŚĆ OKNA, i to nie jest ozdoba. Strefy konsoli są `sticky`
+         i każda ma własne `height` na pełne okno, ale SIATKA pod nimi rosła
+         bez ograniczenia: `grid-row: 1 / span 50` (którym strefa obok kolejki
+         obejmuje stos jej kart) tworzy 50 rzędów, a nadmiar wysokości strefy
+         rozkłada się po tych pustych rzędach. Wychodziło z tego 800 px pustego
+         przewijania POD konsolą — widać było tylko to, że pasek przewijania
+         jest, a nie ma czego przewijać. Zmierzone w przeglądarce. */
+      height: calc(100dvh - var(--hChrome, 130px));
     }
     /* Strefy tracą wszystko, co robiło z nich osobne kartki. Ramki zostają
        tylko WEWNĘTRZNE — boczne krawędzie konsoli dotykają okna i ramka
        rysowałaby tam kreskę wzdłuż samej krawędzi ekranu. */
-    .widok.zSzczegolem > .card,
-    .widok.zSzczegolem > .szczegol,
-    .widok.zSzczegolem > .kontekst {
+    .widok.konsola > .card,
+    .widok.konsola > .szczegol,
+    .widok.konsola > .kontekst {
       border-radius: 0;
       box-shadow: none;
       border-top: 0; border-bottom: 0;
       border-left: 0; border-right: 0;
     }
-    .widok.zSzczegolem > .szczegol,
-    .widok.zSzczegolem > .kontekst { border-left: 1px solid var(--border); }
-    /* Kolumna kolejki bywa STOSEM kart, nie jedną: przy zwrocie stoi pod nią
-       karta brakujących paczek (`PRZY_ZWROCIE`). Bez odstępu zlałyby się
-       w jedną płaszczyznę bez szwu, więc rozdziela je ta sama kreska, która
-       rozdziela strefy. */
-    .widok.zSzczegolem > .card ~ .card { border-top: 1px solid var(--border); }
+    .widok.konsola > .szczegol,
+    .widok.konsola > .kontekst { border-left: 1px solid var(--border); }
+    /* Kolumna kolejki bywa STOSEM kart, nie jedną: przy dostawach stoi pod
+       listą karta „poza WERTIS". Bez odstępu zlałyby się w jedną płaszczyznę
+       bez szwu, więc rozdziela je ta sama kreska, która rozdziela strefy. */
+    .widok.konsola > .card ~ .card { border-top: 1px solid var(--border); }
 
     /* Szyna kolejki przewija się WŁASNYM przewijaniem, jak dwie pozostałe
        strefy. Do tej wersji jechała ze stroną, podczas gdy sprawa i kontekst
@@ -226,7 +249,7 @@
        karta brakujących paczek, przy dostawach karta „poza WERTIS". Sztywna
        wysokość dałaby każdej z nich pełne okno osobno, czyli kolumnę dwa razy
        wyższą od ekranu — sprawdzone na dostawach, zanim to trafiło dalej. */
-    .widok.zSzczegolem > .card {
+    .widok.konsola > .card {
       position: sticky; top: var(--hChrome, 130px);
       max-height: calc(100dvh - var(--hChrome, 130px));
       overflow: auto; overscroll-behavior: contain;
@@ -246,6 +269,56 @@
     }
     #widokDostawy.zSzczegolem,
     #widokSprawy.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr); }
+
+    /* ── SPRAWY bez otwartej sprawy: kolejka · rejestry ──────────────────────
+       Trzecia geometria tej samej konsoli i jedyna, w której KOLEJKA jest
+       szeroka. Przy otwartej sprawie wąska jest kolejka, bo osią pracy jest
+       sprawa; bez otwartej sprawy osią jest kolejka i to rejestry schodzą do
+       szyny. Do 0.116.0 tego stanu nie było wcale — zakładka była wtedy
+       pionowym stosem dziewięciu kart na dwa ekrany przewijania. */
+    #widokSprawy.zKolejka { grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); }
+    #widokSprawy.zKolejka > .card { grid-column: 1; }
+    /* BEZ `grid-row: 1 / span 50`, którym rozpina się kolumnę przy otwartej
+       sprawie. Tam kolumna kolejki bywa stosem kart i strefa obok musi objąć
+       wszystkie jego rzędy; tutaj w kolumnie kolejki stoi DOKŁADNIE jedna
+       karta, a rozpięcie na 50 rzędów dokłada 49 pustych rzędów po kilkanaście
+       pikseli — czyli 800 px przewijania strony pod konsolą, której nie widać,
+       bo jest pusta. Zmierzone, nie wydedukowane. */
+    #widokSprawy.zKolejka > .rejestry {
+      grid-column: 2;
+      position: sticky; top: var(--hChrome, 130px);
+      height: calc(100dvh - var(--hChrome, 130px));
+      overflow: auto; overscroll-behavior: contain;
+      border-left: 1px solid var(--border);
+      background: var(--card);
+      gap: 0;
+    }
+    /* Rejestry w szynie przestają być kartami — szyna JEST jedną taflą, a nie
+       stosem kartek w pudełku. Kreska między nimi zostaje, bo bez niej
+       zwinięte nagłówki zlałyby się w listę bez granic. */
+    #widokSprawy.zKolejka > .rejestry > * {
+      border-radius: 0; box-shadow: none;
+      border-left: 0; border-right: 0; border-bottom: 0;
+      border-top: 1px solid var(--border);
+      margin-top: 0;
+      /* Tabela kosza ma pięć kolumn i nie zwęzi się do 22 rem. Przewija się
+         WŁASNYM przewijaniem poziomym, w swojej sekcji — bez `min-width: 0`
+         rozpychała całą szynę i poziomo jechały wszystkie rejestry naraz,
+         łącznie z tymi, które się mieszczą. */
+      min-width: 0; overflow-x: auto;
+    }
+    #widokSprawy.zKolejka > .rejestry > :first-child { border-top: 0; }
+
+    /* Karta klienta bez otwartej sprawy — ta sama tafla na pełne okno, tylko
+       jednokolumnowa. Bez tego wejście w klienta wypadało z konsoli z powrotem
+       na papier w zaokrąglonej karcie, choć jest tym samym stanowiskiem. */
+    #widokSprawy.zKlient { grid-template-columns: minmax(0, 1fr); }
+    #widokSprawy.zKlient > .szczegol {
+      grid-column: 1;
+      position: sticky; top: var(--hChrome, 130px);
+      height: calc(100dvh - var(--hChrome, 130px));
+      overflow: auto; overscroll-behavior: contain;
+    }
   }
 
   /* ── Szuflada kontekstu ────────────────────────────────────────────────────
@@ -1109,6 +1182,18 @@
       <div id="klientHistoria" style="margin-top:14px"></div>
     </section>
 
+    <!-- JEDYNA kolejka zakładki (0.116.0). Do tej wersji stały tu TRZY —
+         ta, „ZWROTY" i „SKRZYNKA" — każda z własnym nagłówkiem, filtrem
+         i kompletem wierszy, a wszystkie trzy pokazywały te same sprawy
+         w innej kolejności. Wybór, w którą patrzeć, był pracą samą w sobie
+         i nie odpowiadał na pytanie „co teraz zrobić".
+
+         Rejestry per-typ zeszły do szyny obok jako zwijane — do archiwum
+         (zwroty rozliczone, pytania wysłane) wchodzi się z nich dalej. Ale
+         NARZĘDZIA, które w nich mieszkały — skan etykiety, pobrania z Allegro,
+         wyszukiwarka klientów — należą do kolejki, nie do rejestru, i dlatego
+         przeprowadziły się tutaj. Nic nie zginęło; zmieniło się, co jest
+         pierwszym planem. -->
     <section class="card" id="kolejkaSprawKarta">
       <h2>SPRAWY KLIENTÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -1120,10 +1205,23 @@
           Klik otwiera sprawę; klik w login klienta otwiera jego kartę
           ze wszystkimi sprawami. Wiersz (BEZ LOGINU) zbiera wklejki
           z poczty i zwroty ręczne — sprawy bez konta Allegro.
+          Rejestry per-typ, razem z archiwum, stoją w szynie obok.
         </p>
       </div>
       <p id="sprawyPodsumowanie" style="margin-bottom:9px"></p>
-      <div class="czipy" id="sprawyCzipy">
+
+      <!-- DWA WEJŚCIA DO SPRAWY, oba w głowie kolejki, bo oba kończą się
+           otwartą sprawą — a nie krótszą listą. Skan jest wejściem od paczki
+           (praca ze zwrotem ZACZYNA się od etykiety), wyszukiwarka wejściem
+           od klienta, który dzwoni. Czipy niżej robią co innego: zawężają tę
+           samą listę, więc stoją przy niej, nie tutaj. -->
+      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:100%">
+      <div id="zwrotSkanWynik" style="margin-top:8px"></div>
+      <input class="szukaj" id="klienciSzukaj" style="width:100%;margin-top:8px"
+             placeholder="znajdź klienta po loginie" autocomplete="off">
+      <div id="klienciWyniki"></div>
+
+      <div class="czipy" id="sprawyCzipy" style="margin-top:12px">
         <button class="czip" data-rodzaj="" aria-pressed="true">Wszystkie</button>
         <button class="czip" data-rodzaj="pytanie" aria-pressed="false">Pytania</button>
         <button class="czip" data-rodzaj="zwrot" aria-pressed="false">Zwroty</button>
@@ -1131,6 +1229,24 @@
         <button class="czip" data-rodzaj="reklamacja" aria-pressed="false">Reklamacje</button>
       </div>
       <table id="sprawyLista" style="margin-top:10px"></table>
+
+      <!-- Trzy pobrania w jednym rzędzie i wszystkie CICHE. Bursztyn znaczy
+           „ta jedna rzecz do zrobienia tutaj", a tą rzeczą jest sprawa
+           klienta, nie pobranie poczty. Rozsypane po trzech kartach kazały
+           pamiętać, które gdzie stoi; w jednym rzędzie widać też, że
+           WSZYSTKIE trzy rejestry ciągnie się z Allegro ręcznie. -->
+      <div class="sprawaSzyna" style="margin-top:12px">
+        <button class="akcja cichy" id="pytaniaOdswiez">POBIERZ PYTANIA</button>
+        <button class="akcja cichy" id="zapowiedziPobierz">POBIERZ ZWROTY</button>
+        <button class="akcja cichy" id="dyskusjePobierz">POBIERZ DYSKUSJE</button>
+      </div>
+      <!-- Kiedy ostatnio pytaliśmy Allegro i co z tego wyszło. Do 0.102.0 te
+           liczby leciały w toast i ginęły razem z nim — po odświeżeniu strony
+           nie dało się odróżnić „dziś nikt nie napisał" od „nikt dziś nie
+           pobierał". Przy kolejce na zero to JEDYNA rzecz, która te dwa stany
+           rozróżnia, a zero znaczy w nich co innego. -->
+      <p class="mute" id="pytaniaOstatniePobranie" style="margin-top:7px"></p>
+      <div id="dyskusjeTicker" class="mute" style="margin-top:4px;font-size:12px"></div>
     </section>
 
     <!-- ── Karty zwrotów (do 0.108.0 osobna zakładka ZWROTY ALLEGRO) ────────
@@ -1240,142 +1356,6 @@
         </div>
       </div>
     </section>
-
-
-    <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
-         upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
-         tabela „wszystko w porządku" byłaby szumem nad listą zwrotów. -->
-    <section class="card" id="brakujaceKarta" hidden>
-      <h2>BRAKUJĄCE PACZKI <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
-          paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
-          w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
-        </p>
-      </div>
-      <table id="brakujaceLista"></table>
-      <div id="brakujaceTicker" style="margin-top:8px;font-size:12px"></div>
-    </section>
-
-    <section class="card" id="zwrotListaKarta">
-      <!-- SKAN I KOLEJKA W JEDNEJ KARCIE (0.98.0). Do tej wersji stały osobno,
-           a przy otwartym zwrocie obie zostawały w szynie — dwa nagłówki
-           mówiące o tej samej kolejce, jeden nad drugim. Praca ze zwrotem
-           ZACZYNA się od zeskanowania etykiety na paczce, więc pole stoi
-           w głowie kolejki, tam gdzie wzrok i tak ląduje. -->
-      <h2>ZWROTY <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
-          Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
-          doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
-        </p>
-      </div>
-      <p id="zwrotyPodsumowanie" style="margin-bottom:9px"></p>
-      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:100%">
-      <div id="zwrotSkanWynik" style="margin-top:8px"></div>
-
-      <div class="czipy" id="zwrotyCzipy" style="margin-top:10px">
-        <button class="czip" data-status="nowy" aria-pressed="true">Do oceny</button>
-        <button class="czip" data-status="oceniony" aria-pressed="false">Czeka na środki</button>
-        <button class="czip" data-status="rozliczony" aria-pressed="false">Rozliczone</button>
-        <button class="czip" data-status="" aria-pressed="false">Wszystkie</button>
-      </div>
-      <input class="szukaj" id="zwrotSzukajLista" style="margin-top:8px"
-             placeholder="szukaj: etykieta / login / numer zwrotu">
-      <table id="zwrotLista"></table>
-      <!-- Pobranie zapowiedzi stoi POD listą i jest ciche: bursztyn zostaje dla
-           akcji na sprawie. Tu, a nie na karcie BRAKUJĄCE PACZKI, bo tamta
-           chowa się, gdy nie ma czego pokazać — a to jest właśnie chwila,
-           w której chce się sprawdzić, czy coś nowego przyszło. -->
-      <button class="akcja cichy" id="zapowiedziPobierz" style="margin-top:10px">POBIERZ Z ALLEGRO</button>
-    </section>
-
-    <section class="card" id="koszeKarta">
-      <h2>KOSZE ZWROTOWE <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
-          jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
-          Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
-        </p>
-      </div>
-      <div class="filtry" style="margin-bottom:10px">
-        <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
-          <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
-      </div>
-      <div id="koszWyniki"></div>
-      <table id="koszeLista"></table>
-      <div id="koszPodglad" style="margin-top:12px"></div>
-    </section>
-
-    <section class="card" id="pominieteKarta" hidden>
-      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
-          szukać dalej, reklamować u przewoźnika czy poprawić dokument.
-          Najdłużej czekające są na górze.
-        </p>
-      </div>
-      <table id="pominieteLista"></table>
-    </section>
-
-    <section class="card" id="reklamacjeKarta">
-      <h2>REKLAMACJE · PRIORYTET WG TERMINU <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
-          reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
-        </p>
-      </div>
-      <table id="reklamacjeLista"></table>
-    </section>
-
-    <!-- Dyskusje i reklamacje Allegro — rejestr pracy (0.103.0), a od 0.104.0
-         CAŁA sprawa w aplikacji: OTWÓRZ pokazuje rozmowę z Allegro, szkic
-         pisze model, odpowiedź (z załącznikiem) wysyła się stąd. Kolejka
-         z terminem dla CLAIM, właściciel i notatka zostają jak były. -->
-    <section class="card" id="dyskusjeKarta">
-      <h2>DYSKUSJE I REKLAMACJE ALLEGRO <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Kliknij OTWÓRZ, żeby przeczytać rozmowę i odpowiedzieć klientowi
-          prosto stąd — szkic przygotuje model, wysyłka idzie do Allegro.
-          Lista pokazuje, które sprawy czekają, kto którą prowadzi i ile dni
-          zostało do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu
-          schodzą z listy przy pobraniu same.
-        </p>
-      </div>
-      <div class="czipy" id="dyskusjeCzipy">
-        <button class="czip" data-status="" aria-pressed="true">Do obsłużenia</button>
-        <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
-        <button class="czip" data-status="w_toku" aria-pressed="false">W toku</button>
-        <button class="czip" data-status="zamknieta" aria-pressed="false">Zamknięte</button>
-        <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
-      </div>
-      <table id="dyskusjeLista" style="margin-top:8px"></table>
-      <button class="akcja cichy" id="dyskusjePobierz" style="margin-top:10px">POBIERZ Z ALLEGRO</button>
-      <div id="dyskusjeTicker" style="margin-top:8px;font-size:12px"></div>
-    </section>
-
-    <!-- Konto Allegro ZOSTAJE w zakładce zwrotów, choć trzy karty liczb obok
-         niego pojechały do ANALIZY w 0.99.0. To nie wgląd, tylko stan
-         POŁĄCZENIA: gdy token wygasa, przestaje działać skan i pobieranie
-         zapowiedzi, czyli praca na tej zakładce. Jej miejsce jest przy tej
-         pracy, nie przy liczbach o niej. -->
-    <details class="zwijana" id="kontoAllegroKarta">
-      <summary><h2>KONTO ALLEGRO</h2></summary>
-      <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
-      <div id="allegroAkcje"></div>
-    </details>
 
     <!-- ── Karty pytań (do 0.108.0 osobna zakładka PYTANIA KLIENTÓW) ───────
          Odpowiadanie na pytania o dobór części było dotąd pracą poza
@@ -1497,70 +1477,175 @@
       </details>
     </section>
 
-    <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
-         wzorzec karty KONTO ALLEGRO przy pustym client_id. -->
-    <section class="card pelna" id="pytaniaBaner" hidden>
-      <h2>SZKICE AI</h2>
-      <div id="pytaniaBanerTresc" class="mute"></div>
-    </section>
+    <!-- SZYNA REJESTRÓW (0.116.0) — druga tafla konsoli. Mieszka tu wszystko,
+         co nie jest kolejką: alarmy (szkice AI, brakujące paczki, pominięte
+         pozycje), praca magazynu przy koszach, wklejka z poczty, cztery
+         rejestry per-typ i stan połączenia z Allegro.
 
-    <section class="card" id="pytaniaListaKarta">
-      <!-- SKRZYNKA, nie „PYTANIA · DO ODPOWIEDZI". Nagłówek niesie teraz
-           liczbę spraw i ich rozbicie na te ze szkicem i te, które dopiero
-           czekają, aż model policzy. Te liczby JUŻ przychodziły — trasa
-           `/licznik` zwraca `szkice` i `nowe` — i lądowały wyłącznie
-           w dymku pod kursorem, czyli tam, gdzie ich nikt nie widział. -->
-      <h2>SKRZYNKA</h2>
-      <p id="pytaniaPodsumowanie" style="margin-bottom:9px"></p>
-      <!-- Czipy zamiast `<select>`: przy trzech stanach lista możliwości jest
-           krótsza niż jej schowanie. „Wszystkie" niesie też zamknięte
-           i pominięte — osobne czipy dla nich byłyby pięcioma pastylkami na
-           szynę 22 rem. -->
-      <div class="czipy" id="pytaniaCzipy">
-        <button class="czip" data-status="" aria-pressed="true">Do odpowiedzi</button>
-        <button class="czip" data-status="wyslane" aria-pressed="false">Wysłane</button>
-        <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
-      </div>
-      <table id="pytaniaLista" style="margin-top:10px"></table>
-      <!-- ODŚWIEŻ Z ALLEGRO zeszło pod listę i zgasło do cichego. Bursztyn
-           znaczy „ta jedna rzecz do zrobienia tutaj", a tą rzeczą jest
-           odpowiedź klientowi, nie pobranie poczty — dwa bursztyny obok
-           siebie kazałyby wybierać między nimi. -->
-      <button class="akcja cichy" id="pytaniaOdswiez" style="margin-top:10px">ODŚWIEŻ Z ALLEGRO</button>
-      <!-- Kiedy ostatnio pytaliśmy Allegro i co z tego wyszło. Do tej wersji
-           te liczby leciały w toast i ginęły razem z nim — po odświeżeniu
-           strony nie dało się odróżnić „dziś nikt nie napisał" od „nikt dziś
-           nie pobierał". Przy skrzynce na zero to JEDYNA rzecz, która te dwa
-           stany rozróżnia, a zero znaczy w nich co innego. -->
-      <p class="mute" id="pytaniaOstatniePobranie" style="margin-top:7px"></p>
-    </section>
+         Rejestry są ZWIJANE, bo to archiwum: kolejka pokazuje otwarte sprawy,
+         a tu wchodzi się po zwrot rozliczony, pytanie wysłane albo dyskusję
+         zamkniętą. Zwinięta sekcja nie pyta serwera — ta sama reguła, co przy
+         KONCIE ALLEGRO i wglądzie na zwrotach. -->
+    <div class="pelna rejestry" id="sprawyRejestry">
 
-    <!-- Wklejka STOI POD LISTĄ (0.86.0). Pytanie z poczty jest ścieżką
-         poboczną, a lista pracą główną — na laptopie z jedną kolumną wklejka
-         zsuwała listę pod krawędź ekranu. Nasłuch wklejania siedzi na
-         dokumencie, więc Ctrl+V działa w całej zakładce niezależnie od tego,
-         gdzie stoi karta. -->
-    <section class="card" id="pytaniaWklejkaKarta">
-      <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ <button class="info"
-        type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-          Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
-          wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
-          przepisana treść pytania.
+      <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
+           wzorzec karty KONTO ALLEGRO przy pustym client_id. -->
+      <section class="card pelna" id="pytaniaBaner" hidden>
+        <h2>SZKICE AI</h2>
+        <div id="pytaniaBanerTresc" class="mute"></div>
+      </section>
+
+      <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
+           upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
+           tabela „wszystko w porządku" byłaby szumem nad listą zwrotów. -->
+      <section class="card" id="brakujaceKarta" hidden>
+        <h2>BRAKUJĄCE PACZKI <button class="info" type="button"
+          aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+        <div class="objasnienie" hidden>
+          <p class="mute" style="margin-bottom:8px">
+        Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
+        paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
+        w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
         </p>
-      </div>
-      <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
-        placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
-      <div style="margin-top:8px">
-        <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
-        <span class="mute" id="pytaniaWklejkaStan"></span>
-      </div>
-    </section>
+        </div>
+        <table id="brakujaceLista"></table>
+        <div id="brakujaceTicker" style="margin-top:8px;font-size:12px"></div>
+      </section>
 
-    <!-- Statystyki zwinięte wzorem WGLĄDU ze ZWROTÓW (0.83.0). To jest wgląd
-         tygodniowy na zakładce, do której biuro wchodzi kilkanaście razy
-         dziennie — i sekcja zamknięta NIE PYTA serwera. -->
+      <section class="card" id="pominieteKarta" hidden>
+        <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
+          aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+        <div class="objasnienie" hidden>
+          <p class="mute" style="margin-bottom:8px">
+        Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
+        szukać dalej, reklamować u przewoźnika czy poprawić dokument.
+        Najdłużej czekające są na górze.
+        </p>
+        </div>
+        <table id="pominieteLista"></table>
+      </section>
+
+      <section class="card" id="koszeKarta">
+        <h2>KOSZE ZWROTOWE <button class="info" type="button"
+          aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+        <div class="objasnienie" hidden>
+          <p class="mute" style="margin-bottom:8px">
+        Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
+        jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
+        Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
+        </p>
+        </div>
+        <div class="filtry" style="margin-bottom:10px">
+          <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
+            <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
+        </div>
+        <div id="koszWyniki"></div>
+        <table id="koszeLista"></table>
+        <div id="koszPodglad" style="margin-top:12px"></div>
+      </section>
+
+      <!-- Wklejka STOI POD LISTĄ (0.86.0). Pytanie z poczty jest ścieżką
+           poboczną, a lista pracą główną — na laptopie z jedną kolumną wklejka
+           zsuwała listę pod krawędź ekranu. Nasłuch wklejania siedzi na
+           dokumencie, więc Ctrl+V działa w całej zakładce niezależnie od tego,
+           gdzie stoi karta. -->
+      <section class="card" id="pytaniaWklejkaKarta">
+        <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ <button class="info"
+          type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+        <div class="objasnienie" hidden>
+          <p class="mute" style="margin-bottom:8px">
+        Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
+        wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
+        przepisana treść pytania.
+        </p>
+        </div>
+        <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
+          placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
+        <div style="margin-top:8px">
+          <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
+          <span class="mute" id="pytaniaWklejkaStan"></span>
+        </div>
+      </section>
+
+      <details class="zwijana" id="zwrotListaKarta">
+        <summary><h2>REJESTR ZWROTÓW</h2><span class="podpis">skan i pobranie w kolejce</span></summary>
+        <p class="mute" style="margin-bottom:8px">
+        Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
+        Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
+        doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
+        </p>
+        <p id="zwrotyPodsumowanie" style="margin-bottom:9px"></p>
+
+        <div class="czipy" id="zwrotyCzipy" style="margin-top:10px">
+          <button class="czip" data-status="nowy" aria-pressed="true">Do oceny</button>
+          <button class="czip" data-status="oceniony" aria-pressed="false">Czeka na środki</button>
+          <button class="czip" data-status="rozliczony" aria-pressed="false">Rozliczone</button>
+          <button class="czip" data-status="" aria-pressed="false">Wszystkie</button>
+        </div>
+        <input class="szukaj" id="zwrotSzukajLista" style="margin-top:8px"
+               placeholder="szukaj: etykieta / login / numer zwrotu">
+        <table id="zwrotLista"></table>
+      </details>
+
+      <details class="zwijana" id="pytaniaListaKarta">
+        <summary><h2>REJESTR PYTAŃ</h2><span class="podpis">wyszukiwarka i pobranie w kolejce</span></summary>
+        <p id="pytaniaPodsumowanie" style="margin-bottom:9px"></p>
+        <!-- Czipy zamiast `<select>`: przy trzech stanach lista możliwości jest
+             krótsza niż jej schowanie. „Wszystkie" niesie też zamknięte
+             i pominięte — osobne czipy dla nich byłyby pięcioma pastylkami na
+             szynę 22 rem. -->
+        <div class="czipy" id="pytaniaCzipy">
+          <button class="czip" data-status="" aria-pressed="true">Do odpowiedzi</button>
+          <button class="czip" data-status="wyslane" aria-pressed="false">Wysłane</button>
+          <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
+        </div>
+        <table id="pytaniaLista" style="margin-top:10px"></table>
+      </details>
+
+      <!-- Dyskusje i reklamacje Allegro — rejestr pracy (0.103.0), a od 0.104.0
+           CAŁA sprawa w aplikacji: OTWÓRZ pokazuje rozmowę z Allegro, szkic
+           pisze model, odpowiedź (z załącznikiem) wysyła się stąd. Kolejka
+           z terminem dla CLAIM, właściciel i notatka zostają jak były. -->
+      <details class="zwijana" id="dyskusjeKarta">
+        <summary><h2>DYSKUSJE I REKLAMACJE ALLEGRO</h2><span class="podpis">pobranie w kolejce</span></summary>
+        <p class="mute" style="margin-bottom:8px">
+        Kliknij OTWÓRZ, żeby przeczytać rozmowę i odpowiedzieć klientowi
+        prosto stąd — szkic przygotuje model, wysyłka idzie do Allegro.
+        Lista pokazuje, które sprawy czekają, kto którą prowadzi i ile dni
+        zostało do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu
+        schodzą z listy przy pobraniu same.
+        </p>
+        <div class="czipy" id="dyskusjeCzipy">
+          <button class="czip" data-status="" aria-pressed="true">Do obsłużenia</button>
+          <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
+          <button class="czip" data-status="w_toku" aria-pressed="false">W toku</button>
+          <button class="czip" data-status="zamknieta" aria-pressed="false">Zamknięte</button>
+          <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
+        </div>
+        <table id="dyskusjeLista" style="margin-top:8px"></table>
+      </details>
+
+      <details class="zwijana" id="reklamacjeKarta">
+        <summary><h2>REKLAMACJE · PRIORYTET WG TERMINU</h2></summary>
+        <p class="mute" style="margin-bottom:8px">
+        Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
+        reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
+        </p>
+        <table id="reklamacjeLista"></table>
+      </details>
+
+      <!-- Konto Allegro ZOSTAJE w zakładce zwrotów, choć trzy karty liczb obok
+           niego pojechały do ANALIZY w 0.99.0. To nie wgląd, tylko stan
+           POŁĄCZENIA: gdy token wygasa, przestaje działać skan i pobieranie
+           zapowiedzi, czyli praca na tej zakładce. Jej miejsce jest przy tej
+           pracy, nie przy liczbach o niej. -->
+      <details class="zwijana" id="kontoAllegroKarta">
+        <summary><h2>KONTO ALLEGRO</h2></summary>
+        <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
+        <div id="allegroAkcje"></div>
+      </details>
+
+    </div>
   </div>
 
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
@@ -4615,12 +4700,15 @@ function ustawLicznikPytan(d) {
  * wzorzec co przy zapowiedziach zwrotów.
  */
 function ustawOstatniePobranie(sync) {
+  /* „Pytania:" na początku, bo od 0.116.0 ten ślad stoi POD wspólnym rzędem
+     trzech pobrań, obok bliźniaczego śladu dyskusji. Bez nazwy rejestru dwa
+     zdania o „ostatnim pobraniu" jedno pod drugim czyta się jak usterka. */
   $("pytaniaOstatniePobranie").innerHTML = sync
-    ? `Ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
+    ? `Pytania — ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
        · przejrzano ${sync.przejrzanychWatkow}
        ${esc(odmiana(sync.przejrzanychWatkow, ["rozmowę", "rozmowy", "rozmów"]))}${
          czemuNicNieWeszlo(sync)}`
-    : "Jeszcze nic nie pobrano od uruchomienia serwera — kliknij ODŚWIEŻ Z ALLEGRO.";
+    : "Pytań jeszcze nie pobierano od uruchomienia serwera — kliknij POBIERZ PYTANIA.";
 }
 
 /**
@@ -4704,6 +4792,11 @@ async function odswiezLiczniki() {
    zakładce; w następnym szczegóły przeprowadzą się tutaj, a zakładki
    ZWROTY i PYTANIA znikną. */
 let sprawyFiltr = "";
+/* Ostatnio pobrana kolejka. Wariant wiersza (tabela / szyna) i zaznaczenie
+   otwartej sprawy zmieniają się BEZ nowych danych — przy otwarciu sprawy,
+   przy zamknięciu, przy zmianie szerokości okna. Bez tej kopii każde z nich
+   musiałoby jechać po tę samą listę do serwera. */
+let ostatniaKolejkaSpraw = [];
 /* false = karta klienta zamknięta; obiekt {login} = otwarta. Obiekt zamiast
    samego loginu, bo login bywa NULL-em z sensem: kubełek spraw bez konta. */
 let otwartyKlient360 = false;
@@ -4739,9 +4832,45 @@ function wierszeSpraw(lista, zKlientem) {
     </tr>`).join("");
 }
 
+/**
+ * Czy TA sprawa jest tą otwartą — do zaznaczenia wiersza w szynie.
+ * Reklamacja nie ma własnego szczegółu: otwiera swój zwrot (patrz
+ * `otworzSprawe`), więc porównuje się po `zwrotId`, nie po własnym id.
+ */
+function toOtwartaSprawa(s) {
+  if (s.rodzaj === "pytanie") return s.id === otwartePytanie;
+  if (s.rodzaj === "dyskusja") return s.id === otwartaDyskusja;
+  if (s.rodzaj === "reklamacja") return s.zwrotId != null && s.zwrotId === otwartyZwrot;
+  return s.id === otwartyZwrot;
+}
+
+/* Wiersz kolejki w SZYNIE — ten sam kształt, co miały wiersze skrzynki pytań
+   i kolejki zwrotów, zanim obie zeszły do rejestrów. Siedmiu kolumn tabeli nie
+   da się złożyć w 21 rem, a kolejka obok otwartej sprawy ma odpowiadać na
+   jedno pytanie: co jest następne. */
+function wierszSprawyWSzynie(s) {
+  return `<tr data-sprawa-rodzaj="${s.rodzaj}" data-sprawa-id="${s.id}"
+      ${s.zwrotId ? `data-sprawa-zwrot="${s.zwrotId}"` : ""}
+      ${toOtwartaSprawa(s) ? 'class="aktywny"' : ""} style="cursor:pointer">
+      <td class="sprawaWiersz"${s.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
+        <span class="sprawaGora">
+          <span class="b">${esc(s.klient || "(BEZ LOGINU)")}</span>
+          <span class="mute">${esc(wiekPytania(s.kiedy))}</span>
+        </span>
+        <span class="sprawaTemat">${esc(s.tytul || "—")}</span>
+        <span class="sprawaStopka">${plakietkaSprawy(s.rodzaj)}${
+          s.dniDoTerminu != null ? terminSprawy(s) : ""
+        }${s.prowadzi ? `<span class="mute">${esc(s.prowadzi)}</span>` : ""}</span>
+      </td>
+    </tr>`;
+}
+
 function rysujSprawy(lista) {
+  ostatniaKolejkaSpraw = lista;
+  const wSzynie = kolejkaZostaje() &&
+    (otwartyZwrot != null || otwartaDyskusja != null || otwartePytanie != null);
   $("sprawyLista").innerHTML = lista.length
-    ? wierszeSpraw(lista, true)
+    ? (wSzynie ? lista.map(wierszSprawyWSzynie).join("") : wierszeSpraw(lista, true))
     : '<tr><td class="mute">Żadna sprawa nie czeka na obsługę.</td></tr>';
   /* Podsumowanie liczy z tej samej listy, którą widać — nie z osobnego
      zapytania, które mogłoby pokazać inne liczby niż tabela pod spodem. */
@@ -4774,10 +4903,15 @@ async function odswiezKolejkeSpraw() {
 async function odswiezSprawy() {
   if (otwartyZwrot != null || otwartaDyskusja != null) {
     await odswiezZwroty();
+    /* Kolejka stoi OBOK otwartej sprawy (0.116.0) i musi żyć — to ta sama
+       lista, z której się do sprawy weszło, więc nieaktualna kłamałaby o tym,
+       co jest następne. Jedno zapytanie do NASZEJ bazy, bez ruchu do Allegro. */
+    if (kolejkaZostaje()) await odswiezKolejkeSpraw();
     return sprawdzPuls();
   }
   if (otwartePytanie != null) {
     await odswiezPytania();
+    if (kolejkaZostaje()) await odswiezKolejkeSpraw();
     /* Otwarte pytanie świadomie nie odświeża szczegółu (uzasadnienie przy
        odswiezPytania) — ale puls klienta chodzi: to jedno tanie zapytanie
        do NASZEJ bazy, nie do Allegro. */
@@ -5000,10 +5134,10 @@ function stanZwrotu(s) {
 async function odswiezZwroty() {
   if (otwartyZwrot != null) {
     await odswiezSzczegolZwrotu();
-    /* Wąsko: listy nie widać, więc nie ma czego odświeżać. Szeroko stoi obok
-       otwartego zwrotu i musi żyć — ale bez `odswiezEtap3()` niżej, bo koszy,
-       reklamacji ani wglądu i tak wtedy nie widać w żadnym trybie. */
-    if (!kolejkaZostaje()) return;
+    /* Przy otwartej sprawie CAŁA szyna rejestrów schodzi z ekranu (0.116.0),
+       więc nie ma czego odświeżać — obok sprawy stoi wspólna kolejka i to ona
+       jedzie po dane, w `odswiezSprawy`. */
+    return;
   }
   try {
     const q = new URLSearchParams();
@@ -5093,14 +5227,15 @@ function dociagnijWglad(id) {
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
 function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
-  karta.hidden = lista.length === 0 || (otwartyZwrot != null && !kolejkaZostaje())
-    || otwartaDyskusja != null;
+  /* O tym, czy szyna rejestrów w ogóle stoi na ekranie, decyduje rodzeństwo
+     widoku — tutaj zostaje jedynie własna reguła alarmu: pusty nie istnieje. */
+  karta.hidden = lista.length === 0 || $("sprawyRejestry").hidden;
   /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
      ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
   $("brakujaceTicker").innerHTML = !ticker
     /* Od 0.85.0 nic nie pobiera samo, więc „nie było przebiegu" nie jest już
        stanem przejściowym po restarcie — to zdanie musi wskazać przycisk. */
-    ? '<span class="mute">Jeszcze nic nie pobrano — kliknij POBIERZ Z ALLEGRO na karcie ZWROTY.</span>'
+    ? '<span class="mute">Jeszcze nic nie pobrano — kliknij POBIERZ ZWROTY w kolejce spraw.</span>'
     : `<span class="mute">Ostatnie odświeżenie statusów: ${esc(stempelLokalny(ticker.at))}
          · odświeżono ${ticker.odswiezonych}${ticker.doOdswiezenia
            ? ` · czeka jeszcze ${ticker.doOdswiezenia}` : ""}</span>
@@ -5414,9 +5549,9 @@ function rysujDyskusje(lista, sync) {
   /* Ślad pobrania jak przy zapowiedziach: zdanie o braku pobrania jest
      treścią — bez niego pusta lista wygląda jak „Allegro nic nie ma". */
   $("dyskusjeTicker").innerHTML = sync
-    ? `Ostatnio pobrano: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
+    ? `Dyskusje — ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
        · zamkniętych w panelu ${sync.zamknietychPrzezAllegro} · przejrzano ${sync.przejrzanych}`
-    : "Jeszcze nic nie pobrano od uruchomienia serwera — kliknij POBIERZ Z ALLEGRO.";
+    : "Dyskusji jeszcze nie pobierano od uruchomienia serwera — kliknij POBIERZ DYSKUSJE.";
 }
 
 async function odswiezDyskusje() {
@@ -5906,9 +6041,12 @@ function rysujZwroty(zwroty) {
   zwrotyLista = zwroty;
   podsumujZwroty();
 
-  /* Szyna: siedem kolumn nie mieści się w 21 rem, więc wiersz łamie się w pionie
-     — numer z datą, kupujący, a pod spodem status z oceną i dokumentem. */
-  if (otwartyZwrot != null && kolejkaZostaje()) {
+  /* Szyna: siedem kolumn nie mieści się w 22 rem, więc wiersz łamie się w pionie
+     — numer z datą, kupujący, a pod spodem status z oceną i dokumentem.
+     Od 0.116.0 rejestr stoi w szynie ZAWSZE, gdy konsola istnieje: przestał
+     być kolejką zakładki, a szyna rejestrów jest wąska niezależnie od tego,
+     czy obok jest otwarta sprawa. */
+  if (kolejkaZostaje()) {
     $("zwrotLista").innerHTML =
       zwroty.map((z) => `<tr data-zwrot="${z.id}"${z.id === otwartyZwrot ? ' class="aktywny"' : ""} style="cursor:pointer">
         <td class="sprawaWiersz">
@@ -6048,20 +6186,23 @@ function ustawPasmoSzuflady(widokId, sprawaOtwarta) {
   if (!szuflada && szufladaW === widokId) ustawSzuflade(widokId, false);
 }
 
-/* Co zostaje obok otwartego zwrotu. NIE cała zakładka: przy otwartym zwrocie
-   kontekstem jest kolejka zwrotów i skaner następnej etykiety, a nie kosze,
-   reklamacje i statystyki. Te chowają się w obu trybach. */
-const PRZY_ZWROCIE = ["zwrotListaKarta", "brakujaceKarta"];
-/* `wgladKarta` wypadła stąd w 0.99.0 razem z przenosinami trzech kart liczb
-   do ANALIZY. Id, którego nie ma w znaczniku, wywala `$(id).hidden` na `null`
-   i gasi CAŁĄ zakładkę — tak, jak stało się przy pierwszym uruchomieniu tej
-   przeprowadzki. Lista musi kończyć przenosiny razem z nimi. */
-/* `dyskusjeKarta` doszła w 0.103.0 — bez wpisu tutaj stałaby na ekranie obok
-   otwartego szczegółu zwrotu, jako jedyna karta, która nie schodzi. */
-const KARTY_ZWROTOW = [
-  "brakujaceKarta", "zwrotListaKarta", "koszeKarta",
-  "pominieteKarta", "reklamacjeKarta", "dyskusjeKarta", "kontoAllegroKarta",
-];
+/* Co zostaje obok otwartej sprawy: JEDNA kolejka, ta sama, którą widać bez
+   otwartej sprawy. Do 0.116.0 były tu dwie listy zależnie od typu — przy
+   zwrocie kolejka zwrotów, przy pytaniu skrzynka pytań — czyli obok sprawy
+   stało coś INNEGO niż to, z czego się do niej weszło. Zamknięcie sprawy
+   wracało do trzeciej listy i miejsce w kolejce trzeba było znaleźć od nowa. */
+const PRZY_SPRAWIE = ["kolejkaSprawKarta"];
+
+/* Alarmy szyny mają WŁASNĄ regułę pustki, więc muszą stać w pętli osobno —
+   reszta rejestrów siedzi w `sprawyRejestry` i chowa się razem z szyną. */
+const ALARMY_SZYNY = ["pytaniaBaner", "brakujaceKarta", "pominieteKarta"];
+
+/* Wszystkie strefy scalonego widoku SPRAW — jedna lista dla jednego
+   rodzeństwa. Id, którego nie ma w znaczniku, wywala `$(id).hidden` na `null`
+   i gasi CAŁĄ zakładkę: tak stało się w 0.99.0, gdy trzy karty wglądu
+   przejechały do ANALIZY, a ich id zostały tutaj. Lista kończy każde
+   przenosiny razem z nimi. */
+const KARTY_SPRAW = ["kolejkaSprawKarta", "sprawyRejestry", ...ALARMY_SZYNY];
 
 /**
  * JEDNO rodzeństwo dla całego widoku SPRAW (0.109.0) — tabela stanów zamiast
@@ -6081,7 +6222,9 @@ function ustawRodzenstwoSpraw() {
   const pytanie = otwartePytanie != null;
   const wSprawie = zwrot || dyskusja || pytanie;
   const klient = !wSprawie && otwartyKlient360 !== false;
-  const zostaje = kolejkaZostaje() ? (zwrot ? PRZY_ZWROCIE : pytanie ? PRZY_PYTANIU : []) : [];
+  /* Dyskusja nie ma kontekstu, więc stoi na pełnej szerokości — kolejka obok
+     zabrałaby jej miejsce, którego rozmowa potrzebuje bardziej. */
+  const zostaje = kolejkaZostaje() && (zwrot || pytanie) ? PRZY_SPRAWIE : [];
 
   for (const id of KARTY_SPRAW) {
     /* Karty z WŁASNĄ regułą pustki — pusta karta jest nagłówkiem bez treści. */
@@ -6103,6 +6246,14 @@ function ustawRodzenstwoSpraw() {
   /* Trójpodział tylko dla spraw z kontekstem — dyskusja i karta klienta są
      kartami pełnej szerokości, jak przed scaleniem. */
   $("widokSprawy").classList.toggle("zSzczegolem", zwrot || pytanie);
+  /* Trzy geometrie jednej konsoli i jeden przełącznik na wszystkie. `konsola`
+     niesie WYGLĄD tafli (pełny bleed, zero promienia, własne przewijanie),
+     a trzy pozostałe klasy — układ kolumn. Rozdzielone, bo wygląd jest
+     wspólny dla dostaw i spraw, a kolumny są za każdym razem inne.
+     Dyskusja zostaje poza konsolą: jedna kolumna rozmowy na papierze. */
+  $("widokSprawy").classList.toggle("zKolejka", !wSprawie && !klient);
+  $("widokSprawy").classList.toggle("zKlient", klient);
+  $("widokSprawy").classList.toggle("konsola", zwrot || pytanie || klient || !wSprawie);
   ustawPasmoSzuflady("widokSprawy", zwrot || pytanie);
 
   /* Dokąd prowadzi wyjście ze sprawy — do karty klienta, gdy sprawę otwarto
@@ -6110,11 +6261,9 @@ function ustawRodzenstwoSpraw() {
   const wroc = otwartyKlient360 !== false ? "← SPRAWY KLIENTA" : "← KOLEJKA SPRAW";
   for (const id of ["zwrotWroc", "pytanieWroc", "dyskusjaWroc"]) $(id).textContent = wroc;
 
-  /* Warianty list (tabela / szyna) zależą OD TEGO, co ustawiamy tutaj. */
-  rysujZwroty(zwrotyLista);
-  zaznaczWiersz("zwrotLista", "zwrot", otwartyZwrot);
-  rysujListePytan(ostatniaListaPytan);
-  zaznaczWiersz("pytaniaLista", "pytanie", otwartePytanie);
+  /* Wariant kolejki (tabela / szyna) i zaznaczenie otwartej sprawy zależą OD
+     TEGO, co ustawiamy tutaj — więc przerysowanie idzie na końcu, nie przed. */
+  rysujSprawy(ostatniaKolejkaSpraw);
 }
 
 /**
@@ -6779,6 +6928,14 @@ $("chrome").addEventListener("click", (e) => {
        („guzik do połączenia"), a rozpocznij… sam pilnuje podwójnego kliku
        i sam pokaże 403, gdy klika ktoś bez roli admin. */
     pokaz("sprawy");
+    /* KONTO ALLEGRO mieszka od 0.116.0 w szynie rejestrów, a szyna schodzi
+       z ekranu przy otwartej sprawie. Ikona ma OTWIERAĆ kartę, więc najpierw
+       zamyka sprawę — inaczej klik przełączałby zakładkę i nie pokazywał
+       niczego, co obiecał. */
+    zamknijZwrot();
+    zamknijDyskusje();
+    zamknijPytanie();
+    zamknijKlienta360();
     const karta = $("kontoAllegroKarta");
     karta.open = true;
     karta.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -7432,27 +7589,10 @@ function zamknijPytanie() {
   ustawRodzenstwoSpraw();
 }
 
-/* Karty, które szczegół ZASŁANIA. Jedna lista zamiast dwóch pętli: przy
-   dwóch kopiach karta dopisana jutro zostaje widoczna pod otwartym pytaniem
-   i nikt tego nie zauważy, dopóki ktoś nie przewinie ekranu. */
-const KARTY_LISTY_PYTAN = [
-  "pytaniaBaner", "pytaniaWklejkaKarta", "pytaniaListaKarta",
-];
-
-/* Wszystkie karty scalonego widoku SPRAW — jedna lista dla jednego
-   rodzeństwa. Ten sam powód co przy KARTY_ZWROTOW: karta spoza listy
-   stałaby na ekranie obok otwartej sprawy jako jedyna, która nie schodzi. */
-const KARTY_SPRAW = ["kolejkaSprawKarta", ...KARTY_ZWROTOW, ...KARTY_LISTY_PYTAN];
-
-/* Co zostaje obok otwartego pytania na szerokim ekranie: sama kolejka.
-   Wklejka i statystyki chowają się w obu trybach — przy redagowaniu
-   odpowiedzi kontekstem jest lista spraw, a nie skrzynka wejściowa z poczty. */
 /* Wybrany czip skrzynki: `""` = do odpowiedzi (nowe i szkice), `"wyslane"`,
    `"wszystkie"` = razem z archiwum. Stan trzyma skrypt, a nie DOM pola —
    czipy to przyciski, nie `<select>`, i nie mają czego przechowywać. */
 let filtrPytan = "";
-
-const PRZY_PYTANIU = ["pytaniaListaKarta"];
 
 /**
  * Zasłonić listę czy postawić szczegół obok niej.
@@ -7544,7 +7684,8 @@ function rysujListePytan(lista) {
     $("pytaniaLista").innerHTML = `<tr><td class="mute">${nic}</td></tr>`;
     return;
   }
-  const wSzynie = otwartePytanie != null && kolejkaZostaje();
+  /* Jak przy zwrotach: rejestr pytań mieszka w szynie, nie w kolejce. */
+  const wSzynie = kolejkaZostaje();
   const wiersz = (p, tresc) =>
     `<tr data-pytanie="${p.id}"${p.id === otwartePytanie ? ' class="aktywny"' : ""} style="cursor:pointer">${tresc}</tr>`;
 
@@ -8308,7 +8449,63 @@ async function wczytajKonfiguracjePytan() {
   }
 }
 
+/* ── Wyszukiwarka klientów (0.115.0) ─────────────────────────────────────────
+   Wynikiem jest KLIENT, nie pytanie: każdy wiersz niesie `data-klient360`,
+   czyli dokładnie ten marker, który panel obsługuje od 0.109.0. Żadnej drugiej
+   drogi do karty klienta — jedna jest już przetestowana. */
+
+/** Ostatnie wpisane zapytanie; odpowiedź spóźniona o nie swoją frazę ląduje
+    w koszu. Bez tego szybkie pisanie potrafi zostawić na ekranie wyniki
+    sprzed dwóch znaków — odpowiedzi wracają w dowolnej kolejności. */
+let szukaneKlienta = "";
+let zegarKlientow = null;
+
+function rysujKlientow(lista, fraza) {
+  const cel = $("klienciWyniki");
+  if (!fraza) { cel.innerHTML = ""; return; }
+  if (!lista.length) {
+    cel.innerHTML = `<p class="mute" style="margin-top:8px">Żaden klient nie pasuje do „${esc(fraza)}".</p>`;
+    return;
+  }
+  cel.innerHTML = `<div style="margin-top:8px">${
+    lista.map((k) => `<button class="akcja cichy" data-klient360="${esc(k.login)}"
+        style="display:block;width:100%;text-align:left;margin-bottom:6px">
+        <span class="b">${esc(k.login)}</span>
+        <span class="mute" style="display:block;margin-top:2px;font-weight:400">${
+          k.otwartych
+            ? `${k.otwartych} ${odmiana(k.otwartych, ["sprawa czeka", "sprawy czekają", "spraw czeka"])}`
+            : "nic nie czeka"
+        }${k.ostatnia ? ` · ostatnio ${esc(wiekPytania(k.ostatnia))}` : ""}</span>
+      </button>`).join("")
+  }</div>`;
+}
+
+async function szukajKlientow() {
+  const fraza = $("klienciSzukaj").value.trim();
+  szukaneKlienta = fraza;
+  /* Próg dwóch znaków jest po stronie SERWERA (MIN_ZNAKOW_KLIENTA) — tu tylko
+     oszczędzamy zapytanie, które i tak wróciłoby puste. */
+  if (fraza.length < 2) return rysujKlientow([], "");
+  try {
+    const d = await (await api(`/api/biuro/sprawy/klienci?q=${encodeURIComponent(fraza)}`)).json();
+    if (szukaneKlienta !== fraza) return; // wyprzedziła nas świeższa fraza
+    rysujKlientow(d.klienci || [], fraza);
+  } catch (e) {
+    $("klienciWyniki").innerHTML = `<p class="mute" style="margin-top:8px"><span class="badge err">${esc(e.message)}</span></p>`;
+  }
+}
+
 /* ── Zdarzenia zakładki ────────────────────────────────────────────────────── */
+
+/* Wyniki wyszukiwarki klientów obsługuje nasłuch KOLEJKI — pole przeniosło się
+   tam w 0.116.0, a `data-klient360` jest tym samym markerem, który kolejka
+   czyta z wierszy. Osobny nasłuch (na karcie skrzynki, do 0.115.0) zostałby
+   po przeprowadzce na pustej karcie i nikt by tego nie zauważył: martwy
+   przycisk wygląda jak żywy. */
+$("klienciSzukaj").addEventListener("input", () => {
+  clearTimeout(zegarKlientow);
+  zegarKlientow = setTimeout(szukajKlientow, 250);
+});
 
 $("pytaniaLista").addEventListener("click", (e) => {
   const b = e.target.closest("[data-pytanie]");
@@ -8332,7 +8529,9 @@ $("kolejkaSprawKarta").addEventListener("click", (e) => {
   }
   const klient = e.target.closest("button[data-klient360]");
   if (klient) return otworzKlienta360(klient.dataset.klient360);
-  const sprawa = e.target.closest("button[data-sprawa-rodzaj]");
+  /* Bez `button` w selektorze, bo w szynie klika się CAŁY wiersz — przycisku
+     OTWÓRZ tam nie ma, nie zmieściłby się obok trzech linijek treści. */
+  const sprawa = e.target.closest("[data-sprawa-rodzaj]");
   if (sprawa) {
     otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),
       Number(sprawa.dataset.sprawaZwrot || 0) || null);

@@ -7,6 +7,7 @@ import {
   listaSpraw,
   powiazaneSprawy,
   sprawyKlienta,
+  szukajKlientow,
   type RodzajSprawy,
 } from "../services/sprawy.js";
 
@@ -70,6 +71,15 @@ export async function sprawyRoutes(app: FastifyInstance) {
       return { login, ...sprawyKlienta(login) };
     }
   );
+
+  /* Liczba mnoga obok istniejącej pojedynczej i to nie jest przypadek:
+     `/klient` POKAZUJE jednego, `/klienci` SZUKA wielu. Odczyt jak cała
+     rodzina spraw — SQLite, zero ruchu do Allegro (audyt 0.109.1). */
+  app.get<{ Querystring: { q?: string } }>("/api/biuro/sprawy/klienci", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { klienci: szukajKlientow(req.query.q ?? "") };
+  });
 
   // ── Powiązania ────────────────────────────────────────────────────────────
 

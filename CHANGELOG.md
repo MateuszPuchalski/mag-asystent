@@ -33,6 +33,67 @@ historii nie przepisujemy.
 
 ---
 
+## 0.116.0 — 27 sierpnia 2026
+
+**Zakładka SPRAWY: jedna kolejka zamiast trzech, konsola na wysokość okna.**
+
+Zgłoszenie właściciela: „uporządkuj zakładkę sprawy, usuń zaokrąglone końcówki
+i marginesy, okno sprawy powinno mieć ograniczoną wysokość, reszta scrolowana".
+
+Zakładka miała TRZY kolejki: wspólną „SPRAWY KLIENTÓW", kolejkę zwrotów
+i skrzynkę pytań. Każda z własnym nagłówkiem, filtrem i kompletem wierszy,
+a wszystkie pokazywały te same sprawy w innej kolejności. Wybór, w którą
+patrzeć, był pracą samą w sobie i nie odpowiadał na pytanie „co teraz zrobić".
+
+Zostaje jedna kolejka. Rejestry per-typ — zwroty, pytania, dyskusje,
+reklamacje — zeszły do szyny po prawej jako **zwijane**: to archiwum, do
+którego wchodzi się po zwrot rozliczony albo pytanie wysłane. Nic nie zginęło.
+
+Narzędzia, które w nich mieszkały, przeprowadziły się do głowy kolejki, bo
+należą do kolejki, a nie do rejestru: skan etykiety zwrotu, wyszukiwarka
+klientów i rząd trzech pobrań z Allegro. Obok otwartej sprawy stoi teraz TA
+SAMA kolejka, z której się do niej weszło — do tej wersji były to dwie różne
+listy zależnie od typu sprawy.
+
+Konsola z 0.112.0 obejmuje wreszcie CAŁĄ zakładkę, nie tylko stan po otwarciu
+sprawy: pełny bleed, zero promienia, dwie tafle na wysokość okna, każda
+z własnym przewijaniem. Strona nie przewija się wcale.
+
+Przy okazji wyszła usterka starsza od tej zmiany. Strefa obok kolejki rozpina
+się na 50 rzędów siatki, żeby objąć stos jej kart — a nadmiar jej wysokości
+rozkładał się po pustych rzędach i robił **800 px pustego przewijania pod
+konsolą**. Dotyczyło to także DOSTAW. Siatka konsoli ma teraz wysokość okna.
+
+## 0.115.0 — 27 sierpnia 2026
+
+**Skrzynka pytań ma wyszukiwarkę klientów.** Wpisujesz fragment loginu,
+dostajesz listę pasujących klientów, klik otwiera Klienta 360.
+
+**Domknięcie drogi, która była zbudowana w trzech czwartych.** Klient 360
+istnieje od 0.109.0 i pokazuje wszystkie pytania, zwroty, dyskusje
+i reklamacje jednego loginu — ale wchodziło się tam WYŁĄCZNIE klikiem w login
+na otwartej sprawie. Żeby zobaczyć, co u kogoś słychać, trzeba było najpierw
+znaleźć jakąś jego sprawę.
+
+**A szuka się go zwykle wtedy, gdy nic otwartego nie ma.** Klient dzwoni
+z pytaniem „co u mnie" — i właśnie ten przypadek był nieosiągalny. Dlatego
+wyszukiwarka przeszukuje CAŁĄ historię, nie kolejkę: wynik „nic nie czeka ·
+ostatnio 3 dni" jest tu równie dobrą odpowiedzią jak „1 sprawa czeka".
+
+**Liczby zgadzają się z Klientem 360 z konstrukcji, nie z dobrych chęci.**
+Wyszukiwarka woła tych samych budowniczych, co kolejka i karta klienta, tylko
+z innym warunkiem `WHERE`. Gdyby przepisać warunki „otwartości" drugi raz,
+pokazywałaby „3 otwarte" przy karcie wypisującej cztery — i rozjazd wyszedłby
+dopiero komuś przy biurku. Pilnuje tego test porównujący obie liczby.
+
+**Pole stoi NAD czipami**, bo to inna oś: czipy zawężają skrzynkę, a to z niej
+wyprowadza. Wynikiem jest karta klienta, nie krótsza kolejka.
+
+**Sprawy bez loginu nie wypływają w wynikach.** Wklejka ze screenshota i zwrot
+ręczny trafiają do kubełka „bez klienta", który istnieje w Kliencie 360 — ale
+nie ma nazwy, po której dałoby się go szukać, więc udawanie, że da się go
+znaleźć, byłoby mylące. Fraza krótsza niż dwa znaki to pusty wynik, nie błąd:
+jedna litera przeczesuje cztery rejestry i zwraca pół bazy.
 ## 0.114.0 — 27 sierpnia 2026
 
 **Guzik POŁĄCZ Z ALLEGRO przestał umierać po restarcie serwera, a pasek stanu
