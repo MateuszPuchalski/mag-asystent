@@ -703,7 +703,11 @@ dostaje jedną kolumnę na pełną szerokość, monitor 1920 px dwie, 2560 px tr
 Panel otwarty na pół ekranu obok Subiekta zagęszcza się sam.
 
 Pasek stanu i zakładki są **przyklejone do góry**. Przewinięcie długiej listy
-nie zabiera z ekranu ani nawigacji, ani alarmu o kolejce w błędzie.
+nie zabiera z ekranu ani nawigacji, ani alarmu o kolejce w błędzie. Od 0.114.0
+pasek to **dwie ikony zamiast rzędu kafli**: SYSTEM i ALLEGRO. Kolor mówi, czy
+coś wymaga uwagi; pełne zdania kafli stoją w dymku po najechaniu myszą.
+Kliknięcie ikony SYSTEM prowadzi do STANU SYSTEMU, ikony ALLEGRO — do karty
+KONTO ALLEGRO.
 
 Każda tabela ma własne przewijanie, a listy o nieograniczonej długości mają
 ograniczoną wysokość z przyklejonym nagłówkiem kolumn. Jedna dostawa na
@@ -1287,11 +1291,18 @@ z Allegro (scenariusze S67–S69).
    export ALLEGRO_USER_AGENT=...
    ```
 
-2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` →
-   SPRAWY → KONTO ALLEGRO → POŁĄCZ (rola **admin**). Strona pokaże
-   kod i link — otwórz go na zalogowanym koncie sprzedawcy i potwierdź.
-   Token zapisuje się w bazie aplikacji i odświeża sam. Wygasa dopiero po
-   ~3 miesiącach nieużywania — wtedy `/api/health` każe sparować ponownie.
+2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` —
+   najkrócej przez czerwoną ikonę ALLEGRO w pasku na górze (rola **admin**).
+   Klik otwiera kartę KONTO ALLEGRO na SPRAWACH i sam zaczyna parowanie.
+   Strona pokaże kod i link — otwórz go na zalogowanym koncie sprzedawcy
+   i potwierdź. Token zapisuje się w bazie aplikacji i odświeża sam. Wygasa
+   dopiero po ~3 miesiącach nieużywania — wtedy `/api/health` każe sparować
+   ponownie.
+
+   Sesja parowania (kod i link) żyje **w pamięci procesu serwera**. Restart
+   `wertis-api` w trakcie parowania ją zjada — panel powie wtedy „sesja
+   parowania przepadła, zacznij od nowa". To nie awaria: kliknij POŁĄCZ
+   jeszcze raz i dostaniesz świeży kod.
 
 3. **Sandbox** (opcjonalnie, do prób): osobna rejestracja na
    <https://developer.allegro.pl.allegrosandbox.pl> i `ALLEGRO_SANDBOX=1`.

@@ -113,6 +113,14 @@ test("strona czyta stan serwera bez sesji — i tylko to", async () => {
   const h = r.json();
   assert.ok(typeof h.wersja === "string");
   assert.ok("worker" in h);
+  /* Stan Allegro dla ikony w pasku (0.114.0). Publicznie wolno mu nieść
+     TYLKO stan, środowisko i datę wygaśnięcia — nigdy login ani token. */
+  assert.ok(typeof h.allegro?.stan === "string");
+  assert.deepEqual(
+    Object.keys(h.allegro).filter((k) => !["stan", "srodowisko", "wygasa"].includes(k)),
+    [],
+    "health jest bez sesji — pole allegro nie może przemycać niczego ponad stan"
+  );
 });
 
 test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
@@ -1131,6 +1139,54 @@ test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0
   assert.match(html, /\$\("widokNadzor"\)\.addEventListener\("click"/, "nadzór deleguje z sekcji");
   assert.match(html, /\$\("kontaKarta"\)\.addEventListener\("click"/, "konta delegują z sekcji");
   assert.match(html, /id="fOsoba"/, "dziennik filtruje po osobie, nie tylko urządzeniu");
-  assert.match(html, /id="cyklBlad"/, "kulejący cykl ma jeden znacznik zamiast niemych console.warn");
+  /* Do 0.113.0 kulejący cykl miał własny znacznik `#cyklBlad`; od 0.114.0
+     jest bursztynem ikony zdrowia — sygnał zostaje, znacznik nie. */
+  assert.match(html, /kulawyCykl/, "kulejący cykl nadal ma sygnał — jako składnik ikony zdrowia");
   assert.ok(!/console\.warn\(e\)/.test(html), "nieme połykanie błędów cyklu zniknęło");
+});
+
+test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", () => {
+  /* Zgłoszenie właściciela: „nie działa mi guzik do połączenia z Allegro".
+     Sesja parowania żyje w pamięci procesu serwera, więc restart w trakcie
+     (typowe wdrożenie) kończył się odpowiedzią `brak` — a front kręcił nią
+     pętlę jak `czekam`, w nieskończoność. `parowanieTrwa` zostawało true
+     i dwa guardy czyniły guzik martwym aż do przeładowania strony. Druga
+     część zgłoszenia: rząd kafli „serwer OK · worker OK…" zredukowany do
+     jednej ikony koloru problemu, z pełną treścią w `title`.               */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  // 1. `brak` przestał być `czekam`: kończy pętlę i oddaje guzik.
+  assert.ok(
+    !html.includes('d.stan === "czekam" || d.stan === "brak"'),
+    "`brak` nie może kręcić pętli odpytywania jak `czekam`"
+  );
+  /* Kotwica na samej pętli — `d.stan === "brak"` pada w skrypcie także przy
+     rysowaniu tickera, a tam wolno mu znaczyć co innego. */
+  const poll = html.slice(html.indexOf("async function pollParowania"));
+  const galazBrak = poll.slice(
+    poll.indexOf('d.stan === "brak"'),
+    poll.indexOf('d.stan === "polaczone"')
+  );
+  assert.match(galazBrak, /SESJA PAROWANIA PRZEPADŁA/, "panel mówi, co się stało");
+  assert.match(galazBrak, /data-polacz/, "guzik POŁĄCZ wraca od razu, bez przeładowania");
+  assert.ok(
+    !/setTimeout\(pollParowania/.test(galazBrak),
+    "po `brak` nie ma czego odpytywać — sesji na serwerze już nie ma"
+  );
+
+  // 2. Dwie ikony w pasku, każda z natywnym tooltipem i nawigacją z sekcji.
+  assert.match(html, /id="ikonaZdrowia"/, "zdrowie systemu to jedna ikona, nie rząd kafli");
+  assert.match(html, /id="ikonaAllegro"/, "wejście do parowania stoi w pasku na górze");
+  assert.match(html, /ik\.title = linie\.join\("\\n"\)/, "tooltip niesie pełne zdania kafli");
+  assert.match(html, /\$\("chrome"\)\.addEventListener\("click"/, "pasek deleguje z sekcji #chrome");
+  assert.ok(
+    !/\$\("stan"\)\.addEventListener/.test(html),
+    "nasłuch nie wisi na #stan — to pojemnik przerysowywany co cykl"
+  );
+
+  // 3. Stan Allegro płynie z /api/health — ikona żyje na każdej zakładce.
+  assert.match(html, /h\.allegro/, "ikona Allegro czyta stan z health, nie tylko z listy zwrotów");
 });

@@ -248,7 +248,10 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
   /* Powtórne kliknięcie POŁĄCZ oddaje TĘ SAMĄ sesję. Kod z poprzedniej próby
      jest wciąż ważny, a każde `POST /device` to kolejny strzał w apex
      allegro.pl i — po stronie przeglądarki — kolejna równoległa pętla
-     odpytywania. Nowy kod dopiero po wygaśnięciu albo po PRZERWIJ. */
+     odpytywania. Nowy kod DOPIERO po wygaśnięciu sesji: PRZERWIJ w panelu
+     jest wyłącznie frontowy (0.106.0) i tej sesji świadomie NIE czyści —
+     dodatkowa trasa czyszcząca to dodatkowy ruch bez zysku, bo kod i tak
+     wygasa sam. */
   const trwajace = parowanie;
   if (trwajace && Date.now() < trwajace.wygasaMs) {
     return {
