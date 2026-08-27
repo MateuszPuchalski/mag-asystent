@@ -82,6 +82,7 @@ import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
+import pl.wertis.kolektor.core.text.iloscZWpisu
 import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
@@ -1287,7 +1288,20 @@ private fun PanelOdkladania(
            liczenie sztuk, a przy zerowej liczbie pytań przypadkowe dotknięcie
            `+` wysyłałoby dostawcy reklamację. */
         var nadmiarOk by remember(line.id) { mutableStateOf(false) }
-        var pytaONadmiar by remember(line.id) { mutableStateOf(false) }
+        /* Ilość CZEKAJĄCA na zgodę, nie sama flaga „pytamy" — od 0.113.0
+           nadmiar wchodzi dwiema drogami (krok `+` i wpisanie liczby), więc
+           potwierdzenie musi wiedzieć, na co się zgadza. */
+        var nadmiarDo by remember(line.id) { mutableStateOf<Double?>(null) }
+        /* Otwarte pole wpisywania ilości; `null` = zamknięte. Wpis trzymamy
+           jako TEKST, bo w trakcie pisania „1", „1," i „1,2" są poprawnymi
+           stanami klawiatury, a żaden z nich nie jest jeszcze liczbą. */
+        var wpisIlosci by remember(line.id) { mutableStateOf<String?>(null) }
+
+        /* Jedna droga wyjścia dla obu sposobów podania ilości: krok `+` i wpis
+           kończą się tu samo. Nadmiar pyta RAZ — potem licznik idzie swobodnie. */
+        fun ustawIlosc(nowa: Double) {
+            if (nowa > zostalo && !nadmiarOk) nadmiarDo = nowa else onCzesc(nowa)
+        }
         /* `IntrinsicSize.Min` na wierszu plus `fillMaxHeight` na obu kaflach:
            oba dostają wysokość WYŻSZEGO z nich. Bez tego biały rósł o linijkę
            „z 10 · reszta zostaje" albo „w przyjęciach", a ciemny zostawał
@@ -1298,9 +1312,14 @@ private fun PanelOdkladania(
         ) {
             /* KAFEL BIAŁY — ile sztuk idzie TERAZ. Domyślnie cała reszta, bo
                tak wygląda większość odłożeń; częściowe jest wyjątkiem i ma
-               kosztować dotknięcie, nie odwrotnie. Minus i plus zamiast pola:
-               rękawica na klawiaturze numerycznej to trzy pomyłki na dziesięć
-               wpisów, a różnice są tu małe („3 z 10 leży na wierzchu"). */
+               kosztować dotknięcie, nie odwrotnie.
+
+               Licznik − / + JEST domyślną drogą i to się nie zmienia: rękawica
+               na klawiaturze numerycznej to trzy pomyłki na dziesięć wpisów,
+               a różnice bywają tu małe („3 z 10 leży na wierzchu"). Od 0.113.0
+               obok niego stoi jednak WPISYWANIE — dotknięcie samej liczby.
+               Zgłoszenie z hali: przy stu sztukach nadmiaru licznik znaczył sto
+               stuknięć, czyli drogę, której nikt nie przejdzie. */
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -1321,8 +1340,17 @@ private fun PanelOdkladania(
                        „192 szt" w 30 sp nie mieści się między dwoma celami
                        48 dp na połowie szerokości ekranu — a celów nie
                        zmniejszamy, bo to reguła pracy w rękawicy. */
+                    /* SAMA LICZBA JEST PRZYCISKIEM (0.113.0) — dotknięcie
+                       otwiera pole wpisywania. Ze zgłoszenia z hali: przy stu
+                       sztukach nadmiaru trzeba było stuknąć `+` sto razy.
+                       Licznik zostaje dla różnic, które są tu regułą („trzy
+                       z dziesięciu leżą na wierzchu"); wpis jest drogą dla
+                       liczb, których nikt nie wyklika. */
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { wpisIlosci = formatQty(ile) },
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.Bottom,
                     ) {
@@ -1348,10 +1376,19 @@ private fun PanelOdkladania(
                             )
                         }
                     }
-                    KrokIlosci("+", true) {
-                        if (ile >= zostalo && !nadmiarOk) pytaONadmiar = true
-                        else onCzesc(ile + 1)
-                    }
+                    KrokIlosci("+", true) { ustawIlosc(ile + 1) }
+                }
+                /* Zaproszenie do wpisania — bez niego liczba wygląda na
+                   napis, a nie na przycisk. Znika, gdy pole już stoi otwarte
+                   niżej: dwa zaproszenia do tej samej rzeczy naraz. */
+                if (wpisIlosci == null) {
+                    Text(
+                        "dotknij liczby, aby wpisać",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AmberInk,
+                        modifier = Modifier.clickable { wpisIlosci = formatQty(ile) },
+                    )
                 }
                 // „z 10" pojawia się WYŁĄCZNIE przy odłożeniu częściowym —
                 // przy pełnym byłoby powtórzeniem tej samej liczby obok siebie
@@ -1500,13 +1537,55 @@ private fun PanelOdkladania(
             }
         }
 
+        /* POLE WPISYWANIA ILOŚCI (0.113.0). Stoi POD kaflami, tak jak ręczny
+           wpis adresu — kafel ma pół szerokości ekranu i pole z przyciskiem
+           by się w nim nie zmieściło bez zmniejszania celów dotyku.
+
+           Wpis nie omija pytania o nadmiar: przechodzi tą samą drogą co krok
+           `+`, więc „120" przy fakturze na 20 dalej wymaga zgody. Klawiatura
+           numeryczna, bo to liczba — i `WertisTextField`, bo tylko on ucisza
+           skaner na czas pisania. */
+        wpisIlosci?.let { wpis ->
+            val fokus = remember(line.id) { FocusRequester() }
+            LaunchedEffect(line.id) { fokus.requestFocus() }
+            val liczba = iloscZWpisu(wpis)
+            /* Zero i wpis bez sensu nie zamykają pola — człowiek widzi wtedy
+               to, co napisał, zamiast zgadywać, czemu liczba się nie zmieniła.
+               Odkładanie zerowej ilości ma własną drogę: POPRAW ILOŚĆ. */
+            fun zatwierdz() {
+                val v = iloscZWpisu(wpis) ?: return
+                if (v < 1.0) return
+                wpisIlosci = null
+                ustawIlosc(v)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WertisTextField(
+                        value = wpis,
+                        onValueChange = { wpisIlosci = it },
+                        placeholder = "np. 120",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f).focusRequester(fokus),
+                        onDone = { zatwierdz() },
+                    )
+                    PrimaryButton("USTAW", enabled = liczba != null && liczba >= 1.0) { zatwierdz() }
+                    OutlineButton("✕") { wpisIlosci = null }
+                }
+                Text(
+                    "Cała ilość na tę półkę, nie różnica. Reszta partii zostaje na liście.",
+                    fontSize = 11.sp,
+                    color = InkMute,
+                )
+            }
+        }
+
         /* POTWIERDZENIE NADMIARU (0.64.0). Pasek pod kaflami, nie okno na pół
            ekranu: pytanie dotyczy liczby, która stoi tuż wyżej, więc ma być
            widoczne RAZEM z nią. Ta sama zasada co przy rozjeździe adresu.
 
            Mówimy wprost, co się stanie po zamknięciu dostawy — zgoda na coś,
            czego skutku nie widać, nie jest zgodą. */
-        if (pytaONadmiar) {
+        nadmiarDo?.let { doIlu ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1516,8 +1595,9 @@ private fun PanelOdkladania(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "Na fakturze jest ${formatQty(line.qtyDoc)}. Po zakończeniu " +
-                        "dostawy biuro dostanie zgłoszenie nadmiaru.",
+                    "Odkładasz ${formatQty(doIlu)}, a na fakturze jest " +
+                        "${formatQty(line.qtyDoc)}. Po zakończeniu dostawy biuro " +
+                        "dostanie zgłoszenie nadmiaru.",
                     fontSize = 12.sp,
                     color = Ink,
                     lineHeight = 16.sp,
@@ -1531,11 +1611,11 @@ private fun PanelOdkladania(
                        obrysowana — cofa do liczby z faktury i niczego nie psuje. */
                     PrimaryButton("ODŁÓŻ WIĘCEJ", modifier = Modifier.weight(1f)) {
                         nadmiarOk = true
-                        pytaONadmiar = false
-                        onCzesc(ile + 1)
+                        nadmiarDo = null
+                        onCzesc(doIlu)
                     }
                     OutlineButton("ANULUJ", modifier = Modifier.weight(1f)) {
-                        pytaONadmiar = false
+                        nadmiarDo = null
                     }
                 }
             }
@@ -1950,6 +2030,11 @@ private fun KorektaSheet(
     onZapisz: (Double) -> Unit,
 ) {
     var ile by remember(line.id) { mutableStateOf(line.qtyDone) }
+    /* Wpisywanie zamiast klikania — ta sama droga co w panelu odkładania
+       (0.113.0). Tu boli tak samo: poprawka setnej pozycji z dokumentu to sto
+       stuknięć w `+`. Górną granicą jest ilość z dokumentu, bo korekta mówi
+       „tyle leży na półce z TEJ dostawy", a nie „tyle przyjechało". */
+    var wpis by remember(line.id) { mutableStateOf<String?>(null) }
     ModalBottomSheet(onDismissRequest = onCancel, containerColor = Paper) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
@@ -1971,7 +2056,13 @@ private fun KorektaSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 KrokIlosci("−", ile > 0.0) { ile = (ile - 1).coerceAtLeast(0.0) }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { wpis = formatQty(ile) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
                         iloscZJednostka(ile, line.unit),
                         fontFamily = BarlowCond,
@@ -1979,9 +2070,39 @@ private fun KorektaSheet(
                         fontSize = 32.sp,
                         color = Ink,
                     )
-                    Text("z ${formatQty(line.qtyDoc)} na dokumencie", fontSize = 11.sp, color = InkMute)
+                    Text(
+                        if (wpis == null) "z ${formatQty(line.qtyDoc)} na dokumencie · dotknij, aby wpisać"
+                        else "z ${formatQty(line.qtyDoc)} na dokumencie",
+                        fontSize = 11.sp,
+                        color = InkMute,
+                    )
                 }
                 KrokIlosci("+", ile < line.qtyDoc) { ile = (ile + 1).coerceAtMost(line.qtyDoc) }
+            }
+
+            wpis?.let { w ->
+                val fokus = remember(line.id) { FocusRequester() }
+                LaunchedEffect(line.id) { fokus.requestFocus() }
+                // granica z dokumentu: powyżej niej to już nie korekta liczenia,
+                // tylko nadmiar — a ten idzie inną drogą, przez odkładanie
+                val liczba = iloscZWpisu(w, maks = line.qtyDoc)
+                fun zatwierdz() {
+                    val v = iloscZWpisu(w, maks = line.qtyDoc) ?: return
+                    ile = v
+                    wpis = null
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WertisTextField(
+                        value = w,
+                        onValueChange = { wpis = it },
+                        placeholder = "np. ${formatQty(line.qtyDoc)}",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f).focusRequester(fokus),
+                        onDone = { zatwierdz() },
+                    )
+                    PrimaryButton("USTAW", enabled = liczba != null) { zatwierdz() }
+                    OutlineButton("✕") { wpis = null }
+                }
             }
 
             // co się stanie z pozycją po zapisie — mówimy wprost, bo status

@@ -35,10 +35,11 @@ historii nie przepisujemy.
 
 ## 0.113.0 — 27 sierpnia 2026
 
-**Zrobiona pozycja dostawy przestała być przekreślonym napisem.** Trzy zmiany
-w tym samym pasku, wszystkie o jednym: co się z tą grupą wierszy naprawdę robi.
-Nie czyta się jej po kolei — wraca się do niej ze sprawdzeniem, czy ostatnia
-rzecz poszła tam, gdzie miała.
+**Zrobiona pozycja dostawy przestała być przekreślonym napisem, a ilość da się
+wpisać.** Cztery zmiany na jednym ekranie, z czterech zgłoszeń z hali. Trzy
+pierwsze dotyczą grupy zrobionych i mają wspólny mianownik: nie czyta się jej
+po kolei, tylko wraca do niej ze sprawdzeniem, czy ostatnia rzecz poszła tam,
+gdzie miała. Czwarta kończy z wyklikiwaniem stu sztuk.
 
 **Ostatnio odłożona stoi na górze zrobionych.** Kolejność alejkowa nie znaczyła
 w tej grupie nic — nikt nie idzie do tych półek drugi raz — a szukana pozycja
@@ -63,6 +64,25 @@ Serwer dokłada do pozycji dostawy `doneAt` — godzinę odłożenia, którą pa
 biura czyta od 0.36.0, a kolektor dostawał dotąd bez niej. Reguła kolejności
 mieszka w module `:core` i ma własne testy: bez znacznika czasu cicho wraca do
 tego, co było, i wygląda przy tym poprawnie.
+
+**ILOŚĆ MOŻNA WPISAĆ, nie tylko wyklikać.** Ze zgłoszenia z hali: przy stu
+sztukach ponad fakturę licznik `+` znaczył sto stuknięć, czyli drogę, której
+nikt nie przejdzie. Dotknięcie samej liczby otwiera pole z klawiaturą
+numeryczną — pod kaflami, tak samo jak ręczny wpis adresu. To samo dostała
+**POPRAW ILOŚĆ**: tam poprawka setnej pozycji z dokumentu kosztowała dokładnie
+tyle samo stuknięć.
+
+Licznik − / + zostaje domyślną drogą i to się nie zmienia — rękawica na
+klawiaturze numerycznej to trzy pomyłki na dziesięć wpisów, a różnice bywają
+tu małe („trzy z dziesięciu leżą na wierzchu"). Wpis jest drogą dla liczb,
+których nikt nie wyklika.
+
+Wpisana liczba **nie omija pytania o nadmiar**: „120" przy fakturze na 20
+przechodzi tą samą drogą co dwudzieste stuknięcie w `+` i dalej wymaga zgody,
+tyle że potwierdzenie mówi teraz, na co się zgadzasz („odkładasz 120, a na
+fakturze jest 20"). Przecinek i kropka znaczą to samo, spacje lecą, a liczba
+ujemna albo absurdalnie duża jest odrzucana zamiast po cichu przycięta —
+regułę liczy `:core` i ma na to siedem testów.
 
 ## 0.112.0 — 27 sierpnia 2026
 
