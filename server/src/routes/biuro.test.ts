@@ -682,9 +682,14 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
     assert.ok(ia < ib, czemu);
   };
   przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
-  przed("pytaniaListaKarta", "pytaniaWklejkaKarta", "lista pytań przed wklejką z poczty");
-  przed("kolejkaSprawKarta", "zwrotListaKarta",
-    "wspólna kolejka spraw przed kartami per-typ — to ona jest głównym miejscem pracy (0.109.0)");
+  przed("kolejkaSprawKarta", "sprawyRejestry",
+    "wspólna kolejka spraw przed szyną rejestrów — to ona jest głównym miejscem pracy (0.109.0)");
+  /* Wewnątrz szyny: najpierw alarmy (coś czeka), potem praca magazynu i wklejka,
+     na końcu archiwum. Rejestr per-typ jest miejscem, do którego się WRACA. */
+  przed("pytaniaBaner", "brakujaceKarta", "szkice AI przed alarmem o paczkach");
+  przed("brakujaceKarta", "koszeKarta", "alarmy przed pracą przy koszach");
+  przed("pytaniaWklejkaKarta", "zwrotListaKarta", "ścieżka poboczna przed archiwum");
+  przed("zwrotListaKarta", "kontoAllegroKarta", "rejestry przed stanem połączenia");
 });
 
 test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
@@ -726,6 +731,108 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   }
 });
 
+test("na zakładce SPRAW jest JEDNA kolejka, a narzędzia stoją w jej głowie", () => {
+  /* Do 0.115.0 zakładka miała trzy kolejki: wspólną („SPRAWY KLIENTÓW"),
+     kolejkę zwrotów i skrzynkę pytań. Każda z własnym nagłówkiem, filtrem
+     i kompletem wierszy, wszystkie pokazujące te same sprawy w innej
+     kolejności — a wybór, w którą patrzeć, był pracą samą w sobie.
+
+     Rejestry per-typ zeszły do szyny obok jako ZWIJANE (archiwum: zwrot
+     rozliczony, pytanie wysłane, dyskusja zamknięta). NARZĘDZIA, które w nich
+     mieszkały, przeprowadziły się do głowy kolejki — bo należą do kolejki,
+     nie do rejestru. Ten test pilnuje obu połówek: że narzędzia SĄ w kolejce
+     i że rejestry NIE są drugą kolejką na pierwszym planie. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const kolejka = html.slice(
+    html.indexOf('id="kolejkaSprawKarta"'),
+    html.indexOf('id="zwrotSzczegol"')
+  );
+  for (const pole of ["zwrotSkan", "klienciSzukaj", "sprawyLista",
+                      "pytaniaOdswiez", "zapowiedziPobierz", "dyskusjePobierz"]) {
+    assert.ok(kolejka.includes(`id="${pole}"`), `${pole} stoi w kolejce spraw`);
+  }
+
+  /* Zwijane, nie karty: rejestr otwarty na starcie byłby drugą kolejką na
+     pierwszym planie i cała przeprowadzka poszłaby na marne. Zwinięta sekcja
+     NIE PYTA serwera — ta sama reguła, co przy KONCIE ALLEGRO. */
+  const szyna = html.slice(
+    html.indexOf('id="sprawyRejestry"'),
+    html.indexOf('id="widokNadzor"')
+  );
+  for (const rejestr of ["zwrotListaKarta", "pytaniaListaKarta",
+                         "dyskusjeKarta", "reklamacjeKarta"]) {
+    assert.ok(szyna.includes(`id="${rejestr}"`), `${rejestr} mieszka w szynie rejestrów`);
+    assert.match(
+      html,
+      new RegExp(`<details class="zwijana" id="${rejestr}">`),
+      `${rejestr} jest zwijanym rejestrem, nie drugą kolejką`
+    );
+    assert.doesNotMatch(
+      html,
+      new RegExp(`id="${rejestr}"[^>]*\\bopen\\b`),
+      `${rejestr} startuje zwinięty — inaczej znów są dwie kolejki`
+    );
+  }
+
+  /* Obok otwartej sprawy stoi TA SAMA kolejka, z której się do niej weszło.
+     Dwie listy zależnie od typu (do 0.114.0) znaczyły, że zamknięcie sprawy
+     wracało do trzeciej listy i miejsce w kolejce trzeba było znaleźć od nowa. */
+  assert.match(
+    html,
+    /const PRZY_SPRAWIE = \["kolejkaSprawKarta"\];/,
+    "obok sprawy zostaje wspólna kolejka, nie kolejka jej typu"
+  );
+
+  /* Ta sama usterka co w 0.101.0: kolejka w szynie 21 rem dostawała wariant
+     tabeli na siedem kolumn. Wariant szyny musi istnieć i musi wybierać go
+     PASMO, a nie typ otwartej sprawy. */
+  assert.match(html, /function wierszSprawyWSzynie\(/, "kolejka ma wariant szyny");
+  assert.match(
+    html,
+    /const wSzynie = kolejkaZostaje\(\) &&/,
+    "wariant szyny wybiera pasmo, nie typ sprawy"
+  );
+});
+
+test("zakładka spraw bez otwartej sprawy jest konsolą, nie stosem kart", () => {
+  /* Zgłoszenie właściciela do 0.115.0: „okno sprawy powinno mieć ograniczoną
+     wysokość, reszta scrolowana". Bez otwartej sprawy zakładka była pionowym
+     stosem dziewięciu kart na dwa ekrany przewijania — a konsola z 0.112.0
+     włączała się dopiero PO otwarciu sprawy.
+
+     Trzy geometrie jednej konsoli, jeden przełącznik wyglądu: `konsola` niesie
+     taflę (pełny bleed, zero promienia, własne przewijanie), a `zSzczegolem`,
+     `zKolejka` i `zKlient` — układ kolumn. Rozdzielone, bo wygląd jest wspólny
+     dla dostaw i spraw, a kolumny są za każdym razem inne. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  assert.match(
+    html,
+    /#widokSprawy\.zKolejka \{ grid-template-columns: minmax\(0, 1fr\)/,
+    "bez otwartej sprawy szeroka jest KOLEJKA, a rejestry schodzą do szyny"
+  );
+  /* Szyna ma własne przewijanie na pełną wysokość okna — inaczej długi rejestr
+     przewijałby CAŁĄ stronę i kolejka uciekałaby pod krawędź. */
+  const szyna = html.slice(html.indexOf("#widokSprawy.zKolejka > .rejestry {"));
+  assert.match(szyna.slice(0, 400), /height: calc\(100dvh - var\(--hChrome/,
+    "szyna rejestrów ma wysokość okna");
+  assert.match(szyna.slice(0, 400), /overflow: auto/, "szyna przewija się sama");
+
+  for (const klasa of ["zKolejka", "zKlient", "konsola"]) {
+    assert.match(
+      html,
+      new RegExp(`classList\\.toggle\\("${klasa}"`),
+      `skrypt włącza \`${klasa}\`, inaczej reguła w arkuszu jest martwa`
+    );
+  }
+});
+
 test("wyszukiwarka klientów deleguje z KARTY, nie z listy wyników", () => {
   /* Lista wyników przerysowuje się przy KAŻDYM wpisanym znaku, więc nasłuch
      przypięty do niej ginie razem z pierwszym przerysowaniem. To ta sama
@@ -733,21 +840,23 @@ test("wyszukiwarka klientów deleguje z KARTY, nie z listy wyników", () => {
      i 0.101.0: przycisk wygląda normalnie, testy są zielone, zrzut czysty,
      a klik nic nie robi.
 
-     Karta skrzynki miała już dwa nasłuchy na pojemnikach w środku
-     (`#pytaniaLista`, `#pytaniaCzipy`) — trzeci byłby zaproszeniem do
-     powtórki. Wynik wyszukiwarki niesie `data-klient360`, czyli marker, który
-     panel obsługuje od 0.109.0; nowej ścieżki do karty klienta nie ma. */
+     Wynik wyszukiwarki niesie `data-klient360`, czyli marker, który panel
+     obsługuje od 0.109.0; nowej ścieżki do karty klienta nie ma. W 0.115.0
+     pole przeprowadziło się ze skrzynki do głowy kolejki — i to jest drugi
+     powód, dla którego nasłuch ma siedzieć na SEKCJI: własny nasłuch karty
+     skrzynki został po tej przeprowadzce na karcie, w której nie ma już
+     ani pola, ani wyników. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
 
-  assert.match(html, /id="klienciSzukaj"/, "pole szukania stoi w skrzynce");
+  assert.match(html, /id="klienciSzukaj"/, "pole szukania stoi w głowie kolejki");
   assert.match(html, /id="klienciWyniki"/, "wyniki mają swój pojemnik");
   assert.match(
     html,
-    /\$\("pytaniaListaKarta"\)\.addEventListener\("click"/,
-    "klik w wynik łapie KARTA, nie pojemnik wyników"
+    /\$\("kolejkaSprawKarta"\)\.addEventListener\("click"/,
+    "klik w wynik łapie SEKCJA kolejki, nie pojemnik wyników"
   );
   assert.doesNotMatch(
     html,
@@ -788,9 +897,9 @@ test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
 
   /* Trzy rzeczy naraz robiły te przerwy i wszystkie trzy muszą zniknąć —
      sam `gap: 0` zostawiłby zaokrąglone rogi stykające się bokami. */
-  const konsola = html.slice(html.indexOf(".widok.zSzczegolem {"));
+  const konsola = html.slice(html.indexOf(".widok.konsola {"));
   assert.match(konsola.slice(0, 400), /gap: 0/, "strefy stykają się bez odstępu");
-  assert.match(html, /\.widok\.zSzczegolem > \.kontekst \{[\s\S]{0,80}border-radius: 0/,
+  assert.match(html, /\.widok\.konsola > \.kontekst \{[\s\S]{0,80}border-radius: 0/,
     "strefy tracą promień");
 
   /* A karta ZOSTAJE kartą. Bez tej połówki „uprośćmy CSS" skasowałoby różnicę
@@ -806,7 +915,7 @@ test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
      bez szwu, więc rozdziela je kreska. */
   assert.match(
     html,
-    /\.widok\.zSzczegolem > \.card ~ \.card \{ border-top: 1px solid/,
+    /\.widok\.konsola > \.card ~ \.card \{ border-top: 1px solid/,
     "stos kart w kolejce ma szew"
   );
 });

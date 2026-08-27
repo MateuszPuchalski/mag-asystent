@@ -834,7 +834,8 @@ synchronizacji z Subiektem — a nie samego „nie znaleziono".
 ### S73 — skrzynka pytań w trzech stanach
 
 Ziarno zakłada trzy sprawy w skrzynce, po jednej na każdy stan, którym szyna
-się różni. Wejdź w `/biuro` → **SPRAWY**, karta skrzynki pytań.
+się różni. Wejdź w `/biuro` → **SPRAWY**. Od 0.115.0 skrzynka jest zwijanym
+**REJESTREM PYTAŃ** w szynie po prawej — rozwiń go.
 
 `client:44112097` czeka na szkic — nie ma odpowiedzi i nie ma dopasowanych
 towarów. To sprawa, którą model dopiero policzy.
@@ -948,3 +949,30 @@ jednym typie byłby dłuższy od paska przy innym mimo mniejszej liczby.
 
 Przełącz okno na **30 dni**. Dostawcy sprzed miesiąca mają zniknąć z tabeli,
 a mediana i udziały przeliczyć się na krótszym oknie.
+
+### S78 — jedna kolejka i dwie tafle na SPRAWACH
+
+Do 0.114.0 zakładka SPRAWY miała trzy kolejki: wspólną, kolejkę zwrotów
+i skrzynkę pytań. Każda z własnym filtrem, wszystkie o tych samych sprawach.
+
+Wejdź w `/biuro` → **SPRAWY** na oknie szerszym niż 1024 px. Widać dwie tafle
+i żadnej przerwy między nimi: kolejka po lewej, szyna rejestrów po prawej.
+
+**Strona nie ma się przewijać.** Przewijają się tafle, każda osobno. To jest
+cała treść tej zmiany — sprawdź to najpierw.
+
+W głowie kolejki stoją trzy narzędzia, które do 0.114.0 mieszkały w trzech
+kartach: skan etykiety zwrotu, wyszukiwarka klientów i rząd trzech pobrań.
+Zeskanuj `999` — odpowiedź ma przyjść tu, pod polem.
+
+Rejestry w szynie są **zwinięte**. Rozwiń REJESTR ZWROTÓW: to jest archiwum,
+więc czip „Rozliczone" ma pokazać zwroty, których w kolejce nie ma.
+
+Otwórz sprawę z kolejki. Obok niej ma zostać **ta sama kolejka**, zwężona do
+szyny, z podświetlonym wierszem otwartej sprawy. Szyna rejestrów schodzi.
+
+Kliknij login klienta w kolejce. Karta klienta ma zająć całą szerokość okna
+i też mieć własne przewijanie zamiast przewijania strony.
+
+Poniżej **1024 px** konsoli nie ma: wszystko wraca do pionowego stosu kart
+i strona przewija się normalnie. Tak ma być.

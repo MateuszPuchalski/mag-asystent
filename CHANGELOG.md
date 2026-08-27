@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.115.0 — 27 sierpnia 2026
+
+**Zakładka SPRAWY: jedna kolejka zamiast trzech, konsola na wysokość okna.**
+
+Zgłoszenie właściciela: „uporządkuj zakładkę sprawy, usuń zaokrąglone końcówki
+i marginesy, okno sprawy powinno mieć ograniczoną wysokość, reszta scrolowana".
+
+Zakładka miała TRZY kolejki: wspólną „SPRAWY KLIENTÓW", kolejkę zwrotów
+i skrzynkę pytań. Każda z własnym nagłówkiem, filtrem i kompletem wierszy,
+a wszystkie pokazywały te same sprawy w innej kolejności. Wybór, w którą
+patrzeć, był pracą samą w sobie i nie odpowiadał na pytanie „co teraz zrobić".
+
+Zostaje jedna kolejka. Rejestry per-typ — zwroty, pytania, dyskusje,
+reklamacje — zeszły do szyny po prawej jako **zwijane**: to archiwum, do
+którego wchodzi się po zwrot rozliczony albo pytanie wysłane. Nic nie zginęło.
+
+Narzędzia, które w nich mieszkały, przeprowadziły się do głowy kolejki, bo
+należą do kolejki, a nie do rejestru: skan etykiety zwrotu, wyszukiwarka
+klientów i rząd trzech pobrań z Allegro. Obok otwartej sprawy stoi teraz TA
+SAMA kolejka, z której się do niej weszło — do tej wersji były to dwie różne
+listy zależnie od typu sprawy.
+
+Konsola z 0.112.0 obejmuje wreszcie CAŁĄ zakładkę, nie tylko stan po otwarciu
+sprawy: pełny bleed, zero promienia, dwie tafle na wysokość okna, każda
+z własnym przewijaniem. Strona nie przewija się wcale.
+
+Przy okazji wyszła usterka starsza od tej zmiany. Strefa obok kolejki rozpina
+się na 50 rzędów siatki, żeby objąć stos jej kart — a nadmiar jej wysokości
+rozkładał się po pustych rzędach i robił **800 px pustego przewijania pod
+konsolą**. Dotyczyło to także DOSTAW. Siatka konsoli ma teraz wysokość okna.
+
 ## 0.114.0 — 27 sierpnia 2026
 
 **Skrzynka pytań ma wyszukiwarkę klientów.** Wpisujesz fragment loginu,
