@@ -242,6 +242,73 @@ export function sprawyKlienta(login: string | null): { aktywne: Sprawa[]; histor
   return { aktywne, historia };
 }
 
+/* ── Wyszukiwarka klientów ───────────────────────────────────────────────────
+   Klient 360 istnieje od 0.109.0, ale wchodziło się do niego WYŁĄCZNIE klikiem
+   w login na otwartej sprawie — czyli trzeba było najpierw znaleźć jakąś jego
+   sprawę. Gdy klient dzwoni z pytaniem „co u mnie", a nic otwartego nie ma,
+   nie było go jak odszukać. To jest to brakujące ogniwo.                     */
+
+export interface ZnalezionyKlient {
+  login: string;
+  /** Ile spraw czeka na biuro — ta sama definicja, co w kolejce. */
+  otwartych: number;
+  /** Ile w ogóle, razem z historią — klient bez otwartych też ma tu liczbę. */
+  wszystkich: number;
+  /** Ostatnia aktywność w dowolnym rejestrze; null przy sprawie bez daty. */
+  ostatnia: string | null;
+}
+
+/** Krótsza fraza przeczesuje cztery rejestry i zwraca pół bazy. */
+export const MIN_ZNAKOW_KLIENTA = 2;
+
+/**
+ * Klienci pasujący do fragmentu loginu — wejście do Klienta 360 bez sprawy.
+ *
+ * Liczy TYMI SAMYMI budowniczymi, co kolejka i Klient 360, zamiast pisać
+ * własne zapytanie z przepisanymi warunkami „otwartości". Gdyby je przepisać,
+ * wyszukiwarka pokazywałaby „3 otwarte", a Klient 360 po kliknięciu cztery —
+ * i rozjazd wyszedłby dopiero u kogoś przy biurku. Tu liczby zgadzają się
+ * z KONSTRUKCJI: to jest ten sam kod, tylko z innym `WHERE`.
+ *
+ * Login `NULL` (wklejka ze screenshota, zwrot ręczny) nie wchodzi do wyników:
+ * kubełek „bez klienta" istnieje w `sprawyKlienta(null)`, ale nie ma nazwy,
+ * po której dałoby się go szukać.
+ */
+export function szukajKlientow(fraza: string, limit = 12): ZnalezionyKlient[] {
+  const szukane = fraza.trim();
+  if (szukane.length < MIN_ZNAKOW_KLIENTA) return [];
+  const wzor = `%${szukane}%`;
+  const wszystkie = [
+    ...sprawyPytan("kupujacy_login LIKE ?", [wzor]),
+    ...sprawyZwrotow("kupujacy_login LIKE ?", [wzor]),
+    ...sprawyDyskusji("kupujacy_login LIKE ?", [wzor]),
+    ...sprawyReklamacji("z.kupujacy_login LIKE ?", [wzor]),
+  ];
+
+  const wg = new Map<string, ZnalezionyKlient>();
+  for (const s of wszystkie) {
+    if (!s.klient) continue; // LIKE i tak nie łapie NULL-a; jawnie, żeby to było widać
+    const dotad = wg.get(s.klient) ?? {
+      login: s.klient, otwartych: 0, wszystkich: 0, ostatnia: null,
+    };
+    dotad.wszystkich++;
+    if (s.otwarta) dotad.otwartych++;
+    if (s.kiedy && (!dotad.ostatnia || s.kiedy > dotad.ostatnia)) dotad.ostatnia = s.kiedy;
+    wg.set(s.klient, dotad);
+  }
+
+  /* Najpierw ci, u których coś czeka — po to się zwykle szuka. Przy remisie
+     świeższy pierwszy, a na końcu alfabet, żeby kolejność była powtarzalna. */
+  return [...wg.values()]
+    .sort(
+      (a, b) =>
+        b.otwartych - a.otwartych ||
+        (b.ostatnia ?? "").localeCompare(a.ostatnia ?? "") ||
+        a.login.localeCompare(b.login, "pl")
+    )
+    .slice(0, Math.min(Math.max(limit, 1), 50));
+}
+
 /**
  * Powiązane sprawy — ciąg „pytanie → zwrot → dyskusja" jednego problemu.
  * Allegro reprezentuje te obiekty osobno; łączymy je z kluczy, które już są.

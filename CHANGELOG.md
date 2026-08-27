@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.114.0 — 27 sierpnia 2026
+
+**Skrzynka pytań ma wyszukiwarkę klientów.** Wpisujesz fragment loginu,
+dostajesz listę pasujących klientów, klik otwiera Klienta 360.
+
+**Domknięcie drogi, która była zbudowana w trzech czwartych.** Klient 360
+istnieje od 0.109.0 i pokazuje wszystkie pytania, zwroty, dyskusje
+i reklamacje jednego loginu — ale wchodziło się tam WYŁĄCZNIE klikiem w login
+na otwartej sprawie. Żeby zobaczyć, co u kogoś słychać, trzeba było najpierw
+znaleźć jakąś jego sprawę.
+
+**A szuka się go zwykle wtedy, gdy nic otwartego nie ma.** Klient dzwoni
+z pytaniem „co u mnie" — i właśnie ten przypadek był nieosiągalny. Dlatego
+wyszukiwarka przeszukuje CAŁĄ historię, nie kolejkę: wynik „nic nie czeka ·
+ostatnio 3 dni" jest tu równie dobrą odpowiedzią jak „1 sprawa czeka".
+
+**Liczby zgadzają się z Klientem 360 z konstrukcji, nie z dobrych chęci.**
+Wyszukiwarka woła tych samych budowniczych, co kolejka i karta klienta, tylko
+z innym warunkiem `WHERE`. Gdyby przepisać warunki „otwartości" drugi raz,
+pokazywałaby „3 otwarte" przy karcie wypisującej cztery — i rozjazd wyszedłby
+dopiero komuś przy biurku. Pilnuje tego test porównujący obie liczby.
+
+**Pole stoi NAD czipami**, bo to inna oś: czipy zawężają skrzynkę, a to z niej
+wyprowadza. Wynikiem jest karta klienta, nie krótsza kolejka.
+
+**Sprawy bez loginu nie wypływają w wynikach.** Wklejka ze screenshota i zwrot
+ręczny trafiają do kubełka „bez klienta", który istnieje w Kliencie 360 — ale
+nie ma nazwy, po której dałoby się go szukać, więc udawanie, że da się go
+znaleźć, byłoby mylące. Fraza krótsza niż dwa znaki to pusty wynik, nie błąd:
+jedna litera przeczesuje cztery rejestry i zwraca pół bazy.
+
 ## 0.113.0 — 27 sierpnia 2026
 
 **Zrobiona pozycja dostawy przestała być przekreślonym napisem, a ilość da się

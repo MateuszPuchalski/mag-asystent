@@ -1486,6 +1486,17 @@
            w dymku pod kursorem, czyli tam, gdzie ich nikt nie widział. -->
       <h2>SKRZYNKA</h2>
       <p id="pytaniaPodsumowanie" style="margin-bottom:9px"></p>
+      <!-- Wyszukiwarka KLIENTÓW, nie pytań — i dlatego stoi NAD czipami, a nie
+           przy liście. Czipy zawężają skrzynkę, a to z niej wyprowadza:
+           wynikiem jest karta klienta, nie krótsza kolejka.
+
+           Powstała, bo do Klienta 360 wchodziło się wyłącznie klikiem w login
+           NA otwartej sprawie. Żeby zobaczyć, co u kogoś słychać, trzeba było
+           najpierw znaleźć jakąś jego sprawę — a gdy dzwoni z pytaniem „co
+           u mnie" i nic otwartego nie ma, nie było go jak odszukać. -->
+      <input class="szukaj" id="klienciSzukaj" style="width:100%"
+             placeholder="znajdź klienta po loginie" autocomplete="off">
+      <div id="klienciWyniki"></div>
       <!-- Czipy zamiast `<select>`: przy trzech stanach lista możliwości jest
            krótsza niż jej schowanie. „Wszystkie" niesie też zamknięte
            i pominięte — osobne czipy dla nich byłyby pięcioma pastylkami na
@@ -8172,7 +8183,65 @@ async function wczytajKonfiguracjePytan() {
   }
 }
 
+/* ── Wyszukiwarka klientów (0.114.0) ─────────────────────────────────────────
+   Wynikiem jest KLIENT, nie pytanie: każdy wiersz niesie `data-klient360`,
+   czyli dokładnie ten marker, który panel obsługuje od 0.109.0. Żadnej drugiej
+   drogi do karty klienta — jedna jest już przetestowana. */
+
+/** Ostatnie wpisane zapytanie; odpowiedź spóźniona o nie swoją frazę ląduje
+    w koszu. Bez tego szybkie pisanie potrafi zostawić na ekranie wyniki
+    sprzed dwóch znaków — odpowiedzi wracają w dowolnej kolejności. */
+let szukaneKlienta = "";
+let zegarKlientow = null;
+
+function rysujKlientow(lista, fraza) {
+  const cel = $("klienciWyniki");
+  if (!fraza) { cel.innerHTML = ""; return; }
+  if (!lista.length) {
+    cel.innerHTML = `<p class="mute" style="margin-top:8px">Żaden klient nie pasuje do „${esc(fraza)}".</p>`;
+    return;
+  }
+  cel.innerHTML = `<div style="margin-top:8px">${
+    lista.map((k) => `<button class="akcja cichy" data-klient360="${esc(k.login)}"
+        style="display:block;width:100%;text-align:left;margin-bottom:6px">
+        <span class="b">${esc(k.login)}</span>
+        <span class="mute" style="display:block;margin-top:2px;font-weight:400">${
+          k.otwartych
+            ? `${k.otwartych} ${odmiana(k.otwartych, ["sprawa czeka", "sprawy czekają", "spraw czeka"])}`
+            : "nic nie czeka"
+        }${k.ostatnia ? ` · ostatnio ${esc(wiekPytania(k.ostatnia))}` : ""}</span>
+      </button>`).join("")
+  }</div>`;
+}
+
+async function szukajKlientow() {
+  const fraza = $("klienciSzukaj").value.trim();
+  szukaneKlienta = fraza;
+  /* Próg dwóch znaków jest po stronie SERWERA (MIN_ZNAKOW_KLIENTA) — tu tylko
+     oszczędzamy zapytanie, które i tak wróciłoby puste. */
+  if (fraza.length < 2) return rysujKlientow([], "");
+  try {
+    const d = await (await api(`/api/biuro/sprawy/klienci?q=${encodeURIComponent(fraza)}`)).json();
+    if (szukaneKlienta !== fraza) return; // wyprzedziła nas świeższa fraza
+    rysujKlientow(d.klienci || [], fraza);
+  } catch (e) {
+    $("klienciWyniki").innerHTML = `<p class="mute" style="margin-top:8px"><span class="badge err">${esc(e.message)}</span></p>`;
+  }
+}
+
 /* ── Zdarzenia zakładki ────────────────────────────────────────────────────── */
+
+/* Nasłuch na KARCIE, nie na pojemniku wyników — ten się przerysowuje przy
+   każdym wpisanym znaku. Nasłuch przypięty do niego zniknąłby razem z nim,
+   czyli powtórzyłby usterkę z 0.92.0, 0.96.0, 0.97.0, 0.98.0 i 0.101.0. */
+$("pytaniaListaKarta").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-klient360]");
+  if (b) otworzKlienta360(b.dataset.klient360);
+});
+$("klienciSzukaj").addEventListener("input", () => {
+  clearTimeout(zegarKlientow);
+  zegarKlientow = setTimeout(szukajKlientow, 250);
+});
 
 $("pytaniaLista").addEventListener("click", (e) => {
   const b = e.target.closest("[data-pytanie]");

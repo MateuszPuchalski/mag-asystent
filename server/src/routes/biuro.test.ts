@@ -726,6 +726,39 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   }
 });
 
+test("wyszukiwarka klientów deleguje z KARTY, nie z listy wyników", () => {
+  /* Lista wyników przerysowuje się przy KAŻDYM wpisanym znaku, więc nasłuch
+     przypięty do niej ginie razem z pierwszym przerysowaniem. To ta sama
+     usterka, na którą panel przejechał się w 0.92.0, 0.96.0, 0.97.0, 0.98.0
+     i 0.101.0: przycisk wygląda normalnie, testy są zielone, zrzut czysty,
+     a klik nic nie robi.
+
+     Karta skrzynki miała już dwa nasłuchy na pojemnikach w środku
+     (`#pytaniaLista`, `#pytaniaCzipy`) — trzeci byłby zaproszeniem do
+     powtórki. Wynik wyszukiwarki niesie `data-klient360`, czyli marker, który
+     panel obsługuje od 0.109.0; nowej ścieżki do karty klienta nie ma. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  assert.match(html, /id="klienciSzukaj"/, "pole szukania stoi w skrzynce");
+  assert.match(html, /id="klienciWyniki"/, "wyniki mają swój pojemnik");
+  assert.match(
+    html,
+    /\$\("pytaniaListaKarta"\)\.addEventListener\("click"/,
+    "klik w wynik łapie KARTA, nie pojemnik wyników"
+  );
+  assert.doesNotMatch(
+    html,
+    /\$\("klienciWyniki"\)\.addEventListener/,
+    "nasłuch na pojemniku wyników zginie przy pierwszym przerysowaniu"
+  );
+  /* Jedna droga do karty klienta, nie druga obok istniejącej. */
+  assert.match(html, /data-klient360="\$\{esc\(k\.login\)\}"/,
+    "wynik używa markera, który panel już obsługuje");
+});
+
 test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
   /* Makieta rozdziela dwa wyglądy i panel do 0.112.0 znał tylko jeden.
      `Main.dc.html` robi konsolę pracy jako płaskie tafle stykające się

@@ -81,6 +81,7 @@ const TRASY = [
   "/api/biuro/sprawy",
   "/api/biuro/sprawy/licznik",
   "/api/biuro/sprawy/klient?login=jan",
+  "/api/biuro/sprawy/klienci?q=jan",
   "/api/biuro/sprawy/powiazane?rodzaj=zwrot&id=1",
 ];
 
@@ -124,6 +125,96 @@ test("licznik: pigułka zgodna z długością kolejki", async () => {
   });
   const kolejka = await app.inject({ method: "GET", url: "/api/biuro/sprawy", headers: naglowki });
   assert.equal(licznik.json().otwartych, kolejka.json().sprawy.length);
+});
+
+test("wyszukiwarka klientów: liczba otwartych zgadza się z Klientem 360", async () => {
+  /* To jest właściwy niezmiennik tej funkcji, nie kształt odpowiedzi.
+     Wyszukiwarka mówi „N spraw czeka", a klik prowadzi do karty, która te
+     sprawy wypisuje. Gdyby liczby liczyły się osobno — dwa zestawy warunków
+     „otwartości" w dwóch miejscach — rozjechałyby się przy pierwszym nowym
+     statusie i wyszłoby to dopiero komuś przy biurku. Dlatego `szukajKlientow`
+     woła tych samych budowniczych, co `sprawyKlienta`, a ten test tego pilnuje.
+
+     `daneSpraw()` daje klientowi `jan` po jednej sprawie w KAŻDYM z czterech
+     rejestrów — więc test przechodzi przez wszystkie, nie przez jeden. */
+  daneSpraw();
+  const naglowki = { "x-session": zalogowany("biuro") };
+
+  const szukaj = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/klienci?q=ja", headers: naglowki,
+  });
+  assert.equal(szukaj.statusCode, 200);
+  const znaleziony = szukaj.json().klienci.find((k: { login: string }) => k.login === "jan");
+  assert.ok(znaleziony, "fragment loginu znajduje klienta");
+
+  const karta = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/klient?login=jan", headers: naglowki,
+  });
+  assert.equal(
+    znaleziony.otwartych,
+    karta.json().aktywne.length,
+    "wyszukiwarka i Klient 360 liczą otwarte sprawy tak samo"
+  );
+  assert.equal(znaleziony.wszystkich, 4, "po jednej sprawie z każdego rejestru");
+});
+
+test("wyszukiwarka klientów znajduje TEŻ tego, kto nie ma nic otwartego", async () => {
+  /* Cały powód istnienia tej funkcji. Do Klienta 360 wchodziło się klikiem
+     w login NA otwartej sprawie — więc klient bez otwartych spraw był
+     nieosiągalny, a to właśnie wtedy się go szuka („dzwonił, co u niego").
+
+     Bez tego testu pierwsza „optymalizacja" zawęzi zapytanie do otwartych
+     spraw, wyszukiwarka dalej będzie działać na demo i przestanie robić to
+     jedno, po co powstała. */
+  const d = db();
+  const teraz = new Date().toISOString();
+  d.prepare(
+    `INSERT INTO pytanie(zrodlo, kupujacy_login, tresc, otrzymano_at, status,
+       produkty_json, utworzono_at, utworzono_przez)
+     VALUES ('allegro', 'ewa-cicha', 'Dziękuję', ?, 'wyslane', '[]', ?, 'Test')`
+  ).run(teraz, teraz);
+  const naglowki = { "x-session": zalogowany("biuro") };
+
+  const r = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/klienci?q=ewa", headers: naglowki,
+  });
+  const k = r.json().klienci.find((x: { login: string }) => x.login === "ewa-cicha");
+  assert.ok(k, "klient z samą historią jest znajdowalny");
+  assert.equal(k.otwartych, 0, "i widać, że nic nie czeka");
+  assert.equal(k.wszystkich, 1);
+});
+
+test("wyszukiwarka klientów: próg dwóch znaków i cisza o sprawach bez loginu", async () => {
+  const d = db();
+  const teraz = new Date().toISOString();
+  /* Wklejka ze screenshota nie niesie loginu. Kubełek „bez klienta" istnieje
+     w `sprawyKlienta(null)`, ale nie ma nazwy, po której dałoby się go
+     szukać — więc nie ma prawa wypłynąć w wynikach jako pusty wiersz. */
+  d.prepare(
+    `INSERT INTO pytanie(zrodlo, kupujacy_login, tresc, otrzymano_at, status,
+       produkty_json, utworzono_at, utworzono_przez)
+     VALUES ('wklejka', NULL, 'Bez loginu', ?, 'nowe', '[]', ?, 'Test')`
+  ).run(teraz, teraz);
+  daneSpraw();
+  const naglowki = { "x-session": zalogowany("biuro") };
+
+  const krotkie = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/klienci?q=j", headers: naglowki,
+  });
+  assert.equal(krotkie.statusCode, 200, "za krótka fraza to pusty wynik, nie błąd");
+  assert.deepEqual(krotkie.json().klienci, []);
+
+  const bezQ = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/klienci", headers: naglowki,
+  });
+  assert.deepEqual(bezQ.json().klienci, [], "brak parametru też jest pusty");
+
+  const szerokie = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/klienci?q=an", headers: naglowki,
+  });
+  for (const k of szerokie.json().klienci) {
+    assert.ok(k.login, "żaden wynik nie jest sprawą bez klienta");
+  }
 });
 
 test("Klient 360 i powiązania: login z querystring, kubełek bez parametru", async () => {
