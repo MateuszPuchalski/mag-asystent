@@ -40,6 +40,11 @@
        laptop dostaje jedną kolumnę na pełną szerokość, monitor 1920 — dwie,
        2560 — trzy. */
     --kol: 44rem;
+    /* Boczny margines strony. Wychodzi z `main#panel` do zmiennej, bo konsola
+       spraw musi go ODJĄĆ, żeby dotknąć krawędzi okna — a ta sama liczba
+       w dwóch miejscach to dwa miejsca do rozjazdu przy pierwszym strojeniu.
+       Ten sam powód, dla którego progi szerokości mają jeden literał. */
+    --brzeg: clamp(10px, 1.2vw, 24px);
   }
   * { box-sizing: border-box; margin: 0; }
   /* `main` ma display:grid, a styl autora wygrywa z arkuszem przeglądarki —
@@ -77,7 +82,7 @@
      własnej wysokości, więc nie ma zakresu ruchu i po prostu się nie przykleja.
      Siatką jest każdy widok osobno (`.widok`), nie kontener. Reguła `main`
      wyżej zostaje dla `#login`, które dalej ma być wąskim pudełkiem. */
-  main#panel { max-width: none; margin: 0; padding: 0 clamp(10px, 1.2vw, 24px) 28px; display: block; }
+  main#panel { max-width: none; margin: 0; padding: 0 var(--brzeg) 28px; display: block; }
 
   /* Pasek stanu i zakładki jadą ze stroną. Przewinięcie listy dostaw nie ma
      prawa zabierać z ekranu ani nawigacji, ani alarmu o kolejce w błędzie —
@@ -145,13 +150,77 @@
 
      Reguły stoją PRZED blokiem 1280 px i mają z nim równą specyficzność, więc
      powyżej progu wygrywa tamten — kolejnością w źródle, nie `!important`. */
+  /* ── Konsola: tafle, nie pływające karty ──────────────────────────────────
+     Makieta `Main` od początku rysowała konsolę jako płaskie tafle stykające
+     się krawędziami — `.kontekst` ma tam `border-left`, zero promienia i zero
+     cienia, a cała aplikacja jest siatką na pełną wysokość okna. Promień
+     i cień makieta zostawia WYŁĄCZNIE dla powierzchni do czytania: `Analiza`
+     ma `.blok { border-radius: 14px; box-shadow }` i odstęp między blokami.
+
+     Panel dostawał kartę wszędzie, bo `.card` jest jedną klasą na cały arkusz.
+     Trzy strefy pracy pływały więc na papierze, rozdzielone odstępem i cieniem
+     — czyli wyglądały jak trzy niezależne dokumenty, a są jednym stanowiskiem.
+
+     Reguła: KONSOLA PRACY TO TAFLE, POWIERZCHNIA DO CZYTANIA TO KARTY.
+     Poniżej 1024 px konsoli nie ma — widok jest pionowym stosem kart i stos
+     kart jest tam poprawny, więc te reguły go nie dotyczą.
+
+     Wyłamanie z marginesu strony robi ujemny `margin-inline`: siatka zostaje
+     w zwykłym przepływie (żadnego `position` ani `width: 100vw`, które łamią
+     się przy widocznym pasku przewijania), a tylko sięga o `--brzeg` szerzej
+     w obie strony. */
   @media (min-width: 1024px) {
+    .widok.zSzczegolem {
+      gap: 0;
+      margin-top: 0;
+      margin-inline: calc(-1 * var(--brzeg));
+    }
+    /* Strefy tracą wszystko, co robiło z nich osobne kartki. Ramki zostają
+       tylko WEWNĘTRZNE — boczne krawędzie konsoli dotykają okna i ramka
+       rysowałaby tam kreskę wzdłuż samej krawędzi ekranu. */
+    .widok.zSzczegolem > .card,
+    .widok.zSzczegolem > .szczegol,
+    .widok.zSzczegolem > .kontekst {
+      border-radius: 0;
+      box-shadow: none;
+      border-top: 0; border-bottom: 0;
+      border-left: 0; border-right: 0;
+    }
+    .widok.zSzczegolem > .szczegol,
+    .widok.zSzczegolem > .kontekst { border-left: 1px solid var(--border); }
+    /* Kolumna kolejki bywa STOSEM kart, nie jedną: przy zwrocie stoi pod nią
+       karta brakujących paczek (`PRZY_ZWROCIE`). Bez odstępu zlałyby się
+       w jedną płaszczyznę bez szwu, więc rozdziela je ta sama kreska, która
+       rozdziela strefy. */
+    .widok.zSzczegolem > .card ~ .card { border-top: 1px solid var(--border); }
+
+    /* Szyna kolejki przewija się WŁASNYM przewijaniem, jak dwie pozostałe
+       strefy. Do tej wersji jechała ze stroną, podczas gdy sprawa i kontekst
+       stały — przy kilkudziesięciu sprawach w kolejce wyglądało to jak
+       usterka, a w konsoli na pełną wysokość byłoby nie do obrony.
+
+       `grid-row` rozpina kolumnę na całą siatkę, żeby stos kart w kolejce
+       (lista + brakujące paczki) był JEDNĄ przewijaną taflą, a nie dwiema
+       przyklejonymi osobno. */
+    /* Tu `max-height`, a NIE `height` jak przy sprawie i kontekście — i to jest
+       różnica wymuszona przez układ, nie przeoczenie. Sprawa i kontekst są
+       zawsze POJEDYNCZYM elementem w swojej kolumnie, więc sztywna wysokość
+       rozciąga je na okno. Kolejka bywa STOSEM: przy zwrocie stoi pod nią
+       karta brakujących paczek, przy dostawach karta „poza WERTIS". Sztywna
+       wysokość dałaby każdej z nich pełne okno osobno, czyli kolumnę dwa razy
+       wyższą od ekranu — sprawdzone na dostawach, zanim to trafiło dalej. */
+    .widok.zSzczegolem > .card {
+      position: sticky; top: var(--hChrome, 130px);
+      max-height: calc(100dvh - var(--hChrome, 130px));
+      overflow: auto; overscroll-behavior: contain;
+    }
+
     .widok.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) 1fr; }
     .widok.zSzczegolem > .card { grid-column: 1; }
     .widok.zSzczegolem > .szczegol {
       grid-column: 2; grid-row: 1 / span 50;
-      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
-      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      position: sticky; top: var(--hChrome, 130px);
+      height: calc(100dvh - var(--hChrome, 130px));
       display: flex; flex-direction: column; overflow: hidden;
     }
     .widok.zSzczegolem > .szczegol > .sprawaSzyna { align-self: stretch; }
@@ -218,8 +287,8 @@
     .widok.zSzczegolem > .card { grid-column: 1; }
     .widok.zSzczegolem > .szczegol {
       grid-column: 2; grid-row: 1 / span 50;
-      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
-      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      position: sticky; top: var(--hChrome, 130px);
+      height: calc(100dvh - var(--hChrome, 130px));
       overflow: auto; overscroll-behavior: contain;
     }
 
@@ -231,8 +300,8 @@
     #widokSprawy.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 22rem; }
     #widokSprawy.zSzczegolem > .kontekst {
       grid-column: 3; grid-row: 1 / span 50;
-      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
-      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      position: sticky; top: var(--hChrome, 130px);
+      height: calc(100dvh - var(--hChrome, 130px));
       overflow: auto; overscroll-behavior: contain;
     }
     /* Sprawa jest kolumną: przewija się ROZMOWA, a pole odpowiedzi zostaje na
@@ -281,8 +350,8 @@
     #widokDostawy.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 20rem; }
     #widokDostawy.zSzczegolem > .kontekst {
       grid-column: 3; grid-row: 1 / span 50;
-      position: sticky; top: calc(var(--hChrome, 130px) + var(--luz));
-      max-height: calc(100dvh - var(--hChrome, 130px) - 2 * var(--luz));
+      position: sticky; top: var(--hChrome, 130px);
+      height: calc(100dvh - var(--hChrome, 130px));
       overflow: auto; overscroll-behavior: contain;
     }
     #widokDostawy.zSzczegolem > .szczegol {
