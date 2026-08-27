@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.115.0 — 27 sierpnia 2026
+## 0.116.0 — 27 sierpnia 2026
 
 **Zakładka SPRAWY: jedna kolejka zamiast trzech, konsola na wysokość okna.**
 
@@ -64,7 +64,7 @@ się na 50 rzędów siatki, żeby objąć stos jej kart — a nadmiar jej wysoko
 rozkładał się po pustych rzędach i robił **800 px pustego przewijania pod
 konsolą**. Dotyczyło to także DOSTAW. Siatka konsoli ma teraz wysokość okna.
 
-## 0.114.0 — 27 sierpnia 2026
+## 0.115.0 — 27 sierpnia 2026
 
 **Skrzynka pytań ma wyszukiwarkę klientów.** Wpisujesz fragment loginu,
 dostajesz listę pasujących klientów, klik otwiera Klienta 360.
@@ -94,6 +94,44 @@ ręczny trafiają do kubełka „bez klienta", który istnieje w Kliencie 360 �
 nie ma nazwy, po której dałoby się go szukać, więc udawanie, że da się go
 znaleźć, byłoby mylące. Fraza krótsza niż dwa znaki to pusty wynik, nie błąd:
 jedna litera przeczesuje cztery rejestry i zwraca pół bazy.
+## 0.114.0 — 27 sierpnia 2026
+
+**Guzik POŁĄCZ Z ALLEGRO przestał umierać po restarcie serwera, a pasek stanu
+zmienił rząd kafli na dwie ikony.** Obie rzeczy z jednego zgłoszenia
+właściciela: „nie działa mi guzik do połączenia, jego miejsce jest mylące,
+a pasek zredukuj do jednej ikony z tooltipem".
+
+**Naprawa martwego guzika.** Sesja parowania żyje w pamięci procesu serwera.
+Restart w trakcie parowania (typowe wdrożenie) ją zjadał, a front kręcił
+odpowiedzią `brak` wieczną pętlę jak stanem „czekam". Flaga trwającego
+parowania zostawała podniesiona i zabijała guzik aż do przeładowania strony.
+Teraz `brak` kończy pętlę: panel mówi „sesja parowania przepadła — zacznij od
+nowa" i od razu oddaje żywy guzik.
+
+**Ikona ALLEGRO w pasku na górze.** Wejście do parowania stało dotąd trzy
+ekrany w głąb zakładki SPRAWY. Ikona mówi kolorem: zielony — połączone,
+bursztyn — parowanie w toku, czerwień — niepołączone, szary — adapter dev albo
+funkcja wyłączona. Klik otwiera kartę KONTO ALLEGRO i przy czerwieni sam
+zaczyna parowanie. Stan płynie z `/api/health` (nowe pole `allegro`: stan,
+środowisko, data wygaśnięcia — bez sekretów), więc ikona żyje na każdej
+zakładce, nie dopiero po odczycie listy zwrotów.
+
+**Jedna ikona SYSTEM zamiast kafli.** Rząd „serwer OK · worker OK · kolejka
+bez błędów" świecił na zielono cały dzień i uczył siebie nie czytać. Ikona
+odpowiada kolorem na jedno pytanie: czy coś wymaga uwagi. Czerwień — serwer
+zgłasza problemy, worker padł, kolejka w błędzie albo są rozjazdy. Bursztyn —
+działa, ale ostatnie odświeżenie panelu nie doszło (sygnał z 0.111.0, dotąd
+osobny znacznik). Dymek po najechaniu niesie wszystko, co niosły kafle:
+etykietę środowiska, wersję i tryb, workera, kolejkę i pełne zdania
+`problemy[]`. Klik prowadzi do STANU SYSTEMU. Plakietka „odpowiedzi na
+notatki" zostaje osobno — to sygnał roboczy z własną drogą do karty, nie
+zdrowie systemu.
+
+Przy okazji sprostowany komentarz serwera: PRZERWIJ przy parowaniu jest
+wyłącznie frontowy i sesji na serwerze świadomie nie czyści — nowy kod jest
+dopiero po wygaśnięciu starego.
+
+---
 
 ## 0.113.0 — 27 sierpnia 2026
 

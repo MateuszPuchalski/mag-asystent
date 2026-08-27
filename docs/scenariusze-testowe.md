@@ -834,7 +834,7 @@ synchronizacji z Subiektem — a nie samego „nie znaleziono".
 ### S73 — skrzynka pytań w trzech stanach
 
 Ziarno zakłada trzy sprawy w skrzynce, po jednej na każdy stan, którym szyna
-się różni. Wejdź w `/biuro` → **SPRAWY**. Od 0.115.0 skrzynka jest zwijanym
+się różni. Wejdź w `/biuro` → **SPRAWY**. Od 0.116.0 skrzynka jest zwijanym
 **REJESTREM PYTAŃ** w szynie po prawej — rozwiń go.
 
 `client:44112097` czeka na szkic — nie ma odpowiedzi i nie ma dopasowanych
@@ -952,7 +952,7 @@ a mediana i udziały przeliczyć się na krótszym oknie.
 
 ### S78 — jedna kolejka i dwie tafle na SPRAWACH
 
-Do 0.114.0 zakładka SPRAWY miała trzy kolejki: wspólną, kolejkę zwrotów
+Do 0.115.0 zakładka SPRAWY miała trzy kolejki: wspólną, kolejkę zwrotów
 i skrzynkę pytań. Każda z własnym filtrem, wszystkie o tych samych sprawach.
 
 Wejdź w `/biuro` → **SPRAWY** na oknie szerszym niż 1024 px. Widać dwie tafle
@@ -961,7 +961,7 @@ i żadnej przerwy między nimi: kolejka po lewej, szyna rejestrów po prawej.
 **Strona nie ma się przewijać.** Przewijają się tafle, każda osobno. To jest
 cała treść tej zmiany — sprawdź to najpierw.
 
-W głowie kolejki stoją trzy narzędzia, które do 0.114.0 mieszkały w trzech
+W głowie kolejki stoją trzy narzędzia, które do 0.115.0 mieszkały w trzech
 kartach: skan etykiety zwrotu, wyszukiwarka klientów i rząd trzech pobrań.
 Zeskanuj `999` — odpowiedź ma przyjść tu, pod polem.
 
