@@ -159,3 +159,17 @@ test("towar bez adresu w kartotece i bez kolejki zostaje bez adresu", () => {
   const a = D.openDelivery(DOK_A, "jan");
   assert.equal(adres(a), null);
 });
+
+test("linia niesie godzinę odłożenia — po niej kolektor układa zrobione", () => {
+  /* Kolektor stawia ostatnio odłożoną na górze grupy zrobionych (0.113.0),
+     więc bez tego pola cała ta kolejność wraca po cichu do alejkowej —
+     wygląda poprawnie i jest nie ta. */
+  const a = D.openDelivery(DOK_A, "jan");
+  assert.equal(pozycja(a).doneAt, null, "nietknięta linia nie ma godziny");
+
+  D.putawayLine(pozycja(a).id, "B02-01-01", "jan");
+  const po = pozycja(a);
+  assert.equal(po.status, "done");
+  assert.ok(po.doneAt, "odłożona linia ma znacznik czasu");
+  assert.match(String(po.doneAt), /^\d{4}-\d{2}-\d{2}T/, "ISO, bo po nim się sortuje");
+});

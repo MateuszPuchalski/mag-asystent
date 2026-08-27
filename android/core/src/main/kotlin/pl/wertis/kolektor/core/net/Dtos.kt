@@ -589,6 +589,14 @@ data class DeliveryLineView(
     val locActual: String? = null,
     val status: String = "todo",
     /**
+     * Kiedy pozycję odłożono (ISO); `null` — jeszcze nikt jej nie tknął albo
+     * odpowiada starszy serwer, który tego pola nie wysyła.
+     *
+     * Po tym układa się grupa zrobionych: ostatnio odłożona na górze, bo to
+     * jej dotyczy pytanie „czy na pewno na tę półkę".
+     */
+    val doneAt: String? = null,
+    /**
      * Stan na hali i w przyjęciach — surowy, bez korekty o kolejkę i rezerwacje.
      * Przy dostawie krajowej `stanMag` zawiera już rozkładaną partię (towar
      * figuruje na MAG od zaksięgowania dokumentu). Domyślne zera dotyczą

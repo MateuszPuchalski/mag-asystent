@@ -89,18 +89,38 @@ private fun kubelekPozycji(status: String, locExpected: String?): Int = when {
 /**
  * Do zrobienia na górze, bez lokalizacji pośrodku, odłożone na dole.
  *
- * Sortowanie STABILNE — wewnątrz kubełka zostaje kolejność z serwera
+ * Wewnątrz dwóch pierwszych kubełków zostaje kolejność z serwera
  * (alfabetycznie po adresie, czyli po alejkach), więc trasa przez halę się
  * nie zmienia.
  *
+ * ZROBIONE UKŁADAJĄ SIĘ OD NAJNOWSZYCH (0.113.0). Kolejność alejkowa nie
+ * znaczyła tam nic — po odłożeniu nikt nie idzie do tych półek drugi raz —
+ * a jedno pytanie do tej grupy pada naprawdę: „czy ostatnia poszła tam, gdzie
+ * miała". Odpowiedź stoi teraz w pierwszym wierszu pod pracą do zrobienia,
+ * zamiast gdzieś w środku listy. Pozycja bez znacznika czasu (starszy serwer,
+ * pominięcie bez odłożenia) siada za nimi, w kolejności z serwera.
+ *
  * @param status funkcja wyciągająca status pozycji
  * @param locExpected funkcja wyciągająca adres oczekiwany
+ * @param doneAt znacznik odłożenia (ISO); domyślnie brak — wtedy nic nie zmienia
  */
 fun <T> uporzadkujPozycje(
     pozycje: List<T>,
     status: (T) -> String,
     locExpected: (T) -> String?,
-): List<T> = pozycje.sortedBy { kubelekPozycji(status(it), locExpected(it)) }
+    doneAt: (T) -> String? = { null },
+): List<T> {
+    // `groupBy` zachowuje kolejność wejściową wewnątrz grup — na tym stoją
+    // dwa pierwsze kubełki i dlatego nie ma tu jednego `sortedBy`
+    val kubelki = pozycje.groupBy { kubelekPozycji(status(it), locExpected(it)) }
+    return kubelki[0].orEmpty() + kubelki[1].orEmpty() + odNajnowszych(kubelki[2].orEmpty(), doneAt)
+}
+
+/** Zrobione od ostatnio odłożonej; bez znacznika czasu — na końcu, bez zmian. */
+private fun <T> odNajnowszych(zrobione: List<T>, doneAt: (T) -> String?): List<T> =
+    zrobione.sortedWith(
+        compareBy<T> { doneAt(it) == null }.thenByDescending { doneAt(it) ?: "" }
+    )
 
 /** Czy pozycja czeka jeszcze na decyzję „gdzie to położyć". */
 fun <T> czekaBezLokalizacji(

@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -441,7 +440,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     val widoczne = if (szukaneN.isEmpty()) v.lines else v.lines.filter {
         it.sym.lowercase().contains(szukaneN) || it.name.lowercase().contains(szukaneN)
     }
-    val uporzadkowane = uporzadkujPozycje(widoczne, { it.status }, { it.locExpected })
+    val uporzadkowane =
+        uporzadkujPozycje(widoczne, { it.status }, { it.locExpected }, { it.doneAt })
     val bezLok = czekaBezLokalizacji(v.lines, { it.status }, { it.locExpected })
     val pierwszyBezLok = bezLok.firstOrNull()?.id
 
@@ -991,10 +991,12 @@ private fun LineRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // zwinięty pasek jest o połowę niższy — dziesięć pozycji drobnicy
-                // ma się zmieścić na ekranie bez przewijania
-                .heightIn(min = if (zwiniety) 34.dp else 52.dp)
-                .padding(horizontal = 12.dp, vertical = if (zwiniety) 4.dp else 9.dp),
+                /* Zwinięty pasek zostaje wyraźnie niższy od wiersza pracy —
+                   dziesięć pozycji drobnicy ma się zmieścić na ekranie bez
+                   przewijania. 40 dp zamiast 34 dp od 0.113.0: tyle potrzebuje
+                   miniatura, która wróciła do tego paska (patrz niżej). */
+                .heightIn(min = if (zwiniety) 40.dp else 52.dp)
+                .padding(horizontal = 12.dp, vertical = if (zwiniety) 5.dp else 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1014,17 +1016,40 @@ private fun LineRow(
                     tint = Destructive,
                     modifier = Modifier.size(18.dp),
                 )
-                zwiniety -> Icon(
-                    WIcons.Check,
-                    contentDescription = null,
-                    tint = Success,
-                    modifier = Modifier.size(14.dp),
-                )
+                /* ODZNAKA ZAMIAST PRZEKREŚLENIA (0.113.0). Do tej wersji pozycja
+                   zrobiona miała symbol przekreślony linią — i to jest znak,
+                   który trafia dokładnie w to, co się czyta. Symbol towaru jest
+                   ciągiem znaków bez sensu słownego („LS51-139"), więc kreska
+                   przez środek każe go składać literami przez przeszkodę,
+                   a właśnie po nim sprawdza się, CO poszło na półkę.
+
+                   Stan niesie teraz zielony krążek z fajką, stojący POZA
+                   tekstem, w jednej kolumnie przez całą grupę zrobionych.
+                   Pominięta dostaje bursztyn i wykrzyknik — to nie jest ten sam
+                   stan, a do 0.113.0 obie miały tę samą zieloną fajkę. */
+                zwiniety -> {
+                    val pominieta = line.status == StatusLinii.SKIPPED
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (pominieta) AmberBg else Success.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (pominieta) WIcons.Alert else WIcons.Check,
+                            contentDescription = null,
+                            tint = if (pominieta) AmberInk else Success,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
+                }
             }
 
             /* Miniatura W PASKU, po lewej stronie symbolu — zgłoszenie
-               z magazynu. Zdjęcie stoi tu w KAŻDYM trybie poza zwiniętym, więc
-               rozwinięcie wiersza nie przenosi go na drugi koniec ekranu.
+               z magazynu. Zdjęcie stoi tu w KAŻDYM trybie wiersza, więc ani
+               rozwinięcie, ani odłożenie nie przenosi go na drugi koniec
+               ekranu; zmienia się wyłącznie jego bok.
 
                Do 0.55.0 było inaczej: rozwinięty wiersz dostawał 56 dp po
                prawej, w miejscu pastylki adresu, żeby zdjęcie z nią nie
@@ -1033,10 +1058,12 @@ private fun LineRow(
                niżej. Zostawała sama niespójność: ta sama pozycja pokazywała
                zdjęcie w dwóch różnych miejscach, zależnie od rozwinięcia.
 
-               Wiersz zwinięty jej nie dostaje. Pozycja jest odłożona, więc
-               rozpoznawanie towaru nic już nie wnosi, a pasek jest o połowę
-               niższy właśnie po to, żeby dziesięć pozycji drobnicy zmieściło
-               się na ekranie. */
+               Od 0.113.0 zdjęcie stoi TAKŻE w pasku zrobionej pozycji, w 28 dp.
+               Poprzednia decyzja („pozycja odłożona, rozpoznawanie towaru nic
+               już nie wnosi") pomijała to, po co się do tej grupy wraca: żeby
+               sprawdzić, czy poszło to, co miało pójść, i czy trafiło na tę
+               półkę. Na to pytanie zdjęcie odpowiada szybciej niż symbol —
+               a kosztuje sześć punktów wysokości paska. */
             /* Rysunek pudełka zajmuje TYLE SAMO MIEJSCA co miniatura, choć sam
                jest o połowę mniejszy. Bez tego wiersz przeskakiwałby w bok
                o 18 dp w chwili doczytania zdjęcia — a to jest dokładnie ten
@@ -1046,7 +1073,11 @@ private fun LineRow(
             /* Rozwinięty wiersz dostaje kafelek 44 dp na białym tle — nagłówek
                karty z makiety. Oczekujący zostaje przy 36 dp: tam liczy się
                gęstość listy, a nie okazałość jednej pozycji. */
-            val bokMiniatury = if (rozwiniety) 44.dp else 36.dp
+            val bokMiniatury = when {
+                rozwiniety -> 44.dp
+                zwiniety -> 28.dp
+                else -> 36.dp
+            }
             val ikonaPudelka: @Composable () -> Unit = {
                 Box(
                     Modifier
@@ -1066,15 +1097,13 @@ private fun LineRow(
                     Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(20.dp))
                 }
             }
-            if (!zwiniety) {
-                MiniaturaTowaru(
-                    graph,
-                    line.twId,
-                    bokMiniatury,
-                    // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
-                    zamiast = if (problem) null else ikonaPudelka,
-                )
-            }
+            MiniaturaTowaru(
+                graph,
+                line.twId,
+                bokMiniatury,
+                // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
+                zamiast = if (problem) null else ikonaPudelka,
+            )
             Column(Modifier.weight(1f)) {
                 Text(
                     line.sym,
@@ -1087,12 +1116,15 @@ private fun LineRow(
                        `heightIn(min = 34.dp)`, żeby dziesięć pozycji drobnicy
                        mieściło się bez przewijania. */
                     fontSize = when {
-                        zwiniety -> 13.sp
+                        zwiniety -> 14.sp
                         rozwiniety -> 20.sp
                         else -> 18.sp
                     },
-                    color = if (zwiniety) InkMute else Ink,
-                    textDecoration = if (zwiniety) TextDecoration.LineThrough else null,
+                    /* `InkSoft`, nie `InkMute`: pasek ma być cichszy od pracy do
+                       zrobienia, ale nadal CZYTELNY — to po nim sprawdza się,
+                       co już poszło. Przekreślenie zniknęło, powód stoi przy
+                       odznace wyżej. */
+                    color = if (zwiniety) InkSoft else Ink,
                 )
                 // Nazwa i metadane znikają przy zwijaniu; symbol zostaje, bo to
                 // po nim magazynier rozpoznaje towar przy regale.
