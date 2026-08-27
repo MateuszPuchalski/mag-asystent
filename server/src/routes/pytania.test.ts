@@ -365,6 +365,7 @@ test("zero nowych mówi, DLACZEGO — rozbicie pominięć", async () => {
   for (const przebieg of [pierwsze, drugie]) {
     const suma =
       przebieg.nowych +
+      przebieg.dopisanych +
       przebieg.pominiete.juzZnane +
       przebieg.pominiete.zakonczonyNaszaOdpowiedzia +
       przebieg.pominiete.bezWiadomosci +
@@ -423,4 +424,35 @@ test("przesyłki klienta: bramka biura, dane z dev, wklejka daje uczciwą pustk�
   r = await app.inject({ method: "GET", url: `/api/biuro/pytania/${wklejka.id}/przesylki`, headers: biuro });
   assert.equal(r.statusCode, 200);
   assert.deepEqual(r.json().przesylki.zamowienia, []);
+});
+
+test("wysyłka na nieświeżą rozmowę: 409 z dopiskami, wymus przechodzi (0.110.0)", async () => {
+  const naglowki = { "x-session": zalogowany("biuro") };
+  await app.inject({
+    method: "PUT", url: "/api/biuro/pytania/auto-szkic",
+    payload: { autoSzkic: true }, headers: { "x-session": zalogowany("admin") },
+  });
+  await app.inject({
+    method: "POST", url: "/api/biuro/pytania/odswiez", payload: {}, headers: naglowki,
+  });
+  const lista = await app.inject({ method: "GET", url: "/api/biuro/pytania", headers: naglowki });
+  const p = lista.json().pytania.find((x: { threadId: string }) => x.threadId === "dev-pyt-1");
+  db().prepare("UPDATE pytanie SET wiadomosc_id = 'starsza' WHERE id = ?").run(p.id);
+
+  const odmowa = await app.inject({
+    method: "POST", url: `/api/biuro/pytania/${p.id}/wyslij`,
+    payload: { odpowiedz: p.odpowiedz }, headers: naglowki,
+  });
+  assert.equal(odmowa.statusCode, 409);
+  assert.ok(
+    Array.isArray(odmowa.json().noweWiadomosci) && odmowa.json().noweWiadomosci.length > 0,
+    "409 niesie dopiski klienta — panel ma je pokazać, nie kazać ich szukać"
+  );
+
+  const wymus = await app.inject({
+    method: "POST", url: `/api/biuro/pytania/${p.id}/wyslij`,
+    payload: { odpowiedz: p.odpowiedz, wymus: true }, headers: naglowki,
+  });
+  assert.equal(wymus.statusCode, 200);
+  assert.equal(wymus.json().pytanie.status, "wyslane");
 });

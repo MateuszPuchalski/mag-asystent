@@ -3,6 +3,7 @@ import { sesjaZadania } from "../context.js";
 import { stanPolaczenia } from "../services/allegro-token.js";
 import {
   BladDyskusji,
+  BladSwiezosciDyskusji,
   generujSzkicDyskusji,
   licznikDyskusji,
   listaDyskusji,
@@ -56,6 +57,10 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
     try {
       return await fn();
     } catch (e) {
+      /* Świeżość niesie ŁADUNEK — panel pokazuje, co doszło (wzorzec pytań). */
+      if (e instanceof BladSwiezosciDyskusji) {
+        return reply.code(e.kod).send({ error: e.message, noweWiadomosci: e.wiadomosci });
+      }
       if (e instanceof BladDyskusji) return reply.code(e.kod).send({ error: e.message });
       return reply.code(502).send({ error: (e as Error).message });
     }
@@ -194,7 +199,12 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { id: string };
-    Body: { odpowiedz?: string; zalacznik?: ZalacznikDyskusji };
+    Body: {
+      odpowiedz?: string;
+      zalacznik?: ZalacznikDyskusji;
+      ostatniaWidzianaId?: string;
+      wymus?: boolean;
+    };
   }>("/api/biuro/dyskusje/:id/wyslij", async (req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
@@ -206,11 +216,10 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
         zapiszOdpowiedzDyskusji(Number(req.params.id), req.body.odpowiedz, autor());
       }
       return {
-        dyskusja: await wyslijOdpowiedzDyskusji(
-          Number(req.params.id),
-          autor(),
-          req.body?.zalacznik
-        ),
+        dyskusja: await wyslijOdpowiedzDyskusji(Number(req.params.id), autor(), req.body?.zalacznik, {
+          ostatniaWidzianaId: req.body?.ostatniaWidzianaId ?? null,
+          wymus: req.body?.wymus === true,
+        }),
       };
     });
   });

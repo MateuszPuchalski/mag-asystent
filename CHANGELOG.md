@@ -33,6 +33,97 @@ historii nie przepisujemy.
 
 ---
 
+## 0.111.0 — 26 sierpnia 2026
+
+**Panel, który naprawia, nie tylko patrzy.** Przegląd dojrzałości pokazał
+jeden wzorzec: miejsca, w których problem widać, nie były miejscami,
+w których da się go naprawić. Do tego garść porządków.
+
+- **Kolejka błędów z przyciskami.** STAN SYSTEMU dostał PONÓW przy zadaniu
+  w błędzie i ANULUJ przy oczekującym — te same trasy, których używa
+  kolektor. Zapis do Subiekta rusza z biurka, bez chodzenia po urządzenie.
+- **Dwie operacje ratunkowe zeszły z DEPLOY.md na przyciski.** PEŁNY RESYNC
+  Z SUBIEKTA i ODŚWIEŻ BRAKUJĄCE ZDJĘCIA stoją w karcie SERWER, oba za
+  groźnym potwierdzeniem.
+- **KONTA I SESJE w ustawieniach.** Reset hasła, włączenie/wyłączenie konta
+  i — po raz pierwszy — wgląd w sesje (urządzenie, ostatnio widziane) oraz
+  WYLOGUJ WSZĘDZIE: przycisk na zgubiony kolektor. Dotąd wszystko to było
+  poleceniami curl; mutacje przechodzą wyłącznie adminowi (odmowę
+  wypowiada serwer). Nowe trasy: `GET /api/users/:id/sesje`,
+  `POST /api/users/:id/wyloguj`.
+- **DZIENNIK filtruje po osobie.** „Co robił wczoraj Jan" przestało wymagać
+  CSV i Excela — trasa umiała to od dawna, brakowało kontrolki.
+- **Kulejący cykl ma jeden znacznik.** Pięć niemych `console.warn`
+  w odświeżaczach zastąpił wspólny sygnał w pasku stanu: mówi, że
+  odświeżanie nie doszło i gdzie, gaśnie przy pierwszym czystym przebiegu.
+- **Porządki:** jedna lista ról zamiast czterech kopii; `WORKER_SIM_ERRORS`
+  zatrzymuje start na produkcji (symulacja błędów kolejki wyglądałaby jak
+  awaria Sfery); `ALLOW_MANUAL_LOC` trafił do `wertis.env.example`;
+  DEPLOY.md wskazuje JEDNĄ drogę aktualizacji (instalator, ręczna
+  sekwencja tylko awaryjnie); zdanie o pokryciu testami w porównaniu
+  urealnione; nowy `CLAUDE.md` z zasadami pracy w repo.
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu.
+
+## 0.110.0 — 26 sierpnia 2026
+
+**Klient nie przestaje pisać dlatego, że biuro ma jego sprawę na ekranie.**
+Dotąd otwarta sprawa niczego o tym nie mówiła: dopisek klienta potrafił
+założyć DRUGĄ sprawę z tego samego wątku, a odpowiedź szła na starą wersję
+pytania. Trzy zmiany, wszystkie zgodne z audytem 0.109.1 — żadnego nowego
+odpytywania Allegro.
+
+- **Kontrola świeżości przy WYŚLIJ.** W chwili wysyłki serwer porównuje
+  rozmowę z tym, na czym stoi sprawa (jedno zapytanie NA WYSYŁKĘ, nie
+  w cyklu). Gdy klient dopisał — wysyłka staje (409), panel pokazuje
+  dopiski i przycisk WYŚLIJ MIMO TO. Przy dyskusjach punktem odniesienia
+  jest ostatnia wiadomość widziana na ekranie; po odświeżeniu rozmowy
+  ponowna wysyłka przechodzi sama. Awaria pobrania degraduje do wysyłki
+  bez kontroli — czkawka API nie może zatrzymać odpowiedzi klientowi.
+- **Dopisek aktualizuje sprawę, nie zakłada drugiej.** Synchronizacja,
+  widząc nową wiadomość kupującego w wątku z OTWARTĄ sprawą, aktualizuje
+  jej wiersz (treść, stempel „klient dopisał") zamiast tworzyć nowy.
+  Szkic i odpowiedź biura zostają NIETKNIĘTE — znika tylko domniemanie
+  ich świeżości. Rozbicie synchronizacji dostało kubełek „dopisane".
+- **Puls klienta w otwartej sprawie.** Co cykl (30 s) panel czyta NASZĄ
+  bazę — trasę `/sprawy/klient` — i pokazuje banery: KLIENT DOPISAŁ
+  (z przyciskiem POKAŻ ROZMOWĘ) i NOWA SPRAWA KLIENTA (z wejściem do
+  karty klienta). Zero ruchu do Allegro; opóźnienie dopisku = rytm
+  synchronizacji.
+
+Bez zmian w kolektorze, bez nowych uprawnień i bez działania przy
+wdrożeniu (nowa kolumna zakłada się sama przy starcie).
+
+## 0.109.1 — 26 sierpnia 2026
+
+**Utwardzenie użycia API Allegro po audycie.** Domyślny profil ruchu był
+bezpieczny; poprawki zamykają wektory, które jedną literówką w `wertis.env`
+zmieniłyby go w maszynowy — czyli w sygnaturę, która już raz skończyła się
+blokadą adresu IP.
+
+- **Podłoga na `ALLEGRO_POLL_MS`.** Wartość dodatnia poniżej minuty
+  zatrzymuje start serwera ze zdaniem o minimum. To niemal na pewno
+  literówka (sekundy zamiast milisekund), a skutkiem byłyby trzy pętle
+  bijące w Allegro co ułamek sekundy. Zero (domyślne, tło wyłączone)
+  działa jak dotąd.
+- **Wspólny takt trzech pętli tła** (zapowiedzi, pytania, dyskusje):
+  startują w różnych sekundach, a każdy odstęp ma rozrzut ±10%. Równy,
+  zegarowy rytm z jednego adresu wygląda dla anti-bota jak automat —
+  rozrzut zdejmuje tę sygnaturę, nie psując przewidywalności.
+- **Respekt dla 429.** Odpowiedź „za dużo zapytań" jest teraz rozpoznawana
+  (osobna klasa błędu, odczyt `Retry-After`) zamiast lecieć jako surowy
+  kod. Ponowień nadal NIE MA — pętla tła wydłuża następny przebieg o tyle,
+  ile prosi Allegro, hurtowe szkice przerywają się od razu, a człowiek
+  dostaje zdanie „spróbuj za N s". Ta sama gałąź na logowaniu (apex).
+
+Audyt potwierdził też rzeczy, których NIE trzeba było zmieniać: jeden punkt
+wyjścia z User-Agentem i timeoutem, zero automatycznych ponowień, twarde
+sufity stron we wszystkich listach, rozmowy czytane na klik, przyciski
+synchronizacji już blokujące się na czas trwania.
+
+Bez zmian w kolektorze i bez działania przy wdrożeniu (domyślne `0` dla
+`ALLEGRO_POLL_MS` nietknięte).
+
 ## 0.109.0 — 26 sierpnia 2026
 
 **SPRAWY są teraz jedynym oknem obsługi klienta.** Karty dawnych zakładek

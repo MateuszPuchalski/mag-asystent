@@ -282,3 +282,33 @@ test("szkic: kontekst niesie sprawę i zwrot, sprawa zamknięta nie dostaje szki
   D.zmienStatusDyskusji(sprawa.id, "zamknieta", "Ala");
   await assert.rejects(D.generujSzkicDyskusji(sprawa.id, "Ala"), /zamknięta/);
 });
+
+/* ── Świeżość przy wysyłce (0.110.0) ───────────────────────────────────────── */
+
+test("wysyłka dyskusji na nieświeżą rozmowę odmawia; wymus i brak punktu odniesienia wysyłają", async () => {
+  await D.synchronizujDyskusje("test");
+  const sprawa = D.listaDyskusji({}).find((x) => x.typ === "DISCUSSION")!;
+  D.zapiszOdpowiedzDyskusji(sprawa.id, "Dzień dobry, odsyłamy środki.", "anna");
+
+  /* Panel widział rozmowę do wiadomości, której w wątku NIE MA na końcu —
+     czyli po jego odczycie doszło coś nowego. */
+  await assert.rejects(
+    () => D.wyslijOdpowiedzDyskusji(sprawa.id, "anna", undefined, {
+      ostatniaWidzianaId: "wiadomosc-sprzed-dopisku",
+    }),
+    (e: unknown) => {
+      assert.ok(e instanceof D.BladSwiezosciDyskusji);
+      assert.equal((e as InstanceType<typeof D.BladSwiezosciDyskusji>).kod, 409);
+      assert.ok(
+        (e as InstanceType<typeof D.BladSwiezosciDyskusji>).wiadomosci.length > 0,
+        "409 niesie to, czego panel nie pokazał"
+      );
+      return true;
+    }
+  );
+
+  /* Bez punktu odniesienia kontroli nie ma (rozmowa bywa niedostępna przez
+     API — degradacja 0.104.0), a wymus to świadoma decyzja człowieka. */
+  const bez = await D.wyslijOdpowiedzDyskusji(sprawa.id, "anna");
+  assert.ok(bez.wyslanoAt, "brak id z panelu nie blokuje wysyłki");
+});

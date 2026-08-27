@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { ROLE_BIUROWE } from "../services/users.js";
 import { csv, policzZdarzenia, typyZdarzen, zdarzenia, type FiltrAudytu } from "../services/audyt.js";
 import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
@@ -25,7 +26,9 @@ import { sesjaZadania } from "../context.js";
    Od 0.47.0 lista jest krótsza o brygadzistę, bo takiej roli już nie ma. Hala
    audytu nie czyta i to jest zamierzone: ślad audytowy odpowiada na pytania
    „kto to zrobił i kiedy", zadawane przy biurku, a nie przy regale. */
-const CZYTAJACY = ["biuro", "admin"];
+/* Jedno źródło listy (services/users.ts) — czwarta ręczna kopia ról była
+   zapalnikiem, przed którym kod ostrzegał w trzech miejscach naraz. */
+const CZYTAJACY = ROLE_BIUROWE;
 
 /** Filtr z query stringa. Puste i śmieciowe wartości znikają, nie wywracają. */
 function filtr(q: Record<string, string | undefined>): FiltrAudytu {

@@ -1,6 +1,6 @@
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
-import { allegroTryb, allegroUserAgent } from "../adapters/allegro.js";
+import { BladLimituAllegro, allegroTryb, allegroUserAgent, retryAfterMs } from "../adapters/allegro.js";
 import { logEvent } from "./events.js";
 
 /* ── Token OAuth konta Allegro — persystencja, odświeżanie, parowanie ────────
@@ -145,6 +145,16 @@ async function endpointTokena(params: URLSearchParams): Promise<Record<string, u
     json = JSON.parse(surowa) as Record<string, unknown>;
   } catch {
     /* Pusty obiekt znaczy „nie wiem" — rozstrzyga status niżej. */
+  }
+  if (odp.status === 429) {
+    /* Limit na apeksie auth — najgroźniejsze miejsce, bo za tym samym
+       edge'em siedzi anti-bot sklepu. Zdanie mówi też co robić: przerwać. */
+    const poIluMs = retryAfterMs(odp.headers.get("retry-after"), Date.now());
+    throw new BladLimituAllegro(
+      "Allegro prosi o przerwę (429) na logowaniu — przerwij i odczekaj" +
+        (poIluMs !== null ? ` co najmniej ${Math.ceil(poIluMs / 1000)} s.` : " kilka minut."),
+      poIluMs
+    );
   }
   if (!odp.ok && typeof json.error !== "string") {
     throw new Error(`Allegro auth odpowiedziało ${odp.status}`);

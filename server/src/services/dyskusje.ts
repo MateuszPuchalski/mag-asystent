@@ -1,4 +1,5 @@
 import { db, nowIso } from "../db/db.js";
+import { uruchomTakt } from "./takt.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
@@ -443,10 +444,28 @@ function sprawdzZalacznik(z: ZalacznikDyskusji): { nazwa: string; mime: string; 
  * przy screenshotach pytań). Wysyłka nie zamyka sprawy: dyskusja to wiele
  * odpowiedzi, a koniec ogłasza Allegro (sync auto-zamyka po statusie).
  */
+/**
+ * Wysyłka zatrzymana, bo w sprawie pojawiła się wiadomość, której panel nie
+ * pokazał. Punktem odniesienia jest OSTATNIA WIADOMOŚĆ WIDZIANA na ekranie
+ * (rejestr nie przechowuje rozmowy — prywatność, 0.104.0), więc id podaje
+ * przeglądarka. Brak punktu odniesienia = brak kontroli, nie blokada.
+ */
+export class BladSwiezosciDyskusji extends BladDyskusji {
+  constructor(readonly wiadomosci: WiadomoscDyskusji[]) {
+    super(
+      "W sprawie pojawiła się nowa wiadomość po napisaniu tej odpowiedzi — " +
+        "przeczytaj ją, zanim wyślesz.",
+      409
+    );
+    this.name = "BladSwiezosciDyskusji";
+  }
+}
+
 export async function wyslijOdpowiedzDyskusji(
   id: number,
   autor: string,
-  zalacznik?: ZalacznikDyskusji
+  zalacznik?: ZalacznikDyskusji,
+  opcje: { ostatniaWidzianaId?: string | null; wymus?: boolean } = {}
 ): Promise<Dyskusja> {
   const w = wiersz(id);
   if (zamknietaLokalnie(w.status as string)) {
@@ -471,6 +490,23 @@ export async function wyslijOdpowiedzDyskusji(
   }
 
   const adapter = allegroAdapter();
+  /* KONTROLA ŚWIEŻOŚCI jak przy pytaniach (services/pytania.ts): jedno
+     zapytanie NA WYSYŁKĘ, degradacja przy awarii pobrania, „wyślij mimo to"
+     jest świadomą decyzją człowieka. Bez id z panelu kontroli nie ma —
+     rozmowa mogła być niedostępna przez API (degradacja z 0.104.0). */
+  if (!opcje.wymus && opcje.ostatniaWidzianaId) {
+    let swieze: WiadomoscDyskusji[] | null = null;
+    try {
+      swieze = await adapter.wiadomosciDyskusji(w.allegro_id as string);
+    } catch {
+      /* degradacja — wysyłka ważniejsza niż kontrola */
+    }
+    if (swieze && swieze.length > 0) {
+      const znana = swieze.findIndex((m) => m.id === opcje.ostatniaWidzianaId);
+      const nowe = znana >= 0 ? swieze.slice(znana + 1) : swieze;
+      if (nowe.length > 0) throw new BladSwiezosciDyskusji(nowe);
+    }
+  }
   let zalacznikId: string | undefined;
   if (zalacznik) {
     const gotowy = sprawdzZalacznik(zalacznik);
@@ -617,20 +653,13 @@ export async function generujSzkicDyskusji(id: number, autor: string): Promise<D
  * dostroiło. Domyślnie zero — pobiera człowiek, kiedy tego potrzebuje.
  */
 export function uruchomTickerDyskusji(): void {
-  if (config.zwroty.pollMs <= 0) return;
-  const przebieg = () => {
+  /* Rytm dyktuje wspólny takt (services/takt.ts) — uzasadnienie tamże. */
+  uruchomTakt("dyskusje", config.zwroty.pollMs, async () => {
     /* Ten sam strażnik co w tickerach zapowiedzi i pytań: bez sparowanego
        konta przebieg tylko zapełniałby log błędem o brakującym tokenie. */
     const stan = stanPolaczenia().stan;
     if (stan !== "dev" && stan !== "polaczone") return;
-    synchronizujDyskusje("ticker")
-      .then(({ nowych }) => {
-        if (nowych > 0) console.log(`[dyskusje] nowych spraw z Allegro: ${nowych}`);
-      })
-      .catch((e) =>
-        console.error("[dyskusje] przebieg nieudany:", e instanceof Error ? e.message : e)
-      );
-  };
-  przebieg();
-  setInterval(przebieg, config.zwroty.pollMs);
+    const { nowych } = await synchronizujDyskusje("ticker");
+    if (nowych > 0) console.log(`[dyskusje] nowych spraw z Allegro: ${nowych}`);
+  });
 }

@@ -908,7 +908,11 @@ CREATE TABLE IF NOT EXISTS pytanie (
   -- obie. To ZNACZNIK, nie blokada: pole zwalnia się przy wysłaniu i przy
   -- zamknięciu, a cudzej sprawy nikt nie musi odbijać, żeby ją dokończyć.
   prowadzi       TEXT,
-  prowadzi_at    TEXT
+  prowadzi_at    TEXT,
+  -- Klient dopisał nową wiadomość PO tym, jak sprawa trafiła do rejestru
+  -- (stempluje synchronizacja). Panel pokazuje wtedy baner w otwartej
+  -- sprawie, a wysyłka bez potwierdzenia się zatrzymuje. NULL = świeża.
+  nowa_wiadomosc_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_pytanie_status ON pytanie(status, id);
 CREATE INDEX IF NOT EXISTS ix_pytanie_thread ON pytanie(thread_id);

@@ -38,6 +38,25 @@ export const envFile = loadEnvFile();
  */
 export const prostujUkosniki = (v: string): string => v.replace(/\\/g, "/");
 
+/**
+ * Podłoga na interwał tickerów Allegro. Wartość dodatnia poniżej minuty to
+ * niemal na pewno literówka (sekundy zamiast milisekund) — a skutkiem są
+ * TRZY pętle (zapowiedzi, pytania, dyskusje) bijące w Allegro równym,
+ * maszynowym rytmem z jednego adresu. Dokładnie taka sygnatura skończyła
+ * się w sierpniu 2026 blokadą IP przy parowaniu. Twardy błąd przy starcie
+ * jest tańszy niż blokada — ta sama zasada co przy pustym kluczu AI.
+ */
+const POLL_ALLEGRO_MIN_MS = 60_000;
+export const pollAllegro = (ms: number): number => {
+  if (ms > 0 && ms < POLL_ALLEGRO_MIN_MS) {
+    throw new Error(
+      `ALLEGRO_POLL_MS=${ms} — minimum to ${POLL_ALLEGRO_MIN_MS} ms (minuta), ` +
+        "a 0 wyłącza pobieranie w tle. Popraw w wertis.env."
+    );
+  }
+  return ms;
+};
+
 const num = (v: string | undefined, def: number, name?: string) => {
   if (v === undefined || v === "") return def;
   const n = Number(v);
@@ -357,7 +376,7 @@ export const config = {
        jest decyzją właściciela, nie ustawieniem domyślnym — a przy blokadach
        anty-botowych Allegro to ruch, którego nikt nie zamawiał. Liczba
        milisekund wraca do zachowania sprzed tej wersji. */
-    pollMs: num(process.env.ALLEGRO_POLL_MS, 0, "ALLEGRO_POLL_MS"),
+    pollMs: pollAllegro(num(process.env.ALLEGRO_POLL_MS, 0, "ALLEGRO_POLL_MS")),
     /**
      * Po ilu dniach od zgłoszenia zwrot bez zeskanowanej paczki uznaje się
      * za „brakującą paczkę". Trzy dni to typowy czas doręczenia krajowego —
@@ -589,7 +608,20 @@ export const config = {
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {
     pollMs: num(process.env.WORKER_POLL_MS, 1200, "WORKER_POLL_MS"),
-    simErrors: process.env.WORKER_SIM_ERRORS === "1",
+    /* Symulacja losowych porażek kolejki jest narzędziem developerskim —
+       włączona na produkcji (mssql) wyglądałaby jak awaria Sfery i nikt by
+       nie zgadł, że to zmienna środowiskowa. Twardy błąd startu, jak przy
+       ALLEGRO_POLL_MS: tańszy niż tydzień szukania ducha. */
+    simErrors: (() => {
+      const wlaczone = process.env.WORKER_SIM_ERRORS === "1";
+      if (wlaczone && (process.env.SGT_MODE ?? "seeded") === "mssql") {
+        throw new Error(
+          "WORKER_SIM_ERRORS=1 przy SGT_MODE=mssql — symulacja błędów kolejki " +
+            "nie może chodzić na produkcji. Usuń zmienną z wertis.env."
+        );
+      }
+      return wlaczone;
+    })(),
     // backoff dla retry (spec §9): 5s / 30s / 2min
     backoffMs: [5000, 30000, 120000],
     maxAttempts: 3,

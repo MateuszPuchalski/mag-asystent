@@ -38,6 +38,9 @@ export interface Sprawa {
   dniDoTerminu: number | null;
   poTerminie: boolean;
   prowadzi: string | null;
+  /** Pytania: klient dopisał po zarejestrowaniu sprawy (stempluje sync).
+      Panel czyta to z pulsu klienta co cykl — z NASZEJ bazy, nie z Allegro. */
+  nowaWiadomoscAt?: string | null;
   /** Dla reklamacji: zwrot, który UI ma otworzyć — reklamacja nie ma szczegółu. */
   zwrotId?: number;
   /** Sprawa zamknięta trafia tylko do historii klienta, nigdy do kolejki. */
@@ -69,7 +72,8 @@ function skrot(tekst: string | null): string | null {
 function sprawyPytan(gdzie: string, param: unknown[]): Sprawa[] {
   const rows = db()
     .prepare(
-      `SELECT id, kupujacy_login, oferta_tytul, tresc, status, otrzymano_at, prowadzi
+      `SELECT id, kupujacy_login, oferta_tytul, tresc, status, otrzymano_at, prowadzi,
+              nowa_wiadomosc_at
        FROM pytanie WHERE ${gdzie} ORDER BY id DESC LIMIT 500`
     )
     .all(...(param as never[])) as Array<Record<string, unknown>>;
@@ -87,6 +91,7 @@ function sprawyPytan(gdzie: string, param: unknown[]): Sprawa[] {
       dniDoTerminu: null,
       poTerminie: false,
       prowadzi: (r.prowadzi as string) ?? null,
+      nowaWiadomoscAt: (r.nowa_wiadomosc_at as string) ?? null,
       /* Ta sama para co worklista pytań (services/pytania.ts, listaPytan). */
       otwarta: status === "nowe" || status === "szkic",
     };

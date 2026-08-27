@@ -1112,8 +1112,12 @@ się, gdy nie ma czego pokazać. To jest właśnie chwila, w której chce się
 sprawdzić, czy coś przyszło.
 
 Kto woli tło, wpisuje liczbę milisekund w `ALLEGRO_POLL_MS` (`0` = ręcznie,
-i to jest domyślne). Token na tym nie ucierpi: refresh Allegro żyje kwartał
-i odnawia się przy KAŻDYM użyciu, a skan etykiety zwrotu też go używa.
+i to jest domyślne). Minimum to `60000` — mniejsza wartość dodatnia
+zatrzymuje start serwera, bo to niemal na pewno literówka. Od 0.109.1 trzy pętle tła
+startują w różnych sekundach, a każdy odstęp ma rozrzut ±10%. Równy,
+zegarowy rytm z jednego adresu wygląda dla Allegro jak automat. Token na tym
+nie ucierpi: refresh Allegro żyje kwartał i odnawia się przy KAŻDYM użyciu,
+a skan etykiety zwrotu też go używa.
 
 Od 0.70.0 karta czyta **status zwrotu po stronie Allegro** i rozróżnia dwa
 alarmy. Czerwony „DORĘCZONA · NIE PRZYJĘTA" znaczy, że przewoźnik dostarczył,
@@ -1291,6 +1295,10 @@ z Allegro (scenariusze S67–S69).
 
 3. **Sandbox** (opcjonalnie, do prób): osobna rejestracja na
    <https://developer.allegro.pl.allegrosandbox.pl> i `ALLEGRO_SANDBOX=1`.
+
+Osobno od blokady: odpowiedź **429** znaczy „za dużo zapytań w krótkim
+czasie". Aplikacja jej nie ponawia. Pętle tła same wydłużają wtedy odstęp
+o tyle, ile prosi Allegro, a przy pracy ręcznej wystarczy chwilę odczekać.
 
 #### Gdy Allegro pokaże stronę „Zostałeś zablokowany"
 
@@ -1559,6 +1567,18 @@ Pokrętło `ALLEGRO_POLL_MS` dzieli z zapowiedziami zwrotów i od 0.85.0 stoi
 domyślnie na zerze. To ta sama praca na tym samym koncie, więc i jedna decyzja
 o tym, czy cokolwiek chodzi samo.
 
+### Gdy klient dopisze w trakcie (0.110.0)
+
+Otwarta sprawa pilnuje dwóch rzeczy. Baner KLIENT DOPISAŁ mówi, że po
+zarejestrowaniu sprawy przyszła nowa wiadomość — POKAŻ ROZMOWĘ czyta ją
+na klik. Baner NOWA SPRAWA KLIENTA prowadzi do karty klienta. Oba banery
+czytają co pół minuty naszą bazę, nie Allegro.
+
+Wysyłka odpowiedzi ma kontrolę świeżości. Gdy klient dopisał coś, czego
+ekran nie pokazał, wysyłka staje i panel pokazuje dopiski. WYŚLIJ MIMO TO
+jest świadomą decyzją człowieka. Szkic odpowiedzi nigdy nie ginie przez
+dopisek klienta.
+
 ### Kilka osób w skrzynce (0.89.0)
 
 Lista pytań ma kolumnę **PROWADZI**, a wejście w sprawę, którą ktoś już wziął,
@@ -1738,16 +1758,16 @@ obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
   `server/src/services/strefa-zlota.ts` — regały bez reguły trafiają na osobną,
   czwartą listę, zamiast po cichu wpaść do złego kubełka.
 
-- **Aktualizacja aplikacji:**
+- **Aktualizacja aplikacji** — jedną drogą, instalatorem:
 
-  ```bash
-  cd /c/wertis
-  git pull
-  npm ci
-  npm run build
-  nssm restart wertis-api
-  nssm restart wertis-worker
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
   ```
+
+  Instalator ma `-DryRun` i wraca na poprzednią wersję po nieudanym
+  `git pull`. Ręczna sekwencja (`git pull; npm ci; npm run build; restart
+  usług) jest wyłącznie zejściem awaryjnym, gdy instalator sam zawiedzie —
+  nie ma żadnego z jego zabezpieczeń.
 
   **Kolektory biorą nowy APK z serwera** — plik kładzie tam `-Aktualizuj`,
   a urządzenia proponują aktualizację przy otwarciu aplikacji (sekcja 5).

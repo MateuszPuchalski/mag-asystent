@@ -868,6 +868,9 @@
        krawędź pod chromem, a `#stan` przerysowuje się z serwera. -->
   <div id="chrome">
   <div id="stan"></div>
+  <!-- Jeden znacznik na kulejący cykl odświeżania (0.111.0) — zamiast pięciu
+       niemych console.warn. Pusty, dopóki wszystko dochodzi. -->
+  <div id="cyklBlad"></div>
   </div>
 
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
@@ -1055,6 +1058,7 @@
         <button class="akcja cichy szufladaPrzycisk" data-szuflada>KONTEKST →</button>
       </div>
       <div id="zwrotNaglowek" style="margin-top:12px"></div>
+      <div id="zwrotAlarm"></div>
       <!-- ŚRODEK to jedna robota: ocenić każdą pozycję z paczki, dopisać to,
            czego Allegro nie zgłosiło, i wystawić z tego dokumenty. Zdjęcia
            towaru zostają tutaj — decyzję podejmuje się z paczką w ręku, więc
@@ -1117,6 +1121,7 @@
         <button class="akcja cichy" id="dyskusjaWroc">← WSZYSTKIE SPRAWY</button>
       </div>
       <div id="dyskusjaNaglowek" style="margin-top:12px"></div>
+      <div id="dyskusjaAlarm"></div>
       <div class="sprawa-tresc">
         <h2 style="margin-top:16px">ROZMOWA W SPRAWIE</h2>
         <div id="dyskusjaRozmowa"></div>
@@ -1308,6 +1313,7 @@
         <div id="pytanieAkcjeSprawy"></div>
       </div>
       <p id="pytanieProwadzi" style="margin-top:8px" hidden></p>
+      <div id="pytanieAlarm"></div>
 
       <!-- PYTANIE stoi nad rozmową i pochodzi z NASZEJ bazy. Rozmowa jedzie
            z Allegro na żądanie, więc gdy Allegro milczy albo pytanie przyszło
@@ -1538,6 +1544,14 @@
     <section class="card">
       <h2>SERWER</h2>
       <table id="zdrowie"></table>
+      <!-- Dwie operacje ratunkowe, które żyły dotąd wyłącznie w DEPLOY.md
+           jako polecenia curl. Odmowę roli wypowiada serwer (konwencja
+           ustawień); oba przyciski stoją za groźnym potwierdzeniem, bo
+           resync na produkcji to pełny import z Subiekta. -->
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="akcja cichy" id="serwerResync">PEŁNY RESYNC Z SUBIEKTA</button>
+        <button class="akcja cichy" id="serwerZdjecia">ODŚWIEŻ BRAKUJĄCE ZDJĘCIA</button>
+      </div>
     </section>
   </div>
 
@@ -1553,6 +1567,8 @@
         <div><label for="fTyp">TYP</label><select id="fTyp"><option value="">wszystkie</option></select></div>
         <div><label for="fTw">TOWAR (tw_id)</label><input id="fTw" size="8" inputmode="numeric"></div>
         <div><label for="fDev">URZĄDZENIE</label><input id="fDev" size="12"></div>
+        <div><label for="fOsoba">OSOBA</label>
+          <select id="fOsoba"><option value="">wszystkie</option></select></div>
         <div><label for="fLimit">WIERSZY</label>
           <select id="fLimit"><option>100</option><option>500</option><option>1000</option></select></div>
         <div><button class="akcja" id="szukajDziennik">SZUKAJ</button></div>
@@ -1978,6 +1994,28 @@
       </p>
     </section>
 
+    <!-- KONTA I SESJE (0.111.0). Do tej wersji reset hasła, wyłączenie konta
+         i unieważnienie sesji zgubionego kolektora żyły wyłącznie jako
+         polecenia curl w DEPLOY.md — a zakładanie kont na kolektorze.
+         Odmowę roli wypowiada serwer (konwencja ustawień): przyciski widzą
+         wszyscy, mutacje przechodzą tylko adminowi. Kont się nie kasuje —
+         historia w dzienniku musi mieć na co wskazywać. -->
+    <section class="card" id="kontaKarta">
+      <h2>KONTA I SESJE <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Zmienia wyłącznie admin. RESET nadaje nowe hasło (osoba zmieni je
+          sobie przy kolektorze), WYŁĄCZ odbiera dostęp od zaraz — wyłączone
+          konto nie przejdzie żadną sesją. SESJE pokazują, co jest zalogowane
+          i kiedy ostatnio żyło; WYLOGUJ WSZĘDZIE tnie wszystkie sesje konta —
+          to jest przycisk na zgubiony kolektor.
+        </p>
+      </div>
+      <table id="kontaLista"></table>
+      <div id="kontaSesje" style="margin-top:10px"></div>
+    </section>
+
     <section class="card">
       <h2>LOGO DOSTAWCÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -2109,7 +2147,14 @@ async function api(sciezka, opts = {}) {
     wyloguj();
     throw new Error("Sesja wygasła — zaloguj się ponownie");
   }
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Błąd ${r.status}`);
+  if (!r.ok) {
+    const dane = await r.json().catch(() => ({}));
+    const blad = new Error(dane.error || `Błąd ${r.status}`);
+    /* 409 świeżości niesie nowe wiadomości klienta — panel ma je POKAZAĆ,
+       a nie kazać ich szukać. Zwykłe błędy mają tu pusty obiekt. */
+    blad.dane = dane;
+    throw blad;
+  }
   return r;
 }
 
@@ -2195,7 +2240,7 @@ function pokaz(nowy) {
   /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
      Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
      przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
-  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); }
+  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); }
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -3581,16 +3626,172 @@ function rysujKolejke(q) {
      bo to podgląd stanu, a nie kolejka do obsługi — tę ma kolektor. */
   const wiersze = [...q.items].sort((a, b) =>
     (a.status === "error" ? 0 : 1) - (b.status === "error" ? 0 : 1)).slice(0, 20);
+  /* Miejsce, w którym problem WIDAĆ, jest od 0.111.0 miejscem, w którym da
+     się go naprawić: PONÓW przy błędzie i ANULUJ przy oczekującym używają
+     tych samych tras, co przyciski na kolektorze — biuro nie musi po niego
+     iść, żeby ruszyć zapis do Subiekta. */
   $("kolejka").innerHTML =
-    "<tr><th>GODZ.</th><th>ZADANIE</th><th>SZCZEGÓŁ</th><th>STATUS</th></tr>" +
+    "<tr><th>GODZ.</th><th>ZADANIE</th><th>SZCZEGÓŁ</th><th>STATUS</th><th></th></tr>" +
     (wiersze.map((i) => `<tr>
         <td class="mute">${esc(i.time)}</td>
         <td class="b">${esc(i.label)}</td>
         <td>${esc(i.detail)}${i.errMsg ? `<br><span class="mute">${esc(i.errMsg)}</span>` : ""}</td>
         <td>${odznaka(i.status)}</td>
+        <td style="white-space:nowrap">${i.status === "error"
+          ? `<button class="akcja cichy" data-kolejka-ponow="${i.id}" style="font-size:11px;padding:3px 8px">PONÓW</button>`
+          : i.status === "pending"
+            ? `<button class="akcja cichy" data-kolejka-anuluj="${i.id}" style="font-size:11px;padding:3px 8px">ANULUJ</button>`
+            : ""}</td>
       </tr>`).join("") ||
-      '<tr><td colspan="4" class="mute">Kolejka pusta — wszystko zapisane</td></tr>');
+      '<tr><td colspan="5" class="mute">Kolejka pusta — wszystko zapisane</td></tr>');
 }
+
+/* ── Nadzór działa, nie tylko patrzy (0.111.0) ───────────────────────────────
+   Te same trasy, których używa PONÓW na kolektorze — biuro widzi błąd
+   w kolejce, biuro go ponawia. ANULUJ tylko dla oczekujących (trasa i tak
+   odmówi w trakcie zapisu). Operacje ratunkowe serwera za groźnym
+   potwierdzeniem: pełny resync na produkcji to import całej kartoteki. */
+$("widokNadzor").addEventListener("click", async (e) => {
+  const ponow = e.target.closest("[data-kolejka-ponow]");
+  const anuluj = e.target.closest("[data-kolejka-anuluj]");
+  if (ponow || anuluj) {
+    if (anuluj && !(await potwierdz({
+      tytul: "ANULOWANIE ZADANIA",
+      opis: "Zadanie zniknie z kolejki — zapis do Subiekta NIE nastąpi.",
+      potwierdz: "ANULUJ ZADANIE", grozny: true,
+    }))) return;
+    try {
+      const id = ponow ? ponow.dataset.kolejkaPonow : anuluj.dataset.kolejkaAnuluj;
+      await api(`/api/queue/${id}/${ponow ? "retry" : "cancel"}`, { method: "POST", body: "{}" });
+      toast(ponow ? "Zadanie wróciło do kolejki" : "Zadanie anulowane");
+      await odswiezNadzor();
+    } catch (bl) { toast(bl.message); }
+    return;
+  }
+  if (e.target.closest("#serwerResync")) {
+    if (!(await potwierdz({
+      tytul: "PEŁNY RESYNC Z SUBIEKTA",
+      opis: "Read-model przeładuje się z bazy Subiekta. Na dużej kartotece to trwa.",
+      potwierdz: "RESYNC", grozny: true,
+    }))) return;
+    try {
+      const d = await (await api("/api/admin/resync", { method: "POST", body: "{}" })).json();
+      toast(`Resync zakończony ✓ (${JSON.stringify(d.stats || {}).slice(0, 80)})`);
+      await odswiezNadzor();
+    } catch (bl) { toast(bl.message); }
+    return;
+  }
+  if (e.target.closest("#serwerZdjecia")) {
+    try {
+      const d = await (await api("/api/admin/zdjecia/odswiez", { method: "POST", body: "{}" })).json();
+      toast(`Zapomniano ${d.zapomniano ?? 0} braków — kolektory zapytają o zdjęcia ponownie`);
+    } catch (bl) { toast(bl.message); }
+  }
+});
+
+/* ── Konta i sesje (0.111.0) ─────────────────────────────────────────────────
+   Wszystkie mutacje na istniejących trasach admina (routes/auth.ts) —
+   dotąd wołanych wyłącznie z curl. Kont się nie kasuje; sesje tnie się
+   revoked_at, więc ślad „co było zalogowane" zostaje. */
+async function odswiezKonta() {
+  try {
+    const d = await (await api("/api/users")).json();
+    rysujKonta(d.users || []);
+  } catch (e) {
+    $("kontaLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+function rysujKonta(konta) {
+  $("kontaLista").innerHTML =
+    "<tr><th>OSOBA</th><th>LOGIN</th><th>ROLA</th><th>STAN</th><th></th></tr>" +
+    konta.map((k) => `<tr${k.active ? "" : ' style="opacity:.55"'}>
+        <td class="b">${esc(k.name)}</td>
+        <td class="mute">${esc(k.login || "—")}</td>
+        <td>${esc(k.role)}</td>
+        <td>${k.active ? '<span class="badge ok">AKTYWNE</span>' : '<span class="badge mute2">WYŁĄCZONE</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="akcja cichy" data-konto-sesje="${k.userId}" data-konto-nazwa="${esc(k.name)}"
+            style="font-size:11px;padding:3px 8px">SESJE</button>
+          <button class="akcja cichy" data-konto-haslo="${k.userId}"
+            style="font-size:11px;padding:3px 8px">RESET HASŁA</button>
+          <button class="akcja cichy" data-konto-active="${k.userId}" data-konto-na="${k.active ? "0" : "1"}"
+            style="font-size:11px;padding:3px 8px">${k.active ? "WYŁĄCZ" : "WŁĄCZ"}</button>
+        </td>
+      </tr>`).join("");
+}
+
+$("kontaKarta").addEventListener("click", async (e) => {
+  const sesje = e.target.closest("[data-konto-sesje]");
+  if (sesje) {
+    try {
+      const d = await (await api(`/api/users/${sesje.dataset.kontoSesje}/sesje`)).json();
+      $("kontaSesje").innerHTML = `<h2>SESJE · ${esc(sesje.dataset.kontoNazwa)}</h2>` +
+        ((d.sesje || []).length
+          ? `<table><tr><th>URZĄDZENIE</th><th>ZALOGOWANO</th><th>OSTATNIO WIDZIANE</th></tr>` +
+            d.sesje.map((x) => `<tr>
+                <td class="b">${esc(x.deviceId || "—")}</td>
+                <td class="mute">${esc(stempelLokalny(x.createdAt))}</td>
+                <td class="mute">${x.lastSeen ? esc(stempelLokalny(x.lastSeen)) : "—"}</td>
+              </tr>`).join("") + "</table>"
+          : '<p class="mute">Brak czynnych sesji.</p>') +
+        `<div style="margin-top:8px"><button class="akcja cichy" data-konto-wyloguj="${sesje.dataset.kontoSesje}">
+           WYLOGUJ WSZĘDZIE</button></div>`;
+    } catch (bl) { toast(bl.message); }
+    return;
+  }
+  const wyloguj = e.target.closest("[data-konto-wyloguj]");
+  if (wyloguj) {
+    /* Cięcie własnego konta wylogowuje też tę przeglądarkę — potwierdzenie
+       ma to powiedzieć, zanim ekran wróci do logowania. */
+    if (!(await potwierdz({
+      tytul: "WYLOGOWANIE WSZĘDZIE",
+      opis: "Wszystkie sesje tego konta zostaną ucięte — także ta przeglądarka, jeśli to Twoje konto.",
+      potwierdz: "WYLOGUJ", grozny: true,
+    }))) return;
+    try {
+      const d = await (await api(`/api/users/${wyloguj.dataset.kontoWyloguj}/wyloguj`, {
+        method: "POST", body: "{}",
+      })).json();
+      toast(`Ucięto sesji: ${d.sesji}`);
+      $("kontaSesje").innerHTML = "";
+    } catch (bl) { toast(bl.message); }
+    return;
+  }
+  const haslo = e.target.closest("[data-konto-haslo]");
+  if (haslo) {
+    const nowe = await zapytaj({
+      tytul: "RESET HASŁA",
+      opis: "Nowe hasło (min. 8 znaków). Przekaż je osobie bezpośrednio.",
+      przyklad: "nowe hasło",
+      potwierdz: "USTAW",
+    });
+    if (nowe === null || nowe === "") return;
+    try {
+      await api(`/api/users/${haslo.dataset.kontoHaslo}/haslo`, {
+        method: "POST", body: JSON.stringify({ haslo: nowe }),
+      });
+      toast("Hasło ustawione ✓");
+    } catch (bl) { toast(bl.message); }
+    return;
+  }
+  const active = e.target.closest("[data-konto-active]");
+  if (active) {
+    const wlacz = active.dataset.kontoNa === "1";
+    if (!wlacz && !(await potwierdz({
+      tytul: "WYŁĄCZENIE KONTA",
+      opis: "Konto straci dostęp od zaraz — wszystkie jego sesje przestaną przechodzić.",
+      potwierdz: "WYŁĄCZ", grozny: true,
+    }))) return;
+    try {
+      await api(`/api/users/${active.dataset.kontoActive}/active`, {
+        method: "POST", body: JSON.stringify({ active: wlacz }),
+      });
+      toast(wlacz ? "Konto włączone ✓" : "Konto wyłączone ✓");
+      await odswiezKonta();
+    } catch (bl) { toast(bl.message); }
+  }
+});
 
 /* ── Rekoncyliacja ── */
 const NAZWA_ROZJAZDU = {
@@ -3700,6 +3901,7 @@ function paramyDziennika() {
   dodaj("typ", $("fTyp").value);
   dodaj("twId", $("fTw").value.trim());
   dodaj("device", $("fDev").value.trim());
+  dodaj("userRef", $("fOsoba").value);
   dodaj("limit", $("fLimit").value);
   return p.toString();
 }
@@ -3711,6 +3913,16 @@ async function szukajDziennik() {
       for (const t of d.typy || []) {
         $("fTyp").add(new Option(t, t));
       }
+    }
+    /* „Co robił wczoraj Jan" nie może wymagać CSV i Excela — trasa audytu
+       od dawna przyjmuje userRef, brakowało tylko kontrolki. Lista kont
+       ładuje się raz; awaria (rola bez dostępu do listy) zostawia filtr
+       pusty i działający dziennik. */
+    if ($("fOsoba").options.length === 1) {
+      try {
+        const u = await (await api("/api/users")).json();
+        for (const k of u.users || []) $("fOsoba").add(new Option(k.name, String(k.userId)));
+      } catch { /* filtr jest wygodą, nie warunkiem działania dziennika */ }
     }
     $("licznikDziennik").textContent =
       `pokazano ${d.wpisy.length} z ${d.razem} pasujących wpisów`;
@@ -4137,7 +4349,7 @@ async function odswiezStan() {
     rysujOdpowiedzi();
     rysujStan(h, q);
     return { h, q };
-  } catch (e) { console.warn(e); return {}; }
+  } catch (e) { cichaAwaria("stan serwera", e); return {}; }
 }
 
 async function odswiezDostawy() {
@@ -4153,7 +4365,7 @@ async function odswiezDostawy() {
     rysujPozaWertis(poza.documents || []);
     $("odswiezono").textContent =
       `okno: ostatnie ${dok.dniWstecz ?? 14} dni · odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
-  } catch (e) { console.warn(e); }
+  } catch (e) { cichaAwaria("dostawy", e); }
 }
 
 async function odswiezNadzor() {
@@ -4167,7 +4379,25 @@ async function odswiezNadzor() {
     ]);
     rysujMetryki(m);
     rysujKolizje(k.conflicts || []);
-  } catch (e) { console.warn(e); }
+  } catch (e) { cichaAwaria("metryki", e); }
+}
+
+/* ── Sygnał kulejącego cyklu (0.111.0) ───────────────────────────────────────
+   Pięć odświeżaczy łykało błędy w console.warn — słusznie nie wywracały
+   cyklu, ale awaria wyglądała dla biura jak „nic nowego nie przyszło".
+   Jeden wspólny znacznik w pasku stanu zamiast pięciu czerwonych plam:
+   mówi, ŻE cykl kuleje i GDZIE, a gaśnie przy pierwszym czystym przebiegu. */
+let cyklKuleje = null;
+function cichaAwaria(gdzie, e) {
+  console.warn(`[${gdzie}]`, e);
+  cyklKuleje = gdzie;
+}
+function pokazZdrowieCyklu() {
+  const cel = $("cyklBlad");
+  if (!cel) return;
+  cel.innerHTML = cyklKuleje
+    ? `<span class="badge err" title="Ostatnie odświeżenie nie doszło — szczegóły w konsoli przeglądarki">ODŚWIEŻANIE KULEJE · ${esc(cyklKuleje)}</span>`
+    : "";
 }
 
 async function odswiez() {
@@ -4187,6 +4417,8 @@ async function odswiez() {
      w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
      reklamację, siedząc na dostawach. Osobne, tanie trasy. */
   await odswiezLiczniki();
+  pokazZdrowieCyklu();
+  cyklKuleje = null;
 }
 
 /**
@@ -4371,8 +4603,17 @@ async function odswiezKolejkeSpraw() {
  * odświeża siebie, a bez niczego otwartego chodzi kolejka i karty pod nią.
  */
 async function odswiezSprawy() {
-  if (otwartyZwrot != null || otwartaDyskusja != null) return odswiezZwroty();
-  if (otwartePytanie != null) return odswiezPytania();
+  if (otwartyZwrot != null || otwartaDyskusja != null) {
+    await odswiezZwroty();
+    return sprawdzPuls();
+  }
+  if (otwartePytanie != null) {
+    await odswiezPytania();
+    /* Otwarte pytanie świadomie nie odświeża szczegółu (uzasadnienie przy
+       odswiezPytania) — ale puls klienta chodzi: to jedno tanie zapytanie
+       do NASZEJ bazy, nie do Allegro. */
+    return sprawdzPuls();
+  }
   if (otwartyKlient360 !== false) return odswiezKlienta360();
   await odswiezKolejkeSpraw();
   await odswiezZwroty();
@@ -4437,6 +4678,72 @@ function rysujKlienta360(d) {
     (d.historia.length
       ? `<table>${wierszeSpraw(d.historia, false)}</table>`
       : '<p class="mute">Brak zamkniętych spraw.</p>');
+}
+
+/* ── Puls klienta otwartej sprawy (0.110.0) ──────────────────────────────────
+   Klient nie przestaje pisać dlatego, że biuro ma jego sprawę na ekranie:
+   dopisuje wiadomości i zakłada nowe sprawy. Puls czyta co cykl NASZĄ bazę
+   (trasa /sprawy/klient — SQLite, zero ruchu do Allegro; audyt 0.109.1)
+   i porównuje ją z chwilą otwarcia sprawy. Różnica = baner w sprawie:
+   „KLIENT DOPISAŁ" (stempluje synchronizacja) albo „NOWA SPRAWA KLIENTA". */
+let puls = null; // {login, rodzaj, id, otwartych, nowaWiadomoscAt}
+
+const CEL_ALARMU = { pytanie: "pytanieAlarm", zwrot: "zwrotAlarm", dyskusja: "dyskusjaAlarm" };
+
+function wyczyscAlarmy() {
+  for (const id of Object.values(CEL_ALARMU)) $(id).innerHTML = "";
+}
+
+/** Punkt odniesienia z chwili otwarcia sprawy. Ponowne rysowanie TEJ SAMEJ
+    sprawy nie przestawia bazy — inaczej alarm znikałby przy każdym
+    odświeżeniu szczegółu, zanim ktokolwiek go przeczyta. */
+async function uzbrojPuls(login, rodzaj, id) {
+  if (puls && puls.rodzaj === rodzaj && puls.id === id) return;
+  puls = null;
+  wyczyscAlarmy();
+  if (!login) return;
+  try {
+    const d = await (await api(`/api/biuro/sprawy/klient?login=${encodeURIComponent(login)}`)).json();
+    const moja = (d.aktywne || []).find((x) => x.rodzaj === rodzaj && x.id === id);
+    puls = {
+      login, rodzaj, id,
+      otwartych: (d.aktywne || []).length,
+      nowaWiadomoscAt: moja?.nowaWiadomoscAt ?? null,
+    };
+  } catch {
+    /* puls to ozdoba czujności, nie treść — awaria nie ma prawa przeszkadzać */
+  }
+}
+
+async function sprawdzPuls() {
+  if (!puls) return;
+  const { login, rodzaj, id } = puls;
+  let d;
+  try {
+    d = await (await api(`/api/biuro/sprawy/klient?login=${encodeURIComponent(login)}`)).json();
+  } catch {
+    return; // jak wyżej
+  }
+  if (!puls || puls.rodzaj !== rodzaj || puls.id !== id) return; // sprawa się zmieniła
+  const aktywne = d.aktywne || [];
+  const czesci = [];
+
+  const moja = aktywne.find((x) => x.rodzaj === rodzaj && x.id === id);
+  if (rodzaj === "pytanie" && moja?.nowaWiadomoscAt && moja.nowaWiadomoscAt !== puls.nowaWiadomoscAt) {
+    czesci.push(`<span class="badge amber">KLIENT DOPISAŁ</span>
+      klient dopisał wiadomość po powstaniu tej sprawy
+      <button class="akcja cichy" data-pokaz-nowe="${esc(moja.nowaWiadomoscAt)}"
+        style="font-size:11px;padding:3px 8px">POKAŻ ROZMOWĘ</button>`);
+  }
+  if (aktywne.length > puls.otwartych) {
+    czesci.push(`<span class="badge amber">NOWA SPRAWA KLIENTA</span>
+      ${esc(login)} założył kolejną sprawę w trakcie tej
+      <button class="akcja cichy" data-klient360="${esc(login)}"
+        style="font-size:11px;padding:3px 8px">KARTA KLIENTA →</button>`);
+  }
+  $(CEL_ALARMU[rodzaj]).innerHTML = czesci.length
+    ? `<div class="mute" style="margin-top:8px">${czesci.join("<br>")}</div>`
+    : "";
 }
 
 /* ── Powiązane sprawy — ciąg jednego problemu (0.108.0) ──────────────────────
@@ -4539,7 +4846,7 @@ async function odswiezZwroty() {
     rysujZwroty(d.zwroty || []);
     rysujKontoAllegro();
     if (otwartyZwrot == null) await odswiezEtap3();
-  } catch (e) { console.warn(e); }
+  } catch (e) { cichaAwaria("zwroty", e); }
 }
 
 /* Kosze, reklamacje i raport — jedna funkcja, bo odświeżają się razem
@@ -4571,7 +4878,7 @@ async function odswiezEtap3() {
     /* Otwarty szczegół sprawy odświeża nagłówek z tego samego cyklu; rozmowa
        zostaje — dociąga się na wejściu i po wysyłce, nie co 30 sekund. */
     if (otwartaDyskusja != null) await odswiezSzczegolDyskusji(false);
-  } catch (e) { console.warn(e); }
+  } catch (e) { cichaAwaria("sprawy Allegro", e); }
 }
 
 /* ── Sekcje wglądu: pamięć i leniwe pobieranie ──────────────────────────────
@@ -4958,6 +5265,9 @@ async function odswiezDyskusje() {
    u nas zapisywana; szkic i odpowiedź żyją na wierszu rejestru. Załącznik
    trzyma się w zmiennej do chwili wysyłki — nigdy w bazie. */
 let otwartaDyskusja = null;
+/* Ostatnia wiadomość dyskusji WIDZIANA na ekranie — punkt odniesienia
+   kontroli świeżości przy wysyłce (rejestr nie przechowuje rozmowy). */
+let dyskusjaOstatniaWidzianaId = null;
 let dyskusjaZalacznik = null; // {nazwa, mime, dane} — jedzie w body wysyłki
 
 const LIMIT_DYSKUSJI = 2000;
@@ -4967,6 +5277,7 @@ function otworzDyskusje(id) {
   if (otwartyZwrot != null) zamknijZwrot();
   zamknijPytanie();
   otwartaDyskusja = id;
+  dyskusjaOstatniaWidzianaId = null;
   dyskusjaZalacznik = null;
   $("dyskusjaOdpowiedz").value = "";
   $("dyskusjaNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
@@ -4977,6 +5288,7 @@ function otworzDyskusje(id) {
 }
 
 function zamknijDyskusje() {
+  if (puls?.rodzaj === "dyskusja") { puls = null; wyczyscAlarmy(); }
   otwartaDyskusja = null;
   dyskusjaZalacznik = null;
   ustawRodzenstwoSpraw();
@@ -5002,6 +5314,7 @@ async function odswiezSzczegolDyskusji(zRozmowa) {
 
 function rysujSzczegolDyskusji(y, zwrot) {
   const otwartaSprawa = y.status === "nowa" || y.status === "w_toku";
+  uzbrojPuls(y.kupujacyLogin, "dyskusja", y.id);
   $("dyskusjaNaglowek").innerHTML = `
     <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
       <span style="font-size:24px;font-weight:700">${esc(y.temat || "(bez tematu)")}</span>
@@ -5058,6 +5371,7 @@ async function wczytajRozmoweDyskusji(id) {
       $("dyskusjaOdpowiedzBlok").hidden = true;
       return;
     }
+    dyskusjaOstatniaWidzianaId = d.wiadomosci.at(-1)?.id ?? null;
     cel.innerHTML = d.wiadomosci.length
       ? d.wiadomosci.map((m) => `<div class="wiad ${m.odNas ? "my" : "klient"}">
             <div class="kto">${m.odNas
@@ -5124,9 +5438,14 @@ async function wyslijOdpowiedzDyskusji() {
       method: "POST",
       body: JSON.stringify({
         odpowiedz: tresc,
+        /* Kontrola świeżości (0.110.0): serwer porówna rozmowę z tym, co
+           ekran naprawdę pokazał. Bez rozmowy (degradacja 404) pola nie ma
+           i kontrola po prostu nie działa — uczciwie, nie blokująco. */
+        ...(dyskusjaOstatniaWidzianaId ? { ostatniaWidzianaId: dyskusjaOstatniaWidzianaId } : {}),
         ...(dyskusjaZalacznik ? { zalacznik: dyskusjaZalacznik } : {}),
       }),
     });
+    $("dyskusjaAlarm").innerHTML = "";
     toast("Odpowiedź poszła do Allegro ✓");
     dyskusjaZalacznik = null;
     rysujZalacznikDyskusji();
@@ -5136,7 +5455,15 @@ async function wyslijOdpowiedzDyskusji() {
     await odswiezDyskusje();
     await odswiezLiczniki();
   } catch (e) {
-    toast(e.message);
+    if (e.dane?.noweWiadomosci) {
+      /* Rozmowa przeładowuje się od razu — po przeczytaniu ponowne WYŚLIJ
+         przejdzie samo, bo punkt odniesienia przesunął się z ekranem.
+         Szkic w polu odpowiedzi zostaje nietknięty. */
+      $("dyskusjaAlarm").innerHTML = `<div class="mute" style="margin-top:8px">
+        <span class="badge amber">NOWA WIADOMOŚĆ W SPRAWIE</span> ${esc(e.message)}
+        Rozmowa poniżej jest już odświeżona — przeczytaj i kliknij WYŚLIJ ponownie.</div>`;
+      await wczytajRozmoweDyskusji(id);
+    } else toast(e.message);
   } finally {
     b.disabled = false;
   }
@@ -5659,6 +5986,7 @@ function otworzZwrot(id) {
 }
 
 function zamknijZwrot() {
+  if (puls?.rodzaj === "zwrot") { puls = null; wyczyscAlarmy(); }
   otwartyZwrot = null;
   zwrotIdWatku = null;
   $("zwrotSzczegol").hidden = true;
@@ -5693,6 +6021,7 @@ async function odswiezSzczegolZwrotu() {
 
 function rysujSzczegolZwrotu(z) {
   const zamkniety = z.status === "rozliczony";
+  uzbrojPuls(z.kupujacyLogin, "zwrot", z.id);
 
   $("zwrotNaglowek").innerHTML = `
     <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
@@ -6891,6 +7220,7 @@ const KATEGORIE_PYTAN = {
 const badgePytania = (s) => (STATUSY_PYTAN[s] || STATUSY_PYTAN.nowe)[0];
 
 function zamknijPytanie() {
+  if (puls?.rodzaj === "pytanie") { puls = null; wyczyscAlarmy(); }
   otwartePytanie = null;
   pytanieIdRozmowy = null;
   odpowiedzRuszona = false;
@@ -7180,6 +7510,7 @@ function rysujSzczegolPytania(d) {
   rysujWiedzePytania(d);
   /* Wklejka z poczty nie niesie loginu, więc historii nie ma po czym szukać —
      karta bez treści byłaby nagłówkiem obiecującym coś, czego nie ma. */
+  uzbrojPuls(p.kupujacyLogin, "pytanie", p.id);
   $("pytanieKlient").hidden = !p.kupujacyLogin;
   /* Przesyłki jak historia klienta: bez loginu nie ma czego szukać. */
   $("pytaniePrzesylki").hidden = !p.kupujacyLogin;
@@ -7541,6 +7872,37 @@ async function pokazRozmowe(id) {
 }
 
 /** Wspólna obudowa akcji: błąd na toast, potem odświeżenie szczegółu. */
+/**
+ * Wysyłka z KONTROLĄ ŚWIEŻOŚCI (0.110.0). 409 z ładunkiem znaczy: klient
+ * dopisał coś, czego biuro nie widziało — pokazujemy dopiski w sprawie
+ * i dajemy „WYŚLIJ MIMO TO". Serwer porównuje z wiadomością, na której
+ * stoi sprawa, więc zwykłe ponowienie bez `wymus` odbije się tak samo.
+ */
+async function wyslijPytanie(id, tresc, wymus) {
+  try {
+    const d = await (await api(`/api/biuro/pytania/${id}/wyslij`, {
+      method: "POST", body: JSON.stringify({ odpowiedz: tresc, wymus }),
+    })).json();
+    $("pytanieAlarm").innerHTML = "";
+    await przejdzDalej(d);
+  } catch (e) {
+    if (!e.dane?.noweWiadomosci) return toast(e.message);
+    const nowe = e.dane.noweWiadomosci;
+    $("pytanieAlarm").innerHTML = `<div class="mute" style="margin-top:8px">
+      <span class="badge amber">KLIENT DOPISAŁ</span> ${esc(e.message)}</div>` +
+      nowe.map((m) => `<div class="wiad ${m.odKupujacego ? "klient" : "my"}" style="margin-top:6px">
+        <div class="kto">${m.odKupujacego ? esc(m.autor || "KLIENT") : "MY"}
+          ${m.at ? `<span class="mute"> · ${esc(stempelLokalny(m.at))}</span>` : ""}</div>
+        <div>${esc(m.tresc)}</div>
+      </div>`).join("") +
+      `<div style="margin-top:8px">
+        <button class="akcja" data-pytanie-wymus>WYŚLIJ MIMO TO</button>
+        <span class="mute">albo popraw odpowiedź powyżej i wyślij ponownie</span>
+      </div>`;
+    /* Rozmowa w sprawie też ma pokazać dopisek — na klik, jak zawsze. */
+  }
+}
+
 async function akcjaPytania(fn) {
   try {
     await fn();
@@ -7788,6 +8150,19 @@ function klikKlienta360(e) {
   otworzKlienta360(b.dataset.klient360);
 }
 $("pytanieSzczegol").addEventListener("click", klikKlienta360);
+$("pytanieSzczegol").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pokaz-nowe]");
+  if (!b) return;
+  /* Dopisek przeczytany: rozmowa jedzie świeża (jedno zapytanie, na klik),
+     a baza pulsu przesuwa się na WARTOŚĆ Z BAZY niesioną przez przycisk —
+     alarm gaśnie do następnego dopisku, nie do następnego cyklu. */
+  const id = otwartePytanie;
+  if (id == null) return;
+  pytanieIdRozmowy = null;
+  pokazRozmowe(id);
+  if (puls) puls.nowaWiadomoscAt = b.dataset.pokazNowe || puls.nowaWiadomoscAt;
+  $("pytanieAlarm").innerHTML = "";
+});
 $("zwrotSzczegol").addEventListener("click", klikKlienta360);
 $("dyskusjaSzczegol").addEventListener("click", klikKlienta360);
 
@@ -7932,12 +8307,13 @@ $("pytanieSzczegol").addEventListener("click", async (e) => {
       potwierdz: "WYŚLIJ",
     });
     if (!zgoda) return;
-    return akcjaPytania(async () => {
-      const d = await (await api(`/api/biuro/pytania/${id}/wyslij`, {
-        method: "POST", body: JSON.stringify({ odpowiedz: tresc() }),
-      })).json();
-      await przejdzDalej(d);
-    });
+    return wyslijPytanie(id, tresc(), false);
+  }
+
+  /* Świadoma decyzja po przeczytaniu dopisku — przycisk JEST potwierdzeniem,
+     drugi dialog pytałby o to samo drugi raz. */
+  if (e.target.closest("[data-pytanie-wymus]")) {
+    return wyslijPytanie(id, tresc(), true);
   }
 
   if (e.target.closest("#pytanieKopiuj")) return kopiujOdpowiedz(tresc());

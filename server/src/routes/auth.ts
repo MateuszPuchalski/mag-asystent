@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { currentDevice, currentToken, sesjaZadania } from "../context.js";
-import {
+import { sesjeUzytkownika, wylogujWszedzie,
   autoryzuj,
   karaLogowania,
   wyloguj,
@@ -244,6 +244,25 @@ export async function authRoutes(app: FastifyInstance) {
       return { ok: true };
     }
   );
+
+  /* Wgląd w sesje i „wyloguj wszędzie" — ta sama sprawa co odbieranie hasła
+     (zgubiony kolektor to czyjś dostęp), więc ta sama bramka admina. */
+  app.get<{ Params: { id: string } }>("/api/users/:id/sesje", async (req, reply) => {
+    const o = odmowa("zarzadzanie_biurem");
+    if (o) return reply.code(o.kod).send({ error: o.error });
+    return { sesje: sesjeUzytkownika(Number(req.params.id)) };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/users/:id/wyloguj", async (req, reply) => {
+    const o = odmowa("zarzadzanie_biurem");
+    if (o) return reply.code(o.kod).send({ error: o.error });
+    const uciete = wylogujWszedzie(Number(req.params.id));
+    logEvent("user_wylogowany_wszedzie", kto(), null, {
+      userId: Number(req.params.id),
+      sesji: uciete,
+    });
+    return { ok: true, sesji: uciete };
+  });
 
   /**
    * Jednorazowa migracja historii: nazwy z `events` → konta.

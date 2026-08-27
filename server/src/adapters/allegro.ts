@@ -345,6 +345,37 @@ export const LIMIT_WIADOMOSCI = 2000;
  * wygenerowaną na developer.allegro.pl wkleja się w `ALLEGRO_USER_AGENT`;
  * fallback identyfikuje nas nazwą i wersją, nigdy domyślnym „node".
  */
+/**
+ * Allegro prosi o przerwę (HTTP 429). Osobna klasa, nie zdanie w Error:
+ * takt tickerów ma po niej ROZPOZNAĆ limit i wydłużyć następny przebieg
+ * o `poIluMs`, zamiast uderzać ponownie dokładnie po interwale — równe
+ * ponawianie po odmowie to prosta droga do blokady konta albo adresu.
+ * Ponowień nadal nie ma: błąd przerywa bieżącą pętlę jak każdy inny.
+ */
+/**
+ * `Retry-After` z 429 → milisekundy oczekiwania. Nagłówek bywa liczbą sekund
+ * albo datą HTTP; śmieci i przeszłość dają NULL (żadnego zgadywania — takt
+ * użyje wtedy zwykłego interwału). Eksport dla testów.
+ */
+export function retryAfterMs(naglowek: string | null, terazMs: number): number | null {
+  if (!naglowek) return null;
+  const sekundy = Number(naglowek);
+  if (Number.isFinite(sekundy) && sekundy >= 0) return Math.round(sekundy * 1000);
+  const data = Date.parse(naglowek);
+  if (Number.isFinite(data) && data > terazMs) return data - terazMs;
+  return null;
+}
+
+export class BladLimituAllegro extends Error {
+  constructor(
+    komunikat: string,
+    /** Ile poczekać wg nagłówka `Retry-After`; null = Allegro nie podało. */
+    public readonly poIluMs: number | null
+  ) {
+    super(komunikat);
+  }
+}
+
 export function allegroUserAgent(): string {
   return config.allegro.userAgent || `WERTIS/${WERSJA}`;
 }
