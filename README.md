@@ -379,9 +379,9 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   arkusz od dołu. Dostawa zostaje widoczna pod spodem, bo to na niej widać, ile
   jeszcze zostało w kartonie.
 - Lista jest **kontrolą kompletności, nie kolejką**. Pozycje bierze się z kartonu
-  w takiej kolejności, w jakiej wpadną w rękę. Odłożone **zwężają się w miejscu**
-  i dziesięć pozycji drobnicy mieści się na jednym ekranie. Kolejność wierszy się
-  nie zmienia, a pozycje **BEZ LOKALIZACJI** idą na koniec jako osobna sekcja.
+  w takiej kolejności, w jakiej wpadną w rękę. Odłożone **zwężają się do paska
+  ze zdjęciem** i schodzą pod pracę do zrobienia, od ostatnio odłożonej.
+  Pozycje **BEZ LOKALIZACJI** stoją między jednymi a drugimi jako osobna grupa.
 
   Serwer sortuje po lokalizacji docelowej, ale kolektor nie rysuje już nagłówków
   alejek — przy pracy „co wpadnie w rękę" nikt po nich nie nawigował.
@@ -393,8 +393,9 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   aplikacja rzutowała ten stan na flagę faktury, żeby widziało go biuro —
   ten kanał został zamknięty razem z prawem zapisu do tabeli flag.
 - **Liczy się każdą pozycję**, więc skan półki niesie znaczenie „policzyłem,
-  zgadza się". Rozbieżność zgłasza osobny przycisk **INNA ILOŚĆ**: najczęstszy
-  wyjątek nie może wymagać szukania kafla wśród pięciu kategorii.
+  zgadza się". Ilość ustawia licznik − / +, a od 0.113.0 także **wpisanie
+  liczby** po dotknięciu jej w kaflu — sto sztuk nadmiaru nie może znaczyć stu
+  stuknięć. Rozbieżność zgłasza się jako wyjątek („Zła ilość").
 - **Własna pomyłka w liczeniu to nie reklamacja.** Przycisk **POPRAW ILOŚĆ**
   ustawia liczbę odłożonych sztuk na nowo, dopóki faktura jest otwarta. Zmiana
   zostaje w WERTIS: nie rusza Subiekta, nie kasuje zapisanego adresu i nie
@@ -548,7 +549,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 242 testów jednostkowych; buduje się bez Android SDK
+                           + 252 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

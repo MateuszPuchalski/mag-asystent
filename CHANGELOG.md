@@ -33,6 +33,57 @@ historii nie przepisujemy.
 
 ---
 
+## 0.113.0 — 27 sierpnia 2026
+
+**Zrobiona pozycja dostawy przestała być przekreślonym napisem, a ilość da się
+wpisać.** Cztery zmiany na jednym ekranie, z czterech zgłoszeń z hali. Trzy
+pierwsze dotyczą grupy zrobionych i mają wspólny mianownik: nie czyta się jej
+po kolei, tylko wraca do niej ze sprawdzeniem, czy ostatnia rzecz poszła tam,
+gdzie miała. Czwarta kończy z wyklikiwaniem stu sztuk.
+
+**Ostatnio odłożona stoi na górze zrobionych.** Kolejność alejkowa nie znaczyła
+w tej grupie nic — nikt nie idzie do tych półek drugi raz — a szukana pozycja
+lądowała gdzieś w środku listy. Teraz jest pierwszym paskiem pod pracą do
+zrobienia. Pozycja bez godziny (pominięta bez odłożenia, odpowiedź starszego
+serwera) siada za tymi z godziną, w kolejności z serwera.
+
+**Przekreślenie ustąpiło zielonej odznace.** Symbol towaru to ciąg znaków bez
+sensu słownego („LS51-139"), więc kreska przez środek każe go składać literami
+przez przeszkodę — a właśnie po nim sprawdza się, CO poszło na półkę. Stan
+niesie teraz krążek z fajką, stojący POZA tekstem, w jednej kolumnie przez całą
+grupę. Sam napis jest przygaszony, ale nietknięty. Przy okazji pozycja
+**pominięta** dostała bursztyn i wykrzyknik zamiast zielonej fajki — do tej
+wersji obie wyglądały tak samo, choć jedna leży na półce, a druga nie.
+
+**Zdjęcie wróciło do paska.** Decyzja z 0.55.0 mówiła „pozycja odłożona, więc
+rozpoznawanie towaru nic już nie wnosi" i pomijała to, po co się do tej grupy
+wraca. Miniatura 28 dp kosztuje sześć punktów wysokości paska i odpowiada na
+pytanie „czy to na pewno ten towar" szybciej, niż zrobi to symbol.
+
+Serwer dokłada do pozycji dostawy `doneAt` — godzinę odłożenia, którą panel
+biura czyta od 0.36.0, a kolektor dostawał dotąd bez niej. Reguła kolejności
+mieszka w module `:core` i ma własne testy: bez znacznika czasu cicho wraca do
+tego, co było, i wygląda przy tym poprawnie.
+
+**ILOŚĆ MOŻNA WPISAĆ, nie tylko wyklikać.** Ze zgłoszenia z hali: przy stu
+sztukach ponad fakturę licznik `+` znaczył sto stuknięć, czyli drogę, której
+nikt nie przejdzie. Dotknięcie samej liczby otwiera pole z klawiaturą
+numeryczną — pod kaflami, tak samo jak ręczny wpis adresu. To samo dostała
+**POPRAW ILOŚĆ**: tam poprawka setnej pozycji z dokumentu kosztowała dokładnie
+tyle samo stuknięć.
+
+Licznik − / + zostaje domyślną drogą i to się nie zmienia — rękawica na
+klawiaturze numerycznej to trzy pomyłki na dziesięć wpisów, a różnice bywają
+tu małe („trzy z dziesięciu leżą na wierzchu"). Wpis jest drogą dla liczb,
+których nikt nie wyklika.
+
+Wpisana liczba **nie omija pytania o nadmiar**: „120" przy fakturze na 20
+przechodzi tą samą drogą co dwudzieste stuknięcie w `+` i dalej wymaga zgody,
+tyle że potwierdzenie mówi teraz, na co się zgadzasz („odkładasz 120, a na
+fakturze jest 20"). Przecinek i kropka znaczą to samo, spacje lecą, a liczba
+ujemna albo absurdalnie duża jest odrzucana zamiast po cichu przycięta —
+regułę liczy `:core` i ma na to siedem testów.
+
 ## 0.112.0 — 27 sierpnia 2026
 
 **Konsola spraw przestała być trzema pływającymi kartkami.** Zgłoszenie

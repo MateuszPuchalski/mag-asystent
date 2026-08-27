@@ -439,6 +439,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
         locExpected: oczekiwany,
         locActual: r.lok_faktyczna,
         status: r.status,
+        doneAt: r.done_at ?? null,
         stanMag: stany.get(r.tw_id)?.mag ?? 0,
         stanMgp: stany.get(r.tw_id)?.mgp ?? 0,
         /** litera alejki — nagłówek sekcji na liście */
@@ -588,6 +589,7 @@ function toResolution(
       locExpected: oczekiwany,
       locActual: line.lok_faktyczna,
       status: line.status,
+      doneAt: line.done_at ?? null,
       stanMag: stan?.mag ?? 0,
       stanMgp: stan?.mgp ?? 0,
       aisle: oczekiwany ? String(oczekiwany)[0] : null,

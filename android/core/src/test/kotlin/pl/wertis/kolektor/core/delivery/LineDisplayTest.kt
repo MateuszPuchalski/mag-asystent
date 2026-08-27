@@ -71,10 +71,15 @@ class LineDisplayTest {
 
     /* ── Kolejność pozycji ────────────────────────────────────────────────── */
 
-    private data class Poz(val nazwa: String, val status: String, val lok: String?)
+    private data class Poz(
+        val nazwa: String,
+        val status: String,
+        val lok: String?,
+        val kiedy: String? = null,
+    )
 
     private fun uporzadkuj(vararg p: Poz) =
-        uporzadkujPozycje(p.toList(), { it.status }, { it.lok }).map { it.nazwa }
+        uporzadkujPozycje(p.toList(), { it.status }, { it.lok }, { it.kiedy }).map { it.nazwa }
 
     @Test fun `odlozone schodza na dol listy`() {
         assertEquals(
@@ -140,6 +145,51 @@ class LineDisplayTest {
                 Poz("B", StatusLinii.TODO, "B01-01-01"),
                 Poz("C", StatusLinii.TODO, "C01-01-01"),
             ),
+        )
+    }
+
+    @Test fun `zrobione ida od NAJNOWSZEJ, bo o nia sie pyta`() {
+        /* Kolejność alejkowa nie znaczy w tej grupie nic — nikt nie wraca do
+           tych półek. Pytanie pada jedno: „czy ostatnia poszła tam, gdzie
+           miała", więc odpowiedź stoi zaraz pod pracą do zrobienia. */
+        assertEquals(
+            listOf("czeka", "trzecia", "druga", "pierwsza"),
+            uporzadkuj(
+                Poz("pierwsza", StatusLinii.DONE, "A01-01-01", "2026-08-22T10:00:00.000Z"),
+                Poz("druga", StatusLinii.DONE, "B01-01-01", "2026-08-22T10:05:00.000Z"),
+                Poz("czeka", StatusLinii.TODO, "C01-01-01"),
+                Poz("trzecia", StatusLinii.DONE, "C09-01-01", "2026-08-22T10:09:00.000Z"),
+            ),
+        )
+    }
+
+    @Test fun `zrobione bez znacznika czasu siadaja za tymi ze znacznikiem`() {
+        /* Pominięcie bez odłożenia nie ma godziny, tak samo jak odpowiedź
+           starszego serwera. Kolejność z serwera jest wtedy jedyną, jaką
+           mamy — i zostaje, zamiast wskakiwać przed świeżą robotę. */
+        assertEquals(
+            listOf("z godziną", "pominieta", "stara"),
+            uporzadkuj(
+                Poz("pominieta", StatusLinii.SKIPPED, "A01-01-01"),
+                Poz("stara", StatusLinii.DONE, "B01-01-01"),
+                Poz("z godziną", StatusLinii.DONE, "C01-01-01", "2026-08-22T10:00:00.000Z"),
+            ),
+        )
+    }
+
+    @Test fun `bez znacznika czasu nic sie nie zmienia`() {
+        // wywołanie bez `doneAt` (stary kod, panel biura) sortuje jak dawniej
+        assertEquals(
+            listOf("todo", "done A", "done B"),
+            uporzadkujPozycje(
+                listOf(
+                    Poz("done A", StatusLinii.DONE, "A01-01-01"),
+                    Poz("done B", StatusLinii.DONE, "B01-01-01"),
+                    Poz("todo", StatusLinii.TODO, "C01-01-01"),
+                ),
+                { it.status },
+                { it.lok },
+            ).map { it.nazwa },
         )
     }
 

@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,6 +82,7 @@ import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
+import pl.wertis.kolektor.core.text.iloscZWpisu
 import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
@@ -441,7 +441,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     val widoczne = if (szukaneN.isEmpty()) v.lines else v.lines.filter {
         it.sym.lowercase().contains(szukaneN) || it.name.lowercase().contains(szukaneN)
     }
-    val uporzadkowane = uporzadkujPozycje(widoczne, { it.status }, { it.locExpected })
+    val uporzadkowane =
+        uporzadkujPozycje(widoczne, { it.status }, { it.locExpected }, { it.doneAt })
     val bezLok = czekaBezLokalizacji(v.lines, { it.status }, { it.locExpected })
     val pierwszyBezLok = bezLok.firstOrNull()?.id
 
@@ -991,10 +992,12 @@ private fun LineRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // zwinięty pasek jest o połowę niższy — dziesięć pozycji drobnicy
-                // ma się zmieścić na ekranie bez przewijania
-                .heightIn(min = if (zwiniety) 34.dp else 52.dp)
-                .padding(horizontal = 12.dp, vertical = if (zwiniety) 4.dp else 9.dp),
+                /* Zwinięty pasek zostaje wyraźnie niższy od wiersza pracy —
+                   dziesięć pozycji drobnicy ma się zmieścić na ekranie bez
+                   przewijania. 40 dp zamiast 34 dp od 0.113.0: tyle potrzebuje
+                   miniatura, która wróciła do tego paska (patrz niżej). */
+                .heightIn(min = if (zwiniety) 40.dp else 52.dp)
+                .padding(horizontal = 12.dp, vertical = if (zwiniety) 5.dp else 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1014,17 +1017,40 @@ private fun LineRow(
                     tint = Destructive,
                     modifier = Modifier.size(18.dp),
                 )
-                zwiniety -> Icon(
-                    WIcons.Check,
-                    contentDescription = null,
-                    tint = Success,
-                    modifier = Modifier.size(14.dp),
-                )
+                /* ODZNAKA ZAMIAST PRZEKREŚLENIA (0.113.0). Do tej wersji pozycja
+                   zrobiona miała symbol przekreślony linią — i to jest znak,
+                   który trafia dokładnie w to, co się czyta. Symbol towaru jest
+                   ciągiem znaków bez sensu słownego („LS51-139"), więc kreska
+                   przez środek każe go składać literami przez przeszkodę,
+                   a właśnie po nim sprawdza się, CO poszło na półkę.
+
+                   Stan niesie teraz zielony krążek z fajką, stojący POZA
+                   tekstem, w jednej kolumnie przez całą grupę zrobionych.
+                   Pominięta dostaje bursztyn i wykrzyknik — to nie jest ten sam
+                   stan, a do 0.113.0 obie miały tę samą zieloną fajkę. */
+                zwiniety -> {
+                    val pominieta = line.status == StatusLinii.SKIPPED
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (pominieta) AmberBg else Success.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (pominieta) WIcons.Alert else WIcons.Check,
+                            contentDescription = null,
+                            tint = if (pominieta) AmberInk else Success,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
+                }
             }
 
             /* Miniatura W PASKU, po lewej stronie symbolu — zgłoszenie
-               z magazynu. Zdjęcie stoi tu w KAŻDYM trybie poza zwiniętym, więc
-               rozwinięcie wiersza nie przenosi go na drugi koniec ekranu.
+               z magazynu. Zdjęcie stoi tu w KAŻDYM trybie wiersza, więc ani
+               rozwinięcie, ani odłożenie nie przenosi go na drugi koniec
+               ekranu; zmienia się wyłącznie jego bok.
 
                Do 0.55.0 było inaczej: rozwinięty wiersz dostawał 56 dp po
                prawej, w miejscu pastylki adresu, żeby zdjęcie z nią nie
@@ -1033,10 +1059,12 @@ private fun LineRow(
                niżej. Zostawała sama niespójność: ta sama pozycja pokazywała
                zdjęcie w dwóch różnych miejscach, zależnie od rozwinięcia.
 
-               Wiersz zwinięty jej nie dostaje. Pozycja jest odłożona, więc
-               rozpoznawanie towaru nic już nie wnosi, a pasek jest o połowę
-               niższy właśnie po to, żeby dziesięć pozycji drobnicy zmieściło
-               się na ekranie. */
+               Od 0.113.0 zdjęcie stoi TAKŻE w pasku zrobionej pozycji, w 28 dp.
+               Poprzednia decyzja („pozycja odłożona, rozpoznawanie towaru nic
+               już nie wnosi") pomijała to, po co się do tej grupy wraca: żeby
+               sprawdzić, czy poszło to, co miało pójść, i czy trafiło na tę
+               półkę. Na to pytanie zdjęcie odpowiada szybciej niż symbol —
+               a kosztuje sześć punktów wysokości paska. */
             /* Rysunek pudełka zajmuje TYLE SAMO MIEJSCA co miniatura, choć sam
                jest o połowę mniejszy. Bez tego wiersz przeskakiwałby w bok
                o 18 dp w chwili doczytania zdjęcia — a to jest dokładnie ten
@@ -1046,7 +1074,11 @@ private fun LineRow(
             /* Rozwinięty wiersz dostaje kafelek 44 dp na białym tle — nagłówek
                karty z makiety. Oczekujący zostaje przy 36 dp: tam liczy się
                gęstość listy, a nie okazałość jednej pozycji. */
-            val bokMiniatury = if (rozwiniety) 44.dp else 36.dp
+            val bokMiniatury = when {
+                rozwiniety -> 44.dp
+                zwiniety -> 28.dp
+                else -> 36.dp
+            }
             val ikonaPudelka: @Composable () -> Unit = {
                 Box(
                     Modifier
@@ -1066,15 +1098,13 @@ private fun LineRow(
                     Icon(WIcons.Box, contentDescription = null, tint = InkMute, modifier = Modifier.size(20.dp))
                 }
             }
-            if (!zwiniety) {
-                MiniaturaTowaru(
-                    graph,
-                    line.twId,
-                    bokMiniatury,
-                    // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
-                    zamiast = if (problem) null else ikonaPudelka,
-                )
-            }
+            MiniaturaTowaru(
+                graph,
+                line.twId,
+                bokMiniatury,
+                // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
+                zamiast = if (problem) null else ikonaPudelka,
+            )
             Column(Modifier.weight(1f)) {
                 Text(
                     line.sym,
@@ -1087,12 +1117,15 @@ private fun LineRow(
                        `heightIn(min = 34.dp)`, żeby dziesięć pozycji drobnicy
                        mieściło się bez przewijania. */
                     fontSize = when {
-                        zwiniety -> 13.sp
+                        zwiniety -> 14.sp
                         rozwiniety -> 20.sp
                         else -> 18.sp
                     },
-                    color = if (zwiniety) InkMute else Ink,
-                    textDecoration = if (zwiniety) TextDecoration.LineThrough else null,
+                    /* `InkSoft`, nie `InkMute`: pasek ma być cichszy od pracy do
+                       zrobienia, ale nadal CZYTELNY — to po nim sprawdza się,
+                       co już poszło. Przekreślenie zniknęło, powód stoi przy
+                       odznace wyżej. */
+                    color = if (zwiniety) InkSoft else Ink,
                 )
                 // Nazwa i metadane znikają przy zwijaniu; symbol zostaje, bo to
                 // po nim magazynier rozpoznaje towar przy regale.
@@ -1255,7 +1288,20 @@ private fun PanelOdkladania(
            liczenie sztuk, a przy zerowej liczbie pytań przypadkowe dotknięcie
            `+` wysyłałoby dostawcy reklamację. */
         var nadmiarOk by remember(line.id) { mutableStateOf(false) }
-        var pytaONadmiar by remember(line.id) { mutableStateOf(false) }
+        /* Ilość CZEKAJĄCA na zgodę, nie sama flaga „pytamy" — od 0.113.0
+           nadmiar wchodzi dwiema drogami (krok `+` i wpisanie liczby), więc
+           potwierdzenie musi wiedzieć, na co się zgadza. */
+        var nadmiarDo by remember(line.id) { mutableStateOf<Double?>(null) }
+        /* Otwarte pole wpisywania ilości; `null` = zamknięte. Wpis trzymamy
+           jako TEKST, bo w trakcie pisania „1", „1," i „1,2" są poprawnymi
+           stanami klawiatury, a żaden z nich nie jest jeszcze liczbą. */
+        var wpisIlosci by remember(line.id) { mutableStateOf<String?>(null) }
+
+        /* Jedna droga wyjścia dla obu sposobów podania ilości: krok `+` i wpis
+           kończą się tu samo. Nadmiar pyta RAZ — potem licznik idzie swobodnie. */
+        fun ustawIlosc(nowa: Double) {
+            if (nowa > zostalo && !nadmiarOk) nadmiarDo = nowa else onCzesc(nowa)
+        }
         /* `IntrinsicSize.Min` na wierszu plus `fillMaxHeight` na obu kaflach:
            oba dostają wysokość WYŻSZEGO z nich. Bez tego biały rósł o linijkę
            „z 10 · reszta zostaje" albo „w przyjęciach", a ciemny zostawał
@@ -1266,9 +1312,14 @@ private fun PanelOdkladania(
         ) {
             /* KAFEL BIAŁY — ile sztuk idzie TERAZ. Domyślnie cała reszta, bo
                tak wygląda większość odłożeń; częściowe jest wyjątkiem i ma
-               kosztować dotknięcie, nie odwrotnie. Minus i plus zamiast pola:
-               rękawica na klawiaturze numerycznej to trzy pomyłki na dziesięć
-               wpisów, a różnice są tu małe („3 z 10 leży na wierzchu"). */
+               kosztować dotknięcie, nie odwrotnie.
+
+               Licznik − / + JEST domyślną drogą i to się nie zmienia: rękawica
+               na klawiaturze numerycznej to trzy pomyłki na dziesięć wpisów,
+               a różnice bywają tu małe („3 z 10 leży na wierzchu"). Od 0.113.0
+               obok niego stoi jednak WPISYWANIE — dotknięcie samej liczby.
+               Zgłoszenie z hali: przy stu sztukach nadmiaru licznik znaczył sto
+               stuknięć, czyli drogę, której nikt nie przejdzie. */
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -1289,8 +1340,17 @@ private fun PanelOdkladania(
                        „192 szt" w 30 sp nie mieści się między dwoma celami
                        48 dp na połowie szerokości ekranu — a celów nie
                        zmniejszamy, bo to reguła pracy w rękawicy. */
+                    /* SAMA LICZBA JEST PRZYCISKIEM (0.113.0) — dotknięcie
+                       otwiera pole wpisywania. Ze zgłoszenia z hali: przy stu
+                       sztukach nadmiaru trzeba było stuknąć `+` sto razy.
+                       Licznik zostaje dla różnic, które są tu regułą („trzy
+                       z dziesięciu leżą na wierzchu"); wpis jest drogą dla
+                       liczb, których nikt nie wyklika. */
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { wpisIlosci = formatQty(ile) },
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.Bottom,
                     ) {
@@ -1316,10 +1376,19 @@ private fun PanelOdkladania(
                             )
                         }
                     }
-                    KrokIlosci("+", true) {
-                        if (ile >= zostalo && !nadmiarOk) pytaONadmiar = true
-                        else onCzesc(ile + 1)
-                    }
+                    KrokIlosci("+", true) { ustawIlosc(ile + 1) }
+                }
+                /* Zaproszenie do wpisania — bez niego liczba wygląda na
+                   napis, a nie na przycisk. Znika, gdy pole już stoi otwarte
+                   niżej: dwa zaproszenia do tej samej rzeczy naraz. */
+                if (wpisIlosci == null) {
+                    Text(
+                        "dotknij liczby, aby wpisać",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AmberInk,
+                        modifier = Modifier.clickable { wpisIlosci = formatQty(ile) },
+                    )
                 }
                 // „z 10" pojawia się WYŁĄCZNIE przy odłożeniu częściowym —
                 // przy pełnym byłoby powtórzeniem tej samej liczby obok siebie
@@ -1468,13 +1537,55 @@ private fun PanelOdkladania(
             }
         }
 
+        /* POLE WPISYWANIA ILOŚCI (0.113.0). Stoi POD kaflami, tak jak ręczny
+           wpis adresu — kafel ma pół szerokości ekranu i pole z przyciskiem
+           by się w nim nie zmieściło bez zmniejszania celów dotyku.
+
+           Wpis nie omija pytania o nadmiar: przechodzi tą samą drogą co krok
+           `+`, więc „120" przy fakturze na 20 dalej wymaga zgody. Klawiatura
+           numeryczna, bo to liczba — i `WertisTextField`, bo tylko on ucisza
+           skaner na czas pisania. */
+        wpisIlosci?.let { wpis ->
+            val fokus = remember(line.id) { FocusRequester() }
+            LaunchedEffect(line.id) { fokus.requestFocus() }
+            val liczba = iloscZWpisu(wpis)
+            /* Zero i wpis bez sensu nie zamykają pola — człowiek widzi wtedy
+               to, co napisał, zamiast zgadywać, czemu liczba się nie zmieniła.
+               Odkładanie zerowej ilości ma własną drogę: POPRAW ILOŚĆ. */
+            fun zatwierdz() {
+                val v = iloscZWpisu(wpis) ?: return
+                if (v < 1.0) return
+                wpisIlosci = null
+                ustawIlosc(v)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WertisTextField(
+                        value = wpis,
+                        onValueChange = { wpisIlosci = it },
+                        placeholder = "np. 120",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f).focusRequester(fokus),
+                        onDone = { zatwierdz() },
+                    )
+                    PrimaryButton("USTAW", enabled = liczba != null && liczba >= 1.0) { zatwierdz() }
+                    OutlineButton("✕") { wpisIlosci = null }
+                }
+                Text(
+                    "Cała ilość na tę półkę, nie różnica. Reszta partii zostaje na liście.",
+                    fontSize = 11.sp,
+                    color = InkMute,
+                )
+            }
+        }
+
         /* POTWIERDZENIE NADMIARU (0.64.0). Pasek pod kaflami, nie okno na pół
            ekranu: pytanie dotyczy liczby, która stoi tuż wyżej, więc ma być
            widoczne RAZEM z nią. Ta sama zasada co przy rozjeździe adresu.
 
            Mówimy wprost, co się stanie po zamknięciu dostawy — zgoda na coś,
            czego skutku nie widać, nie jest zgodą. */
-        if (pytaONadmiar) {
+        nadmiarDo?.let { doIlu ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1484,8 +1595,9 @@ private fun PanelOdkladania(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "Na fakturze jest ${formatQty(line.qtyDoc)}. Po zakończeniu " +
-                        "dostawy biuro dostanie zgłoszenie nadmiaru.",
+                    "Odkładasz ${formatQty(doIlu)}, a na fakturze jest " +
+                        "${formatQty(line.qtyDoc)}. Po zakończeniu dostawy biuro " +
+                        "dostanie zgłoszenie nadmiaru.",
                     fontSize = 12.sp,
                     color = Ink,
                     lineHeight = 16.sp,
@@ -1499,11 +1611,11 @@ private fun PanelOdkladania(
                        obrysowana — cofa do liczby z faktury i niczego nie psuje. */
                     PrimaryButton("ODŁÓŻ WIĘCEJ", modifier = Modifier.weight(1f)) {
                         nadmiarOk = true
-                        pytaONadmiar = false
-                        onCzesc(ile + 1)
+                        nadmiarDo = null
+                        onCzesc(doIlu)
                     }
                     OutlineButton("ANULUJ", modifier = Modifier.weight(1f)) {
-                        pytaONadmiar = false
+                        nadmiarDo = null
                     }
                 }
             }
@@ -1918,6 +2030,11 @@ private fun KorektaSheet(
     onZapisz: (Double) -> Unit,
 ) {
     var ile by remember(line.id) { mutableStateOf(line.qtyDone) }
+    /* Wpisywanie zamiast klikania — ta sama droga co w panelu odkładania
+       (0.113.0). Tu boli tak samo: poprawka setnej pozycji z dokumentu to sto
+       stuknięć w `+`. Górną granicą jest ilość z dokumentu, bo korekta mówi
+       „tyle leży na półce z TEJ dostawy", a nie „tyle przyjechało". */
+    var wpis by remember(line.id) { mutableStateOf<String?>(null) }
     ModalBottomSheet(onDismissRequest = onCancel, containerColor = Paper) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
@@ -1939,7 +2056,13 @@ private fun KorektaSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 KrokIlosci("−", ile > 0.0) { ile = (ile - 1).coerceAtLeast(0.0) }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { wpis = formatQty(ile) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
                         iloscZJednostka(ile, line.unit),
                         fontFamily = BarlowCond,
@@ -1947,9 +2070,39 @@ private fun KorektaSheet(
                         fontSize = 32.sp,
                         color = Ink,
                     )
-                    Text("z ${formatQty(line.qtyDoc)} na dokumencie", fontSize = 11.sp, color = InkMute)
+                    Text(
+                        if (wpis == null) "z ${formatQty(line.qtyDoc)} na dokumencie · dotknij, aby wpisać"
+                        else "z ${formatQty(line.qtyDoc)} na dokumencie",
+                        fontSize = 11.sp,
+                        color = InkMute,
+                    )
                 }
                 KrokIlosci("+", ile < line.qtyDoc) { ile = (ile + 1).coerceAtMost(line.qtyDoc) }
+            }
+
+            wpis?.let { w ->
+                val fokus = remember(line.id) { FocusRequester() }
+                LaunchedEffect(line.id) { fokus.requestFocus() }
+                // granica z dokumentu: powyżej niej to już nie korekta liczenia,
+                // tylko nadmiar — a ten idzie inną drogą, przez odkładanie
+                val liczba = iloscZWpisu(w, maks = line.qtyDoc)
+                fun zatwierdz() {
+                    val v = iloscZWpisu(w, maks = line.qtyDoc) ?: return
+                    ile = v
+                    wpis = null
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WertisTextField(
+                        value = w,
+                        onValueChange = { wpis = it },
+                        placeholder = "np. ${formatQty(line.qtyDoc)}",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f).focusRequester(fokus),
+                        onDone = { zatwierdz() },
+                    )
+                    PrimaryButton("USTAW", enabled = liczba != null) { zatwierdz() }
+                    OutlineButton("✕") { wpis = null }
+                }
             }
 
             // co się stanie z pozycją po zapisie — mówimy wprost, bo status

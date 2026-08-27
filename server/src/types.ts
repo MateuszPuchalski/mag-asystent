@@ -196,6 +196,14 @@ export interface DeliveryLineView {
   locActual: string | null;
   status: string;
   /**
+   * Kiedy pozycja została odłożona (ISO) — `null`, dopóki nikt jej nie tknął.
+   *
+   * Kolektor układa po tym wykonaną robotę: ostatnio odłożona stoi na górze
+   * grupy zrobionych, bo to jej dotyczy pytanie „czy na pewno na tę półkę".
+   * Panel biura czyta to samo pole od 0.36.0 (`podgladDokumentu`).
+   */
+  doneAt: string | null;
+  /**
    * Stan na hali i w przyjęciach — SUROWY, bez korekty o kolejkę i rezerwacje.
    *
    * Przy półce pytanie brzmi „czy tego już tam coś leży", więc liczy się to,
