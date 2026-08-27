@@ -33,6 +33,47 @@ historii nie przepisujemy.
 
 ---
 
+## 0.112.0 — 27 sierpnia 2026
+
+**Konsola spraw przestała być trzema pływającymi kartkami.** Zgłoszenie
+brzmiało „usuń te zaokrąglone przerwy między sekcjami" i dotyczyło czegoś,
+co makieta rozstrzygnęła dawno, a panel nigdy nie wdrożył.
+
+**Makieta rozdziela dwa wyglądy, panel znał jeden.** `Main` rysuje konsolę
+pracy jako płaskie tafle stykające się krawędziami: kontekst ma tam kreskę
+z lewej, zero promienia i zero cienia. `Analiza` rysuje bloki jako KARTY —
+promień 14, cień, odstęp. Panel dawał kartę wszędzie, bo `.card` jest jedną
+klasą na cały arkusz, więc trzy strefy pracy pływały na papierze jak trzy
+osobne dokumenty. A są jednym stanowiskiem.
+
+**Reguła, która z tego zostaje: konsola pracy to tafle, powierzchnia do
+czytania to karty.** Pilnuje jej test, w obie strony — bo pierwsze
+porządkowanie CSS scaliłoby te dwa wyglądy z powrotem i nikt by nie zauważył.
+
+**Konsola dotyka krawędzi okna.** Wyłamuje się z marginesu strony ujemnym
+marginesem — dokładnie o `--brzeg`, czyli o tę samą zmienną, z której margines
+bierze strona. Na monitorze to trzydzieści kilka pikseli więcej dla wątku
+klienta, a na laptopie obok Subiekta liczy się każdy.
+
+**Strefy sięgają dołu okna** zamiast kończyć się tam, gdzie kończy się treść.
+Krótka sprawa zostawiała pod sobą pas papieru i znowu wyglądała jak kartka
+położona na tle.
+
+**Kolejka przewija się własnym przewijaniem**, jak dwie pozostałe strefy. Do
+tej wersji jechała ze stroną, podczas gdy sprawa i kontekst stały — przy
+kilkudziesięciu sprawach wyglądało to jak usterka.
+
+**Poniżej 1024 px nie zmienia się nic.** Tam widok jest pionowym stosem kart
+i stos kart jest poprawny — makieta `Waski` też go tak rysuje. ANALIZA, STAN
+SYSTEMU i DZIENNIK zostają na kartach na każdej szerokości.
+
+**Złapane przy weryfikacji: kolejka bywa STOSEM, nie jedną taflą.** Przy
+zwrocie stoi pod nią karta brakujących paczek, przy dostawach „poza WERTIS".
+Sztywna wysokość dała każdej z nich pełne okno osobno, czyli kolumnę dwa razy
+wyższą od ekranu. Sprawa i kontekst dostają sztywną wysokość, bo są zawsze
+pojedyncze; kolejka dostaje limit, a karty w niej rozdziela kreska zamiast
+odstępu.
+
 ## 0.111.0 — 26 sierpnia 2026
 
 **Panel, który naprawia, nie tylko patrzy.** Przegląd dojrzałości pokazał
