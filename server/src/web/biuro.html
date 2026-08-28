@@ -1075,6 +1075,9 @@
      Liczb tam nie ma świadomie — pokazanie ich wymagałoby pobrania danych,
      czyli zniszczenia całej oszczędności. */
   details.zwijana > summary .podpis { margin-left: auto; font-size: 11px; color: var(--ink-mute); }
+  /* Zwijana, która JEST kartą (a nie sekcją w jej środku): kreska i odstępy
+     `.zwijana` są pomyślane dla drugiego przypadku i tutaj dublowałyby ramkę. */
+  details.card.zwijana { border-top: 1px solid var(--card-border); padding-top: 12px; margin-top: 0; }
   details.zwijana[open] > summary .podpis { display: none; }
   /* Sekcja zwinięta jako CAŁA treść karty (statystyki pytań): kreska u góry
      wypadłaby wtedy tuż pod krawędzią karty i udawała pustą sekcję nad sobą. */
@@ -1352,13 +1355,21 @@
          w tabeli wyżej: tamta odpowiada na „co magazyn ma do zrobienia", a te
          dokumenty właśnie z tego pytania wypadły. Karta istnieje po to, żeby
          pomyłkowe zamknięcie dało się zauważyć i cofnąć — bez niej dokument
-         znika bez śladu widocznego dla człowieka. -->
-    <section class="card" id="kartaPozaWertis" hidden>
-      <h2>ROZŁOŻONE POZA WERTIS</h2>
+         znika bez śladu widocznego dla człowieka.
+
+         ZWINIĘTA OD 0.121.1, bo to archiwum, nie praca: ta sama lista jedzie
+         pod czip „Poza WERTIS" w tabeli wyżej, a karta niesie ponad to jedną
+         rzecz — przycisk PRZYWRÓĆ. Rozwinięta rosła z każdym zamknięciem
+         i spychała reklamacje, czyli wyjątki CZEKAJĄCE na człowieka, coraz
+         niżej. Liczba w nagłówku mówi, czy w ogóle warto tam zaglądać, więc
+         zwinięcie niczego nie ukrywa. -->
+    <details class="card zwijana" id="kartaPozaWertis" hidden>
+      <summary><h2>ROZŁOŻONE POZA WERTIS</h2>
+        <span class="podpis" id="pozaWertisIle"></span></summary>
       <p class="mute">Zdjęte z listy rozkładania decyzją biura. Towar odłożono
         bez tej aplikacji, więc nie ma z tego ani jednego skanu.</p>
       <table id="pozaWertis"></table>
-    </section>
+    </details>
   </div>
 
   <!-- ── SPRAWY — jedna kolejka obsługi klienta (0.108.0) ─────────────────── -->
@@ -3191,6 +3202,8 @@ function rysujPozaWertis(lista) {
   pozaWertisLista = lista;
   $("kartaPozaWertis").hidden = lista.length === 0;
   if (!lista.length) return;
+  $("pozaWertisIle").textContent = `${lista.length} ${
+    odmiana(lista.length, ["dokument", "dokumenty", "dokumentów"])}`;
   $("pozaWertis").innerHTML =
     "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>ZAMKNĄŁ</th><th>POWÓD</th><th></th></tr>" +
     lista.map((d) => `<tr>

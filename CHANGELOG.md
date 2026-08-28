@@ -33,6 +33,21 @@ historii nie przepisujemy.
 
 ---
 
+## 0.121.1 — 28 sierpnia 2026
+
+**Karta ROZŁOŻONE POZA WERTIS jest zwinięta.** Zgłoszenie właściciela:
+„schowaj gdzieś rozłożone poza wertis".
+
+To archiwum, nie praca: ta sama lista jedzie od 0.97.0 pod czipem „Poza
+WERTIS" w tabeli dostaw, a karta niesie ponad to jedną rzecz — przycisk
+PRZYWRÓĆ, którego nie da się sensownie wcisnąć w wiersz szyny. Rozwinięta
+rosła z każdym zamknięciem i spychała REKLAMACJE, czyli wyjątki czekające na
+człowieka, coraz niżej.
+
+Liczba dokumentów stoi w nagłówku, więc zwinięcie niczego nie ukrywa: widać,
+czy w ogóle warto tam zaglądać. Ten sam wzorzec, co rejestry per-typ w szynie
+spraw — zwinięta sekcja NIE PYTA serwera.
+
 ## 0.121.0 — 28 sierpnia 2026
 
 **Kolejka spraw dostała pasma pilności, przejmowanie spraw i wiersz, który
