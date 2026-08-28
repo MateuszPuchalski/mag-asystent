@@ -976,3 +976,28 @@ i też mieć własne przewijanie zamiast przewijania strony.
 
 Poniżej **1024 px** konsoli nie ma: wszystko wraca do pionowego stosu kart
 i strona przewija się normalnie. Tak ma być.
+
+### S79 — ustawienia jako jeden arkusz
+
+Wejdź w `/biuro` → zębatka → **USTAWIENIA** na oknie szerszym niż 1400 px.
+
+Sekcje mają stać **jedna pod drugą, w jednej kolumnie**, rozdzielone cienką
+kreską. Żadnych zaokrąglonych rogów, żadnych cieni i żadnych przerw z papierem
+między nimi. Do 0.119.0 było to pięć kartek z cieniem, które siatka rozkładała
+na dwie kolumny różnej wysokości.
+
+Arkusz nie rozciąga się na całą szerokość monitora. Sekcje są formularzami,
+a pole promptu eksperta ma szerokość do redagowania, nie do oglądania.
+
+Odstępy w środku sekcji mają być **równe**. Sprawdź to na karcie PROMPT
+EKSPERTA I FAKTY FIRMOWE. Ten sam odstęp ma dzielić etykietę od pola, pole od
+przycisku i przycisk od następnej etykiety.
+
+Zapisz reguły strefy złotej. Zdanie z wynikiem pojawia się **pod tabelą**,
+a przed zapisem nie ma tam pustego pasa po nim.
+
+Otwórz objaśnienie ikoną „i" przy dowolnej sekcji. Akapity mają mieć odstęp
+między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
+
+Reszta zakładek zostaje **na kartach**: ANALIZA, NADZÓR i DZIENNIK dalej mają
+promień, cień i odstęp między kartami. To jest osobny wygląd i ma taki zostać.

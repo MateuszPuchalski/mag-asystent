@@ -21,7 +21,7 @@ import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
    zwroty.ts, dyskusje.ts) — sprawa to widok, nie nowy byt. Bramka biuro|admin
    jak przy dyskusjach: prowadzenie spraw klienckich to robota biura, nie hali.
 
-   JEDEN WYJĄTEK od „wyłącznie odczytu" (0.120.0): przejęcie sprawy. I on też
+   JEDEN WYJĄTEK od „wyłącznie odczytu" (0.121.0): przejęcie sprawy. I on też
    nie łamie reguły, tylko ją potwierdza — trasa NIC nie zapisuje sama, jedynie
    rozdziela na cztery istniejące stemple przy rejestrach źródłowych. Musi
    stać tutaj, bo klika się ją Z KOLEJKI, a kolejka nie wie, do którego

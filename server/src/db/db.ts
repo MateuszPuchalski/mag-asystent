@@ -200,7 +200,7 @@ function migrate(database: DatabaseSync) {
   addColumn("kosz_pozycja", "pozniej_at", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
-  /* Kto prowadzi ZWROT (0.120.0). Jako jedyny z czterech rejestrów zwrot nie
+  /* Kto prowadzi ZWROT (0.121.0). Jako jedyny z czterech rejestrów zwrot nie
      miał gdzie zapisać znacznika prowadzenia — a kolejka spraw pokazuje go
      przy wszystkich czterech, więc bez tej kolumny zwrot byłby jedyną sprawą,
      której nie da się wziąć. Tabela stoi u klienta od 0.53.0, więc migracja.

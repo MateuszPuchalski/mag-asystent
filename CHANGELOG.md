@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.120.0 — 28 sierpnia 2026
+## 0.121.0 — 28 sierpnia 2026
 
 **Kolejka spraw dostała pasma pilności, przejmowanie spraw i wiersz, który
 niesie treść zamiast myślników.** Zgłoszenie właściciela ze zrzutem produkcji:
@@ -90,6 +90,43 @@ w szynie. Pokazuje się wyłącznie wtedy, gdy praca jest naprawdę zablokowana.
 **W szynie nie ma już uciętych tabel.** Brakujące paczki, pominięte pozycje
 i kosze rysowały tam sześć kolumn w 352 px — wszystkie trzy ucięte, każda
 z własnym przewijaniem. Dostały ten sam wiersz pionowy, co kolejka w szynie.
+
+## 0.120.0 — 28 sierpnia 2026
+
+**Zakładka USTAWIENIA to jeden arkusz, nie pięć pływających kartek.**
+
+Zgłoszenie właściciela: „uporządkuj zakładkę ustawień w biuro, pozbądź się
+zaokrągleń i niepotrzebnych marginesów". To trzecie takie zgłoszenie i dwa
+pierwsze mają już odpowiedź w repo — konsola spraw w 0.112.0, cała zakładka
+SPRAWY w 0.116.0. Została z nich reguła: **konsola pracy to tafle,
+powierzchnia do czytania to karty.** Ustawienia były ostatnią zakładką, która
+jej nie przeszła.
+
+**Pięć kartek robiło z jednego kompletu pięć dokumentów.** Siatka rozkładała
+je na monitorze na dwie kolumny różnej wysokości, każdą z własnym promieniem
+i cieniem. A ustawienia są jedną rzeczą: kompletem wartości ustawianych raz
+i obowiązujących wszystkich. Teraz są jedną taflą — jedna kolumna, sekcje
+stykają się kreską, zero promienia i zero cienia.
+
+**Arkusz ma szerokość do redagowania, nie do oglądania.** Sekcje są
+formularzami, a rozciągnięte na monitor 2560 zostawiały metr pustego papieru
+przy sześciopolowym formularzu i robiły z pola promptu linijkę na 300 znaków.
+
+**Osiemnaście marginesów z palca zastąpiła jedna liczba.** Widok niósł
+osiemnaście atrybutów `style` na 135 wierszach, w tym osiem różnych odstępów
+— 4, 6, 8, 10 i 14 px. Żaden nie wynikał z reguły; każdy powstał przy
+dopisywaniu kolejnej sekcji. Rytm niesie dziś arkusz, więc następna sekcja
+dostaje ten sam odstęp bez pamiętania o nim. W znaczniku ustawień nie ma już
+ani jednego `style` — i pilnuje tego liczbowa asercja w teście.
+
+**Pusty wiersz wyniku przestał zabierać odstęp.** Zdania o zapisie reguł,
+zapisie logo i stanie konfiguracji pytań nie istnieją do pierwszej akcji,
+a odstęp za nimi stał od początku.
+
+**Promień zdjęty jest WYŁĄCZNIE tutaj.** `.card` to jedna klasa na cały panel,
+więc globalne zero skasowałoby różnicę między stanowiskiem pracy a
+zestawieniem do czytania. ANALIZA, NADZÓR i DZIENNIK zostają na kartach —
+test pilnuje obu połówek naraz, tak jak przy konsoli.
 
 ## 0.119.1 — 28 sierpnia 2026
 

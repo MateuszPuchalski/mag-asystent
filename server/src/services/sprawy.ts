@@ -43,7 +43,7 @@ export interface Sprawa {
   nowaWiadomoscAt?: string | null;
   /** Dla reklamacji: zwrot, który UI ma otworzyć — reklamacja nie ma szczegółu. */
   zwrotId?: number;
-  /** Dyskusje: `CLAIM` ma ustawowy zegar, zwykła dyskusja nie. Do 0.120.0
+  /** Dyskusje: `CLAIM` ma ustawowy zegar, zwykła dyskusja nie. Do 0.121.0
       kolejka pokazywała obu tę samą plakietkę DYSKUSJA — a to dwie różne
       pilności pod jedną nazwą. */
   typ?: string | null;
@@ -129,7 +129,7 @@ function sprawyZwrotow(gdzie: string, param: unknown[]): Sprawa[] {
       kiedy: (r.utworzono_allegro as string) ?? (r.utworzono_at as string) ?? null,
       dniDoTerminu: null,
       poTerminie: false,
-      /* Od 0.120.0 zwrot ma własny znacznik prowadzenia — był jedynym z czterech
+      /* Od 0.121.0 zwrot ma własny znacznik prowadzenia — był jedynym z czterech
          rejestrów bez niego, więc jako jedyny nie dawał się wziąć z kolejki. */
       prowadzi: (r.prowadzi as string) ?? null,
       /* Jedynym terminalnym statusem zwrotu jest `rozliczony` (przeliczStatus,

@@ -183,6 +183,83 @@
   /* Jedna karta na widok — siatka nie ma czego układać. */
   #widokDziennik { grid-template-columns: 1fr; }
 
+  /* ── USTAWIENIA: jedna tafla, nie pięć kartek ──────────────────────────────
+     Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
+     i niepotrzebnych marginesów". Dwa pierwsze (0.112.0 konsola spraw, 0.116.0
+     cała zakładka SPRAWY) zostawiły regułę: KONSOLA PRACY TO TAFLE,
+     POWIERZCHNIA DO CZYTANIA TO KARTY. Ustawienia były ostatnią zakładką,
+     która jej nie przeszła.
+
+     Ustawienia nie są ani jednym, ani drugim — to KOMPLET rzeczy ustawianych
+     raz. Pięć kartek z cieniem, rozrzuconych przez `auto-fit` na dwie kolumny
+     różnej wysokości, czytało się jak pięć niezależnych dokumentów. Jest to
+     jeden arkusz, więc dostaje wygląd arkusza: jedna kolumna, sekcje stykają
+     się kreską.
+
+     Promień zdejmujemy WYŁĄCZNIE tutaj. `.card` jest jedną klasą na cały
+     panel, więc globalne `border-radius: 0` skasowałoby różnicę między
+     stanowiskiem pracy a zestawieniem do czytania — pilnuje tego test
+     „konsola to tafle, a powierzchnia do czytania zostaje kartą". */
+  #widokDostawcy {
+    grid-template-columns: 1fr;
+    gap: 0;
+    /* Sekcje to FORMULARZE — sześć pól firmy i dwa pola tekstowe. Rozciągnięte
+       na 2560 px zostawiają metr pustego papieru po prawej, a pole promptu
+       robi się nie do redagowania. Tabele (konta, dostawcy, reguły) mieszczą
+       się w tej mierze z zapasem. */
+    max-width: 60rem;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+  }
+  /* Sam `gap: 0` nie wystarczy: zostawiłby stykające się zaokrąglone rogi
+     i cienie wchodzące jeden na drugi. Ta sama uwaga, co przy konsoli. */
+  #widokDostawcy > .card {
+    border-radius: 0; box-shadow: none;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    border-top: 1px solid var(--border);
+  }
+  #widokDostawcy > .card:first-child { border-top: 0; }
+  /* Ślad po kliknięciu kafla w pasku stanu musi przeżyć spłaszczenie:
+     `.card.wskazana` maluje obwódkę cieniem, a `box-shadow: none` wyżej
+     wygrywa z nią specyficznością identyfikatora. Na tafli to i tak jest
+     belka przy krawędzi, nie obwódka — dokładnie jak `tr.aktywny`. */
+  #widokDostawcy > .card.wskazana { box-shadow: inset 3px 0 0 var(--amber); }
+
+  /* ── Rytm pionowy JEDNĄ regułą ─────────────────────────────────────────────
+     Widok niósł osiemnaście atrybutów `style` na 135 wierszach, w tym osiem
+     marginesów dobranych z palca: 4, 6, 8, 10 i 14 px. Żaden nie wynikał
+     z reguły — każdy z osobnego przymiarkowania przy dopisywaniu sekcji.
+     Jedna liczba w arkuszu zastępuje wszystkie i następna sekcja dostaje
+     ten sam odstęp bez pamiętania o nim. */
+  #widokDostawcy > .card > * + * { margin-top: 8px; }
+  /* Rząd pól kończy sekcję, więc jego własny dolny odstęp dokładałby się do
+     dopełnienia karty. Ten sam powód, co przy `.pasekFiltrow .filtry`. */
+  #widokDostawcy .filtry { margin-bottom: 0; }
+  /* Wiersz wyniku (zapis reguł, zapis logo, stan konfiguracji pytań) jest
+     pusty do pierwszej akcji. Bez tego zabierałby odstęp za zdanie, którego
+     jeszcze nie ma — czyli dokładnie taki margines, jak te zdejmowane. */
+  #widokDostawcy > .card > p:empty { display: none; }
+  /* `.objasnienie` nie ma reguły w arkuszu wcale — odstępy niosło mu
+     siedemnaście powtórzonych atrybutów w HTML. Reguła stoi na razie pod
+     identyfikatorem, bo pozostałe dwanaście bloków w panelu wciąż ma swoje
+     marginesy w znaczniku i globalna zdublowałaby im odstęp. */
+  #widokDostawcy .objasnienie { display: grid; gap: 8px; margin-bottom: 8px; }
+  /* Etykieta pola = podpis sekcji, jak w `.filtry`. Bez tej reguły dwie
+     etykiety nad polami tekstowymi stały zwykłym tekstem 14 px i wyglądały
+     na treść, a nie na podpis. */
+  #widokDostawcy label { display: block; font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
+  /* Etykieta przy polu wyboru jest ZDANIEM do przeczytania, nie podpisem —
+     więc odwraca ściszenie z reguły wyżej. */
+  #widokDostawcy .przelacznik {
+    display: flex; align-items: center; gap: 8px;
+    font-size: inherit; letter-spacing: 0; color: var(--ink);
+  }
+  /* Pole na całą szerokość sekcji. Miary do czytania NIE dokładamy drugi raz:
+     `max-width` arkusza trzyma już cały widok na 60 rem, a druga granica
+     zostawiała po prawej stronie pola pas pustej sekcji — wyglądało to na
+     pole, którego nie dociągnięto, a nie na pole odmierzone. */
+  #widokDostawcy textarea { width: 100%; }
+
   /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
      jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
      bezpieczne w każdej szerokości i nie potrzebuje żadnego zapytania.
@@ -603,7 +680,7 @@
   #sprawyBlokada .czemu { display: block; color: var(--err); font-size: 12px; margin-top: 2px; }
   #sprawyBlokada .akcja { margin-left: auto; flex: none; }
 
-  /* ── Kolejka spraw: pasma i wiersz (0.120.0) ───────────────────────────────
+  /* ── Kolejka spraw: pasma i wiersz (0.121.0) ───────────────────────────────
      Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca pyta
      „co teraz zrobić". Pasma rysują granice tam, gdzie sort `poPilnosci`
      i tak je stawiał — nagłówek jest wierszem tabeli, więc kolumny wierszy
@@ -647,7 +724,7 @@
   .klientChip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                 font-size: 11.5px; padding: 3px 9px; border-radius: 12px; }
   /* Dwie linijki zamiast ucięcia na 90 znakach — miejsce wzięte z dwóch
-     martwych kolumn, które w 0.120.0 zeszły do pastylek. */
+     martwych kolumn, które w 0.121.0 zeszły do pastylek. */
   .tresc2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
             overflow: hidden; line-height: 1.4; }
   .stopkaSprawy { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
@@ -1328,7 +1405,7 @@
           Rejestry per-typ, razem z archiwum, stoją w szynie obok.
         </p>
       </div>
-      <!-- ALARM BLOKUJĄCY PRACĘ (0.120.0). Do tej wersji „konto niesparowane"
+      <!-- ALARM BLOKUJĄCY PRACĘ (0.121.0). Do tej wersji „konto niesparowane"
            stało jako szara notka w szynie rejestrów — a to jest najważniejszy
            fakt na ekranie: sprawy czekają i NIE DA SIĘ odpowiedzieć na żadną.
            Pas pokazuje się TYLKO wtedy, gdy praca jest naprawdę zablokowana,
@@ -1338,7 +1415,7 @@
 
       <div class="glowaKolejki">
         <p id="sprawyPodsumowanie"></p>
-        <!-- DWA WEJŚCIA DO SPRAWY zwinięte do ikon (0.120.0). Oba kończą się
+        <!-- DWA WEJŚCIA DO SPRAWY zwinięte do ikon (0.121.0). Oba kończą się
              otwartą sprawą, a nie krótszą listą: skan jest wejściem od paczki,
              wyszukiwarka od klienta, który dzwoni. Rozwinięte na stałe zajmowały
              ~110 px najcenniejszego miejsca — zawsze puste, dla zadań rzadkich
@@ -2236,34 +2313,34 @@
       <h2>PROMPT EKSPERTA I FAKTY FIRMOWE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
+        <p class="mute">
           Zmienia wyłącznie admin. Prompt opisuje, KIM jest doradca i jak pisze.
           Fakty to jedyne źródło prawdy o wysyłce, terminach i płatnościach —
           czego tu nie ma, tego model nie poda klientowi.
         </p>
       </div>
       <label for="pytaniaPrompt">PROMPT EKSPERTA</label>
-      <textarea id="pytaniaPrompt" rows="8" style="width:100%"></textarea>
-      <div style="margin-top:6px">
+      <textarea id="pytaniaPrompt" rows="8"></textarea>
+      <div>
         <button class="akcja" id="pytaniaZapiszPrompt">ZAPISZ PROMPT</button>
       </div>
 
-      <label for="pytaniaFakty" style="margin-top:14px;display:block">FAKTY FIRMOWE</label>
-      <textarea id="pytaniaFakty" rows="8" style="width:100%"
+      <label for="pytaniaFakty">FAKTY FIRMOWE</label>
+      <textarea id="pytaniaFakty" rows="8"
         placeholder="Wysyłka zagraniczna: …&#10;Czas wysyłki: …&#10;Płatności: …"></textarea>
-      <div style="margin-top:6px">
+      <div>
         <button class="akcja" id="pytaniaZapiszFakty">ZAPISZ FAKTY</button>
       </div>
-      <label style="margin-top:14px;display:flex;gap:8px;align-items:center">
+      <label class="przelacznik">
         <input type="checkbox" id="pytaniaAutoSzkic">
         <span>Licz szkice automatycznie, bez pytania</span>
       </label>
-      <p class="mute" style="margin-top:4px">
+      <p class="mute">
         Wyłączone: szkic powstaje po kliknięciu GENERUJ przy konkretnym pytaniu.
         Włączone: model pisze sam przy każdym pobraniu pytań — także do tych,
         których nikt nie otworzy.
       </p>
-      <p class="mute" id="pytaniaKonfiguracjaStan" style="margin-top:8px"></p>
+      <p class="mute" id="pytaniaKonfiguracjaStan"></p>
     </section>
 
     <!-- Jedyna karta na tym widoku zapisywana w przeglądarce, nie na serwerze:
@@ -2274,7 +2351,7 @@
       <h2>DANE FIRMY DO FORMULARZY DOSTAWCÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
+        <p class="mute">
           Nagłówek protokołu reklamacyjnego drukowanego z karty REKLAMACJE.
           Zapisuje się w tej przeglądarce, więc drugie biurko ma własny komplet.
         </p>
@@ -2294,7 +2371,7 @@
       <h2>REGUŁY STREFY ZŁOTEJ <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
           drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
           nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
@@ -2303,12 +2380,12 @@
         </p>
       </div>
       <table id="reguly"></table>
-      <div class="filtry" style="margin-top:8px">
+      <div class="filtry">
         <div><button class="akcja cichy" id="dodajRegule">+ REGUŁA</button></div>
         <div><button class="akcja" id="zapiszStrefe">ZAPISZ REGUŁY</button></div>
       </div>
       <p class="mute" id="wynikStrefy"></p>
-      <p class="mute" style="margin-top:6px">
+      <p class="mute">
         Kandydatów do przeniesienia pokazuje zakładka <b>ANALIZA</b>.
       </p>
     </section>
@@ -2323,7 +2400,7 @@
       <h2>KONTA I SESJE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Zmienia wyłącznie admin. RESET nadaje nowe hasło (osoba zmieni je
           sobie przy kolektorze), WYŁĄCZ odbiera dostęp od zaraz — wyłączone
           konto nie przejdzie żadną sesją. SESJE pokazują, co jest zalogowane
@@ -2332,26 +2409,26 @@
         </p>
       </div>
       <table id="kontaLista"></table>
-      <div id="kontaSesje" style="margin-top:10px"></div>
+      <div id="kontaSesje"></div>
     </section>
 
     <section class="card">
       <h2>LOGO DOSTAWCÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
           dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
           zanim przeczyta się numer dokumentu. To samo logo stoi przy dostawcy
           w tabeli dostaw tego panelu i w nagłówku otwartego dokumentu.
         </p>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
           Przeglądarka zmniejszy go, obetnie przezroczysty margines i przerobi
           na jeden format, zanim cokolwiek pojedzie na serwer. Lista poniżej
           pokazuje dostawców z dokumentów dostaw, także tych bez logo.
         </p>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           <b>Logo wgrane przed 0.87.0 warto wgrać jeszcze raz.</b> Zapisywaliśmy
           je wtedy w kwadracie, więc szeroki logotyp miał nad sobą i pod sobą
           przezroczyste powietrze — i to ono, a nie logo, rosło na ekranie
@@ -4958,7 +5035,7 @@ function plakietkaSprawy(s) {
   if (r === "pytanie") return '<span class="badge amber">PYTANIE</span>';
   if (r === "zwrot") return '<span class="badge ok">ZWROT</span>';
   if (r === "reklamacja") return '<span class="badge err">REKLAMACJA</span>';
-  /* CLAIM to nie pogawędka: ma ustawowy zegar 14 dni, a do 0.120.0 dostawał tę
+  /* CLAIM to nie pogawędka: ma ustawowy zegar 14 dni, a do 0.121.0 dostawał tę
      samą plakietkę DYSKUSJA, bo `Sprawa` nie niosła `typ`. Jedna nazwa na dwie
      różne pilności jest gorsza od dwóch nazw. */
   if (typeof s !== "string" && s.typ === "CLAIM") {
@@ -4981,7 +5058,7 @@ function dniOd(at) {
   return Number.isFinite(ms) ? Math.floor(ms / 86_400_000) : 0;
 }
 
-/* ── Pasma pilności (0.120.0) ────────────────────────────────────────────────
+/* ── Pasma pilności (0.121.0) ────────────────────────────────────────────────
    Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca potrzebuje
    odpowiedzi na „co teraz zrobić". Sort `poPilnosci` (services/sprawy.ts) był
    poprawny już wcześniej — termin, potem najstarsze — tylko NIGDZIE GO NIE BYŁO
@@ -5050,7 +5127,7 @@ function znacznikiSprawy(s) {
     (s.zwrotId ? ` data-sprawa-zwrot="${s.zwrotId}"` : "");
 }
 
-/* Pastylki, które pokazują się TYLKO wtedy, gdy coś niosą. Do 0.120.0 termin
+/* Pastylki, które pokazują się TYLKO wtedy, gdy coś niosą. Do 0.121.0 termin
    i prowadzenie były kolumnami — z myślnikiem w każdym wierszu, bo
    `dniDoTerminu` jest zawsze puste dla pytań i zwrotów, a znacznik prowadzenia
    stawiało dopiero wejście w sprawę. Kolumna, która niesie treść dla
@@ -5197,7 +5274,7 @@ function rysujSprawy(lista) {
 
 async function odswiezKolejkeSpraw() {
   try {
-    /* BEZ `?rodzaj=` (0.120.0): pobieramy CAŁĄ kolejkę i filtrujemy na miejscu.
+    /* BEZ `?rodzaj=` (0.121.0): pobieramy CAŁĄ kolejkę i filtrujemy na miejscu.
        Inaczej czipy nie mają skąd wziąć liczb — a czip „Dyskusje" bez liczby
        nie mówi, czy warto tam patrzeć — ani czip MOJE skąd wziąć swoich spraw.
        Serwer i tak tnie po 500 na rejestr, więc to jedno zapytanie zamiast
@@ -5616,7 +5693,7 @@ function rysujBrakujace(lista, ticker) {
        ${ticker.bledow
          ? `<div><span class="badge err">ALLEGRO ODMAWIA</span> ${esc(ticker.ostatniBlad || "")}</div>`
          : ""}`;
-  /* W SZYNIE NIE MA TABEL (0.120.0) — i to jest reguła, nie poprawka jednego
+  /* W SZYNIE NIE MA TABEL (0.121.0) — i to jest reguła, nie poprawka jednego
      miejsca. 352 px nie mieści sześciu kolumn i żadna przyszła karta tego nie
      zmieni: do tej wersji trzy karty szyny rysowały tabele ucięte w pół,
      każda z własnym paskiem przewijania, i na jednym ekranie było ich cztery
@@ -5654,7 +5731,7 @@ function badgeKosza(status) {
    ZAKOŃCZENIE, bo serwer kasuje oba pola: kolumna nie zostaje z nazwiskiem
    przy koszu, który wrócił do rozkładania. */
 function rysujKosze(kosze) {
-  /* Wiersz pionowy — w szynie nie ma tabel (0.120.0). Pięciu kolumn nie da się
+  /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Pięciu kolumn nie da się
      złożyć w 352 px: do tej wersji ta tabela była tu ucięta w pół. */
   $("koszeLista").innerHTML = kosze.length
     ? kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
@@ -5691,7 +5768,7 @@ function rysujKosze(kosze) {
 function rysujPominiete(lista) {
   $("pominieteKarta").hidden = lista.length === 0 || otwartaDyskusja != null;
   if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
-  /* Wiersz pionowy — w szynie nie ma tabel (0.120.0). Zdjęcie zostaje, bo przy
+  /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Zdjęcie zostaje, bo przy
      „czego nie było w koszu" to ono najszybciej mówi, o który towar chodzi. */
   $("pominieteLista").innerHTML = lista.map((p) => `<tr>
         ${kolFoto(p.twId)}
@@ -8964,7 +9041,7 @@ $("kolejkaSprawKarta").addEventListener("click", (e) => {
 
 $("klientSzczegol").addEventListener("click", (e) => {
   if (e.target.closest("#klientWroc")) return zamknijKlienta360();
-  /* Bez `button` w selektorze: od 0.120.0 celem jest CAŁY wiersz, tu tak samo
+  /* Bez `button` w selektorze: od 0.121.0 celem jest CAŁY wiersz, tu tak samo
      jak w kolejce — przycisku OTWÓRZ nie ma już w żadnej z tych list. */
   const sprawa = e.target.closest("[data-sprawa-rodzaj]");
   if (sprawa) {

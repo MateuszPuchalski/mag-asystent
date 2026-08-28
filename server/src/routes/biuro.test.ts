@@ -192,7 +192,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "(oba za groźnym potwierdzeniem) oraz trzy mutacje kont admina " +
       "(reset hasła, włącz/wyłącz, wyloguj wszędzie) — dotąd dostępne " +
       "wyłącznie przez curl. " +
-      "POST z 0.120.0 to PRZEJĘCIE SPRAWY z kolejki — „WEZMĘ TO\u201d. " +
+      "POST z 0.121.0 to PRZEJĘCIE SPRAWY z kolejki — „WEZMĘ TO\u201d. " +
       "Do tej wersji kolumna PROWADZI miała myślnik w KAŻDYM ze 168 wierszy, " +
       "bo znacznik stawiało dopiero wejście w sprawę: dwie osoby odpowiadały " +
       "na to samo pytanie i nikt się o tym nie dowiadywał. Zapis jest " +
@@ -749,7 +749,7 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   }
 });
 
-test("pasma kolejki są WIDOKIEM sortu serwera, nie drugą regułą (0.120.0)", () => {
+test("pasma kolejki są WIDOKIEM sortu serwera, nie drugą regułą (0.121.0)", () => {
   /* Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca pyta
      „co teraz zrobić". Sort `poPilnosci` był poprawny już wcześniej — termin,
      potem najstarsze — tylko nigdzie go nie było widać.
@@ -777,8 +777,8 @@ test("pasma kolejki są WIDOKIEM sortu serwera, nie drugą regułą (0.120.0)", 
   assert.match(html, /p\.id !== "poterminie"/, "pasma po terminie nie da się zwinąć");
 });
 
-test("wiersz kolejki: cel klikalny i kolumny, które coś niosą (0.120.0)", () => {
-  /* Do 0.120.0 kolumny TERMIN i PROWADZI miały myślnik w KAŻDYM wierszu i to
+test("wiersz kolejki: cel klikalny i kolumny, które coś niosą (0.121.0)", () => {
+  /* Do 0.121.0 kolumny TERMIN i PROWADZI miały myślnik w KAŻDYM wierszu i to
      nie było zapomnianą wartością: `dniDoTerminu` jest zawsze `null` dla pytań
      i zwrotów, a `zwrot` w ogóle nie miał kolumny `prowadzi`. Kolumna niosąca
      treść dla mniejszości wierszy uczy oko, że kolumny nic nie niosą.
@@ -806,7 +806,7 @@ test("wiersz kolejki: cel klikalny i kolumny, które coś niosą (0.120.0)", () 
   assert.match(html, /s\.typ === "CLAIM"/, "CLAIM przestał wyglądać jak pogawędka");
 });
 
-test("przejęcie sprawy: znacznik, nie blokada, i jedna droga (0.120.0)", () => {
+test("przejęcie sprawy: znacznik, nie blokada, i jedna droga (0.121.0)", () => {
   /* Przy 168 sprawach i kilku osobach w biurze kolumna PROWADZI miała myślnik
      wszędzie, bo znacznik stawiało dopiero wejście w sprawę: dwie osoby
      odpowiadały na to samo pytanie i nikt się o tym nie dowiadywał. */
@@ -825,9 +825,9 @@ test("przejęcie sprawy: znacznik, nie blokada, i jedna droga (0.120.0)", () => 
   );
 });
 
-test("alarmy i kosze w szynie: wiersz pionowy zamiast uciętej tabeli (0.120.0)", () => {
+test("alarmy i kosze w szynie: wiersz pionowy zamiast uciętej tabeli (0.121.0)", () => {
   /* 352 px nie mieści sześciu kolumn i żadna przyszła karta tego nie zmieni.
-     Do 0.120.0 te trzy karty rysowały w szynie tabele ucięte w pół, każda
+     Do 0.121.0 te trzy karty rysowały w szynie tabele ucięte w pół, każda
      z własnym paskiem przewijania — na jednym ekranie cztery zagnieżdżone.
 
      Zwijane rejestry per-typ zostają tabelami świadomie: mają po kilka kolumn,
@@ -1036,6 +1036,55 @@ test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
     html,
     /\.widok\.konsola > \.card ~ \.card \{ border-top: 1px solid/,
     "stos kart w kolejce ma szew"
+  );
+});
+
+test("ustawienia to jedna tafla, a odstępy niesie arkusz", () => {
+  /* Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
+     i niepotrzebnych marginesów". Po konsoli spraw (0.112.0) i całej zakładce
+     SPRAWY (0.116.0) ustawienia były ostatnią zakładką na pięciu pływających
+     kartkach — a są JEDNYM kompletem rzeczy ustawianych raz.
+
+     Test pilnuje obu połówek, tak jak ten wyżej pilnuje ich dla konsoli:
+     ustawienia spłaszczyły się, a `.card` NIE stracił promienia globalnie.
+     Trzecia asercja jest o odstępach: widok niósł osiemnaście atrybutów
+     `style` z ośmioma różnymi marginesami dobranymi z palca. Liczba zamiast
+     opisu, bo liczba nie zestarzeje się po cichu. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const a = html.indexOf('id="widokDostawcy"');
+  assert.notEqual(a, -1, "widok ustawień istnieje");
+  const ustawienia = html.slice(a, html.indexOf("</main>", a));
+  assert.equal(
+    (ustawienia.match(/style="/g) ?? []).length,
+    0,
+    "odstępy w ustawieniach niesie arkusz, nie atrybuty w znaczniku"
+  );
+
+  assert.match(
+    html,
+    /#widokDostawcy > \.card \{[\s\S]{0,80}border-radius: 0; box-shadow: none/,
+    "sekcje ustawień tracą promień i cień"
+  );
+  assert.match(
+    html,
+    /#widokDostawcy \{[\s\S]{0,400}gap: 0/,
+    "sekcje ustawień stykają się bez odstępu"
+  );
+  assert.match(
+    html,
+    /#widokDostawcy > \.card \{[\s\S]{0,160}border-top: 1px solid var\(--border\)/,
+    "sekcje rozdziela kreska, skoro nie rozdziela ich odstęp"
+  );
+
+  /* Druga połówka. Ktoś porządkujący USTAWIENIA sięgnąłby po globalne
+     `border-radius: 0` — i skasowałby różnicę, której pilnuje test wyżej. */
+  assert.match(
+    html,
+    /\.card \{ background: var\(--card\);[^}]*border-radius: 14px/,
+    "karta poza ustawieniami dalej ma promień 14"
   );
 });
 
@@ -1315,14 +1364,14 @@ test("sprawy: jedna kolejka czterech rejestrów, karta klienta drugim poziomem (
      zrobić?" jedną listą pytań, zwrotów, dyskusji i reklamacji. Karta
      klienta (360) otwiera się klikiem w login — z kolejki albo z nagłówka
      otwartej sprawy. Zakładka czyta wszystko poza JEDNYM zapisem — przejęciem
-     sprawy (0.120.0) — a liczniki POST/PUT/DELETE wyżej pilnują, że nie
+     sprawy (0.121.0) — a liczniki POST/PUT/DELETE wyżej pilnują, że nie
      przemyciła żadnego innego. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
   assert.match(html, /id="kolejkaSprawKarta"/, "kolejka spraw jest kartą sekcji");
-  /* Od 0.120.0 BEZ `?rodzaj=`: kolejka pobiera cały agregat i filtruje na
+  /* Od 0.121.0 BEZ `?rodzaj=`: kolejka pobiera cały agregat i filtruje na
      miejscu, bo inaczej czipy nie mają skąd wziąć liczb, a czip MOJE — swoich
      spraw. Jedno zapytanie zamiast jednego na każde kliknięcie czipa. */
   assert.match(html, /api\("\/api\/biuro\/sprawy"\)/, "kolejka czyta cały agregat przez api()");
