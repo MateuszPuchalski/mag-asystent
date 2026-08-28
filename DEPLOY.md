@@ -656,6 +656,14 @@ Trzy rzeczy warto wiedzieć przed pierwszym takim wdrożeniem:
 - Aktualizacja niczego nie kasuje: bufor offline, adres serwera i lista
   ostatnio skanowanych zostają na miejscu.
 
+> **Kolektory z wersją od 0.100.0 do 0.118.0 wymagają JEDNEJ instalacji ręką.**
+> Numer wersji zamieniał się tam na liczbę porównywalną starym wzorem, który
+> odrzucał setny minor. Kolektor czytał więc każdą wersję od `0.100.0` jako
+> „nie rozumiem" i milczał zamiast proponować aktualizację. Poprawka jedzie
+> w APK, którego ten kolektor sam nie pobierze, więc plik `0.119.0` trzeba mu
+> podać raz przez MDM albo `adb install -r`. Od tej jednej instalacji
+> samoaktualizacja działa dalej sama.
+
 **3a. Co wymaga której roli.** Do codziennej pracy wystarcza zalogowanie.
 Zastrzeżone są trzy rzeczy:
 

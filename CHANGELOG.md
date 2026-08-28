@@ -33,6 +33,39 @@ historii nie przepisujemy.
 
 ---
 
+## 0.119.0 — 28 sierpnia 2026
+
+**Kolektor znowu widzi aktualizacje. Nie widział ich od 0.100.0.** Zgłoszenie
+brzmiało „kolektor się nie aktualizuje po aktualizacji aplikacji" i było
+dokładnie tym, na co wygląda: samoaktualizacja z 0.52.0 milczała od
+osiemnastu wydań.
+
+**Co się stało.** Numer wersji zamienia się na liczbę porównywalną w TRZECH
+miejscach: przy budowaniu APK (`versionCode` w Gradle), na serwerze
+(`services/aktualizacja.ts`) i na kolektorze (`core/update/Aktualizacja.kt`).
+Przy wydaniu 0.100.0 dwa pierwsze przeszły na wzór z zapasem 999 — bo przy
+starym `0.100.0` dawało 10 000, dokładnie tyle co `1.0.0`. Trzecie miejsce
+zostało przy zapasie 99.
+
+Skutkiem nie był zły numer, tylko CISZA. Człon powyżej zapasu jest tam
+odrzucany świadomie (kolizja czytałaby się jako „ta sama wersja"), więc
+`0.100.0` i wszystko po nim znaczyło dla kolektora „nie rozumiem tego napisu".
+A reguła samoaktualizacji przy każdej wątpliwości odpowiada „nie" — i to jest
+reguła słuszna, bo instalacja wersji starszej kosztuje odinstalowanie aplikacji
+razem z buforem offline. Kolektor nie miał więc czego pokazać: bez błędu, bez
+wpisu w dzienniku, z jedynym śladem w postaci bursztynowego paska „wersje
+różne", który świecił i nic z tym nie robił.
+
+Wzór jest teraz ten sam we wszystkich trzech miejscach, a test w `:core` pilnuje
+setnego minora wprost: `0.100.0` musi być większe od `0.99.0` i mniejsze od
+`1.0.0`.
+
+**[wymaga działania]** — kolektory z wersją od **0.100.0 do 0.118.0** trzeba
+zaktualizować RAZ ręką: przez MDM albo `adb install -r wertis-kolektor-0.119.0.apk`.
+Poprawka jedzie w pliku, którego zepsuty kolektor sam nie pobierze. Od tej
+jednej instalacji samoaktualizacja działa dalej sama. Urządzenia z wersją
+0.99.0 albo starszą pobiorą 0.119.0 same, bez niczyjej pomocy.
+
 ## 0.118.0 — 28 sierpnia 2026
 
 **Panel pozycji kosza zwrotów mówi wreszcie, gdzie ten towar jest.** Dwie
