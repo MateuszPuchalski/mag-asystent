@@ -43,6 +43,16 @@ export interface Sprawa {
   nowaWiadomoscAt?: string | null;
   /** Dla reklamacji: zwrot, który UI ma otworzyć — reklamacja nie ma szczegółu. */
   zwrotId?: number;
+  /** Dyskusje: `CLAIM` ma ustawowy zegar, zwykła dyskusja nie. Do 0.121.0
+      kolejka pokazywała obu tę samą plakietkę DYSKUSJA — a to dwie różne
+      pilności pod jedną nazwą. */
+  typ?: string | null;
+  /** Dyskusje: czy odpowiadaliśmy przez WERTIS. Kolejka NIE WIE, czy sprawa
+      czeka na nas — synchronizacja czyta status z Allegro, nie treść rozmowy
+      (pytania mają ten mechanizm, dyskusje nie). To jedyny lokalny ślad, po
+      którym da się odróżnić dyskusję w toku od takiej, której nikt nie tknął
+      od pobrania; panel składa z niego pasmo „bez potwierdzenia". */
+  odpowiadalismy?: boolean;
   /** Sprawa zamknięta trafia tylko do historii klienta, nigdy do kolejki. */
   otwarta: boolean;
 }
@@ -102,7 +112,7 @@ function sprawyZwrotow(gdzie: string, param: unknown[]): Sprawa[] {
   const rows = db()
     .prepare(
       `SELECT id, kupujacy_login, referencja, waybill, allegro_order_id, status,
-              utworzono_allegro, utworzono_at
+              utworzono_allegro, utworzono_at, prowadzi
        FROM zwrot WHERE ${gdzie} ORDER BY id DESC LIMIT 500`
     )
     .all(...(param as never[])) as Array<Record<string, unknown>>;
@@ -119,7 +129,9 @@ function sprawyZwrotow(gdzie: string, param: unknown[]): Sprawa[] {
       kiedy: (r.utworzono_allegro as string) ?? (r.utworzono_at as string) ?? null,
       dniDoTerminu: null,
       poTerminie: false,
-      prowadzi: null, // zwrot nie ma znacznika prowadzenia — celowo (schema)
+      /* Od 0.121.0 zwrot ma własny znacznik prowadzenia — był jedynym z czterech
+         rejestrów bez niego, więc jako jedyny nie dawał się wziąć z kolejki. */
+      prowadzi: (r.prowadzi as string) ?? null,
       /* Jedynym terminalnym statusem zwrotu jest `rozliczony` (przeliczStatus,
          services/zwroty.ts): `nowy` czeka na ocenę, `oceniony` na zwrot
          środków. Oba są pracą biura, więc oba stoją w kolejce. */
@@ -132,7 +144,7 @@ function sprawyDyskusji(gdzie: string, param: unknown[]): Sprawa[] {
   const rows = db()
     .prepare(
       `SELECT id, kupujacy_login, temat, typ, status, order_id, utworzono_allegro,
-              utworzono_at, prowadzi
+              utworzono_at, prowadzi, wyslano_at
        FROM dyskusja WHERE ${gdzie} ORDER BY id DESC LIMIT 500`
     )
     .all(...(param as never[])) as Array<Record<string, unknown>>;
@@ -161,6 +173,11 @@ function sprawyDyskusji(gdzie: string, param: unknown[]): Sprawa[] {
       dniDoTerminu: zegar ? zegar.dniDoTerminu : null,
       poTerminie: otwarta && zegar !== null && zegar.dniDoTerminu < 0,
       prowadzi: (r.prowadzi as string) ?? null,
+      typ,
+      /* WYŁĄCZNIE nasze wysyłki. Odpowiedź napisana w panelu Allegro nie
+         zostawia tu śladu (rozmowa mieszka w Allegro) — i właśnie dlatego
+         panel nazywa to pasmo „bez potwierdzenia", a nie „nieodpowiedziane". */
+      odpowiadalismy: (r.wyslano_at as string) != null,
       /* Ta sama para co worklista dyskusji (services/dyskusje.ts). */
       otwarta,
     };

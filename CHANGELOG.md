@@ -33,6 +33,64 @@ historii nie przepisujemy.
 
 ---
 
+## 0.121.0 — 28 sierpnia 2026
+
+**Kolejka spraw dostała pasma pilności, przejmowanie spraw i wiersz, który
+niesie treść zamiast myślników.** Zgłoszenie właściciela ze zrzutem produkcji:
+„this is disaster" — 168 spraw w jednej płaskiej liście.
+
+Zakładkę przeprojektowano wcześniej przy dziewięciu sprawach z ziarna i przy
+tej liczbie czytała się dobrze. Przy 168 przestała odpowiadać na pytanie, dla
+którego powstała — „co teraz zrobić" — i stała się zrzutem bazy.
+
+**Pasma są WIDOKIEM istniejącego sortu, nie drugą regułą.** Sort po pilności
+(termin, potem najstarsze) był poprawny od 0.108.0, tylko nigdzie nie było go
+widać. Teraz kolejka rysuje granice tam, gdzie ten sam sort i tak je stawiał:
+PO TERMINIE, TERMIN ZA ≤7 DNI, CZEKA PONAD TYDZIEŃ, CZEKA KILKA DNI, DZIŚ
+I WCZORAJ. Pasmo bez spraw się nie rysuje, po terminie nie daje się zwinąć,
+a domyślnie zwinięte jest tylko najświeższe — i to ono zamienia 168 wierszy
+w ekran.
+
+**Osobne pasmo dla dyskusji bez potwierdzenia.** Kolejka NIE WIE, czy dyskusja
+czeka na nas: synchronizacja czyta status z Allegro, nie treść rozmowy. Pytania
+mają ten mechanizm od dawna — rejestrujemy sprawę tylko wtedy, gdy ostatnie
+słowo należy do klienta — dyskusje nie mają odpowiednika. Takie sprawy schodzą
+pod kolejkę pracy zamiast udawać zadania.
+
+**Kolumny TERMIN i PROWADZI zeszły z nagłówka.** Miały myślnik w każdym
+wierszu i nie była to zapomniana wartość: zegar mają wyłącznie CLAIM-y
+i reklamacje, a znacznik prowadzenia stawiało dopiero wejście w sprawę. Są
+teraz pastylkami, które pokazują się tylko wtedy, gdy coś niosą. Odzyskane
+~200 px poszło na treść sprawy — dwie linijki zamiast ucięcia na 90 znakach.
+
+**Klika się cały wiersz.** Kolumna z bursztynowym OTWÓRZ zniknęła: bursztyn
+znaczy w tym panelu „ta jedna rzecz do zrobienia", a powtórzony 168 razy
+przestawał cokolwiek znaczyć.
+
+**„WEZMĘ TO" — przejęcie sprawy z kolejki.** Znacznik, nie blokada: nie
+odbiera nikomu dostępu, mówi tylko, że ktoś przy tej sprawie siedzi. Przy
+kilku osobach w biurze to jedyna ochrona przed dwiema odpowiedziami na to samo
+pytanie. Zwrot dostał przy okazji kolumnę `prowadzi` — jako jedyny z czterech
+rejestrów jej nie miał, więc jako jedyny nie dawał się wziąć.
+
+**CLAIM przestał wyglądać jak pogawędka** — ma ustawowy zegar 14 dni, a dostawał
+tę samą plakietkę co zwykła dyskusja.
+
+**Czipy niosą liczby**, bo „Dyskusje" bez liczby nie mówi, czy warto tam
+patrzeć. Doszedł czip MOJE. Filtr jest odtąd stanem ekranu, nie zapytaniem:
+jedno pobranie zamiast jednego na każde kliknięcie.
+
+**Skan etykiety i wyszukiwarka klientów zwinęły się do ikon.** Rozwinięte na
+stałe zajmowały ~110 px, zawsze puste, i spychały pierwszy wiersz pod krawędź.
+
+**Alarm blokujący pracę jest wreszcie alarmem.** „Konto niesparowane — nie
+odpowiesz na żadną z tych spraw" stoi pasem nad kolejką, nie szarą notką
+w szynie. Pokazuje się wyłącznie wtedy, gdy praca jest naprawdę zablokowana.
+
+**W szynie nie ma już uciętych tabel.** Brakujące paczki, pominięte pozycje
+i kosze rysowały tam sześć kolumn w 352 px — wszystkie trzy ucięte, każda
+z własnym przewijaniem. Dostały ten sam wiersz pionowy, co kolejka w szynie.
+
 ## 0.120.0 — 28 sierpnia 2026
 
 **Zakładka USTAWIENIA to jeden arkusz, nie pięć pływających kartek.**
@@ -69,6 +127,38 @@ a odstęp za nimi stał od początku.
 więc globalne zero skasowałoby różnicę między stanowiskiem pracy a
 zestawieniem do czytania. ANALIZA, NADZÓR i DZIENNIK zostają na kartach —
 test pilnuje obu połówek naraz, tak jak przy konsoli.
+
+## 0.119.1 — 28 sierpnia 2026
+
+**Ikony SYSTEM i ALLEGRO przeniosły się do górnego paska, a biały pasek stanu
+pod nim zniknął.** Zgłoszenie właściciela: „indykator system i allegro wrzuć
+do top bara".
+
+Pasm chromu było dwa: ciemny nagłówek z zakładkami i biały pasek pod nim
+z dwiema ikonami stanu oraz plakietką odpowiedzi na notatki. Ten drugi był
+PUSTY, gdy odpowiedzi nie było — czyli prawie zawsze — i kosztował ~43 px
+na KAŻDEJ zakładce. Ta sama arytmetyka, która w 0.95.0 wygnała zakładki do
+nagłówka.
+
+Wszystkie trzy rzeczy stoją teraz w klastrze sesji, obok „kto" i WYLOGUJ —
+tam, gdzie mieszka to, co dotyczy całej sesji, a nie jednego widoku.
+
+**Spokojna pastylka jest obrysem, alarm zostaje wypełniony.** Na grafitowym
+pasku biała pastylka byłaby jaśniejsza od zakładki bieżącej, czyli krzyczałaby
+wtedy, gdy nie ma o czym. Wypełnienie zostaje dla wyjątku — i jasna plama na
+ciemnym tle jest mocniejszym alarmem niż na białym. Żadnego nowego koloru:
+ta sama para, co dotąd.
+
+**Poniżej 1280 px z pastylki zostaje sama kropka.** Zmierzone, nie
+przewidziane: przy 1180 px nagłówek zawijał się do drugiego wiersza i oddawał
+dokładnie te 43 px, po które ta zmiana przyszła. Schodzą napisy, nie ikony —
+zgodnie z tym, po co ikony powstały w 0.114.0: kolor odpowiada na jedyne
+pytanie biura, a treść i tak mieszka w tooltipie.
+
+Zmienna `--hChrome` znaczy dalej „ile chromu stoi nad treścią", więc dziewięć
+reguł konsoli nie musiało się o tej przeprowadzce dowiedzieć — o to chodzi
+w mierzeniu wysokości zamiast wpisywania jej. `--hGora` zeszła razem z paskiem,
+bo pozycjonowała wyłącznie jego.
 
 ## 0.119.0 — 28 sierpnia 2026
 

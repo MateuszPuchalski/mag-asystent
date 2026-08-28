@@ -49,10 +49,10 @@ function zalogowany(rola: Rola): string {
   return token;
 }
 
-function daneSpraw(): { dyskusjaId: number } {
+function daneSpraw(): { dyskusjaId: number; zwrotId: number; pytanieId: number; pozycjaId: number } {
   const d = db();
   const teraz = new Date().toISOString();
-  d.prepare(
+  const py = d.prepare(
     `INSERT INTO pytanie(zrodlo, kupujacy_login, tresc, otrzymano_at, status,
        produkty_json, utworzono_at, utworzono_przez)
      VALUES ('allegro', 'jan', 'Czy pasuje?', ?, 'nowe', '[]', ?, 'Test')`
@@ -64,7 +64,7 @@ function daneSpraw(): { dyskusjaId: number } {
        VALUES ('jan', 'WB-1', 'nowy', 'zam-1', ?, ?, 'Test')`
     )
     .run(teraz, teraz);
-  d.prepare(
+  const poz = d.prepare(
     `INSERT INTO zwrot_pozycja(zwrot_id, nazwa, ilosc, decyzja, decyzja_at, decyzja_przez)
      VALUES (?, 'Pęknięty nóż', 1, 'reklamacja', ?, 'Test')`
   ).run(Number(z.lastInsertRowid), teraz);
@@ -74,7 +74,12 @@ function daneSpraw(): { dyskusjaId: number } {
      VALUES ('iss-1', 'CLAIM', 'nowa', 'Pęknięta obudowa', 'jan', 'zam-1', ?, ?, ?)`
   ).run(teraz, teraz, teraz);
   /* Id z bazy, nie „1": rowid nie startuje od zera po DELETE w beforeEach. */
-  return { dyskusjaId: Number(dy.lastInsertRowid) };
+  return {
+    dyskusjaId: Number(dy.lastInsertRowid),
+    zwrotId: Number(z.lastInsertRowid),
+    pytanieId: Number(py.lastInsertRowid),
+    pozycjaId: Number(poz.lastInsertRowid),
+  };
 }
 
 const TRASY = [
@@ -248,4 +253,72 @@ test("Klient 360 i powiązania: login z querystring, kubełek bez parametru", as
     method: "GET", url: "/api/biuro/sprawy/powiazane?rodzaj=dyskusja", headers: naglowki,
   });
   assert.equal(bezId.statusCode, 400);
+});
+
+test("przejęcie sprawy stempluje WŁAŚCIWY rejestr — każdy z czterech", async () => {
+  /* Jedna trasa, cztery rejestry: kolejka nie wie, do którego należy wiersz,
+     i to jest właśnie wiedza, którą niesie moduł spraw. Test sprawdza, że
+     rozdzielenie po rodzaju trafia tam, gdzie powinno — bo pomyłka byłaby
+     cicha: stempel na cudzym rejestrze wygląda z kolejki tak samo. */
+  const token = zalogowany("biuro");
+  const d = daneSpraw();
+  const przypadki: Array<[string, number]> = [
+    ["pytanie", d.pytanieId],
+    ["zwrot", d.zwrotId],
+    ["dyskusja", d.dyskusjaId],
+    ["reklamacja", d.pozycjaId],
+  ];
+  for (const [rodzaj, id] of przypadki) {
+    const r = await app.inject({
+      method: "POST",
+      url: `/api/biuro/sprawy/${rodzaj}/${id}/prowadzi`,
+      headers: { "x-session": token },
+      payload: {},
+    });
+    assert.equal(r.statusCode, 200, rodzaj);
+  }
+
+  /* Liczy się WIDOK, nie tabela: kolejka ma po tym pokazać cztery sprawy
+     z nazwiskiem, a nie cztery zapisy w czterech miejscach. */
+  const kolejka = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
+  });
+  const sprawy = kolejka.json().sprawy as Array<{ rodzaj: string; prowadzi: string | null }>;
+  for (const rodzaj of ["pytanie", "zwrot", "dyskusja", "reklamacja"]) {
+    const s = sprawy.find((x) => x.rodzaj === rodzaj);
+    assert.ok(s, `${rodzaj} jest w kolejce`);
+    assert.ok(s!.prowadzi, `${rodzaj} niesie znacznik prowadzenia do kolejki`);
+  }
+});
+
+test("przejęcie sprawy: bramka biura i odmowa dla złego rodzaju", async () => {
+  const d = daneSpraw();
+  const url = `/api/biuro/sprawy/pytanie/${d.pytanieId}/prowadzi`;
+  const bez = await app.inject({ method: "POST", url, payload: {} });
+  assert.equal(bez.statusCode, 401, "bez sesji 401");
+  const hala = await app.inject({
+    method: "POST", url, headers: { "x-session": zalogowany("magazynier") }, payload: {},
+  });
+  assert.equal(hala.statusCode, 403, "magazynier nie prowadzi spraw klientów");
+
+  const token = zalogowany("biuro");
+  const zly = await app.inject({
+    method: "POST", url: "/api/biuro/sprawy/wymyslony/1/prowadzi",
+    headers: { "x-session": token }, payload: {},
+  });
+  assert.equal(zly.statusCode, 400, "zły rodzaj to literówka w kliencie, nie pusty skutek");
+});
+
+test("rozliczony zwrot nie ma kogo prowadzić", async () => {
+  /* Sprawa zamknięta z nazwiskiem przy sobie sugeruje, że ktoś jeszcze przy
+     niej siedzi. Odmowa jest tu lepsza od cichego braku skutku: klik w kolejce
+     po odświeżeniu inaczej by kłamał. */
+  const token = zalogowany("biuro");
+  const d = daneSpraw();
+  db().prepare("UPDATE zwrot SET status='rozliczony' WHERE id=?").run(d.zwrotId);
+  const r = await app.inject({
+    method: "POST", url: `/api/biuro/sprawy/zwrot/${d.zwrotId}/prowadzi`,
+    headers: { "x-session": token }, payload: {},
+  });
+  assert.equal(r.statusCode, 400);
 });

@@ -561,6 +561,10 @@ CREATE TABLE IF NOT EXISTS zwrot (
   -- `client:44300444`, więc porównanie po loginie z zamówienia nie trafia (0.56.6).
   kupujacy_id       TEXT,
   kupujacy_email    TEXT,
+  -- Kto prowadzi ten zwrot (0.121.0) — znacznik, nie blokada. Czyszczony przy
+  -- rozliczeniu: sprawa zamknięta nie ma kto prowadzić.
+  prowadzi          TEXT,
+  prowadzi_at       TEXT,
   utworzono_allegro TEXT,              -- createdAt zwrotu w Allegro (ISO)
   -- Maszyna stanów zwrotu. Otwarty tekst, nie CHECK — kolejne etapy dopisują
   -- wartości, a stara baza nie ma prawa odrzucić wiersza z nowym stanem.

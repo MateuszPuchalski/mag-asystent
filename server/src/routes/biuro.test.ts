@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    36,
+    37,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -192,6 +192,12 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "(oba za groźnym potwierdzeniem) oraz trzy mutacje kont admina " +
       "(reset hasła, włącz/wyłącz, wyloguj wszędzie) — dotąd dostępne " +
       "wyłącznie przez curl. " +
+      "POST z 0.121.0 to PRZEJĘCIE SPRAWY z kolejki — „WEZMĘ TO\u201d. " +
+      "Do tej wersji kolumna PROWADZI miała myślnik w KAŻDYM ze 168 wierszy, " +
+      "bo znacznik stawiało dopiero wejście w sprawę: dwie osoby odpowiadały " +
+      "na to samo pytanie i nikt się o tym nie dowiadywał. Zapis jest " +
+      "ZNACZNIKIEM, nie blokadą — nie odbiera nikomu dostępu — i dzieje się " +
+      "po jawnym kliknięciu w wierszu, nigdy przy wejściu na ekran.\n\n" +
       "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
       "podnosić — żaden zapis nie dzieje się przy samym patrzeniu."
   );
@@ -454,8 +460,12 @@ test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", (
   assert.ok(otwarcie, "pasek zakładek istnieje");
   assert.ok(otwarcie.index! < html.indexOf("</header>"),
     "pasek stoi w nagłówku — po to wyjechał z osobnego pasma");
-  assert.ok(otwarcie.index! < html.indexOf('id="chrome"'),
-    "pasek nie wrócił do `#chrome`, gdzie został sam pasek stanu");
+  /* Do 0.119.1 stała tu asercja „pasek nie wrócił do `#chrome`". Kotwica
+     zeszła razem z paskiem stanu — od tej wersji chromu jest JEDNO pasmo,
+     więc pilnujemy rzeczy mocniejszej: `#chrome` nie ma go w ogóle. Bez tego
+     ktoś odtworzy pasek pod nagłówkiem i nikt tego nie zauważy. */
+  assert.ok(!html.includes('id="chrome"'),
+    "pasek stanu nie wrócił jako drugie pasmo chromu");
   assert.match(otwarcie[0], /\bhidden\b/,
     "pasek startuje schowany — `#panel` już go nie zasłania");
 
@@ -465,15 +475,15 @@ test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", (
   }
 });
 
-test("pasek stanu niesie licznik odpowiedzi na notatki", () => {
-  /* Pasek widać z KAŻDEJ zakładki i to jest cały sens tego sygnału: do 0.57.0
+test("nagłówek niesie licznik odpowiedzi na notatki", () => {
+  /* Nagłówek widać z KAŻDEJ zakładki i to jest cały sens tego sygnału: do 0.57.0
      odpowiedź widać było wyłącznie po wejściu w tę konkretną dostawę, a biuro
      nie miało powodu tam wracać. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-  assert.match(html, /odpowiedziNaNotatki\.length/, "pasek stanu czyta licznik");
+  assert.match(html, /odpowiedziNaNotatki\.length/, "nagłówek czyta licznik");
   assert.match(html, /biuro\/notatki\/odpowiedzi/, "licznik ma własną trasę za sesją");
   /* Licznik jedzie przez `api()`, nie przez gołe `fetch` — i to jest cała
      różnica: `api()` dokłada `x-session`. Gdyby ktoś dołożył ten licznik do
@@ -736,6 +746,107 @@ test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
   assert.ok(wJs.length >= 2, "skrypt zna oba progi — trzy strefy i pasmo szuflady");
   for (const prog of wJs) {
     assert.ok(wCss.includes(prog), `próg ${prog} ze skryptu musi istnieć w arkuszu`);
+  }
+});
+
+test("pasma kolejki są WIDOKIEM sortu serwera, nie drugą regułą (0.121.0)", () => {
+  /* Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca pyta
+     „co teraz zrobić". Sort `poPilnosci` był poprawny już wcześniej — termin,
+     potem najstarsze — tylko nigdzie go nie było widać.
+
+     NIEBEZPIECZEŃSTWO, którego pilnuje ten test: gdyby pasma dostały własną
+     regułę kolejności, ekran pokazywałby jedno, a twierdził drugie. Warunki
+     muszą czytać DOKŁADNIE te pola, po których sortuje serwer. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const pasma = html.slice(html.indexOf("const PASMA = ["), html.indexOf("const pasmaZwiniete"));
+  assert.ok(pasma.length > 100, "definicja pasm istnieje");
+  for (const pole of ["poTerminie", "dniDoTerminu", "kiedy"]) {
+    assert.ok(pasma.includes(pole), `pasma czytają \`${pole}\` — pole, po którym sortuje serwer`);
+  }
+  assert.ok(!/\.sort\(/.test(pasma), "pasma nie sortują niczego na nowo");
+
+  /* Puste pasmo się NIE rysuje — nagłówek z zerem to ten sam błąd, co kolumna
+     z myślnikiem w każdym wierszu. Na produkcji oba pasma terminowe są puste,
+     bo `dniDoTerminu` niesie coś wyłącznie dla CLAIM-ów i reklamacji. */
+  assert.match(html, /\.filter\(\(p\) => \(wg\[p\.id\] \|\| \[\]\)\.length\)/,
+    "pasmo bez spraw nie rysuje nagłówka");
+  /* Pasmo, które można schować, przestaje być pasmem PO TERMINIE. */
+  assert.match(html, /p\.id !== "poterminie"/, "pasma po terminie nie da się zwinąć");
+});
+
+test("wiersz kolejki: cel klikalny i kolumny, które coś niosą (0.121.0)", () => {
+  /* Do 0.121.0 kolumny TERMIN i PROWADZI miały myślnik w KAŻDYM wierszu i to
+     nie było zapomnianą wartością: `dniDoTerminu` jest zawsze `null` dla pytań
+     i zwrotów, a `zwrot` w ogóle nie miał kolumny `prowadzi`. Kolumna niosąca
+     treść dla mniejszości wierszy uczy oko, że kolumny nic nie niosą.
+
+     Do tego 168 bursztynowych przycisków OTWÓRZ: bursztyn znaczy w tym
+     systemie „ta jedna rzecz do zrobienia" i powtórzony 168 razy przestaje
+     cokolwiek znaczyć. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  /* Kotwica na RENDERERACH KOLEJKI, nie na całym pliku: rejestry per-typ mają
+     te kolumny nadal i słusznie — w liście samych reklamacji TERMIN jest
+     wypełniony w każdym wierszu. Martwa była kolumna w liście MIESZANEJ. */
+  const kolejka = html.slice(html.indexOf("function wierszeSpraw"),
+    html.indexOf("function rysujCzipySpraw"));
+  assert.ok(kolejka.length > 200, "renderery wierszy kolejki istnieją");
+  assert.ok(!kolejka.includes("<th>"), "kolejka nie rysuje nagłówka kolumn — pasma go zastąpiły");
+  assert.ok(!kolejka.includes("OTWÓRZ"), "kolumna z bursztynowym OTWÓRZ zniknęła");
+  assert.match(html, /function stopkaSprawy/, "pastylki pokazują się tylko, gdy coś niosą");
+  assert.match(html, /tr\.sprawaRz \{ cursor: pointer/, "cały wiersz jest celem");
+  assert.match(html, /KLIENT DOPISAŁ/, "dopisek klienta ma własną pastylkę");
+  /* CLAIM ma ustawowy zegar 14 dni, zwykła dyskusja nie — jedna nazwa na dwie
+     różne pilności jest gorsza od dwóch nazw. */
+  assert.match(html, /s\.typ === "CLAIM"/, "CLAIM przestał wyglądać jak pogawędka");
+});
+
+test("przejęcie sprawy: znacznik, nie blokada, i jedna droga (0.121.0)", () => {
+  /* Przy 168 sprawach i kilku osobach w biurze kolumna PROWADZI miała myślnik
+     wszędzie, bo znacznik stawiało dopiero wejście w sprawę: dwie osoby
+     odpowiadały na to samo pytanie i nikt się o tym nie dowiadywał. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.match(html, /data-wez-rodzaj/, "wiersz niesie marker przejęcia");
+  assert.match(html, /\/prowadzi`,\s*\{ method: "POST"/, "przejęcie idzie jedną trasą spraw");
+  /* Cudza sprawa jest PRZYGASZONA, nie ukryta: widać, że ktoś ją wziął. */
+  assert.match(html, /tr\.sprawaRz\.cudza > td \{ opacity/, "cudza sprawa jest widoczna");
+  /* Nasłuch na SEKCJI, nie na przycisku: wiersze przerysowuje każdy cykl. */
+  assert.ok(
+    !/\$\("sprawyLista"\)\.addEventListener/.test(html),
+    "nasłuch nie wisi na liście — ta przerysowuje się co cykl"
+  );
+});
+
+test("alarmy i kosze w szynie: wiersz pionowy zamiast uciętej tabeli (0.121.0)", () => {
+  /* 352 px nie mieści sześciu kolumn i żadna przyszła karta tego nie zmieni.
+     Do 0.121.0 te trzy karty rysowały w szynie tabele ucięte w pół, każda
+     z własnym paskiem przewijania — na jednym ekranie cztery zagnieżdżone.
+
+     Zwijane rejestry per-typ zostają tabelami świadomie: mają po kilka kolumn,
+     mieszczą się (zmierzone), a ich kolumny niosą treść w każdym wierszu,
+     bo lista jest jednorodna. Reguła dotyczy tego, co stoi OTWARTE. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  for (const [lista, kolumna] of [
+    ["brakujaceLista", "NUMERY PACZEK"],
+    ["koszeLista", "ZAWARTOŚĆ"],
+    ["pominieteLista", "POWÓD"],
+  ]) {
+    const gdzie = html.indexOf(`$("${lista}").innerHTML`);
+    assert.ok(gdzie > 0, `${lista} ma renderer`);
+    const blok = html.slice(gdzie, gdzie + 1600);
+    assert.ok(!blok.includes(`<th>${kolumna}</th>`), `${lista} nie rysuje już nagłówka tabeli`);
+    assert.ok(blok.includes("sprawaWiersz"), `${lista} rysuje wiersz pionowy szyny`);
   }
 });
 
@@ -1252,14 +1363,20 @@ test("sprawy: jedna kolejka czterech rejestrów, karta klienta drugim poziomem (
   /* Osią pracy jest SPRAWA, nie klient: kolejka odpowiada na „co mam teraz
      zrobić?" jedną listą pytań, zwrotów, dyskusji i reklamacji. Karta
      klienta (360) otwiera się klikiem w login — z kolejki albo z nagłówka
-     otwartej sprawy. Wszystko tu wyłącznie CZYTA: liczniki POST/PUT/DELETE
-     wyżej pilnują, że zakładka nie przemyciła żadnego zapisu. */
+     otwartej sprawy. Zakładka czyta wszystko poza JEDNYM zapisem — przejęciem
+     sprawy (0.121.0) — a liczniki POST/PUT/DELETE wyżej pilnują, że nie
+     przemyciła żadnego innego. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
   assert.match(html, /id="kolejkaSprawKarta"/, "kolejka spraw jest kartą sekcji");
-  assert.match(html, /api\(`\/api\/biuro\/sprawy\$\{q\}`\)/, "kolejka czyta agregat przez api()");
+  /* Od 0.121.0 BEZ `?rodzaj=`: kolejka pobiera cały agregat i filtruje na
+     miejscu, bo inaczej czipy nie mają skąd wziąć liczb, a czip MOJE — swoich
+     spraw. Jedno zapytanie zamiast jednego na każde kliknięcie czipa. */
+  assert.match(html, /api\("\/api\/biuro\/sprawy"\)/, "kolejka czyta cały agregat przez api()");
+  assert.ok(!/\?rodzaj=\$\{encodeURIComponent\(sprawyFiltr\)\}/.test(html),
+    "filtr rodzaju jest stanem ekranu, nie zapytaniem");
   assert.match(html, /id="sprawyLicznik" class="tabLicznik"/, "pigułka na zakładce");
   assert.match(html, /\/api\/biuro\/sprawy\/licznik/, "pigułka ma własną tanią trasę");
   assert.match(html, /BEZ LOGINU/, "sprawy bez konta Allegro mają kubełek, nie nicość");
@@ -1371,8 +1488,26 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   // 2. Dwie ikony w pasku, każda z natywnym tooltipem i nawigacją z sekcji.
   assert.match(html, /id="ikonaZdrowia"/, "zdrowie systemu to jedna ikona, nie rząd kafli");
   assert.match(html, /id="ikonaAllegro"/, "wejście do parowania stoi w pasku na górze");
+  /* Obie ikony stoją W NAGŁÓWKU (0.119.1), nie w osobnym pasku pod nim. */
+  assert.ok(html.indexOf('id="ikonaZdrowia"') < html.indexOf("</header>"),
+    "ikona zdrowia mieszka w nagłówku");
+  assert.ok(html.indexOf('id="ikonaAllegro"') < html.indexOf("</header>"),
+    "ikona Allegro mieszka w nagłówku");
+  /* Nagłówek nie chowa się razem z `#panel`, więc ikony muszą chować się same —
+     inaczej świecą nad formularzem logowania, jak zakładki przed 0.95.0. */
+  assert.match(html, /const IKONY_STANU = /, "ikony mają jedną listę na trzy miejsca");
+  for (const co of ["hidden = true", "hidden = false"]) {
+    assert.ok(html.includes(`for (const id of IKONY_STANU) $(id).${co}`),
+      `ikony stanu same pilnują swojej widoczności (${co})`);
+  }
   assert.match(html, /ik\.title = linie\.join\("\\n"\)/, "tooltip niesie pełne zdania kafli");
-  assert.match(html, /\$\("chrome"\)\.addEventListener\("click"/, "pasek deleguje z sekcji #chrome");
+  /* DELEGACJA WYJECHAŁA RAZEM Z IKONAMI (0.119.1) i to jest cała treść tej
+     asercji. Zostawiona na `#chrome` byłaby szóstą odsłoną usterki z 0.92.0,
+     0.96.0, 0.97.0, 0.98.0 i 0.101.0 — tyle że tym razem głośną: `#chrome`
+     już nie istnieje, więc `$(…)` zwraca `null` i wywala cały skrypt. */
+  assert.match(html, /document\.querySelector\("header"\)\.addEventListener\("click"/,
+    "pasek deleguje z nagłówka — stamtąd, gdzie stoją ikony");
+  assert.ok(!/\$\("chrome"\)/.test(html), "nic już nie sięga po nieistniejący #chrome");
   assert.ok(
     !/\$\("stan"\)\.addEventListener/.test(html),
     "nasłuch nie wisi na #stan — to pojemnik przerysowywany co cykl"
