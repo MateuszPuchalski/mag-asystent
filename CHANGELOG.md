@@ -33,6 +33,75 @@ historii nie przepisujemy.
 
 ---
 
+## 0.118.0 — 28 sierpnia 2026
+
+**Panel pozycji kosza zwrotów mówi wreszcie, gdzie ten towar jest.** Dwie
+zmiany z hali: wszystkie półki zamiast samej pickingowej i stany magazynowe,
+które widać.
+
+**Kosz zwrotów pokazuje wszystkie półki towaru, nie samą pickingową.** Kartoteka
+Subiekta trzyma kilka adresów rozdzielonych spacjami, a kolektor czytał z tego
+pola wyłącznie pierwszy. Przy dostawie to wystarcza — karton jedzie tam, gdzie
+towar ma być. Przy zwrocie nie: wraca jedna sztuka i najtaniej dołożyć ją tam,
+gdzie ten towar JUŻ leży, bo półka pickingowa bywa pełna albo stoi w drugim
+końcu hali.
+
+Pozostałe adresy stoją teraz pod tym dużym, jako pastylki. **Dotknięcie wpisuje
+adres w pole niżej, nie odkłada** — odłożenie zostaje przy skanie regału
+i przycisku, bo dotknięcie jednego z kilku adresów obok siebie w rękawicy jest
+zbyt tanie na czynność nieodwracalną.
+
+Do tej wersji po tę samą wiedzę trzeba było wyjść z kosza do karty towaru,
+czyli zgubić wskazaną pozycję i wrócić do niej skanem.
+
+Lista adresów jest **żywa tak samo jak adres pickingowy**: zadanie czekające
+w kolejce liczy się, zanim worker dopisze je do Subiekta. Serwer wyprowadza
+obie rzeczy z jednego miejsca (`poleAdresow`), więc nie ma jak się rozjechać —
+pokazujemy to, co BĘDZIE w kartotece, bo zapis jest opóźniony, nie niepewny.
+
+**Stany magazynowe przestały być przypisem.** Stały pod adresem jako linijka
+`MAG 12 · ZWR 3` drobnym, przygaszonym drukiem — a to jest liczba, na której
+stoi decyzja: ile z tego kosza zostało jeszcze na regale zwrotów i czy na hali
+w ogóle coś leży. Teraz każdy magazyn ma własny kafelek z liczbą w 20 sp
+i kodem jako podpisem: pytanie brzmi „ile", a „gdzie" tylko rozstrzyga, którego
+magazynu dotyczy.
+
+**Regał zwrotów świeci bursztynem**, bo to jego licznik schodzi do zera w miarę
+rozkładania. Kolektor poznaje go po ROLI z serwera, nie po kodzie — kod jest
+napisem z konfiguracji klienta i porównywanie go w interfejsie byłoby magicznym
+łańcuchem, który psuje się przy pierwszej zmianie w Subiekcie.
+
+## 0.117.0 — 27 sierpnia 2026
+
+**Filtr w otwartej dostawie wybacza to samo, co wyszukiwarka.** Zgłoszenie
+z hali brzmiało „szukanie nie działa" i było trafne: pole nad listą pozycji
+porównywało wpisany tekst DOSŁOWNIE, przez zwykłe „zawiera" na małych literach.
+Wystarczyło każde z czterech odstępstw, które w magazynie są normą, żeby lista
+wyszła pusta przy towarze leżącym w kartonie:
+
+- `gaznik` nie znajdował `Gaźnika` — ogonków przy palecie nikt nie pisze,
+- `ls51139` nie znajdował `LS51-139` — myślnik jest ozdobnikiem, nie treścią,
+- `kosa spalin` nie znajdowało `Spalinowej kosy` — kolejność słów jest luźna,
+- `gaznk` nie znajdowało niczego — literówka w rękawicy zdarza się co chwilę.
+
+Serwer rozwiązał to samo dawno, dla wyszukiwarki kartotek. Te reguły przeszły
+teraz do modułu `:core` i **filtr kolektora liczy dopasowanie dokładnie tak
+samo**: składa polskie znaki, zwija myślniki i spacje w symbolach, a każde
+słowo zapytania musi trafić osobno — w symbol albo w nazwę. Dwie różne
+odpowiedzi na „czy ten towar pasuje" byłyby gorsze niż brak jednej: ten sam
+towar szukany dwoma polami dawałby dwa różne wyniki.
+
+**Literówka wchodzi DOPIERO przy zerze wyników** i to jest cała jej bezpieczna
+postać — tak samo jak na serwerze. Dopasowanie rozmyte wmieszane w wynik
+dosłowny wciąga sąsiadów (`gaz` łapie `gips`) i psuje trafienie, które było
+dobre. Krótkie słowa nie mają do niej prawa wcale: jeden błąd na trzech znakach
+dopasowuje pół kartoteki.
+
+Ta sama zmiana obejmuje pole filtra na **liście faktur** — `fz214` znajduje
+`FZ 214/MAG/08/2026`, a `ogrod` firmę `OGRÓD-POL`. Kolejność listy zostaje
+nietknięta: filtr zawęża, a nie sortuje, bo trasa alejkami i grupa zrobionych
+należą do rozkładania, nie do szukania.
+
 ## 0.116.0 — 27 sierpnia 2026
 
 **Zakładka SPRAWY: jedna kolejka zamiast trzech, konsola na wysokość okna.**

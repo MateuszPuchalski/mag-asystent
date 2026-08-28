@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,12 +43,14 @@ import pl.wertis.kolektor.core.net.KoszView
 import pl.wertis.kolektor.core.net.OdlozKoszBody
 import pl.wertis.kolektor.core.net.PominKoszBody
 import pl.wertis.kolektor.core.net.ScanBody
+import pl.wertis.kolektor.core.net.StanMagazynu
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
+import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.LokPastylka
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
@@ -575,6 +579,7 @@ private fun PozycjaRow(
    samo wcięcie i odstęp od dołu. Osobna karta rozrywała jedną myśl na dwie
    i to było widać gołym okiem.                                              */
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PanelPozycji(
     p: KoszPozycja,
@@ -612,14 +617,59 @@ private fun PanelPozycji(
             fontSize = 28.sp,
             color = if (p.lokOczekiwana == null) AmberInk else Ink,
         )
-        /* Gdzie tego jeszcze jest. Przy zwrocie najczęściej czyta się drugą
-           liczbę: ile z tego kosza zostało jeszcze na regale zwrotów. */
+        /* POZOSTAŁE PÓŁKI TEGO TOWARU (0.118.0). Kartoteka trzyma kilka adresów,
+           a kolektor pokazywał tu wyłącznie pierwszy — pickingowy. Przy zwrocie
+           to za mało: wraca jedna sztuka i najtaniej dołożyć ją tam, gdzie ten
+           towar już leży, bo półka pickingowa bywa pełna albo stoi w drugim
+           końcu hali. Do tej wersji trzeba było po to wyjść z kosza do karty
+           towaru — czyli zgubić wskazaną pozycję.
+
+           Pastylka WPISUJE adres w pole niżej, nie odkłada. Odłożenie zostaje
+           przy skanie regału i przycisku: dotknięcie jednego z kilku adresów
+           obok siebie w rękawicy jest zbyt tanie na czynność nieodwracalną. */
+        val innePolki = p.lokalizacje.filter { it != p.lokOczekiwana }
+        if (innePolki.isNotEmpty()) {
+            Text(
+                "LEŻY TAKŻE NA — DOTKNIJ, ABY WPISAĆ",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                color = InkSoft,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                innePolki.forEach { kod -> LocChip(kod, primary = false) { onAdres(kod) } }
+            }
+        }
+        /* STANY JAKO KAFELKI, nie jako linijka drobnym drukiem (0.118.0).
+           Ze zgłoszenia: „stany magazynowe powinny być bardziej widoczne".
+           Napis `MAG 12 · ZWR 3` w 12 sp przygaszonym szarym czytało się jak
+           przypis, a to jest liczba, na której stoi decyzja: ile z tego kosza
+           zostało jeszcze na regale zwrotów i czy na hali w ogóle coś leży.
+
+           REGAŁ ZWROTÓW świeci bursztynem, bo to jego licznik schodzi do zera
+           w miarę rozkładania. Poznajemy go po ROLI z serwera, nie po kodzie —
+           kod jest napisem z konfiguracji klienta i porównywanie go tutaj
+           byłoby magicznym łańcuchem psującym się przy zmianie w Subiekcie. */
         Text(
-            if (p.stany.isEmpty()) "brak stanu w magazynach"
-            else p.stany.joinToString(" · ") { "${it.kod} ${formatQty(it.stan)}" },
-            fontSize = 12.sp,
-            color = InkMute,
+            "STANY MAGAZYNOWE",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = InkSoft,
         )
+        if (p.stany.isEmpty()) {
+            Text("brak stanu w magazynach", fontSize = 13.sp, color = InkMute)
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                p.stany.forEach { s -> KafelStanu(s) }
+            }
+        }
         p.zlotaStrefa?.let { z ->
             Text(
                 "Strefa złota: ${z.zbiorekNaDzien} zbiórek dziennie · poziomy ${z.poziomy}",
@@ -654,6 +704,42 @@ private fun PanelPozycji(
             OutlineButton("PÓŹNIEJ — NA KONIEC LISTY", modifier = Modifier.fillMaxWidth(), onClick = onPozniej)
             OutlineButton("POMIŃ — NIE MA CZEGO ODŁOŻYĆ", modifier = Modifier.fillMaxWidth(), onClick = onPomin)
         }
+    }
+}
+
+/**
+ * Jeden magazyn ze stanem — liczba czytana z odległości ramienia.
+ *
+ * Kod magazynu jest podpisem pod liczbą, nie odwrotnie: pytanie brzmi „ile",
+ * a „gdzie" ma tylko rozstrzygnąć, o którym magazynie mowa.
+ */
+@Composable
+private fun KafelStanu(s: StanMagazynu) {
+    val zwroty = s.rola == "ZWROTY"
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (zwroty) AmberBg else CardWhite)
+            .border(1.dp, if (zwroty) AmberLine else CardBorder, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            formatQty(s.stan),
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 20.sp,
+            color = if (zwroty) AmberInk else Ink,
+            maxLines = 1,
+        )
+        Text(
+            s.kod,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.6.sp,
+            color = if (zwroty) AmberInk else InkSoft,
+            maxLines = 1,
+        )
     }
 }
 

@@ -80,6 +80,7 @@ import pl.wertis.kolektor.core.net.OdpowiedzBody
 import pl.wertis.kolektor.core.net.ScanResolution
 import pl.wertis.kolektor.core.net.ZakonczenieDostawy
 import pl.wertis.kolektor.core.scan.ScanKind
+import pl.wertis.kolektor.core.text.filtrujSzukaniem
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.core.text.iloscZWpisu
@@ -437,10 +438,13 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        Filtruje tylko WIDOK. Kolejność alejkowa, sekcja „bez lokalizacji"
        i liczniki postępu liczą się z pełnej listy — inaczej „7 z 10" zmieniałoby
        się przy pisaniu w polu, a to jest stan dostawy, nie stan ekranu. */
-    val szukaneN = szukane.trim().lowercase()
-    val widoczne = if (szukaneN.isEmpty()) v.lines else v.lines.filter {
-        it.sym.lowercase().contains(szukaneN) || it.name.lowercase().contains(szukaneN)
-    }
+    val szukaneN = szukane.trim()
+    /* Dopasowanie liczy `:core` — te same reguły, co w wyszukiwarce serwera
+       (`filtrujSzukaniem` → `server/src/tekst.ts`). Do 0.117.0 stało tu gołe
+       `contains` na małych literach i pole wyglądało na zepsute za każdym
+       razem, gdy człowiek napisał „gaznik" zamiast „Gaźnik" albo „ls51139"
+       zamiast „LS51-139". */
+    val widoczne = filtrujSzukaniem(v.lines, szukaneN, { it.sym }, { it.name })
     val uporzadkowane =
         uporzadkujPozycje(widoczne, { it.status }, { it.locExpected }, { it.doneAt })
     val bezLok = czekaBezLokalizacji(v.lines, { it.status }, { it.locExpected })

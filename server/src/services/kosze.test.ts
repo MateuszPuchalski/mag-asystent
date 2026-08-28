@@ -215,9 +215,18 @@ test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
     [["MAG", 12], ["ZWR", 3]],
     "magazyn ze stanem zero nie jest odpowiedzią na żadne pytanie przy półce"
   );
+  /* ROLA jedzie razem ze stanem (0.118.0): kolektor wyróżnia po niej regał
+     zwrotów, bo to jego licznik schodzi do zera w miarę rozkładania. Kod
+     magazynu jest napisem z konfiguracji klienta, więc rozpoznawanie po nim
+     byłoby magicznym łańcuchem psującym się przy zmianie w Subiekcie. */
+  assert.deepEqual(
+    p.stany.map((s) => s.rola),
+    ["MAG", "ZWROTY"]
+  );
   // magazyn bez roli też się liczy — towar bywa u serwisu
   const drugi = kosz.pozycje.find((x) => x.twId === 900_037);
   assert.deepEqual(drugi?.stany.map((s) => s.kod), ["SERW"]);
+  assert.deepEqual(drugi?.stany.map((s) => s.rola), [null], "magazyn bez roli mówi null");
 });
 
 test("pominięcie: powód obowiązkowy, ZAKOŃCZ przechodzi, MM tylko dla odłożonych", async () => {
@@ -415,5 +424,30 @@ test("odłożona pozycja zjeżdża na koniec listy, kolejna zostaje na górze", 
   assert.deepEqual(
     K.szczegolKosza(kosz.id).pozycje.map((p) => [p.id, p.status]),
     [[pierwsza.id, "todo"], [druga.id, "skipped"]]
+  );
+});
+
+test("pozycja niesie WSZYSTKIE półki towaru, pickingową pierwszą", async () => {
+  /* Zwrot wraca pojedynczo i najtaniej dołożyć go tam, gdzie ten towar już
+     leży. Kolektor znał dotąd sam adres pickingowy, więc po resztę trzeba było
+     wyjść z kosza do karty towaru — czyli zgubić wskazaną pozycję. */
+  db().prepare("UPDATE sgt_towar SET lokalizacja=? WHERE tw_id=?")
+    .run("A01-02-03 B04-01-02", 900_036);
+  const id = await zwrotZDokumentami();
+  K.przypnijZwrot(id, "KZ-01", "Test");
+  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+
+  const p = kosz.pozycje.find((x) => x.twId === 900_036);
+  assert.deepEqual(p?.lokalizacje, ["A01-02-03", "B04-01-02"]);
+  assert.equal(p?.lokOczekiwana, "A01-02-03", "pickingowa zostaje adresem docelowym");
+  // towar bez adresu w kartotece nie dostaje zgadywanki, tylko pustkę
+  assert.deepEqual(kosz.pozycje.find((x) => x.twId === 900_037)?.lokalizacje, []);
+
+  /* Lista jest ŻYWA tak samo jak adres pickingowy: zadanie czekające
+     w kolejce liczy się, zanim worker dopisze je do Subiekta. */
+  K.odlozPozycje(p!.id, "C09-09-09", "Magazynier");
+  assert.deepEqual(
+    K.szczegolKosza(kosz.id).pozycje.find((x) => x.twId === 900_036)?.lokalizacje,
+    ["C09-09-09", "B04-01-02"]
   );
 });

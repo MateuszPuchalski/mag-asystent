@@ -952,6 +952,12 @@ data class StanMagazynu(
     /** Kod magazynu z Subiekta — ten sam napis, który biuro widzi u siebie. */
     val kod: String = "",
     val stan: Double = 0.0,
+    /**
+     * `MAG` | `MGP` | `ZWROTY` | null — po roli, nie po kodzie, poznaje się
+     * regał zwrotów. Kod jest napisem z konfiguracji klienta i porównywanie go
+     * w interfejsie byłoby magicznym łańcuchem. Pusta = starszy serwer.
+     */
+    val rola: String? = null,
 )
 
 @Serializable
@@ -979,6 +985,14 @@ data class KoszPozycja(
     val pozniejAt: String? = null,
     /** Adres ŻYWY z kartoteki (serwer koryguje o kolejkę) — nie snapshot. */
     val lokOczekiwana: String? = null,
+    /**
+     * Wszystkie adresy tego towaru, pickingowy pierwszy; pusta = starszy serwer.
+     *
+     * Zwrot wraca pojedynczo i najtaniej dołożyć go tam, gdzie ten towar już
+     * leży — półka pickingowa bywa pełna albo daleko od miejsca, w którym
+     * magazynier akurat stoi.
+     */
+    val lokalizacje: List<String> = emptyList(),
     val lokFaktyczna: String? = null,
     val mmStatus: String? = null,
 )

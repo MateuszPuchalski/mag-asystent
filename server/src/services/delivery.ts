@@ -263,21 +263,25 @@ interface ZadanieAdresu {
 }
 
 /**
- * Adres oczekiwany dla kompletu towarów — kartoteka skorygowana o kolejkę.
+ * Pole `tw_Lokalizacja` dla kompletu towarów — kartoteka skorygowana o kolejkę.
  *
  * Ta sama zasada, którą stosuje już karta towaru i zawartość regału: pokazujemy
  * to, co BĘDZIE w Subiekcie, bo zapis jest tylko opóźniony, nie niepewny.
  * Zadanie w błędzie też się liczy — towar fizycznie leży tam, gdzie ktoś go
  * położył, niezależnie od tego, czy zapis przeszedł.
+ *
+ * Zwraca CAŁE pole, nie sam adres pickingowy: zadanie z kolejki nadpisuje je
+ * w całości, więc korekta liczy się raz i tak samo dla obu czytelników —
+ * `adresyOczekiwane` (pierwszy kod) i `adresyWszystkie` (wszystkie).
  */
-export function adresyOczekiwane(twIds: number[]): Map<number, string | null> {
-  const out = new Map<number, string | null>();
+function poleAdresow(twIds: number[]): Map<number, string> {
+  const out = new Map<number, string>();
   if (twIds.length === 0) return out;
 
   for (const [twId, pole] of subiekt.lokalizacjeDlaTowarow(twIds)) {
-    out.set(twId, pickingLoc(pole));
+    out.set(twId, pole ?? "");
   }
-  for (const twId of twIds) if (!out.has(twId)) out.set(twId, null);
+  for (const twId of twIds) if (!out.has(twId)) out.set(twId, "");
 
   const dziury = twIds.map(() => "?").join(",");
   const luki = LOC_W_TOKU.map(() => "?").join(",");
@@ -296,12 +300,33 @@ export function adresyOczekiwane(twIds: number[]): Map<number, string | null> {
 
   for (const z of zadania) {
     try {
-      const cel = pickingLoc((JSON.parse(z.payload) as { newValue?: string }).newValue ?? "");
-      if (cel) out.set(z.tw_id, cel);
+      const cel = (JSON.parse(z.payload) as { newValue?: string }).newValue ?? "";
+      if (pickingLoc(cel)) out.set(z.tw_id, cel);
     } catch {
       // zadanie z popsutym payloadem nie ma prawa zepsuć adresu całej listy
     }
   }
+  return out;
+}
+
+/** Adres pickingowy (pierwszy kod) dla kompletu towarów. */
+export function adresyOczekiwane(twIds: number[]): Map<number, string | null> {
+  const out = new Map<number, string | null>();
+  for (const [twId, pole] of poleAdresow(twIds)) out.set(twId, pickingLoc(pole));
+  return out;
+}
+
+/**
+ * WSZYSTKIE adresy, na których towar leży — pickingowy jako pierwszy.
+ *
+ * Kartoteka trzyma ich kilka rozdzielonych spacjami (`locs.ts`), a do 0.118.0
+ * czytaliśmy z tego pola wyłącznie pierwszy kod. Przy zwrocie to za mało:
+ * sztuka wraca pojedynczo i najtaniej dołożyć ją tam, gdzie ten towar już
+ * leży — niekoniecznie na półkę pickingową, która bywa pełna.
+ */
+export function adresyWszystkie(twIds: number[]): Map<number, string[]> {
+  const out = new Map<number, string[]>();
+  for (const [twId, pole] of poleAdresow(twIds)) out.set(twId, parseLocs(pole));
   return out;
 }
 

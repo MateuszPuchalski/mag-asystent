@@ -40,6 +40,7 @@ import pl.wertis.kolektor.core.delivery.stanDokumentu
 import pl.wertis.kolektor.core.delivery.uporzadkujDokumenty
 import pl.wertis.kolektor.core.net.DeliveryDocument
 import pl.wertis.kolektor.core.net.DeliveryDocumentsResponse
+import pl.wertis.kolektor.core.text.filtrujSzukaniem
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -130,12 +131,11 @@ fun DeliveryDocumentsScreen(graph: AppGraph) {
        Kolejność (do dokończenia → nowe → ukończone) liczy się PO odsianiu, więc
        wynik szukania zachowuje ten sam porządek co pełna lista — inaczej ta sama
        faktura stałaby raz wyżej, raz niżej, zależnie od wpisanego tekstu. */
-    val szukaneN = szukane.trim().lowercase()
+    val szukaneN = szukane.trim()
+    /* To samo dopasowanie co w otwartej dostawie i na serwerze: „fz214" ma
+       znaleźć „FZ 214/MAG/08/2026", a „ogrod" — „OGRÓD-POL". */
     val dostawy = uporzadkujDokumenty(
-        if (szukaneN.isEmpty()) r.documents
-        else r.documents.filter {
-            it.nrPelny.lowercase().contains(szukaneN) || it.dostawca.lowercase().contains(szukaneN)
-        }
+        filtrujSzukaniem(r.documents, szukaneN, { it.nrPelny }, { it.dostawca })
     )
 
     Column(
