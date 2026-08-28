@@ -854,7 +854,39 @@ function przeliczStatus(zwrotId: number): void {
     .get(zwrotId) as { zwrot_srodkow_at: string | null };
   const oceniony = c.pozycji > 0 && (c.bez ?? 0) === 0;
   const status = oceniony ? (z.zwrot_srodkow_at ? "rozliczony" : "oceniony") : "nowy";
+  /* Rozliczenie czyści znacznik prowadzenia: sprawa zamknięta nie ma kogo
+     prowadzić, a nazwisko przy niej sugerowałoby, że ktoś jeszcze przy niej
+     siedzi. Ta sama reguła, co przy pytaniu (wysyłka) i reklamacji (werdykt). */
+  if (status === "rozliczony") {
+    d.prepare("UPDATE zwrot SET status=?, prowadzi=NULL, prowadzi_at=NULL WHERE id=?")
+      .run(status, zwrotId);
+    return;
+  }
   d.prepare("UPDATE zwrot SET status=? WHERE id=?").run(status, zwrotId);
+}
+
+/**
+ * Kto prowadzi ten zwrot. ZNACZNIK, NIE BLOKADA — dokładnie jak
+ * `pytanie.prowadzi` (0.89.0) i `zwrot_pozycja.rekl_prowadzi` (0.98.0):
+ * mówi „ktoś to wziął", a nie „tobie nie wolno". Przy 168 sprawach w kolejce
+ * i kilku osobach w biurze to jedyna ochrona przed dwiema odpowiedziami na
+ * to samo zgłoszenie.
+ *
+ * Rozliczony zwrot nie ma kogo prowadzić — stempel na nim jest odmową, nie
+ * cichym brakiem skutku, żeby klik w kolejce po odświeżeniu nie kłamał.
+ */
+export function stempelProwadziZwrotu(zwrotId: number, autor: string): void {
+  const z = db()
+    .prepare("SELECT id, status FROM zwrot WHERE id = ?")
+    .get(zwrotId) as { id: number; status: string } | undefined;
+  if (!z) throw new BladZwrotu(404, `Zwrot ${zwrotId} nie istnieje`);
+  if (z.status === "rozliczony") {
+    throw new BladZwrotu(400, "Zwrot jest rozliczony — nie ma czego prowadzić");
+  }
+  db()
+    .prepare("UPDATE zwrot SET prowadzi=?, prowadzi_at=datetime('now') WHERE id=?")
+    .run(autor, zwrotId);
+  logEvent("zwrot_prowadzi", autor, null, { zwrotId });
 }
 
 // ── Odczyty ─────────────────────────────────────────────────────────────────

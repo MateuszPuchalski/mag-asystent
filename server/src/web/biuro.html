@@ -580,6 +580,91 @@
     background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700;
   }
 
+  .glowaKolejki { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .glowaKolejki > p { margin: 0; }
+  .narzedziaKolejki { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+  .ikonka {
+    display: inline-flex; align-items: center; gap: 6px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px 5px 9px;
+    color: var(--ink-soft); font: 600 12px/1 var(--font-cond); letter-spacing: .5px;
+    cursor: pointer;
+  }
+  .ikonka:hover { border-color: var(--ink-mute); color: var(--ink); }
+  .ikonka[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .ikonka svg { width: 14px; height: 14px; }
+  /* Pas blokady: jedno zdanie o SKUTKU dla pracy (nie o stanie technicznym —
+     „token wygasł" nie mówi nikomu, że kolejka stoi) i jedna akcja, która go
+     zdejmuje. */
+  #sprawyBlokada {
+    display: flex; align-items: center; gap: 12px; background: var(--err-bg);
+    border-left: 4px solid var(--err); border-radius: 0 8px 8px 0;
+    padding: 11px 14px; margin-bottom: 14px;
+  }
+  #sprawyBlokada .czemu { display: block; color: var(--err); font-size: 12px; margin-top: 2px; }
+  #sprawyBlokada .akcja { margin-left: auto; flex: none; }
+
+  /* ── Kolejka spraw: pasma i wiersz (0.120.0) ───────────────────────────────
+     Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca pyta
+     „co teraz zrobić". Pasma rysują granice tam, gdzie sort `poPilnosci`
+     i tak je stawiał — nagłówek jest wierszem tabeli, więc kolumny wierszy
+     pod nim zostają wyrównane. */
+  tr.pasmoRz > td { padding: 0; border-bottom: 0; }
+  tr.pasmoRz + tr.sprawaRz > td { border-top: 1px solid var(--border); }
+  .pasmoGlowa {
+    display: flex; align-items: center; gap: 9px; width: 100%; background: none;
+    border: 0; border-bottom: 1px solid var(--border); padding: 12px 2px 7px 0;
+    cursor: pointer; text-align: left; font-family: inherit;
+  }
+  .pasmoGlowa:hover { border-bottom-color: var(--ink-mute); }
+  .pasmoGlowa[disabled] { cursor: default; }
+  .pasmoGlowa .strzalka { color: var(--ink-mute); font-size: 11px; width: 10px; flex: none; }
+  .pasmoGlowa[disabled] .strzalka { visibility: hidden; }
+  .nazwaPasma { font: 700 12px/1.4 var(--font-cond); letter-spacing: 1.1px;
+                text-transform: uppercase; color: var(--ink); }
+  .ilePasma { font: 700 12px/1 var(--font-cond); color: var(--ink-mute);
+              background: var(--secondary); border-radius: 999px; padding: 3px 9px; }
+  .czemuPasmo { margin-left: auto; color: var(--ink-mute); font-size: 12px; }
+  tr.pasmoRz.pilne .pasmoGlowa { border-bottom-color: var(--err); }
+  tr.pasmoRz.pilne .nazwaPasma { color: var(--err); }
+  tr.pasmoRz.pilne .ilePasma { background: var(--err-bg); color: var(--err); }
+  tr.pasmoRz.termin .pasmoGlowa { border-bottom-color: var(--amber-line); }
+  tr.pasmoRz.termin .ilePasma { background: var(--amber-bg); color: var(--amber-ink); }
+
+  /* Wiersz: klika się CAŁY. Kolumna z bursztynowym OTWÓRZ zniknęła — bursztyn
+     znaczy „ta jedna rzecz do zrobienia", a 168 takich przycisków przestawało
+     cokolwiek znaczyć i zabierało prawą krawędź tabeli. */
+  tr.sprawaRz { cursor: pointer; }
+  tr.sprawaRz:hover > td { background: var(--paper); }
+  tr.sprawaRz.aktywny > td { background: var(--amber-bg); }
+  tr.sprawaRz.poTerminie > td { background: var(--err-bg); }
+  /* Cudza sprawa jest PRZYGASZONA, nie ukryta: widać, że ktoś ją wziął. */
+  tr.sprawaRz.cudza > td { opacity: .55; }
+  td.kTyp { width: 92px; }
+  td.kKlient { width: 152px; }
+  td.kWiek { width: 74px; text-align: right; color: var(--ink-mute); white-space: nowrap;
+             font-weight: 600; }
+  td.kKoniec { width: 118px; text-align: right; }
+  .klientChip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                font-size: 11.5px; padding: 3px 9px; border-radius: 12px; }
+  /* Dwie linijki zamiast ucięcia na 90 znakach — miejsce wzięte z dwóch
+     martwych kolumn, które w 0.120.0 zeszły do pastylek. */
+  .tresc2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; line-height: 1.4; }
+  .stopkaSprawy { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+                  margin-top: 5px; }
+  button.akcja.cichy.wezme { padding: 5px 11px; font-size: 11.5px; border-radius: 10px; }
+  .prowadzi { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+              font: 700 11.5px/1.4 var(--font-sans); color: var(--amber-ink); }
+  .prowadzi i { width: 6px; height: 6px; border-radius: 999px; background: var(--amber);
+                flex: none; }
+  .prowadzi.obcy { color: var(--ink-mute); }
+  .prowadzi.obcy i { background: var(--ink-mute); }
+  /* Czip z zerem zostaje na miejscu, tylko przygaszony: znikający czip zmienia
+     szerokość rzędu przy każdym odświeżeniu i gubi miejsce pod kursorem. */
+  .czip .n { font-weight: 700; margin-left: 5px; opacity: .75; }
+  .czip.pustyCzip { color: var(--ink-mute); opacity: .55; }
+  .czip.moje[aria-pressed="true"] { background: var(--amber-ink); border-color: var(--amber-ink); }
+
   /* ── Stan jako kropka i słowo ───────────────────────────────────────────────
      Wypełniona pigułka krzyczy, a stan zwykły nie ma czego krzyczeć: pięć
      pigułek w wierszu przestaje być sygnałem i robi się tapetą. Kropka niesie
@@ -1243,26 +1328,45 @@
           Rejestry per-typ, razem z archiwum, stoją w szynie obok.
         </p>
       </div>
-      <p id="sprawyPodsumowanie" style="margin-bottom:9px"></p>
+      <!-- ALARM BLOKUJĄCY PRACĘ (0.120.0). Do tej wersji „konto niesparowane"
+           stało jako szara notka w szynie rejestrów — a to jest najważniejszy
+           fakt na ekranie: sprawy czekają i NIE DA SIĘ odpowiedzieć na żadną.
+           Pas pokazuje się TYLKO wtedy, gdy praca jest naprawdę zablokowana,
+           i nigdy nie ma dwóch naraz — inaczej za tydzień będzie tapetą jak
+           rząd kafli, który zniknął w 0.114.0. -->
+      <div id="sprawyBlokada" hidden></div>
 
-      <!-- DWA WEJŚCIA DO SPRAWY, oba w głowie kolejki, bo oba kończą się
-           otwartą sprawą — a nie krótszą listą. Skan jest wejściem od paczki
-           (praca ze zwrotem ZACZYNA się od etykiety), wyszukiwarka wejściem
-           od klienta, który dzwoni. Czipy niżej robią co innego: zawężają tę
-           samą listę, więc stoją przy niej, nie tutaj. -->
-      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu" style="width:100%">
-      <div id="zwrotSkanWynik" style="margin-top:8px"></div>
+      <div class="glowaKolejki">
+        <p id="sprawyPodsumowanie"></p>
+        <!-- DWA WEJŚCIA DO SPRAWY zwinięte do ikon (0.120.0). Oba kończą się
+             otwartą sprawą, a nie krótszą listą: skan jest wejściem od paczki,
+             wyszukiwarka od klienta, który dzwoni. Rozwinięte na stałe zajmowały
+             ~110 px najcenniejszego miejsca — zawsze puste, dla zadań rzadkich
+             w porównaniu z pracą nad kolejką, i spychały pierwszy wiersz pod
+             krawędź. Czipy niżej robią co innego: zawężają tę samą listę. -->
+        <div class="narzedziaKolejki">
+          <button class="ikonka" id="narzScan" aria-pressed="false" title="Skan etykiety zwrotu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M11 8v8M15 8v8M18 8v8"/></svg>
+            SKAN ETYKIETY
+          </button>
+          <button class="ikonka" id="narzKlient" aria-pressed="false" title="Znajdź klienta po loginie">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            ZNAJDŹ KLIENTA
+          </button>
+        </div>
+      </div>
+
+      <input class="szukaj" id="zwrotSkan" placeholder="numer z etykiety zwrotu"
+             style="width:100%;margin-top:8px" hidden>
+      <div id="zwrotSkanWynik"></div>
       <input class="szukaj" id="klienciSzukaj" style="width:100%;margin-top:8px"
-             placeholder="znajdź klienta po loginie" autocomplete="off">
+             placeholder="znajdź klienta po loginie" autocomplete="off" hidden>
       <div id="klienciWyniki"></div>
 
-      <div class="czipy" id="sprawyCzipy" style="margin-top:12px">
-        <button class="czip" data-rodzaj="" aria-pressed="true">Wszystkie</button>
-        <button class="czip" data-rodzaj="pytanie" aria-pressed="false">Pytania</button>
-        <button class="czip" data-rodzaj="zwrot" aria-pressed="false">Zwroty</button>
-        <button class="czip" data-rodzaj="dyskusja" aria-pressed="false">Dyskusje</button>
-        <button class="czip" data-rodzaj="reklamacja" aria-pressed="false">Reklamacje</button>
-      </div>
+      <!-- Czipy rysuje skrypt: niosą LICZBY, a te zmieniają się co cykl. -->
+      <div class="czipy" id="sprawyCzipy" style="margin-top:12px"></div>
       <table id="sprawyLista" style="margin-top:10px"></table>
 
       <!-- Trzy pobrania w jednym rzędzie i wszystkie CICHE. Bursztyn znaczy
@@ -2564,6 +2668,7 @@ const IKONY_STANU = ["ikonaZdrowia", "ikonaAllegro"];
    (parowanie, wygaśnięcie tokenu) i osobne wejście: klik prowadzi do karty
    KONTO ALLEGRO — karta zostaje miejscem pracy, ikona jest tylko drzwiami. */
 function rysujIkoneAllegro() {
+  rysujBlokadeSpraw();
   const ik = $("ikonaAllegro");
   const s = stanAllegro;
   let kolor = "";
@@ -4848,35 +4953,83 @@ let ostatniaKolejkaSpraw = [];
    samego loginu, bo login bywa NULL-em z sensem: kubełek spraw bez konta. */
 let otwartyKlient360 = false;
 
-function plakietkaSprawy(rodzaj) {
-  if (rodzaj === "pytanie") return '<span class="badge amber">PYTANIE</span>';
-  if (rodzaj === "zwrot") return '<span class="badge ok">ZWROT</span>';
-  if (rodzaj === "reklamacja") return '<span class="badge err">REKLAMACJA</span>';
+function plakietkaSprawy(s) {
+  const r = typeof s === "string" ? s : s.rodzaj;
+  if (r === "pytanie") return '<span class="badge amber">PYTANIE</span>';
+  if (r === "zwrot") return '<span class="badge ok">ZWROT</span>';
+  if (r === "reklamacja") return '<span class="badge err">REKLAMACJA</span>';
+  /* CLAIM to nie pogawędka: ma ustawowy zegar 14 dni, a do 0.120.0 dostawał tę
+     samą plakietkę DYSKUSJA, bo `Sprawa` nie niosła `typ`. Jedna nazwa na dwie
+     różne pilności jest gorsza od dwóch nazw. */
+  if (typeof s !== "string" && s.typ === "CLAIM") {
+    return '<span class="badge mute2">CLAIM</span>';
+  }
   return '<span class="badge mute2">DYSKUSJA</span>';
 }
 
 function terminSprawy(s) {
-  if (s.dniDoTerminu == null) return '<span class="mute">—</span>';
+  if (s.dniDoTerminu == null) return "";
   if (s.poTerminie) return `<span class="badge err">${-s.dniDoTerminu} dni PO TERMINIE</span>`;
-  return `za ${s.dniDoTerminu} dni`;
+  return `<span class="badge amber">termin za ${odmiana(s.dniDoTerminu, ["dzień", "dni", "dni"])
+    .replace(/^/, s.dniDoTerminu + " ")}</span>`;
 }
 
-/* Jeden renderer wierszy dla kolejki i karty klienta — różnią się tylko
-   kolumną KLIENT, która u klienta powtarzałaby nagłówek. */
-function wierszeSpraw(lista, zKlientem) {
-  const naglowek = `<tr><th>TYP</th><th>TERMIN</th>${zKlientem ? "<th>KLIENT</th>" : ""}` +
-    `<th>SPRAWA</th><th>WIEK</th><th>PROWADZI</th><th></th></tr>`;
-  return naglowek + lista.map((s) => `<tr${s.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
-      <td>${plakietkaSprawy(s.rodzaj)}</td>
-      <td class="b">${terminSprawy(s)}</td>
-      ${zKlientem ? `<td><button class="akcja cichy" data-klient360="${esc(s.klient ?? "")}"
-        style="font-size:11px;padding:3px 8px">${esc(s.klient || "(BEZ LOGINU)")}</button></td>` : ""}
-      <td>${esc(s.tytul || "—")}${s.orderId ? `<div class="mute">zam. ${esc(s.orderId)}</div>` : ""}</td>
-      <td class="mute">${esc(wiekPytania(s.kiedy))}</td>
-      <td class="mute">${esc(s.prowadzi || "—")}</td>
-      <td><button class="akcja" data-sprawa-rodzaj="${s.rodzaj}" data-sprawa-id="${s.id}"
-        ${s.zwrotId ? `data-sprawa-zwrot="${s.zwrotId}"` : ""}>OTWÓRZ</button></td>
-    </tr>`).join("");
+/** Wiek sprawy w dniach — pasma liczą po nim, a nie po tekście z `wiekPytania`. */
+function dniOd(at) {
+  if (!at) return 0;
+  const ms = Date.now() - Date.parse(at.replace(" ", "T") + (at.endsWith("Z") ? "" : "Z"));
+  return Number.isFinite(ms) ? Math.floor(ms / 86_400_000) : 0;
+}
+
+/* ── Pasma pilności (0.120.0) ────────────────────────────────────────────────
+   Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca potrzebuje
+   odpowiedzi na „co teraz zrobić". Sort `poPilnosci` (services/sprawy.ts) był
+   poprawny już wcześniej — termin, potem najstarsze — tylko NIGDZIE GO NIE BYŁO
+   WIDAĆ. Pasma nie sortują niczego na nowo: rysują granice tam, gdzie ten sam
+   sort i tak je stawiał.
+
+   To jest niezmiennik do obronienia: gdyby pasma dostały własną regułę
+   kolejności, ekran pokazywałby jedno, a twierdził drugie. Dlatego warunki
+   czytają DOKŁADNIE te pola, po których sortuje serwer: `poTerminie`,
+   `dniDoTerminu`, `kiedy`.
+
+   `kolejnosc` to porządek NA EKRANIE, a `gdy` decyduje o przydziale i sprawdza
+   się w kolejności tablicy — dwie różne rzeczy, bo „dyskusje bez potwierdzenia"
+   trzeba wyjąć z pasm wieku wcześnie, a pokazać na samym dole. */
+const PASMA = [
+  { id: "poterminie", nazwa: "Po terminie", klasa: "pilne", kolejnosc: 1,
+    czemu: "ustawowy zegar minął", gdy: (s) => s.poTerminie },
+  { id: "termin", nazwa: "Termin za ≤7 dni", klasa: "termin", kolejnosc: 2,
+    czemu: "CLAIM-y i reklamacje", gdy: (s) => s.dniDoTerminu != null && s.dniDoTerminu <= 7 },
+  /* Wyjmowane PRZED pasmami wieku, pokazywane POD nimi. Kolejka nie wie, czy
+     ta dyskusja czeka na nas: synchronizacja czyta status z Allegro, nie treść
+     rozmowy — pytania mają ten mechanizm (`ostatniaSeriaKupujacego` rejestruje
+     sprawę tylko, gdy ostatnie słowo należy do klienta), dyskusje nie. Do tego
+     lista statusów kończących sprawę jest oznaczona [WERYFIKUJ]. Czternaście
+     dni to ten sam ustawowy próg, którym mierzy się reklamacje: po nim brak
+     ruchu przestaje być normalnym tempem rozmowy. */
+  { id: "bezpotw", nazwa: "Dyskusje bez potwierdzenia", klasa: "", kolejnosc: 6,
+    czemu: "nie wiemy, czy czekają na nas", zwinietePoczatkowo: true,
+    gdy: (s) => s.rodzaj === "dyskusja" && !s.odpowiadalismy && !s.prowadzi
+      && dniOd(s.kiedy) > 14 },
+  { id: "tydzien", nazwa: "Czeka ponad tydzień", klasa: "", kolejnosc: 3,
+    czemu: "najstarsze bez terminu", gdy: (s) => dniOd(s.kiedy) > 7 },
+  { id: "kilka", nazwa: "Czeka kilka dni", klasa: "", kolejnosc: 4,
+    czemu: "", gdy: (s) => dniOd(s.kiedy) >= 2 },
+  { id: "dzis", nazwa: "Dziś i wczoraj", klasa: "", kolejnosc: 5,
+    czemu: "", zwinietePoczatkowo: true, gdy: () => true },
+];
+
+/* Które pasma są zwinięte. Domyślnie tylko dwa — najświeższe sprawy i dyskusje
+   bez potwierdzenia — i to one zamieniają 168 wierszy w ekran. Reszta stoi
+   otwarta, bo pasmo, które trzeba najpierw rozwinąć, nie odpowiada na „co
+   teraz zrobić". Pasmo PO TERMINIE nie daje się zwinąć w ogóle. */
+const pasmaZwiniete = {};
+for (const p of PASMA) if (p.zwinietePoczatkowo) pasmaZwiniete[p.id] = true;
+
+function pasmoSprawy(s) {
+  for (const p of PASMA) if (p.gdy(s)) return p.id;
+  return "dzis";
 }
 
 /**
@@ -4891,34 +5044,146 @@ function toOtwartaSprawa(s) {
   return s.id === otwartyZwrot;
 }
 
+/** Wspólne atrybuty wiersza: jeden marker otwierania dla obu wariantów. */
+function znacznikiSprawy(s) {
+  return `data-sprawa-rodzaj="${s.rodzaj}" data-sprawa-id="${s.id}"` +
+    (s.zwrotId ? ` data-sprawa-zwrot="${s.zwrotId}"` : "");
+}
+
+/* Pastylki, które pokazują się TYLKO wtedy, gdy coś niosą. Do 0.120.0 termin
+   i prowadzenie były kolumnami — z myślnikiem w każdym wierszu, bo
+   `dniDoTerminu` jest zawsze puste dla pytań i zwrotów, a znacznik prowadzenia
+   stawiało dopiero wejście w sprawę. Kolumna, która niesie treść dla
+   mniejszości wierszy, uczy oko, że kolumny nic nie niosą. */
+function stopkaSprawy(s) {
+  const czesci = [];
+  if (s.nowaWiadomoscAt) czesci.push('<span class="badge amber">KLIENT DOPISAŁ</span>');
+  const termin = terminSprawy(s);
+  if (termin) czesci.push(termin);
+  if (s.orderId) czesci.push(`<span class="mute">zam. ${esc(s.orderId)}</span>`);
+  return czesci.length ? `<div class="stopkaSprawy">${czesci.join("")}</div>` : "";
+}
+
+/* Koniec wiersza: kto prowadzi albo zaproszenie, żeby wziąć. */
+function koniecSprawy(s) {
+  if (s.prowadzi) {
+    return `<span class="prowadzi${s.prowadzi === kto ? "" : " obcy"}"><i></i>${
+      esc(s.prowadzi === kto ? "Ty" : s.prowadzi)}</span>`;
+  }
+  return `<button class="akcja cichy wezme" data-wez-rodzaj="${s.rodzaj}"
+    data-wez-id="${s.rodzaj === "reklamacja" ? s.id : s.id}">WEZMĘ TO</button>`;
+}
+
+/* Wiersz kolejki na pełnej szerokości. Klika się CAŁY wiersz — kolumna
+   z bursztynowym OTWÓRZ zniknęła: bursztyn znaczy „ta jedna rzecz do zrobienia",
+   a powtórzony 168 razy przestawał cokolwiek znaczyć i zabierał prawą krawędź. */
+function wierszSprawy(s) {
+  const cudza = s.prowadzi && s.prowadzi !== kto;
+  return `<tr ${znacznikiSprawy(s)} class="sprawaRz${toOtwartaSprawa(s) ? " aktywny" : ""}${
+    cudza ? " cudza" : ""}${s.poTerminie ? " poTerminie" : ""}">
+      <td class="kTyp">${plakietkaSprawy(s)}</td>
+      <td class="kKlient"><button class="akcja cichy klientChip"
+        data-klient360="${esc(s.klient ?? "")}">${esc(s.klient || "(BEZ LOGINU)")}</button></td>
+      <td class="kTresc"><div class="tresc2">${esc(s.tytul || "—")}</div>${stopkaSprawy(s)}</td>
+      <td class="kWiek">${esc(wiekPytania(s.kiedy))}</td>
+      <td class="kKoniec">${koniecSprawy(s)}</td>
+    </tr>`;
+}
+
 /* Wiersz kolejki w SZYNIE — ten sam kształt, co miały wiersze skrzynki pytań
-   i kolejki zwrotów, zanim obie zeszły do rejestrów. Siedmiu kolumn tabeli nie
-   da się złożyć w 21 rem, a kolejka obok otwartej sprawy ma odpowiadać na
-   jedno pytanie: co jest następne. */
+   i kolejki zwrotów, zanim obie zeszły do rejestrów. Pięciu kolumn nie da się
+   złożyć w 21 rem, a kolejka obok otwartej sprawy ma odpowiadać na jedno
+   pytanie: co jest następne. */
 function wierszSprawyWSzynie(s) {
-  return `<tr data-sprawa-rodzaj="${s.rodzaj}" data-sprawa-id="${s.id}"
-      ${s.zwrotId ? `data-sprawa-zwrot="${s.zwrotId}"` : ""}
-      ${toOtwartaSprawa(s) ? 'class="aktywny"' : ""} style="cursor:pointer">
+  return `<tr ${znacznikiSprawy(s)} class="sprawaRz${
+      toOtwartaSprawa(s) ? " aktywny" : ""}" style="cursor:pointer">
       <td class="sprawaWiersz"${s.poTerminie ? ' style="background:var(--err-bg)"' : ""}>
         <span class="sprawaGora">
           <span class="b">${esc(s.klient || "(BEZ LOGINU)")}</span>
           <span class="mute">${esc(wiekPytania(s.kiedy))}</span>
         </span>
         <span class="sprawaTemat">${esc(s.tytul || "—")}</span>
-        <span class="sprawaStopka">${plakietkaSprawy(s.rodzaj)}${
-          s.dniDoTerminu != null ? terminSprawy(s) : ""
-        }${s.prowadzi ? `<span class="mute">${esc(s.prowadzi)}</span>` : ""}</span>
+        <span class="sprawaStopka">${plakietkaSprawy(s)}${terminSprawy(s)}${
+          s.prowadzi ? `<span class="mute">${esc(s.prowadzi)}</span>` : ""}</span>
       </td>
     </tr>`;
 }
 
+/* Wiersze spraw JEDNEGO klienta — karta 360 i blok powiązanych. Bez kolumny
+   KLIENT (powtarzałaby nagłówek) i bez „WEZMĘ TO": tam patrzy się na historię,
+   a bierze się sprawy z kolejki. Termin i prowadzenie są pastylkami, tak samo
+   jak w kolejce — jedna reguła na cały panel, nie dwie. */
+function wierszeSpraw(lista) {
+  return lista.map((s) => `<tr ${znacznikiSprawy(s)} class="sprawaRz" style="cursor:pointer">
+      <td class="kTyp">${plakietkaSprawy(s)}</td>
+      <td class="kTresc"><div class="tresc2">${esc(s.tytul || "—")}</div>${stopkaSprawy(s)}</td>
+      <td class="kWiek">${esc(wiekPytania(s.kiedy))}</td>
+      <td class="kKoniec">${s.prowadzi
+        ? `<span class="prowadzi${s.prowadzi === kto ? "" : " obcy"}"><i></i>${
+            esc(s.prowadzi === kto ? "Ty" : s.prowadzi)}</span>`
+        : ""}</td>
+    </tr>`).join("");
+}
+
+/** Czipy niosą LICZBY, bo „Dyskusje" bez liczby nie mówi, czy warto tam patrzeć. */
+function rysujCzipySpraw(pelna) {
+  const ile = (r) => pelna.filter((s) => s.rodzaj === r).length;
+  const moich = pelna.filter((s) => s.prowadzi === kto).length;
+  const czipy = [
+    { id: "", nazwa: "Wszystkie", n: pelna.length },
+    { id: "pytanie", nazwa: "Pytania", n: ile("pytanie") },
+    { id: "zwrot", nazwa: "Zwroty", n: ile("zwrot") },
+    { id: "dyskusja", nazwa: "Dyskusje", n: ile("dyskusja") },
+    { id: "reklamacja", nazwa: "Reklamacje", n: ile("reklamacja") },
+    { id: "moje", nazwa: "Moje", n: moich },
+  ];
+  $("sprawyCzipy").innerHTML = czipy.map((c) => `<button
+    class="czip${c.n === 0 && c.id !== "" ? " pustyCzip" : ""}${c.id === "moje" ? " moje" : ""}"
+    data-rodzaj="${c.id}" aria-pressed="${String(sprawyFiltr === c.id)}"
+    >${c.nazwa}<span class="n">${c.n}</span></button>`).join("");
+}
+
 function rysujSprawy(lista) {
   ostatniaKolejkaSpraw = lista;
+  rysujCzipySpraw(lista);
+  const widoczne = sprawyFiltr === "moje"
+    ? lista.filter((s) => s.prowadzi === kto)
+    : sprawyFiltr ? lista.filter((s) => s.rodzaj === sprawyFiltr) : lista;
+
   const wSzynie = kolejkaZostaje() &&
     (otwartyZwrot != null || otwartaDyskusja != null || otwartePytanie != null);
-  $("sprawyLista").innerHTML = lista.length
-    ? (wSzynie ? lista.map(wierszSprawyWSzynie).join("") : wierszeSpraw(lista, true))
-    : '<tr><td class="mute">Żadna sprawa nie czeka na obsługę.</td></tr>';
+  if (wSzynie) {
+    /* W szynie pasm nie ma: 21 rem to miejsce na odpowiedź „co następne",
+       a nie na strukturę całej kolejki. Kolejność zostaje ta sama. */
+    $("sprawyLista").innerHTML = widoczne.length
+      ? widoczne.map(wierszSprawyWSzynie).join("")
+      : '<tr><td class="mute">Nic w tym filtrze.</td></tr>';
+  } else if (!widoczne.length) {
+    $("sprawyLista").innerHTML =
+      '<tr><td class="mute">Żadna sprawa nie czeka na obsługę.</td></tr>';
+  } else {
+    const wg = {};
+    for (const s of widoczne) (wg[pasmoSprawy(s)] ??= []).push(s);
+    /* Puste pasmo się NIE rysuje — nagłówek z zerem to ten sam błąd, co kolumna
+       z myślnikiem w każdym wierszu. Przy zerowej liczbie reklamacji i CLAIM-ów
+       oba pasma terminowe są puste i tak ma to wyglądać. */
+    $("sprawyLista").innerHTML = [...PASMA]
+      .sort((a, b) => a.kolejnosc - b.kolejnosc)
+      .filter((p) => (wg[p.id] || []).length)
+      .map((p) => {
+        const w = wg[p.id];
+        const zwiniete = !!pasmaZwiniete[p.id] && p.id !== "poterminie";
+        return `<tr class="pasmoRz ${p.klasa}"><td colspan="5">
+            <button class="pasmoGlowa" data-pasmo="${p.id}"${
+              p.id === "poterminie" ? " disabled" : ""}>
+              <span class="strzalka">${zwiniete ? "▸" : "▾"}</span>
+              <span class="nazwaPasma">${p.nazwa}</span>
+              <span class="ilePasma">${w.length}</span>
+              <span class="czemuPasmo">${p.czemu}</span>
+            </button></td></tr>` + (zwiniete ? "" : w.map(wierszSprawy).join(""));
+      }).join("");
+  }
+
   /* Podsumowanie liczy z tej samej listy, którą widać — nie z osobnego
      zapytania, które mogłoby pokazać inne liczby niż tabela pod spodem. */
   const ile = (r) => lista.filter((s) => s.rodzaj === r).length;
@@ -4932,8 +5197,12 @@ function rysujSprawy(lista) {
 
 async function odswiezKolejkeSpraw() {
   try {
-    const q = sprawyFiltr ? `?rodzaj=${encodeURIComponent(sprawyFiltr)}` : "";
-    const d = await (await api(`/api/biuro/sprawy${q}`)).json();
+    /* BEZ `?rodzaj=` (0.120.0): pobieramy CAŁĄ kolejkę i filtrujemy na miejscu.
+       Inaczej czipy nie mają skąd wziąć liczb — a czip „Dyskusje" bez liczby
+       nie mówi, czy warto tam patrzeć — ani czip MOJE skąd wziąć swoich spraw.
+       Serwer i tak tnie po 500 na rejestr, więc to jedno zapytanie zamiast
+       jednego na każde kliknięcie czipa. */
+    const d = await (await api("/api/biuro/sprawy")).json();
     rysujSprawy(d.sprawy || []);
   } catch (e) {
     $("sprawyLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
@@ -4981,6 +5250,64 @@ function otworzSprawe(rodzaj, id, zwrotId) {
   else otworzZwrot(rodzaj === "reklamacja" ? zwrotId : id);
 }
 
+/**
+ * „WEZMĘ TO" z kolejki — jedyny zapis, jaki ta zakładka robi z poziomu LISTY.
+ * Znacznik, nie blokada: nie odbiera nikomu dostępu, mówi tylko, że ktoś przy
+ * tej sprawie siedzi. Przy 168 sprawach i kilku osobach w biurze to jedyna
+ * ochrona przed dwiema odpowiedziami na to samo pytanie.
+ *
+ * Nie otwiera sprawy przy okazji: wzięcie i wejście to dwie różne decyzje,
+ * a kolejka po kliknięciu ma zostać tam, gdzie była.
+ */
+/* Narzędzie rozwija się W MIEJSCU i od razu dostaje kursor — inaczej klik
+   w ikonę byłby dwoma ruchami zamiast jednego. Naraz otwarte jest najwyżej
+   jedno: dwa pola pod sobą to znów ten sam pas, który schodził z góry. */
+function przelaczNarzedzie(ktore) {
+  const pola = { scan: "zwrotSkan", klient: "klienciSzukaj" };
+  const bylo = $(pola[ktore]).hidden === false;
+  for (const [k, id] of Object.entries(pola)) {
+    const otwarte = k === ktore && !bylo;
+    $(id).hidden = !otwarte;
+    $(k === "scan" ? "narzScan" : "narzKlient").setAttribute("aria-pressed", String(otwarte));
+    if (!otwarte) $(id).value = "";
+  }
+  $("zwrotSkanWynik").innerHTML = "";
+  $("klienciWyniki").innerHTML = "";
+  if (!bylo) $(pola[ktore]).focus();
+}
+$("narzScan").addEventListener("click", () => przelaczNarzedzie("scan"));
+$("narzKlient").addEventListener("click", () => przelaczNarzedzie("klient"));
+
+/**
+ * Pas blokady nad kolejką. Rysuje się z TEGO SAMEGO stanu, co ikona ALLEGRO
+ * w pasku (`stanAllegro`), więc nie może pokazać czego innego niż ona.
+ *
+ * Warunek jest wąski celowo: „niepolaczone" i „zle_srodowisko" znaczą, że
+ * wysyłka odpowiedzi NIE ZADZIAŁA — a tylko taki stan zasługuje na pas przez
+ * całą szerokość. `dev` i `wylaczone` to świadome tryby pracy, nie awarie.
+ */
+function rysujBlokadeSpraw() {
+  const s = stanAllegro;
+  const blokuje = s && (s.stan === "niepolaczone" || s.stan === "zle_srodowisko");
+  $("sprawyBlokada").hidden = !blokuje;
+  if (!blokuje) return;
+  $("sprawyBlokada").innerHTML = `<div>
+      <b>Konto Allegro niesparowane — nie odpowiesz na żadną z tych spraw.</b>
+      <span class="czemu">Kolejka rośnie, a wysyłka odpowiedzi nie zadziała.</span>
+    </div>
+    <button class="akcja" id="blokadaSparuj">SPARUJ KONTO</button>`;
+}
+
+async function wezSprawe(rodzaj, id) {
+  try {
+    await api(`/api/biuro/sprawy/${encodeURIComponent(rodzaj)}/${id}/prowadzi`,
+      { method: "POST", body: "{}" });
+    await odswiezKolejkeSpraw();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 function otworzKlienta360(login) {
   /* Karta klienta to widok ponad sprawami — wejście w nią zamyka otwartą
      sprawę. W drugą stronę jest odwrotnie: otwarcie sprawy z karty ZOSTAWIA
@@ -5022,11 +5349,11 @@ function rysujKlienta360(d) {
       : "wklejki z poczty i zwroty ręczne — sprawy bez konta Allegro"}</div>`;
   $("klientAktywne").innerHTML = `<h2>AKTYWNE SPRAWY</h2>` +
     (d.aktywne.length
-      ? `<table>${wierszeSpraw(d.aktywne, false)}</table>`
+      ? `<table>${wierszeSpraw(d.aktywne)}</table>`
       : '<p class="mute">Nic nie czeka na obsługę.</p>');
   $("klientHistoria").innerHTML = `<h2>HISTORIA</h2>` +
     (d.historia.length
-      ? `<table>${wierszeSpraw(d.historia, false)}</table>`
+      ? `<table>${wierszeSpraw(d.historia)}</table>`
       : '<p class="mute">Brak zamkniętych spraw.</p>');
 }
 
@@ -5103,7 +5430,7 @@ async function sprawdzPuls() {
    (podpisany słabiej). Pobierane PO OTWARCIU, jak historia klienta. */
 function rysujPowiazane(cel, d) {
   const sekcja = (tytul, lista) => lista.length
-    ? `<div class="mute" style="margin:8px 0 4px">${tytul}</div><table>${wierszeSpraw(lista, false)}</table>`
+    ? `<div class="mute" style="margin:8px 0 4px">${tytul}</div><table>${wierszeSpraw(lista)}</table>`
     : "";
   $(cel).innerHTML =
     sekcja("TO SAMO ZAMÓWIENIE", d.zamowienie || []) +
@@ -5289,20 +5616,30 @@ function rysujBrakujace(lista, ticker) {
        ${ticker.bledow
          ? `<div><span class="badge err">ALLEGRO ODMAWIA</span> ${esc(ticker.ostatniBlad || "")}</div>`
          : ""}`;
-  $("brakujaceLista").innerHTML = lista.length
-    ? "<tr><th>STAN</th><th>CZEKA</th><th>ZWROT</th><th>KLIENT</th><th>NUMERY PACZEK</th><th></th></tr>" +
-      lista.map((z) => `<tr>
-          <td>${z.stan === "doreczona"
-            ? '<span class="badge err">DORĘCZONA · NIE PRZYJĘTA</span>'
+  /* W SZYNIE NIE MA TABEL (0.120.0) — i to jest reguła, nie poprawka jednego
+     miejsca. 352 px nie mieści sześciu kolumn i żadna przyszła karta tego nie
+     zmieni: do tej wersji trzy karty szyny rysowały tabele ucięte w pół,
+     każda z własnym paskiem przewijania, i na jednym ekranie było ich cztery
+     zagnieżdżone. Ten sam wiersz pionowy, co w kolejce w szynie. */
+  $("brakujaceLista").innerHTML = lista.map((z) => `<tr>
+      <td class="sprawaWiersz">
+        <span class="sprawaGora">
+          <span class="b">${esc(z.referencja || z.waybills[0] || "—")}</span>
+          <span class="mute">${z.dniOdZgloszenia ?? "?"} dni</span>
+        </span>
+        <span class="sprawaTemat">${z.stan === "doreczona"
+          ? "Doręczona przez przewoźnika, nieprzyjęta skanem — paczka leży gdzieś w firmie."
+          : "Klient zgłosił zwrot, paczka wciąż w drodze."}</span>
+        <span class="sprawaStopka">
+          ${z.stan === "doreczona"
+            ? '<span class="badge err">LEŻY W FIRMIE</span>'
             : '<span class="badge amber">W DRODZE</span>'}
-              <div class="mute">${z.statusAllegro ? esc(z.statusAllegro) : "status jeszcze niepobrany"}</div></td>
-          <td class="b">${z.dniOdZgloszenia ?? "?"} dni</td>
-          <td class="b">${esc(z.referencja || "—")}</td>
-          <td>${esc(z.kupujacyLogin || "—")}</td>
-          <td class="mute">${z.waybills.map(esc).join("<br>") || "—"}</td>
-          <td><button class="akcja cichy" data-pomin="${z.id}">SCHOWAJ</button></td>
-        </tr>`).join("")
-    : "";
+          <span class="mute">${esc(z.kupujacyLogin || "bez loginu")}</span>
+          <button class="akcja cichy" data-pomin="${z.id}"
+            style="padding:3px 9px;font-size:11px">SCHOWAJ</button>
+        </span>
+      </td>
+    </tr>`).join("");
 }
 
 function badgeKosza(status) {
@@ -5317,24 +5654,28 @@ function badgeKosza(status) {
    ZAKOŃCZENIE, bo serwer kasuje oba pola: kolumna nie zostaje z nazwiskiem
    przy koszu, który wrócił do rozkładania. */
 function rysujKosze(kosze) {
+  /* Wiersz pionowy — w szynie nie ma tabel (0.120.0). Pięciu kolumn nie da się
+     złożyć w 352 px: do tej wersji ta tabela była tu ucięta w pół. */
   $("koszeLista").innerHTML = kosze.length
-    ? "<tr><th>KOD</th><th>STATUS</th><th>ZAWARTOŚĆ</th><th>POSTĘP</th><th>ROZŁOŻYŁ</th><th></th></tr>" +
-      kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
-          <td class="b">${esc(k.kod)}</td>
-          <td>${badgeKosza(k.status)}</td>
-          <td class="mute">${k.mmNumer
-            ? `przesunięcie MM ${esc(k.mmNumer)}`
-            : `${k.zwrotow} zwr.`}</td>
-          <td class="mute">${k.status === "otwarty" ? "—" : `${k.odlozonych}/${k.pozycji} poz.`}
-            ${k.pominietych
-              ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>`
-              : ""}</td>
-          <td>${k.rozlozonoPrzez
-            ? `${esc(k.rozlozonoPrzez)}<div class="mute">${esc(stempelLokalny(k.rozlozonoAt))}</div>`
-            : '<span class="mute">—</span>'}</td>
-          <td>${k.status === "otwarty"
-            ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
-            : ""}</td>
+    ? kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
+          <td class="sprawaWiersz">
+            <span class="sprawaGora">
+              <span class="b">${esc(k.kod)}</span>
+              <span class="mute">${k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow} zwr.`}</span>
+            </span>
+            <span class="sprawaTemat">${k.status === "otwarty"
+              ? "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło."
+              : `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${k.rozlozonoPrzez
+                  ? ` · ${esc(k.rozlozonoPrzez)}` : ""}`}</span>
+            <span class="sprawaStopka">
+              ${badgeKosza(k.status)}
+              ${k.pominietych ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>` : ""}
+              ${k.status === "otwarty"
+                ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}"
+                     style="padding:3px 9px;font-size:11px">ZAMKNIJ — NA HALĘ</button>`
+                : ""}
+            </span>
+          </td>
         </tr>`).join("")
     : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
   // podgląd otwartego kosza odświeża się razem z listą, bez mrugania
@@ -5350,20 +5691,23 @@ function rysujKosze(kosze) {
 function rysujPominiete(lista) {
   $("pominieteKarta").hidden = lista.length === 0 || otwartaDyskusja != null;
   if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
-  $("pominieteLista").innerHTML =
-    `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>CZEKA</th><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>POWÓD</th><th></th></tr>" +
-    lista.map((p) => `<tr>
+  /* Wiersz pionowy — w szynie nie ma tabel (0.120.0). Zdjęcie zostaje, bo przy
+     „czego nie było w koszu" to ono najszybciej mówi, o który towar chodzi. */
+  $("pominieteLista").innerHTML = lista.map((p) => `<tr>
         ${kolFoto(p.twId)}
-        <td class="b" style="white-space:nowrap">${p.dni > 0
-          ? `${p.dni} dni`
-          : '<span class="mute">dziś</span>'}</td>
-        <td><span class="b">${esc(p.kod)}</span>${p.mmNumer
-          ? `<div class="mute">MM ${esc(p.mmNumer)}</div>` : ""}</td>
-        <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}</td>
-        <td class="b" style="white-space:nowrap">${p.ilosc}</td>
-        <td><span class="badge amber">${esc(p.powod || "bez powodu")}</span></td>
-        <td><button class="akcja cichy" data-zalatw="${p.pozycjaId}">ZAŁATWIONE</button></td>
+        <td class="sprawaWiersz">
+          <span class="sprawaGora">
+            <span class="b">${esc(p.symbol || p.kod)}</span>
+            <span class="mute">${p.dni > 0 ? `${p.dni} dni` : "dziś"}</span>
+          </span>
+          <span class="sprawaTemat">${esc(p.nazwa)} · ${p.ilosc} szt.</span>
+          <span class="sprawaStopka">
+            <span class="badge mute2">KOSZ ${esc(p.kod)}</span>
+            <span class="badge amber">${esc(p.powod || "bez powodu")}</span>
+            <button class="akcja cichy" data-zalatw="${p.pozycjaId}"
+              style="padding:3px 9px;font-size:11px">ZAŁATWIONE</button>
+          </span>
+        </td>
       </tr>`).join("");
   dolozZdjeciaListy(lista, "pominieteLista", "sesjaPominietych");
 }
@@ -8577,11 +8921,34 @@ $("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPyta
 $("kolejkaSprawKarta").addEventListener("click", (e) => {
   const czip = e.target.closest("button[data-rodzaj]");
   if (czip) {
+    /* Filtr jest STANEM EKRANU, nie zapytaniem: mamy całą kolejkę w pamięci,
+       więc przerysowanie starcza i nie ma po co jechać do serwera. */
     sprawyFiltr = czip.dataset.rodzaj;
-    for (const c of $("sprawyCzipy").querySelectorAll(".czip")) {
-      c.setAttribute("aria-pressed", String(c === czip));
+    rysujSprawy(ostatniaKolejkaSpraw);
+    return;
+  }
+  if (e.target.closest("#blokadaSparuj")) {
+    /* Ta sama droga, co ikona ALLEGRO w nagłówku — jedno wejście do parowania,
+       nie drugie obok istniejącego. */
+    const karta = $("kontoAllegroKarta");
+    karta.open = true;
+    karta.scrollIntoView({ block: "start", behavior: "smooth" });
+    const st = stanAllegro;
+    if (st && (st.stan === "niepolaczone" || st.stan === "zle_srodowisko")) {
+      rozpocznijParowanieAllegro();
     }
-    odswiezSprawy();
+    return;
+  }
+  const pasmo = e.target.closest("[data-pasmo]");
+  if (pasmo) {
+    pasmaZwiniete[pasmo.dataset.pasmo] = !pasmaZwiniete[pasmo.dataset.pasmo];
+    rysujSprawy(ostatniaKolejkaSpraw);
+    return;
+  }
+  const wez = e.target.closest("[data-wez-rodzaj]");
+  if (wez) {
+    e.stopPropagation();
+    wezSprawe(wez.dataset.wezRodzaj, Number(wez.dataset.wezId));
     return;
   }
   const klient = e.target.closest("button[data-klient360]");
@@ -8597,7 +8964,9 @@ $("kolejkaSprawKarta").addEventListener("click", (e) => {
 
 $("klientSzczegol").addEventListener("click", (e) => {
   if (e.target.closest("#klientWroc")) return zamknijKlienta360();
-  const sprawa = e.target.closest("button[data-sprawa-rodzaj]");
+  /* Bez `button` w selektorze: od 0.120.0 celem jest CAŁY wiersz, tu tak samo
+     jak w kolejce — przycisku OTWÓRZ nie ma już w żadnej z tych list. */
+  const sprawa = e.target.closest("[data-sprawa-rodzaj]");
   if (sprawa) {
     otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),
       Number(sprawa.dataset.sprawaZwrot || 0) || null);
@@ -8629,7 +8998,7 @@ $("dyskusjaSzczegol").addEventListener("click", klikKlienta360);
 
 /** Klik w powiązaną sprawę z kontekstu — ta sama droga co z kolejki. */
 function klikPowiazanejSprawy(e) {
-  const sprawa = e.target.closest("button[data-sprawa-rodzaj]");
+  const sprawa = e.target.closest("[data-sprawa-rodzaj]");
   if (!sprawa) return;
   otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),
     Number(sprawa.dataset.sprawaZwrot || 0) || null);
