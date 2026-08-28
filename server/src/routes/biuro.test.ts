@@ -928,6 +928,55 @@ test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
   );
 });
 
+test("ustawienia to jedna tafla, a odstępy niesie arkusz", () => {
+  /* Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
+     i niepotrzebnych marginesów". Po konsoli spraw (0.112.0) i całej zakładce
+     SPRAWY (0.116.0) ustawienia były ostatnią zakładką na pięciu pływających
+     kartkach — a są JEDNYM kompletem rzeczy ustawianych raz.
+
+     Test pilnuje obu połówek, tak jak ten wyżej pilnuje ich dla konsoli:
+     ustawienia spłaszczyły się, a `.card` NIE stracił promienia globalnie.
+     Trzecia asercja jest o odstępach: widok niósł osiemnaście atrybutów
+     `style` z ośmioma różnymi marginesami dobranymi z palca. Liczba zamiast
+     opisu, bo liczba nie zestarzeje się po cichu. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  const a = html.indexOf('id="widokDostawcy"');
+  assert.notEqual(a, -1, "widok ustawień istnieje");
+  const ustawienia = html.slice(a, html.indexOf("</main>", a));
+  assert.equal(
+    (ustawienia.match(/style="/g) ?? []).length,
+    0,
+    "odstępy w ustawieniach niesie arkusz, nie atrybuty w znaczniku"
+  );
+
+  assert.match(
+    html,
+    /#widokDostawcy > \.card \{[\s\S]{0,80}border-radius: 0; box-shadow: none/,
+    "sekcje ustawień tracą promień i cień"
+  );
+  assert.match(
+    html,
+    /#widokDostawcy \{[\s\S]{0,400}gap: 0/,
+    "sekcje ustawień stykają się bez odstępu"
+  );
+  assert.match(
+    html,
+    /#widokDostawcy > \.card \{[\s\S]{0,160}border-top: 1px solid var\(--border\)/,
+    "sekcje rozdziela kreska, skoro nie rozdziela ich odstęp"
+  );
+
+  /* Druga połówka. Ktoś porządkujący USTAWIENIA sięgnąłby po globalne
+     `border-radius: 0` — i skasowałby różnicę, której pilnuje test wyżej. */
+  assert.match(
+    html,
+    /\.card \{ background: var\(--card\);[^}]*border-radius: 14px/,
+    "karta poza ustawieniami dalej ma promień 14"
+  );
+});
+
 test("kontekst ma szufladę na wąskim oknie, a szuflada ma trzy wyjścia", () => {
   /* Od 0.101.0 kontekst nie spada już pod sprawę poniżej 1280 px — wjeżdża
      jako szuflada z prawej, a kolejka zostaje widoczna obok sprawy. Makieta
