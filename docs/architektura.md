@@ -314,6 +314,24 @@ niezależne procesy. Gwarantem staje się wtedy guard w zapytaniu wyboru zadania
 mm (`sfera-worker/sql/`, opis w §3): MM stoi, dopóki wcześniejsze niewykonane
 `set_location` tego samego towaru nie wejdzie.
 
+### Karton jest rodzajem kosza, nie własną tabelą
+
+Rozkładanie ma trzy źródła pracy: dokument dostawy, kosz zwrotowy i — od
+0.122.0 — KARTON, czyli pudło z towarem źle zebranym pod zamówienia. Karton
+nie ma dokumentu i nigdy nie będzie go miał: towar nie opuścił magazynu.
+
+Mimo to siedzi w tabeli `kosz`, odróżniony kolumną `rodzaj`. Powód jest jeden
+i mierzalny: od chwili zatwierdzenia rozkładanie kartonu jest **co do znaku**
+tym samym, co rozkładanie kosza. Ten sam skan towaru, ten sam skan półki, to
+samo pomijanie z powodem, te same trzy drogi powrotne z pomyłki. Osobna tabela
+znaczyłaby przepisanie sześciuset linii `services/kosze.ts` i drugi zestaw
+usterek w kodzie, który już raz je przeszedł.
+
+Różnice są dwie i obie mają w kodzie jedno miejsce. Zawartość kartonu zbiera
+HALA, bo nikt inny jej nie zna — to `services/karton.ts` i faza `otwarty`.
+A `zakonczKosz` nie kolejkuje dla kartonu **żadnego** dokumentu: MM ZWROTY→MAG
+zdjęłoby z bufora zwrotów stan, którego na tym buforze nigdy nie było.
+
 ---
 
 ## 6. Tożsamość (§7)
@@ -621,9 +639,13 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 - `tools/docs_check.py` — liczby i ścieżki w dokumentacji kontra repo. Złapał
   m.in. merge, który zostawił w README dwie sprzeczne liczby testów obok siebie
   (git nie widzi konfliktu semantycznego — plik był poprawny składniowo).
-- `tools/kt_imports_check.py` — brakujące importy i bilans nawiasów. Złapał
-  właściwość rozszerzającą użytą bez importu oraz polski cudzysłów zamknięty
-  prostym `"` wewnątrz łańcucha Kotlina.
+- `tools/kt_imports_check.py` — brakujące importy, bilans nawiasów, domknięcie
+  komentarzy blokowych i `@OptIn`. Złapał właściwość rozszerzającą użytą bez
+  importu oraz polski cudzysłów zamknięty prostym `"` wewnątrz łańcucha.
+  Sprawdzenie komentarzy dopisano po 0.122.0: komentarze Kotlina **się
+  zagnieżdżają**, więc ścieżka z gwiazdką napisana w prozie otwiera kolejny
+  poziom i zjada resztę pliku. Kompilator zgłasza to jako kilkadziesiąt
+  „Unresolved reference" w cudzych plikach, czyli wszędzie poza przyczyną.
 
 Żadne nie jest kompilatorem i nie udaje. Zielony wynik znaczy „nie ten błąd".
 

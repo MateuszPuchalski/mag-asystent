@@ -89,6 +89,24 @@ object WIcons {
     }
 
 
+    /**
+     * KARTON — pudło OTWARTE, ze strzałką w dół.
+     *
+     * `Box` (pudło zamknięte) noszą już DOSTAWY i ZWROTY. Trzecia zakładka
+     * z tą samą ikoną zamieniłaby dolny pasek w zagadkę, a trafia się go
+     * z pamięci, nie wzrokiem. Otwarte wieko mówi zresztą prawdę o trybie:
+     * do tego pudła się dokłada, a nie wozi je zaklejone.
+     */
+    val Karton: ImageVector = strokeIcon("karton") {
+        // rozchylone wieko
+        moveTo(3f, 9f); lineTo(6f, 5f); lineTo(18f, 5f); lineTo(21f, 9f)
+        // korpus
+        moveTo(4f, 9f); lineTo(4f, 20f); lineTo(20f, 20f); lineTo(20f, 9f)
+        // strzałka „do środka"
+        moveTo(12f, 11f); lineTo(12f, 17f)
+        moveTo(9f, 14f); lineTo(12f, 17f); lineTo(15f, 14f)
+    }
+
     val Check: ImageVector = strokeIcon("check", 2.4f) {
         moveTo(20f, 6f); lineTo(9f, 17f); lineTo(4f, 12f)
     }

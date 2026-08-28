@@ -53,7 +53,20 @@ interface WierszKosza {
   /** Dokument MM, z którego kosz powstał; NULL = kosz złożony w aplikacji. */
   mm_dok_id: number | null;
   mm_numer: string | null;
+  /** `zwroty` albo `karton` — patrz `RODZAJ_KARTON`. */
+  rodzaj: string;
 }
+
+/**
+ * Karton (0.122.0) — kosz, do którego pakujący odkładają towar źle zebrany.
+ *
+ * Ten sam byt co kosz zwrotowy i celowo ta sama tabela: rozkładanie kartonu
+ * jest co do znaku tym samym, co rozkładanie kosza (skan towaru, skan półki,
+ * pominięcie, cofanie, ZAKOŃCZ). Różnice są dwie i obie pilnuje ta stała:
+ * zawartość zbiera HALA zamiast biura, a po rozłożeniu NIE POWSTAJE żaden
+ * dokument — towar nie opuścił magazynu, więc nie ma czego przesuwać.
+ */
+export const RODZAJ_KARTON = "karton";
 
 export interface PozycjaKosza {
   id: number;
@@ -123,6 +136,8 @@ export interface SzczegolKosza {
    * żadnego dokumentu do obiecywania — ten wystawia biuro.
    */
   mmNumer: string | null;
+  /** `zwroty` albo `karton` — kolektor po tym wie, którą fazę pokazać. */
+  rodzaj: string;
 }
 
 export interface WierszListyKoszy {
@@ -152,6 +167,8 @@ export interface WierszListyKoszy {
    */
   rozlozonoAt: string | null;
   rozlozonoPrzez: string | null;
+  /** `zwroty` albo `karton` — biuro ma wiedzieć, że kosz bez zwrotów jest cały. */
+  rodzaj: string;
 }
 
 /** Kod z etykiety kosza — po trim/upper, żeby skan i wpis ręczny się spotkały. */
@@ -167,11 +184,18 @@ function wierszKosza(id: number): WierszKosza {
   return k;
 }
 
-/** Aktywny (nierozłożony) kosz o tym kodzie — kod wraca do obiegu po rozłożeniu. */
+/**
+ * Aktywny (nierozłożony) kosz o tym kodzie — kod wraca do obiegu po rozłożeniu.
+ *
+ * KARTONÓW ta funkcja nie widzi i to jest jej rola, nie przeoczenie. Szukają
+ * po niej dwie rzeczy: biuro przypinające zwrot i kolektor skanujący etykietę
+ * z kosza. Karton nie ma ani zwrotów, ani fizycznej etykiety — trafienie
+ * w niego kodem znaczyłoby pomyłkę udającą sukces.
+ */
 export function koszPoKodzie(raw: string): WierszKosza | undefined {
   return db()
-    .prepare("SELECT * FROM kosz WHERE kod = ? AND status <> 'rozlozony'")
-    .get(normalizujKod(raw)) as WierszKosza | undefined;
+    .prepare("SELECT * FROM kosz WHERE kod = ? AND status <> 'rozlozony' AND rodzaj <> ?")
+    .get(normalizujKod(raw), RODZAJ_KARTON) as WierszKosza | undefined;
 }
 
 /**
@@ -204,6 +228,13 @@ export function przypnijZwrot(zwrotId: number, kodRaw: string, autor: string): v
       throw new BladKosza(400, `Kosz ${kod} jest zamknięty — do rozłożenia, nie do dokładania`);
     }
     if (!kosz) {
+      /* Kod zajęty przez KARTON — `koszPoKodzie` kartonów nie widzi, więc bez
+         tego sprawdzenia INSERT rozbiłby się o `ix_kosz_kod_aktywny` i biuro
+         zobaczyłoby błąd bazy zamiast zdania o tym, co się stało. */
+      const zajety = d
+        .prepare("SELECT id FROM kosz WHERE kod = ? AND status <> 'rozlozony'")
+        .get(kod) as { id: number } | undefined;
+      if (zajety) throw new BladKosza(400, `Kod ${kod} nosi karton z hali — zwrotu nie ma tam czego szukać`);
       const res = d
         .prepare("INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez) VALUES (?, 'otwarty', ?, ?)")
         .run(kod, nowIso(), autor);
@@ -242,6 +273,12 @@ export function odepnijZwrot(zwrotId: number, autor: string): void {
 export function zamknijKosz(koszId: number, autor: string): SzczegolKosza {
   const kosz = wierszKosza(koszId);
   if (kosz.status !== "otwarty") throw new BladKosza(400, "Kosz nie jest otwarty");
+  /* Karton zamyka HALA własną trasą (`zatwierdzKarton`), bo to ona zna jego
+     zawartość. Ta funkcja żąda zwrotów z wystawionymi dokumentami i przy
+     kartonie odmówiłaby zdaniem o korekcie, którego nikt by nie zrozumiał. */
+  if (kosz.rodzaj === RODZAJ_KARTON) {
+    throw new BladKosza(400, "Karton zatwierdza się na kolektorze — biuro nie zna jego zawartości");
+  }
   const zwroty = db()
     .prepare(
       `SELECT z.id, z.referencja, z.waybill, q.status AS dok_status
@@ -299,7 +336,7 @@ export function listaKoszy(): WierszListyKoszy[] {
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='skipped') AS pominietych,
-              k.mm_numer
+              k.mm_numer, k.rodzaj
        FROM kosz k
        WHERE k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-14 days')
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
@@ -319,12 +356,25 @@ export function listaKoszy(): WierszListyKoszy[] {
     zamknietoPrzez: (w.zamknieto_przez as string) ?? null,
     rozlozonoAt: (w.rozlozono_at as string) ?? null,
     rozlozonoPrzez: (w.rozlozono_przez as string) ?? null,
+    rodzaj: (w.rodzaj as string) ?? "zwroty",
   }));
 }
 
-/** Kosze do rozłożenia — to, co widzi kolektor na zakładce DOSTAWY. */
+/** Kosze do rozłożenia — to, co widzi kolektor na zakładce ZWROTY. */
 export function koszeDlaKolektora(): WierszListyKoszy[] {
-  return listaKoszy().filter((k) => k.status === "zamkniety");
+  return listaKoszy().filter((k) => k.status === "zamkniety" && k.rodzaj !== RODZAJ_KARTON);
+}
+
+/**
+ * Kartony na zakładce KARTON — otwarte RAZEM z zatwierdzonymi.
+ *
+ * Zakładka pokazuje obie fazy jednej roboty: pudło, do którego się jeszcze
+ * dokłada, i pudło czekające na półki. Rozdzielenie ich na dwie listy kazałoby
+ * szukać własnego kartonu w dwóch miejscach zależnie od tego, czy ktoś zdążył
+ * go zatwierdzić.
+ */
+export function kartonyDlaKolektora(): WierszListyKoszy[] {
+  return listaKoszy().filter((k) => k.rodzaj === RODZAJ_KARTON && k.status !== "rozlozony");
 }
 
 export function szczegolKosza(koszId: number): SzczegolKosza {
@@ -425,6 +475,7 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
   });
   return {
     mmNumer: kosz.mm_numer ?? null,
+    rodzaj: kosz.rodzaj ?? "zwroty",
     id: kosz.id,
     kod: kosz.kod,
     status: kosz.status,
@@ -446,13 +497,24 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
  * się wyłącznie WŚRÓD POZYCJI KOSZA: skan cudzego towaru ma powiedzieć
  * „nie z tego kosza", a nie otworzyć przypadkową kartę.
  */
+/**
+ * Kod z ręki albo ze skanera → towar. EAN, alias EAN, symbol — w tej kolejności.
+ *
+ * Jedno miejsce dla kosza i dla kartonu (0.122.0), bo to JEDNA gramatyka:
+ * magazynier robi ten sam ruch przy obu pudłach i rozjazd w rozpoznawaniu
+ * znaczyłby, że ten sam kod raz działa, a raz nie.
+ */
+export function towarZKodu(code: string) {
+  const raw = code.trim();
+  const p = subiekt.getProductByEan(raw) ?? (aliasKodu(raw) ? subiekt.getProductById(aliasKodu(raw)!.twId) : undefined);
+  return p ?? subiekt.getProductBySymbol(raw.toUpperCase()) ?? subiekt.getProductBySymbol(raw);
+}
+
 export function skanTowaruKosza(
   koszId: number,
   code: string
 ): { pozycjaId: number } | { poza: true; symbol: string } | { nieznany: true } {
-  const raw = code.trim();
-  const p = subiekt.getProductByEan(raw) ?? (aliasKodu(raw) ? subiekt.getProductById(aliasKodu(raw)!.twId) : undefined);
-  const tw = p ?? subiekt.getProductBySymbol(raw.toUpperCase()) ?? subiekt.getProductBySymbol(raw);
+  const tw = towarZKodu(code);
   if (!tw) return { nieznany: true };
   const poz = db()
     .prepare(
@@ -828,12 +890,19 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const pominiete = pozycje.length - odlozone.length;
 
   const d = db();
-  /* Kosz z dokumentu MM (0.75.0) NIE kolejkuje niczego. Przesunięcie na regał
-     zwrotów wystawiło już biuro, a dokument powrotny (ZWR→MAG) też wystawia
-     biuro — kolektor zapisał adresy i to jest cała jego rola. Zakolejkowanie
-     MM tutaj znaczyłoby dokument wystawiony DRUGI raz, na towar, który nikomu
-     się nie przesuwał. */
-  if (kosz.mm_dok_id != null) {
+  /* Dwa kosze NIE kolejkują niczego, każdy z własnego powodu.
+
+     Kosz z dokumentu MM (0.75.0): przesunięcie na regał zwrotów wystawiło już
+     biuro, a dokument powrotny (ZWR→MAG) też wystawia biuro — kolektor zapisał
+     adresy i to jest cała jego rola. Zakolejkowanie MM tutaj znaczyłoby
+     dokument wystawiony DRUGI raz, na towar, który nikomu się nie przesuwał.
+
+     KARTON (0.122.0): towar w ogóle nie opuścił magazynu. Ktoś zebrał go pod
+     zamówienie, pakujący odłożył do pudła, a teraz wraca na półkę — stan
+     magazynu przez cały ten czas się nie zmienił. MM ZWROTY→MAG zdjęłoby
+     z bufora zwrotów towar, którego na tym buforze nigdy nie było, czyli
+     zrobiłoby stan ujemny na dokumencie, którego nikt nie zamawiał. */
+  if (kosz.mm_dok_id != null || kosz.rodzaj === RODZAJ_KARTON) {
     transaction(d, () => {
       d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
         .run(nowIso(), autor, koszId);

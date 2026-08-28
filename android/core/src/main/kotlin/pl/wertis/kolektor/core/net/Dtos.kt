@@ -942,6 +942,8 @@ data class KoszRow(
     val zwrotow: Int = 0,
     val pozycji: Int = 0,
     val odlozonych: Int = 0,
+    /** `zwroty` albo `karton`; puste = starszy serwer, czyli zawsze zwroty. */
+    val rodzaj: String = "zwroty",
 )
 
 @Serializable
@@ -1011,6 +1013,11 @@ data class KoszView(
      * dokumentu — powrotny wystawia biuro.
      */
     val mmNumer: String? = null,
+    /**
+     * `zwroty` albo `karton` (0.122.0). Karton zbiera się na hali, więc przy
+     * statusie `otwarty` ekran pokazuje dokładanie towaru zamiast rozkładania.
+     */
+    val rodzaj: String = "zwroty",
 )
 
 @Serializable
@@ -1022,6 +1029,29 @@ data class KoszSkan(
     val pozycjaId: Long? = null,
     val poza: Boolean = false,
     val symbol: String = "",
+    val nieznany: Boolean = false,
+)
+
+/* ── KARTON: rozkładanie od zera (0.122.0) — lustro routes/karton.ts ──────── */
+
+@Serializable
+data class KartonyResponse(val kartony: List<KoszRow> = emptyList())
+
+/** Dodanie towaru; `ilosc` pominięta znaczy JEDNĄ SZTUKĘ, bo tak działa skan. */
+@Serializable
+data class DodajDoKartonuBody(val code: String, val ilosc: Double? = null)
+
+@Serializable
+data class IloscKartonuBody(val ilosc: Double)
+
+/** Odpowiedź dodania: pozycja po zsumowaniu ALBO uczciwe „nie znam kodu". */
+@Serializable
+data class DodanieDoKartonu(
+    val pozycjaId: Long? = null,
+    val symbol: String = "",
+    val nazwa: String = "",
+    /** Ilość PO dodaniu — drugi skan tego samego towaru podnosi tę pozycję. */
+    val ilosc: Double = 0.0,
     val nieznany: Boolean = false,
 )
 

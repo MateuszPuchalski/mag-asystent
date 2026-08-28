@@ -36,6 +36,8 @@ import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryLinesScreen
+import pl.wertis.kolektor.ui.karton.KartonScreen
+import pl.wertis.kolektor.ui.karton.KartonyScreen
 import pl.wertis.kolektor.ui.kosze.KoszScreen
 import pl.wertis.kolektor.ui.zwroty.PrzyjeciaScreen
 import pl.wertis.kolektor.ui.problems.ProblemsBanner
@@ -170,6 +172,8 @@ fun AppRoot(graph: AppGraph) {
                 Screen.DELIVERY_LINES -> DeliveryLinesScreen(graph)
                 Screen.PRZYJECIA -> PrzyjeciaScreen(graph)
                 Screen.KOSZ_LINES -> KoszScreen(graph)
+                Screen.KARTONY -> KartonyScreen(graph)
+                Screen.KARTON -> KartonScreen(graph)
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)
@@ -186,6 +190,7 @@ fun AppRoot(graph: AppGraph) {
             onHome = { graph.nav.go(Screen.HOME) },
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
             onZwroty = { graph.nav.go(Screen.PRZYJECIA) },
+            onKarton = { graph.nav.go(Screen.KARTONY) },
             onBack = { graph.nav.goBack() },
         )
         WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera) {

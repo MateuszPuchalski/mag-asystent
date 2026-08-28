@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.121.1",
+  "version": "0.122.0",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",

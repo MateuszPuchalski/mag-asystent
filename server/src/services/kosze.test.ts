@@ -451,3 +451,20 @@ test("pozycja niesie WSZYSTKIE półki towaru, pickingową pierwszą", async () 
     ["C09-09-09", "B04-01-02"]
   );
 });
+
+test("karton nie miesza się z obiegiem zwrotów", async () => {
+  /* Karton (0.122.0) mieszka w tej samej tabeli, bo rozkłada się go tak samo.
+     Wszystko PRZED rozkładaniem jest jednak inne i granica musi być twarda:
+     zawartość kartonu zbiera hala, a nie biuro przypinające zwroty. */
+  const KA = await import("./karton.js");
+  const karton = KA.zalozKarton("Magazynier");
+  const id = await zwrotZDokumentami();
+
+  assert.equal(K.koszPoKodzie(karton.kod), undefined, "kod kartonu nie jest kodem kosza");
+  assert.throws(() => K.przypnijZwrot(id, karton.kod, "Biuro"), /karton z hali/);
+  assert.throws(() => K.zamknijKosz(karton.id, "Biuro"), /na kolektorze/);
+
+  K.przypnijZwrot(id, "KZ-01", "Biuro");
+  const kosz = K.koszPoKodzie("KZ-01")!;
+  assert.throws(() => KA.dodajDoKartonu(kosz.id, "TEST-LINIA-TODO", 1, "Magazynier"), /to zwroty/);
+});

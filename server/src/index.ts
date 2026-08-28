@@ -26,6 +26,7 @@ import { zwrotyRoutes } from "./routes/zwroty.js";
 import { pytaniaRoutes } from "./routes/pytania.js";
 import { dyskusjeRoutes } from "./routes/dyskusje.js";
 import { sprawyRoutes } from "./routes/sprawy.js";
+import { kartonRoutes } from "./routes/karton.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
@@ -214,6 +215,7 @@ export async function buildApp() {
   await app.register(dyskusjeRoutes);
   await app.register(sprawyRoutes);
   await app.register(koszeRoutes);
+  await app.register(kartonRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();

@@ -14,6 +14,7 @@ class NavModelTest {
         // kosz zwrotów → lista przyjęć, czyli korzeń WŁASNEJ zakładki (0.75.0);
         // wcześniej wracał na dostawy, bo tam mieszkała lista koszy
         assertEquals(Screen.PRZYJECIA, backTarget(Screen.KOSZ_LINES, null))
+        assertEquals(Screen.KARTONY, backTarget(Screen.KARTON, null))
         assertEquals(Screen.HOME, backTarget(Screen.LOCATION, null))
         assertEquals(Screen.HOME, backTarget(Screen.SETTINGS, null))
     }
@@ -25,6 +26,8 @@ class NavModelTest {
         assertNull(backTarget(Screen.DELIVERY_DOCS, null))
         // korzeń zakładki „ZWROTY"
         assertNull(backTarget(Screen.PRZYJECIA, null))
+        // korzeń zakładki „KARTON"
+        assertNull(backTarget(Screen.KARTONY, null))
     }
 
     @Test fun `kolejka wraca tam skad ja otwarto`() {

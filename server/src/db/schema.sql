@@ -192,6 +192,11 @@ INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
 INSERT OR IGNORE INTO counters(name, value) VALUES ('korekta', 12);
 -- licznik RW zniszczonych zwrotów (dev — w prod numeruje Subiekt)
 INSERT OR IGNORE INTO counters(name, value) VALUES ('rw', 3);
+-- licznik kodów kartonów (0.122.0). Jedyny licznik, który liczy NA SERIO
+-- i w produkcji: karton nie ma dokumentu w Subiekcie, więc numeru nie ma mu
+-- kto nadać poza aplikacją. `OR IGNORE` obsługuje bazę nową i zastaną naraz,
+-- bo schemat wykonuje się przy każdym starcie.
+INSERT OR IGNORE INTO counters(name, value) VALUES ('karton', 0);
 
 -- ── Rozkładanie dostaw (redesign v2.0) ─────────────────────────────────────
 -- Jednostką pracy jest DOKUMENT, nie sesja (D2). Rozkładanie zapisuje WYŁĄCZNIE

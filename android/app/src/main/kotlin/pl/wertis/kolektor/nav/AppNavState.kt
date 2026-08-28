@@ -129,10 +129,24 @@ class AppNavState(private val recentStore: RecentStore) {
         go(Screen.KOSZ_LINES)
     }
 
+    /**
+     * Karton (0.122.0) — ten sam identyfikator, inny ekran.
+     *
+     * Kartonu i kosza nie rozdziela pole `koszId`, bo to jeden byt w bazie
+     * i jeden ekran rozkładania. Rozdziela je ZAKŁADKA: człowiek, który
+     * wszedł tu przez KARTON, ma po WSTECZ wrócić do kartonów, a nie do
+     * cudzej listy koszy z regału zwrotów.
+     */
+    fun openKarton(id: Long) {
+        koszId = id
+        go(Screen.KARTON)
+    }
+
     /** Wyjście z ROZŁOŻONEGO kosza — jak `zakonczonaDostawa`, ten sam powód. */
     fun zakonczonyKosz() {
+        val doKartonow = screen.value == Screen.KARTON
         koszId = null
-        go(Screen.PRZYJECIA)
+        go(if (doKartonow) Screen.KARTONY else Screen.PRZYJECIA)
     }
 
     /**
