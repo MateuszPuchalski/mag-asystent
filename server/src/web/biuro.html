@@ -87,38 +87,75 @@
      wyżej zostaje dla `#login`, które dalej ma być wąskim pudełkiem. */
   main#panel { max-width: none; margin: 0; padding: 0 var(--brzeg) var(--stopka); display: block; }
 
-  /* Pasek stanu i zakładki jadą ze stroną. Przewinięcie listy dostaw nie ma
-     prawa zabierać z ekranu ani nawigacji, ani alarmu o kolejce w błędzie —
-     to jest jedyny powód, dla którego ten pasek w ogóle stoi na górze. */
+  /* Nagłówek jedzie ze stroną. Przewinięcie listy dostaw nie ma prawa zabierać
+     z ekranu ani nawigacji, ani alarmu o kolejce w błędzie — to jest jedyny
+     powód, dla którego ten pasek w ogóle stoi na górze.
+
+     Od 0.119.1 pasmo jest JEDNO. Do tej wersji pod nagłówkiem stał jeszcze
+     biały `#chrome` z dwiema ikonami stanu i plakietką odpowiedzi na notatki —
+     i był PUSTY, gdy odpowiedzi nie było, czyli prawie zawsze. Drugie pasmo
+     chromu kosztowało ~43 px na KAŻDEJ zakładce; ta sama arytmetyka, która
+     w 0.95.0 wygnała zakładki do nagłówka. */
   header { position: sticky; top: 0; z-index: 30; }
-  #chrome {
-    position: sticky; top: var(--hGora, 52px); z-index: 20;
-    background: var(--paper); padding: var(--luz) 0 10px;
-    /* Miękka krawędź zamiast kreski: kreska wisiałaby też przy scrollTop = 0,
-       czyli wtedy, gdy nic jeszcze nie wjechało pod pasek. */
-    box-shadow: 0 10px 12px -10px rgba(42, 42, 44, .18);
-  }
-  /* Od 0.95.0 `#chrome` niesie WYŁĄCZNIE pasek stanu — zakładki pojechały do
-     nagłówka. Odstęp pod paskiem był odstępem PRZED zakładkami; bez nich
-     zostałby pustym pasmem papieru nad pierwszą kartą. */
-  #chrome { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-  #chrome #stan { margin-bottom: 0; }
-  /* Ikony stanu (0.114.0): kropka mówi kolorem, `title` zdaniami. Tooltip
-     natywny świadomie — panel biura to desktop z myszą (założenie repo),
-     a własny dymek to kolejny kawałek UI do utrzymania bez nowej informacji. */
+
+  /* ── Ikony stanu w ciemnym pasku (0.114.0, przeprowadzka 0.119.1) ──────────
+     Kropka mówi kolorem, `title` zdaniami. Tooltip natywny świadomie — panel
+     biura to desktop z myszą (założenie repo), a własny dymek to kolejny
+     kawałek UI do utrzymania bez nowej informacji.
+
+     Spokojna pastylka bierze wartości od sąsiada w tym pasku (`header button`),
+     nie własne: przezroczyste tło, obrys #555, tekst #ccc. Biała pastylka
+     z jasnym obrysem byłaby na grafitowym pasku plamą jaśniejszą od zakładki
+     bieżącej — czyli krzyczałaby wtedy, gdy nie ma o czym. */
   .ikonaStanu {
     display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
-    border: 1px solid var(--border); border-radius: 999px; background: var(--card);
+    border: 1px solid #555; border-radius: 999px; background: none;
     padding: 4px 12px; font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px;
-    color: var(--ink-soft);
+    color: #ccc;
   }
-  .ikonaStanu:hover { border-color: var(--amber); color: var(--ink); }
-  .ikonaStanu i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-soft); }
+  .ikonaStanu:hover { border-color: var(--amber); color: var(--amber); }
+  .ikonaStanu i { width: 10px; height: 10px; border-radius: 50%; background: #888; }
   .ikonaStanu.ok i { background: var(--ok); }
   .ikonaStanu.amber i { background: var(--amber); }
   .ikonaStanu.err i { background: var(--err); }
-  /* Czerwień ma być widoczna kątem oka — sama kropka 10 px nie jest. */
-  .ikonaStanu.err { border-color: var(--err); background: var(--err-bg); color: var(--err); }
+  /* Alarm ZOSTAJE wypełniony i to jest decyzja, nie przeoczenie. `--err` na
+     `--ink` nie ma kontrastu (#B33A3A na #2A2A2C), a jasna plama na ciemnym
+     pasku jest MOCNIEJSZYM alarmem niż na białym — spokój jest tu obrysem,
+     więc wypełnienie zostaje wyłącznie dla wyjątku. Ta sama para kolorów,
+     co dotąd; żadnego nowego odcienia pod ciemne tło. */
+  .ikonaStanu.err { border-color: var(--err-bg); background: var(--err-bg); color: var(--err); }
+  .ikonaStanu.err:hover { border-color: var(--err); color: var(--err); }
+  .ikonaStanu.amber { border-color: var(--amber-bg); background: var(--amber-bg); color: var(--amber-ink); }
+  .ikonaStanu.amber:hover { border-color: var(--amber); color: var(--amber-ink); }
+  /* Plakietka odpowiedzi na notatki nosi kształt ikony stanu, a nie wypełnionej
+     pigułki: wypełniony bursztyn stoi w tym pasku obok BURSZTYNOWEJ ZAKŁADKI
+     BIEŻĄCEJ i dwie bursztynowe pastylki czytałyby się jak dwie zakładki. */
+  #stan .badge { border: 1px solid #555; background: none; color: #ccc;
+                 display: inline-flex; align-items: center; gap: 7px;
+                 padding: 4px 12px; cursor: pointer; text-transform: none;
+                 font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px; }
+  #stan .badge::before { content: ""; width: 10px; height: 10px; border-radius: 50%;
+                         background: var(--amber); flex: none; }
+  #stan .badge:hover { border-color: var(--amber); color: var(--amber); }
+  .ikonaStanu .et, #stan .et { margin-left: -1px; }
+
+  /* ── Wąsko: pastylka schodzi do samej kropki ───────────────────────────────
+     Nagłówek ma `flex-wrap`, a poniżej 1280 px marka, sześć zakładek z podpisami
+     grup i klaster sesji przestają się mieścić w jednym wierszu — zawinięcie
+     robi z niego 93 px i oddaje dokładnie te 43 px, po które ta przeprowadzka
+     przyszła. Zmierzone, nie przewidziane.
+
+     Schodzą NAPISY, nie ikony, i to jest zgodne z tym, po co ikony powstały
+     w 0.114.0: kolor odpowiada na jedyne pytanie biura („czy coś się dzieje?"),
+     a treść i tak mieszka w `title`. Przy plakietce notatek zostaje sama
+     liczba — bo ona jest tam informacją, a nie ozdobą.
+
+     Ten sam próg 1280 px co trzy strefy konsoli, tylko od drugiej strony:
+     jedna liczba na dwa pytania o szerokość, nie dwie do rozjechania. */
+  @media (max-width: 1279px) {
+    .ikonaStanu .et, #stan .et { display: none; }
+    .ikonaStanu, #stan .badge { padding: 4px 9px; }
+  }
 
   /* Karta, do której prowadzi kliknięcie kafla w pasku stanu (`scrollIntoView`)
      albo `focus()` po przełączeniu zakładki, wjechałaby POD przyklejony pasek.
@@ -986,6 +1023,24 @@
        gdy zakładki zajęły cały rząd, „Wyloguj" spadał do drugiego wiersza SAM,
        zostawiając nad sobą zębatkę. Grupa zawija się w komplecie. -->
   <div class="sesja">
+    <!-- STAN W GÓRNYM PASKU (0.119.1). Do tej wersji obie ikony i plakietka
+         odpowiedzi stały w osobnym białym pasku pod nagłówkiem — a ten pasek
+         był PUSTY, gdy nie było odpowiedzi na notatki, czyli prawie zawsze.
+         Drugie pasmo chromu kosztowało ~43 px NA KAŻDEJ zakładce, dokładnie
+         tak jak zakładki przed 0.95.0. Tu jest ich miejsce: obok „kto"
+         i „Wyloguj" mieszka to, co dotyczy całej sesji, a nie jednego widoku.
+
+         Ikony zostają tym, czym były w 0.114.0: kolor odpowiada na jedyne
+         pytanie biura („czy coś się dzieje?"), a wszystko, co niósł rząd
+         kafli, jedzie w tooltipie `title`. -->
+    <button class="ikonaStanu" id="ikonaZdrowia" title="Czekam na pierwszy odczyt stanu…" hidden><i></i><span class="et">SYSTEM</span></button>
+    <button class="ikonaStanu" id="ikonaAllegro" title="Stan konta Allegro jeszcze nieznany" hidden><i></i><span class="et">ALLEGRO</span></button>
+    <!-- Plakietka-zdarzenie (odpowiedzi na notatki) jedzie tu razem z nimi, ale
+         zostaje OSOBNA: to sygnał roboczy z własną drogą (dostawy → karta
+         odpowiedzi), nie zdrowie systemu — zwinięcie go do ikony zdrowia
+         zgubiłoby tę drogę drugi raz (patrz zgłoszenie z 20 sierpnia w teście
+         „licznik prowadzi do karty"). -->
+    <div id="stan"></div>
     <span class="kto" id="kto"></span>
     <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). Do 0.75.0 DOSTAWCY stali w pasku
          zakładek jako trzecia grupa — jedna pastylka o tej samej wadze co
@@ -1021,26 +1076,6 @@
 </main>
 
 <main id="panel" hidden>
-  <!-- Przyklejony pasek stanu (0.83.0). Do 0.94.0 stały tu razem z nim
-       zakładki; od 0.95.0 pojechały do nagłówka i został sam alarm o kolejce.
-       Wrapper zostaje mimo to: to on jest przyklejony i to on rysuje miękką
-       krawędź pod chromem, a `#stan` przerysowuje się z serwera. -->
-  <div id="chrome">
-  <!-- Dwie ikony zamiast rzędu kafli (0.114.0). Rząd „serwer OK · worker OK ·
-       kolejka bez błędów" świecił na zielono cały dzień — pasek, który zawsze
-       coś mówi, uczy siebie nie czytać. Kolor odpowiada na jedyne pytanie
-       biura („czy coś się dzieje?"), a WSZYSTKO, co niosły kafle, jedzie
-       w tooltipie `title`. Ikona Allegro stoi tu, bo parowanie zaczynało się
-       trzy ekrany w głąb zakładki SPRAWY — właściciel go nie znajdował. -->
-  <button class="ikonaStanu" id="ikonaZdrowia" title="Czekam na pierwszy odczyt stanu…"><i></i>SYSTEM</button>
-  <button class="ikonaStanu" id="ikonaAllegro" title="Stan konta Allegro jeszcze nieznany"><i></i>ALLEGRO</button>
-  <!-- Zostają tylko plakietki-zdarzenia (odpowiedzi na notatki): to sygnał
-       roboczy z WŁASNĄ drogą (dostawy → karta odpowiedzi), nie zdrowie
-       systemu — zwinięcie go do ikony zdrowia zgubiłoby tę drogę drugi raz
-       (patrz zgłoszenie z 20 sierpnia w teście „licznik prowadzi do karty"). -->
-  <div id="stan"></div>
-  </div>
-
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
   <div id="widokDostawy" class="widok">
     <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
@@ -2364,9 +2399,13 @@ function wyloguj() {
   localStorage.removeItem("wertis.kto");
   $("panel").hidden = true; $("wyloguj").hidden = true; $("ustawienia").hidden = true;
   /* Zakładki mieszkają od 0.95.0 w nagłówku, czyli POZA `#panel` — samo
-     schowanie panelu już ich nie zdejmuje. Podtytuł wraca: na ekranie
-     logowania nie ma zakładek, które mówiłyby, co to za strona. */
+     schowanie panelu już ich nie zdejmuje. Od 0.119.1 dotyczy to także ikon
+     stanu: przed przeprowadzką chowały się razem z `#panel`, teraz świeciłyby
+     nad formularzem logowania jak zakładki przed 0.95.0. Podtytuł wraca: na
+     ekranie logowania nie ma zakładek, które mówiłyby, co to za strona. */
   zakladki().hidden = true; $("podtytul").hidden = false;
+  for (const id of IKONY_STANU) $(id).hidden = true;
+  $("stan").innerHTML = "";
   $("login").hidden = false; $("kto").textContent = "";
 }
 
@@ -2506,12 +2545,20 @@ function rysujStan(health, kolejka) {
      że sygnał bez drogi do treści jest sygnałem zgubionym. */
   const n = odpowiedziNaNotatki.length;
   $("stan").innerHTML = n
-    ? `<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi">
-      ${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span>`
+    ? `<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi"
+      title="${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"} — kliknij, żeby przeczytać."
+      >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`
     : "";
 
   rysujIkoneAllegro();
 }
+
+/* Ikony stanu mieszkają od 0.119.1 w nagłówku, czyli POZA `#panel` — a to
+   znaczy, że schowanie panelu ich nie zdejmuje i muszą się chować same, przy
+   logowaniu i wylogowaniu. Jedna lista na trzy miejsca: dwie nazwy wpisane
+   w każdym z nich osobno to trzecie miejsce do zapomnienia przy trzeciej
+   ikonie. Ta sama lekcja, co przy `KARTY_SPRAW`. */
+const IKONY_STANU = ["ikonaZdrowia", "ikonaAllegro"];
 
 /* Ikona Allegro obok ikony zdrowia. Osobna, bo Allegro ma osobny cykl życia
    (parowanie, wygaśnięcie tokenu) i osobne wejście: klik prowadzi do karty
@@ -6806,20 +6853,20 @@ async function pollParowania() {
 }
 
 /* ── Wysokość przyklejonego chrome'u ─────────────────────────────────────────
-   Nie jest to kosmetyka: od niej zależy `top` paska zakładek ORAZ
-   `scroll-margin-top` kart, do których prowadzi kliknięcie kafla w pasku stanu
+   Nie jest to kosmetyka: od niej zależy wysokość stref konsoli
+   (`100dvh - --hChrome` w dziewięciu miejscach arkusza) ORAZ
+   `scroll-margin-top` kart, do których prowadzi kliknięcie plakietki
    i `focus()` po przełączeniu zakładki. Sztywna liczba rozjechałaby się
-   pierwszego dnia — nagłówek zawija się na wąskim oknie, a pasek stanu rośnie
-   o kafel „ŚRODOWISKO" i o licznik odpowiedzi na notatki.
+   pierwszego dnia — nagłówek zawija się na wąskim oknie.
 
-   Pętli zwrotnej tu nie ma: zmiana `--hGora` przesuwa `#chrome`, nie zmienia
-   jego wysokości. */
+   Od 0.119.1 pasm chromu jest JEDNO, więc `--hChrome` to po prostu wysokość
+   nagłówka. Zmienna zostaje mimo to i zostaje pod tą nazwą: znaczy „ile chromu
+   stoi nad treścią", a nie „nagłówek plus pasek". Dziewięć reguł konsoli nie
+   musiało się o tej przeprowadzce dowiedzieć — i o to w mierzeniu chodzi.
+   `--hGora` zeszła razem z paskiem: pozycjonowała wyłącznie jego. */
 function mierzChrome() {
-  const gora = document.querySelector("header").offsetHeight;
-  const pasek = $("chrome").offsetHeight;
-  const s = document.documentElement.style;
-  s.setProperty("--hGora", gora + "px");
-  s.setProperty("--hChrome", gora + pasek + "px");
+  document.documentElement.style.setProperty(
+    "--hChrome", document.querySelector("header").offsetHeight + "px");
 }
 
 function start() {
@@ -6831,6 +6878,7 @@ function start() {
      co podświetlona pastylka, a w jednym rzędzie z sześcioma innymi zabiera
      szerokość, której na laptopie nie ma. */
   zakladki().hidden = false; $("podtytul").hidden = true;
+  for (const id of IKONY_STANU) $(id).hidden = false;
   $("kto").textContent = kto;
   wczytajFirme();
   wczytajWglad();
@@ -6851,9 +6899,7 @@ function start() {
   pokaz(widok);
   /* Po odsłonięciu panelu, bo `offsetHeight` schowanego elementu to zero. */
   mierzChrome();
-  for (const el of [document.querySelector("header"), $("chrome")]) {
-    new ResizeObserver(mierzChrome).observe(el);
-  }
+  new ResizeObserver(mierzChrome).observe(document.querySelector("header"));
   odswiezDostawy();
   odswiezStan();
 }
@@ -6918,9 +6964,20 @@ document.addEventListener("click", (e) => {
   blok.hidden = !blok.hidden;
   i.setAttribute("aria-expanded", String(!blok.hidden));
 });
-/* Delegacja z poziomu SEKCJI (#chrome), nie z plakietek w środku — plakietki
-   przerysowuje co pół minuty `rysujStan`, a nasłuch ma to przeżyć. */
-$("chrome").addEventListener("click", (e) => {
+/* Delegacja z poziomu NAGŁÓWKA, nie z plakietek w środku — plakietki
+   przerysowuje co pół minuty `rysujStan`, a nasłuch ma to przeżyć.
+
+   W 0.119.1 ikony wyjechały z `#chrome` do nagłówka i nasłuch wyjechał RAZEM
+   Z NIMI, w tym samym commicie. Zostawiony na `#chrome` byłby szóstą odsłoną
+   tej samej usterki (0.92.0, 0.96.0, 0.97.0, 0.98.0, 0.101.0): SYSTEM i ALLEGRO
+   wyglądałyby normalnie i nie robiłyby nic, a `#chrome` już nie istnieje, więc
+   `$(…)` zwróciłoby `null` i wywaliło CAŁY skrypt przy starcie.
+
+   Nagłówek niesie też pasek zakładek z własną delegacją na `[data-widok]`.
+   Dwie delegacje na jednym elemencie żyją obok siebie, bo szukają rozłącznych
+   markerów, a ta kończy się na `[data-do]` — zębatka USTAWIENIA ma `data-widok`
+   i musi trafić do tamtej. */
+document.querySelector("header").addEventListener("click", (e) => {
   if (e.target.closest("#ikonaZdrowia")) return pokaz("nadzor");
   if (e.target.closest("#ikonaAllegro")) {
     /* Ikona to drzwi, karta KONTO ALLEGRO — miejsce pracy. Gdy stan woła

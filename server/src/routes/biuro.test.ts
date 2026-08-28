@@ -454,8 +454,12 @@ test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", (
   assert.ok(otwarcie, "pasek zakładek istnieje");
   assert.ok(otwarcie.index! < html.indexOf("</header>"),
     "pasek stoi w nagłówku — po to wyjechał z osobnego pasma");
-  assert.ok(otwarcie.index! < html.indexOf('id="chrome"'),
-    "pasek nie wrócił do `#chrome`, gdzie został sam pasek stanu");
+  /* Do 0.119.1 stała tu asercja „pasek nie wrócił do `#chrome`". Kotwica
+     zeszła razem z paskiem stanu — od tej wersji chromu jest JEDNO pasmo,
+     więc pilnujemy rzeczy mocniejszej: `#chrome` nie ma go w ogóle. Bez tego
+     ktoś odtworzy pasek pod nagłówkiem i nikt tego nie zauważy. */
+  assert.ok(!html.includes('id="chrome"'),
+    "pasek stanu nie wrócił jako drugie pasmo chromu");
   assert.match(otwarcie[0], /\bhidden\b/,
     "pasek startuje schowany — `#panel` już go nie zasłania");
 
@@ -465,15 +469,15 @@ test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", (
   }
 });
 
-test("pasek stanu niesie licznik odpowiedzi na notatki", () => {
-  /* Pasek widać z KAŻDEJ zakładki i to jest cały sens tego sygnału: do 0.57.0
+test("nagłówek niesie licznik odpowiedzi na notatki", () => {
+  /* Nagłówek widać z KAŻDEJ zakładki i to jest cały sens tego sygnału: do 0.57.0
      odpowiedź widać było wyłącznie po wejściu w tę konkretną dostawę, a biuro
      nie miało powodu tam wracać. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-  assert.match(html, /odpowiedziNaNotatki\.length/, "pasek stanu czyta licznik");
+  assert.match(html, /odpowiedziNaNotatki\.length/, "nagłówek czyta licznik");
   assert.match(html, /biuro\/notatki\/odpowiedzi/, "licznik ma własną trasę za sesją");
   /* Licznik jedzie przez `api()`, nie przez gołe `fetch` — i to jest cała
      różnica: `api()` dokłada `x-session`. Gdyby ktoś dołożył ten licznik do
@@ -1322,8 +1326,26 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   // 2. Dwie ikony w pasku, każda z natywnym tooltipem i nawigacją z sekcji.
   assert.match(html, /id="ikonaZdrowia"/, "zdrowie systemu to jedna ikona, nie rząd kafli");
   assert.match(html, /id="ikonaAllegro"/, "wejście do parowania stoi w pasku na górze");
+  /* Obie ikony stoją W NAGŁÓWKU (0.119.1), nie w osobnym pasku pod nim. */
+  assert.ok(html.indexOf('id="ikonaZdrowia"') < html.indexOf("</header>"),
+    "ikona zdrowia mieszka w nagłówku");
+  assert.ok(html.indexOf('id="ikonaAllegro"') < html.indexOf("</header>"),
+    "ikona Allegro mieszka w nagłówku");
+  /* Nagłówek nie chowa się razem z `#panel`, więc ikony muszą chować się same —
+     inaczej świecą nad formularzem logowania, jak zakładki przed 0.95.0. */
+  assert.match(html, /const IKONY_STANU = /, "ikony mają jedną listę na trzy miejsca");
+  for (const co of ["hidden = true", "hidden = false"]) {
+    assert.ok(html.includes(`for (const id of IKONY_STANU) $(id).${co}`),
+      `ikony stanu same pilnują swojej widoczności (${co})`);
+  }
   assert.match(html, /ik\.title = linie\.join\("\\n"\)/, "tooltip niesie pełne zdania kafli");
-  assert.match(html, /\$\("chrome"\)\.addEventListener\("click"/, "pasek deleguje z sekcji #chrome");
+  /* DELEGACJA WYJECHAŁA RAZEM Z IKONAMI (0.119.1) i to jest cała treść tej
+     asercji. Zostawiona na `#chrome` byłaby szóstą odsłoną usterki z 0.92.0,
+     0.96.0, 0.97.0, 0.98.0 i 0.101.0 — tyle że tym razem głośną: `#chrome`
+     już nie istnieje, więc `$(…)` zwraca `null` i wywala cały skrypt. */
+  assert.match(html, /document\.querySelector\("header"\)\.addEventListener\("click"/,
+    "pasek deleguje z nagłówka — stamtąd, gdzie stoją ikony");
+  assert.ok(!/\$\("chrome"\)/.test(html), "nic już nie sięga po nieistniejący #chrome");
   assert.ok(
     !/\$\("stan"\)\.addEventListener/.test(html),
     "nasłuch nie wisi na #stan — to pojemnik przerysowywany co cykl"

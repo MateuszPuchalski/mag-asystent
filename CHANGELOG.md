@@ -33,6 +33,38 @@ historii nie przepisujemy.
 
 ---
 
+## 0.119.1 — 28 sierpnia 2026
+
+**Ikony SYSTEM i ALLEGRO przeniosły się do górnego paska, a biały pasek stanu
+pod nim zniknął.** Zgłoszenie właściciela: „indykator system i allegro wrzuć
+do top bara".
+
+Pasm chromu było dwa: ciemny nagłówek z zakładkami i biały pasek pod nim
+z dwiema ikonami stanu oraz plakietką odpowiedzi na notatki. Ten drugi był
+PUSTY, gdy odpowiedzi nie było — czyli prawie zawsze — i kosztował ~43 px
+na KAŻDEJ zakładce. Ta sama arytmetyka, która w 0.95.0 wygnała zakładki do
+nagłówka.
+
+Wszystkie trzy rzeczy stoją teraz w klastrze sesji, obok „kto" i WYLOGUJ —
+tam, gdzie mieszka to, co dotyczy całej sesji, a nie jednego widoku.
+
+**Spokojna pastylka jest obrysem, alarm zostaje wypełniony.** Na grafitowym
+pasku biała pastylka byłaby jaśniejsza od zakładki bieżącej, czyli krzyczałaby
+wtedy, gdy nie ma o czym. Wypełnienie zostaje dla wyjątku — i jasna plama na
+ciemnym tle jest mocniejszym alarmem niż na białym. Żadnego nowego koloru:
+ta sama para, co dotąd.
+
+**Poniżej 1280 px z pastylki zostaje sama kropka.** Zmierzone, nie
+przewidziane: przy 1180 px nagłówek zawijał się do drugiego wiersza i oddawał
+dokładnie te 43 px, po które ta zmiana przyszła. Schodzą napisy, nie ikony —
+zgodnie z tym, po co ikony powstały w 0.114.0: kolor odpowiada na jedyne
+pytanie biura, a treść i tak mieszka w tooltipie.
+
+Zmienna `--hChrome` znaczy dalej „ile chromu stoi nad treścią", więc dziewięć
+reguł konsoli nie musiało się o tej przeprowadzce dowiedzieć — o to chodzi
+w mierzeniu wysokości zamiast wpisywania jej. `--hGora` zeszła razem z paskiem,
+bo pozycjonowała wyłącznie jego.
+
 ## 0.119.0 — 28 sierpnia 2026
 
 **Kolektor znowu widzi aktualizacje. Nie widział ich od 0.100.0.** Zgłoszenie
