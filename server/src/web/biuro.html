@@ -146,6 +146,83 @@
   /* Jedna karta na widok — siatka nie ma czego układać. */
   #widokDziennik { grid-template-columns: 1fr; }
 
+  /* ── USTAWIENIA: jedna tafla, nie pięć kartek ──────────────────────────────
+     Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
+     i niepotrzebnych marginesów". Dwa pierwsze (0.112.0 konsola spraw, 0.116.0
+     cała zakładka SPRAWY) zostawiły regułę: KONSOLA PRACY TO TAFLE,
+     POWIERZCHNIA DO CZYTANIA TO KARTY. Ustawienia były ostatnią zakładką,
+     która jej nie przeszła.
+
+     Ustawienia nie są ani jednym, ani drugim — to KOMPLET rzeczy ustawianych
+     raz. Pięć kartek z cieniem, rozrzuconych przez `auto-fit` na dwie kolumny
+     różnej wysokości, czytało się jak pięć niezależnych dokumentów. Jest to
+     jeden arkusz, więc dostaje wygląd arkusza: jedna kolumna, sekcje stykają
+     się kreską.
+
+     Promień zdejmujemy WYŁĄCZNIE tutaj. `.card` jest jedną klasą na cały
+     panel, więc globalne `border-radius: 0` skasowałoby różnicę między
+     stanowiskiem pracy a zestawieniem do czytania — pilnuje tego test
+     „konsola to tafle, a powierzchnia do czytania zostaje kartą". */
+  #widokDostawcy {
+    grid-template-columns: 1fr;
+    gap: 0;
+    /* Sekcje to FORMULARZE — sześć pól firmy i dwa pola tekstowe. Rozciągnięte
+       na 2560 px zostawiają metr pustego papieru po prawej, a pole promptu
+       robi się nie do redagowania. Tabele (konta, dostawcy, reguły) mieszczą
+       się w tej mierze z zapasem. */
+    max-width: 60rem;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+  }
+  /* Sam `gap: 0` nie wystarczy: zostawiłby stykające się zaokrąglone rogi
+     i cienie wchodzące jeden na drugi. Ta sama uwaga, co przy konsoli. */
+  #widokDostawcy > .card {
+    border-radius: 0; box-shadow: none;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    border-top: 1px solid var(--border);
+  }
+  #widokDostawcy > .card:first-child { border-top: 0; }
+  /* Ślad po kliknięciu kafla w pasku stanu musi przeżyć spłaszczenie:
+     `.card.wskazana` maluje obwódkę cieniem, a `box-shadow: none` wyżej
+     wygrywa z nią specyficznością identyfikatora. Na tafli to i tak jest
+     belka przy krawędzi, nie obwódka — dokładnie jak `tr.aktywny`. */
+  #widokDostawcy > .card.wskazana { box-shadow: inset 3px 0 0 var(--amber); }
+
+  /* ── Rytm pionowy JEDNĄ regułą ─────────────────────────────────────────────
+     Widok niósł osiemnaście atrybutów `style` na 135 wierszach, w tym osiem
+     marginesów dobranych z palca: 4, 6, 8, 10 i 14 px. Żaden nie wynikał
+     z reguły — każdy z osobnego przymiarkowania przy dopisywaniu sekcji.
+     Jedna liczba w arkuszu zastępuje wszystkie i następna sekcja dostaje
+     ten sam odstęp bez pamiętania o nim. */
+  #widokDostawcy > .card > * + * { margin-top: 8px; }
+  /* Rząd pól kończy sekcję, więc jego własny dolny odstęp dokładałby się do
+     dopełnienia karty. Ten sam powód, co przy `.pasekFiltrow .filtry`. */
+  #widokDostawcy .filtry { margin-bottom: 0; }
+  /* Wiersz wyniku (zapis reguł, zapis logo, stan konfiguracji pytań) jest
+     pusty do pierwszej akcji. Bez tego zabierałby odstęp za zdanie, którego
+     jeszcze nie ma — czyli dokładnie taki margines, jak te zdejmowane. */
+  #widokDostawcy > .card > p:empty { display: none; }
+  /* `.objasnienie` nie ma reguły w arkuszu wcale — odstępy niosło mu
+     siedemnaście powtórzonych atrybutów w HTML. Reguła stoi na razie pod
+     identyfikatorem, bo pozostałe dwanaście bloków w panelu wciąż ma swoje
+     marginesy w znaczniku i globalna zdublowałaby im odstęp. */
+  #widokDostawcy .objasnienie { display: grid; gap: 8px; margin-bottom: 8px; }
+  /* Etykieta pola = podpis sekcji, jak w `.filtry`. Bez tej reguły dwie
+     etykiety nad polami tekstowymi stały zwykłym tekstem 14 px i wyglądały
+     na treść, a nie na podpis. */
+  #widokDostawcy label { display: block; font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
+  /* Etykieta przy polu wyboru jest ZDANIEM do przeczytania, nie podpisem —
+     więc odwraca ściszenie z reguły wyżej. */
+  #widokDostawcy .przelacznik {
+    display: flex; align-items: center; gap: 8px;
+    font-size: inherit; letter-spacing: 0; color: var(--ink);
+  }
+  /* Pole na całą szerokość sekcji. Miary do czytania NIE dokładamy drugi raz:
+     `max-width` arkusza trzyma już cały widok na 60 rem, a druga granica
+     zostawiała po prawej stronie pola pas pustej sekcji — wyglądało to na
+     pole, którego nie dociągnięto, a nie na pole odmierzone. */
+  #widokDostawcy textarea { width: 100%; }
+
   /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
      jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
      bezpieczne w każdej szerokości i nie potrzebuje żadnego zapytania.
@@ -2097,34 +2174,34 @@
       <h2>PROMPT EKSPERTA I FAKTY FIRMOWE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
+        <p class="mute">
           Zmienia wyłącznie admin. Prompt opisuje, KIM jest doradca i jak pisze.
           Fakty to jedyne źródło prawdy o wysyłce, terminach i płatnościach —
           czego tu nie ma, tego model nie poda klientowi.
         </p>
       </div>
       <label for="pytaniaPrompt">PROMPT EKSPERTA</label>
-      <textarea id="pytaniaPrompt" rows="8" style="width:100%"></textarea>
-      <div style="margin-top:6px">
+      <textarea id="pytaniaPrompt" rows="8"></textarea>
+      <div>
         <button class="akcja" id="pytaniaZapiszPrompt">ZAPISZ PROMPT</button>
       </div>
 
-      <label for="pytaniaFakty" style="margin-top:14px;display:block">FAKTY FIRMOWE</label>
-      <textarea id="pytaniaFakty" rows="8" style="width:100%"
+      <label for="pytaniaFakty">FAKTY FIRMOWE</label>
+      <textarea id="pytaniaFakty" rows="8"
         placeholder="Wysyłka zagraniczna: …&#10;Czas wysyłki: …&#10;Płatności: …"></textarea>
-      <div style="margin-top:6px">
+      <div>
         <button class="akcja" id="pytaniaZapiszFakty">ZAPISZ FAKTY</button>
       </div>
-      <label style="margin-top:14px;display:flex;gap:8px;align-items:center">
+      <label class="przelacznik">
         <input type="checkbox" id="pytaniaAutoSzkic">
         <span>Licz szkice automatycznie, bez pytania</span>
       </label>
-      <p class="mute" style="margin-top:4px">
+      <p class="mute">
         Wyłączone: szkic powstaje po kliknięciu GENERUJ przy konkretnym pytaniu.
         Włączone: model pisze sam przy każdym pobraniu pytań — także do tych,
         których nikt nie otworzy.
       </p>
-      <p class="mute" id="pytaniaKonfiguracjaStan" style="margin-top:8px"></p>
+      <p class="mute" id="pytaniaKonfiguracjaStan"></p>
     </section>
 
     <!-- Jedyna karta na tym widoku zapisywana w przeglądarce, nie na serwerze:
@@ -2135,7 +2212,7 @@
       <h2>DANE FIRMY DO FORMULARZY DOSTAWCÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
+        <p class="mute">
           Nagłówek protokołu reklamacyjnego drukowanego z karty REKLAMACJE.
           Zapisuje się w tej przeglądarce, więc drugie biurko ma własny komplet.
         </p>
@@ -2155,7 +2232,7 @@
       <h2>REGUŁY STREFY ZŁOTEJ <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
           drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
           nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
@@ -2164,12 +2241,12 @@
         </p>
       </div>
       <table id="reguly"></table>
-      <div class="filtry" style="margin-top:8px">
+      <div class="filtry">
         <div><button class="akcja cichy" id="dodajRegule">+ REGUŁA</button></div>
         <div><button class="akcja" id="zapiszStrefe">ZAPISZ REGUŁY</button></div>
       </div>
       <p class="mute" id="wynikStrefy"></p>
-      <p class="mute" style="margin-top:6px">
+      <p class="mute">
         Kandydatów do przeniesienia pokazuje zakładka <b>ANALIZA</b>.
       </p>
     </section>
@@ -2184,7 +2261,7 @@
       <h2>KONTA I SESJE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Zmienia wyłącznie admin. RESET nadaje nowe hasło (osoba zmieni je
           sobie przy kolektorze), WYŁĄCZ odbiera dostęp od zaraz — wyłączone
           konto nie przejdzie żadną sesją. SESJE pokazują, co jest zalogowane
@@ -2193,26 +2270,26 @@
         </p>
       </div>
       <table id="kontaLista"></table>
-      <div id="kontaSesje" style="margin-top:10px"></div>
+      <div id="kontaSesje"></div>
     </section>
 
     <section class="card">
       <h2>LOGO DOSTAWCÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
           dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
           zanim przeczyta się numer dokumentu. To samo logo stoi przy dostawcy
           w tabeli dostaw tego panelu i w nagłówku otwartego dokumentu.
         </p>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
           Przeglądarka zmniejszy go, obetnie przezroczysty margines i przerobi
           na jeden format, zanim cokolwiek pojedzie na serwer. Lista poniżej
           pokazuje dostawców z dokumentów dostaw, także tych bez logo.
         </p>
-        <p class="mute" style="margin-bottom:10px">
+        <p class="mute">
           <b>Logo wgrane przed 0.87.0 warto wgrać jeszcze raz.</b> Zapisywaliśmy
           je wtedy w kwadracie, więc szeroki logotyp miał nad sobą i pod sobą
           przezroczyste powietrze — i to ono, a nie logo, rosło na ekranie
