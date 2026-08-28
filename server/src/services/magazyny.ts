@@ -101,6 +101,14 @@ function obliczListeMagazynow(): Magazyn[] {
 export interface StanMagazynu {
   kod: string;
   stan: number;
+  /**
+   * Rola magazynu — po niej kolektor wyróżnia REGAŁ ZWROTÓW (0.118.0).
+   *
+   * Kod magazynu jest napisem z konfiguracji klienta („ZWR", „ZWROTY", cokolwiek
+   * biuro tam wpisało), więc rozpoznawanie go po nazwie w interfejsie byłoby
+   * magicznym łańcuchem, który psuje się przy pierwszej zmianie w Subiekcie.
+   */
+  rola: RolaMagazynu;
 }
 
 /**
@@ -121,7 +129,7 @@ export function stanyNiezerowe(twIds: number[]): Map<number, StanMagazynu[]> {
     const lista = wiersze
       .flatMap((w) => {
         const m = widoczne.get(w.magId);
-        return m ? [{ kod: m.kod, stan: w.stan }] : [];
+        return m ? [{ kod: m.kod, stan: w.stan, rola: m.rola }] : [];
       })
       /* Malejąco po stanie — pierwsze pytanie brzmi „gdzie tego jeszcze
          najwięcej", tak samo jak na karcie towaru. */

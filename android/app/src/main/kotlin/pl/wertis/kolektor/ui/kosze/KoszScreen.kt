@@ -43,6 +43,7 @@ import pl.wertis.kolektor.core.net.KoszView
 import pl.wertis.kolektor.core.net.OdlozKoszBody
 import pl.wertis.kolektor.core.net.PominKoszBody
 import pl.wertis.kolektor.core.net.ScanBody
+import pl.wertis.kolektor.core.net.StanMagazynu
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.formatQty
 import pl.wertis.kolektor.core.text.iloscZJednostka
@@ -642,14 +643,33 @@ private fun PanelPozycji(
                 innePolki.forEach { kod -> LocChip(kod, primary = false) { onAdres(kod) } }
             }
         }
-        /* Gdzie tego jeszcze jest. Przy zwrocie najczęściej czyta się drugą
-           liczbę: ile z tego kosza zostało jeszcze na regale zwrotów. */
+        /* STANY JAKO KAFELKI, nie jako linijka drobnym drukiem (0.118.0).
+           Ze zgłoszenia: „stany magazynowe powinny być bardziej widoczne".
+           Napis `MAG 12 · ZWR 3` w 12 sp przygaszonym szarym czytało się jak
+           przypis, a to jest liczba, na której stoi decyzja: ile z tego kosza
+           zostało jeszcze na regale zwrotów i czy na hali w ogóle coś leży.
+
+           REGAŁ ZWROTÓW świeci bursztynem, bo to jego licznik schodzi do zera
+           w miarę rozkładania. Poznajemy go po ROLI z serwera, nie po kodzie —
+           kod jest napisem z konfiguracji klienta i porównywanie go tutaj
+           byłoby magicznym łańcuchem psującym się przy zmianie w Subiekcie. */
         Text(
-            if (p.stany.isEmpty()) "brak stanu w magazynach"
-            else p.stany.joinToString(" · ") { "${it.kod} ${formatQty(it.stan)}" },
-            fontSize = 12.sp,
-            color = InkMute,
+            "STANY MAGAZYNOWE",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = InkSoft,
         )
+        if (p.stany.isEmpty()) {
+            Text("brak stanu w magazynach", fontSize = 13.sp, color = InkMute)
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                p.stany.forEach { s -> KafelStanu(s) }
+            }
+        }
         p.zlotaStrefa?.let { z ->
             Text(
                 "Strefa złota: ${z.zbiorekNaDzien} zbiórek dziennie · poziomy ${z.poziomy}",
@@ -684,6 +704,42 @@ private fun PanelPozycji(
             OutlineButton("PÓŹNIEJ — NA KONIEC LISTY", modifier = Modifier.fillMaxWidth(), onClick = onPozniej)
             OutlineButton("POMIŃ — NIE MA CZEGO ODŁOŻYĆ", modifier = Modifier.fillMaxWidth(), onClick = onPomin)
         }
+    }
+}
+
+/**
+ * Jeden magazyn ze stanem — liczba czytana z odległości ramienia.
+ *
+ * Kod magazynu jest podpisem pod liczbą, nie odwrotnie: pytanie brzmi „ile",
+ * a „gdzie" ma tylko rozstrzygnąć, o którym magazynie mowa.
+ */
+@Composable
+private fun KafelStanu(s: StanMagazynu) {
+    val zwroty = s.rola == "ZWROTY"
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (zwroty) AmberBg else CardWhite)
+            .border(1.dp, if (zwroty) AmberLine else CardBorder, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            formatQty(s.stan),
+            fontFamily = BarlowCond,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 20.sp,
+            color = if (zwroty) AmberInk else Ink,
+            maxLines = 1,
+        )
+        Text(
+            s.kod,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.6.sp,
+            color = if (zwroty) AmberInk else InkSoft,
+            maxLines = 1,
+        )
     }
 }
 

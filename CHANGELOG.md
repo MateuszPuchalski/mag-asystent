@@ -35,6 +35,10 @@ historii nie przepisujemy.
 
 ## 0.118.0 — 28 sierpnia 2026
 
+**Panel pozycji kosza zwrotów mówi wreszcie, gdzie ten towar jest.** Dwie
+zmiany z hali: wszystkie półki zamiast samej pickingowej i stany magazynowe,
+które widać.
+
 **Kosz zwrotów pokazuje wszystkie półki towaru, nie samą pickingową.** Kartoteka
 Subiekta trzyma kilka adresów rozdzielonych spacjami, a kolektor czytał z tego
 pola wyłącznie pierwszy. Przy dostawie to wystarcza — karton jedzie tam, gdzie
@@ -54,6 +58,18 @@ Lista adresów jest **żywa tak samo jak adres pickingowy**: zadanie czekające
 w kolejce liczy się, zanim worker dopisze je do Subiekta. Serwer wyprowadza
 obie rzeczy z jednego miejsca (`poleAdresow`), więc nie ma jak się rozjechać —
 pokazujemy to, co BĘDZIE w kartotece, bo zapis jest opóźniony, nie niepewny.
+
+**Stany magazynowe przestały być przypisem.** Stały pod adresem jako linijka
+`MAG 12 · ZWR 3` drobnym, przygaszonym drukiem — a to jest liczba, na której
+stoi decyzja: ile z tego kosza zostało jeszcze na regale zwrotów i czy na hali
+w ogóle coś leży. Teraz każdy magazyn ma własny kafelek z liczbą w 20 sp
+i kodem jako podpisem: pytanie brzmi „ile", a „gdzie" tylko rozstrzyga, którego
+magazynu dotyczy.
+
+**Regał zwrotów świeci bursztynem**, bo to jego licznik schodzi do zera w miarę
+rozkładania. Kolektor poznaje go po ROLI z serwera, nie po kodzie — kod jest
+napisem z konfiguracji klienta i porównywanie go w interfejsie byłoby magicznym
+łańcuchem, który psuje się przy pierwszej zmianie w Subiekcie.
 
 ## 0.117.0 — 27 sierpnia 2026
 

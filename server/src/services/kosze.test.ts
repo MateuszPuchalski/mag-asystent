@@ -215,9 +215,18 @@ test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
     [["MAG", 12], ["ZWR", 3]],
     "magazyn ze stanem zero nie jest odpowiedzią na żadne pytanie przy półce"
   );
+  /* ROLA jedzie razem ze stanem (0.118.0): kolektor wyróżnia po niej regał
+     zwrotów, bo to jego licznik schodzi do zera w miarę rozkładania. Kod
+     magazynu jest napisem z konfiguracji klienta, więc rozpoznawanie po nim
+     byłoby magicznym łańcuchem psującym się przy zmianie w Subiekcie. */
+  assert.deepEqual(
+    p.stany.map((s) => s.rola),
+    ["MAG", "ZWROTY"]
+  );
   // magazyn bez roli też się liczy — towar bywa u serwisu
   const drugi = kosz.pozycje.find((x) => x.twId === 900_037);
   assert.deepEqual(drugi?.stany.map((s) => s.kod), ["SERW"]);
+  assert.deepEqual(drugi?.stany.map((s) => s.rola), [null], "magazyn bez roli mówi null");
 });
 
 test("pominięcie: powód obowiązkowy, ZAKOŃCZ przechodzi, MM tylko dla odłożonych", async () => {
