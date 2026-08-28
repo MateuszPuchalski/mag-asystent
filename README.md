@@ -252,6 +252,9 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   w ranking wypychałaby trafienia dokładne. Ścieżka skanu tej furtki nie ma
   wcale: sama otwiera kartę przy jednym wyniku, więc dopasowanie przybliżone
   prowadziłoby do cudzej kartoteki.
+- **Te same reguły mają pola filtra na kolektorze** (pozycje otwartej dostawy,
+  lista faktur) — od 0.117.0, przez moduł `:core`. Wcześniej porównywały tekst
+  dosłownie, więc `gaznik` i `ls51139` nie znajdowały niczego.
 - **Rozpoznanie kodu po wzorcu, nie po heurystyce.** `LOC` jest kategorią
   **zamkniętą**: kod, który nie pasuje do wzorca adresu, adresem nie jest.
   Wzorzec należy do serwera i kolektor go tylko pobiera (`/api/locations`).
@@ -552,7 +555,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 252 testów jednostkowych; buduje się bez Android SDK
+                           + 263 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)

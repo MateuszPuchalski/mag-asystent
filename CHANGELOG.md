@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.117.0 — 27 sierpnia 2026
+
+**Filtr w otwartej dostawie wybacza to samo, co wyszukiwarka.** Zgłoszenie
+z hali brzmiało „szukanie nie działa" i było trafne: pole nad listą pozycji
+porównywało wpisany tekst DOSŁOWNIE, przez zwykłe „zawiera" na małych literach.
+Wystarczyło każde z czterech odstępstw, które w magazynie są normą, żeby lista
+wyszła pusta przy towarze leżącym w kartonie:
+
+- `gaznik` nie znajdował `Gaźnika` — ogonków przy palecie nikt nie pisze,
+- `ls51139` nie znajdował `LS51-139` — myślnik jest ozdobnikiem, nie treścią,
+- `kosa spalin` nie znajdowało `Spalinowej kosy` — kolejność słów jest luźna,
+- `gaznk` nie znajdowało niczego — literówka w rękawicy zdarza się co chwilę.
+
+Serwer rozwiązał to samo dawno, dla wyszukiwarki kartotek. Te reguły przeszły
+teraz do modułu `:core` i **filtr kolektora liczy dopasowanie dokładnie tak
+samo**: składa polskie znaki, zwija myślniki i spacje w symbolach, a każde
+słowo zapytania musi trafić osobno — w symbol albo w nazwę. Dwie różne
+odpowiedzi na „czy ten towar pasuje" byłyby gorsze niż brak jednej: ten sam
+towar szukany dwoma polami dawałby dwa różne wyniki.
+
+**Literówka wchodzi DOPIERO przy zerze wyników** i to jest cała jej bezpieczna
+postać — tak samo jak na serwerze. Dopasowanie rozmyte wmieszane w wynik
+dosłowny wciąga sąsiadów (`gaz` łapie `gips`) i psuje trafienie, które było
+dobre. Krótkie słowa nie mają do niej prawa wcale: jeden błąd na trzech znakach
+dopasowuje pół kartoteki.
+
+Ta sama zmiana obejmuje pole filtra na **liście faktur** — `fz214` znajduje
+`FZ 214/MAG/08/2026`, a `ogrod` firmę `OGRÓD-POL`. Kolejność listy zostaje
+nietknięta: filtr zawęża, a nie sortuje, bo trasa alejkami i grupa zrobionych
+należą do rozkładania, nie do szukania.
+
 ## 0.116.0 — 27 sierpnia 2026
 
 **Zakładka SPRAWY: jedna kolejka zamiast trzech, konsola na wysokość okna.**
