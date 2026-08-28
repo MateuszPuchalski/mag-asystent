@@ -979,6 +979,14 @@ data class KoszPozycja(
     val pozniejAt: String? = null,
     /** Adres ŻYWY z kartoteki (serwer koryguje o kolejkę) — nie snapshot. */
     val lokOczekiwana: String? = null,
+    /**
+     * Wszystkie adresy tego towaru, pickingowy pierwszy; pusta = starszy serwer.
+     *
+     * Zwrot wraca pojedynczo i najtaniej dołożyć go tam, gdzie ten towar już
+     * leży — półka pickingowa bywa pełna albo daleko od miejsca, w którym
+     * magazynier akurat stoi.
+     */
+    val lokalizacje: List<String> = emptyList(),
     val lokFaktyczna: String? = null,
     val mmStatus: String? = null,
 )

@@ -2,7 +2,12 @@ import { db, nowIso, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
-import { adresyOczekiwane, porownajAlejkowo, validateDeliveryLocation } from "./delivery.js";
+import {
+  adresyOczekiwane,
+  adresyWszystkie,
+  porownajAlejkowo,
+  validateDeliveryLocation,
+} from "./delivery.js";
 import { stanyNiezerowe, type StanMagazynu } from "./magazyny.js";
 import { adnotacjaStrefy } from "./zbiorki.js";
 import type { ZlotaStrefa } from "../types.js";
@@ -73,6 +78,15 @@ export interface PozycjaKosza {
   zlotaStrefa?: ZlotaStrefa;
   /** Adres ŻYWY z kartoteki skorygowany o kolejkę — nie snapshot. */
   lokOczekiwana: string | null;
+  /**
+   * WSZYSTKIE adresy tego towaru, pickingowy pierwszy (0.118.0).
+   *
+   * Zwrot wraca pojedynczo i najtaniej dołożyć go tam, gdzie ten towar już
+   * leży — a półka pickingowa bywa pełna albo daleko od miejsca, w którym
+   * magazynier akurat stoi. Do tej wersji kolektor znał tylko ją i człowiek
+   * musiał otwierać kartę towaru, żeby zobaczyć resztę.
+   */
+  lokalizacje: string[];
   lokFaktyczna: string | null;
   odlozonoPrzez: string | null;
   /** Kiedy odłożona (0.84.0). Sama osoba to pół odpowiedzi na to samo pytanie. */
@@ -330,6 +344,7 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
      po KAŻDYM odłożeniu, więc pytanie per wiersz zjadałoby budżet trasy. */
   const twIds = wiersze.map((w) => w.tw_id as number);
   const adresy = adresyOczekiwane(twIds);
+  const wszystkieAdresy = adresyWszystkie(twIds);
   const jednostki = subiekt.jednostkiDlaTowarow(twIds);
   const stany = stanyNiezerowe(twIds);
   const pozycje: PozycjaKosza[] = wiersze.map((w) => ({
@@ -352,6 +367,10 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     /* Pozycja tknięta pokazuje SWÓJ zapis — to, co człowiek zrobił; reszta
        adres żywy. Ten sam podział co `adresLinii` przy dostawach. */
     lokOczekiwana: (w.lok_faktyczna as string) ?? adresy.get(w.tw_id as number) ?? null,
+    /* Komplet adresów jedzie NIEZALEŻNIE od tego, czy pozycja jest tknięta:
+       to nie jest zapis pracy, tylko odpowiedź na pytanie „gdzie ten towar
+       jeszcze leży" — a ono nie przestaje mieć sensu po odłożeniu. */
+    lokalizacje: wszystkieAdresy.get(w.tw_id as number) ?? [],
     lokFaktyczna: (w.lok_faktyczna as string) ?? null,
     odlozonoPrzez: (w.odlozono_przez as string) ?? null,
     odlozonoAt: (w.odlozono_at as string) ?? null,

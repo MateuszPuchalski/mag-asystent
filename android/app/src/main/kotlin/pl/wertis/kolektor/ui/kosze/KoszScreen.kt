@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,6 +49,7 @@ import pl.wertis.kolektor.core.text.iloscZJednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
+import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.LokPastylka
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
@@ -575,6 +578,7 @@ private fun PozycjaRow(
    samo wcięcie i odstęp od dołu. Osobna karta rozrywała jedną myśl na dwie
    i to było widać gołym okiem.                                              */
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PanelPozycji(
     p: KoszPozycja,
@@ -612,6 +616,32 @@ private fun PanelPozycji(
             fontSize = 28.sp,
             color = if (p.lokOczekiwana == null) AmberInk else Ink,
         )
+        /* POZOSTAŁE PÓŁKI TEGO TOWARU (0.118.0). Kartoteka trzyma kilka adresów,
+           a kolektor pokazywał tu wyłącznie pierwszy — pickingowy. Przy zwrocie
+           to za mało: wraca jedna sztuka i najtaniej dołożyć ją tam, gdzie ten
+           towar już leży, bo półka pickingowa bywa pełna albo stoi w drugim
+           końcu hali. Do tej wersji trzeba było po to wyjść z kosza do karty
+           towaru — czyli zgubić wskazaną pozycję.
+
+           Pastylka WPISUJE adres w pole niżej, nie odkłada. Odłożenie zostaje
+           przy skanie regału i przycisku: dotknięcie jednego z kilku adresów
+           obok siebie w rękawicy jest zbyt tanie na czynność nieodwracalną. */
+        val innePolki = p.lokalizacje.filter { it != p.lokOczekiwana }
+        if (innePolki.isNotEmpty()) {
+            Text(
+                "LEŻY TAKŻE NA — DOTKNIJ, ABY WPISAĆ",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                color = InkSoft,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                innePolki.forEach { kod -> LocChip(kod, primary = false) { onAdres(kod) } }
+            }
+        }
         /* Gdzie tego jeszcze jest. Przy zwrocie najczęściej czyta się drugą
            liczbę: ile z tego kosza zostało jeszcze na regale zwrotów. */
         Text(

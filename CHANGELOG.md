@@ -33,6 +33,28 @@ historii nie przepisujemy.
 
 ---
 
+## 0.118.0 — 28 sierpnia 2026
+
+**Kosz zwrotów pokazuje wszystkie półki towaru, nie samą pickingową.** Kartoteka
+Subiekta trzyma kilka adresów rozdzielonych spacjami, a kolektor czytał z tego
+pola wyłącznie pierwszy. Przy dostawie to wystarcza — karton jedzie tam, gdzie
+towar ma być. Przy zwrocie nie: wraca jedna sztuka i najtaniej dołożyć ją tam,
+gdzie ten towar JUŻ leży, bo półka pickingowa bywa pełna albo stoi w drugim
+końcu hali.
+
+Pozostałe adresy stoją teraz pod tym dużym, jako pastylki. **Dotknięcie wpisuje
+adres w pole niżej, nie odkłada** — odłożenie zostaje przy skanie regału
+i przycisku, bo dotknięcie jednego z kilku adresów obok siebie w rękawicy jest
+zbyt tanie na czynność nieodwracalną.
+
+Do tej wersji po tę samą wiedzę trzeba było wyjść z kosza do karty towaru,
+czyli zgubić wskazaną pozycję i wrócić do niej skanem.
+
+Lista adresów jest **żywa tak samo jak adres pickingowy**: zadanie czekające
+w kolejce liczy się, zanim worker dopisze je do Subiekta. Serwer wyprowadza
+obie rzeczy z jednego miejsca (`poleAdresow`), więc nie ma jak się rozjechać —
+pokazujemy to, co BĘDZIE w kartotece, bo zapis jest opóźniony, nie niepewny.
+
 ## 0.117.0 — 27 sierpnia 2026
 
 **Filtr w otwartej dostawie wybacza to samo, co wyszukiwarka.** Zgłoszenie
