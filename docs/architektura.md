@@ -639,9 +639,13 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 - `tools/docs_check.py` — liczby i ścieżki w dokumentacji kontra repo. Złapał
   m.in. merge, który zostawił w README dwie sprzeczne liczby testów obok siebie
   (git nie widzi konfliktu semantycznego — plik był poprawny składniowo).
-- `tools/kt_imports_check.py` — brakujące importy i bilans nawiasów. Złapał
-  właściwość rozszerzającą użytą bez importu oraz polski cudzysłów zamknięty
-  prostym `"` wewnątrz łańcucha Kotlina.
+- `tools/kt_imports_check.py` — brakujące importy, bilans nawiasów, domknięcie
+  komentarzy blokowych i `@OptIn`. Złapał właściwość rozszerzającą użytą bez
+  importu oraz polski cudzysłów zamknięty prostym `"` wewnątrz łańcucha.
+  Sprawdzenie komentarzy dopisano po 0.122.0: komentarze Kotlina **się
+  zagnieżdżają**, więc ścieżka z gwiazdką napisana w prozie otwiera kolejny
+  poziom i zjada resztę pliku. Kompilator zgłasza to jako kilkadziesiąt
+  „Unresolved reference" w cudzych plikach, czyli wszędzie poza przyczyną.
 
 Żadne nie jest kompilatorem i nie udaje. Zielony wynik znaczy „nie ten błąd".
 

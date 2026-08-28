@@ -6,7 +6,7 @@ SDK, a środowisko pracy go nie ma (settings.gradle świadomie pomija moduł).
 Każdy brakujący import wychodzi więc dopiero na runnerze, kosztuje pełny cykl
 CI i wraca jako czerwony build. Dwa razy pod rząd był to dokładnie ten błąd.
 
-CO SPRAWDZA. Trzy rzeczy, wszystkie tanie i wszystkie złapane na żywym błędzie:
+CO SPRAWDZA. Cztery rzeczy, wszystkie tanie i wszystkie złapane na żywym błędzie:
 
   1. BRAKUJĄCE IMPORTY. Czy użyte identyfikatory, które są top-levelowymi
      deklaracjami w innym pakiecie tego repo, mają import. Łapie funkcję albo
@@ -19,7 +19,13 @@ CO SPRAWDZA. Trzy rzeczy, wszystkie tanie i wszystkie złapane na żywym błędz
      PROSTYM znakiem `"` wewnątrz łańcucha — Kotlin kończy na nim string
      i dalej wszystko się rozjeżdża.
 
-  3. BRAK `@OptIn` przy API eksperymentalnym Compose. Kompilator `:app` odrzuca
+  3. NIEDOMKNIĘTY KOMENTARZ BLOKOWY. Komentarze Kotlina SIĘ ZAGNIEŻDŻAJĄ, więc
+     ciąg `/*` w prozie — choćby w ścieżce `api/kosze/*` — otwiera kolejny
+     poziom i pierwsze `*/` zamyka wtedy nie ten, co trzeba. Reszta pliku po
+     cichu staje się komentarzem. Kompilator zgłasza to jako pięćdziesiąt
+     „Unresolved reference" w cudzych plikach; tak zginął build 0.122.0.
+
+  4. BRAK `@OptIn` przy API eksperymentalnym Compose. Kompilator `:app` odrzuca
      to BŁĘDEM, nie ostrzeżeniem — a arkusz dolny bez adnotacji położył build
      w 0.42.0, mimo że sąsiednie arkusze tego samego pliku miały ją od dawna.
 
@@ -71,6 +77,65 @@ PO_KROPCE = re.compile(r"\.([A-Za-z_]\w*)\b")
 LOKALNE = re.compile(r"(?:^|[(,]|\bval\s+|\bvar\s+)\s*(\w+)\s*(?::|=[^=])", re.MULTILINE)
 
 
+def koniec_komentarza(src: str, start: int) -> tuple[int, bool]:
+    """Koniec komentarza blokowego zaczętego na `start` + czy się domknął.
+
+    KOMENTARZE BLOKOWE KOTLINA SIĘ ZAGNIEŻDŻAJĄ i to nie jest ciekawostka —
+    to jest błąd, który położył build 0.122.0. Ciąg `/*` WEWNĄTRZ komentarza
+    otwiera kolejny poziom, więc pierwsze `*/` zamyka ten wewnętrzny, a nie
+    cały blok. Wystarczy napisać w prozie ścieżkę `api/kosze/*`, żeby reszta
+    pliku po cichu stała się komentarzem.
+
+    Kompilator mówi wtedy „Unclosed comment" w JEDNEJ linii i „Unresolved
+    reference" w pięćdziesięciu innych plikach — a prawdziwa przyczyna stoi
+    w komentarzu, na który nikt nie patrzy.
+    """
+    i, n, glebokosc = start + 2, len(src), 1
+    while i < n:
+        if src.startswith("/*", i):
+            glebokosc += 1
+            i += 2
+        elif src.startswith("*/", i):
+            glebokosc -= 1
+            i += 2
+            if glebokosc == 0:
+                return i, True
+        else:
+            i += 1
+    return n, False
+
+
+def niedomkniete_komentarze(p: Path, src: str) -> list[str]:
+    """Komentarz blokowy, który zjadł resztę pliku — patrz `koniec_komentarza`."""
+    problemy: list[str] = []
+    i, n = 0, len(src)
+    while i < n:
+        if src.startswith("//", i):
+            while i < n and src[i] != "\n":
+                i += 1
+        elif src.startswith('"""', i):
+            j = src.find('"""', i + 3)
+            i = n if j == -1 else j + 3
+        elif src[i] == '"':
+            i += 1
+            while i < n and src[i] != '"':
+                i += 2 if src[i] == "\\" else 1
+            i += 1
+        elif src.startswith("/*", i):
+            koniec, domkniety = koniec_komentarza(src, i)
+            if not domkniety:
+                problemy.append(
+                    f"{p.relative_to(KORZEN.parent)}:{src.count(chr(10), 0, i) + 1}: "
+                    f"niedomknięty komentarz blokowy — komentarze Kotlina SIĘ ZAGNIEŻDŻAJĄ, "
+                    f"więc `/*` w środku (np. w ścieżce `api/kosze/*`) otwiera kolejny poziom"
+                )
+                break
+            i = koniec
+        else:
+            i += 1
+    return problemy
+
+
 def bez_komentarzy(src: str) -> str:
     """Usuwa komentarze, literały i nazwy w backtickach — inaczej słowa z prozy
     udają kod.
@@ -91,8 +156,7 @@ def bez_komentarzy(src: str) -> str:
             j = src.find("`", i + 1)
             i = n if j == -1 else j + 1
         elif c == "/" and src.startswith("/*", i):
-            j = src.find("*/", i + 2)
-            i = n if j == -1 else j + 2
+            i = koniec_komentarza(src, i)[0]
         elif src.startswith('"""', i):
             j = src.find('"""', i + 3)
             i = n if j == -1 else j + 3
@@ -231,6 +295,7 @@ def sprawdz(
 
         zglos({i.group(1) for i in ODWOLANIE.finditer(kod)}, deklaracje, "symbol")
         zglos({i.group(1) for i in PO_KROPCE.finditer(kod)}, rozszerzenia, "rozszerzenie")
+        problemy += niedomkniete_komentarze(p, src)
         problemy += bilans(p, kod)
         problemy += opt_in(p, kod)
     return problemy

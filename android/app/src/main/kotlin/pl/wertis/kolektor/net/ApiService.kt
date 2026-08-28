@@ -287,7 +287,9 @@ interface ApiService {
 
     /* ── KARTON: rozkładanie od zera (0.122.0) ───────────────────────────
        Tylko ZBIERANIE zawartości. Rozkładanie zatwierdzonego kartonu idzie
-       trasami `api/kosze/*` wyżej — to jest ta sama praca i ten sam ekran. */
+       trasami `api/kosze/…` wyżej — to jest ta sama praca i ten sam ekran.
+       Gwiazdki w tej ścieżce NIE MA celowo: komentarze Kotlina się zagnieżdżają,
+       więc `/` z gwiazdką otwiera tu kolejny poziom i zjada resztę pliku. */
     @GET("api/kartony")
     suspend fun kartony(): KartonyResponse
 
