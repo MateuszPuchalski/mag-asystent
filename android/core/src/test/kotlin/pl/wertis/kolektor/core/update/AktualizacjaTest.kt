@@ -9,14 +9,28 @@ import org.junit.Test
 class AktualizacjaTest {
 
     @Test fun `kod wersji zgadza sie ze wzorem z Gradle`() {
-        assertEquals(4700, kodWersji("0.47.0"))
-        assertEquals(4800, kodWersji("0.48.0"))
-        assertEquals(10203, kodWersji("1.2.3"))
+        assertEquals(47_000, kodWersji("0.47.0"))
+        assertEquals(48_000, kodWersji("0.48.0"))
+        assertEquals(1_002_003, kodWersji("1.2.3"))
         assertEquals(0, kodWersji("0.0.0"))
     }
 
+    @Test fun `setny minor ma wlasny kod — REGRESJA z 0119`() {
+        /* Gradle i serwer przeszły na wzór z zapasem 999 przy wydaniu 0.100.0,
+           a ten plik został przy starym. Od tamtej pory `0.100.0` i wszystko po
+           nim czytało się tu jako „nie rozumiem", a `wartoAktualizowac` na
+           wątpliwość odpowiada „nie" — więc kolektor PRZESTAŁ proponować
+           aktualizacje. Bez błędu, bez wpisu w dzienniku, bez śladu. */
+        assertEquals(100_000, kodWersji("0.100.0"))
+        assertEquals(118_000, kodWersji("0.118.0"))
+        assertTrue("setny minor jest nowszy niż 0.99.0", 100_000 > kodWersji("0.99.0")!!)
+        assertTrue("i starszy niż 1.0.0", 100_000 < kodWersji("1.0.0")!!)
+        assertTrue(wartoAktualizowac("0.99.0", "0.100.0"))
+        assertTrue(wartoAktualizowac("0.117.0", "0.118.0"))
+    }
+
     @Test fun `sufiks wydania nie zmienia kodu`() {
-        assertEquals(4800, kodWersji("0.48.0-rc1"))
+        assertEquals(48_000, kodWersji("0.48.0-rc1"))
     }
 
     @Test fun `smieci nie zamieniaja sie w zero`() {
@@ -34,12 +48,13 @@ class AktualizacjaTest {
         assertNull(kodWersji("1"))
     }
 
-    @Test fun `czlon powyzej 99 jest odrzucany, bo koliduje z sasiednia wersja`() {
-        // 0.47.100 i 0.48.0 dają ten sam kod — kolizja czytałaby się jako
+    @Test fun `czlon powyzej 999 jest odrzucany, bo koliduje z sasiednia wersja`() {
+        // 0.47.1000 i 0.48.0 dają ten sam kod — kolizja czytałaby się jako
         // „ta sama wersja", więc aktualizacja znikałaby po cichu
-        assertEquals(kodWersji("0.48.0"), 4800)
-        assertNull(kodWersji("0.47.100"))
-        assertNull(kodWersji("0.100.0"))
+        assertEquals(48_000, kodWersji("0.48.0"))
+        assertEquals(47_999, kodWersji("0.47.999"))
+        assertNull(kodWersji("0.47.1000"))
+        assertNull(kodWersji("0.1000.0"))
     }
 
     @Test fun `nowsza wersja na serwerze wchodzi`() {

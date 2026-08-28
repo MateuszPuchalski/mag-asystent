@@ -13,18 +13,33 @@ package pl.wertis.kolektor.core.update
 /** Ten sam wzór, co `versionCode` w `android/app/build.gradle.kts`. */
 private val WZORZEC = Regex("""^(\d+)\.(\d+)\.(\d+)$""")
 
+/** Największy człon, który wzór zniesie bez kolizji z sąsiednią wersją. */
+private const val CZLON_MAX = 999
+
 /**
  * Numer wersji → liczba porównywalna. `null` = nie rozumiem tego napisu.
  *
- * Trzy różnice wobec bliźniaczego wyliczenia w Gradle'u, każda celowa:
+ * WZÓR MUSI BYĆ TEN SAM w trzech miejscach: tutaj, w `versionCode`
+ * (`android/app/build.gradle.kts`) i na serwerze (`services/aktualizacja.ts`).
+ * Rozjazd nie daje błędu — daje ciszę.
+ *
+ * ZAPAS PODNIESIONY Z 99 DO 999 i to jest naprawa usterki, nie kosmetyka.
+ * Gradle i serwer przeszły na nowy wzór przy wydaniu 0.100.0, a ten plik został
+ * przy starym: `0.100.0` i wszystko po nim miało tu minor większy niż 99, czyli
+ * `null`, czyli „nie rozumiem". A `wartoAktualizowac` na każdą wątpliwość
+ * odpowiada „nie" — więc od 0.100.0 kolektor po prostu PRZESTAŁ proponować
+ * aktualizacje. Bez komunikatu, bez wpisu w dzienniku, bez różnicy na ekranie
+ * poza tym, że pasek „wersje różne" świecił i nic się z tym nie działo.
+ *
+ * Trzy różnice wobec bliźniaczego wyliczenia w Gradle'u zostają, każda celowa:
  *
  * 1. Śmieci ODRZUCAMY zamiast czytać jako zero. Gradle robi `toIntOrNull() ?: 0`
  *    przy budowaniu, z człowiekiem patrzącym na wynik; tutaj liczba powstaje
  *    na kolektorze, gdzie `0.4x.0` po cichu zamieniłoby się w `400` i kazało
  *    zainstalować wersję starszą od zainstalowanej.
- * 2. Człon powyżej 99 odrzucamy, bo wzór go zwija: `0.47.100` i `0.48.0` dają
- *    tę samą liczbę. Kolizja czyta się jako „ta sama wersja", więc aktualizacja
- *    znikałaby z ekranu zamiast być błędna głośno.
+ * 2. Człon powyżej `CZLON_MAX` odrzucamy, bo wzór go zwija: `0.47.1000`
+ *    i `0.48.0` dają tę samą liczbę. Kolizja czyta się jako „ta sama wersja",
+ *    więc aktualizacja znikałaby z ekranu zamiast być błędna głośno.
  * 3. Wymagamy dokładnie trzech członów — `0.48` to śmieć, nie `0.48.0`.
  */
 fun kodWersji(wersja: String?): Int? {
@@ -34,8 +49,8 @@ fun kodWersji(wersja: String?): Int? {
     val mi = minor.toIntOrNull() ?: return null
     val pa = patch.toIntOrNull() ?: return null
     val ma = major.toIntOrNull() ?: return null
-    if (mi > 99 || pa > 99) return null
-    return ma * 10_000 + mi * 100 + pa
+    if (mi > CZLON_MAX || pa > CZLON_MAX) return null
+    return ma * 1_000_000 + mi * 1_000 + pa
 }
 
 /**
