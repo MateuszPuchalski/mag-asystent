@@ -1273,6 +1273,29 @@ Dokumenty sprzed wdrożenia, których towar dawno leży na regałach, zdejmuje
 z listy **admin** akcją „już rozłożony". Magazynier jej nie ma: to decyzja
 o pominięciu pracy, nie sposób jej wykonania.
 
+### Rozkładanie od zera (zakładka KARTON, 0.122.0)
+
+Czwarta zakładka kolektora obsługuje pudło, do którego pakujący odkładają
+towary źle zebrane pod zamówienia. Ten obieg nie ma dokumentu i **nie będzie
+go miał**: towar nie opuścił magazynu, więc żaden stan się nie zmienia.
+
+1. Magazynier stuka NOWY KARTON — aplikacja nadaje kod (`K-1`, `K-2`, …), bo
+   nie ma go skąd przepisać.
+2. Skanuje zawartość. Jeden skan to jedna sztuka, drugi skan tego samego
+   towaru sumuje ilość. Większą liczbę wpisuje się z klawiatury obok symbolu.
+3. ZATWIERDŹ zamyka listę. Od tej chwili karton jest zwykłym koszem do
+   rozłożenia — ten sam ekran, ten sam skan półki, ten sam ZAKOŃCZ.
+4. ZAKOŃCZ zapisuje **wyłącznie adresy półek**. Żadnego dokumentu w Subiekcie.
+
+Kartony pojawiają się w `/biuro` → SPRAWY, karta KOSZE ZWROTOWE, z pastylką
+KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
+ktoś włożył do pudła. Kilka kartonów naraz jest stanem normalnym.
+
+**[wymaga działania]** Nic ręcznego przy wdrożeniu. Kolumna `kosz.rodzaj`
+dochodzi migracją przy pierwszym starcie i zastane kosze dostają `zwroty`,
+czyli to, czym są. Trzeba natomiast **zainstalować nowy APK** — zakładki KARTON
+nie ma w starszych wersjach kolektora.
+
 Zwrot środków dałoby się zautomatyzować w całości: Allegro ma
 `POST /payments/refunds` (scope płatności), a prowizja wraca wtedy sama.
 Świadomie tego NIE robimy — pieniędzmi rusza człowiek; notatka zostaje tu,

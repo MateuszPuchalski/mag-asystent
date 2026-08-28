@@ -186,6 +186,16 @@ function migrate(database: DatabaseSync) {
      z Subiekta, a nie kod nadany w biurze. NULL = kosz złożony w aplikacji. */
   addColumn("kosz", "mm_dok_id", "INTEGER");
   addColumn("kosz", "mm_numer", "TEXT");
+  /* Rodzaj kosza (0.122.0): `zwroty` albo `karton`. Karton to towar źle
+     zebrany, odłożony przez pakujących do jednego pudła — ta sama praca
+     rozkładania, ale bez dokumentu i bez zwrotu.
+
+     Domyślna wartość załatwia zastane wiersze i to nie jest wygoda, tylko
+     prawda: wszystko, co dziś leży w tej tabeli, powstało ze zwrotu albo
+     z przesunięcia MM. Kolumna stoi TU, a nie w schema.sql, żeby nie
+     rozjeżdżać się z `mm_dok_id` — kosz od 0.75.0 opisują dwa miejsca
+     i trzecie byłoby o jedno za dużo. */
+  addColumn("kosz", "rodzaj", "TEXT NOT NULL DEFAULT 'zwroty'");
   /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
   /* 0.77.0 — powód pominięcia pozycji kosza (status `skipped`). */

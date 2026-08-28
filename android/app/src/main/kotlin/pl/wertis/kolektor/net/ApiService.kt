@@ -56,6 +56,10 @@ import pl.wertis.kolektor.core.net.ZdjecieWstepneBody
 import pl.wertis.kolektor.core.net.ZdjecieWstepneResponse
 import pl.wertis.kolektor.core.net.ZdjecieZapisBody
 import pl.wertis.kolektor.core.net.ZdjecieZapisResponse
+import pl.wertis.kolektor.core.net.KartonyResponse
+import pl.wertis.kolektor.core.net.DodajDoKartonuBody
+import pl.wertis.kolektor.core.net.DodanieDoKartonu
+import pl.wertis.kolektor.core.net.IloscKartonuBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -280,6 +284,27 @@ interface ApiService {
 
     @POST("api/kosze/{id}/zakoncz")
     suspend fun koszZakoncz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
+    /* ── KARTON: rozkładanie od zera (0.122.0) ───────────────────────────
+       Tylko ZBIERANIE zawartości. Rozkładanie zatwierdzonego kartonu idzie
+       trasami `api/kosze/*` wyżej — to jest ta sama praca i ten sam ekran. */
+    @GET("api/kartony")
+    suspend fun kartony(): KartonyResponse
+
+    @POST("api/kartony")
+    suspend fun kartonNowy(@Body body: RequestBody = EMPTY_BODY): KoszResponse
+
+    @POST("api/kartony/{id}/pozycje")
+    suspend fun kartonDodaj(@Path("id") id: Long, @Body body: DodajDoKartonuBody): DodanieDoKartonu
+
+    @POST("api/kartony/pozycje/{id}/ilosc")
+    suspend fun kartonIlosc(@Path("id") id: Long, @Body body: IloscKartonuBody): OkResponse
+
+    @DELETE("api/kartony/pozycje/{id}")
+    suspend fun kartonUsun(@Path("id") id: Long): OkResponse
+
+    @POST("api/kartony/{id}/zatwierdz")
+    suspend fun kartonZatwierdz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
 
     // ── Przyjęcia na regał zwrotów: kosze z dokumentu MM (0.75.0) ─────────
     @GET("api/przyjecia")

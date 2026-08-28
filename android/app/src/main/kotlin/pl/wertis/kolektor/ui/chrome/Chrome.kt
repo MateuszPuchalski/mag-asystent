@@ -193,7 +193,7 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
     }
 }
 
-/* ── Dolny pasek: SKAN · DOSTAWY · ZWROTY · WSTECZ ───────────────────────────
+/* ── Dolny pasek: SKAN · DOSTAWY · ZWROTY · KARTON · WSTECZ ──────────────────
    WSTECZ stoi PO PRAWEJ, bo kolektor trzyma się w prawej dłoni i tam ląduje
    kciuk. Wcześniej był w lewym górnym rogu — najdalszym punkcie ekranu od
    kciuka przy dowolnym chwycie.
@@ -206,7 +206,13 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
    ZWROTY doszły jako trzecia zakładka w 0.75.0. Wcześniej kosze mieszkały
    w DOSTAWACH, bo „to też rozkładanie" — ale magazynier szukał ich pod cudzą
    nazwą, a rozkładanie zwrotów urosło do codziennej roboty z własnym
-   dokumentem z Subiekta.                                                      */
+   dokumentem z Subiekta.
+
+   KARTON doszedł czwarty (0.122.0) tym samym argumentem. Pudło z towarem źle
+   zebranym nie ma dokumentu ani zwrotu, więc pod ZWROTAMI byłoby wpisem, do
+   którego nic nie pasuje. Cztery zakładki po `weight(1f)` plus stały slot
+   WSTECZ dają przy 360 dp około 71 dp na zakładkę — napisy w BarlowCond
+   mieszczą się, ale to jest granica i piąta zakładka jej nie zniesie.        */
 
 /** Szerokość slotu WSTECZ — stała, bo rezerwacja miejsca jest tu całym sensem. */
 private val BackSlot = 76.dp
@@ -218,11 +224,15 @@ fun TabBar(
     onHome: () -> Unit,
     onPutaway: () -> Unit,
     onZwroty: () -> Unit,
+    onKarton: () -> Unit,
     onBack: () -> Unit,
 ) {
     val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES
     val zwrotyActive = screen == Screen.PRZYJECIA || screen == Screen.KOSZ_LINES
-    val homeActive = !putawayActive && !zwrotyActive && screen != Screen.QUEUE
+    val kartonActive = screen == Screen.KARTONY || screen == Screen.KARTON
+    /* Liczony przez NEGACJĘ, więc każdy nowy tryb trzeba tu dopisać — inaczej
+       zapala się razem ze SKANEM i świecą dwie zakładki naraz. */
+    val homeActive = !putawayActive && !zwrotyActive && !kartonActive && screen != Screen.QUEUE
 
     Row(
         modifier = Modifier
@@ -235,6 +245,7 @@ fun TabBar(
         TabItem("SKAN", WIcons.Scan, homeActive, Modifier.weight(1f), onHome)
         TabItem("DOSTAWY", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
         TabItem("ZWROTY", WIcons.Box, zwrotyActive, Modifier.weight(1f), onZwroty)
+        TabItem("KARTON", WIcons.Karton, kartonActive, Modifier.weight(1f), onKarton)
         if (hasBack) {
             BackTab(Modifier.width(BackSlot), onBack)
         } else {

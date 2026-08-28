@@ -358,7 +358,7 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   PONÓW, polling, pull-to-refresh. Wejście prowadzi przez **pastylkę statusu
   Sfery** w prawym górnym rogu. Pastylka jest zarazem wskaźnikiem stanu: zielona
   = OK, amber = ⏳ w kolejce z licznikiem, czerwona = błąd. Dolny pasek ma
-  2 zakładki.
+  4 zakładki: SKAN, DOSTAWY, ZWROTY i KARTON.
 - Bufor offline (plik JSON + WorkManager) na zapisy przy zaniku Wi-Fi, asysta niskiej baterii,
   log upadków urządzenia (`device_drop`) dla serwisu.
 
@@ -431,6 +431,18 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   czerwony pasek na każdym ekranie do czasu zamknięcia) + **raport kolizji
   kodów** dla biura. Eksport problemów dostawy do **CSV** (`;` + BOM, Excel PL)
   pod `GET /api/delivery/:id/problems.csv`.
+
+**KARTON — rozkładanie od zera (0.122.0)** — czwarta zakładka
+- Pakujący odkładają do jednego pudła towary źle zebrane pod zamówienia.
+  Ten obieg **nie ma dokumentu** i nie będzie go miał: towar nie opuścił
+  magazynu, więc żaden stan się nie zmienia.
+- NOWY KARTON otwiera puste pudło z kodem nadanym przez aplikację (`K-1`).
+  Skan dokłada **jedną sztukę** i sumuje na istniejącej pozycji; większą liczbę
+  wpisuje się z klawiatury. Przed ZATWIERDŹ pozycję wolno usunąć.
+- Po ZATWIERDŹ karton jest zwykłym koszem do rozłożenia: ten sam ekran, ten sam
+  skan półki, ten sam ZAKOŃCZ. **Zapisują się wyłącznie adresy** — żadnego MM.
+- W bazie karton to wiersz tabeli `kosz` z `rodzaj = 'karton'`. Biuro widzi go
+  na liście koszy z pastylką KARTON i wyłącznie ogląda.
 
 **Przesunięcie stanu między magazynami**
 - **Jedna czynność, nie tryb pracy**: przesuń tyle a tyle sztuk z magazynu do
@@ -555,8 +567,8 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 264 testów jednostkowych; buduje się bez Android SDK
-  app/                     aplikacja Compose: 13 ekranów, skanery, czujniki
+                           + 267 testów jednostkowych; buduje się bez Android SDK
+  app/                     aplikacja Compose: 15 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*

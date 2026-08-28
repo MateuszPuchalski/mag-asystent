@@ -33,6 +33,32 @@ historii nie przepisujemy.
 
 ---
 
+## 0.122.0 — 28 sierpnia 2026
+
+**Kolektor dostał zakładkę KARTON: rozkładanie od zera.** Zgłoszenie
+właściciela: „zdarza się, że towary, które ktoś źle zebrał, są odkładane przez
+pakujących do jednego kartonu. Ktoś to potem musi rozłożyć na lokalizację".
+
+Do tej wersji rozkładanie znało wyłącznie DOKUMENT: dostawę albo kosz zwrotowy
+z przesunięcia MM. Pudło z towarem źle zebranym nie ma dokumentu i nigdy nie
+będzie go miało — towar nie opuścił magazynu, więc nie ma czego przesuwać.
+Nie miało więc jak trafić na kolektor i wracało na półki z pamięci.
+
+Nowa zakładka prowadzi przez dwie fazy. NOWY KARTON otwiera puste pudło,
+skanowanie dokłada zawartość (skan to jedna sztuka, drugi skan tego samego
+towaru sumuje, większą liczbę wpisuje się z klawiatury), ZATWIERDŹ zamyka
+listę. Od tej chwili karton jest zwykłym koszem do rozłożenia: ten sam ekran,
+ten sam skan półki, ten sam ZAKOŃCZ.
+
+Karton mieszka w tabeli `kosz` z nową kolumną `rodzaj`, bo rozkładanie obu jest
+tą samą pracą — osobna tabela znaczyłaby drugi zestaw usterek w sześciuset
+liniach. ZAKOŃCZ na kartonie **nie wystawia żadnego dokumentu** i pilnuje tego
+test: MM ZWROTY→MAG zdjęłoby z bufora zwrotów stan, którego tam nigdy nie było.
+Zapisuje się wyłącznie adres półki.
+
+Biuro widzi kartony na liście koszy z pastylką KARTON i wyłącznie je ogląda —
+zawartość zna hala. Zakładek na dolnym pasku jest teraz cztery.
+
 ## 0.121.1 — 28 sierpnia 2026
 
 **Karta ROZŁOŻONE POZA WERTIS jest zwinięta.** Zgłoszenie właściciela:

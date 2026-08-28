@@ -201,7 +201,8 @@ fun KoszScreen(graph: AppGraph) {
                     }
                     r.poza -> {
                         graph.feedback.beep(false)
-                        graph.effects.toast("${r.symbol} nie jest z tego kosza")
+                        val gdzie = if (kosz?.rodzaj == "karton") "kartonu" else "kosza"
+                        graph.effects.toast("${r.symbol} nie jest z tego $gdzie")
                     }
                     else -> {
                         graph.feedback.beep(false)
@@ -228,9 +229,17 @@ fun KoszScreen(graph: AppGraph) {
 
     val k = kosz
     if (k == null) {
-        LoadingRow("Wczytywanie kosza…")
+        LoadingRow("Wczytywanie zawartości…")
         return
     }
+    /* Ten sam ekran rozkłada KOSZ i KARTON (0.122.0) — praca jest identyczna,
+       więc dzielą kod. Różnią się WYŁĄCZNIE tym, co obiecują na końcu: po
+       koszu z aplikacji idzie MM cofające bufor, po koszu z dokumentu robotę
+       kończy biuro, a po kartonie nie dzieje się nic, bo towar nie opuścił
+       magazynu. Napis, który tego nie rozróżnia, obiecuje dokument, którego
+       nie będzie. */
+    val karton = k.rodzaj == "karton"
+    val nazwaPudla = if (karton) "KARTON" else "KOSZ"
     val doZrobienia = k.pozycje.count { it.status == "todo" }
     val pominietych = k.pozycje.count { it.status == "skipped" }
     val odlozonych = k.pozycje.size - doZrobienia - pominietych
@@ -268,7 +277,7 @@ fun KoszScreen(graph: AppGraph) {
         val komplet = doZrobienia == 0 && pominietych == 0
         Text(
             buildString {
-                append("KOSZ ${k.kod} · ODŁOŻONE $odlozonych/${k.pozycje.size}")
+                append("$nazwaPudla ${k.kod} · ODŁOŻONE $odlozonych/${k.pozycje.size}")
                 if (pominietych > 0) append(" · POMINIĘTE $pominietych")
                 if (komplet) append(" · KOMPLET")
             },
@@ -280,7 +289,11 @@ fun KoszScreen(graph: AppGraph) {
 
         if (doZrobienia == 0 && k.status == "zamkniety") {
             val zDokumentu = k.mmNumer != null
-            val napis = if (zDokumentu) "ZAKOŃCZ — KOSZ ROZŁOŻONY" else "ZAKOŃCZ — COFNIJ BUFOR"
+            val napis = when {
+                karton -> "ZAKOŃCZ — KARTON ROZŁOŻONY"
+                zDokumentu -> "ZAKOŃCZ — KOSZ ROZŁOŻONY"
+                else -> "ZAKOŃCZ — COFNIJ BUFOR"
+            }
             /* Kosz z pominięciem wraca do biura NIEKOMPLETNY. Przycisk mówi to
                wprost, żeby nikt nie zamknął go w przekonaniu, że rozniósł
                całość — pominięta pozycja czeka na wyjaśnienie po tamtej stronie. */
@@ -297,8 +310,11 @@ fun KoszScreen(graph: AppGraph) {
                     try {
                         apiCall { graph.api.koszZakoncz(id) }
                         graph.effects.toast(
-                            if (zDokumentu) "Kosz ${k.kod} rozłożony — dokument powrotny wystawia biuro"
-                            else "Kosz rozłożony — MM na magazyn główny w kolejce"
+                            when {
+                                karton -> "Karton ${k.kod} rozłożony — żaden dokument nie był potrzebny"
+                                zDokumentu -> "Kosz ${k.kod} rozłożony — dokument powrotny wystawia biuro"
+                                else -> "Kosz rozłożony — MM na magazyn główny w kolejce"
+                            }
                         )
                         graph.nav.zakonczonyKosz()
                     } catch (e: Exception) {
@@ -314,8 +330,11 @@ fun KoszScreen(graph: AppGraph) {
            „dlaczego nic tu nie mogę zrobić". */
         if (k.status == "rozlozony") {
             Text(
-                if (k.mmNumer != null) "Kosz rozłożony. Dokument powrotny (ZWR→MAG) wystawia biuro."
-                else "Kosz rozłożony — bufor cofnięty automatycznie.",
+                when {
+                    karton -> "Karton rozłożony. Towar nie opuszczał magazynu, więc nie ma dokumentu."
+                    k.mmNumer != null -> "Kosz rozłożony. Dokument powrotny (ZWR→MAG) wystawia biuro."
+                    else -> "Kosz rozłożony — bufor cofnięty automatycznie."
+                },
                 fontSize = 13.sp,
                 color = InkMute,
             )

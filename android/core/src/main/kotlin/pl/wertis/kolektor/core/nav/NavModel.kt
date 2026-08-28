@@ -12,6 +12,10 @@ enum class Screen {
     // rozkładanie ZWROTÓW: PRZYJECIA to korzeń własnej zakładki (lista koszy
     // z kartkami), KOSZ_LINES to wejście w konkretny kosz
     PRZYJECIA, KOSZ_LINES,
+    // KARTON: towar źle zebrany, odłożony przez pakujących do jednego pudła.
+    // KARTONY to korzeń zakładki, KARTON to jedno pudło — najpierw zbierane
+    // skanem, po zatwierdzeniu rozkładane jak kosz (ten sam ekran niżej)
+    KARTONY, KARTON,
     LOCATION, SETTINGS,
     // wyjątki: nierozwiązane zgłoszenia + kolizje EAN do naprawy w kartotece
     PROBLEMS,
@@ -24,6 +28,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.SCAN_LOC to Screen.PRODUCT,
     Screen.DELIVERY_LINES to Screen.DELIVERY_DOCS,
     Screen.KOSZ_LINES to Screen.PRZYJECIA,
+    Screen.KARTON to Screen.KARTONY,
     Screen.LOCATION to Screen.HOME,
     Screen.SETTINGS to Screen.HOME,
     Screen.PROBLEMS to Screen.HOME,
@@ -46,6 +51,8 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.DELIVERY_LINES to "DOSTAWA",
     Screen.PRZYJECIA to "ROZKŁADANIE ZWROTÓW",
     Screen.KOSZ_LINES to "KOSZ ZWROTÓW",
+    Screen.KARTONY to "KARTONY",
+    Screen.KARTON to "KARTON",
     Screen.LOCATION to "LOKALIZACJA",
     Screen.SETTINGS to "USTAWIENIA",
     Screen.PROBLEMS to "WYJĄTKI",

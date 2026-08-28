@@ -5745,28 +5745,42 @@ function badgeKosza(status) {
    przy koszu, który wrócił do rozkładania. */
 function rysujKosze(kosze) {
   /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Pięciu kolumn nie da się
-     złożyć w 352 px: do tej wersji ta tabela była tu ucięta w pół. */
+     złożyć w 352 px: do tej wersji ta tabela była tu ucięta w pół.
+
+     KARTONY (0.122.0) stoją na tej samej liście i to jest zamierzone: dla
+     biura „co jest na hali do rozłożenia" jest jednym pytaniem. Bez pastylki
+     karton wyglądałby jednak jak kosz zepsuty — zero zwrotów, brak MM, a mimo
+     to praca w toku. Biuro go tu WYŁĄCZNIE ogląda: zawartość zbiera hala,
+     bo tylko ona wie, co ktoś włożył do pudła. */
   $("koszeLista").innerHTML = kosze.length
-    ? kosze.map((k) => `<tr data-kosz="${k.id}" style="cursor:pointer">
+    ? kosze.map((k) => {
+        const karton = k.rodzaj === "karton";
+        return `<tr data-kosz="${k.id}" style="cursor:pointer">
           <td class="sprawaWiersz">
             <span class="sprawaGora">
               <span class="b">${esc(k.kod)}</span>
-              <span class="mute">${k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow} zwr.`}</span>
+              <span class="mute">${karton
+                ? `${k.pozycji} poz.`
+                : k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow} zwr.`}</span>
             </span>
             <span class="sprawaTemat">${k.status === "otwarty"
-              ? "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło."
+              ? (karton
+                  ? "Hala zbiera zawartość — pudło jeszcze otwarte."
+                  : "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło.")
               : `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${k.rozlozonoPrzez
                   ? ` · ${esc(k.rozlozonoPrzez)}` : ""}`}</span>
             <span class="sprawaStopka">
+              ${karton ? '<span class="badge mute2">KARTON</span>' : ""}
               ${badgeKosza(k.status)}
               ${k.pominietych ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>` : ""}
-              ${k.status === "otwarty"
+              ${k.status === "otwarty" && !karton
                 ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}"
                      style="padding:3px 9px;font-size:11px">ZAMKNIJ — NA HALĘ</button>`
                 : ""}
             </span>
           </td>
-        </tr>`).join("")
+        </tr>`;
+      }).join("")
     : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
   // podgląd otwartego kosza odświeża się razem z listą, bez mrugania
   if (koszPodgladId != null && !kosze.some((k) => k.id === koszPodgladId)) zamknijPodgladKosza();

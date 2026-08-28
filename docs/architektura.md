@@ -314,6 +314,24 @@ niezależne procesy. Gwarantem staje się wtedy guard w zapytaniu wyboru zadania
 mm (`sfera-worker/sql/`, opis w §3): MM stoi, dopóki wcześniejsze niewykonane
 `set_location` tego samego towaru nie wejdzie.
 
+### Karton jest rodzajem kosza, nie własną tabelą
+
+Rozkładanie ma trzy źródła pracy: dokument dostawy, kosz zwrotowy i — od
+0.122.0 — KARTON, czyli pudło z towarem źle zebranym pod zamówienia. Karton
+nie ma dokumentu i nigdy nie będzie go miał: towar nie opuścił magazynu.
+
+Mimo to siedzi w tabeli `kosz`, odróżniony kolumną `rodzaj`. Powód jest jeden
+i mierzalny: od chwili zatwierdzenia rozkładanie kartonu jest **co do znaku**
+tym samym, co rozkładanie kosza. Ten sam skan towaru, ten sam skan półki, to
+samo pomijanie z powodem, te same trzy drogi powrotne z pomyłki. Osobna tabela
+znaczyłaby przepisanie sześciuset linii `services/kosze.ts` i drugi zestaw
+usterek w kodzie, który już raz je przeszedł.
+
+Różnice są dwie i obie mają w kodzie jedno miejsce. Zawartość kartonu zbiera
+HALA, bo nikt inny jej nie zna — to `services/karton.ts` i faza `otwarty`.
+A `zakonczKosz` nie kolejkuje dla kartonu **żadnego** dokumentu: MM ZWROTY→MAG
+zdjęłoby z bufora zwrotów stan, którego na tym buforze nigdy nie było.
+
 ---
 
 ## 6. Tożsamość (§7)
