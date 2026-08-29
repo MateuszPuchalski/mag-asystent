@@ -1659,6 +1659,12 @@ zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
 w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
+Od 0.132.0 przy zwrocie i dyskusji jest zwijana sekcja ZAMÓWIENIE
+I PRZESYŁKA. Pokazuje status zamówienia, płatność (kwota, sposób, czy
+zapłacone), metodę dostawy, paczki i ostatnie zdarzenie śledzenia. Dane jadą z Allegro
+dopiero po rozwinięciu sekcji i nie są u nas zapisywane. Adresu dostawy tam
+nie ma i nie będzie.
+
 Od 0.131.0 pod oceną pozycji zwrotu stoi blok ODPOWIEDZ W SPRAWIE. Pokazuje
 kanały tej samej sprawy, przez które da się napisać do klienta: wątek pytania
 i dyskusję. Gwiazdka stoi przy tym, w którym klient odezwał się ostatni. Zwrot

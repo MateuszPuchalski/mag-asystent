@@ -98,6 +98,7 @@ const TRASY = [
   "/api/biuro/sprawy/powiazane?rodzaj=zwrot&id=1",
   "/api/biuro/sprawy/os?rodzaj=zwrot&id=1",
   "/api/biuro/sprawy/kanaly?rodzaj=zwrot&id=1",
+  "/api/biuro/sprawy/zamowienie?rodzaj=zwrot&id=1",
 ];
 
 test("bez sesji 401, magazynier 403 — sprawy klientów prowadzi biuro", async () => {
@@ -536,4 +537,48 @@ test("kanały odpowiedzi: stojąc w zwrocie widać dyskusję tej samej sprawy", 
   );
   assert.equal(d.kanaly[0].polecany, true, "jedyny kanał jest polecany z definicji");
   assert.equal(typeof d.sprawaId, "number");
+});
+
+test("zamówienie sprawy: status, płatność i paczki przy zwrocie i dyskusji", async () => {
+  const token = zalogowany("biuro");
+  const { zwrotId, dyskusjaId, pytanieId } = daneSpraw();
+  const naglowki = { "x-session": token };
+
+  const zly = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/zamowienie?rodzaj=zwrot&id=-1", headers: naglowki,
+  });
+  assert.equal(zly.statusCode, 400);
+
+  /* Przestawiamy sprawę na zamówienie, które zna adapter deweloperski
+     (dev-ord-1: płatność online, wysyłka SENT) — `daneSpraw` używa numeru
+     wymyślonego, bo reszta testów sprawdza samo grupowanie. */
+  db().prepare("UPDATE zwrot SET allegro_order_id = 'dev-ord-1' WHERE id = ?").run(zwrotId);
+  db().prepare("UPDATE dyskusja SET order_id = 'dev-ord-1' WHERE id = ?").run(dyskusjaId);
+  przebudujSprawy();
+  const r = await app.inject({
+    method: "GET", url: `/api/biuro/sprawy/zamowienie?rodzaj=zwrot&id=${zwrotId}`, headers: naglowki,
+  });
+  assert.equal(r.statusCode, 200);
+  const d = r.json();
+  assert.equal(d.orderId, "dev-ord-1");
+  assert.equal(d.zamowienie.platnosc.typ, "ONLINE");
+  assert.equal(d.zamowienie.platnosc.zaplaconoAt !== null, true, "online znaczy zapłacone");
+  assert.equal(d.wysylkaOpis, "Wysłane", "kod fulfillment.status po polsku");
+
+  /* Dyskusja tej samej sprawy widzi TO SAMO zamówienie — numer bierze się
+     z encji sprawy, więc dyskusja bez `order_id` też by go dostała. */
+  const zDyskusji = await app.inject({
+    method: "GET", url: `/api/biuro/sprawy/zamowienie?rodzaj=dyskusja&id=${dyskusjaId}`,
+    headers: naglowki,
+  });
+  assert.equal(zDyskusji.json().orderId, "dev-ord-1");
+
+  /* Pytanie zamówienia nie ma z konstrukcji — i to jest ODPOWIEDŹ, nie błąd. */
+  const zPytania = await app.inject({
+    method: "GET", url: `/api/biuro/sprawy/zamowienie?rodzaj=pytanie&id=${pytanieId}`,
+    headers: naglowki,
+  });
+  assert.equal(zPytania.statusCode, 200);
+  assert.equal(zPytania.json().orderId, null);
+  assert.equal(zPytania.json().zamowienie, null);
 });

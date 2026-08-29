@@ -363,6 +363,47 @@ test("mapowanie niesie identyfikator kupującego — klucz do wątku wiadomości
   assert.equal(mapujZamowienie({ buyer: { id: "44300444" } }).kupujacyId, "44300444");
 });
 
+test("zamówienie niesie płatność, status i wysyłkę — a brak płatności to NULL", () => {
+  /* Pola leżały w tej samej odpowiedzi od zawsze, tylko nikt ich nie czytał
+     (0.132.0). Kwota jedzie TEKSTEM prosto z API — zaokrąglenie przy
+     pieniądzach jest błędem, którego nikt nie zauważy do reklamacji. */
+  const zam = mapujZamowienie({
+    id: "ord-2",
+    boughtAt: "2026-08-20T10:00:00Z",
+    status: "READY_FOR_PROCESSING",
+    fulfillment: { status: "SENT" },
+    delivery: { method: { name: "Kurier DPD" }, address: { street: "Kwiatowa 1" } },
+    payment: {
+      type: "ONLINE",
+      provider: "PayU",
+      finishedAt: "2026-08-20T10:05:00Z",
+      paidAmount: { amount: "249.90", currency: "PLN" },
+    },
+  });
+  assert.equal(zam.kupionoAt, "2026-08-20T10:00:00Z");
+  assert.equal(zam.status, "READY_FOR_PROCESSING");
+  assert.equal(zam.wysylka, "SENT");
+  assert.equal(zam.dostawaMetoda, "Kurier DPD");
+  assert.equal(zam.platnosc?.kwota, "249.90");
+  assert.equal(zam.platnosc?.waluta, "PLN");
+  assert.equal(zam.platnosc?.zaplaconoAt, "2026-08-20T10:05:00Z");
+  /* Adres dostawy NIE przechodzi przez mapowanie — ta sama granica, co przy
+     przesyłkach kupującego; pilnuje jej test obok. */
+  assert.equal(JSON.stringify(zam).includes("Kwiatowa"), false);
+
+  /* Zamówienie bez ani jednego pola płatności daje NULL, nie pusty obiekt:
+     ekran nie ma rysować wiersza o niczym. */
+  assert.equal(mapujZamowienie({ id: "ord-3" }).platnosc, null);
+  /* Pobranie bez `finishedAt` — pieniądze jeszcze nie doszły i to jest FAKT,
+     nie brak danych. */
+  const pobranie = mapujZamowienie({
+    id: "ord-4",
+    payment: { type: "CASH_ON_DELIVERY", paidAmount: { amount: "129.00", currency: "PLN" } },
+  });
+  assert.equal(pobranie.platnosc?.typ, "CASH_ON_DELIVERY");
+  assert.equal(pobranie.platnosc?.zaplaconoAt, null);
+});
+
 /* ── Pytania klientów (0.80.0) ─────────────────────────────────────────────── */
 
 test("URL ofert: fraza kodowana, filtr aktywnych publikacji zawsze obecny", () => {

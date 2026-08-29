@@ -1,6 +1,7 @@
 import { allegroAdapter } from "../adapters/allegro.js";
 import type {
   PrzesylkaZamowienia,
+  ZamowienieAllegro,
   ZamowienieKupujacego,
   ZdarzenieSledzenia,
 } from "../adapters/allegro.js";
@@ -133,4 +134,49 @@ export function blokPrzesylek(dane: PrzesylkiKlienta): string[] {
       "i wrócimy z informacją."
   );
   return linie;
+}
+
+/* ── Kontekst JEDNEGO zamówienia sprawy (0.132.0) ────────────────────────────
+   Etap E z docs/architektura-spraw.md. Powyżej: zamówienia KUPUJĄCEGO, gdy
+   znamy tylko login (pytania). Tutaj: zamówienie, którego numer sprawa już
+   ma w bazie — przy dyskusji i zwrocie `order_id` leżał nietknięty od
+   0.103.0, a agent i tak szedł po te dane do panelu Allegro.
+
+   Sufit ten sam co wyżej i z tego samego powodu: śledzenie najwyżej dwóch
+   paczek, bo każde zdarzenie to osobny strzał HTTP. Nic nie zapisujemy —
+   status przesyłki i płatności starzeje się w godziny.                       */
+
+export interface KontekstZamowienia {
+  orderId: string | null;
+  zamowienie: ZamowienieAllegro | null;
+  /** Polska etykieta `fulfillment.status`; kod spoza słownika idzie surowo. */
+  wysylkaOpis: string | null;
+  przesylki: PrzesylkaWidok[];
+}
+
+export async function kontekstZamowienia(orderId: string | null): Promise<KontekstZamowienia> {
+  if (!orderId) return { orderId: null, zamowienie: null, wysylkaOpis: null, przesylki: [] };
+  const adapter = allegroAdapter();
+  const zamowienie = await adapter.zamowienie(orderId);
+  /* Zamówienia nie ma (skasowane, cudze, literówka w order_id) — paczek nie
+     ma po co pytać. Uczciwe „nie znaleziono" zamiast pustego szkieletu. */
+  if (!zamowienie) return { orderId, zamowienie: null, wysylkaOpis: null, przesylki: [] };
+
+  const paczki = await adapter.przesylkiZamowienia(orderId);
+  const przesylki: PrzesylkaWidok[] = [];
+  for (const [i, p] of paczki.entries()) {
+    const sledz =
+      i < SLEDZONYCH_PACZEK && p.przewoznikId && p.waybill
+        ? await adapter.sledzeniePrzesylki(p.przewoznikId, p.waybill)
+        : [];
+    przesylki.push({ ...p, ostatnieZdarzenie: sledz.at(-1) ?? null });
+  }
+  return {
+    orderId,
+    zamowienie,
+    wysylkaOpis: zamowienie.wysylka
+      ? (STATUSY_WYSYLKI[zamowienie.wysylka] ?? zamowienie.wysylka)
+      : null,
+    przesylki,
+  };
 }

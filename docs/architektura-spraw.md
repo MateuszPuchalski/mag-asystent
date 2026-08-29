@@ -64,9 +64,10 @@ nich, nie na pamięci.
 - `pytanie` nie ma ani `order_id`, ani `kupujacy_id`, a jego login bywa maską
   `client:NNN`. Zwrot trzyma prawdziwy login, więc złączenie po loginie
   w SQL między rejestrami nie trafia. Odmaskowanie istnieje tylko w adapterze.
-- Statusu płatności nie czyta nikt (`payment.*` z checkout-forms nietknięte).
-  Przy dyskusji nie widać zamówienia ani przesyłki, choć `order_id` leży
-  w bazie; trasa zwraca nawet blok `klient`, a panel go ignoruje.
+- ~~Statusu płatności nie czyta nikt~~ — od 0.132.0 czyta: `payment.*`,
+  status zamówienia i `fulfillment.status` jadą do sekcji ZAMÓWIENIE
+  I PRZESYŁKA przy zwrocie i dyskusji, razem z paczkami i śledzeniem.
+  Zostaje blok `klient` z trasy dyskusji, którego panel dalej nie rysuje.
 - `events` zapisuje ~70 typów, bez wartości przed/po; części mutacji brakuje
   (np. przejęcie pytania nie loguje). Zalążek logu zdarzeń, nie log.
 - Świeżość rozmowy chroni wyłącznie pytania (`nowa_wiadomosc_at` i blokada
@@ -176,10 +177,22 @@ poprzedniego na produkcji.
   kontrola świeżości, stempel i zdarzenie działają tak samo jak przy własnym
   polu. Zwinięcie trzech szczegółów w jeden widok zostało świadomie zdjęte
   z drogi (patrz „Ekran docelowy").
-- **E — narzędzia agenta:** szablony odpowiedzi; reguły tagowania
-  i przydziału; opinie Allegro jako piąte źródło; raporty czasów; komplet
-  kontekstu (płatność, zamówienie i przesyłka przy dyskusji, śledzenie
-  przy zwrocie).
+- **E1 (0.132.0, wykonany) — kontekst zamówienia:** status zamówienia,
+  płatność (kwota, sposób, czy zapłacone), metoda dostawy, paczki i ostatnie
+  zdarzenie śledzenia — w zwijanej sekcji przy zwrocie i dyskusji. Numer
+  zamówienia bierze się z encji sprawy, więc dyskusja bez własnego `order_id`
+  dostaje go od zwrotu z tej samej sprawy. Czyta się NA KLIK i nie zapisuje:
+  status płatności starzeje się w godziny. Adres dostawy dalej nie przechodzi
+  przez mapowanie.
+- **E2 — szablony odpowiedzi:** gotowe teksty ze zmiennymi, wstawiane do pola
+  odpowiedzi. Najczęstsza robota agenta i pierwsza rzecz, którą Responso
+  robi dobrze.
+- **E3 — raporty czasów:** ile czekał klient, ile trwała odpowiedź, na osobę
+  i na kanał. Zdarzenia osi czasu (0.130.0) są już do tego wystarczające.
+- **E4 — opinie Allegro jako piąte źródło:** nowy rejestr i nowy rodzaj
+  `sprawa_zrodlo`; wymaga adaptera i weryfikacji na żywym koncie.
+- **E5 — tagi i reguły:** tagowanie spraw, reguły przydziału. Wymaga
+  najpierw modelu tagów, którego repo nie ma wcale.
 
 ## Czego świadomie nie robimy
 

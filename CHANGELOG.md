@@ -33,6 +33,33 @@ historii nie przepisujemy.
 
 ---
 
+## 0.132.0 — 29 sierpnia 2026
+
+**Zamówienie, płatność i paczka przy sprawie.** Etap E1 z mapy
+w `docs/architektura-spraw.md`: nowa zwijana sekcja ZAMÓWIENIE I PRZESYŁKA
+w szczególe zwrotu i dyskusji.
+
+**Status płatności widać wreszcie w aplikacji.** Pole `payment` z zamówienia
+Allegro leżało nietknięte od pierwszej integracji — a „czy klient zapłacił"
+rozstrzyga rozmowę o zwrocie środków i o wysyłce za pobraniem. Sekcja pokazuje
+kwotę, sposób zapłaty i to, czy pieniądze doszły, obok statusu zamówienia,
+metody dostawy, nadanych paczek i ostatniego zdarzenia śledzenia.
+
+**Numer zamówienia bierze się ze SPRAWY, nie z jednego rejestru.** Dyskusja
+bez własnego `order_id` dostaje numer od zwrotu z tej samej sprawy — dokładnie
+tak, jak sklejają je etapy C i D. Sprawa bez zamówienia (pytanie, zwrot ręczny)
+mówi to wprost jednym zdaniem, zamiast pokazywać puste wiersze.
+
+**Czyta się NA KLIK i nie zapisuje.** To jedyna sekcja spraw, która pyta
+Allegro, więc jedzie dopiero po rozwinięciu — wejście w sprawę niczego nie
+pobiera. Nic nie ląduje w bazie: status paczki i płatności starzeje się
+w godziny, więc kopia u nas kłamałaby od pierwszego odświeżenia.
+
+**Adres dostawy dalej nie przechodzi przez mapowanie.** Do odpowiedzi nie
+jest potrzebny, a dane osobowe nie mają czego szukać w pamięci procesu —
+ta sama granica, co przy przesyłkach klienta z 0.105.0. Pilnują jej testy
+po obu stronach: adaptera i panelu.
+
 ## 0.131.0 — 29 sierpnia 2026
 
 **Odpowiadasz z tego ekranu, na którym stoisz.** Etap D3 z mapy
