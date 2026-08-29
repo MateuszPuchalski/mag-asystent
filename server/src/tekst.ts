@@ -232,3 +232,49 @@ export function progLiterowki(dlugosc: number): number | null {
   if (dlugosc <= 3) return null;
   return dlugosc <= 5 ? 1 : 2;
 }
+
+/* ── Encje HTML z Allegro ────────────────────────────────────────────────────
+   Allegro potrafi oddać tekst z encjami (`zwr&oacute;cić`), a panel escape'uje
+   wszystko przy renderowaniu — więc encja z bazy wyświetla się DOSŁOWNIE.
+   Dekodujemy przy wjeździe (adapter) i raz w migracji dla zastanych wierszy.
+   Moduł tekst.ts, nie adapter: migrację woła db/db.ts, a db → adapters
+   odwracałoby warstwy.                                                       */
+
+/** Słownik encji nazwanych widywanych w tekstach Allegro. Nieznana ZOSTAJE —
+ *  zgadywanie zamieniłoby cudzy tekst po cichu, a dosłowna encja jest
+ *  przynajmniej widoczna jako usterka. */
+const ENCJE: Readonly<Record<string, string>> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  /* Zwykła spacja, nie U+00A0: niełamliwa w bazie psułaby porównania
+     i zawijanie, a nikt jej tu świadomie nie użył. */
+  nbsp: " ",
+  aogon: "ą", Aogon: "Ą", cacute: "ć", Cacute: "Ć",
+  eogon: "ę", Eogon: "Ę", lstrok: "ł", Lstrok: "Ł",
+  nacute: "ń", Nacute: "Ń", oacute: "ó", Oacute: "Ó",
+  sacute: "ś", Sacute: "Ś", zacute: "ź", Zacute: "Ź",
+  zdot: "ż", Zdot: "Ż",
+  ndash: "–", mdash: "—", hellip: "…", laquo: "«", raquo: "»",
+  bdquo: "„", ldquo: "“", rdquo: "”",
+  deg: "°", sect: "§", copy: "©", reg: "®", trade: "™", euro: "€",
+};
+
+/**
+ * Zamienia encje HTML na znaki. JEDEN przebieg regexu — `&amp;lt;` daje
+ * `&lt;` i STOP, bo wynik podstawienia nie jest skanowany ponownie. To
+ * celowe: podwójne kodowanie oznacza, że ktoś po drodze zakodował encję
+ * jako tekst, i jeden poziom na przebieg jest jedynym bezpiecznym ruchem.
+ */
+export function odkodujEncje(s: string): string {
+  return s.replace(/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (calosc, cialo: string) => {
+    if (cialo[0] === "#") {
+      const kod = cialo[1] === "x" || cialo[1] === "X"
+        ? parseInt(cialo.slice(2), 16)
+        : parseInt(cialo.slice(1), 10);
+      /* Poza zakresem Unicode albo surrogat — zostawiamy dosłownie. */
+      if (!Number.isFinite(kod) || kod < 0x20 && kod !== 0x09 && kod !== 0x0a
+          || kod > 0x10ffff || (kod >= 0xd800 && kod <= 0xdfff)) return calosc;
+      return String.fromCodePoint(kod);
+    }
+    return ENCJE[cialo] ?? calosc;
+  });
+}

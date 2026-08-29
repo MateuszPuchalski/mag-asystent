@@ -126,10 +126,12 @@ poprzedniego na produkcji.
 
 - **A (0.125.0, wykonany):** nawigacja boczna zamiast górnego paska; SPRAWY
   rozprężone na trzy widoki; konsole na pełne `100dvh`.
-- **B — uszczelnienie wjazdu:** paginacja `/sale/issues`; weryfikacja listy
-  statusów końcowych dyskusji na żywym koncie; `watek_meta` dla dyskusji
-  i pytań; dekodowanie encji HTML w sanitizerze adaptera i jednorazowe
-  przeliczenie bazy.
+- **B (0.126.0, wykonany) — uszczelnienie wjazdu:** paginacja `/sale/issues`
+  (do 1000 spraw); `watek_meta` dla dyskusji i pytań ze świeżością wysyłki
+  po stronie serwera; dekodowanie encji HTML w adapterze i jednorazowe
+  przeliczenie bazy. Statusy końcowe: mechanizm weryfikacji wszedł (nieznane
+  wartości liczą się i świecą przy DYSKUSJACH), potwierdzenie właściciela na
+  żywym koncie i korekta listy to osobny PATCH.
 - **C — encja sprawy:** `sprawa` i `sprawa_zrodlo` nakładką, wypełnienie
   wstecz po `order_id` i kupującym, `kupujacy_id` przy pytaniach; kolejka
   czyta sprawy zamiast czterech budowniczych.

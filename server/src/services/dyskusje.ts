@@ -1,4 +1,5 @@
 import { db, nowIso } from "../db/db.js";
+import { metaWatku, stempelWyslano, zapiszMetaDyskusji } from "./watek-meta.js";
 import { uruchomTakt } from "./takt.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
@@ -47,6 +48,35 @@ export const STATUSY_DYSKUSJI = ["w_toku", "zamknieta", "pominieta"] as const;
  * degradacja w stronę ręcznego ZAMKNIJ, nie błąd.
  */
 export const FINALNE_STATUSY_ALLEGRO = ["CLOSED", "ENDED", "FINISHED"] as const;
+
+/**
+ * Statusy Allegro, które ZNAMY jako otwarte. [WERYFIKUJ] jak lista finalnych:
+ * wartości spoza obu list nie są błędem — sync je liczy i pokazuje biuru,
+ * żeby właściciel potwierdził na żywym koncie, czy to sprawa otwarta, czy
+ * końcowa, której nie zamykamy. To jest mechanizm weryfikacji listy
+ * finalnych, nie ozdoba.
+ */
+export const ZNANE_STATUSY_OTWARTE = ["ONGOING", "NEW"] as const;
+
+/**
+ * Rozkład statusów przebiegu + wartości, których nie zna żadna lista.
+ * Czysta funkcja — testuje się bez adaptera i bez bazy.
+ */
+export function podzielStatusy(sprawy: Array<{ status: string | null }>): {
+  statusy: Record<string, number>;
+  nieznane: string[];
+} {
+  const statusy: Record<string, number> = {};
+  for (const s of sprawy) {
+    const nazwa = s.status ?? "(brak)";
+    statusy[nazwa] = (statusy[nazwa] ?? 0) + 1;
+  }
+  const znane: readonly string[] = [...FINALNE_STATUSY_ALLEGRO, ...ZNANE_STATUSY_OTWARTE];
+  const nieznane = Object.keys(statusy)
+    .filter((n) => n !== "(brak)" && !znane.includes(n))
+    .sort();
+  return { statusy, nieznane };
+}
 
 export interface Dyskusja {
   id: number;
@@ -202,6 +232,9 @@ export interface StanSynchronizacjiDyskusji {
   nowych: number;
   zamknietychPrzezAllegro: number;
   przejrzanych: number;
+  /* Wartości `status_allegro` spoza znanych list — do potwierdzenia przez
+     właściciela na żywym koncie (patrz ZNANE_STATUSY_OTWARTE). */
+  nieznaneStatusy: string[];
 }
 
 let stanSynchronizacji: StanSynchronizacjiDyskusji | null = null;
@@ -300,12 +333,21 @@ export async function synchronizujDyskusje(autor: string): Promise<WynikSynchron
   if (nowych > 0) {
     logEvent("dyskusja_sync", autor, null, { nowych, przejrzanych: sprawy.length });
   }
+  /* Status spoza znanych list idzie do dziennika RAZ NA WARTOŚĆ, nie na
+     sprawę — sto spraw z tym samym dziwnym statusem to jedno zdarzenie.
+     Trwały ślad plus linia na ekranie to cały mechanizm weryfikacji
+     [WERYFIKUJ] przy FINALNE_STATUSY_ALLEGRO. */
+  const { statusy, nieznane } = podzielStatusy(sprawy);
+  for (const status of nieznane) {
+    logEvent("dyskusja_status_nieznany", autor, null, { status, ile: statusy[status] });
+  }
   stanSynchronizacji = {
     at: teraz,
     przez: autor,
     nowych,
     zamknietychPrzezAllegro,
     przejrzanych: sprawy.length,
+    nieznaneStatusy: nieznane,
   };
   return { nowych, zamknietychPrzezAllegro, przejrzanych: sprawy.length };
 }
@@ -372,10 +414,19 @@ export function zapiszNotatkeDyskusji(id: number, notatka: string, autor: string
    wysyłek w `events`. Zasób jest w becie — 404 z API degraduje do zdania
    „otwórz panel", nigdy do awarii rejestru.                                  */
 
-/** Rozmowa sprawy — na klik, bez zapisu; `null` = niedostępna przez API. */
+/**
+ * Rozmowa sprawy — na klik, TREŚĆ bez zapisu; `null` = niedostępna przez API.
+ * Od 0.126.0 odczyt zostawia metadane piłki w `watek_meta` (kto ostatni,
+ * kiedy, ile) — cache tego, co człowiek właśnie widział; świadomy wyjątek od
+ * „zero zapisu przy patrzeniu", decyzja właściciela. Dzięki niemu kontrola
+ * świeżości wysyłki ma punkt odniesienia po stronie serwera, nie tylko id
+ * przysłane przez przeglądarkę.
+ */
 export async function wiadomosciDyskusji(id: number): Promise<WiadomoscDyskusji[] | null> {
   const w = wiersz(id);
-  return allegroAdapter().wiadomosciDyskusji(w.allegro_id as string);
+  const lista = await allegroAdapter().wiadomosciDyskusji(w.allegro_id as string);
+  if (lista !== null) zapiszMetaDyskusji(w.allegro_id as string, lista, "odczyt");
+  return lista;
 }
 
 function zamknietaLokalnie(status: string): boolean {
@@ -492,18 +543,30 @@ export async function wyslijOdpowiedzDyskusji(
   const adapter = allegroAdapter();
   /* KONTROLA ŚWIEŻOŚCI jak przy pytaniach (services/pytania.ts): jedno
      zapytanie NA WYSYŁKĘ, degradacja przy awarii pobrania, „wyślij mimo to"
-     jest świadomą decyzją człowieka. Bez id z panelu kontroli nie ma —
-     rozmowa mogła być niedostępna przez API (degradacja z 0.104.0). */
-  if (!opcje.wymus && opcje.ostatniaWidzianaId) {
-    let swieze: WiadomoscDyskusji[] | null = null;
+     jest świadomą decyzją człowieka. Punktem odniesienia jest id z panelu,
+     a od 0.126.0 w odwodzie `watek_meta` — serwer pamięta ostatnią widzianą
+     wiadomość KLIENTA z odczytu/sync, więc panel bez id nie wyłącza już
+     kontroli. Brak obu punktów = brak kontroli (pierwszy kontakt w sprawie,
+     degradacja z 0.104.0 zostaje). */
+  const punkt =
+    opcje.ostatniaWidzianaId ??
+    metaWatku("dyskusja", w.allegro_id as string)?.ostatniaKlientId ??
+    null;
+  let swieze: WiadomoscDyskusji[] | null = null;
+  if (!opcje.wymus && punkt) {
     try {
       swieze = await adapter.wiadomosciDyskusji(w.allegro_id as string);
     } catch {
       /* degradacja — wysyłka ważniejsza niż kontrola */
     }
     if (swieze && swieze.length > 0) {
-      const znana = swieze.findIndex((m) => m.id === opcje.ostatniaWidzianaId);
-      const nowe = znana >= 0 ? swieze.slice(znana + 1) : swieze;
+      /* „Nowe" liczą się WYŁĄCZNIE z głosów nie-naszych — symetria z
+         `noweOdKlienta` przy pytaniach i ochrona przed samoblokadą: własna
+         wysłana wiadomość nie może zatrzymać następnej odpowiedzi, gdy
+         punktem odniesienia jest id klienta z meta. */
+      const cudze = swieze.filter((m) => !m.odNas);
+      const znana = cudze.findIndex((m) => m.id === punkt);
+      const nowe = znana >= 0 ? cudze.slice(znana + 1) : cudze;
       if (nowe.length > 0) throw new BladSwiezosciDyskusji(nowe);
     }
   }
@@ -526,6 +589,11 @@ export async function wyslijOdpowiedzDyskusji(
         WHERE id = ?`
     )
     .run(autor, autor, id);
+  /* Meta z rozmowy pobranej przy kontroli (jeśli była), potem stempel „my":
+     ostatnie słowo padło od nas, a id klienta i licznik zostają pod następną
+     kontrolę świeżości. */
+  if (swieze) zapiszMetaDyskusji(w.allegro_id as string, swieze, "wysylka");
+  stempelWyslano("dyskusja", w.allegro_id as string);
   logEvent("dyskusja_wyslana", autor, null, {
     dyskusjaId: id,
     znakow: tresc.length,

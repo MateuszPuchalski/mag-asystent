@@ -4,6 +4,7 @@ import { allegroAdapter } from "../adapters/allegro.js";
 import { stanPolaczenia } from "../services/allegro-token.js";
 import { stanAI } from "../services/ai.js";
 import { przesylkiKupujacego } from "../services/przesylki.js";
+import { zapiszMetaPytania } from "../services/watek-meta.js";
 import {
   BladPytania,
   BladSwiezosci,
@@ -252,21 +253,22 @@ export async function pytaniaRoutes(app: FastifyInstance) {
     return zBledem(reply, () => ({ historia: historiaKlienta(Number(req.params.id)) }));
   });
 
-  /* Rozmowa czytana NA ŻĄDANIE i nietrzymana u nas — ta sama zasada co przy
-     zwrotach: prywatna korespondencja ma jedno miejsce prawdy w Allegro. */
+  /* Rozmowa czytana NA ŻĄDANIE, TREŚĆ nietrzymana u nas — jedno miejsce
+     prawdy w Allegro. Od 0.126.0 odczyt zostawia METADANE piłki (kto ostatni,
+     kiedy, ile) w `watek_meta` — cache tego, co człowiek właśnie widział;
+     świadomy wyjątek od „zero zapisu przy patrzeniu", decyzja właściciela. */
   app.get<{ Params: { id: string } }>("/api/biuro/pytania/:id/wiadomosci", async (req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return zIntegracja(reply, async () => {
       const p = szczegolPytania(Number(req.params.id));
       if (!p.threadId) return { watek: null, zrodlo: p.zrodlo };
+      /* Login kupującego jedzie razem z pytaniem od 0.80.0 — bez niego
+         rozmowa bez ról autora wyświetlała się w całości jako nasza. */
+      const wiadomosci = await allegroAdapter().wiadomosciWatku(p.threadId, p.kupujacyLogin);
+      zapiszMetaPytania(p.threadId, wiadomosci, "odczyt");
       return {
-        watek: {
-          threadId: p.threadId,
-          /* Login kupującego jedzie razem z pytaniem od 0.80.0 — bez niego
-             rozmowa bez ról autora wyświetlała się w całości jako nasza. */
-          wiadomosci: await allegroAdapter().wiadomosciWatku(p.threadId, p.kupujacyLogin),
-        },
+        watek: { threadId: p.threadId, wiadomosci },
         zrodlo: p.zrodlo,
       };
     });

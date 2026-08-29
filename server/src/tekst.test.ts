@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   LITERY,
   naLike,
+  odkodujEncje,
   odlegloscOgraniczona,
   progLiterowki,
   sqlZloz,
@@ -150,4 +151,35 @@ test("krótkie słowa nie dostają prawa do literówki", () => {
   assert.equal(progLiterowki(5), 1);
   assert.equal(progLiterowki(6), 2);
   assert.equal(progLiterowki(20), 2);
+});
+
+/* ── Encje HTML ──────────────────────────────────────────────────────────────
+   Dekoder chroni bazę i ekran przed `zwr&oacute;cić` z Allegro. Przypadki
+   brzegowe są ważniejsze od szczęśliwej ścieżki: podwójne kodowanie nie może
+   dekodować się do końca, a nieznana encja nie może zniknąć.                 */
+
+test("odkodujEncje: polskie encje nazwane i podstawowe", () => {
+  assert.equal(odkodujEncje("zwr&oacute;ci&cacute; &zdot;arna"), "zwrócić żarna");
+  assert.equal(odkodujEncje("A &amp; B &lt;c&gt; &quot;d&quot;"), 'A & B <c> "d"');
+  assert.equal(odkodujEncje("&Lstrok;&aogon;ka"), "Łąka");
+});
+
+test("odkodujEncje: numeryczne dziesiętne i szesnastkowe", () => {
+  assert.equal(odkodujEncje("&#380;&#243;&#322;w"), "żółw");
+  assert.equal(odkodujEncje("&#x17c;&#xF3;&#x142;ty"), "żółty");
+});
+
+test("odkodujEncje: jeden poziom — &amp;lt; nie staje się <", () => {
+  assert.equal(odkodujEncje("&amp;lt;b&amp;gt;"), "&lt;b&gt;");
+});
+
+test("odkodujEncje: nieznana encja i goły ampersand zostają", () => {
+  assert.equal(odkodujEncje("&foobar; Q&A x&y"), "&foobar; Q&A x&y");
+  /* Surrogat i kod spoza Unicode — dosłownie, nie krzak. */
+  assert.equal(odkodujEncje("&#xD800; &#1114300;"), "&#xD800; &#1114300;");
+});
+
+test("odkodujEncje: nbsp na zwykłą spację, typografia dekodowana", () => {
+  assert.equal(odkodujEncje("a&nbsp;b"), "a b");
+  assert.equal(odkodujEncje("&bdquo;x&rdquo; &ndash; 5&deg;"), "„x” – 5°");
 });

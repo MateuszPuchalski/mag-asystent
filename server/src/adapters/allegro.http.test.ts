@@ -661,3 +661,39 @@ test("oferta po id: link, cena i symbol z naszego magazynu (0.107.0)", () => {
   assert.equal(mapujOferte({}, false), null);
   assert.equal(mapujOferte(null, false), null);
 });
+
+/* ── Encje HTML w polach ludzkich (0.126.0) ──────────────────────────────────
+   Allegro oddaje tematy i treści z encjami; dekodujemy przy wjeździe, ale
+   TYLKO w polach czytanych przez człowieka. Id i URL-e muszą zostać sobą —
+   `&amp;` w adresie załącznika po zdekodowaniu wskazywałby inny zasób.       */
+
+test("mapujDyskusje dekoduje temat, id zostaje surowe", () => {
+  const [d] = mapujDyskusje({
+    issues: [{ id: "abc&amp;1", subject: "Zwrot &oacute;smej cz&eogon;ści", status: "ONGOING" }],
+  });
+  assert.equal(d.temat, "Zwrot ósmej części");
+  assert.equal(d.id, "abc&amp;1", "id nie jest polem ludzkim — zostaje dosłowne");
+});
+
+test("mapujWiadomosciDyskusji dekoduje treść i nazwę załącznika, URL nie", () => {
+  const [w] = mapujWiadomosciDyskusji({
+    messages: [{
+      id: "m1",
+      text: "prze&sacute;l&eogon; zdj&eogon;cie",
+      createdAt: "2026-08-01T10:00:00Z",
+      attachment: { fileName: "za&lstrok;&aogon;cznik.jpg", url: "https://x.pl/a?b=1&amp;c=2" },
+    }],
+  });
+  assert.equal(w.tresc, "prześlę zdjęcie");
+  assert.equal(w.zalacznik?.nazwa, "załącznik.jpg");
+  assert.equal(w.zalacznik?.url, "https://x.pl/a?b=1&amp;c=2", "URL zostaje bajt w bajt");
+});
+
+test("mapujWatki i mapujWiadomosci dekodują tytuł oferty i treść", () => {
+  const [w] = mapujWatki({
+    threads: [{ id: "t-9", offer: { name: "Ko&sacute;&nacute; &quot;Zefir&quot;" } }],
+  });
+  assert.equal(w.ofertaTytul, 'Kośń "Zefir"');
+  const [m] = mapujWiadomosci({ messages: [{ id: "m1", text: "zwr&oacute;c&#380;" }] }, null);
+  assert.equal(m.tresc, "zwrócż");
+});

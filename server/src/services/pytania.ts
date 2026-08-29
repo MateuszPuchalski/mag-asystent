@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
 import { kontekstKlienta, type KontekstKlienta } from "./klienci.js";
+import { stempelWyslano, zapiszMetaPytania } from "./watek-meta.js";
 import { blokPrzesylek, czyPytaOWysylke, przesylkiKupujacego } from "./przesylki.js";
 import type { PrzesylkiKlienta } from "./przesylki.js";
 import { BladLimituAllegro, allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
@@ -422,6 +423,10 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
       continue;
     }
     const wiadomosci = await adapter.wiadomosciWatku(watek.threadId, watek.interlokutor);
+    /* Metadane piłki za darmo: rozmowa i tak przeleciała przez ręce sync
+       (docs/architektura-spraw.md) — liczymy „kto ostatni, kiedy, ile"
+       i NIC z treści nie zostaje. */
+    zapiszMetaPytania(watek.threadId, wiadomosci, "sync");
     if (wiadomosci.length === 0) {
       bezWiadomosci++;
       continue;
@@ -1141,6 +1146,9 @@ export async function wyslijOdpowiedz(
        WHERE id = ?`
     )
     .run(autor, id);
+  /* Piłka przechodzi do klienta naszym głosem — bez ponownego GET-a:
+     wystarczy stempel, licznik dogoni następny sync albo odczyt. */
+  stempelWyslano("pytanie", p.threadId);
   utrwalDopasowania(p, autor);
   logEvent("pytanie_wyslane", autor, null, {
     id,

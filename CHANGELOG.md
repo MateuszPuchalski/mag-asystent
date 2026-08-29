@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.126.0 — 29 sierpnia 2026
+
+**Uszczelnienie wjazdu spraw: pełna lista dyskusji, czyste polskie znaki,
+świeżość wysyłki po stronie serwera.** Etap B z mapy
+w `docs/architektura-spraw.md`.
+
+**Rejestr dyskusji widzi wszystko, nie pierwszą setkę.** Pobranie czytało
+JEDNĄ stronę `/sale/issues` po 100 spraw — konto z większą liczbą gubiło
+resztę po cichu. Teraz pobranie kartkuje do 10 stron (1000 spraw), z tym
+samym bezpiecznikiem co przy zwrotach.
+
+**Encje HTML znikają z ekranu.** Allegro potrafi oddać tekst z encjami
+(`zwr&oacute;cić`), a panel słusznie escape'uje wszystko przy renderowaniu —
+więc encja szła na ekran dosłownie. Dekoder rozbraja je przy wjeździe
+w polach czytanych przez człowieka: tematy, treści, tytuły ofert. Id,
+loginy i adresy zostają bajt w bajt. Zastane wiersze przelicza jednorazowa
+migracja przy starcie; szkice i odpowiedzi redagowane ręką człowieka
+świadomie nietknięte.
+
+**Metadane piłki bez treści.** Nowa tabela `watek_meta` pamięta z każdej
+rozmowy tylko: kto powiedział ostatnie słowo, kiedy i ile wiadomości padło.
+Wypełnia ją synchronizacja pytań (rozmowa i tak przelatuje), odczyt rozmowy
+na klik i wysyłka. Treść rozmów dalej czyta się na klik i NIE zapisuje —
+decyzja właściciela: metadane tak, treść nie. To fundament pod pasma
+„kto ma piłkę" z mapy etapów.
+
+**Wysyłka do dyskusji pilnuje świeżości sama.** Dotąd kontrola działała
+tylko, gdy przeglądarka przysłała id ostatniej widzianej wiadomości. Teraz
+punktem odniesienia jest też `watek_meta` — serwer pamięta, co człowiek
+czytał, więc odpowiedź na nieaktualną rozmowę dostaje 409 również bez id
+z panelu. Nowość liczą wyłącznie cudze głosy: własna wiadomość nie blokuje
+następnej odpowiedzi.
+
+**Nieznane statusy Allegro świecą przy DYSKUSJACH.** Lista statusów
+końcowych `/sale/issues` jest niezweryfikowana na żywym koncie. Wartości
+spoza znanych list liczą się przy każdym pobraniu, zapisują w dzienniku
+i pokazują czerwoną linią pod tickerem dyskusji — zgłoszenie ich pozwoli
+potwierdzić listę i zdjąć znacznik osobną poprawką.
+
 ## 0.125.0 — 29 sierpnia 2026
 
 **Nawigacja boczna zamiast górnego paska; SPRAWY rozprężone na trzy widoki.**

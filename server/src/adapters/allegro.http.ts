@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { BladLimituAllegro, allegroUserAgent, retryAfterMs } from "./allegro.js";
 import { wazneBearer } from "../services/allegro-token.js";
+import { odkodujEncje } from "../tekst.js";
 import type {
   AllegroAdapter,
   DyskusjaAllegro,
@@ -139,7 +140,7 @@ export function mapujZamowienieKupujacego(json: unknown): ZamowienieKupujacego {
       const external = (offer.external ?? {}) as Record<string, unknown>;
       return {
         offerId: tekst(offer.id),
-        nazwa: tekst(offer.name) ?? "(bez nazwy)",
+        nazwa: tekstLudzki(offer.name) ?? "(bez nazwy)",
         externalId: tekst(external.id),
         ilosc: liczba(l.quantity, 1),
       };
@@ -216,7 +217,7 @@ export function mapujDyskusje(json: unknown): DyskusjaAllegro[] {
       id: tekst(i.id) ?? "",
       typ: tekst(i.type),
       status: tekst(i.status),
-      temat: tekst(i.subject) ?? tekst(i.title) ?? tekst(i.name),
+      temat: tekstLudzki(i.subject) ?? tekstLudzki(i.title) ?? tekstLudzki(i.name),
       kupujacyLogin: tekst(buyer.login),
       orderId: tekst(order.id) ?? tekst(i.orderId),
       utworzono: tekst(i.createdAt),
@@ -282,10 +283,10 @@ export function mapujWiadomosciDyskusji(json: unknown): WiadomoscDyskusji[] {
       odNas: rola === null ? true : rola === "SELLER",
       autorLogin: tekst(author.login),
       autorRola: rola,
-      tresc: tekst(m.text) ?? tekst(m.message) ?? "",
+      tresc: tekstLudzki(m.text) ?? tekstLudzki(m.message) ?? "",
       at: tekst(m.createdAt),
       zalacznik: zal
-        ? { nazwa: tekst(zal.fileName) ?? tekst(zal.name), url: tekst(zal.url) }
+        ? { nazwa: tekstLudzki(zal.fileName) ?? tekstLudzki(zal.name), url: tekst(zal.url) }
         : null,
     };
   }));
@@ -313,7 +314,7 @@ export function mapujOferte(json: unknown, sandbox: boolean): OfertaAllegro | nu
   const waluta = tekst(price.currency);
   return {
     offerId: id,
-    nazwa: tekst(o.name) ?? "(bez nazwy)",
+    nazwa: tekstLudzki(o.name) ?? "(bez nazwy)",
     cena: kwota ? `${kwota}${waluta ? ` ${waluta}` : ""}` : null,
     externalId: tekst(external.id),
     dostepnych: typeof stock.available === "number" ? stock.available : null,
@@ -363,6 +364,17 @@ export function urlOferty(offerId: string, sandbox: boolean): string {
 
 const tekst = (v: unknown): string | null =>
   typeof v === "string" && v.trim() !== "" ? v : null;
+
+/**
+ * Dla pól czytanych przez człowieka: tematy, treści wiadomości, tytuły ofert.
+ * Allegro oddaje w nich encje HTML (`zwr&oacute;cić`), a panel escape'uje przy
+ * renderowaniu, więc encja szłaby na ekran dosłownie. `tekst()` zostaje osobno
+ * dla id, loginów i URL-i — tam `&amp;` w adresie MUSI pozostać sobą.
+ */
+const tekstLudzki = (v: unknown): string | null => {
+  const t = tekst(v);
+  return t === null ? null : odkodujEncje(t);
+};
 
 const liczba = (v: unknown, def: number): number =>
   typeof v === "number" && Number.isFinite(v) ? v : def;
@@ -428,7 +440,7 @@ export function mapujZwrot(json: unknown): ZwrotAllegro {
     const { powod, opis } = mapujPowod(i);
     return {
       offerId: tekst(i.offerId) ?? tekst(offer.id),
-      nazwa: tekst(i.name) ?? tekst(offer.name) ?? "(bez nazwy)",
+      nazwa: tekstLudzki(i.name) ?? tekstLudzki(offer.name) ?? "(bez nazwy)",
       externalId: null, // zwrot sygnatury NIE niesie — dokleja ją zamówienie
       ilosc: liczba(i.quantity, 1),
       powod,
@@ -476,7 +488,7 @@ export function mapujZamowienie(json: unknown): ZamowienieAllegro {
       const external = (offer.external ?? {}) as Record<string, unknown>;
       return {
         offerId: tekst(offer.id),
-        nazwa: tekst(offer.name) ?? "(bez nazwy)",
+        nazwa: tekstLudzki(offer.name) ?? "(bez nazwy)",
         externalId: tekst(external.id),
         ilosc: liczba(l.quantity, 1),
       };
@@ -548,7 +560,7 @@ export function mapujWiadomosci(json: unknown, rozmowca: string | null): Wiadomo
       id: tekst(w.id) ?? "",
       odKupujacego,
       autor: login,
-      tresc: tekst(w.text) ?? tekst(w.content) ?? "",
+      tresc: tekstLudzki(w.text) ?? tekstLudzki(w.content) ?? "",
       at: tekst(w.createdAt),
       zalacznikow: Array.isArray(w.attachments) ? w.attachments.length : 0,
       ofertaId:
@@ -580,7 +592,7 @@ export function mapujWatki(json: unknown): WatekNaglowek[] {
       ostatniaWiadomoscAt: tekst(w.lastMessageDateTime),
       przeczytany: typeof w.read === "boolean" ? w.read : null,
       ofertaId: tekst(oferta.id) ?? tekst(w.offerId),
-      ofertaTytul: tekst(oferta.name) ?? tekst(w.subject),
+      ofertaTytul: tekstLudzki(oferta.name) ?? tekstLudzki(w.subject),
     };
   });
 }
@@ -607,7 +619,7 @@ export function mapujOferty(json: unknown, sandbox: boolean): OfertaAllegro[] {
       const offerId = tekst(of.id) ?? "";
       return {
         offerId,
-        nazwa: tekst(of.name) ?? "(bez nazwy)",
+        nazwa: tekstLudzki(of.name) ?? "(bez nazwy)",
         cena: cenaOferty(of.sellingMode),
         externalId: tekst(external.id),
         dostepnych: typeof stock.available === "number" ? stock.available : null,
@@ -822,10 +834,20 @@ export class HttpAllegroAdapter implements AllegroAdapter {
   }
 
   async listaDyskusji(): Promise<DyskusjaAllegro[]> {
-    /* Jedna strona setki wystarcza na widok „co się dzieje" — biuro klika
-       po świeże sprawy, a pełne archiwum ma panel Allegro. */
-    const json = await this.zapytaj(urlDyskusji(config.allegro.apiUrl, 0));
-    return json === null ? [] : mapujDyskusje(json);
+    /* Do 0.126.0 czytaliśmy JEDNĄ stronę setki i rejestr nie widział nic
+       ponad nią — konto z ponad setką spraw gubiło resztę po cichu. Pętla
+       jak przy zwrotach: limit 10 stron to bezpiecznik, stop na krótszej
+       stronie. Granicy dat nie ma, bo `/sale/issues` nie dokumentuje
+       filtra daty — upsert w sync jest idempotentny, więc pełny przegląd
+       nie szkodzi. */
+    const wyniki: DyskusjaAllegro[] = [];
+    for (let strona = 0; strona < 10; strona++) {
+      const json = await this.zapytaj(urlDyskusji(config.allegro.apiUrl, strona * 100));
+      const lista = json === null ? [] : mapujDyskusje(json);
+      wyniki.push(...lista);
+      if (lista.length < 100) break;
+    }
+    return wyniki;
   }
 
   async zwrot(id: string): Promise<ZwrotAllegro | null> {
