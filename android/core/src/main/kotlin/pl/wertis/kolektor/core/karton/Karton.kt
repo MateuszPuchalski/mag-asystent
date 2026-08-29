@@ -26,11 +26,19 @@ enum class FazaKartonu {
 
     /** `rozlozony` — nie ma tu już nic do zrobienia. */
     ZROBIONE,
+
+    /**
+     * `anulowany` — pudło odwołane (0.123.0). Osobno od ZROBIONE, bo to jest
+     * przeciwieństwo zrobionego: praca się NIE wydarzyła i ekran nie ma prawa
+     * sugerować, że wszystko poszło na półki.
+     */
+    ANULOWANY,
 }
 
 fun fazaKartonu(status: String): FazaKartonu = when (status) {
     "otwarty" -> FazaKartonu.ZBIORKA
     "rozlozony" -> FazaKartonu.ZROBIONE
+    "anulowany" -> FazaKartonu.ANULOWANY
     else -> FazaKartonu.ROZKLADANIE
 }
 
@@ -62,4 +70,5 @@ fun podpisKartonu(status: String, pozycji: Int, odlozonych: Int): String =
             if (pozycji == 0) "w zbiórce · pusty" else "w zbiórce · $pozycji poz."
         FazaKartonu.ROZKLADANIE -> "do rozłożenia · $odlozonych/$pozycji poz."
         FazaKartonu.ZROBIONE -> "rozłożony"
+        FazaKartonu.ANULOWANY -> "anulowany · $pozycji poz."
     }

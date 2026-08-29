@@ -230,3 +230,124 @@ test("kolejne kartony dostają kolejne kody i nie zderzają się z koszem", asyn
   // K-2 zajęte przez cudzy wiersz, więc licznik idzie dalej zamiast się rozbić
   assert.deepEqual(kody, ["K-1", "K-3", "K-4"]);
 });
+
+test("wskazanie z listy dodaje DOKŁADNIE ten towar, a nie ten o podobnym napisie", async () => {
+  const magazynier = zalogowany("magazynier");
+  let r = await app.inject({ method: "POST", url: "/api/kartony", headers: magazynier });
+  const id = r.json().kosz.id;
+
+  /* Wyszukiwarka oddaje wiersz kartoteki, który człowiek obejrzał wzrokiem —
+     symbol, nazwę i półkę. Ponowne rozwiązywanie go z napisu cofałoby tę
+     decyzję, więc kolektor posyła `twId` i serwer ma go uszanować. */
+  r = await app.inject({
+    method: "POST", url: `/api/kartony/${id}/pozycje`,
+    payload: { twId: 900_102, code: "KAR-A", ilosc: 2 }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().symbol, "KAR-B", "twId ma pierwszeństwo przed napisem");
+
+  // towar spoza kartoteki nie zakłada pozycji-widma, tak samo jak nieznany kod
+  r = await app.inject({
+    method: "POST", url: `/api/kartony/${id}/pozycje`,
+    payload: { twId: 999_999 }, headers: magazynier,
+  });
+  assert.equal(r.json().nieznany, true);
+});
+
+test("ANULUJ: pusty karton znika, karton z zawartością zostaje ze śladem", async () => {
+  const magazynier = zalogowany("magazynier");
+
+  // pusty — pomyłka palca, nie historia
+  let r = await app.inject({ method: "POST", url: "/api/kartony", headers: magazynier });
+  const pusty = r.json().kosz.id;
+  r = await app.inject({ method: "POST", url: `/api/kartony/${pusty}/anuluj`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().usuniety, true);
+  assert.equal(db().prepare("SELECT id FROM kosz WHERE id = ?").get(pusty), undefined);
+
+  // z zawartością — ktoś to zeskanował i odszedł; biuro o to zapyta
+  r = await app.inject({ method: "POST", url: "/api/kartony", headers: magazynier });
+  const pelny = r.json().kosz.id;
+  await app.inject({
+    method: "POST", url: `/api/kartony/${pelny}/pozycje`,
+    payload: { code: "KAR-A", ilosc: 3 }, headers: magazynier,
+  });
+  r = await app.inject({ method: "POST", url: `/api/kartony/${pelny}/anuluj`, headers: magazynier });
+  assert.equal(r.json().usuniety, false);
+  const w = db().prepare("SELECT status, anulowano_przez FROM kosz WHERE id = ?").get(pelny) as
+    | { status: string; anulowano_przez: string }
+    | undefined;
+  assert.equal(w?.status, "anulowany");
+  assert.equal(w?.anulowano_przez, "Ktoś magazynier");
+  const poz = db().prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id = ?").get(pelny) as { n: number };
+  assert.equal(poz.n, 1, "pozycje zostają — to ślad po pracy, która się wydarzyła");
+
+  // anulowany wypada z listy kolektora i nie da się go już zatwierdzić
+  r = await app.inject({ method: "GET", url: "/api/kartony", headers: magazynier });
+  assert.deepEqual(r.json().kartony.map((k: { id: number }) => k.id), []);
+  r = await app.inject({ method: "POST", url: `/api/kartony/${pelny}/zatwierdz`, headers: magazynier });
+  assert.equal(r.statusCode, 400);
+});
+
+test("ANULUJ po ZATWIERDŹ nie cofa tego, co już stoi na półce", async () => {
+  const magazynier = zalogowany("magazynier");
+  let r = await app.inject({ method: "POST", url: "/api/kartony", headers: magazynier });
+  const id = r.json().kosz.id;
+  for (const code of ["KAR-A", "KAR-B"]) {
+    await app.inject({
+      method: "POST", url: `/api/kartony/${id}/pozycje`, payload: { code }, headers: magazynier,
+    });
+  }
+  await app.inject({ method: "POST", url: `/api/kartony/${id}/zatwierdz`, headers: magazynier });
+
+  // KAR-B nie ma adresu w kartotece, więc jego odłożenie zostawia zadanie w kolejce
+  r = await app.inject({ method: "GET", url: `/api/kosze/${id}`, headers: magazynier });
+  const bezAdresu = r.json().kosz.pozycje.find((p: { symbol: string }) => p.symbol === "KAR-B");
+  r = await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${bezAdresu.id}/odloz`,
+    payload: { lokalizacja: "B01-01-01" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+
+  r = await app.inject({ method: "POST", url: `/api/kartony/${id}/anuluj`, headers: magazynier });
+  assert.equal(r.statusCode, 200, r.body);
+
+  /* SEDNO. Towar naprawdę stoi na B01-01-01 i zapis tego adresu jest prawdą
+     o magazynie. Anulowanie dotyczy pracy, która ZOSTAŁA do zrobienia. */
+  const poz = db()
+    .prepare("SELECT status FROM kosz_pozycja WHERE id = ?")
+    .get(bezAdresu.id) as { status: string };
+  assert.equal(poz.status, "done");
+  const zad = db()
+    .prepare("SELECT status FROM sfera_queue WHERE type='set_location'")
+    .all() as Array<{ status: string }>;
+  assert.equal(zad.length, 1);
+  assert.notEqual(zad[0].status, "cancelled", "zapis adresu zostaje — półka nie kłamie");
+
+  // dziennik niesie, ILE roboty zostało nietkniętej przy anulowaniu
+  const ev = db()
+    .prepare("SELECT payload FROM events WHERE type='karton_anulowany' ORDER BY id DESC LIMIT 1")
+    .get() as { payload: string };
+  assert.deepEqual(JSON.parse(ev.payload).odlozonych, 1);
+  assert.deepEqual(JSON.parse(ev.payload).zostalo, 1);
+});
+
+test("kod anulowanego kartonu wraca do obiegu", async () => {
+  const magazynier = zalogowany("magazynier");
+  let r = await app.inject({ method: "POST", url: "/api/kartony", headers: magazynier });
+  const id = r.json().kosz.id;
+  assert.equal(r.json().kosz.kod, "K-1");
+  await app.inject({
+    method: "POST", url: `/api/kartony/${id}/pozycje`, payload: { code: "KAR-A" }, headers: magazynier,
+  });
+  await app.inject({ method: "POST", url: `/api/kartony/${id}/anuluj`, headers: magazynier });
+
+  /* Indeks `ix_kosz_kod_aktywny` pomija anulowane od 0.123.0. Bez tego kosz
+     o tym kodzie rozbiłby się o unikalność — a kod nadaje aplikacja, nie
+     etykieta na pudle, więc trzymanie go w rezerwie nikomu nie służy. */
+  db()
+    .prepare("INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez) VALUES ('K-1','otwarty','zwroty',?,'biuro')")
+    .run(new Date().toISOString());
+  const ile = db().prepare("SELECT COUNT(*) AS n FROM kosz WHERE kod='K-1'").get() as { n: number };
+  assert.equal(ile.n, 2);
+});

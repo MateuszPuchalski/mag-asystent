@@ -5735,6 +5735,10 @@ function rysujBrakujace(lista, ticker) {
 function badgeKosza(status) {
   if (status === "otwarty") return '<span class="badge amber">OTWARTY</span>';
   if (status === "zamkniety") return '<span class="badge ok">NA HALĘ</span>';
+  /* Anulowany (0.123.0) NIE jest odcieniem rozłożonego, tylko jego
+     przeciwieństwem: praca się nie wydarzyła. Czerwień, bo to jedyny stan
+     kosza, o który ktoś w biurze może chcieć zapytać halę. */
+  if (status === "anulowany") return '<span class="badge err">ANULOWANY</span>';
   return '<span class="badge mute2">ROZŁOŻONY</span>';
 }
 
@@ -5763,7 +5767,10 @@ function rysujKosze(kosze) {
                 ? `${k.pozycji} poz.`
                 : k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow} zwr.`}</span>
             </span>
-            <span class="sprawaTemat">${k.status === "otwarty"
+            <span class="sprawaTemat">${k.status === "anulowany"
+              ? `Anulowany${k.anulowanoPrzez ? ` przez ${esc(k.anulowanoPrzez)}` : ""} — ${
+                  k.odlozonych} z ${k.pozycji} poz. zdążyło wrócić na półki.`
+              : k.status === "otwarty"
               ? (karton
                   ? "Hala zbiera zawartość — pudło jeszcze otwarte."
                   : "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło.")

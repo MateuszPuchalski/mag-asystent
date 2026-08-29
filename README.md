@@ -439,6 +439,11 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
 - NOWY KARTON otwiera puste pudło z kodem nadanym przez aplikację (`K-1`).
   Skan dokłada **jedną sztukę** i sumuje na istniejącej pozycji; większą liczbę
   wpisuje się z klawiatury. Przed ZATWIERDŹ pozycję wolno usunąć.
+- **Wpisywanie szuka w kartotece**, a nie dodaje w ciemno (0.123.0). Te same
+  reguły co w dostawie; wyniki to lista z półkami i stanem, a dotknięcie
+  wiersza dokłada towar. Każda pozycja w pudle pokazuje swoje półki.
+- **ANULUJ KARTON** na każdym etapie. Pusty znika z bazy, pudło z zawartością
+  zostaje ze statusem ANULOWANY. Pozycje już odłożone zostają odłożone.
 - Po ZATWIERDŹ karton jest zwykłym koszem do rozłożenia: ten sam ekran, ten sam
   skan półki, ten sam ZAKOŃCZ. **Zapisują się wyłącznie adresy** — żadnego MM.
 - W bazie karton to wiersz tabeli `kosz` z `rodzaj = 'karton'`. Biuro widzi go

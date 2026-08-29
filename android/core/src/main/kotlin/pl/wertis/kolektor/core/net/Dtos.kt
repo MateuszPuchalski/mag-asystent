@@ -383,7 +383,16 @@ sealed interface ScanResult {
 }
 
 @Serializable
-data class SearchResponse(val results: List<ProductRow>)
+data class SearchResponse(
+    val results: List<ProductRow>,
+    /**
+     * `true` = wyniki wyszły z furtki na literówki, a nie z dopasowania
+     * dosłownego. Serwer wysyła to pole od 0.117.0 i czekało na ekran, który
+     * je pokaże; KARTON jest pierwszym, bo tam wybór z listy KOŃCZY SIĘ
+     * dołożeniem towaru do pudła, a nie samym otwarciem karty.
+     */
+    val przyblizone: Boolean = false,
+)
 
 @Serializable
 data class MovementEntry(
@@ -1039,10 +1048,19 @@ data class KartonyResponse(val kartony: List<KoszRow> = emptyList())
 
 /** Dodanie towaru; `ilosc` pominięta znaczy JEDNĄ SZTUKĘ, bo tak działa skan. */
 @Serializable
-data class DodajDoKartonuBody(val code: String, val ilosc: Double? = null)
+data class DodajDoKartonuBody(
+    val code: String? = null,
+    /** Wskazanie z listy wyszukiwarki — ma pierwszeństwo przed `code`. */
+    val twId: Long? = null,
+    val ilosc: Double? = null,
+)
 
 @Serializable
 data class IloscKartonuBody(val ilosc: Double)
+
+/** Wynik anulowania: `usuniety` = pusty karton zniknął z bazy, nie ma dokąd wracać. */
+@Serializable
+data class AnulowanieKartonu(val usuniety: Boolean = false)
 
 /** Odpowiedź dodania: pozycja po zsumowaniu ALBO uczciwe „nie znam kodu". */
 @Serializable

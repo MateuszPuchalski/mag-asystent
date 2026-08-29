@@ -1291,9 +1291,22 @@ Kartony pojawiają się w `/biuro` → SPRAWY, karta KOSZE ZWROTOWE, z pastylką
 KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
 ktoś włożył do pudła. Kilka kartonów naraz jest stanem normalnym.
 
+Wpisywanie w polu u góry **szuka w kartotece** (0.123.0), a nie dodaje w
+ciemno: bez ogonków, symbol bez myślnika, furtka na literówki przy zerze
+trafień. Wyniki to lista z miniaturą, półkami i stanem — dotknięcie wiersza
+dokłada towar. Każda pozycja w pudle pokazuje swoje półki, więc widać, dokąd
+zawartość wróci, zanim ktokolwiek ruszy z miejsca.
+
+**ANULUJ KARTON** kończy pudło, którego nikt nie rozłoży, i działa na każdym
+etapie. Pusty karton znika z bazy. Karton z zawartością zostaje ze statusem
+ANULOWANY i biuro widzi go z czerwoną pastylką, bo ktoś tę zawartość
+zeskanował. Pozycje już odłożone zostają odłożone — towar stoi na półce
+naprawdę i adres jest prawdą o magazynie.
+
 **[wymaga działania]** Nic ręcznego przy wdrożeniu. Kolumna `kosz.rodzaj`
 dochodzi migracją przy pierwszym starcie i zastane kosze dostają `zwroty`,
-czyli to, czym są. Trzeba natomiast **zainstalować nowy APK** — zakładki KARTON
+czyli to, czym są. Kolumny anulowania i przebudowa indeksu `ix_kosz_kod_aktywny`
+idą tą samą drogą. Trzeba natomiast **zainstalować nowy APK** — zakładki KARTON
 nie ma w starszych wersjach kolektora.
 
 Zwrot środków dałoby się zautomatyzować w całości: Allegro ma

@@ -659,7 +659,10 @@ CREATE INDEX IF NOT EXISTS ix_zwrot_poz ON zwrot_pozycja(zwrot_id);
 --
 -- Kod kosza WRACA DO OBIEGU: etykieta na fizycznym koszu jest wielorazowa,
 -- więc unikalność obowiązuje tylko wśród koszy nierozłożonych — stąd indeks
--- częściowy zamiast UNIQUE na kolumnie.
+-- częściowy zamiast UNIQUE na kolumnie. Anulowany karton (0.123.0) też oddaje
+-- kod: pudło, którego nikt nie rozłoży, nie ma prawa blokować numeru.
+-- Predykat jest ŻYWY — przy zmianie trzeba przebudować indeks w `migrate()`,
+-- bo `CREATE ... IF NOT EXISTS` nie rusza indeksu, który już stoi u klienta.
 CREATE TABLE IF NOT EXISTS kosz (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   -- Kod kosza. Dla koszy z Subiekta to LICZBA z numeru MM napisana na kartce
@@ -676,7 +679,8 @@ CREATE TABLE IF NOT EXISTS kosz (
   rozlozono_at  TEXT,
   rozlozono_przez TEXT
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod) WHERE status <> 'rozlozony';
+CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod)
+  WHERE status NOT IN ('rozlozony', 'anulowany');
 
 -- Pozycje kosza — SNAPSHOT z chwili zamknięcia: to, co fizycznie leży w koszu
 -- (pozycje pełnowartościowe zwrotów kosza, te same, które poszły na korektę).
