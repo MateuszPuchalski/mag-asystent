@@ -466,5 +466,5 @@ test("karton nie miesza się z obiegiem zwrotów", async () => {
 
   K.przypnijZwrot(id, "KZ-01", "Biuro");
   const kosz = K.koszPoKodzie("KZ-01")!;
-  assert.throws(() => KA.dodajDoKartonu(kosz.id, "TEST-LINIA-TODO", 1, "Magazynier"), /to zwroty/);
+  assert.throws(() => KA.dodajDoKartonu(kosz.id, { code: "TEST-LINIA-TODO" }, 1, "Magazynier"), /to zwroty/);
 });

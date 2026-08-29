@@ -55,6 +55,8 @@ interface WierszKosza {
   mm_numer: string | null;
   /** `zwroty` albo `karton` — patrz `RODZAJ_KARTON`. */
   rodzaj: string;
+  anulowano_at: string | null;
+  anulowano_przez: string | null;
 }
 
 /**
@@ -138,6 +140,9 @@ export interface SzczegolKosza {
   mmNumer: string | null;
   /** `zwroty` albo `karton` — kolektor po tym wie, którą fazę pokazać. */
   rodzaj: string;
+  /** Kto i kiedy anulował karton (0.123.0); NULL przy każdym innym koszu. */
+  anulowanoAt: string | null;
+  anulowanoPrzez: string | null;
 }
 
 export interface WierszListyKoszy {
@@ -169,6 +174,8 @@ export interface WierszListyKoszy {
   rozlozonoPrzez: string | null;
   /** `zwroty` albo `karton` — biuro ma wiedzieć, że kosz bez zwrotów jest cały. */
   rodzaj: string;
+  anulowanoAt: string | null;
+  anulowanoPrzez: string | null;
 }
 
 /** Kod z etykiety kosza — po trim/upper, żeby skan i wpis ręczny się spotkały. */
@@ -336,9 +343,10 @@ export function listaKoszy(): WierszListyKoszy[] {
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='skipped') AS pominietych,
-              k.mm_numer, k.rodzaj
+              k.mm_numer, k.rodzaj, k.anulowano_at, k.anulowano_przez
        FROM kosz k
-       WHERE k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-14 days')
+       WHERE k.status NOT IN ('rozlozony', 'anulowany')
+          OR COALESCE(k.rozlozono_at, k.anulowano_at) >= datetime('now', '-14 days')
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
     )
     .all() as Array<Record<string, unknown>>;
@@ -357,6 +365,8 @@ export function listaKoszy(): WierszListyKoszy[] {
     rozlozonoAt: (w.rozlozono_at as string) ?? null,
     rozlozonoPrzez: (w.rozlozono_przez as string) ?? null,
     rodzaj: (w.rodzaj as string) ?? "zwroty",
+    anulowanoAt: (w.anulowano_at as string) ?? null,
+    anulowanoPrzez: (w.anulowano_przez as string) ?? null,
   }));
 }
 
@@ -374,7 +384,9 @@ export function koszeDlaKolektora(): WierszListyKoszy[] {
  * go zatwierdzić.
  */
 export function kartonyDlaKolektora(): WierszListyKoszy[] {
-  return listaKoszy().filter((k) => k.rodzaj === RODZAJ_KARTON && k.status !== "rozlozony");
+  return listaKoszy().filter(
+    (k) => k.rodzaj === RODZAJ_KARTON && k.status !== "rozlozony" && k.status !== "anulowany"
+  );
 }
 
 export function szczegolKosza(koszId: number): SzczegolKosza {
@@ -476,6 +488,8 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
   return {
     mmNumer: kosz.mm_numer ?? null,
     rodzaj: kosz.rodzaj ?? "zwroty",
+    anulowanoAt: kosz.anulowano_at ?? null,
+    anulowanoPrzez: kosz.anulowano_przez ?? null,
     id: kosz.id,
     kod: kosz.kod,
     status: kosz.status,

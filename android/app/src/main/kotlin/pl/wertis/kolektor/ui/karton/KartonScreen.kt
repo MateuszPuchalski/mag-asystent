@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,15 +33,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.karton.FazaKartonu
 import pl.wertis.kolektor.core.karton.fazaKartonu
 import pl.wertis.kolektor.core.karton.kolejnoscZbierania
+import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.DodajDoKartonuBody
 import pl.wertis.kolektor.core.net.IloscKartonuBody
 import pl.wertis.kolektor.core.net.KoszPozycja
 import pl.wertis.kolektor.core.net.KoszView
+import pl.wertis.kolektor.core.net.ProductRow
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.text.MAKS_ILOSC_WPISU
 import pl.wertis.kolektor.core.text.formatQty
@@ -48,8 +56,10 @@ import pl.wertis.kolektor.core.text.iloscZWpisu
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
+import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
+import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.kosze.KoszScreen
@@ -66,9 +76,16 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    Ekran ma DWIE fazy i przełącza je STATUS kosza, nie osobny przełącznik —
    dwa źródła prawdy o tym samym rozjeżdżają się przy pierwszym błędzie sieci.
 
-     otwarty   → to, co niżej: dokładanie towaru skanem albo symbolem,
+     otwarty   → to, co niżej: dokładanie towaru skanem albo z wyszukiwarki,
      zamkniety → `KoszScreen`, bez zmian, bo rozkładanie kartonu i rozkładanie
                  kosza to ta sama praca i ta sama gramatyka skanu.
+
+   WPISYWANIE SZUKA, a nie dodaje w ciemno (0.123.0). Do tej wersji pole
+   wysyłało napis na serwer i literówka kończyła się „Nieznany kod" — ta sama
+   usterka, którą 0.117.0 naprawiło w otwartej dostawie. Teraz wpis pyta
+   `/api/products/search`, a człowiek wybiera z listy, która pokazuje symbol,
+   nazwę, PÓŁKI i stan. Dotknięcie wiersza posyła `twId`, więc wybór zrobiony
+   wzrokiem nie jest rozwiązywany drugi raz z napisu.
 
    Skan znaczy JEDNĄ SZTUKĘ i sumuje się na istniejącej pozycji. Tak wygląda
    praca przy pudle: człowiek wyjmuje sztukę po sztuce i nie liczy najpierw
@@ -78,6 +95,8 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    Lista idzie od NAJNOWSZEJ pozycji (`kolejnoscZbierania`), bo jedyne pytanie
    przy zbieraniu brzmi „czy to, co przed chwilą zeskanowałem, weszło".        */
 
+// `debounce` jest wciąż @FlowPreview — ta sama zgoda co w `HomeScreen`
+@OptIn(FlowPreview::class)
 @Composable
 fun KartonScreen(graph: AppGraph) {
     val id = graph.nav.koszId ?: return
@@ -90,6 +109,39 @@ fun KartonScreen(graph: AppGraph) {
        jest odpowiedzią na policzenie konkretnego towaru, nie trybem pracy. */
     var edytowana by remember { mutableStateOf<Long?>(null) }
     var wpisPoprawki by remember { mutableStateOf("") }
+    var wyniki by remember { mutableStateOf<List<ProductRow>>(emptyList()) }
+    var przyblizone by remember { mutableStateOf(false) }
+    var szuka by remember { mutableStateOf(false) }
+    var pytanieOAnulowanie by remember { mutableStateOf(false) }
+
+    /* Wyszukiwarka jedzie do SERWERA, a nie filtruje listy w pamięci.
+       `filtrujSzukaniem` z `core/text/Szukanie.kt` obsługuje listę, którą
+       kolektor już ma (pozycje dostawy); tu kandydatem jest cała kartoteka —
+       3415 pozycji, których nie ma po co ściągać na urządzenie.
+
+       Odbicie 250 ms i `collectLatest` jak w `HomeScreen`: człowiek pisze
+       dalej, kiedy pierwsze żądanie jeszcze leci, a liczy się ostatnie. */
+    val zapytanie = remember { MutableStateFlow("") }
+    LaunchedEffect(Unit) {
+        zapytanie.debounce(250).collectLatest { q ->
+            val czyste = q.trim()
+            if (czyste.isEmpty()) {
+                wyniki = emptyList()
+                przyblizone = false
+                return@collectLatest
+            }
+            szuka = true
+            try {
+                val r = apiCall { graph.api.search(czyste) }
+                wyniki = r.results
+                przyblizone = r.przyblizone
+            } catch (_: Exception) {
+                // brak sieci — zostaw to, co już widać
+            } finally {
+                szuka = false
+            }
+        }
+    }
 
     LaunchedEffect(id, reload) {
         try {
@@ -99,15 +151,13 @@ fun KartonScreen(graph: AppGraph) {
         }
     }
 
-    fun dodaj(code: String, ilosc: Double?) {
-        val czysty = code.trim()
-        if (czysty.isEmpty()) return
+    fun dodaj(body: DodajDoKartonuBody, opis: String) {
         scope.launch {
             try {
-                val r = apiCall { graph.api.kartonDodaj(id, DodajDoKartonuBody(czysty, ilosc)) }
+                val r = apiCall { graph.api.kartonDodaj(id, body) }
                 if (r.nieznany) {
                     graph.feedback.beep(false)
-                    graph.effects.toast("Nieznany kod: $czysty")
+                    graph.effects.toast("Nieznany kod: $opis")
                 } else {
                     graph.feedback.beep(true)
                     /* Meldunek podaje ILOŚĆ PO DODANIU, a nie „dodano 1".
@@ -115,11 +165,40 @@ fun KartonScreen(graph: AppGraph) {
                     graph.effects.toast("${r.symbol} · ${formatQty(r.ilosc)} w kartonie")
                     wpisKodu = ""
                     wpisIlosci = ""
+                    zapytanie.value = ""
+                    wyniki = emptyList()
+                    przyblizone = false
                     reload++
                 }
             } catch (e: Exception) {
                 graph.feedback.beep(false)
                 graph.effects.toast(e.message ?: "Nie udało się dodać towaru")
+            }
+        }
+    }
+
+    /** Skan i ENTER — napis, który dopiero trzeba rozwiązać; robi to serwer. */
+    fun dodajKodem(code: String, ilosc: Double?) {
+        val czysty = code.trim()
+        if (czysty.isEmpty()) return
+        dodaj(DodajDoKartonuBody(code = czysty, ilosc = ilosc), czysty)
+    }
+
+    /** Dotknięcie wiersza wyników — wybór człowieka, więc leci `twId`. */
+    fun dodajZListy(row: ProductRow) =
+        dodaj(DodajDoKartonuBody(twId = row.id, ilosc = iloscZWpisu(wpisIlosci)), row.sym)
+
+    fun anuluj() {
+        scope.launch {
+            try {
+                val r = apiCall { graph.api.kartonAnuluj(id) }
+                pytanieOAnulowanie = false
+                graph.effects.toast(
+                    if (r.usuniety) "Pusty karton usunięty" else "Karton anulowany — biuro go widzi"
+                )
+                graph.nav.go(Screen.KARTONY)
+            } catch (e: Exception) {
+                graph.effects.toast(e.message ?: "Nie udało się anulować kartonu")
             }
         }
     }
@@ -167,7 +246,7 @@ fun KartonScreen(graph: AppGraph) {
             graph.feedback.beep(false)
             graph.effects.toast("To adres półki — do kartonu skanuje się TOWAR")
         } else {
-            dodaj(scan.code, null)
+            dodajKodem(scan.code, null)
         }
         true
     }
@@ -177,8 +256,23 @@ fun KartonScreen(graph: AppGraph) {
         return
     }
     if (fazaKartonu(k.status) != FazaKartonu.ZBIORKA) {
-        // zatwierdzony karton jest zwykłym koszem do rozłożenia — ten sam ekran
-        KoszScreen(graph)
+        /* Zatwierdzony karton jest zwykłym koszem do rozłożenia — ten sam
+           ekran. ANULUJ zostaje pod nim, bo pudło bywa porzucone także TU:
+           ktoś zabrał zawartość ręką albo okazało się, że rozłożył ją kolega
+           (decyzja właściciela — anulowanie działa na każdym etapie). */
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) { KoszScreen(graph) }
+            PasekAnulowania(
+                // faza zbiórki bierze wcięcie z kolumny wyżej, ta go nie ma
+                modifier = Modifier.padding(horizontal = 12.dp),
+                pytamy = pytanieOAnulowanie,
+                pozycji = k.pozycje.size,
+                odlozonych = k.odlozonych,
+                onPytaj = { pytanieOAnulowanie = true },
+                onNie = { pytanieOAnulowanie = false },
+                onTak = { anuluj() },
+            )
+        }
         return
     }
 
@@ -197,7 +291,7 @@ fun KartonScreen(graph: AppGraph) {
             color = InkSoft,
         )
         Text(
-            "Skanuj towar — każdy skan to jedna sztuka. Większą liczbę wpisz obok symbolu.",
+            "Skanuj towar — każdy skan to jedna sztuka. Wpisując, wybierz z listy.",
             fontSize = 12.sp,
             color = InkMute,
         )
@@ -208,11 +302,20 @@ fun KartonScreen(graph: AppGraph) {
         ) {
             WertisTextField(
                 value = wpisKodu,
-                onValueChange = { wpisKodu = it },
-                placeholder = "symbol albo EAN",
+                onValueChange = {
+                    wpisKodu = it
+                    zapytanie.value = it
+                },
+                placeholder = "symbol, EAN albo nazwa",
                 leadingIcon = WIcons.Search,
                 modifier = Modifier.weight(1f),
-                onDone = { dodaj(wpisKodu, iloscZWpisu(wpisIlosci)) },
+                /* ENTER bierze PIERWSZY wynik, a przy pustej liście próbuje
+                   napisem — ten sam odruch, co na ekranie głównym. */
+                onDone = {
+                    val pierwszy = wyniki.firstOrNull()
+                    if (pierwszy != null) dodajZListy(pierwszy)
+                    else dodajKodem(wpisKodu, iloscZWpisu(wpisIlosci))
+                },
             )
             WertisTextField(
                 value = wpisIlosci,
@@ -220,11 +323,8 @@ fun KartonScreen(graph: AppGraph) {
                 placeholder = "szt.",
                 keyboardType = KeyboardType.Number,
                 modifier = Modifier.weight(0.45f),
-                onDone = { dodaj(wpisKodu, iloscZWpisu(wpisIlosci)) },
+                onDone = { wyniki.firstOrNull()?.let { dodajZListy(it) } },
             )
-        }
-        OutlineButton("DODAJ", modifier = Modifier.fillMaxWidth()) {
-            dodaj(wpisKodu, iloscZWpisu(wpisIlosci))
         }
 
         /* ZATWIERDŹ dopiero przy niepustym pudle. Pusty karton i tak odmówi na
@@ -255,6 +355,40 @@ fun KartonScreen(graph: AppGraph) {
                 .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            /* WYNIKI SZUKANIA stoją NAD zawartością pudła, bo to one są teraz
+               pytaniem. Wiersz jest tym samym `ProductRowCard`, co na ekranie
+               głównym — niesie miniaturę, symbol, nazwę, PÓŁKI i stan, czyli
+               wszystko, czego trzeba, żeby wybrać właściwy towar wzrokiem
+               zamiast dodawać go w ciemno. */
+            if (wyniki.isNotEmpty()) {
+                Text(
+                    "WYNIKI (${wyniki.size})${if (szuka) " …" else ""}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    color = InkSoft,
+                )
+                /* Furtka na literówki odpala się WYŁĄCZNIE przy zerze trafień
+                   dosłownych, więc to zdanie znaczy „nie znalazłem tego, co
+                   napisałeś". Przy dokładaniu do pudła warto wtedy popatrzeć
+                   uważniej niż zwykle — pomyłka pojedzie na cudzą półkę. */
+                if (przyblizone) {
+                    Text(
+                        "Nie znalazłem dosłownie — to są podobne.",
+                        fontSize = 12.sp,
+                        color = AmberInk,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                wyniki.forEach { row -> ProductRowCard(graph, row) { dodajZListy(row) } }
+                Text(
+                    "ZAWARTOŚĆ KARTONU",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    color = InkSoft,
+                )
+            }
             if (k.pozycje.isEmpty()) {
                 Text("Karton jest pusty. Zeskanuj pierwszy towar.", fontSize = 13.sp, color = InkMute)
             }
@@ -273,11 +407,80 @@ fun KartonScreen(graph: AppGraph) {
                 )
             }
         }
+        PasekAnulowania(
+            pytamy = pytanieOAnulowanie,
+            pozycji = k.pozycje.size,
+            odlozonych = 0,
+            onPytaj = { pytanieOAnulowanie = true },
+            onNie = { pytanieOAnulowanie = false },
+            onTak = { anuluj() },
+        )
     }
 }
 
 /**
- * Wiersz zbieranej pozycji: co to jest, ile tego jest, i dwa wyjścia z pomyłki.
+ * ANULUJ KARTON — wyjście dla pudła, którego nikt nie rozłoży.
+ *
+ * PYTAMY, zanim zrobimy, i pytanie mówi KONKRETNIE, co przepadnie. Anulowanie
+ * bywa jedynym wyjściem (pudło otwarte przez pomyłkę), ale bywa też cichym
+ * porzuceniem cudzej zbiórki — a te dwie sytuacje wyglądają na ekranie
+ * identycznie. Liczba pozycji w pytaniu jest jedyną rzeczą, która je rozdziela.
+ *
+ * Karton PUSTY znika z bazy bez śladu i pytanie mówi to wprost: kasowanie
+ * pomyłki palca nie ma być obwarowane tak samo jak odpisanie ośmiu pozycji.
+ */
+@Composable
+private fun PasekAnulowania(
+    modifier: Modifier = Modifier,
+    pytamy: Boolean,
+    pozycji: Int,
+    odlozonych: Int,
+    onPytaj: () -> Unit,
+    onNie: () -> Unit,
+    onTak: () -> Unit,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(bottom = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (!pytamy) {
+            OutlineButton("ANULUJ KARTON", danger = true, modifier = Modifier.fillMaxWidth()) { onPytaj() }
+            return@Column
+        }
+        Text(
+            when {
+                pozycji == 0 -> "Pusty karton zniknie bez śladu. Anulować?"
+                odlozonych > 0 ->
+                    "$pozycji poz. w kartonie, $odlozonych już na półkach. " +
+                        "Odłożone zostają, reszta przepada. Anulować?"
+                else -> "$pozycji poz. przepadnie — biuro zobaczy karton jako anulowany. Anulować?"
+            },
+            fontSize = 13.sp,
+            color = Ink,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlineButton("NIE", modifier = Modifier.weight(1f)) { onNie() }
+            OutlineButton("TAK, ANULUJ", danger = true, modifier = Modifier.weight(1f)) { onTak() }
+        }
+    }
+}
+
+/**
+ * Wiersz zbieranej pozycji: co to jest, gdzie wróci, ile tego jest, i dwa
+ * wyjścia z pomyłki.
+ *
+ * ADRES JEST TU OD 0.123.0 i to jest zgłoszenie z hali. Zbiórka wyglądała jak
+ * lista zakupów — symbol, nazwa, liczba — a pierwsze pytanie przy pudle brzmi
+ * „na którą półkę to w ogóle wróci". Odpowiedź jechała w tej samej odpowiedzi
+ * serwera od pierwszego dnia (`szczegolKosza` liczy adresy dla KAŻDEJ pozycji,
+ * także w kartonie otwartym); ekran jej po prostu nie rysował.
+ *
+ * Chipy są tu WYŁĄCZNIE do czytania — w odróżnieniu od rozkładania nie ma
+ * czego nimi wpisywać, bo odkładanie zacznie się dopiero po ZATWIERDŹ.
  *
  * Ilość jest KLIKALNA, bo poprawianie liczby jest tu częstsze niż wszystko
  * inne — ktoś doliczył resztę pudła albo zeskanował dwa razy tę samą sztukę.
@@ -285,6 +488,7 @@ fun KartonScreen(graph: AppGraph) {
  * w ogóle nie ma; przed ZATWIERDŹ wiersz wolno skasować bez śladu, bo nie jest
  * jeszcze zapisem tego, co leży w środku.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ZbieranaPozycja(
     p: KoszPozycja,
@@ -350,6 +554,20 @@ private fun ZbieranaPozycja(
                     tint = Destructive,
                     modifier = Modifier.size(20.dp),
                 )
+            }
+        }
+        /* Adres pickingowy pierwszy i wyróżniony, za nim reszta półek. Towar
+           bez adresu dostaje ZDANIE, nie pustkę: pusty rząd czyta się jak brak
+           danych, a to jest fakt do naprawienia przy odkładaniu. */
+        val polki = listOfNotNull(p.lokOczekiwana) + p.lokalizacje.filter { it != p.lokOczekiwana }
+        if (polki.isEmpty()) {
+            Text("bez adresu w kartotece", fontSize = 12.sp, color = InkMute)
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                polki.forEachIndexed { i, kod -> LocChip(kod, primary = i == 0) {} }
             }
         }
         if (edytowana) {

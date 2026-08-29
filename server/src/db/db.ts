@@ -196,6 +196,12 @@ function migrate(database: DatabaseSync) {
      rozjeżdżać się z `mm_dok_id` — kosz od 0.75.0 opisują dwa miejsca
      i trzecie byłoby o jedno za dużo. */
   addColumn("kosz", "rodzaj", "TEXT NOT NULL DEFAULT 'zwroty'");
+  /* Anulowanie kartonu (0.123.0). Pudło otwarte przez pomyłkę albo porzucone
+     musi mieć jak zniknąć — do tej wersji jedynym wyjściem było rozłożenie
+     wszystkiego. Kolumny nullowalne: brak znacznika znaczy „nie anulowano". */
+  addColumn("kosz", "anulowano_at", "TEXT");
+  addColumn("kosz", "anulowano_przez", "TEXT");
+  przebudujIndeksKoduKosza(database);
   /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
   /* 0.77.0 — powód pominięcia pozycji kosza (status `skipped`). */
@@ -318,6 +324,28 @@ function bezBrygadzisty(database: DatabaseSync) {
  * (pierwsza: `naLoginIHaslo`) i z tego samego powodu: SQLite nie umie zdjąć
  * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
  */
+/**
+ * Indeks unikalności kodu kosza — PRZEBUDOWA, nie dopisanie (0.123.0).
+ *
+ * `CREATE UNIQUE INDEX IF NOT EXISTS` nie rusza indeksu, który już istnieje,
+ * więc zmiana predykatu w schema.sql sama z siebie nie dociera do instalacji
+ * stojącej u klienta. Bez tej funkcji anulowany karton trzymałby swój kod
+ * zajęty na zawsze — a to kod nadany przez aplikację, nie napisany na etykiecie.
+ *
+ * Porównujemy TREŚĆ indeksu z `sqlite_master`, żeby nie przebudowywać go przy
+ * każdym starcie: to tanie na tej tabeli, ale praca bez powodu w ścieżce
+ * uruchomienia zawsze kiedyś urośnie.
+ */
+function przebudujIndeksKoduKosza(database: DatabaseSync) {
+  const CEL = "WHERE status NOT IN ('rozlozony', 'anulowany')";
+  const w = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='ix_kosz_kod_aktywny'")
+    .get() as { sql: string | null } | undefined;
+  if (w?.sql && w.sql.includes("anulowany")) return;
+  database.exec("DROP INDEX IF EXISTS ix_kosz_kod_aktywny");
+  database.exec(`CREATE UNIQUE INDEX ix_kosz_kod_aktywny ON kosz(kod) ${CEL}`);
+}
+
 function zwrotNieobowiazkowyWKoszu(database: DatabaseSync) {
   const wymagany = () =>
     (

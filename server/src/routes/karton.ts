@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import {
+  anulujKarton,
   dodajDoKartonu,
   usunPozycjeKartonu,
   ustawIloscKartonu,
@@ -39,14 +40,19 @@ export async function kartonRoutes(app: FastifyInstance) {
 
   /* Dodanie towaru. `ilosc` pominięta znaczy JEDNĄ SZTUKĘ — bo tak wygląda
      skan, a skan jest tu ruchem podstawowym. Liczbę podaje się wtedy, gdy
-     ktoś policzył zawartość ręką i nie zamierza skanować jej sto razy. */
-  app.post<{ Params: { id: string }; Body: { code?: string; ilosc?: number } }>(
+     ktoś policzył zawartość ręką i nie zamierza skanować jej sto razy.
+
+     `twId` ma pierwszeństwo przed `code`: wskazanie z listy wyszukiwarki jest
+     wyborem człowieka, a napis dopiero pytaniem (patrz `WyborTowaru`). */
+  app.post<{ Params: { id: string }; Body: { code?: string; twId?: number; ilosc?: number } }>(
     "/api/kartony/:id/pozycje",
     async (req, reply) => {
+      const twId = Number(req.body?.twId);
       const code = (req.body?.code ?? "").trim();
-      if (!code) return reply.code(400).send({ error: "Pusty kod" });
+      const wybor = Number.isFinite(twId) && twId > 0 ? { twId } : code ? { code } : null;
+      if (!wybor) return reply.code(400).send({ error: "Pusty kod" });
       return zBledem(reply, () =>
-        dodajDoKartonu(Number(req.params.id), code, req.body?.ilosc ?? null, autor())
+        dodajDoKartonu(Number(req.params.id), wybor, req.body?.ilosc ?? null, autor())
       );
     }
   );
@@ -69,5 +75,12 @@ export async function kartonRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { id: string } }>("/api/kartony/:id/zatwierdz", async (req, reply) =>
     zBledem(reply, () => ({ kosz: zatwierdzKarton(Number(req.params.id), autor()) }))
+  );
+
+  /* Anulowanie — bez bramki roli, jak reszta tej zakładki. Pudło zakłada
+     i porzuca ta sama osoba, a odpowiedź niesie `usuniety`, żeby ekran
+     wiedział, czy jest jeszcze do czego wracać. */
+  app.post<{ Params: { id: string } }>("/api/kartony/:id/anuluj", async (req, reply) =>
+    zBledem(reply, () => anulujKarton(Number(req.params.id), autor()))
   );
 }

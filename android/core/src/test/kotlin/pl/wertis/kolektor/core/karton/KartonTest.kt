@@ -12,6 +12,7 @@ class KartonTest {
         assertEquals(FazaKartonu.ZBIORKA, fazaKartonu("otwarty"))
         assertEquals(FazaKartonu.ROZKLADANIE, fazaKartonu("zamkniety"))
         assertEquals(FazaKartonu.ZROBIONE, fazaKartonu("rozlozony"))
+        assertEquals(FazaKartonu.ANULOWANY, fazaKartonu("anulowany"))
         // status, którego nie znamy, prowadzi do rozkładania — a nie do zbiórki:
         // dokładanie do cudzego pudła jest gorszą pomyłką niż zbędny ekran
         assertEquals(FazaKartonu.ROZKLADANIE, fazaKartonu("cokolwiek"))
@@ -27,5 +28,8 @@ class KartonTest {
         assertEquals("w zbiórce · 4 poz.", podpisKartonu("otwarty", 4, 0))
         assertEquals("do rozłożenia · 2/5 poz.", podpisKartonu("zamkniety", 5, 2))
         assertEquals("rozłożony", podpisKartonu("rozlozony", 5, 5))
+        /* Anulowany podaje LICZBĘ POZYCJI, nie postęp: „2/5" przy pudle,
+           którego nikt już nie rozłoży, czytałoby się jak praca w toku. */
+        assertEquals("anulowany · 5 poz.", podpisKartonu("anulowany", 5, 2))
     }
 }

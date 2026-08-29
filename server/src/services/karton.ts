@@ -1,4 +1,5 @@
 import { db, nowIso, transaction } from "../db/db.js";
+import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
 import {
   BladKosza,
@@ -91,6 +92,7 @@ function karton(koszId: number): WierszKartonu {
 /** Karton, do którego wolno jeszcze dokładać. */
 function otwartyKarton(koszId: number): WierszKartonu {
   const k = karton(koszId);
+  if (k.status === "anulowany") throw new BladKosza(400, `Karton ${k.kod} jest anulowany`);
   if (k.status !== "otwarty") {
     throw new BladKosza(400, `Karton ${k.kod} jest zatwierdzony — teraz się go rozkłada, nie zbiera`);
   }
@@ -121,6 +123,19 @@ export function zalozKarton(autor: string): SzczegolKosza {
   return szczegolKosza(id);
 }
 
+/**
+ * Skąd wiadomo, JAKI towar dokładamy. Dwie drogi, bo są to dwie różne czynności.
+ *
+ * `code` to skan albo wpis — napis, który dopiero trzeba rozwiązać, i serwer
+ * jest właścicielem tej reguły (`towarZKodu`).
+ *
+ * `twId` (0.123.0) to WSKAZANIE wiersza z listy wyszukiwarki. Człowiek już
+ * obejrzał symbol, nazwę i półkę, i wybrał wzrokiem. Rozwiązywanie tego drugi
+ * raz z napisu cofałoby decyzję, którą właśnie podjął — a przy niejednoznacznym
+ * symbolu mogłoby ją nawet zmienić.
+ */
+export type WyborTowaru = { twId: number } | { code: string };
+
 export interface DodanieDoKartonu {
   pozycjaId: number;
   symbol: string;
@@ -139,13 +154,13 @@ export interface DodanieDoKartonu {
  */
 export function dodajDoKartonu(
   koszId: number,
-  code: string,
+  wybor: WyborTowaru,
   ilosc: number | null,
   autor: string
 ): DodanieDoKartonu | { nieznany: true } {
   const k = otwartyKarton(koszId);
   const ile = ilosc == null ? 1 : sprawdzIlosc(ilosc);
-  const tw = towarZKodu(code);
+  const tw = "twId" in wybor ? subiekt.getProductById(wybor.twId) : towarZKodu(wybor.code);
   if (!tw) return { nieznany: true };
 
   const d = db();
@@ -225,8 +240,71 @@ export function usunPozycjeKartonu(pozycjaId: number, autor: string): void {
  * Pusty karton odmawia: `zakonczKosz` zamknąłby go w tej samej sekundzie,
  * a w dzienniku zostałoby pudło, które powstało i zniknęło bez treści.
  */
+/**
+ * ANULUJ — pudło, którego nikt nie rozłoży.
+ *
+ * Dostępne NA KAŻDYM ETAPIE, także po zatwierdzeniu (decyzja właściciela).
+ * Karton bywa otwarty przez pomyłkę, bywa też porzucony w połowie, bo ktoś
+ * zabrał zawartość ręką — a do 0.123.0 jedynym wyjściem było rozłożenie
+ * wszystkiego albo pominięcie każdej pozycji z powodem.
+ *
+ * DWA ZAKOŃCZENIA, bo to dwie różne rzeczy:
+ *
+ *   pusty        → wiersz ZNIKA z bazy. Karton bez ani jednej pozycji to
+ *                  pomyłka palca, nie historia; zostawiony w tabeli byłby
+ *                  śmieciem na liście biura i niczym więcej.
+ *   z zawartością → status `anulowany` ze znacznikiem kto i kiedy. Ktoś
+ *                  zeskanował te rzeczy i odszedł od pudła — to jest fakt,
+ *                  o który biuro zapyta, więc pozycje ZOSTAJĄ.
+ *
+ * CZEGO ANULOWANIE NIE ROBI: nie cofa odłożeń. Pozycja postawiona na półce
+ * naprawdę tam stoi, a jej zapis adresu jest prawdą o magazynie — anulowanie
+ * dotyczy pracy, która ZOSTAŁA do zrobienia, nie tej, która się wydarzyła.
+ * Tym różni się od `cofnijOdlozenie`, które kasuje zadanie, dopóki czeka.
+ */
+export function anulujKarton(koszId: number, autor: string): { usuniety: boolean } {
+  const k = karton(koszId);
+  if (k.status === "rozlozony") {
+    throw new BladKosza(400, `Karton ${k.kod} jest już rozłożony — nie ma czego anulować`);
+  }
+  if (k.status === "anulowany") return { usuniety: false }; // drugie kliknięcie
+
+  const d = db();
+  let usuniety = false;
+  transaction(d, () => {
+    const pozycje = d
+      .prepare("SELECT status FROM kosz_pozycja WHERE kosz_id = ?")
+      .all(k.id) as Array<{ status: string }>;
+    /* Liczby jadą do dziennika, bo anulowanie po ZATWIERDŹ jest cichą drogą
+       porzucenia pracy. Pastylka w biurze mówi „anulowany"; dopiero te dwie
+       liczby mówią, ILE roboty przy tym zostało nietkniętej. */
+    const odlozonych = pozycje.filter((p) => p.status === "done").length;
+    const zostalo = pozycje.length - odlozonych;
+    if (pozycje.length === 0) {
+      d.prepare("DELETE FROM kosz WHERE id = ?").run(k.id);
+      usuniety = true;
+    } else {
+      d.prepare("UPDATE kosz SET status='anulowany', anulowano_at=?, anulowano_przez=? WHERE id=?")
+        .run(nowIso(), autor, k.id);
+    }
+    logEvent("karton_anulowany", autor, null, {
+      koszId: k.id,
+      kod: k.kod,
+      pozycji: pozycje.length,
+      odlozonych,
+      zostalo,
+      usuniety,
+    });
+  })();
+  return { usuniety };
+}
+
 export function zatwierdzKarton(koszId: number, autor: string): SzczegolKosza {
   const k = karton(koszId);
+  /* Anulowany NIE jest „już zatwierdzony" i nie wolno go zbyć jak drugie
+     kliknięcie: odpowiedź 200 na pudle, które ktoś właśnie odwołał, kazałaby
+     rozkładać zawartość odpisaną na straty. */
+  if (k.status === "anulowany") throw new BladKosza(400, `Karton ${k.kod} jest anulowany`);
   if (k.status !== "otwarty") return szczegolKosza(k.id); // drugie kliknięcie
   const { ile } = db()
     .prepare("SELECT COUNT(*) AS ile FROM kosz_pozycja WHERE kosz_id = ?")

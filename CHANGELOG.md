@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.123.0 — 28 sierpnia 2026
+
+**Zbiórka do kartonu pokazuje półki, szuka jak człowiek i daje się odwołać.**
+Trzy zgłoszenia właściciela po pierwszym dniu z KARTONEM.
+
+**Adres na liście zbiórki.** Wiersz pokazywał symbol, nazwę i ilość, a pierwsze
+pytanie przy pudle brzmi „na którą półkę to wróci". Adres pickingowy stoi teraz
+wyróżniony, za nim reszta półek tego towaru. Dane jechały w tej samej
+odpowiedzi serwera od pierwszego dnia — ekran ich nie rysował.
+
+**Wpisywanie SZUKA zamiast dodawać w ciemno.** Pole wysyłało napis na serwer,
+więc literówka albo pół nazwy kończyły się „Nieznany kod" — ta sama usterka,
+którą 0.117.0 naprawiło w otwartej dostawie. Teraz wpis pyta wyszukiwarki
+kartoteki: bez ogonków, symbol bez myślnika, furtka na literówki przy zerze
+trafień. Wyniki są listą z miniaturą, symbolem, nazwą, półkami i stanem;
+dotknięcie wiersza dokłada towar do pudła. Gdy trafienie wyszło z furtki,
+lista mówi „nie znalazłem dosłownie — to są podobne".
+
+Wybór z listy posyła identyfikator towaru, nie napis. Człowiek wybrał wzrokiem
+i rozwiązywanie tego drugi raz mogłoby zmienić jego decyzję.
+
+**ANULUJ KARTON.** Pudło otwarte przez pomyłkę albo porzucone nie miało jak
+zniknąć — jedynym wyjściem było rozłożenie wszystkiego. Anulowanie działa na
+każdym etapie, także w trakcie rozkładania, i pyta o potwierdzenie zdaniem,
+które podaje liczbę pozycji. Pusty karton znika z bazy; karton z zawartością
+zostaje ze statusem ANULOWANY, bo ktoś te rzeczy zeskanował i biuro o to
+zapyta. Pozycje już odłożone ZOSTAJĄ odłożone: towar stoi na półce naprawdę,
+więc cofnięcie adresu zrobiłoby z niej kłamstwo.
+
+Kod anulowanego kartonu wraca do obiegu — indeks unikalności pomija anulowane.
+
 ## 0.122.0 — 28 sierpnia 2026
 
 **Kolektor dostał zakładkę KARTON: rozkładanie od zera.** Zgłoszenie

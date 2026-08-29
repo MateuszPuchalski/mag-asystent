@@ -57,6 +57,7 @@ import pl.wertis.kolektor.core.net.ZdjecieWstepneResponse
 import pl.wertis.kolektor.core.net.ZdjecieZapisBody
 import pl.wertis.kolektor.core.net.ZdjecieZapisResponse
 import pl.wertis.kolektor.core.net.KartonyResponse
+import pl.wertis.kolektor.core.net.AnulowanieKartonu
 import pl.wertis.kolektor.core.net.DodajDoKartonuBody
 import pl.wertis.kolektor.core.net.DodanieDoKartonu
 import pl.wertis.kolektor.core.net.IloscKartonuBody
@@ -307,6 +308,10 @@ interface ApiService {
 
     @POST("api/kartony/{id}/zatwierdz")
     suspend fun kartonZatwierdz(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): KoszResponse
+
+    /** Anulowanie pudła; `usuniety` mówi, czy pusty karton zniknął z bazy. */
+    @POST("api/kartony/{id}/anuluj")
+    suspend fun kartonAnuluj(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): AnulowanieKartonu
 
     // ── Przyjęcia na regał zwrotów: kosze z dokumentu MM (0.75.0) ─────────
     @GET("api/przyjecia")
