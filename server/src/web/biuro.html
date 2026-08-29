@@ -6081,9 +6081,15 @@ function rysujDyskusje(lista, sync) {
         : "Nic tu nie ma."}</td></tr>`;
   /* Ślad pobrania jak przy zapowiedziach: zdanie o braku pobrania jest
      treścią — bez niego pusta lista wygląda jak „Allegro nic nie ma". */
+  /* Nieznany status Allegro to wezwanie do właściciela: lista statusów
+     końcowych jest niezweryfikowana na żywym koncie i dopiero takie zdanie
+     pozwala ją potwierdzić (docs/architektura-spraw.md, etap B). */
+  const nieznane = sync && sync.nieznaneStatusy && sync.nieznaneStatusy.length
+    ? `<div style="color:var(--err)">Nieznane statusy Allegro: <b>${sync.nieznaneStatusy.map(esc).join(", ")}</b> — zgłoś, żeby ustalić, czy zamykają sprawę.</div>`
+    : "";
   $("dyskusjeTicker").innerHTML = sync
     ? `Dyskusje — ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
-       · zamkniętych w panelu ${sync.zamknietychPrzezAllegro} · przejrzano ${sync.przejrzanych}`
+       · zamkniętych w panelu ${sync.zamknietychPrzezAllegro} · przejrzano ${sync.przejrzanych}${nieznane}`
     : "Dyskusji jeszcze nie pobierano od uruchomienia serwera — kliknij POBIERZ DYSKUSJE.";
 }
 

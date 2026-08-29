@@ -1018,3 +1018,24 @@ CREATE INDEX IF NOT EXISTS ix_dyskusja_kupujacy ON dyskusja(kupujacy_login);
 -- Zwrot przyjęty skanem PO pojawieniu się dyskusji musi ją odnaleźć po
 -- numerze zamówienia — bez indeksu szłoby to pełnym skanem przy każdym sync.
 CREATE INDEX IF NOT EXISTS ix_dyskusja_order ON dyskusja(order_id);
+
+-- ── Metadane wątku — piłka bez treści (0.127.0) ─────────────────────────────
+-- Fundament pod „kto ma piłkę" z docs/architektura-spraw.md. Decyzja
+-- właściciela: piłkę liczą METADANE — kto powiedział ostatnie słowo, kiedy
+-- i ile wiadomości padło. Treść rozmów dalej czyta się na klik i NIE zapisuje
+-- (zasada prywatności z CLAUDE.md stoi). Wypełniają: synchronizacja pytań
+-- (metadane i tak przelatują), odczyt rozmowy na klik (cache tego, co człowiek
+-- właśnie widział — świadomy wyjątek od „zero zapisu przy patrzeniu",
+-- zaakceptowany przez właściciela) i wysyłka odpowiedzi.
+CREATE TABLE IF NOT EXISTS watek_meta (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj             TEXT NOT NULL CHECK (rodzaj IN ('pytanie','dyskusja')),
+  allegro_id         TEXT NOT NULL,  -- thread_id pytania / id sprawy z /sale/issues
+  ostatni_glos       TEXT,           -- 'my' | 'klient' | 'allegro'; NULL = nie wiemy
+  ostatnia_at        TEXT,           -- kiedy padł ostatni głos
+  ostatnia_klient_id TEXT,           -- id ostatniej wiadomości KLIENTA — punkt odniesienia świeżości
+  wiadomosci         INTEGER,        -- ile wiadomości widzieliśmy; NULL = nie liczono
+  zrodlo             TEXT NOT NULL,  -- 'sync' | 'odczyt' | 'wysylka' — skąd ostatnia aktualizacja
+  aktualizowano_at   TEXT NOT NULL,
+  UNIQUE (rodzaj, allegro_id)        -- klucz upsertu
+);

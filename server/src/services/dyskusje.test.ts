@@ -25,7 +25,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dyskusja", "zwrot_pozycja", "zwrot", "events"]) {
+  for (const t of ["dyskusja", "zwrot_pozycja", "zwrot", "events", "watek_meta"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   /* Świeży adapter dev na każdy test — wysłana wiadomość z jednego testu nie
@@ -311,4 +311,82 @@ test("wysyłka dyskusji na nieświeżą rozmowę odmawia; wymus i brak punktu od
      API — degradacja 0.104.0), a wymus to świadoma decyzja człowieka. */
   const bez = await D.wyslijOdpowiedzDyskusji(sprawa.id, "anna");
   assert.ok(bez.wyslanoAt, "brak id z panelu nie blokuje wysyłki");
+});
+
+/* ── Nieznane statusy Allegro (0.127.0) ──────────────────────────────────────
+   Lista statusów końcowych jest [WERYFIKUJ] — mechanizmem weryfikacji jest
+   zliczanie wartości spoza znanych list i pokazanie ich biuru. Funkcja jest
+   czysta, więc dziwny status fabrykujemy listą, nie adapterem.               */
+
+test("podzielStatusy: wartość spoza list ląduje w nieznanych, znane nie", () => {
+  const { statusy, nieznane } = D.podzielStatusy([
+    { status: "ONGOING" },
+    { status: "ONGOING" },
+    { status: "CLOSED" },
+    { status: "UNDER_REVIEW" },
+    { status: null },
+  ]);
+  assert.deepEqual(nieznane, ["UNDER_REVIEW"], "znane i (brak) nie są nowością");
+  assert.equal(statusy.ONGOING, 2);
+  assert.equal(statusy["(brak)"], 1);
+});
+
+test("sync niesie nieznane statusy w stanie i loguje je raz na wartość", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  const stan = D.stanSynchronizacjiDyskusji();
+  assert.ok(stan);
+  assert.deepEqual(stan.nieznaneStatusy, [], "adapter dev daje wyłącznie znane statusy");
+  const zdarzen = db()
+    .prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'dyskusja_status_nieznany'")
+    .get() as { n: number };
+  assert.equal(zdarzen.n, 0, "bez nieznanych wartości dziennik milczy");
+});
+
+/* ── Metadane wątku przy dyskusjach (0.127.0) ────────────────────────────────
+   Odczyt na klik i wysyłka zostawiają w `watek_meta` piłkę bez treści;
+   świeżość wysyłki ma odtąd punkt odniesienia po stronie serwera, więc panel
+   bez id nie wyłącza już kontroli.                                           */
+
+test("odczyt rozmowy na klik zostawia metadane piłki", async () => {
+  const M = await import("./watek-meta.js");
+  await D.synchronizujDyskusje("test");
+  const sprawa = D.listaDyskusji({}).find((x) => x.typ === "DISCUSSION")!;
+  assert.equal(M.metaWatku("dyskusja", sprawa.allegroId), null, "przed odczytem meta nie ma");
+  const rozmowa = await D.wiadomosciDyskusji(sprawa.id);
+  assert.ok(rozmowa && rozmowa.length > 0);
+  const meta = M.metaWatku("dyskusja", sprawa.allegroId);
+  assert.ok(meta, "odczyt wypełnia watek_meta");
+  assert.equal(meta.zrodlo, "odczyt");
+  assert.equal(meta.wiadomosci, rozmowa.length);
+  assert.ok(meta.ostatniaKlientId, "id ostatniej wiadomości klienta zapisane");
+});
+
+test("stale meta blokuje wysyłkę bez id z panelu; wysyłka stempluje `my`", async () => {
+  const M = await import("./watek-meta.js");
+  await D.synchronizujDyskusje("test");
+  const sprawa = D.listaDyskusji({}).find((x) => x.typ === "DISCUSSION")!;
+  D.zapiszOdpowiedzDyskusji(sprawa.id, "Dzień dobry, zwracamy środki.", "anna");
+
+  /* Serwer pamięta id klienta, którego w rozmowie nie ma na końcu — czyli po
+     ostatnim odczycie klient dopisał coś nowego. Panel id nie przysłał. */
+  db()
+    .prepare(
+      `INSERT INTO watek_meta (rodzaj, allegro_id, ostatnia_klient_id, zrodlo, aktualizowano_at)
+       VALUES ('dyskusja', ?, 'wiadomosc-sprzed-dopisku', 'odczyt', datetime('now'))`
+    )
+    .run(sprawa.allegroId);
+  await assert.rejects(
+    () => D.wyslijOdpowiedzDyskusji(sprawa.id, "anna"),
+    D.BladSwiezosciDyskusji,
+    "meta zastępuje id z panelu jako punkt odniesienia"
+  );
+
+  /* Człowiek przeczytał rozmowę (odczyt odświeża meta) i wysyła. */
+  await D.wiadomosciDyskusji(sprawa.id);
+  const po = await D.wyslijOdpowiedzDyskusji(sprawa.id, "anna");
+  assert.ok(po.wyslanoAt);
+  const meta = M.metaWatku("dyskusja", sprawa.allegroId);
+  assert.equal(meta?.ostatniGlos, "my", "po wysyłce piłka jest u klienta naszym głosem");
+  assert.equal(meta?.zrodlo, "wysylka");
+  assert.ok(meta?.ostatniaKlientId, "punkt odniesienia klienta przeżywa stempel");
 });

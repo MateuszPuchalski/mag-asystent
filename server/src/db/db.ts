@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
+import { odkodujEncje } from "../tekst.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -245,6 +246,45 @@ function migrate(database: DatabaseSync) {
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
+  odkodujEncjeWBazie(database);
+}
+
+/**
+ * Jednorazowe zdjęcie encji HTML z zastanych wierszy (0.127.0).
+ *
+ * Do 0.127.0 adapter zapisywał teksty Allegro dosłownie, więc w bazie leżą
+ * `zwr&oacute;cić` — a panel escape'uje przy renderowaniu, więc encja szła
+ * na ekran. Nowe dane dekoduje adapter; tu doganiamy stare. Wzorzec
+ * `dosypIdKupujacego`: idempotentnie (po dekodzie encji nie ma), w try/catch,
+ * bez zatrzymywania startu. Dwa procesy (API + worker) mogą wejść tu naraz —
+ * wynik dekodowania jest deterministyczny, więc wyścig jest niegroźny.
+ * Pochodne `szkic_ai`/`odpowiedz` ŚWIADOMIE nietknięte: to teksty redagowane
+ * ręką człowieka — jeśli encja tam została, człowiek ją widział i wysłał.
+ */
+function odkodujEncjeWBazie(database: DatabaseSync) {
+  const cele: Array<[tabela: string, kolumna: string]> = [
+    ["dyskusja", "temat"],
+    ["pytanie", "tresc"],
+    ["pytanie", "oferta_tytul"],
+  ];
+  for (const [tabela, kolumna] of cele) {
+    try {
+      /* LIKE to luźny prefiltr (dopuszcza fałszywe trafienia) — rozstrzyga
+         porównanie w JS. Wierszy są setki, nie miliony. */
+      const wiersze = database
+        .prepare(`SELECT id, ${kolumna} AS v FROM ${tabela} WHERE ${kolumna} LIKE '%&%;%'`)
+        .all() as Array<{ id: number; v: string | null }>;
+      const update = database.prepare(`UPDATE ${tabela} SET ${kolumna} = ? WHERE id = ?`);
+      for (const w of wiersze) {
+        if (typeof w.v !== "string") continue;
+        const czysty = odkodujEncje(w.v);
+        if (czysty !== w.v) update.run(czysty, w.id);
+      }
+    } catch {
+      /* Encja w starym wierszu zostaje widoczna na ekranie — usterka
+         kosmetyczna nie ma prawa zatrzymać startu serwera. */
+    }
+  }
 }
 
 /**

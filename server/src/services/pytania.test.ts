@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dopasowanie", "pytanie", "ai_config", "sgt_towar", "sgt_stan"]) {
+  for (const t of ["dopasowanie", "pytanie", "ai_config", "sgt_towar", "sgt_stan", "watek_meta"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   /* Świeży adapter na każdy test: dev trzyma wysłane wiadomości w pamięci
@@ -584,4 +584,26 @@ test("noweOdKlienta: świeża sprawa milczy, dopisek wraca od znanej wiadomości
   );
   // znanej nie ma w oknie (bardzo stara sprawa) → uczciwie cała rozmowa
   assert.equal(P.noweOdKlienta([w("a"), w("b")], "spoza-okna")!.length, 2);
+});
+
+/* ── Metadane wątku przy pytaniach (0.127.0) ─────────────────────────────────
+   Sync i tak czyta każdą rozmowę — metadane piłki (kto ostatni, kiedy, ile)
+   zostają za darmo; wysyłka stempluje nasz głos bez ponownego GET-a.         */
+
+test("sync wypełnia watek_meta metadanami, wysyłka stempluje nasz głos", async () => {
+  const M = await import("./watek-meta.js");
+  await P.synchronizujPytania("test");
+  const p = P.listaPytan({ limit: 50 }).find((x) => x.threadId === "dev-pyt-1")!;
+  const meta = M.metaWatku("pytanie", p.threadId!);
+  assert.ok(meta, "sync zostawia meta dla przejrzanego wątku");
+  assert.equal(meta.ostatniGlos, "klient", "pytanie w kolejce = ostatni głos klienta");
+  assert.equal(meta.zrodlo, "sync");
+  assert.ok(meta.wiadomosci !== null && meta.wiadomosci > 0, "licznik z rozmowy sync");
+
+  P.zapiszOdpowiedz(p.id, "Dzień dobry, pasek jest w drodze.");
+  await P.wyslijOdpowiedz(p.id, "anna");
+  const po = M.metaWatku("pytanie", p.threadId!);
+  assert.equal(po?.ostatniGlos, "my", "po wysyłce ostatnie słowo jest nasze");
+  assert.equal(po?.zrodlo, "wysylka");
+  assert.equal(po?.wiadomosci, meta.wiadomosci, "stempel nie zeruje licznika");
 });
