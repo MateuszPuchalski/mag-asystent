@@ -331,11 +331,11 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "sprawy", "nadzor", "dziennik", "analiza"],
-    "w pasku tylko zakładki pracy — dostawcy tu nie wracają. ZWROTY ALLEGRO " +
-      "i PYTANIA KLIENTÓW zwinęły się do SPRAW (0.109.0) decyzją właściciela: " +
-      "cztery rejestry obsługi klienta to jedna praca, nie dwie zakładki. " +
-      "DOSTAWY I REKLAMACJE zostają — to inna domena (dostawcy, nie klienci)"
+    ["sprawy", "dostawy", "magazyn", "rejestry", "analiza", "dziennik", "nadzor"],
+    "pasek boczny (0.125.0): SPRAWY pierwsze — wokół nich panel ewoluuje " +
+      "w system tiketowy. MAGAZYN i REJESTRY to rozprężenie SPRAW: praca " +
+      "fizyczna i archiwum wyszły z szyny 352 px do własnych pozycji. " +
+      "Dostawcy dalej za zębatką — konfiguracja to nie praca"
   );
 
   /* Dopasowanie idzie po ZAWARTOŚCI `grupa-btny`, nie po rozbiciu paska na
@@ -353,8 +353,9 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
-    2,
-    "dwie grupy, każda podpisana"
+    3,
+    "trzy grupy (Praca, Archiwum, Wgląd), każda podpisana — Archiwum doszło " +
+      "z rozprężeniem 0.125.0"
   );
 
   /* Druga cicha droga: widok zostaje w pliku, ale przestaje do niego cokolwiek
@@ -442,37 +443,45 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
   }
 });
 
-test("pasek zakładek mieszka w nagłówku i sam pilnuje swojej widoczności", () => {
-  /* Od 0.95.0 zakładki stoją w ciemnym nagłówku, a nie we własnej białej
-     karcie pod nim. Chodziło o pion: trzecie pasmo chromu kosztowało ~60 px
-     NA KAŻDEJ zakładce, a panel bywa otwarty na laptopie obok Subiekta.
+test("zakładki mieszkają w pasku bocznym i same pilnują swojej widoczności", () => {
+  /* Historia domu: karta pod nagłówkiem (0.74.1) → ciemny nagłówek (0.95.0)
+     → pion po lewej (0.125.0). Za każdym razem chodziło o to samo: chrom nad
+     treścią kosztuje na KAŻDEJ zakładce. Pion oddał treści ostatnie 52 px —
+     nad nią nie stoi już nic.
 
-     Przeprowadzka wyniosła pasek POZA `#panel` i to jest jej jedyny haczyk.
-     Cała reszta chromu sesji chowa się, bo `#panel` dostaje `hidden`; pasek
-     stojący w nagłówku nie schowa się od tego NIGDY. Bez własnego `hidden`
-     w znaczniku i bez odsłonięcia w `start()` sześć pastylek świeciłoby nad
-     formularzem logowania — klikalnych, prowadzących do pustych widoków. */
+     Haczyk z 0.95.0 obowiązuje dalej: pasek stoi POZA `#panel`, więc samo
+     schowanie panelu go nie zdejmuje. Bez własnego `hidden` w znaczniku
+     i bez odsłonięcia w `start()` pozycje świeciłyby nad formularzem
+     logowania — klikalne, prowadzące do pustych widoków. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
   const otwarcie = html.match(/<nav class="zakladki"[^>]*>/);
   assert.ok(otwarcie, "pasek zakładek istnieje");
-  assert.ok(otwarcie.index! < html.indexOf("</header>"),
-    "pasek stoi w nagłówku — po to wyjechał z osobnego pasma");
-  /* Do 0.119.1 stała tu asercja „pasek nie wrócił do `#chrome`". Kotwica
-     zeszła razem z paskiem stanu — od tej wersji chromu jest JEDNO pasmo,
-     więc pilnujemy rzeczy mocniejszej: `#chrome` nie ma go w ogóle. Bez tego
-     ktoś odtworzy pasek pod nagłówkiem i nikt tego nie zauważy. */
+  assert.ok(html.includes('<aside id="bok">'), "pasek boczny istnieje");
+  assert.ok(html.indexOf('<aside id="bok">') < otwarcie.index!
+    && otwarcie.index! < html.indexOf("</aside>"),
+    "zakładki stoją w pasku bocznym — po to pojechały w pion");
+  /* Nagłówka i paska stanu nie ma W OGÓLE — jedno pasmo chromu skurczyło się
+     do zera pasm. Odtworzenie któregokolwiek to cofnięcie tej przeprowadzki. */
+  assert.ok(!/<header[\s>]/.test(html), "nagłówek nie wrócił nad treść");
   assert.ok(!html.includes('id="chrome"'),
     "pasek stanu nie wrócił jako drugie pasmo chromu");
   assert.match(otwarcie[0], /\bhidden\b/,
-    "pasek startuje schowany — `#panel` już go nie zasłania");
+    "pasek startuje schowany — `#panel` go nie zasłania");
 
   for (const [co, po] of [["hidden = false", "zalogowaniu"], ["hidden = true", "wylogowaniu"]]) {
     assert.ok(html.includes(`zakladki().${co}`),
       `pasek zmienia widoczność po ${po}`);
   }
+
+  /* Wysokość chromu nad treścią jest odtąd STAŁĄ, nie pomiarem — skrypt
+     mierzący nagłówek zszedł razem z nim, a zmienną czyta kilkanaście reguł
+     konsoli. Pomiar `offsetHeight` nieistniejącego elementu wywaliłby cały
+     skrypt przy starcie. */
+  assert.match(html, /--hChrome: 0px;/, "chrom nad treścią = zero, jako stała");
+  assert.ok(!html.includes("mierzChrome"), "po pomiarach nie ma śladu");
 });
 
 test("nagłówek niesie licznik odpowiedzi na notatki", () => {
@@ -700,14 +709,21 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
     assert.ok(ia < ib, czemu);
   };
   przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
-  przed("kolejkaSprawKarta", "sprawyRejestry",
-    "wspólna kolejka spraw przed szyną rejestrów — to ona jest głównym miejscem pracy (0.109.0)");
-  /* Wewnątrz szyny: najpierw alarmy (coś czeka), potem praca magazynu i wklejka,
-     na końcu archiwum. Rejestr per-typ jest miejscem, do którego się WRACA. */
-  przed("pytaniaBaner", "brakujaceKarta", "szkice AI przed alarmem o paczkach");
+  /* Po rozprężeniu 0.125.0: na SPRAWACH baner AI i wklejka stoją PRZED
+     kolejką (alarm i wejście nowej sprawy nad listą pracy); w MAGAZYNIE
+     alarmy przed pracą przy koszach; w REJESTRACH archiwum przed stanem
+     połączenia. */
+  przed("pytaniaBaner", "kolejkaSprawKarta", "stan modelu AI nad kolejką, nie pod nią");
+  przed("pytaniaWklejkaKarta", "kolejkaSprawKarta", "wejście nowej sprawy nad listą");
   przed("brakujaceKarta", "koszeKarta", "alarmy przed pracą przy koszach");
-  przed("pytaniaWklejkaKarta", "zwrotListaKarta", "ścieżka poboczna przed archiwum");
   przed("zwrotListaKarta", "kontoAllegroKarta", "rejestry przed stanem połączenia");
+  /* Rozprężenie NIE może się cofnąć po cichu: magazyn i rejestry mieszkają
+     we własnych widokach, nie w SPRAWACH. */
+  const sprawy = html.slice(html.indexOf('id="widokSprawy"'), html.indexOf('id="widokMagazyn"'));
+  for (const id of ["brakujaceKarta", "koszeKarta", "pominieteKarta",
+                    "zwrotListaKarta", "dyskusjeKarta", "kontoAllegroKarta"]) {
+    assert.ok(!sprawy.includes(`id="${id}"`), `${id} wyprowadziła się ze SPRAW (0.125.0)`);
+  }
 });
 
 test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
@@ -874,16 +890,18 @@ test("na zakładce SPRAW jest JEDNA kolejka, a narzędzia stoją w jej głowie",
     assert.ok(kolejka.includes(`id="${pole}"`), `${pole} stoi w kolejce spraw`);
   }
 
-  /* Zwijane, nie karty: rejestr otwarty na starcie byłby drugą kolejką na
-     pierwszym planie i cała przeprowadzka poszłaby na marne. Zwinięta sekcja
-     NIE PYTA serwera — ta sama reguła, co przy KONCIE ALLEGRO. */
-  const szyna = html.slice(
-    html.indexOf('id="sprawyRejestry"'),
+  /* Od 0.125.0 rejestry mieszkają we WŁASNYM widoku (rozprężenie), ale dwie
+     zasady przeżyły przeprowadzkę: rejestr jest ZWIJANY (otwarty na starcie
+     byłby drugą kolejką) i zwinięty NIE PYTA serwera — ta sama reguła, co
+     przy KONCIE ALLEGRO. */
+  const widokRejestrow = html.slice(
+    html.indexOf('id="widokRejestry"'),
     html.indexOf('id="widokNadzor"')
   );
   for (const rejestr of ["zwrotListaKarta", "pytaniaListaKarta",
                          "dyskusjeKarta", "reklamacjeKarta"]) {
-    assert.ok(szyna.includes(`id="${rejestr}"`), `${rejestr} mieszka w szynie rejestrów`);
+    assert.ok(widokRejestrow.includes(`id="${rejestr}"`),
+      `${rejestr} mieszka w widoku REJESTRY`);
     assert.match(
       html,
       new RegExp(`<details class="zwijana" id="${rejestr}">`),
@@ -931,17 +949,16 @@ test("zakładka spraw bez otwartej sprawy jest konsolą, nie stosem kart", () =>
     "utf8"
   );
 
+  /* Od 0.125.0 obok kolejki nie stoi już nic: szyna rejestrów wyprowadziła
+     się do własnych widoków (rozprężenie), a kolejka dostała CAŁĄ szerokość.
+     Konsola zostaje konsolą — wysokość okna i własne przewijanie kolumny. */
   assert.match(
     html,
-    /#widokSprawy\.zKolejka \{ grid-template-columns: minmax\(0, 1fr\)/,
-    "bez otwartej sprawy szeroka jest KOLEJKA, a rejestry schodzą do szyny"
+    /#widokSprawy\.zKolejka \{ grid-template-columns: minmax\(0, 1fr\); \}/,
+    "bez otwartej sprawy kolejka jest JEDYNĄ i pełną kolumną"
   );
-  /* Szyna ma własne przewijanie na pełną wysokość okna — inaczej długi rejestr
-     przewijałby CAŁĄ stronę i kolejka uciekałaby pod krawędź. */
-  const szyna = html.slice(html.indexOf("#widokSprawy.zKolejka > .rejestry {"));
-  assert.match(szyna.slice(0, 400), /height: calc\(100dvh - var\(--hChrome/,
-    "szyna rejestrów ma wysokość okna");
-  assert.match(szyna.slice(0, 400), /overflow: auto/, "szyna przewija się sama");
+  assert.ok(!html.includes("sprawyRejestry"),
+    "szyna rejestrów nie wróciła do SPRAW — rozprężenie 0.125.0");
 
   for (const klasa of ["zKolejka", "zKlient", "konsola"]) {
     assert.match(
@@ -1487,13 +1504,14 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
 
   // 2. Dwie ikony w pasku, każda z natywnym tooltipem i nawigacją z sekcji.
   assert.match(html, /id="ikonaZdrowia"/, "zdrowie systemu to jedna ikona, nie rząd kafli");
-  assert.match(html, /id="ikonaAllegro"/, "wejście do parowania stoi w pasku na górze");
-  /* Obie ikony stoją W NAGŁÓWKU (0.119.1), nie w osobnym pasku pod nim. */
-  assert.ok(html.indexOf('id="ikonaZdrowia"') < html.indexOf("</header>"),
-    "ikona zdrowia mieszka w nagłówku");
-  assert.ok(html.indexOf('id="ikonaAllegro"') < html.indexOf("</header>"),
-    "ikona Allegro mieszka w nagłówku");
-  /* Nagłówek nie chowa się razem z `#panel`, więc ikony muszą chować się same —
+  assert.match(html, /id="ikonaAllegro"/, "wejście do parowania stoi w pasku");
+  /* Obie ikony stoją W PASKU BOCZNYM (0.119.1 nagłówek → 0.125.0 aside),
+     nie w osobnym paśmie chromu. */
+  assert.ok(html.indexOf('id="ikonaZdrowia"') < html.indexOf("</aside>"),
+    "ikona zdrowia mieszka w pasku bocznym");
+  assert.ok(html.indexOf('id="ikonaAllegro"') < html.indexOf("</aside>"),
+    "ikona Allegro mieszka w pasku bocznym");
+  /* Pasek nie chowa się razem z `#panel`, więc ikony muszą chować się same —
      inaczej świecą nad formularzem logowania, jak zakładki przed 0.95.0. */
   assert.match(html, /const IKONY_STANU = /, "ikony mają jedną listę na trzy miejsca");
   for (const co of ["hidden = true", "hidden = false"]) {
@@ -1501,13 +1519,16 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
       `ikony stanu same pilnują swojej widoczności (${co})`);
   }
   assert.match(html, /ik\.title = linie\.join\("\\n"\)/, "tooltip niesie pełne zdania kafli");
-  /* DELEGACJA WYJECHAŁA RAZEM Z IKONAMI (0.119.1) i to jest cała treść tej
-     asercji. Zostawiona na `#chrome` byłaby szóstą odsłoną usterki z 0.92.0,
-     0.96.0, 0.97.0, 0.98.0 i 0.101.0 — tyle że tym razem głośną: `#chrome`
-     już nie istnieje, więc `$(…)` zwraca `null` i wywala cały skrypt. */
-  assert.match(html, /document\.querySelector\("header"\)\.addEventListener\("click"/,
-    "pasek deleguje z nagłówka — stamtąd, gdzie stoją ikony");
+  /* DELEGACJA WYJEŻDŻA RAZEM Z IKONAMI za każdą przeprowadzką (`#chrome` →
+     nagłówek 0.119.1 → aside 0.125.0), zawsze w tym samym commicie. Zostawiona
+     w starym domu byłaby kolejną odsłoną usterki z 0.92.0, 0.96.0, 0.97.0,
+     0.98.0 i 0.101.0 — tym razem głośną: starego domu nie ma, `$(…)`/
+     `querySelector` oddaje `null` i wywala cały skrypt przy starcie. */
+  assert.match(html, /\$\("bok"\)\.addEventListener\("click"/,
+    "stan deleguje z paska bocznego — stamtąd, gdzie stoją ikony");
   assert.ok(!/\$\("chrome"\)/.test(html), "nic już nie sięga po nieistniejący #chrome");
+  assert.ok(!/querySelector\("header"\)/.test(html),
+    "nic już nie sięga po nieistniejący nagłówek");
   assert.ok(
     !/\$\("stan"\)\.addEventListener/.test(html),
     "nasłuch nie wisi na #stan — to pojemnik przerysowywany co cykl"

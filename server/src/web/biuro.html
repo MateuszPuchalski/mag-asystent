@@ -48,6 +48,15 @@
     /* Stopka strony. Konsola sięga do dolnej krawędzi okna, więc musi ją odjąć —
        ten sam powód, dla którego margines boczny ma własną zmienną. */
     --stopka: 28px;
+    /* Szerokość paska bocznego (0.125.0). Jedna liczba, bo flex liczy z niej
+       resztę — main nie musi znać szerokości paska. */
+    --bok: 216px;
+    /* Wysokość chromu NAD treścią. Do 0.123.0 mierzył ją skrypt (nagłówek
+       potrafił zawinąć się do dwóch wierszy); nawigacja pojechała W BOK, więc
+       nad treścią nie stoi już nic — zero jest stałą, nie pomiarem. Zmienna
+       ZOSTAJE, bo czyta ją kilkanaście reguł konsoli i szuflady: one pytają
+       „ile chromu jest nad treścią", a odpowiedź brzmi teraz „nic". */
+    --hChrome: 0px;
   }
   * { box-sizing: border-box; margin: 0; }
   /* `main` ma display:grid, a styl autora wygrywa z arkuszem przeglądarki —
@@ -59,19 +68,35 @@
   a:hover { color: var(--amber-dark); }
 
   /* Pasek górny = TopBar kolektora: grafit, marka bursztynem w kondensacie. */
-  header { background: var(--ink); color: #fff; min-height: 52px; padding: 8px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  header b { color: var(--amber); font: 800 20px/1 var(--font-cond); letter-spacing: 1.5px; }
-  header > span { font: 600 15px/1 var(--font-cond); letter-spacing: .5px; color: #fff; }
-  header .sesja { margin-left: auto; display: flex; align-items: center; gap: 14px; }
-  header .kto { font: 600 12px var(--font-sans); color: #bbb; letter-spacing: .3px; }
-  header button { background: none; border: 1px solid #555; color: #ccc; border-radius: 999px; padding: 4px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
-  header button:hover { border-color: var(--amber); color: var(--amber); }
-  /* Zębatka: cel dotyku kwadratowy i nie mniejszy niż sąsiedni „Wyloguj",
-     inaczej ikona byłaby trudniejsza do trafienia niż napis obok niej.
-     Stan aktywny to ten sam bursztyn co zakładka w pasku — bo to JEST
-     wskaźnik bieżącego widoku, tylko postawiony poza paskiem. */
-  header button.ikona { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 999px; }
-  header button.ikona[aria-current="true"] { border-color: var(--amber); color: var(--amber); background: rgba(247, 166, 0, .18); }
+  /* ── Nawigacja boczna (0.125.0) ────────────────────────────────────────────
+     Strona to flex [aside | main]: pasek jest elementem przepływu, nie
+     nakładką, więc szerokości treści nie trzeba nigdzie odejmować ręcznie.
+     `sticky` + własne przewijanie: pasek stoi, gdy treść jedzie. */
+  body { display: flex; align-items: stretch; min-height: 100dvh; }
+  aside#bok {
+    flex: none; width: var(--bok); box-sizing: border-box;
+    position: sticky; top: 0; height: 100dvh; overflow-y: auto; z-index: 30;
+    background: var(--ink); color: #fff;
+    display: flex; flex-direction: column; gap: 14px; padding: 14px 10px 12px;
+  }
+  main { flex: 1; min-width: 0; }
+  #bok .marka { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+  #bok .marka b { color: var(--amber); font: 800 20px/1 var(--font-cond); letter-spacing: 1.5px; }
+  #bok .marka span { font: 600 11px/1 var(--font-cond); letter-spacing: .5px; color: #9A9A9F; }
+  #bok .sesja { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+  #bok .sesjaRzad { display: flex; align-items: center; gap: 8px; }
+  #bok .kto { font: 600 11.5px var(--font-sans); color: #bbb; letter-spacing: .3px;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #bok .sesja button { background: none; border: 1px solid #555; color: #ccc; border-radius: 999px; padding: 4px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
+  #bok .sesja button:hover { border-color: var(--amber); color: var(--amber); }
+  /* Zębatka: cel dotyku kwadratowy i nie mniejszy niż sąsiedni „Wyloguj".
+     Stan aktywny to ten sam bursztyn co pozycja paska — bo to JEST wskaźnik
+     bieżącego widoku, tylko postawiony poza paskiem. */
+  #bok button.ikona { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 999px; flex: none; }
+  #bok button.ikona[aria-current="true"] { border-color: var(--amber); color: var(--amber); background: rgba(247, 166, 0, .18); }
+  #wyloguj { flex: 1; }
+  #wyloguj .tylkoIkona { display: none; width: 16px; height: 16px; fill: none;
+                         stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   main { max-width: 1080px; margin: 20px auto; padding: 0 16px; display: grid; gap: 16px; }
 
@@ -87,23 +112,13 @@
      wyżej zostaje dla `#login`, które dalej ma być wąskim pudełkiem. */
   main#panel { max-width: none; margin: 0; padding: 0 var(--brzeg) var(--stopka); display: block; }
 
-  /* Nagłówek jedzie ze stroną. Przewinięcie listy dostaw nie ma prawa zabierać
-     z ekranu ani nawigacji, ani alarmu o kolejce w błędzie — to jest jedyny
-     powód, dla którego ten pasek w ogóle stoi na górze.
-
-     Od 0.119.1 pasmo jest JEDNO. Do tej wersji pod nagłówkiem stał jeszcze
-     biały `#chrome` z dwiema ikonami stanu i plakietką odpowiedzi na notatki —
-     i był PUSTY, gdy odpowiedzi nie było, czyli prawie zawsze. Drugie pasmo
-     chromu kosztowało ~43 px na KAŻDEJ zakładce; ta sama arytmetyka, która
-     w 0.95.0 wygnała zakładki do nagłówka. */
-  header { position: sticky; top: 0; z-index: 30; }
 
   /* ── Ikony stanu w ciemnym pasku (0.114.0, przeprowadzka 0.119.1) ──────────
      Kropka mówi kolorem, `title` zdaniami. Tooltip natywny świadomie — panel
      biura to desktop z myszą (założenie repo), a własny dymek to kolejny
      kawałek UI do utrzymania bez nowej informacji.
 
-     Spokojna pastylka bierze wartości od sąsiada w tym pasku (`header button`),
+     Spokojna pastylka bierze wartości od sąsiada w tym pasku (`#bok .sesja button`),
      nie własne: przezroczyste tło, obrys #555, tekst #ccc. Biała pastylka
      z jasnym obrysem byłaby na grafitowym pasku plamą jaśniejszą od zakładki
      bieżącej — czyli krzyczałaby wtedy, gdy nie ma o czym. */
@@ -270,14 +285,6 @@
      nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
   .widok > .pelna { grid-column: 1 / -1; }
 
-  /* Szyna rejestrów jest POJEMNIKIEM, nie kartą: poniżej 1024 px konsoli nie
-     ma, więc ma się rozsypać z powrotem na zwykły stos kart — a wtedy odstęp
-     między nimi musi zostać taki, jak między kartami zakładki. */
-  .rejestry { display: grid; gap: var(--luz); align-content: start; }
-  .rejestry > details.zwijana { border-top: 0; margin-top: 0; padding: 12px 14px;
-    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
-    box-shadow: var(--cien); }
-
   /* ── PASMO ŚREDNIE: szyna zostaje, kontekst chowa się do szuflady ─────────
      Między 1024 a 1280 px trzy strefy obok siebie się nie mieszczą — kolumna
      sprawy schodziłaby poniżej miary, przy której da się czytać wątek. Ale
@@ -314,6 +321,10 @@
   @media (min-width: 1024px) {
     .widok.konsola {
       gap: 0;
+      /* Wiersze siatki NIE rozciągają się na zapas wysokości: konsola ma
+         sztywne `height`, a nad kolejką potrafi stać baner (szkice AI) —
+         domyślne `stretch` rozdawało mu pół ekranu pustki. */
+      align-content: start;
       margin-top: 0;
       margin-inline: calc(-1 * var(--brzeg));
       margin-bottom: calc(-1 * var(--stopka));
@@ -384,44 +395,14 @@
     #widokDostawy.zSzczegolem,
     #widokSprawy.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr); }
 
-    /* ── SPRAWY bez otwartej sprawy: kolejka · rejestry ──────────────────────
+    /* ── SPRAWY bez otwartej sprawy: sama kolejka ────────────────────────────
        Trzecia geometria tej samej konsoli i jedyna, w której KOLEJKA jest
-       szeroka. Przy otwartej sprawie wąska jest kolejka, bo osią pracy jest
-       sprawa; bez otwartej sprawy osią jest kolejka i to rejestry schodzą do
-       szyny. Do 0.116.0 tego stanu nie było wcale — zakładka była wtedy
-       pionowym stosem dziewięciu kart na dwa ekrany przewijania. */
-    #widokSprawy.zKolejka { grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); }
+       szeroka. Do 0.123.0 obok stała jeszcze szyna rejestrów 352 px — praca
+       magazynu i archiwum wyprowadziły się do własnych pozycji paska bocznego
+       (0.125.0), więc kolejka dostaje CAŁĄ szerokość. Wysokość okna i własne
+       przewijanie zostają: to dalej konsola, nie strona. */
+    #widokSprawy.zKolejka { grid-template-columns: minmax(0, 1fr); }
     #widokSprawy.zKolejka > .card { grid-column: 1; }
-    /* BEZ `grid-row: 1 / span 50`, którym rozpina się kolumnę przy otwartej
-       sprawie. Tam kolumna kolejki bywa stosem kart i strefa obok musi objąć
-       wszystkie jego rzędy; tutaj w kolumnie kolejki stoi DOKŁADNIE jedna
-       karta, a rozpięcie na 50 rzędów dokłada 49 pustych rzędów po kilkanaście
-       pikseli — czyli 800 px przewijania strony pod konsolą, której nie widać,
-       bo jest pusta. Zmierzone, nie wydedukowane. */
-    #widokSprawy.zKolejka > .rejestry {
-      grid-column: 2;
-      position: sticky; top: var(--hChrome, 130px);
-      height: calc(100dvh - var(--hChrome, 130px));
-      overflow: auto; overscroll-behavior: contain;
-      border-left: 1px solid var(--border);
-      background: var(--card);
-      gap: 0;
-    }
-    /* Rejestry w szynie przestają być kartami — szyna JEST jedną taflą, a nie
-       stosem kartek w pudełku. Kreska między nimi zostaje, bo bez niej
-       zwinięte nagłówki zlałyby się w listę bez granic. */
-    #widokSprawy.zKolejka > .rejestry > * {
-      border-radius: 0; box-shadow: none;
-      border-left: 0; border-right: 0; border-bottom: 0;
-      border-top: 1px solid var(--border);
-      margin-top: 0;
-      /* Tabela kosza ma pięć kolumn i nie zwęzi się do 22 rem. Przewija się
-         WŁASNYM przewijaniem poziomym, w swojej sekcji — bez `min-width: 0`
-         rozpychała całą szynę i poziomo jechały wszystkie rejestry naraz,
-         łącznie z tymi, które się mieszczą. */
-      min-width: 0; overflow-x: auto;
-    }
-    #widokSprawy.zKolejka > .rejestry > :first-child { border-top: 0; }
 
     /* Karta klienta bez otwartej sprawy — ta sama tafla na pełne okno, tylko
        jednokolumnowa. Bez tego wejście w klienta wypadało z konsoli z powrotem
@@ -956,87 +937,76 @@
   /* fokus pola = bursztynowa ramka WertisTextField */
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
-  /* ── Zakładki ──────────────────────────────────────────────────────────────
-     Podgląd urósł z dwóch kart do czterech obszarów. Jedna kolumna kart
-     kazałaby biuru przewijać stronę w poszukiwaniu kolejki, a to jest ekran,
-     na który zagląda się w pośpiechu („czy coś się nie zapisało?").
+  /* ── Zakładki w pasku bocznym (0.125.0) ────────────────────────────────────
+     Historia domu: karta pod nagłówkiem (0.74.1) → ciemny nagłówek (0.95.0)
+     → pion po lewej. Mechanizm od 0.74.1 ten sam: `data-widok`, jedna
+     delegacja, jedna pętla `aria-current`.
 
-     Wygląd = TabBar kolektora: biała listwa, zakładka aktywna dostaje
-     bursztynową pigułkę i AmberInk — nie odwrócone kolory. */
-  /* Odstęp MIĘDZY grupami (24 px + kreska + 24 px) jest wielokrotnie większy
-     niż między przyciskami w grupie (4 px). Od 0.76.0 granicę niesie też
-     pionowa kreska: sam odstęp kazał czytać podpisy, żeby wiedzieć, gdzie
-     kończy się jedna grupa. `align-items: flex-start`, żeby grupa o dwóch
-     przyciskach nie rozciągała się do wysokości trzyprzyciskowej. */
-  nav.zakladki { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 4px 10px 6px; box-shadow: var(--cien); }
-  /* Kreska tylko wtedy, gdy grupy stoją w JEDNYM rzędzie. Po zawinięciu
-     zostałaby pionową krechą na początku nowej linii, czyli czymś, co wygląda
-     na błąd renderowania. Poniżej tej szerokości rozdział niesie sam odstęp. */
-  @media (min-width: 760px) {
-    nav.zakladki .grupa + .grupa { border-left: 1px solid var(--border); padding-left: 24px; }
-  }
-  /* Grupa zawija się W CAŁOŚCI: panel bywa otwarty na wąskim oknie obok
-     Subiekta, a podpis, który został sam nad pustym miejscem, byłby gorszy
-     niż brak podpisu. */
+     PODPISY GRUP ZOSTAJĄ — „Praca", „Archiwum" i „Wgląd" to słownik całej
+     przebudowy, a w pionie podpis nad grupą nic nie kosztuje. */
+  nav.zakladki { display: flex; flex-direction: column; gap: 12px; }
   nav.zakladki .grupa { display: flex; flex-direction: column; gap: 2px; }
-  nav.zakladki .grupa-btny { display: flex; gap: 4px; flex-wrap: wrap; }
+  nav.zakladki .grupa-btny { display: flex; flex-direction: column; gap: 2px; }
   nav.zakladki .grupa-nazwa {
-    padding: 0 8px; font: 700 10px var(--font-cond); letter-spacing: 1.2px;
-    text-transform: uppercase; color: var(--ink-mute);
+    padding: 0 8px 2px; font: 700 10px var(--font-cond); letter-spacing: 1.2px;
+    text-transform: uppercase; color: #8B8B92;
   }
-  /* 7/14 zamiast 8/16 — cel kliknięcia zostaje przy 31 px wysokości, a pasek
-     jest teraz przyklejony, więc każdy odzyskany piksel liczy się podwójnie:
-     raz na sobie, drugi raz na wszystkim, co pod nim stoi. */
   nav.zakladki button {
-    background: none; border: 0; border-radius: 999px;
-    padding: 7px 14px; font: 600 14px var(--font-cond); letter-spacing: .5px;
-    color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: 10px;
+    padding: 8px 8px; font: 600 13px var(--font-cond); letter-spacing: .5px;
+    color: #B9B9BD; cursor: pointer;
   }
-  nav.zakladki button:hover { background: var(--paper); }
-  nav.zakladki button[aria-current="true"] { background: var(--amber-bg); color: var(--amber-ink); font-weight: 800; }
-
-  /* ── Ten sam pasek na ciemnym tle (0.95.0) ─────────────────────────────────
-     Zakładki wjechały do nagłówka, więc karta pod nimi znika: tło, ramka,
-     promień i cień były po to, żeby pasek odcinał się od papieru. W ciemnym
-     nagłówku odcina go sam nagłówek.
-
-     Podpis grupy stoi INLINE przed pastylkami — kolumna z 0.74.1 dawała
-     drugi wiersz w nagłówku i zjadała połowę odzyskanego pionu. Zawijanie
-     zostaje sensowne: `.grupa` nadal zawija się w całości, tyle że w poziomie,
-     więc podpis nigdy nie zostaje sam nad pustym miejscem.
-
-     Barwy pastylek są z ciemnego paska, nie z papieru: szary tekst, biel na
-     najechaniu, a bieżąca zakładka PEŁNYM bursztynem z grafitowym napisem —
-     na papierze wystarczała bursztynowa poświata, tutaj zginęłaby w czerni. */
-  header nav.zakladki {
-    background: none; border: 0; border-radius: 0; box-shadow: none;
-    padding: 0; gap: 14px; align-items: center;
+  nav.zakladki button svg {
+    width: 17px; height: 17px; flex: none; fill: none;
+    stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
-  header nav.zakladki .grupa { flex-direction: row; align-items: center; gap: 5px; }
-  header nav.zakladki .grupa-nazwa { padding: 0; color: #8B8B92; }
-  header nav.zakladki button { color: #B9B9BD; }
-  header nav.zakladki button:hover { background: rgba(255, 255, 255, .09); color: #fff; }
-  header nav.zakladki button[aria-current="true"] {
-    background: var(--amber); color: var(--ink); font-weight: 800;
-  }
-  /* Licznik jako PIGUŁKA, nie nawias. „(3)" w ciemnym pasku czyta się jak
-     część nazwy zakładki; pigułka odcina się od niej i mówi „tyle spraw
-     czeka". Pusta, gdy nie ma nic — zero w kółku to szum, nie sygnał.
-     Klasa wspólna, nie id: tę samą pigułkę noszą PYTANIA i ZWROTY. */
-  header nav.zakladki .tabLicznik:not(:empty) {
+  nav.zakladki button .et { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  nav.zakladki button:hover { background: rgba(255, 255, 255, .09); color: #fff; }
+  /* Bieżąca pozycja PEŁNYM bursztynem z grafitowym napisem — poświata z papieru
+     zginęłaby w czerni (lekcja z 0.95.0). */
+  nav.zakladki button[aria-current="true"] { background: var(--amber); color: var(--ink); font-weight: 800; }
+  /* Licznik jako PIGUŁKA na końcu wiersza. Pusta, gdy nie ma nic — zero
+     w kółku to szum, nie sygnał. */
+  nav.zakladki .tabLicznik:not(:empty) {
     display: inline-grid; place-items: center; min-width: 18px; height: 18px;
-    margin-left: 6px; padding: 0 5px; border-radius: 999px;
+    margin-left: auto; padding: 0 5px; border-radius: 999px;
     background: var(--amber); color: var(--ink);
     font: 800 11px/1 var(--font-sans); letter-spacing: 0;
   }
-  header nav.zakladki button[aria-current="true"] .tabLicznik:not(:empty) {
+  nav.zakladki button[aria-current="true"] .tabLicznik:not(:empty) {
     background: var(--ink); color: var(--amber);
   }
+  /* Kropka alarmu przy pozycji — mówi CZY coś czeka, nie ile. */
+  nav.zakladki .kropka { width: 8px; height: 8px; border-radius: 999px;
+                         background: var(--err); margin-left: auto; flex: none; }
+  nav.zakladki button[aria-current="true"] .kropka { background: var(--ink); }
 
-  /* Kreska między grupami musi być widoczna na grafitze — `--border` to barwa
-     papieru i na czerni jest niewidzialna. */
-  @media (min-width: 760px) {
-    header nav.zakladki .grupa + .grupa { border-left-color: #4A4A4E; padding-left: 18px; }
+  /* ── Wąski pasek: same ikony ───────────────────────────────────────────────
+     Poniżej 1280 px (ten sam próg co trzy strefy konsoli — jedna liczba na
+     wszystkie pytania o szerokość) pasek zwęża się do 64 px: podpisy grup
+     i pozycji schodzą, zostaje ikona z `title`, licznik i kropka siadają
+     w rogu ikony. Panel to desktop biura — poniżej 1024 px nic się już nie
+     zmienia, pasek ikon zostaje. */
+  @media (max-width: 1279px) {
+    :root { --bok: 64px; }
+    aside#bok { padding: 14px 8px 12px; }
+    #bok .marka span, nav.zakladki .grupa-nazwa, nav.zakladki .et,
+    #bok .kto, #bok .ikonaStanu .et { display: none; }
+    #bok .marka b { font-size: 15px; letter-spacing: .5px; }
+    nav.zakladki .grupa-btny { align-items: center; }
+    nav.zakladki button { width: 44px; justify-content: center; padding: 10px 0; position: relative; }
+    nav.zakladki .tabLicznik:not(:empty) { position: absolute; top: 1px; right: 1px;
+      margin: 0; min-width: 15px; height: 15px; font-size: 10px; }
+    nav.zakladki .kropka { position: absolute; top: 4px; right: 6px; margin: 0; }
+    nav.zakladki .grupa + .grupa { border-top: 1px solid #4A4A4E; padding-top: 10px; }
+    #bok .sesja { align-items: center; }
+    #bok .sesjaRzad { flex-direction: column; }
+    #wyloguj { flex: none; width: 32px; height: 32px; padding: 0;
+               display: grid; place-items: center; }
+    #wyloguj .et { display: none; }
+    #wyloguj .tylkoIkona { display: block; }
+    #bok .ikonaStanu { padding: 4px 9px; }
   }
 
   /* Pasek stanu stoi NAD treścią i widać go z każdej zakładki — bo pytanie
@@ -1142,92 +1112,101 @@
 </style>
 </head>
 <body>
-<header>
-  <b>WERTIS</b> <span id="podtytul">Podgląd biura</span>
-  <!-- ZAKŁADKI W CIEMNYM PASKU (0.95.0). Do 0.94.0 stały pod nagłówkiem, we
-       własnej białej karcie — trzecie pasmo chromu nad treścią, obok paska
-       stanu. Panel bywa otwarty na laptopie obok Subiekta i ten pion był
-       najdroższą rzeczą na ekranie: kosztował ~55 px NA KAŻDEJ zakładce,
-       zabranych sprawie, którą się właśnie czyta.
+<aside id="bok">
+  <!-- NAWIGACJA BOCZNA (0.125.0). Do 0.123.0 zakładki, marka i sesja stały
+       w górnym pasku 52 px — a zakładek przybywa: rozprężenie SPRAW dodaje
+       MAGAZYN ZWROTÓW i REJESTRY, i w jednym rzędzie przestały się mieścić
+       razem z sesją już przy 1180 px (zawijanie do 93 px, zmierzone przy
+       0.119.1). Pion po lewej ma miejsce na wzrost, a górne 52 px wraca
+       treści: konsole liczą odtąd pełne 100dvh.
 
-       PODPISY GRUP ZOSTAJĄ, i to jest decyzja, nie przeoczenie. Makiety
-       zastępowały je samym separatorem, ale „Praca" i „Wgląd" to słownik
-       całej przebudowy: pierwsza trójka daje trzy strefy z kolejką, druga
-       jedną z paskiem filtrów. Sam separator mówi, że grupy są dwie, i nic
-       poza tym. W ciemnym pasku podpis stoi INLINE przed pastylkami, a nie
-       nad nimi — inaczej nagłówek urósłby o drugi wiersz i oddał połowę
-       tego, po co zakładki tu przyjechały.
+       MECHANIZM NIETKNIĘTY — to przeprowadzka domu, jak 0.95.0 i 0.119.1:
+       te same `data-widok`, ta sama delegacja, ta sama pętla `aria-current`.
+       Poniżej 1280 px pasek zwęża się do samych ikon (podpis w `title`) —
+       ikona bez podpisu wystarcza, bo pozycji jest osiem, nie osiemdziesiąt. -->
+  <div class="marka"><b>WERTIS</b><span id="podtytul">Podgląd biura</span></div>
 
-       Reszta jak w 0.74.1: `data-widok` NIETKNIĘTE, więc obsługa kliknięcia
-       i pętla `aria-current` szukają przycisków po atrybucie, nie po miejscu
-       w drzewie. Rusza się układ, nie mechanizm. -->
   <nav class="zakladki" hidden>
     <div class="grupa">
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
-        <button data-widok="dostawy" aria-current="true">DOSTAWY I REKLAMACJE</button>
-        <!-- Jedna kolejka czterech rejestrów obsługi klienta (0.108.0);
-             od 0.109.0 JEDYNA zakładka tej pracy — ZWROTY ALLEGRO i PYTANIA
-             KLIENTÓW zwinęły się tutaj decyzją właściciela. Pigułka mówi ILE
-             czeka, dymek CZEGO — pytanie klienta i przeterminowana reklamacja
-             czekają jak nieprzeczytana wiadomość. -->
-        <button data-widok="sprawy">SPRAWY <span id="sprawyLicznik" class="tabLicznik"></span></button>
+        <!-- Jedna kolejka czterech rejestrów obsługi klienta (0.108.0). Pigułka
+             mówi ILE czeka — pytanie klienta i przeterminowana reklamacja
+             czekają jak nieprzeczytana wiadomość. SPRAWY stoją PIERWSZE:
+             to jest praca, wokół której panel ewoluuje w system tiketowy. -->
+        <button data-widok="sprawy" title="Sprawy klientów">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="et">SPRAWY</span><span id="sprawyLicznik" class="tabLicznik"></span>
+        </button>
+        <button data-widok="dostawy" aria-current="true" title="Dostawy i reklamacje">
+          <svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <span class="et">DOSTAWY</span>
+        </button>
+        <!-- Praca FIZYCZNA przy zwrotach: brakujące paczki, kosze, pominięte
+             pozycje. Do 0.123.0 stała ściśnięta w szynie 352 px na SPRAWACH —
+             a to robota innej roli niż rozmowa z klientem. Kropka alarmu
+             zamiast pigułki: tu nie liczy się ILE, tylko CZY coś czeka. -->
+        <button data-widok="magazyn" title="Magazyn zwrotów">
+          <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1z"/><path d="M3.3 7.4L12 12l8.7-4.6M12 12v9"/></svg>
+          <span class="et">MAGAZYN ZWROTÓW</span><i class="kropka" id="magazynKropka" hidden></i>
+        </button>
+      </div>
+    </div>
+    <div class="grupa">
+      <span class="grupa-nazwa">Archiwum</span>
+      <div class="grupa-btny">
+        <!-- Cztery rejestry per-typ i konto Allegro. ARCHIWUM, nie praca:
+             wchodzi się tu po zwrot rozliczony albo pytanie wysłane. -->
+        <button data-widok="rejestry" title="Rejestry per-typ i konto Allegro">
+          <svg viewBox="0 0 24 24"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>
+          <span class="et">REJESTRY</span>
+        </button>
       </div>
     </div>
     <div class="grupa">
       <span class="grupa-nazwa">Wgląd</span>
       <div class="grupa-btny">
-        <button data-widok="nadzor">STAN SYSTEMU</button>
-        <button data-widok="dziennik">DZIENNIK</button>
-        <button data-widok="analiza">ANALIZA</button>
+        <button data-widok="analiza" title="Analiza">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          <span class="et">ANALIZA</span>
+        </button>
+        <button data-widok="dziennik" title="Dziennik zdarzeń">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+          <span class="et">DZIENNIK</span>
+        </button>
+        <button data-widok="nadzor" title="Stan systemu">
+          <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 8L9 4l-3 8H2"/></svg>
+          <span class="et">STAN SYSTEMU</span>
+        </button>
       </div>
     </div>
   </nav>
-  <!-- Kto · ustawienia · wyloguj zawijają się RAZEM. Do 0.95.0 każde z nich
-       było osobnym dzieckiem nagłówka z `margin-left:auto` na pierwszym, więc
-       gdy zakładki zajęły cały rząd, „Wyloguj" spadał do drugiego wiersza SAM,
-       zostawiając nad sobą zębatkę. Grupa zawija się w komplecie. -->
-  <div class="sesja">
-    <!-- STAN W GÓRNYM PASKU (0.119.1). Do tej wersji obie ikony i plakietka
-         odpowiedzi stały w osobnym białym pasku pod nagłówkiem — a ten pasek
-         był PUSTY, gdy nie było odpowiedzi na notatki, czyli prawie zawsze.
-         Drugie pasmo chromu kosztowało ~43 px NA KAŻDEJ zakładce, dokładnie
-         tak jak zakładki przed 0.95.0. Tu jest ich miejsce: obok „kto"
-         i „Wyloguj" mieszka to, co dotyczy całej sesji, a nie jednego widoku.
 
-         Ikony zostają tym, czym były w 0.114.0: kolor odpowiada na jedyne
-         pytanie biura („czy coś się dzieje?"), a wszystko, co niósł rząd
-         kafli, jedzie w tooltipie `title`. -->
+  <div class="sesja">
+    <!-- STAN NA DOLE PASKA (0.119.1 → 0.125.0). Kolor odpowiada na jedyne
+         pytanie biura („czy coś się dzieje?"), pełne zdania jadą w `title`.
+         Plakietka odpowiedzi na notatki zostaje OSOBNA: sygnał roboczy
+         z własną drogą (dostawy → karta odpowiedzi), nie zdrowie systemu. -->
     <button class="ikonaStanu" id="ikonaZdrowia" title="Czekam na pierwszy odczyt stanu…" hidden><i></i><span class="et">SYSTEM</span></button>
     <button class="ikonaStanu" id="ikonaAllegro" title="Stan konta Allegro jeszcze nieznany" hidden><i></i><span class="et">ALLEGRO</span></button>
-    <!-- Plakietka-zdarzenie (odpowiedzi na notatki) jedzie tu razem z nimi, ale
-         zostaje OSOBNA: to sygnał roboczy z własną drogą (dostawy → karta
-         odpowiedzi), nie zdrowie systemu — zwinięcie go do ikony zdrowia
-         zgubiłoby tę drogę drugi raz (patrz zgłoszenie z 20 sierpnia w teście
-         „licznik prowadzi do karty"). -->
     <div id="stan"></div>
     <span class="kto" id="kto"></span>
-    <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). Do 0.75.0 DOSTAWCY stali w pasku
-         zakładek jako trzecia grupa — jedna pastylka o tej samej wadze co
-         DOSTAWY, choć biuro wchodzi tam raz na kilka tygodni. Konfiguracja nie
-         jest zakładką pracy, więc idzie tam, gdzie już mieszka to, co dotyczy
-         całej sesji, a nie jednego widoku: obok „kto" i „Wyloguj".
-
-         `data-widok` nie jest tu ozdobą — wpina zębatkę w TEN SAM mechanizm,
-         który obsługuje pasek: jedna delegacja kliknięcia i jedna pętla
-         `aria-current`. Dwie byłyby dwoma miejscami do zapomnienia. -->
-    <button id="ustawienia" class="ikona" data-widok="dostawcy"
-            title="Ustawienia" aria-label="Ustawienia" hidden>
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round"
-           stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-    </button>
-    <button id="wyloguj" hidden>Wyloguj</button>
+    <div class="sesjaRzad">
+      <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). `data-widok` wpina zębatkę w TEN SAM
+           mechanizm co pasek: jedna delegacja, jedna pętla `aria-current`. -->
+      <button id="ustawienia" class="ikona" data-widok="dostawcy"
+              title="Ustawienia" aria-label="Ustawienia" hidden>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+      <button id="wyloguj" hidden><span class="et">Wyloguj</span><svg class="tylkoIkona" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+    </div>
   </div>
-</header>
+</aside>
 <main id="login" class="card">
   <h2>LOGOWANIE</h2>
   <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada admin albo biuro —
@@ -1402,6 +1381,36 @@
          wyszukiwarka klientów — należą do kolejki, nie do rejestru, i dlatego
          przeprowadziły się tutaj. Nic nie zginęło; zmieniło się, co jest
          pierwszym planem. -->
+    <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
+         wzorzec karty KONTO ALLEGRO przy pustym client_id. -->
+    <section class="card pelna" id="pytaniaBaner" hidden>
+      <h2>SZKICE AI</h2>
+      <div id="pytaniaBanerTresc" class="mute"></div>
+    </section>
+
+    <!-- Wklejka STOI POD LISTĄ (0.86.0). Pytanie z poczty jest ścieżką
+         poboczną, a lista pracą główną — na laptopie z jedną kolumną wklejka
+         zsuwała listę pod krawędź ekranu. Nasłuch wklejania siedzi na
+         dokumencie, więc Ctrl+V działa w całej zakładce niezależnie od tego,
+         gdzie stoi karta. -->
+    <section class="card" id="pytaniaWklejkaKarta" hidden>
+      <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ <button class="info"
+        type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:8px">
+      Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
+      wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
+      przepisana treść pytania.
+      </p>
+      </div>
+      <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
+        placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
+      <div style="margin-top:8px">
+        <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
+        <span class="mute" id="pytaniaWklejkaStan"></span>
+      </div>
+    </section>
+
     <section class="card" id="kolejkaSprawKarta">
       <h2>SPRAWY KLIENTÓW <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -1437,6 +1446,11 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M11 8v8M15 8v8M18 8v8"/></svg>
             SKAN ETYKIETY
+          </button>
+          <button class="ikonka" id="narzWklejka" aria-pressed="false" title="Pytanie z poczty — wklej screenshot albo treść">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+            WKLEJKA
           </button>
           <button class="ikonka" id="narzKlient" aria-pressed="false" title="Znajdź klienta po loginie">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1704,175 +1718,153 @@
       </details>
     </section>
 
-    <!-- SZYNA REJESTRÓW (0.116.0) — druga tafla konsoli. Mieszka tu wszystko,
-         co nie jest kolejką: alarmy (szkice AI, brakujące paczki, pominięte
-         pozycje), praca magazynu przy koszach, wklejka z poczty, cztery
-         rejestry per-typ i stan połączenia z Allegro.
+  </div>
 
-         Rejestry są ZWIJANE, bo to archiwum: kolejka pokazuje otwarte sprawy,
-         a tu wchodzi się po zwrot rozliczony, pytanie wysłane albo dyskusję
-         zamkniętą. Zwinięta sekcja nie pyta serwera — ta sama reguła, co przy
-         KONCIE ALLEGRO i wglądzie na zwrotach. -->
-    <div class="pelna rejestry" id="sprawyRejestry">
-
-      <!-- Stan modelu. Bez klucza zakładka ma powiedzieć WPROST, co dopisać —
-           wzorzec karty KONTO ALLEGRO przy pustym client_id. -->
-      <section class="card pelna" id="pytaniaBaner" hidden>
-        <h2>SZKICE AI</h2>
-        <div id="pytaniaBanerTresc" class="mute"></div>
-      </section>
-
-      <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
-           upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
-           tabela „wszystko w porządku" byłaby szumem nad listą zwrotów. -->
-      <section class="card" id="brakujaceKarta" hidden>
-        <h2>BRAKUJĄCE PACZKI <button class="info" type="button"
-          aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-        <div class="objasnienie" hidden>
-          <p class="mute" style="margin-bottom:8px">
-        Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
-        paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
-        w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
-        </p>
-        </div>
-        <table id="brakujaceLista"></table>
-        <div id="brakujaceTicker" style="margin-top:8px;font-size:12px"></div>
-      </section>
-
-      <section class="card" id="pominieteKarta" hidden>
-        <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
-          aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-        <div class="objasnienie" hidden>
-          <p class="mute" style="margin-bottom:8px">
-        Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
-        szukać dalej, reklamować u przewoźnika czy poprawić dokument.
-        Najdłużej czekające są na górze.
-        </p>
-        </div>
-        <table id="pominieteLista"></table>
-      </section>
-
-      <section class="card" id="koszeKarta">
-        <h2>KOSZE ZWROTOWE <button class="info" type="button"
-          aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-        <div class="objasnienie" hidden>
-          <p class="mute" style="margin-bottom:8px">
-        Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
-        jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
-        Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
-        </p>
-        </div>
-        <div class="filtry" style="margin-bottom:10px">
-          <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
-            <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
-        </div>
-        <div id="koszWyniki"></div>
-        <table id="koszeLista"></table>
-        <div id="koszPodglad" style="margin-top:12px"></div>
-      </section>
-
-      <!-- Wklejka STOI POD LISTĄ (0.86.0). Pytanie z poczty jest ścieżką
-           poboczną, a lista pracą główną — na laptopie z jedną kolumną wklejka
-           zsuwała listę pod krawędź ekranu. Nasłuch wklejania siedzi na
-           dokumencie, więc Ctrl+V działa w całej zakładce niezależnie od tego,
-           gdzie stoi karta. -->
-      <section class="card" id="pytaniaWklejkaKarta">
-        <h2>PYTANIE Z POCZTY · WKLEJ SCREENSHOT ALBO TREŚĆ <button class="info"
-          type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-        <div class="objasnienie" hidden>
-          <p class="mute" style="margin-bottom:8px">
-        Wklej obrazek ze schowka (Ctrl+V w dowolnym miejscu tej zakładki) albo
-        wpisz treść pytania niżej. Obrazu NIE zapisujemy — zostaje sama
-        przepisana treść pytania.
-        </p>
-        </div>
-        <textarea id="pytaniaWklejkaTekst" rows="3" style="width:100%"
-          placeholder="np. Czy cewka zapłonowa pasuje do NAC T375?"></textarea>
-        <div style="margin-top:8px">
-          <button class="akcja" id="pytaniaZapytajAi">ZAPYTAJ AI</button>
-          <span class="mute" id="pytaniaWklejkaStan"></span>
-        </div>
-      </section>
-
-      <details class="zwijana" id="zwrotListaKarta">
-        <summary><h2>REJESTR ZWROTÓW</h2><span class="podpis">skan i pobranie w kolejce</span></summary>
+  <!-- ── MAGAZYN ZWROTÓW ─────────────────────────────────────────────────────
+       Praca FIZYCZNA przy zwrotach: paczki, kosze, pominięte pozycje. Do
+       0.123.0 stała ściśnięta w szynie 352 px na SPRAWACH — a to robota innej
+       roli niż rozmowa z klientem: przy koszu stoi się z towarem w ręku, przy
+       kolejce z klawiaturą. Klasyczne karty na papierze (powierzchnia decyzji,
+       nie konsola); alarmowość niesie kropka przy pozycji paska bocznego. -->
+  <div id="widokMagazyn" class="widok" hidden>
+    <!-- Zgłoszenia zwrotu z Allegro, do których paczka nie dojechała mimo
+         upływu progu dni. Karta znika, gdy nie ma o czym mówić — pusta
+         tabela „wszystko w porządku" byłaby szumem nad listą zwrotów. -->
+    <section class="card" id="brakujaceKarta" hidden>
+      <h2>BRAKUJĄCE PACZKI <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
         <p class="mute" style="margin-bottom:8px">
-        Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
-        Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
-        doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
-        </p>
-        <p id="zwrotyPodsumowanie" style="margin-bottom:9px"></p>
+      Czerwone: przewoźnik dostarczył, a u nas nikt tego nie przyjął skanem —
+      paczka leży gdzieś w firmie. Żółte: klient zgłosił zwrot, paczka wciąż
+      w drodze. Sprawy zamknięte w panelu Allegro schodzą z listy same.
+      </p>
+      </div>
+      <table id="brakujaceLista"></table>
+      <div id="brakujaceTicker" style="margin-top:8px;font-size:12px"></div>
+    </section>
 
-        <div class="czipy" id="zwrotyCzipy" style="margin-top:10px">
-          <button class="czip" data-status="nowy" aria-pressed="true">Do oceny</button>
-          <button class="czip" data-status="oceniony" aria-pressed="false">Czeka na środki</button>
-          <button class="czip" data-status="rozliczony" aria-pressed="false">Rozliczone</button>
-          <button class="czip" data-status="" aria-pressed="false">Wszystkie</button>
-        </div>
-        <input class="szukaj" id="zwrotSzukajLista" style="margin-top:8px"
-               placeholder="szukaj: etykieta / login / numer zwrotu">
-        <table id="zwrotLista"></table>
-      </details>
-
-      <details class="zwijana" id="pytaniaListaKarta">
-        <summary><h2>REJESTR PYTAŃ</h2><span class="podpis">wyszukiwarka i pobranie w kolejce</span></summary>
-        <p id="pytaniaPodsumowanie" style="margin-bottom:9px"></p>
-        <!-- Czipy zamiast `<select>`: przy trzech stanach lista możliwości jest
-             krótsza niż jej schowanie. „Wszystkie" niesie też zamknięte
-             i pominięte — osobne czipy dla nich byłyby pięcioma pastylkami na
-             szynę 22 rem. -->
-        <div class="czipy" id="pytaniaCzipy">
-          <button class="czip" data-status="" aria-pressed="true">Do odpowiedzi</button>
-          <button class="czip" data-status="wyslane" aria-pressed="false">Wysłane</button>
-          <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
-        </div>
-        <table id="pytaniaLista" style="margin-top:10px"></table>
-      </details>
-
-      <!-- Dyskusje i reklamacje Allegro — rejestr pracy (0.103.0), a od 0.104.0
-           CAŁA sprawa w aplikacji: OTWÓRZ pokazuje rozmowę z Allegro, szkic
-           pisze model, odpowiedź (z załącznikiem) wysyła się stąd. Kolejka
-           z terminem dla CLAIM, właściciel i notatka zostają jak były. -->
-      <details class="zwijana" id="dyskusjeKarta">
-        <summary><h2>DYSKUSJE I REKLAMACJE ALLEGRO</h2><span class="podpis">pobranie w kolejce</span></summary>
+    <section class="card" id="koszeKarta">
+      <h2>KOSZE ZWROTOWE <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
         <p class="mute" style="margin-bottom:8px">
-        Kliknij OTWÓRZ, żeby przeczytać rozmowę i odpowiedzieć klientowi
-        prosto stąd — szkic przygotuje model, wysyłka idzie do Allegro.
-        Lista pokazuje, które sprawy czekają, kto którą prowadzi i ile dni
-        zostało do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu
-        schodzą z listy przy pobraniu same.
-        </p>
-        <div class="czipy" id="dyskusjeCzipy">
-          <button class="czip" data-status="" aria-pressed="true">Do obsłużenia</button>
-          <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
-          <button class="czip" data-status="w_toku" aria-pressed="false">W toku</button>
-          <button class="czip" data-status="zamknieta" aria-pressed="false">Zamknięte</button>
-          <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
-        </div>
-        <table id="dyskusjeLista" style="margin-top:8px"></table>
-      </details>
+      Otwarty kosz przyjmuje zwroty (skan kodu na karcie zwrotu). Zamknięty
+      jedzie na halę — kolektor prowadzi rozkładanie i sam cofa bufor.
+      Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
+      </p>
+      </div>
+      <div class="filtry" style="margin-bottom:10px">
+        <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
+          <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
+      </div>
+      <div id="koszWyniki"></div>
+      <table id="koszeLista"></table>
+      <div id="koszPodglad" style="margin-top:12px"></div>
+    </section>
 
-      <details class="zwijana" id="reklamacjeKarta">
-        <summary><h2>REKLAMACJE · PRIORYTET WG TERMINU</h2></summary>
+    <section class="card" id="pominieteKarta" hidden>
+      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
         <p class="mute" style="margin-bottom:8px">
-        Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
-        reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
-        </p>
-        <table id="reklamacjeLista"></table>
-      </details>
+      Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
+      szukać dalej, reklamować u przewoźnika czy poprawić dokument.
+      Najdłużej czekające są na górze.
+      </p>
+      </div>
+      <table id="pominieteLista"></table>
+    </section>
+  </div>
 
-      <!-- Konto Allegro ZOSTAJE w zakładce zwrotów, choć trzy karty liczb obok
-           niego pojechały do ANALIZY w 0.99.0. To nie wgląd, tylko stan
-           POŁĄCZENIA: gdy token wygasa, przestaje działać skan i pobieranie
-           zapowiedzi, czyli praca na tej zakładce. Jej miejsce jest przy tej
-           pracy, nie przy liczbach o niej. -->
-      <details class="zwijana" id="kontoAllegroKarta">
-        <summary><h2>KONTO ALLEGRO</h2></summary>
-        <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
-        <div id="allegroAkcje"></div>
-      </details>
+  <!-- ── REJESTRY ────────────────────────────────────────────────────────────
+       Archiwum czterech rejestrów per-typ + stan konta Allegro. Wchodzi się
+       tu po zwrot rozliczony, pytanie wysłane albo dyskusję zamkniętą —
+       kolejka SPRAW pokazuje wyłącznie otwarte. Zwinięta sekcja nie pyta
+       serwera — reguła z KONTA ALLEGRO obowiązuje cały widok. -->
+  <div id="widokRejestry" class="widok" hidden>
+    <section class="card pelna" id="rejestryKarta">
+      <h2>REJESTRY · ARCHIWUM CZTERECH RODZAJÓW SPRAW</h2>
+      <p class="mute">Kolejka na SPRAWACH pokazuje otwarte; tu jest reszta —
+        razem z filtrami per-typ. Pobrania z Allegro mieszkają w kolejce.</p>
+    <details class="zwijana" id="zwrotListaKarta">
+      <summary><h2>REJESTR ZWROTÓW</h2><span class="podpis">skan i pobranie w kolejce</span></summary>
+      <p class="mute" style="margin-bottom:8px">
+      Zeskanuj numer przesyłki z etykiety na paczce (skaner USB kończy
+      Enterem). Aplikacja pyta Allegro o zwrot — także po numerze przewoźnika
+      doręczającego — i zakłada rekord z kupującym, powodem i pozycjami.
+      </p>
+      <p id="zwrotyPodsumowanie" style="margin-bottom:9px"></p>
 
-    </div>
+      <div class="czipy" id="zwrotyCzipy" style="margin-top:10px">
+        <button class="czip" data-status="nowy" aria-pressed="true">Do oceny</button>
+        <button class="czip" data-status="oceniony" aria-pressed="false">Czeka na środki</button>
+        <button class="czip" data-status="rozliczony" aria-pressed="false">Rozliczone</button>
+        <button class="czip" data-status="" aria-pressed="false">Wszystkie</button>
+      </div>
+      <input class="szukaj" id="zwrotSzukajLista" style="margin-top:8px"
+             placeholder="szukaj: etykieta / login / numer zwrotu">
+      <table id="zwrotLista"></table>
+    </details>
+
+    <details class="zwijana" id="pytaniaListaKarta">
+      <summary><h2>REJESTR PYTAŃ</h2><span class="podpis">wyszukiwarka i pobranie w kolejce</span></summary>
+      <p id="pytaniaPodsumowanie" style="margin-bottom:9px"></p>
+      <!-- Czipy zamiast `<select>`: przy trzech stanach lista możliwości jest
+           krótsza niż jej schowanie. „Wszystkie" niesie też zamknięte
+           i pominięte — osobne czipy dla nich byłyby pięcioma pastylkami na
+           szynę 22 rem. -->
+      <div class="czipy" id="pytaniaCzipy">
+        <button class="czip" data-status="" aria-pressed="true">Do odpowiedzi</button>
+        <button class="czip" data-status="wyslane" aria-pressed="false">Wysłane</button>
+        <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
+      </div>
+      <table id="pytaniaLista" style="margin-top:10px"></table>
+    </details>
+
+    <!-- Dyskusje i reklamacje Allegro — rejestr pracy (0.103.0), a od 0.104.0
+         CAŁA sprawa w aplikacji: OTWÓRZ pokazuje rozmowę z Allegro, szkic
+         pisze model, odpowiedź (z załącznikiem) wysyła się stąd. Kolejka
+         z terminem dla CLAIM, właściciel i notatka zostają jak były. -->
+    <details class="zwijana" id="dyskusjeKarta">
+      <summary><h2>DYSKUSJE I REKLAMACJE ALLEGRO</h2><span class="podpis">pobranie w kolejce</span></summary>
+      <p class="mute" style="margin-bottom:8px">
+      Kliknij OTWÓRZ, żeby przeczytać rozmowę i odpowiedzieć klientowi
+      prosto stąd — szkic przygotuje model, wysyłka idzie do Allegro.
+      Lista pokazuje, które sprawy czekają, kto którą prowadzi i ile dni
+      zostało do terminu reklamacji (CLAIM). Sprawy zamknięte w panelu
+      schodzą z listy przy pobraniu same.
+      </p>
+      <div class="czipy" id="dyskusjeCzipy">
+        <button class="czip" data-status="" aria-pressed="true">Do obsłużenia</button>
+        <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
+        <button class="czip" data-status="w_toku" aria-pressed="false">W toku</button>
+        <button class="czip" data-status="zamknieta" aria-pressed="false">Zamknięte</button>
+        <button class="czip" data-status="wszystkie" aria-pressed="false">Wszystkie</button>
+      </div>
+      <table id="dyskusjeLista" style="margin-top:8px"></table>
+    </details>
+
+    <details class="zwijana" id="reklamacjeKarta">
+      <summary><h2>REKLAMACJE · PRIORYTET WG TERMINU</h2></summary>
+      <p class="mute" style="margin-bottom:8px">
+      Zegar liczy od zgłoszenia w Allegro. Po 14 dniach bez odpowiedzi
+      reklamacja jest uznana z mocy prawa — czerwone wiersze są po terminie.
+      </p>
+      <table id="reklamacjeLista"></table>
+    </details>
+
+    <!-- Konto Allegro ZOSTAJE w zakładce zwrotów, choć trzy karty liczb obok
+         niego pojechały do ANALIZY w 0.99.0. To nie wgląd, tylko stan
+         POŁĄCZENIA: gdy token wygasa, przestaje działać skan i pobieranie
+         zapowiedzi, czyli praca na tej zakładce. Jej miejsce jest przy tej
+         pracy, nie przy liczbach o niej. -->
+    <details class="zwijana" id="kontoAllegroKarta">
+      <summary><h2>KONTO ALLEGRO</h2></summary>
+      <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
+      <div id="allegroAkcje"></div>
+    </details>
+    </section>
   </div>
 
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
@@ -2631,6 +2623,8 @@ function pokaz(nowy) {
   zamknijKlienta360();
   $("widokDostawy").hidden = nowy !== "dostawy";
   $("widokSprawy").hidden = nowy !== "sprawy";
+  $("widokMagazyn").hidden = nowy !== "magazyn";
+  $("widokRejestry").hidden = nowy !== "rejestry";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
@@ -2644,6 +2638,11 @@ function pokaz(nowy) {
   /* Praca ze zwrotem ZACZYNA się od zeskanowania etykiety — skaner dostaje
      focus przy wejściu, jak na dawnej zakładce ZWROTY. */
   if (nowy === "sprawy") { odswiezSprawy(); $("zwrotSkan").focus(); }
+  /* Magazyn i rejestry jedzą z tego samego stołu, co dawna szyna: etap 3
+     (kosze, paczki, pominięte, reklamacje) i listy rejestrów. Odświeżenie na
+     wejściu, nie w cyklu — cykl 30 s należy do widoku, na który się patrzy. */
+  if (nowy === "magazyn") odswiezEtap3();
+  if (nowy === "rejestry") { odswiezZwroty(); odswiezPytania(); odswiezEtap3(); }
   if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
@@ -5354,18 +5353,30 @@ function otworzSprawe(rodzaj, id, zwrotId) {
    jedno: dwa pola pod sobą to znów ten sam pas, który schodził z góry. */
 function przelaczNarzedzie(ktore) {
   const pola = { scan: "zwrotSkan", klient: "klienciSzukaj" };
-  const bylo = $(pola[ktore]).hidden === false;
+  const bylo = ktore === "wklejka" ? wklejkaOtwarta : $(pola[ktore]).hidden === false;
+  /* Naraz otwarte jest najwyżej JEDNO narzędzie — dwa pola pod sobą to znów
+     ten sam pas, który schodził z góry kolejki w 0.121.0. Wklejka jest kartą,
+     nie polem, więc jej stan niesie flaga czytana przez rodzeństwo spraw. */
+  wklejkaOtwarta = ktore === "wklejka" && !bylo;
   for (const [k, id] of Object.entries(pola)) {
     const otwarte = k === ktore && !bylo;
     $(id).hidden = !otwarte;
     $(k === "scan" ? "narzScan" : "narzKlient").setAttribute("aria-pressed", String(otwarte));
     if (!otwarte) $(id).value = "";
   }
+  $("narzWklejka").setAttribute("aria-pressed", String(wklejkaOtwarta));
   $("zwrotSkanWynik").innerHTML = "";
   $("klienciWyniki").innerHTML = "";
-  if (!bylo) $(pola[ktore]).focus();
+  ustawRodzenstwoSpraw();
+  if (ktore !== "wklejka" && !bylo) $(pola[ktore]).focus();
+  if (ktore === "wklejka" && wklejkaOtwarta) $("pytaniaWklejkaTekst").focus();
 }
+/* Czy karta wklejki stoi na ekranie. Flaga, nie odczyt `hidden` — `hidden`
+   ustawia też rodzeństwo spraw przy otwieraniu sprawy i odczyt z DOM myliłby
+   „człowiek zamknął" z „sprawa zasłoniła". */
+let wklejkaOtwarta = false;
 $("narzScan").addEventListener("click", () => przelaczNarzedzie("scan"));
+$("narzWklejka").addEventListener("click", () => przelaczNarzedzie("wklejka"));
 $("narzKlient").addEventListener("click", () => przelaczNarzedzie("klient"));
 
 /**
@@ -5689,11 +5700,27 @@ function dociagnijWglad(id) {
 
 /* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
+/* Kropka przy pozycji MAGAZYN ZWROTÓW. Alarmy wyjechały ze SPRAW do własnego
+   widoku (0.125.0) i bez sygnału przy pozycji paska nikt by tam nie zaglądał —
+   dokładnie ta ślepota, przez którą karta odpowiedzi na notatki dostała
+   plakietkę w 0.57.0. Karmią ją renderery (jadą z cyklem etapu 3), więc nie
+   ma osobnego zapytania ani drugiego źródła prawdy. */
+const alarmyMagazynu = { paczki: 0, pominiete: 0 };
+function rysujKropkeMagazynu() {
+  const ile = alarmyMagazynu.paczki + alarmyMagazynu.pominiete;
+  $("magazynKropka").hidden = ile === 0;
+  $("magazynKropka").title = ile
+    ? `${ile} ${odmiana(ile, ["sprawa czeka", "sprawy czekają", "spraw czeka"])} w magazynie zwrotów`
+    : "";
+}
+
 function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
-  /* O tym, czy szyna rejestrów w ogóle stoi na ekranie, decyduje rodzeństwo
-     widoku — tutaj zostaje jedynie własna reguła alarmu: pusty nie istnieje. */
-  karta.hidden = lista.length === 0 || $("sprawyRejestry").hidden;
+  /* Karta mieszka od 0.125.0 w MAGAZYNIE ZWROTÓW — została jej wyłącznie
+     własna reguła alarmu: pusty nie istnieje. */
+  karta.hidden = lista.length === 0;
+  alarmyMagazynu.paczki = lista.length;
+  rysujKropkeMagazynu();
   /* Stan odświeżania statusów — bez tego „status jeszcze niepobrany" nie ma
      ciągu dalszego: nie widać, czy ticker chodzi, czy Allegro odmawia. */
   $("brakujaceTicker").innerHTML = !ticker
@@ -5800,7 +5827,11 @@ function rysujKosze(kosze) {
    sprawa sprzed tygodnia kosztuje więcej niż wczorajsza.                     */
 
 function rysujPominiete(lista) {
-  $("pominieteKarta").hidden = lista.length === 0 || otwartaDyskusja != null;
+  /* Karta mieszka od 0.125.0 w MAGAZYNIE ZWROTÓW — otwarta dyskusja na
+     SPRAWACH nie ma jej już czym zasłaniać. */
+  $("pominieteKarta").hidden = lista.length === 0;
+  alarmyMagazynu.pominiete = lista.length;
+  rysujKropkeMagazynu();
   if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
   /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Zdjęcie zostaje, bo przy
      „czego nie było w koszu" to ono najszybciej mówi, o który towar chodzi. */
@@ -6695,16 +6726,18 @@ function ustawPasmoSzuflady(widokId, sprawaOtwarta) {
    wracało do trzeciej listy i miejsce w kolejce trzeba było znaleźć od nowa. */
 const PRZY_SPRAWIE = ["kolejkaSprawKarta"];
 
-/* Alarmy szyny mają WŁASNĄ regułę pustki, więc muszą stać w pętli osobno —
-   reszta rejestrów siedzi w `sprawyRejestry` i chowa się razem z szyną. */
-const ALARMY_SZYNY = ["pytaniaBaner", "brakujaceKarta", "pominieteKarta"];
+/* Karty z WŁASNĄ regułą widoczności obok kolejki: baner AI pokazuje się,
+   gdy ma treść, wklejka — gdy człowiek otworzy ją ikonką. Szyna rejestrów
+   zniknęła z tego widoku w 0.125.0 (rozprężenie): magazyn i archiwum mają
+   własne pozycje w pasku bocznym. */
+const ALARMY_SZYNY = ["pytaniaBaner", "pytaniaWklejkaKarta"];
 
 /* Wszystkie strefy scalonego widoku SPRAW — jedna lista dla jednego
    rodzeństwa. Id, którego nie ma w znaczniku, wywala `$(id).hidden` na `null`
    i gasi CAŁĄ zakładkę: tak stało się w 0.99.0, gdy trzy karty wglądu
    przejechały do ANALIZY, a ich id zostały tutaj. Lista kończy każde
    przenosiny razem z nimi. */
-const KARTY_SPRAW = ["kolejkaSprawKarta", "sprawyRejestry", ...ALARMY_SZYNY];
+const KARTY_SPRAW = ["kolejkaSprawKarta", ...ALARMY_SZYNY];
 
 /**
  * JEDNO rodzeństwo dla całego widoku SPRAW (0.109.0) — tabela stanów zamiast
@@ -6729,11 +6762,11 @@ function ustawRodzenstwoSpraw() {
   const zostaje = kolejkaZostaje() && (zwrot || pytanie) ? PRZY_SPRAWIE : [];
 
   for (const id of KARTY_SPRAW) {
-    /* Karty z WŁASNĄ regułą pustki — pusta karta jest nagłówkiem bez treści. */
+    /* Karty z WŁASNĄ regułą widoczności — pusta karta jest nagłówkiem bez
+       treści, a wklejka pokazuje się wyłącznie na życzenie (ikonka). */
     const pusta =
       (id === "pytaniaBaner" && $(id).dataset.pusty === "1") ||
-      (id === "brakujaceKarta" && !$("brakujaceLista").innerHTML) ||
-      (id === "pominieteKarta" && !$("pominieteLista").innerHTML);
+      (id === "pytaniaWklejkaKarta" && !wklejkaOtwarta);
     $(id).hidden = pusta || ((wSprawie || klient) && !zostaje.includes(id));
   }
 
@@ -7307,23 +7340,6 @@ async function pollParowania() {
   }
 }
 
-/* ── Wysokość przyklejonego chrome'u ─────────────────────────────────────────
-   Nie jest to kosmetyka: od niej zależy wysokość stref konsoli
-   (`100dvh - --hChrome` w dziewięciu miejscach arkusza) ORAZ
-   `scroll-margin-top` kart, do których prowadzi kliknięcie plakietki
-   i `focus()` po przełączeniu zakładki. Sztywna liczba rozjechałaby się
-   pierwszego dnia — nagłówek zawija się na wąskim oknie.
-
-   Od 0.119.1 pasm chromu jest JEDNO, więc `--hChrome` to po prostu wysokość
-   nagłówka. Zmienna zostaje mimo to i zostaje pod tą nazwą: znaczy „ile chromu
-   stoi nad treścią", a nie „nagłówek plus pasek". Dziewięć reguł konsoli nie
-   musiało się o tej przeprowadzce dowiedzieć — i o to w mierzeniu chodzi.
-   `--hGora` zeszła razem z paskiem: pozycjonowała wyłącznie jego. */
-function mierzChrome() {
-  document.documentElement.style.setProperty(
-    "--hChrome", document.querySelector("header").offsetHeight + "px");
-}
-
 function start() {
   $("login").hidden = true;
   $("panel").hidden = false;
@@ -7352,9 +7368,6 @@ function start() {
     });
   }
   pokaz(widok);
-  /* Po odsłonięciu panelu, bo `offsetHeight` schowanego elementu to zero. */
-  mierzChrome();
-  new ResizeObserver(mierzChrome).observe(document.querySelector("header"));
   odswiezDostawy();
   odswiezStan();
 }
@@ -7419,35 +7432,28 @@ document.addEventListener("click", (e) => {
   blok.hidden = !blok.hidden;
   i.setAttribute("aria-expanded", String(!blok.hidden));
 });
-/* Delegacja z poziomu NAGŁÓWKA, nie z plakietek w środku — plakietki
+/* Delegacja z poziomu PASKA BOCZNEGO, nie z plakietek w środku — plakietki
    przerysowuje co pół minuty `rysujStan`, a nasłuch ma to przeżyć.
 
-   W 0.119.1 ikony wyjechały z `#chrome` do nagłówka i nasłuch wyjechał RAZEM
-   Z NIMI, w tym samym commicie. Zostawiony na `#chrome` byłby szóstą odsłoną
-   tej samej usterki (0.92.0, 0.96.0, 0.97.0, 0.98.0, 0.101.0): SYSTEM i ALLEGRO
-   wyglądałyby normalnie i nie robiłyby nic, a `#chrome` już nie istnieje, więc
-   `$(…)` zwróciłoby `null` i wywaliło CAŁY skrypt przy starcie.
+   Nasłuch przeprowadza się razem z ikonami PO RAZ TRZECI (`#chrome` → nagłówek
+   w 0.119.1 → aside w 0.125.0) i za każdym razem w tym samym commicie co
+   znacznik. Zostawiony w starym domu byłby kolejną odsłoną usterki z 0.92.0,
+   0.96.0, 0.97.0, 0.98.0 i 0.101.0 — tym razem głośną, bo znacznik nagłówka
+   już nie istnieje i `querySelector` oddałby `null`.
 
-   Nagłówek niesie też pasek zakładek z własną delegacją na `[data-widok]`.
-   Dwie delegacje na jednym elemencie żyją obok siebie, bo szukają rozłącznych
-   markerów, a ta kończy się na `[data-do]` — zębatka USTAWIENIA ma `data-widok`
-   i musi trafić do tamtej. */
-document.querySelector("header").addEventListener("click", (e) => {
+   Pasek niesie też zakładki z własną delegacją na `[data-widok]`. Obie żyją
+   obok siebie, bo szukają rozłącznych markerów, a ta kończy się na
+   `[data-do]` — zębatka USTAWIENIA ma `data-widok` i musi trafić do tamtej. */
+$("bok").addEventListener("click", (e) => {
   if (e.target.closest("#ikonaZdrowia")) return pokaz("nadzor");
   if (e.target.closest("#ikonaAllegro")) {
     /* Ikona to drzwi, karta KONTO ALLEGRO — miejsce pracy. Gdy stan woła
        o parowanie, klik od razu je zaczyna: to była cała droga właściciela
        („guzik do połączenia"), a rozpocznij… sam pilnuje podwójnego kliku
        i sam pokaże 403, gdy klika ktoś bez roli admin. */
-    pokaz("sprawy");
-    /* KONTO ALLEGRO mieszka od 0.116.0 w szynie rejestrów, a szyna schodzi
-       z ekranu przy otwartej sprawie. Ikona ma OTWIERAĆ kartę, więc najpierw
-       zamyka sprawę — inaczej klik przełączałby zakładkę i nie pokazywał
-       niczego, co obiecał. */
-    zamknijZwrot();
-    zamknijDyskusje();
-    zamknijPytanie();
-    zamknijKlienta360();
+    /* KONTO ALLEGRO mieszka od 0.125.0 w widoku REJESTRY — ikona prowadzi
+       tam, gdzie karta naprawdę stoi. `pokaz` sam zamyka otwartą sprawę. */
+    pokaz("rejestry");
     const karta = $("kontoAllegroKarta");
     karta.open = true;
     karta.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -9039,8 +9045,9 @@ $("kolejkaSprawKarta").addEventListener("click", (e) => {
     return;
   }
   if (e.target.closest("#blokadaSparuj")) {
-    /* Ta sama droga, co ikona ALLEGRO w nagłówku — jedno wejście do parowania,
+    /* Ta sama droga, co ikona ALLEGRO w pasku — jedno wejście do parowania,
        nie drugie obok istniejącego. */
+    pokaz("rejestry");
     const karta = $("kontoAllegroKarta");
     karta.open = true;
     karta.scrollIntoView({ block: "start", behavior: "smooth" });

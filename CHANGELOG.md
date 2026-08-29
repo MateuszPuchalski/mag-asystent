@@ -33,6 +33,35 @@ historii nie przepisujemy.
 
 ---
 
+## 0.125.0 — 29 sierpnia 2026
+
+**Nawigacja boczna zamiast górnego paska; SPRAWY rozprężone na trzy widoki.**
+Pierwszy etap ewolucji spraw w system tiketowy — mapa całości w nowym
+`docs/architektura-spraw.md`.
+
+**Pasek boczny.** Górny pasek 52 px znika w całości; zakładki, stan SYSTEM
+i ALLEGRO, zębatka i wylogowanie mieszkają w ciemnym pionie po lewej.
+Zakładek zrobiło się siedem i poziomy rząd przestał je mieścić; pion grupuje
+je w Pracę, Archiwum i Wgląd. Konsole liczą odtąd pełne `100dvh` — wysokość
+chromu nad treścią przestała istnieć, więc pomiar `mierzChrome` zszedł.
+Poniżej 1280 px pasek zwęża się do samych ikon z podpisem w dymku.
+
+**SPRAWY = tylko praca agenta.** Zakładka trzymała naraz pracę trzech ról:
+rozmowy z klientami, archiwum rejestrów i fizyczny magazyn zwrotów. Szyna
+boczna znika; kolejka i alarmy stoją na pełnej szerokości. Wklejka z poczty
+została trzecią ikonką narzędzi — to wejście nowej sprawy, nie archiwum.
+
+**MAGAZYN ZWROTÓW** (nowy widok) — praca fizyczna: brakujące paczki, kosze
+zwrotowe, pominięte pozycje. To powierzchnia do czytania i decyzji, więc
+klasyczne karty, nie konsola. Alarmowość nie ginie: gdy coś czeka, pozycja
+w nawigacji dostaje czerwoną kropkę.
+
+**REJESTRY** (nowy widok) — archiwum czterech rejestrów i KONTO ALLEGRO.
+Ikona stanu Allegro i pas „SPARUJ KONTO" prowadzą odtąd tutaj.
+
+Testy-strażnicy nagłówka i zakładek przepisane na pasek boczny w tym samym
+wydaniu — szósta odsłona usterki „delegacja została w starym domu" grozi
+dokładnie przy takiej przeprowadzce.
 ## 0.124.0 — 29 sierpnia 2026
 
 **Pozycja w kartonie schudła o jedną trzecią.** Zgłoszenie właściciela:
