@@ -1660,8 +1660,11 @@ w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
 W kontekście pytania i zwrotu jest zwijana sekcja POWIĄZANE SPRAWY.
-Pokazuje ciąg jednego problemu: to samo zamówienie, potem ten sam login.
+Pokazuje ciąg jednego problemu: ta sama sprawa, potem ten sam login.
 Dane jadą dopiero po rozwinięciu sekcji, jak przy historii klienta.
+Od 0.129.0 przy podpowiedzi „ten sam kupujący" stoi przycisk SCAL, a przy
+sprawie sklejonej ręką — ROZKLEJ. Oba pytają o potwierdzenie i oba zapisują
+się w dzienniku zdarzeń.
 
 Nowe trasy `/api/biuro/sprawy*` wyłącznie czytają. Zapisy zostają przy
 rejestrach źródłowych i ich dotychczasowych trasach. Od 0.109.0 SPRAWY są
@@ -1704,6 +1707,18 @@ Serwer sam skleja zastane rejestry w sprawy i dosypuje pytaniom identyfikator
 kupującego spod maski — bez żadnej czynności ręcznej. Liczby w czipach
 i pigułce SPRAW mogą po tym ZMALEĆ: obiekty jednego zamówienia liczą się
 odtąd raz, jako jeden problem klienta.
+
+**Od 0.129.0 pierwsze pobrania dyskusji trwają dłużej.** POBIERZ DYSKUSJE
+dociąga metadane rozmów — kto mówił ostatni i kiedy — dla otwartych spraw, po
+sto rozmów na przebieg. Przy większym rejestrze pełne pokrycie zbiera się
+przez kilka pobrań, a kolejne biorą najstarsze metadane. To nie jest czynność
+ręczna: wystarczy klikać POBIERZ DYSKUSJE jak dotąd. Do czasu pokrycia część
+dyskusji stoi w kolejce po dzisiejszej regule „odpowiadaliśmy czy nie".
+
+Kolejka SPRAW zmienia po tej aktualizacji układ ogona. Góra zostaje: po
+terminie, termin za mniej niż tydzień, termin ustawowy. Niżej sprawy czekające
+na nas stoją nad sprawami, w których piłka jest u klienta — te ostatnie są
+zwinięte. Nic nie ginie, zmienia się kolejność.
 
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 

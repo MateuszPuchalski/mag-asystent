@@ -14,7 +14,13 @@ import { BladPytania, stempelProwadzi } from "../services/pytania.js";
 import { BladZwrotu, stempelProwadziZwrotu } from "../services/zwroty.js";
 import { stempelProwadziReklamacji } from "../services/reklamacje.js";
 import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
-import { stempelProwadziSprawy, zrodlaSprawy } from "../services/sprawa.js";
+import {
+  BladSprawy,
+  rozklejSprawe,
+  scalSprawy,
+  stempelProwadziSprawy,
+  zrodlaSprawy,
+} from "../services/sprawa.js";
 
 /* ── Sprawy — trasy jednej kolejki obsługi klienta ───────────────────────────
    Prawie wyłącznie ODCZYT: kolejka, licznik na zakładkę, Klient 360
@@ -22,11 +28,11 @@ import { stempelProwadziSprawy, zrodlaSprawy } from "../services/sprawa.js";
    zwroty.ts, dyskusje.ts) — sprawa to widok, nie nowy byt. Bramka biuro|admin
    jak przy dyskusjach: prowadzenie spraw klienckich to robota biura, nie hali.
 
-   JEDEN WYJĄTEK od „wyłącznie odczytu" (0.121.0): przejęcie sprawy. I on też
-   nie łamie reguły, tylko ją potwierdza — trasa NIC nie zapisuje sama, jedynie
-   rozdziela na cztery istniejące stemple przy rejestrach źródłowych. Musi
-   stać tutaj, bo klika się ją Z KOLEJKI, a kolejka nie wie, do którego
-   rejestru należy wiersz — to jest właśnie ta wiedza, którą ten moduł niesie.
+   TRZY WYJĄTKI od „wyłącznie odczytu": przejęcie sprawy (0.121.0) oraz SCAL
+   i ROZKLEJ (0.129.0). Wszystkie trzy mają ten sam powód i żaden nie łamie
+   reguły: klika się je Z KOLEJKI, a tylko ten moduł wie, przez ile rejestrów
+   przechodzi jeden wiersz. Każdy zapis dzieje się po jawnym kliknięciu —
+   nigdy przy samym wejściu na ekran.
 
    Dlaczego w ogóle: przy 168 sprawach w kolejce i kilku osobach w biurze
    kolumna PROWADZI miała myślnik w KAŻDYM wierszu, bo znacznik stawiało
@@ -44,6 +50,8 @@ export async function sprawyRoutes(app: FastifyInstance) {
     }
     return null;
   }
+
+  const autor = (): string => sesjaZadania()?.user.name ?? "?";
 
   /** Zły rodzaj to literówka w kliencie — 400 z listą, nie pusta odpowiedź. */
   function rodzajZapytania(surowy: string | undefined): RodzajSprawy | null | "blad" {
@@ -115,6 +123,51 @@ export async function sprawyRoutes(app: FastifyInstance) {
     }
   );
 
+  // ── Sklejanie ręką człowieka (0.129.0) ────────────────────────────────────
+
+  /* Identyfikatory w CIELE, nie w ścieżce: dwa id tego samego rodzaju w URL-u
+     proszą się o zamianę miejscami, a nazwane pola w JSON-ie tego nie zrobią.
+     Serwis i tak scala pod mniejsze id, ale czytelność żądania to nie
+     drobiazg przy operacji, która łączy dwa problemy klienta w jeden. */
+  app.post<{ Body: { docelowa?: number; dawca?: number } }>(
+    "/api/biuro/sprawy/scal",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const { docelowa, dawca } = req.body ?? {};
+      if (!Number.isInteger(docelowa) || !Number.isInteger(dawca)) {
+        return reply.code(400).send({ error: "Podaj dwa identyfikatory spraw do scalenia" });
+      }
+      try {
+        return { sprawaId: scalSprawy(docelowa as number, dawca as number, autor()) };
+      } catch (e) {
+        if (e instanceof BladSprawy) return reply.code(e.kod).send({ error: e.message });
+        throw e;
+      }
+    }
+  );
+
+  /* ROZKLEJ cofa SCAL w całości: jednostką jest sprawa, tak samo jak przy
+     scalaniu. Rozklejanie po jednym źródle zostawiało sprawy w stanach,
+     których nikt nie zamawiał. */
+  app.post<{ Body: { sprawaId?: number } }>(
+    "/api/biuro/sprawy/rozklej",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const sprawaId = req.body?.sprawaId;
+      if (!Number.isInteger(sprawaId)) {
+        return reply.code(400).send({ error: "Podaj identyfikator sprawy do rozklejenia" });
+      }
+      try {
+        return { sprawaId: rozklejSprawe(sprawaId as number, autor()) };
+      } catch (e) {
+        if (e instanceof BladSprawy) return reply.code(e.kod).send({ error: e.message });
+        throw e;
+      }
+    }
+  );
+
   // ── Przejęcie sprawy ──────────────────────────────────────────────────────
 
   /**
@@ -144,21 +197,20 @@ export async function sprawyRoutes(app: FastifyInstance) {
           error: `Podaj rodzaj (sprawa, ${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy`,
         });
       }
-      const autor = sesjaZadania()?.user.name ?? "?";
       /* Każdy rejestr rzuca SWOIM błędem z własnym kodem HTTP („sprawa
          zamknięta", „nie ma takiej pozycji") — i te kody muszą dojechać do
          kolejki. Bez tego odmowa wyglądałaby na awarię serwera, a klik
          w wierszu po cichu nie robiłby nic. `BladZwrotu` obsługuje też
          reklamacje: `stempelProwadziReklamacji` rzuca właśnie nim. */
       const stempelZrodla = (r: RodzajSprawy, lokalnyId: number) => {
-        if (r === "pytanie") stempelProwadzi(lokalnyId, autor);
-        else if (r === "zwrot") stempelProwadziZwrotu(lokalnyId, autor);
-        else if (r === "dyskusja") stempelProwadziDyskusji(lokalnyId, autor);
-        else stempelProwadziReklamacji(lokalnyId, autor);
+        if (r === "pytanie") stempelProwadzi(lokalnyId, autor());
+        else if (r === "zwrot") stempelProwadziZwrotu(lokalnyId, autor());
+        else if (r === "dyskusja") stempelProwadziDyskusji(lokalnyId, autor());
+        else stempelProwadziReklamacji(lokalnyId, autor());
       };
       try {
         if (surowy === "sprawa") {
-          stempelProwadziSprawy(id, autor);
+          stempelProwadziSprawy(id, autor());
           /* Tylko OTWARTE źródła: rejestr zamknięty odmówiłby stempla,
              a przejęcie żywej części sprawy to nie jest błąd. */
           for (const z of zrodlaSprawy(id).filter((x) => x.otwarte)) {
@@ -176,7 +228,7 @@ export async function sprawyRoutes(app: FastifyInstance) {
         }
         throw e;
       }
-      return { prowadzi: autor };
+      return { prowadzi: autor() };
     }
   );
 }

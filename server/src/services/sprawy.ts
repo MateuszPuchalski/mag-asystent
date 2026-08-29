@@ -3,6 +3,7 @@ import { licznikOtwartych, licznikiPytan, stanSynchronizacjiPytan } from "./pyta
 import { licznikDyskusji, stanSynchronizacjiDyskusji } from "./dyskusje.js";
 import { listaReklamacji, terminReklamacji } from "./reklamacje.js";
 import { mapaZrodel, type WpisMapyZrodel } from "./sprawa.js";
+import { metaHurtem } from "./watek-meta.js";
 
 /* ── Sprawy — cztery rejestry Allegro, jedna kolejka pracy ───────────────────
    Pytania, zwroty, dyskusje i reklamacje to w backendzie osobne obiekty
@@ -22,6 +23,22 @@ import { mapaZrodel, type WpisMapyZrodel } from "./sprawa.js";
 export type RodzajSprawy = "pytanie" | "zwrot" | "dyskusja" | "reklamacja";
 
 export const RODZAJE_SPRAW: RodzajSprawy[] = ["pytanie", "zwrot", "dyskusja", "reklamacja"];
+
+/**
+ * Kto ma wykonać następny ruch (0.129.0) — najważniejszy stan sprawy z zasady
+ * 2 w docs/architektura-spraw.md. Trzy wartości, nie cztery: ŚWIAT
+ * (przewoźnik, Allegro) nie ma dziś producenta danych — tracking czyta się na
+ * żądanie i nigdzie nie zapisuje, a zapowiedzi zwrotów nie są źródłem sprawy.
+ * Dołożenie go później to jedna wartość w unii i jedno pasmo.
+ *
+ * PIŁKA JEST PROJEKCJĄ, nie kolumną: liczy się przy odczycie ze statusów
+ * rejestrów i `watek_meta`, więc nie może się zestarzeć — dokładnie tak samo
+ * jak termin i tytuł sprawy (patrz komentarz przy tabeli `sprawa`).
+ */
+export type Pilka = "my" | "klient" | "nikt";
+
+/** Im mniej, tym pilniej — po tym redukuje się piłka sprawy i sortuje ogon. */
+const RANGA_PILKI: Record<Pilka, number> = { my: 0, klient: 1, nikt: 2 };
 
 export interface Sprawa {
   rodzaj: RodzajSprawy;
@@ -56,6 +73,9 @@ export interface Sprawa {
   odpowiadalismy?: boolean;
   /** Sprawa zamknięta trafia tylko do historii klienta, nigdy do kolejki. */
   otwarta: boolean;
+  /** Kto ma ruch (0.129.0). Pole WYMAGANE — sprawa bez piłki dałaby NaN
+      w sorcie i cichy rozjazd kolejki z pasmami. */
+  pilka: Pilka;
   /** Id encji sprawy (0.128.0); null = pseudo-sprawa, której rekoncyliacja
       jeszcze nie widziała — źródło i tak stoi w kolejce (siatka
       bezpieczeństwa: brak przebudowy nie ma prawa zgubić sprawy). */
@@ -68,14 +88,30 @@ export interface Sprawa {
 
 const wiersz = (r: Record<string, unknown>) => r as Record<string, unknown>;
 
-/** Wspólny sort kolejki: po terminie najpierw, potem termin rosnąco, potem najstarsze. */
+/* ── Wspólny sort kolejki ────────────────────────────────────────────────────
+   Ustawowy termin, potem PIŁKA, na końcu wiek. Pasma w panelu czytają
+   dokładnie te pola i w tej kolejności — inaczej pasmo przeplatałoby wiersze
+   i ekran twierdziłby coś innego, niż pokazuje.                              */
+
+/** Ranga terminowa: po terminie, z biegnącym zegarem, bez zegara. */
+const rangaTerminu = (s: Sprawa) => (s.poTerminie ? 0 : s.dniDoTerminu !== null ? 1 : 2);
+
 function poPilnosci(a: Sprawa, b: Sprawa): number {
-  const aTermin = a.dniDoTerminu !== null;
-  const bTermin = b.dniDoTerminu !== null;
-  if (aTermin && bTermin && a.dniDoTerminu !== b.dniDoTerminu) {
+  /* Ten podział ODTWARZA dotychczasową kolejność — sprawa po terminie ma
+     ujemne `dniDoTerminu`, więc i tak stała pierwsza — tylko nazywa ją
+     wprost, żeby piłka mogła wejść NIŻEJ, a nie zamiast niej. */
+  const ra = rangaTerminu(a);
+  const rb = rangaTerminu(b);
+  if (ra !== rb) return ra - rb;
+  if (ra < 2 && a.dniDoTerminu !== b.dniDoTerminu) {
     return a.dniDoTerminu! - b.dniDoTerminu!;
   }
-  if (aTermin !== bTermin) return aTermin ? -1 : 1;
+  /* Ustawowy termin dalej bije wszystko; piłka rozstrzyga OGON kolejki,
+     w którym dotąd decydował sam wiek. Sprawa czekająca NA NAS idzie przed
+     tą, w której piłka jest u klienta — nawet jeśli tamta jest starsza. */
+  const pa = RANGA_PILKI[a.pilka] ?? 9;
+  const pb = RANGA_PILKI[b.pilka] ?? 9;
+  if (pa !== pb) return pa - pb;
   const aOd = a.kiedy ? Date.parse(a.kiedy) : Infinity;
   const bOd = b.kiedy ? Date.parse(b.kiedy) : Infinity;
   return aOd - bOd;
@@ -113,6 +149,13 @@ function sprawyPytan(gdzie: string, param: unknown[]): Sprawa[] {
       nowaWiadomoscAt: (r.nowa_wiadomosc_at as string) ?? null,
       /* Ta sama para co worklista pytań (services/pytania.ts, listaPytan). */
       otwarta: status === "nowe" || status === "szkic",
+      /* Pytanie otwarte ZAWSZE czeka na nas — i to nie jest domysł:
+         synchronizacja rejestruje wątek tylko wtedy, gdy ostatnie słowo
+         należy do klienta (`ostatniaSeriaKupujacego`). Wysłane pytanie jest
+         sprawą ZAMKNIĘTĄ, a dopisek klienta zakłada nowy wiersz — dlatego
+         nie ma tu stanu „otwarte, ale czeka na klienta". Ma go jako jedyna
+         dyskusja: ona jednym wątkiem toczy się dalej po naszej odpowiedzi. */
+      pilka: (status === "nowe" || status === "szkic" ? "my" : "nikt") as Pilka,
     };
   });
 }
@@ -145,19 +188,50 @@ function sprawyZwrotow(gdzie: string, param: unknown[]): Sprawa[] {
          services/zwroty.ts): `nowy` czeka na ocenę, `oceniony` na zwrot
          środków. Oba są pracą biura, więc oba stoją w kolejce. */
       otwarta: status === "nowy" || status === "oceniony",
+      /* Obie fazy zwrotu to praca NASZA: ocena towaru i oddanie pieniędzy.
+         Klient zrobił swoje, odsyłając paczkę. */
+      pilka: (status === "nowy" || status === "oceniony" ? "my" : "nikt") as Pilka,
     };
   });
+}
+
+/**
+ * Piłka dyskusji — jedyna, która potrzebuje metadanych wątku.
+ *
+ * Głos ALLEGRO (mediator sporu) liczy się jako NASZ ruch: ktoś u nas ma na
+ * to zareagować, a przy niepewności sprawa ma być WIDOCZNA, nie schowana.
+ *
+ * FALLBACK bez metadanych to dokładnie dotychczasowa flaga `odpowiadalismy`,
+ * zawężona do przypadku, w którym naprawdę nie wiemy: dyskusja, której nikt
+ * nie tknął, ląduje w CZEKA NA NAS — czyli tam, gdzie przed 0.129.0 zbierało
+ * ją pasmo „bez potwierdzenia".
+ */
+function pilkaDyskusji(
+  otwarta: boolean,
+  meta: { ostatniGlos: "my" | "klient" | "allegro" | null } | undefined,
+  odpowiadalismy: boolean
+): Pilka {
+  if (!otwarta) return "nikt";
+  const glos = meta?.ostatniGlos ?? null;
+  if (glos === "klient" || glos === "allegro") return "my";
+  if (glos === "my") return "klient";
+  return odpowiadalismy ? "klient" : "my";
 }
 
 function sprawyDyskusji(gdzie: string, param: unknown[]): Sprawa[] {
   const rows = db()
     .prepare(
-      `SELECT id, kupujacy_login, temat, typ, status, order_id, utworzono_allegro,
-              utworzono_at, prowadzi, wyslano_at
+      `SELECT id, allegro_id, kupujacy_login, temat, typ, status, order_id,
+              utworzono_allegro, utworzono_at, prowadzi, wyslano_at
        FROM dyskusja WHERE ${gdzie} ORDER BY id DESC LIMIT 500`
     )
     .all(...(param as never[])) as Array<Record<string, unknown>>;
   const teraz = Date.now();
+  /* Metadane wątków HURTEM, raz na wywołanie — i tylko gdy jest co łączyć:
+     `powiazaneSprawy` woła budowniczych po kilka razy, więc zapytanie na
+     pustej liście byłoby czystym marnotrawstwem. Dyskusja to JEDYNY rejestr,
+     którego własne kolumny nie wiedzą, kto powiedział ostatnie słowo. */
+  const meta = rows.length > 0 ? metaHurtem("dyskusja") : new Map();
   return rows.map((r0) => {
     const r = wiersz(r0);
     const status = (r.status as string) ?? "nowa";
@@ -183,12 +257,13 @@ function sprawyDyskusji(gdzie: string, param: unknown[]): Sprawa[] {
       poTerminie: otwarta && zegar !== null && zegar.dniDoTerminu < 0,
       prowadzi: (r.prowadzi as string) ?? null,
       typ,
-      /* WYŁĄCZNIE nasze wysyłki. Odpowiedź napisana w panelu Allegro nie
-         zostawia tu śladu (rozmowa mieszka w Allegro) — i właśnie dlatego
-         panel nazywa to pasmo „bez potwierdzenia", a nie „nieodpowiedziane". */
+      /* WYŁĄCZNIE nasze wysyłki — odpowiedź napisana w panelu Allegro nie
+         zostawia tu śladu (rozmowa mieszka w Allegro). Od 0.129.0 to już
+         tylko awaryjny trop: piłkę rozstrzygają metadane wątku. */
       odpowiadalismy: (r.wyslano_at as string) != null,
       /* Ta sama para co worklista dyskusji (services/dyskusje.ts). */
       otwarta,
+      pilka: pilkaDyskusji(otwarta, meta.get(r.allegro_id as string), (r.wyslano_at as string) != null),
     };
   });
 }
@@ -225,6 +300,8 @@ function sprawyReklamacji(gdzie: string, param: unknown[]): Sprawa[] {
       prowadzi: (r.rekl_prowadzi as string) ?? null,
       zwrotId: Number(r.zwrot_id),
       otwarta,
+      /* Reklamacja bez werdyktu czeka na nasze rozstrzygnięcie. */
+      pilka: (otwarta ? "my" : "nikt") as Pilka,
     };
   });
 }
@@ -274,6 +351,14 @@ function zgrupujWSprawy(zrodla: Sprawa[]): Sprawa[] {
       kiedy:
         kiedyMs.length > 0 ? new Date(Math.min(...kiedyMs)).toISOString() : wiodace.kiedy,
       otwarta: otwarte.length > 0,
+      /* Piłka sprawy = NAJOSTRZEJSZA piłka jej otwartych źródeł. Sprawa,
+         w której cokolwiek czeka na nas, czeka na nas — zamknięte źródło nie
+         ma prawa jej wyciszyć. Niezmiennik pilnowany testem: `nikt` wtedy
+         i tylko wtedy, gdy sprawa jest zamknięta. */
+      pilka:
+        otwarte.length === 0
+          ? "nikt"
+          : otwarte.map((c) => c.pilka).sort((x, y) => RANGA_PILKI[x] - RANGA_PILKI[y])[0],
       prowadzi: wpis?.prowadzi ?? czlonkowie.map((c) => c.prowadzi).find((p) => p) ?? null,
       sprawaId: wpis?.sprawaId ?? null,
       kupujacyId: wpis?.kupujacyId ?? null,
@@ -411,12 +496,15 @@ export function szukajKlientow(fraza: string, limit = 12): ZnalezionyKlient[] {
  * spraw). Pytania nie mają zamówienia — dołączają wyłącznie po loginie.
  */
 export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
+  /** Id encji sprawy, w której stoi ŹRÓDŁO pytania — panel podaje je jako
+      docelową przy SCAL-u (0.129.0). */
+  sprawaId: number | null;
   zamowienie: Sprawa[];
   klient: Sprawa[];
   kupujacy: Sprawa[];
 } {
   const zrodlo = sprawaZrodlowa(rodzaj, id);
-  if (!zrodlo) return { zamowienie: [], klient: [], kupujacy: [] };
+  if (!zrodlo) return { sprawaId: null, zamowienie: [], klient: [], kupujacy: [] };
 
   const nieJa = (s: Sprawa) => !(s.rodzaj === rodzaj && s.id === id);
   /* Reklamacja jest pozycją swojego zwrotu — nie pokazujemy zwrotu-rodzica
@@ -478,7 +566,7 @@ export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
       .sort(poPilnosci)
       .slice(0, 10);
   }
-  return { zamowienie, klient, kupujacy };
+  return { sprawaId: wpis?.sprawaId ?? null, zamowienie, klient, kupujacy };
 }
 
 /** Jedna sprawa po (rodzaj, id) — punkt zaczepienia dla powiązań. */

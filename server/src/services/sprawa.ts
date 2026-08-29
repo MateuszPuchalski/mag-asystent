@@ -19,6 +19,17 @@ import { logEvent } from "./events.js";
 
 export type RodzajZrodla = "pytanie" | "zwrot" | "dyskusja" | "reklamacja";
 
+/** Awaria pracy ze sprawą; `kod` niesie status HTTP dla trasy. */
+export class BladSprawy extends Error {
+  constructor(
+    message: string,
+    readonly kod = 400
+  ) {
+    super(message);
+    this.name = "BladSprawy";
+  }
+}
+
 /**
  * Liczba spod maski `client:44300444` to buyer.id (dowód: test
  * `normalizujRef` i adapter dev kluczujący wątki po id). Bliźniak SQL-owej
@@ -189,8 +200,11 @@ export function przebudujSprawy(): void {
       sprawyZastane.set(w.id as number, w);
     }
 
-    /* Grupowanie po kluczu. Członkowie ręczni wypadają z grup — ich dom
-       jest już wybrany ręką człowieka. */
+    /* ── FAZA A: grupowanie automatyczne ──────────────────────────────────
+       Członkowie ręczni (SCAL) wypadają z grup — ich dom wybrała ręka
+       człowieka i automat nie ma prawa go rozkleić. Wracają w fazie B,
+       bo denormalizacja sprawy MUSI ich widzieć: sprawa złożona z samych
+       wiązań ręcznych inaczej nie dostałaby ani kupującego, ani zamknięcia. */
     const grupy = new Map<string, Zrodlo[]>();
     for (const z of zrodla) {
       const stan = zastane.get(`${z.rodzaj}:${z.lokalnyId}`);
@@ -210,32 +224,52 @@ export function przebudujSprawy(): void {
     );
 
     const zyweZrodla = new Set<string>();
-    const zyweSprawy = new Set<number>();
+    /* Komplet członków KAŻDEJ żywej sprawy — na tym liczy się denormalizacja
+       w fazie C, dokładnie RAZ na sprawę. Dwa UPDATE-y na tę samą sprawę
+       (grupa automatyczna + osobno ręczni) nadpisałyby ją połową danych. */
+    const czlonkowiePoSprawie = new Map<number, Zrodlo[]>();
+    const domyPoSprawie = new Map<number, Set<number>>();
+    const dopisz = (sprawaId: number, z: Zrodlo, domy: number[]) => {
+      const lista = czlonkowiePoSprawie.get(sprawaId) ?? [];
+      lista.push(z);
+      czlonkowiePoSprawie.set(sprawaId, lista);
+      const zbior = domyPoSprawie.get(sprawaId) ?? new Set<number>();
+      for (const dom of domy) zbior.add(dom);
+      domyPoSprawie.set(sprawaId, zbior);
+      zyweZrodla.add(`${z.rodzaj}:${z.lokalnyId}`);
+    };
 
     for (const czlonkowie of grupy.values()) {
       /* Grupa przejmuje sprawę o NAJMNIEJSZYM id spośród zastanych domów
          członków — stabilność id jest fundamentem pod zdarzenia etapu D. */
-      let sprawaId: number | null = null;
       const domy: number[] = [];
       for (const z of czlonkowie) {
         const stan = zastane.get(`${z.rodzaj}:${z.lokalnyId}`);
         if (stan) domy.push(stan.sprawaId);
       }
-      if (domy.length > 0) sprawaId = Math.min(...domy);
-      if (sprawaId === null) {
-        sprawaId = Number(wstawSprawe.run(teraz).lastInsertRowid);
-      }
-      zyweSprawy.add(sprawaId);
+      const sprawaId =
+        domy.length > 0 ? Math.min(...domy) : Number(wstawSprawe.run(teraz).lastInsertRowid);
 
       for (const z of czlonkowie) {
         wstawZrodlo.run(sprawaId, z.rodzaj, z.lokalnyId, z.allegroId, teraz);
-        zyweZrodla.add(`${z.rodzaj}:${z.lokalnyId}`);
+        dopisz(sprawaId, z, domy);
       }
+    }
 
-      /* Denormalizacja pod szukanie i podpowiedzi. Login: prawdziwy przed
-         maską (maska ma dwukropek). Przy scaleniu `prowadzi` ocala się
-         z wchłanianych spraw — najwcześniejszy stempel wygrywa, bo to on
-         mówi, kto wziął problem pierwszy. */
+    /* ── FAZA B: członkowie ręczni pod swoim zastanym domem ────────────────
+       Bez `wstawZrodlo` — wiersz już wskazuje właściwą sprawę, a przepisanie
+       go z `wiazanie` z powrotem na `auto` skasowałoby decyzję człowieka. */
+    for (const z of zrodla) {
+      const stan = zastane.get(`${z.rodzaj}:${z.lokalnyId}`);
+      if (stan?.wiazanie !== "reczne") continue;
+      dopisz(stan.sprawaId, z, [stan.sprawaId]);
+    }
+
+    /* ── FAZA C: denormalizacja RAZ na sprawę, nad kompletem członków ──── */
+    for (const [sprawaId, czlonkowie] of czlonkowiePoSprawie) {
+      /* Login: prawdziwy przed maską (maska ma dwukropek). Przy scaleniu
+         `prowadzi` ocala się z wchłanianych spraw — najwcześniejszy stempel
+         wygrywa, bo to on mówi, kto wziął problem pierwszy. */
       const kupujacyId = czlonkowie.map((z) => z.kupujacyId).find((v) => v) ?? null;
       const loginy = czlonkowie.map((z) => z.kupujacyLogin).filter((v): v is string => !!v);
       const login = loginy.find((l) => !l.includes(":")) ?? loginy[0] ?? null;
@@ -244,7 +278,7 @@ export function przebudujSprawy(): void {
 
       let prowadzi: string | null = null;
       let prowadziAt: string | null = null;
-      for (const domId of domy) {
+      for (const domId of domyPoSprawie.get(sprawaId) ?? []) {
         const s = sprawyZastane.get(domId);
         const p = (s?.prowadzi as string | null) ?? null;
         const pAt = (s?.prowadzi_at as string | null) ?? null;
@@ -262,15 +296,6 @@ export function przebudujSprawy(): void {
                 zamknieto_at = CASE WHEN ? THEN NULL ELSE COALESCE(zamknieto_at, ?) END
           WHERE id = ?`
       ).run(kupujacyId, login, orderId, prowadzi, prowadziAt, otwarta ? 1 : 0, teraz, sprawaId);
-    }
-
-    /* Ręczne wiązania żyją dalej, o ile ich źródło jeszcze istnieje. */
-    const istniejace = new Set(zrodla.map((z) => `${z.rodzaj}:${z.lokalnyId}`));
-    for (const [klucz, stan] of zastane) {
-      if (stan.wiazanie === "reczne" && istniejace.has(klucz)) {
-        zyweZrodla.add(klucz);
-        zyweSprawy.add(stan.sprawaId);
-      }
     }
 
     /* Sprzątanie: wiązania do skasowanych źródeł i sprawy-sieroty. */
@@ -294,7 +319,7 @@ export interface WpisMapyZrodel {
   prowadzi: string | null;
   prowadziAt: string | null;
   kupujacyId: string | null;
-  zrodla: Array<{ rodzaj: RodzajZrodla; lokalnyId: number }>;
+  zrodla: Array<{ rodzaj: RodzajZrodla; lokalnyId: number; wiazanie: string }>;
 }
 
 /** Mapa „rodzaj:id" → sprawa — dla grupowania w kolejce (services/sprawy.ts). */
@@ -314,11 +339,17 @@ export function mapaZrodel(): Map<string, WpisMapyZrodel> {
   }
   const mapa = new Map<string, WpisMapyZrodel>();
   for (const w of d
-    .prepare("SELECT sprawa_id, rodzaj, lokalny_id FROM sprawa_zrodlo")
+    .prepare("SELECT sprawa_id, rodzaj, lokalny_id, wiazanie FROM sprawa_zrodlo")
     .all() as Array<Record<string, unknown>>) {
     const wpis = sprawy.get(w.sprawa_id as number);
     if (!wpis) continue;
-    wpis.zrodla.push({ rodzaj: w.rodzaj as RodzajZrodla, lokalnyId: w.lokalny_id as number });
+    wpis.zrodla.push({
+      rodzaj: w.rodzaj as RodzajZrodla,
+      lokalnyId: w.lokalny_id as number,
+      /* Panel rysuje ROZKLEJ tylko przy wiązaniach ręcznych — automatu nie
+         ma po co rozklejać, wróciłby w tej samej sekundzie. */
+      wiazanie: w.wiazanie as string,
+    });
     mapa.set(`${w.rodzaj}:${w.lokalny_id}`, wpis);
   }
   return mapa;
@@ -352,4 +383,86 @@ export function stempelProwadziSprawy(sprawaId: number, autor: string): void {
     .run(autor, sprawaId);
   if (zmiana.changes === 0) throw new Error("Nie ma takiej sprawy");
   logEvent("sprawa_prowadzi", autor, null, { sprawaId });
+}
+
+/* ── Sklejanie ręką człowieka: SCAL i ROZKLEJ (0.129.0) ──────────────────────
+   Automat skleja WYŁĄCZNIE po numerze zamówienia, a pytanie zamówienia nie
+   ma — więc podpowiedź „ten sam kupujący" z 0.128.0 wisiała jako sam odczyt,
+   bez sposobu, żeby ją potwierdzić. Te dwie operacje są tym potwierdzeniem
+   i jego cofnięciem. Obie to decyzje człowieka, więc obie logują zdarzenie
+   (inaczej niż sama rekoncyliacja, która jest projekcją).                    */
+
+/**
+ * Scala dwie sprawy w jedną. Docelowa to ZAWSZE mniejsze id — niezależnie od
+ * tego, co przysłał panel: stabilność id sprawy jest fundamentem pod oś czasu
+ * (etap D2), więc scalenie nigdy nie tworzy nowego identyfikatora.
+ *
+ * Źródła dawcy dostają `wiazanie='reczne'`, żeby następna rekoncyliacja ich
+ * nie rozkleiła po własnym kluczu grupy. Docelowa zachowuje swoje wiązania
+ * automatyczne — grupowanie po `order_id` ma u niej działać dalej.
+ */
+export function scalSprawy(a: number, b: number, autor: string): number {
+  if (a === b) throw new BladSprawy("To jest jedna i ta sama sprawa", 409);
+  const d = db();
+  const istnieje = (id: number) =>
+    d.prepare("SELECT 1 AS jest FROM sprawa WHERE id = ?").get(id) !== undefined;
+  if (!istnieje(a) || !istnieje(b)) throw new BladSprawy("Nie ma takiej sprawy", 404);
+
+  const docelowa = Math.min(a, b);
+  const dawca = Math.max(a, b);
+  let zrodel = 0;
+  transaction(d, () => {
+    zrodel = Number(
+      d
+        .prepare(
+          "UPDATE sprawa_zrodlo SET sprawa_id = ?, wiazanie = 'reczne' WHERE sprawa_id = ?"
+        )
+        .run(docelowa, dawca).changes
+    );
+  })();
+  /* Sprawa-dawca zostaje bez źródeł i znika w sprzątaniu rekoncyliacji;
+     denormalizacja docelowej przelicza się nad kompletem członków. */
+  przebudujSprawy();
+  logEvent("sprawa_scalona", autor, null, { docelowa, dawca, zrodel });
+  return docelowa;
+}
+
+/**
+ * Cofa scalenie: wszystkie ręcznie spięte źródła sprawy wracają pod automat.
+ *
+ * Jednostką jest SPRAWA, nie pojedyncze źródło — bo jednostką SCAL-u też jest
+ * sprawa. Rozklejanie po jednym źródle dawało stany, których nikt nie chciał
+ * (zwrot osobno, a dyskusja tego samego zamówienia dalej przy cudzym
+ * pytaniu) i bywało nieodwracalne, gdy rodzeństwo dzieliło klucz grupy.
+ *
+ * Źródła WYPISUJEMY ze sprawy, zamiast tylko przestawiać `wiazanie` na
+ * `auto`: rekoncyliacja trzyma źródło w jego zastanym domu (reguła
+ * „najmniejsze id" chroni stabilność przy sklejaniu), więc sam powrót na
+ * automat nie rozdzieliłby niczego. Skasowane wiersze odtwarza następna
+ * przebudowa — każde źródło trafia tam, gdzie należy wg numeru zamówienia.
+ */
+export function rozklejSprawe(sprawaId: number, autor: string): number {
+  const d = db();
+  const reczne = d
+    .prepare("SELECT rodzaj, lokalny_id FROM sprawa_zrodlo WHERE sprawa_id = ? AND wiazanie = 'reczne'")
+    .all(sprawaId) as Array<{ rodzaj: string; lokalny_id: number }>;
+  if (reczne.length === 0) {
+    const istnieje = d.prepare("SELECT 1 AS jest FROM sprawa WHERE id = ?").get(sprawaId);
+    if (!istnieje) throw new BladSprawy("Nie ma takiej sprawy", 404);
+    throw new BladSprawy(
+      "W tej sprawie nic nie zostało spięte ręką — automat sklei ją tak samo po rozklejeniu",
+      409
+    );
+  }
+  transaction(d, () => {
+    for (const r of reczne) {
+      d.prepare("DELETE FROM sprawa_zrodlo WHERE rodzaj = ? AND lokalny_id = ?").run(
+        r.rodzaj,
+        r.lokalny_id
+      );
+    }
+  })();
+  przebudujSprawy();
+  logEvent("sprawa_rozklejona", autor, null, { sprawaId, zrodel: reczne.length });
+  return sprawaId;
 }

@@ -386,3 +386,61 @@ test("przejęcie rodzajem `sprawa` stempluje encję i wszystkie otwarte źródł
   });
   assert.equal(brak.statusCode, 404, "nieistniejąca sprawa to 404, nie awaria");
 });
+
+test("SCAL i ROZKLEJ: bramka biura, walidacja ciała, konflikt na tej samej sprawie", async () => {
+  const token = zalogowany("biuro");
+  daneSpraw();
+  const kolejka = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
+  });
+  const [a, b] = (kolejka.json().sprawy as Array<{ sprawaId: number }>).map((s) => s.sprawaId);
+
+  /* Bramka: obie trasy zapisują, więc obie są tylko dla biura. */
+  const tokenHali = zalogowany("magazynier");
+  for (const url of ["/api/biuro/sprawy/scal", "/api/biuro/sprawy/rozklej"]) {
+    const bez = await app.inject({ method: "POST", url, payload: {} });
+    assert.equal(bez.statusCode, 401, `${url} bez sesji`);
+    const hala = await app.inject({
+      method: "POST", url, headers: { "x-session": tokenHali }, payload: {},
+    });
+    assert.equal(hala.statusCode, 403, `${url} dla hali`);
+    const puste = await app.inject({
+      method: "POST", url, headers: { "x-session": token }, payload: {},
+    });
+    assert.equal(puste.statusCode, 400, `${url} bez danych to 400 ze zdaniem`);
+  }
+
+  const taSama = await app.inject({
+    method: "POST", url: "/api/biuro/sprawy/scal",
+    headers: { "x-session": token }, payload: { docelowa: a, dawca: a },
+  });
+  assert.equal(taSama.statusCode, 409, "sprawa scalona sama ze sobą to konflikt, nie awaria");
+
+  const scal = await app.inject({
+    method: "POST", url: "/api/biuro/sprawy/scal",
+    headers: { "x-session": token }, payload: { docelowa: a, dawca: b },
+  });
+  assert.equal(scal.statusCode, 200);
+  assert.equal(scal.json().sprawaId, Math.min(a, b), "docelowa to zawsze mniejsze id");
+  const po = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
+  });
+  assert.equal(po.json().sprawy.length, 1, "dwie sprawy zlały się w jedną");
+
+  /* Sprawa, w której nic nie spięto ręką, nie ma czego rozklejać. */
+  const czysta = await app.inject({
+    method: "POST", url: "/api/biuro/sprawy/rozklej",
+    headers: { "x-session": token }, payload: { sprawaId: 999999 },
+  });
+  assert.equal(czysta.statusCode, 404, "nieistniejąca sprawa to 404");
+
+  const rozklej = await app.inject({
+    method: "POST", url: "/api/biuro/sprawy/rozklej",
+    headers: { "x-session": token }, payload: { sprawaId: scal.json().sprawaId },
+  });
+  assert.equal(rozklej.statusCode, 200);
+  const koniec = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
+  });
+  assert.equal(koniec.json().sprawy.length, 2, "rozklejenie cofa scalenie");
+});
