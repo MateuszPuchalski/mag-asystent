@@ -5127,10 +5127,19 @@ function pasmoSprawy(s) {
  * `otworzSprawe`), więc porównuje się po `zwrotId`, nie po własnym id.
  */
 function toOtwartaSprawa(s) {
-  if (s.rodzaj === "pytanie") return s.id === otwartePytanie;
-  if (s.rodzaj === "dyskusja") return s.id === otwartaDyskusja;
-  if (s.rodzaj === "reklamacja") return s.zwrotId != null && s.zwrotId === otwartyZwrot;
-  return s.id === otwartyZwrot;
+  const zrodlo = (r, id, zwrotId) => {
+    if (r === "pytanie") return id === otwartePytanie;
+    if (r === "dyskusja") return id === otwartaDyskusja;
+    if (r === "reklamacja") return zwrotId != null && zwrotId === otwartyZwrot;
+    return id === otwartyZwrot;
+  };
+  /* Sprawa wielźródłowa jest „tą otwartą", gdy KTÓREKOLWIEK jej źródło
+     stoi w szczegółach — wiersz ma się podświetlać niezależnie od tego,
+     którą odsłoną problemu człowiek wszedł. */
+  if (s.zrodla && s.zrodla.length > 1) {
+    return s.zrodla.some((z) => zrodlo(z.rodzaj, z.id, z.rodzaj === "reklamacja" ? s.zwrotId : null));
+  }
+  return zrodlo(s.rodzaj, s.id, s.zwrotId);
 }
 
 /** Wspólne atrybuty wiersza: jeden marker otwierania dla obu wariantów. */
@@ -5146,6 +5155,15 @@ function znacznikiSprawy(s) {
    mniejszości wierszy, uczy oko, że kolumny nic nie niosą. */
 function stopkaSprawy(s) {
   const czesci = [];
+  /* Sprawa wielźródłowa (0.128.0): wiersz stoi za źródło wiodące, a pastylki
+     mówią, co jeszcze się w niej dzieje — zwrot z dyskusją to JEDEN problem
+     klienta, nie dwa wiersze. */
+  if (s.zrodla && s.zrodla.length > 1) {
+    for (const z of s.zrodla) {
+      if (z.rodzaj === s.rodzaj && z.id === s.id) continue;
+      czesci.push(`<span class="badge mute2">+ ${esc(z.rodzaj.toUpperCase())}</span>`);
+    }
+  }
   if (s.nowaWiadomoscAt) czesci.push('<span class="badge amber">KLIENT DOPISAŁ</span>');
   const termin = terminSprawy(s);
   if (termin) czesci.push(termin);
@@ -5159,8 +5177,13 @@ function koniecSprawy(s) {
     return `<span class="prowadzi${s.prowadzi === kto ? "" : " obcy"}"><i></i>${
       esc(s.prowadzi === kto ? "Ty" : s.prowadzi)}</span>`;
   }
-  return `<button class="akcja cichy wezme" data-wez-rodzaj="${s.rodzaj}"
-    data-wez-id="${s.rodzaj === "reklamacja" ? s.id : s.id}">WEZMĘ TO</button>`;
+  /* Sprawa wielźródłowa przejmuje się W CAŁOŚCI (rodzaj `sprawa`): jeden
+     klik stempluje encję i każde otwarte źródło — połowiczne wzięcie
+     zostawiałoby drugą połowę problemu bez nazwiska. */
+  const [rodzajWez, idWez] = s.sprawaId && s.zrodla && s.zrodla.length > 1
+    ? ["sprawa", s.sprawaId] : [s.rodzaj, s.id];
+  return `<button class="akcja cichy wezme" data-wez-rodzaj="${rodzajWez}"
+    data-wez-id="${idWez}">WEZMĘ TO</button>`;
 }
 
 /* Wiersz kolejki na pełnej szerokości. Klika się CAŁY wiersz — kolumna
@@ -5216,7 +5239,9 @@ function wierszeSpraw(lista) {
 
 /** Czipy niosą LICZBY, bo „Dyskusje" bez liczby nie mówi, czy warto tam patrzeć. */
 function rysujCzipySpraw(pelna) {
-  const ile = (r) => pelna.filter((s) => s.rodzaj === r).length;
+  /* Sprawa wielźródłowa liczy się do KAŻDEGO rodzaju, który zawiera —
+     czipy mówią „ile spraw dotyka zwrotów", nie „ile wierszy ma etykietę". */
+  const ile = (r) => pelna.filter((s) => (s.zrodla || [{ rodzaj: s.rodzaj }]).some((z) => z.rodzaj === r)).length;
   const moich = pelna.filter((s) => s.prowadzi === kto).length;
   const czipy = [
     { id: "", nazwa: "Wszystkie", n: pelna.length },
@@ -5237,7 +5262,10 @@ function rysujSprawy(lista) {
   rysujCzipySpraw(lista);
   const widoczne = sprawyFiltr === "moje"
     ? lista.filter((s) => s.prowadzi === kto)
-    : sprawyFiltr ? lista.filter((s) => s.rodzaj === sprawyFiltr) : lista;
+    : sprawyFiltr
+      /* Ten sam predykat co licznik czipa: sprawa wielźródłowa ZAWIERA rodzaj. */
+      ? lista.filter((s) => (s.zrodla || [{ rodzaj: s.rodzaj }]).some((z) => z.rodzaj === sprawyFiltr))
+      : lista;
 
   const wSzynie = kolejkaZostaje() &&
     (otwartyZwrot != null || otwartaDyskusja != null || otwartePytanie != null);
@@ -5533,9 +5561,14 @@ function rysujPowiazane(cel, d) {
   const sekcja = (tytul, lista) => lista.length
     ? `<div class="mute" style="margin:8px 0 4px">${tytul}</div><table>${wierszeSpraw(lista)}</table>`
     : "";
+  /* Podpowiedź po ODMASKOWANYM kupującym (0.128.0): pytania niosą maskę
+     `client:NNN`, więc złączenie po loginie ich nie widzi — a NNN to
+     buyer.id. To jest podpowiedź do obejrzenia, nie sklejenie: scala się
+     dopiero ręką człowieka (SCAL wejdzie w etapie D). */
   $(cel).innerHTML =
     sekcja("TO SAMO ZAMÓWIENIE", d.zamowienie || []) +
-      sekcja("TEN SAM KLIENT — inne otwarte sprawy", d.klient || []) ||
+      sekcja("TEN SAM KLIENT — inne otwarte sprawy", d.klient || []) +
+      sekcja("TEN SAM KUPUJĄCY — podpowiedź spod maski", d.kupujacy || []) ||
     '<p class="mute">Brak powiązanych spraw.</p>';
 }
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { db, transaction } from "./db.js";
 import { config } from "../config.js";
 import { hashSekret } from "../services/users.js";
+import { kupujacyIdZMaski, przebudujSprawy } from "../services/sprawa.js";
 import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
 
 /* ── Seed scenariuszy — dane pod przypadki brzegowe ──────────────────────────
@@ -482,6 +483,10 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.historiaDostaw = historiaDostaw();
     logoDostawcow();
   })();
+
+  /* Nakładka spraw dogania świeżo zasiane rejestry (0.128.0) — poza
+     transakcją seeda, bo rekoncyliacja otwiera własną. */
+  przebudujSprawy();
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
   // i tak by ich nie usunęło. Kolejność (baza, potem pliki) jest bezpieczniejsza:
@@ -1539,12 +1544,12 @@ function przyjeciaDemo(): number {
 function pytaniaDemo(): number {
   const d = db();
   const wstaw = d.prepare(
-    `INSERT INTO pytanie(zrodlo, thread_id, wiadomosc_id, kupujacy_login,
+    `INSERT INTO pytanie(zrodlo, thread_id, wiadomosc_id, kupujacy_login, kupujacy_id,
                          oferta_id, oferta_tytul, tresc, otrzymano_at, status,
                          szkic_ai, szkic_at, odpowiedz, wyslano_at, odpowiedzial,
                          edytowano, kategoria, urzadzenie, produkty_json,
                          w_ofercie, utworzono_at, utworzono_przez, prowadzi, prowadzi_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   );
 
   /* `wiadomosc_id` z przedrostkiem `dev-msg-` — po nim kasuje je `wyczysc()`,
@@ -1657,11 +1662,24 @@ function pytaniaDemo(): number {
       produkty: [], wOfercie: 0,
       prowadzi: null, wyslaneMinut: -59_940, odpowiedzial: "Jan Kowalski",
     },
+    {
+      /* Para do PODPOWIEDZI „ten sam kupujący" (0.128.0): maska 44300001 to
+         jan_wraca — kupujący zwrotu dev-ret-1 z adaptera dev. Pytanie nie ma
+         zamówienia, więc NIE sklei się automatem — ma się tylko podpowiedzieć
+         przy jego zwrocie i dyskusji. */
+      msg: "dev-msg-0010", login: "client:44300001", minut: -900,
+      oferta: "ŚRUBA MOCUJĄCA ZESTAW MONTAŻOWY",
+      tresc: "Dzień dobry, w zestawie zabrakło śruby mocującej — czy mogą Państwo dosłać?",
+      status: "nowe", szkic: null, odpowiedz: null, edytowano: 0,
+      kategoria: null, urzadzenie: null,
+      produkty: [], wOfercie: null, prowadzi: null,
+    },
   ];
 
   for (const p of pytania) {
     wstaw.run(
       "allegro", `dev-thread-${p.msg.slice(-4)}`, p.msg, p.login,
+      kupujacyIdZMaski(p.login),
       null, p.oferta, p.tresc, chwila(p.minut), p.status,
       p.szkic, p.szkic ? chwila(p.minut + 2) : null,
       p.odpowiedz,

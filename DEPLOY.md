@@ -1699,6 +1699,12 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Od 0.128.0 pierwsze uruchomienie po aktualizacji dogania nakładkę spraw.**
+Serwer sam skleja zastane rejestry w sprawy i dosypuje pytaniom identyfikator
+kupującego spod maski — bez żadnej czynności ręcznej. Liczby w czipach
+i pigułce SPRAW mogą po tym ZMALEĆ: obiekty jednego zamówienia liczą się
+odtąd raz, jako jeden problem klienta.
+
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 
   ```bash

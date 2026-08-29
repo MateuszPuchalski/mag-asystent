@@ -2,6 +2,7 @@ import { db } from "../db/db.js";
 import { licznikOtwartych, licznikiPytan, stanSynchronizacjiPytan } from "./pytania.js";
 import { licznikDyskusji, stanSynchronizacjiDyskusji } from "./dyskusje.js";
 import { listaReklamacji, terminReklamacji } from "./reklamacje.js";
+import { mapaZrodel, type WpisMapyZrodel } from "./sprawa.js";
 
 /* ── Sprawy — cztery rejestry Allegro, jedna kolejka pracy ───────────────────
    Pytania, zwroty, dyskusje i reklamacje to w backendzie osobne obiekty
@@ -55,6 +56,14 @@ export interface Sprawa {
   odpowiadalismy?: boolean;
   /** Sprawa zamknięta trafia tylko do historii klienta, nigdy do kolejki. */
   otwarta: boolean;
+  /** Id encji sprawy (0.128.0); null = pseudo-sprawa, której rekoncyliacja
+      jeszcze nie widziała — źródło i tak stoi w kolejce (siatka
+      bezpieczeństwa: brak przebudowy nie ma prawa zgubić sprawy). */
+  sprawaId?: number | null;
+  /** Wszystkie źródła sprawy — plakietki w wierszu i stemple przejęcia. */
+  zrodla?: Array<{ rodzaj: RodzajSprawy; id: number; otwarte: boolean }>;
+  /** Odmaskowany identyfikator kupującego — nośnik podpowiedzi powiązań. */
+  kupujacyId?: string | null;
 }
 
 const wiersz = (r: Record<string, unknown>) => r as Record<string, unknown>;
@@ -221,18 +230,81 @@ function sprawyReklamacji(gdzie: string, param: unknown[]): Sprawa[] {
 }
 
 /**
- * Kolejka spraw: wszystkie OTWARTE sprawy czterech rejestrów, po pilności.
- * `rodzaj` zawęża do jednego typu (chipy filtra w kolejce).
+ * Grupowanie źródeł w sprawy (0.128.0). Wiersz kolejki to odtąd SPRAWA:
+ * `rodzaj`/`id` wskazują źródło WIODĄCE (najpilniejsze otwarte wg tego
+ * samego sortu co kolejka; w historii — najświeższe), więc panel otwiera
+ * i przejmuje sprawę dokładnie tak, jak dotąd otwierał źródło. Projekcja
+ * pilności liczy się z rejestrów przy każdym odczycie — nie może się
+ * zestarzeć. Źródło spoza `sprawa_zrodlo` zostaje pseudo-sprawą.
+ */
+function zgrupujWSprawy(zrodla: Sprawa[]): Sprawa[] {
+  const mapa = mapaZrodel();
+  const grupy = new Map<string, { wpis: WpisMapyZrodel | null; czlonkowie: Sprawa[] }>();
+  for (const z of zrodla) {
+    const wpis = mapa.get(`${z.rodzaj}:${z.id}`) ?? null;
+    const klucz = wpis ? `s:${wpis.sprawaId}` : `p:${z.rodzaj}:${z.id}`;
+    const g = grupy.get(klucz) ?? { wpis, czlonkowie: [] };
+    g.czlonkowie.push(z);
+    grupy.set(klucz, g);
+  }
+
+  const wynik: Sprawa[] = [];
+  for (const { wpis, czlonkowie } of grupy.values()) {
+    czlonkowie.sort(poPilnosci);
+    const otwarte = czlonkowie.filter((c) => c.otwarta);
+    /* Wiodące: najpilniejsze otwarte; sprawa bez otwartych (historia) —
+       najświeższe, bo tak czyta się kartotekę. */
+    const wiodace =
+      otwarte[0] ??
+      [...czlonkowie].sort(
+        (a, b) => (b.kiedy ? Date.parse(b.kiedy) : 0) - (a.kiedy ? Date.parse(a.kiedy) : 0)
+      )[0];
+    const terminy = otwarte
+      .map((c) => c.dniDoTerminu)
+      .filter((v): v is number => v !== null);
+    const kiedyMs = czlonkowie
+      .map((c) => (c.kiedy ? Date.parse(c.kiedy) : NaN))
+      .filter((v) => !Number.isNaN(v));
+    wynik.push({
+      ...wiodace,
+      /* Termin: najostrzejszy z otwartych źródeł. Początek: najstarsze
+         źródło — sprawa zaczyna się pierwszym głosem klienta. */
+      dniDoTerminu: terminy.length > 0 ? Math.min(...terminy) : wiodace.dniDoTerminu,
+      poTerminie: otwarte.some((c) => c.poTerminie) || wiodace.poTerminie,
+      kiedy:
+        kiedyMs.length > 0 ? new Date(Math.min(...kiedyMs)).toISOString() : wiodace.kiedy,
+      otwarta: otwarte.length > 0,
+      prowadzi: wpis?.prowadzi ?? czlonkowie.map((c) => c.prowadzi).find((p) => p) ?? null,
+      sprawaId: wpis?.sprawaId ?? null,
+      kupujacyId: wpis?.kupujacyId ?? null,
+      zrodla: czlonkowie.map((c) => ({ rodzaj: c.rodzaj, id: c.id, otwarte: c.otwarta })),
+    });
+  }
+  return wynik;
+}
+
+/** Wszystkie OTWARTE źródła czterech rejestrów — surowiec grupowania. */
+function otwarteZrodla(): Sprawa[] {
+  return [
+    ...sprawyPytan("status IN ('nowe','szkic')", []),
+    ...sprawyZwrotow("status IN ('nowy','oceniony')", []),
+    ...sprawyDyskusji("status IN ('nowa','w_toku')", []),
+    ...sprawyReklamacji("p.rekl_wynik IS NULL", []),
+  ];
+}
+
+/**
+ * Kolejka spraw: wszystkie OTWARTE sprawy, po pilności. Od 0.128.0 wiersz
+ * to sprawa (grupowanie po order_id przez sprawa_zrodlo), więc filtr
+ * `rodzaj` znaczy „sprawy ZAWIERAJĄCE źródło tego rodzaju" — a źródła
+ * zbieramy zawsze wszystkie, bo grupa przycięta filtrem byłaby kłamstwem.
  */
 export function listaSpraw(rodzaj?: RodzajSprawy): Sprawa[] {
-  const chce = (r: RodzajSprawy) => !rodzaj || rodzaj === r;
-  const sprawy: Sprawa[] = [
-    ...(chce("pytanie") ? sprawyPytan("status IN ('nowe','szkic')", []) : []),
-    ...(chce("zwrot") ? sprawyZwrotow("status IN ('nowy','oceniony')", []) : []),
-    ...(chce("dyskusja") ? sprawyDyskusji("status IN ('nowa','w_toku')", []) : []),
-    ...(chce("reklamacja") ? sprawyReklamacji("p.rekl_wynik IS NULL", []) : []),
-  ];
-  return sprawy.sort(poPilnosci);
+  const sprawy = zgrupujWSprawy(otwarteZrodla());
+  const przefiltrowane = rodzaj
+    ? sprawy.filter((s) => s.zrodla!.some((z) => z.rodzaj === rodzaj))
+    : sprawy;
+  return przefiltrowane.sort(poPilnosci);
 }
 
 /**
@@ -244,12 +316,14 @@ export function sprawyKlienta(login: string | null): { aktywne: Sprawa[]; histor
   const [gdzie, gdzieZ, gdzieR, param] = login
     ? ["kupujacy_login = ?", "kupujacy_login = ?", "z.kupujacy_login = ?", [login]]
     : ["kupujacy_login IS NULL", "kupujacy_login IS NULL", "z.kupujacy_login IS NULL", []];
-  const wszystkie = [
+  /* Grupowanie PRZED podziałem na aktywne/historię: sprawa z jednym źródłem
+     otwartym i drugim zamkniętym jest JEDNĄ aktywną sprawą, nie parą. */
+  const wszystkie = zgrupujWSprawy([
     ...sprawyPytan(gdzie, param),
     ...sprawyZwrotow(gdzieZ, param),
     ...sprawyDyskusji(gdzie, param),
     ...sprawyReklamacji(gdzieR, param),
-  ];
+  ]);
   const aktywne = wszystkie.filter((s) => s.otwarta).sort(poPilnosci);
   /* Historia od najnowszej — czytana jak kartoteka, nie jak kolejka. */
   const historia = wszystkie
@@ -295,12 +369,15 @@ export function szukajKlientow(fraza: string, limit = 12): ZnalezionyKlient[] {
   const szukane = fraza.trim();
   if (szukane.length < MIN_ZNAKOW_KLIENTA) return [];
   const wzor = `%${szukane}%`;
-  const wszystkie = [
+  /* Od 0.128.0 `otwartych`/`wszystkich` liczą SPRAWY, nie obiekty rejestrów:
+     zwrot i dyskusja jednego zamówienia to dla klienta jedna sprawa, a licznik
+     w wynikach ma mówić jego językiem. */
+  const wszystkie = zgrupujWSprawy([
     ...sprawyPytan("kupujacy_login LIKE ?", [wzor]),
     ...sprawyZwrotow("kupujacy_login LIKE ?", [wzor]),
     ...sprawyDyskusji("kupujacy_login LIKE ?", [wzor]),
     ...sprawyReklamacji("z.kupujacy_login LIKE ?", [wzor]),
-  ];
+  ]);
 
   const wg = new Map<string, ZnalezionyKlient>();
   for (const s of wszystkie) {
@@ -336,9 +413,10 @@ export function szukajKlientow(fraza: string, limit = 12): ZnalezionyKlient[] {
 export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
   zamowienie: Sprawa[];
   klient: Sprawa[];
+  kupujacy: Sprawa[];
 } {
   const zrodlo = sprawaZrodlowa(rodzaj, id);
-  if (!zrodlo) return { zamowienie: [], klient: [] };
+  if (!zrodlo) return { zamowienie: [], klient: [], kupujacy: [] };
 
   const nieJa = (s: Sprawa) => !(s.rodzaj === rodzaj && s.id === id);
   /* Reklamacja jest pozycją swojego zwrotu — nie pokazujemy zwrotu-rodzica
@@ -346,8 +424,21 @@ export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
   const nieRodzic = (s: Sprawa) =>
     !(rodzaj === "reklamacja" && s.rodzaj === "zwrot" && s.id === zrodlo.zwrotId);
 
+  /* „To samo zamówienie" czyta odtąd sprawa_zrodlo zamiast powtarzać
+     SELECT-y po order_id — po Etapie C to jest wprost lista pozostałych
+     źródeł TEJ SAMEJ sprawy. Fallback po order_id zostaje dla źródła,
+     którego rekoncyliacja jeszcze nie widziała. */
+  const wpis = mapaZrodel().get(`${rodzaj}:${id}`);
   let zamowienie: Sprawa[] = [];
-  if (zrodlo.orderId) {
+  if (wpis) {
+    zamowienie = wpis.zrodla
+      .filter((z) => !(z.rodzaj === rodzaj && z.lokalnyId === id))
+      .map((z) => sprawaZrodlowa(z.rodzaj, z.lokalnyId))
+      .filter((s): s is Sprawa => s !== null)
+      .filter(nieRodzic)
+      .sort(poPilnosci)
+      .slice(0, 10);
+  } else if (zrodlo.orderId) {
     zamowienie = [
       ...sprawyZwrotow("allegro_order_id = ?", [zrodlo.orderId]),
       ...sprawyDyskusji("order_id = ?", [zrodlo.orderId]),
@@ -360,8 +451,8 @@ export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
   }
 
   let klient: Sprawa[] = [];
+  const zZamowienia = new Set(zamowienie.map((s) => `${s.rodzaj}:${s.id}`));
   if (zrodlo.klient) {
-    const zZamowienia = new Set(zamowienie.map((s) => `${s.rodzaj}:${s.id}`));
     const { aktywne } = sprawyKlienta(zrodlo.klient);
     klient = aktywne
       .filter(nieJa)
@@ -369,7 +460,25 @@ export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
       .filter((s) => !zZamowienia.has(`${s.rodzaj}:${s.id}`))
       .slice(0, 10);
   }
-  return { zamowienie, klient };
+
+  /* PODPOWIEDŹ po odmaskowanym kupującym (0.128.0) — sam ODCZYT, nigdy
+     sklejenie: pytanie spod maski `client:NNN` nie spotka zwrotu po loginie,
+     ale NNN to buyer.id, więc tu wypływają sprawy, których złączenie po
+     loginie nigdy nie widziało. SCAL jednym klikiem wejdzie w etapie D. */
+  let kupujacy: Sprawa[] = [];
+  const mojeId = wpis?.kupujacyId ?? null;
+  if (mojeId) {
+    const zLoginu = new Set(klient.map((s) => `${s.rodzaj}:${s.id}`));
+    kupujacy = zgrupujWSprawy(otwarteZrodla())
+      .filter((s) => s.kupujacyId === mojeId)
+      .filter((s) => s.sprawaId !== wpis!.sprawaId)
+      .filter(nieJa)
+      .filter((s) => !zZamowienia.has(`${s.rodzaj}:${s.id}`))
+      .filter((s) => !zLoginu.has(`${s.rodzaj}:${s.id}`))
+      .sort(poPilnosci)
+      .slice(0, 10);
+  }
+  return { zamowienie, klient, kupujacy };
 }
 
 /** Jedna sprawa po (rodzaj, id) — punkt zaczepienia dla powiązań. */
@@ -417,8 +526,10 @@ export function licznikSpraw(): LicznikSpraw {
   const poTerminie =
     dysk.claimyPoTerminie + reklamacje.filter((r) => r.poTerminie).length;
   return {
-    otwartych:
-      licznikOtwartych() + zwroty.n + dysk.nowe + dysk.wToku + reklamacje.length,
+    /* Od 0.128.0 pigułka liczy SPRAWY tym samym grupowaniem co kolejka —
+       zgodność z konstrukcji, jak przy wyszukiwarce. Liczniki per-typ niżej
+       zostają obiektami rejestrów: karty per-typ mówią o obiektach. */
+    otwartych: listaSpraw().length,
     pytaniaOtwarte: licznikOtwartych(),
     pytaniaNowe: pyt.nowe,
     szkice: pyt.szkice,

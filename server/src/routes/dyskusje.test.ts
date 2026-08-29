@@ -28,7 +28,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dyskusja", "zwrot", "events", "device_session", "app_user"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "dyskusja", "zwrot", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });

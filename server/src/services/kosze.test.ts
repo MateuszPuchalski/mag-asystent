@@ -30,7 +30,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of [
+  for (const t of ["sprawa_zrodlo", "sprawa", 
     "kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "kosz",
     "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sgt_stan", "sgt_magazyn",
     "sfera_queue",

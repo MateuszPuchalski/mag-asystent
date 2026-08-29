@@ -33,6 +33,35 @@ historii nie przepisujemy.
 
 ---
 
+## 0.128.0 — 29 sierpnia 2026
+
+**Kolejka pokazuje SPRAWY, nie obiekty Allegro.** Etap C z mapy
+w `docs/architektura-spraw.md`: jednostką pracy jest problem klienta.
+
+**Encja sprawy.** Nowe tabele `sprawa` i `sprawa_zrodlo` sklejają obiekty
+rejestrów w problemy klientów — automatycznie WYŁĄCZNIE po numerze
+zamówienia. Zwrot, dyskusja i reklamacja jednego zamówienia to odtąd JEDEN
+wiersz kolejki z pastylkami pozostałych źródeł. Pytanie nie ma zamówienia,
+więc zostaje osobną sprawą. Tabele utrzymuje idempotentna rekoncyliacja
+wołana przy mutacjach; przy pierwszym starcie po aktualizacji nakładka
+dogania zastane rejestry sama.
+
+**Liczby w czipach i pigułce MALEJĄ po sklejeniu — to cel, nie usterka.**
+Trzy obiekty jednego zamówienia liczyły się potrójnie; teraz liczą się raz,
+bo tyle jest problemów do rozwiązania. Karty per-typ dalej mówią o obiektach.
+
+**WEZMĘ TO bierze całą sprawę.** Przejęcie wiersza wielźródłowego stempluje
+prowadzącego na sprawie i na KAŻDYM otwartym źródle naraz — połowiczne
+wzięcie zostawiałoby drugą połowę problemu bez nazwiska.
+
+**Odmaskowanie kupującego przy pytaniach.** Centrum wiadomości oddaje
+rozmówcę jako `client:44300444`, więc pytanie nigdy nie spotykało zwrotów
+tego klienta po loginie. Liczba spod maski to identyfikator kupującego —
+nowa kolumna trzyma ją osobno, a jednorazowa migracja dosypuje ją do
+zastanych pytań. W powiązaniach sprawy pojawia się sekcja „TEN SAM
+KUPUJĄCY — podpowiedź spod maski": sam odczyt do obejrzenia, sklejenie
+jednym klikiem (SCAL) wejdzie w etapie D.
+
 ## 0.127.0 — 29 sierpnia 2026
 
 **Uszczelnienie wjazdu spraw: pełna lista dyskusji, czyste polskie znaki,

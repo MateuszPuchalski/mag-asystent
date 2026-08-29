@@ -886,6 +886,12 @@ CREATE TABLE IF NOT EXISTS pytanie (
   -- w kolumnie UNIQUE.
   wiadomosc_id   TEXT UNIQUE,
   kupujacy_login TEXT,
+  -- Odmaskowany identyfikator kupującego (0.128.0). Centrum wiadomości daje
+  -- rozmówcę jako `client:44300444` — po samym loginie pytanie nigdy nie
+  -- spotka zwrotu tego klienta. Liczba spod maski to buyer.id (dowód: test
+  -- normalizujRef i adapter dev), więc trzymamy ją osobno i po niej
+  -- podpowiadamy powiązania. NULL = wklejka albo prawdziwy login.
+  kupujacy_id    TEXT,
   oferta_id      TEXT,                 -- kontekst wątku, gdy Allegro go podaje
   oferta_tytul   TEXT,
   tresc          TEXT,                 -- pytanie: snapshot z wątku albo transkrypcja ze screenshota
@@ -1039,3 +1045,45 @@ CREATE TABLE IF NOT EXISTS watek_meta (
   aktualizowano_at   TEXT NOT NULL,
   UNIQUE (rodzaj, allegro_id)        -- klucz upsertu
 );
+
+-- ── Sprawa — problem klienta ponad rejestrami (0.128.0) ─────────────────────
+-- Jednostką pracy jest problem klienta, nie obiekt Allegro (zasada 1 z
+-- docs/architektura-spraw.md). Klient pisze o brakującej śrubie, zakłada
+-- dyskusję i odsyła paczkę — trzy obiekty, jeden problem. Sprawa je skleja;
+-- rejestry per-typ ZOSTAJĄ nośnikami mechaniki (kosze, werdykty, wysyłki).
+-- Sklejanie automatyczne WYŁĄCZNIE po order_id; po samym kupującym system
+-- tylko PODPOWIADA (klika człowiek — SCAL wejdzie w etapie D).
+-- Piłka, termin i tytuł ŚWIADOMIE nie są kolumnami: pilność i tytuł liczy
+-- projekcja przy odczycie z rejestrów (nie może się zestarzeć), a piłka
+-- czeka na sprawa_zdarzenie (etap D). Tabelę utrzymuje idempotentna
+-- rekoncyliacja wołana z mutacji — nigdy z samego patrzenia.
+CREATE TABLE IF NOT EXISTS sprawa (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  kupujacy_id    TEXT,       -- odmaskowany identyfikator; NULL = nie znamy
+  kupujacy_login TEXT,       -- do wyświetlenia; prawdziwy login przed maską
+  order_id       TEXT,       -- checkout-form; NULL = bez zamówienia (pytanie, zwrot ręczny)
+  -- Przejęcie Z KOLEJKI (WEZMĘ TO na sprawie). Rejestry trzymają własne
+  -- stemple dalej — projekcja odczytu skleja jedno z drugim.
+  prowadzi       TEXT,
+  prowadzi_at    TEXT,
+  utworzono_at   TEXT NOT NULL,
+  zamknieto_at   TEXT        -- stempluje rekoncyliacja, gdy ostatnie źródło zamknięte
+);
+CREATE INDEX IF NOT EXISTS ix_sprawa_order    ON sprawa(order_id);
+CREATE INDEX IF NOT EXISTS ix_sprawa_kupujacy ON sprawa(kupujacy_id);
+CREATE INDEX IF NOT EXISTS ix_sprawa_login    ON sprawa(kupujacy_login);
+
+-- Wiązanie sprawy z obiektem rejestru. UNIQUE pilnuje sedna modelu: źródło
+-- należy do DOKŁADNIE jednej sprawy. `wiazanie='reczne'` zarezerwowane dla
+-- SCAL z etapu D — rekoncyliacja takich wiązań nie rozkleja.
+CREATE TABLE IF NOT EXISTS sprawa_zrodlo (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  sprawa_id   INTEGER NOT NULL REFERENCES sprawa(id),
+  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja')),
+  lokalny_id  INTEGER NOT NULL,  -- id w tabeli rejestru; reklamacja = id POZYCJI zwrotu
+  allegro_id  TEXT,              -- thread_id / allegro_return_id / id z /sale/issues
+  wiazanie    TEXT NOT NULL DEFAULT 'auto',
+  dodano_at   TEXT NOT NULL,
+  UNIQUE (rodzaj, lokalny_id)
+);
+CREATE INDEX IF NOT EXISTS ix_sprawa_zrodlo ON sprawa_zrodlo(sprawa_id);

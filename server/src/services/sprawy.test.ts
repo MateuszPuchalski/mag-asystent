@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dyskusja", "pytanie", "zwrot_pozycja", "zwrot"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "dyskusja", "pytanie", "zwrot_pozycja", "zwrot"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -132,11 +132,15 @@ test("liczby kolejki równe serwisom per-typ — predykaty nie mogą dryfować",
   reklamacja(z);
   dyskusja("ola", { typ: "CLAIM", status: "nowa" });
 
+  /* Po 0.128.0 wiersz kolejki to sprawa, więc z licznikami per-typ mają się
+     zgadzać ŹRÓDŁA spraw, nie wiersze — sklejenie po order_id celowo skraca
+     kolejkę poniżej sumy rejestrów. */
   const sprawy = S.listaSpraw();
-  const rodzajow = (r: string) => sprawy.filter((s) => s.rodzaj === r).length;
-  assert.equal(rodzajow("pytanie"), P.licznikOtwartych());
-  assert.equal(rodzajow("dyskusja"), D.licznikDyskusji().nowe + D.licznikDyskusji().wToku);
-  assert.equal(rodzajow("reklamacja"), R.listaReklamacji().length);
+  const zrodel = (r: string) =>
+    sprawy.flatMap((s) => s.zrodla ?? []).filter((z) => z.rodzaj === r).length;
+  assert.equal(zrodel("pytanie"), P.licznikOtwartych());
+  assert.equal(zrodel("dyskusja"), D.licznikDyskusji().nowe + D.licznikDyskusji().wToku);
+  assert.equal(zrodel("reklamacja"), R.listaReklamacji().length);
   assert.equal(S.licznikSpraw().otwartych, sprawy.length, "pigułka = długość kolejki");
 });
 
@@ -212,4 +216,56 @@ test("powiązania: to samo zamówienie mocniej niż ten sam login, bez samej sie
      otwiera ją przez ten zwrot, więc to byłby link do samego siebie. */
   const zRekl = S.powiazaneSprawy("reklamacja", rekl);
   assert.ok(zRekl.zamowienie.every((s) => !(s.rodzaj === "zwrot" && s.id === z)));
+});
+
+/* ── Encja sprawy w kolejce (0.128.0) ────────────────────────────────────────
+   Rekoncyliacja skleja po order_id; bez niej źródło stoi w kolejce jako
+   pseudo-sprawa — brak przebudowy nie ma prawa niczego zgubić.               */
+
+test("po rekoncyliacji obiekty jednego zamówienia to JEDEN wiersz kolejki", async () => {
+  const E = await import("./sprawa.js");
+  const z = zwrot("jan", "nowy");
+  db().prepare("UPDATE zwrot SET allegro_order_id = 'zam-9' WHERE id = ?").run(z);
+  reklamacja(z);
+  const dy = dyskusja("jan", { status: "nowa" });
+  db().prepare("UPDATE dyskusja SET order_id = 'zam-9' WHERE id = ?").run(dy);
+  pytanie("jan", "nowe");
+
+  /* Bez rekoncyliacji: cztery pseudo-sprawy (siatka bezpieczeństwa). */
+  const przed = S.listaSpraw();
+  assert.equal(przed.length, 4);
+  assert.ok(przed.every((s) => s.sprawaId === null || s.sprawaId === undefined));
+
+  E.przebudujSprawy();
+  const po = S.listaSpraw();
+  assert.equal(po.length, 2, "trzy obiekty zam-9 zlewają się w jedną sprawę");
+  const zamowienie = po.find((s) => s.rodzaj !== "pytanie")!;
+  assert.ok(zamowienie.sprawaId, "wiersz niesie id encji sprawy");
+  assert.deepEqual(
+    zamowienie.zrodla!.map((x) => x.rodzaj).sort(),
+    ["dyskusja", "reklamacja", "zwrot"]
+  );
+  /* Filtr rodzaju = sprawy ZAWIERAJĄCE źródło tego rodzaju. */
+  assert.equal(S.listaSpraw("zwrot").length, 1);
+  assert.equal(S.listaSpraw("pytanie").length, 1);
+});
+
+test("podpowiedź po kupującym jest podpowiedzią, nie sklejeniem", async () => {
+  const E = await import("./sprawa.js");
+  /* Pytanie spod maski i zwrot tego samego kupującego: dwie sprawy — ale
+     powiązania mają je sobie nawzajem pokazać (odmaskowanie, 0.128.0). */
+  const p = pytanie("client:44300777", "nowe");
+  db().prepare("UPDATE pytanie SET kupujacy_id = '44300777' WHERE id = ?").run(p);
+  const z = zwrot("marek_m", "nowy");
+  db().prepare("UPDATE zwrot SET kupujacy_id = '44300777' WHERE id = ?").run(z);
+  E.przebudujSprawy();
+
+  assert.equal(S.listaSpraw().length, 2, "kupujący NIE skleja automatem");
+  const powiazania = S.powiazaneSprawy("pytanie", p);
+  assert.deepEqual(
+    powiazania.kupujacy.map((s) => s.rodzaj),
+    ["zwrot"],
+    "zwrot spod tego samego buyer.id wypływa jako podpowiedź"
+  );
+  assert.deepEqual(powiazania.klient, [], "po loginie maska nigdy nie trafia");
 });

@@ -132,9 +132,13 @@ poprzedniego na produkcji.
   przeliczenie bazy. Statusy końcowe: mechanizm weryfikacji wszedł (nieznane
   wartości liczą się i świecą przy DYSKUSJACH), potwierdzenie właściciela na
   żywym koncie i korekta listy to osobny PATCH.
-- **C — encja sprawy:** `sprawa` i `sprawa_zrodlo` nakładką, wypełnienie
-  wstecz po `order_id` i kupującym, `kupujacy_id` przy pytaniach; kolejka
-  czyta sprawy zamiast czterech budowniczych.
+- **C (0.128.0, wykonany) — encja sprawy:** `sprawa` i `sprawa_zrodlo`
+  nakładką utrzymywaną rekoncyliacją z mutacji; sklejanie automatem
+  wyłącznie po `order_id`; `kupujacy_id` przy pytaniach odmaskowany
+  z `client:NNN`; kolejka, licznik, wyszukiwarka i Klient 360 liczą sprawy.
+  Podpowiedź „ten sam kupujący" jest odczytem — SCAL i ROZKLEJ czekają
+  na etap D; `kupujacy_id` przy dyskusjach to kandydat do E (wymaga
+  czytania checkout-formów w sync).
 - **D — piłka i oś czasu:** `sprawa_zdarzenie` z projekcją piłki; pasma na
   piłkę × termin; oś czasu w widoku sprawy i jedno pole odpowiedzi.
 - **E — narzędzia agenta:** szablony odpowiedzi; reguły tagowania

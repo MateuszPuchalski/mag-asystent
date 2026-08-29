@@ -8,6 +8,7 @@ import { config } from "../config.js";
 import { enqueueKorektaZwrotu } from "./queue.js";
 import { logEvent } from "./events.js";
 import { odhaczZapowiedz, zapowiedzDlaWaybilla } from "./zapowiedzi.js";
+import { przebudujSprawy } from "./sprawa.js";
 
 /* ── Zwroty Allegro — serwis ─────────────────────────────────────────────────
    Skan etykiety → rekord zwrotu z danymi z Allegro → decyzje pracownika per
@@ -260,6 +261,7 @@ export function utworzReczny(waybill: string, autor: string): SzczegolZwrotu {
     .run(kod, nowIso(), autor);
   const id = Number(wynik.lastInsertRowid);
   logEvent("zwrot_utworzony", autor, null, { zwrotId: id, waybill: kod, reczny: true });
+  przebudujSprawy();
   return szczegolZwrotu(id);
 }
 
@@ -363,6 +365,7 @@ async function utworzZAllegro(
     allegroReturnId: z.id,
     pozycji: z.pozycje.length,
   });
+  przebudujSprawy();
   return szczegolZwrotu(id);
 }
 
@@ -860,9 +863,12 @@ function przeliczStatus(zwrotId: number): void {
   if (status === "rozliczony") {
     d.prepare("UPDATE zwrot SET status=?, prowadzi=NULL, prowadzi_at=NULL WHERE id=?")
       .run(status, zwrotId);
-    return;
+  } else {
+    d.prepare("UPDATE zwrot SET status=? WHERE id=?").run(status, zwrotId);
   }
-  d.prepare("UPDATE zwrot SET status=? WHERE id=?").run(status, zwrotId);
+  /* Lejek mutacji zwrotu (decyzje, pozycje, środki) — nakładka spraw dogania
+     tu, zamiast w każdym z wołających (0.128.0). */
+  przebudujSprawy();
 }
 
 /**
@@ -886,6 +892,7 @@ export function stempelProwadziZwrotu(zwrotId: number, autor: string): void {
   db()
     .prepare("UPDATE zwrot SET prowadzi=?, prowadzi_at=datetime('now') WHERE id=?")
     .run(autor, zwrotId);
+  przebudujSprawy();
   logEvent("zwrot_prowadzi", autor, null, { zwrotId });
 }
 

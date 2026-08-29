@@ -25,7 +25,7 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   // zapowiedź wskazuje zwrot (FK), więc schodzi z bazy PRZED zwrotami
-  for (const t of ["kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot_zapowiedz", "zwrot", "sfera_queue"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot_zapowiedz", "zwrot", "sfera_queue"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
