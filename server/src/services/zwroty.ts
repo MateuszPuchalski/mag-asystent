@@ -9,6 +9,7 @@ import { enqueueKorektaZwrotu } from "./queue.js";
 import { logEvent } from "./events.js";
 import { odhaczZapowiedz, zapowiedzDlaWaybilla } from "./zapowiedzi.js";
 import { przebudujSprawy } from "./sprawa.js";
+import { dopiszZdarzenie } from "./os-sprawy.js";
 
 /* ── Zwroty Allegro — serwis ─────────────────────────────────────────────────
    Skan etykiety → rekord zwrotu z danymi z Allegro → decyzje pracownika per
@@ -261,6 +262,16 @@ export function utworzReczny(waybill: string, autor: string): SzczegolZwrotu {
     .run(kod, nowIso(), autor);
   const id = Number(wynik.lastInsertRowid);
   logEvent("zwrot_utworzony", autor, null, { zwrotId: id, waybill: kod, reczny: true });
+  /* Zwrot ręczny zakłada BIURO, nie klient — oś czasu ma mówić prawdę o tym,
+     czyj to był ruch, także wtedy, gdy sprawa zaczyna się u nas. */
+  dopiszZdarzenie({
+    rodzaj: "zwrot",
+    lokalnyId: id,
+    typ: "zalozona",
+    kto: "my",
+    autor,
+    szczegol: "zwrot ręczny",
+  });
   przebudujSprawy();
   return szczegolZwrotu(id);
 }
@@ -364,6 +375,14 @@ async function utworzZAllegro(
     waybill,
     allegroReturnId: z.id,
     pozycji: z.pozycje.length,
+  });
+  dopiszZdarzenie({
+    rodzaj: "zwrot",
+    lokalnyId: id,
+    typ: "zalozona",
+    kto: "klient",
+    szczegol: `pozycji ${z.pozycje.length}`,
+    kiedy: z.utworzono ?? undefined,
   });
   przebudujSprawy();
   return szczegolZwrotu(id);
@@ -589,6 +608,17 @@ export function zapiszDecyzje(
     .run(decyzja, nowIso(), autor, notatka, pozycjaId);
   przeliczStatus(zwrotId);
   logEvent("zwrot_decyzja", autor, poz.tw_id, { zwrotId, pozycjaId, decyzja, notatka });
+  /* Wariant po POZYCJI i decyzji: zwrot na pięć pozycji to pięć osobnych
+     rozstrzygnięć, a zmiana decyzji jest nowym faktem. */
+  dopiszZdarzenie({
+    rodzaj: "zwrot",
+    lokalnyId: zwrotId,
+    typ: "decyzja",
+    kto: "my",
+    autor,
+    szczegol: decyzja,
+    wariant: `${pozycjaId}:${decyzja}`,
+  });
   return szczegolZwrotu(zwrotId);
 }
 
@@ -632,6 +662,7 @@ export function oznaczZwrotSrodkow(zwrotId: number, autor: string): SzczegolZwro
     .run(nowIso(), autor, zwrotId);
   przeliczStatus(zwrotId);
   logEvent("zwrot_srodki", autor, null, { zwrotId });
+  dopiszZdarzenie({ rodzaj: "zwrot", lokalnyId: zwrotId, typ: "srodki", kto: "my", autor });
   return szczegolZwrotu(zwrotId);
 }
 
@@ -827,6 +858,15 @@ export function wystawDokumenty(zwrotId: number, autor: string): SzczegolZwrotu 
     d.prepare("UPDATE zwrot SET korekta_queue_id=? WHERE id=?").run(queueId, zwrotId);
   })();
 
+  dopiszZdarzenie({
+    rodzaj: "zwrot",
+    lokalnyId: zwrotId,
+    typ: "dokumenty",
+    kto: "my",
+    autor,
+    szczegol: `pozycji ${pozycje.length}`,
+    wariant: String(queueId),
+  });
   logEvent("zwrot_dokumenty", autor, null, {
     zwrotId,
     queueId,
@@ -894,6 +934,14 @@ export function stempelProwadziZwrotu(zwrotId: number, autor: string): void {
     .run(autor, zwrotId);
   przebudujSprawy();
   logEvent("zwrot_prowadzi", autor, null, { zwrotId });
+  dopiszZdarzenie({
+    rodzaj: "zwrot",
+    lokalnyId: zwrotId,
+    typ: "przejeto",
+    kto: "my",
+    autor,
+    wariant: autor,
+  });
 }
 
 // ── Odczyty ─────────────────────────────────────────────────────────────────

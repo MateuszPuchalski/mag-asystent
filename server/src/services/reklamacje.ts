@@ -1,4 +1,5 @@
 import { db, nowIso } from "../db/db.js";
+import { dopiszZdarzenie } from "./os-sprawy.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { BladZwrotu } from "./zwroty.js";
@@ -150,6 +151,16 @@ export function rozpatrzReklamacje(
     )
     .run(wynik, nowIso(), autor, notatka, pozycjaId);
   logEvent("reklamacja_rozpatrzona", autor, p.tw_id, { pozycjaId, wynik, notatka });
+  /* Reklamacja jest źródłem sprawy o granulacji POZYCJI zwrotu — dokładnie
+     tak samo trzyma ją `sprawa_zrodlo` i wiersz kolejki. */
+  dopiszZdarzenie({
+    rodzaj: "reklamacja",
+    lokalnyId: pozycjaId,
+    typ: "werdykt",
+    kto: "my",
+    autor,
+    szczegol: wynik,
+  });
   przebudujSprawy();
 }
 
@@ -175,6 +186,14 @@ export function stempelProwadziReklamacji(pozycjaId: number, autor: string): voi
     )
     .run(autor, pozycjaId);
   logEvent("reklamacja_prowadzi", autor, p.tw_id, { pozycjaId });
+  dopiszZdarzenie({
+    rodzaj: "reklamacja",
+    lokalnyId: pozycjaId,
+    typ: "przejeto",
+    kto: "my",
+    autor,
+    wariant: autor,
+  });
   przebudujSprawy();
 }
 

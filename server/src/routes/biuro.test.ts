@@ -1547,3 +1547,34 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   // 3. Stan Allegro płynie z /api/health — ikona żyje na każdej zakładce.
   assert.match(html, /h\.allegro/, "ikona Allegro czyta stan z health, nie tylko z listy zwrotów");
 });
+
+test("oś czasu sprawy jest w trzech szczegółach i tylko czyta (0.130.0)", () => {
+  /* Etap D2: historia sprawy z wszystkich kanałów w jednym wykazie. Test
+     pilnuje trzech rzeczy, z których każda jest DECYZJĄ, nie szczegółem.
+
+     PIERWSZA: sekcja stoi we WSZYSTKICH trzech szczegółach. Oś czasu, której
+     nie ma przy dyskusji, nie unifikuje niczego — a dyskusja jako jedyna nie
+     ma szuflady kontekstu, więc jest najłatwiejsza do przeoczenia.
+
+     DRUGA: pobiera się PO ROZWINIĘCIU, nie przy wejściu w sprawę. To ta sama
+     reguła co przy historii klienta i powiązaniach.
+
+     TRZECIA: trasa osi jest GET-em. Zdarzenia dopisują mutacje w rejestrach;
+     oś czasu nie ma własnego zapisu i mieć nie będzie. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const sekcja of ["pytanieOs", "zwrotOs", "dyskusjaOs"]) {
+    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
+    assert.ok(html.includes(`id="${sekcja}Tresc"`), `${sekcja} ma miejsce na treść`);
+    assert.ok(
+      html.includes(`$("${sekcja}").addEventListener("toggle"`),
+      `${sekcja} pobiera dane dopiero po rozwinięciu`
+    );
+  }
+  const wywolania = [...html.matchAll(/\/api\/biuro\/sprawy\/os\?rodzaj=/g)];
+  assert.equal(wywolania.length, 1, "jedno wywołanie na trzy sekcje — jedna funkcja, trzy rodzaje");
+  for (const m of wywolania) {
+    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
+    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
+      "oś czasu jedzie zwykłym GET-em — zdarzenia dopisują mutacje rejestrów");
+  }
+});

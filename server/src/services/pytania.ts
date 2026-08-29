@@ -6,6 +6,7 @@ import { logEvent } from "./events.js";
 import { kontekstKlienta, type KontekstKlienta } from "./klienci.js";
 import { stempelWyslano, zapiszMetaPytania } from "./watek-meta.js";
 import { kupujacyIdZMaski, przebudujSprawy } from "./sprawa.js";
+import { dopiszZdarzenie } from "./os-sprawy.js";
 import { blokPrzesylek, czyPytaOWysylke, przesylkiKupujacego } from "./przesylki.js";
 import type { PrzesylkiKlienta } from "./przesylki.js";
 import { BladLimituAllegro, allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
@@ -445,6 +446,17 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
       if (otwarta.wiadomosc_id === seria.id) juzZnane++;
       else {
         dopisz.run(seria.id, seria.tresc, seria.at ?? watek.ostatniaWiadomoscAt, seria.ofertaId, otwarta.id);
+        /* Oś czasu sprawy (0.130.0): id wiadomości jako wariant, bo dopisek
+           bywa drugi i trzeci w tej samej sprawie — bez niego kolejne głosy
+           klienta zlałyby się w jeden wpis. */
+        dopiszZdarzenie({
+          rodzaj: "pytanie",
+          lokalnyId: otwarta.id,
+          typ: "klient_napisal",
+          kto: "klient",
+          kiedy: seria.at ?? watek.ostatniaWiadomoscAt ?? undefined,
+          wariant: seria.id,
+        });
         dopisanych++;
       }
       continue;
@@ -472,8 +484,16 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
        IGNORE` po `wiadomosc_id`). Bez tego kubełka „przejrzano 2, nowych 0"
        nie miałoby żadnego dopowiedzenia — czyli dokładnie ta cisza, którą to
        rozbicie ma usunąć. Cztery kubełki plus `nowych` domykają rachunek. */
-    if (wynik.changes > 0) nowych++;
-    else juzZnane++;
+    if (wynik.changes > 0) {
+      nowych++;
+      dopiszZdarzenie({
+        rodzaj: "pytanie",
+        lokalnyId: Number(wynik.lastInsertRowid),
+        typ: "zalozona",
+        kto: "klient",
+        kiedy: seria.at ?? watek.ostatniaWiadomoscAt ?? undefined,
+      });
+    } else juzZnane++;
   }
 
   if (nowych > 0 || dopisanych > 0) {
@@ -988,6 +1008,15 @@ export async function generujSzkic(id: number, autor: string): Promise<Pytanie> 
     kartotek: kontekst.kartoteki.length,
     ofert: kontekst.oferty.length,
   });
+  dopiszZdarzenie({
+    rodzaj: "pytanie",
+    lokalnyId: id,
+    typ: "szkic",
+    kto: "my",
+    autor,
+    szczegol: wynik.kategoria ?? null,
+    wariant: nowIso(),
+  });
   return zapiszSzkic(id, wynik, null);
 }
 
@@ -1165,6 +1194,17 @@ export async function wyslijOdpowiedz(
     kategoria: p.kategoria,
     znakow: tresc.length,
   });
+  /* Liczba znaków, nie tekst: oś czasu mówi, ŻE odpowiedzieliśmy — treść
+     odpowiedzi mieszka w rejestrze i w Allegro (zasada prywatności). */
+  dopiszZdarzenie({
+    rodzaj: "pytanie",
+    lokalnyId: id,
+    typ: "odpowiedzielismy",
+    kto: "my",
+    autor,
+    szczegol: `${tresc.length} znaków`,
+    wariant: nowIso(),
+  });
 
   return { pytanie: szczegolPytania(id), nastepneId: nastepneOtwarte(id) };
 }
@@ -1181,6 +1221,15 @@ export function zmienStatus(id: number, status: "zamkniete" | "pominiete", autor
     )
     .run(status, autor, id);
   logEvent(`pytanie_${status}`, autor, null, { id });
+  dopiszZdarzenie({
+    rodzaj: "pytanie",
+    lokalnyId: id,
+    typ: "zamknieta",
+    kto: "my",
+    autor,
+    szczegol: status,
+    wariant: status,
+  });
   przebudujSprawy();
   return { pytanie: szczegolPytania(id), nastepneId: nastepneOtwarte(id) };
 }
@@ -1209,6 +1258,14 @@ export function stempelProwadzi(id: number, autor: string): void {
   db()
     .prepare("UPDATE pytanie SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  dopiszZdarzenie({
+    rodzaj: "pytanie",
+    lokalnyId: id,
+    typ: "przejeto",
+    kto: "my",
+    autor,
+    wariant: autor,
+  });
   przebudujSprawy();
 }
 

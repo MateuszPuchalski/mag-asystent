@@ -1,5 +1,6 @@
 import { db, nowIso, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { dopiszZdarzenie, type RodzajZrodlaOsi } from "./os-sprawy.js";
 
 /* ── Encja sprawy — problem klienta ponad rejestrami (0.128.0) ───────────────
    `sprawa` i `sprawa_zrodlo` to NAKŁADKA (docs/architektura-spraw.md):
@@ -410,6 +411,12 @@ export function scalSprawy(a: number, b: number, autor: string): number {
 
   const docelowa = Math.min(a, b);
   const dawca = Math.max(a, b);
+  /* Kogo przenosimy — czytamy PRZED zapisem, bo po nim dawca nie ma już
+     źródeł. Zdarzenie osi czasu wisi przy źródle, więc trafia dokładnie na
+     te wiersze, które zmieniły dom. */
+  const przenoszone = d
+    .prepare("SELECT rodzaj, lokalny_id FROM sprawa_zrodlo WHERE sprawa_id = ?")
+    .all(dawca) as Array<{ rodzaj: string; lokalny_id: number }>;
   let zrodel = 0;
   transaction(d, () => {
     zrodel = Number(
@@ -424,6 +431,18 @@ export function scalSprawy(a: number, b: number, autor: string): number {
      denormalizacja docelowej przelicza się nad kompletem członków. */
   przebudujSprawy();
   logEvent("sprawa_scalona", autor, null, { docelowa, dawca, zrodel });
+  const kiedy = nowIso();
+  for (const z of przenoszone) {
+    dopiszZdarzenie({
+      rodzaj: z.rodzaj as RodzajZrodlaOsi,
+      lokalnyId: z.lokalny_id,
+      typ: "scalona",
+      kto: "my",
+      autor,
+      szczegol: `sprawa ${docelowa}`,
+      wariant: kiedy,
+    });
+  }
   return docelowa;
 }
 
@@ -464,5 +483,17 @@ export function rozklejSprawe(sprawaId: number, autor: string): number {
   })();
   przebudujSprawy();
   logEvent("sprawa_rozklejona", autor, null, { sprawaId, zrodel: reczne.length });
+  const kiedyRozklejenia = nowIso();
+  for (const r of reczne) {
+    dopiszZdarzenie({
+      rodzaj: r.rodzaj as RodzajZrodlaOsi,
+      lokalnyId: r.lokalny_id,
+      typ: "rozklejona",
+      kto: "my",
+      autor,
+      szczegol: `ze sprawy ${sprawaId}`,
+      wariant: kiedyRozklejenia,
+    });
+  }
   return sprawaId;
 }

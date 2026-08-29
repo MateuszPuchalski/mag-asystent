@@ -5,6 +5,7 @@ import { db, transaction } from "./db.js";
 import { config } from "../config.js";
 import { hashSekret } from "../services/users.js";
 import { kupujacyIdZMaski, przebudujSprawy } from "../services/sprawa.js";
+import { dosypOsCzasu } from "../services/os-sprawy.js";
 import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
 
 /* ── Seed scenariuszy — dane pod przypadki brzegowe ──────────────────────────
@@ -487,6 +488,10 @@ export function zbudujScenariusze(): Podsumowanie {
   /* Nakładka spraw dogania świeżo zasiane rejestry (0.128.0) — poza
      transakcją seeda, bo rekoncyliacja otwiera własną. */
   przebudujSprawy();
+  /* Oś czasu z tego samego powodu (0.130.0): demo bez historii pokazywałoby
+     pustą sekcję w każdej sprawie i wyglądało na zepsute. Dosypka czyta
+     wyłącznie stemple, które seed właśnie zapisał. */
+  dosypOsCzasu();
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
   // i tak by ich nie usunęło. Kolejność (baza, potem pliki) jest bezpieczniejsza:

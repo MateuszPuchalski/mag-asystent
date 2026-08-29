@@ -1557,6 +1557,14 @@
         <summary><h2>POWIĄZANE SPRAWY</h2><span class="podpis">to samo zamówienie i ten sam klient</span></summary>
         <div id="zwrotPowiazaneTresc"><p class="mute">Wczytuję…</p></div>
       </details>
+      <!-- OŚ CZASU (0.130.0): co się w tej sprawie działo, wszystkie kanały
+           razem. Zwinięta i pobierana po otwarciu — jak historia klienta
+           i powiązania: to materiał na wypadek pytania „dlaczego to tak
+           stoi", nie lektura do każdej odpowiedzi. -->
+      <details class="zwijana" id="zwrotOs" style="margin-top:14px">
+        <summary><h2>OŚ CZASU SPRAWY</h2><span class="podpis">wszystkie kanały tej sprawy</span></summary>
+        <div id="zwrotOsTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
       <div id="zwrotWiadomosci" style="margin-top:14px"></div>
       <div id="zwrotKosz" style="margin-top:14px"></div>
       <div id="zwrotRozliczenie" style="margin-top:14px"></div>
@@ -1577,6 +1585,14 @@
       <div class="sprawa-tresc">
         <h2 style="margin-top:16px">ROZMOWA W SPRAWIE</h2>
         <div id="dyskusjaRozmowa"></div>
+      <!-- OŚ CZASU (0.130.0): co się w tej sprawie działo, wszystkie kanały
+           razem. Zwinięta i pobierana po otwarciu — jak historia klienta
+           i powiązania: to materiał na wypadek pytania „dlaczego to tak
+           stoi", nie lektura do każdej odpowiedzi. -->
+      <details class="zwijana" id="dyskusjaOs" style="margin-top:14px">
+        <summary><h2>OŚ CZASU SPRAWY</h2><span class="podpis">wszystkie kanały tej sprawy</span></summary>
+        <div id="dyskusjaOsTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
       </div>
       <div class="dok-odpowiedzi" id="dyskusjaOdpowiedzBlok">
         <div id="dyskusjaOdpowiedzGora">
@@ -1716,6 +1732,15 @@
         <summary><h2>POWIĄZANE SPRAWY</h2><span class="podpis">to samo zamówienie i ten sam klient</span></summary>
         <div id="pytaniePowiazaneTresc"><p class="mute">Wczytuję…</p></div>
       </details>
+      <!-- OŚ CZASU (0.130.0): co się w tej sprawie działo, wszystkie kanały
+           razem. Zwinięta i pobierana po otwarciu — jak historia klienta
+           i powiązania: to materiał na wypadek pytania „dlaczego to tak
+           stoi", nie lektura do każdej odpowiedzi. -->
+      <details class="zwijana" id="pytanieOs" style="margin-top:14px">
+        <summary><h2>OŚ CZASU SPRAWY</h2><span class="podpis">wszystkie kanały tej sprawy</span></summary>
+        <div id="pytanieOsTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
+
     </section>
 
   </div>
@@ -5636,6 +5661,67 @@ async function pokazPowiazaneZwrotu() {
   }
 }
 
+
+/* ── Oś czasu sprawy (0.130.0) ───────────────────────────────────────────────
+   Rejestry pamiętają OSTATNI stan; historii nie pamiętał nikt. Serwer składa
+   ją ze zdarzeń wszystkich źródeł sprawy, więc jeden wykaz mówi, co się
+   działo w zwrocie, dyskusji i pytaniu tego samego problemu.
+
+   TREŚCI TU NIE MA I NIE BĘDZIE — wpis mówi, ŻE klient napisał, nie CO.
+   Rozmowa dalej czyta się na klik z Allegro (zasada prywatności). */
+const KANAL_OSI = { pytanie: "PYTANIE", zwrot: "ZWROT", dyskusja: "DYSKUSJA", reklamacja: "REKLAMACJA" };
+/* Kolor niesie CZYJ to był ruch — to jest pytanie, które agent zadaje osi
+   czasu najczęściej („czy piłka wróciła do nas?"). */
+const KTO_OSI = { klient: ["amber", "KLIENT"], my: ["ok", "MY"], allegro: ["mute2", "ALLEGRO"] };
+
+function rysujOsCzasu(cel, d) {
+  const wpisy = d.wpisy || [];
+  if (!wpisy.length) {
+    $(cel).innerHTML = '<p class="mute">W tej sprawie nie zapisano jeszcze żadnego zdarzenia.</p>';
+    return;
+  }
+  /* Kolumnę kanału pokazujemy TYLKO przy sprawie wielźródłowej: przy jednym
+     źródle powtarzałaby to samo słowo w każdym wierszu. */
+  const wielo = (d.zrodla || []).length > 1;
+  $(cel).innerHTML = `<table>${wpisy
+    .map((w) => {
+      const [klasa, kto] = KTO_OSI[w.kto] || ["mute2", w.kto];
+      return `<tr>
+        <td class="mute" style="white-space:nowrap">${esc((w.kiedy || "").slice(0, 16).replace("T", " "))}</td>
+        ${wielo ? `<td><span class="badge mute2">${esc(KANAL_OSI[w.rodzaj] || w.rodzaj)}</span></td>` : ""}
+        <td><span class="badge ${klasa}">${esc(kto)}</span> ${esc(w.opis)}${
+        w.szczegol ? ` <span class="mute">· ${esc(w.szczegol)}</span>` : ""
+      }</td>
+        <td class="mute">${esc(w.autor || "")}</td>
+      </tr>`;
+    })
+    .join("")}</table>`;
+}
+
+/* Jedna funkcja na trzy szczegóły — te same dane, ta sama trasa, różni się
+   wyłącznie rodzaj źródła.
+
+   Pobieramy przy KAŻDYM rozwinięciu, bez pamiętania poprzedniego wyniku
+   (inaczej niż powiązania obok). Powód: oś czasu zmienia każda praca w tej
+   samej sprawie — wysłana odpowiedź, decyzja, zamknięcie — więc zapamiętany
+   wykaz kłamałby po pierwszym kliknięciu WYŚLIJ. Zapytanie jest lokalne
+   (SQLite, zero ruchu do Allegro), a otwiera się je ręką. */
+const osZadania = { pytanie: 0, zwrot: 0, dyskusja: 0 };
+async function wczytajOsCzasu(rodzaj, id, sekcja, cel) {
+  if (id == null || !$(sekcja).open) return;
+  const moje = ++osZadania[rodzaj];
+  $(cel).innerHTML = '<p class="mute">Wczytuję…</p>';
+  try {
+    const d = await (await api(`/api/biuro/sprawy/os?rodzaj=${rodzaj}&id=${id}`)).json();
+    /* Człowiek mógł w tym czasie przejść do innej sprawy — wtedy odpowiedź
+       jest już nie o tym, na co patrzy. */
+    if (osZadania[rodzaj] !== moje) return;
+    rysujOsCzasu(cel, d);
+  } catch (e) {
+    $(cel).innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
    Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
    (ocena towaru, dopasowanie dokumentu, stempel środków), nie operacja z hali,
@@ -9266,6 +9352,12 @@ $("pytanieKontekst").addEventListener("click", klikPowiazanejSprawy);
 $("zwrotKontekst").addEventListener("click", klikPowiazanejSprawy);
 $("pytaniePowiazane").addEventListener("toggle", pokazPowiazanePytania);
 $("zwrotPowiazane").addEventListener("toggle", pokazPowiazaneZwrotu);
+$("pytanieOs").addEventListener("toggle", () =>
+  wczytajOsCzasu("pytanie", otwartePytanie, "pytanieOs", "pytanieOsTresc"));
+$("zwrotOs").addEventListener("toggle", () =>
+  wczytajOsCzasu("zwrot", otwartyZwrot, "zwrotOs", "zwrotOsTresc"));
+$("dyskusjaOs").addEventListener("toggle", () =>
+  wczytajOsCzasu("dyskusja", otwartaDyskusja, "dyskusjaOs", "dyskusjaOsTresc"));
 
 $("pytanieKlient").addEventListener("toggle", pokazHistorieKlienta);
 $("pytaniePrzesylki").addEventListener("toggle", pokazPrzesylki);

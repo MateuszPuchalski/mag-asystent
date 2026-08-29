@@ -43,6 +43,7 @@ import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { uruchomTickerPytan } from "./services/pytania.js";
 import { uruchomTickerDyskusji } from "./services/dyskusje.js";
 import { przebudujSprawy } from "./services/sprawa.js";
+import { dosypOsCzasu } from "./services/os-sprawy.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { brakDostepuDoTla } from "./adapters/tlo.js";
@@ -259,6 +260,12 @@ async function main() {
      (cykl importów db → serwis → db); nie w buildApp() — testy tras nie
      mają prawa zależeć od rekoncyliacji. */
   przebudujSprawy();
+  /* Oś czasu dogania zastane rejestry (0.130.0) — ten sam powód i to samo
+     miejsce co wyżej. Bez dosypki każda sprawa sprzed aktualizacji miałaby
+     pustą historię, co czyta się jak awaria, a nie jak brak danych.
+     Idempotentna, więc kolejne starty nie dopisują nic. */
+  const dosypanych = dosypOsCzasu();
+  if (dosypanych > 0) console.log(`[api] oś czasu spraw: dosypano ${dosypanych} zdarzeń`);
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

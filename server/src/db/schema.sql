@@ -1090,3 +1090,41 @@ CREATE TABLE IF NOT EXISTS sprawa_zrodlo (
   UNIQUE (rodzaj, lokalny_id)
 );
 CREATE INDEX IF NOT EXISTS ix_sprawa_zrodlo ON sprawa_zrodlo(sprawa_id);
+
+-- ── Oś czasu sprawy — co się w niej działo (0.130.0) ────────────────────────
+-- Etap D2 z docs/architektura-spraw.md. Rejestry pamiętają OSTATNI stan:
+-- `wyslano_at` mówi o ostatniej odpowiedzi, `status` o dzisiejszym statusie.
+-- Historii nie pamięta nikt, więc pytanie „co się w tej sprawie działo"
+-- nie miało dotąd odpowiedzi — a przy sprawie z trzech rejestrów jest to
+-- pierwsze pytanie, jakie zadaje agent.
+--
+-- Zdarzenie wisi przy ŹRÓDLE, nie przy sprawie — i to jest sedno projektu.
+-- SCAL i ROZKLEJ przenoszą źródła między sprawami; gdyby zdarzenie niosło
+-- `sprawa_id`, każde scalenie wymagałoby przepisania historii, a rozklejenie
+-- zgadywania, komu ją oddać. Tak oś czasu sprawy jest PROJEKCJĄ: sumą
+-- zdarzeń jej dzisiejszych źródeł, spójną po każdym scaleniu za darmo.
+--
+-- ZERO TREŚCI ROZMÓW. `szczegol` niesie status, decyzję albo liczbę — nigdy
+-- zdania klienta (zasada prywatności z CLAUDE.md). Zapisujemy, ŻE klient
+-- napisał, nie CO napisał; treść dalej czyta się na klik z Allegro.
+--
+-- `klucz` UNIQUE czyni każdy zapis idempotentnym: ten sam fakt zapisany
+-- drugi raz (powtórzony sync, dosypka przy starcie) daje jeden wiersz.
+-- Zdarzenie powtarzalne — druga odpowiedź w dyskusji — ma czas w kluczu.
+CREATE TABLE IF NOT EXISTS sprawa_zdarzenie (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja')),
+  lokalny_id  INTEGER NOT NULL,   -- id w rejestrze; reklamacja = id POZYCJI zwrotu
+  typ         TEXT NOT NULL,      -- slownik w services/os-sprawy.ts (TYPY_ZDARZEN)
+  -- Czyj to był ruch. Osobno od `autor`, bo panel rysuje po TEJ kolumnie:
+  -- głos klienta ma inny kolor niż nasza odpowiedź, a tego nie da się
+  -- odczytać z loginu (autor bywa pusty przy zdarzeniach z Allegro).
+  kto         TEXT NOT NULL CHECK (kto IN ('klient','my','allegro')),
+  autor       TEXT,               -- konto pracownika; NULL gdy ruch nie jest nasz
+  szczegol    TEXT,               -- status, decyzja, liczba — NIGDY treść rozmowy
+  kiedy_at    TEXT NOT NULL,      -- kiedy fakt zaszedł (nie kiedy go zapisano)
+  zapisano_at TEXT NOT NULL,
+  klucz       TEXT NOT NULL UNIQUE
+);
+-- Odczyt zawsze pyta o komplet źródeł jednej sprawy i sortuje po czasie.
+CREATE INDEX IF NOT EXISTS ix_sprawa_zdarzenie ON sprawa_zdarzenie(rodzaj, lokalny_id, kiedy_at);

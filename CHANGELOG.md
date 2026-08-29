@@ -33,6 +33,39 @@ historii nie przepisujemy.
 
 ---
 
+## 0.130.0 — 29 sierpnia 2026
+
+**Sprawa pamięta, co się w niej działo.** Etap D2 z mapy
+w `docs/architektura-spraw.md`: nowa sekcja OŚ CZASU SPRAWY w szczególe
+pytania, zwrotu i dyskusji.
+
+**Jeden wykaz na wszystkie kanały.** Rejestry pamiętają OSTATNI stan:
+`wyslano_at` mówi o ostatniej odpowiedzi, status o dzisiejszym statusie.
+Historii nie pamiętał nikt. Teraz każda praca w sprawie zostawia ślad —
+wpłynięcie, głos klienta, odpowiedź, szkic modelu, przejęcie, decyzja
+o pozycji zwrotu, dokumenty, zwrot środków, werdykt reklamacji, zamknięcie
+oraz SCAL i ROZKLEJ. Sprawa złożona ze zwrotu i dyskusji pokazuje jedną
+listę z kolumną kanału, a nie dwie historie w dwóch miejscach.
+
+**Treści rozmów tam nie ma i nie będzie.** Wpis mówi, ŻE klient napisał
+i kiedy — nigdy CO napisał. Rozmowa dalej czyta się na klik z Allegro
+i nie jest u nas zapisywana. Wiadomość od mediatora Allegro ma własny wpis,
+bo to trzeci głos w sprawie, nie głos kupującego.
+
+**Historia jedzie ze źródłem, nie ze sprawą.** Zdarzenie wisi przy zwrocie
+albo dyskusji, więc SCAL i ROZKLEJ niczego nie przepisują: oś czasu sprawy
+to suma zdarzeń jej dzisiejszych źródeł. Zapis jest idempotentny, więc
+powtórzone pobranie nie dubluje wpisów.
+
+**Sprawy sprzed aktualizacji też mają historię.** Pierwsze uruchomienie
+przepisuje na oś czasu stemple, które rejestry już trzymały: kiedy sprawa
+wpłynęła, kto ją wziął, kiedy poszła odpowiedź, kiedy ją zamknięto. Nic
+ręcznego — i nic ponad to, co w bazie już było.
+
+**Sekcja pobiera dane po rozwinięciu.** Ta sama reguła co przy historii
+klienta i powiązaniach: wejście w sprawę niczego nie pobiera i niczego nie
+zapisuje.
+
 ## 0.129.0 — 29 sierpnia 2026
 
 **Kolejka układa się po tym, KTO MA RUCH.** Etap D1 z mapy

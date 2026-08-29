@@ -33,7 +33,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sprawa_zrodlo", "sprawa", 
+  for (const t of ["sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", 
     "dyskusja", "pytanie", "zwrot_pozycja", "zwrot",
     "events", "device_session", "app_user",
   ]) {
@@ -96,6 +96,7 @@ const TRASY = [
   "/api/biuro/sprawy/klient?login=jan",
   "/api/biuro/sprawy/klienci?q=jan",
   "/api/biuro/sprawy/powiazane?rodzaj=zwrot&id=1",
+  "/api/biuro/sprawy/os?rodzaj=zwrot&id=1",
 ];
 
 test("bez sesji 401, magazynier 403 — sprawy klientów prowadzi biuro", async () => {
@@ -443,4 +444,69 @@ test("SCAL i ROZKLEJ: bramka biura, walidacja ciała, konflikt na tej samej spra
     method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
   });
   assert.equal(koniec.json().sprawy.length, 2, "rozklejenie cofa scalenie");
+});
+
+test("oś czasu: zły parametr to 400, a sprawa oddaje zdarzenia wszystkich źródeł", async () => {
+  const token = zalogowany("biuro");
+  const { zwrotId, dyskusjaId } = daneSpraw();
+  const naglowki = { "x-session": token };
+
+  for (const url of [
+    "/api/biuro/sprawy/os",
+    "/api/biuro/sprawy/os?rodzaj=wymyslony&id=1",
+    `/api/biuro/sprawy/os?rodzaj=zwrot&id=0`,
+  ]) {
+    const zly = await app.inject({ method: "GET", url, headers: naglowki });
+    assert.equal(zly.statusCode, 400, url);
+  }
+
+  /* Zwrot i dyskusja z `daneSpraw` mają to samo zamówienie, więc automat
+     trzyma je w JEDNEJ sprawie — i oś czasu ma pokazać obie strony. */
+  const { dopiszZdarzenie } = await import("../services/os-sprawy.js");
+  dopiszZdarzenie({
+    rodzaj: "zwrot", lokalnyId: zwrotId, typ: "zalozona", kto: "klient",
+    kiedy: "2026-08-01T10:00:00Z",
+  });
+  dopiszZdarzenie({
+    rodzaj: "dyskusja", lokalnyId: dyskusjaId, typ: "odpowiedzielismy", kto: "my",
+    autor: "biuro.anna", szczegol: "80 znaków", kiedy: "2026-08-02T10:00:00Z",
+  });
+
+  const r = await app.inject({
+    method: "GET", url: `/api/biuro/sprawy/os?rodzaj=dyskusja&id=${dyskusjaId}`,
+    headers: naglowki,
+  });
+  assert.equal(r.statusCode, 200);
+  const d = r.json();
+  assert.equal(d.zrodla.length >= 2, true, "sprawa jednego zamówienia niesie oba źródła");
+  assert.deepEqual(
+    d.wpisy.map((w: { rodzaj: string; typ: string }) => `${w.rodzaj}:${w.typ}`),
+    ["zwrot:zalozona", "dyskusja:odpowiedzielismy"]
+  );
+  assert.equal(d.wpisy[1].opis, "odpowiedzieliśmy", "opis idzie ze słownika serwera");
+  assert.equal(d.wpisy[1].autor, "biuro.anna");
+});
+
+test("praca w sprawie sama dopisuje się do osi czasu", async () => {
+  const token = zalogowany("biuro");
+  const { dyskusjaId } = daneSpraw();
+  const naglowki = { "x-session": token };
+
+  /* Przejęcie i zamknięcie idą zwykłymi trasami rejestru — oś czasu nie ma
+     własnej trasy zapisu i mieć nie będzie. */
+  const przejecie = await app.inject({
+    method: "POST", url: `/api/biuro/sprawy/dyskusja/${dyskusjaId}/prowadzi`, headers: naglowki,
+  });
+  assert.equal(przejecie.statusCode, 200);
+  const zamkniecie = await app.inject({
+    method: "POST", url: `/api/biuro/dyskusje/${dyskusjaId}/status`,
+    headers: naglowki, payload: { status: "zamknieta" },
+  });
+  assert.equal(zamkniecie.statusCode, 200);
+
+  const r = await app.inject({
+    method: "GET", url: `/api/biuro/sprawy/os?rodzaj=dyskusja&id=${dyskusjaId}`, headers: naglowki,
+  });
+  const typy = r.json().wpisy.map((w: { typ: string }) => w.typ);
+  assert.deepEqual(typy, ["przejeto", "zamknieta"]);
 });
