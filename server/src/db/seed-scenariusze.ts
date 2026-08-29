@@ -488,6 +488,9 @@ export function zbudujScenariusze(): Podsumowanie {
   /* Nakładka spraw dogania świeżo zasiane rejestry (0.128.0) — poza
      transakcją seeda, bo rekoncyliacja otwiera własną. */
   przebudujSprawy();
+  /* Trzy szablony na start (0.133.0) — demo pustej listy uczy, że funkcji
+     nie ma. Treści są celowo ZWYKŁE: tak pisze agent, gdy nie ma czasu. */
+  szablonyDemo();
   /* Oś czasu z tego samego powodu (0.130.0): demo bez historii pokazywałoby
      pustą sekcję w każdej sprawie i wyglądało na zepsute. Dosypka czyta
      wyłącznie stemple, które seed właśnie zapisał. */
@@ -1776,4 +1779,38 @@ if (wprost) {
   } else {
     wypisz(zbudujScenariusze());
   }
+}
+
+/** Szablony odpowiedzi na start (0.133.0) — trzy najczęstsze sytuacje. */
+function szablonyDemo(): void {
+  const d = db();
+  if ((d.prepare("SELECT COUNT(*) AS n FROM szablon").get() as { n: number }).n > 0) return;
+  const teraz = new Date().toISOString();
+  const wstaw = d.prepare(
+    `INSERT INTO szablon (nazwa, kanal, tresc, autor, utworzono_at, aktualizowano_at)
+     VALUES (?,?,?, 'seed', ?, ?)`
+  );
+  const szablony: Array<[string, string, string]> = [
+    [
+      "Zwrot przyjęty",
+      "dowolny",
+      "Dzień dobry {{klient}},\n\npaczka ze zwrotem {{zwrot}} do zamówienia {{zamowienie}} " +
+        "dotarła do nas i jest w trakcie sprawdzania. O decyzji dam znać w tej rozmowie.\n\n" +
+        "Pozdrawiam\n{{ja}}",
+    ],
+    [
+      "Prośba o numer zamówienia",
+      "pytanie",
+      "Dzień dobry,\n\nżeby sprawdzić sprawę, potrzebuję numeru zamówienia — jest w Allegro " +
+        "w zakładce „Moje zakupy”. Odpiszę od razu, gdy go otrzymam.\n\nPozdrawiam\n{{ja}}",
+    ],
+    [
+      "Środki wracają dziś",
+      "dyskusja",
+      "Dzień dobry {{klient}},\n\nzwrot został rozliczony — środki wracają dziś tą samą drogą, " +
+        "którą przyszła płatność. Zaksięgowanie po stronie banku trwa zwykle do dwóch dni " +
+        "roboczych.\n\nPozdrawiam\n{{ja}}",
+    ],
+  ];
+  for (const [nazwa, kanal, tresc] of szablony) wstaw.run(nazwa, kanal, tresc, teraz, teraz);
 }

@@ -184,9 +184,12 @@ poprzedniego na produkcji.
   dostaje go od zwrotu z tej samej sprawy. Czyta się NA KLIK i nie zapisuje:
   status płatności starzeje się w godziny. Adres dostawy dalej nie przechodzi
   przez mapowanie.
-- **E2 — szablony odpowiedzi:** gotowe teksty ze zmiennymi, wstawiane do pola
-  odpowiedzi. Najczęstsza robota agenta i pierwsza rzecz, którą Responso
-  robi dobrze.
+- **E2 (0.133.0, wykonany) — szablony odpowiedzi:** gotowe teksty z polami
+  `{{klient}}`, `{{zamowienie}}`, `{{zwrot}}`, `{{oferta}}`, `{{ja}}`,
+  wstawiane w miejsce kursora przy każdym polu odpowiedzi. Podstawia SERWER,
+  bo tylko on wie, co stoi w sprawie; pole, którego sprawa nie zna, zostaje
+  widoczną klamrą — panel mówi wprost, co uzupełnić ręką. Redaguje je biuro
+  w ustawieniach, wysyła zawsze człowiek.
 - **E3 — raporty czasów:** ile czekał klient, ile trwała odpowiedź, na osobę
   i na kanał. Zdarzenia osi czasu (0.130.0) są już do tego wystarczające.
 - **E4 — opinie Allegro jako piąte źródło:** nowy rejestr i nowy rodzaj

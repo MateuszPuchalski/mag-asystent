@@ -1659,6 +1659,12 @@ zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
 w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
+Od 0.133.0 przy każdym polu odpowiedzi stoi wybierak SZABLON. Teksty
+redaguje biuro w USTAWIENIACH, karta SZABLONY ODPOWIEDZI. Pola w klamrach
+(`{{klient}}`, `{{zamowienie}}`, `{{zwrot}}`, `{{oferta}}`, `{{ja}}`)
+wypełnia serwer danymi sprawy; czego nie zna, to zostaje w klamrze do
+uzupełnienia ręką.
+
 Od 0.132.0 przy zwrocie i dyskusji jest zwijana sekcja ZAMÓWIENIE
 I PRZESYŁKA. Pokazuje status zamówienia, płatność (kwota, sposób, czy
 zapłacone), metodę dostawy, paczki i ostatnie zdarzenie śledzenia. Dane jadą z Allegro

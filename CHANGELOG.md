@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.133.0 — 29 sierpnia 2026
+
+**Szablony odpowiedzi.** Etap E2 z mapy w `docs/architektura-spraw.md`:
+gotowe teksty wstawiane do pola odpowiedzi jednym kliknięciem.
+
+**Wybierak stoi przy każdym polu odpowiedzi** — przy pytaniu, przy dyskusji
+i w bloku ODPOWIEDZ W SPRAWIE. Lista jest zawężona do kanału, w którym się
+odpowiada; szablony oznaczone jako `dowolny` widać wszędzie. Tekst ląduje
+w miejscu kursora, a nie zamiast całego pola.
+
+**Pola w klamrach podstawia serwer.** `{{klient}}`, `{{zamowienie}}`,
+`{{zwrot}}`, `{{oferta}}` i `{{ja}}` wypełniają się danymi tej sprawy —
+tylko serwer wie, co w niej naprawdę stoi. Pole, którego sprawa nie zna,
+ZOSTAJE w tekście jako klamra, a panel wypisuje, czego zabrakło. Pusty
+łańcuch dałby zdanie z dziurą, które poszłoby do klienta niezauważone.
+Zamaskowany login `client:44300444` nigdy nie trafia w powitanie.
+
+**Redaguje biuro, nie admin.** Kto odpowiada klientom, ten wie, które zdania
+działają — karta SZABLONY ODPOWIEDZI stoi pierwsza w ustawieniach, bo dopisuje
+się do niej po każdej rozmowie, która się powtórzyła. Dodanie, edycja
+i skasowanie zostawiają ślad w dzienniku zdarzeń.
+
+**Wstawienie szablonu niczego nie zapisuje.** To odczyt — wysyła dalej
+człowiek, osobnym kliknięciem i za potwierdzeniem. Automat nie mówi do
+klienta sam i nic w tej wersji tego nie zmienia.
+
+**Trzy szablony na start.** Nowa instalacja demo dostaje „Zwrot przyjęty",
+„Prośba o numer zamówienia" i „Środki wracają dziś" — pusta lista uczyłaby,
+że funkcji nie ma.
+
 ## 0.132.0 — 29 sierpnia 2026
 
 **Zamówienie, płatność i paczka przy sprawie.** Etap E1 z mapy

@@ -1027,6 +1027,10 @@
 
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
 
+  /* Rząd przycisków pod formularzem (0.133.0). Klasa, nie atrybut `style`:
+     ustawienia mają odstępy z arkusza i pilnuje tego test. */
+  .rzadAkcji { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
   /* ── Sekcja zwijana ────────────────────────────────────────────────────────
      Natywny <details>, bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo,
      a strona nie ma kroku budowania, w którym dałoby się to dorobić taniej.
@@ -1627,6 +1631,8 @@
       <div class="dok-odpowiedzi" id="dyskusjaOdpowiedzBlok">
         <div id="dyskusjaOdpowiedzGora">
           <h2>ODPOWIEDŹ</h2>
+          <select class="szablonWybor" id="dyskusjaSzablony" data-kanal="dyskusja"
+            data-pole="dyskusjaOdpowiedz" data-ekran="dyskusja"></select>
           <span class="mute" id="dyskusjaSzkicInfo"></span>
         </div>
         <textarea id="dyskusjaOdpowiedz" rows="6" style="width:100%"></textarea>
@@ -1710,6 +1716,10 @@
              i stoi pod polem. -->
         <div id="pytanieOdpowiedzGora">
           <h2>ODPOWIEDŹ</h2>
+          <!-- Wybierak szablonu (0.133.0): lista zawężona do kanału tego
+               ekranu, wstawia tekst w miejsce kursora. -->
+          <select class="szablonWybor" id="pytanieSzablony" data-kanal="pytanie"
+            data-pole="pytanieOdpowiedz" data-ekran="pytanie"></select>
           <span class="mute" id="pytanieSzkicInfo"></span>
           <span id="pytanieAkcjeSzkicu"></span>
         </div>
@@ -2374,6 +2384,45 @@
     <!-- Zapis wymaga roli admin i mówi o tym serwer, nie przeglądarka: rola
          nie jest tu znana, więc przycisk widzą wszyscy, a odmowę wypowiada
          trasa. Pola stoją jawnie — w widoku ustawień nie ma czego chować. -->
+    <!-- SZABLONY ODPOWIEDZI (0.133.0). Stoją PIERWSZE w ustawieniach, bo
+         dotyka się ich najczęściej: prompt eksperta pisze się raz na kwartał,
+         a szablon dopisuje się po każdej rozmowie, która się powtórzyła.
+         Zapis dostępny dla biura, nie tylko admina — kto odpowiada klientom,
+         ten wie, które zdania działają. -->
+    <section class="card" id="szablonyKarta">
+      <h2>SZABLONY ODPOWIEDZI <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute">
+          Gotowe teksty wstawiane do pola odpowiedzi jednym kliknięciem.
+          W treści wolno użyć pól w klamrach: <code>{{klient}}</code>,
+          <code>{{zamowienie}}</code>, <code>{{zwrot}}</code>,
+          <code>{{oferta}}</code>, <code>{{ja}}</code>. Pole, którego sprawa
+          nie zna, zostaje w tekście jako klamra — widać wtedy, co uzupełnić
+          ręką. Szablon zawsze poprawia i wysyła człowiek.
+        </p>
+      </div>
+      <table id="szablonyLista"></table>
+      <div class="filtry">
+        <div><label for="szablonNazwa">NAZWA</label>
+          <input id="szablonNazwa" size="28" placeholder="np. Zwrot przyjęty"></div>
+        <div><label for="szablonKanal">KANAŁ</label>
+          <select id="szablonKanal">
+            <option value="dowolny">dowolny</option>
+            <option value="pytanie">pytanie</option>
+            <option value="dyskusja">dyskusja</option>
+          </select></div>
+      </div>
+      <label for="szablonTresc">TREŚĆ</label>
+      <textarea id="szablonTresc" rows="4"
+        placeholder="Dzień dobry {{klient}}, zwrot {{zwrot}} przyjęliśmy…"></textarea>
+      <div class="rzadAkcji">
+        <button class="akcja" id="szablonZapisz">DODAJ SZABLON</button>
+        <button class="akcja cichy" id="szablonNowy" hidden>NOWY</button>
+        <span class="mute" id="szablonStan"></span>
+      </div>
+    </section>
+
     <section class="card" id="pytaniaKonfiguracjaKarta">
       <h2>PROMPT EKSPERTA I FAKTY FIRMOWE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -2712,7 +2761,7 @@ function pokaz(nowy) {
   /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
      Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
      przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
-  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); }
+  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); wczytajSzablony(); }
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -4968,7 +5017,12 @@ async function odswiez() {
          ma być widać na żywo, tak samo jak postęp tej otwartej. */
       if (kolejkaZostaje()) await odswiezDostawy();
     } else await odswiezDostawy();
-  } else if (widok === "sprawy") await odswiezSprawy();
+  } else if (widok === "sprawy") {
+    await odswiezSprawy();
+    /* Szablony wczytujemy RAZ, przy pierwszym wejściu na sprawy — wybieraki
+       przy polach odpowiedzi mają być gotowe, zanim ktoś otworzy sprawę. */
+    if (szablonyWszystkie.length === 0) await wczytajSzablony();
+  }
   else if (widok === "nadzor") await odswiezNadzor();
   /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
      w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
@@ -5833,9 +5887,14 @@ function rysujKanalySprawy(ekran) {
       placeholder="Odpowiedź przez ${esc(wybrany.etykieta)}…">${esc(kanalTekst[ekran])}</textarea>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
       <button class="akcja" data-kanal-wyslij>WYŚLIJ PRZEZ ALLEGRO</button>
+      <select class="szablonWybor" data-kanal="${esc(wybrany.rodzaj)}"
+        data-pole="${ekran}KanalTresc" data-ekran="${ekran}"></select>
       <span class="mute">${esc(wybrany.etykieta)}${
         wybrany.tytul ? ` · ${esc(wybrany.tytul)}` : ""}</span>
     </div>` : "");
+  /* Wybierak szablonów powstał przed chwilą razem z blokiem — wypełniamy go
+     z listy, którą panel już ma w pamięci (0.133.0). */
+  rysujWybierakiSzablonow();
 }
 
 /* Gwiazdka przy kanale znaczy: TU klient odezwał się ostatni. Wybór zostaje
@@ -5976,6 +6035,176 @@ async function wczytajZamowienieSprawy(ekran, id, sekcja, cel) {
   } catch (e) {
     $(cel).innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
   }
+}
+
+
+/* ── Szablony odpowiedzi (0.133.0) ───────────────────────────────────────────
+   Etap E2. Gotowe teksty wstawiane do pola odpowiedzi jednym kliknięciem —
+   z podstawionymi danymi sprawy. Podstawia SERWER, bo tylko on wie, co
+   naprawdę stoi w sprawie; przeglądarka wkleja gotowy tekst w miejsce kursora.
+
+   Pole, którego sprawa nie zna, wraca jako widoczna klamra `{{zamowienie}}` —
+   i panel mówi o tym wprost. Pusty łańcuch dałby zdanie z dziurą, które
+   poszłoby do klienta niezauważone. */
+let szablonyWszystkie = [];
+let szablonEdytowany = null;
+
+async function wczytajSzablony() {
+  try {
+    const d = await (await api("/api/biuro/szablony")).json();
+    szablonyWszystkie = d.szablony || [];
+  } catch {
+    /* Brak szablonów nie może wywrócić panelu — pola odpowiedzi działają bez
+       nich tak samo jak przed 0.133.0. */
+    szablonyWszystkie = [];
+  }
+  rysujSzablonyUstawienia();
+  rysujWybierakiSzablonow();
+}
+
+function rysujSzablonyUstawienia() {
+  $("szablonyLista").innerHTML = szablonyWszystkie.length
+    ? szablonyWszystkie.map((s) => `<tr>
+        <td><strong>${esc(s.nazwa)}</strong></td>
+        <td><span class="badge mute2">${esc(s.kanal)}</span></td>
+        <td class="mute">${esc(s.tresc.length > 60 ? s.tresc.slice(0, 60) + "…" : s.tresc)}</td>
+        <td style="white-space:nowrap">
+          <button class="akcja cichy" data-szablon-edytuj="${s.id}"
+            style="font-size:11px;padding:4px 8px">EDYTUJ</button>
+          <button class="akcja cichy" data-szablon-kasuj="${s.id}"
+            style="font-size:11px;padding:4px 8px">SKASUJ</button></td>
+      </tr>`).join("")
+    : '<tr><td class="mute">Nie ma jeszcze żadnego szablonu.</td></tr>';
+}
+
+/* Lista w wybieraku jest ZAWĘŻONA do kanału ekranu: formuła z dyskusji brzmi
+   obco w wątku o dobór części. Szablony `dowolny` zostają wszędzie. */
+function rysujWybierakiSzablonow() {
+  for (const wybor of document.querySelectorAll(".szablonWybor")) {
+    const kanal = wybor.dataset.kanal;
+    const pasujace = szablonyWszystkie.filter((s) => s.kanal === "dowolny" || s.kanal === kanal);
+    wybor.innerHTML = `<option value="">SZABLON…</option>` +
+      pasujace.map((s) => `<option value="${s.id}">${esc(s.nazwa)}</option>`).join("");
+    wybor.hidden = pasujace.length === 0;
+  }
+}
+
+/** Wstawia tekst w miejsce kursora — nie na końcu i nie zamiast całości. */
+function wstawWPole(pole, tekst) {
+  const od = pole.selectionStart ?? pole.value.length;
+  const do_ = pole.selectionEnd ?? od;
+  /* Dopisek do NIEPUSTEGO pola dostaje pustą linię przed sobą — bez niej
+     szablon skleja się z ostatnim zdaniem szkicu w jeden akapit. */
+  const przed = pole.value.slice(0, od);
+  const wstawka = przed.trim() !== "" && !przed.endsWith("\n") ? `\n\n${tekst}` : tekst;
+  pole.value = przed + wstawka + pole.value.slice(do_);
+  const koniec = od + wstawka.length;
+  pole.setSelectionRange(koniec, koniec);
+  pole.focus();
+}
+
+async function wstawSzablon(wybor) {
+  const id = Number(wybor.value);
+  wybor.value = "";
+  if (!id) return;
+  const ekran = wybor.dataset.ekran;
+  const zrodlo = { pytanie: otwartePytanie, zwrot: otwartyZwrot, dyskusja: otwartaDyskusja }[ekran];
+  if (zrodlo == null) return;
+  try {
+    const d = await (await api(
+      `/api/biuro/szablony/${id}/dla?rodzaj=${ekran}&id=${zrodlo}`
+    )).json();
+    wstawWPole($(wybor.dataset.pole), d.tresc);
+    /* Czego nie dało się podstawić — mówimy wprost, bo klamra w środku
+       akapitu bywa przeoczona i poszłaby do klienta. */
+    toast(d.brakujace.length
+      ? `Szablon wstawiony — uzupełnij: ${d.brakujace.join(", ")}`
+      : "Szablon wstawiony ✓");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function zapiszSzablonZFormularza() {
+  const nazwa = $("szablonNazwa").value;
+  const kanal = $("szablonKanal").value;
+  const tresc = $("szablonTresc").value;
+  const dane = JSON.stringify({ nazwa, kanal, tresc });
+  try {
+    /* Dwa jawne wywołania, nie jedno z metodą w zmiennej: licznik zapisów
+       w `routes/biuro.test.ts` ma widzieć każdy zapis wprost, a metoda
+       ukryta w ternarnym wyrażeniu przemyka mu pod nosem. */
+    if (szablonEdytowany) {
+      await api(`/api/biuro/szablony/${szablonEdytowany}`, { method: "PUT", body: dane });
+    } else {
+      await api("/api/biuro/szablony", { method: "POST", body: dane });
+    }
+    toast(szablonEdytowany ? "Szablon zapisany ✓" : "Szablon dodany ✓");
+    nowySzablon();
+    await wczytajSzablony();
+  } catch (e) {
+    $("szablonStan").textContent = e.message;
+  }
+}
+
+function nowySzablon() {
+  szablonEdytowany = null;
+  $("szablonNazwa").value = "";
+  $("szablonTresc").value = "";
+  $("szablonKanal").value = "dowolny";
+  $("szablonZapisz").textContent = "DODAJ SZABLON";
+  $("szablonNowy").hidden = true;
+  $("szablonStan").textContent = "";
+}
+
+function edytujSzablon(id) {
+  const s = szablonyWszystkie.find((x) => x.id === id);
+  if (!s) return;
+  szablonEdytowany = id;
+  $("szablonNazwa").value = s.nazwa;
+  $("szablonKanal").value = s.kanal;
+  $("szablonTresc").value = s.tresc;
+  $("szablonZapisz").textContent = "ZAPISZ ZMIANY";
+  $("szablonNowy").hidden = false;
+  $("szablonStan").textContent = `Edytujesz „${s.nazwa}”.`;
+}
+
+async function skasujSzablon(id) {
+  const s = szablonyWszystkie.find((x) => x.id === id);
+  const zgoda = await potwierdz({
+    tytul: "SKASOWANIE SZABLONU",
+    opis: `Szablon „${s?.nazwa ?? id}” zniknie z listy przy każdym polu odpowiedzi.`,
+    potwierdz: "SKASUJ",
+  });
+  if (!zgoda) return;
+  try {
+    await api(`/api/biuro/szablony/${id}`, { method: "DELETE" });
+    if (szablonEdytowany === id) nowySzablon();
+    toast("Szablon skasowany ✓");
+    await wczytajSzablony();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/* Delegacja na KARCIE, nie na tabeli: tabela jest przerysowywana po każdym
+   zapisie, więc nasłuch na niej ginąłby razem z nią. */
+$("szablonyKarta").addEventListener("click", (e) => {
+  const edytuj = e.target.closest("[data-szablon-edytuj]");
+  if (edytuj) return edytujSzablon(Number(edytuj.dataset.szablonEdytuj));
+  const kasuj = e.target.closest("[data-szablon-kasuj]");
+  if (kasuj) return skasujSzablon(Number(kasuj.dataset.szablonKasuj));
+});
+$("szablonZapisz").addEventListener("click", zapiszSzablonZFormularza);
+$("szablonNowy").addEventListener("click", nowySzablon);
+
+/* Wybieraki stoją w trzech sekcjach spraw i jeden z nich powstaje dopiero
+   przy rysowaniu bloku kanałów — dlatego nasłuch na sekcjach, nie na polach. */
+for (const sekcja of ["pytanieSzczegol", "zwrotSzczegol", "dyskusjaSzczegol"]) {
+  $(sekcja).addEventListener("change", (e) => {
+    const wybor = e.target.closest(".szablonWybor");
+    if (wybor) wstawSzablon(wybor);
+  });
 }
 
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────

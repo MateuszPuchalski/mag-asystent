@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    40,
+    41,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -213,22 +213,28 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "z ekranu sąsiedniego kanału tej samej sprawy. Agent oceniający zwrot " +
       "musiał dotąd przejść na drugi ekran, żeby odpisać klientowi czekającemu " +
       "w dyskusji. Wysyłka dzieje się po jawnym kliknięciu I po potwierdzeniu " +
-      "w okienku, a kontrola świeżości działa tak samo jak przy własnym polu."
+      "w okienku, a kontrola świeżości działa tak samo jak przy własnym polu." +
+      "\n\nPOST i PUT z 0.133.0 to jedno pole formularza szablonów: DODAJ " +
+      "zakłada nowy, ZAPISZ ZMIANY nadpisuje wskazany. Szablon to tekst DO " +
+      "POPRAWIENIA, nie wysyłka — wstawienie go do odpowiedzi jest czystym " +
+      "odczytem i nie podnosi żadnego licznika."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    8,
+    9,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
       "wgranie logo dostawcy, półka reklamacyjna, notatka do dyskusji " +
-      "Allegro, prompt eksperta i fakty firmowe (0.80.0) oraz przełącznik " +
+      "Allegro, prompt eksperta i fakty firmowe (0.80.0), przełącznik " +
       "automatycznego szkicu AI (0.107.0) — ten ostatni po to, by biuro " +
-      "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie"
+      "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie — " +
+      "oraz edycja szablonu odpowiedzi (0.133.0)"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    4,
+    5,
     "DELETE to odpięcie dokumentu zwrotu, odpięcie kosza, rozłączenie " +
-      "konta Allegro i skasowanie logo dostawcy"
+      "konta Allegro, skasowanie logo dostawcy i skasowanie szablonu " +
+      "odpowiedzi (0.133.0)"
   );
   /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
      są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
@@ -1618,4 +1624,30 @@ test("zamówienie przy sprawie: na klik, bez adresu, tylko odczyt (0.132.0)", ()
   }
   assert.ok(!/dostawaAdres|pickupPoint|adresDostawy/.test(html),
     "adres dostawy nie ma czego szukać na ekranie sprawy");
+});
+
+test("szablony: wybierak przy każdym polu odpowiedzi, wstawienie to odczyt (0.133.0)", () => {
+  /* Etap E2. Trzy granice warte testu.
+
+     PIERWSZA: wybierak stoi przy KAŻDYM polu odpowiedzi — przy pytaniu, przy
+     dyskusji i w bloku kanałów sprawy (ten powstaje dopiero przy rysowaniu,
+     więc nasłuch musi siedzieć na sekcji, nie na polu).
+
+     DRUGA: wstawienie szablonu NICZEGO nie zapisuje. Zapisy szablonów są
+     w ustawieniach, za jawnym kliknięciem — nie przy pisaniu odpowiedzi.
+
+     TRZECIA: karta ustawień deleguje z KARTY, bo tabelę przerysowuje każdy
+     zapis (ta sama usterka co przy wyszukiwarce klientów w 0.114.0). */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const wybieraki = [...html.matchAll(/class="szablonWybor"/g)];
+  assert.equal(wybieraki.length, 3, "pytanie, dyskusja i blok kanałów sprawy");
+  assert.ok(html.includes('$("szablonyKarta").addEventListener("click"'),
+    "karta szablonów deleguje z poziomu sekcji");
+  const wstawienie = [...html.matchAll(/\/api\/biuro\/szablony\/\$\{id\}\/dla\?rodzaj=/g)];
+  assert.equal(wstawienie.length, 1, "jedna droga wstawienia na trzy pola");
+  for (const m of wstawienie) {
+    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
+    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
+      "wstawienie szablonu to czysty odczyt");
+  }
 });

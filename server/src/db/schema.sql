@@ -1128,3 +1128,29 @@ CREATE TABLE IF NOT EXISTS sprawa_zdarzenie (
 );
 -- Odczyt zawsze pyta o komplet źródeł jednej sprawy i sortuje po czasie.
 CREATE INDEX IF NOT EXISTS ix_sprawa_zdarzenie ON sprawa_zdarzenie(rodzaj, lokalny_id, kiedy_at);
+
+-- ── Szablony odpowiedzi (0.133.0) ───────────────────────────────────────────
+-- Etap E2 z docs/architektura-spraw.md; zapożyczenie od Responso wypisane
+-- wprost w tamtym dokumencie. Agent pisze te same trzy zdania po raz setny:
+-- „paczka wróciła, środki oddajemy dziś", „proszę o numer zamówienia",
+-- „zgłoszenie przyjęte". Szablon jest TEKSTEM DO POPRAWIENIA, nie wysyłką:
+-- wkleja się do pola odpowiedzi, a wysyła człowiek (zasada 6 — automat nigdy
+-- nie mówi do klienta sam).
+--
+-- `kanal` zawęża listę do miejsca, w którym się odpowiada: formuła grzeczności
+-- z dyskusji brzmi obco w wątku o dobór części. `dowolny` pasuje wszędzie.
+--
+-- Bez licznika użyć: policzenie kliknięcia wymagałoby ZAPISU przy samym
+-- wstawianiu tekstu, a szablonów jest kilkanaście i właściciel wie, których
+-- używa. Gdyby kiedyś było inaczej, liczbę policzy oś czasu sprawy.
+CREATE TABLE IF NOT EXISTS szablon (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa            TEXT NOT NULL,
+  kanal            TEXT NOT NULL DEFAULT 'dowolny'
+                     CHECK (kanal IN ('dowolny','pytanie','dyskusja')),
+  tresc            TEXT NOT NULL,
+  autor            TEXT NOT NULL,
+  utworzono_at     TEXT NOT NULL,
+  aktualizowano_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_szablon_kanal ON szablon(kanal, nazwa);
