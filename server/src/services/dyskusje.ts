@@ -220,6 +220,13 @@ export interface WynikSynchronizacjiDyskusji {
   nowych: number;
   zamknietychPrzezAllegro: number;
   przejrzanych: number;
+  /* Metadane rozmów otwartych spraw (0.129.0). Trzy kubełki domykają liczbę
+     otwartych dyskusji: pobrane, niedostępne przez API i odłożone przez
+     sufit. Suma bez rozbicia kłamałaby tak samo jak „przejrzano 2, nowych 0"
+     przy pytaniach — patrz `pominiete` w services/pytania.ts. */
+  rozmow: number;
+  bezRozmowy: number;
+  pominietychRozmow: number;
 }
 
 /**
@@ -233,6 +240,9 @@ export interface StanSynchronizacjiDyskusji {
   nowych: number;
   zamknietychPrzezAllegro: number;
   przejrzanych: number;
+  rozmow: number;
+  bezRozmowy: number;
+  pominietychRozmow: number;
   /* Wartości `status_allegro` spoza znanych list — do potwierdzenia przez
      właściciela na żywym koncie (patrz ZNANE_STATUSY_OTWARTE). */
   nieznaneStatusy: string[];
@@ -251,6 +261,65 @@ function znajdzZwrot(orderId: string | null): number | null {
     .prepare("SELECT id FROM zwrot WHERE allegro_order_id = ? ORDER BY id DESC LIMIT 1")
     .get(orderId) as { id: number } | undefined;
   return w?.id ?? null;
+}
+
+/**
+ * Ile rozmów wolno dociągnąć w JEDNYM pobraniu (0.129.0).
+ *
+ * Metadanych rozmowy `/sale/issues` nie zwraca — trzeba po nie pójść osobno,
+ * jeden GET na sprawę. Bez sufitu konto z setkami otwartych dyskusji
+ * zamieniłoby jedno kliknięcie w kilkuminutowe zawieszenie przycisku.
+ * Sto spraw to około pół minuty; reszta dogania się w kolejnych pobraniach,
+ * a licznik na ekranie mówi, ile czeka.
+ */
+const SUFIT_ROZMOW = 100;
+
+/**
+ * Metadane rozmów otwartych spraw — piłka („kto ma ruch") dla dyskusji.
+ *
+ * Kolejność jest częścią projektu, nie ozdobą: najpierw sprawy bez żadnych
+ * metadanych, potem te z najstarszymi. Stały porządek (np. po id) sprawiłby,
+ * że po przekroczeniu sufitu ten sam ogon zostaje ślepy w nieskończoność.
+ *
+ * TREŚCI NIE ZAPISUJEMY — rozmowa przelatuje tędy tylko po to, żeby policzyć
+ * metadane (zasada prywatności; patrz services/watek-meta.ts).
+ */
+async function dociagnijRozmowy(): Promise<{
+  rozmow: number;
+  bezRozmowy: number;
+  pominietychRozmow: number;
+}> {
+  const otwarte = db()
+    .prepare(
+      `SELECT d.allegro_id AS allegro_id
+         FROM dyskusja d
+         LEFT JOIN watek_meta m ON m.rodzaj = 'dyskusja' AND m.allegro_id = d.allegro_id
+        WHERE d.status IN ('nowa','w_toku') AND d.allegro_id IS NOT NULL
+        ORDER BY m.aktualizowano_at IS NOT NULL, m.aktualizowano_at ASC`
+    )
+    .all() as Array<{ allegro_id: string }>;
+
+  const adapter = allegroAdapter();
+  let rozmow = 0;
+  let bezRozmowy = 0;
+  const doPobrania = otwarte.slice(0, SUFIT_ROZMOW);
+  for (const { allegro_id } of doPobrania) {
+    try {
+      const lista = await adapter.wiadomosciDyskusji(allegro_id);
+      /* `null` = zasób w becie oddał 404: rozmowa niedostępna, nie awaria.
+         Piłka takiej sprawy spada na dotychczasowy trop (`wyslano_at`). */
+      if (lista === null) bezRozmowy++;
+      else {
+        zapiszMetaDyskusji(allegro_id, lista, "sync");
+        rozmow++;
+      }
+    } catch {
+      /* Jedna sprawa nie ma prawa wywalić całego przebiegu — degradacja
+         w stronę starszych metadanych, nie w stronę błędu pobrania. */
+      bezRozmowy++;
+    }
+  }
+  return { rozmow, bezRozmowy, pominietychRozmow: otwarte.length - doPobrania.length };
 }
 
 /** Jeden przebieg synchronizacji: sprawy z `/sale/issues` do lokalnego rejestru. */
@@ -342,17 +411,21 @@ export async function synchronizujDyskusje(autor: string): Promise<WynikSynchron
   for (const status of nieznane) {
     logEvent("dyskusja_status_nieznany", autor, null, { status, ile: statusy[status] });
   }
+  /* Rozmowy dociągamy PO auto-zamknięciach: sprawa zamknięta w tym samym
+     przebiegu nie ma po co oddawać swojej rozmowy. */
+  const rozmowy = await dociagnijRozmowy();
   stanSynchronizacji = {
     at: teraz,
     przez: autor,
     nowych,
     zamknietychPrzezAllegro,
     przejrzanych: sprawy.length,
+    ...rozmowy,
     nieznaneStatusy: nieznane,
   };
   /* Rejestr się zmienił — nakładka spraw dogania (0.128.0). */
   przebudujSprawy();
-  return { nowych, zamknietychPrzezAllegro, przejrzanych: sprawy.length };
+  return { nowych, zamknietychPrzezAllegro, przejrzanych: sprawy.length, ...rozmowy };
 }
 
 /**

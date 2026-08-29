@@ -76,7 +76,12 @@ export function zapiszMetaDyskusji(
     : ostatnia.autorRola === "ALLEGRO_ADVISOR"
       ? "allegro"
       : "klient";
-  const odKlienta = wiadomosci.filter((m) => !m.odNas && m.autorRola !== "ALLEGRO_ADVISOR");
+  /* `ostatnia_klient_id` to PUNKT ODNIESIENIA kontroli świeżości, więc liczy
+     każdy CUDZY głos — także mediatora Allegro. Filtrowanie advisora (jak
+     przy `ostatni_glos`, gdzie ma własne znaczenie) zapętlało wysyłkę:
+     rozmowa kończąca się głosem mediatora dawała 409 nawet po przeczytaniu,
+     bo punkt odniesienia cofał się do wcześniejszej wiadomości klienta. */
+  const odKlienta = wiadomosci.filter((m) => !m.odNas);
   upsert(
     "dyskusja",
     allegroId,
@@ -156,4 +161,33 @@ export function metaWatku(rodzaj: RodzajWatku, allegroId: string): MetaWatku | n
     zrodlo: w.zrodlo,
     aktualizowanoAt: w.aktualizowano_at,
   };
+}
+
+/**
+ * Wszystkie metadane jednego rodzaju naraz (0.129.0) — pod projekcję piłki
+ * w kolejce. Tabela ma jeden wiersz na wątek, więc pełny odczyt jest tańszy
+ * niż zapytanie per wiersz kolejki (ten sam wzorzec co `mapaZrodel`).
+ */
+export function metaHurtem(rodzaj: RodzajWatku): Map<string, MetaWatku> {
+  const wiersze = db()
+    .prepare(
+      `SELECT rodzaj, allegro_id, ostatni_glos, ostatnia_at, ostatnia_klient_id,
+              wiadomosci, zrodlo, aktualizowano_at
+         FROM watek_meta WHERE rodzaj = ?`
+    )
+    .all(rodzaj) as Array<Record<string, unknown>>;
+  const mapa = new Map<string, MetaWatku>();
+  for (const w of wiersze) {
+    mapa.set(w.allegro_id as string, {
+      rodzaj: w.rodzaj as RodzajWatku,
+      allegroId: w.allegro_id as string,
+      ostatniGlos: (w.ostatni_glos as MetaWatku["ostatniGlos"]) ?? null,
+      ostatniaAt: (w.ostatnia_at as string | null) ?? null,
+      ostatniaKlientId: (w.ostatnia_klient_id as string | null) ?? null,
+      wiadomosci: (w.wiadomosci as number | null) ?? null,
+      zrodlo: w.zrodlo as ZrodloMeta,
+      aktualizowanoAt: w.aktualizowano_at as string,
+    });
+  }
+  return mapa;
 }

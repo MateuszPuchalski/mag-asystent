@@ -69,8 +69,12 @@ test("dyskusja: ALLEGRO_ADVISOR to trzeci głos, nie klient", () => {
     "sync"
   );
   const m = M.metaWatku("dyskusja", "d2");
-  assert.equal(m?.ostatniGlos, "allegro");
-  assert.equal(m?.ostatniaKlientId, "m1", "id klienta wskazuje klienta, nie doradcę");
+  assert.equal(m?.ostatniGlos, "allegro", "głos mediatora ma własną nazwę — to nie klient");
+  assert.equal(
+    m?.ostatniaKlientId,
+    "m2",
+    "punkt odniesienia świeżości to ostatni CUDZY głos, mediator włącznie"
+  );
 });
 
 test("pytanie: ostatni głos nasz, ale id klienta zostaje jego", () => {
@@ -98,4 +102,19 @@ test("stempel wysyłki bez rozmowy nie zeruje licznika ani id klienta", () => {
 test("pusta rozmowa niczego nie zapisuje", () => {
   M.zapiszMetaDyskusji("d4", [], "odczyt");
   assert.equal(M.metaWatku("dyskusja", "d4"), null);
+});
+
+test("metaHurtem oddaje mapę tylko swojego rodzaju", () => {
+  M.zapiszMetaDyskusji("d9", [wiadDyskusji("m1", false, "2026-08-01T10:00:00Z")], "sync");
+  M.zapiszMetaPytania("t9", [wiadPytania("w1", true, "2026-08-01T10:00:00Z")], "sync");
+  const dysk = M.metaHurtem("dyskusja");
+  assert.equal(dysk.size, 1);
+  assert.equal(dysk.get("d9")?.ostatniGlos, "klient");
+  assert.equal(dysk.get("t9"), undefined, "wątek pytania nie przecieka do dyskusji");
+  assert.equal(M.metaHurtem("pytanie").size, 1);
+});
+
+test("metaHurtem na pustej tabeli daje pustą mapę, nie null", () => {
+  db().prepare("DELETE FROM watek_meta").run();
+  assert.equal(M.metaHurtem("dyskusja").size, 0);
 });

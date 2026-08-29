@@ -234,6 +234,10 @@ test("wysyłka: happy path — nowa idzie w toku, nadawca zostaje właścicielem
 test("załącznik: MIME i rozmiar sprawdzane U NAS, wysłany jedzie z wiadomością", async () => {
   await D.synchronizujDyskusje("Biuro");
   const sprawa = D.listaDyskusji().find((y) => y.allegroId === "dev-issue-2")!;
+  /* Od 0.129.0 sync zna ostatni głos w rozmowie, więc wysyłka bez jej
+     przeczytania jest wstrzymana kontrolą świeżości. Panel czyta rozmowę
+     przy otwarciu sprawy — test robi dokładnie to samo. */
+  await D.wiadomosciDyskusji(sprawa.id);
   D.zapiszOdpowiedzDyskusji(sprawa.id, "W załączniku protokół oględzin.", "Biuro");
 
   await assert.rejects(
@@ -351,11 +355,14 @@ test("odczyt rozmowy na klik zostawia metadane piłki", async () => {
   const M = await import("./watek-meta.js");
   await D.synchronizujDyskusje("test");
   const sprawa = D.listaDyskusji({}).find((x) => x.typ === "DISCUSSION")!;
-  assert.equal(M.metaWatku("dyskusja", sprawa.allegroId), null, "przed odczytem meta nie ma");
+  /* Od 0.129.0 metadane wypełnia już SYNCHRONIZACJA (dociąga rozmowy
+     otwartych spraw), a odczyt na klik je tylko odświeża — po to, żeby
+     kolejka znała piłkę, zanim ktokolwiek otworzy sprawę. */
+  assert.equal(M.metaWatku("dyskusja", sprawa.allegroId)?.zrodlo, "sync");
   const rozmowa = await D.wiadomosciDyskusji(sprawa.id);
   assert.ok(rozmowa && rozmowa.length > 0);
   const meta = M.metaWatku("dyskusja", sprawa.allegroId);
-  assert.ok(meta, "odczyt wypełnia watek_meta");
+  assert.ok(meta, "odczyt odświeża watek_meta");
   assert.equal(meta.zrodlo, "odczyt");
   assert.equal(meta.wiadomosci, rozmowa.length);
   assert.ok(meta.ostatniaKlientId, "id ostatniej wiadomości klienta zapisane");
@@ -369,10 +376,12 @@ test("stale meta blokuje wysyłkę bez id z panelu; wysyłka stempluje `my`", as
 
   /* Serwer pamięta id klienta, którego w rozmowie nie ma na końcu — czyli po
      ostatnim odczycie klient dopisał coś nowego. Panel id nie przysłał. */
+  /* Sync zdążył już zapisać metadane (0.129.0), więc cofamy sam punkt
+     odniesienia: serwer pamięta wiadomość, po której klient dopisał. */
   db()
     .prepare(
-      `INSERT INTO watek_meta (rodzaj, allegro_id, ostatnia_klient_id, zrodlo, aktualizowano_at)
-       VALUES ('dyskusja', ?, 'wiadomosc-sprzed-dopisku', 'odczyt', datetime('now'))`
+      `UPDATE watek_meta SET ostatnia_klient_id = 'wiadomosc-sprzed-dopisku'
+        WHERE rodzaj = 'dyskusja' AND allegro_id = ?`
     )
     .run(sprawa.allegroId);
   await assert.rejects(
@@ -389,4 +398,46 @@ test("stale meta blokuje wysyłkę bez id z panelu; wysyłka stempluje `my`", as
   assert.equal(meta?.ostatniGlos, "my", "po wysyłce piłka jest u klienta naszym głosem");
   assert.equal(meta?.zrodlo, "wysylka");
   assert.ok(meta?.ostatniaKlientId, "punkt odniesienia klienta przeżywa stempel");
+});
+
+/* ── Metadane rozmów w synchronizacji (0.129.0) ──────────────────────────────
+   Bez nich kolejka nie wie, czy dyskusja czeka na nas — a to jest cały powód,
+   dla którego przed 0.129.0 istniało pasmo „bez potwierdzenia".              */
+
+test("sync dociąga rozmowy otwartych spraw; kubełki domykają ich liczbę", async () => {
+  const M = await import("./watek-meta.js");
+  const wynik = await D.synchronizujDyskusje("Biuro");
+  const otwartych = D.listaDyskusji().length;
+  assert.equal(
+    wynik.rozmow + wynik.bezRozmowy + wynik.pominietychRozmow,
+    otwartych,
+    "suma kubełków równa się liczbie otwartych spraw"
+  );
+  assert.ok(wynik.rozmow > 0, "adapter dev oddaje rozmowy otwartych spraw");
+  assert.equal(wynik.pominietychRozmow, 0, "przy trzech sprawach sufit nie działa");
+
+  /* Sprawa ZAMKNIĘTA w tym samym przebiegu nie oddaje rozmowy — pobieranie
+     idzie po auto-zamknięciach, nie przed. */
+  const zamknieta = D.listaDyskusji({ status: "wszystkie" }).find(
+    (y) => y.statusAllegro === "CLOSED"
+  )!;
+  assert.equal(M.metaWatku("dyskusja", zamknieta.allegroId), null);
+
+  const stan = D.stanSynchronizacjiDyskusji();
+  assert.equal(stan?.rozmow, wynik.rozmow, "ekran widzi te same liczby co wynik");
+});
+
+test("rozmowa niedostępna przez API nie wywala przebiegu — ląduje w bezRozmowy", async () => {
+  await D.synchronizujDyskusje("Biuro");
+  /* Sprawa, której adapter nie zna pod API rozmów (404 zasobu w becie). */
+  db()
+    .prepare(
+      `INSERT INTO dyskusja (allegro_id, typ, status, temat, kupujacy_login,
+         widziano_at, utworzono_at)
+       VALUES ('iss-bez-rozmowy', 'DISCUSSION', 'nowa', 'Bez rozmowy', 'jan', ?, ?)`
+    )
+    .run(dniTemu(1), dniTemu(1));
+  const wynik = await D.synchronizujDyskusje("Biuro");
+  assert.ok(wynik.bezRozmowy >= 1, "404 rozmowy liczy się osobno, nie jako awaria");
+  assert.ok(wynik.rozmow > 0, "reszta spraw pobrała się mimo jednej niedostępnej");
 });

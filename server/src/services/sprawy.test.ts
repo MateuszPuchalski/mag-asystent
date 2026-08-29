@@ -269,3 +269,111 @@ test("podpowiedź po kupującym jest podpowiedzią, nie sklejeniem", async () =>
   );
   assert.deepEqual(powiazania.klient, [], "po loginie maska nigdy nie trafia");
 });
+
+/* ── Piłka: kto ma ruch (0.129.0) ────────────────────────────────────────────
+   Najważniejszy stan sprawy. Liczy się z rejestrów i metadanych wątku przy
+   KAŻDYM odczycie, więc nie może się zestarzeć — testy pilnują reguł per
+   rejestr, redukcji w sprawie wielźródłowej i tego, że piłka weszła do sortu
+   NIŻEJ niż ustawowy termin.                                                 */
+
+test("piłka pytania i zwrotu: otwarte czeka na nas, załatwione na nikogo", () => {
+  pytanie("jan", "nowe");
+  pytanie("ala", "wyslane");
+  zwrot("ewa", "oceniony");
+  zwrot("iza", "rozliczony");
+  const pilka = (login: string) => {
+    const { aktywne, historia } = S.sprawyKlienta(login);
+    return [...aktywne, ...historia][0]?.pilka;
+  };
+  assert.equal(pilka("jan"), "my", "pytanie w skrzynce czeka na nas");
+  assert.equal(pilka("ala"), "nikt", "po wysyłce sprawa jest zamknięta");
+  assert.equal(pilka("ewa"), "my", "zwrot oceniony czeka na zwrot środków — nasza robota");
+  assert.equal(pilka("iza"), "nikt", "rozliczony zwrot nie czeka na nikogo");
+});
+
+test("piłka dyskusji idzie za ostatnim głosem; głos Allegro liczy się jako nasz ruch", async () => {
+  const M = await import("./watek-meta.js");
+  const E = await import("./sprawa.js");
+  const a = dyskusja("jan", { status: "nowa" });
+  const b = dyskusja("ala", { status: "nowa" });
+  const c = dyskusja("ola", { status: "nowa" });
+  const idAllegro = (id: number) =>
+    (db().prepare("SELECT allegro_id FROM dyskusja WHERE id = ?").get(id) as { allegro_id: string })
+      .allegro_id;
+  const wiad = (id: string, odNas: boolean, rola: string | null) => ({
+    id, odNas, autorLogin: null, autorRola: rola, tresc: "x", at: "2026-08-20T10:00:00Z",
+    zalacznik: null,
+  });
+  M.zapiszMetaDyskusji(idAllegro(a), [wiad("m1", false, "BUYER")], "sync");
+  M.zapiszMetaDyskusji(idAllegro(b), [wiad("m1", true, "SELLER")], "sync");
+  M.zapiszMetaDyskusji(idAllegro(c), [wiad("m1", false, "ALLEGRO_ADVISOR")], "sync");
+  E.przebudujSprawy();
+
+  const wg = new Map(S.listaSpraw().map((s) => [s.klient, s.pilka]));
+  assert.equal(wg.get("jan"), "my", "ostatnie słowo klienta = nasz ruch");
+  assert.equal(wg.get("ala"), "klient", "odpowiedzieliśmy — czekamy na klienta");
+  assert.equal(wg.get("ola"), "my", "mediator Allegro zabrał głos — ktoś ma spojrzeć");
+});
+
+test("dyskusja bez metadanych spada na wyslano_at — nietknięta czeka na nas", () => {
+  const nietknieta = dyskusja("jan", { status: "nowa" });
+  const odpisana = dyskusja("ala", { status: "w_toku" });
+  db().prepare("UPDATE dyskusja SET wyslano_at = ? WHERE id = ?").run(teraz(), odpisana);
+  void nietknieta;
+  const wg = new Map(S.listaSpraw().map((s) => [s.klient, s.pilka]));
+  assert.equal(wg.get("jan"), "my", "nikt jej nie tknął — fallback stawia ją przed nami");
+  assert.equal(wg.get("ala"), "klient", "nasza wysyłka to ostatni znany ruch");
+});
+
+test("piłka sprawy jest najostrzejsza z otwartych źródeł", async () => {
+  const E = await import("./sprawa.js");
+  const z = zwrot("jan", "rozliczony", "zam-p1");
+  const d = dyskusja("jan", { status: "nowa", orderId: "zam-p1" });
+  E.przebudujSprawy();
+  void d;
+  const sprawy = S.listaSpraw();
+  assert.equal(sprawy.length, 1, "jedno zamówienie, jedna sprawa");
+  assert.equal(sprawy[0].pilka, "my", "zamknięty zwrot nie wycisza otwartej dyskusji");
+  void z;
+});
+
+test("piłka `nikt` wtedy i tylko wtedy, gdy sprawa zamknięta", async () => {
+  const E = await import("./sprawa.js");
+  pytanie("jan", "nowe");
+  pytanie("jan", "zamkniete");
+  const z = zwrot("ewa", "rozliczony");
+  reklamacja(z, "uznana");
+  dyskusja("ola", { status: "w_toku" });
+  E.przebudujSprawy();
+  for (const s of S.listaSpraw()) {
+    assert.equal(s.pilka === "nikt", !s.otwarta, `${s.rodzaj}: piłka i otwartość muszą się zgadzać`);
+    assert.equal(s.otwarta, true, "kolejka niesie tylko otwarte");
+  }
+  const { historia } = S.sprawyKlienta("ewa");
+  for (const s of historia) assert.equal(s.pilka, "nikt", "historia ma piłkę u nikogo");
+});
+
+test("piłka bije wiek w ogonie kolejki, ale nie rusza spraw z terminem", async () => {
+  const M = await import("./watek-meta.js");
+  const E = await import("./sprawa.js");
+  /* Dwie otwarte dyskusje bez ustawowego zegara: STARSZA czeka na klienta
+     (odpisaliśmy), MŁODSZA na nas. Przed 0.129.0 kolejność rozstrzygał sam
+     wiek, więc starsza stała pierwsza — a nie ma przy niej nic do zrobienia. */
+  const stara = dyskusja("stary", { status: "w_toku", od: dniTemu(20) });
+  const swieza = dyskusja("swiezy", { status: "nowa", od: dniTemu(3) });
+  const idAllegro = (id: number) =>
+    (db().prepare("SELECT allegro_id FROM dyskusja WHERE id = ?").get(id) as { allegro_id: string })
+      .allegro_id;
+  const wiad = (id: string, odNas: boolean) => ({
+    id, odNas, autorLogin: null, autorRola: odNas ? "SELLER" : "BUYER",
+    tresc: "x", at: dniTemu(1), zalacznik: null,
+  });
+  M.zapiszMetaDyskusji(idAllegro(stara), [wiad("m1", true)], "sync");
+  M.zapiszMetaDyskusji(idAllegro(swieza), [wiad("m1", false)], "sync");
+  E.przebudujSprawy();
+
+  const sprawy = S.listaSpraw();
+  assert.equal(sprawy[0].klient, "swiezy", "sprawa czekająca na nas idzie przed starszą");
+  assert.equal(sprawy[0].pilka, "my");
+  assert.equal(sprawy[1].pilka, "klient");
+});

@@ -19,9 +19,10 @@ rozbija jeden problem na obiekty: wątek wiadomości, dyskusję, CLAIM, zwrot.
 Klient pisze „gdzie paczka", zakłada dyskusję, w końcu odsyła towar — trzy
 obiekty, jeden problem. SPRAWA je agreguje; obiekty są źródłami sprawy.
 
-**2. Najważniejszy stan sprawy: kto ma piłkę.** Cztery wartości: MY, KLIENT,
-ŚWIAT (przewoźnik, Allegro), NIKT (zamknięta). Kolejka pracy to sprawy
-z piłką u nas, po terminie. Statusy Allegro są szczegółem źródła, nie osią.
+**2. Najważniejszy stan sprawy: kto ma piłkę.** Docelowo cztery wartości: MY,
+KLIENT, ŚWIAT (przewoźnik, Allegro), NIKT (zamknięta). Od 0.129.0 działają
+trzy — ŚWIAT czeka na producenta danych. Kolejka pracy to sprawy z piłką
+u nas, po terminie. Statusy Allegro są szczegółem źródła, nie osią.
 Decyzja właściciela: piłkę liczą METADANE (kto ostatni, kiedy, ile
 wiadomości) — treść rozmów dalej czyta się na klik i nie zapisuje.
 
@@ -109,11 +110,13 @@ Warunek wstępny: kolumna `kupujacy_id` przy pytaniach i odmaskowanie loginów.
 ## Ekran docelowy
 
 Powłoka z 0.125.0 zostaje: pasek boczny, konsola kolejka–sprawa–kontekst,
-MAGAZYN ZWROTÓW i REJESTRY osobno. Dwie zmiany czekają na model danych:
+MAGAZYN ZWROTÓW i REJESTRY osobno. Pasma już wiedzą, kto ma ruch; oś czasu
+czeka na etap D2:
 
-- Pasma kolejki przechodzą z wieku na **piłkę × termin**: PO TERMINIE,
-  TERMIN ≤7 DNI, CZEKA NA NAS, dalej zwinięte CZEKA NA KLIENTA
-  i U PRZEWOŹNIKA / ALLEGRO. Dzisiejsze pasma zgadują z wieku; docelowe wiedzą.
+- Pasma kolejki przeszły z wieku na **piłkę × termin** (0.129.0): PO TERMINIE,
+  TERMIN ≤7 DNI, TERMIN USTAWOWY, trzy pasma CZEKA NA NAS (wiek dzieli je
+  wewnątrz piłki) i zwinięte CZEKA NA KLIENTA. Pasmo U PRZEWOŹNIKA / ALLEGRO
+  dojdzie razem z piłką ŚWIAT.
 - Widok sprawy staje się **jedną osią czasu**: wszystkie kanały sprawy
   chronologicznie, jedno pole odpowiedzi z wyborem kanału (domyślnie kanał
   ostatniego głosu klienta). Unifikuje trzy dzisiejsze szczegóły — pytania,
@@ -139,8 +142,16 @@ poprzedniego na produkcji.
   Podpowiedź „ten sam kupujący" jest odczytem — SCAL i ROZKLEJ czekają
   na etap D; `kupujacy_id` przy dyskusjach to kandydat do E (wymaga
   czytania checkout-formów w sync).
-- **D — piłka i oś czasu:** `sprawa_zdarzenie` z projekcją piłki; pasma na
-  piłkę × termin; oś czasu w widoku sprawy i jedno pole odpowiedzi.
+- **D1 (0.129.0, wykonany) — piłka:** kto ma ruch (MY / KLIENT / NIKT) liczy
+  się przy odczycie ze statusów rejestrów i `watek_meta`; pasma przechodzą
+  z wieku na piłkę × termin; synchronizacja dyskusji dociąga metadane rozmów
+  otwartych spraw (sufit stu na pobranie); SCAL i ROZKLEJ potwierdzają
+  podpowiedź „ten sam kupujący" ręką człowieka. Piłka ŚWIAT (przewoźnik,
+  Allegro) czeka na producenta danych: tracking czyta się na żądanie i nigdzie
+  nie zapisuje, a zapowiedzi zwrotów nie są źródłem sprawy.
+- **D2 — oś czasu:** `sprawa_zdarzenie` jako append-only historia sprawy; oś
+  czasu w widoku sprawy i jedno pole odpowiedzi z wyborem kanału (unifikacja
+  trzech dzisiejszych szczegółów).
 - **E — narzędzia agenta:** szablony odpowiedzi; reguły tagowania
   i przydziału; opinie Allegro jako piąte źródło; raporty czasów; komplet
   kontekstu (płatność, zamówienie i przesyłka przy dyskusji, śledzenie

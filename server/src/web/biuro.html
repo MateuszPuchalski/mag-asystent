@@ -5090,35 +5090,45 @@ const PASMA = [
     czemu: "ustawowy zegar minął", gdy: (s) => s.poTerminie },
   { id: "termin", nazwa: "Termin za ≤7 dni", klasa: "termin", kolejnosc: 2,
     czemu: "CLAIM-y i reklamacje", gdy: (s) => s.dniDoTerminu != null && s.dniDoTerminu <= 7 },
-  /* Wyjmowane PRZED pasmami wieku, pokazywane POD nimi. Kolejka nie wie, czy
-     ta dyskusja czeka na nas: synchronizacja czyta status z Allegro, nie treść
-     rozmowy — pytania mają ten mechanizm (`ostatniaSeriaKupujacego` rejestruje
-     sprawę tylko, gdy ostatnie słowo należy do klienta), dyskusje nie. Do tego
-     lista statusów kończących sprawę jest oznaczona [WERYFIKUJ]. Czternaście
-     dni to ten sam ustawowy próg, którym mierzy się reklamacje: po nim brak
-     ruchu przestaje być normalnym tempem rozmowy. */
-  { id: "bezpotw", nazwa: "Dyskusje bez potwierdzenia", klasa: "", kolejnosc: 6,
-    czemu: "nie wiemy, czy czekają na nas", zwinietePoczatkowo: true,
-    gdy: (s) => s.rodzaj === "dyskusja" && !s.odpowiadalismy && !s.prowadzi
-      && dniOd(s.kiedy) > 14 },
-  { id: "tydzien", nazwa: "Czeka ponad tydzień", klasa: "", kolejnosc: 3,
-    czemu: "najstarsze bez terminu", gdy: (s) => dniOd(s.kiedy) > 7 },
-  { id: "kilka", nazwa: "Czeka kilka dni", klasa: "", kolejnosc: 4,
-    czemu: "", gdy: (s) => dniOd(s.kiedy) >= 2 },
-  { id: "dzis", nazwa: "Dziś i wczoraj", klasa: "", kolejnosc: 5,
-    czemu: "", zwinietePoczatkowo: true, gdy: () => true },
+  /* Sprawy z biegnącym zegarem powyżej tygodnia. Sort stawia je PRZED
+     bezterminowymi, więc bez własnego pasma rozerwałyby ciągłość pasm piłki
+     — a pasmo, które przeplata wiersze, kłamie o kolejności. Na produkcji
+     zwykle puste, więc się nie narysuje. */
+  { id: "terminDalej", nazwa: "Termin ustawowy", klasa: "termin", kolejnosc: 3,
+    czemu: "zegar biegnie", gdy: (s) => s.dniDoTerminu != null },
+  /* PIŁKA (0.129.0): trzy pasma „czeka na nas" różnią się wiekiem, bo sort
+     ma `kiedy` w ogonie — dzięki temu podpasma są spójnymi przedziałami
+     posortowanej listy. Jedno wielkie CZEKA NA NAS cofnęłoby zysk z 0.121.0
+     i zrobiło listę na 150 wierszy.
+     Pasmo „dyskusje bez potwierdzenia" ZNIKŁO w tym samym wydaniu: istniało
+     wyłącznie dlatego, że kolejka nie wiedziała, czy dyskusja czeka na nas.
+     Teraz wie — synchronizacja dociąga metadane rozmów. */
+  { id: "nasTydzien", nazwa: "Czeka na nas ponad tydzień", klasa: "", kolejnosc: 4,
+    czemu: "najstarsze bez terminu", gdy: (s) => s.pilka === "my" && dniOd(s.kiedy) > 7 },
+  { id: "nasKilka", nazwa: "Czeka na nas kilka dni", klasa: "", kolejnosc: 5,
+    czemu: "", gdy: (s) => s.pilka === "my" && dniOd(s.kiedy) >= 2 },
+  { id: "nasDzis", nazwa: "Czeka na nas — dziś i wczoraj", klasa: "", kolejnosc: 6,
+    czemu: "", zwinietePoczatkowo: true, gdy: (s) => s.pilka === "my" },
+  /* Piłka u klienta: odpisaliśmy i czekamy. Zwinięte, bo to NIE jest praca
+     do zrobienia — ale widoczne, bo klient bywa cichy przez tydzień i ktoś
+     musi o tym zdecydować. */
+  { id: "klient", nazwa: "Czeka na klienta", klasa: "", kolejnosc: 7,
+    czemu: "piłka po ich stronie", zwinietePoczatkowo: true, gdy: () => true },
 ];
 
-/* Które pasma są zwinięte. Domyślnie tylko dwa — najświeższe sprawy i dyskusje
-   bez potwierdzenia — i to one zamieniają 168 wierszy w ekran. Reszta stoi
-   otwarta, bo pasmo, które trzeba najpierw rozwinąć, nie odpowiada na „co
-   teraz zrobić". Pasmo PO TERMINIE nie daje się zwinąć w ogóle. */
+/* Które pasma są zwinięte. Domyślnie dwa — najświeższe sprawy czekające na nas
+   i te, w których piłka jest u klienta. Reszta stoi otwarta, bo pasmo, które
+   trzeba najpierw rozwinąć, nie odpowiada na „co teraz zrobić". Pasmo
+   PO TERMINIE nie daje się zwinąć w ogóle. */
 const pasmaZwiniete = {};
 for (const p of PASMA) if (p.zwinietePoczatkowo) pasmaZwiniete[p.id] = true;
 
 function pasmoSprawy(s) {
   for (const p of PASMA) if (p.gdy(s)) return p.id;
-  return "dzis";
+  /* Ostatnie pasmo ma warunek `() => true`, więc tu nie dojdziemy — ale
+     fallback wskazuje JE, a nie wpisaną z palca nazwę, która przy zmianie
+     listy zaczęłaby wskazywać pasmo, którego nie ma. */
+  return PASMA[PASMA.length - 1].id;
 }
 
 /**
@@ -5145,7 +5155,9 @@ function toOtwartaSprawa(s) {
 /** Wspólne atrybuty wiersza: jeden marker otwierania dla obu wariantów. */
 function znacznikiSprawy(s) {
   return `data-sprawa-rodzaj="${s.rodzaj}" data-sprawa-id="${s.id}"` +
-    (s.zwrotId ? ` data-sprawa-zwrot="${s.zwrotId}"` : "");
+    (s.zwrotId ? ` data-sprawa-zwrot="${s.zwrotId}"` : "") +
+    /* Id ENCJI sprawy (0.129.0) — po nim scala się dwie sprawy w jedną. */
+    (s.sprawaId ? ` data-sprawa-encja="${s.sprawaId}"` : "");
 }
 
 /* Pastylki, które pokazują się TYLKO wtedy, gdy coś niosą. Do 0.121.0 termin
@@ -5225,15 +5237,18 @@ function wierszSprawyWSzynie(s) {
    KLIENT (powtarzałaby nagłówek) i bez „WEZMĘ TO": tam patrzy się na historię,
    a bierze się sprawy z kolejki. Termin i prowadzenie są pastylkami, tak samo
    jak w kolejce — jedna reguła na cały panel, nie dwie. */
-function wierszeSpraw(lista) {
+/* `akcja` rysuje OSTATNIĄ komórkę: domyślnie kto prowadzi, w sekcji
+   podpowiedzi przycisk SCAL. Jeden renderer wiersza zostaje jeden — inaczej
+   powiązania i kolejka zaczęłyby wyglądać inaczej z tych samych danych. */
+function wierszeSpraw(lista, akcja) {
   return lista.map((s) => `<tr ${znacznikiSprawy(s)} class="sprawaRz" style="cursor:pointer">
       <td class="kTyp">${plakietkaSprawy(s)}</td>
       <td class="kTresc"><div class="tresc2">${esc(s.tytul || "—")}</div>${stopkaSprawy(s)}</td>
       <td class="kWiek">${esc(wiekPytania(s.kiedy))}</td>
-      <td class="kKoniec">${s.prowadzi
+      <td class="kKoniec">${akcja ? akcja(s) : (s.prowadzi
         ? `<span class="prowadzi${s.prowadzi === kto ? "" : " obcy"}"><i></i>${
             esc(s.prowadzi === kto ? "Ty" : s.prowadzi)}</span>`
-        : ""}</td>
+        : "")}</td>
     </tr>`).join("");
 }
 
@@ -5557,18 +5572,35 @@ async function sprawdzPuls() {
    Allegro trzyma je osobno. Serwer składa powiązania z kluczy, które już
    są: najpierw to samo zamówienie (mocny dowód), potem ten sam login
    (podpisany słabiej). Pobierane PO OTWARCIU, jak historia klienta. */
+/* Ostatnio narysowane powiązania — SCAL potrzebuje id sprawy, w której stoi
+   OTWARTY szczegół, a wiersz podpowiedzi niesie tylko id tej drugiej. */
+let ostatniePowiazania = null;
+
 function rysujPowiazane(cel, d) {
-  const sekcja = (tytul, lista) => lista.length
-    ? `<div class="mute" style="margin:8px 0 4px">${tytul}</div><table>${wierszeSpraw(lista)}</table>`
+  ostatniePowiazania = d;
+  const sekcja = (tytul, lista, akcja) => lista.length
+    ? `<div class="mute" style="margin:8px 0 4px">${tytul}</div><table>${wierszeSpraw(lista, akcja)}</table>`
+    : "";
+  /* „TA SAMA SPRAWA", nie „to samo zamówienie" (0.129.0): po SCAL-u sekcja
+     zawiera źródła bez wspólnego zamówienia, więc stara nazwa zaczęłaby
+     kłamać. Przy okazji widać efekt scalenia — wiersz przeskakuje tutaj
+     z podpowiedzi niżej. */
+  const rozklej = d.sprawaId
+    ? `<button class="akcja cichy" data-rozklej="${d.sprawaId}"
+         style="font-size:11px;padding:3px 8px;margin-left:6px">ROZKLEJ</button>`
     : "";
   /* Podpowiedź po ODMASKOWANYM kupującym (0.128.0): pytania niosą maskę
      `client:NNN`, więc złączenie po loginie ich nie widzi — a NNN to
-     buyer.id. To jest podpowiedź do obejrzenia, nie sklejenie: scala się
-     dopiero ręką człowieka (SCAL wejdzie w etapie D). */
+     buyer.id. Do 0.129.0 był to sam odczyt; teraz SCAL pozwala ją
+     POTWIERDZIĆ — automat dalej skleja wyłącznie po numerze zamówienia. */
+  const scal = (s) => s.sprawaId && d.sprawaId
+    ? `<button class="akcja cichy" data-scal="${s.sprawaId}"
+         style="font-size:11px;padding:3px 8px">SCAL</button>`
+    : "";
   $(cel).innerHTML =
-    sekcja("TO SAMO ZAMÓWIENIE", d.zamowienie || []) +
-      sekcja("TEN SAM KLIENT — inne otwarte sprawy", d.klient || []) +
-      sekcja("TEN SAM KUPUJĄCY — podpowiedź spod maski", d.kupujacy || []) ||
+    sekcja(`TA SAMA SPRAWA${rozklej}`, d.zamowienie || []) +
+      sekcja("TEN SAM KLIENT — inne otwarte sprawy", d.klient || [], scal) +
+      sekcja("TEN SAM KUPUJĄCY — podpowiedź spod maski", d.kupujacy || [], scal) ||
     '<p class="mute">Brak powiązanych spraw.</p>';
 }
 
@@ -6120,9 +6152,17 @@ function rysujDyskusje(lista, sync) {
   const nieznane = sync && sync.nieznaneStatusy && sync.nieznaneStatusy.length
     ? `<div style="color:var(--err)">Nieznane statusy Allegro: <b>${sync.nieznaneStatusy.map(esc).join(", ")}</b> — zgłoś, żeby ustalić, czy zamykają sprawę.</div>`
     : "";
+  /* Rozmowy dociągane w pobraniu (0.129.0) — po nich kolejka wie, kto ma
+     piłkę. Odłożone przez sufit mówią wprost, ile spraw czeka na kolejne
+     kliknięcie; bez tej liczby nieświeżość byłaby niewidzialna. */
+  const rozmowy = sync && sync.rozmow != null
+    ? ` · rozmów ${sync.rozmow}` +
+      (sync.bezRozmowy ? ` · bez rozmowy ${sync.bezRozmowy}` : "") +
+      (sync.pominietychRozmow ? ` · odłożonych ${sync.pominietychRozmow}` : "")
+    : "";
   $("dyskusjeTicker").innerHTML = sync
     ? `Dyskusje — ostatnio: <b>${esc(stempelKrotki(sync.at))}</b> · nowych ${sync.nowych}
-       · zamkniętych w panelu ${sync.zamknietychPrzezAllegro} · przejrzano ${sync.przejrzanych}${nieznane}`
+       · zamkniętych w panelu ${sync.zamknietychPrzezAllegro} · przejrzano ${sync.przejrzanych}${rozmowy}${nieznane}`
     : "Dyskusji jeszcze nie pobierano od uruchomienia serwera — kliknij POBIERZ DYSKUSJE.";
 }
 
@@ -6356,7 +6396,8 @@ async function pobierzDyskusjeZAllegro() {
   try {
     const d = await (await api("/api/biuro/dyskusje/odswiez", { method: "POST", body: "{}" })).json();
     toast(d.nowych || d.zamknietychPrzezAllegro
-      ? `Nowych spraw: ${d.nowych} · zamkniętych w panelu: ${d.zamknietychPrzezAllegro}`
+      ? `Nowych spraw: ${d.nowych} · zamkniętych w panelu: ${d.zamknietychPrzezAllegro}` +
+        (d.pominietychRozmow ? ` · rozmów odłożonych: ${d.pominietychRozmow}` : "")
       : "Allegro nie ma nic nowego");
     await odswiezDyskusje();
     await odswiezLiczniki();
@@ -9154,7 +9195,68 @@ $("zwrotSzczegol").addEventListener("click", klikKlienta360);
 $("dyskusjaSzczegol").addEventListener("click", klikKlienta360);
 
 /** Klik w powiązaną sprawę z kontekstu — ta sama droga co z kolejki. */
-function klikPowiazanejSprawy(e) {
+/* Sklejenie dwóch spraw w jedną i cofnięcie tego (0.129.0). Oba zapisy
+   dzieją się PO potwierdzeniu w okienku — scalenie łączy dwa problemy
+   klienta, a to nie jest klik do cofnięcia jednym ruchem. */
+async function scalSprawyZPodpowiedzi(dawca) {
+  const docelowa = ostatniePowiazania?.sprawaId;
+  if (!docelowa) return;
+  if (!(await potwierdz({
+    tytul: "SCALENIE SPRAW",
+    opis: "Obie sprawy staną się jedną — z jedną kolejką, jednym prowadzącym " +
+      "i wspólnym kontekstem. Rozdzielić da się je przyciskiem ROZKLEJ.",
+    potwierdz: "SCAL",
+  }))) return;
+  try {
+    await api("/api/biuro/sprawy/scal", {
+      method: "POST", body: JSON.stringify({ docelowa, dawca }),
+    });
+    toast("Sprawy scalone.");
+    await odswiezPoSklejeniu();
+  } catch (e) { toast(e.message); }
+}
+
+async function rozklejSprawe(sprawaId) {
+  if (!(await potwierdz({
+    tytul: "ROZKLEJENIE SPRAWY",
+    opis: "Ręcznie spięte źródła wrócą tam, gdzie widzi je automat — czyli " +
+      "do własnych spraw albo do wspólnej po numerze zamówienia.",
+    potwierdz: "ROZKLEJ",
+  }))) return;
+  try {
+    await api("/api/biuro/sprawy/rozklej", {
+      method: "POST", body: JSON.stringify({ sprawaId }),
+    });
+    toast("Sprawa rozklejona.");
+    await odswiezPoSklejeniu();
+  } catch (e) { toast(e.message); }
+}
+
+/* Po obu operacjach sekcja powiązań musi się przeładować, a nie odtworzyć
+   z pamięci — dlatego zerujemy znaczniki leniwego ładowania. */
+async function odswiezPoSklejeniu() {
+  pytanieIdPowiazan = null;
+  zwrotIdPowiazan = null;
+  await pokazPowiazanePytania();
+  await pokazPowiazaneZwrotu();
+  await odswiezKolejkeSpraw();
+}
+
+async function klikPowiazanejSprawy(e) {
+  /* SCAL i ROZKLEJ PRZED otwarciem sprawy: oba siedzą w wierszu, który sam
+     jest celem kliknięcia (wzorzec WEZMĘ TO w kolejce). */
+  const scal = e.target.closest("[data-scal]");
+  if (scal) {
+    e.stopPropagation();
+    await scalSprawyZPodpowiedzi(Number(scal.dataset.scal));
+    return;
+  }
+  const rozklej = e.target.closest("[data-rozklej]");
+  if (rozklej) {
+    e.stopPropagation();
+    await rozklejSprawe(Number(rozklej.dataset.rozklej));
+    return;
+  }
   const sprawa = e.target.closest("[data-sprawa-rodzaj]");
   if (!sprawa) return;
   otworzSprawe(sprawa.dataset.sprawaRodzaj, Number(sprawa.dataset.sprawaId),

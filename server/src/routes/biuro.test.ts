@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    37,
+    39,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -199,7 +199,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "ZNACZNIKIEM, nie blokadą — nie odbiera nikomu dostępu — i dzieje się " +
       "po jawnym kliknięciu w wierszu, nigdy przy wejściu na ekran.\n\n" +
       "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
-      "podnosić — żaden zapis nie dzieje się przy samym patrzeniu."
+      "podnosić — żaden zapis nie dzieje się przy samym patrzeniu." +
+      "\n\nDwa POST-y z 0.129.0 to SCAL i ROZKLEJ. Automat skleja sprawy " +
+      "wyłącznie po numerze zamówienia, a pytanie zamówienia nie ma — więc " +
+      "podpowiedź »ten sam kupujący« z 0.128.0 wisiała jako sam odczyt, bez " +
+      "sposobu, żeby ją potwierdzić. Oba zapisy dzieją się po jawnym " +
+      "kliknięciu I po potwierdzeniu w okienku, nigdy przy wejściu na ekran. " +
+      "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
+      "podnosić."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
@@ -779,7 +786,10 @@ test("pasma kolejki są WIDOKIEM sortu serwera, nie drugą regułą (0.121.0)", 
   );
   const pasma = html.slice(html.indexOf("const PASMA = ["), html.indexOf("const pasmaZwiniete"));
   assert.ok(pasma.length > 100, "definicja pasm istnieje");
-  for (const pole of ["poTerminie", "dniDoTerminu", "kiedy"]) {
+  /* `pilka` dołączyła w 0.129.0: serwer sortuje odtąd terminem, PIŁKĄ,
+     a dopiero potem wiekiem — więc pasma muszą czytać także ją, inaczej
+     rozjadą się z kolejnością o cały wymiar. */
+  for (const pole of ["poTerminie", "dniDoTerminu", "kiedy", "pilka"]) {
     assert.ok(pasma.includes(pole), `pasma czytają \`${pole}\` — pole, po którym sortuje serwer`);
   }
   assert.ok(!/\.sort\(/.test(pasma), "pasma nie sortują niczego na nowo");

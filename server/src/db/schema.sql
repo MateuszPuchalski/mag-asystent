@@ -1053,9 +1053,12 @@ CREATE TABLE IF NOT EXISTS watek_meta (
 -- rejestry per-typ ZOSTAJĄ nośnikami mechaniki (kosze, werdykty, wysyłki).
 -- Sklejanie automatyczne WYŁĄCZNIE po order_id; po samym kupującym system
 -- tylko PODPOWIADA (klika człowiek — SCAL wejdzie w etapie D).
--- Piłka, termin i tytuł ŚWIADOMIE nie są kolumnami: pilność i tytuł liczy
--- projekcja przy odczycie z rejestrów (nie może się zestarzeć), a piłka
--- czeka na sprawa_zdarzenie (etap D). Tabelę utrzymuje idempotentna
+-- Piłka, termin i tytuł ŚWIADOMIE nie są kolumnami: liczy je projekcja przy
+-- odczycie z rejestrów i `watek_meta`, więc nie mogą się zestarzeć (0.129.0).
+-- Piłka jako kolumna karmiona logiem zdarzeń miałaby własność odwrotną:
+-- rozjazd z rejestrem po każdej pominiętej mutacji. `sprawa_zdarzenie`
+-- dochodzi razem z osią czasu sprawy — tabela, której jedynym czytelnikiem
+-- byłby ekran, którego jeszcze nie ma, to pisanie na zapas. Tabelę utrzymuje idempotentna
 -- rekoncyliacja wołana z mutacji — nigdy z samego patrzenia.
 CREATE TABLE IF NOT EXISTS sprawa (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,

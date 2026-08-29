@@ -33,6 +33,46 @@ historii nie przepisujemy.
 
 ---
 
+## 0.129.0 — 29 sierpnia 2026
+
+**Kolejka układa się po tym, KTO MA RUCH.** Etap D1 z mapy
+w `docs/architektura-spraw.md`: najważniejszym stanem sprawy jest piłka.
+
+**Piłka: MY, KLIENT albo NIKT.** Liczy się przy każdym odczycie ze statusów
+rejestrów i z metadanych rozmów (`watek_meta`) — nie ma kolumny, więc nie ma
+czego przeterminować. Sprawa wielźródłowa bierze najostrzejszą piłkę
+z otwartych źródeł: jedno pytanie bez odpowiedzi wystarczy, żeby cały problem
+klienta czekał na nas. Piłka ŚWIAT (przewoźnik, Allegro) dojdzie później —
+dziś nikt tych danych nie zapisuje.
+
+**Pasma kolejki przeszły z wieku na piłkę × termin [zmiana kolejności].**
+Góra kolejki zostaje bez zmian: PO TERMINIE, potem TERMIN ≤7 DNI, potem
+TERMIN USTAWOWY. Zmienia się OGON — sprawy czekające na nas stoją nad
+sprawami, w których piłka jest u klienta, a wiek dzieli je dopiero wewnątrz
+piłki (ponad tydzień, kilka dni, dziś i wczoraj). CZEKA NA KLIENTA jest
+zwinięte: to nie jest praca do zrobienia teraz. Pasmo BEZ POTWIERDZENIA
+znikło — pytało „czy ktoś tu czeka", a na to odpowiada teraz piłka.
+
+**POBIERZ DYSKUSJE trwa dłużej [wymaga działania: nic, tylko cierpliwość].**
+Pobranie dociąga metadane rozmów otwartych dyskusji — kto powiedział ostatnie
+słowo i kiedy — bo bez tego rejestr dyskusji nie wie, czyja jest piłka. Sufit
+to sto rozmów na przebieg, więc przy większym rejestrze pełne pokrycie zbiera
+się przez kilka pobrań; kolejne biorą najstarsze metadane. Treść rozmów dalej
+czyta się na klik i NIE zapisuje. Linia pod tickerem mówi, ile rozmów
+pobrano, ile odłożono na później i ile nie miało rozmowy.
+
+**SCAL i ROZKLEJ pod podpowiedzią „ten sam kupujący".** Automat dalej skleja
+wyłącznie po numerze zamówienia — dwa niezależne pytania jednego klienta to
+dwa problemy. Gdy jednak to JEDEN problem, człowiek klika SCAL w sekcji
+POWIĄZANE SPRAWY i sprawy zrastają się w jeden wiersz kolejki. ROZKLEJ cofa
+całe scalenie: ręczne wiązania znikają, a rekoncyliacja układa źródła
+z powrotem tak, jak widzi je automat.
+
+**Rekoncyliacja domyka sprawy złożone z samych ręcznych wiązań.** Wcześniej
+takie sprawy wypadały z denormalizacji i zostawały bez kupującego, numeru
+zamówienia i daty zamknięcia. Poprawka wchodzi razem ze scalaniem, bo dopiero
+ono pozwala takie sprawy w ogóle zbudować.
+
 ## 0.128.0 — 29 sierpnia 2026
 
 **Kolejka pokazuje SPRAWY, nie obiekty Allegro.** Etap C z mapy
