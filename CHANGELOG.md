@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.126.0 — 29 sierpnia 2026
+
+**Rozwinięta pozycja przy rozkładaniu zeszła z 81 do 58 procent ekranu.**
+Zgłoszenie właściciela: „otwarta pozycja zajmuje około 70 % ekranu, nie
+powinno tak być".
+
+Pomiar potwierdził. Karta wskazanej pozycji miała około 518 dp przy liście
+mającej około 640 dp. Trzy rzeczy zabierały najwięcej, każda bez powodu.
+
+**Adres stał na ekranie dwa razy.** Raz w 28 sp, raz w polu tekstowym pod
+spodem, do którego kolektor sam go wpisywał. Pole chowa się teraz za napisem
+„wpisz ręcznie" i otwiera samo w trzech sytuacjach: gdy towar nie ma adresu
+w kartotece, gdy adres różni się od pickingowego (bo ktoś dotknął innej półki)
+albo gdy człowiek poprosi. Skan regału działa bez zmian — to droga podstawowa,
+a klawiatura jest wyjściem przy zdartej etykiecie.
+
+**Trzy przyciski pełnej szerokości pod sobą.** Pełna szerokość należy się
+czynności głównej, więc ODŁÓŻ TUTAJ ją zachowuje, a PÓŹNIEJ i POMIŃ stanęły
+obok siebie po połowie. Zostają osobnymi przyciskami, bo znaczą co innego:
+„później" zostawia pracę w koszu, „pomiń" oddaje ją biuru.
+
+**Osiemdziesiąt dp na same odstępy.** Odstępy między blokami zeszły z 8 na
+6 dp, a nagłówek STANY MAGAZYNOWE zniknął — kafelek niesie liczbę i kod
+magazynu, więc podpisuje się sam.
+
+Stany magazynowe i pozostałe półki zostają widoczne bez stukania. To było
+osobne zgłoszenie z 0.118.0 i ta zmiana go nie cofa.
+
+Ten sam ekran rozkłada kosze zwrotowe i kartony, więc zmiana dotyczy obu.
+
 ## 0.125.0 — 29 sierpnia 2026
 
 **Nawigacja boczna zamiast górnego paska; SPRAWY rozprężone na trzy widoki.**
