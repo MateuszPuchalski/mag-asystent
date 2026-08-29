@@ -190,8 +190,13 @@ poprzedniego na produkcji.
   bo tylko on wie, co stoi w sprawie; pole, którego sprawa nie zna, zostaje
   widoczną klamrą — panel mówi wprost, co uzupełnić ręką. Redaguje je biuro
   w ustawieniach, wysyła zawsze człowiek.
-- **E3 — raporty czasów:** ile czekał klient, ile trwała odpowiedź, na osobę
-  i na kanał. Zdarzenia osi czasu (0.130.0) są już do tego wystarczające.
+- **E3 (0.134.0, wykonany) — raporty czasów:** piąty zakres ANALIZY liczony
+  z osi czasu sprawy, bez ani jednej nowej tabeli. Mediana i p90 od głosu
+  klienta do naszej odpowiedzi, osobno dla pytań i dyskusji, plus rozbiór per
+  osoba z podstawą prawną monitoringu przy danych. Okno tnie po ODPOWIEDZI
+  (jak przy czasach zwrotów), a seria wiadomości klienta liczy się od
+  pierwszej; obok mediany stoi lista KTO CZEKA TERAZ, bo mediana mówi
+  o przeszłości.
 - **E4 — opinie Allegro jako piąte źródło:** nowy rejestr i nowy rodzaj
   `sprawa_zrodlo`; wymaga adaptera i weryfikacji na żywym koncie.
 - **E5 — tagi i reguły:** tagowanie spraw, reguły przydziału. Wymaga

@@ -1651,3 +1651,25 @@ test("szablony: wybierak przy każdym polu odpowiedzi, wstawienie to odczyt (0.1
       "wstawienie szablonu to czysty odczyt");
   }
 });
+
+test("czasy odpowiedzi: piąty zakres analizy z własnym oknem (0.134.0)", () => {
+  /* Etap E3. Zakres dokłada się do czterech istniejących tą samą drogą co
+     DOSTAWY w 0.100.0 — i ma tę samą pułapkę: lista okien w panelu MUSI
+     zgadzać się z listą po stronie trasy, inaczej czip wygląda na wybrany,
+     a serwer liczy swoje domyślne (usterka z 0.96.0).
+
+     Druga asercja jest o drodze do roboty: wiersz „kto czeka teraz" otwiera
+     sprawę tym samym znacznikiem, którego używa kolejka SPRAW. Raport bez
+     drogi do roboty jest tylko ładnym wykresem. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.match(html, /<option value="obsluga">/, "zakres jest w wybieraku");
+  assert.match(html, /obsluga: \[7, 30, 90\]/, "okna zakresu stoją w panelu wprost");
+  assert.match(html, /obsluga: 30/, "zakres ma własne okno domyślne");
+  for (const blok of ["obslugaOdcinki", "obslugaTeraz", "obslugaLudzie", "obslugaPodstawa"]) {
+    assert.ok(html.includes(`id="${blok}"`), `${blok} istnieje`);
+  }
+  assert.ok(html.includes('class="card pelna zakresObsluga"'),
+    "karta nosi klasę zakresu — inaczej nie schowa się przy innych zakresach");
+  assert.match(html, /obslugaPodstawa"\)\.textContent = c\.podstawaPrawna/,
+    "podstawa prawna monitoringu jedzie na ekran razem z danymi imiennymi");
+});

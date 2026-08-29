@@ -33,6 +33,30 @@ historii nie przepisujemy.
 
 ---
 
+## 0.134.0 — 29 sierpnia 2026
+
+**Czasy odpowiedzi jako piąty zakres ANALIZY.** Etap E3 z mapy
+w `docs/architektura-spraw.md` — ile klient czekał na odpowiedź, na kanał
+i na osobę.
+
+**Liczone z osi czasu sprawy, bez nowej tabeli.** Fakt „klient napisał"
+i „odpowiedzieliśmy" leży w `sprawa_zdarzenie` od 0.130.0 z dokładnością do
+minuty i z nazwiskiem przy naszej stronie — raport tylko go czyta.
+
+**Seria wiadomości klienta liczy się od PIERWSZEJ.** Kto pisze trzy razy pod
+rząd, czeka od pierwszej próby, nie od ostatniej. Liczenie od ostatniej
+dawałoby najlepszy wynik dokładnie tam, gdzie obsługa była najgorsza.
+
+**Okno tnie po ODPOWIEDZI, nie po pytaniu.** Ta sama decyzja co przy czasach
+zwrotów: przy cięciu po pytaniu rozmowy jeszcze nieodpowiedziane, czyli te
+najwolniejsze, nigdy nie weszłyby do mediany. Cenę tego wyboru płaci tabela
+KTO CZEKA TERAZ — najdłużej czekające na górze, kliknięcie wiersza otwiera
+sprawę.
+
+**Rozbiór per osoba z podstawą prawną przy danych.** Mediana z próbki poniżej
+dwudziestu odpowiedzi jest podpisana jako niewiarygodna, a nota o monitoringu
+pracowniczym jedzie razem z tabelą — nie obok niej.
+
 ## 0.133.0 — 29 sierpnia 2026
 
 **Szablony odpowiedzi.** Etap E2 z mapy w `docs/architektura-spraw.md`:

@@ -1659,6 +1659,11 @@ zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
 w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
+Od 0.134.0 zakładka ANALIZA ma piąty zakres: CZASY ODPOWIEDZI. Pokazuje
+medianę i p90 od głosu klienta do naszej odpowiedzi, osobno dla pytań
+i dyskusji, listę czekających w tej chwili oraz rozbiór per osoba. Dane
+sięgają 0.130.0 — wcześniejszej historii oś czasu nie zna.
+
 Od 0.133.0 przy każdym polu odpowiedzi stoi wybierak SZABLON. Teksty
 redaguje biuro w USTAWIENIACH, karta SZABLONY ODPOWIEDZI. Pola w klamrach
 (`{{klient}}`, `{{zamowienie}}`, `{{zwrot}}`, `{{oferta}}`, `{{ja}}`)
