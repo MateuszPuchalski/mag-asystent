@@ -5,6 +5,7 @@ import { subiekt } from "../context.js";
 import { logEvent } from "./events.js";
 import { kontekstKlienta, type KontekstKlienta } from "./klienci.js";
 import { stempelWyslano, zapiszMetaPytania } from "./watek-meta.js";
+import { kupujacyIdZMaski, przebudujSprawy } from "./sprawa.js";
 import { blokPrzesylek, czyPytaOWysylke, przesylkiKupujacego } from "./przesylki.js";
 import type { PrzesylkiKlienta } from "./przesylki.js";
 import { BladLimituAllegro, allegroAdapter, LIMIT_WIADOMOSCI } from "../adapters/allegro.js";
@@ -389,9 +390,9 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
 
   const wstaw = db().prepare(
     `INSERT OR IGNORE INTO pytanie
-       (zrodlo, thread_id, wiadomosc_id, kupujacy_login, oferta_id, oferta_tytul,
+       (zrodlo, thread_id, wiadomosc_id, kupujacy_login, kupujacy_id, oferta_id, oferta_tytul,
         tresc, otrzymano_at, status, produkty_json, utworzono_at, utworzono_przez)
-     VALUES ('allegro', ?, ?, ?, ?, ?, ?, ?, 'nowe', '[]', datetime('now'), ?)`
+     VALUES ('allegro', ?, ?, ?, ?, ?, ?, ?, ?, 'nowe', '[]', datetime('now'), ?)`
   );
 
   const otwarteWatku = db().prepare(
@@ -453,6 +454,9 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
       watek.threadId,
       seria.id,
       watek.interlokutor,
+      /* Liczba spod maski client:NNN to buyer.id — po niej pytanie spotka
+         zwroty tego samego klienta (odmaskowanie, 0.128.0). */
+      kupujacyIdZMaski(watek.interlokutor),
       /* Wiadomość wie lepiej niż nagłówek wątku: lista wątków bywa bez
          aukcji, a `relatedObject` przy wiadomości jest dokładnie tym, o co
          klient pyta. Tytuł zostaje z nagłówka — nazwę oferty i tak
@@ -497,6 +501,9 @@ export async function synchronizujPytania(autor: string): Promise<WynikSynchroni
     przejrzanychWatkow: watki.length,
     pominiete,
   };
+  /* Rejestr się zmienił — nakładka spraw dogania (0.128.0). Rekoncyliacja
+     jest pełna i idempotentna, więc wołamy ją bez liczenia, czy coś doszło. */
+  przebudujSprawy();
   return { nowych, dopisanych, przejrzanychWatkow: watki.length, pominiete };
 }
 
@@ -1050,6 +1057,7 @@ export async function pytanieZWklejki(w: Wklejka, autor: string): Promise<Pytani
   });
 
   logEvent("pytanie_wklejka", autor, null, { id, zObrazem: !!obraz });
+  przebudujSprawy();
   /* Transkrypcja nadpisuje pustą treść tylko wtedy, gdy tekstu nie było — przy
      wklejce tekstowej oryginał klienta jest wierniejszy niż powtórzenie modelu. */
   return zapiszSzkic(id, odpowiedz, tekst ? null : odpowiedz.pytanieKlienta);
@@ -1149,6 +1157,7 @@ export async function wyslijOdpowiedz(
   /* Piłka przechodzi do klienta naszym głosem — bez ponownego GET-a:
      wystarczy stempel, licznik dogoni następny sync albo odczyt. */
   stempelWyslano("pytanie", p.threadId);
+  przebudujSprawy();
   utrwalDopasowania(p, autor);
   logEvent("pytanie_wyslane", autor, null, {
     id,
@@ -1172,6 +1181,7 @@ export function zmienStatus(id: number, status: "zamkniete" | "pominiete", autor
     )
     .run(status, autor, id);
   logEvent(`pytanie_${status}`, autor, null, { id });
+  przebudujSprawy();
   return { pytanie: szczegolPytania(id), nastepneId: nastepneOtwarte(id) };
 }
 
@@ -1199,6 +1209,7 @@ export function stempelProwadzi(id: number, autor: string): void {
   db()
     .prepare("UPDATE pytanie SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  przebudujSprawy();
 }
 
 /* ── Ticker ──────────────────────────────────────────────────────────────── */

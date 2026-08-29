@@ -1,5 +1,6 @@
 import { db, nowIso } from "../db/db.js";
 import { metaWatku, stempelWyslano, zapiszMetaDyskusji } from "./watek-meta.js";
+import { przebudujSprawy } from "./sprawa.js";
 import { uruchomTakt } from "./takt.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
@@ -349,6 +350,8 @@ export async function synchronizujDyskusje(autor: string): Promise<WynikSynchron
     przejrzanych: sprawy.length,
     nieznaneStatusy: nieznane,
   };
+  /* Rejestr się zmienił — nakładka spraw dogania (0.128.0). */
+  przebudujSprawy();
   return { nowych, zamknietychPrzezAllegro, przejrzanych: sprawy.length };
 }
 
@@ -362,6 +365,7 @@ export function stempelProwadziDyskusji(id: number, autor: string): void {
   db()
     .prepare("UPDATE dyskusja SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  przebudujSprawy();
 }
 
 export function zmienStatusDyskusji(id: number, status: string, autor: string): Dyskusja {
@@ -388,6 +392,7 @@ export function zmienStatusDyskusji(id: number, status: string, autor: string): 
     )
     .run(status, autor, zamykamy ? nowIso() : null, zamykamy ? autor : null, id);
   logEvent(`dyskusja_${status}`, autor, null, { dyskusjaId: id, poprzedni: obecny });
+  przebudujSprawy();
   return szczegolDyskusji(id);
 }
 
@@ -594,6 +599,7 @@ export async function wyslijOdpowiedzDyskusji(
      kontrolę świeżości. */
   if (swieze) zapiszMetaDyskusji(w.allegro_id as string, swieze, "wysylka");
   stempelWyslano("dyskusja", w.allegro_id as string);
+  przebudujSprawy();
   logEvent("dyskusja_wyslana", autor, null, {
     dyskusjaId: id,
     znakow: tresc.length,

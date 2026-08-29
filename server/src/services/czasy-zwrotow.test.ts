@@ -37,7 +37,7 @@ beforeEach(() => {
   const d = db();
   /* Kolejność jest wymuszona kluczami obcymi: `zwrot.kosz_id` wskazuje na kosz,
      więc kosze schodzą jako ostatnie. */
-  for (const t of ["kosz_pozycja", "zwrot_pozycja", "zwrot", "kosz"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "kosz_pozycja", "zwrot_pozycja", "zwrot", "kosz"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });

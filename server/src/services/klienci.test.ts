@@ -22,7 +22,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dyskusja", "pytanie", "zwrot_pozycja", "zwrot"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "dyskusja", "pytanie", "zwrot_pozycja", "zwrot"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });

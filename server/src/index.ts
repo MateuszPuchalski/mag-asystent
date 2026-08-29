@@ -42,6 +42,7 @@ import { problemAllegro, problemUserAgenta, stanPolaczenia } from "./services/al
 import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
 import { uruchomTickerPytan } from "./services/pytania.js";
 import { uruchomTickerDyskusji } from "./services/dyskusje.js";
+import { przebudujSprawy } from "./services/sprawa.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { brakDostepuDoTla } from "./adapters/tlo.js";
@@ -251,6 +252,13 @@ async function main() {
   /* Dyskusje i reklamacje Allegro — ten sam powód i ten sam interwał: rejestr
      spraw ma schodzić z kolejki sam, gdy panel Allegro je zamyka. */
   uruchomTickerDyskusji();
+
+  /* Nakładka spraw dogania rejestry przy starcie (0.128.0): baza sprzed tego
+     wydania nie ma ani jednego wiersza w `sprawa`, a rekoncyliacja żyje przy
+     mutacjach. W main(), nie w migrate() — migrate() nie może wołać serwisu
+     (cykl importów db → serwis → db); nie w buildApp() — testy tras nie
+     mają prawa zależeć od rekoncyliacji. */
+  przebudujSprawy();
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

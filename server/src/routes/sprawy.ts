@@ -14,6 +14,7 @@ import { BladPytania, stempelProwadzi } from "../services/pytania.js";
 import { BladZwrotu, stempelProwadziZwrotu } from "../services/zwroty.js";
 import { stempelProwadziReklamacji } from "../services/reklamacje.js";
 import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
+import { stempelProwadziSprawy, zrodlaSprawy } from "../services/sprawa.js";
 
 /* ── Sprawy — trasy jednej kolejki obsługi klienta ───────────────────────────
    Prawie wyłącznie ODCZYT: kolejka, licznik na zakładkę, Klient 360
@@ -124,18 +125,24 @@ export async function sprawyRoutes(app: FastifyInstance) {
    *
    * Reklamacja bierze `id` POZYCJI zwrotu, nie zwrotu — tak samo jak wiersz
    * kolejki, który ją niesie (`sprawyReklamacji` zwraca `p.id`).
+   *
+   * Od 0.128.0 rodzaj `sprawa` przejmuje CAŁĄ sprawę wielźródłową: stempel
+   * na encji plus stemple per-typ na każdym otwartym źródle — wiedza „który
+   * rejestr" mieszka odtąd w `sprawa_zrodlo`, nie w kliencie.
    */
   app.post<{ Params: { rodzaj: string; id: string } }>(
     "/api/biuro/sprawy/:rodzaj/:id/prowadzi",
     async (req, reply) => {
       const nie = odmowa();
       if (nie) return reply.code(nie.kod).send({ error: nie.error });
-      const rodzaj = rodzajZapytania(req.params.rodzaj);
+      const surowy = req.params.rodzaj;
+      const rodzaj = surowy === "sprawa" ? null : rodzajZapytania(surowy);
       const id = Number(req.params.id);
-      if (rodzaj === null || rodzaj === "blad" || !Number.isInteger(id) || id <= 0) {
-        return reply
-          .code(400)
-          .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
+      if ((surowy !== "sprawa" && (rodzaj === null || rodzaj === "blad")) ||
+          !Number.isInteger(id) || id <= 0) {
+        return reply.code(400).send({
+          error: `Podaj rodzaj (sprawa, ${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy`,
+        });
       }
       const autor = sesjaZadania()?.user.name ?? "?";
       /* Każdy rejestr rzuca SWOIM błędem z własnym kodem HTTP („sprawa
@@ -143,14 +150,29 @@ export async function sprawyRoutes(app: FastifyInstance) {
          kolejki. Bez tego odmowa wyglądałaby na awarię serwera, a klik
          w wierszu po cichu nie robiłby nic. `BladZwrotu` obsługuje też
          reklamacje: `stempelProwadziReklamacji` rzuca właśnie nim. */
+      const stempelZrodla = (r: RodzajSprawy, lokalnyId: number) => {
+        if (r === "pytanie") stempelProwadzi(lokalnyId, autor);
+        else if (r === "zwrot") stempelProwadziZwrotu(lokalnyId, autor);
+        else if (r === "dyskusja") stempelProwadziDyskusji(lokalnyId, autor);
+        else stempelProwadziReklamacji(lokalnyId, autor);
+      };
       try {
-        if (rodzaj === "pytanie") stempelProwadzi(id, autor);
-        else if (rodzaj === "zwrot") stempelProwadziZwrotu(id, autor);
-        else if (rodzaj === "dyskusja") stempelProwadziDyskusji(id, autor);
-        else stempelProwadziReklamacji(id, autor);
+        if (surowy === "sprawa") {
+          stempelProwadziSprawy(id, autor);
+          /* Tylko OTWARTE źródła: rejestr zamknięty odmówiłby stempla,
+             a przejęcie żywej części sprawy to nie jest błąd. */
+          for (const z of zrodlaSprawy(id).filter((x) => x.otwarte)) {
+            stempelZrodla(z.rodzaj, z.lokalnyId);
+          }
+        } else {
+          stempelZrodla(rodzaj as RodzajSprawy, id);
+        }
       } catch (e) {
         if (e instanceof BladZwrotu || e instanceof BladPytania || e instanceof BladDyskusji) {
           return reply.code(e.kod).send({ error: e.message });
+        }
+        if (e instanceof Error && /Nie ma takiej sprawy/.test(e.message)) {
+          return reply.code(404).send({ error: e.message });
         }
         throw e;
       }

@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { BladZwrotu } from "./zwroty.js";
 import { liczbyZapowiedzi } from "./zapowiedzi.js";
+import { przebudujSprawy } from "./sprawa.js";
 
 /* ── Ścieżka reklamacyjna z priorytetem wg terminu (Etap 3) ──────────────────
    Pozycja z decyzją `reklamacja` staje się sprawą z TERMINEM: ustawowe 14 dni
@@ -149,6 +150,7 @@ export function rozpatrzReklamacje(
     )
     .run(wynik, nowIso(), autor, notatka, pozycjaId);
   logEvent("reklamacja_rozpatrzona", autor, p.tw_id, { pozycjaId, wynik, notatka });
+  przebudujSprawy();
 }
 
 /**
@@ -173,6 +175,7 @@ export function stempelProwadziReklamacji(pozycjaId: number, autor: string): voi
     )
     .run(autor, pozycjaId);
   logEvent("reklamacja_prowadzi", autor, p.tw_id, { pozycjaId });
+  przebudujSprawy();
 }
 
 /**

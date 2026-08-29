@@ -19,17 +19,21 @@ process.env.SGT_MODE = "seeded";
 let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
+/* Dynamicznie jak reszta: statyczny import pociągnąłby config PRZED
+   ustawieniem DB_PATH i testy pisałyby po bazie deweloperskiej. */
+let przebudujSprawy: typeof import("../services/sprawa.js").przebudujSprawy;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
+  ({ przebudujSprawy } = await import("../services/sprawa.js"));
   const { buildApp } = await import("../index.js");
   app = await buildApp();
 });
 
 beforeEach(() => {
   const d = db();
-  for (const t of [
+  for (const t of ["sprawa_zrodlo", "sprawa", 
     "dyskusja", "pytanie", "zwrot_pozycja", "zwrot",
     "events", "device_session", "app_user",
   ]) {
@@ -73,6 +77,10 @@ function daneSpraw(): { dyskusjaId: number; zwrotId: number; pytanieId: number; 
        utworzono_allegro, widziano_at, utworzono_at)
      VALUES ('iss-1', 'CLAIM', 'nowa', 'Pęknięta obudowa', 'jan', 'zam-1', ?, ?, ?)`
   ).run(teraz, teraz, teraz);
+  /* Kształt produkcyjny: nakładka spraw dogania wstawione wiersze — na żywo
+     zrobiłby to hook pierwszej mutacji (0.128.0). Zwrot, dyskusja
+     i reklamacja dzielą zam-1, więc od tej pory są JEDNĄ sprawą. */
+  przebudujSprawy();
   /* Id z bazy, nie „1": rowid nie startuje od zera po DELETE w beforeEach. */
   return {
     dyskusjaId: Number(dy.lastInsertRowid),
@@ -106,14 +114,27 @@ test("kolejka: cztery rodzaje w jednej liście, filtr rodzaju, zły rodzaj = 400
 
   const r = await app.inject({ method: "GET", url: "/api/biuro/sprawy", headers: naglowki });
   assert.equal(r.statusCode, 200);
-  const rodzaje = r.json().sprawy.map((s: { rodzaj: string }) => s.rodzaj).sort();
-  assert.deepEqual(rodzaje, ["dyskusja", "pytanie", "reklamacja", "zwrot"]);
+  /* Po 0.128.0 wiersz kolejki to SPRAWA: zwrot, dyskusja i reklamacja
+     zam-1 zlewają się w jeden wiersz z trzema źródłami; pytanie zostaje
+     osobno. Rodzaj wiersza wskazuje źródło wiodące. */
+  const sprawy = r.json().sprawy as Array<{ rodzaj: string; zrodla: Array<{ rodzaj: string }> }>;
+  assert.equal(sprawy.length, 2, "pytanie + sprawa zamówienia zam-1");
+  const zamowienie = sprawy.find((s) => s.rodzaj !== "pytanie")!;
+  assert.deepEqual(
+    zamowienie.zrodla.map((z) => z.rodzaj).sort(),
+    ["dyskusja", "reklamacja", "zwrot"],
+    "trzy obiekty zam-1 to źródła jednej sprawy"
+  );
   assert.ok("allegro" in r.json(), "stan połączenia dla banera zakładki");
 
+  /* Filtr rodzaju = sprawy ZAWIERAJĄCE źródło tego rodzaju. */
   const filtr = await app.inject({
-    method: "GET", url: "/api/biuro/sprawy?rodzaj=pytanie", headers: naglowki,
+    method: "GET", url: "/api/biuro/sprawy?rodzaj=zwrot", headers: naglowki,
   });
-  assert.deepEqual(filtr.json().sprawy.map((s: { rodzaj: string }) => s.rodzaj), ["pytanie"]);
+  assert.equal(filtr.json().sprawy.length, 1);
+  assert.ok(
+    filtr.json().sprawy[0].zrodla.some((z: { rodzaj: string }) => z.rodzaj === "zwrot")
+  );
 
   const zly = await app.inject({
     method: "GET", url: "/api/biuro/sprawy?rodzaj=faktura", headers: naglowki,
@@ -160,7 +181,8 @@ test("wyszukiwarka klientów: liczba otwartych zgadza się z Klientem 360", asyn
     karta.json().aktywne.length,
     "wyszukiwarka i Klient 360 liczą otwarte sprawy tak samo"
   );
-  assert.equal(znaleziony.wszystkich, 4, "po jednej sprawie z każdego rejestru");
+  /* Po 0.128.0 liczą się SPRAWY: pytanie + sprawa zamówienia zam-1. */
+  assert.equal(znaleziony.wszystkich, 2, "cztery obiekty rejestrów to dwie sprawy");
 });
 
 test("wyszukiwarka klientów znajduje TEŻ tego, kto nie ma nic otwartego", async () => {
@@ -230,7 +252,8 @@ test("Klient 360 i powiązania: login z querystring, kubełek bez parametru", as
     method: "GET", url: "/api/biuro/sprawy/klient?login=jan", headers: naglowki,
   });
   assert.equal(jan.json().login, "jan");
-  assert.equal(jan.json().aktywne.length, 4);
+  /* Po 0.128.0 karta liczy SPRAWY: pytanie + sprawa zamówienia zam-1. */
+  assert.equal(jan.json().aktywne.length, 2);
   assert.ok(Array.isArray(jan.json().historia));
 
   const kubelek = await app.inject({
@@ -278,17 +301,21 @@ test("przejęcie sprawy stempluje WŁAŚCIWY rejestr — każdy z czterech", asy
     assert.equal(r.statusCode, 200, rodzaj);
   }
 
-  /* Liczy się WIDOK, nie tabela: kolejka ma po tym pokazać cztery sprawy
-     z nazwiskiem, a nie cztery zapisy w czterech miejscach. */
+  /* Liczy się WIDOK, nie tabela — a widokiem po 0.128.0 są SPRAWY: pytanie
+     osobno, trójka zam-1 jako jeden wiersz. Oba wiersze mają nieść nazwisko,
+     a stemple per-rejestr sprawdzamy w tabelach — z kolejki ich nie widać. */
   const kolejka = await app.inject({
     method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
   });
   const sprawy = kolejka.json().sprawy as Array<{ rodzaj: string; prowadzi: string | null }>;
-  for (const rodzaj of ["pytanie", "zwrot", "dyskusja", "reklamacja"]) {
-    const s = sprawy.find((x) => x.rodzaj === rodzaj);
-    assert.ok(s, `${rodzaj} jest w kolejce`);
-    assert.ok(s!.prowadzi, `${rodzaj} niesie znacznik prowadzenia do kolejki`);
-  }
+  assert.equal(sprawy.length, 2);
+  for (const s of sprawy) assert.ok(s.prowadzi, `${s.rodzaj} niesie znacznik prowadzenia`);
+  const w = (sql: string, id: number) =>
+    (db().prepare(sql).get(id) as Record<string, unknown> | undefined) ?? {};
+  assert.ok(w("SELECT prowadzi FROM pytanie WHERE id = ?", d.pytanieId).prowadzi);
+  assert.ok(w("SELECT prowadzi FROM zwrot WHERE id = ?", d.zwrotId).prowadzi);
+  assert.ok(w("SELECT prowadzi FROM dyskusja WHERE id = ?", d.dyskusjaId).prowadzi);
+  assert.ok(w("SELECT rekl_prowadzi FROM zwrot_pozycja WHERE id = ?", d.pozycjaId).rekl_prowadzi);
 });
 
 test("przejęcie sprawy: bramka biura i odmowa dla złego rodzaju", async () => {
@@ -321,4 +348,41 @@ test("rozliczony zwrot nie ma kogo prowadzić", async () => {
     headers: { "x-session": token }, payload: {},
   });
   assert.equal(r.statusCode, 400);
+});
+
+test("przejęcie rodzajem `sprawa` stempluje encję i wszystkie otwarte źródła", async () => {
+  const token = zalogowany("biuro");
+  const d = daneSpraw();
+  const kolejka = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy", headers: { "x-session": token },
+  });
+  const zamowienie = (kolejka.json().sprawy as Array<{ rodzaj: string; sprawaId: number | null }>)
+    .find((s) => s.rodzaj !== "pytanie")!;
+  assert.ok(zamowienie.sprawaId, "wiersz wielźródłowy niesie sprawaId");
+
+  const r = await app.inject({
+    method: "POST",
+    url: `/api/biuro/sprawy/sprawa/${zamowienie.sprawaId}/prowadzi`,
+    headers: { "x-session": token },
+    payload: {},
+  });
+  assert.equal(r.statusCode, 200);
+
+  /* Jeden klik, trzy rejestry: zwrot, dyskusja i reklamacja zam-1 dostają
+     stemple naraz — to jest sedno przejęcia CAŁEJ sprawy. */
+  const w = (sql: string, id: number) => db().prepare(sql).get(id) as Record<string, unknown>;
+  assert.ok(w("SELECT prowadzi FROM zwrot WHERE id = ?", d.zwrotId).prowadzi);
+  assert.ok(w("SELECT prowadzi FROM dyskusja WHERE id = ?", d.dyskusjaId).prowadzi);
+  assert.ok(w("SELECT rekl_prowadzi FROM zwrot_pozycja WHERE id = ?", d.pozycjaId).rekl_prowadzi);
+  assert.equal(
+    (db().prepare("SELECT prowadzi FROM sprawa WHERE id = ?").get(zamowienie.sprawaId!) as
+      { prowadzi: string | null }).prowadzi,
+    "Ktoś biuro"
+  );
+
+  const brak = await app.inject({
+    method: "POST", url: "/api/biuro/sprawy/sprawa/999999/prowadzi",
+    headers: { "x-session": token }, payload: {},
+  });
+  assert.equal(brak.statusCode, 404, "nieistniejąca sprawa to 404, nie awaria");
 });

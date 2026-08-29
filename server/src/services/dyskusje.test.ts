@@ -25,7 +25,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dyskusja", "zwrot_pozycja", "zwrot", "events", "watek_meta"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "dyskusja", "zwrot_pozycja", "zwrot", "events", "watek_meta"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   /* Świeży adapter dev na każdy test — wysłana wiadomość z jednego testu nie

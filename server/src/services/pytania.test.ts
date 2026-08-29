@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dopasowanie", "pytanie", "ai_config", "sgt_towar", "sgt_stan", "watek_meta"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "dopasowanie", "pytanie", "ai_config", "sgt_towar", "sgt_stan", "watek_meta"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   /* Świeży adapter na każdy test: dev trzyma wysłane wiadomości w pamięci
