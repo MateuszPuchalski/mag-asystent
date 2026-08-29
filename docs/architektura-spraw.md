@@ -5,7 +5,7 @@ oknami. Sprzedaż idzie wyłącznie przez Allegro, więc API jest jedynym źród
 spraw. Decyzja: **ewolucja WERTIS**, nie nowa aplikacja obok.
 
 Ten dokument spisuje zasady, do których zmierzamy, i mapę etapów. Etap A
-(nawigacja boczna, rozprężenie SPRAW) wszedł w 0.124.0. Kolejne litery to
+(nawigacja boczna, rozprężenie SPRAW) wszedł w 0.125.0. Kolejne litery to
 osobne wydania, każde działające na produkcji.
 
 ## Siedem zasad
@@ -108,7 +108,7 @@ Warunek wstępny: kolumna `kupujacy_id` przy pytaniach i odmaskowanie loginów.
 
 ## Ekran docelowy
 
-Powłoka z 0.124.0 zostaje: pasek boczny, konsola kolejka–sprawa–kontekst,
+Powłoka z 0.125.0 zostaje: pasek boczny, konsola kolejka–sprawa–kontekst,
 MAGAZYN ZWROTÓW i REJESTRY osobno. Dwie zmiany czekają na model danych:
 
 - Pasma kolejki przechodzą z wieku na **piłkę × termin**: PO TERMINIE,
@@ -124,7 +124,7 @@ MAGAZYN ZWROTÓW i REJESTRY osobno. Dwie zmiany czekają na model danych:
 Każdy etap to osobne wydanie i osobny PR; kolejny zaczyna się po obejrzeniu
 poprzedniego na produkcji.
 
-- **A (0.124.0, wykonany):** nawigacja boczna zamiast górnego paska; SPRAWY
+- **A (0.125.0, wykonany):** nawigacja boczna zamiast górnego paska; SPRAWY
   rozprężone na trzy widoki; konsole na pełne `100dvh`.
 - **B — uszczelnienie wjazdu:** paginacja `/sale/issues`; weryfikacja listy
   statusów końcowych dyskusji na żywym koncie; `watek_meta` dla dyskusji

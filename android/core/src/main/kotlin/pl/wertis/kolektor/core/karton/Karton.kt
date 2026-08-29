@@ -59,6 +59,46 @@ fun <T> kolejnoscZbierania(pozycje: List<T>, id: (T) -> Long): List<T> =
     pozycje.sortedByDescending(id)
 
 /**
+ * Polska liczba mnoga dla „półka". Prywatne i celowo: repo nie odmienia
+ * NICZEGO — wszędzie stoją formy nieodmienne (`poz.`, `szt.`, `zwr.`) — więc
+ * pierwszy przypadek nie ma komu służyć poza tym jednym podpisem. Abstrakcja
+ * powstanie, gdy zgłosi się drugi wołający (wzorzec `Szukanie.kt`).
+ *
+ * Reguła jest nieoczywista w obie strony: 12–14 idzie na „półek" MIMO
+ * końcówki 2–4, a 22–24 wraca na „półki". Dlatego ma test.
+ */
+private fun polki(n: Int): String {
+    if (n == 1) return "półka"
+    val dziesiatki = n % 100
+    val jednosci = n % 10
+    return if (jednosci in 2..4 && dziesiatki !in 12..14) "półki" else "półek"
+}
+
+/**
+ * Gdzie ten towar wraca — jedną linią, pod nazwą (0.124.0).
+ *
+ * ZASTĘPUJE RZĄD CHIPÓW i to jest cała ta zmiana. `LocChip` ma
+ * `heightIn(min = 44.dp)`, bo 44 dp to minimalny cel dla palca — a w zbiórce
+ * te chipy były NIEKLIKALNE: odkładanie zaczyna się dopiero po ZATWIERDŹ.
+ * Karta płaciła 52 dp (44 % swojej wysokości) rozmiarem kciuka za coś, czego
+ * żaden kciuk nie dotyka. Ze zgłoszenia: „pozycja zajmuje za dużo miejsca".
+ *
+ * Adres pickingowy zostaje PEŁNYM kodem, bo to on jest odpowiedzią na pytanie
+ * „dokąd to wróci". Reszta półek schodzi do licznika — przy zbieraniu wystarczy
+ * wiedzieć, że są; wypisane w całości zabierały linię, którą zabrały.
+ */
+fun podpisPolek(lokOczekiwana: String?, lokalizacje: List<String>): String {
+    /* Pickingowy z pola, a gdy go nie ma — pierwszy z listy. `szczegolKosza`
+       zawsze wypełnia `lokOczekiwana`, kiedy towar ma jakikolwiek adres, więc
+       ta gałąź jest teoretyczna; pominięcie adresu, który JEST, byłoby jednak
+       gorsze niż jedna linijka zapasu. */
+    val glowna = lokOczekiwana?.takeIf { it.isNotBlank() } ?: lokalizacje.firstOrNull()
+    if (glowna == null) return "bez adresu w kartotece"
+    val innych = lokalizacje.count { it != glowna }
+    return if (innych == 0) glowna else "$glowna · +$innych ${polki(innych)}"
+}
+
+/**
  * Podpis wiersza na liście kartonów — stan PRACY, nie stan rekordu.
  *
  * „otwarty" i „zamknięty" to słowa bazy danych; przy pudle pyta się o co

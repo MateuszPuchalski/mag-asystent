@@ -48,7 +48,7 @@
     /* Stopka strony. Konsola sięga do dolnej krawędzi okna, więc musi ją odjąć —
        ten sam powód, dla którego margines boczny ma własną zmienną. */
     --stopka: 28px;
-    /* Szerokość paska bocznego (0.124.0). Jedna liczba, bo flex liczy z niej
+    /* Szerokość paska bocznego (0.125.0). Jedna liczba, bo flex liczy z niej
        resztę — main nie musi znać szerokości paska. */
     --bok: 216px;
     /* Wysokość chromu NAD treścią. Do 0.123.0 mierzył ją skrypt (nagłówek
@@ -68,7 +68,7 @@
   a:hover { color: var(--amber-dark); }
 
   /* Pasek górny = TopBar kolektora: grafit, marka bursztynem w kondensacie. */
-  /* ── Nawigacja boczna (0.124.0) ────────────────────────────────────────────
+  /* ── Nawigacja boczna (0.125.0) ────────────────────────────────────────────
      Strona to flex [aside | main]: pasek jest elementem przepływu, nie
      nakładką, więc szerokości treści nie trzeba nigdzie odejmować ręcznie.
      `sticky` + własne przewijanie: pasek stoi, gdy treść jedzie. */
@@ -399,7 +399,7 @@
        Trzecia geometria tej samej konsoli i jedyna, w której KOLEJKA jest
        szeroka. Do 0.123.0 obok stała jeszcze szyna rejestrów 352 px — praca
        magazynu i archiwum wyprowadziły się do własnych pozycji paska bocznego
-       (0.124.0), więc kolejka dostaje CAŁĄ szerokość. Wysokość okna i własne
+       (0.125.0), więc kolejka dostaje CAŁĄ szerokość. Wysokość okna i własne
        przewijanie zostają: to dalej konsola, nie strona. */
     #widokSprawy.zKolejka { grid-template-columns: minmax(0, 1fr); }
     #widokSprawy.zKolejka > .card { grid-column: 1; }
@@ -937,7 +937,7 @@
   /* fokus pola = bursztynowa ramka WertisTextField */
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
-  /* ── Zakładki w pasku bocznym (0.124.0) ────────────────────────────────────
+  /* ── Zakładki w pasku bocznym (0.125.0) ────────────────────────────────────
      Historia domu: karta pod nagłówkiem (0.74.1) → ciemny nagłówek (0.95.0)
      → pion po lewej. Mechanizm od 0.74.1 ten sam: `data-widok`, jedna
      delegacja, jedna pętla `aria-current`.
@@ -1113,7 +1113,7 @@
 </head>
 <body>
 <aside id="bok">
-  <!-- NAWIGACJA BOCZNA (0.124.0). Do 0.123.0 zakładki, marka i sesja stały
+  <!-- NAWIGACJA BOCZNA (0.125.0). Do 0.123.0 zakładki, marka i sesja stały
        w górnym pasku 52 px — a zakładek przybywa: rozprężenie SPRAW dodaje
        MAGAZYN ZWROTÓW i REJESTRY, i w jednym rzędzie przestały się mieścić
        razem z sesją już przy 1180 px (zawijanie do 93 px, zmierzone przy
@@ -1183,7 +1183,7 @@
   </nav>
 
   <div class="sesja">
-    <!-- STAN NA DOLE PASKA (0.119.1 → 0.124.0). Kolor odpowiada na jedyne
+    <!-- STAN NA DOLE PASKA (0.119.1 → 0.125.0). Kolor odpowiada na jedyne
          pytanie biura („czy coś się dzieje?"), pełne zdania jadą w `title`.
          Plakietka odpowiedzi na notatki zostaje OSOBNA: sygnał roboczy
          z własną drogą (dostawy → karta odpowiedzi), nie zdrowie systemu. -->
@@ -5701,7 +5701,7 @@ function dociagnijWglad(id) {
 /* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
    zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
 /* Kropka przy pozycji MAGAZYN ZWROTÓW. Alarmy wyjechały ze SPRAW do własnego
-   widoku (0.124.0) i bez sygnału przy pozycji paska nikt by tam nie zaglądał —
+   widoku (0.125.0) i bez sygnału przy pozycji paska nikt by tam nie zaglądał —
    dokładnie ta ślepota, przez którą karta odpowiedzi na notatki dostała
    plakietkę w 0.57.0. Karmią ją renderery (jadą z cyklem etapu 3), więc nie
    ma osobnego zapytania ani drugiego źródła prawdy. */
@@ -5716,7 +5716,7 @@ function rysujKropkeMagazynu() {
 
 function rysujBrakujace(lista, ticker) {
   const karta = $("brakujaceKarta");
-  /* Karta mieszka od 0.124.0 w MAGAZYNIE ZWROTÓW — została jej wyłącznie
+  /* Karta mieszka od 0.125.0 w MAGAZYNIE ZWROTÓW — została jej wyłącznie
      własna reguła alarmu: pusty nie istnieje. */
   karta.hidden = lista.length === 0;
   alarmyMagazynu.paczki = lista.length;
@@ -5827,7 +5827,7 @@ function rysujKosze(kosze) {
    sprawa sprzed tygodnia kosztuje więcej niż wczorajsza.                     */
 
 function rysujPominiete(lista) {
-  /* Karta mieszka od 0.124.0 w MAGAZYNIE ZWROTÓW — otwarta dyskusja na
+  /* Karta mieszka od 0.125.0 w MAGAZYNIE ZWROTÓW — otwarta dyskusja na
      SPRAWACH nie ma jej już czym zasłaniać. */
   $("pominieteKarta").hidden = lista.length === 0;
   alarmyMagazynu.pominiete = lista.length;
@@ -6728,7 +6728,7 @@ const PRZY_SPRAWIE = ["kolejkaSprawKarta"];
 
 /* Karty z WŁASNĄ regułą widoczności obok kolejki: baner AI pokazuje się,
    gdy ma treść, wklejka — gdy człowiek otworzy ją ikonką. Szyna rejestrów
-   zniknęła z tego widoku w 0.124.0 (rozprężenie): magazyn i archiwum mają
+   zniknęła z tego widoku w 0.125.0 (rozprężenie): magazyn i archiwum mają
    własne pozycje w pasku bocznym. */
 const ALARMY_SZYNY = ["pytaniaBaner", "pytaniaWklejkaKarta"];
 
@@ -7436,7 +7436,7 @@ document.addEventListener("click", (e) => {
    przerysowuje co pół minuty `rysujStan`, a nasłuch ma to przeżyć.
 
    Nasłuch przeprowadza się razem z ikonami PO RAZ TRZECI (`#chrome` → nagłówek
-   w 0.119.1 → aside w 0.124.0) i za każdym razem w tym samym commicie co
+   w 0.119.1 → aside w 0.125.0) i za każdym razem w tym samym commicie co
    znacznik. Zostawiony w starym domu byłby kolejną odsłoną usterki z 0.92.0,
    0.96.0, 0.97.0, 0.98.0 i 0.101.0 — tym razem głośną, bo znacznik nagłówka
    już nie istnieje i `querySelector` oddałby `null`.
@@ -7451,7 +7451,7 @@ $("bok").addEventListener("click", (e) => {
        o parowanie, klik od razu je zaczyna: to była cała droga właściciela
        („guzik do połączenia"), a rozpocznij… sam pilnuje podwójnego kliku
        i sam pokaże 403, gdy klika ktoś bez roli admin. */
-    /* KONTO ALLEGRO mieszka od 0.124.0 w widoku REJESTRY — ikona prowadzi
+    /* KONTO ALLEGRO mieszka od 0.125.0 w widoku REJESTRY — ikona prowadzi
        tam, gdzie karta naprawdę stoi. `pokaz` sam zamyka otwartą sprawę. */
     pokaz("rejestry");
     const karta = $("kontoAllegroKarta");

@@ -332,7 +332,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   assert.deepEqual(
     widoki,
     ["sprawy", "dostawy", "magazyn", "rejestry", "analiza", "dziennik", "nadzor"],
-    "pasek boczny (0.124.0): SPRAWY pierwsze — wokół nich panel ewoluuje " +
+    "pasek boczny (0.125.0): SPRAWY pierwsze — wokół nich panel ewoluuje " +
       "w system tiketowy. MAGAZYN i REJESTRY to rozprężenie SPRAW: praca " +
       "fizyczna i archiwum wyszły z szyny 352 px do własnych pozycji. " +
       "Dostawcy dalej za zębatką — konfiguracja to nie praca"
@@ -355,7 +355,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
     3,
     "trzy grupy (Praca, Archiwum, Wgląd), każda podpisana — Archiwum doszło " +
-      "z rozprężeniem 0.124.0"
+      "z rozprężeniem 0.125.0"
   );
 
   /* Druga cicha droga: widok zostaje w pliku, ale przestaje do niego cokolwiek
@@ -445,7 +445,7 @@ test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () =
 
 test("zakładki mieszkają w pasku bocznym i same pilnują swojej widoczności", () => {
   /* Historia domu: karta pod nagłówkiem (0.74.1) → ciemny nagłówek (0.95.0)
-     → pion po lewej (0.124.0). Za każdym razem chodziło o to samo: chrom nad
+     → pion po lewej (0.125.0). Za każdym razem chodziło o to samo: chrom nad
      treścią kosztuje na KAŻDEJ zakładce. Pion oddał treści ostatnie 52 px —
      nad nią nie stoi już nic.
 
@@ -709,7 +709,7 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
     assert.ok(ia < ib, czemu);
   };
   przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
-  /* Po rozprężeniu 0.124.0: na SPRAWACH baner AI i wklejka stoją PRZED
+  /* Po rozprężeniu 0.125.0: na SPRAWACH baner AI i wklejka stoją PRZED
      kolejką (alarm i wejście nowej sprawy nad listą pracy); w MAGAZYNIE
      alarmy przed pracą przy koszach; w REJESTRACH archiwum przed stanem
      połączenia. */
@@ -722,7 +722,7 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
   const sprawy = html.slice(html.indexOf('id="widokSprawy"'), html.indexOf('id="widokMagazyn"'));
   for (const id of ["brakujaceKarta", "koszeKarta", "pominieteKarta",
                     "zwrotListaKarta", "dyskusjeKarta", "kontoAllegroKarta"]) {
-    assert.ok(!sprawy.includes(`id="${id}"`), `${id} wyprowadziła się ze SPRAW (0.124.0)`);
+    assert.ok(!sprawy.includes(`id="${id}"`), `${id} wyprowadziła się ze SPRAW (0.125.0)`);
   }
 });
 
@@ -890,7 +890,7 @@ test("na zakładce SPRAW jest JEDNA kolejka, a narzędzia stoją w jej głowie",
     assert.ok(kolejka.includes(`id="${pole}"`), `${pole} stoi w kolejce spraw`);
   }
 
-  /* Od 0.124.0 rejestry mieszkają we WŁASNYM widoku (rozprężenie), ale dwie
+  /* Od 0.125.0 rejestry mieszkają we WŁASNYM widoku (rozprężenie), ale dwie
      zasady przeżyły przeprowadzkę: rejestr jest ZWIJANY (otwarty na starcie
      byłby drugą kolejką) i zwinięty NIE PYTA serwera — ta sama reguła, co
      przy KONCIE ALLEGRO. */
@@ -949,7 +949,7 @@ test("zakładka spraw bez otwartej sprawy jest konsolą, nie stosem kart", () =>
     "utf8"
   );
 
-  /* Od 0.124.0 obok kolejki nie stoi już nic: szyna rejestrów wyprowadziła
+  /* Od 0.125.0 obok kolejki nie stoi już nic: szyna rejestrów wyprowadziła
      się do własnych widoków (rozprężenie), a kolejka dostała CAŁĄ szerokość.
      Konsola zostaje konsolą — wysokość okna i własne przewijanie kolumny. */
   assert.match(
@@ -958,7 +958,7 @@ test("zakładka spraw bez otwartej sprawy jest konsolą, nie stosem kart", () =>
     "bez otwartej sprawy kolejka jest JEDYNĄ i pełną kolumną"
   );
   assert.ok(!html.includes("sprawyRejestry"),
-    "szyna rejestrów nie wróciła do SPRAW — rozprężenie 0.124.0");
+    "szyna rejestrów nie wróciła do SPRAW — rozprężenie 0.125.0");
 
   for (const klasa of ["zKolejka", "zKlient", "konsola"]) {
     assert.match(
@@ -1505,7 +1505,7 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   // 2. Dwie ikony w pasku, każda z natywnym tooltipem i nawigacją z sekcji.
   assert.match(html, /id="ikonaZdrowia"/, "zdrowie systemu to jedna ikona, nie rząd kafli");
   assert.match(html, /id="ikonaAllegro"/, "wejście do parowania stoi w pasku");
-  /* Obie ikony stoją W PASKU BOCZNYM (0.119.1 nagłówek → 0.124.0 aside),
+  /* Obie ikony stoją W PASKU BOCZNYM (0.119.1 nagłówek → 0.125.0 aside),
      nie w osobnym paśmie chromu. */
   assert.ok(html.indexOf('id="ikonaZdrowia"') < html.indexOf("</aside>"),
     "ikona zdrowia mieszka w pasku bocznym");
@@ -1520,7 +1520,7 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   }
   assert.match(html, /ik\.title = linie\.join\("\\n"\)/, "tooltip niesie pełne zdania kafli");
   /* DELEGACJA WYJEŻDŻA RAZEM Z IKONAMI za każdą przeprowadzką (`#chrome` →
-     nagłówek 0.119.1 → aside 0.124.0), zawsze w tym samym commicie. Zostawiona
+     nagłówek 0.119.1 → aside 0.125.0), zawsze w tym samym commicie. Zostawiona
      w starym domu byłaby kolejną odsłoną usterki z 0.92.0, 0.96.0, 0.97.0,
      0.98.0 i 0.101.0 — tym razem głośną: starego domu nie ma, `$(…)`/
      `querySelector` oddaje `null` i wywala cały skrypt przy starcie. */

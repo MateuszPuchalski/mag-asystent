@@ -5,8 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -42,6 +41,7 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.karton.FazaKartonu
 import pl.wertis.kolektor.core.karton.fazaKartonu
 import pl.wertis.kolektor.core.karton.kolejnoscZbierania
+import pl.wertis.kolektor.core.karton.podpisPolek
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.DodajDoKartonuBody
 import pl.wertis.kolektor.core.net.IloscKartonuBody
@@ -56,13 +56,13 @@ import pl.wertis.kolektor.core.text.iloscZWpisu
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
-import pl.wertis.kolektor.ui.components.LocChip
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.kosze.KoszScreen
+import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.BarlowCond
@@ -479,8 +479,16 @@ private fun PasekAnulowania(
  * serwera od pierwszego dnia (`szczegolKosza` liczy adresy dla KAŻDEJ pozycji,
  * także w kartonie otwartym); ekran jej po prostu nie rysował.
  *
- * Chipy są tu WYŁĄCZNIE do czytania — w odróżnieniu od rozkładania nie ma
- * czego nimi wpisywać, bo odkładanie zacznie się dopiero po ZATWIERDŹ.
+ * ADRES JEST LINIĄ, NIE RZĘDEM CHIPÓW (0.124.0) — drugie zgłoszenie z hali:
+ * „pozycja zajmuje za dużo miejsca". Chipy kosztowały 52 dp z 118, czyli 44 %
+ * karty, a ich wysokość bierze się z `heightIn(min = 44.dp)` w `LocChip`, bo
+ * 44 dp to minimalny CEL DLA PALCA. Tutaj nie było czego dotykać: odkładanie
+ * zaczyna się dopiero po ZATWIERDŹ, więc chipy dostawały puste `{}`. Karta
+ * płaciła rozmiarem kciuka za coś, czego żaden kciuk nie dotyka.
+ *
+ * Rozkładanie (`KoszScreen`) chipy ZACHOWUJE i tam są klikalne — wpisują
+ * adres i pokazują stan zapisu. Różnica nie jest niekonsekwencją, tylko
+ * odpowiedzią na to, co w danej fazie da się zrobić palcem.
  *
  * Ilość jest KLIKALNA, bo poprawianie liczby jest tu częstsze niż wszystko
  * inne — ktoś doliczył resztę pudła albo zeskanował dwa razy tę samą sztukę.
@@ -488,7 +496,6 @@ private fun PasekAnulowania(
  * w ogóle nie ma; przed ZATWIERDŹ wiersz wolno skasować bez śladu, bo nie jest
  * jeszcze zapisem tego, co leży w środku.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ZbieranaPozycja(
     p: KoszPozycja,
@@ -523,9 +530,31 @@ private fun ZbieranaPozycja(
                     p.nazwa,
                     fontSize = 12.sp,
                     color = InkMute,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    /* Kropka TYLKO przy realnym adresie — przy „bez adresu
+                       w kartotece" wskazywałaby półkę, której nie ma. Ten sam
+                       bursztyn, którym `LocChip` znaczy adres pickingowy. */
+                    if (!p.lokOczekiwana.isNullOrBlank() || p.lokalizacje.isNotEmpty()) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(Amber))
+                    }
+                    Text(
+                        podpisPolek(p.lokOczekiwana, p.lokalizacje),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Ink,
+                        /* Jedna linia z wielokropkiem: adres stoi NA POCZĄTKU,
+                           więc ucięty licznik („+2 pó…") kosztuje mniej niż
+                           zawinięty adres kosztowałby wysokości. */
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -554,20 +583,6 @@ private fun ZbieranaPozycja(
                     tint = Destructive,
                     modifier = Modifier.size(20.dp),
                 )
-            }
-        }
-        /* Adres pickingowy pierwszy i wyróżniony, za nim reszta półek. Towar
-           bez adresu dostaje ZDANIE, nie pustkę: pusty rząd czyta się jak brak
-           danych, a to jest fakt do naprawienia przy odkładaniu. */
-        val polki = listOfNotNull(p.lokOczekiwana) + p.lokalizacje.filter { it != p.lokOczekiwana }
-        if (polki.isEmpty()) {
-            Text("bez adresu w kartotece", fontSize = 12.sp, color = InkMute)
-        } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                polki.forEachIndexed { i, kod -> LocChip(kod, primary = i == 0) {} }
             }
         }
         if (edytowana) {

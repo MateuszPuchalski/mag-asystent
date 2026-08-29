@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.124.0 — 29 sierpnia 2026
+## 0.125.0 — 29 sierpnia 2026
 
 **Nawigacja boczna zamiast górnego paska; SPRAWY rozprężone na trzy widoki.**
 Pierwszy etap ewolucji spraw w system tiketowy — mapa całości w nowym
@@ -62,6 +62,26 @@ Ikona stanu Allegro i pas „SPARUJ KONTO" prowadzą odtąd tutaj.
 Testy-strażnicy nagłówka i zakładek przepisane na pasek boczny w tym samym
 wydaniu — szósta odsłona usterki „delegacja została w starym domu" grozi
 dokładnie przy takiej przeprowadzce.
+## 0.124.0 — 29 sierpnia 2026
+
+**Pozycja w kartonie schudła o jedną trzecią.** Zgłoszenie właściciela:
+„otwarta pozycja w karton zajmuje za dużo miejsca".
+
+Pomiar potwierdził zarzut. Karta miała 118 dp, z czego rząd chipów z adresami
+zabierał 52 dp — 44 procent. Ta wysokość bierze się z minimalnego celu dla
+palca, a w zbiórce chipy były nieklikalne: odkładanie zaczyna się dopiero po
+ZATWIERDŹ. Karta płaciła rozmiarem kciuka za coś, czego żaden kciuk nie dotyka.
+
+Adres zszedł pod nazwę, do tej samej kolumny, i drugi rząd zniknął razem
+z odstępem. Karta ma teraz około 76 dp, czyli na ekranie mieści się **pięć
+pozycji zamiast trzech**. Treść zostaje: adres pickingowy pełnym kodem
+z bursztynową kropką, a reszta półek jako licznik („+2 półki").
+
+Nazwa towaru zwija się teraz do jednej linii — druga wracałaby z połową
+odzyskanego miejsca.
+
+Rozkładanie kosza i kartonu chipy ZACHOWUJE. Tam są klikalne: wpisują adres
+i pokazują stan zapisu, więc cel dla palca jest tam zarobiony.
 
 ## 0.123.0 — 28 sierpnia 2026
 

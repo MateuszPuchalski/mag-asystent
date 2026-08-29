@@ -441,7 +441,8 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   wpisuje się z klawiatury. Przed ZATWIERDŹ pozycję wolno usunąć.
 - **Wpisywanie szuka w kartotece**, a nie dodaje w ciemno (0.123.0). Te same
   reguły co w dostawie; wyniki to lista z półkami i stanem, a dotknięcie
-  wiersza dokłada towar. Każda pozycja w pudle pokazuje swoje półki.
+  wiersza dokłada towar. Każda pozycja pokazuje adres jedną linią pod nazwą:
+  pełny kod półki pickingowej i licznik pozostałych (0.124.0).
 - **ANULUJ KARTON** na każdym etapie. Pusty znika z bazy, pudło z zawartością
   zostaje ze statusem ANULOWANY. Pozycje już odłożone zostają odłożone.
 - Po ZATWIERDŹ karton jest zwykłym koszem do rozłożenia: ten sam ekran, ten sam
@@ -572,7 +573,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 267 testów jednostkowych; buduje się bez Android SDK
+                           + 268 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 15 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
