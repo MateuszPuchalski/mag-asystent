@@ -14,6 +14,7 @@ import { BladPytania, stempelProwadzi } from "../services/pytania.js";
 import { BladZwrotu, stempelProwadziZwrotu } from "../services/zwroty.js";
 import { stempelProwadziReklamacji } from "../services/reklamacje.js";
 import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
+import { BladOpinii, stempelProwadziOpinii } from "../services/opinie.js";
 import { osCzasuSprawy } from "../services/os-sprawy.js";
 import { kanalyOdpowiedzi } from "../services/kanaly.js";
 import { kontekstZamowienia } from "../services/przesylki.js";
@@ -281,6 +282,7 @@ export async function sprawyRoutes(app: FastifyInstance) {
         if (r === "pytanie") stempelProwadzi(lokalnyId, autor());
         else if (r === "zwrot") stempelProwadziZwrotu(lokalnyId, autor());
         else if (r === "dyskusja") stempelProwadziDyskusji(lokalnyId, autor());
+        else if (r === "opinia") stempelProwadziOpinii(lokalnyId, autor());
         else stempelProwadziReklamacji(lokalnyId, autor());
       };
       try {
@@ -295,7 +297,12 @@ export async function sprawyRoutes(app: FastifyInstance) {
           stempelZrodla(rodzaj as RodzajSprawy, id);
         }
       } catch (e) {
-        if (e instanceof BladZwrotu || e instanceof BladPytania || e instanceof BladDyskusji) {
+        if (
+          e instanceof BladZwrotu ||
+          e instanceof BladPytania ||
+          e instanceof BladDyskusji ||
+          e instanceof BladOpinii
+        ) {
           return reply.code(e.kod).send({ error: e.message });
         }
         if (e instanceof Error && /Nie ma takiej sprawy/.test(e.message)) {

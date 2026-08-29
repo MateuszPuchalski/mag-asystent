@@ -14,6 +14,7 @@ import type {
   WatekNaglowek,
   WiadomoscAllegro,
   WiadomoscDyskusji,
+  OpiniaAllegro,
   ZamowienieAllegro,
   ZamowienieKupujacego,
   ZdarzenieSledzenia,
@@ -202,6 +203,55 @@ export function urlDyskusji(apiUrl: string, offset: number): string {
 }
 
 /**
+ * Opinie o sprzedawcy (0.135.0). `/sale/user-ratings` przyjmuje `offset`
+ * i `limit`; filtra daty NIE dokumentuje, więc granicę tniemy po naszej
+ * stronie ([WERYFIKUJ] na żywym koncie razem z kształtem pól).
+ */
+export function urlOpinii(apiUrl: string, offset: number): string {
+  return `${apiUrl}/sale/user-ratings?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
+}
+
+/**
+ * Opinia z JSON-a → typ domenowy. Zasób jest [WERYFIKUJ], więc każde pole ma
+ * listę znanych miejsc, a nieznany kształt daje NULL-e, nie wyjątek: opinia
+ * bez oceny na ekranie jest lepsza niż pobranie kończące się błędem 500.
+ */
+export function mapujOpinie(json: unknown): OpiniaAllegro[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(root.ratings)
+    ? root.ratings
+    : Array.isArray(root.userRatings)
+      ? root.userRatings
+      : [];
+  return lista.map((it) => {
+    const r = (it ?? {}) as Record<string, unknown>;
+    const buyer = (r.buyer ?? {}) as Record<string, unknown>;
+    const order = (r.order ?? {}) as Record<string, unknown>;
+    const answer = (r.answer ?? {}) as Record<string, unknown>;
+    /* Ocena bywa liczbą przy `rating`, bywa obiektem z gwiazdkami przy
+       `rates.overall` — pytamy o oba, zanim odpuścimy. */
+    const rates = (r.rates ?? {}) as Record<string, unknown>;
+    const overall = (rates.overall ?? {}) as Record<string, unknown>;
+    return {
+      id: tekst(r.id) ?? "",
+      orderId: tekst(order.id) ?? tekst(r.orderId),
+      kupujacyLogin: tekst(buyer.login) ?? tekst(buyer.id),
+      ocena: liczbaLubNull(r.rating) ?? liczbaLubNull(overall.value),
+      rekomendacja: tekst(r.recommended) ?? tekst(r.recommendation),
+      /* Treść opinii jest PUBLICZNA — dekodujemy encje jak w każdym innym
+         tekście czytanym przez człowieka (0.127.0). */
+      tresc: tekstLudzki(r.comment) ?? tekstLudzki(r.text),
+      odpowiedz: tekstLudzki(answer.text) ?? tekstLudzki(r.answerText),
+      utworzono: tekst(r.createdAt) ?? tekst(r.publishedAt),
+      /* Brak pola traktujemy jako „wolno odpowiedzieć": ukrycie opinii,
+         na którą DA się odpowiedzieć, kosztuje więcej niż pokazanie takiej,
+         przy której Allegro odmówi. */
+      mozliwaOdpowiedz: r.answerAllowed !== false && r.canBeAnswered !== false,
+    };
+  });
+}
+
+/**
  * Dyskusja/reklamacja z JSON-a `/sale/issues` → typ domenowy. Zasób jest
  * w becie i nazwy pól bywają zagnieżdżone różnie — każde pole ma listę
  * znanych miejsc, a nieznany kształt daje NULL-e, nie wyjątek.
@@ -378,6 +428,10 @@ const tekstLudzki = (v: unknown): string | null => {
 
 const liczba = (v: unknown, def: number): number =>
   typeof v === "number" && Number.isFinite(v) ? v : def;
+
+/** Liczba albo NULL — do pól, w których „brak oceny" nie jest zerem (0.135.0). */
+const liczbaLubNull = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
 
 /**
  * Kody powodów zwrotu → zdania po polsku.
@@ -871,6 +925,26 @@ export class HttpAllegroAdapter implements AllegroAdapter {
       const json = await this.zapytaj(urlDyskusji(config.allegro.apiUrl, strona * 100));
       const lista = json === null ? [] : mapujDyskusje(json);
       wyniki.push(...lista);
+      if (lista.length < 100) break;
+    }
+    return wyniki;
+  }
+
+  async listaOpinii(odKiedy: string | null): Promise<OpiniaAllegro[]> {
+    /* Pętla stron jak przy dyskusjach; granicę dat tniemy po swojej stronie,
+       bo zasób jej nie dokumentuje. Stop na krótszej stronie ALBO na opinii
+       starszej niż granica — lista przychodzi od najnowszych. */
+    const granica = odKiedy ? Date.parse(odKiedy) : NaN;
+    const wyniki: OpiniaAllegro[] = [];
+    for (let strona = 0; strona < 10; strona++) {
+      const json = await this.zapytaj(urlOpinii(config.allegro.apiUrl, strona * 100));
+      const lista = json === null ? [] : mapujOpinie(json);
+      for (const o of lista) {
+        if (!Number.isNaN(granica) && o.utworzono && Date.parse(o.utworzono) < granica) {
+          return wyniki;
+        }
+        wyniki.push(o);
+      }
       if (lista.length < 100) break;
     }
     return wyniki;

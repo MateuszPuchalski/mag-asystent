@@ -158,6 +158,33 @@ export interface WatekAllegro {
   wiadomosci: WiadomoscAllegro[];
 }
 
+/* ── Opinie o sprzedawcy (0.135.0) ───────────────────────────────────────────
+   Piąte źródło sprawy z docs/architektura-spraw.md. Opinia jest PUBLICZNA —
+   widzi ją każdy kupujący — więc jej treść wolno u nas trzymać, inaczej niż
+   treść rozmowy. To nie jest wyłom w zasadzie prywatności, tylko inna klasa
+   danych: rozmowa jest prywatna między nami a klientem, opinia wisi na
+   ofercie.
+
+   Odpowiadanie na opinię przez API zostaje na później: końcówka odpowiedzi
+   jest [WERYFIKUJ], a pisanie do klienta przez niezweryfikowany zasób to
+   jedyny rodzaj błędu, którego nie da się cofnąć.                           */
+export interface OpiniaAllegro {
+  id: string;
+  /** Zamówienie, którego dotyczy — most do sprawy (grupowanie po order_id). */
+  orderId: string | null;
+  kupujacyLogin: string | null;
+  /** Gwiazdki 1–5, gdy API je podaje ([WERYFIKUJ] kształt pola). */
+  ocena: number | null;
+  /** POSITIVE | NEUTRAL | NEGATIVE — rekomendacja kupującego ([WERYFIKUJ]). */
+  rekomendacja: string | null;
+  tresc: string | null;
+  /** Nasza odpowiedź, jeśli już jest — po niej poznajemy sprawę załatwioną. */
+  odpowiedz: string | null;
+  utworzono: string | null;
+  /** Czy Allegro dopuszcza jeszcze odpowiedź ([WERYFIKUJ] nazwa pola). */
+  mozliwaOdpowiedz: boolean;
+}
+
 /**
  * Dyskusja albo reklamacja klienta z Allegro (`/sale/issues`, Etap 6).
  * Sam ODCZYT: sprawa toczy się w panelu Allegro, my ją tylko pokazujemy,
@@ -269,6 +296,13 @@ export interface AllegroAdapter {
    * u nas: jedno miejsce prawdy to panel Allegro (Etap 6).
    */
   listaDyskusji(): Promise<DyskusjaAllegro[]>;
+
+  /**
+   * Opinie o sprzedawcy od `odKiedy` (0.135.0). Zasób `/sale/user-ratings`
+   * jest [WERYFIKUJ] — mapowanie defensywne, nieznany kształt daje pustą
+   * listę zamiast wyjątku (ta sama zasada co przy powodach zwrotu).
+   */
+  listaOpinii(odKiedy: string | null): Promise<OpiniaAllegro[]>;
   /** Szczegół zwrotu po id; `null` gdy nie istnieje. */
   zwrot(id: string): Promise<ZwrotAllegro | null>;
   /** Zamówienie (checkout-form) — źródło `externalId` pozycji; `null` gdy brak. */

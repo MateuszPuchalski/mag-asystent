@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    40,
+    46,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -213,22 +213,42 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "z ekranu sąsiedniego kanału tej samej sprawy. Agent oceniający zwrot " +
       "musiał dotąd przejść na drugi ekran, żeby odpisać klientowi czekającemu " +
       "w dyskusji. Wysyłka dzieje się po jawnym kliknięciu I po potwierdzeniu " +
-      "w okienku, a kontrola świeżości działa tak samo jak przy własnym polu."
+      "w okienku, a kontrola świeżości działa tak samo jak przy własnym polu." +
+      "\n\nPOST i PUT z 0.133.0 to jedno pole formularza szablonów: DODAJ " +
+      "zakłada nowy, ZAPISZ ZMIANY nadpisuje wskazany. Szablon to tekst DO " +
+      "POPRAWIENIA, nie wysyłka — wstawienie go do odpowiedzi jest czystym " +
+      "odczytem i nie podnosi żadnego licznika." +
+      "\n\nDwa POST-y z 0.135.0 to piąte źródło spraw: POBIERZ OPINIE " +
+      "(synchronizacja z Allegro, jak przy dyskusjach) i zmiana statusu " +
+      "opinii na PRZEJRZANA albo ZAŁATWIONA. Odpowiadania na opinię przez " +
+      "API tu NIE MA i nie przez przeoczenie: końcówka odpowiedzi jest " +
+      "niezweryfikowana, a pisanie do klienta przez niesprawdzony zasób to " +
+      "jedyny błąd, którego nie da się cofnąć." +
+      "\n\nTrzy POST-y z 0.136.0 to tagi i reguły: dopisanie tagu do sprawy, " +
+      "dodanie reguły i ZASTOSUJ TERAZ. Reguła nadaje tag i może przypisać " +
+      "sprawę osobie — i to jest CAŁA lista rzeczy, które automatowi wolno " +
+      "(zasada 6 z docs/architektura-spraw.md): żadna z nich nie mówi do " +
+      "klienta ani słowa. Przydział nie odbiera sprawy komuś, kto już ją " +
+      "prowadzi."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    8,
+    10,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
       "wgranie logo dostawcy, półka reklamacyjna, notatka do dyskusji " +
-      "Allegro, prompt eksperta i fakty firmowe (0.80.0) oraz przełącznik " +
+      "Allegro, prompt eksperta i fakty firmowe (0.80.0), przełącznik " +
       "automatycznego szkicu AI (0.107.0) — ten ostatni po to, by biuro " +
-      "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie"
+      "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie — " +
+      "edycja szablonu odpowiedzi (0.133.0) oraz edycja reguły tagowania " +
+      "(0.136.0)"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    4,
+    7,
     "DELETE to odpięcie dokumentu zwrotu, odpięcie kosza, rozłączenie " +
-      "konta Allegro i skasowanie logo dostawcy"
+      "konta Allegro, skasowanie logo dostawcy, skasowanie szablonu " +
+      "odpowiedzi (0.133.0) oraz zdjęcie tagu ze sprawy i skasowanie reguły " +
+      "(0.136.0)"
   );
   /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
      są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
@@ -1618,4 +1638,78 @@ test("zamówienie przy sprawie: na klik, bez adresu, tylko odczyt (0.132.0)", ()
   }
   assert.ok(!/dostawaAdres|pickupPoint|adresDostawy/.test(html),
     "adres dostawy nie ma czego szukać na ekranie sprawy");
+});
+
+test("szablony: wybierak przy każdym polu odpowiedzi, wstawienie to odczyt (0.133.0)", () => {
+  /* Etap E2. Trzy granice warte testu.
+
+     PIERWSZA: wybierak stoi przy KAŻDYM polu odpowiedzi — przy pytaniu, przy
+     dyskusji i w bloku kanałów sprawy (ten powstaje dopiero przy rysowaniu,
+     więc nasłuch musi siedzieć na sekcji, nie na polu).
+
+     DRUGA: wstawienie szablonu NICZEGO nie zapisuje. Zapisy szablonów są
+     w ustawieniach, za jawnym kliknięciem — nie przy pisaniu odpowiedzi.
+
+     TRZECIA: karta ustawień deleguje z KARTY, bo tabelę przerysowuje każdy
+     zapis (ta sama usterka co przy wyszukiwarce klientów w 0.114.0). */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const wybieraki = [...html.matchAll(/class="szablonWybor"/g)];
+  assert.equal(wybieraki.length, 3, "pytanie, dyskusja i blok kanałów sprawy");
+  assert.ok(html.includes('$("szablonyKarta").addEventListener("click"'),
+    "karta szablonów deleguje z poziomu sekcji");
+  const wstawienie = [...html.matchAll(/\/api\/biuro\/szablony\/\$\{id\}\/dla\?rodzaj=/g)];
+  assert.equal(wstawienie.length, 1, "jedna droga wstawienia na trzy pola");
+  for (const m of wstawienie) {
+    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
+    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
+      "wstawienie szablonu to czysty odczyt");
+  }
+});
+
+test("czasy odpowiedzi: piąty zakres analizy z własnym oknem (0.134.0)", () => {
+  /* Etap E3. Zakres dokłada się do czterech istniejących tą samą drogą co
+     DOSTAWY w 0.100.0 — i ma tę samą pułapkę: lista okien w panelu MUSI
+     zgadzać się z listą po stronie trasy, inaczej czip wygląda na wybrany,
+     a serwer liczy swoje domyślne (usterka z 0.96.0).
+
+     Druga asercja jest o drodze do roboty: wiersz „kto czeka teraz" otwiera
+     sprawę tym samym znacznikiem, którego używa kolejka SPRAW. Raport bez
+     drogi do roboty jest tylko ładnym wykresem. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.match(html, /<option value="obsluga">/, "zakres jest w wybieraku");
+  assert.match(html, /obsluga: \[7, 30, 90\]/, "okna zakresu stoją w panelu wprost");
+  assert.match(html, /obsluga: 30/, "zakres ma własne okno domyślne");
+  for (const blok of ["obslugaOdcinki", "obslugaTeraz", "obslugaLudzie", "obslugaPodstawa"]) {
+    assert.ok(html.includes(`id="${blok}"`), `${blok} istnieje`);
+  }
+  assert.ok(html.includes('class="card pelna zakresObsluga"'),
+    "karta nosi klasę zakresu — inaczej nie schowa się przy innych zakresach");
+  assert.match(html, /obslugaPodstawa"\)\.textContent = c\.podstawaPrawna/,
+    "podstawa prawna monitoringu jedzie na ekran razem z danymi imiennymi");
+});
+
+test("tagi i reguły: linia w trzech szczegółach, delegacja na sekcji (0.136.0)", () => {
+  /* Etap E5. Tag wisi przy ŹRÓDLE i przeżywa scalanie — to jest sprawdzane
+     testem serwisu. Tutaj trzy granice ekranu.
+
+     PIERWSZA: linia tagów stoi we WSZYSTKICH trzech szczegółach; sprawa
+     pokazuje sumę tagów swoich źródeł, więc brak linii przy jednym z nich
+     ukrywałby połowę prawdy.
+
+     DRUGA: delegacja na SEKCJI, bo linia jest przerysowywana po każdej
+     zmianie tagu (ta sama usterka co przy dostawach w 0.92.0).
+
+     TRZECIA: reguły mają własną kartę w ustawieniach i ręczne ZASTOSUJ TERAZ —
+     automat tagujący nie może chodzić przy samym patrzeniu na ekran. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const sekcja of ["pytanieTagi", "zwrotTagi", "dyskusjaTagi"]) {
+    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
+  }
+  assert.ok(html.includes('$("regulyKarta").addEventListener("click"'),
+    "karta reguł deleguje z poziomu sekcji");
+  assert.ok(html.includes('id="regulyZastosuj"'), "reguły uruchamia się ręką");
+  /* Wzorzec reguły jest FRAZĄ, nie wyrażeniem regularnym — pole i podpowiedź
+     mają o tym mówić, bo zły regexp potrafi zawiesić serwer. */
+  assert.match(html, /bez wyrażeń\s*\n?\s*regularnych/,
+    "objaśnienie mówi wprost, że to fraza, nie regexp");
 });

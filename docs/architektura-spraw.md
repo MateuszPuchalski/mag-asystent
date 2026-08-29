@@ -15,7 +15,8 @@ ustawowy termin nie mija, żaden klient nie czeka bez potrzeby, nikt nie robi
 tego samego dwa razy, każda odpowiedź ma fakty pod ręką.
 
 **1. Jednostką pracy jest problem klienta, nie obiekt Allegro.** Allegro
-rozbija jeden problem na obiekty: wątek wiadomości, dyskusję, CLAIM, zwrot.
+rozbija jeden problem na obiekty: wątek wiadomości, dyskusję, CLAIM, zwrot,
+od 0.135.0 także opinię.
 Klient pisze „gdzie paczka", zakłada dyskusję, w końcu odsyła towar — trzy
 obiekty, jeden problem. SPRAWA je agreguje; obiekty są źródłami sprawy.
 
@@ -184,15 +185,36 @@ poprzedniego na produkcji.
   dostaje go od zwrotu z tej samej sprawy. Czyta się NA KLIK i nie zapisuje:
   status płatności starzeje się w godziny. Adres dostawy dalej nie przechodzi
   przez mapowanie.
-- **E2 — szablony odpowiedzi:** gotowe teksty ze zmiennymi, wstawiane do pola
-  odpowiedzi. Najczęstsza robota agenta i pierwsza rzecz, którą Responso
-  robi dobrze.
-- **E3 — raporty czasów:** ile czekał klient, ile trwała odpowiedź, na osobę
-  i na kanał. Zdarzenia osi czasu (0.130.0) są już do tego wystarczające.
-- **E4 — opinie Allegro jako piąte źródło:** nowy rejestr i nowy rodzaj
-  `sprawa_zrodlo`; wymaga adaptera i weryfikacji na żywym koncie.
-- **E5 — tagi i reguły:** tagowanie spraw, reguły przydziału. Wymaga
-  najpierw modelu tagów, którego repo nie ma wcale.
+- **E2 (0.133.0, wykonany) — szablony odpowiedzi:** gotowe teksty z polami
+  `{{klient}}`, `{{zamowienie}}`, `{{zwrot}}`, `{{oferta}}`, `{{ja}}`,
+  wstawiane w miejsce kursora przy każdym polu odpowiedzi. Podstawia SERWER,
+  bo tylko on wie, co stoi w sprawie; pole, którego sprawa nie zna, zostaje
+  widoczną klamrą — panel mówi wprost, co uzupełnić ręką. Redaguje je biuro
+  w ustawieniach, wysyła zawsze człowiek.
+- **E3 (0.134.0, wykonany) — raporty czasów:** piąty zakres ANALIZY liczony
+  z osi czasu sprawy, bez ani jednej nowej tabeli. Mediana i p90 od głosu
+  klienta do naszej odpowiedzi, osobno dla pytań i dyskusji, plus rozbiór per
+  osoba z podstawą prawną monitoringu przy danych. Okno tnie po ODPOWIEDZI
+  (jak przy czasach zwrotów), a seria wiadomości klienta liczy się od
+  pierwszej; obok mediany stoi lista KTO CZEKA TERAZ, bo mediana mówi
+  o przeszłości.
+- **E4 (0.135.0, wykonany) — opinie jako piąte źródło:** rejestr `opinia`
+  i piąty rodzaj `sprawa_zrodlo`; opinia z numerem zamówienia dopina się do
+  sprawy tego zamówienia, więc zła ocena stoi przy zwrocie, którego dotyczy.
+  Treść opinii TRZYMAMY, inaczej niż treść rozmowy — opinia jest publiczna,
+  rozmowa prywatna. Odpowiadanie przez API czeka na weryfikację końcówki;
+  do tego czasu odpowiada się w panelu Allegro, a rejestr trzyma status.
+- **E5 (0.136.0, wykonany) — tagi i reguły:** tag wisi przy ŹRÓDLE (jak
+  zdarzenie osi czasu), więc przeżywa SCAL, ROZKLEJ i przebudowę nakładki;
+  sprawa pokazuje sumę tagów swoich dzisiejszych źródeł. Reguła szuka FRAZY
+  w tytule i loginie — bez wyrażeń regularnych — nadaje tag i opcjonalnie
+  przypisuje sprawę osobie, nigdy nie odbierając jej temu, kto już ją
+  prowadzi. Reguły chodzą po każdym pobraniu i na żądanie.
+
+Etap E jest zamknięty. Dalsze kierunki wychodzą poza pierwotną mapę:
+odpowiadanie na opinie przez API (po weryfikacji końcówki), piłka ŚWIAT
+(po znalezieniu producenta danych o przewoźniku) i potwierdzenie listy
+`FINALNE_STATUSY_ALLEGRO` na żywym koncie.
 
 ## Czego świadomie nie robimy
 

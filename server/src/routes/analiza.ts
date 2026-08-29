@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { ROLE_BIUROWE } from "../services/users.js";
 import { analiza, type AnalizaAudytu } from "../services/raporty.js";
 import { analizaDostaw } from "../services/podglad-dostawy.js";
+import { czasyObslugi } from "../services/czasy-obslugi.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
 import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
@@ -48,6 +49,17 @@ export async function analizaRoutes(app: FastifyInstance) {
     }
     return null;
   }
+
+  /* Czasy obsługi klienta (0.134.0) — piąty zakres zakładki. Okno jak przy
+     śladzie audytowym (7/30/90): mierzy TEMPO PRACY, a nie rzadkie zdarzenia
+     w rodzaju dostawy. Lista musi zgadzać się z `OKNA_ANALIZY.obsluga`
+     w `web/biuro.html` — rozjazd dawałby czip wybrany na ekranie i inne okno
+     po stronie serwera (usterka z 0.96.0). */
+  app.get<{ Querystring: { days?: string } }>("/api/biuro/czasy-obslugi", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return czasyObslugi(dniZQuery(req.query.days));
+  });
 
   app.get<{ Querystring: { days?: string } }>("/api/analiza", async (req, reply) => {
     const nie = odmowa();

@@ -18,7 +18,7 @@ import { dopiszZdarzenie, type RodzajZrodlaOsi } from "./os-sprawy.js";
    SQL inline zamiast importów z serwisów rejestrów — one importują TEN
    moduł (hooki), więc odwrotny kierunek byłby cyklem.                        */
 
-export type RodzajZrodla = "pytanie" | "zwrot" | "dyskusja" | "reklamacja";
+export type RodzajZrodla = "pytanie" | "zwrot" | "dyskusja" | "reklamacja" | "opinia";
 
 /** Awaria pracy ze sprawą; `kod` niesie status HTTP dla trasy. */
 export class BladSprawy extends Error {
@@ -158,6 +158,31 @@ function zbierzZrodla(): Zrodlo[] {
       prowadziAt: (w.rekl_prowadzi_at as string | null) ?? null,
       kiedy:
         (w.utworzono_allegro as string | null) ?? (w.utworzono_at as string | null) ?? null,
+    });
+  }
+
+  /* Opinie (0.135.0) — grupują się po `order_id` jak zwrot i dyskusja, więc
+     zła ocena siada przy sprawie zamówienia, którego dotyczy. Opinia bez
+     zamówienia zostaje osobną sprawą (klucz zastępczy), bo po samym loginie
+     automat nie skleja niczego. */
+  for (const w of d
+    .prepare(
+      `SELECT id, allegro_id, order_id, kupujacy_login, status, prowadzi, prowadzi_at,
+              utworzono_allegro, utworzono_at FROM opinia`
+    )
+    .all() as Array<Record<string, unknown>>) {
+    zrodla.push({
+      rodzaj: "opinia",
+      lokalnyId: w.id as number,
+      allegroId: (w.allegro_id as string | null) ?? null,
+      grupa: (w.order_id as string | null) ?? `opinia:${w.id}`,
+      kupujacyId: null,
+      kupujacyLogin: (w.kupujacy_login as string | null) ?? null,
+      orderId: (w.order_id as string | null) ?? null,
+      otwarte: w.status !== "zalatwiona",
+      prowadzi: (w.prowadzi as string | null) ?? null,
+      prowadziAt: (w.prowadzi_at as string | null) ?? null,
+      kiedy: (w.utworzono_allegro as string | null) ?? (w.utworzono_at as string | null) ?? null,
     });
   }
 
@@ -527,6 +552,12 @@ export function orderIdSprawy(rodzaj: RodzajZrodla, lokalnyId: number): string |
   }
   if (rodzaj === "dyskusja") {
     const w = d.prepare("SELECT order_id FROM dyskusja WHERE id = ?").get(lokalnyId) as
+      | { order_id: string | null }
+      | undefined;
+    return w?.order_id ?? null;
+  }
+  if (rodzaj === "opinia") {
+    const w = d.prepare("SELECT order_id FROM opinia WHERE id = ?").get(lokalnyId) as
       | { order_id: string | null }
       | undefined;
     return w?.order_id ?? null;

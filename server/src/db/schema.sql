@@ -1082,7 +1082,7 @@ CREATE INDEX IF NOT EXISTS ix_sprawa_login    ON sprawa(kupujacy_login);
 CREATE TABLE IF NOT EXISTS sprawa_zrodlo (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   sprawa_id   INTEGER NOT NULL REFERENCES sprawa(id),
-  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja')),
+  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja','opinia')),
   lokalny_id  INTEGER NOT NULL,  -- id w tabeli rejestru; reklamacja = id POZYCJI zwrotu
   allegro_id  TEXT,              -- thread_id / allegro_return_id / id z /sale/issues
   wiazanie    TEXT NOT NULL DEFAULT 'auto',
@@ -1113,7 +1113,7 @@ CREATE INDEX IF NOT EXISTS ix_sprawa_zrodlo ON sprawa_zrodlo(sprawa_id);
 -- Zdarzenie powtarzalne — druga odpowiedź w dyskusji — ma czas w kluczu.
 CREATE TABLE IF NOT EXISTS sprawa_zdarzenie (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja')),
+  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja','opinia')),
   lokalny_id  INTEGER NOT NULL,   -- id w rejestrze; reklamacja = id POZYCJI zwrotu
   typ         TEXT NOT NULL,      -- slownik w services/os-sprawy.ts (TYPY_ZDARZEN)
   -- Czyj to był ruch. Osobno od `autor`, bo panel rysuje po TEJ kolumnie:
@@ -1128,3 +1128,112 @@ CREATE TABLE IF NOT EXISTS sprawa_zdarzenie (
 );
 -- Odczyt zawsze pyta o komplet źródeł jednej sprawy i sortuje po czasie.
 CREATE INDEX IF NOT EXISTS ix_sprawa_zdarzenie ON sprawa_zdarzenie(rodzaj, lokalny_id, kiedy_at);
+
+-- ── Szablony odpowiedzi (0.133.0) ───────────────────────────────────────────
+-- Etap E2 z docs/architektura-spraw.md; zapożyczenie od Responso wypisane
+-- wprost w tamtym dokumencie. Agent pisze te same trzy zdania po raz setny:
+-- „paczka wróciła, środki oddajemy dziś", „proszę o numer zamówienia",
+-- „zgłoszenie przyjęte". Szablon jest TEKSTEM DO POPRAWIENIA, nie wysyłką:
+-- wkleja się do pola odpowiedzi, a wysyła człowiek (zasada 6 — automat nigdy
+-- nie mówi do klienta sam).
+--
+-- `kanal` zawęża listę do miejsca, w którym się odpowiada: formuła grzeczności
+-- z dyskusji brzmi obco w wątku o dobór części. `dowolny` pasuje wszędzie.
+--
+-- Bez licznika użyć: policzenie kliknięcia wymagałoby ZAPISU przy samym
+-- wstawianiu tekstu, a szablonów jest kilkanaście i właściciel wie, których
+-- używa. Gdyby kiedyś było inaczej, liczbę policzy oś czasu sprawy.
+CREATE TABLE IF NOT EXISTS szablon (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa            TEXT NOT NULL,
+  kanal            TEXT NOT NULL DEFAULT 'dowolny'
+                     CHECK (kanal IN ('dowolny','pytanie','dyskusja')),
+  tresc            TEXT NOT NULL,
+  autor            TEXT NOT NULL,
+  utworzono_at     TEXT NOT NULL,
+  aktualizowano_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_szablon_kanal ON szablon(kanal, nazwa);
+
+-- ── Opinie o sprzedawcy — piąte źródło sprawy (0.135.0) ─────────────────────
+-- Etap E4 z docs/architektura-spraw.md. Opinia z jedną gwiazdką to sprawa
+-- klienta jak każda inna, tylko widoczna publicznie — a do 0.135.0 nie było
+-- jej w aplikacji wcale: agent dowiadywał się o niej z panelu Allegro albo
+-- od właściciela.
+--
+-- TREŚĆ OPINII TRZYMAMY, inaczej niż treść rozmowy — i to nie jest wyłom
+-- w zasadzie prywatności, tylko inna klasa danych. Rozmowa jest prywatna
+-- między nami a klientem; opinia wisi publicznie na ofercie i każdy kupujący
+-- ją widzi. Bez treści rejestr byłby listą gwiazdek bez informacji, po co
+-- w ogóle patrzeć.
+--
+-- Grupowanie w sprawę idzie po `order_id` — tak samo jak zwrot i dyskusja,
+-- więc zła opinia trafia do sprawy zwrotu, którego dotyczy.
+CREATE TABLE IF NOT EXISTS opinia (
+  -- Kształt jak `dyskusja`: lokalne id dla wiązań sprawy, klucz Allegro
+  -- z UNIQUE dla idempotentnego upsertu.
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  allegro_id      TEXT NOT NULL UNIQUE,
+  order_id        TEXT,
+  kupujacy_login  TEXT,
+  ocena           INTEGER,            -- 1–5 gwiazdek; NULL = API nie podało
+  rekomendacja    TEXT,               -- POSITIVE | NEUTRAL | NEGATIVE ([WERYFIKUJ])
+  tresc           TEXT,
+  --   nowa       = nikt jej jeszcze nie tknął
+  --   przejrzana = biuro ją widziało i nie ma nic do zrobienia
+  --   zalatwiona = odpowiedzieliśmy albo sprawa poszła inną drogą
+  status          TEXT NOT NULL DEFAULT 'nowa',
+  -- Odpowiedź, którą Allegro już zna. Odpowiadanie PRZEZ API czeka na
+  -- weryfikację końcówki — patrz komentarz przy OpiniaAllegro.
+  odpowiedz       TEXT,
+  mozliwa_odpowiedz INTEGER NOT NULL DEFAULT 1,
+  prowadzi        TEXT,
+  prowadzi_at     TEXT,
+  utworzono_allegro TEXT,
+  widziano_at     TEXT NOT NULL,      -- ostatni raz w odpowiedzi API (diagnostyka sync)
+  utworzono_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_opinia_status ON opinia(status, id);
+CREATE INDEX IF NOT EXISTS ix_opinia_order ON opinia(order_id);
+
+-- ── Tagi spraw i reguły ich nadawania (0.136.0) ─────────────────────────────
+-- Etap E5 z docs/architektura-spraw.md; ostatnie zapożyczenie od Responso.
+-- Zasada 6 mówi wprost, co wolno automatowi: „tagowanie i przydział mogą być
+-- regułami — ale do klienta mówi wyłącznie człowiek". Tag i przydział niczego
+-- nie wysyłają, więc mieszczą się w tej granicy z zapasem.
+--
+-- Tag wisi przy ŹRÓDLE, nie przy sprawie — ta sama decyzja co przy
+-- `sprawa_zdarzenie` i z tego samego powodu: SCAL i ROZKLEJ przenoszą źródła
+-- między sprawami, a rekoncyliacja potrafi skasować sprawę bez źródeł.
+-- Tag na sprawie zniknąłby wtedy po cichu; tag na źródle jedzie razem z nim.
+CREATE TABLE IF NOT EXISTS sprawa_tag (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj     TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja','opinia')),
+  lokalny_id INTEGER NOT NULL,
+  tag        TEXT NOT NULL,
+  -- Konto człowieka albo `regula:<id>` — po tym widać, co nadał automat.
+  autor      TEXT NOT NULL,
+  dodano_at  TEXT NOT NULL,
+  UNIQUE (rodzaj, lokalny_id, tag)
+);
+CREATE INDEX IF NOT EXISTS ix_sprawa_tag ON sprawa_tag(rodzaj, lokalny_id);
+CREATE INDEX IF NOT EXISTS ix_sprawa_tag_nazwa ON sprawa_tag(tag);
+
+-- Reguła: „sprawa pasująca do wzorca dostaje tag i (opcjonalnie) właściciela".
+-- WZORZEC TO ZWYKŁA FRAZA, nie wyrażenie regularne — świadomie. Regexp w polu
+-- tekstowym redagowanym przez biuro to pułapka na dwa sposoby: nikt go tam nie
+-- napisze poprawnie, a zły regexp potrafi zawiesić serwer na własnym backtrackingu.
+CREATE TABLE IF NOT EXISTS regula (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa        TEXT NOT NULL,
+  -- Rodzaj źródła, do którego reguła się stosuje; NULL = wszystkie.
+  rodzaj       TEXT,
+  -- Fraza szukana w tytule sprawy i loginie klienta, bez rozróżniania wielkości.
+  wzorzec      TEXT NOT NULL,
+  tag          TEXT,
+  -- Login pracownika, któremu przypada sprawa; NULL = reguła tylko taguje.
+  przydziel    TEXT,
+  aktywna      INTEGER NOT NULL DEFAULT 1,
+  autor        TEXT NOT NULL,
+  utworzono_at TEXT NOT NULL
+);

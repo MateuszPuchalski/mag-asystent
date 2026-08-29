@@ -1027,6 +1027,15 @@
 
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
 
+  /* Rząd przycisków pod formularzem (0.133.0). Klasa, nie atrybut `style`:
+     ustawienia mają odstępy z arkusza i pilnuje tego test. */
+  .rzadAkcji { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* Linia tagów sprawy (0.136.0) — pastylki w rzędzie, pole dopisania na
+     końcu. Wąskie, bo to etykiety, a nie treść. */
+  .tagiSprawy { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .tagiSprawy input { width: 11rem; }
+
   /* ── Sekcja zwijana ────────────────────────────────────────────────────────
      Natywny <details>, bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo,
      a strona nie ma kroku budowania, w którym dałoby się to dorobić taniej.
@@ -1538,6 +1547,9 @@
            w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
            ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
            ten, w którym stoi otwarty szczegół. -->
+      <!-- TAGI (0.136.0): etykiety sprawy nadane ręką albo regułą. Wiszą przy
+           źródłach, więc przeżywają SCAL, ROZKLEJ i przebudowę nakładki. -->
+      <div class="tagiSprawy" id="zwrotTagi"></div>
       <div class="dok-odpowiedzi" id="zwrotKanaly"></div>
     </section>
 
@@ -1623,10 +1635,15 @@
            w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
            ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
            ten, w którym stoi otwarty szczegół. -->
+      <!-- TAGI (0.136.0): etykiety sprawy nadane ręką albo regułą. Wiszą przy
+           źródłach, więc przeżywają SCAL, ROZKLEJ i przebudowę nakładki. -->
+      <div class="tagiSprawy" id="dyskusjaTagi"></div>
       <div id="dyskusjaKanaly"></div>
       <div class="dok-odpowiedzi" id="dyskusjaOdpowiedzBlok">
         <div id="dyskusjaOdpowiedzGora">
           <h2>ODPOWIEDŹ</h2>
+          <select class="szablonWybor" id="dyskusjaSzablony" data-kanal="dyskusja"
+            data-pole="dyskusjaOdpowiedz" data-ekran="dyskusja"></select>
           <span class="mute" id="dyskusjaSzkicInfo"></span>
         </div>
         <textarea id="dyskusjaOdpowiedz" rows="6" style="width:100%"></textarea>
@@ -1702,6 +1719,9 @@
            w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
            ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
            ten, w którym stoi otwarty szczegół. -->
+      <!-- TAGI (0.136.0): etykiety sprawy nadane ręką albo regułą. Wiszą przy
+           źródłach, więc przeżywają SCAL, ROZKLEJ i przebudowę nakładki. -->
+      <div class="tagiSprawy" id="pytanieTagi"></div>
       <div id="pytanieKanaly"></div>
       <div class="dok-odpowiedzi">
         <!-- Etykieta, autorstwo szkicu i przeliczenie w jednej linii: to trzy
@@ -1710,6 +1730,10 @@
              i stoi pod polem. -->
         <div id="pytanieOdpowiedzGora">
           <h2>ODPOWIEDŹ</h2>
+          <!-- Wybierak szablonu (0.133.0): lista zawężona do kanału tego
+               ekranu, wstawia tekst w miejsce kursora. -->
+          <select class="szablonWybor" id="pytanieSzablony" data-kanal="pytanie"
+            data-pole="pytanieOdpowiedz" data-ekran="pytanie"></select>
           <span class="mute" id="pytanieSzkicInfo"></span>
           <span id="pytanieAkcjeSzkicu"></span>
         </div>
@@ -1907,6 +1931,32 @@
       <table id="dyskusjeLista" style="margin-top:8px"></table>
     </details>
 
+    <!-- OPINIE (0.135.0): piąte źródło sprawy. Rejestr jest cienki, bo opinia
+         nie ma u nas mechaniki — ma trzy stany i prowadzącego. Jej wartość
+         bierze się ze sklejenia w sprawę: zła ocena siada przy zwrocie tego
+         samego zamówienia. Odpowiadanie idzie na razie panelem Allegro, bo
+         końcówka odpowiedzi jest niezweryfikowana. -->
+    <details class="zwijana" id="opinieKarta">
+      <summary><h2>OPINIE O SPRZEDAWCY</h2><span class="podpis">piąte źródło spraw</span></summary>
+      <p class="mute" style="margin-bottom:8px">
+      Opinia z jedną gwiazdką to sprawa klienta jak każda inna, tylko widoczna
+      publicznie. Zła ocena z numerem zamówienia dopina się do sprawy tego
+      zamówienia — zobaczysz ją przy zwrocie albo dyskusji. Odpowiedź piszesz
+      w panelu Allegro; tutaj oznacz, że sprawa jest załatwiona.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <button class="akcja" id="opiniePobierz">POBIERZ OPINIE</button>
+        <span class="mute" id="opinieStan"></span>
+      </div>
+      <div class="czipy" id="opinieCzipy">
+        <button class="czip" data-status="" aria-pressed="true">Wszystkie</button>
+        <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
+        <button class="czip" data-status="przejrzana" aria-pressed="false">Przejrzane</button>
+        <button class="czip" data-status="zalatwiona" aria-pressed="false">Załatwione</button>
+      </div>
+      <table id="opinieLista" style="margin-top:8px"></table>
+    </details>
+
     <details class="zwijana" id="reklamacjeKarta">
       <summary><h2>REKLAMACJE · PRIORYTET WG TERMINU</h2></summary>
       <p class="mute" style="margin-bottom:8px">
@@ -2077,6 +2127,7 @@
             <option value="pytania">Pytania klientów</option>
             <option value="zwroty">Zwroty</option>
             <option value="dostawy">Dostawy</option>
+            <option value="obsluga">Czasy odpowiedzi</option>
           </select>
         </div>
         <!-- OSOBA dotyczy WYŁĄCZNIE pytań: ślad audytowy ma własny rozbiór per
@@ -2231,6 +2282,33 @@
       <table id="czasyLudzie"></table>
     </section>
 
+    <!-- ── ZAKRES: CZASY ODPOWIEDZI (0.134.0) ──────────────────────────────
+         Piąty zakres. Liczby biorą się z OSI CZASU sprawy (0.130.0), więc nie
+         powstała pod nie żadna nowa tabela: fakt „klient napisał" i
+         „odpowiedzieliśmy" leży tam z dokładnością do minuty i z nazwiskiem
+         przy naszej stronie.
+
+         Układ jak przy czasach zwrotów i dla tej samej racji: mediana mówi
+         o przeszłości, lista KTO CZEKA TERAZ o dzisiaj, a dopiero razem nie
+         kłamią. -->
+    <section class="card pelna zakresObsluga" hidden>
+      <h2>CZASY ODPOWIEDZI · ILE KLIENT CZEKAŁ</h2>
+      <p class="mute" id="obslugaWstep"></p>
+      <div class="kafle" id="obslugaOdcinki"></div>
+
+      <h2>KTO CZEKA TERAZ</h2>
+      <p class="mute">
+        Mediana wyżej liczy się z rozmów, na które JUŻ odpowiedzieliśmy —
+        sprawa stojąca trzeci dzień nie ma na nią wpływu, dopóki ktoś jej nie
+        tknie. Tu widać ją od razu, najdłużej czekające na górze.
+      </p>
+      <table id="obslugaTeraz"></table>
+
+      <h2>ODPOWIEDZI PER OSOBA</h2>
+      <p class="mute" id="obslugaPodstawa"></p>
+      <table id="obslugaLudzie"></table>
+    </section>
+
     <!-- ── ZAKRES: DOSTAWY ─────────────────────────────────────────────────
          Czwarty zakres i jedyny, który nie powstał z przenosin. Trzy pozostałe
          miały swoje liczby już policzone gdzie indziej; zakładka DOSTAWY nie
@@ -2374,6 +2452,88 @@
     <!-- Zapis wymaga roli admin i mówi o tym serwer, nie przeglądarka: rola
          nie jest tu znana, więc przycisk widzą wszyscy, a odmowę wypowiada
          trasa. Pola stoją jawnie — w widoku ustawień nie ma czego chować. -->
+    <!-- SZABLONY ODPOWIEDZI (0.133.0). Stoją PIERWSZE w ustawieniach, bo
+         dotyka się ich najczęściej: prompt eksperta pisze się raz na kwartał,
+         a szablon dopisuje się po każdej rozmowie, która się powtórzyła.
+         Zapis dostępny dla biura, nie tylko admina — kto odpowiada klientom,
+         ten wie, które zdania działają. -->
+    <section class="card" id="szablonyKarta">
+      <h2>SZABLONY ODPOWIEDZI <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute">
+          Gotowe teksty wstawiane do pola odpowiedzi jednym kliknięciem.
+          W treści wolno użyć pól w klamrach: <code>{{klient}}</code>,
+          <code>{{zamowienie}}</code>, <code>{{zwrot}}</code>,
+          <code>{{oferta}}</code>, <code>{{ja}}</code>. Pole, którego sprawa
+          nie zna, zostaje w tekście jako klamra — widać wtedy, co uzupełnić
+          ręką. Szablon zawsze poprawia i wysyła człowiek.
+        </p>
+      </div>
+      <table id="szablonyLista"></table>
+      <div class="filtry">
+        <div><label for="szablonNazwa">NAZWA</label>
+          <input id="szablonNazwa" size="28" placeholder="np. Zwrot przyjęty"></div>
+        <div><label for="szablonKanal">KANAŁ</label>
+          <select id="szablonKanal">
+            <option value="dowolny">dowolny</option>
+            <option value="pytanie">pytanie</option>
+            <option value="dyskusja">dyskusja</option>
+          </select></div>
+      </div>
+      <label for="szablonTresc">TREŚĆ</label>
+      <textarea id="szablonTresc" rows="4"
+        placeholder="Dzień dobry {{klient}}, zwrot {{zwrot}} przyjęliśmy…"></textarea>
+      <div class="rzadAkcji">
+        <button class="akcja" id="szablonZapisz">DODAJ SZABLON</button>
+        <button class="akcja cichy" id="szablonNowy" hidden>NOWY</button>
+        <span class="mute" id="szablonStan"></span>
+      </div>
+    </section>
+
+    <!-- REGUŁY TAGOWANIA I PRZYDZIAŁU (0.136.0). Zasada 6 wyznacza granicę:
+         tagowanie i przydział mogą być regułami, ale do klienta mówi wyłącznie
+         człowiek. Reguła niczego nie wysyła, więc mieści się w niej z zapasem. -->
+    <section class="card" id="regulyKarta">
+      <h2>REGUŁY TAGOWANIA I PRZYDZIAŁU <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute">
+          Reguła szuka FRAZY w tytule sprawy i loginie klienta — bez wyrażeń
+          regularnych, bo zły regexp potrafi zawiesić serwer. Pasującej sprawie
+          nadaje tag, a opcjonalnie przypisuje ją osobie. Przydział NIE odbiera
+          sprawy komuś, kto już ją prowadzi. Reguły chodzą po każdym pobraniu
+          i po kliknięciu ZASTOSUJ TERAZ.
+        </p>
+      </div>
+      <table id="regulyLista"></table>
+      <div class="filtry">
+        <div><label for="regulaNazwa">NAZWA</label>
+          <input id="regulaNazwa" size="22" placeholder="np. Uszkodzenia w transporcie"></div>
+        <div><label for="regulaWzorzec">FRAZA</label>
+          <input id="regulaWzorzec" size="18" placeholder="np. uszkodzon"></div>
+        <div><label for="regulaRodzaj">RODZAJ</label>
+          <select id="regulaRodzaj">
+            <option value="">wszystkie</option>
+            <option value="pytanie">pytanie</option>
+            <option value="zwrot">zwrot</option>
+            <option value="dyskusja">dyskusja</option>
+            <option value="reklamacja">reklamacja</option>
+            <option value="opinia">opinia</option>
+          </select></div>
+        <div><label for="regulaTag">TAG</label>
+          <input id="regulaTag" size="14" placeholder="np. uszkodzenie"></div>
+        <div><label for="regulaPrzydziel">PRZYDZIEL</label>
+          <input id="regulaPrzydziel" size="14" placeholder="imię i nazwisko"></div>
+      </div>
+      <div class="rzadAkcji">
+        <button class="akcja" id="regulaZapisz">DODAJ REGUŁĘ</button>
+        <button class="akcja cichy" id="regulaNowa" hidden>NOWA</button>
+        <button class="akcja cichy" id="regulyZastosuj">ZASTOSUJ TERAZ</button>
+        <span class="mute" id="regulyStan"></span>
+      </div>
+    </section>
+
     <section class="card" id="pytaniaKonfiguracjaKarta">
       <h2>PROMPT EKSPERTA I FAKTY FIRMOWE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -2704,7 +2864,7 @@ function pokaz(nowy) {
      (kosze, paczki, pominięte, reklamacje) i listy rejestrów. Odświeżenie na
      wejściu, nie w cyklu — cykl 30 s należy do widoku, na który się patrzy. */
   if (nowy === "magazyn") odswiezEtap3();
-  if (nowy === "rejestry") { odswiezZwroty(); odswiezPytania(); odswiezEtap3(); }
+  if (nowy === "rejestry") { odswiezZwroty(); odswiezPytania(); odswiezEtap3(); odswiezOpinie(); }
   if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
@@ -2712,7 +2872,7 @@ function pokaz(nowy) {
   /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
      Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
      przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
-  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); }
+  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); wczytajSzablony(); wczytajReguly(); }
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -3626,10 +3786,13 @@ const zakresAnalizy = () => $("zakresAnalizy").value;
    pierwszą godzinę życia tego paska. */
 const OKNA_ANALIZY = {
   audyt: [7, 30, 90], pytania: [30, 90, 180], zwroty: [30, 90, 180], dostawy: [30, 90, 180],
+  /* Czasy odpowiedzi mierzą TEMPO PRACY, więc okna jak przy śladzie
+     audytowym — tydzień w tej tabeli jest pełen, w przeciwieństwie do dostaw. */
+  obsluga: [7, 30, 90],
 };
 
 /** Które okno wybrać, gdy poprzednie nie mieści się w nowym zakresie. */
-const OKNO_DOMYSLNE = { audyt: 7, pytania: 90, zwroty: 90, dostawy: 90 };
+const OKNO_DOMYSLNE = { audyt: 7, pytania: 90, zwroty: 90, dostawy: 90, obsluga: 30 };
 
 /** Zakresy, które mają trasę CSV. Reszta chowa przycisk zamiast pobierać cudzy plik. */
 const ZAKRESY_Z_CSV = ["audyt"];
@@ -3685,6 +3848,7 @@ async function odswiezAnalize() {
   if (zakresAnalizy() === "pytania") return odswiezStatystykiPytan();
   if (zakresAnalizy() === "zwroty") return odswiezAnalizeZwrotow();
   if (zakresAnalizy() === "dostawy") return odswiezAnalizeDostaw();
+  if (zakresAnalizy() === "obsluga") return odswiezCzasyObslugi();
 
   try {
     rysujAnalize(await (await api(`/api/analiza?days=${dniAnalizy}`)).json());
@@ -4968,7 +5132,12 @@ async function odswiez() {
          ma być widać na żywo, tak samo jak postęp tej otwartej. */
       if (kolejkaZostaje()) await odswiezDostawy();
     } else await odswiezDostawy();
-  } else if (widok === "sprawy") await odswiezSprawy();
+  } else if (widok === "sprawy") {
+    await odswiezSprawy();
+    /* Szablony wczytujemy RAZ, przy pierwszym wejściu na sprawy — wybieraki
+       przy polach odpowiedzi mają być gotowe, zanim ktoś otworzy sprawę. */
+    if (szablonyWszystkie.length === 0) await wczytajSzablony();
+  }
   else if (widok === "nadzor") await odswiezNadzor();
   /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
      w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
@@ -5833,9 +6002,14 @@ function rysujKanalySprawy(ekran) {
       placeholder="Odpowiedź przez ${esc(wybrany.etykieta)}…">${esc(kanalTekst[ekran])}</textarea>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
       <button class="akcja" data-kanal-wyslij>WYŚLIJ PRZEZ ALLEGRO</button>
+      <select class="szablonWybor" data-kanal="${esc(wybrany.rodzaj)}"
+        data-pole="${ekran}KanalTresc" data-ekran="${ekran}"></select>
       <span class="mute">${esc(wybrany.etykieta)}${
         wybrany.tytul ? ` · ${esc(wybrany.tytul)}` : ""}</span>
     </div>` : "");
+  /* Wybierak szablonów powstał przed chwilą razem z blokiem — wypełniamy go
+     z listy, którą panel już ma w pamięci (0.133.0). */
+  rysujWybierakiSzablonow();
 }
 
 /* Gwiazdka przy kanale znaczy: TU klient odezwał się ostatni. Wybór zostaje
@@ -5977,6 +6151,378 @@ async function wczytajZamowienieSprawy(ekran, id, sekcja, cel) {
     $(cel).innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
   }
 }
+
+
+/* ── Szablony odpowiedzi (0.133.0) ───────────────────────────────────────────
+   Etap E2. Gotowe teksty wstawiane do pola odpowiedzi jednym kliknięciem —
+   z podstawionymi danymi sprawy. Podstawia SERWER, bo tylko on wie, co
+   naprawdę stoi w sprawie; przeglądarka wkleja gotowy tekst w miejsce kursora.
+
+   Pole, którego sprawa nie zna, wraca jako widoczna klamra `{{zamowienie}}` —
+   i panel mówi o tym wprost. Pusty łańcuch dałby zdanie z dziurą, które
+   poszłoby do klienta niezauważone. */
+let szablonyWszystkie = [];
+let szablonEdytowany = null;
+
+async function wczytajSzablony() {
+  try {
+    const d = await (await api("/api/biuro/szablony")).json();
+    szablonyWszystkie = d.szablony || [];
+  } catch {
+    /* Brak szablonów nie może wywrócić panelu — pola odpowiedzi działają bez
+       nich tak samo jak przed 0.133.0. */
+    szablonyWszystkie = [];
+  }
+  rysujSzablonyUstawienia();
+  rysujWybierakiSzablonow();
+}
+
+function rysujSzablonyUstawienia() {
+  $("szablonyLista").innerHTML = szablonyWszystkie.length
+    ? szablonyWszystkie.map((s) => `<tr>
+        <td><strong>${esc(s.nazwa)}</strong></td>
+        <td><span class="badge mute2">${esc(s.kanal)}</span></td>
+        <td class="mute">${esc(s.tresc.length > 60 ? s.tresc.slice(0, 60) + "…" : s.tresc)}</td>
+        <td style="white-space:nowrap">
+          <button class="akcja cichy" data-szablon-edytuj="${s.id}"
+            style="font-size:11px;padding:4px 8px">EDYTUJ</button>
+          <button class="akcja cichy" data-szablon-kasuj="${s.id}"
+            style="font-size:11px;padding:4px 8px">SKASUJ</button></td>
+      </tr>`).join("")
+    : '<tr><td class="mute">Nie ma jeszcze żadnego szablonu.</td></tr>';
+}
+
+/* Lista w wybieraku jest ZAWĘŻONA do kanału ekranu: formuła z dyskusji brzmi
+   obco w wątku o dobór części. Szablony `dowolny` zostają wszędzie. */
+function rysujWybierakiSzablonow() {
+  for (const wybor of document.querySelectorAll(".szablonWybor")) {
+    const kanal = wybor.dataset.kanal;
+    const pasujace = szablonyWszystkie.filter((s) => s.kanal === "dowolny" || s.kanal === kanal);
+    wybor.innerHTML = `<option value="">SZABLON…</option>` +
+      pasujace.map((s) => `<option value="${s.id}">${esc(s.nazwa)}</option>`).join("");
+    wybor.hidden = pasujace.length === 0;
+  }
+}
+
+/** Wstawia tekst w miejsce kursora — nie na końcu i nie zamiast całości. */
+function wstawWPole(pole, tekst) {
+  const od = pole.selectionStart ?? pole.value.length;
+  const do_ = pole.selectionEnd ?? od;
+  /* Dopisek do NIEPUSTEGO pola dostaje pustą linię przed sobą — bez niej
+     szablon skleja się z ostatnim zdaniem szkicu w jeden akapit. */
+  const przed = pole.value.slice(0, od);
+  const wstawka = przed.trim() !== "" && !przed.endsWith("\n") ? `\n\n${tekst}` : tekst;
+  pole.value = przed + wstawka + pole.value.slice(do_);
+  const koniec = od + wstawka.length;
+  pole.setSelectionRange(koniec, koniec);
+  pole.focus();
+}
+
+async function wstawSzablon(wybor) {
+  const id = Number(wybor.value);
+  wybor.value = "";
+  if (!id) return;
+  const ekran = wybor.dataset.ekran;
+  const zrodlo = { pytanie: otwartePytanie, zwrot: otwartyZwrot, dyskusja: otwartaDyskusja }[ekran];
+  if (zrodlo == null) return;
+  try {
+    const d = await (await api(
+      `/api/biuro/szablony/${id}/dla?rodzaj=${ekran}&id=${zrodlo}`
+    )).json();
+    wstawWPole($(wybor.dataset.pole), d.tresc);
+    /* Czego nie dało się podstawić — mówimy wprost, bo klamra w środku
+       akapitu bywa przeoczona i poszłaby do klienta. */
+    toast(d.brakujace.length
+      ? `Szablon wstawiony — uzupełnij: ${d.brakujace.join(", ")}`
+      : "Szablon wstawiony ✓");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function zapiszSzablonZFormularza() {
+  const nazwa = $("szablonNazwa").value;
+  const kanal = $("szablonKanal").value;
+  const tresc = $("szablonTresc").value;
+  const dane = JSON.stringify({ nazwa, kanal, tresc });
+  try {
+    /* Dwa jawne wywołania, nie jedno z metodą w zmiennej: licznik zapisów
+       w `routes/biuro.test.ts` ma widzieć każdy zapis wprost, a metoda
+       ukryta w ternarnym wyrażeniu przemyka mu pod nosem. */
+    if (szablonEdytowany) {
+      await api(`/api/biuro/szablony/${szablonEdytowany}`, { method: "PUT", body: dane });
+    } else {
+      await api("/api/biuro/szablony", { method: "POST", body: dane });
+    }
+    toast(szablonEdytowany ? "Szablon zapisany ✓" : "Szablon dodany ✓");
+    nowySzablon();
+    await wczytajSzablony();
+  } catch (e) {
+    $("szablonStan").textContent = e.message;
+  }
+}
+
+function nowySzablon() {
+  szablonEdytowany = null;
+  $("szablonNazwa").value = "";
+  $("szablonTresc").value = "";
+  $("szablonKanal").value = "dowolny";
+  $("szablonZapisz").textContent = "DODAJ SZABLON";
+  $("szablonNowy").hidden = true;
+  $("szablonStan").textContent = "";
+}
+
+function edytujSzablon(id) {
+  const s = szablonyWszystkie.find((x) => x.id === id);
+  if (!s) return;
+  szablonEdytowany = id;
+  $("szablonNazwa").value = s.nazwa;
+  $("szablonKanal").value = s.kanal;
+  $("szablonTresc").value = s.tresc;
+  $("szablonZapisz").textContent = "ZAPISZ ZMIANY";
+  $("szablonNowy").hidden = false;
+  $("szablonStan").textContent = `Edytujesz „${s.nazwa}”.`;
+}
+
+async function skasujSzablon(id) {
+  const s = szablonyWszystkie.find((x) => x.id === id);
+  const zgoda = await potwierdz({
+    tytul: "SKASOWANIE SZABLONU",
+    opis: `Szablon „${s?.nazwa ?? id}” zniknie z listy przy każdym polu odpowiedzi.`,
+    potwierdz: "SKASUJ",
+  });
+  if (!zgoda) return;
+  try {
+    await api(`/api/biuro/szablony/${id}`, { method: "DELETE" });
+    if (szablonEdytowany === id) nowySzablon();
+    toast("Szablon skasowany ✓");
+    await wczytajSzablony();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/* Delegacja na KARCIE, nie na tabeli: tabela jest przerysowywana po każdym
+   zapisie, więc nasłuch na niej ginąłby razem z nią. */
+$("szablonyKarta").addEventListener("click", (e) => {
+  const edytuj = e.target.closest("[data-szablon-edytuj]");
+  if (edytuj) return edytujSzablon(Number(edytuj.dataset.szablonEdytuj));
+  const kasuj = e.target.closest("[data-szablon-kasuj]");
+  if (kasuj) return skasujSzablon(Number(kasuj.dataset.szablonKasuj));
+});
+$("szablonZapisz").addEventListener("click", zapiszSzablonZFormularza);
+$("szablonNowy").addEventListener("click", nowySzablon);
+
+/* Wybieraki stoją w trzech sekcjach spraw i jeden z nich powstaje dopiero
+   przy rysowaniu bloku kanałów — dlatego nasłuch na sekcjach, nie na polach. */
+for (const sekcja of ["pytanieSzczegol", "zwrotSzczegol", "dyskusjaSzczegol"]) {
+  $(sekcja).addEventListener("change", (e) => {
+    const wybor = e.target.closest(".szablonWybor");
+    if (wybor) wstawSzablon(wybor);
+  });
+}
+
+
+/* ── Tagi sprawy i reguły (0.136.0) ──────────────────────────────────────────
+   Etap E5. Tag jest etykietą problemu — „uszkodzenie", „vip", „do windykacji" —
+   i wisi przy ŹRÓDLE, więc przeżywa SCAL, ROZKLEJ i przebudowę nakładki.
+   Sprawa pokazuje sumę tagów swoich dzisiejszych źródeł.
+
+   Reguły nadają tagi automatem i mogą przypisać sprawę osobie. To jedyne dwie
+   rzeczy, które automatowi wolno (zasada 6): nie mówią do klienta ani słowa. */
+const tagiEkranu = { pytanie: [], zwrot: [], dyskusja: [] };
+
+function rysujTagiSprawy(ekran) {
+  const cel = $(`${ekran}Tagi`);
+  const tagi = tagiEkranu[ekran] || [];
+  /* Tag nadany regułą podpisuje się `regula:<id>` — pokazujemy to jako inny
+     kolor, żeby było widać, czego NIE zrobił człowiek. */
+  const unikalne = [...new Set(tagi.map((t) => t.tag))];
+  cel.innerHTML = `<span class="mute">TAGI</span>` +
+    unikalne.map((tag) => {
+      const zRegul = tagi.some((t) => t.tag === tag && t.autor.startsWith("regula:"));
+      return `<span class="badge ${zRegul ? "mute2" : "amber"}">${esc(tag)}
+        <button class="akcja cichy" data-tag-zdejmij="${esc(tag)}"
+          style="font-size:10px;padding:0 4px;margin-left:4px">×</button></span>`;
+    }).join(" ") +
+    `<input id="${ekran}TagNowy" placeholder="dopisz tag…" list="slownikTagow">
+     <button class="akcja cichy" data-tag-dodaj style="font-size:11px;padding:4px 8px">DODAJ</button>`;
+}
+
+async function wczytajTagiSprawy(ekran, id) {
+  tagiEkranu[ekran] = [];
+  $(`${ekran}Tagi`).innerHTML = "";
+  if (id == null) return;
+  try {
+    const d = await (await api(`/api/biuro/tagi?rodzaj=${ekran}&id=${id}`)).json();
+    tagiEkranu[ekran] = d.tagi || [];
+    rysujSlownikTagow(d.slownik || []);
+    rysujTagiSprawy(ekran);
+  } catch {
+    /* Brak tagów nie może wywrócić ekranu sprawy — reszta działa bez nich. */
+    $(`${ekran}Tagi`).innerHTML = "";
+  }
+}
+
+/* Jedna lista podpowiedzi na całą stronę: `datalist` wiąże się z polem przez
+   `list`, więc trzy pola mogą dzielić jeden słownik. */
+function rysujSlownikTagow(slownik) {
+  let lista = $("slownikTagow");
+  if (!lista) {
+    lista = document.createElement("datalist");
+    lista.id = "slownikTagow";
+    document.body.appendChild(lista);
+  }
+  lista.innerHTML = slownik.map((s) => `<option value="${esc(s.tag)}">`).join("");
+}
+
+async function zmienTagSprawy(ekran, id, tag, dodaj) {
+  try {
+    const d = dodaj
+      ? await (await api("/api/biuro/tagi", {
+          method: "POST", body: JSON.stringify({ rodzaj: ekran, id, tag }),
+        })).json()
+      : await (await api(
+          `/api/biuro/tagi?rodzaj=${ekran}&id=${id}&tag=${encodeURIComponent(tag)}`,
+          { method: "DELETE" }
+        )).json();
+    tagiEkranu[ekran] = d.tagi || [];
+    rysujTagiSprawy(ekran);
+    await odswiezSprawy();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/* Delegacja na SEKCJACH szczegółów: linia tagów jest przerysowywana po każdej
+   zmianie, więc nasłuch na niej ginąłby razem z nią. */
+for (const [ekran, sekcja] of [["pytanie", "pytanieSzczegol"], ["zwrot", "zwrotSzczegol"],
+                               ["dyskusja", "dyskusjaSzczegol"]]) {
+  $(sekcja).addEventListener("click", (e) => {
+    const otwarte = { pytanie: otwartePytanie, zwrot: otwartyZwrot, dyskusja: otwartaDyskusja };
+    const zdejmij = e.target.closest("[data-tag-zdejmij]");
+    if (zdejmij) {
+      return zmienTagSprawy(ekran, otwarte[ekran], zdejmij.dataset.tagZdejmij, false);
+    }
+    if (e.target.closest("[data-tag-dodaj]")) {
+      const pole = $(`${ekran}TagNowy`);
+      const tag = (pole?.value || "").trim();
+      if (tag) return zmienTagSprawy(ekran, otwarte[ekran], tag, true);
+    }
+  });
+}
+
+/* ── Reguły w ustawieniach ───────────────────────────────────────────────── */
+let regulyWszystkie = [];
+let regulaEdytowana = null;
+
+async function wczytajReguly() {
+  try {
+    regulyWszystkie = (await (await api("/api/biuro/reguly")).json()).reguly || [];
+  } catch {
+    regulyWszystkie = [];
+  }
+  $("regulyLista").innerHTML = regulyWszystkie.length
+    ? "<tr><th>NAZWA</th><th>FRAZA</th><th>RODZAJ</th><th>SKUTEK</th><th></th></tr>" +
+      regulyWszystkie.map((r) => `<tr${r.aktywna ? "" : ' class="mute"'}>
+          <td class="b">${esc(r.nazwa)}${r.aktywna ? "" : " (wyłączona)"}</td>
+          <td>${esc(r.wzorzec)}</td>
+          <td class="mute">${esc(r.rodzaj || "wszystkie")}</td>
+          <td>${r.tag ? `<span class="badge amber">${esc(r.tag)}</span>` : ""}
+            ${r.przydziel ? `<span class="mute">→ ${esc(r.przydziel)}</span>` : ""}</td>
+          <td style="white-space:nowrap">
+            <button class="akcja cichy" data-regula-edytuj="${r.id}"
+              style="font-size:11px;padding:4px 8px">EDYTUJ</button>
+            <button class="akcja cichy" data-regula-kasuj="${r.id}"
+              style="font-size:11px;padding:4px 8px">SKASUJ</button></td>
+        </tr>`).join("")
+    : '<tr><td class="mute">Nie ma jeszcze żadnej reguły.</td></tr>';
+}
+
+function nowaRegula() {
+  regulaEdytowana = null;
+  for (const p of ["regulaNazwa", "regulaWzorzec", "regulaTag", "regulaPrzydziel"]) $(p).value = "";
+  $("regulaRodzaj").value = "";
+  $("regulaZapisz").textContent = "DODAJ REGUŁĘ";
+  $("regulaNowa").hidden = true;
+  $("regulyStan").textContent = "";
+}
+
+function edytujRegule(id) {
+  const r = regulyWszystkie.find((x) => x.id === id);
+  if (!r) return;
+  regulaEdytowana = id;
+  $("regulaNazwa").value = r.nazwa;
+  $("regulaWzorzec").value = r.wzorzec;
+  $("regulaRodzaj").value = r.rodzaj || "";
+  $("regulaTag").value = r.tag || "";
+  $("regulaPrzydziel").value = r.przydziel || "";
+  $("regulaZapisz").textContent = "ZAPISZ ZMIANY";
+  $("regulaNowa").hidden = false;
+  $("regulyStan").textContent = `Edytujesz „${r.nazwa}”.`;
+}
+
+async function zapiszReguleZFormularza() {
+  const dane = JSON.stringify({
+    nazwa: $("regulaNazwa").value,
+    wzorzec: $("regulaWzorzec").value,
+    rodzaj: $("regulaRodzaj").value || null,
+    tag: $("regulaTag").value,
+    przydziel: $("regulaPrzydziel").value,
+  });
+  try {
+    /* Dwa jawne wywołania zamiast metody w zmiennej — licznik zapisów
+       w teście ma widzieć każdy zapis wprost (ta sama zasada co szablony). */
+    if (regulaEdytowana) {
+      await api(`/api/biuro/reguly/${regulaEdytowana}`, { method: "PUT", body: dane });
+    } else {
+      await api("/api/biuro/reguly", { method: "POST", body: dane });
+    }
+    toast(regulaEdytowana ? "Reguła zapisana ✓" : "Reguła dodana ✓");
+    nowaRegula();
+    await wczytajReguly();
+  } catch (e) {
+    $("regulyStan").textContent = e.message;
+  }
+}
+
+async function skasujRegule(id) {
+  const r = regulyWszystkie.find((x) => x.id === id);
+  const zgoda = await potwierdz({
+    tytul: "SKASOWANIE REGUŁY",
+    opis: `Reguła „${r?.nazwa ?? id}” przestanie tagować nowe sprawy. Tagi już nadane zostają.`,
+    potwierdz: "SKASUJ",
+  });
+  if (!zgoda) return;
+  try {
+    await api(`/api/biuro/reguly/${id}`, { method: "DELETE" });
+    if (regulaEdytowana === id) nowaRegula();
+    await wczytajReguly();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function zastosujRegulyTeraz() {
+  $("regulyStan").textContent = "Przebiegam sprawy…";
+  try {
+    const w = await (await api("/api/biuro/reguly/zastosuj", { method: "POST" })).json();
+    $("regulyStan").textContent =
+      `Sprawdzono ${w.sprawdzonych} spraw · nadano ${w.tagow} tagów · przydzielono ${w.przydzialow}`;
+  } catch (e) {
+    $("regulyStan").textContent = e.message;
+  }
+}
+
+$("regulaZapisz").addEventListener("click", zapiszReguleZFormularza);
+$("regulaNowa").addEventListener("click", nowaRegula);
+$("regulyZastosuj").addEventListener("click", zastosujRegulyTeraz);
+$("regulyKarta").addEventListener("click", (e) => {
+  const edytuj = e.target.closest("[data-regula-edytuj]");
+  if (edytuj) return edytujRegule(Number(edytuj.dataset.regulaEdytuj));
+  const kasuj = e.target.closest("[data-regula-kasuj]");
+  if (kasuj) return skasujRegule(Number(kasuj.dataset.regulaKasuj));
+});
 
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
    Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
@@ -6518,6 +7064,100 @@ async function odswiezDyskusje() {
   }
 }
 
+
+/* ── Opinie o sprzedawcy (0.135.0) ───────────────────────────────────────────
+   Etap E4: piąte źródło sprawy. Rejestr cienki — trzy stany i prowadzący —
+   bo opinia nie ma u nas mechaniki. Cała wartość bierze się ze sklejenia
+   w sprawę po numerze zamówienia.
+
+   Odpowiedź pisze się w panelu Allegro: końcówka odpowiedzi jest
+   niezweryfikowana, a pisanie do klienta przez niesprawdzony zasób to jedyny
+   błąd, którego nie da się cofnąć. */
+let opinieFiltr = "";
+
+function gwiazdki(o) {
+  if (o.ocena == null) return esc(o.rekomendacja || "bez oceny");
+  /* Kolor po ocenie, nie po statusie: jedna gwiazdka wisi publicznie
+     niezależnie od tego, czy ktoś ją u nas przejrzał. */
+  const klasa = o.ocena <= 2 ? "err" : o.ocena >= 4 ? "ok" : "amber";
+  return `<span class="badge ${klasa}">${o.ocena}/5</span>`;
+}
+
+function rysujOpinie(d) {
+  const lista = d.opinie || [];
+  const l = d.licznik || { nowe: 0, zle: 0 };
+  $("opinieStan").textContent = d.synchronizacja
+    ? `Ostatnio: ${stempelLokalny(d.synchronizacja.at)} · nowych ${d.synchronizacja.nowych}`
+      + ` · przejrzano ${d.synchronizacja.przejrzanych} · czeka ${l.nowe}, złych ${l.zle}`
+    : `Jeszcze nie pobierano. Czeka ${l.nowe}, złych ${l.zle}.`;
+  $("opinieLista").innerHTML = lista.length
+    ? "<tr><th>OCENA</th><th>KIEDY</th><th>KLIENT</th><th>OPINIA</th><th>STATUS</th><th></th></tr>" +
+      lista.map((o) => `<tr>
+          <td>${gwiazdki(o)}</td>
+          <td class="mute" style="white-space:nowrap">${esc((o.utworzonoAllegro || "").slice(0, 10))}</td>
+          <td>${esc(o.kupujacyLogin || "—")}</td>
+          <td>${esc(o.tresc || "(bez komentarza)")}${o.odpowiedz
+            ? `<div class="mute">nasza odpowiedź: ${esc(o.odpowiedz)}</div>` : ""}</td>
+          <td><span class="badge ${o.status === "zalatwiona" ? "ok" : "mute2"}">${esc(o.status)}</span>
+            ${o.prowadzi ? `<div class="mute">${esc(o.prowadzi)}</div>` : ""}</td>
+          <td style="white-space:nowrap">${o.status !== "przejrzana" && o.status !== "zalatwiona"
+            ? `<button class="akcja cichy" data-opinia="${o.id}" data-status="przejrzana"
+                 style="font-size:11px;padding:4px 8px">PRZEJRZANA</button>` : ""}
+            ${o.status !== "zalatwiona"
+            ? `<button class="akcja cichy" data-opinia="${o.id}" data-status="zalatwiona"
+                 style="font-size:11px;padding:4px 8px">ZAŁATWIONA</button>` : ""}</td>
+        </tr>`).join("")
+    : '<tr><td class="mute">Brak opinii w tym filtrze.</td></tr>';
+}
+
+async function odswiezOpinie() {
+  try {
+    const q = opinieFiltr ? `?status=${encodeURIComponent(opinieFiltr)}` : "";
+    rysujOpinie(await (await api(`/api/biuro/opinie${q}`)).json());
+  } catch (e) {
+    $("opinieLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+async function pobierzOpinie() {
+  $("opinieStan").textContent = "Pytam Allegro…";
+  try {
+    const w = await (await api("/api/biuro/opinie/odswiez", { method: "POST" })).json();
+    toast(`Opinie: nowych ${w.nowych} z ${w.przejrzanych}`);
+    await odswiezOpinie();
+    await odswiezLicznikSpraw();
+  } catch (e) {
+    $("opinieStan").textContent = e.message;
+  }
+}
+
+async function zmienStatusOpinii(id, status) {
+  try {
+    await api(`/api/biuro/opinie/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+    await odswiezOpinie();
+    await odswiezLicznikSpraw();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+$("opiniePobierz").addEventListener("click", pobierzOpinie);
+/* Delegacja na KARCIE, nie na tabeli — tabelę przerysowuje każdy status. */
+$("opinieKarta").addEventListener("click", (e) => {
+  const czip = e.target.closest(".czip");
+  if (czip) {
+    opinieFiltr = czip.dataset.status;
+    for (const c of $("opinieCzipy").querySelectorAll(".czip")) {
+      c.setAttribute("aria-pressed", c === czip ? "true" : "false");
+    }
+    return odswiezOpinie();
+  }
+  const przycisk = e.target.closest("[data-opinia]");
+  if (przycisk) {
+    return zmienStatusOpinii(Number(przycisk.dataset.opinia), przycisk.dataset.status);
+  }
+});
+
 /* ── Szczegół dyskusji (0.104.0): rozmowa, szkic, wysyłka ────────────────────
    Cała sprawa w aplikacji. Rozmowa jedzie z Allegro NA KLIK i nie jest
    u nas zapisywana; szkic i odpowiedź żyją na wierszu rejestru. Załącznik
@@ -6544,6 +7184,7 @@ function otworzDyskusje(id) {
   ustawRodzenstwoSpraw();
   odswiezSzczegolDyskusji(true);
   wczytajKanalySprawy("dyskusja", id);
+  wczytajTagiSprawy("dyskusja", id);
 }
 
 function zamknijDyskusje() {
@@ -6860,6 +7501,61 @@ function czasH(h) {
  * jak awaria karty, a najczęściej znaczy po prostu, że w tym oknie nic się
  * na tym odcinku nie skończyło.
  */
+
+/* ── Czasy odpowiedzi (0.134.0) ──────────────────────────────────────────────
+   Etap E3. Liczby z osi czasu sprawy: od głosu klienta do naszej odpowiedzi.
+   Kafle mówią o przeszłości, tabela KTO CZEKA TERAZ o dzisiaj — dopiero razem
+   nie kłamią (ten sam układ, co przy czasach zwrotów).
+
+   Kliknięcie wiersza otwiera sprawę, bo raport bez drogi do roboty jest
+   tylko ładnym wykresem. */
+function rysujCzasyObslugi(c) {
+  $("obslugaWstep").textContent =
+    `Mediana i p90 z rozmów, na które ODPOWIEDZIELIŚMY w ostatnich ${c.dni} dniach. `
+    + "Seria wiadomości klienta liczy się od pierwszej — kto pisze trzy razy, "
+    + "czeka od pierwszej próby, nie od ostatniej.";
+  $("obslugaOdcinki").innerHTML = c.odcinki.map(kafelCzasu).join("");
+
+  /* Bursztyn od doby: tyle wystarcza, żeby odpowiedź przestała być „szybka",
+     a lista i tak idzie od najdłużej czekających. */
+  $("obslugaTeraz").innerHTML = !c.teraz.length
+    ? '<tr><td class="mute">Nikt nie czeka na odpowiedź — wszystkie sprawy mają piłkę u klienta.</td></tr>'
+    : "<tr><th>SPRAWA</th><th>KLIENT</th><th>CZEKA</th></tr>" +
+      c.teraz.map((s) => `<tr data-sprawa-rodzaj="${esc(s.rodzaj)}" data-sprawa-id="${s.lokalnyId}"
+          style="cursor:pointer">
+          <td><span class="badge mute2">${esc((s.rodzaj || "").toUpperCase())}</span></td>
+          <td>${esc(s.klient || "(bez loginu)")}</td>
+          <td>${s.godzin >= 24
+            ? `<span class="badge amber">${esc(czasH(s.godzin))}</span>`
+            : esc(czasH(s.godzin))}</td>
+        </tr>`).join("");
+
+  $("obslugaPodstawa").textContent = c.podstawaPrawna;
+  $("obslugaLudzie").innerHTML = !c.ludzie.length
+    ? '<tr><td class="mute">Nikt nie odpowiedział w tym oknie.</td></tr>'
+    : "<tr><th>KTO</th><th>ODPOWIEDZI</th><th>MEDIANA</th><th>P90</th></tr>" +
+      c.ludzie.map((l) => `<tr>
+          <td class="b">${esc(l.kto)}</td>
+          <td>${l.odpowiedzi}</td>
+          <td>${esc(czasH(l.medianaH))}${l.wiarygodne ? "" :
+            ` <span class="mute">· próbka poniżej ${c.progWiarygodnosci}</span>`}</td>
+          <td class="mute">${esc(czasH(l.p90H))}</td>
+        </tr>`).join("");
+}
+
+async function odswiezCzasyObslugi() {
+  try {
+    const d = await (await api(`/api/biuro/czasy-obslugi?days=${dniAnalizy}`)).json();
+    rysujCzasyObslugi(d);
+    /* „Dane do" liczy się z najświeższej ODPOWIEDZI — zegar serwera mówiłby
+       zawsze „przed chwilą", nawet gdyby nikt nie odpisał od tygodnia. */
+    ustawDaneDo(d.teraz[0]?.odKiedy ?? null);
+  } catch (e) {
+    $("obslugaOdcinki").innerHTML = `<p class="badge err">${esc(e.message)}</p>`;
+    ustawDaneDo(null);
+  }
+}
+
 function kafelCzasu(o) {
   const dol = o.ile
     ? `p90 ${esc(czasH(o.p90H))} · ${o.ile} ${o.ile === 1 ? "raz" : "razy"}`
@@ -7262,6 +7958,7 @@ function otworzZwrot(id) {
   /* Kanały odpowiedzi sprawy (0.131.0): przy zwrocie to JEDYNA droga do
      klienta bez zmiany ekranu, więc jedzie razem ze szczegółem. */
   wczytajKanalySprawy("zwrot", id);
+  wczytajTagiSprawy("zwrot", id);
 }
 
 function zamknijZwrot() {
@@ -8225,6 +8922,17 @@ $("pominieteLista").addEventListener("click", async (e) => {
 $("widokAnaliza").addEventListener("click", async (e) => {
   const z = e.target.closest("[data-zwrot]");
   if (z) { pokaz("sprawy"); return otworzZwrot(Number(z.dataset.zwrot)); }
+  /* Wiersz „kto czeka teraz" (0.134.0) otwiera sprawę — raport bez drogi do
+     roboty jest tylko ładnym wykresem. Ten sam znacznik co w kolejce SPRAW,
+     więc otwieraczy nie ma co dublować. */
+  const s = e.target.closest("[data-sprawa-rodzaj]");
+  if (s) {
+    pokaz("sprawy");
+    const id = Number(s.dataset.sprawaId);
+    if (s.dataset.sprawaRodzaj === "pytanie") return otworzPytanie(id);
+    if (s.dataset.sprawaRodzaj === "dyskusja") return otworzDyskusje(id);
+    return otworzZwrot(id);
+  }
   const k = e.target.closest("[data-kosz]");
   if (!k) return;
   pokaz("sprawy");
@@ -8687,6 +9395,7 @@ async function otworzPytanie(id) {
   await odswiezSzczegolPytania();
   pokazRozmowe(id);
   wczytajKanalySprawy("pytanie", id);
+  wczytajTagiSprawy("pytanie", id);
 }
 
 async function odswiezSzczegolPytania() {

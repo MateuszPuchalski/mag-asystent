@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
+import { zastosujReguly } from "../services/tagi.js";
 import { allegroAdapter } from "../adapters/allegro.js";
 import { stanPolaczenia } from "../services/allegro-token.js";
 import { stanAI } from "../services/ai.js";
@@ -136,8 +137,12 @@ export async function pytaniaRoutes(app: FastifyInstance) {
          kliknięciu ktoś CZEKA na odpowiedź, a każdy szkic to nawet
          kilkanaście sekund pracy modelu. Dwadzieścia z rzędu zamieniłoby
          przycisk w kilkuminutowe zawieszenie. Resztę policzy ticker w tle. */
+      /* Reguły tagowania (0.136.0) po pobraniu, przed szkicami: tag ma być
+         na ekranie razem z nowym pytaniem. Wołane z TRASY, nie z serwisu —
+         rejestr nie zależy od kolejki spraw, która zależy od niego. */
+      const reguly = zastosujReguly(autor());
       const szkicow = await dogenerujSzkice(autor(), 5);
-      return { ...wynik, szkicow, otwartych: licznikOtwartych() };
+      return { ...wynik, szkicow, otwartych: licznikOtwartych(), reguly };
     });
   });
 

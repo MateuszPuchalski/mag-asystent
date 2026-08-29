@@ -33,6 +33,119 @@ historii nie przepisujemy.
 
 ---
 
+## 0.136.0 — 29 sierpnia 2026
+
+**Tagi spraw i reguły ich nadawania.** Etap E5 z mapy
+w `docs/architektura-spraw.md` — ostatni z pięciu kawałków etapu E.
+
+**Tag jest etykietą problemu.** „uszkodzenie", „vip", „do windykacji" —
+dopisuje się go przy sprawie jednym polem, a sprawa pokazuje sumę tagów
+wszystkich swoich źródeł. Tag wisi przy ŹRÓDLE, nie przy sprawie, więc
+przeżywa SCAL, ROZKLEJ i przebudowę nakładki spraw.
+
+**Reguła szuka FRAZY, nie wyrażenia regularnego.** To jest decyzja, nie
+uproszczenie: regexp w polu redagowanym przez biuro jest pułapką na dwa
+sposoby — nikt go tam nie napisze poprawnie, a zły potrafi zawiesić serwer na
+własnym backtrackingu. Fraza szuka się w tytule sprawy i loginie klienta, bez
+rozróżniania wielkości liter, i daje się sprawdzić okiem przed zapisaniem.
+
+**Reguła może przypisać sprawę osobie, ale nikomu jej nie odbierze.** Sprawa,
+którą ktoś już prowadzi, zostaje przy nim. Tag nadany automatem jest podpisany
+regułą, więc widać, czego nie zrobił człowiek.
+
+**To jest CAŁA lista rzeczy, które automatowi wolno.** Zasada 6 mówi wprost:
+tagowanie i przydział mogą być regułami, ale do klienta mówi wyłącznie
+człowiek. Ani tag, ani przydział nie wysyłają niczego.
+
+**Reguły chodzą po każdym pobraniu i na żądanie.** Nowa sprawa trafia na ekran
+już otagowana; świeżo zapisaną regułę można sprawdzić przyciskiem ZASTOSUJ
+TERAZ, bez czekania na następne pobranie.
+
+## 0.135.0 — 29 sierpnia 2026
+
+**Opinie o sprzedawcy jako piąte źródło sprawy.** Etap E4 z mapy
+w `docs/architektura-spraw.md`. Do tej wersji opinii nie było w aplikacji
+wcale: agent dowiadywał się o jednej gwiazdce z panelu Allegro albo od
+właściciela, zwykle po fakcie.
+
+**Zła ocena stoi przy sprawie, której dotyczy.** Opinia z numerem zamówienia
+dopina się do sprawy tego zamówienia — widać ją przy zwrocie i przy dyskusji,
+razem z resztą historii. Opinia bez zamówienia zostaje osobną sprawą: po samym
+loginie automat nie skleja niczego.
+
+**Rejestr jest cienki i to jest decyzja.** Opinia nie ma u nas mechaniki
+(koszy, korekt, werdyktów) — ma trzy stany: NOWA, PRZEJRZANA, ZAŁATWIONA.
+Cała jej wartość bierze się ze sklejenia w sprawę, nie z osobnego ekranu.
+
+**Treść opinii trzymamy, treści rozmów nadal nie.** To nie jest wyłom
+w prywatności, tylko inna klasa danych: rozmowa jest prywatna między nami
+a klientem, opinia wisi publicznie na ofercie i widzi ją każdy kupujący.
+
+**Odpowiadanie przez API czeka na weryfikację.** Końcówka odpowiedzi na opinię
+jest niepotwierdzona na żywym koncie, a pisanie do klienta przez niesprawdzony
+zasób to jedyny błąd, którego nie da się cofnąć. Odpowiedź piszesz w panelu
+Allegro; w rejestrze oznaczasz, że sprawa jest załatwiona.
+
+**Pierwsze uruchomienie przebuduje dwie tabele nakładki [wymaga działania:
+nic, dzieje się samo].** SQLite nie umie dopisać wartości do ograniczenia
+CHECK, więc `sprawa_zrodlo` i `sprawa_zdarzenie` powstają na nowo z piątym
+rodzajem. Dane, wiązania ręczne i indeksy przechodzą w całości — pilnuje tego
+osobny test na bazie w starym kształcie.
+
+## 0.134.0 — 29 sierpnia 2026
+
+**Czasy odpowiedzi jako piąty zakres ANALIZY.** Etap E3 z mapy
+w `docs/architektura-spraw.md` — ile klient czekał na odpowiedź, na kanał
+i na osobę.
+
+**Liczone z osi czasu sprawy, bez nowej tabeli.** Fakt „klient napisał"
+i „odpowiedzieliśmy" leży w `sprawa_zdarzenie` od 0.130.0 z dokładnością do
+minuty i z nazwiskiem przy naszej stronie — raport tylko go czyta.
+
+**Seria wiadomości klienta liczy się od PIERWSZEJ.** Kto pisze trzy razy pod
+rząd, czeka od pierwszej próby, nie od ostatniej. Liczenie od ostatniej
+dawałoby najlepszy wynik dokładnie tam, gdzie obsługa była najgorsza.
+
+**Okno tnie po ODPOWIEDZI, nie po pytaniu.** Ta sama decyzja co przy czasach
+zwrotów: przy cięciu po pytaniu rozmowy jeszcze nieodpowiedziane, czyli te
+najwolniejsze, nigdy nie weszłyby do mediany. Cenę tego wyboru płaci tabela
+KTO CZEKA TERAZ — najdłużej czekające na górze, kliknięcie wiersza otwiera
+sprawę.
+
+**Rozbiór per osoba z podstawą prawną przy danych.** Mediana z próbki poniżej
+dwudziestu odpowiedzi jest podpisana jako niewiarygodna, a nota o monitoringu
+pracowniczym jedzie razem z tabelą — nie obok niej.
+
+## 0.133.0 — 29 sierpnia 2026
+
+**Szablony odpowiedzi.** Etap E2 z mapy w `docs/architektura-spraw.md`:
+gotowe teksty wstawiane do pola odpowiedzi jednym kliknięciem.
+
+**Wybierak stoi przy każdym polu odpowiedzi** — przy pytaniu, przy dyskusji
+i w bloku ODPOWIEDZ W SPRAWIE. Lista jest zawężona do kanału, w którym się
+odpowiada; szablony oznaczone jako `dowolny` widać wszędzie. Tekst ląduje
+w miejscu kursora, a nie zamiast całego pola.
+
+**Pola w klamrach podstawia serwer.** `{{klient}}`, `{{zamowienie}}`,
+`{{zwrot}}`, `{{oferta}}` i `{{ja}}` wypełniają się danymi tej sprawy —
+tylko serwer wie, co w niej naprawdę stoi. Pole, którego sprawa nie zna,
+ZOSTAJE w tekście jako klamra, a panel wypisuje, czego zabrakło. Pusty
+łańcuch dałby zdanie z dziurą, które poszłoby do klienta niezauważone.
+Zamaskowany login `client:44300444` nigdy nie trafia w powitanie.
+
+**Redaguje biuro, nie admin.** Kto odpowiada klientom, ten wie, które zdania
+działają — karta SZABLONY ODPOWIEDZI stoi pierwsza w ustawieniach, bo dopisuje
+się do niej po każdej rozmowie, która się powtórzyła. Dodanie, edycja
+i skasowanie zostawiają ślad w dzienniku zdarzeń.
+
+**Wstawienie szablonu niczego nie zapisuje.** To odczyt — wysyła dalej
+człowiek, osobnym kliknięciem i za potwierdzeniem. Automat nie mówi do
+klienta sam i nic w tej wersji tego nie zmienia.
+
+**Trzy szablony na start.** Nowa instalacja demo dostaje „Zwrot przyjęty",
+„Prośba o numer zamówienia" i „Środki wracają dziś" — pusta lista uczyłaby,
+że funkcji nie ma.
+
 ## 0.132.0 — 29 sierpnia 2026
 
 **Zamówienie, płatność i paczka przy sprawie.** Etap E1 z mapy

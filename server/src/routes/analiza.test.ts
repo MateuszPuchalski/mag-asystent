@@ -149,3 +149,39 @@ test("eksport CSV zostawia ślad w audycie", async () => {
     .get() as { n: number };
   assert.equal(wpis.n, 1);
 });
+
+test("czasy odpowiedzi: bramka biura, okno z listy i podstawa prawna (0.134.0)", async () => {
+  const bez = await app.inject({ method: "GET", url: "/api/biuro/czasy-obslugi" });
+  assert.equal(bez.statusCode, 401, "dane o ludziach nie mają prawa być otwarte");
+  const hala = await app.inject({
+    method: "GET",
+    url: "/api/biuro/czasy-obslugi",
+    headers: { "x-session": zalogowany("magazynier") },
+  });
+  assert.equal(hala.statusCode, 403);
+
+  const token = zalogowany("biuro");
+  const r = await app.inject({
+    method: "GET",
+    url: "/api/biuro/czasy-obslugi?days=30",
+    headers: { "x-session": token },
+  });
+  assert.equal(r.statusCode, 200);
+  const d = r.json();
+  assert.equal(d.dni, 30);
+  assert.deepEqual(
+    d.odcinki.map((o: { klucz: string }) => o.klucz),
+    ["wszystko", "pytanie", "dyskusja"]
+  );
+  /* Monitoring pracowniczy jedzie RAZEM z danymi imiennymi, nie obok nich. */
+  assert.match(d.podstawaPrawna, /Kodeks pracy/);
+  assert.ok(Array.isArray(d.teraz));
+
+  /* Śmieciowe okno wraca do domyślnego, tak jak przy śladzie audytowym. */
+  const smieci = await app.inject({
+    method: "GET",
+    url: "/api/biuro/czasy-obslugi?days=999",
+    headers: { "x-session": token },
+  });
+  assert.equal(smieci.json().dni, 7);
+});

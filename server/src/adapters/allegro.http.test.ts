@@ -6,6 +6,7 @@ import {
   granicaSzukania,
   mapujPowod,
   mapujWiadomosci,
+  mapujOpinie,
   mapujZamowienie,
   mapujZwrot,
   normalizujRef,
@@ -737,4 +738,38 @@ test("mapujWatki i mapujWiadomosci dekodują tytuł oferty i treść", () => {
   assert.equal(w.ofertaTytul, 'Kośń "Zefir"');
   const [m] = mapujWiadomosci({ messages: [{ id: "m1", text: "zwr&oacute;c&#380;" }] }, null);
   assert.equal(m.tresc, "zwrócż");
+});
+
+test("opinie: dwa znane kształty listy, brak pola nie wywraca mapowania (0.135.0)", () => {
+  /* Zasób `/sale/user-ratings` jest [WERYFIKUJ] — mapowanie przyjmuje oba
+     znane kształty i nieznanego nie zamienia w wyjątek: opinia bez oceny na
+     ekranie jest lepsza niż pobranie kończące się błędem 500. */
+  const zRatings = mapujOpinie({
+    ratings: [
+      {
+        id: "op-1",
+        order: { id: "ord-9" },
+        buyer: { login: "jan" },
+        rating: 1,
+        recommended: "NEGATIVE",
+        comment: "Towar zwr&oacute;cony, brak kontaktu",
+        createdAt: "2026-08-20T10:00:00Z",
+      },
+    ],
+  });
+  assert.equal(zRatings.length, 1);
+  assert.equal(zRatings[0].orderId, "ord-9");
+  assert.equal(zRatings[0].ocena, 1);
+  /* Encje HTML rozbrajamy jak w każdym tekście czytanym przez człowieka. */
+  assert.equal(zRatings[0].tresc, "Towar zwrócony, brak kontaktu");
+  assert.equal(zRatings[0].mozliwaOdpowiedz, true, "brak pola znaczy „wolno odpowiedzieć”");
+
+  const zUserRatings = mapujOpinie({
+    userRatings: [{ id: "op-2", rates: { overall: { value: 5 } }, answerAllowed: false }],
+  });
+  assert.equal(zUserRatings[0].ocena, 5, "ocena bywa obiektem, nie liczbą");
+  assert.equal(zUserRatings[0].mozliwaOdpowiedz, false);
+  assert.equal(zUserRatings[0].orderId, null);
+
+  assert.deepEqual(mapujOpinie({ cokolwiek: 1 }), [], "nieznany kształt to pusta lista");
 });

@@ -252,6 +252,66 @@ function migrate(database: DatabaseSync) {
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
   odkodujEncjeWBazie(database);
+  piateZrodloWCheckach(database);
+}
+
+/**
+ * Piąte źródło sprawy w CHECK-ach `sprawa_zrodlo` i `sprawa_zdarzenie` (0.135.0).
+ *
+ * SQLite nie umie zmienić CHECK-a w miejscu, więc tabelę trzeba przebudować —
+ * ten sam zabieg co przy `kosz_pozycja`. Bez tego pierwsza opinia wpisana do
+ * sprawy kończy się błędem zapisu na bazie sprzed tej wersji, a schemat
+ * w `schema.sql` (czytany tylko przy tworzeniu tabeli) o niczym nie mówi.
+ *
+ * Warunek wejścia czytamy z DEFINICJI tabeli: brak słowa `opinia` w CHECK-u
+ * znaczy, że przebudowa jeszcze nie przeszła. Idempotentne i bezpieczne dla
+ * dwóch procesów naraz — drugi zastaje warunek już fałszywy.
+ */
+function piateZrodloWCheckach(database: DatabaseSync) {
+  const definicja = (tabela: string): string =>
+    (
+      database
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get(tabela) as { sql: string } | undefined
+    )?.sql ?? "";
+
+  for (const tabela of ["sprawa_zrodlo", "sprawa_zdarzenie"]) {
+    const sql = definicja(tabela);
+    if (sql === "" || sql.includes("'opinia'")) continue;
+    /* Nowa definicja to STARA z dopisanym źródłem — przepisywanie jej ręcznie
+       drugi raz rozjechałoby się ze `schema.sql` przy pierwszej zmianie. */
+    const nowa = sql
+      .replace(/CREATE TABLE\s+"?\w+"?/i, `CREATE TABLE ${tabela}_nowa`)
+      .replace(
+        /'pytanie','zwrot','dyskusja','reklamacja'/g,
+        "'pytanie','zwrot','dyskusja','reklamacja','opinia'"
+      );
+    const kolumny = (
+      database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>
+    )
+      .map((k) => k.name)
+      .join(", ");
+    database.exec("PRAGMA foreign_keys = OFF");
+    try {
+      transaction(database, () => {
+        if (definicja(tabela).includes("'opinia'")) return; // drugi proces zdążył
+        database.exec(`
+          ${nowa};
+          INSERT INTO ${tabela}_nowa(${kolumny}) SELECT ${kolumny} FROM ${tabela};
+          DROP TABLE ${tabela};
+          ALTER TABLE ${tabela}_nowa RENAME TO ${tabela};
+        `);
+      })();
+    } finally {
+      database.exec("PRAGMA foreign_keys = ON");
+    }
+  }
+  /* Indeksy zniknęły razem ze starą tabelą — `schema.sql` zakłada je
+     z `IF NOT EXISTS`, więc wystarczy powtórzyć te dwa. */
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS ix_sprawa_zrodlo ON sprawa_zrodlo(sprawa_id);
+    CREATE INDEX IF NOT EXISTS ix_sprawa_zdarzenie ON sprawa_zdarzenie(rodzaj, lokalny_id, kiedy_at);
+  `);
 }
 
 /**

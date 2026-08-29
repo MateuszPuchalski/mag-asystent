@@ -488,6 +488,12 @@ export function zbudujScenariusze(): Podsumowanie {
   /* Nakładka spraw dogania świeżo zasiane rejestry (0.128.0) — poza
      transakcją seeda, bo rekoncyliacja otwiera własną. */
   przebudujSprawy();
+  /* Opinie demo (0.135.0) — piąte źródło sprawy. Jedna zła z numerem
+     zamówienia, żeby demo pokazało sklejenie opinii ze zwrotem. */
+  opinieDemo();
+  /* Trzy szablony na start (0.133.0) — demo pustej listy uczy, że funkcji
+     nie ma. Treści są celowo ZWYKŁE: tak pisze agent, gdy nie ma czasu. */
+  szablonyDemo();
   /* Oś czasu z tego samego powodu (0.130.0): demo bez historii pokazywałoby
      pustą sekcję w każdej sprawie i wyglądało na zepsute. Dosypka czyta
      wyłącznie stemple, które seed właśnie zapisał. */
@@ -1776,4 +1782,56 @@ if (wprost) {
   } else {
     wypisz(zbudujScenariusze());
   }
+}
+
+/** Szablony odpowiedzi na start (0.133.0) — trzy najczęstsze sytuacje. */
+function szablonyDemo(): void {
+  const d = db();
+  if ((d.prepare("SELECT COUNT(*) AS n FROM szablon").get() as { n: number }).n > 0) return;
+  const teraz = new Date().toISOString();
+  const wstaw = d.prepare(
+    `INSERT INTO szablon (nazwa, kanal, tresc, autor, utworzono_at, aktualizowano_at)
+     VALUES (?,?,?, 'seed', ?, ?)`
+  );
+  const szablony: Array<[string, string, string]> = [
+    [
+      "Zwrot przyjęty",
+      "dowolny",
+      "Dzień dobry {{klient}},\n\npaczka ze zwrotem {{zwrot}} do zamówienia {{zamowienie}} " +
+        "dotarła do nas i jest w trakcie sprawdzania. O decyzji dam znać w tej rozmowie.\n\n" +
+        "Pozdrawiam\n{{ja}}",
+    ],
+    [
+      "Prośba o numer zamówienia",
+      "pytanie",
+      "Dzień dobry,\n\nżeby sprawdzić sprawę, potrzebuję numeru zamówienia — jest w Allegro " +
+        "w zakładce „Moje zakupy”. Odpiszę od razu, gdy go otrzymam.\n\nPozdrawiam\n{{ja}}",
+    ],
+    [
+      "Środki wracają dziś",
+      "dyskusja",
+      "Dzień dobry {{klient}},\n\nzwrot został rozliczony — środki wracają dziś tą samą drogą, " +
+        "którą przyszła płatność. Zaksięgowanie po stronie banku trwa zwykle do dwóch dni " +
+        "roboczych.\n\nPozdrawiam\n{{ja}}",
+    ],
+  ];
+  for (const [nazwa, kanal, tresc] of szablony) wstaw.run(nazwa, kanal, tresc, teraz, teraz);
+}
+
+/** Opinie o sprzedawcy na start (0.135.0) — komplet z adaptera dev. */
+function opinieDemo(): void {
+  const d = db();
+  if ((d.prepare("SELECT COUNT(*) AS n FROM opinia").get() as { n: number }).n > 0) return;
+  const teraz = new Date().toISOString();
+  const wstaw = d.prepare(
+    `INSERT INTO opinia (allegro_id, order_id, kupujacy_login, ocena, rekomendacja, tresc,
+                         odpowiedz, mozliwa_odpowiedz, utworzono_allegro, widziano_at, utworzono_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  );
+  const dni = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  wstaw.run("dev-op-1", "dev-ord-2", "ewa_oddaje", 1, "NEGATIVE",
+    "Towar przyszedł uszkodzony, a na wiadomość czekałam trzy dni.", null, 1, dni(1), teraz, teraz);
+  wstaw.run("dev-op-2", "dev-ord-1", "jan_wraca", 5, "POSITIVE",
+    "Szybka wysyłka, wszystko zgodne z opisem.", "Dziękujemy!", 0, dni(6), teraz, teraz);
+  wstaw.run("dev-op-3", null, "firma_x", 3, "NEUTRAL", null, null, 1, dni(20), teraz, teraz);
 }
