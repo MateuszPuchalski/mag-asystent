@@ -497,3 +497,50 @@ export function rozklejSprawe(sprawaId: number, autor: string): number {
   }
   return sprawaId;
 }
+
+/**
+ * Numer zamówienia sprawy (0.132.0) — wejściem jest źródło, bo tyle wie
+ * ekran. Najpierw encja: rekoncyliacja denormalizuje tam `order_id` z całej
+ * sprawy, więc dyskusja bez zamówienia dostaje numer od zwrotu z tej samej
+ * sprawy. Bez wiązania schodzimy do rejestru — pseudo-sprawa też ma prawo
+ * pokazać zamówienie.
+ *
+ * Pytanie zamówienia nie ma z konstrukcji (wątek wisi przy ofercie), więc
+ * samotne pytanie zwraca NULL — i to jest odpowiedź, nie brak danych.
+ */
+export function orderIdSprawy(rodzaj: RodzajZrodla, lokalnyId: number): string | null {
+  const d = db();
+  const wiazanie = d
+    .prepare(
+      `SELECT s.order_id AS order_id
+         FROM sprawa_zrodlo z JOIN sprawa s ON s.id = z.sprawa_id
+        WHERE z.rodzaj = ? AND z.lokalny_id = ?`
+    )
+    .get(rodzaj, lokalnyId) as { order_id: string | null } | undefined;
+  if (wiazanie) return wiazanie.order_id ?? null;
+
+  if (rodzaj === "zwrot") {
+    const w = d.prepare("SELECT allegro_order_id FROM zwrot WHERE id = ?").get(lokalnyId) as
+      | { allegro_order_id: string | null }
+      | undefined;
+    return w?.allegro_order_id ?? null;
+  }
+  if (rodzaj === "dyskusja") {
+    const w = d.prepare("SELECT order_id FROM dyskusja WHERE id = ?").get(lokalnyId) as
+      | { order_id: string | null }
+      | undefined;
+    return w?.order_id ?? null;
+  }
+  if (rodzaj === "reklamacja") {
+    /* Reklamacja to POZYCJA zwrotu — zamówienie niesie zwrot nad nią. */
+    const w = d
+      .prepare(
+        `SELECT z.allegro_order_id AS order_id
+           FROM zwrot_pozycja p JOIN zwrot z ON z.id = p.zwrot_id
+          WHERE p.id = ?`
+      )
+      .get(lokalnyId) as { order_id: string | null } | undefined;
+    return w?.order_id ?? null;
+  }
+  return null;
+}

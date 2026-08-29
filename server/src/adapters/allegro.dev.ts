@@ -124,6 +124,18 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
     kupujacyLogin: "jan_wraca",
     kupujacyId: "44300001",
     kupujacyEmail: "jan.wraca@example.com",
+    /* Zapłacone i wysłane — najczęstszy układ przy dyskusji „gdzie paczka". */
+    kupionoAt: dniTemu(9),
+    status: "READY_FOR_PROCESSING",
+    wysylka: "SENT",
+    dostawaMetoda: "Kurier DPD",
+    platnosc: {
+      typ: "ONLINE",
+      dostawca: "PayU",
+      kwota: "249.90",
+      waluta: "PLN",
+      zaplaconoAt: dniTemu(9),
+    },
     pozycje: [
       { offerId: "of-1", nazwa: "Pozycja jeszcze nietknięta — oferta Allegro", externalId: "TEST-LINIA-TODO", ilosc: 1 },
       { offerId: "of-2", nazwa: "Pozycja odłożona w całości — oferta Allegro", externalId: "TEST-LINIA-DONE", ilosc: 2 },
@@ -134,6 +146,19 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
     kupujacyLogin: "ewa_oddaje",
     kupujacyId: "44300002",
     kupujacyEmail: "ewa.oddaje@example.com",
+    /* Pobranie bez `finishedAt` — demo uczciwego „pieniądze jeszcze nie
+       doszły", które przy reklamacji zmienia całą rozmowę. */
+    kupionoAt: dniTemu(14),
+    status: "READY_FOR_PROCESSING",
+    wysylka: "PICKED_UP",
+    dostawaMetoda: "Kurier DPD — pobranie",
+    platnosc: {
+      typ: "CASH_ON_DELIVERY",
+      dostawca: null,
+      kwota: "129.00",
+      waluta: "PLN",
+      zaplaconoAt: null,
+    },
     pozycje: [
       { offerId: "of-3", nazwa: "Szybkorotujący poza strefą złotą — oferta Allegro", externalId: "TEST-ROTUJACY", ilosc: 1 },
       /* Pozycja, która NIE wraca — sekcja „całe zamówienie" ma pokazywać
@@ -146,6 +171,13 @@ const ZAMOWIENIA: Record<string, ZamowienieAllegro> = {
     kupujacyLogin: "firma_x",
     kupujacyId: "44300003",
     kupujacyEmail: null,
+    /* Zamówienie BEZ bloku płatności — ekran ma to znieść bez pustych
+       wierszy udających dane. */
+    kupionoAt: dniTemu(30),
+    status: "READY_FOR_PROCESSING",
+    wysylka: "PICKED_UP",
+    dostawaMetoda: null,
+    platnosc: null,
     pozycje: [
       { offerId: "of-4", nazwa: "Artykuł sprzedany poza kartoteką WERTIS", externalId: "SPOZA-KATALOGU", ilosc: 1 },
     ],

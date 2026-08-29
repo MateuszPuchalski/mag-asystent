@@ -64,11 +64,36 @@ export interface PozycjaZamowieniaAllegro {
   ilosc: number;
 }
 
+/* Płatność zamówienia (0.132.0). Do tej wersji `payment.*` z checkout-formu
+   nie czytał NIKT — a przy dyskusji „gdzie moje pieniądze" to pierwsze
+   pytanie, na które trzeba odpowiedzieć. Kwota jedzie jako TEKST, prosto
+   z API: liczba zmiennoprzecinkowa przy pieniądzach to błąd, którego nikt
+   nie zauważy do pierwszej reklamacji. */
+export interface PlatnoscAllegro {
+  /** payment.type — np. ONLINE, CASH_ON_DELIVERY, WIRE_TRANSFER ([WERYFIKUJ]). */
+  typ: string | null;
+  /** payment.provider — dostawca płatności, gdy API go poda ([WERYFIKUJ]). */
+  dostawca: string | null;
+  kwota: string | null;
+  waluta: string | null;
+  /** payment.finishedAt — kiedy pieniądze doszły; NULL = jeszcze nie. */
+  zaplaconoAt: string | null;
+}
+
 export interface ZamowienieAllegro {
   id: string;
   kupujacyLogin: string | null;
   kupujacyId: string | null;
   kupujacyEmail: string | null;
+  /** boughtAt — kiedy klient kupił; punkt odniesienia terminów ustawowych. */
+  kupionoAt: string | null;
+  /** status checkout-formu (np. READY_FOR_PROCESSING) ([WERYFIKUJ]). */
+  status: string | null;
+  /** fulfillment.status — ten sam słownik co przy przesyłkach klienta. */
+  wysylka: string | null;
+  /** Nazwa metody dostawy — NIGDY adres ani punkt odbioru (jak przy przesyłkach). */
+  dostawaMetoda: string | null;
+  platnosc: PlatnoscAllegro | null;
   pozycje: PozycjaZamowieniaAllegro[];
 }
 

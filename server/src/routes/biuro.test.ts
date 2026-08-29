@@ -1585,3 +1585,37 @@ test("oś czasu sprawy jest w trzech szczegółach i tylko czyta (0.130.0)", () 
       "oś czasu jedzie zwykłym GET-em — zdarzenia dopisują mutacje rejestrów");
   }
 });
+
+test("zamówienie przy sprawie: na klik, bez adresu, tylko odczyt (0.132.0)", () => {
+  /* Etap E: `order_id` leżał w bazie od 0.103.0, a agent i tak szedł po
+     status płatności i paczki do panelu Allegro. Test pilnuje trzech granic.
+
+     PIERWSZA: sekcja jest przy zwrocie I przy dyskusji — te dwa rejestry mają
+     numer zamówienia; pytanie wisi przy ofercie i sekcji nie dostaje.
+
+     DRUGA: pobiera się PO ROZWINIĘCIU. To jedyna sekcja spraw, która pyta
+     Allegro, więc wejście w sprawę nie ma prawa jej uruchomić.
+
+     TRZECIA: panel nie zna pojęcia adresu dostawy. Mapowanie po stronie
+     serwera go nie przepuszcza (test przy adapterze), a tutaj pilnujemy, żeby
+     nikt nie dorysował go z drugiej strony. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const sekcja of ["zwrotZam", "dyskusjaZam"]) {
+    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
+    assert.ok(html.includes(`id="${sekcja}Tresc"`), `${sekcja} ma miejsce na treść`);
+    assert.ok(
+      html.includes(`$("${sekcja}").addEventListener("toggle"`),
+      `${sekcja} pyta Allegro dopiero po rozwinięciu`
+    );
+  }
+  assert.ok(!html.includes('id="pytanieZam"'), "pytanie nie ma zamówienia z konstrukcji");
+  const wywolania = [...html.matchAll(/\/api\/biuro\/sprawy\/zamowienie\?rodzaj=/g)];
+  assert.equal(wywolania.length, 1, "jedna funkcja na dwa ekrany");
+  for (const m of wywolania) {
+    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
+    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
+      "kontekst zamówienia to czysty odczyt");
+  }
+  assert.ok(!/dostawaAdres|pickupPoint|adresDostawy/.test(html),
+    "adres dostawy nie ma czego szukać na ekranie sprawy");
+});

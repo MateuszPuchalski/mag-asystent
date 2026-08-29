@@ -477,11 +477,37 @@ export function mapujZamowienie(json: unknown): ZamowienieAllegro {
   const z = (json ?? {}) as Record<string, unknown>;
   const buyer = (z.buyer ?? {}) as Record<string, unknown>;
   const lineItems = Array.isArray(z.lineItems) ? z.lineItems : [];
+  /* Płatność, status i wysyłka (0.132.0) — pola leżały w tej samej odpowiedzi
+     od zawsze, tylko nikt ich nie czytał. Mapowanie defensywne jak wszędzie
+     tutaj: brak gałęzi daje null, nie wyjątek. */
+  const payment = (z.payment ?? {}) as Record<string, unknown>;
+  const paidAmount = (payment.paidAmount ?? {}) as Record<string, unknown>;
+  const fulfillment = (z.fulfillment ?? {}) as Record<string, unknown>;
+  const delivery = (z.delivery ?? {}) as Record<string, unknown>;
+  const method = (delivery.method ?? {}) as Record<string, unknown>;
+  /* Płatności NIE MA przy zamówieniu bez ani jednego pola `payment` —
+     pusty obiekt udający „brak danych o płatności" kazałby ekranowi rysować
+     wiersz o niczym. */
+  const platnosc =
+    tekst(payment.type) ?? tekst(payment.finishedAt) ?? tekst(paidAmount.amount)
+      ? {
+          typ: tekst(payment.type),
+          dostawca: tekst(payment.provider),
+          kwota: tekst(paidAmount.amount),
+          waluta: tekst(paidAmount.currency),
+          zaplaconoAt: tekst(payment.finishedAt),
+        }
+      : null;
   return {
     id: tekst(z.id) ?? "",
     kupujacyLogin: tekst(buyer.login),
     kupujacyId: tekst(buyer.id),
     kupujacyEmail: tekst(buyer.email),
+    kupionoAt: tekst(z.boughtAt) ?? tekst(z.updatedAt),
+    status: tekst(z.status),
+    wysylka: tekst(fulfillment.status),
+    dostawaMetoda: tekst(method.name),
+    platnosc,
     pozycje: lineItems.map((li) => {
       const l = (li ?? {}) as Record<string, unknown>;
       const offer = (l.offer ?? {}) as Record<string, unknown>;

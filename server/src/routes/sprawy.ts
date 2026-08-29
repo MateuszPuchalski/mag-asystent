@@ -16,8 +16,10 @@ import { stempelProwadziReklamacji } from "../services/reklamacje.js";
 import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
 import { osCzasuSprawy } from "../services/os-sprawy.js";
 import { kanalyOdpowiedzi } from "../services/kanaly.js";
+import { kontekstZamowienia } from "../services/przesylki.js";
 import {
   BladSprawy,
+  orderIdSprawy,
   rozklejSprawe,
   scalSprawy,
   stempelProwadziSprawy,
@@ -143,6 +145,35 @@ export async function sprawyRoutes(app: FastifyInstance) {
           .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
       }
       return osCzasuSprawy(rodzaj, id);
+    }
+  );
+
+  // ── Zamówienie sprawy: status, płatność, przesyłka (0.132.0) ──────────────
+
+  /* Jedyna trasa spraw, która idzie do Allegro — dlatego jedzie NA KLIK,
+     po rozwinięciu sekcji, nigdy przy wejściu na ekran. Nic nie zapisuje:
+     status płatności i przesyłki starzeje się w godziny, więc kopia u nas
+     kłamałaby od pierwszego odświeżenia (ta sama zasada co przy przesyłkach
+     kupującego z 0.105.0). */
+  app.get<{ Querystring: { rodzaj?: string; id?: string } }>(
+    "/api/biuro/sprawy/zamowienie",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const rodzaj = rodzajZapytania(req.query.rodzaj);
+      const id = Number(req.query.id);
+      if (rodzaj === null || rodzaj === "blad" || !Number.isInteger(id) || id <= 0) {
+        return reply
+          .code(400)
+          .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
+      }
+      try {
+        return await kontekstZamowienia(orderIdSprawy(rodzaj, id));
+      } catch (e) {
+        /* Awaria Allegro to 502, nie 500: to nie nasz serwer się wywalił,
+           a ekran ma powiedzieć prawdę o tym, czyja to usterka. */
+        return reply.code(502).send({ error: e instanceof Error ? e.message : "Allegro nie odpowiada" });
+      }
     }
   );
 

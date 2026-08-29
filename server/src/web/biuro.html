@@ -1564,6 +1564,14 @@
         <summary><h2>POWIĄZANE SPRAWY</h2><span class="podpis">to samo zamówienie i ten sam klient</span></summary>
         <div id="zwrotPowiazaneTresc"><p class="mute">Wczytuję…</p></div>
       </details>
+      <!-- ZAMÓWIENIE I PRZESYŁKA (0.132.0) — komplet kontekstu przy sprawie.
+           `order_id` leżał w bazie od 0.103.0, a agent i tak szedł po status
+           płatności i paczki do panelu Allegro. Zwinięte i pobierane po
+           rozwinięciu: to jedyna sekcja spraw, która pyta Allegro. -->
+      <details class="zwijana" id="zwrotZam" style="margin-top:14px">
+        <summary><h2>ZAMÓWIENIE I PRZESYŁKA</h2><span class="podpis">status, płatność, paczki</span></summary>
+        <div id="zwrotZamTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
       <!-- OŚ CZASU (0.130.0): co się w tej sprawie działo, wszystkie kanały
            razem. Zwinięta i pobierana po otwarciu — jak historia klienta
            i powiązania: to materiał na wypadek pytania „dlaczego to tak
@@ -1592,6 +1600,14 @@
       <div class="sprawa-tresc">
         <h2 style="margin-top:16px">ROZMOWA W SPRAWIE</h2>
         <div id="dyskusjaRozmowa"></div>
+      <!-- ZAMÓWIENIE I PRZESYŁKA (0.132.0) — komplet kontekstu przy sprawie.
+           `order_id` leżał w bazie od 0.103.0, a agent i tak szedł po status
+           płatności i paczki do panelu Allegro. Zwinięte i pobierane po
+           rozwinięciu: to jedyna sekcja spraw, która pyta Allegro. -->
+      <details class="zwijana" id="dyskusjaZam" style="margin-top:14px">
+        <summary><h2>ZAMÓWIENIE I PRZESYŁKA</h2><span class="podpis">status, płatność, paczki</span></summary>
+        <div id="dyskusjaZamTresc"><p class="mute">Wczytuję…</p></div>
+      </details>
       <!-- OŚ CZASU (0.130.0): co się w tej sprawie działo, wszystkie kanały
            razem. Zwinięta i pobierana po otwarciu — jak historia klienta
            i powiązania: to materiał na wypadek pytania „dlaczego to tak
@@ -5881,6 +5897,87 @@ for (const [ekran, sekcja] of [["pytanie", "pytanieSzczegol"], ["zwrot", "zwrotS
   });
 }
 
+
+/* ── Zamówienie i przesyłka przy sprawie (0.132.0) ───────────────────────────
+   Etap E. Numer zamówienia leżał w bazie od 0.103.0, ale status płatności,
+   metodę dostawy i paczki agent oglądał w panelu Allegro. Ta sekcja przynosi
+   je do sprawy — i jest JEDYNĄ sekcją spraw, która pyta Allegro, więc jedzie
+   dopiero po rozwinięciu i niczego nie zapisuje.
+
+   Nie ma tu adresu dostawy ani punktu odbioru: do odpowiedzi nie są potrzebne
+   (ta sama granica, co przy przesyłkach kupującego z 0.105.0). */
+const STATUS_PLATNOSCI = {
+  ONLINE: "płatność online",
+  CASH_ON_DELIVERY: "za pobraniem",
+  WIRE_TRANSFER: "przelew",
+  SPLIT_PAYMENT: "płatność podzielona",
+};
+
+function rysujZamowienieSprawy(cel, d) {
+  if (!d.orderId) {
+    /* Powody są dwa i oba są normalne: pytanie wisi przy ofercie, a zwrot
+       ręczny (wklejka, paczka bez zgłoszenia) nigdy nie miał zamówienia
+       w Allegro. Zdanie ma nie sugerować usterki. */
+    $(cel).innerHTML = '<p class="mute">Ta sprawa nie ma numeru zamówienia ' +
+      "w Allegro — nie ma czego pytać.</p>";
+    return;
+  }
+  if (!d.zamowienie) {
+    $(cel).innerHTML = `<p class="mute">Allegro nie zna zamówienia ${esc(d.orderId)}.</p>`;
+    return;
+  }
+  const z = d.zamowienie;
+  const p = z.platnosc;
+  const wiersz = (etykieta, wartosc) => wartosc
+    ? `<tr><td class="mute" style="white-space:nowrap">${esc(etykieta)}</td><td>${wartosc}</td></tr>`
+    : "";
+  /* Pieniądze i data zapłaty w jednej komórce: „129,00 zł za pobraniem,
+     jeszcze niezapłacone" to JEDEN fakt, po który agent tu przychodzi. */
+  const platnosc = p
+    ? `${p.kwota ? `<strong>${esc(p.kwota)} ${esc(p.waluta || "")}</strong> · ` : ""}${
+        esc(STATUS_PLATNOSCI[p.typ] || p.typ || "sposób nieznany")}${
+        p.dostawca ? ` (${esc(p.dostawca)})` : ""} · ${p.zaplaconoAt
+          ? `<span class="badge ok">ZAPŁACONE</span> ${esc(p.zaplaconoAt.slice(0, 16).replace("T", " "))}`
+          : '<span class="badge amber">JESZCZE NIEZAPŁACONE</span>'}`
+    : "";
+  const paczki = (d.przesylki || []).map((s) => {
+    const zdarzenie = s.ostatnieZdarzenie
+      ? ` · ostatnio: ${esc(s.ostatnieZdarzenie.opis || s.ostatnieZdarzenie.kod || "?")}${
+          s.ostatnieZdarzenie.at ? ` (${esc(s.ostatnieZdarzenie.at.slice(0, 10))})` : ""}`
+      : "";
+    return `<div>${esc(s.przewoznik || s.przewoznikId || "przewoźnik nieznany")} · nr ${
+      esc(s.waybill || "?")}<span class="mute">${zdarzenie}</span></div>`;
+  }).join("");
+
+  $(cel).innerHTML = `<table>
+    ${wiersz("ZAMÓWIENIE", `${esc(z.id)}${z.kupionoAt
+      ? ` <span class="mute">· kupione ${esc(z.kupionoAt.slice(0, 10))}</span>` : ""}`)}
+    ${wiersz("PŁATNOŚĆ", platnosc)}
+    ${wiersz("WYSYŁKA", `${esc(d.wysylkaOpis || z.wysylka || "status nieznany")}${
+      z.dostawaMetoda ? ` <span class="mute">· ${esc(z.dostawaMetoda)}</span>` : ""}`)}
+    ${wiersz("PACZKI", paczki || '<span class="mute">brak nadanych paczek</span>')}
+    ${wiersz("POZYCJE", (z.pozycje || []).map((poz) =>
+      `<div>${esc(poz.nazwa)} <span class="mute">× ${esc(String(poz.ilosc))}</span></div>`).join(""))}
+  </table>`;
+}
+
+/* Pobieramy przy każdym rozwinięciu — jak przy osi czasu i z tego samego
+   powodu: status paczki i płatności zmienia się w godzinach, a zapamiętany
+   wynik kłamałby przy drugim spojrzeniu. */
+const zamZadania = { zwrot: 0, dyskusja: 0 };
+async function wczytajZamowienieSprawy(ekran, id, sekcja, cel) {
+  if (id == null || !$(sekcja).open) return;
+  const moje = ++zamZadania[ekran];
+  $(cel).innerHTML = '<p class="mute">Pytam Allegro…</p>';
+  try {
+    const d = await (await api(`/api/biuro/sprawy/zamowienie?rodzaj=${ekran}&id=${id}`)).json();
+    if (zamZadania[ekran] !== moje) return;
+    rysujZamowienieSprawy(cel, d);
+  } catch (e) {
+    $(cel).innerHTML = `<span class="badge err">${esc(e.message)}</span>`;
+  }
+}
+
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
    Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
    (ocena towaru, dopasowanie dokumentu, stempel środków), nie operacja z hali,
@@ -9522,6 +9619,10 @@ $("zwrotOs").addEventListener("toggle", () =>
   wczytajOsCzasu("zwrot", otwartyZwrot, "zwrotOs", "zwrotOsTresc"));
 $("dyskusjaOs").addEventListener("toggle", () =>
   wczytajOsCzasu("dyskusja", otwartaDyskusja, "dyskusjaOs", "dyskusjaOsTresc"));
+$("zwrotZam").addEventListener("toggle", () =>
+  wczytajZamowienieSprawy("zwrot", otwartyZwrot, "zwrotZam", "zwrotZamTresc"));
+$("dyskusjaZam").addEventListener("toggle", () =>
+  wczytajZamowienieSprawy("dyskusja", otwartaDyskusja, "dyskusjaZam", "dyskusjaZamTresc"));
 
 $("pytanieKlient").addEventListener("toggle", pokazHistorieKlienta);
 $("pytaniePrzesylki").addEventListener("toggle", pokazPrzesylki);
