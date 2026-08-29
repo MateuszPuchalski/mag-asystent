@@ -1659,6 +1659,12 @@ zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
 w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
+Od 0.131.0 pod oceną pozycji zwrotu stoi blok ODPOWIEDZ W SPRAWIE. Pokazuje
+kanały tej samej sprawy, przez które da się napisać do klienta: wątek pytania
+i dyskusję. Gwiazdka stoi przy tym, w którym klient odezwał się ostatni. Zwrot
+własnego kanału nie ma, więc pole rozwija się tam od razu. Odpowiedź wychodzi
+tą samą trasą co z ekranu dyskusji: kontrola świeżości działa bez zmian.
+
 W kontekście pytania i zwrotu jest zwijana sekcja POWIĄZANE SPRAWY.
 Pokazuje ciąg jednego problemu: ta sama sprawa, potem ten sam login.
 Dane jadą dopiero po rozwinięciu sekcji, jak przy historii klienta.

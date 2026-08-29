@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    39,
+    40,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -206,7 +206,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "sposobu, żeby ją potwierdzić. Oba zapisy dzieją się po jawnym " +
       "kliknięciu I po potwierdzeniu w okienku, nigdy przy wejściu na ekran. " +
       "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
-      "podnosić."
+      "podnosić." +
+      "\n\nPOST z 0.131.0 to WYSŁANIE ODPOWIEDZI Z INNEGO KANAŁU SPRAWY. " +
+      "Nie jest to nowa trasa ani nowy rodzaj zapisu: to te same trasy " +
+      "wysyłki, których używają własne pola pytań i dyskusji, wywołane " +
+      "z ekranu sąsiedniego kanału tej samej sprawy. Agent oceniający zwrot " +
+      "musiał dotąd przejść na drugi ekran, żeby odpisać klientowi czekającemu " +
+      "w dyskusji. Wysyłka dzieje się po jawnym kliknięciu I po potwierdzeniu " +
+      "w okienku, a kontrola świeżości działa tak samo jak przy własnym polu."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

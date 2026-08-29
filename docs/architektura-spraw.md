@@ -125,9 +125,17 @@ pokazuje, co się działo:
 - **Oś czasu sprawy** weszła w 0.130.0 jako zwijana sekcja w każdym z trzech
   szczegółów: wszystkie kanały jednej sprawy chronologicznie, z kolumną
   kanału przy sprawie wielźródłowej. Treści rozmów tam nie ma i nie będzie.
-- Zostaje **jedno pole odpowiedzi z wyborem kanału** (domyślnie kanał
-  ostatniego głosu klienta) — dopiero ono zunifikuje trzy dzisiejsze
-  szczegóły, czyli trzy implementacje po kilkaset linii.
+- **Jedno pole odpowiedzi z wyborem kanału** weszło w 0.131.0. Blok
+  ODPOWIEDZ W SPRAWIE pokazuje kanały INNE niż ten, w którym stoi otwarty
+  szczegół, i poleca ten, w którym klient odezwał się ostatni. Przy zwrocie
+  rozwija się od razu — zwrot nie ma własnego kanału, więc to jedyna droga
+  do klienta bez zmiany ekranu.
+- **Zwinięcie trzech szczegółów w jeden widok NIE jest już potrzebne do celu
+  „zero skakania".** Oś czasu i pole odpowiedzi dojechały do każdego z nich,
+  a każdy niesie mechanikę, której pozostałe nie potrzebują: pozycje i kosze
+  przy zwrocie, dopasowane towary przy pytaniu, załącznik przy dyskusji.
+  Scalenie ich w jeden ekran zostaje jako możliwe uproszczenie kodu, nie jako
+  warunek pracy agenta — decyzja właściciela, czy w ogóle warta wydania.
 
 ## Mapa etapów
 
@@ -161,10 +169,13 @@ poprzedniego na produkcji.
   głos klienta, odpowiedź, szkic, przejęcie, decyzja, dokumenty, środki,
   werdykt, zamknięcie, SCAL i ROZKLEJ); dosypka ze stempli rejestrów przy
   starcie; zwijana sekcja OŚ CZASU SPRAWY w trzech szczegółach.
-- **D3 — jedno pole odpowiedzi:** wybór kanału przy odpowiedzi (domyślnie
-  kanał ostatniego głosu klienta) i zwinięcie trzech szczegółów w jeden widok
-  sprawy. To jest reszta unifikacji z etapu D2 — osobne wydanie, bo dotyka
-  trzech ekranów naraz, a oś czasu działa bez niej.
+- **D3 (0.131.0, wykonany) — jedno pole odpowiedzi:** kanałem jest wątek
+  pytania i dyskusja (zwrot i reklamacja niosą mechanikę, nie rozmowę);
+  polecany jest ten, w którym klient odezwał się ostatni — liczone
+  z `watek_meta`, bez pytania Allegro. Wysyłka idzie TRASĄ REJESTRU, więc
+  kontrola świeżości, stempel i zdarzenie działają tak samo jak przy własnym
+  polu. Zwinięcie trzech szczegółów w jeden widok zostało świadomie zdjęte
+  z drogi (patrz „Ekran docelowy").
 - **E — narzędzia agenta:** szablony odpowiedzi; reguły tagowania
   i przydziału; opinie Allegro jako piąte źródło; raporty czasów; komplet
   kontekstu (płatność, zamówienie i przesyłka przy dyskusji, śledzenie
