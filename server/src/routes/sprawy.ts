@@ -14,6 +14,7 @@ import { BladPytania, stempelProwadzi } from "../services/pytania.js";
 import { BladZwrotu, stempelProwadziZwrotu } from "../services/zwroty.js";
 import { stempelProwadziReklamacji } from "../services/reklamacje.js";
 import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
+import { osCzasuSprawy } from "../services/os-sprawy.js";
 import {
   BladSprawy,
   rozklejSprawe,
@@ -120,6 +121,27 @@ export async function sprawyRoutes(app: FastifyInstance) {
           .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
       }
       return powiazaneSprawy(rodzaj, id);
+    }
+  );
+
+  // ── Oś czasu sprawy (0.130.0) ─────────────────────────────────────────────
+
+  /* Wejściem jest ŹRÓDŁO, bo tyle wie każdy z trzech szczegółów panelu —
+     a wyjściem oś czasu CAŁEJ sprawy, do której to źródło dziś należy.
+     Czysty odczyt: zdarzenia dopisują mutacje w rejestrach, nigdy ten GET. */
+  app.get<{ Querystring: { rodzaj?: string; id?: string } }>(
+    "/api/biuro/sprawy/os",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const rodzaj = rodzajZapytania(req.query.rodzaj);
+      const id = Number(req.query.id);
+      if (rodzaj === null || rodzaj === "blad" || !Number.isInteger(id) || id <= 0) {
+        return reply
+          .code(400)
+          .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
+      }
+      return osCzasuSprawy(rodzaj, id);
     }
   );
 

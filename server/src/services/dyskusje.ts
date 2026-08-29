@@ -1,6 +1,7 @@
 import { db, nowIso } from "../db/db.js";
 import { metaWatku, stempelWyslano, zapiszMetaDyskusji } from "./watek-meta.js";
 import { przebudujSprawy } from "./sprawa.js";
+import { dopiszZdarzenie } from "./os-sprawy.js";
 import { uruchomTakt } from "./takt.js";
 import { config } from "../config.js";
 import { logEvent } from "./events.js";
@@ -284,6 +285,35 @@ const SUFIT_ROZMOW = 100;
  * TREŚCI NIE ZAPISUJEMY — rozmowa przelatuje tędy tylko po to, żeby policzyć
  * metadane (zasada prywatności; patrz services/watek-meta.ts).
  */
+/**
+ * Głosy z rozmowy na oś czasu sprawy (0.130.0) — SAM FAKT, nigdy treść.
+ *
+ * Rozmowa przelatuje przez sync po metadane piłki, więc oś czasu dostaje ją
+ * za darmo: bez tego historia dyskusji zaczynałaby się dopiero od naszej
+ * pierwszej odpowiedzi. Id wiadomości jest wariantem klucza, więc kolejne
+ * pobrania tej samej rozmowy niczego nie dublują.
+ *
+ * Zapisujemy tylko CUDZE głosy: nasze wysyłki mają własne zdarzenie
+ * z chwili wysłania, a wysyłka spoza WERTIS (panel Allegro) i tak jest
+ * ruchem, którego nasza historia nie widziała.
+ */
+function glosyNaOsCzasu(dyskusjaId: number, lista: WiadomoscDyskusji[]): void {
+  for (const w of lista) {
+    if (w.odNas) continue;
+    /* Mediator Allegro to trzeci głos w sprawie — osobny typ, nie tylko inny
+       kolor: „klient napisał" o wiadomości od Allegro byłoby nieprawdą. */
+    const odAllegro = w.autorRola === "ALLEGRO_ADVISOR";
+    dopiszZdarzenie({
+      rodzaj: "dyskusja",
+      lokalnyId: dyskusjaId,
+      typ: odAllegro ? "allegro_napisalo" : "klient_napisal",
+      kto: odAllegro ? "allegro" : "klient",
+      kiedy: w.at ?? undefined,
+      wariant: w.id,
+    });
+  }
+}
+
 async function dociagnijRozmowy(): Promise<{
   rozmow: number;
   bezRozmowy: number;
@@ -291,19 +321,19 @@ async function dociagnijRozmowy(): Promise<{
 }> {
   const otwarte = db()
     .prepare(
-      `SELECT d.allegro_id AS allegro_id
+      `SELECT d.id AS id, d.allegro_id AS allegro_id
          FROM dyskusja d
          LEFT JOIN watek_meta m ON m.rodzaj = 'dyskusja' AND m.allegro_id = d.allegro_id
         WHERE d.status IN ('nowa','w_toku') AND d.allegro_id IS NOT NULL
         ORDER BY m.aktualizowano_at IS NOT NULL, m.aktualizowano_at ASC`
     )
-    .all() as Array<{ allegro_id: string }>;
+    .all() as Array<{ id: number; allegro_id: string }>;
 
   const adapter = allegroAdapter();
   let rozmow = 0;
   let bezRozmowy = 0;
   const doPobrania = otwarte.slice(0, SUFIT_ROZMOW);
-  for (const { allegro_id } of doPobrania) {
+  for (const { id, allegro_id } of doPobrania) {
     try {
       const lista = await adapter.wiadomosciDyskusji(allegro_id);
       /* `null` = zasób w becie oddał 404: rozmowa niedostępna, nie awaria.
@@ -311,6 +341,7 @@ async function dociagnijRozmowy(): Promise<{
       if (lista === null) bezRozmowy++;
       else {
         zapiszMetaDyskusji(allegro_id, lista, "sync");
+        glosyNaOsCzasu(id, lista);
         rozmow++;
       }
     } catch {
@@ -373,7 +404,23 @@ export async function synchronizujDyskusje(autor: string): Promise<WynikSynchron
       teraz,
       teraz
     );
-    if (!znana) nowych++;
+    if (!znana) {
+      nowych++;
+      /* Oś czasu (0.130.0) — id lokalne znamy dopiero po upsercie, bo klucz
+         Allegro jest jedynym, który sync ma w ręku. */
+      const nowa = d.prepare("SELECT id FROM dyskusja WHERE allegro_id = ?").get(s.id) as
+        | { id: number }
+        | undefined;
+      if (nowa) {
+        dopiszZdarzenie({
+          rodzaj: "dyskusja",
+          lokalnyId: nowa.id,
+          typ: "zalozona",
+          kto: "klient",
+          kiedy: s.utworzono ?? teraz,
+        });
+      }
+    }
 
     /* Sprawa rozstrzygnięta w panelu Allegro ma zejść z naszej kolejki sama —
        inaczej licznik kłamałby w nieskończoność o sprawach dawno zamkniętych.
@@ -396,6 +443,22 @@ export async function synchronizujDyskusje(autor: string): Promise<WynikSynchron
           allegroId: s.id,
           statusAllegro: s.status,
         });
+        const zamknieta = d.prepare("SELECT id FROM dyskusja WHERE allegro_id = ?").get(s.id) as
+          | { id: number }
+          | undefined;
+        if (zamknieta) {
+          dopiszZdarzenie({
+            rodzaj: "dyskusja",
+            lokalnyId: zamknieta.id,
+            typ: "zamknieta",
+            /* Nie nasz ruch: sprawę rozstrzygnięto w panelu Allegro, a oś
+               czasu ma pokazywać właśnie tę różnicę. */
+            kto: "allegro",
+            szczegol: s.status,
+            kiedy: teraz,
+            wariant: teraz,
+          });
+        }
       }
     }
   }
@@ -438,6 +501,16 @@ export function stempelProwadziDyskusji(id: number, autor: string): void {
   db()
     .prepare("UPDATE dyskusja SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  dopiszZdarzenie({
+    rodzaj: "dyskusja",
+    lokalnyId: id,
+    typ: "przejeto",
+    kto: "my",
+    autor,
+    /* Wariantem jest OSOBA, nie czas: stempel stawia każda praca nad sprawą,
+       więc bez tego oś czasu zbierałaby dziesięć „wzięto sprawę" jednej ręki. */
+    wariant: autor,
+  });
   przebudujSprawy();
 }
 
@@ -465,6 +538,15 @@ export function zmienStatusDyskusji(id: number, status: string, autor: string): 
     )
     .run(status, autor, zamykamy ? nowIso() : null, zamykamy ? autor : null, id);
   logEvent(`dyskusja_${status}`, autor, null, { dyskusjaId: id, poprzedni: obecny });
+  dopiszZdarzenie({
+    rodzaj: "dyskusja",
+    lokalnyId: id,
+    typ: zamykamy ? "zamknieta" : "status",
+    kto: "my",
+    autor,
+    szczegol: status,
+    wariant: `${status}:${nowIso()}`,
+  });
   przebudujSprawy();
   return szczegolDyskusji(id);
 }
@@ -481,6 +563,18 @@ export function zapiszNotatkeDyskusji(id: number, notatka: string, autor: string
     )
     .run(tresc, autor, id);
   logEvent("dyskusja_notatka", autor, null, { dyskusjaId: id, jest: tresc !== null });
+  /* Sam fakt notatki, bez jej treści — mimo że notatka jest NASZA i leży
+     w bazie. Oś czasu ma być czytelna, a nie być drugim miejscem, w którym
+     trzeba szukać tekstu. */
+  dopiszZdarzenie({
+    rodzaj: "dyskusja",
+    lokalnyId: id,
+    typ: "notatka",
+    kto: "my",
+    autor,
+    szczegol: tresc === null ? "skasowana" : `${tresc.length} znaków`,
+    wariant: nowIso(),
+  });
   return szczegolDyskusji(id);
 }
 
@@ -503,7 +597,13 @@ export function zapiszNotatkeDyskusji(id: number, notatka: string, autor: string
 export async function wiadomosciDyskusji(id: number): Promise<WiadomoscDyskusji[] | null> {
   const w = wiersz(id);
   const lista = await allegroAdapter().wiadomosciDyskusji(w.allegro_id as string);
-  if (lista !== null) zapiszMetaDyskusji(w.allegro_id as string, lista, "odczyt");
+  if (lista !== null) {
+    zapiszMetaDyskusji(w.allegro_id as string, lista, "odczyt");
+    /* Ten sam świadomy wyjątek, co linijkę wyżej, i dla tej samej danej:
+       głosy klienta to METADANE (kto, kiedy), nie treść. Bez tego sprawa
+       przeczytana na klik przed pobraniem miałaby dziurę w historii. */
+    glosyNaOsCzasu(id, lista);
+  }
   return lista;
 }
 
@@ -680,6 +780,15 @@ export async function wyslijOdpowiedzDyskusji(
     zZalacznikiem: zalacznik !== undefined,
     typ: (w.typ as string) ?? null,
   });
+  dopiszZdarzenie({
+    rodzaj: "dyskusja",
+    lokalnyId: id,
+    typ: "odpowiedzielismy",
+    kto: "my",
+    autor,
+    szczegol: `${tresc.length} znaków`,
+    wariant: nowIso(),
+  });
   return szczegolDyskusji(id);
 }
 
@@ -778,6 +887,14 @@ export async function generujSzkicDyskusji(id: number, autor: string): Promise<D
     system: zbudujSystem(konfiguracja.prompt, konfiguracja.fakty),
     tekst: ostatniaKlienta ?? d.temat ?? "",
     kontekst: kontekstDyskusji(d, wiadomosci),
+  });
+  dopiszZdarzenie({
+    rodzaj: "dyskusja",
+    lokalnyId: id,
+    typ: "szkic",
+    kto: "my",
+    autor,
+    wariant: nowIso(),
   });
   db()
     .prepare(

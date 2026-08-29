@@ -29,8 +29,10 @@ wiadomości) — treść rozmów dalej czyta się na klik i nie zapisuje.
 **3. Zdarzenia są prawdą, stan jest projekcją.** Synchronizacja i akcje
 agenta dopisują zdarzenia do append-only logu. Piłka, terminy i liczniki
 wyliczają się z niego. To daje idempotentny polling, audyt „czemu ta sprawa
-tu stoi" i odtwarzalność po błędzie. Zalążek istnieje: tabela `events`
-i `logEvent` — append-only z kształtu, ale niekompletny (patrz inwentarz).
+tu stoi" i odtwarzalność po błędzie. Od 0.130.0 sprawa ma taki log:
+`sprawa_zdarzenie` z kluczem idempotencji. Piłka dalej liczy się z rejestrów
+i metadanych — log jest historią dla człowieka, nie źródłem stanu.
+Ogólny `events` zostaje audytem systemu (patrz inwentarz).
 
 **4. Kontekst przyjeżdża do sprawy.** Zamówienie, płatność, przesyłka
 z trackingiem, stan magazynowy, historia klienta — na jednym ekranie, przy
@@ -97,8 +99,11 @@ Cztery istniejące tabele rejestrów ZOSTAJĄ — niosą mechanikę swoich proce
   **piłka**, `termin_at`, `prowadzi`, otwarcie i zamknięcie.
 - `sprawa_zrodlo` — wiązanie sprawy z obiektem: rodzaj (wątek, dyskusja,
   zwrot, reklamacja; w przyszłości opinia), id Allegro, id lokalny.
-- `sprawa_zdarzenie` — append-only oś czasu: klient napisał, odpowiedzieliśmy,
-  status z Allegro, przejęto, szkic AI. Stan sprawy jest projekcją tej osi.
+- `sprawa_zdarzenie` (0.130.0) — append-only oś czasu: klient napisał,
+  odpowiedzieliśmy, status z Allegro, przejęto, szkic AI. Zdarzenie wisi przy
+  ŹRÓDLE, nie przy sprawie, więc SCAL i ROZKLEJ nie przepisują historii —
+  oś czasu sprawy jest sumą zdarzeń jej dzisiejszych źródeł. Zamknięty
+  słownik typów i zero treści rozmów: `szczegol` niesie status albo liczbę.
 - `watek_meta` — metadane piłki bez treści: kto ostatni, kiedy, ile
   wiadomości. Wypełnia je synchronizacja.
 
@@ -110,17 +115,19 @@ Warunek wstępny: kolumna `kupujacy_id` przy pytaniach i odmaskowanie loginów.
 ## Ekran docelowy
 
 Powłoka z 0.125.0 zostaje: pasek boczny, konsola kolejka–sprawa–kontekst,
-MAGAZYN ZWROTÓW i REJESTRY osobno. Pasma już wiedzą, kto ma ruch; oś czasu
-czeka na etap D2:
+MAGAZYN ZWROTÓW i REJESTRY osobno. Pasma wiedzą, kto ma ruch; oś czasu
+pokazuje, co się działo:
 
 - Pasma kolejki przeszły z wieku na **piłkę × termin** (0.129.0): PO TERMINIE,
   TERMIN ≤7 DNI, TERMIN USTAWOWY, trzy pasma CZEKA NA NAS (wiek dzieli je
   wewnątrz piłki) i zwinięte CZEKA NA KLIENTA. Pasmo U PRZEWOŹNIKA / ALLEGRO
   dojdzie razem z piłką ŚWIAT.
-- Widok sprawy staje się **jedną osią czasu**: wszystkie kanały sprawy
-  chronologicznie, jedno pole odpowiedzi z wyborem kanału (domyślnie kanał
-  ostatniego głosu klienta). Unifikuje trzy dzisiejsze szczegóły — pytania,
-  zwrotu i dyskusji — czyli trzy osobne implementacje po kilkaset linii.
+- **Oś czasu sprawy** weszła w 0.130.0 jako zwijana sekcja w każdym z trzech
+  szczegółów: wszystkie kanały jednej sprawy chronologicznie, z kolumną
+  kanału przy sprawie wielźródłowej. Treści rozmów tam nie ma i nie będzie.
+- Zostaje **jedno pole odpowiedzi z wyborem kanału** (domyślnie kanał
+  ostatniego głosu klienta) — dopiero ono zunifikuje trzy dzisiejsze
+  szczegóły, czyli trzy implementacje po kilkaset linii.
 
 ## Mapa etapów
 
@@ -149,9 +156,15 @@ poprzedniego na produkcji.
   podpowiedź „ten sam kupujący" ręką człowieka. Piłka ŚWIAT (przewoźnik,
   Allegro) czeka na producenta danych: tracking czyta się na żądanie i nigdzie
   nie zapisuje, a zapowiedzi zwrotów nie są źródłem sprawy.
-- **D2 — oś czasu:** `sprawa_zdarzenie` jako append-only historia sprawy; oś
-  czasu w widoku sprawy i jedno pole odpowiedzi z wyborem kanału (unifikacja
-  trzech dzisiejszych szczegółów).
+- **D2 (0.130.0, wykonany) — oś czasu:** `sprawa_zdarzenie` jako append-only
+  historia przy źródle; zdarzenia dopisują mutacje rejestrów (wpłynięcie,
+  głos klienta, odpowiedź, szkic, przejęcie, decyzja, dokumenty, środki,
+  werdykt, zamknięcie, SCAL i ROZKLEJ); dosypka ze stempli rejestrów przy
+  starcie; zwijana sekcja OŚ CZASU SPRAWY w trzech szczegółach.
+- **D3 — jedno pole odpowiedzi:** wybór kanału przy odpowiedzi (domyślnie
+  kanał ostatniego głosu klienta) i zwinięcie trzech szczegółów w jeden widok
+  sprawy. To jest reszta unifikacji z etapu D2 — osobne wydanie, bo dotyka
+  trzech ekranów naraz, a oś czasu działa bez niej.
 - **E — narzędzia agenta:** szablony odpowiedzi; reguły tagowania
   i przydziału; opinie Allegro jako piąte źródło; raporty czasów; komplet
   kontekstu (płatność, zamówienie i przesyłka przy dyskusji, śledzenie

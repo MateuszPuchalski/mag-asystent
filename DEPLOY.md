@@ -1708,6 +1708,12 @@ kupującego spod maski — bez żadnej czynności ręcznej. Liczby w czipach
 i pigułce SPRAW mogą po tym ZMALEĆ: obiekty jednego zamówienia liczą się
 odtąd raz, jako jeden problem klienta.
 
+**Od 0.130.0 pierwsze uruchomienie zakłada oś czasu spraw.** Serwer
+przepisuje na nią stemple, które rejestry już trzymały — kiedy sprawa
+wpłynęła, kto ją wziął, kiedy poszła odpowiedź. Robi to sam, raz, i wypisuje
+w logu liczbę dosypanych zdarzeń. Historia sprzed tej wersji jest z natury
+uboższa: rejestr pamiętał ostatnią odpowiedź, nie wszystkie.
+
 **Od 0.129.0 pierwsze pobrania dyskusji trwają dłużej.** POBIERZ DYSKUSJE
 dociąga metadane rozmów — kto mówił ostatni i kiedy — dla otwartych spraw, po
 sto rozmów na przebieg. Przy większym rejestrze pełne pokrycie zbiera się
