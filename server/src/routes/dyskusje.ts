@@ -18,6 +18,7 @@ import {
   type ZalacznikDyskusji,
 } from "../services/dyskusje.js";
 import { kontekstKlienta } from "../services/klienci.js";
+import { zastosujReguly } from "../services/tagi.js";
 import { db } from "../db/db.js";
 
 /* ── Dyskusje i reklamacje Allegro — trasy biura ─────────────────────────────
@@ -100,7 +101,11 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     try {
       const wynik = await synchronizujDyskusje(autor());
-      return { ...wynik, ...licznikDyskusji() };
+      /* Reguły tagowania (0.136.0) po pobraniu — świeża sprawa ma trafić na
+         ekran już otagowana. Wołane z TRASY, nie z serwisu: rejestr nie ma
+         prawa zależeć od kolejki spraw, która sama zależy od niego. */
+      const reguly = zastosujReguly(autor());
+      return { ...wynik, ...licznikDyskusji(), reguly };
     } catch (e) {
       /* Odmowa Allegro (wygasły token, brak uprawnienia disputes) ma dojść
          do człowieka, który kliknął — w logu serwera nikt jej nie szuka. */

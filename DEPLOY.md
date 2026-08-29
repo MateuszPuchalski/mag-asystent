@@ -1659,6 +1659,11 @@ zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
 w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
+Od 0.136.0 przy każdej sprawie jest linia TAGI, a w USTAWIENIACH karta
+REGUŁY TAGOWANIA I PRZYDZIAŁU. Reguła szuka frazy w tytule sprawy i loginie
+klienta, nadaje tag i opcjonalnie przypisuje sprawę osobie. Chodzi po każdym
+pobraniu; przycisk ZASTOSUJ TERAZ przebiega sprawy od razu.
+
 Od 0.135.0 w REJESTRACH jest karta OPINIE O SPRZEDAWCY. POBIERZ OPINIE
 ściąga je z Allegro; opinia z numerem zamówienia dopina się do sprawy tego
 zamówienia. Odpowiedź piszesz w panelu Allegro — tutaj oznaczasz stan.

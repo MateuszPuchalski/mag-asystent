@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    43,
+    46,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -223,24 +223,32 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "opinii na PRZEJRZANA albo ZAŁATWIONA. Odpowiadania na opinię przez " +
       "API tu NIE MA i nie przez przeoczenie: końcówka odpowiedzi jest " +
       "niezweryfikowana, a pisanie do klienta przez niesprawdzony zasób to " +
-      "jedyny błąd, którego nie da się cofnąć."
+      "jedyny błąd, którego nie da się cofnąć." +
+      "\n\nTrzy POST-y z 0.136.0 to tagi i reguły: dopisanie tagu do sprawy, " +
+      "dodanie reguły i ZASTOSUJ TERAZ. Reguła nadaje tag i może przypisać " +
+      "sprawę osobie — i to jest CAŁA lista rzeczy, które automatowi wolno " +
+      "(zasada 6 z docs/architektura-spraw.md): żadna z nich nie mówi do " +
+      "klienta ani słowa. Przydział nie odbiera sprawy komuś, kto już ją " +
+      "prowadzi."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    9,
+    10,
     "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
       "wgranie logo dostawcy, półka reklamacyjna, notatka do dyskusji " +
       "Allegro, prompt eksperta i fakty firmowe (0.80.0), przełącznik " +
       "automatycznego szkicu AI (0.107.0) — ten ostatni po to, by biuro " +
       "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie — " +
-      "oraz edycja szablonu odpowiedzi (0.133.0)"
+      "edycja szablonu odpowiedzi (0.133.0) oraz edycja reguły tagowania " +
+      "(0.136.0)"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    5,
+    7,
     "DELETE to odpięcie dokumentu zwrotu, odpięcie kosza, rozłączenie " +
-      "konta Allegro, skasowanie logo dostawcy i skasowanie szablonu " +
-      "odpowiedzi (0.133.0)"
+      "konta Allegro, skasowanie logo dostawcy, skasowanie szablonu " +
+      "odpowiedzi (0.133.0) oraz zdjęcie tagu ze sprawy i skasowanie reguły " +
+      "(0.136.0)"
   );
   /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
      są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
@@ -1678,4 +1686,30 @@ test("czasy odpowiedzi: piąty zakres analizy z własnym oknem (0.134.0)", () =>
     "karta nosi klasę zakresu — inaczej nie schowa się przy innych zakresach");
   assert.match(html, /obslugaPodstawa"\)\.textContent = c\.podstawaPrawna/,
     "podstawa prawna monitoringu jedzie na ekran razem z danymi imiennymi");
+});
+
+test("tagi i reguły: linia w trzech szczegółach, delegacja na sekcji (0.136.0)", () => {
+  /* Etap E5. Tag wisi przy ŹRÓDLE i przeżywa scalanie — to jest sprawdzane
+     testem serwisu. Tutaj trzy granice ekranu.
+
+     PIERWSZA: linia tagów stoi we WSZYSTKICH trzech szczegółach; sprawa
+     pokazuje sumę tagów swoich źródeł, więc brak linii przy jednym z nich
+     ukrywałby połowę prawdy.
+
+     DRUGA: delegacja na SEKCJI, bo linia jest przerysowywana po każdej
+     zmianie tagu (ta sama usterka co przy dostawach w 0.92.0).
+
+     TRZECIA: reguły mają własną kartę w ustawieniach i ręczne ZASTOSUJ TERAZ —
+     automat tagujący nie może chodzić przy samym patrzeniu na ekran. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const sekcja of ["pytanieTagi", "zwrotTagi", "dyskusjaTagi"]) {
+    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
+  }
+  assert.ok(html.includes('$("regulyKarta").addEventListener("click"'),
+    "karta reguł deleguje z poziomu sekcji");
+  assert.ok(html.includes('id="regulyZastosuj"'), "reguły uruchamia się ręką");
+  /* Wzorzec reguły jest FRAZĄ, nie wyrażeniem regularnym — pole i podpowiedź
+     mają o tym mówić, bo zły regexp potrafi zawiesić serwer. */
+  assert.match(html, /bez wyrażeń\s*\n?\s*regularnych/,
+    "objaśnienie mówi wprost, że to fraza, nie regexp");
 });

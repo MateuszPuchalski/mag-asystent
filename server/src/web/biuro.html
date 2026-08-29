@@ -1031,6 +1031,11 @@
      ustawienia mają odstępy z arkusza i pilnuje tego test. */
   .rzadAkcji { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
+  /* Linia tagów sprawy (0.136.0) — pastylki w rzędzie, pole dopisania na
+     końcu. Wąskie, bo to etykiety, a nie treść. */
+  .tagiSprawy { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .tagiSprawy input { width: 11rem; }
+
   /* ── Sekcja zwijana ────────────────────────────────────────────────────────
      Natywny <details>, bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo,
      a strona nie ma kroku budowania, w którym dałoby się to dorobić taniej.
@@ -1542,6 +1547,9 @@
            w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
            ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
            ten, w którym stoi otwarty szczegół. -->
+      <!-- TAGI (0.136.0): etykiety sprawy nadane ręką albo regułą. Wiszą przy
+           źródłach, więc przeżywają SCAL, ROZKLEJ i przebudowę nakładki. -->
+      <div class="tagiSprawy" id="zwrotTagi"></div>
       <div class="dok-odpowiedzi" id="zwrotKanaly"></div>
     </section>
 
@@ -1627,6 +1635,9 @@
            w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
            ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
            ten, w którym stoi otwarty szczegół. -->
+      <!-- TAGI (0.136.0): etykiety sprawy nadane ręką albo regułą. Wiszą przy
+           źródłach, więc przeżywają SCAL, ROZKLEJ i przebudowę nakładki. -->
+      <div class="tagiSprawy" id="dyskusjaTagi"></div>
       <div id="dyskusjaKanaly"></div>
       <div class="dok-odpowiedzi" id="dyskusjaOdpowiedzBlok">
         <div id="dyskusjaOdpowiedzGora">
@@ -1708,6 +1719,9 @@
            w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
            ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
            ten, w którym stoi otwarty szczegół. -->
+      <!-- TAGI (0.136.0): etykiety sprawy nadane ręką albo regułą. Wiszą przy
+           źródłach, więc przeżywają SCAL, ROZKLEJ i przebudowę nakładki. -->
+      <div class="tagiSprawy" id="pytanieTagi"></div>
       <div id="pytanieKanaly"></div>
       <div class="dok-odpowiedzi">
         <!-- Etykieta, autorstwo szkicu i przeliczenie w jednej linii: to trzy
@@ -2477,6 +2491,49 @@
       </div>
     </section>
 
+    <!-- REGUŁY TAGOWANIA I PRZYDZIAŁU (0.136.0). Zasada 6 wyznacza granicę:
+         tagowanie i przydział mogą być regułami, ale do klienta mówi wyłącznie
+         człowiek. Reguła niczego nie wysyła, więc mieści się w niej z zapasem. -->
+    <section class="card" id="regulyKarta">
+      <h2>REGUŁY TAGOWANIA I PRZYDZIAŁU <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute">
+          Reguła szuka FRAZY w tytule sprawy i loginie klienta — bez wyrażeń
+          regularnych, bo zły regexp potrafi zawiesić serwer. Pasującej sprawie
+          nadaje tag, a opcjonalnie przypisuje ją osobie. Przydział NIE odbiera
+          sprawy komuś, kto już ją prowadzi. Reguły chodzą po każdym pobraniu
+          i po kliknięciu ZASTOSUJ TERAZ.
+        </p>
+      </div>
+      <table id="regulyLista"></table>
+      <div class="filtry">
+        <div><label for="regulaNazwa">NAZWA</label>
+          <input id="regulaNazwa" size="22" placeholder="np. Uszkodzenia w transporcie"></div>
+        <div><label for="regulaWzorzec">FRAZA</label>
+          <input id="regulaWzorzec" size="18" placeholder="np. uszkodzon"></div>
+        <div><label for="regulaRodzaj">RODZAJ</label>
+          <select id="regulaRodzaj">
+            <option value="">wszystkie</option>
+            <option value="pytanie">pytanie</option>
+            <option value="zwrot">zwrot</option>
+            <option value="dyskusja">dyskusja</option>
+            <option value="reklamacja">reklamacja</option>
+            <option value="opinia">opinia</option>
+          </select></div>
+        <div><label for="regulaTag">TAG</label>
+          <input id="regulaTag" size="14" placeholder="np. uszkodzenie"></div>
+        <div><label for="regulaPrzydziel">PRZYDZIEL</label>
+          <input id="regulaPrzydziel" size="14" placeholder="imię i nazwisko"></div>
+      </div>
+      <div class="rzadAkcji">
+        <button class="akcja" id="regulaZapisz">DODAJ REGUŁĘ</button>
+        <button class="akcja cichy" id="regulaNowa" hidden>NOWA</button>
+        <button class="akcja cichy" id="regulyZastosuj">ZASTOSUJ TERAZ</button>
+        <span class="mute" id="regulyStan"></span>
+      </div>
+    </section>
+
     <section class="card" id="pytaniaKonfiguracjaKarta">
       <h2>PROMPT EKSPERTA I FAKTY FIRMOWE <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -2815,7 +2872,7 @@ function pokaz(nowy) {
   /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
      Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
      przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
-  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); wczytajSzablony(); }
+  if (nowy === "dostawcy") { odswiezDostawcow(); wczytajKonfiguracjePytan(); odswiezStrefe(); odswiezKonta(); wczytajSzablony(); wczytajReguly(); }
 }
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
@@ -6265,6 +6322,208 @@ for (const sekcja of ["pytanieSzczegol", "zwrotSzczegol", "dyskusjaSzczegol"]) {
   });
 }
 
+
+/* ── Tagi sprawy i reguły (0.136.0) ──────────────────────────────────────────
+   Etap E5. Tag jest etykietą problemu — „uszkodzenie", „vip", „do windykacji" —
+   i wisi przy ŹRÓDLE, więc przeżywa SCAL, ROZKLEJ i przebudowę nakładki.
+   Sprawa pokazuje sumę tagów swoich dzisiejszych źródeł.
+
+   Reguły nadają tagi automatem i mogą przypisać sprawę osobie. To jedyne dwie
+   rzeczy, które automatowi wolno (zasada 6): nie mówią do klienta ani słowa. */
+const tagiEkranu = { pytanie: [], zwrot: [], dyskusja: [] };
+
+function rysujTagiSprawy(ekran) {
+  const cel = $(`${ekran}Tagi`);
+  const tagi = tagiEkranu[ekran] || [];
+  /* Tag nadany regułą podpisuje się `regula:<id>` — pokazujemy to jako inny
+     kolor, żeby było widać, czego NIE zrobił człowiek. */
+  const unikalne = [...new Set(tagi.map((t) => t.tag))];
+  cel.innerHTML = `<span class="mute">TAGI</span>` +
+    unikalne.map((tag) => {
+      const zRegul = tagi.some((t) => t.tag === tag && t.autor.startsWith("regula:"));
+      return `<span class="badge ${zRegul ? "mute2" : "amber"}">${esc(tag)}
+        <button class="akcja cichy" data-tag-zdejmij="${esc(tag)}"
+          style="font-size:10px;padding:0 4px;margin-left:4px">×</button></span>`;
+    }).join(" ") +
+    `<input id="${ekran}TagNowy" placeholder="dopisz tag…" list="slownikTagow">
+     <button class="akcja cichy" data-tag-dodaj style="font-size:11px;padding:4px 8px">DODAJ</button>`;
+}
+
+async function wczytajTagiSprawy(ekran, id) {
+  tagiEkranu[ekran] = [];
+  $(`${ekran}Tagi`).innerHTML = "";
+  if (id == null) return;
+  try {
+    const d = await (await api(`/api/biuro/tagi?rodzaj=${ekran}&id=${id}`)).json();
+    tagiEkranu[ekran] = d.tagi || [];
+    rysujSlownikTagow(d.slownik || []);
+    rysujTagiSprawy(ekran);
+  } catch {
+    /* Brak tagów nie może wywrócić ekranu sprawy — reszta działa bez nich. */
+    $(`${ekran}Tagi`).innerHTML = "";
+  }
+}
+
+/* Jedna lista podpowiedzi na całą stronę: `datalist` wiąże się z polem przez
+   `list`, więc trzy pola mogą dzielić jeden słownik. */
+function rysujSlownikTagow(slownik) {
+  let lista = $("slownikTagow");
+  if (!lista) {
+    lista = document.createElement("datalist");
+    lista.id = "slownikTagow";
+    document.body.appendChild(lista);
+  }
+  lista.innerHTML = slownik.map((s) => `<option value="${esc(s.tag)}">`).join("");
+}
+
+async function zmienTagSprawy(ekran, id, tag, dodaj) {
+  try {
+    const d = dodaj
+      ? await (await api("/api/biuro/tagi", {
+          method: "POST", body: JSON.stringify({ rodzaj: ekran, id, tag }),
+        })).json()
+      : await (await api(
+          `/api/biuro/tagi?rodzaj=${ekran}&id=${id}&tag=${encodeURIComponent(tag)}`,
+          { method: "DELETE" }
+        )).json();
+    tagiEkranu[ekran] = d.tagi || [];
+    rysujTagiSprawy(ekran);
+    await odswiezSprawy();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/* Delegacja na SEKCJACH szczegółów: linia tagów jest przerysowywana po każdej
+   zmianie, więc nasłuch na niej ginąłby razem z nią. */
+for (const [ekran, sekcja] of [["pytanie", "pytanieSzczegol"], ["zwrot", "zwrotSzczegol"],
+                               ["dyskusja", "dyskusjaSzczegol"]]) {
+  $(sekcja).addEventListener("click", (e) => {
+    const otwarte = { pytanie: otwartePytanie, zwrot: otwartyZwrot, dyskusja: otwartaDyskusja };
+    const zdejmij = e.target.closest("[data-tag-zdejmij]");
+    if (zdejmij) {
+      return zmienTagSprawy(ekran, otwarte[ekran], zdejmij.dataset.tagZdejmij, false);
+    }
+    if (e.target.closest("[data-tag-dodaj]")) {
+      const pole = $(`${ekran}TagNowy`);
+      const tag = (pole?.value || "").trim();
+      if (tag) return zmienTagSprawy(ekran, otwarte[ekran], tag, true);
+    }
+  });
+}
+
+/* ── Reguły w ustawieniach ───────────────────────────────────────────────── */
+let regulyWszystkie = [];
+let regulaEdytowana = null;
+
+async function wczytajReguly() {
+  try {
+    regulyWszystkie = (await (await api("/api/biuro/reguly")).json()).reguly || [];
+  } catch {
+    regulyWszystkie = [];
+  }
+  $("regulyLista").innerHTML = regulyWszystkie.length
+    ? "<tr><th>NAZWA</th><th>FRAZA</th><th>RODZAJ</th><th>SKUTEK</th><th></th></tr>" +
+      regulyWszystkie.map((r) => `<tr${r.aktywna ? "" : ' class="mute"'}>
+          <td class="b">${esc(r.nazwa)}${r.aktywna ? "" : " (wyłączona)"}</td>
+          <td>${esc(r.wzorzec)}</td>
+          <td class="mute">${esc(r.rodzaj || "wszystkie")}</td>
+          <td>${r.tag ? `<span class="badge amber">${esc(r.tag)}</span>` : ""}
+            ${r.przydziel ? `<span class="mute">→ ${esc(r.przydziel)}</span>` : ""}</td>
+          <td style="white-space:nowrap">
+            <button class="akcja cichy" data-regula-edytuj="${r.id}"
+              style="font-size:11px;padding:4px 8px">EDYTUJ</button>
+            <button class="akcja cichy" data-regula-kasuj="${r.id}"
+              style="font-size:11px;padding:4px 8px">SKASUJ</button></td>
+        </tr>`).join("")
+    : '<tr><td class="mute">Nie ma jeszcze żadnej reguły.</td></tr>';
+}
+
+function nowaRegula() {
+  regulaEdytowana = null;
+  for (const p of ["regulaNazwa", "regulaWzorzec", "regulaTag", "regulaPrzydziel"]) $(p).value = "";
+  $("regulaRodzaj").value = "";
+  $("regulaZapisz").textContent = "DODAJ REGUŁĘ";
+  $("regulaNowa").hidden = true;
+  $("regulyStan").textContent = "";
+}
+
+function edytujRegule(id) {
+  const r = regulyWszystkie.find((x) => x.id === id);
+  if (!r) return;
+  regulaEdytowana = id;
+  $("regulaNazwa").value = r.nazwa;
+  $("regulaWzorzec").value = r.wzorzec;
+  $("regulaRodzaj").value = r.rodzaj || "";
+  $("regulaTag").value = r.tag || "";
+  $("regulaPrzydziel").value = r.przydziel || "";
+  $("regulaZapisz").textContent = "ZAPISZ ZMIANY";
+  $("regulaNowa").hidden = false;
+  $("regulyStan").textContent = `Edytujesz „${r.nazwa}”.`;
+}
+
+async function zapiszReguleZFormularza() {
+  const dane = JSON.stringify({
+    nazwa: $("regulaNazwa").value,
+    wzorzec: $("regulaWzorzec").value,
+    rodzaj: $("regulaRodzaj").value || null,
+    tag: $("regulaTag").value,
+    przydziel: $("regulaPrzydziel").value,
+  });
+  try {
+    /* Dwa jawne wywołania zamiast metody w zmiennej — licznik zapisów
+       w teście ma widzieć każdy zapis wprost (ta sama zasada co szablony). */
+    if (regulaEdytowana) {
+      await api(`/api/biuro/reguly/${regulaEdytowana}`, { method: "PUT", body: dane });
+    } else {
+      await api("/api/biuro/reguly", { method: "POST", body: dane });
+    }
+    toast(regulaEdytowana ? "Reguła zapisana ✓" : "Reguła dodana ✓");
+    nowaRegula();
+    await wczytajReguly();
+  } catch (e) {
+    $("regulyStan").textContent = e.message;
+  }
+}
+
+async function skasujRegule(id) {
+  const r = regulyWszystkie.find((x) => x.id === id);
+  const zgoda = await potwierdz({
+    tytul: "SKASOWANIE REGUŁY",
+    opis: `Reguła „${r?.nazwa ?? id}” przestanie tagować nowe sprawy. Tagi już nadane zostają.`,
+    potwierdz: "SKASUJ",
+  });
+  if (!zgoda) return;
+  try {
+    await api(`/api/biuro/reguly/${id}`, { method: "DELETE" });
+    if (regulaEdytowana === id) nowaRegula();
+    await wczytajReguly();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function zastosujRegulyTeraz() {
+  $("regulyStan").textContent = "Przebiegam sprawy…";
+  try {
+    const w = await (await api("/api/biuro/reguly/zastosuj", { method: "POST" })).json();
+    $("regulyStan").textContent =
+      `Sprawdzono ${w.sprawdzonych} spraw · nadano ${w.tagow} tagów · przydzielono ${w.przydzialow}`;
+  } catch (e) {
+    $("regulyStan").textContent = e.message;
+  }
+}
+
+$("regulaZapisz").addEventListener("click", zapiszReguleZFormularza);
+$("regulaNowa").addEventListener("click", nowaRegula);
+$("regulyZastosuj").addEventListener("click", zastosujRegulyTeraz);
+$("regulyKarta").addEventListener("click", (e) => {
+  const edytuj = e.target.closest("[data-regula-edytuj]");
+  if (edytuj) return edytujRegule(Number(edytuj.dataset.regulaEdytuj));
+  const kasuj = e.target.closest("[data-regula-kasuj]");
+  if (kasuj) return skasujRegule(Number(kasuj.dataset.regulaKasuj));
+});
+
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
    Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
    (ocena towaru, dopasowanie dokumentu, stempel środków), nie operacja z hali,
@@ -6925,6 +7184,7 @@ function otworzDyskusje(id) {
   ustawRodzenstwoSpraw();
   odswiezSzczegolDyskusji(true);
   wczytajKanalySprawy("dyskusja", id);
+  wczytajTagiSprawy("dyskusja", id);
 }
 
 function zamknijDyskusje() {
@@ -7698,6 +7958,7 @@ function otworzZwrot(id) {
   /* Kanały odpowiedzi sprawy (0.131.0): przy zwrocie to JEDYNA droga do
      klienta bez zmiany ekranu, więc jedzie razem ze szczegółem. */
   wczytajKanalySprawy("zwrot", id);
+  wczytajTagiSprawy("zwrot", id);
 }
 
 function zamknijZwrot() {
@@ -9134,6 +9395,7 @@ async function otworzPytanie(id) {
   await odswiezSzczegolPytania();
   pokazRozmowe(id);
   wczytajKanalySprawy("pytanie", id);
+  wczytajTagiSprawy("pytanie", id);
 }
 
 async function odswiezSzczegolPytania() {

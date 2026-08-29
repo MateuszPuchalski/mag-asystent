@@ -408,8 +408,16 @@ function sprawyOpinii(gdzie: string, param: unknown[]): Sprawa[] {
   });
 }
 
-/** Wszystkie OTWARTE źródła pięciu rejestrów — surowiec grupowania. */
-function otwarteZrodla(): Sprawa[] {
+/**
+ * Wszystkie OTWARTE źródła pięciu rejestrów — surowiec grupowania.
+ *
+ * Eksportowane od 0.136.0: reguły tagowania dopasowują się do POJEDYNCZEGO
+ * źródła, nie do wiersza sprawy. Sprawa pokazuje tytuł źródła wiodącego, więc
+ * reguła szukająca frazy w temacie dyskusji nie znalazłaby jej w sprawie,
+ * której czoło stanowi zwrot — a tag ma wisieć dokładnie przy tym źródle,
+ * którego dotyczy.
+ */
+export function otwarteZrodlaSpraw(): Sprawa[] {
   return [
     ...sprawyPytan("status IN ('nowe','szkic')", []),
     ...sprawyZwrotow("status IN ('nowy','oceniony')", []),
@@ -426,7 +434,7 @@ function otwarteZrodla(): Sprawa[] {
  * zbieramy zawsze wszystkie, bo grupa przycięta filtrem byłaby kłamstwem.
  */
 export function listaSpraw(rodzaj?: RodzajSprawy): Sprawa[] {
-  const sprawy = zgrupujWSprawy(otwarteZrodla());
+  const sprawy = zgrupujWSprawy(otwarteZrodlaSpraw());
   const przefiltrowane = rodzaj
     ? sprawy.filter((s) => s.zrodla!.some((z) => z.rodzaj === rodzaj))
     : sprawy;
@@ -600,7 +608,7 @@ export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
   const mojeId = wpis?.kupujacyId ?? null;
   if (mojeId) {
     const zLoginu = new Set(klient.map((s) => `${s.rodzaj}:${s.id}`));
-    kupujacy = zgrupujWSprawy(otwarteZrodla())
+    kupujacy = zgrupujWSprawy(otwarteZrodlaSpraw())
       .filter((s) => s.kupujacyId === mojeId)
       .filter((s) => s.sprawaId !== wpis!.sprawaId)
       .filter(nieJa)

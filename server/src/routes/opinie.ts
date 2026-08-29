@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { stanPolaczenia } from "../services/allegro-token.js";
+import { zastosujReguly } from "../services/tagi.js";
 import {
   BladOpinii,
   licznikOpinii,
@@ -48,7 +49,12 @@ export async function opinieRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     try {
-      return await synchronizujOpinie(autor());
+      const wynik = await synchronizujOpinie(autor());
+      /* Reguły tagowania (0.136.0) chodzą PO pobraniu i stąd, nie z serwisu:
+         serwis rejestru nie ma prawa zależeć od kolejki spraw, która sama
+         zależy od niego. Świeża zła opinia trafia na ekran już otagowana. */
+      const reguly = zastosujReguly(autor());
+      return { ...wynik, reguly };
     } catch (e) {
       return reply
         .code(502)

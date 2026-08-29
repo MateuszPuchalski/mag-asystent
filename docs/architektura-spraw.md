@@ -204,8 +204,17 @@ poprzedniego na produkcji.
   Treść opinii TRZYMAMY, inaczej niż treść rozmowy — opinia jest publiczna,
   rozmowa prywatna. Odpowiadanie przez API czeka na weryfikację końcówki;
   do tego czasu odpowiada się w panelu Allegro, a rejestr trzyma status.
-- **E5 — tagi i reguły:** tagowanie spraw, reguły przydziału. Wymaga
-  najpierw modelu tagów, którego repo nie ma wcale.
+- **E5 (0.136.0, wykonany) — tagi i reguły:** tag wisi przy ŹRÓDLE (jak
+  zdarzenie osi czasu), więc przeżywa SCAL, ROZKLEJ i przebudowę nakładki;
+  sprawa pokazuje sumę tagów swoich dzisiejszych źródeł. Reguła szuka FRAZY
+  w tytule i loginie — bez wyrażeń regularnych — nadaje tag i opcjonalnie
+  przypisuje sprawę osobie, nigdy nie odbierając jej temu, kto już ją
+  prowadzi. Reguły chodzą po każdym pobraniu i na żądanie.
+
+Etap E jest zamknięty. Dalsze kierunki wychodzą poza pierwotną mapę:
+odpowiadanie na opinie przez API (po weryfikacji końcówki), piłka ŚWIAT
+(po znalezieniu producenta danych o przewoźniku) i potwierdzenie listy
+`FINALNE_STATUSY_ALLEGRO` na żywym koncie.
 
 ## Czego świadomie nie robimy
 

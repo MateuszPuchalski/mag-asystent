@@ -33,6 +33,34 @@ historii nie przepisujemy.
 
 ---
 
+## 0.136.0 — 29 sierpnia 2026
+
+**Tagi spraw i reguły ich nadawania.** Etap E5 z mapy
+w `docs/architektura-spraw.md` — ostatni z pięciu kawałków etapu E.
+
+**Tag jest etykietą problemu.** „uszkodzenie", „vip", „do windykacji" —
+dopisuje się go przy sprawie jednym polem, a sprawa pokazuje sumę tagów
+wszystkich swoich źródeł. Tag wisi przy ŹRÓDLE, nie przy sprawie, więc
+przeżywa SCAL, ROZKLEJ i przebudowę nakładki spraw.
+
+**Reguła szuka FRAZY, nie wyrażenia regularnego.** To jest decyzja, nie
+uproszczenie: regexp w polu redagowanym przez biuro jest pułapką na dwa
+sposoby — nikt go tam nie napisze poprawnie, a zły potrafi zawiesić serwer na
+własnym backtrackingu. Fraza szuka się w tytule sprawy i loginie klienta, bez
+rozróżniania wielkości liter, i daje się sprawdzić okiem przed zapisaniem.
+
+**Reguła może przypisać sprawę osobie, ale nikomu jej nie odbierze.** Sprawa,
+którą ktoś już prowadzi, zostaje przy nim. Tag nadany automatem jest podpisany
+regułą, więc widać, czego nie zrobił człowiek.
+
+**To jest CAŁA lista rzeczy, które automatowi wolno.** Zasada 6 mówi wprost:
+tagowanie i przydział mogą być regułami, ale do klienta mówi wyłącznie
+człowiek. Ani tag, ani przydział nie wysyłają niczego.
+
+**Reguły chodzą po każdym pobraniu i na żądanie.** Nowa sprawa trafia na ekran
+już otagowana; świeżo zapisaną regułę można sprawdzić przyciskiem ZASTOSUJ
+TERAZ, bez czekania na następne pobranie.
+
 ## 0.135.0 — 29 sierpnia 2026
 
 **Opinie o sprzedawcy jako piąte źródło sprawy.** Etap E4 z mapy

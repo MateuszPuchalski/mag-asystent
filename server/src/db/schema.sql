@@ -1195,3 +1195,45 @@ CREATE TABLE IF NOT EXISTS opinia (
 );
 CREATE INDEX IF NOT EXISTS ix_opinia_status ON opinia(status, id);
 CREATE INDEX IF NOT EXISTS ix_opinia_order ON opinia(order_id);
+
+-- ── Tagi spraw i reguły ich nadawania (0.136.0) ─────────────────────────────
+-- Etap E5 z docs/architektura-spraw.md; ostatnie zapożyczenie od Responso.
+-- Zasada 6 mówi wprost, co wolno automatowi: „tagowanie i przydział mogą być
+-- regułami — ale do klienta mówi wyłącznie człowiek". Tag i przydział niczego
+-- nie wysyłają, więc mieszczą się w tej granicy z zapasem.
+--
+-- Tag wisi przy ŹRÓDLE, nie przy sprawie — ta sama decyzja co przy
+-- `sprawa_zdarzenie` i z tego samego powodu: SCAL i ROZKLEJ przenoszą źródła
+-- między sprawami, a rekoncyliacja potrafi skasować sprawę bez źródeł.
+-- Tag na sprawie zniknąłby wtedy po cichu; tag na źródle jedzie razem z nim.
+CREATE TABLE IF NOT EXISTS sprawa_tag (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj     TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja','opinia')),
+  lokalny_id INTEGER NOT NULL,
+  tag        TEXT NOT NULL,
+  -- Konto człowieka albo `regula:<id>` — po tym widać, co nadał automat.
+  autor      TEXT NOT NULL,
+  dodano_at  TEXT NOT NULL,
+  UNIQUE (rodzaj, lokalny_id, tag)
+);
+CREATE INDEX IF NOT EXISTS ix_sprawa_tag ON sprawa_tag(rodzaj, lokalny_id);
+CREATE INDEX IF NOT EXISTS ix_sprawa_tag_nazwa ON sprawa_tag(tag);
+
+-- Reguła: „sprawa pasująca do wzorca dostaje tag i (opcjonalnie) właściciela".
+-- WZORZEC TO ZWYKŁA FRAZA, nie wyrażenie regularne — świadomie. Regexp w polu
+-- tekstowym redagowanym przez biuro to pułapka na dwa sposoby: nikt go tam nie
+-- napisze poprawnie, a zły regexp potrafi zawiesić serwer na własnym backtrackingu.
+CREATE TABLE IF NOT EXISTS regula (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa        TEXT NOT NULL,
+  -- Rodzaj źródła, do którego reguła się stosuje; NULL = wszystkie.
+  rodzaj       TEXT,
+  -- Fraza szukana w tytule sprawy i loginie klienta, bez rozróżniania wielkości.
+  wzorzec      TEXT NOT NULL,
+  tag          TEXT,
+  -- Login pracownika, któremu przypada sprawa; NULL = reguła tylko taguje.
+  przydziel    TEXT,
+  aktywna      INTEGER NOT NULL DEFAULT 1,
+  autor        TEXT NOT NULL,
+  utworzono_at TEXT NOT NULL
+);
