@@ -488,6 +488,9 @@ export function zbudujScenariusze(): Podsumowanie {
   /* Nakładka spraw dogania świeżo zasiane rejestry (0.128.0) — poza
      transakcją seeda, bo rekoncyliacja otwiera własną. */
   przebudujSprawy();
+  /* Opinie demo (0.135.0) — piąte źródło sprawy. Jedna zła z numerem
+     zamówienia, żeby demo pokazało sklejenie opinii ze zwrotem. */
+  opinieDemo();
   /* Trzy szablony na start (0.133.0) — demo pustej listy uczy, że funkcji
      nie ma. Treści są celowo ZWYKŁE: tak pisze agent, gdy nie ma czasu. */
   szablonyDemo();
@@ -1813,4 +1816,22 @@ function szablonyDemo(): void {
     ],
   ];
   for (const [nazwa, kanal, tresc] of szablony) wstaw.run(nazwa, kanal, tresc, teraz, teraz);
+}
+
+/** Opinie o sprzedawcy na start (0.135.0) — komplet z adaptera dev. */
+function opinieDemo(): void {
+  const d = db();
+  if ((d.prepare("SELECT COUNT(*) AS n FROM opinia").get() as { n: number }).n > 0) return;
+  const teraz = new Date().toISOString();
+  const wstaw = d.prepare(
+    `INSERT INTO opinia (allegro_id, order_id, kupujacy_login, ocena, rekomendacja, tresc,
+                         odpowiedz, mozliwa_odpowiedz, utworzono_allegro, widziano_at, utworzono_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  );
+  const dni = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  wstaw.run("dev-op-1", "dev-ord-2", "ewa_oddaje", 1, "NEGATIVE",
+    "Towar przyszedł uszkodzony, a na wiadomość czekałam trzy dni.", null, 1, dni(1), teraz, teraz);
+  wstaw.run("dev-op-2", "dev-ord-1", "jan_wraca", 5, "POSITIVE",
+    "Szybka wysyłka, wszystko zgodne z opisem.", "Dziękujemy!", 0, dni(6), teraz, teraz);
+  wstaw.run("dev-op-3", null, "firma_x", 3, "NEUTRAL", null, null, 1, dni(20), teraz, teraz);
 }

@@ -9,6 +9,7 @@ import type {
   WatekNaglowek,
   WiadomoscAllegro,
   WiadomoscDyskusji,
+  OpiniaAllegro,
   ZamowienieAllegro,
   ZamowienieKupujacego,
   ZdarzenieSledzenia,
@@ -431,6 +432,13 @@ export class DevAllegroAdapter implements AllegroAdapter {
     );
   }
 
+  async listaOpinii(odKiedy: string | null): Promise<OpiniaAllegro[]> {
+    const granica = odKiedy ? Date.parse(odKiedy) : NaN;
+    return OPINIE_DEV.filter(
+      (o) => Number.isNaN(granica) || !o.utworzono || Date.parse(o.utworzono) >= granica
+    );
+  }
+
   async zwrot(id: string): Promise<ZwrotAllegro | null> {
     return zwroty().find((z) => z.id === id) ?? null;
   }
@@ -751,3 +759,42 @@ const ROZMOWY_DYSKUSJI: Record<string, WiadomoscDyskusji[]> = {
     },
   ],
 };
+
+/* Opinie demo (0.135.0) — zestrojone z zamówieniami wyżej, żeby sprawa
+   sklejała się po numerze zamówienia. Jedna zła (dopina się do dyskusji
+   dev-ord-2), jedna dobra i jedna bez zamówienia. */
+const OPINIE_DEV: OpiniaAllegro[] = [
+  {
+    id: "dev-op-1",
+    orderId: "dev-ord-2",
+    kupujacyLogin: "ewa_oddaje",
+    ocena: 1,
+    rekomendacja: "NEGATIVE",
+    tresc: "Towar przyszedł uszkodzony, a na wiadomość czekałam trzy dni.",
+    odpowiedz: null,
+    utworzono: dniTemu(1),
+    mozliwaOdpowiedz: true,
+  },
+  {
+    id: "dev-op-2",
+    orderId: "dev-ord-1",
+    kupujacyLogin: "jan_wraca",
+    ocena: 5,
+    rekomendacja: "POSITIVE",
+    tresc: "Szybka wysyłka, wszystko zgodne z opisem.",
+    odpowiedz: "Dziękujemy!",
+    utworzono: dniTemu(6),
+    mozliwaOdpowiedz: false,
+  },
+  {
+    id: "dev-op-3",
+    orderId: null,
+    kupujacyLogin: "firma_x",
+    ocena: 3,
+    rekomendacja: "NEUTRAL",
+    tresc: null,
+    odpowiedz: null,
+    utworzono: dniTemu(20),
+    mozliwaOdpowiedz: true,
+  },
+];

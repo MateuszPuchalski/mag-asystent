@@ -33,6 +33,37 @@ historii nie przepisujemy.
 
 ---
 
+## 0.135.0 — 29 sierpnia 2026
+
+**Opinie o sprzedawcy jako piąte źródło sprawy.** Etap E4 z mapy
+w `docs/architektura-spraw.md`. Do tej wersji opinii nie było w aplikacji
+wcale: agent dowiadywał się o jednej gwiazdce z panelu Allegro albo od
+właściciela, zwykle po fakcie.
+
+**Zła ocena stoi przy sprawie, której dotyczy.** Opinia z numerem zamówienia
+dopina się do sprawy tego zamówienia — widać ją przy zwrocie i przy dyskusji,
+razem z resztą historii. Opinia bez zamówienia zostaje osobną sprawą: po samym
+loginie automat nie skleja niczego.
+
+**Rejestr jest cienki i to jest decyzja.** Opinia nie ma u nas mechaniki
+(koszy, korekt, werdyktów) — ma trzy stany: NOWA, PRZEJRZANA, ZAŁATWIONA.
+Cała jej wartość bierze się ze sklejenia w sprawę, nie z osobnego ekranu.
+
+**Treść opinii trzymamy, treści rozmów nadal nie.** To nie jest wyłom
+w prywatności, tylko inna klasa danych: rozmowa jest prywatna między nami
+a klientem, opinia wisi publicznie na ofercie i widzi ją każdy kupujący.
+
+**Odpowiadanie przez API czeka na weryfikację.** Końcówka odpowiedzi na opinię
+jest niepotwierdzona na żywym koncie, a pisanie do klienta przez niesprawdzony
+zasób to jedyny błąd, którego nie da się cofnąć. Odpowiedź piszesz w panelu
+Allegro; w rejestrze oznaczasz, że sprawa jest załatwiona.
+
+**Pierwsze uruchomienie przebuduje dwie tabele nakładki [wymaga działania:
+nic, dzieje się samo].** SQLite nie umie dopisać wartości do ograniczenia
+CHECK, więc `sprawa_zrodlo` i `sprawa_zdarzenie` powstają na nowo z piątym
+rodzajem. Dane, wiązania ręczne i indeksy przechodzą w całości — pilnuje tego
+osobny test na bazie w starym kształcie.
+
 ## 0.134.0 — 29 sierpnia 2026
 
 **Czasy odpowiedzi jako piąty zakres ANALIZY.** Etap E3 z mapy

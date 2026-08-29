@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    41,
+    43,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -217,7 +217,13 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "\n\nPOST i PUT z 0.133.0 to jedno pole formularza szablonów: DODAJ " +
       "zakłada nowy, ZAPISZ ZMIANY nadpisuje wskazany. Szablon to tekst DO " +
       "POPRAWIENIA, nie wysyłka — wstawienie go do odpowiedzi jest czystym " +
-      "odczytem i nie podnosi żadnego licznika."
+      "odczytem i nie podnosi żadnego licznika." +
+      "\n\nDwa POST-y z 0.135.0 to piąte źródło spraw: POBIERZ OPINIE " +
+      "(synchronizacja z Allegro, jak przy dyskusjach) i zmiana statusu " +
+      "opinii na PRZEJRZANA albo ZAŁATWIONA. Odpowiadania na opinię przez " +
+      "API tu NIE MA i nie przez przeoczenie: końcówka odpowiedzi jest " +
+      "niezweryfikowana, a pisanie do klienta przez niesprawdzony zasób to " +
+      "jedyny błąd, którego nie da się cofnąć."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

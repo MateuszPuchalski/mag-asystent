@@ -2,6 +2,7 @@ import { db } from "../db/db.js";
 import { licznikOtwartych, licznikiPytan, stanSynchronizacjiPytan } from "./pytania.js";
 import { licznikDyskusji, stanSynchronizacjiDyskusji } from "./dyskusje.js";
 import { listaReklamacji, terminReklamacji } from "./reklamacje.js";
+import { licznikOpinii } from "./opinie.js";
 import { mapaZrodel, type WpisMapyZrodel } from "./sprawa.js";
 import { metaHurtem } from "./watek-meta.js";
 
@@ -20,9 +21,9 @@ import { metaHurtem } from "./watek-meta.js";
    przy każdym SELECT); test w sprawy.test.ts porównuje liczby z tamtymi
    serwisami, żeby dopisany komuś status nie schował spraw z głównej kolejki. */
 
-export type RodzajSprawy = "pytanie" | "zwrot" | "dyskusja" | "reklamacja";
+export type RodzajSprawy = "pytanie" | "zwrot" | "dyskusja" | "reklamacja" | "opinia";
 
-export const RODZAJE_SPRAW: RodzajSprawy[] = ["pytanie", "zwrot", "dyskusja", "reklamacja"];
+export const RODZAJE_SPRAW: RodzajSprawy[] = ["pytanie", "zwrot", "dyskusja", "reklamacja", "opinia"];
 
 /**
  * Kto ma wykonać następny ruch (0.129.0) — najważniejszy stan sprawy z zasady
@@ -368,13 +369,53 @@ function zgrupujWSprawy(zrodla: Sprawa[]): Sprawa[] {
   return wynik;
 }
 
-/** Wszystkie OTWARTE źródła czterech rejestrów — surowiec grupowania. */
+/* ── Opinie o sprzedawcy (0.135.0) ───────────────────────────────────────────
+   Piąte źródło. Bez terminu ustawowego — opinia nie ma zegara, ma ciężar:
+   jedna gwiazdka wisi publicznie przy ofercie, dopóki ktoś się nią nie zajmie.
+   Tytuł wiersza to treść opinii, bo ona JEST sprawą; przy opinii bez treści
+   zostają same gwiazdki i to też jest uczciwa informacja.                   */
+function sprawyOpinii(gdzie: string, param: unknown[]): Sprawa[] {
+  const rows = db()
+    .prepare(
+      `SELECT id, order_id, kupujacy_login, ocena, rekomendacja, tresc, status, prowadzi,
+              utworzono_allegro, utworzono_at
+       FROM opinia WHERE ${gdzie} ORDER BY id DESC LIMIT 500`
+    )
+    .all(...(param as never[])) as Array<Record<string, unknown>>;
+  return rows.map((r0) => {
+    const r = wiersz(r0);
+    const status = (r.status as string) ?? "nowa";
+    const otwarta = status !== "zalatwiona";
+    const ocena = (r.ocena as number | null) ?? null;
+    const gwiazdki = ocena !== null ? `${ocena}/5` : ((r.rekomendacja as string) ?? "bez oceny");
+    return {
+      rodzaj: "opinia" as const,
+      id: Number(r.id),
+      klient: (r.kupujacy_login as string) ?? null,
+      tytul: skrot((r.tresc as string) ?? `Opinia ${gwiazdki} bez komentarza`),
+      orderId: (r.order_id as string) ?? null,
+      status,
+      kiedy: (r.utworzono_allegro as string) ?? (r.utworzono_at as string) ?? null,
+      dniDoTerminu: null,
+      poTerminie: false,
+      prowadzi: (r.prowadzi as string) ?? null,
+      typ: gwiazdki,
+      otwarta,
+      /* Opinia nie jest rozmową: dopóki jej nie załatwiono, ruch jest NASZ.
+         Nie ma stanu „czekamy na klienta" — klient powiedział, co miał. */
+      pilka: otwarta ? ("my" as const) : ("nikt" as const),
+    };
+  });
+}
+
+/** Wszystkie OTWARTE źródła pięciu rejestrów — surowiec grupowania. */
 function otwarteZrodla(): Sprawa[] {
   return [
     ...sprawyPytan("status IN ('nowe','szkic')", []),
     ...sprawyZwrotow("status IN ('nowy','oceniony')", []),
     ...sprawyDyskusji("status IN ('nowa','w_toku')", []),
     ...sprawyReklamacji("p.rekl_wynik IS NULL", []),
+    ...sprawyOpinii("status <> 'zalatwiona'", []),
   ];
 }
 
@@ -462,6 +503,7 @@ export function szukajKlientow(fraza: string, limit = 12): ZnalezionyKlient[] {
     ...sprawyZwrotow("kupujacy_login LIKE ?", [wzor]),
     ...sprawyDyskusji("kupujacy_login LIKE ?", [wzor]),
     ...sprawyReklamacji("z.kupujacy_login LIKE ?", [wzor]),
+    ...sprawyOpinii("kupujacy_login LIKE ?", [wzor]),
   ]);
 
   const wg = new Map<string, ZnalezionyKlient>();
@@ -531,6 +573,7 @@ export function powiazaneSprawy(rodzaj: RodzajSprawy, id: number): {
       ...sprawyZwrotow("allegro_order_id = ?", [zrodlo.orderId]),
       ...sprawyDyskusji("order_id = ?", [zrodlo.orderId]),
       ...sprawyReklamacji("z.allegro_order_id = ?", [zrodlo.orderId]),
+      ...sprawyOpinii("order_id = ?", [zrodlo.orderId]),
     ]
       .filter(nieJa)
       .filter(nieRodzic)
@@ -581,6 +624,8 @@ function sprawaZrodlowa(rodzaj: RodzajSprawy, id: number): Sprawa | null {
       return jedna(sprawyDyskusji("id = ?", [id]));
     case "reklamacja":
       return jedna(sprawyReklamacji("p.id = ?", [id]));
+    case "opinia":
+      return jedna(sprawyOpinii("id = ?", [id]));
   }
 }
 
@@ -595,6 +640,8 @@ export interface LicznikSpraw {
   dyskusjeWToku: number;
   poTerminie: number;
   reklamacjeOtwarte: number;
+  opinieNowe: number;
+  opinieZle: number;
   synchronizacjaPytan: ReturnType<typeof stanSynchronizacjiPytan>;
   synchronizacjaDyskusji: ReturnType<typeof stanSynchronizacjiDyskusji>;
 }
@@ -608,6 +655,7 @@ export function licznikSpraw(): LicznikSpraw {
   const pyt = licznikiPytan();
   const dysk = licznikDyskusji();
   const reklamacje = listaReklamacji();
+  const opinie = licznikOpinii();
   const zwroty = db()
     .prepare(`SELECT COUNT(*) AS n FROM zwrot WHERE status IN ('nowy','oceniony')`)
     .get() as { n: number };
@@ -626,6 +674,12 @@ export function licznikSpraw(): LicznikSpraw {
     dyskusjeWToku: dysk.wToku,
     poTerminie,
     reklamacjeOtwarte: reklamacje.length,
+    /* Opinie (0.135.0): `nowe` to te nietknięte, `zle` — negatywne i jedno-
+       lub dwugwiazdkowe, które nie są jeszcze załatwione. Druga liczba jest
+       ważniejsza i dlatego jest osobno: opinia przejrzana, ale niezałatwiona,
+       dalej wisi publicznie. */
+    opinieNowe: opinie.nowe,
+    opinieZle: opinie.zle,
     synchronizacjaPytan: stanSynchronizacjiPytan(),
     synchronizacjaDyskusji: stanSynchronizacjiDyskusji(),
   };

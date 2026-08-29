@@ -1917,6 +1917,32 @@
       <table id="dyskusjeLista" style="margin-top:8px"></table>
     </details>
 
+    <!-- OPINIE (0.135.0): piąte źródło sprawy. Rejestr jest cienki, bo opinia
+         nie ma u nas mechaniki — ma trzy stany i prowadzącego. Jej wartość
+         bierze się ze sklejenia w sprawę: zła ocena siada przy zwrocie tego
+         samego zamówienia. Odpowiadanie idzie na razie panelem Allegro, bo
+         końcówka odpowiedzi jest niezweryfikowana. -->
+    <details class="zwijana" id="opinieKarta">
+      <summary><h2>OPINIE O SPRZEDAWCY</h2><span class="podpis">piąte źródło spraw</span></summary>
+      <p class="mute" style="margin-bottom:8px">
+      Opinia z jedną gwiazdką to sprawa klienta jak każda inna, tylko widoczna
+      publicznie. Zła ocena z numerem zamówienia dopina się do sprawy tego
+      zamówienia — zobaczysz ją przy zwrocie albo dyskusji. Odpowiedź piszesz
+      w panelu Allegro; tutaj oznacz, że sprawa jest załatwiona.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <button class="akcja" id="opiniePobierz">POBIERZ OPINIE</button>
+        <span class="mute" id="opinieStan"></span>
+      </div>
+      <div class="czipy" id="opinieCzipy">
+        <button class="czip" data-status="" aria-pressed="true">Wszystkie</button>
+        <button class="czip" data-status="nowa" aria-pressed="false">Nowe</button>
+        <button class="czip" data-status="przejrzana" aria-pressed="false">Przejrzane</button>
+        <button class="czip" data-status="zalatwiona" aria-pressed="false">Załatwione</button>
+      </div>
+      <table id="opinieLista" style="margin-top:8px"></table>
+    </details>
+
     <details class="zwijana" id="reklamacjeKarta">
       <summary><h2>REKLAMACJE · PRIORYTET WG TERMINU</h2></summary>
       <p class="mute" style="margin-bottom:8px">
@@ -2781,7 +2807,7 @@ function pokaz(nowy) {
      (kosze, paczki, pominięte, reklamacje) i listy rejestrów. Odświeżenie na
      wejściu, nie w cyklu — cykl 30 s należy do widoku, na który się patrzy. */
   if (nowy === "magazyn") odswiezEtap3();
-  if (nowy === "rejestry") { odswiezZwroty(); odswiezPytania(); odswiezEtap3(); }
+  if (nowy === "rejestry") { odswiezZwroty(); odswiezPytania(); odswiezEtap3(); odswiezOpinie(); }
   if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") odswiezNadzor();
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
@@ -6778,6 +6804,100 @@ async function odswiezDyskusje() {
     $("dyskusjeLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
   }
 }
+
+
+/* ── Opinie o sprzedawcy (0.135.0) ───────────────────────────────────────────
+   Etap E4: piąte źródło sprawy. Rejestr cienki — trzy stany i prowadzący —
+   bo opinia nie ma u nas mechaniki. Cała wartość bierze się ze sklejenia
+   w sprawę po numerze zamówienia.
+
+   Odpowiedź pisze się w panelu Allegro: końcówka odpowiedzi jest
+   niezweryfikowana, a pisanie do klienta przez niesprawdzony zasób to jedyny
+   błąd, którego nie da się cofnąć. */
+let opinieFiltr = "";
+
+function gwiazdki(o) {
+  if (o.ocena == null) return esc(o.rekomendacja || "bez oceny");
+  /* Kolor po ocenie, nie po statusie: jedna gwiazdka wisi publicznie
+     niezależnie od tego, czy ktoś ją u nas przejrzał. */
+  const klasa = o.ocena <= 2 ? "err" : o.ocena >= 4 ? "ok" : "amber";
+  return `<span class="badge ${klasa}">${o.ocena}/5</span>`;
+}
+
+function rysujOpinie(d) {
+  const lista = d.opinie || [];
+  const l = d.licznik || { nowe: 0, zle: 0 };
+  $("opinieStan").textContent = d.synchronizacja
+    ? `Ostatnio: ${stempelLokalny(d.synchronizacja.at)} · nowych ${d.synchronizacja.nowych}`
+      + ` · przejrzano ${d.synchronizacja.przejrzanych} · czeka ${l.nowe}, złych ${l.zle}`
+    : `Jeszcze nie pobierano. Czeka ${l.nowe}, złych ${l.zle}.`;
+  $("opinieLista").innerHTML = lista.length
+    ? "<tr><th>OCENA</th><th>KIEDY</th><th>KLIENT</th><th>OPINIA</th><th>STATUS</th><th></th></tr>" +
+      lista.map((o) => `<tr>
+          <td>${gwiazdki(o)}</td>
+          <td class="mute" style="white-space:nowrap">${esc((o.utworzonoAllegro || "").slice(0, 10))}</td>
+          <td>${esc(o.kupujacyLogin || "—")}</td>
+          <td>${esc(o.tresc || "(bez komentarza)")}${o.odpowiedz
+            ? `<div class="mute">nasza odpowiedź: ${esc(o.odpowiedz)}</div>` : ""}</td>
+          <td><span class="badge ${o.status === "zalatwiona" ? "ok" : "mute2"}">${esc(o.status)}</span>
+            ${o.prowadzi ? `<div class="mute">${esc(o.prowadzi)}</div>` : ""}</td>
+          <td style="white-space:nowrap">${o.status !== "przejrzana" && o.status !== "zalatwiona"
+            ? `<button class="akcja cichy" data-opinia="${o.id}" data-status="przejrzana"
+                 style="font-size:11px;padding:4px 8px">PRZEJRZANA</button>` : ""}
+            ${o.status !== "zalatwiona"
+            ? `<button class="akcja cichy" data-opinia="${o.id}" data-status="zalatwiona"
+                 style="font-size:11px;padding:4px 8px">ZAŁATWIONA</button>` : ""}</td>
+        </tr>`).join("")
+    : '<tr><td class="mute">Brak opinii w tym filtrze.</td></tr>';
+}
+
+async function odswiezOpinie() {
+  try {
+    const q = opinieFiltr ? `?status=${encodeURIComponent(opinieFiltr)}` : "";
+    rysujOpinie(await (await api(`/api/biuro/opinie${q}`)).json());
+  } catch (e) {
+    $("opinieLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
+  }
+}
+
+async function pobierzOpinie() {
+  $("opinieStan").textContent = "Pytam Allegro…";
+  try {
+    const w = await (await api("/api/biuro/opinie/odswiez", { method: "POST" })).json();
+    toast(`Opinie: nowych ${w.nowych} z ${w.przejrzanych}`);
+    await odswiezOpinie();
+    await odswiezLicznikSpraw();
+  } catch (e) {
+    $("opinieStan").textContent = e.message;
+  }
+}
+
+async function zmienStatusOpinii(id, status) {
+  try {
+    await api(`/api/biuro/opinie/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+    await odswiezOpinie();
+    await odswiezLicznikSpraw();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+$("opiniePobierz").addEventListener("click", pobierzOpinie);
+/* Delegacja na KARCIE, nie na tabeli — tabelę przerysowuje każdy status. */
+$("opinieKarta").addEventListener("click", (e) => {
+  const czip = e.target.closest(".czip");
+  if (czip) {
+    opinieFiltr = czip.dataset.status;
+    for (const c of $("opinieCzipy").querySelectorAll(".czip")) {
+      c.setAttribute("aria-pressed", c === czip ? "true" : "false");
+    }
+    return odswiezOpinie();
+  }
+  const przycisk = e.target.closest("[data-opinia]");
+  if (przycisk) {
+    return zmienStatusOpinii(Number(przycisk.dataset.opinia), przycisk.dataset.status);
+  }
+});
 
 /* ── Szczegół dyskusji (0.104.0): rozmowa, szkic, wysyłka ────────────────────
    Cała sprawa w aplikacji. Rozmowa jedzie z Allegro NA KLIK i nie jest

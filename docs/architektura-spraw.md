@@ -15,7 +15,8 @@ ustawowy termin nie mija, żaden klient nie czeka bez potrzeby, nikt nie robi
 tego samego dwa razy, każda odpowiedź ma fakty pod ręką.
 
 **1. Jednostką pracy jest problem klienta, nie obiekt Allegro.** Allegro
-rozbija jeden problem na obiekty: wątek wiadomości, dyskusję, CLAIM, zwrot.
+rozbija jeden problem na obiekty: wątek wiadomości, dyskusję, CLAIM, zwrot,
+od 0.135.0 także opinię.
 Klient pisze „gdzie paczka", zakłada dyskusję, w końcu odsyła towar — trzy
 obiekty, jeden problem. SPRAWA je agreguje; obiekty są źródłami sprawy.
 
@@ -197,8 +198,12 @@ poprzedniego na produkcji.
   (jak przy czasach zwrotów), a seria wiadomości klienta liczy się od
   pierwszej; obok mediany stoi lista KTO CZEKA TERAZ, bo mediana mówi
   o przeszłości.
-- **E4 — opinie Allegro jako piąte źródło:** nowy rejestr i nowy rodzaj
-  `sprawa_zrodlo`; wymaga adaptera i weryfikacji na żywym koncie.
+- **E4 (0.135.0, wykonany) — opinie jako piąte źródło:** rejestr `opinia`
+  i piąty rodzaj `sprawa_zrodlo`; opinia z numerem zamówienia dopina się do
+  sprawy tego zamówienia, więc zła ocena stoi przy zwrocie, którego dotyczy.
+  Treść opinii TRZYMAMY, inaczej niż treść rozmowy — opinia jest publiczna,
+  rozmowa prywatna. Odpowiadanie przez API czeka na weryfikację końcówki;
+  do tego czasu odpowiada się w panelu Allegro, a rejestr trzyma status.
 - **E5 — tagi i reguły:** tagowanie spraw, reguły przydziału. Wymaga
   najpierw modelu tagów, którego repo nie ma wcale.
 

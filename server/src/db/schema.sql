@@ -1082,7 +1082,7 @@ CREATE INDEX IF NOT EXISTS ix_sprawa_login    ON sprawa(kupujacy_login);
 CREATE TABLE IF NOT EXISTS sprawa_zrodlo (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   sprawa_id   INTEGER NOT NULL REFERENCES sprawa(id),
-  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja')),
+  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja','opinia')),
   lokalny_id  INTEGER NOT NULL,  -- id w tabeli rejestru; reklamacja = id POZYCJI zwrotu
   allegro_id  TEXT,              -- thread_id / allegro_return_id / id z /sale/issues
   wiazanie    TEXT NOT NULL DEFAULT 'auto',
@@ -1113,7 +1113,7 @@ CREATE INDEX IF NOT EXISTS ix_sprawa_zrodlo ON sprawa_zrodlo(sprawa_id);
 -- Zdarzenie powtarzalne — druga odpowiedź w dyskusji — ma czas w kluczu.
 CREATE TABLE IF NOT EXISTS sprawa_zdarzenie (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja')),
+  rodzaj      TEXT NOT NULL CHECK (rodzaj IN ('pytanie','zwrot','dyskusja','reklamacja','opinia')),
   lokalny_id  INTEGER NOT NULL,   -- id w rejestrze; reklamacja = id POZYCJI zwrotu
   typ         TEXT NOT NULL,      -- slownik w services/os-sprawy.ts (TYPY_ZDARZEN)
   -- Czyj to był ruch. Osobno od `autor`, bo panel rysuje po TEJ kolumnie:
@@ -1154,3 +1154,44 @@ CREATE TABLE IF NOT EXISTS szablon (
   aktualizowano_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_szablon_kanal ON szablon(kanal, nazwa);
+
+-- ── Opinie o sprzedawcy — piąte źródło sprawy (0.135.0) ─────────────────────
+-- Etap E4 z docs/architektura-spraw.md. Opinia z jedną gwiazdką to sprawa
+-- klienta jak każda inna, tylko widoczna publicznie — a do 0.135.0 nie było
+-- jej w aplikacji wcale: agent dowiadywał się o niej z panelu Allegro albo
+-- od właściciela.
+--
+-- TREŚĆ OPINII TRZYMAMY, inaczej niż treść rozmowy — i to nie jest wyłom
+-- w zasadzie prywatności, tylko inna klasa danych. Rozmowa jest prywatna
+-- między nami a klientem; opinia wisi publicznie na ofercie i każdy kupujący
+-- ją widzi. Bez treści rejestr byłby listą gwiazdek bez informacji, po co
+-- w ogóle patrzeć.
+--
+-- Grupowanie w sprawę idzie po `order_id` — tak samo jak zwrot i dyskusja,
+-- więc zła opinia trafia do sprawy zwrotu, którego dotyczy.
+CREATE TABLE IF NOT EXISTS opinia (
+  -- Kształt jak `dyskusja`: lokalne id dla wiązań sprawy, klucz Allegro
+  -- z UNIQUE dla idempotentnego upsertu.
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  allegro_id      TEXT NOT NULL UNIQUE,
+  order_id        TEXT,
+  kupujacy_login  TEXT,
+  ocena           INTEGER,            -- 1–5 gwiazdek; NULL = API nie podało
+  rekomendacja    TEXT,               -- POSITIVE | NEUTRAL | NEGATIVE ([WERYFIKUJ])
+  tresc           TEXT,
+  --   nowa       = nikt jej jeszcze nie tknął
+  --   przejrzana = biuro ją widziało i nie ma nic do zrobienia
+  --   zalatwiona = odpowiedzieliśmy albo sprawa poszła inną drogą
+  status          TEXT NOT NULL DEFAULT 'nowa',
+  -- Odpowiedź, którą Allegro już zna. Odpowiadanie PRZEZ API czeka na
+  -- weryfikację końcówki — patrz komentarz przy OpiniaAllegro.
+  odpowiedz       TEXT,
+  mozliwa_odpowiedz INTEGER NOT NULL DEFAULT 1,
+  prowadzi        TEXT,
+  prowadzi_at     TEXT,
+  utworzono_allegro TEXT,
+  widziano_at     TEXT NOT NULL,      -- ostatni raz w odpowiedzi API (diagnostyka sync)
+  utworzono_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_opinia_status ON opinia(status, id);
+CREATE INDEX IF NOT EXISTS ix_opinia_order ON opinia(order_id);

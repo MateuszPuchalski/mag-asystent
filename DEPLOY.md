@@ -1659,6 +1659,12 @@ zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
 w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
 (BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
 
+Od 0.135.0 w REJESTRACH jest karta OPINIE O SPRZEDAWCY. POBIERZ OPINIE
+ściąga je z Allegro; opinia z numerem zamówienia dopina się do sprawy tego
+zamówienia. Odpowiedź piszesz w panelu Allegro — tutaj oznaczasz stan.
+Pierwsze uruchomienie po aktualizacji przebuduje dwie tabele nakładki spraw,
+żeby przyjęły piąty rodzaj źródła. Dzieje się to samo i nic nie ginie.
+
 Od 0.134.0 zakładka ANALIZA ma piąty zakres: CZASY ODPOWIEDZI. Pokazuje
 medianę i p90 od głosu klienta do naszej odpowiedzi, osobno dla pytań
 i dyskusji, listę czekających w tej chwili oraz rozbiór per osoba. Dane

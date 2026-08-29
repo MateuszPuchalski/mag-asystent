@@ -100,7 +100,7 @@ function kanalDyskusji(id: number): KanalOdpowiedzi | null {
  * bo tyle wie każdy szczegół; źródło bez wiązania odpowiada za siebie samo.
  */
 export function kanalyOdpowiedzi(
-  rodzaj: "pytanie" | "zwrot" | "dyskusja" | "reklamacja",
+  rodzaj: "pytanie" | "zwrot" | "dyskusja" | "reklamacja" | "opinia",
   lokalnyId: number
 ): KanalyWSprawie {
   const d = db();

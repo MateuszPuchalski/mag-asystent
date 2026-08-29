@@ -23,7 +23,7 @@ import { db, nowIso } from "../db/db.js";
    SQL inline zamiast importu z sprawa.ts: tamten moduł pisze tutaj (SCAL,
    ROZKLEJ), więc odwrotny kierunek byłby cyklem.                            */
 
-export type RodzajZrodlaOsi = "pytanie" | "zwrot" | "dyskusja" | "reklamacja";
+export type RodzajZrodlaOsi = "pytanie" | "zwrot" | "dyskusja" | "reklamacja" | "opinia";
 
 /** Czyj to był ruch. Po tym panel koloruje wpis — login autora nie wystarcza,
     bo przy zdarzeniach z Allegro nie ma żadnego naszego konta. */

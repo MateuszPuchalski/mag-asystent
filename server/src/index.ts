@@ -27,6 +27,7 @@ import { pytaniaRoutes } from "./routes/pytania.js";
 import { dyskusjeRoutes } from "./routes/dyskusje.js";
 import { sprawyRoutes } from "./routes/sprawy.js";
 import { szablonyRoutes } from "./routes/szablony.js";
+import { opinieRoutes } from "./routes/opinie.js";
 import { kartonRoutes } from "./routes/karton.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
@@ -218,6 +219,7 @@ export async function buildApp() {
   await app.register(dyskusjeRoutes);
   await app.register(sprawyRoutes);
   await app.register(szablonyRoutes);
+  await app.register(opinieRoutes);
   await app.register(koszeRoutes);
   await app.register(kartonRoutes);
   await app.register(aktualizacjaRoutes);
