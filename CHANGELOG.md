@@ -33,6 +33,34 @@ historii nie przepisujemy.
 
 ---
 
+## 0.131.0 — 29 sierpnia 2026
+
+**Odpowiadasz z tego ekranu, na którym stoisz.** Etap D3 z mapy
+w `docs/architektura-spraw.md`: jedno pole odpowiedzi z wyborem kanału.
+
+**Zwrot dostał drogę do klienta.** Agent oceniający zwrot musiał dotąd
+zgadnąć, że klient czeka w dyskusji tej samej sprawy, i przejść na drugi
+ekran, żeby odpisać. Teraz pod oceną pozycji stoi blok ODPOWIEDZ W SPRAWIE
+z polem gotowym do pisania — sam zwrot kanałem nie jest, bo nie ma przez co
+napisać, ale sprawa zwykle ma dyskusję.
+
+**Gwiazdka pokazuje, gdzie klient odezwał się ostatni.** Polecenie liczy się
+z metadanych rozmów, więc nie kosztuje ani jednego zapytania do Allegro.
+Kanał, w którym ostatnie słowo należy do nas, nie wygrywa polecenia — piłka
+jest tam u klienta. Wybór zostaje przy człowieku: gwiazdka podpowiada, nie
+decyduje.
+
+**Ekran z własnym polem odpowiedzi nie dostaje drugiego.** Blok pokazuje
+wyłącznie kanały INNE niż ten, w którym stoi otwarty szczegół, i jest
+zwinięty do czasu kliknięcia. Dwa pola obok siebie byłyby pytaniem, w które
+z nich pisać.
+
+**Wysyłka idzie tą samą drogą co dotąd.** Odpowiedź z bloku wychodzi trasą
+rejestru — kontrola świeżości, znacznik prowadzącego i wpis na osi czasu
+działają identycznie jak przy własnym polu pytania czy dyskusji. Gdy w
+międzyczasie przyszła nowa wiadomość, blok mówi o tym i pozwala wysłać mimo
+to, dokładnie jak dotychczasowe pola.
+
 ## 0.130.0 — 29 sierpnia 2026
 
 **Sprawa pamięta, co się w niej działo.** Etap D2 z mapy

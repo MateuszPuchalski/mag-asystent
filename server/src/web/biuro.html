@@ -1532,6 +1532,13 @@
         <div id="zwrotZamowienie" style="margin-top:14px"></div>
         <div id="zwrotDokumenty" style="margin-top:14px"></div>
       </div>
+      <!-- ODPOWIEDŹ W SPRAWIE (0.131.0) — jedno pole, wybór kanału.
+           Sprawa bywa złożona z kilku obiektów Allegro, a odpowiedzieć da się
+           tylko przez wątek pytania albo dyskusję. Ten blok mówi, GDZIE
+           w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
+           ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
+           ten, w którym stoi otwarty szczegół. -->
+      <div class="dok-odpowiedzi" id="zwrotKanaly"></div>
     </section>
 
     <!-- KONTEKST zwrotu: do czego ten zwrot należy, co pisze klient, gdzie
@@ -1594,6 +1601,13 @@
         <div id="dyskusjaOsTresc"><p class="mute">Wczytuję…</p></div>
       </details>
       </div>
+      <!-- ODPOWIEDŹ W SPRAWIE (0.131.0) — jedno pole, wybór kanału.
+           Sprawa bywa złożona z kilku obiektów Allegro, a odpowiedzieć da się
+           tylko przez wątek pytania albo dyskusję. Ten blok mówi, GDZIE
+           w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
+           ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
+           ten, w którym stoi otwarty szczegół. -->
+      <div id="dyskusjaKanaly"></div>
       <div class="dok-odpowiedzi" id="dyskusjaOdpowiedzBlok">
         <div id="dyskusjaOdpowiedzGora">
           <h2>ODPOWIEDŹ</h2>
@@ -1666,6 +1680,13 @@
         <div id="pytanieRozmowa"></div>
       </div>
 
+      <!-- ODPOWIEDŹ W SPRAWIE (0.131.0) — jedno pole, wybór kanału.
+           Sprawa bywa złożona z kilku obiektów Allegro, a odpowiedzieć da się
+           tylko przez wątek pytania albo dyskusję. Ten blok mówi, GDZIE
+           w tej sprawie klient czeka, i pozwala tam napisać bez zmiany
+           ekranu. Pusty (i niewidoczny), gdy sprawa nie ma innego kanału niż
+           ten, w którym stoi otwarty szczegół. -->
+      <div id="pytanieKanaly"></div>
       <div class="dok-odpowiedzi">
         <!-- Etykieta, autorstwo szkicu i przeliczenie w jednej linii: to trzy
              rzeczy o TYM SAMYM tekście, a przeliczenie jest jedyną akcją,
@@ -5722,6 +5743,144 @@ async function wczytajOsCzasu(rodzaj, id, sekcja, cel) {
   }
 }
 
+
+/* ── Odpowiedź w sprawie: jedno pole, wybór kanału (0.131.0) ─────────────────
+   Etap D3. Sprawa bywa złożona z kilku obiektów Allegro, ale napisać do
+   klienta da się tylko przez wątek pytania albo dyskusję — zwrot i reklamacja
+   niosą mechanikę, nie rozmowę. Agent oceniający zwrot musiał dotąd zgadnąć,
+   że klient czeka w dyskusji, i przejść na drugi ekran, żeby odpisać.
+
+   Blok pokazuje WYŁĄCZNIE kanały INNE niż ten, w którym stoi otwarty
+   szczegół: dyskusja ma własne pole odpowiedzi i drugie obok byłoby pytaniem,
+   w które z nich pisać. Przy zwrocie własnego kanału nie ma, więc polecany
+   rozwija się od razu — to jest cały sens tej zmiany.
+
+   Wysyłka idzie TRASĄ REJESTRU, nie nową trasą sprawy: każdy kanał ma własną
+   kontrolę świeżości, własne zdarzenie w dzienniku i własny stempel. Kopia
+   tego w „trasie sprawy" byłaby drugą implementacją wysyłki do klienta. */
+const kanalyEkranu = { pytanie: null, zwrot: null, dyskusja: null };
+const kanalWybrany = { pytanie: null, zwrot: null, dyskusja: null };
+/* Wpisany tekst przeżywa przerysowanie bloku (zmiana kanału, alarm o nowej
+   wiadomości) — inaczej wybór drugiego kanału kasowałby napisaną odpowiedź. */
+const kanalTekst = { pytanie: "", zwrot: "", dyskusja: "" };
+
+const kluczKanalu = (k) => `${k.rodzaj}:${k.id}`;
+
+async function wczytajKanalySprawy(ekran, id) {
+  kanalyEkranu[ekran] = null;
+  kanalWybrany[ekran] = null;
+  kanalTekst[ekran] = "";
+  $(`${ekran}Kanaly`).innerHTML = "";
+  if (id == null) return;
+  try {
+    const d = await (await api(`/api/biuro/sprawy/kanaly?rodzaj=${ekran}&id=${id}`)).json();
+    /* Kanał tego ekranu wypada — o nim mówi jego własne pole odpowiedzi. */
+    const inne = (d.kanaly || []).filter((k) => !(k.rodzaj === ekran && k.id === id));
+    kanalyEkranu[ekran] = inne;
+    /* Ekran bez własnego pola (zwrot) otwiera polecany kanał od razu; tam,
+       gdzie pole już jest, drugie czeka na świadomy klik. */
+    if (ekran === "zwrot") {
+      const polecany = inne.find((k) => k.polecany) || inne[0];
+      if (polecany) kanalWybrany[ekran] = kluczKanalu(polecany);
+    }
+    rysujKanalySprawy(ekran);
+  } catch {
+    /* Brak kanałów nie jest awarią ekranu — zwrot bez dyskusji to norma. */
+    $(`${ekran}Kanaly`).innerHTML = "";
+  }
+}
+
+function rysujKanalySprawy(ekran) {
+  const cel = $(`${ekran}Kanaly`);
+  const kanaly = kanalyEkranu[ekran] || [];
+  if (!kanaly.length) { cel.innerHTML = ""; return; }
+  const pole = $(`${ekran}KanalTresc`);
+  if (pole) kanalTekst[ekran] = pole.value;
+  const wybrany = kanaly.find((k) => kluczKanalu(k) === kanalWybrany[ekran]) || null;
+
+  const opisKanalu = (k) => k.ostatniaAt
+    ? `${k.ostatniGlos === "my" ? "my ostatnio" : "klient pisał"} ${
+        esc(k.ostatniaAt.slice(0, 16).replace("T", " "))}`
+    : "bez metadanych rozmowy";
+  const przyciski = kanaly.map((k) => `<button class="akcja${
+      kluczKanalu(k) === kanalWybrany[ekran] ? "" : " cichy"}" data-kanal="${esc(kluczKanalu(k))}"
+      style="font-size:11px;padding:4px 9px">${esc(k.etykieta)}${
+      k.polecany ? " ★" : ""}</button>`).join(" ");
+
+  cel.innerHTML = `<div class="mute" style="margin-top:10px;display:flex;gap:8px;
+      align-items:center;flex-wrap:wrap">
+      <strong>ODPOWIEDZ W SPRAWIE</strong> ${przyciski}
+      <span>${esc(kanaly.map((k) => `${k.etykieta}: ${opisKanalu(k)}`).join(" · "))}</span>
+    </div>` + (wybrany ? `
+    <div id="${ekran}KanalAlarm"></div>
+    <textarea id="${ekran}KanalTresc" rows="5" style="width:100%;margin-top:8px"
+      placeholder="Odpowiedź przez ${esc(wybrany.etykieta)}…">${esc(kanalTekst[ekran])}</textarea>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+      <button class="akcja" data-kanal-wyslij>WYŚLIJ PRZEZ ALLEGRO</button>
+      <span class="mute">${esc(wybrany.etykieta)}${
+        wybrany.tytul ? ` · ${esc(wybrany.tytul)}` : ""}</span>
+    </div>` : "");
+}
+
+/* Gwiazdka przy kanale znaczy: TU klient odezwał się ostatni. Wybór zostaje
+   przy człowieku — polecenie jest podpowiedzią, nie decyzją. */
+function wybierzKanalSprawy(ekran, klucz) {
+  kanalWybrany[ekran] = kanalWybrany[ekran] === klucz ? null : klucz;
+  rysujKanalySprawy(ekran);
+}
+
+async function wyslijWKanaleSprawy(ekran, id, wymus) {
+  const kanaly = kanalyEkranu[ekran] || [];
+  const kanal = kanaly.find((k) => kluczKanalu(k) === kanalWybrany[ekran]);
+  if (!kanal) return;
+  const tresc = ($(`${ekran}KanalTresc`)?.value || "").trim();
+  if (!tresc) return toast("Odpowiedź jest pusta");
+  const zgoda = await potwierdz({
+    tytul: "WYSŁANIE ODPOWIEDZI DO KLIENTA",
+    opis: `Odpowiedź pójdzie do klienta przez ${kanal.etykieta} w imieniu firmy.`,
+    potwierdz: "WYŚLIJ",
+  });
+  if (!zgoda) return;
+  const url = kanal.rodzaj === "dyskusja"
+    ? `/api/biuro/dyskusje/${kanal.id}/wyslij`
+    : `/api/biuro/pytania/${kanal.id}/wyslij`;
+  try {
+    await api(url, { method: "POST", body: JSON.stringify({ odpowiedz: tresc, wymus: wymus === true }) });
+    toast(`Odpowiedź poszła przez ${kanal.etykieta} ✓`);
+    kanalTekst[ekran] = "";
+    await wczytajKanalySprawy(ekran, id);
+    await odswiezLicznikSpraw();
+  } catch (e) {
+    if (!e.dane?.noweWiadomosci) return toast(e.message);
+    /* Ta sama kontrola świeżości, co przy własnym polu każdego rejestru:
+       serwer widzi cudzy głos nowszy niż nasz punkt odniesienia. Rozmowy tu
+       nie pokazujemy — leży w swoim szczególe i tam czyta się ją na klik. */
+    kanalTekst[ekran] = tresc;
+    rysujKanalySprawy(ekran);
+    $(`${ekran}KanalAlarm`).innerHTML = `<div class="mute" style="margin-top:8px">
+      <span class="badge amber">NOWA WIADOMOŚĆ W SPRAWIE</span> ${esc(e.message)}
+      <button class="akcja" data-kanal-wymus style="margin-left:6px">WYŚLIJ MIMO TO</button></div>`;
+  }
+}
+
+/* Delegacja stoi na SEKCJACH szczegółów, nie na blokach kanałów: blok jest
+   przerysowywany przy każdej zmianie wyboru, więc nasłuch na nim ginąłby
+   razem z nim (ta sama reguła co przy kontekście zwrotu). */
+for (const [ekran, sekcja] of [["pytanie", "pytanieSzczegol"], ["zwrot", "zwrotSzczegol"],
+                               ["dyskusja", "dyskusjaSzczegol"]]) {
+  $(sekcja).addEventListener("click", (e) => {
+    const wybor = e.target.closest("[data-kanal]");
+    if (wybor) return wybierzKanalSprawy(ekran, wybor.dataset.kanal);
+    const otwarte = { pytanie: otwartePytanie, zwrot: otwartyZwrot, dyskusja: otwartaDyskusja };
+    if (e.target.closest("[data-kanal-wyslij]")) {
+      return wyslijWKanaleSprawy(ekran, otwarte[ekran], false);
+    }
+    if (e.target.closest("[data-kanal-wymus]")) {
+      return wyslijWKanaleSprawy(ekran, otwarte[ekran], true);
+    }
+  });
+}
+
 /* ── Zwroty Allegro ───────────────────────────────────────────────────────────
    Jedyna zakładka biura, która ZAPISUJE — jak import zbiórek: to praca biura
    (ocena towaru, dopasowanie dokumentu, stempel środków), nie operacja z hali,
@@ -6287,6 +6446,7 @@ function otworzDyskusje(id) {
   rysujZalacznikDyskusji();
   ustawRodzenstwoSpraw();
   odswiezSzczegolDyskusji(true);
+  wczytajKanalySprawy("dyskusja", id);
 }
 
 function zamknijDyskusje() {
@@ -7002,6 +7162,9 @@ function otworzZwrot(id) {
   zwrotIdPowiazan = null;
   ustawRodzenstwoSpraw();
   odswiezSzczegolZwrotu();
+  /* Kanały odpowiedzi sprawy (0.131.0): przy zwrocie to JEDYNA droga do
+     klienta bez zmiany ekranu, więc jedzie razem ze szczegółem. */
+  wczytajKanalySprawy("zwrot", id);
 }
 
 function zamknijZwrot() {
@@ -8426,6 +8589,7 @@ async function otworzPytanie(id) {
   ustawRodzenstwoSpraw();
   await odswiezSzczegolPytania();
   pokazRozmowe(id);
+  wczytajKanalySprawy("pytanie", id);
 }
 
 async function odswiezSzczegolPytania() {

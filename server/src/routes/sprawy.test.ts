@@ -33,7 +33,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", 
+  for (const t of ["watek_meta", "sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", 
     "dyskusja", "pytanie", "zwrot_pozycja", "zwrot",
     "events", "device_session", "app_user",
   ]) {
@@ -97,6 +97,7 @@ const TRASY = [
   "/api/biuro/sprawy/klienci?q=jan",
   "/api/biuro/sprawy/powiazane?rodzaj=zwrot&id=1",
   "/api/biuro/sprawy/os?rodzaj=zwrot&id=1",
+  "/api/biuro/sprawy/kanaly?rodzaj=zwrot&id=1",
 ];
 
 test("bez sesji 401, magazynier 403 — sprawy klientów prowadzi biuro", async () => {
@@ -509,4 +510,30 @@ test("praca w sprawie sama dopisuje się do osi czasu", async () => {
   });
   const typy = r.json().wpisy.map((w: { typ: string }) => w.typ);
   assert.deepEqual(typy, ["przejeto", "zamknieta"]);
+});
+
+test("kanały odpowiedzi: stojąc w zwrocie widać dyskusję tej samej sprawy", async () => {
+  const token = zalogowany("biuro");
+  const { zwrotId, dyskusjaId } = daneSpraw();
+  const naglowki = { "x-session": token };
+
+  const zly = await app.inject({
+    method: "GET", url: "/api/biuro/sprawy/kanaly?rodzaj=zwrot", headers: naglowki,
+  });
+  assert.equal(zly.statusCode, 400, "brak id to 400 ze zdaniem");
+
+  const r = await app.inject({
+    method: "GET", url: `/api/biuro/sprawy/kanaly?rodzaj=zwrot&id=${zwrotId}`, headers: naglowki,
+  });
+  assert.equal(r.statusCode, 200);
+  const d = r.json();
+  /* Zwrot i dyskusja z `daneSpraw` mają wspólne zamówienie, więc automat
+     trzyma je w jednej sprawie: stojąc przy zwrocie da się odpisać klientowi
+     bez zmiany ekranu. Sam zwrot kanałem NIE jest — nie ma przez co pisać. */
+  assert.deepEqual(
+    d.kanaly.map((k: { rodzaj: string; id: number }) => `${k.rodzaj}:${k.id}`),
+    [`dyskusja:${dyskusjaId}`]
+  );
+  assert.equal(d.kanaly[0].polecany, true, "jedyny kanał jest polecany z definicji");
+  assert.equal(typeof d.sprawaId, "number");
 });

@@ -15,6 +15,7 @@ import { BladZwrotu, stempelProwadziZwrotu } from "../services/zwroty.js";
 import { stempelProwadziReklamacji } from "../services/reklamacje.js";
 import { BladDyskusji, stempelProwadziDyskusji } from "../services/dyskusje.js";
 import { osCzasuSprawy } from "../services/os-sprawy.js";
+import { kanalyOdpowiedzi } from "../services/kanaly.js";
 import {
   BladSprawy,
   rozklejSprawe,
@@ -142,6 +143,27 @@ export async function sprawyRoutes(app: FastifyInstance) {
           .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
       }
       return osCzasuSprawy(rodzaj, id);
+    }
+  );
+
+  // ── Kanały odpowiedzi (0.131.0) ───────────────────────────────────────────
+
+  /* Gdzie w TEJ sprawie da się napisać do klienta i gdzie odezwał się on
+     ostatni. Odczyt jak cała rodzina spraw — wysyłką dalej zajmują się trasy
+     rejestrów, każda ze swoją kontrolą świeżości. */
+  app.get<{ Querystring: { rodzaj?: string; id?: string } }>(
+    "/api/biuro/sprawy/kanaly",
+    async (req, reply) => {
+      const nie = odmowa();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const rodzaj = rodzajZapytania(req.query.rodzaj);
+      const id = Number(req.query.id);
+      if (rodzaj === null || rodzaj === "blad" || !Number.isInteger(id) || id <= 0) {
+        return reply
+          .code(400)
+          .send({ error: `Podaj rodzaj (${RODZAJE_SPRAW.join(", ")}) i dodatnie id sprawy` });
+      }
+      return kanalyOdpowiedzi(rodzaj, id);
     }
   );
 
