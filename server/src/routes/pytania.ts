@@ -254,7 +254,7 @@ export async function pytaniaRoutes(app: FastifyInstance) {
   });
 
   /* Rozmowa czytana NA ŻĄDANIE, TREŚĆ nietrzymana u nas — jedno miejsce
-     prawdy w Allegro. Od 0.126.0 odczyt zostawia METADANE piłki (kto ostatni,
+     prawdy w Allegro. Od 0.127.0 odczyt zostawia METADANE piłki (kto ostatni,
      kiedy, ile) w `watek_meta` — cache tego, co człowiek właśnie widział;
      świadomy wyjątek od „zero zapisu przy patrzeniu", decyzja właściciela. */
   app.get<{ Params: { id: string } }>("/api/biuro/pytania/:id/wiadomosci", async (req, reply) => {

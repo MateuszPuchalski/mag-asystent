@@ -834,7 +834,7 @@ export class HttpAllegroAdapter implements AllegroAdapter {
   }
 
   async listaDyskusji(): Promise<DyskusjaAllegro[]> {
-    /* Do 0.126.0 czytaliśmy JEDNĄ stronę setki i rejestr nie widział nic
+    /* Do 0.127.0 czytaliśmy JEDNĄ stronę setki i rejestr nie widział nic
        ponad nią — konto z ponad setką spraw gubiło resztę po cichu. Pętla
        jak przy zwrotach: limit 10 stron to bezpiecznik, stop na krótszej
        stronie. Granicy dat nie ma, bo `/sale/issues` nie dokumentuje

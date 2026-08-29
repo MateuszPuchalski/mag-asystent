@@ -6,8 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
-/* ── Jednorazowe zdjęcie encji HTML (0.126.0) ────────────────────────────────
-   Do 0.126.0 adapter zapisywał teksty Allegro dosłownie, więc w bazach
+/* ── Jednorazowe zdjęcie encji HTML (0.127.0) ────────────────────────────────
+   Do 0.127.0 adapter zapisywał teksty Allegro dosłownie, więc w bazach
    produkcyjnych leżą `zwr&oacute;cić`. Migracja ma je zdekodować RAZ — i nie
    ruszyć niczego innego. Konstrukcja jak w migracja-kont.test.ts: bazę „sprzed"
    budujemy surowo (tu: dzisiejszym schematem, bo migracja goni DANE, nie

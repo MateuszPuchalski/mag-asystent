@@ -1,7 +1,7 @@
 import { db, nowIso } from "../db/db.js";
 import type { WiadomoscAllegro, WiadomoscDyskusji } from "../adapters/allegro.js";
 
-/* ── Metadane wątku — piłka bez treści (0.126.0) ─────────────────────────────
+/* ── Metadane wątku — piłka bez treści (0.127.0) ─────────────────────────────
    Fundament „kto ma piłkę" z docs/architektura-spraw.md: kto powiedział
    ostatnie słowo, kiedy i ile wiadomości padło. Treści NIE zapisujemy —
    listy wiadomości przelatują tędy tylko po to, żeby policzyć metadane.

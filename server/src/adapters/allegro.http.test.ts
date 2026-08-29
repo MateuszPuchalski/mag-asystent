@@ -662,7 +662,7 @@ test("oferta po id: link, cena i symbol z naszego magazynu (0.107.0)", () => {
   assert.equal(mapujOferte(null, false), null);
 });
 
-/* ── Encje HTML w polach ludzkich (0.126.0) ──────────────────────────────────
+/* ── Encje HTML w polach ludzkich (0.127.0) ──────────────────────────────────
    Allegro oddaje tematy i treści z encjami; dekodujemy przy wjeździe, ale
    TYLKO w polach czytanych przez człowieka. Id i URL-e muszą zostać sobą —
    `&amp;` w adresie załącznika po zdekodowaniu wskazywałby inny zasób.       */

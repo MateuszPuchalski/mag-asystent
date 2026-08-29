@@ -586,7 +586,7 @@ test("noweOdKlienta: świeża sprawa milczy, dopisek wraca od znanej wiadomości
   assert.equal(P.noweOdKlienta([w("a"), w("b")], "spoza-okna")!.length, 2);
 });
 
-/* ── Metadane wątku przy pytaniach (0.126.0) ─────────────────────────────────
+/* ── Metadane wątku przy pytaniach (0.127.0) ─────────────────────────────────
    Sync i tak czyta każdą rozmowę — metadane piłki (kto ostatni, kiedy, ile)
    zostają za darmo; wysyłka stempluje nasz głos bez ponownego GET-a.         */
 

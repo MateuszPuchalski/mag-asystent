@@ -611,12 +611,27 @@ private fun PanelPozycji(
 ) {
     val done = p.status == "done"
     val pominieta = p.status == "skipped"
+    /* Pole wpisywania adresu OTWIERANE NA ŻĄDANIE (0.126.0). Adres stoi
+       oczko wyżej w 28 sp, więc pole pokazywało go DRUGI raz i kosztowało
+       56 dp z panelu, który zajmował 81 % listy. Skan regału jest tu drogą
+       podstawową; klawiatura wchodzi przy zniszczonej etykiecie.
+
+       Trzy powody, dla których otwiera się samo — każdy znaczy „to nie jest
+       już powtórzenie tego, co wyżej":
+         • towar BEZ adresu w kartotece: bez pola nie ma czym odłożyć,
+         • adres różny od pickingowego: ktoś dotknął innej półki albo wpisał,
+         • człowiek poprosił wprost. */
+    var recznie by remember(p.id) { mutableStateOf(false) }
+    val brakAdresu = p.lokOczekiwana.isNullOrBlank()
+    val pokazPole = recznie || brakAdresu || (adres.isNotBlank() && adres != p.lokOczekiwana)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        /* 6 dp zamiast 8: przy jedenastu blokach same odstępy dawały 80 dp,
+           czyli tyle co dwa przyciski. Panel dalej oddycha, tylko ciaśniej. */
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             when {
@@ -629,13 +644,34 @@ private fun PanelPozycji(
             letterSpacing = 1.2.sp,
             color = InkSoft,
         )
-        Text(
-            p.lokOczekiwana ?: "BEZ ADRESU",
-            fontFamily = BarlowCond,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 28.sp,
-            color = if (p.lokOczekiwana == null) AmberInk else Ink,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                p.lokOczekiwana ?: "BEZ ADRESU",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 28.sp,
+                color = if (p.lokOczekiwana == null) AmberInk else Ink,
+            )
+            /* Wejście do klawiatury stoi PRZY adresie, który ma zastąpić —
+               tam pada pytanie „a jeśli etykieta jest zdarta". Znika, gdy pole
+               i tak jest otwarte, żeby nie zapraszać drugi raz do tego samego. */
+            if (!pokazPole) {
+                Text(
+                    "wpisz ręcznie",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = InkSoft,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { recznie = true }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+            }
+        }
         /* POZOSTAŁE PÓŁKI TEGO TOWARU (0.118.0). Kartoteka trzyma kilka adresów,
            a kolektor pokazywał tu wyłącznie pierwszy — pickingowy. Przy zwrocie
            to za mało: wraca jedna sztuka i najtaniej dołożyć ją tam, gdzie ten
@@ -643,9 +679,11 @@ private fun PanelPozycji(
            końcu hali. Do tej wersji trzeba było po to wyjść z kosza do karty
            towaru — czyli zgubić wskazaną pozycję.
 
-           Pastylka WPISUJE adres w pole niżej, nie odkłada. Odłożenie zostaje
-           przy skanie regału i przycisku: dotknięcie jednego z kilku adresów
-           obok siebie w rękawicy jest zbyt tanie na czynność nieodwracalną. */
+           Pastylka WPISUJE adres, nie odkłada. Odłożenie zostaje przy skanie
+           regału i przycisku: dotknięcie jednego z kilku adresów obok siebie
+           w rękawicy jest zbyt tanie na czynność nieodwracalną. Od 0.126.0
+           dotknięcie OTWIERA schowane pole z wpisanym kodem — adres różny od
+           pickingowego przestaje być powtórzeniem tego, co stoi wyżej. */
         val innePolki = p.lokalizacje.filter { it != p.lokOczekiwana }
         if (innePolki.isNotEmpty()) {
             Text(
@@ -672,13 +710,9 @@ private fun PanelPozycji(
            w miarę rozkładania. Poznajemy go po ROLI z serwera, nie po kodzie —
            kod jest napisem z konfiguracji klienta i porównywanie go tutaj
            byłoby magicznym łańcuchem psującym się przy zmianie w Subiekcie. */
-        Text(
-            "STANY MAGAZYNOWE",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.2.sp,
-            color = InkSoft,
-        )
+        /* Nagłówka „STANY MAGAZYNOWE" nie ma od 0.126.0: kafelek niesie liczbę
+           I kod magazynu, więc podpisuje się sam. Nagłówek „LEŻY TAKŻE NA"
+           zostaje — bez niego chipy półek myliłyby się z adresem docelowym. */
         if (p.stany.isEmpty()) {
             Text("brak stanu w magazynach", fontSize = 13.sp, color = InkMute)
         } else {
@@ -697,13 +731,15 @@ private fun PanelPozycji(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        WertisTextField(
-            value = adres,
-            onValueChange = onAdres,
-            placeholder = "np. A01-02-03",
-            leadingIcon = WIcons.Scan,
-            onDone = onOdloz,
-        )
+        if (pokazPole) {
+            WertisTextField(
+                value = adres,
+                onValueChange = onAdres,
+                placeholder = "np. A01-02-03",
+                leadingIcon = WIcons.Scan,
+                onDone = onOdloz,
+            )
+        }
         PrimaryButton(
             if (done) "POPRAW — ODŁÓŻ TUTAJ" else "ODŁÓŻ TUTAJ",
             enabled = adres.isNotBlank(),
@@ -720,8 +756,19 @@ private fun PanelPozycji(
                 onClick = onCofnij,
             )
         } else {
-            OutlineButton("PÓŹNIEJ — NA KONIEC LISTY", modifier = Modifier.fillMaxWidth(), onClick = onPozniej)
-            OutlineButton("POMIŃ — NIE MA CZEGO ODŁOŻYĆ", modifier = Modifier.fillMaxWidth(), onClick = onPomin)
+            /* Dwa wyjścia awaryjne W JEDNYM RZĘDZIE (0.126.0). Pełna szerokość
+               należy się czynności głównej, a te dwie są odpowiedzią na kłopot:
+               „później" zostawia pracę w koszu, „pomiń" oddaje ją biuru.
+               Znaczenia dalej rozdziela osobny przycisk, nie jedno menu —
+               zmienia się szerokość, nie wybór. Wyjaśnienia z napisów schodzą,
+               bo powtarzały to, co przycisk i tak robi. */
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlineButton("PÓŹNIEJ", modifier = Modifier.weight(1f), onClick = onPozniej)
+                OutlineButton("POMIŃ", modifier = Modifier.weight(1f), onClick = onPomin)
+            }
         }
     }
 }

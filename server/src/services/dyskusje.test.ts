@@ -313,7 +313,7 @@ test("wysyłka dyskusji na nieświeżą rozmowę odmawia; wymus i brak punktu od
   assert.ok(bez.wyslanoAt, "brak id z panelu nie blokuje wysyłki");
 });
 
-/* ── Nieznane statusy Allegro (0.126.0) ──────────────────────────────────────
+/* ── Nieznane statusy Allegro (0.127.0) ──────────────────────────────────────
    Lista statusów końcowych jest [WERYFIKUJ] — mechanizmem weryfikacji jest
    zliczanie wartości spoza znanych list i pokazanie ich biuru. Funkcja jest
    czysta, więc dziwny status fabrykujemy listą, nie adapterem.               */
@@ -342,7 +342,7 @@ test("sync niesie nieznane statusy w stanie i loguje je raz na wartość", async
   assert.equal(zdarzen.n, 0, "bez nieznanych wartości dziennik milczy");
 });
 
-/* ── Metadane wątku przy dyskusjach (0.126.0) ────────────────────────────────
+/* ── Metadane wątku przy dyskusjach (0.127.0) ────────────────────────────────
    Odczyt na klik i wysyłka zostawiają w `watek_meta` piłkę bez treści;
    świeżość wysyłki ma odtąd punkt odniesienia po stronie serwera, więc panel
    bez id nie wyłącza już kontroli.                                           */

@@ -1019,7 +1019,7 @@ CREATE INDEX IF NOT EXISTS ix_dyskusja_kupujacy ON dyskusja(kupujacy_login);
 -- numerze zamówienia — bez indeksu szłoby to pełnym skanem przy każdym sync.
 CREATE INDEX IF NOT EXISTS ix_dyskusja_order ON dyskusja(order_id);
 
--- ── Metadane wątku — piłka bez treści (0.126.0) ─────────────────────────────
+-- ── Metadane wątku — piłka bez treści (0.127.0) ─────────────────────────────
 -- Fundament pod „kto ma piłkę" z docs/architektura-spraw.md. Decyzja
 -- właściciela: piłkę liczą METADANE — kto powiedział ostatnie słowo, kiedy
 -- i ile wiadomości padło. Treść rozmów dalej czyta się na klik i NIE zapisuje

@@ -126,7 +126,7 @@ poprzedniego na produkcji.
 
 - **A (0.125.0, wykonany):** nawigacja boczna zamiast górnego paska; SPRAWY
   rozprężone na trzy widoki; konsole na pełne `100dvh`.
-- **B (0.126.0, wykonany) — uszczelnienie wjazdu:** paginacja `/sale/issues`
+- **B (0.127.0, wykonany) — uszczelnienie wjazdu:** paginacja `/sale/issues`
   (do 1000 spraw); `watek_meta` dla dyskusji i pytań ze świeżością wysyłki
   po stronie serwera; dekodowanie encji HTML w adapterze i jednorazowe
   przeliczenie bazy. Statusy końcowe: mechanizm weryfikacji wszedł (nieznane

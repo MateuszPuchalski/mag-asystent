@@ -416,7 +416,7 @@ export function zapiszNotatkeDyskusji(id: number, notatka: string, autor: string
 
 /**
  * Rozmowa sprawy — na klik, TREŚĆ bez zapisu; `null` = niedostępna przez API.
- * Od 0.126.0 odczyt zostawia metadane piłki w `watek_meta` (kto ostatni,
+ * Od 0.127.0 odczyt zostawia metadane piłki w `watek_meta` (kto ostatni,
  * kiedy, ile) — cache tego, co człowiek właśnie widział; świadomy wyjątek od
  * „zero zapisu przy patrzeniu", decyzja właściciela. Dzięki niemu kontrola
  * świeżości wysyłki ma punkt odniesienia po stronie serwera, nie tylko id
@@ -544,7 +544,7 @@ export async function wyslijOdpowiedzDyskusji(
   /* KONTROLA ŚWIEŻOŚCI jak przy pytaniach (services/pytania.ts): jedno
      zapytanie NA WYSYŁKĘ, degradacja przy awarii pobrania, „wyślij mimo to"
      jest świadomą decyzją człowieka. Punktem odniesienia jest id z panelu,
-     a od 0.126.0 w odwodzie `watek_meta` — serwer pamięta ostatnią widzianą
+     a od 0.127.0 w odwodzie `watek_meta` — serwer pamięta ostatnią widzianą
      wiadomość KLIENTA z odczytu/sync, więc panel bez id nie wyłącza już
      kontroli. Brak obu punktów = brak kontroli (pierwszy kontakt w sprawie,
      degradacja z 0.104.0 zostaje). */

@@ -250,9 +250,9 @@ function migrate(database: DatabaseSync) {
 }
 
 /**
- * Jednorazowe zdjęcie encji HTML z zastanych wierszy (0.126.0).
+ * Jednorazowe zdjęcie encji HTML z zastanych wierszy (0.127.0).
  *
- * Do 0.126.0 adapter zapisywał teksty Allegro dosłownie, więc w bazie leżą
+ * Do 0.127.0 adapter zapisywał teksty Allegro dosłownie, więc w bazie leżą
  * `zwr&oacute;cić` — a panel escape'uje przy renderowaniu, więc encja szła
  * na ekran. Nowe dane dekoduje adapter; tu doganiamy stare. Wzorzec
  * `dosypIdKupujacego`: idempotentnie (po dekodzie encji nie ma), w try/catch,
