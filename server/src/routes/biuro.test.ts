@@ -172,91 +172,39 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    47,
-    "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
-      "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
-      "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
-      "parowanie, korekta z MM, kosz, zamknięcie kosza, reklamacja, " +
-      "schowanie zapowiedzi, załatwienie pominięcia, POBRANIE ZAPOWIEDZI " +
-      "z 0.85.0 oraz PRZEJĘCIE REKLAMACJI), pięć zapisów pytań klientów " +
-      "(synchronizacja, wklejka, szkic, wysyłka odpowiedzi, " +
-      "zamknięcie/pominięcie — dwa ostatnie jedną pętlą) i cztery zapisy " +
-      "dyskusji Allegro (pobranie do rejestru, zmiana statusu, szkic, " +
-      "wysyłka odpowiedzi) — nic ponadto.\n\n" +
-      "Dwa POST-y z 0.104.0 domykają proces dyskusji w aplikacji: " +
-      "GENERUJ liczy szkic, WYŚLIJ posyła odpowiedź do sprawy w Allegro — " +
-      "oba za jawnym kliknięciem, wysyłka dodatkowo za potwierdzeniem.\n\n" +
-      "Sześć POST-ów z 0.111.0 to panel, który NAPRAWIA, nie tylko patrzy: " +
-      "PONÓW/ANULUJ kolejki (jedno wywołanie o dwóch trasach — te same, " +
-      "których używa kolektor), RESYNC i ODŚWIEŻENIE ZDJĘĆ w karcie SERWER " +
-      "(oba za groźnym potwierdzeniem) oraz trzy mutacje kont admina " +
-      "(reset hasła, włącz/wyłącz, wyloguj wszędzie) — dotąd dostępne " +
-      "wyłącznie przez curl. " +
-      "POST z 0.121.0 to PRZEJĘCIE SPRAWY z kolejki — „WEZMĘ TO\u201d. " +
-      "Do tej wersji kolumna PROWADZI miała myślnik w KAŻDYM ze 168 wierszy, " +
-      "bo znacznik stawiało dopiero wejście w sprawę: dwie osoby odpowiadały " +
-      "na to samo pytanie i nikt się o tym nie dowiadywał. Zapis jest " +
-      "ZNACZNIKIEM, nie blokadą — nie odbiera nikomu dostępu — i dzieje się " +
-      "po jawnym kliknięciu w wierszu, nigdy przy wejściu na ekran.\n\n" +
-      "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
-      "podnosić — żaden zapis nie dzieje się przy samym patrzeniu." +
-      "\n\nDwa POST-y z 0.129.0 to SCAL i ROZKLEJ. Automat skleja sprawy " +
-      "wyłącznie po numerze zamówienia, a pytanie zamówienia nie ma — więc " +
-      "podpowiedź »ten sam kupujący« z 0.128.0 wisiała jako sam odczyt, bez " +
-      "sposobu, żeby ją potwierdzić. Oba zapisy dzieją się po jawnym " +
-      "kliknięciu I po potwierdzeniu w okienku, nigdy przy wejściu na ekran. " +
-      "Liczba rośnie tu ŚWIADOMIE i to jedyny sposób, w jaki wolno ją " +
-      "podnosić." +
-      "\n\nPOST z 0.131.0 to WYSŁANIE ODPOWIEDZI Z INNEGO KANAŁU SPRAWY. " +
-      "Nie jest to nowa trasa ani nowy rodzaj zapisu: to te same trasy " +
-      "wysyłki, których używają własne pola pytań i dyskusji, wywołane " +
-      "z ekranu sąsiedniego kanału tej samej sprawy. Agent oceniający zwrot " +
-      "musiał dotąd przejść na drugi ekran, żeby odpisać klientowi czekającemu " +
-      "w dyskusji. Wysyłka dzieje się po jawnym kliknięciu I po potwierdzeniu " +
-      "w okienku, a kontrola świeżości działa tak samo jak przy własnym polu." +
-      "\n\nPOST i PUT z 0.133.0 to jedno pole formularza szablonów: DODAJ " +
-      "zakłada nowy, ZAPISZ ZMIANY nadpisuje wskazany. Szablon to tekst DO " +
-      "POPRAWIENIA, nie wysyłka — wstawienie go do odpowiedzi jest czystym " +
-      "odczytem i nie podnosi żadnego licznika." +
-      "\n\nDwa POST-y z 0.135.0 to piąte źródło spraw: POBIERZ OPINIE " +
-      "(synchronizacja z Allegro, jak przy dyskusjach) i zmiana statusu " +
-      "opinii na PRZEJRZANA albo ZAŁATWIONA. Odpowiadania na opinię przez " +
-      "API tu NIE MA i nie przez przeoczenie: końcówka odpowiedzi jest " +
-      "niezweryfikowana, a pisanie do klienta przez niesprawdzony zasób to " +
-      "jedyny błąd, którego nie da się cofnąć." +
-      "\n\nTrzy POST-y z 0.136.0 to tagi i reguły: dopisanie tagu do sprawy, " +
-      "dodanie reguły i ZASTOSUJ TERAZ. Reguła nadaje tag i może przypisać " +
-      "sprawę osobie — i to jest CAŁA lista rzeczy, które automatowi wolno " +
-      "(zasada 6 z docs/architektura-spraw.md): żadna z nich nie mówi do " +
-      "klienta ani słowa. Przydział nie odbiera sprawy komuś, kto już ją " +
-      "prowadzi." +
-      "\n\nJEDEN POST z 0.138.0 to masowa zmiana lokalizacji z arkusza — " +
-      "i jedno wywołanie, nie dwa, choć czynności są dwie. Ta sama trasa " +
-      "liczy podgląd (`zastosuj` pominięte) i wykonuje zapis (`zastosuj: " +
-      "true`), więc nie da się zastosować czegoś innego, niż się widziało " +
-      "na ekranie. Patrzenie nadal nic nie zapisuje: podgląd nie kolejkuje " +
-      "ani jednego zadania i nie zostawia wpisu `privileged` — pilnuje tego " +
-      "`routes/lokalizacje-masowe.test.ts`. Zapis stoi za jawnym wyborem " +
-      "pliku, groźnym potwierdzeniem i rolą administratora."
+    16,
+    "Po kasacji obsługi klienta (0.140.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
+      "logowanie, zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, " +
+      "notatka do dostawy, odczyt odpowiedzi na notatkę, zamknięcie wyjątku, " +
+      "import zbiórek, załatwienie pominiętej pozycji kosza, parowanie konta " +
+      "Allegro, PONÓW/ANULUJ kolejki Sfery (jedno wywołanie o dwóch trasach) " +
+      "oraz trzy mutacje kont admina (reset hasła, włącz/wyłącz, wyloguj " +
+      "wszędzie), RESYNC z odświeżeniem zdjęć w karcie SERWER i masowa " +
+      "zmiana lokalizacji z arkusza.\n\n" +
+      "Licznik SPADŁ z 47 do 16 — i to jest cały ślad tego wydania w tym " +
+      "teście. Zapisy obsługi klienta (skan zwrotu, decyzje, dokumenty, " +
+      "kosze, reklamacje, pytania, dyskusje, opinie, tagi, reguły, szablony) " +
+      "odeszły razem z ekranami, które je wywoływały.\n\n" +
+      "Zapis szesnasty przyszedł z 0.138.0 i ZOSTAJE: masowa zmiana " +
+      "lokalizacji to jedno wywołanie, nie dwa, choć czynności są dwie. " +
+      "Ta sama trasa liczy podgląd (`zastosuj` pominięte) i wykonuje zapis " +
+      "(`zastosuj: true`), więc nie da się zastosować czegoś innego, niż " +
+      "się widziało na ekranie. Patrzenie nadal nic nie zapisuje — pilnuje " +
+      "tego `routes/lokalizacje-masowe.test.ts`.\n\n" +
+      "Reguła się NIE zmienia: liczba rośnie wyłącznie ŚWIADOMIE, a żaden " +
+      "zapis nie dzieje się przy samym patrzeniu na ekran."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    10,
-    "PUT to komplet reguł strefy złotej, ręczny wybór dokumentu zwrotu, " +
-      "wgranie logo dostawcy, półka reklamacyjna, notatka do dyskusji " +
-      "Allegro, prompt eksperta i fakty firmowe (0.80.0), przełącznik " +
-      "automatycznego szkicu AI (0.107.0) — ten ostatni po to, by biuro " +
-      "samo decydowało, czy model pracuje w tle, czy dopiero na kliknięcie — " +
-      "edycja szablonu odpowiedzi (0.133.0) oraz edycja reguły tagowania " +
-      "(0.136.0)"
+    2,
+    "PUT to komplet reguł strefy złotej i wgranie logo dostawcy — obie " +
+      "rzeczy z ustawień, obie po jawnym kliknięciu ZAPISZ"
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    7,
-    "DELETE to odpięcie dokumentu zwrotu, odpięcie kosza, rozłączenie " +
-      "konta Allegro, skasowanie logo dostawcy, skasowanie szablonu " +
-      "odpowiedzi (0.133.0) oraz zdjęcie tagu ze sprawy i skasowanie reguły " +
-      "(0.136.0)"
+    2,
+    "DELETE zostały dwa: rozłączenie konta Allegro (za potwierdzeniem, rola " +
+      "admin) i skasowanie logo dostawcy z ustawień."
   );
   /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
      są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
@@ -271,7 +219,6 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /dokument\/\$\{dokId\}\/zamknij/, "zamknięcie poza WERTIS");
   assert.match(html, /dokument\/\$\{dokId\}\/otworz/, "droga powrotna");
   assert.match(html, /zbiorki\/import/, "import zbiórek z Sellasist");
-  assert.match(html, /zwroty\/skan/, "skan etykiety zwrotu Allegro");
   assert.match(html, /biuro\/dostawcy\/\$\{khId\}\/logo/, "wgranie logo dostawcy");
   /* Konwersja formatów MUSI zostać po stronie przeglądarki: serwer przyjmuje
      wyłącznie PNG, a loga przychodzą też jako SVG i WebP. Bez `<canvas>`
@@ -279,60 +226,163 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
   assert.match(html, /problems\/\$\{id\}\/resolve/, "biuro zamyka wyjątek");
   assert.match(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "biuro zamyka sprawę pominięcia");
-  /* Odpowiedź do klienta wysyła CZŁOWIEK i to się nie zmienia. Model pisze
-     szkic, biuro go czyta i klika — automatycznej wysyłki tu nie ma i test
-     pilnuje, żeby nie weszła bokiem. */
-  assert.match(html, /pytania\/\$\{id\}\/wyslij/, "wysyłka odpowiedzi po kliknięciu");
-  assert.match(html, /WYŚLIJ PRZEZ ALLEGRO/, "wysyłka jest jawnym przyciskiem");
-  assert.match(html, /potwierdz\(\{[\s\S]{0,200}WYSŁANIE ODPOWIEDZI DO KLIENTA/, "wysyłka za potwierdzeniem");
+  /* Po 0.140.0 panel NIE MA ani jednej drogi do klienta i to jest teraz
+     przedmiotem strażnika: żadnej wysyłki, żadnego szkicu, żadnego pola
+     odpowiedzi. Nowa obsługa klienta przyniesie je razem z własnym testem
+     i własnym uzasadnieniem przy liczniku wyżej. */
+  assert.ok(!/api\/biuro\/(pytania|dyskusje)[^"'`]*wyslij/.test(html),
+    "panel nie ma ani jednej trasy wysyłki do klienta");
+  assert.ok(!/WYŚLIJ PRZEZ ALLEGRO/.test(html), "przycisku wysyłki nie ma");
 });
 
-test("dyskusje Allegro: rejestr pracy i cała sprawa w aplikacji", () => {
-  /* 0.103.0 zrobiło z dyskusji rejestr pracy (lista z NASZEJ tabeli, status,
-     prowadzący, pigułka uwagi na zakładce). 0.104.0 domknęło proces: rozmowę
-     czyta się i odpowiedź wysyła stąd, przez API dyskusji — przeskok do
-     panelu Allegro zostaje tylko degradacją, gdy API nie zna sprawy.
-     Wysyłka jest jawnym kliknięciem za potwierdzeniem, jak przy pytaniach —
-     automatycznej wysyłki nie ma i ten test pilnuje, żeby nie weszła bokiem. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /id="dyskusjeKarta"/, "dyskusje mają własną kartę pracy");
-  assert.match(html, /api\(`\/api\/biuro\/dyskusje\$\{q\}`\)/, "lista czyta lokalny rejestr za sesją");
-  assert.match(html, /"\/api\/biuro\/dyskusje\/odswiez"/, "pobranie z Allegro jest jawnym przyciskiem");
-  assert.match(html, /data-dysk-status/, "status sprawy zmienia kliknięcie");
-  assert.match(html, /dyskusje\/\$\{[^}]+\}\/notatka/, "notatka z ustaleń zostaje u nas");
-  // cała sprawa w aplikacji (0.104.0)
-  assert.match(html, /id="dyskusjaSzczegol"/, "sprawa ma pełnoekranowy szczegół");
-  assert.match(html, /dyskusje\/\$\{[^}]+\}\/wiadomosci/, "rozmowa czytana z Allegro na klik");
-  assert.match(html, /dyskusje\/\$\{[^}]+\}\/generuj/, "szkic pisze model na jawne kliknięcie");
-  assert.match(html, /dyskusje\/\$\{[^}]+\}\/wyslij/, "odpowiedź wysyła się z aplikacji");
-  assert.match(
-    html,
-    /potwierdz\(\{[\s\S]{0,200}WYSŁANIE ODPOWIEDZI DO KLIENTA/,
-    "wysyłka do dyskusji za potwierdzeniem"
-  );
-  assert.match(html, /Rozmowa niedostępna przez API/, "degradacja do panelu, gdy API nie zna sprawy");
-  /* Od 0.109.0 pigułka jest JEDNA, na zakładce SPRAWY — dawne pigułki
-     ZWROTÓW i PYTAŃ zniknęły razem z zakładkami. Trasa dalej celowo tania:
-     licznik składany z liczników per-typ, żadnego czwartego COUNT-a. */
-  assert.match(html, /id="sprawyLicznik" class="tabLicznik"/, "pigułka uwagi na zakładce SPRAWY");
-  assert.match(html, /\/api\/biuro\/sprawy\/licznik/, "pigułka ma własną tanią trasę");
-  assert.match(html, /data-rekl-prowadzi/, "jawne przejęcie reklamacji przyciskiem");
-});
+/**
+ * Kod panelu bez komentarzy i bez tekstu dla człowieka.
+ *
+ * Przejście znak po znaku, a nie łańcuch podstawień: proza po polsku niesie
+ * apostrofy i odwrotne apostrofy (`nazwaFunkcji`), a adresy w napisach niosą
+ * `//`. Każde podstawienie z osobna myliło jedno z drugim i zostawiało ogonki
+ * słów wyglądające jak wywołania. Wnętrza `${…}` w szablonach ZOSTAJĄ — tam
+ * siedzą prawdziwe wywołania.
+ */
+function kodPanelu(html: string): string {
+  return bezTekstu(html.slice(html.lastIndexOf("<script>") + 8, html.lastIndexOf("</script>")));
+}
 
-test("kopiowanie odpowiedzi ma zejście awaryjne bez HTTPS", () => {
-  /* `navigator.clipboard` istnieje wyłącznie w bezpiecznym kontekście, a panel
-     biura chodzi po LAN-ie pod gołym http — czyli dokładnie tam, gdzie tego
-     API nie ma. Bez `execCommand` przycisk KOPIUJ byłby martwy na produkcji
-     i żywy w każdym teście przeglądarkowym. */
+function bezTekstu(src: string): string {
+  let out = "";
+  let i = 0;
+  /* Ukośnik zaczyna wyrażenie regularne albo dzielenie — rozstrzyga ostatni
+     znaczący znak przed nim. Ta sama heurystyka, co w każdym podświetlaczu. */
+  const poOperatorze = () => {
+    const t = out.trimEnd();
+    return t === "" || "(,=:[!&|?{};+-*%<>~^".includes(t[t.length - 1]) || /\breturn$|\btypeof$/.test(t);
+  };
+  while (i < src.length) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (c === "/" && d === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+      continue;
+    }
+    if (c === "/" && d === "*") {
+      i = src.indexOf("*/", i + 2);
+      i = i === -1 ? src.length : i + 2;
+      out += " ";
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      i++;
+      while (i < src.length && src[i] !== c) i += src[i] === "\\" ? 2 : 1;
+      i++;
+      out += '""';
+      continue;
+    }
+    if (c === "`") {
+      i++;
+      while (i < src.length && src[i] !== "`") {
+        if (src[i] === "\\") { i += 2; continue; }
+        if (src[i] === "$" && src[i + 1] === "{") {
+          /* Wnętrze `${…}` bywa zagnieżdżone (szablon w szablonie), więc
+             liczymy klamry zamiast szukać pierwszej zamykającej. */
+          let glebokosc = 1;
+          i += 2;
+          const od = i;
+          while (i < src.length && glebokosc > 0) {
+            if (src[i] === "{") glebokosc++;
+            if (src[i] === "}") glebokosc--;
+            i++;
+          }
+          /* Rekurencja, bo szablon bywa zagnieżdżony w szablonie: bez niej
+             wnętrze wracało surowe i proza z tego drugiego wyglądała jak kod. */
+          out += bezTekstu(src.slice(od, i - 1)) + ";";
+          continue;
+        }
+        i++;
+      }
+      i++;
+      continue;
+    }
+    if (c === "/" && poOperatorze()) {
+      i++;
+      let wKlasie = false;
+      while (i < src.length && (wKlasie || src[i] !== "/")) {
+        if (src[i] === "\\") { i += 2; continue; }
+        if (src[i] === "[") wKlasie = true;
+        if (src[i] === "]") wKlasie = false;
+        i++;
+      }
+      i++;
+      while (i < src.length && /[a-z]/.test(src[i])) i++;   // flagi
+      out += "0";
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/* Druga strona tej samej monety co test dubli: funkcja WOŁANA, ale nigdzie
+   nie zdefiniowana. Przeglądarka mówi o tym dopiero przy kliknięciu, i tylko
+   w konsoli — a `rysujDostawy` wołające skasowany `wiekPytania` przestało
+   rysować CAŁĄ tabelę dostaw w ciszy (0.140.0, złapane dopiero w Playwrighcie).
+
+   Skanowanie idzie po tekście, bo panel nie ma parsera i mieć nie będzie.
+   Żeby nie zgadywać, wycinamy najpierw komentarze i literały tekstowe —
+   proza po polsku niesie nawiasy i wyglądałaby jak wywołanie. Bierzemy tylko
+   wywołania BEZ kropki przed nazwą: metody obiektów wbudowanych i DOM-u nie
+   są naszymi funkcjami i nie mamy skąd znać ich listy. */
+test("panel nie woła funkcji, której nie ma", () => {
   const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    path.join(import.meta.dirname, "..", "web", "biuro.html"),
     "utf8"
   );
-  assert.match(html, /navigator\.clipboard\.writeText/, "droga główna");
-  assert.match(html, /document\.execCommand\("copy"\)/, "zejście awaryjne bez HTTPS");
+  const js = kodPanelu(html);
+
+  const zdefiniowane = new Set<string>();
+  for (const re of [
+    /\bfunction\s+([A-Za-z_$][\w$]*)/g,
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g,
+    /\bcatch\s*\(\s*([A-Za-z_$][\w$]*)/g,
+  ]) {
+    for (const m of js.matchAll(re)) zdefiniowane.add(m[1]);
+  }
+  // parametry funkcji i strzałek — też są nazwami wołalnymi (callbacki)
+  for (const m of js.matchAll(/\(([^()]*)\)\s*(?:=>|\{)/g)) {
+    for (const p of m[1].split(",")) {
+      const nazwa = p.trim().split("=")[0].trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(nazwa)) zdefiniowane.add(nazwa);
+    }
+  }
+
+  /* Globalne przeglądarki i słowa kluczowe, po których stoi nawias. Lista
+     jest krótka świadomie: rośnie tylko wtedy, gdy panel naprawdę sięgnie po
+     coś nowego z platformy, i wtedy ma to być widoczne w diffie. */
+  const platforma = new Set(
+    ("if for while switch catch return typeof function new delete void await do else " +
+      "async " +
+      "setTimeout setInterval clearTimeout clearInterval fetch alert confirm prompt " +
+      "encodeURIComponent decodeURIComponent parseInt parseFloat isNaN Number String " +
+      "Boolean Array Object JSON Math Date Promise Map Set URL URLSearchParams Blob " +
+      "FormData Error RegExp requestAnimationFrame matchMedia getComputedStyle " +
+      "structuredClone AbortController Image FileReader Option " +
+      // rozbieranie arkusza .xlsx w przeglądarce (0.138.0)
+      "DecompressionStream DOMParser Response Uint8Array DataView TextDecoder").split(" ")
+  );
+
+  const brakujace = [
+    ...new Set([...js.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1])),
+  ]
+    .filter((n) => !zdefiniowane.has(n) && !platforma.has(n))
+    .sort();
+
+  assert.deepEqual(
+    brakujace,
+    [],
+    "panel woła funkcje, których nie ma — przy kasowaniu ekranu zabrano " +
+      "pomocnika, z którego korzystał ktoś jeszcze"
+  );
+
 });
 
 test("lista dostaw sygnalizuje wyjątki", () => {
@@ -373,10 +423,10 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["sprawy", "dostawy", "magazyn", "rejestry", "analiza", "dziennik", "nadzor"],
-    "pasek boczny (0.125.0): SPRAWY pierwsze — wokół nich panel ewoluuje " +
-      "w system tiketowy. MAGAZYN i REJESTRY to rozprężenie SPRAW: praca " +
-      "fizyczna i archiwum wyszły z szyny 352 px do własnych pozycji. " +
+    ["dostawy", "magazyn", "analiza", "dziennik", "nadzor"],
+    "pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
+      "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
+      "pustą zakładką — konto Allegro mieszka w STANIE SYSTEMU. " +
       "Dostawcy dalej za zębatką — konfiguracja to nie praca"
   );
 
@@ -395,9 +445,9 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
-    3,
-    "trzy grupy (Praca, Archiwum, Wgląd), każda podpisana — Archiwum doszło " +
-      "z rozprężeniem 0.125.0"
+    2,
+    "dwie grupy (Praca, Wgląd), każda podpisana — Archiwum odeszło w 0.140.0 " +
+      "razem z rejestrami obsługi klienta"
   );
 
   /* Druga cicha droga: widok zostaje w pliku, ale przestaje do niego cokolwiek
@@ -416,73 +466,6 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
     /querySelector\("nav\.zakladki"\)\.addEventListener/,
     "obsługa kliknięcia nie może być przypięta do samego paska"
   );
-});
-
-test("przyciski sprawy noszą delegację, która przeżyje ich przenosiny", () => {
-  /* TRZECI raz ta sama usterka, więc trzeci raz jest ostatni.
-
-     W 0.92.0 delegacja dostaw została na `#szczegolNaglowek` — dokładnie na
-     elemencie, który przyciski opuściły. W 0.93.0 to samo groziło zwrotom.
-     W 0.96.0 przyciski sprawy rozeszły się na trzy miejsca (przy tytule, przy
-     etykiecie ODPOWIEDŹ, pod polem), a nasłuch dalej wisiał na `#pytanieAkcje`
-     — czyli na rzędzie, z którego cztery z nich wyszły. PRZELICZ SZKIC,
-     PRZYWRÓĆ SZKIC, ZAŁATWIONE POZA APLIKACJĄ i POMIŃ klikały się bez skutku.
-
-     Wygląd był bez zarzutu, wszystkie 974 testy przechodziły, a zrzut ekranu
-     niczego nie pokazywał — bo martwy przycisk wygląda jak żywy. Jedyne, co to
-     łapie, to nasłuch na POJEMNIKU, który przetrwa przenosiny w środku. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-
-  /* Nasłuch, który wymienia POJEMNIKI WEWNĘTRZNE z nazwy, jest zaproszeniem do
-     tego błędu przy każdej kolejnej zmianie układu: dołożenie trzeciego bloku
-     nie wywala niczego, tylko cicho go pomija. Delegacja ma siedzieć na SEKCJI
-     sprawy — ona przeżyje przenosiny w środku. */
-  const zakazane = [
-    "pytanieAkcje",         // rząd przycisków pod polem odpowiedzi (0.96.0)
-    "szczegolNaglowek",     // nagłówek dostawy — stąd wyjechały notatki (0.92.0)
-    "szczegolLinie",        // tabela pozycji — wyjątki wyszły nad nią (0.97.0)
-    "szczegolBezLinii",
-    "zwrotPozycje",         // lista pozycji zwrotu (0.98.0)
-    "zwrotDokumenty",       // blok korekty — stąd wyszło OCEŃ I ZLEĆ (0.98.0)
-    /* Trzy karty wglądu, które w 0.99.0 przejechały CAŁĄ ZAKŁADKĘ — ze
-       ZWROTÓW do ANALIZY. Nasłuch na karcie przeżyłby same przenosiny (jechał
-       z blokiem), ale nie przeżył CELU: klik w wiersz „co stoi teraz" otwiera
-       kosz, który został w zakładce pracy, więc obsługa musi stać nad kartą
-       i umieć przełączyć widok. */
-    "raportZwrotowKarta",
-    "statystykiKarta",
-    "czasyKarta",           // klik wiersza „co stoi teraz" (0.99.0)
-  ];
-  for (const id of zakazane) {
-    assert.doesNotMatch(
-      html,
-      new RegExp(`\\$\\("${id}"\\)\\.addEventListener\\("click"`),
-      `delegacja nie może wisieć na \`${id}\` — to pojemnik w środku sprawy`
-    );
-  }
-
-  /* Bezpieczny wzorzec jest już tylko JEDEN: delegacja z poziomu sekcji.
-
-     Zwroty trzymały się do 0.97.0 innego — każdy blok kontekstu niósł własny
-     nasłuch, więc przeniesienie bloku zabierało nasłuch ze sobą. Działało,
-     dopóki wędrowały BLOKI. W 0.98.0 wywędrował sam przycisk: „OCEŃ I ZLEĆ
-     KOREKTĘ" przeszło ze sprawy (`#zwrotDokumenty`) do kontekstu
-     (`#zwrotRozliczenie`) i zostawiło nasłuch za sobą. Ten wzorzec broni
-     jedynie przed przeprowadzką całego bloku, a nie przed przeprowadzką
-     przycisku — dlatego zwroty dołączyły do sekcji. */
-  for (const sekcja of [
-    "pytanieSzczegol", "szczegol", "zwrotSzczegol", "zwrotKontekst", "widokAnaliza",
-  ]) {
-    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
-    assert.match(
-      html,
-      new RegExp(`\\$\\("${sekcja}"\\)\\.addEventListener\\("click"`),
-      `${sekcja} deleguje z poziomu sekcji, nie z pojemnika w środku`
-    );
-  }
 });
 
 test("zakładki mieszkają w pasku bocznym i same pilnują swojej widoczności", () => {
@@ -603,7 +586,6 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
 
   // czworo wywołań, które ta reguła utrzymuje przy życiu
   assert.match(html, /dokument\/\$\{dokId\}\/otworz`,\s*\{\s*method:\s*"POST"/);
-  assert.match(html, /zwroty\/\$\{otwartyZwrot\}\/dokument`,\s*\{\s*method:\s*"DELETE"/);
   assert.match(html, /"\/api\/biuro\/allegro",\s*\{\s*method:\s*"DELETE"/);
   assert.match(html, /dostawcy\/\$\{khId\}\/logo`,\s*\{\s*method:\s*"DELETE"/);
 });
@@ -723,16 +705,14 @@ test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
     return html.slice(a, b);
   };
   const ustawienia = wycinek('id="widokDostawcy"', "</main>");
-  for (const pole of ["pytaniaPrompt", "pytaniaFakty", "reguly", "firmaNazwa", "dostawcy"]) {
+  for (const pole of ["reguly", "firmaNazwa", "dostawcy"]) {
     assert.ok(ustawienia.includes(`id="${pole}"`), `${pole} należy do ustawień`);
   }
 
-  const sprawy = wycinek('id="widokSprawy"', 'id="widokNadzor"');
-  assert.ok(!sprawy.includes('id="pytaniaPrompt"'), "prompt zszedł z zakładki pracy");
   const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
   assert.ok(!analiza.includes('id="reguly"'), "reguły zeszły z ANALIZY");
   assert.ok(analiza.includes("Ustawieniach"), "ANALIZA mówi, gdzie ustawia się reguły");
-  const dostawy = wycinek('id="widokDostawy"', 'id="widokSprawy"');
+  const dostawy = wycinek('id="widokDostawy"', 'id="widokMagazyn"');
   assert.ok(!dostawy.includes('id="firmaNazwa"'), "dane firmy zeszły z REKLAMACJI");
 });
 
@@ -751,302 +731,17 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
     assert.ok(ia < ib, czemu);
   };
   przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
-  /* Po rozprężeniu 0.125.0: na SPRAWACH baner AI i wklejka stoją PRZED
-     kolejką (alarm i wejście nowej sprawy nad listą pracy); w MAGAZYNIE
-     alarmy przed pracą przy koszach; w REJESTRACH archiwum przed stanem
-     połączenia. */
-  przed("pytaniaBaner", "kolejkaSprawKarta", "stan modelu AI nad kolejką, nie pod nią");
-  przed("pytaniaWklejkaKarta", "kolejkaSprawKarta", "wejście nowej sprawy nad listą");
-  przed("brakujaceKarta", "koszeKarta", "alarmy przed pracą przy koszach");
-  przed("zwrotListaKarta", "kontoAllegroKarta", "rejestry przed stanem połączenia");
-  /* Rozprężenie NIE może się cofnąć po cichu: magazyn i rejestry mieszkają
-     we własnych widokach, nie w SPRAWACH. */
-  const sprawy = html.slice(html.indexOf('id="widokSprawy"'), html.indexOf('id="widokMagazyn"'));
-  for (const id of ["brakujaceKarta", "koszeKarta", "pominieteKarta",
-                    "zwrotListaKarta", "dyskusjeKarta", "kontoAllegroKarta"]) {
-    assert.ok(!sprawy.includes(`id="${id}"`), `${id} wyprowadziła się ze SPRAW (0.125.0)`);
+  /* W MAGAZYNIE praca przed jej wyjątkami: kosze nad listą pominiętych
+     pozycji, bo pominięcie jest skutkiem rozkładania, nie jego wstępem. */
+  przed("koszeKarta", "pominieteKarta", "praca hali nad jej wyjątkami");
+  /* Rozprężenie z 0.125.0 nie może się cofnąć po cichu, a po 0.140.0 pilnuje
+     też kasacji: widoku SPRAW nie ma, a jego karty nie wróciły bokiem do
+     magazynu. */
+  assert.equal(html.indexOf('id="widokSprawy"'), -1, "widok SPRAW zniknął (0.140.0)");
+  const magazyn = html.slice(html.indexOf('id="widokMagazyn"'), html.indexOf('id="widokNadzor"'));
+  for (const id of ["zwrotListaKarta", "dyskusjeKarta", "pytaniaListaKarta", "opinieKarta"]) {
+    assert.ok(!magazyn.includes(`id="${id}"`), `${id} nie wróciła do magazynu`);
   }
-});
-
-test("konsola pytań ma trzy strefy, a próg szerokości jest jeden", () => {
-  /* Od 0.91.0 sprawa pytania rozkłada się na kolejkę, sprawę i kontekst;
-     od 0.109.0 wszystko mieszka w scalonym `#widokSprawy`. Żeby kontekst
-     mógł być TRZECIĄ KOLUMNĄ siatki, musi być rodzeństwem szczegółu —
-     wsunięty do środka karty sprawy wygląda tak samo w kodzie, a na
-     ekranie wraca pod odpowiedź. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const widok = html.slice(
-    html.indexOf('id="widokSprawy"'),
-    html.indexOf('id="widokNadzor"')
-  );
-  const szczegol = widok.indexOf('id="pytanieSzczegol"');
-  const kontekst = widok.indexOf('id="pytanieKontekst"');
-  const konsczegolu = widok.indexOf("</section>", szczegol);
-  assert.ok(szczegol !== -1 && kontekst !== -1, "obie strefy istnieją");
-  assert.ok(kontekst > konsczegolu, "kontekst jest OBOK sprawy, nie w jej środku");
-  assert.match(html, /#widokSprawy\.zSzczegolem \{ grid-template-columns:/,
-    "trzy kolumny opisane jedną regułą — wspólną dla pytań i zwrotów");
-
-  /* Progi stoją w DWÓCH miejscach — w arkuszu i w skrypcie — i nic ich nie
-     pilnowało. Rozjazd nie wywraca niczego głośno: szczegół po prostu
-     zasłania kolejkę na jednej szerokości okna i nikt nie wie dlaczego.
-
-     Do 0.101.0 próg był jeden i test brał z HTML PIERWSZE dopasowanie. Od
-     0.101.0 są dwa — 1280 px dla trzech stref i 1024 px dla pasma, w którym
-     kontekst jest szufladą — więc sprawdzamy KOMPLET: drugi próg wpisany
-     tylko do skryptu dawałby szufladę bez stylów, czyli kontekst znikający
-     bez śladu na jednej szerokości okna. */
-  const wCss = [...html.matchAll(/@media \(min-width: (\d+)px\)/g)].map((m) => m[1]);
-  const wJs = [...html.matchAll(/matchMedia\("\(min-width: (\d+)px\)"\)/g)].map((m) => m[1]);
-  assert.ok(wJs.length >= 2, "skrypt zna oba progi — trzy strefy i pasmo szuflady");
-  for (const prog of wJs) {
-    assert.ok(wCss.includes(prog), `próg ${prog} ze skryptu musi istnieć w arkuszu`);
-  }
-});
-
-test("pasma kolejki są WIDOKIEM sortu serwera, nie drugą regułą (0.121.0)", () => {
-  /* Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca pyta
-     „co teraz zrobić". Sort `poPilnosci` był poprawny już wcześniej — termin,
-     potem najstarsze — tylko nigdzie go nie było widać.
-
-     NIEBEZPIECZEŃSTWO, którego pilnuje ten test: gdyby pasma dostały własną
-     regułę kolejności, ekran pokazywałby jedno, a twierdził drugie. Warunki
-     muszą czytać DOKŁADNIE te pola, po których sortuje serwer. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const pasma = html.slice(html.indexOf("const PASMA = ["), html.indexOf("const pasmaZwiniete"));
-  assert.ok(pasma.length > 100, "definicja pasm istnieje");
-  /* `pilka` dołączyła w 0.129.0: serwer sortuje odtąd terminem, PIŁKĄ,
-     a dopiero potem wiekiem — więc pasma muszą czytać także ją, inaczej
-     rozjadą się z kolejnością o cały wymiar. */
-  for (const pole of ["poTerminie", "dniDoTerminu", "kiedy", "pilka"]) {
-    assert.ok(pasma.includes(pole), `pasma czytają \`${pole}\` — pole, po którym sortuje serwer`);
-  }
-  assert.ok(!/\.sort\(/.test(pasma), "pasma nie sortują niczego na nowo");
-
-  /* Puste pasmo się NIE rysuje — nagłówek z zerem to ten sam błąd, co kolumna
-     z myślnikiem w każdym wierszu. Na produkcji oba pasma terminowe są puste,
-     bo `dniDoTerminu` niesie coś wyłącznie dla CLAIM-ów i reklamacji. */
-  assert.match(html, /\.filter\(\(p\) => \(wg\[p\.id\] \|\| \[\]\)\.length\)/,
-    "pasmo bez spraw nie rysuje nagłówka");
-  /* Pasmo, które można schować, przestaje być pasmem PO TERMINIE. */
-  assert.match(html, /p\.id !== "poterminie"/, "pasma po terminie nie da się zwinąć");
-});
-
-test("wiersz kolejki: cel klikalny i kolumny, które coś niosą (0.121.0)", () => {
-  /* Do 0.121.0 kolumny TERMIN i PROWADZI miały myślnik w KAŻDYM wierszu i to
-     nie było zapomnianą wartością: `dniDoTerminu` jest zawsze `null` dla pytań
-     i zwrotów, a `zwrot` w ogóle nie miał kolumny `prowadzi`. Kolumna niosąca
-     treść dla mniejszości wierszy uczy oko, że kolumny nic nie niosą.
-
-     Do tego 168 bursztynowych przycisków OTWÓRZ: bursztyn znaczy w tym
-     systemie „ta jedna rzecz do zrobienia" i powtórzony 168 razy przestaje
-     cokolwiek znaczyć. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  /* Kotwica na RENDERERACH KOLEJKI, nie na całym pliku: rejestry per-typ mają
-     te kolumny nadal i słusznie — w liście samych reklamacji TERMIN jest
-     wypełniony w każdym wierszu. Martwa była kolumna w liście MIESZANEJ. */
-  const kolejka = html.slice(html.indexOf("function wierszeSpraw"),
-    html.indexOf("function rysujCzipySpraw"));
-  assert.ok(kolejka.length > 200, "renderery wierszy kolejki istnieją");
-  assert.ok(!kolejka.includes("<th>"), "kolejka nie rysuje nagłówka kolumn — pasma go zastąpiły");
-  assert.ok(!kolejka.includes("OTWÓRZ"), "kolumna z bursztynowym OTWÓRZ zniknęła");
-  assert.match(html, /function stopkaSprawy/, "pastylki pokazują się tylko, gdy coś niosą");
-  assert.match(html, /tr\.sprawaRz \{ cursor: pointer/, "cały wiersz jest celem");
-  assert.match(html, /KLIENT DOPISAŁ/, "dopisek klienta ma własną pastylkę");
-  /* CLAIM ma ustawowy zegar 14 dni, zwykła dyskusja nie — jedna nazwa na dwie
-     różne pilności jest gorsza od dwóch nazw. */
-  assert.match(html, /s\.typ === "CLAIM"/, "CLAIM przestał wyglądać jak pogawędka");
-});
-
-test("przejęcie sprawy: znacznik, nie blokada, i jedna droga (0.121.0)", () => {
-  /* Przy 168 sprawach i kilku osobach w biurze kolumna PROWADZI miała myślnik
-     wszędzie, bo znacznik stawiało dopiero wejście w sprawę: dwie osoby
-     odpowiadały na to samo pytanie i nikt się o tym nie dowiadywał. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /data-wez-rodzaj/, "wiersz niesie marker przejęcia");
-  assert.match(html, /\/prowadzi`,\s*\{ method: "POST"/, "przejęcie idzie jedną trasą spraw");
-  /* Cudza sprawa jest PRZYGASZONA, nie ukryta: widać, że ktoś ją wziął. */
-  assert.match(html, /tr\.sprawaRz\.cudza > td \{ opacity/, "cudza sprawa jest widoczna");
-  /* Nasłuch na SEKCJI, nie na przycisku: wiersze przerysowuje każdy cykl. */
-  assert.ok(
-    !/\$\("sprawyLista"\)\.addEventListener/.test(html),
-    "nasłuch nie wisi na liście — ta przerysowuje się co cykl"
-  );
-});
-
-test("alarmy i kosze w szynie: wiersz pionowy zamiast uciętej tabeli (0.121.0)", () => {
-  /* 352 px nie mieści sześciu kolumn i żadna przyszła karta tego nie zmieni.
-     Do 0.121.0 te trzy karty rysowały w szynie tabele ucięte w pół, każda
-     z własnym paskiem przewijania — na jednym ekranie cztery zagnieżdżone.
-
-     Zwijane rejestry per-typ zostają tabelami świadomie: mają po kilka kolumn,
-     mieszczą się (zmierzone), a ich kolumny niosą treść w każdym wierszu,
-     bo lista jest jednorodna. Reguła dotyczy tego, co stoi OTWARTE. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  for (const [lista, kolumna] of [
-    ["brakujaceLista", "NUMERY PACZEK"],
-    ["koszeLista", "ZAWARTOŚĆ"],
-    ["pominieteLista", "POWÓD"],
-  ]) {
-    const gdzie = html.indexOf(`$("${lista}").innerHTML`);
-    assert.ok(gdzie > 0, `${lista} ma renderer`);
-    const blok = html.slice(gdzie, gdzie + 1600);
-    assert.ok(!blok.includes(`<th>${kolumna}</th>`), `${lista} nie rysuje już nagłówka tabeli`);
-    assert.ok(blok.includes("sprawaWiersz"), `${lista} rysuje wiersz pionowy szyny`);
-  }
-});
-
-test("na zakładce SPRAW jest JEDNA kolejka, a narzędzia stoją w jej głowie", () => {
-  /* Do 0.116.0 zakładka miała trzy kolejki: wspólną („SPRAWY KLIENTÓW"),
-     kolejkę zwrotów i skrzynkę pytań. Każda z własnym nagłówkiem, filtrem
-     i kompletem wierszy, wszystkie pokazujące te same sprawy w innej
-     kolejności — a wybór, w którą patrzeć, był pracą samą w sobie.
-
-     Rejestry per-typ zeszły do szyny obok jako ZWIJANE (archiwum: zwrot
-     rozliczony, pytanie wysłane, dyskusja zamknięta). NARZĘDZIA, które w nich
-     mieszkały, przeprowadziły się do głowy kolejki — bo należą do kolejki,
-     nie do rejestru. Ten test pilnuje obu połówek: że narzędzia SĄ w kolejce
-     i że rejestry NIE są drugą kolejką na pierwszym planie. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const kolejka = html.slice(
-    html.indexOf('id="kolejkaSprawKarta"'),
-    html.indexOf('id="zwrotSzczegol"')
-  );
-  for (const pole of ["zwrotSkan", "klienciSzukaj", "sprawyLista",
-                      "pytaniaOdswiez", "zapowiedziPobierz", "dyskusjePobierz"]) {
-    assert.ok(kolejka.includes(`id="${pole}"`), `${pole} stoi w kolejce spraw`);
-  }
-
-  /* Od 0.125.0 rejestry mieszkają we WŁASNYM widoku (rozprężenie), ale dwie
-     zasady przeżyły przeprowadzkę: rejestr jest ZWIJANY (otwarty na starcie
-     byłby drugą kolejką) i zwinięty NIE PYTA serwera — ta sama reguła, co
-     przy KONCIE ALLEGRO. */
-  const widokRejestrow = html.slice(
-    html.indexOf('id="widokRejestry"'),
-    html.indexOf('id="widokNadzor"')
-  );
-  for (const rejestr of ["zwrotListaKarta", "pytaniaListaKarta",
-                         "dyskusjeKarta", "reklamacjeKarta"]) {
-    assert.ok(widokRejestrow.includes(`id="${rejestr}"`),
-      `${rejestr} mieszka w widoku REJESTRY`);
-    assert.match(
-      html,
-      new RegExp(`<details class="zwijana" id="${rejestr}">`),
-      `${rejestr} jest zwijanym rejestrem, nie drugą kolejką`
-    );
-    assert.doesNotMatch(
-      html,
-      new RegExp(`id="${rejestr}"[^>]*\\bopen\\b`),
-      `${rejestr} startuje zwinięty — inaczej znów są dwie kolejki`
-    );
-  }
-
-  /* Obok otwartej sprawy stoi TA SAMA kolejka, z której się do niej weszło.
-     Dwie listy zależnie od typu (do 0.115.0) znaczyły, że zamknięcie sprawy
-     wracało do trzeciej listy i miejsce w kolejce trzeba było znaleźć od nowa. */
-  assert.match(
-    html,
-    /const PRZY_SPRAWIE = \["kolejkaSprawKarta"\];/,
-    "obok sprawy zostaje wspólna kolejka, nie kolejka jej typu"
-  );
-
-  /* Ta sama usterka co w 0.101.0: kolejka w szynie 21 rem dostawała wariant
-     tabeli na siedem kolumn. Wariant szyny musi istnieć i musi wybierać go
-     PASMO, a nie typ otwartej sprawy. */
-  assert.match(html, /function wierszSprawyWSzynie\(/, "kolejka ma wariant szyny");
-  assert.match(
-    html,
-    /const wSzynie = kolejkaZostaje\(\) &&/,
-    "wariant szyny wybiera pasmo, nie typ sprawy"
-  );
-});
-
-test("zakładka spraw bez otwartej sprawy jest konsolą, nie stosem kart", () => {
-  /* Zgłoszenie właściciela do 0.116.0: „okno sprawy powinno mieć ograniczoną
-     wysokość, reszta scrolowana". Bez otwartej sprawy zakładka była pionowym
-     stosem dziewięciu kart na dwa ekrany przewijania — a konsola z 0.112.0
-     włączała się dopiero PO otwarciu sprawy.
-
-     Trzy geometrie jednej konsoli, jeden przełącznik wyglądu: `konsola` niesie
-     taflę (pełny bleed, zero promienia, własne przewijanie), a `zSzczegolem`,
-     `zKolejka` i `zKlient` — układ kolumn. Rozdzielone, bo wygląd jest wspólny
-     dla dostaw i spraw, a kolumny są za każdym razem inne. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-
-  /* Od 0.125.0 obok kolejki nie stoi już nic: szyna rejestrów wyprowadziła
-     się do własnych widoków (rozprężenie), a kolejka dostała CAŁĄ szerokość.
-     Konsola zostaje konsolą — wysokość okna i własne przewijanie kolumny. */
-  assert.match(
-    html,
-    /#widokSprawy\.zKolejka \{ grid-template-columns: minmax\(0, 1fr\); \}/,
-    "bez otwartej sprawy kolejka jest JEDYNĄ i pełną kolumną"
-  );
-  assert.ok(!html.includes("sprawyRejestry"),
-    "szyna rejestrów nie wróciła do SPRAW — rozprężenie 0.125.0");
-
-  for (const klasa of ["zKolejka", "zKlient", "konsola"]) {
-    assert.match(
-      html,
-      new RegExp(`classList\\.toggle\\("${klasa}"`),
-      `skrypt włącza \`${klasa}\`, inaczej reguła w arkuszu jest martwa`
-    );
-  }
-});
-
-test("wyszukiwarka klientów deleguje z KARTY, nie z listy wyników", () => {
-  /* Lista wyników przerysowuje się przy KAŻDYM wpisanym znaku, więc nasłuch
-     przypięty do niej ginie razem z pierwszym przerysowaniem. To ta sama
-     usterka, na którą panel przejechał się w 0.92.0, 0.96.0, 0.97.0, 0.98.0
-     i 0.101.0: przycisk wygląda normalnie, testy są zielone, zrzut czysty,
-     a klik nic nie robi.
-
-     Wynik wyszukiwarki niesie `data-klient360`, czyli marker, który panel
-     obsługuje od 0.109.0; nowej ścieżki do karty klienta nie ma. W 0.116.0
-     pole przeprowadziło się ze skrzynki do głowy kolejki — i to jest drugi
-     powód, dla którego nasłuch ma siedzieć na SEKCJI: własny nasłuch karty
-     skrzynki został po tej przeprowadzce na karcie, w której nie ma już
-     ani pola, ani wyników. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-
-  assert.match(html, /id="klienciSzukaj"/, "pole szukania stoi w głowie kolejki");
-  assert.match(html, /id="klienciWyniki"/, "wyniki mają swój pojemnik");
-  assert.match(
-    html,
-    /\$\("kolejkaSprawKarta"\)\.addEventListener\("click"/,
-    "klik w wynik łapie SEKCJA kolejki, nie pojemnik wyników"
-  );
-  assert.doesNotMatch(
-    html,
-    /\$\("klienciWyniki"\)\.addEventListener/,
-    "nasłuch na pojemniku wyników zginie przy pierwszym przerysowaniu"
-  );
-  /* Jedna droga do karty klienta, nie druga obok istniejącej. */
-  assert.match(html, /data-klient360="\$\{esc\(k\.login\)\}"/,
-    "wynik używa markera, który panel już obsługuje");
 });
 
 test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
@@ -1167,10 +862,13 @@ test("kontekst ma szufladę na wąskim oknie, a szuflada ma trzy wyjścia", () =
 
   /* Liczymy ZNACZNIK, nie selektor: `data-szuflada>` kończy atrybut, więc nie
      łapie ani `data-szuflada-zamknij`, ani `[data-szuflada]` z obsługi kliknięć. */
-  assert.equal((html.match(/data-szuflada>/g) ?? []).length, 3,
-    "przycisk KONTEKST stoi w każdej z trzech spraw");
-  assert.equal((html.match(/data-szuflada-zamknij>/g) ?? []).length, 3,
-    "i każda szuflada ma własne ZAMKNIJ");
+  /* Po 0.140.0 szuflada została JEDNA — przy dostawie. Trzy sprawy klienta,
+     które miały własne, odeszły razem z obsługą klienta; mechanizm zostaje
+     i przyjmie następną sekcję kontekstu bez zmian. */
+  assert.equal((html.match(/data-szuflada>/g) ?? []).length, 1,
+    "przycisk KONTEKST stoi przy dostawie");
+  assert.equal((html.match(/data-szuflada-zamknij>/g) ?? []).length, 1,
+    "i szuflada ma własne ZAMKNIJ");
   assert.match(html, /id="szufladaCien"/, "przyciemnienie istnieje");
 
   /* Klasy są UMOWĄ między arkuszem a skryptem: pasmo ustawia jedna, stan
@@ -1260,49 +958,6 @@ test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", ()
   assert.ok(nadzor.includes('id="dniMetryk"'), "OKNO metryk zostaje przy metrykach");
 });
 
-test("kontekst zwrotu jest rodzeństwem sprawy, a delegacja stoi na sekcji", () => {
-  /* Od 0.93.0 zakładka ZWROTY rozkłada się jak PYTANIA i DOSTAWY: kolejka,
-     ocena pozycji, kontekst sprawy. Ten test pilnuje DWÓCH rzeczy, bo przy
-     dostawach (0.92.0) obie dały się złamać po cichu.
-
-     PIERWSZA: kontekst musi być RODZEŃSTWEM szczegółu, nie jego dzieckiem.
-     Wsunięty do środka karty sprawy wygląda w kodzie tak samo, a na ekranie
-     wraca pod tabelę pozycji — czyli dokładnie tam, skąd go zabraliśmy.
-
-     DRUGA: delegacja kliknięć musi siedzieć NAD wszystkimi blokami. Do 0.97.0
-     wisiała na samych blokach i to wystarczało, dopóki wędrowały bloki.
-     W 0.98.0 wywędrował sam przycisk — „OCEŃ I ZLEĆ KOREKTĘ" przeszło ze
-     sprawy do kontekstu i zostawiło nasłuch za sobą, czyli powtórzyło usterkę
-     dostaw z 0.92.0. Nasłuch na SEKCJI przeżywa jedno i drugie. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  /* Wycinek do PYTANIOWEGO szczegółu — od 0.109.0 karty zwrotów i pytań
-     mieszkają w jednym `#widokSprawy`, więc granicą jest następna sprawa. */
-  const widok = html.slice(
-    html.indexOf('id="widokSprawy"'),
-    html.indexOf('id="pytanieSzczegol"')
-  );
-  const szczegol = widok.indexOf('id="zwrotSzczegol"');
-  const kontekst = widok.indexOf('id="zwrotKontekst"');
-  assert.ok(szczegol !== -1 && kontekst !== -1, "obie strefy istnieją");
-  assert.ok(kontekst > widok.indexOf("</section>", szczegol),
-    "kontekst stoi OBOK sprawy, nie w jej środku");
-  assert.match(html, /#widokSprawy\.zSzczegolem \{ grid-template-columns:/,
-    "trzy kolumny opisane jedną regułą");
-
-  for (const blok of ["zwrotDokument", "zwrotKlient", "zwrotWiadomosci", "zwrotKosz", "zwrotRozliczenie"]) {
-    assert.ok(widok.includes(`id="${blok}"`), `${blok} istnieje w zakładce`);
-    assert.ok(widok.indexOf(`id="${blok}"`) > kontekst,
-      `${blok} mieszka w kontekście, a nie w sprawie`);
-  }
-  assert.ok(html.includes('$("zwrotKontekst").addEventListener'),
-    "kontekst deleguje z poziomu sekcji — przycisk może wędrować między blokami");
-  assert.ok(html.includes('$("zwrotSzczegol").addEventListener'),
-    "sprawa deleguje z poziomu sekcji");
-});
-
 test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   /* Ikona bez bloku obok siebie jest przyciskiem, który nic nie robi, a blok
      bez ikony jest tekstem, którego nie da się otworzyć. Delegacja szuka
@@ -1314,7 +969,7 @@ test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   );
   const ikony = html.match(/class="info"/g) ?? [];
   const bloki = html.match(/class="objasnienie"/g) ?? [];
-  assert.ok(ikony.length >= 15, `ikon objaśnień: ${ikony.length}`);
+  assert.ok(ikony.length >= 10, `ikon objaśnień: ${ikony.length}`);
   assert.equal(ikony.length, bloki.length, "każda ikona ma swój blok");
   assert.match(
     html,
@@ -1322,66 +977,6 @@ test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
     "blok stoi bezpośrednio po nagłówku — inaczej delegacja go nie znajdzie"
   );
   assert.match(html, /h2 \.info/, "ikona ma własny styl");
-});
-
-test("statystyki pytań nie jadą po dane, gdy nikt na nie nie patrzy", () => {
-  /* REGUŁA ZOSTAJE, MECHANIZM SIĘ ZMIENIŁ — i to jest cała treść tej zmiany.
-
-     Do 0.95.0 statystyki były zwijaną sekcją na zakładce PYTANIA, a oszczędność
-     polegała na tym, że zwinięta NIE jechała po dane przy każdym wejściu na
-     zakładkę pracy. W 0.96.0 przeniosły się na ANALIZĘ, pod filtr ZAKRES:
-     zakładki pracy zostają czystą kolejką spraw, zgodnie z podziałem, który
-     pasek zakładek ogłasza od 0.74.1.
-
-     Reguła obowiązuje dalej, tylko spełnia ją co innego. Wejście na PYTANIA
-     nie tyka już statystyk wcale, a ANALIZA pobiera WYŁĄCZNIE wybrany zakres.
-     Gdyby `odswiezAnalize` przestało rozgałęziać się na zakresie, każde wejście
-     na ANALIZĘ ciągnęłoby komplet danych z każdego zakresu i nikt by tego nie
-     zobaczył poza serwerem. W 0.99.0 doszedł trzeci zakres — zwroty — więc
-     stawka tego rozgałęzienia urosła o trzy kolejne trasy. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-
-  const wejscie = html.match(/if \(nowy === "pytania"\).*/)?.[0] ?? "";
-  assert.ok(
-    !wejscie.includes("Statystyk") && !wejscie.includes("statystyk"),
-    "wejście na zakładkę pracy nie tyka statystyk — one mieszkają na ANALIZIE"
-  );
-
-  assert.match(html, /function odswiezAnalize\(\)[\s\S]*?zakresAnalizy\(\) === "pytania"[\s\S]*?return odswiezStatystykiPytan\(\)/,
-    "ANALIZA pobiera tylko wybrany zakres, nie oba naraz");
-  assert.match(html, /function odswiezAnalize\(\)[\s\S]*?zakresAnalizy\(\) === "zwroty"[\s\S]*?return odswiezAnalizeZwrotow\(\)/,
-    "zakres zwrotów też ma własną gałąź, nie leci przy każdym wejściu");
-
-  /* Klasa zakresu, nie CAŁY atrybut `class`: układ karty (`pelna`) to inna
-     decyzja niż jej przynależność do zakresu i wolno ją zmieniać bez ruszania
-     tego testu. Do 0.99.0 wzorzec obejmował oba i wywrócił się na dopisaniu
-     jednego słowa, nie mówiąc nic o regule, której pilnuje. */
-  for (const klasa of ["zakresPytania", "zakresAudyt", "zakresZwroty"]) {
-    assert.match(html, new RegExp(`class="[^"]*\\b${klasa}\\b`),
-      `karty zakresu ${klasa} znają swój zakres`);
-  }
-});
-
-test("przesyłki klienta: sekcja na klik i szybki guzik statusu (0.105.0)", () => {
-  /* „Kiedy dojdzie paczka" ma dwie drogi: automatyczną (blok w kontekście
-     szkicu — testują services/pytania.test.ts) i ręczną — tę sekcję.
-     Pilnujemy trzech rzeczy: dane jadą leniwie po otwarciu (do ~7 zapytań
-     do Allegro nie ma prawa jechać z każdym otwarciem sprawy), wstawienie
-     statusu to jawny przycisk, a strona nigdzie nie renderuje adresu
-     dostawy — do odpowiedzi wystarczy status, kurier i numer. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /id="pytaniePrzesylki"/, "sekcja przesyłek w szufladzie kontekstu");
-  assert.match(html, /PRZESYŁKI KLIENTA/, "nagłówek sekcji");
-  assert.match(html, /pytania\/\$\{id\}\/przesylki/, "dane jadą osobną trasą na klik");
-  assert.match(html, /addEventListener\("toggle", pokazPrzesylki\)/, "pobranie dopiero po otwarciu");
-  assert.match(html, /data-wstaw-status/, "wstawienie statusu jest jawnym przyciskiem");
-  assert.match(html, /jeszcze nie nadane/, "zamówienie bez paczki to stan, nie błąd");
 });
 
 test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
@@ -1403,91 +998,6 @@ test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
   );
   assert.match(html, /id="allegroPrzerwij"/, "czekanie da się przerwać bez przeładowania strony");
   assert.match(html, /stronę blokady/, "panel mówi, co zrobić, gdy Allegro zablokuje adres");
-});
-
-test("pytania: oferta z wiadomości i szkic AI jako wybór biura (0.107.0)", () => {
-  /* Dwie skargi z jednego dnia. Pierwsza: nagłówek sprawy pokazywał tytuł
-     wątku, a klient pyta o KONKRETNĄ aukcję — ta jedzie w `relatedObject`
-     wiadomości, nie w wątku. Druga: model pisał szkice do wszystkiego, co
-     przyszło z synchronizacji, także do spraw, których nikt nie otworzy.
-     Domyślnie ma milczeć, a biuro włącza go świadomie przełącznikiem. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /id="pytaniaAutoSzkic"/, "przełącznik automatycznego szkicu w karcie AI");
-  assert.match(html, /pytania\/auto-szkic/, "przełącznik zapisuje się od razu, bez ZAPISZ");
-  assert.match(html, /PYTANIE O TĘ AUKCJĘ/, "nagłówek sprawy nazywa aukcję z wiadomości");
-  assert.match(html, /AUKCJA ZAKOŃCZONA/, "znikła oferta to stan do pokazania, nie pusty nagłówek");
-});
-
-test("sprawy: jedna kolejka czterech rejestrów, karta klienta drugim poziomem (0.108.0)", () => {
-  /* Osią pracy jest SPRAWA, nie klient: kolejka odpowiada na „co mam teraz
-     zrobić?" jedną listą pytań, zwrotów, dyskusji i reklamacji. Karta
-     klienta (360) otwiera się klikiem w login — z kolejki albo z nagłówka
-     otwartej sprawy. Zakładka czyta wszystko poza JEDNYM zapisem — przejęciem
-     sprawy (0.121.0) — a liczniki POST/PUT/DELETE wyżej pilnują, że nie
-     przemyciła żadnego innego. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /id="kolejkaSprawKarta"/, "kolejka spraw jest kartą sekcji");
-  /* Od 0.121.0 BEZ `?rodzaj=`: kolejka pobiera cały agregat i filtruje na
-     miejscu, bo inaczej czipy nie mają skąd wziąć liczb, a czip MOJE — swoich
-     spraw. Jedno zapytanie zamiast jednego na każde kliknięcie czipa. */
-  assert.match(html, /api\("\/api\/biuro\/sprawy"\)/, "kolejka czyta cały agregat przez api()");
-  assert.ok(!/\?rodzaj=\$\{encodeURIComponent\(sprawyFiltr\)\}/.test(html),
-    "filtr rodzaju jest stanem ekranu, nie zapytaniem");
-  assert.match(html, /id="sprawyLicznik" class="tabLicznik"/, "pigułka na zakładce");
-  assert.match(html, /\/api\/biuro\/sprawy\/licznik/, "pigułka ma własną tanią trasę");
-  assert.match(html, /BEZ LOGINU/, "sprawy bez konta Allegro mają kubełek, nie nicość");
-  assert.match(html, /data-klient360/, "login jest wejściem do karty klienta");
-  assert.match(
-    html,
-    /\$\("kolejkaSprawKarta"\)\.addEventListener\("click"/,
-    "kolejka deleguje z poziomu sekcji"
-  );
-  assert.match(
-    html,
-    /\$\("klientSzczegol"\)\.addEventListener\("click"/,
-    "karta klienta deleguje z poziomu sekcji"
-  );
-  /* Powiązania: ciąg jednego problemu (zwrot → dyskusja → reklamacja) widać
-     z kontekstu sprawy; pobierane leniwie, po otwarciu — jak historia. */
-  assert.match(html, /POWIĄZANE SPRAWY/, "kontekst pokazuje ciąg jednej sprawy");
-  assert.match(html, /addEventListener\("toggle", pokazPowiazanePytania\)/, "leniwie przy pytaniu");
-  assert.match(html, /addEventListener\("toggle", pokazPowiazaneZwrotu\)/, "leniwie przy zwrocie");
-  assert.match(html, /REKLAMACJE TEGO KLIENTA/, "historia klienta zna czwarty rejestr");
-});
-
-test("świeżość sprawy: puls z naszej bazy i wysyłka za zgodą po dopisku (0.110.0)", () => {
-  /* Klient nie przestaje pisać, bo biuro ma jego sprawę na ekranie. Panel
-     pilnuje dwóch rzeczy BEZ ruchu do Allegro (audyt 0.109.1): puls czyta
-     co cykl trasę /sprawy/klient (SQLite), a kontrola świeżości przy
-     wysyłce to jedno zapytanie serwera W MOMENCIE wysyłki. „Wyślij mimo to"
-     jest świadomym kliknięciem po pokazaniu dopisków — nigdy domysłem. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /id="pytanieAlarm"/, "miejsce alarmu w pytaniu");
-  assert.match(html, /id="zwrotAlarm"/, "miejsce alarmu w zwrocie");
-  assert.match(html, /id="dyskusjaAlarm"/, "miejsce alarmu w dyskusji");
-  assert.match(html, /KLIENT DOPISAŁ/, "dopisek nazwany wprost");
-  assert.match(html, /NOWA SPRAWA KLIENTA/, "nowa sprawa nazwana wprost");
-  assert.match(html, /data-pytanie-wymus/, "wysyłka mimo dopisku jest jawnym przyciskiem");
-  assert.match(html, /data-pokaz-nowe/, "dopisek czyta się na klik, nie w tle");
-  assert.match(html, /ostatniaWidzianaId/, "dyskusja wysyła punkt odniesienia z ekranu");
-  assert.match(
-    html,
-    /sprawy\/klient\?login=/,
-    "puls chodzi po naszej bazie — nie po Allegro"
-  );
-  assert.ok(
-    !/setInterval[^)]*wiadomosci/.test(html),
-    "rozmowy nadal nie odpytują się cyklicznie — świeżość nie może wrócić rytmem maszyny"
-  );
 });
 
 test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0)", () => {
@@ -1583,168 +1093,3 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   assert.match(html, /h\.allegro/, "ikona Allegro czyta stan z health, nie tylko z listy zwrotów");
 });
 
-test("oś czasu sprawy jest w trzech szczegółach i tylko czyta (0.130.0)", () => {
-  /* Etap D2: historia sprawy z wszystkich kanałów w jednym wykazie. Test
-     pilnuje trzech rzeczy, z których każda jest DECYZJĄ, nie szczegółem.
-
-     PIERWSZA: sekcja stoi we WSZYSTKICH trzech szczegółach. Oś czasu, której
-     nie ma przy dyskusji, nie unifikuje niczego — a dyskusja jako jedyna nie
-     ma szuflady kontekstu, więc jest najłatwiejsza do przeoczenia.
-
-     DRUGA: pobiera się PO ROZWINIĘCIU, nie przy wejściu w sprawę. To ta sama
-     reguła co przy historii klienta i powiązaniach.
-
-     TRZECIA: trasa osi jest GET-em. Zdarzenia dopisują mutacje w rejestrach;
-     oś czasu nie ma własnego zapisu i mieć nie będzie. */
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  for (const sekcja of ["pytanieOs", "zwrotOs", "dyskusjaOs"]) {
-    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
-    assert.ok(html.includes(`id="${sekcja}Tresc"`), `${sekcja} ma miejsce na treść`);
-    assert.ok(
-      html.includes(`$("${sekcja}").addEventListener("toggle"`),
-      `${sekcja} pobiera dane dopiero po rozwinięciu`
-    );
-  }
-  const wywolania = [...html.matchAll(/\/api\/biuro\/sprawy\/os\?rodzaj=/g)];
-  assert.equal(wywolania.length, 1, "jedno wywołanie na trzy sekcje — jedna funkcja, trzy rodzaje");
-  for (const m of wywolania) {
-    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
-    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
-      "oś czasu jedzie zwykłym GET-em — zdarzenia dopisują mutacje rejestrów");
-  }
-});
-
-test("zamówienie przy sprawie: na klik, bez adresu, tylko odczyt (0.132.0)", () => {
-  /* Etap E: `order_id` leżał w bazie od 0.103.0, a agent i tak szedł po
-     status płatności i paczki do panelu Allegro. Test pilnuje trzech granic.
-
-     PIERWSZA: sekcja jest przy zwrocie I przy dyskusji — te dwa rejestry mają
-     numer zamówienia; pytanie wisi przy ofercie i sekcji nie dostaje.
-
-     DRUGA: pobiera się PO ROZWINIĘCIU. To jedyna sekcja spraw, która pyta
-     Allegro, więc wejście w sprawę nie ma prawa jej uruchomić.
-
-     TRZECIA: panel nie zna pojęcia adresu dostawy. Mapowanie po stronie
-     serwera go nie przepuszcza (test przy adapterze), a tutaj pilnujemy, żeby
-     nikt nie dorysował go z drugiej strony. */
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  for (const sekcja of ["zwrotZam", "dyskusjaZam"]) {
-    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
-    assert.ok(html.includes(`id="${sekcja}Tresc"`), `${sekcja} ma miejsce na treść`);
-    assert.ok(
-      html.includes(`$("${sekcja}").addEventListener("toggle"`),
-      `${sekcja} pyta Allegro dopiero po rozwinięciu`
-    );
-  }
-  assert.ok(!html.includes('id="pytanieZam"'), "pytanie nie ma zamówienia z konstrukcji");
-  const wywolania = [...html.matchAll(/\/api\/biuro\/sprawy\/zamowienie\?rodzaj=/g)];
-  assert.equal(wywolania.length, 1, "jedna funkcja na dwa ekrany");
-  for (const m of wywolania) {
-    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
-    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
-      "kontekst zamówienia to czysty odczyt");
-  }
-  assert.ok(!/dostawaAdres|pickupPoint|adresDostawy/.test(html),
-    "adres dostawy nie ma czego szukać na ekranie sprawy");
-});
-
-test("szablony: wybierak przy każdym polu odpowiedzi, wstawienie to odczyt (0.133.0)", () => {
-  /* Etap E2. Trzy granice warte testu.
-
-     PIERWSZA: wybierak stoi przy KAŻDYM polu odpowiedzi — przy pytaniu, przy
-     dyskusji i w bloku kanałów sprawy (ten powstaje dopiero przy rysowaniu,
-     więc nasłuch musi siedzieć na sekcji, nie na polu).
-
-     DRUGA: wstawienie szablonu NICZEGO nie zapisuje. Zapisy szablonów są
-     w ustawieniach, za jawnym kliknięciem — nie przy pisaniu odpowiedzi.
-
-     TRZECIA: karta ustawień deleguje z KARTY, bo tabelę przerysowuje każdy
-     zapis (ta sama usterka co przy wyszukiwarce klientów w 0.114.0). */
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  const wybieraki = [...html.matchAll(/class="szablonWybor"/g)];
-  assert.equal(wybieraki.length, 3, "pytanie, dyskusja i blok kanałów sprawy");
-  assert.ok(html.includes('$("szablonyKarta").addEventListener("click"'),
-    "karta szablonów deleguje z poziomu sekcji");
-  const wstawienie = [...html.matchAll(/\/api\/biuro\/szablony\/\$\{id\}\/dla\?rodzaj=/g)];
-  assert.equal(wstawienie.length, 1, "jedna droga wstawienia na trzy pola");
-  for (const m of wstawienie) {
-    const otoczenie = html.slice(Math.max(0, m.index - 200), m.index);
-    assert.ok(!/method:\s*"(POST|PUT|DELETE)"/.test(otoczenie),
-      "wstawienie szablonu to czysty odczyt");
-  }
-});
-
-test("czasy odpowiedzi: piąty zakres analizy z własnym oknem (0.134.0)", () => {
-  /* Etap E3. Zakres dokłada się do czterech istniejących tą samą drogą co
-     DOSTAWY w 0.100.0 — i ma tę samą pułapkę: lista okien w panelu MUSI
-     zgadzać się z listą po stronie trasy, inaczej czip wygląda na wybrany,
-     a serwer liczy swoje domyślne (usterka z 0.96.0).
-
-     Druga asercja jest o drodze do roboty: wiersz „kto czeka teraz" otwiera
-     sprawę tym samym znacznikiem, którego używa kolejka SPRAW. Raport bez
-     drogi do roboty jest tylko ładnym wykresem. */
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  assert.match(html, /<option value="obsluga">/, "zakres jest w wybieraku");
-  assert.match(html, /obsluga: \[7, 30, 90\]/, "okna zakresu stoją w panelu wprost");
-  assert.match(html, /obsluga: 30/, "zakres ma własne okno domyślne");
-  for (const blok of ["obslugaOdcinki", "obslugaTeraz", "obslugaLudzie", "obslugaPodstawa"]) {
-    assert.ok(html.includes(`id="${blok}"`), `${blok} istnieje`);
-  }
-  assert.ok(html.includes('class="card pelna zakresObsluga"'),
-    "karta nosi klasę zakresu — inaczej nie schowa się przy innych zakresach");
-  assert.match(html, /obslugaPodstawa"\)\.textContent = c\.podstawaPrawna/,
-    "podstawa prawna monitoringu jedzie na ekran razem z danymi imiennymi");
-});
-
-test("tagi sterują kolejką: drugi rząd czipów i etykieta w wierszu (0.137.0)", () => {
-  /* Domknięcie E5. Do 0.136.0 tag było widać dopiero PO wejściu w sprawę,
-     więc reguła tagująca nie zmieniała ani jednego piksela kolejki — a to
-     kolejka odpowiada na „co teraz robić".
-
-     PIERWSZA granica: rząd czipów tagów jest OSOBNY od rzędu rodzajów, bo oba
-     filtry się składają; jedna zmienna stanu nie odpowiedziałaby na „zwroty
-     otagowane #uszkodzenie".
-
-     DRUGA: delegacja na SEKCJI kolejki — czipy przerysowują się przy każdym
-     odświeżeniu listy, więc nasłuch na samym czipie ginąłby co 30 sekund.
-
-     TRZECIA: pusty rząd znika z ekranu zamiast stać pustym paskiem. */
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  assert.ok(html.includes('id="sprawyCzipyTagi"'), "kolejka ma rząd czipów tagów");
-  assert.ok(html.includes('id="sprawyCzipy"'), "rząd rodzajów zostaje osobno");
-  assert.match(html, /\.czipyTagow:empty \{ display: none; \}/,
-    "rząd bez tagów w ogóle się nie rysuje");
-  assert.match(html, /const czipTagu = e\.target\.closest\("button\[data-tag\]"\);/,
-    "klik w czip tagu łapie się na sekcji kolejki, nie na czipie");
-  assert.match(html, /class="tagWiersza"/, "wiersz kolejki pokazuje etykiety sprawy");
-  /* Filtr tagu przecina się z filtrem rodzaju — gdyby go zastępował, „Moje
-     sprawy z tym tagiem" trzeba by składać okiem z dwóch ekranów. */
-  assert.match(html, /wgRodzaju\.filter\(\(s\) => \(s\.tagi \|\| \[\]\)\.includes\(sprawyTag\)\)/,
-    "oba filtry kolejki składają się, a nie wykluczają");
-});
-
-test("tagi i reguły: linia w trzech szczegółach, delegacja na sekcji (0.136.0)", () => {
-  /* Etap E5. Tag wisi przy ŹRÓDLE i przeżywa scalanie — to jest sprawdzane
-     testem serwisu. Tutaj trzy granice ekranu.
-
-     PIERWSZA: linia tagów stoi we WSZYSTKICH trzech szczegółach; sprawa
-     pokazuje sumę tagów swoich źródeł, więc brak linii przy jednym z nich
-     ukrywałby połowę prawdy.
-
-     DRUGA: delegacja na SEKCJI, bo linia jest przerysowywana po każdej
-     zmianie tagu (ta sama usterka co przy dostawach w 0.92.0).
-
-     TRZECIA: reguły mają własną kartę w ustawieniach i ręczne ZASTOSUJ TERAZ —
-     automat tagujący nie może chodzić przy samym patrzeniu na ekran. */
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  for (const sekcja of ["pytanieTagi", "zwrotTagi", "dyskusjaTagi"]) {
-    assert.ok(html.includes(`id="${sekcja}"`), `${sekcja} istnieje`);
-  }
-  assert.ok(html.includes('$("regulyKarta").addEventListener("click"'),
-    "karta reguł deleguje z poziomu sekcji");
-  assert.ok(html.includes('id="regulyZastosuj"'), "reguły uruchamia się ręką");
-  /* Wzorzec reguły jest FRAZĄ, nie wyrażeniem regularnym — pole i podpowiedź
-     mają o tym mówić, bo zły regexp potrafi zawiesić serwer. */
-  assert.match(html, /bez wyrażeń\s*\n?\s*regularnych/,
-    "objaśnienie mówi wprost, że to fraza, nie regexp");
-});

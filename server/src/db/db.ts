@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
-import { odkodujEncje } from "../tekst.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -105,7 +104,6 @@ function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
-  zwrotNieobowiazkowyWKoszu(database);
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
@@ -125,13 +123,9 @@ function migrate(database: DatabaseSync) {
      0.80.0, więc kolumny muszą dojść migracją — bazy z tamtego wydania nie
      przechodzą przez CREATE TABLE. Nullowalne: sprawa bez prowadzącego jest
      stanem normalnym, nie brakiem danych. */
-  addColumn("pytanie", "prowadzi", "TEXT");
-  addColumn("pytanie", "prowadzi_at", "TEXT");
-  addColumn("pytanie", "nowa_wiadomosc_at", "TEXT");
   /* Odmaskowany identyfikator kupującego (0.128.0) — ten sam wzorzec co
      `zwrot.kupujacy_id`: po nim, nie po loginie-masce, pytanie spotyka
      zwroty tego samego klienta. */
-  addColumn("pytanie", "kupujacy_id", "TEXT");
   dosypIdZMaski(database);
   /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot
      tego, co aplikacja wtedy wiedziała, i jedyny ślad po zdarzeniach sprzed
@@ -171,23 +165,13 @@ function migrate(database: DatabaseSync) {
      EXISTS` nie dokłada kolumny do tabeli, która już istnieje — a `zwrot`
      stoi u klienta od 0.53.0. Bez tej linii wyszukiwanie wątku wiadomości
      wywracałoby się na nieznanej kolumnie. */
-  addColumn("zwrot", "kupujacy_id", "TEXT");
   dosypIdKupujacego(database);
   /* Etap 2 zwrotów (0.58.0): korekta + MM na bufor. `zwrot` i `sfera_queue`
      stoją u klienta od dawna, a `sgt_sprzedaz` odświeża się w całości przy
      imporcie — ale kolumna musi ISTNIEĆ, zanim import spróbuje do niej pisać. */
-  addColumn("zwrot", "korekta_queue_id", "INTEGER");
   addColumn("sfera_queue", "wynik_json", "TEXT");
-  addColumn("sgt_sprzedaz", "mag_id", "INTEGER");
   /* Etap 3 zwrotów (0.59.0): kosze i ścieżka reklamacyjna. Nowe tabele idą
      z CREATE TABLE IF NOT EXISTS; tu tylko kolumny w tabelach zastanych. */
-  addColumn("zwrot", "kosz_id", "INTEGER");
-  addColumn("zwrot_pozycja", "rekl_wynik", "TEXT");
-  addColumn("zwrot_pozycja", "rekl_at", "TEXT");
-  addColumn("zwrot_pozycja", "rekl_przez", "TEXT");
-  addColumn("zwrot_pozycja", "rekl_notatka", "TEXT");
-  addColumn("zwrot_pozycja", "rekl_polka", "TEXT");
-  addColumn("zwrot_zapowiedz", "status_allegro", "TEXT");
   /* Kosz z dokumentu MM (0.75.0): numer z kartki wskazuje przesunięcie
      z Subiekta, a nie kod nadany w biurze. NULL = kosz złożony w aplikacji. */
   addColumn("kosz", "mm_dok_id", "INTEGER");
@@ -227,128 +211,100 @@ function migrate(database: DatabaseSync) {
      przy wszystkich czterech, więc bez tej kolumny zwrot byłby jedyną sprawą,
      której nie da się wziąć. Tabela stoi u klienta od 0.53.0, więc migracja.
      Znacznik, nie blokada: mówi „ktoś to wziął", nie „tobie nie wolno". */
-  addColumn("zwrot", "prowadzi", "TEXT");
-  addColumn("zwrot", "prowadzi_at", "TEXT");
   /* Kto prowadzi reklamację. `zwrot_pozycja` stoi u klienta od 0.53.0, więc
      kolumny muszą dojść migracją — jak `pytanie.prowadzi` (0.89.0), z tego
      samego powodu i z tą samą naturą znacznika, nie blokady. */
-  addColumn("zwrot_pozycja", "rekl_prowadzi", "TEXT");
-  addColumn("zwrot_pozycja", "rekl_prowadzi_at", "TEXT");
   /* Odpowiedzi w dyskusjach Allegro (0.104.0). Tabela `dyskusja` stoi
      u klienta od 0.103.0, więc kolumny muszą dojść migracją. Nazwy lustrzane
      z `pytanie` — celowo: jedna para pojęć (szkic/odpowiedź) w całym biurze. */
-  addColumn("dyskusja", "szkic_ai", "TEXT");
-  addColumn("dyskusja", "szkic_at", "TEXT");
-  addColumn("dyskusja", "odpowiedz", "TEXT");
-  addColumn("dyskusja", "edytowano", "INTEGER NOT NULL DEFAULT 0");
-  addColumn("dyskusja", "wyslano_at", "TEXT");
-  addColumn("dyskusja", "odpowiedzial", "TEXT");
   /* Przełącznik automatycznych szkiców (0.107.0). `ai_config` stoi u klienta
      od 0.80.0, więc kolumna musi dojść migracją. Domyślne 0 znaczy, że po
      aktualizacji szkice przestają powstawać same — świadomie, bo o to
      poprosił właściciel. */
-  addColumn("ai_config", "auto_szkic", "INTEGER NOT NULL DEFAULT 0");
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
-  odkodujEncjeWBazie(database);
-  piateZrodloWCheckach(database);
+  bezObslugiKlienta(database);
 }
 
 /**
- * Piąte źródło sprawy w CHECK-ach `sprawa_zrodlo` i `sprawa_zdarzenie` (0.135.0).
+ * Kasacja obsługi klienta (0.140.0).
  *
- * SQLite nie umie zmienić CHECK-a w miejscu, więc tabelę trzeba przebudować —
- * ten sam zabieg co przy `kosz_pozycja`. Bez tego pierwsza opinia wpisana do
- * sprawy kończy się błędem zapisu na bazie sprzed tej wersji, a schemat
- * w `schema.sql` (czytany tylko przy tworzeniu tabeli) o niczym nie mówi.
+ * Rejestry pytań, dyskusji, opinii i zwrotów Allegro oraz nakładka spraw
+ * odeszły razem z kodem, który je czytał. Tabela bez czytelnika nie jest
+ * archiwum, tylko pułapką: następna osoba czytająca schemat zobaczy model
+ * danych, którego nikt nie utrzymuje, i uzna go za obowiązujący.
  *
- * Warunek wejścia czytamy z DEFINICJI tabeli: brak słowa `opinia` w CHECK-u
- * znaczy, że przebudowa jeszcze nie przeszła. Idempotentne i bezpieczne dla
- * dwóch procesów naraz — drugi zastaje warunek już fałszywy.
+ * KTO CHCE TYCH LICZB, robi kopię bazy PRZED aktualizacją — mówi o tym
+ * DEPLOY.md, a `npm run inwentarz` czyta taką kopię i wypisuje z niej raport.
+ *
+ * Kolejność kasowania wynika z kluczy obcych: najpierw dzieci. `kosz_pozycja`
+ * przebudowujemy, bo jej `zwrot_id` wskazywał na znikającą tabelę — SQLite
+ * nie umie skasować kolumny z kluczem obcym inaczej niż przez nową tabelę
+ * (ten sam zabieg co przy `zwrotNieobowiazkowyWKoszu` w 0.75.0).
  */
-function piateZrodloWCheckach(database: DatabaseSync) {
-  const definicja = (tabela: string): string =>
-    (
-      database
-        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
-        .get(tabela) as { sql: string } | undefined
-    )?.sql ?? "";
+function bezObslugiKlienta(database: DatabaseSync) {
+  const maKolumne = (tabela: string, kolumna: string) =>
+    (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).some(
+      (c) => c.name === kolumna
+    );
 
-  for (const tabela of ["sprawa_zrodlo", "sprawa_zdarzenie"]) {
-    const sql = definicja(tabela);
-    if (sql === "" || sql.includes("'opinia'")) continue;
-    /* Nowa definicja to STARA z dopisanym źródłem — przepisywanie jej ręcznie
-       drugi raz rozjechałoby się ze `schema.sql` przy pierwszej zmianie. */
-    const nowa = sql
-      .replace(/CREATE TABLE\s+"?\w+"?/i, `CREATE TABLE ${tabela}_nowa`)
-      .replace(
-        /'pytanie','zwrot','dyskusja','reklamacja'/g,
-        "'pytanie','zwrot','dyskusja','reklamacja','opinia'"
-      );
-    const kolumny = (
-      database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>
-    )
-      .map((k) => k.name)
-      .join(", ");
-    database.exec("PRAGMA foreign_keys = OFF");
-    try {
-      transaction(database, () => {
-        if (definicja(tabela).includes("'opinia'")) return; // drugi proces zdążył
+  /* Klucze obce schodzą PRZED transakcją — w transakcji `PRAGMA foreign_keys`
+     jest ignorowane po cichu (ta sama pułapka co przy `naLoginIHaslo`). */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      if (maKolumne("kosz_pozycja", "zwrot_id")) {
+        /* Kolumny przepisujemy WSPÓLNE dla obu kształtów: baza klienta bywa
+           starsza niż schemat i nie ma wszystkich pól z 0.79.0. */
+        const stare = (
+          database.prepare("PRAGMA table_info(kosz_pozycja)").all() as Array<{ name: string }>
+        ).map((c) => c.name);
         database.exec(`
-          ${nowa};
-          INSERT INTO ${tabela}_nowa(${kolumny}) SELECT ${kolumny} FROM ${tabela};
-          DROP TABLE ${tabela};
-          ALTER TABLE ${tabela}_nowa RENAME TO ${tabela};
+          CREATE TABLE kosz_pozycja_nowa (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
+            tw_id         INTEGER NOT NULL,
+            symbol        TEXT NOT NULL,
+            nazwa         TEXT NOT NULL,
+            ilosc         REAL NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'todo',
+            lok_faktyczna TEXT,
+            odlozono_at   TEXT,
+            odlozono_przez TEXT,
+            powod         TEXT,
+            pominieto_at  TEXT,
+            zalatwione_at TEXT,
+            zalatwione_przez TEXT,
+            zalatwione_notatka TEXT,
+            loc_queue_id  INTEGER REFERENCES sfera_queue(id),
+            pozniej_at    TEXT,
+            mm_queue_id   INTEGER REFERENCES sfera_queue(id)
+          );
         `);
-      })();
-    } finally {
-      database.exec("PRAGMA foreign_keys = ON");
-    }
-  }
-  /* Indeksy zniknęły razem ze starą tabelą — `schema.sql` zakłada je
-     z `IF NOT EXISTS`, więc wystarczy powtórzyć te dwa. */
-  database.exec(`
-    CREATE INDEX IF NOT EXISTS ix_sprawa_zrodlo ON sprawa_zrodlo(sprawa_id);
-    CREATE INDEX IF NOT EXISTS ix_sprawa_zdarzenie ON sprawa_zdarzenie(rodzaj, lokalny_id, kiedy_at);
-  `);
-}
-
-/**
- * Jednorazowe zdjęcie encji HTML z zastanych wierszy (0.127.0).
- *
- * Do 0.127.0 adapter zapisywał teksty Allegro dosłownie, więc w bazie leżą
- * `zwr&oacute;cić` — a panel escape'uje przy renderowaniu, więc encja szła
- * na ekran. Nowe dane dekoduje adapter; tu doganiamy stare. Wzorzec
- * `dosypIdKupujacego`: idempotentnie (po dekodzie encji nie ma), w try/catch,
- * bez zatrzymywania startu. Dwa procesy (API + worker) mogą wejść tu naraz —
- * wynik dekodowania jest deterministyczny, więc wyścig jest niegroźny.
- * Pochodne `szkic_ai`/`odpowiedz` ŚWIADOMIE nietknięte: to teksty redagowane
- * ręką człowieka — jeśli encja tam została, człowiek ją widział i wysłał.
- */
-function odkodujEncjeWBazie(database: DatabaseSync) {
-  const cele: Array<[tabela: string, kolumna: string]> = [
-    ["dyskusja", "temat"],
-    ["pytanie", "tresc"],
-    ["pytanie", "oferta_tytul"],
-  ];
-  for (const [tabela, kolumna] of cele) {
-    try {
-      /* LIKE to luźny prefiltr (dopuszcza fałszywe trafienia) — rozstrzyga
-         porównanie w JS. Wierszy są setki, nie miliony. */
-      const wiersze = database
-        .prepare(`SELECT id, ${kolumna} AS v FROM ${tabela} WHERE ${kolumna} LIKE '%&%;%'`)
-        .all() as Array<{ id: number; v: string | null }>;
-      const update = database.prepare(`UPDATE ${tabela} SET ${kolumna} = ? WHERE id = ?`);
-      for (const w of wiersze) {
-        if (typeof w.v !== "string") continue;
-        const czysty = odkodujEncje(w.v);
-        if (czysty !== w.v) update.run(czysty, w.id);
+        const nowe = (
+          database.prepare("PRAGMA table_info(kosz_pozycja_nowa)").all() as Array<{ name: string }>
+        ).map((c) => c.name);
+        const wspolne = nowe.filter((c) => stare.includes(c)).join(", ");
+        database.exec(`
+          INSERT INTO kosz_pozycja_nowa(${wspolne}) SELECT ${wspolne} FROM kosz_pozycja;
+          DROP TABLE kosz_pozycja;
+          ALTER TABLE kosz_pozycja_nowa RENAME TO kosz_pozycja;
+          CREATE INDEX IF NOT EXISTS ix_kosz_poz ON kosz_pozycja(kosz_id);
+        `);
       }
-    } catch {
-      /* Encja w starym wierszu zostaje widoczna na ekranie — usterka
-         kosmetyczna nie ma prawa zatrzymać startu serwera. */
-    }
+
+      for (const tabela of [
+        "sprawa_tag", "sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", "regula", "szablon",
+        "watek_meta", "opinia", "dyskusja", "dopasowanie", "pytanie", "ai_config",
+        "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot_zapowiedz", "zwrot",
+        "sgt_sprzedaz_pozycja", "sgt_sprzedaz",
+      ]) {
+        database.exec(`DROP TABLE IF EXISTS ${tabela}`);
+      }
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
   }
 }
 
@@ -449,52 +405,6 @@ function przebudujIndeksKoduKosza(database: DatabaseSync) {
   if (w?.sql && w.sql.includes("anulowany")) return;
   database.exec("DROP INDEX IF EXISTS ix_kosz_kod_aktywny");
   database.exec(`CREATE UNIQUE INDEX ix_kosz_kod_aktywny ON kosz(kod) ${CEL}`);
-}
-
-function zwrotNieobowiazkowyWKoszu(database: DatabaseSync) {
-  const wymagany = () =>
-    (
-      database.prepare("PRAGMA table_info(kosz_pozycja)").all() as Array<{
-        name: string;
-        notnull: number;
-      }>
-    ).some((c) => c.name === "zwrot_id" && c.notnull === 1);
-  if (!wymagany()) return;
-
-  /* Klucze obce schodzą PRZED transakcją — w transakcji `PRAGMA foreign_keys`
-     jest ignorowane po cichu (ta sama pułapka co przy `naLoginIHaslo`). */
-  database.exec("PRAGMA foreign_keys = OFF");
-  try {
-    transaction(database, () => {
-      if (!wymagany()) return; // drugi proces mógł zdążyć pierwszy
-      database.exec(`
-        CREATE TABLE kosz_pozycja_nowa (
-          id            INTEGER PRIMARY KEY AUTOINCREMENT,
-          kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
-          zwrot_id      INTEGER REFERENCES zwrot(id),
-          tw_id         INTEGER NOT NULL,
-          symbol        TEXT NOT NULL,
-          nazwa         TEXT NOT NULL,
-          ilosc         REAL NOT NULL,
-          status        TEXT NOT NULL DEFAULT 'todo',
-          lok_faktyczna TEXT,
-          odlozono_at   TEXT,
-          odlozono_przez TEXT,
-          mm_queue_id   INTEGER REFERENCES sfera_queue(id)
-        );
-        INSERT INTO kosz_pozycja_nowa(id, kosz_id, zwrot_id, tw_id, symbol, nazwa, ilosc,
-                                      status, lok_faktyczna, odlozono_at, odlozono_przez, mm_queue_id)
-          SELECT id, kosz_id, zwrot_id, tw_id, symbol, nazwa, ilosc,
-                 status, lok_faktyczna, odlozono_at, odlozono_przez, mm_queue_id
-            FROM kosz_pozycja;
-        DROP TABLE kosz_pozycja;
-        ALTER TABLE kosz_pozycja_nowa RENAME TO kosz_pozycja;
-        CREATE INDEX IF NOT EXISTS ix_kosz_poz ON kosz_pozycja(kosz_id);
-      `);
-    })();
-  } finally {
-    database.exec("PRAGMA foreign_keys = ON");
-  }
 }
 
 function usunSesjeRozkladania(database: DatabaseSync) {

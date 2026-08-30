@@ -212,18 +212,6 @@ export class SqlSferaAdapter implements SferaAdapter {
     db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = ?").run(twId);
   }
 
-  async createKorektaZwrotu(): Promise<never> {
-    /* Ten sam powód co przy MM, tylko mocniejszy: korekta sprzedaży to
-       dokument z numeracją, VAT-em i skutkiem magazynowym. SQL-em da się to
-       wyłącznie zepsuć. Zadanie ląduje w 'error' z przyciskiem PONÓW, a do
-       czasu wdrożenia workera korektę i MM wystawia biuro ręcznie w Subiekcie
-       — karta zwrotu mówi wtedy wprost, czego brakuje. */
-    throw new Error(
-      "Korektę zwrotu i MM na bufor tworzy worker Sfery (usługa wertis-sfera — wdrożenie: DEPLOY §6 etap 2). " +
-        "Bez niego oba dokumenty wystawia biuro w Subiekcie; reszta karty zwrotu działa normalnie."
-    );
-  }
-
   async createMM(_magFrom: number, _magTo: number, _items: MmItem[]): Promise<string> {
     // MM nie da się bezpiecznie zrobić SQL-em (dokument + numeracja + skutki
     // magazynowe to domena Sfery). Tworzy je worker Sfery — gotowy proces C#

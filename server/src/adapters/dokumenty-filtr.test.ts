@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budujFiltryDokumentow,
-  budujFiltrySprzedazy,
   zapytaniePozycjiMm,
   zdaniePrzyjecBezPozycji,
 } from "./subiekt.mssql.js";
@@ -73,21 +72,6 @@ test("otwarta dostawa wchodzi OBOK okna dat, nie zamiast niego", () => {
 test("identyfikatory otwartych dostaw też są obcinane", () => {
   const { oknoFilter } = budujFiltryDokumentow([1], [4821.7]);
   assert.match(oknoFilter, /IN \(4821\)/);
-});
-
-// ── Sprzedaż (FS/PA) do dopasowywania zwrotów Allegro (0.53.0) ──────────────
-// Te same dwie reguły co wyżej, ta sama cena pomyłki — tyle że wyjątkiem okna
-// nie jest niedokończona dostawa, a dokument NIEROZLICZONEGO zwrotu.
-
-test("filtr sprzedaży wpuszcza FS i PA, pusta lista daje NULL", () => {
-  assert.equal(budujFiltrySprzedazy([2, 21], []).typFilter, "d.dok_Typ IN (2,21)");
-  assert.equal(budujFiltrySprzedazy([], []).typFilter, "d.dok_Typ IN (NULL)");
-});
-
-test("dokument nierozliczonego zwrotu wchodzi OBOK okna sprzedaży", () => {
-  const { oknoFilter } = budujFiltrySprzedazy([2, 21], [901]);
-  assert.equal(oknoFilter, "(d.dok_DataWyst >= @cutoff OR d.dok_Id IN (901))");
-  assert.equal(budujFiltrySprzedazy([2, 21], []).oknoFilter, "d.dok_DataWyst >= @cutoff");
 });
 
 /* ── Pozycje przesunięcia MM (0.76.1) ────────────────────────────────────────

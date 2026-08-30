@@ -74,7 +74,6 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
     kosz.pozycje.map((p) => [p.symbol, p.ilosc]),
     [["TEST-LINIA-TODO", 3], ["TEST-LINIA-DONE", 1], ["TEST-WYCOFANY", 2]]
   );
-  assert.equal(kosz.pozycje[0].zwrotId, null, "pozycja nie pochodzi ze zwrotu");
 
   // drugi skan tej samej kartki — ten sam kosz, nie drugi
   const drugi = P.otworzPrzyjecie("MM 1209/MAG/2026", "Ewa");

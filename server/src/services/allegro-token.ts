@@ -175,7 +175,7 @@ let odswiezanie: Promise<string> | null = null;
 export async function wazneBearer(): Promise<string> {
   const t = wiersz();
   if (!t) {
-    throw new Error("Konto Allegro niepołączone — /biuro → ZWROTY → KONTO ALLEGRO → POŁĄCZ.");
+    throw new Error("Konto Allegro niepołączone — /biuro → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ.");
   }
   if (t.srodowisko !== srodowisko()) {
     throw new Error(
@@ -197,7 +197,7 @@ export async function wazneBearer(): Promise<string> {
           throw new Error(
             "Allegro odmówiło odświeżenia tokena" +
               (typeof json.error === "string" ? ` (${json.error})` : "") +
-              " — sparuj konto ponownie: /biuro → ZWROTY → KONTO ALLEGRO."
+              " — sparuj konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO."
           );
         }
         zapisz(
@@ -243,7 +243,7 @@ export interface StartParowania {
 /** Start parowania: kod dla człowieka + link do potwierdzenia. */
 export async function rozpocznijParowanie(): Promise<StartParowania> {
   if (!config.allegro.clientId) {
-    throw new Error("Zwroty Allegro są wyłączone — ustaw ALLEGRO_CLIENT_ID w wertis.env.");
+    throw new Error("Połączenie z Allegro jest wyłączone — ustaw ALLEGRO_CLIENT_ID w wertis.env.");
   }
   /* Powtórne kliknięcie POŁĄCZ oddaje TĘ SAMĄ sesję. Kod z poprzedniej próby
      jest wciąż ważny, a każde `POST /device` to kolejny strzał w apex
@@ -421,14 +421,14 @@ export function problemAllegro(): string | null {
   const s = stanPolaczenia();
   if (s.stan === "niepolaczone") {
     return (
-      "ALLEGRO_CLIENT_ID ustawione, ale konto niepołączone — /biuro → ZWROTY → " +
+      "ALLEGRO_CLIENT_ID ustawione, ale konto niepołączone — /biuro → STAN SYSTEMU → " +
       "KONTO ALLEGRO → POŁĄCZ (rola admin)."
     );
   }
   if (s.stan === "zle_srodowisko") {
     return (
       "Token Allegro pochodzi z innego środowiska niż ALLEGRO_SANDBOX wskazuje — " +
-      "sparuj konto ponownie w /biuro → ZWROTY → KONTO ALLEGRO."
+      "sparuj konto ponownie w /biuro → STAN SYSTEMU → KONTO ALLEGRO."
     );
   }
   return null;

@@ -23,31 +23,18 @@ import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import { lokalizacjeMasoweRoutes } from "./routes/lokalizacje-masowe.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
-import { zwrotyRoutes } from "./routes/zwroty.js";
-import { pytaniaRoutes } from "./routes/pytania.js";
-import { dyskusjeRoutes } from "./routes/dyskusje.js";
-import { sprawyRoutes } from "./routes/sprawy.js";
-import { szablonyRoutes } from "./routes/szablony.js";
-import { opinieRoutes } from "./routes/opinie.js";
-import { tagiRoutes } from "./routes/tagi.js";
 import { kartonRoutes } from "./routes/karton.js";
+import { allegroRoutes } from "./routes/allegro.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
-  bladImportuSprzedazy,
   brakDostepuDoMagazynow,
-  brakKolumnSprzedazy,
   brakKolumnyZrealizowano,
   importFromMssql,
   lastImport,
   przyjeciaBezPozycji,
 } from "./adapters/subiekt.mssql.js";
 import { problemAllegro, problemUserAgenta, stanPolaczenia } from "./services/allegro-token.js";
-import { uruchomTickerZapowiedzi } from "./services/zapowiedzi.js";
-import { uruchomTickerPytan } from "./services/pytania.js";
-import { uruchomTickerDyskusji } from "./services/dyskusje.js";
-import { przebudujSprawy } from "./services/sprawa.js";
-import { dosypOsCzasu } from "./services/os-sprawy.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
 import { brakDostepuDoZdjec } from "./adapters/zdjecia.sgt.js";
 import { brakDostepuDoTla } from "./adapters/tlo.js";
@@ -102,11 +89,9 @@ export async function buildApp() {
       /* Sprzedaż bez kolumny numeru obcego dopasowuje zwroty tylko po
          pozycjach; konto Allegro niesparowane wysypuje każdy skan etykiety.
          Oba stany wyglądają na ekranie jak „zwroty nie działają". */
-      brakKolumnSprzedazy,
-      /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty dopasowują
+          /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty dopasowują
          na danych z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
-      bladImportuSprzedazy,
-      /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
+          /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
          pracuje na danych sprzed awarii. Do 0.76.1 tego zdania na liście
          brakowało, więc awaria nie miała jak wypłynąć. */
       bladImportuMm,
@@ -217,15 +202,9 @@ export async function buildApp() {
   await app.register(zbiorkiRoutes);
   await app.register(lokalizacjeMasoweRoutes);
   await app.register(dostawcyRoutes);
-  await app.register(zwrotyRoutes);
-  await app.register(pytaniaRoutes);
-  await app.register(dyskusjeRoutes);
-  await app.register(sprawyRoutes);
-  await app.register(szablonyRoutes);
-  await app.register(opinieRoutes);
-  await app.register(tagiRoutes);
   await app.register(koszeRoutes);
   await app.register(kartonRoutes);
+  await app.register(allegroRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();
@@ -251,29 +230,10 @@ async function main() {
     }, config.mssql.syncMs);
   }
 
-  /* Zapowiedzi zwrotów z Allegro — w main(), nie w buildApp(): testy tras
-     budują aplikację i nie mają prawa uruchamiać pętli sięgającej do API. */
-  uruchomTickerZapowiedzi();
-  /* Pytania klientów (0.80.0) — ten sam powód i ten sam interwał: praca w tle
-     na tym samym koncie Allegro, plus szkice, żeby otwarte pytanie miało
-     odpowiedź gotową, a nie przycisk „wygeneruj” i czekanie. */
-  uruchomTickerPytan();
-  /* Dyskusje i reklamacje Allegro — ten sam powód i ten sam interwał: rejestr
-     spraw ma schodzić z kolejki sam, gdy panel Allegro je zamyka. */
-  uruchomTickerDyskusji();
-
-  /* Nakładka spraw dogania rejestry przy starcie (0.128.0): baza sprzed tego
-     wydania nie ma ani jednego wiersza w `sprawa`, a rekoncyliacja żyje przy
-     mutacjach. W main(), nie w migrate() — migrate() nie może wołać serwisu
-     (cykl importów db → serwis → db); nie w buildApp() — testy tras nie
-     mają prawa zależeć od rekoncyliacji. */
-  przebudujSprawy();
-  /* Oś czasu dogania zastane rejestry (0.130.0) — ten sam powód i to samo
-     miejsce co wyżej. Bez dosypki każda sprawa sprzed aktualizacji miałaby
-     pustą historię, co czyta się jak awaria, a nie jak brak danych.
-     Idempotentna, więc kolejne starty nie dopisują nic. */
-  const dosypanych = dosypOsCzasu();
-  if (dosypanych > 0) console.log(`[api] oś czasu spraw: dosypano ${dosypanych} zdarzeń`);
+  /* Tickerów obsługi klienta nie ma od 0.140.0 — razem z całą obsługą.
+     Zostaje `importFromMssql` wyżej: to jedyna pętla tła, jakiej potrzebuje
+     magazyn. Nowa obsługa klienta powstaje od zera i sama zdecyduje, czy
+     w ogóle chce pracy w tle. */
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

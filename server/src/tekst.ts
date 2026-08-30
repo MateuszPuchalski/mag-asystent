@@ -263,6 +263,12 @@ const ENCJE: Readonly<Record<string, string>> = {
  * `&lt;` i STOP, bo wynik podstawienia nie jest skanowany ponownie. To
  * celowe: podwójne kodowanie oznacza, że ktoś po drodze zakodował encję
  * jako tekst, i jeden poziom na przebieg jest jedynym bezpiecznym ruchem.
+ *
+ * OD 0.140.0 BEZ WOŁAJĄCEGO: jedynym był adapter rozmów Allegro, który odszedł
+ * z obsługą klienta. Funkcja zostaje z testami, bo „&oacute; w treści pytania"
+ * to blizna zapłacona wydaniem 0.127.0 i wpisana na listę w
+ * `docs/obsluga-klienta.md` — nowa obsługa ma ją wziąć gotową, nie odkryć
+ * drugi raz na produkcji.
  */
 export function odkodujEncje(s: string): string {
   return s.replace(/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (calosc, cialo: string) => {

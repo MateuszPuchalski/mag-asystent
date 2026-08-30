@@ -703,5 +703,5 @@ gdzie kończy się możliwość szybkiego sprawdzenia.
 | Jak podpiąć Subiekta? | `docs/subiekt-gt-edu-setup.md` |
 | Co dokładnie jest w bazie Subiekta? | `docs/subiekt-gt-struktura.md` |
 | Jak wygląda rozkładanie w praktyce? | `docs/analiza-rozkladanie.md` |
-| Dokąd zmierzają sprawy klientów? | `docs/architektura-spraw.md` |
+| Dokąd zmierza obsługa klienta? | `docs/obsluga-klienta.md` |
 | Jak zbudować kolektor? | `android/README.md` |

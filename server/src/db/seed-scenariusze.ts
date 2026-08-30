@@ -4,8 +4,6 @@ import path from "node:path";
 import { db, transaction } from "./db.js";
 import { config } from "../config.js";
 import { hashSekret } from "../services/users.js";
-import { kupujacyIdZMaski, przebudujSprawy } from "../services/sprawa.js";
-import { dosypOsCzasu } from "../services/os-sprawy.js";
 import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
 
 /* ── Seed scenariuszy — dane pod przypadki brzegowe ──────────────────────────
@@ -206,25 +204,16 @@ export const KATALOG: Scenariusz[] = [
   { id: "S64", obszar: "reslot", tytul: "Pobrania to wystąpienia, nie sztuki", wejscie: "npm run reslot -- --demo" },
   { id: "S65", obszar: "reslot", tytul: "Regał bez reguły strefy złotej", wejscie: "npm run reslot -- --demo" },
 
-  // ── zwroty Allegro (adapter dev — ALLEGRO_MODE puste przy SGT_MODE=seeded) ──
-  { id: "S67", obszar: "zwroty", tytul: "Zwrot dopasowany jednoznacznie (numer zamówienia na FS)", wejscie: "/biuro → ZWROTY → skan DEVWB0001" },
-  { id: "S68", obszar: "zwroty", tytul: "Dwa kandydujące paragony — wybór ręczny; etykieta przewoźnika doręczającego", wejscie: "/biuro → ZWROTY → skan DEVTW0002" },
-  { id: "S69", obszar: "zwroty", tytul: "Pozycja zwrotu spoza kartoteki i etykieta nieznana Allegro", wejscie: "/biuro → ZWROTY → skan DEVWB0003, potem dowolny inny kod" },
 
   // ── logo dostawcy ──
   { id: "S70", obszar: "dostawa", tytul: "Dostawca z logo i dostawca bez logo", wejscie: "zakładka DOSTAWY, potem /biuro → DOSTAWCY" },
   { id: "S71", obszar: "karta", tytul: "Zamienniki wypisane bez nagłówka", wejscie: "karta TEST-ZAMIENNIK-LISTA" },
 
-  // ── rozkładanie zwrotów z regału ──
-  { id: "S72", obszar: "zwroty", tytul: "Kosz z kartką: numer MM otwiera przyjęcie, ZAKOŃCZ nie wystawia dokumentu", wejscie: "kolektor → zakładka ZWROTY → numer 1209" },
+  // ── kosze z regału zwrotów (dokument MM z Subiekta) ──
+  { id: "S72", obszar: "kosze", tytul: "Kosz z kartką: numer MM otwiera przyjęcie, ZAKOŃCZ nie wystawia dokumentu", wejscie: "kolektor → zakładka ZWROTY → numer 1209" },
 
-  // ── pytania klientów ──
-  { id: "S73", obszar: "pytania", tytul: "Skrzynka w trzech stanach: bez szkicu, szkic po poprawce, wysłane", wejscie: "/biuro → PYTANIA KLIENTÓW" },
-  { id: "S74", obszar: "pytania", tytul: "Pytanie o towar spoza oferty — jedyne źródło listy braków", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\"" },
-  { id: "S75", obszar: "pytania", tytul: "Wykres tygodni, słupki proporcji i zdanie o szczycie — pytania rozłożone na dwa miesiące", wejscie: "/biuro → ANALIZA → zakres „pytania klientów\" → okno 90 dni" },
-  { id: "S76", obszar: "zwroty", tytul: "Wgląd w zwroty stoi w ANALIZIE, nie w zakładce pracy", wejscie: "/biuro → ANALIZA → zakres „zwroty\"" },
+
   { id: "S77", obszar: "dostawy", tytul: "Analiza dostaw: u kogo się psuje, i dostawa zdjęta poza WERTIS", wejscie: "/biuro → ANALIZA → zakres „dostawy\"" },
-  { id: "S78", obszar: "sprawy", tytul: "Jedna kolejka i dwie tafle: konsola SPRAW na wysokość okna", wejscie: "/biuro → SPRAWY" },
   { id: "S79", obszar: "konta", tytul: "Ustawienia jako jeden arkusz: sekcje bez zaokrągleń i bez przerw", wejscie: "/biuro → zębatka → USTAWIENIA" },
   { id: "S80", obszar: "kolejka", tytul: "Masowa zmiana lokalizacji z arkusza: podgląd, potem zapis", wejscie: "/biuro → STAN SYSTEMU → WGRAJ ARKUSZ" },
 ];
@@ -433,9 +422,7 @@ export interface Podsumowanie {
   zamowienia: number;
   dokumentyWz: number;
   pozycjeWz: number;
-  sprzedaz: number;
   przyjecia: number;
-  pytania: number;
   /** Domknięte dostawy historyczne pod zakres DOSTAWY w ANALIZIE (0.100.0). */
   historiaDostaw: number;
 }
@@ -458,7 +445,7 @@ export function zbudujScenariusze(): Podsumowanie {
   const licz = {
     towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
     konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
-    sprzedaz: 0, przyjecia: 0, pytania: 0, historiaDostaw: 0,
+    przyjecia: 0, historiaDostaw: 0,
   };
 
   const wszystkieTowary = [...TOWARY, ...DROBNICA];
@@ -479,26 +466,13 @@ export function zbudujScenariusze(): Podsumowanie {
     const wz = historiaPobran();
     licz.dokumentyWz = wz.dokumentow;
     licz.pozycjeWz = wz.pozycji;
-    licz.sprzedaz = sprzedazDemo();
     licz.przyjecia = przyjeciaDemo();
-    licz.pytania = pytaniaDemo();
     licz.historiaDostaw = historiaDostaw();
     logoDostawcow();
   })();
 
-  /* Nakładka spraw dogania świeżo zasiane rejestry (0.128.0) — poza
-     transakcją seeda, bo rekoncyliacja otwiera własną. */
-  przebudujSprawy();
-  /* Opinie demo (0.135.0) — piąte źródło sprawy. Jedna zła z numerem
-     zamówienia, żeby demo pokazało sklejenie opinii ze zwrotem. */
-  opinieDemo();
-  /* Trzy szablony na start (0.133.0) — demo pustej listy uczy, że funkcji
-     nie ma. Treści są celowo ZWYKŁE: tak pisze agent, gdy nie ma czasu. */
-  szablonyDemo();
-  /* Oś czasu z tego samego powodu (0.130.0): demo bez historii pokazywałoby
-     pustą sekcję w każdej sprawie i wyglądało na zepsute. Dosypka czyta
-     wyłącznie stemple, które seed właśnie zapisał. */
-  dosypOsCzasu();
+  /* Obsługi klienta nie ma w ziarnie od 0.140.0 — razem z jej rejestrami.
+     Zostaje magazyn: dostawy, kartoteka, kolejka zapisów, kosze z przyjęć. */
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
   // i tak by ich nie usunęło. Kolejność (baza, potem pliki) jest bezpieczniejsza:
@@ -532,8 +506,6 @@ function wyczysc(): void {
     d.prepare("DELETE FROM sgt_zam_pozycja WHERE dok_id >= ?").run(DOK_OD);
     d.prepare("DELETE FROM sgt_zamowienie WHERE dok_id >= ?").run(DOK_OD);
 
-    d.prepare("DELETE FROM sgt_sprzedaz_pozycja WHERE dok_id >= ?").run(DOK_SPRZ_OD);
-    d.prepare("DELETE FROM sgt_sprzedaz WHERE dok_id >= ?").run(DOK_SPRZ_OD);
     /* Kosze z dokumentu i same dokumenty — w tej kolejności, bo kosz wskazuje
        przyjęcie, a jego pozycje wskazują kosz. */
     d.prepare(
@@ -543,25 +515,6 @@ function wyczysc(): void {
     d.prepare("DELETE FROM przyjecie_pominiete WHERE dok_id >= ?").run(DOK_MM_OD);
     d.prepare("DELETE FROM sgt_mm_zwrot_pozycja WHERE dok_id >= ?").run(DOK_MM_OD);
     d.prepare("DELETE FROM sgt_mm_zwrot WHERE dok_id >= ?").run(DOK_MM_OD);
-    /* Zwroty założone z adaptera dev (skan DEVWB…) — kasowane po znaczniku
-       `dev-ret-`, żeby ponowne uruchomienie wracało do punktu wyjścia także
-       w zakładce ZWROTY. Zwroty ręczne z innych etykiet zostają. */
-    d.prepare(
-      `DELETE FROM zwrot_zam_pozycja WHERE zwrot_id IN
-         (SELECT id FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%')`
-    ).run();
-    d.prepare(
-      `DELETE FROM zwrot_pozycja WHERE zwrot_id IN
-         (SELECT id FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%')`
-    ).run();
-    d.prepare("DELETE FROM zwrot WHERE allegro_return_id LIKE 'dev-ret-%'").run();
-    /* Pytania scenariuszowe po przedrostku `dev-msg-`, tak samo jak zwroty
-       po `dev-ret-`. `dopasowanie` wskazuje na `pytanie`, więc idzie pierwsze. */
-    d.prepare(
-      `DELETE FROM dopasowanie WHERE pytanie_id IN
-         (SELECT id FROM pytanie WHERE wiadomosc_id LIKE 'dev-msg-%')`
-    ).run();
-    d.prepare("DELETE FROM pytanie WHERE wiadomosc_id LIKE 'dev-msg-%'").run();
 
     d.prepare("DELETE FROM sgt_stan WHERE tw_id >= ?").run(TW_OD);
     d.prepare("DELETE FROM sgt_towar WHERE tw_id >= ?").run(TW_OD);
@@ -1459,37 +1412,6 @@ function historiaPobran(): { dokumentow: number; pozycji: number } {
    Trzy pliki na dysku i JEDNA referencja bez pliku (S37). Trasa zdjęcia musi
    odróżniać te przypadki, bo w firmie zdarzy się dokładnie to: kopia bazy bez
    katalogu `data/photos`.                                                    */
-/* ── S67–S69: sprzedaż pod zwroty Allegro ───────────────────────────────────
-   Dokumenty FS/PA w read-modelu `sgt_sprzedaz` — dokładnie to, co na produkcji
-   przyniósłby importer MSSQL. Zestrojone 1:1 z fikcyjnymi zwrotami adaptera
-   dev (`adapters/allegro.dev.ts`): numery zamówień, symbole i ilości muszą się
-   zgadzać, bo scenariusze mierzą właśnie dopasowanie. */
-function sprzedazDemo(): number {
-  const d = db();
-  const insDok = d.prepare(
-    `INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, uwagi, mag_id)
-     VALUES (?,?,?,?,?,?,?,?)`
-  );
-  const insPoz = d.prepare(
-    "INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
-  );
-
-  // S67 — FS z numerem zamówienia Allegro w numerze obcym: dopasowanie auto
-  // Magazyn sprzedaży wprost: to on jest źródłem MM na bufor zwrotowy (Etap 2).
-  insDok.run(DOK_SPRZ_OD, "FS", `FS ${DOK_SPRZ_OD}/${mmrrrr(dzien(-10))}`, "dev-ord-1", dzien(-10), "ALLEGRO", null, config.magId.MAG);
-  insPoz.run(DOK_SPRZ_OD, 900_036, 1); // TEST-LINIA-TODO
-  insPoz.run(DOK_SPRZ_OD, 900_037, 2); // TEST-LINIA-DONE
-
-  /* S68 — DWA paragony z tym samym towarem, żaden bez numeru zamówienia nie
-     wygrywa sam: szczegół zwrotu pokazuje kandydatów i czeka na wybór ręką. */
-  insDok.run(DOK_SPRZ_OD + 1, "PA", `PA ${DOK_SPRZ_OD + 1}/${mmrrrr(dzien(-12))}`, null, dzien(-12), "DETAL", null, config.magId.MAG);
-  insPoz.run(DOK_SPRZ_OD + 1, 900_029, 1); // TEST-ROTUJACY
-  insDok.run(DOK_SPRZ_OD + 2, "PA", `PA ${DOK_SPRZ_OD + 2}/${mmrrrr(dzien(-20))}`, null, dzien(-20), "DETAL", null, config.magId.MAG);
-  insPoz.run(DOK_SPRZ_OD + 2, 900_029, 1);
-
-  return 3;
-}
-
 /**
  * Przyjęcia na regał zwrotów — kosze, których numer magazyn nosi na kartce.
  *
@@ -1553,180 +1475,6 @@ function przyjeciaDemo(): number {
  * ze szkicem po poprawce człowieka i wysłane. Czwarte pyta o towar, którego
  * nie mamy — to jedyne źródło danych dla listy „pytali o towar spoza oferty".
  */
-function pytaniaDemo(): number {
-  const d = db();
-  const wstaw = d.prepare(
-    `INSERT INTO pytanie(zrodlo, thread_id, wiadomosc_id, kupujacy_login, kupujacy_id,
-                         oferta_id, oferta_tytul, tresc, otrzymano_at, status,
-                         szkic_ai, szkic_at, odpowiedz, wyslano_at, odpowiedzial,
-                         edytowano, kategoria, urzadzenie, produkty_json,
-                         w_ofercie, utworzono_at, utworzono_przez, prowadzi, prowadzi_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-  );
-
-  /* `wiadomosc_id` z przedrostkiem `dev-msg-` — po nim kasuje je `wyczysc()`,
-     tak samo jak zwroty po `dev-ret-`. Pytania wklejone ręcznie zostają. */
-  const pytania = [
-    {
-      // S73a — sprawa BEZ szkicu: stan „czeka na szkic", pusta szyna kontekstu
-      msg: "dev-msg-0001", login: "client:44112097", minut: -1440,
-      oferta: "GAŹNIK DO STIHL MS 180 GAŹNIK ZAMA DO PIŁY STIHL 017 018 MS170 MS180 FILTR",
-      tresc: "Dzień dobry, czy ten gaźnik pasuje do MS 170 z 2019 roku? I czy w komplecie jest filtr paliwa?",
-      status: "nowe", szkic: null, odpowiedz: null, edytowano: 0,
-      kategoria: "dobor-czesci", urzadzenie: "STIHL MS 170",
-      produkty: [], wOfercie: null, prowadzi: null,
-    },
-    {
-      // S73b — szkic PO poprawce człowieka: szyna szkicu ma być zgaszona
-      msg: "dev-msg-0002", login: "client:44251880", minut: -300,
-      oferta: "OLEJ BRIGGS STRATTON 0,6L SAE30 KOSIARKI AGREGATU TRAKTORKA CZTEROSUWOWYCH",
-      tresc: "Witam, ile takich olejów potrzeba na wymianę w kosiarce spalinowej? Starczy jedna butelka?",
-      status: "szkic",
-      szkic: "Dzień dobry, do wymiany w kosiarce spalinowej wystarcza jedna butelka 0,6 l. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, do typowej kosiarki spalinowej wystarcza jedna butelka 0,6 l — miska olejowa mieści zwykle 0,5–0,6 l. Pozdrawiamy, WERTIS",
-      edytowano: 1, kategoria: "dobor-czesci", urzadzenie: null,
-      produkty: [{ twId: 900_017, symbol: "TEST-ULAMEK" }], wOfercie: 1,
-      prowadzi: "Ewa Bąk",
-    },
-    {
-      // S73c — sprawa ZAŁATWIONA: liczy się do mediany czasu odpowiedzi
-      msg: "dev-msg-0003", login: "client:44300104", minut: -2880,
-      oferta: "ŚWIECA ZAPŁONOWA do kosiarek i agregatów — trio EAN",
-      tresc: "witam czy można wysłać do Chorwacji i na kiedy by było i jaki koszt wysyłki oczywiście płatność z góry",
-      status: "wyslane",
-      szkic: "Dzień dobry, tak, wysyłamy do Chorwacji. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, tak, wysyłamy do Chorwacji — paczka kurierska DPD, koszt 89 zł, czas dostawy 4–6 dni roboczych. Płatność z góry przelewem, wysyłka następnego dnia roboczego po zaksięgowaniu. Pozdrawiamy, WERTIS",
-      edytowano: 1, kategoria: "dostawa-wysylka", urzadzenie: null,
-      produkty: [{ twId: 900_003, symbol: "TEST-TRIO-1" }], wOfercie: 1,
-      prowadzi: null, wyslaneMinut: -2820, odpowiedzial: "Jan Kowalski",
-    },
-    {
-      // S74 — pytanie o towar SPOZA oferty: jedyne dane pod listę braków
-      msg: "dev-msg-0004", login: "client:44380022", minut: -4320,
-      oferta: null,
-      tresc: "Szukam noża do kosiarki NAC LS46-127 o długości 46 cm. Macie taki?",
-      status: "wyslane",
-      szkic: "Dzień dobry, niestety nie mamy tego noża w ofercie. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, niestety nie mamy tego noża w ofercie. Pozdrawiamy, WERTIS",
-      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: "NAC LS46-127",
-      produkty: [], wOfercie: 0,
-      prowadzi: null, wyslaneMinut: -4260, odpowiedzial: "Ewa Bąk",
-    },
-    /* ── Tło pod ANALIZĘ (0.99.0) ────────────────────────────────────────────
-       Cztery pytania wyżej stoją w jednym tygodniu i opisują STANY sprawy —
-       to ich zadanie. Wykres tygodni, słupki proporcji i zdanie o szczycie
-       potrzebują czegoś innego: rozrzutu w czasie i różnych towarów. Bez tego
-       zakładka pokazywała jeden słupek i cztery jednakowe paski, czyli nie
-       dawało się zobaczyć, czy w ogóle działa. Ta sama luka, przez którą
-       skrzynka pytań stała pusta do 0.96.0. */
-    {
-      msg: "dev-msg-0005", login: "client:44112097", minut: -14_400,
-      oferta: "GAŹNIK DO STIHL MS 180 GAŹNIK ZAMA DO PIŁY STIHL 017 018 MS170 MS180 FILTR",
-      tresc: "Dzień dobry, czy do MS 180 pasuje ten sam gaźnik co do 170? Piła z 2016 roku.",
-      status: "wyslane",
-      szkic: "Dzień dobry, tak — te modele mają wspólny gaźnik. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, tak — MS 170 i MS 180 mają wspólny gaźnik Zama C1Q-S57B. Pozdrawiamy, WERTIS",
-      edytowano: 1, kategoria: "dobor-czesci", urzadzenie: "STIHL MS 180",
-      produkty: [{ twId: 900_003, symbol: "TEST-TRIO-1" }], wOfercie: 1,
-      prowadzi: null, wyslaneMinut: -14_100, odpowiedzial: "Jan Kowalski",
-    },
-    {
-      msg: "dev-msg-0006", login: "client:44251880", minut: -24_000,
-      oferta: "OLEJ BRIGGS STRATTON 0,6L SAE30 KOSIARKI AGREGATU TRAKTORKA CZTEROSUWOWYCH",
-      tresc: "Czy ten olej nadaje się do agregatu prądotwórczego, czy tylko do kosiarki?",
-      status: "wyslane",
-      szkic: "Dzień dobry, nadaje się także do agregatów. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, nadaje się także do agregatów czterosuwowych. Pozdrawiamy, WERTIS",
-      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: null,
-      produkty: [{ twId: 900_017, symbol: "TEST-ULAMEK" }], wOfercie: 1,
-      prowadzi: null, wyslaneMinut: -23_940, odpowiedzial: "Ewa Bąk",
-    },
-    {
-      msg: "dev-msg-0007", login: "client:44380022", minut: -33_600,
-      oferta: null,
-      tresc: "Potrzebuję rozrusznika linkowego do agregatu Loncin G200F. Da się zamówić?",
-      status: "wyslane",
-      szkic: "Dzień dobry, nie prowadzimy części do Loncin. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, nie prowadzimy części do Loncin. Pozdrawiamy, WERTIS",
-      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: "Loncin G200F",
-      produkty: [], wOfercie: 0,
-      prowadzi: null, wyslaneMinut: -33_540, odpowiedzial: "Jan Kowalski",
-    },
-    {
-      msg: "dev-msg-0008", login: "client:44300104", minut: -46_000,
-      oferta: "ŚWIECA ZAPŁONOWA do kosiarek i agregatów — trio EAN",
-      tresc: "Jaki jest odstęp elektrod w tej świecy? Instrukcja podaje 0,7 mm.",
-      status: "wyslane",
-      szkic: "Dzień dobry, odstęp fabryczny to 0,7 mm. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, odstęp fabryczny to 0,7 mm i tak jest ustawiona. Pozdrawiamy, WERTIS",
-      edytowano: 1, kategoria: "dobor-czesci", urzadzenie: null,
-      produkty: [{ twId: 900_003, symbol: "TEST-TRIO-1" }], wOfercie: 1,
-      prowadzi: null, wyslaneMinut: -45_900, odpowiedzial: "Ewa Bąk",
-    },
-    {
-      msg: "dev-msg-0009", login: "client:44112097", minut: -60_000,
-      oferta: null,
-      tresc: "Szukam gaźnika do pilarki Stihl MS 181 C-BE, oznaczenie C1Q-S137. Jest na stanie?",
-      status: "wyslane",
-      szkic: "Dzień dobry, nie mamy tego gaźnika. Pozdrawiamy, WERTIS",
-      odpowiedz: "Dzień dobry, nie mamy tego gaźnika w ofercie. Pozdrawiamy, WERTIS",
-      edytowano: 0, kategoria: "dobor-czesci", urzadzenie: "STIHL MS 181 C-BE",
-      produkty: [], wOfercie: 0,
-      prowadzi: null, wyslaneMinut: -59_940, odpowiedzial: "Jan Kowalski",
-    },
-    {
-      /* Para do PODPOWIEDZI „ten sam kupujący" (0.128.0): maska 44300001 to
-         jan_wraca — kupujący zwrotu dev-ret-1 z adaptera dev. Pytanie nie ma
-         zamówienia, więc NIE sklei się automatem — ma się tylko podpowiedzieć
-         przy jego zwrocie i dyskusji. */
-      msg: "dev-msg-0010", login: "client:44300001", minut: -900,
-      oferta: "ŚRUBA MOCUJĄCA ZESTAW MONTAŻOWY",
-      tresc: "Dzień dobry, w zestawie zabrakło śruby mocującej — czy mogą Państwo dosłać?",
-      status: "nowe", szkic: null, odpowiedz: null, edytowano: 0,
-      kategoria: null, urzadzenie: null,
-      produkty: [], wOfercie: null, prowadzi: null,
-    },
-  ];
-
-  for (const p of pytania) {
-    wstaw.run(
-      "allegro", `dev-thread-${p.msg.slice(-4)}`, p.msg, p.login,
-      kupujacyIdZMaski(p.login),
-      null, p.oferta, p.tresc, chwila(p.minut), p.status,
-      p.szkic, p.szkic ? chwila(p.minut + 2) : null,
-      p.odpowiedz,
-      "wyslaneMinut" in p ? chwila(p.wyslaneMinut as number) : null,
-      "odpowiedzial" in p ? (p.odpowiedzial as string) : null,
-      p.edytowano, p.kategoria, p.urzadzenie, JSON.stringify(p.produkty),
-      p.wOfercie, chwila(p.minut), "Biuro (scenariusze)",
-      p.prowadzi, p.prowadzi ? chwila(p.minut + 5) : null
-    );
-  }
-
-  /* Potwierdzone dopasowania maszyna→część. Pierwsze jest tu od 0.96.0, żeby
-     sekcja „skąd to dopasowanie" miała co pokazać poza samymi frazami; reszta
-     doszła w 0.99.0 pod kafel „potwierdzonych dopasowań" w ANALIZIE. Kafel
-     liczący zawsze jeden nie pokazuje, czy działa — ani czy działa filtr
-     OSOBA, który jako jedyny z przekrojów produktowych go obejmuje. Stąd dwa
-     nazwiska i różne daty. */
-  const dopasuj = d.prepare(
-    `INSERT OR IGNORE INTO dopasowanie(urzadzenie, symbol, tw_id, pytanie_id,
-                                       potwierdzono_at, potwierdzono_przez)
-     VALUES (?,?,?,(SELECT id FROM pytanie WHERE wiadomosc_id = ?),?,?)`
-  );
-  for (const [urzadzenie, symbol, twId, msg, minut, kto] of [
-    ["STIHL MS 170", "TEST-TRIO-1", 900_003, "dev-msg-0003", -2800, "Jan Kowalski"],
-    ["STIHL MS 180", "TEST-TRIO-1", 900_003, "dev-msg-0005", -14_050, "Jan Kowalski"],
-    ["STIHL MS 180", "TEST-KOLIZJA-A", 900_001, "dev-msg-0005", -14_040, "Jan Kowalski"],
-    ["NAC LS46-127", "TEST-ULAMEK", 900_017, "dev-msg-0004", -4200, "Ewa Bąk"],
-    ["BRIGGS 550E", "TEST-ULAMEK", 900_017, "dev-msg-0006", -23_900, "Ewa Bąk"],
-  ] as Array<[string, string, number, string, number, string]>) {
-    dopasuj.run(urzadzenie, symbol, twId, msg, chwila(minut), kto);
-  }
-
-  return pytania.length;
-}
-
 function zdjecia(): void {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   fs.mkdirSync(dir, { recursive: true });
@@ -1749,10 +1497,8 @@ function wypisz(licz: Podsumowanie): void {
       `zdarzenia=${licz.zdarzenia} zamówienia=${licz.zamowienia}`
   );
   console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
-  console.log(`[scenariusze] sprzedaż pod zwroty Allegro: dokumentów=${licz.sprzedaz}`);
   console.log(`[scenariusze] przyjęcia na regał zwrotów (kosze z kartką): ${licz.przyjecia}`);
   console.log(`[scenariusze] domknięte dostawy historyczne (analiza dostaw): ${licz.historiaDostaw}`);
-  console.log(`[scenariusze] pytania klientów w skrzynce: ${licz.pytania}`);
   console.log("");
   let obszar = "";
   for (const s of KATALOG) {
@@ -1785,54 +1531,3 @@ if (wprost) {
   }
 }
 
-/** Szablony odpowiedzi na start (0.133.0) — trzy najczęstsze sytuacje. */
-function szablonyDemo(): void {
-  const d = db();
-  if ((d.prepare("SELECT COUNT(*) AS n FROM szablon").get() as { n: number }).n > 0) return;
-  const teraz = new Date().toISOString();
-  const wstaw = d.prepare(
-    `INSERT INTO szablon (nazwa, kanal, tresc, autor, utworzono_at, aktualizowano_at)
-     VALUES (?,?,?, 'seed', ?, ?)`
-  );
-  const szablony: Array<[string, string, string]> = [
-    [
-      "Zwrot przyjęty",
-      "dowolny",
-      "Dzień dobry {{klient}},\n\npaczka ze zwrotem {{zwrot}} do zamówienia {{zamowienie}} " +
-        "dotarła do nas i jest w trakcie sprawdzania. O decyzji dam znać w tej rozmowie.\n\n" +
-        "Pozdrawiam\n{{ja}}",
-    ],
-    [
-      "Prośba o numer zamówienia",
-      "pytanie",
-      "Dzień dobry,\n\nżeby sprawdzić sprawę, potrzebuję numeru zamówienia — jest w Allegro " +
-        "w zakładce „Moje zakupy”. Odpiszę od razu, gdy go otrzymam.\n\nPozdrawiam\n{{ja}}",
-    ],
-    [
-      "Środki wracają dziś",
-      "dyskusja",
-      "Dzień dobry {{klient}},\n\nzwrot został rozliczony — środki wracają dziś tą samą drogą, " +
-        "którą przyszła płatność. Zaksięgowanie po stronie banku trwa zwykle do dwóch dni " +
-        "roboczych.\n\nPozdrawiam\n{{ja}}",
-    ],
-  ];
-  for (const [nazwa, kanal, tresc] of szablony) wstaw.run(nazwa, kanal, tresc, teraz, teraz);
-}
-
-/** Opinie o sprzedawcy na start (0.135.0) — komplet z adaptera dev. */
-function opinieDemo(): void {
-  const d = db();
-  if ((d.prepare("SELECT COUNT(*) AS n FROM opinia").get() as { n: number }).n > 0) return;
-  const teraz = new Date().toISOString();
-  const wstaw = d.prepare(
-    `INSERT INTO opinia (allegro_id, order_id, kupujacy_login, ocena, rekomendacja, tresc,
-                         odpowiedz, mozliwa_odpowiedz, utworzono_allegro, widziano_at, utworzono_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
-  );
-  const dni = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
-  wstaw.run("dev-op-1", "dev-ord-2", "ewa_oddaje", 1, "NEGATIVE",
-    "Towar przyszedł uszkodzony, a na wiadomość czekałam trzy dni.", null, 1, dni(1), teraz, teraz);
-  wstaw.run("dev-op-2", "dev-ord-1", "jan_wraca", 5, "POSITIVE",
-    "Szybka wysyłka, wszystko zgodne z opisem.", "Dziękujemy!", 0, dni(6), teraz, teraz);
-  wstaw.run("dev-op-3", null, "firma_x", 3, "NEUTRAL", null, null, 1, dni(20), teraz, teraz);
-}

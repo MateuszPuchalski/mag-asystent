@@ -5,34 +5,33 @@ import os from "node:os";
 import path from "node:path";
 
 /* ── Kosze zwrotowe — serwis ─────────────────────────────────────────────────
-   Trzy niezmienniki z cichym trybem awarii:
+   Dwa niezmienniki z cichym trybem awarii:
 
-   1. KOSZ WIĄŻE SIĘ Z DOKUMENTEM. Przypięcie przed zleceniem korekty i MM
-      albo zamknięcie, zanim dokumenty weszły do Subiekta, kończy się później
-      cofnięciem bufora, na którym towaru nigdy nie było — ujemnym stanem.
-   2. ADRES PRZED SPRZEDAWALNOŚCIĄ. Zapis lokalizacji z odkładania musi stanąć
+   1. ADRES PRZED SPRZEDAWALNOŚCIĄ. Zapis lokalizacji z odkładania musi stanąć
       w kolejce PRZED zadaniem MM tego samego towaru.
-   3. COFNIĘCIE BUFORA IDZIE SAMO — po zakończeniu każda pozycja ma zadanie
-      MM ZWROTY→MAG, jednopozycyjne i z tw_id (przez wzgląd na guard).       */
+   2. ZAKOŃCZENIE NIE WYSTAWIA DOKUMENTU. Kosz przyjechał dokumentem MM
+      z Subiekta i dokument powrotny też wystawia biuro — drugie MM z aplikacji
+      przesuwałoby towar, którego nikt nie ruszał.
+
+   Trzeci niezmiennik — „kosz wiąże się z dokumentem korekty" — zniknął
+   w 0.140.0 razem z rejestrem zwrotów. Kosz powstaje teraz WYŁĄCZNIE
+   z dokumentu MM ZWROTY wystawionego w Subiekcie (`otworzPrzyjecie`), więc
+   dokument jest warunkiem jego istnienia, a nie regułą do pilnowania.      */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-kosz-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
 let db: typeof import("../db/db.js").db;
-let Z: typeof import("./zwroty.js");
 let K: typeof import("./kosze.js");
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  Z = await import("./zwroty.js");
   K = await import("./kosze.js");
 });
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sprawa_zrodlo", "sprawa", 
-    "kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "kosz",
-    "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sgt_stan", "sgt_magazyn",
+  for (const t of ["kosz_pozycja", "kosz", "sgt_towar", "sgt_stan", "sgt_magazyn",
     "sfera_queue",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -43,13 +42,6 @@ beforeEach(() => {
   ins.run(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", "", "A01-02-03");
   ins.run(900_037, "TEST-LINIA-DONE", "Pozycja odłożona w całości", "5900000000037", "");
   ins.run(900_029, "TEST-ROTUJACY", "Szybkorotujący", "", "C01-01-01");
-  d.prepare(
-    "INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, mag_id) VALUES (101,'FS','FS 101/08/2026','dev-ord-1',?, 'ALLEGRO', 1)"
-  ).run(new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10));
-  const poz = d.prepare("INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (101,?,?)");
-  poz.run(900_036, 1);
-  poz.run(900_037, 2);
-
   /* Magazyny i stany — do linijki „gdzie tego jeszcze jest" pod pozycją kosza.
      ZWR jest tu najciekawszy: to z niego rozkładany towar właśnie schodzi. */
   const mag = d.prepare("INSERT INTO sgt_magazyn(mag_id, kod, nazwa) VALUES (?,?,?)");
@@ -64,48 +56,34 @@ beforeEach(() => {
   stan.run(900_037, 9, 4);
 });
 
-/** Zwrot z wystawionymi dokumentami — punkt startu Etapu 3. */
-async function zwrotZDokumentami(dokDone = true): Promise<number> {
-  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
-  if (w.rodzaj !== "utworzony") throw new Error("oczekiwano utworzenia");
-  for (const p of w.zwrot.pozycje) Z.zapiszDecyzje(w.zwrot.id, p.id, "pelnowartosciowy", null, "Test");
-  const queueId = Z.wystawDokumenty(w.zwrot.id, "Test").dokumenty.queueId;
-  if (dokDone) {
-    db().prepare("UPDATE sfera_queue SET status='done', sgt_doc_number='KFS 1/08/2026' WHERE id=?").run(queueId);
-  }
-  return w.zwrot.id;
+/**
+ * Kosz gotowy do rozkładania — dokładnie taki, jaki rodzi `otworzPrzyjecie`
+ * z dokumentu MM ZWROTY: od razu ZAMKNIĘTY, z pozycjami i bez ani jednego
+ * odwołania do zwrotu. Wstawiamy go SQL-em, a nie przez przyjęcia, żeby ten
+ * plik testował rozkładanie, a nie import dokumentu (ten ma własny test
+ * w `przyjecia.test.ts`).
+ */
+function koszDoRozkladania(kod = "KZ-01"): ReturnType<typeof K.szczegolKosza> {
+  const d = db();
+  const teraz = new Date().toISOString();
+  const kosz = d
+    .prepare(
+      `INSERT INTO kosz(kod, status, mm_dok_id, mm_numer, utworzono_at, utworzono_przez,
+                        zamknieto_at, zamknieto_przez)
+       VALUES (?, 'zamkniety', 1209, ?, ?, 'Test', ?, 'Test')`
+    )
+    .run(kod, kod, teraz, teraz);
+  const koszId = Number(kosz.lastInsertRowid);
+  const ins = d.prepare(
+    "INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)"
+  );
+  ins.run(koszId, 900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", 1);
+  ins.run(koszId, 900_037, "TEST-LINIA-DONE", "Pozycja odłożona w całości", 2);
+  return K.szczegolKosza(koszId);
 }
 
-test("kosz nie przyjmie zwrotu bez zleconych dokumentów", async () => {
-  const w = await Z.utworzZeSkanu("DEVWB0001", "Test");
-  if (w.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
-  assert.throws(() => K.przypnijZwrot(w.zwrot.id, "KZ-01", "Test"), /korektę i MM/);
-});
-
-test("przypięcie tworzy kosz przy pierwszym skanie i jest idempotentne", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, " kz-01 ", "Test"); // trim + upper — skan i wpis się spotykają
-  K.przypnijZwrot(id, "KZ-01", "Test");   // drugi skan tego samego kosza
-  const kosze = K.listaKoszy();
-  assert.equal(kosze.length, 1);
-  assert.equal(kosze[0].kod, "KZ-01");
-  assert.equal(kosze[0].zwrotow, 1);
-  assert.throws(() => K.przypnijZwrot(id, "KZ-02", "Test"), /innym koszu/);
-  K.odepnijZwrot(id, "Test");
-  K.przypnijZwrot(id, "KZ-02", "Test");
-});
-
-test("zamknięcie czeka, aż dokumenty NAPRAWDĘ wejdą do Subiekta", async () => {
-  const id = await zwrotZDokumentami(false); // zadanie korekty wciąż pending
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const koszId = K.listaKoszy()[0].id;
-  assert.throws(() => K.zamknijKosz(koszId, "Test"), /nie weszły do Subiekta/);
-});
-
 test("snapshot przy zamknięciu: pozycje pełnowartościowe z symbolem i ilością", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   assert.equal(kosz.status, "zamkniety");
   assert.equal(kosz.pozycje.length, 2);
   // sortowanie alejkowe: towar z adresem przed towarem bez adresu
@@ -116,9 +94,7 @@ test("snapshot przy zamknięciu: pozycje pełnowartościowe z symbolem i ilości
 });
 
 test("skan towaru wskazuje pozycję kosza; cudzy towar mówi „nie z tego kosza”", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const poEan = K.skanTowaruKosza(kosz.id, "5900000000037");
   assert.ok("pozycjaId" in poEan);
   const poSymbolu = K.skanTowaruKosza(kosz.id, "test-linia-todo");
@@ -129,9 +105,7 @@ test("skan towaru wskazuje pozycję kosza; cudzy towar mówi „nie z tego kosza
 });
 
 test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const [zAdresem, bezAdresu] = kosz.pozycje;
 
   // towar wraca na SWOJĄ półkę → zero zapisu lokalizacji
@@ -161,39 +135,28 @@ test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", a
 
   const rozlozony = K.zakonczKosz(kosz.id, "Magazynier");
   assert.equal(rozlozony.status, "rozlozony");
-  const mm = db()
-    .prepare("SELECT id, tw_id, payload FROM sfera_queue WHERE type='mm' ORDER BY id")
-    .all() as Array<{ id: number; tw_id: number; payload: string }>;
-  assert.equal(mm.length, 2, "MM jednopozycyjne per pozycja kosza");
-  for (const zadanie of mm) {
-    const p = JSON.parse(zadanie.payload);
-    assert.equal(p.magFrom, 3, "z bufora zwrotów");
-    assert.equal(p.magTo, 1, "na magazyn główny");
-    assert.ok(zadanie.tw_id, "tw_id ustawione — guard kolejności musi widzieć towar");
-  }
-  // niezmiennik: zapis adresu stoi w kolejce PRZED cofnięciem bufora tego towaru
-  const mm37 = mm.find((z) => z.tw_id === 900_037)!;
-  assert.ok(setLoc[0].id < mm37.id, "set_location przed mm dla tego samego towaru");
-
-  // drugie kliknięcie ZAKOŃCZ nie dubluje dokumentów
+  /* Zakończenie kosza z dokumentu NIE kolejkuje MM: przesunięcie powrotne
+     wystawia biuro w Subiekcie. Drugi dokument na ten sam towar byłby
+     przesunięciem, którego nikt nie zamawiał. */
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    0,
+    "kolektor zapisuje adresy, dokumenty wystawia biuro"
+  );
+  // drugie kliknięcie ZAKOŃCZ niczego nie powtarza
   K.zakonczKosz(kosz.id, "Magazynier");
-  assert.equal((db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n, 2);
+  assert.equal(K.szczegolKosza(kosz.id).status, "rozlozony");
 
-  // kod wraca do obiegu: nowy kosz pod tym samym kodem (inny zwrot — DEVTW0002)
-  const w2 = await Z.utworzZeSkanu("DEVTW0002", "Test");
-  if (w2.rodzaj !== "utworzony") return assert.fail("oczekiwano utworzenia");
-  for (const p of w2.zwrot.pozycje) Z.zapiszDecyzje(w2.zwrot.id, p.id, "pelnowartosciowy", null, "Test");
-  Z.ustawDokument(w2.zwrot.id, 101, "Test");
-  const q2 = Z.wystawDokumenty(w2.zwrot.id, "Test").dokumenty.queueId;
-  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(q2);
-  K.przypnijZwrot(w2.zwrot.id, "KZ-01", "Test");
-  assert.equal(K.listaKoszy().filter((k) => k.kod === "KZ-01" && k.status === "otwarty").length, 1);
+  /* Kod wraca do obiegu: rozłożony kosz zwalnia etykietę, więc następne
+     przyjęcie może ją nosić. Pilnuje tego indeks częściowy `ix_kosz_kod_aktywny`
+     — bez zwolnienia drugie wstawienie rozbiłoby się o unikalność. */
+  const nastepny = koszDoRozkladania("KZ-01");
+  assert.equal(nastepny.kod, "KZ-01");
+  assert.equal(K.listaKoszy().filter((k) => k.kod === "KZ-01").length, 2);
 });
 
 test("zakończenie odmawia, dopóki cokolwiek leży w koszu", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
   assert.throws(() => K.zakonczKosz(kosz.id, "Magazynier"), /Nieodłożone pozycje/);
 });
@@ -204,9 +167,7 @@ test("zakończenie odmawia, dopóki cokolwiek leży w koszu", async () => {
    blokowała wcześniej zakończenie i cały obieg.                             */
 
 test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
 
   const p = kosz.pozycje.find((x) => x.twId === 900_036);
   assert.ok(p);
@@ -230,9 +191,7 @@ test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
 });
 
 test("pominięcie: powód obowiązkowy, ZAKOŃCZ przechodzi, MM tylko dla odłożonych", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   assert.equal(kosz.pozycje.length, 2);
 
   assert.throws(() => K.pominPozycjeKosza(kosz.pozycje[0].id, "  ", "Magazynier"), /Podaj powód/);
@@ -247,17 +206,14 @@ test("pominięcie: powód obowiązkowy, ZAKOŃCZ przechodzi, MM tylko dla odło�
   const pominieta = rozlozony.pozycje.find((p) => p.status === "skipped");
   assert.equal(pominieta?.powod, "uszkodzony");
 
-  /* Sedno: MM cofa bufor tylko dla towaru, który NAPRAWDĘ wrócił na halę.
-     Przesunięcie pominiętej pozycji zdejmowałoby z bufora coś, czego nikt
-     nie ruszył — a to ten sam błąd co dokument wystawiony drugi raz. */
-  const mm = db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number };
-  assert.equal(mm.n, 1, "jedno MM: za odłożoną pozycję, nie za pominiętą");
+  /* Sedno POMINIĘCIA: pozycja, której w koszu nie było, nie blokuje obiegu,
+     ale zostaje widoczna z powodem — biuro dostaje ją na osobnej liście. */
+  const wPominietych = K.pominietePozycje().filter((p) => p.kod === kosz.kod);
+  assert.equal(wPominietych.length, 1, "pominięta trafia na listę pracy biura");
 });
 
 test("odłożenie cofa pominięcie — znaleziony towar nie wymaga odklikiwania", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
 
   K.pominPozycjeKosza(kosz.pozycje[0].id, "nie ma w koszu", "Magazynier");
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
@@ -274,9 +230,7 @@ test("odłożenie cofa pominięcie — znaleziony towar nie wymaga odklikiwania"
    cofa wszystko bez śladu; po zapisie nie cofa nic i mówi to wprost.        */
 
 test("cofnięcie odłożenia anuluje zapis adresu, dopóki ten czeka w kolejce", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const p = kosz.pozycje.find((x) => x.twId === 900_037)!; // bez adresu w kartotece
 
   K.odlozPozycje(p.id, "B02-01-01", "Magazynier");
@@ -292,9 +246,7 @@ test("cofnięcie odłożenia anuluje zapis adresu, dopóki ten czeka w kolejce",
 });
 
 test("po zapisie adresu do Subiekta cofnięcie odmawia i mówi, co zrobić", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const p = kosz.pozycje.find((x) => x.twId === 900_037)!;
 
   K.odlozPozycje(p.id, "B02-01-01", "Magazynier");
@@ -310,51 +262,34 @@ test("po zapisie adresu do Subiekta cofnięcie odmawia i mówi, co zrobić", asy
   );
 });
 
-test("cofnięcie zakończenia: anuluje MM w kolejce, odmawia po zapisie", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+test("cofnięcie zakończenia zdejmuje ślad rozłożenia, praca zostaje", () => {
+  const kosz = koszDoRozkladania();
   for (const p of kosz.pozycje) K.odlozPozycje(p.id, "C01-01-01", "Magazynier");
   K.zakonczKosz(kosz.id, "Magazynier");
 
-  /* Ślad rozłożenia jedzie na ekran biura — patrz test niżej. Tu sprawdzamy
-     drugą połowę tej samej reguły: kosz cofnięty NIE jest rozłożony przez
-     nikogo. Nazwisko, które zostałoby po cofnięciu, byłoby gorsze niż jego
-     brak — mówiłoby o pracy, której w tej chwili nie ma. */
+  /* Ślad rozłożenia jedzie na ekran biura. Druga połowa tej samej reguły:
+     kosz cofnięty NIE jest rozłożony przez nikogo. Nazwisko, które zostałoby
+     po cofnięciu, byłoby gorsze niż jego brak — mówiłoby o pracy, której
+     w tej chwili nie ma. */
   const poZakonczeniu = K.szczegolKosza(kosz.id);
   assert.equal(poZakonczeniu.rozlozonoPrzez, "Magazynier");
   assert.ok(poZakonczeniu.rozlozonoAt);
 
-  /* Sprawdzenie WSZYSTKICH zadań przed anulowaniem czegokolwiek: jedno MM
-     przetworzone ma zablokować całość, a nie zostawić połowy anulowanej. */
-  const mm = db().prepare("SELECT id FROM sfera_queue WHERE type='mm'").all() as Array<{ id: number }>;
-  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(mm[0].id);
-  assert.throws(() => K.cofnijZakonczenie(kosz.id, "Magazynier"), /już w Subiekcie/);
-  assert.equal(K.szczegolKosza(kosz.id).status, "rozlozony", "kosz nie ruszył się z miejsca");
-  assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='cancelled'").get() as { n: number }).n,
-    0,
-    "żadne MM nie zostało anulowane przy odmowie"
-  );
-
-  db().prepare("UPDATE sfera_queue SET status='pending' WHERE id=?").run(mm[0].id);
   const cofniety = K.cofnijZakonczenie(kosz.id, "Magazynier");
   assert.equal(cofniety.status, "zamkniety", "kosz wraca do rozkładania");
   assert.equal(cofniety.pozycje.every((p) => p.status === "done"), true, "praca zostaje");
   assert.equal(cofniety.rozlozonoPrzez, null, "ślad rozłożenia znika razem z rozłożeniem");
   assert.equal(cofniety.rozlozonoAt, null);
   assert.equal(K.listaKoszy()[0].rozlozonoPrzez, null, "lista biura mówi to samo co szczegół");
+  /* Zapisów adresu cofnięcie NIE rusza: towar naprawdę leży tam, gdzie go
+     odłożono, a kartoteka ma o tym wiedzieć niezależnie od stanu kosza. */
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='cancelled'").get() as { n: number }).n,
-    mm.length,
-    "wszystkie MM anulowane"
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='set_location' AND status='cancelled'").get() as { n: number }).n,
+    0
   );
 });
-
 test("odłożenie na PÓŹNIEJ zsuwa pozycję na koniec listy, bez pomijania jej", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const pierwsza = kosz.pozycje[0];
 
   const po = K.przesunNaKoniec(pierwsza.id, "Magazynier");
@@ -374,9 +309,7 @@ test("odłożenie na PÓŹNIEJ zsuwa pozycję na koniec listy, bez pomijania jej
 });
 
 test("cofnięcie pominięcia przywraca pozycję do pracy", async () => {
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const p = kosz.pozycje[0];
 
   K.pominPozycjeKosza(p.id, "nie ma w koszu", "Magazynier");
@@ -391,9 +324,7 @@ test("odłożona pozycja zjeżdża na koniec listy, kolejna zostaje na górze", 
      pasek zrobionej pozycji dalej zajmuje ekran, więc przy koszu na dwadzieścia
      pozycji do roboty trzeba było PRZEWIJAĆ przez robotę już wykonaną. Ta sama
      lekcja, którą rozkładanie dostaw odrobiło w 0.35.0. */
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
   const [pierwsza, druga] = kosz.pozycje;
 
   K.odlozPozycje(pierwsza.id, "A01-02-03", "Magazynier");
@@ -433,9 +364,7 @@ test("pozycja niesie WSZYSTKIE półki towaru, pickingową pierwszą", async () 
      wyjść z kosza do karty towaru — czyli zgubić wskazaną pozycję. */
   db().prepare("UPDATE sgt_towar SET lokalizacja=? WHERE tw_id=?")
     .run("A01-02-03 B04-01-02", 900_036);
-  const id = await zwrotZDokumentami();
-  K.przypnijZwrot(id, "KZ-01", "Test");
-  const kosz = K.zamknijKosz(K.listaKoszy()[0].id, "Test");
+  const kosz = koszDoRozkladania();
 
   const p = kosz.pozycje.find((x) => x.twId === 900_036);
   assert.deepEqual(p?.lokalizacje, ["A01-02-03", "B04-01-02"]);
@@ -455,16 +384,14 @@ test("pozycja niesie WSZYSTKIE półki towaru, pickingową pierwszą", async () 
 test("karton nie miesza się z obiegiem zwrotów", async () => {
   /* Karton (0.122.0) mieszka w tej samej tabeli, bo rozkłada się go tak samo.
      Wszystko PRZED rozkładaniem jest jednak inne i granica musi być twarda:
-     zawartość kartonu zbiera hala, a nie biuro przypinające zwroty. */
+     zawartość kartonu zbiera hala, a kosz przyjeżdża dokumentem z Subiekta. */
   const KA = await import("./karton.js");
   const karton = KA.zalozKarton("Magazynier");
-  const id = await zwrotZDokumentami();
+  const kosz = koszDoRozkladania();
 
   assert.equal(K.koszPoKodzie(karton.kod), undefined, "kod kartonu nie jest kodem kosza");
-  assert.throws(() => K.przypnijZwrot(id, karton.kod, "Biuro"), /karton z hali/);
-  assert.throws(() => K.zamknijKosz(karton.id, "Biuro"), /na kolektorze/);
-
-  K.przypnijZwrot(id, "KZ-01", "Biuro");
-  const kosz = K.koszPoKodzie("KZ-01")!;
-  assert.throws(() => KA.dodajDoKartonu(kosz.id, { code: "TEST-LINIA-TODO" }, 1, "Magazynier"), /to zwroty/);
+  assert.throws(
+    () => KA.dodajDoKartonu(kosz.id, { code: "TEST-LINIA-TODO" }, 1, "Magazynier"),
+    /to zwroty/
+  );
 });

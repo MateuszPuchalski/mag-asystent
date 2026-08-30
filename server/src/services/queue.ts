@@ -1,7 +1,7 @@
 import { db } from "../db/db.js";
 import { currentUserRef } from "../context.js";
 import { logEvent } from "./events.js";
-import type { MmItem, ZlecenieKorekty } from "../adapters/sfera.js";
+import type { MmItem } from "../adapters/sfera.js";
 
 export interface EnqueueBase {
   createdBy: string;
@@ -191,16 +191,4 @@ export function enqueueMM(
   base: EnqueueBase
 ): number {
   return insert("mm", { magFrom, magTo, items }, base);
-}
-
-/**
- * Korekta sprzedaży + MM na bufor zwrotowy — JEDNO zadanie.
- *
- * Dwa osobne zadania byłyby prostsze w kolejce i gorsze w magazynie: między
- * nimi istniałaby chwila, w której korekta jest wystawiona, a towar leży
- * w magazynie sprzedaży jako sprzedawalny. Sklep sprzedałby go drugi raz,
- * zanim ktokolwiek zdążył go obejrzeć.
- */
-export function enqueueKorektaZwrotu(zlecenie: ZlecenieKorekty, base: EnqueueBase): number {
-  return insert("korekta_zwrot", zlecenie, base);
 }

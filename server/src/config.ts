@@ -243,13 +243,6 @@ export const config = {
     dokTypFS: num(process.env.DOK_TYP_FS, 2, "DOK_TYP_FS"),
     dokTypPA: num(process.env.DOK_TYP_PA, 21, "DOK_TYP_PA"),
     /**
-     * Okno importu dokumentów sprzedaży [dni]. WŁASNE, szersze niż okno dostaw:
-     * klient ma prawo zwrotu liczone od doręczenia, a paczka wraca i po dwóch
-     * miesiącach. Dokument wskazany przez NIEROZLICZONY zwrot zostaje w imporcie
-     * niezależnie od wieku (ten sam wyjątek co `otwarteDokumenty`).
-     */
-    sprzedazDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 90, "DOK_SPRZEDAZ_DNI_WSTECZ"),
-    /**
      * Ile dni wstecz czytać przesunięcia MM NA regał zwrotów — dokumenty,
      * których numery magazyn pisze na koszach. Domyślne 30 dni to okno,
      * którego biuro używa w Subiekcie („ostatnie 30 dni" na liście przyjęć).
@@ -260,25 +253,6 @@ export const config = {
      * struktury (9-MM), ta sama lista co pozostałe kody dokumentów.
      */
     dokTypMM: num(process.env.DOK_TYP_MM, 9, "DOK_TYP_MM"),
-    /**
-     * Kolumna `dok__Dokument` z numerem obcym/oryginalnym dokumentu.
-     * Integracje sprzedażowe zwykle wpisują tam numer zamówienia — jeśli tak
-     * jest i tu, dopasowanie zwrotu do dokumentu staje się jednoznaczne.
-     * ISTNIENIE kolumny potwierdzone w opisie struktury 1.8731.31.6933
-     * (`dok_NrPelnyOryg`, varchar 30); [WERYFIKUJ] zostaje tylko to, czy
-     * integracja faktycznie wpisuje tam numer Allegro. Gdy kolumny nie ma
-     * (inna wersja bazy), import ponawia zapytanie bez niej i melduje
-     * w /api/health. Puste = świadoma rezygnacja z tego sygnału.
-     */
-    sprzedazNrOrygColumn: process.env.MSSQL_SPRZEDAZ_NR_ORYG_COLUMN ?? "dok_NrPelnyOryg",
-    /**
-     * Kolumna `dok__Dokument` z uwagami — drugi kandydat na miejsce, gdzie
-     * integracja zostawia numer zamówienia Allegro. Domyślnie `dok_Uwagi`
-     * (varchar 500) — istnienie potwierdzone w tym samym opisie struktury
-     * (0.53.1; wcześniej pusta z ostrożności). Dopasowanie bez tego sygnału
-     * degraduje do nakładki pozycji + ręcznego wyboru, nie do awarii.
-     */
-    sprzedazUwagiColumn: process.env.MSSQL_SPRZEDAZ_UWAGI_COLUMN ?? "dok_Uwagi",
   },
 
   /**
