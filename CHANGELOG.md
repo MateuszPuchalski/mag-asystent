@@ -33,6 +33,52 @@ historii nie przepisujemy.
 
 ---
 
+## 0.138.0 — 30 sierpnia 2026
+
+**Masowa zmiana lokalizacji z arkusza — STAN SYSTEMU, tylko admin.**
+
+Zgłoszenie właściciela: „dodaje arkusz z symbolami produktów i podmienia mi na
+lokalizacje wskazane w arkuszu". Przestawienie jednego regału to sto
+kilkadziesiąt kartotek, a jedyną drogą była karta towaru na kolektorze, jeden
+towar na raz. Dzień pracy zamiast dwóch minut.
+
+**Wgrywasz .xlsx wprost z Subiekta — bez zapisywania jako CSV.** Arkusz
+rozbiera PRZEGLĄDARKA, nie serwer: `.xlsx` to ZIP z XML-ami, a przeglądarka umie
+oba (`DecompressionStream`, `DOMParser`). Na serwer jedzie lista symbol–adres,
+nigdy bajty pliku. Ta sama zasada, dla której obrazy przerabia przeglądarka —
+i dzięki niej serwer nadal ma dwie zależności, a strona zero. CSV też działa,
+tą samą trasą.
+
+**Kolumny rozpoznajemy po nagłówkach `Symbol` i `Lokalizacja`**, nie po literze
+kolumny. Eksport o innym układzie wgrałby inaczej „Nazwę" jako adres — po cichu.
+
+**Najpierw podgląd, dopiero potem zapis.** Widzisz tabelę BYŁO → BĘDZIE, a obok
+niej dwie listy Z NAZWAMI: wiersze odrzucone z powodem i symbole spoza
+kartoteki. To jest lista do poprawienia w arkuszu, więc liczba by nie
+wystarczyła. Podgląd nie kolejkuje ani jednego zadania i nie zostawia wpisu
+w audycie — wybranie pliku to jeszcze nie operacja.
+
+**Wiersz z jednym złym adresem odpada W CAŁOŚCI.** „A05-02-02 PAL38II
+A10-06-06" zapisane bez palety byłoby cichym skasowaniem adresu, którego nikt
+nie kazał kasować — a po zapisie nie ma go z czego odtworzyć.
+
+**Wiersz, który niczego nie zmienia, nie jedzie do Subiekta.** Arkusz jest
+EKSPORTEM, więc przy poprawianiu jednego regału większość wierszy niesie adres,
+który już tam stoi. Bez tego jedno kliknięcie posyłałoby sto zapisów po nic.
+Tak samo z wgraniem tego samego pliku drugi raz, zanim kolejka się wykona:
+zmiany, które już w niej czekają, liczą się osobno i nie kolejkują się ponownie.
+
+**Operacja należy do administratora**, nie do biura. Import zbiórek i reguły
+strefy zmieniają dane, z których liczą się PODPOWIEDZI; ta zmienia adresy
+w bazie firmy, a magazynier przy regale znajdzie towar tam, gdzie ten arkusz
+powiedział. Kartę widać przy każdej roli — odmowę wypowiada serwer, zgodnie
+z konwencją panelu.
+
+Sprawdzone na prawdziwym arkuszu właściciela: 125 wierszy, 72 zmiany, 52
+symbole spoza kartoteki i jeden odrzucony adres. Wdrożenie nie wymaga niczego:
+zapis idzie istniejącym zadaniem `set_location`, na którego uprawnienie SQL
+jest już nadane.
+
 ## 0.137.1 — 30 sierpnia 2026
 
 **Trzy przejęcia sprawy zapisywały się w ciszy.** Audyt logu zdarzeń: stempel

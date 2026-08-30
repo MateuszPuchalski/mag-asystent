@@ -21,6 +21,7 @@ import { magazynRoutes } from "./routes/magazyny.js";
 import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
+import { lokalizacjeMasoweRoutes } from "./routes/lokalizacje-masowe.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { pytaniaRoutes } from "./routes/pytania.js";
@@ -214,6 +215,7 @@ export async function buildApp() {
   await app.register(analizaRoutes);
   await app.register(biuroRoutes);
   await app.register(zbiorkiRoutes);
+  await app.register(lokalizacjeMasoweRoutes);
   await app.register(dostawcyRoutes);
   await app.register(zwrotyRoutes);
   await app.register(pytaniaRoutes);

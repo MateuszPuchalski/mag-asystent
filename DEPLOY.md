@@ -1706,6 +1706,44 @@ jedyną zakładką tej pracy: karty dawnych zakładek ZWROTY ALLEGRO i PYTANIA
 KLIENTÓW przeprowadziły się tutaj w całości, a same zakładki znikły.
 Wszystkie identyfikatory kart i tras zostały bez zmian.
 
+## 6e. Masowa zmiana lokalizacji z arkusza (0.138.0)
+
+Przestawienie całego regału bez chodzenia od kartoteki do kartoteki. Wykonuje
+**wyłącznie administrator**, w `/biuro` → **STAN SYSTEMU**.
+
+**Wdrożenie nie wymaga niczego.** Ani zmiennej w `wertis.env`, ani nowego
+uprawnienia SQL: zapis idzie istniejącym zadaniem `set_location`, czyli tą samą
+drogą, co zmiana adresu z kolektora. Grant na `tw_Lokalizacja` jest już nadany.
+
+### Jak się tego używa
+
+1. W Subiekcie wyeksportuj kartoteki regału do arkusza. Potrzebne są kolumny
+   **Symbol** i **Lokalizacja** — reszta może zostać.
+2. Popraw kolumnę adresu w Excelu i zapisz plik. Przyjmujemy **.xlsx** oraz
+   **.csv**.
+3. `/biuro` → STAN SYSTEMU → **WGRAJ ARKUSZ**. Zobaczysz podgląd: tabelę
+   BYŁO → BĘDZIE, listę odrzuconych wierszy z powodem i listę symboli spoza
+   kartoteki. Do Subiekta nie poszło jeszcze nic.
+4. **ZASTOSUJ** kolejkuje zmiany — po jednym zadaniu na kartotekę. Wykonuje je
+   kolejka zapisów, widoczna w karcie wyżej.
+
+### Czego pilnować
+
+Adres musi mieć format regału `A01-02-03` albo palety `PAL-042`. Wiersz z choć
+jednym złym kodem odpada w całości i jest wypisany z nazwy — popraw go
+w arkuszu i wgraj plik jeszcze raz.
+
+Pusta komórka adresu **nie kasuje** lokalizacji. Zdjęcie adresu zostaje
+czynnością świadomą, z karty towaru na kolektorze.
+
+Kolejka wykonuje jedno zadanie na sekundę, więc sto kartotek schodzi w około
+dwie minuty. Wgranie tego samego pliku w trakcie niczego nie zdubluje: zmiany
+czekające w kolejce są liczone osobno i nie kolejkują się drugi raz. Naraz
+wolno wgrać **2000 wierszy**.
+
+Cofnięcia jednym kliknięciem nie ma. Odwrotem jest arkusz z poprzednimi
+adresami — dlatego eksport sprzed zmiany warto zachować.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
