@@ -275,6 +275,12 @@
      pole, którego nie dociągnięto, a nie na pole odmierzone. */
   #widokDostawcy textarea { width: 100%; }
 
+  /* Wybór, które obecne adresy zdjąć przy imporcie z arkusza (0.139.0).
+     Kody stoją JEDEN POD DRUGIM, nie w rzędzie: przy kilku adresach rząd
+     rozpychał kolumnę tabeli szerzej niż reszta wiersza. */
+  .wyborKodu { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .wyborKodu + .wyborKodu { margin-top: 3px; }
+
   /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
      jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
      bezpieczne w każdej szerokości i nie potrzebuje żadnego zapytania.
@@ -2036,6 +2042,48 @@
       </div>
       <div class="kafle" id="kafleKolejki"></div>
       <table id="kolejka" style="margin-top:12px"></table>
+    </section>
+
+    <!-- ── Masowa zmiana adresów z arkusza (0.138.0) ─────────────────────────
+         Stoi POD kolejką zapisów świadomie: to ta kolejka wykona skutek tej
+         karty, a sto zadań, które się w niej pojawią, ma być widoczne w tym
+         samym spojrzeniu. Karta wyżej mówi „ta strona tylko czyta" o PONÓW —
+         i to nadal prawda, bo ponawianie zostaje na kolektorze.
+
+         Rola NIE jest w przeglądarce znana i nie zaczynamy jej tu trzymać:
+         kartę widzą wszyscy, odmowę wypowiada serwer. Ta sama konwencja, co
+         przy kontach w ustawieniach. -->
+    <section class="card" id="arkuszLokalizacjiKarta">
+      <h2>MASOWA ZMIANA LOKALIZACJI Z ARKUSZA <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Wykonuje wyłącznie <b>administrator</b>. Wyeksportuj kartoteki
+          z Subiekta, popraw kolumnę <b>Lokalizacja</b> w Excelu i wgraj plik
+          z powrotem. Przyjmujemy <b>.xlsx</b> i <b>.csv</b>; kolumny
+          rozpoznajemy po nagłówkach <b>Symbol</b> i <b>Lokalizacja</b>.
+        </p>
+        <p class="mute" style="margin-bottom:10px">
+          Arkusz <b>podmienia</b> całe pole adresu. Wiersze, które mówią to samo,
+          co Subiekt, są pomijane — wgranie własnego eksportu bez zmian nie
+          zrobi nic. Wiersz z błędnym adresem odpada w całości, żeby zapis nie
+          skasował po cichu adresu, którego nikt nie kazał kasować.
+        </p>
+        <p class="mute" style="margin-bottom:10px">
+          Nic nie idzie do Subiekta przed kliknięciem <b>ZASTOSUJ</b>. Każda
+          zmiana to osobne zadanie w kolejce wyżej i osobny wpis w dzienniku.
+        </p>
+      </div>
+      <div class="filtry">
+        <div>
+          <button class="akcja" id="wgrajArkuszLok">WGRAJ ARKUSZ</button>
+          <input type="file" id="plikArkuszLok"
+            accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        </div>
+        <div><button class="akcja" id="zastosujArkuszLok" hidden>ZASTOSUJ</button></div>
+      </div>
+      <p class="mute" id="wynikArkuszLok"></p>
+      <div id="arkuszLokPodglad"></div>
     </section>
 
     <section class="card">
@@ -8660,6 +8708,333 @@ $("zakresAnalizy").addEventListener("change", odswiezAnalize);
 $("osobaAnalizy").addEventListener("change", odswiezStatystykiPytan);
 $("csvAnalizy").addEventListener("click", () =>
   pobierz(`/api/analiza/csv?days=${dniAnalizy}`, "wertis-analiza.csv"));
+
+/* ── Masowa zmiana lokalizacji z arkusza (0.138.0) ───────────────────────────
+   ARKUSZ ROZBIERA PRZEGLĄDARKA, nie serwer. Ta sama zasada, dla której obrazy
+   przerabia przeglądarka: na serwer jedzie STRUKTURA — lista `{symbol,
+   lokalizacja}` — a nigdy bajty pliku. Inaczej serwer o dwóch zależnościach
+   musiałby dostać trzecią, do rozpakowywania ZIP-a.
+
+   Bo .xlsx to ZIP z XML-ami w środku, a przeglądarka umie oba: `DecompressionStream`
+   rozpakowuje, `DOMParser` czyta. Zero bibliotek, zero builda — czyli dokładnie
+   to, na czym stoi ta strona.                                                 */
+
+/** Nagłówki, po których poznajemy kolumny. Ta sama reguła, co na serwerze. */
+const ARK_SYMBOL = "symbol";
+const ARK_LOKALIZACJA = "lokalizacja";
+
+/**
+ * Rozbiór ZIP-a przez STOPKĘ (EOCD) i centralny katalog, a nie przez skanowanie
+ * nagłówków lokalnych od początku pliku.
+ *
+ * Nagłówek lokalny przy ustawionym bicie 3 flagi ma zera w polach rozmiaru —
+ * prawdziwe wartości leżą w deskryptorze ZA danymi. Skan sekwencyjny rozjeżdża
+ * się wtedy na pierwszym takim wpisie i zwraca śmieci. Centralny katalog ma
+ * rozmiary ZAWSZE.
+ */
+async function rozpakujZip(bufor) {
+  const b = new Uint8Array(bufor);
+  const dv = new DataView(bufor);
+  // EOCD ma sygnaturę PK\x05\x06 i komentarz do 64 kB, więc szukamy od końca.
+  let eocd = -1;
+  for (let i = b.length - 22; i >= 0 && i >= b.length - 22 - 65535; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error("To nie jest plik .xlsx (brak stopki ZIP)");
+  const ile = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+
+  const pliki = {};
+  for (let n = 0; n < ile; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("Uszkodzony katalog ZIP");
+    const metoda = dv.getUint16(p + 10, true);
+    const skompr = dv.getUint32(p + 20, true);
+    const dlNazwy = dv.getUint16(p + 28, true);
+    const dlExtra = dv.getUint16(p + 30, true);
+    const dlKom = dv.getUint16(p + 32, true);
+    const offset = dv.getUint32(p + 42, true);
+    const nazwa = new TextDecoder().decode(b.subarray(p + 46, p + 46 + dlNazwy));
+    p += 46 + dlNazwy + dlExtra + dlKom;
+
+    // Dane zaczynają się za nagłówkiem LOKALNYM — jego pola długości bywają
+    // inne niż w katalogu (extra field), więc czytamy je stąd, nie stamtąd.
+    const lokDlNazwy = dv.getUint16(offset + 26, true);
+    const lokDlExtra = dv.getUint16(offset + 28, true);
+    const od = offset + 30 + lokDlNazwy + lokDlExtra;
+    const dane = b.subarray(od, od + skompr);
+    // Metoda 0 = bez kompresji. Plik z Subiekta ma OBIE, więc obie obsługujemy.
+    pliki[nazwa] = metoda === 0 ? dane : await rozdmuchaj(dane);
+  }
+  return pliki;
+}
+
+/** Deflate bez nagłówka zlib — tak trzyma dane ZIP. */
+async function rozdmuchaj(dane) {
+  const s = new Blob([dane]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+
+/** Litera kolumny z adresu komórki: `C12` → `C`. */
+const kolumnaZAdresu = (ref) => (ref || "").replace(/\d+/g, "");
+
+/**
+ * Wiersze arkusza .xlsx jako tablice tekstów.
+ *
+ * Numer kolumny bierze się z ADRESU komórki, nie z jej pozycji w wierszu:
+ * Excel pomija komórki puste, więc liczenie po kolei przesuwa wszystko w lewo
+ * i „Nazwa" ląduje tam, gdzie miał być adres.
+ */
+async function wierszeZXlsx(bufor) {
+  const pliki = await rozpakujZip(bufor);
+  const arkusz = Object.keys(pliki).find((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n));
+  if (!arkusz) throw new Error("Plik nie zawiera arkusza");
+  const tekst = (u8) => new TextDecoder().decode(u8);
+  const xml = (u8) => new DOMParser().parseFromString(tekst(u8), "application/xml");
+
+  /* Teksty współdzielone: Excel trzyma powtarzalne napisy raz, a komórka
+     `t="s"` niesie tylko indeks. Plik właściciela ich nie ma (komórki `t="str"`),
+     ale eksport z innej wersji Excela będzie je miał — bez tego całe kolumny
+     wróciłyby jako liczby. */
+  /* Szukamy po NAZWIE LOKALNEJ (`getElementsByTagNameNS("*", …)`), a nie po
+     nazwie kwalifikowanej. Eksport z Subiekta prefiksuje wszystko przestrzenią
+     nazw — `<x:row>`, `<x:c>`, `<x:v>` — i wtedy `getElementsByTagName("row")`
+     nie znajduje NICZEGO, bo pyta o element o nazwie dokładnie „row". Plik
+     wyglądał na pusty, choć miał 125 wierszy. Inne arkusze mają domyślną
+     przestrzeń i gołe `<row>`; ta forma zapytania obsługuje obie. */
+  const poNazwie = (el, nazwa) => el.getElementsByTagNameNS("*", nazwa);
+
+  const wsp = [];
+  if (pliki["xl/sharedStrings.xml"]) {
+    for (const si of poNazwie(xml(pliki["xl/sharedStrings.xml"]), "si")) {
+      wsp.push([...poNazwie(si, "t")].map((t) => t.textContent).join(""));
+    }
+  }
+
+  const wiersze = [];
+  for (const row of poNazwie(xml(pliki[arkusz]), "row")) {
+    const komorki = {};
+    for (const c of poNazwie(row, "c")) {
+      const typ = c.getAttribute("t");
+      let v;
+      if (typ === "inlineStr") {
+        v = [...poNazwie(c, "t")].map((t) => t.textContent).join("");
+      } else {
+        const el = poNazwie(c, "v")[0];
+        v = el ? el.textContent : "";
+        // `t="s"` to INDEKS do tablicy tekstów, nie treść komórki.
+        if (typ === "s") v = wsp[Number(v)] ?? "";
+      }
+      komorki[kolumnaZAdresu(c.getAttribute("r"))] = v ?? "";
+    }
+    wiersze.push(komorki);
+  }
+  return wiersze;
+}
+
+/**
+ * Znajduje kolumny po nagłówku i wyciąga pary symbol–lokalizacja.
+ *
+ * Symbol jedzie dalej jako TEKST. Excel podaje „440117" jako liczbę i bez tego
+ * wiersz nie dopasowałby się do żadnej kartoteki — po cichu, bo lista
+ * nieznanych symboli i tak bywa długa.
+ */
+function paryZArkusza(wiersze) {
+  if (!wiersze.length) throw new Error("Arkusz jest pusty");
+  const naglowek = wiersze[0];
+  let kSym = null;
+  let kLok = null;
+  for (const [kol, wartosc] of Object.entries(naglowek)) {
+    const h = String(wartosc).trim().toLowerCase();
+    if (h === ARK_SYMBOL) kSym = kol;
+    // „Lokalizacja SIE" — sufiks bywa różny, więc dopasowanie po przedrostku.
+    else if (h.startsWith(ARK_LOKALIZACJA)) kLok = kol;
+  }
+  if (!kSym || !kLok) {
+    throw new Error("Arkusz musi mieć kolumny „Symbol” i „Lokalizacja” w pierwszym wierszu");
+  }
+  return wiersze.slice(1).map((w) => ({
+    symbol: String(w[kSym] ?? "").trim(),
+    lokalizacja: String(w[kLok] ?? "").trim(),
+  }));
+}
+
+/** Ostatni wczytany arkusz — treść żądania dla podglądu i dla zapisu. */
+let arkuszLokWiersze = null;
+/* Ostatni policzony raport. Liczby biorą się STĄD, a nie z policzonych wierszy
+   tabeli w DOM-ie: podgląd zawiera też tabelę odrzuconych, więc licznik po
+   wierszach mylił się o tyle, ile ich w niej było. */
+let arkuszLokRaport = null;
+/* Które obecne kody człowiek kazał ZOSTAWIĆ, per symbol (0.139.0). Stan żyje
+   TUTAJ, a nie w polach wyboru: każde przeliczenie przerysowuje tabelę od zera,
+   więc zaznaczenia trzymane w DOM-ie znikałyby przy pierwszym kliknięciu. */
+let arkuszLokZachowane = new Map();
+
+async function wyslijArkuszLok(zastosuj) {
+  /* Wybory jadą OBOK wierszy, mapą symbol → kody. CSV rozbiera serwer, więc
+     przeglądarka nie ma tam wierszy, do których mogłaby je dokleić — jedna
+     mapa działa tak samo dla arkusza i dla CSV. */
+  const zachowaj = {};
+  for (const [symbol, kody] of arkuszLokZachowane) {
+    if (kody.size) zachowaj[symbol] = [...kody];
+  }
+  const cialo = { ...arkuszLokWiersze, zastosuj, zachowaj };
+  const o = await api("/api/biuro/lokalizacje/arkusz", {
+    method: "POST", body: JSON.stringify(cialo),
+  });
+  return o.json();
+}
+
+/**
+ * Pola wyboru przy kodach, które podmiana ZDEJMIE.
+ *
+ * Pokazujemy wyłącznie kody, których w arkuszu nie ma — kod obecny w obu i tak
+ * zostaje, więc pytanie o niego byłoby wyborem bez różnicy. Zaznaczone znaczy
+ * „zdejmij" i takie są domyślnie: arkusz PODMIENIA pole, a to jest opcja na
+ * wyjątek od tej reguły, nie nowa reguła.
+ */
+function wyborKodow(z) {
+  if (!z.znikaja.length) return '<span class="mute">—</span>';
+  return z.znikaja.map((kod) => {
+    const zdejmij = !z.zachowane.includes(kod);
+    return `<label class="wyborKodu"><input type="checkbox" data-zdejmij="${esc(kod)}"
+      data-symbol="${esc(z.symbol)}"${zdejmij ? " checked" : ""}><span>${esc(kod)}</span></label>`;
+  }).join("");
+}
+
+function rysujArkuszLok(r, poZapisie) {
+  const czesci = [`Wierszy w arkuszu: <b>${r.wierszy}</b>`,
+                  `do zmiany: <b>${r.doZmiany.length}</b>`,
+                  `bez zmian: ${r.bezZmian}`];
+  // Pokazujemy TYLKO gdy niezerowe — pusty licznik przy pierwszym wgraniu
+  // byłby pytaniem bez powodu.
+  if (r.wKolejce) czesci.push(`już czeka w kolejce: ${r.wKolejce}`);
+  if (r.nieznane.length) czesci.push(`nieznane symbole: ${r.nieznane.length}`);
+  if (r.odrzucone.length) czesci.push(`odrzucone: ${r.odrzucone.length}`);
+  const naglowek = poZapisie
+    ? `<b>Zakolejkowano ${r.zakolejkowano} zmian.</b> Wykonuje je kolejka wyżej.`
+    : czesci.join(" · ");
+
+  const zmiany = r.doZmiany.length
+    ? '<table><tr><th>SYMBOL</th><th>NAZWA</th><th>BYŁO</th><th>BĘDZIE</th>' +
+      "<th>ZDJĄĆ OBECNE</th></tr>" +
+      r.doZmiany.map((z) =>
+        `<tr><td class="b">${esc(z.symbol)}</td><td>${esc(z.nazwa)}</td>
+         <td class="mute">${esc(z.przed || "—")}</td><td class="b">${esc(z.po)}</td>
+         <td>${wyborKodow(z)}</td></tr>`).join("") +
+      "</table>"
+    : r.wKolejce
+      ? '<p class="mute">Wszystkie zmiany z tego arkusza już czekają w kolejce wyżej — nie kolejkujemy ich drugi raz.</p>'
+      : '<p class="mute">Żaden wiersz nie zmienia adresu — arkusz mówi to samo, co Subiekt.</p>';
+
+  /* Odrzucone i nieznane pokazujemy Z NAZWY, nie samą liczbą: to jest lista
+     do poprawienia w arkuszu, a „5 błędów" nie mówi, których wierszy szukać. */
+  const problemy = [];
+  if (r.odrzucone.length) {
+    problemy.push('<h2 style="margin-top:12px">ODRZUCONE WIERSZE</h2><table>' +
+      r.odrzucone.map((o) =>
+        `<tr><td class="b">${esc(o.symbol)}</td><td>${esc(o.powod)}</td></tr>`).join("") +
+      "</table>");
+  }
+  if (r.nieznane.length) {
+    problemy.push('<h2 style="margin-top:12px">SYMBOLE SPOZA KARTOTEKI</h2>' +
+      `<p class="mute">${esc(r.nieznane.join(", "))}</p>`);
+  }
+
+  /* Osiemdziesiąt wierszy odklikanych po jednym to nie jest opcja, więc obok
+     wyboru per wiersz stoi ten sam wybór dla całego pliku. */
+  const hurt = !poZapisie && r.doZmiany.some((z) => z.znikaja.length)
+    ? '<p class="mute" style="margin-top:8px">Obecne adresy spoza arkusza: ' +
+      '<button class="akcja cichy" data-hurt="zdejmij">ZDEJMIJ WSZYSTKIE</button> ' +
+      '<button class="akcja cichy" data-hurt="zostaw">ZOSTAW WSZYSTKIE</button></p>'
+    : "";
+  $("wynikArkuszLok").innerHTML = naglowek + hurt;
+  $("arkuszLokPodglad").innerHTML = poZapisie ? problemy.join("") : zmiany + problemy.join("");
+  // Przycisk pojawia się TYLKO wtedy, gdy jest co zastosować.
+  $("zastosujArkuszLok").hidden = poZapisie || r.doZmiany.length === 0;
+}
+
+async function wczytajArkuszLok(plik) {
+  $("wynikArkuszLok").textContent = `Czytam ${plik.name}…`;
+  $("arkuszLokPodglad").innerHTML = "";
+  $("zastosujArkuszLok").hidden = true;
+  try {
+    /* CSV jedzie na serwer TEKSTEM: parser CSV jest tam już napisany
+       i przetestowany (import zbiórek). Drugi w przeglądarce byłby drugim
+       miejscem do poprawiania tego samego błędu. */
+    arkuszLokWiersze = /\.csv$/i.test(plik.name)
+      ? { csv: await plik.text() }
+      : { wiersze: paryZArkusza(await wierszeZXlsx(await plik.arrayBuffer())) };
+    // Nowy plik = nowe wybory. Zaznaczenia z poprzedniego dotyczyły innych
+    // wierszy i po cichu przeniosłyby się na te same symbole.
+    arkuszLokZachowane = new Map();
+    arkuszLokRaport = await wyslijArkuszLok(false);
+    rysujArkuszLok(arkuszLokRaport, false);
+  } catch (e) {
+    arkuszLokWiersze = null;
+    $("wynikArkuszLok").textContent = e.message;
+  }
+}
+
+/** Przelicza podgląd po zmianie wyborów — tą samą trasą, co pierwsze wgranie. */
+async function przeliczArkuszLok() {
+  try {
+    arkuszLokRaport = await wyslijArkuszLok(false);
+    rysujArkuszLok(arkuszLokRaport, false);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function zastosujArkuszLok() {
+  const ile = arkuszLokRaport ? arkuszLokRaport.doZmiany.length : 0;
+  const tak = await potwierdz({
+    tytul: "Zapisać adresy do Subiekta?",
+    opis: `Zmian do wykonania: ${ile}. Każda pojedzie do bazy firmy przez kolejkę ` +
+      "zapisów i nie ma po niej cofnięcia jednym kliknięciem.",
+    potwierdz: "ZASTOSUJ",
+    grozny: true,
+  });
+  if (!tak) return;
+  try {
+    rysujArkuszLok(await wyslijArkuszLok(true), true);
+    arkuszLokWiersze = null;
+    arkuszLokRaport = null;
+    odswiezNadzor();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+$("wgrajArkuszLok").addEventListener("click", () => $("plikArkuszLok").click());
+$("plikArkuszLok").addEventListener("change", (e) => {
+  const plik = e.target.files?.[0];
+  if (plik) wczytajArkuszLok(plik);
+  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
+});
+$("zastosujArkuszLok").addEventListener("click", zastosujArkuszLok);
+/* Delegacja stoi na SEKCJI, nie na tabeli podglądu: tabela jest przerysowywana
+   przy każdym przeliczeniu, więc słuchacz na niej ginąłby razem z nią. */
+$("arkuszLokalizacjiKarta").addEventListener("change", (e) => {
+  const p = e.target.closest("[data-zdejmij]");
+  if (!p) return;
+  const zostaw = arkuszLokZachowane.get(p.dataset.symbol) ?? new Set();
+  // zaznaczone = ZDEJMIJ, więc lista „zostaw" jest jego dopełnieniem
+  if (p.checked) zostaw.delete(p.dataset.zdejmij);
+  else zostaw.add(p.dataset.zdejmij);
+  arkuszLokZachowane.set(p.dataset.symbol, zostaw);
+  przeliczArkuszLok();
+});
+$("wynikArkuszLok").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-hurt]");
+  if (!b || !arkuszLokRaport) return;
+  arkuszLokZachowane = new Map();
+  if (b.dataset.hurt === "zostaw") {
+    for (const z of arkuszLokRaport.doZmiany) {
+      if (z.znikaja.length) arkuszLokZachowane.set(z.symbol, new Set(z.znikaja));
+    }
+  }
+  przeliczArkuszLok();
+});
 $("wgrajZbiorki").addEventListener("click", () => $("plikZbiorek").click());
 $("plikZbiorek").addEventListener("change", (e) => {
   const plik = e.target.files?.[0];

@@ -33,6 +33,87 @@ historii nie przepisujemy.
 
 ---
 
+## 0.139.0 — 30 sierpnia 2026
+
+**Arkusz nie zdejmuje już adresów, o których nic nie wie.**
+
+Zgłoszenie właściciela: „jeśli produkt ma kilka lokalizacji dodaj opcję aby
+zaznaczyć które ma podmienić". To była realna dziura w 0.138.0.
+
+**Kartoteka bywa w kilku miejscach naraz i nie wszystkie dotyczą regału, który
+przestawiasz.** Obok adresu stoi paleta, bufor albo kod sprzed wzorca — w bazie
+właściciela to `KT1`, `paleta64`, `PALETA65`. Arkusz z jednym adresem
+podmieniał CAŁE pole, więc zdejmował je wszystkie. Po cichu, bo w arkuszu ich
+nie widać.
+
+**Kolumna ZDJĄĆ OBECNE w podglądzie.** Przy każdym wierszu stoją pola wyboru
+z tymi obecnymi kodami, których w arkuszu NIE MA — czyli dokładnie z tymi,
+które podmiana zdejmie. Zaznaczone znaczy „zdejmij" i takie są domyślnie:
+arkusz nadal PODMIENIA pole, a to jest wyjątek od tej reguły, nie nowa reguła.
+Odznaczenie zostawia kod obok adresu z arkusza.
+
+**Kod obecny w arkuszu i w Subiekcie do wyboru nie trafia.** I tak zostaje,
+więc pytanie o niego byłoby wyborem bez różnicy.
+
+**Dla całego pliku dwa przyciski**, bo osiemdziesiąt wierszy odklikanych po
+jednym to nie jest opcja: ZDEJMIJ WSZYSTKIE i ZOSTAW WSZYSTKIE.
+
+**Zachowany kod wraca w oryginalnej pisowni** i liczy się do limitu pola.
+Porównanie idzie bez względu na wielkość liter — bez tego `paleta64` znikał
+mimo zaznaczenia „zostaw", bo pole w Subiekcie niesie kody pisane ręką przez
+lata. Przepisanie ich wielkimi literami odpada: to byłaby zmiana danych,
+o którą nikt nie prosił.
+
+Wybory jadą na serwer mapą symbol–kody, OBOK wierszy. Plik CSV rozbiera
+serwer, więc przeglądarka nie ma tam wierszy, do których mogłaby wybór
+dokleić — jedna mapa działa tak samo dla obu wejść.
+
+## 0.138.0 — 30 sierpnia 2026
+
+**Masowa zmiana lokalizacji z arkusza — STAN SYSTEMU, tylko admin.**
+
+Zgłoszenie właściciela: „dodaje arkusz z symbolami produktów i podmienia mi na
+lokalizacje wskazane w arkuszu". Przestawienie jednego regału to sto
+kilkadziesiąt kartotek, a jedyną drogą była karta towaru na kolektorze, jeden
+towar na raz. Dzień pracy zamiast dwóch minut.
+
+**Wgrywasz .xlsx wprost z Subiekta — bez zapisywania jako CSV.** Arkusz
+rozbiera PRZEGLĄDARKA, nie serwer: `.xlsx` to ZIP z XML-ami, a przeglądarka umie
+oba (`DecompressionStream`, `DOMParser`). Na serwer jedzie lista symbol–adres,
+nigdy bajty pliku. Ta sama zasada, dla której obrazy przerabia przeglądarka —
+i dzięki niej serwer nadal ma dwie zależności, a strona zero. CSV też działa,
+tą samą trasą.
+
+**Kolumny rozpoznajemy po nagłówkach `Symbol` i `Lokalizacja`**, nie po literze
+kolumny. Eksport o innym układzie wgrałby inaczej „Nazwę" jako adres — po cichu.
+
+**Najpierw podgląd, dopiero potem zapis.** Widzisz tabelę BYŁO → BĘDZIE, a obok
+niej dwie listy Z NAZWAMI: wiersze odrzucone z powodem i symbole spoza
+kartoteki. To jest lista do poprawienia w arkuszu, więc liczba by nie
+wystarczyła. Podgląd nie kolejkuje ani jednego zadania i nie zostawia wpisu
+w audycie — wybranie pliku to jeszcze nie operacja.
+
+**Wiersz z jednym złym adresem odpada W CAŁOŚCI.** „A05-02-02 PAL38II
+A10-06-06" zapisane bez palety byłoby cichym skasowaniem adresu, którego nikt
+nie kazał kasować — a po zapisie nie ma go z czego odtworzyć.
+
+**Wiersz, który niczego nie zmienia, nie jedzie do Subiekta.** Arkusz jest
+EKSPORTEM, więc przy poprawianiu jednego regału większość wierszy niesie adres,
+który już tam stoi. Bez tego jedno kliknięcie posyłałoby sto zapisów po nic.
+Tak samo z wgraniem tego samego pliku drugi raz, zanim kolejka się wykona:
+zmiany, które już w niej czekają, liczą się osobno i nie kolejkują się ponownie.
+
+**Operacja należy do administratora**, nie do biura. Import zbiórek i reguły
+strefy zmieniają dane, z których liczą się PODPOWIEDZI; ta zmienia adresy
+w bazie firmy, a magazynier przy regale znajdzie towar tam, gdzie ten arkusz
+powiedział. Kartę widać przy każdej roli — odmowę wypowiada serwer, zgodnie
+z konwencją panelu.
+
+Sprawdzone na prawdziwym arkuszu właściciela: 125 wierszy, 72 zmiany, 52
+symbole spoza kartoteki i jeden odrzucony adres. Wdrożenie nie wymaga niczego:
+zapis idzie istniejącym zadaniem `set_location`, na którego uprawnienie SQL
+jest już nadane.
+
 ## 0.137.1 — 30 sierpnia 2026
 
 **Trzy przejęcia sprawy zapisywały się w ciszy.** Audyt logu zdarzeń: stempel

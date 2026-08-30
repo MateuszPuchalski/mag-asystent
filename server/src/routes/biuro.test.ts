@@ -172,7 +172,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    46,
+    47,
     "logowanie, zamknięcie poza WERTIS, cofnięcie, notatka, import zbiórek, " +
       "zamknięcie wyjątku, odczyt odpowiedzi na notatkę, CZTERNAŚCIE zapisów " +
       "zwrotów Allegro (skan, utworzenie, decyzja, pozycja ręczna, środki, " +
@@ -229,7 +229,15 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "sprawę osobie — i to jest CAŁA lista rzeczy, które automatowi wolno " +
       "(zasada 6 z docs/architektura-spraw.md): żadna z nich nie mówi do " +
       "klienta ani słowa. Przydział nie odbiera sprawy komuś, kto już ją " +
-      "prowadzi."
+      "prowadzi." +
+      "\n\nJEDEN POST z 0.138.0 to masowa zmiana lokalizacji z arkusza — " +
+      "i jedno wywołanie, nie dwa, choć czynności są dwie. Ta sama trasa " +
+      "liczy podgląd (`zastosuj` pominięte) i wykonuje zapis (`zastosuj: " +
+      "true`), więc nie da się zastosować czegoś innego, niż się widziało " +
+      "na ekranie. Patrzenie nadal nic nie zapisuje: podgląd nie kolejkuje " +
+      "ani jednego zadania i nie zostawia wpisu `privileged` — pilnuje tego " +
+      "`routes/lokalizacje-masowe.test.ts`. Zapis stoi za jawnym wyborem " +
+      "pliku, groźnym potwierdzeniem i rolą administratora."
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,

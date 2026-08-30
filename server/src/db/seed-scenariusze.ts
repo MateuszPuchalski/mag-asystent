@@ -226,6 +226,7 @@ export const KATALOG: Scenariusz[] = [
   { id: "S77", obszar: "dostawy", tytul: "Analiza dostaw: u kogo się psuje, i dostawa zdjęta poza WERTIS", wejscie: "/biuro → ANALIZA → zakres „dostawy\"" },
   { id: "S78", obszar: "sprawy", tytul: "Jedna kolejka i dwie tafle: konsola SPRAW na wysokość okna", wejscie: "/biuro → SPRAWY" },
   { id: "S79", obszar: "konta", tytul: "Ustawienia jako jeden arkusz: sekcje bez zaokrągleń i bez przerw", wejscie: "/biuro → zębatka → USTAWIENIA" },
+  { id: "S80", obszar: "kolejka", tytul: "Masowa zmiana lokalizacji z arkusza: podgląd, potem zapis", wejscie: "/biuro → STAN SYSTEMU → WGRAJ ARKUSZ" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────

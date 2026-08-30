@@ -240,7 +240,18 @@ export type OperacjaUprzywilejowana =
    * wspólnego worka znaczyłoby, że „biuro zmieniło widoczność magazynów"
    * i „biuro założyło konto" wyglądają w historii identycznie.
    */
-  | "widocznosc_magazynow";
+  | "widocznosc_magazynow"
+  /**
+   * Podmiana adresów CAŁEJ listy kartotek z arkusza (0.138.0).
+   *
+   * Jedyna operacja, która zapisuje do bazy firmy SETKI kartotek jednym
+   * kliknięciem — reszta dróg do `tw_Lokalizacja` przestawia jeden towar
+   * i wymaga stania przy regale. Pomyłka w kolumnie arkusza rozsypuje adresy
+   * całego regału, a jedynym odwrotem jest drugi arkusz z poprzednim stanem.
+   * Dlatego admin, a nie biuro: to nie jest praca biurowa, tylko przebudowa
+   * magazynu wykonana z zewnątrz.
+   */
+  | "masowa_lokalizacja";
 
 /**
  * Kto może.
@@ -265,6 +276,8 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   // widoczność magazynów jest wspólna dla wszystkich kolektorów, więc ustawia
   // ją ta sama rola, która odpowiada za konfigurację — nie pojedynczy magazynier
   widocznosc_magazynow: ["biuro", "admin"],
+  // Setki kartotek jednym kliknięciem — patrz uzasadnienie przy nazwie operacji.
+  masowa_lokalizacja: ["admin"],
 };
 
 const NAZWA_ROL: Record<Rola, string> = {

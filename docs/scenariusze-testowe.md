@@ -1001,3 +1001,41 @@ między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
 
 Reszta zakładek zostaje **na kartach**: ANALIZA, NADZÓR i DZIENNIK dalej mają
 promień, cień i odstęp między kartami. To jest osobny wygląd i ma taki zostać.
+
+### S80 — masowa zmiana lokalizacji z arkusza
+
+Zaloguj się jako **admin** i wejdź w `/biuro` → **STAN SYSTEMU**. Karta
+MASOWA ZMIANA LOKALIZACJI Z ARKUSZA stoi pod kolejką zapisów do Subiekta.
+
+Przygotuj arkusz z eksportu Subiekta. Muszą w nim być kolumny **Symbol**
+i **Lokalizacja** — reszta kolumn nie przeszkadza. Przyjmowany jest plik
+**.xlsx** oraz **.csv**; oba mają dać ten sam wynik.
+
+Kliknij WGRAJ ARKUSZ. Podgląd pokazuje liczby, tabelę **BYŁO → BĘDZIE**
+i dwie listy z nazwami: odrzucone wiersze oraz symbole spoza kartoteki.
+**Do Subiekta nie poszło jeszcze nic** — sprawdź kolejkę wyżej.
+
+Wpisz w arkuszu adres w złym formacie, na przykład `PAL38II` obok dwóch
+poprawnych kodów w tej samej komórce. Wiersz ma odpaść **w całości**, z kodem
+wymienionym w powodzie. Zapisanie go bez palety skasowałoby adres po cichu.
+
+Znajdź wiersz, w którym towar ma **kilka adresów** — kolumna BYŁO pokazuje je
+po spacji. W kolumnie ZDJĄĆ OBECNE stoją pola wyboru, wszystkie zaznaczone.
+Odznacz jeden kod: ma dopisać się do kolumny BĘDZIE obok adresu z arkusza.
+
+Kliknij ZOSTAW WSZYSTKIE. Wszystkie obecne adresy mają dojść do kolumny BĘDZIE.
+ZDEJMIJ WSZYSTKIE wraca do podmiany całego pola.
+
+Sprawdź to na kodzie pisanym **małą literą** (w bazie są takie, na przykład
+`paleta64`). Ma zostać z zachowaną pisownią, a nie zniknąć ani zmienić się na
+wielkie litery.
+
+Kliknij ZASTOSUJ i potwierdź. Kolejka wyżej dostaje tyle zadań, ile obiecywał
+podgląd — po jednym na kartotekę.
+
+Wgraj **ten sam plik** drugi raz, zanim kolejka się wykona. Wszystko ma wpaść
+w „już czeka w kolejce", a przycisk ZASTOSUJ ma zniknąć. Po wykonaniu kolejki
+ten sam plik pokazuje „bez zmian".
+
+Zaloguj się jako **biuro** albo magazynier i spróbuj wgrać plik. Serwer ma
+odmówić — kartę widać, ale operacja należy do administratora.
