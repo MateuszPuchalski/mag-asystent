@@ -498,9 +498,19 @@ export async function synchronizujDyskusje(autor: string): Promise<WynikSynchron
  * podmienia nazwisko. Samo patrzenie na ekran niczego nie zajmuje.
  */
 export function stempelProwadziDyskusji(id: number, autor: string): void {
+  const przed = db().prepare("SELECT prowadzi FROM dyskusja WHERE id = ?").get(id) as
+    | { prowadzi: string | null }
+    | undefined;
   db()
     .prepare("UPDATE dyskusja SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  /* Log audytu (0.137.1) tylko przy ZMIANIE prowadzącego. Ten stempel stawia
+     KAŻDY zapis przy sprawie (patrz opis funkcji), więc bezwarunkowy wpis
+     zapełniłby dziennik dziesiątką tego samego zdania po jednej osobie.
+     Zdarzeniem wartym audytu jest przejęcie, nie kolejne kliknięcie ZAPISZ. */
+  if (przed && przed.prowadzi !== autor) {
+    logEvent("dyskusja_prowadzi", autor, null, { id, poprzedni: przed.prowadzi });
+  }
   dopiszZdarzenie({
     rodzaj: "dyskusja",
     lokalnyId: id,
@@ -625,13 +635,14 @@ export function zapiszOdpowiedzDyskusji(id: number, tresc: string, autor: string
      miara „ile poprawiamy po modelu" wymaga nietkniętego `szkic_ai` obok. */
   const szkic = (w.szkic_ai as string | null)?.trim() ?? null;
   const edytowano = szkic !== null && czysta === szkic ? 0 : 1;
+  /* Stempel prowadzącego stawia FUNKCJA STEMPLA, nie ta klauzula UPDATE
+     (0.137.1). Redakcja odpowiedzi jest wzięciem sprawy dokładnie tak samo jak
+     przy pytaniach — a dwie drogi do jednej kolumny znaczyły tyle, że tędy
+     sprawa zmieniała właściciela bez śladu w dzienniku i bez wpisu na osi. */
+  stempelProwadziDyskusji(id, autor);
   db()
-    .prepare(
-      `UPDATE dyskusja
-          SET odpowiedz = ?, edytowano = ?, prowadzi = ?, prowadzi_at = datetime('now')
-        WHERE id = ?`
-    )
-    .run(czysta, edytowano, autor, id);
+    .prepare("UPDATE dyskusja SET odpowiedz = ?, edytowano = ? WHERE id = ?")
+    .run(czysta, edytowano, id);
   return szczegolDyskusji(id);
 }
 

@@ -59,20 +59,27 @@ nich, nie na pamięci.
 - Adapter woła 17 rodzin endpointów Allegro. Wszystko jest listowaniem stanu
   i pollingiem; zdarzeniowego nie ma nic (żadnych webhooków ani journala).
   Tickery tła są domyślnie wyłączone (`pollMs=0`) — pobiera człowiek.
-- `/sale/issues` czyta JEDNĄ stronę po 100, offset zawsze 0. Rejestr dyskusji
-  nie widzi nic ponad setkę — to najpewniejsze źródło „100 dyskusji"
-  z produkcji, obok niezweryfikowanej listy statusów końcowych.
+- ~~`/sale/issues` czyta JEDNĄ stronę po 100~~ — od 0.127.0 adapter stronicuje
+  do tysiąca spraw. Zostaje niezweryfikowana lista statusów końcowych: nieznane
+  wartości liczą się i świecą przy DYSKUSJACH, czekając na potwierdzenie
+  właściciela.
 - `pytanie` nie ma ani `order_id`, ani `kupujacy_id`, a jego login bywa maską
   `client:NNN`. Zwrot trzyma prawdziwy login, więc złączenie po loginie
   w SQL między rejestrami nie trafia. Odmaskowanie istnieje tylko w adapterze.
 - ~~Statusu płatności nie czyta nikt~~ — od 0.132.0 czyta: `payment.*`,
   status zamówienia i `fulfillment.status` jadą do sekcji ZAMÓWIENIE
   I PRZESYŁKA przy zwrocie i dyskusji, razem z paczkami i śledzeniem.
-  Zostaje blok `klient` z trasy dyskusji, którego panel dalej nie rysuje.
-- `events` zapisuje ~70 typów, bez wartości przed/po; części mutacji brakuje
-  (np. przejęcie pytania nie loguje). Zalążek logu zdarzeń, nie log.
-- Świeżość rozmowy chroni wyłącznie pytania (`nowa_wiadomosc_at` i blokada
-  wysyłki). Dyskusja i zwrot mogą wysłać odpowiedź na nieaktualną rozmowę.
+  Blok `klient` z trasy dyskusji panel rysuje od 0.129.0 jako sekcję
+  TEN SAM KLIENT — to z niej klika się SCAL.
+- `events` zapisuje ~70 typów, wciąż bez wartości przed/po. Dziura „część
+  mutacji nie loguje" była realna: audyt z 0.137.1 znalazł trzy stemple
+  prowadzącego (pytanie, dyskusja, opinia), które zapisywały do bazy w ciszy.
+  Zaległość reszty jest inna niż się wydawało — usługi magazynowe logują
+  z TRASY, nie z serwisu, i to jest u nich świadomy wzorzec.
+- ~~Świeżość rozmowy chroni wyłącznie pytania~~ — dyskusje mają własną blokadę
+  wysyłki od 0.127.0 (`BladSwiezosciDyskusji`), a zwrot nie ma własnego kanału:
+  od 0.131.0 odpowiada się z niego TRASĄ REJESTRU, więc kontrola świeżości
+  działa tam tak samo.
 
 ## Responso — zapożyczenia i krytyka
 

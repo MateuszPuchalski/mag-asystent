@@ -25,7 +25,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sprawa_zrodlo", "sprawa", "dyskusja", "zwrot_pozycja", "zwrot", "events", "watek_meta"]) {
+  for (const t of ["sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", "dyskusja", "zwrot_pozycja",
+    "zwrot", "events", "watek_meta"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   /* Świeży adapter dev na każdy test — wysłana wiadomość z jednego testu nie
@@ -425,6 +426,36 @@ test("sync dociąga rozmowy otwartych spraw; kubełki domykają ich liczbę", as
 
   const stan = D.stanSynchronizacjiDyskusji();
   assert.equal(stan?.rozmow, wynik.rozmow, "ekran widzi te same liczby co wynik");
+});
+
+test("redakcja odpowiedzi bierze sprawę TĄ SAMĄ drogą co stempel (0.137.1)", async () => {
+  /* Do 0.137.1 zapis odpowiedzi ustawiał `prowadzi` własną klauzulą UPDATE,
+     obok funkcji stempla. Skutek: tędy sprawa zmieniała właściciela bez wpisu
+     w dzienniku i bez zdarzenia na osi czasu — dwie drogi do jednej kolumny,
+     z których tylko jedna zostawiała ślad. */
+  await D.synchronizujDyskusje("Biuro");
+  const id = D.listaDyskusji({ limit: 1 })[0].id;
+
+  D.zapiszOdpowiedzDyskusji(id, "Przepraszamy, paczka jedzie jutro.", "Anna");
+  assert.equal(D.szczegolDyskusji(id).prowadzi, "Anna", "redakcja JEST wzięciem sprawy");
+  assert.equal(D.szczegolDyskusji(id).odpowiedz, "Przepraszamy, paczka jedzie jutro.");
+
+  const ile = (typ: string) =>
+    Number(
+      (db().prepare(`SELECT COUNT(*) AS n FROM events WHERE type = ?`).get(typ) as { n: number }).n
+    );
+  assert.equal(ile("dyskusja_prowadzi"), 1, "zmiana ręki widnieje w dzienniku");
+  const naOsi = db()
+    .prepare(
+      "SELECT COUNT(*) AS n FROM sprawa_zdarzenie WHERE rodzaj='dyskusja' AND typ='przejeto' AND lokalny_id = ?"
+    )
+    .get(id) as { n: number };
+  assert.equal(naOsi.n, 1, "oś czasu sprawy też widzi przejęcie");
+
+  /* Druga poprawka tej samej ręki niczego nie dokłada — inaczej dziennik
+     rósłby o wpis po każdym kliknięciu ZAPISZ. */
+  D.zapiszOdpowiedzDyskusji(id, "Przepraszamy, paczka jedzie jutro rano.", "Anna");
+  assert.equal(ile("dyskusja_prowadzi"), 1);
 });
 
 test("rozmowa niedostępna przez API nie wywala przebiegu — ląduje w bezRozmowy", async () => {

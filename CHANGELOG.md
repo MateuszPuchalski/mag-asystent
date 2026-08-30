@@ -33,6 +33,36 @@ historii nie przepisujemy.
 
 ---
 
+## 0.137.1 — 30 sierpnia 2026
+
+**Trzy przejęcia sprawy zapisywały się w ciszy.** Audyt logu zdarzeń: stempel
+prowadzącego przy PYTANIU, DYSKUSJI i OPINII zmieniał bazę i nie zostawiał
+wpisu w dzienniku. Przy zwrocie i reklamacji zostawiał od początku. Dziennik
+nie umiał więc odpowiedzieć „kto wziął tę sprawę i kiedy" dla trzech z pięciu
+rejestrów — a to jest pytanie, dla którego ten log w ogóle istnieje.
+
+**Wpis powstaje przy ZMIANIE ręki, nie przy każdym zapisie.** Stempel stawia
+każdy zapis przy sprawie — tak ma być, bo nazwisko pojawia się z pracy, a nie
+z zaglądania. Bezwarunkowy wpis dokładałby to samo zdanie po każdym kliknięciu
+ZAPISZ. Zdarzeniem wartym audytu jest przejęcie; wpis niesie też nazwisko
+poprzednika, więc widać, komu sprawa wypadła z rąk.
+
+**Redakcja odpowiedzi w dyskusji brała sprawę drugą drogą.** Zapis odpowiedzi
+ustawiał kolumnę `prowadzi` własną klauzulą UPDATE, obok funkcji stempla —
+więc tędy sprawa zmieniała właściciela bez wpisu w dzienniku i bez zdarzenia
+na osi czasu. Teraz obie drogi to jedna droga.
+
+**Inwentarz w `docs/architektura-spraw.md` zmurszał i został poprawiony.**
+Trzy zdania opisywały stan sprzed etapów B, D1 i D3: paginację dyskusji,
+brak kontroli świeżości poza pytaniami i nierysowany blok klienta przy
+dyskusji. Nieaktualny inwentarz podpowiada złą decyzję — dokument stoi na
+przeglądzie kodu, nie na pamięci.
+
+**Reszta zaległości okazała się wzorcem, nie długiem.** Usługi magazynowe
+(kartoteka, strefa złota, zdjęcia, konta) logują z TRASY, nie z serwisu —
+tak jak mówi komentarz przy `zapiszReguly`. Zmiana tego byłaby przepisywaniem
+działającej konwencji, nie naprawą.
+
 ## 0.137.0 — 30 sierpnia 2026
 
 **Tagi sterują kolejką.** Domknięcie etapu E5: do 0.136.0 tag było widać

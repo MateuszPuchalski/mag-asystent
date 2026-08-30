@@ -1255,9 +1255,19 @@ export function zmienStatus(id: number, status: "zamkniete" | "pominiete", autor
  * równolegle, a ostatni pracujący po prostu podmienia nazwisko.
  */
 export function stempelProwadzi(id: number, autor: string): void {
+  const przed = db().prepare("SELECT prowadzi FROM pytanie WHERE id = ?").get(id) as
+    | { prowadzi: string | null }
+    | undefined;
   db()
     .prepare("UPDATE pytanie SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  /* Log audytu (0.137.1) tylko przy ZMIANIE prowadzącego. Ten stempel stawia
+     KAŻDY zapis przy sprawie (patrz opis funkcji), więc bezwarunkowy wpis
+     zapełniłby dziennik dziesiątką tego samego zdania po jednej osobie.
+     Zdarzeniem wartym audytu jest przejęcie, nie kolejne kliknięcie ZAPISZ. */
+  if (przed && przed.prowadzi !== autor) {
+    logEvent("pytanie_prowadzi", autor, null, { id, poprzedni: przed.prowadzi });
+  }
   dopiszZdarzenie({
     rodzaj: "pytanie",
     lokalnyId: id,
