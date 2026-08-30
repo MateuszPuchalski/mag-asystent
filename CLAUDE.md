@@ -11,8 +11,9 @@ bez bundlera), kolektor Android (`android/`). Architektura i decyzje:
   Decyzja bez uzasadnienia w komentarzu to decyzja do wycofania.
 - **Jeden front.** Panel biura to `biuro.html` — żadnego drugiego frontu,
   frameworka ani bundlera. Funkcje w jego `<script>` nie mogą się powtarzać
-  z nazwy (test dubli), delegacje kliknięć stoją na SEKCJACH, nie na
-  pojemnikach w środku sprawy (test delegacji).
+  z nazwy (test dubli) ani wołać funkcji, której nie ma (test wywołań);
+  delegacje kliknięć stoją na SEKCJACH, nie na pojemnikach w ich środku
+  (test delegacji).
 - **Zero zapisu przy patrzeniu.** Otwarcie ekranu niczego nie mutuje.
   Liczniki `method: "POST"/"PUT"/"DELETE"` w `routes/biuro.test.ts` są
   UMOWĄ — każdy nowy zapis podnosi licznik i dostaje zdanie w uzasadnieniu.
@@ -20,11 +21,11 @@ bez bundlera), kolektor Android (`android/`). Architektura i decyzje:
   `tsx --test`). Każda mutacja woła `logEvent`. Bramka ról: `odmowa()`
   w trasach biura, `autoryzuj()` przy operacjach uprzywilejowanych.
 - **Tickery wyłącznie w `main()`**, nigdy w `buildApp()` (testy tras nie
-  strzelają do Allegro). `ALLEGRO_POLL_MS` domyślnie 0; rytm przez
-  `services/takt.ts` (rozrzut, respekt dla 429).
-- **Prywatność:** rozmowy z Allegro czyta się na klik i NIE zapisuje;
-  załączniki i obrazy nie są przechowywane; adresy dostawy nie przechodzą
-  przez mapowanie (pilnują testy).
+  strzelają do Allegro). Dziś żadnego nie ma — gdy wróci, rytm bierze
+  z `services/takt.ts` (rozrzut, respekt dla 429).
+- **Prywatność:** adresy dostawy nie przechodzą przez mapowanie (pilnują
+  testy). Obsługa klienta powstaje od nowa i swoją politykę danych ma
+  zapisać w `docs/obsluga-klienta.md`, zanim dotknie pierwszej rozmowy.
 - **`[WERYFIKUJ]`** znaczy: niezweryfikowane na żywym Allegro/Subiekcie.
   Licznik tych znaczników sprawdza `tools/docs_check.py` — dopisując lub
   zdejmując znacznik, zaktualizuj preambułę w `docs/subiekt-gt-struktura.md`.

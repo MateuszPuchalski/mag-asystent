@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.140.1 — 30 sierpnia 2026
+
+**Sprzątanie po kasacji obsługi klienta.** Zero zmian w działaniu: 725 wierszy
+mniej, żadnej nowej ani zmienionej funkcji. Wszystko, co tu ubyło, było
+martwe od 0.140.0 — a martwy kod kłamie o tym, co aplikacja robi.
+
+**Trzy sekcje ustawień, których nikt nie czytał.** `AI_PROVIDER`, `AI_MODEL`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` i `AI_TIMEOUT_MS` opisywały doradcę,
+który odszedł razem z pytaniami klientów. Z nimi walidacja startu: serwer
+odmawiał wstania przy `AI_PROVIDER` bez klucza, w imię funkcji, której nie
+ma. To samo z `REKLAMACJA_DNI`, `BRAKUJACA_PACZKA_DNI`, `ALLEGRO_POLL_MS`
+oraz kluczami read-modelu sprzedaży. Zostawione w `wertis.env` nic nie robią
+i nie trzeba ich stamtąd usuwać.
+
+**Numeratory korekty i RW.** `nextKorektaNumber` i `nextRwNumber` nadawały
+atrapy numerów dokumentów zwrotu w trybie demo; razem z nimi znikają wiersze
+`korekta` i `rw` z tabeli `counters`. Licznik `mm` i `karton` zostają — te
+liczą na serio.
+
+**Panel schudł o 328 wierszy stylów.** 106 reguł CSS nie miało prawa trafić
+w nic: opisywały konsolę SPRAW, pasma pilności kolejki, czipy tagów, kartę
+zwrotu i liczniki zakładek. Razem z nimi odeszły zdjęcia karty zwrotu
+(`dolozZdjeciaZwrotu`) i pięć bloków komentarza opisujących sekcje ANALIZY,
+których w pliku już nie było.
+
+**Filtr OSOBA zniknął zamiast się chować.** Do 0.140.0 stał ukryty na stałe,
+z komentarzem „nowa obsługa pewnie znów będzie mierzyć per osoba". Ukryte
+pole, którego nic nie wypełnia, to obietnica bez pokrycia — nowa obsługa doda
+własny filtr, gdy będzie wiedziała, co filtruje.
+
+**Strażnik „konsola to tafle" przepisany na to, co zostało.** Pilnował dwóch
+połówek: układu konsoli SPRAW i tego, że karta zostaje kartą. Pierwsza
+połówka straciła przedmiot, druga jest ważniejsza niż była — na promieniu
+i cieniu stoją dziś ANALIZA i STAN SYSTEMU.
+
+**Zasada w `CLAUDE.md` o dublach nazw dostała drugą połowę:** panel nie może
+też wołać funkcji, której nie ma. To strażnik z 0.140.0, który złapał dwa
+takie braki przy cięciu.
+
 ## 0.140.0 — 30 sierpnia 2026
 
 **Cała obsługa klienta skasowana.** Odchodzą pytania, dyskusje, opinie,

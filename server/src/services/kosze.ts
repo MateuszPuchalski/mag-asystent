@@ -700,8 +700,6 @@ export function cofnijPozycje(pozycjaId: number, autor: string): SzczegolKosza {
 }
 
 /** Powody pominięcia, które kolektor podaje z listy; „inny" niesie wpis ręczny. */
-export const POWODY_POMINIECIA = ["nie ma w koszu", "uszkodzony", "obcy towar"] as const;
-
 /**
  * Pominięcie pozycji, której magazynier nie ma jak odłożyć.
  *
