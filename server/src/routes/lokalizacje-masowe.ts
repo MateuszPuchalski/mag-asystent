@@ -30,6 +30,14 @@ const LIMIT_CIALA = 8 * 1024 * 1024;
 interface CialoImportu {
   wiersze?: WierszArkusza[];
   csv?: string;
+  /**
+   * Które obecne kody zostawić, per symbol kartoteki (0.139.0).
+   *
+   * Mapa OBOK wierszy, a nie pole w wierszu, i to jest wymuszone przez CSV:
+   * plik CSV rozbiera serwer, więc przeglądarka nie ma wierszy, do których
+   * mogłaby wybór dokleić. Jedna mapa działa tak samo dla obu wejść.
+   */
+  zachowaj?: Record<string, string[]>;
   zastosuj?: boolean;
 }
 
@@ -110,6 +118,16 @@ export async function lokalizacjeMasoweRoutes(app: FastifyInstance) {
         // zły plik to decyzja wołającego, nie awaria serwera — tak samo jak
         // przy imporcie zbiórek
         return reply.code(400).send({ error: (e as Error).message });
+      }
+
+      /* Wybory dopinamy PO rozbiorze pliku, żeby jedna droga obsłużyła oba
+         wejścia. Symbol jest kluczem, bo tylko on identyfikuje wiersz
+         niezależnie od tego, czy przyszedł z arkusza, czy z CSV. */
+      const wybory = body.zachowaj ?? {};
+      if (Object.keys(wybory).length) {
+        wiersze = wiersze.map((w) =>
+          wybory[w.symbol] ? { ...w, zachowaj: wybory[w.symbol] } : w
+        );
       }
 
       let raport;

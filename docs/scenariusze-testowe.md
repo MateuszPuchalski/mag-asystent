@@ -1019,6 +1019,17 @@ Wpisz w arkuszu adres w złym formacie, na przykład `PAL38II` obok dwóch
 poprawnych kodów w tej samej komórce. Wiersz ma odpaść **w całości**, z kodem
 wymienionym w powodzie. Zapisanie go bez palety skasowałoby adres po cichu.
 
+Znajdź wiersz, w którym towar ma **kilka adresów** — kolumna BYŁO pokazuje je
+po spacji. W kolumnie ZDJĄĆ OBECNE stoją pola wyboru, wszystkie zaznaczone.
+Odznacz jeden kod: ma dopisać się do kolumny BĘDZIE obok adresu z arkusza.
+
+Kliknij ZOSTAW WSZYSTKIE. Wszystkie obecne adresy mają dojść do kolumny BĘDZIE.
+ZDEJMIJ WSZYSTKIE wraca do podmiany całego pola.
+
+Sprawdź to na kodzie pisanym **małą literą** (w bazie są takie, na przykład
+`paleta64`). Ma zostać z zachowaną pisownią, a nie zniknąć ani zmienić się na
+wielkie litery.
+
 Kliknij ZASTOSUJ i potwierdź. Kolejka wyżej dostaje tyle zadań, ile obiecywał
 podgląd — po jednym na kartotekę.
 

@@ -1724,7 +1724,9 @@ drogą, co zmiana adresu z kolektora. Grant na `tw_Lokalizacja` jest już nadany
 3. `/biuro` → STAN SYSTEMU → **WGRAJ ARKUSZ**. Zobaczysz podgląd: tabelę
    BYŁO → BĘDZIE, listę odrzuconych wierszy z powodem i listę symboli spoza
    kartoteki. Do Subiekta nie poszło jeszcze nic.
-4. **ZASTOSUJ** kolejkuje zmiany — po jednym zadaniu na kartotekę. Wykonuje je
+4. Jeśli towar stoi w **kilku miejscach**, w kolumnie ZDJĄĆ OBECNE odznacz te
+   adresy, które mają zostać. Domyślnie arkusz podmienia całe pole.
+5. **ZASTOSUJ** kolejkuje zmiany — po jednym zadaniu na kartotekę. Wykonuje je
    kolejka zapisów, widoczna w karcie wyżej.
 
 ### Czego pilnować
@@ -1735,6 +1737,12 @@ w arkuszu i wgraj plik jeszcze raz.
 
 Pusta komórka adresu **nie kasuje** lokalizacji. Zdjęcie adresu zostaje
 czynnością świadomą, z karty towaru na kolektorze.
+
+Kartoteka bywa w kilku miejscach naraz, a arkusz zna tylko przestawiany regał.
+Obok adresu stoi paleta, bufor albo kod sprzed wzorca (`KT1`, `paleta64`).
+Do 0.139.0 podmiana zdejmowała je wszystkie. Dziś decydujesz o każdym z nich
+w kolumnie ZDJĄĆ OBECNE. Dla całego pliku służą do tego przyciski ZDEJMIJ
+WSZYSTKIE i ZOSTAW WSZYSTKIE.
 
 Kolejka wykonuje jedno zadanie na sekundę, więc sto kartotek schodzi w około
 dwie minuty. Wgranie tego samego pliku w trakcie niczego nie zdubluje: zmiany

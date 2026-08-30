@@ -25,6 +25,14 @@ import { enqueueSetLocation } from "./queue.js";
 export interface WierszArkusza {
   symbol: string;
   lokalizacja: string;
+  /**
+   * Obecne kody, które mają ZOSTAĆ mimo podmiany (0.139.0).
+   *
+   * Puste albo pominięte = zachowanie sprzed tej wersji, czyli arkusz
+   * podmienia CAŁE pole. Wybór dotyczy wyłącznie kodów, których w arkuszu nie
+   * ma — bo tylko one przy podmianie znikają.
+   */
+  zachowaj?: string[];
 }
 
 /** Wiersz, który faktycznie coś zmieni. `przed`/`po` to CAŁE pole, nie kod. */
@@ -34,6 +42,15 @@ export interface ZmianaAdresu {
   nazwa: string;
   przed: string;
   po: string;
+  /**
+   * Obecne kody, których w arkuszu NIE MA — czyli te, które podmiana zdejmie.
+   *
+   * Panel robi z nich pola wyboru: odznaczone znaczy „zostaw". Kod, który
+   * w arkuszu jest, tu nie trafia — nie ma o czym decydować, bo i tak zostaje.
+   */
+  znikaja: string[];
+  /** Które z powyższych człowiek kazał zostawić — już wliczone w `po`. */
+  zachowane: string[];
 }
 
 /** Wiersz odrzucony wraz z powodem — arkusz poprawia się po tej liście. */
@@ -164,6 +181,7 @@ export function przeliczImport(wiersze: WierszArkusza[]): RaportImportu {
     }
 
     const kody = parseLocs(zadany.toUpperCase());
+    const przed = parseLocs(towar.lokalizacja ?? "");
     /* Zły kod odrzuca CAŁY wiersz, a nie sam siebie. „A05-02-02 PAL38II
        A10-06-06" zapisane bez palety byłoby cichym skasowaniem adresu,
        którego nikt nie kazał kasować — a po zapisie nie ma już z czego go
@@ -174,7 +192,26 @@ export function przeliczImport(wiersze: WierszArkusza[]): RaportImportu {
       continue;
     }
 
-    const po = kody.join(" ");
+    /* ── Wybór, co zostaje z obecnego pola (0.139.0) ──────────────────────
+       Kartoteka bywa w kilku miejscach naraz i nie wszystkie dotyczą regału,
+       który właśnie przestawiamy: obok adresu regału stoi paleta, bufor albo
+       kod spoza wzorca („KT1", „paleta64"), których arkusz nie zna. Podmiana
+       całego pola zdejmowała je wszystkie — po cichu, bo w arkuszu ich nie
+       widać.
+
+       Decyzja dotyczy WYŁĄCZNIE kodów, których w arkuszu nie ma: kod obecny
+       w obu i tak zostaje, więc pytanie o niego byłoby wyborem bez różnicy. */
+    const znikaja = przed.filter((k) => !kody.includes(k));
+    /* Porównanie BEZ WZGLĘDU NA WIELKOŚĆ LITER, ale zachowany kod wraca
+       w oryginalnej pisowni. Pole w Subiekcie niesie kody zapisane ręką przez
+       lata — obok „A05-02-02" stoi „paleta64" i „KT1". Porównanie wprost gubiło
+       te pisane małą literą: człowiek zaznaczał „zostaw", a kod i tak znikał.
+       Przepisanie ich wielkimi literami też odpada — to byłaby zmiana danych,
+       o którą nikt nie prosił. */
+    const chce = (w.zachowaj ?? []).map((k) => k.trim().toUpperCase());
+    const zachowane = znikaja.filter((k) => chce.includes(k.toUpperCase()));
+
+    const po = [...kody, ...zachowane].join(" ");
     if (po.length > config.locFieldLimit) {
       raport.odrzucone.push({
         symbol,
@@ -185,10 +222,14 @@ export function przeliczImport(wiersze: WierszArkusza[]): RaportImportu {
 
     /* Porównanie po ZBIORZE kodów, nie po tekście pola: arkusz bywa zapisany
        w innej kolejności albo z podwójną spacją, a to nie jest zmiana adresu.
-       Bez tego wgranie własnego eksportu wyglądałoby na 125 zmian. */
-    const przed = parseLocs(towar.lokalizacja ?? "");
+       Bez tego wgranie własnego eksportu wyglądałoby na 125 zmian.
+
+       Porównujemy do pola WYNIKOWEGO, nie do samego arkusza: gdy człowiek
+       zostawił wszystkie znikające kody, wynik równa się stanowi obecnemu
+       i wiersz nie ma czego zapisywać. */
+    const docelowe = [...kody, ...zachowane];
     const tosamo =
-      przed.length === kody.length && przed.every((k) => kody.includes(k));
+      przed.length === docelowe.length && przed.every((k) => docelowe.includes(k));
     if (tosamo) {
       raport.bezZmian++;
       continue;
@@ -198,7 +239,7 @@ export function przeliczImport(wiersze: WierszArkusza[]): RaportImportu {
        Porównanie po ZBIORZE kodów, jak wyżej: zadanie zapisane w innej
        kolejności prowadzi do tego samego adresu. */
     const wDrodze = parseLocs(czekaja.get(towar.tw_id) ?? "");
-    if (wDrodze.length === kody.length && wDrodze.every((k) => kody.includes(k))) {
+    if (wDrodze.length === docelowe.length && wDrodze.every((k) => docelowe.includes(k))) {
       raport.wKolejce++;
       continue;
     }
@@ -209,6 +250,8 @@ export function przeliczImport(wiersze: WierszArkusza[]): RaportImportu {
       nazwa: towar.nazwa ?? "",
       przed: towar.lokalizacja ?? "",
       po,
+      znikaja,
+      zachowane,
     });
   }
 

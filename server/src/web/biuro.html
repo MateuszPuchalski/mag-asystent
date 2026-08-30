@@ -275,6 +275,12 @@
      pole, którego nie dociągnięto, a nie na pole odmierzone. */
   #widokDostawcy textarea { width: 100%; }
 
+  /* Wybór, które obecne adresy zdjąć przy imporcie z arkusza (0.139.0).
+     Kody stoją JEDEN POD DRUGIM, nie w rzędzie: przy kilku adresach rząd
+     rozpychał kolumnę tabeli szerzej niż reszta wiersza. */
+  .wyborKodu { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .wyborKodu + .wyborKodu { margin-top: 3px; }
+
   /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
      jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
      bezpieczne w każdej szerokości i nie potrzebuje żadnego zapytania.
@@ -8858,15 +8864,41 @@ let arkuszLokWiersze = null;
    tabeli w DOM-ie: podgląd zawiera też tabelę odrzuconych, więc licznik po
    wierszach mylił się o tyle, ile ich w niej było. */
 let arkuszLokRaport = null;
+/* Które obecne kody człowiek kazał ZOSTAWIĆ, per symbol (0.139.0). Stan żyje
+   TUTAJ, a nie w polach wyboru: każde przeliczenie przerysowuje tabelę od zera,
+   więc zaznaczenia trzymane w DOM-ie znikałyby przy pierwszym kliknięciu. */
+let arkuszLokZachowane = new Map();
 
 async function wyslijArkuszLok(zastosuj) {
-  const cialo = arkuszLokWiersze.csv
-    ? { csv: arkuszLokWiersze.csv, zastosuj }
-    : { wiersze: arkuszLokWiersze.wiersze, zastosuj };
+  /* Wybory jadą OBOK wierszy, mapą symbol → kody. CSV rozbiera serwer, więc
+     przeglądarka nie ma tam wierszy, do których mogłaby je dokleić — jedna
+     mapa działa tak samo dla arkusza i dla CSV. */
+  const zachowaj = {};
+  for (const [symbol, kody] of arkuszLokZachowane) {
+    if (kody.size) zachowaj[symbol] = [...kody];
+  }
+  const cialo = { ...arkuszLokWiersze, zastosuj, zachowaj };
   const o = await api("/api/biuro/lokalizacje/arkusz", {
     method: "POST", body: JSON.stringify(cialo),
   });
   return o.json();
+}
+
+/**
+ * Pola wyboru przy kodach, które podmiana ZDEJMIE.
+ *
+ * Pokazujemy wyłącznie kody, których w arkuszu nie ma — kod obecny w obu i tak
+ * zostaje, więc pytanie o niego byłoby wyborem bez różnicy. Zaznaczone znaczy
+ * „zdejmij" i takie są domyślnie: arkusz PODMIENIA pole, a to jest opcja na
+ * wyjątek od tej reguły, nie nowa reguła.
+ */
+function wyborKodow(z) {
+  if (!z.znikaja.length) return '<span class="mute">—</span>';
+  return z.znikaja.map((kod) => {
+    const zdejmij = !z.zachowane.includes(kod);
+    return `<label class="wyborKodu"><input type="checkbox" data-zdejmij="${esc(kod)}"
+      data-symbol="${esc(z.symbol)}"${zdejmij ? " checked" : ""}><span>${esc(kod)}</span></label>`;
+  }).join("");
 }
 
 function rysujArkuszLok(r, poZapisie) {
@@ -8883,10 +8915,12 @@ function rysujArkuszLok(r, poZapisie) {
     : czesci.join(" · ");
 
   const zmiany = r.doZmiany.length
-    ? '<table><tr><th>SYMBOL</th><th>NAZWA</th><th>BYŁO</th><th>BĘDZIE</th></tr>' +
+    ? '<table><tr><th>SYMBOL</th><th>NAZWA</th><th>BYŁO</th><th>BĘDZIE</th>' +
+      "<th>ZDJĄĆ OBECNE</th></tr>" +
       r.doZmiany.map((z) =>
         `<tr><td class="b">${esc(z.symbol)}</td><td>${esc(z.nazwa)}</td>
-         <td class="mute">${esc(z.przed || "—")}</td><td class="b">${esc(z.po)}</td></tr>`).join("") +
+         <td class="mute">${esc(z.przed || "—")}</td><td class="b">${esc(z.po)}</td>
+         <td>${wyborKodow(z)}</td></tr>`).join("") +
       "</table>"
     : r.wKolejce
       ? '<p class="mute">Wszystkie zmiany z tego arkusza już czekają w kolejce wyżej — nie kolejkujemy ich drugi raz.</p>'
@@ -8906,7 +8940,14 @@ function rysujArkuszLok(r, poZapisie) {
       `<p class="mute">${esc(r.nieznane.join(", "))}</p>`);
   }
 
-  $("wynikArkuszLok").innerHTML = naglowek;
+  /* Osiemdziesiąt wierszy odklikanych po jednym to nie jest opcja, więc obok
+     wyboru per wiersz stoi ten sam wybór dla całego pliku. */
+  const hurt = !poZapisie && r.doZmiany.some((z) => z.znikaja.length)
+    ? '<p class="mute" style="margin-top:8px">Obecne adresy spoza arkusza: ' +
+      '<button class="akcja cichy" data-hurt="zdejmij">ZDEJMIJ WSZYSTKIE</button> ' +
+      '<button class="akcja cichy" data-hurt="zostaw">ZOSTAW WSZYSTKIE</button></p>'
+    : "";
+  $("wynikArkuszLok").innerHTML = naglowek + hurt;
   $("arkuszLokPodglad").innerHTML = poZapisie ? problemy.join("") : zmiany + problemy.join("");
   // Przycisk pojawia się TYLKO wtedy, gdy jest co zastosować.
   $("zastosujArkuszLok").hidden = poZapisie || r.doZmiany.length === 0;
@@ -8923,11 +8964,24 @@ async function wczytajArkuszLok(plik) {
     arkuszLokWiersze = /\.csv$/i.test(plik.name)
       ? { csv: await plik.text() }
       : { wiersze: paryZArkusza(await wierszeZXlsx(await plik.arrayBuffer())) };
+    // Nowy plik = nowe wybory. Zaznaczenia z poprzedniego dotyczyły innych
+    // wierszy i po cichu przeniosłyby się na te same symbole.
+    arkuszLokZachowane = new Map();
     arkuszLokRaport = await wyslijArkuszLok(false);
     rysujArkuszLok(arkuszLokRaport, false);
   } catch (e) {
     arkuszLokWiersze = null;
     $("wynikArkuszLok").textContent = e.message;
+  }
+}
+
+/** Przelicza podgląd po zmianie wyborów — tą samą trasą, co pierwsze wgranie. */
+async function przeliczArkuszLok() {
+  try {
+    arkuszLokRaport = await wyslijArkuszLok(false);
+    rysujArkuszLok(arkuszLokRaport, false);
+  } catch (e) {
+    toast(e.message);
   }
 }
 
@@ -8958,6 +9012,29 @@ $("plikArkuszLok").addEventListener("change", (e) => {
   e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
 });
 $("zastosujArkuszLok").addEventListener("click", zastosujArkuszLok);
+/* Delegacja stoi na SEKCJI, nie na tabeli podglądu: tabela jest przerysowywana
+   przy każdym przeliczeniu, więc słuchacz na niej ginąłby razem z nią. */
+$("arkuszLokalizacjiKarta").addEventListener("change", (e) => {
+  const p = e.target.closest("[data-zdejmij]");
+  if (!p) return;
+  const zostaw = arkuszLokZachowane.get(p.dataset.symbol) ?? new Set();
+  // zaznaczone = ZDEJMIJ, więc lista „zostaw" jest jego dopełnieniem
+  if (p.checked) zostaw.delete(p.dataset.zdejmij);
+  else zostaw.add(p.dataset.zdejmij);
+  arkuszLokZachowane.set(p.dataset.symbol, zostaw);
+  przeliczArkuszLok();
+});
+$("wynikArkuszLok").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-hurt]");
+  if (!b || !arkuszLokRaport) return;
+  arkuszLokZachowane = new Map();
+  if (b.dataset.hurt === "zostaw") {
+    for (const z of arkuszLokRaport.doZmiany) {
+      if (z.znikaja.length) arkuszLokZachowane.set(z.symbol, new Set(z.znikaja));
+    }
+  }
+  przeliczArkuszLok();
+});
 $("wgrajZbiorki").addEventListener("click", () => $("plikZbiorek").click());
 $("plikZbiorek").addEventListener("change", (e) => {
   const plik = e.target.files?.[0];

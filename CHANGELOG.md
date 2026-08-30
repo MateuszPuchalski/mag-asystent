@@ -33,6 +33,41 @@ historii nie przepisujemy.
 
 ---
 
+## 0.139.0 — 30 sierpnia 2026
+
+**Arkusz nie zdejmuje już adresów, o których nic nie wie.**
+
+Zgłoszenie właściciela: „jeśli produkt ma kilka lokalizacji dodaj opcję aby
+zaznaczyć które ma podmienić". To była realna dziura w 0.138.0.
+
+**Kartoteka bywa w kilku miejscach naraz i nie wszystkie dotyczą regału, który
+przestawiasz.** Obok adresu stoi paleta, bufor albo kod sprzed wzorca — w bazie
+właściciela to `KT1`, `paleta64`, `PALETA65`. Arkusz z jednym adresem
+podmieniał CAŁE pole, więc zdejmował je wszystkie. Po cichu, bo w arkuszu ich
+nie widać.
+
+**Kolumna ZDJĄĆ OBECNE w podglądzie.** Przy każdym wierszu stoją pola wyboru
+z tymi obecnymi kodami, których w arkuszu NIE MA — czyli dokładnie z tymi,
+które podmiana zdejmie. Zaznaczone znaczy „zdejmij" i takie są domyślnie:
+arkusz nadal PODMIENIA pole, a to jest wyjątek od tej reguły, nie nowa reguła.
+Odznaczenie zostawia kod obok adresu z arkusza.
+
+**Kod obecny w arkuszu i w Subiekcie do wyboru nie trafia.** I tak zostaje,
+więc pytanie o niego byłoby wyborem bez różnicy.
+
+**Dla całego pliku dwa przyciski**, bo osiemdziesiąt wierszy odklikanych po
+jednym to nie jest opcja: ZDEJMIJ WSZYSTKIE i ZOSTAW WSZYSTKIE.
+
+**Zachowany kod wraca w oryginalnej pisowni** i liczy się do limitu pola.
+Porównanie idzie bez względu na wielkość liter — bez tego `paleta64` znikał
+mimo zaznaczenia „zostaw", bo pole w Subiekcie niesie kody pisane ręką przez
+lata. Przepisanie ich wielkimi literami odpada: to byłaby zmiana danych,
+o którą nikt nie prosił.
+
+Wybory jadą na serwer mapą symbol–kody, OBOK wierszy. Plik CSV rozbiera
+serwer, więc przeglądarka nie ma tam wierszy, do których mogłaby wybór
+dokleić — jedna mapa działa tak samo dla obu wejść.
+
 ## 0.138.0 — 30 sierpnia 2026
 
 **Masowa zmiana lokalizacji z arkusza — STAN SYSTEMU, tylko admin.**

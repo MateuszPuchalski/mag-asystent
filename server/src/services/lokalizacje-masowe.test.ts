@@ -35,6 +35,8 @@ const STARTER = 102;
 const TARCZA = 103;
 /** Symbol czysto liczbowy — Excel podaje takie komórki jako liczby. */
 const LICZBOWY = 104;
+/** Kartoteka z kodami spoza wzorca, pisanymi małą literą — takie są w bazie. */
+const RECZNY = 105;
 
 beforeEach(() => {
   const d = db();
@@ -48,6 +50,8 @@ beforeEach(() => {
   t.run(STARTER, "08-25001", "Starter do kosiarki", "", "A05-02-02 PAL-038");
   t.run(TARCZA, "S12150", "Tarcza diamentowa", "", "");
   t.run(LICZBOWY, "440117", "Pasek MTD", "", "A02-02-02");
+  // Pole w Subiekcie niesie kody pisane ręką przez lata — także małą literą.
+  t.run(RECZNY, "W07-0101", "Klemy akumulatora", "", "A05-01-01 paleta64 KT1");
 });
 
 const zadan = (): number =>
@@ -87,6 +91,9 @@ test("prawdziwa zmiana trafia do doZmiany z polem PRZED i PO", () => {
     nazwa: "Pasek napędu noży",
     przed: "A01-01-01",
     po: "A10-06-01",
+    // Jedyny obecny kod schodzi, więc jest do wyboru — nikt go nie zostawił.
+    znikaja: ["A01-01-01"],
+    zachowane: [],
   });
 });
 
@@ -164,6 +171,76 @@ test("plik ponad limit jest odrzucany w całości, z podaniem liczby", () => {
     lokalizacja: "A10-06-01",
   }));
   assert.throws(() => L.przeliczImport(duzy), /2000/);
+});
+
+/* ── Wybór, co zostaje z obecnego pola (0.139.0) ─────────────────────────── */
+
+test("bez wyboru arkusz podmienia CAŁE pole — zachowanie sprzed 0.139.0", () => {
+  const r = L.przeliczImport([{ symbol: "08-25001", lokalizacja: "A10-06-01" }]);
+  assert.equal(r.doZmiany[0].po, "A10-06-01");
+  // Do wyboru trafiają oba obecne kody, bo arkusz nie zna żadnego z nich.
+  assert.deepEqual(r.doZmiany[0].znikaja, ["A05-02-02", "PAL-038"]);
+  assert.deepEqual(r.doZmiany[0].zachowane, []);
+});
+
+test("zachowany kod zostaje w polu obok adresu z arkusza", () => {
+  /* Kartoteka bywa w kilku miejscach naraz i nie wszystkie dotyczą regału,
+     który przestawiamy: obok adresu stoi paleta albo bufor, o których arkusz
+     nic nie wie. Bez tego wyboru podmiana zdejmowała je po cichu. */
+  const r = L.przeliczImport([
+    { symbol: "08-25001", lokalizacja: "A10-06-01", zachowaj: ["PAL-038"] },
+  ]);
+  assert.equal(r.doZmiany[0].po, "A10-06-01 PAL-038");
+  assert.deepEqual(r.doZmiany[0].zachowane, ["PAL-038"]);
+});
+
+test("do wyboru NIE trafia kod, który arkusz i tak zostawia", () => {
+  /* Kod obecny w obu miejscach zostaje niezależnie od decyzji — pytanie o niego
+     byłoby wyborem bez różnicy. */
+  const r = L.przeliczImport([
+    { symbol: "08-25001", lokalizacja: "A10-06-01 PAL-038" },
+  ]);
+  assert.deepEqual(r.doZmiany[0].znikaja, ["A05-02-02"]);
+});
+
+test("zachowanie WSZYSTKIEGO przy adresie, który już jest, to brak zmiany", () => {
+  /* Wynik równy stanowi obecnemu nie ma czego zapisywać — inaczej odklikanie
+     wszystkich kodów zostawiałoby zadanie, które nic nie robi. */
+  const r = L.przeliczImport([
+    { symbol: "08-25001", lokalizacja: "A05-02-02", zachowaj: ["PAL-038"] },
+  ]);
+  assert.equal(r.bezZmian, 1);
+  assert.equal(r.doZmiany.length, 0);
+});
+
+test("wybór liczy się do limitu pola — zostawienie kodu może go przekroczyć", () => {
+  /* Zachowany kod dokłada znaków. Gdyby limit sprawdzał się przed doklejeniem,
+     pole wjechałoby do Subiekta dłuższe, niż kolumna przyjmie. */
+  const dlugi = "A01-01-01 A02-02-02 A03-03-03 A04-04-04";
+  const r = L.przeliczImport([
+    { symbol: "08-25001", lokalizacja: dlugi, zachowaj: ["A05-02-02", "PAL-038"] },
+  ]);
+  assert.equal(r.doZmiany.length, 0);
+  assert.match(r.odrzucone[0].powod, /znaków/);
+});
+
+test("zachowanie działa dla kodu pisanego małą literą i nie zmienia pisowni", () => {
+  /* Pole niesie „paleta64" i „KT1" — kody sprzed wzorca, wpisane ręką.
+     Porównanie wprost gubiło te małą literą: człowiek zaznaczał „zostaw",
+     a kod i tak znikał. Przepisanie ich wielkimi literami też odpada, bo to
+     byłaby zmiana danych, o którą nikt nie prosił. */
+  const r = L.przeliczImport([
+    { symbol: "W07-0101", lokalizacja: "A10-06-01", zachowaj: ["paleta64", "KT1"] },
+  ]);
+  assert.equal(r.doZmiany[0].po, "A10-06-01 paleta64 KT1");
+});
+
+test("wybór kodu, którego nie ma w polu, jest ignorowany", () => {
+  // Wybór z poprzedniego pliku nie ma prawa dokleić adresu spoza kartoteki.
+  const r = L.przeliczImport([
+    { symbol: "08-25001", lokalizacja: "A10-06-01", zachowaj: ["Z09-09-09"] },
+  ]);
+  assert.equal(r.doZmiany[0].po, "A10-06-01");
 });
 
 /* ── Wykonanie ───────────────────────────────────────────────────────────── */

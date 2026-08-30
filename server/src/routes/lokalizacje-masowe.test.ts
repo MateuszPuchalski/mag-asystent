@@ -167,6 +167,33 @@ test("CSV bez kolumny Lokalizacja odmawia i wypisuje znalezione nagłówki", asy
   assert.match(r.json().error, /nazwa/i);
 });
 
+/* ── Wybór, co zostaje z obecnego pola (0.139.0) ─────────────────────────── */
+
+test("mapa `zachowaj` działa tak samo dla arkusza i dla CSV", async () => {
+  /* Mapa stoi OBOK wierszy właśnie po to: CSV rozbiera serwer, więc
+     przeglądarka nie ma tam wierszy, do których mogłaby wybór dokleić.
+     Gdyby wybór był polem w wierszu, odznaczenie kodu w pliku CSV nie
+     robiłoby nic — po cichu. */
+  const token = zalogowany("admin");
+  db().prepare("UPDATE sgt_towar SET lokalizacja = ? WHERE tw_id = 1").run("A01-01-05 PAL-038");
+  const zachowaj = { "W32-0203": ["PAL-038"] };
+
+  const zArkusza = await wyslij(token, { wiersze: ARKUSZ, zachowaj });
+  assert.equal(zArkusza.json().doZmiany[0].po, "A10-06-01 PAL-038");
+
+  const csv = ["Symbol,Lokalizacja SIE", "W32-0203,A10-06-01"].join("\r\n");
+  const zCsv = await wyslij(token, { csv, zachowaj });
+  assert.equal(zCsv.json().doZmiany[0].po, "A10-06-01 PAL-038");
+});
+
+test("zapis kolejkuje pole Z zachowanym kodem, nie samą wartość z arkusza", async () => {
+  const token = zalogowany("admin");
+  db().prepare("UPDATE sgt_towar SET lokalizacja = ? WHERE tw_id = 1").run("A01-01-05 PAL-038");
+  await wyslij(token, { wiersze: ARKUSZ, zachowaj: { "W32-0203": ["PAL-038"] }, zastosuj: true });
+  const z = db().prepare("SELECT payload FROM sfera_queue").get() as { payload: string };
+  assert.equal(JSON.parse(z.payload).newValue, "A10-06-01 PAL-038");
+});
+
 test("body bez wierszy i bez csv odmawia, zamiast liczyć pusty raport", async () => {
   const r = await wyslij(zalogowany("admin"), {});
   assert.equal(r.statusCode, 400);
