@@ -51,7 +51,7 @@ export interface MmItem {
 /**
  * Zlecenie „korekta sprzedaży + MM na bufor zwrotowy" — jedna operacja.
  *
- * OD 0.138.0 NIC TEGO NIE NADAJE: rejestr zwrotów odszedł razem z obsługą
+ * OD 0.140.0 NIC TEGO NIE NADAJE: rejestr zwrotów odszedł razem z obsługą
  * klienta, a korektę wystawia biuro w Subiekcie. Kontrakt zostaje, bo worker
  * Sfery (C#) dalej bierze `korekta_zwrot` z kolejki — zadania nadane przed
  * aktualizacją muszą się dokończyć, a nie zawisnąć na nieznanym typie.

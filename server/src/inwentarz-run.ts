@@ -10,7 +10,7 @@ import { db } from "./db/db.js";
    WYŁĄCZNIE ODCZYT: ani jednego INSERT-a, UPDATE-a i DELETE. Skrypt wolno
    puścić na kopii bazy produkcyjnej i puścić dwa razy.
 
-   Po cięciu z 0.138.0 czyta SUROWE TABELE, bo serwisów, które je opisywały,
+   Po cięciu z 0.140.0 czyta SUROWE TABELE, bo serwisów, które je opisywały,
    już nie ma. Każda sekcja sprawdza najpierw, czy tabela istnieje — na bazie
    po migracji raport mówi „tabeli już nie ma" zamiast się wywracać. Sekcja
    czasów odpowiedzi wypadła razem z licznikiem, który je liczył; kto ich

@@ -200,7 +200,7 @@ export function koszPoKodzie(raw: string): WierszKosza | undefined {
     .get(normalizujKod(raw), RODZAJ_KARTON) as WierszKosza | undefined;
 }
 
-/* ── Czym kosz NIE jest od 0.138.0 ───────────────────────────────────────────
+/* ── Czym kosz NIE jest od 0.140.0 ───────────────────────────────────────────
    Do tej wersji kosz napełniało się dwiema drogami: dokumentem MM ZWROTY
    z Subiekta (`otworzPrzyjecie` w `przyjecia.ts`) albo przypięciem zwrotu
    z rejestru w aplikacji. Rejestr zwrotu zniknął razem z całą obsługą klienta,
@@ -776,7 +776,7 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const pominiete = pozycje.length - odlozone.length;
 
   const d = db();
-  /* ŻADEN kosz nie kolejkuje już dokumentu (0.138.0) i to nie jest przeoczenie.
+  /* ŻADEN kosz nie kolejkuje już dokumentu (0.140.0) i to nie jest przeoczenie.
 
      Kosz z dokumentu MM (0.75.0): przesunięcie na regał zwrotów wystawiło
      biuro i dokument powrotny (ZWR→MAG) też wystawia biuro — kolektor zapisał

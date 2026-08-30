@@ -21,6 +21,7 @@ import { magazynRoutes } from "./routes/magazyny.js";
 import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
+import { lokalizacjeMasoweRoutes } from "./routes/lokalizacje-masowe.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { kartonRoutes } from "./routes/karton.js";
 import { allegroRoutes } from "./routes/allegro.js";
@@ -199,6 +200,7 @@ export async function buildApp() {
   await app.register(analizaRoutes);
   await app.register(biuroRoutes);
   await app.register(zbiorkiRoutes);
+  await app.register(lokalizacjeMasoweRoutes);
   await app.register(dostawcyRoutes);
   await app.register(koszeRoutes);
   await app.register(kartonRoutes);
@@ -228,7 +230,7 @@ async function main() {
     }, config.mssql.syncMs);
   }
 
-  /* Tickerów obsługi klienta nie ma od 0.138.0 — razem z całą obsługą.
+  /* Tickerów obsługi klienta nie ma od 0.140.0 — razem z całą obsługą.
      Zostaje `importFromMssql` wyżej: to jedyna pętla tła, jakiej potrzebuje
      magazyn. Nowa obsługa klienta powstaje od zera i sama zdecyduje, czy
      w ogóle chce pracy w tle. */

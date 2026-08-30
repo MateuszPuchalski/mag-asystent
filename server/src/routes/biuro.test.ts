@@ -172,18 +172,25 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    15,
-    "Po kasacji obsługi klienta (0.138.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
+    16,
+    "Po kasacji obsługi klienta (0.140.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
       "logowanie, zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, " +
       "notatka do dostawy, odczyt odpowiedzi na notatkę, zamknięcie wyjątku, " +
       "import zbiórek, załatwienie pominiętej pozycji kosza, parowanie konta " +
       "Allegro, PONÓW/ANULUJ kolejki Sfery (jedno wywołanie o dwóch trasach) " +
       "oraz trzy mutacje kont admina (reset hasła, włącz/wyłącz, wyloguj " +
-      "wszędzie) i RESYNC z odświeżeniem zdjęć w karcie SERWER.\n\n" +
-      "Licznik SPADŁ z 46 do 15 — i to jest cały ślad tego wydania w tym " +
+      "wszędzie), RESYNC z odświeżeniem zdjęć w karcie SERWER i masowa " +
+      "zmiana lokalizacji z arkusza.\n\n" +
+      "Licznik SPADŁ z 47 do 16 — i to jest cały ślad tego wydania w tym " +
       "teście. Zapisy obsługi klienta (skan zwrotu, decyzje, dokumenty, " +
       "kosze, reklamacje, pytania, dyskusje, opinie, tagi, reguły, szablony) " +
       "odeszły razem z ekranami, które je wywoływały.\n\n" +
+      "Zapis szesnasty przyszedł z 0.138.0 i ZOSTAJE: masowa zmiana " +
+      "lokalizacji to jedno wywołanie, nie dwa, choć czynności są dwie. " +
+      "Ta sama trasa liczy podgląd (`zastosuj` pominięte) i wykonuje zapis " +
+      "(`zastosuj: true`), więc nie da się zastosować czegoś innego, niż " +
+      "się widziało na ekranie. Patrzenie nadal nic nie zapisuje — pilnuje " +
+      "tego `routes/lokalizacje-masowe.test.ts`.\n\n" +
       "Reguła się NIE zmienia: liczba rośnie wyłącznie ŚWIADOMIE, a żaden " +
       "zapis nie dzieje się przy samym patrzeniu na ekran."
   );
@@ -219,7 +226,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
   assert.match(html, /problems\/\$\{id\}\/resolve/, "biuro zamyka wyjątek");
   assert.match(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "biuro zamyka sprawę pominięcia");
-  /* Po 0.138.0 panel NIE MA ani jednej drogi do klienta i to jest teraz
+  /* Po 0.140.0 panel NIE MA ani jednej drogi do klienta i to jest teraz
      przedmiotem strażnika: żadnej wysyłki, żadnego szkicu, żadnego pola
      odpowiedzi. Nowa obsługa klienta przyniesie je razem z własnym testem
      i własnym uzasadnieniem przy liczniku wyżej. */
@@ -318,7 +325,7 @@ function bezTekstu(src: string): string {
 /* Druga strona tej samej monety co test dubli: funkcja WOŁANA, ale nigdzie
    nie zdefiniowana. Przeglądarka mówi o tym dopiero przy kliknięciu, i tylko
    w konsoli — a `rysujDostawy` wołające skasowany `wiekPytania` przestało
-   rysować CAŁĄ tabelę dostaw w ciszy (0.138.0, złapane dopiero w Playwrighcie).
+   rysować CAŁĄ tabelę dostaw w ciszy (0.140.0, złapane dopiero w Playwrighcie).
 
    Skanowanie idzie po tekście, bo panel nie ma parsera i mieć nie będzie.
    Żeby nie zgadywać, wycinamy najpierw komentarze i literały tekstowe —
@@ -358,7 +365,9 @@ test("panel nie woła funkcji, której nie ma", () => {
       "encodeURIComponent decodeURIComponent parseInt parseFloat isNaN Number String " +
       "Boolean Array Object JSON Math Date Promise Map Set URL URLSearchParams Blob " +
       "FormData Error RegExp requestAnimationFrame matchMedia getComputedStyle " +
-      "structuredClone AbortController Image FileReader Option").split(" ")
+      "structuredClone AbortController Image FileReader Option " +
+      // rozbieranie arkusza .xlsx w przeglądarce (0.138.0)
+      "DecompressionStream DOMParser Response Uint8Array DataView TextDecoder").split(" ")
   );
 
   const brakujace = [
@@ -415,7 +424,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   assert.deepEqual(
     widoki,
     ["dostawy", "magazyn", "analiza", "dziennik", "nadzor"],
-    "pasek boczny po 0.138.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
+    "pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
       "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
       "pustą zakładką — konto Allegro mieszka w STANIE SYSTEMU. " +
       "Dostawcy dalej za zębatką — konfiguracja to nie praca"
@@ -437,7 +446,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
     2,
-    "dwie grupy (Praca, Wgląd), każda podpisana — Archiwum odeszło w 0.138.0 " +
+    "dwie grupy (Praca, Wgląd), każda podpisana — Archiwum odeszło w 0.140.0 " +
       "razem z rejestrami obsługi klienta"
   );
 
@@ -725,10 +734,10 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
   /* W MAGAZYNIE praca przed jej wyjątkami: kosze nad listą pominiętych
      pozycji, bo pominięcie jest skutkiem rozkładania, nie jego wstępem. */
   przed("koszeKarta", "pominieteKarta", "praca hali nad jej wyjątkami");
-  /* Rozprężenie z 0.125.0 nie może się cofnąć po cichu, a po 0.138.0 pilnuje
+  /* Rozprężenie z 0.125.0 nie może się cofnąć po cichu, a po 0.140.0 pilnuje
      też kasacji: widoku SPRAW nie ma, a jego karty nie wróciły bokiem do
      magazynu. */
-  assert.equal(html.indexOf('id="widokSprawy"'), -1, "widok SPRAW zniknął (0.138.0)");
+  assert.equal(html.indexOf('id="widokSprawy"'), -1, "widok SPRAW zniknął (0.140.0)");
   const magazyn = html.slice(html.indexOf('id="widokMagazyn"'), html.indexOf('id="widokNadzor"'));
   for (const id of ["zwrotListaKarta", "dyskusjeKarta", "pytaniaListaKarta", "opinieKarta"]) {
     assert.ok(!magazyn.includes(`id="${id}"`), `${id} nie wróciła do magazynu`);
@@ -853,7 +862,7 @@ test("kontekst ma szufladę na wąskim oknie, a szuflada ma trzy wyjścia", () =
 
   /* Liczymy ZNACZNIK, nie selektor: `data-szuflada>` kończy atrybut, więc nie
      łapie ani `data-szuflada-zamknij`, ani `[data-szuflada]` z obsługi kliknięć. */
-  /* Po 0.138.0 szuflada została JEDNA — przy dostawie. Trzy sprawy klienta,
+  /* Po 0.140.0 szuflada została JEDNA — przy dostawie. Trzy sprawy klienta,
      które miały własne, odeszły razem z obsługą klienta; mechanizm zostaje
      i przyjmie następną sekcję kontekstu bez zmian. */
   assert.equal((html.match(/data-szuflada>/g) ?? []).length, 1,

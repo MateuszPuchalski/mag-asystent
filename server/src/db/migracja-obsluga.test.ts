@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-/* ── Kasacja obsługi klienta (0.138.0) ───────────────────────────────────────
+/* ── Kasacja obsługi klienta (0.140.0) ───────────────────────────────────────
    Migracja, która USUWA dane, jest jedyną, przy której błąd kosztuje pracę
    magazynu, a nie komunikat. Trzy rzeczy do sprawdzenia:
 

@@ -916,7 +916,7 @@ Ta sama funkcja rysuje miniatury w **podglądzie kosza zwrotowego** i na
 **liście reklamacji dostawczych**. Nic tu nie trzeba włączać osobno: gdy
 `ZDJECIA_ZRODLO` jest ustawione, kolumna pojawia się sama, a bez niej znika
 razem z nagłówkiem. Karta zwrotu Allegro, która korzystała z tego od 0.72.0,
-odeszła w 0.138.0.
+odeszła w 0.140.0.
 
 **Zdjęcie dodane w Subiekcie pojawia się z opóźnieniem** i to jest projektowe.
 Serwer pamięta „ta kartoteka zdjęcia nie ma" przez `ZDJECIA_BRAK_TTL_H`
@@ -941,7 +941,7 @@ było największe — dopiero na tych liczbach dobiera się `ZDJECIA_MAX_KB`.
 
 Osobny proces C#/.NET czytający tę samą tabelę `sfera_queue` i wykonujący
 **wyłącznie zadania dokumentowe**: `mm` oraz `korekta_zwrot`. Tego drugiego
-aplikacja od 0.138.0 nie nadaje — worker umie go dalej, żeby zadania nadane
+aplikacja od 0.140.0 nie nadaje — worker umie go dalej, żeby zadania nadane
 przed aktualizacją dokończyły się, a nie zawisły. Wymaga: licencji Sfery, Windows z Subiektem GT
 (COM jest lokalny) i konta operatora Subiekta z prawem wystawiania MM.
 Kompletna instrukcja: [`sfera-worker/README.md`](sfera-worker/README.md).
@@ -1029,7 +1029,7 @@ stanu przez workera Sfery.
 
 ## 6a. Zwroty na regale — kosze z dokumentu MM ZWROTY
 
-**Od 0.138.0 aplikacja nie prowadzi zwrotów Allegro.** Skasowany został cały
+**Od 0.140.0 aplikacja nie prowadzi zwrotów Allegro.** Skasowany został cały
 rejestr: skan etykiety zwrotnej, dopasowanie dokumentu sprzedaży, decyzje
 o pozycjach, korekta zlecana z panelu, reklamacje, zapowiedzi zwrotów
 i statystyki. Odeszły razem z obsługą klienta — pytaniami, dyskusjami
@@ -1167,7 +1167,7 @@ nie ma w starszych wersjach kolektora.
 
 ## 6b. Konto Allegro — parowanie i token
 
-Aplikacja łączy się z kontem sprzedawcy jednym tokenem. Po 0.138.0 korzysta
+Aplikacja łączy się z kontem sprzedawcy jednym tokenem. Po 0.140.0 korzysta
 z niego odczyt zamówień i sonda kształtu (`npm run sonda`), a nowa obsługa
 klienta wystartuje z tego samego parowania. Bez `ALLEGRO_CLIENT_ID` funkcja
 jest **wyłączona** i reszta aplikacji pracuje normalnie.
@@ -1242,7 +1242,7 @@ miejscach znaczy, że serwer i biuro dzielą łącze — wtedy link potwierdzeni
 zawsze otwieraj z telefonu.
    Token nie przeżywa zmiany środowiska — po przełączeniu paruj ponownie.
 
-**Od 0.138.0 import NIE czyta już dokumentów sprzedaży.** Read-model FS/PA
+**Od 0.140.0 import NIE czyta już dokumentów sprzedaży.** Read-model FS/PA
 istniał wyłącznie po to, żeby dopasować zwrot Allegro do faktury, a rejestru
 zwrotów nie ma. Znikają razem z nim ustawienia `DOK_SPRZEDAZ_DNI_WSTECZ`,
 `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` i `MSSQL_SPRZEDAZ_UWAGI_COLUMN` — zostawione
@@ -1269,7 +1269,7 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    kształtu — to informacja, nie awaria.
 
 Punkty o korekcie sprzedaży, RW dla pozycji zniszczonych, numerze zamówienia
-w `dok__Dokument` i kształcie powodu zwrotu odeszły w 0.138.0 razem
+w `dok__Dokument` i kształcie powodu zwrotu odeszły w 0.140.0 razem
 z rejestrem zwrotów. Wrócą, gdy wróci obieg, który ich potrzebuje.
 
 ## 6c. Środowisko dev obok produkcji
@@ -1347,6 +1347,52 @@ Konfigurację czyta z `wertis.env` w katalogu roboczym; inną ścieżkę wskazuj
 - Worker Sfery nie istnieje w dev i to jest poprawne — dane demo obsługuje
   wbudowany adapter zapisu.
 
+## 6d. Masowa zmiana lokalizacji z arkusza (0.138.0)
+
+Przestawienie całego regału bez chodzenia od kartoteki do kartoteki. Wykonuje
+**wyłącznie administrator**, w `/biuro` → **STAN SYSTEMU**.
+
+**Wdrożenie nie wymaga niczego.** Ani zmiennej w `wertis.env`, ani nowego
+uprawnienia SQL: zapis idzie istniejącym zadaniem `set_location`, czyli tą samą
+drogą, co zmiana adresu z kolektora. Grant na `tw_Lokalizacja` jest już nadany.
+
+### Jak się tego używa
+
+1. W Subiekcie wyeksportuj kartoteki regału do arkusza. Potrzebne są kolumny
+   **Symbol** i **Lokalizacja** — reszta może zostać.
+2. Popraw kolumnę adresu w Excelu i zapisz plik. Przyjmujemy **.xlsx** oraz
+   **.csv**.
+3. `/biuro` → STAN SYSTEMU → **WGRAJ ARKUSZ**. Zobaczysz podgląd: tabelę
+   BYŁO → BĘDZIE, listę odrzuconych wierszy z powodem i listę symboli spoza
+   kartoteki. Do Subiekta nie poszło jeszcze nic.
+4. Jeśli towar stoi w **kilku miejscach**, w kolumnie ZDJĄĆ OBECNE odznacz te
+   adresy, które mają zostać. Domyślnie arkusz podmienia całe pole.
+5. **ZASTOSUJ** kolejkuje zmiany — po jednym zadaniu na kartotekę. Wykonuje je
+   kolejka zapisów, widoczna w karcie wyżej.
+
+### Czego pilnować
+
+Adres musi mieć format regału `A01-02-03` albo palety `PAL-042`. Wiersz z choć
+jednym złym kodem odpada w całości i jest wypisany z nazwy — popraw go
+w arkuszu i wgraj plik jeszcze raz.
+
+Pusta komórka adresu **nie kasuje** lokalizacji. Zdjęcie adresu zostaje
+czynnością świadomą, z karty towaru na kolektorze.
+
+Kartoteka bywa w kilku miejscach naraz, a arkusz zna tylko przestawiany regał.
+Obok adresu stoi paleta, bufor albo kod sprzed wzorca (`KT1`, `paleta64`).
+Do 0.139.0 podmiana zdejmowała je wszystkie. Dziś decydujesz o każdym z nich
+w kolumnie ZDJĄĆ OBECNE. Dla całego pliku służą do tego przyciski ZDEJMIJ
+WSZYSTKIE i ZOSTAW WSZYSTKIE.
+
+Kolejka wykonuje jedno zadanie na sekundę, więc sto kartotek schodzi w około
+dwie minuty. Wgranie tego samego pliku w trakcie niczego nie zdubluje: zmiany
+czekające w kolejce są liczone osobno i nie kolejkują się drugi raz. Naraz
+wolno wgrać **2000 wierszy**.
+
+Cofnięcia jednym kliknięciem nie ma. Odwrotem jest arkusz z poprzednimi
+adresami — dlatego eksport sprzed zmiany warto zachować.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
@@ -1377,7 +1423,7 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
-**Aktualizacja do 0.138.0 kasuje osiemnaście tabel — zrób kopię bazy.**
+**Aktualizacja do 0.140.0 kasuje osiemnaście tabel — zrób kopię bazy.**
 Odchodzi cała obsługa klienta z rejestrem zwrotów włącznie. Kopię wykonaj
 poleceniem z punktu „Backup" niżej, ZANIM zatrzymasz usługi. Liczby z tych
 tabel zdejmuje `npm run inwentarz` uruchomiony na kopii — po migracji nie ma

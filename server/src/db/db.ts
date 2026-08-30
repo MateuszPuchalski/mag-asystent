@@ -228,7 +228,7 @@ function migrate(database: DatabaseSync) {
 }
 
 /**
- * Kasacja obsługi klienta (0.138.0).
+ * Kasacja obsługi klienta (0.140.0).
  *
  * Rejestry pytań, dyskusji, opinii i zwrotów Allegro oraz nakładka spraw
  * odeszły razem z kodem, który je czytał. Tabela bez czytelnika nie jest

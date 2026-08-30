@@ -5,7 +5,7 @@ import { WERSJA } from "../wersja.js";
    Do 0.137.2 ten plik trzymał kontrakt adaptera i komplet typów domenowych
    zwrotów, wątków, dyskusji i opinii. Wszystkie opisywały kształt JSON-a
    wymyślony w testach i nigdy niesprawdzony na żywym koncie — dlatego odeszły
-   razem z obsługą klienta (0.138.0), a nie zostały przepisane.
+   razem z obsługą klienta (0.140.0), a nie zostały przepisane.
 
    Zostaje to, co dotyczy samego POŁĄCZENIA i nie zależy od żadnego kształtu:
    nagłówek User-Agent, odczyt 429 i wybór trybu. Implementacja siedzi

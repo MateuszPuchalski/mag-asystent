@@ -14,7 +14,7 @@ import path from "node:path";
       przesuwałoby towar, którego nikt nie ruszał.
 
    Trzeci niezmiennik — „kosz wiąże się z dokumentem korekty" — zniknął
-   w 0.138.0 razem z rejestrem zwrotów. Kosz powstaje teraz WYŁĄCZNIE
+   w 0.140.0 razem z rejestrem zwrotów. Kosz powstaje teraz WYŁĄCZNIE
    z dokumentu MM ZWROTY wystawionego w Subiekcie (`otworzPrzyjecie`), więc
    dokument jest warunkiem jego istnienia, a nie regułą do pilnowania.      */
 

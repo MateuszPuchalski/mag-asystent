@@ -517,7 +517,7 @@ CREATE TABLE IF NOT EXISTS strefa_regula (
   poziomy  TEXT NOT NULL            -- CSV numerów poziomów, np. '2,3,4'
 );
 
--- ── Obsługa klienta: skasowana w 0.138.0 ───────────────────────────────────
+-- ── Obsługa klienta: skasowana w 0.140.0 ───────────────────────────────────
 -- Stały tu rejestry pytań, dyskusji, opinii i zwrotów Allegro plus nakładka
 -- spraw. Wszystkie zniknęły razem z kodem, który je czytał: model danych stał
 -- na kształcie odpowiedzi API, którego nikt nie sprawdził na żywym koncie,

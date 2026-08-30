@@ -9,7 +9,7 @@ import {
   stanPolaczenia,
 } from "../services/allegro-token.js";
 
-/* ── Konto Allegro — parowanie i stan (0.138.0) ──────────────────────────────
+/* ── Konto Allegro — parowanie i stan (0.140.0) ──────────────────────────────
    Te cztery trasy mieszkały do 0.137.2 w `routes/zwroty.ts` i odeszłyby razem
    z rejestrem zwrotów. Zostają, bo token nie należał do zwrotów: to jedno
    połączenie konta sprzedawcy, z którego skorzysta nowa obsługa klienta,

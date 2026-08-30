@@ -1,7 +1,7 @@
 # Obsługa klienta od zera — zasady
 
 Dotychczasowa obsługa klienta — rozmowy, nakładka spraw, rejestr zwrotów
-i reklamacje — została skasowana w 0.138.0. Ten dokument opisuje, co ma
+i reklamacje — została skasowana w 0.140.0. Ten dokument opisuje, co ma
 stanąć na jej miejscu. Poprzednik, `architektura-spraw.md`, opisywał kod
 i odszedł razem z nim.
 

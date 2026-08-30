@@ -20,7 +20,7 @@ import {
   problemUserAgenta,
 } from "../services/allegro-token.js";
 
-/* ── Allegro HTTP — połączenie, bez mapowania (0.138.0) ──────────────────────
+/* ── Allegro HTTP — połączenie, bez mapowania (0.140.0) ──────────────────────
    Do 0.137.2 ten plik testował KSZTAŁT odpowiedzi na fixturach pisanych ręką.
    To był dokładnie ten kształt, który nigdy nie został sprawdzony na żywym
    koncie — testy zieleniły się na naszym własnym wyobrażeniu. Zniknęły razem
