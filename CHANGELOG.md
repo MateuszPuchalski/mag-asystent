@@ -33,6 +33,67 @@ historii nie przepisujemy.
 
 ---
 
+## 0.137.1 — 30 sierpnia 2026
+
+**Trzy przejęcia sprawy zapisywały się w ciszy.** Audyt logu zdarzeń: stempel
+prowadzącego przy PYTANIU, DYSKUSJI i OPINII zmieniał bazę i nie zostawiał
+wpisu w dzienniku. Przy zwrocie i reklamacji zostawiał od początku. Dziennik
+nie umiał więc odpowiedzieć „kto wziął tę sprawę i kiedy" dla trzech z pięciu
+rejestrów — a to jest pytanie, dla którego ten log w ogóle istnieje.
+
+**Wpis powstaje przy ZMIANIE ręki, nie przy każdym zapisie.** Stempel stawia
+każdy zapis przy sprawie — tak ma być, bo nazwisko pojawia się z pracy, a nie
+z zaglądania. Bezwarunkowy wpis dokładałby to samo zdanie po każdym kliknięciu
+ZAPISZ. Zdarzeniem wartym audytu jest przejęcie; wpis niesie też nazwisko
+poprzednika, więc widać, komu sprawa wypadła z rąk.
+
+**Redakcja odpowiedzi w dyskusji brała sprawę drugą drogą.** Zapis odpowiedzi
+ustawiał kolumnę `prowadzi` własną klauzulą UPDATE, obok funkcji stempla —
+więc tędy sprawa zmieniała właściciela bez wpisu w dzienniku i bez zdarzenia
+na osi czasu. Teraz obie drogi to jedna droga.
+
+**Inwentarz w `docs/architektura-spraw.md` zmurszał i został poprawiony.**
+Trzy zdania opisywały stan sprzed etapów B, D1 i D3: paginację dyskusji,
+brak kontroli świeżości poza pytaniami i nierysowany blok klienta przy
+dyskusji. Nieaktualny inwentarz podpowiada złą decyzję — dokument stoi na
+przeglądzie kodu, nie na pamięci.
+
+**Reszta zaległości okazała się wzorcem, nie długiem.** Usługi magazynowe
+(kartoteka, strefa złota, zdjęcia, konta) logują z TRASY, nie z serwisu —
+tak jak mówi komentarz przy `zapiszReguly`. Zmiana tego byłaby przepisywaniem
+działającej konwencji, nie naprawą.
+
+## 0.137.0 — 30 sierpnia 2026
+
+**Tagi sterują kolejką.** Domknięcie etapu E5: do 0.136.0 tag było widać
+dopiero po wejściu w sprawę, więc reguła tagująca nie zmieniała w kolejce ani
+jednego piksela. Etykieta, której nie widać tam, gdzie się wybiera następną
+robotę, jest ozdobą.
+
+**Wiersz kolejki pokazuje etykiety sprawy.** Tę samą sumę tagów wszystkich
+źródeł, co ekran sprawy — wiersz i szczegół nie mówią dwóch różnych rzeczy
+o jednej sprawie. Tagi stoją na końcu stopki wiersza: termin i „klient
+dopisał" odpowiadają, czy brać sprawę teraz, tag mówi tylko, czego dotyczy.
+
+**Drugi rząd czipów filtruje po tagu.** Liczba przy tagu mówi, ile spraw pod
+nim stoi, i liczy się z całej kolejki — wybranie tagu nie zeruje liczb przy
+pozostałych. Czip jest przełącznikiem: drugi klik w ten sam tag zdejmuje
+filtr, więc rząd nie potrzebuje pozycji „Wszystkie".
+
+**Oba filtry się składają.** Rodzaj sprawy (albo MOJE) przecina się z tagiem,
+bo „moje zwroty z etykietą #uszkodzenie" to pytanie, które biuro zadaje
+naprawdę. Pusty wynik filtra mówi „Nic w tym filtrze", a nie „Żadna sprawa nie
+czeka na obsługę" — pierwsze zdejmuje się klikiem, drugie znaczy, że kolejka
+jest zrobiona.
+
+**Rząd tagów znika, gdy tagów nie ma.** Pusty pasek filtrów uczy oko, że pasek
+filtrów nic nie niesie. Z tego samego powodu filtr wskazujący tag, który
+wypadł z kolejki, zdejmuje się sam, zamiast pokazywać pustą tabelę.
+
+**Kolejka nie pojechała po tagi drugim zapytaniem.** Jadą razem z wierszami,
+bo dwa zapytania potrafiłyby pokazać etykiety z innej chwili niż sprawy pod
+nimi. Zero nowych zapisów — cała zmiana jest odczytem.
+
 ## 0.136.0 — 29 sierpnia 2026
 
 **Tagi spraw i reguły ich nadawania.** Etap E5 z mapy

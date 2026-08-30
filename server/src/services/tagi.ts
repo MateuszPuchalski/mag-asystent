@@ -1,6 +1,6 @@
 import { db, nowIso } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { listaSpraw, otwarteZrodlaSpraw, type RodzajSprawy } from "./sprawy.js";
+import { listaSpraw, otwarteZrodlaSpraw, type RodzajSprawy, type Sprawa } from "./sprawy.js";
 
 /* ── Tagi spraw i reguły ich nadawania (0.136.0) ─────────────────────────────
    Etap E5 z docs/architektura-spraw.md. Zasada 6 wyznacza granicę: tagowanie
@@ -76,6 +76,53 @@ export function slownikTagow(): Array<{ tag: string; ile: number }> {
   return db()
     .prepare("SELECT tag, COUNT(*) AS ile FROM sprawa_tag GROUP BY tag ORDER BY ile DESC, tag")
     .all() as Array<{ tag: string; ile: number }>;
+}
+
+/* ── Tagi w kolejce (0.137.0) ────────────────────────────────────────────────
+   Tag nadany w sprawie był do 0.136.0 widoczny dopiero PO wejściu w sprawę,
+   więc reguła tagowała w próżnię: kolejka wyglądała tak samo przed regułą
+   i po niej. Te dwie funkcje domykają E5 — etykieta ma sterować kolejnością
+   patrzenia, inaczej jest ozdobą.
+
+   Kierunek zależności wymusza reguła importów: `sprawy.ts` NIE MOŻE wiedzieć
+   o tagach (ten moduł już wie o kolejce, więc odwrotny import zawiązałby
+   cykl). Dlatego dekoracja mieszka tutaj, a nie przy kolejce.                */
+
+/** Mapa `rodzaj:id` → posortowane tagi źródła. Jeden SELECT po CAŁEJ tabeli:
+    tagów jest tyle, ile ktoś nadał, a kolejka bierze ich setki naraz —
+    zapytanie z klauzulą IN po każdym źródle byłoby dłuższe od tabeli. */
+function mapaTagow(): Map<string, string[]> {
+  const wiersze = db()
+    .prepare("SELECT rodzaj, lokalny_id, tag FROM sprawa_tag ORDER BY tag")
+    .all() as Array<Record<string, unknown>>;
+  const mapa = new Map<string, string[]>();
+  for (const w of wiersze) {
+    const klucz = `${w.rodzaj as string}:${w.lokalny_id as number}`;
+    const dotad = mapa.get(klucz);
+    if (dotad) dotad.push(w.tag as string);
+    else mapa.set(klucz, [w.tag as string]);
+  }
+  return mapa;
+}
+
+/**
+ * Kolejka spraw z tagami w wierszu. Sprawa pokazuje SUMĘ tagów swoich
+ * dzisiejszych źródeł — ta sama reguła, co w szczegółach sprawy, żeby wiersz
+ * i ekran nie mówiły dwóch różnych rzeczy o tej samej sprawie.
+ *
+ * Filtrowania po tagu tu NIE MA celowo: panel ma całą kolejkę w pamięci
+ * i tnie ją czipami na miejscu (tak samo jak po rodzaju i po MOJE), więc
+ * parametr w trasie byłby drugą drogą do tego samego wyniku.
+ */
+export function sprawyZTagami(rodzaj?: RodzajSprawy): Sprawa[] {
+  const mapa = mapaTagow();
+  if (mapa.size === 0) return listaSpraw(rodzaj).map((s) => ({ ...s, tagi: [] }));
+  return listaSpraw(rodzaj).map((s) => {
+    const zrodla = s.zrodla ?? [{ rodzaj: s.rodzaj, id: s.id, otwarte: s.otwarta }];
+    const tagi = new Set<string>();
+    for (const z of zrodla) for (const t of mapa.get(`${z.rodzaj}:${z.id}`) ?? []) tagi.add(t);
+    return { ...s, tagi: [...tagi].sort() };
+  });
 }
 
 /** Tag jest ETYKIETĄ, nie zdaniem: krótki, bez klamr i bez przecinków. */

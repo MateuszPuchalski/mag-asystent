@@ -217,10 +217,17 @@ export function zmienStatusOpinii(id: number, status: string, autor: string): Op
 
 /** Stempel „prowadzę" — znacznik, nie blokada (wzorzec pozostałych rejestrów). */
 export function stempelProwadziOpinii(id: number, autor: string): void {
-  opinia(id); // 404, zanim cokolwiek zapiszemy
+  const przed = opinia(id); // 404, zanim cokolwiek zapiszemy
   db()
     .prepare("UPDATE opinia SET prowadzi = ?, prowadzi_at = datetime('now') WHERE id = ?")
     .run(autor, id);
+  /* Log audytu (0.137.1) tylko przy ZMIANIE prowadzącego. Ten stempel stawia
+     KAŻDY zapis przy sprawie (patrz opis funkcji), więc bezwarunkowy wpis
+     zapełniłby dziennik dziesiątką tego samego zdania po jednej osobie.
+     Zdarzeniem wartym audytu jest przejęcie, nie kolejne kliknięcie ZAPISZ. */
+  if (przed.prowadzi !== autor) {
+    logEvent("opinia_prowadzi", autor, null, { id, poprzedni: przed.prowadzi });
+  }
   dopiszZdarzenie({
     rodzaj: "opinia",
     lokalnyId: id,

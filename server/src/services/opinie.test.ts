@@ -32,6 +32,29 @@ beforeEach(() => {
   }
 });
 
+test("przejęcie opinii zostawia ślad w dzienniku (0.137.1)", async () => {
+  /* Trzeci z trzech stempli, które zapisywały bez logu. Opinia wisi publicznie
+     przy ofercie, więc „kto się nią zajął" jest dokładnie tym pytaniem, na
+     które ma odpowiadać dziennik. */
+  await O.synchronizujOpinie("Anna");
+  const id = O.listaOpinii()[0].id;
+  const ile = () =>
+    Number(
+      (
+        db()
+          .prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'opinia_prowadzi'")
+          .get() as { n: number }
+      ).n
+    );
+
+  O.stempelProwadziOpinii(id, "Anna");
+  assert.equal(ile(), 1);
+  O.stempelProwadziOpinii(id, "Anna");
+  assert.equal(ile(), 1, "ta sama ręka drugi raz nie dokłada wpisu");
+  O.stempelProwadziOpinii(id, "Bartek");
+  assert.equal(ile(), 2, "zmiana ręki to nowe zdarzenie");
+});
+
 test("sync jest idempotentny i NIE cofa naszego statusu", async () => {
   const pierwszy = await O.synchronizujOpinie("Anna");
   assert.equal(pierwszy.nowych, 3, "adapter dev ma trzy opinie");

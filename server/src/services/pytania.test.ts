@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sprawa_zrodlo", "sprawa", "dopasowanie", "pytanie", "ai_config", "sgt_towar", "sgt_stan", "watek_meta"]) {
+  for (const t of ["sprawa_zrodlo", "sprawa", "dopasowanie", "pytanie", "ai_config", "sgt_towar", "sgt_stan", "watek_meta", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   /* Świeży adapter na każdy test: dev trzyma wysłane wiadomości w pamięci
@@ -51,6 +51,33 @@ function towar(twId: number, sym: string, nazwa: string, opis = "", ean = ""): v
     .run(twId, sym, nazwa, ean, opis);
   db().prepare("INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,1,5,0)").run(twId);
 }
+
+/* ── Audyt przejęcia ──────────────────────────────────────────────────────── */
+
+test("przejęcie pytania zostawia ślad w dzienniku — ale tylko przy ZMIANIE ręki", async () => {
+  /* Do 0.137.1 ten stempel zapisywał do bazy i NIE logował niczego, więc
+     dziennik nie umiał odpowiedzieć „kto wziął tę sprawę i kiedy" — a to jest
+     pytanie, dla którego log zdarzeń w ogóle istnieje.
+
+     Warunek na zmianę ręki nie jest ozdobą: stempel stawia KAŻDY zapis przy
+     pytaniu (patrz opis funkcji), więc bezwarunkowy wpis dokładałby to samo
+     zdanie po każdym kliknięciu ZAPISZ. */
+  await P.synchronizujPytania("test");
+  const id = P.listaPytan({ limit: 1 })[0].id;
+  const wpisy = () =>
+    db()
+      .prepare("SELECT payload FROM events WHERE type = 'pytanie_prowadzi' ORDER BY id")
+      .all() as Array<{ payload: string }>;
+
+  P.stempelProwadzi(id, "Anna");
+  assert.equal(wpisy().length, 1, "przejęcie sprawy jest zdarzeniem audytu");
+  P.stempelProwadzi(id, "Anna");
+  assert.equal(wpisy().length, 1, "drugi zapis tej samej ręki nie zaśmieca dziennika");
+
+  P.stempelProwadzi(id, "Bartek");
+  const ostatni = JSON.parse(wpisy()[1].payload);
+  assert.equal(ostatni.poprzedni, "Anna", "dziennik mówi, komu sprawa wypadła z rąk");
+});
 
 /* ── Synchronizacja ────────────────────────────────────────────────────────── */
 

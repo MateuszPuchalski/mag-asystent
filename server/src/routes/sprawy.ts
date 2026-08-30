@@ -4,7 +4,6 @@ import { stanPolaczenia } from "../services/allegro-token.js";
 import {
   RODZAJE_SPRAW,
   licznikSpraw,
-  listaSpraw,
   powiazaneSprawy,
   sprawyKlienta,
   szukajKlientow,
@@ -18,6 +17,7 @@ import { BladOpinii, stempelProwadziOpinii } from "../services/opinie.js";
 import { osCzasuSprawy } from "../services/os-sprawy.js";
 import { kanalyOdpowiedzi } from "../services/kanaly.js";
 import { kontekstZamowienia } from "../services/przesylki.js";
+import { sprawyZTagami } from "../services/tagi.js";
 import {
   BladSprawy,
   orderIdSprawy,
@@ -75,7 +75,10 @@ export async function sprawyRoutes(app: FastifyInstance) {
         .code(400)
         .send({ error: `Nieznany rodzaj sprawy — dozwolone: ${RODZAJE_SPRAW.join(", ")}` });
     }
-    return { sprawy: listaSpraw(rodzaj ?? undefined), allegro: stanPolaczenia() };
+    /* Tagi (0.137.0) jadą Z KOLEJKĄ, nie osobną trasą: panel i tak ma całą
+       listę w pamięci i filtruje ją czipami na miejscu, a drugie zapytanie
+       potrafiłoby pokazać tagi z innej chwili niż wiersze pod nimi. */
+    return { sprawy: sprawyZTagami(rodzaj ?? undefined), allegro: stanPolaczenia() };
   });
 
   /* Osobna, celowo TANIA trasa — pigułka na zakładce odświeża się co 30 s

@@ -1688,6 +1688,33 @@ test("czasy odpowiedzi: piąty zakres analizy z własnym oknem (0.134.0)", () =>
     "podstawa prawna monitoringu jedzie na ekran razem z danymi imiennymi");
 });
 
+test("tagi sterują kolejką: drugi rząd czipów i etykieta w wierszu (0.137.0)", () => {
+  /* Domknięcie E5. Do 0.136.0 tag było widać dopiero PO wejściu w sprawę,
+     więc reguła tagująca nie zmieniała ani jednego piksela kolejki — a to
+     kolejka odpowiada na „co teraz robić".
+
+     PIERWSZA granica: rząd czipów tagów jest OSOBNY od rzędu rodzajów, bo oba
+     filtry się składają; jedna zmienna stanu nie odpowiedziałaby na „zwroty
+     otagowane #uszkodzenie".
+
+     DRUGA: delegacja na SEKCJI kolejki — czipy przerysowują się przy każdym
+     odświeżeniu listy, więc nasłuch na samym czipie ginąłby co 30 sekund.
+
+     TRZECIA: pusty rząd znika z ekranu zamiast stać pustym paskiem. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.ok(html.includes('id="sprawyCzipyTagi"'), "kolejka ma rząd czipów tagów");
+  assert.ok(html.includes('id="sprawyCzipy"'), "rząd rodzajów zostaje osobno");
+  assert.match(html, /\.czipyTagow:empty \{ display: none; \}/,
+    "rząd bez tagów w ogóle się nie rysuje");
+  assert.match(html, /const czipTagu = e\.target\.closest\("button\[data-tag\]"\);/,
+    "klik w czip tagu łapie się na sekcji kolejki, nie na czipie");
+  assert.match(html, /class="tagWiersza"/, "wiersz kolejki pokazuje etykiety sprawy");
+  /* Filtr tagu przecina się z filtrem rodzaju — gdyby go zastępował, „Moje
+     sprawy z tym tagiem" trzeba by składać okiem z dwóch ekranów. */
+  assert.match(html, /wgRodzaju\.filter\(\(s\) => \(s\.tagi \|\| \[\]\)\.includes\(sprawyTag\)\)/,
+    "oba filtry kolejki składają się, a nie wykluczają");
+});
+
 test("tagi i reguły: linia w trzech szczegółach, delegacja na sekcji (0.136.0)", () => {
   /* Etap E5. Tag wisi przy ŹRÓDLE i przeżywa scalanie — to jest sprawdzane
      testem serwisu. Tutaj trzy granice ekranu.
