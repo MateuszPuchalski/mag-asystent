@@ -780,103 +780,122 @@ export function scopeDlaUrl(url: string): string {
   return "allegro:api:orders:read";
 }
 
-export class HttpAllegroAdapter implements AllegroAdapter {
-  private async zapytaj(
-    url: string,
-    /* Do 0.80.0 ten klient tylko CZYTAŁ. Wysyłka odpowiedzi klientowi jest
-       pierwszym zapisem — te same nagłówki i ta sama nauka `Accept`, więc
-       metoda i ciało doszły jako opcje zamiast drugiej funkcji obok. */
-    opcje: { metoda?: "POST" | "PUT"; body?: unknown } = {}
-  ): Promise<unknown | null> {
-    const bearer = await wazneBearer();
-    const rodzina = rodzinaKoncowki(url);
-    const znany = dzialajacyAccept.get(rodzina);
-    const doProbowania = znany ? [znany] : [...AKCEPTY];
+/**
+ * Jedno zapytanie do Allegro: token, nauka nagłówka `Accept`, tłumaczenie
+ * 401/403/406/429 na zdania po ludzku. Surowy JSON, bez mapowania.
+ *
+ * Na poziomie MODUŁU, nie w klasie (0.137.2): sonda kształtu (`npm run sonda`)
+ * potrzebuje dokładnie tej obsługi błędów, a nie potrzebuje ani jednego
+ * mapowania. Drugi klient HTTP obok tego znaczyłby drugie miejsce, w którym
+ * trzeba pamiętać o User-Agencie i o wersjach zasobów.
+ *
+ * Do 0.80.0 ten klient tylko CZYTAŁ. Wysyłka odpowiedzi klientowi jest
+ * pierwszym zapisem — te same nagłówki i ta sama nauka `Accept`, więc metoda
+ * i ciało doszły jako opcje zamiast drugiej funkcji obok.
+ */
+export async function zapytajAllegro(
+  url: string,
+  opcje: { metoda?: "POST" | "PUT"; body?: unknown } = {}
+): Promise<unknown | null> {
+  const bearer = await wazneBearer();
+  const rodzina = rodzinaKoncowki(url);
+  const znany = dzialajacyAccept.get(rodzina);
+  const doProbowania = znany ? [znany] : [...AKCEPTY];
 
-    let ostatnia406 = "";
-    for (const accept of doProbowania) {
-      let odp: Response;
-      try {
-        odp = await fetch(url, {
-          method: opcje.metoda ?? "GET",
-          headers: {
-            accept,
-            authorization: `Bearer ${bearer}`,
-            /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
-               zablokowaniem klucza API (ekran po rejestracji aplikacji). */
-            "user-agent": allegroUserAgent(),
-            /* Tylko przy ciele — pusty `content-type` przy GET-cie bywa
-               powodem odrzucenia u ostrożnych bramek. */
-            ...(opcje.body === undefined ? {} : { "content-type": "application/json" }),
-          },
-          body: opcje.body === undefined ? undefined : JSON.stringify(opcje.body),
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-      } catch (e) {
-        /* Timeout i DNS to najczęstsze awarie — komunikat ma mówić, CO sprawdzić,
-           bo „fetch failed" na ekranie biura nie prowadzi donikąd. */
-        throw new Error(
-          `Brak połączenia z Allegro (${config.allegro.apiUrl}) — sprawdź internet ` +
-            `na serwerze. (${e instanceof Error ? e.message : e})`
-        );
-      }
-
-      /* 406 = zła WERSJA zasobu, nie zły token ani brak danych. Próbujemy
-         kolejnego nagłówka zamiast pokazywać biuru surowy błąd Allegro. */
-      if (odp.status === 406) {
-        ostatnia406 = await odp.text().catch(() => "");
-        dzialajacyAccept.delete(rodzina);
-        continue;
-      }
-
-      if (odp.status === 404) return null;
-      if (odp.status === 401) {
-        throw new Error(
-          "Allegro odrzuciło token (401) — sparuj konto ponownie: /biuro → ZWROTY → KONTO ALLEGRO."
-        );
-      }
-      if (odp.status === 403) {
-        throw new Error(
-          `Brak uprawnienia (403) — aplikacja na developer.allegro.pl musi mieć scope ` +
-            `${scopeDlaUrl(url)}. Po dodaniu uprawnienia sparuj konto ponownie: ` +
-            "token wydany pod stary zakres sam się nie rozszerzy."
-        );
-      }
-      if (odp.status === 429) {
-        /* Limit zapytań. Bez ponowienia — ale z klasą, po której takt
-           tickerów wie, ile odczekać, a człowiek dostaje zdanie, nie kod. */
-        const poIluMs = retryAfterMs(odp.headers.get("retry-after"), Date.now());
-        throw new BladLimituAllegro(
-          "Allegro prosi o przerwę (429) — za dużo zapytań w krótkim czasie." +
-            (poIluMs !== null ? ` Spróbuj za ${Math.ceil(poIluMs / 1000)} s.` : ""),
-          poIluMs
-        );
-      }
-      if (!odp.ok) {
-        const tresc = await odp.text().catch(() => "");
-        throw new Error(`Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`);
-      }
-
-      dzialajacyAccept.set(rodzina, accept);
-      /* 204 i puste ciało to poprawna odpowiedź na PUT/POST — `json()` na
-         pustce rzuca, a odhaczenie wątku niczego nie zwraca. */
-      if (odp.status === 204) return null;
-      const surowa = await odp.text();
-      if (surowa.trim() === "") return null;
-      try {
-        return JSON.parse(surowa);
-      } catch {
-        return null;
-      }
+  let ostatnia406 = "";
+  for (const accept of doProbowania) {
+    let odp: Response;
+    try {
+      odp = await fetch(url, {
+        method: opcje.metoda ?? "GET",
+        headers: {
+          accept,
+          authorization: `Bearer ${bearer}`,
+          /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
+             zablokowaniem klucza API (ekran po rejestracji aplikacji). */
+          "user-agent": allegroUserAgent(),
+          /* Tylko przy ciele — pusty `content-type` przy GET-cie bywa
+             powodem odrzucenia u ostrożnych bramek. */
+          ...(opcje.body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        body: opcje.body === undefined ? undefined : JSON.stringify(opcje.body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (e) {
+      /* Timeout i DNS to najczęstsze awarie — komunikat ma mówić, CO sprawdzić,
+         bo „fetch failed" na ekranie biura nie prowadzi donikąd. */
+      throw new Error(
+        `Brak połączenia z Allegro (${config.allegro.apiUrl}) — sprawdź internet ` +
+          `na serwerze. (${e instanceof Error ? e.message : e})`
+      );
     }
 
-    /* Żaden ze znanych nagłówków nie przeszedł. Zapamiętany nagłówek mógł się
-       zdezaktualizować (Allegro wypromowało zasób), więc kasujemy go wyżej
-       i mówimy wprost, czego spróbowaliśmy. */
-    throw new Error(
-      `Allegro nie akceptuje żadnej znanej wersji zasobu (406) dla ${rodzina}. ` +
-        `Próbowano: ${doProbowania.join(", ")}. ${ostatnia406.slice(0, 200)}`
-    );
+    /* 406 = zła WERSJA zasobu, nie zły token ani brak danych. Próbujemy
+       kolejnego nagłówka zamiast pokazywać biuru surowy błąd Allegro. */
+    if (odp.status === 406) {
+      ostatnia406 = await odp.text().catch(() => "");
+      dzialajacyAccept.delete(rodzina);
+      continue;
+    }
+
+    if (odp.status === 404) return null;
+    if (odp.status === 401) {
+      throw new Error(
+        "Allegro odrzuciło token (401) — sparuj konto ponownie: /biuro → ZWROTY → KONTO ALLEGRO."
+      );
+    }
+    if (odp.status === 403) {
+      throw new Error(
+        `Brak uprawnienia (403) — aplikacja na developer.allegro.pl musi mieć scope ` +
+          `${scopeDlaUrl(url)}. Po dodaniu uprawnienia sparuj konto ponownie: ` +
+          "token wydany pod stary zakres sam się nie rozszerzy."
+      );
+    }
+    if (odp.status === 429) {
+      /* Limit zapytań. Bez ponowienia — ale z klasą, po której takt
+         tickerów wie, ile odczekać, a człowiek dostaje zdanie, nie kod. */
+      const poIluMs = retryAfterMs(odp.headers.get("retry-after"), Date.now());
+      throw new BladLimituAllegro(
+        "Allegro prosi o przerwę (429) — za dużo zapytań w krótkim czasie." +
+          (poIluMs !== null ? ` Spróbuj za ${Math.ceil(poIluMs / 1000)} s.` : ""),
+        poIluMs
+      );
+    }
+    if (!odp.ok) {
+      const tresc = await odp.text().catch(() => "");
+      throw new Error(`Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`);
+    }
+
+    dzialajacyAccept.set(rodzina, accept);
+    /* 204 i puste ciało to poprawna odpowiedź na PUT/POST — `json()` na
+       pustce rzuca, a odhaczenie wątku niczego nie zwraca. */
+    if (odp.status === 204) return null;
+    const surowa = await odp.text();
+    if (surowa.trim() === "") return null;
+    try {
+      return JSON.parse(surowa);
+    } catch {
+      return null;
+    }
+  }
+
+  /* Żaden ze znanych nagłówków nie przeszedł. Zapamiętany nagłówek mógł się
+     zdezaktualizować (Allegro wypromowało zasób), więc kasujemy go wyżej
+     i mówimy wprost, czego spróbowaliśmy. */
+  throw new Error(
+    `Allegro nie akceptuje żadnej znanej wersji zasobu (406) dla ${rodzina}. ` +
+      `Próbowano: ${doProbowania.join(", ")}. ${ostatnia406.slice(0, 200)}`
+  );
+}
+
+export class HttpAllegroAdapter implements AllegroAdapter {
+  /* Cienki delegat: cała mechanika stoi w `zapytajAllegro` na poziomie
+     modułu, żeby sonda kształtu mogła jej użyć bez tworzenia adaptera. */
+  private zapytaj(
+    url: string,
+    opcje: { metoda?: "POST" | "PUT"; body?: unknown } = {}
+  ): Promise<unknown | null> {
+    return zapytajAllegro(url, opcje);
   }
 
   async szukajZwrotowPoWaybill(waybill: string): Promise<ZwrotAllegro[]> {

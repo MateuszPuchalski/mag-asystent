@@ -33,6 +33,48 @@ historii nie przepisujemy.
 
 ---
 
+## 0.137.2 — 30 sierpnia 2026
+
+**Dwa narzędzia i dokument, od których zaczyna się przebudowa obsługi
+klienta.** Właściciel zdecydował o skasowaniu rozmów, spraw, rejestru zwrotów
+i reklamacji, i zbudowaniu obsługi od nowa. Ta wersja nie kasuje niczego —
+zbiera dowody, bez których nowe zasady byłyby kolejnym domysłem.
+
+**Powód głębszy niż jedna usterka.** Pytanie o rozrusznik przyjechało bez
+numeru oferty, choć mail z Allegro tę ofertę nazywa — i dopasowanie zeszło do
+zgadywania z treści. Ale sedno jest inne: model danych stał na kształcie
+JSON-a wymyślonym w naszych testach i nigdy nie sprawdzonym na żywym koncie.
+
+**`npm run sonda` — kształt odpowiedzi Allegro, bez treści.** Wyłącznie GET po
+siedmiu rodzinach końcówek. Wypisuje nazwy pól, typy oraz to, w ilu rekordach
+pole było obecne i w ilu niepuste. Nie wypisuje wiadomości, loginów, nazwisk
+ani numerów; wartości pokazuje tylko dla pól słownikowych pisanych wersalikami,
+czyli enumów Allegro. Raport ma wejść do repo, więc te granice pilnują testy,
+a nie ostrożność autora.
+
+**Kolumna „niepuste" jest w tym raporcie najważniejsza.** Pole obecne
+w każdym rekordzie, ale puste w połowie, wygląda w kodzie na pewne i pewne nie
+jest. Dokładnie tak zachował się numer oferty przy pytaniach.
+
+**`npm run inwentarz` — liczby, których po skasowaniu nikt nie odtworzy.**
+Wpływ pytań, dyskusji, opinii, zwrotów i reklamacji miesiąc po miesiącu; ile
+pytań miało numer oferty, a ile nie; ile trafiło w kartotekę; ile szkiców
+poszło bez edycji; czasy odpowiedzi; decyzje na pozycjach zwrotu. I tabelka
+najważniejsza dla magazynu: którędy napełniały się kosze — dokumentem MM
+z Subiekta czy przypiętym zwrotem. Po cięciu zostaje tylko pierwsza droga.
+
+**`docs/obsluga-klienta.md` — osiem pytań i lista blizn.** Dokument zasad
+pisany od zera, z odpowiedziami jeszcze pustymi: każda ma się oprzeć na
+dowodzie z sondy albo z inwentarza. Lista blizn spisuje trzynaście usterek już
+zapłaconych wydaniem — nowy kod ma prawo wyglądać inaczej, ale nie ma prawa
+kupić ich drugi raz.
+
+**Klient HTTP Allegro wyszedł z klasy adaptera.** `zapytajAllegro` stoi teraz
+na poziomie modułu, a metoda klasy jest jego delegatem. Sonda potrzebuje
+dokładnie tej obsługi 401/403/406/429, a nie potrzebuje ani jednego mapowania;
+drugi klient obok znaczyłby drugie miejsce, w którym trzeba pamiętać
+o User-Agencie i o wersjach zasobów.
+
 ## 0.137.1 — 30 sierpnia 2026
 
 **Trzy przejęcia sprawy zapisywały się w ciszy.** Audyt logu zdarzeń: stempel

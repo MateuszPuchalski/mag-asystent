@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.137.1",
+  "version": "0.137.2",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -18,7 +18,9 @@
     "start:worker": "node dist/worker/worker.js",
     "test": "tsx --test src/*.test.ts src/**/*.test.ts",
     "reconcile": "tsx src/reconcile-run.ts",
-    "reslot": "tsx src/reslot-run.ts"
+    "reslot": "tsx src/reslot-run.ts",
+    "sonda": "tsx src/sonda-run.ts",
+    "inwentarz": "tsx src/inwentarz-run.ts"
   },
   "dependencies": {
     "fastify": "^5.2.1",
