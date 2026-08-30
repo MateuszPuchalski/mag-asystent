@@ -1,13 +1,14 @@
 # Obsługa klienta od zera — zasady
 
-Dokument powstaje przed skasowaniem dotychczasowej obsługi klienta: rozmów,
-nakładki spraw, rejestru zwrotów i reklamacji. Nie jest wersją
-[`architektura-spraw.md`](architektura-spraw.md) — tamten opisuje kod, który
-odchodzi, i odejdzie razem z nim. Ten opisuje, co ma stanąć na jego miejscu.
+Dotychczasowa obsługa klienta — rozmowy, nakładka spraw, rejestr zwrotów
+i reklamacje — została skasowana w 0.138.0. Ten dokument opisuje, co ma
+stanąć na jej miejscu. Poprzednik, `architektura-spraw.md`, opisywał kod
+i odszedł razem z nim.
 
 **Stan: SZKIELET.** Osiem pytań niżej ma odpowiedzi puste. Wypełnia się je
 dowodami z dwóch narzędzi, nie z pamięci — o tym mówi następny rozdział.
-Dopóki odpowiedzi nie ma, nie kasujemy ani jednej linii kodu.
+Właściciel zdecydował ciąć przed zebraniem dowodów, żeby nie budować nowego
+na starym; dowody rozstrzygają, co powstanie, a nie czy ciąć.
 
 ## Dlaczego od zera
 

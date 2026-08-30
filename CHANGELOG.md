@@ -33,6 +33,75 @@ historii nie przepisujemy.
 
 ---
 
+## 0.138.0 — 30 sierpnia 2026
+
+**Cała obsługa klienta skasowana.** Odchodzą pytania, dyskusje, opinie,
+nakładka spraw z osią czasu i tagami, szablony, kanały, czasy obsługi,
+a razem z nimi cały rejestr zwrotów Allegro: skan etykiety zwrotnej,
+dopasowanie dokumentu sprzedaży, decyzje o pozycjach, korekty, zniszczenia,
+zwrot środków, reklamacje, zapowiedzi i statystyki zwrotów. Ubyło blisko
+dwadzieścia dziewięć tysięcy linii i ponad trzysta testów.
+
+**Powód stoi w `docs/obsluga-klienta.md`.** Model danych opierał się na
+kształcie JSON-a wymyślonym w naszych testach i nigdy nie sprawdzonym na
+żywym koncie. Pytanie o rozrusznik bez numeru oferty było objawem, nie
+przyczyną. Nowa obsługa ma powstać z raportu sondy (`npm run sonda`), pole po
+polu, a nie z poprawiania starego kodu.
+
+**[wymaga działania] Jedyną drogą towaru z powrotem na półkę jest teraz
+dokument MM ZWROTY wystawiony w Subiekcie.** Ta droga działała już wcześniej
+i nic w niej nie zmieniamy: biuro wystawia MM, pisze numer na kartce przy
+koszu, hala rozkłada zawartość kolektorem. Znika natomiast druga droga —
+przypinanie zwrotu do kosza z rejestru. Decyzje o pozycjach zwrotu, korekty
+sprzedaży i zwrot środków robi się od tej wersji poza aplikacją: w Subiekcie
+i w panelu Allegro.
+
+**[wymaga działania] Zrób kopię bazy przed aktualizacją.** Migracja kasuje
+osiemnaście tabel bezpowrotnie. Liczby, które w nich siedzą, zdejmuje
+`npm run inwentarz` — uruchom go na KOPII sprzed aktualizacji, bo po niej nie
+ma z czego ich odtworzyć.
+
+**[wymaga działania] Opróżnij kolejkę z zadań `korekta_zwrot`.** Aplikacja
+przestaje je nadawać, ale zadania nadane wcześniej niczego nie tracą — worker
+Sfery umie je dalej. Zadanie stojące w błędzie rozstrzygnij przed
+aktualizacją, bo karty zwrotu, z której było widać jego powód, już nie będzie.
+
+**Kolektor bez zmian.** Zakładki SKAN, DOSTAWY, ZWROTY i KARTON nie dotykały
+kasowanych tras. Nowego APK to wydanie nie wymaga.
+
+**Panel schudł o połowę.** Zniknął widok SPRAW z całym szczegółem sprawy
+i zwrotu, cztery rejestry per-typ, karta BRAKUJĄCE PACZKI i zakresy ANALIZY
+liczone ze spraw. Zakładka REJESTRY odeszła razem z nimi, a karta KONTO
+ALLEGRO przeniosła się do STANU SYSTEMU — ikona ALLEGRO w pasku prowadzi
+tam, gdzie karta naprawdę stoi. Zostają DOSTAWY, MAGAZYN ZWROTÓW, ANALIZA,
+DZIENNIK i STAN SYSTEMU.
+
+**Konto Allegro zostaje.** Token nie należał do zwrotów: to jedno połączenie
+konta sprzedawcy, z którego korzysta dziś sonda kształtu, a jutro nowa obsługa
+klienta. Parowanie i rozłączenie dalej wymaga roli admin, sam stan czyta
+biuro. Trasy przeprowadziły się z `routes/zwroty.ts` do `routes/allegro.ts`.
+
+**Import z Subiekta czyta o dwa zapytania mniej.** Read-model dokumentów
+sprzedaży (FS/PA) istniał wyłącznie po to, żeby dopasować zwrot do faktury.
+Razem z nim przestają cokolwiek robić `DOK_SPRZEDAZ_DNI_WSTECZ`,
+`MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` i `MSSQL_SPRZEDAZ_UWAGI_COLUMN` — zostawione
+w `wertis.env` są nieszkodliwe.
+
+**Adapter Allegro zszedł do samego połączenia.** Kontrakt rozmów, zwrotów
+i opinii wraz z kompletem funkcji `mapuj*` i adapterem dev odszedł, bo to on
+był usterką. Zostają budowa URL-i, negocjacja nagłówka `Accept`, scope
+w komunikacie 403 i jedno wyjście do sieci — czyli to, czego używa sonda.
+
+**Nowy strażnik: panel nie woła funkcji, której nie ma.** Kasowanie ekranu
+zabrało pomocników, z których korzystały ekrany zostające — i lista dostaw
+przestała się rysować w ciszy, bo `rysujDostawy` wołało skasowany `wiekPytania`.
+Test skanuje `<script>` panelu, pomijając komentarze i tekst dla człowieka,
+i porównuje wywołania z definicjami. Złapał dwa takie braki w tym wydaniu.
+
+**Licznik zapisów w `routes/biuro.test.ts` spadł z 46 na 15.** To nie jest
+poluzowanie umowy „zero zapisu przy patrzeniu", tylko jej skutek: zniknęły
+trasy, które te zapisy robiły.
+
 ## 0.137.2 — 30 sierpnia 2026
 
 **Dwa narzędzia i dokument, od których zaczyna się przebudowa obsługi

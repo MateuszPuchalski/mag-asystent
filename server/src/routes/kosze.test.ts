@@ -29,23 +29,15 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sprawa_zrodlo", "sprawa", 
-    "kosz_pozycja", "zwrot_zam_pozycja", "zwrot_pozycja", "zwrot", "kosz",
+  for (const t of ["kosz_pozycja", "kosz",
     "przyjecie_pominiete", "sgt_mm_zwrot_pozycja", "sgt_mm_zwrot",
-    "sgt_sprzedaz_pozycja", "sgt_sprzedaz", "sgt_towar", "sfera_queue",
-    "events", "device_session", "app_user",
+    "sgt_towar", "sfera_queue", "events", "device_session", "app_user",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const ins = d.prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean, lokalizacja) VALUES (?,?,?,?,?)");
   ins.run(900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", "", "A01-02-03");
   ins.run(900_037, "TEST-LINIA-DONE", "Pozycja odłożona w całości", "5900000000037", "");
-  d.prepare(
-    "INSERT INTO sgt_sprzedaz(dok_id, typ, nr_pelny, nr_oryg, data_wyst, kontrahent, mag_id) VALUES (101,'FS','FS 101/08/2026','dev-ord-1',?, 'ALLEGRO', 1)"
-  ).run(new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10));
-  const poz = d.prepare("INSERT INTO sgt_sprzedaz_pozycja(dok_id, tw_id, ilosc) VALUES (101,?,?)");
-  poz.run(900_036, 1);
-  poz.run(900_037, 2);
 });
 
 function zalogowany(rola: Rola): Record<string, string> {
@@ -58,30 +50,34 @@ function zalogowany(rola: Rola): Record<string, string> {
   return { "x-session": token };
 }
 
-async function zwrotWKoszu(biuro: Record<string, string>): Promise<{ zwrotId: number; koszId: number }> {
-  let r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/skan", payload: { kod: "DEVWB0001" }, headers: biuro });
-  const zwrot = r.json().zwrot;
-  for (const p of zwrot.pozycje) {
-    await app.inject({
-      method: "POST",
-      url: `/api/biuro/zwroty/${zwrot.id}/pozycje/${p.id}/decyzja`,
-      payload: { decyzja: "pelnowartosciowy" },
-      headers: biuro,
-    });
-  }
-  r = await app.inject({ method: "POST", url: `/api/biuro/zwroty/${zwrot.id}/dokumenty`, headers: biuro });
-  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(r.json().zwrot.dokumenty.queueId);
-  r = await app.inject({ method: "POST", url: `/api/biuro/zwroty/${zwrot.id}/kosz`, payload: { kod: "KZ-07" }, headers: biuro });
-  assert.equal(r.statusCode, 200);
-  return { zwrotId: zwrot.id, koszId: r.json().zwrot.kosz.id };
+/**
+ * Kosz gotowy do rozkładania — taki, jaki rodzi przyjęcie z dokumentu MM
+ * ZWROTY (`otworzPrzyjecie`): od razu ZAMKNIĘTY i bez odwołań do zwrotu.
+ * SQL-em, bo ten plik sprawdza TRASY rozkładania, a nie import dokumentu.
+ */
+function koszDoRozkladania(kod = "KZ-07"): number {
+  const d = db();
+  const teraz = new Date().toISOString();
+  const kosz = d
+    .prepare(
+      `INSERT INTO kosz(kod, status, mm_dok_id, mm_numer, utworzono_at, utworzono_przez,
+                        zamknieto_at, zamknieto_przez)
+       VALUES (?, 'zamkniety', 41209, ?, ?, 'Biuro', ?, 'Biuro')`
+    )
+    .run(kod, kod, teraz, teraz);
+  const koszId = Number(kosz.lastInsertRowid);
+  const ins = d.prepare(
+    "INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)"
+  );
+  ins.run(koszId, 900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", 1);
+  ins.run(koszId, 900_037, "TEST-LINIA-DONE", "Pozycja odłożona w całości", 2);
+  return koszId;
 }
 
-test("bramki: przypinanie i zamykanie to biuro, rozkładanie działa na magazynierze", async () => {
+test("bramki: podgląd koszy to biuro, rozkładanie działa na magazynierze", async () => {
   const magazynier = zalogowany("magazynier");
-  let r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/1/kosz", payload: { kod: "X" }, headers: magazynier });
-  assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "GET", url: "/api/biuro/kosze", headers: magazynier });
-  assert.equal(r.statusCode, 403);
+  let r = await app.inject({ method: "GET", url: "/api/biuro/kosze", headers: magazynier });
+  assert.equal(r.statusCode, 403, "lista biura nie jest dla hali");
   // hala bez sesji — bramka globalna
   r = await app.inject({ method: "GET", url: "/api/kosze" });
   assert.equal(r.statusCode, 401);
@@ -89,16 +85,13 @@ test("bramki: przypinanie i zamykanie to biuro, rozkładanie działa na magazyni
   assert.equal(r.statusCode, 200);
 });
 
-test("pełny przepływ: kosz na karcie, zamknięcie, rozkładanie, cofnięcie bufora", async () => {
+test("pełny przepływ: kosz z dokumentu, rozkładanie, zakończenie", async () => {
   const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");
-  const { zwrotId, koszId } = await zwrotWKoszu(biuro);
+  const koszId = koszDoRozkladania();
 
-  // karta zwrotu pokazuje kosz
-  let r = await app.inject({ method: "GET", url: `/api/biuro/zwroty/${zwrotId}`, headers: biuro });
-  assert.equal(r.json().zwrot.kosz.kod, "KZ-07");
-
-  r = await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  // biuro widzi kosz na swojej liście
+  let r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().kosz.pozycje.length, 2);
 
@@ -125,11 +118,16 @@ test("pełny przepływ: kosz na karcie, zamknięcie, rozkładanie, cofnięcie bu
   r = await app.inject({ method: "POST", url: `/api/kosze/${koszId}/zakoncz`, headers: magazynier });
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().kosz.status, "rozlozony");
+  /* Kosz przyjechał dokumentem MM z Subiekta i dokument powrotny też wystawia
+     biuro — aplikacja nie kolejkuje niczego. Zadanie stąd byłoby przesunięciem
+     na towar, którego nikt nie ruszał. */
   const mm = db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number };
-  assert.equal(mm.n, 2, "bufor cofa się sam — MM per pozycja");
+  assert.equal(mm.n, 0, "kolektor zapisuje adresy, dokumenty wystawia biuro");
 
-  // autor zadań MM = magazynier z sesji, nie biuro
-  const autorzy = db().prepare("SELECT DISTINCT created_by FROM sfera_queue WHERE type='mm'").all() as Array<{ created_by: string }>;
+  // autor zapisów adresu = magazynier z sesji, nie biuro
+  const autorzy = db()
+    .prepare("SELECT DISTINCT created_by FROM sfera_queue WHERE type='set_location'")
+    .all() as Array<{ created_by: string }>;
   assert.deepEqual(autorzy.map((a) => a.created_by), ["Ktoś magazynier"]);
 
   /* Biuro widzi, KTO rozłożył — i musi to być hala, nie biuro, które kosz
@@ -140,17 +138,15 @@ test("pełny przepływ: kosz na karcie, zamknięcie, rozkładanie, cofnięcie bu
   const wiersz = r.json().kosze.find((x: { id: number }) => x.id === koszId);
   assert.equal(wiersz.rozlozonoPrzez, "Ktoś magazynier");
   assert.ok(wiersz.rozlozonoAt, "lista niesie też godzinę");
-  assert.equal(wiersz.zamknietoPrzez, "Ktoś biuro", "zamykało biuro — inna osoba, inna kolumna");
+  assert.equal(wiersz.zamknietoPrzez, "Biuro", "kosz zamknęło przyjęcie dokumentu, nie hala");
 
   r = await app.inject({ method: "GET", url: `/api/biuro/kosze/${koszId}`, headers: biuro });
   assert.equal(r.json().kosz.rozlozonoPrzez, "Ktoś magazynier", "szczegół mówi to samo co lista");
 });
 
 test("cofanie i odkładanie na później przez HTTP — bez bramki roli", async () => {
-  const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");
-  const { koszId } = await zwrotWKoszu(biuro);
-  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const koszId = koszDoRozkladania();
   const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
   const pierwsza = kosz.pozycje[0].id;
 
@@ -222,10 +218,8 @@ test("przyjęcia: hala otwiera numerem z kartki, zdejmuje z listy tylko admin", 
 });
 
 test("pominięcie pozycji: przez HTTP, z powodem, i nie blokuje zakończenia", async () => {
-  const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");
-  const { koszId } = await zwrotWKoszu(biuro);
-  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const koszId = koszDoRozkladania();
   const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
 
   // powód jest treścią zgłoszenia — bez niego trasa odmawia
@@ -257,8 +251,7 @@ test("pominięcie pozycji: przez HTTP, z powodem, i nie blokuje zakończenia", a
 test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async () => {
   const biuro = zalogowany("biuro");
   const magazynier = zalogowany("magazynier");
-  const { koszId } = await zwrotWKoszu(biuro);
-  await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/zamknij`, headers: biuro });
+  const koszId = koszDoRozkladania();
   const kosz = (await app.inject({ method: "GET", url: "/api/kosze/kod/KZ-07", headers: magazynier })).json().kosz;
   await app.inject({
     method: "POST",
@@ -335,81 +328,3 @@ test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async
   assert.equal(po.zalatwioneAt, null);
 });
 
-test("reklamacje i raport odpowiadają przez HTTP z bramką biura", async () => {
-  const biuro = zalogowany("biuro");
-  const magazynier = zalogowany("magazynier");
-  let r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/reklamacje", headers: magazynier });
-  assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/reklamacje", headers: biuro });
-  assert.equal(r.statusCode, 200);
-  assert.deepEqual(r.json().reklamacje, []);
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/raport", headers: biuro });
-  assert.equal(r.statusCode, 200);
-  assert.equal(typeof r.json().raport.zwroty.razem30dni, "number");
-  // statystyki produktowe (0.78.0) — ta sama bramka, okno z zapytania
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki", headers: magazynier });
-  assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki?dni=30", headers: biuro });
-  assert.equal(r.statusCode, 200, r.body);
-  assert.equal(r.json().statystyki.dni, 30);
-  // nieznane okno nie wywraca trasy, tylko wraca do domyślnego
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/statystyki?dni=abc", headers: biuro });
-  assert.equal(r.json().statystyki.dni, 90);
-  /* Czasy obsługi (0.82.0) — ta sama bramka. Odpowiedź na pustej bazie ma być
-     KOMPLETNA: pięć odcinków, każdy z wyjaśnieniem, dlaczego jest pusty, i
-     podstawa prawna monitoringu przy tempie ludzi. */
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/czasy", headers: magazynier });
-  assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/czasy?dni=30", headers: biuro });
-  assert.equal(r.statusCode, 200, r.body);
-  const czasy = r.json().czasy;
-  assert.equal(czasy.dni, 30);
-  assert.equal(czasy.odcinki.length, 5);
-  assert.ok(czasy.odcinki.every((o: { czemuPusto: string | null }) => o.czemuPusto));
-  assert.match(czasy.podstawaPrawna, /Kodeks pracy/);
-  // brakujące paczki (Etap 4) — ta sama bramka biura, pusta lista bez przebiegu tickera
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: magazynier });
-  assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: biuro });
-  assert.equal(r.statusCode, 200);
-  assert.deepEqual(r.json().zapowiedzi, [], "nic nie pobiera się samo — to jest teza 0.85.0");
-
-  /* ...a pobranie Z RĘKI przynosi zgłoszenia. Te dwie asercje mają sens
-     WYŁĄCZNIE razem: pierwsza pilnuje, że tło milczy, druga — że przycisk
-     naprawdę działa. Sama pierwsza przeszłaby też przy trasie zepsutej na
-     głucho, czyli w stanie, w którym karta BRAKUJĄCE PACZKI nigdy nic nie
-     pokaże i nikt się nie dowie dlaczego. */
-  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/odswiez", headers: magazynier });
-  assert.equal(r.statusCode, 403, "pobiera biuro, nie hala");
-  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/odswiez", headers: biuro });
-  assert.equal(r.statusCode, 200, r.body);
-  assert.ok(r.json().nowych > 0, "adapter dev ma zgłoszenia — przycisk musi je przynieść");
-
-  r = await app.inject({ method: "GET", url: "/api/biuro/zwroty/zapowiedzi", headers: biuro });
-  assert.ok(r.json().zapowiedzi.length > 0, "po pobraniu lista przestaje być pusta");
-  /* Schowanie zapowiedzi (0.70.0) — bramka biura, a nieznane id to 404, nie 500.
-     Id musi być NAPRAWDĘ nieznane: od 0.85.0 pobranie wyżej zakłada zgłoszenia,
-     więc `1` jest już zajęte i test sprawdzałby coś innego, niż zamierzał. */
-  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/999999/pomin", payload: {}, headers: magazynier });
-  assert.equal(r.statusCode, 403);
-  r = await app.inject({ method: "POST", url: "/api/biuro/zwroty/zapowiedzi/999999/pomin", payload: {}, headers: biuro });
-  assert.equal(r.statusCode, 404);
-  // półka reklamacyjna i dyskusje Allegro (Etap 6) — bramka biura
-  r = await app.inject({
-    method: "PUT", url: "/api/biuro/zwroty/reklamacje/1/polka",
-    payload: { polka: "REK-01" }, headers: magazynier,
-  });
-  assert.equal(r.statusCode, 403);
-  /* Dyskusje mają od tej wersji WŁASNY rejestr: najpierw pobranie z Allegro
-     do lokalnej tabeli, potem lista z niej. Sprawa zamknięta w panelu
-     (trzecia w adapterze dev) schodzi z worklisty automatem przy pobraniu. */
-  r = await app.inject({ method: "POST", url: "/api/biuro/dyskusje/odswiez", payload: {}, headers: magazynier });
-  assert.equal(r.statusCode, 403, "pobiera biuro, nie hala");
-  r = await app.inject({ method: "POST", url: "/api/biuro/dyskusje/odswiez", payload: {}, headers: biuro });
-  assert.equal(r.statusCode, 200, r.body);
-  r = await app.inject({ method: "GET", url: "/api/biuro/dyskusje", headers: biuro });
-  assert.equal(r.statusCode, 200);
-  const dyskusje = r.json().dyskusje;
-  assert.equal(dyskusje.length, 2, "rozmowa i formalna reklamacja czekają; sprawa CLOSED zeszła sama");
-  assert.ok(dyskusje.some((y: { typ: string }) => y.typ === "CLAIM"));
-});

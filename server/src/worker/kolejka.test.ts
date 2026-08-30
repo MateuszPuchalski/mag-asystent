@@ -43,9 +43,6 @@ const padajacy = (msg = "Kartoteka w edycji"): SferaAdapter => ({
   createMM: async () => {
     throw new Error(msg);
   },
-  createKorektaZwrotu: async () => {
-    throw new Error(msg);
-  },
 });
 
 const udany = (): SferaAdapter => ({
@@ -53,7 +50,6 @@ const udany = (): SferaAdapter => ({
   applySetEan: async () => {},
   applySetZdjecie: async () => {},
   createMM: async () => "MM 1/2026",
-  createKorektaZwrotu: async () => ({ korektaNumer: "KFS 1/2026", mmNumer: "MM 1/2026" }),
 });
 
 function dodajZadanie(
@@ -125,7 +121,6 @@ test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async ()
     },
     applySetZdjecie: async () => {},
     createMM: async () => "MM 1/2026",
-    createKorektaZwrotu: async () => ({ korektaNumer: "KFS 1/2026", mmNumer: "MM 1/2026" }),
   };
   const id = dodajZadanie("set_ean", payload);
   await K.przetworzZadanie(
@@ -151,7 +146,6 @@ test("zdjęcie kartoteki trafia do adaptera, nie w gałąź nieznanego typu", as
       zapisane.push(twId);
     },
     createMM: async () => "MM 1/2026",
-    createKorektaZwrotu: async () => ({ korektaNumer: "KFS 1/2026", mmNumer: "MM 1/2026" }),
   };
   const id = dodajZadanie("set_zdjecie", payload);
   await K.przetworzZadanie(
@@ -245,53 +239,3 @@ test("set_location nie czeka na dokument — wstrzymanie dotyczy tylko MM", asyn
   );
 });
 
-test("korekta zwrotu oddaje DWA numery: korekta w kolumnie, MM w wyniku", async () => {
-  /* Jedno zadanie tworzy dwa dokumenty, a kolumna z numerem jest jedna.
-     W `sgt_doc_number` ląduje korekta — to jej numer podaje się klientowi
-     i księgowości; numer MM stoi obok w `wynik_json`, bo po nim magazyn
-     odnajdzie towar na buforze. */
-  const payload = {
-    dokId: 101,
-    typ: "FS",
-    magZrodlowy: 1,
-    magZwrotow: 3,
-    pozycje: [{ twId: 900_036, qty: 1 }],
-  };
-  let dostane: unknown = null;
-  const adapter: SferaAdapter = {
-    ...udany(),
-    createKorektaZwrotu: async (z) => {
-      dostane = z;
-      return { korektaNumer: "KFS 9/08/2026", mmNumer: "MM 77/08/2026" };
-    },
-  };
-  const id = dodajZadanie("korekta_zwrot", payload);
-  await K.przetworzZadanie(
-    { id, type: "korekta_zwrot", payload: JSON.stringify(payload), attempts: 0, source_doc_id: 101, ...AUDYT },
-    adapter
-  );
-  const s = stan(id);
-  assert.equal(s.status, "done");
-  assert.equal(s.sgt_doc_number, "KFS 9/08/2026");
-  assert.deepEqual(JSON.parse(s.wynik_json ?? "null"), {
-    korektaNumer: "KFS 9/08/2026",
-    mmNumer: "MM 77/08/2026",
-  });
-  assert.deepEqual(dostane, payload, "payload idzie do adaptera bez przeróbek");
-});
-
-test("korekta NIE czeka na bufor — dokument sprzedaży nie jest dostawą", async () => {
-  /* `waiting_for_doc` pilnuje dokumentów z read-modelu dostaw. Dokument
-     sprzedaży tam nie stoi, więc sprawdzanie bufora dawałoby zawsze „nie
-     w buforze" — pozór reguły. Lepiej, żeby reguły nie było wprost. */
-  const id = dodajZadanie("korekta_zwrot", { dokId: 101 }, { docId: 101 });
-  db()
-    .prepare(
-      "INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, w_buforze) VALUES (101,'FS','FS 101','2026-08-01',1,1)"
-    )
-    .run();
-  assert.equal(
-    K.czekaNaDokument({ id, type: "korekta_zwrot", payload: "{}", attempts: 0, source_doc_id: 101, ...AUDYT }),
-    false
-  );
-});

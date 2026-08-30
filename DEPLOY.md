@@ -721,21 +721,13 @@ Każda tabela ma własne przewijanie, a listy o nieograniczonej długości mają
 ograniczoną wysokość z przyklejonym nagłówkiem kolumn. Jedna dostawa na
 siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
 
-**Karta WGLĄD** na zakładce ZWROTY zbiera raport procesu, statystyki, czasy
-obsługi i stan konta Allegro. Domyślnie rozwinięty jest sam raport, reszta
-czeka zwinięta. Zwinięta sekcja **nie pyta serwera** — to nie jest chowanie
-pikseli, tylko oszczędność żądań: raport szedł dotąd w każdym
-trzydziestosekundowym cyklu odświeżania.
+**Zwinięta sekcja nie pyta serwera** — to nie jest chowanie pikseli, tylko
+oszczędność żądań. Wybór, co jest rozwinięte, zapamiętuje przeglądarka.
 
-Wybór, co jest rozwinięte, zapamiętuje przeglądarka. Jeden wyjątek: gdy
-parowanie z Allegro jest rozerwane, sekcja KONTO ALLEGRO otwiera się sama.
-Skan etykiety wtedy nie zadziała, a to nie jest rzecz do odkrycia przez
-rozwijanie sekcji.
-
-**Szczegół obok listy.** Wejście w zwrot albo w dostawę na oknie szerszym niż
-1280 px zostawia listę widoczną po lewej, a szczegół stawia obok niej. Otwarty
-wiersz jest podświetlony. Na węższym oknie szczegół zasłania listę,
-jak wcześniej — dwie kolumny nie mieszczą się na laptopie obok siebie.
+**Szczegół obok listy.** Wejście w dostawę na oknie szerszym niż 1280 px
+zostawia listę widoczną po lewej, a szczegół stawia obok niej. Otwarty wiersz
+jest podświetlony. Na węższym oknie szczegół zasłania listę, jak wcześniej —
+dwie kolumny nie mieszczą się na laptopie obok siebie.
 
 ## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
@@ -885,6 +877,7 @@ bazie. Przejdź tę tabelę przed pierwszą pracą na produkcji:
 | `MSSQL_ZD_ZREAL_COLUMN` | ilość już odebrana z zamówienia | zawyżone ilości na karcie towaru |
 | `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
 | `MM_ZWROTY_DNI_WSTECZ` | okno importu przesunięć na regał zwrotów (§6a) | starszy kosz z kartką nie otworzy się numerem |
+| `MAG_ID_ZWROTY` | magazyn, na który biuro wystawia MM ZWROTY (§6a) | lista przyjęć pusta, bez błędu |
 
 Gdy kolumny ilości zrealizowanej nie ma wcale (patrz Etap 1 wyżej), zostaw
 wartość pustą. Karta towaru opisze wtedy ilość jako oszacowanie, a `/api/health`
@@ -919,10 +912,11 @@ Miniatura na karcie towaru wymaga APK w wersji **0.30.0 lub nowszej**.
 Serwer wyda zdjęcia od razu po restarcie, starszy kolektor nie ma ich gdzie
 narysować.
 
-Ta sama funkcja rysuje od 0.72.0 miniatury na **karcie zwrotu Allegro**
-(pozycje wracające i całe zamówienie) oraz na **liście reklamacji**. Nic tu
-nie trzeba włączać osobno: gdy `ZDJECIA_ZRODLO` jest ustawione, kolumna
-pojawia się sama, a bez niej znika razem z nagłówkiem.
+Ta sama funkcja rysuje miniatury w **podglądzie kosza zwrotowego** i na
+**liście reklamacji dostawczych**. Nic tu nie trzeba włączać osobno: gdy
+`ZDJECIA_ZRODLO` jest ustawione, kolumna pojawia się sama, a bez niej znika
+razem z nagłówkiem. Karta zwrotu Allegro, która korzystała z tego od 0.72.0,
+odeszła w 0.138.0.
 
 **Zdjęcie dodane w Subiekcie pojawia się z opóźnieniem** i to jest projektowe.
 Serwer pamięta „ta kartoteka zdjęcia nie ma" przez `ZDJECIA_BRAK_TTL_H`
@@ -946,8 +940,9 @@ było największe — dopiero na tych liczbach dobiera się `ZDJECIA_MAX_KB`.
 **Etap 2 — dokumenty przez Sferę (worker gotowy w `sfera-worker/`):**
 
 Osobny proces C#/.NET czytający tę samą tabelę `sfera_queue` i wykonujący
-**wyłącznie zadania dokumentowe**: `mm` oraz `korekta_zwrot` (korekta
-sprzedaży z MM na magazyn zwrotów — §6a). Wymaga: licencji Sfery, Windows z Subiektem GT
+**wyłącznie zadania dokumentowe**: `mm` oraz `korekta_zwrot`. Tego drugiego
+aplikacja od 0.138.0 nie nadaje — worker umie go dalej, żeby zadania nadane
+przed aktualizacją dokończyły się, a nie zawisły. Wymaga: licencji Sfery, Windows z Subiektem GT
 (COM jest lokalny) i konta operatora Subiekta z prawem wystawiania MM.
 Kompletna instrukcja: [`sfera-worker/README.md`](sfera-worker/README.md).
 Kolejność — **wszystko najpierw na KOPII bazy**:
@@ -1032,162 +1027,23 @@ i widać je na karcie, a zadanie stoi w kolejce z czytelnym błędem.
 **Etap 3 — pełny obieg:** rozkładanie dostaw z prawdziwych FZ/PZ i przesunięcia
 stanu przez workera Sfery.
 
-## 6a. Zwroty Allegro (rejestr, decyzje, korekta z MM)
+## 6a. Zwroty na regale — kosze z dokumentu MM ZWROTY
 
-Karty zwrotów na zakładce SPRAWY w `/biuro` (do 0.108.0 osobna zakładka
-ZWROTY ALLEGRO). Skan etykiety zwrotnej pobiera z Allegro
-dane kupującego, powód i pozycje, po czym zakłada rekord zwrotu. Aplikacja
-sama dopasowuje dokument sprzedaży (FS/PA) z Subiekta. Decyzje zapadają per
-pozycję: pełnowartościowy / reklamacja / do wyjaśnienia / do zniszczenia.
-Zwrot środków jest półautomatyczny: link do panelu Allegro + potwierdzenie ręką.
+**Od 0.138.0 aplikacja nie prowadzi zwrotów Allegro.** Skasowany został cały
+rejestr: skan etykiety zwrotnej, dopasowanie dokumentu sprzedaży, decyzje
+o pozycjach, korekta zlecana z panelu, reklamacje, zapowiedzi zwrotów
+i statystyki. Odeszły razem z obsługą klienta — pytaniami, dyskusjami
+i opiniami. Powód i plan odbudowy stoją w
+[`docs/obsluga-klienta.md`](docs/obsluga-klienta.md).
 
-Po decyzjach jedno kliknięcie zleca **dokumenty zwrotu jednym zadaniem
-kolejki**: korektę sprzedaży, MM na magazyn zwrotów i — od 0.67.0 — RW dla
-pozycji zniszczonych. Korekta obejmuje pozycje **pełnowartościowe
-i zniszczone** (klient oddał towar, sprzedaż koryguje się w całości); na bufor
-jadą tylko pełnowartościowe, zniszczone od razu schodzą dokumentem RW.
-Reklamacja i pozycje do wyjaśnienia zostają poza korektą. Decyzja „korekta
-tylko pełnowartościowe" z 0.58.0 została świadomie ROZSZERZONA o zniszczone —
-bez tego RW nie miałoby czego zdjąć, a zniszczony towar znikał bez śladu
-magazynowego.
+Zostaje sama praca magazynu. **Jedyną drogą towaru z powrotem na półkę jest
+dokument MM ZWROTY wystawiony w Subiekcie**, opisany w sekcji niżej. Decyzje
+o pozycjach, korekty sprzedaży i zwrot środków robi biuro poza aplikacją:
+w Subiekcie i w panelu Allegro.
 
-Wymaga wdrożonego workera Sfery (§6, etap 2) i poprawnego `MAG_ID_ZWROTY`.
-Bez workera zadanie ląduje w błędzie z czytelnym zdaniem, a dokumenty wystawia
-biuro ręcznie w Subiekcie — reszta karty zwrotu działa normalnie.
-
-Dalej proces przejmują **cyfrowe kosze** (0.59.0). Biuro przypina zwroty do
-kosza skanem jego etykiety i zamyka kosz. Magazynier na kolektorze (zakładka
-ZWROTY, druga sekcja) rozkłada zawartość skanami: towar wskazuje pozycję, regał ją
-odkłada. Zakończenie rozkładania **samo** kolejkuje MM ze zwrotów na
-magazyn główny — dokument cofający bufor nie wymaga nikogo przy komputerze.
-Kody koszy są wielorazowe; kosz powstaje przy pierwszym skanie etykiety.
-
-Równolegle działa **ścieżka reklamacyjna**: pozycje z decyzją „reklamacja"
-stoją na liście sortowanej po dniach do terminu ustawowego
-(`REKLAMACJA_DNI`, domyślnie 14). Karta RAPORT zbiera liczby całego procesu.
-
-Od 0.78.0 pod raportem stoi karta **STATYSTYKI ZWROTÓW**. Pokazuje, które
-produkty wracają najczęściej, decyzje biura w sztukach, zwroty per tydzień
-i kupujących z więcej niż jednym zwrotem. Okno wybiera się na miejscu:
-30, 90 albo 180 dni.
-
-Kolumna WSKAŹNIK dzieli zwrócone sztuki przez sprzedane w tym samym oknie
-i jest jedyną liczbą mówiącą, czy z produktem jest problem. Mianownik pochodzi
-z read-modelu sprzedaży, więc sięga tylko `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie
-90 dni). Dla dłuższego okna wskaźnika NIE MA — zamiast zawyżonego ilorazu
-widnieje myślnik i zdanie z wyjaśnieniem.
-
-Od 0.82.0 niżej stoi karta **CZASY OBSŁUGI ZWROTU**. Odpowiada na trzecie
-pytanie o zwroty: nie ile czego jest i nie co wraca, tylko jak długo towar
-stoi, zanim wróci na półkę.
-
-Pięć odcinków drogi, każdy z medianą i p90. Cała droga to przyjęcie → półka. Odcinki składowe: przyjęcie → ocena,
-ocena → zamknięcie kosza, zamknięcie kosza → półka (czyli czas rozłożenia).
-Osobno idzie przyjęcie → zwrot środków. Okno dzieli ze statystykami
-produktowymi.
-
-Okno liczy się od zdarzenia KOŃCZĄCEGO odcinek, nie od przyjęcia paczki. Karta
-odpowiada więc na pytanie „ile trwało to, co się w tym oknie skończyło".
-Liczenie od przyjęcia wypychałoby ze statystyki sprawy jeszcze niedokończone,
-czyli z definicji najwolniejsze, i proces wyglądałby na szybszy, niż jest.
-
-Ceną tego wyboru jest to, że rzeczy stojące nadal nie mają wpływu na medianę.
-Dlatego karta niesie sekcję **CO STOI TERAZ** — kosze czekające na rozłożenie
-i zwroty bez domknięcia, od najstarszej sprawy, z nazwanym etapem. Kliknięcie
-wiersza otwiera kosz albo kartę zwrotu.
-
-Odcinek bez danych pokazuje POWÓD zamiast samego myślnika. Najczęstszy powód
-jest jeden: kosze z dokumentu MM (§6a wyżej) nie mają przypiętego zwrotu.
-Do „całej drogi" więc nie wchodzą — liczy się dla nich sam czas rozłożenia.
-
-Na dole karty stoi **tempo rozkładania per osoba**. To monitoring pracowniczy
-w rozumieniu Kodeksu pracy. Podstawa prawna jest ta sama co przy raporcie
-wydajności na zakładce ANALIZA i tak samo jedzie z danymi z serwera.
-
-Miarą jest czas aktywny, w którym przerwy dłuższe niż 15 minut nie liczą się
-jako praca. Odstęp od zamknięcia kosza byłby miarą nieuczciwą: mierzyłby
-głównie to, jak długo kosz czekał na kogokolwiek. Karałby wtedy człowieka za
-sięgnięcie po najstarszą robotę. Próbka poniżej 20 pozycji nie dostaje wyniku.
-
-Aplikacja czyta **zapowiedzi zwrotów** — zgłoszenia klientów z Allegro, zanim
-paczka dojedzie. Skan etykiety trafia wtedy w znane zgłoszenie jednym
-zapytaniem, a zgłoszenia czekające na paczkę dłużej niż `BRAKUJACA_PACZKA_DNI`
-(domyślnie 3) widać na karcie **BRAKUJĄCE PACZKI**.
-
-**Od 0.85.0 pobiera to CZŁOWIEK**, przyciskiem POBIERZ Z ALLEGRO na karcie
-ZWROTY. Do 0.84.1 robił to ticker co pięć minut. Ruch w tle na cudzym serwisie
-jest decyzją właściciela, nie ustawieniem domyślnym — a Allegro potrafi
-blokować sieć, z której idzie ruch wyglądający na automat.
-
-Przycisk stoi na karcie ZWROTY, nie na BRAKUJĄCYCH PACZKACH, bo tamta chowa
-się, gdy nie ma czego pokazać. To jest właśnie chwila, w której chce się
-sprawdzić, czy coś przyszło.
-
-Kto woli tło, wpisuje liczbę milisekund w `ALLEGRO_POLL_MS` (`0` = ręcznie,
-i to jest domyślne). Minimum to `60000` — mniejsza wartość dodatnia
-zatrzymuje start serwera, bo to niemal na pewno literówka. Od 0.109.1 trzy pętle tła
-startują w różnych sekundach, a każdy odstęp ma rozrzut ±10%. Równy,
-zegarowy rytm z jednego adresu wygląda dla Allegro jak automat. Token na tym
-nie ucierpi: refresh Allegro żyje kwartał i odnawia się przy KAŻDYM użyciu,
-a skan etykiety zwrotu też go używa.
-
-Od 0.70.0 karta czyta **status zwrotu po stronie Allegro** i rozróżnia dwa
-alarmy. Czerwony „DORĘCZONA · NIE PRZYJĘTA" znaczy, że przewoźnik dostarczył,
-a u nas nikt nie zeskanował — paczka leży gdzieś w firmie. Taki wiersz pojawia
-się natychmiast, bez czekania na próg dni. Żółty „W DRODZE" to zwykłe
-oczekiwanie i alarmuje dopiero po progu. Sprawy, które Allegro uważa za
-zamknięte (`FINISHED`, `REJECTED`, zwrot prowizji, magazyn Allegro), schodzą
-z listy same. Przycisk SCHOWAJ zdejmuje pojedyncze zgłoszenie ręką — do spraw
-załatwionych poza aplikacją; ślad zostaje w dzienniku.
-
-Pod tabelą stoi ślad ostatniego odświeżania: kiedy było, ile zgłoszeń
-dostało status i ile jeszcze czeka. Gdy Allegro odmawia — wygasły token, brak
-uprawnienia — widnieje tam czerwone `ALLEGRO ODMAWIA` z treścią błędu.
-To pierwsze miejsce do sprawdzenia, gdy wiersz uparcie mówi „status jeszcze
-niepobrany".
-
-Statusy zgłoszeń, które wciąż czekają na paczkę, ticker odświeża od 0.73.0
-POJEDYNCZO po identyfikatorze, najwyżej 25 na przebieg. Lista zwrotów filtruje
-po dacie utworzenia, więc sprawa sprzed miesiąca nigdy nie wróciłaby w oknie
-przyrostowym — a jej status w Allegro zmienia się dalej.
-
-Od 0.68.0 reklamacja ma **półkę** — pole „gdzie fizycznie leży towar" na
-liście reklamacji i karcie zwrotu. To ewidencja w aplikacji, nie ruch
-w Subiekcie: reklamowany towar nie jest na stanie, więc MM nie miałoby czego
-przesuwać. Od 0.103.0 lista reklamacji pokazuje też, **kto prowadzi sprawę**.
-Znacznik działa jak przy pytaniach klientów: to informacja dla reszty biura,
-nie blokada. Nazwisko pojawia się przy odłożeniu na półkę albo po kliknięciu
-PROWADZĘ, a rozpatrzenie je zdejmuje.
-
-Obok stoi karta **DYSKUSJE I REKLAMACJE ALLEGRO**. Do 0.102 była podglądem
-na kliknięcie, bez zapisu u nas. Od 0.103.0 to **rejestr pracy biura**, ten
-sam wzorzec co pytania klientów. Przycisk POBIERZ Z ALLEGRO zapisuje sprawy
-z `GET /sale/issues` do lokalnej tabeli. Lista pokazuje status naszej pracy,
-prowadzącego, notatkę z ustaleń i powiązany zwrot (po numerze zamówienia).
-
-Formalna reklamacja (CLAIM) dostaje termin ustawowy liczony jak przy
-reklamacjach ze zwrotów. Zakładka ZWROTY nosi licznik spraw, które czekają.
-Sprawa zamknięta w panelu schodzi z listy sama przy najbliższym pobraniu.
-
-Od 0.104.0 **cała sprawa toczy się w aplikacji**. Przycisk OTWÓRZ pokazuje
-rozmowę czytaną z API dyskusji (`/sale/disputes`) — na klik, bez zapisu
-u nas. Szkic odpowiedzi pisze model (przycisk GENERUJ SZKIC), z kontekstem
-sprawy: rozmowa, powiązany zwrot z decyzjami biura i historia klienta.
-Wysyłka idzie przyciskiem WYŚLIJ PRZEZ ALLEGRO, za potwierdzeniem.
-Do odpowiedzi można dodać załącznik (PNG, JPEG, WebP, PDF, do 4 MB) —
-plik jedzie do Allegro i nie zostaje u nas.
-
-Końcówki `/sale/disputes/...` są `[WERYFIKUJ]` na żywym koncie — zasób jest
-w becie. Gdy API nie zna sprawy, szczegół mówi „Rozmowa niedostępna przez
-API — otwórz panel Allegro", a rejestr (status, notatka, prowadzący) działa
-dalej. Nic się wtedy nie psuje — wraca stan z 0.103.0.
-
-Pobieranie może też chodzić w tle: ticker dzieli interwał `ALLEGRO_POLL_MS`
-z zapowiedziami i pytaniami, domyślnie zero — pobiera człowiek. Uprawnienie
-bez zmian: `allegro:api:disputes` przy rejestracji aplikacji; bez niego
-przycisk mówi, czego brakuje. Jeśli okaże się, że ZAPIS wymaga szerszego
-zakresu, komunikat 403 wskaże go z nazwy — po dodaniu uprawnienia trzeba
-sparować konto ponownie (jak w §6c).
+Kolektor tej zmiany nie widzi. Zakładki SKAN, DOSTAWY, ZWROTY i KARTON
+działają jak dotąd, bo żadna z nich nie dotykała kasowanego rejestru.
+Wgrywanie nowego APK nie jest do tego wydania potrzebne.
 
 ### Rozkładanie zwrotów z regału (zakładka ZWROTY, 0.75.0)
 
@@ -1242,7 +1098,7 @@ ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazyn
 z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
 zostało jeszcze na regale zwrotów.
 
-Biuro sprawdza zawartość kosza w `/biuro` → SPRAWY, karta KOSZE
+Biuro sprawdza zawartość kosza w `/biuro` → MAGAZYN ZWROTÓW, karta KOSZE
 ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
 i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
 
@@ -1287,7 +1143,7 @@ go miał**: towar nie opuścił magazynu, więc żaden stan się nie zmienia.
    rozłożenia — ten sam ekran, ten sam skan półki, ten sam ZAKOŃCZ.
 4. ZAKOŃCZ zapisuje **wyłącznie adresy półek**. Żadnego dokumentu w Subiekcie.
 
-Kartony pojawiają się w `/biuro` → SPRAWY, karta KOSZE ZWROTOWE, z pastylką
+Kartony pojawiają się w `/biuro` → MAGAZYN ZWROTÓW, karta KOSZE ZWROTOWE, z pastylką
 KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
 ktoś włożył do pudła. Kilka kartonów naraz jest stanem normalnym.
 
@@ -1309,25 +1165,30 @@ czyli to, czym są. Kolumny anulowania i przebudowa indeksu `ix_kosz_kod_aktywny
 idą tą samą drogą. Trzeba natomiast **zainstalować nowy APK** — zakładki KARTON
 nie ma w starszych wersjach kolektora.
 
-Zwrot środków dałoby się zautomatyzować w całości: Allegro ma
-`POST /payments/refunds` (scope płatności), a prowizja wraca wtedy sama.
-Świadomie tego NIE robimy — pieniędzmi rusza człowiek; notatka zostaje tu,
-żeby przyszła decyzja nie zaczynała od odkrywania możliwości.
+## 6b. Konto Allegro — parowanie i token
 
-Domyślnie funkcja jest **wyłączona** (puste `ALLEGRO_CLIENT_ID`), a w trybie
-demo (`SGT_MODE=seeded`) działa na fikcyjnych zwrotach bez kontaktu
-z Allegro (scenariusze S67–S69).
+Aplikacja łączy się z kontem sprzedawcy jednym tokenem. Po 0.138.0 korzysta
+z niego odczyt zamówień i sonda kształtu (`npm run sonda`), a nowa obsługa
+klienta wystartuje z tego samego parowania. Bez `ALLEGRO_CLIENT_ID` funkcja
+jest **wyłączona** i reszta aplikacji pracuje normalnie.
+
+Stan połączenia stoi w `/biuro` → STAN SYSTEMU, karta KONTO ALLEGRO. Do
+0.137.2 karta mieszkała na zakładce REJESTRY, która odeszła razem z rejestrami
+obsługi klienta. Czerwona ikona ALLEGRO w pasku bocznym prowadzi wprost do
+tej karty.
 
 ### Włączenie na produkcji
 
 1. **Rejestracja aplikacji** na <https://developer.allegro.pl> (konto
    sprzedawcy firmy): *Moje aplikacje → Nowa aplikacja*, typ **„urządzenie”**
    (device flow — bez adresu przekierowania). Uprawnienia:
-   `allegro:api:orders:read` (wymagane) oraz `allegro:api:messaging`, jeśli
-   karta zwrotu ma pokazywać rozmowę z klientem. Bez tego drugiego wszystko
-   działa, a przycisk „POKAŻ ROZMOWĘ" mówi, czego brakuje. Po rejestracji kliknij **„Wygeneruj nagłówek
-   User-Agent”** — Allegro wymaga tego nagłówka w każdym żądaniu, a jego
-   brak grozi zablokowaniem klucza. Zapisz wszystko do `wertis.env`:
+   `allegro:api:orders:read` (wymagane). Sonda kształtu czyta więcej rodzin
+   końcówek, więc do jej uruchomienia dołóż `allegro:api:messaging`,
+   `allegro:api:disputes` i `allegro:api:sale:offers:read`. Bez nich sonda
+   zapisze przy tych rodzinach odmowę i pojedzie dalej. Po rejestracji kliknij
+   **„Wygeneruj nagłówek User-Agent”** — Allegro wymaga tego nagłówka
+   w każdym żądaniu, a jego brak grozi zablokowaniem klucza. Zapisz wszystko
+   do `wertis.env`:
 
    ```
    export ALLEGRO_CLIENT_ID=...
@@ -1337,7 +1198,7 @@ z Allegro (scenariusze S67–S69).
 
 2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` —
    najkrócej przez czerwoną ikonę ALLEGRO w pasku na górze (rola **admin**).
-   Klik otwiera kartę KONTO ALLEGRO na SPRAWACH i sam zaczyna parowanie.
+   Klik otwiera kartę KONTO ALLEGRO w STANIE SYSTEMU i sam zaczyna parowanie.
    Strona pokaże kod i link — otwórz go na zalogowanym koncie sprzedawcy
    i potwierdź. Token zapisuje się w bazie aplikacji i odświeża sam. Wygasa
    dopiero po ~3 miesiącach nieużywania — wtedy `/api/health` każe sparować
@@ -1381,52 +1242,37 @@ miejscach znaczy, że serwer i biuro dzielą łącze — wtedy link potwierdzeni
 zawsze otwieraj z telefonu.
    Token nie przeżywa zmiany środowiska — po przełączeniu paruj ponownie.
 
-Import z MSSQL zaczyna też zaciągać dokumenty sprzedaży (FS i PA, okno
-`DOK_SPRZEDAZ_DNI_WSTECZ`, domyślnie 90 dni) — **zero nowych GRANT-ów**,
-te same tabele co dostawy. Awaria tego odczytu (timeout, przeciążona baza)
-degraduje: magazyn pracuje, zwroty dopasowują na ostatnim udanym odczycie,
-a `/api/health` mówi o tym zdaniem. Na dużych bazach z obciążonym serwerem
-SQL można podnieść `MSSQL_REQUEST_TIMEOUT_MS` (domyślnie 30000).
+**Od 0.138.0 import NIE czyta już dokumentów sprzedaży.** Read-model FS/PA
+istniał wyłącznie po to, żeby dopasować zwrot Allegro do faktury, a rejestru
+zwrotów nie ma. Znikają razem z nim ustawienia `DOK_SPRZEDAZ_DNI_WSTECZ`,
+`MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` i `MSSQL_SPRZEDAZ_UWAGI_COLUMN` — zostawione
+w `wertis.env` nic nie robią. Zapytań do bazy firmy jest o dwa mniej przy
+każdej synchronizacji. Na dużych bazach z obciążonym serwerem SQL można nadal
+podnieść `MSSQL_REQUEST_TIMEOUT_MS` (domyślnie 30000).
 
 ### Do sprawdzenia na własnej bazie i koncie ([WERYFIKUJ])
 
 Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
 
-1. **Gdzie integracja sprzedażowa wpisuje numer zamówienia Allegro** na
-   dokumencie w Subiekcie. Obie kolumny istnieją w bazie 1.8731.31.6933
-   (`dok_NrPelnyOryg`, `dok_Uwagi`) i obie są domyślnie czytane. Sprawdź na
-   świeżej sprzedaży, czy któraś faktycznie niesie numer:
-   `SELECT dok_NrPelny, dok_NrPelnyOryg, dok_Uwagi FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC`.
-   Nigdzie → ustaw `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN`/`MSSQL_SPRZEDAZ_UWAGI_COLUMN`
-   puste; dopasowanie działa wtedy po pozycjach z ręcznym wyborem kandydata.
-2. **Czy `offer.external.id` w zamówieniach niesie symbol kartoteki** —
-   POTWIERDZONE co do zasady: sygnatura oferty (SKU) jest wpisywana ręcznie
-   i równa `tw_Symbol`. Sprawdź wyrywkowo na kilku ofertach, że sygnatury są
-   uzupełnione — oferta bez sygnatury da pozycję zwrotu bez kartoteki.
-3. **Scope tokena**: żądamy `allegro:api:orders:read`; jeśli skan kończy się
-   403, dodaj uprawnienie do zamówień przy rejestracji aplikacji.
-4. **Kształt pola powodu zwrotu** w odpowiedzi customer-returns — mapowanie
-   przyjmuje znane warianty, nieznany daje pustą kolumnę POWÓD (nie błąd).
-5. **Wystawianie korekty przez Sferę** — wywołania COM są szkicem
-   z `sfera-worker/src/SferaComAdapter.cs` i noszą `[WERYFIKUJ]`. Pierwszą
-   korektę rób na KOPII bazy, na dokumencie próbnym.
-6. **Magazyn sprzedaży** trafia do read-modelu z `dok_MagId` i to on jest
-   źródłem MM. Sprawdź, czy sprzedaż firmy naprawdę wychodzi z tego magazynu,
-   z którego ma wracać towar.
-7. **RW dla pozycji zniszczonych** (0.67.0) — wywołanie
-   `DokumentyMagazynoweManager.DodajRW()` jest szkicem jak korekta i MM.
-   Pierwsze RW rób na kopii bazy, na zwrocie próbnym z jedną pozycją
-   „do zniszczenia". Sprawdź, że korekta objęła pozycję, a RW zdjęło ją
-   z magazynu sprzedaży.
-8. **Kolumny przesunięcia MM** (0.75.0) — na bazie firmy POTWIERDZONE
+1. **Kolumny przesunięcia MM** (0.75.0) — na bazie firmy POTWIERDZONE
    w sierpniu 2026 i zostawione tu dla innych wdrożeń. Magazyn docelowy niesie
    `dok_OdbiorcaId`, a pozycje wiszą na `ob_DokMagId` (nie na `ob_DokHanId`,
    który dla dokumentu magazynowego jest NULL). Zapytania sprawdzające stoją
    w [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md). Pomyłka
    w którejkolwiek daje **pustą listę albo puste kosze** — nie złe dane, bo
    warunek po prostu nikogo nie łapie. Od 0.76.1 mówi o tym `/api/health`.
+2. **Magazyn zwrotów** (`MAG_ID_ZWROTY`) musi wskazywać ten sam magazyn, na
+   który biuro wystawia MM ZWROTY. Zły identyfikator daje pustą listę przyjęć,
+   a nie błąd — importer po prostu nie łapie żadnego dokumentu.
+3. **Scope tokena**: parowanie żąda `allegro:api:orders:read`. Sonda kształtu
+   czyta szerzej i przy braku uprawnienia zapisze w raporcie odmowę zamiast
+   kształtu — to informacja, nie awaria.
 
-## 6b. Środowisko dev obok produkcji
+Punkty o korekcie sprzedaży, RW dla pozycji zniszczonych, numerze zamówienia
+w `dok__Dokument` i kształcie powodu zwrotu odeszły w 0.138.0 razem
+z rejestrem zwrotów. Wrócą, gdy wróci obieg, który ich potrzebuje.
+
+## 6c. Środowisko dev obok produkcji
 
 Magazyn pracuje na produkcji, a rozwój nie może czekać na wolny wieczór.
 Instancja dev stoi na TEJ SAMEJ maszynie: własny katalog, port, usługi, baza
@@ -1501,211 +1347,6 @@ Konfigurację czyta z `wertis.env` w katalogu roboczym; inną ścieżkę wskazuj
 - Worker Sfery nie istnieje w dev i to jest poprawne — dane demo obsługuje
   wbudowany adapter zapisu.
 
-## 6c. Pytania klientów (szkice odpowiedzi o dobór części)
-
-Karty pytań na zakładce SPRAWY w `/biuro` (do 0.108.0 osobna zakładka
-PYTANIA KLIENTÓW). Aplikacja ściąga pytania z Centrum
-wiadomości Allegro i przygotowuje szkic odpowiedzi z kartoteki, stanów,
-zamienników i linków do naszych aukcji. Po akceptacji człowieka wysyła ją do
-klienta. Pytania spoza Allegro (screenshot z poczty) wchodzą przez wklejkę.
-
-**Odpowiedź wysyła zawsze człowiek.** Model pisze szkic, biuro czyta, poprawia
-i klika. Automatycznej wysyłki nie ma.
-
-Włączenie ma **trzy kroki i żadnego nie da się pominąć**:
-
-1. **Uprawnienia aplikacji Allegro.** Na developer.allegro.pl dodaj do swojej
-   aplikacji `allegro:api:messaging` (Centrum wiadomości — odczyt i zapis)
-   oraz `allegro:api:sale:offers:read` (nasze oferty). Zwroty z §6a tych
-   uprawnień nie wymagały.
-
-2. **PONOWNE PAROWANIE KONTA.** To krok, o który najłatwiej się potknąć: token
-   wydany pod stary zakres uprawnień **sam się nie rozszerzy**. Po dodaniu
-   uprawnień wejdź w `/biuro` → SPRAWY → KONTO ALLEGRO, rozłącz konto
-   i sparuj je jeszcze raz. Bez tego pierwsze odświeżenie pytań kończy się
-   błędem 403 — komunikat wskazuje wtedy brakujące uprawnienie po nazwie.
-
-3. **Klucz modelu w `wertis.env`.** Dwaj dostawcy do wyboru:
-
-   ```ini
-   export AI_PROVIDER=anthropic
-   export ANTHROPIC_API_KEY=sk-ant-...
-   ```
-
-   albo
-
-   ```ini
-   export AI_PROVIDER=openai
-   export OPENAI_API_KEY=sk-...
-   ```
-
-   Model musi obsługiwać obrazy, inaczej wklejony screenshot pytania nie
-   zadziała. Domyślne (`claude-opus-5` i `gpt-4o`) obsługują; własny wybór
-   wpisuje się w `AI_MODEL`. Po zmianie pliku **zrestartuj `wertis-api`**.
-
-   Serwer z ustawionym `AI_PROVIDER` i pustym kluczem **nie wystartuje** —
-   celowo: twardy błąd przy starcie jest tańszy niż awaria przy pierwszym
-   pytaniu klienta.
-
-Bez konfiguracji funkcja jest wyłączona, a zakładka mówi wprost, co dopisać.
-W `SGT_MODE=seeded` działa doradca DEV: odpowiedzi fikcyjne, składane
-z kontekstu, bez wychodzenia w internet — do pokazu i do testów.
-
-### Przesyłki klienta w odpowiedziach (0.105.0)
-
-Klienci często pytają „kiedy dojdzie paczka". Od 0.105.0 odpowiedź nie
-wymaga panelu Allegro. Aplikacja czyta ostatnie zamówienia kupującego
-z rodziny `/order/` — status wysyłki, kuriera, numer przesyłki i ostatnie
-zdarzenie śledzenia. Adresów dostawy nie pobiera i nie pokazuje.
-
-Dane wchodzą dwiema drogami. Pierwsza działa sama: gdy pytanie brzmi jak
-pytanie o wysyłkę, blok przesyłek trafia do kontekstu szkicu AI. Druga jest
-ręczna: sekcja PRZESYŁKI KLIENTA w kontekście sprawy, ładowana po otwarciu.
-Przycisk WSTAW STATUS wkleja do odpowiedzi gotowe zdanie z realnym statusem.
-
-**Bez nowych uprawnień i bez ponownego parowania.** Wszystkie trzy końcówki
-należą do już wymaganego `allegro:api:orders:read`. Uprawnienie
-`allegro:api:shipments:read` (WZA) NIE jest używane — zna tylko etykiety
-kupowane przez Allegro, więc można je zostawić odznaczone. Do sprawdzenia
-na własnym koncie ([WERYFIKUJ]): zakres i kształt odpowiedzi śledzenia,
-parametr `sort`, dopasowanie `buyer.id` do maski `client:NNN` z wątków.
-Gdy paczka jedzie z etykietą spoza integracji Allegro, lista przesyłek jest
-pusta — panel mówi wtedy „jeszcze nie nadane", co jest stanem, nie awarią.
-
-### Aukcja, o którą pyta klient (0.107.0)
-
-Kupujący zwykle klika PYTANIE przy konkretnej ofercie. Allegro wpina ją w tę
-wiadomość, więc od 0.107.0 aplikacja bierze aukcję stamtąd, nie z nagłówka
-wątku. Różnica jest widoczna przy stałym kliencie: nagłówek wątku pamięta
-pierwszą sprawę sprzed miesięcy, czyli zwykle inny towar.
-
-Nagłówek sprawy pokazuje wtedy plakietkę **PYTANIE O TĘ AUKCJĘ** z symbolem,
-ceną, dostępnością i linkiem. Symbol z aukcji prowadzi też szukanie
-w kartotece — trafia pewniej niż nazwa. Aukcja zakończona daje plakietkę
-**AUKCJA ZAKOŃCZONA**, a model dostaje polecenie „dopytaj klienta" zamiast
-zgadywania po opisie.
-
-Rozmowa w panelu układa się od najstarszej wiadomości. Kolejność zwracana
-przez Allegro nie jest umową, więc sortujemy ją u siebie po dacie.
-
-### Zanim włączysz: dwie decyzje właściciela
-
-- **Prywatność.** Treść pytania klienta (a przy wklejce — obraz ze schowka)
-  wychodzi do zewnętrznego dostawcy modelu. Samego obrazu nie zapisujemy
-  u siebie: zostaje wyłącznie przepisana treść pytania. To decyzja właściciela
-  firmy i dlatego funkcja jest domyślnie wyłączona.
-- **Koszt.** Od 0.107.0 szkic powstaje po kliknięciu GENERUJ przy konkretnym
-  pytaniu. Rachunek rośnie wtedy z liczbą kliknięć, nie z ruchem w skrzynce.
-  Kto woli mieć odpowiedzi gotowe od ręki, włącza w karcie AI przełącznik
-  **„Licz szkice automatycznie, bez pytania"**. Wtedy model pisze do każdego
-  pobranego pytania, także tego, na które nikt nie odpowie. Przełącznik należy
-  do admina, bo to on płaci za model.
-
-### Pierwsze uruchomienie
-
-Pierwsza synchronizacja schodzi płycej niż kolejne — bierze około
-sześćdziesięciu najświeższych rozmów, żeby nie zrobić listy setek „pytań",
-na które dawno odpowiedziano. Zrób ją **pod nadzorem**: wejdź w zakładkę,
-kliknij ODŚWIEŻ Z ALLEGRO i przeczytaj pierwsze szkice, zanim cokolwiek
-wyślesz.
-
-Zaraz potem wypełnij **FAKTY FIRMOWE**. Od 0.86.0 karta stoi w ustawieniach —
-ikona koła zębatego w prawym górnym rogu panelu, obok „Wyloguj". Zmienia je
-admin: cennik wysyłek zagranicznych, czas wysyłki, zasady płatności. To
-jedyne źródło, z którego model może je podać klientowi — czego tam nie ma,
-tego nie poda. Pusta karta znaczy szkice, które przy pytaniu o wysyłkę do
-Chorwacji napiszą „sprawdzimy i odpiszemy" zamiast konkretu.
-
-Pytania ściąga przycisk **ODŚWIEŻ Z ALLEGRO** na karcie PYTANIA.
-
-Pokrętło `ALLEGRO_POLL_MS` dzieli z zapowiedziami zwrotów i od 0.85.0 stoi
-domyślnie na zerze. To ta sama praca na tym samym koncie, więc i jedna decyzja
-o tym, czy cokolwiek chodzi samo.
-
-### Gdy klient dopisze w trakcie (0.110.0)
-
-Otwarta sprawa pilnuje dwóch rzeczy. Baner KLIENT DOPISAŁ mówi, że po
-zarejestrowaniu sprawy przyszła nowa wiadomość — POKAŻ ROZMOWĘ czyta ją
-na klik. Baner NOWA SPRAWA KLIENTA prowadzi do karty klienta. Oba banery
-czytają co pół minuty naszą bazę, nie Allegro.
-
-Wysyłka odpowiedzi ma kontrolę świeżości. Gdy klient dopisał coś, czego
-ekran nie pokazał, wysyłka staje i panel pokazuje dopiski. WYŚLIJ MIMO TO
-jest świadomą decyzją człowieka. Szkic odpowiedzi nigdy nie ginie przez
-dopisek klienta.
-
-### Kilka osób w skrzynce (0.89.0)
-
-Lista pytań ma kolumnę **PROWADZI**, a wejście w sprawę, którą ktoś już wziął,
-wita ostrzeżenie z nazwiskiem. To znacznik, nie blokada — sprawy nie trzeba
-odbijać, żeby ją dokończyć. Klient i tak zobaczy każdą wysłaną odpowiedź.
-Jedyną obroną przed dwiema jest to, żeby ludzie się widzieli.
-
-Nazwisko pojawia się, gdy ktoś **policzy szkic dla tej sprawy albo zapisze
-odpowiedź**. Samo otwarcie pytania nie zajmuje niczego — panel biura nie
-zapisuje przy patrzeniu na ekran. Wysłanie i zamknięcie sprawę zwalniają.
-
-Nic tu nie trzeba ustawiać. Kolumny w bazie zakłada aktualizacja przy starcie.
-
-## 6d. Sprawy — jedna kolejka obsługi klienta (0.108.0)
-
-Zakładka SPRAWY zbiera otwarte pytania, zwroty, dyskusje i reklamacje
-w jedną listę „co mam teraz zrobić?". Na górze stoją sprawy z ustawowym
-terminem: reklamacje i CLAIM-y, przeterminowane najpierw. Dalej lista
-układa się od najstarszych. Chipy nad tabelą filtrują po typie sprawy.
-
-Klik w OTWÓRZ prowadzi do szczegółu sprawy na jej dotychczasowej
-zakładce. Reklamacja otwiera swój zwrot, bo tam są jej akcje. Klik
-w login klienta otwiera jego kartę ze wszystkimi sprawami. Wiersz
-(BEZ LOGINU) zbiera wklejki z poczty i zwroty ręczne.
-
-Od 0.136.0 przy każdej sprawie jest linia TAGI, a w USTAWIENIACH karta
-REGUŁY TAGOWANIA I PRZYDZIAŁU. Reguła szuka frazy w tytule sprawy i loginie
-klienta, nadaje tag i opcjonalnie przypisuje sprawę osobie. Chodzi po każdym
-pobraniu; przycisk ZASTOSUJ TERAZ przebiega sprawy od razu.
-
-Od 0.135.0 w REJESTRACH jest karta OPINIE O SPRZEDAWCY. POBIERZ OPINIE
-ściąga je z Allegro; opinia z numerem zamówienia dopina się do sprawy tego
-zamówienia. Odpowiedź piszesz w panelu Allegro — tutaj oznaczasz stan.
-Pierwsze uruchomienie po aktualizacji przebuduje dwie tabele nakładki spraw,
-żeby przyjęły piąty rodzaj źródła. Dzieje się to samo i nic nie ginie.
-
-Od 0.134.0 zakładka ANALIZA ma piąty zakres: CZASY ODPOWIEDZI. Pokazuje
-medianę i p90 od głosu klienta do naszej odpowiedzi, osobno dla pytań
-i dyskusji, listę czekających w tej chwili oraz rozbiór per osoba. Dane
-sięgają 0.130.0 — wcześniejszej historii oś czasu nie zna.
-
-Od 0.133.0 przy każdym polu odpowiedzi stoi wybierak SZABLON. Teksty
-redaguje biuro w USTAWIENIACH, karta SZABLONY ODPOWIEDZI. Pola w klamrach
-(`{{klient}}`, `{{zamowienie}}`, `{{zwrot}}`, `{{oferta}}`, `{{ja}}`)
-wypełnia serwer danymi sprawy; czego nie zna, to zostaje w klamrze do
-uzupełnienia ręką.
-
-Od 0.132.0 przy zwrocie i dyskusji jest zwijana sekcja ZAMÓWIENIE
-I PRZESYŁKA. Pokazuje status zamówienia, płatność (kwota, sposób, czy
-zapłacone), metodę dostawy, paczki i ostatnie zdarzenie śledzenia. Dane jadą z Allegro
-dopiero po rozwinięciu sekcji i nie są u nas zapisywane. Adresu dostawy tam
-nie ma i nie będzie.
-
-Od 0.131.0 pod oceną pozycji zwrotu stoi blok ODPOWIEDZ W SPRAWIE. Pokazuje
-kanały tej samej sprawy, przez które da się napisać do klienta: wątek pytania
-i dyskusję. Gwiazdka stoi przy tym, w którym klient odezwał się ostatni. Zwrot
-własnego kanału nie ma, więc pole rozwija się tam od razu. Odpowiedź wychodzi
-tą samą trasą co z ekranu dyskusji: kontrola świeżości działa bez zmian.
-
-W kontekście pytania i zwrotu jest zwijana sekcja POWIĄZANE SPRAWY.
-Pokazuje ciąg jednego problemu: ta sama sprawa, potem ten sam login.
-Dane jadą dopiero po rozwinięciu sekcji, jak przy historii klienta.
-Od 0.129.0 przy podpowiedzi „ten sam kupujący" stoi przycisk SCAL, a przy
-sprawie sklejonej ręką — ROZKLEJ. Oba pytają o potwierdzenie i oba zapisują
-się w dzienniku zdarzeń.
-
-Nowe trasy `/api/biuro/sprawy*` wyłącznie czytają. Zapisy zostają przy
-rejestrach źródłowych i ich dotychczasowych trasach. Od 0.109.0 SPRAWY są
-jedyną zakładką tej pracy: karty dawnych zakładek ZWROTY ALLEGRO i PYTANIA
-KLIENTÓW przeprowadziły się tutaj w całości, a same zakładki znikły.
-Wszystkie identyfikatory kart i tras zostały bez zmian.
-
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
@@ -1736,29 +1377,20 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
-**Od 0.128.0 pierwsze uruchomienie po aktualizacji dogania nakładkę spraw.**
-Serwer sam skleja zastane rejestry w sprawy i dosypuje pytaniom identyfikator
-kupującego spod maski — bez żadnej czynności ręcznej. Liczby w czipach
-i pigułce SPRAW mogą po tym ZMALEĆ: obiekty jednego zamówienia liczą się
-odtąd raz, jako jeden problem klienta.
+**Aktualizacja do 0.138.0 kasuje osiemnaście tabel — zrób kopię bazy.**
+Odchodzi cała obsługa klienta z rejestrem zwrotów włącznie. Kopię wykonaj
+poleceniem z punktu „Backup" niżej, ZANIM zatrzymasz usługi. Liczby z tych
+tabel zdejmuje `npm run inwentarz` uruchomiony na kopii — po migracji nie ma
+ich skąd wziąć.
 
-**Od 0.130.0 pierwsze uruchomienie zakłada oś czasu spraw.** Serwer
-przepisuje na nią stemple, które rejestry już trzymały — kiedy sprawa
-wpłynęła, kto ją wziął, kiedy poszła odpowiedź. Robi to sam, raz, i wypisuje
-w logu liczbę dosypanych zdarzeń. Historia sprzed tej wersji jest z natury
-uboższa: rejestr pamiętał ostatnią odpowiedź, nie wszystkie.
+**Przed aktualizacją opróżnij kolejkę z zadań `korekta_zwrot`.** Aplikacja
+przestaje je nadawać, a worker Sfery dokończy te już nadane. Zadanie stojące
+w błędzie rozstrzygnij wcześniej: karta zwrotu, z której było widać jego
+powód, po aktualizacji nie istnieje.
 
-**Od 0.129.0 pierwsze pobrania dyskusji trwają dłużej.** POBIERZ DYSKUSJE
-dociąga metadane rozmów — kto mówił ostatni i kiedy — dla otwartych spraw, po
-sto rozmów na przebieg. Przy większym rejestrze pełne pokrycie zbiera się
-przez kilka pobrań, a kolejne biorą najstarsze metadane. To nie jest czynność
-ręczna: wystarczy klikać POBIERZ DYSKUSJE jak dotąd. Do czasu pokrycia część
-dyskusji stoi w kolejce po dzisiejszej regule „odpowiadaliśmy czy nie".
-
-Kolejka SPRAW zmienia po tej aktualizacji układ ogona. Góra zostaje: po
-terminie, termin za mniej niż tydzień, termin ustawowy. Niżej sprawy czekające
-na nas stoją nad sprawami, w których piłka jest u klienta — te ostatnie są
-zwinięte. Nic nie ginie, zmienia się kolejność.
+**Po aktualizacji zwroty rozlicza się poza aplikacją.** Towar wraca na półkę
+wyłącznie dokumentem MM ZWROTY z Subiekta (§6a). Decyzje o pozycjach, korekty
+sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
 
 - **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
 

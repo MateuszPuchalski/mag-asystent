@@ -1,7 +1,7 @@
 import { db, nowIso, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
-import { enqueueMM, enqueueSetLocation } from "./queue.js";
+import { enqueueSetLocation } from "./queue.js";
 import {
   adresyOczekiwane,
   adresyWszystkie,
@@ -14,7 +14,6 @@ import type { ZlotaStrefa } from "../types.js";
 import { aliasKodu } from "./ean-alias.js";
 import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
-import { pozycjeDoKorekty } from "./zwroty.js";
 
 /* ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
    Kosz zastępuje papierową kartkę wożoną z towarem. Cykl życia:
@@ -72,8 +71,6 @@ export const RODZAJ_KARTON = "karton";
 
 export interface PozycjaKosza {
   id: number;
-  /** NULL przy koszu z dokumentu MM — pozycja nie pochodzi ze zwrotu. */
-  zwrotId: number | null;
   twId: number;
   symbol: string;
   nazwa: string;
@@ -129,7 +126,6 @@ export interface SzczegolKosza {
   rozlozonoAt: string | null;
   /** Kto rozłożył (0.84.0) — patrz komentarz przy `WierszListyKoszy`. */
   rozlozonoPrzez: string | null;
-  zwroty: Array<{ id: number; referencja: string | null; waybill: string }>;
   pozycje: PozycjaKosza[];
   odlozonych: number;
   /**
@@ -149,7 +145,6 @@ export interface WierszListyKoszy {
   id: number;
   kod: string;
   status: string;
-  zwrotow: number;
   pozycji: number;
   odlozonych: number;
   /**
@@ -172,7 +167,7 @@ export interface WierszListyKoszy {
    */
   rozlozonoAt: string | null;
   rozlozonoPrzez: string | null;
-  /** `zwroty` albo `karton` — biuro ma wiedzieć, że kosz bez zwrotów jest cały. */
+  /** `zwroty` albo `karton` — kolektor po tym wie, którą fazę pokazać. */
   rodzaj: string;
   anulowanoAt: string | null;
   anulowanoPrzez: string | null;
@@ -205,133 +200,17 @@ export function koszPoKodzie(raw: string): WierszKosza | undefined {
     .get(normalizujKod(raw), RODZAJ_KARTON) as WierszKosza | undefined;
 }
 
-/**
- * Przypięcie zwrotu do kosza — skanem kodu na karcie zwrotu.
- *
- * Kosz o nieznanym kodzie POWSTAJE tutaj: rejestr koszy prowadzony osobno
- * byłby drugą listą do pilnowania, a etykieta na fizycznym koszu i tak jest
- * jedynym źródłem prawdy o tym, które kosze istnieją.
- */
-export function przypnijZwrot(zwrotId: number, kodRaw: string, autor: string): void {
-  const kod = normalizujKod(kodRaw);
-  const z = db()
-    .prepare("SELECT id, kosz_id, korekta_queue_id FROM zwrot WHERE id = ?")
-    .get(zwrotId) as { id: number; kosz_id: number | null; korekta_queue_id: number | null } | undefined;
-  if (!z) throw new BladKosza(404, `Zwrot ${zwrotId} nie istnieje`);
-  /* Kosz wiąże się z DOKUMENTEM MM (proces, krok 6) — bez zleconych
-     dokumentów nie ma czego wiązać, a towar bez korekty nie ma prawa
-     jechać na bufor. */
-  if (!z.korekta_queue_id) {
-    throw new BladKosza(400, "Najpierw wystaw korektę i MM — kosz wiąże się z dokumentem");
-  }
-  if (pozycjeDoKorekty(zwrotId).length === 0) {
-    throw new BladKosza(400, "Zwrot nie ma pozycji pełnowartościowych — nie ma czego włożyć do kosza");
-  }
+/* ── Czym kosz NIE jest od 0.138.0 ───────────────────────────────────────────
+   Do tej wersji kosz napełniało się dwiema drogami: dokumentem MM ZWROTY
+   z Subiekta (`otworzPrzyjecie` w `przyjecia.ts`) albo przypięciem zwrotu
+   z rejestru w aplikacji. Rejestr zwrotu zniknął razem z całą obsługą klienta,
+   więc zostaje pierwsza droga — i tylko ona.
 
-  const d = db();
-  transaction(d, () => {
-    let kosz = koszPoKodzie(kod);
-    if (kosz && kosz.status !== "otwarty") {
-      throw new BladKosza(400, `Kosz ${kod} jest zamknięty — do rozłożenia, nie do dokładania`);
-    }
-    if (!kosz) {
-      /* Kod zajęty przez KARTON — `koszPoKodzie` kartonów nie widzi, więc bez
-         tego sprawdzenia INSERT rozbiłby się o `ix_kosz_kod_aktywny` i biuro
-         zobaczyłoby błąd bazy zamiast zdania o tym, co się stało. */
-      const zajety = d
-        .prepare("SELECT id FROM kosz WHERE kod = ? AND status <> 'rozlozony'")
-        .get(kod) as { id: number } | undefined;
-      if (zajety) throw new BladKosza(400, `Kod ${kod} nosi karton z hali — zwrotu nie ma tam czego szukać`);
-      const res = d
-        .prepare("INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez) VALUES (?, 'otwarty', ?, ?)")
-        .run(kod, nowIso(), autor);
-      kosz = wierszKosza(Number(res.lastInsertRowid));
-    }
-    if (z.kosz_id === kosz.id) return; // drugi skan tego samego kosza — nic do zrobienia
-    if (z.kosz_id) {
-      throw new BladKosza(400, "Zwrot leży już w innym koszu — najpierw go odepnij");
-    }
-    d.prepare("UPDATE zwrot SET kosz_id = ? WHERE id = ?").run(kosz.id, zwrotId);
-    logEvent("kosz_przypiecie", autor, null, { zwrotId, koszId: kosz.id, kod });
-  })();
-}
-
-export function odepnijZwrot(zwrotId: number, autor: string): void {
-  const z = db().prepare("SELECT kosz_id FROM zwrot WHERE id = ?").get(zwrotId) as
-    | { kosz_id: number | null }
-    | undefined;
-  if (!z) throw new BladKosza(404, `Zwrot ${zwrotId} nie istnieje`);
-  if (!z.kosz_id) return;
-  const kosz = wierszKosza(z.kosz_id);
-  if (kosz.status !== "otwarty") {
-    throw new BladKosza(400, "Kosz jest już zamknięty — zawartość idzie na halę w komplecie");
-  }
-  db().prepare("UPDATE zwrot SET kosz_id = NULL WHERE id = ?").run(zwrotId);
-  logEvent("kosz_odpiecie", autor, null, { zwrotId, koszId: kosz.id, kod: kosz.kod });
-}
-
-/**
- * Zamknięcie kosza — od tej chwili to jednostka pracy dla hali.
- *
- * Snapshot pozycji powstaje TERAZ, nie przy przypinaniu: dokłada się do kosza
- * partiami, a listą do rozłożenia ma być stan z chwili, gdy biuro mówi
- * „komplet". Adres do snapshotu nie wchodzi — liczy się żywy (patrz schema).
- */
-export function zamknijKosz(koszId: number, autor: string): SzczegolKosza {
-  const kosz = wierszKosza(koszId);
-  if (kosz.status !== "otwarty") throw new BladKosza(400, "Kosz nie jest otwarty");
-  /* Karton zamyka HALA własną trasą (`zatwierdzKarton`), bo to ona zna jego
-     zawartość. Ta funkcja żąda zwrotów z wystawionymi dokumentami i przy
-     kartonie odmówiłaby zdaniem o korekcie, którego nikt by nie zrozumiał. */
-  if (kosz.rodzaj === RODZAJ_KARTON) {
-    throw new BladKosza(400, "Karton zatwierdza się na kolektorze — biuro nie zna jego zawartości");
-  }
-  const zwroty = db()
-    .prepare(
-      `SELECT z.id, z.referencja, z.waybill, q.status AS dok_status
-       FROM zwrot z LEFT JOIN sfera_queue q ON q.id = z.korekta_queue_id
-       WHERE z.kosz_id = ?`
-    )
-    .all(koszId) as Array<{ id: number; referencja: string | null; waybill: string; dok_status: string | null }>;
-  if (zwroty.length === 0) throw new BladKosza(400, "Pusty kosz nie ma czego jechać na halę");
-  /* Kosz jedzie na halę dopiero, gdy korekty i MM NAPRAWDĘ weszły do
-     Subiekta. Zamknięcie z zadaniem w błędzie skończyłoby się cofnięciem
-     bufora, na którym tego towaru nigdy nie było — czyli ujemnym stanem. */
-  const czekaja = zwroty.filter((z) => z.dok_status !== "done");
-  if (czekaja.length > 0) {
-    throw new BladKosza(
-      400,
-      "Dokumenty jeszcze nie weszły do Subiekta dla: " +
-        czekaja.map((z) => z.referencja ?? z.waybill).join(", ") +
-        " — sprawdź kolejkę zapisów"
-    );
-  }
-
-  const d = db();
-  transaction(d, () => {
-    const ins = d.prepare(
-      `INSERT INTO kosz_pozycja(kosz_id, zwrot_id, tw_id, symbol, nazwa, ilosc)
-       VALUES (?,?,?,?,?,?)`
-    );
-    let pozycji = 0;
-    for (const z of zwroty) {
-      for (const p of pozycjeDoKorekty(z.id)) {
-        /* Symbol z żywej kartoteki; towar, który wypadł z read-modelu, dostaje
-           pustkę — snapshot nazwy i ilości wystarcza, żeby pracować dalej. */
-        const t = subiekt.getProductById(p.twId);
-        ins.run(koszId, z.id, p.twId, t?.symbol ?? "", p.nazwa, p.ilosc);
-        pozycji++;
-      }
-    }
-    if (pozycji === 0) {
-      throw new BladKosza(400, "Żaden zwrot w koszu nie ma pozycji pełnowartościowych");
-    }
-    d.prepare("UPDATE kosz SET status='zamkniety', zamknieto_at=?, zamknieto_przez=? WHERE id=?")
-      .run(nowIso(), autor, koszId);
-    logEvent("kosz_zamkniety", autor, null, { koszId, kod: kosz.kod, zwrotow: zwroty.length, pozycji });
-  })();
-  return szczegolKosza(koszId);
-}
+   Zniknęły stąd `przypnijZwrot`, `odepnijZwrot` i `zamknijKosz`. Ta trzecia
+   robiła snapshot pozycji z korekt zwrotu i żądała, żeby dokumenty naprawdę
+   weszły do Subiekta; kosz z dokumentu MM powstaje od razu ZAMKNIĘTY
+   (`otworzPrzyjecie`), więc nie ma czego zamykać. Decyzje o towarze podejmuje
+   się teraz w Subiekcie, a aplikacja rozkłada to, co przyjechało.          */
 
 export function listaKoszy(): WierszListyKoszy[] {
   /* Rozłożone tylko świeże: lista służy pracy, historię trzyma audyt. */
@@ -339,7 +218,6 @@ export function listaKoszy(): WierszListyKoszy[] {
     .prepare(
       `SELECT k.id, k.kod, k.status, k.utworzono_at,
               k.zamknieto_at, k.zamknieto_przez, k.rozlozono_at, k.rozlozono_przez,
-              (SELECT COUNT(*) FROM zwrot z WHERE z.kosz_id = k.id) AS zwrotow,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='skipped') AS pominietych,
@@ -354,7 +232,6 @@ export function listaKoszy(): WierszListyKoszy[] {
     id: w.id as number,
     kod: w.kod as string,
     status: w.status as string,
-    zwrotow: w.zwrotow as number,
     pozycji: w.pozycji as number,
     odlozonych: w.odlozonych as number,
     pominietych: w.pominietych as number,
@@ -391,9 +268,6 @@ export function kartonyDlaKolektora(): WierszListyKoszy[] {
 
 export function szczegolKosza(koszId: number): SzczegolKosza {
   const kosz = wierszKosza(koszId);
-  const zwroty = db()
-    .prepare("SELECT id, referencja, waybill FROM zwrot WHERE kosz_id = ? ORDER BY id")
-    .all(koszId) as Array<{ id: number; referencja: string | null; waybill: string }>;
   const wiersze = db()
     .prepare(
       `SELECT p.*, q.status AS mm_status, q.sgt_doc_number AS mm_numer
@@ -411,7 +285,6 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
   const stany = stanyNiezerowe(twIds);
   const pozycje: PozycjaKosza[] = wiersze.map((w) => ({
     id: w.id as number,
-    zwrotId: w.zwrot_id as number,
     twId: w.tw_id as number,
     symbol: w.symbol as string,
     nazwa: w.nazwa as string,
@@ -498,7 +371,6 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     zamknietoPrzez: kosz.zamknieto_przez,
     rozlozonoAt: kosz.rozlozono_at,
     rozlozonoPrzez: kosz.rozlozono_przez,
-    zwroty,
     pozycje,
     odlozonych: pozycje.filter((p) => p.status === "done").length,
   };
@@ -904,46 +776,21 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const pominiete = pozycje.length - odlozone.length;
 
   const d = db();
-  /* Dwa kosze NIE kolejkują niczego, każdy z własnego powodu.
+  /* ŻADEN kosz nie kolejkuje już dokumentu (0.138.0) i to nie jest przeoczenie.
 
-     Kosz z dokumentu MM (0.75.0): przesunięcie na regał zwrotów wystawiło już
-     biuro, a dokument powrotny (ZWR→MAG) też wystawia biuro — kolektor zapisał
+     Kosz z dokumentu MM (0.75.0): przesunięcie na regał zwrotów wystawiło
+     biuro i dokument powrotny (ZWR→MAG) też wystawia biuro — kolektor zapisał
      adresy i to jest cała jego rola. Zakolejkowanie MM tutaj znaczyłoby
      dokument wystawiony DRUGI raz, na towar, który nikomu się nie przesuwał.
 
      KARTON (0.122.0): towar w ogóle nie opuścił magazynu. Ktoś zebrał go pod
-     zamówienie, pakujący odłożył do pudła, a teraz wraca na półkę — stan
-     magazynu przez cały ten czas się nie zmienił. MM ZWROTY→MAG zdjęłoby
-     z bufora zwrotów towar, którego na tym buforze nigdy nie było, czyli
-     zrobiłoby stan ujemny na dokumencie, którego nikt nie zamawiał. */
-  if (kosz.mm_dok_id != null || kosz.rodzaj === RODZAJ_KARTON) {
-    transaction(d, () => {
-      d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
-        .run(nowIso(), autor, koszId);
-      logEvent("kosz_rozlozony", autor, null, {
-        koszId,
-        kod: kosz.kod,
-        pozycji: pozycje.length,
-        pominietych: pominiete,
-        mmDokId: kosz.mm_dok_id,
-      });
-    })();
-    return szczegolKosza(koszId);
-  }
+     zamówienie, pakujący odłożył do pudła, a teraz wraca na półkę.
 
+     Trzecia droga — kosz złożony w aplikacji z przypiętych zwrotów — miała
+     tu własne MM ZWROTY→MAG. Zniknęła razem z rejestrem zwrotów, więc gałąź
+     kolejkująca była już nieosiągalna; trzymanie jej udawałoby, że kosz
+     powstaje jeszcze jakoś inaczej. */
   transaction(d, () => {
-    /* MM wyłącznie dla ODŁOŻONYCH. Pominięta pozycja nigdzie fizycznie nie
-       pojechała, więc przesunięcie na nią zdejmowałoby z bufora towar, który
-       dalej leży na regale zwrotów — albo którego nie ma wcale. */
-    for (const p of odlozone) {
-      const queueId = enqueueMM(config.magId.ZWROTY, config.magId.MAG, [{ twId: p.tw_id, qty: p.ilosc }], {
-        createdBy: autor,
-        twId: p.tw_id,
-        label: "MM zwroty→magazyn · " + (p.symbol || p.tw_id),
-        detail: `Kosz ${kosz.kod} rozłożony`,
-      });
-      d.prepare("UPDATE kosz_pozycja SET mm_queue_id = ? WHERE id = ?").run(queueId, p.id);
-    }
     d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
       .run(nowIso(), autor, koszId);
     logEvent("kosz_rozlozony", autor, null, {
@@ -951,6 +798,7 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
       kod: kosz.kod,
       pozycji: pozycje.length,
       pominietych: pominiete,
+      mmDokId: kosz.mm_dok_id,
     });
   })();
   return szczegolKosza(koszId);

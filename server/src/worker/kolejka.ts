@@ -1,6 +1,6 @@
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
-import { TYPY_SFERY, type MmItem, type SferaAdapter, type ZlecenieKorekty } from "../adapters/sfera.js";
+import { TYPY_SFERY, type MmItem, type SferaAdapter } from "../adapters/sfera.js";
 import { logEvent } from "../services/events.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
@@ -37,7 +37,7 @@ const inBuffer = (docId: number): boolean => {
 
 export function pickTask(): Task | undefined {
   const now = nowIso();
-  /* Przy SFERA_WORKER=1 zadania dokumentowe (`mm`, `korekta_zwrot`) wykonuje
+  /* Przy SFERA_WORKER=1 zadania dokumentowe (`mm`) wykonuje
      osobny proces (sfera-worker/) — ten worker ma ich NIE DOTYKAĆ, inaczej
      oznaczy je jako error padającym adapterem SQL, zanim worker Sfery zdąży
      je wziąć. Celowo wykluczamy LISTĘ typów, a nie wybieramy `set_location`:
@@ -153,12 +153,6 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
       await sfera.applySetZdjecie(payload.twId);
     } else if (task.type === "mm") {
       docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
-    } else if (task.type === "korekta_zwrot") {
-      const w = await sfera.createKorektaZwrotu(payload as ZlecenieKorekty);
-      wynik = w;
-      /* W kolumnie z numerem ląduje KOREKTA: to jej numer biuro podaje
-         klientowi i księgowości. Numer MM stoi w wyniku obok. */
-      docNo = w.korektaNumer;
     } else {
       throw new Error("Nieznany typ zadania: " + task.type);
     }

@@ -513,9 +513,9 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   kuleje, czerwień — coś stoi. Najechanie pokazuje pełne zdania: wersję i tryb
   serwera, workera, kolejkę, rozjazdy i problemy z `/api/health`. Kliknięcie
   prowadzi do STANU SYSTEMU. Ikona ALLEGRO mówi kolorem o stanie konta,
-  a kliknięcie otwiera kartę KONTO ALLEGRO i od razu zaczyna parowanie.
+  a kliknięcie otwiera stojącą tam kartę KONTO ALLEGRO i zaczyna parowanie.
 - **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
-  PRACA (dostawy, zwroty) otwiera się kilkanaście razy dziennie.
+  PRACA (dostawy, magazyn zwrotów) otwiera się kilkanaście razy dziennie.
   WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
 - **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Dziś prowadzi
   do DOSTAWCÓW. Konfiguracja nie jest zakładką pracy i nie ma ważyć tyle,
@@ -590,15 +590,16 @@ server/                    backend (Fastify + SQLite + worker)
                            dokumentu dla biura — sam odczyt),
                            queue, locations, events, notatki (do dostaw),
                            zamienniki + zamowienia-towaru (karta towaru),
-                           pytania + ai (pytania klientów: szkice odpowiedzi
-                           o dobór części, model językowy za `fetch`),
+                           kosze + karton + przyjecia (zwroty na regale),
+                           ksztalt (opis kształtu JSON bez treści — sonda),
                            raporty + reslot (analiza), zbiorki + strefa-zlota
                            (rotacja z Sellasist),
                            aktualizacja (APK dla kolektorów)
   src/routes/              products, delivery, problems, przesuniecie, queue,
                            locations, device (§8), auth, magazyny, audyt,
                            analiza, zbiorki, biuro, aktualizacja (APK),
-                           dostawcy (logo), pytania (pytania klientów)
+                           dostawcy (logo), kosze, kartony, przyjecia,
+                           allegro (parowanie konta)
   data/photos/             zdjęcia dowodowe do reklamacji (poza gitem)
   data/zdjecia/            CACHE zdjęć kartotek z Subiekta — wolno skasować
   data/apk/                APK dla kolektorów — kładzie go instalator

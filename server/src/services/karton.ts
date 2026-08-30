@@ -176,8 +176,8 @@ export function dodajDoKartonu(
     } else {
       const res = d
         .prepare(
-          `INSERT INTO kosz_pozycja(kosz_id, zwrot_id, tw_id, symbol, nazwa, ilosc)
-           VALUES (?, NULL, ?, ?, ?, ?)`
+          `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc)
+           VALUES (?, ?, ?, ?, ?)`
         )
         .run(k.id, tw.tw_id, tw.symbol, tw.nazwa, ile);
       wynik = { pozycjaId: Number(res.lastInsertRowid), symbol: tw.symbol, nazwa: tw.nazwa, ilosc: ile };

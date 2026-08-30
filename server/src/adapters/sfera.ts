@@ -51,6 +51,11 @@ export interface MmItem {
 /**
  * Zlecenie „korekta sprzedaży + MM na bufor zwrotowy" — jedna operacja.
  *
+ * OD 0.138.0 NIC TEGO NIE NADAJE: rejestr zwrotów odszedł razem z obsługą
+ * klienta, a korektę wystawia biuro w Subiekcie. Kontrakt zostaje, bo worker
+ * Sfery (C#) dalej bierze `korekta_zwrot` z kolejki — zadania nadane przed
+ * aktualizacją muszą się dokończyć, a nie zawisnąć na nieznanym typie.
+ *
  * Pozycje są te same dla obu dokumentów: korekta zdejmuje je ze sprzedaży
  * (stan wraca do magazynu, z którego wyszły), a MM od razu przesuwa je na
  * bufor zwrotowy. Rozdzielenie tego na dwa zadania kolejki dałoby stan,
@@ -90,7 +95,7 @@ export interface WynikKorekty {
  * Node. Jedna lista dla obu stron: `pickTask` w Node ma ich nie dotykać przy
  * SFERA_WORKER=1, a `sfera-worker/sql/*.sql` bierze dokładnie te same.
  */
-export const TYPY_SFERY = ["mm", "korekta_zwrot"] as const;
+export const TYPY_SFERY = ["mm"] as const;
 
 export interface SferaAdapter {
   /** Ustaw pole lokalizacji na kartotece towaru (spec §5.2). */
@@ -131,5 +136,4 @@ export interface SferaAdapter {
    * dokumenty, więc nie ma innej drogi niż wycofanie ręką implementacji —
    * i dlatego to JEDNA metoda, a nie dwa zadania kolejki.
    */
-  createKorektaZwrotu(zlecenie: ZlecenieKorekty): Promise<WynikKorekty>;
 }

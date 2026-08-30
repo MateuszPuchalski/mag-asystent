@@ -571,178 +571,7 @@ czwartą listę, a nie do kosza „poza strefą".
 Regał bez reguły nie jest regałem poza strefą. Gdyby nim był, jego martwy towar
 zniknąłby z oczu.
 
-## Zwroty Allegro
-
-Zakładka ZWROTY w `/biuro` (rola biuro albo admin). W trybie demo
-(`SGT_MODE=seeded`) pracuje adapter dev — fikcyjne zwroty bez kontaktu
-z Allegro, zestrojone z dokumentami sprzedaży z tego seedu.
-
-### S66a — nic nie pobiera się samo
-
-Zaraz po starcie serwera karta **BRAKUJĄCE PACZKI** ma być pusta, a pod nią
-zdanie „Jeszcze nic nie pobrano". W dzienniku serwera nie ma ani jednego wpisu
-`[zapowiedzi]` i `[pytania]`. Odczekaj minutę: ma się nie zmienić nic.
-
-Od 0.85.0 pobiera CZŁOWIEK. Kliknij **POBIERZ Z ALLEGRO** na karcie ZWROTY —
-toast ma powiedzieć, ile zgłoszeń przyszło, a lista przestać być pusta.
-Cichy przycisk kazałby klikać drugi raz „bo chyba nie zadziałało".
-
-Ta sama reguła dotyczy pytań klientów: przycisk **ODŚWIEŻ Z ALLEGRO** na ich
-karcie. Oba pobierania gasi i włącza jedno pokrętło `ALLEGRO_POLL_MS`.
-
-### S67 — zwrot dopasowany jednoznacznie
-
-Skan `DEVWB0001` zakłada zwrot z dwiema pozycjami (`TEST-LINIA-TODO`,
-`TEST-LINIA-DONE`). Faktura `FS 30001` niesie numer zamówienia `dev-ord-1`
-w numerze obcym, więc dokument dopasowuje się sam (`dopasowanie=auto`).
-
-Decyzje per pozycja: jedna pełnowartościowa, druga do reklamacji — status
-zwrotu przechodzi na `oceniony` dopiero po OBU decyzjach. Przycisk
-ODDANO ŚRODKI kończy przepływ (`rozliczony`).
-
-### S68 — dwa kandydujące paragony i etykieta przewoźnika doręczającego
-
-Skan `DEVTW0002` — to numer przewoźnika DORĘCZAJĄCEGO (transportingWaybill),
-inny niż numer nadania zwrotu. Adapter ma go znaleźć tak samo jak numer
-nadania.
-
-Towar `TEST-ROTUJACY` stoi na DWÓCH paragonach bez numeru zamówienia —
-szczegół zwrotu pokazuje obu kandydatów z punktacją i czeka na wybór ręką
-(`dopasowanie=reczne`). Wybór da się cofnąć.
-
-### S69 — pozycja spoza kartoteki i etykieta nieznana
-
-Skan `DEVWB0003` zakłada zwrot, którego pozycja ma sygnaturę spoza kartoteki —
-`tw_id` zostaje puste (uczciwy brak), dokument się nie dopasowuje.
-
-Skan dowolnego innego kodu kończy się komunikatem „Allegro nie zna tej
-etykiety" i przyciskiem założenia zwrotu ręcznego.
-
-### S69a — korekta i MM na bufor jednym kliknięciem
-
-Zwrot z S67 z OBIEMA pozycjami oznaczonymi jako pełnowartościowe. Panel
-KOREKTA + MM NA BUFOR pokazuje wtedy przycisk. Kliknięcie zakłada JEDNO
-zadanie kolejki (`korekta_zwrot`), a nie dwa.
-
-Efekt w trybie demo: stan magazynu sprzedaży nie zmienia się ani o sztukę,
-bo korekta go dodaje, a MM zabiera. Zeskanowany towar ląduje na magazynie
-zwrotów. Karta pokazuje oba numery: korekty i MM.
-
-Po zleceniu decyzji nie da się już zmienić. Odmowa jest zamierzona —
-dokumenty poszły na treść z chwili kliknięcia.
-
-Cztery przypadki, w których zamiast przycisku stoi zdanie o przeszkodzie.
-Pozycja bez decyzji. Brak dopasowanego dokumentu. Pozycja pełnowartościowa
-bez rozpoznanej kartoteki. Zwrot bez ani jednej pozycji pełnowartościowej.
-
-### S69b — kosz zwrotowy: od przypięcia po automatyczne cofnięcie bufora
-
-Ciąg dalszy S69a. Po zleceniu dokumentów karta zwrotu pokazuje sekcję
-KOSZ ZWROTOWY. Wpisz kod (np. `KZ-01`) i kliknij PRZYPNIJ — kosz powstaje
-przy pierwszym użyciu kodu. Karta KOSZE ZWROTOWE pokazuje go jako otwarty.
-
-Przycisk ZAMKNIJ — NA HALĘ działa dopiero, gdy dokumenty weszły do
-Subiekta. Zadanie korekty w błędzie blokuje zamknięcie z czytelnym zdaniem.
-
-Na kolektorze zamknięty kosz stoi na zakładce ZWROTY, w sekcji
-KOSZE Z APLIKACJI — pod listą przyjęć z regału zwrotów.
-Wejście otwiera listę pozycji w kolejności alejkowej. Skan towaru wskazuje
-pozycję, skan regału ją odkłada. Towar spoza kosza dostaje odmowę.
-
-Po ostatniej pozycji zostaje przycisk ZAKOŃCZ — COFNIJ BUFOR. Kolejka
-dostaje MM ze zwrotów na magazyn główny, po jednym na pozycję. Nikt przy
-komputerze niczego nie wystawia. Kod kosza wraca do obiegu.
-
-### S69c — reklamacje wg terminu i raport procesu
-
-Pozycja z decyzją „reklamacja" trafia na kartę REKLAMACJE. Lista sortuje
-się po dniach do terminu ustawowego (14 dni od zgłoszenia w Allegro),
-a wiersze po terminie są czerwone. UZNANA / ODRZUCONA pyta o notatkę
-i zdejmuje wiersz z listy. Rozpatrzenie jest jednorazowe.
-
-Karta RAPORT PROCESU ZWROTÓW pokazuje kafle: stany zwrotów, dokumenty
-w kolejce i w błędzie, kosze, reklamacje po terminie oraz medianę czasu
-od skanu do rozliczenia.
-
-### S69d — statystyki zwrotów i uczciwy wskaźnik
-
-Karta **STATYSTYKI ZWROTÓW** stoi pod raportem. Po skanie kilku etykiet
-(S67–S69) tabela ma pokazać towary z liczbą zwrotów i sztuk, a pozycja spoza
-kartoteki — znacznik POZA KARTOTEKĄ zamiast zniknąć z listy.
-
-Sedno tego scenariusza to kolumna WSKAŹNIK. Przy oknie 90 dni liczy się ze
-sprzedaży w read-modelu. Przełącz okno na **180 dni**: wskaźnik ma zamilknąć
-w całej kolumnie, a pod tabelą ma stanąć zdanie, że sprzedaż sięga tylko
-90 dni wstecz. Liczba wyliczona z pełnego licznika i niepełnego mianownika
-byłaby zawyżona, a po niej ktoś mógłby wycofać dobrze sprzedający się towar.
-
-Wykres tygodni ma mieć słupki także dla tygodni BEZ zwrotów — oś czasu bez
-dziur. Lista kupujących pokazuje wyłącznie loginy z więcej niż jednym zwrotem.
-
-### S69e — czasy obsługi zwrotu i uczciwa pustka
-
-Karta **CZASY OBSŁUGI ZWROTU** stoi pod statystykami. Na świeżym ziarnie jest
-PUSTA i to jest właściwy pierwszy widok do sprawdzenia. Każdy z pięciu kafli
-ma pokazać myślnik ORAZ zdanie, dlaczego nie ma liczby. Sam myślnik wyglądałby
-jak awaria karty.
-
-Kafel PRZYJĘCIE → PÓŁKA mówi wprost rzecz, która myli najczęściej: kosze
-z dokumentu MM nie mają przypiętego zwrotu, więc do całej drogi nie wchodzą.
-
-Przejdź teraz S67–S69, żeby zwrot przeszedł drogę od skanu do półki. Kafle
-mają dostać liczby, a sekcja CO STOI TERAZ — wiersze kosza czekającego na
-rozłożenie i zwrotu bez domknięcia, od najstarszej sprawy. Kliknięcie wiersza
-kosza otwiera jego podgląd, kliknięcie wiersza zwrotu — kartę zwrotu.
-
-Tabela tempa per osoba ma nieść podstawę prawną monitoringu NAD sobą i nie
-pokazywać liczby przy próbce mniejszej niż 20 pozycji.
-
-### S69f — układ panelu w różnych szerokościach
-
-Otwórz `/biuro` i zwężaj okno od pełnego ekranu do połowy. Karty mają
-przechodzić z trzech kolumn na dwie i na jedną **płynnie**, bez skoku układu
-i bez poziomego paska przewijania. Ten pasek na dole strony to usterka, nie
-efekt uboczny.
-
-Przewiń długą listę: pasek stanu i zakładki mają zostać na górze. Kliknij kafel
-w pasku stanu — karta docelowa ma stanąć POD paskiem, w całości widoczna.
-
-Na zakładce ZWROTY karta **WGLĄD** ma mieć rozwinięty sam RAPORT. Rozwiń
-STATYSTYKI, odśwież stronę: mają zostać rozwinięte. Zwiń wszystko i zostaw
-zakładkę otwartą na minutę — w narzędziach przeglądarki nie mają lecieć
-żądania o raport, statystyki ani czasy. Zwinięta sekcja nie pyta serwera.
-
-Ta sama reguła obowiązuje statystyki pytań na zakładce SPRAWY. Wejdź na
-nią przy zwiniętej sekcji: ma polecieć żądanie o listę pytań i **żadne**
-o statystyki. Rozwiń sekcję — dane mają dojść od razu, jednym żądaniem, nie
-dwoma. Podwójne żądanie znaczy, że przywrócenie układu wzięto za kliknięcie.
-
-Kliknij ikonę **i** przy nagłówku dowolnej karty. Objaśnienie ma się rozwinąć
-pod nagłówkiem i zwinąć przy drugim kliknięciu. Po odświeżeniu strony ma być
-znowu schowane — stanu objaśnień świadomie nie pamiętamy.
-
-Kliknij wiersz zwrotu przy szerokim oknie: lista ma zostać po lewej, a karta
-zwrotu stanąć obok niej, z podświetlonym wierszem. Zwęź okno poniżej 1280 px
-przy otwartym zwrocie — szczegół ma zasłonić listę. Rozszerz z powrotem: ma
-wrócić układ dwukolumnowy, bez odświeżania strony.
-
-### S69g — konfiguracja za zębatką
-
-Kliknij ikonę koła zębatego w prawym górnym rogu panelu. Widok ustawień ma
-mieć cztery karty: **PROMPT EKSPERTA I FAKTY FIRMOWE**, **DANE FIRMY DO
-FORMULARZY DOSTAWCÓW**, **REGUŁY STREFY ZŁOTEJ** i **LOGO DOSTAWCÓW**.
-
-Sprawdź, że żadnej z nich nie ma na zakładkach pracy. Prompt nie stoi na
-PYTANIACH, reguły nie stoją na ANALIZIE, a dane firmy nie stoją w karcie
-REKLAMACJE. Zakładka ANALIZA ma za to zdanie mówiące, gdzie te reguły są.
-
-Zmień coś w FAKTACH i zapisz. Wiersz pod przyciskiem ma pokazać datę i osobę.
-Ta sama trasa na koncie biura ma odpowiedzieć 403 — prompt i fakty zmienia
-wyłącznie admin, a mówi to serwer, nie przeglądarka.
-
-Wejdź na PYTANIA i na ANALIZĘ z otwartymi narzędziami przeglądarki. Żadna
-z nich nie ma już pytać o `pytania/prompt` ani o `strefa` — te dwa żądania
-lecą dopiero po wejściu w ustawienia.
+## Dostawcy, analiza dostaw i ustawienia
 
 ### S70 — dostawca z logo i dostawca bez logo
 
@@ -775,6 +604,66 @@ nawet do numerów obcych.
 
 Kontrola drugiej strony: `TEST-ZNAKI` nie ma w opisie podwójnego ukośnika
 i jego sekcja ma pozostać taka jak dotąd.
+
+### S77 — analiza dostaw: u kogo się psuje
+
+Ziarno zakłada osiem domkniętych dostaw u czterech dostawców, rozłożonych na
+sześć tygodni. Do 0.99.0 domknięta dostawa była jedna — a jedna nie odpowiada
+na pytanie „u kogo są problemy" wcale.
+
+Wejdź w `/biuro` → **ANALIZA**, zakres **dostawy**, okno **90 dni**.
+
+Tabela „dostawcy" jest posortowana po **udziale** pozycji z wyjątkiem, a nie po
+liczbie dostaw. IMPORT SHANGHAI ma stać na górze mimo najmniejszej liczby
+dostaw — to jest wniosek, którego ta karta ma dostarczać. Kolejność po liczbie
+zepchnęłaby go na dół.
+
+FALON-TECH ma dostawę zdjętą **poza WERTIS**. Sprawdź dwie rzeczy: wchodzi do
+liczby dostaw i **nie wchodzi** do mediany czasu, więc kolumna MEDIANA ma przy
+nim myślnik. Nikt tej dostawy tutaj nie rozkładał, więc nie ma czego zmierzyć.
+
+Kafel „z tego poza WERTIS" ma pokazać jeden i **nie ma być czerwony**:
+zamknięcie poza WERTIS jest legalną drogą, nie wpadką.
+
+Tabela „najczęstsze wyjątki" liczy po dacie zgłoszenia, nie po dacie domknięcia
+dostawy. Otwarte i rozwiązane mają wspólną skalę słupków — inaczej pasek przy
+jednym typie byłby dłuższy od paska przy innym mimo mniejszej liczby.
+
+Przełącz okno na **30 dni**. Dostawcy sprzed miesiąca mają zniknąć z tabeli,
+a mediana i udziały przeliczyć się na krótszym oknie.
+
+### S79 — ustawienia jako jeden arkusz
+
+Wejdź w `/biuro` → zębatka → **USTAWIENIA** na oknie szerszym niż 1400 px.
+
+Sekcje mają stać **jedna pod drugą, w jednej kolumnie**, rozdzielone cienką
+kreską. Żadnych zaokrąglonych rogów, żadnych cieni i żadnych przerw z papierem
+między nimi. Do 0.119.0 było to pięć kartek z cieniem, które siatka rozkładała
+na dwie kolumny różnej wysokości.
+
+Arkusz nie rozciąga się na całą szerokość monitora. Sekcje są formularzami,
+a pole promptu eksperta ma szerokość do redagowania, nie do oglądania.
+
+Odstępy w środku sekcji mają być **równe**. Sprawdź to na karcie PROMPT
+EKSPERTA I FAKTY FIRMOWE. Ten sam odstęp ma dzielić etykietę od pola, pole od
+przycisku i przycisk od następnej etykiety.
+
+Zapisz reguły strefy złotej. Zdanie z wynikiem pojawia się **pod tabelą**,
+a przed zapisem nie ma tam pustego pasa po nim.
+
+Otwórz objaśnienie ikoną „i" przy dowolnej sekcji. Akapity mają mieć odstęp
+między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
+
+Reszta zakładek zostaje **na kartach**: ANALIZA, NADZÓR i DZIENNIK dalej mają
+promień, cień i odstęp między kartami. To jest osobny wygląd i ma taki zostać.
+
+## Kosze z regału zwrotów
+
+Obsługa klienta — pytania, dyskusje, opinie i rejestr zwrotów Allegro —
+zniknęła w 0.138.0 razem ze swoimi scenariuszami. Nowa powstaje od zera
+(patrz `obsluga-klienta.md`) i przyniesie własne. Z dawnego obiegu zwrotów
+zostaje to, co dotyczy HALI: kosz zbudowany z dokumentu MM ZWROTY
+wystawionego w Subiekcie.
 
 ### S72 — rozkładanie zwrotów z regału, czyli kosz z kartką
 
@@ -830,174 +719,3 @@ odpowiedzieć 403.
 
 Nieznany numer: wpisz `999`. Komunikat ma mówić, czego szukać — kartki albo
 synchronizacji z Subiektem — a nie samego „nie znaleziono".
-
-### S73 — skrzynka pytań w trzech stanach
-
-Ziarno zakłada trzy sprawy w skrzynce, po jednej na każdy stan, którym szyna
-się różni. Wejdź w `/biuro` → **SPRAWY**. Od 0.116.0 skrzynka jest zwijanym
-**REJESTREM PYTAŃ** w szynie po prawej — rozwiń go.
-
-`client:44112097` czeka na szkic — nie ma odpowiedzi i nie ma dopasowanych
-towarów. To sprawa, którą model dopiero policzy.
-
-`client:44251880` ma szkic **po poprawce człowieka**. Sygnał autorstwa ma być
-zgaszony: tekst nie jest już tym, co napisał model. Porównaj z przyciskiem
-PRZYWRÓĆ SZKIC — on wraca do wersji surowej i sygnał ma się wtedy zapalić.
-
-`client:44300104` jest wysłana. Nie liczy się do skrzynki, ale wchodzi do
-mediany czasu odpowiedzi w statystykach.
-
-Otwórz pierwszą sprawę na oknie szerszym niż 1280 px. Zakładka ma rozłożyć się
-na trzy strefy: kolejka po lewej, wątek na środku, kontekst po prawej.
-
-**Pasma szerokości są od 0.101.0 trzy i każde zachowuje się inaczej.** Zwężaj
-okno i sprawdzaj po kolei.
-
-Poniżej **1280 px** trzy strefy się nie mieszczą, ale kolejka zostaje: wchodzi
-pasmo z szufladą. Kolejka po lewej, sprawa obok niej, a kontekst chowa się za
-przyciskiem **KONTEKST** w rzędzie nad tytułem. Kliknij go — panel wjeżdża
-z prawej i przyciemnia to, co pod nim.
-
-Panel ma **trzy wyjścia** i każde trzeba sprawdzić osobno: przycisk ZAMKNIJ
-w jego głowie, kliknięcie w przyciemnienie i klawisz Escape. Escape ma zamknąć
-SAMĄ SZUFLADĘ — sprawa zostaje otwarta. Drugi Escape dopiero z niej wychodzi.
-
-Poniżej **1024 px** wraca zachowanie sprzed 0.101.0: sprawa zasłania kolejkę,
-a kontekst schodzi pod nią i przycisku KONTEKST nie ma.
-
-Rozszerz okno z powrotem powyżej 1280 px przy wysuniętej szufladzie. Panel ma
-zgasnąć sam, a kontekst wrócić jako trzecia kolumna — wysunięta szuflada
-zasłaniałaby wtedy kolumnę, którą sama pokazuje.
-
-To samo obowiązuje na **DOSTAWACH** i **ZWROTACH**: powłoka trzech stref jest
-wspólna, więc szuflada też.
-
-### S74 — pytanie o towar spoza oferty
-
-`client:44380022` pytał o nóż do kosiarki NAC LS46-127. Nie mamy go
-w kartotece, więc sprawa ma znacznik „poza ofertą".
-
-Wejdź w `/biuro` → **ANALIZA** i ustaw zakres na pytania klientów. Lista
-„pytali o towar spoza naszej oferty" ma pokazać ten wiersz z rozpoznanym
-urządzeniem. To jest najtańszy research asortymentu, jaki firma ma.
-
-### S75 — wykres tygodni, słupki i zdanie o szczycie
-
-Ziarno rozkłada dziewięć pytań na dwa miesiące, a nie na jeden dzień. Bez tego
-rozrzutu wykres tygodni pokazywał jeden słupek, a wszystkie paski proporcji
-w tabeli towarów były jednakowej długości.
-
-Wejdź w `/biuro` → **ANALIZA**, zakres pytania klientów, okno **90 dni**.
-
-Tabela „najczęściej pytane towary" ma mieć pasek przy każdej liczbie. Pasek
-najdłuższy należy do pierwszego wiersza — skalą jest największa wartość w tej
-tabeli, nie żaden próg z góry. Obok stoi kolumna **STAN**. Towar spoza
-kartoteki ma w niej myślnik, nie zero: to dwie różne odpowiedzi.
-
-Pod wykresem tygodni stoi zdanie o szczycie. Mówi, który tydzień odstaje i ile
-razy wobec mediany pozostałych. Sprawdź, czy liczba w zdaniu zgadza się
-z najwyższym słupkiem. Zdanie znika, gdy szczyt nie odstaje — to jest
-zamierzone, a nie brak danych.
-
-Przełącz okno na **30 dni**. Zdanie ma zniknąć albo się zmienić, bo próbka
-jest wtedy krótsza. Kafel „potwierdzonych dopasowań" ma spaść.
-
-Ustaw **OSOBA** na Jana Kowalskiego. Zmienić mają się cztery kafle: wysłane,
-mediana, udział bez poprawki i potwierdzone dopasowania. Tabela towarów,
-kategorie i tygodnie zostają dla całego biura — mówi o tym zdanie pod kaflami.
-
-### S76 — wgląd w zwroty stoi w analizie
-
-Do 0.99.0 raport procesu, statystyki i czasy obsługi były zwijanymi sekcjami
-na zakładce ZWROTY, z własnym oknem. Wgląd stał w zakładce pracy, wbrew
-podziałowi, który pasek zakładek ogłasza.
-
-Wejdź w `/biuro` → **ZWROTY**. Ma tu zostać sama praca: skan, kolejka, kosze,
-reklamacje, zapowiedzi i karta konta Allegro. Kart z liczbami nie ma.
-
-Wejdź w **ANALIZA** i ustaw zakres na zwroty. Trzy karty mają stać jedna pod
-drugą, rozwinięte. Czip OKNA rządzi statystykami i czasami; raport procesu
-mówi wprost, że jego nie dotyczy — liczy stan, nie okno.
-
-W karcie „czasy obsługi" kliknij wiersz w tabeli „co stoi teraz". Panel ma
-przełączyć się na zakładkę ZWROTY i otworzyć ten kosz albo ten zwrot. Kliknięcie
-prowadzi przez granicę zakładek i to jest cała trudność tej przeprowadzki.
-
-### S77 — analiza dostaw: u kogo się psuje
-
-Ziarno zakłada osiem domkniętych dostaw u czterech dostawców, rozłożonych na
-sześć tygodni. Do 0.99.0 domknięta dostawa była jedna — a jedna nie odpowiada
-na pytanie „u kogo są problemy" wcale.
-
-Wejdź w `/biuro` → **ANALIZA**, zakres **dostawy**, okno **90 dni**.
-
-Tabela „dostawcy" jest posortowana po **udziale** pozycji z wyjątkiem, a nie po
-liczbie dostaw. IMPORT SHANGHAI ma stać na górze mimo najmniejszej liczby
-dostaw — to jest wniosek, którego ta karta ma dostarczać. Kolejność po liczbie
-zepchnęłaby go na dół.
-
-FALON-TECH ma dostawę zdjętą **poza WERTIS**. Sprawdź dwie rzeczy: wchodzi do
-liczby dostaw i **nie wchodzi** do mediany czasu, więc kolumna MEDIANA ma przy
-nim myślnik. Nikt tej dostawy tutaj nie rozkładał, więc nie ma czego zmierzyć.
-
-Kafel „z tego poza WERTIS" ma pokazać jeden i **nie ma być czerwony**:
-zamknięcie poza WERTIS jest legalną drogą, nie wpadką.
-
-Tabela „najczęstsze wyjątki" liczy po dacie zgłoszenia, nie po dacie domknięcia
-dostawy. Otwarte i rozwiązane mają wspólną skalę słupków — inaczej pasek przy
-jednym typie byłby dłuższy od paska przy innym mimo mniejszej liczby.
-
-Przełącz okno na **30 dni**. Dostawcy sprzed miesiąca mają zniknąć z tabeli,
-a mediana i udziały przeliczyć się na krótszym oknie.
-
-### S78 — jedna kolejka i dwie tafle na SPRAWACH
-
-Do 0.115.0 zakładka SPRAWY miała trzy kolejki: wspólną, kolejkę zwrotów
-i skrzynkę pytań. Każda z własnym filtrem, wszystkie o tych samych sprawach.
-
-Wejdź w `/biuro` → **SPRAWY** na oknie szerszym niż 1024 px. Widać dwie tafle
-i żadnej przerwy między nimi: kolejka po lewej, szyna rejestrów po prawej.
-
-**Strona nie ma się przewijać.** Przewijają się tafle, każda osobno. To jest
-cała treść tej zmiany — sprawdź to najpierw.
-
-W głowie kolejki stoją trzy narzędzia, które do 0.115.0 mieszkały w trzech
-kartach: skan etykiety zwrotu, wyszukiwarka klientów i rząd trzech pobrań.
-Zeskanuj `999` — odpowiedź ma przyjść tu, pod polem.
-
-Rejestry w szynie są **zwinięte**. Rozwiń REJESTR ZWROTÓW: to jest archiwum,
-więc czip „Rozliczone" ma pokazać zwroty, których w kolejce nie ma.
-
-Otwórz sprawę z kolejki. Obok niej ma zostać **ta sama kolejka**, zwężona do
-szyny, z podświetlonym wierszem otwartej sprawy. Szyna rejestrów schodzi.
-
-Kliknij login klienta w kolejce. Karta klienta ma zająć całą szerokość okna
-i też mieć własne przewijanie zamiast przewijania strony.
-
-Poniżej **1024 px** konsoli nie ma: wszystko wraca do pionowego stosu kart
-i strona przewija się normalnie. Tak ma być.
-
-### S79 — ustawienia jako jeden arkusz
-
-Wejdź w `/biuro` → zębatka → **USTAWIENIA** na oknie szerszym niż 1400 px.
-
-Sekcje mają stać **jedna pod drugą, w jednej kolumnie**, rozdzielone cienką
-kreską. Żadnych zaokrąglonych rogów, żadnych cieni i żadnych przerw z papierem
-między nimi. Do 0.119.0 było to pięć kartek z cieniem, które siatka rozkładała
-na dwie kolumny różnej wysokości.
-
-Arkusz nie rozciąga się na całą szerokość monitora. Sekcje są formularzami,
-a pole promptu eksperta ma szerokość do redagowania, nie do oglądania.
-
-Odstępy w środku sekcji mają być **równe**. Sprawdź to na karcie PROMPT
-EKSPERTA I FAKTY FIRMOWE. Ten sam odstęp ma dzielić etykietę od pola, pole od
-przycisku i przycisk od następnej etykiety.
-
-Zapisz reguły strefy złotej. Zdanie z wynikiem pojawia się **pod tabelą**,
-a przed zapisem nie ma tam pustego pasa po nim.
-
-Otwórz objaśnienie ikoną „i" przy dowolnej sekcji. Akapity mają mieć odstęp
-między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
-
-Reszta zakładek zostaje **na kartach**: ANALIZA, NADZÓR i DZIENNIK dalej mają
-promień, cień i odstęp między kartami. To jest osobny wygląd i ma taki zostać.

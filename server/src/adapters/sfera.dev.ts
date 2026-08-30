@@ -1,5 +1,5 @@
-import { db, nextKorektaNumber, nextMmNumber, nextRwNumber, transaction } from "../db/db.js";
-import type { MmItem, SferaAdapter, WynikKorekty, ZlecenieKorekty } from "./sfera.js";
+import { db, nextMmNumber, transaction } from "../db/db.js";
+import type { MmItem, SferaAdapter } from "./sfera.js";
 import { oznaczWSubiekcie, wlasneZdjecie } from "../services/zdjecia-wlasne.js";
 
 /**
@@ -37,49 +37,6 @@ export class DevSferaAdapter implements SferaAdapter {
     if (!wlasneZdjecie(twId)) return;
     oznaczWSubiekcie(twId);
     db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = ?").run(twId);
-  }
-
-  /**
-   * Korekta + MM w jednym. Kolejność jak w produkcji: najpierw stan wraca do
-   * magazynu sprzedaży (skutek korekty), potem jedzie MM na bufor.
-   *
-   * Wycofania korekty przy padzie MM nie trzeba tu pisać ręką — całość idzie
-   * w JEDNEJ transakcji SQLite, więc wyjątek cofa oba skutki naraz. Sfera
-   * takiej transakcji nie ma i tam wycofanie jest jawnym `Usun()`; różnica
-   * mieszka w implementacjach, kontrakt widzi to samo.
-   */
-  async createKorektaZwrotu(z: ZlecenieKorekty): Promise<WynikKorekty> {
-    const d = db();
-    let numery: WynikKorekty = { korektaNumer: "", mmNumer: "" };
-    const zniszczone = z.pozycjeZniszczone ?? [];
-    const tx = transaction(d, () => {
-      const sprzedaz = d
-        .prepare("SELECT dok_id FROM sgt_sprzedaz WHERE dok_id = ?")
-        .get(z.dokId);
-      if (!sprzedaz) throw new Error(`Nie znaleziono dokumentu sprzedaży dok_id=${z.dokId}`);
-      for (const it of z.pozycje) {
-        /* Dwa kroki, oba widoczne: korekta oddaje sztuki magazynowi sprzedaży,
-           MM zabiera je stamtąd na bufor. Netto magazyn źródłowy wychodzi na
-           zero i to jest POPRAWNE — towar nie ma być sprzedawalny ani chwili. */
-        dopiszStan(it.twId, z.magZrodlowy, it.qty);
-        zdejmijStan(it.twId, z.magZrodlowy, it.qty);
-        dopiszStan(it.twId, z.magZwrotow, it.qty);
-      }
-      for (const it of zniszczone) {
-        /* Zniszczone: korekta oddaje sztuki, RW od razu je zdejmuje — na
-           bufor nie jadą wcale. Netto zero, ale z dokumentem, dzięki któremu
-           stan i papier mówią to samo. */
-        dopiszStan(it.twId, z.magZrodlowy, it.qty);
-        zdejmijStan(it.twId, z.magZrodlowy, it.qty);
-      }
-      numery = {
-        korektaNumer: nextKorektaNumber(z.typ),
-        mmNumer: z.pozycje.length > 0 ? nextMmNumber() : "",
-        ...(zniszczone.length > 0 ? { rwNumer: nextRwNumber() } : {}),
-      };
-    });
-    tx();
-    return numery;
   }
 
   async createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string> {

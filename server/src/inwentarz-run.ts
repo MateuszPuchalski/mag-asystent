@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import { db } from "./db/db.js";
-import { czasyObslugi } from "./services/czasy-obslugi.js";
 
 /* ── Inwentarz obsługi klienta przed cięciem (0.137.2) ───────────────────────
    Etap 1 przebudowy. Rejestry pytań, dyskusji, opinii, zwrotów i reklamacji
@@ -10,6 +9,12 @@ import { czasyObslugi } from "./services/czasy-obslugi.js";
 
    WYŁĄCZNIE ODCZYT: ani jednego INSERT-a, UPDATE-a i DELETE. Skrypt wolno
    puścić na kopii bazy produkcyjnej i puścić dwa razy.
+
+   Po cięciu z 0.138.0 czyta SUROWE TABELE, bo serwisów, które je opisywały,
+   już nie ma. Każda sekcja sprawdza najpierw, czy tabela istnieje — na bazie
+   po migracji raport mówi „tabeli już nie ma" zamiast się wywracać. Sekcja
+   czasów odpowiedzi wypadła razem z licznikiem, który je liczył; kto ich
+   potrzebuje, ma stemple w kopii bazy sprzed migracji.
 
    Uruchomienie:  npm run inwentarz            (raport na ekran)
                   npm run inwentarz -- plik.md (raport do pliku)             */
@@ -209,30 +214,6 @@ function sekcjaKoszy(): string {
   ].join("\n");
 }
 
-function sekcjaCzasow(): string {
-  if (!jest("sprawa_zdarzenie")) return "## Czasy odpowiedzi\n\nOsi czasu już nie ma.\n";
-  /* Wołamy istniejący licznik z `services/czasy-obslugi.ts`, a nie piszemy
-     drugiego: dwa liczniki tej samej rzeczy rozjeżdżają się przy pierwszej
-     zmianie definicji, a ten jest obłożony testami. */
-  const c = czasyObslugi(365);
-  return [
-    "## Czasy odpowiedzi (365 dni)",
-    "",
-    tabela(
-      ["odcinek", "par głos→odpowiedź", "mediana", "p90"],
-      c.odcinki.map((o) => [
-        o.nazwa,
-        String(o.ile),
-        o.medianaH === null ? "—" : `${o.medianaH} h`,
-        o.p90H === null ? "—" : `${o.p90H} h`,
-      ])
-    ),
-    "",
-    `Czekających w tej chwili: **${c.teraz.length}**. Osób z odpowiedziami: **${c.ludzie.length}**.`,
-    "",
-  ].join("\n");
-}
-
 const raport = [
   "# Obsługa klienta — stan zastany przed cięciem",
   "",
@@ -248,7 +229,6 @@ const raport = [
   sekcjaOpinii(),
   sekcjaZwrotow(),
   sekcjaKoszy(),
-  sekcjaCzasow(),
 ].join("\n");
 
 const plik = process.argv[2];

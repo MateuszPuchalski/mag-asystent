@@ -12,20 +12,16 @@ import {
   koszPoKodzie,
   koszeDlaKolektora,
   listaKoszy,
-  odepnijZwrot,
   odlozPozycje,
   pominietePozycje,
   pominPozycjeKosza,
   przesunNaKoniec,
-  przypnijZwrot,
   skanTowaruKosza,
   szczegolKosza,
   szukajWKoszach,
   zakonczKosz,
   zalatwPominiecie,
-  zamknijKosz,
 } from "../services/kosze.js";
-import { szczegolZwrotu } from "../services/zwroty.js";
 
 /* ── Kosze zwrotowe — trasy ──────────────────────────────────────────────────
    Dwie publiczności jednej tabeli:
@@ -59,28 +55,7 @@ export async function koszeRoutes(app: FastifyInstance) {
     }
   }
 
-  // ── Biuro: wiązanie zwrotów i zamykanie ───────────────────────────────────
-
-  app.post<{ Params: { id: string }; Body: { kod?: string } }>(
-    "/api/biuro/zwroty/:id/kosz",
-    async (req, reply) => {
-      const nie = odmowaBiuro();
-      if (nie) return reply.code(nie.kod).send({ error: nie.error });
-      return zBledem(reply, () => {
-        przypnijZwrot(Number(req.params.id), req.body?.kod ?? "", autor());
-        return { zwrot: szczegolZwrotu(Number(req.params.id)) };
-      });
-    }
-  );
-
-  app.delete<{ Params: { id: string } }>("/api/biuro/zwroty/:id/kosz", async (req, reply) => {
-    const nie = odmowaBiuro();
-    if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return zBledem(reply, () => {
-      odepnijZwrot(Number(req.params.id), autor());
-      return { zwrot: szczegolZwrotu(Number(req.params.id)) };
-    });
-  });
+  // ── Biuro: podgląd koszy ──────────────────────────────────────────────────
 
   app.get("/api/biuro/kosze", async (_req, reply) => {
     const nie = odmowaBiuro();
@@ -121,12 +96,6 @@ export async function koszeRoutes(app: FastifyInstance) {
     const nie = odmowaBiuro();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return zBledem(reply, () => ({ kosz: szczegolKosza(Number(req.params.id)) }));
-  });
-
-  app.post<{ Params: { id: string } }>("/api/biuro/kosze/:id/zamknij", async (req, reply) => {
-    const nie = odmowaBiuro();
-    if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return zBledem(reply, () => ({ kosz: zamknijKosz(Number(req.params.id), autor()) }));
   });
 
   // ── Hala: rozkładanie z kosza na kolektorze ───────────────────────────────

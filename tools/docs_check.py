@@ -35,6 +35,10 @@ ALLOWED_MISSING = {
     # APK dla kolektorów — kładzie go instalator przy aktualizacji, w świeżym
     # klonie go nie ma, a dokumentacja musi móc nazwać katalog po imieniu
     "server/data/apk/",
+    # Inwentarz obsługi klienta — skasowany w 0.138.0 razem z kodem, który
+    # opisywał. Wpisy CHANGELOG-a od 0.128.0 do 0.137.1 nazywają go po imieniu
+    # i mają do tego prawo: opisują wydania, w których ten plik istniał.
+    "docs/architektura-spraw.md",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis
