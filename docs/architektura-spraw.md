@@ -209,9 +209,12 @@ poprzedniego na produkcji.
   sprawa pokazuje sumę tagów swoich dzisiejszych źródeł. Reguła szuka FRAZY
   w tytule i loginie — bez wyrażeń regularnych — nadaje tag i opcjonalnie
   przypisuje sprawę osobie, nigdy nie odbierając jej temu, kto już ją
-  prowadzi. Reguły chodzą po każdym pobraniu i na żądanie.
+  prowadzi. Reguły chodzą po każdym pobraniu i na żądanie. Od 0.137.0 tag jedzie
+  RAZEM z wierszami kolejki: wiersz pokazuje etykiety sprawy, a drugi rząd
+  czipów filtruje po tagu i składa się z filtrem rodzaju. Bez tego reguła
+  tagowała w próżnię — kolejka wyglądała tak samo przed regułą i po niej.
 
-Etap E jest zamknięty. Dalsze kierunki wychodzą poza pierwotną mapę:
+Etap E jest zamknięty (0.137.0 domyka E5 w kolejce). Dalsze kierunki wychodzą poza pierwotną mapę:
 odpowiadanie na opinie przez API (po weryfikacji końcówki), piłka ŚWIAT
 (po znalezieniu producenta danych o przewoźniku) i potwierdzenie listy
 `FINALNE_STATUSY_ALLEGRO` na żywym koncie.

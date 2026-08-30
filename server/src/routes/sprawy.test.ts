@@ -33,7 +33,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["watek_meta", "sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", 
+  for (const t of ["watek_meta", "sprawa_zdarzenie", "sprawa_tag", "sprawa_zrodlo", "sprawa", 
     "dyskusja", "pytanie", "zwrot_pozycja", "zwrot",
     "events", "device_session", "app_user",
   ]) {
@@ -144,6 +144,29 @@ test("kolejka: cztery rodzaje w jednej liście, filtr rodzaju, zły rodzaj = 400
   });
   assert.equal(zly.statusCode, 400);
   assert.match(zly.json().error, /dozwolone/);
+});
+
+test("kolejka niesie tagi sprawy — etykieta nadana przy źródle wraca w wierszu (0.137.0)", async () => {
+  const { zwrotId } = daneSpraw();
+  const naglowki = { "x-session": zalogowany("biuro") };
+
+  /* Tag nadajemy TRASĄ, nie SQL-em: chodzi o to, czy etykieta postawiona
+     w szczegółach sprawy dojeżdża do kolejki — a to jest droga, którą
+     naprawdę przechodzi klik człowieka. */
+  const dodanie = await app.inject({
+    method: "POST", url: "/api/biuro/tagi", headers: naglowki,
+    payload: { rodzaj: "zwrot", id: zwrotId, tag: "Uszkodzenie" },
+  });
+  assert.equal(dodanie.statusCode, 200);
+
+  const sprawy = (await app.inject({
+    method: "GET", url: "/api/biuro/sprawy", headers: naglowki,
+  })).json().sprawy as Array<{ rodzaj: string; tagi: string[] }>;
+  const zamowienie = sprawy.find((s) => s.rodzaj !== "pytanie")!;
+  assert.deepEqual(zamowienie.tagi, ["uszkodzenie"], "tag zwrotu jest tagiem całej sprawy");
+  /* Sprawa nietknięta dostaje pustą listę, nie brak pola — panel czyta to
+     w pętli i nie ma jak odróżnić „brak tagów" od „nie pytaliśmy". */
+  assert.deepEqual(sprawy.find((s) => s.rodzaj === "pytanie")!.tagi, []);
 });
 
 test("licznik: pigułka zgodna z długością kolejki", async () => {

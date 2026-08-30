@@ -143,6 +143,33 @@ test("reguła bez skutku i ze zbyt krótkim wzorcem to odmowa ze zdaniem", () =>
   assert.equal(T.listaRegul().length, 0);
 });
 
+test("kolejka niesie SUMĘ tagów źródeł — tag nadany przy zwrocie widać w wierszu", () => {
+  const { zwrotId } = sprawaDwuzrodlowa();
+  T.dodajTag("zwrot", zwrotId, "uszkodzenie", "Anna");
+
+  const kolejka = T.sprawyZTagami();
+  assert.equal(kolejka.length, 1, "zwrot i dyskusja jednego zamówienia to JEDEN wiersz");
+  /* Sedno domknięcia E5: wiersz kolejki mówi to samo, co ekran sprawy.
+     Tag wisi przy zwrocie, a wiersz stoi za całą sprawę — gdyby czytał tagi
+     samego źródła wiodącego, etykieta znikałaby zależnie od tego, które
+     źródło akurat jest najpilniejsze. */
+  assert.deepEqual(kolejka[0].tagi, ["uszkodzenie"]);
+});
+
+test("sprawa bez tagów niesie PUSTĄ listę, nie brak pola", () => {
+  sprawaDwuzrodlowa();
+  /* Panel czyta `s.tagi` w pętli. Brak pola i pusta lista znaczą tam to samo,
+     ale tylko puste pole mówi wprost „pytano o tagi i nie ma żadnego". */
+  assert.deepEqual(T.sprawyZTagami()[0].tagi, []);
+});
+
+test("ten sam tag przy DWÓCH źródłach sprawy nie dubluje się w wierszu", () => {
+  const { zwrotId, dyskusjaId } = sprawaDwuzrodlowa();
+  T.dodajTag("zwrot", zwrotId, "vip", "Anna");
+  T.dodajTag("dyskusja", dyskusjaId, "vip", "Anna");
+  assert.deepEqual(T.sprawyZTagami()[0].tagi, ["vip"], "suma źródeł jest zbiorem, nie listą");
+});
+
 test("słownik tagów liczy użycia — podpowiedź przy dopisywaniu", () => {
   const { zwrotId, dyskusjaId } = sprawaDwuzrodlowa();
   T.dodajTag("zwrot", zwrotId, "uszkodzenie", "Anna");

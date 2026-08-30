@@ -85,6 +85,11 @@ export interface Sprawa {
   zrodla?: Array<{ rodzaj: RodzajSprawy; id: number; otwarte: boolean }>;
   /** Odmaskowany identyfikator kupującego — nośnik podpowiedzi powiązań. */
   kupujacyId?: string | null;
+  /** Etykiety sprawy (0.137.0) — suma tagów jej dzisiejszych źródeł. Dokłada
+      je `sprawyZTagami` z tagi.ts, bo to TAMTEN moduł wie o tagach; kolejka
+      nie może go zaimportować, nie zawiązując cyklu. Brak pola znaczy
+      „nikt nie pytał o tagi", pusta tablica — „sprawa nie ma żadnego". */
+  tagi?: string[];
 }
 
 const wiersz = (r: Record<string, unknown>) => r as Record<string, unknown>;

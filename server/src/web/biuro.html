@@ -634,6 +634,17 @@
     color: var(--ink-soft); cursor: pointer;
   }
   .czip:hover { border-color: var(--ink-mute); color: var(--ink); }
+  /* Drugi rząd czipów: TAGI (0.137.0). Osobny rząd, bo to inna oś niż rodzaj
+     sprawy — oba filtry SKŁADAJĄ się, a nie wykluczają. Pusty rząd znika
+     zupełnie: pasek filtrów bez filtrów uczy oko, że pasek nic nie niesie. */
+  .czipyTagow { margin-top: 6px; }
+  .czipyTagow:empty { display: none; }
+  /* Tag w wierszu jest ETYKIETĄ, nie akcją — dlatego blada obwódka, a nie
+     plakietka: bursztyn i czerwień w tym wierszu znaczą termin. */
+  .tagWiersza {
+    font: 600 11.5px/1 var(--font-cond); letter-spacing: .3px; color: var(--ink-mute);
+    border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px;
+  }
   .czip[aria-pressed="true"] {
     background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700;
   }
@@ -1478,6 +1489,7 @@
 
       <!-- Czipy rysuje skrypt: niosą LICZBY, a te zmieniają się co cykl. -->
       <div class="czipy" id="sprawyCzipy" style="margin-top:12px"></div>
+      <div class="czipy czipyTagow" id="sprawyCzipyTagi"></div>
       <table id="sprawyLista" style="margin-top:10px"></table>
 
       <!-- Trzy pobrania w jednym rzędzie i wszystkie CICHE. Bursztyn znaczy
@@ -5264,6 +5276,10 @@ async function odswiezLiczniki() {
    zakładce; w następnym szczegóły przeprowadzą się tutaj, a zakładki
    ZWROTY i PYTANIA znikną. */
 let sprawyFiltr = "";
+/* Druga oś filtra kolejki (0.137.0): tag. Osobna zmienna, nie druga wartość
+   `sprawyFiltr` — „zwroty otagowane #uszkodzenie" to pytanie, które biuro
+   zadaje naprawdę, a jedna zmienna nie umiałaby na nie odpowiedzieć. */
+let sprawyTag = "";
 /* Ostatnio pobrana kolejka. Wariant wiersza (tabela / szyna) i zaznaczenie
    otwartej sprawy zmieniają się BEZ nowych danych — przy otwarciu sprawy,
    przy zamknięciu, przy zmianie szerokości okna. Bez tej kopii każde z nich
@@ -5411,6 +5427,10 @@ function stopkaSprawy(s) {
   const termin = terminSprawy(s);
   if (termin) czesci.push(termin);
   if (s.orderId) czesci.push(`<span class="mute">zam. ${esc(s.orderId)}</span>`);
+  /* Tagi na końcu stopki: termin i „klient dopisał" mówią, CZY brać sprawę
+     teraz, tag mówi tylko, CZEGO dotyczy. Kolejność w wierszu jest
+     kolejnością pytań, które zadaje oko. */
+  for (const t of s.tagi || []) czesci.push(`<span class="tagWiersza">#${esc(t)}</span>`);
   return czesci.length ? `<div class="stopkaSprawy">${czesci.join("")}</div>` : "";
 }
 
@@ -5503,15 +5523,41 @@ function rysujCzipySpraw(pelna) {
     >${c.nazwa}<span class="n">${c.n}</span></button>`).join("");
 }
 
+/* Czipy tagów (0.137.0) — liczba mówi, ile spraw stoi pod etykietą. Liczy się
+   z CAŁEJ kolejki, nie z widocznej: inaczej wybranie tagu zerowałoby liczby
+   przy pozostałych i wyglądałoby, jakby zniknęły. */
+function rysujCzipyTagow(pelna) {
+  const ile = new Map();
+  for (const s of pelna) for (const t of s.tagi || []) ile.set(t, (ile.get(t) || 0) + 1);
+  /* Filtr wskazujący tag, którego nie ma już w kolejce (ostatnia sprawa
+     zamknięta), pokazywałby pustą tabelę i wyglądał na awarię. Zdejmujemy go
+     zamiast tłumaczyć. */
+  if (sprawyTag && !ile.has(sprawyTag)) sprawyTag = "";
+  const cel = $("sprawyCzipyTagi");
+  if (ile.size === 0) { cel.innerHTML = ""; return; }
+  cel.innerHTML = [...ile.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pl"))
+    .map(([t, n]) => `<button class="czip" data-tag="${esc(t)}"
+      aria-pressed="${String(sprawyTag === t)}">#${esc(t)}<span class="n">${n}</span></button>`)
+    .join("");
+}
+
 function rysujSprawy(lista) {
   ostatniaKolejkaSpraw = lista;
   rysujCzipySpraw(lista);
-  const widoczne = sprawyFiltr === "moje"
+  /* PRZED filtrowaniem: ta funkcja potrafi zdjąć nieaktualny tag, a wtedy
+     `widoczne` musi się policzyć już bez niego. */
+  rysujCzipyTagow(lista);
+  const wgRodzaju = sprawyFiltr === "moje"
     ? lista.filter((s) => s.prowadzi === kto)
     : sprawyFiltr
       /* Ten sam predykat co licznik czipa: sprawa wielźródłowa ZAWIERA rodzaj. */
       ? lista.filter((s) => (s.zrodla || [{ rodzaj: s.rodzaj }]).some((z) => z.rodzaj === sprawyFiltr))
       : lista;
+  /* Dwa filtry SKŁADAJĄ się: rodzaj (albo MOJE) przecina się z tagiem. */
+  const widoczne = sprawyTag
+    ? wgRodzaju.filter((s) => (s.tagi || []).includes(sprawyTag))
+    : wgRodzaju;
 
   const wSzynie = kolejkaZostaje() &&
     (otwartyZwrot != null || otwartaDyskusja != null || otwartePytanie != null);
@@ -5522,8 +5568,11 @@ function rysujSprawy(lista) {
       ? widoczne.map(wierszSprawyWSzynie).join("")
       : '<tr><td class="mute">Nic w tym filtrze.</td></tr>';
   } else if (!widoczne.length) {
-    $("sprawyLista").innerHTML =
-      '<tr><td class="mute">Żadna sprawa nie czeka na obsługę.</td></tr>';
+    /* Puste z filtru to co innego niż puste z pracy: pierwsze zdejmuje się
+       klikiem, drugie znaczy, że kolejka jest zrobiona. */
+    $("sprawyLista").innerHTML = sprawyFiltr || sprawyTag
+      ? '<tr><td class="mute">Nic w tym filtrze.</td></tr>'
+      : '<tr><td class="mute">Żadna sprawa nie czeka na obsługę.</td></tr>';
   } else {
     const wg = {};
     for (const s of widoczne) (wg[pasmoSprawy(s)] ??= []).push(s);
@@ -10172,6 +10221,15 @@ $("pytanieWroc").addEventListener("click", () => { zamknijPytanie(); odswiezPyta
    klienta i konteksty spraw. Wejście do Klienta 360 z nagłówka sprawy
    przełącza zakładkę — karta mieszka na SPRAWACH. */
 $("kolejkaSprawKarta").addEventListener("click", (e) => {
+  const czipTagu = e.target.closest("button[data-tag]");
+  if (czipTagu) {
+    /* Czip tagu jest PRZEŁĄCZNIKIEM: drugi klik w ten sam tag zdejmuje filtr.
+       Rząd tagów nie ma czipa „Wszystkie" — dokładanie go po to, żeby dało
+       się wrócić, zabierałoby miejsce w każdym stanie ekranu. */
+    sprawyTag = sprawyTag === czipTagu.dataset.tag ? "" : czipTagu.dataset.tag;
+    rysujSprawy(ostatniaKolejkaSpraw);
+    return;
+  }
   const czip = e.target.closest("button[data-rodzaj]");
   if (czip) {
     /* Filtr jest STANEM EKRANU, nie zapytaniem: mamy całą kolejkę w pamięci,
