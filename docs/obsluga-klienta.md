@@ -5,7 +5,9 @@ i reklamacje — została skasowana w 0.140.0. Ten dokument opisuje, co ma
 stanąć na jej miejscu. Poprzednik, `architektura-spraw.md`, opisywał kod
 i odszedł razem z nim.
 
-**Stan: SZKIELET.** Osiem pytań niżej ma odpowiedzi puste. Wypełnia się je
+**Stan: BUDOWA.** Wydanie 0.141.0 dostarcza pierwszy pionowy kawałek:
+panel React/Tailwind → zadanie terenowe → kolektor → wynik w panelu.
+Osiem pytań niżej nadal prowadzi projekt pełnej skrzynki Allegro. Wypełnia się je
 dowodami z dwóch narzędzi, nie z pamięci — o tym mówi następny rozdział.
 Właściciel zdecydował ciąć przed zebraniem dowodów, żeby nie budować nowego
 na starym; dowody rozstrzygają, co powstanie, a nie czy ciąć.

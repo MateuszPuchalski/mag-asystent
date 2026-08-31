@@ -524,6 +524,34 @@ CREATE TABLE IF NOT EXISTS strefa_regula (
 -- a każda kolejna warstwa dziedziczyła po nim niepewność. Nowa obsługa
 -- powstaje od zera (patrz docs/obsluga-klienta.md) i przyniesie własne tabele.
 
+-- ── Zadania terenowe obsługi klienta (0.141.0) ───────────────────────────────
+-- Biuro nie wysyła magazynierowi wiadomości na prywatny komunikator. Zleca
+-- konkretną czynność przy towarze, a wynik wraca do tego samego panelu.
+CREATE TABLE IF NOT EXISTS zadanie_terenowe (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj TEXT NOT NULL CHECK (rodzaj IN ('pomiar','zdjecie','weryfikacja','inne')),
+  tytul TEXT NOT NULL,
+  instrukcja TEXT NOT NULL,
+  tw_id INTEGER REFERENCES sgt_towar(tw_id),
+  zrodlo TEXT NOT NULL DEFAULT 'reczne',
+  zrodlo_ref TEXT,
+  priorytet TEXT NOT NULL DEFAULT 'normalny' CHECK (priorytet IN ('normalny','pilny')),
+  status TEXT NOT NULL DEFAULT 'nowe' CHECK (status IN ('nowe','w_toku','wykonane','anulowane')),
+  utworzono_at TEXT NOT NULL, utworzono_przez TEXT NOT NULL,
+  utworzono_user_id INTEGER REFERENCES app_user(user_id),
+  przypisano_at TEXT, przypisano_przez TEXT,
+  przypisano_user_id INTEGER REFERENCES app_user(user_id),
+  wynik TEXT, wykonano_at TEXT, wykonano_przez TEXT,
+  wykonano_user_id INTEGER REFERENCES app_user(user_id),
+  anulowano_at TEXT, anulowano_przez TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_status
+  ON zadanie_terenowe(status, priorytet, utworzono_at);
+CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_przypisane
+  ON zadanie_terenowe(przypisano_user_id, status);
+CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_towar
+  ON zadanie_terenowe(tw_id, utworzono_at);
+
 -- Token OAuth konta Allegro. JEDEN wiersz (id=1): aplikacja obsługuje jedno
 -- konto sprzedawcy. Refresh token jest STANEM, nie konfiguracją — Allegro
 -- wydaje nową parę przy każdym odświeżeniu, więc env nie ma tu czego trzymać.

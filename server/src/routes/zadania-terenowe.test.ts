@@ -1,0 +1,15 @@
+import { before, beforeEach, test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { FastifyInstance } from "fastify";
+import type { Rola } from "../services/users.js";
+process.env.DB_PATH=path.join(fs.mkdtempSync(path.join(os.tmpdir(),"wertis-zadania-")),"t.db");
+process.env.LOG_LEVEL="silent";process.env.SGT_MODE="seeded";
+let app:FastifyInstance;let db:typeof import("../db/db.js").db;let createUser:typeof import("../services/users.js").createUser;
+before(async()=>{({db}=await import("../db/db.js"));({createUser}=await import("../services/users.js"));const m=await import("../index.js");app=await m.buildApp();});
+beforeEach(()=>{const d=db();for(const t of ["zadanie_terenowe","events","device_session","app_user","sgt_towar"])d.prepare(`DELETE FROM ${t}`).run();d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,lokalizacja) VALUES(?,?,?,?)").run(77,"USZ-LON","Uszczelki Loncin","A01-02-03");});
+function login(role:Rola,name:string){const u=createUser(name,role,`${role}${Math.random()}`,"tajnehaslo");const token=`t-${u.userId}`;const n=new Date().toISOString();db().prepare("INSERT INTO device_session(token,user_id,created_at,last_seen) VALUES(?,?,?,?)").run(token,u.userId,n,n);return{"x-session":token};}
+test("biuro zleca pomiar, jeden magazynier przejmuje i oddaje wynik",async()=>{const b=login("biuro","Anna"),m=login("magazynier","Marek"),drugi=login("magazynier","Ola");let r=await app.inject({method:"POST",url:"/api/zadania-terenowe",headers:b,payload:{rodzaj:"pomiar",tytul:"Zmierz rozstaw otworów",instrukcja:"Od środka do środka, w mm.",twId:77,priorytet:"pilny",zrodlo:"allegro",zrodloRef:"thread-1"}});assert.equal(r.statusCode,200,r.body);const id=r.json().zadanie.id;assert.equal(r.json().zadanie.symbol,"USZ-LON");r=await app.inject({method:"GET",url:"/api/zadania-terenowe?moje=1",headers:m});assert.equal(r.json().zadania.length,1);r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wez`,headers:m});assert.equal(r.json().zadanie.przypisanoPrzez,"Marek");r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wez`,headers:drugi});assert.equal(r.statusCode,400);r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wykonaj`,headers:m,payload:{wynik:"46 mm od środka do środka."}});assert.equal(r.statusCode,200,r.body);assert.equal(r.json().zadanie.status,"wykonane");assert.equal(r.json().zadanie.wynik,"46 mm od środka do środka.");const e=db().prepare("SELECT type FROM events WHERE type LIKE 'zadanie_terenowe_%' ORDER BY id").all() as Array<{type:string}>;assert.deepEqual(e.map(x=>x.type),["zadanie_terenowe_utworzone","zadanie_terenowe_przejete","zadanie_terenowe_wykonane"]);});
+test("magazynier nie tworzy ani nie anuluje zadania",async()=>{const m=login("magazynier","Marek");let r=await app.inject({method:"POST",url:"/api/zadania-terenowe",headers:m,payload:{rodzaj:"pomiar",tytul:"X",instrukcja:"Y"}});assert.equal(r.statusCode,403);r=await app.inject({method:"POST",url:"/api/zadania-terenowe/123/anuluj",headers:m});assert.equal(r.statusCode,403);});

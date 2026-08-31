@@ -40,3 +40,6 @@ android/.kotlin/
 
 # artefakt importu tools/*.py (styl_check bywa importowany przy diagnozie)
 __pycache__/
+
+# TypeScript build cache
+*.tsbuildinfo

@@ -1,10 +1,11 @@
 {
   "name": "wertis-kolektor",
   "private": true,
-  "version": "0.140.0",
+  "version": "0.141.0",
   "description": "WERTIS — asystent magazyniera (Subiekt GT). Monorepo: server (Fastify/SQLite/worker) + android (kolektor Kotlin/Compose) — jedynym interfejsem człowieka jest kolektor.",
   "workspaces": [
-    "server"
+    "server",
+    "panel"
   ],
   "engines": {
     "node": ">=22.5"
@@ -15,10 +16,11 @@
     "dev:worker": "npm -w server run worker",
     "seed": "npm -w server run seed",
     "seed:scenariusze": "npm -w server run seed:scenariusze --",
-    "build": "npm -w server run build",
+    "build": "npm -w @wertis/panel-obslugi run build && npm -w server run build",
     "start": "npm -w server run start",
     "reconcile": "npm -w server run reconcile",
-    "reslot": "npm -w server run reslot --"
+    "reslot": "npm -w server run reslot --",
+    "dev:panel": "npm -w @wertis/panel-obslugi run dev"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

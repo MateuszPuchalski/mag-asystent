@@ -62,6 +62,13 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 | Usługa tła (`tlo-worker/`) | C#/.NET 8 · ONNX Runtime · SkiaSharp — wycina tło ze zdjęcia dodanego z kolektora, opcjonalna ([README](tlo-worker/README.md)) |
 
 Kolorystyka WERTIS: amber `#F7A600`, grafit `#2A2A2C`, papier `#F6F5F2`.
+
+Nowy panel obsługi klienta działa pod **`/obsluga`**. Jest osobną aplikacją
+React z Tailwind CSS. Pierwsza funkcja panelu wysyła pomiary i weryfikacje
+bezpośrednio na kolektory magazynierów, a wykonany wynik wraca do biura.
+Rozwój frontendu: `npm -w @wertis/panel-obslugi run dev` na porcie 5174.
+Produkcję buduje zwykłe `npm run build`.
+
 Strefa przyjęć nazywa się **MGP**.
 
 ## Architektura (spec §3)
@@ -574,7 +581,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
                            + 268 testów jednostkowych; buduje się bez Android SDK
-  app/                     aplikacja Compose: 15 ekranów, skanery, czujniki
+  app/                     aplikacja Compose: 16 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*
