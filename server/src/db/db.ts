@@ -526,27 +526,6 @@ function naLoginIHaslo(database: DatabaseSync) {
 /** ISO timestamp UTC (spójny z DEFAULT w schemacie). */
 export const nowIso = () => new Date().toISOString();
 
-/** Kolejny numer korekty sprzedaży (dev; w prod numeruje Subiekt). */
-export function nextKorektaNumber(typ: "FS" | "PA"): string {
-  const d = db();
-  const row = d
-    .prepare("UPDATE counters SET value = value + 1 WHERE name='korekta' RETURNING value")
-    .get() as { value: number };
-  /* Nazewnictwo jak w Subiekcie: korekta faktury to KFS, korekta paragonu
-     to KPA. Numer jest atrapą — liczy się to, że karta zwrotu pokazuje ten
-     sam kształt, co pokaże produkcja. */
-  return `${typ === "PA" ? "KPA" : "KFS"} ${row.value}/07/2026`;
-}
-
-/** Kolejny numer RW — rozchód zniszczonych zwrotów (dev; w prod nadaje Subiekt). */
-export function nextRwNumber(): string {
-  const d = db();
-  const row = d
-    .prepare("UPDATE counters SET value = value + 1 WHERE name='rw' RETURNING value")
-    .get() as { value: number };
-  return `RW ${row.value}/07/2026`;
-}
-
 /** Kolejny numer dokumentu MM (dev; w prod nadaje Subiekt). */
 export function nextMmNumber(): string {
   const d = db();

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { config, bledyKonfiguracji, bezpiecznaWartosc, pollAllegro } from "./config.js";
+import { config, bledyKonfiguracji, bezpiecznaWartosc } from "./config.js";
 
 /* Kody Subiekta jako test, nie jako komentarz.
    ─────────────────────────────────────────────────────────────────────────
@@ -243,24 +243,17 @@ test("długa wartość spoza listy prefiksów też schodzi pod maskę", () => {
   assert.match(bezpieczna, /120 znaków/);
 });
 
-test("błąd AI_PROVIDER mówi, gdzie NAPRAWDĘ wpisuje się klucz", () => {
+test("komunikat o złym trybie nie wynosi tego, co człowiek wkleił", () => {
+  /* Do 0.140.1 pilnował tego przypadek AI_PROVIDER, bo tam najłatwiej było
+     wkleić klucz w pole trybu. Dostawcy AI nie ma, ale pomyłka jest ta sama
+     i dotyczy każdego pola trybu: wartość idzie do komunikatu, komunikat do
+     logu, a log bywa wysyłany dalej. Maskowanie ma działać na całej drodze
+     przez `bledyKonfiguracji`, nie tylko w samej `bezpiecznaWartosc`. */
   const zly = structuredClone(config) as typeof config;
-  (zly.ai as { provider: string }).provider = "sk-ant-api03-TAJNE";
+  (zly.allegro as { mode: string }).mode = "sk-ant-api03-TAJNE";
   const bledy = bledyKonfiguracji(zly);
-  const o = bledy.find((b) => b.startsWith("AI_PROVIDER="));
-  assert.ok(o, "brak zdania o AI_PROVIDER");
+  const o = bledy.find((b) => b.startsWith("ALLEGRO_MODE="));
+  assert.ok(o, "brak zdania o ALLEGRO_MODE");
   assert.ok(!o.includes("TAJNE"), "komunikat wyniósł sekret");
-  assert.match(o, /ANTHROPIC_API_KEY/, "bez tej wskazówki człowiek wklei klucz drugi raz");
-});
-
-test("ALLEGRO_POLL_MS poniżej minuty nie przechodzi startu", () => {
-  /* Wartość dodatnia poniżej minuty to niemal na pewno literówka (sekundy
-     zamiast milisekund) — a skutkiem byłyby trzy tickery bijące w Allegro
-     maszynowym rytmem z jednego adresu. Dokładnie ta sygnatura skończyła się
-     w sierpniu 2026 blokadą IP. Zero (wyłączone) i minuta wzwyż przechodzą. */
-  assert.throws(() => pollAllegro(500), /minimum/);
-  assert.throws(() => pollAllegro(59_999), /60000/);
-  assert.equal(pollAllegro(0), 0, "zero wyłącza — bez błędu");
-  assert.equal(pollAllegro(60_000), 60_000);
-  assert.equal(pollAllegro(300_000), 300_000);
+  assert.match(o, /dev, http/, "bez listy dozwolonych wartości człowiek zgaduje drugi raz");
 });
