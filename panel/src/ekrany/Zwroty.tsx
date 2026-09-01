@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
 import { useZwroty } from "../api/zwroty";
 import type { BilansKartotek, Kubelek } from "../api/typy";
+import { Decyzje } from "../zwroty/Decyzje";
+import { useKwota, useOcena, useWerdykt } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -20,16 +22,6 @@ import { Dowody } from "../zwroty/Dowody";
    Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
    strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się
    od pierwszego wydania, a nie po dołożeniu zapisu.                        */
-
-/** Klawisze decyzji z projektu — dziś podpisy, od 0.151.0 działanie. */
-const DECYZJE: Record<Kubelek, Array<[string, string]>> = {
-  decyzja: [["P", "Przyjmij"], ["O", "Odrzuć"], ["J", "Odłóż"]],
-  ocena: [["S", "Na stan"], ["C", "Na przecenę"], ["U", "Utylizacja"]],
-  zwrot: [["Enter", "Kwota proponowana"], ["B", "Bez wysyłki"], ["K", "Inna kwota"]],
-  korekta: [["Enter", "Zleć korektę"], ["R", "Numer z palca"]],
-  odrzucony: [],
-  zamkniety: [],
-};
 
 /* Krótkie etykiety do LICZNIKA. Pełne zdania pisze serwer i stoją przy
    pozycji (`Dowody`); tutaj muszą się zmieścić w jednym pasku, więc panel ma
@@ -72,6 +64,16 @@ export function Zwroty() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<Kubelek>("decyzja");
+  const werdykt = useWerdykt();
+  const ocena2 = useOcena();
+  const kwota = useKwota();
+  const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending;
+  /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
+     gotowe przy 409 — panel go nie układa od nowa. */
+  const bladDecyzji = [werdykt.error, ocena2.error, kwota.error]
+    .find(Boolean) instanceof Error
+    ? String(([werdykt.error, ocena2.error, kwota.error].find(Boolean) as Error).message)
+    : "";
   const { data, isLoading, error } = useZwroty();
 
   const wKubelku = useMemo(
@@ -165,25 +167,13 @@ export function Zwroty() {
               <p className="text-sm text-slate-500">
                 {KUBELKI.find((k) => k.id === zwrot.kubelek)?.pytanie}</p>
             </header>
-            <div className="border-b border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap gap-2">
-                {DECYZJE[zwrot.kubelek].map(([klawisz, etykieta]) => (
-                  <span key={klawisz}
-                    className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-400">
-                    <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 text-xs">{klawisz}</kbd>
-                    {etykieta}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                {DECYZJE[zwrot.kubelek].length
-                  ? "To wydanie tylko czyta. Decyzje zapisuje 0.151.0 — klawisze są już te."
-                  : "Stan końcowy — nie ma tu decyzji do podjęcia."}
-              </p>
-            </div>
-            <div className="p-4 text-sm text-slate-600">
-              <p>Oś zwrotu pojawi się razem z pierwszą decyzją zapisaną w panelu.</p>
-            </div>
+            <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+              onWerdykt={(decyzja, powod) =>
+                werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja })}
+              onOcena={(pozycjaId, ocena) =>
+                ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}
+              onKwota={(pozycjeIds, dostawa) =>
+                kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })} />
           </>}
     </Karta>
 

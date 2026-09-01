@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { db as defaultDb, type Db } from "../db/db.js";
+import { db as defaultDb, type Db, transaction } from "../db/db.js";
 import { zaproponujKartoteke, type Dopasowanie } from "./dopasowanie-sku.js";
 import { linkZamowienia, linkZwrotu } from "./allegro-linki.js";
 import { logEvent } from "./events.js";
@@ -469,4 +469,166 @@ export function potwierdzKartoteke(
     teraz.toISOString(), kto.name, kto.id);
 
   return { twId: towar.tw_id, twSymbol: towar.symbol, twZrodlo: zrodlo };
+}
+
+/* ── Decyzje biura (0.156.0) ─────────────────────────────────────────────────
+   Do tego wydania kolejka bramek była DEKORACJĄ: `kubelekZwrotu` routuje po
+   `werdykt`, ocenie pozycji, `kwota_grosze` i `korekta_numer`, a żadnej z tych
+   kolumn nic nie zapisywało. Każdy zwrot stał w DO DECYZJI na zawsze.
+
+   Trzy zapisy domykają trzy pierwsze kubełki. Korekta i zamknięcie zostają
+   poza wydaniem: tamto wychodzi do Subiekta i ma własny kontrakt.
+
+   KONTROLA WSPÓŁBIEŻNOŚCI jak przy rozmowie. Kolumna `wersja` stoi w schemacie
+   od 0.150.0 z komentarzem „dwóch agentów nie zamyka jednego zwrotu dwiema
+   różnymi kwotami" — dopiero teraz ma czego pilnować.                       */
+
+export class ZwrotConflict extends Error {
+  constructor(message: string, public readonly szczegoly: Record<string, unknown>) {
+    super(message);
+  }
+}
+
+type StanZwrotu = { id: number; wersja: number; werdykt: string | null; zamkniety_at: string | null };
+
+/** Wczytanie ze sprawdzeniem wersji. Zwraca stan sprzed zmiany. */
+function podKlucz(database: Db, zwrotId: number, wersja: number): StanZwrotu {
+  const z = database.prepare(
+    "SELECT id, wersja, werdykt, zamkniety_at FROM zwrot_klienta WHERE id=?")
+    .get(zwrotId) as StanZwrotu | undefined;
+  if (!z) throw new Error("Nie znaleziono zwrotu");
+  if (Number(z.wersja) !== wersja) {
+    throw new ZwrotConflict(
+      "Zwrot zmienił się w międzyczasie — odśwież i sprawdź, co zrobił inny agent.",
+      { wersja: Number(z.wersja), przyslana: wersja });
+  }
+  if (z.zamkniety_at) throw new Error("Zwrot jest zamknięty");
+  return z;
+}
+
+const podnies = (database: Db, zwrotId: number) =>
+  database.prepare("UPDATE zwrot_klienta SET wersja=wersja+1 WHERE id=?").run(zwrotId);
+
+/**
+ * Werdykt biura: przyjęcie albo odmowa.
+ *
+ * ODMOWA WYMAGA POWODU i to nie jest formalność. §25a.5 stawia ją wśród dwóch
+ * rzeczy nieodwracalnych; zwrot odrzucony bez uzasadnienia nie da się później
+ * obronić przed klientem ani przed Allegro.
+ *
+ * Nasza odmowa jest czymś innym niż `rejection_code` z Allegro i dlatego siedzi
+ * w osobnych kolumnach — pochodzenie decyzji jest tu informacją, nie
+ * szczegółem (patrz komentarz przy tabeli).
+ */
+export function rozstrzygnijZwrot(
+  database: Db, zwrotId: number, decyzja: "przyjety" | "odrzucony",
+  powod: string | null, wersja: number, kto: { id: number; name: string },
+  teraz = new Date(),
+): { werdykt: string; wersja: number } {
+  const uzasadnienie = (powod ?? "").trim();
+  if (decyzja === "odrzucony" && uzasadnienie === "") {
+    throw new Error("Odmowa zwrotu wymaga powodu — bez niego nie ma czego pokazać klientowi.");
+  }
+  return transaction(database, () => {
+    podKlucz(database, zwrotId, wersja);
+    database.prepare(`UPDATE zwrot_klienta
+      SET werdykt=?, werdykt_at=?, werdykt_przez=?, werdykt_user_id=?, werdykt_powod=?
+      WHERE id=?`).run(decyzja, teraz.toISOString(), kto.name, kto.id,
+        uzasadnienie === "" ? null : uzasadnienie, zwrotId);
+    podnies(database, zwrotId);
+    logEvent(`zwrot_werdykt_${decyzja}`, kto.name, null,
+      { zwrotId, powod: uzasadnienie || null }, kto.id, database);
+    return { werdykt: decyzja, wersja: wersja + 1 };
+  })();
+}
+
+/** Ocena towaru: na stan, na przecenę albo do utylizacji. `null` cofa ocenę. */
+export function ocenPozycje(
+  database: Db, pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja" | null,
+  wersja: number, kto: { id: number; name: string }, teraz = new Date(),
+): { wersja: number } {
+  const p = database.prepare("SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as { id: number; zwrot_id: number } | undefined;
+  if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+  return transaction(database, () => {
+    const z = podKlucz(database, Number(p.zwrot_id), wersja);
+    /* Ocena ma sens dopiero po przyjęciu. Ocenianie towaru ze zwrotu, którego
+       nie przyjęliśmy, zostawiałoby w bazie decyzję o czymś, co nie wraca. */
+    if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+    database.prepare(`UPDATE zwrot_klienta_pozycja
+      SET ocena=?, ocena_at=?, ocena_przez=? WHERE id=?`)
+      .run(ocena, ocena === null ? null : teraz.toISOString(),
+        ocena === null ? null : kto.name, pozycjaId);
+    podnies(database, Number(p.zwrot_id));
+    logEvent(ocena === null ? "zwrot_ocena_cofnieta" : "zwrot_ocena", kto.name, null,
+      { zwrotId: Number(p.zwrot_id), pozycjaId, ocena }, kto.id, database);
+    return { wersja: wersja + 1 };
+  })();
+}
+
+/**
+ * Kwota do oddania — z ZAZNACZENIA, nie z liczby przysłanej przez panel.
+ *
+ * §25a.3 mówi wprost: „Liczy ją serwer, panel niczego nie zgaduje". Panel
+ * przysyła więc listę zaznaczonych pozycji i informację o dostawie, a sumę
+ * składa ta funkcja. Gdyby przyjmowała gotową liczbę, dałoby się zapisać
+ * dowolną kwotę żądaniem z pominięciem ekranu — a to są cudze pieniądze.
+ *
+ * `kwota_wariant` wylicza się z zaznaczenia i jest ETYKIETĄ, nie wyborem:
+ * wszystko z dostawą to `pelna`, wszystko bez niej `bez_wysylki`, każde inne
+ * zaznaczenie `inna`.
+ */
+export function zapiszKwote(
+  database: Db, zwrotId: number, wybor: { pozycjeIds: number[]; dostawa: boolean },
+  wersja: number, kto: { id: number; name: string }, teraz = new Date(),
+): { kwotaGrosze: number; dostawaGrosze: number; wariant: string; wersja: number } {
+  return transaction(database, () => {
+    const z = podKlucz(database, zwrotId, wersja);
+    if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+
+    const wszystkie = database.prepare(
+      "SELECT id, cena_grosze, ilosc FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+      .all(zwrotId) as Array<{ id: number; cena_grosze: number; ilosc: number }>;
+    const znane = new Set(wszystkie.map((p) => Number(p.id)));
+    /* Obca pozycja ODPADA GŁOŚNO. Ciche pominięcie zapisałoby kwotę niższą,
+       niż operator widział na ekranie — a on kliknął to, co widział. */
+    const obce = wybor.pozycjeIds.filter((id) => !znane.has(Number(id)));
+    if (obce.length) {
+      throw new Error(`Pozycje ${obce.join(", ")} nie należą do tego zwrotu.`);
+    }
+    const wybrane = new Set(wybor.pozycjeIds.map(Number));
+    const suma = wszystkie
+      .filter((p) => wybrane.has(Number(p.id)))
+      .reduce((s, p) => s + Math.round(Number(p.cena_grosze) * Number(p.ilosc)), 0);
+
+    /* Koszt dostawy bierze się z ZAMÓWIENIA, nie ze zwrotu: Allegro nie
+       przysyła go przy zwrocie. Dociągamy zamówienia od 0.152.0 i dopiero to
+       zdjęło blokadę opisaną przy `sumaPozycji`. Brak zamówienia znaczy zero,
+       bo nie ma czego oddać — a nie „oddaj nieznaną kwotę". */
+    const dostawa = wybor.dostawa
+      ? Number((database.prepare(`SELECT k.dostawa_grosze AS d FROM zamowienie_klienta k
+          JOIN zwrot_klienta z ON z.order_id = k.external_id
+            AND z.channel_account_id = k.channel_account_id
+          WHERE z.id=?`).get(zwrotId) as { d: number | null } | undefined)?.d ?? 0)
+      : 0;
+
+    const wariant = wybrane.size === wszystkie.length
+      ? (wybor.dostawa ? "pelna" : "bez_wysylki")
+      : "inna";
+
+    database.prepare("UPDATE zwrot_klienta_pozycja SET w_zwrocie=0 WHERE zwrot_id=?").run(zwrotId);
+    if (wybrane.size) {
+      const znaki = [...wybrane].map(() => "?").join(",");
+      database.prepare(
+        `UPDATE zwrot_klienta_pozycja SET w_zwrocie=1 WHERE id IN (${znaki})`).run(...wybrane);
+    }
+    database.prepare(`UPDATE zwrot_klienta
+      SET kwota_grosze=?, kwota_dostawa_grosze=?, kwota_wariant=?, kwota_at=?, kwota_przez=?
+      WHERE id=?`).run(suma + dostawa, dostawa, wariant, teraz.toISOString(), kto.name, zwrotId);
+    podnies(database, zwrotId);
+    logEvent("zwrot_kwota", kto.name, null,
+      { zwrotId, kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant,
+        pozycje: [...wybrane] }, kto.id, database);
+    return { kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant, wersja: wersja + 1 };
+  })();
 }

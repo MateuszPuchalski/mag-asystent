@@ -34,6 +34,72 @@ historii nie przepisujemy.
 ---
 
 
+## 0.156.0 — 1 września 2026
+
+**Kolejka bramek przestaje być dekoracją.**
+
+`kubelekZwrotu` routuje po czterech kolumnach — werdykt, ocena pozycji, kwota
+i numer korekty. Żadnej z nich nic nie zapisywało, więc każdy zwrot stał
+w DO DECYZJI na zawsze, chyba że ktoś odrzucił go w panelu Allegro. Maszyna
+kubełków była zbudowana i nie miała paliwa.
+
+Trzy zapisy domykają trzy pierwsze kubełki.
+
+### Werdykt
+
+Przyjęcie idzie jednym kliknięciem. Odmowa **wymaga powodu** i dostaje
+potwierdzenie — §25a.5 stawia ją wśród dwóch rzeczy nieodwracalnych, a zwrotu
+odrzuconego bez uzasadnienia nie da się obronić przed klientem.
+
+Nasza odmowa siedzi w osobnych kolumnach niż `rejection_code` z Allegro, bo
+pochodzenie decyzji jest informacją, a nie szczegółem.
+
+### Ocena towaru
+
+Na stan, na przecenę albo do utylizacji, osobno dla każdej pozycji. Weszła
+razem z resztą nie z rozpędu: bez niej nic nie przechodzi z DO OCENY do
+DO ZWROTU i wydania nie dałoby się sprawdzić od początku do końca.
+
+### Kwota z zaznaczenia
+
+Operator odhacza pozycje i koszt dostawy, suma rośnie na oczach, jedno
+kliknięcie ją zapisuje. Trzy warianty z projektu — pełna, bez wysyłki, inna —
+zostały ETYKIETĄ wyliczaną z zaznaczenia, a nie pozycją w menu.
+
+Do serwera idzie samo zaznaczenie. §25a.3 mówi „liczy ją serwer, panel niczego
+nie zgaduje", więc suma na ekranie jest podglądem — gdyby panel wysyłał gotową
+liczbę, dałoby się oddać dowolną kwotę żądaniem z pominięciem ekranu. Pilnuje
+tego test, który wkłada do żądania absurdalne `kwotaGrosze` i sprawdza, że
+trasa go nie czyta.
+
+Koszt dostawy bierze się z zamówienia. Komentarz przy `sumaPozycji` mówił, że
+wariantu „bez wysyłki" nie da się odróżnić od pełnego, „dopóki panel nie
+zacznie dociągać zamówienia" — zaczął w 0.152.0, więc blokada zniknęła.
+
+### Współbieżność i audyt
+
+Kolumna `wersja` stoi w schemacie od 0.150.0 z komentarzem „dwóch agentów nie
+zamyka jednego zwrotu dwiema różnymi kwotami". Dopiero teraz ma czego pilnować:
+każda z trzech decyzji niesie wersję, a spóźniony agent dostaje 409 ze
+szczegółami — tak samo jak przy przejmowaniu rozmowy.
+
+Każda decyzja zostawia zdarzenie w audycie.
+
+### Umowa licznika tras
+
+Zwroty miały dwie trasy zapisu, mają pięć. Uzasadnienie każdej stoi w teście,
+jak przy `biuro.html`. Korekta i oddanie pieniędzy nadal nie mają trasy:
+pierwsze idzie do Subiekta, drugie po końcówki ZAPISU Allegro, których sonda
+nie potwierdzi, bo jest GET-em.
+
+### Przy okazji
+
+`docs/panel-obslugi-klienta.md` §28 nie wymieniał załączników z 0.155.0. Ta
+tabela istnieje po to, żeby nikt nie zbudował czegoś drugi raz — jej własna
+preambuła mówi, że w tym repo zdarzyło się to już dwa razy. Wiersz dopisany.
+
+Wdrożenie: nic ręką, dwie kolumny dochodzą migracją.
+
 ## 0.155.0 — 1 września 2026
 
 Sonda pobiegła pierwszy raz na żywym koncie. Potwierdziła całe mapowanie

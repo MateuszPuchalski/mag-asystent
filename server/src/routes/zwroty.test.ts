@@ -64,6 +64,9 @@ const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/zwroty" },
   { method: "GET" as const, url: `/api/obsluga/zwroty/${zwrot}` },
   { method: "POST" as const, url: "/api/obsluga/zwroty/zamowienia" },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/werdykt` },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/kwota` },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/ocena" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -122,24 +125,33 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają dokładnie dwie trasy zapisu", async () => {
+test("zwroty mają dokładnie pięć tras zapisu", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
-     Do 0.151.0 stało tu zero, w 0.152.0 jeden. Dziś są dwa:
+     Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa. Dziś jest
+     pięć — trzy doszły w 0.156.0, gdy kolejka bramek przestała być dekoracją:
 
      1. POTWIERDZENIE KARTOTEKI dla pozycji — bez `tw_id` pozycja nie ma czym
         pokazać zdjęcia, bo cache obrazów jest kluczowany po tym polu.
      2. RĘCZNE DOCIĄGNIĘCIE ZAMÓWIEŃ — bez niego diagnoza na produkcji
         wymagała czekania dziesięciu minut na najrzadszy ticker.
+     3. WERDYKT biura — przyjęcie albo odmowa. Do 0.156.0 `kubelekZwrotu`
+        routował po tej kolumnie, a nic jej nie zapisywało: każdy zwrot stał
+        w DO DECYZJI na zawsze.
+     4. OCENA POZYCJI — na stan, na przecenę albo do utylizacji. Bez niej nic
+        nie przechodzi z DO OCENY do DO ZWROTU.
+     5. KWOTA — z ZAZNACZENIA pozycji i dostawy, liczona po stronie serwera.
 
-     Werdykt, kwota, ocena hali i korekta NADAL nie mają tu trasy, a do
-     Allegro z tego ekranu wciąż nie wychodzi żadna decyzja. Kto dokłada
-     kolejny zapis, podnosi tę liczbę i dopisuje zdanie, co zapisuje i po co. */
+     Korekta i oddanie pieniędzy NADAL nie mają tu trasy: pierwsze idzie do
+     Subiekta, drugie po końcówki zapisu Allegro, których sonda nie potwierdzi.
+     Kto dokłada kolejny zapis, podnosi tę liczbę i dopisuje zdanie. */
   const zapisy = app.printRoutes({ commonPrefix: false })
     .split("\n")
     .filter((l) => /POST|PUT|DELETE|PATCH/.test(l));
   const nasze = app.printRoutes({ commonPrefix: false });
-  assert.equal(nasze.includes("kartoteka"), true, "trasa potwierdzenia kartoteki istnieje");
-  assert.ok(zapisy.length >= 2);
+  for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia"]) {
+    assert.equal(nasze.includes(slowo), true, `brak trasy ${slowo}`);
+  }
+  assert.ok(zapisy.length >= 5, `tras zapisu jest ${zapisy.length}, a umowa mówi o pięciu`);
 });
 
 test("bilans kartotek jedzie razem z kolejką", async () => {
@@ -225,4 +237,60 @@ test("hala nie potwierdza kartoteki", async () => {
   const r = await app.inject({ method: "POST", headers: naglowki,
     url: `/api/obsluga/zwroty/pozycje/${poz}/kartoteka`, payload: { twId: null } });
   assert.equal(r.statusCode, 403);
+});
+
+test("decyzje zwrotu: rola, brak powodu przy odmowie i konflikt wersji", async () => {
+  /* Trzy odmowy, każda z innym kodem — operator ma odróżnić „nie wolno ci"
+     od „ktoś zdążył pierwszy". */
+  const bezSesji = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    payload: { decyzja: "przyjety", wersja: 1 } });
+  assert.equal(bezSesji.statusCode, 401);
+
+  const hala = login("magazynier", "Hala");
+  const zHali = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/werdykt`, headers: hala.naglowki,
+    payload: { decyzja: "przyjety", wersja: 1 } });
+  assert.equal(zHali.statusCode, 403, "zwroty prowadzi biuro");
+
+  const b = login("biuro", "Biuro");
+  const bezPowodu = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/werdykt`, headers: b.naglowki,
+    payload: { decyzja: "odrzucony", powod: "   ", wersja: 1 } });
+  assert.equal(bezPowodu.statusCode, 400);
+  assert.match(bezPowodu.json().error, /powod|powód/i);
+
+  const ok = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/werdykt`, headers: b.naglowki,
+    payload: { decyzja: "przyjety", wersja: 1 } });
+  assert.equal(ok.statusCode, 200);
+
+  /* Drugi agent z tą samą wersją dostaje 409 ZE SZCZEGÓŁAMI, nie 400 —
+     panel ma narysować „ktoś zdążył pierwszy", a nie gołe „błąd". */
+  const spozniony = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/werdykt`, headers: b.naglowki,
+    payload: { decyzja: "odrzucony", powod: "duplikat", wersja: 1 } });
+  assert.equal(spozniony.statusCode, 409);
+  assert.equal(spozniony.json().wersja, 2);
+});
+
+test("kwota bierze się z zaznaczenia — liczba przysłana przez panel jest ignorowana", async () => {
+  const poz = Number((db().prepare(
+    "SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?").get(zwrot) as { id: number }).id);
+  const b = login("biuro", "Biuro");
+
+  await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    headers: b.naglowki, payload: { decyzja: "przyjety", wersja: 1 } });
+  await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${poz}/ocena`,
+    headers: b.naglowki, payload: { ocena: "stan", wersja: 2 } });
+
+  const odp = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota`,
+    headers: b.naglowki,
+    /* `kwotaGrosze` w ciele jest CELOWO absurdalne: trasa nie ma prawa go
+       przeczytać. Gdyby czytała, dałoby się oddać dowolną kwotę żądaniem
+       z pominięciem ekranu — a to są cudze pieniądze. */
+    payload: { pozycjeIds: [poz], dostawa: false, wersja: 3, kwotaGrosze: 999999 } });
+
+  assert.equal(odp.statusCode, 200);
+  assert.equal(odp.json().kwotaGrosze, 4999, "jedna sztuka po 49,99 z fixture'u");
 });
