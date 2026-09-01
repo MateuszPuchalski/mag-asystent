@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało dwanaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzynaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -17,6 +17,10 @@ klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
 W 0.151.0 zeszła do jedenastu. Właściciel wgrał `swagger.yaml`, a specyfikacja
 potwierdziła zgadnięty kształt wysyłki do Centrum wiadomości. Dwa znaczniki
 zdjęte, żaden nowy.
+
+W 0.154.0 doszedł jeden. Nie wiadomo, czy `offerId` na pozycji zwrotu należy
+do tej samej przestrzeni co `offer.id` na pozycji zamówienia. Specyfikacja tego
+nie rozstrzyga, a sonda nie pokazuje wartości pól niesłownikowych.
 
 Warto czytać tę liczbę ostrożnie. W tym samym wydaniu wyszło, że mapowanie
 ODCZYTU skrzynki było błędne w każdym polu, choć nie nosiło ani jednego

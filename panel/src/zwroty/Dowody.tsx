@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import {
-  CalendarClock, Check, Copy, ExternalLink, Package, Receipt, ShoppingCart, Undo2, X as Krzyzyk,
+  CalendarClock, Check, Copy, ExternalLink, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
+  X as Krzyzyk,
 } from "lucide-react";
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
-import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
+import { useDociagnijZamowienia, usePotwierdzKartoteke, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { czas } from "../ui";
 import { Zdjecie } from "./Zdjecie";
@@ -80,7 +81,11 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
     return <p className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
       Kartoteka <b>{p.twSymbol}</b>
       <span className="text-slate-500">
-        {p.twZrodlo === "sku" ? "· z SKU oferty, zatwierdzone" : "· wskazana ręcznie"}
+        {/* „zatwierdzona propozycja", a nie „z SKU oferty": od 0.154.0 automat
+            proponuje z czterech źródeł (SKU, pamięć wskazań, jedyna pozycja
+            zamówienia, nazwa w zamówieniu), a wszystkie zapisują się tym samym
+            `sku`. Dawny podpis kłamałby przy trzech z czterech. */}
+        {p.twZrodlo === "sku" ? "· zatwierdzona propozycja" : "· wskazana ręcznie"}
       </span>
       <button type="button" title="Zdejmij powiązanie" disabled={zapisz.isPending}
         onClick={() => ustaw(null, "reczne")}
@@ -92,9 +97,12 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 
   const prop = p.propozycja;
   return <div className="mt-1 text-xs">
-    {prop?.pewnosc === "sku"
+    {prop?.twId != null
       /* Propozycja nie udaje faktu: mówi, skąd się wzięła, i czeka na
-         zatwierdzenie. Projekt panelu §4.3 i §11.3. */
+         zatwierdzenie. Projekt panelu §4.3 i §11.3. Warunek stoi na `twId`,
+         a nie na jednej wartości pewności — inaczej propozycja z pamięci
+         wskazań (ta najpewniejsza, bo za nią stoi człowiek) nie dostałaby
+         przycisku i wymagałaby ręcznego wskazania po raz drugi. */
       ? <div className="flex flex-wrap items-center gap-2 text-amber-800">
           <span>Propozycja: <b>{prop.symbol}</b>
             <span className="text-slate-500"> · {prop.zrodlo}</span></span>
@@ -103,18 +111,52 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
             className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
             <Check size={12} />Zatwierdź</button>
         </div>
-      : <span className="text-slate-500">
-          Bez kartoteki{prop?.zrodlo ? ` · ${prop.zrodlo}` : ""}</span>}
+      /* POWÓD, nie samo „Bez kartoteki". Do 0.153.1 sześć różnych zerwań
+         łańcucha wyglądało tu identycznie i operator nie miał jak odróżnić
+         „sprzedawca nie wypełnił SKU" od „kod ma błąd". Zdanie pisze SERWER
+         (`dopasowanie-sku.ts`) — druga kopia tej reguły w panelu rozjechałaby
+         się przy pierwszej poprawce jednej z nich. */
+      : <p className="text-slate-500">
+          Bez kartoteki{prop?.zrodlo ? <> · <span className="text-slate-600">{prop.zrodlo}</span></> : null}</p>}
 
     {szukam
       ? <div className="mt-1">
           <Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
             onWybierz={(t: Towar | null) => t && ustaw(t.id, "reczne")} />
         </div>
+      /* Własny wiersz, nie doklejka do zdania o powodzie: „…jeszcze nie
+         pobranowskaż kartotekę" czytało się jak jedno słowo. */
       : <button type="button" onClick={() => setSzukam(true)}
-          className="mt-1 text-slate-500 underline underline-offset-2 hover:text-slate-800">
+          className="mt-1 block text-slate-500 underline underline-offset-2 hover:text-slate-800">
           wskaż kartotekę</button>}
     {zapisz.error && <p className="mt-1 text-red-700">{(zapisz.error as Error).message}</p>}
+  </div>;
+}
+
+/**
+ * Ręczne dociągnięcie zamówień.
+ *
+ * Stoi DOKŁADNIE tam, gdzie widać jego brak — w sekcji zamówienia, pod
+ * zdaniem „jeszcze nie pobrano". Bez niego jedyną odpowiedzią na „czemu ta
+ * pozycja nie ma kartoteki" było czekanie dziesięciu minut na ticker.
+ *
+ * To jest ZAPIS na ekranie, który poza tym tylko czyta, i dlatego wymaga
+ * kliknięcia: „zero zapisu przy patrzeniu" znaczy, że otwarcie ekranu niczego
+ * nie mutuje, a nie że ekran nie ma prawa mieć przycisku.
+ */
+function DociagnijZamowienia() {
+  const dociagnij = useDociagnijZamowienia();
+  return <div className="mt-2">
+    <button type="button" disabled={dociagnij.isPending}
+      onClick={() => dociagnij.mutate()}
+      className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+      <RefreshCw size={12} className={dociagnij.isPending ? "animate-spin" : ""} />
+      {dociagnij.isPending ? "Pobieram…" : "Dociągnij teraz"}
+    </button>
+    {dociagnij.error && <p className="mt-1 text-xs text-red-700">
+      {(dociagnij.error as Error).message}</p>}
+    {dociagnij.isSuccess && <p className="mt-1 text-xs text-slate-500">
+      Pobrano zamówień: {dociagnij.data?.pobrano ?? 0}.</p>}
   </div>;
 }
 
@@ -150,8 +192,15 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
               {zwrot.orderId && <Skopiuj tekst={zwrot.orderId} />}
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Treści zamówienia jeszcze nie pobrano — dociągnie ją najbliższa
-              synchronizacja.</p>
+              {zwrot.orderId
+                ? `Treści zamówienia jeszcze nie pobrano — dociągnie ją najbliższa
+                   synchronizacja. Bez niej pozycje zwrotu nie mają skąd wziąć kartoteki.`
+                : `Allegro nie podało przy tym zwrocie numeru zamówienia. Bez niego
+                   nie ma czego dociągnąć ani z czego wziąć kartoteki.`}</p>
+            {/* Przycisk tylko wtedy, gdy JEST co pobrać. Przy zwrocie bez numeru
+                zamówienia dociąganie nie zmieni niczego, a obiecywałoby, że
+                zmieni. */}
+            {zwrot.orderId && <DociagnijZamowienia />}
           </>
         : <>
             <div className="flex items-center gap-1">
@@ -200,14 +249,24 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
                 onKlik={p.twId !== null ? () => setPowiekszony(p) : undefined} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="truncate font-semibold">
-                    <Link href={p.url}>{p.nazwa}</Link></span>
+                  <span className="truncate font-semibold">{p.nazwa}</span>
                   <span className="ml-auto shrink-0 tabular-nums">{zlote(p.cenaGrosze, p.waluta)}</span>
                 </div>
                 <div className="text-xs text-slate-600">
                   {p.ilosc} szt.{p.powod ? ` · ${POWODY[p.powod] ?? p.powod}` : ""}
                   {p.ocena ? ` · ocena: ${p.ocena}` : ""}
                 </div>
+                {/* Odnośnik JAWNY i podpisany. Od 0.153.0 był nim sama nazwa
+                    towaru — istniał, ale nikt go nie widział: podkreślenie nie
+                    mówi, dokąd prowadzi, a pod nazwą równie dobrze mogłaby stać
+                    nasza kartoteka. Gdy adresu nie ma, ekran mówi to wprost —
+                    milczenie wygląda jak usterka panelu, a jest brakiem danych
+                    po stronie Allegro. */}
+                <p className="mt-0.5 text-xs">
+                  {p.url
+                    ? <Link href={p.url}>Zobacz ofertę</Link>
+                    : <span className="text-slate-400">Allegro nie podało adresu oferty</span>}
+                </p>
                 {p.powodKomentarz && <p className="mt-1 text-xs italic text-slate-600">
                   „{p.powodKomentarz}"</p>}
                 <Kartoteka p={p} />

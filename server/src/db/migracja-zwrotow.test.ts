@@ -83,3 +83,105 @@ test("adresu ani konta bankowego nie ma gdzie zapisać", () => {
   }
   d.close();
 });
+
+
+test("potwierdzona kartoteka PRZEŻYWA import z Subiekta", () => {
+  /* USTERKA 0.152.0, naprawiona w 0.154.0. `tw_id` miało klucz obcy do
+     `sgt_towar`, a import kasuje CAŁY read-model i wstawia go od nowa co
+     `MSSQL_SYNC_MS` — czyli co minutę zerował każdą kartotekę potwierdzoną
+     przez człowieka. Cicho, bez błędu, z „Bez kartoteki" jako objawem.
+
+     Ten test odtwarza dokładnie to, co robi import. Na schemacie sprzed
+     poprawki musi paść. */
+  const d = poMigracji();
+  d.exec("PRAGMA foreign_keys = ON");
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (9001,'SEK-46','Sekator')").run();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-1','2026-08-25T09:00:00Z','2026-09-01T09:00:00Z')`).run();
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,nazwa,ilosc,cena_grosze,waluta,klucz,tw_id,tw_symbol,tw_zrodlo)
+    VALUES (1,'Sekator',1,4999,'PLN','|Sekator',9001,'SEK-46','reczne')`).run();
+
+  d.exec("DELETE FROM sgt_towar");
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (9001,'SEK-46','Sekator')").run();
+
+  const p = d.prepare("SELECT tw_id, tw_symbol, tw_zrodlo FROM zwrot_klienta_pozycja").get() as Record<string, unknown>;
+  assert.equal(p.tw_id, 9001, "praca człowieka nie ma prawa zginąć razem z read-modelem");
+  assert.equal(p.tw_symbol, "SEK-46");
+  d.close();
+});
+
+test("pozycja zwrotu nie wisi na read-modelu, tak jak `ean_alias`", () => {
+  const d = poMigracji();
+  const obce = d.prepare("PRAGMA foreign_key_list(zwrot_klienta_pozycja)")
+    .all() as Array<{ table: string }>;
+  assert.equal(obce.some((f) => f.table === "sgt_towar"), false,
+    "powiązanie nadane przez człowieka nie jest częścią read-modelu");
+  assert.equal(obce.some((f) => f.table === "zwrot_klienta"), true,
+    "ale kaskada po zwrocie zostaje — pozycja bez zwrotu nie ma sensu");
+  d.close();
+});
+
+test("pamięć powiązań też nie wisi na read-modelu", () => {
+  const d = poMigracji();
+  assert.equal(istnieje(d, "oferta_kartoteka"), true);
+  const obce = d.prepare("PRAGMA foreign_key_list(oferta_kartoteka)")
+    .all() as Array<{ table: string }>;
+  assert.equal(obce.some((f) => f.table === "sgt_towar"), false,
+    "wpis ma przeżyć import — to warunek działania, nie niedopatrzenie");
+  d.close();
+});
+
+test("klucz naturalny pozycji nie przepuszcza duplikatu, także bez `offer_id`", () => {
+  /* SQLite traktuje NULL-e w UNIQUE jako RÓŻNE, więc `UNIQUE (zwrot_id,
+     offer_id, nazwa)` przepuszczałby duplikaty dokładnie tam, gdzie bolą:
+     przy pozycjach bez identyfikatora oferty. Stąd osobna kolumna `klucz`. */
+  const d = poMigracji();
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-1','2026-08-25T09:00:00Z','2026-09-01T09:00:00Z')`).run();
+  const wstaw = () => d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz)
+    VALUES (1,NULL,'Sekator',1,4999,'PLN','|Sekator')`).run();
+  wstaw();
+  assert.throws(wstaw, /UNIQUE/, "druga pozycja o tym samym kluczu nie wchodzi");
+  d.close();
+});
+
+test("przebudowa przepisuje dane starej tabeli, nie kasuje ich", () => {
+  /* Baza klienta ma już pozycje zwrotów z 0.150.0-0.153.1. Migracja ma je
+     przenieść w komplecie i dorobić `klucz`, a nie zacząć od pustej. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  /* Kształt sprzed 0.154.0: z kluczem obcym i bez `klucz`. */
+  d.exec("DROP TABLE zwrot_klienta_pozycja");
+  d.exec(`CREATE TABLE zwrot_klienta_pozycja (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+    offer_id TEXT, nazwa TEXT NOT NULL, ilosc REAL NOT NULL,
+    cena_grosze INTEGER NOT NULL, waluta TEXT NOT NULL,
+    powod TEXT, powod_komentarz TEXT, url TEXT,
+    ocena TEXT, ocena_at TEXT, ocena_przez TEXT,
+    tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
+    tw_symbol TEXT, tw_zrodlo TEXT, tw_at TEXT, tw_przez TEXT)`);
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  /* Stary schemat MIAŁ klucz obcy, więc bez kartoteki ten INSERT by nie
+     przeszedł — to samo w sobie pokazuje, co tam stało. */
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (9001,'SEK-46','Sekator')").run();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-1','2026-08-25T09:00:00Z','2026-09-01T09:00:00Z')`).run();
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena,tw_id,tw_symbol)
+    VALUES (1,'111','Sekator',2,4999,'PLN','stan',9001,'SEK-46')`).run();
+
+  migrate(d);
+
+  const p = d.prepare("SELECT * FROM zwrot_klienta_pozycja").get() as Record<string, unknown>;
+  assert.equal(p.nazwa, "Sekator");
+  assert.equal(p.ilosc, 2);
+  assert.equal(p.ocena, "stan", "ocena hali przeżywa przebudowę");
+  assert.equal(p.tw_id, 9001, "i kartoteka też");
+  assert.equal(p.klucz, "111|Sekator", "klucz naturalny dorabia się przy przepisaniu");
+  d.close();
+});

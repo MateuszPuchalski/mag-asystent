@@ -33,6 +33,96 @@ historii nie przepisujemy.
 
 ---
 
+## 0.154.0 — 1 września 2026
+
+**Zwroty gubiły powiązania z kartotekami, a ekran mówił o tym jednym zdaniem
+dla sześciu różnych przyczyn.** Pytanie właściciela brzmiało: „dlaczego zwroty
+mają problem z linkowaniem towarów do kartotek?". Odpowiedź miała trzy części
+i wszystkie trzy są tu naprawione.
+
+**Po pierwsze: potwierdzona kartoteka kasowała się co minutę.** Kolumna
+`zwrot_klienta_pozycja.tw_id` miała `REFERENCES sgt_towar(tw_id) ON DELETE SET
+NULL`, a import z Subiekta kasuje cały read-model i wstawia go od nowa co
+`MSSQL_SYNC_MS` (domyślnie 60 sekund). Każdy taki cykl zerował pracę człowieka.
+
+To była usterka wprowadzona w 0.152.0 razem z samą funkcją, a komentarz przy
+migracji oceniał ją odwrotnie: pisał, że brak klucza obcego w starszych bazach
+„wystarcza". To OBECNOŚĆ klucza była szkodliwa. Skutek był przewrotny —
+instalacja sprzed 0.152.0 trzymała powiązania, świeża traciła je co minutę.
+
+Wzorzec był w repo od dawna: `ean_alias.tw_id` jest zwykłym `INTEGER` bez
+klucza obcego właśnie dlatego, że ma przeżyć import. Tabela pozycji zwrotu
+przebudowuje się teraz tak samo. Testem jest przeżycie `DELETE FROM sgt_towar`
+razem z ponownym wstawieniem tego samego towaru.
+
+**Po drugie: złączenie mogło iść po złej kolumnie.** Pozycja zwrotu niosła
+`offerId`, a szukaliśmy go w `zamowienie_klienta_pozycja.offer_id`. Trzy
+przesłanki ze specyfikacji w repo mówią, że to bywają RÓŻNE przestrzenie
+identyfikatorów: przykład `offerId` jest UUID-em, `offer.id` numerem, a UUID
+pokrywa się kształtem z `lineItems[].id`, czyli z pozycją zamówienia.
+
+Ale to są przykłady, a `docs/allegro/README.md` ostrzega, że bywają niezgodne
+ze schematem. Oba pola to `type: string` bez `format`, więc plik nie
+rozstrzyga. Sonda też nie — pokazuje wartości wyłącznie dla pól słownikowych.
+
+Zamiast zgadywać, łączymy po OBU kolumnach i zapisujemy, która trafiła
+(`poKolumnie`). Poprawne pod każdym odczytem, a odpowiedź przyjedzie z
+produkcji. Test odwzorowuje ROZJAZD: UUID po stronie zwrotu, numer po stronie
+zamówienia. Dotychczasowy test wstawiał tę samą stałą po obu stronach i
+dlatego usterki nie widział.
+
+**Po trzecie: identyfikator pozycji zwrotu zmieniał się przy każdej
+synchronizacji.** Pozycje kasowaliśmy i wstawialiśmy od nowa, a pracę
+człowieka odtwarzaliśmy po mapie. Otwarty panel trzymał nieaktualne `id`,
+a dwie pozycje o tej samej nazwie bez `offer_id` sklejały się w jeden klucz.
+Teraz pozycja ma klucz naturalny (`offer_id|nazwa`) i jest UPSERTOWANA.
+
+**Ekran mówi, KTÓRE ogniwo pękło.** Zamiast „Bez kartoteki" pozycja niesie
+powód: zwrot bez numeru zamówienia, zamówienie niepobrane, oferty nie ma
+w pobranym zamówieniu, oferta bez SKU w Allegro, SKU nie trafia w kartotekę,
+symbol zdublowany. Nad kolejką stoi licznik zbiorczy — ile pozycji czeka i z
+jakiego powodu. Bez tych liczb nie da się powiedzieć, czy problem jest
+w kodzie, czy w danych Allegro.
+
+**Pamięć wskazań.** Potwierdzenie zapisuje parę oferta–kartoteka w nowej
+tabeli `oferta_kartoteka` (wzorzec `ean_alias`: bez klucza obcego, poza listą
+kasowaną przy imporcie). Następny zwrot tej samej oferty dostaje propozycję
+bez udziału zamówienia. To jedyna zmiana, która realnie zdejmuje pracę
+powtarzalną. Zdjęcie powiązania kasuje też wpis z pamięci.
+
+**Dopasowanie zapasowe — wyłącznie w obrębie jednego zamówienia.** Gdy
+identyfikator nie trafia: zamówienie z jedną pozycją to ta pozycja, a przy
+kilku liczy się dokładnie jedna o zgodnej nazwie. To nie jest zakazane
+szukanie po nazwie w kartotece — tamto przeszukuje trzy i pół tysiąca kart
+i prowadzi do cudzego towaru. Tu zbiór ma dwie do pięciu pozycji jednej
+transakcji. Każdy wariant niesie własny poziom pewności i własne zdanie
+o źródle.
+
+**Jawny odnośnik do oferty [wymaga działania: sprawdź wzorce].** Przy każdej
+zwracanej pozycji stoi teraz podpisany link „Zobacz ofertę". Do 0.153.0
+odnośnikiem była sama nazwa towaru — istniał, ale nikt go tak nie czytał.
+Gdy Allegro nie podało adresu, ekran mówi to wprost.
+
+**Ręczne dociągnięcie zamówień.** Przycisk „Dociągnij teraz" stoi przy
+zamówieniu, którego jeszcze nie pobrano. Wcześniej diagnoza wymagała czekania
+dziesięciu minut na najrzadszy z trzech tickerów. Przycisku nie ma tam, gdzie
+Allegro nie podało numeru zamówienia — nie byłoby czego pobrać.
+
+Zamówienia odświeżają się też same, gdy wszystkie ich pozycje mają puste SKU,
+ale nie częściej niż raz na dobę. Do 0.153.1 zamówienie zapisane raz z pustymi
+SKU nie było odpytywane NIGDY.
+
+**Trim po obu stronach porównania symbolu.** `subiekt.mssql.ts` nie trimuje
+`tw_Symbol` przy imporcie (`mag_Symbol` tuż obok — trimuje), więc symbol
+z białym znakiem na końcu nie trafiał nigdy.
+
+Licznik tras zapisu zwrotów rośnie z jednej na dwie. Druga wychodzi do Allegro
+wyłącznie po odczyt i tak samo jak ticker przerywa na 429.
+
+Znaczników `[WERYFIKUJ]` jest teraz trzynaście: doszła przestrzeń
+identyfikatora oferty w zwrocie. Ten znacznik zdejmie produkcja, nie kolejna
+lektura specyfikacji.
+
 ## 0.153.1 — 1 września 2026
 
 **Narzędzia z konsoli czytają `wertis.env` z katalogu instalacji.** Zgłoszenie

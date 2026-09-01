@@ -183,7 +183,8 @@ describe("Dowody", () => {
     expect(screen.getByText(/Bez kartoteki/)).toBeInTheDocument();
 
     rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
-      propozycja: { pewnosc: "sku", twId: 10, symbol: "SEK-46", zrodlo: 'SKU oferty „SEK-46"' } }] })} />));
+      propozycja: { pewnosc: "sku", twId: 10, symbol: "SEK-46", zrodlo: 'SKU oferty „SEK-46"',
+        powod: null, poKolumnie: "offer_id" } }] })} />));
     /* Propozycja czeka na JEDNO kliknięcie i mówi, skąd się wzięła. */
     expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
     expect(screen.getByText("SEK-46")).toBeInTheDocument();
@@ -193,5 +194,55 @@ describe("Dowody", () => {
       twId: 10, twSymbol: "SEK-46", twZrodlo: "reczne" }] })} />));
     expect(screen.getByText(/wskazana ręcznie/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zatwierdź/ })).not.toBeInTheDocument();
+  });
+
+  it("propozycja z pamięci wskazań też czeka na JEDNO kliknięcie", () => {
+    /* Warunek przycisku stoi na `twId`, nie na jednej wartości pewności.
+       Propozycja z pamięci jest tą najpewniejszą — stoi za nią człowiek —
+       a do 0.153.1 jako jedyna nie dostawała przycisku i kazała wskazywać
+       kartotekę po raz drugi. */
+    render(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA, propozycja: {
+      pewnosc: "pamiec", twId: 10, symbol: "SEK-46",
+      zrodlo: "Wskazane wcześniej przez: Ala", powod: null, poKolumnie: null } }] })} />));
+    expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
+    expect(screen.getByText(/Wskazane wcześniej przez/)).toBeInTheDocument();
+  });
+
+  it("brak kartoteki niesie POWÓD, a nie samo »Bez kartoteki«", () => {
+    /* Sześć różnych zerwań łańcucha wyglądało do 0.153.1 identycznie
+       i operator nie miał jak odróżnić braku danych od usterki kodu. */
+    render(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA, propozycja: {
+      pewnosc: "brak", twId: null, symbol: null,
+      zrodlo: "Oferta bez SKU w Allegro (pole „sygnatura”)",
+      powod: "oferta_bez_sku", poKolumnie: null } }] })} />));
+    expect(screen.getByText(/Oferta bez SKU w Allegro/)).toBeInTheDocument();
+  });
+
+  it("odnośnik do oferty jest podpisany, a jego brak — powiedziany wprost", () => {
+    /* Podkreślona nazwa towaru BYŁA odnośnikiem od 0.153.0 i nikt jej tak nie
+       czytał: podkreślenie nie mówi, dokąd prowadzi. Milczenie przy pustym
+       adresie wygląda z kolei na usterkę panelu, a jest brakiem danych
+       po stronie Allegro. */
+    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByText(/Allegro nie podało adresu oferty/)).toBeInTheDocument();
+
+    rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
+      url: "https://allegro.pl/oferta/sekator-111" }] })} />));
+    const link = screen.getByRole("link", { name: /Zobacz ofertę/ });
+    expect(link).toHaveAttribute("href", "https://allegro.pl/oferta/sekator-111");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("bez pobranego zamówienia ekran daje drogę wyjścia, nie samo czekanie", () => {
+    /* Diagnoza „czemu ta pozycja nie ma kartoteki" wymagała wcześniej
+       czekania dziesięciu minut na najrzadszy z trzech tickerów. */
+    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByRole("button", { name: /Dociągnij teraz/ })).toBeInTheDocument();
+
+    /* Bez numeru zamówienia nie ma czego dociągnąć — przycisk, który niczego
+       nie zmieni, obiecywałby, że zmieni. */
+    rerender(zKlientem(<Dowody zwrot={zwrot({ orderId: null })} />));
+    expect(screen.queryByRole("button", { name: /Dociągnij teraz/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/nie podało przy tym zwrocie numeru zamówienia/)).toBeInTheDocument();
   });
 });

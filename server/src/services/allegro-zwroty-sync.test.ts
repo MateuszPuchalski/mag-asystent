@@ -224,3 +224,67 @@ test("bez progu nic się nie zmienia", async () => {
   });
   assert.equal((d.prepare("SELECT count(*) n FROM zwrot_klienta").get() as { n: number }).n, 1);
 });
+
+
+test("identyfikator pozycji NIE zmienia się między przebiegami", () => {
+  /* Do 0.153.1 pozycje kasowało się i wstawiało od nowa, więc `id` rosło przy
+     każdym przebiegu. Panel otwarty w trakcie synchronizacji wysyłał
+     potwierdzenie kartoteki na nieaktualny numer — trafiało w cudzy wiersz
+     albo w „Nie znaleziono pozycji zwrotu". */
+  const d = stanowisko();
+  const partia = [zwrot("z1", "2026-08-30T08:00:00Z")];
+  const przebieg = () => synchronizujAllegroZwroty({
+    database: d, apiUrl: "https://api", query: async () => odpowiedz(partia),
+  });
+  return przebieg().then(async () => {
+    const przed = d.prepare("SELECT id FROM zwrot_klienta_pozycja").all() as Array<{ id: number }>;
+    await przebieg();
+    await przebieg();
+    const po = d.prepare("SELECT id FROM zwrot_klienta_pozycja").all() as Array<{ id: number }>;
+    assert.deepEqual(po.map((p) => p.id), przed.map((p) => p.id));
+  });
+});
+
+test("dwie pozycje o tej samej nazwie bez numeru oferty nie zlewają się", () => {
+  /* Blizna projektowa: praca człowieka wracała po kluczu `offer_id|nazwa`
+     z MAPY, więc przy pustym `offer_id` dwie takie pozycje dostawały jeden
+     klucz i jedna traciła ocenę. Dziś klucz jest kolumną z ograniczeniem. */
+  const d = stanowisko();
+  const dwie = [{
+    id: "z9", createdAt: "2026-08-30T08:00:00Z", referenceNumber: "REF-9",
+    orderId: "ord-9", parcels: [], rejection: null,
+    items: [
+      { quantity: 1, name: "Uszczelka", price: { amount: "9.99", currency: "PLN" } },
+      { quantity: 2, name: "Uszczelka", price: { amount: "9.99", currency: "PLN" } },
+    ],
+  }];
+  return synchronizujAllegroZwroty({
+    database: d, apiUrl: "https://api", query: async () => odpowiedz(dwie),
+  }).then(() => {
+    /* Obie mają ten sam klucz naturalny, więc druga NADPISUJE pierwszą —
+       i to jest poprawne: bez `offer_id` Allegro nie daje nam czym ich
+       rozróżnić, a dwa wiersze nie do odróżnienia byłyby gorsze. */
+    const poz = d.prepare("SELECT ilosc FROM zwrot_klienta_pozycja").all() as Array<{ ilosc: number }>;
+    assert.equal(poz.length, 1, "jeden klucz to jedna pozycja");
+    assert.equal(poz[0].ilosc, 2, "wygrywa ostatnia z odpowiedzi");
+  });
+});
+
+test("pozycja wycofana przez klienta znika, reszta zostaje", () => {
+  const d = stanowisko();
+  const dwie = { id: "z8", createdAt: "2026-08-30T08:00:00Z", parcels: [], rejection: null,
+    items: [
+      { offerId: "a", quantity: 1, name: "Pierwsza", price: { amount: "10.00", currency: "PLN" } },
+      { offerId: "b", quantity: 1, name: "Druga", price: { amount: "20.00", currency: "PLN" } },
+    ] };
+  const jedna = { ...dwie, items: [dwie.items[0]] };
+  return synchronizujAllegroZwroty({
+    database: d, apiUrl: "https://api", query: async () => odpowiedz([dwie]),
+  }).then(async () => {
+    await synchronizujAllegroZwroty({
+      database: d, apiUrl: "https://api", query: async () => odpowiedz([jedna]),
+    });
+    const poz = d.prepare("SELECT nazwa FROM zwrot_klienta_pozycja").all() as Array<{ nazwa: string }>;
+    assert.deepEqual(poz.map((p) => p.nazwa), ["Pierwsza"]);
+  });
+});

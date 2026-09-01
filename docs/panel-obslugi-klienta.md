@@ -657,7 +657,32 @@ kluczowany po `tw_id`.
 
 **Automat proponuje, człowiek zatwierdza.** Dopasowanie po SKU niesie źródło
 i czeka na jedno kliknięcie. Zero i wiele trafień daje brak, nigdy
-zgadywanie; po nazwie towaru nie dopasowujemy nigdy.
+zgadywanie; po nazwie towaru w KARTOTECE nie dopasowujemy nigdy.
+
+**Pamięć wskazań (0.154.0).** Potwierdzenie zapamiętuje parę oferta–kartoteka,
+a następny zwrot tej samej oferty dostaje ją bez pytania o zamówienie. To
+jedyna zmiana, która realnie zdejmuje pracę powtarzalną; źródłem jest wtedy
+człowiek, nie SKU, i ekran tak to podpisuje.
+
+**Dopasowanie zapasowe idzie wyłącznie w obrębie jednego zamówienia.** Gdy
+identyfikator nie trafia, a zamówienie ma dokładnie jedną pozycję — to jest ta
+pozycja. Gdy ma kilka, liczy się dokładnie jedna o zgodnej nazwie. Zbiór ma
+dwie do pięciu pozycji z tej samej transakcji, więc to nie jest zakazane
+szukanie po nazwie wśród trzech tysięcy kartotek.
+
+**Brak kartoteki niesie POWÓD.** Łańcuch ma sześć ogniw i do 0.153.1 każde
+zerwane wyglądało identycznie. Ekran mówi teraz, które pękło: zwrot bez
+zamówienia, zamówienie niepobrane, oferty nie ma w zamówieniu, oferta bez SKU,
+SKU nie trafia w kartotekę, symbol zdublowany. Nad kolejką stoi licznik: ile
+pozycji czeka i z jakiego powodu. Bez tych liczb nie da się powiedzieć, czy
+problem jest w kodzie, czy w danych Allegro.
+
+Zdanie o powodzie pisze SERWER. Druga kopia tej reguły w panelu rozjechałaby
+się przy pierwszej poprawce jednej z nich, a rozjazd byłby niewidoczny.
+
+Przy zamówieniu, którego jeszcze nie pobrano, stoi przycisk „Dociągnij teraz".
+Bez niego diagnoza wymagała czekania dziesięciu minut na ticker. Przycisku nie
+ma tam, gdzie Allegro nie podało numeru zamówienia: nie byłoby czego pobrać.
 
 Zdjęcie widać w trzech miejscach: miniatura w wierszu kolejki, kafel przy
 pozycji w kolumnie dowodów i powiększenie po kliknięciu. Kafel ma stały
@@ -666,9 +691,15 @@ kursorem.
 
 ### 25a.7. Odnośniki do Allegro
 
-Numer zwrotu i zamówienie są klikalne i prowadzą do panelu sprzedawcy; nazwa
-pozycji prowadzi do oferty. Identyfikator zamówienia jest UUID-em, więc obok
-stoi przycisk kopiowania — nikt go nie przepisuje z ekranu ręcznie.
+Numer zwrotu i zamówienie są klikalne i prowadzą do panelu sprzedawcy.
+Identyfikator zamówienia jest UUID-em, więc obok stoi przycisk kopiowania —
+nikt go nie przepisuje z ekranu ręcznie.
+
+Oferta ma **własny, podpisany odnośnik** „Zobacz ofertę" przy każdej zwracanej
+pozycji. Do 0.153.0 odnośnikiem była sama nazwa towaru: istniał, ale nikt go
+tak nie czytał, bo podkreślenie nie mówi, dokąd prowadzi. Gdy Allegro adresu
+nie podało, ekran mówi to wprost — milczenie wygląda na usterkę panelu, a jest
+brakiem danych po drugiej stronie.
 
 Adresy panelu nie są udokumentowane przez Allegro, więc stoją w konfiguracji
 i noszą `[WERYFIKUJ]`. Bez adresu zostaje sam tekst: link donikąd jest gorszy
@@ -725,6 +756,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |
+| Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
+| Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias` |
+| Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
 | Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
@@ -747,6 +781,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
 | Werdykt, kwota, ocena, korekta | **projekt** | kolumny stoją, zapisu nie ma |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
+| Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |
 | Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |
 | Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
 | Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |

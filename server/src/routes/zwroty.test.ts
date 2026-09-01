@@ -37,7 +37,7 @@ beforeEach(() => {
   const d = db();
   for (const t of ["zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
     "zamowienie_klienta_pozycja", "zamowienie_klienta", "allegro_zamowienie",
-    "sgt_towar", "channel_account", "events", "device_session", "app_user"]) {
+    "oferta_kartoteka", "sgt_towar", "channel_account", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const konto = Number(d.prepare(
@@ -47,8 +47,8 @@ beforeEach(() => {
     reference_number,order_id,created_at,paczka_at,synced_at)
     VALUES (?,'zw-1','REF-1','ord-1','2026-08-25T09:00:00Z','2026-08-28T09:00:00Z','2026-09-01T09:00:00Z')`)
     .run(konto).lastInsertRowid);
-  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod)
-    VALUES (?,'111','Sekator NAC',1,4999,'PLN','DONT_LIKE_IT')`).run(zwrot);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,klucz)
+    VALUES (?,'111','Sekator NAC',1,4999,'PLN','DONT_LIKE_IT','111|Sekator NAC')`).run(zwrot);
 });
 
 function login(role: Rola, name: string) {
@@ -63,6 +63,7 @@ function login(role: Rola, name: string) {
 const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/zwroty" },
   { method: "GET" as const, url: `/api/obsluga/zwroty/${zwrot}` },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/zamowienia" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -114,28 +115,57 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
       .join("/");
   };
   const przed = licz();
-  for (const t of TRASY()) {
+  for (const t of TRASY().filter((t) => t.method === "GET")) {
     await app.inject({ method: t.method, url: t.url, headers: naglowki });
     await app.inject({ method: t.method, url: t.url, headers: naglowki });
   }
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają dokładnie jedną trasę zapisu", async () => {
+test("zwroty mają dokładnie dwie trasy zapisu", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
-     Do 0.151.0 stało tu zero. Jedynym zapisem jest POTWIERDZENIE KARTOTEKI
-     dla pozycji: bez `tw_id` pozycja nie ma czym pokazać zdjęcia, bo
-     `zdjecie_cache` i `zdjecie_wlasne` są kluczowane po tym polu.
+     Do 0.151.0 stało tu zero, w 0.152.0 jeden. Dziś są dwa:
+
+     1. POTWIERDZENIE KARTOTEKI dla pozycji — bez `tw_id` pozycja nie ma czym
+        pokazać zdjęcia, bo cache obrazów jest kluczowany po tym polu.
+     2. RĘCZNE DOCIĄGNIĘCIE ZAMÓWIEŃ — bez niego diagnoza na produkcji
+        wymagała czekania dziesięciu minut na najrzadszy ticker.
 
      Werdykt, kwota, ocena hali i korekta NADAL nie mają tu trasy, a do
-     Allegro z tego ekranu wciąż nie wychodzi nic. Kto dokłada kolejny zapis,
-     podnosi tę liczbę i dopisuje zdanie mówiące, co zapisuje i po co. */
+     Allegro z tego ekranu wciąż nie wychodzi żadna decyzja. Kto dokłada
+     kolejny zapis, podnosi tę liczbę i dopisuje zdanie, co zapisuje i po co. */
   const zapisy = app.printRoutes({ commonPrefix: false })
     .split("\n")
     .filter((l) => /POST|PUT|DELETE|PATCH/.test(l));
   const nasze = app.printRoutes({ commonPrefix: false });
   assert.equal(nasze.includes("kartoteka"), true, "trasa potwierdzenia kartoteki istnieje");
-  assert.ok(zapisy.length >= 1);
+  assert.ok(zapisy.length >= 2);
+});
+
+test("bilans kartotek jedzie razem z kolejką", async () => {
+  /* Bez liczby nie da się powiedzieć, czy problem jest w kodzie, czy
+     w danych Allegro — a przez trzy wydania nie dało się tego rozstrzygnąć. */
+  const { naglowki } = login("biuro", "Ala liczy");
+  const r = await app.inject({ method: "GET", url: "/api/obsluga/zwroty", headers: naglowki });
+  const b = r.json().kartoteki;
+  assert.equal(b.wszystkie, 1);
+  assert.equal(b.bez, 1);
+  assert.equal(b.powody.zamowienie_niepobrane, 1, "powód jest nazwany, nie zbiorczy");
+});
+
+test("ręczne dociągnięcie zamówień wymaga sparowanego konta", async () => {
+  /* Bez konta trasa mówi, czego brakuje, zamiast strzelać w Allegro bez
+     tokenu i oddawać 401 z obcego systemu. */
+  const { naglowki } = login("biuro", "Ala dociąga");
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/zamowienia", headers: naglowki });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /sparowane/);
+});
+
+test("hala nie dociąga zamówień", async () => {
+  const { naglowki } = login("magazynier", "Marek z hali");
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/zamowienia", headers: naglowki });
+  assert.equal(r.statusCode, 403);
 });
 
 test("potwierdzenie kartoteki zapisuje wybór RAZEM ze źródłem", async () => {

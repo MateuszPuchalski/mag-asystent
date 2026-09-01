@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 import { db as defaultDb, type Db } from "../db/db.js";
-import { dopasujPoSku, skuPozycji, type Dopasowanie } from "./dopasowanie-sku.js";
+import { zaproponujKartoteke, type Dopasowanie } from "./dopasowanie-sku.js";
 import { linkZamowienia, linkZwrotu } from "./allegro-linki.js";
 import { logEvent } from "./events.js";
 
@@ -269,17 +269,11 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
       const surowe = wgZwrotu.get(Number(z.id)) ?? [];
       const zam = zamWgKlucza.get(`${z.channel_account_id}|${z.order_id}`) ?? null;
       const pozZamowienia = zam ? pozWgZam.get(Number(zam.id)) ?? [] : [];
-      const wracajace = new Set(surowe.map((p) => (p.offer_id as string) ?? ""));
+      const wracajace = new Set(
+        surowe.map((p) => (p.offer_id as string) ?? "").filter((v) => v !== ""));
 
       const zlozone: PozycjaZwrotu[] = surowe.map((p) => {
         const twId = p.tw_id == null ? null : Number(p.tw_id);
-        /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
-           Podpowiadanie obok potwierdzonego wyboru byłoby podważaniem
-           decyzji człowieka, a §4.3 stawia ją wyżej niż wynik automatu. */
-        const sku = twId === null
-          ? skuPozycji(database, Number(z.channel_account_id),
-              (z.order_id as string) ?? null, (p.offer_id as string) ?? null)
-          : null;
         return {
           id: Number(p.id),
           offerId: (p.offer_id as string) ?? null,
@@ -294,7 +288,15 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           twId,
           twSymbol: (p.tw_symbol as string) ?? null,
           twZrodlo: (p.tw_zrodlo as string) ?? null,
-          propozycja: twId === null ? dopasujPoSku(database, sku) : null,
+          /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
+             Podpowiadanie obok potwierdzonego wyboru byłoby podważaniem
+             decyzji człowieka, a §4.3 stawia ją wyżej niż wynik automatu. */
+          propozycja: twId === null ? zaproponujKartoteke(database, {
+            channelAccountId: Number(z.channel_account_id),
+            orderId: (z.order_id as string) ?? null,
+            offerId: (p.offer_id as string) ?? null,
+            nazwa: String(p.nazwa),
+          }) : null,
         };
       });
 
@@ -316,8 +318,15 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           cenaGrosze: Number(p.cena_grosze),
           waluta: String(p.waluta),
           /* Które pozycje wracają — to jest cały powód, dla którego panel
-             pokazuje CAŁE zamówienie, a nie same zwracane sztuki. */
-          zwracana: wracajace.has((p.offer_id as string) ?? ""),
+             pokazuje CAŁE zamówienie, a nie same zwracane sztuki.
+
+             Sprawdzamy OBIE kolumny z tego samego powodu co złączenie
+             w `dopasowanie-sku.ts`: nie wiadomo, czy `offerId` ze zwrotu to
+             numer oferty, czy identyfikator pozycji zamówienia. Do 0.153.1
+             porównanie szło po jednej i przy rozjeździe ŻADNA pozycja nie
+             dostawała plakietki WRACA — co samo w sobie było objawem. */
+          zwracana: wracajace.has((p.offer_id as string) ?? "")
+            || wracajace.has((p.external_id as string) ?? ""),
         })),
       } : null;
 
@@ -326,6 +335,32 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
        jakiej ten ekran potrzebuje. */
     .sort((a, b) => a.dniDoTerminu - b.dniDoTerminu);
+}
+
+/**
+ * Ile pozycji czeka na kartotekę i z jakiego powodu.
+ *
+ * Bez tej liczby nie da się powiedzieć, czy problem jest w kodzie, czy
+ * w danych po stronie Allegro — a przez trzy wydania nie dało się tego
+ * rozstrzygnąć właśnie dlatego, że każde zerwane ogniwo wyglądało tak samo.
+ */
+export function bilansKartotek(zwroty: WierszZwrotu[]) {
+  const powody: Record<string, number> = {};
+  let bez = 0;
+  let wszystkie = 0;
+  for (const z of zwroty) {
+    /* Stany końcowe nie są pracą do zrobienia i nie mają prawa zawyżać
+       licznika, który ma mówić „ile jeszcze przede mną". */
+    if (z.kubelek === "zamkniety" || z.kubelek === "odrzucony") continue;
+    for (const p of z.pozycje) {
+      wszystkie++;
+      if (p.twId !== null) continue;
+      bez++;
+      const powod = p.propozycja?.powod ?? (p.propozycja?.twId != null ? "do_zatwierdzenia" : "inne");
+      powody[powod] = (powody[powod] ?? 0) + 1;
+    }
+  }
+  return { bez, wszystkie, powody };
 }
 
 /** Ile pracy stoi w każdym kubełku — liczby przy zakładkach kolejki. */
@@ -368,14 +403,25 @@ export function potwierdzKartoteke(
   teraz = new Date(),
 ): { twId: number | null; twSymbol: string | null; twZrodlo: string | null } {
   const pozycja = database.prepare(
-    "SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?"
-  ).get(pozycjaId) as { id: number; zwrot_id: number } | undefined;
+    `SELECT p.id, p.zwrot_id, p.offer_id, z.channel_account_id
+     FROM zwrot_klienta_pozycja p
+     JOIN zwrot_klienta z ON z.id = p.zwrot_id
+     WHERE p.id=?`
+  ).get(pozycjaId) as
+    { id: number; zwrot_id: number; offer_id: string | null; channel_account_id: number } | undefined;
   if (!pozycja) throw new Error("Nie znaleziono pozycji zwrotu");
 
   if (twId === null) {
     database.prepare(`UPDATE zwrot_klienta_pozycja
       SET tw_id=NULL, tw_symbol=NULL, tw_zrodlo=NULL, tw_at=?, tw_przez=? WHERE id=?`)
       .run(teraz.toISOString(), kto.name, pozycjaId);
+    /* Pamięć znika RAZEM z powiązaniem. Inaczej zdjęcie kartoteki nic by nie
+       dało: następny odczyt zaproponowałby ją z powrotem, a operator
+       zobaczyłby, że jego decyzja się nie przyjęła. */
+    if (pozycja.offer_id) {
+      database.prepare("DELETE FROM oferta_kartoteka WHERE channel_account_id=? AND offer_id=?")
+        .run(pozycja.channel_account_id, pozycja.offer_id);
+    }
     logEvent("zwrot_kartoteka_zdjeta", kto.name, null,
       { pozycjaId, zwrotId: pozycja.zwrot_id }, undefined, database);
     return { twId: null, twSymbol: null, twZrodlo: null };
@@ -397,6 +443,23 @@ export function potwierdzKartoteke(
   logEvent("zwrot_kartoteka", kto.name, towar.tw_id,
     { pozycjaId, zwrotId: pozycja.zwrot_id, symbol: towar.symbol, zrodlo },
     kto.id, database);
+
+  /* PAMIĘĆ POWIĄZAŃ — wzorzec `ean_alias`. Człowiek wskazuje kartotekę RAZ;
+     ten sam towar wraca za miesiąc na innym zwrocie i wiąże się sam. Bez tego
+     praca powtarza się w nieskończoność, a to jest dokładnie ten koszt, który
+     panel zwrotów miał zdejmować.
+
+     Pamięć trzyma się OFERTY, nie pozycji: pozycja żyje jednym zwrotem. */
+  if (pozycja.offer_id) {
+    database.prepare(`INSERT INTO oferta_kartoteka
+      (channel_account_id,offer_id,tw_id,tw_symbol,sku,wskazano_at,wskazano_przez)
+      VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(channel_account_id, offer_id) DO UPDATE SET
+        tw_id=excluded.tw_id, tw_symbol=excluded.tw_symbol, sku=excluded.sku,
+        wskazano_at=excluded.wskazano_at, wskazano_przez=excluded.wskazano_przez`).run(
+      pozycja.channel_account_id, pozycja.offer_id, towar.tw_id, towar.symbol,
+      zrodlo === "sku" ? towar.symbol : null, teraz.toISOString(), kto.name);
+  }
 
   database.prepare(`INSERT INTO zwrot_zdarzenie(zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto,kto_user_id)
     VALUES (?,?,?,?,?,?,?)`).run(
