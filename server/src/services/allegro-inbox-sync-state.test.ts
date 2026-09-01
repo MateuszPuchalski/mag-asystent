@@ -54,6 +54,25 @@ test("cisza dłuższa niż dwa interwały to opóźnienie, nawet bez ani jednego
     stan({ lastSuccessAt: stary, lastAttemptAt: stary }), TERAZ, INTERWAL), "delayed");
 });
 
+test("status bierze kod z klasy błędu, nie ze zdania komunikatu", async () => {
+  /* Regres z 0.147.0: kod wyłuskiwany wyrażeniem `\((\d{3})\)` łapał „(401)",
+     ale nie „Allegro odpowiedziało 503: …" — czyli milczał akurat przy
+     odmowach, które status ma nazywać. */
+  const { BladOdpowiedziAllegro } = await import("../adapters/allegro.js");
+  const database = mkDb();
+  await assert.rejects(() => synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", intervalMs: INTERWAL,
+    query: async () => {
+      throw new BladOdpowiedziAllegro("Allegro odpowiedziało 403: {\"code\":\"UC\"}", 403);
+    },
+  }));
+
+  const s = stanSynchronizacji(database);
+  assert.equal(s.lastErrorCode, 403);
+  assert.equal(statusSynchronizacji(s, TERAZ, INTERWAL), "authentication_error",
+    "403 ma wołać administratora, nie chować się w ogólnym „nie udało się\"");
+});
+
 test("alarm jest osobny od statusu", () => {
   const database = mkDb();
   database.prepare(`INSERT INTO allegro_inbox_sync_state

@@ -297,6 +297,14 @@ if ($Aktualizuj) {
     Write-Krok "Budowanie"
     if (-not (Test-DryRun "Uruchomiłbym npm ci i npm run build w $Katalog.")) {
         Push-Location $Katalog
+        # Przeglądarki Playwrighta NIE schodzą na produkcję. Od 0.146.0
+        # `@playwright/test` jest zależnością deweloperską panelu, a jego
+        # instalacja domyślnie dociąga kilkaset megabajtów Chromium — których
+        # ta maszyna nigdy nie użyje, bo testy end-to-end biegną u dewelopera
+        # i w CI. Bez tej zmiennej aktualizacja w magazynie ciągnie je przez
+        # łącze biura, a przy odciętej sieci potrafi się na nich wywrócić.
+        # CI ustawia dokładnie to samo (.github/workflows/server.yml).
+        $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
         & npm ci
         $kodCi = $LASTEXITCODE
         if ($kodCi -eq 0) { & npm run build; $kodCi = $LASTEXITCODE }
@@ -397,6 +405,14 @@ if (-not $TylkoKonfiguracja) {
     Write-Krok "Budowanie"
     if (-not (Test-DryRun "Uruchomiłbym npm ci i npm run build w $Katalog.")) {
         Push-Location $Katalog
+        # Przeglądarki Playwrighta NIE schodzą na produkcję. Od 0.146.0
+        # `@playwright/test` jest zależnością deweloperską panelu, a jego
+        # instalacja domyślnie dociąga kilkaset megabajtów Chromium — których
+        # ta maszyna nigdy nie użyje, bo testy end-to-end biegną u dewelopera
+        # i w CI. Bez tej zmiennej aktualizacja w magazynie ciągnie je przez
+        # łącze biura, a przy odciętej sieci potrafi się na nich wywrócić.
+        # CI ustawia dokładnie to samo (.github/workflows/server.yml).
+        $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
         & npm ci
         if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Blad "npm ci nie powiodło się."; exit 1 }
         & npm run build

@@ -62,6 +62,49 @@ import { allegroTryb } from "./adapters/allegro.js";
  * Poza tym zostaje tu wyłącznie to, co niepotrzebne w teście: cykliczny import
  * z MSSQL i samo `listen`.
  */
+/**
+ * Stan ostatniego odświeżenia read-modelu Subiekta.
+ *
+ * `null` znaczy „ostatni przebieg się udał". Wartość trafia na listę problemów
+ * w `/api/health`, więc nieświeży read-model jest WIDOCZNY, a nie domyślany.
+ */
+let bladImportuStartowego: string | null = null;
+
+/**
+ * Odświeżenie read-modelu, którego awaria NIE kładzie serwera.
+ *
+ * Do 0.149.0 import przy starcie był twardym błędem: `main()` czekał na
+ * `importFromMssql()` przed `app.listen()`, a wyjątek kończył proces. Decyzja
+ * była świadoma („twardy błąd, gdy baza nieosiągalna") i okazała się kosztowna:
+ * 1 września 2026 jeden zerwany klucz obcy w imporcie położył CAŁE API
+ * w pętli restartów NSSM — razem z kolektorami, które o Subiekta nie pytają,
+ * i z panelem biura, który czyta własne tabele. To ta sama awaria co 0.53.1,
+ * tylko z inną przyczyną pod spodem.
+ *
+ * Nowa reguła: read-model ma prawo być nieświeży, API nie ma prawa nie wstać.
+ * Stan sprzed ostatniego udanego importu zostaje w SQLite (transakcja się
+ * wycofuje), więc kolektor pracuje na danych sprzed awarii zamiast na niczym,
+ * a `/api/health` mówi zdaniem, że tak jest.
+ */
+export async function odswiezReadModel(
+  etap: "start" | "cykl",
+  /* Import wstrzykiwany, żeby dało się sprawdzić NIEBLOKUJĄCOŚĆ bez serwera
+     MSSQL. Bez tego jedyną drogą do tego zachowania byłoby wywrócenie
+     produkcji — a właśnie tak się o nim dowiedzieliśmy. */
+  imp: () => Promise<unknown> = importFromMssql,
+): Promise<void> {
+  try {
+    await imp();
+    bladImportuStartowego = null;
+  } catch (e) {
+    const powod = e instanceof Error ? e.message : String(e);
+    bladImportuStartowego =
+      `Import z Subiekta nie powiódł się (${etap}): ${powod}. ` +
+      "Kartoteki i stany pochodzą z ostatniego udanego odświeżenia.";
+    console.error("[mssql] odświeżenie nieudane:", powod);
+  }
+}
+
 export async function buildApp() {
   const app = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
@@ -79,19 +122,44 @@ export async function buildApp() {
      była przez niego NIEWYKRYWALNA. Teraz `ok` jest fałszywe, gdy cokolwiek
      wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
   app.get("/api/health", async () => {
-    const worker = stanWorkera();
+    /* Trasa zdrowia jest JEDYNYM sposobem, w jaki instalator i biuro poznają,
+       że system żyje — `Test-WertisHealth` odpytuje ją piętnaście razy i po
+       piętnastym wyjątku melduje „API nie odpowiedziało". Blok, który rzuci,
+       nie ma więc prawa zabrać ze sobą całej odpowiedzi: zwraca `null`
+       i melduje się zdaniem wśród problemów. Odpowiedź niepełna mówi, czego
+       brakuje; brak odpowiedzi nie mówi nic. */
+    const awarie: string[] = [];
+    const bez = <T>(nazwa: string, fn: () => T): T | null => {
+      try {
+        return fn();
+      } catch (e) {
+        awarie.push(`Blok „${nazwa}" trasy zdrowia padł: ${e instanceof Error ? e.message : e}`);
+        return null;
+      }
+    };
+
+    const worker = bez("worker", stanWorkera) ?? { problem: null, zyje: false, sgtMode: "?", widziany: null };
     /* Blok Sfery istnieje TYLKO przy SFERA_WORKER=1. Bez przełącznika brak
        tego procesu jest normą (etapy 0-1 wdrożenia) i zdanie o nim robiłoby
        każdą dotychczasową instalację czerwoną bez powodu. */
-    const sfera = config.sferaWorker ? stanSfery() : null;
+    const sfera = config.sferaWorker ? bez("worker Sfery", stanSfery) : null;
+    /* Bloki danych liczone PRZED listą problemów, nie w obiekcie zwracanym:
+       `bez()` melduje awarię dopisaniem do `awarie`, a lista problemów jest
+       budowana raz. Odwrotna kolejność dawała pustą sekcję BEZ zdania o tym,
+       dlaczego jest pusta — czyli dokładnie tę ciszę, którą ta trasa ma łamać. */
+    const allegro = bez("połączenie Allegro", stanPolaczenia);
+    const allegroInbox = bez("synchronizacja Allegro", () => stanSynchronizacjiHealth(db()));
+    const obsluga = bez("obsługa klienta", stanObslugiHealth);
+    const audyt = bez("audyt", statystykiAudytu);
+
     const problemy = [
       worker.problem,
       sfera?.problem ?? null,
-      config.sferaWorker ? zaleglosciMm() : null,
+      config.sferaWorker ? bez("zaległości MM", zaleglosciMm) : null,
       /* PIERWSZY na liście świadomie: przykryta konfiguracja unieważnia
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
          więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
-      problemPrzykrytejKonfiguracji(envFile, config.sgtMode),
+      bez("konfiguracja", () => problemPrzykrytejKonfiguracji(envFile, config.sgtMode)),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
       /* Sprzedaż bez kolumny numeru obcego dopasowuje zwroty tylko po
@@ -105,12 +173,12 @@ export async function buildApp() {
       bladImportuMm,
       /* Groźniejszy od awarii jest pusty wynik: dokumenty są, pozycji zero,
          a kosz z zerem pozycji na kolektorze wygląda jak dzień bez zwrotów. */
-      przyjeciaBezPozycji(),
-      problemAllegro(),
+      bez("przyjęcia bez pozycji", przyjeciaBezPozycji),
+      bez("konto Allegro", problemAllegro),
       /* Brak własnego User-Agenta grozi zablokowaniem klucza przez Allegro
          (ostrzeżenie z ekranu rejestracji aplikacji), a objawia się dopiero
          blokadą — czyli wtedy, gdy jest już za późno na spokojną naprawę. */
-      problemUserAgenta(),
+      bez("User-Agent Allegro", problemUserAgenta),
       /* Zdjęcia: brak dostępu do źródła wygląda dokładnie tak samo jak
          kartoteka bez zdjęcia — pusty slot na karcie. Bez tego zdania nikt by
          nie skojarzył, że przyczyną jest brak GRANT-u albo zły katalog. */
@@ -123,7 +191,11 @@ export async function buildApp() {
          konfiguracji — ale dokumenty chodzą wtedy po ekranie jako `TYP-7`
          i ktoś powinien to dokończyć. Bez tej linii nie miałoby to gdzie
          wypłynąć. */
-      nienazwaneTypyDostaw(),
+      bez("typy dostaw", nienazwaneTypyDostaw),
+      /* Read-model Subiekta bywa nieświeży i to jest stan do zameldowania,
+         a nie powód, żeby nie wstać — patrz `odswiezReadModel`. */
+      bladImportuStartowego,
+      ...awarie,
     ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
@@ -152,12 +224,15 @@ export async function buildApp() {
          z każdej zakładki, a nie dopiero po odczycie listy zwrotów. Trasa jest
          publiczna i to jest w porządku: payload to stan/środowisko/data
          wygaśnięcia — bez loginu konta i bez tokenów. */
-      allegro: stanPolaczenia(),
-      allegroInbox: stanSynchronizacjiHealth(db()),
+      allegro,
+      allegroInbox,
       /* Liczby obsługi klienta z §21 projektu panelu: ile pytań czeka i jak
          długo wisi najstarsze zadanie dla hali. Same liczby — trasa jest
          publiczna, więc klient, treść i numer oferty tu nie wchodzą. */
-      obsluga: stanObslugiHealth(),
+      obsluga,
+      /* Liczby obsługi klienta z §21 projektu panelu: ile pytań czeka i jak
+         długo wisi najstarsze zadanie dla hali. Same liczby — trasa jest
+         publiczna, więc klient, treść i numer oferty tu nie wchodzą. */
       /* Pole addytywne — kolektor go nie deserializuje (Dtos.kt ignoruje
          nieznane pola), więc stare APK nie mają czego zepsuć. */
       ...(sfera ? { sfera: { zyje: sfera.zyje, mode: sfera.sgtMode, widziany: sfera.widziany } } : {}),
@@ -165,7 +240,7 @@ export async function buildApp() {
          przychodzi po miesiącach. Ale „rośnie w nieskończoność" bez licznika
          kończy się pełnym dyskiem o trzeciej w nocy, więc rozmiar i wiek
          historii widać tutaj. Decyzję o archiwum podejmuje się na liczbach. */
-      audyt: statystykiAudytu(),
+      audyt,
       /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
          z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
       ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),
@@ -235,15 +310,12 @@ async function main() {
   ziarnoKontaDemo();
   zamelduj("api");
 
-  // SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
-  // starcie (twardy błąd, gdy baza nieosiągalna), potem co MSSQL_SYNC_MS.
+  /* SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
+     starcie, potem co MSSQL_SYNC_MS. Awaria NIE kończy procesu; uzasadnienie
+     przy `odswiezReadModel`. */
   if (config.sgtMode === "mssql") {
-    await importFromMssql();
-    setInterval(() => {
-      importFromMssql().catch((e) =>
-        console.error("[mssql] odświeżenie nieudane:", e instanceof Error ? e.message : e)
-      );
-    }, config.mssql.syncMs);
+    await odswiezReadModel("start");
+    setInterval(() => void odswiezReadModel("cykl"), config.mssql.syncMs);
   }
 
   /* Wyłącznie punkt wejścia uruchamia pracę w tle: import buildApp w testach

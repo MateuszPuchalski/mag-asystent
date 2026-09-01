@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { BladLimituAllegro, allegroUserAgent, retryAfterMs } from "./allegro.js";
+import { BladLimituAllegro, BladOdpowiedziAllegro, allegroUserAgent, retryAfterMs } from "./allegro.js";
 import { wazneBearer } from "../services/allegro-token.js";
 
 /* ── Allegro — połączenie HTTP ───────────────────────────────────────────────
@@ -179,16 +179,18 @@ export async function zapytajAllegro(
 
     if (odp.status === 404) return null;
     if (odp.status === 401) {
-      throw new Error(
+      throw new BladOdpowiedziAllegro(
         "Allegro odrzuciło token (401) — sparuj konto ponownie: " +
-          "/biuro → STAN SYSTEMU → KONTO ALLEGRO."
+          "/biuro → STAN SYSTEMU → KONTO ALLEGRO.",
+        401
       );
     }
     if (odp.status === 403) {
-      throw new Error(
+      throw new BladOdpowiedziAllegro(
         `Brak uprawnienia (403) — aplikacja na developer.allegro.pl musi mieć scope ` +
           `${scopeDlaUrl(url)}. Po dodaniu uprawnienia sparuj konto ponownie: ` +
-          "token wydany pod stary zakres sam się nie rozszerzy."
+          "token wydany pod stary zakres sam się nie rozszerzy.",
+        403
       );
     }
     if (odp.status === 429) {
@@ -203,7 +205,8 @@ export async function zapytajAllegro(
     }
     if (!odp.ok) {
       const tresc = await odp.text().catch(() => "");
-      throw new Error(`Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`);
+      throw new BladOdpowiedziAllegro(
+        `Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`, odp.status);
     }
 
     dzialajacyAccept.set(rodzina, accept);

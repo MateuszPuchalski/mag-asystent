@@ -2,7 +2,7 @@ import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.http.js";
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
-import { BladLimituAllegro } from "../adapters/allegro.js";
+import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 
 type Thread = { id: string; read: boolean; lastMessageDate: string;
@@ -10,14 +10,12 @@ type Thread = { id: string; read: boolean; lastMessageDate: string;
 type Message = { id: string; author: { login: string; role: string }; text: string;
   relatedObject: { type: string; id: string } | null; read: boolean };
 
-/* Adapter Allegro zamienia kody na zdania po polsku, bo to one trafiają na
-   ekran biura. Status synchronizacji potrzebuje jednak samego kodu, więc
-   wyjmujemy go z komunikatu — jedyne miejsce, w którym ta wiedza jest
-   powielona, i dlatego stoi tu, a nie w trzech miejscach. */
-function kodHttp(error: unknown): number | null {
-  const m = /\((\d{3})\)/.exec(error instanceof Error ? error.message : "");
-  return m ? Number(m[1]) : null;
-}
+/* Kod bierze się z KLASY błędu, nie z jego zdania. Do 0.149.0 stało tu
+   wyrażenie szukające kodu w nawiasie — łapało „(401)", ale nie „Allegro
+   odpowiedziało 503: …", więc status synchronizacji milczał akurat przy
+   odmowach, które sam ma nazywać. */
+const kodHttp = (error: unknown): number | null =>
+  error instanceof BladOdpowiedziAllegro ? error.status : null;
 
 function tablica<T>(value: unknown, pole: string): T[] {
   if (!value || typeof value !== "object" || !Array.isArray((value as Record<string, unknown>)[pole])) {

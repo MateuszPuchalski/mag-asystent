@@ -147,6 +147,20 @@ def sprawdz_wersje() -> int:
         print(f"ZŁA WERSJA      server/package.json → {srv}, w korzeniu {wersja}")
         bad += 1
 
+    # Plik blokady niesie własną kopię numeru w DWÓCH miejscach i `npm ci`
+    # jej nie poprawia. Rozjazd nie psuje instalacji, ale kłamie: wersja
+    # w blokadzie została na 0.145.1 przez trzy podbicia i wyszła dopiero przy
+    # czytaniu repo po awarii. Repo ma na to precedens — commit „Plik blokady
+    # dogania wersję 0.145.0" — a precedens bez mechanizmu wraca.
+    blok = json.load(open("package-lock.json", encoding="utf-8"))
+    for gdzie, wpis in (("", blok), ('packages[""]', blok.get("packages", {}).get("", {}))):
+        wblok = wpis.get("version")
+        if wblok is not None and wblok != wersja:
+            etykieta = f"package-lock.json {gdzie}".strip()
+            print(f"ZŁA WERSJA      {etykieta} → {wblok}, w korzeniu {wersja}")
+            print("                napraw: npm install --package-lock-only")
+            bad += 1
+
     # Android czyta package.json przy budowaniu; pilnujemy, że NADAL czyta,
     # a nie że ktoś w pośpiechu wpisał numer z powrotem na sztywno.
     gradle = open("android/app/build.gradle.kts", encoding="utf-8").read()

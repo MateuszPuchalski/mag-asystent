@@ -33,6 +33,40 @@ historii nie przepisujemy.
 
 ---
 
+## 0.149.0 — 1 września 2026
+
+**Awaria Subiekta przestaje kłaść całe API.** Import read-modelu przy starcie
+był twardym błędem: `main()` czekał na niego przed nasłuchem, a wyjątek kończył
+proces. Jeden zerwany klucz obcy położył w ten sposób kolektory, które
+o Subiekta nie pytają, i panel biura, który czyta własne tabele.
+
+Nowa reguła: read-model ma prawo być nieświeży, API nie ma prawa nie wstać.
+Dane sprzed ostatniego udanego importu zostają w bazie, a `/api/health` mówi
+zdaniem, że tak jest. To ta sama lekcja co 0.53.1 — tym razem z mechanizmem.
+
+**Trasa zdrowia nie pada w całości przez jeden licznik.** Zbiera kilkanaście
+liczb z bazy i z adapterów; dotąd rzut jednej zabierał całą odpowiedź.
+Instalator odróżnia wtedy martwy proces od zepsutego licznika tylko po tym, że
+oba wyglądają identycznie. Blok, który padnie, zwraca puste pole i melduje się
+zdaniem wśród problemów.
+
+**`/api/health` dostaje pierwsze testy.** Nie miała ich wcale, choć to po niej
+instalator poznaje, że system żyje.
+
+**Status synchronizacji Allegro bierze kod z klasy błędu, nie ze zdania.**
+Wyrażenie szukające kodu w nawiasie łapało „(401)", ale nie „Allegro
+odpowiedziało 503: …" — czyli milczało akurat przy odmowach, które ten status
+ma nazywać.
+
+**Instalator nie pobiera już przeglądarek Playwrighta.** Od 0.146.0 są
+zależnością deweloperską panelu, a ich instalacja dociąga kilkaset megabajtów
+Chromium, których magazyn nigdy nie użyje. CI blokuje to od początku, produkcja
+nie blokowała wcale.
+
+**Plik blokady dogania wersję i dostaje strażnika.** Został na 0.145.1 przez
+trzy podbicia. `tools/docs_check.py` pilnuje teraz obu miejsc, w których numer
+tam stoi — precedens bez mechanizmu wraca.
+
 ## 0.148.1 — 1 września 2026
 
 **[wymaga działania]** API padało w pętli restartów po każdym starcie usług.
