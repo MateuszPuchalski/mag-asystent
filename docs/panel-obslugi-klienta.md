@@ -592,6 +592,64 @@ techniczna pokazuje źródło; negatywne dopasowania są widoczne; awaria
 synchronizacji jest jawna; każda mutacja ma autora i czas; system działa bez
 Teamsa i Slacka; agent obsłuży typowe pytanie bez otwierania panelu Allegro.
 
+## 25a. Zwroty klienckie
+
+Rozdział dopisany w 0.150.0. Odpowiada na pytanie §6 z `docs/obsluga-klienta.md`
+i opisuje drugi ekran obsługi — pierwszy poza skrzynką.
+
+### 25a.1. Czym jest zwrot
+
+Dwoma bytami o jednym numerze. Sprawa klienta żyje w Allegro: identyfikator,
+zegar ustawowy, pieniądze. Proces magazynowy żyje w Subiekcie: paczka wraca,
+korekta, MM na bufor. Panel spina oba i nie buduje trzeciego obiegu.
+
+### 25a.2. Kolejka bramek
+
+Ekran nie jest rejestrem. Praca dzieli się na kubełki, a w każdym stoi jedno
+pytanie, więc operator nie wybiera akcji z menu — odpowiada.
+
+| kubełek | pytanie | klawisze |
+|---|---|---|
+| DO DECYZJI | przyjąć czy odrzucić? | `P` `O` `J` |
+| DO OCENY | co z towarem? | `S` `C` `U` |
+| DO ZWROTU | ile oddać? | `Enter` `B` `K` |
+| DO KOREKTY | zlecić korektę? | `Enter` `R` |
+| ODRZUCONE, ZAMKNIĘTE | — | tylko wgląd |
+
+Po decyzji kursor schodzi na następny wiersz. Strzałki chodzą po kolejce,
+cyfry przełączają kubełek.
+
+Przełączenie kubełka przestawia też kursor na jego pierwszy zwrot. Bez tego
+jeden klawisz zmieniałby listę, a zaznaczenie zostawałoby na zwrocie
+z poprzedniego kubełka — i trzeba by dokliknąć wiersz.
+
+### 25a.3. Propozycja i sygnały
+
+Wiersz przyjeżdża z policzoną propozycją kwoty, więc typowy zwrot to jeden
+klawisz. Liczy ją serwer, panel niczego nie zgaduje.
+
+Sygnały są trzy: termin ustawowy blisko, towar jeszcze nie wrócił, sprawa
+rozstrzygnięta już w panelu Allegro. Czwarty z projektu — rozjazd liczby
+sztuk — czeka na ocenę hali z 0.151.0.
+
+Kolejność bierze się z terminu ustawowego, nie z daty wpływu.
+
+### 25a.4. Układ
+
+Trzy kolumny, jak §10.1: kolejka, pasek werdyktu z osią, dowody. Dwa ekrany
+obsługi mają mieć jeden nawyk, nie dwa.
+
+### 25a.5. Cofnięcie zamiast potwierdzenia
+
+Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
+zwrotu. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
+
+### 25a.6. Czego panel nie wie
+
+Kwota pełna to pozycje plus dostawa, a kosztu dostawy zwrot nie niesie —
+stoi przy zamówieniu. Do czasu dociągnięcia zamówienia panel proponuje samą
+sumę pozycji i mówi o tym na ekranie.
+
 ## 26. Decyzje do potwierdzenia
 
 Ile kont Allegro podłączymy? Ilu agentów pracuje jednocześnie? Jak długo
@@ -654,3 +712,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
+| Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
+| Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
+| Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
+| Werdykt, kwota, ocena, korekta | **projekt** | kolumny stoją, zapisu nie ma — 0.151.0 |
+| Zwrot pieniędzy i odmowa w Allegro | **projekt** | `outbox`, `commandId` — 0.151.0 |
+| Automat korekty przez Sferę | **projekt** | kontrakt `korekta_zwrot` żyje, brak nadawcy |

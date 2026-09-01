@@ -1041,6 +1041,18 @@ dokument MM ZWROTY wystawiony w Subiekcie**, opisany w sekcji niżej. Decyzje
 o pozycjach, korekty sprzedaży i zwrot środków robi biuro poza aplikacją:
 w Subiekcie i w panelu Allegro.
 
+**Od 0.150.0 biuro znów WIDZI zwroty — w panelu obsługi, zakładka ZWROTY.**
+To wydanie wyłącznie czyta. Pokazuje kolejkę zwrotów z terminem ustawowym,
+pozycjami i proponowaną kwotą, więc biuro nie musi otwierać panelu Allegro,
+żeby wiedzieć, co czeka. Decyzji nadal nie zapisuje: werdykt, kwota, ocena
+towaru i korekta wchodzą w kolejnym wydaniu.
+
+Zdanie wyżej zostaje więc w mocy w części o DECYZJACH. Zmienia się tylko to,
+gdzie biuro patrzy, zanim je podejmie.
+
+Ta zmiana nie rusza obiegu magazynowego. Kosze z dokumentu MM ZWROTY działają
+jak dotąd i kolektor jej nie widzi.
+
 Kolektor tej zmiany nie widzi. Zakładki SKAN, DOSTAWY, ZWROTY i KARTON
 działają jak dotąd, bo żadna z nich nie dotykała kasowanego rejestru.
 Wgrywanie nowego APK nie jest do tego wydania potrzebne.
@@ -1422,6 +1434,20 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 **APK przynosi ten sam instalator** — ląduje w `server\data\apk\`, a kolektory
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
+
+**Aktualizacja do 0.150.0 nie wymaga niczego ręcznego.** Pięć nowych tabel
+zwrotów dochodzi migracją przy pierwszym starcie. Ticker zwrotów rusza tylko
+przy sparowanym koncie Allegro w trybie `http`, a jego domyślny odstęp to
+pięć minut. Nowego APK to wydanie nie potrzebuje.
+
+**Pierwszy przebieg pobiera zwroty z dziewięćdziesięciu dni wstecz.** Potem
+rządzi kursor i pobierane są tylko nowe. Okno zmienia
+`ALLEGRO_ZWROTY_DNI_WSTECZ`, ale działa ono raz — na świeżej bazie.
+
+**Gdy zakładka ZWROTY jest pusta, odpowiedź stoi w pasku stanu panelu.**
+Ten sam blok co przy skrzynce mówi, kiedy była ostatnia udana synchronizacja
+i jaki kod zwróciło Allegro. Puste konto i zablokowany token wyglądają
+inaczej i tak ma być.
 
 **Aktualizacja do 0.140.0 kasuje osiemnaście tabel — zrób kopię bazy.**
 Odchodzi cała obsługa klienta z rejestrem zwrotów włącznie. Kopię wykonaj

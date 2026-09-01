@@ -6,10 +6,12 @@ import {
   urlDyskusji,
   urlListyZwrotow,
   urlOpinii,
+  urlRoszczenProwizji,
   urlOstatnichZamowien,
   urlWatkow,
   urlWiadomosci,
   urlWiadomosciDyskusji,
+  urlZwrotu,
   zapytajAllegro,
 } from "./adapters/allegro.http.js";
 
@@ -144,10 +146,31 @@ async function main(): Promise<void> {
     ).md
   );
 
+  /* Zwroty rozwijamy do szczegółu, tak jak wątki do wiadomości. Powód jest
+     ten sam: od 0.150.0 panel zwrotów czyta LISTĘ, więc sonda ma potwierdzić,
+     że lista niesie komplet pól, a nie tylko nagłówek. Rozjazd między listą
+     a szczegółem byłby widoczny dopiero na produkcji. */
+  const zwroty = await sekcja("`/order/customer-returns` — zwroty", async () =>
+    tablica(await zapytajAllegro(urlListyZwrotow(api, null, 0)), "customerReturns")
+  );
+  sekcje.push(zwroty.md);
+
   sekcje.push(
     (
-      await sekcja("`/order/customer-returns` — zwroty", async () =>
-        tablica(await zapytajAllegro(urlListyZwrotow(api, null, 0)), "customerReturns")
+      await sekcja("`/order/customer-returns/{id}` — szczegół zwrotu", async () => {
+        const zebrane: unknown[] = [];
+        for (const id of idy(zwroty.rekordy, ROZMOW)) {
+          zebrane.push(await zapytajAllegro(urlZwrotu(api, id)));
+        }
+        return zebrane;
+      })
+    ).md
+  );
+
+  sekcje.push(
+    (
+      await sekcja("`/order/refund-claims` — roszczenia o zwrot prowizji", async () =>
+        tablica(await zapytajAllegro(urlRoszczenProwizji(api, 0)), "refundClaims")
       )
     ).md
   );

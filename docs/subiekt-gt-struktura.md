@@ -6,10 +6,15 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało osiem.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzynaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
+
+Liczba urosła w 0.150.0 z ośmiu na trzynaście. Pięć nowych pozycji to zwroty
+klienckie: mapowanie powstało z oficjalnej specyfikacji Allegro, ale
+z jej kopii sprzed dwóch lat. `npm run sonda` na żywym koncie zdejmie te
+znaczniki i wtedy liczba wróci w dół.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 

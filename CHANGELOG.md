@@ -33,6 +33,96 @@ historii nie przepisujemy.
 
 ---
 
+## 0.150.0 — 1 września 2026
+
+**Zwroty Allegro wracają — jako kolejka decyzji, nie jako rejestr.** Panel
+obsługi dostaje trzecią zakładkę: ZWROTY. Biuro widzi wszystkie zwroty
+klienckie razem z terminem ustawowym, nie otwierając panelu Allegro. To jest
+odpowiedź na pytanie §6 z `docs/obsluga-klienta.md`, jedyne z ośmiu, które od
+0.140.0 stało puste.
+
+**Zwrot jest dwoma bytami o jednym numerze i ekran to pokazuje.** Sprawa
+klienta żyje w Allegro, proces magazynowy w Subiekcie, a WERTIS trzyma wiersz
+spinający oba. Trzeciego obiegu magazynowego nie ma: towar wraca na półkę
+dalej wyłącznie dokumentem MM ZWROTY, a ocena pójdzie istniejącym zadaniem
+terenowym. Rejestr skasowany w 0.140.0 próbował być naraz kartą zwrotu,
+dokumentem i kolejką korekt — ten nie próbuje.
+
+**Praca dzieli się na kubełki, a w kubełku stoi jedno pytanie.** Rejestr każe
+najpierw znaleźć zwrot, potem wybrać akcję z menu — dwa kliknięcia przed
+jakąkolwiek decyzją. Tu operator nie wybiera, co zrobić: kubełek już to
+powiedział. Wiersz przyjeżdża z policzoną kwotą, więc typowy zwrot ma być
+jednym klawiszem. Strzałki chodzą po kolejce, cyfry przełączają kubełek.
+
+**Kolejność bierze się z zegara ustawowego, nie z daty wpływu.** Zwrot
+z dwoma dniami zapasu stoi nad wczorajszym. To blizna 0.121.0 zastosowana do
+zwrotów: ustawowy termin jest osobnym bytem i steruje kolejnością pracy.
+Liczbę dni podaje `ZWROT_TERMIN_DNI`, bo to liczba z prawa, a nie z kodu.
+
+**Sygnały są trzy, bo czwarty nie miałby z czego się zapalić.** Termin blisko,
+towar jeszcze nie wrócił, sprawa rozstrzygnięta już w panelu Allegro.
+Rozjazd liczby sztuk czeka na ocenę hali. Kolor zapalany zawsze uczy
+operatora go ignorować.
+
+**Mapowanie pochodzi z oficjalnej specyfikacji Allegro, nie z pamięci.**
+`developer.allegro.pl` jest niedostępny z sieci, w której powstał ten kod,
+więc pola odczytano z publicznej kopii wygenerowanego klienta OpenAPI.
+Spełnia to regułę §8.2 projektu panelu, ale kopia ma dwa lata — rzeczy od
+niej młodsze noszą `[WERYFIKUJ]`. Licznik w preambule
+`docs/subiekt-gt-struktura.md` urósł z ośmiu na trzynaście i zejdzie po
+pierwszym `npm run sonda` na żywym koncie.
+
+**Synchronizator idzie kursorem, nie offsetem.** Allegro przyjmuje przy liście
+zwrotów parametr `from` — identyfikator ostatnio widzianego zwrotu. Offset
+gubi rekord, gdy w środku strony pojawi się nowy; kursor nie. To blizna
+0.127.0 zdjęta u źródła, a nie obchodzona bezpiecznikiem. Bezpiecznik i tak
+stoi: dziesięć stron na przebieg.
+
+**Konta bankowego i telefonu nadawcy nie pobieramy.** Odpowiedź Allegro niesie
+przy zwrocie IBAN, właściciela konta i jego adres, a przy paczce telefon
+nadawcy. Zwrot da się rozstrzygnąć bez nich. Kolumn na te pola nie ma wcale,
+więc nieuważne mapowanie wywali się na zapytaniu, zamiast wyciec po cichu do
+kopii zapasowej. Zostaje sam fakt powrotu paczki.
+
+**To wydanie wyłącznie czyta.** Ani jednej trasy zapisu, ani jednego żądania
+POST do Allegro — pilnuje tego test tras, tak jak licznik `method:` pilnuje
+panelu biura. Werdykt, kwota, ocena i korekta wchodzą w 0.151.0; kolumny
+i klawisze już na nie czekają, a ekran mówi o tym wprost zamiast pokazywać
+przyciski, które nie działają.
+
+**Nazwy `zwrot` i `zwrot_pozycja` są spalone na zawsze.** Migracja kasująca
+obsługę klienta chodzi przy KAŻDYM starcie, bo bazy klientów wciąż mają tamte
+tabele. Tabela nazwana tak samo powstałaby ze schematu i znikała sekundę
+później, po cichu i bez błędu, z pustym ekranem jako jedynym objawem. Zwroty
+wróciły więc jako `zwrot_klienta`, a strażnik tej miny stoi w
+`db/migracja-zwrotow.test.ts`.
+
+**Drugi ticker Allegro ma inny rytm, nie tylko inne przesunięcie.** Zwroty
+tykają co pięć minut, skrzynka co minutę: zwrot ma termin w dniach, pytanie
+klienta czeka na odpowiedź. Równy chór dwóch pętli z jednego adresu to ta
+sygnatura maszyny, która w sierpniu 2026 skończyła się blokadą IP.
+
+**Aktywna zakładka panelu przestaje wynikać z liczby zakładek.** Wyrażenie
+wybierające ją działało dla dwóch i przy trzeciej podświetlałoby ZADANIA na
+ekranie zwrotów. Mina uzbrojona od 0.146.0, rozbrojona przy pierwszym
+ekranie, który ją uruchamiał.
+
+**Licznik `[WERYFIKUJ]` przestaje kończyć się na dziewięciu.** Słownik
+liczebników w `tools/docs_check.py` nie znał większych liczb, więc pierwsza
+sekcja przekraczająca próg zatrzymywałaby bramkę — a jedynym wyjściem
+wyglądającym na łatwe byłoby skasowanie znacznika. Licznik ma zmuszać do
+sprawdzenia rzeczy, nie do jej ukrycia.
+
+**Konto kanału ma jedną funkcję zamiast dwóch kopii.** `kontoKanalu` stało
+prywatnie w synchronizatorze skrzynki; zwroty potrzebują tego samego wiersza.
+Druga kopia rozjechałaby się przy pierwszej zmianie klucza konta, a wtedy
+rozmowy i zwroty tego samego sprzedawcy wylądowałyby na dwóch kontach.
+
+**Nic ręcznego przy wdrożeniu.** Pięć nowych tabel dochodzi schematem, ticker
+zwrotów startuje tylko przy sparowanym koncie Allegro w trybie `http`, a
+domyślne wartości `ALLEGRO_ZWROTY_SYNC_MS`, `ALLEGRO_ZWROTY_DNI_WSTECZ`
+i `ZWROT_TERMIN_DNI` działają bez wpisu w `wertis.env`.
+
 ## 0.149.0 — 1 września 2026
 
 **Awaria Subiekta przestaje kłaść całe API.** Import read-modelu przy starcie

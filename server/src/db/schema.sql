@@ -749,6 +749,123 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   next_attempt_at TEXT
 );
 
+-- ── Zwroty klienckie z Allegro (0.150.0) ────────────────────────────────────
+-- Zwrot jest DWOMA BYTAMI O JEDNYM NUMERZE: sprawą klienta w Allegro (zegar
+-- ustawowy, pieniądze) i procesem magazynowym w Subiekcie (paczka wraca,
+-- korekta, MM na bufor). Te tabele spinają oba i NIE budują trzeciego obiegu
+-- magazynowego: fizyczne odłożenie zostaje w koszach z dokumentu MM ZWROTY,
+-- a ocena towaru idzie istniejącym `zadanie_terenowe`.
+--
+-- Podział na lądowisko i model pracy jest ten sam co przy skrzynce:
+-- `allegro_zwrot` trzyma odpowiedź w kształcie, w jakim przyszła, a panel
+-- czyta wyłącznie `zwrot_klienta`.
+--
+-- NAZWY `zwrot` I `zwrot_pozycja` SĄ SPALONE — `bezObslugiKlienta()` kasuje
+-- je przy KAŻDEJ migracji, więc tabela o takiej nazwie znikałaby po cichu
+-- sekundę po powstaniu. Powód i strażnik stoją w `db/db.ts`.
+CREATE TABLE IF NOT EXISTS allegro_zwrot (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  surowe_json TEXT NOT NULL,
+  synced_at TEXT NOT NULL
+);
+
+-- Model pracy. KUBEŁKA NIE MA W KOLUMNIE: wynika z faktów niżej i liczy go
+-- `services/zwroty.ts`. Zdenormalizowany kubełek rozjechałby się z werdyktem
+-- przy pierwszym zapisie, który go zapomni — a to jest dokładnie ten gatunek
+-- usterki, który kosztował licznik błędów w 0.147.0.
+CREATE TABLE IF NOT EXISTS zwrot_klienta (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  reference_number TEXT,
+  order_id TEXT,
+  -- Moment z Allegro. Od niego liczy się zegar ustawowy, więc jest NOT NULL:
+  -- zwrot bez daty nie ma terminu, a termin steruje kolejnością pracy.
+  created_at TEXT NOT NULL,
+  -- Pierwsza paczka. NULL znaczy „towar jeszcze nie wrócił" i zapala sygnał
+  -- „brak dowodu", gdy termin już biegnie.
+  paczka_at TEXT,
+  -- Odrzucenie POBRANE z Allegro (ktoś kliknął w panelu Allegro, nie u nas).
+  -- Nasze własne odrzucenie ma osobne kolumny `werdykt_*`, bo pochodzenie
+  -- decyzji jest tu informacją, a nie szczegółem.
+  rejection_code TEXT,
+  rejection_reason TEXT,
+  -- ── Decyzje biura (zapisywane od 0.151.0) ──────────────────────────────
+  werdykt TEXT CHECK (werdykt IN ('przyjety','odrzucony')),
+  werdykt_at TEXT, werdykt_przez TEXT,
+  werdykt_user_id INTEGER REFERENCES app_user(user_id),
+  werdykt_powod TEXT,
+  kwota_wariant TEXT CHECK (kwota_wariant IN ('pelna','bez_wysylki','inna')),
+  kwota_grosze INTEGER,
+  kwota_at TEXT, kwota_przez TEXT,
+  korekta_queue_id INTEGER REFERENCES sfera_queue(id),
+  korekta_numer TEXT,
+  zamkniety_at TEXT,
+  -- Ocena towaru wraca z hali. `zadanie_terenowe` niesie ją w `wynik`;
+  -- tu stoi samo powiązanie, żeby oś zwrotu miała po czym trafić do zadania.
+  zadanie_id INTEGER REFERENCES zadanie_terenowe(id) ON DELETE SET NULL,
+  conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  -- Kontrola współbieżności, jak przy rozmowie: dwóch agentów nie zamyka
+  -- jednego zwrotu dwiema różnymi kwotami.
+  wersja INTEGER NOT NULL DEFAULT 1,
+  synced_at TEXT NOT NULL,
+  UNIQUE (channel_account_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_termin
+  ON zwrot_klienta(created_at);
+
+CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+  offer_id TEXT,
+  nazwa TEXT NOT NULL,
+  ilosc REAL NOT NULL,
+  -- Grosze w INTEGER, choć Allegro oddaje kwotę STRINGIEM. Powód jest ten
+  -- sam po obu stronach: liczba zmiennoprzecinkowa gubi grosz przy sumowaniu,
+  -- a tu sumujemy pozycje, żeby zaproponować kwotę zwrotu.
+  cena_grosze INTEGER NOT NULL,
+  waluta TEXT NOT NULL,
+  powod TEXT,
+  powod_komentarz TEXT,
+  -- Decyzja o towarze, jedna z trzech (0.151.0). NULL = hala jeszcze nie
+  -- oceniła; wtedy zwrot nie wchodzi do kubełka DO ZWROTU.
+  ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
+  ocena_at TEXT, ocena_przez TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
+  ON zwrot_klienta_pozycja(zwrot_id);
+
+-- Oś zwrotu. Wpisy wiszą przy ŹRÓDLE, nie przy sprawie — blizna 0.130.0,
+-- gdzie historia ginęła przy scalaniu.
+CREATE TABLE IF NOT EXISTS zwrot_zdarzenie (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+  rodzaj TEXT NOT NULL,
+  tresc TEXT,
+  dane_json TEXT,
+  kiedy_at TEXT NOT NULL,
+  kto TEXT,
+  kto_user_id INTEGER REFERENCES app_user(user_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_zdarzenie_zwrot
+  ON zwrot_zdarzenie(zwrot_id, kiedy_at);
+
+-- Stan synchronizatora zwrotów. Osobny wiersz od skrzynki, bo to osobna
+-- rodzina końcówek z własnym limitem i własnym kursorem.
+CREATE TABLE IF NOT EXISTS allegro_zwroty_sync_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  -- Identyfikator ostatnio widzianego zwrotu. Allegro przyjmuje go jako
+  -- `from` i oddaje zwroty utworzone PO nim — kursor, nie offset.
+  cursor_id TEXT,
+  cursor_at TEXT,
+  last_success_at TEXT,
+  last_attempt_at TEXT,
+  last_error_code INTEGER,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT
+);
+
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
 -- Kosz zastępuje papierową kartkę wożoną z towarem: biuro przypina zwroty do
 -- kosza skanem jego kodu, zamyka go, a magazynier na kolektorze rozkłada

@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ClipboardList, Inbox, LogOut, Warehouse } from "lucide-react";
+import { ClipboardList, Inbox, LogOut, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useZdrowie } from "./api/rozmowy";
 import { czas } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
+import { Zwroty } from "./ekrany/Zwroty";
 import { Zadania } from "./ekrany/Zadania";
 import "./index.css";
 
@@ -26,9 +27,14 @@ const klient = new QueryClient({
   },
 });
 
+/* `korzen` znaczy „to jest strona domowa panelu" i tylko ona dopasowuje się
+   po równości. Do 0.149.0 aktywną zakładkę wybierało wyrażenie
+   `endsWith("skrzynka") ? naSkrzynce : !naSkrzynce` — działało dla DWÓCH
+   zakładek i przy trzeciej podświetlałoby Zadania na ekranie zwrotów. */
 const ZAKLADKI = [
-  { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} /> },
-  { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} /> },
+  { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: true },
+  { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
+  { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
 ];
 
 /* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
@@ -51,7 +57,6 @@ function PigulkaSynchronizacji() {
 
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
-  const naSkrzynce = pathname.startsWith("/obsluga/skrzynka");
   return <header className="sticky top-0 z-20 border-b border-slate-200 bg-wertis-ink text-white">
     <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-5 py-3">
       <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
@@ -59,7 +64,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
         <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {
-          const aktywna = z.do.endsWith("skrzynka") ? naSkrzynce : !naSkrzynce;
+          const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
           return <Link key={z.do} to={z.do}
             className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
@@ -85,6 +90,10 @@ function App() {
             a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/skrzynka" element={<Skrzynka />} />
         <Route path="/obsluga/skrzynka/:id" element={<Skrzynka />} />
+        {/* Zwrot ma własny adres z tego samego powodu co rozmowa: odświeżenie
+            go nie gubi, a link do sprawy da się wkleić koledze. */}
+        <Route path="/obsluga/zwroty" element={<Zwroty />} />
+        <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>
