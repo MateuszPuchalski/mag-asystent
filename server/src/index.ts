@@ -50,6 +50,7 @@ import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js
 import { stanObslugiHealth } from "./services/skrzynka.js";
 import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
+import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { allegroTryb } from "./adapters/allegro.js";
 
@@ -332,6 +333,12 @@ async function main() {
        to ta sygnatura maszyny, która w sierpniu 2026 skończyła się blokadą
        (patrz nagłówek `services/takt.ts`). */
     uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, synchronizujAllegroZwroty);
+    /* Trzeci ticker, najrzadszy z całej trójki. Uzupełnia zamówienia do
+       zwrotów, które już mamy, więc po kilku przebiegach nie ma czego
+       pobierać i milczy — a gdy zwrot dojdzie, dociągnie mu kontekst
+       w kwadrans. Zwrot i tak ma termin liczony w dniach. */
+    uruchomTakt("allegro-zamowienia", config.allegro.zamowieniaSyncMs,
+      async () => { await uzupelnijZamowienia(); });
   }
 
   const app = await buildApp();

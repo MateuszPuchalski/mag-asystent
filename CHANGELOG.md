@@ -33,6 +33,83 @@ historii nie przepisujemy.
 
 ---
 
+## 0.152.0 — 1 września 2026
+
+**Zwrot pokazuje CAŁE zamówienie, ze zdjęciami i drogą do Allegro.** Kolumna
+ZAMÓWIENIE pokazywała dotąd goły identyfikator `7669d920-5cf4-11f1-…`, a towar
+opisywała sama nazwa. Operator i tak otwierał panel Allegro, żeby zobaczyć, co
+klient kupił i jak to wygląda — czyli robił dokładnie to, czego ten ekran miał
+go pozbawić.
+
+**Jedno pobranie zamówienia załatwia trzy rzeczy naraz.** Komplet pozycji, więc
+widać, że klient kupił trzy rzeczy, a oddaje jedną. Koszt dostawy, czyli
+brakujący składnik kwoty pełnej — do 0.151.0 ekran musiał pisać zdanie „bez
+kosztu dostawy", bo ten stoi przy zamówieniu, nie przy zwrocie. I SKU
+sprzedawcy, czyli mostek do kartoteki.
+
+**Kartoteka wywiedziona z oferty przestaje być „następnym".** Schemat
+`OfferReference` w specyfikacji, która weszła do repo w 0.151.0, ma pole
+`external.id` — „identyfikator oferty w systemie sprzedawcy", u tej firmy
+symbol z Subiekta. Projekt panelu §28 czekał na tę dokumentację od 0.141.0.
+
+**Automat proponuje, człowiek zatwierdza — jednym kliknięciem.** Dopasowanie
+niesie źródło i poziom pewności, jak żąda §11.3. Zero trafień i dwa trafienia
+dają brak, nigdy pierwszy z brzegu; po nazwie towaru nie dopasowujemy wcale,
+bo furtka na literówki prowadzi do CUDZEJ kartoteki i wysyła na halę zadanie
+o cudzym towarze.
+
+**Zdjęcia towaru wchodzą do panelu obsługi po raz pierwszy.** Miniatura
+w wierszu kolejki, kafel przy pozycji, powiększenie po kliknięciu. Trasa
+zdjęć stoi za sesją, więc obraz idzie przez `fetch` i `blob:` — gołe
+`<img src>` dostałoby 401. Razem z nią przyszły trzy lekcje z panelu
+magazynu, każda kupiona tam osobno: pamięć negatywu (o brak pytamy raz),
+najwyżej trzy pobrania naraz (przy pierwszym trafieniu serwer ciągnie plik
+z bazy firmy) i stały rozmiar kafla (rosnący przesuwa wiersze pod kursorem).
+
+**Numer zwrotu i zamówienie są klikalne.** Nazwa pozycji prowadzi do oferty —
+ten jeden adres opisuje specyfikacja, więc idzie bez znacznika. Adresy panelu
+sprzedawcy to strony UI, których nie opisuje nikt, więc wzorce stoją
+w konfiguracji i noszą `[WERYFIKUJ]`: gdy link trafi w 404, poprawia się to
+wpisem w `wertis.env`, a nie nowym wydaniem. Obok UUID-a zamówienia stanął
+przycisk kopiowania.
+
+**[wymaga działania] Zwroty bierzemy od 20 sierpnia 2026.** Decyzja
+właściciela, wpisana jako `ALLEGRO_ZWROTY_OD`. Granica jest STAŁA, nie
+ruchoma, i to jest różnica: okno „dziewięćdziesiąt dni wstecz" przesuwa się
+każdego dnia, więc po kwartale przestaje sięgać początku historii, a przy
+odtwarzaniu bazy z kopii wciąga co innego niż przy pierwszym uruchomieniu.
+Wartość spoza formatu daty zatrzymuje przebieg zamiast po cichu wrócić do
+okna dnowego.
+
+**[wymaga działania] Lądowiska przestają trzymać dane osobowe.** To jest
+poprawka nieprawdziwego zdania: polityka danych z 0.150.0 mówiła „konta
+bankowego i telefonu nadawcy nie pobieramy", a `allegro_zwrot.surowe_json`
+zapisywało odpowiedź DOSŁOWNIE — razem z IBAN-em, właścicielem konta i jego
+adresem. Model pracy był czysty, kopia zapasowa nie.
+
+Od tego wydania obie odpowiedzi przechodzą przez czyszczenie, zanim trafią do
+bazy: **wartość znika, klucz zostaje**. Lądowisko dalej niesie kształt, po
+który istnieje. Lista pól idzie po NAZWIE, nie po ścieżce, żeby pole dodane
+kiedyś przez Allegro pod tą samą nazwą odpadło samo. Wiersze zapisane
+wcześniej trzeba usunąć ręcznie — mówi o tym `DEPLOY.md`.
+
+To ten sam gatunek poprawki co w 0.143.0, gdzie szkic polityki twierdził, że
+treści rozmów nie trafiają do bazy. Wtedy poprawiliśmy zdanie, bo kopia treści
+była ceną za działający ekran. Tu poprawiliśmy kod, bo konto bankowe nie
+kupuje nam niczego.
+
+**Zwroty dostają pierwszą trasę zapisu.** Licznik tras zapisu w teście stał
+na zerze od 0.150.0 i był umową, jak licznik `method:` dla panelu magazynu.
+Jedynym zapisem jest potwierdzenie kartoteki — bez `tw_id` pozycja nie ma czym
+pokazać zdjęcia. Werdykt, kwota, ocena hali i korekta nadal nie mają tu
+trasy, a do Allegro z tego ekranu wciąż nie wychodzi nic.
+
+**Trzeci ticker Allegro jest najrzadszy z całej trójki.** Dociąga wyłącznie
+zamówienia do zwrotów, które już mamy, najwyżej dwadzieścia na przebieg — po
+kilku przebiegach nie ma czego pobierać i milczy. Bezpiecznik jest tu po to,
+żeby pierwsze uruchomienie nie wystrzeliło dziewięćdziesięciu żądań w jednym
+ciągu z jednego adresu.
+
 ## 0.151.0 — 1 września 2026
 
 **Mapowanie odczytu skrzynki Allegro było błędne w każdym polu. Skrzynka nie

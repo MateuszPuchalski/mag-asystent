@@ -62,6 +62,35 @@ export function urlListyZwrotow(
 }
 
 /**
+ * Jedno zamówienie (`/order/checkout-forms/{id}`).
+ *
+ * Zwrot niesie sam numer zamówienia, a decyzja potrzebuje jego treści: co
+ * jeszcze klient kupił, ile kosztowała dostawa i — to najważniejsze — jaki
+ * SKU ma sprzedana oferta. `checkoutForm.lineItems[].offer.external.id`
+ * (schemat `OfferReference` w `docs/allegro/swagger.yaml`) to identyfikator
+ * oferty w systemie sprzedawcy, czyli u tej firmy symbol z Subiekta.
+ *
+ * Jedno wywołanie na ZAMÓWIENIE, nie na ofertę. `/sale/product-offers/{id}`
+ * dałoby ten sam SKU po jednym strzale na pozycję i nie dałoby ani kosztu
+ * dostawy, ani pozycji, których klient nie zwraca.
+ */
+export function urlZamowienia(apiUrl: string, id: string): string {
+  return `${apiUrl}/order/checkout-forms/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Jedna oferta (`/sale/product-offers/{id}`) — po zdjęcia.
+ *
+ * Wchodzi dopiero tam, gdzie SKU nie trafił w kartotekę, bo kosztuje
+ * wywołanie na ofertę. `/sale/product-offers/{id}/parts` NIE jest tańszym
+ * zamiennikiem: schemat dopuszcza w `include` wyłącznie `stock` i `price`,
+ * więc zdjęć tamtędy nie ma.
+ */
+export function urlOferty(apiUrl: string, offerId: string): string {
+  return `${apiUrl}/sale/product-offers/${encodeURIComponent(offerId)}`;
+}
+
+/**
  * Szczegół jednego zwrotu (`/order/customer-returns/{id}`, Accept beta.v1).
  *
  * Lista oddaje już komplet pól zwrotu, więc ta końcówka NIE jest potrzebna
@@ -146,6 +175,10 @@ const dzialajacyAccept = new Map<string, string>();
  */
 export function scopeDlaUrl(url: string): string {
   if (url.includes("/messaging/")) return "allegro:api:messaging";
+  /* `product-offers` PRZED `offers`: pierwszy wzorzec zawiera drugi jako
+     podciąg tylko przy odwrotnej kolejności sprawdzania, ale oba i tak
+     żądają tego samego uprawnienia — kolejność jest tu dla czytelnika. */
+  if (url.includes("/sale/product-offers")) return "allegro:api:sale:offers:read";
   if (url.includes("/sale/offers")) return "allegro:api:sale:offers:read";
   /* Dyskusje: odczyt spraw, rozmowa i załączniki — jedno uprawnienie.
      [WERYFIKUJ] czy obejmuje też ZAPISY; jeśli nie, 403 i tak wskaże scope. */

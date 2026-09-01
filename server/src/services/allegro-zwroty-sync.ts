@@ -4,6 +4,7 @@ import { urlListyZwrotow, zapytajAllegro } from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
+import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 
 /* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
@@ -21,12 +22,18 @@ import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
    wywali się na SQL-u zamiast wyciec po cichu (pilnuje
    `db/migracja-zwrotow.test.ts`).
 
+   OD 0.152.0 DOTYCZY TO TAKŻE LĄDOWISKA. Do 0.151.0 `surowe_json` trzymało
+   odpowiedź dosłownie, więc IBAN i telefon nadawcy jednak lądowały w bazie —
+   wbrew zdaniu z polityki danych, które mówiło „nie pobieramy". Teraz
+   przechodzą przez `oczyscSurowy`: wartość znika, klucz zostaje, kształt
+   nadal da się obejrzeć.
+
    Rytm i respekt dla 429 bierze `services/takt.ts`; ponowień w środku
    przebiegu nie ma.                                                         */
 
 type Kwota = { amount?: string; currency?: string };
 type Pozycja = {
-  offerId?: string; quantity?: number; name?: string; price?: Kwota;
+  offerId?: string; quantity?: number; name?: string; price?: Kwota; url?: string;
   reason?: { type?: string; userComment?: string } | null;
 };
 type Paczka = { createdAt?: string; waybill?: string; carrierId?: string };
@@ -68,6 +75,7 @@ export interface ZwrotySyncDeps {
   intervalMs?: number;
   accountId?: string;
   oknoDni?: number;
+  od?: string;
 }
 
 function tablica<T>(value: unknown, pole: string): T[] {
@@ -93,6 +101,32 @@ export function naGrosze(amount: string | undefined): number {
   return m[1] === "-" ? -grosze : grosze;
 }
 
+/**
+ * Granica pierwszego pobrania.
+ *
+ * Data z konfiguracji wygrywa z oknem dnowym, bo jest STAŁA: mówi, gdzie
+ * zaczyna się historia zwrotów tej firmy, i nie przesuwa się z każdym dniem.
+ * Sama data (`2026-08-20`) znaczy początek tego dnia w UTC — zwrot zgłoszony
+ * tego dnia rano ma wejść, a nie wypaść o kilka godzin.
+ *
+ * Śmieciowa wartość NIE cofa nas po cichu do okna dnowego: to byłby ten sam
+ * gatunek cichej podmiany, przez który `MAG_ID_MAG=jeden` dawało kiedyś 1.
+ */
+export function poczatekHistorii(
+  { od, oknoDni, teraz }: { od: string; oknoDni: number; teraz: Date },
+): string {
+  const czyste = (od ?? "").trim();
+  if (!czyste) return new Date(teraz.getTime() - oknoDni * 86_400_000).toISOString();
+  const pelna = /^\d{4}-\d{2}-\d{2}$/.test(czyste) ? `${czyste}T00:00:00.000Z` : czyste;
+  const ms = Date.parse(pelna);
+  if (!Number.isFinite(ms)) {
+    throw new Error(
+      `ALLEGRO_ZWROTY_OD=${od} — oczekiwano daty ISO, np. 2026-08-20. Popraw w wertis.env.`
+    );
+  }
+  return new Date(ms).toISOString();
+}
+
 /** Najwcześniejsza paczka; NULL znaczy „towar jeszcze nie wrócił". */
 function pierwszaPaczka(paczki: Paczka[] | undefined): string | null {
   const daty = (paczki ?? []).map((p) => p.createdAt).filter((d): d is string => Boolean(d));
@@ -109,12 +143,12 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
   const oknoDni = deps.oknoDni ?? config.allegro.zwrotyOknoDni;
   const start = stanZwrotow(database);
 
-  /* Kursor rządzi, gdy jest; okno dat wchodzi TYLKO przy pierwszym przebiegu.
-     Trzymanie obu naraz zawężałoby wynik dwa razy i po dziewięćdziesięciu
-     dniach cicho przestałoby oddawać cokolwiek nowego. */
-  const odKiedy = start.cursorId
-    ? null
-    : new Date(now().getTime() - oknoDni * 86_400_000).toISOString();
+  /* Kursor rządzi, gdy jest; granica dat wchodzi TYLKO przy pierwszym
+     przebiegu. Trzymanie obu naraz zawężałoby wynik dwa razy i po jakimś
+     czasie cicho przestałoby oddawać cokolwiek nowego. */
+  const odKiedy = start.cursorId ? null : poczatekHistorii({
+    od: deps.od ?? config.allegro.zwrotyOd, oknoDni, teraz: now(),
+  });
 
   const zebrane: Zwrot[] = [];
   try {
@@ -180,7 +214,7 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   database.prepare(`INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at)
     VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET created_at=excluded.created_at,
     surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
-    zwrot.id, utworzono, JSON.stringify(zwrot), at);
+    zwrot.id, utworzono, JSON.stringify(oczyscSurowy(zwrot)), at);
 
   database.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,reference_number,order_id,created_at,paczka_at,
@@ -202,12 +236,28 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   /* Ocena hali NIE MA prawa zginąć przy odświeżeniu listy. Zdejmujemy ją
      przed przepisaniem pozycji i oddajemy po ofercie i nazwie — jedyne dwa
      pola, po których pozycja daje się rozpoznać między przebiegami. */
-  const oceny = new Map<string, { ocena: string; at: string | null; przez: string | null }>();
+  type Praca = {
+    ocena: string | null; at: string | null; przez: string | null;
+    twId: number | null; twSymbol: string | null; twZrodlo: string | null;
+    twAt: string | null; twPrzez: string | null;
+  };
+  const oceny = new Map<string, Praca>();
   for (const p of database.prepare(
-    "SELECT offer_id, nazwa, ocena, ocena_at, ocena_przez FROM zwrot_klienta_pozycja WHERE zwrot_id=? AND ocena IS NOT NULL",
-  ).all(id) as Array<Record<string, string | null>>) {
-    oceny.set(`${p.offer_id ?? ""}|${p.nazwa ?? ""}`,
-      { ocena: p.ocena as string, at: p.ocena_at, przez: p.ocena_przez });
+    `SELECT offer_id, nazwa, ocena, ocena_at, ocena_przez, tw_id, tw_symbol, tw_zrodlo,
+            tw_at, tw_przez
+     FROM zwrot_klienta_pozycja
+     WHERE zwrot_id=? AND (ocena IS NOT NULL OR tw_id IS NOT NULL)`,
+  ).all(id) as Array<Record<string, unknown>>) {
+    oceny.set(`${(p.offer_id as string) ?? ""}|${(p.nazwa as string) ?? ""}`, {
+      ocena: (p.ocena as string) ?? null,
+      at: (p.ocena_at as string) ?? null,
+      przez: (p.ocena_przez as string) ?? null,
+      twId: p.tw_id == null ? null : Number(p.tw_id),
+      twSymbol: (p.tw_symbol as string) ?? null,
+      twZrodlo: (p.tw_zrodlo as string) ?? null,
+      twAt: (p.tw_at as string) ?? null,
+      twPrzez: (p.tw_przez as string) ?? null,
+    });
   }
 
   database.prepare("DELETE FROM zwrot_klienta_pozycja WHERE zwrot_id=?").run(id);
@@ -215,12 +265,14 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
     const nazwa = poz.name ?? "";
     const stara = oceny.get(`${poz.offerId ?? ""}|${nazwa}`);
     database.prepare(`INSERT INTO zwrot_klienta_pozycja
-      (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,powod_komentarz,
-       ocena,ocena_at,ocena_przez)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+      (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,powod_komentarz,url,
+       ocena,ocena_at,ocena_przez,tw_id,tw_symbol,tw_zrodlo,tw_at,tw_przez)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       id, poz.offerId ?? null, nazwa, Number(poz.quantity ?? 0),
       naGrosze(poz.price?.amount), poz.price?.currency ?? "PLN",
-      poz.reason?.type ?? null, poz.reason?.userComment ?? null,
-      stara?.ocena ?? null, stara?.at ?? null, stara?.przez ?? null);
+      poz.reason?.type ?? null, poz.reason?.userComment ?? null, poz.url ?? null,
+      stara?.ocena ?? null, stara?.at ?? null, stara?.przez ?? null,
+      stara?.twId ?? null, stara?.twSymbol ?? null, stara?.twZrodlo ?? null,
+      stara?.twAt ?? null, stara?.twPrzez ?? null);
   }
 }

@@ -308,11 +308,26 @@ sam FAKT powrotu paczki. Surową odpowiedź Allegro trzyma osobne lądowisko
 `allegro_zwrot`, jak przy skrzynce — jest dowodem źródłowym przy sporze
 o kształt.
 
-**Konta bankowego i telefonu nadawcy NIE POBIERAMY.** Odpowiedź Allegro niesie
-`refund.bankAccount` z właścicielem, numerem konta, IBAN-em, SWIFT-em
+**Konta bankowego i telefonu nadawcy NIE ZAPISUJEMY.** Odpowiedź Allegro
+niesie `refund.bankAccount` z właścicielem, numerem konta, IBAN-em, SWIFT-em
 i adresem, a przy paczce `sender.phoneNumber`. Zwrot da się rozstrzygnąć bez
 nich. Kolumn na te pola nie ma wcale, więc nieuważne mapowanie wywali się na
-zapytaniu, zamiast wyciec po cichu do kopii zapasowej.
+zapytaniu, zamiast wyciec po cichu.
+
+**To zdanie było do 0.151.0 nieprawdziwe i tu jest poprawka.** Mówiło „nie
+pobieramy", a lądowisko `allegro_zwrot` zapisywało odpowiedź DOSŁOWNIE —
+razem z IBAN-em i telefonem. Model pracy był czysty, kopia zapasowa nie.
+
+Od 0.152.0 obie odpowiedzi przechodzą przez `services/allegro-oczyszczanie.ts`
+ZANIM trafią do bazy: wartość znika, klucz zostaje. Lądowisko dalej niesie
+kształt, po który istnieje, ale nie niesie już treści, której nie wolno nam
+trzymać. Kosztuje to część dowodu przy sporze o kształt — i dlatego pełny
+kontrakt czyta się dziś ze specyfikacji w repo, nie z kopii cudzych danych.
+
+To ten sam gatunek poprawki co w 0.143.0, gdzie szkic tej polityki twierdził,
+że treści rozmów nie trafiają do bazy. Wtedy poprawiliśmy ZDANIE, bo kopia
+treści była ceną za działający ekran. Tu poprawiliśmy KOD, bo konto bankowe
+nie kupuje nam niczego.
 
 **Zasada adresów zostaje nietknięta.** Adresy dostawy nie przechodzą przez
 mapowanie ani tu, ani w skrzynce.
@@ -321,9 +336,21 @@ mapowanie ani tu, ani w skrzynce.
 magazyniera idzie wyłącznie zadanie oceny towaru, tak jak przy pytaniach
 idzie samo zadanie pomiaru.
 
-**Nic nie wychodzi do Allegro w tym wydaniu.** Wersja 0.150.0 wyłącznie czyta;
-ani jednej trasy zapisu, ani jednego żądania POST do Allegro. Pilnuje tego
-test tras.
+**Zamówienie pobieramy w całości, bez danych kupującego.** Od 0.152.0 zwrot
+dociąga swoje zamówienie: pozycje, koszt dostawy i SKU sprzedawcy
+(`offer.external.id`). Adres dostawy, e-mail, telefon i PESEL kupującego nie
+przechodzą przez mapowanie ani przez lądowisko. Zostaje login — jedyna dana
+osobowa, którą ta polityka dopuszcza wprost.
+
+**Kartotekę wskazuje człowiek, a automat tylko proponuje.** Dopasowanie po
+SKU liczy się przy ODCZYCIE i niczego nie zapisuje; do bazy trafia dopiero
+potwierdzenie agenta, razem ze źródłem (`sku` albo `reczne`). Projekt panelu
+§4.3 nie pozwala, żeby wybór człowieka udawał fakt z Allegro — wybór automatu
+tym bardziej.
+
+**Do Allegro nadal nie wychodzi z tego ekranu nic.** Jedyny zapis zwrotów to
+potwierdzenie kartoteki, i zostaje on u nas. Werdykt, kwota, ocena hali
+i korekta wciąż czekają. Pilnuje tego licznik tras zapisu w teście.
 
 ## Wysyłka odpowiedzi (0.148.0)
 

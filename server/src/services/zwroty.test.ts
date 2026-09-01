@@ -26,23 +26,43 @@ function stanowisko() {
   return d as unknown as Db;
 }
 
+/** Zamówienie z kosztem dostawy i SKU — kontekst, którego zwrot sam nie ma. */
+function zamowienie(d: Db, ext: string, pozycje: Array<{ offerId: string; nazwa: string; sku: string | null; cena: number; ilosc?: number }>) {
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,
+    dostawa_grosze,dostawa_metoda,suma_grosze,waluta,synced_at)
+    VALUES (1,?,'READY_FOR_PROCESSING',1499,'Kurier InPost',20496,'PLN','2026-09-01T10:00:00Z')`).run(ext);
+  const id = Number((d.prepare("SELECT id FROM zamowienie_klienta WHERE external_id=?").get(ext) as { id: number }).id);
+  for (const p of pozycje) {
+    d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+      (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+      VALUES (?,?,?,?,?,?,'PLN')`).run(id, p.offerId, p.nazwa, p.sku, p.ilosc ?? 1, p.cena);
+  }
+}
+
+function towar(d: Db, twId: number, symbol: string) {
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(twId, symbol, `Towar ${symbol}`);
+}
+
 let kolejny = 0;
-type Poz = { ilosc: number; cena: number; ocena?: string };
+type Poz = { ilosc: number; cena: number; ocena?: string; offerId?: string;
+  nazwa?: string; url?: string; twId?: number; twSymbol?: string; twZrodlo?: string };
 
 function dodaj(d: Db, utworzono: string, pola: Record<string, unknown> = {},
                pozycje: Poz[] = [{ ilosc: 1, cena: 4999 }]) {
   const ext = `z${++kolejny}`;
-  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at,
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,
     paczka_at,werdykt,kwota_grosze,korekta_numer,zamkniety_at,rejection_code)
-    VALUES (1,?,?,?,?,?,?,?,?,?)`).run(
-    ext, utworzono, utworzono,
+    VALUES (1,?,?,?,?,?,?,?,?,?,?)`).run(
+    ext, (pola.order_id as string) ?? null, utworzono, utworzono,
     (pola.paczka_at as string) ?? null, (pola.werdykt as string) ?? null,
     (pola.kwota_grosze as number) ?? null, (pola.korekta_numer as string) ?? null,
     (pola.zamkniety_at as string) ?? null, (pola.rejection_code as string) ?? null);
   const id = Number((d.prepare("SELECT id FROM zwrot_klienta WHERE external_id=?").get(ext) as { id: number }).id);
   for (const p of pozycje) {
-    d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,nazwa,ilosc,cena_grosze,waluta,ocena)
-      VALUES (?,?,?,?,'PLN',?)`).run(id, "Sekator", p.ilosc, p.cena, p.ocena ?? null);
+    d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena,url,tw_id,tw_symbol,tw_zrodlo)
+      VALUES (?,?,?,?,?,'PLN',?,?,?,?,?)`).run(
+      id, p.offerId ?? null, p.nazwa ?? "Sekator", p.ilosc, p.cena, p.ocena ?? null,
+      p.url ?? null, p.twId ?? null, p.twSymbol ?? null, p.twZrodlo ?? null);
   }
   return id;
 }
@@ -149,4 +169,76 @@ test("propozycja kwoty to suma pozycji, nie zgadywana kwota pełna", () => {
   assert.equal(z.sumaPozycjiGrosze, 10498);
   assert.equal(z.waluta, "PLN");
   assert.equal(z.kwotaGrosze, null, "propozycja nie jest decyzją — kwota zostaje pusta");
+});
+
+test("kwota pełna dochodzi dopiero z zamówieniem — wcześniej jest brakiem, nie sumą", () => {
+  /* Do 0.151.0 ekran musiał pisać zdanie „bez kosztu dostawy", bo ten stoi
+     przy zamówieniu, nie przy zwrocie. Teraz albo znamy całość, albo mówimy
+     wprost, że jej nie znamy. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 2, cena: 8999, offerId: "111" }]);
+  assert.equal(listaZwrotow(d, TERAZ)[0].kwotaPelnaGrosze, null, "bez zamówienia nie zgadujemy");
+
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", cena: 8999 }]);
+  const z = listaZwrotow(d, TERAZ)[0];
+  assert.equal(z.sumaPozycjiGrosze, 17998);
+  assert.equal(z.kwotaPelnaGrosze, 17998 + 1499, "pozycje plus koszt dostawy");
+});
+
+test("panel pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
+  /* Klient kupił trzy rzeczy, oddaje jedną — to jest kontekst, którego
+     ekran do 0.151.0 nie miał wcale. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 8999, offerId: "111" }]);
+  zamowienie(d, "ord-1", [
+    { offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", cena: 8999 },
+    { offerId: "222", nazwa: "Zraszacz", sku: null, cena: 3490 },
+    { offerId: "333", nazwa: "Wąż 20 m", sku: "WAZ-20", cena: 5950 },
+  ]);
+  const zam = listaZwrotow(d, TERAZ)[0].zamowienie!;
+  assert.equal(zam.pozycje.length, 3);
+  assert.deepEqual(zam.pozycje.map((p) => p.zwracana), [true, false, false]);
+  assert.equal(zam.dostawaMetoda, "Kurier InPost");
+  assert.equal(zam.kupujacyLogin, null);
+});
+
+test("propozycja kartoteki liczy się z SKU zamówienia i niesie źródło", () => {
+  const d = stanowisko();
+  towar(d, 10, "SEK-46");
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 8999, offerId: "111" }]);
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", cena: 8999 }]);
+  const p = listaZwrotow(d, TERAZ)[0].pozycje[0];
+  assert.equal(p.twId, null, "propozycja to nie potwierdzenie");
+  assert.equal(p.propozycja?.pewnosc, "sku");
+  assert.equal(p.propozycja?.twId, 10);
+  assert.match(p.propozycja!.zrodlo, /SEK-46/);
+});
+
+test("przy potwierdzonej kartotece propozycji już nie liczymy", () => {
+  /* Podpowiadanie obok wyboru człowieka byłoby podważaniem jego decyzji,
+     a §4.3 stawia ją wyżej niż wynik automatu. */
+  const d = stanowisko();
+  towar(d, 10, "SEK-46");
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 8999, offerId: "111", twId: 10, twSymbol: "SEK-46", twZrodlo: "reczne" }]);
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", cena: 8999 }]);
+  const p = listaZwrotow(d, TERAZ)[0].pozycje[0];
+  assert.equal(p.twId, 10);
+  assert.equal(p.twZrodlo, "reczne");
+  assert.equal(p.propozycja, null);
+});
+
+test("zwrot niesie odnośniki, a brak numeru nie robi linku donikąd", () => {
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 8999, offerId: "111", url: "https://allegro.pl/oferta/sekator-111" }]);
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: null, cena: 8999 }]);
+  const z = listaZwrotow(d, TERAZ)[0];
+  assert.match(z.linkZwrotu!, /moje-allegro/);
+  assert.match(z.zamowienie!.link!, /ord-1$/);
+  assert.equal(z.pozycje[0].url, "https://allegro.pl/oferta/sekator-111",
+    "adres oferty to jedyny link opisany w specyfikacji");
 });

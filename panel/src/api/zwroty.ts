@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type { KolejkaZwrotow, WpisOsiZwrotu, Zwrot } from "./typy";
 
@@ -30,3 +30,22 @@ export function useZwrot(id: number | null) {
 /** Grosze na tekst, który czyta biuro. Jedna funkcja na cały panel. */
 export const zlote = (grosze: number | null | undefined, waluta = "PLN") =>
   grosze == null ? "—" : `${(grosze / 100).toFixed(2).replace(".", ",")} ${waluta}`;
+
+/**
+ * Potwierdzenie kartoteki dla pozycji zwrotu.
+ *
+ * `twId: null` ZDEJMUJE powiązanie — droga wyjścia z błędnego potwierdzenia.
+ * `zrodlo` jedzie razem z wyborem, bo bez niego nie da się później odróżnić
+ * zatwierdzonej propozycji automatu od wskazania człowieka (§4.3).
+ */
+export function usePotwierdzKartoteke() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; twId: number | null; zrodlo: "sku" | "reczne" }) =>
+      api<{ twId: number | null; twSymbol: string | null; twZrodlo: string | null }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/kartoteka`,
+        { method: "POST", body: JSON.stringify({ twId: v.twId, zrodlo: v.zrodlo }) },
+      ),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}

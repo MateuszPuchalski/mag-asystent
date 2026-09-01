@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { naGrosze, synchronizujAllegroZwroty } from "./allegro-zwroty-sync.js";
+import { naGrosze, poczatekHistorii, synchronizujAllegroZwroty } from "./allegro-zwroty-sync.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
+import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 
 /* ── Strażnicy synchronizatora zwrotów (0.150.0) ─────────────────────────────
    Cztery rzeczy, z których każda kosztowała już wydanie w innym rejestrze:
@@ -41,14 +42,35 @@ test("kwotę liczymy na tekście — Allegro oddaje ją stringiem nie bez powodu
     "kształt spoza kontraktu ma się zapalić, a nie policzyć na zero");
 });
 
-test("pierwszy przebieg bierze okno dat, kolejny idzie kursorem", async () => {
+test("granica historii: stała data wygrywa z ruchomym oknem", () => {
+  /* Okno „N dni wstecz" przesuwa się każdego dnia — po kwartale przestaje
+     sięgać początku historii, a przy odtwarzaniu bazy z kopii wciąga co
+     innego niż przy pierwszym uruchomieniu. Data mówi wprost, gdzie ta
+     historia się zaczyna. */
+  const teraz = new Date("2026-09-01T10:00:00Z");
+  assert.equal(poczatekHistorii({ od: "2026-08-20", oknoDni: 90, teraz }),
+    "2026-08-20T00:00:00.000Z", "sama data znaczy początek dnia w UTC");
+  assert.equal(poczatekHistorii({ od: "  2026-08-20 ", oknoDni: 90, teraz }),
+    "2026-08-20T00:00:00.000Z");
+  assert.equal(poczatekHistorii({ od: "2026-08-20T06:30:00Z", oknoDni: 90, teraz }),
+    "2026-08-20T06:30:00.000Z", "pełny znacznik czasu przechodzi bez zmian");
+  assert.equal(poczatekHistorii({ od: "", oknoDni: 90, teraz }),
+    "2026-06-03T10:00:00.000Z", "puste = zapasowe okno dnowe");
+  /* Śmieć NIE cofa nas po cichu do okna: to ten sam gatunek cichej podmiany,
+     przez który `MAG_ID_MAG=jeden` dawało kiedyś 1. */
+  assert.throws(() => poczatekHistorii({ od: "wczoraj", oknoDni: 90, teraz }),
+    /ALLEGRO_ZWROTY_OD/);
+});
+
+test("pierwszy przebieg bierze granicę dat, kolejny idzie kursorem", async () => {
   const d = stanowisko();
   const url: string[] = [];
   await synchronizujAllegroZwroty({
-    database: d, oknoDni: 90, now: () => new Date("2026-09-01T10:00:00Z"),
+    database: d, od: "2026-08-20", now: () => new Date("2026-09-01T10:00:00Z"),
     apiUrl: "https://api", query: async (u) => { url.push(u); return odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]); },
   });
-  assert.match(url[0], /createdAt\.gte=2026-06-03/, "brak kursora → okno dat");
+  assert.match(url[0], /createdAt\.gte=2026-08-20T00%3A00%3A00\.000Z/,
+    "brak kursora → granica z konfiguracji");
   assert.equal(url[0].includes("from="), false);
 
   url.length = 0;
@@ -144,9 +166,9 @@ test("kod porażki bierze się z klasy błędu, nie z jego zdania", async () => 
 });
 
 test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => {
-  /* Lądowisko trzyma surowy JSON i to jest świadome — dowód źródłowy.
-     Model pracy nie ma na te pola ani jednej kolumny, więc panel ich nie
-     zobaczy, a raport z bazy ich nie wyniesie. */
+  /* Do 0.151.0 ten test sprawdzał WYŁĄCZNIE model pracy, a lądowisko trzymało
+     odpowiedź dosłownie — więc IBAN jednak był w bazie, wbrew zdaniu
+     z polityki danych. Od 0.152.0 sprawdzamy obie tabele. */
   const d = stanowisko();
   await synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api",
@@ -160,4 +182,12 @@ test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => 
   assert.equal(zapisane.includes("PL61109010140000071219812874"), false, "IBAN nie wchodzi do modelu pracy");
   assert.equal(zapisane.includes("600100200"), false, "telefon nadawcy też nie");
   assert.equal(wiersz.paczka_at, "2026-08-31T09:00:00Z", "sam FAKT powrotu paczki zostaje — bez danych nadawcy");
+
+  const ladowisko = (d.prepare("SELECT surowe_json FROM allegro_zwrot").get() as { surowe_json: string }).surowe_json;
+  assert.equal(ladowisko.includes("PL61109010140000071219812874"), false, "IBAN nie wchodzi też do lądowiska");
+  assert.equal(ladowisko.includes("600100200"), false, "telefon nadawcy też nie");
+  assert.equal(zostalyWrazliwe(ladowisko), false, "żadne pole wrażliwe nie zostało z wartością");
+  /* Kształt ma przeżyć czyszczenie — to po niego lądowisko istnieje. */
+  assert.equal(ladowisko.includes("bankAccount"), true, "klucz zostaje, znika wartość");
+  assert.equal(ladowisko.includes("WB1"), true, "list przewozowy to nie dane osobowe");
 });

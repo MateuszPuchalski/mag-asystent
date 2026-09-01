@@ -301,13 +301,51 @@ export const config = {
      */
     zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 14, "ZWROT_TERMIN_DNI"),
     /**
-     * Okno PIERWSZEGO pobrania zwrotów, w dniach. Później rządzi kursor.
+     * Data, od której w ogóle bierzemy zwroty. Decyzja właściciela.
      *
-     * Bez okna pierwszy przebieg ściągnąłby całą historię konta — setki
-     * stron, jeden ciąg zapytań i prosta droga do 429 przy starcie usługi.
-     * Dziewięćdziesiąt dni z zapasem pokrywa zwrot najstarszy jeszcze żywy.
+     * GRANICA STAŁA, nie ruchoma — i to jest różnica, która ma znaczenie.
+     * Okno „N dni wstecz" przesuwa się każdego dnia: po kwartale przestaje
+     * sięgać początku historii, a przy odtwarzaniu bazy z kopii wciąga co
+     * innego niż przy pierwszym uruchomieniu. Data mówi wprost, gdzie
+     * zaczyna się historia zwrotów tej firmy w WERTIS.
+     *
+     * Działa tylko przy PIERWSZYM przebiegu; potem rządzi kursor `from`.
+     * Puste = wraca okno dnowe niżej.
+     */
+    zwrotyOd: process.env.ALLEGRO_ZWROTY_OD ?? "2026-08-20",
+    /**
+     * Zapasowe okno pierwszego pobrania, w dniach — używane, gdy
+     * `ALLEGRO_ZWROTY_OD` jest puste.
+     *
+     * Bez żadnej granicy pierwszy przebieg ściągnąłby całą historię konta:
+     * setki stron w jednym ciągu i prosta droga do 429 przy starcie usługi.
      */
     zwrotyOknoDni: num(process.env.ALLEGRO_ZWROTY_DNI_WSTECZ, 90, "ALLEGRO_ZWROTY_DNI_WSTECZ"),
+    /** Takt uzupełniania zamówień do zwrotów; 0 wyłącza ticker. */
+    zamowieniaSyncMs: num(
+      process.env.ALLEGRO_ZAMOWIENIA_SYNC_MS, 600_000, "ALLEGRO_ZAMOWIENIA_SYNC_MS"
+    ),
+    /**
+     * Wzorce adresów PANELU SPRZEDAWCY — `{id}` w miejscu identyfikatora.
+     *
+     * To są strony UI, a nie API, więc NIE opisuje ich `docs/allegro/swagger.yaml`
+     * ani żadna inna specyfikacja. Domyślne wartości niżej są założeniem
+     * (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`), a link trafiający w 404
+     * kosztuje kliknięcie i zaufanie do całego ekranu.
+     *
+     * Dlatego stoją w konfiguracji: gdy Allegro przestawi adres, poprawia się
+     * to wpisem w `wertis.env`, a nie wydaniem aplikacji.
+     */
+    panelZwrot:
+      process.env.ALLEGRO_PANEL_ZWROT ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zwroty/{id}"
+        : "https://allegro.pl/moje-allegro/sprzedaz/zwroty/{id}"),
+    panelZamowienie:
+      process.env.ALLEGRO_PANEL_ZAMOWIENIE ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zamowienia/{id}"
+        : "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}"),
   },
 
   /**
