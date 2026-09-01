@@ -161,6 +161,24 @@ export function migrate(database: DatabaseSync) {
   /* Stan synchronizacji urósł w 0.147.0 o to, czego żąda §21 projektu panelu:
      moment ostatniej PRÓBY i kod jej porażki. Bez nich panel umie powiedzieć
      tylko „nie udało się", a agent nie wie, czy czekać, czy wołać admina. */
+  /* Kartoteka Subiekta przy pozycji zwrotu (0.152.0). `zwrot_klienta_pozycja`
+     stoi u klienta od 0.150.0, więc te kolumny muszą dojść migracją — bez
+     nich pozycja nie ma jak nieść zdjęcia, bo `zdjecie_cache` i
+     `zdjecie_wlasne` są kluczowane po `tw_id`.
+
+     `ALTER TABLE ... ADD COLUMN` w SQLite NIE przyjmuje klucza obcego, więc
+     `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL` ze `schema.sql` obowiązuje
+     wyłącznie bazy założone od 0.152.0. Dla starszych zostaje sama kolumna
+     i to WYSTARCZA: `sgt_towar` jest read-modelem kasowanym przy każdym
+     imporcie, a twardy klucz obcy właśnie tam kładł kiedyś API (blizna
+     0.148.1). Wiszące `tw_id` odsiewa odczyt, który i tak sprawdza istnienie
+     towaru przed pokazaniem zdjęcia. */
+  addColumn("zwrot_klienta_pozycja", "url", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "tw_id", "INTEGER");
+  addColumn("zwrot_klienta_pozycja", "tw_symbol", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "tw_zrodlo", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "tw_at", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "tw_przez", "TEXT");
   addColumn("allegro_inbox_sync_state", "last_attempt_at", "TEXT");
   addColumn("allegro_inbox_sync_state", "last_error_code", "INTEGER");
   addColumn("allegro_inbox_sync_state", "error_thread_count", "INTEGER NOT NULL DEFAULT 0");

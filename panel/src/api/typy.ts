@@ -112,6 +112,14 @@ export type SzczegolyWysylki = {
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro";
 
+/** Wynik dopasowania po SKU — §11.3 żąda widocznego źródła i pewności. */
+export interface Dopasowanie {
+  pewnosc: "brak" | "sku" | "niejednoznaczne";
+  twId: number | null;
+  symbol: string | null;
+  zrodlo: string;
+}
+
 export interface PozycjaZwrotu {
   id: number;
   offerId: string | null;
@@ -122,6 +130,34 @@ export interface PozycjaZwrotu {
   powod: string | null;
   powodKomentarz: string | null;
   ocena: string | null;
+  url: string | null;
+  twId: number | null;
+  twSymbol: string | null;
+  twZrodlo: string | null;
+  propozycja: Dopasowanie | null;
+}
+
+export interface PozycjaZamowienia {
+  offerId: string | null;
+  nazwa: string;
+  sku: string | null;
+  ilosc: number;
+  cenaGrosze: number;
+  waluta: string;
+  zwracana: boolean;
+}
+
+export interface Zamowienie {
+  externalId: string;
+  status: string | null;
+  kupujacyLogin: string | null;
+  dostawaGrosze: number | null;
+  dostawaMetoda: string | null;
+  sumaGrosze: number | null;
+  waluta: string;
+  kupionoAt: string | null;
+  link: string | null;
+  pozycje: PozycjaZamowienia[];
 }
 
 export interface Zwrot {
@@ -136,7 +172,10 @@ export interface Zwrot {
   terminAt: string;
   dniDoTerminu: number;
   sumaPozycjiGrosze: number;
+  kwotaPelnaGrosze: number | null;
   waluta: string;
+  linkZwrotu: string | null;
+  zamowienie: Zamowienie | null;
   werdykt: string | null;
   kwotaGrosze: number | null;
   kwotaWariant: string | null;

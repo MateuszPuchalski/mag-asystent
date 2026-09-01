@@ -336,8 +336,11 @@ export const config = {
      */
     zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 14, "ZWROT_TERMIN_DNI"),
     /**
-     * Od kiedy widzimy zwroty. Decyzja właściciela z 0.152.0: 20 lipca 2026,
-     * północ czasu lokalnego (stąd 19 lipca 22:00 UTC).
+     * Od kiedy widzimy zwroty. Decyzja właściciela: 20 SIERPNIA 2026, północ
+     * czasu lokalnego (stąd 19 sierpnia 22:00 UTC — Polska jest w sierpniu
+     * na UTC+2). Do 0.152.0 stało tu 20 lipca; właściciel przesunął próg
+     * o miesiąc, a że to jest ustawienie, a nie stała, przesunie go znowu
+     * bez wydania.
      *
      * ZASTĄPIŁO OKNO WZGLĘDNE `ALLEGRO_ZWROTY_DNI_WSTECZ`, i to jest zmiana
      * natury, nie jednostki. Tamto liczyło się WYŁĄCZNIE przy pierwszym
@@ -349,7 +352,32 @@ export const config = {
      * ściągnąłby całą historię konta jednym ciągiem zapytań, czyli prostą
      * drogą do 429 przy starcie usługi.
      */
-    zwrotyOd: data(process.env.ALLEGRO_ZWROTY_OD, "2026-07-19T22:00:00Z", "ALLEGRO_ZWROTY_OD"),
+    zwrotyOd: data(process.env.ALLEGRO_ZWROTY_OD, "2026-08-19T22:00:00Z", "ALLEGRO_ZWROTY_OD"),
+    /** Takt uzupełniania zamówień do zwrotów; 0 wyłącza ticker. */
+    zamowieniaSyncMs: num(
+      process.env.ALLEGRO_ZAMOWIENIA_SYNC_MS, 600_000, "ALLEGRO_ZAMOWIENIA_SYNC_MS"
+    ),
+    /**
+     * Wzorce adresów PANELU SPRZEDAWCY — `{id}` w miejscu identyfikatora.
+     *
+     * To są strony UI, a nie API, więc NIE opisuje ich `docs/allegro/swagger.yaml`
+     * ani żadna inna specyfikacja. Domyślne wartości niżej są założeniem
+     * (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`), a link trafiający w 404
+     * kosztuje kliknięcie i zaufanie do całego ekranu.
+     *
+     * Dlatego stoją w konfiguracji: gdy Allegro przestawi adres, poprawia się
+     * to wpisem w `wertis.env`, a nie wydaniem aplikacji.
+     */
+    panelZwrot:
+      process.env.ALLEGRO_PANEL_ZWROT ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zwroty/{id}"
+        : "https://allegro.pl/moje-allegro/sprzedaz/zwroty/{id}"),
+    panelZamowienie:
+      process.env.ALLEGRO_PANEL_ZAMOWIENIE ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zamowienia/{id}"
+        : "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}"),
   },
 
   /**

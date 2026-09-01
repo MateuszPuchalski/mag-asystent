@@ -246,3 +246,84 @@ wtedy status z §21, a nie pustą kolejkę udającą brak zwrotów.
 
 Przy zapisie (0.151.0): Allegro odpowie 400 albo 422, kolejka zapisze to jako
 porażkę razem z treścią odpowiedzi, a do klienta nic nie wyjdzie po cichu.
+
+## Zamówienie klienta — kształt ze specyfikacji w repo
+
+Ta sekcja różni się od poprzednich pochodzeniem po raz drugi, tym razem na
+lepsze. Od 0.151.0 cała specyfikacja Allegro leży w repo
+(`docs/allegro/swagger.yaml`), więc pola niżej odczytano ze SCHEMATU, nie
+z pamięci ani z kopii sprzed dwóch lat. Znaczników tu nie ma.
+
+### `GET /order/checkout-forms/{id}`
+
+Schemat `CheckoutForm`. Bierzemy `id`, `status`, `updatedAt`,
+`summary.totalToPay`, `delivery.cost`, `delivery.method.name` oraz
+`lineItems[]`.
+
+Pozycja (`CheckoutFormLineItem`) ma `id`, `offer`, `quantity`, `price`
+i `boughtAt`. Data zakupu stoi przy POZYCJI, nie przy zamówieniu — bierzemy
+najwcześniejszą, bo zamówienie scalone z kilku zakupów miałoby inaczej datę
+przypadkową.
+
+Oferta (`OfferReference`) ma `id`, `name` i **`external`**. To ostatnie pole
+jest powodem, dla którego w ogóle pobieramy zamówienia.
+
+### `external.id` — mostek do kartoteki
+
+Schemat `ExternalId` opisuje je jako „The ID of the offer in the external
+system": identyfikator, który sprzedawca sam wpisał przy ofercie. U tej firmy
+to symbol z Subiekta.
+
+Bez tego mostka pozycja zwrotu nie ma zdjęcia, bo `zdjecie_cache`
+i `zdjecie_wlasne` są kluczowane po `tw_id`. Projekt panelu §28 nazywał to
+„czeka na dostęp do dokumentacji Allegro" — dokumentacja przyszła.
+
+Dopasowanie jest PROPOZYCJĄ, nie faktem: `services/dopasowanie-sku.ts`
+porównuje SKU z `sgt_towar.symbol`, a zapisuje dopiero potwierdzenie
+człowieka. Zero i wiele trafień daje brak, nigdy zgadywanie.
+
+### Jedno wywołanie na zamówienie, nie na ofertę
+
+`GET /sale/product-offers/{offerId}` dałoby ten sam SKU po jednym strzale na
+pozycję i nie dałby ani kosztu dostawy, ani pozycji, których klient nie
+zwraca. `/sale/product-offers/{offerId}/parts` NIE jest tańszym zamiennikiem:
+schemat dopuszcza w `include` wyłącznie `stock` i `price`.
+
+### Czego z zamówienia NIE bierzemy
+
+`CheckoutForm.buyer` niesie `email`, `firstName`, `lastName`, `companyName`,
+`personalIdentity`, `phoneNumber` i `address`, a `CheckoutFormDeliveryReference`
+— adres dostawy z imieniem i nazwiskiem. `CLAUDE.md` mówi twardo: adresy
+dostawy nie przechodzą przez mapowanie.
+
+Zostaje `buyer.login` i `buyer.id` — polityka danych skrzynki dopuszcza login
+rozmówcy wprost, a bez niego nie da się powiązać zamówienia z rozmową.
+
+### Lądowiska są OKROJONE — i to jest zmiana z 0.152.0
+
+Do 0.151.0 `allegro_zwrot.surowe_json` trzymało odpowiedź dosłownie, razem
+z numerem konta bankowego kupującego i telefonem nadawcy paczki. Polityka
+danych mówiła tymczasem „nie pobieramy" i to zdanie było nieprawdziwe.
+
+Od 0.152.0 oba lądowiska przechodzą przez `services/allegro-oczyszczanie.ts`:
+**wartość znika, klucz zostaje**. Kształt nadal da się obejrzeć, a pełny
+kontrakt czyta się ze specyfikacji w repo, nie z kopii cudzych danych.
+
+Lista pól idzie po NAZWIE, nie po ścieżce — tak, żeby pole, które Allegro
+doda w przyszłości pod tą samą nazwą, odpadło samo.
+
+## Odnośniki do panelu sprzedawcy
+
+Adres oferty przy pozycji zwrotu (`CustomerReturnItem.url`, przykład
+`https://allegro.pl/oferta/item-name-7678887152`) jest udokumentowany i idzie
+na ekran wprost.
+
+Adresy PANELU SPRZEDAWCY to strony UI, więc nie opisuje ich ani ta
+specyfikacja, ani żadna inna.
+
+`[WERYFIKUJ]` Zwrot otwiera się pod
+`https://allegro.pl/moje-allegro/sprzedaz/zwroty/{id}`, a zamówienie pod
+`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}`. Oba wzorce stoją
+w konfiguracji (`ALLEGRO_PANEL_ZWROT`, `ALLEGRO_PANEL_ZAMOWIENIE`), bo link
+trafiający w 404 kosztuje kliknięcie i zaufanie do ekranu — a poprawka ma być
+wpisem w `wertis.env`, nie nowym wydaniem.

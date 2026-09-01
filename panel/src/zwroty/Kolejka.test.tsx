@@ -1,26 +1,55 @@
+import React from "react";
 import { describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka, dniSlowo } from "./Kolejka";
 import { Dowody } from "./Dowody";
-import type { Zwrot } from "../api/typy";
+import type { PozycjaZwrotu, Zamowienie, Zwrot } from "../api/typy";
 
 /* Wiersz kolejki ma się czytać W BIEGU. Te testy pilnują trzech rzeczy,
    od których to zależy: pilność widać bez klikania, sygnał zapala się
    tylko wtedy, gdy naprawdę każe przeczytać, a ekran mówi wprost o tym,
    czego NIE wie i czego nie pobiera. */
 
+const POZYCJA: PozycjaZwrotu = {
+  id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
+  waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
+  url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+};
+
+const ZAMOWIENIE: Zamowienie = {
+  externalId: "ord-1", status: "READY_FOR_PROCESSING", kupujacyLogin: null,
+  dostawaGrosze: 1499, dostawaMetoda: "Kurier InPost", sumaGrosze: 9997,
+  waluta: "PLN", kupionoAt: "2026-08-20T11:00:00.000Z",
+  link: "https://allegro.pl/moje-allegro/zam/ord-1",
+  pozycje: [
+    { offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", ilosc: 1, cenaGrosze: 4999, waluta: "PLN", zwracana: true },
+    { offerId: "222", nazwa: "Zraszacz obrotowy", sku: null, ilosc: 1, cenaGrosze: 3490, waluta: "PLN", zwracana: false },
+  ],
+};
+
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "zw-1", numer: "REF-1", orderId: "ord-1",
   utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z",
   kubelek: "decyzja", sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z",
-  dniDoTerminu: 7, sumaPozycjiGrosze: 4999, waluta: "PLN",
+  dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
+  linkZwrotu: null, zamowienie: null,
   werdykt: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null,
   rejectionCode: null, wersja: 1,
   pozycje: [{ id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
-    waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null }],
+    waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
+    url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null }],
   ...n,
 });
+
+
+/* `Dowody` woła mutację potwierdzenia kartoteki, więc render potrzebuje
+   klienta zapytań — inaczej hook wywala się, zanim cokolwiek się narysuje. */
+const zKlientem = (ui: React.ReactNode) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
+};
 
 describe("Kolejka zwrotów", () => {
   it("pusty kubełek mówi o sobie zamiast pokazywać pustą listę", () => {
@@ -84,26 +113,85 @@ describe("Kolejka zwrotów", () => {
 
 describe("Dowody", () => {
   it("mówi wprost, czego nie wie i czego nie pobiera", () => {
-    /* Dwa zdania, które muszą być na ekranie, a nie tylko w kodzie: kwota
-       jest bez dostawy, a danych nadawcy nie pobieramy wcale. */
-    render(<Dowody zwrot={zwrot()} />);
-    expect(screen.getByText(/Bez kosztu dostawy/)).toBeInTheDocument();
+    /* Dwa zdania, które muszą być na ekranie, a nie tylko w kodzie: bez
+       zamówienia nie znamy kwoty pełnej, a danych nadawcy nie pobieramy. */
+    render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByText(/Kwoty pełnej nie znamy bez zamówienia/)).toBeInTheDocument();
     expect(screen.getByText(/Danych nadawcy i konta bankowego nie pobieramy/)).toBeInTheDocument();
   });
 
   it("brak paczki jest zdaniem, nie pustym polem", () => {
-    render(<Dowody zwrot={zwrot({ paczkaAt: null })} />);
+    render(zKlientem(<Dowody zwrot={zwrot({ paczkaAt: null })} />));
     expect(screen.getByText(/Towar jeszcze nie wrócił/)).toBeInTheDocument();
   });
 
   it("powód zwrotu tłumaczy się na polski, a komentarz klienta zostaje w cudzysłowie", () => {
-    render(<Dowody zwrot={zwrot()} />);
+    render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.getByText(/nie spodobał się/)).toBeInTheDocument();
     expect(screen.getByText(/za ciężki/)).toBeInTheDocument();
   });
 
   it("zwrot bez pozycji mówi, że nie ma czego wycenić", () => {
-    render(<Dowody zwrot={zwrot({ pozycje: [], sumaPozycjiGrosze: 0 })} />);
+    render(zKlientem(<Dowody zwrot={zwrot({ pozycje: [], sumaPozycjiGrosze: 0 })} />));
     expect(screen.getByText(/nie ma czego wycenić/)).toBeInTheDocument();
+  });
+
+  it("z zamówieniem pokazuje kwotę pełną zamiast zdania o jej braku", () => {
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE, kwotaPelnaGrosze: 6498 })} />));
+    expect(screen.queryByText(/Kwoty pełnej nie znamy/)).not.toBeInTheDocument();
+    expect(screen.getByText("64,98 PLN")).toBeInTheDocument();
+    expect(screen.getByText(/Kurier InPost/)).toBeInTheDocument();
+  });
+
+  it("pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
+    /* „Kupił trzy, oddaje jedną" jest kontekstem decyzji, nie ciekawostką. */
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
+    /* Sekator jest dwa razy: raz na liście zamówienia, raz wśród zwracanych
+       pozycji — i to jest właśnie ten kontekst, o który chodzi. Zraszacz
+       tylko raz, bo nie wraca. */
+    expect(screen.getAllByText("Sekator NAC")).toHaveLength(2);
+    expect(screen.getByText("Zraszacz obrotowy")).toBeInTheDocument();
+    expect(screen.getAllByText("wraca")).toHaveLength(1);
+  });
+
+  it("bez pobranego zamówienia pokazuje identyfikator i mówi, że treść dojdzie", () => {
+    render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByText("ord-1")).toBeInTheDocument();
+    expect(screen.getByText(/dociągnie ją najbliższa synchronizacja/)).toBeInTheDocument();
+  });
+
+  it("odnośniki wychodzą w nowej karcie i nie wynoszą naszego adresu", () => {
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE, linkZwrotu: "https://allegro.pl/zwroty/1" })} />));
+    const zwrotLink = screen.getByRole("link", { name: /REF-1/ });
+    expect(zwrotLink).toHaveAttribute("href", "https://allegro.pl/zwroty/1");
+    expect(zwrotLink).toHaveAttribute("target", "_blank");
+    expect(zwrotLink).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByRole("link", { name: /Otwórz w Allegro/ }))
+      .toHaveAttribute("href", "https://allegro.pl/moje-allegro/zam/ord-1");
+  });
+
+  it("bez adresu zostaje sam tekst — link donikąd jest gorszy od jego braku", () => {
+    render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.queryByRole("link", { name: /REF-1/ })).not.toBeInTheDocument();
+    expect(screen.getByText("REF-1")).toBeInTheDocument();
+  });
+
+  it("kartoteka zawsze niesie źródło: zatwierdzona, proponowana albo żadna", () => {
+    /* §11.3 żąda widocznego źródła i pewności, a §4.3 nie pozwala, żeby wybór
+       automatu udawał fakt z Allegro. */
+    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByText(/Bez kartoteki/)).toBeInTheDocument();
+
+    rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
+      propozycja: { pewnosc: "sku", twId: 10, symbol: "SEK-46", zrodlo: 'SKU oferty „SEK-46"' } }] })} />));
+    /* Propozycja czeka na JEDNO kliknięcie i mówi, skąd się wzięła. */
+    expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
+    expect(screen.getByText("SEK-46")).toBeInTheDocument();
+    expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
+
+    rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
+      twId: 10, twSymbol: "SEK-46", twZrodlo: "reczne" }] })} />));
+    expect(screen.getByText(/wskazana ręcznie/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zatwierdź/ })).not.toBeInTheDocument();
   });
 });

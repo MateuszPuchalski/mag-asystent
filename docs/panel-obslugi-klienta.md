@@ -644,11 +644,40 @@ obsługi mają mieć jeden nawyk, nie dwa.
 Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
 zwrotu. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
 
-### 25a.6. Czego panel nie wie
+### 25a.6. Zamówienie i zdjęcia
 
-Kwota pełna to pozycje plus dostawa, a kosztu dostawy zwrot nie niesie —
-stoi przy zamówieniu. Do czasu dociągnięcia zamówienia panel proponuje samą
-sumę pozycji i mówi o tym na ekranie.
+Zwrot niesie sam numer zamówienia, więc panel dociąga jego treść i pokazuje
+**całe zamówienie**, zaznaczając pozycje, które wracają. „Kupił trzy, oddaje
+jedną" jest kontekstem decyzji, a nie ciekawostką.
+
+Stamtąd bierze się też koszt dostawy — składnik kwoty pełnej, którego zwrot
+sam nie zna — oraz SKU sprzedawcy (`offer.external.id`), czyli mostek do
+kartoteki Subiekta. Bez kartoteki nie ma zdjęcia: cache obrazów jest
+kluczowany po `tw_id`.
+
+**Automat proponuje, człowiek zatwierdza.** Dopasowanie po SKU niesie źródło
+i czeka na jedno kliknięcie. Zero i wiele trafień daje brak, nigdy
+zgadywanie; po nazwie towaru nie dopasowujemy nigdy.
+
+Zdjęcie widać w trzech miejscach: miniatura w wierszu kolejki, kafel przy
+pozycji w kolumnie dowodów i powiększenie po kliknięciu. Kafel ma stały
+rozmiar także wtedy, gdy zdjęcia nie ma — rosnący przesuwałby wiersze pod
+kursorem.
+
+### 25a.7. Odnośniki do Allegro
+
+Numer zwrotu i zamówienie są klikalne i prowadzą do panelu sprzedawcy; nazwa
+pozycji prowadzi do oferty. Identyfikator zamówienia jest UUID-em, więc obok
+stoi przycisk kopiowania — nikt go nie przepisuje z ekranu ręcznie.
+
+Adresy panelu nie są udokumentowane przez Allegro, więc stoją w konfiguracji
+i noszą `[WERYFIKUJ]`. Bez adresu zostaje sam tekst: link donikąd jest gorszy
+od jego braku.
+
+### 25a.8. Czego panel nie wie
+
+Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
+to wprost, zamiast pokazywać sumę pozycji jako całość.
 
 ## 26. Decyzje do potwierdzenia
 
@@ -695,7 +724,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
-| Kartoteka wywiedziona z oferty | **następne** | czeka na dostęp do dokumentacji Allegro |
+| Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |
 | Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
@@ -716,6 +745,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
-| Werdykt, kwota, ocena, korekta | **projekt** | kolumny stoją, zapisu nie ma — 0.151.0 |
+| Werdykt, kwota, ocena, korekta | **projekt** | kolumny stoją, zapisu nie ma |
+| Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
+| Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |
+| Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
+| Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
 | Zwrot pieniędzy i odmowa w Allegro | **projekt** | `outbox`, `commandId` — 0.151.0 |
 | Automat korekty przez Sferę | **projekt** | kontrakt `korekta_zwrot` żyje, brak nadawcy |

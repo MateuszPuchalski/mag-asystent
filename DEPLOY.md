@@ -126,7 +126,7 @@ npm -w server run start:worker       # okno 2: worker
 ```
 
 Aplikacja szuka `wertis.env` obok pliku wykonywalnego, a w instalacji z repo —
-w katalogu roboczym i katalogach nad nim. Chodzenie w górę powstało w 0.152.1:
+w katalogu roboczym i katalogach nad nim. Chodzenie w górę powstało w 0.153.1:
 npm uruchamia skrypty w `C:\wertis\server`, a plik leży piętro wyżej. Wygrywa
 plik najbliższy, a który to był — pokazuje `/api/health`. `source wertis.env`
 nie jest już potrzebne (dalej działa: zmienne środowiskowe mają pierwszeństwo
@@ -1048,7 +1048,8 @@ o pozycjach, korekty sprzedaży i zwrot środków robi biuro poza aplikacją:
 w Subiekcie i w panelu Allegro.
 
 **Od 0.150.0 biuro znów WIDZI zwroty — w panelu obsługi, zakładka ZWROTY.**
-To wydanie wyłącznie czyta. Pokazuje kolejkę zwrotów z terminem ustawowym,
+Od 0.152.0 widzi przy nich całe zamówienie, zdjęcia towaru i odnośniki do
+Allegro. Zapisuje przy tym jedną rzecz: wskazaną kartotekę. Pokazuje kolejkę zwrotów z terminem ustawowym,
 pozycjami i proponowaną kwotą, więc biuro nie musi otwierać panelu Allegro,
 żeby wiedzieć, co czeka. Decyzji nadal nie zapisuje: werdykt, kwota, ocena
 towaru i korekta wchodzą w kolejnym wydaniu.
@@ -1441,6 +1442,37 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.153.0 — dwie czynności.**
+
+**Po pierwsze: usuń stare lądowiska zwrotów.** Do 0.151.0 kolumna
+`allegro_zwrot.surowe_json` zapisywała odpowiedź Allegro dosłownie, razem
+z numerem konta bankowego kupującego i telefonem nadawcy paczki. Nowy kod tego
+nie zapisuje, ale **wierszy zapisanych wcześniej sam nie posprząta**.
+
+Zatrzymaj usługi i wykonaj na bazie:
+
+```
+DELETE FROM allegro_zwrot;
+```
+
+Nic przez to nie ginie: lądowisko jest kopią odpowiedzi, a model pracy
+(`zwrot_klienta`) zostaje nietknięty. Najbliższa synchronizacja zapisze
+te zwroty ponownie, już po oczyszczeniu.
+
+**Po drugie: próg zwrotów przesuwa się na 20 sierpnia 2026.** Domyślne
+`ALLEGRO_ZWROTY_OD` to teraz `2026-08-19T22:00:00Z` (północ czasu lokalnego)
+zamiast 20 lipca. Zwroty sprzed tej daty przestaną być widoczne przy
+najbliższym przebiegu — próg jest bezwzględny i działa też wtedy, gdy kursor
+już stoi. Jeśli w `wertis.env` stoi własna wartość, to ona nadal rządzi.
+
+**Odnośniki do panelu Allegro mogą wymagać poprawki.** Adresy stron panelu
+sprzedawcy nie są przez Allegro udokumentowane, więc domyślne wzorce są
+założeniem. Kliknij w numer zwrotu i w zamówienie po wdrożeniu; gdy trafią
+w 404, popraw `ALLEGRO_PANEL_ZWROT` i `ALLEGRO_PANEL_ZAMOWIENIE`
+w `wertis.env`. Pusta wartość wyłącza odnośnik i zostawia sam tekst.
+
+**Zdjęcia w panelu obsługi działają tylko przy włączonym `ZDJECIA_ZRODLO`.**
+Bez niego kafle pokazują „bez zdjęcia" i nic więcej się nie psuje.
 **Aktualizacja do 0.152.0 wymaga JEDNEJ zmiany w `wertis.env`: usuń
 `ALLEGRO_ZWROTY_DNI_WSTECZ`.** Okno względne zastąpił próg bezwzględny
 `ALLEGRO_ZWROTY_OD`. Zostawiony wpis zatrzyma start z komunikatem — celowo,

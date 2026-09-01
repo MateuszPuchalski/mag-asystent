@@ -850,10 +850,28 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   waluta TEXT NOT NULL,
   powod TEXT,
   powod_komentarz TEXT,
-  -- Decyzja o towarze, jedna z trzech (0.151.0). NULL = hala jeszcze nie
-  -- oceniła; wtedy zwrot nie wchodzi do kubełka DO ZWROTU.
+  -- Adres oferty wprost z `items[].url` — JEDYNY odnośnik, który specyfikacja
+  -- Allegro opisuje, więc jedyny bez znacznika `[WERYFIKUJ]`.
+  url TEXT,
   ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
-  ocena_at TEXT, ocena_przez TEXT
+  ocena_at TEXT, ocena_przez TEXT,
+  -- ── Kartoteka Subiekta (0.152.0) ──────────────────────────────────────
+  -- Bez niej pozycja nie ma zdjęcia: `zdjecie_cache` i `zdjecie_wlasne` są
+  -- kluczowane po `tw_id`, więc to jedyna droga do obrazu.
+  --
+  -- ON DELETE SET NULL, bo `sgt_towar` jest READ-MODELEM kasowanym w całości
+  -- przy każdym imporcie z Subiekta. Twardy klucz obcy trzymał kiedyś wiersz
+  -- towaru w zakładnikach i KŁADŁ CAŁE API w pętli restartów (blizna 0.148.1
+  -- przy `zadanie_terenowe`). Snapshot symbolu niżej sprawia, że utrata
+  -- samego powiązania niczego pozycji nie zabiera.
+  tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
+  tw_symbol TEXT,
+  -- `sku` = automat dopasował po `offer.external.id`, `reczne` = wskazał
+  -- człowiek. Źródło jest tu równie ważne jak sam fakt: projekt panelu §4.3
+  -- żąda, żeby wybór człowieka nie udawał faktu z Allegro — a wybór automatu
+  -- tym bardziej.
+  tw_zrodlo TEXT CHECK (tw_zrodlo IN ('sku','reczne')),
+  tw_at TEXT, tw_przez TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
   ON zwrot_klienta_pozycja(zwrot_id);
@@ -887,6 +905,62 @@ CREATE TABLE IF NOT EXISTS allegro_zwroty_sync_state (
   error_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT
 );
+
+-- ── Zamówienia klienckie z Allegro (0.152.0) ────────────────────────────────
+-- Zwrot niesie sam numer zamówienia, a decyzja potrzebuje jego treści: co
+-- jeszcze klient kupił, ile kosztowała dostawa i jaki SKU ma sprzedana
+-- oferta. To ostatnie jest tu najważniejsze — `offer.external.id` to
+-- identyfikator oferty w systemie sprzedawcy, czyli mostek do kartoteki,
+-- z którego bierze się zdjęcie.
+--
+-- NAZWA `zamowienie_klienta`, nie `zamowienie`: `sgt_zamowienie` to już
+-- zamówienia DO DOSTAWCY z Subiekta i pomylenie ich kosztowałoby czytelnika
+-- godzinę. Wzór nazwy ten sam co przy `zwrot_klienta`.
+CREATE TABLE IF NOT EXISTS allegro_zamowienie (
+  id TEXT PRIMARY KEY,
+  -- Odpowiedź PO oczyszczeniu (`services/allegro-oczyszczanie.ts`). Adres,
+  -- e-mail i telefon kupującego mają tu znacznik zamiast wartości; klucze
+  -- zostają, żeby kształt dało się obejrzeć przy sporze.
+  surowe_json TEXT NOT NULL,
+  synced_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zamowienie_klienta (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  status TEXT,
+  -- Login kupującego — jedyna dana osobowa, którą polityka danych skrzynki
+  -- dopuszcza wprost. Bez niej nie da się powiązać zamówienia z rozmową.
+  kupujacy_login TEXT,
+  -- Koszt dostawy, czyli składnik, którego zwrotowi BRAKOWAŁO w 0.150.0.
+  -- Bez niego wariant „bez wysyłki" był nieodróżnialny od pełnej kwoty.
+  dostawa_grosze INTEGER,
+  dostawa_metoda TEXT,
+  suma_grosze INTEGER,
+  waluta TEXT NOT NULL DEFAULT 'PLN',
+  kupiono_at TEXT,
+  zmieniono_at TEXT,
+  synced_at TEXT NOT NULL,
+  UNIQUE (channel_account_id, external_id)
+);
+
+CREATE TABLE IF NOT EXISTS zamowienie_klienta_pozycja (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  zamowienie_id INTEGER NOT NULL REFERENCES zamowienie_klienta(id) ON DELETE CASCADE,
+  external_id TEXT,
+  offer_id TEXT,
+  nazwa TEXT NOT NULL,
+  -- SKU sprzedawcy z `offer.external.id`. Trzymamy go SUROWO, bez
+  -- normalizacji: dopasowanie do kartoteki jest osobną decyzją i ma być
+  -- widać, na czym stanęło.
+  sku TEXT,
+  ilosc REAL NOT NULL,
+  cena_grosze INTEGER NOT NULL,
+  waluta TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_pozycja_zam
+  ON zamowienie_klienta_pozycja(zamowienie_id);
 
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
 -- Kosz zastępuje papierową kartkę wożoną z towarem: biuro przypina zwroty do

@@ -1,5 +1,8 @@
 import { config } from "../config.js";
 import { db as defaultDb, type Db } from "../db/db.js";
+import { dopasujPoSku, skuPozycji, type Dopasowanie } from "./dopasowanie-sku.js";
+import { linkZamowienia, linkZwrotu } from "./allegro-linki.js";
+import { logEvent } from "./events.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -30,6 +33,38 @@ export interface PozycjaZwrotu {
   powod: string | null;
   powodKomentarz: string | null;
   ocena: string | null;
+  /** Odnośnik do oferty — jedyny link udokumentowany w specyfikacji. */
+  url: string | null;
+  /** Kartoteka POTWIERDZONA przez człowieka; bez niej nie ma zdjęcia. */
+  twId: number | null;
+  twSymbol: string | null;
+  twZrodlo: string | null;
+  /** Propozycja automatu — pokazywana obok, nigdy zamiast potwierdzonej. */
+  propozycja: Dopasowanie | null;
+}
+
+/** Pozycja zamówienia; `zwracana` mówi, które z nich wracają do nas. */
+export interface PozycjaZamowienia {
+  offerId: string | null;
+  nazwa: string;
+  sku: string | null;
+  ilosc: number;
+  cenaGrosze: number;
+  waluta: string;
+  zwracana: boolean;
+}
+
+export interface Zamowienie {
+  externalId: string;
+  status: string | null;
+  kupujacyLogin: string | null;
+  dostawaGrosze: number | null;
+  dostawaMetoda: string | null;
+  sumaGrosze: number | null;
+  waluta: string;
+  kupionoAt: string | null;
+  link: string | null;
+  pozycje: PozycjaZamowienia[];
 }
 
 export interface WierszZwrotu {
@@ -44,7 +79,16 @@ export interface WierszZwrotu {
   terminAt: string;
   dniDoTerminu: number;
   sumaPozycjiGrosze: number;
+  /**
+   * Kwota PEŁNA: pozycje plus koszt dostawy. `null`, dopóki zamówienia nie
+   * pobrano — do 0.151.0 ekran nie umiał jej policzyć wcale i mówił o tym
+   * wprost, bo koszt dostawy stoi przy zamówieniu, nie przy zwrocie.
+   */
+  kwotaPelnaGrosze: number | null;
   waluta: string;
+  /** Odnośniki do panelu Allegro; `null` = nie ma czego linkować. */
+  linkZwrotu: string | null;
+  zamowienie: Zamowienie | null;
   werdykt: string | null;
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
@@ -137,7 +181,9 @@ export function sumaPozycji(pozycje: Array<{ cenaGrosze: number; ilosc: number }
   return pozycje.reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
 }
 
-function zloz(z: Wiersz, pozycje: PozycjaZwrotu[], teraz: number): WierszZwrotu {
+function zloz(
+  z: Wiersz, pozycje: PozycjaZwrotu[], zamowienie: Zamowienie | null, teraz: number,
+): WierszZwrotu {
   const utworzono = String(z.created_at);
   const terminAt = terminZwrotu(utworzono);
   const dni = dniDoTerminu(terminAt, teraz);
@@ -150,6 +196,7 @@ function zloz(z: Wiersz, pozycje: PozycjaZwrotu[], teraz: number): WierszZwrotu 
     korektaNumer: (z.korekta_numer as string) ?? null,
     pozycje,
   });
+  const suma = sumaPozycji(pozycje);
   return {
     id: Number(z.id),
     externalId: String(z.external_id),
@@ -161,8 +208,14 @@ function zloz(z: Wiersz, pozycje: PozycjaZwrotu[], teraz: number): WierszZwrotu 
     sygnaly: sygnalyZwrotu({ kubelek, dni, paczkaAt: (z.paczka_at as string) ?? null, rejectionCode }),
     terminAt,
     dniDoTerminu: dni,
-    sumaPozycjiGrosze: sumaPozycji(pozycje),
-    waluta: pozycje[0]?.waluta ?? "PLN",
+    sumaPozycjiGrosze: suma,
+    /* Kwota pełna = pozycje + dostawa. Bez zamówienia zostaje `null`, a nie
+       suma pozycji udająca całość — do 0.151.0 ekran musiał o tym pisać
+       zdanie, bo koszt dostawy stoi przy zamówieniu, nie przy zwrocie. */
+    kwotaPelnaGrosze: zamowienie ? suma + (zamowienie.dostawaGrosze ?? 0) : null,
+    waluta: pozycje[0]?.waluta ?? zamowienie?.waluta ?? "PLN",
+    linkZwrotu: linkZwrotu((z.reference_number as string) ?? (z.external_id as string)),
+    zamowienie,
     werdykt: (z.werdykt as string) ?? null,
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     kwotaWariant: (z.kwota_wariant as string) ?? null,
@@ -188,26 +241,88 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
   const pozycje = database.prepare(
     "SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC"
   ).all() as Wiersz[];
+  const zamowienia = database.prepare(
+    "SELECT * FROM zamowienie_klienta"
+  ).all() as Wiersz[];
+  const pozZam = database.prepare(
+    "SELECT * FROM zamowienie_klienta_pozycja ORDER BY id ASC"
+  ).all() as Wiersz[];
 
-  const wgZwrotu = new Map<number, PozycjaZwrotu[]>();
+  const zamWgKlucza = new Map<string, Wiersz>();
+  for (const k of zamowienia) zamWgKlucza.set(`${k.channel_account_id}|${k.external_id}`, k);
+  const pozWgZam = new Map<number, Wiersz[]>();
+  for (const p of pozZam) {
+    const l = pozWgZam.get(Number(p.zamowienie_id)) ?? [];
+    l.push(p);
+    pozWgZam.set(Number(p.zamowienie_id), l);
+  }
+
+  const wgZwrotu = new Map<number, Wiersz[]>();
   for (const p of pozycje) {
     const lista = wgZwrotu.get(Number(p.zwrot_id)) ?? [];
-    lista.push({
-      id: Number(p.id),
-      offerId: (p.offer_id as string) ?? null,
-      nazwa: String(p.nazwa),
-      ilosc: Number(p.ilosc),
-      cenaGrosze: Number(p.cena_grosze),
-      waluta: String(p.waluta),
-      powod: (p.powod as string) ?? null,
-      powodKomentarz: (p.powod_komentarz as string) ?? null,
-      ocena: (p.ocena as string) ?? null,
-    });
+    lista.push(p);
     wgZwrotu.set(Number(p.zwrot_id), lista);
   }
 
   return zwroty
-    .map((z) => zloz(z, wgZwrotu.get(Number(z.id)) ?? [], teraz))
+    .map((z) => {
+      const surowe = wgZwrotu.get(Number(z.id)) ?? [];
+      const zam = zamWgKlucza.get(`${z.channel_account_id}|${z.order_id}`) ?? null;
+      const pozZamowienia = zam ? pozWgZam.get(Number(zam.id)) ?? [] : [];
+      const wracajace = new Set(surowe.map((p) => (p.offer_id as string) ?? ""));
+
+      const zlozone: PozycjaZwrotu[] = surowe.map((p) => {
+        const twId = p.tw_id == null ? null : Number(p.tw_id);
+        /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
+           Podpowiadanie obok potwierdzonego wyboru byłoby podważaniem
+           decyzji człowieka, a §4.3 stawia ją wyżej niż wynik automatu. */
+        const sku = twId === null
+          ? skuPozycji(database, Number(z.channel_account_id),
+              (z.order_id as string) ?? null, (p.offer_id as string) ?? null)
+          : null;
+        return {
+          id: Number(p.id),
+          offerId: (p.offer_id as string) ?? null,
+          nazwa: String(p.nazwa),
+          ilosc: Number(p.ilosc),
+          cenaGrosze: Number(p.cena_grosze),
+          waluta: String(p.waluta),
+          powod: (p.powod as string) ?? null,
+          powodKomentarz: (p.powod_komentarz as string) ?? null,
+          ocena: (p.ocena as string) ?? null,
+          url: (p.url as string) ?? null,
+          twId,
+          twSymbol: (p.tw_symbol as string) ?? null,
+          twZrodlo: (p.tw_zrodlo as string) ?? null,
+          propozycja: twId === null ? dopasujPoSku(database, sku) : null,
+        };
+      });
+
+      const zamowienie: Zamowienie | null = zam ? {
+        externalId: String(zam.external_id),
+        status: (zam.status as string) ?? null,
+        kupujacyLogin: (zam.kupujacy_login as string) ?? null,
+        dostawaGrosze: zam.dostawa_grosze == null ? null : Number(zam.dostawa_grosze),
+        dostawaMetoda: (zam.dostawa_metoda as string) ?? null,
+        sumaGrosze: zam.suma_grosze == null ? null : Number(zam.suma_grosze),
+        waluta: String(zam.waluta ?? "PLN"),
+        kupionoAt: (zam.kupiono_at as string) ?? null,
+        link: linkZamowienia(String(zam.external_id)),
+        pozycje: pozZamowienia.map((p) => ({
+          offerId: (p.offer_id as string) ?? null,
+          nazwa: String(p.nazwa),
+          sku: (p.sku as string) ?? null,
+          ilosc: Number(p.ilosc),
+          cenaGrosze: Number(p.cena_grosze),
+          waluta: String(p.waluta),
+          /* Które pozycje wracają — to jest cały powód, dla którego panel
+             pokazuje CAŁE zamówienie, a nie same zwracane sztuki. */
+          zwracana: wracajace.has((p.offer_id as string) ?? ""),
+        })),
+      } : null;
+
+      return zloz(z, zlozone, zamowienie, teraz);
+    })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
        jakiej ten ekran potrzebuje. */
     .sort((a, b) => a.dniDoTerminu - b.dniDoTerminu);
@@ -227,4 +342,68 @@ export function osZwrotu(database: Db, zwrotId: number) {
   return database.prepare(
     "SELECT rodzaj, tresc, dane_json, kiedy_at, kto FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY kiedy_at ASC, id ASC"
   ).all(zwrotId);
+}
+
+/**
+ * Potwierdzenie kartoteki dla pozycji zwrotu.
+ *
+ * PIERWSZY ZAPIS tego ekranu. Do 0.151.0 zwroty wyłącznie czytały, a licznik
+ * tras zapisu w `routes/zwroty.test.ts` stał na zerze i był umową — tak jak
+ * licznik `method:` w `biuro.test.ts` dla panelu magazynu.
+ *
+ * Zapisuje ŹRÓDŁO razem z wyborem. `sku` znaczy „agent zatwierdził propozycję
+ * automatu", `reczne` — „wskazał sam". Projekt panelu §4.3 żąda, żeby wybór
+ * człowieka nie udawał faktu z Allegro; tu obowiązuje to w obie strony, bo
+ * bez źródła nie da się później odróżnić, komu wierzyć.
+ *
+ * `twId === null` ZDEJMUJE powiązanie — to jest droga wyjścia z błędnego
+ * potwierdzenia, a nie brak funkcji.
+ */
+export function potwierdzKartoteke(
+  database: Db,
+  pozycjaId: number,
+  twId: number | null,
+  zrodlo: "sku" | "reczne",
+  kto: { id: number; name: string },
+  teraz = new Date(),
+): { twId: number | null; twSymbol: string | null; twZrodlo: string | null } {
+  const pozycja = database.prepare(
+    "SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?"
+  ).get(pozycjaId) as { id: number; zwrot_id: number } | undefined;
+  if (!pozycja) throw new Error("Nie znaleziono pozycji zwrotu");
+
+  if (twId === null) {
+    database.prepare(`UPDATE zwrot_klienta_pozycja
+      SET tw_id=NULL, tw_symbol=NULL, tw_zrodlo=NULL, tw_at=?, tw_przez=? WHERE id=?`)
+      .run(teraz.toISOString(), kto.name, pozycjaId);
+    logEvent("zwrot_kartoteka_zdjeta", kto.name, null,
+      { pozycjaId, zwrotId: pozycja.zwrot_id }, undefined, database);
+    return { twId: null, twSymbol: null, twZrodlo: null };
+  }
+
+  /* Symbol bierzemy z KARTOTEKI, nie z żądania. Panel mógłby przysłać dowolny
+     napis, a snapshot ma przeżyć skasowanie read-modelu przy imporcie —
+     kłamliwy snapshot byłby gorszy od jego braku. */
+  const towar = database.prepare("SELECT tw_id, symbol FROM sgt_towar WHERE tw_id=?")
+    .get(twId) as { tw_id: number; symbol: string } | undefined;
+  if (!towar) throw new Error("Nie znaleziono towaru");
+
+  database.prepare(`UPDATE zwrot_klienta_pozycja
+    SET tw_id=?, tw_symbol=?, tw_zrodlo=?, tw_at=?, tw_przez=? WHERE id=?`)
+    .run(towar.tw_id, towar.symbol, zrodlo, teraz.toISOString(), kto.name, pozycjaId);
+
+  /* Audyt idzie tą samą bazą co mutacja — inaczej zdarzenie mogłoby przeżyć
+     wycofaną transakcję (wzorzec z `services/wysylka.ts`). */
+  logEvent("zwrot_kartoteka", kto.name, towar.tw_id,
+    { pozycjaId, zwrotId: pozycja.zwrot_id, symbol: towar.symbol, zrodlo },
+    kto.id, database);
+
+  database.prepare(`INSERT INTO zwrot_zdarzenie(zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto,kto_user_id)
+    VALUES (?,?,?,?,?,?,?)`).run(
+    pozycja.zwrot_id, "kartoteka",
+    `Wskazano kartotekę ${towar.symbol}`,
+    JSON.stringify({ pozycjaId, twId: towar.tw_id, zrodlo }),
+    teraz.toISOString(), kto.name, kto.id);
+
+  return { twId: towar.tw_id, twSymbol: towar.symbol, twZrodlo: zrodlo };
 }

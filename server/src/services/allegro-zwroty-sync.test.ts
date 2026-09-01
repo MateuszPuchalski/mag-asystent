@@ -6,6 +6,7 @@ import { migrate, type Db } from "../db/db.js";
 import { naGrosze, synchronizujAllegroZwroty } from "./allegro-zwroty-sync.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
+import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 
 /* ── Strażnicy synchronizatora zwrotów (0.150.0) ─────────────────────────────
    Cztery rzeczy, z których każda kosztowała już wydanie w innym rejestrze:
@@ -147,9 +148,9 @@ test("kod porażki bierze się z klasy błędu, nie z jego zdania", async () => 
 });
 
 test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => {
-  /* Lądowisko trzyma surowy JSON i to jest świadome — dowód źródłowy.
-     Model pracy nie ma na te pola ani jednej kolumny, więc panel ich nie
-     zobaczy, a raport z bazy ich nie wyniesie. */
+  /* Do 0.151.0 ten test sprawdzał WYŁĄCZNIE model pracy, a lądowisko trzymało
+     odpowiedź dosłownie — więc IBAN jednak był w bazie, wbrew zdaniu
+     z polityki danych. Od 0.152.0 sprawdzamy obie tabele. */
   const d = stanowisko();
   await synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api",
@@ -163,6 +164,14 @@ test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => 
   assert.equal(zapisane.includes("PL61109010140000071219812874"), false, "IBAN nie wchodzi do modelu pracy");
   assert.equal(zapisane.includes("600100200"), false, "telefon nadawcy też nie");
   assert.equal(wiersz.paczka_at, "2026-08-31T09:00:00Z", "sam FAKT powrotu paczki zostaje — bez danych nadawcy");
+
+  const ladowisko = (d.prepare("SELECT surowe_json FROM allegro_zwrot").get() as { surowe_json: string }).surowe_json;
+  assert.equal(ladowisko.includes("PL61109010140000071219812874"), false, "IBAN nie wchodzi też do lądowiska");
+  assert.equal(ladowisko.includes("600100200"), false, "telefon nadawcy też nie");
+  assert.equal(zostalyWrazliwe(ladowisko), false, "żadne pole wrażliwe nie zostało z wartością");
+  /* Kształt ma przeżyć czyszczenie — to po niego lądowisko istnieje. */
+  assert.equal(ladowisko.includes("bankAccount"), true, "klucz zostaje, znika wartość");
+  assert.equal(ladowisko.includes("WB1"), true, "list przewozowy to nie dane osobowe");
 });
 
 /* ── Próg bezwzględny (0.152.0) ──────────────────────────────────────────────

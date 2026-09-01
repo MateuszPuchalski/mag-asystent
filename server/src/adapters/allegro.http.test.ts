@@ -215,7 +215,7 @@ test("brak ALLEGRO_USER_AGENT to zdanie w /api/health, nie cisza", () => {
   }
 });
 
-/* ── Powód odmowy dla narzędzia z konsoli (0.153.0) ─────────────────────────
+/* ── Powód odmowy dla narzędzia z konsoli (0.153.1) ─────────────────────────
    Sonda odmawiała jednym zdaniem dla wszystkich stanów: „konto nie jest
    sparowane — sparuj w panelu". Trafiało to obok dwa razy. Tryb `dev` nie
    ma czego parować (panel mówi to wprost), a zdanie prowadziło w dodatku do

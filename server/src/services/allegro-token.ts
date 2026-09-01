@@ -434,7 +434,7 @@ export function problemAllegro(): string | null {
   return null;
 }
 
-/* ── Dlaczego narzędzie z konsoli nie ma czego czytać (0.153.0) ──────────────
+/* ── Dlaczego narzędzie z konsoli nie ma czego czytać (0.153.1) ──────────────
    `npm run sonda` odmawiał jednym zdaniem dla wszystkich pięciu stanów:
    „konto nie jest sparowane — sparuj w panelu". Dwa razy wprowadzało to
    w błąd. Po pierwsze, `dev` NIE ZNACZY braku parowania: w trybie demo nie ma

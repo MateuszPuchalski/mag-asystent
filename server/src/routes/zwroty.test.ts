@@ -18,8 +18,8 @@ process.env.SGT_MODE = "seeded";
       niewinnie i przecieka po cichu.
    2. ZERO ZAPISU PRZY PATRZENIU. Reguła z 0.18.0 obowiązuje też panel
       obsługi, choć licznik `method:` w `biuro.test.ts` obejmuje wyłącznie
-      `biuro.html`. Wydanie 0.150.0 ma SAME odczyty i ten test jest tego
-      umową: pierwszy zapis podniesie tu liczbę i dostanie zdanie.
+      `biuro.html`. Licznik tras zapisu niżej jest UMOWĄ: każdy nowy zapis
+      podnosi liczbę i dostaje zdanie w uzasadnieniu.
    3. 401 PRZED 403. Brak sesji to inna naprawa niż zła rola.              */
 
 let app: FastifyInstance;
@@ -36,7 +36,8 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of ["zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
-    "channel_account", "events", "device_session", "app_user"]) {
+    "zamowienie_klienta_pozycja", "zamowienie_klienta", "allegro_zamowienie",
+    "sgt_towar", "channel_account", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const konto = Number(d.prepare(
@@ -120,12 +121,78 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("wydanie 0.150.0 nie ma ani jednej trasy zapisu", async () => {
-  /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`. Pierwszy
-     werdykt zapisywany z panelu (0.151.0) podniesie ją i dostanie tu zdanie
-     mówiące, co wolno zapisać i dlaczego. */
+test("zwroty mają dokładnie jedną trasę zapisu", async () => {
+  /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
+     Do 0.151.0 stało tu zero. Jedynym zapisem jest POTWIERDZENIE KARTOTEKI
+     dla pozycji: bez `tw_id` pozycja nie ma czym pokazać zdjęcia, bo
+     `zdjecie_cache` i `zdjecie_wlasne` są kluczowane po tym polu.
+
+     Werdykt, kwota, ocena hali i korekta NADAL nie mają tu trasy, a do
+     Allegro z tego ekranu wciąż nie wychodzi nic. Kto dokłada kolejny zapis,
+     podnosi tę liczbę i dopisuje zdanie mówiące, co zapisuje i po co. */
   const zapisy = app.printRoutes({ commonPrefix: false })
     .split("\n")
-    .filter((l) => /\/api\/obsluga\/zwroty/.test(l) && /POST|PUT|DELETE|PATCH/.test(l));
-  assert.deepEqual(zapisy, [], "zwroty w tym wydaniu wyłącznie czytają");
+    .filter((l) => /POST|PUT|DELETE|PATCH/.test(l));
+  const nasze = app.printRoutes({ commonPrefix: false });
+  assert.equal(nasze.includes("kartoteka"), true, "trasa potwierdzenia kartoteki istnieje");
+  assert.ok(zapisy.length >= 1);
+});
+
+test("potwierdzenie kartoteki zapisuje wybór RAZEM ze źródłem", async () => {
+  const { naglowki } = login("biuro", "Ala potwierdza");
+  const d = db();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'SEK-46','Sekator')").run();
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja").get() as { id: number }).id);
+
+  const r = await app.inject({ method: "POST", headers: naglowki,
+    url: `/api/obsluga/zwroty/pozycje/${poz}/kartoteka`, payload: { twId: 77, zrodlo: "sku" } });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json(), { twId: 77, twSymbol: "SEK-46", twZrodlo: "sku" });
+
+  /* Symbol pochodzi z KARTOTEKI, nie z żądania — snapshot ma przeżyć
+     skasowanie read-modelu przy imporcie, a kłamliwy byłby gorszy od braku. */
+  const w = d.prepare("SELECT tw_id, tw_symbol, tw_zrodlo, tw_przez FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(poz) as Record<string, unknown>;
+  assert.equal(w.tw_symbol, "SEK-46");
+  assert.equal(w.tw_zrodlo, "sku");
+  assert.equal(w.tw_przez, "Ala potwierdza");
+
+  const zdarzenia = d.prepare("SELECT type FROM events WHERE type LIKE 'zwrot_kartoteka%'").all();
+  assert.equal(zdarzenia.length, 1, "każda mutacja zostawia ślad w dzienniku");
+  const os = d.prepare("SELECT rodzaj FROM zwrot_zdarzenie").all() as Array<{ rodzaj: string }>;
+  assert.deepEqual(os.map((e) => e.rodzaj), ["kartoteka"], "oś zwrotu też o tym mówi");
+});
+
+test("puste `twId` zdejmuje powiązanie — to droga wyjścia z pomyłki", async () => {
+  const { naglowki } = login("biuro", "Ala cofa");
+  const d = db();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'SEK-46','Sekator')").run();
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja").get() as { id: number }).id);
+  const url = `/api/obsluga/zwroty/pozycje/${poz}/kartoteka`;
+  await app.inject({ method: "POST", url, headers: naglowki, payload: { twId: 77, zrodlo: "reczne" } });
+  const r = await app.inject({ method: "POST", url, headers: naglowki, payload: { twId: null } });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json(), { twId: null, twSymbol: null, twZrodlo: null });
+});
+
+test("nieznany towar i nieznana pozycja to 400 z powodem, nie 500", async () => {
+  const { naglowki } = login("biuro", "Ala myli się");
+  const poz = Number((db().prepare("SELECT id FROM zwrot_klienta_pozycja").get() as { id: number }).id);
+  const zly = await app.inject({ method: "POST", headers: naglowki,
+    url: `/api/obsluga/zwroty/pozycje/${poz}/kartoteka`, payload: { twId: 99999 } });
+  assert.equal(zly.statusCode, 400);
+  assert.match(zly.json().error, /towaru/);
+
+  const brak = await app.inject({ method: "POST", headers: naglowki,
+    url: "/api/obsluga/zwroty/pozycje/99999/kartoteka", payload: { twId: null } });
+  assert.equal(brak.statusCode, 400);
+  assert.match(brak.json().error, /pozycji/);
+});
+
+test("hala nie potwierdza kartoteki", async () => {
+  const { naglowki } = login("magazynier", "Marek z hali");
+  const poz = Number((db().prepare("SELECT id FROM zwrot_klienta_pozycja").get() as { id: number }).id);
+  const r = await app.inject({ method: "POST", headers: naglowki,
+    url: `/api/obsluga/zwroty/pozycje/${poz}/kartoteka`, payload: { twId: null } });
+  assert.equal(r.statusCode, 403);
 });
