@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.159.0 — 1 września 2026
+## 0.160.0 — 1 września 2026
 
 **Wzmianka docierała tylko do tego, kto zgadł, w której rozmowie ją zostawiono.**
 
@@ -71,6 +71,59 @@ bez treści komentarza.
 **[wymaga działania]** Migracja dokłada `seen_at` do `conversation_mention`
 i indeks po parze konto–stan. Wzmianki zastane wchodzą jako nieodhaczone, bo
 nikt ich dotąd nie mógł odhaczyć.
+
+## 0.159.0 — 1 września 2026
+
+**Wejście w pytanie przydziela je agentowi, odpowiedź przydziela na stałe.**
+Decyzja właściciela. Do 0.158.0 przydział był jeden i wymagał osobnego
+kliknięcia: agent, który wszedł w pytanie i napisał odpowiedź, dostawał na
+końcu „Rozmowę prowadzi kto inny — najpierw ją przejmij" i tracił ruch, choć
+rozmowa nie należała do nikogo.
+
+**Uchwyt tymczasowy nie dotyka bazy** i to jest cała jego istota. §6.3 projektu
+napisano w 0.141.0: „Obecność i »pisze« nie są tabelą. To stan krótkotrwały,
+żyjący w pamięci procesu i wygasający sam. Zapisany do bazy stałby się trwałym
+statusem rozmowy, czyli dokładnie tym, czym nie jest — a po restarcie serwera
+kłamałby o tym, kto siedzi przy sprawie". Ten akapit czekał na zastosowanie
+i właśnie je dostał.
+
+Dwa skutki. Wejście na ekran nie zapisuje ani jednego wiersza, więc „zero
+zapisu przy patrzeniu" obowiązuje mimo trasy `POST`. I żadna rozmowa nie
+zostaje zablokowana przez agenta, który wyszedł z pracy w czwartek — po
+restarcie usługi wszystkie uchwyty znikają.
+
+**Trzyma PIERWSZY, który wszedł.** Nie ostatni: inaczej kolega otwierający
+rozmowę „na chwilę" odbierałby ją komuś w połowie pisania odpowiedzi.
+
+Uchwyt puszcza po czterdziestu pięciu sekundach bez znaku życia; panel bije
+sercem co piętnaście. Trzykrotny zapas jest po to, żeby jedno zgubione żądanie
+nie oddało rozmowy komuś innemu. Wyjście z ekranu i zamknięcie karty puszczają
+uchwyt od razu — wymeldowanie idzie z `keepalive`, bo bez niego przeglądarka
+przerywa żądanie w locie.
+
+**Blokada jest MIĘKKA.** Gdy przy rozmowie siedzi kto inny, wysyłka odpada
+z 409 i nazwiskiem, a ekran daje jawne „Odpowiedz mimo to" obok „Zostaw
+koledze". Twarda blokada zatrzymywałaby biuro za każdym razem, gdy kolega
+zostawił otwartą zakładkę i wyszedł na obiad. To ta sama zasada co przy
+dopisku klienta z 0.110.0: zgoda ma być jawna, nigdy domyślna.
+
+**Kto odpisał klientowi, ten prowadzi sprawę.** Przypisanie idzie tą samą
+transakcją co wiadomość wychodząca: przypisanie bez wysłanej odpowiedzi albo
+odwrotnie to dwa różne rodzaje kłamstwa. Trwały właściciel dalej bije
+wszystko — rozmowy prowadzonej przez kogoś innego nie odblokuje ani uchwyt,
+ani „mimo to".
+
+**Widać to, ZANIM padnie pierwsze słowo odpowiedzi.** Wiersz kolejki pokazuje
+oko z nazwiskiem kolegi, który tam siedzi. Bez tego dwóch agentów pisze tę samą
+odpowiedź i dowiaduje się o sobie dopiero przy wysyłce, czyli po straconej
+pracy.
+
+**`waiting_for_internal` dostaje nadawcę.** Status z §7 wszedł do bazy
+w 0.158.0 i stał w liście dopuszczonych wartości bez ani jednego automatu,
+który by go ustawiał — agent musiał wybrać go ręcznie, choć fakt już się
+wydarzył. Teraz zlecenie pomiaru przestawia rozmowę na „czeka na nas", a wynik
+z hali ten stan zdejmuje. Oba przejścia lądują na osi; to drugie podpisuje
+HALA, nie agent — tak samo jak przebudzenie podpisuje klient.
 
 ## 0.158.0 — 1 września 2026
 

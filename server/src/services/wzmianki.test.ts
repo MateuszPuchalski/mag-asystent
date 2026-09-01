@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-wzmianki-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Skrzynka wzmianek (0.159.0) ─────────────────────────────────────────────
+/* ── Skrzynka wzmianek (0.160.0) ─────────────────────────────────────────────
    Wzmianka była do tego wydania zapisem bez odczytu — dokładnie tą samą blizną,
    którą komentarze dostały w 0.157.0. `conversation_mention` zapełniała się
    przy każdym komentarzu z „@", a jedyną drogą do niej było OTWARCIE tej

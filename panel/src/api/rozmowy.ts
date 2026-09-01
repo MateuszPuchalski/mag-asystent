@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
@@ -217,13 +218,15 @@ export function useWyslij() {
   return useMutation({
     mutationFn: (v: {
       id: number; body: string; expectedVersion: number;
-      expectedLastMessageId: number | null; mimoNowejWiadomosci?: boolean;
+      expectedLastMessageId: number | null;
+      mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
     }) => api<WynikWysylki>(`/api/conversations/${v.id}/send`, {
       method: "POST",
       body: JSON.stringify({
         body: v.body, expectedVersion: v.expectedVersion,
         expectedLastMessageId: v.expectedLastMessageId,
         mimoNowejWiadomosci: Boolean(v.mimoNowejWiadomosci),
+        mimoObecnosci: Boolean(v.mimoObecnosci),
       }),
     }),
     onSettled: (_d, _e, v) => {
@@ -268,4 +271,38 @@ export function useAgenci() {
        nie ma kogo wzmiankować, a ekran nie ma prawa się o to wywrócić. */
     retry: false,
   });
+}
+
+/* ── Uchwyt rozmowy (0.159.0) ────────────────────────────────────────────────
+   Samo wejście w pytanie przydziela je agentowi NA CZAS SIEDZENIA; odpowiedź
+   przydziela na stałe. Uchwyt żyje w pamięci serwera i wygasa bez znaku
+   życia, więc panel musi bić sercem i musi się wymeldować przy wyjściu.
+
+   Odstęp jest TRZYKROTNIE krótszy od czasu życia uchwytu po stronie serwera:
+   jedno zgubione żądanie nie ma prawa oddać rozmowy komuś innemu w połowie
+   pisania odpowiedzi. */
+const BICIE_MS = 15_000;
+
+export function useUchwytRozmowy(id: number | null) {
+  useEffect(() => {
+    if (id === null) return;
+    const melduj = (obecny: boolean) => api(`/api/conversations/${id}/presence`, {
+      method: "POST", body: JSON.stringify({ obecny }),
+      /* `keepalive` po to, żeby wymeldowanie doszło także wtedy, gdy karta
+         znika. Bez niego przeglądarka przerywa żądanie w locie, a rozmowa
+         zostaje zablokowana do końca czasu życia uchwytu. */
+      keepalive: !obecny,
+    }).catch(() => {});
+
+    void melduj(true);
+    const zegar = setInterval(() => void melduj(true), BICIE_MS);
+    const naZamkniecie = () => void melduj(false);
+    window.addEventListener("pagehide", naZamkniecie);
+
+    return () => {
+      clearInterval(zegar);
+      window.removeEventListener("pagehide", naZamkniecie);
+      void melduj(false);
+    };
+  }, [id]);
 }

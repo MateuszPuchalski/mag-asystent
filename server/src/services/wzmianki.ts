@@ -3,7 +3,7 @@ import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
 
 /**
- * Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.159.0).
+ * Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.160.0).
  *
  * Do tego wydania `conversation_mention` była ZAPISEM BEZ ODCZYTU poza jedną
  * rozmową: wzmianka wracała wyłącznie do tego, kto sam otworzył właściwy wątek.

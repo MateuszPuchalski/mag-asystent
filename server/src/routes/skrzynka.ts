@@ -3,7 +3,9 @@ import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
 import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawStatus, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
-import { onConversationEvent, setTyping, typingPresence } from "../services/conversation-realtime.js";
+import {
+  onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
+} from "../services/conversation-realtime.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
 import { db } from "../db/db.js";
@@ -115,12 +117,27 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         req.body?.body ?? "", req.body?.mentionedUserIds ?? []); } catch (e) { return blad(reply, e); }
     });
 
-  app.post<{ Params: { id: string }; Body: { typing?: boolean } }>(
+  /* ── Obecność i uchwyt rozmowy (0.159.0) ──────────────────────────────────
+     Ta trasa jest ZAPISEM tylko z nazwy: cały stan żyje w pamięci procesu
+     i wygasa sam (§6.3). Do bazy nie idzie nic, więc „zero zapisu przy
+     patrzeniu" obowiązuje mimo tego, że wejście na ekran ją woła.
+
+     `obecny: false` to wyjście z rozmowy i puszczenie uchwytu. Panel woła je
+     przy zmianie rozmowy i przy zamykaniu karty; gdyby nie doszło, uchwyt
+     i tak puści po swoim czasie. */
+  app.post<{ Params: { id: string }; Body: { typing?: boolean; obecny?: boolean } }>(
     "/api/conversations/:id/presence", async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
       const user = sesjaZadania()!.user;
-      setTyping(Number(req.params.id), user.userId, user.name, Boolean(req.body?.typing));
-      return { presence: typingPresence(Number(req.params.id)) };
+      const id = Number(req.params.id);
+      if (req.body?.obecny === false) {
+        wyjdzZRozmowy(id, user.userId);
+      } else if (req.body?.typing === undefined) {
+        wejdzDoRozmowy(id, user.userId, user.name);
+      } else {
+        setTyping(id, user.userId, user.name, Boolean(req.body.typing));
+      }
+      return { presence: przyRozmowie(id), trzyma: trzymajacy(id) };
     });
 
   /* Ręczna synchronizacja (§9). NIE omija przerwy: gdy Allegro poprosiło
@@ -147,7 +164,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return blad(reply, e); }
   });
 
-  /* SKRZYNKA WZMIANEK (§6.4, 0.159.0). `userId` bierze się z SESJI, nigdy
+  /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy
      z parametru — wzmianka niesie fragment komentarza wewnętrznego, a cudzych
      notatek nikt tu oglądać nie ma. Trasa listy niczego nie odhacza. */
   app.get<{ Querystring: { tylkoNowe?: string } }>("/api/obsluga/wzmianki",

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import { ConversationConflict, zmienStatus } from "./conversations.js";
-import { publishConversationEvent } from "./conversation-realtime.js";
+import { publishConversationEvent, trzymajacy } from "./conversation-realtime.js";
 import { logEvent } from "./events.js";
 import { wyslijDoAllegro, type WyslijDoAllegro } from "./allegro-wysylka.js";
 
@@ -14,6 +14,8 @@ export interface ZadanieWysylki {
   expectedLastMessageId: number | null;
   /** Jawna zgoda z blizny 0.110.0 — „wyślij mimo to", nigdy ciche nadpisanie. */
   mimoNowejWiadomosci?: boolean;
+  /** Druga jawna zgoda: „odpowiadam, choć przy rozmowie siedzi kto inny". */
+  mimoObecnosci?: boolean;
   database?: DatabaseSync;
   wyslij?: WyslijDoAllegro;
 }
@@ -98,12 +100,31 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
 
   const k = kontekst(database, z.conversationId);
 
-  if (k.assignedUserId !== z.autor.id) {
-    /* Wysyła TEN, kto prowadzi rozmowę. Inaczej dwóch agentów odpowiada
+  /* ── Kto ma prawo odpowiedzieć (0.159.0) ──────────────────────────────────
+     Do 0.158.0 wysyłka wymagała WCZEŚNIEJSZEGO przejęcia rozmowy: agent, który
+     wszedł w pytanie i napisał odpowiedź, dostawał na końcu „najpierw ją
+     przejmij" i tracił ruch. Decyzja właściciela: samo wejście trzyma rozmowę
+     na czas siedzenia, a ODPOWIEDŹ przydziela ją na stałe.
+
+     Rozmowa nieprzypisana idzie więc do wysyłki bez osobnego kliknięcia —
+     chyba że siedzi przy niej kto inny. Wtedy blokuje UCHWYT z pamięci
+     procesu, a nie kolumna w bazie: sygnał żyje kilkadziesiąt sekund od
+     ostatniego znaku życia i nie przeżywa restartu usługi. */
+  if (k.assignedUserId !== null && k.assignedUserId !== z.autor.id) {
+    /* Trwały właściciel bije wszystko. Inaczej dwóch agentów odpowiada
        jednocześnie, a klient dostaje dwie różne wersje tej samej prawdy. */
     throw new ConversationConflict("Rozmowę prowadzi kto inny — najpierw ją przejmij", {
       assignedUserId: k.assignedUserId, version: k.version,
     });
+  }
+  const trzyma = k.assignedUserId === null ? trzymajacy(z.conversationId) : null;
+  if (trzyma && trzyma.userId !== z.autor.id && !z.mimoObecnosci) {
+    /* Blokada MIĘKKA i z jawnym wyjściem: kolega mógł zostawić otwartą
+       zakładkę i wyjść. Bez „mimo to" uchwyt byłby ścianą do końca TTL. */
+    throw new ConversationConflict(
+      `Przy tej rozmowie siedzi ${trzyma.name} — odpowiedź wymaga potwierdzenia`, {
+        trzymajacyUserId: trzyma.userId, trzymajacyName: trzyma.name, version: k.version,
+      });
   }
   if (k.version !== z.expectedVersion) {
     throw new ConversationConflict("Rozmowa zmieniła się podczas redagowania", {
@@ -208,6 +229,22 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
        stronie klienta i kolejka ma to pokazywać sama — status wymagający
        osobnego kliknięcia po każdej wysyłce zostałby pomijany. */
     zmienStatus(database, z.conversationId, "waiting_for_customer", z.autor.id, null);
+
+    /* ODPOWIEDŹ PRZYDZIELA NA STAŁE (0.159.0). Kto odpisał klientowi, ten
+       prowadzi sprawę — bez tego rozmowa wracałaby do puli zaraz po tym, jak
+       ktoś wziął za nią odpowiedzialność, a klient dopytujący trafiałby za
+       każdym razem na kogo innego.
+
+       Zapis idzie razem z wiadomością, w tej samej transakcji: przypisanie
+       bez wysłanej odpowiedzi albo odwrotnie to dwa różne rodzaje kłamstwa. */
+    if (k.assignedUserId === null) {
+      database.prepare(`UPDATE conversation SET assigned_user_id=?, version=version+1
+        WHERE id=?`).run(z.autor.id, z.conversationId);
+      database.prepare(`INSERT INTO conversation_assignment(conversation_id, assigned_to, assigned_by)
+        VALUES (?,?,?)`).run(z.conversationId, z.autor.id, z.autor.id);
+      logEvent("rozmowa_przypisana_odpowiedzia", z.autor.name, null,
+        { conversationId: z.conversationId, outboxId }, undefined, database);
+    }
 
     logEvent("rozmowa_wyslana", z.autor.name, null,
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,

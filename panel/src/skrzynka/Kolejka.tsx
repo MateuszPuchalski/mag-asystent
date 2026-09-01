@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlarmClock, Inbox, RefreshCw, UserCheck } from "lucide-react";
+import { AlarmClock, Eye, Inbox, RefreshCw, UserCheck } from "lucide-react";
 import type { Rozmowa, StanSkrzynki } from "../api/typy";
 import { Plakietka, czas } from "../ui";
 import { NAZWA } from "./statusy";
@@ -96,12 +96,18 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
           <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>
         </div>
         <p className="mt-1 line-clamp-2 text-sm text-slate-600">{r.ostatniaWiadomosc}</p>
-        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
           <span>{czas(r.ostatniaWiadomoscAt)}</span>
           {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
             <UserCheck size={12} />{r.wlasciciel}</span>}
           {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">
             <AlarmClock size={12} />po terminie</span>}
+          {/* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
+              agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
+              przy wysyłce — czyli po straconej pracy. */}
+          {r.oglada && r.oglada.userId !== mojeId &&
+            <span className="flex items-center gap-1 font-semibold text-violet-700">
+              <Eye size={12} />{r.oglada.name}</span>}
         </div>
       </button>)}
       {nieswieza && <p className="border-t bg-red-50 px-4 py-2 text-xs text-red-800">

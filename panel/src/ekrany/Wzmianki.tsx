@@ -4,7 +4,7 @@ import { AtSign, Check, Lock } from "lucide-react";
 import { useOdhaczWzmianke, useWzmianki } from "../api/rozmowy";
 import { Blad, Karta, Przycisk, Pusto, czas } from "../ui";
 
-/* Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.159.0).
+/* Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.160.0).
    
    Do tego wydania wzmianka docierała wyłącznie do tego, kto sam otworzył
    właściwą rozmowę. Ekran jest tu po to, żeby prośba kolegi nie zależała od

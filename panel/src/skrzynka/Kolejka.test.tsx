@@ -9,7 +9,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z",
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
-  status: "new", odlozoneDo: null, poTerminie: false, ...n,
+  status: "new", odlozoneDo: null, poTerminie: false, oglada: null, ...n,
 });
 
 const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
@@ -126,5 +126,18 @@ describe("Kolejka", () => {
       wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.getByText("Otwarta")).toBeInTheDocument();
     expect(screen.getByText(/po terminie/)).toBeInTheDocument();
+  });
+
+  it("wiersz mówi, kto siedzi przy rozmowie — ale nie o mnie samym", () => {
+    /* Uchwyt widać ZANIM padnie pierwsze słowo odpowiedzi. Dowiadywanie się
+       o koledze dopiero przy wysyłce znaczy dwie napisane odpowiedzi. */
+    const { rerender } = render(<Kolejka
+      rozmowy={[rozmowa({ oglada: { userId: 9, name: "M. Wójcik" } })]} stan={STAN}
+      wybranaId={null} laduje={false} mojeId={7} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText("M. Wójcik")).toBeInTheDocument();
+
+    rerender(<Kolejka rozmowy={[rozmowa({ oglada: { userId: 7, name: "Ja" } })]} stan={STAN}
+      wybranaId={null} laduje={false} mojeId={7} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.queryByText("Ja")).not.toBeInTheDocument();
   });
 });

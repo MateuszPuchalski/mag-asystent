@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { WpisWzmianki } from "../api/typy";
 
-/* ── Skrzynka wzmianek (0.159.0) ─────────────────────────────────────────────
+/* ── Skrzynka wzmianek (0.160.0) ─────────────────────────────────────────────
    Wzmianka to prośba kolegi o zajęcie się czymś. Ekran pilnuje dwóch rzeczy:
    że nieodhaczone widać bez szukania, i że NIC ich nie kasuje samo — ani
    otwarcie listy, ani przejście do rozmowy. */

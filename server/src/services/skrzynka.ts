@@ -1,5 +1,7 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
+import { uchwyty } from "./conversation-realtime.js";
+import { ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
@@ -22,6 +24,10 @@ export interface RozmowaSkrzynki {
      z kubełków zwrotów). Wiersz taki wraca jako `open` i wygląda jak każdy
      inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
   poTerminie: boolean;
+  /* Kto SIEDZI przy rozmowie teraz — przydział tymczasowy, na czas oglądania.
+     Nie ma go w bazie i nie ma prawa być (§6.3): po restarcie usługi rozmowa
+     nie może zostać zablokowana przez agenta, który dawno wyszedł. */
+  oglada: { userId: number; name: string } | null;
 }
 /** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
 export interface ZalacznikOsi {
@@ -49,7 +55,11 @@ const LISTA = `
            AS ostatniaWiadomosc
     FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id`;
 
-const naRozmowe = (w: Record<string, unknown>, teraz = Date.now()): RozmowaSkrzynki => {
+const naRozmowe = (
+  w: Record<string, unknown>,
+  teraz = Date.now(),
+  trzymane: Map<number, { userId: number; name: string }> = new Map(),
+): RozmowaSkrzynki => {
   const odlozoneDo = w.odlozoneDo === null ? null : String(w.odlozoneDo);
   const minal = Boolean(odlozoneDo && Date.parse(odlozoneDo) <= teraz);
   return {
@@ -66,6 +76,7 @@ const naRozmowe = (w: Record<string, unknown>, teraz = Date.now()): RozmowaSkrzy
     status: (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
+    oglada: trzymane.get(Number(w.id)) ?? null,
   };
 };
 
@@ -101,8 +112,11 @@ export function stanObslugiHealth(teraz = Date.now()) {
 }
 
 export function listaRozmow(): RozmowaSkrzynki[] {
+  /* Uchwyty bierzemy RAZ na całą listę, nie po jednym na wiersz: kolejka
+     odświeża się przy każdym zdarzeniu, a mapa i tak stoi w pamięci. */
+  const trzymane = uchwyty();
   return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
-    .map((w) => naRozmowe(w));
+    .map((w) => naRozmowe(w, Date.now(), trzymane));
 }
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
@@ -111,7 +125,7 @@ export function osRozmowy(id: number): {
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
-  const rozmowa = naRozmowe(wiersz);
+  const rozmowa = naRozmowe(wiersz, Date.now(), uchwyty());
 
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,
@@ -300,5 +314,11 @@ export function zlecPomiar(
      `zrodlo_ref` — dzięki temu wynik wraca na oś TEJ rozmowy i tej wiadomości. */
   db().prepare("UPDATE zadanie_terenowe SET conversation_id=?, message_id=? WHERE id=?")
     .run(rozmowaId, messageId, zadanie.id);
+  /* ZLECONY POMIAR PRZESTAWIA STATUS (0.159.0). Bez tego `waiting_for_internal`
+     z §7 stał w liście dopuszczonych wartości i nie miał ani jednego nadawcy:
+     agent musiałby wybrać go ręcznie z listy, choć fakt już się wydarzył.
+     Wyjście z tego stanu jest równie automatyczne — zdejmuje go wynik z hali
+     (`dopiszZdarzenieWyniku`). */
+  ustawStatus(db(), rozmowaId, "waiting_for_internal", autor.id, null);
   return { ...zadanie, conversationId: rozmowaId, messageId };
 }

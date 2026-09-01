@@ -22,6 +22,9 @@ export type Rozmowa = {
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
+  /* Kto SIEDZI przy rozmowie teraz. Przydział tymczasowy, na czas oglądania —
+     żyje w pamięci serwera i wygasa sam, więc bywa `null` sekundę później. */
+  oglada: { userId: number; name: string } | null;
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
@@ -43,7 +46,7 @@ export type WpisOsi = {
   wzmianki?: Array<{ userId: number; name: string }>;
 };
 
-/* Wzmianka w skrzynce „wspomniano o mnie" (§6.4, 0.159.0). Fragment liczy
+/* Wzmianka w skrzynce „wspomniano o mnie" (§6.4, 0.160.0). Fragment liczy
    SERWER — panel nie skraca treści drugi raz po swojemu. */
 export type WpisWzmianki = {
   commentId: number;
@@ -132,6 +135,11 @@ export type SzczegolyWysylki = {
   lastMessageId?: number | null;
   nowaWiadomosc?: { id: number; tresc: string; at: string } | null;
   kluczIdempotencji?: string;
+  /* Drugi rodzaj konfliktu wysyłki (0.159.0): przy rozmowie siedzi kto inny.
+     Osobne pole, bo i pytanie do agenta jest inne — tam „klient dopisał",
+     tu „kolega już przy tym siedzi". */
+  trzymajacyName?: string;
+  trzymajacyUserId?: number;
 };
 
 /* ── Zwroty klienckie (0.150.0) ──────────────────────────────────────────────

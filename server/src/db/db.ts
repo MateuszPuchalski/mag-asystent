@@ -111,12 +111,12 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
-  /* Odhaczenie wzmianki (0.159.0). Do tego wydania `conversation_mention`
+  /* Odhaczenie wzmianki (0.160.0). Do tego wydania `conversation_mention`
      mówiła tylko „ktoś cię wymienił" i nie znała odpowiedzi na „czy już się
      tym zająłeś" — a bez niej skrzynka wzmianek pokazywałaby w kółko to samo. */
   addColumn("conversation_mention", "seen_at", "TEXT");
   /* Indeks stoi TUTAJ, nie w `schema.sql`: tamten plik wykonuje się przed
-     migracją, więc na bazie sprzed 0.159.0 wywróciłby start na nieistniejącej
+     migracją, więc na bazie sprzed 0.160.0 wywróciłby start na nieistniejącej
      kolumnie. Skrzynka wzmianek pyta zawsze o jednego użytkownika i najczęściej
      o same nieodhaczone. */
   database.exec(`CREATE INDEX IF NOT EXISTS ix_conversation_mention_user

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { ConversationConflict, przejmijRozmowe, zapiszSzkic } from "./conversations.js";
 import { kluczIdempotencji, LIMIT_ZNAKOW, wyslijOdpowiedz } from "./wysylka.js";
+import { _wyczyscObecnosc, wejdzDoRozmowy, wyjdzZRozmowy } from "./conversation-realtime.js";
 import type { WyslijDoAllegro } from "./allegro-wysylka.js";
 
 /* Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na zewnątrz.
@@ -38,6 +39,11 @@ function stanowisko() {
 
 const udany = (id = "m-99001"): WyslijDoAllegro => async () => ({ externalMessageId: id });
 const autorAli = (id: number) => ({ id, name: "A. Lewandowska" });
+
+/** Wpisy dziennika danego rodzaju — audyt jest częścią umowy, nie dodatkiem. */
+const zdarzenia = (d: DatabaseSync, type: string) => d.prepare(
+  "SELECT user_id, payload FROM events WHERE type=? ORDER BY id").all(type) as
+  Array<{ user_id: string; payload: string | null }>;
 
 const outbox = (d: DatabaseSync) => d.prepare(
   "SELECT id, status, idempotency_key, external_message_id, blad FROM outbox ORDER BY id").all() as
@@ -84,6 +90,25 @@ test("udana wysyłka dopisuje wiadomość wychodzącą i kasuje szkic", async ()
   /* Szkic znika dopiero po UDANEJ wysyłce — przy każdym innym końcu zostaje. */
   assert.equal((d.prepare("SELECT count(*) n FROM conversation_draft").get() as {n:number}).n, 0);
   assert.equal(outbox(d)[0].status, "sent");
+
+  /* Ruch jest teraz po stronie klienta i status mówi to sam. Gdyby czekał na
+     kliknięcie, kłamałby przy pierwszej rozmowie, w której agent się spieszył. */
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string }).status, "waiting_for_customer");
+});
+
+test("nieudana wysyłka NIE przestawia statusu na czekanie", async () => {
+  /* Status ma opisywać to, co się stało. Odmowa Allegro znaczy, że klient
+     dalej czeka na nas — a nie odwrotnie. */
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  await assert.rejects(() => wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+    wyslij: async () => { throw new Error("400 Bad Request"); },
+  }));
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string }).status, "open");
 });
 
 test("wysyła ten, kto prowadzi rozmowę", async () => {
@@ -250,4 +275,87 @@ test("każdy koniec wysyłki zostawia ślad w dzienniku, bez treści", async () 
   const payloady = (d.prepare("SELECT payload FROM events").all() as Array<{payload: string|null}>)
     .map((w) => w.payload ?? "").join(" ");
   assert.ok(!payloady.includes(tajne), "treść odpowiedzi przeciekła do dziennika");
+});
+
+/* ── Uchwyt rozmowy i przydział przez odpowiedź (0.158.0) ────────────────────
+   Decyzja właściciela: wejście w pytanie trzyma je na czas siedzenia,
+   odpowiedź przydziela na stałe. Uchwyt żyje w PAMIĘCI, więc każdy test
+   zaczyna od czystego stanu — inaczej niósłby się między nimi. */
+
+test("odpowiedź na nieprzypisaną rozmowę przydziela ją na stałe", async () => {
+  _wyczyscObecnosc();
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  /* ANI JEDNEGO przejęcia po drodze: agent wszedł w pytanie i odpisał. */
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje, rozstaw 148 mm.",
+    expectedVersion: 1, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+  });
+  assert.equal(w.status, "sent");
+
+  const c = d.prepare("SELECT assigned_user_id, version FROM conversation WHERE id=?")
+    .get(rozmowa) as { assigned_user_id: number; version: number };
+  assert.equal(c.assigned_user_id, ala, "kto odpisał klientowi, ten prowadzi sprawę");
+  assert.equal(c.version, 2, "przydział jest decyzją człowieka, więc podnosi wersję");
+  /* Historia przypisań ma pokazać, skąd wzięło się to przypisanie. */
+  assert.equal((d.prepare("SELECT count(*) n FROM conversation_assignment WHERE conversation_id=?")
+    .get(rozmowa) as { n: number }).n, 1);
+  assert.equal(zdarzenia(d, "rozmowa_przypisana_odpowiedzia").length, 1);
+});
+
+test("uchwyt kolegi zatrzymuje odpowiedź, dopóki nie padnie jawne „mimo to\"", async () => {
+  _wyczyscObecnosc();
+  const { d, ala, marek, rozmowa, pytanie } = stanowisko();
+  /* Ala weszła pierwsza i siedzi przy pytaniu. */
+  wejdzDoRozmowy(rozmowa, ala, "A. Lewandowska");
+
+  await assert.rejects(() => wyslijOdpowiedz({
+    conversationId: rozmowa, autor: { id: marek, name: "M. Wójcik" }, body: "Pasuje.",
+    expectedVersion: 1, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+  }), (e: unknown) => {
+    assert.ok(e instanceof ConversationConflict);
+    assert.match(e.message, /siedzi A. Lewandowska/);
+    assert.equal(e.details.trzymajacyUserId, ala);
+    return true;
+  });
+  assert.equal((d.prepare("SELECT count(*) n FROM message WHERE direction='outgoing'")
+    .get() as { n: number }).n, 0, "zablokowana odpowiedź nie idzie do klienta");
+
+  /* Blokada jest MIĘKKA: kolega mógł zostawić otwartą zakładkę i wyjść. */
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: { id: marek, name: "M. Wójcik" }, body: "Pasuje.",
+    expectedVersion: 1, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+    mimoObecnosci: true,
+  });
+  assert.equal(w.status, "sent");
+  assert.equal((d.prepare("SELECT assigned_user_id FROM conversation WHERE id=?")
+    .get(rozmowa) as { assigned_user_id: number }).assigned_user_id, marek);
+});
+
+test("wyjście z pytania puszcza uchwyt i nie zostawia nic w bazie", async () => {
+  _wyczyscObecnosc();
+  const { d, ala, marek, rozmowa, pytanie } = stanowisko();
+  wejdzDoRozmowy(rozmowa, ala, "A. Lewandowska");
+  /* Wyjście BEZ odpowiedzi: rozmowa wraca do puli, a w bazie nie ma po tym
+     śladu — cały uchwyt żył w pamięci procesu (§6.3). */
+  wyjdzZRozmowy(rozmowa, ala);
+  assert.equal((d.prepare("SELECT assigned_user_id FROM conversation WHERE id=?")
+    .get(rozmowa) as { assigned_user_id: number | null }).assigned_user_id, null);
+  assert.equal(zdarzenia(d, "rozmowa_przypisana_odpowiedzia").length, 0);
+
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: { id: marek, name: "M. Wójcik" }, body: "Pasuje.",
+    expectedVersion: 1, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+  });
+  assert.equal(w.status, "sent", "po wyjściu kolegi nikt już nie blokuje");
+});
+
+test("własny uchwyt nie blokuje własnej odpowiedzi", async () => {
+  _wyczyscObecnosc();
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  wejdzDoRozmowy(rozmowa, ala, "A. Lewandowska");
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje.",
+    expectedVersion: 1, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+  });
+  assert.equal(w.status, "sent");
 });

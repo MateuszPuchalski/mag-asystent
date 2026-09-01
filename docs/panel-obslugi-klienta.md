@@ -134,6 +134,26 @@ przekazana ekspertowi, odłożona albo zakończona.
 uda się jeden zapis. Drugi dostaje konflikt z aktualnym właścicielem, czasem
 przejęcia i bieżącą wersją rozmowy.
 
+**Dwa rodzaje przydziału (0.159.0).** Decyzja właściciela: samo wejście agenta
+w pytanie przydziela mu je NA CZAS SIEDZENIA, a odpowiedź — na stałe.
+
+| przydział | co go daje | jak długo trwa | gdzie żyje |
+|---|---|---|---|
+| tymczasowy (uchwyt) | wejście w rozmowę | do wyjścia albo do wygaśnięcia | pamięć procesu |
+| trwały | odpowiedź do klienta albo „Przejmij" | do przekazania | `conversation.assigned_user_id` |
+
+Uchwyt trzyma PIERWSZY, który wszedł, nie ostatni: inaczej kolega otwierający
+rozmowę „na chwilę" odbierałby ją komuś w połowie pisania odpowiedzi.
+
+Wysyłka odpowiedzi na rozmowę nieprzypisaną nie wymaga już osobnego przejęcia.
+Do 0.158.0 agent, który wszedł w pytanie i napisał odpowiedź, dostawał na
+końcu „najpierw ją przejmij" i tracił ruch.
+
+**Blokada jest miękka.** Gdy przy rozmowie siedzi kto inny, wysyłka odpada
+z 409 i nazwiskiem — ale ekran daje jawne „odpowiedz mimo to". Twarda blokada
+zatrzymywałaby biuro za każdym razem, gdy kolega zostawił otwartą zakładkę
+i wyszedł.
+
 ### 6.3. Obecność agentów
 
 Panel pokazuje, kto ogląda rozmowę, kto pisze, kto zmienił szkic i kto ostatnio
@@ -144,13 +164,23 @@ procesu (`services/conversation-realtime.ts`) i wygasający sam. Zapisany do
 bazy stałby się trwałym statusem rozmowy, czyli dokładnie tym, czym nie jest —
 a po restarcie serwera kłamałby o tym, kto siedzi przy sprawie.
 
+Ten akapit napisano w 0.141.0, a w 0.159.0 dostał zastosowanie: to na nim
+stoi przydział tymczasowy z §6.2. Uchwyt puszcza po czterdziestu pięciu
+sekundach bez znaku życia, panel bije sercem co piętnaście. Trzykrotny zapas
+jest po to, żeby jedno zgubione żądanie nie oddało rozmowy komuś innemu
+w połowie pisania odpowiedzi.
+
+Dzięki temu wejście na ekran nie zapisuje ANI JEDNEGO wiersza. Trasa obecności
+jest zapisem tylko z nazwy — reguła „zero zapisu przy patrzeniu" obowiązuje
+skrzynkę tak samo jak resztę.
+
 ### 6.4. Wewnętrzne komentarze
 
 Komentarze są widoczne wyłącznie dla pracowników, mogą zawierać wzmianki, mogą
 wskazywać produkt, zadanie lub dowód, nie mogą przypadkiem trafić do klienta
 i są wizualnie odróżnione od wiadomości klienta.
 
-#### 6.4.1. Skrzynka wzmianek (0.159.0)
+#### 6.4.1. Skrzynka wzmianek (0.160.0)
 
 Wzmianka jest prośbą o zajęcie się czymś, więc musi mieć własną drogę do
 adresata. Do 0.158.0 wracała wyłącznie do tego, kto sam otworzył właściwą
@@ -188,11 +218,18 @@ w `services/conversations.ts`, `CHECK` na kolumnie `conversation.status`
 i typ `StatusRozmowy` w panelu. Każda kopia pilnuje innej granicy — typów,
 API i bazy — a rozjazd wychodzi przy kompilacji albo przy zapisie.
 
-Trzy przejścia dzieją się SAME, bez agenta:
+Pięć przejść dzieje się SAMYCH, bez agenta:
 
 - przejęcie rozmowy prowadzi `new` → `open`;
 - wysłana odpowiedź prowadzi do `waiting_for_customer`;
-- przychodząca wiadomość klienta budzi rozmowę do `open`.
+- przychodząca wiadomość klienta budzi rozmowę do `open`;
+- zlecony pomiar prowadzi do `waiting_for_internal` (0.159.0);
+- wynik z hali zdejmuje ten stan z powrotem do `open` (0.159.0).
+
+Dwa ostatnie doszły później i nie są dodatkiem: do 0.158.0
+`waiting_for_internal` stał w liście dopuszczonych wartości bez ani jednego
+nadawcy. Agent musiał wybrać go ręcznie, choć fakt — zlecenie pomiaru — już
+się wydarzył.
 
 Budzenie omija `closed` i `spam`. To jawne werdykty człowieka, a automat,
 który je cofa, kazałby zamykać tę samą rozmowę w kółko.
@@ -809,7 +846,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
 | Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
 | Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users` |
-| Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.159.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
+| Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.160.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
 | Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
 | Obecność i „pisze" | **działa**, w pamięci | `services/conversation-realtime.ts` |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
@@ -821,6 +858,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias` |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
 | Statusy rozmowy (§7) | **działa** od 0.158.0 | `conversation.status`, `ustawStatus`, kubełki kolejki |
+| Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
+| Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
+| `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Statusy doboru (§7) | **projekt** | dobór części nie ma jeszcze własnego stanu |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
