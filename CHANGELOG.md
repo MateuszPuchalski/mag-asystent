@@ -33,6 +33,28 @@ historii nie przepisujemy.
 
 ---
 
+## 0.143.0 — 1 września 2026
+
+**Skrzynka obsługi klienta czyta rozmowy.** Panel pod `/obsluga/skrzynka`
+pokazuje listę rozmów Allegro, oś czasu wybranej rozmowy i numer oferty przy
+wiadomości. Ekran stoi w istniejącym panelu React, bez drugiego bundlera.
+
+**Ekran czyta bazę, nie Allegro.** Rozmowy bierze z tabel, które wypełnia
+synchronizator skrzynki. Dzięki temu otwiera się także wtedy, gdy Allegro nie
+odpowiada, i pokazuje wprost moment ostatniej udanej synchronizacji.
+
+**Pomiar zleca się z konkretnej wiadomości.** Kontekst składa serwer z bazy:
+pytanie klienta w oryginale, numer oferty oraz namiary rozmowy. Agent podaje
+tylko identyfikatory, więc nie wskaże hali cudzej oferty.
+
+**Wynik z hali jest dopiskiem, nie podmianą.** Wraca na oś rozmowy jako osobny
+wpis. Do szkicu odpowiedzi trafia wyłącznie na jawne kliknięcie agenta.
+Wysyłka odpowiedzi do Allegro zostaje wyłączona w tym wydaniu.
+
+**Zadanie ze skrzynki nie dostaje numeru kartoteki.** Synchronizator nie pobiera
+ofert, więc mapowania oferta→kartoteka nie ma z czego zrobić. Ekran mówi to
+wprost ostrzeżeniem, zamiast zgadywać.
+
 ## 0.142.0 — 1 września 2026
 
 **Wraca fundament obsługi rozmów.** Baza rozróżnia kanał od konkretnego
