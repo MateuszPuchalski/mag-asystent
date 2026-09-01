@@ -152,6 +152,12 @@ export function migrate(database: DatabaseSync) {
      kasuje ani nie nadpisuje: zdarzenie, którego nie da się przypisać, zostaje
      z `user_ref = NULL`, bo to jest uczciwe, w odróżnieniu od zgadywania. */
   addColumn("events", "user_ref", "INTEGER");
+  /* Stan synchronizacji urósł w 0.147.0 o to, czego żąda §21 projektu panelu:
+     moment ostatniej PRÓBY i kod jej porażki. Bez nich panel umie powiedzieć
+     tylko „nie udało się", a agent nie wie, czy czekać, czy wołać admina. */
+  addColumn("allegro_inbox_sync_state", "last_attempt_at", "TEXT");
+  addColumn("allegro_inbox_sync_state", "last_error_code", "INTEGER");
+  addColumn("allegro_inbox_sync_state", "error_thread_count", "INTEGER NOT NULL DEFAULT 0");
   /* Indeks MUSI powstać tutaj, nie w schema.sql: `user_ref` dochodzi migracją,
      więc w chwili wykonania schematu ta kolumna jeszcze nie istnieje. Raport
      wydajności (§7) grupuje właśnie po niej. */

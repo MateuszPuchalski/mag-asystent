@@ -4,6 +4,8 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClipboardList, Inbox, LogOut, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
+import { useZdrowie } from "./api/rozmowy";
+import { czas } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zadania } from "./ekrany/Zadania";
@@ -29,6 +31,24 @@ const ZAKLADKI = [
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} /> },
 ];
 
+/* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
+   ją widzieć z każdej zakładki. Awaria integracji, o której wie tylko jeden
+   ekran, jest awarią widoczną dopiero wtedy, gdy ktoś na ten ekran wejdzie. */
+function PigulkaSynchronizacji() {
+  const { data } = useZdrowie();
+  if (!data) return null;
+  const i = data.allegroInbox;
+  const zle = i.status !== "current";
+  return <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
+    zle ? "bg-red-500/20 text-red-100" : "bg-white/10 text-slate-300"}`}>
+    <span className={`h-2 w-2 rounded-full ${zle ? "bg-red-400" : "bg-emerald-400"}`} />
+    {i.alarm
+      ? `Synchronizacja stanęła ${czas(i.ostatniaUdanaSynchronizacja).slice(-8, -3)}`
+      : `Synchronizacja ${czas(i.ostatniaUdanaSynchronizacja).slice(-8, -3) || "—"} · ${
+          i.liczbaBledow} błędów`}
+  </div>;
+}
+
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
   const naSkrzynce = pathname.startsWith("/obsluga/skrzynka");
@@ -46,6 +66,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
             {z.ikona}{z.etykieta}</Link>;
         })}
       </nav>
+      <PigulkaSynchronizacji />
       <button className="rounded-lg p-2 text-slate-400 hover:bg-white/10" onClick={wyloguj}
         title="Wyloguj" aria-label="Wyloguj"><LogOut size={20} /></button>
     </div>

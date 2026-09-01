@@ -33,6 +33,46 @@ historii nie przepisujemy.
 
 ---
 
+## 0.147.0 — 1 września 2026
+
+**Awaria synchronizacji przestaje być cicha.** Po więcej niż dwóch nieudanych
+przebiegach panel pokazuje trwały baner: ile przebiegów padło, dlaczego i jak
+stare są dane na ekranie. Kolejka dostaje wtedy plakietkę „STAN Z", gasnie
+i mówi, że dalsze wiersze mogą czekać w Allegro.
+
+Pusta kolejka o 9:41 znaczy co innego, gdy synchronizator stanął o 7:05.
+Do tej pory ekran nie odróżniał tych dwóch rzeczy.
+
+**Synchronizacja ma status, a nie samą liczbę błędów.** Kod porażki rozstrzyga
+przed jej liczbą: 401 znaczy „zawołaj admina", 429 znaczy „poczekaj". Statusy
+pochodzą z rozdziału 7 projektu panelu.
+
+**[wymaga działania]** Licznik błędów zeruje się przy udanym przebiegu. Do tej
+pory klauzula zapisu go pomijała, więc rósł do końca życia bazy — pierwsza
+w tygodniu odmowa Allegro zostawiała w panelu „błędów: 1" na stałe. Po
+aktualizacji licznik pokazuje nieudane przebiegi Z RZĘDU. Istniejące bazy
+wyzerują go przy pierwszej udanej synchronizacji.
+
+**Ręczna synchronizacja z panelu.** Przycisk nie omija przerwy, o którą
+poprosiło Allegro — skraca tylko czekanie po jej końcu. Ekran mówi to wprost.
+
+**Przegrany wyścig o rozmowę pokazuje trzy rzeczy.** Kto prowadzi, kiedy
+przejął i na której wersji stoi rozmowa wobec tej, którą niosło żądanie.
+Czas bierze się z historii przypisań, nie ze znacznika zmiany rozmowy.
+
+**Administrator może odebrać rozmowę, ale wyłącznie z powodem.** Powód idzie
+do dziennika razem z autorem, czasem i wersją przed i po. Poprzednie
+przypisanie zamyka się, zamiast zniknąć.
+
+**Pytanie bez numeru oferty dostaje trzy wyjścia.** Agent wskazuje ofertę
+ręcznie, wskazuje kartotekę wyszukiwarką albo dopytuje klienta. Wskazanie
+ręczne zapisuje się jako wybór agenta i tak wygląda na osi — panel nadal nie
+dobiera towaru z najdłuższych słów treści.
+
+**`/api/health` raportuje stan integracji.** Status połączenia, ostatnia próba
+z kodem, wiek danych, wątki z błędem, rozmowy oczekujące i wiek najstarszego
+zadania. Panel pokazuje to w osobnym kafelku.
+
 ## 0.146.0 — 1 września 2026
 
 **[wymaga działania]** Panel obsługi ma nowe zależności, więc po `git pull`

@@ -49,6 +49,21 @@ describe("Kolejka", () => {
     expect(wybierz).toHaveBeenCalledWith(4821);
   });
 
+  it("nieświeża kolejka mówi, z kiedy jest stan i czego może brakować", () => {
+    /* Pusta kolejka przy stojącym synchronizatorze to nie „brak pytań",
+       tylko „nie wiem" — i ekran ma to powiedzieć. */
+    render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null} laduje={false}
+      nieswieza onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText(/STAN Z/)).toBeInTheDocument();
+    expect(screen.getByText(/nie zostały jeszcze pobrane/)).toBeInTheDocument();
+  });
+
+  it("świeża kolejka nie straszy plakietką", () => {
+    render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.queryByText(/STAN Z/)).not.toBeInTheDocument();
+  });
+
   it("wybrany wiersz jest oznaczony dla czytnika ekranu, nie tylko kolorem", () => {
     render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={4821} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);

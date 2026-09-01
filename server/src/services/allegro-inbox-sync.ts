@@ -10,6 +10,15 @@ type Thread = { id: string; read: boolean; lastMessageDate: string;
 type Message = { id: string; author: { login: string; role: string }; text: string;
   relatedObject: { type: string; id: string } | null; read: boolean };
 
+/* Adapter Allegro zamienia kody na zdania po polsku, bo to one trafiają na
+   ekran biura. Status synchronizacji potrzebuje jednak samego kodu, więc
+   wyjmujemy go z komunikatu — jedyne miejsce, w którym ta wiedza jest
+   powielona, i dlatego stoi tu, a nie w trzech miejscach. */
+function kodHttp(error: unknown): number | null {
+  const m = /\((\d{3})\)/.exec(error instanceof Error ? error.message : "");
+  return m ? Number(m[1]) : null;
+}
+
 function tablica<T>(value: unknown, pole: string): T[] {
   if (!value || typeof value !== "object" || !Array.isArray((value as Record<string, unknown>)[pole])) {
     throw new Error(`Odpowiedź Allegro nie ma tablicy ${pole} opisanej w docs/allegro-ksztalt.md`);
@@ -83,22 +92,35 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
         }
         zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
       }
+      /* `error_count` ZERUJE SIĘ na sukcesie i to jest zmiana z 0.147.0.
+         Wcześniej klauzula `DO UPDATE` go pomijała, więc licznik rósł do
+         końca życia bazy: pierwsza w tygodniu odmowa Allegro zostawiała
+         w panelu „błędów: 1" na stałe, a §21 nie miał z czego policzyć,
+         ile przebiegów Z RZĘDU się nie powiodło. */
       database.prepare(`INSERT INTO allegro_inbox_sync_state
-        (id,cursor_at,cursor_id,last_success_at,error_count,next_attempt_at)
-        VALUES(1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
+        (id,cursor_at,cursor_id,last_success_at,last_attempt_at,last_error_code,
+         error_count,error_thread_count,next_attempt_at)
+        VALUES(1,?,?,?,?,NULL,0,0,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
         cursor_id=excluded.cursor_id,last_success_at=excluded.last_success_at,
-        next_attempt_at=excluded.next_attempt_at`).run(
+        last_attempt_at=excluded.last_attempt_at,last_error_code=NULL,
+        error_count=0,error_thread_count=0,next_attempt_at=excluded.next_attempt_at`).run(
           newest?.lastMessageDate ?? startState.cursorAt, newest?.id ?? startState.cursorId,
-          at, startState.errorCount, new Date(Date.parse(at) + interval).toISOString());
+          at, at, new Date(Date.parse(at) + interval).toISOString());
     })();
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
       ? Math.max(interval, error.poIluMs ?? interval * 2)
       : interval;
     const next = new Date(now().getTime() + wait).toISOString();
-    database.prepare(`INSERT INTO allegro_inbox_sync_state(id,error_count,next_attempt_at)
-      VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET error_count=error_count+1,
-      next_attempt_at=excluded.next_attempt_at`).run(next);
+    /* Kod porażki decyduje o statusie z §7: 401 i 403 to `authentication_error`
+       („zawołaj admina"), 429 to `rate_limited` („poczekaj"). Bez zapamiętania
+       kodu panel umiałby powiedzieć wyłącznie „nie udało się". */
+    const kod = error instanceof BladLimituAllegro ? 429 : kodHttp(error);
+    database.prepare(`INSERT INTO allegro_inbox_sync_state
+      (id,error_count,last_attempt_at,last_error_code,next_attempt_at)
+      VALUES(1,1,?,?,?) ON CONFLICT(id) DO UPDATE SET error_count=error_count+1,
+      last_attempt_at=excluded.last_attempt_at,last_error_code=excluded.last_error_code,
+      next_attempt_at=excluded.next_attempt_at`).run(now().toISOString(), kod, next);
     throw error;
   }
 }

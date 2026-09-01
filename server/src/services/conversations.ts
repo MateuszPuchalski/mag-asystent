@@ -64,12 +64,20 @@ export function przejmijRozmowe(conversationId: number, userId: number, expected
       SET assigned_user_id=?, version=version+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
       WHERE id=? AND assigned_user_id IS NULL AND version=?`).run(userId, conversationId, expectedVersion);
     if (result.changes === 0) {
-      const winner = database.prepare(`SELECT c.version, u.user_id, u.name FROM conversation c
-        LEFT JOIN app_user u ON u.user_id=c.assigned_user_id WHERE c.id=?`).get(conversationId) as
-        { version: number; user_id: number | null; name: string | null } | undefined;
+      /* Czas przejęcia bierze się z HISTORII przypisań, nie z `updated_at`
+         rozmowy: ten drugi rusza się przy każdym zapisie szkicu i pokazywałby
+         nie moment przejęcia, tylko ostatnią dowolną zmianę. */
+      const winner = database.prepare(`SELECT c.version, u.user_id, u.name,
+        (SELECT a.assigned_at FROM conversation_assignment a
+          WHERE a.conversation_id=c.id AND a.unassigned_at IS NULL
+          ORDER BY a.id DESC LIMIT 1) AS assigned_at
+        FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
+        WHERE c.id=?`).get(conversationId) as
+        { version: number; user_id: number | null; name: string | null; assigned_at: string | null } | undefined;
       if (!winner) throw new Error("Nie znaleziono rozmowy");
       throw new ConversationConflict("Rozmowę przejął już inny agent", {
-        assignedUserId: winner.user_id, assignedUserName: winner.name, version: winner.version,
+        assignedUserId: winner.user_id, assignedUserName: winner.name,
+        assignedAt: winner.assigned_at, version: winner.version,
       });
     }
 
@@ -89,6 +97,87 @@ export function przejmijRozmowe(conversationId: number, userId: number, expected
      dostałby wiadomość o przejęciu, którego nie ma w bazie. */
   publishConversationEvent("assignment.changed", conversationId,
     { assignedUserId: userId, version: wynik.version });
+  return wynik;
+}
+
+/**
+ * Odebranie rozmowy agentowi, który ją prowadzi (§6.2, §19).
+ *
+ * Powód jest OBOWIĄZKOWY i to jest cała różnica między tą operacją a zwykłym
+ * przejęciem. Rozmowa wraca do kolejki albo trafia do wskazanej osoby, a w
+ * dzienniku zostaje kto, kiedy, z jakiej wersji na jaką i dlaczego.
+ *
+ * Bramkę roli trzyma trasa (`autoryzuj`), nie ten serwis — tak samo jak przy
+ * domknięciu dostawy. Serwis pilnuje wersji i kompletu zapisu.
+ */
+export function przekazRozmowe(conversationId: number, autorId: number,
+  doUserId: number | null, powod: string, expectedVersion: number,
+  database: DatabaseSync = db()) {
+  const uzasadnienie = (powod ?? "").trim();
+  if (!uzasadnienie) throw new Error("Wymuszone przekazanie wymaga powodu");
+
+  const wynik = transaction(database, () => {
+    const result = database.prepare(`UPDATE conversation
+      SET assigned_user_id=?, version=version+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE id=? AND version=?`).run(doUserId, conversationId, expectedVersion);
+    if (result.changes === 0) {
+      const teraz = database.prepare(`SELECT c.version, u.user_id, u.name FROM conversation c
+        LEFT JOIN app_user u ON u.user_id=c.assigned_user_id WHERE c.id=?`).get(conversationId) as
+        { version: number; user_id: number | null; name: string | null } | undefined;
+      if (!teraz) throw new Error("Nie znaleziono rozmowy");
+      throw new ConversationConflict("Rozmowa zmieniła się, zanim doszło przekazanie", {
+        assignedUserId: teraz.user_id, assignedUserName: teraz.name, version: teraz.version,
+      });
+    }
+
+    /* Poprzednie przypisanie się ZAMYKA, a nie znika: historia ma pokazać,
+       komu sprawę odebrano, a nie tylko kto ma ją teraz. */
+    database.prepare(`UPDATE conversation_assignment SET unassigned_at=
+      strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE conversation_id=? AND unassigned_at IS NULL`)
+      .run(conversationId);
+    if (doUserId !== null) {
+      database.prepare(`INSERT INTO conversation_assignment(conversation_id, assigned_to, assigned_by)
+        VALUES (?,?,?)`).run(conversationId, doUserId, autorId);
+    }
+
+    const version = expectedVersion + 1;
+    logEvent("rozmowa_przekazana_wymuszenie", imieAutora(database, autorId), null,
+      { conversationId, doUserId, powod: uzasadnienie, wersjaPrzed: expectedVersion, wersjaPo: version },
+      undefined, database);
+    return { conversationId, assignedUserId: doUserId, version };
+  })();
+
+  publishConversationEvent("assignment.changed", conversationId,
+    { assignedUserId: doUserId, version: wynik.version });
+  return wynik;
+}
+
+/**
+ * Ręczne wskazanie oferty przez agenta (makieta „brak powiązania z ofertą").
+ *
+ * Zapis idzie do `conversation_event`, NIE do `message.related_object_id`.
+ * Tamto pole niesie fakt z Allegro; to jest wybór człowieka. §4.3 zabrania
+ * mieszać źródła bez pokazania pochodzenia, a ekran ma umieć powiedzieć,
+ * skąd wziął numer oferty.
+ */
+export function wskazOferte(conversationId: number, ofertaId: string, autorId: number,
+  database: DatabaseSync = db()) {
+  const numer = (ofertaId ?? "").trim();
+  if (!/^\d{1,20}$/.test(numer)) throw new Error("Numer oferty Allegro to same cyfry");
+  const autor = imieAutora(database, autorId);
+
+  const wynik = transaction(database, () => {
+    const jest = database.prepare("SELECT id FROM conversation WHERE id=?").get(conversationId);
+    if (!jest) throw new Error("Nie znaleziono rozmowy");
+    database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
+      VALUES (?, NULL, 'offer_linked_manually', json_object('ofertaId', ?, 'autor', ?))`)
+      .run(conversationId, numer, autor);
+    logEvent("rozmowa_oferta_wskazana", autor, null, { conversationId, ofertaId: numer },
+      undefined, database);
+    return { conversationId, ofertaId: numer, autor };
+  })();
+
+  publishConversationEvent("assignment.changed", conversationId, { ofertaId: numer });
   return wynik;
 }
 

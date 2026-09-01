@@ -46,6 +46,7 @@ import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
 import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js";
+import { stanObslugiHealth } from "./services/skrzynka.js";
 import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { allegroTryb } from "./adapters/allegro.js";
@@ -153,6 +154,10 @@ export async function buildApp() {
          wygaśnięcia — bez loginu konta i bez tokenów. */
       allegro: stanPolaczenia(),
       allegroInbox: stanSynchronizacjiHealth(db()),
+      /* Liczby obsługi klienta z §21 projektu panelu: ile pytań czeka i jak
+         długo wisi najstarsze zadanie dla hali. Same liczby — trasa jest
+         publiczna, więc klient, treść i numer oferty tu nie wchodzą. */
+      obsluga: stanObslugiHealth(),
       /* Pole addytywne — kolektor go nie deserializuje (Dtos.kt ignoruje
          nieznane pola), więc stare APK nie mają czego zepsuć. */
       ...(sfera ? { sfera: { zyje: sfera.zyje, mode: sfera.sgtMode, widziany: sfera.widziany } } : {}),

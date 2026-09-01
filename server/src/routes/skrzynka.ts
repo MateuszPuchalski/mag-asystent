@@ -1,8 +1,14 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
+import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, zapiszSzkic } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, wskazOferte, zapiszSzkic } from "../services/conversations.js";
 import { onConversationEvent, setTyping, typingPresence } from "../services/conversation-realtime.js";
+import { autoryzuj } from "../services/auth.js";
+import { config } from "../config.js";
+import { db } from "../db/db.js";
+import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
+import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -75,6 +81,56 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       const user = sesjaZadania()!.user;
       setTyping(Number(req.params.id), user.userId, user.name, Boolean(req.body?.typing));
       return { presence: typingPresence(Number(req.params.id)) };
+    });
+
+  /* Ręczna synchronizacja (§9). NIE omija przerwy: gdy Allegro poprosiło
+     o `Retry-After`, przycisk skraca tylko czekanie po jej końcu. Omijanie
+     przerwy kosztowałoby konto — a agent klika wtedy, gdy najbardziej mu
+     zależy, czyli dokładnie w środku limitu. */
+  app.post("/api/obsluga/synchronizuj", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    if (!config.allegro.clientId) {
+      return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+    }
+    const stan = stanSynchronizacji(db());
+    if (stan.nextAttemptAt && Date.parse(stan.nextAttemptAt) > Date.now()) {
+      return reply.code(409).send({
+        error: "Allegro prosi o przerwę — synchronizacja czeka",
+        nastepnaProba: stan.nextAttemptAt,
+      });
+    }
+    const s = sesjaZadania()!;
+    logEvent("skrzynka_synchronizacja_reczna", s.user.name);
+    try {
+      await synchronizujAllegroInbox();
+      return { stan: stanSynchronizacji(db()) };
+    } catch (e) { return blad(reply, e); }
+  });
+
+  /* Wymuszone przekazanie — odebranie rozmowy komuś z rąk. Rola i powód
+     stoją tutaj, bo to trasa decyduje o uprawnieniu (wzorzec z domknięcia
+     dostawy), a serwis pilnuje wersji i kompletu zapisu. */
+  app.post<{ Params: { id: string }; Body: { doUserId?: number | null; powod?: string; expectedVersion?: number } }>(
+    "/api/conversations/:id/assign", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const s = sesjaZadania()!;
+      const zgoda = autoryzuj(s.user, "wymuszone_przekazanie");
+      if (!zgoda.ok) return reply.code(403).send({ error: zgoda.powod });
+      try {
+        return przekazRozmowe(Number(req.params.id), s.user.userId,
+          req.body?.doUserId ?? null, req.body?.powod ?? "", Number(req.body?.expectedVersion));
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Ręczne wskazanie oferty. Pytanie bez numeru oferty zostaje pytaniem bez
+     numeru — ekran nie zgaduje towaru z najdłuższych słów treści. */
+  app.post<{ Params: { id: string }; Body: { ofertaId?: string } }>(
+    "/api/conversations/:id/oferta", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return wskazOferte(Number(req.params.id), req.body?.ofertaId ?? "",
+          sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
     });
 
   // SSE: jedna szyna dla obecności, wiadomości, przypisań i wyników magazynu.

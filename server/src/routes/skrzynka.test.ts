@@ -74,6 +74,11 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/comments`, payload: { body: "Uwaga" } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/presence`, payload: { typing: true } },
   { method: "GET" as const, url: "/api/conversations/events" },
+  { method: "POST" as const, url: "/api/obsluga/synchronizuj" },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/assign`,
+    payload: { doUserId: null, powod: "urlop", expectedVersion: 1 } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/oferta`,
+    payload: { ofertaId: "14892374512" } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -156,4 +161,80 @@ test("mutacje przez trasę zostawiają ślad w dzienniku", async () => {
     "SELECT type FROM events WHERE type LIKE 'rozmowa_%' ORDER BY id").all() as Array<{type:string}>)
     .map((w) => w.type);
   assert.deepEqual(typy, ["rozmowa_przejeta", "rozmowa_komentarz"]);
+});
+
+test("wymuszone przekazanie wymaga administratora, nie samego biura", async () => {
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/assign`,
+    headers: b.naglowki, payload: { doUserId: null, powod: "urlop", expectedVersion: 1 } });
+  assert.equal(r.statusCode, 403);
+  assert.match(r.json().error, /administratora/);
+});
+
+test("wymuszone przekazanie bez powodu nie przechodzi", async () => {
+  const a = login("admin", "Admin");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/assign`,
+    headers: a.naglowki, payload: { doUserId: null, powod: "   ", expectedVersion: 1 } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /powodu/);
+});
+
+test("wymuszone przekazanie zamyka stare przypisanie i zapisuje powód", async () => {
+  const ala = login("biuro", "A. Lewandowska");
+  const admin = login("admin", "Admin");
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: ala.naglowki, payload: { expectedVersion: 1 } });
+
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/assign`,
+    headers: admin.naglowki, payload: { doUserId: null, powod: "A. Lewandowska na urlopie", expectedVersion: 2 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().assignedUserId, null, "rozmowa wraca do kolejki");
+  assert.equal(r.json().version, 3);
+
+  /* Historia ma pokazać, komu sprawę odebrano — nie tylko kto ma ją teraz. */
+  const przypisania = db().prepare(`SELECT assigned_to, unassigned_at
+    FROM conversation_assignment WHERE conversation_id=?`).all(rozmowa) as
+    Array<{ assigned_to: number; unassigned_at: string | null }>;
+  assert.equal(przypisania.length, 1);
+  assert.ok(przypisania[0].unassigned_at, "poprzednie przypisanie zostało zamknięte");
+
+  const wpis = db().prepare(
+    "SELECT payload FROM events WHERE type='rozmowa_przekazana_wymuszenie'").get() as { payload: string };
+  const p = JSON.parse(wpis.payload);
+  assert.equal(p.powod, "A. Lewandowska na urlopie");
+  assert.equal(p.wersjaPrzed, 2);
+  assert.equal(p.wersjaPo, 3);
+});
+
+test("ręcznie wskazana oferta ląduje na osi jako wybór agenta, nie fakt z Allegro", async () => {
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/oferta`,
+    headers: b.naglowki, payload: { ofertaId: "14892374512" } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  const zd = db().prepare(`SELECT event_type, payload FROM conversation_event
+    WHERE conversation_id=?`).get(rozmowa) as { event_type: string; payload: string };
+  assert.equal(zd.event_type, "offer_linked_manually");
+  assert.equal(JSON.parse(zd.payload).autor, "Anna", "ekran ma umieć powiedzieć, kto wskazał");
+
+  /* Pole `message.related_object_id` niesie fakt z Allegro i ma zostać puste. */
+  const m = db().prepare("SELECT related_object_id r FROM message WHERE id=?")
+    .get(pytanie) as { r: string | null };
+  assert.equal(m.r, null, "wybór agenta nie podszywa się pod dane kanału");
+});
+
+test("numer oferty spoza cyfr odpada", async () => {
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/oferta`,
+    headers: b.naglowki, payload: { ofertaId: "szarpak do NAC" } });
+  assert.equal(r.statusCode, 400);
+});
+
+test("ręczna synchronizacja bez sparowanego konta mówi wprost, czego brakuje", async () => {
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/synchronizuj", headers: b.naglowki });
+  /* W testach konto Allegro nie jest sparowane, więc trasa ma odpaść PRZED
+     jakimkolwiek zapytaniem do sieci — testy tras nie strzelają do Allegro. */
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /nie jest sparowane/);
 });

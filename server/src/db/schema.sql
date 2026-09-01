@@ -701,6 +701,13 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   cursor_id TEXT,
   last_success_at TEXT,
   error_count INTEGER NOT NULL DEFAULT 0,
+  -- Ostatnia PRÓBA, nie ostatni sukces: bez niej ekran nie odróżnia
+  -- synchronizatora, który stanął, od takiego, który bije w zamknięte drzwi.
+  last_attempt_at  TEXT,
+  -- Kod HTTP ostatniej porażki. Status z §7 (`rate_limited`,
+  -- `authentication_error`) wynika z niego, a nie z samej liczby błędów.
+  last_error_code  INTEGER,
+  error_thread_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT
 );
 

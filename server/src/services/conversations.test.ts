@@ -59,6 +59,8 @@ test("wyścig o przejęcie rozstrzyga jeden zapis, przegrany dostaje właścicie
     assert.equal(e.details.assignedUserId, ala);
     assert.equal(e.details.assignedUserName, "A. Lewandowska");
     assert.equal(e.details.version, 2, "przegrany widzi wersję BIEŻĄCĄ, nie swoją");
+    /* Bez czasu przejęcia kafelek „Przejęcie o" z makiety nie ma treści. */
+    assert.ok(e.details.assignedAt, "przegrany widzi, kiedy sprawę przejęto");
   }
 });
 

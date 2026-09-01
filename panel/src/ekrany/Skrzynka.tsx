@@ -2,11 +2,17 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
-import { useJa, usePrzejmij, useRozmowa, useRozmowy, useZapiszSzkic, useZlecPomiar } from "../api/rozmowy";
+import {
+  useJa, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
+  useWskazOferte, useZapiszSzkic, useZdrowie, useZlecPomiar,
+} from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import { Rozmowa } from "../skrzynka/Rozmowa";
+import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
+import { StanIntegracji } from "../skrzynka/StanIntegracji";
+import type { SzczegolyKonfliktu } from "../api/typy";
 
 export function Skrzynka() {
   /* Wybrana rozmowa siedzi w ADRESIE, nie w stanie komponentu. Do 0.146.0
@@ -20,6 +26,10 @@ export function Skrzynka() {
   const lista = useRozmowy();
   const rozmowa = useRozmowa(wybranaId);
   const przejmij = usePrzejmij();
+  const przekaz = usePrzekaz();
+  const oferta = useWskazOferte();
+  const zdrowie = useZdrowie();
+  const synchronizuj = useSynchronizuj();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
 
@@ -29,6 +39,10 @@ export function Skrzynka() {
   const [towar, setTowar] = useState<Towar | null>(null);
   const [nowa, setNowa] = useState(false);
   const [blad, setBlad] = useState("");
+  const [konflikt, setKonflikt] = useState<SzczegolyKonfliktu | null>(null);
+  const [bladKonfliktu, setBladKonfliktu] = useState("");
+  const [bladOferty, setBladOferty] = useState("");
+  const [bladSynchronizacji, setBladSynchronizacji] = useState("");
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
 
@@ -37,13 +51,32 @@ export function Skrzynka() {
   useEffect(() => {
     setSzkic(rozmowa.data?.szkic?.body ?? "");
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
+    setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
     setBlad(e instanceof Konflikt ? `${e.message} — odśwież rozmowę` : (e as Error).message);
 
+  /* Przegrany wyścig o przejęcie NIE jest zwykłym błędem: ekran ma pokazać
+     właściciela, czas i obie wersje, a nie zamienić to w jedno zdanie. */
+  const zglosPrzejecie = (e: unknown) => {
+    if (e instanceof Konflikt) setKonflikt(e.szczegoly as SzczegolyKonfliktu);
+    else setBlad((e as Error).message);
+  };
+
+  const jestemAdminem = ja.data?.user.role === "admin";
+  const alarm = Boolean(zdrowie.data?.allegroInbox.alarm);
+
   return <div className="grid gap-4 lg:grid-cols-[22rem_1fr]">
+    <div className="lg:col-span-2">
+      <AlarmSynchronizacji zdrowie={zdrowie.data} trwa={synchronizuj.isPending}
+        blad={bladSynchronizacji}
+        synchronizuj={() => { setBladSynchronizacji(""); synchronizuj.mutate(undefined,
+          { onError: (e) => setBladSynchronizacji((e as Error).message) }); }} />
+    </div>
+
     <Kolejka
+      nieswieza={alarm}
       rozmowy={lista.data?.rozmowy ?? []}
       stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
       wybranaId={wybranaId}
@@ -62,7 +95,7 @@ export function Skrzynka() {
       towar={towar}
       onPrzejmij={() => rozmowa.data && przejmij.mutate(
         { id: rozmowa.data.rozmowa.id, expectedVersion: rozmowa.data.rozmowa.wersja },
-        { onError: zglos })}
+        { onError: zglosPrzejecie, onSuccess: () => setKonflikt(null) })}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
       onSzkic={setSzkic}
       onZapiszSzkic={() => {
@@ -82,8 +115,43 @@ export function Skrzynka() {
           rozmowaId: rozmowa.data.rozmowa.id, wiadomoscId: zrodlo,
           instrukcja: wskazowka, twId: towar ? towar.id : null,
         }, { onError: zglos, onSuccess: () => { setZrodlo(null); setWskazowka(""); setTowar(null); } });
-      }} />
+      }}
+      konflikt={konflikt}
+      mozeWymusic={jestemAdminem}
+      wymusza={przekaz.isPending}
+      bladKonfliktu={bladKonfliktu}
+      zapisujeOferte={oferta.isPending}
+      bladOferty={bladOferty}
+      onZamknijKonflikt={() => setKonflikt(null)}
+      onPoprosOPrzekazanie={() => {
+        /* Prośba o przekazanie to komentarz wewnętrzny, nie osobny mechanizm:
+           właściciel czyta go w rozmowie, przy której siedzi. */
+        if (!rozmowa.data) return;
+        setSzkic(`@${konflikt?.assignedUserName ?? ""} — przejmiesz tę rozmowę? `.trimEnd());
+        setKonflikt(null);
+      }}
+      onWymus={(powod) => {
+        if (!rozmowa.data) return;
+        setBladKonfliktu("");
+        przekaz.mutate({
+          id: rozmowa.data.rozmowa.id, doUserId: ja.data?.user.userId ?? null,
+          powod, expectedVersion: konflikt?.version ?? rozmowa.data.rozmowa.wersja,
+        }, { onSuccess: () => setKonflikt(null),
+             onError: (e) => setBladKonfliktu((e as Error).message) });
+      }}
+      onWskazOferte={(ofertaId) => {
+        if (!rozmowa.data) return;
+        setBladOferty("");
+        oferta.mutate({ id: rozmowa.data.rozmowa.id, ofertaId },
+          { onError: (e) => setBladOferty((e as Error).message) });
+      }}
+      onDopytajOOferte={() => setSzkic((s) => s
+        || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
+    />
 
-    <div className="lg:col-span-2"><Blad>{blad || (lista.error as Error | null)?.message}</Blad></div>
+    <div className="lg:col-span-2 space-y-4">
+      <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
+      <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
+    </div>
   </div>;
 }

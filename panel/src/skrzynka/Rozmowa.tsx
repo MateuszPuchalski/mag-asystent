@@ -1,10 +1,12 @@
 import React from "react";
-import { AlertTriangle, Bell, Inbox, Ruler, UserCheck } from "lucide-react";
+import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import type { OsRozmowy } from "../api/typy";
+import type { OsRozmowy, SzczegolyKonfliktu } from "../api/typy";
 import { Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
 import { Edytor } from "./Edytor";
+import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
+import { BrakOferty } from "./BrakOferty";
 
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
@@ -23,6 +25,17 @@ export function Rozmowa(p: {
   onWskazowka: (v: string) => void;
   onTowar: (t: Towar | null) => void;
   onZlec: () => void;
+  konflikt: SzczegolyKonfliktu | null;
+  mozeWymusic: boolean;
+  wymusza: boolean;
+  bladKonfliktu: string;
+  zapisujeOferte: boolean;
+  bladOferty: string;
+  onZamknijKonflikt: () => void;
+  onPoprosOPrzekazanie: () => void;
+  onWymus: (powod: string) => void;
+  onWskazOferte: (ofertaId: string) => void;
+  onDopytajOOferte: () => void;
 }) {
   if (!p.dane) {
     return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
@@ -34,7 +47,9 @@ export function Rozmowa(p: {
   const cudza = rozmowa.wlascicielId != null && rozmowa.wlascicielId !== p.mojeId;
   /* Pytanie bez numeru oferty mówi o tym wprost. Ekran nie podstawia oferty
      zgadniętej z treści — tak wygrywały kiedyś „zdemontowanym" i „Pozdrawiam". */
-  const bezOferty = os.some((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.ofertaId);
+  const bezOferty = os.some((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.ofertaId)
+    && !os.some((w) => w.ofertaId);
+  const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
   return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
     <header className="flex flex-wrap items-center gap-3 border-b p-4">
@@ -51,8 +66,22 @@ export function Rozmowa(p: {
       <Bell size={16} />Klient dopisał nową wiadomość.
       <button className="underline" onClick={p.onPokazNowa}>Pokaż</button></p>}
 
-    {bezOferty && <p className="flex items-center gap-2 border-b bg-amber-50 px-4 py-2 text-sm text-amber-800">
-      <AlertTriangle size={16} />Brak powiązania z ofertą — hala nie dostanie numeru kartoteki.</p>}
+    {p.konflikt && <KonfliktPrzejecia
+      szczegoly={p.konflikt}
+      mojaWersja={rozmowa.wersja}
+      czasPrzejecia={p.konflikt.assignedAt ?? null}
+      mozeWymusic={p.mozeWymusic}
+      wymusza={p.wymusza}
+      blad={p.bladKonfliktu}
+      onZamknij={p.onZamknijKonflikt}
+      onPoprosOPrzekazanie={p.onPoprosOPrzekazanie}
+      onWymus={p.onWymus} />}
+
+    {/* Wskazana ręcznie oferta ląduje na osi jako wybór agenta, więc blok
+        znika dopiero wtedy, gdy oś ją zobaczy — nie zaraz po kliknięciu. */}
+    {bezOferty && !wskazanaRecznie && <BrakOferty
+      zapisuje={p.zapisujeOferte} blad={p.bladOferty}
+      onWskaz={p.onWskazOferte} onDopytaj={p.onDopytajOOferte} />}
 
     <Os wpisy={os} zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
       onZrodlo={p.onZrodlo}

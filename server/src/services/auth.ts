@@ -222,6 +222,15 @@ export type OperacjaUprzywilejowana =
   /** Zakładanie kont magazynierów, migracja historii. */
   | "zarzadzanie_kontami"
   /**
+   * Odebranie rozmowy agentowi, który ją prowadzi (0.147.0).
+   *
+   * Przejęcie wolnej rozmowy robi każdy z biura i to nie jest ta operacja.
+   * Ta zdejmuje sprawę komuś Z RĄK — a więc, jak domknięcie dostawy, siedzi
+   * za rolą i za powodem wpisanym z ręki. Powód idzie do dziennika razem
+   * z wersją rozmowy przed i po; §19 wymienia wymuszone przejęcie osobno.
+   */
+  | "wymuszone_przekazanie"
+  /**
    * To, czego biuru NIE wolno: konta o roli `biuro` albo `admin`, wyłączanie
    * kont i odbieranie haseł.
    *
@@ -272,6 +281,9 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
      z dokumentem, nie do człowieka przy palecie. */
   domkniecie_dostawy: ["biuro", "admin"],
   zarzadzanie_kontami: ["biuro", "admin"],
+  /* §5 projektu panelu daje wymuszone przekazanie administratorowi. Biuro
+     prowadzi własne rozmowy; odbieranie cudzych to inna decyzja. */
+  wymuszone_przekazanie: ["admin"],
   zarzadzanie_biurem: ["admin"],
   // widoczność magazynów jest wspólna dla wszystkich kolektorów, więc ustawia
   // ją ta sama rola, która odpowiada za konfigurację — nie pojedynczy magazynier

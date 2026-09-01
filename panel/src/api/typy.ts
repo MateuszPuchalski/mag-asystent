@@ -28,7 +28,14 @@ export type Szkic = { body: string; wersja: number; expectedLastMessageId: numbe
 
 export type StanSkrzynki = { ostatniaSynchronizacja: string | null; bledy: number };
 
-export type OsRozmowy = { rozmowa: Rozmowa; os: WpisOsi[]; szkic: Szkic | null };
+export type OfertaWskazana = { ofertaId: string; autor: string };
+
+export type OsRozmowy = {
+  rozmowa: Rozmowa;
+  os: WpisOsi[];
+  szkic: Szkic | null;
+  ofertaWskazana: OfertaWskazana | null;
+};
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
@@ -37,4 +44,38 @@ export type Zadanie = {
   status: "nowe" | "w_toku" | "wykonane" | "anulowane";
   utworzonoAt: string; utworzonoPrzez: string; przypisanoPrzez: string | null;
   wynik: string | null; wykonanoPrzez: string | null;
+};
+
+export type StatusSynchronizacji =
+  | "current" | "delayed" | "rate_limited" | "authentication_error" | "failed";
+
+export type Zdrowie = {
+  allegro?: { stan?: string };
+  allegroInbox: {
+    status: StatusSynchronizacji;
+    alarm: boolean;
+    ostatniaProba: string | null;
+    ostatniaUdanaSynchronizacja: string | null;
+    kodOstatniegoBledu: number | null;
+    liczbaBledow: number;
+    watkiZBledem: number;
+    opoznienieMs: number | null;
+    nastepnaProba: string | null;
+    interwalMs: number;
+  };
+  obsluga: {
+    rozmowyOczekujace: number;
+    zadaniaTerenowe: number;
+    najstarszeZadanieMs: number | null;
+    kolejkaWysylek: string;
+  };
+  worker?: { zyje: boolean; mode: string; widziany: string | null };
+};
+
+/** Konflikt przejęcia — kształt szczegółów, które serwer zwraca przy 409. */
+export type SzczegolyKonfliktu = {
+  assignedUserId?: number | null;
+  assignedUserName?: string | null;
+  assignedAt?: string | null;
+  version?: number;
 };

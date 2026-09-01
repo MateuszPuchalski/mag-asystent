@@ -646,4 +646,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
 | Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |
+| Status synchronizacji (§7) | **działa** od 0.147.0 | `statusSynchronizacji` |
+| Trwały alarm synchronizacji (§21) | **działa** od 0.147.0 | `skrzynka/AlarmSynchronizacji.tsx` |
+| Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
+| Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
+| Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
