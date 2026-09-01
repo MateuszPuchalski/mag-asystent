@@ -159,3 +159,45 @@ test("przejęcie rozmowy działa na rozmowie z synchronizacji", async () => {
   assert.equal(wynik.assignedUserId, agent);
   assert.throws(() => przejmijRozmowe(rozmowa.id, agent + 1, rozmowa.version, database), /przejął już inny agent/);
 });
+
+/* ── §9: błąd pojedynczego wątku ma być IZOLOWANY ───────────────────────────
+   Z produkcji (1 września 2026): `Provided value cannot be bound to SQLite
+   parameter 3` w kółko, przez wiele przebiegów. Parametr trzeci wstawki wątku
+   to `lastMessageDate`, a `node:sqlite` nie umie związać `undefined`.
+
+   Cała partia idzie JEDNĄ transakcją, więc jeden taki wątek wywracał przebieg
+   w całości: skrzynka przestawała się odświeżać, choć pozostałe wątki były
+   zdrowe. §9 projektu panelu żąda czegoś innego — synchronizator „izoluje błąd
+   pojedynczego wątku", a §8.3 zabrania przesuwać kursor „po niepełnym
+   zapisie". Kolumna `error_thread_count` istnieje od 0.147.0 i pokazuje ją panel
+   („Wątki z błędem"), ale nikt do niej nie pisze.
+
+   Ten test opisuje stan DOCELOWY i dziś pada. Predykat „co znaczy zepsuty
+   wątek" domknie specyfikacja Allegro; sam mechanizm izolacji jest od niej
+   niezależny i to on jest tu sprawdzany. */
+test("jeden zepsuty wątek nie zatrzymuje przebiegu ani nie truje kursora", async () => {
+  const database = mkDb();
+  const zdrowy1 = thread(1);
+  const zdrowy2 = thread(2);
+  /* Wątek dokładnie taki, jaki przyszedł z Allegro: bez daty ostatniej
+     wiadomości, choć `docs/allegro-ksztalt.md` opisuje to pole jako obecne. */
+  const { lastMessageDate: _, ...bezDaty } = thread(3);
+
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[zdrowy1, bezDaty as typeof zdrowy1, zdrowy2]]).query,
+  });
+
+  const zapisane = (database.prepare("SELECT id FROM allegro_inbox_thread ORDER BY id")
+    .all() as Array<{ id: string }>).map((w) => w.id);
+  assert.deepEqual(zapisane, ["t-1", "t-2"], "zdrowe wątki mają przejść mimo zepsutego");
+
+  const stan = database.prepare(`SELECT cursor_id, last_success_at, error_thread_count
+    FROM allegro_inbox_sync_state WHERE id=1`).get() as
+    { cursor_id: string | null; last_success_at: string | null; error_thread_count: number };
+  assert.ok(stan.last_success_at, "przebieg ma się domknąć, a nie polec");
+  assert.equal(stan.error_thread_count, 1, "zepsuty wątek ma się policzyć");
+  /* Kursor nie może stanąć na wątku, którego nie zapisaliśmy — inaczej
+     następny przebieg uzna go za punkt odniesienia i zgubi to, co za nim. */
+  assert.notEqual(stan.cursor_id, "t-3");
+});
