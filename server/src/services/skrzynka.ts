@@ -109,6 +109,7 @@ export function szkicRozmowy(id: number): Szkic | null {
  */
 export function zlecPomiar(
   rozmowaId: number, messageId: number, instrukcja: string, autor: { id: number; name: string },
+  twId: number | null = null,
 ) {
   const m = db().prepare(`
     SELECT m.body, m.related_object_type AS typ, m.related_object_id AS oferta, c.subject AS klient
@@ -120,20 +121,24 @@ export function zlecPomiar(
   const oferta = String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null;
   const dodatkowa = (instrukcja ?? "").trim();
 
-  /* Hala dostaje pytanie klienta w oryginale plus namiary. `tw_id` zostaje
-     puste: synchronizator nie pobiera ofert, więc mapowania oferta→kartoteka
-     nie ma z czego zrobić. Zgadywanie byłoby gorsze niż uczciwy brak — patrz
-     ostrzeżenie „Brak powiązania z ofertą" na ekranie skrzynki. */
+  /* Kartoteka WSKAZANA przez agenta to co innego niż WYWIEDZIONA z oferty.
+     Pierwsza jest jego wyborem i tak ma być podpisana; druga będzie faktem
+     z Allegro, gdy dojdzie pobieranie ofert. Hala i audyt muszą widzieć
+     różnicę — projekt panelu §4.3 zabrania mieszać fakty z różnych źródeł
+     bez pokazania pochodzenia. Dziś synchronizator ofert nie pobiera, więc
+     bez wskazania agenta `tw_id` zostaje puste; zgadywanie byłoby gorsze
+     niż uczciwy brak. */
   const kontekst = [
     `Pytanie klienta: ${String(m.body)}`,
     oferta ? `Oferta Allegro: ${oferta}` : "Brak powiązania z ofertą Allegro.",
+    twId != null ? `Kartotekę wskazał(a) ${autor.name}, nie wynika z oferty.` : "",
     dodatkowa ? `Wskazówka biura: ${dodatkowa}` : "",
   ].filter(Boolean).join("\n");
 
   const zadanie = utworzZadanie({
     rodzaj: "pomiar",
     tytul: `Pomiar z rozmowy — ${String(m.klient ?? "klient")}`,
-    instrukcja: kontekst, twId: null, zrodlo: SKRZYNKA, zrodloRef: String(rozmowaId),
+    instrukcja: kontekst, twId, zrodlo: SKRZYNKA, zrodloRef: String(rozmowaId),
   }, autor);
 
   /* Powiązanie idzie kluczami obcymi modelu kanonicznego (0.144.0), a nie samym

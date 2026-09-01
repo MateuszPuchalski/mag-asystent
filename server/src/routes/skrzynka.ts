@@ -31,7 +31,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     try { return osRozmowy(Number(req.params.id)); } catch (e) { return blad(reply, e); }
   });
 
-  app.post<{ Body: { rozmowaId?: number; wiadomoscId?: number; instrukcja?: string } }>(
+  app.post<{ Body: { rozmowaId?: number; wiadomoscId?: number; instrukcja?: string; twId?: number | null } }>(
     "/api/obsluga/zadania/pomiar", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -41,6 +41,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
           zadanie: zlecPomiar(
             Number(req.body?.rozmowaId), Number(req.body?.wiadomoscId),
             req.body?.instrukcja ?? "", { id: s.user.userId, name: s.user.name },
+            req.body?.twId ?? null,
           ),
         };
       } catch (e) { return blad(reply, e); }

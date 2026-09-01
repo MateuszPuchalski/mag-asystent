@@ -5,6 +5,9 @@ i reklamacje — została skasowana w 0.140.0. Ten dokument opisuje, co ma
 stanąć na jej miejscu. Poprzednik, `architektura-spraw.md`, opisywał kod
 i odszedł razem z nim.
 
+Projekt docelowy panelu opisuje `docs/panel-obslugi-klienta.md`. Ten plik
+zostaje rejestrem decyzji i dowodów; tamten mówi, dokąd idziemy.
+
 **Stan: BUDOWA.** Wydanie 0.141.0 dostarcza pierwszy pionowy kawałek:
 panel React/Tailwind → zadanie terenowe → kolektor → wynik w panelu.
 Osiem pytań niżej nadal prowadzi projekt pełnej skrzynki Allegro. Wypełnia się je
@@ -67,7 +70,15 @@ skleja obiekty Allegro w jeden problem" i kosztowała cztery tabele nakładki
 plus ręczne SCAL i ROZKLEJ. Inwentarz powie, ile spraw naprawdę miało więcej
 niż jedno źródło — czyli czy było co sklejać.
 
-> **Odpowiedź:** _(do wypełnienia po sondzie i inwentarzu)_
+> **Odpowiedź:** Rozmowa, sprawa, dobór i zadanie to CZTERY osobne byty —
+> `panel-obslugi-klienta.md` §6.1. Sprawa stoi ponad rozmowami i skleja te,
+> które dotyczą jednego problemu klienta.
+>
+> **To decyzja właściciela podjęta przed liczbami, których to pytanie żądało.**
+> Inwentarz miał powiedzieć, ile spraw naprawdę miało więcej niż jedno źródło,
+> czyli czy było co sklejać. Poprzednia odpowiedź o tym samym kształcie
+> kosztowała cztery tabele nakładki oraz ręczne SCAL i ROZKLEJ. Zapisujemy to
+> jawnie, żeby nikt nie wziął tej odpowiedzi za wniosek z dowodów.
 
 ### 2. Co wjeżdża i skąd?
 
@@ -75,16 +86,27 @@ Lista końcówek z `allegro-ksztalt.md`, z jawnym podziałem na pola pewne
 i takie, które bywają puste. Każde pole, na którym stanie logika, ma tu mieć
 liczbę „niepuste" przy sobie.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Kształty bierzemy z **oficjalnej dokumentacji Allegro**, nie
+> z sondy — decyzja właściciela. Potwierdzone pola zapisuje
+> `docs/allegro-ksztalt.md` i to on jest kontraktem dla kodu. Pole, którego nie
+> da się odczytać z dokumentacji wprost, dostaje `[WERYFIKUJ]` i wchodzi do
+> licznika w preambule `docs/subiekt-gt-struktura.md`.
+>
+> Zakaz zostaje bez zmian: żadnego mapowania z pamięci, z wymyślonego JSON-a,
+> z usuniętej implementacji ani z treści e-maila powiadamiającego. Ta lista
+> kosztowała już jedno wydanie — `external.id` czytany z wiadomości zamiast
+> z oferty dawał `NaN`.
 
 ### 3. Co trzymamy u siebie?
 
-Dziś treści rozmów nie zapisujemy wcale — i to jest jeden z powodów, dla
-których szukanie po sprawach i dopasowania towarów są słabe: cała wiedza
-o tym, o co klient pytał, ginie po zamknięciu ekranu. Jeśli zasada ma zostać,
-tutaj musi stać, czym za nią płacimy i co ją zastępuje.
+Do 0.142.1 treści rozmów nie zapisywaliśmy wcale — i to był jeden z powodów,
+dla których szukanie po sprawach i dopasowania towarów były słabe: wiedza
+o tym, o co klient pytał, ginęła po zamknięciu ekranu. Od 0.142.1 zapisujemy je
+lokalnie; czym za to płacimy, mówi rozdział „Polityka danych skrzynki" niżej.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Trzymamy u siebie treści wiadomości, w dwóch warstwach —
+> surowej i modelu obsługi. Pełny zapis stoi w rozdziale „Polityka danych
+> skrzynki" na końcu tego pliku i on jest odpowiedzią na to pytanie.
 
 ### 4. Kto ma następny ruch i skąd to wiemy?
 
@@ -92,7 +114,13 @@ Z metadanych, z treści, czy z jawnego stanu stawianego ręką człowieka?
 Poprzednia odpowiedź (piłka liczona z metadanych) działała, ale wymagała
 osobnej tabeli `watek_meta` i dociągania rozmów przy każdej synchronizacji.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Z **jawnego stanu stawianego ręką człowieka** — trzecia
+> z trzech możliwości, o które pyta ten rozdział. Statusy rozmowy wymienia
+> `panel-obslugi-klienta.md` §7: `waiting_for_customer` znaczy „piłka po
+> stronie klienta", `waiting_for_internal` — po stronie pracownika lub hali.
+>
+> Odpada liczenie piłki z metadanych, które wymagało osobnej tabeli
+> `watek_meta` i dociągania rozmów przy każdej synchronizacji.
 
 ### 5. Czym jest odpowiedź i gdzie stoi granica automatu?
 
@@ -100,7 +128,14 @@ Dotychczasowa granica: automat proponuje, do klienta mówi wyłącznie człowiek
 Ta zasada nie jest podważana przez żaden znany nam fakt — ale ma tu zostać
 zapisana świadomie, a nie odziedziczona.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Granica zostaje tam, gdzie była, i zostaje zapisana
+> świadomie: **automat proponuje, do klienta mówi wyłącznie człowiek.**
+> Rozwinięcie w `panel-obslugi-klienta.md` §14.2 — automat nie wysyła
+> odpowiedzi, nie potwierdza niepewnego dopasowania, nie obiecuje dostępności
+> ani terminu i nie usuwa negatywnego dopasowania.
+>
+> Do tego §14.3: każde twierdzenie techniczne w szkicu wskazuje źródło, a treść
+> bez źródła jest oznaczona jako przypuszczenie.
 
 ### 6. Czym jest zwrot?
 
@@ -127,6 +162,20 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > Rośnie też koszt czytania: dwa fronty to dwa zestawy nawyków, a odruch
 > „szukaj w `biuro.html`" przestaje wystarczać.
 >
+> **Koszt urósł w 0.145.0 z trzech bibliotek do ośmiu.** Pierwotna wycena
+> obejmowała React, Vite i Tailwind. `panel-obslugi-klienta.md` §10 dokłada
+> React Router, TanStack Query, shadcn, React Hook Form, Zod oraz testy
+> w Vitest, Testing Library i Playwright. Decyzja właściciela, świadoma.
+>
+> Kupujemy za to rzeczy, których panel dziś nie ma: adresowalne ekrany zamiast
+> jednego przełącznika, wspólny cache zapytań zamiast ręcznego odświeżania co
+> dwadzieścia sekund, walidację formularzy w jednym miejscu i testy frontu,
+> których nie ma wcale. Płacimy ośmioma zależnościami i dłuższym buildem.
+>
+> **To odwraca decyzję z 0.143.0**, gdzie TanStack Query odrzuciłem jako
+> przedwczesny przy pierwszym, czytającym wydaniu skrzynki. Przedwczesny
+> przestaje być, gdy ekranów jest kilka i mają wspólny stan.
+>
 > **Co to kupuje.** Ekrany obsługi są stanowe — lista zadań, formularz wyniku,
 > odświeżanie w tle. `biuro.html` robi to ręcznie na `innerHTML`, a testy-
 > strażnicy dubli i delegacji istnieją właśnie dlatego, że ten sposób się tam
@@ -143,7 +192,13 @@ o dobór części bez otwierania Allegro"), nie lista funkcji. Ma też nazwać
 użytecznym kawałkiem — bo przez ten czas biuro pracuje w panelu Allegro
 i w Subiekcie.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Siedemnaście zdań sprawdzalnych okiem stoi
+> w `panel-obslugi-klienta.md` §25. Najkrótsze z nich niesie sens całości:
+> agent obsłuży typowe pytanie bez otwierania panelu Allegro.
+>
+> **Druga połowa pytania zostaje bez odpowiedzi.** Dopuszczalnej długości
+> przerwy w pracy biura nie nazwał ani ten rozdział, ani projekt docelowy.
+> Przez ten czas biuro pracuje w panelu Allegro i w Subiekcie.
 
 ## Lista blizn
 
