@@ -34,10 +34,10 @@ historii nie przepisujemy.
 ---
 
 
-## 0.158.0 — 1 września 2026
+## 0.159.0 — 1 września 2026
 
 **Wejście w pytanie przydziela je agentowi, odpowiedź przydziela na stałe.**
-Decyzja właściciela. Do 0.157.0 przydział był jeden i wymagał osobnego
+Decyzja właściciela. Do 0.158.0 przydział był jeden i wymagał osobnego
 kliknięcia: agent, który wszedł w pytanie i napisał odpowiedź, dostawał na
 końcu „Rozmowę prowadzi kto inny — najpierw ją przejmij" i tracił ruch, choć
 rozmowa nie należała do nikogo.
@@ -71,111 +71,150 @@ dopisku klienta z 0.110.0: zgoda ma być jawna, nigdy domyślna.
 
 **Kto odpisał klientowi, ten prowadzi sprawę.** Przypisanie idzie tą samą
 transakcją co wiadomość wychodząca: przypisanie bez wysłanej odpowiedzi albo
-odwrotnie to dwa różne rodzaje kłamstwa. Wersja rozmowy rośnie, bo to decyzja
-człowieka, a w historii przypisań zostaje wiersz ze zdarzeniem
-`rozmowa_przypisana_odpowiedzia`.
+odwrotnie to dwa różne rodzaje kłamstwa. Trwały właściciel dalej bije
+wszystko — rozmowy prowadzonej przez kogoś innego nie odblokuje ani uchwyt,
+ani „mimo to".
 
-Trwały właściciel dalej bije wszystko: rozmowy prowadzonej przez kogoś innego
-nie da się odpowiedzieć ani uchwytem, ani „mimo to" — trzeba ją przejąć.
+**Widać to, ZANIM padnie pierwsze słowo odpowiedzi.** Wiersz kolejki pokazuje
+oko z nazwiskiem kolegi, który tam siedzi. Bez tego dwóch agentów pisze tę samą
+odpowiedź i dowiaduje się o sobie dopiero przy wysyłce, czyli po straconej
+pracy.
 
-**Widać to, ZANIM padnie pierwsze słowo odpowiedzi.** Wiersz kolejki i pasek
-nad rozmową pokazują oko z nazwiskiem kolegi, który tam siedzi. Bez tego dwóch
-agentów pisze tę samą odpowiedź i dowiaduje się o sobie dopiero przy wysyłce —
-czyli po straconej pracy.
+**`waiting_for_internal` dostaje nadawcę.** Status z §7 wszedł do bazy
+w 0.158.0 i stał w liście dopuszczonych wartości bez ani jednego automatu,
+który by go ustawiał — agent musiał wybrać go ręcznie, choć fakt już się
+wydarzył. Teraz zlecenie pomiaru przestawia rozmowę na „czeka na nas", a wynik
+z hali ten stan zdejmuje. Oba przejścia lądują na osi; to drugie podpisuje
+HALA, nie agent — tak samo jak przebudzenie podpisuje klient.
 
-Przycisk „Przejmij rozmowę" zostaje. Od tego wydania służy do czegoś innego niż
-dotąd: do wzięcia sprawy na siebie BEZ odpowiadania od razu.
+## 0.158.0 — 1 września 2026
+
+**Rozmowa nie miała statusu, więc kolejka nie odróżniała sprawy załatwionej
+od nietkniętej.**
+
+`conversation` nie miała kolumny stanu. Lista pokazywała wszystko obok siebie
+w kolejności ostatniej wiadomości, a jedynym podziałem był właściciel. Sprawa
+zamknięta wczoraj leżała między pytaniami z dzisiaj, a §7 projektu panelu —
+osiem statusów rozmowy — istniał wyłącznie na papierze.
+
+### Osiem statusów z §7 wchodzi do bazy
+
+`conversation.status` z `CHECK` na zamkniętej liście i `snoozed_until` obok.
+Lista stoi w trzech miejscach: w bazie, w `STATUSY_ROZMOWY` na serwerze
+i w typach panelu. Każda kopia pilnuje innej granicy, a rozjazd wychodzi przy
+kompilacji albo przy zapisie.
+
+### Trzy przejścia dzieją się same
+
+Przejęcie rozmowy prowadzi `new` → `open`. Wysłana odpowiedź stawia
+`waiting_for_customer`. Przychodząca wiadomość klienta budzi rozmowę do `open`
+i to jest sedno wydania: bez tego przejścia klient dopisuje do sprawy uznanej
+za rozwiązaną, a rozmowa zostaje na liście „rozwiązane" i nikt do niej nie
+zagląda. Status, który nie wraca sam, jest gorszy niż jego brak.
+
+Budzenie omija `closed` i `spam`. To jawne werdykty człowieka, a automat, który
+je cofa, kazałby zamykać tę samą rozmowę w kółko.
+
+### Odłożenie kończy się samo, bez tickera
+
+`snoozed` wymaga terminu — §7 nie zna rozmowy odłożonej na zawsze. Koniec
+odłożenia liczymy PRZY ODCZYCIE: stan wyliczalny nie potrzebuje procesu, który
+go pilnuje, a ticker, który raz nie wstanie, zostawiłby rozmowy odłożone na
+zawsze. Rozmowa po minionym terminie wraca jako otwarta i niesie znacznik
+„po terminie", bo inaczej nie różniłaby się od świeżo otwartej.
+
+### Kolejka dostaje kubełki z §10.1
+
+Wszystkie, Nieprzypisane, Moje, Oczekujące, Po terminie — z licznikiem przy
+każdym. Zamknięte i spam schodzą z kolejki roboczej, ale zostają
+we „Wszystkich": ukrycie ich wszędzie znaczyłoby, że pomyłkowego zamknięcia nie
+da się cofnąć. Pusty kubełek mówi co innego niż pusta skrzynka.
+
+### Zmiana statusu ląduje na osi
+
+§10.3 wymienia ją wśród wpisów osi. Wpis jest kreską, nie kafelkiem — to nie
+czyjaś wypowiedź, tylko znak, że sprawa przeszła dalej. Autorem bywa KLIENT,
+nie agent: podpisanie budzenia agentem kłamałoby w audycie o tym, kto co
+zrobił. Każda zmiana idzie też do dziennika jako `rozmowa_status`.
+
+Automatycznego zamknięcia po N dniach NIE MA i nie wchodzi tym wydaniem —
+§26 wymienia je wśród pytań do właściciela.
+
+**[wymaga działania]** Migracja dokłada dwie kolumny do `conversation`.
+Rozmowy zastane dostają status `new`, bo tak wygląda prawda o nich: przyjechały
+z synchronizacji i nikt ich nie tknął.
 
 ## 0.157.0 — 1 września 2026
 
-**Skrzynka nie umiała powiedzieć, co jest zrobione.** `conversation` nie miała
-kolumny statusu — były tylko `unread` z Allegro i właściciel. Rozmowa
-obsłużona wyglądała identycznie jak czekająca na klienta i jak ta, przy której
-nikt jeszcze nie usiadł. Panel miał komponent `Plakietka` z pięcioma barwami
-statusów i **nie używał go ani razu**: barwy czekały na wartość, której nie
-było skąd wziąć.
+**Komentarz wewnętrzny był funkcją do zapisu bez odczytu.**
 
-**Automat prowadzi, człowiek poprawia.** Status wynika z faktów, które i tak
-zapisujemy, i zapisuje go ta sama transakcja co fakt: wiadomość od klienta
-daje `new` (albo `open`, gdy ktoś rozmowę prowadzi), przejęcie i przekazanie
-`open`, wysłana odpowiedź `waiting_for_customer`, zlecony pomiar
-`waiting_for_internal`, a wynik z hali zdejmuje to czekanie z powrotem na
-`open`. Typowa rozmowa nie wymaga ANI JEDNEGO kliknięcia w status.
+`conversation_comment` miała w całym kodzie serwera JEDEN INSERT i ZERO
+odczytów. Agent mógł dodać notatkę, wiersz wpadał do tabeli i nie było drogi,
+którą wróciłby do kogokolwiek. Trasa istniała od 0.144.0, ekranu nie było
+nigdy, a §28 opisywał to jako „model gotowy, brak ekranu" — za łagodnie, bo
+brakowało też połowy modelu.
 
-Ręką stawia się cztery stany, których automat nie ma jak zgadnąć: odłożenie
-z terminem, załatwione, zamknięte i spam. To poprawka do
-`docs/obsluga-klienta.md` §4, gdzie stało „jawny stan stawiany ręką
-człowieka" — właściciel rozstrzygnął inaczej, tym samym kryterium co przy
-zwrotach: minimum klikań. Wersja ręczna kłamałaby przy pierwszej rozmowie,
-w której agent się spieszył, a status, który kłamie, jest gorszy od jego braku.
+### Komentarz wraca na oś
 
-**Dwie reguły nadrzędne.** `spam` jest nietykalny dla automatu — spamer pisze
-dalej, a rozmowa wracająca do kolejki przy każdej jego wiadomości czyniłaby
-oznaczenie bezużytecznym. `waiting_for_internal` przeżywa dopisek klienta:
-hala dalej mierzy, a to, że przyszło coś nowego, mówi flaga nieprzeczytanej.
+§10.3 wymienia komentarz wśród rzeczy, które ma nieść oś rozmowy. Wchodzi jako
+trzeci rodzaj wpisu, razem z autorem i wzmiankami.
 
-**Rozmowa, do której klient odpisał po zamknięciu, wraca do `open`** i dostaje
-w kolejce znacznik „wróciła". Bez niego wygląda jak każda inna w toku, a to
-jedyna, przy której agent musi przeczytać, co obiecał wcześniej. Znacznik
-liczy się przy odczycie i gaśnie sam, gdy biuro odpisze — osobna kolumna
-wymagałaby kasowania jej przy wysyłce, czyli jeszcze jednego zapisu, który
-może się nie wykonać.
+`odKlienta` zostaje przy nim fałszem i to nie jest szczegół: na tym polu stoi
+cały wygląd wpisu klienta, więc komentarz z zapaloną flagą wyglądałby jak cudza
+wiadomość — dokładnie odwrotnie, niż żąda §6.4.
 
-**Odłożenie wygasa przy ODCZYCIE**, nie zapisem. W bazie zostaje `snoozed`
-razem z terminem, a po terminie odczyt pokazuje `open`. Ticker przebudzający
-rozmowy byłby czwartym w tym systemie i jedynym, którego całą pracą jest
-przepisanie kolumny dającej się policzyć — a „zero zapisu przy patrzeniu"
-obowiązuje też skrzynkę.
+### Oś jest chronologiczna
 
-**Status to nie jest flaga nieprzeczytanej.** `unread` przychodzi z Allegro
-i mówi, czy sprzedawca odpisał klientowi; `status` mówi, co z tym zrobiło
-biuro. Rozmowa załatwiona telefonicznie ma `unread = 0` i `resolved`. Jedna
-kolumna dla obu kłamałaby przy każdej takiej.
+Do tego wydania wyniki zadań doklejały się za wszystkimi wiadomościami bez
+względu na czas. Przy dwóch źródłach było to znośne; przy trzech oś przestawała
+opowiadać przebieg sprawy.
 
-**Wersja rośnie tylko przy decyzji człowieka.** Automatyczne przejście nie
-podbija `version` i nie rusza `updated_at`. Podbicie wersji przy wiadomości
-z synchronizacji dawałoby agentowi 409 za każdym razem, gdy klient coś
-dopisał — a od tego jest kontrola świeżości (blizna 0.110.0). Ruszenie
-`updated_at` przestawiłoby na liście datę ostatniej wiadomości, choć nikt nic
-nie napisał.
+Sortowanie jest STABILNE, więc wiadomości z tą samą datą zostają w kolejności
+identyfikatorów. To ważne: Allegro potrafi oddać dwie wiadomości z jedną
+sekundą, a wtedy porządek niesie `message.id`.
 
-**Ekran dostaje kubełki i skróty, jak zwroty.** Siedem kubełków: moje,
-nieprzypisane, czeka na klienta, czeka na nas, odłożone, załatwione
-i wszystkie. Ostatni jest wszystkożerny nie dla ozdoby — rozmowa, która nie
-trafiłaby do żadnego, znikałaby operatorowi z oczu bez jednego objawu.
-Przełączenie kubełka przestawia też kursor; to blizna z panelu zwrotów,
-znaleziona okiem, nie testem.
+### Dwa tryby, dwa pola, dwa przyciski
 
-Skrzynka nie miała dotąd ANI JEDNEGO skrótu klawiszowego. Ma teraz strzałki
-po kolejce, cyfry po kubełkach oraz `O` (odłóż), `Z` (załatwione), `S` (spam)
-i `Backspace` (powrót do pracy). Żaden nie działa, gdy kursor stoi w polu
-tekstowym — inaczej „s" w szkicu odpowiedzi oznaczałoby rozmowę jako spam.
+§10.4 żąda, żeby przycisk komentarza i przycisk wysyłki były jednoznacznie
+rozdzielone; §6.4 dodaje, że komentarz „nie może przypadkiem trafić do
+klienta"; §25 stawia to wśród kryteriów gotowości.
 
-**Cofnięcie zamiast potwierdzenia**, tak jak przy zwrotach (§25a.5). Powrót do
-`open` idzie tą samą trasą co reszta decyzji: dopóki nic nie poszło do
-Allegro, każdy ruch ma mieć drogę powrotną, a dialog „czy na pewno" kosztuje
-kliknięcie także przy decyzji trafnej.
+Rozdzieliliśmy najmocniej, jak się dało. **W trybie komentarza przycisk wysyłki
+nie istnieje w drzewie** — wyłączony da się kliknąć, gdy tryb zmieni się
+o ułamek sekundy za późno; nieistniejącego nie da się nigdy.
 
-Odłożenie pyta o termin trzema gotowymi wyborami — jutro rano, za trzy dni, za
-tydzień. Zawsze na ósmą rano: „za tydzień o 14:37" to termin wymyślony przez
-zegar, nie przez biuro.
+Pola też są osobne. Gdyby oba tryby dzieliły jeden tekst, notatka „klient bywa
+trudny" zostawałaby w szkicu po przełączeniu z powrotem i czekała na kliknięcie
+WYŚLIJ.
 
-**Umowa licznika tras:** skrzynka miała dziewięć tras zapisu, ma dwanaście.
-Trzy nowe to trzy różne decyzje człowieka, nie jedna z przełącznikiem.
-Statusów automatu nie da się wpisać żądaniem — trasa odrzuca je tak samo jak
-serwis, bo `waiting_for_customer` z palca kłamałoby o tym, że odpowiedź
-poszła do klienta.
+Komentowanie nie wymaga prowadzenia rozmowy: notatka zespołu to nie odpowiedź,
+a kolega ma prawo dopisać „to ten sam klient co wczoraj" bez przejmowania
+sprawy.
 
-**Wdrożenie:** nic ręką. Kolumny dochodzą migracją, a rozmowa prowadzona przez
-agenta dostaje przy tym `open`; reszta zostaje `new`. Uzupełnienie wykonuje
-się RAZ, w chwili dołożenia kolumny — puszczone przy każdym starcie cofałoby
-decyzję operatora przy najbliższym restarcie usługi.
+### Wzmianki
 
-Czego to wydanie NIE robi: bytu `sprawa` (`case`) z §15. Właściciel
-potwierdził, że jeden problem klienta regularnie rozkłada się na kilka
-wątków, więc grunt jest realny — ale zanim powstanie tabela, trzeba policzyć
-na danych ze skrzynki, ile loginów ma więcej niż jeden wątek i w jakim oknie
-czasu. Scalanie zgadnięte sklei sprawy dwóch różnych klientów.
+Wybiera się je z listy kont, nie wpisuje z palca. Lista idzie z istniejącej
+trasy `/api/users` — bez własnej końcówki, bo drugi adres na te same dane
+znaczyłby dwa miejsca do pilnowania przy zmianie ról. Hala dostaje tam 403
+i to jest poprawne: wtedy po prostu nie ma kogo wzmiankować.
+
+### Test, który przechodził przypadkiem
+
+Pierwsza wersja strażnika §25 wołała `payloadAllegroWiadomosci` z numerem
+komentarza i sprawdzała, że funkcja rzuci. Przechodziła — ale z niewłaściwego
+powodu.
+
+`conversation_comment.id` i `message.id` to dwie NIEZALEŻNE sekwencje, więc oba
+bywają jedynką. Przy kolizji tamta funkcja oddałaby cudzą wiadomość zamiast
+rzucić; test mierzył szczęście w doborze danych. Sprawdzone osobnym skryptem:
+przy pierwszym komentarzu i pierwszej wiadomości oba identyfikatory to 1.
+
+Granica okazała się zdrowa z innego powodu: wysyłka bierze TEKST ze szkicu, nie
+identyfikator, a `payloadAllegroWiadomosci` nie ma dziś żadnego wołającego.
+Nowy test sprawdza to, co jest prawdą — treść komentarza nie trafia ani do
+`message`, ani do `conversation_draft`.
+
+Wdrożenie: nic ręką, bez migracji.
 
 ## 0.156.0 — 1 września 2026
 

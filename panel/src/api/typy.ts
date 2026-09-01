@@ -1,7 +1,9 @@
 /* Kształty odpowiedzi serwera. Trzymane osobno, bo czytają je i ekrany,
    i testy — a duplikat rozjechałby się przy pierwszym nowym polu. */
 
-/** Osiem stanów z §7 projektu panelu. Lustro `StatusRozmowy` z serwera. */
+/* Lista ZAMKNIĘTA, wprost z §7 projektu panelu. Ten sam komplet stoi
+   w `STATUSY_ROZMOWY` na serwerze i w `CHECK` na kolumnie — trzy kopie jednej
+   listy, bo każda pilnuje innej granicy: typów, API i bazy. */
 export type StatusRozmowy =
   | "new" | "open" | "waiting_for_customer" | "waiting_for_internal"
   | "snoozed" | "resolved" | "closed" | "spam";
@@ -15,16 +17,11 @@ export type Rozmowa = {
   wlascicielId: number | null;
   wlasciciel: string | null;
   wersja: number;
-  /* Status WIDZIANY liczy serwer — panel go nie wyprowadza po raz drugi, tak
-     samo jak kubełka zwrotu. Dwie kopie tej reguły rozjechałyby się przy
-     pierwszej poprawce jednej z nich, a rozjazd byłby niewidoczny: ekran
-     pokazywałby po prostu inną kolejkę niż liczniki. */
+  /** Status WYLICZONY: odłożenie po terminie przyjeżdża już jako `open`. */
   status: StatusRozmowy;
-  /** Zapisany w bazie: `snoozed` mimo `status: "open"` znaczy „termin minął". */
-  statusZapisany: StatusRozmowy;
-  snoozeDo: string | null;
-  /** Klient odpisał po zamknięciu i nikt mu jeszcze nie odpowiedział. */
-  wrocilaPoZamknieciu: boolean;
+  odlozoneDo: string | null;
+  /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
+  poTerminie: boolean;
   /* Kto SIEDZI przy rozmowie teraz. Przydział tymczasowy, na czas oglądania —
      żyje w pamięci serwera i wygasa sam, więc bywa `null` sekundę później. */
   oglada: { userId: number; name: string } | null;
@@ -37,7 +34,7 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "wynik_zadania";
+  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -46,6 +43,7 @@ export type WpisOsi = {
   zadanieId?: number;
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
+  wzmianki?: Array<{ userId: number; name: string }>;
 };
 
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };
@@ -124,7 +122,7 @@ export type SzczegolyWysylki = {
   lastMessageId?: number | null;
   nowaWiadomosc?: { id: number; tresc: string; at: string } | null;
   kluczIdempotencji?: string;
-  /* Drugi rodzaj konfliktu wysyłki (0.158.0): przy rozmowie siedzi kto inny.
+  /* Drugi rodzaj konfliktu wysyłki (0.159.0): przy rozmowie siedzi kto inny.
      Osobne pole, bo i pytanie do agenta jest inne — tam „klient dopisał",
      tu „kolega już przy tym siedzi". */
   trzymajacyName?: string;

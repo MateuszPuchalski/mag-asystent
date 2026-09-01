@@ -99,9 +99,6 @@ test("zlecony pomiar niesie pytanie klienta, ofertę i klucze rozmowy", () => {
   /* tw_id zostaje puste: synchronizator nie pobiera ofert, więc mapowania
      oferta→kartoteka nie ma z czego zrobić. Zgadywanie byłoby gorsze. */
   assert.equal(z.twId, null);
-  /* Rozmowa czeka teraz na NAS. Agent nie klika w status — zlecenie pomiaru
-     jest tym faktem, z którego status wynika. */
-  assert.equal(listaRozmow()[0].status, "waiting_for_internal");
 });
 
 test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
@@ -124,8 +121,6 @@ test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
   assert.equal((db().prepare(
     "SELECT count(*) n FROM conversation_event WHERE conversation_id=? AND event_type='field_task_result'")
     .get(rozmowaId) as { n: number }).n, 1);
-  /* Wynik zdejmuje `waiting_for_internal` — to na niego rozmowa czekała. */
-  assert.equal(listaRozmow()[0].status, "open");
 });
 
 /* Bramka własności zostaje bramką także wtedy, gdy zadanie wisi na rozmowie. */
@@ -162,37 +157,129 @@ test("bez wskazania kartoteki zadanie idzie jak dotąd, bez podpisu o wyborze", 
   assert.match(z.instrukcja, /Oferta Allegro: oferta-9/);
 });
 
-/* ── Status przy odczycie (0.157.0) ─────────────────────────────────────────
-   Stan ustawiamy tu `UPDATE`-em świadomie: pod testem jest ODCZYT, a nie
-   przejście. Przejścia sprawdzają testy wyżej, przez prawdziwe mutacje. */
+/* ── Komentarze wewnętrzne na osi (0.157.0) ──────────────────────────────────
+   Do tego wydania `conversation_comment` miała w całym kodzie serwera JEDEN
+   INSERT i ZERO odczytów. Agent mógł dodać notatkę, wiersz wpadał do tabeli
+   i nie było drogi, którą wróciłby do kogokolwiek — funkcja do zapisu bez
+   odczytu. §10.3 wymienia komentarz wśród rzeczy, które ma nieść oś. */
 
-test("odłożenie po terminie czyta się jako otwarte, a baza zostaje nietknięta", () => {
+test("komentarz wewnętrzny wraca na oś, z autorem i wzmiankami", async () => {
+  const { dodajKomentarz } = await import("./conversations.js");
   const d = db();
-  d.prepare("UPDATE conversation SET status='snoozed', snooze_do=? WHERE id=?")
-    .run("2026-08-31T09:00:00.000Z", rozmowaId);
+  const ala = Number(d.prepare(
+    "INSERT INTO app_user(login,name,role) VALUES ('ala','Ala','biuro')").run().lastInsertRowid);
 
-  const r = listaRozmow()[0];
-  assert.equal(r.status, "open", "termin minął, więc rozmowa jest z powrotem w pracy");
-  assert.equal(r.statusZapisany, "snoozed", "ekran ma czym wytłumaczyć, skąd ta zmiana");
-  /* Zero zapisu przy patrzeniu: przebudzenie policzył odczyt, do bazy nie
-     poszło nic. Ticker robiący to samo byłby czwartym w tym systemie. */
-  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowaId) as
-    { status: string }).status, "snoozed");
+  dodajKomentarz(rozmowaId, BIURO.id, "Sprawdź, czy to nie jest ten sam klient co wczoraj.", [ala]);
+
+  const { os } = osRozmowy(rozmowaId);
+  const k = os.find((w) => w.rodzaj === "komentarz");
+  assert.ok(k, "komentarz ma stać na osi");
+  assert.match(k.tresc, /ten sam klient/);
+  assert.equal(k.autor, "Biuro");
+  assert.equal(k.odKlienta, false);
+  assert.deepEqual(k.wzmianki?.map((w) => w.name), ["Ala"]);
 });
 
-test("powrót po zamknięciu widać, dopóki biuro nie odpisze", () => {
+test("oś jest CHRONOLOGICZNA — komentarz z wczoraj nie ląduje na końcu", () => {
+  /* Do 0.157.0 wyniki zadań doklejały się za wszystkimi wiadomościami bez
+     względu na czas, bo oś nie miała wspólnego porządku. Przy dwóch źródłach
+     to było znośne; przy trzech oś przestawała opowiadać przebieg sprawy. */
   const d = db();
-  d.prepare("UPDATE conversation SET status='open', snooze_do=NULL WHERE id=?").run(rozmowaId);
-  d.prepare(`INSERT INTO conversation_event(conversation_id,event_type,payload,created_at)
-    VALUES (?,'reopened_by_customer','{}','2026-09-02T09:00:00.000Z')`).run(rozmowaId);
-  assert.equal(listaRozmow()[0].wrocilaPoZamknieciu, true);
-
-  /* Nasza odpowiedź gasi znacznik sama — bez kolumny do sprzątania i bez
-     zapisu, który mógłby się nie wykonać. */
-  const konto = (d.prepare("SELECT channel_account_id AS k FROM conversation WHERE id=?")
-    .get(rozmowaId) as { k: number }).k;
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,unread,updated_at)
+    SELECT channel_account_id,'w-chrono','klient',0,'2026-08-31T10:00:00.000Z'
+      FROM conversation WHERE id=?`).run(rozmowaId).lastInsertRowid);
+  const konto = Number((d.prepare("SELECT channel_account_id k FROM conversation WHERE id=?")
+    .get(rozmowa) as { k: number }).k);
   d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
-    direction,body,sent_at) VALUES (?,?,'m-po-powrocie','outgoing','Już odpisuję.',
-    '2026-09-02T10:00:00.000Z')`).run(rozmowaId, konto);
-  assert.equal(listaRozmow()[0].wrocilaPoZamknieciu, false);
+    direction,body,sent_at) VALUES (?,?,'c-1','incoming','Pytanie','2026-08-31T09:00:00.000Z')`)
+    .run(rozmowa, konto);
+  d.prepare(`INSERT INTO conversation_comment(conversation_id,author_user_id,body,created_at)
+    VALUES (?,?,'Notatka w środku','2026-08-31T09:30:00.000Z')`).run(rozmowa, BIURO.id);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'c-2','outgoing','Odpowiedź','2026-08-31T10:00:00.000Z')`)
+    .run(rozmowa, konto);
+
+  const rodzaje = osRozmowy(rozmowa).os.map((w) => w.rodzaj);
+  assert.deepEqual(rodzaje, ["wiadomosc", "komentarz", "wiadomosc"]);
+});
+
+test("treść komentarza NIE trafia do tabeli, z której czyta wysyłka", async () => {
+  /* §6.4: komentarze „nie mogą przypadkiem trafić do klienta"; §25 stawia to
+     wśród kryteriów gotowości. Granica jest STRUKTURALNA: wysyłka bierze tekst
+     ze szkicu i zapisuje go do `message`, a komentarz mieszka w osobnej tabeli
+     i nigdy tam nie wchodzi.
+
+     Pierwsza wersja tego testu wołała `payloadAllegroWiadomosci` z numerem
+     komentarza i PRZECHODZIŁA PRZYPADKIEM. `conversation_comment.id`
+     i `message.id` to dwie niezależne sekwencje, więc oba bywają jedynką —
+     przy kolizji tamta funkcja oddałaby cudzą wiadomość zamiast rzucić. Test
+     mierzył szczęście w doborze danych, a nie granicę. */
+  const { dodajKomentarz } = await import("./conversations.js");
+  const tresc = "Klient bywa trudny — uważaj na ton.";
+  dodajKomentarz(rozmowaId, BIURO.id, tresc, []);
+
+  const wMessage = (db().prepare("SELECT count(*) n FROM message WHERE body=?")
+    .get(tresc) as { n: number }).n;
+  assert.equal(wMessage, 0, "treść komentarza znalazła się wśród wiadomości");
+
+  const wSzkicu = (db().prepare("SELECT count(*) n FROM conversation_draft WHERE body=?")
+    .get(tresc) as { n: number }).n;
+  assert.equal(wSzkicu, 0, "treść komentarza wylądowała w szkicu, który idzie do klienta");
+});
+
+test("odłożenie po terminie wraca do kolejki jako otwarte i widać, że termin minął", async () => {
+  /* Rozmowa odłożona na wczoraj wygląda w kolumnie tak samo jak odłożona na
+     przyszły tydzień — różnicę robi dopiero czas. Kolejka ma pokazać ją jako
+     otwartą, ale nie milczeć o tym, że nikt jej po terminie nie tknął. */
+  const { ustawStatus } = await import("./conversations.js");
+  const d = db();
+  ustawStatus(d, rozmowaId, "snoozed", BIURO.id, "2026-08-31T06:00:00.000Z");
+
+  const wiersz = listaRozmow().find((r) => r.id === rozmowaId)!;
+  assert.equal(wiersz.status, "open", "termin minął, więc rozmowa jest znów otwarta");
+  assert.equal(wiersz.poTerminie, true);
+  assert.equal(wiersz.odlozoneDo, "2026-08-31T06:00:00.000Z");
+
+  /* Odczyt niczego nie prostuje w bazie — reguła „zero zapisu przy patrzeniu".
+     Kolumna zostaje `snoozed` do najbliższej ręcznej zmiany. */
+  const wBazie = d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowaId) as
+    { status: string };
+  assert.equal(wBazie.status, "snoozed");
+
+  ustawStatus(d, rozmowaId, "open", BIURO.id, null);
+  const po = listaRozmow().find((r) => r.id === rozmowaId)!;
+  assert.equal(po.poTerminie, false);
+  assert.equal(po.odlozoneDo, null, "ręczna zmiana kasuje termin, bo już nic nie znaczy");
+});
+
+test("zmiana statusu ląduje na osi, a zmiana bez różnicy nie zostawia nic", () => {
+  /* §10.3 wymienia zmianę statusu wśród wpisów osi. Kolejność sprawdzamy
+     razem z resztą, bo wpis bez daty wypłynąłby na samą górę — przed
+     pierwszym pytaniem klienta. */
+  const wpisy = osRozmowy(rozmowaId).os;
+  assert.equal(wpisy[0].rodzaj, "wiadomosc", "pytanie klienta zostaje pierwsze");
+
+  const statusy = wpisy.filter((w) => w.rodzaj === "status");
+  /* Oś opowiada CAŁY przebieg, razem z pętlą przez halę: zlecony pomiar
+     przestawia rozmowę na „czeka na nas", a wynik z hali zdejmuje ten stan
+     (0.159.0). Oba przejścia są automatyczne i oba mają tu zostać — bez nich
+     czytelnik nie wie, dlaczego sprawa stała.
+
+     Czego NIE MA na tej liście: „open → open". Otwarcie rozmowy odłożonej,
+     której termin już minął, nie zmieniło niczego, co widać — dla czytelnika
+     była otwarta od chwili terminu, a wpis opowiadałby o zdarzeniu, którego
+     nie było. */
+  assert.deepEqual(statusy.map((w) => w.tresc), [
+    "new → open",
+    "open → waiting_for_internal",
+    "waiting_for_internal → open",
+    "open → waiting_for_internal",
+    "waiting_for_internal → snoozed",
+  ]);
+  assert.equal(statusy.at(-1)!.autor, "Biuro");
+  assert.equal(statusy.at(-1)!.odKlienta, false,
+    "zmiana statusu nie ma prawa wyglądać jak głos klienta");
+  /* Wynik z hali podpisuje HALA, nie agent: to jej pomiar zmienił stan. */
+  assert.equal(statusy[2].autor, "hala");
 });

@@ -1,12 +1,13 @@
 import React from "react";
 import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import type { OsRozmowy, SzczegolyKonfliktu } from "../api/typy";
+import type { OsRozmowy, StatusRozmowy, SzczegolyKonfliktu } from "../api/typy";
 import { Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
 import { Edytor } from "./Edytor";
 import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
+import { Status } from "./Status";
 
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
@@ -27,6 +28,13 @@ export function Rozmowa(p: {
   onZlec: () => void;
   wysyla: boolean;
   onWyslij: () => void;
+  komentarz: string;
+  onKomentarz: (v: string) => void;
+  onDodajKomentarz: () => void;
+  komentuje: boolean;
+  agenci: Array<{ userId: number; name: string }>;
+  wzmianki: number[];
+  onWzmianki: (v: number[]) => void;
   konflikt: SzczegolyKonfliktu | null;
   mozeWymusic: boolean;
   wymusza: boolean;
@@ -38,6 +46,9 @@ export function Rozmowa(p: {
   onWymus: (powod: string) => void;
   onWskazOferte: (ofertaId: string) => void;
   onDopytajOOferte: () => void;
+  zapisujeStatus: boolean;
+  bladStatusu: string;
+  onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
   if (!p.dane) {
     return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
@@ -62,6 +73,12 @@ export function Rozmowa(p: {
             <UserCheck size={15} />{moja ? "Twoja rozmowa" : `Prowadzi ${rozmowa.wlasciciel}`}</span>
         : <Przycisk wariant="glowny" onClick={p.onPrzejmij}>
             <UserCheck size={16} />PRZEJMIJ ROZMOWĘ</Przycisk>}
+      {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co
+          z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
+          także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
+          w telefonie nie jest przejęciem jej. */}
+      <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
+        onZmien={p.onZmienStatus} />
     </header>
 
     {p.nowaWiadomosc && <p className="flex items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
@@ -108,6 +125,9 @@ export function Rozmowa(p: {
 
     <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
       zapisuje={p.zapisuje} wysyla={p.wysyla}
-      onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij} />
+      onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
+      komentarz={p.komentarz} onKomentarz={p.onKomentarz}
+      onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
+      agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki} />
   </section>;
 }

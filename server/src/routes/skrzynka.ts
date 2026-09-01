@@ -2,10 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import {
-  ConversationConflict, dodajKomentarz, odlozRozmowe, przejmijRozmowe, przekazRozmowe,
-  ustawStatusRozmowy, wskazOferte, zapiszSzkic,
-} from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawStatus, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
@@ -119,7 +116,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         req.body?.body ?? "", req.body?.mentionedUserIds ?? []); } catch (e) { return blad(reply, e); }
     });
 
-  /* ── Obecność i uchwyt rozmowy (0.158.0) ──────────────────────────────────
+  /* ── Obecność i uchwyt rozmowy (0.159.0) ──────────────────────────────────
      Ta trasa jest ZAPISEM tylko z nazwy: cały stan żyje w pamięci procesu
      i wygasa sam (§6.3). Do bazy nie idzie nic, więc „zero zapisu przy
      patrzeniu" obowiązuje mimo tego, że wejście na ekran ją woła.
@@ -166,6 +163,23 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return blad(reply, e); }
   });
 
+  /* Status rozmowy (§7, 0.158.0). Zmiana ręką agenta; przejścia automatyczne
+     robią synchronizator i wysyłka, bez udziału tej trasy. */
+  app.post<{ Params: { id: string }; Body: { status?: string; doKiedy?: string | null } }>(
+    "/api/obsluga/rozmowy/:id/status", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = req.body?.status ?? "";
+      if (!(STATUSY_ROZMOWY as readonly string[]).includes(s)) {
+        return reply.code(400).send({
+          error: `Nieznany status. Dozwolone: ${STATUSY_ROZMOWY.join(", ")}.` });
+      }
+      try {
+        return ustawStatus(db(), Number(req.params.id), s as StatusRozmowy,
+          sesjaZadania()!.user.userId, req.body?.doKiedy ?? null);
+      } catch (e) { return blad(reply, e); }
+    });
+
   /* Wymuszone przekazanie — odebranie rozmowy komuś z rąk. Rola i powód
      stoją tutaj, bo to trasa decyduje o uprawnieniu (wzorzec z domknięcia
      dostawy), a serwis pilnuje wersji i kompletu zapisu. */
@@ -178,41 +192,6 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return przekazRozmowe(Number(req.params.id), s.user.userId,
           req.body?.doUserId ?? null, req.body?.powod ?? "", Number(req.body?.expectedVersion));
-      } catch (e) { return konflikt(reply, e); }
-    });
-
-  /* ── Status rozmowy (0.157.0) ─────────────────────────────────────────────
-     Trzy trasy, bo trzy różne decyzje, a nie jedna z przełącznikiem: odłożenie
-     niesie termin, załatwienie jest jednym kliknięciem (najczęstszym), a trzecia
-     obsługa resztę razem z POWROTEM do `open`. Ścieżki są te z §16 projektu.
-
-     Bez `autoryzuj()`: to zwykła praca biura, nie operacja uprzywilejowana —
-     ten sam argument co przy potwierdzeniu kartoteki w zwrotach. Wymuszone
-     przekazanie zostaje jedyną trasą skrzynki z osobnym uprawnieniem. */
-  app.post<{ Params: { id: string }; Body: { do?: string; expectedVersion?: number } }>(
-    "/api/conversations/:id/snooze", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return odlozRozmowe(Number(req.params.id), sesjaZadania()!.user.userId,
-          req.body?.do ?? "", Number(req.body?.expectedVersion));
-      } catch (e) { return konflikt(reply, e); }
-    });
-
-  app.post<{ Params: { id: string }; Body: { expectedVersion?: number } }>(
-    "/api/conversations/:id/resolve", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return ustawStatusRozmowy(Number(req.params.id), sesjaZadania()!.user.userId,
-          "resolved", null, Number(req.body?.expectedVersion));
-      } catch (e) { return konflikt(reply, e); }
-    });
-
-  app.post<{ Params: { id: string }; Body: { status?: string; powod?: string; expectedVersion?: number } }>(
-    "/api/conversations/:id/status", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return ustawStatusRozmowy(Number(req.params.id), sesjaZadania()!.user.userId,
-          req.body?.status ?? "", req.body?.powod ?? null, Number(req.body?.expectedVersion));
       } catch (e) { return konflikt(reply, e); }
     });
 

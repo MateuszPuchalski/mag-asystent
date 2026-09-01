@@ -84,6 +84,28 @@ export function useZapiszSzkic() {
   });
 }
 
+/**
+ * Zmiana statusu rozmowy (§7).
+ *
+ * Bez blokady optymistycznej i to jest wybór, nie przeoczenie: status nie
+ * jest treścią, którą dwoje ludzi pisze naraz. Dwa kliknięcia w tej samej
+ * sekundzie dają stan tego, kto kliknął później — a oś pokazuje oba przejścia
+ * z podpisami, więc nic nie ginie po cichu.
+ */
+export function useUstawStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; status: StatusRozmowy; doKiedy?: string | null }) =>
+      api<{ status: StatusRozmowy; snoozedUntil: string | null }>(
+        `/api/obsluga/rozmowy/${v.id}/status`,
+        { method: "POST", body: JSON.stringify({ status: v.status, doKiedy: v.doKiedy ?? null }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+    },
+  });
+}
+
 export function useZlecPomiar() {
   const qc = useQueryClient();
   return useMutation({
@@ -188,55 +210,44 @@ export function useWyslij() {
   });
 }
 
-/* ── Status rozmowy (0.157.0) ────────────────────────────────────────────────
-   Trzy mutacje, bo trzy różne decyzje. Wszystkie unieważniają OBIE listy:
-   kubełki liczą się z tej samej odpowiedzi co wiersze, więc odświeżenie
-   jednego bez drugiego pokazałoby liczbę przy zakładce niezgodną z jej
-   zawartością — i to jest ten gatunek rozjazdu, którego nikt nie zgłasza. */
-
-const odswiez = (qc: ReturnType<typeof useQueryClient>, id: number) => {
-  qc.invalidateQueries({ queryKey: klucze.rozmowy });
-  qc.invalidateQueries({ queryKey: klucze.rozmowa(id) });
-};
-
-/** Odłożenie z terminem powrotu. Bez terminu byłoby ukrytym zamknięciem. */
-export function useOdloz() {
+/**
+ * Komentarz wewnętrzny (0.157.0).
+ *
+ * Do tego wydania `conversation_comment` miała w kodzie serwera jeden INSERT
+ * i zero odczytów — notatka agenta przepadała. Trasa istniała, ekranu nie było.
+ */
+export function useDodajKomentarz() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; do: string; expectedVersion: number }) =>
-      api<{ status: StatusRozmowy; version: number }>(`/api/conversations/${v.id}/snooze`, {
-        method: "POST", body: JSON.stringify({ do: v.do, expectedVersion: v.expectedVersion }),
-      }),
-    onSettled: (_d, _e, v) => odswiez(qc, v.id),
+    mutationFn: (v: { rozmowaId: number; body: string; mentionedUserIds: number[] }) =>
+      api<{ id: number }>(`/api/obsluga/rozmowy/${v.rozmowaId}/komentarz`,
+        { method: "POST", body: JSON.stringify({
+          body: v.body, mentionedUserIds: v.mentionedUserIds }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+    },
   });
 }
 
-/** Najczęstsza decyzja dnia, więc ma własną trasę i jedno kliknięcie. */
-export function useZalatw() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; expectedVersion: number }) =>
-      api<{ status: StatusRozmowy; version: number }>(`/api/conversations/${v.id}/resolve`, {
-        method: "POST", body: JSON.stringify({ expectedVersion: v.expectedVersion }),
-      }),
-    onSettled: (_d, _e, v) => odswiez(qc, v.id),
+/**
+ * Konta do wzmianek — z istniejącej trasy `/api/users`.
+ *
+ * Bez własnej końcówki: lista kont jest już wystawiona biuru i adminowi,
+ * a drugi adres na te same dane znaczyłby dwa miejsca do pilnowania przy
+ * zmianie ról.
+ */
+export function useAgenci() {
+  return useQuery({
+    queryKey: ["agenci"],
+    queryFn: () => api<{ users: Array<{ userId: number; name: string; role: string }> }>("/api/users"),
+    staleTime: 5 * 60_000,
+    /* Hala nie dostaje listy kont (403) i to jest poprawne — wtedy po prostu
+       nie ma kogo wzmiankować, a ekran nie ma prawa się o to wywrócić. */
+    retry: false,
   });
 }
 
-/** Zamknięcie, spam i POWRÓT do `open` — cofnięcie każdej z tych decyzji. */
-export function useUstawStatus() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; status: StatusRozmowy; powod?: string; expectedVersion: number }) =>
-      api<{ status: StatusRozmowy; version: number }>(`/api/conversations/${v.id}/status`, {
-        method: "POST",
-        body: JSON.stringify({ status: v.status, powod: v.powod, expectedVersion: v.expectedVersion }),
-      }),
-    onSettled: (_d, _e, v) => odswiez(qc, v.id),
-  });
-}
-
-/* ── Uchwyt rozmowy (0.158.0) ────────────────────────────────────────────────
+/* ── Uchwyt rozmowy (0.159.0) ────────────────────────────────────────────────
    Samo wejście w pytanie przydziela je agentowi NA CZAS SIEDZENIA; odpowiedź
    przydziela na stałe. Uchwyt żyje w pamięci serwera i wygasa bez znaku
    życia, więc panel musi bić sercem i musi się wymeldować przy wyjściu.

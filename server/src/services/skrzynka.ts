@@ -1,7 +1,8 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
-import { statusEfektywny, zapiszStatusAutomatu, type StatusRozmowy } from "./statusy.js";
 import { uchwyty } from "./conversation-realtime.js";
+import { ustawStatus } from "./conversations.js";
+import type { StatusRozmowy } from "./conversations.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -15,13 +16,14 @@ import { uchwyty } from "./conversation-realtime.js";
 export interface RozmowaSkrzynki {
   id: number; klient: string; ostatniaWiadomosc: string; ostatniaWiadomoscAt: string;
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
-  /** Status WIDZIANY: odłożenie po terminie jest już `open` (`statusy.ts`). */
+  /** Status WYLICZONY (§7) — odłożenie po terminie wraca tu już jako `open`. */
   status: StatusRozmowy;
-  /** Zapisany w bazie — po to, żeby ekran umiał pokazać, że termin minął. */
-  statusZapisany: StatusRozmowy;
-  snoozeDo: string | null;
-  /** Klient odpisał po zamknięciu i nikt mu jeszcze nie odpowiedział. */
-  wrocilaPoZamknieciu: boolean;
+  odlozoneDo: string | null;
+  /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
+     ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
+     z kubełków zwrotów). Wiersz taki wraca jako `open` i wygląda jak każdy
+     inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
+  poTerminie: boolean;
   /* Kto SIEDZI przy rozmowie teraz — przydział tymczasowy, na czas oglądania.
      Nie ma go w bazie i nie ma prawa być (§6.3): po restarcie usługi rozmowa
      nie może zostać zablokowana przez agenta, który dawno wyszedł. */
@@ -31,41 +33,35 @@ export interface RozmowaSkrzynki {
 export interface ZalacznikOsi {
   id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
 }
+/** Wzmianka w komentarzu — kto ma to przeczytać. */
+export interface Wzmianka { userId: number; name: string }
+
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "wynik_zadania";
+  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   zalaczniki?: ZalacznikOsi[];
+  wzmianki?: Wzmianka[];
 }
 export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
 
 const SKRZYNKA = "skrzynka";
 
-/* Znacznik powrotu liczy się PRZY ODCZYCIE i gaśnie sam, gdy biuro odpisze:
-   porównujemy moment ostatniego zdarzenia `reopened_by_customer` z momentem
-   ostatniej naszej wiadomości. Osobna kolumna wymagałaby kasowania jej przy
-   wysyłce, czyli jeszcze jednego zapisu, który może się nie wykonać. */
 const LISTA = `
   SELECT c.id, c.subject AS klient, c.updated_at AS ostatniaWiadomoscAt, c.unread,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
-         c.status, c.snooze_do AS snoozeDo,
+         c.status, c.snoozed_until AS odlozoneDo,
          (SELECT m.body FROM message m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1)
-           AS ostatniaWiadomosc,
-         (SELECT MAX(e.created_at) FROM conversation_event e
-           WHERE e.conversation_id=c.id AND e.event_type='reopened_by_customer') AS wrocilaAt,
-         (SELECT MAX(m.sent_at) FROM message m
-           WHERE m.conversation_id=c.id AND m.direction='outgoing') AS odpisanoAt
+           AS ostatniaWiadomosc
     FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id`;
 
 const naRozmowe = (
   w: Record<string, unknown>,
-  teraz = new Date(),
+  teraz = Date.now(),
   trzymane: Map<number, { userId: number; name: string }> = new Map(),
 ): RozmowaSkrzynki => {
-  const zapisany = String(w.status ?? "new");
-  const snoozeDo = w.snoozeDo == null ? null : String(w.snoozeDo);
-  const wrocilaAt = w.wrocilaAt == null ? null : String(w.wrocilaAt);
-  const odpisanoAt = w.odpisanoAt == null ? null : String(w.odpisanoAt);
+  const odlozoneDo = w.odlozoneDo === null ? null : String(w.odlozoneDo);
+  const minal = Boolean(odlozoneDo && Date.parse(odlozoneDo) <= teraz);
   return {
     id: Number(w.id), klient: String(w.klient ?? "Klient"),
     ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
@@ -74,10 +70,12 @@ const naRozmowe = (
     wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
     wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
     wersja: Number(w.wersja),
-    status: statusEfektywny(zapisany, snoozeDo, teraz),
-    statusZapisany: (zapisany as StatusRozmowy),
-    snoozeDo,
-    wrocilaPoZamknieciu: wrocilaAt !== null && (odpisanoAt === null || wrocilaAt > odpisanoAt),
+    /* Ta sama reguła co w `statusRozmowy`, liczona tu bez dodatkowego zapytania
+       na wiersz: odłożenie kończy się samo, a status zapisany w kolumnie zostaje
+       `snoozed` do najbliższej ręcznej zmiany. */
+    status: (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+    odlozoneDo,
+    poTerminie: String(w.status) === "snoozed" && minal,
     oglada: trzymane.get(Number(w.id)) ?? null,
   };
 };
@@ -118,7 +116,7 @@ export function listaRozmow(): RozmowaSkrzynki[] {
      odświeża się przy każdym zdarzeniu, a mapa i tak stoi w pamięci. */
   const trzymane = uchwyty();
   return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
-    .map((w) => naRozmowe(w, new Date(), trzymane));
+    .map((w) => naRozmowe(w, Date.now(), trzymane));
 }
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
@@ -127,7 +125,7 @@ export function osRozmowy(id: number): {
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
-  const rozmowa = naRozmowe(wiersz, new Date(), uchwyty());
+  const rozmowa = naRozmowe(wiersz, Date.now(), uchwyty());
 
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,
@@ -185,6 +183,68 @@ export function osRozmowy(id: number): {
       tresc: String(z.wynik), at: String(z.wykonano_at), ofertaId: null, zadanieId: Number(z.id),
     });
   }
+  /* KOMENTARZE WEWNĘTRZNE (0.157.0). Do tego wydania `conversation_comment`
+     miała w całym serwerze jeden INSERT i zero odczytów — notatka agenta
+     wpadała do tabeli i nie wracała do nikogo. §10.3 wymienia ją wśród rzeczy,
+     które ma nieść oś, a §6.4 każe odróżnić ją wizualnie od treści klienta;
+     tu dajemy do tego `rodzaj`, a wygląd robi panel. */
+  const komentarze = db().prepare(`
+    SELECT k.id, k.body, k.created_at, u.name AS autor
+      FROM conversation_comment k JOIN app_user u ON u.user_id = k.author_user_id
+     WHERE k.conversation_id=? ORDER BY k.created_at, k.id
+  `).all(id) as Array<Record<string, unknown>>;
+  const wzmianki = new Map<number, Wzmianka[]>();
+  for (const w of db().prepare(`
+    SELECT m.comment_id, m.user_id, u.name
+      FROM conversation_mention m
+      JOIN conversation_comment k ON k.id = m.comment_id
+      JOIN app_user u ON u.user_id = m.user_id
+     WHERE k.conversation_id=? ORDER BY u.name
+  `).all(id) as Array<Record<string, unknown>>) {
+    const lista = wzmianki.get(Number(w.comment_id)) ?? [];
+    lista.push({ userId: Number(w.user_id), name: String(w.name) });
+    wzmianki.set(Number(w.comment_id), lista);
+  }
+  for (const k of komentarze) {
+    os.push({
+      id: `komentarz-${k.id}`, rodzaj: "komentarz", autor: String(k.autor),
+      /* `odKlienta` zostaje FAŁSZEM i to nie jest szczegół: na tym polu stoi
+         cały wygląd wpisu klienta. Komentarz, który je zapala, wyglądałby jak
+         cudza wiadomość — a §6.4 żąda dokładnie odwrotnego. */
+      odKlienta: false, tresc: String(k.body), at: String(k.created_at), ofertaId: null,
+      ...(wzmianki.has(Number(k.id)) ? { wzmianki: wzmianki.get(Number(k.id)) } : {}),
+    });
+  }
+
+  /* ZMIANY STATUSU (0.158.0). §10.3 wymienia je wprost wśród rzeczy, które
+     ma nieść oś. Nie są ozdobą: „dlaczego ta rozmowa wróciła na wierzch"
+     odpowiada wyłącznie wpis mówiący, że klient dopisał do sprawy uznanej za
+     rozwiązaną. Autor bywa KLIENTEM, nie agentem — patrz `obudzPrzychodzaca`.
+
+     `created_at` bierzemy z wiersza zdarzenia, bo oś sortuje się po czasie
+     i wpis bez daty wylądowałby na samej górze, przed pierwszym pytaniem. */
+  for (const z of db().prepare(`
+    SELECT id, payload, created_at FROM conversation_event
+     WHERE conversation_id=? AND event_type='status_changed' ORDER BY id
+  `).all(id) as Array<Record<string, unknown>>) {
+    const p = JSON.parse(String(z.payload ?? "{}")) as
+      { przed?: string; po?: string; autor?: string };
+    os.push({
+      id: `status-${z.id}`, rodzaj: "status", autor: String(p.autor ?? "system"),
+      odKlienta: false, tresc: `${p.przed ?? "?"} → ${p.po ?? "?"}`,
+      at: String(z.created_at), ofertaId: null,
+    });
+  }
+
+  /* OŚ JEST CHRONOLOGICZNA (0.157.0). Do tego wydania wyniki zadań doklejały
+     się za wszystkimi wiadomościami bez względu na czas — przy dwóch źródłach
+     znośne, przy trzech oś przestawała opowiadać przebieg sprawy.
+
+     Sortowanie jest STABILNE, więc wiadomości z tą samą datą zostają
+     w kolejności identyfikatorów. To ważne: Allegro potrafi oddać dwie
+     wiadomości z jedną sekundą, a wtedy porządek niesie `message.id`. */
+  os.sort((a, b) => a.at.localeCompare(b.at));
+
   return { rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id) };
 }
 
@@ -254,9 +314,11 @@ export function zlecPomiar(
      `zrodlo_ref` — dzięki temu wynik wraca na oś TEJ rozmowy i tej wiadomości. */
   db().prepare("UPDATE zadanie_terenowe SET conversation_id=?, message_id=? WHERE id=?")
     .run(rozmowaId, messageId, zadanie.id);
-  /* Rozmowa czeka teraz na NAS, nie na klienta — i tym różni się ten status od
-     `waiting_for_customer`. Wynik z hali zdejmuje go sam (`dopiszZdarzenieWyniku`),
-     więc agent nie ma tu nic do klikania w żadną stronę. */
-  zapiszStatusAutomatu(db(), rozmowaId, "waiting_for_internal");
+  /* ZLECONY POMIAR PRZESTAWIA STATUS (0.159.0). Bez tego `waiting_for_internal`
+     z §7 stał w liście dopuszczonych wartości i nie miał ani jednego nadawcy:
+     agent musiałby wybrać go ręcznie z listy, choć fakt już się wydarzył.
+     Wyjście z tego stanu jest równie automatyczne — zdejmuje go wynik z hali
+     (`dopiszZdarzenieWyniku`). */
+  ustawStatus(db(), rozmowaId, "waiting_for_internal", autor.id, null);
   return { ...zadanie, conversationId: rozmowaId, messageId };
 }

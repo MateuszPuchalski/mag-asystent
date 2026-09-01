@@ -1,10 +1,9 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
-import { ConversationConflict } from "./conversations.js";
+import { ConversationConflict, zmienStatus } from "./conversations.js";
 import { publishConversationEvent, trzymajacy } from "./conversation-realtime.js";
 import { logEvent } from "./events.js";
-import { zapiszStatusAutomatu } from "./statusy.js";
 import { wyslijDoAllegro, type WyslijDoAllegro } from "./allegro-wysylka.js";
 
 export interface ZadanieWysylki {
@@ -101,8 +100,8 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
 
   const k = kontekst(database, z.conversationId);
 
-  /* ── Kto ma prawo odpowiedzieć (0.158.0) ──────────────────────────────────
-     Do 0.157.0 wysyłka wymagała WCZEŚNIEJSZEGO przejęcia rozmowy: agent, który
+  /* ── Kto ma prawo odpowiedzieć (0.159.0) ──────────────────────────────────
+     Do 0.158.0 wysyłka wymagała WCZEŚNIEJSZEGO przejęcia rozmowy: agent, który
      wszedł w pytanie i napisał odpowiedź, dostawał na końcu „najpierw ją
      przejmij" i tracił ruch. Decyzja właściciela: samo wejście trzyma rozmowę
      na czas siedzenia, a ODPOWIEDŹ przydziela ją na stałe.
@@ -226,7 +225,12 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */
     database.prepare("DELETE FROM conversation_draft WHERE conversation_id=?").run(z.conversationId);
 
-    /* ODPOWIEDŹ PRZYDZIELA NA STAŁE (0.158.0). Kto odpisał klientowi, ten
+    /* ODPOWIEDŹ PRZESTAWIA ROZMOWĘ NA CZEKANIE (§7, 0.158.0). Piłka jest po
+       stronie klienta i kolejka ma to pokazywać sama — status wymagający
+       osobnego kliknięcia po każdej wysyłce zostałby pomijany. */
+    zmienStatus(database, z.conversationId, "waiting_for_customer", z.autor.id, null);
+
+    /* ODPOWIEDŹ PRZYDZIELA NA STAŁE (0.159.0). Kto odpisał klientowi, ten
        prowadzi sprawę — bez tego rozmowa wracałaby do puli zaraz po tym, jak
        ktoś wziął za nią odpowiedzialność, a klient dopytujący trafiałby za
        każdym razem na kogo innego.
@@ -241,13 +245,6 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       logEvent("rozmowa_przypisana_odpowiedzia", z.autor.name, null,
         { conversationId: z.conversationId, outboxId }, undefined, database);
     }
-
-    /* Odpowiedź poszła, więc ruch jest po stronie klienta — i to jest cały
-       powód, dla którego ten status liczy się sam. Gdyby zostawał do
-       kliknięcia, kłamałby przy pierwszej rozmowie, w której agent się
-       spieszył. Status wychodzi z transakcji razem z wiadomością: wysłana
-       odpowiedź bez zmiany statusu byłaby rozjazdem nie do zauważenia. */
-    zapiszStatusAutomatu(database, z.conversationId, "waiting_for_customer");
 
     logEvent("rozmowa_wyslana", z.autor.name, null,
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,

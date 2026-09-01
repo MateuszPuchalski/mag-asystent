@@ -1,17 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
-  useJa, useOdloz, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
-  useUchwytRozmowy, useUstawStatus, useWskazOferte, useWyslij, useZalatw, useZapiszSzkic,
-  useZdrowie, useZlecPomiar,
+  useAgenci, useDodajKomentarz, useJa, usePrzejmij, usePrzekaz, useRozmowa,
+  useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawStatus, useWskazOferte, useWyslij,
+  useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
-import { KUBELKI, Kubelki, wKubelku, type KubelekId } from "../skrzynka/Kubelki";
-import { Decyzja } from "../skrzynka/Decyzja";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
@@ -37,11 +35,17 @@ export function Skrzynka() {
   const wyslij = useWyslij();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
-  const odloz = useOdloz();
-  const zalatw = useZalatw();
+
   const status = useUstawStatus();
+  const agenci = useAgenci();
+  const dodajKomentarz = useDodajKomentarz();
 
   const [szkic, setSzkic] = useState("");
+  /* Komentarz ma WŁASNY stan, osobny od szkicu. Gdyby dzieliły jeden, notatka
+     „klient bywa trudny" zostawałaby w szkicu po przełączeniu trybu i czekała
+     na kliknięcie WYŚLIJ (§6.4). */
+  const [komentarz, setKomentarz] = useState("");
+  const [wzmianki, setWzmianki] = useState<number[]>([]);
   const [zrodlo, setZrodlo] = useState<number | null>(null);
   const [wskazowka, setWskazowka] = useState("");
   const [towar, setTowar] = useState<Towar | null>(null);
@@ -53,80 +57,13 @@ export function Skrzynka() {
   const [bladSynchronizacji, setBladSynchronizacji] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWysylki, setBladWysylki] = useState("");
-  const [kubelek, setKubelek] = useState<KubelekId>("moje");
   const [bladStatusu, setBladStatusu] = useState("");
   const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
   /* Samo wejście w pytanie trzyma je dla tego agenta — do wyjścia albo do
-     odpowiedzi, która przydziela je na stałe (decyzja właściciela, 0.158.0). */
+     odpowiedzi, która przydziela je na stałe (decyzja właściciela, 0.159.0). */
   useUchwytRozmowy(wybranaId);
-
-  const mojeId = ja.data?.user.userId ?? null;
-  const wszystkie = lista.data?.rozmowy ?? [];
-  const wKolejce = useMemo(
-    () => wszystkie.filter((r) => wKubelku(r, kubelek, mojeId)),
-    [wszystkie, kubelek, mojeId]);
-  const wybrana = wszystkie.find((r) => r.id === wybranaId) ?? null;
-
-  /* Wejście z paska adresu na rozmowę spoza wybranego kubełka ma pokazać TĘ
-     rozmowę, a nie pustą listę. Adres jest źródłem prawdy, kubełek za nim
-     idzie — dokładnie jak w zwrotach. */
-  useEffect(() => {
-    if (wybrana && !wKubelku(wybrana, kubelek, mojeId)) setKubelek("wszystkie");
-  }, [wybrana?.id, wybrana?.status]);
-
-  /**
-   * Przełączenie kubełka PRZESTAWIA TEŻ KURSOR.
-   *
-   * Blizna z panelu zwrotów, znaleziona okiem, nie testem: bez tego jeden
-   * klawisz zmieniał listę, a zaznaczenie zostawało na rozmowie z poprzedniego
-   * kubełka — i trzeba było dokliknąć wiersz.
-   */
-  const przelacz = (k: KubelekId) => {
-    setKubelek(k);
-    const pierwsza = wszystkie.find((r) => wKubelku(r, k, mojeId));
-    nawiguj(pierwsza ? `/obsluga/skrzynka/${pierwsza.id}` : "/obsluga/skrzynka");
-  };
-
-  const idz = (o: number) => {
-    if (!wKolejce.length) return;
-    const i = wKolejce.findIndex((r) => r.id === wybranaId);
-    const nast = wKolejce[Math.min(wKolejce.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
-    if (nast) nawiguj(`/obsluga/skrzynka/${nast.id}`);
-  };
-
-  /** Zmiana statusu z jednego miejsca — klawisz i przycisk robią to samo. */
-  const zmienStatus = (nowyStatus: StatusRozmowy) => {
-    if (!wybrana) return;
-    setBladStatusu("");
-    const przy = { onError: (e: unknown) => setBladStatusu((e as Error).message) };
-    if (nowyStatus === "resolved") {
-      zalatw.mutate({ id: wybrana.id, expectedVersion: wybrana.wersja }, przy);
-    } else {
-      status.mutate({ id: wybrana.id, status: nowyStatus, expectedVersion: wybrana.wersja }, przy);
-    }
-  };
-
-  useEffect(() => {
-    const naKlawisz = (e: KeyboardEvent) => {
-      /* Skrót nie ma prawa zadziałać, gdy ktoś pisze — inaczej „s" w szkicu
-         odpowiedzi oznaczałoby rozmowę jako spam, a `Backspace` cofałby
-         decyzję zamiast kasować literę. */
-      const cel = e.target as HTMLElement | null;
-      if (cel && /^(INPUT|TEXTAREA|SELECT)$/.test(cel.tagName)) return;
-      if (cel?.isContentEditable) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "ArrowDown") { e.preventDefault(); idz(1); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); idz(-1); }
-      else if (/^[1-7]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
-      else if (e.key === "z" || e.key === "Z") zmienStatus("resolved");
-      else if (e.key === "s" || e.key === "S") zmienStatus("spam");
-      else if (e.key === "Backspace") { e.preventDefault(); zmienStatus("open"); }
-    };
-    window.addEventListener("keydown", naKlawisz);
-    return () => window.removeEventListener("keydown", naKlawisz);
-  }, [wKolejce, wybranaId, wszystkie, kubelek, mojeId]);
 
   /* Szkic wchodzi do pola przy zmianie ROZMOWY, nie przy każdym odczycie:
      nadpisywanie go w trakcie pisania kasowałoby pracę agenta. */
@@ -134,7 +71,7 @@ export function Skrzynka() {
     setSzkic(rozmowa.data?.szkic?.body ?? "");
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
-    setKonfliktWysylki(null); setBladWysylki(""); setPrzyRozmowie(null);
+    setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setPrzyRozmowie(null);
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -195,17 +132,17 @@ export function Skrzynka() {
 
     <Kolejka
       nieswieza={alarm}
-      kubelki={<Kubelki rozmowy={wszystkie} mojeId={mojeId}
-        wybrany={kubelek} onWybierz={przelacz} />}
-      mojeId={mojeId}
-      rozmowy={wKolejce}
+      rozmowy={lista.data?.rozmowy ?? []}
       stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
       wybranaId={wybranaId}
+      mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}
       onOdswiez={() => lista.refetch()}
       onWybierz={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />
 
     <div className="space-y-4">
+    {/* Uchwyt kolegi zatrzymuje wysyłkę, ale nigdy po cichu: zgoda jest jawna,
+        tak samo jak przy dopisku klienta z 0.110.0. */}
     {przyRozmowie && <div className="card flex flex-wrap items-center gap-3 border-violet-300 bg-violet-50 p-3 text-sm">
       <span><b>{przyRozmowie}</b> siedzi teraz przy tej rozmowie.</span>
       <span className="text-slate-600">Dwie odpowiedzi na jedno pytanie to dwie różne prawdy u klienta.</span>
@@ -217,21 +154,9 @@ export function Skrzynka() {
       </div>
     </div>}
 
-    {wybrana && <Decyzja
-      rozmowa={wybrana}
-      zajete={odloz.isPending || zalatw.isPending || status.isPending}
-      blad={bladStatusu}
-      onOdloz={(iso) => {
-        setBladStatusu("");
-        odloz.mutate({ id: wybrana.id, do: iso, expectedVersion: wybrana.wersja },
-          { onError: (e) => setBladStatusu((e as Error).message) });
-      }}
-      onStatus={zmienStatus}
-      mojeId={mojeId} />}
-
     <Rozmowa
       dane={rozmowa.data}
-      mojeId={mojeId}
+      mojeId={ja.data?.user.userId ?? null}
       nowaWiadomosc={nowa}
       szkic={szkic}
       zapisuje={zapisz.isPending}
@@ -242,6 +167,19 @@ export function Skrzynka() {
         { id: rozmowa.data.rozmowa.id, expectedVersion: rozmowa.data.rozmowa.wersja },
         { onError: zglosPrzejecie, onSuccess: () => setKonflikt(null) })}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
+      komentarz={komentarz}
+      onKomentarz={setKomentarz}
+      komentuje={dodajKomentarz.isPending}
+      /* Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie
+         odpowiedź do klienta. */
+      onDodajKomentarz={() => rozmowa.data && dodajKomentarz.mutate(
+        { rozmowaId: rozmowa.data.rozmowa.id, body: komentarz, mentionedUserIds: wzmianki },
+        { onSuccess: () => { setKomentarz(""); setWzmianki([]); } })}
+      agenci={(agenci.data?.users ?? [])
+        .filter((u) => u.userId !== ja.data?.user.userId)
+        .map((u) => ({ userId: u.userId, name: u.name }))}
+      wzmianki={wzmianki}
+      onWzmianki={setWzmianki}
       onSzkic={setSzkic}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;
@@ -291,6 +229,14 @@ export function Skrzynka() {
         setBladOferty("");
         oferta.mutate({ id: rozmowa.data.rozmowa.id, ofertaId },
           { onError: (e) => setBladOferty((e as Error).message) });
+      }}
+      zapisujeStatus={status.isPending}
+      bladStatusu={bladStatusu}
+      onZmienStatus={(nowy: StatusRozmowy, doKiedy) => {
+        if (!rozmowa.data) return;
+        setBladStatusu("");
+        status.mutate({ id: rozmowa.data.rozmowa.id, status: nowy, doKiedy },
+          { onError: (e) => setBladStatusu((e as Error).message) });
       }}
       onDopytajOOferte={() => setSzkic((s) => s
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}

@@ -1,5 +1,5 @@
 import React from "react";
-import { Paperclip } from "lucide-react";
+import { ArrowRight, Lock, Paperclip } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk } from "../ui";
 
@@ -45,7 +45,28 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
   return <div className="flex-1 space-y-3 overflow-y-auto p-4">
-    {wpisy.map((w) => w.rodzaj === "wynik_zadania"
+    {wpisy.map((w) => w.rodzaj === "status"
+      /* Zmiana statusu (§10.3, 0.158.0) jest KRESKĄ, nie kafelkiem: to nie
+         czyjaś wypowiedź, tylko znak, że sprawa przeszła dalej. Kafelek
+         w rzędzie wiadomości przerwałby czytanie rozmowy w biegu. */
+      ? <p key={w.id} className="flex items-center justify-center gap-2 text-xs text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          <ArrowRight size={12} />{w.tresc} · {w.autor}
+          <span className="h-px flex-1 bg-slate-200" />
+        </p>
+      : w.rodzaj === "komentarz"
+      /* §6.4: komentarz ma być WIZUALNIE ODRÓŻNIONY od wiadomości klienta.
+         Inna barwa to za mało — kłódka i podpis mówią wprost, że klient tego
+         nie widzi, bo to jedyna rzecz, o którą tu naprawdę chodzi. */
+      ? <article key={w.id} className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
+            <Lock size={12} />NOTATKA WEWNĘTRZNA · {w.autor}
+            {w.wzmianki?.length ? <span className="font-normal">
+              · dla: {w.wzmianki.map((m) => m.name).join(", ")}</span> : null}
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+        </article>
+      : w.rodzaj === "wynik_zadania"
       ? <article key={w.id} className="rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
           <div className="text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu · {w.autor}</div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>

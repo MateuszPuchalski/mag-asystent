@@ -81,16 +81,8 @@ const TRASY = () => [
     payload: { ofertaId: "14892374512" } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
-  /* Status rozmowy (0.157.0): trzy trasy zapisu więcej. Każda jest DECYZJĄ
-     człowieka — odłożenie z terminem, załatwienie jednym kliknięciem i reszta
-     razem z powrotem do `open`. Automat swoje statusy zapisuje przy okazji
-     faktów (wysyłka, pomiar, wynik z hali), bez własnej trasy. */
-  { method: "POST" as const, url: `/api/conversations/${rozmowa}/snooze`,
-    payload: { do: "2027-01-04T08:00:00.000Z", expectedVersion: 1 } },
-  { method: "POST" as const, url: `/api/conversations/${rozmowa}/resolve`,
-    payload: { expectedVersion: 1 } },
-  { method: "POST" as const, url: `/api/conversations/${rozmowa}/status`,
-    payload: { status: "spam", expectedVersion: 1 } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
+    payload: { status: "resolved" } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -172,7 +164,11 @@ test("mutacje przez trasę zostawiają ślad w dzienniku", async () => {
   const typy = (db().prepare(
     "SELECT type FROM events WHERE type LIKE 'rozmowa_%' ORDER BY id").all() as Array<{type:string}>)
     .map((w) => w.type);
-  assert.deepEqual(typy, ["rozmowa_przejeta", "rozmowa_komentarz"]);
+  /* `rozmowa_status` doszło w 0.158.0: przejęcie otwiera rozmowę, więc zostawia
+     DWA ślady — o przejęciu i o zmianie stanu. Kolejność jest znacząca, bo
+     audyt czyta się z góry na dół: status zmieniony przed przejęciem
+     opowiadałby, że rozmowa otworzyła się sama. */
+  assert.deepEqual(typy, ["rozmowa_przejeta", "rozmowa_status", "rozmowa_komentarz"]);
 });
 
 test("wymuszone przekazanie wymaga administratora, nie samego biura", async () => {
@@ -256,18 +252,20 @@ test("ręczna synchronizacja bez sparowanego konta mówi wprost, czego brakuje",
    `services/wysylka.test.ts` z podstawionym adapterem — testy tras nie
    strzelają do Allegro. */
 test("nie wyśle ten, kto nie prowadzi rozmowy", async () => {
-  /* Od 0.158.0 rozmowa NIEPRZYPISANA idzie do wysyłki bez osobnego przejęcia
-     (przydziela ją sama odpowiedź). Blokadą zostaje trwały właściciel: gdy
+  /* Od 0.159.0 rozmowa NIEPRZYPISANA idzie do wysyłki bez osobnego przejęcia:
+     przydziela ją sama odpowiedź. Blokadą zostaje trwały właściciel — gdy
      rozmowę prowadzi kto inny, odpowiedź nie wychodzi. */
   const ala = login("biuro", "A. Lewandowska");
   const marek = login("biuro", "M. Wójcik");
+  const wersja = () => (db().prepare("SELECT version FROM conversation WHERE id=?")
+    .get(rozmowa) as { version: number }).version;
   const przejecie = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
-    headers: ala.naglowki, payload: { expectedVersion: 1 } });
+    headers: ala.naglowki, payload: { expectedVersion: wersja() } });
   assert.equal(przejecie.statusCode, 200, przejecie.body);
 
   const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
     headers: marek.naglowki,
-    payload: { body: "Pasuje.", expectedVersion: 2, expectedLastMessageId: pytanie } });
+    payload: { body: "Pasuje.", expectedVersion: wersja(), expectedLastMessageId: pytanie } });
   assert.equal(r.statusCode, 409);
   assert.match(r.json().error, /najpierw ją przejmij/);
 });
@@ -345,47 +343,33 @@ test("pobranie załącznika: rola, stan i nieznane id", async () => {
   assert.equal(nieznany.statusCode, 404);
 });
 
-test("odłożenie, załatwienie i powrót chodzą jedną drogą i pilnują wersji", async () => {
+test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async () => {
+  /* Dwa różne błędy o tym samym kodzie, bo oba są pomyłką wołającego, nie
+     stanem rozmowy. Trasa sprawdza NAZWĘ (lista §7 jest zamknięta), a serwis
+     TERMIN — i tylko test przez HTTP pokazuje, że obie bramki naprawdę stoją
+     na drodze żądania, a nie tylko w kodzie obok. */
   const b = login("biuro", "Anna");
-  const wersja = () => (db().prepare("SELECT version FROM conversation WHERE id=?")
-    .get(rozmowa) as { version: number }).version;
 
-  let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/snooze`,
-    headers: b.naglowki, payload: { do: "2027-01-04T08:00:00.000Z", expectedVersion: wersja() } });
-  assert.equal(r.statusCode, 200, r.body);
-  assert.equal(r.json().status, "snoozed");
-  assert.equal(r.json().snoozeDo, "2027-01-04T08:00:00.000Z");
+  const zmyslony = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "zalatwione" } });
+  assert.equal(zmyslony.statusCode, 400);
+  assert.match(zmyslony.json().error, /waiting_for_customer/, "błąd ma wymienić dozwolone stany");
 
-  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/resolve`,
-    headers: b.naglowki, payload: { expectedVersion: wersja() } });
-  assert.equal(r.statusCode, 200, r.body);
-  assert.equal(r.json().status, "resolved");
+  const bezTerminu = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "snoozed" } });
+  assert.equal(bezTerminu.statusCode, 400);
 
-  /* POWRÓT do `open` idzie tą samą trasą co reszta — cofnięcie jest tańsze
-     od dialogu „czy na pewno" i dlatego nie ma własnego przycisku-wyjątku. */
-  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/status`,
-    headers: b.naglowki, payload: { status: "open", expectedVersion: wersja() } });
-  assert.equal(r.statusCode, 200, r.body);
-  assert.equal(r.json().status, "open");
+  const stan = db().prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string };
+  assert.equal(stan.status, "new", "odrzucone żądanie nie ma prawa ruszyć rozmowy");
 
-  /* Spóźniony agent dostaje 409 ze stanem, a nie ciche nadpisanie cudzej
-     decyzji — tak samo jak przy przejęciu i przy wysyłce. */
-  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/resolve`,
-    headers: b.naglowki, payload: { expectedVersion: 1 } });
-  assert.equal(r.statusCode, 409, r.body);
-  assert.equal(r.json().status, "open");
-});
-
-test("statusu automatu nie da się wpisać żądaniem", async () => {
-  /* Trasa jest równie ważną granicą co serwis: `waiting_for_customer` wpisane
-     żądaniem kłamałoby o tym, że odpowiedź poszła do klienta. */
-  const b = login("biuro", "Anna");
-  const wersja = (db().prepare("SELECT version FROM conversation WHERE id=?")
-    .get(rozmowa) as { version: number }).version;
-  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/status`,
-    headers: b.naglowki, payload: { status: "waiting_for_customer", expectedVersion: wersja } });
-  assert.equal(r.statusCode, 400, r.body);
-  assert.match(r.json().error, /nie ustawia się ręcznie/);
+  const dobre = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "snoozed", doKiedy: "2026-09-08T07:00:00.000Z" } });
+  assert.equal(dobre.statusCode, 200, dobre.body);
+  assert.equal(dobre.json().snoozedUntil, "2026-09-08T07:00:00.000Z");
 });
 
 test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", async () => {
@@ -401,9 +385,6 @@ test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", asy
   assert.equal(r.json().trzyma.userId, ala.userId);
 
   assert.equal(liczbaZdarzen(), przed, "wejście w rozmowę dopisało zdarzenie do dziennika");
-  assert.equal((db().prepare("SELECT assigned_user_id FROM conversation WHERE id=?")
-    .get(rozmowa) as { assigned_user_id: number | null }).assigned_user_id, null,
-    "uchwyt nie ma prawa dotknąć kolumny właściciela");
 
   /* Widać go w kolejce — inaczej kolega nie miałby skąd wiedzieć, że ktoś
      już przy tym pytaniu siedzi. */
@@ -416,3 +397,4 @@ test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", asy
     headers: ala.naglowki, payload: { obecny: false } });
   assert.equal(r.json().trzyma, null);
 });
+

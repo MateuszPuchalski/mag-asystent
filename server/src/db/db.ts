@@ -111,6 +111,16 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  /* Status rozmowy (§7, 0.158.0). `new` jako domyślny opisuje prawdę
+     o rozmowach zastanych: przyjechały z synchronizacji i nikt ich nie tknął.
+     `CHECK` powtarza listę ze `schema.sql`, bo baza założona przed tym
+     wydaniem dostaje kolumnę TĘDY i inaczej stałaby bez strażnika. */
+  addColumn("conversation", "status", `TEXT NOT NULL DEFAULT 'new' CHECK(status IN
+    ('new','open','waiting_for_customer','waiting_for_internal','snoozed',
+     'resolved','closed','spam'))`);
+  /* Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
+     stanem, z którego nic nie wyprowadza — a §7 nie zna „odłożona na zawsze". */
+  addColumn("conversation", "snoozed_until", "TEXT");
   /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
      po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */
@@ -281,7 +291,6 @@ export function migrate(database: DatabaseSync) {
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
-  statusRozmowy(database);
   /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
@@ -291,30 +300,6 @@ export function migrate(database: DatabaseSync) {
      kształcie. */
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
-}
-
-/**
- * Status rozmowy razem z jednorazowym uzupełnieniem (0.157.0).
- *
- * Osobna funkcja, a nie dwa `addColumn`, WYŁĄCZNIE przez to uzupełnienie:
- * ma się wykonać raz, w chwili dołożenia kolumny. Puszczone przy każdym
- * starcie cofałoby ręczną decyzję operatora przy najbliższym restarcie —
- * a status ma być tym, co powiedział człowiek albo policzył automat, nie tym,
- * co migracja uważa za rozsądne.
- *
- * Uzupełnienie jest najostrożniejsze z możliwych: rozmowa, którą ktoś
- * prowadzi, dostaje `open`; cała reszta zostaje przy domyślnym `new`.
- * Kuszące „ostatnia wiadomość wyszła od nas, więc czekamy na klienta" byłoby
- * zgadywaniem — biuro odpowiadało też telefonem i w panelu Allegro.
- */
-function statusRozmowy(database: DatabaseSync) {
-  const kolumny = database.prepare("PRAGMA table_info(conversation)").all() as Array<{ name: string }>;
-  if (!kolumny.length || kolumny.some((k) => k.name === "status")) return;
-  database.exec(`ALTER TABLE conversation ADD COLUMN status TEXT NOT NULL DEFAULT 'new'
-    CHECK (status IN ('new','open','waiting_for_customer','waiting_for_internal',
-                      'snoozed','resolved','closed','spam'))`);
-  database.exec("ALTER TABLE conversation ADD COLUMN snooze_do TEXT");
-  database.exec("UPDATE conversation SET status='open' WHERE assigned_user_id IS NOT NULL");
 }
 
 /**

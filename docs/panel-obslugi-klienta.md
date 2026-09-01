@@ -134,7 +134,7 @@ przekazana ekspertowi, odłożona albo zakończona.
 uda się jeden zapis. Drugi dostaje konflikt z aktualnym właścicielem, czasem
 przejęcia i bieżącą wersją rozmowy.
 
-**Dwa rodzaje przydziału (0.158.0).** Decyzja właściciela: samo wejście agenta
+**Dwa rodzaje przydziału (0.159.0).** Decyzja właściciela: samo wejście agenta
 w pytanie przydziela mu je NA CZAS SIEDZENIA, a odpowiedź — na stałe.
 
 | przydział | co go daje | jak długo trwa | gdzie żyje |
@@ -146,7 +146,7 @@ Uchwyt trzyma PIERWSZY, który wszedł, nie ostatni: inaczej kolega otwierający
 rozmowę „na chwilę" odbierałby ją komuś w połowie pisania odpowiedzi.
 
 Wysyłka odpowiedzi na rozmowę nieprzypisaną nie wymaga już osobnego przejęcia.
-Do 0.157.0 agent, który wszedł w pytanie i napisał odpowiedź, dostawał na
+Do 0.158.0 agent, który wszedł w pytanie i napisał odpowiedź, dostawał na
 końcu „najpierw ją przejmij" i tracił ruch.
 
 **Blokada jest miękka.** Gdy przy rozmowie siedzi kto inny, wysyłka odpada
@@ -164,7 +164,7 @@ procesu (`services/conversation-realtime.ts`) i wygasający sam. Zapisany do
 bazy stałby się trwałym statusem rozmowy, czyli dokładnie tym, czym nie jest —
 a po restarcie serwera kłamałby o tym, kto siedzi przy sprawie.
 
-Ten akapit napisano w 0.141.0, a w 0.158.0 dostał zastosowanie: to na nim
+Ten akapit napisano w 0.141.0, a w 0.159.0 dostał zastosowanie: to na nim
 stoi przydział tymczasowy z §6.2. Uchwyt puszcza po czterdziestu pięciu
 sekundach bez znaku życia, panel bije sercem co piętnaście. Trzykrotny zapas
 jest po to, żeby jedno zgubione żądanie nie oddało rozmowy komuś innemu
@@ -183,49 +183,7 @@ i są wizualnie odróżnione od wiadomości klienta.
 ## 7. Statusy
 
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_internal`,
-`snoozed`, `resolved`, `closed`, `spam`. **Działają od 0.157.0**, komplet
-ośmiu.
-
-### 7.1. Cztery liczy automat, cztery stawia człowiek
-
-Status wynika z faktów, które i tak zapisujemy, i zapisuje go ta sama
-transakcja co fakt:
-
-| fakt | status po |
-|---|---|
-| przyszła wiadomość od klienta | `new`, a przy rozmowie z właścicielem `open` |
-| ktoś przejął albo przekazał rozmowę | `open` |
-| odpowiedź poszła do klienta | `waiting_for_customer` |
-| zlecono zadanie hali | `waiting_for_internal` |
-| wrócił wynik z hali | `open` |
-
-Ręką stawia się cztery: odłożenie z terminem, `resolved`, `closed` i `spam`.
-Automat nie ustawia ich NIGDY — nie ma jak wiedzieć, że sprawa jest
-załatwiona, a domyślanie się tego to ten gatunek zgadywania, po którym
-w 0.140.0 zniknął cały moduł.
-
-Dwie reguły nadrzędne. `spam` jest nietykalny dla automatu, bo spamer pisze
-dalej. `waiting_for_internal` przeżywa dopisek klienta: hala dalej mierzy,
-a to, że przyszło coś nowego, mówi flaga nieprzeczytanej.
-
-Rozmowa `resolved` albo `closed`, do której klient odpisał, WRACA do `open`
-i dostaje w kolejce znacznik „wróciła". Bez niego wygląda jak każda inna
-w toku, a to jedyna, przy której trzeba przeczytać, co obiecano wcześniej.
-
-### 7.2. Odłożenie wygasa przy odczycie
-
-`snoozed` obowiązuje, dopóki `snooze_do` jest w przyszłości; potem odczyt
-pokazuje `open` — bez zapisu i bez tickera. Ticker przebudzający rozmowy
-byłby czwartym w tym systemie i jedynym, którego całą pracą jest przepisanie
-kolumny dającej się policzyć. „Zero zapisu przy patrzeniu" obowiązuje też
-skrzynkę.
-
-### 7.3. Status to nie jest flaga nieprzeczytanej
-
-`conversation.unread` przychodzi z Allegro i mówi, czy sprzedawca odpisał
-klientowi. `status` mówi, co z tym zrobiło biuro. Rozmowa załatwiona
-telefonicznie ma `unread = 0` i `resolved`; jedna kolumna dla obu kłamałaby
-przy każdej takiej.
+`snoozed`, `resolved`, `closed`, `spam`.
 
 **Dobór:** `not_started`, `extracting_data`, `missing_information`, `searching`,
 `candidates_found`, `requires_expert`, `confirmed`, `rejected`,
@@ -236,6 +194,36 @@ przy każdej takiej.
 
 **Synchronizacja** ma status niezależny od rozmowy: `current`, `delayed`,
 `rate_limited`, `authentication_error`, `failed`.
+
+### 7.1. Statusy rozmowy w kodzie (0.158.0)
+
+Lista rozmowy stoi w trzech miejscach naraz: `STATUSY_ROZMOWY`
+w `services/conversations.ts`, `CHECK` na kolumnie `conversation.status`
+i typ `StatusRozmowy` w panelu. Każda kopia pilnuje innej granicy — typów,
+API i bazy — a rozjazd wychodzi przy kompilacji albo przy zapisie.
+
+Pięć przejść dzieje się SAMYCH, bez agenta:
+
+- przejęcie rozmowy prowadzi `new` → `open`;
+- wysłana odpowiedź prowadzi do `waiting_for_customer`;
+- przychodząca wiadomość klienta budzi rozmowę do `open`;
+- zlecony pomiar prowadzi do `waiting_for_internal` (0.159.0);
+- wynik z hali zdejmuje ten stan z powrotem do `open` (0.159.0).
+
+Dwa ostatnie doszły później i nie są dodatkiem: do 0.158.0
+`waiting_for_internal` stał w liście dopuszczonych wartości bez ani jednego
+nadawcy. Agent musiał wybrać go ręcznie, choć fakt — zlecenie pomiaru — już
+się wydarzył.
+
+Budzenie omija `closed` i `spam`. To jawne werdykty człowieka, a automat,
+który je cofa, kazałby zamykać tę samą rozmowę w kółko.
+
+Odłożenie wymaga terminu i kończy się SAMO — liczymy to przy odczycie, bez
+tickera. Rozmowa po minionym terminie wraca jako `open` i niesie znacznik
+„po terminie", bo inaczej niczym nie różniłaby się od świeżo otwartej.
+
+Zamknięcia automatycznego po N dniach NIE MA. §26 wymienia je wśród pytań
+do właściciela; do czasu decyzji rozmowę zamyka wyłącznie człowiek.
 
 ## 8. Integracja z Allegro
 
@@ -342,6 +330,16 @@ wynik magazyniera oraz przygotowanie i wysłanie odpowiedzi. Każdy rodzaj
 zdarzenia wygląda inaczej.
 
 ### 10.4. Edytor odpowiedzi
+
+**Rozdzielenie trybów (0.157.0).** Przełącznik ma dwa tryby i każdy ma WŁASNE
+pole oraz własny przycisk. W trybie komentarza przycisk wysyłki nie istnieje
+w drzewie — wyłączony da się kliknąć, gdy stan rozjedzie się o ułamek sekundy;
+nieistniejącego nie da się nigdy. Osobne pola znaczą też, że przełączenie
+trybu nie przenosi notatki do szkicu, który idzie do klienta.
+
+Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie odpowiedź,
+a kolega ma prawo dopisać „to ten sam klient co wczoraj" bez przejmowania
+sprawy.
 
 Zwykły tekst, szablony, szkic ze sztucznej inteligencji, licznik znaków,
 podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
@@ -831,7 +829,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Lista rozmów i oś czasu | **działa** od 0.143.0 | `services/skrzynka.ts`, `panel/src/skrzynka/` |
 | Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
 | Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
-| Komentarze i wzmianki | **model gotowy**, brak ekranu | `conversation_comment`, `conversation_mention` |
+| Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users` |
+| Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
 | Obecność i „pisze" | **działa**, w pamięci | `services/conversation-realtime.ts` |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
@@ -841,11 +840,12 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
 | Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias` |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
-| Statusy rozmowy (§7) | **działa** od 0.157.0 | `conversation.status`, `services/statusy.ts` |
-| Kubełki i skróty w skrzynce | **działa** od 0.157.0 | `panel/src/skrzynka/Kubelki.tsx`, `Decyzja.tsx` |
-| Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.158.0 | `conversation-realtime.ts`, w pamięci |
-| Odpowiedź przydziela rozmowę na stałe | **działa** od 0.158.0 | `services/wysylka.ts` |
-| Statusy doboru (§7) | **projekt** | dobór to etap E, którego nie ma |
+| Statusy rozmowy (§7) | **działa** od 0.158.0 | `conversation.status`, `ustawStatus`, kubełki kolejki |
+| Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
+| Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
+| `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
+| Statusy doboru (§7) | **projekt** | dobór części nie ma jeszcze własnego stanu |
+| Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
