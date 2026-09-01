@@ -1,0 +1,4 @@
+# Cudze pliki. `linguist-vendored` trzyma je poza statystyką języków repo,
+# a brak `diff` sprawia, że 40 tysięcy linii cudzej specyfikacji nie zalewa
+# przeglądu zmian — do porównania wersji służy `sha256` z sąsiedniego README.
+docs/allegro/swagger.yaml linguist-vendored linguist-generated -diff
