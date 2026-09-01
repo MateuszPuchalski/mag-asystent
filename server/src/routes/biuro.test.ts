@@ -1066,3 +1066,56 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
   assert.match(html, /h\.allegro/, "ikona Allegro czyta stan z health, nie tylko z listy zwrotów");
 });
 
+
+/* ── Instrukcja nawigacji nie może wskazywać zakładki, której nie ma ─────────
+   `sonda-run.ts` przez dwanaście wydań kazał iść do „/biuro → REJESTRY →
+   KONTO ALLEGRO". Zakładka REJESTRY odeszła w 0.140.0, a karta konta stoi od
+   tamtej pory w STANIE SYSTEMU. Nic tego nie zgłaszało: zdanie żyje w stringu,
+   a stringów nie sprawdza ani kompilator, ani przegląd — czyta je wyłącznie
+   człowiek, który już ma problem i szuka wyjścia.
+
+   Test bierze PIERWSZY człon każdej takiej instrukcji z kodu serwera
+   i sprawdza go wobec paska zakładek. Dalsze człony (karta, przycisk) zostają
+   poza sprawdzeniem: pasek jest jedynym zbiorem nazw, który da się odczytać
+   z HTML-a bez zgadywania.                                                   */
+
+test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const otwarcie = html.match(/<nav class="zakladki"[^>]*>/);
+  assert.ok(otwarcie, "pasek zakładek istnieje");
+  const nav = html.slice(otwarcie.index!, html.indexOf("</nav>"));
+
+  /* Dozwolone są NAZWY Z PASKA i identyfikatory widoków. Widok bywa dostępny
+     spoza paska — USTAWIENIA otwiera zębatka i `data-widok="dostawcy"` jest
+     jedynym miejscem, w którym ta nazwa stoi w HTML-u. */
+  const dozwolone = new Set([
+    ...[...nav.matchAll(/<span class="et">([^<]+)<\/span>/g)].map((m) => m[1].trim().toUpperCase()),
+    ...[...html.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1].toUpperCase()),
+  ]);
+
+  const pliki: string[] = [];
+  const zbierz = (dir: string): void => {
+    for (const w of fs.readdirSync(dir, { withFileTypes: true })) {
+      const pelna = path.join(dir, w.name);
+      if (w.isDirectory()) zbierz(pelna);
+      else if (w.name.endsWith(".ts") && !w.name.endsWith(".test.ts")) pliki.push(pelna);
+    }
+  };
+  zbierz(path.resolve(import.meta.dirname, ".."));
+
+  let znalezione = 0;
+  for (const plik of pliki) {
+    const tekst = fs.readFileSync(plik, "utf8");
+    /* Człon zapisany WIELKIMI literami — tak wyglądają nazwy zakładek na
+       pasku. Małe litery („/biuro → zębatka") opisują drogę, nie zakładkę. */
+    for (const m of tekst.matchAll(/\/biuro\s*→\s*([A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ ]*)/g)) {
+      znalezione++;
+      const cel = m[1].trim();
+      assert.ok(
+        dozwolone.has(cel),
+        `${path.basename(plik)} odsyła do „${cel}", a pasek zna: ${[...dozwolone].join(", ")}`
+      );
+    }
+  }
+  assert.ok(znalezione >= 5, "wzorzec przestał cokolwiek znajdować — test pilnowałby pustki");
+});

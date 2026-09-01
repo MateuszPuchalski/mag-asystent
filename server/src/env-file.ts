@@ -53,6 +53,37 @@ export function parseEnvFile(text: string): Record<string, string> {
   return out;
 }
 
+/**
+ * Katalog i jego rodzice, od najbliższego. Czysta funkcja, bo to jedyna
+ * reguła szukania, którą da się sprawdzić bez dotykania dysku.
+ */
+export function katalogiWGore(start: string): string[] {
+  const out: string[] = [];
+  let dir = path.resolve(start);
+  for (;;) {
+    out.push(dir);
+    const wyzej = path.dirname(dir);
+    if (wyzej === dir) return out;
+    dir = wyzej;
+  }
+}
+
+/* ── Katalog roboczy I JEGO RODZICE (0.153.0) ────────────────────────────────
+   Do 0.152.0 lista kończyła się na samym katalogu roboczym i to wystarczało
+   wyłącznie usługom: NSSM ma `AppDirectory C:\wertis`, więc plik leży dokładnie
+   tam. Każde narzędzie z konsoli npm uruchamia W KATALOGU WORKSPACE'U —
+   `npm run sonda`, `reconcile`, `reslot`, `inwentarz`, a także `npm run dev`
+   startują w `C:\wertis\server`. Plik stoi piętro wyżej, więc nie był
+   wczytywany wcale, a proces po cichu wracał do wartości domyślnych: pusty
+   `SGT_MODE` znaczy tryb demo, a demo znaczy `allegroTryb() === "dev"`.
+
+   Objaw kłamał. Sonda mówiła „konto nie jest sparowane", choć konto było
+   sparowane — tyle że pytał o nie proces czytający inny zestaw ustawień niż
+   usługa, z tej samej instalacji. Chodzenie w górę kasuje różnicę między
+   „uruchomione z korzenia" a „uruchomione z server/": obie drogi trafiają na
+   ten sam plik. Najbliższy wygrywa, a `/api/health` i tak pokazuje, który to
+   był — pomyłka w wyborze pliku ma więc gdzie wyjść na jaw.                  */
+
 /** Miejsca, w których szukamy pliku — w kolejności. */
 export function envFileCandidates(): string[] {
   const explicit = process.env.WERTIS_ENV_FILE;
@@ -60,8 +91,8 @@ export function envFileCandidates(): string[] {
   return [
     // obok pliku wykonywalnego — tak stoi instalacja produkcyjna (.exe)
     path.join(path.dirname(process.execPath), "wertis.env"),
-    // korzeń repozytorium — tak wygląda praca deweloperska
-    path.resolve(process.cwd(), "wertis.env"),
+    // katalog roboczy, potem w górę — korzeń repo widziany też z `server/`
+    ...katalogiWGore(process.cwd()).map((d) => path.join(d, "wertis.env")),
   ];
 }
 

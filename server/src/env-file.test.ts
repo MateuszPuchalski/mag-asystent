@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseEnvFile, problemPrzykrytejKonfiguracji } from "./env-file.js";
+import path from "node:path";
+import {
+  envFileCandidates,
+  katalogiWGore,
+  parseEnvFile,
+  problemPrzykrytejKonfiguracji,
+} from "./env-file.js";
 
 /* Plik `wertis.env` jest wczytywany DWIEMA drogami: `source` w bashu (tak stoi
    w dokumentacji) i tym parserem. Rozjazd między nimi dałby aplikacji inne
@@ -136,4 +142,53 @@ test("HASŁO NIE WYCIEKA DO KOMUNIKATU", () => {
   assert.doesNotMatch(p, /Tajne-Haslo-123/, "wartość hasła NIE MOŻE trafić do komunikatu");
   assert.doesNotMatch(p, /konto-aplikacji/, "ani login");
   assert.doesNotMatch(p, /PODMIOT_PRODUKCJA/, "ani nazwa bazy");
+});
+
+/* ── Gdzie szukamy pliku ────────────────────────────────────────────────────
+   POWSTAŁO Z SONDY, KTÓRA MÓWIŁA „KONTO NIE JEST SPAROWANE" NA SPAROWANYM
+   KONCIE. Narzędzia z konsoli npm uruchamia w katalogu workspace'u
+   (`C:\\wertis\\server`), a `wertis.env` leży piętro wyżej — obok usług.
+   Lista kandydatów kończyła się na katalogu roboczym, więc plik nie był
+   wczytywany wcale i proces po cichu wracał do trybu demo.                  */
+
+test("kandydaci obejmują katalog roboczy I JEGO RODZICÓW", () => {
+  const byl = process.env.WERTIS_ENV_FILE;
+  delete process.env.WERTIS_ENV_FILE;
+  try {
+    const k = envFileCandidates();
+    const tu = path.join(process.cwd(), "wertis.env");
+    const pietroWyzej = path.join(path.dirname(process.cwd()), "wertis.env");
+    assert.ok(k.includes(tu), "katalog roboczy zostaje na liście");
+    assert.ok(
+      k.includes(pietroWyzej),
+      "korzeń repo widziany z server/ — tak npm uruchamia sondę i `npm run dev`"
+    );
+    assert.ok(
+      k.indexOf(tu) < k.indexOf(pietroWyzej),
+      "bliższy plik wygrywa: instalacja obok kodu nie może przegrać z katalogiem wyżej"
+    );
+  } finally {
+    if (byl !== undefined) process.env.WERTIS_ENV_FILE = byl;
+  }
+});
+
+test("WERTIS_ENV_FILE ucina szukanie — wskazana ścieżka albo nic", () => {
+  /* Jawna ścieżka jest decyzją człowieka. Gdyby po niej szło jeszcze chodzenie
+     w górę, literówka w zmiennej kończyłaby się cichym wczytaniem CZEGOŚ
+     INNEGO zamiast pustej konfiguracji, którą widać. */
+  const byl = process.env.WERTIS_ENV_FILE;
+  process.env.WERTIS_ENV_FILE = path.join("C:", "gdzie-indziej", "wertis.env");
+  try {
+    assert.deepEqual(envFileCandidates(), [process.env.WERTIS_ENV_FILE]);
+  } finally {
+    if (byl === undefined) delete process.env.WERTIS_ENV_FILE;
+    else process.env.WERTIS_ENV_FILE = byl;
+  }
+});
+
+test("chodzenie w górę zatrzymuje się na korzeniu, a nie kręci w kółko", () => {
+  const k = katalogiWGore(path.join(path.sep, "a", "b", "c"));
+  assert.equal(k[0], path.resolve(path.join(path.sep, "a", "b", "c")), "najbliższy pierwszy");
+  assert.equal(k.at(-1), path.parse(process.cwd()).root, "ostatni jest korzeń dysku");
+  assert.equal(new Set(k).size, k.length, "żaden katalog nie powtarza się na liście");
 });

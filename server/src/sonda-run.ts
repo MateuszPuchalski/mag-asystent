@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import { config } from "./config.js";
-import { stanPolaczenia } from "./services/allegro-token.js";
+import { config, envFile } from "./config.js";
+import { powodBrakuKonta, stanPolaczenia } from "./services/allegro-token.js";
 import { opiszKsztalt, raportKoncowki } from "./services/ksztalt.js";
 import {
   urlDyskusji,
@@ -79,10 +79,14 @@ async function sekcja(
 async function main(): Promise<void> {
   const stan = stanPolaczenia();
   if (stan.stan !== "polaczone") {
+    /* Powód i droga wyjścia idą z `powodBrakuKonta`: pięć stanów ma pięć
+       różnych wyjść, a jedno zdanie dla wszystkich wysyłało człowieka do
+       panelu także wtedy, gdy w panelu nie ma czego kliknąć. Nazwa stanu
+       zostaje na końcu — do zgłoszenia, nie do czytania. */
     console.error(
-      `Konto Allegro nie jest sparowane (stan: ${stan.stan}). Sonda czyta żywe ` +
-        "konto, więc bez tokenu nie ma czego oglądać — sparuj konto w panelu: " +
-        "/biuro → REJESTRY → KONTO ALLEGRO."
+      "Sonda czyta ŻYWE konto Allegro i bez połączenia nie ma czego oglądać.\n" +
+        powodBrakuKonta(stan.stan, envFile.path) +
+        `\n(stan połączenia: ${stan.stan})`
     );
     process.exitCode = 1;
     return;
