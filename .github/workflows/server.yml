@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - "server/**"
+      - "panel/**"
       - "tools/**"
       - "package.json"
       - "README.md"
@@ -26,6 +27,7 @@ on:
   pull_request:
     paths:
       - "server/**"
+      - "panel/**"
       - "tools/**"
       - "package.json"
       - "README.md"
@@ -45,7 +47,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      # repo jest npm workspace (`workspaces: ["server"]`), więc lockfile
+      # repo jest npm workspace (`workspaces: ["server","panel"]`), więc lockfile
       # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć
       - name: Instalacja zależności
         run: npm ci
@@ -55,6 +57,12 @@ jobs:
       - name: Testy jednostkowe
         working-directory: server
         run: npm test
+      # Build całego monorepo: panel (Vite) i serwer (tsconfig.build.json).
+      # Do 0.143.1 nie robił tego nikt — kontrola typów wyżej używa konfiguracji
+      # deweloperskiej, więc błąd w panelu albo w buildzie serwera wychodził
+      # dopiero przy wdrożeniu, po `git pull` na produkcji.
+      - name: Build panelu i serwera
+        run: npm run build
       # docs_check pilnuje, żeby liczby w README (ekrany, trasy, testy) nie
       # rozjechały się z kodem — bez tego dokumentacja starzeje się po cichu.
       - name: Spójność dokumentacji

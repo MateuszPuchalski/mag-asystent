@@ -33,6 +33,25 @@ historii nie przepisujemy.
 
 ---
 
+## 0.143.1 — 1 września 2026
+
+**Panel wchodzi do wspólnych poleceń.** `npm run dev` podnosi go razem z API
+i workerem, więc rozwój nie wymaga już drugiego terminala ani pamiętania nazwy
+workspace'u. `npm run build` budował go od 0.141.0 i to się nie zmienia.
+
+**CI w końcu buduje to, co idzie na produkcję.** Do tej pory żadne zadanie nie
+uruchamiało `npm run build`: kontrola typów używa konfiguracji deweloperskiej,
+a wydanie idzie z `tsconfig.build.json` i przez Vite. Błąd w panelu albo
+w buildzie serwera wychodził dopiero po `git pull` na produkcji.
+
+**Zmiana w samym panelu nie uruchamiała żadnego zadania.** Workflow serwera nie
+miał `panel/` na liście ścieżek — ta sama dziura, którą ten plik opisuje dla
+`docs/`, otwarta ponownie przy drugim froncie.
+
+**Panel traci własny numer wersji.** Miał 0.141.0, gdy reszta była na 0.143.0.
+Numer stoi w korzeniu i w `server/`, a trzecia kopia to dokładnie ten mechanizm,
+który raz już się rozjechał — opisuje to preambuła tego pliku.
+
 ## 0.143.0 — 1 września 2026
 
 **Skrzynka obsługi klienta czyta rozmowy.** Panel pod `/obsluga/skrzynka`
