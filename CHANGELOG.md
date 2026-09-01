@@ -122,6 +122,66 @@ rozmowy i zwroty tego samego sprzedawcy wylądowałyby na dwóch kontach.
 zwrotów startuje tylko przy sparowanym koncie Allegro w trybie `http`, a
 domyślne wartości `ALLEGRO_ZWROTY_SYNC_MS`, `ALLEGRO_ZWROTY_DNI_WSTECZ`
 i `ZWROT_TERMIN_DNI` działają bez wpisu w `wertis.env`.
+## 0.149.2 — 1 września 2026
+
+**Jeden zepsuty wątek przestaje zatrzymywać całą skrzynkę.**
+
+Z dziennika produkcji, w kółko przez wiele przebiegów:
+
+    [allegro-inbox] przebieg nieudany: Provided value cannot be bound to
+    SQLite parameter 3.
+
+Trzeci parametr wstawki wątku to `lastMessageDate`. Allegro przysłało wątek bez
+tego pola, a `node:sqlite` nie umie związać `undefined`. Cała partia szła jedną
+transakcją, więc wycofanie zabrało ze sobą wszystkie zdrowe wątki z tego samego
+przebiegu — skrzynka stała, choć zepsuty był jeden wątek.
+
+Projekt panelu żądał czegoś innego od początku: §9 mówi, że synchronizator
+„izoluje błąd pojedynczego wątku". Teraz każdy wątek ma własną transakcję.
+Zepsuty zostaje poza skrzynką, jego identyfikator idzie do dziennika, a przebieg
+leci dalej i domyka się normalnie.
+
+Kursor przestaje móc stanąć na wątku, którego nie zapisaliśmy. To osobna,
+cichsza usterka tej samej sytuacji: §8.3 zabrania przesuwać kursor „po
+niepełnym zapisie", a stary kod brał go z pierwszego wątku strony, nie pytając,
+czy ten wątek w ogóle wszedł. Kursor stojący na pominiętym wątku zabrałby ze
+sobą całą historię za nim.
+
+`error_thread_count` dostaje wreszcie pisarza. Kolumna i wiersz „Wątki z błędem"
+w panelu istnieją od 0.147.0 i do dziś pokazywały zero także wtedy, gdy skrzynka
+gubiła wątki. Licznik stoi osobno od `error_count`, bo liczy co innego: przebieg
+z pominiętym wątkiem domknął się i nie jest porażką przebiegu.
+
+Czego to wydanie **nie** rozstrzyga: czy wątek bez daty ma prawo wejść do
+skrzynki z pustą datą, czy słusznie zostaje odrzucony. To mówi specyfikacja
+Allegro, której wciąż nie mamy — `developer.allegro.pl` jest niedostępny z
+maszyny budującej, a `docs/allegro-ksztalt.md` nosi z tego powodu znaczniki
+`[WERYFIKUJ]`. Do czasu odczytu kontraktu taki wątek jest odrzucany, czyli
+zachowuje się tak jak dotąd; zmienia się wyłącznie to, że nie zabiera reszty
+przebiegu ze sobą. Zgadywanie predykatu byłoby drugą pamięcią wpisaną w kod.
+
+Wdrożenie: nic ręką. Sama aktualizacja usług.
+
+## 0.149.1 — 1 września 2026
+
+**Przycisk SYNCHRONIZUJ TERAZ przestaje zwracać „Bad Request".** Klient HTTP
+panelu obsługi wysyłał nagłówek `content-type: application/json` przy każdym
+żądaniu, także tym bez ciała. Domyślny parser Fastify odrzuca taką parę, więc
+jedyne wywołanie bez ciała — ręczna synchronizacja skrzynki — kończyło się
+kodem 400.
+
+To jest przycisk z banera awarii, czyli ten, który ma pomóc, gdy synchronizacja
+stoi. Nie działał dokładnie wtedy, gdy ktoś go naciskał.
+
+**To była blizna kupiona drugi raz.** Panel magazynu naprawił dokładnie to samo
+i nosi przy swojej funkcji `api()` zdanie „Kusi, żeby to uprościć z powrotem do
+jednego obiektu. Nie upraszczaj". Kolektor zna tę regułę osobno i wysyła puste
+ciało bez nagłówka typu. Panel obsługi był jedynym klientem, który jej nie znał.
+
+Strażnik tamtej reguły czyta źródło `biuro.html` wyrażeniem regularnym, bo tego
+pliku nie da się zaimportować — i dlatego nie miał jak objąć drugiego frontu.
+Panel dostaje własnego, sprawdzającego zachowanie zamiast tekstu. `CLAUDE.md`
+mówi teraz wprost, że dokładając front, dokłada się też jego strażnika.
 
 ## 0.149.0 — 1 września 2026
 
