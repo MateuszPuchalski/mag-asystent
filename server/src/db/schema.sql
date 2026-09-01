@@ -538,6 +538,40 @@ CREATE TABLE IF NOT EXISTS allegro_token (
   polaczono_przez TEXT NOT NULL
 );
 
+-- Surowy read-model Centrum wiadomości. Kolumny są wyłącznie polami
+-- potwierdzonymi przez docs/allegro-ksztalt.md; JSON zachowuje dowód źródłowy.
+CREATE TABLE IF NOT EXISTS allegro_inbox_thread (
+  id TEXT PRIMARY KEY,
+  read INTEGER NOT NULL,
+  last_message_at TEXT NOT NULL,
+  interlocutor_login TEXT NOT NULL,
+  surowe_json TEXT NOT NULL,
+  synced_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS allegro_inbox_message (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES allegro_inbox_thread(id) ON DELETE CASCADE,
+  author_login TEXT NOT NULL,
+  author_role TEXT NOT NULL,
+  text TEXT NOT NULL,
+  related_object_type TEXT,
+  related_object_id TEXT,
+  read INTEGER NOT NULL,
+  surowe_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_allegro_inbox_message_thread
+  ON allegro_inbox_message(thread_id);
+
+-- Osobny, pojedynczy model stanu synchronizatora (nie stan tokena).
+CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  cursor_at TEXT,
+  cursor_id TEXT,
+  last_success_at TEXT,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT
+);
+
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
 -- Kosz zastępuje papierową kartkę wożoną z towarem: biuro przypina zwroty do
 -- kosza skanem jego kodu, zamyka go, a magazynier na kolektorze rozkłada
@@ -657,4 +691,3 @@ CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
   at     TEXT NOT NULL,
   przez  TEXT NOT NULL
 );
-
