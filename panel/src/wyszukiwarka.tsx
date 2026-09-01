@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
+import { api } from "./api/klient";
 
 /* Agent nie wpisuje `tw_id` z pamięci — wskazuje towar (projekt panelu §13.2).
    Techniczny identyfikator bazy nie jest wiedzą, którą ktokolwiek nosi w
@@ -8,11 +9,10 @@ import { Search, X } from "lucide-react";
 export interface Towar { id: number; sym: string; name: string; locs: string[] }
 
 export function Wyszukiwarka(
-  { wybrany, onWybierz, etykieta = "Towar z Subiekta", api }: {
+  { wybrany, onWybierz, etykieta = "Towar z Subiekta" }: {
     wybrany: Towar | null;
     onWybierz: (t: Towar | null) => void;
     etykieta?: string;
-    api: (p: string, i?: RequestInit) => Promise<any>;
   },
 ) {
   const [q, setQ] = useState("");
@@ -28,7 +28,8 @@ export function Wyszukiwarka(
     const t = setTimeout(async () => {
       setSzuka(true);
       try {
-        const d = await api(`/api/products/search?q=${encodeURIComponent(fraza)}`);
+        const d = await api<{ results?: Towar[]; przyblizone?: boolean }>(
+          `/api/products/search?q=${encodeURIComponent(fraza)}`);
         setWyniki(d.results ?? []);
         setPrzyblizone(Boolean(d.przyblizone));
       } catch { setWyniki([]); } finally { setSzuka(false); }

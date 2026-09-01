@@ -50,6 +50,11 @@ jobs:
       # repo jest npm workspace (`workspaces: ["server","panel"]`), więc lockfile
       # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć
       - name: Instalacja zależności
+        # Przeglądarek Playwrighta CI nie pobiera: testy end-to-end biegną na
+        # razie lokalnie, a `npm ci` bez tej zmiennej ściągałby kilkaset
+        # megabajtów przy każdym przebiegu, żeby ich nie użyć.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: npm ci
       - name: Kontrola typów
         working-directory: server
@@ -57,6 +62,10 @@ jobs:
       - name: Testy jednostkowe
         working-directory: server
         run: npm test
+      # Testy frontu (Vitest + Testing Library). Do 0.146.0 panel nie miał ich
+      # wcale, więc błąd w nim wychodził dopiero na ekranie u kogoś w biurze.
+      - name: Testy panelu obsługi
+        run: npm -w @wertis/panel-obslugi run test
       # Build całego monorepo: panel (Vite) i serwer (tsconfig.build.json).
       # Do 0.143.1 nie robił tego nikt — kontrola typów wyżej używa konfiguracji
       # deweloperskiej, więc błąd w panelu albo w buildzie serwera wychodził

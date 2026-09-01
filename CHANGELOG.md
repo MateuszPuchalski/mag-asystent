@@ -33,6 +33,45 @@ historii nie przepisujemy.
 
 ---
 
+## 0.146.0 — 1 września 2026
+
+**[wymaga działania]** Panel obsługi ma nowe zależności, więc po `git pull`
+trzeba `npm ci`, a nie samo `npm run build`.
+
+**Rozmowa ma własny adres.** `/obsluga/skrzynka/4821` otwiera tę rozmowę,
+przetrwa odświeżenie strony i da się wkleić koledze. Do tej pory panel
+zapisywał numer rozmowy w adresie i nigdy go stamtąd nie odczytywał, więc
+odświeżenie wracało do pustego ekranu.
+
+**Panel przestaje być trzema plikami.** `main.tsx` trzymał całą aplikację
+w trzynastu linijkach, razem z logowaniem, ekranem zadań i nagłówkiem.
+Teraz stoi tam sam router, a reszta mieszka w `api/`, `ui/`, `ekrany/`
+i `skrzynka/`. Kolejne ekrany mają dokładać pliki, a nie puchnąć te same.
+
+**Wspólny cache zapytań zastępuje odświeżanie co piętnaście sekund.** Lista
+zadań odpytywała serwer zegarem, a skrzynka przeładowywała się w całości przy
+każdym zdarzeniu. Teraz zdarzenie unieważnia dokładnie ten fragment, którego
+dotyczy.
+
+**Szyna zdarzeń łączy się ponownie po zerwaniu.** Wcześniej zerwany strumień
+zostawiał ekran, który wyglądał na żywy i milczał do końca zmiany. Odczekiwanie
+rośnie dwukrotnie do pół minuty, żeby padnięty serwer nie dostał pętli żądań.
+
+**Formularze mają walidację w jednym miejscu.** Logowanie i zadanie dla
+magazynu sprawdzają dane schematem, a nie warunkami wpisanymi przy wysyłce.
+
+**Front dostaje testy — pierwsze w historii panelu.** Dziewięć testów Vitest
+pilnuje kolejki i rozdziału trzech odpowiedzi serwera: wygasłej sesji,
+konfliktu wersji i zwykłego błędu. Dwa testy Playwrighta sprawdzają, że
+adresy ekranów prowadzą do panelu. Testy Vitest wchodzą do CI.
+
+**Serwer przestaje wypisywać ścieżki ekranów z ręki.** Stały tam dwie sztuki
+i każdy nowy ekran dawał 404 po odświeżeniu, dopóki ktoś nie dopisał go
+w kodzie serwera.
+
+**Tokeny makiet wchodzą do konfiguracji Tailwinda.** Barwy statusów rozmowy,
+rangi wierszy stanu i tła wpisów osi mają jedno źródło.
+
 ## 0.145.1 — 1 września 2026
 
 **Przejęcie rozmowy przestaje zapisywać się w ciszy.** Przejęcie, zapis szkicu
