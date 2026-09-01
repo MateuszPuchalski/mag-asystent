@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #f1f5f9; font-family: Barlow, 'Helvetica Neue', Arial, sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
+    a { color: #b45309; text-decoration: none; } a:hover { color: #92400e; }
+    button { font-family: inherit; cursor: pointer; }
+    p { margin: 0; } h2, h3 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="width: 900px; height: 880px; display: flex; flex-direction: column; gap: 14px; padding: 18px; background: #f1f5f9; overflow: hidden">
+
+  <!-- ══ WYŚCIG O PRZEJĘCIE (§6.2) ══ -->
+  <section style="border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+    <header style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e5e7eb">
+      <b style="font-size: 14px">Kupujący 51200871</b>
+      <span style="padding: 3px 8px; border-radius: 5px; background: #fef3c7; font-size: 11px; font-weight: 700; color: #78350f">waiting_for_internal</span>
+      <span style="margin-left: auto; font-size: 11.5px; color: #64748b">rozmowa #4818</span>
+    </header>
+
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #f8fafc; border-bottom: 1px solid #e5e7eb">
+      <div style="display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; background: #e2e8f0; color: #334155">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="min-width: 0">
+        <h2 style="font-size: 14.5px">Nie udało się przejąć — rozmowę prowadzi M. Wójcik</h2>
+        <p style="margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: #475569">Przejęcie jest atomowe: zapisze się jedno. M. Wójcik był o sekundę wcześniej, więc Twoje żądanie zostało odrzucone, zanim cokolwiek zmieniło.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px 16px">
+      <sc-for list="{{ szczegoly }}" as="s" hint-placeholder-count="3">
+        <div style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc">
+          <p style="font-size: 10.5px; color: #64748b">{{ s.nazwa }}</p>
+          <p style="margin-top: 3px; font-size: 13px; font-weight: 700">{{ s.wartosc }}</p>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 9px; padding: 0 16px 14px 16px">
+      <button style="padding: 8px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700">Otwórz do czytania</button>
+      <button style="padding: 8px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700">Poproś M. Wójcika o przekazanie</button>
+      <button style="{{ wymus.styl }}" onClick="{{ wymus.klik }}">{{ wymus.etykieta }}</button>
+    </div>
+
+    <sc-if value="{{ wymus.otwarte }}" hint-placeholder-val="{{ true }}">
+      <div style="margin: 0 16px 16px 16px; padding: 13px 14px; border: 1px dashed #fbbf24; border-radius: 10px; background: #fffbeb">
+        <p style="font-size: 12px; font-weight: 700; color: #78350f">Wymuszone przekazanie wymaga powodu</p>
+        <p style="margin-top: 4px; font-size: 11.5px; line-height: 1.45; color: #78350f">Powód trafia do dziennika razem z autorem, czasem, wersją rozmowy przed i po oraz identyfikatorem żądania. Bez powodu operacja nie przejdzie.</p>
+        <div style="margin-top: 9px; padding: 10px 11px; border: 1px solid #fde68a; border-radius: 8px; background: #ffffff">
+          <p style="font-size: 12.5px; color: #94a3b8">Np. „M. Wójcik na urlopie od dziś, klient czeka po terminie”</p>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 10px">
+          <button style="margin-left: auto; padding: 8px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700" onClick="{{ wymus.klik }}">Anuluj</button>
+          <button style="padding: 8px 14px; border: 0; border-radius: 8px; background: #2A2A2C; font-size: 12px; font-weight: 700; color: #ffffff">WYMUŚ I ZAPISZ POWÓD</button>
+        </div>
+      </div>
+    </sc-if>
+  </section>
+
+  <!-- ══ JAWNY BRAK POWIĄZANIA Z OFERTĄ ══ -->
+  <section style="flex: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+    <header style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e5e7eb">
+      <b style="font-size: 14px">Kupujący 39811245</b>
+      <span style="padding: 3px 8px; border-radius: 5px; background: #fef3c7; font-size: 11px; font-weight: 700; color: #78350f">new</span>
+      <span style="margin-left: auto; font-size: 11.5px; color: #64748b">rozmowa #4815</span>
+    </header>
+
+    <p style="display: flex; align-items: center; gap: 9px; padding: 10px 16px; border-bottom: 1px solid #fecaca; background: #fef2f2; font-size: 12.5px; color: #7f1d1d">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+      <b>Brak powiązania z ofertą.</b> Ekran mówi to wprost, zamiast podstawiać ofertę zgadniętą z treści.
+    </p>
+
+    <div style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb">
+      <p style="font-size: 11.5px; color: #b45309">Klient · Allegro · 04:29</p>
+      <p style="margin-top: 5px; font-size: 13px; line-height: 1.5">Czy jest jeszcze dostępna linka rozrusznika do Stiga SP386?</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px">
+      <div style="padding: 11px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #64748b">CZEGO PANEL NIE ZROBI</p>
+        <p style="margin-top: 6px; font-size: 11.5px; line-height: 1.5; color: #475569">Nie dobierze towaru z najdłuższych słów w treści. Tak wygrywały kiedyś „zdemontowanym” i „Pozdrawiam”, a „szarpaku” wypadało przez limit fraz.</p>
+      </div>
+      <div style="padding: 11px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #ffffff">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #64748b">CO MOŻE ZROBIĆ AGENT</p>
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px">
+          <button style="padding: 7px 11px; border: 1px solid #cbd5e1; border-radius: 7px; background: #ffffff; font-size: 11.5px; font-weight: 700; text-align: left">Wskaż ofertę ręcznie</button>
+          <button style="padding: 7px 11px; border: 1px solid #cbd5e1; border-radius: 7px; background: #ffffff; font-size: 11.5px; font-weight: 700; text-align: left">Wskaż kartotekę wyszukiwarką</button>
+          <button style="padding: 7px 11px; border: 1px solid #cbd5e1; border-radius: 7px; background: #ffffff; font-size: 11.5px; font-weight: 700; text-align: left">Dopytaj klienta o numer oferty</button>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top: auto; padding: 11px 16px; border-top: 1px solid #e5e7eb; background: #f8fafc; font-size: 11px; color: #64748b">
+      Wskazanie ręczne zapisuje się jako wybór agenta. Zadanie dla hali odróżni je od kartoteki wywiedzionej z oferty (§13.2).
+    </p>
+  </section>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#F7A600","options":["#F7A600","#2A2A2C","#0F766E","#B45309"],"section":"Marka"}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { wymus: false };
+  }
+
+  renderVals() {
+    const w = this.state.wymus;
+    return {
+      accent: this.props.accent ?? "#F7A600",
+      szczegoly: [
+        { nazwa: "Właściciel", wartosc: "M. Wójcik" },
+        { nazwa: "Przejęcie o", wartosc: "09:47:12" },
+        { nazwa: "Wersja rozmowy", wartosc: "12 · Twoje żądanie niosło 11" }
+      ],
+      wymus: {
+        otwarte: w,
+        etykieta: w ? "ANULUJ WYMUSZENIE" : "WYMUŚ PRZEKAZANIE",
+        klik: () => this.setState({ wymus: !w }),
+        styl: "margin-left: auto; padding: 8px 13px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1px solid " + (w ? "#fbbf24" : "#e2e8f0") + "; background: " + (w ? "#fffbeb" : "#f8fafc") + "; color: " + (w ? "#78350f" : "#64748b")
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

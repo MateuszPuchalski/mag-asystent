@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #f1f5f9; font-family: Barlow, 'Helvetica Neue', Arial, sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
+    a { color: #b45309; text-decoration: none; } a:hover { color: #92400e; }
+    button { font-family: inherit; cursor: pointer; }
+    p { margin: 0; } h2, h3 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="width: 1040px; height: 1060px; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden">
+
+  <header style="display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: #2A2A2C; color: #ffffff">
+    <div>
+      <h2 style="font-size: 16px">Dobór części</h2>
+      <p style="margin-top: 2px; font-size: 12px; color: #94a3b8">rozmowa #4821 · Kupujący 44300444 · oferta 14892374512</p>
+    </div>
+    <span style="padding: 4px 9px; border-radius: 5px; background: #fef3c7; font-size: 11px; font-weight: 700; color: #78350f">candidates_found</span>
+    <span style="margin-left: auto; font-size: 12px; color: #cbd5e1">Dobór jest osobnym bytem od rozmowy i od zadania (§6.1)</span>
+  </header>
+
+  <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px 0 20px; overflow: hidden">
+
+    <!-- ══ DANE WEJŚCIOWE (§11.1) ══ -->
+    <section style="border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05)">
+      <header style="display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #e5e7eb">
+        <b style="font-size: 13.5px">Rozpoznane dane wejściowe</b>
+        <span style="font-size: 11px; color: #64748b">propozycja Copilota — każdą wartość agent może poprawić</span>
+        <span style="margin-left: auto; padding: 2px 7px; border-radius: 4px; background: #fee2e2; font-size: 10.5px; font-weight: 700; color: #b91c1c">2 braki</span>
+      </header>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 12px 14px">
+        <sc-for list="{{ wejscie }}" as="d" hint-placeholder-count="8">
+          <div style="{{ d.styl }}">
+            <p style="font-size: 10.5px; color: #64748b">{{ d.nazwa }}</p>
+            <p style="{{ d.stylWartosc }}">{{ d.wartosc }}</p>
+            <p style="margin-top: 3px; font-size: 10px; color: #94a3b8">{{ d.zrodlo }}</p>
+          </div>
+        </sc-for>
+      </div>
+      <p style="display: flex; align-items: center; gap: 8px; margin: 0 14px 12px 14px; padding: 8px 10px; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; font-size: 11.5px; color: #7f1d1d">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        Pełny numer seryjny rozstrzyga między dwoma wariantami szarpaka. Bez niego dobór zostaje w stanie <b style="font-weight: 700">missing_information</b>.
+        <button style="margin-left: auto; padding: 5px 10px; border: 1px solid #fca5a5; border-radius: 6px; background: #ffffff; font-size: 11px; font-weight: 700; color: #b91c1c">Wstaw pytanie doprecyzowujące</button>
+      </p>
+    </section>
+
+    <!-- ══ KANDYDACI (§11.2) ══ -->
+    <section style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px">
+
+      <div style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+        <header style="display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #e5e7eb">
+          <b style="font-size: 13.5px">Kandydaci</b>
+          <span style="font-size: 11px; color: #64748b">kolejność wyszukiwania: symbol → EAN → OEM → zastosowanie → zamiennik → parametry → pełny tekst → semantyka</span>
+        </header>
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow: hidden">
+          <sc-for list="{{ kandydaci }}" as="k" hint-placeholder-count="4">
+            <button style="{{ k.styl }}" onClick="{{ k.pick }}">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span style="display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: #f1f5f9; font-size: 10.5px; font-weight: 700; color: #475569">{{ k.nr }}</span>
+                <b style="font-size: 13px">{{ k.symbol }}</b>
+                <span style="{{ k.pewnoscStyl }}">{{ k.pewnosc }}</span>
+                <span style="margin-left: auto; font-size: 11px; color: #64748b">{{ k.stan }}</span>
+              </div>
+              <p style="margin-top: 5px; font-size: 12px; color: #334155">{{ k.nazwa }}</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px">
+                <span style="padding: 2px 7px; border-radius: 4px; background: #f1f5f9; font-size: 10px; font-weight: 600; color: #475569">droga: {{ k.droga }}</span>
+                <span style="padding: 2px 7px; border-radius: 4px; background: #f1f5f9; font-size: 10px; font-weight: 600; color: #475569">{{ k.zgodnosc }}</span>
+              </div>
+              <sc-if value="{{ k.ostrzezenie }}" hint-placeholder-val="{{ true }}">
+                <p style="display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 8px; border: 1px dashed #fbbf24; border-radius: 6px; background: #fffbeb; font-size: 11px; color: #78350f">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                  {{ k.ostrzezenie }}
+                </p>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- panel dowodów wybranego kandydata -->
+      <aside style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+        <header style="padding: 11px 14px; border-bottom: 1px solid #e5e7eb">
+          <b style="font-size: 13.5px">Dowody dla {{ wybrany.symbol }}</b>
+          <p style="margin-top: 2px; font-size: 11px; color: #64748b">{{ wybrany.podpis }}</p>
+        </header>
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow: hidden">
+          <sc-for list="{{ wybrany.dowody }}" as="d" hint-placeholder-count="3">
+            <div style="{{ d.styl }}">
+              <div style="display: flex; align-items: center; gap: 6px">
+                <span style="{{ d.rangaStyl }}">{{ d.ranga }}</span>
+                <span style="margin-left: auto; font-size: 10px; color: #94a3b8">{{ d.data }}</span>
+              </div>
+              <p style="margin-top: 5px; font-size: 11.5px; line-height: 1.45">{{ d.tresc }}</p>
+              <p style="margin-top: 4px; font-size: 10.5px; color: #64748b">{{ d.zrodlo }}</p>
+            </div>
+          </sc-for>
+          <p style="margin-top: auto; font-size: 10.5px; line-height: 1.45; color: #64748b">Poziom pewności bierze się z najsłabszego dowodu, nie z najmocniejszego (§11.3).</p>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ══ NEGATYWNE DOPASOWANIA (§11.4) ══ -->
+    <section style="border: 1px solid #fecaca; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05)">
+      <header style="display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #fee2e2; background: #fef2f2; border-radius: 12px 12px 0 0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <b style="font-size: 13.5px; color: #7f1d1d">Negatywne dopasowania</b>
+        <span style="font-size: 11px; color: #7f1d1d">to jest ostrzeżenie, nie brak danych — i nie usuwa go automat (§14.2)</span>
+      </header>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 14px">
+        <sc-for list="{{ negatywne }}" as="n" hint-placeholder-count="3">
+          <div style="padding: 10px; border: 1px solid #e2e8f0; border-left: 3px solid #b91c1c; border-radius: 8px">
+            <b style="font-size: 12px">{{ n.symbol }}</b>
+            <p style="margin-top: 4px; font-size: 11.5px; line-height: 1.4; color: #334155">{{ n.powod }}</p>
+            <p style="margin-top: 5px; font-size: 10.5px; color: #64748b">{{ n.zrodlo }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <footer style="display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #ffffff">
+    <span style="font-size: 11.5px; color: #64748b">Wybrano: <b style="color: #0f172a">{{ wybrany.symbol }}</b> · {{ wybrany.pewnosc }}</span>
+    <button style="margin-left: auto; padding: 8px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700">Zleć pomiar hali</button>
+    <button style="padding: 8px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700">Wstaw do szkicu ze źródłem</button>
+    <span style="display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 8px; background: #e2e8f0; font-size: 12px; font-weight: 700; color: #94a3b8">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      ZATWIERDŹ ZASTOSOWANIE — tylko ekspert
+    </span>
+  </footer>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#F7A600","options":["#F7A600","#2A2A2C","#0F766E","#B45309"],"section":"Marka"}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { wybrany: "SZR-148/82" };
+  }
+
+  dane() {
+    return [
+      { symbol: "SZR-148/82", nr: "1", nazwa: "Szarpak kompletny 148/82, zaczep dwuramienny", stan: "5 dostępnych",
+        droga: "potwierdzone zastosowanie", zgodnosc: "rozstaw i średnica zgodne", pewnosc: "potwierdzone", ranga: "ok", ostrzezenie: "",
+        podpis: "potwierdzone przez producenta i pomiar własny",
+        dowody: [
+          { ranga: "producent", data: "katalog 2021", tresc: "Szarpak 148/82 jest częścią zamienną do NAC LS 46-450 od rocznika 2018.", zrodlo: "Katalog NAC 2021, s. 34 · zatwierdził T. Bąk", ok: true },
+          { ranga: "pomiar własny", data: "01.09.2026", tresc: "Rozstaw otworów 148 mm, średnica koła 82 mm, zaczep dwuramienny.", zrodlo: "Zadanie #312 · M. Kowal · czeka na zatwierdzenie jako wiedza", ok: false },
+          { ranga: "sprzedaż i weryfikacja", data: "14.06.2024", tresc: "Ten sam klient kupił tę część do tej samej maszyny i potwierdził dopasowanie.", zrodlo: "Rozmowa #3140 · zamówienie 2024/06/1183", ok: true }
+        ] },
+      { symbol: "SZR-148/76", nr: "6", nazwa: "Szarpak kompletny 148/76, koło mniejsze", stan: "12 dostępnych",
+        droga: "zgodne parametry", zgodnosc: "rozstaw zgodny, średnica −6 mm", pewnosc: "prawdopodobne", ranga: "moze", ostrzezenie: "",
+        podpis: "prawdopodobne — brak dowodu zastosowania",
+        dowody: [
+          { ranga: "parametry", data: "kartoteka", tresc: "Rozstaw 148 mm zgodny; średnica koła 76 mm zamiast 82 mm.", zrodlo: "Subiekt GT · tw_id 40318", ok: false },
+          { ranga: "brak dowodu", data: "—", tresc: "Żaden katalog ani pomiar nie wiąże tej części z LS 46-450.", zrodlo: "baza wiedzy: brak wpisu Fitment", ok: false }
+        ] },
+      { symbol: "OEM 118550127/0", nr: "3", nazwa: "Numer OEM podany przez producenta silnika", stan: "brak w kartotece",
+        droga: "numer OEM", zgodnosc: "identyfikator, nie towar", pewnosc: "wymaga danych", ranga: "moze", ostrzezenie: "",
+        podpis: "identyfikator bez wiersza w kartotece",
+        dowody: [
+          { ranga: "identyfikator", data: "dokumentacja", tresc: "OEM 118550127/0 występuje w dokumentacji silnika 1P70FV.", zrodlo: "PartIdentifier · dokumentacja producenta", ok: true },
+          { ranga: "brak towaru", data: "—", tresc: "Ten numer nie ma odpowiednika w kartotece Subiekta. Zamówienie u dostawcy nie jest jeszcze złożone.", zrodlo: "Subiekt GT · brak dopasowania", ok: false }
+        ] },
+      { symbol: "SZR-152/82", nr: "8", nazwa: "Szarpak 152/82 do kosiarek spalinowych 46 cm", stan: "3 dostępne",
+        droga: "wyszukiwanie semantyczne", zgodnosc: "podobny opis", pewnosc: "nie jest dowodem", ranga: "sem",
+        ostrzezenie: "Wynik semantyczny nie jest dowodem kompatybilności — potrzebny pomiar albo katalog.",
+        podpis: "trafienie z podobieństwa opisu",
+        dowody: [
+          { ranga: "semantyka", data: "wyszukiwanie", tresc: "Opis towaru jest podobny do treści pytania klienta. Podobieństwo opisu nie mówi nic o rozstawie.", zrodlo: "wyszukiwanie semantyczne · próg 0,81", ok: false }
+        ] }
+    ];
+  }
+
+  renderVals() {
+    const s = this.state;
+    const akcent = this.props.accent ?? "#F7A600";
+
+    const barwy = {
+      ok:   { tlo: "#d1fae5", tekst: "#065f46", ramka: "#047857" },
+      moze: { tlo: "#fef3c7", tekst: "#78350f", ramka: "#f59e0b" },
+      sem:  { tlo: "#f1f5f9", tekst: "#475569", ramka: "#94a3b8" }
+    };
+
+    const kandydaci = this.dane().map((k) => {
+      const wyb = k.symbol === s.wybrany;
+      const b = barwy[k.ranga];
+      return Object.assign({}, k, {
+        pick: () => this.setState({ wybrany: k.symbol }),
+        styl: "display: block; width: 100%; padding: 11px 13px; text-align: left; border: 1px solid " + (wyb ? akcent : "#e2e8f0") + "; border-left: 3px solid " + b.ramka + "; border-radius: 10px; background: " + (wyb ? "#fffbeb" : "#ffffff"),
+        pewnoscStyl: "padding: 1px 7px; border-radius: 4px; background: " + b.tlo + "; font-size: 10px; font-weight: 700; color: " + b.tekst
+      });
+    });
+
+    const wyb = this.dane().find((k) => k.symbol === s.wybrany) || this.dane()[0];
+    const wybrany = Object.assign({}, wyb, {
+      dowody: wyb.dowody.map((d) => ({
+        ranga: d.ranga, data: d.data, tresc: d.tresc, zrodlo: d.zrodlo,
+        rangaStyl: "padding: 1px 7px; border-radius: 4px; background: " + (d.ok ? "#d1fae5" : "#fef3c7") + "; font-size: 10px; font-weight: 700; color: " + (d.ok ? "#065f46" : "#78350f"),
+        styl: "padding: 10px; border: " + (d.ok ? "1px solid #e2e8f0" : "1px dashed #fbbf24") + "; border-radius: 8px; background: " + (d.ok ? "#ffffff" : "#fffbeb")
+      }))
+    });
+
+    const pole = (nazwa, wartosc, zrodlo, brak) => ({
+      nazwa: nazwa, wartosc: wartosc, zrodlo: zrodlo,
+      styl: "padding: 9px 10px; border: " + (brak ? "1px dashed #fca5a5" : "1px solid #e2e8f0") + "; border-radius: 8px; background: " + (brak ? "#fef2f2" : "#f8fafc"),
+      stylWartosc: "margin-top: 2px; font-size: 12.5px; font-weight: 700; color: " + (brak ? "#b91c1c" : "#0f172a")
+    });
+
+    return {
+      accent: akcent,
+      kandydaci: kandydaci,
+      wybrany: wybrany,
+      wejscie: [
+        pole("Marka", "NAC", "z pytania klienta"),
+        pole("Model urządzenia", "LS 46-450", "z pytania klienta"),
+        pole("Rocznik", "2019", "z dopisku klienta 09:38"),
+        pole("Numer seryjny", "LS19… niepełny", "urwany w treści", true),
+        pole("Kod silnika", "1P70FV", "z tabliczki, treść klienta"),
+        pole("Nazwa części", "szarpak (linka rozrusznika)", "propozycja Copilota"),
+        pole("Rozstaw otworów", "148 mm", "pomiar #312, hala"),
+        pole("Wariant obudowy", "nieustalony", "dwa warianty w roczniku", true)
+      ],
+      negatywne: [
+        { symbol: "SZR-140/82", powod: "Nie pasuje: rozstaw 140 mm zamiast 148 mm, mimo identycznej średnicy koła.", zrodlo: "pomiar własny · 01.09.2026 · M. Kowal" },
+        { symbol: "SZR-148/82-L", powod: "Pasuje tylko do wariantu z obudową lewostronną — mylące oznaczenie u dostawcy.", zrodlo: "zatwierdził T. Bąk · 12.03.2026" },
+        { symbol: "SZ-UNIWERSALNY-46", powod: "Właściwa średnica przy innym sposobie mocowania — wymaga dodatkowego pomiaru przed sprzedażą.", zrodlo: "reklamacja 2025/04/221 · zwrot z błędnego dopasowania" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

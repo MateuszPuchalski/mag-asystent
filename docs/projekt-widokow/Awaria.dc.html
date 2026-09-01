@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #f1f5f9; font-family: Barlow, 'Helvetica Neue', Arial, sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
+    a { color: #b45309; text-decoration: none; } a:hover { color: #92400e; }
+    button { font-family: inherit; cursor: pointer; }
+    p { margin: 0; } h2 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="width: 900px; height: 680px; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden">
+
+  <header style="display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: #2A2A2C; color: #ffffff">
+    <div style="display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: {{accent}}; color: #2A2A2C">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><rect x="6" y="10" width="12" height="12"/></svg>
+    </div>
+    <b style="font-size: 15px; margin-right: auto">WERTIS · Skrzynka</b>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; background: rgba(239,68,68,0.18); font-size: 12px; font-weight: 600; color: #fecaca">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444"></span>
+      Synchronizacja stanęła 07:05
+    </div>
+  </header>
+
+  <!-- ══ TRWAŁY ALARM (§21) ══ -->
+  <div style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 18px; background: #fef2f2; border-bottom: 1px solid #fecaca">
+    <div style="display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border-radius: 8px; background: #fee2e2; color: #b91c1c">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    </div>
+    <div style="min-width: 0">
+      <h2 style="font-size: 14.5px; color: #7f1d1d">Synchronizacja Allegro nie powiodła się przez trzy planowane przebiegi</h2>
+      <p style="margin-top: 3px; font-size: 12.5px; color: #7f1d1d">Allegro odpowiada <b>429</b> i prosi o przerwę. Panel pokazuje dane sprzed 2 g 36 min — nowe pytania klientów mogą już czekać, a ich tu nie widać.</p>
+    </div>
+    <button style="{{ przycisk.styl }}" onClick="{{ przycisk.klik }}">{{ przycisk.etykieta }}</button>
+  </div>
+
+  <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; padding: 14px 18px; overflow: hidden">
+
+    <!-- lista z jawnie oznaczoną nieświeżością -->
+    <section style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+      <header style="display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #e5e7eb">
+        <b style="font-size: 13.5px; margin-right: auto">Kolejka</b>
+        <span style="padding: 2px 8px; border-radius: 4px; background: #fee2e2; font-size: 10.5px; font-weight: 700; color: #b91c1c">STAN Z 07:05</span>
+      </header>
+      <p style="padding: 8px 14px; border-bottom: 1px solid #e5e7eb; background: #fef2f2; font-size: 11.5px; color: #7f1d1d">
+        Pusta kolejka o 09:41 znaczy co innego, gdy synchronizator stanął o 07:05. Ekran nie ma prawa milczeć o tej różnicy.
+      </p>
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden">
+        <sc-for list="{{ rozmowy }}" as="r" hint-placeholder-count="3">
+          <div style="padding: 11px 14px; border-bottom: 1px solid #e5e7eb; opacity: 0.62">
+            <div style="display: flex; align-items: center; gap: 6px">
+              <b style="font-size: 13px">{{ r.klient }}</b>
+              <span style="margin-left: auto; font-size: 11px; color: #94a3b8">{{ r.at }}</span>
+            </div>
+            <p style="margin-top: 4px; font-size: 12px; color: #475569">{{ r.fragment }}</p>
+          </div>
+        </sc-for>
+        <p style="padding: 14px; font-size: 12px; color: #94a3b8; text-align: center">dalsze wiersze mogą istnieć w Allegro i nie zostały jeszcze pobrane</p>
+      </div>
+    </section>
+
+    <!-- /api/health -->
+    <aside style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+      <header style="padding: 11px 14px; border-bottom: 1px solid #e5e7eb">
+        <b style="font-size: 13.5px">Stan integracji</b>
+        <p style="margin-top: 2px; font-size: 11px; color: #64748b">/api/health · odczyt 09:41</p>
+      </header>
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden">
+        <sc-for list="{{ zdrowie }}" as="z" hint-placeholder-count="8">
+          <div style="display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; border-bottom: 1px solid #f1f5f9">
+            <span style="flex: 1; font-size: 11.5px; color: #64748b">{{ z.nazwa }}</span>
+            <span style="{{ z.styl }}">{{ z.wartosc }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding: 11px 14px; border-top: 1px solid #e5e7eb; background: #f8fafc">
+        <p style="font-size: 11px; line-height: 1.45; color: #64748b">Respektujemy <b>Retry-After</b>. Ręczna synchronizacja nie omija tej przerwy — skraca tylko czekanie po jej końcu.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#F7A600","options":["#F7A600","#2A2A2C","#0F766E","#B45309"],"section":"Marka"}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { proba: false };
+  }
+
+  renderVals() {
+    const p = this.state.proba;
+    const akcent = this.props.accent ?? "#F7A600";
+    const wiersz = (nazwa, wartosc, ranga) => ({
+      nazwa: nazwa, wartosc: wartosc,
+      styl: "font-size: 11.5px; font-weight: 700; color: " + ({ zle: "#b91c1c", uwaga: "#92400e", ok: "#047857", nic: "#334155" })[ranga]
+    });
+    return {
+      accent: akcent,
+      przycisk: {
+        etykieta: p ? "PRÓBA W TOKU…" : "SYNCHRONIZUJ TERAZ",
+        klik: () => this.setState({ proba: !p }),
+        styl: "margin-left: auto; flex: 0 0 auto; padding: 9px 15px; border: 0; border-radius: 8px; font-size: 12.5px; font-weight: 700; background: " + (p ? "#e2e8f0" : "#2A2A2C") + "; color: " + (p ? "#64748b" : "#ffffff")
+      },
+      rozmowy: [
+        { klient: "Kupujący 44300444", at: "07:12", fragment: "Dzień dobry, czy ten szarpak pasuje do kosiarki NAC LS 46-450?" },
+        { klient: "Kupujący 51200871", at: "wczoraj", fragment: "Zamówiłem gaźnik, przyszedł z innym rozstawem śrub…" },
+        { klient: "Kupujący 39811245", at: "04:29", fragment: "Czy jest jeszcze dostępna linka rozrusznika do Stiga SP386?" }
+      ],
+      zdrowie: [
+        wiersz("Połączenie Allegro", "rate_limited", "zle"),
+        wiersz("Ostatnia próba", "09:38 · 429", "zle"),
+        wiersz("Ostatni sukces", "07:05", "uwaga"),
+        wiersz("Wiek lokalnych danych", "2 g 36 min", "uwaga"),
+        wiersz("Następna próba", "10:12 (Retry-After 900 s)", "nic"),
+        wiersz("Wątki z błędem", "2", "uwaga"),
+        wiersz("Rozmowy oczekujące", "14", "nic"),
+        wiersz("Zadania terenowe", "3 · najstarsze 1 g 12 min", "nic"),
+        wiersz("Kolejka wysyłek", "wysyłka wyłączona", "nic"),
+        wiersz("Subiekt GT", "odczyt 09:31", "ok"),
+        wiersz("Copilot", "gotowy", "ok")
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
