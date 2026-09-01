@@ -282,6 +282,8 @@ export const config = {
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://api.allegro.pl.allegrosandbox.pl"
         : "https://api.allegro.pl"),
+    /** Takt synchronizacji Centrum wiadomości; 0 wyłącza ticker. */
+    inboxSyncMs: num(process.env.ALLEGRO_INBOX_SYNC_MS, 60_000, "ALLEGRO_INBOX_SYNC_MS"),
   },
 
   /**

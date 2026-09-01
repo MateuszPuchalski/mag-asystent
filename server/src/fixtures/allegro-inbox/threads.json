@@ -1,0 +1,11 @@
+{
+  "threads": [
+    {
+      "id": "thread-anon-001",
+      "read": false,
+      "lastMessageDate": "2026-08-30T12:00:00.000Z",
+      "interlocutor": { "login": "buyer-anon-001" }
+    }
+  ],
+  "totalCount": 1
+}

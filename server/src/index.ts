@@ -44,6 +44,10 @@ import { statystykiWlasnych } from "./services/zdjecia-wlasne.js";
 import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
 import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
+import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js";
+import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
+import { uruchomTakt } from "./services/takt.js";
+import { allegroTryb } from "./adapters/allegro.js";
 
 /**
  * Złożenie aplikacji BEZ nasłuchiwania.
@@ -147,6 +151,7 @@ export async function buildApp() {
          publiczna i to jest w porządku: payload to stan/środowisko/data
          wygaśnięcia — bez loginu konta i bez tokenów. */
       allegro: stanPolaczenia(),
+      allegroInbox: stanSynchronizacjiHealth(db()),
       /* Pole addytywne — kolektor go nie deserializuje (Dtos.kt ignoruje
          nieznane pola), więc stare APK nie mają czego zepsuć. */
       ...(sfera ? { sfera: { zyje: sfera.zyje, mode: sfera.sgtMode, widziany: sfera.widziany } } : {}),
@@ -234,10 +239,11 @@ async function main() {
     }, config.mssql.syncMs);
   }
 
-  /* Tickerów obsługi klienta nie ma od 0.140.0 — razem z całą obsługą.
-     Zostaje `importFromMssql` wyżej: to jedyna pętla tła, jakiej potrzebuje
-     magazyn. Nowa obsługa klienta powstaje od zera i sama zdecyduje, czy
-     w ogóle chce pracy w tle. */
+  /* Wyłącznie punkt wejścia uruchamia pracę w tle: import buildApp w testach
+     ani narzędzia administracyjne nie mogą zacząć odpytywać Allegro. */
+  if (config.allegro.clientId && allegroTryb() === "http") {
+    uruchomTakt("allegro-inbox", config.allegro.inboxSyncMs, synchronizujAllegroInbox);
+  }
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

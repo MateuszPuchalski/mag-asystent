@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "id": "message-anon-001",
+      "author": { "login": "buyer-anon-001", "role": "BUYER" },
+      "text": "Zanonimizowana treść wiadomości.",
+      "relatedObject": { "type": "OFFER", "id": "offer-anon-001" },
+      "attachments": [],
+      "read": false
+    }
+  ]
+}
