@@ -1,0 +1,532 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #f1f5f9; font-family: Barlow, 'Helvetica Neue', Arial, sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
+    a { color: #b45309; text-decoration: none; } a:hover { color: #92400e; }
+    button { font-family: inherit; cursor: pointer; }
+    p { margin: 0; } h1, h2, h3 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 1080px; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden">
+
+  <header style="display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #2A2A2C; color: #ffffff; border-bottom: 1px solid #e2e8f0">
+    <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 8px; background: {{accent}}; color: #2A2A2C">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><rect x="6" y="10" width="12" height="12"/></svg>
+    </div>
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-right: auto">
+      <b style="font-size: 17px; letter-spacing: 0.02em">WERTIS</b>
+      <span style="font-size: 13px; color: #94a3b8">Obsługa klienta</span>
+    </div>
+    <nav style="display: flex; gap: 4px; padding: 4px; border-radius: 8px; background: rgba(255,255,255,0.10)">
+      <span style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #cbd5e1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+        Zadania
+      </span>
+      <span style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; background: {{accent}}; color: #2A2A2C">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        Skrzynka
+      </span>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; background: rgba(255,255,255,0.08); font-size: 12px; color: #cbd5e1">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #34d399"></span>
+      Synchronizacja 09:41 · 0 błędów
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; padding-left: 4px; font-size: 13px; font-weight: 600">
+      <span style="display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #475569; font-size: 12px">AL</span>
+      A. Lewandowska
+    </div>
+  </header>
+
+  <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr) 400px; gap: 16px; padding: 20px">
+
+    <!-- ══ KOLEJKA ══ -->
+    <section style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+      <header style="display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #e5e7eb">
+        <b style="margin-right: auto; font-size: 14px">Kolejka</b>
+        <button style="display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #64748b">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </header>
+      <div style="display: flex; gap: 4px; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; background: #f8fafc">
+        <sc-for list="{{ filtry }}" as="f" hint-placeholder-count="4">
+          <button style="{{ f.styl }}" onClick="{{ f.pick }}">{{ f.etykieta }}</button>
+        </sc-for>
+      </div>
+      <p style="padding: 7px 14px; border-bottom: 1px solid #e5e7eb; background: #f8fafc; font-size: 11px; color: #64748b">
+        Ostatnia synchronizacja: 01.09.2026, 09:41
+      </p>
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden">
+        <sc-for list="{{ kolejka }}" as="r" hint-placeholder-count="4">
+          <button style="{{ r.styl }}" onClick="{{ r.pick }}">
+            <div style="display: flex; align-items: center; gap: 6px">
+              <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: #b45309">{{ r.kanal }}</span>
+              <span style="margin-left: auto; font-size: 11px; color: {{ r.czasKolor }}">{{ r.czeka }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px">
+              <b style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ r.klient }}</b>
+              <sc-if value="{{ r.nowe }}" hint-placeholder-val="{{ true }}">
+                <span style="padding: 1px 5px; border-radius: 4px; background: #fde68a; font-size: 10px; font-weight: 700; color: #78350f">{{ r.noweEtykieta }}</span>
+              </sc-if>
+              <sc-if value="{{ r.pilne }}" hint-placeholder-val="{{ true }}">
+                <span style="padding: 1px 5px; border-radius: 4px; background: #fee2e2; font-size: 10px; font-weight: 700; color: #b91c1c">PILNE</span>
+              </sc-if>
+            </div>
+            <p style="margin-top: 4px; font-size: 12px; line-height: 1.35; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{ r.fragment }}</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px">
+              <span style="{{ r.ofertaStyl }}">{{ r.oferta }}</span>
+              <span style="{{ r.doborStyl }}">{{ r.dobor }}</span>
+              <sc-if value="{{ r.zadanie }}" hint-placeholder-val="{{ true }}">
+                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 4px; background: #f1f5f9; font-size: 10px; font-weight: 600; color: #475569">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 8.7 8.7 21.3a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4L15.3 2.7a1 1 0 0 1 1.4 0l4.6 4.6a1 1 0 0 1 0 1.4Z"/><path d="m7.5 10.5 2 2"/><path d="m10.5 7.5 2 2"/><path d="m13.5 4.5 2 2"/></svg>
+                  {{ r.zadanie }}
+                </span>
+              </sc-if>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 11px; color: #94a3b8">
+              <span>{{ r.wlasciciel }}</span>
+              <span style="margin-left: auto; color: {{ r.terminKolor }}">{{ r.termin }}</span>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- ══ ROZMOWA ══ -->
+    <section style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+      <header style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e5e7eb">
+        <div style="min-width: 0; margin-right: auto">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <b style="font-size: 15px">{{ akt.klient }}</b>
+            <span style="padding: 2px 7px; border-radius: 4px; border: 1px dashed #cbd5e1; font-size: 10px; font-weight: 600; color: #64748b; white-space: nowrap">login zamaskowany</span>
+          </div>
+          <p style="margin-top: 2px; font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ akt.temat }}</p>
+        </div>
+        <span style="{{ akt.statusStyl }}">{{ akt.status }}</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 8px; background: #ecfdf5; font-size: 12px; font-weight: 600; color: #047857; white-space: nowrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg>
+          Twoja rozmowa
+        </span>
+        <button style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700; color: #0f172a">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          ODŁÓŻ
+        </button>
+        <button style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12px; font-weight: 700; color: #0f172a">ZAKOŃCZ</button>
+      </header>
+
+      <p style="display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-bottom: 1px solid #e5e7eb; background: #f8fafc; font-size: 11px; color: #64748b">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #34d399"></span>
+        M. Wójcik ogląda tę rozmowę · T. Bąk pisze komentarz…
+        <span style="margin-left: auto; font-style: italic">obecność jest stanem chwilowym, nie statusem rozmowy</span>
+      </p>
+
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px; overflow: hidden">
+        <sc-for list="{{ akt.os }}" as="w" hint-placeholder-count="5">
+
+          <sc-if value="{{ w.szyna }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 0 4px">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1"></span>
+              <span style="font-size: 11.5px; color: #64748b">{{ w.tresc }}</span>
+              <span style="flex: 1; height: 1px; background: #f1f5f9"></span>
+              <span style="font-size: 11px; color: #94a3b8">{{ w.at }}</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ w.karta }}" hint-placeholder-val="{{ true }}">
+            <article style="{{ w.styl }}">
+              <div style="display: flex; align-items: center; gap: 6px">
+                <sc-if value="{{ w.ikonaKlient }}" hint-placeholder-val="{{ true }}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </sc-if>
+                <sc-if value="{{ w.ikonaKomentarz }}" hint-placeholder-val="{{ true }}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </sc-if>
+                <sc-if value="{{ w.ikonaWynik }}" hint-placeholder-val="{{ true }}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 8.7 8.7 21.3a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4L15.3 2.7a1 1 0 0 1 1.4 0l4.6 4.6a1 1 0 0 1 0 1.4Z"/><path d="m7.5 10.5 2 2"/><path d="m10.5 7.5 2 2"/><path d="m13.5 4.5 2 2"/></svg>
+                </sc-if>
+                <sc-if value="{{ w.ikonaFirma }}" hint-placeholder-val="{{ true }}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                </sc-if>
+                <b style="{{ w.etykietaStyl }}">{{ w.etykieta }}</b>
+                <span style="font-size: 11px; color: #94a3b8">· {{ w.autor }}</span>
+                <span style="margin-left: auto; font-size: 11px; color: #94a3b8">{{ w.at }}</span>
+              </div>
+              <sc-if value="{{ w.oferta }}" hint-placeholder-val="{{ true }}">
+                <span style="display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 7px; border-radius: 4px; background: #fffbeb; border: 1px solid #fde68a; font-size: 10.5px; font-weight: 600; color: #92400e">{{ w.oferta }}</span>
+              </sc-if>
+              <p style="margin-top: 6px; font-size: 13px; line-height: 1.5; color: #1e293b; white-space: pre-line">{{ w.tresc }}</p>
+              <sc-if value="{{ w.akcja }}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; gap: 6px; margin-top: 9px">
+                  <button style="{{ w.akcjaStyl }}">{{ w.akcja }}</button>
+                  <sc-if value="{{ w.akcja2 }}" hint-placeholder-val="{{ true }}">
+                    <button style="padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; font-size: 11.5px; font-weight: 700; color: #0f172a">{{ w.akcja2 }}</button>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </article>
+          </sc-if>
+
+        </sc-for>
+      </div>
+
+      <!-- ══ EDYTOR (§10.4) ══ -->
+      <div style="{{ edytor.styl }}">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <div style="display: flex; gap: 4px; padding: 3px; border-radius: 8px; background: #e2e8f0">
+            <button style="{{ edytor.stylOdpowiedz }}" onClick="{{ edytor.pickOdpowiedz }}">Odpowiedź do klienta</button>
+            <button style="{{ edytor.stylKomentarz }}" onClick="{{ edytor.pickKomentarz }}">Komentarz wewnętrzny</button>
+          </div>
+          <span style="margin-left: auto; font-size: 11px; color: #64748b">{{ edytor.licznik }}</span>
+          <a href="#" style="font-size: 11px; font-weight: 600">historia wersji (4)</a>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px">
+          <sc-for list="{{ edytor.narzedzia }}" as="n" hint-placeholder-count="4">
+            <span style="padding: 4px 9px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; font-size: 11px; font-weight: 600; color: #334155">{{ n.etykieta }}</span>
+          </sc-for>
+        </div>
+
+        <div style="{{ edytor.polaStyl }}">
+          <p style="font-size: 12.5px; line-height: 1.55; color: #1e293b; white-space: pre-line">{{ edytor.tresc }}</p>
+        </div>
+
+        <sc-if value="{{ edytor.odpowiedz }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 7px 10px; border: 1px solid #fde68a; border-radius: 8px; background: #fffbeb">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <span style="font-size: 11.5px; color: #78350f">Jedno zdanie bez źródła — pójdzie oznaczone jako <b>przypuszczenie</b> (§14.3).</span>
+            <a href="#" style="margin-left: auto; font-size: 11.5px; font-weight: 700">pokaż</a>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px">
+            <button style="padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 12.5px; font-weight: 700; color: #0f172a">ZAPISZ SZKIC</button>
+            <span style="font-size: 11px; color: #94a3b8">szkic jest współdzielony z zespołem · zapisano 09:36</span>
+            <button style="display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding: 9px 16px; border: 0; border-radius: 8px; background: {{accent}}; font-size: 12.5px; font-weight: 700; color: #2A2A2C">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              WYŚLIJ DO KLIENTA
+            </button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ edytor.komentarz }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px">
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #78350f">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Widoczny tylko dla zespołu — nie ma drogi do klienta.
+            </span>
+            <button style="display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding: 9px 16px; border: 0; border-radius: 8px; background: #2A2A2C; font-size: 12.5px; font-weight: 700; color: #ffffff">DODAJ KOMENTARZ</button>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+
+    <!-- ══ KONTEKST ══ -->
+    <aside style="display: flex; flex-direction: column; min-height: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); overflow: hidden">
+      <div style="display: flex; gap: 2px; padding: 8px 8px 0 8px; border-bottom: 1px solid #e5e7eb">
+        <sc-for list="{{ zakladki }}" as="z" hint-placeholder-count="5">
+          <button style="{{ z.styl }}" onClick="{{ z.pick }}">{{ z.etykieta }}</button>
+        </sc-for>
+      </div>
+
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px; overflow: hidden">
+
+        <sc-if value="{{ karta.oferta }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="padding: 2px 7px; border-radius: 4px; background: #fffbeb; border: 1px solid #fde68a; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #92400e">ŹRÓDŁO: ALLEGRO</span>
+            <span style="font-size: 11px; color: #94a3b8">odświeżono 4 min temu</span>
+          </div>
+          <div style="display: flex; gap: 10px">
+            <div style="display: grid; place-items: center; width: 74px; height: 74px; flex: 0 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; color: #cbd5e1">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L3 21"/></svg>
+            </div>
+            <div style="min-width: 0">
+              <p style="font-size: 12.5px; font-weight: 600; line-height: 1.4">Szarpak / linka rozrusznika kosiarka NAC LS 46-450, silnik 1P70FV</p>
+              <p style="margin-top: 5px; font-size: 11.5px; color: #64748b">Oferta 14892374512 · AKTYWNA</p>
+              <p style="margin-top: 3px; font-size: 14px; font-weight: 700">79,00 zł</p>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc">
+            <sc-for list="{{ parametry }}" as="p" hint-placeholder-count="4">
+              <div style="display: flex; align-items: baseline; gap: 8px; font-size: 11.5px">
+                <span style="flex: 0 0 106px; color: #64748b">{{ p.nazwa }}</span>
+                <span style="{{ p.stylWartosc }}">{{ p.wartosc }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <p style="font-size: 11px; line-height: 1.45; color: #64748b">Pole puste w ofercie zostaje puste na ekranie. Panel nie uzupełnia go z kartoteki — to byłoby wymieszanie źródeł (§4.3).</p>
+        </sc-if>
+
+        <sc-if value="{{ karta.towar }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="padding: 2px 7px; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #334155">ŹRÓDŁO: SUBIEKT GT</span>
+            <span style="font-size: 11px; color: #94a3b8">odczyt 09:31</span>
+          </div>
+          <div style="padding: 10px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #ffffff">
+            <p style="font-size: 11px; color: #475569"><b>Kartotekę wskazała A. Lewandowska</b> wyszukiwarką — to wybór agenta, nie fakt potwierdzony przez Allegro (§13.2).</p>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc">
+            <sc-for list="{{ kartoteka }}" as="p" hint-placeholder-count="6">
+              <div style="display: flex; align-items: baseline; gap: 8px; font-size: 11.5px">
+                <span style="flex: 0 0 106px; color: #64748b">{{ p.nazwa }}</span>
+                <span style="{{ p.stylWartosc }}">{{ p.wartosc }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 6px">
+            <button style="flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 11.5px; font-weight: 700">Wstaw parametry do szkicu</button>
+            <button style="flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; font-size: 11.5px; font-weight: 700">Zmień kartotekę</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ karta.dobor }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="padding: 3px 8px; border-radius: 4px; background: #fef3c7; font-size: 10.5px; font-weight: 700; color: #78350f">candidates_found</span>
+            <span style="font-size: 11px; color: #94a3b8">3 kandydatów · 1 ostrzeżenie</span>
+          </div>
+          <sc-for list="{{ kandydaci }}" as="k" hint-placeholder-count="3">
+            <div style="{{ k.styl }}">
+              <div style="display: flex; align-items: center; gap: 6px">
+                <b style="font-size: 12px">{{ k.symbol }}</b>
+                <span style="{{ k.pewnoscStyl }}">{{ k.pewnosc }}</span>
+              </div>
+              <p style="margin-top: 4px; font-size: 11.5px; color: #475569">{{ k.nazwa }}</p>
+              <p style="margin-top: 4px; font-size: 10.5px; color: #64748b">droga: {{ k.droga }} · źródło: {{ k.zrodlo }}</p>
+            </div>
+          </sc-for>
+          <button style="padding: 9px 12px; border: 0; border-radius: 8px; background: #2A2A2C; font-size: 12px; font-weight: 700; color: #ffffff">OTWÓRZ PEŁNY DOBÓR</button>
+        </sc-if>
+
+        <sc-if value="{{ karta.klient }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="padding: 2px 7px; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #334155">HISTORIA U NAS</span>
+          </div>
+          <div style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc">
+            <p style="font-size: 11.5px; font-weight: 700">Maszyny klienta</p>
+            <p style="margin-top: 4px; font-size: 11.5px; color: #475569">NAC LS 46-450 (2019) · silnik 1P70FV — ustalone w rozmowie #3140, 14.06.2024</p>
+          </div>
+          <sc-for list="{{ historia }}" as="h" hint-placeholder-count="3">
+            <div style="display: flex; gap: 8px; padding: 9px 10px; border: 1px solid #e2e8f0; border-radius: 8px">
+              <span style="flex: 0 0 62px; font-size: 11px; color: #94a3b8">{{ h.data }}</span>
+              <span style="font-size: 11.5px; color: #334155">{{ h.opis }}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <sc-if value="{{ karta.wiedza }}" hint-placeholder-val="{{ true }}">
+          <p style="font-size: 11px; color: #64748b">Każde twierdzenie techniczne w szkicu wskazuje jeden z tych dowodów (§14.3).</p>
+          <sc-for list="{{ dowody }}" as="d" hint-placeholder-count="3">
+            <div style="{{ d.styl }}">
+              <div style="display: flex; align-items: center; gap: 6px">
+                <span style="{{ d.rangaStyl }}">{{ d.ranga }}</span>
+                <span style="margin-left: auto; font-size: 10.5px; color: #94a3b8">{{ d.data }}</span>
+              </div>
+              <p style="margin-top: 5px; font-size: 11.5px; line-height: 1.45; color: #1e293b">{{ d.tresc }}</p>
+              <p style="margin-top: 4px; font-size: 10.5px; color: #64748b">{{ d.zrodlo }}</p>
+            </div>
+          </sc-for>
+        </sc-if>
+
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#F7A600","options":["#F7A600","#2A2A2C","#0F766E","#B45309"],"section":"Marka"}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { wybrana: 4821, zakladka: "oferta", tryb: "odpowiedz", filtr: "moje" };
+  }
+
+  /* Kolejka i osie są danymi PRZYKŁADOWYMI: kształt wiersza pochodzi z §10.2,
+     rodzaje wpisów osi z §10.3. Numery ofert i symbole są zmyślone. */
+  rozmowy() {
+    return [
+      { id: 4821, kanal: "ALLEGRO", klient: "Kupujący 44300444", temat: "Szarpak / linka rozrusznika NAC LS 46-450 · oferta 14892374512",
+        fragment: "Dopisuję: kosiarka jest z 2019, numer seryjny zaczyna się od LS19…",
+        czeka: "czeka 2 g 29 min", nowe: "2 NOWE", pilne: false, oferta: "oferta 14892374512", dobor: "candidates_found",
+        zadanie: "pomiar wykonany", wlasciciel: "Ty", termin: "termin za 3 g 20 min", poTerminie: false,
+        status: "waiting_for_internal",
+        os: [
+          this.szyna("Rozmowa utworzona z pytania pod ofertą 14892374512", "07:12"),
+          this.karta("klient", "Kupujący 44300444", "07:12", "Dzień dobry, czy ten szarpak pasuje do kosiarki NAC LS 46-450? Silnik ma na tabliczce 1P70FV. Poprzedni pękł przy zaczepie, kupowałem go u Państwa dwa lata temu.", { oferta: "oferta 14892374512 · pole external.id z oferty, nie z e-maila" }),
+          this.szyna("Przejęcie rozmowy — A. Lewandowska", "07:20"),
+          this.karta("komentarz", "A. Lewandowska", "07:41", "@T. Bąk 1P70FV to Loncin, ale w LS 46-450 chodziły dwa warianty szarpaka. Zlecam pomiar rozstawu, zanim cokolwiek obiecamy."),
+          this.szyna("Zadanie terenowe #312 — pomiar rozstawu otworów, priorytet normalny", "08:02"),
+          this.szyna("Zadanie przejął M. Kowal (hala)", "08:19"),
+          this.karta("wynik", "M. Kowal · zadanie #312", "08:47", "Rozstaw otworów 148 mm, średnica koła 82 mm, zaczep dwuramienny. Zdjęcie tabliczki w załączniku.", { akcja: "Wstaw wynik do szkicu", akcja2: "Zapisz jako dowód zastosowania" }),
+          this.karta("klient", "Kupujący 44300444", "09:38", "Dopisuję: kosiarka jest z 2019, numer seryjny zaczyna się od LS19. Czy to coś zmienia?")
+        ] },
+      { id: 4818, kanal: "ALLEGRO", klient: "Kupujący 51200871", temat: "Gaźnik do pilarki · oferta 14771203998",
+        fragment: "Zamówiłem gaźnik, przyszedł z innym rozstawem śrub niż w oryginale…",
+        czeka: "czeka 1 d 4 g", nowe: "", pilne: true, oferta: "oferta 14771203998", dobor: "requires_expert",
+        zadanie: "weryfikacja w toku", wlasciciel: "M. Wójcik", termin: "po terminie 41 min", poTerminie: true,
+        status: "waiting_for_internal",
+        os: [
+          this.szyna("Rozmowa utworzona z Centrum Wiadomości", "31.08, 05:30"),
+          this.karta("klient", "Kupujący 51200871", "31.08, 05:30", "Zamówiłem gaźnik, przyszedł z innym rozstawem śrub niż w oryginale. Czy to na pewno ten model?", { oferta: "oferta 14771203998" }),
+          this.szyna("Przekazano ekspertowi — T. Bąk", "31.08, 11:02"),
+          this.karta("komentarz", "T. Bąk", "31.08, 11:20", "To znany przypadek: ten sam symbol dostawcy obejmuje dwa rozstawy. Potrzebny pomiar egzemplarza z półki, zanim odpowiemy.")
+        ] },
+      { id: 4815, kanal: "ALLEGRO", klient: "Kupujący 39811245", temat: "Brak powiązania z ofertą",
+        fragment: "Czy jest jeszcze dostępna linka rozrusznika do Stiga SP386?",
+        czeka: "czeka 5 g 12 min", nowe: "1 NOWA", pilne: false, oferta: "brak oferty", dobor: "missing_information",
+        zadanie: "", wlasciciel: "nieprzypisana", termin: "termin za 40 min", poTerminie: false,
+        status: "new",
+        os: [
+          this.szyna("Rozmowa utworzona z Centrum Wiadomości — bez kontekstu oferty", "04:29"),
+          this.karta("klient", "Kupujący 39811245", "04:29", "Czy jest jeszcze dostępna linka rozrusznika do Stiga SP386?"),
+          this.szyna("Copilot: brak numeru oferty — dopasowanie towaru wymaga pytania doprecyzowującego", "04:29")
+        ] },
+      { id: 4809, kanal: "ALLEGRO", klient: "Kupujący 47029330", temat: "Nóż do kosiarki 46 cm · oferta 14690012774",
+        fragment: "Dziękuję, pasuje idealnie. Pozdrawiam.",
+        czeka: "zamknięta 08:15", nowe: "", pilne: false, oferta: "oferta 14690012774", dobor: "confirmed",
+        zadanie: "", wlasciciel: "A. Lewandowska", termin: "odpowiedź w 34 min", poTerminie: false,
+        status: "resolved",
+        os: [
+          this.karta("klient", "Kupujący 47029330", "wczoraj 16:02", "Czy nóż 46 cm z tej oferty pasuje do mojej kosiarki Stiga Combi 48?", { oferta: "oferta 14690012774" }),
+          this.karta("firma", "A. Lewandowska", "wczoraj 16:36", "Dzień dobry, tak — nóż NZ-460/18 pasuje do Stiga Combi 48.\nrozstaw 18 mm — katalog Stiga 2020, s. 12\nzastosowanie — potwierdzone przez producenta"),
+          this.karta("klient", "Kupujący 47029330", "08:15", "Dziękuję, pasuje idealnie. Pozdrawiam."),
+          this.szyna("Rozmowa zakończona — A. Lewandowska", "08:15")
+        ] }
+    ];
+  }
+
+  szyna(tresc, at) { return { szyna: true, karta: false, tresc: tresc, at: at }; }
+
+  /* Cztery rodzaje kart różnią się tłem, ramką, ikoną i wcięciem, bo §10.3
+     żąda, żeby każdy rodzaj zdarzenia wyglądał inaczej — sam podpis nie
+     wystarczy, gdy oś czyta się w biegu. */
+  karta(typ, autor, at, tresc, extra) {
+    const wzor = {
+      klient:    { tlo: "#ffffff", ramka: "1px solid #e2e8f0", etykieta: "Klient · Allegro", kolor: "#b45309", wciecie: "0 40px 0 0" },
+      firma:     { tlo: "#f8fafc", ramka: "1px solid #e2e8f0", etykieta: "Odpowiedź firmy", kolor: "#475569", wciecie: "0 0 0 40px" },
+      komentarz: { tlo: "#fffbeb", ramka: "1px dashed #fbbf24", etykieta: "Komentarz wewnętrzny", kolor: "#92400e", wciecie: "0 0 0 24px" },
+      wynik:     { tlo: "#ecfdf5", ramka: "1px solid #a7f3d0", etykieta: "Wynik z magazynu", kolor: "#047857", wciecie: "0 0 0 24px" }
+    }[typ];
+    const e = extra || {};
+    return {
+      szyna: false, karta: true, autor: autor, at: at, tresc: tresc, oferta: e.oferta || "",
+      etykieta: wzor.etykieta, etykietaStyl: "font-size: 11.5px; color: " + wzor.kolor,
+      styl: "padding: 11px 13px; border: " + wzor.ramka + "; border-radius: 10px; background: " + wzor.tlo + "; margin: " + wzor.wciecie,
+      ikonaKlient: typ === "klient", ikonaFirma: typ === "firma",
+      ikonaKomentarz: typ === "komentarz", ikonaWynik: typ === "wynik",
+      akcja: e.akcja || "", akcja2: e.akcja2 || "",
+      akcjaStyl: "padding: 5px 10px; border: 0; border-radius: 6px; background: #047857; font-size: 11.5px; font-weight: 700; color: #ffffff"
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const akcent = this.props.accent ?? "#F7A600";
+    const lista = this.rozmowy();
+    const akt = lista.find((r) => r.id === s.wybrana) || lista[0];
+
+    const statusy = {
+      new: "#fef3c7|#78350f", open: "#e0f2fe|#075985",
+      waiting_for_customer: "#f1f5f9|#334155", waiting_for_internal: "#fef3c7|#78350f",
+      resolved: "#d1fae5|#065f46"
+    };
+    const [tloStatus, kolorStatus] = statusy[akt.status].split("|");
+
+    const kolejka = lista.map((r) => {
+      const wyb = r.id === s.wybrana;
+      return Object.assign({}, r, {
+        pick: () => this.setState({ wybrana: r.id }),
+        styl: "display: block; width: 100%; padding: 11px 14px; border: 0; border-bottom: 1px solid #e5e7eb; border-left: 3px solid " + (wyb ? akcent : "transparent") + "; background: " + (wyb ? "#fffbeb" : "#ffffff") + "; text-align: left",
+        czasKolor: r.poTerminie ? "#b91c1c" : "#94a3b8",
+        terminKolor: r.poTerminie ? "#b91c1c" : "#94a3b8",
+        ofertaStyl: "padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: " + (r.oferta === "brak oferty" ? "#fee2e2" : "#fffbeb") + "; color: " + (r.oferta === "brak oferty" ? "#b91c1c" : "#92400e"),
+        doborStyl: "padding: 2px 6px; border-radius: 4px; background: #f1f5f9; font-size: 10px; font-weight: 600; color: #475569",
+        noweEtykieta: r.nowe
+      });
+    });
+
+    const filtrStyl = (v) => "padding: 5px 7px; border: 0; border-radius: 6px; font-size: 10.5px; font-weight: 700; white-space: nowrap; background: " + (s.filtr === v ? "#2A2A2C" : "transparent") + "; color: " + (s.filtr === v ? "#ffffff" : "#64748b");
+    const filtry = [["nieprzypisane", "Nieprzypisane 4"], ["moje", "Moje 3"], ["oczekujace", "Oczekujące"], ["termin", "Po terminie 1"]]
+      .map(([v, etykieta]) => ({ etykieta: etykieta, styl: filtrStyl(v), pick: () => this.setState({ filtr: v }) }));
+
+    const zakladki = [["oferta", "Oferta"], ["towar", "Towar"], ["dobor", "Dobór"], ["klient", "Klient"], ["wiedza", "Wiedza"]]
+      .map(([v, etykieta]) => ({
+        etykieta: etykieta,
+        pick: () => this.setState({ zakladka: v }),
+        styl: "flex: 1; padding: 8px 4px; border: 0; border-bottom: 2px solid " + (s.zakladka === v ? akcent : "transparent") + "; background: transparent; font-size: 11.5px; font-weight: 700; color: " + (s.zakladka === v ? "#0f172a" : "#94a3b8")
+      }));
+
+    const wartosc = (v, puste) => ({ nazwa: v[0], wartosc: v[1], stylWartosc: "font-weight: 600; color: " + (puste ? "#b91c1c" : "#0f172a") });
+
+    const trybOdp = s.tryb === "odpowiedz";
+    const przyciskTryb = (aktywny) => "padding: 6px 11px; border: 0; border-radius: 6px; font-size: 11.5px; font-weight: 700; background: " + (aktywny ? "#ffffff" : "transparent") + "; color: " + (aktywny ? "#0f172a" : "#64748b");
+
+    return {
+      accent: akcent,
+      kolejka: kolejka, filtry: filtry, zakladki: zakladki,
+      akt: Object.assign({}, akt, { statusStyl: "padding: 4px 9px; border-radius: 5px; background: " + tloStatus + "; font-size: 11px; font-weight: 700; color: " + kolorStatus }),
+      karta: { oferta: s.zakladka === "oferta", towar: s.zakladka === "towar", dobor: s.zakladka === "dobor", klient: s.zakladka === "klient", wiedza: s.zakladka === "wiedza" },
+
+      parametry: [
+        wartosc(["Marka", "NAC"]), wartosc(["Rodzaj", "szarpak kompletny"]),
+        wartosc(["Kategoria", "Części do kosiarek"]), wartosc(["EAN w ofercie", "pole puste"], true)
+      ],
+      kartoteka: [
+        wartosc(["tw_id", "40312"]), wartosc(["Symbol", "SZR-148/82"]),
+        wartosc(["EAN", "5901234567890"]), wartosc(["Stan", "7 szt."]),
+        wartosc(["Rezerwacje", "2 szt."]), wartosc(["Dostępny", "5 szt."]),
+        wartosc(["Lokalizacja", "R12-B3 · magazyn główny"]), wartosc(["U dostawcy", "20 szt. na 08.09"])
+      ],
+      kandydaci: [
+        { symbol: "SZR-148/82", nazwa: "Szarpak kompletny 148/82, zaczep dwuramienny", droga: "potwierdzone zastosowanie", zrodlo: "katalog NAC 2021 + pomiar własny",
+          pewnosc: "potwierdzone", pewnoscStyl: "padding: 1px 6px; border-radius: 4px; background: #d1fae5; font-size: 10px; font-weight: 700; color: #065f46",
+          styl: "padding: 10px; border: 1px solid #a7f3d0; border-left: 3px solid #047857; border-radius: 8px; background: #ffffff" },
+        { symbol: "SZR-148/76", nazwa: "Szarpak kompletny 148/76, koło mniejsze", droga: "zgodne parametry", zrodlo: "kartoteka Subiekt",
+          pewnosc: "prawdopodobne", pewnoscStyl: "padding: 1px 6px; border-radius: 4px; background: #fef3c7; font-size: 10px; font-weight: 700; color: #78350f",
+          styl: "padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff" },
+        { symbol: "SZR-140/82", nazwa: "Szarpak 140/82 — INNY ROZSTAW", droga: "negatywne dopasowanie", zrodlo: "pomiar własny 01.09.2026",
+          pewnosc: "nie pasuje", pewnoscStyl: "padding: 1px 6px; border-radius: 4px; background: #fee2e2; font-size: 10px; font-weight: 700; color: #b91c1c",
+          styl: "padding: 10px; border: 1px solid #fecaca; border-left: 3px solid #b91c1c; border-radius: 8px; background: #fef2f2" }
+      ],
+      historia: [
+        { data: "14.06.2024", opis: "Zakup szarpaka SZR-148/82 — zamówienie 2024/06/1183" },
+        { data: "14.06.2024", opis: "Rozmowa #3140: ustalono model kosiarki i kod silnika" },
+        { data: "02.03.2023", opis: "Zakup noża NZ-460/18" }
+      ],
+      dowody: [
+        { ranga: "producent", data: "katalog 2021", tresc: "Szarpak 148/82 jest częścią zamienną do LS 46-450 od rocznika 2018.", zrodlo: "Katalog NAC 2021, s. 34 · zatwierdził T. Bąk",
+          rangaStyl: "padding: 1px 6px; border-radius: 4px; background: #d1fae5; font-size: 10px; font-weight: 700; color: #065f46",
+          styl: "padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff" },
+        { ranga: "pomiar własny", data: "01.09.2026", tresc: "Rozstaw otworów 148 mm, średnica koła 82 mm, zaczep dwuramienny.", zrodlo: "Zadanie #312 · M. Kowal · niezatwierdzone jako wiedza",
+          rangaStyl: "padding: 1px 6px; border-radius: 4px; background: #fef3c7; font-size: 10px; font-weight: 700; color: #78350f",
+          styl: "padding: 10px; border: 1px dashed #fbbf24; border-radius: 8px; background: #fffbeb" },
+        { ranga: "sprzedaż i weryfikacja", data: "14.06.2024", tresc: "Ten sam klient kupił SZR-148/82 do tej samej maszyny i potwierdził dopasowanie.", zrodlo: "Rozmowa #3140 · zamówienie 2024/06/1183",
+          rangaStyl: "padding: 1px 6px; border-radius: 4px; background: #f1f5f9; font-size: 10px; font-weight: 700; color: #334155",
+          styl: "padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff" }
+      ],
+
+      edytor: {
+        odpowiedz: trybOdp, komentarz: !trybOdp,
+        pickOdpowiedz: () => this.setState({ tryb: "odpowiedz" }),
+        pickKomentarz: () => this.setState({ tryb: "komentarz" }),
+        stylOdpowiedz: przyciskTryb(trybOdp), stylKomentarz: przyciskTryb(!trybOdp),
+        styl: "padding: 12px 16px 14px 16px; border-top: 1px solid #e5e7eb; background: " + (trybOdp ? "#ffffff" : "#fffbeb"),
+        polaStyl: "margin-top: 9px; padding: 11px 12px; min-height: 96px; border: " + (trybOdp ? "1px solid #cbd5e1" : "1px dashed #fbbf24") + "; border-radius: 8px; background: #ffffff",
+        licznik: trybOdp ? "612 znaków" : "wzmianka: @T. Bąk",
+        narzedzia: trybOdp
+          ? [{ etykieta: "Szablony" }, { etykieta: "Szkic Copilota" }, { etykieta: "Wstaw wynik #312" }, { etykieta: "Wstaw parametry towaru" }, { etykieta: "Podgląd" }]
+          : [{ etykieta: "Wzmianka @" }, { etykieta: "Wskaż zadanie" }, { etykieta: "Wskaż dowód" }, { etykieta: "Wskaż produkt" }],
+        tresc: trybOdp
+          ? "Dzień dobry,\n\ndo kosiarki NAC LS 46-450 z silnikiem 1P70FV pasuje szarpak SZR-148/82.\n• rozstaw otworów 148 mm — pomiar własny, magazyn, 01.09.2026\n• zastosowanie do LS 46-450 — katalog NAC 2021, s. 34\nWysyłka powinna wyjść jeszcze dziś."
+          : "@T. Bąk klient dopisał rocznik 2019 i numer seryjny LS19… Czy zakres numerów w katalogu obejmuje ten rocznik, czy potrzebny drugi pomiar?"
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
