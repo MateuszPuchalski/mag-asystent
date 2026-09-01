@@ -16,7 +16,7 @@ const INTERWAL = 60_000;
 const TERAZ = Date.parse("2026-09-01T09:41:00.000Z");
 const stan = (n: Partial<Parameters<typeof statusSynchronizacji>[0]> = {}) => ({
   cursorAt: null, cursorId: null, lastSuccessAt: null, lastAttemptAt: null,
-  lastErrorCode: null, errorCount: 0, errorThreadCount: 0, nextAttemptAt: null, ...n,
+  lastErrorCode: null, lastErrorText: null, errorCount: 0, errorThreadCount: 0, nextAttemptAt: null, ...n,
 });
 
 test("świeża instalacja bez ani jednej próby nie jest awarią", () => {

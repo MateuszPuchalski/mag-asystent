@@ -36,6 +36,16 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
   const i = zdrowie?.allegroInbox;
   if (!i?.alarm) return null;
 
+  /* Niesparowane konto to NIE jest awaria synchronizacji, choć wygląda tak
+     samo: przebiegi padają, licznik rośnie, baner się zapala. Różnica jest
+     w tym, co pomaga — SYNCHRONIZUJ TERAZ wywoła dokładnie ten sam błąd,
+     bo próba bez tokena nie ma jak wyjść do Allegro.
+
+     Przycisk, który na pewno nie zadziała, jest gorszy niż jego brak:
+     obiecuje naprawę i zabiera uwagę od jedynej rzeczy, która działa. */
+  const bezPolaczenia = zdrowie?.allegro?.stan === "niepolaczone"
+    || zdrowie?.allegro?.stan === "zle_srodowisko";
+
   return <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
     <div className="flex flex-wrap items-center gap-3">
       <AlertTriangle className="text-ranga-zle" size={20} />
@@ -44,14 +54,17 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
           Synchronizacja Allegro nie powiodła się przez {i.liczbaBledow} przebiegi
         </b>
         <p className="mt-1 text-sm text-red-900">
-          {POWOD[i.status] ?? "Synchronizacja nie działa."}{" "}
+          {/* Zdanie z serwera bije nasz słownik statusów: niesie POWÓD
+              i instrukcję, a status niesie tylko ocenę. */}
+          {zdrowie?.problemy?.[0] ?? i.tekstOstatniegoBledu
+            ?? POWOD[i.status] ?? "Synchronizacja nie działa."}{" "}
           Panel pokazuje dane sprzed {wiek(i.opoznienieMs)} — nowe pytania klientów mogą już
           czekać, a ich tu nie widać.
         </p>
       </div>
-      <Przycisk onClick={synchronizuj} disabled={trwa}>
+      {!bezPolaczenia && <Przycisk onClick={synchronizuj} disabled={trwa}>
         <RefreshCw size={16} />{trwa ? "PRÓBA W TOKU…" : "SYNCHRONIZUJ TERAZ"}
-      </Przycisk>
+      </Przycisk>}
     </div>
     {blad && <p className="mt-2 text-sm text-red-800">{blad}</p>}
     {/* Ręczna synchronizacja NIE omija przerwy — skraca tylko czekanie po jej

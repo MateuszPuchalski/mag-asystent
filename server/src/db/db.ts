@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
+import { odkodujEncje } from "../tekst.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -110,6 +111,11 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  /* Powód porażki SŁOWEM, nie tylko kodem HTTP (0.152.0). Przez sześćdziesiąt
+     dwa przebiegi panel mówił „failed", bo skrzynka stała na błędzie BEZ kodu
+     („Konto Allegro niepołączone — /biuro → …"). Serwer znał to zdanie
+     i pisał je do dziennika; na ekran nie trafiało nic. */
+  addColumn("allegro_inbox_sync_state", "last_error_text", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
@@ -255,6 +261,10 @@ export function migrate(database: DatabaseSync) {
   zadanieNieTrzymaTowaru(database);
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
+  /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
+     kształcie. */
+  sprzatnijSprzedGranicy(database);
+  odkodujEncjeWZastanych(database);
 }
 
 /**
@@ -776,4 +786,110 @@ export function nextMmNumber(): string {
     .prepare("UPDATE counters SET value = value + 1 WHERE name='mm' RETURNING value")
     .get() as { value: number };
   return `${row.value}/07/2026`;
+}
+
+
+/**
+ * Zastane dane sprzed granic czasu znikają (0.152.0).
+ *
+ * Właściciel wyznaczył progi: skrzynka od 1 września 2026, zwroty od 20 lipca
+ * 2026. Pierwsza synchronizacja po naprawie mapowania zdążyła wciągnąć całą
+ * historię konta, więc w bazie leży to, czego panel ma nie pokazywać.
+ *
+ * KASUJEMY, a nie ukrywamy zapytaniem. Baza, która trzyma co innego, niż widać
+ * na ekranie, to rozjazd — a rozjazd między tym, co jest, a tym, co widać,
+ * kosztował w tym repo już kilka wieczorów. Utrata jest zresztą pozorna:
+ * przesunięcie progu w `wertis.env` i ponowna synchronizacja sprowadzą te dane
+ * z powrotem z Allegro.
+ *
+ * Bieg PRZY KAŻDYM STARCIE jest celowy, mimo że wygląda na jednorazowy zabieg.
+ * Próg jest ustawieniem, więc może się przesunąć w przód — i wtedy baza ma za
+ * nim nadążyć bez ręcznego SQL-a. Gdy nic nie wystaje ponad próg, funkcja nie
+ * dotyka niczego.
+ *
+ * Audyt piszemy SUROWYM SQL-em zamiast przez `logEvent`, i to jest wymuszone
+ * warstwami: `services/events.ts` importuje ten moduł, więc odwrotny import
+ * domknąłby cykl. Ta sama zasada, dla której `odkodujEncje` mieszka
+ * w `tekst.ts`, a nie w adapterze.
+ */
+function sprzatnijSprzedGranicy(database: DatabaseSync) {
+  const audyt = (typ: string, ile: number, granica: string) => {
+    if (ile === 0) return;
+    database.prepare(
+      "INSERT INTO events(type, user_id, payload) VALUES (?,?,?)",
+    ).run(typ, "migracja", JSON.stringify({ usunieto: ile, granica }));
+  };
+
+  const inboxOd = config.allegro.inboxOd;
+  if (inboxOd) {
+    /* Kolejność ma znaczenie: `message` przed `conversation`, bo rozmowa jest
+       rodzicem. Rozmowę kasujemy tylko wtedy, gdy CAŁA jest sprzed progu —
+       granica stoi na wątku, więc rozmowa z jedną wrześniową wiadomością
+       zostaje razem ze swoim sierpniowym kontekstem. */
+    const doKasacji = `SELECT c.id FROM conversation c
+      WHERE NOT EXISTS (SELECT 1 FROM message m
+        WHERE m.conversation_id = c.id AND m.sent_at >= ?)
+        AND c.updated_at < ?`;
+    const ile = (database.prepare(
+      `SELECT count(*) n FROM (${doKasacji})`).get(inboxOd, inboxOd) as { n: number }).n;
+    if (ile > 0) {
+      transaction(database, () => {
+        database.prepare(
+          `DELETE FROM message WHERE conversation_id IN (${doKasacji})`).run(inboxOd, inboxOd);
+        database.prepare(`DELETE FROM conversation WHERE id IN (${doKasacji})`).run(inboxOd, inboxOd);
+        /* Lądowisko idzie tą samą granicą. Wątek bez daty zostaje: schemat
+           Allegro dopuszcza brak `last_message_at`, a `NULL < próg` i tak nie
+           jest prawdą w SQLite. */
+        database.prepare("DELETE FROM allegro_inbox_thread WHERE last_message_at < ?").run(inboxOd);
+      })();
+      audyt("inbox.granica.sprzatanie", ile, inboxOd);
+    }
+  }
+
+  const zwrotyOd = config.allegro.zwrotyOd;
+  if (zwrotyOd) {
+    const ile = (database.prepare(
+      "SELECT count(*) n FROM zwrot_klienta WHERE created_at < ?").get(zwrotyOd) as { n: number }).n;
+    if (ile > 0) {
+      transaction(database, () => {
+        database.prepare("DELETE FROM zwrot_klienta WHERE created_at < ?").run(zwrotyOd);
+        database.prepare("DELETE FROM allegro_zwrot WHERE created_at < ?").run(zwrotyOd);
+      })();
+      audyt("zwroty.granica.sprzatanie", ile, zwrotyOd);
+    }
+  }
+}
+
+/**
+ * Encje HTML znikają z wierszy zapisanych przed 0.152.0.
+ *
+ * Blizna 0.127.0 kupiona drugi raz: `odkodujEncje` czekała gotowa w `tekst.ts`,
+ * a mapowanie jej nie wołało, więc `kt&oacute;ry` stał na ekranie dosłownie.
+ * Poprawka w synchronizatorze naprawia tylko to, co przyjdzie od teraz — ta
+ * migracja bierze to, co już leży.
+ *
+ * Dotyka WYŁĄCZNIE modelu pracy (`message.body`, `conversation.subject`).
+ * Lądowisko `allegro_inbox_*` zostaje surowe, bo taka jest jego rola.
+ *
+ * Warunek `LIKE '%&%'` nie jest optymalizacją, tylko warunkiem POPRAWNOŚCI:
+ * bez niego funkcja przepisywałaby wszystkie wiersze przy każdym starcie, a na
+ * tekście już odkodowanym drugi przebieg mógłby zjeść znak `&`, który należał
+ * do treści.
+ */
+function odkodujEncjeWZastanych(database: DatabaseSync) {
+  const napraw = (tabela: string, kolumna: string) => {
+    const wiersze = database.prepare(
+      `SELECT id, ${kolumna} AS v FROM ${tabela} WHERE ${kolumna} LIKE '%&%'`,
+    ).all() as Array<{ id: number; v: string }>;
+    const zmiany = wiersze
+      .map((w) => ({ id: w.id, v: odkodujEncje(w.v) }))
+      .filter((w, i) => w.v !== wiersze[i].v);
+    if (zmiany.length === 0) return;
+    transaction(database, () => {
+      const upd = database.prepare(`UPDATE ${tabela} SET ${kolumna}=? WHERE id=?`);
+      for (const z of zmiany) upd.run(z.v, z.id);
+    })();
+  };
+  napraw("message", "body");
+  napraw("conversation", "subject");
 }

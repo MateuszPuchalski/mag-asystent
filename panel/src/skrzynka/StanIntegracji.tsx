@@ -15,6 +15,13 @@ const RANGA_STATUSU: Record<string, Ranga> = {
   authentication_error: "zle", failed: "zle",
 };
 
+/* Stan POŁĄCZENIA to nie stan synchronizacji, choć oba bywają czerwone naraz.
+   `niepolaczone` woła admina do parowania, `failed` — do dziennika. */
+const RANGA_POLACZENIA: Record<string, Ranga> = {
+  polaczone: "ok", dev: "nic", wylaczone: "uwaga",
+  niepolaczone: "zle", zle_srodowisko: "zle",
+};
+
 /** Panel „Stan integracji" z §21 — trzynaście rzeczy, które ma raportować health. */
 export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefined; odczyt: number | null }) {
   if (!zdrowie) return null;
@@ -22,10 +29,22 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
   const o = zdrowie.obsluga;
 
   const wiersze: Array<[string, string, Ranga]> = [
-    ["Połączenie Allegro", i.status, RANGA_STATUSU[i.status] ?? "nic"],
+    /* DWA OSOBNE WIERSZE, i to jest poprawka z 0.152.0. Do niej etykieta
+       „Połączenie Allegro" niosła `allegroInbox.status`, czyli stan
+       SYNCHRONIZACJI — ekran nazywał rzecz, której nie pokazywał. Niesparowane
+       konto wyglądało wtedy jak awaria synchronizacji i właściciel szukał
+       przyczyny w dzienniku usługi zamiast na ekranie. */
+    ["Połączenie Allegro", zdrowie.allegro?.stan ?? "nieznany",
+      RANGA_POLACZENIA[zdrowie.allegro?.stan ?? ""] ?? "nic"],
+    ["Synchronizacja", i.status, RANGA_STATUSU[i.status] ?? "nic"],
     ["Ostatnia próba", i.ostatniaProba
       ? `${czas(i.ostatniaProba)}${i.kodOstatniegoBledu ? ` · ${i.kodOstatniegoBledu}` : ""}`
       : "nie było", i.kodOstatniegoBledu ? "zle" : "nic"],
+    /* Zdanie o powodzie dochodzi TYLKO wtedy, gdy jest. Pusty wiersz „Ostatni
+       błąd: —" przy zdrowej skrzynce byłby szumem na stałe. */
+    ...(i.tekstOstatniegoBledu
+      ? [["Ostatni błąd", i.tekstOstatniegoBledu, "zle"] as [string, string, Ranga]]
+      : []),
     ["Ostatni sukces", czas(i.ostatniaUdanaSynchronizacja), i.ostatniaUdanaSynchronizacja ? "nic" : "uwaga"],
     ["Wiek lokalnych danych", wiek(i.opoznienieMs), i.alarm ? "uwaga" : "nic"],
     ["Następna próba", czas(i.nastepnaProba), "nic"],
