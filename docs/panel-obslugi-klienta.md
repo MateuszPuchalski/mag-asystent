@@ -612,7 +612,7 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 |---|---|---|
 | DO DECYZJI | przyjąć czy odrzucić? | `P` `O` `J` |
 | DO OCENY | co z towarem? | `S` `C` `U` |
-| DO ZWROTU | ile oddać? | `Enter` `B` `K` |
+| DO ZWROTU | ile oddać? | zaznaczenie + `Enter` |
 | DO KOREKTY | zlecić korektę? | `Enter` `R` |
 | ODRZUCONE, ZAMKNIĘTE | — | tylko wgląd |
 
@@ -627,6 +627,16 @@ z poprzedniego kubełka — i trzeba by dokliknąć wiersz.
 
 Wiersz przyjeżdża z policzoną propozycją kwoty, więc typowy zwrot to jeden
 klawisz. Liczy ją serwer, panel niczego nie zgaduje.
+
+**Kwota powstaje z ZAZNACZENIA (0.156.0).** Operator odhacza pozycje i koszt
+dostawy, suma rośnie na oczach, a jedno kliknięcie ją zapisuje. Trzy warianty
+z pierwszej wersji projektu — pełna, bez wysyłki, inna — zostały ETYKIETĄ
+wyliczaną z zaznaczenia, a nie pozycją w menu.
+
+Do serwera idzie samo zaznaczenie. Suma na ekranie jest podglądem: gdyby panel
+wysyłał gotową liczbę, dałoby się oddać dowolną kwotę żądaniem z pominięciem
+ekranu. Koszt dostawy bierze się z zamówienia — dociągamy je od 0.152.0
+i dopiero to zdjęło blokadę opisaną wcześniej przy `sumaPozycji`.
 
 Sygnały są trzy: termin ustawowy blisko, towar jeszcze nie wrócił, sprawa
 rozstrzygnięta już w panelu Allegro. Czwarty z projektu — rozjazd liczby
@@ -779,7 +789,11 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
-| Werdykt, kwota, ocena, korekta | **projekt** | kolumny stoją, zapisu nie ma |
+| Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |
+| Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`przecena`/`utylizacja` |
+| Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |
+| Korekta i zamknięcie zwrotu | **projekt** | kolumny stoją, zapisu nie ma |
+| Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |
 | Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |

@@ -840,8 +840,14 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   werdykt_at TEXT, werdykt_przez TEXT,
   werdykt_user_id INTEGER REFERENCES app_user(user_id),
   werdykt_powod TEXT,
+  -- `kwota_wariant` jest ETYKIETĄ tego, co zaznaczono, a nie wyborem z menu:
+  -- operator odhacza pozycje i dostawę, a wariant wylicza się z zaznaczenia
+  -- (wszystko z dostawą = pełna, wszystko bez = bez_wysylki, reszta = inna).
   kwota_wariant TEXT CHECK (kwota_wariant IN ('pelna','bez_wysylki','inna')),
   kwota_grosze INTEGER,
+  -- Ile z kwoty to DOSTAWA. Osobno od sumy, bo bez tego nie da się odtworzyć,
+  -- czy operator ją oddał, czy tylko pozycje wyszły akurat na tyle samo.
+  kwota_dostawa_grosze INTEGER,
   kwota_at TEXT, kwota_przez TEXT,
   korekta_queue_id INTEGER REFERENCES sfera_queue(id),
   korekta_numer TEXT,
@@ -877,6 +883,10 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   url TEXT,
   ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
   ocena_at TEXT, ocena_przez TEXT,
+  -- Czy ta pozycja weszła do zwracanej kwoty. Zaznaczenie trzeba zapamiętać,
+  -- bo sama suma nie mówi, KTÓRE pozycje operator oddał — a przy sporze
+  -- z klientem to jest właśnie pytanie.
+  w_zwrocie INTEGER NOT NULL DEFAULT 0,
   -- Klucz naturalny pozycji: `offer_id|nazwa`, wyliczany w kodzie. Kolumna
   -- istnieje, bo SQLite traktuje NULL-e w UNIQUE jako RÓŻNE — a `offer_id`
   -- bywa puste, więc `UNIQUE (zwrot_id, offer_id, nazwa)` przepuszczałoby

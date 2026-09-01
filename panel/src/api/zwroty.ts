@@ -66,3 +66,48 @@ export function useDociagnijZamowienia() {
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
+
+/* ── Decyzje biura (0.156.0) ─────────────────────────────────────────────────
+   Trzy mutacje domykają trzy pierwsze kubełki. Każda niesie WERSJĘ zwrotu,
+   bo dwóch agentów nie ma prawa zamknąć jednego zwrotu dwiema kwotami —
+   ten sam wzorzec, co przy przejmowaniu rozmowy. Konflikt wraca kodem 409
+   i typem `Konflikt`, więc ekran rysuje „ktoś zdążył pierwszy", a nie błąd. */
+
+export function useWerdykt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; decyzja: "przyjety" | "odrzucony"; powod: string | null; wersja: number }) =>
+      api<{ werdykt: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/werdykt`,
+        { method: "POST", body: JSON.stringify({ decyzja: v.decyzja, powod: v.powod, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+export function useOcena() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; ocena: "stan" | "przecena" | "utylizacja"; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,
+        { method: "POST", body: JSON.stringify({ ocena: v.ocena, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
+ * Zapis kwoty — wysyła ZAZNACZENIE, nigdy liczby.
+ *
+ * §25a.3: „Liczy ją serwer, panel niczego nie zgaduje". Suma na ekranie jest
+ * podglądem; gdyby panel przysyłał gotową kwotę, dałoby się oddać dowolną
+ * sumę żądaniem z pominięciem ekranu.
+ */
+export function useKwota() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; pozycjeIds: number[]; dostawa: boolean; wersja: number }) =>
+      api<{ kwotaGrosze: number; dostawaGrosze: number; wariant: string; wersja: number }>(
+        `/api/obsluga/zwroty/${v.id}/kwota`,
+        { method: "POST", body: JSON.stringify({
+          pozycjeIds: v.pozycjeIds, dostawa: v.dostawa, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}

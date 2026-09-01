@@ -4,8 +4,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow,
-  sumaPozycji, sygnalyZwrotu, terminZwrotu,
+  dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
+  rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKwote,
 } from "./zwroty.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
@@ -245,4 +245,138 @@ test("zwrot niesie odnośniki, a brak numeru nie robi linku donikąd", () => {
   assert.match(z.zamowienie!.link!, /ord-1$/);
   assert.equal(z.pozycje[0].url, "https://allegro.pl/oferta/sekator-111",
     "adres oferty to jedyny link opisany w specyfikacji");
+});
+
+/* ── Decyzje biura: werdykt, ocena, kwota (0.156.0) ──────────────────────────
+   Do tego wydania kolejka bramek była DEKORACJĄ. `kubelekZwrotu` routuje po
+   czterech kolumnach — `werdykt`, `ocena` pozycji, `kwota_grosze`,
+   `korekta_numer` — a żadnej z nich nic nie zapisywało. Każdy zwrot stał więc
+   w DO DECYZJI na zawsze, chyba że ktoś odrzucił go w panelu Allegro.
+
+   Ocena wchodzi razem z werdyktem i kwotą nie z rozpędu, tylko dlatego, że bez
+   niej nic nie przechodzi z DO OCENY do DO ZWROTU — łańcucha nie dałoby się
+   sprawdzić od początku do końca. */
+
+let licznikZwrotow = 0;
+
+function zwrotDoDecyzji(d: Db) {
+  /* Konto i numery muszą być UNIKALNE przy każdym wywołaniu: jeden z testów
+     stawia dwa zwroty obok siebie, żeby sprawdzić, że zaznaczenie nie sięga
+     cudzych pozycji. */
+  const n = ++licznikZwrotow;
+  d.prepare(`INSERT INTO channel_account(channel,external_account_id)
+    VALUES ('allegro',?) ON CONFLICT DO NOTHING`).run(`k-${n}`);
+  const konto = Number((d.prepare(
+    "SELECT id FROM channel_account WHERE channel='allegro' AND external_account_id=?")
+    .get(`k-${n}`) as { id: number }).id);
+  const id = Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id,external_id,order_id,created_at,synced_at)
+    VALUES (?,?,?,?,?)`).run(konto, `z-${n}`, `ord-${n}`,
+      "2026-09-01T08:00:00Z", "2026-09-01T08:00:00Z").lastInsertRowid);
+  const poz = [1, 2].map((i) => Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,klucz,offer_id,nazwa,ilosc,cena_grosze,waluta)
+    VALUES (?,?,?,?,?,?,?)`).run(id, `of-${n}-${i}`, `of-${n}-${i}`, `Część ${i}`, 1, 5000 * i, "PLN")
+    .lastInsertRowid));
+  return { konto, id, poz };
+}
+
+/* Konto MUSI istnieć: `werdykt_user_id` ma klucz obcy do `app_user`, a audyt
+   wskazuje na nie przez `user_ref`. Test z wymyślonym identyfikatorem
+   sprawdzałby bazę bez kluczy, czyli nie tę, na której chodzi serwer. */
+function biuro(d: Db) {
+  const id = Number(d.prepare(
+    "INSERT INTO app_user(name,role) VALUES ('Biuro','biuro')").run().lastInsertRowid);
+  return { id, name: "Biuro" };
+}
+
+test("przyjęcie zwrotu przesuwa go z DO DECYZJI do DO OCENY", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id } = zwrotDoDecyzji(d);
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "decyzja");
+
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "ocena");
+});
+
+test("odrzucenie wymaga powodu — bez niego nie zapisuje niczego", () => {
+  /* §25a.5: odmowa jest nieodwracalna, więc musi nieść uzasadnienie. Zwrot
+     odrzucony bez powodu nie da się później obronić przed klientem. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id } = zwrotDoDecyzji(d);
+
+  assert.throws(() => rozstrzygnijZwrot(d, id, "odrzucony", "  ", 1, KTO), /powod|powód/i);
+  assert.equal((d.prepare("SELECT werdykt FROM zwrot_klienta WHERE id=?")
+    .get(id) as { werdykt: string | null }).werdykt, null);
+});
+
+test("ocena pozycji przesuwa zwrot dopiero, gdy ocenione są WSZYSTKIE", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "ocena",
+    "jedna oceniona pozycja z dwóch to wciąż DO OCENY");
+
+  ocenPozycje(d, poz[1], "utylizacja", 3, KTO);
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "zwrot");
+});
+
+test("kwotę liczy SERWER z zaznaczenia, nie panel", () => {
+  /* §25a.3: „Liczy ją serwer, panel niczego nie zgaduje". Panel przysyła
+     ZAZNACZENIE, nie liczbę — inaczej dałoby się zapisać dowolną kwotę
+     żądaniem z pominięciem ekranu. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+
+  const wynik = zapiszKwote(d, id, { pozycjeIds: [poz[0]], dostawa: false }, 4, KTO);
+  assert.equal(wynik.kwotaGrosze, 5000, "sama pierwsza pozycja");
+
+  const obie = zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 5, KTO);
+  assert.equal(obie.kwotaGrosze, 15000, "obie pozycje");
+});
+
+test("zaznaczenie obcej pozycji odpada, zamiast po cichu podnieść kwotę", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotDoDecyzji(d);
+  const b = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, a.id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  ocenPozycje(d, a.poz[1], "stan", 3, KTO);
+
+  assert.throws(
+    () => zapiszKwote(d, a.id, { pozycjeIds: [a.poz[0], b.poz[0]], dostawa: false }, 4, KTO),
+    /pozycj/i);
+});
+
+test("stara wersja przegrywa — dwóch agentów nie zamyka zwrotu dwiema kwotami", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+
+  assert.throws(() => rozstrzygnijZwrot(d, id, "odrzucony", "duplikat", 1, KTO),
+    /wersj|inny agent/i);
+});
+
+test("każda decyzja zostawia ślad w audycie", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+
+  const typy = (d.prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>)
+    .map((e) => e.type);
+  assert.ok(typy.some((t) => t.includes("werdykt")), `brak werdyktu w ${typy.join(",")}`);
+  assert.ok(typy.some((t) => t.includes("ocena")), `brak oceny w ${typy.join(",")}`);
 });

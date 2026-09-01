@@ -1,0 +1,102 @@
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Decyzje } from "./Decyzje";
+import type { Zwrot } from "../api/typy";
+
+/* ── Pasek decyzji (0.156.0) ─────────────────────────────────────────────────
+   Do tego wydania kolejka bramek była DEKORACJĄ: klawisze stały jako podpisy,
+   a kolumny, po których routuje `kubelekZwrotu`, nie miały ani jednego
+   zapisu. Każdy zwrot stał w DO DECYZJI na zawsze. */
+
+const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
+  id: 1, externalId: "z-1", numer: "REF-1", orderId: "ord-1",
+  utworzono: "2026-09-01T08:00:00Z", paczkaAt: null, kubelek: "decyzja",
+  sygnaly: [], terminAt: "2026-09-15T08:00:00Z", dniDoTerminu: 14,
+  sumaPozycjiGrosze: 9998, kwotaPelnaGrosze: null, waluta: "PLN",
+  linkZwrotu: null, werdykt: null, kwotaGrosze: null, kwotaWariant: null,
+  korektaNumer: null, rejectionCode: null, wersja: 3,
+  zamowienie: { externalId: "ord-1", status: null, kupujacyLogin: null,
+    dostawaGrosze: 1500, dostawaMetoda: "InPost", sumaGrosze: 11498,
+    waluta: "PLN", kupionoAt: null, link: null, pozycje: [] },
+  pozycje: [
+    { id: 11, offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
+      waluta: "PLN", powod: null, powodKomentarz: null, ocena: "stan", url: null,
+      twId: null, twSymbol: null, twZrodlo: null, propozycja: null },
+    { id: 12, offerId: "of-2", nazwa: "Filtr", ilosc: 1, cenaGrosze: 4999,
+      waluta: "PLN", powod: null, powodKomentarz: null, ocena: "stan", url: null,
+      twId: null, twSymbol: null, twZrodlo: null, propozycja: null },
+  ],
+  ...n,
+});
+
+const pasek = (z: Zwrot, h: Partial<Parameters<typeof Decyzje>[0]> = {}) =>
+  render(<Decyzje zwrot={z} onWerdykt={vi.fn()} onOcena={vi.fn()} onKwota={vi.fn()}
+    trwa={false} blad="" {...h} />);
+
+describe("Decyzje zwrotu", () => {
+  it("przyjęcie idzie jednym kliknięciem, bez pytania o nic", () => {
+    const onWerdykt = vi.fn();
+    pasek(zwrot(), { onWerdykt });
+    screen.getByRole("button", { name: /Przyjmij/ }).click();
+    expect(onWerdykt).toHaveBeenCalledWith("przyjety", null);
+  });
+
+  it("odmowa NIE wychodzi bez powodu — jest nieodwracalna", async () => {
+    /* §25a.5: potwierdzenie dostają dwie rzeczy nieodwracalne, a odmowa jest
+       jedną z nich. Zwrot odrzucony bez uzasadnienia nie da się obronić
+       przed klientem. */
+    const onWerdykt = vi.fn();
+    pasek(zwrot(), { onWerdykt });
+    await userEvent.click(screen.getByRole("button", { name: /Odrzuć/ }));
+
+    const potwierdz = screen.getByRole("button", { name: /Potwierdź odmowę/ });
+    expect(potwierdz).toBeDisabled();
+    expect(onWerdykt).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getByLabelText(/Powód/), "Towar użyty");
+    await userEvent.click(potwierdz);
+    expect(onWerdykt).toHaveBeenCalledWith("odrzucony", "Towar użyty");
+  });
+
+  it("kwota: zaznaczone pozycje i dostawa SUMUJĄ SIĘ na podglądzie", async () => {
+    const onKwota = vi.fn();
+    pasek(zwrot({ kubelek: "zwrot" }), { onKwota });
+
+    /* Pozycje startują zaznaczone — to one wracają. Dostawa nie, bo o niej
+       decyduje człowiek. */
+    expect(screen.getByTestId("suma")).toHaveTextContent("99,98");
+
+    await userEvent.click(screen.getByLabelText(/Koszt dostawy/));
+    expect(screen.getByTestId("suma")).toHaveTextContent("114,98");
+
+    await userEvent.click(screen.getByLabelText(/Filtr/));
+    expect(screen.getByTestId("suma")).toHaveTextContent("64,99");
+
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
+    expect(onKwota).toHaveBeenCalledWith([11], true);
+  });
+
+  it("podgląd sumy nie jest tym, co się zapisuje — panel wysyła ZAZNACZENIE", async () => {
+    /* §25a.3: liczy serwer. Gdyby panel wysyłał liczbę, dałoby się zapisać
+       dowolną kwotę z pominięciem ekranu. */
+    const onKwota = vi.fn();
+    pasek(zwrot({ kubelek: "zwrot" }), { onKwota });
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
+
+    const [pozycje, dostawa] = onKwota.mock.calls[0];
+    expect(pozycje).toEqual([11, 12]);
+    expect(dostawa).toBe(false);
+    expect(onKwota.mock.calls[0]).toHaveLength(2);
+  });
+
+  it("bez zamówienia nie ma czego oddać za dostawę", () => {
+    pasek(zwrot({ kubelek: "zwrot", zamowienie: null }));
+    expect(screen.queryByLabelText(/Koszt dostawy/)).toBeNull();
+  });
+
+  it("stan końcowy nie proponuje decyzji", () => {
+    pasek(zwrot({ kubelek: "zamkniety" }));
+    expect(screen.queryByRole("button", { name: /Przyjmij|Zapisz kwotę/ })).toBeNull();
+  });
+});

@@ -62,8 +62,10 @@ describe("Ekran zwrotów", () => {
     await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
     /* Nagłówek środkowej kolumny i klawisze mają opisywać TEN SAM zwrot. */
     expect(screen.getByRole("heading", { name: "ZW-2" })).toBeInTheDocument();
-    expect(screen.getByText("Kwota proponowana")).toBeInTheDocument();
-    expect(screen.queryByText("Przyjmij")).not.toBeInTheDocument();
+    /* Etykieta zmieniła się w 0.156.0 razem z modelem: zamiast wyboru
+       wariantu jest zaznaczanie pozycji i jeden zapis. */
+    expect(screen.getByRole("button", { name: /Zapisz kwotę/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Przyjmij/ })).not.toBeInTheDocument();
   });
 
   it("wejście z paska adresu na zwrot z innego kubełka przestawia kubełek", async () => {
@@ -79,11 +81,13 @@ describe("Ekran zwrotów", () => {
     expect(screen.getByText(/Wybierz zwrot z kolejki/)).toBeInTheDocument();
   });
 
-  it("mówi wprost, że to wydanie tylko czyta", () => {
-    /* Przycisk, który wygląda na działający i nie działa, jest gorszy od
-       jego braku. Zdanie musi być na ekranie, nie tylko w CHANGELOG-u. */
+  it("pasek decyzji DZIAŁA — zdanie o czytaniu zeszło razem z 0.156.0", () => {
+    /* Do 0.155.0 stało tu „To wydanie tylko czyta", bo przycisk wyglądający
+       na działający i niedziałający jest gorszy od jego braku. Teraz działa,
+       więc to zdanie byłoby kłamstwem w drugą stronę. */
     pokaz("/obsluga/zwroty/1");
-    expect(screen.getByText(/To wydanie tylko czyta/)).toBeInTheDocument();
+    expect(screen.queryByText(/To wydanie tylko czyta/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Przyjmij/ })).toBeEnabled();
   });
 
   it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", () => {

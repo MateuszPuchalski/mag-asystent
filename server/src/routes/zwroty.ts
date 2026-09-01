@@ -3,16 +3,19 @@ import { sesjaZadania } from "../context.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  bilansKartotek, licznikiKubelkow, listaZwrotow, osZwrotu, potwierdzKartoteke,
+  bilansKartotek, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKwote, ZwrotConflict,
 } from "../services/zwroty.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
 
-/* ── Trasy zwrotów klienckich (0.150.0, zapis od 0.152.0) ────────────────────
-   JEDEN ZAPIS: potwierdzenie kartoteki dla pozycji. Nic nie wychodzi stąd do
-   Allegro — werdykt, kwota i korekta nadal czekają.
+/* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
+   CZTERY ZAPISY: kartoteka pozycji, werdykt, ocena towaru i kwota. Nic nie
+   wychodzi stąd do Allegro — korekta i oddanie pieniędzy nadal czekają, bo
+   jedno idzie do Subiekta, a drugie po końcówki zapisu Allegro, których sonda
+   nie potwierdzi (jest GET-em).
 
    Bramka roli stoi na KAŻDEJ trasie, także na odczycie — tak samo jak przy
    skrzynce. Zwrot niesie numer zamówienia i nazwisko sprawy klienta; to są
@@ -93,6 +96,63 @@ export async function zwrotyRoutes(app: FastifyInstance) {
            serwera — ten sam wzorzec co przy domknięciu dostawy. */
         return reply.code(400).send({ error: (e as Error).message });
       }
+    });
+
+  /* Konflikt wersji dostaje 409 i SZCZEGÓŁY, tak samo jak przy rozmowie:
+     panel ma narysować „inny agent zdążył pierwszy", a nie gołe „błąd". */
+  const konflikt = (reply: FastifyReply, e: unknown) => e instanceof ZwrotConflict
+    ? reply.code(409).send({ error: e.message, ...e.szczegoly })
+    : reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
+
+  const kto = () => {
+    const s = sesjaZadania()!;
+    return { id: s.user.userId, name: s.user.name };
+  };
+
+  app.post<{ Params: { id: string }; Body: { decyzja?: string; powod?: string; wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/werdykt", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const d = req.body?.decyzja;
+      if (d !== "przyjety" && d !== "odrzucony") {
+        return reply.code(400).send({ error: "Werdykt to `przyjety` albo `odrzucony`." });
+      }
+      try {
+        return rozstrzygnijZwrot(db(), Number(req.params.id), d,
+          req.body?.powod ?? null, Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { ocena?: string | null; wersja?: number } }>(
+    "/api/obsluga/zwroty/pozycje/:id/ocena", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const o = req.body?.ocena ?? null;
+      if (o !== null && !["stan", "przecena", "utylizacja"].includes(o)) {
+        return reply.code(400).send({ error: "Ocena to `stan`, `przecena`, `utylizacja` albo brak." });
+      }
+      try {
+        return ocenPozycje(db(), Number(req.params.id), o as never,
+          Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Panel przysyła ZAZNACZENIE, nie kwotę. §25a.3: liczy serwer, panel niczego
+     nie zgaduje — inaczej dałoby się zapisać dowolną liczbę z pominięciem
+     ekranu, a to są cudze pieniądze. */
+  app.post<{ Params: { id: string }; Body: { pozycjeIds?: number[]; dostawa?: boolean; wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/kwota", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const ids = req.body?.pozycjeIds;
+      if (!Array.isArray(ids) || ids.some((i) => !Number.isInteger(i))) {
+        return reply.code(400).send({ error: "`pozycjeIds` to lista identyfikatorów pozycji." });
+      }
+      try {
+        return zapiszKwote(db(), Number(req.params.id),
+          { pozycjeIds: ids, dostawa: req.body?.dostawa === true },
+          Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
     });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/zwroty/:id", async (req, reply) => {
