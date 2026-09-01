@@ -50,13 +50,19 @@ export type StatusSynchronizacji =
   | "current" | "delayed" | "rate_limited" | "authentication_error" | "failed";
 
 export type Zdrowie = {
+  /** Stan POŁĄCZENIA (tokena), osobny od stanu synchronizacji. */
   allegro?: { stan?: string };
+  /** Zdania „co zrobić" z trasy zdrowia — pusta lista nie przyjeżdża wcale. */
+  problemy?: string[];
   allegroInbox: {
     status: StatusSynchronizacji;
     alarm: boolean;
     ostatniaProba: string | null;
     ostatniaUdanaSynchronizacja: string | null;
     kodOstatniegoBledu: number | null;
+    /* Powód SŁOWEM. Kod HTTP odpowiada tylko na część porażek — brak
+       parowania, timeout i odmowa wersji zasobu kodu nie mają. */
+    tekstOstatniegoBledu: string | null;
     liczbaBledow: number;
     watkiZBledem: number;
     opoznienieMs: number | null;

@@ -11,6 +11,7 @@ export interface AllegroInboxSyncState {
   lastSuccessAt: string | null;
   lastAttemptAt: string | null;
   lastErrorCode: number | null;
+  lastErrorText: string | null;
   errorCount: number;
   errorThreadCount: number;
   nextAttemptAt: string | null;
@@ -18,12 +19,12 @@ export interface AllegroInboxSyncState {
 
 const PUSTY: AllegroInboxSyncState = {
   cursorAt: null, cursorId: null, lastSuccessAt: null, lastAttemptAt: null,
-  lastErrorCode: null, errorCount: 0, errorThreadCount: 0, nextAttemptAt: null,
+  lastErrorCode: null, lastErrorText: null, errorCount: 0, errorThreadCount: 0, nextAttemptAt: null,
 };
 
 export function stanSynchronizacji(db: Db): AllegroInboxSyncState {
   const row = db.prepare(`SELECT cursor_at, cursor_id, last_success_at, last_attempt_at,
-    last_error_code, error_count, error_thread_count, next_attempt_at
+    last_error_code, last_error_text, error_count, error_thread_count, next_attempt_at
     FROM allegro_inbox_sync_state WHERE id=1`).get() as Record<string, unknown> | undefined;
   if (!row) return PUSTY;
   return {
@@ -32,6 +33,7 @@ export function stanSynchronizacji(db: Db): AllegroInboxSyncState {
     lastSuccessAt: (row.last_success_at as string) ?? null,
     lastAttemptAt: (row.last_attempt_at as string) ?? null,
     lastErrorCode: row.last_error_code == null ? null : Number(row.last_error_code),
+    lastErrorText: row.last_error_text == null ? null : String(row.last_error_text),
     errorCount: Number(row.error_count ?? 0),
     errorThreadCount: Number(row.error_thread_count ?? 0),
     nextAttemptAt: (row.next_attempt_at as string) ?? null,
@@ -82,6 +84,9 @@ export function stanSynchronizacjiHealth(
     ostatniaProba: s.lastAttemptAt,
     ostatniaUdanaSynchronizacja: s.lastSuccessAt,
     kodOstatniegoBledu: s.lastErrorCode,
+    /* Zdanie o powodzie. Kod HTTP odpowiada tylko na część porażek —
+       brak parowania, timeout i odmowa wersji zasobu kodu nie mają. */
+    tekstOstatniegoBledu: s.lastErrorText,
     liczbaBledow: s.errorCount,
     watkiZBledem: s.errorThreadCount,
     opoznienieMs: s.lastSuccessAt ? Math.max(0, teraz - Date.parse(s.lastSuccessAt)) : null,

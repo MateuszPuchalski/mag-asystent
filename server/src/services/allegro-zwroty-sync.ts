@@ -67,7 +67,8 @@ export interface ZwrotySyncDeps {
   apiUrl?: string;
   intervalMs?: number;
   accountId?: string;
-  oknoDni?: number;
+  /** Próg bezwzględny; `null` znaczy „bez granicy". Patrz `config.allegro.zwrotyOd`. */
+  zwrotyOd?: string | null;
 }
 
 function tablica<T>(value: unknown, pole: string): T[] {
@@ -106,22 +107,29 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
   const now = deps.now ?? (() => new Date());
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const interval = deps.intervalMs ?? config.allegro.zwrotySyncMs;
-  const oknoDni = deps.oknoDni ?? config.allegro.zwrotyOknoDni;
+  const od = deps.zwrotyOd !== undefined ? deps.zwrotyOd : config.allegro.zwrotyOd;
   const start = stanZwrotow(database);
 
-  /* Kursor rządzi, gdy jest; okno dat wchodzi TYLKO przy pierwszym przebiegu.
-     Trzymanie obu naraz zawężałoby wynik dwa razy i po dziewięćdziesięciu
-     dniach cicho przestałoby oddawać cokolwiek nowego. */
-  const odKiedy = start.cursorId
-    ? null
-    : new Date(now().getTime() - oknoDni * 86_400_000).toISOString();
+  /* Kursor rządzi w ZAPYTANIU, gdy jest; filtr dat wchodzi tylko przy pierwszym
+     przebiegu. Trzymanie obu naraz zawężałoby wynik dwa razy i cicho przestałoby
+     oddawać cokolwiek nowego.
+
+     Ale PRÓG to nie to samo co dawne okno względne (0.152.0). Okno było
+     wyłącznie oszczędnością pierwszego pobrania; próg jest granicą tego, co
+     firma w ogóle chce widzieć, więc obowiązuje ZAWSZE — także wtedy, gdy
+     kursor już stoi i zapytanie nie niesie żadnej daty. Dlatego oprócz filtra
+     w adresie tnie się jeszcze wynik, niżej. */
+  const odKiedy = start.cursorId ? null : od;
 
   const zebrane: Zwrot[] = [];
   try {
     for (let strona = 0; strona < MAKS_STRON; strona++) {
       const body = await query(urlListyZwrotow(apiUrl, odKiedy, strona * NA_STRONE, start.cursorId));
       const partia = tablica<Zwrot>(body, "customerReturns");
-      zebrane.push(...partia.filter((z) => typeof z?.id === "string"));
+      /* Zwrot BEZ daty przepuszczamy — `createdAt` jest w schemacie opcjonalne,
+         a cicha utrata zwrotu kosztuje więcej niż jeden rekord za progiem. */
+      zebrane.push(...partia.filter((z) => typeof z?.id === "string"
+        && !(od && z.createdAt && z.createdAt < od)));
       if (partia.length < NA_STRONE) break;
     }
 

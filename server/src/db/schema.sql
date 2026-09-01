@@ -763,6 +763,10 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   -- Kod HTTP ostatniej porażki. Status z §7 (`rate_limited`,
   -- `authentication_error`) wynika z niego, a nie z samej liczby błędów.
   last_error_code  INTEGER,
+  -- Powód SŁOWEM. Nie każda porażka ma kod HTTP: brak parowania, timeout
+  -- i odmowa wersji zasobu to gołe wyjątki, a to WŁAŚNIE one najczęściej
+  -- zatrzymują skrzynkę na dłużej.
+  last_error_text  TEXT,
   error_thread_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT
 );

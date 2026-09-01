@@ -41,14 +41,17 @@ test("kwotę liczymy na tekście — Allegro oddaje ją stringiem nie bez powodu
     "kształt spoza kontraktu ma się zapalić, a nie policzyć na zero");
 });
 
-test("pierwszy przebieg bierze okno dat, kolejny idzie kursorem", async () => {
+test("pierwszy przebieg bierze filtr dat, kolejny idzie kursorem", async () => {
+  /* Do 0.152.0 filtrem było OKNO WZGLĘDNE (90 dni wstecz od teraz); dziś jest
+     nim próg bezwzględny. Dla adresu zapytania różnica jest żadna — liczy się
+     to, że dwa filtry nigdy nie jadą razem. */
   const d = stanowisko();
   const url: string[] = [];
   await synchronizujAllegroZwroty({
-    database: d, oknoDni: 90, now: () => new Date("2026-09-01T10:00:00Z"),
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z", now: () => new Date("2026-09-01T10:00:00Z"),
     apiUrl: "https://api", query: async (u) => { url.push(u); return odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]); },
   });
-  assert.match(url[0], /createdAt\.gte=2026-06-03/, "brak kursora → okno dat");
+  assert.match(url[0], /createdAt\.gte=2026-06-03/, "brak kursora → filtr dat");
   assert.equal(url[0].includes("from="), false);
 
   url.length = 0;
@@ -160,4 +163,55 @@ test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => 
   assert.equal(zapisane.includes("PL61109010140000071219812874"), false, "IBAN nie wchodzi do modelu pracy");
   assert.equal(zapisane.includes("600100200"), false, "telefon nadawcy też nie");
   assert.equal(wiersz.paczka_at, "2026-08-31T09:00:00Z", "sam FAKT powrotu paczki zostaje — bez danych nadawcy");
+});
+
+/* ── Próg bezwzględny (0.152.0) ──────────────────────────────────────────────
+   Decyzja właściciela: zwroty od 20 lipca 2026. Okno względne
+   `ALLEGRO_ZWROTY_DNI_WSTECZ` znika, a to jest zmiana NATURY, nie jednostki:
+   tamto liczyło się wyłącznie przy pierwszym przebiegu, bo dalej rządził
+   kursor. Próg obowiązuje zawsze. */
+const PROG = "2026-07-19T22:00:00Z";
+
+test("próg wchodzi do pierwszego zapytania zamiast okna dni", async () => {
+  const d = stanowisko();
+  const url: string[] = [];
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: PROG, now: () => new Date("2026-09-01T10:00:00Z"),
+    apiUrl: "https://api",
+    query: async (u) => { url.push(u); return odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]); },
+  });
+  assert.match(url[0], /createdAt\.gte=2026-07-19/, "pierwszy przebieg ma prosić od progu");
+});
+
+test("próg obowiązuje TAKŻE wtedy, gdy kursor już stoi", async () => {
+  /* Tu przewracało się okno względne. Gdy kursor już jest, zapytanie idzie
+     `from=`, bez filtra dat — więc zwrot sprzed progu wjeżdżał przy pierwszej
+     zmianie po stronie Allegro. Próg musi ciąć wynik, a nie tylko zapytanie. */
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: PROG, now: () => new Date("2026-09-01T10:00:00Z"),
+    apiUrl: "https://api", query: async () => odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]),
+  });
+
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: PROG, now: () => new Date("2026-09-01T10:05:00Z"),
+    apiUrl: "https://api",
+    query: async () => odpowiedz([
+      zwrot("stary", "2026-07-01T08:00:00Z"),
+      zwrot("nowy", "2026-08-31T08:00:00Z"),
+    ]),
+  });
+
+  const id = (d.prepare("SELECT external_id FROM zwrot_klienta ORDER BY external_id")
+    .all() as Array<{ external_id: string }>).map((z) => z.external_id);
+  assert.deepEqual(id, ["nowy", "z1"], "zwrot sprzed progu wjechał mimo granicy");
+});
+
+test("bez progu nic się nie zmienia", async () => {
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: null, now: () => new Date("2026-09-01T10:00:00Z"),
+    apiUrl: "https://api", query: async () => odpowiedz([zwrot("stary", "2020-01-01T08:00:00Z")]),
+  });
+  assert.equal((d.prepare("SELECT count(*) n FROM zwrot_klienta").get() as { n: number }).n, 1);
 });
