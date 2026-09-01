@@ -118,7 +118,22 @@ Czy zostaje jeden panel bez bundlera (`biuro.html`), czy obsługa klienta
 dostaje własne miejsce. Reguła „jeden front" z `CLAUDE.md` obowiązuje, dopóki
 ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Obsługa klienta dostaje własne miejsce — `panel/` pod
+> `/obsluga`, React z Vite i Tailwindem. Decyzja właściciela z 0.141.0.
+>
+> **Co to kosztuje.** Wdrożenie przestaje być kopiowaniem pliku: `npm run
+> build` musi zbudować panel, zanim serwer skopiuje go do `dist/web/obsluga`.
+> Dochodzi drzewo zależności npm, którego `biuro.html` nie miał wcale.
+> Rośnie też koszt czytania: dwa fronty to dwa zestawy nawyków, a odruch
+> „szukaj w `biuro.html`" przestaje wystarczać.
+>
+> **Co to kupuje.** Ekrany obsługi są stanowe — lista zadań, formularz wyniku,
+> odświeżanie w tle. `biuro.html` robi to ręcznie na `innerHTML`, a testy-
+> strażnicy dubli i delegacji istnieją właśnie dlatego, że ten sposób się tam
+> już raz wymknął. Nowa obsługa startuje od zera i nie musi tego dziedziczyć.
+>
+> **Gdzie stoi granica.** Magazyn zostaje w `biuro.html`; przepisywanie go nie
+> jest częścią tej decyzji. Trzeciego frontu nie ma.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 

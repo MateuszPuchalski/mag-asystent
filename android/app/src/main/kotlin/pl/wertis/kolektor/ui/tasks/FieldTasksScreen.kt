@@ -18,7 +18,16 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.SectionLabel
-import pl.wertis.kolektor.ui.theme.*
+import pl.wertis.kolektor.ui.theme.AmberBg
+import pl.wertis.kolektor.ui.theme.AmberInk
+import pl.wertis.kolektor.ui.theme.AmberLine
+import pl.wertis.kolektor.ui.theme.CardBorder
+import pl.wertis.kolektor.ui.theme.CardWhite
+import pl.wertis.kolektor.ui.theme.Destructive
+import pl.wertis.kolektor.ui.theme.Ink
+import pl.wertis.kolektor.ui.theme.InkMute
+import pl.wertis.kolektor.ui.theme.InkSoft
+import pl.wertis.kolektor.ui.theme.cardSurface
 
 @Composable
 fun FieldTasksScreen(graph: AppGraph) {
