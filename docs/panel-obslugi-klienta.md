@@ -150,6 +150,22 @@ Komentarze są widoczne wyłącznie dla pracowników, mogą zawierać wzmianki, 
 wskazywać produkt, zadanie lub dowód, nie mogą przypadkiem trafić do klienta
 i są wizualnie odróżnione od wiadomości klienta.
 
+#### 6.4.1. Skrzynka wzmianek (0.159.0)
+
+Wzmianka jest prośbą o zajęcie się czymś, więc musi mieć własną drogę do
+adresata. Do 0.158.0 wracała wyłącznie do tego, kto sam otworzył właściwą
+rozmowę — kto nie zgadł którą, nie dowiadywał się nigdy.
+
+Zakładka „Wzmianki" pokazuje wzmianki JEDNEGO konta; adresat bierze się
+z sesji, nigdy z parametru żądania. Licznik nieodhaczonych stoi przy zakładce,
+bo prośba kolegi ma być widoczna z każdego ekranu panelu.
+
+Odhaczenie jest jawnym kliknięciem wzmiankowanego. Nie robi tego ani otwarcie
+listy, ani wejście do rozmowy: obowiązuje reguła „zero zapisu przy patrzeniu",
+a wzmianka gasnąca od samego spojrzenia ginęłaby przy przewijaniu listy.
+Odhacza się PARĘ komentarz–osoba, bo dwoje wzmiankowanych w jednym zdaniu ma
+z nim dwie różne sprawy. Odhaczone zostają na liście jako dowód.
+
 ## 7. Statusy
 
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_internal`,
@@ -793,6 +809,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
 | Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
 | Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users` |
+| Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.159.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
 | Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
 | Obecność i „pisze" | **działa**, w pamięci | `services/conversation-realtime.ts` |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |

@@ -165,8 +165,19 @@ CREATE INDEX IF NOT EXISTS ix_conversation_comment_time
 CREATE TABLE IF NOT EXISTS conversation_mention (
   comment_id INTEGER NOT NULL REFERENCES conversation_comment(id) ON DELETE CASCADE,
   user_id    INTEGER NOT NULL REFERENCES app_user(user_id),
+  -- Kiedy wzmiankowany ją ODHACZYŁ (0.159.0). NULL znaczy „jeszcze czeka".
+  -- Znacznik jest PER PARA: dwie osoby wzmiankowane w jednym komentarzu
+  -- odhaczają go niezależnie, bo każda ma z nim inną sprawę do załatwienia.
+  -- Odhaczenie jest JAWNYM kliknięciem, nie skutkiem otwarcia listy —
+  -- reguła „zero zapisu przy patrzeniu" obowiązuje też tutaj, a wzmianka
+  -- kasowana samym spojrzeniem gubiłaby się dokładnie wtedy, gdy agent
+  -- przewija listę w biegu.
+  seen_at    TEXT,
   PRIMARY KEY(comment_id, user_id)
 );
+-- Indeks po (user_id, seen_at) zakłada MIGRACJA, nie ten plik: `schema.sql`
+-- wykonuje się PRZED nią, a na bazie sprzed 0.159.0 kolumny `seen_at` jeszcze
+-- wtedy nie ma i `CREATE INDEX` wywróciłby start serwera.
 
 -- ── Konta pracowników (plan §7) ────────────────────────────────────────────
 -- Do lipca 2026 „użytkownik" to był DOWOLNY łańcuch wpisywany ręcznie na
