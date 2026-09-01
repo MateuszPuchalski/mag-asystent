@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { dopiszZdarzenieWyniku } from "./conversations.js";
 
 export type RodzajZadania = "pomiar" | "zdjecie" | "weryfikacja" | "inne";
 export type PriorytetZadania = "normalny" | "pilny";
@@ -42,6 +43,11 @@ export function wezZadanie(id:number,autor:{id:number;name:string}){
 }
 export function wykonajZadanie(id:number,wynik:string,autor:{id:number;name:string}){
  const w=tekst(wynik,"Wynik",4000);const r=db().prepare("UPDATE zadanie_terenowe SET status='wykonane',wynik=?,wykonano_at=?,wykonano_przez=?,wykonano_user_id=? WHERE id=? AND status='w_toku' AND przypisano_user_id=?").run(w,teraz(),autor.name,autor.id,id,autor.id);
- if(!r.changes)throw new Error("Zadanie musi być przejęte przez Ciebie przed zapisaniem wyniku");const z=zadanie(id)!;logEvent("zadanie_terenowe_wykonane",autor.name,z.twId,{zadanieId:id});return z;
+ if(!r.changes)throw new Error("Zadanie musi być przejęte przez Ciebie przed zapisaniem wyniku");const z=zadanie(id)!;
+ /* Zadanie z rozmowy oddaje wynik na jej oś (0.142.0). Zdarzenie, nie edycja
+    wiadomości: treść napisana przez klienta ma zostać tym, czym była. */
+ const rozmowa=db().prepare("SELECT conversation_id FROM zadanie_terenowe WHERE id=?").get(id) as {conversation_id:number|null};
+ if(rozmowa?.conversation_id!=null)dopiszZdarzenieWyniku(rozmowa.conversation_id,id,w);
+ logEvent("zadanie_terenowe_wykonane",autor.name,z.twId,{zadanieId:id});return z;
 }
 export function anulujZadanie(id:number,autor:{id:number;name:string}){const r=db().prepare("UPDATE zadanie_terenowe SET status='anulowane',anulowano_at=?,anulowano_przez=? WHERE id=? AND status IN ('nowe','w_toku')").run(teraz(),autor.name,id);if(!r.changes)throw new Error("Zadania nie można anulować");const z=zadanie(id)!;logEvent("zadanie_terenowe_anulowane",autor.name,z.twId,{zadanieId:id});return z;}

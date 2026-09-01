@@ -110,6 +110,11 @@ function migrate(database: DatabaseSync) {
      konta, a nazwa nie jest tożsamością. Stare zadania mają NULL i tak
      zostaje: zgadywanie po nazwie byłoby gorsze niż uczciwy brak. */
   addColumn("sfera_queue", "created_by_ref", "INTEGER");
+  /* Zadania istniejące przed odbudową obsługi klienta nie mają rozmowy,
+     z której pochodzą. NULL zachowuje tę prawdę; migracja nie zgaduje
+     powiązań po opisie ani dacie. */
+  addColumn("zadanie_terenowe", "conversation_id", "INTEGER REFERENCES conversation(id) ON DELETE SET NULL");
+  addColumn("zadanie_terenowe", "message_id", "INTEGER REFERENCES message(id) ON DELETE SET NULL");
   addColumn("delivery", "source_mag_id", "INTEGER");
   /* Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0). Kolumny są
      nullowalne, więc dostawy zamknięte normalnie zostają nietknięte — a puste
