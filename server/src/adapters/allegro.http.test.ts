@@ -19,6 +19,7 @@ import {
   czyOdswiezyc,
   czyStronaBlokady,
   interwalParowania,
+  powodBrakuKonta,
   problemUserAgenta,
 } from "../services/allegro-token.js";
 
@@ -212,4 +213,41 @@ test("brak ALLEGRO_USER_AGENT to zdanie w /api/health, nie cisza", () => {
     (config.allegro as { userAgent: string }).userAgent = bylUA;
     (config.allegro as { mode: string }).mode = bylTryb;
   }
+});
+
+/* ── Powód odmowy dla narzędzia z konsoli (0.153.1) ─────────────────────────
+   Sonda odmawiała jednym zdaniem dla wszystkich stanów: „konto nie jest
+   sparowane — sparuj w panelu". Trafiało to obok dwa razy. Tryb `dev` nie
+   ma czego parować (panel mówi to wprost), a zdanie prowadziło w dodatku do
+   zakładki REJESTRY, skasowanej w 0.140.0.                                 */
+
+test("tryb dev NIE odsyła do parowania — w panelu nie ma czego kliknąć", () => {
+  const p = powodBrakuKonta("dev", "C:\\wertis\\wertis.env");
+  assert.match(p, /SGT_MODE=mssql/, "wyjściem jest konfiguracja, nie przycisk w panelu");
+  assert.match(p, /ALLEGRO_MODE=http/);
+  assert.doesNotMatch(p, /sparuj/i, "parowanie w trybie demo to ślepa uliczka");
+});
+
+test("BRAK wertis.env jest NAZWANY — to on robi z konsoli tryb demo", () => {
+  /* Sedno tej zmiany. `npm run sonda` startuje w katalogu workspace'u, a plik
+     leży piętro wyżej: proces widział pustą konfigurację i mówił „konto nie
+     jest sparowane" o koncie, które usługa obok ma sparowane. */
+  assert.match(powodBrakuKonta("dev", null), /nie znalazł wertis\.env/);
+  assert.match(
+    powodBrakuKonta("dev", "C:\\wertis\\wertis.env"),
+    /C:\\wertis\\wertis\.env/,
+    "gdy plik JEST, zdanie ma go nazwać — inaczej nie da się porównać z usługą"
+  );
+});
+
+test("każdy stan bez połączenia ma własną drogę wyjścia", () => {
+  const stany = ["dev", "wylaczone", "niepolaczone", "zle_srodowisko"] as const;
+  const zdania = stany.map((s) => powodBrakuKonta(s, null));
+  assert.equal(new Set(zdania).size, stany.length, "żadne dwa stany nie dostają tego samego zdania");
+  assert.match(powodBrakuKonta("wylaczone", null), /ALLEGRO_CLIENT_ID/);
+  assert.match(powodBrakuKonta("zle_srodowisko", null), /ALLEGRO_SANDBOX/);
+  // parowanie ma sens dokładnie w dwóch stanach i tam ma prowadzić do KARTY
+  assert.match(powodBrakuKonta("niepolaczone", null), /STAN SYSTEMU → KONTO ALLEGRO/);
+  assert.match(powodBrakuKonta("zle_srodowisko", null), /STAN SYSTEMU → KONTO ALLEGRO/);
+  for (const z of zdania) assert.doesNotMatch(z, /REJESTRY/, "zakładka odeszła w 0.140.0");
 });

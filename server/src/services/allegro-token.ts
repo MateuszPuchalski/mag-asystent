@@ -434,6 +434,69 @@ export function problemAllegro(): string | null {
   return null;
 }
 
+/* ── Dlaczego narzędzie z konsoli nie ma czego czytać (0.153.1) ──────────────
+   `npm run sonda` odmawiał jednym zdaniem dla wszystkich pięciu stanów:
+   „konto nie jest sparowane — sparuj w panelu". Dwa razy wprowadzało to
+   w błąd. Po pierwsze, `dev` NIE ZNACZY braku parowania: w trybie demo nie ma
+   czego parować i panel mówi to wprost, więc odesłanie do niego kończyło się
+   kartą bez przycisku POŁĄCZ. Po drugie, zdanie prowadziło do zakładki
+   REJESTRY, skasowanej w 0.140.0 razem z obsługą klienta — karta KONTO
+   ALLEGRO stoi od tamtej pory w STANIE SYSTEMU.
+
+   Prawdziwym powodem bywa przy tym coś trzeciego: proces konsoli nie znalazł
+   `wertis.env` i pracuje na domyślnych wartościach, choć usługa obok czyta
+   plik i konto ma sparowane. Dlatego zdanie o konfiguracji NAZYWA PLIK, na
+   którym ten proces stoi — bez tego jedynym objawem różnicy między procesami
+   jest słowo „dev", z którego nikt niczego nie odczyta.                      */
+
+/** Skąd ten proces wziął ustawienia — zdanie doklejane do powodu. */
+const zrodloKonfiguracji = (plikEnv: string | null): string =>
+  plikEnv === null
+    ? "Ten proces nie znalazł wertis.env i pracuje na samych zmiennych środowiskowych — " +
+      "usługa czyta plik z katalogu instalacji, więc może widzieć co innego."
+    : `Ten proces czyta ustawienia z ${plikEnv}.`;
+
+/**
+ * Powód, dla którego narzędzie konsolowe nie dostanie danych z Allegro —
+ * zdanie dla człowieka przy klawiaturze, z drogą wyjścia dla KAŻDEGO stanu.
+ *
+ * Stan `polaczone` jest wykluczony w typie: gdyby wchodził, funkcja musiałaby
+ * zmyślać zdanie dla sytuacji, w której nie ma problemu.
+ */
+export function powodBrakuKonta(
+  stan: Exclude<StanPolaczenia["stan"], "polaczone">,
+  plikEnv: string | null
+): string {
+  switch (stan) {
+    case "dev":
+      return (
+        "Tryb dev — połączenia z Allegro nie ma i NIE MA CZEGO PAROWAĆ; panel " +
+        "mówi w tym stanie dokładnie to samo. Żywe konto wymaga SGT_MODE=mssql " +
+        "albo ALLEGRO_MODE=http w wertis.env. " +
+        zrodloKonfiguracji(plikEnv)
+      );
+    case "wylaczone":
+      return (
+        "Brak ALLEGRO_CLIENT_ID — połączenie z Allegro jest wyłączone. Poświadczenia " +
+        "aplikacji (typ „urządzenie”, developer.allegro.pl) wpisuje się do wertis.env " +
+        "razem z ALLEGRO_CLIENT_SECRET. " +
+        zrodloKonfiguracji(plikEnv)
+      );
+    case "niepolaczone":
+      return (
+        "Konto Allegro niepołączone — sparuj je w panelu: /biuro → STAN SYSTEMU → " +
+        "KONTO ALLEGRO → POŁĄCZ (rola admin). " +
+        zrodloKonfiguracji(plikEnv)
+      );
+    case "zle_srodowisko":
+      return (
+        "Token pochodzi z innego środowiska, niż wskazuje ALLEGRO_SANDBOX — sparuj " +
+        "konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO. " +
+        zrodloKonfiguracji(plikEnv)
+      );
+  }
+}
+
 /**
  * Brak własnego nagłówka User-Agent — osobne zdanie do /api/health.
  *

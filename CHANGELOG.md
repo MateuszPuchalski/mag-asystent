@@ -33,6 +33,60 @@ historii nie przepisujemy.
 
 ---
 
+## 0.153.1 — 1 września 2026
+
+**Narzędzia z konsoli czytają `wertis.env` z katalogu instalacji.** Zgłoszenie
+z produkcji, z `C:\wertis\server`:
+
+    npm run sonda
+    Konto Allegro nie jest sparowane (stan: dev). Sonda czyta żywe konto, więc
+    bez tokenu nie ma czego oglądać — sparuj konto w panelu: /biuro → REJESTRY
+    → KONTO ALLEGRO.
+
+Konto było sparowane. Sondzie brakowało czego innego — ustawień. npm uruchamia
+skrypt workspace'u w `C:\wertis\server`, a `wertis.env` leży piętro wyżej, obok
+usług. Lista miejsc, w których szukamy pliku, kończyła się na katalogu
+roboczym, więc plik nie był wczytywany wcale. Proces wracał do wartości
+domyślnych: puste `SGT_MODE` znaczy tryb demo, a demo znaczy „bez kontaktu
+z Allegro".
+
+Dotyczyło to każdego narzędzia z konsoli — `sonda`, `reconcile`, `reslot`,
+`inwentarz` — a także `npm run dev`. DEPLOY obiecywał przy tym od dawna, że
+proces deweloperski czyta plik z katalogu roboczego. Usługi problemu nie miały
+i to jest cała przyczyna, dla której nikt tego nie zauważył wcześniej: NSSM ma
+`AppDirectory C:\wertis`, więc plik leży dokładnie tam, gdzie usługa patrzy.
+
+Teraz szukanie idzie w górę: katalog roboczy, potem jego rodzice. Wygrywa plik
+najbliższy, a `/api/health` dalej pokazuje, który to był — pomyłka w wyborze ma
+więc gdzie wyjść na jaw. `WERTIS_ENV_FILE` bez zmian: wskazana ścieżka ucina
+szukanie, bo jawna decyzja człowieka nie ma prawa po cichu wczytać czegoś
+innego.
+
+**Sonda przestaje kłamać o powodzie odmowy.** Jedno zdanie obsługiwało pięć
+stanów połączenia i przy dwóch trafiało obok. Tryb `dev` nie jest brakiem
+parowania — w trybie demo nie ma czego parować i karta w panelu mówi to wprost,
+więc odesłanie do niej kończyło się szukaniem przycisku, którego tam nie ma.
+Drugi błąd był starszy: zdanie prowadziło do zakładki REJESTRY, skasowanej
+w 0.140.0 razem z obsługą klienta. Karta KONTO ALLEGRO stoi od tamtej pory
+w STANIE SYSTEMU.
+
+Każdy stan ma teraz własne wyjście: `dev` — ustawienie `SGT_MODE` albo
+`ALLEGRO_MODE`, `wylaczone` — poświadczenia aplikacji, `niepolaczone`
+i `zle_srodowisko` — parowanie w panelu, ze wskazaniem właściwej zakładki.
+Do każdego dochodzi zdanie o tym, Z KTÓREGO pliku ten proces wziął ustawienia
+albo że nie znalazł żadnego. Bez tego jedyną różnicą między procesem konsoli
+a usługą jest słowo „dev", z którego nikt niczego nie odczyta.
+
+Instrukcji nawigacji pilnuje odtąd test. Bierze pierwszy człon każdego zdania
+w rodzaju „/biuro → …" z kodu serwera i sprawdza go wobec paska zakładek.
+Martwa instrukcja w stringu nie zapala dziś niczego: nie widzi jej ani
+kompilator, ani przegląd kodu. Widzi ją wyłącznie człowiek, który ma już
+problem i szuka wyjścia.
+
+Wdrożenie: nic ręką. Sama aktualizacja usług. Jeśli w katalogu NAD instalacją
+leży inny `wertis.env`, zostanie teraz zauważony — sprawdź `configZPliku`
+w `/api/health` po restarcie.
+
 ## 0.153.0 — 1 września 2026
 
 **Zwrot pokazuje CAŁE zamówienie, ze zdjęciami i drogą do Allegro.** Kolumna

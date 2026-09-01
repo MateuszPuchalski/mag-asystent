@@ -126,9 +126,12 @@ npm -w server run start:worker       # okno 2: worker
 ```
 
 Aplikacja szuka `wertis.env` obok pliku wykonywalnego, a w instalacji z repo —
-w katalogu, z którego ją uruchomiono. `source wertis.env` nie jest już
-potrzebne (dalej działa: zmienne środowiskowe mają pierwszeństwo nad plikiem).
-Inną ścieżkę wskazuje `WERTIS_ENV_FILE`.
+w katalogu roboczym i katalogach nad nim. Chodzenie w górę powstało w 0.153.1:
+npm uruchamia skrypty w `C:\wertis\server`, a plik leży piętro wyżej. Wygrywa
+plik najbliższy, a który to był — pokazuje `/api/health`. `source wertis.env`
+nie jest już potrzebne (dalej działa: zmienne środowiskowe mają pierwszeństwo
+nad plikiem). Inną ścieżkę wskazuje `WERTIS_ENV_FILE` i wtedy szukanie kończy
+się na niej.
 
 Instalator **scala** ten plik, a nie nadpisuje. Klucz, o który kreator zapytał,
 bierze z odpowiedzi; klucza, o który nie pytał, nie rusza. Wartości dopisane
@@ -1350,8 +1353,8 @@ cd C:\wertis-dev
 npm run dev        # API + worker, przeładowanie przy zmianie pliku
 ```
 
-Konfigurację czyta z `wertis.env` w katalogu roboczym; inną ścieżkę wskazuje
-`WERTIS_ENV_FILE`.
+Konfigurację czyta z `wertis.env` w katalogu roboczym albo nad nim; inną
+ścieżkę wskazuje `WERTIS_ENV_FILE`.
 
 ### Czego pilnować
 
