@@ -47,13 +47,39 @@ export function stanSkrzynki(): StanSkrzynki {
   return { ostatniaSynchronizacja: s?.last_success_at ?? null, bledy: s?.error_count ?? 0 };
 }
 
+/**
+ * Liczby obsługi dla `/api/health` (§21).
+ *
+ * Trasa zdrowia jest publiczna, więc idą tu wyłącznie LICZBY: ile rozmów
+ * czeka i jak stare jest najstarsze zadanie. Bez klientów, bez treści i bez
+ * numerów ofert — te same reguły, co przy statystykach audytu obok.
+ */
+export function stanObslugiHealth(teraz = Date.now()) {
+  const rozmowy = db().prepare(
+    "SELECT count(*) n FROM conversation WHERE assigned_user_id IS NULL").get() as { n: number };
+  const zadania = db().prepare(`SELECT count(*) n, min(utworzono_at) najstarsze
+    FROM zadanie_terenowe WHERE status IN ('nowe','w_toku')`).get() as
+    { n: number; najstarsze: string | null };
+  return {
+    rozmowyOczekujace: rozmowy.n,
+    zadaniaTerenowe: zadania.n,
+    najstarszeZadanieMs: zadania.najstarsze
+      ? Math.max(0, teraz - Date.parse(zadania.najstarsze)) : null,
+    /* Kolejka wysyłek melduje się nawet wyłączona: brak pozycji i brak
+       mechanizmu wyglądają na ekranie tak samo, a znaczą co innego. */
+    kolejkaWysylek: "wysyłka wyłączona" as const,
+  };
+}
+
 export function listaRozmow(): RozmowaSkrzynki[] {
   return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
     .map(naRozmowe);
 }
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
-export function osRozmowy(id: number): { rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null } {
+export function osRozmowy(id: number): {
+  rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null; ofertaWskazana: OfertaWskazana | null;
+} {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
   const rozmowa = naRozmowe(wiersz);
@@ -88,10 +114,22 @@ export function osRozmowy(id: number): { rozmowa: RozmowaSkrzynki; os: WpisOsi[]
       tresc: String(z.wynik), at: String(z.wykonano_at), ofertaId: null, zadanieId: Number(z.id),
     });
   }
-  return { rozmowa, os, szkic: szkicRozmowy(id) };
+  return { rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id) };
 }
 
 export interface Szkic { body: string; wersja: number; expectedLastMessageId: number | null }
+
+/** Oferta wskazana RĘCZNIE przez agenta — wybór człowieka, nie fakt z Allegro. */
+export interface OfertaWskazana { ofertaId: string; autor: string }
+
+export function ofertaWskazana(id: number): OfertaWskazana | null {
+  const w = db().prepare(`SELECT payload FROM conversation_event
+    WHERE conversation_id=? AND event_type='offer_linked_manually'
+    ORDER BY id DESC LIMIT 1`).get(id) as { payload: string | null } | undefined;
+  if (!w?.payload) return null;
+  const p = JSON.parse(w.payload) as { ofertaId?: string; autor?: string };
+  return p.ofertaId ? { ofertaId: p.ofertaId, autor: p.autor ?? "agent" } : null;
+}
 
 export function szkicRozmowy(id: number): Szkic | null {
   const s = db().prepare(

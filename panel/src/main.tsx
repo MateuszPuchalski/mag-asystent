@@ -1,13 +1,100 @@
-import React,{useEffect,useState} from "react";
-import{createRoot}from"react-dom/client";
-import{ClipboardList,Inbox,LogOut,Plus,Ruler,Search,Warehouse,CheckCircle2,Clock,AlertTriangle}from"lucide-react";
-import{Skrzynka}from"./skrzynka";
-import{Wyszukiwarka,type Towar}from"./wyszukiwarka";
-import"./index.css";
-type Task={id:number;rodzaj:string;tytul:string;instrukcja:string;twId:number|null;symbol:string|null;nazwaTowaru:string|null;lokalizacja:string|null;priorytet:"normalny"|"pilny";status:"nowe"|"w_toku"|"wykonane"|"anulowane";utworzonoAt:string;utworzonoPrzez:string;przypisanoPrzez:string|null;wynik:string|null;wykonanoPrzez:string|null};
-const KEY="wertis-panel-token";
-async function api(path:string,init:RequestInit={}){const r=await fetch(path,{...init,headers:{"content-type":"application/json","x-session":localStorage.getItem(KEY)||"",...(init.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`Błąd ${r.status}`);return d;}
-function Login({done}:{done:()=>void}){const[login,setLogin]=useState("");const[haslo,setHaslo]=useState("");const[err,setErr]=useState("");async function submit(e:React.FormEvent){e.preventDefault();try{const d=await api("/api/auth/login",{method:"POST",body:JSON.stringify({login,haslo})});localStorage.setItem(KEY,d.token);done();}catch(x){setErr((x as Error).message)}}return <main className="grid min-h-screen place-items-center bg-wertis-ink p-5"><form onSubmit={submit} className="card w-full max-w-sm p-7"><div className="mb-7 flex items-center gap-3"><div className="rounded-xl bg-wertis-amber p-3"><Warehouse/></div><div><h1 className="text-2xl font-bold">WERTIS</h1><p className="text-sm text-slate-500">Obsługa klienta</p></div></div><label className="mb-4 block text-sm font-semibold">Login<input className="field mt-1" value={login} onChange={e=>setLogin(e.target.value)} autoFocus/></label><label className="mb-5 block text-sm font-semibold">Hasło<input className="field mt-1" type="password" value={haslo} onChange={e=>setHaslo(e.target.value)}/></label>{err&&<p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</p>}<button className="btn-primary w-full">ZALOGUJ</button></form></main>}
-function NewTask({close,saved}:{close:()=>void;saved:()=>void}){const[form,setForm]=useState({rodzaj:"pomiar",tytul:"",instrukcja:"",priorytet:"normalny"});const[towar,setTowar]=useState<Towar|null>(null);const[err,setErr]=useState("");const set=(k:string,v:string)=>setForm(x=>({...x,[k]:v}));async function submit(e:React.FormEvent){e.preventDefault();try{await api("/api/zadania-terenowe",{method:"POST",body:JSON.stringify({...form,twId:towar?towar.id:null,zrodlo:"panel"})});saved();close()}catch(x){setErr((x as Error).message)}}return <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><form onSubmit={submit} className="card w-full max-w-xl p-6"><div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-bold">Nowe zadanie dla magazynu</h2><button type="button" onClick={close} className="text-slate-500">✕</button></div><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Rodzaj<select className="field mt-1" value={form.rodzaj} onChange={e=>set("rodzaj",e.target.value)}><option value="pomiar">Pomiar</option><option value="zdjecie">Zdjęcie</option><option value="weryfikacja">Weryfikacja</option><option value="inne">Inne</option></select></label><label className="text-sm font-semibold">Priorytet<select className="field mt-1" value={form.priorytet} onChange={e=>set("priorytet",e.target.value)}><option value="normalny">Normalny</option><option value="pilny">Pilny</option></select></label></div><label className="mt-4 block text-sm font-semibold">Tytuł<input className="field mt-1" placeholder="Np. zmierz rozstaw otworów" value={form.tytul} onChange={e=>set("tytul",e.target.value)}/></label><label className="mt-4 block text-sm font-semibold">Instrukcja<textarea className="field mt-1 min-h-28" placeholder="Co i jak zmierzyć; podaj jednostkę." value={form.instrukcja} onChange={e=>set("instrukcja",e.target.value)}/></label><div className="mt-4"><div className="mb-1 text-sm font-semibold">Towar <span className="font-normal text-slate-500">(opcjonalnie — hala zobaczy symbol i półkę)</span></div><Wyszukiwarka wybrany={towar} onWybierz={setTowar} api={api}/></div>{err&&<p className="mt-4 text-sm text-red-700">{err}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={close} className="btn-secondary">Anuluj</button><button className="btn-primary"><Ruler size={17}/>Wyślij na kolektor</button></div></form></div>}
-function App(){const[auth,setAuth]=useState(!!localStorage.getItem(KEY));const[ekran,setEkran]=useState(location.pathname.startsWith("/obsluga/skrzynka")?"skrzynka":"zadania");const[mojeId,setMojeId]=useState<number|null>(null);useEffect(()=>{if(auth)api("/api/auth/me").then(d=>setMojeId(d.user.userId)).catch(()=>setMojeId(null))},[auth]);const[tasks,setTasks]=useState<Task[]>([]);const[filter,setFilter]=useState("otwarte");const[modal,setModal]=useState(false);const[err,setErr]=useState("");async function load(){try{const d=await api("/api/zadania-terenowe");setTasks(d.zadania);setErr("")}catch(x){if((x as Error).message.includes("zaloguj")){localStorage.removeItem(KEY);setAuth(false)}else setErr((x as Error).message)}}useEffect(()=>{if(auth){load();const id=setInterval(load,15000);return()=>clearInterval(id)}},[auth]);if(!auth)return <Login done={()=>setAuth(true)}/>;const shown=tasks.filter(t=>filter==="wszystkie"||(filter==="otwarte"?["nowe","w_toku"].includes(t.status):t.status===filter));return <div className="min-h-screen"><header className="sticky top-0 z-20 border-b border-slate-200 bg-wertis-ink text-white"><div className="mx-auto flex max-w-[1500px] items-center gap-4 px-5 py-3"><div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22}/></div><div className="mr-auto"><b>WERTIS</b><span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div><nav className="mr-3 flex rounded-lg bg-white/10 p-1">{[["zadania","Zadania",<ClipboardList size={16}/>],["skrzynka","Skrzynka",<Inbox size={16}/>]].map(([v,l,i]:any)=><button key={v} onClick={()=>{setEkran(v);history.replaceState(null,"",v==="skrzynka"?"/obsluga/skrzynka":"/obsluga/")}} className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${ekran===v?"bg-wertis-amber text-wertis-ink":"text-slate-300"}`}>{i}{l}</button>)}</nav>{ekran==="zadania"&&<button className="btn-primary" onClick={()=>setModal(true)}><Plus size={18}/>ZADANIE DLA MAGAZYNU</button>}<button className="rounded-lg p-2 text-slate-400 hover:bg-white/10" onClick={()=>{localStorage.removeItem(KEY);setAuth(false)}} title="Wyloguj"><LogOut size={20}/></button></div></header><main className="mx-auto max-w-[1500px] p-5">{ekran==="skrzynka"?<Skrzynka api={api} mojeId={mojeId}/>:<><div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-bold">Zadania terenowe</h1><p className="text-sm text-slate-500">Pomiary i weryfikacje wracają bezpośrednio z kolektorów.</p></div><div className="flex rounded-lg border bg-white p-1">{[["otwarte","Otwarte"],["wykonane","Wykonane"],["wszystkie","Wszystkie"]].map(([v,l])=><button key={v} onClick={()=>setFilter(v)} className={`rounded-md px-4 py-2 text-sm font-semibold ${filter===v?"bg-wertis-ink text-white":"text-slate-600"}`}>{l}</button>)}</div></div>{err&&<div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{err}</div>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{shown.map(t=><article key={t.id} className={`card overflow-hidden ${t.priorytet==="pilny"?"border-red-300":""}`}><div className="flex items-start gap-3 p-5"><div className={`rounded-lg p-2 ${t.status==="wykonane"?"bg-emerald-100 text-emerald-700":t.priorytet==="pilny"?"bg-red-100 text-red-700":"bg-amber-100 text-amber-700"}`}>{t.status==="wykonane"?<CheckCircle2/>:t.priorytet==="pilny"?<AlertTriangle/>:<Ruler/>}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-bold">{t.tytul}</h2>{t.priorytet==="pilny"&&<span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">PILNE</span>}</div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{t.instrukcja}</p></div></div>{t.symbol&&<div className="border-y bg-slate-50 px-5 py-3 text-sm"><b>{t.symbol}</b> · {t.nazwaTowaru}<div className="text-slate-500">Lokalizacja: {t.lokalizacja||"brak"}</div></div>}<div className="space-y-2 p-5 text-sm">{t.przypisanoPrzez&&<p><Clock className="mr-2 inline" size={15}/>{t.status==="wykonane"?"Wykonał":"Realizuje"}: <b>{t.status==="wykonane"?t.wykonanoPrzez:t.przypisanoPrzez}</b></p>}{t.wynik&&<div className="rounded-lg bg-emerald-50 p-3"><div className="mb-1 text-xs font-bold uppercase text-emerald-700">Wynik z magazynu</div><p className="whitespace-pre-wrap">{t.wynik}</p></div>}<p className="text-xs text-slate-400">Zlecił(a) {t.utworzonoPrzez} · {new Date(t.utworzonoAt).toLocaleString("pl")}</p></div></article>)}</div>{!shown.length&&<div className="card grid place-items-center p-16 text-center text-slate-500"><ClipboardList size={38}/><p className="mt-3 font-semibold">Brak zadań w tym widoku</p></div>}</>}</main>{modal&&<NewTask close={()=>setModal(false)} saved={load}/>}</div>}
-createRoot(document.getElementById("root")!).render(<React.StrictMode><App/></React.StrictMode>);
+import React, { useState } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ClipboardList, Inbox, LogOut, Warehouse } from "lucide-react";
+import { BrakSesji, token, wyczyscToken } from "./api/klient";
+import { useZdrowie } from "./api/rozmowy";
+import { czas } from "./ui";
+import { Logowanie } from "./ekrany/Logowanie";
+import { Skrzynka } from "./ekrany/Skrzynka";
+import { Zadania } from "./ekrany/Zadania";
+import "./index.css";
+
+/* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
+   piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
+   za którą płacimy TanStackiem: ekrany dzielą stan zamiast każdy swój. */
+const klient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      /* Sesja wygasła nie jest błędem do ponowienia — ekran ma wrócić do
+         logowania. Bez tego panel próbowałby trzy razy i pokazał błąd. */
+      retry: (proba, blad) => !(blad instanceof BrakSesji) && proba < 2,
+      staleTime: 10_000,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
+
+const ZAKLADKI = [
+  { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} /> },
+  { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} /> },
+];
+
+/* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
+   ją widzieć z każdej zakładki. Awaria integracji, o której wie tylko jeden
+   ekran, jest awarią widoczną dopiero wtedy, gdy ktoś na ten ekran wejdzie. */
+function PigulkaSynchronizacji() {
+  const { data } = useZdrowie();
+  if (!data) return null;
+  const i = data.allegroInbox;
+  const zle = i.status !== "current";
+  return <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
+    zle ? "bg-red-500/20 text-red-100" : "bg-white/10 text-slate-300"}`}>
+    <span className={`h-2 w-2 rounded-full ${zle ? "bg-red-400" : "bg-emerald-400"}`} />
+    {i.alarm
+      ? `Synchronizacja stanęła ${czas(i.ostatniaUdanaSynchronizacja).slice(-8, -3)}`
+      : `Synchronizacja ${czas(i.ostatniaUdanaSynchronizacja).slice(-8, -3) || "—"} · ${
+          i.liczbaBledow} błędów`}
+  </div>;
+}
+
+function Naglowek({ wyloguj }: { wyloguj: () => void }) {
+  const { pathname } = useLocation();
+  const naSkrzynce = pathname.startsWith("/obsluga/skrzynka");
+  return <header className="sticky top-0 z-20 border-b border-slate-200 bg-wertis-ink text-white">
+    <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-5 py-3">
+      <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
+      <div className="mr-auto"><b>WERTIS</b>
+        <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
+      <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
+        {ZAKLADKI.map((z) => {
+          const aktywna = z.do.endsWith("skrzynka") ? naSkrzynce : !naSkrzynce;
+          return <Link key={z.do} to={z.do}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${
+              aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
+            {z.ikona}{z.etykieta}</Link>;
+        })}
+      </nav>
+      <PigulkaSynchronizacji />
+      <button className="rounded-lg p-2 text-slate-400 hover:bg-white/10" onClick={wyloguj}
+        title="Wyloguj" aria-label="Wyloguj"><LogOut size={20} /></button>
+    </div>
+  </header>;
+}
+
+function App() {
+  const [zalogowany, setZalogowany] = useState(Boolean(token()));
+  if (!zalogowany) return <Logowanie zalogowano={() => setZalogowany(true)} />;
+  return <div className="min-h-screen">
+    <Naglowek wyloguj={() => { wyczyscToken(); klient.clear(); setZalogowany(false); }} />
+    <main className="mx-auto max-w-[1500px] p-5">
+      <Routes>
+        <Route path="/obsluga/" element={<Zadania />} />
+        {/* Rozmowa ma własny adres, więc odświeżenie strony jej nie gubi,
+            a link do sprawy da się wkleić koledze. */}
+        <Route path="/obsluga/skrzynka" element={<Skrzynka />} />
+        <Route path="/obsluga/skrzynka/:id" element={<Skrzynka />} />
+        <Route path="*" element={<Navigate to="/obsluga/" replace />} />
+      </Routes>
+    </main>
+  </div>;
+}
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={klient}>
+      <BrowserRouter><App /></BrowserRouter>
+    </QueryClientProvider>
+  </React.StrictMode>,
+);

@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
 import { currentDevice, currentUserRef } from "../context.js";
 
@@ -18,9 +19,16 @@ export function logEvent(
    * z bufora offline wykonana przed zmianą zmiany (patrz `autorOperacji`).
    * `undefined` = zwykła ścieżka, konto bierzemy z sesji.
    */
-  userRef?: number | null
+  userRef?: number | null,
+  /**
+   * Baza, do której idzie wpis. Domyślnie globalna — ale serwisy rozmów
+   * przyjmują bazę parametrem, żeby ich testy stały na bazie w pamięci.
+   * Bez tego audyt mutacji rozmowy pisałby gdzie indziej niż sama mutacja,
+   * czyli poza transakcją, która ją obejmuje.
+   */
+  database: DatabaseSync = db()
 ): void {
-  db()
+  database
     .prepare(
       "INSERT INTO events(type, tw_id, payload, user_id, device_id, user_ref) VALUES (?,?,?,?,?,?)"
     )

@@ -33,6 +33,154 @@ historii nie przepisujemy.
 
 ---
 
+## 0.148.0 — 1 września 2026
+
+**[wymaga działania]** Wysyłka odpowiedzi do Allegro jest włączona. Od tego
+wydania treść wychodzi z WERTIS na zewnątrz. Polityka danych w
+`docs/obsluga-klienta.md` dostała osobny rozdział o tym, co dokładnie wychodzi
+i na czyje kliknięcie.
+
+**[wymaga działania]** Kształt żądania POST pochodzi z pamięci, nie
+z dokumentacji Allegro. Decyzja właściciela, podjęta wbrew regule z rozdziału 8
+projektu panelu. Mapowanie stoi w jednej funkcji, nosi znacznik `[WERYFIKUJ]`
+i ma osobną sekcję w `docs/allegro-ksztalt.md`. Pierwsza wysyłka na produkcji
+jest testem kontraktu — zrób ją świadomie, na rozmowie, którą znasz.
+
+Jeśli kształt jest inny, Allegro odpowie 400 albo 422. Kolejka zapisze to jako
+`send_failed` razem z odpowiedzią serwera i to ona poda właściwy kształt.
+Do klienta nie wyjdzie nic po cichu.
+
+**Podwójne kliknięcie nie tworzy drugiej odpowiedzi.** Klucz idempotencji
+wylicza serwer z rozmowy, pytania i treści. Dwie zakładki i dwa kliknięcia dają
+ten sam klucz, więc drugi strzał nie idzie do Allegro.
+
+**Dopisek klienta zatrzymuje wysyłkę.** Serwer zwraca 409, szkic zostaje
+nietknięty, a panel stawia dialog z porównaniem szkicu i nowej wiadomości.
+Wysyłka mimo to wymaga zaznaczenia zgody — to blizna 0.110.0.
+
+Kontrola świeżości porównuje ostatnią wiadomość KLIENTA, nie ostatnią w ogóle.
+Inaczej własna odpowiedź blokowałaby kolejną w tej samej rozmowie.
+
+**Po niejednoznacznym timeoucie nic nie idzie ponownie.** Próba zostaje w stanie
+`send_uncertain` i blokuje kolejną, dopóki synchronizacja nie sprawdzi, czy
+odpowiedź już jest w wątku.
+
+**Wiadomość wychodząca powstaje tylko z numerem od Allegro.** Bez numeru
+synchronizacja przyniosłaby ją drugi raz i na osi stanęłyby dwie.
+
+**Szkic znika dopiero po udanej wysyłce.** Przy każdym innym końcu zostaje.
+
+**Licznik `[WERYFIKUJ]` obejmuje teraz oba dokumenty kontraktowe.** Do tej pory
+skanował wyłącznie `docs/subiekt-gt-struktura.md`, więc znacznik postawiony
+gdziekolwiek indziej przechodził bez kontroli.
+
+## 0.147.0 — 1 września 2026
+
+**Awaria synchronizacji przestaje być cicha.** Po więcej niż dwóch nieudanych
+przebiegach panel pokazuje trwały baner: ile przebiegów padło, dlaczego i jak
+stare są dane na ekranie. Kolejka dostaje wtedy plakietkę „STAN Z", gasnie
+i mówi, że dalsze wiersze mogą czekać w Allegro.
+
+Pusta kolejka o 9:41 znaczy co innego, gdy synchronizator stanął o 7:05.
+Do tej pory ekran nie odróżniał tych dwóch rzeczy.
+
+**Synchronizacja ma status, a nie samą liczbę błędów.** Kod porażki rozstrzyga
+przed jej liczbą: 401 znaczy „zawołaj admina", 429 znaczy „poczekaj". Statusy
+pochodzą z rozdziału 7 projektu panelu.
+
+**[wymaga działania]** Licznik błędów zeruje się przy udanym przebiegu. Do tej
+pory klauzula zapisu go pomijała, więc rósł do końca życia bazy — pierwsza
+w tygodniu odmowa Allegro zostawiała w panelu „błędów: 1" na stałe. Po
+aktualizacji licznik pokazuje nieudane przebiegi Z RZĘDU. Istniejące bazy
+wyzerują go przy pierwszej udanej synchronizacji.
+
+**Ręczna synchronizacja z panelu.** Przycisk nie omija przerwy, o którą
+poprosiło Allegro — skraca tylko czekanie po jej końcu. Ekran mówi to wprost.
+
+**Przegrany wyścig o rozmowę pokazuje trzy rzeczy.** Kto prowadzi, kiedy
+przejął i na której wersji stoi rozmowa wobec tej, którą niosło żądanie.
+Czas bierze się z historii przypisań, nie ze znacznika zmiany rozmowy.
+
+**Administrator może odebrać rozmowę, ale wyłącznie z powodem.** Powód idzie
+do dziennika razem z autorem, czasem i wersją przed i po. Poprzednie
+przypisanie zamyka się, zamiast zniknąć.
+
+**Pytanie bez numeru oferty dostaje trzy wyjścia.** Agent wskazuje ofertę
+ręcznie, wskazuje kartotekę wyszukiwarką albo dopytuje klienta. Wskazanie
+ręczne zapisuje się jako wybór agenta i tak wygląda na osi — panel nadal nie
+dobiera towaru z najdłuższych słów treści.
+
+**`/api/health` raportuje stan integracji.** Status połączenia, ostatnia próba
+z kodem, wiek danych, wątki z błędem, rozmowy oczekujące i wiek najstarszego
+zadania. Panel pokazuje to w osobnym kafelku.
+
+## 0.146.0 — 1 września 2026
+
+**[wymaga działania]** Panel obsługi ma nowe zależności, więc po `git pull`
+trzeba `npm ci`, a nie samo `npm run build`.
+
+**Rozmowa ma własny adres.** `/obsluga/skrzynka/4821` otwiera tę rozmowę,
+przetrwa odświeżenie strony i da się wkleić koledze. Do tej pory panel
+zapisywał numer rozmowy w adresie i nigdy go stamtąd nie odczytywał, więc
+odświeżenie wracało do pustego ekranu.
+
+**Panel przestaje być trzema plikami.** `main.tsx` trzymał całą aplikację
+w trzynastu linijkach, razem z logowaniem, ekranem zadań i nagłówkiem.
+Teraz stoi tam sam router, a reszta mieszka w `api/`, `ui/`, `ekrany/`
+i `skrzynka/`. Kolejne ekrany mają dokładać pliki, a nie puchnąć te same.
+
+**Wspólny cache zapytań zastępuje odświeżanie co piętnaście sekund.** Lista
+zadań odpytywała serwer zegarem, a skrzynka przeładowywała się w całości przy
+każdym zdarzeniu. Teraz zdarzenie unieważnia dokładnie ten fragment, którego
+dotyczy.
+
+**Szyna zdarzeń łączy się ponownie po zerwaniu.** Wcześniej zerwany strumień
+zostawiał ekran, który wyglądał na żywy i milczał do końca zmiany. Odczekiwanie
+rośnie dwukrotnie do pół minuty, żeby padnięty serwer nie dostał pętli żądań.
+
+**Formularze mają walidację w jednym miejscu.** Logowanie i zadanie dla
+magazynu sprawdzają dane schematem, a nie warunkami wpisanymi przy wysyłce.
+
+**Front dostaje testy — pierwsze w historii panelu.** Dziewięć testów Vitest
+pilnuje kolejki i rozdziału trzech odpowiedzi serwera: wygasłej sesji,
+konfliktu wersji i zwykłego błędu. Dwa testy Playwrighta sprawdzają, że
+adresy ekranów prowadzą do panelu. Testy Vitest wchodzą do CI.
+
+**Serwer przestaje wypisywać ścieżki ekranów z ręki.** Stały tam dwie sztuki
+i każdy nowy ekran dawał 404 po odświeżeniu, dopóki ktoś nie dopisał go
+w kodzie serwera.
+
+**Tokeny makiet wchodzą do konfiguracji Tailwinda.** Barwy statusów rozmowy,
+rangi wierszy stanu i tła wpisów osi mają jedno źródło.
+
+## 0.145.1 — 1 września 2026
+
+**Przejęcie rozmowy przestaje zapisywać się w ciszy.** Przejęcie, zapis szkicu
+i komentarz wewnętrzny zostawiają wpis w dzienniku zdarzeń. Do tej pory
+`services/conversations.ts` nie wołał `logEvent` ani razu.
+
+To jest blizna 0.137.1 kupiona drugi raz. Wtedy trzy przejęcia sprawy
+przechodziły bez śladu; teraz to samo dotyczyło rozmów z nowego modelu obsługi.
+Dziennik niesie wersję rozmowy przed i po, ale nigdy treści — rozdział 19
+projektu panelu zabrania wpuszczać wiadomości do ogólnego logu.
+
+**Rozmowa zapisuje historię przypisań, nie samo pole właściciela.** Tabela
+`conversation_assignment` stała pusta od 0.144.0, bo nikt do niej nie pisał.
+Bez czasu przejęcia ekran przegranego wyścigu nie ma czego pokazać poza nazwiskiem.
+
+**Trasy skrzynki i serwis rozmów dostają testy.** Osiem tras stało bez ani
+jednego sprawdzenia, w tym bramka roli na odczycie. Nowe testy pilnują, że hala
+nie zobaczy rozmów, że patrzenie na skrzynkę niczego nie zapisuje i że konflikt
+wersji wraca jako 409 z właścicielem.
+
+**`logEvent` przyjmuje bazę parametrem.** Bez tego audyt mutacji rozmowy pisałby
+poza transakcją, która tę mutację obejmuje. Przy okazji `migrate` jest
+eksportowane: baza zbudowana z samego `schema.sql` nie ma kolumny `user_ref`,
+więc test na takiej bazie sprawdzał kształt nieistniejący na produkcji.
+
+**Panel przestaje zamawiać dziewięć bibliotek jako `"latest"`.** Tak React
+przeskoczył z 18 na 19 przy zwykłym `npm install`, bez decyzji i bez wpisu tutaj.
+
 ## 0.145.0 — 1 września 2026
 
 **Agent przestaje wpisywać numer towaru z pamięci.** Formularz zadania

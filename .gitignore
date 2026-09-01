@@ -48,3 +48,7 @@ __pycache__/
 # Źródłem są pliki .dc.html w docs/projekt-widokow, kanwę składa się z nich
 # od nowa przy każdej zmianie.
 .design/
+
+# Artefakty testów end-to-end panelu obsługi (Playwright).
+panel/test-results/
+panel/playwright-report/

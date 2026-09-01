@@ -628,7 +628,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Konto kanału, rozmowa, wiadomość | **działa** od 0.144.0 | `channel_account`, `conversation`, `message` |
 | Synchronizacja skrzynki Allegro | **działa** od 0.142.1 | `services/allegro-inbox-sync.ts` |
 | Surowe lądowisko odpowiedzi kanału | **działa** | `allegro_inbox_thread`, `allegro_inbox_message` |
-| Lista rozmów i oś czasu | **działa** od 0.143.0 | `services/skrzynka.ts`, `panel/src/skrzynka.tsx` |
+| Lista rozmów i oś czasu | **działa** od 0.143.0 | `services/skrzynka.ts`, `panel/src/skrzynka/` |
 | Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
 | Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
 | Komentarze i wzmianki | **model gotowy**, brak ekranu | `conversation_comment`, `conversation_mention` |
@@ -640,7 +640,17 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kartoteka wywiedziona z oferty | **następne** | czeka na dostęp do dokumentacji Allegro |
 | Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
-| Wysyłka do Allegro (§8.5) | **projekt** | świadomie wyłączona |
+| Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
+| Kształt POST wysyłki | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
+| Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
 | Baza wiedzy i dobór części (§11–12) | **projekt** | etapy E i dalsze |
 | Copilot (§14) | **projekt** | etap F |
-| Front na TanStack, Router, shadcn | **projekt** | zatwierdzone w §10, osobne wydanie |
+| Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
+| Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
+| Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |
+| Status synchronizacji (§7) | **działa** od 0.147.0 | `statusSynchronizacji` |
+| Trwały alarm synchronizacji (§21) | **działa** od 0.147.0 | `skrzynka/AlarmSynchronizacji.tsx` |
+| Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
+| Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
+| Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
+| Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
