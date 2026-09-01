@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Kubelek, Zwrot } from "../api/typy";
 
 /* Ten plik istnieje przez usterkę znalezioną OKIEM, nie testem: przełączenie
@@ -14,10 +16,12 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   id, externalId: `zw-${id}`, numer, orderId: `ord-${id}`,
   utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z",
   kubelek, sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z", dniDoTerminu: 7,
-  sumaPozycjiGrosze: 4999, waluta: "PLN", werdykt: null, kwotaGrosze: null,
+  sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
+  linkZwrotu: null, zamowienie: null, werdykt: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, rejectionCode: null, wersja: 1,
   pozycje: [{ id, offerId: "1", nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
-    waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null }],
+    waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
+    url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null }],
 });
 
 const ZWROTY = [zwrot(1, "decyzja", "ZW-1"), zwrot(2, "zwrot", "ZW-2")];
@@ -37,12 +41,13 @@ vi.mock("../api/zwroty", async () => {
 const { Zwroty } = await import("./Zwroty");
 
 const pokaz = (adres = "/obsluga/zwroty") =>
-  render(<MemoryRouter initialEntries={[adres]}>
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter initialEntries={[adres]}>
     <Routes>
       <Route path="/obsluga/zwroty" element={<Zwroty />} />
       <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
     </Routes>
-  </MemoryRouter>);
+  </MemoryRouter></QueryClientProvider>);
 
 describe("Ekran zwrotów", () => {
   it("kubełek niesie pytanie, a nie samą etykietę", () => {

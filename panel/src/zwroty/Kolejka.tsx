@@ -2,6 +2,7 @@ import React from "react";
 import { AlertTriangle, PackageX, Ban } from "lucide-react";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
+import { Zdjecie } from "./Zdjecie";
 
 /* ── Kolejka zwrotów ─────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej
@@ -68,7 +69,13 @@ export function Kolejka({ zwroty, wybrany, onWybierz }: {
              ma być wybrany także dla czytnika ekranu. */
           aria-current={aktywny ? "true" : undefined}
           onClick={() => onWybierz(z.id)}
-          className={`w-full px-4 py-3 text-left ${aktywny ? "bg-amber-50" : "hover:bg-slate-50"}`}>
+          className={`flex w-full gap-3 px-4 py-3 text-left ${aktywny ? "bg-amber-50" : "hover:bg-slate-50"}`}>
+          {/* Miniatura PIERWSZEJ pozycji. Zwrot wielopozycyjny i tak
+              rozstrzyga się w kolumnie dowodów, a rząd czterech kafli
+              zrobiłby z wiersza tabelę. */}
+          <Zdjecie twId={z.pozycje[0]?.twId ?? null} rozmiar={44}
+            nazwa={z.pozycje[0]?.nazwa} />
+          <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-bold">{z.numer ?? z.externalId}</span>
             <span className="ml-auto" />
@@ -88,6 +95,7 @@ export function Kolejka({ zwroty, wybrany, onWybierz }: {
                 {SYGNALY[s].ikona}{s === "termin" ? "termin" : s === "brak_dowodu" ? "bez paczki" : "w Allegro"}
               </span>
             ))}
+          </div>
           </div>
         </button>
       </li>;
