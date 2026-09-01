@@ -4,6 +4,7 @@ import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.ht
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
 
 /* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md. Do 0.151.0
@@ -51,6 +52,8 @@ export interface InboxSyncDeps {
   apiUrl?: string;
   intervalMs?: number;
   accountId?: string;
+  /** Granica czasu; `null` znaczy „bez progu". Patrz `config.allegro.inboxOd`. */
+  inboxOd?: string | null;
 }
 
 /** Jeden przebieg. Sieć kończy się przed zapisem, więc wolne API nie blokuje SQLite. */
@@ -60,6 +63,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const now = deps.now ?? (() => new Date());
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const interval = deps.intervalMs ?? config.allegro.inboxSyncMs;
+  const od = deps.inboxOd !== undefined ? deps.inboxOd : config.allegro.inboxOd;
   const startState = stanSynchronizacji(database);
   const threads: Thread[] = [];
   const messages = new Map<string, Message[]>();
@@ -69,10 +73,24 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const widziane: Thread[] = [];
   let offset = 0;
   let reachedCursor = false;
+  let poniżejGranicy = false;
   try {
     do {
       const page = tablica<Thread>(await query(urlWatkow(apiUrl, offset)), "threads");
       for (const thread of page) {
+        /* GRANICA CZASU (0.152.0). Lista przychodzi od najnowszego, więc
+           pierwszy wątek poniżej progu znaczy „dalej są już same starsze" —
+           i to jest jedyny moment, w którym wolno przestać czytać. Bez tego
+           każdy przebieg chodził przez całą historię konta aż do końca.
+
+           Wątek BEZ daty przepuszczamy: schemat Allegro dopuszcza brak
+           `lastMessageDateTime` (patrz 0.151.0), a świeżo założona rozmowa nie
+           ma jak mieć ostatniej wiadomości. Odrzucanie jej progiem znaczyłoby
+           rozmowę, której panel nigdy nie pokaże. */
+        if (od && thread.lastMessageDateTime && thread.lastMessageDateTime < od) {
+          poniżejGranicy = true;
+          break;
+        }
         widziane.push(thread);
         if (thread.lastMessageDateTime === startState.cursorAt && thread.id === startState.cursorId) {
           reachedCursor = true;
@@ -88,7 +106,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
         }
       }
       offset += page.length;
-      if (page.length < 20) break;
+      if (poniżejGranicy || page.length < 20) break;
     } while (!reachedCursor);
 
     const at = now().toISOString();
@@ -167,10 +185,10 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
          wtedy, gdy skrzynka gubiła wątki. */
       database.prepare(`INSERT INTO allegro_inbox_sync_state
         (id,cursor_at,cursor_id,last_success_at,last_attempt_at,last_error_code,
-         error_count,error_thread_count,next_attempt_at)
-        VALUES(1,?,?,?,?,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
+         last_error_text,error_count,error_thread_count,next_attempt_at)
+        VALUES(1,?,?,?,?,NULL,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
         cursor_id=excluded.cursor_id,last_success_at=excluded.last_success_at,
-        last_attempt_at=excluded.last_attempt_at,last_error_code=NULL,
+        last_attempt_at=excluded.last_attempt_at,last_error_code=NULL,last_error_text=NULL,
         error_count=0,error_thread_count=excluded.error_thread_count,
         next_attempt_at=excluded.next_attempt_at`).run(
           kursor?.lastMessageDateTime ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
@@ -185,11 +203,17 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
        („zawołaj admina"), 429 to `rate_limited` („poczekaj"). Bez zapamiętania
        kodu panel umiałby powiedzieć wyłącznie „nie udało się". */
     const kod = error instanceof BladLimituAllegro ? 429 : kodHttp(error);
+    /* Zdanie, nie tylko kod. Komunikaty z `wazneBearer` i `zapytajAllegro` są
+       pisane dla człowieka i niosą instrukcję, co kliknąć — przepisujemy je
+       bez zmian, zamiast budować drugi słownik powodów. Obcięcie chroni
+       kolumnę przed odpowiedzią serwera wklejoną w całości. */
+    const tekst = (error instanceof Error ? error.message : String(error)).slice(0, 500);
     database.prepare(`INSERT INTO allegro_inbox_sync_state
-      (id,error_count,last_attempt_at,last_error_code,next_attempt_at)
-      VALUES(1,1,?,?,?) ON CONFLICT(id) DO UPDATE SET error_count=error_count+1,
+      (id,error_count,last_attempt_at,last_error_code,last_error_text,next_attempt_at)
+      VALUES(1,1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET error_count=error_count+1,
       last_attempt_at=excluded.last_attempt_at,last_error_code=excluded.last_error_code,
-      next_attempt_at=excluded.next_attempt_at`).run(now().toISOString(), kod, next);
+      last_error_text=excluded.last_error_text,
+      next_attempt_at=excluded.next_attempt_at`).run(now().toISOString(), kod, tekst, next);
     throw error;
   }
 }
@@ -225,9 +249,26 @@ function najnowsza(messages: Message[]): string | null {
    ma, wołający zostaje przy loginie rozmówcy, czyli przy tym, co stało
    w `conversation.subject` do 0.151.0. */
 function temat(messages: Message[]): string | null {
-  return messages.find((m) => typeof m.subject === "string" && m.subject !== "")?.subject ?? null;
+  const s = messages.find((m) => typeof m.subject === "string" && m.subject !== "")?.subject;
+  return s === undefined ? null : odkodujEncje(s);
 }
 
+/* ENCJE HTML SCHODZĄ TUTAJ, przy wjeździe do modelu pracy — nie przy
+   wyświetlaniu. To jest blizna 0.127.0 („polskie znaki przyjeżdżały jako encje
+   HTML") z listy w `docs/obsluga-klienta.md`, kupiona DRUGI RAZ: `odkodujEncje`
+   czekała w `tekst.ts` z kompletem testów i z komentarzem mówiącym wprost, że
+   nowa obsługa ma ją wziąć gotową, nie odkryć drugi raz na produkcji. Odkryła
+   ją drugi raz na produkcji — panel escape'uje przy renderowaniu, więc
+   `kt&oacute;ry` z bazy stał na ekranie dosłownie, w każdej polskiej
+   wiadomości.
+
+   Specyfikacja tego nie zapowiada: `Message.text` to goły `type: string`, bez
+   słowa o HTML-u. Tak wygląda różnica między tym, co Allegro DEKLARUJE,
+   a tym, co przysyła.
+
+   LĄDOWISKO ZOSTAJE SUROWE. `allegro_inbox_message.text` i `surowe_json` niosą
+   odpowiedź w kształcie, w jakim przyszła — to jedyny ślad, gdyby dekodowanie
+   kiedyś skrzywdziło cudzy tekst. */
 function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], konto: number): void {
   database.prepare(`INSERT INTO conversation(channel_account_id, external_conversation_id, subject, unread, updated_at)
     VALUES (?,?,?,?,?) ON CONFLICT(channel_account_id, external_conversation_id)
@@ -255,7 +296,7 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej
          odpowiedzi rzucało `TypeError`. */
       flaga(message.author.isInterlocutor, "author.isInterlocutor") ? "incoming" : "outgoing",
-      message.text, oferta(message)[0], oferta(message)[1],
+      odkodujEncje(message.text), oferta(message)[0], oferta(message)[1],
       /* Data POJEDYNCZEJ wiadomości. Do 0.151.0 wszystkie wiadomości wątku
          dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
          daty wiadomości nie podaje. Podaje: `createdAt`. */

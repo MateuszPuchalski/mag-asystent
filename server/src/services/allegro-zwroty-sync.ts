@@ -74,8 +74,8 @@ export interface ZwrotySyncDeps {
   apiUrl?: string;
   intervalMs?: number;
   accountId?: string;
-  oknoDni?: number;
-  od?: string;
+  /** Próg bezwzględny; `null` znaczy „bez granicy". Patrz `config.allegro.zwrotyOd`. */
+  zwrotyOd?: string | null;
 }
 
 function tablica<T>(value: unknown, pole: string): T[] {
@@ -101,32 +101,6 @@ export function naGrosze(amount: string | undefined): number {
   return m[1] === "-" ? -grosze : grosze;
 }
 
-/**
- * Granica pierwszego pobrania.
- *
- * Data z konfiguracji wygrywa z oknem dnowym, bo jest STAŁA: mówi, gdzie
- * zaczyna się historia zwrotów tej firmy, i nie przesuwa się z każdym dniem.
- * Sama data (`2026-08-20`) znaczy początek tego dnia w UTC — zwrot zgłoszony
- * tego dnia rano ma wejść, a nie wypaść o kilka godzin.
- *
- * Śmieciowa wartość NIE cofa nas po cichu do okna dnowego: to byłby ten sam
- * gatunek cichej podmiany, przez który `MAG_ID_MAG=jeden` dawało kiedyś 1.
- */
-export function poczatekHistorii(
-  { od, oknoDni, teraz }: { od: string; oknoDni: number; teraz: Date },
-): string {
-  const czyste = (od ?? "").trim();
-  if (!czyste) return new Date(teraz.getTime() - oknoDni * 86_400_000).toISOString();
-  const pelna = /^\d{4}-\d{2}-\d{2}$/.test(czyste) ? `${czyste}T00:00:00.000Z` : czyste;
-  const ms = Date.parse(pelna);
-  if (!Number.isFinite(ms)) {
-    throw new Error(
-      `ALLEGRO_ZWROTY_OD=${od} — oczekiwano daty ISO, np. 2026-08-20. Popraw w wertis.env.`
-    );
-  }
-  return new Date(ms).toISOString();
-}
-
 /** Najwcześniejsza paczka; NULL znaczy „towar jeszcze nie wrócił". */
 function pierwszaPaczka(paczki: Paczka[] | undefined): string | null {
   const daty = (paczki ?? []).map((p) => p.createdAt).filter((d): d is string => Boolean(d));
@@ -140,22 +114,29 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
   const now = deps.now ?? (() => new Date());
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const interval = deps.intervalMs ?? config.allegro.zwrotySyncMs;
-  const oknoDni = deps.oknoDni ?? config.allegro.zwrotyOknoDni;
+  const od = deps.zwrotyOd !== undefined ? deps.zwrotyOd : config.allegro.zwrotyOd;
   const start = stanZwrotow(database);
 
-  /* Kursor rządzi, gdy jest; granica dat wchodzi TYLKO przy pierwszym
-     przebiegu. Trzymanie obu naraz zawężałoby wynik dwa razy i po jakimś
-     czasie cicho przestałoby oddawać cokolwiek nowego. */
-  const odKiedy = start.cursorId ? null : poczatekHistorii({
-    od: deps.od ?? config.allegro.zwrotyOd, oknoDni, teraz: now(),
-  });
+  /* Kursor rządzi w ZAPYTANIU, gdy jest; filtr dat wchodzi tylko przy pierwszym
+     przebiegu. Trzymanie obu naraz zawężałoby wynik dwa razy i cicho przestałoby
+     oddawać cokolwiek nowego.
+
+     Ale PRÓG to nie to samo co dawne okno względne (0.152.0). Okno było
+     wyłącznie oszczędnością pierwszego pobrania; próg jest granicą tego, co
+     firma w ogóle chce widzieć, więc obowiązuje ZAWSZE — także wtedy, gdy
+     kursor już stoi i zapytanie nie niesie żadnej daty. Dlatego oprócz filtra
+     w adresie tnie się jeszcze wynik, niżej. */
+  const odKiedy = start.cursorId ? null : od;
 
   const zebrane: Zwrot[] = [];
   try {
     for (let strona = 0; strona < MAKS_STRON; strona++) {
       const body = await query(urlListyZwrotow(apiUrl, odKiedy, strona * NA_STRONE, start.cursorId));
       const partia = tablica<Zwrot>(body, "customerReturns");
-      zebrane.push(...partia.filter((z) => typeof z?.id === "string"));
+      /* Zwrot BEZ daty przepuszczamy — `createdAt` jest w schemacie opcjonalne,
+         a cicha utrata zwrotu kosztuje więcej niż jeden rekord za progiem. */
+      zebrane.push(...partia.filter((z) => typeof z?.id === "string"
+        && !(od && z.createdAt && z.createdAt < od)));
       if (partia.length < NA_STRONE) break;
     }
 

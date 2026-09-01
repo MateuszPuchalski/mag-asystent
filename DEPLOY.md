@@ -170,8 +170,11 @@ mkdir -p /c/wertis/logs
 # API (razem z podglądem biura pod /biuro)
 nssm install wertis-api 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\index.js'
 nssm set wertis-api AppDirectory 'C:\wertis'
-nssm set wertis-api AppStdout 'C:\wertis\logs\api.log'
-nssm set wertis-api AppStderr 'C:\wertis\logs\api.err.log'
+# Nazwy plików MUSZĄ zgadzać się z instalatorem (`instalator/uslugi.ps1`),
+# bo to on je tworzy u klienta: dziennik nazywa się nazwą usługi. Do 0.152.0
+# stało tu `api.log` i szukanie awarii kończyło się na `PathNotFound`.
+nssm set wertis-api AppStdout 'C:\wertis\logs\wertis-api.log'
+nssm set wertis-api AppStderr 'C:\wertis\logs\wertis-api.err.log'
 nssm set wertis-api AppRotateFiles 1
 nssm set wertis-api AppRotateBytes 10485760
 nssm set wertis-api Start SERVICE_AUTO_START
@@ -180,8 +183,8 @@ nssm set wertis-api AppExit Default Restart
 # Worker zapisu (lokalizacje; gdy SFERA_WORKER=0 bierze też zadania MM)
 nssm install wertis-worker 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\worker\worker.js'
 nssm set wertis-worker AppDirectory 'C:\wertis'
-nssm set wertis-worker AppStdout 'C:\wertis\logs\worker.log'
-nssm set wertis-worker AppStderr 'C:\wertis\logs\worker.err.log'
+nssm set wertis-worker AppStdout 'C:\wertis\logs\wertis-worker.log'
+nssm set wertis-worker AppStderr 'C:\wertis\logs\wertis-worker.err.log'
 nssm set wertis-worker AppRotateFiles 1
 nssm set wertis-worker Start SERVICE_AUTO_START
 nssm set wertis-worker AppExit Default Restart
@@ -1436,7 +1439,7 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
-**Aktualizacja do 0.152.0 — dwie czynności.**
+**Aktualizacja do 0.153.0 — dwie czynności.**
 
 **Po pierwsze: usuń stare lądowiska zwrotów.** Do 0.151.0 kolumna
 `allegro_zwrot.surowe_json` zapisywała odpowiedź Allegro dosłownie, razem
@@ -1453,10 +1456,11 @@ Nic przez to nie ginie: lądowisko jest kopią odpowiedzi, a model pracy
 (`zwrot_klienta`) zostaje nietknięty. Najbliższa synchronizacja zapisze
 te zwroty ponownie, już po oczyszczeniu.
 
-**Po drugie: sprawdź datę początku historii.** Zwroty bierzemy od 20 sierpnia
-2026 (`ALLEGRO_ZWROTY_OD`). Jeśli firma ma zacząć od innego dnia, wpisz go do
-`wertis.env` PRZED pierwszym uruchomieniem — po nim rządzi już kursor i zmiana
-daty niczego nie cofnie.
+**Po drugie: próg zwrotów przesuwa się na 20 sierpnia 2026.** Domyślne
+`ALLEGRO_ZWROTY_OD` to teraz `2026-08-19T22:00:00Z` (północ czasu lokalnego)
+zamiast 20 lipca. Zwroty sprzed tej daty przestaną być widoczne przy
+najbliższym przebiegu — próg jest bezwzględny i działa też wtedy, gdy kursor
+już stoi. Jeśli w `wertis.env` stoi własna wartość, to ona nadal rządzi.
 
 **Odnośniki do panelu Allegro mogą wymagać poprawki.** Adresy stron panelu
 sprzedawcy nie są przez Allegro udokumentowane, więc domyślne wzorce są
@@ -1466,15 +1470,29 @@ w `wertis.env`. Pusta wartość wyłącza odnośnik i zostawia sam tekst.
 
 **Zdjęcia w panelu obsługi działają tylko przy włączonym `ZDJECIA_ZRODLO`.**
 Bez niego kafle pokazują „bez zdjęcia" i nic więcej się nie psuje.
+**Aktualizacja do 0.152.0 wymaga JEDNEJ zmiany w `wertis.env`: usuń
+`ALLEGRO_ZWROTY_DNI_WSTECZ`.** Okno względne zastąpił próg bezwzględny
+`ALLEGRO_ZWROTY_OD`. Zostawiony wpis zatrzyma start z komunikatem — celowo,
+bo ciche zignorowanie znaczyłoby, że ktoś liczy na ustawienie, które nic
+nie robi.
+
+**To wydanie KASUJE dane sprzed granic.** Skrzynka pokazuje rozmowy od
+1 września 2026, zwroty — od 20 lipca 2026. Wszystko wcześniejsze znika
+z bazy przy pierwszym starcie, a liczba usuniętych wierszy trafia do audytu.
+Progi ustawiają `ALLEGRO_INBOX_OD` i `ALLEGRO_ZWROTY_OD`; cofnięcie progu
+i ponowna synchronizacja sprowadzą dane z powrotem z Allegro.
+
+Granica skrzynki działa na WĄTEK: rozmowa z jedną wrześniową wiadomością
+zostaje w całości, razem z wcześniejszym kontekstem.
 
 **Aktualizacja do 0.150.0 nie wymaga niczego ręcznego.** Pięć nowych tabel
 zwrotów dochodzi migracją przy pierwszym starcie. Ticker zwrotów rusza tylko
 przy sparowanym koncie Allegro w trybie `http`, a jego domyślny odstęp to
 pięć minut. Nowego APK to wydanie nie potrzebuje.
 
-**Pierwszy przebieg pobiera zwroty z dziewięćdziesięciu dni wstecz.** Potem
-rządzi kursor i pobierane są tylko nowe. Okno zmienia
-`ALLEGRO_ZWROTY_DNI_WSTECZ`, ale działa ono raz — na świeżej bazie.
+**Zwroty widać od progu `ALLEGRO_ZWROTY_OD`** (od 0.152.0; wcześniej było to
+okno względne `ALLEGRO_ZWROTY_DNI_WSTECZ`). Próg obowiązuje zawsze, także gdy
+kursor już stoi. Poza nim rządzi kursor i pobierane są tylko nowe zwroty.
 
 **Gdy zakładka ZWROTY jest pusta, odpowiedź stoi w pasku stanu panelu.**
 Ten sam blok co przy skrzynce mówi, kiedy była ostatnia udana synchronizacja

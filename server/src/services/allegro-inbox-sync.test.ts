@@ -16,25 +16,30 @@ const mkDb = () => { const d = new DatabaseSync(":memory:"); d.exec(schema); mig
    `relatedObject` — i to on jest powodem, dla którego skrzynka nigdy nie
    zapisała ani jednego wątku. Testy nie mają prawa opisywać wygodniejszego
    Allegro niż prawdziwe. */
-const thread = (n: number, date = `2026-08-${String(30 - n).padStart(2, "0")}T12:00:00Z`) => ({
+/* Daty fixture'ów stoją ZA granicą produkcyjną (1 września 2026). Sierpniowe
+   znaczyłyby dziś „przed progiem" i testy mierzyłyby granicę tam, gdzie
+   sprawdzają co innego. */
+const thread = (n: number, date = `2026-09-${String(30 - n).padStart(2, "0")}T12:00:00Z`) => ({
   id: `t-${n}`, read: false, lastMessageDateTime: date,
   interlocutor: { login: `anon-${n}`, avatarUrl: `https://a.example.test/anon-${n}` },
 });
 const message = (id: string, nadpisz: Record<string, unknown> = {}) => ({
-  id, status: "DELIVERED", type: "MESSAGE_CENTER", createdAt: "2026-08-29T11:00:00Z",
+  id, status: "DELIVERED", type: "MESSAGE_CENTER", createdAt: "2026-09-29T11:00:00Z",
   thread: { id: "t-1" }, author: { login: "anon", isInterlocutor: true },
   text: "zanonimizowana treść", subject: "Zanonimizowany temat",
   relatesTo: { offer: { id: "oferta-anon" } },
   hasAdditionalAttachments: false, attachments: [], ...nadpisz,
 });
 
-function fake(pages: object[][], messageIds = new Map<string, string[]>()) {
+function fake(pages: object[][], messageIds = new Map<string, string[]>(),
+  nadpiszWiadomosc: Record<string, unknown> = {}) {
   const urls: string[] = [];
   return { urls, query: async (url: string): Promise<unknown> => {
     urls.push(url);
     if (url.includes("/messages")) {
       const id = decodeURIComponent(url.split("/").at(-2)!);
-      return { messages: (messageIds.get(id) ?? [`m-${id}`]).map((m) => message(m)),
+      return { messages: (messageIds.get(id) ?? [`m-${id}`])
+          .map((m) => message(m, nadpiszWiadomosc)),
         offset: 0, limit: 20 };
     }
     const offset = Number(new URL(url).searchParams.get("offset"));
@@ -68,7 +73,7 @@ test("paginacja nie kończy się na pierwszych 20 rekordach", async () => {
 test("dopisanej wiadomości nie gubi drugi przebieg", async () => {
   const database = mkDb(); const one = thread(1);
   await synchronizujAllegroInbox({ database, query: fake([[one]]).query, apiUrl: "https://api.test" });
-  const changed = thread(1, "2026-08-31T12:00:00.000Z");
+  const changed = thread(1, "2026-09-30T12:00:00.000Z");
   await synchronizujAllegroInbox({ database, query: fake([[changed]], new Map([["t-1", ["old", "new"]]])).query, apiUrl: "https://api.test" });
   assert.equal((database.prepare("SELECT count(*) n FROM allegro_inbox_message").get() as {n:number}).n, 2);
 });
@@ -156,8 +161,8 @@ test("wiadomość niesie własną datę i temat, nie datę wątku", async () => 
   const database = mkDb();
   const query = async (url: string): Promise<unknown> => url.includes("/messages")
     ? { messages: [
-        message("m-1", { createdAt: "2026-08-29T09:15:00Z", subject: "Rozrusznik 148" }),
-        message("m-2", { createdAt: "2026-08-29T16:40:00Z", subject: "Rozrusznik 148" }),
+        message("m-1", { createdAt: "2026-09-29T09:15:00Z", subject: "Rozrusznik 148" }),
+        message("m-2", { createdAt: "2026-09-29T16:40:00Z", subject: "Rozrusznik 148" }),
       ], offset: 0, limit: 20 }
     : { threads: Number(new URL(url).searchParams.get("offset")) ? [] : [thread(1)],
         offset: 0, limit: 20 };
@@ -165,7 +170,7 @@ test("wiadomość niesie własną datę i temat, nie datę wątku", async () => 
 
   const daty = (database.prepare("SELECT sent_at FROM message ORDER BY id")
     .all() as Array<{ sent_at: string }>).map((w) => w.sent_at);
-  assert.deepEqual(daty, ["2026-08-29T09:15:00Z", "2026-08-29T16:40:00Z"]);
+  assert.deepEqual(daty, ["2026-09-29T09:15:00Z", "2026-09-29T16:40:00Z"]);
 
   const temat = (database.prepare("SELECT subject FROM conversation").get() as
     { subject: string | null }).subject;
@@ -180,7 +185,7 @@ test("powtórna synchronizacja nie dubluje ani nie podmienia wiadomości", async
   const przed = database.prepare("SELECT id FROM message").get() as { id: number };
   // nowa data wątku wymusza ponowne pobranie wiadomości
   await synchronizujAllegroInbox({
-    database, query: fake([[thread(1, "2026-08-31T12:00:00.000Z")]]).query, apiUrl: "https://api.test",
+    database, query: fake([[thread(1, "2026-09-30T12:00:00.000Z")]]).query, apiUrl: "https://api.test",
   });
   const po = database.prepare("SELECT id FROM message").all() as Array<{ id: number }>;
   assert.equal(po.length, 1, "wiadomość nie zdublowała się");
@@ -264,4 +269,160 @@ test("jeden zepsuty wątek nie zatrzymuje przebiegu ani nie truje kursora", asyn
   assert.ok(stan.last_success_at, "przebieg ma się domknąć, a nie polec");
   assert.equal(stan.error_thread_count, 1, "zepsuty wątek ma się policzyć");
   assert.notEqual(stan.cursor_id, "t-3");
+});
+
+/* ── Granica czasu (0.152.0) ─────────────────────────────────────────────────
+   Decyzja właściciela: skrzynka pokazuje rozmowy od 1 września 2026, północy
+   czasu lokalnego. Wcześniejszych nie pobieramy wcale — nie chodzi o ukrycie
+   ich na ekranie, tylko o to, żeby synchronizacja przestała przemielać całą
+   historię konta przy każdym przebiegu.
+
+   Granica stoi na WĄTKU, nie na wiadomości: rozmowa z jakąkolwiek wiadomością
+   po tej dacie wchodzi w całości, razem z wcześniejszym kontekstem. Agent,
+   który widzi pytanie bez jego początku, odpowiada w ciemno. */
+const GRANICA = "2026-08-31T22:00:00Z";
+
+test("wątek sprzed granicy nie wchodzi i NIE zostaje kursorem", async () => {
+  const database = mkDb();
+  const nowy = thread(1, "2026-09-01T08:00:00.000Z");
+  const stary = thread(2, "2026-08-20T08:00:00.000Z");
+
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", inboxOd: GRANICA,
+    query: fake([[nowy, stary]]).query,
+  });
+
+  const zapisane = (database.prepare("SELECT id FROM allegro_inbox_thread ORDER BY id")
+    .all() as Array<{ id: string }>).map((w) => w.id);
+  assert.deepEqual(zapisane, ["t-1"], "wątek sprzed granicy wjechał mimo progu");
+
+  /* Ta sama zasada, co przy wątku pominiętym w 0.149.2: kursor na wątku,
+     którego nie zapisaliśmy, kazałby następnemu przebiegowi uznać go za punkt
+     odniesienia i przestać widzieć wszystko, co za nim. */
+  const stan = database.prepare("SELECT cursor_id FROM allegro_inbox_sync_state WHERE id=1")
+    .get() as { cursor_id: string | null };
+  assert.equal(stan.cursor_id, "t-1");
+});
+
+test("granica zatrzymuje skanowanie, zamiast czytać całą historię", async () => {
+  /* Lista wątków przychodzi od najnowszego, więc pierwszy wątek poniżej progu
+     znaczy „dalej są już same starsze". Bez zatrzymania każdy przebieg
+     chodziłby przez wszystkie strony konta aż do końca historii. */
+  const database = mkDb();
+  /* OBIE strony są PEŁNE (20 wątków). Bez granicy pętla poszłaby po trzecią,
+     bo pełna strona znaczy „może być więcej" — więc brak zapytania o
+     `offset=40` jest dowodem, że zatrzymał ją próg, a nie koniec danych. */
+  const api = fake([
+    Array.from({ length: 20 }, (_, i) => thread(i, `2026-09-${String(30 - i).padStart(2, "0")}T08:00:00Z`)),
+    Array.from({ length: 20 }, (_, i) => thread(100 + i, `2026-08-${String(30 - i).padStart(2, "0")}T08:00:00Z`)),
+    Array.from({ length: 20 }, (_, i) => thread(200 + i, `2026-07-${String(30 - i).padStart(2, "0")}T08:00:00Z`)),
+  ]);
+
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", inboxOd: GRANICA, query: api.query,
+  });
+
+  assert.ok(!api.urls.some((u) => u.includes("offset=40")),
+    "skanowanie poszło dalej mimo wątku poniżej granicy");
+});
+
+test("wątek po granicy wchodzi z CAŁYM kontekstem, także sprzed niej", async () => {
+  const database = mkDb();
+  const aktywny = thread(1, "2026-09-01T08:00:00.000Z");
+
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", inboxOd: GRANICA,
+    query: fake([[aktywny]], new Map([["t-1", ["sierpniowa", "wrzesniowa"]]])).query,
+  });
+
+  const n = (database.prepare("SELECT count(*) n FROM message").get() as { n: number }).n;
+  assert.equal(n, 2, "kontekst sprzed granicy został obcięty");
+});
+
+test("bez granicy nic się nie zmienia", async () => {
+  /* Pusta wartość to poprawne „bez progu", nie brak konfiguracji. */
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", inboxOd: null,
+    query: fake([[thread(1, "2020-01-01T00:00:00.000Z")]]).query,
+  });
+  assert.equal((database.prepare("SELECT count(*) n FROM allegro_inbox_thread")
+    .get() as { n: number }).n, 1);
+});
+
+/* ── Encje HTML (0.152.0) ────────────────────────────────────────────────────
+   BLIZNA KUPIONA DRUGI RAZ. `odkodujEncje` leży w `tekst.ts` od 0.127.0
+   z kompletem testów, a jej komentarz mówi wprost: „nowa obsługa ma ją wziąć
+   gotową, nie odkryć drugi raz na produkcji". Nowa obsługa odkryła ją drugi
+   raz na produkcji — panel escape'uje przy renderowaniu, więc `kt&oacute;ry`
+   z bazy wyświetlał się dosłownie w każdej polskiej wiadomości. */
+test("encje HTML schodzą z treści i tematu przy wjeździe", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]]), {
+      text: "zwr&oacute;ci&cacute; kt&oacute;ry &ndash; tak",
+      subject: "Re: zam&oacute;wienie",
+    }).query,
+  });
+
+  /* Temat wisi na ROZMOWIE, nie na wiadomości — Allegro powtarza go w każdej
+     wiadomości wątku, więc trzymanie go przy każdej byłoby powielaniem. */
+  const body = (database.prepare("SELECT body FROM message").get() as { body: string }).body;
+  const temat = (database.prepare("SELECT subject FROM conversation")
+    .get() as { subject: string | null }).subject;
+  assert.equal(body, "zwrócić który – tak");
+  assert.equal(temat, "Re: zamówienie");
+});
+
+test("lądowisko zostaje SUROWE — encje i tak tam siedzą", async () => {
+  /* Doktryna tabel `allegro_inbox_*`: trzymają odpowiedź w kształcie, w jakim
+     przyszła. To jedyny ślad, gdyby dekodowanie kiedyś skrzywdziło tekst. */
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]]),
+      { text: "kt&oacute;ry" }).query,
+  });
+
+  const l = database.prepare("SELECT text, surowe_json FROM allegro_inbox_message")
+    .get() as { text: string; surowe_json: string };
+  assert.equal(l.text, "kt&oacute;ry");
+  assert.ok(l.surowe_json.includes("kt&oacute;ry"));
+});
+
+/* ── Powód porażki SŁOWEM (0.152.0) ──────────────────────────────────────────
+   Skrzynka stała 62 przebiegi na błędzie BEZ kodu HTTP („Konto Allegro
+   niepołączone — /biuro → …"). Serwer znał to zdanie i pisał je do dziennika;
+   panel pokazywał `failed` i nic więcej, bo baza trzymała wyłącznie kod.
+   Właściciel szukał przyczyny w logach usługi zamiast przeczytać ją z ekranu. */
+test("błąd bez kodu HTTP zapisuje SWOJE ZDANIE, nie samo `failed`", async () => {
+  const database = mkDb();
+  await assert.rejects(synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: async () => { throw new Error("Konto Allegro niepołączone — /biuro → POŁĄCZ."); },
+  }));
+
+  const s = database.prepare(
+    "SELECT last_error_code, last_error_text FROM allegro_inbox_sync_state WHERE id=1")
+    .get() as { last_error_code: number | null; last_error_text: string | null };
+  assert.equal(s.last_error_code, null, "goły Error nie ma kodu i to jest cała sprawa");
+  assert.match(s.last_error_text ?? "", /niepołączone/);
+});
+
+test("udany przebieg czyści zdanie o błędzie razem z licznikiem", async () => {
+  const database = mkDb();
+  await assert.rejects(synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: async () => { throw new Error("chwilowa awaria"); },
+  }));
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", query: fake([[thread(1)]]).query,
+  });
+
+  const s = database.prepare(
+    "SELECT last_error_text, error_count FROM allegro_inbox_sync_state WHERE id=1")
+    .get() as { last_error_text: string | null; error_count: number };
+  assert.equal(s.last_error_text, null, "stare zdanie zostało na ekranie po naprawie");
+  assert.equal(s.error_count, 0);
 });

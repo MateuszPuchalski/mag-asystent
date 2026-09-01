@@ -47,6 +47,28 @@ const num = (v: string | undefined, def: number, name?: string) => {
   return n;
 };
 
+/**
+ * Granica czasu z `wertis.env` jako ISO. Data ma być USTAWIENIEM, nie stałą
+ * w kodzie: zabetonowana w źródle jest datą, której nikt nie przesunie bez
+ * wydania, a właściciel przesuwa takie progi sam.
+ *
+ * Puste znaczy „bez granicy" i to jest wartość poprawna, nie brak — inaczej
+ * nie dałoby się wyłączyć progu bez edycji kodu.
+ */
+const data = (v: string | undefined, def: string, name: string): string | null => {
+  const s = (v ?? def).trim();
+  if (s === "") return null;
+  const ms = Date.parse(s);
+  if (!Number.isFinite(ms)) {
+    throw new Error(
+      `${name}=${s} — oczekiwano daty ISO, np. 2026-08-31T22:00:00Z. Popraw w wertis.env.`,
+    );
+  }
+  /* Normalizujemy do ISO w UTC, bo porównania idą po TEKŚCIE: daty z Allegro
+     przyjeżdżają w tym samym kształcie i tylko wtedy `<` znaczy „wcześniej". */
+  return new Date(ms).toISOString();
+};
+
 export const config = {
   /** Port serwera API. */
   port: num(process.env.PORT, 3001, "PORT"),
@@ -285,6 +307,19 @@ export const config = {
     /** Takt synchronizacji Centrum wiadomości; 0 wyłącza ticker. */
     inboxSyncMs: num(process.env.ALLEGRO_INBOX_SYNC_MS, 60_000, "ALLEGRO_INBOX_SYNC_MS"),
     /**
+     * Od kiedy skrzynka w ogóle widzi rozmowy. Decyzja właściciela z 0.152.0:
+     * 1 września 2026, czyli dzień uruchomienia obsługi klienta.
+     *
+     * Domyślna wartość to PÓŁNOC CZASU LOKALNEGO, zapisana w UTC — Polska jest
+     * we wrześniu na UTC+2. Data w kodzie musi być w UTC, bo porównuje się ją
+     * z `lastMessageDateTime` od Allegro, a to jest UTC.
+     *
+     * Granica działa na WĄTEK, nie na wiadomość: rozmowa z jakąkolwiek
+     * wiadomością po tej dacie wchodzi w całości. Agent, który widzi pytanie
+     * bez jego początku, odpowiada w ciemno.
+     */
+    inboxOd: data(process.env.ALLEGRO_INBOX_OD, "2026-08-31T22:00:00Z", "ALLEGRO_INBOX_OD"),
+    /**
      * Takt synchronizacji zwrotów klienckich; 0 wyłącza ticker.
      *
      * RZADZIEJ NIŻ SKRZYNKA, i to jest decyzja, nie zaniedbanie. Zwrot ma
@@ -301,26 +336,23 @@ export const config = {
      */
     zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 14, "ZWROT_TERMIN_DNI"),
     /**
-     * Data, od której w ogóle bierzemy zwroty. Decyzja właściciela.
+     * Od kiedy widzimy zwroty. Decyzja właściciela: 20 SIERPNIA 2026, północ
+     * czasu lokalnego (stąd 19 sierpnia 22:00 UTC — Polska jest w sierpniu
+     * na UTC+2). Do 0.152.0 stało tu 20 lipca; właściciel przesunął próg
+     * o miesiąc, a że to jest ustawienie, a nie stała, przesunie go znowu
+     * bez wydania.
      *
-     * GRANICA STAŁA, nie ruchoma — i to jest różnica, która ma znaczenie.
-     * Okno „N dni wstecz" przesuwa się każdego dnia: po kwartale przestaje
-     * sięgać początku historii, a przy odtwarzaniu bazy z kopii wciąga co
-     * innego niż przy pierwszym uruchomieniu. Data mówi wprost, gdzie
-     * zaczyna się historia zwrotów tej firmy w WERTIS.
+     * ZASTĄPIŁO OKNO WZGLĘDNE `ALLEGRO_ZWROTY_DNI_WSTECZ`, i to jest zmiana
+     * natury, nie jednostki. Tamto liczyło się WYŁĄCZNIE przy pierwszym
+     * przebiegu, bo dalej rządził kursor; próg bezwzględny obowiązuje zawsze,
+     * także wtedy, gdy kursor już stoi. Bez tej różnicy zwrot sprzed granicy
+     * wjechałby przy pierwszej zmianie po stronie Allegro.
      *
-     * Działa tylko przy PIERWSZYM przebiegu; potem rządzi kursor `from`.
-     * Puste = wraca okno dnowe niżej.
+     * Próg zastępuje też tamten bezpiecznik: bez niego pierwszy przebieg
+     * ściągnąłby całą historię konta jednym ciągiem zapytań, czyli prostą
+     * drogą do 429 przy starcie usługi.
      */
-    zwrotyOd: process.env.ALLEGRO_ZWROTY_OD ?? "2026-08-20",
-    /**
-     * Zapasowe okno pierwszego pobrania, w dniach — używane, gdy
-     * `ALLEGRO_ZWROTY_OD` jest puste.
-     *
-     * Bez żadnej granicy pierwszy przebieg ściągnąłby całą historię konta:
-     * setki stron w jednym ciągu i prosta droga do 429 przy starcie usługi.
-     */
-    zwrotyOknoDni: num(process.env.ALLEGRO_ZWROTY_DNI_WSTECZ, 90, "ALLEGRO_ZWROTY_DNI_WSTECZ"),
+    zwrotyOd: data(process.env.ALLEGRO_ZWROTY_OD, "2026-08-19T22:00:00Z", "ALLEGRO_ZWROTY_OD"),
     /** Takt uzupełniania zamówień do zwrotów; 0 wyłącza ticker. */
     zamowieniaSyncMs: num(
       process.env.ALLEGRO_ZAMOWIENIA_SYNC_MS, 600_000, "ALLEGRO_ZAMOWIENIA_SYNC_MS"
@@ -815,6 +847,15 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      a wymuszony jawnie znaczy, że ktoś liczy na prawdziwe API. */
   if (c.allegro.mode === "http" && !c.allegro.clientId) {
     bledy.push("ALLEGRO_MODE=http wymaga ALLEGRO_CLIENT_ID i ALLEGRO_CLIENT_SECRET.");
+  }
+  /* Ustawienie zdjęte w 0.152.0. Ciche zignorowanie byłoby gorsze niż błąd:
+     kto je zostawił, ten liczy, że działa, a zwroty milczałyby wtedy inaczej,
+     niż każe wpis w `wertis.env`. */
+  if ((process.env.ALLEGRO_ZWROTY_DNI_WSTECZ ?? "") !== "") {
+    bledy.push(
+      "ALLEGRO_ZWROTY_DNI_WSTECZ zniknęło w 0.152.0 — okno względne zastąpił próg " +
+        "bezwzględny ALLEGRO_ZWROTY_OD (data ISO). Usuń stary wpis z wertis.env.",
+    );
   }
   if (c.mssql.dokTypFS === c.mssql.dokTypPA) {
     bledy.push(

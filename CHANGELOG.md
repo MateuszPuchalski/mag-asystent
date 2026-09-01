@@ -33,7 +33,7 @@ historii nie przepisujemy.
 
 ---
 
-## 0.152.0 — 1 września 2026
+## 0.153.0 — 1 września 2026
 
 **Zwrot pokazuje CAŁE zamówienie, ze zdjęciami i drogą do Allegro.** Kolumna
 ZAMÓWIENIE pokazywała dotąd goły identyfikator `7669d920-5cf4-11f1-…`, a towar
@@ -73,13 +73,12 @@ w konfiguracji i noszą `[WERYFIKUJ]`: gdy link trafi w 404, poprawia się to
 wpisem w `wertis.env`, a nie nowym wydaniem. Obok UUID-a zamówienia stanął
 przycisk kopiowania.
 
-**[wymaga działania] Zwroty bierzemy od 20 sierpnia 2026.** Decyzja
-właściciela, wpisana jako `ALLEGRO_ZWROTY_OD`. Granica jest STAŁA, nie
-ruchoma, i to jest różnica: okno „dziewięćdziesiąt dni wstecz" przesuwa się
-każdego dnia, więc po kwartale przestaje sięgać początku historii, a przy
-odtwarzaniu bazy z kopii wciąga co innego niż przy pierwszym uruchomieniu.
-Wartość spoza formatu daty zatrzymuje przebieg zamiast po cichu wrócić do
-okna dnowego.
+**[wymaga działania] Próg zwrotów przesuwa się z 20 lipca na 20 sierpnia
+2026.** Decyzja właściciela. Mechanika progu przyszła w 0.152.0 i zostaje bez
+zmian — to jest sama data, wpisana jako `ALLEGRO_ZWROTY_OD`, więc następne
+przesunięcie też nie będzie wymagało wydania.
+
+Zwroty sprzed tej daty przestaną być widoczne przy najbliższym przebiegu.
 
 **[wymaga działania] Lądowiska przestają trzymać dane osobowe.** To jest
 poprawka nieprawdziwego zdania: polityka danych z 0.150.0 mówiła „konta
@@ -109,6 +108,177 @@ zamówienia do zwrotów, które już mamy, najwyżej dwadzieścia na przebieg �
 kilku przebiegach nie ma czego pobierać i milczy. Bezpiecznik jest tu po to,
 żeby pierwsze uruchomienie nie wystrzeliło dziewięćdziesięciu żądań w jednym
 ciągu z jednego adresu.
+Pierwsze uruchomienie skrzynki wyciągnęło cztery rzeczy naraz.
+
+### Granice czasu
+
+Decyzja właściciela: **skrzynka pokazuje rozmowy od 1 września 2026, zwroty —
+od 20 lipca 2026.** Obie daty to północ czasu lokalnego, w konfiguracji
+zapisana w UTC (`ALLEGRO_INBOX_OD`, `ALLEGRO_ZWROTY_OD`), bo w tej strefie
+przychodzą daty z Allegro.
+
+Granica skrzynki stoi na WĄTKU, nie na wiadomości. Rozmowa z jakąkolwiek
+wiadomością po progu wchodzi w całości, razem z wcześniejszym kontekstem —
+agent, który widzi pytanie bez jego początku, odpowiada w ciemno.
+
+Lista wątków przychodzi od najnowszego, więc skanowanie zatrzymuje się na
+pierwszym wątku poniżej progu. To przy okazji naprawia drugą rzecz:
+synchronizacja przestała przemielać całą historię konta przy każdym przebiegu.
+
+**`ALLEGRO_ZWROTY_DNI_WSTECZ` znika.** Okno względne liczyło się wyłącznie przy
+pierwszym przebiegu, bo dalej rządził kursor; próg bezwzględny obowiązuje
+zawsze. Bez tej różnicy zwrot sprzed granicy wjeżdżałby przy pierwszej zmianie
+po stronie Allegro. Zostawiony w `wertis.env` stary wpis zatrzyma start
+z komunikatem — ciche zignorowanie znaczyłoby, że ktoś liczy na ustawienie,
+które nic nie robi.
+
+Migracja kasuje z bazy to, co sprzed granic. Kasuje, a nie ukrywa zapytaniem:
+baza trzymająca co innego, niż widać na ekranie, to rozjazd, który potem
+kosztuje wieczór. Liczba usuniętych wierszy idzie do audytu, bo to kasowanie
+danych, a nie porządki. Utrata jest pozorna — cofnięcie progu i ponowna
+synchronizacja sprowadzą je z powrotem z Allegro.
+
+### Encje HTML — blizna kupiona DRUGI RAZ
+
+Na ekranie stało `kt&oacute;ry`, `zam&oacute;wienia`, `&ndash;` — w każdej
+polskiej wiadomości. Panel escape'uje przy renderowaniu, więc encja z bazy
+wyświetla się dosłownie.
+
+To nie było odkrycie. `odkodujEncje` leżała w `server/src/tekst.ts` od 0.127.0,
+gotowa, ze słownikiem polskich encji i kompletem testów, a jej komentarz mówił
+wprost: „nowa obsługa ma ją wziąć gotową, nie odkryć drugi raz na produkcji".
+Lista blizn w `docs/obsluga-klienta.md` niosła ten sam wpis razem z wnioskiem:
+dekodowanie przy wejściu, nie przy wyświetlaniu.
+
+Nowa obsługa odkryła ją drugi raz na produkcji.
+
+Dekodowanie wchodzi przy wjeździe do modelu pracy. Lądowisko `allegro_inbox_*`
+zostaje surowe — to jedyny ślad, gdyby dekodowanie kiedyś skrzywdziło cudzy
+tekst. Migracja odkodowuje wiersze już zapisane; warunek jest tak postawiony,
+żeby drugie wejście nie zjadło znaku `&`, który należy do treści.
+
+Specyfikacja tego nie zapowiada: `Message.text` to goły `type: string`, bez
+słowa o HTML-u. Tak wygląda różnica między tym, co Allegro DEKLARUJE, a tym,
+co przysyła — czyli luka, na którą odpowiada sonda, a nie `swagger.yaml`.
+
+### Panel nie umiał nazwać powodu przez 62 przebiegi
+
+Skrzynka stała, bo konto nie było sparowane. Serwer **znał to zdanie** i pisał
+je do dziennika przy każdym przebiegu, razem z instrukcją, co kliknąć. Na ekran
+trafiało słowo `failed`.
+
+Złożyły się na to trzy rzeczy:
+
+`allegro_inbox_sync_state` trzymała wyłącznie kod HTTP, a ta porażka kodu nie
+miała — brak parowania, timeout i odmowa wersji zasobu to gołe wyjątki.
+Dochodzi `last_error_text`; udany przebieg czyści je razem z licznikiem.
+
+Wiersz podpisany „Połączenie Allegro" pokazywał stan SYNCHRONIZACJI. Prawdziwy
+stan połączenia — ze stanami `niepolaczone` i `zle_srodowisko` — jechał w tej
+samej odpowiedzi `/api/health` i nie był rysowany nigdzie. Teraz to dwa osobne
+wiersze, a przy porażce bez kodu dochodzi trzeci: „Ostatni błąd" ze zdaniem.
+
+Baner oferował SYNCHRONIZUJ TERAZ, czyli przycisk wywołujący dokładnie ten sam
+błąd. Przy niesparowanym koncie przycisk znika, a baner pokazuje zdanie
+z trasy zdrowia — to, które mówi, gdzie kliknąć.
+
+### Nazwa pliku dziennika
+
+`DEPLOY.md` kazał szukać awarii w `C:\wertis\logs\api.err.log`, a instalator
+tworzy `wertis-api.err.log` — nazwą usługi. Ten sam dokument w innym miejscu
+pisał już poprawnie. Właściciel dostał `PathNotFound` w środku diagnozy.
+
+### Wdrożenie
+
+Migracje robią się same, ale **`wertis.env` wymaga ruchu ręką**: usunięcia
+`ALLEGRO_ZWROTY_DNI_WSTECZ`. Szczegóły w `DEPLOY.md`.
+
+## 0.152.0 — 1 września 2026
+
+Pierwsze uruchomienie skrzynki wyciągnęło cztery rzeczy naraz.
+
+### Granice czasu
+
+Decyzja właściciela: **skrzynka pokazuje rozmowy od 1 września 2026, zwroty —
+od 20 lipca 2026.** Obie daty to północ czasu lokalnego, w konfiguracji
+zapisana w UTC (`ALLEGRO_INBOX_OD`, `ALLEGRO_ZWROTY_OD`), bo w tej strefie
+przychodzą daty z Allegro.
+
+Granica skrzynki stoi na WĄTKU, nie na wiadomości. Rozmowa z jakąkolwiek
+wiadomością po progu wchodzi w całości, razem z wcześniejszym kontekstem —
+agent, który widzi pytanie bez jego początku, odpowiada w ciemno.
+
+Lista wątków przychodzi od najnowszego, więc skanowanie zatrzymuje się na
+pierwszym wątku poniżej progu. To przy okazji naprawia drugą rzecz:
+synchronizacja przestała przemielać całą historię konta przy każdym przebiegu.
+
+**`ALLEGRO_ZWROTY_DNI_WSTECZ` znika.** Okno względne liczyło się wyłącznie przy
+pierwszym przebiegu, bo dalej rządził kursor; próg bezwzględny obowiązuje
+zawsze. Bez tej różnicy zwrot sprzed granicy wjeżdżałby przy pierwszej zmianie
+po stronie Allegro. Zostawiony w `wertis.env` stary wpis zatrzyma start
+z komunikatem — ciche zignorowanie znaczyłoby, że ktoś liczy na ustawienie,
+które nic nie robi.
+
+Migracja kasuje z bazy to, co sprzed granic. Kasuje, a nie ukrywa zapytaniem:
+baza trzymająca co innego, niż widać na ekranie, to rozjazd, który potem
+kosztuje wieczór. Liczba usuniętych wierszy idzie do audytu, bo to kasowanie
+danych, a nie porządki. Utrata jest pozorna — cofnięcie progu i ponowna
+synchronizacja sprowadzą je z powrotem z Allegro.
+
+### Encje HTML — blizna kupiona DRUGI RAZ
+
+Na ekranie stało `kt&oacute;ry`, `zam&oacute;wienia`, `&ndash;` — w każdej
+polskiej wiadomości. Panel escape'uje przy renderowaniu, więc encja z bazy
+wyświetla się dosłownie.
+
+To nie było odkrycie. `odkodujEncje` leżała w `server/src/tekst.ts` od 0.127.0,
+gotowa, ze słownikiem polskich encji i kompletem testów, a jej komentarz mówił
+wprost: „nowa obsługa ma ją wziąć gotową, nie odkryć drugi raz na produkcji".
+Lista blizn w `docs/obsluga-klienta.md` niosła ten sam wpis razem z wnioskiem:
+dekodowanie przy wejściu, nie przy wyświetlaniu.
+
+Nowa obsługa odkryła ją drugi raz na produkcji.
+
+Dekodowanie wchodzi przy wjeździe do modelu pracy. Lądowisko `allegro_inbox_*`
+zostaje surowe — to jedyny ślad, gdyby dekodowanie kiedyś skrzywdziło cudzy
+tekst. Migracja odkodowuje wiersze już zapisane; warunek jest tak postawiony,
+żeby drugie wejście nie zjadło znaku `&`, który należy do treści.
+
+Specyfikacja tego nie zapowiada: `Message.text` to goły `type: string`, bez
+słowa o HTML-u. Tak wygląda różnica między tym, co Allegro DEKLARUJE, a tym,
+co przysyła — czyli luka, na którą odpowiada sonda, a nie `swagger.yaml`.
+
+### Panel nie umiał nazwać powodu przez 62 przebiegi
+
+Skrzynka stała, bo konto nie było sparowane. Serwer **znał to zdanie** i pisał
+je do dziennika przy każdym przebiegu, razem z instrukcją, co kliknąć. Na ekran
+trafiało słowo `failed`.
+
+Złożyły się na to trzy rzeczy:
+
+`allegro_inbox_sync_state` trzymała wyłącznie kod HTTP, a ta porażka kodu nie
+miała — brak parowania, timeout i odmowa wersji zasobu to gołe wyjątki.
+Dochodzi `last_error_text`; udany przebieg czyści je razem z licznikiem.
+
+Wiersz podpisany „Połączenie Allegro" pokazywał stan SYNCHRONIZACJI. Prawdziwy
+stan połączenia — ze stanami `niepolaczone` i `zle_srodowisko` — jechał w tej
+samej odpowiedzi `/api/health` i nie był rysowany nigdzie. Teraz to dwa osobne
+wiersze, a przy porażce bez kodu dochodzi trzeci: „Ostatni błąd" ze zdaniem.
+
+Baner oferował SYNCHRONIZUJ TERAZ, czyli przycisk wywołujący dokładnie ten sam
+błąd. Przy niesparowanym koncie przycisk znika, a baner pokazuje zdanie
+z trasy zdrowia — to, które mówi, gdzie kliknąć.
+
+### Nazwa pliku dziennika
+
+`DEPLOY.md` kazał szukać awarii w `C:\wertis\logs\api.err.log`, a instalator
+tworzy `wertis-api.err.log` — nazwą usługi. Ten sam dokument w innym miejscu
+pisał już poprawnie. Właściciel dostał `PathNotFound` w środku diagnozy.
+
+### Wdrożenie
+
+Migracje robią się same, ale **`wertis.env` wymaga ruchu ręką**: usunięcia
+`ALLEGRO_ZWROTY_DNI_WSTECZ`. Szczegóły w `DEPLOY.md`.
 
 ## 0.151.0 — 1 września 2026
 

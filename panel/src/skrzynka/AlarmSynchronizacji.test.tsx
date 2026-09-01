@@ -9,7 +9,7 @@ const zdrowie = (n: Partial<Zdrowie["allegroInbox"]> = {}): Zdrowie => ({
     status: "rate_limited", alarm: true,
     ostatniaProba: "2026-09-01T09:38:00.000Z",
     ostatniaUdanaSynchronizacja: "2026-09-01T07:05:00.000Z",
-    kodOstatniegoBledu: 429, liczbaBledow: 3, watkiZBledem: 2,
+    kodOstatniegoBledu: 429, tekstOstatniegoBledu: null, liczbaBledow: 3, watkiZBledem: 2,
     opoznienieMs: 9_360_000, nastepnaProba: "2026-09-01T10:12:00.000Z",
     interwalMs: 60_000, ...n,
   },
@@ -61,5 +61,32 @@ describe("wiek()", () => {
     expect(wiek(30_000)).toBe("poniżej minuty");
     expect(wiek(41 * 60_000)).toBe("41 min");
     expect(wiek(9_360_000)).toBe("2 g 36 min");
+  });
+});
+
+describe("AlarmSynchronizacji — konto niepołączone (0.152.0)", () => {
+  /* Przy niesparowanym koncie SYNCHRONIZUJ TERAZ wywołuje dokładnie ten sam
+     błąd, na którym stoi skrzynka. Przycisk, który na pewno nie zadziała,
+     jest gorszy niż jego brak: obiecuje naprawę i zabiera uwagę od tej
+     jedynej rzeczy, która pomaga. */
+  const nieSparowane = (): Zdrowie => ({
+    ...zdrowie({ status: "failed", liczbaBledow: 62, kodOstatniegoBledu: null }),
+    allegro: { stan: "niepolaczone" },
+    problemy: ["ALLEGRO_CLIENT_ID ustawione, ale konto niepołączone — /biuro → " +
+      "STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ (rola admin)."],
+  });
+
+  it("chowa przycisk synchronizacji i mówi, co zrobić zamiast niego", () => {
+    render(<AlarmSynchronizacji zdrowie={nieSparowane()} synchronizuj={() => {}}
+      trwa={false} blad="" />);
+
+    expect(screen.queryByRole("button", { name: /SYNCHRONIZUJ/ })).toBeNull();
+    expect(screen.getByText(/KONTO ALLEGRO/)).toBeTruthy();
+  });
+
+  it("przy sparowanym koncie przycisk zostaje", () => {
+    render(<AlarmSynchronizacji zdrowie={zdrowie()} synchronizuj={() => {}}
+      trwa={false} blad="" />);
+    expect(screen.getByRole("button", { name: /SYNCHRONIZUJ/ })).toBeTruthy();
   });
 });
