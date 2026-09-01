@@ -171,11 +171,18 @@ ale nie ma prawa kupić ich drugi raz.
 `CLAUDE.md` żąda, żeby nowa obsługa zapisała swoją politykę danych, zanim
 dotknie pierwszej rozmowy. To jest ten zapis, w stanie na 0.143.0.
 
-**Treści wiadomości SĄ przechowywane lokalnie.** Zapisuje je synchronizator
-skrzynki do tabel `allegro_inbox_thread` i `allegro_inbox_message`, razem
-z surową odpowiedzią Allegro. Ekran skrzynki tylko je czyta. Wcześniejszy
-szkic tego rozdziału mówił odwrotnie i był nieprawdziwy — kopia lokalna jest
-ceną za ekran, który otwiera się przy niedostępnym Allegro.
+**Treści wiadomości SĄ przechowywane lokalnie, w dwóch warstwach.**
+Synchronizator zapisuje surową odpowiedź Allegro do `allegro_inbox_thread`
+i `allegro_inbox_message`, a z niej składa model obsługi: `channel_account`,
+`conversation` i `message`. Ekran skrzynki czyta wyłącznie ten drugi.
+Wcześniejszy szkic tego rozdziału mówił, że treści nie trafiają do bazy, i był
+nieprawdziwy — kopia lokalna jest ceną za ekran, który otwiera się przy
+niedostępnym Allegro.
+
+**Szkic odpowiedzi i komentarze zostają u nas.** Szkic jest współdzielony
+w zespole i nigdzie nie wychodzi, dopóki wysyłka jest wyłączona. Komentarz
+wewnętrzny ma osobną tabelę, żeby nie dało się go pomylić z wiadomością
+kanału — adapter Allegro czyta wyłącznie `message`.
 
 **Zadanie dla hali niesie kopię pytania.** Treść wiadomości źródłowej, numer
 oferty oraz identyfikatory rozmowy i wiadomości trafiają do `zadanie_terenowe`.

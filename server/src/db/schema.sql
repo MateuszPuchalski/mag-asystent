@@ -77,6 +77,9 @@ CREATE TABLE IF NOT EXISTS conversation (
   subject                  TEXT,
   assigned_user_id         INTEGER REFERENCES app_user(user_id),
   version                  INTEGER NOT NULL DEFAULT 1,
+  -- Flaga „nieprzeczytana" pochodzi z Allegro, nie z naszego stanu. Kanał wie,
+  -- czy sprzedawca odpisał; my tylko odzwierciedlamy to, co widzi klient.
+  unread                   INTEGER NOT NULL DEFAULT 0,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(channel_account_id, external_conversation_id)
@@ -89,6 +92,11 @@ CREATE TABLE IF NOT EXISTS message (
   external_message_id TEXT NOT NULL,
   direction          TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
   body               TEXT NOT NULL,
+  -- Powiązanie wiadomości z ofertą kanału. Bez tych dwóch kolumn model
+  -- kanoniczny nie wystarcza do obsługi rozmowy i trzeba by zaglądać do
+  -- surowego lądowiska — a wtedy `conversation`/`message` nie byłyby modelem.
+  related_object_type TEXT,
+  related_object_id   TEXT,
   sent_at             TEXT NOT NULL,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   -- Ponowne pobranie tej samej strony kanału ma skończyć się konfliktem,

@@ -28,10 +28,10 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id", async (req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    try { return osRozmowy(req.params.id); } catch (e) { return blad(reply, e); }
+    try { return osRozmowy(Number(req.params.id)); } catch (e) { return blad(reply, e); }
   });
 
-  app.post<{ Body: { rozmowaId?: string; wiadomoscId?: string; instrukcja?: string } }>(
+  app.post<{ Body: { rozmowaId?: number; wiadomoscId?: number; instrukcja?: string } }>(
     "/api/obsluga/zadania/pomiar", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -39,7 +39,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return {
           zadanie: zlecPomiar(
-            req.body?.rozmowaId ?? "", req.body?.wiadomoscId ?? "",
+            Number(req.body?.rozmowaId), Number(req.body?.wiadomoscId),
             req.body?.instrukcja ?? "", { id: s.user.userId, name: s.user.name },
           ),
         };
