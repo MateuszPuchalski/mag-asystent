@@ -33,6 +33,27 @@ historii nie przepisujemy.
 
 ---
 
+## 0.149.1 — 1 września 2026
+
+**Przycisk SYNCHRONIZUJ TERAZ przestaje zwracać „Bad Request".** Klient HTTP
+panelu obsługi wysyłał nagłówek `content-type: application/json` przy każdym
+żądaniu, także tym bez ciała. Domyślny parser Fastify odrzuca taką parę, więc
+jedyne wywołanie bez ciała — ręczna synchronizacja skrzynki — kończyło się
+kodem 400.
+
+To jest przycisk z banera awarii, czyli ten, który ma pomóc, gdy synchronizacja
+stoi. Nie działał dokładnie wtedy, gdy ktoś go naciskał.
+
+**To była blizna kupiona drugi raz.** Panel magazynu naprawił dokładnie to samo
+i nosi przy swojej funkcji `api()` zdanie „Kusi, żeby to uprościć z powrotem do
+jednego obiektu. Nie upraszczaj". Kolektor zna tę regułę osobno i wysyła puste
+ciało bez nagłówka typu. Panel obsługi był jedynym klientem, który jej nie znał.
+
+Strażnik tamtej reguły czyta źródło `biuro.html` wyrażeniem regularnym, bo tego
+pliku nie da się zaimportować — i dlatego nie miał jak objąć drugiego frontu.
+Panel dostaje własnego, sprawdzającego zachowanie zamiast tekstu. `CLAUDE.md`
+mówi teraz wprost, że dokładając front, dokłada się też jego strażnika.
+
 ## 0.149.0 — 1 września 2026
 
 **Awaria Subiekta przestaje kłaść całe API.** Import read-modelu przy starcie

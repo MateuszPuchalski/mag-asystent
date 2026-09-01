@@ -18,10 +18,28 @@ export const zapiszToken = (t: string) => localStorage.setItem(KLUCZ, t);
 export const wyczyscToken = () => localStorage.removeItem(KLUCZ);
 
 export async function api<T = any>(sciezka: string, init: RequestInit = {}): Promise<T> {
-  const odp = await fetch(sciezka, {
-    ...init,
-    headers: { "content-type": "application/json", "x-session": token(), ...(init.headers ?? {}) },
-  });
+  /* `content-type` TYLKO wtedy, gdy jest co opisywać. Nagłówek wysyłany zawsze
+     wywraca każde żądanie BEZ CIAŁA: domyślny parser Fastify odrzuca pustą
+     treść zadeklarowaną jako JSON (FST_ERR_CTP_EMPTY_JSON_BODY, 400), a ekran
+     pokazuje wtedy gołe „Bad Request".
+
+     To jest blizna z `biuro.html` (patrz komentarz przy tamtejszym `api()`)
+     kupiona drugi raz. Tam kosztowała cztery martwe czynności naraz; tutaj —
+     przycisk SYNCHRONIZUJ TERAZ, czyli ten, który ma pomóc, gdy synchronizacja
+     stoi. Kolektor zna tę regułę osobno: `ApiService.kt` wysyła `EMPTY_BODY`
+     bez nagłówka typu.
+
+     Kusi, żeby to uprościć z powrotem do jednego obiektu. Nie upraszczaj:
+     komunikat bez treści nie ma prawa deklarować typu treści. Pilnuje tego
+     `klient.test.ts`. */
+  const naglowki: Record<string, string> = {
+    "x-session": token(),
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (init.body !== undefined && !naglowki["content-type"]) {
+    naglowki["content-type"] = "application/json";
+  }
+  const odp = await fetch(sciezka, { ...init, headers: naglowki });
   const dane = await odp.json().catch(() => ({}));
   if (odp.status === 401) throw new BrakSesji(dane.error ?? "Sesja wygasła — zaloguj się");
   /* 409 dostaje własny typ, bo panel MUSI umieć go narysować inaczej niż błąd:

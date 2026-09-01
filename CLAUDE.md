@@ -19,6 +19,13 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
   z nazwy (test dubli) ani wołać funkcji, której nie ma (test wywołań);
   delegacje kliknięć stoją na SEKCJACH, nie na pojemnikach w ich środku
   (test delegacji).
+- **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
+  nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
+  i gołe „Bad Request" na ekranie. Pilnują tego trzy niezależne strażnice:
+  `routes/biuro.test.ts` (po źródle `biuro.html`), `panel/src/api/klient.test.ts`
+  (po zachowaniu) i `EMPTY_BODY` w kolektorze. Panel obsługi kupił tę bliznę
+  drugi raz, bo strażnik istniał tylko dla jednego pliku. Dokładając front,
+  dokładasz też jego strażnika.
 - **Zero zapisu przy patrzeniu.** Otwarcie ekranu niczego nie mutuje.
   Liczniki `method: "POST"/"PUT"/"DELETE"` w `routes/biuro.test.ts` są
   UMOWĄ — każdy nowy zapis podnosi licznik i dostaje zdanie w uzasadnieniu.
