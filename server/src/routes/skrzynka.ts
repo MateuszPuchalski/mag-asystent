@@ -39,7 +39,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     try { return osRozmowy(Number(req.params.id)); } catch (e) { return blad(reply, e); }
   });
 
-  /* ── Pobranie załącznika (0.154.0) ────────────────────────────────────────
+  /* ── Pobranie załącznika (0.155.0) ────────────────────────────────────────
      ADRES ALLEGRO NIE IDZIE DO PRZEGLĄDARKI, i to jest cała treść tej trasy.
 
      `attachments[].url` wskazuje `upload.allegro.pl`. Czy ten adres otwiera

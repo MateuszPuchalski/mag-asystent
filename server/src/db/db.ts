@@ -274,6 +274,8 @@ export function migrate(database: DatabaseSync) {
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
   bezObslugiKlienta(database);
+  pozycjaZwrotuBezReadModelu(database);
+  indeksKluczaPozycji(database);
   /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
@@ -283,6 +285,109 @@ export function migrate(database: DatabaseSync) {
      kształcie. */
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
+}
+
+/**
+ * Pozycja zwrotu przestaje wisieć na read-modelu (0.154.0).
+ *
+ * DO 0.153.1 `zwrot_klienta_pozycja.tw_id` miało
+ * `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL`. Import z Subiekta kasuje
+ * CAŁY read-model i wstawia go od nowa co `MSSQL_SYNC_MS` — czyli domyślnie
+ * co minutę zerował KAŻDĄ kartotekę potwierdzoną przez człowieka. Cicho,
+ * bez błędu, z „Bez kartoteki" jako jedynym objawem.
+ *
+ * Przewrotność tamtego stanu: `ALTER TABLE` w SQLite nie umie dołożyć klucza
+ * obcego, więc instalacja sprzed 0.152.0 dostała samą kolumnę i powiązania
+ * TRZYMAŁA. Traciła je dopiero baza założona ze świeżego schematu.
+ *
+ * Przy okazji dochodzi `klucz` — naturalny identyfikator pozycji w obrębie
+ * zwrotu (`offer_id|nazwa`). Bez niego synchronizator musiał kasować pozycje
+ * i wstawiać od nowa, a `id` zmieniało się pod otwartym panelem.
+ *
+ * Zabieg ten sam co przy `kosz_pozycja` w 0.140.0: nowa tabela, przepisanie
+ * kolumn WSPÓLNYCH, podmiana nazwy. Klucze obce schodzą PRZED transakcją, bo
+ * w transakcji `PRAGMA foreign_keys` jest ignorowane po cichu.
+ */
+function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
+  const kolumny = (tabela: string) =>
+    (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>)
+      .map((c) => c.name);
+
+  /* Bazy budowane w testach bywają MINIMALNE — mają dwie tabele, których
+     akurat dotyczy dany test, i nic poza tym. Migracja nie ma prawa się na
+     nich wywalić; ta sama ostrożność co przy `maKolumne` wyżej. */
+  const jest = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='zwrot_klienta_pozycja'"
+  ).get();
+  if (!jest) return;
+
+  /* Przebudowujemy TYLKO wtedy, gdy klucz obcy naprawdę tam jest albo brakuje
+     `klucz`. Bez tego warunku każdy start przepisywałby całą tabelę. */
+  const obce = database.prepare("PRAGMA foreign_key_list(zwrot_klienta_pozycja)")
+    .all() as Array<{ table: string }>;
+  const maObcyDoTowaru = obce.some((f) => f.table === "sgt_towar");
+  const maKlucz = kolumny("zwrot_klienta_pozycja").includes("klucz");
+  if (!maObcyDoTowaru && maKlucz) return;
+
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      const stare = kolumny("zwrot_klienta_pozycja");
+      database.exec(`
+        CREATE TABLE zwrot_klienta_pozycja_nowa (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+          offer_id TEXT,
+          nazwa TEXT NOT NULL,
+          ilosc REAL NOT NULL,
+          cena_grosze INTEGER NOT NULL,
+          waluta TEXT NOT NULL,
+          powod TEXT,
+          powod_komentarz TEXT,
+          url TEXT,
+          klucz TEXT NOT NULL,
+          ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
+          ocena_at TEXT, ocena_przez TEXT,
+          tw_id INTEGER,
+          tw_symbol TEXT,
+          tw_zrodlo TEXT CHECK (tw_zrodlo IN ('sku','reczne')),
+          tw_at TEXT, tw_przez TEXT
+        );
+      `);
+      const nowe = kolumny("zwrot_klienta_pozycja_nowa");
+      /* `klucz` liczymy przy przepisaniu, bo w starej tabeli go nie było. */
+      const wspolne = nowe.filter((c) => c !== "klucz" && stare.includes(c));
+      database.exec(`
+        INSERT INTO zwrot_klienta_pozycja_nowa(${wspolne.join(", ")}, klucz)
+          SELECT ${wspolne.join(", ")}, COALESCE(offer_id,'') || '|' || nazwa
+          FROM zwrot_klienta_pozycja;
+        DROP TABLE zwrot_klienta_pozycja;
+        ALTER TABLE zwrot_klienta_pozycja_nowa RENAME TO zwrot_klienta_pozycja;
+        CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
+          ON zwrot_klienta_pozycja(zwrot_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
+          ON zwrot_klienta_pozycja(zwrot_id, klucz);
+      `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/**
+ * Indeks klucza naturalnego pozycji zwrotu.
+ *
+ * Stoi TUTAJ, nie w `schema.sql`, bo kolumna `klucz` dochodzi przebudową:
+ * w chwili wykonania schematu istniejąca baza jeszcze jej nie ma, a indeks
+ * na nieistniejącej kolumnie wywala start. Ta sama reguła co przy
+ * `ix_events_ref_time`.
+ */
+function indeksKluczaPozycji(database: DatabaseSync) {
+  const ma = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
+    .all() as Array<{ name: string }>).some((c) => c.name === "klucz");
+  if (!ma) return;
+  database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
+    ON zwrot_klienta_pozycja(zwrot_id, klucz)`);
 }
 
 /**

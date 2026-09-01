@@ -1049,7 +1049,9 @@ w Subiekcie i w panelu Allegro.
 
 **Od 0.150.0 biuro znów WIDZI zwroty — w panelu obsługi, zakładka ZWROTY.**
 Od 0.152.0 widzi przy nich całe zamówienie, zdjęcia towaru i odnośniki do
-Allegro. Zapisuje przy tym jedną rzecz: wskazaną kartotekę. Pokazuje kolejkę zwrotów z terminem ustawowym,
+Allegro. Od 0.154.0 widzi też POWÓD, gdy pozycja nie ma kartoteki, i licznik
+takich pozycji nad kolejką. Zapisuje przy tym dwie rzeczy: wskazaną kartotekę
+i ręczne dociągnięcie zamówień. Pokazuje kolejkę zwrotów z terminem ustawowym,
 pozycjami i proponowaną kwotą, więc biuro nie musi otwierać panelu Allegro,
 żeby wiedzieć, co czeka. Decyzji nadal nie zapisuje: werdykt, kwota, ocena
 towaru i korekta wchodzą w kolejnym wydaniu.
@@ -1441,6 +1443,23 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 **APK przynosi ten sam instalator** — ląduje w `server\data\apk\`, a kolektory
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
+
+**Aktualizacja do 0.154.0 nie wymaga niczego ręcznego — ale coś naprawia.**
+Tabela pozycji zwrotu przebudowuje się przy pierwszym starcie, bez kolumny
+`tw_id` wskazującej na read-model Subiekta. Do 0.153.1 ta zależność kasowała
+wskazane kartoteki przy KAŻDYM imporcie z Subiekta, czyli domyślnie co minutę.
+
+Dotyczyło to wyłącznie baz założonych od 0.152.0 wzwyż. Starsze instalacje
+dostały tę kolumnę migracją, a `ALTER TABLE` w SQLite nie umie dołożyć klucza
+obcego — i właśnie dlatego problemu nie miały.
+
+**Wskazań utraconych przed aktualizacją kod nie odtworzy.** Wskaż je raz
+jeszcze; od tego wydania panel je pamięta i sam proponuje przy następnym
+zwrocie tej samej oferty.
+
+Dochodzi jedna trasa zapisu: przycisk „Dociągnij teraz" przy zamówieniu,
+którego jeszcze nie pobrano. Nie omija limitu Allegro — pobiera tyle samo co
+ticker i tak samo przerywa na 429.
 
 **Aktualizacja do 0.153.0 — dwie czynności.**
 

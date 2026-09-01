@@ -118,12 +118,17 @@ export type SzczegolyWysylki = {
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro";
 
-/** Wynik dopasowania po SKU — §11.3 żąda widocznego źródła i pewności. */
+/** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
-  pewnosc: "brak" | "sku" | "niejednoznaczne";
+  pewnosc: "brak" | "sku" | "pamiec" | "jedyna_pozycja" | "nazwa_w_zamowieniu" | "niejednoznaczne";
   twId: number | null;
   symbol: string | null;
   zrodlo: string;
+  /** Które ogniwo pękło; `null` przy trafieniu. */
+  powod:
+    | "brak_zamowienia_w_zwrocie" | "zamowienie_niepobrane" | "oferty_nie_ma_w_zamowieniu"
+    | "oferta_bez_sku" | "sku_nie_trafia" | "symbol_zdublowany" | null;
+  poKolumnie: "offer_id" | "external_id" | null;
 }
 
 export interface PozycjaZwrotu {
@@ -212,8 +217,16 @@ export interface StanZwrotow {
   interwalMs: number;
 }
 
+/** Ile pozycji czeka na kartotekę i dlaczego — licznik do nagłówka ekranu. */
+export interface BilansKartotek {
+  bez: number;
+  wszystkie: number;
+  powody: Record<string, number>;
+}
+
 export interface KolejkaZwrotow {
   zwroty: Zwrot[];
   liczniki: Record<Kubelek, number>;
+  kartoteki: BilansKartotek;
   stan: StanZwrotow;
 }

@@ -157,3 +157,49 @@ test("drugi przebieg nie ma czego pobierać", async () => {
   const ile = d.prepare("SELECT COUNT(*) c FROM zamowienie_klienta_pozycja").get() as { c: number };
   assert.equal(ile.c, 2, "pozycje nie duplikują się przy ponownym zapisie");
 });
+
+
+test("zamówienie bez ani jednego SKU wraca do pobrania — po dobie", () => {
+  /* Do 0.153.1 warunkiem było wyłącznie „nie ma takiego wiersza", więc jedna
+     zła synchronizacja zamieniała się w trwały stan: po naprawieniu mapowania
+     zamówienie i tak nie było odpytywane NIGDY. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (1,'ord-1','2026-08-30T10:00:00Z')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (1,'111','Sekator',NULL,1,8999,'PLN')`).run();
+
+  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"],
+    "puste SKU po dobie kwalifikuje do ponownego pobrania");
+  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-08-30T12:00:00Z")), [],
+    "ale nie w kółko co dziesięć minut");
+});
+
+test("zamówienie z choćby jednym SKU zostaje w spokoju", () => {
+  /* Sprzedawca, który opisał część oferty, nie ma być odpytywany codziennie
+     o resztę — to jest jego decyzja, nie nasza awaria. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (1,'ord-1','2026-08-01T10:00:00Z')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (1,'111','Sekator','SEK-46',1,8999,'PLN')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (1,'222','Zraszacz',NULL,1,3490,'PLN')`).run();
+  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), []);
+});
+
+test("SKU z samych spacji liczy się jak brak", () => {
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (1,'ord-1','2026-08-01T10:00:00Z')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (1,'111','Sekator','   ',1,8999,'PLN')`).run();
+  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"]);
+});

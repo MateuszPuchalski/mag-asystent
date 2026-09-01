@@ -59,10 +59,11 @@ function dodaj(d: Db, utworzono: string, pola: Record<string, unknown> = {},
     (pola.zamkniety_at as string) ?? null, (pola.rejection_code as string) ?? null);
   const id = Number((d.prepare("SELECT id FROM zwrot_klienta WHERE external_id=?").get(ext) as { id: number }).id);
   for (const p of pozycje) {
-    d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena,url,tw_id,tw_symbol,tw_zrodlo)
-      VALUES (?,?,?,?,?,'PLN',?,?,?,?,?)`).run(
+    d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena,url,tw_id,tw_symbol,tw_zrodlo,klucz)
+      VALUES (?,?,?,?,?,'PLN',?,?,?,?,?,?)`).run(
       id, p.offerId ?? null, p.nazwa ?? "Sekator", p.ilosc, p.cena, p.ocena ?? null,
-      p.url ?? null, p.twId ?? null, p.twSymbol ?? null, p.twZrodlo ?? null);
+      p.url ?? null, p.twId ?? null, p.twSymbol ?? null, p.twZrodlo ?? null,
+      `${p.offerId ?? ""}|${p.nazwa ?? "Sekator"}`);
   }
   return id;
 }
@@ -164,7 +165,10 @@ test("propozycja kwoty to suma pozycji, nie zgadywana kwota pełna", () => {
   /* Koszt dostawy nie przyjeżdża ze zwrotem, więc wariant „bez wysyłki"
      byłby dziś nieodróżnialny od pełnego. Ekran ma mówić, co wie. */
   const d = stanowisko();
-  dodaj(d, "2026-08-31T00:00:00Z", {}, [{ ilosc: 2, cena: 4999 }, { ilosc: 1, cena: 500 }]);
+  /* Dwie RÓŻNE pozycje — bez `offer_id` rozróżnia je nazwa, bo klucz
+     naturalny to `offer_id|nazwa`. */
+  dodaj(d, "2026-08-31T00:00:00Z", {},
+    [{ ilosc: 2, cena: 4999, nazwa: "Sekator" }, { ilosc: 1, cena: 500, nazwa: "Zraszacz" }]);
   const z = listaZwrotow(d, TERAZ)[0];
   assert.equal(z.sumaPozycjiGrosze, 10498);
   assert.equal(z.waluta, "PLN");

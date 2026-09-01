@@ -269,7 +269,7 @@ ale nie ma prawa kupić ich drugi raz.
 
 ## Polityka danych skrzynki (0.143.0)
 
-**Załączniki (0.154.0).** Trzymamy nazwę pliku, typ i stan — nie trzymamy
+**Załączniki (0.155.0).** Trzymamy nazwę pliku, typ i stan — nie trzymamy
 samego pliku. Nazwa bywa daną osobową (`faktura_Kowalski.pdf`) i przyjmujemy
 to świadomie: skoro w bazie leży treść rozmowy, nazwa załącznika niczego nie
 zmienia w skali ryzyka, a bez niej agent nie wie, co dostał.
@@ -360,9 +360,17 @@ potwierdzenie agenta, razem ze źródłem (`sku` albo `reczne`). Projekt panelu
 §4.3 nie pozwala, żeby wybór człowieka udawał fakt z Allegro — wybór automatu
 tym bardziej.
 
-**Do Allegro nadal nie wychodzi z tego ekranu nic.** Jedyny zapis zwrotów to
-potwierdzenie kartoteki, i zostaje on u nas. Werdykt, kwota, ocena hali
-i korekta wciąż czekają. Pilnuje tego licznik tras zapisu w teście.
+**Pamięć wskazań trzyma identyfikatory, nie ludzi.** Od 0.154.0 potwierdzenie
+zapisuje w `oferta_kartoteka` parę oferta–kartoteka razem z symbolem, datą
+i IMIENIEM AGENTA. To ostatnie jest daną pracownika, nie klienta, i stoi tam
+z tego samego powodu co przy każdej innej mutacji: zapis bez autora nie da się
+później rozliczyć. Zdjęcie powiązania kasuje wpis.
+
+**Do Allegro nadal nie wychodzi z tego ekranu nic.** Zapisy zwrotów są dwa:
+potwierdzenie kartoteki i ręczne dociągnięcie zamówień. Drugi WYCHODZI do
+Allegro, ale wyłącznie po odczyt — pobiera to samo co ticker i tak samo
+przerywa na 429. Werdykt, kwota, ocena hali i korekta wciąż czekają. Pilnuje
+tego licznik tras zapisu w teście.
 
 ## Wysyłka odpowiedzi (0.148.0)
 

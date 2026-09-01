@@ -127,7 +127,7 @@ test("komunikat 403 wskazuje uprawnienie właściwe dla końcówki", () => {
   );
   assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues"), "allegro:api:disputes");
   assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues/1/chat"), "allegro:api:disputes");
-  /* Opinie mają WŁASNE uprawnienie. Do 0.154.0 ten adres wpadał w domyślne
+  /* Opinie mają WŁASNE uprawnienie. Do 0.155.0 ten adres wpadał w domyślne
      `orders:read`, więc odmowa kazała dodać uprawnienie, którym sonda w tym
      samym przebiegu pobrała sto zamówień. */
   assert.equal(
@@ -158,7 +158,7 @@ test("każda rodzina końcówek sondy ma nazwane uprawnienie, nie domyślne", ()
 });
 
 test("adres rozmowy w sprawie istnieje w specyfikacji Allegro", () => {
-  /* Do 0.154.0 kod pukał do `/sale/disputes/{id}/messages`, a w całym
+  /* Do 0.155.0 kod pukał do `/sale/disputes/{id}/messages`, a w całym
      `docs/allegro/swagger.yaml` nie ma ani jednej ścieżki `/sale/disputes`.
      Sonda oddawała zero rekordów przy sprawach, które miały `messagesCount`
      większy od zera. */

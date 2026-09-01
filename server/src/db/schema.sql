@@ -751,7 +751,7 @@ CREATE INDEX IF NOT EXISTS ix_allegro_inbox_message_thread
   ON allegro_inbox_message(thread_id);
 
 -- Osobny, pojedynczy model stanu synchronizatora (nie stan tokena).
--- Załączniki wiadomości (0.154.0). Sonda z żywego konta pokazała je w 7 z 39
+-- Załączniki wiadomości (0.155.0). Sonda z żywego konta pokazała je w 7 z 39
 -- wiadomości — do tej pory agent ich nie widział, choć klient przysyłał
 -- zdjęcie części.
 --
@@ -877,16 +877,39 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   url TEXT,
   ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
   ocena_at TEXT, ocena_przez TEXT,
+  -- Klucz naturalny pozycji: `offer_id|nazwa`, wyliczany w kodzie. Kolumna
+  -- istnieje, bo SQLite traktuje NULL-e w UNIQUE jako RÓŻNE — a `offer_id`
+  -- bywa puste, więc `UNIQUE (zwrot_id, offer_id, nazwa)` przepuszczałoby
+  -- duplikaty dokładnie tam, gdzie najbardziej bolą.
+  --
+  -- Do 0.153.1 pozycje kasowało się i wstawiało od nowa przy każdym
+  -- przebiegu, a pracę człowieka odtwarzało z mapy. Kosztowało to dwie
+  -- rzeczy: `id` pozycji zmieniało się pod otwartym panelem (potwierdzenie
+  -- trafiało w cudzy wiersz albo w „nie znaleziono"), a dwie pozycje o tej
+  -- samej nazwie bez `offer_id` sklejały się w jeden klucz mapy i jedna
+  -- traciła ocenę. Upsert po tym kluczu znosi oba.
+  klucz TEXT NOT NULL,
   -- ── Kartoteka Subiekta (0.152.0) ──────────────────────────────────────
   -- Bez niej pozycja nie ma zdjęcia: `zdjecie_cache` i `zdjecie_wlasne` są
   -- kluczowane po `tw_id`, więc to jedyna droga do obrazu.
   --
-  -- ON DELETE SET NULL, bo `sgt_towar` jest READ-MODELEM kasowanym w całości
-  -- przy każdym imporcie z Subiekta. Twardy klucz obcy trzymał kiedyś wiersz
-  -- towaru w zakładnikach i KŁADŁ CAŁE API w pętli restartów (blizna 0.148.1
-  -- przy `zadanie_terenowe`). Snapshot symbolu niżej sprawia, że utrata
-  -- samego powiązania niczego pozycji nie zabiera.
-  tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
+  -- BEZ KLUCZA OBCEGO DO `sgt_towar`, i to jest poprawka z 0.154.0. Do niej
+  -- stało tu `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL` — a import
+  -- z Subiekta kasuje CAŁY read-model i wstawia go od nowa co
+  -- `MSSQL_SYNC_MS` (domyślnie minutę). Skutek: każda potwierdzona przez
+  -- człowieka kartoteka znikała po minucie, cicho. Ponowny INSERT tego
+  -- samego `tw_id` nie cofa `SET NULL`.
+  --
+  -- Przewrotność tamtego stanu: instalacja sprzed 0.152.0 dostała kolumnę
+  -- przez `ALTER TABLE`, który w SQLite nie umie dołożyć klucza obcego,
+  -- więc TRZYMAŁA powiązania. Traciła je dopiero baza świeża.
+  --
+  -- Wzorzec bierzemy z `ean_alias.tw_id`: zwykły INTEGER, żadnych
+  -- `REFERENCES`. Powiązanie nadane przez człowieka NIE jest częścią
+  -- read-modelu i nie ma prawa ginąć razem z nim. Wiszące `tw_id` odsiewa
+  -- odczyt, który i tak sprawdza istnienie towaru, a `tw_symbol` niesie
+  -- sens nawet bez trafienia w kartotekę.
+  tw_id INTEGER,
   tw_symbol TEXT,
   -- `sku` = automat dopasował po `offer.external.id`, `reczne` = wskazał
   -- człowiek. Źródło jest tu równie ważne jak sam fakt: projekt panelu §4.3
@@ -897,6 +920,35 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
   ON zwrot_klienta_pozycja(zwrot_id);
+-- Indeks na `klucz` powstaje w `migrate()`, NIE tutaj. Na istniejącej bazie
+-- `CREATE TABLE IF NOT EXISTS` nie dokłada kolumny, więc w chwili wykonania
+-- schematu `klucz` jeszcze nie istnieje i indeks wywalałby start. To ta sama
+-- reguła co przy `ix_events_ref_time`.
+
+-- ── Pamięć powiązań oferta → kartoteka (0.154.0) ────────────────────────────
+-- Człowiek wskazuje kartotekę RAZ. Ten sam towar wraca za miesiąc na innym
+-- zwrocie i ma się powiązać sam — inaczej praca powtarza się w nieskończoność,
+-- a to jest dokładnie ten koszt, który panel zwrotów miał zdejmować.
+--
+-- Wzorzec i uzasadnienie wprost z `ean_alias`: BEZ klucza obcego do
+-- `sgt_towar`, bo wpis ma przeżyć import kasujący read-model. To nie jest
+-- niedopatrzenie, tylko warunek działania.
+--
+-- Klucz to identyfikator oferty RAZEM z kontem kanału — projekt panelu §15.1
+-- zabrania zakładać wspólnej przestrzeni identyfikatorów, a ta sama oferta
+-- na drugim koncie sprzedawcy jest inną ofertą.
+CREATE TABLE IF NOT EXISTS oferta_kartoteka (
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  offer_id TEXT NOT NULL,
+  tw_id INTEGER NOT NULL,
+  tw_symbol TEXT NOT NULL,
+  -- SKU, po którym trafiło, gdy trafiło. NULL = człowiek wskazał ręcznie.
+  sku TEXT,
+  wskazano_at TEXT NOT NULL,
+  wskazano_przez TEXT NOT NULL,
+  PRIMARY KEY (channel_account_id, offer_id)
+);
+CREATE INDEX IF NOT EXISTS ix_oferta_kartoteka_tw ON oferta_kartoteka(tw_id);
 
 -- Oś zwrotu. Wpisy wiszą przy ŹRÓDLE, nie przy sprawie — blizna 0.130.0,
 -- gdzie historia ginęła przy scalaniu.

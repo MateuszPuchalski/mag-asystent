@@ -63,15 +63,34 @@ export interface ZamowieniaSyncDeps {
   naPrzebieg?: number;
 }
 
-/** Numery zamówień, do których prowadzi zwrot, a których jeszcze nie mamy. */
-export function brakujaceZamowienia(database: Db, ile: number): string[] {
+/**
+ * Numery zamówień do pobrania: brakujące ORAZ te bez ani jednego SKU.
+ *
+ * Do 0.153.1 warunkiem było wyłącznie `k.id IS NULL`, więc zamówienie
+ * zapisane raz z pustymi SKU nie było odpytywane NIGDY — także po naprawieniu
+ * mapowania po naszej stronie. To zamieniało jedną złą synchronizację
+ * w trwały stan, którego nie dało się odkręcić inaczej niż ręcznie w bazie.
+ *
+ * Drugi warunek ma bezpiecznik czasowy: odświeżamy najwyżej raz na dobę.
+ * Zamówienie, którego sprzedawca po prostu nie opisał SKU, nie ma się
+ * odpytywać w kółko co dziesięć minut do końca świata.
+ */
+export function brakujaceZamowienia(database: Db, ile: number, teraz = new Date()): string[] {
+  const doba = new Date(teraz.getTime() - 86_400_000).toISOString();
   return (database.prepare(`SELECT DISTINCT z.order_id AS id
     FROM zwrot_klienta z
     LEFT JOIN zamowienie_klienta k
       ON k.channel_account_id = z.channel_account_id AND k.external_id = z.order_id
-    WHERE z.order_id IS NOT NULL AND z.order_id <> '' AND k.id IS NULL
+    WHERE z.order_id IS NOT NULL AND z.order_id <> ''
+      AND (
+        k.id IS NULL
+        OR (k.synced_at < ? AND NOT EXISTS (
+              SELECT 1 FROM zamowienie_klienta_pozycja p
+              WHERE p.zamowienie_id = k.id AND p.sku IS NOT NULL AND TRIM(p.sku) <> ''
+            ))
+      )
     ORDER BY z.created_at DESC
-    LIMIT ?`).all(ile) as Array<{ id: string }>).map((r) => r.id);
+    LIMIT ?`).all(doba, ile) as Array<{ id: string }>).map((r) => r.id);
 }
 
 /**
@@ -89,7 +108,7 @@ export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promis
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const ile = deps.naPrzebieg ?? NA_PRZEBIEG;
 
-  const doPobrania = brakujaceZamowienia(database, ile);
+  const doPobrania = brakujaceZamowienia(database, ile, now());
   if (!doPobrania.length) return 0;
 
   const pobrane: Zamowienie[] = [];

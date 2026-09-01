@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { Os } from "./Os";
 import type { WpisOsi } from "../api/typy";
 
-/* ── Załączniki na osi (0.154.0) ─────────────────────────────────────────────
+/* ── Załączniki na osi (0.155.0) ─────────────────────────────────────────────
    Sonda z żywego konta: 7 z 39 wiadomości ma załącznik, a agent go nie
    widział. W sklepie z częściami do maszyn ogrodniczych zdjęcie pękniętego
    elementu bywa całą treścią pytania. */

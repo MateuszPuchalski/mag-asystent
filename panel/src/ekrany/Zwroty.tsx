@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
 import { useZwroty } from "../api/zwroty";
-import type { Kubelek } from "../api/typy";
+import type { BilansKartotek, Kubelek } from "../api/typy";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -30,6 +30,43 @@ const DECYZJE: Record<Kubelek, Array<[string, string]>> = {
   odrzucony: [],
   zamkniety: [],
 };
+
+/* Krótkie etykiety do LICZNIKA. Pełne zdania pisze serwer i stoją przy
+   pozycji (`Dowody`); tutaj muszą się zmieścić w jednym pasku, więc panel ma
+   własne, skrócone. To jedyne miejsce, gdzie kod powodu zamienia się na tekst
+   po naszej stronie — i dlatego nieznany kod pokazuje się SUROWY zamiast
+   zniknąć. Licznik, który cicho gubi część liczb, jest gorszy od jego braku. */
+const POWODY_SKROT: Record<string, string> = {
+  do_zatwierdzenia: "czeka na zatwierdzenie",
+  brak_zamowienia_w_zwrocie: "zwrot bez zamówienia",
+  zamowienie_niepobrane: "zamówienie niepobrane",
+  oferty_nie_ma_w_zamowieniu: "oferty nie ma w zamówieniu",
+  oferta_bez_sku: "oferta bez SKU",
+  sku_nie_trafia: "SKU nie trafia w kartotekę",
+  symbol_zdublowany: "symbol zdublowany",
+};
+
+/**
+ * Ile pozycji czeka na kartotekę i DLACZEGO.
+ *
+ * Bez tych liczb nie da się odpowiedzieć na pytanie właściciela — czy problem
+ * jest w kodzie, czy w danych Allegro. Jedna pozycja bez kartoteki to zwykle
+ * brak SKU u sprzedawcy; czterdzieści z tym samym powodem to usterka.
+ *
+ * Stany końcowe do licznika nie wchodzą (liczy je `bilansKartotek`): zamknięty
+ * zwrot nie jest pracą do zrobienia i zawyżałby liczbę, która ma mówić „ile
+ * jeszcze przede mną".
+ */
+function PasekKartotek({ bilans }: { bilans: BilansKartotek }) {
+  if (!bilans.bez) return null;
+  const powody = Object.entries(bilans.powody).sort((a, b) => b[1] - a[1]);
+  return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:col-span-3">
+    <b>Bez kartoteki: {bilans.bez} z {bilans.wszystkie} pozycji w pracy</b>
+    {powody.map(([kod, ile]) => <span key={kod} className="text-amber-800">
+      {POWODY_SKROT[kod] ?? kod} <b className="tabular-nums">{ile}</b>
+    </span>)}
+  </div>;
+}
 
 export function Zwroty() {
   const { id } = useParams();
@@ -91,6 +128,7 @@ export function Zwroty() {
   const opis = KUBELKI.find((k) => k.id === kubelek);
 
   return <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
+    {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} />}
     <Karta className="overflow-hidden">
       <nav className="flex flex-wrap gap-1 border-b border-slate-200 p-2">
         {KUBELKI.map((k, i) => {

@@ -128,7 +128,7 @@ export function urlOpinii(apiUrl: string, offset: number): string {
 /**
  * Rozmowa w sprawie posprzedażowej (`/sale/issues/{issueId}/chat`).
  *
- * DO 0.154.0 STAŁ TU ADRES, KTÓREGO ALLEGRO NIE MA. Kod pukał do
+ * DO 0.155.0 STAŁ TU ADRES, KTÓREGO ALLEGRO NIE MA. Kod pukał do
  * `/sale/disputes/{id}/messages`, a w całej specyfikacji nie ma ani jednej
  * ścieżki `/sale/disputes` — sonda oddała przy tej końcówce zero rekordów,
  * choć `chat.messagesCount` na tych samych sprawach był większy od zera.
@@ -191,7 +191,7 @@ export function scopeDlaUrl(url: string): string {
   /* Cała rodzina spraw posprzedażowych — lista, rozmowa i załączniki — stoi
      na jednym uprawnieniu (specyfikacja przy `/sale/issues/{issueId}/chat`). */
   if (url.includes("/sale/issues")) return "allegro:api:disputes";
-  /* Opinie mają WŁASNE uprawnienie i to jest poprawka z 0.154.0. Bez tej
+  /* Opinie mają WŁASNE uprawnienie i to jest poprawka z 0.155.0. Bez tej
      gałęzi adres wpadał w domyślne `orders:read` i odmowa 403 kazała dodać
      uprawnienie, które sonda właśnie z powodzeniem WYKORZYSTAŁA do pobrania
      stu zamówień. Zła instrukcja jest gorsza niż jej brak: wysyła człowieka
@@ -313,7 +313,7 @@ export async function zapytajAllegro(
 }
 
 /**
- * Pobranie załącznika wiadomości — jedyne wyjście do Allegro po BAJTY (0.154.0).
+ * Pobranie załącznika wiadomości — jedyne wyjście do Allegro po BAJTY (0.155.0).
  *
  * Osobno od `zapytajAllegro`, bo tamta funkcja negocjuje `Accept` wersją zasobu
  * i parsuje JSON. Tutaj obie te rzeczy są niepotrzebne, a jedna z nich szkodzi:

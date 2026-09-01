@@ -29,12 +29,12 @@ stoją tutaj, a nie tylko w raporcie:
   numerze oferty byłby pusty przy większości rozmów.
 - `subject` jest niepuste w **5 z 39**, a `type` to `MESSAGE_CENTER` ×25,
   `ASK_QUESTION` ×9 i `MAIL` ×5. Temat mają praktycznie tylko maile.
-- `attachments` jest niepuste w **7 z 39**. Załączniki są realne i od 0.154.0
+- `attachments` jest niepuste w **7 z 39**. Załączniki są realne i od 0.155.0
   wchodzą do modelu pracy.
 
 Pełny raport wchodzi obok tego dokumentu po najbliższym przebiegu sondy — ten
 z 1 września wyniósł numery listów przewozowych i nie może trafić do repo
-(poprawka w `server/src/services/ksztalt.ts` weszła w 0.154.0). Ten dokument
+(poprawka w `server/src/services/ksztalt.ts` weszła w 0.155.0). Ten dokument
 jest KONTRAKTEM, czyli mówi, co wolno czytać kodowi; raport będzie OBSERWACJĄ
 z datą. Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia.
 
@@ -310,6 +310,39 @@ i `zdjecie_wlasne` są kluczowane po `tw_id`. Projekt panelu §28 nazywał to
 Dopasowanie jest PROPOZYCJĄ, nie faktem: `services/dopasowanie-sku.ts`
 porównuje SKU z `sgt_towar.symbol`, a zapisuje dopiero potwierdzenie
 człowieka. Zero i wiele trafień daje brak, nigdy zgadywanie.
+
+### Dwie przestrzenie identyfikatorów oferty — pytanie otwarte
+
+`CustomerReturnItem.offerId` i `OfferReference.id` to być może NIE to samo.
+Przykład pierwszego jest UUID-em (`3e895572-…`), a drugiego — numerem
+(`3213213`). W tym samym schemacie `url` kończy się numerem oferty; gdyby
+`offerId` nim był, przykład adresu kończyłby się na tej samej wartości.
+UUID-owy kształt pokrywa się za to z `CheckoutFormLineItem.id`, czyli
+z przestrzenią POZYCJI zamówienia.
+
+To są jednak PRZYKŁADY, a `docs/allegro/README.md` ostrzega, że bywają
+niezgodne ze schematem. Oba pola mają `type: string` bez `format`, więc plik
+tego nie rozstrzyga. Sonda też nie: `services/ksztalt.ts` pokazuje wartości
+wyłącznie dla pól słownikowych, a identyfikator oferty nim nie jest.
+
+`[WERYFIKUJ]` Do której przestrzeni należy `CustomerReturnItem.offerId`.
+Zamiast zgadywać, `dopasowanie-sku.ts` łączy pozycję zwrotu z pozycją
+zamówienia po `offer_id` **albo** po `external_id` i zapisuje w polu
+`poKolumnie`, która z nich trafiła. Odpowiedź przyjedzie z produkcji.
+Wcześniejsze złączenie po samym `offer_id` nie trafiało nigdy — cicho
+i w stu procentach — jeśli rozjazd jest faktem.
+
+### Pamięć wskazań — `oferta_kartoteka`
+
+Potwierdzenie kartoteki zapisuje parę `offer_id → tw_id` w tabeli
+`oferta_kartoteka`. Następny zwrot tej samej oferty dostaje propozycję
+z tej pamięci, z pominięciem całego łańcucha wyżej.
+
+Tabela stoi na wzorcu `ean_alias`: `tw_id` jest zwykłym `INTEGER`, **bez**
+klucza obcego do `sgt_towar`. Import z Subiekta kasuje cały read-model
+i wstawia go od nowa; klucz obcy zerowałby przy tym pracę człowieka co minutę.
+Zdjęcie powiązania kasuje też wpis z pamięci — inaczej następny odczyt
+zaproponowałby je z powrotem.
 
 ### Jedno wywołanie na zamówienie, nie na ofertę
 

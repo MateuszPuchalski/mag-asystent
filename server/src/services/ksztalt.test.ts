@@ -107,7 +107,7 @@ test("nazwa zakazana blokuje wartość nawet zapisaną wersalikami", () => {
   ]);
 });
 
-/* ── Numer listu przewozowego wyciekł do raportu (0.154.0) ───────────────────
+/* ── Numer listu przewozowego wyciekł do raportu (0.155.0) ───────────────────
    Z prawdziwego przebiegu sondy, sekcja zwrotów:
 
        | `parcels[].waybill` | null, tekst | 94 | 88 |

@@ -34,7 +34,7 @@ const ZAKAZANE_KLUCZE = [
   "text", "content", "message", "body", "note", "comment", "subject", "title",
   "login", "name", "email", "phone", "address", "street", "city", "zip", "post",
   "company", "tax", "nip", "account", "iban", "token", "secret",
-  /* `waybill` doszło w 0.154.0, bo prawdziwy raport wyniósł sześć numerów
+  /* `waybill` doszło w 0.155.0, bo prawdziwy raport wyniósł sześć numerów
      listów przewozowych InPost. Numer listu prowadzi w systemie kuriera do
      adresu i odbiorcy — jest daną osobową okrężną drogą, przez co nie wygląda
      na nią przy czytaniu tej listy. */
@@ -61,7 +61,7 @@ const MAX_WARTOSCI = 12;
  * więc daną, choćby wyglądała jak enum i stała pod nazwą, której nikt nie
  * wpisał na listę zakazanych.
  *
- * To jest odpowiedź na 0.154.0: `waybill` przeszedł, bo wzorzec słownika nie
+ * To jest odpowiedź na 0.155.0: `waybill` przeszedł, bo wzorzec słownika nie
  * odróżnia `A000H44281` od `INPOST`, a sufit `MAX_WARTOSCI` nie zadziałał —
  * wzorzec odsiał 82 numery o innym formacie, więc mapa nigdy nie urosła ponad
  * sześć wartości. Zapora, która wyglądała na drugą, była tą samą co pierwsza.

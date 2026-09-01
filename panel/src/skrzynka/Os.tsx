@@ -3,7 +3,7 @@ import { Paperclip } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk } from "../ui";
 
-/* Załączniki wiadomości (0.154.0). Sonda pokazała je w 7 z 39 wiadomości —
+/* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
 
    ADRES ALLEGRO NIE TRAFIA DO PRZEGLĄDARKI. Pobranie idzie przez naszą trasę,

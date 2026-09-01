@@ -427,7 +427,7 @@ test("udany przebieg czyści zdanie o błędzie razem z licznikiem", async () =>
   assert.equal(s.error_count, 0);
 });
 
-/* ── Załączniki (0.154.0) ────────────────────────────────────────────────────
+/* ── Załączniki (0.155.0) ────────────────────────────────────────────────────
    Sonda z żywego konta: `attachments` niepuste w 7 z 39 wiadomości. Klient
    przysyłający zdjęcie pękniętej części był dla agenta niewidzialny, bo
    mapowanie kończyło się na treści.
