@@ -165,6 +165,17 @@ def sprawdz_wersje() -> int:
 
 STRUKTURA = "docs/subiekt-gt-struktura.md"
 
+# Dokumenty, w których liczy się znaczniki `[WERYFIKUJ]`. Do 0.148.0 był tu
+# wyłącznie `STRUKTURA` — i to była dziura: `panel-obslugi-klienta.md` §8.2 każe
+# kierować do TEGO SAMEGO licznika znaczniki z mapowania Allegro, a te siedzą
+# w `allegro-ksztalt.md`. Znacznik postawiony poza jednym plikiem przechodził
+# więc bez żadnej kontroli, czyli dokładnie tam, gdzie licznik miał pracować.
+#
+# Deklaracja zostaje w preambule `STRUKTURA` i obejmuje sumę z obu plików:
+# jedno zdanie o tym, ile rzeczy czeka na sprawdzenie, jest łatwiejsze do
+# utrzymania niż dwa, które trzeba dodać w pamięci.
+SKANOWANE_ZNACZNIKI = [STRUKTURA, "docs/allegro-ksztalt.md"]
+
 # Liczebniki, którymi preambuła może wyrazić liczbę rzeczy do ustalenia.
 LICZEBNIKI = {
     "zero": 0, "jedna": 1, "dwie": 2, "trzy": 3, "cztery": 4,
@@ -202,7 +213,10 @@ def sprawdz_licznik_weryfikuj() -> int:
         return 1
 
     zadeklarowane = LICZEBNIKI[slowo]
-    faktyczne = len(ZNACZNIK_RE.findall(text))
+    faktyczne = sum(
+        len(ZNACZNIK_RE.findall(open(doc, encoding="utf-8").read()))
+        for doc in SKANOWANE_ZNACZNIKI
+    )
     if zadeklarowane != faktyczne:
         print(
             f"ZŁY LICZNIK     {STRUKTURA}: preambula mowi {slowo!r} "

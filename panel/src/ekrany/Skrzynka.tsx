@@ -4,7 +4,7 @@ import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
   useJa, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
-  useWskazOferte, useZapiszSzkic, useZdrowie, useZlecPomiar,
+  useWskazOferte, useWyslij, useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
@@ -12,7 +12,8 @@ import { Kolejka } from "../skrzynka/Kolejka";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
-import type { SzczegolyKonfliktu } from "../api/typy";
+import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
+import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 
 export function Skrzynka() {
   /* Wybrana rozmowa siedzi w ADRESIE, nie w stanie komponentu. Do 0.146.0
@@ -30,6 +31,7 @@ export function Skrzynka() {
   const oferta = useWskazOferte();
   const zdrowie = useZdrowie();
   const synchronizuj = useSynchronizuj();
+  const wyslij = useWyslij();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
 
@@ -43,6 +45,8 @@ export function Skrzynka() {
   const [bladKonfliktu, setBladKonfliktu] = useState("");
   const [bladOferty, setBladOferty] = useState("");
   const [bladSynchronizacji, setBladSynchronizacji] = useState("");
+  const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
+  const [bladWysylki, setBladWysylki] = useState("");
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
 
@@ -52,6 +56,7 @@ export function Skrzynka() {
     setSzkic(rozmowa.data?.szkic?.body ?? "");
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
+    setKonfliktWysylki(null); setBladWysylki("");
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -63,6 +68,35 @@ export function Skrzynka() {
     if (e instanceof Konflikt) setKonflikt(e.szczegoly as SzczegolyKonfliktu);
     else setBlad((e as Error).message);
   };
+
+  /* Kontrola świeżości porównuje ostatnią wiadomość KLIENTA, nie ostatnią
+     w ogóle — inaczej własna odpowiedź blokowałaby kolejną w tej rozmowie. */
+  const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
+    .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
+
+  function wyslijOdpowiedz(mimoNowejWiadomosci = false) {
+    if (!rozmowa.data) return;
+    setBladWysylki("");
+    wyslij.mutate({
+      id: rozmowa.data.rozmowa.id, body: szkic,
+      expectedVersion: rozmowa.data.rozmowa.wersja,
+      expectedLastMessageId: ostatniaKlienta, mimoNowejWiadomosci,
+    }, {
+      onSuccess: (w) => {
+        setKonfliktWysylki(null);
+        if (w.status === "sent") setSzkic("");
+        else setBlad("Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj wątek.");
+      },
+      onError: (e) => {
+        /* Dopisek klienta nie jest błędem do pokazania w pasku: ekran ma
+           postawić dialog i poprosić o jawną zgodę. */
+        if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined) {
+          setKonfliktWysylki(e.szczegoly as SzczegolyWysylki);
+        } else if (konfliktWysylki) setBladWysylki((e as Error).message);
+        else zglos(e);
+      },
+    });
+  }
 
   const jestemAdminem = ja.data?.user.role === "admin";
   const alarm = Boolean(zdrowie.data?.allegroInbox.alarm);
@@ -109,6 +143,8 @@ export function Skrzynka() {
       onZrodlo={setZrodlo}
       onWskazowka={setWskazowka}
       onTowar={setTowar}
+      wysyla={wyslij.isPending}
+      onWyslij={() => wyslijOdpowiedz(false)}
       onZlec={() => {
         if (!rozmowa.data || !zrodlo) return;
         zlec.mutate({
@@ -148,6 +184,11 @@ export function Skrzynka() {
       onDopytajOOferte={() => setSzkic((s) => s
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
     />
+
+    {konfliktWysylki && <DialogKonfliktu
+      szczegoly={konfliktWysylki} szkic={szkic} wysyla={wyslij.isPending} blad={bladWysylki}
+      onWyslijMimoTo={() => wyslijOdpowiedz(true)}
+      onPopraw={() => { setKonfliktWysylki(null); rozmowa.refetch(); }} />}
 
     <div className="lg:col-span-2 space-y-4">
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>

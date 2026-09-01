@@ -235,7 +235,8 @@ nieprawdziwy — kopia lokalna jest ceną za ekran, który otwiera się przy
 niedostępnym Allegro.
 
 **Szkic odpowiedzi i komentarze zostają u nas.** Szkic jest współdzielony
-w zespole i nigdzie nie wychodzi, dopóki wysyłka jest wyłączona. Komentarz
+w zespole i wychodzi na zewnątrz WYŁĄCZNIE przez wysyłkę, na jawne kliknięcie
+agenta. Komentarz
 wewnętrzny ma osobną tabelę, żeby nie dało się go pomylić z wiadomością
 kanału — adapter Allegro czyta wyłącznie `message`.
 
@@ -251,8 +252,39 @@ mają bramkę roli także na odczycie — rozmowy z klientami to dane biura.
 i do szkicu trafia wyłącznie na jawne kliknięcie agenta.
 
 **Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
-loginem rozmówcy nie są pobierane. Wysyłka odpowiedzi do Allegro jest
-wyłączona, więc żadna treść nie wychodzi z WERTIS na zewnątrz.
+loginem rozmówcy nie są pobierane.
+
+## Wysyłka odpowiedzi (0.148.0)
+
+Ten rozdział unieważnia zdanie, które stało tu do 0.147.0: „wysyłka jest
+wyłączona, więc żadna treść nie wychodzi z WERTIS na zewnątrz". Od 0.148.0
+wychodzi — i dlatego dostaje własny zapis.
+
+**Wychodzi wyłącznie to, co człowiek wysłał.** Automat nie wysyła niczego;
+regułę tę projekt panelu wymienia jako drugą zasadę nadrzędną. Wysyła agent,
+który prowadzi rozmowę, jednym kliknięciem, po zatwierdzeniu treści.
+
+**Nie wychodzi nic poza treścią odpowiedzi.** Do Allegro idzie sam tekst.
+Komentarze wewnętrzne mają osobną tabelę i adapter ich nie widzi. Załączników
+nie wysyłamy wcale.
+
+**Każda próba zostawia wiersz w kolejce.** Tabela `outbox` trzyma treść, klucz
+idempotencji, wersję rozmowy i stan próby. Podwójne kliknięcie nie tworzy
+drugiej odpowiedzi, bo klucz wylicza serwer z rozmowy, pytania i treści.
+
+**Dopisek klienta zatrzymuje wysyłkę.** Serwer zwraca 409, szkic zostaje
+nietknięty, a agent decyduje: poprawić odpowiedź albo wysłać mimo to. Zgoda
+jest jawna — to blizna 0.110.0 i nie wolno jej kupić drugi raz.
+
+**Po niejednoznacznym timeoucie nic nie idzie ponownie.** Stan `send_uncertain`
+blokuje kolejną próbę, dopóki synchronizacja nie sprawdzi, czy odpowiedź już
+jest w wątku.
+
+**Kształt żądania jest niepotwierdzony.** Mapowanie POST powstało z pamięci,
+wbrew regule §8.2 projektu panelu, na polecenie właściciela. Stoi w jednej
+funkcji, nosi znacznik `[WERYFIKUJ]` i ma osobną sekcję
+w `docs/allegro-ksztalt.md`. Do czasu potwierdzenia pierwsza wysyłka na
+produkcji jest testem kontraktu, nie rutyną.
 
 ## Co się nie zmienia
 

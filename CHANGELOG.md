@@ -33,6 +33,47 @@ historii nie przepisujemy.
 
 ---
 
+## 0.148.0 — 1 września 2026
+
+**[wymaga działania]** Wysyłka odpowiedzi do Allegro jest włączona. Od tego
+wydania treść wychodzi z WERTIS na zewnątrz. Polityka danych w
+`docs/obsluga-klienta.md` dostała osobny rozdział o tym, co dokładnie wychodzi
+i na czyje kliknięcie.
+
+**[wymaga działania]** Kształt żądania POST pochodzi z pamięci, nie
+z dokumentacji Allegro. Decyzja właściciela, podjęta wbrew regule z rozdziału 8
+projektu panelu. Mapowanie stoi w jednej funkcji, nosi znacznik `[WERYFIKUJ]`
+i ma osobną sekcję w `docs/allegro-ksztalt.md`. Pierwsza wysyłka na produkcji
+jest testem kontraktu — zrób ją świadomie, na rozmowie, którą znasz.
+
+Jeśli kształt jest inny, Allegro odpowie 400 albo 422. Kolejka zapisze to jako
+`send_failed` razem z odpowiedzią serwera i to ona poda właściwy kształt.
+Do klienta nie wyjdzie nic po cichu.
+
+**Podwójne kliknięcie nie tworzy drugiej odpowiedzi.** Klucz idempotencji
+wylicza serwer z rozmowy, pytania i treści. Dwie zakładki i dwa kliknięcia dają
+ten sam klucz, więc drugi strzał nie idzie do Allegro.
+
+**Dopisek klienta zatrzymuje wysyłkę.** Serwer zwraca 409, szkic zostaje
+nietknięty, a panel stawia dialog z porównaniem szkicu i nowej wiadomości.
+Wysyłka mimo to wymaga zaznaczenia zgody — to blizna 0.110.0.
+
+Kontrola świeżości porównuje ostatnią wiadomość KLIENTA, nie ostatnią w ogóle.
+Inaczej własna odpowiedź blokowałaby kolejną w tej samej rozmowie.
+
+**Po niejednoznacznym timeoucie nic nie idzie ponownie.** Próba zostaje w stanie
+`send_uncertain` i blokuje kolejną, dopóki synchronizacja nie sprawdzi, czy
+odpowiedź już jest w wątku.
+
+**Wiadomość wychodząca powstaje tylko z numerem od Allegro.** Bez numeru
+synchronizacja przyniosłaby ją drugi raz i na osi stanęłyby dwie.
+
+**Szkic znika dopiero po udanej wysyłce.** Przy każdym innym końcu zostaje.
+
+**Licznik `[WERYFIKUJ]` obejmuje teraz oba dokumenty kontraktowe.** Do tej pory
+skanował wyłącznie `docs/subiekt-gt-struktura.md`, więc znacznik postawiony
+gdziekolwiek indziej przechodził bez kontroli.
+
 ## 0.147.0 — 1 września 2026
 
 **Awaria synchronizacji przestaje być cicha.** Po więcej niż dwóch nieudanych

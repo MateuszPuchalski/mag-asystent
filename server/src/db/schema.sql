@@ -166,6 +166,37 @@ CREATE TABLE IF NOT EXISTS conversation_mention (
 --
 -- Wejście to LOGIN I HASŁO — ten sam wzorzec, co reszta systemów w firmie.
 -- Wcześniej był nim skan plakietki; wyszedł w 0.20.0 razem z PIN-em.
+-- ── Kolejka wysyłek (0.148.0) ──────────────────────────────────────────────
+-- Jeden wiersz na PRÓBĘ wysyłki, nie na wysłaną wiadomość. Bez tego rozdziału
+-- niejednoznaczny timeout nie ma gdzie zostać: żądanie poszło, odpowiedź nie
+-- wróciła, a `message` mówiłby albo „wysłano", albo nic — obie odpowiedzi
+-- nieprawdziwe.
+--
+-- `CHECK` na statusie stoi od razu z pełnym zbiorem z §7 projektu panelu.
+-- Rozszerzanie CHECK w SQLite wymaga przebudowy tabeli (blizna 0.135.0),
+-- więc dokładanie wartości po jednej kosztowałoby migrację za każdym razem.
+CREATE TABLE IF NOT EXISTS outbox (
+  id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id          INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  -- Klucz wylicza SERWER z rozmowy, ostatniej wiadomości i treści. Gdyby
+  -- podawał go klient, podwójne kliknięcie z dwiema zakładkami dałoby dwa
+  -- klucze i dwie odpowiedzi u klienta.
+  idempotency_key          TEXT NOT NULL UNIQUE,
+  body                     TEXT NOT NULL,
+  expected_version         INTEGER NOT NULL,
+  expected_last_message_id INTEGER REFERENCES message(id) ON DELETE SET NULL,
+  status                   TEXT NOT NULL
+    CHECK (status IN ('sending','sent','send_uncertain','send_failed')),
+  -- Numer nadany przez Allegro. Po niejednoznacznym timeoucie zostaje pusty
+  -- i dopiero synchronizacja rozstrzyga, czy odpowiedź tam jest.
+  external_message_id      TEXT,
+  blad                     TEXT,
+  created_by               INTEGER NOT NULL REFERENCES app_user(user_id),
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  finished_at              TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_outbox_rozmowa ON outbox(conversation_id, id);
+
 CREATE TABLE IF NOT EXISTS app_user (
   user_id    INTEGER PRIMARY KEY AUTOINCREMENT,
   -- NULL jest stanem prawidłowym i celowym: konto-ślad. Powstaje przy migracji

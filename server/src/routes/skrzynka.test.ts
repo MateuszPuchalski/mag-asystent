@@ -79,6 +79,8 @@ const TRASY = () => [
     payload: { doUserId: null, powod: "urlop", expectedVersion: 1 } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/oferta`,
     payload: { ofertaId: "14892374512" } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
+    payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -237,4 +239,61 @@ test("ręczna synchronizacja bez sparowanego konta mówi wprost, czego brakuje",
      jakimkolwiek zapytaniem do sieci — testy tras nie strzelają do Allegro. */
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /nie jest sparowane/);
+});
+
+/* Trasa wysyłki jest sprawdzana WYŁĄCZNIE na ścieżkach konfliktu: wszystkie
+   odpadają, zanim cokolwiek poleci do Allegro. Udaną wysyłkę pokrywa
+   `services/wysylka.test.ts` z podstawionym adapterem — testy tras nie
+   strzelają do Allegro. */
+test("nie wyśle ten, kto nie prowadzi rozmowy", async () => {
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
+    headers: b.naglowki, payload: { body: "Pasuje.", expectedVersion: 1, expectedLastMessageId: pytanie } });
+  assert.equal(r.statusCode, 409);
+  assert.match(r.json().error, /najpierw ją przejmij/);
+});
+
+test("dopisek klienta zatrzymuje wysyłkę i oddaje panelowi wszystko, czego trzeba", async () => {
+  const b = login("biuro", "Anna");
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: b.naglowki, payload: { expectedVersion: 1 } });
+
+  const konto = (db().prepare("SELECT channel_account_id k FROM conversation WHERE id=?")
+    .get(rozmowa) as { k: number }).k;
+  const dopisek = Number(db().prepare(`INSERT INTO message(conversation_id,channel_account_id,
+    external_message_id,direction,body,sent_at) VALUES (?,?,'m-88903','incoming',?,?)`)
+    .run(rozmowa, konto, "Dopisuję: rocznik 2019.", "2026-09-01T09:38:00.000Z").lastInsertRowid);
+
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
+    headers: b.naglowki,
+    payload: { body: "Pasuje.", expectedVersion: 2, expectedLastMessageId: pytanie } });
+  assert.equal(r.statusCode, 409, r.body);
+
+  /* Dokładnie te pola rysują dialog konfliktu z makiety. */
+  const d = r.json();
+  assert.equal(d.lastMessageId, dopisek);
+  assert.equal(d.nowaWiadomosc.tresc, "Dopisuję: rocznik 2019.");
+  assert.match(d.kluczIdempotencji, /^snd-/);
+  assert.equal((db().prepare("SELECT count(*) n FROM outbox").get() as {n:number}).n, 0,
+    "odrzucona wysyłka nie zostawia wiersza w kolejce");
+});
+
+test("konflikt świeżości zostawia ślad w dzienniku", async () => {
+  const b = login("biuro", "Anna");
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: b.naglowki, payload: { expectedVersion: 1 } });
+  const konto = (db().prepare("SELECT channel_account_id k FROM conversation WHERE id=?")
+    .get(rozmowa) as { k: number }).k;
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'m-88903','incoming','Dopisek',?)`)
+    .run(rozmowa, konto, "2026-09-01T09:38:00.000Z");
+
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
+    headers: b.naglowki,
+    payload: { body: "Pasuje.", expectedVersion: 2, expectedLastMessageId: pytanie } });
+
+  /* §19 wymienia konflikt świeżości wśród operacji objętych audytem. */
+  const n = (db().prepare(
+    "SELECT count(*) n FROM events WHERE type='rozmowa_wysylka_konflikt'").get() as {n:number}).n;
+  assert.equal(n, 1);
 });

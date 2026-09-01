@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { OsRozmowy, Rozmowa, StanSkrzynki, Zadanie, Zdrowie } from "./typy";
+import type { OsRozmowy, Rozmowa, StanSkrzynki, WynikWysylki, Zadanie, Zdrowie } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
    że unieważnienie mija się z zapytaniem o jedną literę — i ekran pokazuje
@@ -153,5 +153,32 @@ export function useWskazOferte() {
         method: "POST", body: JSON.stringify({ ofertaId: v.ofertaId }),
       }),
     onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) }),
+  });
+}
+
+/**
+ * Wysyłka odpowiedzi do klienta (§8.5).
+ *
+ * Konflikt świeżości NIE jest tu łapany: `Konflikt` leci do ekranu, bo to on
+ * ma pokazać dopisek klienta obok szkicu i poprosić o jawną zgodę.
+ */
+export function useWyslij() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      id: number; body: string; expectedVersion: number;
+      expectedLastMessageId: number | null; mimoNowejWiadomosci?: boolean;
+    }) => api<WynikWysylki>(`/api/conversations/${v.id}/send`, {
+      method: "POST",
+      body: JSON.stringify({
+        body: v.body, expectedVersion: v.expectedVersion,
+        expectedLastMessageId: v.expectedLastMessageId,
+        mimoNowejWiadomosci: Boolean(v.mimoNowejWiadomosci),
+      }),
+    }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+    },
   });
 }

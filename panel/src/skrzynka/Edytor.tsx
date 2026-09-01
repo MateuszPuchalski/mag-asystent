@@ -5,18 +5,20 @@ import { Przycisk } from "../ui";
 /**
  * Edytor odpowiedzi (§10.4).
  *
- * Wysyłka jest wyłączona w tym wydaniu i przycisk mówi to wprost, zamiast
- * udawać, że działa. Przełącznik „komentarz wewnętrzny" i reszta paska
- * narzędzi dochodzą w kolejnych etapach — tu ma być miejsce, w które da się
- * je dołożyć bez ruszania kolejki i osi.
+ * Przycisk komentarza i przycisk wysyłki do klienta mają być jednoznacznie
+ * rozdzielone (§10.4). Przełącznik komentarza wewnętrznego i reszta paska
+ * narzędzi dochodzą w kolejnym etapie — tu ma być miejsce, w które da się je
+ * dołożyć bez ruszania kolejki i osi.
  */
-export function Edytor({ szkic, cudza, wlasciciel, zapisuje, onZmiana, onZapisz }: {
+export function Edytor({ szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij }: {
   szkic: string;
   cudza: boolean;
   wlasciciel: string | null;
   zapisuje: boolean;
+  wysyla: boolean;
   onZmiana: (v: string) => void;
   onZapisz: () => void;
+  onWyslij: () => void;
 }) {
   return <div className="border-t p-4">
     {cudza && <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
@@ -27,11 +29,11 @@ export function Edytor({ szkic, cudza, wlasciciel, zapisuje, onZmiana, onZapisz 
     <div className="mt-2 flex items-center gap-2">
       <Przycisk onClick={onZapisz} disabled={cudza || zapisuje}>
         {zapisuje ? "ZAPISUJĘ…" : "ZAPISZ SZKIC"}</Przycisk>
-      {/* Wysyłka do Allegro wchodzi w etapie 3 razem z kolejką `outbox`,
-          kluczem idempotencji i kontrolą świeżości. Do tego czasu żadna
-          treść nie wychodzi z WERTIS na zewnątrz. */}
-      <Przycisk disabled title="Wysyłka do Allegro wchodzi w kolejnym wydaniu">
-        <Send size={16} />WYŚLIJ (wkrótce)</Przycisk>
+      {/* Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na zewnątrz,
+          i idzie WYŁĄCZNIE na kliknięcie człowieka. Automat nie wysyła nic —
+          druga zasada nadrzędna projektu panelu. */}
+      <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}>
+        <Send size={16} />{wysyla ? "WYSYŁAM…" : "WYŚLIJ DO KLIENTA"}</Przycisk>
       <span className="ml-auto text-xs text-slate-400">{szkic.length} znaków</span>
     </div>
   </div>;

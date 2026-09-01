@@ -79,3 +79,19 @@ export type SzczegolyKonfliktu = {
   assignedAt?: string | null;
   version?: number;
 };
+
+export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed";
+
+export type WynikWysylki = {
+  outboxId: number;
+  status: StatusWysylki;
+  kluczIdempotencji: string;
+  externalMessageId: string | null;
+};
+
+/** Szczegóły 409 przy kontroli świeżości — z nich rysuje się dialog konfliktu. */
+export type SzczegolyWysylki = {
+  lastMessageId?: number | null;
+  nowaWiadomosc?: { id: number; tresc: string; at: string } | null;
+  kluczIdempotencji?: string;
+};

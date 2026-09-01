@@ -640,7 +640,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kartoteka wywiedziona z oferty | **następne** | czeka na dostęp do dokumentacji Allegro |
 | Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
-| Wysyłka do Allegro (§8.5) | **projekt** | świadomie wyłączona |
+| Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
+| Kształt POST wysyłki | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
+| Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
 | Baza wiedzy i dobór części (§11–12) | **projekt** | etapy E i dalsze |
 | Copilot (§14) | **projekt** | etap F |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |

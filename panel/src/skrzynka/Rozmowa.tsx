@@ -25,6 +25,8 @@ export function Rozmowa(p: {
   onWskazowka: (v: string) => void;
   onTowar: (t: Towar | null) => void;
   onZlec: () => void;
+  wysyla: boolean;
+  onWyslij: () => void;
   konflikt: SzczegolyKonfliktu | null;
   mozeWymusic: boolean;
   wymusza: boolean;
@@ -105,6 +107,7 @@ export function Rozmowa(p: {
     </div>}
 
     <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
-      zapisuje={p.zapisuje} onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} />
+      zapisuje={p.zapisuje} wysyla={p.wysyla}
+      onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij} />
   </section>;
 }

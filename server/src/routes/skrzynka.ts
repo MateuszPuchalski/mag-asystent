@@ -9,6 +9,7 @@ import { config } from "../config.js";
 import { db } from "../db/db.js";
 import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
+import { wyslijOdpowiedz } from "../services/wysylka.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -132,6 +133,27 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
           sesjaZadania()!.user.userId);
       } catch (e) { return blad(reply, e); }
     });
+
+  /* Wysyłka odpowiedzi (§8.5). Warunki „zalogowany agent" i „uprawnienie"
+     domyka `odmowa()`; resztą — przypisaniem, wersją, świeżością, kluczem
+     idempotencji i audytem — zajmuje się serwis. */
+  app.post<{ Params: { id: string }; Body: {
+    body?: string; expectedVersion?: number; expectedLastMessageId?: number | null;
+    mimoNowejWiadomosci?: boolean;
+  } }>("/api/conversations/:id/send", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const s = sesjaZadania()!;
+    try {
+      return await wyslijOdpowiedz({
+        conversationId: Number(req.params.id),
+        autor: { id: s.user.userId, name: s.user.name },
+        body: req.body?.body ?? "",
+        expectedVersion: Number(req.body?.expectedVersion),
+        expectedLastMessageId: req.body?.expectedLastMessageId ?? null,
+        mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
+      });
+    } catch (e) { return konflikt(reply, e); }
+  });
 
   // SSE: jedna szyna dla obecności, wiadomości, przypisań i wyników magazynu.
   app.get<{ Querystring: { conversationId?: string } }>("/api/conversations/events", async (req, reply) => {
