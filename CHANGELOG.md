@@ -33,6 +33,19 @@ historii nie przepisujemy.
 
 ---
 
+## 0.141.0 — 31 sierpnia 2026
+
+**Wraca fundament obsługi rozmów.** Baza rozróżnia kanał od konkretnego
+konta kanału, więc firma może podłączyć więcej niż jedno konto Allegro.
+Rozmowy, wiadomości, zdarzenia osi oraz historia przypisań mają osobne tabele.
+
+**Synchronizację można bezpiecznie powtarzać.** Zewnętrzne identyfikatory są
+unikalne w obrębie konta, a ponownie pobrana wiadomość nie tworzy kopii.
+
+**Zadanie terenowe może wskazać rozmowę i wiadomość.** Wynik zadania trafia
+na oś rozmowy jako osobne zdarzenie. Treść wiadomości klienta pozostaje
+oryginalna. Zastane zadania zachowują dane i dostają puste powiązania.
+
 ## 0.140.0 — 30 sierpnia 2026
 
 **Cała obsługa klienta skasowana.** Odchodzą pytania, dyskusje, opinie,

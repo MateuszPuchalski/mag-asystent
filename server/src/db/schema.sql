@@ -58,6 +58,78 @@ CREATE INDEX IF NOT EXISTS ix_events_user_time ON events(user_id, created_at);
 -- towaru skanowała całą tabelę, która rośnie z każdym skanem.
 CREATE INDEX IF NOT EXISTS ix_events_tw_time ON events(tw_id, created_at);
 
+-- ── Rozmowy wielokanałowe ────────────────────────────────────────────────
+-- Konto jest osobnym korzeniem modelu. Nie utożsamiamy kanału „allegro"
+-- z kontem, bo jedna firma może podłączyć kilka kont tego kanału.
+CREATE TABLE IF NOT EXISTS channel_account (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel             TEXT NOT NULL,
+  external_account_id TEXT NOT NULL,
+  display_name        TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(channel, external_account_id)
+);
+
+CREATE TABLE IF NOT EXISTS conversation (
+  id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_account_id       INTEGER NOT NULL REFERENCES channel_account(id),
+  external_conversation_id TEXT NOT NULL,
+  subject                  TEXT,
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(channel_account_id, external_conversation_id)
+);
+
+CREATE TABLE IF NOT EXISTS message (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id    INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_message_id TEXT NOT NULL,
+  direction          TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
+  body               TEXT NOT NULL,
+  sent_at             TEXT NOT NULL,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Ponowne pobranie tej samej strony kanału ma skończyć się konfliktem,
+  -- który importer zamienia na no-op, a nie drugim wierszem wiadomości.
+  UNIQUE(channel_account_id, external_message_id)
+);
+CREATE INDEX IF NOT EXISTS ix_message_conversation ON message(conversation_id, sent_at);
+
+CREATE TABLE IF NOT EXISTS conversation_event (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  message_id      INTEGER REFERENCES message(id) ON DELETE SET NULL,
+  event_type      TEXT NOT NULL,
+  payload         TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_conversation_event_time
+  ON conversation_event(conversation_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS conversation_assignment (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  assigned_to     INTEGER NOT NULL REFERENCES app_user(user_id),
+  assigned_by     INTEGER REFERENCES app_user(user_id),
+  assigned_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  unassigned_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_conversation_assignment
+  ON conversation_assignment(conversation_id, unassigned_at);
+
+-- Zadanie zlecone poza biuro może pochodzić z rozmowy. Wynik pozostaje
+-- osobnym faktem na osi czasu i nigdy nie nadpisuje wiadomości klienta.
+CREATE TABLE IF NOT EXISTS zadanie_terenowe (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  opis            TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'open',
+  wynik           TEXT,
+  conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  message_id      INTEGER REFERENCES message(id) ON DELETE SET NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  completed_at    TEXT
+);
+
 -- ── Konta pracowników (plan §7) ────────────────────────────────────────────
 -- Do lipca 2026 „użytkownik" to był DOWOLNY łańcuch wpisywany ręcznie na
 -- kolektorze i wysyłany w nagłówku X-User. Skutek: `events.user_id` zawiera
@@ -661,4 +733,3 @@ CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
   at     TEXT NOT NULL,
   przez  TEXT NOT NULL
 );
-
