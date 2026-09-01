@@ -227,3 +227,46 @@ test("treść komentarza NIE trafia do tabeli, z której czyta wysyłka", async 
     .get(tresc) as { n: number }).n;
   assert.equal(wSzkicu, 0, "treść komentarza wylądowała w szkicu, który idzie do klienta");
 });
+
+test("odłożenie po terminie wraca do kolejki jako otwarte i widać, że termin minął", async () => {
+  /* Rozmowa odłożona na wczoraj wygląda w kolumnie tak samo jak odłożona na
+     przyszły tydzień — różnicę robi dopiero czas. Kolejka ma pokazać ją jako
+     otwartą, ale nie milczeć o tym, że nikt jej po terminie nie tknął. */
+  const { ustawStatus } = await import("./conversations.js");
+  const d = db();
+  ustawStatus(d, rozmowaId, "snoozed", BIURO.id, "2026-08-31T06:00:00.000Z");
+
+  const wiersz = listaRozmow().find((r) => r.id === rozmowaId)!;
+  assert.equal(wiersz.status, "open", "termin minął, więc rozmowa jest znów otwarta");
+  assert.equal(wiersz.poTerminie, true);
+  assert.equal(wiersz.odlozoneDo, "2026-08-31T06:00:00.000Z");
+
+  /* Odczyt niczego nie prostuje w bazie — reguła „zero zapisu przy patrzeniu".
+     Kolumna zostaje `snoozed` do najbliższej ręcznej zmiany. */
+  const wBazie = d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowaId) as
+    { status: string };
+  assert.equal(wBazie.status, "snoozed");
+
+  ustawStatus(d, rozmowaId, "open", BIURO.id, null);
+  const po = listaRozmow().find((r) => r.id === rozmowaId)!;
+  assert.equal(po.poTerminie, false);
+  assert.equal(po.odlozoneDo, null, "ręczna zmiana kasuje termin, bo już nic nie znaczy");
+});
+
+test("zmiana statusu ląduje na osi, a zmiana bez różnicy nie zostawia nic", () => {
+  /* §10.3 wymienia zmianę statusu wśród wpisów osi. Kolejność sprawdzamy
+     razem z resztą, bo wpis bez daty wypłynąłby na samą górę — przed
+     pierwszym pytaniem klienta. */
+  const wpisy = osRozmowy(rozmowaId).os;
+  assert.equal(wpisy[0].rodzaj, "wiadomosc", "pytanie klienta zostaje pierwsze");
+
+  const statusy = wpisy.filter((w) => w.rodzaj === "status");
+  /* Trzy wywołania `ustawStatus` po drodze, DWA wpisy. Trzecie — otwarcie
+     rozmowy odłożonej, której termin już minął — nie zmieniło niczego, co
+     widać: dla czytelnika była otwarta od chwili terminu. Wpis „open → open"
+     opowiadałby o zdarzeniu, którego nie było. */
+  assert.deepEqual(statusy.map((w) => w.tresc), ["new → open", "open → snoozed"]);
+  assert.equal(statusy[1].autor, "Biuro");
+  assert.equal(statusy[1].odKlienta, false,
+    "zmiana statusu nie ma prawa wyglądać jak głos klienta");
+});

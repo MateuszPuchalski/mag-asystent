@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, wskazOferte, zapiszSzkic } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawStatus, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import { onConversationEvent, setTyping, typingPresence } from "../services/conversation-realtime.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
@@ -145,6 +145,23 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       return { stan: stanSynchronizacji(db()) };
     } catch (e) { return blad(reply, e); }
   });
+
+  /* Status rozmowy (§7, 0.158.0). Zmiana ręką agenta; przejścia automatyczne
+     robią synchronizator i wysyłka, bez udziału tej trasy. */
+  app.post<{ Params: { id: string }; Body: { status?: string; doKiedy?: string | null } }>(
+    "/api/obsluga/rozmowy/:id/status", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = req.body?.status ?? "";
+      if (!(STATUSY_ROZMOWY as readonly string[]).includes(s)) {
+        return reply.code(400).send({
+          error: `Nieznany status. Dozwolone: ${STATUSY_ROZMOWY.join(", ")}.` });
+      }
+      try {
+        return ustawStatus(db(), Number(req.params.id), s as StatusRozmowy,
+          sesjaZadania()!.user.userId, req.body?.doKiedy ?? null);
+      } catch (e) { return blad(reply, e); }
+    });
 
   /* Wymuszone przekazanie — odebranie rozmowy komuś z rąk. Rola i powód
      stoją tutaj, bo to trasa decyduje o uprawnieniu (wzorzec z domknięcia

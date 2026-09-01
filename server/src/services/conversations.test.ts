@@ -4,7 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  ConversationConflict, dodajKomentarz, przejmijRozmowe, zapiszSzkic,
+  ConversationConflict, dodajKomentarz, obudzPrzychodzaca, przejmijRozmowe,
+  statusRozmowy, ustawStatus, zapiszSzkic,
 } from "./conversations.js";
 
 /* Serwis rozmów nie miał testu obok do 0.145.1, choć trzyma trzy mutacje
@@ -158,4 +159,90 @@ test("komentarz zapisuje wzmianki bez duplikatów i odrzuca pustą treść", () 
   assert.equal((d.prepare("SELECT count(*) n FROM conversation_mention").get() as {n:number}).n, 1);
 
   assert.throws(() => dodajKomentarz(rozmowa, ala, "   ", [], d), /nie może być pusty/);
+});
+
+/* ── Statusy rozmowy §7 (0.158.0) ────────────────────────────────────────────
+   `conversation` nie miała kolumny statusu, więc kolejka nie odróżniała sprawy
+   załatwionej od nietkniętej, a rozmowa raz otwarta rosła w nieskończoność.
+
+   Najważniejsze są tu PRZEJŚCIA AUTOMATYCZNE. Status, który trzeba ustawić
+   ręcznie po każdym ruchu, jest biurokracją — a status, który nie wraca sam,
+   gdy klient dopisze pytanie, jest gorszy od jego braku: rozmowa wygląda na
+   załatwioną i nikt do niej nie zagląda. */
+
+test("nowa rozmowa jest `new`, przejęcie robi z niej `open`", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  assert.equal(statusRozmowy(d, rozmowa), "new");
+
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  assert.equal(statusRozmowy(d, rozmowa), "open");
+});
+
+test("wysłanie odpowiedzi przestawia rozmowę na `waiting_for_customer`", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+
+  ustawStatus(d, rozmowa, "waiting_for_customer", ala, null);
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_customer");
+});
+
+test("PRZYCHODZĄCA wiadomość budzi rozmowę rozwiązaną i odłożoną", () => {
+  /* To jest sedno całego wydania. Klient dopisuje pytanie do sprawy, którą
+     biuro uznało za zamkniętą; bez tego przejścia rozmowa zostaje na liście
+     „rozwiązane" i nikt jej nie otwiera. */
+  for (const zamkniety of ["resolved", "waiting_for_customer", "snoozed"] as const) {
+    const { d, ala, rozmowa } = stanowisko();
+    przejmijRozmowe(rozmowa, ala, 1, d);
+    ustawStatus(d, rozmowa, zamkniety, ala, zamkniety === "snoozed" ? "2026-12-01T08:00:00Z" : null);
+
+    obudzPrzychodzaca(d, rozmowa);
+
+    assert.equal(statusRozmowy(d, rozmowa), "open", `${zamkniety} nie wróciło do open`);
+  }
+});
+
+test("`closed` i `spam` NIE budzą się same — to decyzja człowieka", () => {
+  /* Zamknięcie i spam są jawnymi werdyktami biura. Automat, który je cofa,
+     kazałby ręcznie zamykać tę samą rozmowę w kółko. */
+  for (const koniec of ["closed", "spam"] as const) {
+    const { d, ala, rozmowa } = stanowisko();
+    przejmijRozmowe(rozmowa, ala, 1, d);
+    ustawStatus(d, rozmowa, koniec, ala, null);
+
+    obudzPrzychodzaca(d, rozmowa);
+
+    assert.equal(statusRozmowy(d, rozmowa), koniec, `${koniec} obudziło się samo`);
+  }
+});
+
+test("odłożenie wymaga terminu, a po nim rozmowa wraca sama", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+
+  assert.throws(() => ustawStatus(d, rozmowa, "snoozed", ala, null), /termin|do kiedy/i);
+
+  ustawStatus(d, rozmowa, "snoozed", ala, "2026-09-02T08:00:00Z");
+  /* Termin jeszcze nie minął — rozmowa ma leżeć odłożona. */
+  assert.equal(statusRozmowy(d, rozmowa, Date.parse("2026-09-01T20:00:00Z")), "snoozed");
+  /* Po terminie wraca SAMA, bez tickera: liczymy przy odczycie, bo stan
+     wyliczalny nie potrzebuje procesu, który go pilnuje. */
+  assert.equal(statusRozmowy(d, rozmowa, Date.parse("2026-09-02T09:00:00Z")), "open");
+});
+
+test("zmiana statusu ląduje na osi i w audycie", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  ustawStatus(d, rozmowa, "resolved", ala, null);
+
+  const zdarzenia = (d.prepare(
+    "SELECT event_type FROM conversation_event WHERE conversation_id=?").all(rozmowa) as
+    Array<{ event_type: string }>).map((z) => z.event_type);
+  assert.ok(zdarzenia.includes("status_changed"), `oś nie zna zmiany: ${zdarzenia.join(",")}`);
+  assert.ok((d.prepare("SELECT count(*) n FROM events WHERE type='rozmowa_status'")
+    .get() as { n: number }).n > 0, "brak śladu w audycie");
+});
+
+test("nieznany status odpada — lista z §7 jest zamknięta", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  assert.throws(() => ustawStatus(d, rozmowa, "zalatwione" as never, ala, null), /status/i);
 });

@@ -480,3 +480,32 @@ test("wiadomość bez załączników nie zakłada pustych wierszy", async () => 
   assert.equal((database.prepare("SELECT count(*) n FROM message_attachment")
     .get() as { n: number }).n, 0);
 });
+
+/* ── Status rozmowy budzi się z synchronizacji (0.158.0) ─────────────────────
+   Przejście samo w sobie ma test w `conversations.test.ts`; ten sprawdza, że
+   synchronizator NAPRAWDĘ je woła. Bez tego funkcja byłaby poprawna i martwa —
+   dokładnie tak, jak `odkodujEncje` przez trzynaście wydań. */
+test("nowa wiadomość klienta otwiera rozmowę uznaną za rozwiązaną", async () => {
+  const database = mkDb();
+  const agent = Number(database.prepare(
+    "INSERT INTO app_user(login,name,role) VALUES ('ala','Ala','biuro')").run().lastInsertRowid);
+
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", query: fake([[thread(1)]]).query,
+  });
+  const rozmowa = Number((database.prepare("SELECT id FROM conversation").get() as { id: number }).id);
+
+  const { statusRozmowy, ustawStatus } = await import("./conversations.js");
+  ustawStatus(database, rozmowa, "resolved", agent, null);
+  assert.equal(statusRozmowy(database, rozmowa), "resolved");
+
+  /* Drugi przebieg z DOPISANĄ wiadomością klienta. */
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[thread(1, "2026-09-30T12:00:00Z")]],
+      new Map([["t-1", ["m-1", "m-2"]]])).query,
+  });
+
+  assert.equal(statusRozmowy(database, rozmowa), "open",
+    "rozmowa została rozwiązana mimo nowego pytania klienta");
+});

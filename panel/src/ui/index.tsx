@@ -23,6 +23,9 @@ const STATUS: Record<string, string> = {
   "waiting_for_customer": "bg-stan-klient text-stan-klient-tekst",
   "waiting_for_internal": "bg-stan-wewnetrzne text-stan-wewnetrzne-tekst",
   "resolved": "bg-stan-zrobione text-stan-zrobione-tekst",
+  "snoozed": "bg-stan-odlozona text-stan-odlozona-tekst",
+  "closed": "bg-stan-zamknieta text-stan-zamknieta-tekst",
+  "spam": "bg-stan-spam text-stan-spam-tekst",
 };
 export const Plakietka = ({ status, children, className = "" }:
   { status?: string; children: React.ReactNode; className?: string }) =>

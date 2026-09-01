@@ -165,6 +165,29 @@ i są wizualnie odróżnione od wiadomości klienta.
 **Synchronizacja** ma status niezależny od rozmowy: `current`, `delayed`,
 `rate_limited`, `authentication_error`, `failed`.
 
+### 7.1. Statusy rozmowy w kodzie (0.158.0)
+
+Lista rozmowy stoi w trzech miejscach naraz: `STATUSY_ROZMOWY`
+w `services/conversations.ts`, `CHECK` na kolumnie `conversation.status`
+i typ `StatusRozmowy` w panelu. Każda kopia pilnuje innej granicy — typów,
+API i bazy — a rozjazd wychodzi przy kompilacji albo przy zapisie.
+
+Trzy przejścia dzieją się SAME, bez agenta:
+
+- przejęcie rozmowy prowadzi `new` → `open`;
+- wysłana odpowiedź prowadzi do `waiting_for_customer`;
+- przychodząca wiadomość klienta budzi rozmowę do `open`.
+
+Budzenie omija `closed` i `spam`. To jawne werdykty człowieka, a automat,
+który je cofa, kazałby zamykać tę samą rozmowę w kółko.
+
+Odłożenie wymaga terminu i kończy się SAMO — liczymy to przy odczycie, bez
+tickera. Rozmowa po minionym terminie wraca jako `open` i niesie znacznik
+„po terminie", bo inaczej niczym nie różniłaby się od świeżo otwartej.
+
+Zamknięcia automatycznego po N dniach NIE MA. §26 wymienia je wśród pytań
+do właściciela; do czasu decyzji rozmowę zamyka wyłącznie człowiek.
+
 ## 8. Integracja z Allegro
 
 ### 8.1. Autoryzacja
@@ -780,7 +803,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
 | Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias` |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
-| Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
+| Statusy rozmowy (§7) | **działa** od 0.158.0 | `conversation.status`, `ustawStatus`, kubełki kolejki |
+| Statusy doboru (§7) | **projekt** | dobór części nie ma jeszcze własnego stanu |
+| Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |

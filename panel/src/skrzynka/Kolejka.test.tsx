@@ -8,7 +8,8 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z",
-  nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1, ...n,
+  nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
+  status: "new", odlozoneDo: null, poTerminie: false, ...n,
 });
 
 const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
@@ -68,5 +69,62 @@ describe("Kolejka", () => {
     render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={4821} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.getByRole("button", { current: true })).toBeInTheDocument();
+  });
+
+  /* Kubełki z §10.1. Filtr sprawdzamy PO WIERSZACH, nie po liczniku: licznik
+     zgodny z pustą listą byłby błędem, którego test po samym liczniku nie
+     zobaczy. */
+  const KOMPLET = [
+    rozmowa({ id: 1, klient: "Nieprzypisana", status: "open" }),
+    rozmowa({ id: 2, klient: "Moja", status: "open", wlascicielId: 7, wlasciciel: "Ja" }),
+    rozmowa({ id: 3, klient: "Czeka", status: "waiting_for_customer", wlascicielId: 7, wlasciciel: "Ja" }),
+    rozmowa({ id: 4, klient: "Zapomniana", status: "open", poTerminie: true,
+      odlozoneDo: "2026-08-30T06:00:00.000Z" }),
+    rozmowa({ id: 5, klient: "Sprawa z archiwum", status: "closed" }),
+  ];
+
+  const kubelek = async (etykieta: RegExp) => {
+    render(<Kolejka rozmowy={KOMPLET} stan={STAN} wybranaId={null} mojeId={7} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: etykieta }));
+  };
+
+  it("kubełek MOJE pokazuje wyłącznie rozmowy zalogowanego agenta", async () => {
+    await kubelek(/^Moje/);
+    expect(screen.getByText("Moja")).toBeInTheDocument();
+    expect(screen.getByText("Czeka")).toBeInTheDocument();
+    expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
+  });
+
+  it("kubełek PO TERMINIE wyławia rozmowę, o której zapomniano", async () => {
+    await kubelek(/^Po terminie/);
+    expect(screen.getByText("Zapomniana")).toBeInTheDocument();
+    expect(screen.queryByText("Moja")).not.toBeInTheDocument();
+  });
+
+  it("zamknięta rozmowa schodzi z kolejki roboczej, ale zostaje we WSZYSTKICH", async () => {
+    /* Ukrycie jej wszędzie znaczyłoby, że pomyłkowego zamknięcia nie da się
+       cofnąć — nikt nie szuka sprawy, której nie widać na żadnej liście. */
+    await kubelek(/^Nieprzypisane/);
+    expect(screen.queryByText("Sprawa z archiwum")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Wszystkie/ }));
+    expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
+  });
+
+  it("pusty kubełek nie udaje pustej skrzynki", async () => {
+    /* „Nic nie czeka na mnie" i „nic nie przyszło" to dwa różne zdania.
+       Jedno z nich kazałoby agentowi sprawdzać synchronizację. */
+    render(<Kolejka rozmowy={[rozmowa({ status: "open" })]} stan={STAN} wybranaId={null}
+      mojeId={7} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    expect(screen.getByText(/Ten kubełek jest pusty/)).toBeInTheDocument();
+    expect(screen.queryByText(/Brak rozmów w zsynchronizowanej skrzynce/)).not.toBeInTheDocument();
+  });
+
+  it("wiersz niesie status po polsku i znacznik minionego terminu", () => {
+    render(<Kolejka rozmowy={[rozmowa({ status: "open", poTerminie: true })]} stan={STAN}
+      wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText("Otwarta")).toBeInTheDocument();
+    expect(screen.getByText(/po terminie/)).toBeInTheDocument();
   });
 });

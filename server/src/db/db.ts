@@ -111,6 +111,16 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  /* Status rozmowy (§7, 0.158.0). `new` jako domyślny opisuje prawdę
+     o rozmowach zastanych: przyjechały z synchronizacji i nikt ich nie tknął.
+     `CHECK` powtarza listę ze `schema.sql`, bo baza założona przed tym
+     wydaniem dostaje kolumnę TĘDY i inaczej stałaby bez strażnika. */
+  addColumn("conversation", "status", `TEXT NOT NULL DEFAULT 'new' CHECK(status IN
+    ('new','open','waiting_for_customer','waiting_for_internal','snoozed',
+     'resolved','closed','spam'))`);
+  /* Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
+     stanem, z którego nic nie wyprowadza — a §7 nie zna „odłożona na zawsze". */
+  addColumn("conversation", "snoozed_until", "TEXT");
   /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
      po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */
