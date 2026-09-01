@@ -126,13 +126,19 @@ export function urlOpinii(apiUrl: string, offset: number): string {
 }
 
 /**
- * Rozmowa w dyskusji (`/sale/disputes/{id}/messages`). Identyfikator sprawy
- * bierzemy z `/sale/issues` przy założeniu wspólnej przestrzeni id —
- * [WERYFIKUJ] na sandboxie, i to jedno z pytań, na które ma odpowiedzieć
- * sonda.
+ * Rozmowa w sprawie posprzedażowej (`/sale/issues/{issueId}/chat`).
+ *
+ * DO 0.154.0 STAŁ TU ADRES, KTÓREGO ALLEGRO NIE MA. Kod pukał do
+ * `/sale/disputes/{id}/messages`, a w całej specyfikacji nie ma ani jednej
+ * ścieżki `/sale/disputes` — sonda oddała przy tej końcówce zero rekordów,
+ * choć `chat.messagesCount` na tych samych sprawach był większy od zera.
+ *
+ * Komentarz obok prosił o sprawdzenie, „czy id spraw i dyskusji dzielą
+ * przestrzeń". Dzielą: specyfikacja opisuje `issueId` jako „Dispute or claim
+ * identifier". Zgadnięte było co innego — sam adres.
  */
 export function urlWiadomosciDyskusji(apiUrl: string, id: string): string {
-  return `${apiUrl}/sale/disputes/${encodeURIComponent(id)}/messages`;
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/chat`;
 }
 
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
@@ -182,10 +188,15 @@ export function scopeDlaUrl(url: string): string {
   if (url.includes("/sale/offers")) return "allegro:api:sale:offers:read";
   /* Dyskusje: odczyt spraw, rozmowa i załączniki — jedno uprawnienie.
      [WERYFIKUJ] czy obejmuje też ZAPISY; jeśli nie, 403 i tak wskaże scope. */
-  if (url.includes("/sale/disputes") || url.includes("/sale/dispute-attachments")) {
-    return "allegro:api:disputes";
-  }
+  /* Cała rodzina spraw posprzedażowych — lista, rozmowa i załączniki — stoi
+     na jednym uprawnieniu (specyfikacja przy `/sale/issues/{issueId}/chat`). */
   if (url.includes("/sale/issues")) return "allegro:api:disputes";
+  /* Opinie mają WŁASNE uprawnienie i to jest poprawka z 0.154.0. Bez tej
+     gałęzi adres wpadał w domyślne `orders:read` i odmowa 403 kazała dodać
+     uprawnienie, które sonda właśnie z powodzeniem WYKORZYSTAŁA do pobrania
+     stu zamówień. Zła instrukcja jest gorsza niż jej brak: wysyła człowieka
+     po coś, co już ma, i każe sparować konto ponownie bez skutku. */
+  if (url.includes("/sale/user-ratings")) return "allegro:api:ratings";
   return "allegro:api:orders:read";
 }
 
@@ -301,3 +312,47 @@ export async function zapytajAllegro(
   );
 }
 
+/**
+ * Pobranie załącznika wiadomości — jedyne wyjście do Allegro po BAJTY (0.154.0).
+ *
+ * Osobno od `zapytajAllegro`, bo tamta funkcja negocjuje `Accept` wersją zasobu
+ * i parsuje JSON. Tutaj obie te rzeczy są niepotrzebne, a jedna z nich szkodzi:
+ * plik nie ma wersji zasobu i nie jest JSON-em.
+ *
+ * Adres bierzemy z odpowiedzi Allegro (`attachments[].url`), więc sprawdzamy,
+ * czy prowadzi do Allegro — nasz serwer nie ma się stać bramką do dowolnego
+ * miejsca w internecie, kiedy odpowiedź kiedyś zmieni kształt albo ktoś dopisze
+ * wiersz do bazy ręcznie.
+ */
+const HOSTY_ZALACZNIKOW = ["allegro.pl", "allegro.pl.allegrosandbox.pl"];
+
+export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error(`Adres załącznika nie jest poprawnym URL-em: ${url.slice(0, 80)}`);
+  }
+  if (!HOSTY_ZALACZNIKOW.some((h) => host === h || host.endsWith(`.${h}`))) {
+    throw new Error(`Adres załącznika prowadzi poza Allegro (${host}) — pobranie wstrzymane.`);
+  }
+
+  const bearer = await wazneBearer();
+  let odp: Response;
+  try {
+    odp = await fetch(url, {
+      headers: { authorization: `Bearer ${bearer}`, "user-agent": allegroUserAgent() },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new Error(
+      `Nie udało się pobrać załącznika z Allegro — sprawdź internet na serwerze. ` +
+        `(${e instanceof Error ? e.message : e})`
+    );
+  }
+  if (!odp.ok) {
+    throw new BladOdpowiedziAllegro(
+      `Allegro nie oddało załącznika (${odp.status}).`, odp.status);
+  }
+  return odp.arrayBuffer();
+}

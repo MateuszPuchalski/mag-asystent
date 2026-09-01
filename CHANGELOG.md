@@ -33,6 +33,88 @@ historii nie przepisujemy.
 
 ---
 
+## 0.154.0 — 1 września 2026
+
+Sonda pobiegła pierwszy raz na żywym koncie. Potwierdziła całe mapowanie
+odczytu i wyciągnęła cztery rzeczy, których nie mówiła ani specyfikacja,
+ani kod.
+
+### Sonda wynosiła numery listów przewozowych
+
+Raport z produkcji niósł sześć prawdziwych numerów przesyłek InPost przy polu
+`parcels[].waybill`. Numer listu prowadzi w systemie kuriera do adresu
+i odbiorcy, a raport ma z założenia trafiać do repo.
+
+Zawiodły obie zapory naraz. Lista zakazanych nazw znała `address`, `phone`
+i `iban` — nie znała listu przewozowego. Wzorzec słownika nie odróżnia
+`A000H44281` od `INPOST`, bo jedno i drugie to wersaliki z cyframi.
+
+Sufit dwunastu wartości też nie pomógł i to jest najciekawsza część: wzorzec
+odsiał 82 numery o innym formacie, więc mapa nigdy nie urosła ponad sześć.
+**Zapora, która wyglądała na drugą, była tą samą co pierwsza.**
+
+Dochodzi trzecia reguła, niezależna od dwóch pozostałych i od nazwy pola:
+wartość widziana RAZ w dużej próbce nie jest słownikiem. Enum się powtarza
+(`INPOST` ×79, `PLN` ×127); identyfikator nie. Przy małej próbce reguła
+milczy, bo tam każda wartość bywa unikalna z natury.
+
+Raportu z 1 września nie commitujemy. Do repo wejdzie dopiero przebieg po tej
+poprawce.
+
+### Załączniki wchodzą do rozmowy
+
+Sonda pokazała je w 7 z 39 wiadomości. Klient przysyłający zdjęcie pękniętej
+części był dla agenta niewidzialny, bo mapowanie kończyło się na treści.
+
+Specyfikacja mówi więcej niż raport: `MessageAttachmentInfo` wymaga wyłącznie
+`fileName` i `status`, więc **adres bywa pusty**, a stan ma cztery wartości —
+`NEW`, `SAFE`, `UNSAFE`, `EXPIRED`. Załącznik bez adresu nie jest usterką,
+tylko stanem, i zostaje widoczny: ukrycie kłamałoby, że klient nic nie
+przysłał.
+
+Pobranie oferujemy tylko przy `SAFE`. `UNSAFE` znaczy, że Allegro uznało plik
+za niebezpieczny, a my nie mamy powodu wiedzieć lepiej.
+
+**Adres Allegro nie trafia do przeglądarki.** Pobranie idzie przez naszą trasę,
+która dokłada token po stronie serwera i sprawdza, czy adres prowadzi do
+Allegro. Czy `upload.allegro.pl` otwiera się bez tokena — nie wiemy i nie
+zgadujemy; ta droga działa niezależnie od odpowiedzi.
+
+### Dwa złe adresy — jeden zgadnięty, jeden wymyślony
+
+`/sale/disputes/{id}/messages` **nie istnieje**. W całej specyfikacji nie ma
+ani jednej ścieżki `/sale/disputes`. Sonda oddawała przy tej końcówce zero
+rekordów, choć `chat.messagesCount` na tych samych sprawach był większy od
+zera. Prawdziwy adres to `GET /sale/issues/{issueId}/chat`.
+
+Komentarz w kodzie prosił o sprawdzenie, czy sprawy i dyskusje dzielą
+przestrzeń identyfikatorów. Dzielą — specyfikacja opisuje `issueId` jako
+„Dispute or claim identifier". Zgadnięty był sam adres.
+
+`scopeDlaUrl` wysyłał po złe uprawnienie. `/sale/user-ratings` nie miał własnej
+gałęzi, więc wpadał w domyślną i przy odmowie 403 radził dodać
+`allegro:api:orders:read` — czyli to, którym sonda w tym samym przebiegu
+pobrała sto zamówień. Specyfikacja mówi `allegro:api:ratings`. Zła instrukcja
+jest gorsza niż jej brak: wysyła człowieka po coś, co już ma.
+
+Doszedł test sprawdzający KOMPLET rodzin końcówek używanych przez sondę.
+Domyślne uprawnienie jest poprawne tylko dla rodziny `/order/`; wszędzie
+indziej znaczy „zapomniano o gałęzi".
+
+### Czego sonda nie zdejmuje
+
+Wcześniejsze wpisy sugerowały, że sonda zdejmie jedenaście znaczników
+weryfikacji. Nie zdejmuje żadnego. Siedem dotyczy Subiekta GT, pozostałe
+opisują końcówki ZAPISU w Allegro — a sonda jest z założenia GET-em.
+
+### Liczby, które zmieniają decyzje
+
+`relatesTo.offer` jest niepuste w 5 z 39 wiadomości, więc ekran zbudowany na
+numerze oferty byłby pusty przy większości rozmów. `subject` też w 5 z 39 —
+temat mają praktycznie tylko maile. Obie liczby stoją w kontrakcie.
+
+Wdrożenie: nic ręką. Tabela załączników dochodzi sama.
+
 ## 0.153.1 — 1 września 2026
 
 **Narzędzia z konsoli czytają `wertis.env` z katalogu instalacji.** Zgłoszenie

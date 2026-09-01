@@ -106,3 +106,74 @@ test("nazwa zakazana blokuje wartość nawet zapisaną wersalikami", () => {
     { wartosc: "NEW", ile: 1 },
   ]);
 });
+
+/* ── Numer listu przewozowego wyciekł do raportu (0.154.0) ───────────────────
+   Z prawdziwego przebiegu sondy, sekcja zwrotów:
+
+       | `parcels[].waybill` | null, tekst | 94 | 88 |
+         `A000H44281` ×1, `A000H5HJB0` ×1, … |
+
+   Numer listu prowadzi do adresu i odbiorcy w systemie kuriera, a raport ma
+   z założenia trafić do repo. Zawiodły OBIE zapory naraz: `waybill` nie stał
+   na liście zakazanych nazw, a wzorzec słownika nie odróżnia `A000H44281`
+   od `INPOST` — jedno i drugie to wersaliki z cyframi.
+
+   Sufit różnorodności też nie pomógł, i to jest najciekawsza część: wzorzec
+   odsiał 82 numery, które zaczynały się inaczej, więc mapa nigdy nie urosła
+   ponad sześć wartości. Zapora, która wyglądała na drugą, była tą samą co
+   pierwsza. */
+
+/* Próbka WIERNA produkcji, i ten szczegół jest tu całym testem: numerów jest
+   dwadzieścia, ale tylko SZEŚĆ ma format InPost (wersaliki z cyframi). Reszta
+   zaczyna się od cyfry, więc wzorzec słownika je odsiewa — i mapa nigdy nie
+   rośnie ponad sufit dwunastu wartości, który miał być drugą zaporą.
+
+   Pierwsze podejście do tego testu dawało dwadzieścia numerów w formacie
+   InPost i PRZECHODZIŁO na zepsutym kodzie: sufit się przepełniał i wartości
+   znikały same. Test niczego wtedy nie mierzył. */
+const ZWROTY = Array.from({ length: 20 }, (_, i) => ({
+  id: `ret-${i}`,
+  parcels: [{
+    carrierId: i < 17 ? "INPOST" : "DPD",
+    waybill: i < 6 ? `A000H${String(i).padStart(5, "0")}` : `6${String(i).padStart(9, "0")}`,
+  }],
+}));
+
+test("numer listu przewozowego NIE trafia do raportu", () => {
+  const pola = opiszKsztalt(ZWROTY);
+  const list = pola.find((p) => p.sciezka === "parcels[].waybill");
+  assert.ok(list, "pole ma być opisane — chodzi o wartości, nie o jego ukrycie");
+  assert.deepEqual(list.wartosci, [], "numer listu wyszedł w raporcie");
+});
+
+test("przewoźnik dalej się pokazuje — to jest prawdziwy enum", () => {
+  /* Poprawka nie ma prawa zabrać raportowi tego, po co powstał. */
+  const pola = opiszKsztalt(ZWROTY);
+  const carrier = pola.find((p) => p.sciezka === "parcels[].carrierId");
+  assert.deepEqual(carrier?.wartosci, [
+    { wartosc: "INPOST", ile: 17 }, { wartosc: "DPD", ile: 3 },
+  ]);
+});
+
+test("wartość widziana RAZ w dużej próbce nie jest słownikiem", () => {
+  /* Reguła niezależna od nazwy pola, więc łapie też te, których nikt nie
+     wpisał na listę zakazanych. Enum się powtarza; identyfikator nie. */
+  const probka = Array.from({ length: 20 }, (_, i) => ({
+    /* Sześć różnych wartości na dwadzieścia rekordów — pod sufitem
+       dwunastu, więc stara reguła je przepuszcza. */
+    kod: i < 6 ? `KOD${i}` : "",
+    rodzaj: i % 2 ? "PELNY" : "CZESCIOWY",
+  }));
+  const pola = opiszKsztalt(probka);
+  assert.deepEqual(pola.find((p) => p.sciezka === "kod")?.wartosci, []);
+  assert.equal(pola.find((p) => p.sciezka === "rodzaj")?.wartosci.length, 2,
+    "prawdziwy enum ma przejść");
+});
+
+test("mała próbka nie kasuje słownika — nie ma z czego liczyć powtórzeń", () => {
+  /* Przy trzech rekordach każda wartość bywa unikalna z natury. Reguła
+     powtarzalności ma tam milczeć, inaczej sonda przestałaby opisywać enumy
+     końcówek, które oddają mało rekordów. */
+  const pola = opiszKsztalt([{ rodzaj: "PELNY" }, { rodzaj: "CZESCIOWY" }, { rodzaj: "INNY" }]);
+  assert.equal(pola.find((p) => p.sciezka === "rodzaj")?.wartosci.length, 3);
+});

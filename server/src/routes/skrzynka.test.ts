@@ -297,3 +297,31 @@ test("konflikt świeżości zostawia ślad w dzienniku", async () => {
     "SELECT count(*) n FROM events WHERE type='rozmowa_wysylka_konflikt'").get() as {n:number}).n;
   assert.equal(n, 1);
 });
+
+test("pobranie załącznika: rola, stan i nieznane id", async () => {
+  /* Trzy odmowy, każda z innego powodu i każda z innym kodem — bo agent
+     czytający ekran ma odróżnić „nie wolno ci" od „nie ma czego pobrać". */
+  const d = db();
+  const zal = Number(d.prepare(`INSERT INTO message_attachment
+    (message_id,file_name,mime_type,url,status)
+    VALUES (?,?,?,?,?)`).run(pytanie, "wirus.exe", "application/octet-stream",
+      "https://upload.allegro.pl/a", "UNSAFE").lastInsertRowid);
+
+  const bezSesji = await app.inject({ method: "GET", url: `/api/obsluga/zalaczniki/${zal}` });
+  assert.equal(bezSesji.statusCode, 401);
+
+  const hala = login("magazynier", "Hala");
+  const zHali = await app.inject({ method: "GET", url: `/api/obsluga/zalaczniki/${zal}`,
+    headers: hala.naglowki });
+  assert.equal(zHali.statusCode, 403, "rozmowy z klientami nie są dla hali");
+
+  const biuro = login("biuro", "Biuro");
+  const niebezpieczny = await app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${zal}`, headers: biuro.naglowki });
+  assert.equal(niebezpieczny.statusCode, 409, "UNSAFE nie ma prawa się pobrać");
+  assert.match(niebezpieczny.json().error, /UNSAFE/);
+
+  const nieznany = await app.inject({ method: "GET",
+    url: "/api/obsluga/zalaczniki/99999", headers: biuro.naglowki });
+  assert.equal(nieznany.statusCode, 404);
+});

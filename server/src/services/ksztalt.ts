@@ -34,6 +34,11 @@ const ZAKAZANE_KLUCZE = [
   "text", "content", "message", "body", "note", "comment", "subject", "title",
   "login", "name", "email", "phone", "address", "street", "city", "zip", "post",
   "company", "tax", "nip", "account", "iban", "token", "secret",
+  /* `waybill` doszło w 0.154.0, bo prawdziwy raport wyniósł sześć numerów
+     listów przewozowych InPost. Numer listu prowadzi w systemie kuriera do
+     adresu i odbiorcy — jest daną osobową okrężną drogą, przez co nie wygląda
+     na nią przy czytaniu tej listy. */
+  "waybill", "parcel", "tracking",
 ];
 
 /**
@@ -46,6 +51,26 @@ const WZORZEC_SLOWNIKA = /^[A-Z][A-Z0-9_]{0,31}$/;
 
 /** Powyżej tylu różnych wartości pole przestaje być słownikiem, a zaczyna być danymi. */
 const MAX_WARTOSCI = 12;
+
+/**
+ * Od tylu rekordów wymagamy, żeby wartość słownikowa się POWTÓRZYŁA.
+ *
+ * Trzecia reguła, niezależna od dwóch pozostałych — i jedyna, która nie pyta
+ * o nazwę pola ani o kształt wartości. Enum się powtarza (`INPOST` ×79,
+ * `PLN` ×127); identyfikator nie. Wartość widziana raz w dużej próbce jest
+ * więc daną, choćby wyglądała jak enum i stała pod nazwą, której nikt nie
+ * wpisał na listę zakazanych.
+ *
+ * To jest odpowiedź na 0.154.0: `waybill` przeszedł, bo wzorzec słownika nie
+ * odróżnia `A000H44281` od `INPOST`, a sufit `MAX_WARTOSCI` nie zadziałał —
+ * wzorzec odsiał 82 numery o innym formacie, więc mapa nigdy nie urosła ponad
+ * sześć wartości. Zapora, która wyglądała na drugą, była tą samą co pierwsza.
+ *
+ * Przy MAŁEJ próbce reguła milczy: gdy rekordów jest mniej, każda wartość
+ * bywa unikalna z natury i sonda przestałaby opisywać enumy końcówek, które
+ * oddają mało danych.
+ */
+const PROG_POWTORZEN = 10;
 
 const zakazany = (sciezka: string): boolean => {
   const ostatni = sciezka.split(".").pop()?.replace("[]", "").toLowerCase() ?? "";
@@ -142,9 +167,13 @@ export function opiszKsztalt(rekordy: unknown[]): PoleKsztaltu[] {
       typy: [...z.typy].sort(),
       obecne: z.obecne,
       niepuste: z.niepuste,
+      /* Wartości logicznych ta reguła nie dotyczy — `true` widziane raz jest
+         nadal `true`, a nie czyimś numerem. */
       wartosci: z.zaDuzo
         ? []
         : [...z.wartosci.entries()]
+            .filter(([wartosc, ile]) =>
+              ile > 1 || z.obecne < PROG_POWTORZEN || wartosc === "true" || wartosc === "false")
             .map(([wartosc, ile]) => ({ wartosc, ile }))
             .sort((a, b) => b.ile - a.ile || a.wartosc.localeCompare(b.wartosc)),
     }))

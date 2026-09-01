@@ -19,6 +19,35 @@ kształt wymyślony w testach i nigdy niesprawdzony na żywym koncie. Za drugim
 razem założenie nosiło znacznik do sprawdzenia i było uczciwe. Za trzecim nosiło
 etykietę „raport z produkcji" — i dlatego nikt go nie sprawdził.
 
+## Co potwierdziła sonda (1 września 2026)
+
+Pierwszy przebieg `npm run sonda` na koncie firmy potwierdził **całe mapowanie
+odczytu** pole po polu. Trzy liczby z niego zmieniają jednak decyzje, więc
+stoją tutaj, a nie tylko w raporcie:
+
+- `relatesTo.offer` jest niepuste w **5 z 39** wiadomości. Ekran zbudowany na
+  numerze oferty byłby pusty przy większości rozmów.
+- `subject` jest niepuste w **5 z 39**, a `type` to `MESSAGE_CENTER` ×25,
+  `ASK_QUESTION` ×9 i `MAIL` ×5. Temat mają praktycznie tylko maile.
+- `attachments` jest niepuste w **7 z 39**. Załączniki są realne i od 0.154.0
+  wchodzą do modelu pracy.
+
+Pełny raport wchodzi obok tego dokumentu po najbliższym przebiegu sondy — ten
+z 1 września wyniósł numery listów przewozowych i nie może trafić do repo
+(poprawka w `server/src/services/ksztalt.ts` weszła w 0.154.0). Ten dokument
+jest KONTRAKTEM, czyli mówi, co wolno czytać kodowi; raport będzie OBSERWACJĄ
+z datą. Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia.
+
+Znaczniki weryfikacji niżej dotyczą wyłącznie końcówek ZAPISU. Sonda ich nie
+tknie, bo jest z założenia GET-em — więc licznik nie zejdzie od niej ani
+o jeden.
+
+### `commission.amount` jest LICZBĄ
+
+W `/order/refund-claims` kwota przyjeżdża jako liczba, gdy wszędzie indziej
+Allegro oddaje ją tekstem. Nikt tego pola dziś nie mapuje; `naGrosze()`
+przyjmuje tekst i na liczbie się wywróci.
+
 ## `GET /messaging/threads`
 
 Obiekt ma tablicę `threads` oraz `offset` i `limit`. Pola `totalCount`

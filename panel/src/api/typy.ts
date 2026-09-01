@@ -12,6 +12,11 @@ export type Rozmowa = {
   wersja: number;
 };
 
+/** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
+export type ZalacznikOsi = {
+  id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
+};
+
 export type WpisOsi = {
   id: string;
   rodzaj: "wiadomosc" | "wynik_zadania";
@@ -22,6 +27,7 @@ export type WpisOsi = {
   ofertaId: string | null;
   zadanieId?: number;
   messageId?: number;
+  zalaczniki?: ZalacznikOsi[];
 };
 
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };

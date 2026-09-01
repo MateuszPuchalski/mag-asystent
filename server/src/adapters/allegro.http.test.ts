@@ -11,6 +11,7 @@ import {
   urlWatkow,
   urlWiadomosci,
   urlWiadomosciDyskusji,
+  pobierzZalacznik,
   urlZwrotu,
 } from "./allegro.http.js";
 import { allegroUserAgent, retryAfterMs } from "./allegro.js";
@@ -51,7 +52,7 @@ test("identyfikator w ścieżce jest kodowany — ukośnik nie dokłada segmentu
      jak „Allegro nie zna tej dyskusji". */
   assert.equal(
     urlWiadomosciDyskusji("https://api.allegro.pl", "a/b"),
-    "https://api.allegro.pl/sale/disputes/a%2Fb/messages"
+    "https://api.allegro.pl/sale/issues/a%2Fb/chat"
   );
 });
 
@@ -125,11 +126,45 @@ test("komunikat 403 wskazuje uprawnienie właściwe dla końcówki", () => {
     "allegro:api:sale:offers:read"
   );
   assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues"), "allegro:api:disputes");
-  assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/disputes/1/messages"), "allegro:api:disputes");
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues/1/chat"), "allegro:api:disputes");
+  /* Opinie mają WŁASNE uprawnienie. Do 0.154.0 ten adres wpadał w domyślne
+     `orders:read`, więc odmowa kazała dodać uprawnienie, którym sonda w tym
+     samym przebiegu pobrała sto zamówień. */
+  assert.equal(
+    scopeDlaUrl("https://api.allegro.pl/sale/user-ratings"),
+    "allegro:api:ratings"
+  );
   assert.equal(
     scopeDlaUrl("https://api.allegro.pl/order/customer-returns"),
     "allegro:api:orders:read"
   );
+});
+
+test("każda rodzina końcówek sondy ma nazwane uprawnienie, nie domyślne", () => {
+  /* Luka przy `user-ratings` wzięła się stąd, że nikt nie sprawdził KOMPLETU
+     adresów, których sonda używa. Domyślne `orders:read` jest poprawne tylko
+     dla rodziny `/order/` — wszędzie indziej znaczy „zapomniano o gałęzi". */
+  const poza = [
+    "https://api.allegro.pl/sale/issues?limit=100",
+    "https://api.allegro.pl/sale/issues/abc/chat",
+    "https://api.allegro.pl/sale/user-ratings?limit=100",
+    "https://api.allegro.pl/messaging/threads?limit=20",
+    "https://api.allegro.pl/messaging/threads/abc/messages",
+  ];
+  for (const url of poza) {
+    assert.notEqual(scopeDlaUrl(url), "allegro:api:orders:read",
+      `${url} dostaje uprawnienie od zamówień, czyli brakuje mu gałęzi`);
+  }
+});
+
+test("adres rozmowy w sprawie istnieje w specyfikacji Allegro", () => {
+  /* Do 0.154.0 kod pukał do `/sale/disputes/{id}/messages`, a w całym
+     `docs/allegro/swagger.yaml` nie ma ani jednej ścieżki `/sale/disputes`.
+     Sonda oddawała zero rekordów przy sprawach, które miały `messagesCount`
+     większy od zera. */
+  const url = urlWiadomosciDyskusji("https://api.allegro.pl", "abc-1");
+  assert.equal(url, "https://api.allegro.pl/sale/issues/abc-1/chat");
+  assert.equal(url.includes("/sale/disputes"), false);
 });
 
 test("User-Agent: wygenerowany z env wygrywa, fallback nazywa nas po imieniu", () => {
@@ -250,4 +285,17 @@ test("każdy stan bez połączenia ma własną drogę wyjścia", () => {
   assert.match(powodBrakuKonta("niepolaczone", null), /STAN SYSTEMU → KONTO ALLEGRO/);
   assert.match(powodBrakuKonta("zle_srodowisko", null), /STAN SYSTEMU → KONTO ALLEGRO/);
   for (const z of zdania) assert.doesNotMatch(z, /REJESTRY/, "zakładka odeszła w 0.140.0");
+});
+
+test("pobranie załącznika nie idzie poza Allegro", async () => {
+  /* Adres bierze się z ODPOWIEDZI Allegro, więc jest cudzym wejściem. Bez tej
+     bramki nasz serwer stałby się pośrednikiem do dowolnego miejsca w sieci,
+     dokładającym po drodze Bearera konta firmy. */
+  for (const zly of [
+    "https://przyklad.test/plik.jpg",
+    "https://upload.allegro.pl.zly.test/plik.jpg",
+    "nie-adres",
+  ]) {
+    await assert.rejects(() => pobierzZalacznik(zly), /poza Allegro|poprawnym URL/);
+  }
 });

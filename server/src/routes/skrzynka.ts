@@ -10,6 +10,7 @@ import { db } from "../db/db.js";
 import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
+import { pobierzZalacznik } from "../adapters/allegro.http.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -36,6 +37,43 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     const nie = odmowa(reply);
     if (nie) return nie;
     try { return osRozmowy(Number(req.params.id)); } catch (e) { return blad(reply, e); }
+  });
+
+  /* ── Pobranie załącznika (0.154.0) ────────────────────────────────────────
+     ADRES ALLEGRO NIE IDZIE DO PRZEGLĄDARKI, i to jest cała treść tej trasy.
+
+     `attachments[].url` wskazuje `upload.allegro.pl`. Czy ten adres otwiera
+     się bez tokena — NIE WIEM i nie zgaduję; zgadywanie kształtu Allegro
+     kosztowało ten projekt trzy wydania. Pobranie przez nas działa niezależnie
+     od odpowiedzi na tamto pytanie, a przy okazji nie wypuszcza Bearera do
+     przeglądarki i zostawia ślad w audycie.
+
+     Tylko `SAFE`. `UNSAFE` znaczy, że Allegro uznało plik za niebezpieczny —
+     nie mamy powodu wiedzieć lepiej, a plik szedłby na maszynę biura. */
+  app.get<{ Params: { id: string } }>("/api/obsluga/zalaczniki/:id", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const z = db().prepare(`SELECT a.file_name, a.mime_type, a.url, a.status, m.conversation_id
+      FROM message_attachment a JOIN message m ON m.id=a.message_id WHERE a.id=?`)
+      .get(Number(req.params.id)) as Record<string, unknown> | undefined;
+    if (!z) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
+    if (String(z.status) !== "SAFE" || z.url == null) {
+      return reply.code(409).send({
+        error: `Załącznik „${String(z.file_name)}" nie jest do pobrania (stan ${String(z.status)}).`,
+      });
+    }
+    try {
+      const odp = await pobierzZalacznik(String(z.url));
+      logEvent("obsluga.zalacznik.pobrany", sesjaZadania()?.user.name ?? "?", null,
+        { rozmowaId: Number(z.conversation_id), nazwa: String(z.file_name) });
+      return reply
+        .header("content-type", String(z.mime_type ?? "application/octet-stream"))
+        /* `attachment` z nazwą: przeglądarka nie ma renderować cudzego pliku
+           w naszym origin. Cudzysłowy w nazwie znikają, bo rozbiłyby nagłówek. */
+        .header("content-disposition",
+          `attachment; filename="${String(z.file_name).replace(/["\r\n]/g, "")}"`)
+        .send(Buffer.from(odp));
+    } catch (e) { return blad(reply, e); }
   });
 
   app.post<{ Body: { rozmowaId?: number; wiadomoscId?: number; instrukcja?: string; twId?: number | null } }>(
