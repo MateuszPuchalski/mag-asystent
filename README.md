@@ -64,10 +64,14 @@ Dwie rzeczy z tej tabeli zmieniają projekt, a nie tylko go opisują:
 Kolorystyka WERTIS: amber `#F7A600`, grafit `#2A2A2C`, papier `#F6F5F2`.
 
 Nowy panel obsługi klienta działa pod **`/obsluga`**. Jest osobną aplikacją
-React z Tailwind CSS. Pierwsza funkcja panelu wysyła pomiary i weryfikacje
-bezpośrednio na kolektory magazynierów, a wykonany wynik wraca do biura.
-Rozwój frontendu: `npm -w @wertis/panel-obslugi run dev` na porcie 5174.
-Produkcję buduje zwykłe `npm run build`.
+React z Tailwind CSS. Wysyła pomiary i weryfikacje bezpośrednio na kolektory
+magazynierów, a wykonany wynik wraca do biura; pod `/obsluga/skrzynka` czyta
+zsynchronizowane rozmowy Allegro.
+
+Panel nie wymaga osobnych poleceń. `npm run dev` podnosi go razem z API
+i workerem: Vite na porcie 5174, proxy `/api` na 3001. `npm run build`
+wkłada gotowy panel do `dist/web/obsluga`, skąd serwuje go ten sam proces
+co `/biuro`. Sam front bez reszty: `npm run dev:panel`.
 
 Strefa przyjęć nazywa się **MGP**.
 

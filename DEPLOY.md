@@ -92,7 +92,7 @@ cd /c
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis
 cd /c/wertis
 npm ci
-npm run build      # server → server/dist (API + strona /biuro)
+npm run build      # panel → dist/web/obsluga, server → server/dist (API, /biuro, /obsluga)
 npm run seed       # zasila SQLite danymi demo (tryb seeded)
 ```
 
