@@ -214,46 +214,41 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
     "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?",
   ).get(konto, zwrot.id) as { id: number }).id);
 
-  /* Ocena hali NIE MA prawa zginąć przy odświeżeniu listy. Zdejmujemy ją
-     przed przepisaniem pozycji i oddajemy po ofercie i nazwie — jedyne dwa
-     pola, po których pozycja daje się rozpoznać między przebiegami. */
-  type Praca = {
-    ocena: string | null; at: string | null; przez: string | null;
-    twId: number | null; twSymbol: string | null; twZrodlo: string | null;
-    twAt: string | null; twPrzez: string | null;
-  };
-  const oceny = new Map<string, Praca>();
-  for (const p of database.prepare(
-    `SELECT offer_id, nazwa, ocena, ocena_at, ocena_przez, tw_id, tw_symbol, tw_zrodlo,
-            tw_at, tw_przez
-     FROM zwrot_klienta_pozycja
-     WHERE zwrot_id=? AND (ocena IS NOT NULL OR tw_id IS NOT NULL)`,
-  ).all(id) as Array<Record<string, unknown>>) {
-    oceny.set(`${(p.offer_id as string) ?? ""}|${(p.nazwa as string) ?? ""}`, {
-      ocena: (p.ocena as string) ?? null,
-      at: (p.ocena_at as string) ?? null,
-      przez: (p.ocena_przez as string) ?? null,
-      twId: p.tw_id == null ? null : Number(p.tw_id),
-      twSymbol: (p.tw_symbol as string) ?? null,
-      twZrodlo: (p.tw_zrodlo as string) ?? null,
-      twAt: (p.tw_at as string) ?? null,
-      twPrzez: (p.tw_przez as string) ?? null,
-    });
-  }
+  /* UPSERT PO KLUCZU NATURALNYM, nie `DELETE` + `INSERT`.
+     Do 0.153.1 pozycje kasowało się i wstawiało od nowa, a pracę człowieka
+     odtwarzało z mapy po `offer_id|nazwa`. Kosztowało to dwie rzeczy naraz:
+     `id` pozycji zmieniało się przy każdym przebiegu, więc potwierdzenie
+     wysłane z otwartego panelu trafiało w cudzy wiersz albo w „nie
+     znaleziono"; a dwie pozycje o tej samej nazwie bez `offer_id` sklejały
+     się w jeden klucz mapy i jedna traciła ocenę.
 
-  database.prepare("DELETE FROM zwrot_klienta_pozycja WHERE zwrot_id=?").run(id);
+     Teraz klucz jest kolumną, a praca człowieka po prostu ZOSTAJE — nie
+     trzeba jej nigdzie odkładać ani oddawać. */
+  const widziane: string[] = [];
   for (const poz of zwrot.items ?? []) {
     const nazwa = poz.name ?? "";
-    const stara = oceny.get(`${poz.offerId ?? ""}|${nazwa}`);
+    const klucz = `${poz.offerId ?? ""}|${nazwa}`;
+    widziane.push(klucz);
     database.prepare(`INSERT INTO zwrot_klienta_pozycja
-      (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,powod_komentarz,url,
-       ocena,ocena_at,ocena_przez,tw_id,tw_symbol,tw_zrodlo,tw_at,tw_przez)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,powod_komentarz,url,klucz)
+      VALUES (?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(zwrot_id, klucz) DO UPDATE SET
+        offer_id=excluded.offer_id, ilosc=excluded.ilosc,
+        cena_grosze=excluded.cena_grosze, waluta=excluded.waluta,
+        powod=excluded.powod, powod_komentarz=excluded.powod_komentarz,
+        url=excluded.url`).run(
       id, poz.offerId ?? null, nazwa, Number(poz.quantity ?? 0),
       naGrosze(poz.price?.amount), poz.price?.currency ?? "PLN",
-      poz.reason?.type ?? null, poz.reason?.userComment ?? null, poz.url ?? null,
-      stara?.ocena ?? null, stara?.at ?? null, stara?.przez ?? null,
-      stara?.twId ?? null, stara?.twSymbol ?? null, stara?.twZrodlo ?? null,
-      stara?.twAt ?? null, stara?.twPrzez ?? null);
+      poz.reason?.type ?? null, poz.reason?.userComment ?? null,
+      poz.url ?? null, klucz);
   }
+
+  /* Pozycja, której Allegro już nie oddaje, znika — ale dopiero teraz i tylko
+     ona. Zwrot potrafi stracić pozycję, gdy klient wycofa część zgłoszenia. */
+  const zostaja = widziane.length
+    ? ` AND klucz NOT IN (${widziane.map(() => "?").join(",")})`
+    : "";
+  database.prepare(
+    `DELETE FROM zwrot_klienta_pozycja WHERE zwrot_id=?${zostaja}`
+  ).run(id, ...widziane);
 }

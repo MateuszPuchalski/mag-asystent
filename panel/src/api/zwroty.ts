@@ -49,3 +49,20 @@ export function usePotwierdzKartoteke() {
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
+
+
+/**
+ * Ręczne dociągnięcie zamówień.
+ *
+ * Bez niego diagnoza „czemu ta pozycja nie ma kartoteki" wymagała czekania
+ * dziesięciu minut na najrzadszy z trzech tickerów — czyli dokładnie wtedy,
+ * gdy ktoś patrzy na ekran i chce wiedzieć, czy problem jest w danych, czy
+ * w kodzie.
+ */
+export function useDociagnijZamowienia() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ pobrano: number }>("/api/obsluga/zwroty/zamowienia", { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}

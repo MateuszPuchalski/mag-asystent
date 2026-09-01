@@ -32,7 +32,9 @@ vi.mock("../api/zwroty", async () => {
     ...rzeczywisty,
     useZwroty: () => ({
       data: { zwroty: ZWROTY, liczniki: { decyzja: 1, ocena: 0, zwrot: 1, korekta: 0,
-        zamkniety: 0, odrzucony: 0 }, stan: {} },
+        zamkniety: 0, odrzucony: 0 },
+        kartoteki: { bez: 3, wszystkie: 8, powody: { oferta_bez_sku: 2, jakis_nowy_kod: 1 } },
+        stan: {} },
       isLoading: false, error: null,
     }),
   };
@@ -82,5 +84,17 @@ describe("Ekran zwrotów", () => {
        jego braku. Zdanie musi być na ekranie, nie tylko w CHANGELOG-u. */
     pokaz("/obsluga/zwroty/1");
     expect(screen.getByText(/To wydanie tylko czyta/)).toBeInTheDocument();
+  });
+
+  it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", () => {
+    /* Bez liczb nie da się powiedzieć, czy problem jest w kodzie, czy
+       w danych Allegro: jedna pozycja bez SKU to sprzedawca, czterdzieści
+       z tym samym powodem to usterka. Kod, którego panel nie zna, pokazuje
+       się surowy — licznik, który cicho gubi część liczb, jest gorszy od
+       jego braku. */
+    pokaz();
+    expect(screen.getByText(/Bez kartoteki: 3 z 8 pozycji w pracy/)).toBeInTheDocument();
+    expect(screen.getByText(/oferta bez SKU/)).toBeInTheDocument();
+    expect(screen.getByText(/jakis_nowy_kod/)).toBeInTheDocument();
   });
 });

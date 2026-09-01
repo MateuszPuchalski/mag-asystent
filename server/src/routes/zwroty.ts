@@ -2,7 +2,12 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
-import { licznikiKubelkow, listaZwrotow, osZwrotu, potwierdzKartoteke } from "../services/zwroty.js";
+import {
+  bilansKartotek, licznikiKubelkow, listaZwrotow, osZwrotu, potwierdzKartoteke,
+} from "../services/zwroty.js";
+import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
+import { config } from "../config.js";
+import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, zapis od 0.152.0) ────────────────────
@@ -32,7 +37,34 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa(reply);
     if (nie) return nie;
     const zwroty = listaZwrotow(db());
-    return { zwroty, liczniki: licznikiKubelkow(zwroty), stan: stanZwrotowHealth(db()) };
+    return {
+      zwroty, liczniki: licznikiKubelkow(zwroty),
+      kartoteki: bilansKartotek(zwroty),
+      stan: stanZwrotowHealth(db()),
+    };
+  });
+
+  /* Ręczne dociągnięcie zamówień (§9, wzorzec „synchronizuj teraz" ze
+     skrzynki). Bez niego diagnoza na produkcji wymagała czekania dziesięciu
+     minut na najrzadszy z trzech tickerów — a to jest dokładnie ten moment,
+     w którym ktoś patrzy na ekran i chce wiedzieć, czy problem jest
+     w danych, czy w kodzie.
+
+     NIE omija limitu Allegro: pobiera tyle samo co ticker i tak samo
+     przerywa na 429. */
+  app.post("/api/obsluga/zwroty/zamowienia", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    if (!config.allegro.clientId) {
+      return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+    }
+    const s = sesjaZadania()!;
+    logEvent("zwroty_zamowienia_reczne", s.user.name);
+    try {
+      return { pobrano: await uzupelnijZamowienia() };
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 
   /* Potwierdzenie kartoteki. `twId: null` ZDEJMUJE powiązanie i to jest droga

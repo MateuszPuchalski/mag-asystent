@@ -282,6 +282,39 @@ Dopasowanie jest PROPOZYCJĄ, nie faktem: `services/dopasowanie-sku.ts`
 porównuje SKU z `sgt_towar.symbol`, a zapisuje dopiero potwierdzenie
 człowieka. Zero i wiele trafień daje brak, nigdy zgadywanie.
 
+### Dwie przestrzenie identyfikatorów oferty — pytanie otwarte
+
+`CustomerReturnItem.offerId` i `OfferReference.id` to być może NIE to samo.
+Przykład pierwszego jest UUID-em (`3e895572-…`), a drugiego — numerem
+(`3213213`). W tym samym schemacie `url` kończy się numerem oferty; gdyby
+`offerId` nim był, przykład adresu kończyłby się na tej samej wartości.
+UUID-owy kształt pokrywa się za to z `CheckoutFormLineItem.id`, czyli
+z przestrzenią POZYCJI zamówienia.
+
+To są jednak PRZYKŁADY, a `docs/allegro/README.md` ostrzega, że bywają
+niezgodne ze schematem. Oba pola mają `type: string` bez `format`, więc plik
+tego nie rozstrzyga. Sonda też nie: `services/ksztalt.ts` pokazuje wartości
+wyłącznie dla pól słownikowych, a identyfikator oferty nim nie jest.
+
+`[WERYFIKUJ]` Do której przestrzeni należy `CustomerReturnItem.offerId`.
+Zamiast zgadywać, `dopasowanie-sku.ts` łączy pozycję zwrotu z pozycją
+zamówienia po `offer_id` **albo** po `external_id` i zapisuje w polu
+`poKolumnie`, która z nich trafiła. Odpowiedź przyjedzie z produkcji.
+Wcześniejsze złączenie po samym `offer_id` nie trafiało nigdy — cicho
+i w stu procentach — jeśli rozjazd jest faktem.
+
+### Pamięć wskazań — `oferta_kartoteka`
+
+Potwierdzenie kartoteki zapisuje parę `offer_id → tw_id` w tabeli
+`oferta_kartoteka`. Następny zwrot tej samej oferty dostaje propozycję
+z tej pamięci, z pominięciem całego łańcucha wyżej.
+
+Tabela stoi na wzorcu `ean_alias`: `tw_id` jest zwykłym `INTEGER`, **bez**
+klucza obcego do `sgt_towar`. Import z Subiekta kasuje cały read-model
+i wstawia go od nowa; klucz obcy zerowałby przy tym pracę człowieka co minutę.
+Zdjęcie powiązania kasuje też wpis z pamięci — inaczej następny odczyt
+zaproponowałby je z powrotem.
+
 ### Jedno wywołanie na zamówienie, nie na ofertę
 
 `GET /sale/product-offers/{offerId}` dałoby ten sam SKU po jednym strzale na
