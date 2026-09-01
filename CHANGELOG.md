@@ -33,6 +33,85 @@ historii nie przepisujemy.
 
 ---
 
+## 0.151.0 — 1 września 2026
+
+**Mapowanie odczytu skrzynki Allegro było błędne w każdym polu. Skrzynka nie
+zapisała ani jednego wątku, odkąd powstała.**
+
+Właściciel wgrał `swagger.yaml` — oficjalną specyfikację OpenAPI Allegro.
+Rozstrzygnęła dwie sprawy naraz i obie inaczej, niż się spodziewaliśmy.
+
+### Zgadnięta wysyłka była trafiona
+
+`POST /messaging/threads/{id}/messages` przyjmuje `{ text, attachments? }`
+i oddaje wiadomość z polem `id`. Dokładnie to zakłada kod od 0.148.0, napisany
+z pamięci wbrew §8.2, na polecenie właściciela. Dwa znaczniki `[WERYFIKUJ]`
+schodzą.
+
+Doszedł jeden warunek, którego nie znaliśmy: `text` ma `maxLength` 2000 znaków.
+Sprawdzamy go przed wysłaniem. Po wysłaniu jedyną informacją zwrotną byłoby 400
+od Allegro i `send_failed` w kolejce — agent traciłby napisany tekst i nie
+wiedziałby dlaczego.
+
+### Nieoznaczony odczyt był zmyślony
+
+Prawdziwe pole to `lastMessageDateTime`, nie `lastMessageDate`. Autora opisuje
+`author.isInterlocutor`, nie `author.role` z `BUYER`/`SELLER`. Ofertę niesie
+`relatesTo.offer.id`, nie `relatedObject`. Wiadomość ma własne `createdAt`
+i `subject`, których nie czytaliśmy wcale. Odpowiedź nie ma `totalCount`.
+
+`lastMessageDate` był trzecim parametrem wstawki wątku, więc `undefined`
+wywracał zapis KAŻDEGO wątku — nie rzadkiego egzemplarza, tylko wszystkich.
+Ta nazwa stoi w kodzie od pierwszego commita synchronizacji. Tabele
+`allegro_inbox_*`, `conversation` i `message` są u klienta puste.
+
+**To prostuje diagnozę z 0.149.2.** Tamten wpis mówi „Allegro przysłało wątek
+bez tego pola". Nieprawda — pole nazywa się inaczej i nie przysyła go żaden
+wątek. Sama poprawka z 0.149.2 była potrzebna i zostaje: bez niej ta zmiana
+zamieniłaby awarię głośną w cichą.
+
+### Schemat obalił też nasze poprawki
+
+Pierwsza wersja tej zmiany zakładała, że wątek bez daty jest uszkodzony
+i należy go pominąć. Schemat `Thread` wymaga WYŁĄCZNIE `id` i `read`;
+`lastMessageDateTime` i `interlocutor` są opcjonalne i jawnie `nullable`. Wątek
+świeżo założony nie ma jak mieć ostatniej wiadomości — pomijanie go znaczyłoby
+rozmowę, której panel nie pokazuje. Obie kolumny dopuszczają teraz NULL.
+
+### Zmiany w bazie
+
+`allegro_inbox_message` traci `author_role` i `read` — dwa pola, których
+Centrum wiadomości nie przysyła — a zyskuje `author_is_interlocutor`, `status`,
+`created_at` i `subject`. `allegro_inbox_thread` traci `NOT NULL` na dacie
+i loginie rozmówcy. Obie przebudowy przepisują wiersze zamiast kasować tabelę:
+gdyby gdzieś stał wiersz z ręcznego eksperymentu, kasowanie zabrałoby też
+`surowe_json`, czyli jedyny ślad prawdziwej odpowiedzi Allegro.
+
+`message.sent_at` bierze `createdAt` wiadomości, a nie datę wątku — do tej pory
+wszystkie wiadomości rozmowy miały jedną godzinę i oś czasu była zmyślona.
+`conversation.subject` bierze temat, a nie login rozmówcy.
+
+### Skąd to się wzięło
+
+`docs/allegro-ksztalt.md` przedstawiał się jako „raport zanonimizowanej
+odpowiedzi produkcyjnej" i jako „jedyny kontrakt mapowania". Powstał w tym
+samym commicie co kod i fixture'y, a `npm run sonda` — narzędzie napisane
+właśnie po to, żeby ten raport wyprodukować — nigdy przeciw temu kontu nie
+pobiegła.
+
+To ta sama blizna trzeci raz. Za drugim razem założenie nosiło `[WERYFIKUJ]`
+i było uczciwe. Za trzecim nosiło etykietę „raport z produkcji" — i dlatego
+nikt go nie sprawdził. Znacznik mierzy to, komu się przyznano, a nie to, co
+jest sprawdzone.
+
+Ciekawostka nie bez znaczenia: wymyślone `author.role` z `BUYER`/`SELLER`
+odpowiada wersji `beta.v1` zasobu, która naprawdę istnieje i ma inny kształt
+niż `public.v1`, którym chodzimy. Zgadywanie trafiło w kształt prawdziwy —
+tylko nie w ten, który dostajemy.
+
+Wdrożenie: nic ręką, migracja robi się sama. **Skrzynka zapełni się historią,
+której panel do tej pory nie pokazywał ani razu.**
+
 ## 0.150.0 — 1 września 2026
 
 **Zwroty Allegro wracają — jako kolejka decyzji, nie jako rejestr.** Panel

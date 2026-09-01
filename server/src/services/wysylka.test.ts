@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { ConversationConflict, przejmijRozmowe, zapiszSzkic } from "./conversations.js";
-import { kluczIdempotencji, wyslijOdpowiedz } from "./wysylka.js";
+import { kluczIdempotencji, LIMIT_ZNAKOW, wyslijOdpowiedz } from "./wysylka.js";
 import type { WyslijDoAllegro } from "./allegro-wysylka.js";
 
 /* Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na zewnątrz.
@@ -42,6 +42,26 @@ const autorAli = (id: number) => ({ id, name: "A. Lewandowska" });
 const outbox = (d: DatabaseSync) => d.prepare(
   "SELECT id, status, idempotency_key, external_message_id, blad FROM outbox ORDER BY id").all() as
   Array<{ id: number; status: string; idempotency_key: string; external_message_id: string | null; blad: string | null }>;
+
+/* Limit 2000 znaków stoi w schemacie `NewMessageInThread`. Sprawdzamy go PRZED
+   wysłaniem, bo po wysłaniu jedyną informacją zwrotną jest 400 od Allegro
+   i `send_failed` w kolejce — agent traci wtedy napisany tekst. */
+test("odpowiedź dłuższa niż limit Allegro nie wychodzi z serwera", async () => {
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  let strzalow = 0;
+
+  await assert.rejects(
+    wyslijOdpowiedz({
+      conversationId: rozmowa, autor: autorAli(ala), body: "x".repeat(LIMIT_ZNAKOW + 1),
+      expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+      wyslij: async () => { strzalow += 1; return { externalMessageId: "nie-powinno" }; },
+    }),
+    /2000 znaków/);
+
+  assert.equal(strzalow, 0, "za długa treść nie ma prawa dotknąć Allegro");
+  assert.equal(outbox(d).length, 0, "odrzucona odpowiedź nie zostawia wiersza w kolejce");
+});
 
 test("udana wysyłka dopisuje wiadomość wychodzącą i kasuje szkic", async () => {
   const { d, ala, rozmowa, pytanie } = stanowisko();

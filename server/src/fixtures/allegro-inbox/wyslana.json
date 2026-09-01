@@ -1,0 +1,13 @@
+{
+  "id": "message-anon-002",
+  "status": "DELIVERED",
+  "type": "MESSAGE_CENTER",
+  "createdAt": "2026-08-30T12:10:00Z",
+  "thread": { "id": "thread-anon-001" },
+  "author": { "login": "seller-anon", "isInterlocutor": false },
+  "text": "Zanonimizowana odpowiedź sprzedawcy.",
+  "subject": "Zanonimizowany temat",
+  "relatesTo": { "offer": { "id": "offer-anon-001" } },
+  "hasAdditionalAttachments": false,
+  "attachments": []
+}

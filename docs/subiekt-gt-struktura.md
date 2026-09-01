@@ -6,15 +6,23 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzynaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało jedenaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
 
 Liczba urosła w 0.150.0 z ośmiu na trzynaście. Pięć nowych pozycji to zwroty
-klienckie: mapowanie powstało z oficjalnej specyfikacji Allegro, ale
-z jej kopii sprzed dwóch lat. `npm run sonda` na żywym koncie zdejmie te
-znaczniki i wtedy liczba wróci w dół.
+klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
+
+W 0.151.0 zeszła do jedenastu. Właściciel wgrał `swagger.yaml`, a specyfikacja
+potwierdziła zgadnięty kształt wysyłki do Centrum wiadomości. Dwa znaczniki
+zdjęte, żaden nowy.
+
+Warto czytać tę liczbę ostrożnie. W tym samym wydaniu wyszło, że mapowanie
+ODCZYTU skrzynki było błędne w każdym polu, choć nie nosiło ani jednego
+znacznika. Zgadnięta wysyłka, która nosiła dwa, okazała się trafiona. Znacznik
+mierzy to, komu się przyznano, a nie to, co jest sprawdzone. Jedyne, co
+sprawdza, to specyfikacja i `npm run sonda` na żywym koncie.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 

@@ -253,6 +253,8 @@ export function migrate(database: DatabaseSync) {
   /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
+  watekInboxuDopuszczaBrakDaty(database);
+  wiadomoscInboxuMaKsztaltAllegro(database);
 }
 
 /**
@@ -338,6 +340,121 @@ function zadanieNieTrzymaTowaru(database: DatabaseSync) {
         CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_towar
           ON zadanie_terenowe(tw_id, utworzono_at);
       `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+
+/**
+ * Wątek bez ostatniej wiadomości wchodzi do skrzynki (0.151.0).
+ *
+ * Schemat `Thread` w specyfikacji Allegro wymaga WYŁĄCZNIE `id` i `read`.
+ * `lastMessageDateTime` i `interlocutor` są opcjonalne, a do tego jawnie
+ * `nullable`. Nasze `NOT NULL` na obu kolumnach zamieniało więc poprawną
+ * odpowiedź Allegro w błąd zapisu — i to nie teoretycznie, bo wątek świeżo
+ * założony żadnej ostatniej wiadomości mieć nie może.
+ *
+ * Kursor synchronizatora porównuje się PARĄ (data, id), więc wątek bez daty
+ * nie ma jak w tej parze stanąć — i nie staje, patrz `allegro-inbox-sync.ts`.
+ * To osobna sprawa od zapisu i została rozwiązana osobno.
+ */
+function watekInboxuDopuszczaBrakDaty(database: DatabaseSync) {
+  const wymagaDaty = () => (database.prepare(
+    "PRAGMA table_info(allegro_inbox_thread)").all() as Array<{ name: string; notnull: number }>)
+    .some((k) => k.name === "last_message_at" && k.notnull === 1);
+  if (!wymagaDaty()) return;
+
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      if (!wymagaDaty()) return;
+      database.exec(`
+        CREATE TABLE allegro_inbox_thread_nowy (
+          id TEXT PRIMARY KEY,
+          read INTEGER NOT NULL,
+          last_message_at TEXT,
+          interlocutor_login TEXT,
+          surowe_json TEXT NOT NULL,
+          synced_at TEXT NOT NULL
+        );
+        INSERT INTO allegro_inbox_thread_nowy(
+          id, read, last_message_at, interlocutor_login, surowe_json, synced_at)
+        SELECT id, read, last_message_at, interlocutor_login, surowe_json, synced_at
+        FROM allegro_inbox_thread;
+        DROP TABLE allegro_inbox_thread;
+        ALTER TABLE allegro_inbox_thread_nowy RENAME TO allegro_inbox_thread;
+      `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/**
+ * Lądowisko skrzynki przestaje opisywać Allegro, którego nie ma (0.151.0).
+ *
+ * `allegro_inbox_message` miała `author_role NOT NULL` i `read NOT NULL`.
+ * Centrum wiadomości nie przysyła ani jednego z tych pól: autora opisuje
+ * `author.isInterlocutor`, a stan wiadomości — `status`. Nie miały więc
+ * źródła, tylko wartość zmyśloną przy zapisie.
+ *
+ * To nie jest kosmetyka nazw. Cały kształt odczytu był wymyślony razem
+ * z kodem (`lastMessageDate` zamiast `lastMessageDateTime`, `relatedObject`
+ * zamiast `relatesTo`), więc synchronizacja NIGDY nie zapisała ani jednego
+ * wiersza — każdy wątek wywracał wstawkę na niezwiązanym parametrze. Tabela
+ * jest u klienta pusta i przebudowa nic nie kosztuje.
+ *
+ * Mimo to przebudowa PRZEPISUJE dane zamiast kasować tabelę: gdyby gdzieś
+ * stały wiersze z ręcznego eksperymentu, kasowanie zabrałoby też `surowe_json`,
+ * czyli jedyny ślad prawdziwej odpowiedzi Allegro. `author_is_interlocutor`
+ * wyliczamy ze starej roli (wszystko poza `SELLER` to rozmówca).
+ */
+function wiadomoscInboxuMaKsztaltAllegro(database: DatabaseSync) {
+  const maStaryKsztalt = () => (database.prepare(
+    "PRAGMA table_info(allegro_inbox_message)").all() as Array<{ name: string }>)
+    .some((k) => k.name === "author_role");
+  if (!maStaryKsztalt()) return;
+
+  /* Tak samo jak przy `zadanie_terenowe`: klucze obce schodzą PRZED
+     transakcją, bo w transakcji `PRAGMA foreign_keys` jest ignorowane. */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      /* Ponowne sprawdzenie pod blokadą zapisu — API i worker wołają
+         `migrate()` równolegle, bo NSSM startuje je razem. */
+      if (!maStaryKsztalt()) return;
+      database.exec(`
+        CREATE TABLE allegro_inbox_message_nowa (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT NOT NULL REFERENCES allegro_inbox_thread(id) ON DELETE CASCADE,
+          author_login TEXT NOT NULL,
+          author_is_interlocutor INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          subject TEXT,
+          status TEXT,
+          created_at TEXT,
+          related_object_type TEXT,
+          related_object_id TEXT,
+          surowe_json TEXT NOT NULL
+        );
+        INSERT INTO allegro_inbox_message_nowa(
+          id, thread_id, author_login, author_is_interlocutor, text,
+          related_object_type, related_object_id, surowe_json)
+        SELECT
+          id, thread_id, author_login,
+          CASE WHEN upper(author_role) = 'SELLER' THEN 0 ELSE 1 END,
+          text, related_object_type, related_object_id, surowe_json
+        FROM allegro_inbox_message;
+        DROP TABLE allegro_inbox_message;
+        ALTER TABLE allegro_inbox_message_nowa RENAME TO allegro_inbox_message;
+      `);
+      /* Indeks ginie razem z tabelą, a `schema.sql` odtworzy go dopiero przy
+         następnym otwarciu bazy — do tego czasu każdy odczyt wątku skanowałby
+         całą skrzynkę. */
+      database.exec(`CREATE INDEX IF NOT EXISTS ix_allegro_inbox_message_thread
+        ON allegro_inbox_message(thread_id);`);
     })();
   } finally {
     database.exec("PRAGMA foreign_keys = ON");

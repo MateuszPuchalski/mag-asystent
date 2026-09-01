@@ -699,7 +699,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
-| Kształt POST wysyłki | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
+| Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
+| Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
 | Baza wiedzy i dobór części (§11–12) | **projekt** | etapy E i dalsze |
 | Copilot (§14) | **projekt** | etap F |
