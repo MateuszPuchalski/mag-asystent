@@ -5,7 +5,7 @@ i reklamacje — została skasowana w 0.140.0. Ten dokument opisuje, co ma
 stanąć na jej miejscu. Poprzednik, `architektura-spraw.md`, opisywał kod
 i odszedł razem z nim.
 
-**Stan: SZKIELET.** Osiem pytań niżej ma odpowiedzi puste. Wypełnia się je
+**Stan: PIERWSZY ODCZYT.** Skrzynka 0.141.0 rozstrzyga ekran i granicę automatu; pozostałe odpowiedzi nadal wymagają dowodów. Wypełnia się je
 dowodami z dwóch narzędzi, nie z pamięci — o tym mówi następny rozdział.
 Właściciel zdecydował ciąć przed zebraniem dowodów, żeby nie budować nowego
 na starym; dowody rozstrzygają, co powstanie, a nie czy ciąć.
@@ -116,7 +116,7 @@ Czy zostaje jeden panel bez bundlera (`biuro.html`), czy obsługa klienta
 dostaje własne miejsce. Reguła „jeden front" z `CLAUDE.md` obowiązuje, dopóki
 ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** Skrzynka ma własną trasę `/obsluga/skrzynka`, ale pozostaje częścią jednego panelu i tej samej sesji. Ma mały, budowany zasób React, ponieważ TanStack Query i wirtualizacja rozwiązują odczyt długich list bez kopiowania mechanizmu cache do `biuro.html`. Kosztem jest krok esbuild oraz trzy zależności frontowe.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
@@ -154,3 +154,12 @@ ale nie ma prawa kupić ich drugi raz.
 Trzy rzeczy nie są przedmiotem tej przebudowy, bo nie mają z nią nic wspólnego:
 kosze i przyjęcia z dokumentu MM, kolektor (dotyka wyłącznie `/api/kosze`,
 `/api/kartony`, `/api/przyjecia`) oraz dostawy, kartoteka i strefa złota.
+
+
+## Polityka danych skrzynki 0.141.0
+
+Lista i rozmowa są pobierane na żądanie. Treści wiadomości nie trafiają do
+lokalnej bazy. Wyjątek stanowi tekst pytania wybrany jako źródło zadania dla
+hali. Jest przechowywany razem z identyfikatorami rozmowy, wiadomości, oferty
+i kartoteki, aby kolektor nie zgadywał kontekstu. Wynik pomiaru jest zdarzeniem
+wewnętrznym. Nie staje się odpowiedzią bez jawnej decyzji agenta.

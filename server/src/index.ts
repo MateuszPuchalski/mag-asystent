@@ -20,6 +20,7 @@ import { ziarnoKontaDemo } from "./services/users.js";
 import { magazynRoutes } from "./routes/magazyny.js";
 import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
+import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
 import { lokalizacjeMasoweRoutes } from "./routes/lokalizacje-masowe.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
@@ -199,6 +200,7 @@ export async function buildApp() {
   await app.register(audytRoutes);
   await app.register(analizaRoutes);
   await app.register(biuroRoutes);
+  await app.register(skrzynkaRoutes);
   await app.register(zbiorkiRoutes);
   await app.register(lokalizacjeMasoweRoutes);
   await app.register(dostawcyRoutes);

@@ -658,3 +658,20 @@ CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
   przez  TEXT NOT NULL
 );
 
+
+-- Zadanie z rozmowy niesie pełny, niemodyfikowalny kontekst. Hala nie zgaduje
+-- kartoteki, a agent nie może podać tw_id spoza oferty źródłowej.
+CREATE TABLE IF NOT EXISTS field_task (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id TEXT NOT NULL,
+  source_message_id TEXT NOT NULL,
+  offer_id TEXT NOT NULL,
+  tw_id INTEGER NOT NULL,
+  question TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','done','cancelled')),
+  result TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_field_task_conversation ON field_task(conversation_id, created_at);

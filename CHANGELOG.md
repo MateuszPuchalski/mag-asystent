@@ -33,6 +33,20 @@ historii nie przepisujemy.
 
 ---
 
+## 0.141.0 — 31 sierpnia 2026
+
+**Skrzynka obsługi pod `/obsluga/skrzynka`.** Lista rozmów korzysta z TanStack
+Query i wirtualizacji. Wybór rozmowy zmienia adres przez History API, bez
+przeładowania panelu. Oś pokazuje wiadomości oraz wewnętrzne wyniki z hali.
+
+**Pomiar zachowuje pełny kontekst.** Zadanie dostaje ofertę, kartotekę, rozmowę
+i wiadomość źródłową wyłącznie po stronie serwera. Agent nie podaje `twId`.
+Wynik nie trafia sam do odpowiedzi. Osobna akcja wstawia go do lokalnego szkicu.
+
+**Granica wydania pozostaje przy odczycie.** Są szkielety, pustka, błąd
+synchronizacji i ostrzeżenie o braku oferty. Wysyłka do Allegro jest jawnie
+nieaktywna. Bez nowego APK; kolektor może czytać i domykać zadania przez API.
+
 ## 0.140.1 — 30 sierpnia 2026
 
 **Sprzątanie po kasacji obsługi klienta.** Zero zmian w działaniu: 725 wierszy

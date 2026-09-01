@@ -47,6 +47,15 @@ export async function biuroRoutes(app: FastifyInstance) {
 
   app.get("/biuro", async (_req, reply) => reply.type("text/html; charset=utf-8").send(html));
 
+  const skrzynkaHtml = fs.readFileSync(path.join(__dirname, "../web/skrzynka.html"), "utf8");
+  const skrzynkaJs = fs.readFileSync(path.join(__dirname, "../web/skrzynka.js"), "utf8");
+  app.get("/obsluga/skrzynka", async (_req, reply) =>
+    reply.type("text/html; charset=utf-8").send(skrzynkaHtml)
+  );
+  app.get("/obsluga/skrzynka.js", async (_req, reply) =>
+    reply.type("text/javascript; charset=utf-8").send(skrzynkaJs)
+  );
+
   /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
      Androida). Serwowane z własnego serwera, bo biuro pracuje w LAN-ie bez
      wyjścia w świat: link do Google Fonts dawałby pustą czcionkę i timeout.

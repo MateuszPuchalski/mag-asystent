@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.140.1",
+  "version": "0.141.0",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -13,7 +13,8 @@
     "worker": "tsx watch src/worker/worker.ts",
     "seed": "tsx src/db/seed.ts",
     "seed:scenariusze": "tsx src/db/seed-scenariusze.ts",
-    "build": "tsc -p tsconfig.build.json && node -e \"const f=require('fs');f.copyFileSync('src/db/schema.sql','dist/db/schema.sql');f.mkdirSync('dist/web',{recursive:true});f.copyFileSync('src/web/biuro.html','dist/web/biuro.html');f.cpSync('src/web/fonty','dist/web/fonty',{recursive:true})\"",
+    "build:inbox": "esbuild src/web/skrzynka.tsx --bundle --minify --format=iife --outfile=src/web/skrzynka.js",
+    "build": "npm run build:inbox && tsc -p tsconfig.build.json && node -e \"const f=require('fs');f.copyFileSync('src/db/schema.sql','dist/db/schema.sql');f.mkdirSync('dist/web',{recursive:true});for(const n of ['biuro.html','skrzynka.html','skrzynka.js'])f.copyFileSync('src/web/'+n,'dist/web/'+n);f.cpSync('src/web/fonty','dist/web/fonty',{recursive:true})\"",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker/worker.js",
     "test": "tsx --test src/*.test.ts src/**/*.test.ts",
@@ -23,12 +24,19 @@
     "inwentarz": "tsx src/inwentarz-run.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-virtual": "^3.14.10",
     "fastify": "^5.2.1",
-    "mssql": "^11.0.1"
+    "mssql": "^11.0.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/mssql": "^9.1.7",
     "@types/node": "^22.13.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
