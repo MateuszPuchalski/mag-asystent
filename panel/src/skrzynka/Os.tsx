@@ -1,6 +1,37 @@
 import React from "react";
-import type { WpisOsi } from "../api/typy";
+import { Paperclip } from "lucide-react";
+import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk } from "../ui";
+
+/* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
+   do tej pory rozmowa milczała o tym, że klient coś przysłał.
+
+   ADRES ALLEGRO NIE TRAFIA DO PRZEGLĄDARKI. Pobranie idzie przez naszą trasę,
+   bo wymaga tokena konta firmy, a ten zostaje po stronie serwera.
+
+   Plik nie do pobrania ZOSTAJE WIDOCZNY. Ukrycie kłamałoby, że klient nic nie
+   przysłał; `UNSAFE` znaczy, że Allegro uznało go za niebezpieczny, a `EXPIRED`
+   — że wygasł u nich. Agent ma wiedzieć, że coś było, i móc o to dopytać. */
+const POWOD: Record<string, string> = {
+  UNSAFE: "Allegro uznało plik za niebezpieczny",
+  EXPIRED: "załącznik wygasł po stronie Allegro",
+  NEW: "Allegro jeszcze go sprawdza",
+};
+
+function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
+  return <ul className="mt-2 space-y-1 border-t pt-2 text-xs">
+    {lista.map((z) => <li key={z.id} className="flex items-center gap-1.5">
+      <Paperclip size={12} className="shrink-0 text-slate-400" />
+      {z.doPobrania
+        ? <a className="font-bold text-slate-700 underline hover:text-slate-900"
+             href={`/api/obsluga/zalaczniki/${z.id}`}>{z.nazwa}</a>
+        : <span className="text-slate-500">
+            <span className="font-bold">{z.nazwa}</span>
+            {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
+          </span>}
+    </li>)}
+  </ul>;
+}
 
 /* §10.3: każdy rodzaj wpisu ma wyglądać inaczej. Dziś rodzaje są dwa —
    wiadomość kanału i wynik z hali. Komentarze, zdarzenia systemowe i wpisy
@@ -29,6 +60,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             <b>{w.autor}</b>{w.ofertaId && <span>· oferta {w.ofertaId}</span>}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+          {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
           {w.odKlienta && mozeZlecac && <button
             className={`mt-2 text-xs font-bold ${
               zrodloPomiaru === w.messageId ? "text-amber-700" : "text-slate-500"}`}

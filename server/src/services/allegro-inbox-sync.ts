@@ -17,7 +17,8 @@ type Thread = { id: string; read: unknown; lastMessageDateTime?: string | null;
   interlocutor?: { login: string } | null };
 type Message = { id: string; author: { login: string; isInterlocutor: unknown };
   text: string; subject?: string; status?: string; createdAt: string;
-  relatesTo?: { offer?: { id: string }; order?: { id: string } } | null };
+  relatesTo?: { offer?: { id: string }; order?: { id: string } } | null;
+  attachments?: Array<{ fileName: string; mimeType?: string; url?: string; status: string }> };
 
 /* Schemat mówi `type: boolean`, ale opublikowany PRZYKŁAD renderuje `read`
    jako tekst („false"). Ta funkcja przyjmuje obie postaci — kosztuje trzy
@@ -302,6 +303,16 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          daty wiadomości nie podaje. Podaje: `createdAt`. */
       message.createdAt);
     if (wynik.changes > 0) {
+      /* Załączniki wchodzą TYLKO razem z nową wiadomością. Wiadomości nie
+         nadpisujemy (wiszą na nich szkice i zadania), więc powtórny przebieg
+         nie ma tu czego robić — i dzięki temu nie trzeba osobnego klucza
+         przeciw duplikatom na polach, z których żadne nie jest wymagane. */
+      for (const z of message.attachments ?? []) {
+        database.prepare(`INSERT INTO message_attachment
+          (message_id, file_name, mime_type, url, status) VALUES (?,?,?,?,?)`).run(
+          Number(wynik.lastInsertRowid), odkodujEncje(z.fileName),
+          z.mimeType ?? null, z.url ?? null, z.status);
+      }
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,
       });

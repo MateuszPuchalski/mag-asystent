@@ -14,10 +14,15 @@ export interface RozmowaSkrzynki {
   id: number; klient: string; ostatniaWiadomosc: string; ostatniaWiadomoscAt: string;
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
 }
+/** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
+export interface ZalacznikOsi {
+  id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
+}
 export interface WpisOsi {
   id: string; rodzaj: "wiadomosc" | "wynik_zadania";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
+  zalaczniki?: ZalacznikOsi[];
 }
 export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
 
@@ -91,14 +96,40 @@ export function osRozmowy(id: number): {
      WHERE m.conversation_id=? ORDER BY m.id
   `).all(id) as Array<Record<string, unknown>>;
 
-  /* Kolejność niesie `message.id`, nie `sent_at`: Allegro podaje datę WĄTKU,
-     nie pojedynczej wiadomości (docs/allegro-ksztalt.md). */
+  /* Załączniki jednym zapytaniem dla całej rozmowy, nie po jednym na
+     wiadomość: siedem na trzydzieści dziewięć wiadomości to zbyt mało, żeby
+     płacić za to osobnym odpytaniem przy każdym wierszu osi. */
+  const zalaczniki = new Map<number, ZalacznikOsi[]>();
+  for (const z of db().prepare(`
+    SELECT a.id, a.message_id, a.file_name, a.mime_type, a.status
+      FROM message_attachment a JOIN message m ON m.id=a.message_id
+     WHERE m.conversation_id=? ORDER BY a.id
+  `).all(id) as Array<Record<string, unknown>>) {
+    const lista = zalaczniki.get(Number(z.message_id)) ?? [];
+    lista.push({
+      id: Number(z.id), nazwa: String(z.file_name),
+      typ: z.mime_type == null ? null : String(z.mime_type),
+      status: String(z.status),
+      /* Pobranie oferujemy WYŁĄCZNIE przy `SAFE`. `UNSAFE` znaczy, że Allegro
+         uznało plik za niebezpieczny — nie mamy powodu wiedzieć lepiej, a plik
+         i tak wędrowałby przez maszynę biura. `EXPIRED` i `NEW` nie mają czego
+         oddać. */
+      doPobrania: String(z.status) === "SAFE",
+    });
+    zalaczniki.set(Number(z.message_id), lista);
+  }
+
+  /* Kolejność niesie `message.id`, nie `sent_at`. Do 0.151.0 stało tu
+     uzasadnienie „Allegro podaje datę wątku, nie wiadomości" — nieprawdziwe,
+     `createdAt` jest per wiadomość. Kolejność po identyfikatorze zostaje, bo
+     jest stabilna także przy dwóch wiadomościach z tej samej sekundy. */
   const os: WpisOsi[] = wiadomosci.map((m) => ({
     id: `msg-${m.id}`, rodzaj: "wiadomosc" as const, messageId: Number(m.id),
     autor: String(m.direction) === "incoming" ? String(m.klient ?? "Klient") : "Biuro",
     odKlienta: String(m.direction) === "incoming",
     tresc: String(m.body), at: String(m.sent_at),
     ofertaId: String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null,
+    ...(zalaczniki.has(Number(m.id)) ? { zalaczniki: zalaczniki.get(Number(m.id)) } : {}),
   }));
 
   /* Wynik z hali jest osobnym wpisem osi, nigdy podmianą treści klienta —

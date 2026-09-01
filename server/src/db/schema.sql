@@ -751,6 +751,28 @@ CREATE INDEX IF NOT EXISTS ix_allegro_inbox_message_thread
   ON allegro_inbox_message(thread_id);
 
 -- Osobny, pojedynczy model stanu synchronizatora (nie stan tokena).
+-- Załączniki wiadomości (0.155.0). Sonda z żywego konta pokazała je w 7 z 39
+-- wiadomości — do tej pory agent ich nie widział, choć klient przysyłał
+-- zdjęcie części.
+--
+-- `url` JEST NULLOWALNE i to nie jest ostrożność na wyrost: schemat Allegro
+-- (`MessageAttachmentInfo`) wymaga wyłącznie `fileName` i `status`. Załącznik
+-- wygasły albo odrzucony jako niebezpieczny nie ma adresu i nadal musi być
+-- widoczny — inaczej rozmowa kłamie, że nic nie przyszło.
+CREATE TABLE IF NOT EXISTS message_attachment (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+  file_name  TEXT NOT NULL,
+  mime_type  TEXT,
+  url        TEXT,
+  -- `NEW`, `SAFE`, `UNSAFE`, `EXPIRED` wprost ze schematu Allegro. Pobranie
+  -- oferujemy wyłącznie przy `SAFE`: `UNSAFE` znaczy, że Allegro uznało plik
+  -- za niebezpieczny, a my nie mamy powodu wiedzieć lepiej.
+  status     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_message_attachment_wiadomosc
+  ON message_attachment(message_id);
+
 CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   cursor_at TEXT,

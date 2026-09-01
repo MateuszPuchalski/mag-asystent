@@ -426,3 +426,57 @@ test("udany przebieg czyści zdanie o błędzie razem z licznikiem", async () =>
   assert.equal(s.last_error_text, null, "stare zdanie zostało na ekranie po naprawie");
   assert.equal(s.error_count, 0);
 });
+
+/* ── Załączniki (0.155.0) ────────────────────────────────────────────────────
+   Sonda z żywego konta: `attachments` niepuste w 7 z 39 wiadomości. Klient
+   przysyłający zdjęcie pękniętej części był dla agenta niewidzialny, bo
+   mapowanie kończyło się na treści.
+
+   Schemat Allegro (`MessageAttachmentInfo`) wymaga TYLKO `fileName` i `status`
+   — `url` bywa go pozbawiony, a status ma cztery wartości, w tym `UNSAFE`
+   i `EXPIRED`. Załącznik bez adresu nie jest usterką, tylko stanem. */
+test("załączniki wiadomości wchodzą do bazy razem z nią", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]]), {
+      attachments: [
+        { fileName: "szarpak.jpeg", mimeType: "image/jpeg", status: "SAFE",
+          url: "https://upload.allegro.pl/message-center/message-attachments/a1" },
+        { fileName: "wygasly.pdf", status: "EXPIRED" },
+      ],
+    }).query,
+  });
+
+  const z = database.prepare(`SELECT file_name, mime_type, url, status
+    FROM message_attachment ORDER BY file_name`).all() as Array<Record<string, unknown>>;
+  assert.equal(z.length, 2);
+  assert.equal(z[0].file_name, "szarpak.jpeg");
+  assert.equal(z[0].status, "SAFE");
+  /* Brak adresu ma zostać brakiem, a nie pustym napisem: panel rozróżnia
+     „nie ma czego pobrać" od „adres jest, tylko pusty". */
+  assert.equal(z[1].url, null);
+  assert.equal(z[1].status, "EXPIRED");
+});
+
+test("powtórna synchronizacja nie dubluje załączników", async () => {
+  const database = mkDb();
+  const zal = { attachments: [{ fileName: "a.jpg", status: "SAFE", url: "https://u/1" }] };
+  for (let i = 0; i < 2; i++) {
+    await synchronizujAllegroInbox({
+      database, apiUrl: "https://api.test",
+      query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]]), zal).query,
+    });
+  }
+  assert.equal((database.prepare("SELECT count(*) n FROM message_attachment")
+    .get() as { n: number }).n, 1);
+});
+
+test("wiadomość bez załączników nie zakłada pustych wierszy", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", query: fake([[thread(1)]]).query,
+  });
+  assert.equal((database.prepare("SELECT count(*) n FROM message_attachment")
+    .get() as { n: number }).n, 0);
+});

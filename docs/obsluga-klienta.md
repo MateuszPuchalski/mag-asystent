@@ -269,6 +269,15 @@ ale nie ma prawa kupić ich drugi raz.
 
 ## Polityka danych skrzynki (0.143.0)
 
+**Załączniki (0.155.0).** Trzymamy nazwę pliku, typ i stan — nie trzymamy
+samego pliku. Nazwa bywa daną osobową (`faktura_Kowalski.pdf`) i przyjmujemy
+to świadomie: skoro w bazie leży treść rozmowy, nazwa załącznika niczego nie
+zmienia w skali ryzyka, a bez niej agent nie wie, co dostał.
+
+Pobranie idzie przez nasz serwer, nie z przeglądarki do Allegro — token konta
+firmy nie ma prawa opuścić maszyny. Plik o stanie `UNSAFE` nie jest do
+pobrania wcale.
+
 `CLAUDE.md` żąda, żeby nowa obsługa zapisała swoją politykę danych, zanim
 dotknie pierwszej rozmowy. To jest ten zapis, w stanie na 0.143.0.
 
