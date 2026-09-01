@@ -14,6 +14,7 @@ import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
+import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../services/sprawy.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -163,6 +164,43 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       return { stan: stanSynchronizacji(db()) };
     } catch (e) { return blad(reply, e); }
   });
+
+  /* SPRAWA (§6.1, 0.161.0). Trzy zapisy: założenie klamry, dołączenie
+     kolejnej rozmowy i odklejenie. Czwartego nie ma i to jest cały zamysł —
+     poprzednia odpowiedź o tym samym kształcie kosztowała cztery tabele
+     nakładki plus ręczne SCAL i ROZKLEJ. */
+  app.get("/api/obsluga/sprawy", async (_req, reply) =>
+    odmowa(reply) ?? { sprawy: listaSpraw() });
+
+  app.post<{ Body: { tytul?: string; rozmowaId?: number } }>("/api/obsluga/sprawy",
+    async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return utworzSprawe(req.body?.tytul ?? "", Number(req.body?.rozmowaId),
+          sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { rozmowaId?: number } }>(
+    "/api/obsluga/sprawy/:id/rozmowy", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return dolaczRozmowe(Number(req.params.id), Number(req.body?.rozmowaId),
+          sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/odlacz",
+    async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        odlaczRozmowe(Number(req.params.id), sesjaZadania()!.user.userId);
+        return { sprawa: null };
+      } catch (e) { return blad(reply, e); }
+    });
 
   /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy
      z parametru — wzmianka niesie fragment komentarza wewnętrznego, a cudzych

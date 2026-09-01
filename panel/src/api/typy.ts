@@ -34,7 +34,7 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status";
+  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -59,6 +59,19 @@ export type WpisWzmianki = {
   odhaczonaAt: string | null;
 };
 
+/* Sprawa (§6.1, 0.161.0) — klamra nad rozmowami jednego problemu. Nie ma
+   statusu ani osi: §7 nie zna statusów sprawy, a zdarzenia wiszą przy ŹRÓDLE
+   (blizna 0.130.0). */
+export type SprawaRozmowy = {
+  id: number;
+  tytul: string;
+  rozmowy: Array<{ id: number; klient: string; ostatniaWiadomoscAt: string }>;
+};
+
+export type WierszSprawy = {
+  id: number; tytul: string; liczbaRozmow: number; ostatniaWiadomoscAt: string | null;
+};
+
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };
 
 export type StanSkrzynki = { ostatniaSynchronizacja: string | null; bledy: number };
@@ -70,6 +83,7 @@ export type OsRozmowy = {
   os: WpisOsi[];
   szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null;
+  sprawa: SprawaRozmowy | null;
 };
 
 export type Zadanie = {

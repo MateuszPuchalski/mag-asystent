@@ -45,10 +45,11 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
   return <div className="flex-1 space-y-3 overflow-y-auto p-4">
-    {wpisy.map((w) => w.rodzaj === "status"
-      /* Zmiana statusu (§10.3, 0.158.0) jest KRESKĄ, nie kafelkiem: to nie
-         czyjaś wypowiedź, tylko znak, że sprawa przeszła dalej. Kafelek
-         w rzędzie wiadomości przerwałby czytanie rozmowy w biegu. */
+    {wpisy.map((w) => w.rodzaj === "status" || w.rodzaj === "sprawa"
+      /* Zmiana statusu (§10.3, 0.158.0) i sklejenie sprawy (0.161.0) są
+         KRESKĄ, nie kafelkiem: to nie czyjaś wypowiedź, tylko znak, że sprawa
+         przeszła dalej. Kafelek w rzędzie wiadomości przerwałby czytanie
+         rozmowy w biegu. */
       ? <p key={w.id} className="flex items-center justify-center gap-2 text-xs text-slate-400">
           <span className="h-px flex-1 bg-slate-200" />
           <ArrowRight size={12} />{w.tresc} · {w.autor}

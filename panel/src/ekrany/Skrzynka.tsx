@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
-  useAgenci, useDodajKomentarz, useJa, usePrzejmij, usePrzekaz, useRozmowa,
+  useAgenci, useDodajKomentarz, useDolaczDoSprawy, useJa, useOdlaczOdSprawy, usePrzejmij,
+  usePrzekaz, useRozmowa, useSprawy, useZalozSprawe,
   useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawStatus, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
@@ -37,6 +38,10 @@ export function Skrzynka() {
   const zlec = useZlecPomiar();
 
   const status = useUstawStatus();
+  const sprawy = useSprawy();
+  const zalozSprawe = useZalozSprawe();
+  const dolaczDoSprawy = useDolaczDoSprawy();
+  const odlaczOdSprawy = useOdlaczOdSprawy();
   const agenci = useAgenci();
   const dodajKomentarz = useDodajKomentarz();
 
@@ -58,6 +63,7 @@ export function Skrzynka() {
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWysylki, setBladWysylki] = useState("");
   const [bladStatusu, setBladStatusu] = useState("");
+  const [bladSprawy, setBladSprawy] = useState("");
   const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
@@ -71,7 +77,7 @@ export function Skrzynka() {
     setSzkic(rozmowa.data?.szkic?.body ?? "");
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
-    setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setPrzyRozmowie(null);
+    setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setBladSprawy(""); setPrzyRozmowie(null);
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -230,6 +236,28 @@ export function Skrzynka() {
         oferta.mutate({ id: rozmowa.data.rozmowa.id, ofertaId },
           { onError: (e) => setBladOferty((e as Error).message) });
       }}
+      sprawy={sprawy.data?.sprawy ?? []}
+      trwaSprawa={zalozSprawe.isPending || dolaczDoSprawy.isPending || odlaczOdSprawy.isPending}
+      bladSprawy={bladSprawy}
+      onZalozSprawe={(tytul) => {
+        if (!rozmowa.data) return;
+        setBladSprawy("");
+        zalozSprawe.mutate({ tytul, rozmowaId: rozmowa.data.rozmowa.id },
+          { onError: (e) => setBladSprawy((e as Error).message) });
+      }}
+      onDolaczDoSprawy={(sprawaId) => {
+        if (!rozmowa.data) return;
+        setBladSprawy("");
+        dolaczDoSprawy.mutate({ sprawaId, rozmowaId: rozmowa.data.rozmowa.id },
+          { onError: (e) => setBladSprawy((e as Error).message) });
+      }}
+      onOdlaczOdSprawy={() => {
+        if (!rozmowa.data) return;
+        setBladSprawy("");
+        odlaczOdSprawy.mutate({ rozmowaId: rozmowa.data.rozmowa.id },
+          { onError: (e) => setBladSprawy((e as Error).message) });
+      }}
+      onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)}
       zapisujeStatus={status.isPending}
       bladStatusu={bladStatusu}
       onZmienStatus={(nowy: StatusRozmowy, doKiedy) => {

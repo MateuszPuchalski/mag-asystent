@@ -8,6 +8,7 @@ import { Edytor } from "./Edytor";
 import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
+import { Sprawa } from "./Sprawa";
 
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
@@ -46,6 +47,13 @@ export function Rozmowa(p: {
   onWymus: (powod: string) => void;
   onWskazOferte: (ofertaId: string) => void;
   onDopytajOOferte: () => void;
+  sprawy: import("../api/typy").WierszSprawy[];
+  trwaSprawa: boolean;
+  bladSprawy: string;
+  onZalozSprawe: (tytul: string) => void;
+  onDolaczDoSprawy: (sprawaId: number) => void;
+  onOdlaczOdSprawy: () => void;
+  onOtworzRozmowe: (id: number) => void;
   zapisujeStatus: boolean;
   bladStatusu: string;
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
@@ -80,6 +88,13 @@ export function Rozmowa(p: {
       <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
         onZmien={p.onZmienStatus} />
     </header>
+
+    {/* Sprawa stoi POD nagłówkiem, nad wszystkim innym: „to ten sam problem
+        co w tamtej rozmowie" zmienia sposób czytania całej reszty ekranu. */}
+    <Sprawa sprawa={p.dane.sprawa} rozmowaId={rozmowa.id} sprawy={p.sprawy}
+      trwa={p.trwaSprawa} blad={p.bladSprawy}
+      onZaloz={p.onZalozSprawe} onDolacz={p.onDolaczDoSprawy} onOdlacz={p.onOdlaczOdSprawy}
+      onOtworz={p.onOtworzRozmowe} />
 
     {p.nowaWiadomosc && <p className="flex items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
       <Bell size={16} />Klient dopisał nową wiadomość.

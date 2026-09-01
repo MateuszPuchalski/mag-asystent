@@ -3,6 +3,7 @@ import { utworzZadanie } from "./zadania-terenowe.js";
 import { uchwyty } from "./conversation-realtime.js";
 import { ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
+import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -37,7 +38,7 @@ export interface ZalacznikOsi {
 export interface Wzmianka { userId: number; name: string }
 
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status";
+  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   zalaczniki?: ZalacznikOsi[];
@@ -121,7 +122,8 @@ export function listaRozmow(): RozmowaSkrzynki[] {
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
 export function osRozmowy(id: number): {
-  rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null; ofertaWskazana: OfertaWskazana | null;
+  rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
+  ofertaWskazana: OfertaWskazana | null; sprawa: SprawaRozmowy | null;
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
@@ -236,6 +238,23 @@ export function osRozmowy(id: number): {
     });
   }
 
+  /* SKLEJENIE I ROZKLEJENIE SPRAWY (0.161.0) na osi ROZMOWY, nie sprawy.
+     Blizna 0.130.0: „historia sprawy ginęła przy scalaniu", bo wisiała przy
+     sprawie. Wpis przy źródle zostaje także wtedy, gdy klamra zniknie. */
+  for (const z of db().prepare(`
+    SELECT id, event_type, payload, created_at FROM conversation_event
+     WHERE conversation_id=? AND event_type IN ('sprawa_dolaczona','sprawa_odlaczona')
+     ORDER BY id
+  `).all(id) as Array<Record<string, unknown>>) {
+    const p = JSON.parse(String(z.payload ?? "{}")) as { tytul?: string; autor?: string };
+    os.push({
+      id: `sprawa-${z.id}`, rodzaj: "sprawa", autor: String(p.autor ?? "system"),
+      odKlienta: false,
+      tresc: `${String(z.event_type) === "sprawa_dolaczona" ? "dołączono do sprawy" : "odłączono od sprawy"} „${p.tytul ?? "?"}"`,
+      at: String(z.created_at), ofertaId: null,
+    });
+  }
+
   /* OŚ JEST CHRONOLOGICZNA (0.157.0). Do tego wydania wyniki zadań doklejały
      się za wszystkimi wiadomościami bez względu na czas — przy dwóch źródłach
      znośne, przy trzech oś przestawała opowiadać przebieg sprawy.
@@ -245,7 +264,13 @@ export function osRozmowy(id: number): {
      wiadomości z jedną sekundą, a wtedy porządek niesie `message.id`. */
   os.sort((a, b) => a.at.localeCompare(b.at));
 
-  return { rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id) };
+  return {
+    rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id),
+    /* Sprawa jedzie razem z rozmową, bo agent ma zobaczyć rodzeństwo ZANIM
+       zacznie pisać: druga rozmowa o tym samym problemie bywa tą, w której
+       padła już odpowiedź. */
+    sprawa: sprawaRozmowy(id),
+  };
 }
 
 export interface Szkic { body: string; wersja: number; expectedLastMessageId: number | null }

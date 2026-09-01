@@ -84,6 +84,11 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
     payload: { status: "resolved" } },
   { method: "GET" as const, url: "/api/obsluga/wzmianki" },
+  { method: "GET" as const, url: "/api/obsluga/sprawy" },
+  { method: "POST" as const, url: "/api/obsluga/sprawy",
+    payload: { tytul: "Szarpak", rozmowaId: rozmowa } },
+  { method: "POST" as const, url: "/api/obsluga/sprawy/1/rozmowy", payload: { rozmowaId: rozmowa } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/odlacz` },
   { method: "POST" as const, url: "/api/obsluga/wzmianki/1/odhacz" },
 ];
 
@@ -434,4 +439,49 @@ test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", asy
   r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/presence`,
     headers: ala.naglowki, payload: { obecny: false } });
   assert.equal(r.json().trzyma, null);
+});
+
+test("sprawa skleja rozmowy, a rozmowa mówi wprost, do której już należy", async () => {
+  const b = login("biuro", "Anna");
+  const d = db();
+  const druga = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject)
+    SELECT channel_account_id,'w-2','Kupujący 44300444' FROM conversation WHERE id=?`)
+    .run(rozmowa).lastInsertRowid);
+
+  let r = await app.inject({ method: "POST", url: "/api/obsluga/sprawy", headers: b.naglowki,
+    payload: { tytul: "Szarpak do NAC LS 46-450", rozmowaId: rozmowa } });
+  assert.equal(r.statusCode, 200, r.body);
+  const sprawa = r.json().id;
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/sprawy/${sprawa}/rozmowy`,
+    headers: b.naglowki, payload: { rozmowaId: druga } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().rozmowy.length, 2);
+
+  /* Rozmowa jedzie razem ze swoją sprawą — agent ma zobaczyć rodzeństwo,
+     zanim zacznie pisać. */
+  r = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${druga}`,
+    headers: b.naglowki });
+  assert.equal(r.json().sprawa.tytul, "Szarpak do NAC LS 46-450");
+
+  /* Rozmowa w drugiej sprawie odpada, a odmowa niesie TYTUŁ tej pierwszej —
+     inaczej agent nie wie, co odkleić. */
+  const trzecia = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject)
+    SELECT channel_account_id,'w-3','Kupujący 44300444' FROM conversation WHERE id=?`)
+    .run(rozmowa).lastInsertRowid);
+  r = await app.inject({ method: "POST", url: "/api/obsluga/sprawy", headers: b.naglowki,
+    payload: { tytul: "Filtr", rozmowaId: trzecia } });
+  assert.equal(r.statusCode, 200, r.body);
+  const inna = await app.inject({ method: "POST", url: `/api/obsluga/sprawy/${r.json().id}/rozmowy`,
+    headers: b.naglowki, payload: { rozmowaId: druga } });
+  assert.equal(inna.statusCode, 400);
+  assert.match(inna.json().error, /Szarpak do NAC LS 46-450/);
+
+  const odlacz = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${druga}/odlacz`, headers: b.naglowki });
+  assert.equal(odlacz.statusCode, 200, odlacz.body);
+  r = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${druga}`, headers: b.naglowki });
+  assert.equal(r.json().sprawa, null);
 });

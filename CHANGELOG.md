@@ -34,6 +34,51 @@ historii nie przepisujemy.
 ---
 
 
+## 0.161.0 — 1 września 2026
+
+**Sprawa istniała w projekcie od §6.1 i nie miała tabeli.**
+
+Rozmowa, sprawa, dobór i zadanie to cztery osobne byty — decyzja właściciela
+z `docs/obsluga-klienta.md` (pytanie 1). Sprawa stoi ponad rozmowami i skleja
+te, które dotyczą jednego problemu klienta. Do tego wydania nie miała gdzie
+mieszkać, więc druga rozmowa o tej samej kosiarce była rozmową obcą.
+
+### Klamra, nie byt z historią
+
+Sprawa ma tytuł i listę rozmów. Nie ma statusu, bo §7 go dla niej nie zna, i nie
+ma własnej osi, bo zdarzenia wiszą przy ŹRÓDLE — blizna z 0.130.0 mówi wprost,
+że historia sprawy ginęła przy scalaniu. Sklejenie i rozklejenie widać na osi
+KAŻDEJ rozmowy, której dotyczyło, więc odklejenie nie zabiera historii ze sobą.
+
+Rozmowa należy do co najwyżej jednej sprawy i pilnuje tego klucz główny, nie
+dyscyplina serwisu: druga sprawa odbija się o SQL nawet wtedy, gdy ktoś ominie
+serwis. Odmowa niesie TYTUŁ tej pierwszej sprawy — „należy już do innej"
+kazałoby agentowi szukać, którą odkleić.
+
+Ekranu sprawy nie ma i to jest wybór. Pasek nad rozmową pokazuje tytuł
+i rodzeństwo, bo to jedyne pytanie, na które sprawa dziś odpowiada. Poprzednia
+odpowiedź o tym samym kształcie kosztowała cztery tabele nakładki plus ręczne
+SCAL i ROZKLEJ.
+
+### Mina, która wybuchła przy pisaniu
+
+Tabela nazwana wprost `sprawa` powstawała ze `schema.sql` i ZNIKAŁA sekundę
+później. `migrate()` kasuje ją przy każdym starcie, bo stoi na liście nakładek
+po starej implementacji — bazy klientów wciąż je mają i każda musi je stracić.
+Bez błędu i bez wyjątku; jedynym objawem był test, który nie widział własnej
+tabeli.
+
+Stąd `sprawa_klienta`, tym samym ruchem, którym zwroty wróciły w 0.150.0 jako
+`zwrot_klienta`. Komentarz w `db.ts` ostrzegał przed tym od 0.150.0 i właśnie
+zarobił na siebie drugi raz. Pilnuje tego teraz `db/migracja-sprawy.test.ts`:
+nowe nazwy mają przeżyć migrację, stare mają nadal znikać.
+
+Nazwy `case` z §15 projektu też nie ma: to słowo kluczowe SQLite i każde
+zapytanie musiałoby ją cytować. Dokument dostał nazwę z kodu, nie odwrotnie.
+
+**[wymaga działania]** Migracja dokłada dwie tabele. Panel trzeba przebudować
+(`npm run build`), bo pasek sprawy żyje po jego stronie.
+
 ## 0.160.0 — 1 września 2026
 
 **Wzmianka docierała tylko do tego, kto zgadł, w której rozmowie ją zostawiono.**
