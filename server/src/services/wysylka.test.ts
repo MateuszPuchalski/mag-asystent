@@ -84,6 +84,25 @@ test("udana wysyłka dopisuje wiadomość wychodzącą i kasuje szkic", async ()
   /* Szkic znika dopiero po UDANEJ wysyłce — przy każdym innym końcu zostaje. */
   assert.equal((d.prepare("SELECT count(*) n FROM conversation_draft").get() as {n:number}).n, 0);
   assert.equal(outbox(d)[0].status, "sent");
+
+  /* Ruch jest teraz po stronie klienta i status mówi to sam. Gdyby czekał na
+     kliknięcie, kłamałby przy pierwszej rozmowie, w której agent się spieszył. */
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string }).status, "waiting_for_customer");
+});
+
+test("nieudana wysyłka NIE przestawia statusu na czekanie", async () => {
+  /* Status ma opisywać to, co się stało. Odmowa Allegro znaczy, że klient
+     dalej czeka na nas — a nie odwrotnie. */
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  await assert.rejects(() => wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+    wyslij: async () => { throw new Error("400 Bad Request"); },
+  }));
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string }).status, "open");
 });
 
 test("wysyła ten, kto prowadzi rozmowę", async () => {

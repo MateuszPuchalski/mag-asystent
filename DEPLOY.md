@@ -1444,6 +1444,22 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.157.0 nie wymaga niczego ręcznego.** Rozmowa dostaje
+status: dwie kolumny dochodzą migracją przy pierwszym starcie.
+
+Rozmowa, którą ktoś prowadzi, dostaje przy tym `open`; cała reszta zostaje
+`new`. Uzupełnienie wykonuje się RAZ, w chwili dołożenia kolumny — nie wraca
+przy kolejnym restarcie i nie cofa decyzji operatora.
+
+**Skrzynka zyskuje kubełki i skróty klawiszowe.** Warto o tym powiedzieć
+biuru. Cyfry przełączają kubełek, a strzałki chodzą po kolejce. `O` odkłada
+rozmowę, `Z` oznacza ją jako załatwioną, `S` jako spam. `Backspace` cofa każdą
+z tych decyzji. Skróty milczą, gdy kursor stoi w polu tekstowym.
+
+Statusy liczą się same z pracy, którą biuro i tak wykonuje — wysłana
+odpowiedź, zlecony pomiar, wynik z hali. Ręcznie ustawia się tylko odłożenie,
+załatwione, zamknięte i spam.
+
 **Aktualizacja do 0.154.0 nie wymaga niczego ręcznego — ale coś naprawia.**
 Tabela pozycji zwrotu przebudowuje się przy pierwszym starcie, bez kolumny
 `tw_id` wskazującej na read-model Subiekta. Do 0.153.1 ta zależność kasowała

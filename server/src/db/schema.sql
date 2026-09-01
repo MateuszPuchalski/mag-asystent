@@ -77,6 +77,18 @@ CREATE TABLE IF NOT EXISTS conversation (
   subject                  TEXT,
   assigned_user_id         INTEGER REFERENCES app_user(user_id),
   version                  INTEGER NOT NULL DEFAULT 1,
+  -- Status rozmowy (0.157.0, §7 projektu panelu). To jest NASZ stan i stoi
+  -- osobno od `unread` niżej, bo te dwie kolumny odpowiadają na różne pytania:
+  -- flaga mówi, czy sprzedawca odpisał klientowi w Allegro, a status — co
+  -- z tym zrobiło biuro. Rozmowa załatwiona telefonicznie ma `unread = 0`
+  -- i `resolved`; jedna kolumna dla obu kłamałaby przy każdej takiej.
+  status                   TEXT NOT NULL DEFAULT 'new' CHECK (status IN (
+                             'new','open','waiting_for_customer','waiting_for_internal',
+                             'snoozed','resolved','closed','spam')),
+  -- Kiedy odłożona rozmowa ma wrócić. Przebudzenie liczy się PRZY ODCZYCIE
+  -- (`services/statusy.ts`), więc nie ma tu ani tickera, ani zapisu przy
+  -- patrzeniu — a to druga z twardych zasad tego repo.
+  snooze_do                TEXT,
   -- Flaga „nieprzeczytana" pochodzi z Allegro, nie z naszego stanu. Kanał wie,
   -- czy sprzedawca odpisał; my tylko odzwierciedlamy to, co widzi klient.
   unread                   INTEGER NOT NULL DEFAULT 0,

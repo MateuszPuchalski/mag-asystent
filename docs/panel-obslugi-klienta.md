@@ -153,7 +153,49 @@ i są wizualnie odróżnione od wiadomości klienta.
 ## 7. Statusy
 
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_internal`,
-`snoozed`, `resolved`, `closed`, `spam`.
+`snoozed`, `resolved`, `closed`, `spam`. **Działają od 0.157.0**, komplet
+ośmiu.
+
+### 7.1. Cztery liczy automat, cztery stawia człowiek
+
+Status wynika z faktów, które i tak zapisujemy, i zapisuje go ta sama
+transakcja co fakt:
+
+| fakt | status po |
+|---|---|
+| przyszła wiadomość od klienta | `new`, a przy rozmowie z właścicielem `open` |
+| ktoś przejął albo przekazał rozmowę | `open` |
+| odpowiedź poszła do klienta | `waiting_for_customer` |
+| zlecono zadanie hali | `waiting_for_internal` |
+| wrócił wynik z hali | `open` |
+
+Ręką stawia się cztery: odłożenie z terminem, `resolved`, `closed` i `spam`.
+Automat nie ustawia ich NIGDY — nie ma jak wiedzieć, że sprawa jest
+załatwiona, a domyślanie się tego to ten gatunek zgadywania, po którym
+w 0.140.0 zniknął cały moduł.
+
+Dwie reguły nadrzędne. `spam` jest nietykalny dla automatu, bo spamer pisze
+dalej. `waiting_for_internal` przeżywa dopisek klienta: hala dalej mierzy,
+a to, że przyszło coś nowego, mówi flaga nieprzeczytanej.
+
+Rozmowa `resolved` albo `closed`, do której klient odpisał, WRACA do `open`
+i dostaje w kolejce znacznik „wróciła". Bez niego wygląda jak każda inna
+w toku, a to jedyna, przy której trzeba przeczytać, co obiecano wcześniej.
+
+### 7.2. Odłożenie wygasa przy odczycie
+
+`snoozed` obowiązuje, dopóki `snooze_do` jest w przyszłości; potem odczyt
+pokazuje `open` — bez zapisu i bez tickera. Ticker przebudzający rozmowy
+byłby czwartym w tym systemie i jedynym, którego całą pracą jest przepisanie
+kolumny dającej się policzyć. „Zero zapisu przy patrzeniu" obowiązuje też
+skrzynkę.
+
+### 7.3. Status to nie jest flaga nieprzeczytanej
+
+`conversation.unread` przychodzi z Allegro i mówi, czy sprzedawca odpisał
+klientowi. `status` mówi, co z tym zrobiło biuro. Rozmowa załatwiona
+telefonicznie ma `unread = 0` i `resolved`; jedna kolumna dla obu kłamałaby
+przy każdej takiej.
 
 **Dobór:** `not_started`, `extracting_data`, `missing_information`, `searching`,
 `candidates_found`, `requires_expert`, `confirmed`, `rejected`,
@@ -769,7 +811,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
 | Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias` |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
-| Statusy rozmowy i doboru (§7) | **projekt** | `conversation` nie ma dziś kolumny statusu |
+| Statusy rozmowy (§7) | **działa** od 0.157.0 | `conversation.status`, `services/statusy.ts` |
+| Kubełki i skróty w skrzynce | **działa** od 0.157.0 | `panel/src/skrzynka/Kubelki.tsx`, `Decyzja.tsx` |
+| Statusy doboru (§7) | **projekt** | dobór to etap E, którego nie ma |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |

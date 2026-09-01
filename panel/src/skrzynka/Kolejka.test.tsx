@@ -8,7 +8,8 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z",
-  nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1, ...n,
+  nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
+  status: "new", statusZapisany: "new", snoozeDo: null, wrocilaPoZamknieciu: false, ...n,
 });
 
 const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
@@ -68,5 +69,26 @@ describe("Kolejka", () => {
     render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={4821} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.getByRole("button", { current: true })).toBeInTheDocument();
+  });
+
+  it("wiersz niesie NASZ status obok flagi z Allegro", () => {
+    /* „NOWE" mówi, że sprzedawca nie odpisał w Allegro; plakietka mówi, co
+       z tym zrobiło biuro. Jedna kolumna dla obu kłamałaby przy rozmowie
+       załatwionej telefonicznie. */
+    render(<Kolejka rozmowy={[rozmowa({ nieprzeczytana: true, status: "waiting_for_customer" })]}
+      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText("NOWE")).toBeInTheDocument();
+    expect(screen.getByText("czeka na klienta")).toBeInTheDocument();
+  });
+
+  it("odłożona pokazuje datę powrotu, a wracająca po zamknięciu — znacznik", () => {
+    const { rerender } = render(<Kolejka rozmowy={[rozmowa({
+      status: "snoozed", statusZapisany: "snoozed", snoozeDo: "2026-09-05T06:00:00.000Z",
+    })]} stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText(/wraca/)).toBeInTheDocument();
+
+    rerender(<Kolejka rozmowy={[rozmowa({ wrocilaPoZamknieciu: true })]} stan={STAN}
+      wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText("WRÓCIŁA")).toBeInTheDocument();
   });
 });

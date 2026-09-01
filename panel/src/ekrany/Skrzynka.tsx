@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
-  useJa, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
-  useWskazOferte, useWyslij, useZapiszSzkic, useZdrowie, useZlecPomiar,
+  useJa, useOdloz, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
+  useUstawStatus, useWskazOferte, useWyslij, useZalatw, useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
+import { KUBELKI, Kubelki, wKubelku, type KubelekId } from "../skrzynka/Kubelki";
+import { Decyzja } from "../skrzynka/Decyzja";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
-import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
+import type { StatusRozmowy, SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 
 export function Skrzynka() {
@@ -34,6 +36,9 @@ export function Skrzynka() {
   const wyslij = useWyslij();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
+  const odloz = useOdloz();
+  const zalatw = useZalatw();
+  const status = useUstawStatus();
 
   const [szkic, setSzkic] = useState("");
   const [zrodlo, setZrodlo] = useState<number | null>(null);
@@ -47,8 +52,76 @@ export function Skrzynka() {
   const [bladSynchronizacji, setBladSynchronizacji] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWysylki, setBladWysylki] = useState("");
+  const [kubelek, setKubelek] = useState<KubelekId>("moje");
+  const [bladStatusu, setBladStatusu] = useState("");
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
+
+  const mojeId = ja.data?.user.userId ?? null;
+  const wszystkie = lista.data?.rozmowy ?? [];
+  const wKolejce = useMemo(
+    () => wszystkie.filter((r) => wKubelku(r, kubelek, mojeId)),
+    [wszystkie, kubelek, mojeId]);
+  const wybrana = wszystkie.find((r) => r.id === wybranaId) ?? null;
+
+  /* Wejście z paska adresu na rozmowę spoza wybranego kubełka ma pokazać TĘ
+     rozmowę, a nie pustą listę. Adres jest źródłem prawdy, kubełek za nim
+     idzie — dokładnie jak w zwrotach. */
+  useEffect(() => {
+    if (wybrana && !wKubelku(wybrana, kubelek, mojeId)) setKubelek("wszystkie");
+  }, [wybrana?.id, wybrana?.status]);
+
+  /**
+   * Przełączenie kubełka PRZESTAWIA TEŻ KURSOR.
+   *
+   * Blizna z panelu zwrotów, znaleziona okiem, nie testem: bez tego jeden
+   * klawisz zmieniał listę, a zaznaczenie zostawało na rozmowie z poprzedniego
+   * kubełka — i trzeba było dokliknąć wiersz.
+   */
+  const przelacz = (k: KubelekId) => {
+    setKubelek(k);
+    const pierwsza = wszystkie.find((r) => wKubelku(r, k, mojeId));
+    nawiguj(pierwsza ? `/obsluga/skrzynka/${pierwsza.id}` : "/obsluga/skrzynka");
+  };
+
+  const idz = (o: number) => {
+    if (!wKolejce.length) return;
+    const i = wKolejce.findIndex((r) => r.id === wybranaId);
+    const nast = wKolejce[Math.min(wKolejce.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
+    if (nast) nawiguj(`/obsluga/skrzynka/${nast.id}`);
+  };
+
+  /** Zmiana statusu z jednego miejsca — klawisz i przycisk robią to samo. */
+  const zmienStatus = (nowyStatus: StatusRozmowy) => {
+    if (!wybrana) return;
+    setBladStatusu("");
+    const przy = { onError: (e: unknown) => setBladStatusu((e as Error).message) };
+    if (nowyStatus === "resolved") {
+      zalatw.mutate({ id: wybrana.id, expectedVersion: wybrana.wersja }, przy);
+    } else {
+      status.mutate({ id: wybrana.id, status: nowyStatus, expectedVersion: wybrana.wersja }, przy);
+    }
+  };
+
+  useEffect(() => {
+    const naKlawisz = (e: KeyboardEvent) => {
+      /* Skrót nie ma prawa zadziałać, gdy ktoś pisze — inaczej „s" w szkicu
+         odpowiedzi oznaczałoby rozmowę jako spam, a `Backspace` cofałby
+         decyzję zamiast kasować literę. */
+      const cel = e.target as HTMLElement | null;
+      if (cel && /^(INPUT|TEXTAREA|SELECT)$/.test(cel.tagName)) return;
+      if (cel?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); idz(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); idz(-1); }
+      else if (/^[1-7]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
+      else if (e.key === "z" || e.key === "Z") zmienStatus("resolved");
+      else if (e.key === "s" || e.key === "S") zmienStatus("spam");
+      else if (e.key === "Backspace") { e.preventDefault(); zmienStatus("open"); }
+    };
+    window.addEventListener("keydown", naKlawisz);
+    return () => window.removeEventListener("keydown", naKlawisz);
+  }, [wKolejce, wybranaId, wszystkie, kubelek, mojeId]);
 
   /* Szkic wchodzi do pola przy zmianie ROZMOWY, nie przy każdym odczycie:
      nadpisywanie go w trakcie pisania kasowałoby pracę agenta. */
@@ -111,16 +184,30 @@ export function Skrzynka() {
 
     <Kolejka
       nieswieza={alarm}
-      rozmowy={lista.data?.rozmowy ?? []}
+      kubelki={<Kubelki rozmowy={wszystkie} mojeId={mojeId}
+        wybrany={kubelek} onWybierz={przelacz} />}
+      rozmowy={wKolejce}
       stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
       wybranaId={wybranaId}
       laduje={lista.isLoading}
       onOdswiez={() => lista.refetch()}
       onWybierz={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />
 
+    <div className="space-y-4">
+    {wybrana && <Decyzja
+      rozmowa={wybrana}
+      zajete={odloz.isPending || zalatw.isPending || status.isPending}
+      blad={bladStatusu}
+      onOdloz={(iso) => {
+        setBladStatusu("");
+        odloz.mutate({ id: wybrana.id, do: iso, expectedVersion: wybrana.wersja },
+          { onError: (e) => setBladStatusu((e as Error).message) });
+      }}
+      onStatus={zmienStatus} />}
+
     <Rozmowa
       dane={rozmowa.data}
-      mojeId={ja.data?.user.userId ?? null}
+      mojeId={mojeId}
       nowaWiadomosc={nowa}
       szkic={szkic}
       zapisuje={zapisz.isPending}
@@ -184,6 +271,7 @@ export function Skrzynka() {
       onDopytajOOferte={() => setSzkic((s) => s
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
     />
+    </div>
 
     {konfliktWysylki && <DialogKonfliktu
       szczegoly={konfliktWysylki} szkic={szkic} wysyla={wyslij.isPending} blad={bladWysylki}

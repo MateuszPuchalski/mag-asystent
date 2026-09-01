@@ -1,6 +1,11 @@
 /* Kształty odpowiedzi serwera. Trzymane osobno, bo czytają je i ekrany,
    i testy — a duplikat rozjechałby się przy pierwszym nowym polu. */
 
+/** Osiem stanów z §7 projektu panelu. Lustro `StatusRozmowy` z serwera. */
+export type StatusRozmowy =
+  | "new" | "open" | "waiting_for_customer" | "waiting_for_internal"
+  | "snoozed" | "resolved" | "closed" | "spam";
+
 export type Rozmowa = {
   id: number;
   klient: string;
@@ -10,6 +15,16 @@ export type Rozmowa = {
   wlascicielId: number | null;
   wlasciciel: string | null;
   wersja: number;
+  /* Status WIDZIANY liczy serwer — panel go nie wyprowadza po raz drugi, tak
+     samo jak kubełka zwrotu. Dwie kopie tej reguły rozjechałyby się przy
+     pierwszej poprawce jednej z nich, a rozjazd byłby niewidoczny: ekran
+     pokazywałby po prostu inną kolejkę niż liczniki. */
+  status: StatusRozmowy;
+  /** Zapisany w bazie: `snoozed` mimo `status: "open"` znaczy „termin minął". */
+  statusZapisany: StatusRozmowy;
+  snoozeDo: string | null;
+  /** Klient odpisał po zamknięciu i nikt mu jeszcze nie odpowiedział. */
+  wrocilaPoZamknieciu: boolean;
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */

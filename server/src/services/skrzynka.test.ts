@@ -99,6 +99,9 @@ test("zlecony pomiar niesie pytanie klienta, ofertę i klucze rozmowy", () => {
   /* tw_id zostaje puste: synchronizator nie pobiera ofert, więc mapowania
      oferta→kartoteka nie ma z czego zrobić. Zgadywanie byłoby gorsze. */
   assert.equal(z.twId, null);
+  /* Rozmowa czeka teraz na NAS. Agent nie klika w status — zlecenie pomiaru
+     jest tym faktem, z którego status wynika. */
+  assert.equal(listaRozmow()[0].status, "waiting_for_internal");
 });
 
 test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
@@ -121,6 +124,8 @@ test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
   assert.equal((db().prepare(
     "SELECT count(*) n FROM conversation_event WHERE conversation_id=? AND event_type='field_task_result'")
     .get(rozmowaId) as { n: number }).n, 1);
+  /* Wynik zdejmuje `waiting_for_internal` — to na niego rozmowa czekała. */
+  assert.equal(listaRozmow()[0].status, "open");
 });
 
 /* Bramka własności zostaje bramką także wtedy, gdy zadanie wisi na rozmowie. */
@@ -155,4 +160,39 @@ test("bez wskazania kartoteki zadanie idzie jak dotąd, bez podpisu o wyborze", 
   assert.equal(z.twId, null);
   assert.doesNotMatch(z.instrukcja, /wskazał/);
   assert.match(z.instrukcja, /Oferta Allegro: oferta-9/);
+});
+
+/* ── Status przy odczycie (0.157.0) ─────────────────────────────────────────
+   Stan ustawiamy tu `UPDATE`-em świadomie: pod testem jest ODCZYT, a nie
+   przejście. Przejścia sprawdzają testy wyżej, przez prawdziwe mutacje. */
+
+test("odłożenie po terminie czyta się jako otwarte, a baza zostaje nietknięta", () => {
+  const d = db();
+  d.prepare("UPDATE conversation SET status='snoozed', snooze_do=? WHERE id=?")
+    .run("2026-08-31T09:00:00.000Z", rozmowaId);
+
+  const r = listaRozmow()[0];
+  assert.equal(r.status, "open", "termin minął, więc rozmowa jest z powrotem w pracy");
+  assert.equal(r.statusZapisany, "snoozed", "ekran ma czym wytłumaczyć, skąd ta zmiana");
+  /* Zero zapisu przy patrzeniu: przebudzenie policzył odczyt, do bazy nie
+     poszło nic. Ticker robiący to samo byłby czwartym w tym systemie. */
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowaId) as
+    { status: string }).status, "snoozed");
+});
+
+test("powrót po zamknięciu widać, dopóki biuro nie odpisze", () => {
+  const d = db();
+  d.prepare("UPDATE conversation SET status='open', snooze_do=NULL WHERE id=?").run(rozmowaId);
+  d.prepare(`INSERT INTO conversation_event(conversation_id,event_type,payload,created_at)
+    VALUES (?,'reopened_by_customer','{}','2026-09-02T09:00:00.000Z')`).run(rozmowaId);
+  assert.equal(listaRozmow()[0].wrocilaPoZamknieciu, true);
+
+  /* Nasza odpowiedź gasi znacznik sama — bez kolumny do sprzątania i bez
+     zapisu, który mógłby się nie wykonać. */
+  const konto = (d.prepare("SELECT channel_account_id AS k FROM conversation WHERE id=?")
+    .get(rozmowaId) as { k: number }).k;
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'m-po-powrocie','outgoing','Już odpisuję.',
+    '2026-09-02T10:00:00.000Z')`).run(rozmowaId, konto);
+  assert.equal(listaRozmow()[0].wrocilaPoZamknieciu, false);
 });

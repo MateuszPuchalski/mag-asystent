@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { OsRozmowy, Rozmowa, StanSkrzynki, WynikWysylki, Zadanie, Zdrowie } from "./typy";
+import type {
+  OsRozmowy, Rozmowa, StanSkrzynki, StatusRozmowy, WynikWysylki, Zadanie, Zdrowie,
+} from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
    że unieważnienie mija się z zapytaniem o jedną literę — i ekran pokazuje
@@ -180,5 +182,53 @@ export function useWyslij() {
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
     },
+  });
+}
+
+/* ── Status rozmowy (0.157.0) ────────────────────────────────────────────────
+   Trzy mutacje, bo trzy różne decyzje. Wszystkie unieważniają OBIE listy:
+   kubełki liczą się z tej samej odpowiedzi co wiersze, więc odświeżenie
+   jednego bez drugiego pokazałoby liczbę przy zakładce niezgodną z jej
+   zawartością — i to jest ten gatunek rozjazdu, którego nikt nie zgłasza. */
+
+const odswiez = (qc: ReturnType<typeof useQueryClient>, id: number) => {
+  qc.invalidateQueries({ queryKey: klucze.rozmowy });
+  qc.invalidateQueries({ queryKey: klucze.rozmowa(id) });
+};
+
+/** Odłożenie z terminem powrotu. Bez terminu byłoby ukrytym zamknięciem. */
+export function useOdloz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; do: string; expectedVersion: number }) =>
+      api<{ status: StatusRozmowy; version: number }>(`/api/conversations/${v.id}/snooze`, {
+        method: "POST", body: JSON.stringify({ do: v.do, expectedVersion: v.expectedVersion }),
+      }),
+    onSettled: (_d, _e, v) => odswiez(qc, v.id),
+  });
+}
+
+/** Najczęstsza decyzja dnia, więc ma własną trasę i jedno kliknięcie. */
+export function useZalatw() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; expectedVersion: number }) =>
+      api<{ status: StatusRozmowy; version: number }>(`/api/conversations/${v.id}/resolve`, {
+        method: "POST", body: JSON.stringify({ expectedVersion: v.expectedVersion }),
+      }),
+    onSettled: (_d, _e, v) => odswiez(qc, v.id),
+  });
+}
+
+/** Zamknięcie, spam i POWRÓT do `open` — cofnięcie każdej z tych decyzji. */
+export function useUstawStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; status: StatusRozmowy; powod?: string; expectedVersion: number }) =>
+      api<{ status: StatusRozmowy; version: number }>(`/api/conversations/${v.id}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status: v.status, powod: v.powod, expectedVersion: v.expectedVersion }),
+      }),
+    onSettled: (_d, _e, v) => odswiez(qc, v.id),
   });
 }

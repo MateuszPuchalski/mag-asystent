@@ -81,6 +81,16 @@ const TRASY = () => [
     payload: { ofertaId: "14892374512" } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
+  /* Status rozmowy (0.157.0): trzy trasy zapisu więcej. Każda jest DECYZJĄ
+     człowieka — odłożenie z terminem, załatwienie jednym kliknięciem i reszta
+     razem z powrotem do `open`. Automat swoje statusy zapisuje przy okazji
+     faktów (wysyłka, pomiar, wynik z hali), bez własnej trasy. */
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/snooze`,
+    payload: { do: "2027-01-04T08:00:00.000Z", expectedVersion: 1 } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/resolve`,
+    payload: { expectedVersion: 1 } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/status`,
+    payload: { status: "spam", expectedVersion: 1 } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -324,4 +334,47 @@ test("pobranie załącznika: rola, stan i nieznane id", async () => {
   const nieznany = await app.inject({ method: "GET",
     url: "/api/obsluga/zalaczniki/99999", headers: biuro.naglowki });
   assert.equal(nieznany.statusCode, 404);
+});
+
+test("odłożenie, załatwienie i powrót chodzą jedną drogą i pilnują wersji", async () => {
+  const b = login("biuro", "Anna");
+  const wersja = () => (db().prepare("SELECT version FROM conversation WHERE id=?")
+    .get(rozmowa) as { version: number }).version;
+
+  let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/snooze`,
+    headers: b.naglowki, payload: { do: "2027-01-04T08:00:00.000Z", expectedVersion: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().status, "snoozed");
+  assert.equal(r.json().snoozeDo, "2027-01-04T08:00:00.000Z");
+
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/resolve`,
+    headers: b.naglowki, payload: { expectedVersion: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().status, "resolved");
+
+  /* POWRÓT do `open` idzie tą samą trasą co reszta — cofnięcie jest tańsze
+     od dialogu „czy na pewno" i dlatego nie ma własnego przycisku-wyjątku. */
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/status`,
+    headers: b.naglowki, payload: { status: "open", expectedVersion: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().status, "open");
+
+  /* Spóźniony agent dostaje 409 ze stanem, a nie ciche nadpisanie cudzej
+     decyzji — tak samo jak przy przejęciu i przy wysyłce. */
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/resolve`,
+    headers: b.naglowki, payload: { expectedVersion: 1 } });
+  assert.equal(r.statusCode, 409, r.body);
+  assert.equal(r.json().status, "open");
+});
+
+test("statusu automatu nie da się wpisać żądaniem", async () => {
+  /* Trasa jest równie ważną granicą co serwis: `waiting_for_customer` wpisane
+     żądaniem kłamałoby o tym, że odpowiedź poszła do klienta. */
+  const b = login("biuro", "Anna");
+  const wersja = (db().prepare("SELECT version FROM conversation WHERE id=?")
+    .get(rozmowa) as { version: number }).version;
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/status`,
+    headers: b.naglowki, payload: { status: "waiting_for_customer", expectedVersion: wersja } });
+  assert.equal(r.statusCode, 400, r.body);
+  assert.match(r.json().error, /nie ustawia się ręcznie/);
 });

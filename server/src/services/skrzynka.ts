@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
+import { statusEfektywny, zapiszStatusAutomatu, type StatusRozmowy } from "./statusy.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -13,6 +14,13 @@ import { utworzZadanie } from "./zadania-terenowe.js";
 export interface RozmowaSkrzynki {
   id: number; klient: string; ostatniaWiadomosc: string; ostatniaWiadomoscAt: string;
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
+  /** Status WIDZIANY: odłożenie po terminie jest już `open` (`statusy.ts`). */
+  status: StatusRozmowy;
+  /** Zapisany w bazie — po to, żeby ekran umiał pokazać, że termin minął. */
+  statusZapisany: StatusRozmowy;
+  snoozeDo: string | null;
+  /** Klient odpisał po zamknięciu i nikt mu jeszcze nie odpowiedział. */
+  wrocilaPoZamknieciu: boolean;
 }
 /** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
 export interface ZalacznikOsi {
@@ -28,22 +36,41 @@ export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: nu
 
 const SKRZYNKA = "skrzynka";
 
+/* Znacznik powrotu liczy się PRZY ODCZYCIE i gaśnie sam, gdy biuro odpisze:
+   porównujemy moment ostatniego zdarzenia `reopened_by_customer` z momentem
+   ostatniej naszej wiadomości. Osobna kolumna wymagałaby kasowania jej przy
+   wysyłce, czyli jeszcze jednego zapisu, który może się nie wykonać. */
 const LISTA = `
   SELECT c.id, c.subject AS klient, c.updated_at AS ostatniaWiadomoscAt, c.unread,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
+         c.status, c.snooze_do AS snoozeDo,
          (SELECT m.body FROM message m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1)
-           AS ostatniaWiadomosc
+           AS ostatniaWiadomosc,
+         (SELECT MAX(e.created_at) FROM conversation_event e
+           WHERE e.conversation_id=c.id AND e.event_type='reopened_by_customer') AS wrocilaAt,
+         (SELECT MAX(m.sent_at) FROM message m
+           WHERE m.conversation_id=c.id AND m.direction='outgoing') AS odpisanoAt
     FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id`;
 
-const naRozmowe = (w: Record<string, unknown>): RozmowaSkrzynki => ({
-  id: Number(w.id), klient: String(w.klient ?? "Klient"),
-  ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
-  ostatniaWiadomoscAt: String(w.ostatniaWiadomoscAt),
-  nieprzeczytana: Boolean(Number(w.unread)),
-  wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
-  wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
-  wersja: Number(w.wersja),
-});
+const naRozmowe = (w: Record<string, unknown>, teraz = new Date()): RozmowaSkrzynki => {
+  const zapisany = String(w.status ?? "new");
+  const snoozeDo = w.snoozeDo == null ? null : String(w.snoozeDo);
+  const wrocilaAt = w.wrocilaAt == null ? null : String(w.wrocilaAt);
+  const odpisanoAt = w.odpisanoAt == null ? null : String(w.odpisanoAt);
+  return {
+    id: Number(w.id), klient: String(w.klient ?? "Klient"),
+    ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
+    ostatniaWiadomoscAt: String(w.ostatniaWiadomoscAt),
+    nieprzeczytana: Boolean(Number(w.unread)),
+    wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
+    wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
+    wersja: Number(w.wersja),
+    status: statusEfektywny(zapisany, snoozeDo, teraz),
+    statusZapisany: (zapisany as StatusRozmowy),
+    snoozeDo,
+    wrocilaPoZamknieciu: wrocilaAt !== null && (odpisanoAt === null || wrocilaAt > odpisanoAt),
+  };
+};
 
 export function stanSkrzynki(): StanSkrzynki {
   const s = db().prepare(
@@ -78,7 +105,7 @@ export function stanObslugiHealth(teraz = Date.now()) {
 
 export function listaRozmow(): RozmowaSkrzynki[] {
   return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
-    .map(naRozmowe);
+    .map((w) => naRozmowe(w));
 }
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
@@ -214,5 +241,9 @@ export function zlecPomiar(
      `zrodlo_ref` — dzięki temu wynik wraca na oś TEJ rozmowy i tej wiadomości. */
   db().prepare("UPDATE zadanie_terenowe SET conversation_id=?, message_id=? WHERE id=?")
     .run(rozmowaId, messageId, zadanie.id);
+  /* Rozmowa czeka teraz na NAS, nie na klienta — i tym różni się ten status od
+     `waiting_for_customer`. Wynik z hali zdejmuje go sam (`dopiszZdarzenieWyniku`),
+     więc agent nie ma tu nic do klikania w żadną stronę. */
+  zapiszStatusAutomatu(db(), rozmowaId, "waiting_for_internal");
   return { ...zadanie, conversationId: rozmowaId, messageId };
 }

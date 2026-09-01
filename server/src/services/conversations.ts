@@ -2,6 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import {
+  jestStatusem, statusPoWiadomosciKlienta, zapiszStatusAutomatu, type StatusRozmowy,
+} from "./statusy.js";
 
 /**
  * Imię do dziennika bierzemy z konta, nie z parametru.
@@ -45,6 +48,13 @@ export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db
     dane.sentAt,
   );
   const id = wynik.changes === 0 ? null : Number(wynik.lastInsertRowid);
+  /* Status przelicza się TYLKO przy nowym wierszu i tylko dla wiadomości od
+     klienta. `changes === 0` znaczy „ta wiadomość już u nas była" — ponowna
+     synchronizacja nie ma prawa otwierać zamkniętej rozmowy (blizna 0.128.0),
+     a własna odpowiedź ustawia status w `wysylka.ts`, nie tutaj. */
+  if (id !== null && dane.direction === "incoming") {
+    statusPoWiadomosciKlienta(database, dane.conversationId);
+  }
   if (id !== null) publishConversationEvent("message.created", dane.conversationId, { messageId: id });
   return id;
 }
@@ -60,8 +70,12 @@ export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db
 export function przejmijRozmowe(conversationId: number, userId: number, expectedVersion: number,
   database: DatabaseSync = db()) {
   const wynik = transaction(database, () => {
+    /* Status idzie TYM SAMYM `UPDATE`-em co właściciel — osobny zapis mógłby
+       trafić w rozmowę przejętą w międzyczasie przez kogoś innego. Przejęcie
+       budzi też odłożoną rozmowę: ktoś przy niej właśnie usiadł. */
     const result = database.prepare(`UPDATE conversation
-      SET assigned_user_id=?, version=version+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      SET assigned_user_id=?, status='open', snooze_do=NULL,
+          version=version+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
       WHERE id=? AND assigned_user_id IS NULL AND version=?`).run(userId, conversationId, expectedVersion);
     if (result.changes === 0) {
       /* Czas przejęcia bierze się z HISTORII przypisań, nie z `updated_at`
@@ -117,8 +131,12 @@ export function przekazRozmowe(conversationId: number, autorId: number,
   if (!uzasadnienie) throw new Error("Wymuszone przekazanie wymaga powodu");
 
   const wynik = transaction(database, () => {
+    /* Przekazana rozmowa wraca do gry, więc dostaje `open` także wtedy, gdy
+       idzie z powrotem do kolejki (`doUserId === null`) — nieprzypisana rozmowa
+       w toku ma stać w kubełku nieprzypisanych, a nie zniknąć w załatwionych. */
     const result = database.prepare(`UPDATE conversation
-      SET assigned_user_id=?, version=version+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      SET assigned_user_id=?, status='open', snooze_do=NULL,
+          version=version+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
       WHERE id=? AND version=?`).run(doUserId, conversationId, expectedVersion);
     if (result.changes === 0) {
       const teraz = database.prepare(`SELECT c.version, u.user_id, u.name FROM conversation c
@@ -228,6 +246,87 @@ export function dodajKomentarz(conversationId: number, authorUserId: number, bod
   })();
 }
 
+/** Statusy, które wolno ustawić RĘKĄ. Reszta wynika z faktów (`statusy.ts`). */
+const RECZNE: StatusRozmowy[] = ["open", "resolved", "closed", "spam"];
+
+/**
+ * Wspólne domknięcie zmiany statusu: wersja, audyt, zdarzenie do panelu.
+ *
+ * Ta sama kontrola wersji co przy przejęciu i przekazaniu — spóźniony agent
+ * dostaje 409 z aktualnym stanem, zamiast po cichu nadpisać cudzą decyzję.
+ * Zmiana ręczna PODBIJA `version`, w odróżnieniu od automatycznej: to jest
+ * decyzja człowieka i ma unieważnić cudzą wysyłkę w toku.
+ */
+function zmienStatus(
+  database: DatabaseSync, conversationId: number, autorId: number,
+  status: StatusRozmowy, snoozeDo: string | null, powod: string | null,
+  expectedVersion: number, zdarzenie: string,
+) {
+  const wynik = transaction(database, () => {
+    const result = database.prepare(`UPDATE conversation
+      SET status=?, snooze_do=?, version=version+1
+      WHERE id=? AND version=?`).run(status, snoozeDo, conversationId, expectedVersion);
+    if (result.changes === 0) {
+      const teraz = database.prepare(`SELECT c.version, c.status, u.user_id, u.name
+        FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
+        WHERE c.id=?`).get(conversationId) as
+        { version: number; status: string; user_id: number | null; name: string | null } | undefined;
+      if (!teraz) throw new Error("Nie znaleziono rozmowy");
+      throw new ConversationConflict("Rozmowa zmieniła się, zanim doszła zmiana statusu", {
+        assignedUserId: teraz.user_id, assignedUserName: teraz.name,
+        version: teraz.version, status: teraz.status,
+      });
+    }
+    const version = expectedVersion + 1;
+    logEvent(zdarzenie, imieAutora(database, autorId), null,
+      { conversationId, status, snoozeDo, powod, wersjaPrzed: expectedVersion, wersjaPo: version },
+      undefined, database);
+    return { conversationId, status, snoozeDo, version };
+  })();
+
+  publishConversationEvent("assignment.changed", conversationId,
+    { status: wynik.status, version: wynik.version });
+  return wynik;
+}
+
+/**
+ * Odłożenie rozmowy na później (§7 `snoozed`).
+ *
+ * Termin jest OBOWIĄZKOWY i musi być w przyszłości. Odłożenie bez terminu
+ * byłoby ukrytym zamknięciem: rozmowa znika z kolejki i nie ma dnia, w którym
+ * wraca. `snooze_do` w przeszłości znaczy dla odczytu „już wróciła", więc
+ * przyjęcie takiego terminu dałoby przycisk, który nic nie robi.
+ */
+export function odlozRozmowe(conversationId: number, autorId: number, doKiedy: string,
+  expectedVersion: number, database: DatabaseSync = db(), teraz = new Date()) {
+  const kiedy = Date.parse(doKiedy ?? "");
+  if (Number.isNaN(kiedy)) throw new Error("Odłożenie wymaga terminu powrotu");
+  if (kiedy <= teraz.getTime()) throw new Error("Termin powrotu musi być w przyszłości");
+  return zmienStatus(database, conversationId, autorId, "snoozed",
+    new Date(kiedy).toISOString(), null, expectedVersion, "rozmowa_odlozona");
+}
+
+/**
+ * Ręczna zmiana statusu: załatwione, zamknięte, spam i powrót do `open`.
+ *
+ * POWRÓT DO `open` JEST DROGĄ WYJŚCIA z każdej z tych decyzji i dlatego stoi
+ * na tej samej trasie. Panel zwrotów kupił tę lekcję pierwszy: cofnięcie jest
+ * tańsze od dialogu „czy na pewno", a dopóki nic nie poszło do Allegro, każdy
+ * ruch ma mieć powrót.
+ *
+ * `new` i oba `waiting_*` są nie do ustawienia ręką — wynikają z faktów,
+ * a wpisane z palca kłamałyby o tym, że coś się wydarzyło.
+ */
+export function ustawStatusRozmowy(conversationId: number, autorId: number,
+  status: string, powod: string | null, expectedVersion: number,
+  database: DatabaseSync = db()) {
+  if (!jestStatusem(status) || !RECZNE.includes(status)) {
+    throw new Error(`Statusu „${status}" nie ustawia się ręcznie`);
+  }
+  return zmienStatus(database, conversationId, autorId, status, null,
+    (powod ?? "").trim() || null, expectedVersion, "rozmowa_status");
+}
+
 /** Granica adaptera: komentarze nie mogą zostać pomylone z wiadomością. */
 export function payloadAllegroWiadomosci(messageId: number, database: DatabaseSync = db()) {
   const row = database.prepare("SELECT body FROM message WHERE id=? AND direction='outgoing'").get(messageId) as
@@ -258,5 +357,9 @@ export function dopiszZdarzenieWyniku(
     INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
     VALUES (?, NULL, 'field_task_result', json_object('taskId', ?, 'result', ?))
   `).run(conversationId, zadanieId, wynik);
+  /* Wynik z hali ZDEJMUJE `waiting_for_internal`: to na niego rozmowa czekała.
+     Bez tego jedyne wyjście z tego statusu byłoby ręczne, a agent musiałby
+     pamiętać o kliknięciu, którego nikt od niego nie oczekuje. */
+  zapiszStatusAutomatu(database, conversationId, "open");
   publishConversationEvent("warehouse.result", conversationId, { taskId: zadanieId, result: wynik });
 }

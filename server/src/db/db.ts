@@ -281,6 +281,7 @@ export function migrate(database: DatabaseSync) {
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
+  statusRozmowy(database);
   /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
@@ -290,6 +291,30 @@ export function migrate(database: DatabaseSync) {
      kształcie. */
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
+}
+
+/**
+ * Status rozmowy razem z jednorazowym uzupełnieniem (0.157.0).
+ *
+ * Osobna funkcja, a nie dwa `addColumn`, WYŁĄCZNIE przez to uzupełnienie:
+ * ma się wykonać raz, w chwili dołożenia kolumny. Puszczone przy każdym
+ * starcie cofałoby ręczną decyzję operatora przy najbliższym restarcie —
+ * a status ma być tym, co powiedział człowiek albo policzył automat, nie tym,
+ * co migracja uważa za rozsądne.
+ *
+ * Uzupełnienie jest najostrożniejsze z możliwych: rozmowa, którą ktoś
+ * prowadzi, dostaje `open`; cała reszta zostaje przy domyślnym `new`.
+ * Kuszące „ostatnia wiadomość wyszła od nas, więc czekamy na klienta" byłoby
+ * zgadywaniem — biuro odpowiadało też telefonem i w panelu Allegro.
+ */
+function statusRozmowy(database: DatabaseSync) {
+  const kolumny = database.prepare("PRAGMA table_info(conversation)").all() as Array<{ name: string }>;
+  if (!kolumny.length || kolumny.some((k) => k.name === "status")) return;
+  database.exec(`ALTER TABLE conversation ADD COLUMN status TEXT NOT NULL DEFAULT 'new'
+    CHECK (status IN ('new','open','waiting_for_customer','waiting_for_internal',
+                      'snoozed','resolved','closed','spam'))`);
+  database.exec("ALTER TABLE conversation ADD COLUMN snooze_do TEXT");
+  database.exec("UPDATE conversation SET status='open' WHERE assigned_user_id IS NOT NULL");
 }
 
 /**

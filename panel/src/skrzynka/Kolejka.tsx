@@ -1,15 +1,19 @@
 import React from "react";
 import { Inbox, RefreshCw, UserCheck } from "lucide-react";
 import type { Rozmowa, StanSkrzynki } from "../api/typy";
-import { czas } from "../ui";
+import { NAZWA_STATUSU, Plakietka, czas } from "../ui";
 
 /* Kolejka pokazuje moment ostatniej synchronizacji, bo pusta lista o 9:00
    znaczy co innego, gdy synchronizator stanął o 6:00, a co innego, gdy
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
-export function Kolejka({ rozmowy, stan, wybranaId, onWybierz, onOdswiez, laduje, nieswieza }: {
+export function Kolejka({ rozmowy, stan, wybranaId, onWybierz, onOdswiez, laduje, nieswieza,
+  kubelki }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
   wybranaId: number | null;
+  /* Pasek kubełków wchodzi TU, a nie osobną kartą obok: zakładki oderwane od
+     listy, którą filtrują, czyta się jako dwa niezależne ekrany. */
+  kubelki?: React.ReactNode;
   onWybierz: (id: number) => void;
   onOdswiez: () => void;
   laduje: boolean;
@@ -25,6 +29,7 @@ export function Kolejka({ rozmowy, stan, wybranaId, onWybierz, onOdswiez, laduje
       <button className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>
+    {kubelki}
     <p className="border-b bg-slate-50 px-4 py-2 text-xs text-slate-500">
       Ostatnia synchronizacja: {czas(stan.ostatniaSynchronizacja)}
       {stan.bledy > 0 && <span className="ml-2 font-bold text-amber-700">błędów: {stan.bledy}</span>}
@@ -39,14 +44,27 @@ export function Kolejka({ rozmowy, stan, wybranaId, onWybierz, onOdswiez, laduje
           wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
         <div className="flex items-center gap-2">
           <b className="truncate">{r.klient}</b>
+          {/* „NOWE" to flaga Z ALLEGRO (nieprzeczytana), a plakietka obok to
+              NASZ status. Dwie różne prawdy, więc dwa różne znaczki: rozmowa
+              przeczytana przez sprzedawcę i niezałatwiona przez biuro wygląda
+              inaczej niż taka, której nikt jeszcze nie otworzył. */}
           {r.nieprzeczytana &&
             <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[11px] font-bold">NOWE</span>}
+          <Plakietka status={r.status} className="ml-auto shrink-0">
+            {NAZWA_STATUSU[r.status] ?? r.status}</Plakietka>
         </div>
         <p className="mt-1 line-clamp-2 text-sm text-slate-600">{r.ostatniaWiadomosc}</p>
-        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
           <span>{czas(r.ostatniaWiadomoscAt)}</span>
           {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
             <UserCheck size={12} />{r.wlasciciel}</span>}
+          {r.status === "snoozed" && r.snoozeDo &&
+            <span className="font-semibold text-slate-600">wraca {czas(r.snoozeDo)}</span>}
+          {/* Jedyna rozmowa, przy której agent MUSI przeczytać, co obiecano
+              wcześniej. Bez znacznika wygląda jak każda inna „w toku". */}
+          {r.wrocilaPoZamknieciu &&
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 font-bold text-amber-900">
+              WRÓCIŁA</span>}
         </div>
       </button>)}
       {nieswieza && <p className="border-t bg-red-50 px-4 py-2 text-xs text-red-800">

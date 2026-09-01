@@ -34,6 +34,97 @@ historii nie przepisujemy.
 ---
 
 
+## 0.157.0 — 1 września 2026
+
+**Skrzynka nie umiała powiedzieć, co jest zrobione.** `conversation` nie miała
+kolumny statusu — były tylko `unread` z Allegro i właściciel. Rozmowa
+obsłużona wyglądała identycznie jak czekająca na klienta i jak ta, przy której
+nikt jeszcze nie usiadł. Panel miał komponent `Plakietka` z pięcioma barwami
+statusów i **nie używał go ani razu**: barwy czekały na wartość, której nie
+było skąd wziąć.
+
+**Automat prowadzi, człowiek poprawia.** Status wynika z faktów, które i tak
+zapisujemy, i zapisuje go ta sama transakcja co fakt: wiadomość od klienta
+daje `new` (albo `open`, gdy ktoś rozmowę prowadzi), przejęcie i przekazanie
+`open`, wysłana odpowiedź `waiting_for_customer`, zlecony pomiar
+`waiting_for_internal`, a wynik z hali zdejmuje to czekanie z powrotem na
+`open`. Typowa rozmowa nie wymaga ANI JEDNEGO kliknięcia w status.
+
+Ręką stawia się cztery stany, których automat nie ma jak zgadnąć: odłożenie
+z terminem, załatwione, zamknięte i spam. To poprawka do
+`docs/obsluga-klienta.md` §4, gdzie stało „jawny stan stawiany ręką
+człowieka" — właściciel rozstrzygnął inaczej, tym samym kryterium co przy
+zwrotach: minimum klikań. Wersja ręczna kłamałaby przy pierwszej rozmowie,
+w której agent się spieszył, a status, który kłamie, jest gorszy od jego braku.
+
+**Dwie reguły nadrzędne.** `spam` jest nietykalny dla automatu — spamer pisze
+dalej, a rozmowa wracająca do kolejki przy każdej jego wiadomości czyniłaby
+oznaczenie bezużytecznym. `waiting_for_internal` przeżywa dopisek klienta:
+hala dalej mierzy, a to, że przyszło coś nowego, mówi flaga nieprzeczytanej.
+
+**Rozmowa, do której klient odpisał po zamknięciu, wraca do `open`** i dostaje
+w kolejce znacznik „wróciła". Bez niego wygląda jak każda inna w toku, a to
+jedyna, przy której agent musi przeczytać, co obiecał wcześniej. Znacznik
+liczy się przy odczycie i gaśnie sam, gdy biuro odpisze — osobna kolumna
+wymagałaby kasowania jej przy wysyłce, czyli jeszcze jednego zapisu, który
+może się nie wykonać.
+
+**Odłożenie wygasa przy ODCZYCIE**, nie zapisem. W bazie zostaje `snoozed`
+razem z terminem, a po terminie odczyt pokazuje `open`. Ticker przebudzający
+rozmowy byłby czwartym w tym systemie i jedynym, którego całą pracą jest
+przepisanie kolumny dającej się policzyć — a „zero zapisu przy patrzeniu"
+obowiązuje też skrzynkę.
+
+**Status to nie jest flaga nieprzeczytanej.** `unread` przychodzi z Allegro
+i mówi, czy sprzedawca odpisał klientowi; `status` mówi, co z tym zrobiło
+biuro. Rozmowa załatwiona telefonicznie ma `unread = 0` i `resolved`. Jedna
+kolumna dla obu kłamałaby przy każdej takiej.
+
+**Wersja rośnie tylko przy decyzji człowieka.** Automatyczne przejście nie
+podbija `version` i nie rusza `updated_at`. Podbicie wersji przy wiadomości
+z synchronizacji dawałoby agentowi 409 za każdym razem, gdy klient coś
+dopisał — a od tego jest kontrola świeżości (blizna 0.110.0). Ruszenie
+`updated_at` przestawiłoby na liście datę ostatniej wiadomości, choć nikt nic
+nie napisał.
+
+**Ekran dostaje kubełki i skróty, jak zwroty.** Siedem kubełków: moje,
+nieprzypisane, czeka na klienta, czeka na nas, odłożone, załatwione
+i wszystkie. Ostatni jest wszystkożerny nie dla ozdoby — rozmowa, która nie
+trafiłaby do żadnego, znikałaby operatorowi z oczu bez jednego objawu.
+Przełączenie kubełka przestawia też kursor; to blizna z panelu zwrotów,
+znaleziona okiem, nie testem.
+
+Skrzynka nie miała dotąd ANI JEDNEGO skrótu klawiszowego. Ma teraz strzałki
+po kolejce, cyfry po kubełkach oraz `O` (odłóż), `Z` (załatwione), `S` (spam)
+i `Backspace` (powrót do pracy). Żaden nie działa, gdy kursor stoi w polu
+tekstowym — inaczej „s" w szkicu odpowiedzi oznaczałoby rozmowę jako spam.
+
+**Cofnięcie zamiast potwierdzenia**, tak jak przy zwrotach (§25a.5). Powrót do
+`open` idzie tą samą trasą co reszta decyzji: dopóki nic nie poszło do
+Allegro, każdy ruch ma mieć drogę powrotną, a dialog „czy na pewno" kosztuje
+kliknięcie także przy decyzji trafnej.
+
+Odłożenie pyta o termin trzema gotowymi wyborami — jutro rano, za trzy dni, za
+tydzień. Zawsze na ósmą rano: „za tydzień o 14:37" to termin wymyślony przez
+zegar, nie przez biuro.
+
+**Umowa licznika tras:** skrzynka miała dziewięć tras zapisu, ma dwanaście.
+Trzy nowe to trzy różne decyzje człowieka, nie jedna z przełącznikiem.
+Statusów automatu nie da się wpisać żądaniem — trasa odrzuca je tak samo jak
+serwis, bo `waiting_for_customer` z palca kłamałoby o tym, że odpowiedź
+poszła do klienta.
+
+**Wdrożenie:** nic ręką. Kolumny dochodzą migracją, a rozmowa prowadzona przez
+agenta dostaje przy tym `open`; reszta zostaje `new`. Uzupełnienie wykonuje
+się RAZ, w chwili dołożenia kolumny — puszczone przy każdym starcie cofałoby
+decyzję operatora przy najbliższym restarcie usługi.
+
+Czego to wydanie NIE robi: bytu `sprawa` (`case`) z §15. Właściciel
+potwierdził, że jeden problem klienta regularnie rozkłada się na kilka
+wątków, więc grunt jest realny — ale zanim powstanie tabela, trzeba policzyć
+na danych ze skrzynki, ile loginów ma więcej niż jeden wątek i w jakim oknie
+czasu. Scalanie zgadnięte sklei sprawy dwóch różnych klientów.
+
 ## 0.156.0 — 1 września 2026
 
 **Kolejka bramek przestaje być dekoracją.**

@@ -23,6 +23,22 @@ const STATUS: Record<string, string> = {
   "waiting_for_customer": "bg-stan-klient text-stan-klient-tekst",
   "waiting_for_internal": "bg-stan-wewnetrzne text-stan-wewnetrzne-tekst",
   "resolved": "bg-stan-zrobione text-stan-zrobione-tekst",
+  "snoozed": "bg-stan-odlozone text-stan-odlozone-tekst",
+  "closed": "bg-stan-zamkniete text-stan-zamkniete-tekst",
+  "spam": "bg-stan-spam text-stan-spam-tekst",
+};
+
+/* Nazwy PO POLSKU i w jednym miejscu. Ekran czyta biuro, nie serwer, a druga
+   kopia tego słownika rozjechałaby się przy pierwszym nowym statusie. */
+export const NAZWA_STATUSU: Record<string, string> = {
+  "new": "nowa",
+  "open": "w toku",
+  "waiting_for_customer": "czeka na klienta",
+  "waiting_for_internal": "czeka na nas",
+  "snoozed": "odłożona",
+  "resolved": "załatwiona",
+  "closed": "zamknięta",
+  "spam": "spam",
 };
 export const Plakietka = ({ status, children, className = "" }:
   { status?: string; children: React.ReactNode; className?: string }) =>

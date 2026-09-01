@@ -2,7 +2,10 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, wskazOferte, zapiszSzkic } from "../services/conversations.js";
+import {
+  ConversationConflict, dodajKomentarz, odlozRozmowe, przejmijRozmowe, przekazRozmowe,
+  ustawStatusRozmowy, wskazOferte, zapiszSzkic,
+} from "../services/conversations.js";
 import { onConversationEvent, setTyping, typingPresence } from "../services/conversation-realtime.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
@@ -158,6 +161,41 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return przekazRozmowe(Number(req.params.id), s.user.userId,
           req.body?.doUserId ?? null, req.body?.powod ?? "", Number(req.body?.expectedVersion));
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* ── Status rozmowy (0.157.0) ─────────────────────────────────────────────
+     Trzy trasy, bo trzy różne decyzje, a nie jedna z przełącznikiem: odłożenie
+     niesie termin, załatwienie jest jednym kliknięciem (najczęstszym), a trzecia
+     obsługa resztę razem z POWROTEM do `open`. Ścieżki są te z §16 projektu.
+
+     Bez `autoryzuj()`: to zwykła praca biura, nie operacja uprzywilejowana —
+     ten sam argument co przy potwierdzeniu kartoteki w zwrotach. Wymuszone
+     przekazanie zostaje jedyną trasą skrzynki z osobnym uprawnieniem. */
+  app.post<{ Params: { id: string }; Body: { do?: string; expectedVersion?: number } }>(
+    "/api/conversations/:id/snooze", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return odlozRozmowe(Number(req.params.id), sesjaZadania()!.user.userId,
+          req.body?.do ?? "", Number(req.body?.expectedVersion));
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { expectedVersion?: number } }>(
+    "/api/conversations/:id/resolve", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return ustawStatusRozmowy(Number(req.params.id), sesjaZadania()!.user.userId,
+          "resolved", null, Number(req.body?.expectedVersion));
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { status?: string; powod?: string; expectedVersion?: number } }>(
+    "/api/conversations/:id/status", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return ustawStatusRozmowy(Number(req.params.id), sesjaZadania()!.user.userId,
+          req.body?.status ?? "", req.body?.powod ?? null, Number(req.body?.expectedVersion));
       } catch (e) { return konflikt(reply, e); }
     });
 

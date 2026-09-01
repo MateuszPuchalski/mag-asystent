@@ -4,6 +4,7 @@ import { db, transaction } from "../db/db.js";
 import { ConversationConflict } from "./conversations.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import { logEvent } from "./events.js";
+import { zapiszStatusAutomatu } from "./statusy.js";
 import { wyslijDoAllegro, type WyslijDoAllegro } from "./allegro-wysylka.js";
 
 export interface ZadanieWysylki {
@@ -203,6 +204,13 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     /* Szkic znika dopiero po UDANEJ wysyłce. Przy każdym innym końcu zostaje
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */
     database.prepare("DELETE FROM conversation_draft WHERE conversation_id=?").run(z.conversationId);
+
+    /* Odpowiedź poszła, więc ruch jest po stronie klienta — i to jest cały
+       powód, dla którego ten status liczy się sam. Gdyby zostawał do
+       kliknięcia, kłamałby przy pierwszej rozmowie, w której agent się
+       spieszył. Status wychodzi z transakcji razem z wiadomością: wysłana
+       odpowiedź bez zmiany statusu byłaby rozjazdem nie do zauważenia. */
+    zapiszStatusAutomatu(database, z.conversationId, "waiting_for_customer");
 
     logEvent("rozmowa_wyslana", z.autor.name, null,
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,
