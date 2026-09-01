@@ -33,6 +33,46 @@ historii nie przepisujemy.
 
 ---
 
+## 0.149.2 — 1 września 2026
+
+**Jeden zepsuty wątek przestaje zatrzymywać całą skrzynkę.**
+
+Z dziennika produkcji, w kółko przez wiele przebiegów:
+
+    [allegro-inbox] przebieg nieudany: Provided value cannot be bound to
+    SQLite parameter 3.
+
+Trzeci parametr wstawki wątku to `lastMessageDate`. Allegro przysłało wątek bez
+tego pola, a `node:sqlite` nie umie związać `undefined`. Cała partia szła jedną
+transakcją, więc wycofanie zabrało ze sobą wszystkie zdrowe wątki z tego samego
+przebiegu — skrzynka stała, choć zepsuty był jeden wątek.
+
+Projekt panelu żądał czegoś innego od początku: §9 mówi, że synchronizator
+„izoluje błąd pojedynczego wątku". Teraz każdy wątek ma własną transakcję.
+Zepsuty zostaje poza skrzynką, jego identyfikator idzie do dziennika, a przebieg
+leci dalej i domyka się normalnie.
+
+Kursor przestaje móc stanąć na wątku, którego nie zapisaliśmy. To osobna,
+cichsza usterka tej samej sytuacji: §8.3 zabrania przesuwać kursor „po
+niepełnym zapisie", a stary kod brał go z pierwszego wątku strony, nie pytając,
+czy ten wątek w ogóle wszedł. Kursor stojący na pominiętym wątku zabrałby ze
+sobą całą historię za nim.
+
+`error_thread_count` dostaje wreszcie pisarza. Kolumna i wiersz „Wątki z błędem"
+w panelu istnieją od 0.147.0 i do dziś pokazywały zero także wtedy, gdy skrzynka
+gubiła wątki. Licznik stoi osobno od `error_count`, bo liczy co innego: przebieg
+z pominiętym wątkiem domknął się i nie jest porażką przebiegu.
+
+Czego to wydanie **nie** rozstrzyga: czy wątek bez daty ma prawo wejść do
+skrzynki z pustą datą, czy słusznie zostaje odrzucony. To mówi specyfikacja
+Allegro, której wciąż nie mamy — `developer.allegro.pl` jest niedostępny z
+maszyny budującej, a `docs/allegro-ksztalt.md` nosi z tego powodu znaczniki
+`[WERYFIKUJ]`. Do czasu odczytu kontraktu taki wątek jest odrzucany, czyli
+zachowuje się tak jak dotąd; zmienia się wyłącznie to, że nie zabiera reszty
+przebiegu ze sobą. Zgadywanie predykatu byłoby drugą pamięcią wpisaną w kod.
+
+Wdrożenie: nic ręką. Sama aktualizacja usług.
+
 ## 0.149.1 — 1 września 2026
 
 **Przycisk SYNCHRONIZUJ TERAZ przestaje zwracać „Bad Request".** Klient HTTP

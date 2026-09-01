@@ -33,7 +33,7 @@ export interface InboxSyncDeps {
   accountId?: string;
 }
 
-/** Jeden przebieg. Sieć kończy się przed transakcją, więc wolne API nie blokuje SQLite. */
+/** Jeden przebieg. Sieć kończy się przed zapisem, więc wolne API nie blokuje SQLite. */
 export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promise<void> {
   const database = deps.database ?? defaultDb();
   const query = deps.query ?? zapytajAllegro;
@@ -43,14 +43,17 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const startState = stanSynchronizacji(database);
   const threads: Thread[] = [];
   const messages = new Map<string, Message[]>();
+  /* Wszystkie wątki tego przebiegu w kolejności od Allegro, czyli od
+     najnowszego. Kursor wybiera się z tej listy DOPIERO po zapisie, bo dopiero
+     wtedy wiadomo, który wątek faktycznie wszedł do skrzynki. */
+  const widziane: Thread[] = [];
   let offset = 0;
   let reachedCursor = false;
-  let newest: Thread | undefined;
   try {
     do {
       const page = tablica<Thread>(await query(urlWatkow(apiUrl, offset)), "threads");
-      newest ??= page[0];
       for (const thread of page) {
+        widziane.push(thread);
         if (thread.lastMessageDate === startState.cursorAt && thread.id === startState.cursorId) {
           reachedCursor = true;
           break;
@@ -69,41 +72,85 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
     } while (!reachedCursor);
 
     const at = now().toISOString();
-    transaction(database, () => {
-      const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
-      for (const thread of threads) {
-        database.prepare(`INSERT INTO allegro_inbox_thread
-          (id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
-          VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET read=excluded.read,
-          last_message_at=excluded.last_message_at, interlocutor_login=excluded.interlocutor_login,
-          surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
-          thread.id, Number(thread.read), thread.lastMessageDate, thread.interlocutor.login,
-          JSON.stringify(thread), at);
-        database.prepare("DELETE FROM allegro_inbox_message WHERE thread_id=?").run(thread.id);
-        for (const message of messages.get(thread.id) ?? []) {
-          database.prepare(`INSERT INTO allegro_inbox_message
-            (id,thread_id,author_login,author_role,text,related_object_type,
-             related_object_id,read,surowe_json) VALUES (?,?,?,?,?,?,?,?,?)`).run(
-            message.id, thread.id, message.author.login, message.author.role, message.text,
-            message.relatedObject?.type ?? null, message.relatedObject?.id ?? null,
-            Number(message.read), JSON.stringify(message));
-        }
-        zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
+    const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
+
+    /* KAŻDY WĄTEK MA WŁASNĄ TRANSAKCJĘ, bo §9 projektu panelu żąda, żeby
+       synchronizator „izolował błąd pojedynczego wątku". Do 0.149.2 cała
+       partia szła jedną transakcją i produkcja pokazała, co to znaczy:
+       Allegro przysłało wątek bez
+       `lastMessageDate`, `node:sqlite` odmówił związania `undefined`
+       („Provided value cannot be bound to SQLite parameter 3"), a wycofanie
+       zabrało ze sobą wszystkie zdrowe wątki z tego samego przebiegu. Skrzynka
+       stała przez wiele przebiegów z rzędu przez JEDEN zepsuty wątek.
+
+       Nie zgaduję tutaj, czy wątek bez daty ma prawo wejść do skrzynki z pustą
+       datą — rozstrzyga to specyfikacja Allegro, której wciąż nie mamy (patrz
+       znaczniki `[WERYFIKUJ]` w docs/allegro-ksztalt.md). Do tego czasu taki
+       wątek jest odrzucany, czyli tak samo jak dotąd; zmienia się wyłącznie
+       to, że nie zabiera reszty przebiegu ze sobą. */
+    const zepsute = new Set<string>();
+    for (const thread of threads) {
+      try {
+        transaction(database, () => {
+          database.prepare(`INSERT INTO allegro_inbox_thread
+            (id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
+            VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET read=excluded.read,
+            last_message_at=excluded.last_message_at, interlocutor_login=excluded.interlocutor_login,
+            surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
+            thread.id, Number(thread.read), thread.lastMessageDate, thread.interlocutor.login,
+            JSON.stringify(thread), at);
+          database.prepare("DELETE FROM allegro_inbox_message WHERE thread_id=?").run(thread.id);
+          for (const message of messages.get(thread.id) ?? []) {
+            database.prepare(`INSERT INTO allegro_inbox_message
+              (id,thread_id,author_login,author_role,text,related_object_type,
+               related_object_id,read,surowe_json) VALUES (?,?,?,?,?,?,?,?,?)`).run(
+              message.id, thread.id, message.author.login, message.author.role, message.text,
+              message.relatedObject?.type ?? null, message.relatedObject?.id ?? null,
+              Number(message.read), JSON.stringify(message));
+          }
+          zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
+        })();
+      } catch (e) {
+        /* Wątek zostaje poza skrzynką, ale przebieg leci dalej. Dziennik niesie
+           IDENTYFIKATOR, bo bez niego „wątek pominięty" jest nie do odtworzenia
+           po stronie Allegro. Treści wątku nie logujemy — polityka danych
+           z docs/obsluga-klienta.md obowiązuje też dziennik. */
+        zepsute.add(thread.id);
+        console.warn("[allegro-inbox] wątek pominięty:", thread.id,
+          e instanceof Error ? e.message : e);
       }
+    }
+
+    /* §8.3: kursora nie przesuwa się „po niepełnym zapisie". Może więc stanąć
+       WYŁĄCZNIE na wątku, który przeszedł. Gdyby stanął na pominiętym, następny
+       przebieg uznałby go za punkt odniesienia i przestał widzieć wszystko,
+       co za nim — jeden zepsuty wątek zabrałby ze sobą
+       historię, zamiast samego siebie. Wątek bez daty odpada z tego wyboru
+       osobno, bo kursor porównuje się PARĄ (data, id). */
+    const kursor = widziane.find((w) => !zepsute.has(w.id) && w.lastMessageDate != null);
+
+    transaction(database, () => {
       /* `error_count` ZERUJE SIĘ na sukcesie i to jest zmiana z 0.147.0.
          Wcześniej klauzula `DO UPDATE` go pomijała, więc licznik rósł do
          końca życia bazy: pierwsza w tygodniu odmowa Allegro zostawiała
          w panelu „błędów: 1" na stałe, a §21 nie miał z czego policzyć,
-         ile przebiegów Z RZĘDU się nie powiodło. */
+         ile przebiegów Z RZĘDU się nie powiodło.
+
+         `error_thread_count` liczy co innego i dlatego stoi osobno: przebieg
+         z pominiętym wątkiem DOMKNĄŁ SIĘ, więc nie jest porażką przebiegu.
+         Kolumna i wiersz „Wątki z błędem" w panelu istnieją od 0.147.0 —
+         do 0.149.2 nikt do nich nie pisał, więc panel pokazywał zero także
+         wtedy, gdy skrzynka gubiła wątki. */
       database.prepare(`INSERT INTO allegro_inbox_sync_state
         (id,cursor_at,cursor_id,last_success_at,last_attempt_at,last_error_code,
          error_count,error_thread_count,next_attempt_at)
-        VALUES(1,?,?,?,?,NULL,0,0,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
+        VALUES(1,?,?,?,?,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
         cursor_id=excluded.cursor_id,last_success_at=excluded.last_success_at,
         last_attempt_at=excluded.last_attempt_at,last_error_code=NULL,
-        error_count=0,error_thread_count=0,next_attempt_at=excluded.next_attempt_at`).run(
-          newest?.lastMessageDate ?? startState.cursorAt, newest?.id ?? startState.cursorId,
-          at, at, new Date(Date.parse(at) + interval).toISOString());
+        error_count=0,error_thread_count=excluded.error_thread_count,
+        next_attempt_at=excluded.next_attempt_at`).run(
+          kursor?.lastMessageDate ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
+          at, at, zepsute.size, new Date(Date.parse(at) + interval).toISOString());
     })();
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
