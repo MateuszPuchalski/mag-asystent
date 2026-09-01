@@ -115,6 +115,12 @@ function migrate(database: DatabaseSync) {
      powiązań po opisie ani dacie. */
   addColumn("zadanie_terenowe", "conversation_id", "INTEGER REFERENCES conversation(id) ON DELETE SET NULL");
   addColumn("zadanie_terenowe", "message_id", "INTEGER REFERENCES message(id) ON DELETE SET NULL");
+  /* Model kanoniczny zaczyna być zasilany w 0.144.0. Wiadomość musi unieść
+     powiązanie z ofertą, a rozmowa flagę nieprzeczytanej — inaczej skrzynka
+     dalej musiałaby czytać surowe lądowisko Allegro. */
+  addColumn("message", "related_object_type", "TEXT");
+  addColumn("message", "related_object_id", "TEXT");
+  addColumn("conversation", "unread", "INTEGER NOT NULL DEFAULT 0");
   addColumn("conversation", "assigned_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("conversation", "version", "INTEGER NOT NULL DEFAULT 1");
   addColumn("delivery", "source_mag_id", "INTEGER");

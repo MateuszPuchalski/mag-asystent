@@ -33,6 +33,33 @@ historii nie przepisujemy.
 
 ---
 
+## 0.144.0 — 1 września 2026
+
+**Rozmowy z Allegro trafiają wreszcie do modelu obsługi.** Synchronizator
+zasila `channel_account`, `conversation` i `message`, a surowe `allegro_inbox_*`
+zostaje lądowiskiem odpowiedzi kanału. Do 0.143.1 nikt nie zapisywał do
+`conversation`, więc przejmowanie rozmowy i współdzielony szkic z 0.143.0 były
+kodem nieosiągalnym: trasy przyjmowały liczbowy numer rozmowy, której nic nie
+tworzyło.
+
+**Agent przejmuje rozmowę, a drugi widzi właściciela.** Przejęcie rozstrzyga
+warunkowy zapis, więc z dwóch kliknięć wygrywa jedno. Przegrany dostaje imię
+właściciela zamiast cichej porażki, a nazwisko prowadzącego stoi też na liście.
+
+**Szkic odpowiedzi jest współdzielony i trwały.** Zapisuje go właściciel
+rozmowy, jawnym kliknięciem i z numerem wersji. Szkic napisany do
+nieaktualnej osi zostaje odrzucony, zamiast nadpisać cudzą pracę.
+
+**Panel mówi o nowej wiadomości, gdy ona przychodzi.** Zdarzenia idą jedną
+szyną z serwera; otwarta rozmowa dostaje pasek „klient dopisał nową
+wiadomość". Wcześniej agent dowiadywał się o niej przy następnym kliknięciu.
+
+**Wynik z hali wraca na oś właściwej rozmowy kluczem obcym.** Zadanie ze
+skrzynki niesie `conversation_id` i `message_id`, a nie samą nazwę źródła.
+
+**Wysyłka do Allegro pozostaje wyłączona.** Nic z panelu nie wychodzi na
+zewnątrz; polityka odpowiedzi ma najpierw stanąć w `docs/obsluga-klienta.md`.
+
 ## 0.143.1 — 1 września 2026
 
 **Panel wchodzi do wspólnych poleceń.** `npm run dev` podnosi go razem z API

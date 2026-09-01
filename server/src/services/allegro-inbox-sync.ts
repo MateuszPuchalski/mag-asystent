@@ -3,6 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.http.js";
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
+import { publishConversationEvent } from "./conversation-realtime.js";
 
 type Thread = { id: string; read: boolean; lastMessageDate: string;
   interlocutor: { login: string } };
@@ -22,6 +23,7 @@ export interface InboxSyncDeps {
   now?: () => Date;
   apiUrl?: string;
   intervalMs?: number;
+  accountId?: string;
 }
 
 /** Jeden przebieg. Sieć kończy się przed transakcją, więc wolne API nie blokuje SQLite. */
@@ -61,6 +63,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
 
     const at = now().toISOString();
     transaction(database, () => {
+      const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
       for (const thread of threads) {
         database.prepare(`INSERT INTO allegro_inbox_thread
           (id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
@@ -78,6 +81,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
             message.relatedObject?.type ?? null, message.relatedObject?.id ?? null,
             Number(message.read), JSON.stringify(message));
         }
+        zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
       }
       database.prepare(`INSERT INTO allegro_inbox_sync_state
         (id,cursor_at,cursor_id,last_success_at,error_count,next_attempt_at)
@@ -96,5 +100,56 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET error_count=error_count+1,
       next_attempt_at=excluded.next_attempt_at`).run(next);
     throw error;
+  }
+}
+
+/* ── Model kanoniczny (0.144.0) ─────────────────────────────────────────────
+   Tabele `allegro_inbox_*` zostają SUROWYM LĄDOWISKIEM: trzymają odpowiedź
+   Allegro w kształcie, w jakim przyszła, razem z `surowe_json`. Obsługa
+   klienta pracuje na `channel_account`/`conversation`/`message`, bo tylko ten
+   model unosi drugi kanał, przypisanie agenta, szkic i komentarze.
+
+   Do 0.143.1 nikt nie zapisywał do `conversation`, więc przejmowanie rozmowy
+   i szkic z 0.143.0 były kodem nieosiągalnym — trasy przyjmowały liczbowe id
+   rozmowy, której nic nie tworzyło. Ten zapis jest tym brakującym ogniwem. */
+
+function kontoKanalu(database: Db, externalAccountId: string): number {
+  const id = externalAccountId || "domyslne";
+  database.prepare(`INSERT INTO channel_account(channel, external_account_id)
+    VALUES ('allegro', ?) ON CONFLICT(channel, external_account_id) DO NOTHING`).run(id);
+  return Number((database.prepare(
+    "SELECT id FROM channel_account WHERE channel='allegro' AND external_account_id=?",
+  ).get(id) as { id: number }).id);
+}
+
+function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], konto: number): void {
+  database.prepare(`INSERT INTO conversation(channel_account_id, external_conversation_id, subject, unread, updated_at)
+    VALUES (?,?,?,?,?) ON CONFLICT(channel_account_id, external_conversation_id)
+    DO UPDATE SET unread=excluded.unread, updated_at=excluded.updated_at`).run(
+    konto, thread.id, thread.interlocutor.login, Number(!thread.read), thread.lastMessageDate);
+  const rozmowa = Number((database.prepare(
+    "SELECT id FROM conversation WHERE channel_account_id=? AND external_conversation_id=?",
+  ).get(konto, thread.id) as { id: number }).id);
+
+  for (const message of messages) {
+    /* Wiadomości NIE kasujemy i nie nadpisujemy, inaczej niż w lądowisku:
+       wiszą na nich szkic (`expected_last_message_id`) i zadania terenowe.
+       Konflikt na unikalnym kluczu jest tu poprawnym końcem pracy. */
+    const wynik = database.prepare(`INSERT INTO message(conversation_id, channel_account_id,
+      external_message_id, direction, body, related_object_type, related_object_id, sent_at)
+      VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
+      rozmowa, konto, message.id,
+      message.author.role.toUpperCase() === "SELLER" ? "outgoing" : "incoming",
+      message.text, message.relatedObject?.type ?? null, message.relatedObject?.id ?? null,
+      /* Allegro podaje datę WĄTKU, nie pojedynczej wiadomości — patrz
+         docs/allegro-ksztalt.md. Kolejność niesie `message.id`, a `sent_at`
+         jest etykietą wątku; udawanie godzin per wiadomość dałoby oś, która
+         wygląda na dokładną i nie jest. */
+      thread.lastMessageDate);
+    if (wynik.changes > 0) {
+      publishConversationEvent("message.created", rozmowa, {
+        messageId: Number(wynik.lastInsertRowid), external: message.id,
+      });
+    }
   }
 }
