@@ -109,6 +109,33 @@ odpowiada wersji `beta.v1` zasobu, która naprawdę istnieje i ma inny kształt
 niż `public.v1`, którym chodzimy. Zgadywanie trafiło w kształt prawdziwy —
 tylko nie w ten, który dostajemy.
 
+### Specyfikacja wchodzi do repo
+
+`docs/allegro/swagger.yaml` — kopia oficjalnej specyfikacji OpenAPI Allegro,
+1,5 MB i 40 842 linie, wraz z notatką o pochodzeniu i odświeżaniu
+w `docs/allegro/README.md`.
+
+To jest ta część, która naprawia PRZYCZYNĘ, a nie kolejny jej skutek. Trzy razy
+z rzędu mapowanie powstawało ze zgadywania, bo `developer.allegro.pl` jest
+nieosiągalny z maszyny, na której pisze się kod. Teraz kształt pola sprawdza się
+odczytem pliku.
+
+Plik jest CUDZY i ma cudzy zostać. Sumę kontrolną pilnuje `tools/docs_check.py`
+— nie dla bezpieczeństwa, tylko dlatego, że przy czterdziestu tysiącach linii
+poprawka wsunięta w środek nie ma szans zostać zauważona w przeglądzie zmian.
+Od tej chwili mapowanie stałoby znowu na czymś wymyślonym, tyle że wyglądającym
+na dokumentację. `.gitattributes` oznacza plik jako obcy, żeby nie zalewał
+diffów ani statystyki języków.
+
+`CLAUDE.md` mówi teraz wprost, jak z tego korzystać: czytać SCHEMAT, nie
+przykład, bo przykłady Allegro bywają niezgodne z własnym schematem; sprawdzać
+listę `required`, bo tylko ona mówi o wymagalności; pamiętać, że `public.v1`
+i `beta.v1` to bywają różne kształty, a nie warianty.
+
+Czego kopia NIE zastępuje: sondy. Specyfikacja mówi, co Allegro deklaruje,
+a nie co dostaje konto firmy — które pola bywają puste i dokąd sięgają
+uprawnienia. Znaczniki `[WERYFIKUJ]` zdejmuje `npm run sonda`, nie ten plik.
+
 Wdrożenie: nic ręką, migracja robi się sama. **Skrzynka zapełni się historią,
 której panel do tej pory nie pokazywał ani razu.**
 

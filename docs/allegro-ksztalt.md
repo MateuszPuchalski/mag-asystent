@@ -1,8 +1,12 @@
 # Kształt Centrum wiadomości Allegro
 
-Kontrakt mapowania skrzynki. **Pochodzi ze specyfikacji OpenAPI Allegro**
-(`developer.allegro.pl/swagger.yaml`, odczyt 1 września 2026), nie z żywego
-konta — `npm run sonda` na koncie firmy jeszcze nie biegła.
+Kontrakt mapowania skrzynki. **Pochodzi ze specyfikacji OpenAPI Allegro**,
+nie z żywego konta — `npm run sonda` na koncie firmy jeszcze nie biegła.
+
+Specyfikacja leży w repo: `docs/allegro/swagger.yaml`, razem z notatką
+o pochodzeniu i sposobie odświeżania w `docs/allegro/README.md`. Nie trzeba
+już wychodzić do sieci, żeby sprawdzić kształt pola — i to jest jedyna zmiana,
+która naprawia przyczynę opisaną niżej, a nie kolejny jej skutek.
 
 Do 0.151.0 ten plik przedstawiał się jako „raport zanonimizowanej odpowiedzi
 produkcyjnej". Nie był nim: powstał w tym samym commicie co synchronizacja

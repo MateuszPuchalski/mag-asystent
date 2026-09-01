@@ -7,6 +7,7 @@ jest gorszy niż jego brak — czytelnik nie wie, która część opisu jest jes
 prawdziwa. Ten skrypt łapie to automatycznie, a nie okiem.
 """
 import glob
+import hashlib
 import json
 import os
 import re
@@ -249,8 +250,49 @@ def sprawdz_licznik_weryfikuj() -> int:
     return 0
 
 
+
+# ── Cudza specyfikacja Allegro ───────────────────────────────────────────────
+# `docs/allegro/swagger.yaml` to plik Allegro, nie nasz. Leży w repo, bo
+# `developer.allegro.pl` jest nieosiągalny z maszyny, na której pisze się kod,
+# a zgadywanie kształtu kosztowało już trzy wydania.
+#
+# Suma kontrolna nie jest tu zabezpieczeniem, tylko czujnikiem. Cudzy plik ma
+# ZOSTAĆ CUDZY: przy 40 tysiącach linii poprawka wsunięta w środek nie ma szans
+# zostać zauważona w przeglądzie zmian, a od tej chwili mapowanie stałoby
+# znowu na czymś wymyślonym — tyle że wyglądającym na dokumentację.
+SPEC_ALLEGRO = "docs/allegro/swagger.yaml"
+SPEC_README = "docs/allegro/README.md"
+SPEC_SUMA_RE = re.compile(r"`([0-9a-f]{64})`")
+
+
+def sprawdz_specyfikacje_allegro() -> int:
+    """Kopia specyfikacji zgadza się z sumą zapisaną obok niej."""
+    if not os.path.exists(SPEC_ALLEGRO):
+        print(f"BRAK PLIKU      {SPEC_ALLEGRO} — kopia specyfikacji Allegro zniknęła")
+        return 1
+
+    m = SPEC_SUMA_RE.search(open(SPEC_README, encoding="utf-8").read())
+    if not m:
+        print(f"BRAK SUMY       {SPEC_README} nie podaje sha256 kopii specyfikacji")
+        return 1
+
+    with open(SPEC_ALLEGRO, "rb") as f:
+        faktyczna = hashlib.sha256(f.read()).hexdigest()
+    if faktyczna != m.group(1):
+        print(
+            f"ZMIENIONA KOPIA {SPEC_ALLEGRO}: sha256 to {faktyczna},\n"
+            f"                a {SPEC_README} mówi {m.group(1)}.\n"
+            "                Cudzej specyfikacji się nie poprawia — jeśli to\n"
+            "                odświeżenie, zaktualizuj sumę i datę w README."
+        )
+        return 1
+
+    print(f"specyfikacja Allegro: kopia zgodna z sumą w {SPEC_README}")
+    return 0
+
+
 def main() -> int:
-    bad = sprawdz_wersje() + sprawdz_licznik_weryfikuj()
+    bad = sprawdz_wersje() + sprawdz_licznik_weryfikuj() + sprawdz_specyfikacje_allegro()
     for doc in DOCS:
         text = open(doc, encoding="utf-8").read()
         base = os.path.dirname(doc)

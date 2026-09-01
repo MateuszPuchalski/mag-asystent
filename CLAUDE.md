@@ -38,6 +38,13 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
 - **Prywatność:** adresy dostawy nie przechodzą przez mapowanie (pilnują
   testy). Obsługa klienta powstaje od nowa i swoją politykę danych ma
   zapisać w `docs/obsluga-klienta.md`, zanim dotknie pierwszej rozmowy.
+- **Kształt Allegro czyta się z pliku, nie z pamięci.** Specyfikacja leży
+  w repo: `docs/allegro/swagger.yaml` (cudza, nietykalna — sumę pilnuje
+  `tools/docs_check.py`). Czytaj SCHEMAT, nie przykład: przykłady Allegro bywają
+  niezgodne z własnym schematem, a wymagalność pola mówi wyłącznie lista
+  `required`. `public.v1` i `beta.v1` to bywają RÓŻNE kształty, nie warianty.
+  Mapowanie z pamięci kosztowało już trzy wydania, a raz — skrzynkę, która
+  przez dwa wydania nie zapisała ani jednego wątku.
 - **`[WERYFIKUJ]`** znaczy: niezweryfikowane na żywym Allegro/Subiekcie.
   Licznik tych znaczników sprawdza `tools/docs_check.py` — dopisując lub
   zdejmując znacznik, zaktualizuj preambułę w `docs/subiekt-gt-struktura.md`.
