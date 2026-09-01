@@ -351,11 +351,21 @@ jest jawna — to blizna 0.110.0 i nie wolno jej kupić drugi raz.
 blokuje kolejną próbę, dopóki synchronizacja nie sprawdzi, czy odpowiedź już
 jest w wątku.
 
-**Kształt żądania jest niepotwierdzony.** Mapowanie POST powstało z pamięci,
-wbrew regule §8.2 projektu panelu, na polecenie właściciela. Stoi w jednej
-funkcji, nosi znacznik `[WERYFIKUJ]` i ma osobną sekcję
-w `docs/allegro-ksztalt.md`. Do czasu potwierdzenia pierwsza wysyłka na
-produkcji jest testem kontraktu, nie rutyną.
+**Kształt żądania jest potwierdzony specyfikacją** (0.151.0). Mapowanie POST
+powstało z pamięci, wbrew regule §8.2, na polecenie właściciela — i okazało się
+trafione co do znaku. Ciało to `{ text }`, a limit `text` wynosi 2000 znaków
+i jest sprawdzany przed wysłaniem, nie po odmowie Allegro.
+
+Ta sama specyfikacja pokazała, że mapowanie ODCZYTU skrzynki, które żadnego
+znacznika nie nosiło, było błędne w każdym polu i przez dwa wydania nie
+zapisało ani jednego wątku. Zakaz z §8.2 zostaje w mocy tym mocniej: nie
+chroni przed zgadywaniem oznaczonym, tylko przed nieoznaczonym.
+
+**Dane, które zostają w bazie.** Lądowisko (`allegro_inbox_*`) trzyma całą
+odpowiedź Allegro w `surowe_json`, więc adresy załączników
+i `additionalInformation` zostają, choć nie mają własnych kolumn ani ekranu.
+Model kanoniczny bierze z wiadomości wyłącznie treść, autora, datę, temat
+i numer oferty.
 
 ## Co się nie zmienia
 

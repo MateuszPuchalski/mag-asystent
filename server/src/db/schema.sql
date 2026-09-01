@@ -713,20 +713,38 @@ CREATE TABLE IF NOT EXISTS allegro_token (
 CREATE TABLE IF NOT EXISTS allegro_inbox_thread (
   id TEXT PRIMARY KEY,
   read INTEGER NOT NULL,
-  last_message_at TEXT NOT NULL,
-  interlocutor_login TEXT NOT NULL,
+  -- NULL jest POPRAWNĄ wartością obu tych kolumn i mówi o tym schemat Allegro:
+  -- `Thread` wymaga wyłącznie `id` i `read`, a `lastMessageDateTime`
+  -- i `interlocutor` są opcjonalne i dopuszczają null. Wątek bez ostatniej
+  -- wiadomości to wątek świeżo założony, a nie wątek uszkodzony — do 0.151.0
+  -- stało tu `NOT NULL` i taki wątek nie miał jak wejść do skrzynki.
+  last_message_at TEXT,
+  interlocutor_login TEXT,
   surowe_json TEXT NOT NULL,
   synced_at TEXT NOT NULL
 );
+-- Kolumny odpowiadają POLOM ALLEGRO, nie naszym wyobrażeniom o nich.
+-- Do 0.151.0 stało tu `author_role NOT NULL` i `read NOT NULL` — dwa pola,
+-- których Centrum wiadomości nie przysyła w ogóle. To lądowisko ma trzymać
+-- odpowiedź w kształcie, w jakim przyszła; własny słownik należy do modelu
+-- kanonicznego (`message.direction`), nie tutaj.
 CREATE TABLE IF NOT EXISTS allegro_inbox_message (
   id TEXT PRIMARY KEY,
   thread_id TEXT NOT NULL REFERENCES allegro_inbox_thread(id) ON DELETE CASCADE,
   author_login TEXT NOT NULL,
-  author_role TEXT NOT NULL,
+  -- `author.isInterlocutor`: rozmówca to ten, który nie jest nami. Z tego
+  -- wynika kierunek wiadomości i nie ma innego źródła.
+  author_is_interlocutor INTEGER NOT NULL,
   text TEXT NOT NULL,
+  subject TEXT,
+  -- `status` (np. `DELIVERED`) mówi o DORĘCZENIU, nie o przeczytaniu.
+  -- Przeczytanie niesie wątek, nie wiadomość.
+  status TEXT,
+  -- Data POJEDYNCZEJ wiadomości. Dopóki jej nie czytaliśmy, oś czasu rozmowy
+  -- stała na dacie wątku i wszystkie wiadomości miały jedną godzinę.
+  created_at TEXT,
   related_object_type TEXT,
   related_object_id TEXT,
-  read INTEGER NOT NULL,
   surowe_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_allegro_inbox_message_thread

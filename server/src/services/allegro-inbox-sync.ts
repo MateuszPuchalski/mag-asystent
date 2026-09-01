@@ -6,10 +6,29 @@ import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js
 import { publishConversationEvent } from "./conversation-realtime.js";
 import { kontoKanalu } from "./kanal-konto.js";
 
-type Thread = { id: string; read: boolean; lastMessageDate: string;
-  interlocutor: { login: string } };
-type Message = { id: string; author: { login: string; role: string }; text: string;
-  relatedObject: { type: string; id: string } | null; read: boolean };
+/* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md. Do 0.151.0
+   stały tu nazwy wymyślone razem z kodem (`lastMessageDate`, `author.role`,
+   `relatedObject`) i przez to skrzynka nie zapisała ani jednego wątku:
+   `undefined` na trzecim parametrze wstawki wywracał każdy z nich.
+   Pola, których świadomie nie mapujemy, są wymienione w kontrakcie —
+   `surowe_json` i tak trzyma całą odpowiedź. */
+type Thread = { id: string; read: unknown; lastMessageDateTime?: string | null;
+  interlocutor?: { login: string } | null };
+type Message = { id: string; author: { login: string; isInterlocutor: unknown };
+  text: string; subject?: string; status?: string; createdAt: string;
+  relatesTo?: { offer?: { id: string }; order?: { id: string } } | null };
+
+/* Schemat mówi `type: boolean`, ale opublikowany PRZYKŁAD renderuje `read`
+   jako tekst („false"). Ta funkcja przyjmuje obie postaci — kosztuje trzy
+   linijki, a broni przed rozbieżnością, którą Allegro ma we własnej
+   dokumentacji. Wszystko inne jest błędem wątku, nie zgadniętym zerem: po
+   0.149.2 taki wątek zostaje pominięty, a przebieg leci dalej. */
+function flaga(wartosc: unknown, pole: string): boolean {
+  if (typeof wartosc === "boolean") return wartosc;
+  if (wartosc === "true") return true;
+  if (wartosc === "false") return false;
+  throw new Error(`Pole ${pole} ma nieoczekiwaną postać: ${JSON.stringify(wartosc)}`);
+}
 
 /* Kod bierze się z KLASY błędu, nie z jego zdania. Do 0.149.0 stało tu
    wyrażenie szukające kodu w nawiasie — łapało „(401)", ale nie „Allegro
@@ -55,14 +74,14 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       const page = tablica<Thread>(await query(urlWatkow(apiUrl, offset)), "threads");
       for (const thread of page) {
         widziane.push(thread);
-        if (thread.lastMessageDate === startState.cursorAt && thread.id === startState.cursorId) {
+        if (thread.lastMessageDateTime === startState.cursorAt && thread.id === startState.cursorId) {
           reachedCursor = true;
           break;
         }
         const known = database.prepare(
           "SELECT last_message_at FROM allegro_inbox_thread WHERE id=?"
         ).get(thread.id) as { last_message_at: string } | undefined;
-        if (!known || known.last_message_at !== thread.lastMessageDate) {
+        if (!known || known.last_message_at !== thread.lastMessageDateTime) {
           const body = await query(urlWiadomosci(apiUrl, thread.id));
           messages.set(thread.id, tablica<Message>(body, "messages"));
           threads.push(thread);
@@ -98,16 +117,20 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
             VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET read=excluded.read,
             last_message_at=excluded.last_message_at, interlocutor_login=excluded.interlocutor_login,
             surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
-            thread.id, Number(thread.read), thread.lastMessageDate, thread.interlocutor.login,
+            thread.id, Number(flaga(thread.read, "thread.read")),
+            thread.lastMessageDateTime ?? null, thread.interlocutor?.login ?? null,
             JSON.stringify(thread), at);
           database.prepare("DELETE FROM allegro_inbox_message WHERE thread_id=?").run(thread.id);
           for (const message of messages.get(thread.id) ?? []) {
             database.prepare(`INSERT INTO allegro_inbox_message
-              (id,thread_id,author_login,author_role,text,related_object_type,
-               related_object_id,read,surowe_json) VALUES (?,?,?,?,?,?,?,?,?)`).run(
-              message.id, thread.id, message.author.login, message.author.role, message.text,
-              message.relatedObject?.type ?? null, message.relatedObject?.id ?? null,
-              Number(message.read), JSON.stringify(message));
+              (id,thread_id,author_login,author_is_interlocutor,text,subject,status,
+               created_at,related_object_type,related_object_id,surowe_json)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+              message.id, thread.id, message.author.login,
+              Number(flaga(message.author.isInterlocutor, "author.isInterlocutor")),
+              message.text, message.subject ?? null, message.status ?? null,
+              message.createdAt, oferta(message)[0], oferta(message)[1],
+              JSON.stringify(message));
           }
           zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
         })();
@@ -128,7 +151,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
        co za nim — jeden zepsuty wątek zabrałby ze sobą
        historię, zamiast samego siebie. Wątek bez daty odpada z tego wyboru
        osobno, bo kursor porównuje się PARĄ (data, id). */
-    const kursor = widziane.find((w) => !zepsute.has(w.id) && w.lastMessageDate != null);
+    const kursor = widziane.find((w) => !zepsute.has(w.id) && w.lastMessageDateTime != null);
 
     transaction(database, () => {
       /* `error_count` ZERUJE SIĘ na sukcesie i to jest zmiana z 0.147.0.
@@ -150,7 +173,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
         last_attempt_at=excluded.last_attempt_at,last_error_code=NULL,
         error_count=0,error_thread_count=excluded.error_thread_count,
         next_attempt_at=excluded.next_attempt_at`).run(
-          kursor?.lastMessageDate ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
+          kursor?.lastMessageDateTime ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
           at, at, zepsute.size, new Date(Date.parse(at) + interval).toISOString());
     })();
   } catch (error) {
@@ -181,11 +204,40 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
    i szkic z 0.143.0 były kodem nieosiągalnym — trasy przyjmowały liczbowe id
    rozmowy, której nic nie tworzyło. Ten zapis jest tym brakującym ogniwem. */
 
+/* Powiązanie wiadomości z ofertą. Allegro daje `relatesTo` z osobnymi gałęziami
+   `offer` i `order`; nas interesuje oferta, bo to ona nazywa TOWAR, o który
+   pyta klient. Numer zamówienia zostaje w `surowe_json` do czasu, aż będzie
+   miał ekran. Typ zapisujemy jako `OFFER`, bo tak nazywa go model kanoniczny —
+   to nasze słowo, nie cytat z Allegro. */
+function oferta(message: Message): [string | null, string | null] {
+  const id = message.relatesTo?.offer?.id;
+  return id == null ? [null, null] : ["OFFER", String(id)];
+}
+
+/* Najpóźniejsze `createdAt` z wątku. `Message.createdAt` jest w schemacie
+   WYMAGANE, więc gdy wiadomości są, data też jest. */
+function najnowsza(messages: Message[]): string | null {
+  return messages.map((m) => m.createdAt).sort().at(-1) ?? null;
+}
+
+/* Temat rozmowy niesie WIADOMOŚĆ, nie wątek. Bierzemy pierwszy niepusty —
+   Allegro powtarza go w kolejnych wiadomościach tego samego wątku. Gdy go nie
+   ma, wołający zostaje przy loginie rozmówcy, czyli przy tym, co stało
+   w `conversation.subject` do 0.151.0. */
+function temat(messages: Message[]): string | null {
+  return messages.find((m) => typeof m.subject === "string" && m.subject !== "")?.subject ?? null;
+}
+
 function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], konto: number): void {
   database.prepare(`INSERT INTO conversation(channel_account_id, external_conversation_id, subject, unread, updated_at)
     VALUES (?,?,?,?,?) ON CONFLICT(channel_account_id, external_conversation_id)
     DO UPDATE SET unread=excluded.unread, updated_at=excluded.updated_at`).run(
-    konto, thread.id, thread.interlocutor.login, Number(!thread.read), thread.lastMessageDate);
+    konto, thread.id, temat(messages) ?? thread.interlocutor?.login ?? null,
+    Number(!flaga(thread.read, "thread.read")),
+    /* `updated_at` jest NOT NULL, a data wątku bywa pusta. Wtedy schodzimy na
+       datę najnowszej wiadomości, a gdy wątek nie ma i wiadomości — na czas
+       synchronizacji. Rozmowa musi mieć się gdzie ustawić na liście. */
+    thread.lastMessageDateTime ?? najnowsza(messages) ?? new Date().toISOString());
   const rozmowa = Number((database.prepare(
     "SELECT id FROM conversation WHERE channel_account_id=? AND external_conversation_id=?",
   ).get(konto, thread.id) as { id: number }).id);
@@ -198,13 +250,16 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
       external_message_id, direction, body, related_object_type, related_object_id, sent_at)
       VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
       rozmowa, konto, message.id,
-      message.author.role.toUpperCase() === "SELLER" ? "outgoing" : "incoming",
-      message.text, message.relatedObject?.type ?? null, message.relatedObject?.id ?? null,
-      /* Allegro podaje datę WĄTKU, nie pojedynczej wiadomości — patrz
-         docs/allegro-ksztalt.md. Kolejność niesie `message.id`, a `sent_at`
-         jest etykietą wątku; udawanie godzin per wiadomość dałoby oś, która
-         wygląda na dokładną i nie jest. */
-      thread.lastMessageDate);
+      /* KIERUNEK Z `isInterlocutor`. Rozmówca to ten, który nie jest nami,
+         więc jego wiadomość jest przychodząca. Do 0.151.0 stało tu porównanie
+         z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej
+         odpowiedzi rzucało `TypeError`. */
+      flaga(message.author.isInterlocutor, "author.isInterlocutor") ? "incoming" : "outgoing",
+      message.text, oferta(message)[0], oferta(message)[1],
+      /* Data POJEDYNCZEJ wiadomości. Do 0.151.0 wszystkie wiadomości wątku
+         dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
+         daty wiadomości nie podaje. Podaje: `createdAt`. */
+      message.createdAt);
     if (wynik.changes > 0) {
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,

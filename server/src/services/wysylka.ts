@@ -79,11 +79,22 @@ function kontekst(database: DatabaseSync, conversationId: number): Kontekst {
  * Sieć jest POZA transakcją, tak samo jak w synchronizatorze: wolne Allegro
  * nie ma prawa trzymać blokady zapisu SQLite.
  */
+/** `NewMessageInThread.text` — `maxLength: 2000` wprost ze specyfikacji. */
+export const LIMIT_ZNAKOW = 2000;
+
 export async function wyslijOdpowiedz(z: ZadanieWysylki) {
   const database = z.database ?? db();
   const wyslij = z.wyslij ?? wyslijDoAllegro;
   const tresc = (z.body ?? "").trim();
   if (!tresc) throw new Error("Pusta odpowiedź nie idzie do klienta");
+  /* Limit z `NewMessageInThread` w specyfikacji Allegro. Bez tej bramki
+     za długa odpowiedź idzie do Allegro, wraca jako 400, a kolejka zapisuje
+     `send_failed` — agent traci napisany tekst i nie wie, dlaczego. Lepiej
+     powiedzieć to przed wysłaniem, gdy szkic jeszcze stoi na ekranie. */
+  if (tresc.length > LIMIT_ZNAKOW) {
+    throw new Error(
+      `Allegro przyjmuje najwyżej ${LIMIT_ZNAKOW} znaków, a odpowiedź ma ${tresc.length}`);
+  }
 
   const k = kontekst(database, z.conversationId);
 
