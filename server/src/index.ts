@@ -27,6 +27,7 @@ import { kartonRoutes } from "./routes/karton.js";
 import { allegroRoutes } from "./routes/allegro.js";
 import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
 import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
+import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
@@ -214,6 +215,7 @@ export async function buildApp() {
   await app.register(allegroRoutes);
   await app.register(zadaniaTerenoweRoutes);
   await app.register(panelObslugiRoutes);
+  await app.register(skrzynkaRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();
