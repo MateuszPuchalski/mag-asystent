@@ -115,6 +115,8 @@ function migrate(database: DatabaseSync) {
      powiązań po opisie ani dacie. */
   addColumn("zadanie_terenowe", "conversation_id", "INTEGER REFERENCES conversation(id) ON DELETE SET NULL");
   addColumn("zadanie_terenowe", "message_id", "INTEGER REFERENCES message(id) ON DELETE SET NULL");
+  addColumn("conversation", "assigned_user_id", "INTEGER REFERENCES app_user(user_id)");
+  addColumn("conversation", "version", "INTEGER NOT NULL DEFAULT 1");
   addColumn("delivery", "source_mag_id", "INTEGER");
   /* Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0). Kolumny są
      nullowalne, więc dostawy zamknięte normalnie zostają nietknięte — a puste

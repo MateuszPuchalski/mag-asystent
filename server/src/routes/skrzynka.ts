@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, zapiszSzkic } from "../services/conversations.js";
+import { onConversationEvent, setTyping, typingPresence } from "../services/conversation-realtime.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -18,6 +20,8 @@ function odmowa(reply: FastifyReply) {
 }
 
 export async function skrzynkaRoutes(app: FastifyInstance) {
+  const konflikt = (reply: FastifyReply, e: unknown) => e instanceof ConversationConflict
+    ? reply.code(409).send({ error: e.message, ...e.details }) : blad(reply, e);
   app.get("/api/obsluga/rozmowy", async (_req, reply) =>
     odmowa(reply) ?? { rozmowy: listaRozmow(), stan: stanSkrzynki() });
 
@@ -41,4 +45,52 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         };
       } catch (e) { return blad(reply, e); }
     });
+
+  app.post<{ Params: { id: string }; Body: { expectedVersion?: number } }>(
+    "/api/conversations/:id/claim", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return przejmijRozmowe(Number(req.params.id), sesjaZadania()!.user.userId,
+        Number(req.body?.expectedVersion)); } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.put<{ Params: { id: string }; Body: { body?: string; expectedLastMessageId?: number | null; expectedVersion?: number | null } }>(
+    "/api/conversations/:id/draft", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return zapiszSzkic(Number(req.params.id), sesjaZadania()!.user.userId,
+        req.body?.body ?? "", req.body?.expectedLastMessageId ?? null,
+        req.body?.expectedVersion ?? null); } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { body?: string; mentionedUserIds?: number[] } }>(
+    "/api/conversations/:id/comments", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return dodajKomentarz(Number(req.params.id), sesjaZadania()!.user.userId,
+        req.body?.body ?? "", req.body?.mentionedUserIds ?? []); } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { typing?: boolean } }>(
+    "/api/conversations/:id/presence", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const user = sesjaZadania()!.user;
+      setTyping(Number(req.params.id), user.userId, user.name, Boolean(req.body?.typing));
+      return { presence: typingPresence(Number(req.params.id)) };
+    });
+
+  // SSE: jedna szyna dla obecności, wiadomości, przypisań i wyników magazynu.
+  app.get<{ Querystring: { conversationId?: string } }>("/api/conversations/events", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const filter = req.query.conversationId ? Number(req.query.conversationId) : null;
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache",
+      connection: "keep-alive", "x-accel-buffering": "no",
+    });
+    reply.raw.write(": connected\n\n");
+    const off = onConversationEvent((event) => {
+      if (filter !== null && event.conversationId !== filter) return;
+      reply.raw.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+    });
+    const keepAlive = setInterval(() => reply.raw.write(": keep-alive\n\n"), 15_000);
+    req.raw.on("close", () => { clearInterval(keepAlive); off(); });
+  });
 }

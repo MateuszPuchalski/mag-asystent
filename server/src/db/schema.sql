@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS conversation (
   channel_account_id       INTEGER NOT NULL REFERENCES channel_account(id),
   external_conversation_id TEXT NOT NULL,
   subject                  TEXT,
+  assigned_user_id         INTEGER REFERENCES app_user(user_id),
+  version                  INTEGER NOT NULL DEFAULT 1,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(channel_account_id, external_conversation_id)
@@ -116,6 +118,36 @@ CREATE TABLE IF NOT EXISTS conversation_assignment (
 );
 CREATE INDEX IF NOT EXISTS ix_conversation_assignment
   ON conversation_assignment(conversation_id, unassigned_at);
+
+-- Szkic jest współdzielonym dokumentem z kontrolą optymistyczną. Punkt
+-- odniesienia do ostatniej wiadomości chroni również przed wysłaniem szkicu,
+-- który zestarzał się, gdy klient dopisał kolejną wiadomość.
+CREATE TABLE IF NOT EXISTS conversation_draft (
+  conversation_id          INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
+  body                     TEXT NOT NULL,
+  expected_last_message_id INTEGER REFERENCES message(id) ON DELETE SET NULL,
+  version                  INTEGER NOT NULL DEFAULT 1,
+  updated_by               INTEGER NOT NULL REFERENCES app_user(user_id),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Komentarz wewnętrzny nie jest wiadomością kanału. Osobna tabela jest
+-- fizyczną granicą bezpieczeństwa: adapter Allegro czyta wyłącznie message.
+CREATE TABLE IF NOT EXISTS conversation_comment (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  author_user_id  INTEGER NOT NULL REFERENCES app_user(user_id),
+  body            TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_conversation_comment_time
+  ON conversation_comment(conversation_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS conversation_mention (
+  comment_id INTEGER NOT NULL REFERENCES conversation_comment(id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES app_user(user_id),
+  PRIMARY KEY(comment_id, user_id)
+);
 
 -- ── Konta pracowników (plan §7) ────────────────────────────────────────────
 -- Do lipca 2026 „użytkownik" to był DOWOLNY łańcuch wpisywany ręcznie na
