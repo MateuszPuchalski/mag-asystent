@@ -19,7 +19,7 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "wynik_zadania";
+  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -28,6 +28,7 @@ export type WpisOsi = {
   zadanieId?: number;
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
+  wzmianki?: Array<{ userId: number; name: string }>;
 };
 
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };

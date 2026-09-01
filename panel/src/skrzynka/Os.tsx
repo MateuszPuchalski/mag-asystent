@@ -1,5 +1,5 @@
 import React from "react";
-import { Paperclip } from "lucide-react";
+import { Lock, Paperclip } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk } from "../ui";
 
@@ -45,7 +45,19 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
   return <div className="flex-1 space-y-3 overflow-y-auto p-4">
-    {wpisy.map((w) => w.rodzaj === "wynik_zadania"
+    {wpisy.map((w) => w.rodzaj === "komentarz"
+      /* §6.4: komentarz ma być WIZUALNIE ODRÓŻNIONY od wiadomości klienta.
+         Inna barwa to za mało — kłódka i podpis mówią wprost, że klient tego
+         nie widzi, bo to jedyna rzecz, o którą tu naprawdę chodzi. */
+      ? <article key={w.id} className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
+            <Lock size={12} />NOTATKA WEWNĘTRZNA · {w.autor}
+            {w.wzmianki?.length ? <span className="font-normal">
+              · dla: {w.wzmianki.map((m) => m.name).join(", ")}</span> : null}
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+        </article>
+      : w.rodzaj === "wynik_zadania"
       ? <article key={w.id} className="rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
           <div className="text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu · {w.autor}</div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>

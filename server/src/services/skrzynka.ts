@@ -18,11 +18,15 @@ export interface RozmowaSkrzynki {
 export interface ZalacznikOsi {
   id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
 }
+/** Wzmianka w komentarzu — kto ma to przeczytać. */
+export interface Wzmianka { userId: number; name: string }
+
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "wynik_zadania";
+  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   zalaczniki?: ZalacznikOsi[];
+  wzmianki?: Wzmianka[];
 }
 export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
 
@@ -145,6 +149,48 @@ export function osRozmowy(id: number): {
       tresc: String(z.wynik), at: String(z.wykonano_at), ofertaId: null, zadanieId: Number(z.id),
     });
   }
+  /* KOMENTARZE WEWNĘTRZNE (0.157.0). Do tego wydania `conversation_comment`
+     miała w całym serwerze jeden INSERT i zero odczytów — notatka agenta
+     wpadała do tabeli i nie wracała do nikogo. §10.3 wymienia ją wśród rzeczy,
+     które ma nieść oś, a §6.4 każe odróżnić ją wizualnie od treści klienta;
+     tu dajemy do tego `rodzaj`, a wygląd robi panel. */
+  const komentarze = db().prepare(`
+    SELECT k.id, k.body, k.created_at, u.name AS autor
+      FROM conversation_comment k JOIN app_user u ON u.user_id = k.author_user_id
+     WHERE k.conversation_id=? ORDER BY k.created_at, k.id
+  `).all(id) as Array<Record<string, unknown>>;
+  const wzmianki = new Map<number, Wzmianka[]>();
+  for (const w of db().prepare(`
+    SELECT m.comment_id, m.user_id, u.name
+      FROM conversation_mention m
+      JOIN conversation_comment k ON k.id = m.comment_id
+      JOIN app_user u ON u.user_id = m.user_id
+     WHERE k.conversation_id=? ORDER BY u.name
+  `).all(id) as Array<Record<string, unknown>>) {
+    const lista = wzmianki.get(Number(w.comment_id)) ?? [];
+    lista.push({ userId: Number(w.user_id), name: String(w.name) });
+    wzmianki.set(Number(w.comment_id), lista);
+  }
+  for (const k of komentarze) {
+    os.push({
+      id: `komentarz-${k.id}`, rodzaj: "komentarz", autor: String(k.autor),
+      /* `odKlienta` zostaje FAŁSZEM i to nie jest szczegół: na tym polu stoi
+         cały wygląd wpisu klienta. Komentarz, który je zapala, wyglądałby jak
+         cudza wiadomość — a §6.4 żąda dokładnie odwrotnego. */
+      odKlienta: false, tresc: String(k.body), at: String(k.created_at), ofertaId: null,
+      ...(wzmianki.has(Number(k.id)) ? { wzmianki: wzmianki.get(Number(k.id)) } : {}),
+    });
+  }
+
+  /* OŚ JEST CHRONOLOGICZNA (0.157.0). Do tego wydania wyniki zadań doklejały
+     się za wszystkimi wiadomościami bez względu na czas — przy dwóch źródłach
+     znośne, przy trzech oś przestawała opowiadać przebieg sprawy.
+
+     Sortowanie jest STABILNE, więc wiadomości z tą samą datą zostają
+     w kolejności identyfikatorów. To ważne: Allegro potrafi oddać dwie
+     wiadomości z jedną sekundą, a wtedy porządek niesie `message.id`. */
+  os.sort((a, b) => a.at.localeCompare(b.at));
+
   return { rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id) };
 }
 

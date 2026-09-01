@@ -271,6 +271,16 @@ zdarzenia wygląda inaczej.
 
 ### 10.4. Edytor odpowiedzi
 
+**Rozdzielenie trybów (0.157.0).** Przełącznik ma dwa tryby i każdy ma WŁASNE
+pole oraz własny przycisk. W trybie komentarza przycisk wysyłki nie istnieje
+w drzewie — wyłączony da się kliknąć, gdy stan rozjedzie się o ułamek sekundy;
+nieistniejącego nie da się nigdy. Osobne pola znaczą też, że przełączenie
+trybu nie przenosi notatki do szkicu, który idzie do klienta.
+
+Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie odpowiedź,
+a kolega ma prawo dopisać „to ten sam klient co wczoraj" bez przejmowania
+sprawy.
+
 Zwykły tekst, szablony, szkic ze sztucznej inteligencji, licznik znaków,
 podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
 magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
@@ -759,7 +769,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Lista rozmów i oś czasu | **działa** od 0.143.0 | `services/skrzynka.ts`, `panel/src/skrzynka/` |
 | Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
 | Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
-| Komentarze i wzmianki | **model gotowy**, brak ekranu | `conversation_comment`, `conversation_mention` |
+| Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users` |
+| Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
 | Obecność i „pisze" | **działa**, w pamięci | `services/conversation-realtime.ts` |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |

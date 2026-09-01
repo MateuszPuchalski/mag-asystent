@@ -156,3 +156,74 @@ test("bez wskazania kartoteki zadanie idzie jak dotąd, bez podpisu o wyborze", 
   assert.doesNotMatch(z.instrukcja, /wskazał/);
   assert.match(z.instrukcja, /Oferta Allegro: oferta-9/);
 });
+
+/* ── Komentarze wewnętrzne na osi (0.157.0) ──────────────────────────────────
+   Do tego wydania `conversation_comment` miała w całym kodzie serwera JEDEN
+   INSERT i ZERO odczytów. Agent mógł dodać notatkę, wiersz wpadał do tabeli
+   i nie było drogi, którą wróciłby do kogokolwiek — funkcja do zapisu bez
+   odczytu. §10.3 wymienia komentarz wśród rzeczy, które ma nieść oś. */
+
+test("komentarz wewnętrzny wraca na oś, z autorem i wzmiankami", async () => {
+  const { dodajKomentarz } = await import("./conversations.js");
+  const d = db();
+  const ala = Number(d.prepare(
+    "INSERT INTO app_user(login,name,role) VALUES ('ala','Ala','biuro')").run().lastInsertRowid);
+
+  dodajKomentarz(rozmowaId, BIURO.id, "Sprawdź, czy to nie jest ten sam klient co wczoraj.", [ala]);
+
+  const { os } = osRozmowy(rozmowaId);
+  const k = os.find((w) => w.rodzaj === "komentarz");
+  assert.ok(k, "komentarz ma stać na osi");
+  assert.match(k.tresc, /ten sam klient/);
+  assert.equal(k.autor, "Biuro");
+  assert.equal(k.odKlienta, false);
+  assert.deepEqual(k.wzmianki?.map((w) => w.name), ["Ala"]);
+});
+
+test("oś jest CHRONOLOGICZNA — komentarz z wczoraj nie ląduje na końcu", () => {
+  /* Do 0.157.0 wyniki zadań doklejały się za wszystkimi wiadomościami bez
+     względu na czas, bo oś nie miała wspólnego porządku. Przy dwóch źródłach
+     to było znośne; przy trzech oś przestawała opowiadać przebieg sprawy. */
+  const d = db();
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,unread,updated_at)
+    SELECT channel_account_id,'w-chrono','klient',0,'2026-08-31T10:00:00.000Z'
+      FROM conversation WHERE id=?`).run(rozmowaId).lastInsertRowid);
+  const konto = Number((d.prepare("SELECT channel_account_id k FROM conversation WHERE id=?")
+    .get(rozmowa) as { k: number }).k);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'c-1','incoming','Pytanie','2026-08-31T09:00:00.000Z')`)
+    .run(rozmowa, konto);
+  d.prepare(`INSERT INTO conversation_comment(conversation_id,author_user_id,body,created_at)
+    VALUES (?,?,'Notatka w środku','2026-08-31T09:30:00.000Z')`).run(rozmowa, BIURO.id);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'c-2','outgoing','Odpowiedź','2026-08-31T10:00:00.000Z')`)
+    .run(rozmowa, konto);
+
+  const rodzaje = osRozmowy(rozmowa).os.map((w) => w.rodzaj);
+  assert.deepEqual(rodzaje, ["wiadomosc", "komentarz", "wiadomosc"]);
+});
+
+test("treść komentarza NIE trafia do tabeli, z której czyta wysyłka", async () => {
+  /* §6.4: komentarze „nie mogą przypadkiem trafić do klienta"; §25 stawia to
+     wśród kryteriów gotowości. Granica jest STRUKTURALNA: wysyłka bierze tekst
+     ze szkicu i zapisuje go do `message`, a komentarz mieszka w osobnej tabeli
+     i nigdy tam nie wchodzi.
+
+     Pierwsza wersja tego testu wołała `payloadAllegroWiadomosci` z numerem
+     komentarza i PRZECHODZIŁA PRZYPADKIEM. `conversation_comment.id`
+     i `message.id` to dwie niezależne sekwencje, więc oba bywają jedynką —
+     przy kolizji tamta funkcja oddałaby cudzą wiadomość zamiast rzucić. Test
+     mierzył szczęście w doborze danych, a nie granicę. */
+  const { dodajKomentarz } = await import("./conversations.js");
+  const tresc = "Klient bywa trudny — uważaj na ton.";
+  dodajKomentarz(rozmowaId, BIURO.id, tresc, []);
+
+  const wMessage = (db().prepare("SELECT count(*) n FROM message WHERE body=?")
+    .get(tresc) as { n: number }).n;
+  assert.equal(wMessage, 0, "treść komentarza znalazła się wśród wiadomości");
+
+  const wSzkicu = (db().prepare("SELECT count(*) n FROM conversation_draft WHERE body=?")
+    .get(tresc) as { n: number }).n;
+  assert.equal(wSzkicu, 0, "treść komentarza wylądowała w szkicu, który idzie do klienta");
+});
