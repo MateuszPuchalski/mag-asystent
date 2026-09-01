@@ -112,7 +112,6 @@
      wyżej zostaje dla `#login`, które dalej ma być wąskim pudełkiem. */
   main#panel { max-width: none; margin: 0; padding: 0 var(--brzeg) var(--stopka); display: block; }
 
-
   /* ── Ikony stanu w ciemnym pasku (0.114.0, przeprowadzka 0.119.1) ──────────
      Kropka mówi kolorem, `title` zdaniami. Tooltip natywny świadomie — panel
      biura to desktop z myszą (założenie repo), a własny dymek to kolejny
@@ -263,12 +262,6 @@
      etykiety nad polami tekstowymi stały zwykłym tekstem 14 px i wyglądały
      na treść, a nie na podpis. */
   #widokDostawcy label { display: block; font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
-  /* Etykieta przy polu wyboru jest ZDANIEM do przeczytania, nie podpisem —
-     więc odwraca ściszenie z reguły wyżej. */
-  #widokDostawcy .przelacznik {
-    display: flex; align-items: center; gap: 8px;
-    font-size: inherit; letter-spacing: 0; color: var(--ink);
-  }
   /* Pole na całą szerokość sekcji. Miary do czytania NIE dokładamy drugi raz:
      `max-width` arkusza trzyma już cały widok na 60 rem, a druga granica
      zostawiała po prawej stronie pola pas pustej sekcji — wyglądało to na
@@ -305,86 +298,7 @@
 
      Reguły stoją PRZED blokiem 1280 px i mają z nim równą specyficzność, więc
      powyżej progu wygrywa tamten — kolejnością w źródle, nie `!important`. */
-  /* ── Konsola: tafle, nie pływające karty ──────────────────────────────────
-     Makieta `Main` od początku rysowała konsolę jako płaskie tafle stykające
-     się krawędziami — `.kontekst` ma tam `border-left`, zero promienia i zero
-     cienia, a cała aplikacja jest siatką na pełną wysokość okna. Promień
-     i cień makieta zostawia WYŁĄCZNIE dla powierzchni do czytania: `Analiza`
-     ma `.blok { border-radius: 14px; box-shadow }` i odstęp między blokami.
-
-     Panel dostawał kartę wszędzie, bo `.card` jest jedną klasą na cały arkusz.
-     Trzy strefy pracy pływały więc na papierze, rozdzielone odstępem i cieniem
-     — czyli wyglądały jak trzy niezależne dokumenty, a są jednym stanowiskiem.
-
-     Reguła: KONSOLA PRACY TO TAFLE, POWIERZCHNIA DO CZYTANIA TO KARTY.
-     Poniżej 1024 px konsoli nie ma — widok jest pionowym stosem kart i stos
-     kart jest tam poprawny, więc te reguły go nie dotyczą.
-
-     Wyłamanie z marginesu strony robi ujemny `margin-inline`: siatka zostaje
-     w zwykłym przepływie (żadnego `position` ani `width: 100vw`, które łamią
-     się przy widocznym pasku przewijania), a tylko sięga o `--brzeg` szerzej
-     w obie strony. */
   @media (min-width: 1024px) {
-    .widok.konsola {
-      gap: 0;
-      /* Wiersze siatki NIE rozciągają się na zapas wysokości: konsola ma
-         sztywne `height`, a nad kolejką potrafi stać baner (szkice AI) —
-         domyślne `stretch` rozdawało mu pół ekranu pustki. */
-      align-content: start;
-      margin-top: 0;
-      margin-inline: calc(-1 * var(--brzeg));
-      margin-bottom: calc(-1 * var(--stopka));
-      /* Tło konsoli, nie kart: kolumna kolejki bywa krótsza od okna i pod nią
-         prześwitywał papier, przez co jedna tafla wyglądała na odciętą w pół
-         wysokości. Stanowisko jest jedno, więc i płaszczyzna jest jedna. */
-      background: var(--card);
-      /* WYSOKOŚĆ OKNA, i to nie jest ozdoba. Strefy konsoli są `sticky`
-         i każda ma własne `height` na pełne okno, ale SIATKA pod nimi rosła
-         bez ograniczenia: `grid-row: 1 / span 50` (którym strefa obok kolejki
-         obejmuje stos jej kart) tworzy 50 rzędów, a nadmiar wysokości strefy
-         rozkłada się po tych pustych rzędach. Wychodziło z tego 800 px pustego
-         przewijania POD konsolą — widać było tylko to, że pasek przewijania
-         jest, a nie ma czego przewijać. Zmierzone w przeglądarce. */
-      height: calc(100dvh - var(--hChrome, 130px));
-    }
-    /* Strefy tracą wszystko, co robiło z nich osobne kartki. Ramki zostają
-       tylko WEWNĘTRZNE — boczne krawędzie konsoli dotykają okna i ramka
-       rysowałaby tam kreskę wzdłuż samej krawędzi ekranu. */
-    .widok.konsola > .card,
-    .widok.konsola > .szczegol,
-    .widok.konsola > .kontekst {
-      border-radius: 0;
-      box-shadow: none;
-      border-top: 0; border-bottom: 0;
-      border-left: 0; border-right: 0;
-    }
-    .widok.konsola > .szczegol,
-    .widok.konsola > .kontekst { border-left: 1px solid var(--border); }
-    /* Kolumna kolejki bywa STOSEM kart, nie jedną: przy dostawach stoi pod
-       listą karta „poza WERTIS". Bez odstępu zlałyby się w jedną płaszczyznę
-       bez szwu, więc rozdziela je ta sama kreska, która rozdziela strefy. */
-    .widok.konsola > .card ~ .card { border-top: 1px solid var(--border); }
-
-    /* Szyna kolejki przewija się WŁASNYM przewijaniem, jak dwie pozostałe
-       strefy. Do tej wersji jechała ze stroną, podczas gdy sprawa i kontekst
-       stały — przy kilkudziesięciu sprawach w kolejce wyglądało to jak
-       usterka, a w konsoli na pełną wysokość byłoby nie do obrony.
-
-       `grid-row` rozpina kolumnę na całą siatkę, żeby stos kart w kolejce
-       (lista + brakujące paczki) był JEDNĄ przewijaną taflą, a nie dwiema
-       przyklejonymi osobno. */
-    /* Tu `max-height`, a NIE `height` jak przy sprawie i kontekście — i to jest
-       różnica wymuszona przez układ, nie przeoczenie. Sprawa i kontekst są
-       zawsze POJEDYNCZYM elementem w swojej kolumnie, więc sztywna wysokość
-       rozciąga je na okno. Kolejka bywa STOSEM: przy zwrocie stoi pod nią
-       karta brakujących paczek, przy dostawach karta „poza WERTIS". Sztywna
-       wysokość dałaby każdej z nich pełne okno osobno, czyli kolumnę dwa razy
-       wyższą od ekranu — sprawdzone na dostawach, zanim to trafiło dalej. */
-    .widok.konsola > .card {
-      position: sticky; top: var(--hChrome, 130px);
-      max-height: calc(100dvh - var(--hChrome, 130px));
-      overflow: auto; overscroll-behavior: contain;
-    }
 
     .widok.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) 1fr; }
     .widok.zSzczegolem > .card { grid-column: 1; }
@@ -397,28 +311,6 @@
     .widok.zSzczegolem > .szczegol > .sprawaSzyna { align-self: stretch; }
     .widok.zSzczegolem .sprawa-tresc {
       flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
-    }
-    #widokDostawy.zSzczegolem,
-    #widokSprawy.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr); }
-
-    /* ── SPRAWY bez otwartej sprawy: sama kolejka ────────────────────────────
-       Trzecia geometria tej samej konsoli i jedyna, w której KOLEJKA jest
-       szeroka. Do 0.123.0 obok stała jeszcze szyna rejestrów 352 px — praca
-       magazynu i archiwum wyprowadziły się do własnych pozycji paska bocznego
-       (0.125.0), więc kolejka dostaje CAŁĄ szerokość. Wysokość okna i własne
-       przewijanie zostają: to dalej konsola, nie strona. */
-    #widokSprawy.zKolejka { grid-template-columns: minmax(0, 1fr); }
-    #widokSprawy.zKolejka > .card { grid-column: 1; }
-
-    /* Karta klienta bez otwartej sprawy — ta sama tafla na pełne okno, tylko
-       jednokolumnowa. Bez tego wejście w klienta wypadało z konsoli z powrotem
-       na papier w zaokrąglonej karcie, choć jest tym samym stanowiskiem. */
-    #widokSprawy.zKlient { grid-template-columns: minmax(0, 1fr); }
-    #widokSprawy.zKlient > .szczegol {
-      grid-column: 1;
-      position: sticky; top: var(--hChrome, 130px);
-      height: calc(100dvh - var(--hChrome, 130px));
-      overflow: auto; overscroll-behavior: contain;
     }
   }
 
@@ -483,58 +375,6 @@
       overflow: auto; overscroll-behavior: contain;
     }
 
-    /* ── Konsola spraw: kolejka · sprawa · kontekst ──────────────────────────
-       Trzy niezależnie przewijane strefy zamiast jednego pionowego stosu;
-       od 0.109.0 jedna reguła dla pytań, zwrotów i dyskusji — wszystkie
-       mieszkają w #widokSprawy. Geometria po zwrotach (kontekst 22 rem),
-       bo kontekst niesie i kandydatów na dokument, i kartotekę. */
-    #widokSprawy.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 22rem; }
-    #widokSprawy.zSzczegolem > .kontekst {
-      grid-column: 3; grid-row: 1 / span 50;
-      position: sticky; top: var(--hChrome, 130px);
-      height: calc(100dvh - var(--hChrome, 130px));
-      overflow: auto; overscroll-behavior: contain;
-    }
-    /* Sprawa jest kolumną: przewija się ROZMOWA, a pole odpowiedzi zostaje na
-       dole. Przy dłuższym wątku odpowiedź uciekała pod krawędź ekranu i biuro
-       skakało między tym, co klient napisał, a tym, co pisze samo. */
-    #widokSprawy.zSzczegolem > .szczegol {
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    /* Dzieci kolumny rozciągają się na jej szerokość — przycisk powrotu nie ma
-       być pasem przez cały ekran. */
-    #widokSprawy.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
-    #widokSprawy.zSzczegolem .sprawa-tresc {
-      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
-    }
-    /* Miara wiersza. Na monitorze 1920 px kolumna sprawy ma ponad 1100 px,
-       a wiersz tej długości czyta się źle niezależnie od stopnia pisma. */
-    #widokSprawy.zSzczegolem .sprawa-tresc > * { max-width: 62rem; }
-    /* Tytuł sprawy bierze szerokość, akcje zdejmujące ją trzymają się prawej
-     i nie zawijają pojedynczo — para wychodzi na drugą linię w komplecie. */
-  #pytanieGora { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-top: 12px; }
-  #pytanieGora > #pytanieNaglowek { flex: 1 1 22rem; min-width: 0; }
-  #pytanieGora > #pytanieAkcjeSprawy { display: flex; gap: 6px; flex-wrap: wrap; }
-  #pytanieOdpowiedzGora { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px; }
-  #pytanieOdpowiedzGora h2 { margin-bottom: 0; }
-  #pytanieOdpowiedzGora #pytanieSzkicInfo { font-size: 12px; }
-  #pytanieOdpowiedzGora #pytanieAkcjeSzkicu { margin-left: auto; }
-  #pytanieOdpowiedzDol {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px;
-  }
-  #pytanieOdpowiedzDol #pytanieAkcje { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  #pytanieOdpowiedzDol #pytanieLicznikZnakow { margin-left: auto; white-space: nowrap; }
-  /* Podpowiedź skrótu przy akcji głównej — 0.96.0. Skrót istnieje dopiero od
-     tej wersji i bez podpisu nie miałby jak się o sobie dowiedzieć. */
-  .skrot {
-    font: 600 11px var(--font-sans); color: var(--ink-mute);
-    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
-  }
-
-  #widokSprawy.zSzczegolem .dok-odpowiedzi {
-      border-top: 1px solid var(--border); padding-top: 11px; margin-top: 10px;
-    }
-
     /* Dostawy dostają ten sam trójpodział: lista dokumentów, pozycje na
        środku, dostawca z notatkami po prawej. Kolumna środkowa jest szersza
        niż przy pytaniach, bo niesie tabelę na pięć kolumn, nie tekst. */
@@ -573,45 +413,6 @@
   .sprawaStopka { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; margin-top: 6px; }
   .sprawaStopka > .mute { white-space: nowrap; }
 
-  /* ── Pozycja zwrotu jako KARTA ──────────────────────────────────────────────
-     Wiersz tabeli mieścił cytat klienta w kolumnie „POWÓD ZWROTU" obok trzech
-     innych — a to jest jedyne zdanie, które tłumaczy, dlaczego ta rzecz do nas
-     wróciła, i po nim zapada decyzja. Karta daje mu własny blok. */
-  .pozycjaZwrotu {
-    border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px;
-    margin-bottom: 10px;
-  }
-  .pozycjaZwrotu .gora { display: flex; align-items: flex-start; gap: 10px; }
-  .pozycjaZwrotu .gora .rosnie { flex: 1; min-width: 0; }
-  .powodKlienta {
-    background: var(--secondary); border-radius: 10px; padding: 9px 11px;
-    margin-top: 9px; font-size: 14px; line-height: 1.55; color: var(--ink-soft);
-  }
-
-  /* ── Segment: jedna decyzja z kilku ─────────────────────────────────────────
-     Wybrana decyzja jest GRAFITOWA, nie bursztynowa. Bursztyn znaczy „to jest
-     ta jedna rzecz do zrobienia tutaj", a zwrot na trzy pozycje dawał trzy
-     bursztynowe pigułki plus bursztynową akcję główną — cztery wołania
-     o uwagę, z których tylko jedno było wezwaniem do działania.
-
-     Przyciski sklejone w jeden pasek, bo to jest WYBÓR JEDNEJ Z CZTERECH,
-     a nie cztery osobne akcje. Poniżej 30 rem pasek łamie się na dwa rzędy;
-     `flex-wrap` zamiast przewijania, bo ucięta decyzja jest gorsza niż
-     zawinięta. */
-  .segment { display: flex; flex-wrap: wrap; gap: 0; margin-top: 10px; }
-  .segment button {
-    background: var(--card); border: 1px solid var(--border); border-right-width: 0;
-    padding: 7px 12px; font: 600 12px var(--font-cond); letter-spacing: .4px;
-    color: var(--ink-soft); cursor: pointer; white-space: nowrap;
-  }
-  .segment button:first-child { border-radius: 999px 0 0 999px; padding-left: 15px; }
-  .segment button:last-child { border-radius: 0 999px 999px 0; border-right-width: 1px; padding-right: 15px; }
-  .segment button:hover { background: var(--paper); color: var(--ink); }
-  .segment button[aria-pressed="true"] {
-    background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700;
-  }
-  .segment button[aria-pressed="true"] + button { border-left-color: var(--ink); }
-
   /* ── Słupek w komórce tabeli ────────────────────────────────────────────────
      Liczba w kolumnie mówi „trzydzieści cztery" i nie mówi, czy to dużo.
      Odpowiedź na to drugie pytanie jest w tabeli — w pierwszym wierszu — ale
@@ -640,105 +441,16 @@
     color: var(--ink-soft); cursor: pointer;
   }
   .czip:hover { border-color: var(--ink-mute); color: var(--ink); }
-  /* Drugi rząd czipów: TAGI (0.137.0). Osobny rząd, bo to inna oś niż rodzaj
-     sprawy — oba filtry SKŁADAJĄ się, a nie wykluczają. Pusty rząd znika
-     zupełnie: pasek filtrów bez filtrów uczy oko, że pasek nic nie niesie. */
-  .czipyTagow { margin-top: 6px; }
-  .czipyTagow:empty { display: none; }
-  /* Tag w wierszu jest ETYKIETĄ, nie akcją — dlatego blada obwódka, a nie
-     plakietka: bursztyn i czerwień w tym wierszu znaczą termin. */
-  .tagWiersza {
-    font: 600 11.5px/1 var(--font-cond); letter-spacing: .3px; color: var(--ink-mute);
-    border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px;
-  }
   .czip[aria-pressed="true"] {
     background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700;
   }
-
-  .glowaKolejki { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
-  .glowaKolejki > p { margin: 0; }
-  .narzedziaKolejki { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
-  .ikonka {
-    display: inline-flex; align-items: center; gap: 6px; background: var(--card);
-    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px 5px 9px;
-    color: var(--ink-soft); font: 600 12px/1 var(--font-cond); letter-spacing: .5px;
-    cursor: pointer;
-  }
-  .ikonka:hover { border-color: var(--ink-mute); color: var(--ink); }
-  .ikonka[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .ikonka svg { width: 14px; height: 14px; }
-  /* Pas blokady: jedno zdanie o SKUTKU dla pracy (nie o stanie technicznym —
-     „token wygasł" nie mówi nikomu, że kolejka stoi) i jedna akcja, która go
-     zdejmuje. */
-  #sprawyBlokada {
-    display: flex; align-items: center; gap: 12px; background: var(--err-bg);
-    border-left: 4px solid var(--err); border-radius: 0 8px 8px 0;
-    padding: 11px 14px; margin-bottom: 14px;
-  }
-  #sprawyBlokada .czemu { display: block; color: var(--err); font-size: 12px; margin-top: 2px; }
-  #sprawyBlokada .akcja { margin-left: auto; flex: none; }
-
-  /* ── Kolejka spraw: pasma i wiersz (0.121.0) ───────────────────────────────
-     Przy 168 sprawach płaska lista odpowiada na „co istnieje", a praca pyta
-     „co teraz zrobić". Pasma rysują granice tam, gdzie sort `poPilnosci`
-     i tak je stawiał — nagłówek jest wierszem tabeli, więc kolumny wierszy
-     pod nim zostają wyrównane. */
-  tr.pasmoRz > td { padding: 0; border-bottom: 0; }
-  tr.pasmoRz + tr.sprawaRz > td { border-top: 1px solid var(--border); }
-  .pasmoGlowa {
-    display: flex; align-items: center; gap: 9px; width: 100%; background: none;
-    border: 0; border-bottom: 1px solid var(--border); padding: 12px 2px 7px 0;
-    cursor: pointer; text-align: left; font-family: inherit;
-  }
-  .pasmoGlowa:hover { border-bottom-color: var(--ink-mute); }
-  .pasmoGlowa[disabled] { cursor: default; }
-  .pasmoGlowa .strzalka { color: var(--ink-mute); font-size: 11px; width: 10px; flex: none; }
-  .pasmoGlowa[disabled] .strzalka { visibility: hidden; }
-  .nazwaPasma { font: 700 12px/1.4 var(--font-cond); letter-spacing: 1.1px;
-                text-transform: uppercase; color: var(--ink); }
-  .ilePasma { font: 700 12px/1 var(--font-cond); color: var(--ink-mute);
-              background: var(--secondary); border-radius: 999px; padding: 3px 9px; }
-  .czemuPasmo { margin-left: auto; color: var(--ink-mute); font-size: 12px; }
-  tr.pasmoRz.pilne .pasmoGlowa { border-bottom-color: var(--err); }
-  tr.pasmoRz.pilne .nazwaPasma { color: var(--err); }
-  tr.pasmoRz.pilne .ilePasma { background: var(--err-bg); color: var(--err); }
-  tr.pasmoRz.termin .pasmoGlowa { border-bottom-color: var(--amber-line); }
-  tr.pasmoRz.termin .ilePasma { background: var(--amber-bg); color: var(--amber-ink); }
-
-  /* Wiersz: klika się CAŁY. Kolumna z bursztynowym OTWÓRZ zniknęła — bursztyn
-     znaczy „ta jedna rzecz do zrobienia", a 168 takich przycisków przestawało
-     cokolwiek znaczyć i zabierało prawą krawędź tabeli. */
-  tr.sprawaRz { cursor: pointer; }
-  tr.sprawaRz:hover > td { background: var(--paper); }
-  tr.sprawaRz.aktywny > td { background: var(--amber-bg); }
-  tr.sprawaRz.poTerminie > td { background: var(--err-bg); }
-  /* Cudza sprawa jest PRZYGASZONA, nie ukryta: widać, że ktoś ją wziął. */
-  tr.sprawaRz.cudza > td { opacity: .55; }
-  td.kTyp { width: 92px; }
-  td.kKlient { width: 152px; }
-  td.kWiek { width: 74px; text-align: right; color: var(--ink-mute); white-space: nowrap;
-             font-weight: 600; }
-  td.kKoniec { width: 118px; text-align: right; }
-  .klientChip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                font-size: 11.5px; padding: 3px 9px; border-radius: 12px; }
-  /* Dwie linijki zamiast ucięcia na 90 znakach — miejsce wzięte z dwóch
-     martwych kolumn, które w 0.121.0 zeszły do pastylek. */
-  .tresc2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-            overflow: hidden; line-height: 1.4; }
-  .stopkaSprawy { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
-                  margin-top: 5px; }
-  button.akcja.cichy.wezme { padding: 5px 11px; font-size: 11.5px; border-radius: 10px; }
   .prowadzi { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
               font: 700 11.5px/1.4 var(--font-sans); color: var(--amber-ink); }
   .prowadzi i { width: 6px; height: 6px; border-radius: 999px; background: var(--amber);
                 flex: none; }
-  .prowadzi.obcy { color: var(--ink-mute); }
-  .prowadzi.obcy i { background: var(--ink-mute); }
   /* Czip z zerem zostaje na miejscu, tylko przygaszony: znikający czip zmienia
      szerokość rzędu przy każdym odświeżeniu i gubi miejsce pod kursorem. */
   .czip .n { font-weight: 700; margin-left: 5px; opacity: .75; }
-  .czip.pustyCzip { color: var(--ink-mute); opacity: .55; }
-  .czip.moje[aria-pressed="true"] { background: var(--amber-ink); border-color: var(--amber-ink); }
 
   /* ── Stan jako kropka i słowo ───────────────────────────────────────────────
      Wypełniona pigułka krzyczy, a stan zwykły nie ma czego krzyczeć: pięć
@@ -751,17 +463,7 @@
     width: 7px; height: 7px; border-radius: 999px; background: var(--ink-mute);
     flex: none;
   }
-  .stan.gotowy i { background: var(--amber); }
   .stan.zrobione i { background: var(--ok); }
-  .stan.pilne i { background: var(--err); }
-
-  .towarKafel { display: block; }
-  .towarGora { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
-  .towarFakty {
-    display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 6px;
-    font-size: 12px; color: var(--ink-mute);
-  }
-  .towarDol { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 
   /* ── Zakładki wglądu: jedna strefa i pasek filtrów ──────────────────────────
      STAN SYSTEMU, DZIENNIK i ANALIZA nie mają kolejki — nie ma tu spraw do
@@ -828,7 +530,6 @@
      się w rozmiarze komórki tabeli. Etykieta wyżej właśnie ucichła; te dwie
      klasy są drugą połową tej samej zmiany. */
   .temat { font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px; color: var(--ink); }
-  .czytanie { font-size: 15px; line-height: 1.6; }
 
   /* ── Objaśnienie za ikoną (0.86.0) ─────────────────────────────────────────
      Prawie każda karta miała pod nagłówkiem akapit tłumaczący, co ta karta
@@ -861,11 +562,6 @@
      siedemdziesiąt pozycji wypycha WSZYSTKO poniżej poza ekran — czyli robi
      dokładnie to, przed czym cała ta przebudowa ma bronić. */
   .tabelaBox { overflow-x: auto; overscroll-behavior-x: contain; max-width: 100%; }
-  /* Tabele rysowane DOPIERO na żądanie (podgląd kosza, dokumenty i rozliczenie
-     zwrotu) nie istnieją w chwili owijania, więc przewijanie dostają ich
-     kontenery. */
-  #koszPodglad, #zwrotDokument, #zwrotDokumenty, #zwrotKosz,
-  #zwrotRozliczenie, #zwrotZamowienie, #koszWyniki, #pytanieTowary { overflow-x: auto; }
   .tabelaBox.wysoka { max-height: min(52vh, 34rem); overflow-y: auto; }
   /* Nagłówek przyklejony TYLKO w pudle z własnym przewijaniem pionowym —
      inaczej przykleiłby się do okna i przejechał przez sąsiednie karty.
@@ -939,18 +635,6 @@
      więc jedyne poprawnie wyglądające pole stało w oknie dialogowym. */
   textarea { font: inherit; border: 1px solid var(--border); border-radius: 12px;
              padding: 8px 10px; resize: vertical; }
-  /* Pole, którego treść trafia do klienta, dostaje rozmiar do CZYTANIA. */
-  #pytanieOdpowiedz { font-size: 15px; line-height: 1.6; }
-  /* ── Szyna autorstwa szkicu ─────────────────────────────────────────────────
-     Bursztynowy pasek przy lewej krawędzi pola znaczy jedno: TEGO NIE
-     NAPISAŁ CZŁOWIEK. Po pierwszej poprawce gaśnie do szarości, bo tekst
-     przestaje być cudzy. Do 0.96.0 różnicy nie było widać wcale — mówiło
-     o niej jedno zdanie nad polem, które czyta się raz i przestaje.
-
-     To jest sygnał przy rzeczy, którą klient za chwilę przeczyta na Allegro,
-     więc stoi PRZY POLU, a nie w opisie obok. */
-  #pytanieOdpowiedz { border-left: 3px solid var(--border); }
-  #pytanieOdpowiedz.odModelu { border-left-color: var(--amber); }
   /* fokus pola = bursztynowa ramka WertisTextField */
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
@@ -983,17 +667,6 @@
   /* Bieżąca pozycja PEŁNYM bursztynem z grafitowym napisem — poświata z papieru
      zginęłaby w czerni (lekcja z 0.95.0). */
   nav.zakladki button[aria-current="true"] { background: var(--amber); color: var(--ink); font-weight: 800; }
-  /* Licznik jako PIGUŁKA na końcu wiersza. Pusta, gdy nie ma nic — zero
-     w kółku to szum, nie sygnał. */
-  nav.zakladki .tabLicznik:not(:empty) {
-    display: inline-grid; place-items: center; min-width: 18px; height: 18px;
-    margin-left: auto; padding: 0 5px; border-radius: 999px;
-    background: var(--amber); color: var(--ink);
-    font: 800 11px/1 var(--font-sans); letter-spacing: 0;
-  }
-  nav.zakladki button[aria-current="true"] .tabLicznik:not(:empty) {
-    background: var(--ink); color: var(--amber);
-  }
   /* Kropka alarmu przy pozycji — mówi CZY coś czeka, nie ile. */
   nav.zakladki .kropka { width: 8px; height: 8px; border-radius: 999px;
                          background: var(--err); margin-left: auto; flex: none; }
@@ -1013,8 +686,6 @@
     #bok .marka b { font-size: 15px; letter-spacing: .5px; }
     nav.zakladki .grupa-btny { align-items: center; }
     nav.zakladki button { width: 44px; justify-content: center; padding: 10px 0; position: relative; }
-    nav.zakladki .tabLicznik:not(:empty) { position: absolute; top: 1px; right: 1px;
-      margin: 0; min-width: 15px; height: 15px; font-size: 10px; }
     nav.zakladki .kropka { position: absolute; top: 4px; right: 6px; margin: 0; }
     nav.zakladki .grupa + .grupa { border-top: 1px solid #4A4A4E; padding-top: 10px; }
     #bok .sesja { align-items: center; }
@@ -1043,15 +714,6 @@
   .kafel .opis { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
 
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
-
-  /* Rząd przycisków pod formularzem (0.133.0). Klasa, nie atrybut `style`:
-     ustawienia mają odstępy z arkusza i pilnuje tego test. */
-  .rzadAkcji { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-  /* Linia tagów sprawy (0.136.0) — pastylki w rzędzie, pole dopisania na
-     końcu. Wąskie, bo to etykiety, a nie treść. */
-  .tagiSprawy { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
-  .tagiSprawy input { width: 11rem; }
 
   /* ── Sekcja zwijana ────────────────────────────────────────────────────────
      Natywny <details>, bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo,
@@ -1089,15 +751,6 @@
      — kartoteki mają obrazki w różnych proporcjach, a lista dogrywa je po
      kolei już po narysowaniu tabeli. */
   #dostawy tr[data-dok] { cursor: pointer; }
-  /* Notatka czekająca na odpowiedź jest jedynym powodem, dla którego dostawa
-     nie może się domknąć — musi się odróżniać od tej już zamkniętej. */
-  .karta-notatka { border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; margin: 5px 0; }
-  .karta-notatka.czeka { border-color: var(--amber); background: var(--amber-bg); }
-  /* Odpowiedź, której biuro jeszcze nie widziało — zielona, bo to dobra
-     wiadomość: pytanie doczekało się odpowiedzi. „czeka" zostaje bursztynowe,
-     bo tam wciąż ktoś jest coś winien. */
-  .karta-notatka.nowa { border-color: var(--ok); background: var(--ok-bg); }
-  .karta-notatka .odp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
   td.kolFoto { width: 56px; }
   .foto, .brakfoto { width: 48px; height: 48px; border-radius: 10px; display: block; }
   .foto { object-fit: cover; border: 1px solid var(--border); }
@@ -1592,64 +1245,19 @@
             <option value="dostawy">Dostawy</option>
           </select>
         </div>
-        <!-- OSOBA dotyczy WYŁĄCZNIE pytań: ślad audytowy ma własny rozbiór per
-             osoba w karcie WYDAJNOŚĆ i filtrowanie go tutaj dublowałoby tamtą
-             tabelę. Pole chowa się razem z zakresem, żeby nie obiecywać
-             filtra, którego przy śladzie nie zakładamy. -->
-        <div id="osobaAnalizyPole" hidden>
-          <label for="osobaAnalizy">OSOBA</label>
-          <select id="osobaAnalizy"><option value="">Wszyscy</option></select>
-        </div>
-        <!-- CSV ma tylko ślad audytowy — pytania i zwroty nie mają trasy
-             eksportu. Przycisk, który przy jednym zakresie pobiera plik
-             z innego, jest gorszy od przycisku, którego nie ma. -->
+        <!-- CSV ma tylko ślad audytowy: zakres DOSTAWY nie ma trasy eksportu.
+             Przycisk, który przy jednym zakresie pobiera plik z innego, jest
+             gorszy od przycisku, którego nie ma. -->
         <div><button class="akcja cichy" id="csvAnalizy">POBIERZ CSV</button></div>
         <!-- „Dane do…" — DO KTÓREJ CHWILI zestawienie sięga, liczone
              z najświeższego rekordu, nie z zegara serwera. Zegar powiedziałby
              tylko, że zapytanie właśnie poszło; ta data mówi, czy dane w ogóle
              dochodzą. Cichnie, gdy nie ma z czego jej policzyć. -->
-        <div id="daneDoPole" style="margin-left:auto;align-self:flex-end">
+        <div style="margin-left:auto;align-self:flex-end">
           <span class="mute" id="daneDo"></span>
         </div>
       </div>
     </section>
-
-    <!-- ── ZAKRES: PYTANIA KLIENTÓW ────────────────────────────────────────
-         Do 0.96.0 te liczby były zwijaną sekcją na zakładce PYTANIA — czyli
-         wgląd doklejony do kolejki pracy, dokładnie wbrew podziałowi, który
-         pasek zakładek ogłasza od 0.74.1. Tu mają własne miejsce, wspólne
-         OKNO z resztą analizy i filtr OSOBA, którego przy sekcji nie było.
-
-         Własnego `<select>` z oknem już nie niosą: rządzi nim pasek filtrów
-         nad kartami, tak jak zakresem śladu audytowego. -->
-
-
-    <!-- ── ZAKRES: ZWROTY ──────────────────────────────────────────────────
-         Trzy karty przyjechały tu z zakładki ZWROTY w 0.99.0 — dokładnie tą
-         samą drogą, którą statystyki pytań przeszły w 0.96.0. Stały tam jako
-         `<details>` z własnym oknem, czyli wgląd doklejony do kolejki pracy,
-         wbrew podziałowi, który pasek zakładek ogłasza od 0.74.1.
-
-         Przestały być zwijane, bo zwinięcie miało tam sens: chowało wgląd,
-         żeby praca została na wierzchu. Tutaj wgląd JEST treścią zakładki —
-         zwinięta karta chowałaby to, po co ktoś tu wszedł. -->
-
-    <!-- Raport wyżej mówi, JAK IDZIE ROBOTA. Ta sekcja mówi, CO WRACA — inne
-         pytanie, więc osobna sekcja, a nie kolejne kafle w tamtej. -->
-
-    <!-- Trzecie pytanie o zwroty. RAPORT mówi, ile czego jest; STATYSTYKI —
-         co wraca; ta sekcja — JAK DŁUGO to trwa. Osobna, bo osobne pytanie,
-         ale okno dzieli ze statystykami: obie czyta się razem. -->
-
-    <!-- ── ZAKRES: CZASY ODPOWIEDZI (0.134.0) ──────────────────────────────
-         Piąty zakres. Liczby biorą się z OSI CZASU sprawy (0.130.0), więc nie
-         powstała pod nie żadna nowa tabela: fakt „klient napisał" i
-         „odpowiedzieliśmy" leży tam z dokładnością do minuty i z nazwiskiem
-         przy naszej stronie.
-
-         Układ jak przy czasach zwrotów i dla tej samej racji: mediana mówi
-         o przeszłości, lista KTO CZEKA TERAZ o dzisiaj, a dopiero razem nie
-         kłamią. -->
 
     <!-- ── ZAKRES: DOSTAWY ─────────────────────────────────────────────────
          Czwarty zakres i jedyny, który nie powstał z przenosin. Trzy pozostałe
@@ -3055,11 +2663,6 @@ function ustawZakresAnalizy() {
     const klasa = "zakres" + z[0].toUpperCase() + z.slice(1);
     for (const el of $("widokAnaliza").querySelectorAll("." + klasa)) el.hidden = z !== zakres;
   }
-  /* Pole OSOBA zostało po zakresie pytań klientów (0.140.0): ślad audytowy
-     ma własny rozbiór per osoba w karcie WYDAJNOŚĆ, więc nie ma go po co
-     pokazywać. Chowamy zamiast kasować — nowa obsługa klienta prawdopodobnie
-     znów będzie mierzyć pracę per osoba. */
-  $("osobaAnalizyPole").hidden = true;
   $("csvAnalizy").hidden = !ZAKRESY_Z_CSV.includes(zakres);
 
   const okna = OKNA_ANALIZY[zakres];
@@ -3943,48 +3546,14 @@ function zakolejkuj(zadania, aktualne) {
   while (pobieraczy < ROWNOLEGLE && kolejkaFoto.length) pobieracz();
 }
 
-/* Zdjęcia towarów na karcie zwrotu: pozycje wracające ORAZ całe zamówienie.
-   Biuro ocenia towar z paczki w ręku — obrazek kartoteki mówi od razu, czy to
-   ta sama rzecz, zanim ktokolwiek przeczyta symbol. */
-function dolozZdjeciaZwrotu(z) {
-  if (!zdjeciaWlaczone) return;
-  const moja = ++sesjaZwrotu;
-  const aktualne = () => moja === sesjaZwrotu;
-  const zadania = [];
-  /* Selektor NIE wymienia znacznika: pozycje zwrotu są kartami (`<span>`),
-     a reszta zamówienia dalej tabelą (`<td>`). Wspólna jest klasa `kolFoto`
-     i to po niej celujemy — inaczej przy przejściu na karty zdjęcia zniknęłyby
-     po cichu, bo `td.kolFoto` nie pasowałoby do niczego. */
-  const dodaj = (twId, gdzie) => {
-    if (twId == null) return;
-    zadania.push({ klucz: `t${twId}`, url: `/api/products/${twId}/zdjecie`,
-                   sel: `#${gdzie} .kolFoto[data-tw="${twId}"]`, klasa: "foto" });
-  };
-  for (const p of z.pozycje) dodaj(p.twId, "zwrotPozycje");
-  for (const p of z.pozycjeZamowienia || []) dodaj(p.twId, "zwrotZamowienie");
-  zakolejkuj(zadania, aktualne);
-}
-
 /** Pusta komórka na zdjęcie; wypełni ją kolejka. Bez kartoteki nie ma czego pytać. */
 const kolFoto = (twId) =>
   !zdjeciaWlaczone ? "" : `<td class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}></td>`;
-
-/* To samo poza tabelą — pozycje zwrotu są od 0.98.0 kartami, a `<td>` poza
-   `<table>` parser wyrzuca. Klasa `kolFoto` zostaje, bo po niej celuje kolejka
-   zdjęć; zmienia się wyłącznie znacznik. */
-const kolFotoZwrotu = (twId) =>
-  !zdjeciaWlaczone ? "" : `<span class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}
-    style="display:block;width:48px;flex:none"></span>`;
 
 const zadanieDowodu = (p) => ({
   klucz: `p${p.id}`, url: `/api/problems/${p.id}/photo`,
   sel: `#szczegol [data-foto="${p.id}"]`, klasa: "",
 });
-
-/* Osobne liczniki, bo karta zwrotu i lista reklamacji przerysowują się
-   niezależnie od siebie i od podglądu dostawy. */
-let sesjaZwrotu = 0;
-let sesjaReklamacji = 0;
 
 async function pobieracz() {
   pobieraczy++;

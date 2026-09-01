@@ -38,25 +38,6 @@ export const envFile = loadEnvFile();
  */
 export const prostujUkosniki = (v: string): string => v.replace(/\\/g, "/");
 
-/**
- * Podłoga na interwał tickerów Allegro. Wartość dodatnia poniżej minuty to
- * niemal na pewno literówka (sekundy zamiast milisekund) — a skutkiem są
- * TRZY pętle (zapowiedzi, pytania, dyskusje) bijące w Allegro równym,
- * maszynowym rytmem z jednego adresu. Dokładnie taka sygnatura skończyła
- * się w sierpniu 2026 blokadą IP przy parowaniu. Twardy błąd przy starcie
- * jest tańszy niż blokada — ta sama zasada co przy pustym kluczu AI.
- */
-const POLL_ALLEGRO_MIN_MS = 60_000;
-export const pollAllegro = (ms: number): number => {
-  if (ms > 0 && ms < POLL_ALLEGRO_MIN_MS) {
-    throw new Error(
-      `ALLEGRO_POLL_MS=${ms} — minimum to ${POLL_ALLEGRO_MIN_MS} ms (minuta), ` +
-        "a 0 wyłącza pobieranie w tle. Popraw w wertis.env."
-    );
-  }
-  return ms;
-};
-
 const num = (v: string | undefined, def: number, name?: string) => {
   if (v === undefined || v === "") return def;
   const n = Number(v);
@@ -301,62 +282,6 @@ export const config = {
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://api.allegro.pl.allegrosandbox.pl"
         : "https://api.allegro.pl"),
-  },
-
-  /**
-   * Pytania klientów (0.80.0) — szkic odpowiedzi pisze model językowy.
-   *
-   * `provider` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM, jak `allegro.clientId`:
-   * puste wynika z `SGT_MODE` (seeded → `dev`, mssql → funkcji nie ma), a
-   * zakładka PYTANIA KLIENTÓW mówi wtedy wprost, co dopisać do wertis.env.
-   *
-   * Dwaj dostawcy, bo właściciel ma dziś konto u jednego z nich i zmiana nie
-   * może wymagać przebudowy: obaj przyjmują obraz (screenshot pytania) i obaj
-   * mówią zwykłym HTTPS-em, więc kosztem jest jedna gałąź w `services/ai.ts`,
-   * nie druga zależność.
-   *
-   * Klucz mieszka w env, a NIE w bazie — inaczej niż token Allegro, który
-   * odświeżenie wymienia na nowy. Klucz API jest stały i nadaje go człowiek.
-   */
-  ai: {
-    /** "" (wg SGT_MODE) | dev | anthropic | openai. */
-    provider: (process.env.AI_PROVIDER ?? "") as "" | "dev" | "anthropic" | "openai",
-    anthropicKey: process.env.ANTHROPIC_API_KEY ?? "",
-    openaiKey: process.env.OPENAI_API_KEY ?? "",
-    /** Puste = domyślny model dostawcy. Env zostaje, żeby zmiana modelu nie wymagała wydania. */
-    model: process.env.AI_MODEL ?? "",
-    /**
-     * Ile czekamy na odpowiedź modelu. Minuta, nie dziesięć sekund jak przy
-     * Allegro: odpowiedź z obrazem i rozumowaniem trwa dziesiątki sekund,
-     * a ticker liczy szkice w tle — nikt nie patrzy na zegarek.
-     */
-    timeoutMs: num(process.env.AI_TIMEOUT_MS, 60_000, "AI_TIMEOUT_MS"),
-  },
-
-  zwroty: {
-    /**
-     * Ile dni od zgłoszenia ma firma na odpowiedź w sprawie reklamacji.
-     * Ustawowy termin to 14 dni (rękojmia/niezgodność z umową) — po nim
-     * reklamację uznaje się milcząco, więc priorytet listy liczy się właśnie
-     * do tej daty. Env zostaje na wypadek własnych, krótszych zobowiązań.
-     */
-    reklamacjaDni: num(process.env.REKLAMACJA_DNI, 14, "REKLAMACJA_DNI"),
-    /**
-     * Co ile ms ticker ściąga z Allegro zapowiedzi zwrotów (Etap 4).
-     * 0 = wyłączone. Skutek uboczny jest celowy: regularne użycie tokena
-     * odświeża go, więc refresh token nie umiera po miesiącach ciszy.
-     */
-    /* 0 = pobiera CZŁOWIEK przyciskiem (0.85.0). Ruch w tle na cudzym serwisie
-       jest decyzją właściciela, nie ustawieniem domyślnym — a przy blokadach
-       anty-botowych Allegro to ruch, którego nikt nie zamawiał. Liczba
-       milisekund wraca do zachowania sprzed tej wersji. */
-    pollMs: pollAllegro(num(process.env.ALLEGRO_POLL_MS, 0, "ALLEGRO_POLL_MS")),
-    /**
-     * Po ilu dniach od zgłoszenia zwrot bez zeskanowanej paczki uznaje się
-     * za „brakującą paczkę". Trzy dni to typowy czas doręczenia krajowego —
-     * wcześniej alarm byłby szumem o paczkach, które po prostu jadą.
-     */
-    brakujacaDni: num(process.env.BRAKUJACA_PACZKA_DNI, 3, "BRAKUJACA_PACZKA_DNI"),
   },
 
   /**
@@ -826,22 +751,6 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      a wymuszony jawnie znaczy, że ktoś liczy na prawdziwe API. */
   if (c.allegro.mode === "http" && !c.allegro.clientId) {
     bledy.push("ALLEGRO_MODE=http wymaga ALLEGRO_CLIENT_ID i ALLEGRO_CLIENT_SECRET.");
-  }
-  /* Dostawca AI bez klucza to ten sam błąd co client_id bez sekretu: start
-     przechodzi, a wywala się dopiero przy pierwszym szkicu — czyli gdy ktoś
-     przy panelu czeka na odpowiedź dla klienta. */
-  if (!["", "dev", "anthropic", "openai"].includes(c.ai.provider)) {
-    bledy.push(
-      `AI_PROVIDER=${bezpiecznaWartosc(c.ai.provider)} — dozwolone: ` +
-        "puste (wg SGT_MODE), dev, anthropic, openai. " +
-        "Klucz API wpisuje się w ANTHROPIC_API_KEY albo OPENAI_API_KEY.",
-    );
-  }
-  if (c.ai.provider === "anthropic" && !c.ai.anthropicKey) {
-    bledy.push("AI_PROVIDER=anthropic wymaga ANTHROPIC_API_KEY (console.anthropic.com).");
-  }
-  if (c.ai.provider === "openai" && !c.ai.openaiKey) {
-    bledy.push("AI_PROVIDER=openai wymaga OPENAI_API_KEY (platform.openai.com).");
   }
   if (c.mssql.dokTypFS === c.mssql.dokTypPA) {
     bledy.push(

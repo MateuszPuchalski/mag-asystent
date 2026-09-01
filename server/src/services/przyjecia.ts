@@ -1,5 +1,4 @@
 import { db, nowIso, transaction } from "../db/db.js";
-import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { BladKosza, szczegolKosza, type SzczegolKosza } from "./kosze.js";
 
@@ -206,5 +205,3 @@ export function liczbaPrzyjecDoRozlozenia(): number {
   return listaPrzyjec().filter((p) => p.stan === "nietkniety" || p.stan === "w_rozkladaniu").length;
 }
 
-/** Magazyn zwrotów, z którego przychodzą przyjęcia — do komunikatów i diagnozy. */
-export const MAGAZYN_ZWROTOW = config.magId.ZWROTY;

@@ -744,56 +744,29 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
   }
 });
 
-test("konsola to tafle, a powierzchnia do czytania zostaje kartą", () => {
-  /* Makieta rozdziela dwa wyglądy i panel do 0.112.0 znał tylko jeden.
-     `Main.dc.html` robi konsolę pracy jako płaskie tafle stykające się
-     krawędziami — `.kontekst` ma tam `border-left`, zero promienia, zero
-     cienia. `Analiza.dc.html` robi z bloków KARTY: promień 14, cień, odstęp.
+test("karta zostaje kartą, a jej wygląd stoi w JEDNYM miejscu", () => {
+  /* Do 0.140.1 ten test pilnował DWÓCH połówek: że konsola pracy jest taflą
+     i że zmiana nie rozlała się na karty. Konsola była układem ekranu SPRAW
+     i odeszła razem z nim — reguły `.widok.konsola` nie miały już czego
+     trafić. Została połówka druga i ona jest tu cała: powierzchnia do
+     czytania ma promień i cień, bo na nich stoją ANALIZA i STAN SYSTEMU.
 
-     Panel dawał kartę wszędzie, bo `.card` jest jedną klasą na cały arkusz,
-     więc trzy strefy pracy pływały na papierze jak trzy osobne dokumenty.
-     Ten test pilnuje OBU połówek naraz: że konsola zrobiła się taflą i że
-     zmiana NIE rozlała się na karty analizy. Pierwsze porządkowanie CSS
-     scaliłoby te dwa wyglądy z powrotem, i nikt by nie zauważył. */
+     Bez tej asercji pierwsze porządkowanie CSS zdejmie promień „bo nikt tego
+     nie widzi" i nikt nie zauważy, dopóki właściciel nie otworzy analizy. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-
-  /* Margines strony stoi w JEDNYM miejscu, bo konsola musi go odjąć, żeby
-     dotknąć krawędzi okna. Dwie kopie tej liczby to dwa miejsca do rozjazdu —
-     ta sama reguła, co przy progach szerokości. */
-  assert.match(html, /--brzeg:/, "margines strony ma własną zmienną");
-  assert.match(html, /padding: 0 var\(--brzeg\)/, "strona bierze margines ze zmiennej");
-  assert.match(
-    html,
-    /margin-inline: calc\(-1 \* var\(--brzeg\)\)/,
-    "konsola wyłamuje się z marginesu strony DOKŁADNIE o niego"
-  );
-
-  /* Trzy rzeczy naraz robiły te przerwy i wszystkie trzy muszą zniknąć —
-     sam `gap: 0` zostawiłby zaokrąglone rogi stykające się bokami. */
-  const konsola = html.slice(html.indexOf(".widok.konsola {"));
-  assert.match(konsola.slice(0, 400), /gap: 0/, "strefy stykają się bez odstępu");
-  assert.match(html, /\.widok\.konsola > \.kontekst \{[\s\S]{0,80}border-radius: 0/,
-    "strefy tracą promień");
-
-  /* A karta ZOSTAJE kartą. Bez tej połówki „uprośćmy CSS" skasowałoby różnicę
-     między stanowiskiem pracy a zestawieniem do czytania. */
   assert.match(
     html,
     /\.card \{ background: var\(--card\);[^}]*border-radius: 14px;[^}]*box-shadow: var\(--cien\)/,
     "karta dalej ma promień 14 i cień — analiza i stan systemu na nich stoją"
   );
 
-  /* Kolejka bywa STOSEM kart (lista + brakujące paczki przy zwrocie, lista +
-     „poza WERTIS" przy dostawach). Bez odstępu zlałyby się w jedną płaszczyznę
-     bez szwu, więc rozdziela je kreska. */
-  assert.match(
-    html,
-    /\.widok\.konsola > \.card ~ \.card \{ border-top: 1px solid/,
-    "stos kart w kolejce ma szew"
-  );
+  /* Margines strony stoi w JEDNYM miejscu. Dwie kopie tej liczby to dwa
+     miejsca do rozjazdu — ta sama reguła, co przy progach szerokości. */
+  assert.match(html, /--brzeg:/, "margines strony ma własną zmienną");
+  assert.match(html, /padding: 0 var\(--brzeg\)/, "strona bierze margines ze zmiennej");
 });
 
 test("ustawienia to jedna tafla, a odstępy niesie arkusz", () => {
@@ -934,7 +907,7 @@ test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", ()
        została ta sama: w pasku stoi to, co rządzi całym widokiem. ZAKRES
        rządzi nim najdosłowniej ze wszystkiego — decyduje, które karty w ogóle
        są na ekranie. */
-    ["analiza", analiza, ["oknoAnalizy", "zakresAnalizy", "osobaAnalizy", "csvAnalizy"]],
+    ["analiza", analiza, ["oknoAnalizy", "zakresAnalizy", "csvAnalizy"]],
   ] as [string, string, string[]][]) {
     const pasek = widok.indexOf('class="pelna pasekFiltrow"');
     assert.notEqual(pasek, -1, `${nazwa} ma pasek filtrów`);
