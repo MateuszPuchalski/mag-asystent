@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlarmClock, Ban, Check, Undo2 } from "lucide-react";
+import { AlarmClock, Ban, Check, Eye, Undo2 } from "lucide-react";
 import type { Rozmowa, StatusRozmowy } from "../api/typy";
 import { NAZWA_STATUSU, Plakietka, czas } from "../ui";
 
@@ -30,12 +30,15 @@ export function terminy(teraz: Date): Array<{ etykieta: string; iso: string }> {
   ];
 }
 
-export function Decyzja({ rozmowa, zajete, blad, onOdloz, onStatus, teraz = new Date() }: {
+export function Decyzja({ rozmowa, zajete, blad, onOdloz, onStatus, mojeId = null,
+  teraz = new Date() }: {
   rozmowa: Rozmowa;
   zajete: boolean;
   blad: string;
   onOdloz: (iso: string) => void;
   onStatus: (status: StatusRozmowy) => void;
+  /** Żeby nie mówić agentowi, że sam przy tej rozmowie siedzi. */
+  mojeId?: number | null;
   teraz?: Date;
 }) {
   const [odkladam, setOdkladam] = useState(false);
@@ -58,6 +61,11 @@ export function Decyzja({ rozmowa, zajete, blad, onOdloz, onStatus, teraz = new 
       {rozmowa.wrocilaPoZamknieciu &&
         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">
           WRÓCIŁA PO ZAMKNIĘCIU</span>}
+      {/* Uchwyt jest przydziałem TYMCZASOWYM — na czas siedzenia. Widać go,
+          zanim padnie pierwsze słowo odpowiedzi, a nie dopiero przy wysyłce. */}
+      {rozmowa.oglada && rozmowa.oglada.userId !== mojeId &&
+        <span className="flex items-center gap-1 text-xs font-semibold text-violet-700">
+          <Eye size={13} />siedzi tu {rozmowa.oglada.name}</span>}
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {zamkniete

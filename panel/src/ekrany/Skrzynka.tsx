@@ -4,7 +4,8 @@ import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
   useJa, useOdloz, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
-  useUstawStatus, useWskazOferte, useWyslij, useZalatw, useZapiszSzkic, useZdrowie, useZlecPomiar,
+  useUchwytRozmowy, useUstawStatus, useWskazOferte, useWyslij, useZalatw, useZapiszSzkic,
+  useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
@@ -54,8 +55,12 @@ export function Skrzynka() {
   const [bladWysylki, setBladWysylki] = useState("");
   const [kubelek, setKubelek] = useState<KubelekId>("moje");
   const [bladStatusu, setBladStatusu] = useState("");
+  const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
+  /* Samo wejście w pytanie trzyma je dla tego agenta — do wyjścia albo do
+     odpowiedzi, która przydziela je na stałe (decyzja właściciela, 0.158.0). */
+  useUchwytRozmowy(wybranaId);
 
   const mojeId = ja.data?.user.userId ?? null;
   const wszystkie = lista.data?.rozmowy ?? [];
@@ -129,7 +134,7 @@ export function Skrzynka() {
     setSzkic(rozmowa.data?.szkic?.body ?? "");
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
-    setKonfliktWysylki(null); setBladWysylki("");
+    setKonfliktWysylki(null); setBladWysylki(""); setPrzyRozmowie(null);
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -147,16 +152,17 @@ export function Skrzynka() {
   const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
     .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
 
-  function wyslijOdpowiedz(mimoNowejWiadomosci = false) {
+  function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false) {
     if (!rozmowa.data) return;
     setBladWysylki("");
     wyslij.mutate({
       id: rozmowa.data.rozmowa.id, body: szkic,
       expectedVersion: rozmowa.data.rozmowa.wersja,
-      expectedLastMessageId: ostatniaKlienta, mimoNowejWiadomosci,
+      expectedLastMessageId: ostatniaKlienta, mimoNowejWiadomosci, mimoObecnosci,
     }, {
       onSuccess: (w) => {
         setKonfliktWysylki(null);
+        setPrzyRozmowie(null);
         if (w.status === "sent") setSzkic("");
         else setBlad("Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj wątek.");
       },
@@ -165,6 +171,11 @@ export function Skrzynka() {
            postawić dialog i poprosić o jawną zgodę. */
         if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined) {
           setKonfliktWysylki(e.szczegoly as SzczegolyWysylki);
+        /* Drugi rodzaj konfliktu: przy rozmowie siedzi kto inny. Pytanie do
+           agenta jest inne niż przy dopisku klienta, więc i pasek jest inny —
+           a zgoda musi być jawna, tak samo jak tam. */
+        } else if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).trzymajacyName) {
+          setPrzyRozmowie((e.szczegoly as SzczegolyWysylki).trzymajacyName ?? "");
         } else if (konfliktWysylki) setBladWysylki((e as Error).message);
         else zglos(e);
       },
@@ -186,6 +197,7 @@ export function Skrzynka() {
       nieswieza={alarm}
       kubelki={<Kubelki rozmowy={wszystkie} mojeId={mojeId}
         wybrany={kubelek} onWybierz={przelacz} />}
+      mojeId={mojeId}
       rozmowy={wKolejce}
       stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
       wybranaId={wybranaId}
@@ -194,6 +206,17 @@ export function Skrzynka() {
       onWybierz={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />
 
     <div className="space-y-4">
+    {przyRozmowie && <div className="card flex flex-wrap items-center gap-3 border-violet-300 bg-violet-50 p-3 text-sm">
+      <span><b>{przyRozmowie}</b> siedzi teraz przy tej rozmowie.</span>
+      <span className="text-slate-600">Dwie odpowiedzi na jedno pytanie to dwie różne prawdy u klienta.</span>
+      <div className="ml-auto flex gap-2">
+        <button type="button" className="btn-secondary text-sm"
+          onClick={() => setPrzyRozmowie(null)}>Zostaw koledze</button>
+        <button type="button" className="btn-primary text-sm" disabled={wyslij.isPending}
+          onClick={() => wyslijOdpowiedz(false, true)}>Odpowiedz mimo to</button>
+      </div>
+    </div>}
+
     {wybrana && <Decyzja
       rozmowa={wybrana}
       zajete={odloz.isPending || zalatw.isPending || status.isPending}
@@ -203,7 +226,8 @@ export function Skrzynka() {
         odloz.mutate({ id: wybrana.id, do: iso, expectedVersion: wybrana.wersja },
           { onError: (e) => setBladStatusu((e as Error).message) });
       }}
-      onStatus={zmienStatus} />}
+      onStatus={zmienStatus}
+      mojeId={mojeId} />}
 
     <Rozmowa
       dane={rozmowa.data}

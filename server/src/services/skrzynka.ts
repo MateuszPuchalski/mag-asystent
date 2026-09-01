@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
 import { statusEfektywny, zapiszStatusAutomatu, type StatusRozmowy } from "./statusy.js";
+import { uchwyty } from "./conversation-realtime.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -21,6 +22,10 @@ export interface RozmowaSkrzynki {
   snoozeDo: string | null;
   /** Klient odpisał po zamknięciu i nikt mu jeszcze nie odpowiedział. */
   wrocilaPoZamknieciu: boolean;
+  /* Kto SIEDZI przy rozmowie teraz — przydział tymczasowy, na czas oglądania.
+     Nie ma go w bazie i nie ma prawa być (§6.3): po restarcie usługi rozmowa
+     nie może zostać zablokowana przez agenta, który dawno wyszedł. */
+  oglada: { userId: number; name: string } | null;
 }
 /** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
 export interface ZalacznikOsi {
@@ -52,7 +57,11 @@ const LISTA = `
            WHERE m.conversation_id=c.id AND m.direction='outgoing') AS odpisanoAt
     FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id`;
 
-const naRozmowe = (w: Record<string, unknown>, teraz = new Date()): RozmowaSkrzynki => {
+const naRozmowe = (
+  w: Record<string, unknown>,
+  teraz = new Date(),
+  trzymane: Map<number, { userId: number; name: string }> = new Map(),
+): RozmowaSkrzynki => {
   const zapisany = String(w.status ?? "new");
   const snoozeDo = w.snoozeDo == null ? null : String(w.snoozeDo);
   const wrocilaAt = w.wrocilaAt == null ? null : String(w.wrocilaAt);
@@ -69,6 +78,7 @@ const naRozmowe = (w: Record<string, unknown>, teraz = new Date()): RozmowaSkrzy
     statusZapisany: (zapisany as StatusRozmowy),
     snoozeDo,
     wrocilaPoZamknieciu: wrocilaAt !== null && (odpisanoAt === null || wrocilaAt > odpisanoAt),
+    oglada: trzymane.get(Number(w.id)) ?? null,
   };
 };
 
@@ -104,8 +114,11 @@ export function stanObslugiHealth(teraz = Date.now()) {
 }
 
 export function listaRozmow(): RozmowaSkrzynki[] {
+  /* Uchwyty bierzemy RAZ na całą listę, nie po jednym na wiersz: kolejka
+     odświeża się przy każdym zdarzeniu, a mapa i tak stoi w pamięci. */
+  const trzymane = uchwyty();
   return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
-    .map((w) => naRozmowe(w));
+    .map((w) => naRozmowe(w, new Date(), trzymane));
 }
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
@@ -114,7 +127,7 @@ export function osRozmowy(id: number): {
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
-  const rozmowa = naRozmowe(wiersz);
+  const rozmowa = naRozmowe(wiersz, new Date(), uchwyty());
 
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,

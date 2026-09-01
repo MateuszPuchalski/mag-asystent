@@ -256,9 +256,18 @@ test("ręczna synchronizacja bez sparowanego konta mówi wprost, czego brakuje",
    `services/wysylka.test.ts` z podstawionym adapterem — testy tras nie
    strzelają do Allegro. */
 test("nie wyśle ten, kto nie prowadzi rozmowy", async () => {
-  const b = login("biuro", "Anna");
+  /* Od 0.158.0 rozmowa NIEPRZYPISANA idzie do wysyłki bez osobnego przejęcia
+     (przydziela ją sama odpowiedź). Blokadą zostaje trwały właściciel: gdy
+     rozmowę prowadzi kto inny, odpowiedź nie wychodzi. */
+  const ala = login("biuro", "A. Lewandowska");
+  const marek = login("biuro", "M. Wójcik");
+  const przejecie = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: ala.naglowki, payload: { expectedVersion: 1 } });
+  assert.equal(przejecie.statusCode, 200, przejecie.body);
+
   const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
-    headers: b.naglowki, payload: { body: "Pasuje.", expectedVersion: 1, expectedLastMessageId: pytanie } });
+    headers: marek.naglowki,
+    payload: { body: "Pasuje.", expectedVersion: 2, expectedLastMessageId: pytanie } });
   assert.equal(r.statusCode, 409);
   assert.match(r.json().error, /najpierw ją przejmij/);
 });
@@ -377,4 +386,33 @@ test("statusu automatu nie da się wpisać żądaniem", async () => {
     headers: b.naglowki, payload: { status: "waiting_for_customer", expectedVersion: wersja } });
   assert.equal(r.statusCode, 400, r.body);
   assert.match(r.json().error, /nie ustawia się ręcznie/);
+});
+
+test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", async () => {
+  /* Sedno decyzji właściciela: wejście przydziela rozmowę NA CZAS SIEDZENIA.
+     Cały uchwyt żyje w pamięci procesu (§6.3), więc mimo trasy `POST` do bazy
+     nie idzie nic — „zero zapisu przy patrzeniu" zostaje nienaruszone. */
+  const ala = login("biuro", "A. Lewandowska");
+  const przed = liczbaZdarzen();
+
+  let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/presence`,
+    headers: ala.naglowki, payload: {} });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().trzyma.userId, ala.userId);
+
+  assert.equal(liczbaZdarzen(), przed, "wejście w rozmowę dopisało zdarzenie do dziennika");
+  assert.equal((db().prepare("SELECT assigned_user_id FROM conversation WHERE id=?")
+    .get(rozmowa) as { assigned_user_id: number | null }).assigned_user_id, null,
+    "uchwyt nie ma prawa dotknąć kolumny właściciela");
+
+  /* Widać go w kolejce — inaczej kolega nie miałby skąd wiedzieć, że ktoś
+     już przy tym pytaniu siedzi. */
+  r = await app.inject({ method: "GET", url: "/api/obsluga/rozmowy", headers: ala.naglowki });
+  const wiersz = r.json().rozmowy.find((x: { id: number }) => x.id === rozmowa);
+  assert.equal(wiersz.oglada.name, "A. Lewandowska");
+
+  /* Wyjście puszcza uchwyt natychmiast, nie po czasie. */
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/presence`,
+    headers: ala.naglowki, payload: { obecny: false } });
+  assert.equal(r.json().trzyma, null);
 });

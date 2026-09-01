@@ -1,5 +1,5 @@
 import React from "react";
-import { Inbox, RefreshCw, UserCheck } from "lucide-react";
+import { Eye, Inbox, RefreshCw, UserCheck } from "lucide-react";
 import type { Rozmowa, StanSkrzynki } from "../api/typy";
 import { NAZWA_STATUSU, Plakietka, czas } from "../ui";
 
@@ -7,13 +7,15 @@ import { NAZWA_STATUSU, Plakietka, czas } from "../ui";
    znaczy co innego, gdy synchronizator stanął o 6:00, a co innego, gdy
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
 export function Kolejka({ rozmowy, stan, wybranaId, onWybierz, onOdswiez, laduje, nieswieza,
-  kubelki }: {
+  kubelki, mojeId }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
   wybranaId: number | null;
   /* Pasek kubełków wchodzi TU, a nie osobną kartą obok: zakładki oderwane od
      listy, którą filtrują, czyta się jako dwa niezależne ekrany. */
   kubelki?: React.ReactNode;
+  /** Po to, żeby nie pokazywać agentowi, że sam przy tej rozmowie siedzi. */
+  mojeId?: number | null;
   onWybierz: (id: number) => void;
   onOdswiez: () => void;
   laduje: boolean;
@@ -60,6 +62,11 @@ export function Kolejka({ rozmowy, stan, wybranaId, onWybierz, onOdswiez, laduje
             <UserCheck size={12} />{r.wlasciciel}</span>}
           {r.status === "snoozed" && r.snoozeDo &&
             <span className="font-semibold text-slate-600">wraca {czas(r.snoozeDo)}</span>}
+          {/* Kolega SIEDZI przy tym pytaniu. Bez tego znaku dwóch agentów pisze
+              tę samą odpowiedź, a dowiadują się o tym dopiero przy wysyłce. */}
+          {r.oglada && r.oglada.userId !== mojeId &&
+            <span className="flex items-center gap-1 font-semibold text-violet-700">
+              <Eye size={12} />{r.oglada.name}</span>}
           {/* Jedyna rozmowa, przy której agent MUSI przeczytać, co obiecano
               wcześniej. Bez znacznika wygląda jak każda inna „w toku". */}
           {r.wrocilaPoZamknieciu &&

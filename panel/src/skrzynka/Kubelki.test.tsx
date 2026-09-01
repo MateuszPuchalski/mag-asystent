@@ -14,7 +14,7 @@ const JA = 7;
 const rozmowa = (status: StatusRozmowy, wlascicielId: number | null = null): Rozmowa => ({
   id: 1, klient: "Kupujący", ostatniaWiadomosc: "…", ostatniaWiadomoscAt: "2026-09-02T08:00:00.000Z",
   nieprzeczytana: false, wlascicielId, wlasciciel: wlascicielId ? "Ala" : null, wersja: 1,
-  status, statusZapisany: status, snoozeDo: null, wrocilaPoZamknieciu: false,
+  status, statusZapisany: status, snoozeDo: null, wrocilaPoZamknieciu: false, oglada: null,
 });
 
 describe("Kubełki skrzynki", () => {

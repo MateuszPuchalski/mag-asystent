@@ -134,6 +134,26 @@ przekazana ekspertowi, odłożona albo zakończona.
 uda się jeden zapis. Drugi dostaje konflikt z aktualnym właścicielem, czasem
 przejęcia i bieżącą wersją rozmowy.
 
+**Dwa rodzaje przydziału (0.158.0).** Decyzja właściciela: samo wejście agenta
+w pytanie przydziela mu je NA CZAS SIEDZENIA, a odpowiedź — na stałe.
+
+| przydział | co go daje | jak długo trwa | gdzie żyje |
+|---|---|---|---|
+| tymczasowy (uchwyt) | wejście w rozmowę | do wyjścia albo do wygaśnięcia | pamięć procesu |
+| trwały | odpowiedź do klienta albo „Przejmij" | do przekazania | `conversation.assigned_user_id` |
+
+Uchwyt trzyma PIERWSZY, który wszedł, nie ostatni: inaczej kolega otwierający
+rozmowę „na chwilę" odbierałby ją komuś w połowie pisania odpowiedzi.
+
+Wysyłka odpowiedzi na rozmowę nieprzypisaną nie wymaga już osobnego przejęcia.
+Do 0.157.0 agent, który wszedł w pytanie i napisał odpowiedź, dostawał na
+końcu „najpierw ją przejmij" i tracił ruch.
+
+**Blokada jest miękka.** Gdy przy rozmowie siedzi kto inny, wysyłka odpada
+z 409 i nazwiskiem — ale ekran daje jawne „odpowiedz mimo to". Twarda blokada
+zatrzymywałaby biuro za każdym razem, gdy kolega zostawił otwartą zakładkę
+i wyszedł.
+
 ### 6.3. Obecność agentów
 
 Panel pokazuje, kto ogląda rozmowę, kto pisze, kto zmienił szkic i kto ostatnio
@@ -143,6 +163,16 @@ wykonał działanie.
 procesu (`services/conversation-realtime.ts`) i wygasający sam. Zapisany do
 bazy stałby się trwałym statusem rozmowy, czyli dokładnie tym, czym nie jest —
 a po restarcie serwera kłamałby o tym, kto siedzi przy sprawie.
+
+Ten akapit napisano w 0.141.0, a w 0.158.0 dostał zastosowanie: to na nim
+stoi przydział tymczasowy z §6.2. Uchwyt puszcza po czterdziestu pięciu
+sekundach bez znaku życia, panel bije sercem co piętnaście. Trzykrotny zapas
+jest po to, żeby jedno zgubione żądanie nie oddało rozmowy komuś innemu
+w połowie pisania odpowiedzi.
+
+Dzięki temu wejście na ekran nie zapisuje ANI JEDNEGO wiersza. Trasa obecności
+jest zapisem tylko z nazwy — reguła „zero zapisu przy patrzeniu" obowiązuje
+skrzynkę tak samo jak resztę.
 
 ### 6.4. Wewnętrzne komentarze
 
@@ -813,6 +843,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
 | Statusy rozmowy (§7) | **działa** od 0.157.0 | `conversation.status`, `services/statusy.ts` |
 | Kubełki i skróty w skrzynce | **działa** od 0.157.0 | `panel/src/skrzynka/Kubelki.tsx`, `Decyzja.tsx` |
+| Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.158.0 | `conversation-realtime.ts`, w pamięci |
+| Odpowiedź przydziela rozmowę na stałe | **działa** od 0.158.0 | `services/wysylka.ts` |
 | Statusy doboru (§7) | **projekt** | dobór to etap E, którego nie ma |
 | Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |

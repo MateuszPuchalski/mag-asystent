@@ -15,7 +15,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 1, klient: "Kupujący", ostatniaWiadomosc: "…", ostatniaWiadomoscAt: "2026-09-02T08:00:00.000Z",
   nieprzeczytana: false, wlascicielId: 7, wlasciciel: "Ala", wersja: 3,
   status: "open" as StatusRozmowy, statusZapisany: "open" as StatusRozmowy,
-  snoozeDo: null, wrocilaPoZamknieciu: false, ...n,
+  snoozeDo: null, wrocilaPoZamknieciu: false, oglada: null, ...n,
 });
 
 const pasek = (r: Rozmowa, onStatus = vi.fn(), onOdloz = vi.fn()) => {
@@ -82,5 +82,19 @@ describe("Pasek decyzji o statusie", () => {
       blad="Rozmowa zmieniła się, zanim doszła zmiana statusu"
       onOdloz={vi.fn()} onStatus={vi.fn()} teraz={TERAZ} />);
     expect(screen.getByText(/Rozmowa zmieniła się/)).toBeInTheDocument();
+  });
+
+  it("kolega siedzący przy rozmowie jest widoczny, a ja sam — nie", () => {
+    /* Uchwyt widać ZANIM padnie pierwsze słowo odpowiedzi. Dowiadywanie się
+       o koledze dopiero przy wysyłce znaczy dwie napisane odpowiedzi. */
+    const { unmount } = render(<Decyzja rozmowa={rozmowa({
+      oglada: { userId: 9, name: "M. Wójcik" } })} zajete={false} blad=""
+      onOdloz={vi.fn()} onStatus={vi.fn()} mojeId={7} teraz={TERAZ} />);
+    expect(screen.getByText(/siedzi tu M. Wójcik/)).toBeInTheDocument();
+    unmount();
+
+    render(<Decyzja rozmowa={rozmowa({ oglada: { userId: 7, name: "Ja" } })} zajete={false}
+      blad="" onOdloz={vi.fn()} onStatus={vi.fn()} mojeId={7} teraz={TERAZ} />);
+    expect(screen.queryByText(/siedzi tu/)).not.toBeInTheDocument();
   });
 });
