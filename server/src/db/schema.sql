@@ -82,6 +82,17 @@ CREATE TABLE IF NOT EXISTS conversation (
   unread                   INTEGER NOT NULL DEFAULT 0,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Status rozmowy (§7 projektu panelu, 0.158.0). Do tego wydania kolumny nie
+  -- było wcale: kolejka nie odróżniała sprawy załatwionej od nietkniętej.
+  -- Lista jest ZAMKNIĘTA i pochodzi wprost z §7, a `CHECK` jest tu strażnikiem
+  -- projektu: status spoza niej znaczyłby, że ktoś dołożył pojęcie, którego
+  -- dokument nie zna. Ten sam warunek stoi w migracji `db.ts`.
+  status                   TEXT NOT NULL DEFAULT 'new' CHECK(status IN
+    ('new','open','waiting_for_customer','waiting_for_internal','snoozed',
+     'resolved','closed','spam')),
+  -- Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
+  -- stanem, z którego nic nie wyprowadza — §7 nie zna „odłożonej na zawsze".
+  snoozed_until            TEXT,
   UNIQUE(channel_account_id, external_conversation_id)
 );
 

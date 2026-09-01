@@ -4,8 +4,8 @@ import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
   useAgenci, useDodajKomentarz, useJa, usePrzejmij, usePrzekaz, useRozmowa,
-  useRozmowy, useSynchronizuj, useWskazOferte, useWyslij, useZapiszSzkic,
-  useZdrowie, useZlecPomiar,
+  useRozmowy, useSynchronizuj, useUstawStatus, useWskazOferte, useWyslij,
+  useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
@@ -13,7 +13,7 @@ import { Kolejka } from "../skrzynka/Kolejka";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
-import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
+import type { StatusRozmowy, SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 
 export function Skrzynka() {
@@ -36,6 +36,7 @@ export function Skrzynka() {
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
 
+  const status = useUstawStatus();
   const agenci = useAgenci();
   const dodajKomentarz = useDodajKomentarz();
 
@@ -56,6 +57,7 @@ export function Skrzynka() {
   const [bladSynchronizacji, setBladSynchronizacji] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWysylki, setBladWysylki] = useState("");
+  const [bladStatusu, setBladStatusu] = useState("");
 
   useSzynaZdarzen(wybranaId, () => setNowa(true));
 
@@ -65,7 +67,7 @@ export function Skrzynka() {
     setSzkic(rozmowa.data?.szkic?.body ?? "");
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
-    setKonfliktWysylki(null); setBladWysylki("");
+    setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu("");
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -123,6 +125,7 @@ export function Skrzynka() {
       rozmowy={lista.data?.rozmowy ?? []}
       stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
       wybranaId={wybranaId}
+      mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}
       onOdswiez={() => lista.refetch()}
       onWybierz={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />
@@ -202,6 +205,14 @@ export function Skrzynka() {
         setBladOferty("");
         oferta.mutate({ id: rozmowa.data.rozmowa.id, ofertaId },
           { onError: (e) => setBladOferty((e as Error).message) });
+      }}
+      zapisujeStatus={status.isPending}
+      bladStatusu={bladStatusu}
+      onZmienStatus={(nowy: StatusRozmowy, doKiedy) => {
+        if (!rozmowa.data) return;
+        setBladStatusu("");
+        status.mutate({ id: rozmowa.data.rozmowa.id, status: nowy, doKiedy },
+          { onError: (e) => setBladStatusu((e as Error).message) });
       }}
       onDopytajOOferte={() => setSzkic((s) => s
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}

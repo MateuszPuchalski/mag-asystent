@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
+import type { StatusRozmowy } from "./conversations.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -13,6 +14,14 @@ import { utworzZadanie } from "./zadania-terenowe.js";
 export interface RozmowaSkrzynki {
   id: number; klient: string; ostatniaWiadomosc: string; ostatniaWiadomoscAt: string;
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
+  /** Status WYLICZONY (§7) — odłożenie po terminie wraca tu już jako `open`. */
+  status: StatusRozmowy;
+  odlozoneDo: string | null;
+  /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
+     ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
+     z kubełków zwrotów). Wiersz taki wraca jako `open` i wygląda jak każdy
+     inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
+  poTerminie: boolean;
 }
 /** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
 export interface ZalacznikOsi {
@@ -22,7 +31,7 @@ export interface ZalacznikOsi {
 export interface Wzmianka { userId: number; name: string }
 
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz";
+  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   zalaczniki?: ZalacznikOsi[];
@@ -35,19 +44,30 @@ const SKRZYNKA = "skrzynka";
 const LISTA = `
   SELECT c.id, c.subject AS klient, c.updated_at AS ostatniaWiadomoscAt, c.unread,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
+         c.status, c.snoozed_until AS odlozoneDo,
          (SELECT m.body FROM message m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1)
            AS ostatniaWiadomosc
     FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id`;
 
-const naRozmowe = (w: Record<string, unknown>): RozmowaSkrzynki => ({
-  id: Number(w.id), klient: String(w.klient ?? "Klient"),
-  ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
-  ostatniaWiadomoscAt: String(w.ostatniaWiadomoscAt),
-  nieprzeczytana: Boolean(Number(w.unread)),
-  wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
-  wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
-  wersja: Number(w.wersja),
-});
+const naRozmowe = (w: Record<string, unknown>, teraz = Date.now()): RozmowaSkrzynki => {
+  const odlozoneDo = w.odlozoneDo === null ? null : String(w.odlozoneDo);
+  const minal = Boolean(odlozoneDo && Date.parse(odlozoneDo) <= teraz);
+  return {
+    id: Number(w.id), klient: String(w.klient ?? "Klient"),
+    ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
+    ostatniaWiadomoscAt: String(w.ostatniaWiadomoscAt),
+    nieprzeczytana: Boolean(Number(w.unread)),
+    wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
+    wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
+    wersja: Number(w.wersja),
+    /* Ta sama reguła co w `statusRozmowy`, liczona tu bez dodatkowego zapytania
+       na wiersz: odłożenie kończy się samo, a status zapisany w kolumnie zostaje
+       `snoozed` do najbliższej ręcznej zmiany. */
+    status: (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+    odlozoneDo,
+    poTerminie: String(w.status) === "snoozed" && minal,
+  };
+};
 
 export function stanSkrzynki(): StanSkrzynki {
   const s = db().prepare(
@@ -82,7 +102,7 @@ export function stanObslugiHealth(teraz = Date.now()) {
 
 export function listaRozmow(): RozmowaSkrzynki[] {
   return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
-    .map(naRozmowe);
+    .map((w) => naRozmowe(w));
 }
 
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
@@ -179,6 +199,26 @@ export function osRozmowy(id: number): {
          cudza wiadomość — a §6.4 żąda dokładnie odwrotnego. */
       odKlienta: false, tresc: String(k.body), at: String(k.created_at), ofertaId: null,
       ...(wzmianki.has(Number(k.id)) ? { wzmianki: wzmianki.get(Number(k.id)) } : {}),
+    });
+  }
+
+  /* ZMIANY STATUSU (0.158.0). §10.3 wymienia je wprost wśród rzeczy, które
+     ma nieść oś. Nie są ozdobą: „dlaczego ta rozmowa wróciła na wierzch"
+     odpowiada wyłącznie wpis mówiący, że klient dopisał do sprawy uznanej za
+     rozwiązaną. Autor bywa KLIENTEM, nie agentem — patrz `obudzPrzychodzaca`.
+
+     `created_at` bierzemy z wiersza zdarzenia, bo oś sortuje się po czasie
+     i wpis bez daty wylądowałby na samej górze, przed pierwszym pytaniem. */
+  for (const z of db().prepare(`
+    SELECT id, payload, created_at FROM conversation_event
+     WHERE conversation_id=? AND event_type='status_changed' ORDER BY id
+  `).all(id) as Array<Record<string, unknown>>) {
+    const p = JSON.parse(String(z.payload ?? "{}")) as
+      { przed?: string; po?: string; autor?: string };
+    os.push({
+      id: `status-${z.id}`, rodzaj: "status", autor: String(p.autor ?? "system"),
+      odKlienta: false, tresc: `${p.przed ?? "?"} → ${p.po ?? "?"}`,
+      at: String(z.created_at), ofertaId: null,
     });
   }
 

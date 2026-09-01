@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { OsRozmowy, Rozmowa, StanSkrzynki, WynikWysylki, Zadanie, Zdrowie } from "./typy";
+import type {
+  OsRozmowy, Rozmowa, StanSkrzynki, StatusRozmowy, WynikWysylki, Zadanie, Zdrowie,
+} from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
    że unieważnienie mija się z zapytaniem o jedną literę — i ekran pokazuje
@@ -78,6 +80,28 @@ export function useZapiszSzkic() {
         }),
       }),
     onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) }),
+  });
+}
+
+/**
+ * Zmiana statusu rozmowy (§7).
+ *
+ * Bez blokady optymistycznej i to jest wybór, nie przeoczenie: status nie
+ * jest treścią, którą dwoje ludzi pisze naraz. Dwa kliknięcia w tej samej
+ * sekundzie dają stan tego, kto kliknął później — a oś pokazuje oba przejścia
+ * z podpisami, więc nic nie ginie po cichu.
+ */
+export function useUstawStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; status: StatusRozmowy; doKiedy?: string | null }) =>
+      api<{ status: StatusRozmowy; snoozedUntil: string | null }>(
+        `/api/obsluga/rozmowy/${v.id}/status`,
+        { method: "POST", body: JSON.stringify({ status: v.status, doKiedy: v.doKiedy ?? null }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+    },
   });
 }
 

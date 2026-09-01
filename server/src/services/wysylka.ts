@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
-import { ConversationConflict } from "./conversations.js";
+import { ConversationConflict, zmienStatus } from "./conversations.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import { logEvent } from "./events.js";
 import { wyslijDoAllegro, type WyslijDoAllegro } from "./allegro-wysylka.js";
@@ -203,6 +203,11 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     /* Szkic znika dopiero po UDANEJ wysyłce. Przy każdym innym końcu zostaje
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */
     database.prepare("DELETE FROM conversation_draft WHERE conversation_id=?").run(z.conversationId);
+
+    /* ODPOWIEDŹ PRZESTAWIA ROZMOWĘ NA CZEKANIE (§7, 0.158.0). Piłka jest po
+       stronie klienta i kolejka ma to pokazywać sama — status wymagający
+       osobnego kliknięcia po każdej wysyłce zostałby pomijany. */
+    zmienStatus(database, z.conversationId, "waiting_for_customer", z.autor.id, null);
 
     logEvent("rozmowa_wyslana", z.autor.name, null,
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,

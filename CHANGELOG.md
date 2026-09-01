@@ -34,6 +34,63 @@ historii nie przepisujemy.
 ---
 
 
+## 0.158.0 — 1 września 2026
+
+**Rozmowa nie miała statusu, więc kolejka nie odróżniała sprawy załatwionej
+od nietkniętej.**
+
+`conversation` nie miała kolumny stanu. Lista pokazywała wszystko obok siebie
+w kolejności ostatniej wiadomości, a jedynym podziałem był właściciel. Sprawa
+zamknięta wczoraj leżała między pytaniami z dzisiaj, a §7 projektu panelu —
+osiem statusów rozmowy — istniał wyłącznie na papierze.
+
+### Osiem statusów z §7 wchodzi do bazy
+
+`conversation.status` z `CHECK` na zamkniętej liście i `snoozed_until` obok.
+Lista stoi w trzech miejscach: w bazie, w `STATUSY_ROZMOWY` na serwerze
+i w typach panelu. Każda kopia pilnuje innej granicy, a rozjazd wychodzi przy
+kompilacji albo przy zapisie.
+
+### Trzy przejścia dzieją się same
+
+Przejęcie rozmowy prowadzi `new` → `open`. Wysłana odpowiedź stawia
+`waiting_for_customer`. Przychodząca wiadomość klienta budzi rozmowę do `open`
+i to jest sedno wydania: bez tego przejścia klient dopisuje do sprawy uznanej
+za rozwiązaną, a rozmowa zostaje na liście „rozwiązane" i nikt do niej nie
+zagląda. Status, który nie wraca sam, jest gorszy niż jego brak.
+
+Budzenie omija `closed` i `spam`. To jawne werdykty człowieka, a automat, który
+je cofa, kazałby zamykać tę samą rozmowę w kółko.
+
+### Odłożenie kończy się samo, bez tickera
+
+`snoozed` wymaga terminu — §7 nie zna rozmowy odłożonej na zawsze. Koniec
+odłożenia liczymy PRZY ODCZYCIE: stan wyliczalny nie potrzebuje procesu, który
+go pilnuje, a ticker, który raz nie wstanie, zostawiłby rozmowy odłożone na
+zawsze. Rozmowa po minionym terminie wraca jako otwarta i niesie znacznik
+„po terminie", bo inaczej nie różniłaby się od świeżo otwartej.
+
+### Kolejka dostaje kubełki z §10.1
+
+Wszystkie, Nieprzypisane, Moje, Oczekujące, Po terminie — z licznikiem przy
+każdym. Zamknięte i spam schodzą z kolejki roboczej, ale zostają
+we „Wszystkich": ukrycie ich wszędzie znaczyłoby, że pomyłkowego zamknięcia nie
+da się cofnąć. Pusty kubełek mówi co innego niż pusta skrzynka.
+
+### Zmiana statusu ląduje na osi
+
+§10.3 wymienia ją wśród wpisów osi. Wpis jest kreską, nie kafelkiem — to nie
+czyjaś wypowiedź, tylko znak, że sprawa przeszła dalej. Autorem bywa KLIENT,
+nie agent: podpisanie budzenia agentem kłamałoby w audycie o tym, kto co
+zrobił. Każda zmiana idzie też do dziennika jako `rozmowa_status`.
+
+Automatycznego zamknięcia po N dniach NIE MA i nie wchodzi tym wydaniem —
+§26 wymienia je wśród pytań do właściciela.
+
+**[wymaga działania]** Migracja dokłada dwie kolumny do `conversation`.
+Rozmowy zastane dostają status `new`, bo tak wygląda prawda o nich: przyjechały
+z synchronizacji i nikt ich nie tknął.
+
 ## 0.157.0 — 1 września 2026
 
 **Komentarz wewnętrzny był funkcją do zapisu bez odczytu.**

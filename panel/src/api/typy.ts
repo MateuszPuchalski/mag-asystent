@@ -1,6 +1,13 @@
 /* Kształty odpowiedzi serwera. Trzymane osobno, bo czytają je i ekrany,
    i testy — a duplikat rozjechałby się przy pierwszym nowym polu. */
 
+/* Lista ZAMKNIĘTA, wprost z §7 projektu panelu. Ten sam komplet stoi
+   w `STATUSY_ROZMOWY` na serwerze i w `CHECK` na kolumnie — trzy kopie jednej
+   listy, bo każda pilnuje innej granicy: typów, API i bazy. */
+export type StatusRozmowy =
+  | "new" | "open" | "waiting_for_customer" | "waiting_for_internal"
+  | "snoozed" | "resolved" | "closed" | "spam";
+
 export type Rozmowa = {
   id: number;
   klient: string;
@@ -10,6 +17,11 @@ export type Rozmowa = {
   wlascicielId: number | null;
   wlasciciel: string | null;
   wersja: number;
+  /** Status WYLICZONY: odłożenie po terminie przyjeżdża już jako `open`. */
+  status: StatusRozmowy;
+  odlozoneDo: string | null;
+  /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
+  poTerminie: boolean;
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
@@ -19,7 +31,7 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz";
+  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status";
   autor: string;
   odKlienta: boolean;
   tresc: string;

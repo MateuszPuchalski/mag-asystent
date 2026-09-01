@@ -81,6 +81,8 @@ const TRASY = () => [
     payload: { ofertaId: "14892374512" } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
+    payload: { status: "resolved" } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -162,7 +164,11 @@ test("mutacje przez trasę zostawiają ślad w dzienniku", async () => {
   const typy = (db().prepare(
     "SELECT type FROM events WHERE type LIKE 'rozmowa_%' ORDER BY id").all() as Array<{type:string}>)
     .map((w) => w.type);
-  assert.deepEqual(typy, ["rozmowa_przejeta", "rozmowa_komentarz"]);
+  /* `rozmowa_status` doszło w 0.158.0: przejęcie otwiera rozmowę, więc zostawia
+     DWA ślady — o przejęciu i o zmianie stanu. Kolejność jest znacząca, bo
+     audyt czyta się z góry na dół: status zmieniony przed przejęciem
+     opowiadałby, że rozmowa otworzyła się sama. */
+  assert.deepEqual(typy, ["rozmowa_przejeta", "rozmowa_status", "rozmowa_komentarz"]);
 });
 
 test("wymuszone przekazanie wymaga administratora, nie samego biura", async () => {
@@ -324,4 +330,33 @@ test("pobranie załącznika: rola, stan i nieznane id", async () => {
   const nieznany = await app.inject({ method: "GET",
     url: "/api/obsluga/zalaczniki/99999", headers: biuro.naglowki });
   assert.equal(nieznany.statusCode, 404);
+});
+
+test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async () => {
+  /* Dwa różne błędy o tym samym kodzie, bo oba są pomyłką wołającego, nie
+     stanem rozmowy. Trasa sprawdza NAZWĘ (lista §7 jest zamknięta), a serwis
+     TERMIN — i tylko test przez HTTP pokazuje, że obie bramki naprawdę stoją
+     na drodze żądania, a nie tylko w kodzie obok. */
+  const b = login("biuro", "Anna");
+
+  const zmyslony = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "zalatwione" } });
+  assert.equal(zmyslony.statusCode, 400);
+  assert.match(zmyslony.json().error, /waiting_for_customer/, "błąd ma wymienić dozwolone stany");
+
+  const bezTerminu = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "snoozed" } });
+  assert.equal(bezTerminu.statusCode, 400);
+
+  const stan = db().prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string };
+  assert.equal(stan.status, "new", "odrzucone żądanie nie ma prawa ruszyć rozmowy");
+
+  const dobre = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "snoozed", doKiedy: "2026-09-08T07:00:00.000Z" } });
+  assert.equal(dobre.statusCode, 200, dobre.body);
+  assert.equal(dobre.json().snoozedUntil, "2026-09-08T07:00:00.000Z");
 });

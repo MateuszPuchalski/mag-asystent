@@ -4,6 +4,7 @@ import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.ht
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import { obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
 
@@ -303,6 +304,13 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          daty wiadomości nie podaje. Podaje: `createdAt`. */
       message.createdAt);
     if (wynik.changes > 0) {
+      /* PRZYCHODZĄCA BUDZI ROZMOWĘ (§7, 0.158.0). Klient dopisujący pytanie do
+         sprawy uznanej za załatwioną musi ją z powrotem otworzyć — inaczej
+         rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
+         Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
+      if (flaga(message.author.isInterlocutor, "author.isInterlocutor")) {
+        obudzPrzychodzaca(database, rozmowa);
+      }
       /* Załączniki wchodzą TYLKO razem z nową wiadomością. Wiadomości nie
          nadpisujemy (wiszą na nich szkice i zadania), więc powtórny przebieg
          nie ma tu czego robić — i dzięki temu nie trzeba osobnego klucza
