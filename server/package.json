@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.140.1",
+  "version": "0.141.0",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "worker": "tsx watch src/worker/worker.ts",
     "seed": "tsx src/db/seed.ts",
     "seed:scenariusze": "tsx src/db/seed-scenariusze.ts",
-    "build": "tsc -p tsconfig.build.json && node -e \"const f=require('fs');f.copyFileSync('src/db/schema.sql','dist/db/schema.sql');f.mkdirSync('dist/web',{recursive:true});f.copyFileSync('src/web/biuro.html','dist/web/biuro.html');f.cpSync('src/web/fonty','dist/web/fonty',{recursive:true})\"",
+    "build": "tsc -p tsconfig.build.json && node -e \"const f=require('fs');f.copyFileSync('src/db/schema.sql','dist/db/schema.sql');f.mkdirSync('dist/web',{recursive:true});f.copyFileSync('src/web/biuro.html','dist/web/biuro.html');f.cpSync('src/web/fonty','dist/web/fonty',{recursive:true});f.cpSync('../panel/dist','dist/web/obsluga',{recursive:true})\"",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker/worker.js",
     "test": "tsx --test src/*.test.ts src/**/*.test.ts",

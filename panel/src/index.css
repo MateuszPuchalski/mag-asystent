@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face { font-family: Barlow; src: url('/biuro/fonty/barlow_regular.ttf'); }
+@font-face { font-family: Barlow; src: url('/biuro/fonty/barlow_bold.ttf'); font-weight: 700; }
+
+@layer base {
+  body { @apply m-0 bg-slate-100 font-sans text-slate-900; }
+  button, input, textarea, select { @apply font-sans; }
+}
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wertis-amber px-4 py-2 text-sm font-bold text-wertis-ink transition hover:bg-amber-500 disabled:opacity-50; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold transition hover:bg-slate-50; }
+  .card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+  .field { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-wertis-amber focus:ring-2 focus:ring-amber-100; }
+}

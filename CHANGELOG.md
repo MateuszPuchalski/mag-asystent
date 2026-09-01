@@ -33,6 +33,28 @@ historii nie przepisujemy.
 
 ---
 
+## 0.141.0 — 31 sierpnia 2026
+
+**Pierwszy kawałek nowej obsługi klienta: zadania terenowe.** Biuro otwiera
+osobny panel pod `/obsluga`, zbudowany w React i Tailwind CSS. Z panelu zleca
+magazynowi pomiar, zdjęcie albo weryfikację fizycznego towaru.
+
+**Zadanie trafia prosto na kolektory.** Bursztynowy baner pokazuje liczbę
+oczekujących zadań na każdym ekranie. Magazynier przejmuje zadanie, widzi
+symbol oraz półkę, a wynik odsyła bez komunikatora i bez zmiany aplikacji.
+
+**Jedno zadanie ma jednego wykonawcę.** Warunkowy zapis w bazie rozstrzyga
+wyścig dwóch kolektorów. Utworzenie, przejęcie, wykonanie i anulowanie zostawia
+imienny wpis w audycie.
+
+**Reguła „jeden front" zastąpiona regułą dwóch.** `biuro.html` zostaje bez
+bundlera i obsługuje magazyn; obsługa klienta dostaje `panel/`. Uzasadnienie
+wraz z kosztem stoi w `docs/obsluga-klienta.md` §7 — rozdziale, który
+`CLAUDE.md` wskazywał jako jedyne miejsce na tę zmianę. Trzeciego frontu nie ma.
+
+**[wymaga działania] Nowy APK.** Serwer udostępnia nowe API od razu po
+aktualizacji. Zadania na hali wymagają aktualizacji aplikacji kolektora.
+
 ## 0.140.1 — 30 sierpnia 2026
 
 **Sprzątanie po kasacji obsługi klienta.** Zero zmian w działaniu: 725 wierszy

@@ -45,6 +45,8 @@ import pl.wertis.kolektor.ui.problems.ProblemsScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
+import pl.wertis.kolektor.ui.tasks.FieldTasksScreen
+import pl.wertis.kolektor.ui.tasks.FieldTasksBanner
 import pl.wertis.kolektor.ui.scan.globalScan
 import pl.wertis.kolektor.ui.setup.SetupScreen
 import pl.wertis.kolektor.ui.splash.SplashScreen
@@ -162,6 +164,9 @@ fun AppRoot(graph: AppGraph) {
         if (screen != Screen.PROBLEMS) {
             ProblemsBanner(problems.size) { graph.nav.openProblems() }
         }
+        if (screen != Screen.FIELD_TASKS) {
+            FieldTasksBanner(graph) { graph.nav.openFieldTasks() }
+        }
         Box(Modifier.weight(1f).fillMaxSize()) {
             when (screen) {
                 Screen.HOME -> HomeScreen(graph)
@@ -177,6 +182,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)
+                Screen.FIELD_TASKS -> FieldTasksScreen(graph)
                 Screen.SPLASH -> {}
                 Screen.SETUP -> {}
             }

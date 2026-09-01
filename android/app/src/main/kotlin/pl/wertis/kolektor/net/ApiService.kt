@@ -397,6 +397,16 @@ interface ApiService {
     @GET("api/aktualizacja/apk")
     suspend fun apk(): Response<ResponseBody>
 
+    // Zadania z panelu obsługi klienta trafiają wprost na kolektor.
+    @GET("api/zadania-terenowe")
+    suspend fun zadaniaTerenowe(@Query("moje") moje: String = "1"): pl.wertis.kolektor.core.net.ZadaniaTerenoweResponse
+
+    @POST("api/zadania-terenowe/{id}/wez")
+    suspend fun zadanieTerenoweWez(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
+
+    @POST("api/zadania-terenowe/{id}/wykonaj")
+    suspend fun zadanieTerenoweWykonaj(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.WynikZadaniaBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
+
     @GET("api/magazyny")
     suspend fun listMagazyny(): MagazynyResponse
 

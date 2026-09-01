@@ -1104,3 +1104,27 @@ data class OdlozKoszResponse(val ok: Boolean = true, val mismatch: Boolean = fal
 /** Pominięcie pozycji, której w koszu nie ma. Powód jest treścią zgłoszenia. */
 @Serializable
 data class PominKoszBody(val powod: String)
+
+/* Zadanie z panelu obsługi klienta — pomiar lub weryfikacja przy fizycznym towarze. */
+@Serializable
+data class ZadanieTerenowe(
+    val id: Long,
+    val rodzaj: String,
+    val tytul: String,
+    val instrukcja: String,
+    val twId: Long? = null,
+    val symbol: String? = null,
+    val nazwaTowaru: String? = null,
+    val lokalizacja: String? = null,
+    val priorytet: String = "normalny",
+    val status: String,
+    val utworzonoAt: String,
+    val utworzonoPrzez: String,
+    val przypisanoPrzez: String? = null,
+    val przypisanoUserId: Long? = null,
+    val wynik: String? = null,
+    val wykonanoPrzez: String? = null,
+)
+@Serializable data class ZadaniaTerenoweResponse(val zadania: List<ZadanieTerenowe> = emptyList())
+@Serializable data class ZadanieTerenoweResponse(val zadanie: ZadanieTerenowe)
+@Serializable data class WynikZadaniaBody(val wynik: String)

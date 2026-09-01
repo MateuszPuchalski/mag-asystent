@@ -1,16 +1,21 @@
 # WERTIS — zasady pracy w tym repo
 
 Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
-(`server/`), jeden ręcznie pisany panel biura (`server/src/web/biuro.html`,
-bez bundlera), kolektor Android (`android/`). Architektura i decyzje:
+(`server/`), ręcznie pisany panel biura (`server/src/web/biuro.html`, bez
+bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
+(`android/`). Architektura i decyzje:
 `docs/architektura.md`. Ten plik mówi tylko, CZEGO pilnować przy zmianach.
 
 ## Twarde zasady
 
 - **Komentarze po polsku i wyjaśniają DLACZEGO**, nie co robi następna linia.
   Decyzja bez uzasadnienia w komentarzu to decyzja do wycofania.
-- **Jeden front.** Panel biura to `biuro.html` — żadnego drugiego frontu,
-  frameworka ani bundlera. Funkcje w jego `<script>` nie mogą się powtarzać
+- **Dwa fronty, każdy ze swoją granicą.** Do 0.141.0 front był jeden. Decyzja
+  właściciela z `docs/obsluga-klienta.md` §7 dołożyła drugi: obsługa klienta
+  dostaje `panel/` (React + Vite, build do `dist/web/obsluga`). Magazyn zostaje
+  w `biuro.html` — bez frameworka i bez bundlera, bo nic tam tego nie wymaga.
+  Nowy ekran magazynu idzie do `biuro.html`, nowy ekran obsługi do `panel/`.
+  Trzeciego frontu nie ma. Funkcje w `<script>` biura nie mogą się powtarzać
   z nazwy (test dubli) ani wołać funkcji, której nie ma (test wywołań);
   delegacje kliknięć stoją na SEKCJACH, nie na pojemnikach w ich środku
   (test delegacji).
