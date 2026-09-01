@@ -658,7 +658,14 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   rodzaj TEXT NOT NULL CHECK (rodzaj IN ('pomiar','zdjecie','weryfikacja','inne')),
   tytul TEXT NOT NULL,
   instrukcja TEXT NOT NULL,
-  tw_id INTEGER REFERENCES sgt_towar(tw_id),
+  -- ON DELETE SET NULL, bo `sgt_towar` jest READ-MODELEM odtwarzanym przy
+  -- każdym imporcie z Subiekta: `importFromMssql` kasuje całą tabelę i wstawia
+  -- ją od nowa. Bez tej klauzuli klucz obcy trzymał wiersz towaru w zakładnikach
+  -- i KASOWANIE PADAŁO, a razem z nim całe API — import biegnie przed
+  -- nasłuchem, więc jedno zadanie ze wskazanym towarem kładło serwer w pętli
+  -- restartów. Zadanie i tak niesie własny snapshot symbolu oraz nazwy, więc
+  -- utrata samego powiązania nic mu nie zabiera.
+  tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
   zrodlo TEXT NOT NULL DEFAULT 'reczne',
   zrodlo_ref TEXT,
   priorytet TEXT NOT NULL DEFAULT 'normalny' CHECK (priorytet IN ('normalny','pilny')),
