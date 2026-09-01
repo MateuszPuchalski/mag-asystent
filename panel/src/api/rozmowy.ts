@@ -182,3 +182,40 @@ export function useWyslij() {
     },
   });
 }
+
+/**
+ * Komentarz wewnętrzny (0.157.0).
+ *
+ * Do tego wydania `conversation_comment` miała w kodzie serwera jeden INSERT
+ * i zero odczytów — notatka agenta przepadała. Trasa istniała, ekranu nie było.
+ */
+export function useDodajKomentarz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; body: string; mentionedUserIds: number[] }) =>
+      api<{ id: number }>(`/api/obsluga/rozmowy/${v.rozmowaId}/komentarz`,
+        { method: "POST", body: JSON.stringify({
+          body: v.body, mentionedUserIds: v.mentionedUserIds }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+    },
+  });
+}
+
+/**
+ * Konta do wzmianek — z istniejącej trasy `/api/users`.
+ *
+ * Bez własnej końcówki: lista kont jest już wystawiona biuru i adminowi,
+ * a drugi adres na te same dane znaczyłby dwa miejsca do pilnowania przy
+ * zmianie ról.
+ */
+export function useAgenci() {
+  return useQuery({
+    queryKey: ["agenci"],
+    queryFn: () => api<{ users: Array<{ userId: number; name: string; role: string }> }>("/api/users"),
+    staleTime: 5 * 60_000,
+    /* Hala nie dostaje listy kont (403) i to jest poprawne — wtedy po prostu
+       nie ma kogo wzmiankować, a ekran nie ma prawa się o to wywrócić. */
+    retry: false,
+  });
+}

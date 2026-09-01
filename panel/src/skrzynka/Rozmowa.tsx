@@ -27,6 +27,13 @@ export function Rozmowa(p: {
   onZlec: () => void;
   wysyla: boolean;
   onWyslij: () => void;
+  komentarz: string;
+  onKomentarz: (v: string) => void;
+  onDodajKomentarz: () => void;
+  komentuje: boolean;
+  agenci: Array<{ userId: number; name: string }>;
+  wzmianki: number[];
+  onWzmianki: (v: number[]) => void;
   konflikt: SzczegolyKonfliktu | null;
   mozeWymusic: boolean;
   wymusza: boolean;
@@ -108,6 +115,9 @@ export function Rozmowa(p: {
 
     <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
       zapisuje={p.zapisuje} wysyla={p.wysyla}
-      onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij} />
+      onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
+      komentarz={p.komentarz} onKomentarz={p.onKomentarz}
+      onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
+      agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki} />
   </section>;
 }

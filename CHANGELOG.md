@@ -34,6 +34,78 @@ historii nie przepisujemy.
 ---
 
 
+## 0.157.0 — 1 września 2026
+
+**Komentarz wewnętrzny był funkcją do zapisu bez odczytu.**
+
+`conversation_comment` miała w całym kodzie serwera JEDEN INSERT i ZERO
+odczytów. Agent mógł dodać notatkę, wiersz wpadał do tabeli i nie było drogi,
+którą wróciłby do kogokolwiek. Trasa istniała od 0.144.0, ekranu nie było
+nigdy, a §28 opisywał to jako „model gotowy, brak ekranu" — za łagodnie, bo
+brakowało też połowy modelu.
+
+### Komentarz wraca na oś
+
+§10.3 wymienia komentarz wśród rzeczy, które ma nieść oś rozmowy. Wchodzi jako
+trzeci rodzaj wpisu, razem z autorem i wzmiankami.
+
+`odKlienta` zostaje przy nim fałszem i to nie jest szczegół: na tym polu stoi
+cały wygląd wpisu klienta, więc komentarz z zapaloną flagą wyglądałby jak cudza
+wiadomość — dokładnie odwrotnie, niż żąda §6.4.
+
+### Oś jest chronologiczna
+
+Do tego wydania wyniki zadań doklejały się za wszystkimi wiadomościami bez
+względu na czas. Przy dwóch źródłach było to znośne; przy trzech oś przestawała
+opowiadać przebieg sprawy.
+
+Sortowanie jest STABILNE, więc wiadomości z tą samą datą zostają w kolejności
+identyfikatorów. To ważne: Allegro potrafi oddać dwie wiadomości z jedną
+sekundą, a wtedy porządek niesie `message.id`.
+
+### Dwa tryby, dwa pola, dwa przyciski
+
+§10.4 żąda, żeby przycisk komentarza i przycisk wysyłki były jednoznacznie
+rozdzielone; §6.4 dodaje, że komentarz „nie może przypadkiem trafić do
+klienta"; §25 stawia to wśród kryteriów gotowości.
+
+Rozdzieliliśmy najmocniej, jak się dało. **W trybie komentarza przycisk wysyłki
+nie istnieje w drzewie** — wyłączony da się kliknąć, gdy tryb zmieni się
+o ułamek sekundy za późno; nieistniejącego nie da się nigdy.
+
+Pola też są osobne. Gdyby oba tryby dzieliły jeden tekst, notatka „klient bywa
+trudny" zostawałaby w szkicu po przełączeniu z powrotem i czekała na kliknięcie
+WYŚLIJ.
+
+Komentowanie nie wymaga prowadzenia rozmowy: notatka zespołu to nie odpowiedź,
+a kolega ma prawo dopisać „to ten sam klient co wczoraj" bez przejmowania
+sprawy.
+
+### Wzmianki
+
+Wybiera się je z listy kont, nie wpisuje z palca. Lista idzie z istniejącej
+trasy `/api/users` — bez własnej końcówki, bo drugi adres na te same dane
+znaczyłby dwa miejsca do pilnowania przy zmianie ról. Hala dostaje tam 403
+i to jest poprawne: wtedy po prostu nie ma kogo wzmiankować.
+
+### Test, który przechodził przypadkiem
+
+Pierwsza wersja strażnika §25 wołała `payloadAllegroWiadomosci` z numerem
+komentarza i sprawdzała, że funkcja rzuci. Przechodziła — ale z niewłaściwego
+powodu.
+
+`conversation_comment.id` i `message.id` to dwie NIEZALEŻNE sekwencje, więc oba
+bywają jedynką. Przy kolizji tamta funkcja oddałaby cudzą wiadomość zamiast
+rzucić; test mierzył szczęście w doborze danych. Sprawdzone osobnym skryptem:
+przy pierwszym komentarzu i pierwszej wiadomości oba identyfikatory to 1.
+
+Granica okazała się zdrowa z innego powodu: wysyłka bierze TEKST ze szkicu, nie
+identyfikator, a `payloadAllegroWiadomosci` nie ma dziś żadnego wołającego.
+Nowy test sprawdza to, co jest prawdą — treść komentarza nie trafia ani do
+`message`, ani do `conversation_draft`.
+
+Wdrożenie: nic ręką, bez migracji.
+
 ## 0.156.0 — 1 września 2026
 
 **Kolejka bramek przestaje być dekoracją.**

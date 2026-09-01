@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import {
-  useJa, usePrzejmij, usePrzekaz, useRozmowa, useRozmowy, useSynchronizuj,
-  useWskazOferte, useWyslij, useZapiszSzkic, useZdrowie, useZlecPomiar,
+  useAgenci, useDodajKomentarz, useJa, usePrzejmij, usePrzekaz, useRozmowa,
+  useRozmowy, useSynchronizuj, useWskazOferte, useWyslij, useZapiszSzkic,
+  useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
@@ -35,7 +36,15 @@ export function Skrzynka() {
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
 
+  const agenci = useAgenci();
+  const dodajKomentarz = useDodajKomentarz();
+
   const [szkic, setSzkic] = useState("");
+  /* Komentarz ma WŁASNY stan, osobny od szkicu. Gdyby dzieliły jeden, notatka
+     „klient bywa trudny" zostawałaby w szkicu po przełączeniu trybu i czekała
+     na kliknięcie WYŚLIJ (§6.4). */
+  const [komentarz, setKomentarz] = useState("");
+  const [wzmianki, setWzmianki] = useState<number[]>([]);
   const [zrodlo, setZrodlo] = useState<number | null>(null);
   const [wskazowka, setWskazowka] = useState("");
   const [towar, setTowar] = useState<Towar | null>(null);
@@ -131,6 +140,19 @@ export function Skrzynka() {
         { id: rozmowa.data.rozmowa.id, expectedVersion: rozmowa.data.rozmowa.wersja },
         { onError: zglosPrzejecie, onSuccess: () => setKonflikt(null) })}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
+      komentarz={komentarz}
+      onKomentarz={setKomentarz}
+      komentuje={dodajKomentarz.isPending}
+      /* Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie
+         odpowiedź do klienta. */
+      onDodajKomentarz={() => rozmowa.data && dodajKomentarz.mutate(
+        { rozmowaId: rozmowa.data.rozmowa.id, body: komentarz, mentionedUserIds: wzmianki },
+        { onSuccess: () => { setKomentarz(""); setWzmianki([]); } })}
+      agenci={(agenci.data?.users ?? [])
+        .filter((u) => u.userId !== ja.data?.user.userId)
+        .map((u) => ({ userId: u.userId, name: u.name }))}
+      wzmianki={wzmianki}
+      onWzmianki={setWzmianki}
       onSzkic={setSzkic}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;
