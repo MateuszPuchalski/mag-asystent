@@ -33,6 +33,29 @@ historii nie przepisujemy.
 
 ---
 
+## 0.145.0 — 1 września 2026
+
+**Agent przestaje wpisywać numer towaru z pamięci.** Formularz zadania
+i zlecenie pomiaru ze skrzynki dostają wyszukiwarkę po symbolu, nazwie i EAN-ie.
+Wybrany towar pokazuje symbol, nazwę i półkę, więc widać, co poszło na halę.
+
+**Wskazana kartoteka jest podpisana nazwiskiem.** Zadanie zapisuje, że towar
+wskazał agent, a nie że wynika z oferty Allegro. Gdy dojdzie kartoteka
+wywiedziona z oferty, te dwie rzeczy nie będą wyglądać tak samo.
+
+**Projekt docelowy panelu wchodzi do repo.** `docs/panel-obslugi-klienta.md`
+opisuje skrzynkę zespołową, dobór części, bazę wiedzy, zadania terenowe
+i granicę automatu. Rozdział 28 mówi, co z tego już działa i od której wersji —
+w tym repo dwa razy zdarzyło się zbudować drugi raz coś, co stało.
+
+**Osiem pytań z `docs/obsluga-klienta.md` ma pięć nowych odpowiedzi.** Bez
+odpowiedzi zostaje pytanie o zwroty, których projekt nie dotyka, oraz połowa
+pytania o gotowość: dopuszczalnej długości przerwy w pracy biura nikt nie nazwał.
+
+**Panel kosztuje odtąd osiem bibliotek zamiast trzech.** Decyzja właściciela
+zapisana w §7 razem z tym, co za nie kupujemy. Odwraca to odrzucenie TanStacka
+z 0.143.0 — przedwczesny przestaje być, gdy ekranów jest kilka.
+
 ## 0.144.0 — 1 września 2026
 
 **Rozmowy z Allegro trafiają wreszcie do modelu obsługi.** Synchronizator

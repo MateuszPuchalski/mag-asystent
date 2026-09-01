@@ -129,3 +129,30 @@ test("wynik zadania z rozmowy zapisze tylko ten, kto je przejął", () => {
   assert.throws(() => wykonajZadanie(zadanie.id, "48 mm", { id: 999, name: "Ktoś inny" }),
     /przejęte przez Ciebie/);
 });
+
+/* ── Kartoteka wskazana przez agenta (0.145.0) ─────────────────────────────
+   Agent nie wpisuje `tw_id`, tylko wskazuje towar wyszukiwarką. Zadanie ma
+   zapisać, że to JEGO wybór — bo wkrótce dojdzie kartoteka wywiedziona
+   z oferty i te dwie rzeczy nie mogą wyglądać tak samo. */
+
+test("wskazana kartoteka ląduje na zadaniu i jest podpisana jako wybór agenta", () => {
+  db().prepare(
+    "INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (1042,'ROZ-GCV','Rozrusznik kompletny GCV')",
+  ).run();
+  const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO, 1042);
+  assert.equal(z.twId, 1042);
+  assert.match(z.instrukcja, /Kartotekę wskazał\(a\) Biuro, nie wynika z oferty/);
+});
+
+test("nieistniejąca kartoteka odrzucona, zadanie nie powstaje", () => {
+  const przed = (db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n;
+  assert.throws(() => zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO, 987654), /Nie znaleziono towaru/);
+  assert.equal((db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n, przed);
+});
+
+test("bez wskazania kartoteki zadanie idzie jak dotąd, bez podpisu o wyborze", () => {
+  const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO);
+  assert.equal(z.twId, null);
+  assert.doesNotMatch(z.instrukcja, /wskazał/);
+  assert.match(z.instrukcja, /Oferta Allegro: oferta-9/);
+});

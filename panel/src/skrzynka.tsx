@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bell, Inbox, Lock, RefreshCw, Ruler, Send, UserCheck } from "lucide-react";
+import { Wyszukiwarka, type Towar } from "./wyszukiwarka";
 
 /* Ekran skrzynki jest CZYTELNIKIEM modelu kanonicznego, nie klientem Allegro.
    Dlatego pokazuje moment ostatniej synchronizacji: pusta lista o 9:00 znaczy
@@ -22,6 +23,7 @@ export function Skrzynka({ api, mojeId }: { api: (p: string, i?: RequestInit) =>
   const [szkicWersja, setSzkicWersja] = useState<number | null>(null);
   const [zrodlo, setZrodlo] = useState<number | null>(null);
   const [wskazowka, setWskazowka] = useState("");
+  const [towar, setTowar] = useState<Towar | null>(null);
   const [nowa, setNowa] = useState(false);
   const [err, setErr] = useState("");
   const [laduje, setLaduje] = useState(true);
@@ -36,7 +38,7 @@ export function Skrzynka({ api, mojeId }: { api: (p: string, i?: RequestInit) =>
   useEffect(() => { wczytaj(); }, []);
 
   async function otworz(id: number) {
-    wybranaRef.current = id; setZrodlo(null); setWskazowka(""); setNowa(false);
+    wybranaRef.current = id; setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false);
     history.replaceState(null, "", `/obsluga/skrzynka?rozmowa=${id}`);
     try {
       const d = await api(`/api/obsluga/rozmowy/${id}`);
@@ -114,9 +116,12 @@ export function Skrzynka({ api, mojeId }: { api: (p: string, i?: RequestInit) =>
     try {
       await api("/api/obsluga/zadania/pomiar", {
         method: "POST",
-        body: JSON.stringify({ rozmowaId: wybrana.id, wiadomoscId: zrodlo, instrukcja: wskazowka }),
+        body: JSON.stringify({
+          rozmowaId: wybrana.id, wiadomoscId: zrodlo, instrukcja: wskazowka,
+          twId: towar ? towar.id : null,
+        }),
       });
-      setWskazowka(""); setZrodlo(null); otworz(wybrana.id);
+      setWskazowka(""); setZrodlo(null); setTowar(null); otworz(wybrana.id);
     } catch (x) { setErr((x as Error).message); }
   }
 
@@ -185,6 +190,10 @@ export function Skrzynka({ api, mojeId }: { api: (p: string, i?: RequestInit) =>
               </article>)}
         </div>
         {zrodlo && <div className="border-t bg-amber-50 p-4">
+          {/* Kartoteki nie wywiedziemy dziś z oferty, więc agent może ją wskazać.
+              Zadanie zapisze, że to jego wybór, a nie fakt z Allegro. */}
+          <div className="mb-3"><div className="mb-1 text-sm font-semibold">Kartoteka dla hali <span className="font-normal text-slate-500">(opcjonalnie)</span></div>
+            <Wyszukiwarka wybrany={towar} onWybierz={setTowar} api={api} etykieta="Wskazana przez Ciebie" /></div>
           <label className="block text-sm font-semibold">Wskazówka dla hali <span className="font-normal text-slate-500">(opcjonalnie)</span>
             <input className="field mt-1" value={wskazowka} onChange={(e) => setWskazowka(e.target.value)} placeholder="Np. podaj wynik w milimetrach" /></label>
           <button className="btn-primary mt-3" onClick={zlec}><Ruler size={16} />ZLEĆ POMIAR</button>
