@@ -1,1 +1,27 @@
-{"name":"@wertis/panel-obslugi","private":true,"type":"module","scripts":{"dev":"vite","build":"tsc -b && vite build","preview":"vite preview"},"dependencies":{"@vitejs/plugin-react":"latest","vite":"latest","typescript":"latest","react":"latest","react-dom":"latest","lucide-react":"latest","tailwindcss":"^3.4.17","postcss":"latest","autoprefixer":"latest"},"devDependencies":{"@types/react":"latest","@types/react-dom":"latest"}}
+{
+  "name": "@wertis/panel-obslugi",
+  "private": true,
+  "type": "module",
+  "description": "WERTIS — panel obsługi klienta (React, Vite, Tailwind). Serwowany pod /obsluga.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "//": "Wersje przypięte zakresem, jak w server/package.json. Do 0.145.1 stało tu dziewięć razy \"latest\" — i tak React przeskoczył z 18 na 19 przy zwykłym npm install, bez żadnej decyzji i bez wpisu w CHANGELOG-u. Lockfile chroni npm ci; to chroni resztę.",
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "lucide-react": "^1.38.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2"
+  }
+}

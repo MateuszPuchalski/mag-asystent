@@ -33,6 +33,34 @@ historii nie przepisujemy.
 
 ---
 
+## 0.145.1 — 1 września 2026
+
+**Przejęcie rozmowy przestaje zapisywać się w ciszy.** Przejęcie, zapis szkicu
+i komentarz wewnętrzny zostawiają wpis w dzienniku zdarzeń. Do tej pory
+`services/conversations.ts` nie wołał `logEvent` ani razu.
+
+To jest blizna 0.137.1 kupiona drugi raz. Wtedy trzy przejęcia sprawy
+przechodziły bez śladu; teraz to samo dotyczyło rozmów z nowego modelu obsługi.
+Dziennik niesie wersję rozmowy przed i po, ale nigdy treści — rozdział 19
+projektu panelu zabrania wpuszczać wiadomości do ogólnego logu.
+
+**Rozmowa zapisuje historię przypisań, nie samo pole właściciela.** Tabela
+`conversation_assignment` stała pusta od 0.144.0, bo nikt do niej nie pisał.
+Bez czasu przejęcia ekran przegranego wyścigu nie ma czego pokazać poza nazwiskiem.
+
+**Trasy skrzynki i serwis rozmów dostają testy.** Osiem tras stało bez ani
+jednego sprawdzenia, w tym bramka roli na odczycie. Nowe testy pilnują, że hala
+nie zobaczy rozmów, że patrzenie na skrzynkę niczego nie zapisuje i że konflikt
+wersji wraca jako 409 z właścicielem.
+
+**`logEvent` przyjmuje bazę parametrem.** Bez tego audyt mutacji rozmowy pisałby
+poza transakcją, która tę mutację obejmuje. Przy okazji `migrate` jest
+eksportowane: baza zbudowana z samego `schema.sql` nie ma kolumny `user_ref`,
+więc test na takiej bazie sprawdzał kształt nieistniejący na produkcji.
+
+**Panel przestaje zamawiać dziewięć bibliotek jako `"latest"`.** Tak React
+przeskoczył z 18 na 19 przy zwykłym `npm install`, bez decyzji i bez wpisu tutaj.
+
 ## 0.145.0 — 1 września 2026
 
 **Agent przestaje wpisywać numer towaru z pamięci.** Formularz zadania

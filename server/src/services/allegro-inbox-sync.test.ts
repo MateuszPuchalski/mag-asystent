@@ -2,11 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
+import { migrate } from "../db/db.js";
 import { synchronizujAllegroInbox } from "./allegro-inbox-sync.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
-const mkDb = () => { const d = new DatabaseSync(":memory:"); d.exec(schema); return d; };
+/* Schemat PLUS dostawki: `events.user_ref` i część indeksów dochodzą dopiero
+   w `migrate()`, więc baza z samego `schema.sql` ma inny kształt niż ta,
+   na której chodzi serwer. Audyt przejęcia rozmowy pisze właśnie do `events`. */
+const mkDb = () => { const d = new DatabaseSync(":memory:"); d.exec(schema); migrate(d); return d; };
 const thread = (n: number, date = `2026-08-${String(30 - n).padStart(2, "0")}T12:00:00.000Z`) => ({
   id: `t-${n}`, read: false, lastMessageDate: date, interlocutor: { login: `anon-${n}` },
 });

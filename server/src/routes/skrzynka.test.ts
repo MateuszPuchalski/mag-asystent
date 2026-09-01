@@ -1,0 +1,159 @@
+import { before, beforeEach, test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { FastifyInstance } from "fastify";
+import type { Rola } from "../services/users.js";
+
+process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-skrzynka-tras-")), "t.db");
+process.env.LOG_LEVEL = "silent";
+process.env.SGT_MODE = "seeded";
+
+/* Trasy skrzynki nie miały testu do 0.145.1. Pilnują tu dwóch rzeczy, których
+   test serwisu nie złapie, bo obie żyją na granicy HTTP:
+
+   1. BRAMKA ROLI TAKŻE NA ODCZYCIE. Polityka danych skrzynki mówi wprost, że
+      rozmowy z klientami są danymi biura, a hala widzi wyłącznie zadanie.
+      Trasa odczytu bez bramki wyglądałaby na niewinną i przeciekłaby cicho.
+   2. ZERO ZAPISU PRZY PATRZENIU. Reguła z 0.18.0 obowiązuje też panel obsługi,
+      choć licznik `method:` w `biuro.test.ts` obejmuje wyłącznie `biuro.html`. */
+
+let app: FastifyInstance;
+let db: typeof import("../db/db.js").db;
+let createUser: typeof import("../services/users.js").createUser;
+let rozmowa = 0;
+let pytanie = 0;
+
+before(async () => {
+  ({ db } = await import("../db/db.js"));
+  ({ createUser } = await import("../services/users.js"));
+  app = await (await import("../index.js")).buildApp();
+});
+
+beforeEach(() => {
+  const d = db();
+  for (const t of ["conversation_mention", "conversation_comment", "conversation_draft",
+    "conversation_assignment", "conversation_event", "message", "conversation",
+    "channel_account", "zadanie_terenowe", "events", "device_session", "app_user"]) {
+    d.prepare(`DELETE FROM ${t}`).run();
+  }
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
+    .run().lastInsertRowid);
+  rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject) VALUES (?,'w-1','Kupujący 44300444')`)
+    .run(konto).lastInsertRowid);
+  pytanie = Number(d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
+    external_message_id,direction,body,sent_at) VALUES (?,?,'m-1','incoming',?,?)`)
+    .run(rozmowa, konto, "Czy ten szarpak pasuje do NAC LS 46-450?",
+      "2026-09-01T07:12:00.000Z").lastInsertRowid);
+});
+
+function login(role: Rola, name: string) {
+  const u = createUser(name, role, `${role}${Math.random()}`, "tajnehaslo");
+  const token = `t-${u.userId}`;
+  const n = new Date().toISOString();
+  db().prepare("INSERT INTO device_session(token,user_id,created_at,last_seen) VALUES(?,?,?,?)")
+    .run(token, u.userId, n, n);
+  return { naglowki: { "x-session": token }, userId: u.userId };
+}
+
+const liczbaZdarzen = () =>
+  (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
+
+/** Komplet tras skrzynki — lista rośnie razem z nimi i tak ma być. */
+const TRASY = () => [
+  { method: "GET" as const, url: "/api/obsluga/rozmowy" },
+  { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}` },
+  { method: "POST" as const, url: "/api/obsluga/zadania/pomiar",
+    payload: { rozmowaId: rozmowa, wiadomoscId: pytanie, instrukcja: "Zmierz rozstaw." } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/claim`, payload: { expectedVersion: 1 } },
+  { method: "PUT" as const, url: `/api/conversations/${rozmowa}/draft`,
+    payload: { body: "Szkic", expectedLastMessageId: null, expectedVersion: null } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/comments`, payload: { body: "Uwaga" } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/presence`, payload: { typing: true } },
+  { method: "GET" as const, url: "/api/conversations/events" },
+];
+
+test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
+  for (const t of TRASY()) {
+    const r = await app.inject({ method: t.method, url: t.url, payload: t.payload });
+    assert.equal(r.statusCode, 401, `${t.method} ${t.url} przepuścił brak sesji`);
+  }
+});
+
+test("magazynier nie widzi rozmów — także na odczycie", async () => {
+  const m = login("magazynier", "Marek");
+  for (const t of TRASY()) {
+    const r = await app.inject({ method: t.method, url: t.url, headers: m.naglowki, payload: t.payload });
+    assert.equal(r.statusCode, 403, `${t.method} ${t.url} wpuścił halę`);
+  }
+});
+
+test("patrzenie na skrzynkę niczego nie zapisuje", async () => {
+  const b = login("biuro", "Anna");
+  const przed = liczbaZdarzen();
+  for (const url of ["/api/obsluga/rozmowy", `/api/obsluga/rozmowy/${rozmowa}`]) {
+    const r = await app.inject({ method: "GET", url, headers: b.naglowki });
+    assert.equal(r.statusCode, 200, r.body);
+  }
+  assert.equal(liczbaZdarzen(), przed, "odczyt dopisał zdarzenie");
+  assert.equal((db().prepare("SELECT count(*) n FROM conversation_assignment").get() as {n:number}).n, 0);
+});
+
+test("przegrany wyścig o przejęcie dostaje 409 z właścicielem i wersją", async () => {
+  const ala = login("biuro", "A. Lewandowska");
+  const marek = login("biuro", "M. Wójcik");
+
+  let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: ala.naglowki, payload: { expectedVersion: 1 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().version, 2);
+
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: marek.naglowki, payload: { expectedVersion: 1 } });
+  assert.equal(r.statusCode, 409, "konflikt wersji ma być 409, nie 400");
+  /* Te trzy pola rysuje ekran przegranego: kto prowadzi, pod jakim kontem
+     i na której wersji stoi rozmowa. Bez nich zostaje goły komunikat błędu. */
+  assert.equal(r.json().assignedUserId, ala.userId);
+  assert.equal(r.json().assignedUserName, "A. Lewandowska");
+  assert.equal(r.json().version, 2);
+});
+
+test("szkic pisany do starej osi odpada z 409, a zapisany zostaje", async () => {
+  const b = login("biuro", "Anna");
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: b.naglowki, payload: { expectedVersion: 1 } });
+  let r = await app.inject({ method: "PUT", url: `/api/conversations/${rozmowa}/draft`,
+    headers: b.naglowki, payload: { body: "Pierwsza wersja", expectedLastMessageId: pytanie, expectedVersion: null } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  /* Klient dopisuje w trakcie redagowania — blizna 0.110.0. */
+  const konto = (db().prepare("SELECT channel_account_id k FROM conversation WHERE id=?")
+    .get(rozmowa) as { k: number }).k;
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'m-2','incoming','Dopisuję: rocznik 2019.',?)`)
+    .run(rozmowa, konto, "2026-09-01T09:38:00.000Z");
+
+  r = await app.inject({ method: "PUT", url: `/api/conversations/${rozmowa}/draft`,
+    headers: b.naglowki, payload: { body: "Druga wersja", expectedLastMessageId: pytanie, expectedVersion: 1 } });
+  assert.equal(r.statusCode, 409, r.body);
+
+  const szkic = db().prepare("SELECT body FROM conversation_draft WHERE conversation_id=?")
+    .get(rozmowa) as { body: string };
+  assert.equal(szkic.body, "Pierwsza wersja", "409 nie ma prawa skasować szkicu");
+});
+
+test("mutacje przez trasę zostawiają ślad w dzienniku", async () => {
+  const b = login("biuro", "Anna");
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/claim`,
+    headers: b.naglowki, payload: { expectedVersion: 1 } });
+  await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/comments`,
+    headers: b.naglowki, payload: { body: "Sprawdzić rozstaw." } });
+
+  const typy = (db().prepare(
+    "SELECT type FROM events WHERE type LIKE 'rozmowa_%' ORDER BY id").all() as Array<{type:string}>)
+    .map((w) => w.type);
+  assert.deepEqual(typy, ["rozmowa_przejeta", "rozmowa_komentarz"]);
+});

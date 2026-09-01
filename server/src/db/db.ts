@@ -95,8 +95,14 @@ export function transaction<A extends unknown[], R>(
   };
 }
 
-/** Dostawki do istniejących baz (CREATE TABLE IF NOT EXISTS nie dodaje kolumn). */
-function migrate(database: DatabaseSync) {
+/**
+ * Dostawki do istniejących baz (CREATE TABLE IF NOT EXISTS nie dodaje kolumn).
+ *
+ * Eksportowane, bo baza zbudowana z samego `schema.sql` NIE JEST tym, na czym
+ * chodzi aplikacja — część kolumn i indeksów dokłada dopiero ta funkcja.
+ * Test stawiający bazę bez niej sprawdza kształt, którego nie ma na produkcji.
+ */
+export function migrate(database: DatabaseSync) {
   const addColumn = (table: string, column: string, decl: string) => {
     const cols = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === column)) {
