@@ -59,7 +59,7 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 ┌──────────▼──────────────────────────────────────────────────┐
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
-│  SQLite (node:sqlite, WAL) — 29 tabel:                       │
+│  SQLite (node:sqlite, WAL) — 50 tabel:                       │
 │    delivery + delivery_line   rozkładanie faktur zakupu      │
 │    delivery_note              notatki biura do dostawy       │
 │    problem, ean_conflict      wyjątki                        │
@@ -67,8 +67,18 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 │    zdjecie_cache              zdjęcia kartotek z Subiekta    │
 │    dostawca_logo              logo dostawcy wgrane w biurze  │
 │    zbiorka, strefa_regula     rotacja i strefa złota         │
-│    zwrot + zwrot_pozycja      zwroty Allegro                 │
+│    kosz + kosz_pozycja        cyfrowe kosze zwrotowe (MM)    │
+│    zadanie_terenowe           zlecenia biura dla hali        │
+│    channel_account            konto kanału obsługi klienta   │
+│    conversation + message     rozmowy z klientem             │
+│    conversation_draft, _comment, _event, _assignment, _mention│
+│    outbox                     kolejka odpowiedzi do Allegro  │
+│    zwrot_klienta + _pozycja   zwroty klienckie (0.150.0)     │
+│    zwrot_zdarzenie            oś zwrotu                      │
 │    allegro_token              parowanie konta Allegro        │
+│    allegro_inbox_*            surowe lądowisko skrzynki      │
+│    allegro_zwrot              surowe lądowisko zwrotów       │
+│    allegro_*_sync_state       stan dwóch synchronizatorów    │
 │    app_user, device_session   tożsamość (§7)                 │
 │    sfera_queue                kolejka zapisów do Subiekta    │
 │    events                     audyt — każdy skan i decyzja   │

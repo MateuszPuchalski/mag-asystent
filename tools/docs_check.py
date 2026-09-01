@@ -191,9 +191,16 @@ STRUKTURA = "docs/subiekt-gt-struktura.md"
 SKANOWANE_ZNACZNIKI = [STRUKTURA, "docs/allegro-ksztalt.md"]
 
 # Liczebniki, którymi preambuła może wyrazić liczbę rzeczy do ustalenia.
+# Do 0.150.0 lista kończyła się na dziewięciu — i to była mina, nie oszczędność:
+# pierwsza sekcja, która przekroczyła próg, zatrzymywała bramkę na „ZŁY
+# LICZEBNIK", a jedynym wyjściem wyglądającym na łatwe było skasowanie
+# znacznika. Licznik ma zmuszać do sprawdzenia rzeczy, nie do jej ukrycia.
 LICZEBNIKI = {
     "zero": 0, "jedna": 1, "dwie": 2, "trzy": 3, "cztery": 4,
     "pięć": 5, "sześć": 6, "siedem": 7, "osiem": 8, "dziewięć": 9,
+    "dziesięć": 10, "jedenaście": 11, "dwanaście": 12, "trzynaście": 13,
+    "czternaście": 14, "piętnaście": 15, "szesnaście": 16, "siedemnaście": 17,
+    "osiemnaście": 18, "dziewiętnaście": 19, "dwadzieścia": 20,
 }
 
 # Znacznik otwierający akapit — taka jest konwencja tego dokumentu. Wystąpienie

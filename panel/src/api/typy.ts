@@ -95,3 +95,74 @@ export type SzczegolyWysylki = {
   nowaWiadomosc?: { id: number; tresc: string; at: string } | null;
   kluczIdempotencji?: string;
 };
+
+/* ── Zwroty klienckie (0.150.0) ──────────────────────────────────────────────
+   Kształt lustrzany do `WierszZwrotu` w `server/src/services/zwroty.ts`.
+   Kubełek i sygnały LICZY SERWER — panel ich nie wyprowadza po raz drugi,
+   bo dwie kopie tej reguły rozjechałyby się przy pierwszej poprawce jednej
+   z nich, a rozjazd byłby niewidoczny: ekran po prostu pokazywałby inną
+   kolejkę niż liczniki.                                                     */
+
+export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
+export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro";
+
+export interface PozycjaZwrotu {
+  id: number;
+  offerId: string | null;
+  nazwa: string;
+  ilosc: number;
+  cenaGrosze: number;
+  waluta: string;
+  powod: string | null;
+  powodKomentarz: string | null;
+  ocena: string | null;
+}
+
+export interface Zwrot {
+  id: number;
+  externalId: string;
+  numer: string | null;
+  orderId: string | null;
+  utworzono: string;
+  paczkaAt: string | null;
+  kubelek: Kubelek;
+  sygnaly: Sygnal[];
+  terminAt: string;
+  dniDoTerminu: number;
+  sumaPozycjiGrosze: number;
+  waluta: string;
+  werdykt: string | null;
+  kwotaGrosze: number | null;
+  kwotaWariant: string | null;
+  korektaNumer: string | null;
+  rejectionCode: string | null;
+  wersja: number;
+  pozycje: PozycjaZwrotu[];
+}
+
+export interface WpisOsiZwrotu {
+  rodzaj: string;
+  tresc: string | null;
+  dane_json: string | null;
+  kiedy_at: string;
+  kto: string | null;
+}
+
+/** Kształt z `stanZwrotowHealth` — lustrzany do bloku skrzynki w §21. */
+export interface StanZwrotow {
+  status: "current" | "delayed" | "rate_limited" | "authentication_error" | "failed";
+  alarm: boolean;
+  ostatniaProba: string | null;
+  ostatniaUdanaSynchronizacja: string | null;
+  kodOstatniegoBledu: number | null;
+  liczbaBledow: number;
+  opoznienieMs: number | null;
+  nastepnaProba: string | null;
+  interwalMs: number;
+}
+
+export interface KolejkaZwrotow {
+  zwroty: Zwrot[];
+  liczniki: Record<Kubelek, number>;
+  stan: StanZwrotow;
+}

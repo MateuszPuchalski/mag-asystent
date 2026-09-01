@@ -411,6 +411,15 @@ function bezObslugiKlienta(database: DatabaseSync) {
         `);
       }
 
+      /* TE NAZWY SĄ SPALONE NA ZAWSZE. Lista chodzi przy KAŻDEJ migracji, a nie
+         raz za znacznikiem — bo bazy klientów wciąż mają te tabele i każda
+         musi je stracić. Skutek uboczny: tabela nazwana tak samo powstałaby
+         ze `schema.sql` i znikała sekundę później, po cichu i bez błędu,
+         bo `migrate()` chodzi PO schemacie.
+
+         Dlatego zwroty wróciły w 0.150.0 jako `zwrot_klienta`, a nie `zwrot`.
+         Kto następnym razem wskrzesza read-model sprzedaży, nazywa go
+         `sgt_faktura`, nie `sgt_sprzedaz`. Pilnuje tego `db/migracja-zwrotow.test.ts`. */
       for (const tabela of [
         "sprawa_tag", "sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", "regula", "szablon",
         "watek_meta", "opinia", "dyskusja", "dopasowanie", "pytanie", "ai_config",

@@ -17,7 +17,7 @@ import { wazneBearer } from "../services/allegro-token.js";
    koncie. Nowe mapowanie ma powstać dopiero po raporcie sondy
    (`npm run sonda` → `docs/allegro-ksztalt.md`), pole po polu.
 
-   Zostaje samo połączenie: budowa URL-i siedmiu rodzin końcówek, negocjacja
+   Zostaje samo połączenie: budowa URL-i dziewięciu rodzin końcówek, negocjacja
    nagłówka `Accept` i jedno wyjście do sieci. Z tego korzysta dziś sonda,
    a jutro nowa obsługa klienta.                                             */
 
@@ -36,13 +36,50 @@ export function urlOstatnichZamowien(apiUrl: string, odKiedyIso: string, offset:
 }
 
 /**
- * URL strony listy zwrotów dla tickera zapowiedzi. `createdAt.gte` odcina to,
- * co już znamy, a paginacja idzie setkami — jedna strona pokrywa tydzień
- * zwrotów nawet w szczycie.
+ * URL strony listy zwrotów klienckich. `createdAt.gte` odcina to, co już
+ * znamy, a paginacja idzie setkami — jedna strona pokrywa tydzień zwrotów
+ * nawet w szczycie.
+ *
+ * `from` to KURSOR, nie offset: dokumentacja opisuje go jako „identyfikator
+ * ostatnio widzianego zwrotu", a odpowiedź niesie zwroty utworzone po nim.
+ * Kursor jest odporny na wstawkę w środku strony, a offset nie — przy
+ * stronicowaniu offsetem nowy zwrot przesuwa całą resztę o jeden i jeden
+ * rekord wypada bez śladu. To jest blizna 0.127.0 („rejestr widział pierwszą
+ * setkę dyskusji i gubił resztę po cichu") załatwiona u źródła.
  */
-export function urlListyZwrotow(apiUrl: string, odKiedy: string | null, offset: number): string {
+export function urlListyZwrotow(
+  apiUrl: string,
+  odKiedy: string | null,
+  offset: number,
+  odKursora: string | null = null
+): string {
   const filtr = odKiedy ? `&createdAt.gte=${encodeURIComponent(odKiedy)}` : "";
-  return `${apiUrl}/order/customer-returns?limit=100&offset=${Math.max(0, Math.trunc(offset))}${filtr}`;
+  const kursor = odKursora ? `&from=${encodeURIComponent(odKursora)}` : "";
+  return (
+    `${apiUrl}/order/customer-returns?limit=100&offset=${Math.max(0, Math.trunc(offset))}` +
+    `${filtr}${kursor}`
+  );
+}
+
+/**
+ * Szczegół jednego zwrotu (`/order/customer-returns/{id}`, Accept beta.v1).
+ *
+ * Lista oddaje już komplet pól zwrotu, więc ta końcówka NIE jest potrzebna
+ * do synchronizacji — stoi tu dla sondy i dla ręcznego sprawdzenia jednego
+ * zwrotu, gdy lista i panel mówią co innego.
+ */
+export function urlZwrotu(apiUrl: string, id: string): string {
+  return `${apiUrl}/order/customer-returns/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Roszczenia o zwrot prowizji (`/order/refund-claims`). Osobny byt od zwrotu
+ * pieniędzy kupującemu: tamten oddaje kasę klientowi, ten odzyskuje prowizję
+ * od Allegro. Panel pokazuje oba, bo zwrot bez odzyskanej prowizji kosztuje
+ * dwa razy.
+ */
+export function urlRoszczenProwizji(apiUrl: string, offset: number): string {
+  return `${apiUrl}/order/refund-claims?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
 }
 
 /** URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1). */

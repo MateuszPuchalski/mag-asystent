@@ -145,7 +145,50 @@ dokumentem MM ZWROTY z Subiekta, a zwroty wracają później **zaprojektowane od
 nowa**. Ten rozdział jest miejscem na ten projekt — po liczbach z inwentarza,
 zwłaszcza po tabelce „którędy napełniane były kosze".
 
-> **Odpowiedź:** _(do wypełnienia)_
+> **Odpowiedź:** **Dwoma bytami o jednym numerze** — i panel ma to pokazywać
+> wprost. Sprawa klienta żyje w Allegro: identyfikator zwrotu, zegar ustawowy,
+> pieniądze. Proces magazynowy żyje w Subiekcie: paczka wraca, korekta, MM na
+> bufor. WERTIS trzyma jeden wiersz spinający oba.
+>
+> **Czego ten projekt NIE robi.** Nie buduje trzeciego obiegu magazynowego.
+> Fizyczne odłożenie zostaje w koszach z dokumentu MM ZWROTY (`DEPLOY.md` §6a),
+> a ocena towaru idzie istniejącym `zadanie_terenowe` — rodzaj `weryfikacja`
+> już jest w ograniczeniu tabeli, więc kolektor nie dostaje nowego ekranu.
+>
+> Tu leży różnica wobec rejestru skasowanego w 0.140.0. Tamten próbował być
+> naraz kartą zwrotu, dokumentem magazynowym i kolejką korekt. Ten jest
+> **kolejką decyzji** nad danymi, których właścicielami są Allegro i Subiekt.
+>
+> **Kształt ekranu wynika z jednego kryterium: minimum klikań.** Rejestr każe
+> najpierw znaleźć zwrot, potem wybrać akcję z menu — dwa kliknięcia przed
+> jakąkolwiek decyzją. Panel dzieli pracę na kubełki, a w każdym stoi
+> dokładnie jedno pytanie:
+>
+> | kubełek | pytanie |
+> |---|---|
+> | DO DECYZJI | przyjąć czy odrzucić? |
+> | DO OCENY | co z towarem? |
+> | DO ZWROTU | ile oddać? |
+> | DO KOREKTY | zlecić korektę? |
+>
+> Operator nie wybiera, co zrobić — kubełek już to powiedział. Odpowiada
+> tylko „tak", „nie" albo „ile". Wiersz przyjeżdża z policzoną propozycją,
+> więc typowy zwrot to jeden klawisz.
+>
+> **Kolejność bierze się z zegara ustawowego**, nie z daty wpływu. To blizna
+> 0.121.0 zastosowana do zwrotów: termin jest osobnym bytem i steruje
+> kolejnością pracy. Zwrot z dwoma dniami zapasu stoi nad wczorajszym.
+>
+> **Sygnały są trzy**, bo kolor zapalany zawsze uczy go ignorować: termin
+> blisko, towar jeszcze nie wrócił, sprawa rozstrzygnięta już w panelu
+> Allegro. Wszystko inne wiersz mówi bez czytania.
+>
+> **Potwierdzenie dostają dwie rzeczy nieodwracalne** — oddanie pieniędzy
+> i odmowa zwrotu. Reszta ma cofnięcie, jak trzy cofnięcia koszy z 0.79.0:
+> dopóki zapis czeka w kolejce, aplikacja go anuluje.
+>
+> Pełny projekt ekranu stoi w `docs/panel-obslugi-klienta.md`, rozdział
+> „Zwroty klienckie".
 
 ### 7. Jak wygląda ekran?
 
@@ -253,6 +296,34 @@ i do szkicu trafia wyłącznie na jawne kliknięcie agenta.
 
 **Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
 loginem rozmówcy nie są pobierane.
+
+## Polityka danych zwrotów (0.150.0)
+
+Zwroty pobierają WIĘCEJ niż skrzynka, więc dostają własny zapis. Ten rozdział
+powstał, zanim powstała pierwsza tabela.
+
+**Trzymamy to, co rozstrzyga zwrot.** Identyfikator i numer zwrotu, numer
+zamówienia, datę zgłoszenia, pozycje z nazwą, ilością, ceną i powodem oraz
+sam FAKT powrotu paczki. Surową odpowiedź Allegro trzyma osobne lądowisko
+`allegro_zwrot`, jak przy skrzynce — jest dowodem źródłowym przy sporze
+o kształt.
+
+**Konta bankowego i telefonu nadawcy NIE POBIERAMY.** Odpowiedź Allegro niesie
+`refund.bankAccount` z właścicielem, numerem konta, IBAN-em, SWIFT-em
+i adresem, a przy paczce `sender.phoneNumber`. Zwrot da się rozstrzygnąć bez
+nich. Kolumn na te pola nie ma wcale, więc nieuważne mapowanie wywali się na
+zapytaniu, zamiast wyciec po cichu do kopii zapasowej.
+
+**Zasada adresów zostaje nietknięta.** Adresy dostawy nie przechodzą przez
+mapowanie ani tu, ani w skrzynce.
+
+**Hala nie widzi zwrotu.** Trasy mają bramkę roli także na odczycie. Do
+magazyniera idzie wyłącznie zadanie oceny towaru, tak jak przy pytaniach
+idzie samo zadanie pomiaru.
+
+**Nic nie wychodzi do Allegro w tym wydaniu.** Wersja 0.150.0 wyłącznie czyta;
+ani jednej trasy zapisu, ani jednego żądania POST do Allegro. Pilnuje tego
+test tras.
 
 ## Wysyłka odpowiedzi (0.148.0)
 

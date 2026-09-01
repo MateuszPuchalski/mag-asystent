@@ -284,6 +284,30 @@ export const config = {
         : "https://api.allegro.pl"),
     /** Takt synchronizacji Centrum wiadomości; 0 wyłącza ticker. */
     inboxSyncMs: num(process.env.ALLEGRO_INBOX_SYNC_MS, 60_000, "ALLEGRO_INBOX_SYNC_MS"),
+    /**
+     * Takt synchronizacji zwrotów klienckich; 0 wyłącza ticker.
+     *
+     * RZADZIEJ NIŻ SKRZYNKA, i to jest decyzja, nie zaniedbanie. Zwrot ma
+     * termin liczony w dniach, więc pięć minut opóźnienia nie kosztuje nic;
+     * pytanie klienta czeka na odpowiedź i kosztuje. Dwa tickery na jednym
+     * adresie mają też różnić się rytmem, bo równy chór jest tą sygnaturą
+     * maszyny, którą anti-bot Allegro rozpoznaje (patrz `services/takt.ts`).
+     */
+    zwrotySyncMs: num(process.env.ALLEGRO_ZWROTY_SYNC_MS, 300_000, "ALLEGRO_ZWROTY_SYNC_MS"),
+    /**
+     * Ile dni ma sprzedawca na oddanie pieniędzy od oświadczenia klienta.
+     * Ustawowo czternaście; w env, bo to liczba z prawa, a nie z naszego
+     * kodu — zmiana przepisu ma być wpisem w `wertis.env`, nie wydaniem.
+     */
+    zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 14, "ZWROT_TERMIN_DNI"),
+    /**
+     * Okno PIERWSZEGO pobrania zwrotów, w dniach. Później rządzi kursor.
+     *
+     * Bez okna pierwszy przebieg ściągnąłby całą historię konta — setki
+     * stron, jeden ciąg zapytań i prosta droga do 429 przy starcie usługi.
+     * Dziewięćdziesiąt dni z zapasem pokrywa zwrot najstarszy jeszcze żywy.
+     */
+    zwrotyOknoDni: num(process.env.ALLEGRO_ZWROTY_DNI_WSTECZ, 90, "ALLEGRO_ZWROTY_DNI_WSTECZ"),
   },
 
   /**

@@ -4,6 +4,7 @@ import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.ht
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import { kontoKanalu } from "./kanal-konto.js";
 
 type Thread = { id: string; read: boolean; lastMessageDate: string;
   interlocutor: { login: string } };
@@ -179,15 +180,6 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
    Do 0.143.1 nikt nie zapisywał do `conversation`, więc przejmowanie rozmowy
    i szkic z 0.143.0 były kodem nieosiągalnym — trasy przyjmowały liczbowe id
    rozmowy, której nic nie tworzyło. Ten zapis jest tym brakującym ogniwem. */
-
-function kontoKanalu(database: Db, externalAccountId: string): number {
-  const id = externalAccountId || "domyslne";
-  database.prepare(`INSERT INTO channel_account(channel, external_account_id)
-    VALUES ('allegro', ?) ON CONFLICT(channel, external_account_id) DO NOTHING`).run(id);
-  return Number((database.prepare(
-    "SELECT id FROM channel_account WHERE channel='allegro' AND external_account_id=?",
-  ).get(id) as { id: number }).id);
-}
 
 function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], konto: number): void {
   database.prepare(`INSERT INTO conversation(channel_account_id, external_conversation_id, subject, unread, updated_at)

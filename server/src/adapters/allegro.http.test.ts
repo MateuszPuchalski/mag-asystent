@@ -5,11 +5,13 @@ import {
   scopeDlaUrl,
   urlDyskusji,
   urlListyZwrotow,
+  urlRoszczenProwizji,
   urlOpinii,
   urlOstatnichZamowien,
   urlWatkow,
   urlWiadomosci,
   urlWiadomosciDyskusji,
+  urlZwrotu,
 } from "./allegro.http.js";
 import { allegroUserAgent, retryAfterMs } from "./allegro.js";
 import { config } from "../config.js";
@@ -65,6 +67,31 @@ test("filtr daty w liście zwrotów jest kodowany albo znika, gdy go nie ma", ()
   assert.match(
     urlOstatnichZamowien("https://api.allegro.pl", "2026-08-01T00:00:00Z", -1),
     /updatedAt\.gte=2026-08-01T00%3A00%3A00Z&limit=100&offset=0&sort=-updatedAt$/
+  );
+});
+
+test("kursor `from` w liście zwrotów jest kodowany i znika, gdy go nie ma", () => {
+  /* `from` to identyfikator ostatnio widzianego zwrotu, nie liczba. Kodowanie
+     jest tu istotne, bo identyfikatory Allegro bywają UUID-ami z myślnikami,
+     a kiedyś potrafiły nieść znak spoza zestawu bezpiecznego dla URL-a. */
+  const z = urlListyZwrotow("https://api.allegro.pl", null, 0, "abc/123");
+  assert.match(z, /&from=abc%2F123$/);
+  assert.equal(urlListyZwrotow("https://api.allegro.pl", null, 0).includes("from="), false);
+});
+
+test("szczegół zwrotu i roszczenia prowizji stoją we własnych rodzinach", () => {
+  /* Rodzina decyduje o zapamiętanym nagłówku `Accept`. Zwroty i roszczenia
+     są w becie, więc muszą negocjować wersję OSOBNO od zamówień — inaczej
+     jedno 406 przestawiłoby wersję całej rodzinie `/order/`. */
+  assert.equal(
+    urlZwrotu("https://api.allegro.pl", "zw 1"),
+    "https://api.allegro.pl/order/customer-returns/zw%201"
+  );
+  assert.equal(rodzinaKoncowki(urlZwrotu("https://api.allegro.pl", "x")), "customer-returns");
+  assert.match(urlRoszczenProwizji("https://api.allegro.pl", -2), /refund-claims\?limit=100&offset=0$/);
+  assert.equal(
+    rodzinaKoncowki(urlRoszczenProwizji("https://api.allegro.pl", 0)),
+    "refund-claims"
   );
 });
 

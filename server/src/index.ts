@@ -28,6 +28,7 @@ import { allegroRoutes } from "./routes/allegro.js";
 import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
 import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
+import { zwrotyRoutes } from "./routes/zwroty.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
@@ -48,6 +49,7 @@ import { WERSJA } from "./wersja.js";
 import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js";
 import { stanObslugiHealth } from "./services/skrzynka.js";
 import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
+import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { allegroTryb } from "./adapters/allegro.js";
 
@@ -296,6 +298,7 @@ export async function buildApp() {
   await app.register(zadaniaTerenoweRoutes);
   await app.register(panelObslugiRoutes);
   await app.register(skrzynkaRoutes);
+  await app.register(zwrotyRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();
@@ -322,6 +325,13 @@ async function main() {
      ani narzędzia administracyjne nie mogą zacząć odpytywać Allegro. */
   if (config.allegro.clientId && allegroTryb() === "http") {
     uruchomTakt("allegro-inbox", config.allegro.inboxSyncMs, synchronizujAllegroInbox);
+    /* Drugi ticker na TYM SAMYM adresie IP, więc rytm musi być inny — nie
+       tylko przesunięty. `uruchomTakt` daje rozrzut i losowy start, a bazowy
+       odstęp zwrotów jest pięć razy dłuższy od skrzynki: zwrot ma termin
+       w dniach, pytanie klienta czeka na odpowiedź. Równy chór dwóch pętli
+       to ta sygnatura maszyny, która w sierpniu 2026 skończyła się blokadą
+       (patrz nagłówek `services/takt.ts`). */
+    uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, synchronizujAllegroZwroty);
   }
 
   const app = await buildApp();
