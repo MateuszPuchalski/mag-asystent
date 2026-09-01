@@ -13,6 +13,7 @@ import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
+import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -162,6 +163,29 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       return { stan: stanSynchronizacji(db()) };
     } catch (e) { return blad(reply, e); }
   });
+
+  /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy
+     z parametru — wzmianka niesie fragment komentarza wewnętrznego, a cudzych
+     notatek nikt tu oglądać nie ma. Trasa listy niczego nie odhacza. */
+  app.get<{ Querystring: { tylkoNowe?: string } }>("/api/obsluga/wzmianki",
+    async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const ja = sesjaZadania()!.user.userId;
+      return {
+        wzmianki: wzmiankiDlaMnie(ja, { tylkoNowe: req.query?.tylkoNowe === "1" }),
+        nowe: liczbaNowychWzmianek(ja),
+      };
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/wzmianki/:id/odhacz",
+    async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return odhaczWzmianke(Number(req.params.id), sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
 
   /* Status rozmowy (§7, 0.158.0). Zmiana ręką agenta; przejścia automatyczne
      robią synchronizator i wysyłka, bez udziału tej trasy. */

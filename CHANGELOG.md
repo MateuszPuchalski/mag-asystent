@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.160.0 — 1 września 2026
+
+**Wzmianka docierała tylko do tego, kto zgadł, w której rozmowie ją zostawiono.**
+
+`conversation_mention` zapełniała się przy każdym komentarzu z „@", ale jedyną
+drogą do niej było OTWARCIE tego właśnie wątku. To ta sama blizna, którą
+komentarze dostały w 0.157.0: zapis bez odczytu. Wzmianka jest prośbą o zajęcie
+się czymś, więc niedostarczona kosztuje tyle, co niezadana.
+
+### Zakładka „Wzmianki" z licznikiem
+
+Skrzynka pokazuje wzmianki JEDNEGO konta — adresat bierze się z sesji, nigdy
+z parametru żądania. Wzmianka niesie fragment komentarza wewnętrznego, a te
+bywają równie wrażliwe co treść klienta, więc cudzej nikt tu nie zobaczy.
+
+Licznik nieodhaczonych stoi przy zakładce, nie na jej ekranie. Prośba, o której
+wie tylko własny ekran, dociera wtedy, gdy ktoś na niego wejdzie — czyli
+dokładnie wtedy, gdy nie jest już potrzebna.
+
+### Odhaczenie jest jawne i osobne dla każdego
+
+Ani otwarcie listy, ani wejście do rozmowy niczego nie kasuje: reguła „zero
+zapisu przy patrzeniu" obowiązuje też tutaj, a wzmianka gasnąca od samego
+spojrzenia ginęłaby przy przewijaniu listy w biegu.
+
+Odhacza się PARĘ komentarz–osoba. Dwoje ludzi wzmiankowanych w jednym zdaniu ma
+z nim dwie różne sprawy, więc wspólne odhaczenie kasowałoby cudzą robotę jednym
+kliknięciem. Powtórne kliknięcie nie przestawia godziny — data odhaczenia mówi,
+KIEDY ktoś się tym zajął.
+
+Odhaczone zostają na liście jako dowód „pisałam ci o tym w środę", ale domyślnie
+schodzą z oczu. Każde odhaczenie idzie do dziennika jako `wzmianka_odhaczona`,
+bez treści komentarza.
+
+**[wymaga działania]** Migracja dokłada `seen_at` do `conversation_mention`
+i indeks po parze konto–stan. Wzmianki zastane wchodzą jako nieodhaczone, bo
+nikt ich dotąd nie mógł odhaczyć.
+
 ## 0.159.0 — 1 września 2026
 
 **Wejście w pytanie przydziela je agentowi, odpowiedź przydziela na stałe.**

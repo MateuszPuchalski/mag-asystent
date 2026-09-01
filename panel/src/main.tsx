@@ -2,14 +2,15 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ClipboardList, Inbox, LogOut, Undo2, Warehouse } from "lucide-react";
+import { AtSign, ClipboardList, Inbox, LogOut, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
-import { useZdrowie } from "./api/rozmowy";
+import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { czas } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
 import { Zadania } from "./ekrany/Zadania";
+import { Wzmianki } from "./ekrany/Wzmianki";
 import "./index.css";
 
 /* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
@@ -35,7 +36,19 @@ const ZAKLADKI = [
   { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: true },
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
+  { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
 ];
+
+/* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
+   prośba kolegi ma być widoczna z każdego widoku panelu. Wzmianka, o której
+   wie tylko własny ekran, dociera wtedy, gdy ktoś na niego wejdzie — czyli
+   dokładnie wtedy, gdy nie jest już potrzebna. */
+function LicznikWzmianek() {
+  const { data } = useWzmianki();
+  if (!data?.nowe) return null;
+  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-[11px] font-bold text-wertis-ink"
+    aria-label={`nieodhaczonych wzmianek: ${data.nowe}`}>{data.nowe}</span>;
+}
 
 /* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
    ją widzieć z każdej zakładki. Awaria integracji, o której wie tylko jeden
@@ -68,7 +81,8 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
           return <Link key={z.do} to={z.do}
             className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
-            {z.ikona}{z.etykieta}</Link>;
+            {z.ikona}{z.etykieta}
+            {z.do === "/obsluga/wzmianki" && <LicznikWzmianek />}</Link>;
         })}
       </nav>
       <PigulkaSynchronizacji />
@@ -94,6 +108,7 @@ function App() {
             go nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
+        <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>

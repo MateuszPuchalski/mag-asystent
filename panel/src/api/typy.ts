@@ -46,6 +46,19 @@ export type WpisOsi = {
   wzmianki?: Array<{ userId: number; name: string }>;
 };
 
+/* Wzmianka w skrzynce „wspomniano o mnie" (§6.4, 0.160.0). Fragment liczy
+   SERWER — panel nie skraca treści drugi raz po swojemu. */
+export type WpisWzmianki = {
+  commentId: number;
+  conversationId: number;
+  klient: string;
+  autor: string;
+  fragment: string;
+  at: string;
+  odhaczona: boolean;
+  odhaczonaAt: string | null;
+};
+
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };
 
 export type StanSkrzynki = { ostatniaSynchronizacja: string | null; bledy: number };

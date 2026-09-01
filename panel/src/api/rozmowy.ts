@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  OsRozmowy, Rozmowa, StanSkrzynki, StatusRozmowy, WynikWysylki, Zadanie, Zdrowie,
+  OsRozmowy, Rozmowa, StanSkrzynki, StatusRozmowy, WpisWzmianki, WynikWysylki, Zadanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -14,6 +14,7 @@ export const klucze = {
   zadania: ["zadania"] as const,
   ja: ["ja"] as const,
   zdrowie: ["zdrowie"] as const,
+  wzmianki: ["wzmianki"] as const,
 };
 
 export function useJa() {
@@ -36,6 +37,31 @@ export function useRozmowa(id: number | null) {
     queryKey: klucze.rozmowa(id ?? 0),
     queryFn: () => api<OsRozmowy>(`/api/obsluga/rozmowy/${id}`),
     enabled: id !== null,
+  });
+}
+
+/**
+ * Skrzynka wzmianek (§6.4).
+ *
+ * Odpytujemy zegarem, bo wzmianka przychodzi od KOLEGI, a nie z akcji tego
+ * ekranu — panel nie ma po czym poznać, że w innej rozmowie ktoś właśnie
+ * poprosił o pomoc. Trzydzieści sekund to rytm plakietki synchronizacji obok.
+ */
+export function useWzmianki() {
+  return useQuery({
+    queryKey: klucze.wzmianki,
+    queryFn: () => api<{ wzmianki: WpisWzmianki[]; nowe: number }>("/api/obsluga/wzmianki"),
+    refetchInterval: 30_000,
+  });
+}
+
+/** Odhaczenie jest JAWNE — otwarcie listy niczego nie kasuje (§ zero zapisu). */
+export function useOdhaczWzmianke() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { commentId: number }) =>
+      api(`/api/obsluga/wzmianki/${v.commentId}/odhacz`, { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: klucze.wzmianki }),
   });
 }
 

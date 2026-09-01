@@ -1444,6 +1444,20 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.160.0 nie wymaga niczego ręcznego** — kolumna `seen_at`
+i indeks wzmianek dochodzą przy pierwszym starcie usługi.
+
+Panel dostaje zakładkę „Wzmianki" z licznikiem przy nazwie. Trafia tam każdy
+komentarz, w którym ktoś wymienił dane konto — dotąd wracał wyłącznie do tego,
+kto sam otworzył właściwą rozmowę.
+
+Wzmianki zastane wchodzą jako nieodhaczone, bo nikt ich dotąd nie mógł
+odhaczyć. Odhaczenie jest osobnym kliknięciem: ani otwarcie listy, ani wejście
+w rozmowę niczego nie kasuje.
+
+**Panel obsługi trzeba przebudować** (`npm run build`) — nowa zakładka żyje po
+jego stronie.
+
 **Aktualizacja do 0.159.0 nie wymaga niczego ręcznego** — nie dochodzi ani
 jedna kolumna. Zmienia się natomiast nawyk biura, więc warto o tym powiedzieć.
 

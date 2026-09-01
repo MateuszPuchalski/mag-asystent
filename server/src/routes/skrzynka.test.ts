@@ -83,6 +83,8 @@ const TRASY = () => [
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
     payload: { status: "resolved" } },
+  { method: "GET" as const, url: "/api/obsluga/wzmianki" },
+  { method: "POST" as const, url: "/api/obsluga/wzmianki/1/odhacz" },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -372,6 +374,42 @@ test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async
   assert.equal(dobre.json().snoozedUntil, "2026-09-08T07:00:00.000Z");
 });
 
+test("skrzynka wzmianek pokazuje swoje, nie cudze, i odhacza jawnym kliknięciem", async () => {
+  /* Trzy granice naraz, bo wszystkie trzy żyją na styku sesji z serwisem:
+     adresat bierze się z SESJI, odczyt niczego nie zapisuje, a odhaczenie
+     cudzej wzmianki nie przechodzi nawet z ważną sesją biura. */
+  const { dodajKomentarz } = await import("../services/conversations.js");
+  const ala = login("biuro", "A. Lewandowska");
+  const bogdan = login("biuro", "B. Nowak");
+  const k = dodajKomentarz(rozmowa, ala.userId, "@Bogdan zerkniesz?", [bogdan.userId]);
+
+  const przed = liczbaZdarzen();
+  const moje = await app.inject({ method: "GET", url: "/api/obsluga/wzmianki",
+    headers: bogdan.naglowki });
+  assert.equal(moje.statusCode, 200, moje.body);
+  assert.equal(moje.json().nowe, 1);
+  assert.equal(moje.json().wzmianki[0].autor, "A. Lewandowska");
+  assert.equal(liczbaZdarzen(), przed, "odczyt wzmianek dopisał zdarzenie");
+
+  const cudze = await app.inject({ method: "GET", url: "/api/obsluga/wzmianki",
+    headers: ala.naglowki });
+  assert.deepEqual(cudze.json().wzmianki, [], "autorka nie wzmiankowała siebie");
+
+  const nieswoja = await app.inject({ method: "POST",
+    url: `/api/obsluga/wzmianki/${k.id}/odhacz`, headers: ala.naglowki });
+  assert.equal(nieswoja.statusCode, 400);
+  assert.match(nieswoja.json().error, /Nie znaleziono wzmianki/);
+
+  const swoja = await app.inject({ method: "POST",
+    url: `/api/obsluga/wzmianki/${k.id}/odhacz`, headers: bogdan.naglowki });
+  assert.equal(swoja.statusCode, 200, swoja.body);
+
+  const po = await app.inject({ method: "GET", url: "/api/obsluga/wzmianki",
+    headers: bogdan.naglowki });
+  assert.equal(po.json().nowe, 0);
+  assert.equal(po.json().wzmianki[0].odhaczona, true, "odhaczona zostaje na liście jako dowód");
+});
+
 test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", async () => {
   /* Sedno decyzji właściciela: wejście przydziela rozmowę NA CZAS SIEDZENIA.
      Cały uchwyt żyje w pamięci procesu (§6.3), więc mimo trasy `POST` do bazy
@@ -397,4 +435,3 @@ test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", asy
     headers: ala.naglowki, payload: { obecny: false } });
   assert.equal(r.json().trzyma, null);
 });
-
