@@ -250,6 +250,98 @@ export function migrate(database: DatabaseSync) {
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
   bezObslugiKlienta(database);
+  /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
+     nazwach, więc musi widzieć tabelę już kompletną. */
+  zadanieNieTrzymaTowaru(database);
+}
+
+/**
+ * Zadanie terenowe przestaje blokować przebudowę read-modelu (0.148.1).
+ *
+ * `zadanie_terenowe.tw_id` wskazywał na `sgt_towar(tw_id)` BEZ `ON DELETE`,
+ * czyli z domyślnym `NO ACTION`. Tymczasem `sgt_towar` jest read-modelem:
+ * `importFromMssql` kasuje całą tabelę i wstawia ją od nowa przy każdym
+ * odświeżeniu z Subiekta.
+ *
+ * Skutek był taki, że JEDNO zadanie ze wskazanym towarem wywracało `DELETE
+ * FROM sgt_towar` na `FOREIGN KEY constraint failed` — a że import biegnie
+ * w `main()` PRZED `app.listen()`, kładło to całe API w pętli restartów NSSM.
+ * Mina leżała uzbrojona od 0.141.0 i wybuchła, gdy 0.145.0 dało agentom
+ * wyszukiwarkę towaru, czyli pierwszy łatwy sposób na wpisanie `tw_id`.
+ *
+ * `SET NULL` jest właściwą odpowiedzią, nie obejściem: zadanie niesie własny
+ * snapshot symbolu i nazwy, więc po utracie powiązania nadal mówi hali, o co
+ * chodziło. Ta sama tabela trzyma tak `conversation_id` i `message_id`.
+ *
+ * Zmiana klucza obcego w SQLite wymaga przebudowy tabeli (blizna 0.135.0).
+ */
+function zadanieNieTrzymaTowaru(database: DatabaseSync) {
+  const trzymaTowar = () => (database.prepare(
+    "PRAGMA foreign_key_list(zadanie_terenowe)").all() as Array<{ table: string; on_delete: string }>)
+    .some((k) => k.table === "sgt_towar" && k.on_delete !== "SET NULL");
+  if (!trzymaTowar()) return;
+
+  /* Klucze obce MUSZĄ zejść PRZED transakcją: w transakcji `PRAGMA
+     foreign_keys` jest ignorowane po cichu, a `DROP TABLE` rodzica przy
+     wierszach dziecka skończyłby się błędem przy starcie usługi. */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      /* Warunek sprawdzany PONOWNIE, już pod blokadą zapisu: API i worker to
+         dwa procesy startowane razem przez NSSM i oba wołają `migrate()`. */
+      if (!trzymaTowar()) return;
+      database.exec(`
+        CREATE TABLE zadanie_terenowe_nowe (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          rodzaj TEXT NOT NULL CHECK (rodzaj IN ('pomiar','zdjecie','weryfikacja','inne')),
+          tytul TEXT NOT NULL,
+          instrukcja TEXT NOT NULL,
+          tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
+          zrodlo TEXT NOT NULL DEFAULT 'reczne',
+          zrodlo_ref TEXT,
+          priorytet TEXT NOT NULL DEFAULT 'normalny' CHECK (priorytet IN ('normalny','pilny')),
+          status TEXT NOT NULL DEFAULT 'nowe' CHECK (status IN ('nowe','w_toku','wykonane','anulowane')),
+          utworzono_at TEXT NOT NULL, utworzono_przez TEXT NOT NULL,
+          utworzono_user_id INTEGER REFERENCES app_user(user_id),
+          przypisano_at TEXT, przypisano_przez TEXT,
+          przypisano_user_id INTEGER REFERENCES app_user(user_id),
+          wynik TEXT, wykonano_at TEXT, wykonano_przez TEXT,
+          wykonano_user_id INTEGER REFERENCES app_user(user_id),
+          anulowano_at TEXT, anulowano_przez TEXT,
+          conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+          message_id INTEGER REFERENCES message(id) ON DELETE SET NULL
+        );
+        INSERT INTO zadanie_terenowe_nowe(
+          id, rodzaj, tytul, instrukcja, tw_id, zrodlo, zrodlo_ref, priorytet, status,
+          utworzono_at, utworzono_przez, utworzono_user_id,
+          przypisano_at, przypisano_przez, przypisano_user_id,
+          wynik, wykonano_at, wykonano_przez, wykonano_user_id,
+          anulowano_at, anulowano_przez, conversation_id, message_id)
+        SELECT
+          id, rodzaj, tytul, instrukcja, tw_id, zrodlo, zrodlo_ref, priorytet, status,
+          utworzono_at, utworzono_przez, utworzono_user_id,
+          przypisano_at, przypisano_przez, przypisano_user_id,
+          wynik, wykonano_at, wykonano_przez, wykonano_user_id,
+          anulowano_at, anulowano_przez, conversation_id, message_id
+        FROM zadanie_terenowe;
+        DROP TABLE zadanie_terenowe;
+        ALTER TABLE zadanie_terenowe_nowe RENAME TO zadanie_terenowe;
+      `);
+      /* Indeksy giną razem z tabelą, a `schema.sql` odtworzy je dopiero przy
+         NASTĘPNYM otwarciu bazy. Do tego czasu kolejka zadań na kolektorze
+         skanowałaby całą tabelę, więc stawiamy je tutaj. */
+      database.exec(`
+        CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_status
+          ON zadanie_terenowe(status, priorytet, utworzono_at);
+        CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_przypisane
+          ON zadanie_terenowe(przypisano_user_id, status);
+        CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_towar
+          ON zadanie_terenowe(tw_id, utworzono_at);
+      `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 /**

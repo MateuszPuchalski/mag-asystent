@@ -33,6 +33,33 @@ historii nie przepisujemy.
 
 ---
 
+## 0.148.1 — 1 września 2026
+
+**[wymaga działania]** API padało w pętli restartów po każdym starcie usług.
+Aktualizacja do tej wersji naprawia to sama, przy pierwszym uruchomieniu.
+
+**Zadanie terenowe blokowało import z Subiekta.** `zadanie_terenowe.tw_id`
+wskazywał na `sgt_towar` bez `ON DELETE`, a import kasuje całą tę tabelę
+i wstawia ją od nowa. Wystarczyło jedno zadanie ze wskazanym towarem, żeby
+`DELETE FROM sgt_towar` padał na `FOREIGN KEY constraint failed`.
+
+Import biegnie przed nasłuchem serwera, więc ten błąd kończył proces. NSSM
+restartował usługę, import padał znowu, i tak w kółko. Z zewnątrz wyglądało to
+jak martwe API, a instalator meldował „API nie odpowiedziało".
+
+Klucz obcy dostaje `ON DELETE SET NULL` — tak samo, jak ta sama tabela trzyma
+już powiązanie z rozmową i wiadomością. Zadanie niesie własny snapshot symbolu
+i nazwy, więc po utracie powiązania nadal mówi hali, o co chodziło.
+
+**Mina leżała uzbrojona od 0.141.0.** Wybuchła, gdy 0.145.0 dało agentom
+wyszukiwarkę towaru, czyli pierwszy łatwy sposób na wpisanie `tw_id`. Cofnięcie
+do wcześniejszej wersji jej NIE naprawiało — usterka jest starsza.
+
+**Test odtwarza awarię, zanim ją naprawi.** `db/migracja-zadania.test.ts` stawia
+bazę w kształcie z 0.141.0, sprawdza, że kasowanie towaru faktycznie pada,
+i dopiero potem uruchamia migrację. Test, który nie umie pokazać usterki, nie
+dowodzi jej naprawy.
+
 ## 0.148.0 — 1 września 2026
 
 **[wymaga działania]** Wysyłka odpowiedzi do Allegro jest włączona. Od tego
