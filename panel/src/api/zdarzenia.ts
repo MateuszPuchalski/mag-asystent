@@ -71,6 +71,10 @@ export function useSzynaZdarzen(
     function obsluz(z: ZdarzenieRozmowy) {
       if (z.type === "presence") {
         setObecnosc((z.obecni as Obecnosc[] | undefined) ?? []);
+        /* Kolejka też musi się odświeżyć: od 0.158.0 wiersz pokazuje, kto
+           siedzi przy rozmowie, a to zmienia się właśnie tymi zdarzeniami.
+           Bicie serca ich NIE wysyła — tylko wejście, wyjście i „pisze". */
+        qc.invalidateQueries({ queryKey: klucze.rozmowy });
         return;
       }
       /* Kolejka reaguje na KAŻDE zdarzenie: nowa wiadomość zmienia kolejność,

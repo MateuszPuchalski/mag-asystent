@@ -273,6 +273,19 @@ export function dopiszZdarzenieWyniku(
     INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
     VALUES (?, NULL, 'field_task_result', json_object('taskId', ?, 'result', ?))
   `).run(conversationId, zadanieId, wynik);
+  /* Wynik z hali ZDEJMUJE `waiting_for_internal`: to na niego rozmowa czekała.
+     Bez tego jedyne wyjście z tego statusu byłoby ręczne, a agent musiałby
+     pamiętać o kliknięciu, którego nikt od niego nie oczekuje.
+
+     Bez własnej transakcji — `wykonajZadanie` stoi już w swojej, tak samo jak
+     synchronizator przy `obudzPrzychodzaca`. Autorem jest HALA, nie agent:
+     to jej pomiar zmienił stan sprawy. */
+  const przedWynikiem = statusRozmowy(database, conversationId);
+  if (przedWynikiem === "waiting_for_internal") {
+    database.prepare("UPDATE conversation SET status='open', snoozed_until=NULL WHERE id=?")
+      .run(conversationId);
+    zapiszZmianeStatusu(database, conversationId, przedWynikiem, "open", "hala", undefined);
+  }
   publishConversationEvent("warehouse.result", conversationId, { taskId: zadanieId, result: wynik });
 }
 

@@ -261,12 +261,25 @@ test("zmiana statusu ląduje na osi, a zmiana bez różnicy nie zostawia nic", (
   assert.equal(wpisy[0].rodzaj, "wiadomosc", "pytanie klienta zostaje pierwsze");
 
   const statusy = wpisy.filter((w) => w.rodzaj === "status");
-  /* Trzy wywołania `ustawStatus` po drodze, DWA wpisy. Trzecie — otwarcie
-     rozmowy odłożonej, której termin już minął — nie zmieniło niczego, co
-     widać: dla czytelnika była otwarta od chwili terminu. Wpis „open → open"
-     opowiadałby o zdarzeniu, którego nie było. */
-  assert.deepEqual(statusy.map((w) => w.tresc), ["new → open", "open → snoozed"]);
-  assert.equal(statusy[1].autor, "Biuro");
-  assert.equal(statusy[1].odKlienta, false,
+  /* Oś opowiada CAŁY przebieg, razem z pętlą przez halę: zlecony pomiar
+     przestawia rozmowę na „czeka na nas", a wynik z hali zdejmuje ten stan
+     (0.159.0). Oba przejścia są automatyczne i oba mają tu zostać — bez nich
+     czytelnik nie wie, dlaczego sprawa stała.
+
+     Czego NIE MA na tej liście: „open → open". Otwarcie rozmowy odłożonej,
+     której termin już minął, nie zmieniło niczego, co widać — dla czytelnika
+     była otwarta od chwili terminu, a wpis opowiadałby o zdarzeniu, którego
+     nie było. */
+  assert.deepEqual(statusy.map((w) => w.tresc), [
+    "new → open",
+    "open → waiting_for_internal",
+    "waiting_for_internal → open",
+    "open → waiting_for_internal",
+    "waiting_for_internal → snoozed",
+  ]);
+  assert.equal(statusy.at(-1)!.autor, "Biuro");
+  assert.equal(statusy.at(-1)!.odKlienta, false,
     "zmiana statusu nie ma prawa wyglądać jak głos klienta");
+  /* Wynik z hali podpisuje HALA, nie agent: to jej pomiar zmienił stan. */
+  assert.equal(statusy[2].autor, "hala");
 });

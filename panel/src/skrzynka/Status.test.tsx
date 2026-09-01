@@ -9,7 +9,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z",
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
-  status: "new", odlozoneDo: null, poTerminie: false, ...n,
+  status: "new", odlozoneDo: null, poTerminie: false, oglada: null, ...n,
 });
 
 describe("Status rozmowy", () => {

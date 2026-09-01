@@ -114,13 +114,29 @@ Z metadanych, z treści, czy z jawnego stanu stawianego ręką człowieka?
 Poprzednia odpowiedź (piłka liczona z metadanych) działała, ale wymagała
 osobnej tabeli `watek_meta` i dociągania rozmów przy każdej synchronizacji.
 
-> **Odpowiedź:** Z **jawnego stanu stawianego ręką człowieka** — trzecia
-> z trzech możliwości, o które pyta ten rozdział. Statusy rozmowy wymienia
+> **Odpowiedź:** Z **jawnego stanu**, ale stawianego RĘKĄ TYLKO TAM, GDZIE
+> automat nie ma go z czego policzyć. Statusy rozmowy wymienia
 > `panel-obslugi-klienta.md` §7: `waiting_for_customer` znaczy „piłka po
 > stronie klienta", `waiting_for_internal` — po stronie pracownika lub hali.
 >
 > Odpada liczenie piłki z metadanych, które wymagało osobnej tabeli
 > `watek_meta` i dociągania rozmów przy każdej synchronizacji.
+>
+> **Poprawka z 0.157.0 — druga połowa tej odpowiedzi.** Do tego wydania
+> rozdział mówił „stawianego ręką człowieka" i tak też miał powstać ekran.
+> Właściciel rozstrzygnął inaczej, tym samym kryterium co przy zwrotach:
+> minimum klikań. Status wynika więc z FAKTÓW, które i tak zapisujemy —
+> przyszła wiadomość, ktoś przejął rozmowę, odpowiedź poszła do klienta,
+> zlecono pomiar, wrócił wynik z hali.
+>
+> Ręką zostają cztery stany, których automat nie ma jak zgadnąć: odłożenie
+> (z terminem), załatwione, zamknięte i spam. To nie jest liczenie piłki
+> z metadanych — status zapisuje ta sama transakcja co fakt, z którego
+> wynika, i nikt go potem nie odgaduje przy odczycie.
+>
+> Różnica jest mierzalna: typowa rozmowa nie wymaga ANI JEDNEGO kliknięcia
+> w status. Wersja ręczna kłamałaby przy pierwszej rozmowie, w której agent
+> się spieszył — a status, który kłamie, jest gorszy od jego braku.
 
 ### 5. Czym jest odpowiedź i gdzie stoi granica automatu?
 

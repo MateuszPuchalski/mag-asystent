@@ -1444,6 +1444,25 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.159.0 nie wymaga niczego ręcznego** — nie dochodzi ani
+jedna kolumna. Zmienia się natomiast nawyk biura, więc warto o tym powiedzieć.
+
+Wejście w rozmowę przydziela ją agentowi na czas siedzenia. Kolega widzi wtedy
+przy wierszu oko z nazwiskiem, a przy próbie odpowiedzi dostaje pytanie, czy
+odpowiedzieć mimo to. Odpowiedź wysłana do klienta przydziela rozmowę na stałe
+— osobne „Przejmij rozmowę" nie jest już do tego potrzebne.
+
+Uchwyt żyje w pamięci usługi i puszcza sam po kilkudziesięciu sekundach bez
+znaku życia. Restart usługi kasuje wszystkie uchwyty i to jest zachowanie
+zamierzone: żadna rozmowa nie zostaje zablokowana przez zamkniętą zakładkę.
+
+Zlecenie pomiaru przestawia rozmowę na „czeka na nas", a wynik z hali zdejmuje
+ten stan. Agent nie klika w to w żadną stronę.
+
+**Panel obsługi trzeba przebudować** (`npm run build`), bo bicie serca uchwytu
+działa po jego stronie. Bez tego wejście w rozmowę niczego nie przydzieli,
+a reszta ekranu działa jak dotąd.
+
 **Aktualizacja do 0.154.0 nie wymaga niczego ręcznego — ale coś naprawia.**
 Tabela pozycji zwrotu przebudowuje się przy pierwszym starcie, bez kolumny
 `tw_id` wskazującej na read-model Subiekta. Do 0.153.1 ta zależność kasowała
