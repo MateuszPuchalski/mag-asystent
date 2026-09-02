@@ -9,9 +9,17 @@ on:
     # `package.json` korzenia MUSI tu być: z niego bierze się `versionName`
     # i `versionCode` APK. Bez tego sam podbicie wersji nie przebudowywało
     # kolektora i na wydanie szedł plik z numerem sprzed zmiany.
-    paths: ["android/**", "package.json", ".github/workflows/android.yml"]
+    # `tools/**` jest tu, bo dwie bramki Kotlina to skrypty w Pythonie
+    # (`kt_imports_check.py`, `ergonomia_check.py`). Bez tego wpisu zmiana
+    # samej bramki przechodziła BEZ jej uruchomienia — ta sama dziura, którą
+    # `docs/**` załatało w workflow serwera.
+    paths: ["android/**", "tools/**", "package.json", ".github/workflows/android.yml"]
   pull_request:
-    paths: ["android/**", "package.json", ".github/workflows/android.yml"]
+    # `tools/**` jest tu, bo dwie bramki Kotlina to skrypty w Pythonie
+    # (`kt_imports_check.py`, `ergonomia_check.py`). Bez tego wpisu zmiana
+    # samej bramki przechodziła BEZ jej uruchomienia — ta sama dziura, którą
+    # `docs/**` załatało w workflow serwera.
+    paths: ["android/**", "tools/**", "package.json", ".github/workflows/android.yml"]
   # Ręczne uruchomienie — po to, żeby dało się zbudować wydanie BEZ wymyślania
   # zmiany w kodzie. Potrzebne dokładnie raz na instalację: po dodaniu sekretów
   # podpisu nie ma czego wypchnąć, a bez biegu nie powstanie ani APK, ani
@@ -40,6 +48,11 @@ jobs:
       - name: Kontrola importów Kotlina
         working-directory: ${{ github.workspace }}
         run: python3 tools/kt_imports_check.py
+      # Cele dotyku — mierzalna część `docs/ergonomia-magazynu.md`. Tu, a nie
+      # w workflow serwera, bo czyta źródła kolektora i razem z nimi się starzeje.
+      - name: Kontrola ergonomii kolektora
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/ergonomia_check.py
       - name: Testy :core (JVM)
         run: ./gradlew :core:test
       - name: Testy jednostkowe + APK debug

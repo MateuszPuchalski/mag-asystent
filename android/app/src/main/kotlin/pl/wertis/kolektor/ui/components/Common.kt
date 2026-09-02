@@ -427,7 +427,10 @@ fun LocChip(
             .clip(shape)
             .border(if (failed) 2.dp else 1.5.dp, border, shape)
             .background(fill)
-            .heightIn(min = if (big) 52.dp else 44.dp)
+            /* Wariant mały brał 44 dp i to była DRUGA liczba udająca „minimum
+               dla palca" obok MinTap, w tym samym pliku. Jedno źródło znaczy
+               jedno źródło. */
+            .heightIn(min = if (big) 52.dp else MinTap)
             .clickable(onClick = onClick)
             .padding(horizontal = if (big) 16.dp else 14.dp, vertical = if (big) 12.dp else 9.dp),
         verticalAlignment = Alignment.CenterVertically,

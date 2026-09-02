@@ -630,6 +630,9 @@ docs/subiekt-gt-edu-setup.md  podpięcie Subiekta GT krok po kroku
 docs/subiekt-gt-struktura.md  co WERTIS czyta i pisze w bazie Subiekta
 docs/slownik.md            jak pisze się tę dokumentację: reguły w duchu
                            ASD-STE100 i słowniczek terminów
+docs/ergonomia-magazynu.md dekalog ergonomii pracy magazynowej: pod kogo
+                           projektuje się ekran magazynowy, czego nie wolno,
+                           co się mierzy i które punkty obowiązują biuro
 instalator/README.md       instalator Windows: usługi, kreator konfiguracji,
                            konto SQL o minimalnych uprawnieniach
 tools/convert_xlsx.py      konwersja eksportu Subiekta → products.json
@@ -639,6 +642,9 @@ tools/styl_check.py        mierzalna część reguł z docs/slownik.md (długoś
                            i akapitu, odrzucone terminy)
 tools/kt_imports_check.py  namiastka kompilatora dla :app (brakujące importy,
                            bilans nawiasów) — :app nie kompiluje się bez SDK
+tools/ergonomia_check.py   cele dotyku na kolektorze ≥48 dp — mierzalna część
+                           docs/ergonomia-magazynu.md; mniejszy cel wymaga
+                           komentarza „ergonomia: <powód>"
 .github/workflows/         CI: android.yml (testy :core, APK debug, a na main
                            podpisane wydanie z sumą SHA-256), server.yml
                            (testy serwera, tsc, docs_check), instalator.yml
