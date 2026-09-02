@@ -2,7 +2,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 
-/* ── Rabat transakcyjny przy pozycji zwrotu (0.163.0) ────────────────────────
+/* ── Rabat transakcyjny przy pozycji zwrotu (0.164.0) ────────────────────────
    Zwrot prowizji od sprzedaży. Do tego wydania firma klikała po niego ręcznie
    przy KAŻDYM zwrocie w panelu Allegro — nie dlatego, że tak trzeba, tylko
    dlatego, że znikąd nie było widać, przy którym wniosek już jest.

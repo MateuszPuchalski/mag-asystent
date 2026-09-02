@@ -908,7 +908,7 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- czy operator ją oddał, czy tylko pozycje wyszły akurat na tyle samo.
   kwota_dostawa_grosze INTEGER,
   kwota_at TEXT, kwota_przez TEXT,
-  -- Oś czasu zwrotu PO STRONIE ALLEGRO (0.163.0) — nie mylić z `werdykt`
+  -- Oś czasu zwrotu PO STRONIE ALLEGRO (0.164.0) — nie mylić z `werdykt`
   -- ani `zamkniety_at`, które są naszymi decyzjami. Jedenaście wartości
   -- opisuje `docs/allegro-ksztalt.md`; BEZ `CHECK`, bo schemat Allegro
   -- wymienia je słownie i nie zamyka enumem, a nieznana wartość ma przejść,
@@ -1032,7 +1032,7 @@ CREATE INDEX IF NOT EXISTS ix_oferta_kartoteka_tw ON oferta_kartoteka(tw_id);
 
 -- Oś zwrotu. Wpisy wiszą przy ŹRÓDLE, nie przy sprawie — blizna 0.130.0,
 -- gdzie historia ginęła przy scalaniu.
--- ── Wnioski o rabat transakcyjny (0.163.0) ─────────────────────────────────
+-- ── Wnioski o rabat transakcyjny (0.164.0) ─────────────────────────────────
 -- Zwrot prowizji od sprzedaży. Do 0.162.1 firma klikała po niego ręcznie przy
 -- każdym zwrocie w panelu Allegro; obserwacja z 2 września pokazuje, ile to
 -- pracy: `type` to MANUAL ×60 i AUTOMATIC ×40 na sto wniosków.

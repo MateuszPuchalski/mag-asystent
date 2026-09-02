@@ -60,7 +60,12 @@ const ZAKAZANE_KLUCZE = [
   /* `waybill` doszło w 0.155.0, bo prawdziwy raport wyniósł sześć numerów
      listów przewozowych InPost. Numer listu prowadzi w systemie kuriera do
      adresu i odbiorcy — jest daną osobową okrężną drogą, przez co nie wygląda
-     na nią przy czytaniu tej listy. */
+     na nią przy czytaniu tej listy.
+
+     Czyszczenie lądowisk przepuszcza ten sam numer bez zmian i to NIE jest
+     sprzeczność: raport sondy wchodzi do repo, a lądowisko zostaje prywatną
+     kopią w bazie biura. Rozróżnienie stoi w `docs/obsluga-klienta.md`,
+     w polityce danych zwrotów. */
   "waybill", "parcel", "tracking",
 ];
 

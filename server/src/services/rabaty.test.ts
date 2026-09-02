@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { stanRabatu, pozycjaDoWniosku, zlozWniosekORabat, RabatConflict } from "./rabaty.js";
 
-/* ── Rabat transakcyjny przy pozycji zwrotu (0.163.0) ────────────────────────
+/* ── Rabat transakcyjny przy pozycji zwrotu (0.164.0) ────────────────────────
    Firma klikała po zwrot prowizji ręcznie przy KAŻDYM zwrocie w panelu
    Allegro, bo skądinąd nie widziała, przy którym wniosek już jest. Te testy
    pilnują dwóch rzeczy, na których stoi cała reszta:

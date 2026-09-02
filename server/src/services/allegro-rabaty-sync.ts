@@ -3,7 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { urlRoszczenProwizji, zapytajAllegro } from "../adapters/allegro.http.js";
 import { kontoKanalu } from "./kanal-konto.js";
 
-/* ── Wnioski o rabat transakcyjny (0.163.0) ──────────────────────────────────
+/* ── Wnioski o rabat transakcyjny (0.164.0) ──────────────────────────────────
    Zwrot prowizji od sprzedaży. Odczyt istnieje po to, żeby panel wiedział,
    przy którym zwrocie wniosek już jest — a firma klikała dotąd w panelu
    Allegro przy KAŻDYM, bo skąd inąd tego nie widziała.

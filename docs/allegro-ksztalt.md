@@ -1,7 +1,7 @@
 # Kształt Centrum wiadomości Allegro
 
 Kontrakt mapowania skrzynki. **Pochodzi ze specyfikacji OpenAPI Allegro**,
-a od 0.163.0 stoi obok niego obserwacja z żywego konta:
+a od 0.164.0 stoi obok niego obserwacja z żywego konta:
 [`allegro-sonda.md`](allegro-sonda.md), zdjęta 2 września 2026. Ten plik mówi,
 co WOLNO czytać kodowi; tamten mówi, co konto firmy naprawdę oddało danego dnia.
 Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia — i tak powstały
@@ -43,7 +43,7 @@ jest KONTRAKTEM, czyli mówi, co wolno czytać kodowi; raport będzie OBSERWACJ�
 z datą. Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia.
 
 Znaczniki weryfikacji niżej dotyczą **w większości** końcówek ZAPISU i tych
-sonda nie tknie, bo jest z założenia GET-em. Do 0.163.0 stało tu twardsze
+sonda nie tknie, bo jest z założenia GET-em. Do 0.164.0 stało tu twardsze
 zdanie — „wyłącznie zapisu, licznik nie zejdzie ani o jeden" — i było
 nieprawdziwe: trzy z siedmiu znaczników w tym pliku mówiły o czym innym,
 a jeden z nich (`status` zwrotu) dało się zdjąć samą lekturą `swagger.yaml`
@@ -200,7 +200,7 @@ Negocjuje to `zapytajAllegro` i zapamiętuje wynik osobno dla tej rodziny.
 
 Obiekt ma liczbę `count` i tablicę `customerReturns`. Zwrot ma pola `id`,
 `createdAt`, `referenceNumber`, `orderId`, `items`, `refund`, `parcels`,
-`rejection`, `marketplaceId` oraz — dopisane w 0.163.0 — `status`, `buyer`
+`rejection`, `marketplaceId` oraz — dopisane w 0.164.0 — `status`, `buyer`
 i `isFulfillment`.
 
 `status` to OŚ CZASU ZWROTU po stronie Allegro, nie nasza decyzja. Jedenaście
@@ -234,13 +234,18 @@ Paczka (`parcels[]`) ma `createdAt`, `waybill`, `carrierId` oraz `sender`.
 Odrzucenie (`rejection`) ma `code`, `reason` i `createdAt`. Kodów jest
 SIEDEM, nie cztery: `REFUND_REJECTED`, `NEW_ITEM_SENT`, `ITEM_FIXED`,
 `MISSING_PART_SENT`, `ITEM_MISMATCH`, `BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`.
-Do 0.163.0 stała tu lista czterech, przepisana z ogłoszenia zamiast ze
+Do 0.164.0 stała tu lista czterech, przepisana z ogłoszenia zamiast ze
 schematu.
 
 Filtry listy: `customerReturnId`, `orderId`, `items.offerId`, `items.name`,
 `parcels.waybill`, `parcels.carrierId`, `parcels.senderPhoneNumber`,
 `referenceNumber`, `from`, `createdAt.gte`, `createdAt.lte`, `marketplaceId`,
 `limit` (domyślnie 100) i `offset`.
+
+Od 0.163.0 używamy jednego z tych filtrów: `parcels.waybill` przy skanie
+etykiety zwrotnej. Pytamy o JEDEN numer listu, poza rytmem synchronizacji,
+i nie ruszamy przy tym kursora — inaczej ręczne pytanie przestawiłoby
+ticker i zgubiło zwroty pomiędzy.
 
 Parametr `from` jest KURSOREM: dokumentacja opisuje go jako identyfikator
 ostatnio widzianego zwrotu, a odpowiedź niesie zwroty utworzone po nim.
@@ -250,7 +255,7 @@ strony — i to jest blizna 0.127.0 zdjęta u źródła.
 ### `GET /order/customer-returns/{id}`
 
 Szczegół zwrotu ma TEN SAM kształt co element listy — obie ścieżki oddają
-`CustomerReturn`. Sekcji tu nie było do 0.163.0, choć sonda mierzy szczegół od
+`CustomerReturn`. Sekcji tu nie było do 0.164.0, choć sonda mierzy szczegół od
 0.154.0; obserwacja z 2 września potwierdza zgodność pole po polu na dziesięciu
 zwrotach.
 
@@ -268,7 +273,7 @@ Trzy rzeczy z tej odpowiedzi nie mają u nas kolumny.
 `refund.bankAccount` niesie `owner`, `accountNumber`, `iban`, `swift`
 i `address`. `parcels[].sender.phoneNumber` niesie telefon nadawcy.
 `buyer.email` niesie adres e-mail kupującego — dopisany do tej listy
-w 0.163.0, bo `buyer` wszedł wtedy do kontraktu i bez tego zdania wyglądałby
+w 0.164.0, bo `buyer` wszedł wtedy do kontraktu i bez tego zdania wyglądałby
 na pole do wzięcia w całości. W obserwacji z 2 września `buyer.email` było
 puste w stu rekordach na sto, ale schemat je przewiduje i to schemat
 rozstrzyga, czego nie wolno zapisać.
@@ -281,9 +286,14 @@ mapowanie wywali się na SQL-u, zamiast wyciec po cichu. Pilnuje tego
 Zostaje sam FAKT powrotu paczki — `paczka_at` z najwcześniejszego
 `parcels[].createdAt`. To wystarcza, żeby powiedzieć „towar wrócił".
 
+Numer listu (`parcels[].waybill`) kolumny u nas nie ma i mieć nie będzie,
+mimo że skan etykiety go szuka. Szukamy po kopii odpowiedzi w lądowisku,
+więc numer żyje przez jedno żądanie zamiast zostać u nas na lata. Politykę
+opisuje `docs/obsluga-klienta.md`, rozdział o danych zwrotów.
+
 ### Pola młodsze od kopii specyfikacji
 
-Znacznik przy `status` zwrotu ZDJĘTY w 0.163.0. Twierdził, że „kopia
+Znacznik przy `status` zwrotu ZDJĘTY w 0.164.0. Twierdził, że „kopia
 specyfikacji z 2024 roku go nie zawiera" — a `docs/allegro/swagger.yaml`
 opisuje to pole razem z jedenastoma wartościami. Znacznik przeżył wymianę
 źródła z 0.151.0: sekcja o zwrotach dalej była pisana z dwuletniej kopii, choć
@@ -315,13 +325,13 @@ zwrotem pieniędzy.
 `[WERYFIKUJ]` `POST /order/refund-claims` — kształt ŻĄDANIA jest znany
 ze schematu (`RefundClaimRequest`, patrz sekcja niżej), ale nie przeszedł
 jeszcze przez żywe konto. Znacznik schodzi po PIERWSZYM udanym wniosku
-złożonym z panelu, nie wcześniej. Do 0.163.0 stało tu, że kształt jest
+złożonym z panelu, nie wcześniej. Do 0.164.0 stało tu, że kształt jest
 „najsłabiej udokumentowany z całej trójki" — nieprawda, bo schemat leży
 w repo; nieznana jest wyłącznie odpowiedź konta.
 
 ### Rabat transakcyjny — `/order/refund-claims`
 
-Zwrot prowizji od sprzedaży, po polsku „rabat transakcyjny". Do 0.163.0 firma
+Zwrot prowizji od sprzedaży, po polsku „rabat transakcyjny". Do 0.164.0 firma
 klikała po niego ręcznie przy każdym zwrocie w panelu Allegro; obserwacja
 z 2 września pokazuje, dlaczego to była praca: `type` to `MANUAL` ×60
 i `AUTOMATIC` ×40, czyli Allegro część wniosków zakłada samo, a resztę trzeba
@@ -392,7 +402,7 @@ system": identyfikator, który sprzedawca sam wpisał przy ofercie. U tej firmy
 to symbol z Subiekta.
 
 **Pole jest OPCJONALNE w schemacie** — `OfferReference` wymaga tylko `id`
-i `name` — więc do 0.163.0 cały mostek do kartoteki stał na nieznanym
+i `name` — więc do 0.164.0 cały mostek do kartoteki stał na nieznanym
 pokryciu. Obserwacja z 2 września odpowiada: `lineItems[].offer.external.id`
 było niepuste w **165 na 165** pozycji. Grunt jest pewny, ale nie z definicji:
 to liczba z jednego dnia i jednego konta, a kod ma dalej znosić brak SKU

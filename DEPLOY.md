@@ -1414,6 +1414,32 @@ wolno wgrać **2000 wierszy**.
 Cofnięcia jednym kliknięciem nie ma. Odwrotem jest arkusz z poprzednimi
 adresami — dlatego eksport sprzed zmiany warto zachować.
 
+## 6e. Czytnik kodów przy zwrotach (0.163.0)
+
+Paczka zwrotna wraca do biura z etykietą kurierską i od 0.163.0 skan tej
+etykiety otwiera właściwy zwrot w panelu obsługi. Nie ma tu nic do wpisania
+w `wertis.env`.
+
+**Czytnik ma być klawiaturowy (wedge) i kończyć kod Enterem.** Tak wychodzą
+z pudełka niemal wszystkie czytniki USB — to samo ustawienie działa na
+kolektorach. Jeśli twój kończy Tabem, panel przyjmie i to. Jeśli nie kończy
+niczym, przestaw go kodem konfiguracyjnym producenta: bez znaku końca kod
+nigdzie nie doleci.
+
+Skanuje się **prosto w ekran kolejki zwrotów**, bez klikania w pole. Kursor
+nie musi w nim stać. Bez czytnika ta sama praca idzie ręką: numer zwrotu
+wpisany w pole i Enter.
+
+Skan wyszuka zwrot po numerze zwrotu, po identyfikatorze z Allegro albo po
+numerze listu przewozowego. Ostatnia droga działa tylko dla zwrotów już
+zsynchronizowanych — a paczka bywa w biurze szybciej niż wpis w Allegro.
+Dlatego przy nieznanym kodzie ekran daje przycisk POSZUKAJ W ALLEGRO, który
+pyta o ten jeden numer poza kolejnością tickera. Konto Allegro musi być
+sparowane (§6b).
+
+Numeru listu WERTIS nigdzie nie zapisuje. Nie ma go w dzienniku zdarzeń ani
+w logu żądań serwera.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
@@ -1444,7 +1470,7 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
-**Aktualizacja do 0.163.0 wymaga JEDNEJ rzeczy ręką: nowego uprawnienia.**
+**Aktualizacja do 0.164.0 wymaga JEDNEJ rzeczy ręką: nowego uprawnienia.**
 
 Panel zaczyna pokazywać przy każdej pozycji zwrotu, czy wniosek o rabat
 transakcyjny już jest — i pozwala go złożyć jednym kliknięciem. To pierwszy

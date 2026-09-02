@@ -4,11 +4,13 @@ import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   bilansKartotek, cofnijKorekte, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
-  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, ZwrotConflict,
+  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, znajdzZwrotPoKodzie,
+  ZwrotConflict,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { zglosRabat } from "../adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
+import { dociagnijZwrotPoLiscie } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
@@ -181,7 +183,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* RABAT TRANSAKCYJNY (0.163.0) — jedyna trasa tego pliku, która WYCHODZI
+  /* RABAT TRANSAKCYJNY (0.164.0) — jedyna trasa tego pliku, która WYCHODZI
      do Allegro. Reszta zapisuje wyłącznie u nas. Stąd osobna ostrożność:
      strażnik przed dubletem stoi w serwisie, PRZED siecią, bo końcówka
      Allegro nie ma idempotencji. */
@@ -197,6 +199,49 @@ export async function zwrotyRoutes(app: FastifyInstance) {
            wykonana — a ekran ma powiedzieć, KTÓRY wniosek już istnieje. */
         if (e instanceof RabatConflict) return reply.code(409).send({ error: e.message });
         return konflikt(reply, e);
+      }
+    });
+
+  /* ── Skan etykiety zwrotnej (0.163.0) ─────────────────────────────────────
+     TA TRASA JEST POST-em, CHOĆ NICZEGO NIE ZAPISUJE, i to jest świadome.
+     Zeskanowany kod w adresie wylądowałby w logu żądań serwera — a numer listu
+     przewozowego prowadzi w systemie kuriera do adresu odbiorcy (`ksztalt.ts`,
+     0.155.0). Stałby się więc trwały tylnymi drzwiami, mimo że w bazie nie ma
+     na niego kolumny. Ten sam argument stoi przy szynie zdarzeń panelu:
+     „token lądowałby w logach żądań serwera" (`panel/src/api/zdarzenia.ts`).
+
+     Z tego samego powodu nie ma tu `logEvent`: wpis z kodem w dzienniku byłby
+     dokładnie tym zapisem, którego unikamy, a bez kodu nie niósłby nic. */
+  app.post<{ Body: { kod?: string } }>("/api/obsluga/zwroty/skan", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const kod = (req.body?.kod ?? "").trim();
+    if (!kod) return reply.code(400).send({ error: "Pusty kod" });
+    return znajdzZwrotPoKodzie(kod, db());
+  });
+
+  /* Skan, który nie trafił w nic u nas. Paczka bywa w biurze szybciej, niż
+     zwrot doleci synchronizacją, więc pytamy Allegro o TEN JEDEN numer listu
+     zamiast kazać czekać na ticker.
+
+     Ta trasa ZAPISUJE (dociąga zwrot), więc woła `logEvent` — bez kodu
+     w danych zdarzenia, z tego samego powodu co wyżej. */
+  app.post<{ Body: { kod?: string } }>("/api/obsluga/zwroty/skan/dociagnij",
+    async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const kod = (req.body?.kod ?? "").trim();
+      if (!kod) return reply.code(400).send({ error: "Pusty kod" });
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      const s = sesjaZadania()!;
+      try {
+        const pobrano = await dociagnijZwrotPoLiscie(kod);
+        logEvent("zwrot_skan_dociagniecie", s.user.name, null, { pobrano });
+        return { pobrano, ...znajdzZwrotPoKodzie(kod, db()) };
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
       }
     });
 

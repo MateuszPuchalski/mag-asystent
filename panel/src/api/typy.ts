@@ -179,7 +179,7 @@ export interface Dopasowanie {
   poKolumnie: "offer_id" | "external_id" | null;
 }
 
-/* Rabat transakcyjny przy pozycji zwrotu (0.163.0). Stan LICZY SERWER —
+/* Rabat transakcyjny przy pozycji zwrotu (0.164.0). Stan LICZY SERWER —
    panel go nie wyprowadza, bo wiąże wniosek z pozycją zamówienia, a to
    złączenie ma jedno miejsce. */
 export type StanRabatu = {

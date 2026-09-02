@@ -166,7 +166,7 @@ test("adres rozmowy w sprawie istnieje w specyfikacji Allegro", () => {
   const url = urlWiadomosciDyskusji("https://api.allegro.pl", "abc-1");
   assert.equal(url, "https://api.allegro.pl/sale/issues/abc-1/chat?limit=100");
   assert.equal(url.includes("/sale/disputes"), false);
-  /* `limit` JAWNIE (0.163.0): przy tej jednej końcówce specyfikacja daje
+  /* `limit` JAWNIE (0.164.0): przy tej jednej końcówce specyfikacja daje
      domyślne 10, nie 100 jak przy listach obok. Bez tego próbka sondy była
      cicho przycięta do dziesięciu wiadomości na sprawę. */
   assert.match(url, /limit=100$/);

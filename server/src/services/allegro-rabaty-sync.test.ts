@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { prowizjaNaGrosze, synchronizujAllegroRabaty } from "./allegro-rabaty-sync.js";
 
-/* ── Synchronizator wniosków o rabat (0.163.0) ───────────────────────────────
+/* ── Synchronizator wniosków o rabat (0.164.0) ───────────────────────────────
    Lustro odczytu, nie rejestr decyzji. Pilnujemy trzech rzeczy: kwoty (bo
    przyjeżdża LICZBĄ, gdy Allegro wszędzie indziej oddaje kwotę tekstem),
    idempotencji (drugi przebieg nie mnoży wierszy) i tego, że wniosek bez

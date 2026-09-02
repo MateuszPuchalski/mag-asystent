@@ -13,7 +13,7 @@ była jedna, a nie dwie.
 
 Liczba urosła w 0.150.0 z ośmiu na trzynaście — pięć nowych pozycji to były
 zwroty klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
-W 0.163.0 zeszła na dwanaście: znacznik przy `status` zwrotu okazał się
+W 0.164.0 zeszła na dwanaście: znacznik przy `status` zwrotu okazał się
 nieaktualny, bo schemat leżał już w repo od 0.151.0.
 
 Rozkład dzisiejszy jest po połowie: sześć pozycji dotyczy Subiekta GT, sześć

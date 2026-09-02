@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.163.0 — 2 września 2026
+## 0.164.0 — 2 września 2026
 
 **Rabat transakcyjny widać przy zwrocie i składa się jednym kliknięciem.**
 
@@ -113,6 +113,80 @@ niebezpieczne: `docs/obsluga-klienta.md` kazał zapisać raport sondy jako
 uprawnienie `allegro:api:orders:write` i sparować konto ponownie — bez tego
 przycisk zwróci 403 z nazwą brakującego uprawnienia. Migracja dokłada kolumnę
 i tabelę sama; panel wymaga przebudowy.
+
+## 0.163.0 — 2 września 2026
+
+**Zwrot otwiera się skanem etykiety zwrotnej.**
+
+Kolejka zwrotów była domknięta od 0.162.0 — werdykt, ocena, kwota, korekta,
+kartoteki, zdjęcia — ale brakowało w niej wejścia od strony fizycznej paczki.
+Karton lądował na biurku, a operator szukał właściwego zwrotu oczami. Teraz
+ciągnie po naklejce czytnikiem USB i zwrot otwiera się sam.
+
+### Jedno pole rozpoznaje kod samo
+
+Serwer próbuje po kolei i pierwsze trafienie wygrywa: numer zwrotu
+(`1234/Z04A`), identyfikator zwrotu z Allegro, na końcu numer listu
+przewozowego. Odpowiedź mówi, KTÓRA droga zadziałała.
+
+Dopasowanie jest dokładne, nigdy przybliżone, a **dwa trafienia to brak
+trafienia** — ekran pokazuje wtedy oba i każe wybrać. Ekran sam otwiera zwrot
+przy jednym wyniku, więc przybliżenie prowadziłoby do cudzej sprawy, a przy
+zwrocie znaczy to cudzego klienta i cudze pieniądze. Ten sam wzorzec stoi przy
+kodach EAN (`ktoMaTenKod`), gdzie każde dodatkowe trafienie jest powodem
+odmowy.
+
+### Numeru listu nie zapisujemy
+
+`zwrot_klienta` nie dostaje kolumny na numer listu i nie dostanie. Numer i tak
+leży w kopii odpowiedzi Allegro (`allegro_zwrot.surowe_json`) i tam go szukamy,
+zapytaniem po `json_each`. Jest UŻYTY, nie ZAPAMIĘTANY.
+
+Z tego samego powodu trasa skanu jest POST-em, choć **niczego nie zapisuje**:
+kod w adresie wylądowałby w logu żądań serwera, czyli stałby się trwały tylnymi
+drzwiami. Nie ma go też w dzienniku zdarzeń.
+
+Przy okazji znika sprzeczność dwóch plików. `services/ksztalt.ts` nazywa numer
+listu daną osobową okrężną drogą, a czyszczenie lądowisk przepuszcza go bez
+zmian. Obie oceny są prawdziwe o różnych miejscach: raport sondy wchodzi do
+repo, lądowisko jest prywatną kopią w bazie biura. Oba komentarze wskazują
+teraz jeden akapit polityki w `docs/obsluga-klienta.md`.
+
+### Paczka bywa szybsza niż synchronizacja
+
+Nieznany kod nie kończy się samym „nie znam". Ekran wypisuje zeskanowany kod,
+mówi, czego szukał, i daje przycisk „Poszukaj w Allegro" — pytanie o ten jeden
+numer listu filtrem `parcels.waybill`, poza rytmem tickera. Kursor
+synchronizacji zostaje nietknięty, żeby ręczne pytanie nie zgubiło zwrotów
+pomiędzy.
+
+Przy czytniku samo „nie znalazłem" wygląda identycznie jak zepsuty czytnik —
+dlatego kod jest na ekranie, choćby naklejka była pomięta, a skan urwany.
+
+### Czytnik przestał walczyć ze skrótami
+
+To była konkretna usterka, nie ryzyko teoretyczne. Cyfry `1`–`6` przełączają
+kubełek kolejki od 0.150.0, a etykieta InPostu `600000367616070023174201`
+zawiera je wszystkie: bez zabezpieczenia jeden skan przerzuciłby kubełek sześć
+razy, zanim doleciałby Enter.
+
+Panel dostaje wzorzec, który kolektor ma od pięciu wydań
+(`scan/WedgeKeySource.kt`): przerwa 300 ms resetuje bufor, Enter kończy serię,
+seria krótsza niż sześć znaków nie jest kodem, a w polu tekstowym hook milczy.
+Doszło jedno: **pierwszy znak serii czeka czterdzieści milisekund**, zanim
+trafi do skrótów. Bez tego pierwsza cyfra kodu i tak przełączyłaby kubełek —
+w chwili jej naciśnięcia nikt jeszcze nie wie, czy to skan, czy skrót.
+Człowiek nie wciska dwóch klawiszy w takim czasie, a czytnik wysyła znak co
+kilka.
+
+Pojedyncza „3" naciśnięta ręką dalej przełącza kubełek.
+
+### Przy wdrożeniu
+
+Czytnik ma być klawiaturowy i kończyć kod Enterem — tak wychodzą z pudełka
+niemal wszystkie. Nic do wpisania w `wertis.env`. Opisuje to `DEPLOY.md` §6e.
+
+---
 
 ## 0.162.1 — 2 września 2026
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
-import { useZwroty } from "../api/zwroty";
+import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
 import type { BilansKartotek, Kubelek } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import {
@@ -10,6 +10,8 @@ import {
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
+import { Skan } from "../zwroty/Skan";
+import { useSkaner } from "../skaner";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
@@ -86,6 +88,25 @@ export function Zwroty() {
     () => (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek),
     [data, kubelek]);
 
+  const skan = useSkanZwrotu();
+  const dociagnij = useDociagnijPoSkanie();
+  const [kod, setKod] = useState("");
+  const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
+  const [bladSkanu, setBladSkanu] = useState("");
+
+  /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
+     źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
+     gdy stoi w innym kubełku niż oglądany. */
+  const przyjmij = (w: WynikSkanu) => {
+    setWynikSkanu(w);
+    setBladSkanu("");
+    if (w.zwrotId) nawiguj(`/obsluga/zwroty/${w.zwrotId}`);
+  };
+  const szukaj = (v: string) => {
+    setKod(v);
+    skan.mutate(v, { onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) });
+  };
+
   const wybrany = id ? Number(id) : null;
   const zwrot = data?.zwroty.find((z) => z.id === wybrany) ?? null;
 
@@ -116,20 +137,17 @@ export function Zwroty() {
     if (nast) nawiguj(`/obsluga/zwroty/${nast.id}`);
   };
 
-  useEffect(() => {
-    const naKlawisz = (e: KeyboardEvent) => {
-      /* Skrót nie ma prawa zadziałać, gdy ktoś pisze — inaczej „s" w polu
-         szukania oceniałoby towar. */
-      const cel = e.target as HTMLElement | null;
-      if (cel && /^(INPUT|TEXTAREA|SELECT)$/.test(cel.tagName)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+  /* Skróty idą TĄ SAMĄ drogą co czytnik (0.163.0). Dwa niezależne nasłuchy
+     nie umiałyby się dogadać, który klawisz jest czyj — a numer listu
+     `600000367616070023174201` zawiera wszystkie cyfry kubełków. */
+  useSkaner(
+    (kod) => szukaj(kod),
+    (e) => {
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-6]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
-    };
-    window.addEventListener("keydown", naKlawisz);
-    return () => window.removeEventListener("keydown", naKlawisz);
-  }, [wKubelku, wybrany, data]);
+    },
+  );
 
   if (error) return <Blad>{(error as Error).message}</Blad>;
 
@@ -150,6 +168,15 @@ export function Zwroty() {
           </button>;
         })}
       </nav>
+      <Skan
+        wynik={wynikSkanu} kod={kod} szuka={skan.isPending} dociaga={dociagnij.isPending}
+        blad={bladSkanu}
+        onKod={setKod}
+        onSzukaj={szukaj}
+        onDociagnij={(v) => dociagnij.mutate(v, {
+          onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
+        onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }} />
+
       {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji. */}
       <p className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
         {opis?.pytanie}

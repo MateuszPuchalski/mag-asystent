@@ -178,7 +178,7 @@ test("mała próbka nie kasuje słownika — nie ma z czego liczyć powtórzeń"
   assert.equal(pola.find((p) => p.sciezka === "rodzaj")?.wartosci.length, 3);
 });
 
-/* ── Klucz listy w odpowiedzi (0.163.0) ──────────────────────────────────────
+/* ── Klucz listy w odpowiedzi (0.164.0) ──────────────────────────────────────
    Ta funkcja przemilczała całą sekcję raportu i nie miała testu, bo siedziała
    jako prywatna stała w `sonda-run.ts`. Sonda pytała o `messages`, a rozmowa
    dyskusji przyjeżdża pod kluczem `chat` — HTTP 200, ciało pełne wiadomości,

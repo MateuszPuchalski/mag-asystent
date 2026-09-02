@@ -111,7 +111,7 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
-  /* Status zwrotu po stronie Allegro (0.163.0). Bez `CHECK` — schemat Allegro
+  /* Status zwrotu po stronie Allegro (0.164.0). Bez `CHECK` — schemat Allegro
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */
   addColumn("zwrot_klienta", "status_allegro", "TEXT");

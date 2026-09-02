@@ -4,7 +4,7 @@ import type { StanRabatu } from "../api/typy";
 import { Przycisk } from "../ui";
 import { zlote } from "../api/zwroty";
 
-/* Rabat transakcyjny przy pozycji zwrotu (0.163.0).
+/* Rabat transakcyjny przy pozycji zwrotu (0.164.0).
 
    Do tego wydania firma odzyskiwała prowizję klikając ręcznie przy KAŻDYM
    zwrocie w panelu Allegro — nie dlatego, że tak trzeba, tylko dlatego, że

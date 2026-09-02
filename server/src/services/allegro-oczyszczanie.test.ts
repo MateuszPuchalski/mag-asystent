@@ -71,7 +71,11 @@ test("wartość znika, ale KLUCZ zostaje — lądowisko ma dalej nieść kształ
   assert.equal("bankAccount" in czysty.refund, true, "klucz ma zostać");
   assert.equal(czysty.refund.bankAccount, USUNIETE);
   assert.equal(czysty.parcels[0].sender, USUNIETE);
-  assert.equal(czysty.parcels[0].waybill, "PX1", "list przewozowy to nie dane osobowe");
+  /* Numer listu zostaje, choć `ksztalt.ts` odsiewa go z raportu sondy. Obie
+     oceny są prawdziwe o różnych miejscach — raport wchodzi do repo, lądowisko
+     jest prywatną kopią w bazie biura. Od 0.163.0 to lądowisko jest JEDYNYM
+     miejscem, gdzie skan etykiety znajduje zwrot po numerze listu. */
+  assert.equal(czysty.parcels[0].waybill, "PX1", "list przewozowy zostaje w prywatnej kopii");
 });
 
 test("wszystko, co rozstrzyga zwrot, przechodzi bez zmian", () => {

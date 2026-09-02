@@ -130,7 +130,7 @@ async function main(): Promise<void> {
         for (const id of idy(dyskusje.rekordy, ROZMOW)) {
           zebrane.push(
             /* `chat` PIERWSZY, bo tak nazywa listę schemat `PostPurchaseIssueChatResponse`.
-                 `messages` zostaje za nim jako zapas — to po nim sonda pytała do 0.163.0
+                 `messages` zostaje za nim jako zapas — to po nim sonda pytała do 0.164.0
                  i dlatego ta sekcja raportu była pusta przy stu sprawach z niezerowym
                  `chat.messagesCount`. */
               ...tablica(await zapytajAllegro(urlWiadomosciDyskusji(api, id)), "chat", "messages")

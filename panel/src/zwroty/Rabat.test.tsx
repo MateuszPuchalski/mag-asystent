@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Rabat } from "./Rabat";
 import type { StanRabatu } from "../api/typy";
 
-/* ── Rabat transakcyjny przy pozycji (0.163.0) ───────────────────────────────
+/* ── Rabat transakcyjny przy pozycji (0.164.0) ───────────────────────────────
    Ekran ma odpowiedzieć na jedno pytanie: czy przy TEJ pozycji trzeba jeszcze
    coś kliknąć. Do tego wydania odpowiedź brzmiała „nie wiadomo, sprawdź
    w panelu Allegro" — i dlatego sprawdzało się przy każdym zwrocie.        */
