@@ -8,6 +8,7 @@ import { Zdjecie } from "./Zdjecie";
 import { Powiekszenie } from "./Powiekszenie";
 import { Rabat } from "./Rabat";
 import { Link } from "./Link";
+import { Potracenie } from "./Potracenie";
 
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
    Do 0.165.0 pozycje stały w PRAWEJ kolumnie, szerokiej na 340 px: nazwy
@@ -116,7 +117,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 }
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
-  onOcena, onKwota, onZglosRabat }: {
+  onOcena, onKwota, onZglosRabat, onPotracenie }: {
   zwrot: Zwrot;
   trwa: boolean;
   blad: string;
@@ -125,6 +126,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja") => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
+  onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
 }) {
   const [powiekszony, setPowiekszony] = useState<PozycjaZwrotu | null>(null);
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
@@ -137,10 +139,13 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   const ocenianie = zwrot.kubelek === "ocena";
   const dostawaGrosze = zwrot.zamowienie?.dostawaGrosze ?? null;
 
+  /* Podgląd odejmuje potrącenia tak samo jak serwer — inaczej operator
+     widziałby jedną liczbę, a klient dostawał inną. Liczy je jednak SERWER;
+     to nadal tylko podgląd zaznaczenia. */
   const suma = useMemo(() => {
     const pozycje = zwrot.pozycje
       .filter((p) => wybrane.includes(p.id))
-      .reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
+      .reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc) - (p.potracenieGrosze ?? 0), 0);
     return pozycje + (dostawa ? dostawaGrosze ?? 0 : 0);
   }, [zwrot.pozycje, wybrane, dostawa, dostawaGrosze]);
 
@@ -212,6 +217,13 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           </div>}
           {p.ocena && <p className="mt-2 text-xs font-bold text-ranga-ok">
             Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}</p>}
+
+          {/* Potrącenie proponuje się TAM, gdzie zapada decyzja o pieniądzach,
+              czyli przy wycenie. Zapisane widać wszędzie, bo to fakt o pozycji
+              — jak ocena hali. */}
+          {onPotracenie && (wycena || p.potracenieGrosze != null) &&
+            <Potracenie p={p} trwa={trwa} blad={blad}
+              onZapisz={(g, powod) => onPotracenie(p.id, g, powod)} />}
         </div>
       </li>)}
     </ul>

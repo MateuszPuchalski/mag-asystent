@@ -157,7 +157,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają dziesięć tras POST, a jedna z nich wychodzi do Allegro", async () => {
+test("zwroty mają jedenaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -175,17 +175,23 @@ test("zwroty mają dziesięć tras POST, a jedna z nich wychodzi do Allegro", as
      wyłącznie u nas. Uzasadnienie: firma odzyskiwała prowizję klikając ręcznie
      przy każdym zwrocie w panelu Allegro, bo znikąd nie było widać, przy
      którym wniosek już jest. Końcówka Allegro nie ma idempotencji, więc
-     strażnik przed dubletem stoi w serwisie, PRZED siecią. */
+     strażnik przed dubletem stoi w serwisie, PRZED siecią.
+
+     JEDENASTA to potrącenie za utratę wartości (0.170.0) — jedyna trasa
+     zwrotów przyjmująca od panelu LICZBĘ o pieniądzach. Dlatego jako jedyna
+     waliduje ją w widełkach `0…wartość pozycji` i wymaga powodu, a kwotę do
+     oddania dalej składa serwer z zaznaczenia (§25a.3). Bez niej kwota była
+     binarna per pozycja: cała cena albo nic, a towar wraca używany. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 10, `tras POST jest ${posty.length}, a umowa mówi o dziesięciu`);
+  assert.equal(posty.length, 11, `tras POST jest ${posty.length}, a umowa mówi o jedenastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
-    "korekta", "cofnij", "skan", "dociagnij", "rabat"]) {
+    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

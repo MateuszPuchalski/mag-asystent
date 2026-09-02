@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
+  zapiszPotracenie,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
   cofnijKorekte, znajdzZwrotPoKodzie,
 } from "./zwroty.js";
@@ -696,4 +697,103 @@ test("zwrot bez pozycji też dostaje wiersz w zestawieniu", () => {
   const d = stanowisko();
   dodaj(d, "2026-08-30T09:00:00Z", {}, []);
   assert.equal(csvZwrotow(listaZwrotow(d, TERAZ)).trim().split("\r\n").length, 2);
+});
+
+/* ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────── */
+
+const KTO = { id: 1, name: "Ala z biura" };
+
+test("potrącenie obniża kwotę do oddania, a liczy ją nadal SERWER", () => {
+  /* §25a.3 zostaje: panel przysyła zaznaczenie, nie sumę. Potrącenie jest
+     osobnym, walidowanym zapisem przy pozycji. */
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" },
+    [{ ilosc: 1, cena: 10000, ocena: "stan" }]);
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+
+  const w = zapiszPotracenie(d, poz, 3000, "ślady użycia na ostrzu", 1, KTO);
+  assert.equal(w.potracenieGrosze, 3000);
+
+  const zapis = zapiszKwote(d, id, { pozycjeIds: [poz], dostawa: false }, w.wersja, KTO);
+  assert.equal(zapis.kwotaGrosze, 7000, "sto złotych minus trzydzieści potrącenia");
+});
+
+test("potrącenie nie może przekroczyć wartości pozycji", () => {
+  /* Większe znaczyłoby, że klient nam dopłaca za własny zwrot. */
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" },
+    [{ ilosc: 2, cena: 5000 }]);
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+
+  assert.throws(() => zapiszPotracenie(d, poz, 10001, "powód", 1, KTO),
+    /nie może przekroczyć wartości pozycji/);
+  /* Widełki liczą się z ceny RAZY ilość, więc dziesięć tysięcy przechodzi. */
+  assert.equal(zapiszPotracenie(d, poz, 10000, "całość do utylizacji", 1, KTO)
+    .potracenieGrosze, 10000);
+});
+
+test("potrącenie bez powodu nie przechodzi — powód zobaczy klient", () => {
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" });
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+  assert.throws(() => zapiszPotracenie(d, poz, 500, "   ", 1, KTO),
+    /wymaga powodu/);
+  assert.throws(() => zapiszPotracenie(d, poz, -1, "powód", 1, KTO), /nie mniej niż zero/);
+});
+
+test("potrącenie ma sens dopiero po przyjęciu zwrotu", () => {
+  /* Tak samo jak ocena: obniżanie kwoty przy zwrocie, którego nie
+     przyjmujemy, zostawiałoby decyzję o pieniądzach, które i tak nie wyjdą. */
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z");
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+  assert.throws(() => zapiszPotracenie(d, poz, 500, "powód", 1, KTO), /Najpierw przyjmij/);
+});
+
+test("potrącenie da się cofnąć, razem z powodem i autorem", () => {
+  /* Cofnięcie zamiast potwierdzenia — §25a.5, ta sama droga co przy ocenie. */
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" },
+    [{ ilosc: 1, cena: 10000, ocena: "stan" }]);
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+
+  const w = zapiszPotracenie(d, poz, 2500, "zarysowana obudowa", 1, KTO);
+  assert.equal(listaZwrotow(d, TERAZ)[0].pozycje[0].potraceniePowod, "zarysowana obudowa");
+
+  zapiszPotracenie(d, poz, null, "", w.wersja, KTO);
+  const p = listaZwrotow(d, TERAZ)[0].pozycje[0];
+  assert.equal(p.potracenieGrosze, null);
+  assert.equal(p.potraceniePowod, null, "powód znika razem z kwotą");
+});
+
+test("potrącenie zostawia ślad w dzienniku, razem z powodem", () => {
+  /* Każda mutacja ma autora — a przy pieniądzach klienta tym bardziej. */
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" });
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+  zapiszPotracenie(d, poz, 1500, "brak opakowania", 1, KTO);
+
+  const e = d.prepare("SELECT type, payload FROM events WHERE type='zwrot_potracenie'")
+    .get() as { type: string; payload: string };
+  assert.ok(e, "zdarzenie jest");
+  assert.match(e.payload, /brak opakowania/);
+});
+
+test("potrącenie wchodzi do zestawienia CSV razem z powodem", () => {
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" },
+    [{ ilosc: 1, cena: 10000, ocena: "stan" }]);
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+  zapiszPotracenie(d, poz, 2500, "ślady użycia", 1, KTO);
+
+  const csv = csvZwrotow(listaZwrotow(d, TERAZ));
+  assert.match(csv, /Potracenie;Powod potracenia;/);
+  assert.match(csv, /25,00;ślady użycia/);
 });

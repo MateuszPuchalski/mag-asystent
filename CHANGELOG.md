@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.170.0 — 2 września 2026
+## 0.171.0 — 2 września 2026
 
 **Sygnatura wiąże kartotekę sama, a ekran ustawień mówi, ile wiąże.** Dwie
 decyzje właściciela: „wiąż zamówienia z Allegro z Subiektem po sygnaturze"
@@ -88,6 +88,57 @@ od braku raportu.
 
 Wdrożenie: nic ręką. Pozycje zwrotów czekające dziś na zatwierdzenie powiążą
 się przy najbliższym przebiegu synchronizacji.
+
+## 0.170.0 — 2 września 2026
+
+**Za towar, który wrócił używany, da się oddać mniej.**
+
+Do tego wydania kwota była BINARNA per pozycja: cała cena albo nic. Operator
+wyceniający zwrot mógł zaznaczyć pozycję albo jej nie zaznaczyć, a trzeciej
+drogi nie było — mimo że towar wracający zniszczony to codzienność biura.
+Druga pozycja z listy pracownika od zwrotów.
+
+### Kwota, nie procent
+
+Decyzja właściciela. Klient widzi złotówki, a procent przy każdej pozycji
+zostawiałby końcówki, których nikt nie umie wytłumaczyć.
+
+**Powód jest obowiązkowy** i pilnuje go najpierw pole, potem serwer. To jego
+treść tłumaczy klientowi, czemu dostał mniej — potrącenie bez uzasadnienia
+byłoby liczbą, której nie da się obronić. Razem z kwotą i powodem zapisuje się
+autor i czas, a cofnięcie zdejmuje wszystko naraz.
+
+### Reguła o cudzych pieniądzach zostaje nienaruszona
+
+§25a.3 mówi, że sumę liczy serwer, bo panel przysyłający gotową kwotę pozwalałby
+oddać dowolną liczbę żądaniem z pominięciem ekranu. Ta zasada nie ustąpiła:
+panel dalej przysyła ZAZNACZENIE, a potrącenie jest **osobnym zapisem przy
+pozycji**, nie liczbą doklejaną do sumy.
+
+Ta jedna trasa przyjmuje więc od panelu liczbę o pieniądzach — i jako jedyna
+trzyma ją w widełkach `0…cena × ilość`. Potrącenie większe niż wartość pozycji
+znaczyłoby, że klient dopłaca nam za własny zwrot; ekran zatrzymuje to u siebie,
+a serwer odmawia drugi raz.
+
+Licznik tras zapisu rośnie do jedenastu.
+
+### Gdzie to stoi
+
+Formularz otwiera się dopiero na żądanie, jak ręczne wskazanie kartoteki:
+typowy zwrot wraca w porządku, a pole pod każdą pozycją byłoby ścianą pytań
+o wyjątek. Propozycja pojawia się w kubełku DO ZWROTU, bo tam zapada decyzja
+o pieniądzach.
+
+Zapisane potrącenie widać w KAŻDYM kubełku — to fakt o pozycji, jak ocena hali.
+Po zamknięciu zwrotu trzeba umieć powiedzieć, czemu klient dostał mniej. Wchodzi
+też do zestawienia CSV, razem z powodem.
+
+### Przy wdrożeniu
+
+Nic. Migracja dokłada cztery kolumny i chodzi sama przy starcie.
+
+---
+
 
 ## 0.169.0 — 2 września 2026
 

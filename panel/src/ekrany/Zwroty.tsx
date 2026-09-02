@@ -6,7 +6,7 @@ import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pozycje } from "../zwroty/Pozycje";
 import {
-  useCofnijKorekte, useKorekta, useKwota, useOcena, useWerdykt, useZglosRabat,
+  useCofnijKorekte, useKorekta, useKwota, useOcena, usePotracenie, useWerdykt, useZglosRabat,
 } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
@@ -87,12 +87,14 @@ export function Zwroty() {
   const korekta = useKorekta();
   const cofnijKorekte = useCofnijKorekte();
   const rabat = useZglosRabat();
+  const potracenie = usePotracenie();
   const [bladRabatu, setBladRabatu] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
-    || korekta.isPending || cofnijKorekte.isPending;
+    || korekta.isPending || cofnijKorekte.isPending || potracenie.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
      gotowe przy 409 — panel go nie układa od nowa. */
-  const bledy = [werdykt.error, ocena2.error, kwota.error, korekta.error, cofnijKorekte.error];
+  const bledy = [werdykt.error, ocena2.error, kwota.error, korekta.error, cofnijKorekte.error,
+    potracenie.error];
   const bladDecyzji = bledy.find(Boolean) instanceof Error
     ? String((bledy.find(Boolean) as Error).message) : "";
   const { data, isLoading, error } = useZwroty();
@@ -350,6 +352,8 @@ export function Zwroty() {
                   ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}
                 onKwota={(pozycjeIds, dostawa) =>
                   kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })}
+                onPotracenie={(pozycjaId, grosze, powod) =>
+                  potracenie.mutate({ pozycjaId, grosze, powod, wersja: zwrot.wersja })}
                 onZglosRabat={(pozycjaId) => {
                   setBladRabatu("");
                   rabat.mutate({ pozycjaId },
