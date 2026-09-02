@@ -12,6 +12,7 @@ import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import { Rozmowa } from "../skrzynka/Rozmowa";
+import { Kontekst } from "../skrzynka/Kontekst";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { StatusRozmowy, SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
@@ -145,7 +146,12 @@ export function Skrzynka() {
       synchronizuj={() => { setBladSynchronizacji(""); synchronizuj.mutate(undefined,
         { onError: (e) => setBladSynchronizacji((e as Error).message) }); }} />
 
-    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_1fr] lg:grid-rows-[minmax(0,1fr)]">
+    {/* Trzy kolumny (§10.1, 0.180.0), wzorcem z ekranu zwrotów: skrajne stałe,
+        środek `minmax(0,1fr)`. Samo `1fr` to skrót od `minmax(auto,1fr)` —
+        środek rozpychałby się ponad przydział, gdy oś dostanie długi wyraz.
+        `lg:grid-rows-[minmax(0,1fr)]` trzyma wysokość: pojedynczy wiersz
+        `auto` mierzy się do `max-content` i grid wylewa się poza okno. */}
+    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
     <Kolejka
       nieswieza={alarm}
       rozmowy={lista.data?.rozmowy ?? []}
@@ -280,6 +286,10 @@ export function Skrzynka() {
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
     />
     </div>
+
+    {/* Trzecia kolumna. Bez rozmowy nie ma czego pokazać — kolumna znika,
+        zamiast stać pusta i zabierać środkowi 340 px. */}
+    {rozmowa.data && <Kontekst dane={rozmowa.data} />}
     </div>
 
     {/* Dialog jest `fixed`, ale jako dziecko gridu założyłby niejawny wiersz —

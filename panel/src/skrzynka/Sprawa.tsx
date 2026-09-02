@@ -30,7 +30,7 @@ export function Sprawa({ sprawa, rozmowaId, sprawy, trwa, blad, onZaloz, onDolac
 
   if (sprawa) {
     const rodzenstwo = sprawa.rozmowy.filter((r) => r.id !== rozmowaId);
-    return <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-4 py-2 text-sm">
+    return <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-slate-50 px-4 py-2 text-sm">
       <Layers size={15} className="text-slate-500" />
       <b>{sprawa.tytul}</b>
       {rodzenstwo.length

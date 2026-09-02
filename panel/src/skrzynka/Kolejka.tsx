@@ -57,18 +57,21 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
   const [kubelek, setKubelek] = useState<Kubelek>("wszystkie");
   const widoczne = rozmowy.filter((r) => wKubelku(r, kubelek, mojeId));
   return <section className="card flex min-h-0 flex-col overflow-hidden">
-    <header className="flex items-center gap-2 border-b p-4">
+    {/* `shrink-0` nad scrollerem i `min-h-0` na nim (0.180.0). Bez tego przy
+        węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
+        blok z bazą 0 — kurczy się do zera. Wzorzec z kolumn zwrotów. */}
+    <header className="flex shrink-0 items-center gap-2 border-b p-4">
       <Inbox size={18} /><b className="mr-auto">Rozmowy</b>
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
         STAN Z {czas(stan.ostatniaSynchronizacja).slice(-8, -3) || "—"}</span>}
       <button className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>
-    <p className="border-b bg-slate-50 px-4 py-2 text-xs text-slate-500">
+    <p className="shrink-0 border-b bg-slate-50 px-4 py-2 text-xs text-slate-500">
       Ostatnia synchronizacja: {czas(stan.ostatniaSynchronizacja)}
       {stan.bledy > 0 && <span className="ml-2 font-bold text-amber-700">błędów: {stan.bledy}</span>}
     </p>
-    <div className="flex flex-wrap gap-1 border-b px-2 py-2">
+    <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-2">
       {KUBELKI.map((k) => <button key={k.klucz} onClick={() => setKubelek(k.klucz)}
         aria-pressed={kubelek === k.klucz}
         className={`rounded px-2 py-1 text-xs font-semibold ${kubelek === k.klucz
@@ -76,7 +79,7 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
         {k.etykieta} <span className="font-normal">
           {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
     </div>
-    <div className={`flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
+    <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
       {laduje && <p className="p-4 text-sm text-slate-500">Wczytuję…</p>}
       {!laduje && !rozmowy.length &&
         <p className="p-4 text-sm text-slate-500">Brak rozmów w zsynchronizowanej skrzynce.</p>}

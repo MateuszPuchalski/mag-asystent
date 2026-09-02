@@ -9,9 +9,6 @@ import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { Sprawa } from "./Sprawa";
-import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
-import { OfertaRozmowy } from "./OfertaRozmowy";
-import { TowarRozmowy } from "./TowarRozmowy";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -87,7 +84,11 @@ export function Rozmowa(p: {
   const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
   return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
-    <header className="flex flex-wrap items-center gap-3 border-b p-4">
+    {/* `shrink-0` na wszystkim poza osią (0.180.0): po zwężeniu kolumny do
+        ~700 px nagłówki zawijają się na dwie linie, a `Os` jest jedynym
+        blokiem z bazą 0 — bez tych klauzul kurczyłaby się treść rozmowy,
+        czyli jedyna rzecz, po którą agent tu przyszedł. */}
+    <header className="flex shrink-0 flex-wrap items-center gap-3 border-b p-4">
       <b className="mr-auto">{rozmowa.klient}</b>
       {rozmowa.wlasciciel
         ? <span className={`flex items-center gap-1 text-sm font-semibold ${
@@ -110,25 +111,12 @@ export function Rozmowa(p: {
       onZaloz={p.onZalozSprawe} onDolacz={p.onDolaczDoSprawy} onOdlacz={p.onOdlaczOdSprawy}
       onOtworz={p.onOtworzRozmowe} />
 
-    {/* Oferta NAD zamówieniem (0.178.0): pytanie padło pod ofertą, więc to
-        ona jest tematem rozmowy. Zamówienie, gdy jest, opisuje zakup — czyli
-        odpowiada na późniejsze pytanie i stoi niżej. Oba bloki naraz zdarzają
-        się rzadko: sonda liczy ofertę w 5, a zamówienie w 7 z 33 wiadomości. */}
-    {p.dane.oferta && <OfertaRozmowy oferta={p.dane.oferta} />}
+    {/* Oferta, towar i zamówienie przeniosły się do KOLUMNY KONTEKSTU
+        (0.180.0). Cztery bloki jeden pod drugim spychały pytanie klienta
+        poniżej krawędzi okna, a to ono jest powodem, dla którego agent tu
+        przyszedł. Środkowa kolumna niesie odtąd rozmowę i nic poza nią. */}
 
-    {/* Towar POD ofertą (0.179.0): najpierw „o czym mowa", potem „co mamy na
-        półce". Blok stoi tylko przy ofercie, bo bez jej numeru nie ma z czego
-        wywieść kartoteki — a zgadywanie po treści kosztowało już wydanie. */}
-    {p.dane.oferta && <section className="border-b" aria-label="Towar">
-      <TowarRozmowy oferta={p.dane.oferta} rozmowaId={rozmowa.id} />
-    </section>}
-
-    {/* Zamówienie POD sprawą, NAD wiadomościami (0.166.0): „czego dotyczy"
-        czyta się przed „co napisał". Blok stoi tylko, gdy wiadomość niesie
-        numer — rozmowa bez zamówienia nie udaje, że jakieś ma. */}
-    {p.dane.zamowienie && <ZamowienieRozmowy zamowienie={p.dane.zamowienie} />}
-
-    {p.nowaWiadomosc && <p className="flex items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
+    {p.nowaWiadomosc && <p className="flex shrink-0 items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
       <Bell size={16} />Klient dopisał nową wiadomość.
       <button className="underline" onClick={p.onPokazNowa}>Pokaż</button></p>}
 
@@ -153,7 +141,7 @@ export function Rozmowa(p: {
       onZrodlo={p.onZrodlo}
       onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)} />
 
-    {p.zrodloPomiaru && <div className="border-t bg-amber-50 p-4">
+    {p.zrodloPomiaru && <div className="shrink-0 border-t bg-amber-50 p-4">
       {/* Kartoteki nie wywiedziemy dziś z oferty, więc agent może ją wskazać.
           Zadanie zapisze, że to jego wybór, a nie fakt z Allegro. */}
       <div className="mb-3">

@@ -26,7 +26,7 @@ export function KonfliktPrzejecia({ szczegoly, mojaWersja, czasPrzejecia, mozeWy
   const [powod, setPowod] = useState("");
   const wlasciciel = szczegoly.assignedUserName ?? "inny agent";
 
-  return <div className="border-b border-amber-200 bg-amber-50 p-4">
+  return <div className="shrink-0 border-b border-amber-200 bg-amber-50 p-4">
     <div className="flex items-start gap-3">
       <UserX className="mt-0.5 text-ranga-uwaga" size={18} />
       <div className="flex-1">

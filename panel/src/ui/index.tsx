@@ -33,6 +33,32 @@ export const Plakietka = ({ status, children, className = "" }:
   <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
     STATUS[status ?? ""] ?? "bg-slate-100 text-slate-600"} ${className}`}>{children}</span>;
 
+/**
+ * Zakładki jednej kolumny (0.180.0).
+ *
+ * Kolumna dowodów przy ZWROCIE ma sekcje jedna pod drugą, bo to jedna lista
+ * faktów o jednej sprawie. Kolumna kontekstu przy ROZMOWIE ma zakładki, bo
+ * niesie dwa RÓWNORZĘDNE tematy: co klient kupuje i co mamy na półce.
+ * Sekcje kazałyby przewijać obok tematu, którego akurat nie czytasz.
+ *
+ * `aria-pressed` zamiast roli `tab`: pełny wzorzec zakładek żąda strzałek,
+ * `aria-controls` i zarządzania ogniskiem, a to są dwa przyciski przełączające
+ * treść pod spodem. Ta sama decyzja co przy kubełkach kolejki.
+ */
+export function Zakladki<T extends string>({ wybrana, onWybierz, pozycje }: {
+  wybrana: T;
+  onWybierz: (v: T) => void;
+  pozycje: Array<{ klucz: T; etykieta: string }>;
+}) {
+  return <div className="flex gap-1 border-b border-slate-200 px-2 py-2">
+    {pozycje.map((z) => <button key={z.klucz} type="button" aria-pressed={wybrana === z.klucz}
+      onClick={() => onWybierz(z.klucz)}
+      className={`flex-1 rounded px-2 py-1 text-xs font-semibold ${wybrana === z.klucz
+        ? "bg-wertis-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+      {z.etykieta}</button>)}
+  </div>;
+}
+
 export const Pusto = ({ ikona, children }: { ikona: React.ReactNode; children: React.ReactNode }) =>
   <div className="grid flex-1 place-items-center p-16 text-center text-slate-500">
     {ikona}<p className="mt-3 font-semibold">{children}</p>

@@ -352,8 +352,14 @@ do ośmiu. Decyzja właściciela, świadoma; §7 niesie nową wycenę.
 **Ekran mieści się w OKNIE, a przewijają się kolumny (0.165.0).** Do 0.164.0
 przewijał się dokument, czyli wszystkie kolumny naraz: żeby dojść do dołu
 dowodów przy zwrocie, operator zjeżdżał z oczu kolejce i paskowi decyzji.
-Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku —
-front po prostu do niej nie doszedł.
+Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku.
+
+**Skrzynka ma trzy kolumny od 0.180.0.** Do 0.179.0 miała dwie, a kontekst —
+oferta, towar i zamówienie — leżał w środkowej, nad osią. Cztery bloki jeden
+pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
+po co agent otwiera rozmowę. Kolumna kontekstu ma DWIE zakładki: „Oferta"
+i „Towar". Trzech pozostałych z makiety — „Dobór", „Klient", „Wiedza" — nie ma,
+bo nie mają skąd wziąć danych; wchodzą razem z etapem E.
 
 Blokada zaczyna się od szerokości `lg`. Niżej grid jest jednokolumnowy, a trzy
 scrollery po dwieście pikseli czytałoby się gorzej niż jedną przewijaną stronę;
@@ -782,6 +788,13 @@ Kolejność bierze się z terminu ustawowego, nie z daty wpływu.
 Trzy kolumny, jak §10.1: kolejka, produkty ze zwrotu, dowody. Dwa ekrany
 obsługi mają mieć jeden nawyk, nie dwa.
 
+**Zakładki przy rozmowie, sekcje przy zwrocie (0.180.0).** Kolumna dowodów
+zwrotu to jedna lista faktów o jednej sprawie i czyta się ją w całości.
+Kolumna kontekstu rozmowy niesie dwa RÓWNORZĘDNE tematy — czego klient chce
+i co mamy na półce — a sekcje kazałyby przewijać obok tego, którego akurat
+nie czytasz. „Jeden nawyk" obowiązuje dalej dla układu trzech kolumn, ich
+szerokości i przewijania; różni się to, co stoi w środku trzeciej.
+
 **Produkty stoją w GŁÓWNYM oknie (0.167.0).** Do 0.165.0 leżały w prawej
 kolumnie, szerokiej na 340 px: nazwy ucinały się w połowie, zdjęcia miały
 56 px, a najszersza kolumna świeciła pustką pod paskiem decyzji. Teraz środek
@@ -1183,6 +1196,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx` |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
+| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`, zakładki Oferta i Towar |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |

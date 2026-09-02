@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.180.0 — 2 września 2026
+
+**Skrzynka dostaje trzecią kolumnę — kontekst przestaje spychać pytanie
+klienta poniżej krawędzi okna.**
+
+### Co było źle
+
+Układ z trzema kolumnami stoi w §10.1 od początku, a makieta narysowała go
+poprawnie. Front miał dwie: kolejkę i rozmowę. Kontekst — sprawa, oferta,
+towar, zamówienie — leżał w środkowej kolumnie, nad osią. Cztery bloki jeden
+pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
+po co agent w ogóle otwiera rozmowę.
+
+### Co się zmienia
+
+Oferta, towar i zamówienie przenoszą się do kolumny kontekstu z DWIEMA
+zakładkami. Środkowa kolumna niesie odtąd rozmowę i nic poza nią.
+
+Zakładek jest dwie, nie pięć jak w makiecie. „Dobór", „Klient" i „Wiedza" nie
+mają dziś skąd wziąć danych — tabel `part`, `fitment`, `customer`
+i `customer_machine` nie ma wcale. Zakładka, która zawsze mówi „wkrótce", uczy
+nie klikać.
+
+**Zakładki przy rozmowie, sekcje przy zwrocie.** Kolumna dowodów zwrotu to
+jedna lista faktów o jednej sprawie. Kontekst rozmowy niesie dwa równorzędne
+tematy, a sekcje kazałyby przewijać obok tego, którego akurat nie czytasz.
+§25a.4 niesie to rozstrzygnięcie.
+
+### Dług spłacony przy okazji
+
+Środkowa kolumna zwęziła się o 340 px i to obnażyło brak, który czekał
+w kodzie: `Os` była jedynym blokiem z bazą 0, więc kurczyłaby się pierwsza —
+do zera. Nagłówek, sprawa, banery i edytor dostają `shrink-0`, a lista kolejki
+`min-h-0`. Wzorzec pochodzi z ekranu zwrotów, gdzie stoi od 0.165.0.
+
+Testy tego nie złapią: jsdom nie liczy układu. Sprawdzone okiem w przeglądarce
+przy 1280 i 1920 — dokument się nie przewija, nic nie wychodzi poza okno,
+a kolumna kontekstu ma swoje 340 px.
+
+---
+
 ## 0.179.0 — 2 września 2026
 
 **Rozmowa pokazuje towar z Subiekta, nie tylko ofertę z Allegro.**
