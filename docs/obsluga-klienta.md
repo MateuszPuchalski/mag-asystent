@@ -382,6 +382,21 @@ i IMIENIEM AGENTA. To ostatnie jest daną pracownika, nie klienta, i stoi tam
 z tego samego powodu co przy każdej innej mutacji: zapis bez autora nie da się
 później rozliczyć. Zdjęcie powiązania kasuje wpis.
 
+**Numeru listu przewozowego NIE ZAPISUJEMY w modelu pracy.** Od 0.163.0 skan
+etykiety otwiera zwrot, a szukamy po kopii odpowiedzi Allegro w lądowisku
+`allegro_zwrot`. Kolumny na ten numer nie ma i nie będzie: leży tam, gdzie
+i tak leżał, i żyje przez jedno żądanie. Zeskanowany kod nie trafia ani do
+dziennika zdarzeń, ani do adresu żądania — dlatego trasa skanu jest POST-em,
+choć niczego nie zapisuje.
+
+**Dwie oceny tego numeru są obie prawdziwe.** Raport sondy nazywa go daną
+osobową okrężną drogą (`services/ksztalt.ts`, 0.155.0), a czyszczenie lądowisk
+przepuszcza go bez zmian (`allegro-oczyszczanie.test.ts`). Różnią się miejscem,
+nie oceną: raport sondy WCHODZI DO REPO i czyta go każdy, kto ma dostęp do
+kodu, a lądowisko jest prywatną kopią w bazie biura, pod tą samą bramką roli
+co reszta zwrotu. To, co wolno trzymać w bazie, nie zawsze wolno wypisać
+w pliku.
+
 **Do Allegro nadal nie wychodzi z tego ekranu nic.** Zapisy zwrotów są dwa:
 potwierdzenie kartoteki i ręczne dociągnięcie zamówień. Drugi WYCHODZI do
 Allegro, ale wyłącznie po odczyt — pobiera to samo co ticker i tak samo

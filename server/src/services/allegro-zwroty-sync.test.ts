@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { naGrosze, synchronizujAllegroZwroty } from "./allegro-zwroty-sync.js";
+import {
+  dociagnijZwrotPoLiscie, naGrosze, synchronizujAllegroZwroty,
+} from "./allegro-zwroty-sync.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
@@ -296,3 +298,64 @@ test("pozycja wycofana przez klienta znika, reszta zostaje", () => {
     assert.deepEqual(poz.map((p) => p.nazwa), ["Pierwsza"]);
   });
 });
+
+/* ── Dociągnięcie po numerze listu (0.163.0) ─────────────────────────────── */
+
+const ETYKIETA = "600000367616070023174201";
+
+test("skan pyta Allegro o TEN numer listu i nie rusza kursora", async () => {
+  /* Zapytanie punktowe, nie przebieg. Przesunięcie kursora na zwrocie
+     wyłowionym ze środka historii kazałoby synchronizatorowi przeskoczyć
+     wszystko, czego jeszcze nie widział — blizna 0.127.0. */
+  const d = stanowisko();
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  await synchronizujAllegroZwroty({
+    database: d, accountId: "k", zwrotyOd: null, apiUrl: "https://api",
+    now: () => new Date("2026-09-01T10:00:00Z"),
+    query: async () => odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]),
+  });
+  const kursorPrzed = d.prepare("SELECT cursor_id FROM allegro_zwroty_sync_state WHERE id=1")
+    .get() as { cursor_id: string };
+
+  const url: string[] = [];
+  const ile = await dociagnijZwrotPoLiscie(ETYKIETA, {
+    database: d, accountId: "k", zwrotyOd: null, apiUrl: "https://api",
+    now: () => new Date("2026-09-01T10:10:00Z"),
+    query: async (u) => { url.push(u); return odpowiedz([
+      zwrot("z9", "2026-07-01T08:00:00Z", { parcels: [{ waybill: ETYKIETA }] })]); },
+  });
+
+  assert.equal(ile, 1);
+  assert.match(url[0], /parcels\.waybill=600000367616070023174201/,
+    "pytamy filtrem, a nie przemiatamy stron");
+  assert.equal(url[0].includes("createdAt.gte="), false, "zapytanie punktowe nie niesie okna dat");
+  assert.equal((d.prepare("SELECT cursor_id FROM allegro_zwroty_sync_state WHERE id=1")
+    .get() as { cursor_id: string }).cursor_id, kursorPrzed.cursor_id, "kursor stoi nietknięty");
+  assert.equal((d.prepare("SELECT count(*) n FROM zwrot_klienta WHERE external_id='z9'")
+    .get() as { n: number }).n, 1, "zwrot wszedł do modelu pracy");
+});
+
+test("próg firmy obowiązuje także przy dociąganiu ze skanu", async () => {
+  /* Zwrot sprzed granicy nie ma prawa wejść bocznymi drzwiami tylko dlatego,
+     że jego paczka przyjechała dziś. */
+  const d = stanowisko();
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  const ile = await dociagnijZwrotPoLiscie(ETYKIETA, {
+    database: d, accountId: "k", zwrotyOd: "2026-08-20T00:00:00Z", apiUrl: "https://api",
+    query: async () => odpowiedz([zwrot("stary", "2026-05-01T08:00:00Z",
+      { parcels: [{ waybill: ETYKIETA }] })]),
+  });
+  assert.equal(ile, 0);
+  assert.equal((d.prepare("SELECT count(*) n FROM zwrot_klienta").get() as { n: number }).n, 0);
+});
+
+test("pusty kod nie strzela do Allegro", async () => {
+  const d = stanowisko();
+  let strzalow = 0;
+  const ile = await dociagnijZwrotPoLiscie("   ", {
+    database: d, apiUrl: "https://api", query: async () => { strzalow++; return odpowiedz([]); },
+  });
+  assert.equal(ile, 0);
+  assert.equal(strzalow, 0, "limit Allegro wydany na pusty kod to limit wyrzucony");
+});
+

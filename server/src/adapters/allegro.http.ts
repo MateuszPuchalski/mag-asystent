@@ -51,13 +51,23 @@ export function urlListyZwrotow(
   apiUrl: string,
   odKiedy: string | null,
   offset: number,
-  odKursora: string | null = null
+  odKursora: string | null = null,
+  waybill: string | null = null
 ): string {
   const filtr = odKiedy ? `&createdAt.gte=${encodeURIComponent(odKiedy)}` : "";
   const kursor = odKursora ? `&from=${encodeURIComponent(odKursora)}` : "";
+  /* Filtr po numerze listu przewozowego (0.163.0). Allegro ma go gotowego —
+     `parcels.waybill` w `getCustomerReturns` — a my używamy go dokładnie raz:
+     gdy skan etykiety nie trafił w nic, co już mamy u siebie. Pytamy wtedy
+     o TEN JEDEN numer, nie o stronę zwrotów.
+
+     `transportingWaybill` osobnym filtrem nie idzie: Allegro nie łączy filtrów
+     alternatywą, a dwa żądania przy jednym skanie to dwa razy więcej limitu
+     wydanego na przypadek, który w tej firmie jest rzadki. */
+  const list = waybill ? `&parcels.waybill=${encodeURIComponent(waybill)}` : "";
   return (
     `${apiUrl}/order/customer-returns?limit=100&offset=${Math.max(0, Math.trunc(offset))}` +
-    `${filtr}${kursor}`
+    `${filtr}${kursor}${list}`
   );
 }
 

@@ -841,6 +841,35 @@ Adresy panelu nie są udokumentowane przez Allegro, więc stoją w konfiguracji
 i noszą `[WERYFIKUJ]`. Bez adresu zostaje sam tekst: link donikąd jest gorszy
 od jego braku.
 
+### 25a.9. Skan etykiety zwrotnej (0.163.0)
+
+Wejście od strony fizycznej paczki. Karton ląduje na biurku, operator ciągnie
+po naklejce czytnikiem USB i właściwy zwrot otwiera się sam — bez szukania
+oczami po kolejce.
+
+Pole jest JEDNO i rozpoznaje kod samo. Serwer próbuje po kolei: numer zwrotu
+(`1234/Z04A`), identyfikator zwrotu z Allegro, na końcu numer listu z kopii
+odpowiedzi. Wynik mówi, KTÓRA droga zadziałała.
+
+Dopasowanie jest dokładne, nigdy przybliżone. Ekran sam otwiera zwrot przy
+jednym wyniku, więc dopasowanie przybliżone prowadziłoby do cudzej sprawy —
+a przy zwrocie znaczy to cudzego klienta i cudze pieniądze. **Dwa trafienia
+to brak trafienia:** ekran pokazuje oba i każe wybrać.
+
+Brak trafienia daje przycisk „Poszukaj w Allegro". Paczka bywa u nas szybciej
+niż synchronizacja, więc pytamy o ten jeden numer listu, zamiast czekać na
+ticker. Komunikat wypisuje zeskanowany kod i mówi, czego szukano: przy
+czytniku samo „nie znalazłem" wygląda identycznie jak zepsuty czytnik.
+
+**Czytnik nie walczy ze skrótami.** Cyfry `1`–`6` przełączają kubełek, a
+przykładowa etykieta InPostu `600000367616070023174201` zawiera je wszystkie.
+Hook `panel/src/skaner.ts` odróżnia serię czytnika od klawisza człowieka tym
+samym wzorcem co kolektor: przerwa resetuje bufor, Enter kończy serię, krótka
+seria nie jest kodem, a pierwszy znak czeka czterdzieści milisekund, zanim
+trafi do skrótów. Człowiek nie wciska dwóch klawiszy w takim czasie.
+
+Numeru listu ekran nie zapisuje. Politykę opisuje `docs/obsluga-klienta.md`.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -927,6 +956,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`przecena`/`utylizacja` |
 | Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |
 | Korekta i zamknięcie zwrotu | **działa** od 0.162.0 | `zapiszKorekte`, `cofnijKorekte` — numer z Subiekta |
+| Skan etykiety zwrotnej otwiera zwrot | **działa** od 0.163.0 | `znajdzZwrotPoKodzie`, `panel/src/skaner.ts` |
 | Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |

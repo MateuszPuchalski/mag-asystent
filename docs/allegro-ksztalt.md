@@ -211,6 +211,11 @@ Filtry listy: `customerReturnId`, `orderId`, `items.offerId`, `items.name`,
 `referenceNumber`, `from`, `createdAt.gte`, `createdAt.lte`, `marketplaceId`,
 `limit` (domyślnie 100) i `offset`.
 
+Od 0.163.0 używamy jednego z tych filtrów: `parcels.waybill` przy skanie
+etykiety zwrotnej. Pytamy o JEDEN numer listu, poza rytmem synchronizacji,
+i nie ruszamy przy tym kursora — inaczej ręczne pytanie przestawiłoby
+ticker i zgubiło zwroty pomiędzy.
+
 Parametr `from` jest KURSOREM: dokumentacja opisuje go jako identyfikator
 ostatnio widzianego zwrotu, a odpowiedź niesie zwroty utworzone po nim.
 Synchronizator idzie kursorem, bo offset gubi rekord przy wstawce w środku
@@ -230,6 +235,11 @@ mapowanie wywali się na SQL-u, zamiast wyciec po cichu. Pilnuje tego
 
 Zostaje sam FAKT powrotu paczki — `paczka_at` z najwcześniejszego
 `parcels[].createdAt`. To wystarcza, żeby powiedzieć „towar wrócił".
+
+Numer listu (`parcels[].waybill`) kolumny u nas nie ma i mieć nie będzie,
+mimo że skan etykiety go szuka. Szukamy po kopii odpowiedzi w lądowisku,
+więc numer żyje przez jedno żądanie zamiast zostać u nas na lata. Politykę
+opisuje `docs/obsluga-klienta.md`, rozdział o danych zwrotów.
 
 ### Pola młodsze od kopii specyfikacji
 
