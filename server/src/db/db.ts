@@ -145,6 +145,12 @@ export function migrate(database: DatabaseSync) {
      („Konto Allegro niepołączone — /biuro → …"). Serwer znał to zdanie
      i pisał je do dziennika; na ekran nie trafiało nic. */
   addColumn("allegro_inbox_sync_state", "last_error_text", "TEXT");
+  /* Dno przejrzanej listy (0.164.1). Bez tej kolumny sufit stron musiałby
+     obowiązywać od pierwszego przebiegu — a wtedy instalacja z zaległością
+     większą niż sufit czytałaby w kółko te same 25 stron i nigdy nie zobaczyła
+     resztę. NULL na bazie zastanej jest poprawny: znaczy „zejdź raz do dna
+     bez sufitu", czyli dokładnie to, co robił kod do 0.164.0. */
+  addColumn("allegro_inbox_sync_state", "dno_at", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do

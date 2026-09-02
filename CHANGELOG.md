@@ -34,6 +34,67 @@ historii nie przepisujemy.
 ---
 
 
+## 0.164.1 — 2 września 2026
+
+**Skrzynka przestaje móc przeczytać całą historię konta w kółko.** Statystyki
+aplikacji na developer.allegro.pl pokazały za 1 września **315 986 żądań**
+przy zerowym odsetku błędów po stronie Allegro. Zero błędów jest tu ważniejsze
+od tej dużej liczby: Allegro przyjęło każde z tych żądań i odpowiedziało
+poprawnie. To nie była blokada ani lawina ponowień, tylko nasza własna pętla,
+która przez siedem godzin czytała to samo.
+
+### Skąd tyle
+
+Skrzynka była JEDYNĄ z czterech pętli Allegro bez ogranicznika. Zwroty mają
+`MAKS_STRON`, rabaty mają, zamówienia mają `NA_PRZEBIEG` — a przebieg skrzynki
+szedł tyle stron, ile Allegro miało do oddania. Złożyły się trzy rzeczy naraz,
+wszystkie z tego samego dnia:
+
+- **Nic się nie zapisywało** (do 0.151.0 nazwy pól były wymyślone, nie ze
+  specyfikacji), więc każdy wątek wyglądał na nowy i dostawał własne żądanie
+  o wiadomości — w KAŻDYM przebiegu.
+- **Kursor nigdy nie ruszał**, bo zapis i kursor szły dopiero po całej pętli,
+  a pętla do nich nie dochodziła.
+- **Nie było granicy czasu** (weszła w 0.152.0), więc każdy przebieg zaczynał
+  od najnowszego wątku i schodził do początku historii konta.
+
+Przy takcie 60 s i przebiegu dłuższym od minuty znaczyło to pracę ciągłą:
+315 986 żądań przez siedem godzin to 12,5 żądania na sekundę, czyli dokładnie
+tempo pętli wysyłającej żądania jedno po drugim.
+
+### Co się zmienia
+
+**Sufit 25 stron na przebieg.** Jest bezpieczny, bo lista przychodzi
+posortowana po dacie ostatniej wiadomości, od najnowszej — tak mówi
+specyfikacja w `docs/allegro/swagger.yaml`. Wątek, w którym coś się dzieje,
+wskakuje na górę listy. Pod sufit może zejść wyłącznie rozmowa, w której nic
+się nie zmieniło od 500 nowszych wątków.
+
+**Zapis po każdej stronie, nie na końcu przebiegu.** Awaria na stronie
+trzechsetnej kasowała dotąd dorobek dwustu dziewięćdziesięciu dziewięciu,
+a następny przebieg pytał o te same wiadomości raz jeszcze. Strona jest
+najmniejszą jednostką zapisu: wątki strony niedoczytanej nadal nie wchodzą
+pojedynczo.
+
+**Kursor przesuwa się także po przebiegu obciętym sufitem.** Bez tego następny
+przebieg czytałby te same 25 stron co minutę, w kółko. Wolno, bo nowa kolumna
+`dno_at` zapamiętuje, że jakiś wcześniejszy przebieg zszedł do granicy czasu —
+a więc to, co pod sufitem, już przez skrzynkę przeszło.
+
+**Pierwsze zejście idzie bez sufitu.** Dopóki `dno_at` jest puste, ogranicznik
+nie obowiązuje: instalacja z zaległością większą niż 25 stron nigdy by jej
+inaczej nie nadrobiła, bo każdy przebieg czytałby te same 500 wątków i zawracał.
+To zejście jest jednorazowe i ograniczone progiem `ALLEGRO_INBOX_OD`.
+
+Czego to wydanie **nie** rozstrzyga: gdyby między dwoma przebiegami przybyło
+ponad 500 wątków z nowymi wiadomościami, te spod sufitu poczekają na następny
+przebieg. Przy takcie 60 s to jest ruch, którego ta firma nie generuje — ale
+to jest założenie, nie prawo, i dlatego stoi wypisane przy stałej w kodzie.
+
+Wdrożenie: nic ręką. Kolumna `dno_at` dochodzi migracją przy pierwszym starcie,
+a jej pusta wartość na bazie zastanej znaczy „zejdź raz do dna bez sufitu",
+czyli dokładnie to, co robił kod do 0.164.0.
+
 ## 0.164.0 — 2 września 2026
 
 **Rabat transakcyjny widać przy zwrocie i składa się jednym kliknięciem.**
