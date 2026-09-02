@@ -258,6 +258,28 @@ tickera. Rozmowa po minionym terminie wraca jako `open` i niesie znacznik
 Zamknięcia automatycznego po N dniach NIE MA. §26 wymienia je wśród pytań
 do właściciela; do czasu decyzji rozmowę zamyka wyłącznie człowiek.
 
+### 7.2. Statusy doboru w kodzie (etap E1)
+
+Lista doboru stoi, jak lista rozmowy, w trzech miejscach: `STATUSY_DOBORU`
+w `services/dobor.ts`, `CHECK` na kolumnie `dobor_rozmowy.status` i typ
+`StatusDoboru` w panelu. Brak wiersza `dobor_rozmowy` znaczy `not_started`
+i liczy się przy odczycie. Otwarcie zakładki niczego nie wstawia.
+
+`extracting_data` nie ma w etapie E nadawcy. To stan, w którym Copilot wyciąga
+dane z pytania klienta (etap F). Człowiek dane wpisuje, nie wyciąga, więc
+serwis odrzuca ten status z ręki. `CHECK` zostawia go na liście, żeby etap F
+nie przebudowywał tabeli.
+
+Trzy przejścia dzieją się SAME:
+
+- pierwszy zapis danych wejściowych prowadzi `not_started` → `searching`;
+- wybór kandydata prowadzi do `candidates_found`, z każdego stanu;
+- zdjęcie wyboru przy `confirmed` cofa do `candidates_found`.
+
+`confirmed` wymaga wybranej kartoteki. `missing_information` niesie notatkę,
+czego dopytać; wyjście z tego stanu ją kasuje. Zatwierdza każdy z biura.
+Roli „ekspert" nie ma decyzją właściciela, a automat nie zatwierdza nigdy.
+
 ## 8. Integracja z Allegro
 
 ### 8.1. Autoryzacja
@@ -372,10 +394,13 @@ oczekiwania, ofertę lub produkt, właściciela, priorytet, termin, liczbę nowy
 wiadomości, status doboru i oczekujące zadanie terenowe.
 
 **Wiersz uzupełniony w 0.181.0: priorytet, czas oczekiwania, licznik dopisków
-klienta i znak oczekującego zadania.** Dwóch pozycji z listy wyżej dalej nie ma
-i to jest decyzja, nie przeoczenie. TERMIN odpowiedzi czeka na rozstrzygnięcie
-z §26 — bez niego byłby zmyślony. STATUS DOBORU czeka na etap E, bo dobór nie
-ma jeszcze własnego bytu.
+klienta i znak oczekującego zadania.** Jednej pozycji z listy wyżej dalej nie
+ma i to jest decyzja, nie przeoczenie. TERMIN odpowiedzi czeka na
+rozstrzygnięcie z §26 — bez niego byłby zmyślony.
+
+**Status doboru doszedł w etapie E1.** Wiersz milczy przy `not_started`
+i `not_applicable`: plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby
+niczego, a „nie dotyczy" to wiersz, przy którym doboru nie trzeba robić.
 
 **Licznik mówi to, co mierzy.** To liczba wiadomości klienta od NASZEJ
 ostatniej odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się
@@ -447,6 +472,18 @@ zastosowanie, zamiennik, zgodne parametry, wyszukiwanie pełnotekstowe,
 wyszukiwanie semantyczne.
 
 **Wynik semantyczny nie jest dowodem kompatybilności.**
+
+**Co działa od etapu E1.** Dobór wisi przy rozmowie w tabeli `dobor_rozmowy`
+(nie `dopasowanie` — tę nazwę `migrate()` kasuje). Agent wpisuje dane §11.1,
+widzi kandydatów i wybiera kartotekę. Kandydatów daje `services/kandydaci.ts`
+z czterech szczebli: dokładny symbol, EAN, kartoteka oferty, zamiennik z opisu.
+Numer OEM, zastosowanie i pełny tekst raportują się jako pominięte do E2/E3.
+Każdy szczebel mówi, czy był sprawdzony; pominięty niesie powód. Wyszukiwarka
+klikana ręcznie nie jest kandydatem, tylko wyborem z drogą `wyszukiwarka`.
+Furtki na literówki dobór nie używa — blizna „szarpaka".
+
+Zdanie do szkicu pisze serwer, ze źródłem (§14.3). Dobór zatwierdzony przez
+agenta to wciąż dobór, nie potwierdzone zastosowanie — wiedza idzie w E2.
 
 ### 11.3. Poziomy pewności
 
@@ -612,7 +649,14 @@ GET    /api/products/search
 GET    /api/obsluga/dopasowania/szukaj
 POST   /api/obsluga/dopasowania/propozycje
 POST   /api/obsluga/dopasowania/:id/zatwierdz
+GET    /api/obsluga/rozmowy/:id/dobor/kandydaci
+PUT    /api/obsluga/rozmowy/:id/dobor/dane
+POST   /api/obsluga/rozmowy/:id/dobor/status
+POST   /api/obsluga/rozmowy/:id/dobor/wybor
 ```
+
+Cztery trasy doboru działają od etapu E1 pod prefiksem skrzynki. Trzy trasy
+`dopasowania/*` z projektu właściciela zostają zapisem zamiaru na E2.
 
 Każda mutacja przyjmuje oczekiwaną wersję rekordu. Konflikt wersji zwraca 409.
 
@@ -1191,7 +1235,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
-| Statusy doboru (§7) | **projekt** | dobór części nie ma jeszcze własnego stanu |
+| Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
+| Kandydaci doboru (§11.2) | **częściowo** od E1 | `services/kandydaci.ts`: symbol, EAN, oferta, zamiennik; OEM, zastosowanie i pełny tekst w E2/E3 |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Sprawa nad rozmowami (§6.1) | **działa** od 0.161.0 | `sprawa_klienta`, `services/sprawy.ts`, pasek w rozmowie |
 | Ekran sprawy z własną osią | **poza zakresem** | zdarzenia wiszą przy źródle — blizna 0.130.0 |
@@ -1199,7 +1244,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
 | Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
-| Baza wiedzy i dobór części (§11–12) | **projekt** | etapy E i dalsze |
+| Baza wiedzy (§12) | **projekt** | etap E2 — zastosowania, dowody, negatywne dopasowania |
 | Copilot (§14) | **projekt** | etap F |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
@@ -1217,8 +1262,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx` |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
-| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`, zakładki Oferta i Towar |
-| Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie; bez terminu i statusu doboru |
+| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`, zakładki Oferta, Towar i od E1 Dobór |
+| Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |

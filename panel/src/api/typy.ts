@@ -33,6 +33,8 @@ export type Rozmowa = {
   nowychOdOdpowiedzi: number;
   /** Niezamknięte zadanie terenowe przy rozmowie. */
   zadanieWToku: boolean;
+  /** Status doboru (§7, §10.2, etap E1). Bez wiersza doboru — `not_started`. */
+  dobor: StatusDoboru;
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
@@ -48,7 +50,7 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa";
+  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -131,6 +133,9 @@ export type DopasowanieKartoteki = {
    agenta przy rozmowie: czy jest, ile jest i gdzie leży. */
 export type KartaTowaru = {
   id: number; sym: string; name: string; ean: string | null; unit: string | null;
+  /** Opis kartoteki i zamienniki z niego wyczytane — serwer to zwraca od dawna, kolektor czyta. */
+  desc?: string;
+  zamienniki?: { znane: Array<{ id: number; sym: string; name: string }>; obce: string[] };
   locs: string[];
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
@@ -144,7 +149,57 @@ export type OsRozmowy = {
   sprawa: SprawaRozmowy | null;
   zamowienie: ZamowienieRozmowy | null;
   oferta: OfertaRozmowy | null;
+  dobor: Dobor;
 };
+
+/* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────
+   Lista statusów ZAMKNIĘTA, wprost z §7 — trzecia kopia obok `STATUSY_DOBORU`
+   na serwerze i `CHECK` na kolumnie. `extracting_data` nie ma w E nadawcy:
+   serwer go odrzuca, nada go Copilot (F). */
+export type StatusDoboru =
+  | "not_started" | "extracting_data" | "missing_information" | "searching"
+  | "candidates_found" | "requires_expert" | "confirmed" | "rejected" | "not_applicable";
+
+/* Osiem dróg §11.2. `zastosowanie`, `oem` i `pelnotekst` czekają na E2/E3. */
+export type DrogaDoboru =
+  | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "oem" | "pelnotekst";
+
+export type DaneDoboru = {
+  marka: string | null; model: string | null; wariant: string | null; rocznik: string | null;
+  nrSeryjny: string | null; silnik: string | null; oem: string | null; nazwaCzesci: string | null;
+  parametry: Record<string, string>;
+};
+
+export type WyborDoboru = {
+  twId: number; symbol: string; droga: DrogaDoboru; przez: string; at: string;
+  /** Zdanie do szkicu pisze SERWER (§14.3) — ze źródłem; panel go nie układa. */
+  zdanieDoSzkicu: string;
+};
+
+export type Dobor = {
+  status: StatusDoboru;
+  /** Wersja DANYCH doboru — własna, nie `Rozmowa.wersja`. */
+  wersja: number;
+  dane: DaneDoboru;
+  brakuje: string | null;
+  wybrany: WyborDoboru | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+};
+
+export type KandydatDoboru = {
+  nr: number; twId: number; symbol: string; nazwa: string; stan: number;
+  droga: DrogaDoboru;
+  pewnosc: "potwierdzone" | "prawdopodobne" | "wymaga_danych";
+  /** Zdanie z serwera (§11.3): skąd kandydat, nie sam kod drogi. */
+  zrodlo: string;
+  ostrzezenia: string[];
+};
+
+/** Szczebel §11.2: sprawdzony z liczbą wyników albo pominięty Z POWODEM. */
+export type SzczebelDoboru = { droga: DrogaDoboru; sprawdzona: boolean; wynikow: number; powod?: string };
+
+export type KandydaciDoboru = { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[] };
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;

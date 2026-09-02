@@ -7,6 +7,7 @@ import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
+import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -45,6 +46,10 @@ export interface RozmowaSkrzynki {
   nowychOdOdpowiedzi: number;
   /** Czy przy rozmowie stoi niezamknięte zadanie terenowe (§10.2). */
   zadanieWToku: boolean;
+  /* Status doboru (§7, §10.2, etap E1). Brak wiersza `dobor_rozmowy` to
+     `not_started` — liczone tu, w SQL, żeby lista nie robiła zapytania na
+     wiersz i żeby otwarcie ekranu niczego nie wstawiało. */
+  dobor: StatusDoboru;
   odlozoneDo: string | null;
   /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
      ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
@@ -64,7 +69,7 @@ export interface ZalacznikOsi {
 export interface Wzmianka { userId: number; name: string }
 
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa";
+  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
@@ -137,9 +142,11 @@ const LISTA = `
                                    WHERE n.conversation_id=c.id AND n.direction='outgoing'), 0)
          ) AS nowych,
          EXISTS(SELECT 1 FROM zadanie_terenowe z
-                 WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie
+                 WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie,
+         COALESCE(d.status, 'not_started') AS dobor
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
+    LEFT JOIN dobor_rozmowy d ON d.conversation_id=c.id
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
        ORDER BY (m.direction='incoming') DESC, m.id DESC LIMIT 1)`;
@@ -169,6 +176,7 @@ const naRozmowe = (
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
     zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
+    dobor: String(w.dobor ?? "not_started") as StatusDoboru,
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
     oglada: trzymane.get(Number(w.id)) ?? null,
@@ -292,6 +300,7 @@ export function osRozmowy(id: number): {
   rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null; sprawa: SprawaRozmowy | null;
   zamowienie: ZamowienieRozmowy | null; oferta: OfertaRozmowy | null;
+  dobor: Dobor;
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
@@ -475,6 +484,28 @@ export function osRozmowy(id: number): {
     });
   }
 
+  /* DOBÓR NA OSI (etap E1): zmiana statusu, wybór i zdjęcie wyboru — kreską,
+     jak status rozmowy. Bez tych wpisów „dlaczego dobór stoi na
+     `missing_information`" byłoby pytaniem do kolegi, nie do ekranu. */
+  for (const z of db().prepare(`
+    SELECT id, event_type, payload, created_at FROM conversation_event
+     WHERE conversation_id=? AND event_type IN ('dobor_status_changed','dobor_wybrano','dobor_wybor_zdjety')
+     ORDER BY id
+  `).all(id) as Array<Record<string, unknown>>) {
+    const p = JSON.parse(String(z.payload ?? "{}")) as
+      { przed?: string; po?: string; brakuje?: string; symbol?: string; droga?: string; autor?: string };
+    const typ = String(z.event_type);
+    const tresc = typ === "dobor_status_changed"
+      ? `dobór: ${p.przed ?? "?"} → ${p.po ?? "?"}${p.brakuje ? ` (brakuje: ${p.brakuje})` : ""}`
+      : typ === "dobor_wybrano"
+      ? `dobór: wybrano ${p.symbol ?? "?"} (droga: ${p.droga ?? "?"})`
+      : `dobór: zdjęto wybór ${p.symbol ?? "?"}`;
+    os.push({
+      id: `dobor-${z.id}`, rodzaj: "dobor", autor: String(p.autor ?? "system"),
+      odKlienta: false, tresc, at: String(z.created_at), ofertaId: null,
+    });
+  }
+
   /* OŚ JEST CHRONOLOGICZNA (0.157.0). Do tego wydania wyniki zadań doklejały
      się za wszystkimi wiadomościami bez względu na czas — przy dwóch źródłach
      znośne, przy trzech oś przestawała opowiadać przebieg sprawy.
@@ -491,6 +522,10 @@ export function osRozmowy(id: number): {
        padła już odpowiedź. */
     sprawa: sprawaRozmowy(id),
     zamowienie, oferta,
+    /* Dobór jedzie z rozmową, bo jest lekki (jeden wiersz); KANDYDACI nie —
+       to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
+       zdarzenie szyny. */
+    dobor: doborRozmowy(id),
   };
 }
 

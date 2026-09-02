@@ -297,7 +297,16 @@ export function Skrzynka() {
 
     {/* Trzecia kolumna. Bez rozmowy nie ma czego pokazać — kolumna znika,
         zamiast stać pusta i zabierać środkowi 340 px. */}
-    {rozmowa.data && <Kontekst dane={rozmowa.data} />}
+    {rozmowa.data && <Kontekst dane={rozmowa.data}
+      onWstawDoSzkicu={(t) => setSzkic((s) => s ? `${s}\n${t}` : t)}
+      /* „Zleć pomiar" z doboru to ISTNIEJĄCY przepływ: kartoteka wskazana
+         z góry, źródłem ostatnia wiadomość klienta — agent widzi formularz
+         i sam klika ZLEĆ. Bez wiadomości klienta nie ma z czego zlecać. */
+      onZlecPomiar={(t) => {
+        const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
+          .find((w) => w.odKlienta && w.messageId)?.messageId ?? null;
+        setTowar(t); setZrodlo(ostatniaKlienta);
+      }} />}
     </div>
 
     {/* Dialog jest `fixed`, ale jako dziecko gridu założyłby niejawny wiersz —

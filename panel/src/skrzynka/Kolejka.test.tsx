@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, ...n,
+  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started", ...n,
 });
 
 const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
@@ -194,5 +194,17 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
   it("oczekujące zadanie terenowe widać przy rozmowie", () => {
     pokaz([rozmowa({ zadanieWToku: true })]);
     expect(screen.getByText(/zadanie w toku/)).toBeInTheDocument();
+  });
+
+  it("status doboru stoi w wierszu, ale nierozpoczęty i „nie dotyczy” milczą", () => {
+    /* §10.2 domknięty w E1: plakietka mówi, na czym stanął dobór. Na wierszu
+       bez doboru nie ma czego mówić — „nierozpoczęty" wszędzie to szum. */
+    const { rerender } = render(<Kolejka rozmowy={[rozmowa({ dobor: "missing_information" })]}
+      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText("Brakuje danych")).toBeInTheDocument();
+    rerender(<Kolejka rozmowy={[rozmowa({ dobor: "not_applicable" }), rozmowa({ id: 2, dobor: "not_started" })]}
+      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.queryByText("Nie dotyczy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nierozpoczęty")).not.toBeInTheDocument();
   });
 });

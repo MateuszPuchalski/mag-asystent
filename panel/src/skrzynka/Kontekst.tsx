@@ -5,6 +5,8 @@ import { Zakladki } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { TowarRozmowy } from "./TowarRozmowy";
+import { Dobor } from "./Dobor";
+import type { Towar } from "../wyszukiwarka";
 
 /**
  * Trzecia kolumna ekranu skrzynki (§10.1, 0.180.0).
@@ -15,14 +17,21 @@ import { TowarRozmowy } from "./TowarRozmowy";
  * nad osią: cztery bloki jeden pod drugim spychały pytanie klienta poniżej
  * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
  *
- * DWIE zakładki, nie pięć z makiety. „Dobór", „Klient" i „Wiedza" nie mają
- * dziś skąd wziąć danych — tabel `part`, `fitment`, `customer`
- * i `customer_machine` nie ma wcale (etapy E i F z §24). Zakładka, która
- * zawsze mówi „wkrótce", uczy nie klikać.
+ * TRZY zakładki, nie pięć z makiety. „Dobór" doszła w etapie E1, gdy dostała
+ * byt (`dobor_rozmowy`). „Klient" i „Wiedza" nadal nie mają skąd wziąć danych
+ * (E2 i F z §24). Zakładka, która zawsze mówi „wkrótce", uczy nie klikać.
+ *
+ * Dwa zwrotne uchwyty idą ze `Skrzynka.tsx`, gdzie leży szkic i formularz
+ * pomiaru: zakładka doboru wstawia zdanie do szkicu i podstawia kartotekę
+ * do zlecenia — obu rzeczy nie ma prawa robić po cichu.
  */
-type Widok = "oferta" | "towar";
+type Widok = "oferta" | "towar" | "dobor";
 
-export function Kontekst({ dane }: { dane: OsRozmowy }) {
+export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
+  dane: OsRozmowy;
+  onWstawDoSzkicu: (tresc: string) => void;
+  onZlecPomiar: (towar: Towar) => void;
+}) {
   const [widok, setWidok] = useState<Widok>("oferta");
   const oferta = dane.oferta;
 
@@ -30,6 +39,7 @@ export function Kontekst({ dane }: { dane: OsRozmowy }) {
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
       { klucz: "oferta", etykieta: "Oferta" },
       { klucz: "towar", etykieta: "Towar" },
+      { klucz: "dobor", etykieta: "Dobór" },
     ]} />
 
     {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
@@ -54,6 +64,9 @@ export function Kontekst({ dane }: { dane: OsRozmowy }) {
             <span>Bez powiązanej oferty nie ma z czego wywieść kartoteki.
               Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</span>
           </p>)}
+
+      {widok === "dobor" && <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
+        onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />}
     </div>
   </section>;
 }

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { AlarmClock, Eye, Inbox, RefreshCw, Ruler, UserCheck } from "lucide-react";
+import { AlarmClock, Eye, Inbox, RefreshCw, Ruler, UserCheck, Wrench } from "lucide-react";
 import type { Rozmowa, StanSkrzynki } from "../api/typy";
 import { Plakietka, czas } from "../ui";
-import { NAZWA } from "./statusy";
+import { NAZWA, NAZWA_DOBORU } from "./statusy";
 
 /* Kubełki kolejki wprost z §10.1: „Nieprzypisane, Moje, Oczekujące, Po
    terminie". Filtr jest po stronie EKRANU, bo lista i tak przyjeżdża w
@@ -136,6 +136,14 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
               {r.nowychOdOdpowiedzi} dopiski klienta</span>}
           {r.zadanieWToku && <span className="flex items-center gap-1 font-semibold text-slate-600">
             <Ruler size={12} />zadanie w toku</span>}
+          {/* Status DOBORU (§10.2, E1). `not_started` i `not_applicable` milczą:
+              plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby niczego,
+              a „nie dotyczy" to wiersz, przy którym doboru NIE trzeba robić. */}
+          {r.dobor !== "not_started" && r.dobor !== "not_applicable" &&
+            <span className={`flex items-center gap-1 font-semibold ${
+              r.dobor === "confirmed" ? "text-emerald-700"
+                : r.dobor === "missing_information" ? "text-ranga-zle" : "text-amber-700"}`}>
+              <Wrench size={12} />{NAZWA_DOBORU[r.dobor]}</span>}
           {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
             <UserCheck size={12} />{r.wlasciciel}</span>}
           {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">

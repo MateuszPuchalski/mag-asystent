@@ -34,6 +34,49 @@ historii nie przepisujemy.
 ---
 
 
+## 0.182.0 — 2 września 2026
+
+**Dobór części przy rozmowie (§11, etap E1).** §1 nazywa dobór najważniejszym
+przypadkiem panelu, a do tego wydania panel nie miał go wcale: ani stanu,
+ani miejsca na to, o jaką maszynę chodzi. Teraz kolumna kontekstu ma trzecią
+zakładkę „Dobór”: dane wejściowe (marka, model, wariant, rocznik, numer
+seryjny, silnik, numer OEM, część, parametry), status z §7, kandydaci z drogą
+i źródłem, wybór kartoteki i zatwierdzenie doboru. Status doboru wchodzi do
+wiersza kolejki (§10.2), a każdy krok zostawia kreskę na osi rozmowy.
+
+### Co daje kandydatów
+
+Cztery szczeble z §11.2: dokładny symbol, EAN, kartoteka oferty (pamięć wskazań
+albo SKU) i zamiennik z opisu tej kartoteki. Numer OEM, potwierdzone
+zastosowanie i pełny tekst raportują się jako POMINIĘTE do E2/E3 — szczebel
+bez danych mówi, że go nie sprawdzono, zamiast udawać „zero wyników”.
+Wyszukiwarka klikana ręcznie nie jest kandydatem, tylko wyborem podpisanym
+agentem. Furtki na literówki dobór nie używa (blizna „szarpaka”).
+
+### Zasady, które stoją w kształcie
+
+- Tabela nazywa się `dobor_rozmowy`, nie `dopasowanie`: tamtą nazwę
+  `migrate()` kasuje przy każdym starcie. Test migracji pilnuje obu połów.
+- Jedna rozmowa = jeden dobór (klucz główny). Brak wiersza znaczy
+  `not_started` i liczy się przy odczycie — otwarcie zakładki nic nie wstawia.
+- Dobór ma WŁASNĄ wersję, nie `conversation.version`: edycja chipów nie
+  wywraca cudzego szkicu na 409. Konflikt danych nie kasuje wpisanego.
+- Symbol wybranej kartoteki idzie z bazy, nie z żądania; bez klucza obcego do
+  `sgt_towar`, bo import odtwarza read-model.
+- `extracting_data` nie ma nadawcy do etapu F: serwer odrzuca go z ręki.
+  `confirmed` wymaga wyboru. Zatwierdza każdy z biura — roli „ekspert” nie ma
+  decyzją właściciela, automat nie zatwierdza nigdy.
+- Zdanie do szkicu pisze serwer, ze źródłem (§14.3). Panel go nie układa.
+
+### Trasy
+
+`GET …/rozmowy/:id/dobor/kandydaci`, `PUT …/dobor/dane` (409 przy rozjeździe
+wersji), `POST …/dobor/status`, `POST …/dobor/wybor`. Wszystkie za bramką
+biura; strażnik adresów panelu z 0.181.1 obejmuje nowe hooki.
+
+Poza zakresem tego wydania: baza zastosowań i dowodów (E2), identyfikatory OEM
+i pełny tekst (E3), Copilot (F).
+
 ## 0.181.1 — 2 września 2026
 
 **Komentarz wewnętrzny ze skrzynki dostawał 404 od 0.157.0.** Panel wołał
