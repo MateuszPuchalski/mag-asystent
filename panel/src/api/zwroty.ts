@@ -140,3 +140,21 @@ export function useCofnijKorekte() {
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
+
+/**
+ * Złożenie wniosku o rabat transakcyjny — jedyna mutacja panelu, która
+ * WYCHODZI do Allegro.
+ *
+ * Bez `wersja` i to jest wybór: wniosek nie zmienia stanu zwrotu u nas, a przed
+ * dubletem broni strażnik serwera (końcówka Allegro nie ma idempotencji).
+ * Blokada optymistyczna na cudzym zasobie dawałaby złudzenie kontroli.
+ */
+export function useZglosRabat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number }) =>
+      api<{ wniosekId: string; lineItemId: string }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/rabat`, { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}

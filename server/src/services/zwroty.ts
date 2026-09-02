@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { db as defaultDb, type Db, transaction } from "../db/db.js";
 import { zaproponujKartoteke, type Dopasowanie } from "./dopasowanie-sku.js";
+import { stanRabatu, type StanRabatu } from "./rabaty.js";
 import { linkZamowienia, linkZwrotu } from "./allegro-linki.js";
 import { logEvent } from "./events.js";
 
@@ -41,6 +42,8 @@ export interface PozycjaZwrotu {
   twZrodlo: string | null;
   /** Propozycja automatu — pokazywana obok, nigdy zamiast potwierdzonej. */
   propozycja: Dopasowanie | null;
+  /** Rabat transakcyjny: czy wniosek o zwrot prowizji już jest (0.163.0). */
+  rabat: StanRabatu;
 }
 
 /** Pozycja zamówienia; `zwracana` mówi, które z nich wracają do nas. */
@@ -297,6 +300,10 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
             offerId: (p.offer_id as string) ?? null,
             nazwa: String(p.nazwa),
           }) : null,
+          /* Rabat liczy się dla KAŻDEJ pozycji, także rozstrzygniętej: wniosek
+             o prowizję żyje własnym rytmem po stronie Allegro i bywa złożony
+             długo po tym, jak zwrot zszedł z biurka. */
+          rabat: stanRabatu(database, Number(p.id)),
         };
       });
 

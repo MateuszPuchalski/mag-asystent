@@ -69,6 +69,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/ocena" },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta/cofnij` },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/rabat" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -341,4 +342,24 @@ test("korekta domyka zwrot przez HTTP, a cofnięcie otwiera go z powrotem", asyn
   assert.equal(cofnij.statusCode, 200, cofnij.body);
   r = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
   assert.equal(r.json().zwrot.kubelek, "korekta", "wraca do kubełka, nie na początek kolejki");
+});
+
+test("wniosek o rabat: bez dopasowanej pozycji zamówienia trasa mówi POWÓD", async () => {
+  /* Jedyna trasa tego pliku, która WYCHODZI do Allegro. Tu sprawdzamy, że nie
+     wychodzi wtedy, gdy nie ma czego wysłać — identyfikator pozycji zamówienia
+     jest jedynym wymaganym polem żądania i bez niego nie ma wniosku.
+
+     Zwrot z tego stanowiska nie ma pobranego zamówienia, więc łańcuch pęka na
+     pierwszym ogniwie i ekran ma to powiedzieć zdaniem, nie ciszą. */
+  const { naglowki } = login("biuro", "Ala z biura");
+  const pozycja = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+
+  const r = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/pozycje/${pozycja}/rabat`, headers: naglowki });
+  assert.equal(r.statusCode, 400, r.body);
+  assert.match(r.json().error, /zamówieni/i);
+
+  /* I nie zostawia po sobie wniosku-widma. */
+  assert.equal((db().prepare("SELECT count(*) n FROM allegro_rabat").get() as { n: number }).n, 0);
 });

@@ -6,13 +6,19 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzynaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało dwanaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
 
-Liczba urosła w 0.150.0 z ośmiu na trzynaście. Pięć nowych pozycji to zwroty
-klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
+Liczba urosła w 0.150.0 z ośmiu na trzynaście — pięć nowych pozycji to były
+zwroty klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
+W 0.163.0 zeszła na dwanaście: znacznik przy `status` zwrotu okazał się
+nieaktualny, bo schemat leżał już w repo od 0.151.0.
+
+Rozkład dzisiejszy jest po połowie: sześć pozycji dotyczy Subiekta GT, sześć
+mapowania Allegro. Z tych drugich cztery to końcówki ZAPISU, których sonda nie
+dosięgnie, bo jest GET-em.
 
 W 0.151.0 zeszła do jedenastu. Właściciel wgrał `swagger.yaml`, a specyfikacja
 potwierdziła zgadnięty kształt wysyłki do Centrum wiadomości. Dwa znaczniki

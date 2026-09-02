@@ -908,6 +908,17 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- czy operator ją oddał, czy tylko pozycje wyszły akurat na tyle samo.
   kwota_dostawa_grosze INTEGER,
   kwota_at TEXT, kwota_przez TEXT,
+  -- Oś czasu zwrotu PO STRONIE ALLEGRO (0.163.0) — nie mylić z `werdykt`
+  -- ani `zamkniety_at`, które są naszymi decyzjami. Jedenaście wartości
+  -- opisuje `docs/allegro-ksztalt.md`; BEZ `CHECK`, bo schemat Allegro
+  -- wymienia je słownie i nie zamyka enumem, a nieznana wartość ma przejść,
+  -- nie wywrócić synchronizację.
+  --
+  -- Dwie z nich mówią o PROWIZJI, nie o pieniądzach klienta:
+  -- `COMMISSION_REFUND_CLAIMED` i `COMMISSION_REFUNDED`. Kolejka bramek NIE
+  -- routuje po tym polu — w obserwacji z 2 września 95 zwrotów na 100 miało
+  -- `COMMISSION_REFUNDED`, więc routowanie opustoszyłoby ją prawie całkiem.
+  status_allegro TEXT,
   korekta_queue_id INTEGER REFERENCES sfera_queue(id),
   korekta_numer TEXT,
   zamkniety_at TEXT,
@@ -1021,6 +1032,43 @@ CREATE INDEX IF NOT EXISTS ix_oferta_kartoteka_tw ON oferta_kartoteka(tw_id);
 
 -- Oś zwrotu. Wpisy wiszą przy ŹRÓDLE, nie przy sprawie — blizna 0.130.0,
 -- gdzie historia ginęła przy scalaniu.
+-- ── Wnioski o rabat transakcyjny (0.163.0) ─────────────────────────────────
+-- Zwrot prowizji od sprzedaży. Do 0.162.1 firma klikała po niego ręcznie przy
+-- każdym zwrocie w panelu Allegro; obserwacja z 2 września pokazuje, ile to
+-- pracy: `type` to MANUAL ×60 i AUTOMATIC ×40 na sto wniosków.
+--
+-- Tabela jest LUSTREM odczytu z `/order/refund-claims`, nie naszym rejestrem
+-- decyzji — stąd sam `external_id` jako klucz naturalny i żadnych kolumn
+-- „kto u nas kliknął". Kto kliknął, mówi dziennik zdarzeń i oś zwrotu.
+--
+-- `line_item_id` to identyfikator POZYCJI ZAMÓWIENIA (`lineItems[].id`),
+-- czyli to samo, co `zamowienie_klienta_pozycja.external_id`. Po nim, i tylko
+-- po nim, wiąże się wniosek ze zwrotem: `items[].offerId` zwrotu należy do
+-- przestrzeni, której wciąż nie znamy (`[WERYFIKUJ]` w allegro-ksztalt.md).
+CREATE TABLE IF NOT EXISTS allegro_rabat (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  line_item_id TEXT,
+  offer_id TEXT,
+  ilosc REAL,
+  -- Prowizja przyjeżdża LICZBĄ, gdy wszędzie indziej Allegro oddaje kwotę
+  -- tekstem (`docs/allegro-ksztalt.md`). Grosze w INTEGER jak wszędzie u nas.
+  prowizja_grosze INTEGER,
+  waluta TEXT,
+  -- Bez `CHECK` z tego samego powodu co przy `status_allegro`: siedem wartości
+  -- zna filtr listy, ale schemat odpowiedzi ich nie zamyka.
+  status TEXT,
+  -- `MANUAL` albo `AUTOMATIC` — czyli czy wniosek złożył człowiek, czy Allegro
+  -- samo. To ta liczba mówi, ile pracy zdejmuje przycisk w panelu.
+  typ TEXT,
+  created_at TEXT,
+  synced_at TEXT NOT NULL,
+  UNIQUE (channel_account_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS ix_allegro_rabat_pozycja
+  ON allegro_rabat(line_item_id);
+
 CREATE TABLE IF NOT EXISTS zwrot_zdarzenie (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,

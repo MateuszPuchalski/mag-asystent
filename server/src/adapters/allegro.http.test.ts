@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   rodzinaKoncowki,
   scopeDlaUrl,
+  urlWnioskuORabat,
   urlDyskusji,
   urlListyZwrotow,
   urlRoszczenProwizji,
@@ -52,7 +53,7 @@ test("identyfikator w ścieżce jest kodowany — ukośnik nie dokłada segmentu
      jak „Allegro nie zna tej dyskusji". */
   assert.equal(
     urlWiadomosciDyskusji("https://api.allegro.pl", "a/b"),
-    "https://api.allegro.pl/sale/issues/a%2Fb/chat"
+    "https://api.allegro.pl/sale/issues/a%2Fb/chat?limit=100"
   );
 });
 
@@ -163,8 +164,12 @@ test("adres rozmowy w sprawie istnieje w specyfikacji Allegro", () => {
      Sonda oddawała zero rekordów przy sprawach, które miały `messagesCount`
      większy od zera. */
   const url = urlWiadomosciDyskusji("https://api.allegro.pl", "abc-1");
-  assert.equal(url, "https://api.allegro.pl/sale/issues/abc-1/chat");
+  assert.equal(url, "https://api.allegro.pl/sale/issues/abc-1/chat?limit=100");
   assert.equal(url.includes("/sale/disputes"), false);
+  /* `limit` JAWNIE (0.163.0): przy tej jednej końcówce specyfikacja daje
+     domyślne 10, nie 100 jak przy listach obok. Bez tego próbka sondy była
+     cicho przycięta do dziesięciu wiadomości na sprawę. */
+  assert.match(url, /limit=100$/);
 });
 
 test("User-Agent: wygenerowany z env wygrywa, fallback nazywa nas po imieniu", () => {
@@ -298,4 +303,27 @@ test("pobranie załącznika nie idzie poza Allegro", async () => {
   ]) {
     await assert.rejects(() => pobierzZalacznik(zly), /poza Allegro|poprawnym URL/);
   }
+});
+
+test("ZAPIS na zamówieniach żąda innego uprawnienia niż odczyt", () => {
+  /* Blizna 0.155.0 w nowym miejscu. Odmowa 403 niesie NAZWĘ uprawnienia i to
+     jedyna rzecz, od której da się zacząć naprawę — a nazwa wskazująca
+     uprawnienie, które konto już ma, wysyła człowieka po nic i każe mu
+     sparować konto ponownie bez skutku. */
+  const wniosek = "https://api.allegro.pl/order/refund-claims";
+  assert.equal(scopeDlaUrl(wniosek), "allegro:api:orders:read", "odczyt listy wniosków");
+  assert.equal(scopeDlaUrl(wniosek, "POST"), "allegro:api:orders:write",
+    "złożenie wniosku to ZAPIS");
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/order/refund-claims/rc-1", "DELETE"),
+    "allegro:api:orders:write", "anulowanie też");
+  /* Rodziny spoza zamówień zachowują swoje uprawnienia niezależnie od metody. */
+  assert.equal(scopeDlaUrl("https://api.allegro.pl/messaging/threads/1/messages", "POST"),
+    "allegro:api:messaging");
+});
+
+test("adres pojedynczego wniosku koduje identyfikator", () => {
+  assert.equal(
+    urlWnioskuORabat("https://api.allegro.pl", "rc/1"),
+    "https://api.allegro.pl/order/refund-claims/rc%2F1"
+  );
 });

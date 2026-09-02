@@ -22,10 +22,14 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   pozycje: [
     { id: 11, offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
       waluta: "PLN", powod: null, powodKomentarz: null, ocena: "stan", url: null,
-      twId: null, twSymbol: null, twZrodlo: null, propozycja: null },
+      twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+      rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null } },
     { id: 12, offerId: "of-2", nazwa: "Filtr", ilosc: 1, cenaGrosze: 4999,
       waluta: "PLN", powod: null, powodKomentarz: null, ocena: "stan", url: null,
-      twId: null, twSymbol: null, twZrodlo: null, propozycja: null },
+      twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+      rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null } },
   ],
   ...n,
 });

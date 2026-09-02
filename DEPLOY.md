@@ -1444,6 +1444,26 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.163.0 wymaga JEDNEJ rzeczy ręką: nowego uprawnienia.**
+
+Panel zaczyna pokazywać przy każdej pozycji zwrotu, czy wniosek o rabat
+transakcyjny już jest — i pozwala go złożyć jednym kliknięciem. To pierwszy
+zapis tego systemu do Allegro, a zapis na zamówieniach chodzi na osobnym
+uprawnieniu.
+
+Na developer.allegro.pl dodaj aplikacji `allegro:api:orders:write`, a potem
+sparuj konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ. Token
+wydany pod stary zakres sam się nie rozszerzy. Bez tego przycisk zwróci odmowę
+z nazwą brakującego uprawnienia — i to jest poprawne zachowanie, nie usterka.
+
+Pierwszy wniosek złóż na JEDNYM zwrocie i sprawdź go w panelu Allegro, zanim
+puścisz resztę. Końcówka Allegro nie ma idempotencji: powtórzone żądanie
+zakłada drugi wniosek, a nie oddaje tego samego. Panel broni przed tym
+potrójnie, ale pierwszy przebieg na żywym koncie warto obejrzeć.
+
+Migracja dokłada kolumnę i tabelę sama. **Panel trzeba przebudować**
+(`npm run build`).
+
 **Aktualizacja do 0.162.1 naprawia instalację, która nie wstaje.** Skok
 z wersji sprzed 0.154.0 potrafił zatrzymać wszystko: usługi zostawały
 w `SERVICE_PAUSED`, a `npm run sonda` kończył się błędem

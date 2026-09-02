@@ -329,6 +329,9 @@ export const config = {
      * maszyny, którą anti-bot Allegro rozpoznaje (patrz `services/takt.ts`).
      */
     zwrotySyncMs: num(process.env.ALLEGRO_ZWROTY_SYNC_MS, 300_000, "ALLEGRO_ZWROTY_SYNC_MS"),
+    /* Wnioski o rabat transakcyjny zmieniają stan po stronie Allegro godzinami,
+       nie minutami — Allegro część z nich rozpatruje samo. Rzadziej niż zwroty. */
+    rabatySyncMs: num(process.env.ALLEGRO_RABATY_SYNC_MS, 900_000, "ALLEGRO_RABATY_SYNC_MS"),
     /**
      * Ile dni ma sprzedawca na oddanie pieniędzy od oświadczenia klienta.
      * Ustawowo czternaście; w env, bo to liczba z prawa, a nie z naszego

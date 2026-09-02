@@ -34,6 +34,86 @@ historii nie przepisujemy.
 ---
 
 
+## 0.163.0 — 2 września 2026
+
+**Rabat transakcyjny widać przy zwrocie i składa się jednym kliknięciem.**
+
+Firma odzyskiwała zwrot prowizji klikając ręcznie przy KAŻDYM zwrocie w panelu
+Allegro. Nie z konieczności — po prostu znikąd nie było widać, przy którym
+wniosek już jest. Obserwacja sondy z 2 września pokazuje skalę: 60 wniosków
+na 100 złożył człowiek, 40 Allegro samo.
+
+### Stan przy każdej pozycji, nie przy zwrocie
+
+Wniosek składa się na POZYCJĘ ZAMÓWIENIA, więc zwrot z dwiema pozycjami ma dwa
+osobne rabaty. Stany są cztery i każdy każe co innego zrobić: brak wniosku daje
+przycisk, złożony każe czekać, przyznany pokazuje kwotę prowizji, odrzucony
+odsyła po odwołanie do panelu Allegro. Piąty mówi „nie wiadomo" i podaje POWÓD,
+bo milczenie wygląda jak usterka, a jest zerwanym ogniwem w danych.
+
+Wnioski przyjeżdżają własnym taktem z `/order/refund-claims`, osobnym od
+zwrotów: jedna końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie
+błędem. To blizna 0.149.2 zastosowana z góry.
+
+### Pierwszy zapis tego systemu do Allegro
+
+Dotąd wychodziła stąd wyłącznie wiadomość do klienta. `POST /order/refund-claims`
+żąda dwóch rzeczy: pozycji zamówienia i ilości.
+
+**Identyfikator bierze się z pozycji ZAMÓWIENIA, nigdy z `offerId` zwrotu.**
+Do której przestrzeni należy ten drugi, jest wciąż pytaniem otwartym — a idąc
+przez zamówienie, pytanie nas nie dotyczy.
+
+**Ta końcówka nie ma idempotencji.** `commandId` jest przy zwrocie pieniędzy,
+nie tutaj, więc powtórzone żądanie zakłada DRUGI wniosek. Strażnik jest nasz,
+potrójny, i stoi PRZED wyjściem do sieci: nasze lustro wniosków, status zwrotu
+z Allegro (`COMMISSION_REFUND_CLAIMED`, `COMMISSION_REFUNDED`) oraz zniknięcie
+przycisku po złożeniu. Zapis lokalny idzie PO udanej odpowiedzi — odwrotna
+kolejność zostawiłaby wniosek-widmo i zablokowała pozycję na zawsze.
+
+Automatu nie ma i nie planujemy: Allegro zakłada 40 wniosków na 100 samo, więc
+ticker po naszej stronie dublowałby ich pracę bez niczyjej wiedzy.
+
+### `scopeDlaUrl` uczy się metody
+
+Zapis na zamówieniach żąda `allegro:api:orders:write`, odczyt
+`orders:read` — a ta funkcja patrzyła dotąd na sam adres. Odmowa 403 przy
+składaniu wniosku kazałaby dodać uprawnienie, które konto już ma. Dokładnie ta
+pomyłka kosztowała wydanie przy opiniach: zła instrukcja jest gorsza niż jej
+brak, bo wysyła człowieka po coś, co ma.
+
+### Sonda mierzyła zero tam, gdzie są dane
+
+Sekcja „rozmowa dyskusji" była pusta przy stu sprawach z niezerowym licznikiem
+wiadomości. Adres był dobry; zły był klucz listy — sonda pytała o `messages`,
+a odpowiedź niesie `chat`. Helper przy nietrafionym kluczu cicho oddawał pustą
+tablicę, więc HTTP 200 z pełnym ciałem liczyło się jako zero rekordów.
+
+Helper przeniósł się do `services/ksztalt.ts`, gdzie ma testy; do próbki doszedł
+jawny `limit=100`, bo przy tej jednej końcówce specyfikacja daje domyślne 10.
+
+### Raport sondy wchodzi do repo
+
+`docs/allegro-sonda.md` — obserwacja z datą, bez zmian w treści. Kontrakt mówi,
+co WOLNO czytać kodowi; raport mówi, co konto naprawdę oddało. Przy rozjeździe
+wygrywa obserwacja, więc kontrakt dostał sześć poprawek: zwrot ma `status`,
+`buyer` i `isFulfillment`, `rejection.code` ma siedem kodów zamiast czterech,
+doszła sekcja o szczególe zwrotu i pokrycie `external.id` (165 na 165 niepuste —
+mostek do kartoteki stoi na pewnym gruncie).
+
+Znacznik `[WERYFIKUJ]` przy `status` zwrotu ZDJĘTY: twierdził, że specyfikacja
+go nie zawiera, a leży ona w tym repo od 0.151.0. Licznik zszedł z 13 na 12.
+
+Poprawione też trzy zdania, które kłamały o stanie rzeczy — w tym jedno
+niebezpieczne: `docs/obsluga-klienta.md` kazał zapisać raport sondy jako
+`allegro-ksztalt.md`, czyli NADPISAĆ kontrakt raportem. Tak powstała blizna
+0.151.0.
+
+**[wymaga działania]** Na developer.allegro.pl trzeba dodać aplikacji
+uprawnienie `allegro:api:orders:write` i sparować konto ponownie — bez tego
+przycisk zwróci 403 z nazwą brakującego uprawnienia. Migracja dokłada kolumnę
+i tabelę sama; panel wymaga przebudowy.
+
 ## 0.162.1 — 2 września 2026
 
 **Aktualizacja 0.153.1 → 0.162.0 nie podnosiła instalacji wcale.**

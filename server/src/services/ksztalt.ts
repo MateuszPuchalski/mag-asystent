@@ -10,6 +10,29 @@
    wchodzi do repo, więc nie ma prawa nieść ani jednej danej osobowej — i to
    jest jedyny powód, dla którego wartości pokazujemy tak skąpo.             */
 
+/**
+ * Lista rekordów wyjęta z odpowiedzi, po którymkolwiek ze znanych kluczy.
+ *
+ * Mieszkała w `sonda-run.ts` jako prywatna stała i dlatego nie miała testu —
+ * a to ona przemilczała całą sekcję raportu. Sonda pytała o `messages`, gdy
+ * `/sale/issues/{id}/chat` niesie rekordy pod kluczem `chat`: HTTP 200, ciało
+ * pełne wiadomości, w raporcie zero. Nietrafiony klucz nadal oddaje pustkę,
+ * bo sonda ma opisać kształt, a nie wywrócić się na wariancie nazwy — ale
+ * teraz jest to zachowanie z testem obok.
+ *
+ * Kolejność kluczy jest znacząca: pierwszy trafiony wygrywa, więc na początek
+ * idzie nazwa ze specyfikacji, a warianty za nią.
+ */
+export function listaZOdpowiedzi(
+  json: unknown, klucze: string[], ile: number,
+): unknown[] {
+  const root = (json ?? {}) as Record<string, unknown>;
+  for (const k of klucze) {
+    if (Array.isArray(root[k])) return (root[k] as unknown[]).slice(0, ile);
+  }
+  return [];
+}
+
 /** Jedno pole w odpowiedzi: gdzie stoi, czym bywa i jak często je widać. */
 export interface PoleKsztaltu {
   /** Ścieżka z gwiazdką za tablicami, np. `messages[].relatedObject.type`. */

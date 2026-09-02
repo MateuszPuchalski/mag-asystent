@@ -111,6 +111,10 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  /* Status zwrotu po stronie Allegro (0.163.0). Bez `CHECK` — schemat Allegro
+     wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
+     przejść, nie wywrócić synchronizację. */
+  addColumn("zwrot_klienta", "status_allegro", "TEXT");
   /* Odhaczenie wzmianki (0.160.0). Do tego wydania `conversation_mention`
      mówiła tylko „ktoś cię wymienił" i nie znała odpowiedzi na „czy już się
      tym zająłeś" — a bez niej skrzynka wzmianek pokazywałaby w kółko to samo. */

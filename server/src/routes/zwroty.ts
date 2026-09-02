@@ -6,6 +6,8 @@ import {
   bilansKartotek, cofnijKorekte, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, ZwrotConflict,
 } from "../services/zwroty.js";
+import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
+import { zglosRabat } from "../adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -177,6 +179,25 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return cofnijKorekte(db(), Number(req.params.id), Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* RABAT TRANSAKCYJNY (0.163.0) — jedyna trasa tego pliku, która WYCHODZI
+     do Allegro. Reszta zapisuje wyłącznie u nas. Stąd osobna ostrożność:
+     strażnik przed dubletem stoi w serwisie, PRZED siecią, bo końcówka
+     Allegro nie ma idempotencji. */
+  app.post<{ Params: { id: string } }>("/api/obsluga/zwroty/pozycje/:id/rabat",
+    async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return await zlozWniosekORabat(db(), Number(req.params.id), kto(),
+          (lineItemId, ilosc) => zglosRabat(config.allegro.apiUrl, lineItemId, ilosc));
+      } catch (e) {
+        /* Dublet to 409, nie 400: to nie jest zła prośba, tylko praca już
+           wykonana — a ekran ma powiedzieć, KTÓRY wniosek już istnieje. */
+        if (e instanceof RabatConflict) return reply.code(409).send({ error: e.message });
+        return konflikt(reply, e);
+      }
     });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/zwroty/:id", async (req, reply) => {

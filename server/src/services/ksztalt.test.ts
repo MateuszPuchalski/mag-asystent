@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { opiszKsztalt, raportKoncowki } from "./ksztalt.js";
+import { listaZOdpowiedzi, opiszKsztalt, raportKoncowki } from "./ksztalt.js";
 
 /* ── Sonda kształtu ──────────────────────────────────────────────────────────
    Jedno zobowiązanie jest tu ważniejsze od wszystkich pozostałych: raport
@@ -176,4 +176,38 @@ test("mała próbka nie kasuje słownika — nie ma z czego liczyć powtórzeń"
      końcówek, które oddają mało rekordów. */
   const pola = opiszKsztalt([{ rodzaj: "PELNY" }, { rodzaj: "CZESCIOWY" }, { rodzaj: "INNY" }]);
   assert.equal(pola.find((p) => p.sciezka === "rodzaj")?.wartosci.length, 3);
+});
+
+/* ── Klucz listy w odpowiedzi (0.163.0) ──────────────────────────────────────
+   Ta funkcja przemilczała całą sekcję raportu i nie miała testu, bo siedziała
+   jako prywatna stała w `sonda-run.ts`. Sonda pytała o `messages`, a rozmowa
+   dyskusji przyjeżdża pod kluczem `chat` — HTTP 200, ciało pełne wiadomości,
+   w raporcie zero rekordów przy stu sprawach z niezerowym licznikiem.     */
+
+test("rekordy wychodzą spod klucza ze specyfikacji, nie spod zgadniętego", () => {
+  const odpowiedz = { chat: [{ id: "1" }, { id: "2" }] };
+  assert.equal(listaZOdpowiedzi(odpowiedz, ["chat", "messages"], 100).length, 2);
+  assert.deepEqual(listaZOdpowiedzi(odpowiedz, ["messages"], 100), [],
+    "zgadnięty klucz oddaje pustkę — i to jest cały mechanizm tamtej ciszy");
+});
+
+test("pierwszy trafiony klucz wygrywa, więc kolejność jest znacząca", () => {
+  /* `/sale/user-ratings` oddaje raz `ratings`, raz `userRatings`. Nazwa ze
+     specyfikacji idzie pierwsza, warianty za nią. */
+  const obie = { ratings: [{ id: "a" }], userRatings: [{ id: "b" }, { id: "c" }] };
+  assert.deepEqual(listaZOdpowiedzi(obie, ["ratings", "userRatings"], 100), [{ id: "a" }]);
+  assert.deepEqual(listaZOdpowiedzi(obie, ["userRatings", "ratings"], 100).length, 2);
+});
+
+test("brak klucza i pusta odpowiedź nie wywracają sondy", () => {
+  /* Sonda ma opisać kształt, także wtedy, gdy końcówka oddała coś innego,
+     niż opisuje schemat. Wyjątek zabrałby ze sobą wszystkie pozostałe sekcje. */
+  assert.deepEqual(listaZOdpowiedzi(null, ["chat"], 100), []);
+  assert.deepEqual(listaZOdpowiedzi({}, ["chat"], 100), []);
+  assert.deepEqual(listaZOdpowiedzi({ chat: "nie tablica" }, ["chat"], 100), []);
+});
+
+test("próbka jest przycinana do zadanej liczby, bo sonda nie jest eksportem", () => {
+  const duza = { chat: Array.from({ length: 250 }, (_, i) => ({ id: String(i) })) };
+  assert.equal(listaZOdpowiedzi(duza, ["chat"], 100).length, 100);
 });

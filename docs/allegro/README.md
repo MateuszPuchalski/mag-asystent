@@ -66,5 +66,6 @@ Specyfikacja mówi, jak Allegro **deklaruje** swoje odpowiedzi. Nie mówi, co
 konto firmy naprawdę dostaje: które pola bywają puste, jakie wartości
 wyliczeniowe wchodzą w grę u nas i czy uprawnienia sięgają danej końcówki.
 
-Na to odpowiada `npm run sonda`, która nadal nie pobiegła na żywym koncie.
+Na to odpowiada `npm run sonda`. Pobiegła dwa razy — 1 i 2 września 2026 —
+a obserwacja z drugiego przebiegu leży w repo jako `docs/allegro-sonda.md`.
 Znaczniki `[WERYFIKUJ]` zdejmuje właśnie ona, a nie ten plik.
