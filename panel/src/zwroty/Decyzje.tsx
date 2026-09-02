@@ -1,7 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import type { Zwrot } from "../api/typy";
 import { Przycisk, Pole, Blad } from "../ui";
-import { zlote } from "../api/zwroty";
 
 /* ── Pasek decyzji zwrotu (0.156.0) ──────────────────────────────────────────
    Do tego wydania klawisze z §25a.2 stały tu jako PODPISY: `kubelekZwrotu`
@@ -11,48 +10,29 @@ import { zlote } from "../api/zwroty";
    Trzy kubełki dostały działanie w 0.156.0, czwarty — korekta — w 0.162.0.
    Korekty NIE wystawia panel: robi to człowiek w Subiekcie, a tutaj przepisuje
    jej numer. Stąd pole tekstowe zamiast przycisku „zleć" i stąd cofnięcie
-   (§25a.5): literówka w przepisanym numerze jest zdarzeniem normalnym.      */
+   (§25a.5): literówka w przepisanym numerze jest zdarzeniem normalnym.
+
+   Od 0.167.0 zostają tu decyzje o CAŁYM zwrocie: werdykt, korekta, cofnięcie.
+   Ocena towaru i wycena dotyczą pojedynczych pozycji, więc przeniosły się na
+   wiersz produktu (`Pozycje.tsx`) — operator ocenia towar, patrząc na towar,
+   a nie na jego nazwę wypisaną drugi raz obok.                              */
 
 type Props = {
   zwrot: Zwrot;
   onWerdykt: (decyzja: "przyjety" | "odrzucony", powod: string | null) => void;
-  onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja") => void;
-  onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onKorekta: (numer: string) => void;
   onCofnijKorekte: () => void;
   trwa: boolean;
   blad: string;
 };
 
-const OCENY: Array<["stan" | "przecena" | "utylizacja", string, string]> = [
-  ["stan", "S", "Na stan"],
-  ["przecena", "C", "Na przecenę"],
-  ["utylizacja", "U", "Utylizacja"],
-];
-
-export function Decyzje({ zwrot, onWerdykt, onOcena, onKwota, onKorekta, onCofnijKorekte,
+export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte,
   trwa, blad }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
-  /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
-     o niej decyduje człowiek, bo zależy od tego, czy klient odstępuje od
-     całego zamówienia, czy oddaje jedną rzecz z pięciu. */
-  const [wybrane, setWybrane] = useState<number[]>(() => zwrot.pozycje.map((p) => p.id));
-  const [dostawa, setDostawa] = useState(false);
   /* Numer korekty PRZEPISUJE człowiek z Subiekta — panel go nie wywiedzie
      z niczego, bo read-model zna tylko dokumenty zakupu (FZ, PZ). */
   const [numer, setNumer] = useState("");
-
-  const dostawaGrosze = zwrot.zamowienie?.dostawaGrosze ?? null;
-  const suma = useMemo(() => {
-    const pozycje = zwrot.pozycje
-      .filter((p) => wybrane.includes(p.id))
-      .reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
-    return pozycje + (dostawa ? dostawaGrosze ?? 0 : 0);
-  }, [zwrot.pozycje, wybrane, dostawa, dostawaGrosze]);
-
-  const przelacz = (id: number) => setWybrane((w) =>
-    w.includes(id) ? w.filter((x) => x !== id) : [...w, id].sort((a, b) => a - b));
 
   const ramka = "border-b border-slate-200 bg-slate-50 p-4";
 
@@ -89,67 +69,9 @@ export function Decyzje({ zwrot, onWerdykt, onOcena, onKwota, onKorekta, onCofni
     </div>;
   }
 
-  if (zwrot.kubelek === "ocena") {
-    return <div className={ramka}>
-      <ul className="space-y-2">
-        {zwrot.pozycje.map((p) => <li key={p.id} className="flex flex-wrap items-center gap-2">
-          <span className="mr-auto text-sm">{p.nazwa}</span>
-          {p.ocena
-            ? <span className="text-xs font-bold text-ranga-ok">
-                {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}</span>
-            : OCENY.map(([klucz, klawisz, etykieta]) => (
-                <Przycisk key={klucz} className="text-xs" disabled={trwa}
-                  onClick={() => onOcena(p.id, klucz)}>
-                  <kbd className="rounded border border-slate-300 px-1">{klawisz}</kbd> {etykieta}
-                </Przycisk>))}
-        </li>)}
-      </ul>
-      {blad && <Blad>{blad}</Blad>}
-    </div>;
-  }
-
-  if (zwrot.kubelek === "zwrot") {
-    return <div className={ramka}>
-      {/* ZAZNACZENIE, nie wybór wariantu. Operator odhacza to, co oddaje,
-          a suma rośnie na oczach. Wariant („pełna", „bez wysyłki") wylicza
-          sobie z tego serwer — jest etykietą, a nie pozycją w menu. */}
-      <ul className="space-y-1">
-        {zwrot.pozycje.map((p) => <li key={p.id}>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={wybrane.includes(p.id)}
-              onChange={() => przelacz(p.id)} />
-            <span className="mr-auto">{p.nazwa}{p.ilosc !== 1 && ` × ${p.ilosc}`}</span>
-            <span className="tabular-nums text-slate-600">
-              {zlote(Math.round(p.cenaGrosze * p.ilosc), p.waluta)}</span>
-          </label>
-        </li>)}
-        {dostawaGrosze != null && <li>
-          <label className="flex items-center gap-2 border-t border-slate-200 pt-1 text-sm">
-            <input type="checkbox" checked={dostawa} onChange={() => setDostawa((d) => !d)} />
-            <span className="mr-auto">Koszt dostawy</span>
-            <span className="tabular-nums text-slate-600">
-              {zlote(dostawaGrosze, zwrot.waluta)}</span>
-          </label>
-        </li>}
-      </ul>
-      <div className="mt-3 flex items-center gap-3 border-t border-slate-300 pt-2">
-        <span className="text-xs font-bold uppercase text-slate-500">Do oddania</span>
-        <b data-testid="suma" className="mr-auto tabular-nums text-lg">
-          {zlote(suma, zwrot.waluta)}</b>
-        <Przycisk wariant="glowny" disabled={trwa}
-          onClick={() => onKwota(wybrane, dostawa)}>
-          <kbd className="rounded border border-black/20 px-1 text-xs">Enter</kbd> Zapisz kwotę
-        </Przycisk>
-      </div>
-      {/* Podgląd jest PODGLĄDEM. Do serwera idzie zaznaczenie, a sumę składa
-          on sam (§25a.3) — inaczej dałoby się zapisać dowolną kwotę żądaniem
-          z pominięciem tego ekranu. */}
-      <p className="mt-1 text-xs text-slate-500">
-        Kwotę przelicza serwer z zaznaczenia; to podgląd.
-      </p>
-      {blad && <Blad>{blad}</Blad>}
-    </div>;
-  }
+  /* DO OCENY i DO ZWROTU nie mają paska: ich pytanie zadaje wiersz produktu,
+     bo dotyczy pojedynczej pozycji, a nie całego zwrotu. */
+  if (zwrot.kubelek === "ocena" || zwrot.kubelek === "zwrot") return null;
 
   if (zwrot.kubelek === "korekta") {
     return <div className={ramka}>
