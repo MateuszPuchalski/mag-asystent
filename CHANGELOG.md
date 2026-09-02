@@ -34,6 +34,67 @@ historii nie przepisujemy.
 ---
 
 
+## 0.184.0 — 2 września 2026
+
+**Do zwrotu da się dopisać produkt, którego klient nie zgłosił.** Decyzja
+właściciela: „czasami klient zgłosi tylko jeden produkt do zwrotu, a wyśle
+dwa".
+
+### Regulamin Allegro nie wymaga, żeby jedno zgadzało się z drugim
+
+Klient ma czternaście dni na OŚWIADCZENIE o odstąpieniu i liczy się jego
+termin, nie zgodność przesyłki ze zgłoszeniem. Opóźnienie samej wysyłki
+odstąpienia nie unieważnia. Formularz zwrotu wypełnia się przy tym na ekranie,
+a paczkę pakuje przy stole — i wtedy dokłada się to, co też nie pasowało.
+
+Pieniądze i tak trzeba oddać, więc biuro musi mieć czym zapisać to, co
+naprawdę przyszło.
+
+### Produkt bierze się z ZAMÓWIENIA, nie z pola tekstowego
+
+Klient może odesłać wyłącznie to, co kupił, więc lista zamówienia jest granicą
+naturalną — a ograniczenie jest tańsze od komunikatu. Przy okazji pozycja
+przynosi cenę i walutę, więc kwota do oddania dalej liczy się z faktów.
+§25a.3 zostaje nienaruszone: panel przysyła zaznaczenie, sumę składa serwer.
+
+Lista pokazuje RÓŻNICĘ zamówienia i zwrotu, nie całe zamówienie. Gdy różnicy
+nie ma, nie ma też przycisku.
+
+### Oznaczenie `zrodlo='biuro'` pracuje w dwie strony
+
+Na ekranie mówi, że to zapis człowieka, a nie zgłoszenie klienta (§4.3).
+W bazie CHRONI — i to jest cichy błąd, który ta zmiana usuwa przy okazji.
+
+Synchronizacja kasuje pozycje, których Allegro już nie oddaje. Pozycji
+dopisanej przez biuro Allegro nie zna i nigdy nie odda, więc bez warunku
+`zrodlo='allegro'` każdy takt kasowałby ją razem z oceną hali i zaznaczeniem
+do kwoty. Nic nie wygląda na zepsute, dopóki ktoś nie policzy pieniędzy.
+Osobny test pilnuje obu połówek: dopisana przeżywa takt, a wycofana przez
+klienta nadal znika.
+
+Zdjąć da się wyłącznie pozycję biura (§25a.5). Zgłoszona przez klienta
+wróciłaby przy najbliższej synchronizacji, więc przycisk obiecywałby skutek,
+którego nie ma.
+
+### Pierwsze zastosowanie dekalogu ergonomii poza kolektorem
+
+`docs/ergonomia-magazynu.md` obowiązuje panel biura w punktach 1, 2, 5, 6
+i 10. Cztery z nich widać tutaj: lista pokazuje różnicę, nie całe zamówienie
+(5); otwiera się na żądanie, jak potrącenie (2); nie ma pola tekstowego, bo
+zamówienie jest granicą (6); przycisk stoi pod listą produktów, bo tam operator
+zauważa brak (1).
+
+Punktu 10 nie da się tu spełnić i mówimy to wprost: tej czynności nie mierzy
+żaden licznik. Dekalog sam każe narzędziu mówić, czego NIE dowodzi.
+
+### Reszta
+
+Dopisanie cofa zwrot do kubełka DO OCENY, bo nowa pozycja nie ma jeszcze oceny
+hali. To wychodzi z istniejącej logiki kubełków, bez ani jednej nowej linii.
+
+Trasy zapisujące rosną do piętnastu. **Anulowanie wniosku o rabat schodzi
+z planu** — decyzja właściciela: Allegro anuluje wniosek samo.
+
 ## 0.183.0 — 2 września 2026
 
 **Dobór części przy rozmowie (§11, etap E1).** §1 nazywa dobór najważniejszym

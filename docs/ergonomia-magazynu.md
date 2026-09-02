@@ -22,6 +22,16 @@ przy biurku. Obowiązują tam punkty 1, 2, 5, 6 i 10.
 Punkty o celach dotyku, o koszcie fizycznym i o trasie biura NIE obowiązują.
 Mysz na blacie ma inną charakterystykę niż kciuk w rękawicy.
 
+**Pierwsze zastosowanie poza kolektorem: dopisanie produktu do zwrotu
+(0.184.0).** Cztery punkty naraz:
+
+- **5** — lista pokazuje RÓŻNICĘ zamówienia i zwrotu, nie całe zamówienie.
+- **2** — otwiera się na żądanie, tak samo jak potrącenie.
+- **6** — nie ma pola tekstowego; zamówienie jest granicą naturalną.
+- **1** — przycisk stoi tam, gdzie operator zauważa brak.
+
+Opis stoi w `docs/panel-obslugi-klienta.md` §25a.15.
+
 > **Dlaczego to rozgraniczenie.** Bez niego dekalog albo nie dotyczy niczego,
 > albo każe powiększać przyciski w tabeli, którą czyta się na siedząco.
 > Reguła bez zakresu przestaje bramkować cokolwiek po pierwszym sporze.

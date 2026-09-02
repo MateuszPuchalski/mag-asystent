@@ -29,6 +29,8 @@ export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro";
 
 export interface PozycjaZwrotu {
   id: number;
+  /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
+  zrodlo: string;
   offerId: string | null;
   nazwa: string;
   ilosc: number;
@@ -447,6 +449,7 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           twZrodlo: (p.tw_zrodlo as string) ?? null,
           sku: skuWgOferty.get(String(p.offer_id ?? "")) ?? null,
           ean: twId === null ? null : eanWgTw.get(twId) ?? null,
+          zrodlo: String(p.zrodlo ?? "allegro"),
           potracenieGrosze: p.potracenie_grosze == null ? null : Number(p.potracenie_grosze),
           potraceniePowod: (p.potracenie_powod as string) ?? null,
           /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
@@ -803,6 +806,158 @@ export function zarejestrujNieodebrana(
     logEvent("zwrot_nieodebrana", kto.name, null,
       { zwrotId, orderId, pozycji }, kto.id, database);
     return { zwrotId, pozycji };
+  })();
+}
+
+/* ── Dopisanie produktu do zwrotu (0.184.0) ──────────────────────────────────
+   Klient zgłasza jedną rzecz, a odsyła dwie. To nie jest wypadek przy pracy,
+   tylko normalny bieg: formularz zwrotu wypełnia się na ekranie, a paczkę
+   pakuje się przy stole i wtedy dokłada się to, co też nie pasowało.
+
+   Regulamin Allegro stoi po stronie klienta i nie wymaga, żeby jedno zgadzało
+   się z drugim. Liczy się TERMINOWE OŚWIADCZENIE o odstąpieniu, nie zgodność
+   przesyłki ze zgłoszeniem; opóźnienie samej wysyłki nie unieważnia
+   odstąpienia. Pieniądze i tak trzeba oddać, więc biuro musi mieć czym
+   zapisać to, co naprawdę przyszło.
+
+   Produkt wybiera się Z ZAMÓWIENIA, nie z pola tekstowego. Klient może odesłać
+   wyłącznie to, co kupił, więc lista zamówienia jest granicą naturalną —
+   a ograniczenie jest tańsze od komunikatu (dekalog ergonomii, punkt 6).
+   Przy okazji pozycja przynosi cenę i walutę, więc kwota do oddania dalej
+   liczy się z faktów, nie z tego, co ktoś wpisze.                            */
+
+/** Pozycja zamówienia, której NIE MA jeszcze w zwrocie — kandydat do dopisania. */
+export interface DoDopisania {
+  zamPozycjaId: number;
+  offerId: string | null;
+  nazwa: string;
+  ilosc: number;
+  cenaGrosze: number;
+  waluta: string;
+}
+
+/**
+ * Co jeszcze z tego zamówienia można dopisać.
+ *
+ * Lista jest RÓŻNICĄ zamówienia i zwrotu, a nie całym zamówieniem. Pokazywanie
+ * pozycji już zgłoszonych kazałoby operatorowi porównywać dwie listy oczami —
+ * a to jest dokładnie ta praca, którą ekran ma zdjąć (dekalog, punkt 5).
+ */
+export function doDopisania(zwrotId: number, database: Db = defaultDb()): DoDopisania[] {
+  const z = database.prepare(
+    "SELECT channel_account_id, order_id FROM zwrot_klienta WHERE id=?")
+    .get(zwrotId) as { channel_account_id: number; order_id: string | null } | undefined;
+  if (!z?.order_id) return [];
+
+  const wZwrocie = new Set((database.prepare(
+    "SELECT klucz FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
+    Array<{ klucz: string }>).map((r) => String(r.klucz)));
+
+  const poz = database.prepare(`SELECT p.id, p.offer_id, p.nazwa, p.ilosc, p.cena_grosze, p.waluta
+      FROM zamowienie_klienta_pozycja p
+      JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
+     WHERE k.channel_account_id=? AND k.external_id=?
+     ORDER BY p.id`).all(z.channel_account_id, z.order_id) as Array<Record<string, unknown>>;
+
+  /* Klucz liczy się tak samo jak przy synchronizacji i przy paczce
+     nieodebranej: przyrostek per POWTÓRZENIE pary `offer_id|nazwa`. Dwie
+     sztuki tego samego towaru w zamówieniu to dwa osobne kandydaty. */
+  const licznik = new Map<string, number>();
+  const wynik: DoDopisania[] = [];
+  for (const p of poz) {
+    const baza = `${p.offer_id ?? ""}|${p.nazwa}`;
+    const n = (licznik.get(baza) ?? 0) + 1;
+    licznik.set(baza, n);
+    if (wZwrocie.has(n === 1 ? baza : `${baza}|#${n}`)) continue;
+    wynik.push({
+      zamPozycjaId: Number(p.id), offerId: (p.offer_id as string) ?? null,
+      nazwa: String(p.nazwa), ilosc: Number(p.ilosc),
+      cenaGrosze: Number(p.cena_grosze), waluta: String(p.waluta ?? "PLN"),
+    });
+  }
+  return wynik;
+}
+
+/**
+ * Dopisuje pozycję zamówienia do zwrotu jako pozycję BIURA.
+ *
+ * `zrodlo='biuro'` nie jest etykietą dla ozdoby. Po pierwsze, synchronizacja
+ * kasuje pozycje, których Allegro nie oddaje — bez tej wartości dopisana
+ * znikałaby przy najbliższym takcie razem z oceną hali. Po drugie, ekran ma
+ * mówić, że to zapis człowieka, a nie zgłoszenie klienta: projekt panelu §4.3
+ * nie pozwala, żeby wybór człowieka udawał fakt z Allegro.
+ */
+export function dopiszPozycje(
+  database: Db, zwrotId: number, zamPozycjaId: number, wersja: number,
+  kto: { id: number; name: string },
+): { wersja: number; pozycjaId: number } {
+  return transaction(database, () => {
+    podKlucz(database, zwrotId, wersja);
+    /* Kandydata bierzemy z TEJ SAMEJ listy, którą widział operator. Dzięki temu
+       nie da się dopisać pozycji z cudzego zamówienia ani zdublować tej, która
+       w zwrocie już stoi — jedno zapytanie zamiast trzech osobnych warunków. */
+    const kandydat = doDopisania(zwrotId, database)
+      .find((k) => k.zamPozycjaId === zamPozycjaId);
+    if (!kandydat) {
+      throw new Error(
+        "Tej pozycji nie ma na liście do dopisania — jest już w zwrocie albo " +
+        "nie pochodzi z tego zamówienia. Odśwież ekran.");
+    }
+
+    /* Klucz musi być liczony PONOWNIE względem tego, co stoi w zwrocie, a nie
+       przepisany z zamówienia: pozycja o tej samej parze mogła już wejść ze
+       zgłoszenia klienta. Duplikat klucza wywróciłby zapis na indeksie
+       UNIQUE — blizna 0.174.2. */
+    const baza = `${kandydat.offerId ?? ""}|${kandydat.nazwa}`;
+    const zajete = new Set((database.prepare(
+      "SELECT klucz FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
+      Array<{ klucz: string }>).map((r) => String(r.klucz)));
+    let klucz = baza;
+    for (let n = 2; zajete.has(klucz); n++) klucz = `${baza}|#${n}`;
+
+    const wynik = database.prepare(`INSERT INTO zwrot_klienta_pozycja
+      (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz,zrodlo)
+      VALUES (?,?,?,?,?,?,?,'biuro')`).run(
+      zwrotId, kandydat.offerId, kandydat.nazwa, kandydat.ilosc,
+      kandydat.cenaGrosze, kandydat.waluta, klucz);
+
+    podnies(database, zwrotId);
+    logEvent("zwrot_pozycja_dopisana", kto.name, null,
+      { zwrotId, klucz, nazwa: kandydat.nazwa, cenaGrosze: kandydat.cenaGrosze },
+      kto.id, database);
+    return { wersja: wersja + 1, pozycjaId: Number(wynik.lastInsertRowid) };
+  })();
+}
+
+/**
+ * Zdejmuje pozycję dopisaną przez biuro — cofnięcie zamiast potwierdzenia
+ * (§25a.5).
+ *
+ * Pozycji ze zgłoszenia klienta zdjąć się NIE DA i to nie jest brak funkcji.
+ * Ona przyszła z Allegro; usunięta u nas wróciłaby przy najbliższym takcie,
+ * więc przycisk obiecywałby skutek, którego nie ma.
+ */
+export function usunDopisanaPozycje(
+  database: Db, pozycjaId: number, wersja: number,
+  kto: { id: number; name: string },
+): { wersja: number } {
+  return transaction(database, () => {
+    const p = database.prepare(
+      "SELECT id, zwrot_id, zrodlo, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
+      .get(pozycjaId) as
+      { id: number; zwrot_id: number; zrodlo: string; nazwa: string } | undefined;
+    if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+    if (String(p.zrodlo) !== "biuro") {
+      throw new Error(
+        "Tej pozycji nie dopisało biuro — przyszła ze zgłoszenia klienta " +
+        "i usunięta u nas wróciłaby przy najbliższej synchronizacji.");
+    }
+    podKlucz(database, Number(p.zwrot_id), wersja);
+    database.prepare("DELETE FROM zwrot_klienta_pozycja WHERE id=?").run(pozycjaId);
+    podnies(database, Number(p.zwrot_id));
+    logEvent("zwrot_pozycja_zdjeta", kto.name, null,
+      { zwrotId: Number(p.zwrot_id), nazwa: String(p.nazwa) }, kto.id, database);
+    return { wersja: wersja + 1 };
   })();
 }
 

@@ -13,7 +13,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
    akcja i produkt są w JEDNYM wierszu. */
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
-  id: 11, offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
+  id: 11, zrodlo: "allegro", offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, url: null,
   twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
@@ -33,7 +33,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   zamowienie: { externalId: "ord-1", status: null, kupujacyLogin: null,
     dostawaGrosze: 1500, dostawaMetoda: "InPost", platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 11498,
     waluta: "PLN", kupionoAt: null, link: null, pozycje: [] },
-  pozycje: [POZYCJA(), POZYCJA({ id: 12, offerId: "of-2", nazwa: "Filtr" })],
+  pozycje: [POZYCJA(), POZYCJA({ id: 12, zrodlo: "allegro", offerId: "of-2", nazwa: "Filtr" })],
   ...n,
 });
 
@@ -255,5 +255,25 @@ describe("Produkty ze zwrotu", () => {
   it("odmowa serwera ląduje przy przyciskach, które ją wywołały", () => {
     lista(zwrot({ kubelek: "zwrot" }), { blad: "Zwrot zmienił się w innej karcie" });
     expect(screen.getByText(/zmienił się w innej karcie/)).toBeInTheDocument();
+  });
+});
+
+describe("Pozycja dopisana przez biuro", () => {
+  it("niesie plakietkę i daje się zdjąć; pozycja klienta NIE", async () => {
+    /* Zapis człowieka nie udaje faktu z Allegro (§4.3). Przycisk zdjęcia stoi
+       wyłącznie przy pozycji biura: zgłoszona przez klienta wróciłaby przy
+       najbliższym takcie, więc obiecywałby skutek, którego nie ma. */
+    const onZdejmij = vi.fn();
+    lista(zwrot({ pozycje: [
+      POZYCJA({ id: 11, nazwa: "Sekator" }),
+      POZYCJA({ id: 12, nazwa: "Łopata", zrodlo: "biuro" }),
+    ] }), { onZdejmij });
+
+    expect(screen.getByText("dopisane przez biuro")).toBeInTheDocument();
+    const zdejmij = screen.getAllByRole("button", { name: /zdejmij ze zwrotu/ });
+    expect(zdejmij).toHaveLength(1);
+
+    await userEvent.click(zdejmij[0]);
+    expect(onZdejmij).toHaveBeenCalledWith(12);
   });
 });

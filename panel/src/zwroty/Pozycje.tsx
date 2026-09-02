@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
-import type { PozycjaZwrotu, Zwrot } from "../api/typy";
+import type { DoDopisania, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Przycisk, Blad } from "../ui";
@@ -9,6 +9,7 @@ import { Powiekszenie } from "../towar/Powiekszenie";
 import { Rabat } from "./Rabat";
 import { Link } from "./Link";
 import { Potracenie } from "./Potracenie";
+import { Dopisz } from "./Dopisz";
 
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
    Do 0.165.0 pozycje stały w PRAWEJ kolumnie, szerokiej na 340 px: nazwy
@@ -117,16 +118,22 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 }
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
-  onOcena, onKwota, onZglosRabat, onPotracenie }: {
+  doDopisania = [], bladDopisania = "",
+  onOcena, onKwota, onZglosRabat, onPotracenie, onDopisz, onZdejmij }: {
   zwrot: Zwrot;
   trwa: boolean;
   blad: string;
   trwaRabat?: boolean;
   bladRabatu?: string;
+  /** Pozycje zamówienia, których w zwrocie jeszcze nie ma (0.184.0). */
+  doDopisania?: DoDopisania[];
+  bladDopisania?: string;
   onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja") => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
+  onDopisz?: (zamPozycjaId: number) => void;
+  onZdejmij?: (pozycjaId: number) => void;
 }) {
   const [powiekszony, setPowiekszony] = useState<PozycjaZwrotu | null>(null);
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
@@ -172,6 +179,11 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 nie mieści — łamie się, zamiast gubić końcówkę. Ucinanie było
                 ceną za 340 px po prawej i tej ceny już nie płacimy. */}
             <span className="font-semibold">{p.nazwa}</span>
+            {/* Zapis człowieka nie udaje faktu z Allegro (§4.3). Plakietka
+                stoi przy nazwie, bo tam pada pytanie „skąd to się tu wzięło". */}
+            {p.zrodlo === "biuro" && <span
+              className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-800">
+              dopisane przez biuro</span>}
             <span className="ml-auto shrink-0 tabular-nums">
               {zlote(Math.round(p.cenaGrosze * p.ilosc), p.waluta)}</span>
           </div>
@@ -224,9 +236,22 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           {onPotracenie && (wycena || p.potracenieGrosze != null) &&
             <Potracenie p={p} trwa={trwa} blad={blad}
               onZapisz={(g, powod) => onPotracenie(p.id, g, powod)} />}
+
+          {/* Cofnięcie zamiast potwierdzenia (§25a.5). Tylko przy pozycji
+              biura: zgłoszona przez klienta wróciłaby przy najbliższym
+              takcie, więc przycisk obiecywałby skutek, którego nie ma. */}
+          {onZdejmij && p.zrodlo === "biuro" && <button type="button" disabled={trwa}
+            onClick={() => onZdejmij(p.id)}
+            className="mt-1 text-xs text-slate-500 underline underline-offset-2
+              hover:text-slate-800">zdejmij ze zwrotu</button>}
         </div>
       </li>)}
     </ul>
+
+    {/* Pod listą, bo TAM operator zauważa różnicę: przelicza karton, patrzy
+        na ekran i widzi o jedną pozycję mniej (dekalog ergonomii, punkt 1). */}
+    {onDopisz && <Dopisz kandydaci={doDopisania} trwa={trwa} blad={bladDopisania}
+      onDopisz={onDopisz} />}
 
     {wycena
       /* ZAZNACZENIE, nie wybór wariantu. Operator odhacza to, co oddaje,

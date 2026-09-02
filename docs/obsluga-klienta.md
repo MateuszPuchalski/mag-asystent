@@ -439,6 +439,11 @@ Stary model z 0.53.0 kopiował oba te pola i punktował kontrahenta przeciw
 loginowi kupującego. Wskrzeszenie nie jest przywróceniem — te dwie kolumny nie
 wracają.
 
+**Produkt dopisany do zwrotu nie wnosi nowych danych (0.184.0).** Pozycja
+przepisuje się z zamówienia, które i tak już mamy: nazwa, ilość, cena, waluta.
+Nie ma tu pola tekstowego, więc nie ma czym wpisać niczego o człowieku. Autor
+dopisania trafia do dziennika — jak przy każdej mutacji.
+
 **Zestawienie CSV wynosi loginy, więc zostawia ślad.** Eksport kolejki zwrotów
 dopisuje zdarzenie `zwroty_eksport` — kto pobiera zestawienie o ludziach, sam
 trafia do dziennika. To ta sama zasada co przy analizie i audycie. Numeru listu
