@@ -47,6 +47,25 @@ function tablica<T>(value: unknown, pole: string): T[] {
   return (value as Record<string, unknown>)[pole] as T[];
 }
 
+/* ── Sufit stron w jednym przebiegu (0.164.1) ────────────────────────────────
+   POWSTAŁO PO 316 TYSIĄCACH ŻĄDAŃ W CIĄGU DOBY. Skrzynka była jedyną z czterech
+   pętli Allegro bez ogranicznika: zwroty mają `MAKS_STRON`, rabaty mają,
+   zamówienia mają `NA_PRZEBIEG`, a tutaj przebieg szedł tyle stron, ile
+   Allegro miało do oddania. Przy niesparowanym kursorze i szerokiej granicy
+   znaczyło to całą historię konta — co minutę, przez siedem godzin.
+
+   Sufit jest BEZPIECZNY, bo lista przychodzi posortowana po dacie ostatniej
+   wiadomości, od najnowszej (specyfikacja: „sorted by last message date,
+   starting from newest"). Wątek, w którym coś się dzieje, wskakuje na górę.
+   Zejść pod sufit może więc wyłącznie rozmowa, w której nic się nie zmieniło
+   od 500 nowszych wątków — a takiej nie ma czego dociągać.
+
+   CZEGO SUFIT NIE GWARANTUJE: gdyby między dwoma przebiegami przybyło ponad
+   500 wątków z nowymi wiadomościami, te spod sufitu poczekają do następnego
+   przebiegu. Przy takcie 60 s to jest ruch, którego ta firma nie generuje —
+   ale to jest założenie, nie prawo, i dlatego stoi tu wypisane. */
+const MAKS_STRON = 25;
+
 export interface InboxSyncDeps {
   database?: Db;
   query?: (url: string) => Promise<unknown | null>;
@@ -67,18 +86,94 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const interval = deps.intervalMs ?? config.allegro.inboxSyncMs;
   const od = deps.inboxOd !== undefined ? deps.inboxOd : config.allegro.inboxOd;
   const startState = stanSynchronizacji(database);
-  const threads: Thread[] = [];
-  const messages = new Map<string, Message[]>();
   /* Wszystkie wątki tego przebiegu w kolejności od Allegro, czyli od
      najnowszego. Kursor wybiera się z tej listy DOPIERO po zapisie, bo dopiero
      wtedy wiadomo, który wątek faktycznie wszedł do skrzynki. */
   const widziane: Thread[] = [];
+  const zepsute = new Set<string>();
+  const at = now().toISOString();
+  const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
   let offset = 0;
+  let stron = 0;
   let reachedCursor = false;
   let poniżejGranicy = false;
+  /* Czy ten przebieg zszedł do dna listy — do granicy czasu albo do końca
+     historii. Tylko taki przebieg ma prawo zapisać `dno_at`. */
+  let doDna = false;
+  let obciety = false;
+  /* SUFIT OBOWIĄZUJE DOPIERO PO PIERWSZYM ZEJŚCIU DO DNA. Bez tego wyjątku
+     instalacja z zaległością większą niż sufit nigdy by jej nie nadrobiła:
+     każdy przebieg czytałby te same 25 stron i zawracał. Pierwsze zejście
+     jest jednorazowe i ograniczone granicą czasu, więc wolno mu być długie. */
+  const limitStron = startState.dnoAt === null ? Number.POSITIVE_INFINITY : MAKS_STRON;
+
+  /**
+   * Zapis JEDNEJ STRONY listy. Wydzielone z ciała przebiegu, bo od 0.164.1
+   * woła się to po każdej stronie, a nie raz na końcu.
+   */
+  const zapiszPartie = (threads: Thread[], messages: Map<string, Message[]>): void => {
+      /* KAŻDY WĄTEK MA WŁASNĄ TRANSAKCJĘ, bo §9 projektu panelu żąda, żeby
+         synchronizator „izolował błąd pojedynczego wątku". Do 0.149.2 cała
+         partia szła jedną transakcją i produkcja pokazała, co to znaczy:
+         Allegro przysłało wątek bez
+         `lastMessageDate`, `node:sqlite` odmówił związania `undefined`
+         („Provided value cannot be bound to SQLite parameter 3"), a wycofanie
+         zabrało ze sobą wszystkie zdrowe wątki z tego samego przebiegu. Skrzynka
+         stała przez wiele przebiegów z rzędu przez JEDEN zepsuty wątek.
+
+         Nie zgaduję tutaj, czy wątek bez daty ma prawo wejść do skrzynki z pustą
+         datą — rozstrzyga to specyfikacja Allegro, której wciąż nie mamy (patrz
+         znaczniki `[WERYFIKUJ]` w docs/allegro-ksztalt.md). Do tego czasu taki
+         wątek jest odrzucany, czyli tak samo jak dotąd; zmienia się wyłącznie
+         to, że nie zabiera reszty przebiegu ze sobą. */
+      for (const thread of threads) {
+        try {
+          transaction(database, () => {
+            database.prepare(`INSERT INTO allegro_inbox_thread
+              (id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
+              VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET read=excluded.read,
+              last_message_at=excluded.last_message_at, interlocutor_login=excluded.interlocutor_login,
+              surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
+              thread.id, Number(flaga(thread.read, "thread.read")),
+              thread.lastMessageDateTime ?? null, thread.interlocutor?.login ?? null,
+              JSON.stringify(thread), at);
+            database.prepare("DELETE FROM allegro_inbox_message WHERE thread_id=?").run(thread.id);
+            for (const message of messages.get(thread.id) ?? []) {
+              database.prepare(`INSERT INTO allegro_inbox_message
+                (id,thread_id,author_login,author_is_interlocutor,text,subject,status,
+                 created_at,related_object_type,related_object_id,surowe_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+                message.id, thread.id, message.author.login,
+                Number(flaga(message.author.isInterlocutor, "author.isInterlocutor")),
+                message.text, message.subject ?? null, message.status ?? null,
+                message.createdAt, oferta(message)[0], oferta(message)[1],
+                JSON.stringify(message));
+            }
+            zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
+          })();
+        } catch (e) {
+          /* Wątek zostaje poza skrzynką, ale przebieg leci dalej. Dziennik niesie
+             IDENTYFIKATOR, bo bez niego „wątek pominięty" jest nie do odtworzenia
+             po stronie Allegro. Treści wątku nie logujemy — polityka danych
+             z docs/obsluga-klienta.md obowiązuje też dziennik. */
+          zepsute.add(thread.id);
+          console.warn("[allegro-inbox] wątek pominięty:", thread.id,
+            e instanceof Error ? e.message : e);
+        }
+      }
+  };
+
   try {
     do {
+      if (stron >= limitStron) {
+        obciety = true;
+        break;
+      }
       const page = tablica<Thread>(await query(urlWatkow(apiUrl, offset)), "threads");
+      stron++;
+      /* Partia jednej strony, nie całego przebiegu — patrz zapis niżej. */
+      const threads: Thread[] = [];
+      const messages = new Map<string, Message[]>();
       for (const thread of page) {
         /* GRANICA CZASU (0.152.0). Lista przychodzi od najnowszego, więc
            pierwszy wątek poniżej progu znaczy „dalej są już same starsze" —
@@ -107,62 +202,31 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           threads.push(thread);
         }
       }
+      /* ZAPIS PO KAŻDEJ STRONIE, nie na końcu przebiegu (0.164.1). Do tego
+         wydania wszystko czekało w pamięci do ostatniej strony, więc awaria
+         na stronie trzechsetnej kasowała dorobek dwustu dziewięćdziesięciu
+         dziewięciu — i następny przebieg pytał Allegro o te same wiadomości
+         raz jeszcze. Tak wyglądała doba z 316 tysiącami żądań: żaden przebieg
+         nie doszedł do zapisu, więc każdy zaczynał od zera.
+
+         Strona jest najmniejszą jednostką, jaką wolno tu zapisać: test
+         „awaria sieci przy pobieraniu wiadomości kończy przebieg bez zapisu"
+         pilnuje, że wątki strony NIEDOCZYTANEJ nie wchodzą pojedynczo. */
+      zapiszPartie(threads, messages);
       offset += page.length;
-      if (poniżejGranicy || page.length < 20) break;
+      if (poniżejGranicy || page.length < 20) {
+        doDna = true;
+        break;
+      }
     } while (!reachedCursor);
 
-    const at = now().toISOString();
-    const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
-
-    /* KAŻDY WĄTEK MA WŁASNĄ TRANSAKCJĘ, bo §9 projektu panelu żąda, żeby
-       synchronizator „izolował błąd pojedynczego wątku". Do 0.149.2 cała
-       partia szła jedną transakcją i produkcja pokazała, co to znaczy:
-       Allegro przysłało wątek bez
-       `lastMessageDate`, `node:sqlite` odmówił związania `undefined`
-       („Provided value cannot be bound to SQLite parameter 3"), a wycofanie
-       zabrało ze sobą wszystkie zdrowe wątki z tego samego przebiegu. Skrzynka
-       stała przez wiele przebiegów z rzędu przez JEDEN zepsuty wątek.
-
-       Nie zgaduję tutaj, czy wątek bez daty ma prawo wejść do skrzynki z pustą
-       datą — rozstrzyga to specyfikacja Allegro, której wciąż nie mamy (patrz
-       znaczniki `[WERYFIKUJ]` w docs/allegro-ksztalt.md). Do tego czasu taki
-       wątek jest odrzucany, czyli tak samo jak dotąd; zmienia się wyłącznie
-       to, że nie zabiera reszty przebiegu ze sobą. */
-    const zepsute = new Set<string>();
-    for (const thread of threads) {
-      try {
-        transaction(database, () => {
-          database.prepare(`INSERT INTO allegro_inbox_thread
-            (id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
-            VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET read=excluded.read,
-            last_message_at=excluded.last_message_at, interlocutor_login=excluded.interlocutor_login,
-            surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
-            thread.id, Number(flaga(thread.read, "thread.read")),
-            thread.lastMessageDateTime ?? null, thread.interlocutor?.login ?? null,
-            JSON.stringify(thread), at);
-          database.prepare("DELETE FROM allegro_inbox_message WHERE thread_id=?").run(thread.id);
-          for (const message of messages.get(thread.id) ?? []) {
-            database.prepare(`INSERT INTO allegro_inbox_message
-              (id,thread_id,author_login,author_is_interlocutor,text,subject,status,
-               created_at,related_object_type,related_object_id,surowe_json)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
-              message.id, thread.id, message.author.login,
-              Number(flaga(message.author.isInterlocutor, "author.isInterlocutor")),
-              message.text, message.subject ?? null, message.status ?? null,
-              message.createdAt, oferta(message)[0], oferta(message)[1],
-              JSON.stringify(message));
-          }
-          zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
-        })();
-      } catch (e) {
-        /* Wątek zostaje poza skrzynką, ale przebieg leci dalej. Dziennik niesie
-           IDENTYFIKATOR, bo bez niego „wątek pominięty" jest nie do odtworzenia
-           po stronie Allegro. Treści wątku nie logujemy — polityka danych
-           z docs/obsluga-klienta.md obowiązuje też dziennik. */
-        zepsute.add(thread.id);
-        console.warn("[allegro-inbox] wątek pominięty:", thread.id,
-          e instanceof Error ? e.message : e);
-      }
+    if (obciety) {
+      /* Zdanie do dziennika, bo obcięcie jest STANEM, nie awarią: przebieg
+         domknął się i przesunął kursor, ale reszty listy tym razem nie
+         dotknął. Cisza w tym miejscu znaczyłaby, że nikt się nie dowie
+         o skrzynce, która nie nadąża. */
+      console.warn(`[allegro-inbox] przebieg obcięty na ${MAKS_STRON} stronach —`,
+        "kursor nie trafił, reszta listy poczeka na następny przebieg.");
     }
 
     /* §8.3: kursora nie przesuwa się „po niepełnym zapisie". Może więc stanąć
@@ -172,6 +236,13 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
        historię, zamiast samego siebie. Wątek bez daty odpada z tego wyboru
        osobno, bo kursor porównuje się PARĄ (data, id). */
     const kursor = widziane.find((w) => !zepsute.has(w.id) && w.lastMessageDateTime != null);
+
+    /* DNO zapisuje WYŁĄCZNIE przebieg, który do niego zszedł. Przebieg obcięty
+       sufitem ani przebieg zatrzymany na kursorze nie mają czego stwierdzić
+       o reszcie listy — a `dno_at` jest właśnie stwierdzeniem „to, co niżej,
+       już przez nas przeszło". Pusta lista (konto bez rozmów) też jest dnem:
+       nie ma czego czytać dalej. */
+    const dno = doDna ? (widziane.at(-1)?.lastMessageDateTime ?? at) : startState.dnoAt;
 
     transaction(database, () => {
       /* `error_count` ZERUJE SIĘ na sukcesie i to jest zmiana z 0.147.0.
@@ -187,14 +258,14 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
          wtedy, gdy skrzynka gubiła wątki. */
       database.prepare(`INSERT INTO allegro_inbox_sync_state
         (id,cursor_at,cursor_id,last_success_at,last_attempt_at,last_error_code,
-         last_error_text,error_count,error_thread_count,next_attempt_at)
-        VALUES(1,?,?,?,?,NULL,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
+         last_error_text,error_count,error_thread_count,next_attempt_at,dno_at)
+        VALUES(1,?,?,?,?,NULL,NULL,0,?,?,?) ON CONFLICT(id) DO UPDATE SET cursor_at=excluded.cursor_at,
         cursor_id=excluded.cursor_id,last_success_at=excluded.last_success_at,
         last_attempt_at=excluded.last_attempt_at,last_error_code=NULL,last_error_text=NULL,
         error_count=0,error_thread_count=excluded.error_thread_count,
-        next_attempt_at=excluded.next_attempt_at`).run(
+        next_attempt_at=excluded.next_attempt_at,dno_at=excluded.dno_at`).run(
           kursor?.lastMessageDateTime ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
-          at, at, zepsute.size, new Date(Date.parse(at) + interval).toISOString());
+          at, at, zepsute.size, new Date(Date.parse(at) + interval).toISOString(), dno);
     })();
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
