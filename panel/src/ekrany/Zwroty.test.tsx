@@ -19,14 +19,19 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, rejectionCode: null, wersja: 1,
+  kupujacyLogin: null, przewoznik: null, rozmowy: [],
   pozycje: [{ id, offerId: "1", nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
-    url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+    url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
       prowizjaGrosze: null, waluta: null, typ: null, powod: null } }],
 });
 
-const ZWROTY = [zwrot(1, "decyzja", "ZW-1"), zwrot(2, "zwrot", "ZW-2")];
+const ZWROTY = [
+  { ...zwrot(1, "decyzja", "ZW-1"), przewoznik: "INPOST", paczkaAt: "2026-08-28T09:00:00.000Z" },
+  { ...zwrot(2, "zwrot", "ZW-2"), przewoznik: "DPD", paczkaAt: "2026-08-20T09:00:00.000Z",
+    dniDoTerminu: 9 },
+];
 
 vi.mock("../api/zwroty", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/zwroty")>("../api/zwroty");
@@ -128,6 +133,51 @@ describe("Ekran zwrotów", () => {
     await userEvent.click(screen.getByRole("button", { name: /Do decyzji/ }));
     expect(screen.queryByText(/szukam po wszystkich kubełkach/)).toBeNull();
     expect(screen.getAllByText("Przyjąć czy odrzucić?").length).toBeGreaterThan(0);
+  });
+
+  it("zakładka WSZYSTKIE pokazuje oba kubełki naraz, z plakietką przy wierszu", async () => {
+    /* To zakładka do SZUKANIA, nie siódmy kubełek: kubełki zostają silnikiem
+       pracy, bo rejestr mieszający jedno z drugim skasowaliśmy w 0.140.0. */
+    pokaz();
+    expect(screen.queryByText("ZW-2")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
+    expect(screen.getAllByText("ZW-2").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
+    /* Pytanie nad LISTĄ milczy — nie ma czyje zadać. Nagłówek środkowej
+       kolumny zostaje, bo opisuje otwarty zwrot, a nie zakładkę. */
+    expect(screen.getAllByText("Przyjąć czy odrzucić?")).toHaveLength(1);
+  });
+
+  it("filtr przewoźnika zna tylko firmy, które naprawdę przyjechały", () => {
+    /* Allegro nie publikuje zamkniętej listy przewoźników, a sonda złapała
+       `UNKNOWN`. Filtr ze słownika uczyłby klikać na próżno. */
+    pokaz();
+    const wybor = screen.getByLabelText("Przewoźnik");
+    expect(wybor).toHaveTextContent("Każdy przewoźnik");
+    expect(wybor).toHaveTextContent("INPOST");
+    expect(wybor).not.toHaveTextContent("DHL");
+  });
+
+  it("przewoźnik zawęża kolejkę, a domyślnie nie zawęża niczego", async () => {
+    pokaz();
+    expect(screen.getAllByText("ZW-1").length).toBeGreaterThan(0);
+    await userEvent.selectOptions(screen.getByLabelText("Przewoźnik"), "DPD");
+    expect(screen.queryByText("ZW-1")).toBeNull();
+  });
+
+  it("kolejność domyślna zostaje po terminie ustawowym", async () => {
+    /* Blizna 0.121.0: termin steruje kolejnością pracy. Data nadania jest
+       PRZEŁĄCZNIKIEM, bo odpowiada na inne pytanie. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
+    const przed = screen.getAllByRole("button").map((b) => b.textContent ?? "")
+      .filter((t) => t.includes("ZW-"));
+    expect(przed[0]).toContain("ZW-1");
+
+    await userEvent.click(screen.getByLabelText(/Od daty nadania/));
+    const po = screen.getAllByRole("button").map((b) => b.textContent ?? "")
+      .filter((t) => t.includes("ZW-"));
+    expect(po[0]).toContain("ZW-2");
   });
 
   it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", () => {

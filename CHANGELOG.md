@@ -34,6 +34,81 @@ historii nie przepisujemy.
 ---
 
 
+## 0.169.0 — 2 września 2026
+
+**Dziesięć rzeczy z listy biura zwrotów — wszystkie z danych, które już mamy.**
+
+Pracownik od zwrotów przysłał listę osiemnastu życzeń. Po analizie okazało się,
+że większość z nich Allegro przysyła od początku, a nasze mapowanie po prostu
+je wyrzucało. To wydanie podnosi je z podłogi.
+
+### Kupujący, przewoźnik, płatność, dokument
+
+Login kupującego stoi teraz PRZY ZWROCIE, nie tylko przy zamówieniu: zwrot
+niesie go zawsze, a zamówienie bywa jeszcze niepobrane. Przewoźnik idzie z tej
+samej paczki, co data — inaczej zwrot w dwóch przesyłkach pokazywałby datę
+jednej, a firmę drugiej. Nieznanego przewoźnika pokazujemy surowo, bo Allegro
+nie publikuje zamkniętej listy: sonda złapała `UNKNOWN`, którego nie ma
+w żadnej specyfikacji.
+
+Przy zamówieniu doszła forma płatności i rodzaj dokumentu. To przy zwrocie nie
+ciekawostka: przy pobraniu nie ma karty, na którą oddać pieniądze. Z faktury
+bierzemy SAMĄ FLAGĘ — jej adres niesie ulicę i miasto, a adresy nie przechodzą
+przez mapowanie. Brak informacji pokazuje się jako „nie wiadomo", bo paragon
+wpisany na ślepo kazałby wystawić niewłaściwą korektę.
+
+### Kody towaru i siedemnaście powodów
+
+Wiersz produktu dostał EAN i SKU. EAN wisi przy KARTOTECE i pojawia się dopiero
+po jej potwierdzeniu — Allegro nie podaje go przy zwrocie wcale (jest tylko
+w One Fulfillment, którego ta firma nie używa). SKU idzie z pozycji ZAMÓWIENIA,
+bo pozycja zwrotu własnego nie ma.
+
+Powodów zwrotu tłumaczymy siedemnaście zamiast jedenastu. Tyle wymienia schemat;
+jedenaście to te, które zaobserwowała sonda, a pozostałe sześć szło na ekran
+surowym kodem.
+
+### Ekran przestał nazywać datę nadania powrotem towaru
+
+Przy paczce stało „Wróciła 1.09.2026" i to była nieprawda: Allegro podaje datę
+UTWORZENIA paczki przez klienta, a daty doręczenia do nas nie podaje w obiekcie
+zwrotu wcale. Teraz ekran pisze „Nadana przez klienta" i mówi wprost, czego nie
+wie. Sygnał kolejki zmienił się z tego samego powodu: „nie nadana" zamiast
+„bez paczki".
+
+### Wiadomości o tym zakupie
+
+Prawa kolumna pokazuje rozmowy dotyczące tego samego zamówienia, z odnośnikiem
+do skrzynki. Mostkiem jest numer zamówienia przy wiadomości, mapowany od
+0.166.0 — ani jednego nowego żądania do Allegro.
+
+Pusty wynik mówi „Allegro nie powiązało z tym zamówieniem żadnej wiadomości",
+a nie „klient nie pisał". Allegro oznacza zamówieniem tylko część wiadomości,
+więc klient piszący z poziomu oferty tym mostkiem się nie znajdzie — i lepiej,
+żeby ekran to powiedział, niż udawał pewność.
+
+### Lista, filtry, Excel
+
+Siódma zakładka WSZYSTKIE jest do SZUKANIA, nie do pracy: kubełki zostają
+silnikiem, bo rejestr mieszający jedno z drugim skasowaliśmy w 0.140.0. Doszedł
+filtr przewoźnika — budowany z tego, co przyjechało, nie ze słownika — oraz
+przełącznik kolejności po dacie nadania. Domyślna kolejność zostaje po zegarze
+ustawowym, bo to termin steruje pracą (blizna 0.121.0).
+
+Eksport CSV ma separator `;`, żeby Excel PL otwierał plik bez kreatora importu,
+i jeden wiersz na POZYCJĘ, bo w Excelu liczy się towary. Numeru listu
+przewozowego w nim nie ma. Trasa jest jedynym GET-em zwrotów, który zostawia
+ślad w dzienniku, i to jest świadome: umowa „odczyt niczego nie zapisuje" mówi
+o PATRZENIU, a wyniesienie pliku z loginami kupujących na dysk patrzeniem nie
+jest.
+
+### Przy wdrożeniu
+
+Nic. Migracja dokłada pięć kolumn i chodzi sama przy starcie.
+
+---
+
+
 ## 0.168.0 — 2 września 2026
 
 **Stan integracji schodzi ze Skrzynki za zębatkę.** Decyzja właściciela.

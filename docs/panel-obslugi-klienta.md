@@ -945,6 +945,63 @@ a przy zwrocie znaczy to cudzego klienta i cudze pieniądze. Numeru listu ten
 filtr nie widzi, bo nie ma go w modelu pracy; od niego jest Enter, który pyta
 serwer.
 
+### 25a.10. Co widać przy zwrocie (0.169.0)
+
+Lista życzeń biura zwrotów. Wszystkie te rzeczy Allegro przysyłało od początku,
+a mapowanie je wyrzucało — pracownik szukał ich potem w panelu sprzedawcy.
+
+**Kupujący i przewoźnik stoją PRZY ZWROCIE**, nie tylko przy zamówieniu. Zwrot
+niesie login zawsze, a zamówienie bywa jeszcze niepobrane. Login to jedyna dana
+osobowa, którą polityka dopuszcza wprost; imienia Allegro przy zwrocie nie
+podaje wcale. Nieznanego przewoźnika pokazujemy surowo, bo Allegro nie publikuje
+zamkniętej listy — sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
+
+**Forma płatności i rodzaj dokumentu** przy zamówieniu. Przy pobraniu nie ma
+karty, na którą oddać pieniądze, a rodzaj dokumentu mówi, czy potrzebna będzie
+korekta faktury. Bierzemy SAMĄ FLAGĘ `invoice.required`: dane firmy niosą ulicę
+i miasto, a adresy nie przechodzą przez mapowanie. Brak informacji pokazuje się
+jako „nie wiadomo" — paragon wpisany na ślepo kazałby wystawić złą korektę.
+
+**Kody towaru na wierszu produktu.** Symbol kartoteki był od 0.154.0, teraz
+dochodzą EAN i SKU sprzedawcy. EAN wisi przy KARTOTECE i pojawia się dopiero po
+jej potwierdzeniu — Allegro nie podaje go przy zwrocie wcale. SKU idzie
+z pozycji ZAMÓWIENIA, bo pozycja zwrotu własnego nie ma.
+
+**Powodów zwrotu jest siedemnaście, nie jedenaście.** Tyle wymienia schemat;
+sonda zaobserwowała jedenaście i tylko te były tłumaczone. Lista i tak nie jest
+zamknięta, więc nieznany kod dalej przechodzi surowy.
+
+### 25a.11. Wiadomości o tym zakupie (0.169.0)
+
+Prawa kolumna pokazuje rozmowy dotyczące tego samego zamówienia, z odnośnikiem
+do skrzynki. Mostkiem jest numer zamówienia przy wiadomości — ten sam, który
+skrzynka mapuje od 0.166.0. Nie kosztuje to ani jednego żądania do Allegro.
+
+Pusty wynik mówi „Allegro nie powiązało z tym zamówieniem żadnej wiadomości",
+a nie „klient nie pisał". To dwa różne zdania i tylko pierwsze jest prawdziwe:
+Allegro oznacza zamówieniem część wiadomości, a klient piszący z poziomu oferty
+tym mostkiem się nie znajdzie.
+
+**Po loginie kupującego dobierać nie wolno** — blizna 0.56.6: Allegro maskuje
+rozmówcę jako `client:44300444`, więc rozmowy szuka się po identyfikatorze.
+
+### 25a.12. Lista, filtry i eksport (0.169.0)
+
+Siódma zakładka WSZYSTKIE jest do SZUKANIA, nie do pracy: kubełki zostają
+silnikiem, bo rejestr mieszający jedno z drugim skasowaliśmy w 0.140.0. Wiersz
+niesie tam plakietkę swojego kubełka, tak samo jak przy szukaniu po kodzie.
+
+Filtr przewoźnika buduje się z tego, co przyjechało, nie ze słownika — filtr
+znający wartości nieobecne w danych uczy klikać na próżno.
+
+**Kolejność domyślna zostaje po zegarze ustawowym** (blizna 0.121.0). Sortowanie
+po dacie nadania jest przełącznikiem, bo odpowiada na inne pytanie: „co przyszło
+najdawniej", a nie „co się najbardziej pali".
+
+Eksport CSV ma separator `;`, jeden wiersz na POZYCJĘ i nie niesie numeru listu
+przewozowego. Zostawia ślad w dzienniku, bo wynosi loginy kupujących — ta sama
+zasada co przy analizie i audycie.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -1039,6 +1096,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
 | Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
 | Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
+| Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
+| EAN i SKU na wierszu produktu | **działa** od 0.169.0 | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |
+| Wiadomości o tym zakupie przy zwrocie | **działa** od 0.169.0 | złączenie po `message.related_order_id` |
+| Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
 | Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |

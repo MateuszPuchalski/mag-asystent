@@ -15,14 +15,14 @@ import type { PozycjaZwrotu, Zamowienie, Zwrot } from "../api/typy";
 const POZYCJA: PozycjaZwrotu = {
   id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
-  url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+  url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
       prowizjaGrosze: null, waluta: null, typ: null, powod: null },
 };
 
 const ZAMOWIENIE: Zamowienie = {
   externalId: "ord-1", status: "READY_FOR_PROCESSING", kupujacyLogin: null,
-  dostawaGrosze: 1499, dostawaMetoda: "Kurier InPost", sumaGrosze: 9997,
+  dostawaGrosze: 1499, dostawaMetoda: "Kurier InPost", platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 9997,
   waluta: "PLN", kupionoAt: "2026-08-20T11:00:00.000Z",
   link: "https://allegro.pl/moje-allegro/zam/ord-1",
   pozycje: [
@@ -38,10 +38,11 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
   werdykt: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null,
+  kupujacyLogin: null, przewoznik: null, rozmowy: [],
   rejectionCode: null, wersja: 1,
   pozycje: [{ id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
-    url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+    url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
       prowizjaGrosze: null, waluta: null, typ: null, powod: null } }],
   ...n,
@@ -127,14 +128,14 @@ describe("Kolejka zwrotów", () => {
     /* Kolor, który zapala się zawsze, uczy operatora go ignorować. */
     render(<Kolejka zwroty={[zwrot()]} wybrany={null} onWybierz={() => {}} />);
     expect(screen.queryByText("termin")).not.toBeInTheDocument();
-    expect(screen.queryByText("bez paczki")).not.toBeInTheDocument();
+    expect(screen.queryByText("nie nadana")).not.toBeInTheDocument();
   });
 
   it("sygnały mają podpis, nie tylko barwę", () => {
     render(<Kolejka zwroty={[zwrot({ sygnaly: ["termin", "brak_dowodu"] })]}
       wybrany={null} onWybierz={() => {}} />);
     expect(screen.getByText("termin")).toBeInTheDocument();
-    expect(screen.getByText("bez paczki")).toBeInTheDocument();
+    expect(screen.getByText("nie nadana")).toBeInTheDocument();
   });
 
   it("wybrany wiersz jest wybrany także dla czytnika ekranu", () => {
@@ -161,7 +162,10 @@ describe("Dowody", () => {
 
   it("brak paczki jest zdaniem, nie pustym polem", () => {
     render(zKlientem(<Dowody zwrot={zwrot({ paczkaAt: null })} />));
-    expect(screen.getByText(/Towar jeszcze nie wrócił/)).toBeInTheDocument();
+    /* Od 0.169.0 zdanie mówi PRAWDĘ: Allegro podaje datę nadania paczki przez
+       klienta, a nie datę jej doręczenia do nas. Wcześniejsze „towar jeszcze
+       nie wrócił" twierdziło coś, czego nie wiemy. */
+    expect(screen.getByText(/Klient nie nadał jeszcze paczki/)).toBeInTheDocument();
   });
 
   it("zamówienie niesie metodę dostawy, bo to ona kosztuje", () => {
@@ -200,6 +204,65 @@ describe("Dowody", () => {
     render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.queryByRole("link", { name: /REF-1/ })).not.toBeInTheDocument();
     expect(screen.getByText("REF-1")).toBeInTheDocument();
+  });
+
+  it("kupujący i przewoźnik stoją przy zwrocie, bez pobranego zamówienia", () => {
+    /* Login niesie sam zwrot, więc widać go także wtedy, gdy zamówienia
+       jeszcze nie pobrano. To jedyna dana osobowa dopuszczona wprost. */
+    render(zKlientem(<Dowody zwrot={zwrot({ kupujacyLogin: "mirek352810",
+      przewoznik: "INPOST" })} />));
+    expect(screen.getByText("mirek352810")).toBeInTheDocument();
+    expect(screen.getByText("InPost")).toBeInTheDocument();
+  });
+
+  it("nieznany przewoźnik pokazuje się surowy, bo Allegro nie zamyka listy", () => {
+    /* Sonda złapała `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
+    render(zKlientem(<Dowody zwrot={zwrot({ przewoznik: "JAKAS_FIRMA" })} />));
+    expect(screen.getByText("JAKAS_FIRMA")).toBeInTheDocument();
+  });
+
+  it("płatność i rodzaj dokumentu stoją przy zamówieniu", () => {
+    /* Przy pobraniu nie ma karty, na którą oddać pieniądze — to nie jest
+       ciekawostka, tylko warunek zwrotu. */
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: { ...ZAMOWIENIE,
+      platnoscTyp: "CASH_ON_DELIVERY", fakturaZadana: true } })} />));
+    expect(screen.getByText("za pobraniem")).toBeInTheDocument();
+    expect(screen.getByText("faktura")).toBeInTheDocument();
+  });
+
+  it("brak informacji o fakturze mówi »nie wiadomo«, a nie »paragon«", () => {
+    /* Paragon wpisany na ślepo kazałby wystawić niewłaściwą korektę. */
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
+    expect(screen.getByText("nie wiadomo")).toBeInTheDocument();
+  });
+
+  it("data paczki to data NADANIA przez klienta, nie powrotu do nas", () => {
+    /* Do 0.167.0 ekran pisał przy niej „Wróciła" i to była nieprawda:
+       Allegro nie podaje w obiekcie zwrotu daty doręczenia wcale. */
+    render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByText(/Nadana przez klienta/)).toBeInTheDocument();
+    expect(screen.getByText(/nie podaje daty doręczenia/)).toBeInTheDocument();
+    expect(screen.queryByText(/Wróciła/)).toBeNull();
+  });
+
+  it("wiadomości o zakupie prowadzą do skrzynki, a ich brak mówi o sobie", () => {
+    /* Puste znaczy „Allegro nic nie powiązało", nie „klient nie pisał":
+       Allegro oznacza zamówieniem tylko część wiadomości. */
+    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
+    expect(screen.getByText(/nie powiązało z tym zamówieniem żadnej wiadomości/))
+      .toBeInTheDocument();
+
+    rerender(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
+      { id: 7, temat: "Kiedy zwrot pieniędzy?", status: "open",
+        ostatniaAt: "2026-09-01T10:00:00.000Z" }] })} />));
+    const link = screen.getByRole("link", { name: /Kiedy zwrot pieniędzy/ });
+    expect(link).toHaveAttribute("href", "/obsluga/skrzynka/7");
+  });
+
+  it("rozmowa bez tematu dostaje nazwę, a nie pusty odnośnik", () => {
+    render(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
+      { id: 8, temat: "  ", status: "new", ostatniaAt: null }] })} />));
+    expect(screen.getByRole("link", { name: /Rozmowa bez tematu/ })).toBeInTheDocument();
   });
 
   it("bez pobranego zamówienia ekran daje drogę wyjścia, nie samo czekanie", () => {

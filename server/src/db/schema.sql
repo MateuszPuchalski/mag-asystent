@@ -930,6 +930,14 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- routuje po tym polu — w obserwacji z 2 września 95 zwrotów na 100 miało
   -- `COMMISSION_REFUNDED`, więc routowanie opustoszyłoby ją prawie całkiem.
   status_allegro TEXT,
+  -- Login kupującego (0.169.0). Zwrot niesie go ZAWSZE, a zamówienie bywa
+  -- jeszcze niepobrane — dlatego stoi tu, a nie tylko przy zamówieniu. To
+  -- jedyna dana osobowa dopuszczona przez politykę danych zwrotów wprost;
+  -- imienia i nazwiska Allegro przy zwrocie nie podaje w ogóle.
+  kupujacy_login TEXT,
+  -- Przewoźnik z pierwszej paczki. Bez `CHECK`: Allegro nie publikuje
+  -- zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
+  przewoznik TEXT,
   korekta_queue_id INTEGER REFERENCES sfera_queue(id),
   korekta_numer TEXT,
   zamkniety_at TEXT,
@@ -1139,6 +1147,13 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   -- Bez niego wariant „bez wysyłki" był nieodróżnialny od pełnej kwoty.
   dostawa_grosze INTEGER,
   dostawa_metoda TEXT,
+  -- Forma płatności (0.169.0). Przy zwrocie to nie ciekawostka:
+  -- `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać pieniądze.
+  platnosc_typ TEXT,
+  platnosc_at TEXT,
+  -- Czy kupujący zażądał faktury. SAMA FLAGA — dane firmy z `invoice.address`
+  -- niosą ulicę i miasto, a adresy nie przechodzą przez mapowanie.
+  faktura_zadana INTEGER,
   suma_grosze INTEGER,
   waluta TEXT NOT NULL DEFAULT 'PLN',
   kupiono_at TEXT,

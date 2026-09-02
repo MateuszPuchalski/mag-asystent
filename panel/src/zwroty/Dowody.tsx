@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import {
-  CalendarClock, Copy, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
+  CalendarClock, Copy, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
 } from "lucide-react";
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
-import { czas } from "../ui";
+import { czas, Plakietka } from "../ui";
 import { Link } from "./Link";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
@@ -15,6 +15,19 @@ import { Link } from "./Link";
    Od 0.167.0 to kolumna o ZWROCIE, nie o towarze: zegar ustawowy, numery,
    zamówienie klienta, fakt powrotu paczki. Produkty przeniosły się do
    głównego okna (`Pozycje.tsx`), bo 340 px ucinało im nazwy w połowie. */
+
+/* Przewoźnicy i formy płatności po polsku. Kod nieznany pokazuje się SUROWY,
+   bo Allegro nie publikuje zamkniętej listy przewoźników — sonda złapała
+   `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
+const PRZEWOZNICY: Record<string, string> = {
+  INPOST: "InPost", DPD: "DPD", ALLEGRO: "Allegro", POCZTA_POLSKA: "Poczta Polska",
+  DHL: "DHL", UPS: "UPS", GLS: "GLS", FEDEX: "FedEx", UNKNOWN: "nieznany",
+};
+
+const PLATNOSCI: Record<string, string> = {
+  ONLINE: "online", CASH_ON_DELIVERY: "za pobraniem", WIRE_TRANSFER: "przelew",
+  SPLIT_PAYMENT: "podzielona", EXTENDED_TERM: "odroczona",
+};
 
 const ODRZUCENIA: Record<string, string> = {
   REFUND_REJECTED: "odmowa zwrotu pieniędzy",
@@ -94,6 +107,15 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
       <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1">
         <dt className="text-slate-500">Numer</dt>
         <dd><Link href={zwrot.linkZwrotu}>{zwrot.numer ?? zwrot.externalId}</Link></dd>
+        {/* Login stoi PRZY ZWROCIE, więc widać go także wtedy, gdy zamówienia
+            jeszcze nie pobrano. To jedyna dana osobowa, którą polityka danych
+            zwrotów dopuszcza wprost — imienia Allegro tu nie podaje wcale. */}
+        {zwrot.kupujacyLogin && <>
+          <dt className="text-slate-500">Kupujący</dt>
+          <dd className="break-all">{zwrot.kupujacyLogin}</dd></>}
+        {zwrot.przewoznik && <>
+          <dt className="text-slate-500">Przewoźnik</dt>
+          <dd>{PRZEWOZNICY[zwrot.przewoznik] ?? zwrot.przewoznik}</dd></>}
       </dl>
     </Sekcja>
 
@@ -127,6 +149,16 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
                 <dd>{zam.dostawaMetoda} · {zlote(zam.dostawaGrosze, zam.waluta)}</dd></>}
               <dt className="text-slate-500">Zapłacono</dt>
               <dd className="tabular-nums">{zlote(zam.sumaGrosze, zam.waluta)}</dd>
+              {/* Forma płatności to przy zwrocie nie ciekawostka: przy pobraniu
+                  nie ma karty, na którą oddać pieniądze. */}
+              {zam.platnoscTyp && <><dt className="text-slate-500">Płatność</dt>
+                <dd>{PLATNOSCI[zam.platnoscTyp] ?? zam.platnoscTyp}</dd></>}
+              {/* `null` znaczy „nie wiadomo" i tak się pokazuje — paragon
+                  wpisany na ślepo kazałby wystawić niewłaściwą korektę. */}
+              <dt className="text-slate-500">Dokument</dt>
+              <dd>{zam.fakturaZadana == null
+                ? <span className="text-slate-400">nie wiadomo</span>
+                : zam.fakturaZadana ? "faktura" : "paragon"}</dd>
             </dl>
             {/* CAŁE zamówienie, nie tylko zwracane pozycje: „kupił trzy,
                 oddaje jedną" jest kontekstem decyzji, a nie ciekawostką. */}
@@ -145,12 +177,45 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
     </Sekcja>
 
     <Sekcja ikona={<Package size={14} />} tytul="Paczka zwrotna">
+      {/* „Nadana", nie „wróciła" (0.169.0). Allegro podaje przy paczce datę
+          jej UTWORZENIA przez klienta i nic poza tym — daty doręczenia do nas
+          nie ma w obiekcie zwrotu wcale. Do 0.167.0 ekran nazywał tę datę
+          powrotem towaru i to było po prostu nieprawdą. */}
       {zwrot.paczkaAt
-        ? <p>Wróciła {czas(zwrot.paczkaAt)}.</p>
+        ? <>
+            <p>Nadana przez klienta {czas(zwrot.paczkaAt)}.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Allegro nie podaje daty doręczenia do nas.</p>
+          </>
         : <p className="font-semibold text-ranga-uwaga">
-            Towar jeszcze nie wrócił, a termin biegnie.</p>}
+            Klient nie nadał jeszcze paczki, a termin biegnie.</p>}
       <p className="mt-2 text-xs text-slate-500">
         Danych nadawcy i konta bankowego nie pobieramy.</p>
+    </Sekcja>
+
+    {/* ── Wiadomości o tym zakupie (0.169.0) ─────────────────────────────────
+        Mostkiem jest numer zamówienia przy wiadomości (`related_order_id`,
+        mapowany od 0.166.0) — ani jednego nowego żądania do Allegro.
+
+        Pusty wynik mówi „Allegro nic nie powiązało", a nie „klient nie
+        pisał". To dwa różne zdania i tylko pierwsze jest prawdziwe: Allegro
+        oznacza zamówieniem tylko część wiadomości, a klient piszący z poziomu
+        oferty tym mostkiem się nie znajdzie. */}
+    <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">
+      {zwrot.rozmowy.length === 0
+        ? <p className="text-xs text-slate-500">
+            Allegro nie powiązało z tym zamówieniem żadnej wiadomości.</p>
+        : <ul className="space-y-1">
+            {zwrot.rozmowy.map((r) => <li key={r.id}>
+              <a href={`/obsluga/skrzynka/${r.id}`}
+                className="block rounded-lg bg-slate-50 px-2 py-1 hover:bg-slate-100">
+                <span className="font-semibold text-sky-700 underline underline-offset-2">
+                  {r.temat?.trim() || "Rozmowa bez tematu"}</span>
+                <span className="ml-2 text-xs text-slate-500">{czas(r.ostatniaAt)}</span>
+                <Plakietka status={r.status} className="ml-2">{r.status}</Plakietka>
+              </a>
+            </li>)}
+          </ul>}
     </Sekcja>
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">

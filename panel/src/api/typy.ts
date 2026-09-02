@@ -221,6 +221,8 @@ export interface PozycjaZwrotu {
   twId: number | null;
   twSymbol: string | null;
   twZrodlo: string | null;
+  sku: string | null;
+  ean: string | null;
   propozycja: Dopasowanie | null;
   rabat: StanRabatu;
 }
@@ -241,6 +243,11 @@ export interface Zamowienie {
   kupujacyLogin: string | null;
   dostawaGrosze: number | null;
   dostawaMetoda: string | null;
+  /** `ONLINE`, `CASH_ON_DELIVERY`… — surowo, bo Allegro nie zamyka listy. */
+  platnoscTyp: string | null;
+  platnoscAt: string | null;
+  /** `null` znaczy „nie wiadomo", nie „paragon". */
+  fakturaZadana: boolean | null;
   sumaGrosze: number | null;
   waluta: string;
   kupionoAt: string | null;
@@ -269,8 +276,19 @@ export interface Zwrot {
   kwotaWariant: string | null;
   korektaNumer: string | null;
   rejectionCode: string | null;
+  kupujacyLogin: string | null;
+  przewoznik: string | null;
+  rozmowy: RozmowaZwrotu[];
   wersja: number;
   pozycje: PozycjaZwrotu[];
+}
+
+/** Rozmowa o tym samym zakupie — mostkiem jest numer zamówienia. */
+export interface RozmowaZwrotu {
+  id: number;
+  temat: string | null;
+  status: string;
+  ostatniaAt: string | null;
 }
 
 export interface WpisOsiZwrotu {

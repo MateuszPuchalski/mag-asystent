@@ -80,7 +80,7 @@ const kody = (z: Zwrot) => [z.numer, z.externalId, z.orderId, z.korektaNumer]
 export function Zwroty() {
   const { id } = useParams();
   const nawiguj = useNavigate();
-  const [kubelek, setKubelek] = useState<Kubelek>("decyzja");
+  const [kubelek, setKubelek] = useState<Kubelek | null>("decyzja");
   const werdykt = useWerdykt();
   const ocena2 = useOcena();
   const kwota = useKwota();
@@ -97,9 +97,26 @@ export function Zwroty() {
     ? String((bledy.find(Boolean) as Error).message) : "";
   const { data, isLoading, error } = useZwroty();
 
-  const wKubelku = useMemo(
-    () => (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek),
-    [data, kubelek]);
+  /* WSZYSTKIE to siódma zakładka, nie siódmy kubełek (0.169.0). Kubełki dalej
+     są silnikiem pracy — każdy niesie jedno pytanie — a ta zakładka jest do
+     SZUKANIA: „gdzie stoi ten zwrot", nie „co mam zrobić". Rejestr skasowany
+     w 0.140.0 mieszał te dwie rzeczy i to go pogrążyło. */
+  const [przewoznik, setPrzewoznik] = useState<string>("");
+  const [poNadaniu, setPoNadaniu] = useState(false);
+
+  const wKubelku = useMemo(() => {
+    const lista = kubelek === null
+      ? (data?.zwroty ?? [])
+      : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek);
+    return przewoznik ? lista.filter((z) => (z.przewoznik ?? "") === przewoznik) : lista;
+  }, [data, kubelek, przewoznik]);
+
+  /* Przewoźnicy z TEGO, co przyszło, nie ze słownika: Allegro nie publikuje
+     zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
+     Filtr, który zna wartości niewystępujące w danych, uczy klikać na próżno. */
+  const przewoznicy = useMemo(() => [...new Set(
+    (data?.zwroty ?? []).map((z) => z.przewoznik).filter((p): p is string => Boolean(p)),
+  )].sort(), [data]);
 
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
@@ -125,7 +142,16 @@ export function Zwroty() {
      kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
      ZAMKNIĘTYCH. Kod jest mocniejszy niż zakładka, na którą ktoś przed chwilą
      kliknął — tak samo jak adres w pasku przeglądarki. */
-  const widoczne = pasujace ?? wKubelku;
+  /* Kolejność DOMYŚLNA zostaje po zegarze ustawowym — blizna 0.121.0: termin
+     jest osobnym bytem i steruje kolejnością pracy. Sortowanie po dacie
+     nadania jest PRZEŁĄCZNIKIEM, bo odpowiada na inne pytanie: „co przyszło
+     najdawniej", a nie „co się najbardziej pali". */
+  const widoczne = useMemo(() => {
+    const lista = pasujace ?? wKubelku;
+    if (!poNadaniu) return lista;
+    return [...lista].sort((a, b) =>
+      String(a.paczkaAt ?? "9999").localeCompare(String(b.paczkaAt ?? "9999")));
+  }, [pasujace, wKubelku, poNadaniu]);
 
   /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
      źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
@@ -147,7 +173,7 @@ export function Zwroty() {
   /* Wejście z paska adresu na zwrot z innego kubełka ma pokazać ten zwrot,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
   useEffect(() => {
-    if (zwrot && zwrot.kubelek !== kubelek) setKubelek(zwrot.kubelek);
+    if (zwrot && kubelek !== null && zwrot.kubelek !== kubelek) setKubelek(zwrot.kubelek);
   }, [zwrot?.id]);
 
   /**
@@ -179,13 +205,13 @@ export function Zwroty() {
    * kubełka nad klawiszami starego. Operator musiał dokliknąć wiersz, czyli
    * dokładnie to jedno kliknięcie, którego ten ekran miał nie mieć.
    */
-  const przelacz = (k: Kubelek) => {
+  const przelacz = (k: Kubelek | null) => {
     setKubelek(k);
     /* Kliknięcie w kubełek jest prośbą o TEN kubełek, więc zdejmuje filtr.
        Inaczej przełącznik wyglądałby na zepsuty: lista zostawałaby ta sama. */
     setFraza("");
     setWynikSkanu(null);
-    const pierwszy = (data?.zwroty ?? []).find((z) => z.kubelek === k);
+    const pierwszy = (data?.zwroty ?? []).find((z) => k === null || z.kubelek === k);
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
 
@@ -207,6 +233,7 @@ export function Zwroty() {
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-6]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
+      else if (e.key === "7") przelacz(null);
     },
   );
 
@@ -243,7 +270,33 @@ export function Zwroty() {
             {k.etykieta}<span className="ml-1 tabular-nums opacity-70">{ile}</span>
           </button>;
         })}
+        <button onClick={() => przelacz(null)} title="Wszystkie zwroty (klawisz 7)"
+          className={`rounded-md px-2 py-1 text-xs font-bold ${
+            kubelek === null ? "bg-wertis-amber text-wertis-ink" : "text-slate-600 hover:bg-slate-100"}`}>
+          Wszystkie<span className="ml-1 tabular-nums opacity-70">
+            {data?.zwroty?.length ?? 0}</span>
+        </button>
       </nav>
+
+      {/* Filtr przewoźnika i kolejność. Oba liczą się w pamięci ekranu, tak
+          samo jak kubełek — lista i tak przyjeżdża w całości. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-2 py-1.5 text-xs">
+        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
+          aria-label="Przewoźnik" value={przewoznik}
+          onChange={(e) => setPrzewoznik(e.target.value)}>
+          <option value="">Każdy przewoźnik</option>
+          {przewoznicy.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <label className="flex items-center gap-1 text-slate-600">
+          <input type="checkbox" checked={poNadaniu}
+            onChange={() => setPoNadaniu((v) => !v)} />
+          Od daty nadania
+        </label>
+        {/* Eksport zostawia ŚLAD w dzienniku, bo wynosi loginy kupujących —
+            ta sama zasada co przy analizie i audycie. */}
+        <a href="/api/obsluga/zwroty/csv" className="ml-auto text-slate-500 underline
+          underline-offset-2 hover:text-slate-800">Pobierz CSV</a>
+      </div>
       <Szukanie
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
@@ -256,13 +309,13 @@ export function Zwroty() {
       {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.
           Przy włączonym filtrze milknie: lista nie jest wtedy kubełkiem,
           więc jego pytanie mówiłoby nieprawdę o tym, co widać. */}
-      {!pasujace && <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
+      {!pasujace && kubelek !== null && <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
         {opis?.pytanie}
       </p>}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <p className="p-6 text-center text-sm text-slate-500">Wczytuję kolejkę…</p>
-          : <Kolejka zwroty={widoczne} wybrany={wybrany} zKubelkiem={Boolean(pasujace)}
+          : <Kolejka zwroty={widoczne} wybrany={wybrany} zKubelkiem={Boolean(pasujace) || kubelek === null}
               onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
       </div>
     </Karta>

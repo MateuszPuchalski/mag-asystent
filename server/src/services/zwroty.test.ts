@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
+  csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
   cofnijKorekte, znajdzZwrotPoKodzie,
 } from "./zwroty.js";
@@ -40,8 +40,21 @@ function zamowienie(d: Db, ext: string, pozycje: Array<{ offerId: string; nazwa:
   }
 }
 
-function towar(d: Db, twId: number, symbol: string) {
-  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(twId, symbol, `Towar ${symbol}`);
+function towar(d: Db, twId: number, symbol: string, ean: string | null = null) {
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)")
+    .run(twId, symbol, `Towar ${symbol}`, ean);
+}
+
+/** Rozmowa w skrzynce, w której klient wspomniał o tym zamówieniu. */
+function rozmowa(d: Db, ext: string, orderId: string | null, temat: string, kiedy: string) {
+  d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,subject,status)
+    VALUES (1,?,?,'open')`).run(ext, temat);
+  const id = Number((d.prepare(
+    "SELECT id FROM conversation WHERE external_conversation_id=?").get(ext) as { id: number }).id);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,related_order_id,sent_at)
+    VALUES (?,1,?,'incoming','Kiedy zwrot?',?,?)`).run(id, `m-${ext}`, orderId, kiedy);
+  return id;
 }
 
 let kolejny = 0;
@@ -52,12 +65,14 @@ function dodaj(d: Db, utworzono: string, pola: Record<string, unknown> = {},
                pozycje: Poz[] = [{ ilosc: 1, cena: 4999 }]) {
   const ext = `z${++kolejny}`;
   d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,
-    paczka_at,werdykt,kwota_grosze,korekta_numer,zamkniety_at,rejection_code)
-    VALUES (1,?,?,?,?,?,?,?,?,?,?)`).run(
+    paczka_at,werdykt,kwota_grosze,korekta_numer,zamkniety_at,rejection_code,
+    kupujacy_login,przewoznik)
+    VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     ext, (pola.order_id as string) ?? null, utworzono, utworzono,
     (pola.paczka_at as string) ?? null, (pola.werdykt as string) ?? null,
     (pola.kwota_grosze as number) ?? null, (pola.korekta_numer as string) ?? null,
-    (pola.zamkniety_at as string) ?? null, (pola.rejection_code as string) ?? null);
+    (pola.zamkniety_at as string) ?? null, (pola.rejection_code as string) ?? null,
+    (pola.kupujacy_login as string) ?? null, (pola.przewoznik as string) ?? null);
   const id = Number((d.prepare("SELECT id FROM zwrot_klienta WHERE external_id=?").get(ext) as { id: number }).id);
   for (const p of pozycje) {
     d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena,url,tw_id,tw_symbol,tw_zrodlo,klucz)
@@ -590,4 +605,95 @@ test("zwrot bez lądowiska nie wywraca szukania", () => {
     .run();
   assert.equal(znajdzZwrotPoKodzie(ETYKIETA, d).trafienie, null);
   assert.ok(znajdzZwrotPoKodzie("1234/Z04A", d).zwrotId, "numer zwrotu dalej działa");
+});
+
+/* ── Cztery rzeczy, o które prosiło biuro zwrotów (0.169.0) ─────────────── */
+
+test("wiersz niesie kupującego i przewoźnika, bez pobranego zamówienia", () => {
+  /* Login przy ZWROCIE, nie tylko przy zamówieniu: zwrot niesie go zawsze,
+     a zamówienie bywa jeszcze niepobrane. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-30T09:00:00Z", { kupujacy_login: "mirek352810", przewoznik: "INPOST" });
+  const [z] = listaZwrotow(d, TERAZ);
+  assert.equal(z.kupujacyLogin, "mirek352810");
+  assert.equal(z.przewoznik, "INPOST");
+  assert.equal(z.zamowienie, null, "zamówienia nie ma, a login i tak jest");
+});
+
+test("kod towaru: symbol z kartoteki, EAN z kartoteki, SKU z zamówienia", () => {
+  /* Allegro EAN-u przy zwrocie nie podaje wcale, a SKU niesie POZYCJA
+     ZAMÓWIENIA — pozycja zwrotu ma w specyfikacji samo `offerId`. */
+  const d = stanowisko();
+  towar(d, 70, "SEK-46", "5901234123457");
+  zamowienie(d, "ord-9", [{ offerId: "of-1", nazwa: "Sekator", sku: "SEK-46", cena: 4999 }]);
+  dodaj(d, "2026-08-30T09:00:00Z", { order_id: "ord-9" },
+    [{ ilosc: 1, cena: 4999, offerId: "of-1", twId: 70, twSymbol: "SEK-46", twZrodlo: "sku" }]);
+
+  const [p] = listaZwrotow(d, TERAZ)[0].pozycje;
+  assert.equal(p.twSymbol, "SEK-46");
+  assert.equal(p.ean, "5901234123457");
+  assert.equal(p.sku, "SEK-46");
+});
+
+test("bez potwierdzonej kartoteki EAN-u nie zgadujemy", () => {
+  /* EAN wisi przy kartotece, a kartotekę wskazuje człowiek. Propozycja
+     automatu nie jest jeszcze faktem i nie ma prawa dokleić kodu. */
+  const d = stanowisko();
+  towar(d, 70, "SEK-46", "5901234123457");
+  dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 4999 }]);
+  assert.equal(listaZwrotow(d, TERAZ)[0].pozycje[0].ean, null);
+});
+
+test("zwrot pokazuje rozmowy o TYM zakupie, po numerze zamówienia", () => {
+  /* Mostkiem jest `message.related_order_id` z 0.166.0 — ani jednego nowego
+     żądania do Allegro. Jeden zakup potrafi mieć kilka wątków, więc lista. */
+  const d = stanowisko();
+  rozmowa(d, "w-1", "ord-9", "Pytanie o zwrot", "2026-08-31T10:00:00Z");
+  rozmowa(d, "w-2", "ord-9", "Druga wiadomość", "2026-09-01T08:00:00Z");
+  rozmowa(d, "w-3", "ord-INNE", "Cudza sprawa", "2026-09-01T09:00:00Z");
+  rozmowa(d, "w-4", null, "Bez zamówienia", "2026-09-01T09:30:00Z");
+  dodaj(d, "2026-08-30T09:00:00Z", { order_id: "ord-9" });
+
+  const [z] = listaZwrotow(d, TERAZ);
+  assert.equal(z.rozmowy.length, 2, "dwie rozmowy o tym zakupie, ani jednej cudzej");
+  assert.deepEqual(z.rozmowy.map((r) => r.temat), ["Druga wiadomość", "Pytanie o zwrot"],
+    "najnowsza na górze");
+  assert.equal(z.rozmowy[0].status, "open", "status rozmowy jedzie razem z nią");
+});
+
+test("zwrot bez powiązanych wiadomości ma pustą listę, a nie brak pola", () => {
+  /* Puste znaczy „Allegro nic nie powiązało", nie „klient nie pisał" —
+     i ekran ma prawo powiedzieć to wprost. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-30T09:00:00Z", { order_id: "ord-9" });
+  assert.deepEqual(listaZwrotow(d, TERAZ)[0].rozmowy, []);
+});
+
+test("CSV dla biura ma średniki, jeden wiersz na pozycję i żadnego listu przewozowego", () => {
+  /* Separator `;`, bo Excel PL otwiera taki plik bez kreatora importu.
+     Numeru listu nie wynosimy na dysk — polityka danych zwrotów z 0.163.0. */
+  const d = stanowisko();
+  towar(d, 70, "SEK-46", "5901234123457");
+  zamowienie(d, "ord-9", [{ offerId: "of-1", nazwa: "Sekator", sku: "SEK-46", cena: 4999 }]);
+  dodaj(d, "2026-08-30T09:00:00Z",
+    { order_id: "ord-9", kupujacy_login: "mirek352810", przewoznik: "DPD" },
+    [{ ilosc: 1, cena: 4999, offerId: "of-1", twId: 70, twSymbol: "SEK-46" },
+      { ilosc: 2, cena: 1000, offerId: "of-2", nazwa: "Filtr" }]);
+
+  const csv = csvZwrotow(listaZwrotow(d, TERAZ));
+  const linie = csv.trim().split("\r\n");
+  assert.equal(linie.length, 3, "nagłówek i dwie pozycje");
+  assert.match(linie[0], /^﻿?Numer zwrotu;/, "BOM i średniki, żeby Excel PL nie pytał");
+  assert.match(linie[1], /mirek352810;/);
+  assert.match(linie[1], /DPD;/);
+  assert.match(linie[1], /5901234123457/, "EAN wchodzi do zestawienia");
+  assert.match(linie[2], /Filtr;/);
+  assert.equal(csv.includes("waybill"), false, "numeru listu w pliku nie ma");
+});
+
+test("zwrot bez pozycji też dostaje wiersz w zestawieniu", () => {
+  /* Inaczej zniknąłby z pliku i nikt by się nie dowiedział, że jest. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-30T09:00:00Z", {}, []);
+  assert.equal(csvZwrotow(listaZwrotow(d, TERAZ)).trim().split("\r\n").length, 2);
 });
