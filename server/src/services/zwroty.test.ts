@@ -5,7 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
-  rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKwote,
+  rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
+  cofnijKorekte,
 } from "./zwroty.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
@@ -379,4 +380,118 @@ test("każda decyzja zostawia ślad w audycie", () => {
     .map((e) => e.type);
   assert.ok(typy.some((t) => t.includes("werdykt")), `brak werdyktu w ${typy.join(",")}`);
   assert.ok(typy.some((t) => t.includes("ocena")), `brak oceny w ${typy.join(",")}`);
+});
+
+/* ── Korekta domyka kolejkę (0.162.0) ────────────────────────────────────────
+   Piąty kubełek był ślepym zaułkiem: `kubelekZwrotu` routuje po
+   `korekta_numer`, a tej kolumny nic nie zapisywało. Zwrot z zapisaną kwotą
+   stał w DO KOREKTY na zawsze.
+
+   Numer korekty jest PRZEPISYWANY Z SUBIEKTA ręką człowieka, więc pomyłka jest
+   tu normalnym zdarzeniem, nie awarią — stąd cofnięcie z §25a.5.            */
+
+function zwrotDoKorekty(d: Db, KTO: { id: number; name: string }) {
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+  zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 4, KTO);
+  return { id, poz, wersja: 5 };
+}
+
+test("numer korekty zamyka zwrot i schodzi z kolejki pracy", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, wersja } = zwrotDoKorekty(d, KTO);
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "korekta");
+
+  zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.equal(z.kubelek, "zamkniety");
+  assert.equal(z.korektaNumer, "KFS 12/2026");
+  /* Zamknięcie jest FAKTEM z godziną, nie wnioskiem z obecności numeru:
+     inaczej nie da się powiedzieć, kiedy sprawa zeszła z biurka. */
+  assert.notEqual((d.prepare("SELECT zamkniety_at FROM zwrot_klienta WHERE id=?")
+    .get(id) as { zamkniety_at: string | null }).zamkniety_at, null);
+});
+
+test("korekta bez numeru nie przechodzi — pusty numer nie domyka niczego", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, wersja } = zwrotDoKorekty(d, KTO);
+  assert.throws(() => zapiszKorekte(d, id, "   ", wersja, KTO), /numer/i);
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "korekta");
+});
+
+test("korekta przed kwotą odpada — nie ma czego korygować", () => {
+  /* Kolejność bramek jest UMOWĄ kolejki. Numer korekty zapisany przed kwotą
+     przeskoczyłby zwrot z DO ZWROTU wprost do zamkniętych, czyli oddałby
+     pieniądze, o których nikt nie zdecydował. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+
+  assert.throws(() => zapiszKorekte(d, id, "KFS 12/2026", 4, KTO), /kwot/i);
+});
+
+test("cofnięcie korekty otwiera zwrot z powrotem — numer przepisuje człowiek", () => {
+  /* §25a.5: potwierdzenie dostają dwie rzeczy nieodwracalne, reszta ma
+     cofnięcie. Numer dokumentu przepisany z Subiekta to dokładnie ten rodzaj
+     pomyłki, którą trzeba dać odkręcić. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, wersja } = zwrotDoKorekty(d, KTO);
+  zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
+
+  cofnijKorekte(d, id, wersja + 1, KTO);
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.equal(z.kubelek, "korekta", "zwrot wraca do kubełka, nie do decyzji");
+  assert.equal(z.korektaNumer, null);
+  assert.equal((d.prepare("SELECT zamkniety_at FROM zwrot_klienta WHERE id=?")
+    .get(id) as { zamkniety_at: string | null }).zamkniety_at, null);
+  /* Kwota i werdykt ZOSTAJĄ: cofamy korektę, nie całą pracę nad zwrotem. */
+  assert.equal(z.kwotaGrosze, 15000);
+  assert.equal(z.werdykt, "przyjety");
+});
+
+test("zamknięty zwrot nie przyjmuje innych zmian niż cofnięcie korekty", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz, wersja } = zwrotDoKorekty(d, KTO);
+  zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
+
+  assert.throws(() => ocenPozycje(d, poz[0], "przecena", wersja + 1, KTO), /zamkni/i);
+  assert.throws(() => zapiszKwote(d, id, { pozycjeIds: poz, dostawa: true }, wersja + 1, KTO),
+    /zamkni/i);
+});
+
+test("korekta i jej cofnięcie zostawiają ślad w dzienniku i na osi zwrotu", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, wersja } = zwrotDoKorekty(d, KTO);
+  zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
+  cofnijKorekte(d, id, wersja + 1, KTO);
+
+  const typy = (d.prepare("SELECT type FROM events WHERE type LIKE 'zwrot_korekta%' ORDER BY id")
+    .all() as Array<{ type: string }>).map((w) => w.type);
+  assert.deepEqual(typy, ["zwrot_korekta", "zwrot_korekta_cofnieta"]);
+
+  const os = (d.prepare("SELECT rodzaj FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id")
+    .all(id) as Array<{ rodzaj: string }>).map((w) => w.rodzaj);
+  assert.deepEqual(os.filter((r) => r.startsWith("korekta")), ["korekta", "korekta_cofnieta"]);
+});
+
+test("dwóch agentów nie zamyka jednego zwrotu dwoma numerami", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, wersja } = zwrotDoKorekty(d, KTO);
+  zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
+
+  assert.throws(() => zapiszKorekte(d, id, "KFS 13/2026", wersja, KTO), /zmienił się|zamkni/i);
+  assert.equal(listaZwrotow(d).find((z) => z.id === id)?.korektaNumer, "KFS 12/2026");
 });

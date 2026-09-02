@@ -3,8 +3,8 @@ import { sesjaZadania } from "../context.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  bilansKartotek, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
-  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKwote, ZwrotConflict,
+  bilansKartotek, cofnijKorekte, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, ZwrotConflict,
 } from "../services/zwroty.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { config } from "../config.js";
@@ -12,9 +12,12 @@ import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
-   CZTERY ZAPISY: kartoteka pozycji, werdykt, ocena towaru i kwota. Nic nie
-   wychodzi stąd do Allegro — korekta i oddanie pieniędzy nadal czekają, bo
-   jedno idzie do Subiekta, a drugie po końcówki zapisu Allegro, których sonda
+   SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
+   0.162.0 — numer korekty i jego cofnięcie. Nic nie wychodzi stąd do Allegro
+   ani do Subiekta: korektę wystawia człowiek w Subiekcie, a pieniądze oddaje
+   w panelu Allegro. Panel zapisuje FAKT, że to się stało.
+
+   Oddanie pieniędzy przez API czeka na końcówki zapisu Allegro, których sonda
    nie potwierdzi (jest GET-em).
 
    Bramka roli stoi na KAŻDEJ trasie, także na odczycie — tak samo jak przy
@@ -152,6 +155,27 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return zapiszKwote(db(), Number(req.params.id),
           { pozycjeIds: ids, dostawa: req.body?.dostawa === true },
           Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Numer korekty PRZEPISUJE człowiek z Subiekta, więc pomyłka jest tu
+     zdarzeniem normalnym — stąd druga trasa, cofająca (§25a.5). */
+  app.post<{ Params: { id: string }; Body: { numer?: string; wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/korekta", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return zapiszKorekte(db(), Number(req.params.id), req.body?.numer ?? "",
+          Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/korekta/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return cofnijKorekte(db(), Number(req.params.id), Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

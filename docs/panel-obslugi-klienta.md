@@ -724,7 +724,7 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 | DO DECYZJI | przyjąć czy odrzucić? | `P` `O` `J` |
 | DO OCENY | co z towarem? | `S` `C` `U` |
 | DO ZWROTU | ile oddać? | zaznaczenie + `Enter` |
-| DO KOREKTY | zlecić korektę? | `Enter` `R` |
+| DO KOREKTY | jaki numer korekty? | `Enter` `R` |
 | ODRZUCONE, ZAMKNIĘTE | — | tylko wgląd |
 
 Po decyzji kursor schodzi na następny wiersz. Strzałki chodzą po kolejce,
@@ -759,6 +759,21 @@ Kolejność bierze się z terminu ustawowego, nie z daty wpływu.
 
 Trzy kolumny, jak §10.1: kolejka, pasek werdyktu z osią, dowody. Dwa ekrany
 obsługi mają mieć jeden nawyk, nie dwa.
+
+### 25a.4a. Korekta i zamknięcie (0.162.0)
+
+Korektę wystawia człowiek w Subiekcie, a panel zapisuje jej NUMER — i to nie
+jest półśrodek w drodze do automatu. Zadanie `korekta_zwrot` w kolejce Sfery
+potrzebuje identyfikatora dokumentu SPRZEDAŻY, a read-model Subiekta trzyma
+wyłącznie zakupy (FZ, PZ). Bez tego identyfikatora automat musiałby go zgadywać.
+
+Zapisany numer zamyka zwrot i zdejmuje go z kolejki pracy. Zamknięcie znaczy
+„nasza część jest zrobiona", nie „klient dostał przelew": pieniądze oddaje
+człowiek w panelu Allegro i ekran mówi to wprost przy przycisku.
+
+Numer przepisuje się ręką, więc literówka jest zdarzeniem normalnym.
+Cofnięcie korekty jest JEDYNĄ operacją dozwoloną na zwrocie zamkniętym
+i przywraca go do DO KOREKTY — werdykt, oceny i kwota zostają.
 
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
@@ -911,7 +926,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |
 | Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`przecena`/`utylizacja` |
 | Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |
-| Korekta i zamknięcie zwrotu | **projekt** | kolumny stoją, zapisu nie ma |
+| Korekta i zamknięcie zwrotu | **działa** od 0.162.0 | `zapiszKorekte`, `cofnijKorekte` — numer z Subiekta |
 | Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |
@@ -919,4 +934,4 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
 | Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
 | Zwrot pieniędzy i odmowa w Allegro | **projekt** | `outbox`, `commandId` — 0.151.0 |
-| Automat korekty przez Sferę | **projekt** | kontrakt `korekta_zwrot` żyje, brak nadawcy |
+| Automat korekty przez Sferę | **poza zasięgiem** | brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ |

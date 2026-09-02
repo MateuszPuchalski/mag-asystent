@@ -111,3 +111,32 @@ export function useKwota() {
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
+
+/**
+ * Numer korekty wystawionej w Subiekcie — i jego cofnięcie.
+ *
+ * Panel niczego nie wystawia: `korekta_zwrot` w kolejce Sfery potrzebuje
+ * `dok_Id` dokumentu SPRZEDAŻY, a read-model zna wyłącznie zakupy. Zapisujemy
+ * FAKT, że korekta powstała, i pozwalamy go cofnąć — numer przepisuje ręką
+ * człowiek, więc literówka jest tu zdarzeniem normalnym (§25a.5).
+ */
+export function useKorekta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; numer: string; wersja: number }) =>
+      api<{ korektaNumer: string; zamknietyAt: string; wersja: number }>(
+        `/api/obsluga/zwroty/${v.id}/korekta`,
+        { method: "POST", body: JSON.stringify({ numer: v.numer, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+export function useCofnijKorekte() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/korekta/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
