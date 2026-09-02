@@ -13,7 +13,6 @@ import { Blad } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
-import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import type { StatusRozmowy, SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 
@@ -131,9 +130,15 @@ export function Skrzynka() {
   /* Ekran trzyma się okna, a przewijają się kolumny (0.165.0) — ten sam nawyk
      co w zwrotach, bo dwa ekrany obsługi mają mieć jeden, nie dwa.
 
-     Alarm i stan integracji stoją POZA gridem: jako wiersze `col-span-2`
-     byłyby wierszami warunkowymi, a wtedy kolumny wpadałyby w nie przy pustym
-     alarmie i blokada by znikała. */
+     Alarm stoi POZA gridem: jako wiersz `col-span-2` byłby wierszem
+     warunkowym, a wtedy kolumny wpadałyby w niego przy pustym alarmie
+     i blokada by znikała.
+
+     TABELA `StanIntegracji` odeszła stąd w 0.168.0 — za zębatkę, na ekran
+     ustawień. Skrzynka jest ekranem pracy, a trzynaście wierszy z
+     `/api/health` czyta się raz na tydzień. Alarm ZOSTAJE: zasada 10 projektu
+     mówi „awaria integracji musi być widoczna", a §21 żąda trwałego alarmu —
+     schowaniu podlegała tabela, nie ostrzeżenie. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <AlarmSynchronizacji zdrowie={zdrowie.data} trwa={synchronizuj.isPending}
       blad={bladSynchronizacji}
@@ -286,7 +291,6 @@ export function Skrzynka() {
 
     <div className="shrink-0 space-y-4">
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
-      <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
     </div>
   </div>;
 }

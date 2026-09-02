@@ -647,6 +647,12 @@ Subiekta.
 Panel pokazuje trwały alarm, gdy synchronizacja nie powiodła się przez więcej
 niż dwa planowane interwały.
 
+Od 0.168.0 pełna tabela tych trzynastu pozycji mieszka **za zębatką**, na
+ekranie `/obsluga/ustawienia`. Ekran pracy niesie to, co woła o reakcję:
+pigułkę synchronizacji w nagłówku i trwały alarm nad kolejką. Sama tabela
+opisuje tło i czyta się ją rzadko — zasada 10 mówi o widocznej AWARII, nie
+o widocznej diagnostyce.
+
 ## 22. Metryki biznesowe
 
 Czas do pierwszej odpowiedzi, czas do rozwiązania, rozmowy po terminie, liczba
@@ -1014,6 +1020,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |
 | Status synchronizacji (§7) | **działa** od 0.147.0 | `statusSynchronizacji` |
 | Trwały alarm synchronizacji (§21) | **działa** od 0.147.0 | `skrzynka/AlarmSynchronizacji.tsx` |
+| Ustawienia obsługi za zębatką (§21) | **działa** od 0.168.0 | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
