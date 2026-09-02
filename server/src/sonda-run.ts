@@ -22,11 +22,17 @@ import {
    pytanie o rozrusznik przyjechało bez numeru oferty, choć mail z Allegro tę
    ofertę nazywa.
 
-   WYŁĄCZNIE GET. Sonda niczego nie zapisuje ani u nas, ani w Allegro; nie
-   dotyka też bazy poza odczytem tokenu. Wypisuje KSZTAŁT (nazwy pól, typy,
-   jak często puste), nigdy treści — raport ma wejść do repo jako
-   `docs/allegro-ksztalt.md`, więc nie ma prawa nieść danych osobowych.
-   Pilnują tego reguły w `services/ksztalt.ts` i testy obok nich.
+   WYŁĄCZNIE GET po stronie Allegro: sonda nie zmienia tam ani jednej rzeczy.
+   Wypisuje KSZTAŁT (nazwy pól, typy, jak często puste), nigdy treści — raport
+   ma wejść do repo jako `docs/allegro-ksztalt.md`, więc nie ma prawa nieść
+   danych osobowych. Pilnują tego reguły w `services/ksztalt.ts` i testy obok.
+
+   BAZY DOTYKA, i to bardziej, niż mówiło zdanie stojące tu do 0.162.1
+   („nie dotyka bazy poza odczytem tokenu"). Odczyt tokenu idzie przez `db()`,
+   a `db()` wykonuje `schema.sql` i CAŁĄ migrację; przy wygasłym tokenie
+   dochodzi jeszcze zapis odświeżonego. Ta nieścisłość kosztowała czas przy
+   awarii 0.162.1: `npm run sonda` padał na migracji pozycji zwrotu, a szukało
+   się przyczyny w sondzie — choć tak samo padały wtedy API i worker.
 
    Uruchomienie:  npm run sonda            (raport na ekran)
                   npm run sonda -- plik.md (raport do pliku)                 */

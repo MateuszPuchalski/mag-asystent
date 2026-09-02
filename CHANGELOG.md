@@ -34,6 +34,69 @@ historii nie przepisujemy.
 ---
 
 
+## 0.162.1 — 2 września 2026
+
+**Aktualizacja 0.153.1 → 0.162.0 nie podnosiła instalacji wcale.**
+
+`wertis-api` i `wertis-worker` zostawały w `SERVICE_PAUSED`, a `npm run sonda`
+kończył się kodem 1. Wszystkie trzy padały na tym samym zdaniu:
+`UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id, …klucz`, w migracji
+wołanej przez `db()` — czyli przez każdy proces, który otwiera bazę.
+
+### Klucz naturalny pozycji obiecywał więcej, niż dane mogą dać
+
+`CustomerReturnItem` w specyfikacji Allegro nie ma ŻADNEGO identyfikatora
+pozycji: są `offerId`, `quantity`, `name`, `price`, `url`, `reason`
+i `serialNumbers`. Ta sama oferta potrafi więc wystąpić w jednym zwrocie dwa
+razy, a klucz `offer_id|nazwa` sklejał takie pozycje w jedną.
+
+Do 0.153.1 nie bolało: synchronizator kasował pozycje i wstawiał od nowa bez
+żadnego ograniczenia, więc duplikaty spokojnie leżały w bazie. Przebudowa
+z 0.154.0 liczyła im identyczny klucz i zakładała na niego indeks UNIQUE —
+na bazie z takim zwrotem wywracała się w kółko, przy każdym starcie.
+
+Klucz dostaje NUMER WYSTĄPIENIA: pierwsza pozycja zostaje przy dzisiejszym
+kluczu, druga dostaje `|#2`. Bazy już zmigrowane nie przekluczają ani jednego
+wiersza, a to do klucza przywiązana jest praca człowieka — ocena, kartoteka
+i zaznaczenie do kwoty.
+
+### Ta sama wada żyła w synchronizatorze
+
+Dwie pozycje tej samej oferty nadpisywały się nawzajem przez `DO UPDATE`, więc
+zwrot cicho gubił wiersz, a kwota liczyła się z jednej sztuki zamiast dwóch.
+Utrwalał to test, którego NAZWA mówiła „nie zlewają się", a asercja dowodziła,
+że jednak się zlewają. Teraz obie pozycje mają własny wiersz, a test pilnuje
+też tego, że drugi przebieg synchronizacji ich nie mnoży.
+
+### Przebudowa gubiła po drodze `w_zwrocie`
+
+Druga wada na tej samej ścieżce, widoczna dopiero po odblokowaniu startu. Nowa
+tabela nie miała tej kolumny, choć `addColumn` dokłada ją kilkadziesiąt linii
+wyżej w tym samym przebiegu — przebudowa kasowała ją razem ze starą tabelą,
+a wracała dopiero przy następnym starcie. Do tego czasu zapis kwoty leciał na
+nieistniejącą kolumnę.
+
+### Test, który miał to złapać
+
+Istniejący test przepisania wstawiał do starej tabeli JEDEN wiersz i dlatego
+przepuścił awarię. Nowy stawia bazę w kształcie sprzed 0.154.0 z dwiema parami
+duplikatów i sprawdza komplet: wszystkie cztery pozycje przeżywają, klucze są
+różne, oceny się nie nadpisują, `w_zwrocie` istnieje, indeks unikalny stoi,
+a drugi przebieg migracji nie robi nic.
+
+Migracja NIE dostaje trybu „przełknij błąd i jedź dalej". Baza w połowie
+przebudowana jest gorsza niż start, który uczciwie staje.
+
+### Sonda mówiła o sobie nieprawdę
+
+Nagłówek obiecywał, że sonda „nie dotyka bazy poza odczytem tokenu". Odczyt
+tokenu idzie przez `db()`, a `db()` wykonuje schemat i całą migrację. To zdanie
+kazało szukać przyczyny w sondzie, choć tak samo padały wtedy API i worker.
+
+**[wymaga działania]** Migracja naprawia się sama przy pierwszym starcie —
+w bazie nic nie trzeba ruszać. Usługi trzeba jednak wystartować RĘCZNIE, bo
+NSSM zostawił je w `SERVICE_PAUSED` po nieudanych próbach.
+
 ## 0.162.0 — 2 września 2026
 
 **Piąty kubełek kolejki zwrotów był ślepym zaułkiem.**
