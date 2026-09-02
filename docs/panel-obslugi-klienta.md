@@ -1058,6 +1058,45 @@ wychodzi w eksporcie. Politykę opisuje `docs/obsluga-klienta.md`.
 Odnośnika do Allegro taki wiersz nie dostaje. Prowadziłby na stronę zwrotu,
 którego po tamtej stronie nie ma.
 
+### 25a.14. Dokument sprzedaży z Subiekta (0.174.0)
+
+Ostatnia pozycja z listy biura zwrotów: „widoczny numer paragonu". Pracownik
+szukał go w Subiekcie ręcznie — po dacie i nazwisku, bo nic innego nie miał.
+Po tym numerze wystawia się korekta, więc od niego zależą pieniądze.
+
+**Read-model `sgt_faktura` wrócił po skasowaniu w 0.140.0.** Nazwa jest nowa
+i to nie jest kosmetyka: `sgt_sprzedaz` stoi na liście kasowania, która chodzi
+przy KAŻDEJ migracji. Tabela nazwana tak samo powstałaby ze `schema.sql`
+i znikała sekundę później, po cichu i bez błędu.
+
+**Automat wiąże wyłącznie pewność.** Sygnałem rozstrzygającym jest numer
+zamówienia stojący NA dokumencie. Jeden taki dokument wiąże się sam; dwa to
+spór, nie trafienie, i zostają dla człowieka.
+
+**Nakładka pozycji NIE WIĄŻE nigdy.** Firma ogrodnicza sprzedaje ten sam
+sekator dziesięć razy dziennie, więc „wszystkie zwracane towary są na tym
+dokumencie" bywa prawdą o kilkunastu dokumentach naraz. To poszlaka — kandydat
+z nią trafia na listę, ale wskazuje człowiek. Ta sama doktryna co przy
+sygnaturze w 0.169.0 i z tego samego powodu: powiązanie prowadzi do korekty,
+a zła korekta idzie do cudzej sprzedaży.
+
+**Kandydat pokazuje SWÓJ powód**, nie sam numer. Wybiera człowiek, więc ma
+widzieć, czemu akurat te dokumenty tam stoją. Pochodzenie zostaje widoczne po
+wybraniu: automat mówi „numer zamówienia stoi na tym dokumencie", a wskazanie
+ręczne podpisuje się imieniem. Projekt panelu §4.3 nie pozwala, żeby wybór
+człowieka udawał fakt z danych.
+
+**Pusty wynik się tłumaczy.** Trzy powody i wszystkie prawdziwe: sprzedaż bywa
+starsza niż okno importu, integracja nie zawsze wpisuje numer na dokument,
+a bez potwierdzonej kartoteki nie ma po czym dopasować towarów. Bez tych zdań
+„nie znalazłem" czyta się jak zepsuty import.
+
+**Numer jest SNAPSHOTEM przy zwrocie.** Read-model czyści się przy każdym
+imporcie, a dokument wypada z okna po dwóch miesiącach — powiązanie musi
+przeżyć własne źródło. Wchodzi też do eksportu CSV, osobną kolumną.
+
+Zdjęcie powiązania to droga wyjścia z pomyłki, nie brak funkcji (§25a.5).
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -1143,6 +1182,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx` |
 | Nazwa towaru przy ofercie w rozmowie | **z zamówienia** od 0.167.0 | `nazwaOferty` — ofert nadal nie pobieramy |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
+| Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |

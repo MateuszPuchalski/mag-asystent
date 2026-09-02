@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  budujFiltrFaktur,
   budujFiltryDokumentow,
   zapytaniePozycjiMm,
   zdaniePrzyjecBezPozycji,
@@ -103,4 +104,21 @@ test("dokumenty bez pozycji mówią o sobie, zamiast wyglądać na spokojny dzie
   // dzień bez przesunięć i normalny import milczą
   assert.equal(zdaniePrzyjecBezPozycji(0, 0), null);
   assert.equal(zdaniePrzyjecBezPozycji(6, 18), null);
+});
+
+/* ── Dokumenty sprzedaży (0.174.0) ───────────────────────────────────────────
+   Okno jest DATĄ, nie listą identyfikatorów, i to nie jest kwestia gustu.
+   Sześćdziesiąt dni sprzedaży to dziesiątki tysięcy dokumentów, a `IN (id,…)`
+   tej długości położyło wdrożenie 0.53.0 błędem 8623 na przemian z timeoutem
+   — import startowy jest twardym błędem, więc API weszło w pętlę restartów. */
+
+test("filtr sprzedaży bierze oba typy i tnie datą, nie listą numerów", () => {
+  const gdzie = budujFiltrFaktur([2, 21]);
+  assert.equal(gdzie, "d.dok_Typ IN (2,21) AND d.dok_DataWyst >= @cutoff");
+  assert.doesNotMatch(gdzie, /dok_Id IN/);
+});
+
+test("sam paragon odcina fakturę", () => {
+  // firma sprzedająca wyłącznie na PA — faktura jest u niej innym procesem
+  assert.match(budujFiltrFaktur([21]), /d\.dok_Typ IN \(21\)/);
 });

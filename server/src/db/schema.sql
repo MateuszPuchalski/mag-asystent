@@ -951,6 +951,21 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- Przewoźnik z pierwszej paczki. Bez `CHECK`: Allegro nie publikuje
   -- zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
   przewoznik TEXT,
+  -- ── Dokument sprzedaży z Subiekta (0.174.0) ─────────────────────────────
+  -- Numer, po którym biuro odnajduje sprzedaż, żeby wystawić korektę. Wskazuje
+  -- go CZŁOWIEK z listy kandydatów albo automat, ale wyłącznie wtedy, gdy na
+  -- dokumencie stoi numer zamówienia — nakładka pozycji jest poszlaką, a zły
+  -- dokument znaczy korektę do cudzej sprzedaży.
+  faktura_dok_id INTEGER,
+  -- Snapshot numeru i typu. Read-model `sgt_faktura` czyści się przy KAŻDYM
+  -- imporcie, a dokument wypada z okna po dwóch miesiącach — bez kopii numer
+  -- zniknąłby biuru z ekranu razem z nim.
+  faktura_numer TEXT,
+  faktura_typ TEXT,
+  -- `numer` = automat po numerze zamówienia, `reczne` = wskazanie człowieka.
+  -- Ta sama zasada co przy kartotece: wybór człowieka nie udaje faktu z danych.
+  faktura_zrodlo TEXT CHECK (faktura_zrodlo IN ('numer','reczne')),
+  faktura_at TEXT, faktura_przez TEXT,
   korekta_queue_id INTEGER REFERENCES sfera_queue(id),
   korekta_numer TEXT,
   zamkniety_at TEXT,
@@ -1286,6 +1301,43 @@ CREATE INDEX IF NOT EXISTS ix_kosz_poz ON kosz_pozycja(kosz_id);
 --
 -- Read-model, nie prawda: wipe+insert przy każdym imporcie, dokładnie jak
 -- sgt_sprzedaz. Aplikacja czyta stąd WYŁĄCZNIE listę „co jest w koszu".
+-- ── Dokumenty sprzedaży (FS/PA) — read-model wskrzeszony w 0.174.0 ──────────
+-- Biuro zwrotów potrzebuje NUMERU dokumentu: po nim, i tylko po nim, odnajduje
+-- sprzedaż w Subiekcie, żeby wystawić korektę. Do 0.140.0 stały tu tabele
+-- `sgt_sprzedaz*`; ta nazwa jest SPALONA (migracja kasuje ją przy każdym
+-- starcie), więc read-model wraca jako `sgt_faktura`.
+--
+-- Nazwy `kontrahent` tu NIE MA i to jest decyzja, nie przeoczenie. Stary model
+-- kopiował `kh_Symbol`, a przy sprzedaży konsumenckiej bywa tam imię i nazwisko
+-- człowieka — polityka danych dopuszcza wprost sam login kupującego. Tak samo
+-- odpada `dok_Uwagi`: pięćset znaków dowolnego tekstu, w które ktoś kiedyś
+-- wpisze adres albo telefon.
+--
+-- Read-model, nie prawda: wipe+insert przy każdym imporcie.
+CREATE TABLE IF NOT EXISTS sgt_faktura (
+  dok_id    INTEGER PRIMARY KEY,
+  typ       TEXT NOT NULL,           -- FS | PA
+  nr_pelny  TEXT NOT NULL,           -- „FS 1240/2026" — to widzi biuro
+  -- Numer obcy z dokumentu (`dok_NrPelnyOryg`, varchar(30)). Identyfikator
+  -- zamówienia Allegro jest UUID-em o 36 znakach, więc CAŁY tam nie wejdzie —
+  -- kolumna zostaje, bo integracja bywa ustawiona na własny, krótszy numer.
+  nr_oryg   TEXT,
+  data_wyst TEXT NOT NULL            -- ISO date
+);
+CREATE INDEX IF NOT EXISTS ix_faktura_data ON sgt_faktura(data_wyst);
+CREATE INDEX IF NOT EXISTS ix_faktura_oryg ON sgt_faktura(nr_oryg);
+
+CREATE TABLE IF NOT EXISTS sgt_faktura_pozycja (
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  dok_id INTEGER NOT NULL REFERENCES sgt_faktura(dok_id),
+  tw_id  INTEGER NOT NULL,
+  ilosc  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_faktura_poz_dok ON sgt_faktura_pozycja(dok_id);
+-- Dopasowanie pyta „na których dokumentach stoi TEN towar" — bez tego indeksu
+-- każde otwarcie zwrotu skanowałoby pozycje z całego okna importu.
+CREATE INDEX IF NOT EXISTS ix_faktura_poz_tw ON sgt_faktura_pozycja(tw_id);
+
 CREATE TABLE IF NOT EXISTS sgt_mm_zwrot (
   dok_id    INTEGER PRIMARY KEY,
   nr_pelny  TEXT NOT NULL,           -- „MM 1240/MAG/2026"

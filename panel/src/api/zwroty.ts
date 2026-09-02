@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { KolejkaZwrotow, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -22,7 +22,8 @@ export function useZwroty() {
 export function useZwrot(id: number | null) {
   return useQuery({
     queryKey: kluczeZwrotow.zwrot(id ?? 0),
-    queryFn: () => api<{ zwrot: Zwrot; os: WpisOsiZwrotu[] }>(`/api/obsluga/zwroty/${id}`),
+    queryFn: () => api<{ zwrot: Zwrot; os: WpisOsiZwrotu[]; kandydaciFaktury: KandydatFaktury[] }>(
+      `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,
   });
 }
@@ -230,5 +231,26 @@ export function useDociagnijPoSkanie() {
         method: "POST", body: JSON.stringify({ kod }),
       }),
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
+ * Wskazanie dokumentu sprzedaży z Subiekta (0.174.0).
+ *
+ * `dokId: null` ZDEJMUJE powiązanie — droga wyjścia z pomyłki, a nie brak
+ * funkcji (§25a.5). Panel wysyła sam identyfikator z listy kandydatów: numeru
+ * wpisanego z palca serwer i tak nie przyjmie, bo dokument musi stać
+ * w read-modelu.
+ */
+export function useFaktura() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; dokId: number | null }) =>
+      api<{ faktura: FakturaZwrotu }>(`/api/obsluga/zwroty/${v.id}/faktura`,
+        { method: "POST", body: JSON.stringify({ dokId: v.dokId }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
   });
 }

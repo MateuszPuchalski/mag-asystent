@@ -427,6 +427,18 @@ i samą flagę `invoice.required`. Adres z faktury niesie ulicę i miasto, a zas
 „adresy nie przechodzą przez mapowanie" nie ma wyjątków. Ekran mówi więc
 „paragon", „faktura" albo „nie wiadomo", i nic ponadto.
 
+**Read-model sprzedaży bierze cztery kolumny i ani jednej więcej (0.174.0).**
+`sgt_faktura` niesie identyfikator dokumentu, typ, numer pełny, numer obcy
+i datę. Nie ma tam `kh_Symbol`, bo przy sprzedaży konsumenckiej bywa w nim imię
+i nazwisko człowieka — a polityka dopuszcza wprost sam login kupującego. Nie ma
+też `dok_Uwagi`: pięćset znaków dowolnego tekstu, w które ktoś kiedyś wpisze
+adres albo telefon. Read-model kopiuje to, co przeczyta, razem do kopii
+zapasowych.
+
+Stary model z 0.53.0 kopiował oba te pola i punktował kontrahenta przeciw
+loginowi kupującego. Wskrzeszenie nie jest przywróceniem — te dwie kolumny nie
+wracają.
+
 **Zestawienie CSV wynosi loginy, więc zostawia ślad.** Eksport kolejki zwrotów
 dopisuje zdarzenie `zwroty_eksport` — kto pobiera zestawienie o ludziach, sam
 trafia do dziennika. To ta sama zasada co przy analizie i audycie. Numeru listu

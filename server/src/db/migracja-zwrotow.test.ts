@@ -53,6 +53,18 @@ test("stare nazwy zwrotów nadal znikają — lista kasowania jest nietknięta",
   d.close();
 });
 
+test("read-model sprzedaży wraca pod NOWĄ nazwą i migrację przeżywa", () => {
+  /* Trzecia połowa tej samej umowy (0.174.0). `sgt_sprzedaz` jest na liście
+     kasowania, która chodzi przy KAŻDEJ migracji — tabela nazwana tak samo
+     powstałaby ze `schema.sql` i znikała sekundę później, po cichu i bez
+     błędu, bo `migrate()` chodzi PO schemacie. Dlatego `sgt_faktura`. */
+  const d = poMigracji();
+  for (const tabela of ["sgt_faktura", "sgt_faktura_pozycja"]) {
+    assert.equal(istnieje(d, tabela), true, `${tabela} musi przeżyć migrate()`);
+  }
+  d.close();
+});
+
 test("kubełka nie ma w kolumnie — wynika z faktów, nie z zapisu", () => {
   /* Zdenormalizowany kubełek rozjechałby się z werdyktem przy pierwszym
      zapisie, który go zapomni. Liczy go `services/zwroty.ts`. */

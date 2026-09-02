@@ -6,8 +6,8 @@ import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pozycje } from "../zwroty/Pozycje";
 import {
-  useCofnijKorekte, useKorekta, useKwota, useNieodebrana, useOcena, usePotracenie,
-  useWerdykt, useZglosRabat,
+  useCofnijKorekte, useFaktura, useKorekta, useKwota, useNieodebrana, useOcena,
+  usePotracenie, useWerdykt, useZglosRabat, useZwrot,
 } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
@@ -90,7 +90,9 @@ export function Zwroty() {
   const rabat = useZglosRabat();
   const potracenie = usePotracenie();
   const nieodebrana = useNieodebrana();
+  const faktura = useFaktura();
   const [bladRabatu, setBladRabatu] = useState("");
+  const [bladFaktury, setBladFaktury] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || potracenie.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
@@ -173,6 +175,10 @@ export function Zwroty() {
 
   const wybrany = id ? Number(id) : null;
   const zwrot = data?.zwroty.find((z) => z.id === wybrany) ?? null;
+  /* Kandydatów na dokument sprzedaży niesie DOPIERO szczegół zwrotu, nie
+     kolejka: liczą się z okna sześćdziesięciu dni sprzedaży, a kolejka ma
+     dziesiątki wierszy. Jeden otwarty zwrot to jedno takie liczenie. */
+  const szczegol = useZwrot(wybrany);
 
   /* Wejście z paska adresu na zwrot z innego kubełka ma pokazać ten zwrot,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
@@ -390,7 +396,14 @@ export function Zwroty() {
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
-        ? <Dowody zwrot={zwrot} />
+        ? <Dowody zwrot={zwrot}
+            kandydaciFaktury={szczegol.data?.kandydaciFaktury ?? []}
+            fakturaTrwa={faktura.isPending} fakturaBlad={bladFaktury}
+            onFaktura={(dokId) => {
+              setBladFaktury("");
+              faktura.mutate({ id: zwrot.id, dokId },
+                { onError: (e) => setBladFaktury((e as Error).message) });
+            }} />
         : <p className="p-6 text-center text-sm text-slate-500">
             Dowody pokażą się po wybraniu zwrotu.</p>}
       </div>

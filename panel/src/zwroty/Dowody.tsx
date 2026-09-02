@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import {
   CalendarClock, Copy, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
 } from "lucide-react";
-import type { PozycjaZwrotu, Zwrot } from "../api/typy";
+import type { KandydatFaktury, PozycjaZwrotu, Zwrot } from "../api/typy";
+import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
 import { czas, Plakietka } from "../ui";
 import { Link } from "./Link";
@@ -87,7 +88,15 @@ function DociagnijZamowienia() {
   </div>;
 }
 
-export function Dowody({ zwrot }: { zwrot: Zwrot }) {
+export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
+  fakturaBlad = "", onFaktura }: {
+  zwrot: Zwrot;
+  kandydaciFaktury?: KandydatFaktury[];
+  fakturaTrwa?: boolean;
+  fakturaBlad?: string;
+  /** Brak = kolumna nie proponuje wskazania (przycisk bez działania kłamie). */
+  onFaktura?: (dokId: number | null) => void;
+}) {
   const zam = zwrot.zamowienie;
 
   return <div className="text-sm">
@@ -217,6 +226,15 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
             </li>)}
           </ul>}
     </Sekcja>
+
+    {/* ── Dokument sprzedaży (0.174.0) ───────────────────────────────────────
+        Stoi POD zamówieniem, bo to jego druga strona: zamówienie mówi, co
+        klient kupił w Allegro, dokument — pod jakim numerem ta sprzedaż stoi
+        w Subiekcie. Po tym numerze biuro wystawia korektę. */}
+    {onFaktura && <Sekcja ikona={ikonaDokumentu} tytul="Dokument sprzedaży">
+      <Dokument faktura={zwrot.faktura} kandydaci={kandydaciFaktury}
+        trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura} />
+    </Sekcja>}
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
       <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>

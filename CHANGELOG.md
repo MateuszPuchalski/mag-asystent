@@ -34,6 +34,82 @@ historii nie przepisujemy.
 ---
 
 
+## 0.174.0 — 2 września 2026
+
+**Przy zwrocie widać numer dokumentu sprzedaży z Subiekta.** Ostatnia pozycja
+z listy biura zwrotów: „widoczny numer paragonu". Decyzja właściciela:
+„wskrzesić read-model sprzedaży z Subiekta".
+
+### Po tym numerze wystawia się korektę
+
+Pracownik szukał go w Subiekcie ręcznie — po dacie i nazwisku, bo nic innego
+nie miał. Read-model dokumentów sprzedaży istniał do 0.140.0 i odszedł razem
+z rejestrem zwrotów. Kolejka zwrotów odbudowana od 0.150.0 potrzebuje go
+z powrotem.
+
+Wraca pod NOWĄ nazwą — `sgt_faktura`, nie `sgt_sprzedaz`. Ta druga jest spalona
+na zawsze: stoi na liście kasowania, która chodzi przy KAŻDEJ migracji. Tabela
+nazwana tak samo powstałaby ze `schema.sql` i znikała sekundę później, po cichu
+i bez błędu. Pilnuje tego osobny test migracji.
+
+### Automat wiąże wyłącznie pewność
+
+Sygnałem rozstrzygającym jest numer zamówienia stojący NA dokumencie. Jeden
+taki dokument wiąże się sam, w takcie synchronizacji; dwa to spór, nie
+trafienie, i zostają dla człowieka.
+
+**Nakładka pozycji nie wiąże nigdy.** Firma ogrodnicza sprzedaje ten sam
+sekator dziesięć razy dziennie, więc „wszystkie zwracane towary są na tym
+dokumencie" bywa prawdą o kilkunastu dokumentach naraz. To poszlaka: kandydat
+z nią trafia na listę, ale wskazuje człowiek. Ta sama doktryna co przy
+sygnaturze w 0.169.0 — powiązanie prowadzi do korekty, a zła korekta idzie do
+cudzej sprzedaży.
+
+Kandydat pokazuje SWÓJ powód, nie sam numer. Po wybraniu widać pochodzenie:
+automat mówi „numer zamówienia stoi na tym dokumencie", a wskazanie ręczne
+podpisuje się imieniem. Zdjęcie powiązania to droga wyjścia z pomyłki.
+
+### Arytmetyka, która unieważniła stare założenie
+
+`dok_NrPelnyOryg` jest kolumną varchar(30). Identyfikator zamówienia Allegro to
+UUID o 36 znakach. **Cały numer się tam nie mieści** i nie trzeba tego
+sprawdzać na bazie — wystarczy odjąć.
+
+Wersja z 0.53.0 szukała w tej kolumnie całego numeru, więc ten sygnał nie miał
+prawa zadziałać ani razu. Teraz dopasowanie uznaje dwie drogi: numer zawarty
+w numerze obcym albo numer obcy będący jego początkiem uciętym dokładnie do
+trzydziestu znaków. Krótszego prefiksu nie uznajemy — „1234" pasowałoby do co
+drugiego dokumentu w oknie.
+
+### Read-model bierze cztery kolumny i ani jednej więcej
+
+Identyfikator, typ, numer pełny, numer obcy i data. Nie ma `kh_Symbol`, bo przy
+sprzedaży konsumenckiej bywa w nim imię i nazwisko człowieka — polityka danych
+zwrotów dopuszcza wprost sam login kupującego. Nie ma `dok_Uwagi`: pięćset
+znaków dowolnego tekstu, w które ktoś kiedyś wpisze adres albo telefon.
+
+Stary model kopiował oba te pola i punktował kontrahenta przeciw loginowi
+kupującego. Wskrzeszenie nie jest przywróceniem.
+
+### Reszta
+
+Numer stoi przy zwrocie SNAPSHOTEM: read-model czyści się przy każdym imporcie,
+a dokument wypada z okna po dwóch miesiącach — powiązanie musi przeżyć własne
+źródło. Wchodzi też do eksportu CSV, osobną kolumną. Trasa
+`POST /api/obsluga/zwroty/:id/faktura` podnosi umowę tras zapisujących do
+trzynastu; obie mutacje piszą do dziennika.
+
+Dwa zdania w `/api/health` osierocone w 0.140.0 wracają do swoich wartości:
+brak kolumny numeru obcego i awaria odczytu sprzedaży. Odczyt DEGRADUJE, nie
+przerywa importu — stany i lokalizacje są pracą hali, a numer faktury wygodą
+biura.
+
+**[wymaga działania]** Nic, jeśli zostawisz domyślne. `DOK_SPRZEDAZ_DNI_WSTECZ`
+(60 dni) i `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` (`dok_NrPelnyOryg`) wracają do
+`wertis.env` i działają bez wpisywania. Warto sprawdzić na własnej bazie, czy
+integracja tę kolumnę wypełnia — zapytanie stoi w DEPLOY §6.
+`MSSQL_SPRZEDAZ_UWAGI_COLUMN` nie wraca i nie wróci.
+
 ## 0.173.0 — 2 września 2026
 
 **Odpowiadanie w wiadomościach Allegro nie było wyłączone — było opisane

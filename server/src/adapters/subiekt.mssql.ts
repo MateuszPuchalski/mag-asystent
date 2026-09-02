@@ -135,6 +135,14 @@ interface ZamPozRow {
   zreal: number;
 }
 
+interface FakturaRow {
+  dok_Id: number;
+  dok_Typ: number;
+  dok_NrPelny: string;
+  nr_oryg: string | null;
+  data_wyst: string;
+}
+
 export interface ImportStats {
   towary: number;
   stany: number;
@@ -147,6 +155,11 @@ export interface ImportStats {
      na ekranie kolektora oba wyglądają tak samo, a znaczą co innego. */
   mm: number;
   mmPozycje: number;
+  /* Dokumenty sprzedaży (0.174.0). Ta sama para co przy MM i z tego samego
+     powodu: „dziś nie sprzedano nic" wygląda na ekranie tak samo jak „pozycje
+     wiszą na innej kolumnie", a znaczy co innego. */
+  faktury: number;
+  fakturyPozycje: number;
   at: string;
 }
 
@@ -182,6 +195,25 @@ export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
  * ZWROTY na kolektorze pokazuje to, co widziała przy poprzedniej synchronizacji.
  */
 export let bladImportuMm: string | null = null;
+
+/**
+ * Odczyt dokumentów sprzedaży padł — zdanie do `/api/health` (0.174.0).
+ *
+ * Degraduje jak MM: stany i lokalizacje są ważniejsze niż numer faktury przy
+ * zwrocie, a biuro woli wczorajszą listę dokumentów niż wywrócony import.
+ */
+export let bladImportuFaktur: string | null = null;
+
+/**
+ * Kolumna z numerem obcym nie istnieje — zdanie do `/api/health` (0.174.0).
+ *
+ * To NIE to samo co `bladImportuFaktur`: dokumenty wchodzą, brakuje wyłącznie
+ * sygnału rozstrzygającego, więc zwrot dopasuje się po pozycjach i czeka na
+ * wskazanie człowieka. Rozróżnienie po numerze błędu SQL Servera (207 =
+ * invalid column name), bo timeout wzięty za brak kolumny dawałby fałszywy
+ * komunikat i DRUGIE ciężkie zapytanie do bazy, która właśnie nie wyrabia.
+ */
+export let brakKolumnyNrOryg: string | null = null;
 
 /**
  * Dokumenty MM weszły, pozycji nie ma ani jednej.
@@ -424,6 +456,89 @@ async function pobierzMmZwrotow(
   return { mm, mmPozycje };
 }
 
+/**
+ * Filtr dokumentów sprzedaży — wydzielony, żeby dało się go sprawdzić testem
+ * bez serwera MSSQL (ten sam powód co przy `budujFiltryDokumentow`).
+ *
+ * Okno jest DATĄ, nie listą identyfikatorów. Sześćdziesiąt dni sprzedaży to
+ * dziesiątki tysięcy dokumentów, a `IN (id, id, …)` tej długości położyło
+ * wdrożenie 0.53.0 błędem 8623 („query processor ran out of internal
+ * resources") na przemian z timeoutem — import startowy jest twardym błędem,
+ * więc API weszło wtedy w pętlę restartów.
+ */
+export function budujFiltrFaktur(typy: number[]): string {
+  const lista = typy.map((t) => Number(t)).join(",");
+  return `d.dok_Typ IN (${lista}) AND d.dok_DataWyst >= @cutoff`;
+}
+
+/**
+ * Dokumenty sprzedaży (FS/PA) do read-modelu `sgt_faktura` (0.174.0).
+ *
+ * Bierzemy CZTERY kolumny i ani jednej więcej. Nie ma tu `kh_Symbol`, bo przy
+ * sprzedaży konsumenckiej bywa tam imię i nazwisko, a polityka danych zwrotów
+ * dopuszcza wprost sam login kupującego. Nie ma `dok_Uwagi`, bo to pięćset
+ * znaków dowolnego tekstu — kiedyś ktoś wpisze tam adres albo telefon, a
+ * read-model kopiowałby to do naszej bazy i do kopii zapasowych.
+ *
+ * `WITH (NOLOCK)` jak przy MM: to zasilanie read-modelu odświeżanego taktem,
+ * brudny odczyt niczego nie psuje, a w dzienniku wdrożenia stoi deadlock
+ * z Subiektem pracującym obok na tych samych tabelach.
+ *
+ * Pozycje wiszą na `ob_DokHanId` — FS i PA są dokumentami HANDLOWYMI. To ta
+ * sama kolumna, którą 0.75.0 przepisało do MM i straciło wydanie; reguła stoi
+ * w `docs/subiekt-gt-struktura.md`.
+ */
+async function pobierzFaktury(
+  pool: sql.ConnectionPool
+): Promise<{ faktury: FakturaRow[]; fakturyPozycje: PozRow[] }> {
+  const c = config.mssql;
+  const gdzie = budujFiltrFaktur([c.dokTypFS, c.dokTypPA]);
+  const cutoff = new Date(Date.now() - c.fakturyDniWstecz * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+  const req = () => pool.request().input("cutoff", sql.VarChar, cutoff);
+
+  const zapytanie = (nrOryg: string) =>
+    req().query<FakturaRow>(
+      `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
+              ${nrOryg} AS nr_oryg,
+              CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst
+       FROM dok__Dokument d WITH (NOLOCK)
+       WHERE ${gdzie}`
+    );
+
+  const kolumna = c.fakturyNrOrygColumn
+    ? `d.${assertSafeColumn(c.fakturyNrOrygColumn)}`
+    : "NULL";
+
+  let faktury: FakturaRow[];
+  try {
+    faktury = (await zapytanie(kolumna)).recordset;
+    brakKolumnyNrOryg = null;
+  } catch (e) {
+    if (kolumna === "NULL") throw e; // to już nie jest kolumna opcjonalna
+    if ((e as { number?: unknown }).number !== 207) throw e;
+    brakKolumnyNrOryg =
+      `Kolumna ${kolumna} nie istnieje w dok__Dokument — zwroty dopasują ` +
+      "dokument sprzedaży po pozycjach, a numer wskaże człowiek. Sprawdź nazwę " +
+      "na własnej bazie i ustaw MSSQL_SPRZEDAZ_NR_ORYG_COLUMN (DEPLOY §6); " +
+      "puste = świadoma rezygnacja.";
+    console.warn(`[mssql] ${brakKolumnyNrOryg}`);
+    faktury = (await zapytanie("NULL")).recordset;
+  }
+
+  if (faktury.length === 0) return { faktury, fakturyPozycje: [] };
+  const fakturyPozycje = (
+    await req().query<PozRow>(
+      `SELECT p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag
+       FROM dok_Pozycja p WITH (NOLOCK)
+       JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId
+       WHERE ${gdzie}`
+    )
+  ).recordset;
+  return { faktury, fakturyPozycje };
+}
+
 export async function importFromMssql(): Promise<ImportStats> {
   const pool = await mssqlPool();
   const c = config.mssql;
@@ -518,6 +633,26 @@ export async function importFromMssql(): Promise<ImportStats> {
     console.warn(`[mssql] ${bladImportuMm}`);
   }
 
+  /* Sprzedaż degraduje tak samo jak MM i z tego samego powodu: numer faktury
+     przy zwrocie jest wygodą biura, a stany i lokalizacje są pracą hali.
+     `fakturyOk` steruje też czyszczeniem — read-modelu nie zaorujemy tylko
+     dlatego, że akurat jedno zapytanie padło. */
+  let faktury: FakturaRow[] = [];
+  let fakturyPozycje: PozRow[] = [];
+  let fakturyOk = false;
+  try {
+    ({ faktury, fakturyPozycje } = await pobierzFaktury(pool));
+    fakturyOk = true;
+    bladImportuFaktur = null;
+  } catch (e) {
+    bladImportuFaktur =
+      "Odczyt dokumentów sprzedaży (FS/PA) nie powiódł się — zwroty pokazują " +
+      "dokument z ostatniej udanej synchronizacji. Sprawdź DOK_TYP_FS, " +
+      "DOK_TYP_PA i DOK_SPRZEDAZ_DNI_WSTECZ (DEPLOY §6). " +
+      `Przyczyna: ${e instanceof Error ? e.message : e}`;
+    console.warn(`[mssql] ${bladImportuFaktur}`);
+  }
+
   // ── wpis do read-modelu sgt_* (wzorzec wipe+insert z seed.ts) ─────────────
   const d = db();
   const knownTw = new Set(towary.map((t) => t.tw_Id));
@@ -550,6 +685,13 @@ export async function importFromMssql(): Promise<ImportStats> {
   const insMmPoz = d.prepare(
     "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa) VALUES (?,?,?,?,?)"
   );
+  const insFaktura = d.prepare(
+    `INSERT INTO sgt_faktura(dok_id, typ, nr_pelny, nr_oryg, data_wyst)
+     VALUES (?,?,?,?,?)`
+  );
+  const insFakturaPoz = d.prepare(
+    "INSERT INTO sgt_faktura_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
+  );
 
   const apply = transaction(d, () => {
     /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy.
@@ -559,6 +701,7 @@ export async function importFromMssql(): Promise<ImportStats> {
        sgt_mm_zwrot* czyszczone tylko przy udanym odczycie — patrz `mmOk`. */
     for (const t of [
       ...(mmOk ? ["sgt_mm_zwrot_pozycja", "sgt_mm_zwrot"] : []),
+      ...(fakturyOk ? ["sgt_faktura_pozycja", "sgt_faktura"] : []),
       "sgt_zam_pozycja", "sgt_zamowienie",
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
@@ -639,6 +782,24 @@ export async function importFromMssql(): Promise<ImportStats> {
         p.nazwa ?? ""
       );
     }
+
+    for (const f of faktury) {
+      insFaktura.run(
+        f.dok_Id,
+        symbolTypu(f.dok_Typ),
+        f.dok_NrPelny,
+        (f.nr_oryg ?? "").trim() || null,
+        f.data_wyst
+      );
+    }
+    /* Z filtrem `knownTw`, inaczej niż przy MM. Pozycja faktury służy WYŁĄCZNIE
+       dopasowaniu zwrotu po nakładce towarów, a zwrot dopasowuje się po
+       `tw_id` z kartoteki — wiersz o towarze spoza importu nie miałby z czym
+       się zejść i tylko rozmywałby punktację. */
+    for (const p of fakturyPozycje) {
+      if (!knownTw.has(p.ob_TowId)) continue;
+      insFakturaPoz.run(p.ob_DokHanId, p.ob_TowId, Math.abs(p.ob_IloscMag ?? 0));
+    }
   });
   apply();
 
@@ -651,6 +812,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     zamPozycje: zamPozycje.length,
     mm: mm.length,
     mmPozycje: mmPozycje.length,
+    faktury: faktury.length,
+    fakturyPozycje: fakturyPozycje.length,
     at: nowIso(),
   };
   console.log(
