@@ -762,13 +762,22 @@ export function zarejestrujNieodebrana(
         JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
        WHERE k.channel_account_id=? AND k.external_id=?`)
         .all(konto.id, orderId) as Array<Record<string, unknown>>;
-      poz.forEach((p, i) => {
+      /* Przyrostek liczy się per POWTÓRZENIE, nie per wiersz — poprawka
+         0.174.2. Do niej stało tu `i + 1` z pętli, więc druga pozycja
+         zamówienia dostawała `|#2` nawet wtedy, gdy niczego nie powtarzała.
+         Taki napis w kluczu zderzał się potem w migracji z prawdziwym
+         duplikatem sąsiada i kładł start aplikacji. */
+      const wystapienia = new Map<string, number>();
+      poz.forEach((p) => {
+        const baza = `${p.offer_id ?? ""}|${p.nazwa}`;
+        const n = (wystapienia.get(baza) ?? 0) + 1;
+        wystapienia.set(baza, n);
         database.prepare(`INSERT INTO zwrot_klienta_pozycja
           (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz)
           VALUES (?,?,?,?,?,?,?)`).run(
           zwrotId, (p.offer_id as string) ?? null, String(p.nazwa), Number(p.ilosc),
           Number(p.cena_grosze), String(p.waluta ?? "PLN"),
-          `${p.offer_id ?? ""}|${p.nazwa}${i ? `|#${i + 1}` : ""}`);
+          `${baza}${n > 1 ? `|#${n}` : ""}`);
       });
       pozycji = poz.length;
     }

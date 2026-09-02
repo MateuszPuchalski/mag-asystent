@@ -827,6 +827,26 @@ test("paczkę nieodebraną znajduje skan po numerze listu", () => {
   assert.equal(t.zwrotId, w.zwrotId);
 });
 
+test("przyrostek klucza liczy POWTÓRZENIA, nie numery wierszy", () => {
+  /* Poprawka 0.174.2. Do niej przyrostek brał numer wiersza z pętli, więc
+     druga pozycja zamówienia dostawała `|#2`, choć niczego nie powtarzała.
+     Taki napis w kluczu zderzał się potem w migracji z prawdziwym duplikatem
+     sąsiada i kładł start aplikacji w pętli restartów. */
+  const d = stanowisko();
+  zamowienie(d, "ord-dup", [
+    { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
+    { offerId: "222", nazwa: "Łopata", sku: null, cena: 2999 },
+    { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
+  ]);
+  const w = zarejestrujNieodebrana(d, { waybill: "PX9", orderId: "ord-dup" }, KTO);
+  const klucze = (d.prepare(
+    "SELECT klucz FROM zwrot_klienta_pozycja WHERE zwrot_id=? ORDER BY id")
+    .all(w.zwrotId) as Array<{ klucz: string }>).map((r) => r.klucz);
+
+  /* Łopata jest druga w zamówieniu, ale pierwsza swojego rodzaju. */
+  assert.deepEqual(klucze, ["111|Sekator", "222|Łopata", "111|Sekator|#2"]);
+});
+
 test("ta sama paczka nie rejestruje się dwa razy", () => {
   /* Skan powtórzony przy odkładaniu kartonu jest zdarzeniem normalnym. */
   const d = stanowisko();
