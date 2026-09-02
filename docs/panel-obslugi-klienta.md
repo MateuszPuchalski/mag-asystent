@@ -422,9 +422,14 @@ rozdzielone.**
 
 ### 10.5. Widok mobilny
 
-Lista jest osobnym ekranem, otwarcie rozmowy ją zastępuje, kontekst otwiera się
-jako panel albo zakładka, szkic nie ginie przy powrocie, a przycisk powrotu
-jest zawsze dostępny.
+**Zdjęty z planu decyzją właściciela (0.181.1).** Panel obsługi pracuje na
+monitorach biura; telefon nie jest stanowiskiem pracy agenta. Poniżej
+szerokości `lg` kolumny stają jedna pod drugą i przewija się cała strona — to
+wystarcza na podgląd, a osobnego ekranu z przyciskiem powrotu nie będzie.
+
+Pierwotny projekt zostaje dla historii: lista jako osobny ekran, otwarcie
+rozmowy ją zastępuje, kontekst jako panel albo zakładka, szkic nie ginie przy
+powrocie. Gdyby decyzja wróciła, to jest punkt wyjścia.
 
 ## 11. Dobór części
 
@@ -1170,7 +1175,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Lista rozmów i oś czasu | **działa** od 0.143.0 | `services/skrzynka.ts`, `panel/src/skrzynka/` |
 | Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
 | Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
-| Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users` |
+| Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users`; od 0.157.0 do 0.181.0 panel wołał zły adres i dostawał 404 |
 | Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.160.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
 | Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
 | Obecność i „pisze" | **działa**, w pamięci | `services/conversation-realtime.ts` |

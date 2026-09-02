@@ -33,7 +33,12 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["conversation_mention", "conversation_comment", "conversation_draft",
+  /* Sprawy PRZED użytkownikami: `sprawa_klienta.utworzyl` wskazuje na
+     `app_user` bez kaskady. Do 0.181.0 test spraw był ostatni w pliku, więc
+     brak tych dwóch nazw nie wywracał niczego — każdy test dopisany po nim
+     padał w `beforeEach` na kluczu obcym. */
+  for (const t of ["sprawa_klienta_rozmowa", "sprawa_klienta",
+    "conversation_mention", "conversation_comment", "conversation_draft",
     "conversation_assignment", "conversation_event", "message", "conversation",
     "channel_account", "zadanie_terenowe", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -488,4 +493,46 @@ test("sprawa skleja rozmowy, a rozmowa mówi wprost, do której już należy", a
   assert.equal(odlacz.statusCode, 200, odlacz.body);
   r = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${druga}`, headers: b.naglowki });
   assert.equal(r.json().sprawa, null);
+});
+
+/* ── Strażnik adresów panelu (0.181.1) ──────────────────────────────────────
+   `TRASY()` wyżej pilnuje tras, które ISTNIEJĄ. Nie pilnuje tego, że panel
+   woła te same adresy — i dokładnie tędy przeszło 404 komentarza: od 0.157.0
+   do 0.181.0 hook wołał `/api/obsluga/rozmowy/:id/komentarz`, a serwer miał
+   tylko `/api/conversations/:id/comments`. Oba zestawy testów były zielone.
+
+   Ten test czyta źródło hooków panelu — tak samo jak `biuro.test.ts` czyta
+   `biuro.html` — i pyta Fastify o KAŻDY adres, który tam stoi. Adres bez trasy
+   wywraca test z nazwą hooka, zanim wywróci ekran u agenta.                 */
+test("każdy adres wołany z panel/src/api/rozmowy.ts ma trasę na serwerze", async () => {
+  const zrodlo = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/api/rozmowy.ts"), "utf8");
+  /* Para: `api(...)` z literałem adresu i — opcjonalnie — `method` w tym samym
+     wywołaniu. Brak `method` to GET. `${...}` w adresie zastępujemy jedynką
+     i puszczamy PRAWDZIWE żądanie przez router: `hasRoute` porównuje wzorzec
+     `:id` z tekstem, więc każdy adres z parametrem wychodziłby jako brak.
+     Brak TRASY poznajemy po domyślnym 404 Fastify („Route … not found");
+     404 z treścią aplikacji („nie znaleziono rozmowy") to trasa, która jest. */
+  const wywolania = [...zrodlo.matchAll(/api(?:<[^>]*>)?\(\s*`([^`]+)`(?:\s*,\s*\{[^}]*?method:\s*"(GET|POST|PUT|DELETE)")?/gs)];
+  assert.ok(wywolania.length >= 15, `spodziewałem się kilkunastu wywołań api(), jest ${wywolania.length}`);
+  const b = await login("biuro", "Biuro");
+  const bledne: string[] = [];
+  for (const [, adres, metoda] of wywolania) {
+    const url = adres.replace(/\$\{[^}]+\}/g, "1").replace(/\?.*$/, "");
+    const method = (metoda ?? "GET") as "GET" | "POST" | "PUT" | "DELETE";
+    const r = await app.inject({ method, url, headers: b.naglowki,
+      ...(method === "GET" ? {} : { payload: {} }) });
+    const tresc = r.json<{ message?: string }>();
+    if (r.statusCode === 404 && /^Route /.test(tresc.message ?? "")) bledne.push(`${method} ${adres}`);
+  }
+  assert.deepEqual(bledne, [], "panel woła adresy bez trasy na serwerze");
+});
+
+test("komentarz wewnętrzny ze skrzynki zapisuje się pod adresem, który panel woła", async () => {
+  const b = await login("biuro", "Biuro");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/comments`,
+    headers: b.naglowki, payload: { body: "to ten sam klient co wczoraj", mentionedUserIds: [] } });
+  assert.equal(r.statusCode, 200, r.body);
+  /* Stary adres NIE istnieje — nikt nie ma „naprawić" tego dublując trasę. */
+  assert.equal(app.hasRoute({ method: "POST", url: "/api/obsluga/rozmowy/1/komentarz" }), false);
 });

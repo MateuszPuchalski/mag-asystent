@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.181.1 — 2 września 2026
+
+**Komentarz wewnętrzny ze skrzynki dostawał 404 od 0.157.0.** Panel wołał
+`/api/obsluga/rozmowy/:id/komentarz`, a serwer wystawiał wyłącznie
+`/api/conversations/:id/comments`. Ciało żądania pasowało, adres nie.
+
+### Dlaczego nikt tego nie widział przez siedem wydań
+
+Testy tras (`TRASY()` w `routes/skrzynka.test.ts`) pilnują tras, które
+ISTNIEJĄ — 401 bez sesji, 403 dla magazyniera, „patrzenie niczego nie
+zapisuje". Nie pilnują tego, że panel woła te same adresy. Test komponentu
+`Komentarz.test.tsx` renderuje komponent z propsami, nie sięga do sieci. Oba
+zestawy były zielone, a komentarz szedł w próżnię.
+
+### Co się zmienia
+
+Adres w `useDodajKomentarz` poprawiony. Do testów tras dochodzi STRAŻNIK:
+czyta źródło hooków panelu, wyciąga każdy adres z metodą i puszcza prawdziwe
+żądanie przez router. Brak trasy poznaje po domyślnym 404 Fastify, więc 404
+aplikacji („nie znaleziono rozmowy") go nie myli. Sprawdzone przez cofnięcie
+poprawki: strażnik wskazał dokładnie ten adres.
+
+Przy okazji: `beforeEach` w testach tras nie sprzątał `sprawa_klienta`, więc
+każdy test dopisany po teście spraw padał na kluczu obcym. Naprawione.
+
+**Widok mobilny (§10.5) zdjęty z planu** decyzją właściciela — panel pracuje
+na monitorach biura. Dokument zachowuje pierwotny projekt dla historii.
+
+---
+
 ## 0.181.0 — 2 września 2026
 
 **Wiersz kolejki mówi, za co wziąć się najpierw.**

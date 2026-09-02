@@ -337,12 +337,17 @@ export function useWyslij() {
  *
  * Do tego wydania `conversation_comment` miała w kodzie serwera jeden INSERT
  * i zero odczytów — notatka agenta przepadała. Trasa istniała, ekranu nie było.
+ *
+ * Od 0.157.0 do 0.181.0 hook wołał `/api/obsluga/rozmowy/:id/komentarz`,
+ * którego serwer nigdy nie wystawił — komentarz ze skrzynki dostawał 404.
+ * Testy tras pilnowały tras, które istnieją, a nie tego, że panel woła te same
+ * adresy; od 0.181.1 pilnuje tego strażnik w `routes/skrzynka.test.ts`.
  */
 export function useDodajKomentarz() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { rozmowaId: number; body: string; mentionedUserIds: number[] }) =>
-      api<{ id: number }>(`/api/obsluga/rozmowy/${v.rozmowaId}/komentarz`,
+      api<{ id: number }>(`/api/conversations/${v.rozmowaId}/comments`,
         { method: "POST", body: JSON.stringify({
           body: v.body, mentionedUserIds: v.mentionedUserIds }) }),
     onSettled: (_d, _e, v) => {
