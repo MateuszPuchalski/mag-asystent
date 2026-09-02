@@ -34,6 +34,79 @@ historii nie przepisujemy.
 ---
 
 
+## 0.182.0 — 2 września 2026
+
+**Ergonomia magazynu przestaje być kwestią gustu.**
+
+### Co było źle
+
+Reguły projektowania ekranów magazynowych żyły w komentarzach przy kodzie
+i w pamięci osób, które je kiedyś ustaliły. Nie dało się na nie wskazać przy
+sporze o kształt ekranu, więc każdy taki spór zaczynał się od zera.
+
+Kosztowało to konkretnie, nie teoretycznie. Kolektor deklarował JEDEN minimalny
+cel dotyku — `MinTap = 48 dp` w `Common.kt` — a dwadzieścia linii niżej,
+w tym samym pliku, `LocChip` brał 44 dp. Komentarz w `KartonScreen.kt` nazywał
+te 44 dp „minimalnym CELEM DLA PALCA". Dwie liczby twierdziły o sobie to samo.
+
+Trzy inne miejsca zjechały poniżej progu bez śladu decyzji: awatar wchodzący
+w ustawienia, pastylka kolejki Sfery i pastylka adresu. Nic tego nie mierzyło,
+więc rozjazd był niewidoczny aż do przeczytania kodu z linijką w ręku.
+
+### Co się zmienia
+
+**Dekalog stoi w `docs/ergonomia-magazynu.md`.** Dziesięć reguł z zakresem,
+z wiązaniem do konkretnych plików i z listą miar. Rozstrzyga spór na korzyść
+tego projektu, który wymaga mniej decyzji, interakcji, uwagi, pamiętania,
+ruchu i błędów — w tej kolejności, a urody dopiero po nich.
+
+Dokument mówi też, czego NIE obejmuje: biuro i panel obsługi klienta biorą
+z niego punkty 1, 2, 5, 6 i 10, bo mysz na blacie ma inną charakterystykę niż
+kciuk w rękawicy. Reguła bez zakresu przestaje bramkować cokolwiek po
+pierwszym sporze.
+
+**Punkt 4 dostaje bramkę: `tools/ergonomia_check.py`.** Szuka łańcuchów
+`Modifier` z `clickable`, które same schodzą poniżej 48 dp. Liczy wyłącznie
+ogniwa łańcucha, nigdy rozmiarów z ich argumentów — ikona 20 dp w środku
+przycisku 48 dp jest poprawna i nie ma prawa się zapalić. Bramka biegnie w CI
+przed Gradle'em, tak jak kontrola importów, i w sekundy.
+
+**Zwolnienie jest jawne i kosztuje zdanie.** Cel mniejszy niż 48 dp wymaga
+komentarza `ergonomia: <powód>` o co najmniej trzech wyrazach. Dekalog sam
+dopuszcza mniejszy cel przy czynności rzadkiej albo groźnej; skrypt ma wymusić
+uzasadnienie, nie zabronić decyzji.
+
+**Trzy cele urosły do 48 dp.** Awatar zachowuje kółko 40 dp, ale klikalne pole
+ma teraz 48 — rozmiar widoczny i rozmiar dotykany to dwie różne rzeczy,
+a pasek górny ma 62 dp, więc pionowo to nic nie kosztuje. Pastylka Sfery
+i pastylka adresu biorą wysokość z `MinTap`, czyli z jednego źródła.
+
+**Trzy zostały mniejsze świadomie i mają to napisane.** Krzyżyk kasujący
+pozycję z kartonu — bo kasuje pracę i stoi tuż przy poprawianiu ilości.
+Krzyżyk zwijający wiersz dostawy — bo ten sam skutek daje powtórny tap w cały
+pasek. Wejście w przesunięcie z MGP — bo pełne 48 dp rozpycha nagłówek karty,
+a wejście jest rzadkie; było tam kiedyś 15 dp, więc 40 dp to i tak naprawa.
+
+**Dekalog wszedł pod `styl_check.py`.** Dokument o dyscyplinie, który sam łamie
+limit długości zdania, przekonuje tyle, co komentarz „zgodnie z wersją
+monorepo".
+
+### Czego ta zmiana NIE robi
+
+Nie mierzy dziewięciu pozostałych punktów. Liczby decyzji, kolejności
+informacji, kosztu ruchu i trasy nie sprawdza tu nic — zostają do przeglądu
+przez człowieka, a dokument mówi to wprost. Nie wykrywa też celu za małego
+przez sam brak wymiaru: łańcuch bez zadeklarowanej wysokości mierzy się
+dopiero na urządzeniu.
+
+Trasy zbiórki nie liczy nadal nic w kodzie. Punkt 9 stoi w dokumencie po to,
+żeby pierwsza implementacja nie zaczęła od najkrótszej drogi jako jedynego celu.
+
+### Przy wdrożeniu
+
+Nic ręcznie. Baza i konfiguracja bez zmian. Nowe cele dotyku widać dopiero
+po aktualizacji APK, którą kolektory proponują same.
+
 ## 0.181.0 — 2 września 2026
 
 **Wiersz kolejki mówi, za co wziąć się najpierw.**

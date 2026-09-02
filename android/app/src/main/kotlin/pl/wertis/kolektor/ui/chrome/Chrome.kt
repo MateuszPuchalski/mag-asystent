@@ -41,6 +41,7 @@ import pl.wertis.kolektor.core.nav.SCREEN_TITLES
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.QueueSummary
 import pl.wertis.kolektor.core.session.userInitials
+import pl.wertis.kolektor.ui.components.MinTap
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.AmberBg
@@ -123,16 +124,23 @@ fun TopBar(
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )
-        // awatar (inicjały) → ustawienia
+        /* Awatar (inicjały) → ustawienia. KÓŁKO ZOSTAJE 40 dp, CEL DOTYKU MA 48:
+           rozmiar widoczny i rozmiar klikalny to dwie różne rzeczy, a pasek ma
+           62 dp wysokości, więc pionowo to nic nie kosztuje. Patrz
+           `docs/ergonomia-magazynu.md` §4. */
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(MinTap)
                 .clip(CircleShape)
-                .background(Amber)
                 .clickable(onClick = onOpenSettings),
             contentAlignment = Alignment.Center,
         ) {
-            Text(userInitials(user), color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(Amber),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(userInitials(user), color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            }
         }
         Box(Modifier.size(8.dp))
         SferaPill(summary, onClick = onOpenQueue)
@@ -172,7 +180,10 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
             .clip(shape)
             .background(bg)
             .then(if (resting) Modifier.border(1.dp, Color.White.copy(alpha = 0.18f), shape) else Modifier)
-            .heightIn(min = 40.dp)
+            /* Po pastylce sięga ręka wtedy, gdy zrobi się czerwona — a wtedy
+               chybienie kosztuje drugi ruch. Wysokość bierze z MinTap, nie
+               z własnej liczby. */
+            .heightIn(min = MinTap)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

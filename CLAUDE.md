@@ -19,6 +19,16 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
   z nazwy (test dubli) ani wołać funkcji, której nie ma (test wywołań);
   delegacje kliknięć stoją na SEKCJACH, nie na pojemnikach w ich środku
   (test delegacji).
+- **Ekran magazynowy projektuje się pod ergonomię, nie pod wygląd.** Reguły
+  stoją w `docs/ergonomia-magazynu.md`. Rozstrzygają spór o kształt ekranu na
+  korzyść tego, który wymaga mniej decyzji, mniej interakcji, mniej uwagi,
+  mniej pamiętania, mniej ruchu i mniej błędów. Uroda liczy się dopiero po
+  tamtym. Mierzalną część — cele dotyku na kolektorze — bramkuje
+  `tools/ergonomia_check.py`: cel mniejszy niż 48 dp wymaga komentarza
+  `ergonomia: <powód>` przy łańcuchu, bo zwolnienie bez uzasadnienia to
+  brak zwolnienia. Dekalog obowiązuje kolektor; biuro i panel obsługi biorą
+  z niego punkty 1, 2, 5, 6 i 10, bo mysz na blacie to nie kciuk w rękawicy.
+
 - **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
   nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
   i gołe „Bad Request" na ekranie. Pilnują tego trzy niezależne strażnice:
@@ -86,8 +96,11 @@ wyrzucenia.
 ```bash
 cd server && npx tsc --noEmit && npm test
 python3 tools/docs_check.py && python3 tools/styl_check.py   # ≤25 słów/zdanie
+python3 tools/ergonomia_check.py && python3 tools/kt_imports_check.py   # kolektor
 ```
 
-Wszystkie cztery muszą być czyste. `npm test` to także testy-strażnicy
+Wszystkie sześć musi być czystych. Dwie ostatnie dotyczą Kotlina i biegną
+w sekundy — moduł `:app` nie kompiluje się poza CI, więc to jedyne, co łapie
+mały cel dotyku i brakujący import przed wypchnięciem. `npm test` to także testy-strażnicy
 struktury `biuro.html` — ich odmowa zwykle znaczy, że łamiesz jedną
 z zasad wyżej, nie że test jest do poprawienia.

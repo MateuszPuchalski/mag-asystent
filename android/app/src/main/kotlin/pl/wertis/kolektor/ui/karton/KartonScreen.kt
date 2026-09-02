@@ -481,9 +481,9 @@ private fun PasekAnulowania(
  *
  * ADRES JEST LINIĄ, NIE RZĘDEM CHIPÓW (0.124.0) — drugie zgłoszenie z hali:
  * „pozycja zajmuje za dużo miejsca". Chipy kosztowały 52 dp z 118, czyli 44 %
- * karty, a ich wysokość bierze się z `heightIn(min = 44.dp)` w `LocChip`, bo
- * 44 dp to minimalny CEL DLA PALCA. Tutaj nie było czego dotykać: odkładanie
- * zaczyna się dopiero po ZATWIERDŹ, więc chipy dostawały puste `{}`. Karta
+ * karty, a ich wysokość bierze się z `MinTap` w `LocChip`, bo tyle ma minimalny
+ * CEL DLA PALCA. Tutaj nie było czego dotykać: odkładanie zaczyna się dopiero
+ * po ZATWIERDŹ, więc chipy dostawały puste `{}`. Karta
  * płaciła rozmiarem kciuka za coś, czego żaden kciuk nie dotyka.
  *
  * Rozkładanie (`KoszScreen`) chipy ZACHOWUJE i tam są klikalne — wpisują
@@ -570,6 +570,9 @@ private fun ZbieranaPozycja(
                     color = AmberInk,
                 )
             }
+            // ergonomia: cel 40 dp świadomie — kasowanie wiersza ma być trudniejsze
+            // od poprawienia ilości obok, a stoi tuż przy niej (dekalog §4: rzadka
+            // i groźna czynność wolno, żeby wymagała ruchu świadomego)
             Box(
                 modifier = Modifier
                     .size(40.dp)
