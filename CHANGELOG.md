@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.174.1 — 2 września 2026
+
+**`tools/co_w_toku.sh` widzi otwarte PR-y i numery, które już zajmują.**
+
+Do tego wydania skrypt kończył się zdaniem „otwarte PR-y sprawdź narzędziami
+GitHuba — ten skrypt ich nie widzi". Właśnie dlatego nikt ich nie sprawdzał:
+instrukcja bez wykonania jest kosztem, a nie pomocą.
+
+Rachunek jest policzalny. Numer wydania zderzył się z cudzą gałęzią cztery razy
+w jeden dzień — 0.166.0, 0.168.0, 0.171.0 i 0.173.0 — za każdym razem po tym,
+jak numer trafił już do komentarzy w kodzie. Każde przenumerowanie to kilkanaście
+plików i jedna okazja, żeby przy okazji ruszyć cudzy komentarz. Raz się to
+zdarzyło.
+
+Gałąź z commitami spoza `main` mówi „ktoś tu pracuje". Otwarty PR mówi więcej:
+ktoś to ZAMYKA i zaraz zajmie numer.
+
+Skrypt wypisuje teraz numer PR-a, tytuł, gałąź i to, czy jest szkicem. Pod listą
+stoi wiersz „Numery zajęte przez otwarte PR-y", a numer nazwany w CUDZYM PR-ze
+i wpisany zarazem w lokalne `package.json` podnosi głośne ostrzeżenie. Własna
+gałąź go nie podnosi — ostrzeżenie przed samym sobą uczy ignorować ostrzeżenia.
+
+`gh` jest OPCJONALNE i to jest warunek, nie wygoda. Skrypt NIGDY nie kończy się
+błędem, więc brak `gh`, zerwana sieć i wygasły token dają zdanie o tym, czego
+nie wiadomo, i kod wyjścia zero. Wywołanie chodzi pod `timeout 10`, bo hak
+`SessionStart` nie ma prawa wisieć na cudzym narzędziu.
+
+`CLAUDE.md` mówi teraz wprost, żeby **numer wydania wybierać przy commicie**,
+a nie przy pisaniu kodu.
+
 ## 0.174.0 — 2 września 2026
 
 **Przy zwrocie widać numer dokumentu sprzedaży z Subiekta.** Ostatnia pozycja
