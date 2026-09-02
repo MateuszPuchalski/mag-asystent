@@ -12,6 +12,7 @@ let listaRozmow: typeof import("./skrzynka.js").listaRozmow;
 let osRozmowy: typeof import("./skrzynka.js").osRozmowy;
 let zlecPomiar: typeof import("./skrzynka.js").zlecPomiar;
 let stanSkrzynki: typeof import("./skrzynka.js").stanSkrzynki;
+let stanKolejkiWysylek: typeof import("./skrzynka.js").stanKolejkiWysylek;
 let przejmijRozmowe: typeof import("./conversations.js").przejmijRozmowe;
 let wezZadanie: typeof import("./zadania-terenowe.js").wezZadanie;
 let wykonajZadanie: typeof import("./zadania-terenowe.js").wykonajZadanie;
@@ -22,7 +23,8 @@ let wiadomoscKlienta = 0;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ listaRozmow, osRozmowy, zlecPomiar, stanSkrzynki } = await import("./skrzynka.js"));
+  ({ listaRozmow, osRozmowy, zlecPomiar, stanSkrzynki, stanKolejkiWysylek } =
+    await import("./skrzynka.js"));
   ({ przejmijRozmowe } = await import("./conversations.js"));
   ({ wezZadanie, wykonajZadanie } = await import("./zadania-terenowe.js"));
   const d = db();
@@ -353,4 +355,43 @@ test("zmiana statusu ląduje na osi, a zmiana bez różnicy nie zostawia nic", (
     "zmiana statusu nie ma prawa wyglądać jak głos klienta");
   /* Wynik z hali podpisuje HALA, nie agent: to jej pomiar zmienił stan. */
   assert.equal(statusy[2].autor, "hala");
+});
+
+/* ── Kolejka wysyłek mówi prawdę (0.173.0) ───────────────────────────────────
+   Do 0.172.0 `/api/health` twierdził „wysyłka wyłączona" — nieprawda od
+   0.148.0, czyli od wydania, w którym wysyłka zaczęła działać. Napis, który
+   każe NIE szukać, jest gorszy od braku wskaźnika.                         */
+
+/** Wiersz kolejki w zadanym stanie; kasuje poprzednie, bo baza jest wspólna. */
+function outbox(stany: string[]) {
+  const d = db();
+  d.prepare("DELETE FROM outbox").run();
+  stany.forEach((status, i) => {
+    d.prepare(`INSERT INTO outbox(conversation_id,idempotency_key,body,expected_version,status,created_by)
+      VALUES (?,?,'tekst',1,?,?)`).run(rozmowaId, `k-${i}-${status}`, status, BIURO.id);
+  });
+}
+
+test("pusta kolejka mówi, że nic nie poszło — nie że wysyłka nie działa", () => {
+  outbox([]);
+  const s = stanKolejkiWysylek();
+  assert.equal(s.kolejkaWysylek, "pusta — nic jeszcze nie poszło");
+  assert.equal(s.wysylkiDoSprawdzenia, 0);
+});
+
+test("nieudana, niepewna i wisząca wysyłka WOŁAJĄ o człowieka, wysłana nie", () => {
+  outbox(["sent", "sent", "send_failed", "send_uncertain", "sending"]);
+  const s = stanKolejkiWysylek();
+  assert.match(s.kolejkaWysylek, /2 wysłanych/);
+  assert.match(s.kolejkaWysylek, /1 nieudanych/);
+  assert.match(s.kolejkaWysylek, /1 niepewnych/);
+  assert.match(s.kolejkaWysylek, /1 w toku/);
+  assert.equal(s.wysylkiDoSprawdzenia, 3, "wysłane nie wołają o nic — reszta tak");
+});
+
+test("same udane wysyłki nie zapalają wskaźnika", () => {
+  outbox(["sent"]);
+  const s = stanKolejkiWysylek();
+  assert.equal(s.kolejkaWysylek, "1 wysłanych");
+  assert.equal(s.wysylkiDoSprawdzenia, 0);
 });

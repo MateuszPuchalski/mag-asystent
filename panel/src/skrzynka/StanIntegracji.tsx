@@ -53,7 +53,10 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
     ["Zadania terenowe", o.najstarszeZadanieMs != null
       ? `${o.zadaniaTerenowe} · najstarsze ${wiek(o.najstarszeZadanieMs)}`
       : String(o.zadaniaTerenowe), "nic"],
-    ["Kolejka wysyłek", o.kolejkaWysylek, "nic"],
+    /* Nieudana wysyłka znaczy, że odpowiedź NIE poszła do klienta, a niepewna —
+       że nie wiadomo, czy poszła. Zasada 10 projektu każe to pokazać, więc
+       wiersz zmienia rangę, zamiast stać zawsze na szaro. */
+    ["Kolejka wysyłek", o.kolejkaWysylek, o.wysylkiDoSprawdzenia ? "uwaga" : "nic"],
     ["Subiekt GT", zdrowie.worker?.zyje ? `tryb ${zdrowie.worker.mode}` : "worker milczy",
       zdrowie.worker?.zyje ? "ok" : "uwaga"],
   ];

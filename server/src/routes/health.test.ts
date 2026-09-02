@@ -47,7 +47,11 @@ test("blok obsługi klienta niesie liczby z §21, bez treści i bez klientów", 
   const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
   assert.equal(typeof h.obsluga.rozmowyOczekujace, "number");
   assert.equal(typeof h.obsluga.zadaniaTerenowe, "number");
-  assert.equal(h.obsluga.kolejkaWysylek, "wysyłka wyłączona");
+  /* Do 0.172.0 stała tu stała „wysyłka wyłączona" — zdanie nieprawdziwe od
+     0.148.0, czyli od wydania, w którym wysyłka zaczęła działać. Teraz pole
+     opisuje STAN kolejki, a pusta baza znaczy „nic jeszcze nie poszło". */
+  assert.equal(h.obsluga.kolejkaWysylek, "pusta — nic jeszcze nie poszło");
+  assert.equal(h.obsluga.wysylkiDoSprawdzenia, 0);
 
   /* Trasa jest publiczna, więc do payloadu nie ma wstępu nic poza liczbami. */
   const surowy = JSON.stringify(h);

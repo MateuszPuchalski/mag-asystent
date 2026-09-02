@@ -14,7 +14,7 @@ const zdrowie = (n: Partial<Zdrowie["allegroInbox"]> = {}): Zdrowie => ({
     interwalMs: 60_000, ...n,
   },
   obsluga: { rozmowyOczekujace: 14, zadaniaTerenowe: 3, najstarszeZadanieMs: 4_320_000,
-    kolejkaWysylek: "wysyłka wyłączona" },
+    kolejkaWysylek: "pusta — nic jeszcze nie poszło", wysylkiDoSprawdzenia: 0 },
 });
 
 describe("AlarmSynchronizacji", () => {

@@ -24,7 +24,7 @@ const zdrowie: Zdrowie = {
     watkiZBledem: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 60_000,
   },
   obsluga: { rozmowyOczekujace: 0, zadaniaTerenowe: 0, najstarszeZadanieMs: null,
-    kolejkaWysylek: "wysyłka wyłączona" },
+    kolejkaWysylek: "pusta — nic jeszcze nie poszło", wysylkiDoSprawdzenia: 0 },
 };
 
 vi.mock("../api/rozmowy", async () => {
