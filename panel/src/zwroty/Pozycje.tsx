@@ -24,12 +24,19 @@ import { Link } from "./Link";
    Prawa kolumna zostaje kolumną DOWODÓW: zegar ustawowy, numery, zamówienie,
    paczka. To rzeczy o zwrocie, nie o towarze.                               */
 
+/* Siedemnaście powodów, bo tyle wymienia SCHEMAT Allegro (0.169.0). Do
+   0.167.0 stało tu jedenaście — te zaobserwowane przez sondę — a sześć
+   pozostałych pokazywało się operatorowi surowym kodem. `reason.type` nie ma
+   w specyfikacji enuma, więc lista i tak nie jest zamknięta: nieznany kod
+   nadal przechodzi surowy, zamiast zniknąć. */
 const POWODY: Record<string, string> = {
   NONE: "bez powodu", MISTAKE: "pomyłka klienta", TRANSPORT: "uszkodzenie w transporcie",
   DAMAGED: "towar uszkodzony", NOT_AS_DESCRIBED: "niezgodny z opisem",
   DONT_LIKE_IT: "nie spodobał się", OVERDUE_DELIVERY: "dostawa po terminie",
   INCOMPLETE: "niekompletny", HIDDEN_FLAW: "wada ukryta", OTHER_FLAW: "inna wada",
-  DIFFERENT: "inny towar",
+  DIFFERENT: "inny towar", COUNTERFEIT: "podróbka", NOT_NEW: "towar nienowy",
+  TOO_LARGE: "za duży", TOO_SMALL: "za mały", NOT_AS_EXPECTED: "inny niż oczekiwany",
+  ORDERED_FOR_COMPARISON: "zamówiony na przymiarkę",
 };
 
 const OCENY: Array<["stan" | "przecena" | "utylizacja", string, string]> = [
@@ -166,6 +173,14 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           <div className="text-xs text-slate-600">
             {p.ilosc} szt.{p.powod ? ` · ${POWODY[p.powod] ?? p.powod}` : ""}
           </div>
+          {/* Kody, po których pracownik szuka towaru na półce i w Subiekcie.
+              EAN wisi przy KARTOTECE, więc pojawia się dopiero po jej
+              potwierdzeniu; SKU jest sprzedawcy i idzie z pozycji ZAMÓWIENIA,
+              bo pozycja zwrotu własnego SKU w specyfikacji nie ma. */}
+          {(p.ean || p.sku) && <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-slate-500">
+            {p.ean && <span>EAN <b className="font-mono text-slate-700">{p.ean}</b></span>}
+            {p.sku && <span>SKU <b className="font-mono text-slate-700">{p.sku}</b></span>}
+          </div>}
           {/* Odnośnik JAWNY i podpisany. Od 0.153.0 był nim sama nazwa towaru —
               istniał, ale nikt go nie widział: podkreślenie nie mówi, dokąd
               prowadzi. Gdy adresu nie ma, ekran mówi to wprost — milczenie

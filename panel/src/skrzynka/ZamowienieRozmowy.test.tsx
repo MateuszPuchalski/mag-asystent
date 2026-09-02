@@ -26,7 +26,7 @@ describe("Zamówienie przy rozmowie", () => {
   it("po dociągnięciu: pozycje z nazwą, SKU i ceną oraz suma", () => {
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: {
       externalId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001", status: "READY_FOR_PROCESSING",
-      kupujacyLogin: null, dostawaGrosze: 1499, dostawaMetoda: "Kurier InPost",
+      kupujacyLogin: null, dostawaGrosze: 1499, dostawaMetoda: "Kurier InPost", platnoscTyp: null, platnoscAt: null, fakturaZadana: null,
       sumaGrosze: 6098, waluta: "PLN", kupionoAt: "2026-08-30T11:00:00Z", link: null,
       pozycje: [{ offerId: "17235726715", nazwa: "Szarpak do NAC LS 46-450", sku: "SZR-NAC-46",
         ilosc: 1, cenaGrosze: 4599, waluta: "PLN", zwracana: false }],

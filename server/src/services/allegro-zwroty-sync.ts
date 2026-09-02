@@ -42,6 +42,10 @@ type Zwrot = {
   createdAt?: string;
   referenceNumber?: string;
   orderId?: string;
+  /* Sam login. `CustomerReturnBuyer` ma w specyfikacji DWA pola — `login`
+     i `email` — i tego drugiego nie bierzemy. Sonda pokazuje zresztą, że
+     Allegro przysyła przy zwrocie `email: null` w stu przypadkach na sto. */
+  buyer?: { login?: string } | null;
   items?: Pozycja[];
   parcels?: Paczka[];
   rejection?: { code?: string; reason?: string; createdAt?: string } | null;
@@ -105,10 +109,19 @@ export function naGrosze(amount: string | undefined): number {
   return m[1] === "-" ? -grosze : grosze;
 }
 
-/** Najwcześniejsza paczka; NULL znaczy „towar jeszcze nie wrócił". */
-function pierwszaPaczka(paczki: Paczka[] | undefined): string | null {
-  const daty = (paczki ?? []).map((p) => p.createdAt).filter((d): d is string => Boolean(d));
-  return daty.length ? daty.sort()[0] : null;
+/**
+ * Najwcześniejsza paczka: jej data i przewoźnik.
+ *
+ * `data` na NULL znaczy „towar jeszcze nie wrócił". Przewoźnik idzie z TEJ
+ * SAMEJ paczki, co data — inaczej zwrot w dwóch przesyłkach pokazywałby datę
+ * jednej, a firmę drugiej.
+ */
+function pierwszaPaczka(paczki: Paczka[] | undefined):
+  { data: string | null; przewoznik: string | null } {
+  const zDatami = (paczki ?? []).filter((p) => Boolean(p.createdAt))
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const p = zDatami[0];
+  return { data: p?.createdAt ?? null, przewoznik: p?.carrierId ?? null };
 }
 
 /** Jeden przebieg. Sieć kończy się PRZED transakcją, więc wolne API nie blokuje SQLite. */
@@ -240,18 +253,20 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
     surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
     zwrot.id, utworzono, JSON.stringify(oczyscSurowy(zwrot)), at);
 
+  const paczka = pierwszaPaczka(zwrot.parcels);
   database.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,reference_number,order_id,created_at,paczka_at,
-     rejection_code,rejection_reason,status_allegro,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?)
+     kupujacy_login,przewoznik,rejection_code,rejection_reason,status_allegro,synced_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
       created_at=excluded.created_at, paczka_at=excluded.paczka_at,
+      kupujacy_login=excluded.kupujacy_login, przewoznik=excluded.przewoznik,
       rejection_code=excluded.rejection_code, rejection_reason=excluded.rejection_reason,
       status_allegro=excluded.status_allegro,
       synced_at=excluded.synced_at`).run(
     konto, zwrot.id, zwrot.referenceNumber ?? null, zwrot.orderId ?? null,
-    utworzono, pierwszaPaczka(zwrot.parcels),
+    utworzono, paczka.data, zwrot.buyer?.login ?? null, paczka.przewoznik,
     zwrot.rejection?.code ?? null, zwrot.rejection?.reason ?? null,
     zwrot.status ?? null, at);
 

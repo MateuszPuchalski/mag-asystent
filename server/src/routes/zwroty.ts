@@ -3,7 +3,7 @@ import { sesjaZadania } from "../context.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  bilansKartotek, cofnijKorekte, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, znajdzZwrotPoKodzie,
   ZwrotConflict,
 } from "../services/zwroty.js";
@@ -249,6 +249,29 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: (e as Error).message });
       }
     });
+
+  /**
+   * Zestawienie zwrotów do Excela.
+   *
+   * To JEDYNY GET w tym pliku, który zostawia ślad w dzienniku — i dlatego
+   * stoi poza umową „otwarcie kolejki nie zapisuje niczego". Ta umowa mówi
+   * o PATRZENIU: otwarcie ekranu niczego nie mutuje (blizna 0.18.0). Pobranie
+   * pliku z loginami kupujących nie jest patrzeniem, tylko wyniesieniem
+   * danych na dysk — a kto wynosi zestawienia o ludziach, sam trafia do logu.
+   * Ta sama zasada stoi przy `analiza_eksport` i `audyt_eksport`.
+   */
+  app.get("/api/obsluga/zwroty/csv", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const zwroty = listaZwrotow(db());
+    const s = sesjaZadania();
+    logEvent("zwroty_eksport", s?.user.name ?? "?", null,
+      { zwrotow: zwroty.length }, s?.user.userId ?? null, db());
+    return reply
+      .type("text/csv; charset=utf-8")
+      .header("content-disposition", 'attachment; filename="wertis-zwroty.csv"')
+      .send(csvZwrotow(zwroty));
+  });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/zwroty/:id", async (req, reply) => {
     const nie = odmowa(reply);

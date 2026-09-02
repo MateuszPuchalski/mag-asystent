@@ -26,7 +26,7 @@ export const KUBELKI: Array<{ id: Kubelek; etykieta: string; pytanie: string }> 
 const SYGNALY: Record<Sygnal, { tytul: string; ikona: React.ReactNode; klasa: string }> = {
   termin: { tytul: "Termin ustawowy blisko albo minął", klasa: "bg-red-100 text-ranga-zle",
     ikona: <AlertTriangle size={13} /> },
-  brak_dowodu: { tytul: "Towar jeszcze nie wrócił, a termin biegnie",
+  brak_dowodu: { tytul: "Klient nie nadał jeszcze paczki, a termin biegnie",
     klasa: "bg-amber-100 text-ranga-uwaga", ikona: <PackageX size={13} /> },
   odrzucony_w_allegro: { tytul: "Ktoś rozstrzygnął to już w panelu Allegro",
     klasa: "bg-slate-200 text-ranga-nic", ikona: <Ban size={13} /> },
@@ -117,7 +117,7 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
             {z.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>
-                {SYGNALY[s].ikona}{s === "termin" ? "termin" : s === "brak_dowodu" ? "bez paczki" : "w Allegro"}
+                {SYGNALY[s].ikona}{s === "termin" ? "termin" : s === "brak_dowodu" ? "nie nadana" : "w Allegro"}
               </span>
             ))}
           </div>

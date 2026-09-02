@@ -272,6 +272,28 @@ niepuste w dziesięciu na dziesięć. Numeru listu i tak nie zapisujemy, więc
 różnica nie zmienia dziś niczego; gdyby kiedyś zaczęła, to jest miejsce,
 w którym szczegół daje więcej.
 
+### Co zaczęliśmy mapować w 0.169.0
+
+`buyer.login` przy ZWROCIE (sonda: 100 na 100 niepustych), `parcels[].carrierId`
+z tej samej paczki, co data, oraz przy zamówieniu `payment.type`,
+`payment.finishedAt` i `invoice.required`.
+
+`carrierId` nie ma w schemacie ani enuma, ani listy — Allegro oddaje słownik
+osobno, pod `GET /order/carriers`. Sonda złapała `INPOST`, `ALLEGRO`, `DPD`
+i `UNKNOWN`, przy czym ostatniej wartości nie ma w żadnej specyfikacji. Dlatego
+kolumna jest bez `CHECK`, a panel buduje filtr z tego, co przyjechało.
+
+`items[].reason.type` też nie ma enuma: schemat wymienia SIEDEMNAŚCIE wartości
+słownie, a sonda zaobserwowała jedenaście. Panel tłumaczy dziś wszystkie
+siedemnaście, a kod spoza listy pokazuje surowy.
+
+**Daty doręczenia zwrotu do nas obiekt zwrotu nie niesie wcale.** `parcels[]`
+ma wyłącznie `createdAt`, czyli moment utworzenia paczki przez klienta — i tak
+się to nazywa na ekranie od 0.169.0. Jest droga pośrednia przez
+`GET /order/carriers/{carrierId}/tracking` (`code = DELIVERED` i `occurredAt`),
+ale `[WERYFIKUJ]`: końcówka jest opisana dla przesyłek ZAMÓWIENIA, `carrierId`
+bywa `UNKNOWN`, a `waybill` na liście zwrotów jest pusty w 88 z 94 rekordów.
+
 ### Czego NIE mapujemy i dlaczego
 
 Trzy rzeczy z tej odpowiedzi nie mają u nas kolumny.
