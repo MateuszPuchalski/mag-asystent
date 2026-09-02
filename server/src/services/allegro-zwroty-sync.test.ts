@@ -246,9 +246,14 @@ test("identyfikator pozycji NIE zmienia się między przebiegami", () => {
 });
 
 test("dwie pozycje o tej samej nazwie bez numeru oferty nie zlewają się", () => {
-  /* Blizna projektowa: praca człowieka wracała po kluczu `offer_id|nazwa`
-     z MAPY, więc przy pustym `offer_id` dwie takie pozycje dostawały jeden
-     klucz i jedna traciła ocenę. Dziś klucz jest kolumną z ograniczeniem. */
+  /* Nazwa tego testu mówiła prawdę od 0.153.1, ale jego asercja jej przeczyła:
+     utrwalała, że druga pozycja NADPISUJE pierwszą. Do 0.162.1 tak właśnie
+     było — zwrot cicho gubił wiersz, a kwota liczyła się z jednej sztuki
+     zamiast dwóch.
+
+     `CustomerReturnItem` w specyfikacji Allegro nie ma identyfikatora pozycji,
+     więc rozróżnia je wyłącznie kolejność w tablicy. Numer wystąpienia w kluczu
+     jest jedynym, co z tej kolejności da się zapisać. */
   const d = stanowisko();
   const dwie = [{
     id: "z9", createdAt: "2026-08-30T08:00:00Z", referenceNumber: "REF-9",
@@ -258,15 +263,18 @@ test("dwie pozycje o tej samej nazwie bez numeru oferty nie zlewają się", () =
       { quantity: 2, name: "Uszczelka", price: { amount: "9.99", currency: "PLN" } },
     ],
   }];
-  return synchronizujAllegroZwroty({
+  const przebieg = () => synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api", query: async () => odpowiedz(dwie),
-  }).then(() => {
-    /* Obie mają ten sam klucz naturalny, więc druga NADPISUJE pierwszą —
-       i to jest poprawne: bez `offer_id` Allegro nie daje nam czym ich
-       rozróżnić, a dwa wiersze nie do odróżnienia byłyby gorsze. */
-    const poz = d.prepare("SELECT ilosc FROM zwrot_klienta_pozycja").all() as Array<{ ilosc: number }>;
-    assert.equal(poz.length, 1, "jeden klucz to jedna pozycja");
-    assert.equal(poz[0].ilosc, 2, "wygrywa ostatnia z odpowiedzi");
+  });
+  return przebieg().then(przebieg).then(() => {
+    const poz = d.prepare("SELECT ilosc, klucz FROM zwrot_klienta_pozycja ORDER BY id")
+      .all() as Array<{ ilosc: number; klucz: string }>;
+    assert.equal(poz.length, 2, "dwie pozycje Allegro to dwa wiersze");
+    assert.deepEqual(poz.map((p) => p.ilosc), [1, 2], "każda niesie swoją ilość");
+    assert.deepEqual(poz.map((p) => p.klucz), ["|Uszczelka", "|Uszczelka|#2"]);
+    /* DRUGI przebieg nie mnoży wierszy: upsert trafia w te same klucze.
+       Bez tej asercji poprawka mogłaby zamienić nadpisywanie na duplikowanie
+       przy każdym takcie synchronizacji. */
   });
 });
 

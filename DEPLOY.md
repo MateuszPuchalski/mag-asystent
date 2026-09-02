@@ -1444,6 +1444,25 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.162.1 naprawia instalację, która nie wstaje.** Skok
+z wersji sprzed 0.154.0 potrafił zatrzymać wszystko: usługi zostawały
+w `SERVICE_PAUSED`, a `npm run sonda` kończył się błędem
+`UNIQUE constraint failed … zwrot_klienta_pozycja … klucz`. Winna była
+migracja pozycji zwrotu, którą wykonuje każdy proces otwierający bazę.
+
+W bazie nic nie trzeba ruszać — migracja dochodzi do skutku sama, a zastane
+duplikaty dostają odróżniający przyrostek w kluczu.
+
+**Usługi trzeba wystartować ręcznie**, bo NSSM zostawił je zatrzymane po
+nieudanych próbach:
+
+```powershell
+cd C:\wertis\tools
+./nssm start wertis-api ; ./nssm start wertis-worker
+```
+
+Po starcie sprawdź `/api/health` i dopiero wtedy uruchamiaj `npm run sonda`.
+
 **Aktualizacja do 0.162.0 nie wymaga niczego ręcznego** — kolumny stoją
 w bazie od 0.150.0, migracji nie ma. Zmienia się nawyk biura.
 

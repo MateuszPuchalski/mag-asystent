@@ -370,6 +370,12 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
           powod TEXT,
           powod_komentarz TEXT,
           url TEXT,
+          -- Kolumna w_zwrocie MUSI tu być, choć addColumn dokłada ją
+          -- kilkadziesiąt linii wyżej w tym samym przebiegu: przebudowa kasuje
+          -- starą tabelę, więc kolumny nieobecne w TEJ definicji znikają razem
+          -- z nią i wracają dopiero przy następnym starcie. Do tego czasu
+          -- zapiszKwote leci na nieistniejącą kolumnę.
+          w_zwrocie INTEGER NOT NULL DEFAULT 0,
           klucz TEXT NOT NULL,
           ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
           ocena_at TEXT, ocena_przez TEXT,
@@ -382,10 +388,27 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
       const nowe = kolumny("zwrot_klienta_pozycja_nowa");
       /* `klucz` liczymy przy przepisaniu, bo w starej tabeli go nie było. */
       const wspolne = nowe.filter((c) => c !== "klucz" && stare.includes(c));
+      /* NUMER WYSTĄPIENIA, i to jest poprawka z 0.162.1. Sam `offer_id|nazwa`
+         NIE JEST unikalny w obrębie zwrotu: `CustomerReturnItem` w specyfikacji
+         Allegro nie ma żadnego identyfikatora pozycji, więc ta sama oferta
+         potrafi wystąpić dwa razy — a do 0.153.1 synchronizator wstawiał takie
+         pary bez żadnego ograniczenia. Przy skoku 0.153.1 → 0.162.0 ta
+         przebudowa liczyła im identyczny klucz, indeks UNIQUE go odrzucał
+         i wywracał `migrate()`: instalacja nie wstawała wcale, bo `db()` woła
+         migrację, a `db()` woła KAŻDY proces.
+
+         Pierwsze wystąpienie zostaje przy kluczu bez przyrostka. Dzięki temu
+         bazy już zmigrowane nie przekluczają ani jednego wiersza — a do klucza
+         przywiązana jest praca człowieka: ocena, kartoteka, zaznaczenie kwoty. */
       database.exec(`
         INSERT INTO zwrot_klienta_pozycja_nowa(${wspolne.join(", ")}, klucz)
-          SELECT ${wspolne.join(", ")}, COALESCE(offer_id,'') || '|' || nazwa
-          FROM zwrot_klienta_pozycja;
+          SELECT ${wspolne.join(", ")},
+                 COALESCE(offer_id,'') || '|' || nazwa ||
+                   CASE WHEN n = 1 THEN '' ELSE '|#' || n END
+          FROM (SELECT *, ROW_NUMBER() OVER (
+                  PARTITION BY zwrot_id, COALESCE(offer_id,'') || '|' || nazwa
+                  ORDER BY id) AS n
+                FROM zwrot_klienta_pozycja);
         DROP TABLE zwrot_klienta_pozycja;
         ALTER TABLE zwrot_klienta_pozycja_nowa RENAME TO zwrot_klienta_pozycja;
         CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot

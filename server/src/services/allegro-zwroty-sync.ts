@@ -224,10 +224,24 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
 
      Teraz klucz jest kolumną, a praca człowieka po prostu ZOSTAJE — nie
      trzeba jej nigdzie odkładać ani oddawać. */
+  /* NUMER WYSTĄPIENIA (0.162.1). `CustomerReturnItem` w specyfikacji Allegro
+     nie ma ŻADNEGO identyfikatora pozycji — są `offerId`, `quantity`, `name`,
+     `price`, `url`, `reason` i `serialNumbers`. Ta sama oferta potrafi więc
+     wystąpić w zwrocie dwa razy, a sam `offer_id|nazwa` sklejał je w jeden
+     klucz: druga pozycja CICHO nadpisywała pierwszą przez `DO UPDATE`, więc
+     zwrot gubił wiersz, a kwota liczyła się z jednej sztuki zamiast dwóch.
+
+     Pierwsze wystąpienie zostaje przy kluczu bez przyrostka — inaczej każdy
+     przebieg przekluczyłby wiersze zastane, a do klucza przywiązana jest praca
+     człowieka: ocena, kartoteka i zaznaczenie do kwoty. */
+  const licznik = new Map<string, number>();
   const widziane: string[] = [];
   for (const poz of zwrot.items ?? []) {
     const nazwa = poz.name ?? "";
-    const klucz = `${poz.offerId ?? ""}|${nazwa}`;
+    const para = `${poz.offerId ?? ""}|${nazwa}`;
+    const n = (licznik.get(para) ?? 0) + 1;
+    licznik.set(para, n);
+    const klucz = n === 1 ? para : `${para}|#${n}`;
     widziane.push(klucz);
     database.prepare(`INSERT INTO zwrot_klienta_pozycja
       (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,powod_komentarz,url,klucz)

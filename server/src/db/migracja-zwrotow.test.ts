@@ -185,3 +185,76 @@ test("przebudowa przepisuje dane starej tabeli, nie kasuje ich", () => {
   assert.equal(p.klucz, "111|Sekator", "klucz naturalny dorabia się przy przepisaniu");
   d.close();
 });
+
+test("przebudowa przeżywa DUPLIKAT klucza naturalnego z zastanej bazy", () => {
+  /* Ta awaria położyła całą instalację przy skoku 0.153.1 → 0.162.0.
+     `wertis-api`, `wertis-worker` i `npm run sonda` padały tym samym:
+     `UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id, …klucz`.
+
+     Do 0.153.1 synchronizator kasował pozycje i wstawiał od nowa BEZ żadnego
+     ograniczenia, więc dwie pozycje jednego zwrotu o tej samej ofercie
+     i nazwie były legalne — i w bazach klientów SĄ. Przebudowa liczyła im
+     identyczny klucz, a zaraz potem zakładała na niego indeks UNIQUE. Wyjątek
+     wycofywał transakcję, `db()` rzucał i tak przy KAŻDYM starcie.
+
+     Poprzedni test przepisania wstawiał JEDEN wiersz i dlatego to przepuścił. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  d.exec("DROP TABLE zwrot_klienta_pozycja");
+  /* Kształt sprzed 0.154.0: klucz obcy do read-modelu, bez `klucz`
+     i bez `w_zwrocie` — ta druga kolumna dochodzi dopiero `addColumn`. */
+  d.exec(`CREATE TABLE zwrot_klienta_pozycja (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+    offer_id TEXT, nazwa TEXT NOT NULL, ilosc REAL NOT NULL,
+    cena_grosze INTEGER NOT NULL, waluta TEXT NOT NULL,
+    powod TEXT, powod_komentarz TEXT, url TEXT,
+    ocena TEXT, ocena_at TEXT, ocena_przez TEXT,
+    tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
+    tw_symbol TEXT, tw_zrodlo TEXT, tw_at TEXT, tw_przez TEXT)`);
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-1','2026-08-25T09:00:00Z','2026-09-01T09:00:00Z')`).run();
+  const wstaw = d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena)
+    VALUES (?,?,?,?,?,?,?)`);
+  /* Ta sama oferta dwa razy w jednym zwrocie — Allegro tak potrafi, bo
+     `CustomerReturnItem` NIE MA identyfikatora pozycji. */
+  wstaw.run(1, "111", "Sekator", 1, 4999, "PLN", "stan");
+  wstaw.run(1, "111", "Sekator", 2, 4999, "PLN", "przecena");
+  /* I para bez oferty, o tej samej nazwie — drugi wariant tej kolizji. */
+  wstaw.run(1, null, "Uszczelka", 1, 999, "PLN", null);
+  wstaw.run(1, null, "Uszczelka", 3, 999, "PLN", null);
+
+  migrate(d);
+
+  const poz = d.prepare(
+    "SELECT nazwa, ilosc, ocena, klucz, w_zwrocie FROM zwrot_klienta_pozycja ORDER BY id")
+    .all() as Array<Record<string, unknown>>;
+  assert.equal(poz.length, 4, "przebudowa nie ma prawa zgubić ani jednej pozycji");
+  assert.deepEqual(poz.map((p) => p.klucz),
+    ["111|Sekator", "111|Sekator|#2", "|Uszczelka", "|Uszczelka|#2"]);
+  /* Pierwsze wystąpienie zostaje przy DZISIEJSZYM kluczu — instalacja już
+     zmigrowana nie przekluczy ani jednego wiersza, a to do klucza przywiązana
+     jest praca człowieka. */
+  assert.deepEqual(poz.map((p) => p.ilosc), [1, 2, 1, 3], "ilości zostają rozdzielone");
+  assert.deepEqual(poz.map((p) => p.ocena), ["stan", "przecena", null, null],
+    "druga pozycja nie nadpisuje oceny pierwszej");
+
+  /* `w_zwrocie` dochodzi `addColumn` PRZED przebudową, więc nowa tabela musi
+     ją mieć — inaczej znika razem ze starą i `zapiszKwote` leci na
+     nieistniejącą kolumnę aż do następnego restartu. */
+  assert.equal(poz[0].w_zwrocie, 0, "zaznaczenie do kwoty przeżywa przebudowę");
+
+  const indeksy = (d.prepare("PRAGMA index_list(zwrot_klienta_pozycja)")
+    .all() as Array<{ name: string }>).map((i) => i.name);
+  assert.ok(indeksy.includes("ux_zwrot_klienta_pozycja_klucz"),
+    "indeks unikalny ma powstać, a nie zostać pominięty dla świętego spokoju");
+
+  /* Drugi przebieg nie robi nic — warunek przerwania trzyma. */
+  migrate(d);
+  assert.equal((d.prepare("SELECT count(*) n FROM zwrot_klienta_pozycja").get() as
+    { n: number }).n, 4);
+  d.close();
+});
+
