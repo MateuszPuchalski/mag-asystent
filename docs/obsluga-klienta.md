@@ -402,6 +402,23 @@ kodu, a lądowisko jest prywatną kopią w bazie biura, pod tą samą bramką ro
 co reszta zwrotu. To, co wolno trzymać w bazie, nie zawsze wolno wypisać
 w pliku.
 
+**Login kupującego stoi teraz PRZY ZWROCIE (0.169.0).** Do tego wydania mieliśmy
+go wyłącznie przy zamówieniu, więc znikał, dopóki zamówienia nie pobrano — choć
+Allegro przysyła go z każdym zwrotem. To ta sama dana, którą polityka dopuszcza
+wprost, w innej kolumnie. Imienia i nazwiska Allegro przy zwrocie nie podaje
+w ogóle, a przy zamówieniu ich nie mapujemy.
+
+**Forma płatności i ŻĄDANIE faktury — bez danych firmy.** Bierzemy `payment.type`
+i samą flagę `invoice.required`. Adres z faktury niesie ulicę i miasto, a zasada
+„adresy nie przechodzą przez mapowanie" nie ma wyjątków. Ekran mówi więc
+„paragon", „faktura" albo „nie wiadomo", i nic ponadto.
+
+**Zestawienie CSV wynosi loginy, więc zostawia ślad.** Eksport kolejki zwrotów
+dopisuje zdarzenie `zwroty_eksport` — kto pobiera zestawienie o ludziach, sam
+trafia do dziennika. To ta sama zasada co przy analizie i audycie. Numeru listu
+przewozowego w pliku nie ma: plik na dysku jest zapisem trwalszym niż baza,
+a polityka z 0.163.0 mówi, że tego numeru nie zapisujemy.
+
 **Do Allegro nadal nie wychodzi z tego ekranu nic.** Zapisy zwrotów są dwa:
 potwierdzenie kartoteki i ręczne dociągnięcie zamówień. Drugi WYCHODZI do
 Allegro, ale wyłącznie po odczyt — pobiera to samo co ticker i tak samo

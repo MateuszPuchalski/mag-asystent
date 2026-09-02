@@ -140,6 +140,31 @@ export function migrate(database: DatabaseSync) {
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */
   addColumn("zwrot_klienta", "kwota_dostawa_grosze", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "w_zwrocie", "INTEGER NOT NULL DEFAULT 0");
+  /* Cztery rzeczy, o które prosiło biuro zwrotów (0.169.0). Wszystkie
+     przyjeżdżały z Allegro od początku i wszystkie były wyrzucane przy
+     mapowaniu — pracownik szukał ich potem w panelu sprzedawcy.
+
+     Login kupującego stoi PRZY ZWROCIE, nie tylko przy zamówieniu: zwrot
+     niesie go zawsze (sonda: 100 na 100), a zamówienie bywa jeszcze
+     niepobrane. To jedyna dana osobowa, którą polityka danych zwrotów
+     dopuszcza wprost — imienia i nazwiska Allegro przy zwrocie nie podaje
+     wcale, a przy zamówieniu ich nie mapujemy.
+
+     Przewoźnik bez `CHECK`: Allegro nie publikuje zamkniętej listy, a sonda
+     złapała `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
+  addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
+  addColumn("zwrot_klienta", "przewoznik", "TEXT");
+  /* Forma płatności i żądanie faktury (0.169.0). Przy zwrocie to nie
+     ciekawostka: `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać
+     pieniądze, a `faktura_zadana` mówi, czy do zwrotu trzeba korekty faktury,
+     czy paragonu.
+
+     `faktura_zadana` to SAMA FLAGA. Dane firmy z `invoice.address` niosą
+     ulicę i miasto, a adresy nie przechodzą przez mapowanie — ta reguła nie
+     ma wyjątku i tutaj też go nie dostaje. */
+  addColumn("zamowienie_klienta", "platnosc_typ", "TEXT");
+  addColumn("zamowienie_klienta", "platnosc_at", "TEXT");
+  addColumn("zamowienie_klienta", "faktura_zadana", "INTEGER");
   /* Powód porażki SŁOWEM, nie tylko kodem HTTP (0.152.0). Przez sześćdziesiąt
      dwa przebiegi panel mówił „failed", bo skrzynka stała na błędzie BEZ kodu
      („Konto Allegro niepołączone — /biuro → …"). Serwer znał to zdanie

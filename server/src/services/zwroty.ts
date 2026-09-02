@@ -5,6 +5,7 @@ import { stanRabatu, type StanRabatu } from "./rabaty.js";
 import { linkZwrotu } from "./allegro-linki.js";
 import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
+import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -41,6 +42,10 @@ export interface PozycjaZwrotu {
   twId: number | null;
   twSymbol: string | null;
   twZrodlo: string | null;
+  /** SKU sprzedawcy z pozycji ZAMÓWIENIA — zwrot własnego SKU nie niesie. */
+  sku: string | null;
+  /** EAN z kartoteki Subiekta. Allegro EAN-u nie podaje przy zwrocie wcale. */
+  ean: string | null;
   /** Propozycja automatu — pokazywana obok, nigdy zamiast potwierdzonej. */
   propozycja: Dopasowanie | null;
   /** Rabat transakcyjny: czy wniosek o zwrot prowizji już jest (0.164.0). */
@@ -78,8 +83,32 @@ export interface WierszZwrotu {
   kwotaWariant: string | null;
   korektaNumer: string | null;
   rejectionCode: string | null;
+  /** Login kupującego prosto ze zwrotu — nie wymaga pobranego zamówienia. */
+  kupujacyLogin: string | null;
+  /** `INPOST`, `DPD`, `UNKNOWN`… — surowo, bo Allegro nie zamyka listy. */
+  przewoznik: string | null;
+  /** Rozmowy o TYM zakupie; puste znaczy „Allegro nic nie powiązało". */
+  rozmowy: RozmowaZwrotu[];
   wersja: number;
   pozycje: PozycjaZwrotu[];
+}
+
+/**
+ * Rozmowa z klientem o tym samym zakupie (0.169.0).
+ *
+ * Mostkiem jest `message.related_order_id`, mapowany od 0.166.0 z gałęzi
+ * `relatesTo.order`. Nie ma tu ani jednego nowego żądania do Allegro: numer
+ * zamówienia zwrot ma od zawsze, a wiadomości leżą już w naszej bazie.
+ *
+ * Po loginie kupującego dobierać NIE WOLNO — blizna 0.56.6: Allegro maskuje
+ * rozmówcę jako `client:44300444`, więc rozmowy szuka się po identyfikatorze,
+ * nigdy po loginie. `conversation` identyfikatora zresztą nie trzyma.
+ */
+export interface RozmowaZwrotu {
+  id: number;
+  temat: string | null;
+  status: string;
+  ostatniaAt: string | null;
 }
 
 /** Ile dni przed terminem wiersz zapala się na czerwono. */
@@ -167,6 +196,7 @@ export function sumaPozycji(pozycje: Array<{ cenaGrosze: number; ilosc: number }
 
 function zloz(
   z: Wiersz, pozycje: PozycjaZwrotu[], zamowienie: Zamowienie | null, teraz: number,
+  rozmowy: RozmowaZwrotu[] = [],
 ): WierszZwrotu {
   const utworzono = String(z.created_at);
   const terminAt = terminZwrotu(utworzono);
@@ -205,9 +235,59 @@ function zloz(
     kwotaWariant: (z.kwota_wariant as string) ?? null,
     korektaNumer: (z.korekta_numer as string) ?? null,
     rejectionCode,
+    kupujacyLogin: (z.kupujacy_login as string) ?? null,
+    przewoznik: (z.przewoznik as string) ?? null,
+    rozmowy,
     wersja: Number(z.wersja ?? 1),
     pozycje,
   };
+}
+
+/**
+ * Kolejka jako CSV dla biura.
+ *
+ * Separator `;`, bo Excel PL otwiera taki plik bez kreatora importu — ta sama
+ * reguła co przy analizie i rekoncyliacji (`services/csv.ts`). Jeden wiersz
+ * na POZYCJĘ, nie na zwrot: pracownik liczy w Excelu towary, a zwrot
+ * wielopozycyjny w jednym wierszu kazałby mu je rozklejać ręcznie.
+ *
+ * Numeru listu przewozowego tu NIE MA — polityka danych zwrotów z 0.163.0
+ * mówi, że nie zapisujemy go w modelu pracy, a plik wynoszony na dysk jest
+ * zapisem trwalszym niż baza.
+ */
+export function csvZwrotow(zwroty: WierszZwrotu[]): string {
+  const naglowek = [
+    "Numer zwrotu", "Identyfikator", "Zamowienie", "Kupujacy", "Zgloszony",
+    "Termin", "Dni do terminu", "Kubelek", "Przewoznik", "Platnosc", "Faktura",
+    "Towar", "Symbol", "EAN", "SKU", "Sztuk", "Cena", "Waluta", "Powod",
+    "Ocena", "Werdykt", "Kwota oddana", "Numer korekty",
+  ].join(";");
+
+  const wiersze = zwroty.flatMap((z) => {
+    const wspolne = [
+      z.numer ?? "", z.externalId, z.orderId ?? "", z.kupujacyLogin ?? "",
+      z.utworzono, z.terminAt, z.dniDoTerminu, z.kubelek, z.przewoznik ?? "",
+      z.zamowienie?.platnoscTyp ?? "",
+      z.zamowienie?.fakturaZadana == null ? "" : (z.zamowienie.fakturaZadana ? "faktura" : "paragon"),
+    ];
+    const ogon = [
+      z.werdykt ?? "",
+      z.kwotaGrosze == null ? "" : (z.kwotaGrosze / 100).toFixed(2).replace(".", ","),
+      z.korektaNumer ?? "",
+    ];
+    /* Zwrot bez pozycji też dostaje wiersz — inaczej zniknąłby z zestawienia
+       i nikt by się nie dowiedział, że w ogóle jest. */
+    if (!z.pozycje.length) {
+      return [wierszCsv([...wspolne, "", "", "", "", "", "", "", "", "", ...ogon], ";")];
+    }
+    return z.pozycje.map((p) => wierszCsv([
+      ...wspolne, p.nazwa, p.twSymbol ?? "", p.ean ?? "", p.sku ?? "", p.ilosc,
+      (p.cenaGrosze / 100).toFixed(2).replace(".", ","), p.waluta,
+      p.powod ?? "", p.ocena ?? "", ...ogon,
+    ], ";"));
+  });
+
+  return zbudujCsv([naglowek, ...wiersze]);
 }
 
 /**
@@ -248,6 +328,38 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
     wgZwrotu.set(Number(p.zwrot_id), lista);
   }
 
+  /* EAN bierze się z KARTOTEKI, bo Allegro go przy zwrocie nie podaje w ogóle
+     (jest tylko przy One Fulfillment, którego ta firma nie używa). Jedno
+     zapytanie na całą kolejkę, nie jedno na pozycję. */
+  const eanWgTw = new Map<number, string>();
+  for (const t of database.prepare(
+    "SELECT tw_id, ean FROM sgt_towar WHERE ean IS NOT NULL AND ean <> ''",
+  ).all() as Wiersz[]) {
+    eanWgTw.set(Number(t.tw_id), String(t.ean));
+  }
+
+  /* Rozmowy o tym zakupie. Grupujemy po numerze zamówienia, bo jeden zakup
+     potrafi mieć kilka wątków — dlatego lista, a nie kolumna `conversation_id`
+     przy zwrocie, która mieści jedną. */
+  const rozmowyWgZam = new Map<string, RozmowaZwrotu[]>();
+  for (const r of database.prepare(`
+    SELECT m.related_order_id AS zam, c.id, c.subject, c.status,
+           MAX(m.sent_at) AS ostatnia
+      FROM message m JOIN conversation c ON c.id = m.conversation_id
+     WHERE m.related_order_id IS NOT NULL
+     GROUP BY m.related_order_id, c.id
+     ORDER BY ostatnia DESC`).all() as Wiersz[]) {
+    const klucz = String(r.zam);
+    const lista = rozmowyWgZam.get(klucz) ?? [];
+    lista.push({
+      id: Number(r.id),
+      temat: (r.subject as string) ?? null,
+      status: String(r.status),
+      ostatniaAt: (r.ostatnia as string) ?? null,
+    });
+    rozmowyWgZam.set(klucz, lista);
+  }
+
   return zwroty
     .map((z) => {
       const surowe = wgZwrotu.get(Number(z.id)) ?? [];
@@ -255,6 +367,18 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
       const pozZamowienia = zam ? pozWgZam.get(Number(zam.id)) ?? [] : [];
       const wracajace = new Set(
         surowe.map((p) => (p.offer_id as string) ?? "").filter((v) => v !== ""));
+
+      /* SKU sprzedawcy niesie POZYCJA ZAMÓWIENIA — pozycja zwrotu ma w
+         specyfikacji samo `offerId`, bez zagnieżdżonej oferty. Dopasowanie
+         po obu kolumnach z tego samego powodu co niżej przy plakietce WRACA. */
+      const skuWgOferty = new Map<string, string>();
+      for (const pz of pozZamowienia) {
+        const sku = (pz.sku as string) ?? "";
+        if (!sku) continue;
+        for (const k of [pz.offer_id, pz.external_id]) {
+          if (k) skuWgOferty.set(String(k), sku);
+        }
+      }
 
       const zlozone: PozycjaZwrotu[] = surowe.map((p) => {
         const twId = p.tw_id == null ? null : Number(p.tw_id);
@@ -272,6 +396,8 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           twId,
           twSymbol: (p.tw_symbol as string) ?? null,
           twZrodlo: (p.tw_zrodlo as string) ?? null,
+          sku: skuWgOferty.get(String(p.offer_id ?? "")) ?? null,
+          ean: twId === null ? null : eanWgTw.get(twId) ?? null,
           /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
              Podpowiadanie obok potwierdzonego wyboru byłoby podważaniem
              decyzji człowieka, a §4.3 stawia ją wyżej niż wynik automatu. */
@@ -300,7 +426,8 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
         wracajace.has((p.offer_id as string) ?? "")
           || wracajace.has((p.external_id as string) ?? "")) : null;
 
-      return zloz(z, zlozone, zamowienie, teraz);
+      return zloz(z, zlozone, zamowienie, teraz,
+        rozmowyWgZam.get(String(z.order_id ?? "")) ?? []);
     })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
        jakiej ten ekran potrzebuje. */

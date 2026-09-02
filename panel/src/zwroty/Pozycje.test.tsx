@@ -15,7 +15,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   id: 11, offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, url: null,
-  twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+  twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, propozycja: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
     prowizjaGrosze: null, waluta: null, typ: null, powod: null },
   ...n,
@@ -27,9 +27,10 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   sygnaly: [], terminAt: "2026-09-15T08:00:00Z", dniDoTerminu: 14,
   sumaPozycjiGrosze: 9998, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, werdykt: null, kwotaGrosze: null, kwotaWariant: null,
+  kupujacyLogin: null, przewoznik: null, rozmowy: [],
   korektaNumer: null, rejectionCode: null, wersja: 3,
   zamowienie: { externalId: "ord-1", status: null, kupujacyLogin: null,
-    dostawaGrosze: 1500, dostawaMetoda: "InPost", sumaGrosze: 11498,
+    dostawaGrosze: 1500, dostawaMetoda: "InPost", platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 11498,
     waluta: "PLN", kupionoAt: null, link: null, pozycje: [] },
   pozycje: [POZYCJA(), POZYCJA({ id: 12, offerId: "of-2", nazwa: "Filtr" })],
   ...n,
@@ -184,6 +185,34 @@ describe("Produkty ze zwrotu", () => {
       symbol: null, zrodlo: "Oferta bez SKU w Allegro (pole „sygnatura”)",
       powod: "oferta_bez_sku", poKolumnie: null } })] }));
     expect(screen.getByText(/Oferta bez SKU w Allegro/)).toBeInTheDocument();
+  });
+
+  it("kody towaru: EAN z kartoteki, SKU sprzedawcy", () => {
+    /* Pracownik szuka po nich towaru na półce i w Subiekcie. Allegro EAN-u
+       przy zwrocie nie podaje wcale — kod wisi przy kartotece. */
+    lista(zwrot({ pozycje: [POZYCJA({ ean: "5901234123457", sku: "SEK-46" })] }));
+    expect(screen.getByText("5901234123457")).toBeInTheDocument();
+    expect(screen.getByText("SEK-46")).toBeInTheDocument();
+  });
+
+  it("bez kodów wiersz nie pokazuje pustych etykiet", () => {
+    lista(zwrot({ pozycje: [POZYCJA()] }));
+    expect(screen.queryByText("EAN")).toBeNull();
+    expect(screen.queryByText("SKU")).toBeNull();
+  });
+
+  it("powód spoza jedenastu zaobserwowanych też ma polską nazwę", () => {
+    /* Schemat Allegro wymienia siedemnaście wartości, sonda zaobserwowała
+       jedenaście — do 0.167.0 pozostałe sześć szło na ekran surowym kodem. */
+    lista(zwrot({ pozycje: [POZYCJA({ powod: "ORDERED_FOR_COMPARISON" })] }));
+    expect(screen.getByText(/zamówiony na przymiarkę/)).toBeInTheDocument();
+  });
+
+  it("kod, którego nie znamy, pokazuje się surowy zamiast znikać", () => {
+    /* `reason.type` nie ma w specyfikacji enuma, więc lista nigdy nie będzie
+       zamknięta — a cicho gubiony powód jest gorszy od brzydkiego. */
+    lista(zwrot({ pozycje: [POZYCJA({ powod: "COS_NOWEGO" })] }));
+    expect(screen.getByText(/COS_NOWEGO/)).toBeInTheDocument();
   });
 
   it("zwrot bez pozycji mówi to wprost", () => {

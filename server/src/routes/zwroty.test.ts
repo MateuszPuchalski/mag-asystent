@@ -63,6 +63,7 @@ function login(role: Rola, name: string) {
 const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/zwroty" },
   { method: "GET" as const, url: `/api/obsluga/zwroty/${zwrot}` },
+  { method: "GET" as const, url: "/api/obsluga/zwroty/csv" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/zamowienia" },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/werdykt` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/kwota` },
@@ -123,11 +124,37 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
       .join("/");
   };
   const przed = licz();
-  for (const t of TRASY().filter((t) => t.method === "GET")) {
+  /* Eksport CSV jest tu JAWNIE wyłączony i to jedyny wyjątek. Umowa mówi
+     o patrzeniu, a wyniesienie pliku z loginami kupujących na dysk nie jest
+     patrzeniem — dlatego zostawia ślad (test niżej tego pilnuje). */
+  for (const t of TRASY().filter((t) => t.method === "GET" && !t.url.endsWith("/csv"))) {
     await app.inject({ method: t.method, url: t.url, headers: naglowki });
     await app.inject({ method: t.method, url: t.url, headers: naglowki });
   }
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
+});
+
+test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () => {
+  /* Ta sama zasada co przy `analiza_eksport` i `audyt_eksport`: kto pobiera
+     zestawienie o ludziach, sam trafia do dziennika. */
+  const { naglowki } = login("biuro", "Ala z eksportu");
+  const d = db();
+  const zdarzen = () => (d.prepare(
+    "SELECT count(*) n FROM events WHERE type='zwroty_eksport'").get() as { n: number }).n;
+  const przed = zdarzen();
+
+  const r = await app.inject({ method: "GET", url: "/api/obsluga/zwroty/csv", headers: naglowki });
+  assert.equal(r.statusCode, 200);
+  assert.match(r.headers["content-type"] as string, /text\/csv/);
+  assert.match(r.headers["content-disposition"] as string, /wertis-zwroty\.csv/);
+  assert.equal(zdarzen(), przed + 1, "eksport dopisał zdarzenie");
+
+  /* Separator `;`, bo Excel PL otwiera taki plik bez kreatora importu.
+     Numeru listu przewozowego w pliku NIE MA — polityka danych zwrotów. */
+  const tekst = r.body;
+  assert.match(tekst, /Numer zwrotu;/);
+  assert.match(tekst, /EAN;SKU;/);
+  assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
 test("zwroty mają dziesięć tras POST, a jedna z nich wychodzi do Allegro", async () => {

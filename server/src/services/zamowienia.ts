@@ -24,6 +24,11 @@ export interface Zamowienie {
   kupujacyLogin: string | null;
   dostawaGrosze: number | null;
   dostawaMetoda: string | null;
+  /** `ONLINE`, `CASH_ON_DELIVERY`, … — surowo, bo Allegro nie zamyka listy. */
+  platnoscTyp: string | null;
+  platnoscAt: string | null;
+  /** `null` znaczy „nie wiadomo", nie „paragon". */
+  fakturaZadana: boolean | null;
   sumaGrosze: number | null;
   waluta: string;
   kupionoAt: string | null;
@@ -48,6 +53,9 @@ export function naZamowienie(
     kupujacyLogin: (zam.kupujacy_login as string) ?? null,
     dostawaGrosze: zam.dostawa_grosze == null ? null : Number(zam.dostawa_grosze),
     dostawaMetoda: (zam.dostawa_metoda as string) ?? null,
+    platnoscTyp: (zam.platnosc_typ as string) ?? null,
+    platnoscAt: (zam.platnosc_at as string) ?? null,
+    fakturaZadana: zam.faktura_zadana == null ? null : Boolean(Number(zam.faktura_zadana)),
     sumaGrosze: zam.suma_grosze == null ? null : Number(zam.suma_grosze),
     waluta: String(zam.waluta ?? "PLN"),
     kupionoAt: (zam.kupiono_at as string) ?? null,
