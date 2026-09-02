@@ -13,6 +13,7 @@ import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { zglosRabat } from "../adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { zwiazPewne } from "../services/sygnatury.js";
+import { kandydaciFaktury, wskazFakture, zwiazFakturyPewne } from "../services/faktury.js";
 import { dociagnijZwrotPoLiscie } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -78,7 +79,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       /* Powiązanie ZARAZ PO dociągnięciu: to zamówienie niesie sygnaturę,
          więc dopiero teraz jest z czego wiązać. Bez tego operator klikałby
          „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu. */
-      return { pobrano, powiazano: zwiazPewne(db()) };
+      return { pobrano, powiazano: zwiazPewne(db()), faktury: zwiazFakturyPewne(db()) };
     } catch (e) {
       return reply.code(400).send({ error: (e as Error).message });
     }
@@ -316,6 +317,31 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const id = Number(req.params.id);
     const zwrot = listaZwrotow(db()).find((z) => z.id === id);
     if (!zwrot) return reply.code(404).send({ error: "Nie znaleziono zwrotu" });
-    return { zwrot, os: osZwrotu(db(), id) };
+    /* Kandydatów liczymy TYLKO wtedy, gdy dokumentu jeszcze nie ma. Przy
+       zwrocie z dokumentem lista nie ma komu służyć, a przebiega okno
+       sześćdziesięciu dni sprzedaży. */
+    const kandydaci = zwrot.faktura.dokId === null ? kandydaciFaktury(id, db()) : [];
+    return { zwrot, os: osZwrotu(db(), id), kandydaciFaktury: kandydaci };
   });
+
+  /* Wskazanie dokumentu sprzedaży przez człowieka (0.174.0). `dokId: null`
+     ZDEJMUJE powiązanie i to jest droga wyjścia z pomyłki, a nie brak funkcji
+     (§25a.5 — cofnięcie zamiast potwierdzenia).
+
+     Bez `autoryzuj()`: to zwykła praca biura, nie operacja uprzywilejowana —
+     ten sam argument co przy potwierdzeniu kartoteki wyżej. */
+  app.post<{ Params: { id: string }; Body: { dokId?: number | null } }>(
+    "/api/obsluga/zwroty/:id/faktura", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const dokId = req.body?.dokId == null ? null : Number(req.body.dokId);
+      if (dokId !== null && !Number.isInteger(dokId)) {
+        return reply.code(400).send({ error: "Zły identyfikator dokumentu" });
+      }
+      try {
+        return { faktura: wskazFakture(db(), Number(req.params.id), dokId, kto()) };
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
 }

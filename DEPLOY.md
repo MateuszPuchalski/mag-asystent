@@ -884,6 +884,8 @@ bazie. Przejdź tę tabelę przed pierwszą pracą na produkcji:
 | `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
 | `MM_ZWROTY_DNI_WSTECZ` | okno importu przesunięć na regał zwrotów (§6a) | starszy kosz z kartką nie otworzy się numerem |
 | `MAG_ID_ZWROTY` | magazyn, na który biuro wystawia MM ZWROTY (§6a) | lista przyjęć pusta, bez błędu |
+| `DOK_SPRZEDAZ_DNI_WSTECZ` | okno importu dokumentów sprzedaży (§6) | starsza sprzedaż nie pokaże się przy zwrocie |
+| `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` | kolumna z numerem obcym na dokumencie | dokument wskaże człowiek, nie automat |
 
 Gdy kolumny ilości zrealizowanej nie ma wcale (patrz Etap 1 wyżej), zostaw
 wartość pustą. Karta towaru opisze wtedy ilość jako oszacowanie, a `/api/health`
@@ -1263,13 +1265,26 @@ miejscach znaczy, że serwer i biuro dzielą łącze — wtedy link potwierdzeni
 zawsze otwieraj z telefonu.
    Token nie przeżywa zmiany środowiska — po przełączeniu paruj ponownie.
 
-**Od 0.140.0 import NIE czyta już dokumentów sprzedaży.** Read-model FS/PA
-istniał wyłącznie po to, żeby dopasować zwrot Allegro do faktury, a rejestru
-zwrotów nie ma. Znikają razem z nim ustawienia `DOK_SPRZEDAZ_DNI_WSTECZ`,
-`MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` i `MSSQL_SPRZEDAZ_UWAGI_COLUMN` — zostawione
-w `wertis.env` nic nie robią. Zapytań do bazy firmy jest o dwa mniej przy
-każdej synchronizacji. Na dużych bazach z obciążonym serwerem SQL można nadal
-podnieść `MSSQL_REQUEST_TIMEOUT_MS` (domyślnie 30000).
+**Od 0.174.0 import znowu czyta dokumenty sprzedaży (FS/PA).** Read-model
+istnieje po to, żeby przy zwrocie widać było numer dokumentu. Po tym numerze
+biuro wystawia korektę. W 0.140.0 read-model zniknął razem z rejestrem zwrotów,
+a kolejka odbudowana od 0.150.0 potrzebuje go z powrotem.
+
+Wracają dwa ustawienia i oba mają rozsądne domyślne:
+
+- `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie **60**) — okno importu. Wyżej rośnie już
+  tylko koszt zapytania do bazy firmy.
+- `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` (domyślnie `dok_NrPelnyOryg`) — kolumna
+  z numerem obcym. Puste = świadoma rezygnacja: dokument wskaże wtedy człowiek.
+
+`MSSQL_SPRZEDAZ_UWAGI_COLUMN` **nie wraca** i nie wróci. Wolne pole tekstowe
+niesie kiedyś adres albo telefon, a read-model kopiuje to do kopii zapasowych.
+
+Zapytań do bazy firmy jest przy każdej synchronizacji o dwa więcej. Odczyt
+DEGRADUJE, nie przerywa importu: gdy padnie, stany i lokalizacje wchodzą
+normalnie, a zwroty pokazują dokument sprzed awarii — zdanie o tym stoi
+w `/api/health`. Na dużych bazach z obciążonym serwerem SQL można podnieść
+`MSSQL_REQUEST_TIMEOUT_MS` (domyślnie 30000).
 
 ### Do sprawdzenia na własnej bazie i koncie ([WERYFIKUJ])
 
@@ -1285,7 +1300,14 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
 2. **Magazyn zwrotów** (`MAG_ID_ZWROTY`) musi wskazywać ten sam magazyn, na
    który biuro wystawia MM ZWROTY. Zły identyfikator daje pustą listę przyjęć,
    a nie błąd — importer po prostu nie łapie żadnego dokumentu.
-3. **Scope tokena**: parowanie żąda `allegro:api:orders:read`. Sonda kształtu
+3. **Kolumna numeru obcego** (`MSSQL_SPRZEDAZ_NR_ORYG_COLUMN`, 0.174.0) — czy
+   integracja sprzedażowa w ogóle ją wypełnia i czym. `dok_NrPelnyOryg` jest
+   varchar(30), a identyfikator zamówienia Allegro ma 36 znaków. Cały tam nie
+   wejdzie, więc dopasowanie uznaje też początek ucięty do trzydziestu znaków.
+   Pomyłka daje pustą listę pewnych trafień, a nie złe dane — zwrot czeka wtedy
+   na wskazanie człowieka. Sprawdzisz zapytaniem:
+   `SELECT TOP 20 dok_NrPelny, dok_NrPelnyOryg FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC;`
+4. **Scope tokena**: parowanie żąda `allegro:api:orders:read`. Sonda kształtu
    czyta szerzej i przy braku uprawnienia zapisze w raporcie odmowę zamiast
    kształtu — to informacja, nie awaria.
 

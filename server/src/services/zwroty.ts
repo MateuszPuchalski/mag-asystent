@@ -5,6 +5,7 @@ import { stanRabatu, type StanRabatu } from "./rabaty.js";
 import { linkZwrotu } from "./allegro-linki.js";
 import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
+import type { FakturaZwrotu } from "./faktury.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
@@ -96,6 +97,8 @@ export interface WierszZwrotu {
   przewoznik: string | null;
   /** Rozmowy o TYM zakupie; puste znaczy „Allegro nic nie powiązało". */
   rozmowy: RozmowaZwrotu[];
+  /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */
+  faktura: FakturaZwrotu;
   wersja: number;
   pozycje: PozycjaZwrotu[];
 }
@@ -251,6 +254,17 @@ function zloz(
     kupujacyLogin: (z.kupujacy_login as string) ?? null,
     przewoznik: (z.przewoznik as string) ?? null,
     rozmowy,
+    /* Snapshot z kolumn zwrotu, a nie złączenie z `sgt_faktura`: read-model
+       czyści się przy każdym imporcie i dokument wypada z okna po dwóch
+       miesiącach — numer musi przeżyć własne źródło. */
+    faktura: {
+      dokId: z.faktura_dok_id == null ? null : Number(z.faktura_dok_id),
+      numer: (z.faktura_numer as string) ?? null,
+      typ: (z.faktura_typ as string) ?? null,
+      zrodlo: (z.faktura_zrodlo as "numer" | "reczne") ?? null,
+      at: (z.faktura_at as string) ?? null,
+      przez: (z.faktura_przez as string) ?? null,
+    },
     wersja: Number(z.wersja ?? 1),
     pozycje,
   };
@@ -273,7 +287,8 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
     "Zrodlo", "Numer zwrotu", "Identyfikator", "Zamowienie", "Kupujacy", "Zgloszony",
     "Termin", "Dni do terminu", "Kubelek", "Przewoznik", "Platnosc", "Faktura",
     "Towar", "Symbol", "EAN", "SKU", "Sztuk", "Cena", "Waluta", "Powod",
-    "Ocena", "Potracenie", "Powod potracenia", "Werdykt", "Kwota oddana", "Numer korekty",
+    "Ocena", "Potracenie", "Powod potracenia", "Werdykt", "Kwota oddana",
+    "Dokument sprzedazy", "Numer korekty",
   ].join(";");
 
   const wiersze = zwroty.flatMap((z) => {
@@ -287,6 +302,7 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
     const ogon = [
       z.werdykt ?? "",
       z.kwotaGrosze == null ? "" : (z.kwotaGrosze / 100).toFixed(2).replace(".", ","),
+      z.faktura.numer ?? "",
       z.korektaNumer ?? "",
     ];
     /* Zwrot bez pozycji też dostaje wiersz — inaczej zniknąłby z zestawienia

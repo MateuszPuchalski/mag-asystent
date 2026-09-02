@@ -177,6 +177,18 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta_pozycja", "potracenie_przez", "TEXT");
   addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
   addColumn("zwrot_klienta", "przewoznik", "TEXT");
+  /* Dokument sprzedaży z Subiekta przy zwrocie (0.174.0). Numer trzymamy
+     SNAPSHOTEM, bo `sgt_faktura` czyści się przy każdym imporcie i dokument
+     wypada z okna — powiązanie musi przeżyć własne źródło. */
+  addColumn("zwrot_klienta", "faktura_dok_id", "INTEGER");
+  addColumn("zwrot_klienta", "faktura_numer", "TEXT");
+  addColumn("zwrot_klienta", "faktura_typ", "TEXT");
+  /* `CHECK` tą samą drogą co przy `zrodlo` — baza sprzed wydania stałaby
+     inaczej bez strażnika. */
+  addColumn("zwrot_klienta", "faktura_zrodlo",
+    "TEXT CHECK(faktura_zrodlo IN ('numer','reczne'))");
+  addColumn("zwrot_klienta", "faktura_at", "TEXT");
+  addColumn("zwrot_klienta", "faktura_przez", "TEXT");
   /* Forma płatności i żądanie faktury (0.169.0). Przy zwrocie to nie
      ciekawostka: `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać
      pieniądze, a `faktura_zadana` mówi, czy do zwrotu trzeba korekty faktury,

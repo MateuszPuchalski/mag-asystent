@@ -256,6 +256,29 @@ export const config = {
      * struktury (9-MM), ta sama lista co pozostałe kody dokumentów.
      */
     dokTypMM: num(process.env.DOK_TYP_MM, 9, "DOK_TYP_MM"),
+    /**
+     * Ile dni wstecz czytać dokumenty sprzedaży (FS/PA) do read-modelu
+     * `sgt_faktura` (0.174.0).
+     *
+     * Zwrot z Allegro wraca zwykle w ustawowych czternastu dniach, ale paczka
+     * potrafi poleżeć w „do wyjaśnienia", a odstąpienie liczy się od
+     * DORĘCZENIA. Sześćdziesiąt dni to zapas nad tym oknem; wyżej rośnie już
+     * tylko koszt zapytania do bazy firmy.
+     */
+    fakturyDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 60, "DOK_SPRZEDAZ_DNI_WSTECZ"),
+    /**
+     * Kolumna `dok__Dokument` z numerem obcym — tym, który integracja
+     * sprzedażowa wpisuje na dokument.
+     *
+     * `dok_NrPelnyOryg` to varchar(30), a identyfikator zamówienia Allegro
+     * jest UUID-em (36 znaków, `format: uuid` w schemacie). CAŁY numer się
+     * tam NIE ZMIEŚCI i to nie jest przypuszczenie, tylko arytmetyka. Kolumna
+     * zostaje, bo integracja bywa ustawiona na własny, krótszy numer — ale
+     * dopasowanie po niej jest premią, nie fundamentem.
+     *
+     * Puste = świadoma rezygnacja; wtedy zostaje dopasowanie po pozycjach.
+     */
+    fakturyNrOrygColumn: process.env.MSSQL_SPRZEDAZ_NR_ORYG_COLUMN ?? "dok_NrPelnyOryg",
   },
 
   /**

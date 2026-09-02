@@ -32,6 +32,8 @@ import { zwrotyRoutes } from "./routes/zwroty.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
+  bladImportuFaktur,
+  brakKolumnyNrOryg,
   bladImportuMm,
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
@@ -55,6 +57,7 @@ import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { zwiazPewne } from "./services/sygnatury.js";
+import { zwiazFakturyPewne } from "./services/faktury.js";
 import { allegroTryb } from "./adapters/allegro.js";
 
 /**
@@ -168,12 +171,16 @@ export async function buildApp() {
       bez("konfiguracja", () => problemPrzykrytejKonfiguracji(envFile, config.sgtMode)),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
-      /* Sprzedaż bez kolumny numeru obcego dopasowuje zwroty tylko po
-         pozycjach; konto Allegro niesparowane wysypuje każdy skan etykiety.
-         Oba stany wyglądają na ekranie jak „zwroty nie działają". */
-          /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty dopasowują
-         na danych z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
-          /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
+      /* Sprzedaż bez kolumny numeru obcego wiąże dokument tylko ręką: zwrot
+         dopasuje się po pozycjach, ale wskazać musi człowiek. Na ekranie
+         wygląda to jak „numer paragonu się nie pokazuje". Te dwa zdania
+         osierociały w 0.140.0 razem z read-modelem i wracają tu z nim
+         w 0.174.0. */
+      brakKolumnyNrOryg,
+      /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty pokazują
+         dokument z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
+      bladImportuFaktur,
+      /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
          pracuje na danych sprzed awarii. Do 0.76.1 tego zdania na liście
          brakowało, więc awaria nie miała jak wypłynąć. */
       bladImportuMm,
@@ -342,6 +349,10 @@ async function main() {
     uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, async () => {
       await synchronizujAllegroZwroty();
       zwiazPewne(db());
+      /* Dokument sprzedaży PO kartotece (0.174.0): wiąże go numer zamówienia,
+         więc kolejność nie jest wymogiem — ale kandydaci do wskazania ręcznego
+         liczą się z `tw_id`, a te dopiero co powstały. */
+      zwiazFakturyPewne(db());
     });
     /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
        końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
@@ -355,7 +366,7 @@ async function main() {
        ono niesie sygnaturę, więc bez tego wywołania pozycja czekałaby na
        powiązanie do następnego przebiegu zwrotów. */
     uruchomTakt("allegro-zamowienia", config.allegro.zamowieniaSyncMs,
-      async () => { await uzupelnijZamowienia(); zwiazPewne(db()); });
+      async () => { await uzupelnijZamowienia(); zwiazPewne(db()); zwiazFakturyPewne(db()); });
   }
 
   const app = await buildApp();

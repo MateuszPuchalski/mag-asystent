@@ -287,8 +287,37 @@ export interface Zwrot {
   kupujacyLogin: string | null;
   przewoznik: string | null;
   rozmowy: RozmowaZwrotu[];
+  /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */
+  faktura: FakturaZwrotu;
   wersja: number;
   pozycje: PozycjaZwrotu[];
+}
+
+/**
+ * Dokument sprzedaży przy zwrocie (0.174.0).
+ *
+ * `zrodlo` mówi, KTO go wskazał: `numer` to automat po numerze zamówienia na
+ * dokumencie, `reczne` to wybór człowieka. Ekran musi je rozróżniać — wybór
+ * człowieka nie ma udawać faktu z danych.
+ */
+export interface FakturaZwrotu {
+  dokId: number | null;
+  numer: string | null;
+  typ: string | null;
+  zrodlo: "numer" | "reczne" | null;
+  at: string | null;
+  przez: string | null;
+}
+
+/** Dokument, którym MOŻE być ta sprzedaż — z jawnym uzasadnieniem. */
+export interface KandydatFaktury {
+  dokId: number;
+  numer: string;
+  typ: string;
+  data: string;
+  powody: string[];
+  /** Numer zamówienia stoi na dokumencie. Tylko to wiąże automatycznie. */
+  pewny: boolean;
 }
 
 /** Rozmowa o tym samym zakupie — mostkiem jest numer zamówienia. */

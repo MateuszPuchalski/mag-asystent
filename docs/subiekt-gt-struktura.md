@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało dwanaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzynaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -16,9 +16,13 @@ zwroty klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
 W 0.164.0 zeszła na dwanaście: znacznik przy `status` zwrotu okazał się
 nieaktualny, bo schemat leżał już w repo od 0.151.0.
 
-Rozkład dzisiejszy jest po połowie: sześć pozycji dotyczy Subiekta GT, sześć
-mapowania Allegro. Z tych drugich cztery to końcówki ZAPISU, których sonda nie
-dosięgnie, bo jest GET-em.
+W 0.174.0 doszedł jeden, razem z read-modelem sprzedaży: nie wiadomo, czy
+integracja tej firmy wypełnia `dok_NrPelnyOryg` i czym. Pomyłka daje pustą
+listę pewnych trafień, a nie złe dane.
+
+Rozkład dzisiejszy: siedem pozycji dotyczy Subiekta GT, sześć mapowania
+Allegro. Z tych drugich cztery to końcówki ZAPISU, których sonda nie dosięgnie,
+bo jest GET-em.
 
 W 0.151.0 zeszła do jedenastu. Właściciel wgrał `swagger.yaml`, a specyfikacja
 potwierdziła zgadnięty kształt wysyłki do Centrum wiadomości. Dwa znaczniki
@@ -58,6 +62,27 @@ Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`.
 | `dok_Pozycja` | `ob_DokHanId` (→ `dok_Id` dokumentu **handlowego**), `ob_DokMagId` (→ `dok_Id` dokumentu **magazynowego**), `ob_TowId` (→ `tw_Id`), `ob_IloscMag` |
 | `kh__Kontrahent` | `kh_Id`, `kh_Symbol` |
 | `sl_Magazyn` | `mag_Id`, `mag_Symbol`, `mag_Nazwa` — nazwy magazynów na karcie towaru |
+
+## Numer obcy na dokumencie sprzedaży — arytmetyka, nie domysł
+
+`dok_NrPelnyOryg` jest kolumną **varchar(30)**. Identyfikator zamówienia
+Allegro to UUID o **36 znakach** (`format: uuid` w schemacie, przykład
+`29738e61-7f6a-11e8-ac45-09db60ede9d6`). Cały numer się tam nie zmieści i nie
+trzeba tego sprawdzać na bazie — wystarczy odjąć.
+
+To unieważnia założenie z 0.53.0, które kazało szukać w tej kolumnie CAŁEGO
+numeru zamówienia. Read-model wskrzeszony w 0.174.0 dopasowuje więc dwiema
+drogami: numer zamówienia zawarty w numerze obcym ALBO numer obcy będący jego
+początkiem uciętym dokładnie do trzydziestu znaków. Krótszego prefiksu nie
+uznajemy — „1234" pasowałoby do co drugiego dokumentu w oknie.
+
+`[WERYFIKUJ]` czy integracja tej firmy w ogóle wypełnia tę kolumnę i czym.
+Pomyłka daje pustą listę pewnych trafień, a nie złe dane: zwrot czeka wtedy na
+wskazanie człowieka, a nie wiąże się z cudzą sprzedażą.
+
+Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie czytamy**. Zmieściłby
+się w nim cały UUID, ale mieści się też adres i telefon — a read-model kopiuje
+to, co przeczyta, razem do kopii zapasowych.
 
 ## Lokalizacja: pola własne, nie `tw_Lokalizacja`
 

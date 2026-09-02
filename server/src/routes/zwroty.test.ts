@@ -37,7 +37,8 @@ beforeEach(() => {
   const d = db();
   for (const t of ["zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
     "zamowienie_klienta_pozycja", "zamowienie_klienta", "allegro_zamowienie",
-    "oferta_kartoteka", "sgt_towar", "channel_account", "events", "device_session", "app_user"]) {
+    "oferta_kartoteka", "sgt_faktura_pozycja", "sgt_faktura", "sgt_towar",
+    "channel_account", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const konto = Number(d.prepare(
@@ -157,7 +158,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają dwanaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
+test("zwroty mają trzynaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -186,17 +187,24 @@ test("zwroty mają dwanaście tras POST, a jedna z nich wychodzi do Allegro", as
      DWUNASTA to rejestracja paczki NIEODEBRANEJ (0.172.0) — jedyna trasa
      zwrotów, która tworzy zwrot OD ZERA. Allegro takiego bytu nie zna:
      `CustomerReturn` powstaje z deklaracji klienta, a nieodebrana przesyłka
-     wraca sama. Pieniądze i tak trzeba oddać. */
+     wraca sama. Pieniądze i tak trzeba oddać.
+
+     TRZYNASTA wskazuje DOKUMENT SPRZEDAŻY z Subiekta (0.174.0). Zapisuje
+     wyłącznie wybór człowieka z listy kandydatów — sam automat wiąże taktem,
+     bez trasy, bo „zero zapisu przy patrzeniu" nie zna wyjątków. Uzasadnienie:
+     biuro szukało numeru paragonu ręcznie w Subiekcie, po dacie i nazwisku,
+     bo nic innego nie miało. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 12, `tras POST jest ${posty.length}, a umowa mówi o dwunastu`);
+  assert.equal(posty.length, 13, `tras POST jest ${posty.length}, a umowa mówi o trzynastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
-    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana"]) {
+    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
+    "faktura"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
@@ -210,6 +218,50 @@ test("bilans kartotek jedzie razem z kolejką", async () => {
   assert.equal(b.wszystkie, 1);
   assert.equal(b.bez, 1);
   assert.equal(b.powody.zamowienie_niepobrane, 1, "powód jest nazwany, nie zbiorczy");
+});
+
+test("dokument sprzedaży wskazuje człowiek, a szczegół podaje kandydatów", async () => {
+  /* Numer paragonu to ostatnia pozycja z listy biura zwrotów. Bez niego
+     pracownik szukał sprzedaży w Subiekcie po dacie i nazwisku. */
+  const d = db();
+  d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,data_wyst)
+    VALUES (500,'FS','FS 140/2026','REF-1','2026-08-20')`).run();
+  const { naglowki } = login("biuro", "Ala wskazuje");
+
+  const szczegol = await app.inject({
+    method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  const kandydaci = szczegol.json().kandydaciFaktury;
+  assert.equal(kandydaci.length, 1);
+  assert.equal(kandydaci[0].pewny, true, "numer zwrotu stoi na dokumencie");
+
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/zwroty/${zwrot}/faktura`,
+    headers: naglowki, payload: { dokId: 500 } });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().faktura.numer, "FS 140/2026");
+  assert.equal(r.json().faktura.zrodlo, "reczne");
+
+  /* Zdjęcie powiązania to droga wyjścia z pomyłki, a nie brak funkcji. */
+  const cofniete = await app.inject({
+    method: "POST", url: `/api/obsluga/zwroty/${zwrot}/faktura`,
+    headers: naglowki, payload: { dokId: null } });
+  assert.equal(cofniete.json().faktura.dokId, null);
+
+  const ev = d.prepare(
+    "SELECT COUNT(*) n FROM events WHERE type IN ('zwrot_faktura','zwrot_faktura_cofnieta')")
+    .get() as { n: number };
+  assert.equal(Number(ev.n), 2, "obie mutacje zostawiają ślad");
+});
+
+test("dokumentu spoza read-modelu wskazać się nie da", async () => {
+  /* Numer wpisany z palca byłby napisem, którego nikt nie odnajdzie
+     w Subiekcie — a to jest cała jego rola. */
+  const { naglowki } = login("biuro", "Ala zmyśla");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/zwroty/${zwrot}/faktura`,
+    headers: naglowki, payload: { dokId: 999 } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /Nie znam takiego dokumentu/);
 });
 
 test("ręczne dociągnięcie zamówień wymaga sparowanego konta", async () => {
