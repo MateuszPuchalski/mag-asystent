@@ -15,7 +15,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   id: 11, offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, url: null,
-  twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, propozycja: null,
+  twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
     prowizjaGrosze: null, waluta: null, typ: null, powod: null },
   ...n,
@@ -213,6 +213,37 @@ describe("Produkty ze zwrotu", () => {
        zamknięta — a cicho gubiony powód jest gorszy od brzydkiego. */
     lista(zwrot({ pozycje: [POZYCJA({ powod: "COS_NOWEGO" })] }));
     expect(screen.getByText(/COS_NOWEGO/)).toBeInTheDocument();
+  });
+
+  it("potrącenie obniża podgląd sumy tak samo, jak obniży go serwer", async () => {
+    /* Inaczej operator widziałby jedną liczbę, a klient dostawał inną. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ potracenieGrosze: 2000, potraceniePowod: "ślady użycia" }),
+      POZYCJA({ id: 12, nazwa: "Filtr" })] }), { onPotracenie: vi.fn() });
+    /* Dwie pozycje po 49,99 to 99,98; minus dwadzieścia złotych potrącenia. */
+    expect(screen.getByTestId("suma")).toHaveTextContent("79,98");
+  });
+
+  it("propozycja potrącenia stoi przy WYCENIE, bo tam zapada decyzja o pieniądzach", () => {
+    const onPotracenie = vi.fn();
+    const { rerender, klient } = lista(zwrot({ pozycje: [POZYCJA()] }), { onPotracenie });
+    expect(screen.queryByRole("button", { name: /oddaj mniej/ })).toBeNull();
+
+    rerender(<QueryClientProvider client={klient}>
+      <Pozycje zwrot={zwrot({ kubelek: "zwrot", pozycje: [POZYCJA()] })} trwa={false} blad=""
+        onOcena={vi.fn()} onKwota={vi.fn()} onPotracenie={onPotracenie} />
+    </QueryClientProvider>);
+    expect(screen.getByRole("button", { name: /oddaj mniej/ })).toBeInTheDocument();
+  });
+
+  it("zapisane potrącenie widać w KAŻDYM kubełku, bo to fakt o pozycji", () => {
+    /* Tak samo jak ocenę hali — po zamknięciu zwrotu trzeba umieć powiedzieć,
+       czemu klient dostał mniej. */
+    lista(zwrot({ kubelek: "korekta", pozycje: [
+      POZYCJA({ potracenieGrosze: 1500, potraceniePowod: "brak opakowania" })] }),
+      { onPotracenie: vi.fn() });
+    expect(screen.getByText(/Potrącenie −15,00/)).toBeInTheDocument();
+    expect(screen.getByText(/brak opakowania/)).toBeInTheDocument();
   });
 
   it("zwrot bez pozycji mówi to wprost", () => {

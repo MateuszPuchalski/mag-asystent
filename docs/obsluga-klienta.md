@@ -402,6 +402,11 @@ kodu, a lądowisko jest prywatną kopią w bazie biura, pod tą samą bramką ro
 co reszta zwrotu. To, co wolno trzymać w bazie, nie zawsze wolno wypisać
 w pliku.
 
+**Potrącenie za utratę wartości zapisuje kwotę, powód i autora (0.170.0).**
+Powód jest obowiązkowy, bo to jego treść zobaczy klient pytający, czemu dostał
+mniej. Kwotę do oddania dalej składa serwer z zaznaczenia; potrącenie tylko ją
+obniża i mieści się w widełkach `0…wartość pozycji`.
+
 **Login kupującego stoi teraz PRZY ZWROCIE (0.169.0).** Do tego wydania mieliśmy
 go wyłącznie przy zamówieniu, więc znikał, dopóki zamówienia nie pobrano — choć
 Allegro przysyła go z każdym zwrotem. To ta sama dana, którą polityka dopuszcza

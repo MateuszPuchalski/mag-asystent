@@ -152,6 +152,16 @@ export function migrate(database: DatabaseSync) {
 
      Przewoźnik bez `CHECK`: Allegro nie publikuje zamkniętej listy, a sonda
      złapała `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
+  /* Potrącenie za utratę wartości (0.170.0). Do tego wydania kwota do oddania
+     była binarna per pozycja: cała cena albo nic. Towar wracający używany nie
+     miał jak zjechać w dół, a to jest codzienność biura zwrotów.
+
+     Kwota, nie procent — klient widzi złotówki. Powód obowiązkowy, bo to jego
+     treść tłumaczy klientowi, czemu dostał mniej. */
+  addColumn("zwrot_klienta_pozycja", "potracenie_grosze", "INTEGER");
+  addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "potracenie_przez", "TEXT");
   addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
   addColumn("zwrot_klienta", "przewoznik", "TEXT");
   /* Forma płatności i żądanie faktury (0.169.0). Przy zwrocie to nie
