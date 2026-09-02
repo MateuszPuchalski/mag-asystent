@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { db } from "./db/db.js";
+import { bezMigracji, db } from "./db/db.js";
 
 /* ── Inwentarz obsługi klienta przed cięciem (0.137.2) ───────────────────────
    Etap 1 przebudowy. Rejestry pytań, dyskusji, opinii, zwrotów i reklamacji
@@ -18,6 +18,11 @@ import { db } from "./db/db.js";
 
    Uruchomienie:  npm run inwentarz            (raport na ekran)
                   npm run inwentarz -- plik.md (raport do pliku)             */
+
+/* Migracji NIE robimy (0.177.1) — schemat zakłada wyłącznie serwer API. Ten
+   skrypt bywa uruchamiany przy żywej usłudze, a migracja z dwóch procesów
+   naraz to blizna z 2 września. */
+bezMigracji();
 
 type Wiersz = Record<string, unknown>;
 

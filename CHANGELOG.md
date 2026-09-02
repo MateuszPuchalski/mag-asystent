@@ -34,6 +34,68 @@ historii nie przepisujemy.
 ---
 
 
+## 0.177.1 — 2 września 2026
+
+**Schemat bazy ma odtąd jednego właściciela: serwer API.** Domknięcie awarii
+z 0.174.2 — tamto wydanie usunęło konkretny wyjątek, to usuwa układ, który
+zamieniał jedną awarię migracji w awarię dwóch usług.
+
+### Co było źle
+
+Migracja siedziała w `db()`, więc wykonywał ją KAŻDY proces otwierający bazę:
+API, worker, sonda, inwentarz, rekoncyliacja. 2 września jeden wyjątek położył
+API i workera naraz, a `AppExit Default Restart` bez opóźnienia zamienił to
+w pętlę. W logu workera zostawało „database is locked" — objaw, który prowadził
+diagnozę w złe miejsce, bo bazę blokowało API mielące migrację w kółko.
+
+Że układ jest zły, repo wiedziało i obchodziło to po kawałku. Dwie przebudowy
+tabel sprawdzają swój warunek DRUGI RAZ pod blokadą zapisu, obie z tym samym
+uzasadnieniem: „API i worker to dwa procesy startowane razem przez NSSM i oba
+wołają `migrate()`".
+
+### Wzorzec był już w repo, tylko nie u nas
+
+Worker Sfery w C# pracuje tak od początku i mówi to wprost
+(`sfera-worker/src/Db.cs`): otwiera bazę w trybie, który jej nie utworzy,
+sprawdza obecność tabel i odmawia startu, gdy ich nie ma. Worker w Node był
+jedynym procesem piszącym, który tej zasady nie dostał.
+
+### Worker CZEKA, a nie odmawia
+
+Jedna różnica wobec C# jest świadoma. Proces, który pada, NSSM podnosi
+z powrotem — czyli odmowa startu byłaby pętlą restartów z wyboru, dokładnie tym
+stanem, z którego wychodzimy. Worker wypisuje JEDNO zdanie o tym, na co czeka,
+i próbuje dalej; gdy API zmigruje, wraca do pracy sam i mówi o tym drugim
+zdaniem. Restart usługi nie jest do tego potrzebny.
+
+Zdanie pada przy ZMIANIE stanu, nie co takt. Przy takcie rzędu sekundy druga
+droga zapełniłaby dziennik kopiami — tę cenę repo już raz zapłaciło.
+
+### Zrzeczenie się migracji jest jawne i nie da się go przegapić
+
+`bezMigracji()` wywołane PO otwarciu bazy rzuca wyjątkiem, zamiast po cichu nie
+zadziałać: proces myślałby wtedy, że nie migruje, a migracja już by przeszła.
+Proces bez migracji nie wykonuje też `schema.sql` — na gotowej bazie byłby
+niby-nieszkodliwy, ale na pustej założyłby pół schematu bez migracji.
+
+Dostają je: worker, `npm run sonda`, `npm run inwentarz`, `npm run reconcile`.
+**`seed` i `seed:scenariusze` migrują nadal** — one bazę BUDUJĄ. To nie wyjątek
+od reguły, tylko jej druga strona: schemat zakłada ten, kto tworzy bazę.
+
+### Reszta
+
+Przebudowa pozycji zwrotu dostała brakujące sprawdzenie warunku pod blokadą
+zapisu — miały je dwie inne przebudowy, ta nie. Migrujących procesów jest teraz
+mniej, ale nie zero: `seed` potrafi chodzić przy żywym API.
+
+**Poprawka błędu z 0.174.2:** procedura wychodzenia z awarii kazała odpytać
+`localhost:3000`, a serwer stoi na 3001. Zły port w instrukcji ratunkowej to
+najgorsze możliwe miejsce na literówkę.
+
+Sześć nowych testów, każdy uruchamiany we WŁASNYM procesie, bo zrzeczenie się
+migracji jest stanem modułu. Pięć z nich pada bez poprawki; szósty jest
+kontrolą i ma przechodzić w obie strony — inaczej pierwszy nic by nie mierzył.
+
 ## 0.177.0 — 2 września 2026
 
 **Login kupującego widać przy każdym zwrocie.** Zgłoszenie właściciela: „nie

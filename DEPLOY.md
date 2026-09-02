@@ -1875,6 +1875,10 @@ git pull && npm ci && npm -w server run build
 node 'C:\wertis\server\dist\index.js'      # RĘCZNIE, żeby zobaczyć log
 ```
 
+`git pull` stoi tu świadomie zamiast instalatora. Instalator sam uruchamia
+usługi na końcu, a przy tej awarii chodzi o to, żeby zobaczyć start API na
+własne oczy. Do zwykłej aktualizacji dalej służy instalator (§7 wyżej).
+
 Ręczne uruchomienie jest tu istotne: usługa chowa wyjście do pliku, a migracja
 melduje, ile kluczy rozplotła. Zdanie zaczyna się od `[migracja]`. Gdy API
 wstanie i odpowie na `/api/health`, zatrzymaj je Ctrl-C i wróć do usług:
@@ -1882,12 +1886,43 @@ wstanie i odpowie na `/api/health`, zatrzymaj je Ctrl-C i wróć do usług:
 ```bash
 nssm start wertis-api
 nssm start wertis-worker
-curl http://localhost:3000/api/health
+curl http://localhost:3001/api/health
 ```
 
 Kopia bazy nie jest ostrożnością na zapas. Rozplatanie ZMIENIA klucze pozycji
 zwrotu — nie kasuje ani jednego wiersza, ale zmienia dane, więc stan sprzed
 naprawy musi zostać do wglądu.
+
+### Schemat bazy ma jednego właściciela: `wertis-api` (0.177.1)
+
+Migrację wykonuje **wyłącznie serwer API**, przy starcie. Worker, sonda,
+inwentarz i rekoncyliacja otwierają bazę, ale schematu nie dotykają.
+
+Do 0.177.0 migrował każdy proces otwierający bazę i to jest przyczyna awarii
+z 2 września: jeden wyjątek w migracji położył API i workera naraz. Worker
+Sfery w C# pracował tak od początku i o tym mówił (`sfera-worker/src/Db.cs`);
+worker w Node był jedynym procesem piszącym, który tej zasady nie miał.
+
+**Co z tego wynika przy starcie systemu.** Usługi nie mają między sobą
+zależności, więc `wertis-worker` bywa uruchomiony przed `wertis-api`. Worker
+nie pada wtedy i nie jest restartowany — CZEKA, wypisując JEDNO zdanie:
+
+```
+[worker] czekam — w bazie nie ma tabeli sfera_queue. Schemat zakłada serwer
+API (wertis-api); worker podejmie pracę sam, gdy tabela się pojawi.
+```
+
+Gdy API zmigruje, worker sam wraca do pracy i mówi o tym drugim zdaniem
+(`[worker] schemat gotowy`). **Restart usługi nie jest do tego potrzebny.**
+Zdanie pada raz na zmianę stanu, nie co takt.
+
+To zdanie w logu nie jest awarią. Awarią jest, gdy **stoi tam dłużej niż start
+API**. Przyczyna jest wtedy po stronie `wertis-api` i szuka się jej w jego
+logu, nie w logu workera.
+
+**Świeża instalacja:** bazę musi założyć API. Uruchomienie samego workera na
+pustej bazie nie utworzy schematu — świadomie, bo pół schematu bez migracji
+jest gorsze niż jego brak.
 
 ## 8. Odinstalowanie
 
