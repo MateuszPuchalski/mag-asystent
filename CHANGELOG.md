@@ -34,6 +34,50 @@ historii nie przepisujemy.
 ---
 
 
+## 0.161.1 — 1 września 2026
+
+**Dwie sesje zderzyły się dwa razy w ciągu jednego dnia, więc repo dostaje
+sprawdzenie na starcie.** Statusy rozmowy powstały DWA RAZY, w dwóch gałęziach
+naraz (0.157.0 i 0.158.0), i jedną implementację trzeba było wyrzucić w całości
+przy scalaniu — diff jednego PR-a skurczył się z 2091 do 716 dodanych linii
+i to jest miara straty. Kilka godzin później numer 0.159.0 nazwały dwie gałęzie
+jednocześnie, każda co innego.
+
+Zdalnych gałęzi jest ponad trzydzieści, w tym prawie trzydzieści `claude/*`.
+Mimo to `CLAUDE.md` nie wspominał o pracy równoległej ANI RAZU — w całym repo
+nie było jednej reguły mówiącej, żeby przed zaczęciem sprawdzić, co budują
+inni. Decyzja właściciela: sprawdzać na starcie.
+
+**`tools/co_w_toku.sh`** wypisuje gałęzie z commitami spoza `main` (okno 48
+godzin, po trzy commity, bez merge'y — „Scalenie main do gałęzi X" nie mówi,
+co ktoś buduje) oraz wersję `main` obok lokalnej. Kolizja dwóch sesji objawia
+się najpierw wyścigiem numerów wydania i to jest najtańszy sygnał.
+
+Skrypt NIGDY nie kończy się błędem. Brak sieci, świeży klon bez `origin`,
+uruchomienie spoza repo — każdy z tych przypadków daje zdanie o tym, czego nie
+wiadomo, i kod wyjścia zero. Sprawdzenie informacyjne nie ma prawa położyć
+startu sesji. Pustka też mówi o sobie wprost: cisza jest nieodróżnialna od
+awarii skryptu.
+
+**`.claude/settings.json`** to pierwszy plik konfiguracji Claude Code W TYM
+REPO. Hak `SessionStart` woła skrypt, więc wynik stoi w kontekście, zanim
+padnie pierwsza linijka kodu. Plik jest wersjonowany i przez to działa dla
+każdej przyszłej sesji, także cudzej — to cała różnica wobec haków z katalogu
+domowego, które znikają razem z kontenerem.
+
+Hak niczego nie blokuje. Bramka odmawiająca startu kosztowałaby przy każdej
+sesji, a płacić ma tylko ta, w której kolizja naprawdę jest.
+
+**`CLAUDE.md` dostaje sekcję „Zanim zaczniesz"**, symetryczną do „Zanim
+wypchniesz": bramka na wejściu i bramka na wyjściu. Mówi też, czego skrypt NIE
+widzi — otwartych PR-ów, bo to shell, a GitHub stoi za osobnymi narzędziami.
+
+Reguła przy kolizji jest jedna i twarda: gdy ktoś buduje to samo, powiedz
+właścicielowi i **czekaj na decyzję, zanim napiszesz linijkę kodu**. Jedna
+wymiana zdań kosztuje mniej niż wydanie do wyrzucenia.
+
+Wdrożenie: nic. To narzędzie dla sesji, nie dla firmy.
+
 ## 0.161.0 — 1 września 2026
 
 **Sprawa istniała w projekcie od §6.1 i nie miała tabeli.**
