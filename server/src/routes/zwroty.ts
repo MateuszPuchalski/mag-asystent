@@ -10,6 +10,7 @@ import {
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { zglosRabat } from "../adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
+import { zwiazPewne } from "../services/sygnatury.js";
 import { dociagnijZwrotPoLiscie } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -71,7 +72,11 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const s = sesjaZadania()!;
     logEvent("zwroty_zamowienia_reczne", s.user.name);
     try {
-      return { pobrano: await uzupelnijZamowienia() };
+      const pobrano = await uzupelnijZamowienia();
+      /* Powiązanie ZARAZ PO dociągnięciu: to zamówienie niesie sygnaturę,
+         więc dopiero teraz jest z czego wiązać. Bez tego operator klikałby
+         „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu. */
+      return { pobrano, powiazano: zwiazPewne(db()) };
     } catch (e) {
       return reply.code(400).send({ error: (e as Error).message });
     }

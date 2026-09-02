@@ -29,7 +29,15 @@ const zdrowie: Zdrowie = {
 
 vi.mock("../api/rozmowy", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
-  return { ...rzeczywisty, useZdrowie: () => ({ data: zdrowie, dataUpdatedAt: 0 }) };
+  return {
+    ...rzeczywisty,
+    useZdrowie: () => ({ data: zdrowie, dataUpdatedAt: 0 }),
+    /* Ekran od 0.169.0 niesie drugą kartę. Atrapa jest tu, a nie w osobnym
+       teście, bo ten sprawdza SKŁAD ekranu — dane obu kart mają własne testy. */
+    usePokrycieSygnatur: () => ({
+      data: { pozycji: 0, bezSygnatury: 0, trafia: 0, sygnatur: 0, pudla: [], zdublowane: [] },
+    }),
+  };
 });
 
 const { Ustawienia } = await import("./Ustawienia");
@@ -39,6 +47,7 @@ describe("Ustawienia obsługi", () => {
     render(<MemoryRouter><Ustawienia /></MemoryRouter>);
     expect(screen.getByText("Stan integracji")).toBeInTheDocument();
     expect(screen.getByText("Połączenie Allegro")).toBeInTheDocument();
+    expect(screen.getByText("Sygnatura → kartoteka Subiekta")).toBeInTheDocument();
   });
 
   it("SKRZYNKA już jej nie renderuje, ale alarm na niej ZOSTAJE", () => {

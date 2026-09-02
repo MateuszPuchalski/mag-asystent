@@ -307,3 +307,22 @@ export interface KolejkaZwrotow {
   kartoteki: BilansKartotek;
   stan: StanZwrotow;
 }
+
+/** Sygnatura, która nie prowadzi do jednej kartoteki (§ pokrycie sygnatur). */
+export interface WierszSygnatury {
+  sygnatura: string;
+  nazwa: string;
+  pozycji: number;
+  /** 0 = nie ma takiego symbolu w Subiekcie, >1 = symbol zdublowany. */
+  kartotek: number;
+}
+
+/** Ile sygnatur z Allegro trafia w kartotekę Subiekta — `GET /api/obsluga/sygnatury`. */
+export interface PokrycieSygnatur {
+  pozycji: number;
+  bezSygnatury: number;
+  trafia: number;
+  sygnatur: number;
+  pudla: WierszSygnatury[];
+  zdublowane: WierszSygnatury[];
+}

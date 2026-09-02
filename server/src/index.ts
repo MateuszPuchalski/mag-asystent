@@ -29,6 +29,7 @@ import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
 import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
+import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuMm,
@@ -53,6 +54,7 @@ import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
 import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uruchomTakt } from "./services/takt.js";
+import { zwiazPewne } from "./services/sygnatury.js";
 import { allegroTryb } from "./adapters/allegro.js";
 
 /**
@@ -301,6 +303,7 @@ export async function buildApp() {
   await app.register(panelObslugiRoutes);
   await app.register(skrzynkaRoutes);
   await app.register(zwrotyRoutes);
+  await app.register(ustawieniaRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();
@@ -333,7 +336,13 @@ async function main() {
        w dniach, pytanie klienta czeka na odpowiedź. Równy chór dwóch pętli
        to ta sygnatura maszyny, która w sierpniu 2026 skończyła się blokadą
        (patrz nagłówek `services/takt.ts`). */
-    uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, synchronizujAllegroZwroty);
+    /* Wiązanie po sygnaturze idzie ZARAZ PO synchronizacji, w takcie, nigdy
+       przy otwarciu ekranu. Nowy zwrot bywa gotowy do powiązania od razu —
+       gdy zamówienie stoi już w bazie. */
+    uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, async () => {
+      await synchronizujAllegroZwroty();
+      zwiazPewne(db());
+    });
     /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
        końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
        (blizna 0.149.2 — jeden zepsuty wątek zatrzymywał całą synchronizację). */
@@ -342,8 +351,11 @@ async function main() {
        zwrotów, które już mamy, więc po kilku przebiegach nie ma czego
        pobierać i milczy — a gdy zwrot dojdzie, dociągnie mu kontekst
        w kwadrans. Zwrot i tak ma termin liczony w dniach. */
+    /* I DRUGI RAZ TUTAJ, bo zamówienie dochodzi zwykle PO zwrocie: to dopiero
+       ono niesie sygnaturę, więc bez tego wywołania pozycja czekałaby na
+       powiązanie do następnego przebiegu zwrotów. */
     uruchomTakt("allegro-zamowienia", config.allegro.zamowieniaSyncMs,
-      async () => { await uzupelnijZamowienia(); });
+      async () => { await uzupelnijZamowienia(); zwiazPewne(db()); });
   }
 
   const app = await buildApp();
