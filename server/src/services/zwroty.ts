@@ -86,6 +86,10 @@ export interface WierszZwrotu {
   kwotaWariant: string | null;
   korektaNumer: string | null;
   rejectionCode: string | null;
+  /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
+  zrodlo: string;
+  /** Notatka biura przy paczce nieodebranej; przy zwrocie z Allegro `null`. */
+  notatka: string | null;
   /** Login kupującego prosto ze zwrotu — nie wymaga pobranego zamówienia. */
   kupujacyLogin: string | null;
   /** `INPOST`, `DPD`, `UNKNOWN`… — surowo, bo Allegro nie zamyka listy. */
@@ -231,13 +235,19 @@ function zloz(
        zdanie, bo koszt dostawy stoi przy zamówieniu, nie przy zwrocie. */
     kwotaPelnaGrosze: zamowienie ? suma + (zamowienie.dostawaGrosze ?? 0) : null,
     waluta: pozycje[0]?.waluta ?? zamowienie?.waluta ?? "PLN",
-    linkZwrotu: linkZwrotu((z.reference_number as string) ?? (z.external_id as string)),
+    /* Paczka nieodebrana nie ma zwrotu w Allegro, więc nie ma czego otwierać —
+       link prowadziłby w 404 i kosztował zaufanie do całego ekranu. */
+    linkZwrotu: String(z.zrodlo ?? "allegro") === "nieodebrana"
+      ? null
+      : linkZwrotu((z.reference_number as string) ?? (z.external_id as string)),
     zamowienie,
     werdykt: (z.werdykt as string) ?? null,
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     kwotaWariant: (z.kwota_wariant as string) ?? null,
     korektaNumer: (z.korekta_numer as string) ?? null,
     rejectionCode,
+    zrodlo: String(z.zrodlo ?? "allegro"),
+    notatka: (z.notatka as string) ?? null,
     kupujacyLogin: (z.kupujacy_login as string) ?? null,
     przewoznik: (z.przewoznik as string) ?? null,
     rozmowy,
@@ -260,7 +270,7 @@ function zloz(
  */
 export function csvZwrotow(zwroty: WierszZwrotu[]): string {
   const naglowek = [
-    "Numer zwrotu", "Identyfikator", "Zamowienie", "Kupujacy", "Zgloszony",
+    "Zrodlo", "Numer zwrotu", "Identyfikator", "Zamowienie", "Kupujacy", "Zgloszony",
     "Termin", "Dni do terminu", "Kubelek", "Przewoznik", "Platnosc", "Faktura",
     "Towar", "Symbol", "EAN", "SKU", "Sztuk", "Cena", "Waluta", "Powod",
     "Ocena", "Potracenie", "Powod potracenia", "Werdykt", "Kwota oddana", "Numer korekty",
@@ -268,6 +278,7 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
 
   const wiersze = zwroty.flatMap((z) => {
     const wspolne = [
+      z.zrodlo === "nieodebrana" ? "nieodebrana paczka" : "zwrot klienta",
       z.numer ?? "", z.externalId, z.orderId ?? "", z.kupujacyLogin ?? "",
       z.utworzono, z.terminAt, z.dniDoTerminu, z.kubelek, z.przewoznik ?? "",
       z.zamowienie?.platnoscTyp ?? "",
@@ -681,6 +692,78 @@ export function ocenPozycje(
 }
 
 /**
+ * Rejestracja paczki, która wróciła NIEODEBRANA (0.172.0).
+ *
+ * Allegro takiego bytu nie zna: `CustomerReturn` powstaje z DEKLARACJI klienta,
+ * a nieodebrana przesyłka wraca sama i zwrotem nigdy nie zostanie. Pieniądze
+ * i tak trzeba oddać, więc paczka idzie TĄ SAMĄ kolejką — ale z jawnym
+ * oznaczeniem `zrodlo = "nieodebrana"`, żeby nigdzie nie udawała zgłoszenia.
+ *
+ * Identyfikator dostaje przedrostek `nieodebrana:`. Dwie rzeczy naraz: nigdy
+ * nie zderzy się z UUID-em z Allegro, więc synchronizator go nie tknie, i widać
+ * na pierwszy rzut oka, że to nasz wiersz, a nie cudzy.
+ *
+ * Gdy podany numer zamówienia jest już w bazie, pozycje przepisujemy z niego —
+ * bez nich zwrot nie miałby czego wycenić, a operator nie wie, co w paczce
+ * jest, dopóki jej nie otworzy.
+ */
+export function zarejestrujNieodebrana(
+  database: Db, dane: { waybill: string; orderId?: string | null; notatka?: string | null },
+  kto: { id: number; name: string }, teraz = new Date(),
+): { zwrotId: number; pozycji: number } {
+  const waybill = (dane.waybill ?? "").trim();
+  if (!waybill) throw new Error("Numer listu przewozowego jest tu jedynym uchwytem — podaj go.");
+
+  const konto = database.prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
+    .get() as { id: number } | undefined;
+  if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro w /biuro.");
+
+  const external = `nieodebrana:${waybill}`;
+  const juz = database.prepare(
+    "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
+    .get(konto.id, external) as { id: number } | undefined;
+  if (juz) throw new Error(`Ta paczka jest już zarejestrowana (zwrot ${juz.id}).`);
+
+  const orderId = (dane.orderId ?? "").trim() || null;
+  const at = teraz.toISOString();
+
+  return transaction(database, () => {
+    database.prepare(`INSERT INTO zwrot_klienta
+      (channel_account_id,external_id,order_id,created_at,paczka_at,zrodlo,waybill,notatka,synced_at)
+      VALUES (?,?,?,?,?,'nieodebrana',?,?,?)`).run(
+      konto.id, external, orderId, at,
+      /* Paczka JEST u nas — inaczej nie byłoby czego rejestrować. To jedyny
+         zwrot, przy którym datę powrotu znamy na pewno. */
+      at, waybill, (dane.notatka ?? "").trim() || null, at);
+    const zwrotId = Number((database.prepare(
+      "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
+      .get(konto.id, external) as { id: number }).id);
+
+    let pozycji = 0;
+    if (orderId) {
+      const poz = database.prepare(`SELECT p.offer_id, p.nazwa, p.ilosc, p.cena_grosze, p.waluta
+        FROM zamowienie_klienta_pozycja p
+        JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
+       WHERE k.channel_account_id=? AND k.external_id=?`)
+        .all(konto.id, orderId) as Array<Record<string, unknown>>;
+      poz.forEach((p, i) => {
+        database.prepare(`INSERT INTO zwrot_klienta_pozycja
+          (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz)
+          VALUES (?,?,?,?,?,?,?)`).run(
+          zwrotId, (p.offer_id as string) ?? null, String(p.nazwa), Number(p.ilosc),
+          Number(p.cena_grosze), String(p.waluta ?? "PLN"),
+          `${p.offer_id ?? ""}|${p.nazwa}${i ? `|#${i + 1}` : ""}`);
+      });
+      pozycji = poz.length;
+    }
+
+    logEvent("zwrot_nieodebrana", kto.name, null,
+      { zwrotId, orderId, pozycji }, kto.id, database);
+    return { zwrotId, pozycji };
+  })();
+}
+
+/**
  * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
  *
  * Do tego wydania kwota była BINARNA per pozycja: cała cena albo nic. Towar
@@ -951,13 +1034,17 @@ export function znajdzZwrotPoKodzie(kod: string, database: Db = defaultDb()): Wy
   const szukane = (kod ?? "").trim();
   if (!szukane) return PUSTY;
 
-  const poKolumnie = (kolumna: "reference_number" | "external_id"): number[] =>
+  const poKolumnie = (kolumna: "reference_number" | "external_id" | "waybill"): number[] =>
     (database.prepare(`SELECT id FROM zwrot_klienta WHERE ${kolumna} = ?`)
       .all(szukane) as Array<{ id: number }>).map((w) => Number(w.id));
 
   const kandydaci: Array<[TrafienieSkanu, number[]]> = [
     ["numer", poKolumnie("reference_number")],
     ["external", poKolumnie("external_id")],
+    /* Paczka nieodebrana ma numer listu W MODELU, bo nie ma kopii odpowiedzi
+       Allegro, w której dałoby się go szukać (0.172.0). Stoi przed szukaniem
+       po lądowisku, żeby raz zarejestrowana paczka znalazła się od razu. */
+    ["waybill", poKolumnie("waybill")],
     ["waybill", (database.prepare(`
       SELECT z.id FROM zwrot_klienta z
         JOIN allegro_zwrot a ON a.id = z.external_id,

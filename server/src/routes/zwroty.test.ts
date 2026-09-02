@@ -157,7 +157,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają jedenaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
+test("zwroty mają dwanaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -181,17 +181,22 @@ test("zwroty mają jedenaście tras POST, a jedna z nich wychodzi do Allegro", a
      zwrotów przyjmująca od panelu LICZBĘ o pieniądzach. Dlatego jako jedyna
      waliduje ją w widełkach `0…wartość pozycji` i wymaga powodu, a kwotę do
      oddania dalej składa serwer z zaznaczenia (§25a.3). Bez niej kwota była
-     binarna per pozycja: cała cena albo nic, a towar wraca używany. */
+     binarna per pozycja: cała cena albo nic, a towar wraca używany.
+
+     DWUNASTA to rejestracja paczki NIEODEBRANEJ (0.172.0) — jedyna trasa
+     zwrotów, która tworzy zwrot OD ZERA. Allegro takiego bytu nie zna:
+     `CustomerReturn` powstaje z deklaracji klienta, a nieodebrana przesyłka
+     wraca sama. Pieniądze i tak trzeba oddać. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 11, `tras POST jest ${posty.length}, a umowa mówi o jedenastu`);
+  assert.equal(posty.length, 12, `tras POST jest ${posty.length}, a umowa mówi o dwunastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
-    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie"]) {
+    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

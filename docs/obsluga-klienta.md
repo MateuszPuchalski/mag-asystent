@@ -394,6 +394,15 @@ i tak leżał, i żyje przez jedno żądanie. Zeskanowany kod nie trafia ani do
 dziennika zdarzeń, ani do adresu żądania — dlatego trasa skanu jest POST-em,
 choć niczego nie zapisuje.
 
+**Jeden wyjątek: paczka nieodebrana (0.172.0).** Tam numer listu STOI w modelu
+pracy, w kolumnie `zwrot_klienta.waybill`. Zwrot z Allegro ma kopię odpowiedzi,
+w której da się numeru poszukać; przesyłki, której klient nie odebrał, Allegro
+nie zna wcale, więc kopii nie ma i nigdy nie będzie. Numer jest wtedy jedynym
+uchwytem, po którym operator zeskanuje ten sam karton drugi raz. Wyjątek jest
+wąski i pilnują go trzy rzeczy: kolumna wypełnia się tylko dla
+`zrodlo='nieodebrana'`, wpisuje ją człowiek ze skanu, a eksport CSV jej nie
+niesie — bo plik na dysku zostaje trwalszy niż baza.
+
 **Dwie oceny tego numeru są obie prawdziwe.** Raport sondy nazywa go daną
 osobową okrężną drogą (`services/ksztalt.ts`, 0.155.0), a czyszczenie lądowisk
 przepuszcza go bez zmian (`allegro-oczyszczanie.test.ts`). Różnią się miejscem,

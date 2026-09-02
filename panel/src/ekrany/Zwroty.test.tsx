@@ -19,7 +19,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, rejectionCode: null, wersja: 1,
-  kupujacyLogin: null, przewoznik: null, rozmowy: [],
+  zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   pozycje: [{ id, offerId: "1", nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
     url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,

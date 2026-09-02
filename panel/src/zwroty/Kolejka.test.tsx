@@ -38,7 +38,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
   werdykt: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null,
-  kupujacyLogin: null, przewoznik: null, rozmowy: [],
+  zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   rejectionCode: null, wersja: 1,
   pozycje: [{ id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
@@ -95,6 +95,15 @@ describe("Kolejka zwrotów", () => {
        kubełek bywa pełen, tylko nic w nim nie pasuje. */
     render(<Kolejka zwroty={[]} wybrany={null} zKubelkiem onWybierz={() => {}} />);
     expect(screen.getByText(/Żaden zwrot nie pasuje/)).toBeInTheDocument();
+  });
+
+  it("paczka nieodebrana mówi o sobie i pokazuje numer listu", () => {
+    /* Bez plakietki wyglądałaby na zwrot zgłoszony przez klienta, a to inna
+       sprawa: klient niczego nie zgłaszał, przesyłka wróciła sama. */
+    render(<Kolejka wybrany={null} onWybierz={() => {}} zwroty={[zwrot({
+      zrodlo: "nieodebrana", numer: null, externalId: "nieodebrana:AD00R28X72" })]} />);
+    expect(screen.getByText("nieodebrana")).toBeInTheDocument();
+    expect(screen.getByText("AD00R28X72")).toBeInTheDocument();
   });
 
   it("wiersz niesie numer, towar, sztuki i kwotę — i ani jednej rzeczy więcej", () => {

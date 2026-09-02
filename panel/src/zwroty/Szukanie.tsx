@@ -1,5 +1,5 @@
-import React from "react";
-import { ScanLine, Search, X } from "lucide-react";
+import React, { useState } from "react";
+import { PackageX, ScanLine, Search, X } from "lucide-react";
 import type { WynikSkanu } from "../api/zwroty";
 
 /* ── Szukanie zwrotu: czytnikiem albo ręką (0.163.0, rozszerzone w 0.165.0) ──
@@ -18,8 +18,8 @@ import type { WynikSkanu } from "../api/zwroty";
    identycznie jak zepsuty czytnik.                                          */
 
 export function Szukanie({
-  wynik, kod, fraza, szuka, dociaga, blad, ile,
-  onFraza, onSzukaj, onDociagnij, onWybierz,
+  wynik, kod, fraza, szuka, dociaga, blad, ile, rejestruje = false,
+  onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana,
 }: {
   wynik: WynikSkanu | null;
   kod: string;
@@ -33,7 +33,13 @@ export function Szukanie({
   onSzukaj: (kod: string) => void;
   onDociagnij: (kod: string) => void;
   onWybierz: (id: number) => void;
+  /** Rejestracja paczki nieodebranej; brak = ekran jej nie proponuje. */
+  rejestruje?: boolean;
+  onNieodebrana?: (waybill: string, orderId: string, notatka: string) => void;
 }) {
+  const [nieodebrana, setNieodebrana] = useState(false);
+  const [zamowienie, setZamowienie] = useState("");
+  const [notatka, setNotatka] = useState("");
   const brak = wynik?.trafienie === null;
   const wiele = wynik?.trafienie === "wiele";
 
@@ -81,6 +87,38 @@ export function Szukanie({
         className="btn-secondary mt-2 inline-flex items-center gap-1 text-xs">
         <Search size={12} />{dociaga ? "Pytam Allegro…" : "Poszukaj w Allegro"}
       </button>
+
+      {/* ── Paczka nieodebrana (0.172.0) ──────────────────────────────────────
+          Druga droga wyjścia z nieznanego kodu. Allegro nie zna zwrotu, którego
+          klient nie zgłosił — przesyłka nieodebrana wraca sama i zwrotem nigdy
+          nie zostanie. Pieniądze i tak trzeba oddać, więc paczka wchodzi do
+          kolejki, ale JAWNIE oznaczona. */}
+      {onNieodebrana && !nieodebrana &&
+        <button type="button" onClick={() => setNieodebrana(true)}
+          className="btn-secondary ml-2 mt-2 inline-flex items-center gap-1 text-xs">
+          <PackageX size={12} />To nieodebrana paczka</button>}
+
+      {onNieodebrana && nieodebrana && <div className="mt-2 rounded-lg border border-amber-300 bg-white p-2">
+        <p className="text-slate-600">
+          Klient nie odebrał przesyłki i wróciła do nas. To NIE jest zwrot
+          zgłoszony przez klienta — panel oznaczy ją wprost.</p>
+        <input className="field mt-2 h-7 text-xs" value={zamowienie}
+          aria-label="Numer zamówienia" placeholder="Numer zamówienia (jeśli znasz)"
+          onChange={(e) => setZamowienie(e.target.value)} />
+        <p className="mt-1 text-slate-500">
+          Z numerem zamówienia paczka dostanie pozycje i będzie co wycenić.</p>
+        <input className="field mt-2 h-7 text-xs" value={notatka}
+          aria-label="Notatka" placeholder="Notatka, np. awizo dwa razy"
+          onChange={(e) => setNotatka(e.target.value)} />
+        <div className="mt-2 flex gap-2">
+          <button type="button" disabled={rejestruje}
+            onClick={() => onNieodebrana(kod, zamowienie.trim(), notatka.trim())}
+            className="btn-primary text-xs">
+            {rejestruje ? "Rejestruję…" : "Zarejestruj paczkę"}</button>
+          <button type="button" className="btn-secondary text-xs"
+            onClick={() => setNieodebrana(false)}>Wróć</button>
+        </div>
+      </div>}
     </div>}
 
     {/* Dwa trafienia to brak trafienia — wybiera człowiek, patrząc na oba. */}

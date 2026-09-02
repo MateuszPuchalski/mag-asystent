@@ -94,6 +94,22 @@ export function useOcena() {
 }
 
 /**
+ * Rejestracja paczki, której klient nie odebrał (0.172.0).
+ *
+ * Allegro takiego bytu nie zna, więc wiersz zakłada biuro — to jedyne miejsce
+ * w panelu, gdzie zwrot powstaje od zera, a nie z synchronizacji.
+ */
+export function useNieodebrana() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { waybill: string; orderId?: string | null; notatka?: string | null }) =>
+      api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
  * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
  *
  * To JEDYNA liczba o pieniądzach, jaką panel wolno mu wysłać — i dlatego

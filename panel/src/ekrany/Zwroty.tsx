@@ -6,7 +6,8 @@ import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pozycje } from "../zwroty/Pozycje";
 import {
-  useCofnijKorekte, useKorekta, useKwota, useOcena, usePotracenie, useWerdykt, useZglosRabat,
+  useCofnijKorekte, useKorekta, useKwota, useNieodebrana, useOcena, usePotracenie,
+  useWerdykt, useZglosRabat,
 } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
@@ -88,6 +89,7 @@ export function Zwroty() {
   const cofnijKorekte = useCofnijKorekte();
   const rabat = useZglosRabat();
   const potracenie = usePotracenie();
+  const nieodebrana = useNieodebrana();
   const [bladRabatu, setBladRabatu] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || potracenie.isPending;
@@ -306,7 +308,15 @@ export function Zwroty() {
         onSzukaj={szukaj}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
-        onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }} />
+        onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
+        rejestruje={nieodebrana.isPending}
+        onNieodebrana={(waybill, orderId, notatka) => {
+          setBladSkanu("");
+          nieodebrana.mutate({ waybill, orderId: orderId || null, notatka: notatka || null }, {
+            onSuccess: (w) => { setWynikSkanu(null); setFraza(""); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
+            onError: (e) => setBladSkanu((e as Error).message),
+          });
+        }} />
 
       {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.
           Przy włączonym filtrze milknie: lista nie jest wtedy kubełkiem,
@@ -331,9 +341,21 @@ export function Zwroty() {
                 listy. Te dwie rzeczy rozjeżdżają się przy wejściu z paska
                 adresu, a wtedy nagłówek pytałby o co innego niż klawisze. */}
             <header className="shrink-0 border-b border-slate-200 p-4">
-              <h2 className="text-lg font-bold">{zwrot.numer ?? zwrot.externalId}</h2>
+              <h2 className="flex items-center gap-2 text-lg font-bold">
+                {zwrot.zrodlo === "nieodebrana"
+                  ? (zwrot.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
+                  : (zwrot.numer ?? zwrot.externalId)}
+                {/* Oznaczenie stoi PRZY NUMERZE, nie w dowodach: operator ma
+                    wiedzieć, z czym pracuje, zanim cokolwiek kliknie. */}
+                {zwrot.zrodlo === "nieodebrana" &&
+                  <span className="rounded bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">
+                    nieodebrana paczka</span>}
+              </h2>
               <p className="text-sm text-slate-500">
                 {KUBELKI.find((k) => k.id === zwrot.kubelek)?.pytanie}</p>
+              {zwrot.zrodlo === "nieodebrana" && <p className="mt-1 text-xs text-violet-800">
+                Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.
+                {zwrot.notatka ? ` „${zwrot.notatka}"` : ""}</p>}
             </header>
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
                 decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
