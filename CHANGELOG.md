@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.181.0 — 2 września 2026
+
+**Wiersz kolejki mówi, za co wziąć się najpierw.**
+
+### Co było źle
+
+§10.2 wymienia jedenaście rzeczy, które ma nieść wiersz. Panel niósł sześć.
+Brakowało priorytetu, czasu oczekiwania, liczby nowych wiadomości i znaku
+oczekującego zadania — czyli wszystkiego, co odpowiada na pytanie „za co się
+teraz wziąć". Data ostatniej wiadomości sama tego nie mówi: trzeba ją odjąć
+w głowie od dzisiaj.
+
+### Co się zmienia
+
+Wiersz niesie **PILNE**, **czas oczekiwania** („czeka 2 g 14 min"), **licznik
+dopisków klienta** i **znak zadania w toku**. Kolejność listy bierze najpierw
+flagę, potem najdłużej czekające pytanie.
+
+**Zegar liczy się od PYTANIA klienta**, nie od ostatniej wiadomości w wątku.
+Rozmowa, w której klient nic nie napisał, nie dostaje zegara wcale — nie ma
+tam nikogo, kto czeka, a licznik od naszej wiadomości kłamałby o cudzej
+cierpliwości.
+
+**Licznik mówi to, co mierzy.** To dopiski klienta od NASZEJ ostatniej
+odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się nie da:
+Allegro oddaje samą flagę wątku (`thread.read`), a `message` nie ma znacznika
+odczytu. Ekran nie obiecuje pomiaru, którego nie robi.
+
+**Flaga „pilne" jest RĘCZNA** i zostawia ślad na osi oraz w dzienniku. Automat
+nie ma z czego jej wyliczyć, dopóki §26 nie rozstrzygnie terminu odpowiedzi —
+bez terminu „pilne" znaczyłoby tylko „stare".
+
+### Czego dalej nie ma
+
+**Termin odpowiedzi** czeka na decyzję z §26; bez niej byłby zmyślony, a kubełek
+„po terminie" zostaje przy dzisiejszym znaczeniu, czyli wygasłym odłożeniu.
+**Status doboru** czeka na etap E — dobór nie ma jeszcze własnego bytu.
+
+---
+
 ## 0.180.0 — 2 września 2026
 
 **Skrzynka dostaje trzecią kolumnę — kontekst przestaje spychać pytanie

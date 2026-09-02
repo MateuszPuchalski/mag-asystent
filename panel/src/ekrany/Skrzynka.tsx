@@ -5,7 +5,7 @@ import { Konflikt } from "../api/klient";
 import {
   useAgenci, useDodajKomentarz, useDolaczDoSprawy, useJa, useOdlaczOdSprawy, usePrzejmij,
   usePrzekaz, useRozmowa, useSprawy, useZalozSprawe,
-  useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawStatus, useWskazOferte, useWyslij,
+  useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
@@ -38,6 +38,7 @@ export function Skrzynka() {
   const zlec = useZlecPomiar();
 
   const status = useUstawStatus();
+  const priorytet = useUstawPriorytet();
   const sprawy = useSprawy();
   const zalozSprawe = useZalozSprawe();
   const dolaczDoSprawy = useDolaczDoSprawy();
@@ -275,6 +276,13 @@ export function Skrzynka() {
       }}
       onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)}
       zapisujeStatus={status.isPending}
+      zapisujePriorytet={priorytet.isPending}
+      onPriorytet={(nowy) => {
+        if (!rozmowa.data) return;
+        setBladStatusu("");
+        priorytet.mutate({ id: rozmowa.data.rozmowa.id, priorytet: nowy },
+          { onError: (e) => setBladStatusu((e as Error).message) });
+      }}
       bladStatusu={bladStatusu}
       onZmienStatus={(nowy: StatusRozmowy, doKiedy) => {
         if (!rozmowa.data) return;

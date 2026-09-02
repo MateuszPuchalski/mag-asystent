@@ -21,6 +21,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     id: 4821, klient: "Kupujący 44300444", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "",
     ostatniaOdKlienta: true, nieprzeczytana: false, wlascicielId: null, wlasciciel: null,
     wersja: 1, status: "open", odlozoneDo: null, poTerminie: false, oglada: null,
+    priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false,
   },
   os: [], szkic: null, ofertaWskazana: null, sprawa: null, zamowienie: null,
   oferta: { externalId: "12096815384", link: null, pobrana: null,

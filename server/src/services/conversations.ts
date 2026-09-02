@@ -419,6 +419,44 @@ export function ustawStatus(
     zmienStatus(database, conversationId, status, userId, doKiedy, teraz))();
 }
 
+export type PriorytetRozmowy = "normalny" | "pilny";
+
+/**
+ * Ręczna flaga „pilne" (§10.2, 0.181.0).
+ *
+ * Priorytet jest RĘCZNY, bo automat nie ma z czego go wyliczyć: terminu
+ * odpowiedzi §26 nie rozstrzygnęło, a bez niego „pilne" znaczyłoby tylko
+ * „stare" — i reklamacja z zegarem ustawowym nie wyprzedziłaby zwykłego
+ * pytania. Kolejność listy niesie za to czas oczekiwania, więc obie drogi
+ * działają naraz: flaga przebija zegar.
+ *
+ * Zmiana zostawia ślad na osi i w dzienniku, jak każda inna mutacja rozmowy.
+ * Nie wymaga prowadzenia rozmowy — „to się pali" wolno powiedzieć o cudzej
+ * sprawie, tak samo jak zmienić jej status.
+ */
+export function ustawPriorytet(
+  database: DatabaseSync, conversationId: number, priorytet: PriorytetRozmowy, userId: number,
+): { priorytet: PriorytetRozmowy } {
+  if (priorytet !== "normalny" && priorytet !== "pilny") {
+    throw new Error(`Nieznany priorytet: ${priorytet}. Rozmowa zna „normalny" i „pilny".`);
+  }
+  const autor = imieAutora(database, userId);
+  const wynik = transaction(database, () => {
+    const przed = database.prepare("SELECT priorytet FROM conversation WHERE id=?")
+      .get(conversationId) as { priorytet: string } | undefined;
+    if (!przed) throw new Error("Nie znaleziono rozmowy");
+    database.prepare("UPDATE conversation SET priorytet=? WHERE id=?").run(priorytet, conversationId);
+    database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
+      VALUES (?, NULL, 'priority_changed', json_object('z', ?, 'na', ?, 'autor', ?))`)
+      .run(conversationId, przed.priorytet, priorytet, autor);
+    logEvent("rozmowa_priorytet", autor, null,
+      { conversationId, z: przed.priorytet, na: priorytet }, undefined, database);
+    return { priorytet };
+  })();
+  publishConversationEvent("assignment.changed", conversationId, { priorytet });
+  return wynik;
+}
+
 /**
  * Rdzeń zmiany statusu BEZ własnej transakcji.
  *

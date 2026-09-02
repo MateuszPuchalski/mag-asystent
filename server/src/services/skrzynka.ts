@@ -25,6 +25,26 @@ export interface RozmowaSkrzynki {
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
   /** Status WYLICZONY (§7) — odłożenie po terminie wraca tu już jako `open`. */
   status: StatusRozmowy;
+  /** Ręczna flaga „pilne" (§10.2, 0.181.0). */
+  priorytet: "normalny" | "pilny";
+  /**
+   * Ile czeka pytanie klienta, w milisekundach. `null`, gdy klient nie napisał
+   * nic — wątek zaczęty przez nas nie ma na co czekać, a zegar liczony od
+   * NASZEJ wiadomości kłamałby o cudzej cierpliwości.
+   */
+  czekaOdMs: number | null;
+  /**
+   * Wiadomości klienta od NASZEJ ostatniej odpowiedzi.
+   *
+   * To NIE jest „nieprzeczytane przez agenta" i ekran tak tego nie podpisuje.
+   * Tamtego policzyć się nie da: `conversation.unread` to flaga 0/1 z Allegro
+   * (`thread.read`), a `message` nie ma znacznika odczytu. Ta liczba mówi, ile
+   * klient dopisał, odkąd ostatnio odpisaliśmy — i to jest pytanie, które ma
+   * agent, patrząc na kolejkę.
+   */
+  nowychOdOdpowiedzi: number;
+  /** Czy przy rozmowie stoi niezamknięte zadanie terenowe (§10.2). */
+  zadanieWToku: boolean;
   odlozoneDo: string | null;
   /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
      ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
@@ -102,9 +122,22 @@ const LISTA = `
   SELECT c.id, c.subject AS klient, c.unread,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
          c.status, c.snoozed_until AS odlozoneDo,
+         c.priorytet,
          o.body AS ostatniaWiadomosc,
          COALESCE(o.sent_at, c.updated_at) AS ostatniaWiadomoscAt,
-         o.direction AS ostatniKierunek
+         o.direction AS ostatniKierunek,
+         -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
+         -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
+         -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
+         (SELECT MAX(k.sent_at) FROM message k
+           WHERE k.conversation_id=c.id AND k.direction='incoming') AS pytanieAt,
+         (SELECT COUNT(*) FROM message k
+           WHERE k.conversation_id=c.id AND k.direction='incoming'
+             AND k.id > COALESCE((SELECT MAX(n.id) FROM message n
+                                   WHERE n.conversation_id=c.id AND n.direction='outgoing'), 0)
+         ) AS nowych,
+         EXISTS(SELECT 1 FROM zadanie_terenowe z
+                 WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
     LEFT JOIN message o ON o.id = (
@@ -132,6 +165,10 @@ const naRozmowe = (
        na wiersz: odłożenie kończy się samo, a status zapisany w kolumnie zostaje
        `snoozed` do najbliższej ręcznej zmiany. */
     status: (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+    priorytet: String(w.priorytet ?? "normalny") === "pilny" ? "pilny" : "normalny",
+    czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
+    nowychOdOdpowiedzi: Number(w.nowych ?? 0),
+    zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
     oglada: trzymane.get(Number(w.id)) ?? null,
@@ -213,9 +250,20 @@ export function listaRozmow(): RozmowaSkrzynki[] {
   /* Uchwyty bierzemy RAZ na całą listę, nie po jednym na wiersz: kolejka
      odświeża się przy każdym zdarzeniu, a mapa i tak stoi w pamięci. */
   const trzymane = uchwyty();
-  /* Tie-breaker po `id`: dwie rozmowy z tą samą datą wątku stały dotąd
-     w kolejności, jaką dał planer zapytań, czyli w żadnej. */
-  return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC, c.id DESC`).all() as Array<Record<string, unknown>>)
+  /* PILNE na górze, potem najdłużej czekające pytanie (0.181.0).
+     Właściciel wybrał obie drogi naraz: ręczna flaga przebija automatyczną
+     kolejność. Terminu odpowiedzi nie ma (§26 zostaje bez rozstrzygnięcia),
+     więc automatyczną kolejność niesie CZAS OCZEKIWANIA — najstarsze pytanie
+     klienta stoi wyżej. Rozmowa bez pytania klienta idzie na koniec: nie ma
+     tam nikogo, kto czeka.
+
+     Data wątku zostaje ostatnim rozstrzygnięciem, a `id` tie-breakerem: dwie
+     rozmowy z tą samą datą stały dotąd w kolejności, jaką dał planer zapytań,
+     czyli w żadnej. */
+  return (db().prepare(`${LISTA}
+    ORDER BY CASE c.priorytet WHEN 'pilny' THEN 0 ELSE 1 END,
+             pytanieAt IS NULL, pytanieAt ASC,
+             c.updated_at DESC, c.id DESC`).all() as Array<Record<string, unknown>>)
     .map((w) => naRozmowe(w, Date.now(), trzymane));
 }
 

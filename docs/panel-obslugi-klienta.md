@@ -371,6 +371,22 @@ Wiersz pokazuje kanał, klienta, fragment ostatniej wiadomości, czas
 oczekiwania, ofertę lub produkt, właściciela, priorytet, termin, liczbę nowych
 wiadomości, status doboru i oczekujące zadanie terenowe.
 
+**Wiersz uzupełniony w 0.181.0: priorytet, czas oczekiwania, licznik dopisków
+klienta i znak oczekującego zadania.** Dwóch pozycji z listy wyżej dalej nie ma
+i to jest decyzja, nie przeoczenie. TERMIN odpowiedzi czeka na rozstrzygnięcie
+z §26 — bez niego byłby zmyślony. STATUS DOBORU czeka na etap E, bo dobór nie
+ma jeszcze własnego bytu.
+
+**Licznik mówi to, co mierzy.** To liczba wiadomości klienta od NASZEJ
+ostatniej odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się
+nie da: Allegro oddaje samą flagę wątku, a nasza baza nie ma znacznika odczytu.
+Nazwa na ekranie idzie za tym, co liczba naprawdę zlicza.
+
+**Kolejność listy: PILNE, potem najdłużej czekające pytanie.** Właściciel
+wybrał obie drogi naraz — ręczna flaga przebija automatyczną kolejność. Flaga
+jest ręczna, bo bez terminu odpowiedzi automat wyliczyłby z niej tylko „stare",
+a reklamacja z zegarem ustawowym nie wyprzedziłaby zwykłego pytania.
+
 **Fragment to ostatnia wiadomość KLIENTA, z jej datą (0.167.0).** Do 0.165.0
 wiersz brał ostatnią wiadomość jakąkolwiek, więc autoodpowiedź konta Allegro
 zasłaniała pytanie, a data pod nią była datą wątku. Gdy klient nic nie napisał,
@@ -1197,6 +1213,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
 | Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`, zakładki Oferta i Towar |
+| Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie; bez terminu i statusu doboru |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |

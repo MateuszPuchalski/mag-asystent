@@ -9,14 +9,15 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
-  status: "new", odlozoneDo: null, poTerminie: false, oglada: null, ...n,
+  status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
+  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, ...n,
 });
 
 describe("Status rozmowy", () => {
   it("pokazuje stan bieżący po polsku, także gdy nikt go nie ruszył", () => {
     /* „Nowa" jest informacją, nie brakiem informacji: znaczy, że sprawy nikt
        nie tknął. Pole musi mieć opcję dla wartości, którą pokazuje. */
-    render(<Status rozmowa={rozmowa()} zapisuje={false} blad="" onZmien={() => {}} />);
+    render(<Status rozmowa={rozmowa()} zapisuje={false} blad="" onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
     expect(screen.getByRole("combobox", { name: /Status rozmowy/ })).toHaveValue("new");
     expect(screen.getAllByText("Nowa").length).toBeGreaterThan(0);
   });
@@ -24,7 +25,7 @@ describe("Status rozmowy", () => {
   it("zwykła zmiana idzie od razu, bez terminu", async () => {
     const zmien = vi.fn();
     render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
-      onZmien={zmien} />);
+      onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /Status rozmowy/ }),
       "resolved");
     expect(zmien).toHaveBeenCalledWith("resolved", null);
@@ -35,7 +36,7 @@ describe("Status rozmowy", () => {
        zawsze. Agent nie ma się dowiadywać o tej regule z komunikatu błędu. */
     const zmien = vi.fn();
     render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
-      onZmien={zmien} />);
+      onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /Status rozmowy/ }),
       "snoozed");
     expect(zmien).not.toHaveBeenCalled();
@@ -54,13 +55,37 @@ describe("Status rozmowy", () => {
 
   it("miniony termin odłożenia jest widoczny, bo wiersz wygląda jak zwykły otwarty", () => {
     render(<Status rozmowa={rozmowa({ status: "open", poTerminie: true,
-      odlozoneDo: "2026-08-30T06:00:00.000Z" })} zapisuje={false} blad="" onZmien={() => {}} />);
+      odlozoneDo: "2026-08-30T06:00:00.000Z" })} zapisuje={false} blad="" onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
     expect(screen.getByText(/termin odłożenia minął/)).toBeInTheDocument();
   });
 
   it("odmowa serwera ląduje przy przełączniku, nie w ogólnym pasku błędów", () => {
     render(<Status rozmowa={rozmowa()} zapisuje={false}
-      blad="Odłożenie wymaga terminu" onZmien={() => {}} />);
+      blad="Odłożenie wymaga terminu" onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
     expect(screen.getByText(/Odłożenie wymaga terminu/)).toBeInTheDocument();
+  });
+});
+
+/* ── Priorytet (§10.2, 0.181.0) ──────────────────────────────────────────── */
+
+describe("ręczna flaga „pilne”", () => {
+  it("przełącznik pokazuje stan i podnosi flagę", async () => {
+    const onPriorytet = vi.fn();
+    render(<Status rozmowa={rozmowa()} zapisuje={false} blad="" onZmien={() => {}}
+      onPriorytet={onPriorytet} zapisujePriorytet={false} />);
+    const p = screen.getByRole("button", { name: /Oznacz jako pilne/ });
+    expect(p).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(p);
+    expect(onPriorytet).toHaveBeenCalledWith("pilny");
+  });
+
+  it("podniesiona flaga daje się opuścić tym samym przyciskiem", async () => {
+    const onPriorytet = vi.fn();
+    render(<Status rozmowa={rozmowa({ priorytet: "pilny" })} zapisuje={false} blad=""
+      onZmien={() => {}} onPriorytet={onPriorytet} zapisujePriorytet={false} />);
+    const p = screen.getByRole("button", { name: "PILNE" });
+    expect(p).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(p);
+    expect(onPriorytet).toHaveBeenCalledWith("normalny");
   });
 });

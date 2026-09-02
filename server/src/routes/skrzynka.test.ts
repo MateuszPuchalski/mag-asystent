@@ -85,6 +85,8 @@ const TRASY = () => [
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
     payload: { status: "resolved" } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
+    payload: { priorytet: "pilny" } },
   { method: "GET" as const, url: "/api/obsluga/wzmianki" },
   { method: "GET" as const, url: "/api/obsluga/sprawy" },
   { method: "POST" as const, url: "/api/obsluga/sprawy",

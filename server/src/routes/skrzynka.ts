@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
@@ -239,6 +239,21 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return ustawStatus(db(), Number(req.params.id), s as StatusRozmowy,
           sesjaZadania()!.user.userId, req.body?.doKiedy ?? null);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* Priorytet rozmowy (§10.2, 0.181.0). Ręczna flaga — automat nie ma z czego
+     jej wyliczyć, dopóki §26 nie rozstrzygnie terminu odpowiedzi. */
+  app.post<{ Params: { id: string }; Body: { priorytet?: string } }>(
+    "/api/obsluga/rozmowy/:id/priorytet", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const p = req.body?.priorytet ?? "";
+      if (p !== "normalny" && p !== "pilny") {
+        return reply.code(400).send({ error: `Priorytet to „normalny" albo „pilny".` });
+      }
+      try {
+        return ustawPriorytet(db(), Number(req.params.id), p, sesjaZadania()!.user.userId);
       } catch (e) { return blad(reply, e); }
     });
 

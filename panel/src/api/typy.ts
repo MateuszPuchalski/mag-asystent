@@ -21,6 +21,18 @@ export type Rozmowa = {
   wersja: number;
   /** Status WYLICZONY: odłożenie po terminie przyjeżdża już jako `open`. */
   status: StatusRozmowy;
+  /** Ręczna flaga „pilne" (§10.2, 0.181.0). */
+  priorytet: "normalny" | "pilny";
+  /** Ile czeka pytanie klienta. `null` = klient nic nie napisał, nikt nie czeka. */
+  czekaOdMs: number | null;
+  /**
+   * Wiadomości klienta OD NASZEJ ODPOWIEDZI — nie „nieprzeczytane przez
+   * agenta". Tamtego policzyć się nie da (Allegro daje samą flagę wątku),
+   * więc ekran podpisuje tę liczbę tak, jak ją liczy.
+   */
+  nowychOdOdpowiedzi: number;
+  /** Niezamknięte zadanie terenowe przy rozmowie. */
+  zadanieWToku: boolean;
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;

@@ -15,6 +15,7 @@ let stanSkrzynki: typeof import("./skrzynka.js").stanSkrzynki;
 let stanKolejkiWysylek: typeof import("./skrzynka.js").stanKolejkiWysylek;
 let przejmijRozmowe: typeof import("./conversations.js").przejmijRozmowe;
 let wskazKartoteke: typeof import("./conversations.js").wskazKartoteke;
+let ustawPriorytet: typeof import("./conversations.js").ustawPriorytet;
 let wezZadanie: typeof import("./zadania-terenowe.js").wezZadanie;
 let wykonajZadanie: typeof import("./zadania-terenowe.js").wykonajZadanie;
 
@@ -26,7 +27,7 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ listaRozmow, osRozmowy, zlecPomiar, stanSkrzynki, stanKolejkiWysylek } =
     await import("./skrzynka.js"));
-  ({ przejmijRozmowe, wskazKartoteke } = await import("./conversations.js"));
+  ({ przejmijRozmowe, wskazKartoteke, ustawPriorytet } = await import("./conversations.js"));
   ({ wezZadanie, wykonajZadanie } = await import("./zadania-terenowe.js"));
   const d = db();
   BIURO.id = Number(d.prepare(
@@ -274,6 +275,73 @@ test("ręczne wskazanie kartoteki zapisuje pamięć, oś i audyt, a zdjęcie ją
 
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
   d.prepare("DELETE FROM sgt_towar WHERE tw_id=7702").run();
+});
+
+test("wiersz kolejki niesie czas oczekiwania, licznik dopisków i znak zadania", () => {
+  const w = listaRozmow().find((r) => r.id === rozmowaId)!;
+  /* Zegar liczy się od PYTANIA klienta (08:42), nie od naszej odpowiedzi
+     o 09:00 — inaczej mierzyłby cudzą cierpliwość od złego momentu. */
+  assert.ok(w.czekaOdMs !== null && w.czekaOdMs > 0);
+  assert.equal(w.nowychOdOdpowiedzi, 0, "klient nie dopisał nic po naszej odpowiedzi");
+  assert.equal(w.zadanieWToku, false);
+  assert.equal(w.priorytet, "normalny");
+});
+
+test("rozmowa bez pytania klienta nie dostaje zegara oczekiwania", () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-nasza','kupujacy_8','2026-09-02T16:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    sent_at) VALUES (?,?,'m-nasza','outgoing','Dzień dobry','2026-09-02T16:00:00.000Z')`).run(r, konto);
+  /* `null`, nie zero: nikt tu nie czeka, a zegar od NASZEJ wiadomości
+     kłamałby o cierpliwości klienta, który nic nie napisał. */
+  assert.equal(listaRozmow().find((x) => x.id === r)!.czekaOdMs, null);
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});
+
+test("licznik liczy dopiski klienta OD NASZEJ ODPOWIEDZI, nie nieprzeczytane", () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-licz','kupujacy_6','2026-09-02T16:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  const wiadomosc = (ext: string, kierunek: string, at: string) =>
+    d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,
+      body,sent_at) VALUES (?,?,?,?,'tresc',?)`).run(r, konto, ext, kierunek, at);
+  wiadomosc("l-1", "incoming", "2026-09-02T10:00:00.000Z");
+  wiadomosc("l-2", "outgoing", "2026-09-02T11:00:00.000Z");
+  wiadomosc("l-3", "incoming", "2026-09-02T12:00:00.000Z");
+  wiadomosc("l-4", "incoming", "2026-09-02T13:00:00.000Z");
+  assert.equal(listaRozmow().find((x) => x.id === r)!.nowychOdOdpowiedzi, 2);
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});
+
+test("PILNE idzie na górę listy, a poza tym rządzi czas oczekiwania", () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const zaloz = (ext: string, pytanieAt: string) => {
+    const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+      subject,updated_at) VALUES (?,?,?,'2026-09-02T16:00:00.000Z')`)
+      .run(konto, ext, ext).lastInsertRowid);
+    d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,
+      body,sent_at) VALUES (?,?,?, 'incoming','pytanie',?)`).run(r, konto, `m-${ext}`, pytanieAt);
+    return r;
+  };
+  const stara = zaloz("w-stara", "2026-08-01T10:00:00.000Z");
+  const swieza = zaloz("w-swieza", "2026-09-02T15:00:00.000Z");
+
+  const bezFlagi = listaRozmow().map((x) => x.id);
+  assert.ok(bezFlagi.indexOf(stara) < bezFlagi.indexOf(swieza), "starsze pytanie stoi wyżej");
+
+  ustawPriorytet(d, swieza, "pilny", BIURO.id);
+  assert.equal(listaRozmow()[0].id, swieza, "ręczna flaga przebija zegar");
+  /* Ślad zostaje: mutacja bez autora nie istnieje w tym repo. */
+  assert.equal((d.prepare("SELECT count(*) n FROM events WHERE type='rozmowa_priorytet'")
+    .get() as { n: number }).n, 1);
+
+  d.prepare("DELETE FROM conversation WHERE id IN (?,?)").run(stara, swieza);
 });
 
 /* Data ostatniej synchronizacji jest częścią odpowiedzi, bo pusta lista bez niej

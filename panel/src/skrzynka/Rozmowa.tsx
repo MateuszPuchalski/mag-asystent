@@ -69,6 +69,8 @@ export function Rozmowa(p: {
   onOdlaczOdSprawy: () => void;
   onOtworzRozmowe: (id: number) => void;
   zapisujeStatus: boolean;
+  onPriorytet: (priorytet: "normalny" | "pilny") => void;
+  zapisujePriorytet: boolean;
   bladStatusu: string;
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
@@ -101,7 +103,8 @@ export function Rozmowa(p: {
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
           w telefonie nie jest przejęciem jej. */}
       <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
-        onZmien={p.onZmienStatus} />
+        onZmien={p.onZmienStatus}
+        onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet} />
     </header>
 
     {/* Sprawa stoi POD nagłówkiem, nad wszystkim innym: „to ten sam problem

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlarmClock, Eye, Inbox, RefreshCw, UserCheck } from "lucide-react";
+import { AlarmClock, Eye, Inbox, RefreshCw, Ruler, UserCheck } from "lucide-react";
 import type { Rozmowa, StanSkrzynki } from "../api/typy";
 import { Plakietka, czas } from "../ui";
 import { NAZWA } from "./statusy";
@@ -26,6 +26,18 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
    widać je w „Wszystkie". Ukrycie ich wszędzie znaczyłoby, że pomyłkowego
    zamknięcia nie da się cofnąć — a nikt nie szuka sprawy, której nie ma. */
 const ZESZLA_Z_BIURKA = ["closed", "spam"];
+
+/**
+ * Czas oczekiwania po ludzku. Minuty do godziny, potem godziny do doby, dalej
+ * dni — bo „czeka 3140 min" nie mówi nic, a „czeka 2 d" mówi wszystko.
+ */
+export function czekaOd(ms: number): string {
+  const minuty = Math.floor(ms / 60_000);
+  if (minuty < 60) return `${minuty} min`;
+  const godziny = Math.floor(minuty / 60);
+  if (godziny < 24) return `${godziny} g ${minuty % 60} min`;
+  return `${Math.floor(godziny / 24)} d ${godziny % 24} g`;
+}
 
 function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean {
   if (kubelek === "wszystkie") return true;
@@ -94,6 +106,11 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
           wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
         <div className="flex items-center gap-2">
           <b className="truncate">{r.klient}</b>
+          {/* PILNE przed statusem: „co się pali" czyta się przed „co z tym
+              zrobiono". Flagę stawia człowiek — patrz `ustawPriorytet`. */}
+          {r.priorytet === "pilny" &&
+            <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
+              PILNE</span>}
           {r.nieprzeczytana &&
             <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[11px] font-bold">NOWE</span>}
           <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>
@@ -107,6 +124,18 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
           {r.ostatniaWiadomosc}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
           <span>{czas(r.ostatniaWiadomoscAt)}</span>
+          {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
+              „za co się wziąć", a data każe je dopiero policzyć w głowie. */}
+          {r.czekaOdMs !== null &&
+            <span className="font-semibold text-slate-600">czeka {czekaOd(r.czekaOdMs)}</span>}
+          {/* Liczba DOPISKÓW klienta od naszej odpowiedzi. Nie nazywamy jej
+              „nieprzeczytane": tego Allegro nie podaje, a ekran nie ma prawa
+              obiecywać pomiaru, którego nie robi. */}
+          {r.nowychOdOdpowiedzi > 1 &&
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">
+              {r.nowychOdOdpowiedzi} dopiski klienta</span>}
+          {r.zadanieWToku && <span className="flex items-center gap-1 font-semibold text-slate-600">
+            <Ruler size={12} />zadanie w toku</span>}
           {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
             <UserCheck size={12} />{r.wlasciciel}</span>}
           {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">

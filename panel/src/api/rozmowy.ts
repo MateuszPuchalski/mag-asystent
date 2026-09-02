@@ -277,6 +277,21 @@ export function useWskazKartoteke() {
   });
 }
 
+/** Ręczna flaga „pilne" (§10.2). */
+export function useUstawPriorytet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; priorytet: "normalny" | "pilny" }) =>
+      api(`/api/obsluga/rozmowy/${v.id}/priorytet`, {
+        method: "POST", body: JSON.stringify({ priorytet: v.priorytet }),
+      }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+    },
+  });
+}
+
 export function useWskazOferte() {
   const qc = useQueryClient();
   return useMutation({
