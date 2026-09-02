@@ -56,6 +56,27 @@ interface WierszZwrotu {
   order_id: string | null;
   reference_number: string | null;
   created_at: string;
+  /** Data zakupu z pobranego zamówienia; `null`, gdy zamówienia jeszcze nie ma. */
+  kupiono_at: string | null;
+}
+
+/**
+ * Dokument sprzedaży nie może być starszy niż zakup — a do 0.174.0 mógł.
+ *
+ * Okno liczyło się wyłącznie od daty ZWROTU, sześćdziesiąt dni wstecz, więc
+ * przy zwrocie z września lista kandydatów niosła paragony z lipca, wystawione
+ * przed dniem, w którym klient w ogóle złożył zamówienie. Data zakupu leży
+ * w bazie obok (`zamowienie_klienta.kupiono_at`) i ekran ją pokazuje, tylko
+ * dopasowanie jej nie czytało.
+ *
+ * Jeden dzień luzu, bo `kupiono_at` jest chwilą w UTC, a `data_wyst` samą
+ * datą w czasie lokalnym Subiekta — zakup tuż po północy naszego czasu ma
+ * datę UTC dnia poprzedniego.
+ */
+export function dolnaGranicaOkna(created: string, kupiono: string | null, oknoDni: number): string {
+  const odZwrotu = Date.parse(created.slice(0, 10)) - oknoDni * 86_400_000;
+  const odZakupu = kupiono ? Date.parse(kupiono.slice(0, 10)) - 86_400_000 : Number.NEGATIVE_INFINITY;
+  return new Date(Math.max(odZwrotu, odZakupu)).toISOString().slice(0, 10);
 }
 
 /**
@@ -88,20 +109,23 @@ export function numerWskazuje(nrOryg: string | null, szukane: string[]): boolean
  */
 export function kandydaciFaktury(zwrotId: number, database: Db = defaultDb()): KandydatFaktury[] {
   const z = database.prepare(
-    "SELECT id, order_id, reference_number, created_at FROM zwrot_klienta WHERE id=?")
+    `SELECT z.id, z.order_id, z.reference_number, z.created_at, k.kupiono_at
+     FROM zwrot_klienta z
+     LEFT JOIN zamowienie_klienta k
+       ON k.channel_account_id = z.channel_account_id AND k.external_id = z.order_id
+     WHERE z.id=?`)
     .get(zwrotId) as WierszZwrotu | undefined;
   if (!z) return [];
 
   const koniec = String(z.created_at).slice(0, 10);
-  const poczatek = new Date(Date.parse(koniec) - OKNO_DNI * 86_400_000)
-    .toISOString().slice(0, 10);
+  const poczatek = dolnaGranicaOkna(String(z.created_at), z.kupiono_at ?? null, OKNO_DNI);
 
   const dokumenty = database.prepare(
-    `SELECT dok_id, typ, nr_pelny, nr_oryg, data_wyst FROM sgt_faktura
+    `SELECT dok_id, typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst FROM sgt_faktura
      WHERE data_wyst >= ? AND data_wyst <= ?`)
     .all(poczatek, koniec) as Array<{
       dok_id: number; typ: string; nr_pelny: string;
-      nr_oryg: string | null; data_wyst: string;
+      nr_oryg: string | null; zamowienie_z_uwag: string | null; data_wyst: string;
     }>;
   if (dokumenty.length === 0) return [];
 
@@ -137,8 +161,15 @@ export function kandydaciFaktury(zwrotId: number, database: Db = defaultDb()): K
   const kandydaci: KandydatFaktury[] = [];
   for (const dok of dokumenty) {
     const powody: string[] = [];
-    const pewny = numerWskazuje(dok.nr_oryg, szukane);
-    if (pewny) powody.push("numer zamówienia stoi na dokumencie");
+    /* Dwie drogi tego samego sygnału. Sellasist pisze numer zamówienia
+       w uwagach (0.175.0), inne integracje — w numerze obcym; obie są
+       dokładne, więc obie wiążą. Powód nazywa miejsce, żeby biuro wiedziało,
+       gdzie w Subiekcie na to spojrzeć. */
+    const wNumerze = numerWskazuje(dok.nr_oryg, szukane);
+    const wUwagach = numerWskazuje(dok.zamowienie_z_uwag, szukane);
+    const pewny = wNumerze || wUwagach;
+    if (wNumerze) powody.push("numer zamówienia stoi na dokumencie");
+    else if (wUwagach) powody.push("numer zamówienia stoi w uwagach dokumentu");
 
     let komplet = false;
     if (pozycjeZwrotu.length) {

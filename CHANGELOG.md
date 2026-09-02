@@ -34,6 +34,63 @@ historii nie przepisujemy.
 ---
 
 
+## 0.175.0 — 2 września 2026
+
+**Dokument sprzedaży wiąże się sam, bo numer zamówienia czyta się z uwag.**
+Właściciel pokazał paragon z Subiekta: w polu *Uwagi* stoi
+`b9732a20-a621-11f1-8e66-3787b0f6d855 ; Client:143874145`, a kolumna numeru
+obcego jest pusta. Tam — i tylko tam — Sellasist wpisuje identyfikator
+zamówienia Allegro.
+
+### Dlaczego automat nie wiązał nic
+
+Mechanizm z 0.174.0 czytał wyłącznie `dok_NrPelnyOryg`. Skoro integracja jej
+nie wypełnia, jedyny sygnał, który wiąże automatycznie, nie miał prawa
+zadziałać ani razu — i każdy zwrot kończył na liście kandydatów „wskaż
+właściwy", nawet gdy dokument był oczywisty.
+
+### Uwag nie kopiujemy — wycinamy z nich UUID w SQL
+
+0.174.0 celowo nie czytało `dok_Uwagi`: to pięćset znaków wolnego tekstu,
+w które ktoś kiedyś wpisze adres albo telefon, a read-model idzie do kopii
+zapasowych. **Ta decyzja stoi.** Kolumna dalej nie jest kopiowana. Z uwag
+wycinany jest po stronie serwera Subiekta — `PATINDEX` i `SUBSTRING` —
+wyłącznie ciąg o kształcie UUID-a: 36 znaków szesnastkowych z myślnikami
+w ustalonych miejscach. Wolny tekst nie opuszcza bazy firmy. Po naszej stronie
+stoi druga zapora: wynik przechodzi jeszcze raz przez sprawdzenie kształtu,
+zanim trafi do bazy.
+
+Ustawienie `MSSQL_SPRZEDAZ_UWAGI_COLUMN` nie wraca — ono kopiowało całą
+kolumnę. To jest inna rzecz.
+
+Brak dostępu do `dok_Uwagi` (kolumna albo uprawnienie) degraduje, nie
+przerywa: import idzie dalej bez tej drogi, a `/api/health` mówi zdaniem, że
+automat nie ma czym wiązać. Obie kolumny numeru są opcjonalne z osobna —
+brak jednej nie zabiera drugiej.
+
+### Paragon sprzed dnia zakupu przestaje być kandydatem
+
+Ten sam zrzut ekranu pokazał drugą rzecz: zamówienie kupione 17.08, a wśród
+kandydatów paragony z 13.08 i 23.07. Okno liczyło się wyłącznie od daty
+ZWROTU, sześćdziesiąt dni wstecz. Data zakupu leżała w bazie obok
+(`zamowienie_klienta.kupiono_at`) i ekran ją pokazywał — tylko dopasowanie jej
+nie czytało. Teraz dolna granica okna to późniejsza z dwóch dat: sześćdziesiąt
+dni przed zwrotem albo dzień przed zakupem. Dzień luzu, bo zakup jest chwilą
+w UTC, a data dokumentu datą lokalną Subiekta.
+
+Na zrzucie z pytania zostałyby dwa kandydaty zamiast czterech — a z numerem
+z uwag zostałby jeden i związał się sam.
+
+### Testy
+
+Pięć nowych dla dopasowania, pięć dla wycinania UUID-a. Wśród nich dokładny
+napis z pola *Uwagi* ze zrzutu: przechodzi z niego sam identyfikator, numer
+klienta po średniku zostaje w Subiekcie. Adres i telefon nie przechodzą.
+
+Wdrożenie: nic ręką. Kolumna `zamowienie_z_uwag` dochodzi migracją, a numer
+z uwag wchodzi przy najbliższym imporcie z Subiekta. Konto `wertis` ma już
+`SELECT` na `dok__Dokument`, więc nowego grantu nie potrzebuje.
+
 ## 0.174.2 — 2 września 2026
 
 **Awaria produkcyjna: instalacja nie wstawała wcale.** API i worker padały
