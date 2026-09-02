@@ -5,6 +5,7 @@ import { db } from "../db/db.js";
 import {
   bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
+  zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
   ZwrotConflict,
 } from "../services/zwroty.js";
@@ -147,6 +148,23 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return ocenPozycje(db(), Number(req.params.id), o as never,
           Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,
+     więc wiersz zakłada BIURO — i to jest jedyna trasa zwrotów tworząca zwrot
+     od zera. Pieniądze i tak trzeba oddać, więc idzie tą samą kolejką, ale
+     `zrodlo` mówi wprost, że to nie zgłoszenie klienta. */
+  app.post<{ Body: { waybill?: string; orderId?: string | null; notatka?: string | null } }>(
+    "/api/obsluga/zwroty/nieodebrana", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return zarejestrujNieodebrana(db(), {
+          waybill: String(req.body?.waybill ?? ""),
+          orderId: req.body?.orderId ?? null,
+          notatka: req.body?.notatka ?? null,
+        }, kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

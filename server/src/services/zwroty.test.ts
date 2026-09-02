@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
-  zapiszPotracenie,
+  zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
   cofnijKorekte, znajdzZwrotPoKodzie,
 } from "./zwroty.js";
@@ -684,7 +684,8 @@ test("CSV dla biura ma średniki, jeden wiersz na pozycję i żadnego listu prze
   const csv = csvZwrotow(listaZwrotow(d, TERAZ));
   const linie = csv.trim().split("\r\n");
   assert.equal(linie.length, 3, "nagłówek i dwie pozycje");
-  assert.match(linie[0], /^﻿?Numer zwrotu;/, "BOM i średniki, żeby Excel PL nie pytał");
+  assert.match(linie[0], /^﻿?Zrodlo;Numer zwrotu;/, "BOM i średniki, żeby Excel PL nie pytał");
+  assert.match(linie[1], /^zwrot klienta;/, "wiersz mówi, czy to zgłoszenie, czy nieodebrana");
   assert.match(linie[1], /mirek352810;/);
   assert.match(linie[1], /DPD;/);
   assert.match(linie[1], /5901234123457/, "EAN wchodzi do zestawienia");
@@ -796,4 +797,85 @@ test("potrącenie wchodzi do zestawienia CSV razem z powodem", () => {
   const csv = csvZwrotow(listaZwrotow(d, TERAZ));
   assert.match(csv, /Potracenie;Powod potracenia;/);
   assert.match(csv, /25,00;ślady użycia/);
+});
+
+/* ── Paczki nieodebrane (0.172.0) ───────────────────────────────────────── */
+
+test("nieodebrana paczka wchodzi w kolejkę, ale nie udaje zgłoszenia klienta", () => {
+  /* Allegro takiego bytu nie zna — `CustomerReturn` powstaje z DEKLARACJI
+     klienta. Pieniądze i tak trzeba oddać, więc idzie tą samą drogą. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, { waybill: "600000367616070023174201" }, KTO);
+
+  const [z] = listaZwrotow(d, TERAZ);
+  assert.equal(z.id, w.zwrotId);
+  assert.equal(z.zrodlo, "nieodebrana");
+  assert.equal(z.kubelek, "decyzja", "idzie tą samą kolejką co zwrot z Allegro");
+  assert.match(z.externalId, /^nieodebrana:/, "identyfikator mówi, skąd jest");
+  assert.equal(z.linkZwrotu, null, "w Allegro nie ma czego otworzyć");
+  assert.ok(z.paczkaAt, "paczka JEST u nas — inaczej nie byłoby czego rejestrować");
+});
+
+test("paczkę nieodebraną znajduje skan po numerze listu", () => {
+  /* Numer z etykiety jest tu JEDYNYM uchwytem: nie ma kopii odpowiedzi
+     Allegro, w której dałoby się go szukać. Stąd świadomy wyjątek od
+     polityki z 0.163.0. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, { waybill: "AD00R28X72" }, KTO);
+  const t = znajdzZwrotPoKodzie("AD00R28X72", d);
+  assert.equal(t.trafienie, "waybill");
+  assert.equal(t.zwrotId, w.zwrotId);
+});
+
+test("ta sama paczka nie rejestruje się dwa razy", () => {
+  /* Skan powtórzony przy odkładaniu kartonu jest zdarzeniem normalnym. */
+  const d = stanowisko();
+  zarejestrujNieodebrana(d, { waybill: "PX1" }, KTO);
+  assert.throws(() => zarejestrujNieodebrana(d, { waybill: "PX1" }, KTO),
+    /już zarejestrowana/);
+});
+
+test("bez numeru listu nie ma czego rejestrować", () => {
+  const d = stanowisko();
+  assert.throws(() => zarejestrujNieodebrana(d, { waybill: "   " }, KTO),
+    /jedynym uchwytem/);
+});
+
+test("znane zamówienie oddaje swoje pozycje, żeby było co wycenić", () => {
+  /* Operator nie wie, co w paczce jest, dopóki jej nie otworzy — a bez pozycji
+     zwrot nie miałby czego wycenić. */
+  const d = stanowisko();
+  zamowienie(d, "ord-N", [
+    { offerId: "of-1", nazwa: "Sekator", sku: "SEK-46", cena: 4999 },
+    { offerId: "of-2", nazwa: "Filtr", sku: null, cena: 1000, ilosc: 2 }]);
+  const w = zarejestrujNieodebrana(d,
+    { waybill: "PX2", orderId: "ord-N", notatka: "awizo dwa razy" }, KTO);
+  assert.equal(w.pozycji, 2);
+
+  const [z] = listaZwrotow(d, TERAZ);
+  assert.equal(z.notatka, "awizo dwa razy");
+  assert.deepEqual(z.pozycje.map((p) => p.nazwa), ["Sekator", "Filtr"]);
+  assert.equal(z.sumaPozycjiGrosze, 4999 + 2000, "cena razy ilość, jak wszędzie");
+  assert.ok(z.zamowienie, "zamówienie dopina się tą samą drogą co przy zwrocie");
+});
+
+test("nieznane zamówienie nie wstrzymuje rejestracji", () => {
+  /* Paczka leży na biurku niezależnie od tego, czy zamówienie już pobraliśmy. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, { waybill: "PX3", orderId: "ord-NIEZNANE" }, KTO);
+  assert.equal(w.pozycji, 0);
+  assert.equal(listaZwrotow(d, TERAZ)[0].pozycje.length, 0);
+});
+
+test("rejestracja zostawia ślad w dzienniku", () => {
+  const d = stanowisko();
+  zarejestrujNieodebrana(d, { waybill: "PX4" }, KTO);
+  const e = d.prepare("SELECT type FROM events WHERE type='zwrot_nieodebrana'").get();
+  assert.ok(e, "każda mutacja ma autora, także ta");
+});
+
+test("zestawienie CSV odróżnia paczkę nieodebraną od zgłoszenia", () => {
+  const d = stanowisko();
+  zarejestrujNieodebrana(d, { waybill: "PX5" }, KTO);
+  assert.match(csvZwrotow(listaZwrotow(d, TERAZ)), /nieodebrana paczka;/);
 });

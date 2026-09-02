@@ -279,6 +279,9 @@ export interface Zwrot {
   kwotaWariant: string | null;
   korektaNumer: string | null;
   rejectionCode: string | null;
+  /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
+  zrodlo: string;
+  notatka: string | null;
   kupujacyLogin: string | null;
   przewoznik: string | null;
   rozmowy: RozmowaZwrotu[];

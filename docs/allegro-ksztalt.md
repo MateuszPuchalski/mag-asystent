@@ -314,10 +314,26 @@ mapowanie wywali się na SQL-u, zamiast wyciec po cichu. Pilnuje tego
 Zostaje sam FAKT powrotu paczki — `paczka_at` z najwcześniejszego
 `parcels[].createdAt`. To wystarcza, żeby powiedzieć „towar wrócił".
 
-Numer listu (`parcels[].waybill`) kolumny u nas nie ma i mieć nie będzie,
-mimo że skan etykiety go szuka. Szukamy po kopii odpowiedzi w lądowisku,
-więc numer żyje przez jedno żądanie zamiast zostać u nas na lata. Politykę
-opisuje `docs/obsluga-klienta.md`, rozdział o danych zwrotów.
+Numeru listu (`parcels[].waybill`) NIE BIERZEMY z tej odpowiedzi, mimo że skan
+etykiety go szuka. Szukamy po kopii odpowiedzi w lądowisku, więc numer żyje
+przez jedno żądanie zamiast zostać u nas na lata. Politykę opisuje
+`docs/obsluga-klienta.md`, rozdział o danych zwrotów.
+
+Kolumna `zwrot_klienta.waybill` powstała w 0.172.0 i tego zdania nie łamie.
+Wypełnia się wyłącznie dla wierszy `zrodlo='nieodebrana'`, a te nie pochodzą
+z Allegro wcale — wpisuje je operator ze skanu. Z mapowania odpowiedzi Allegro
+nadal nie trafia tam ani jeden numer.
+
+### Paczki nieodebranej Allegro nie zna
+
+`CustomerReturn` powstaje ze ZGŁOSZENIA klienta. Przesyłka, której klient nie
+odebrał, wraca sama i żadnego zwrotu po tamtej stronie nie tworzy. W schemacie
+nie ma na to ani zasobu, ani statusu, ani wartości `reason.type`.
+
+Dlatego takie wiersze zakłada u nas człowiek, a kolumna `zrodlo` mówi wprost,
+skąd wiersz pochodzi. Odnośnika do panelu sprzedawcy taki zwrot nie dostaje:
+prowadziłby na stronę, której tam nie ma. Synchronizacja ich nie dotyka, bo
+dopasowuje po `external_id` z Allegro, a lokalny nosi własny przedrostek.
 
 ### Pola młodsze od kopii specyfikacji
 

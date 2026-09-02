@@ -98,7 +98,17 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
             nazwa={z.pozycje[0]?.nazwa} />
           <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate font-bold">{z.numer ?? z.externalId}</span>
+            {/* Paczka nieodebrana nie ma numeru zwrotu — jej identyfikator to
+                nasz `nieodebrana:<numer listu>`, więc pokazujemy sam numer
+                listu i mówimy wprost, czym to jest. */}
+            <span className="truncate font-bold">
+              {z.zrodlo === "nieodebrana"
+                ? (z.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
+                : (z.numer ?? z.externalId)}</span>
+            {z.zrodlo === "nieodebrana" &&
+              <span title="Klient nie odebrał przesyłki — to nie jest zgłoszony zwrot"
+                className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-800">
+                nieodebrana</span>}
             <span className="ml-auto" />
             {/* Wynik szukania bywa z kubełka, którego nikt nie ogląda —
                 bez tej etykiety zwrot ZAMKNIĘTY wyglądałby jak praca. */}

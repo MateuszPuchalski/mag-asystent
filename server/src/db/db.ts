@@ -158,6 +158,19 @@ export function migrate(database: DatabaseSync) {
 
      Kwota, nie procent — klient widzi złotówki. Powód obowiązkowy, bo to jego
      treść tłumaczy klientowi, czemu dostał mniej. */
+  /* Paczki nieodebrane (0.172.0). Allegro nie zna takiego bytu — `CustomerReturn`
+     powstaje z DEKLARACJI klienta, a nieodebrana przesyłka wraca sama. Pieniądze
+     i tak trzeba oddać, więc idzie tą samą kolejką, ale z jawnym oznaczeniem.
+
+     `CHECK` dokłada się TĄ drogą, bo baza sprzed tego wydania inaczej stałaby
+     bez strażnika — ta sama lekcja co przy statusie rozmowy w 0.158.0. */
+  addColumn("zwrot_klienta", "zrodlo",
+    "TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','nieodebrana'))");
+  /* Numer listu WYŁĄCZNIE dla paczek nieodebranych — świadomy wyjątek od
+     polityki z 0.163.0. Tam numer leży w kopii odpowiedzi Allegro; tu takiej
+     kopii nie ma, więc numer z etykiety jest jedynym uchwytem do skanu. */
+  addColumn("zwrot_klienta", "waybill", "TEXT");
+  addColumn("zwrot_klienta", "notatka", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_grosze", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");

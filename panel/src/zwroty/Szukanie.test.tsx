@@ -14,7 +14,8 @@ const ETYKIETA = "600000367616070023174201";
 const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof Szukanie>> = {}) => {
   const p = {
     wynik, kod: ETYKIETA, fraza: "", ile: null, szuka: false, dociaga: false, blad: "",
-    onFraza: vi.fn(), onSzukaj: vi.fn(), onDociagnij: vi.fn(), onWybierz: vi.fn(), ...n,
+    onFraza: vi.fn(), onSzukaj: vi.fn(), onDociagnij: vi.fn(), onWybierz: vi.fn(),
+    onNieodebrana: vi.fn(), ...n,
   };
   render(<Szukanie {...p} />);
   return p;
@@ -96,6 +97,33 @@ describe("Pole szukania zwrotu", () => {
     pokaz(null);
     expect(screen.queryByRole("button", { name: "Wyczyść szukanie" })).not.toBeInTheDocument();
     expect(screen.queryByText(/kubełkach/)).not.toBeInTheDocument();
+  });
+
+  it("nieznany kod daje DWIE drogi wyjścia, nie jedną", async () => {
+    /* Allegro nie zna zwrotu, którego klient nie zgłosił: nieodebrana
+       przesyłka wraca sama i zwrotem nigdy nie zostanie. */
+    const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
+    expect(screen.getByRole("button", { name: /Poszukaj w Allegro/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /To nieodebrana paczka/ }));
+
+    await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-9");
+    await userEvent.type(screen.getByLabelText("Notatka"), "awizo dwa razy");
+    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
+    expect(p.onNieodebrana).toHaveBeenCalledWith(ETYKIETA, "ord-9", "awizo dwa razy");
+  });
+
+  it("rejestracja mówi wprost, że to nie jest zgłoszenie klienta", async () => {
+    pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
+    await userEvent.click(screen.getByRole("button", { name: /To nieodebrana paczka/ }));
+    expect(screen.getByText(/NIE jest zwrot/)).toBeInTheDocument();
+    /* Numer zamówienia jest opcjonalny, ale ekran mówi, co za niego dostaje. */
+    expect(screen.getByText(/będzie co wycenić/)).toBeInTheDocument();
+  });
+
+  it("bez podpiętej obsługi ekran nie proponuje rejestracji", () => {
+    /* Przycisk bez działania obiecywałby drogę, której nie ma. */
+    pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { onNieodebrana: undefined });
+    expect(screen.queryByRole("button", { name: /nieodebrana paczka/ })).toBeNull();
   });
 
   it("odmowa serwera ląduje przy polu, a nie w konsoli", () => {

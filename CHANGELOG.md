@@ -34,6 +34,71 @@ historii nie przepisujemy.
 ---
 
 
+## 0.172.0 — 2 września 2026
+
+**Paczka, której klient nie odebrał, wchodzi do kolejki jawnie oznaczona.**
+Przedostatnia pozycja z listy biura zwrotów: „żeby skanowały się nieodebrane
+paczki". Decyzja właściciela: „do tych paczek też wykonujemy zwrot pieniędzy,
+oznacz, że jest to nieodebrana paczka, a nie świadomy zwrot klienta".
+
+### Allegro takiego zdarzenia nie zna
+
+`CustomerReturn` powstaje wyłącznie ze ZGŁOSZENIA klienta. Przesyłka
+nieodebrana wraca sama, po dwóch awizach, i zwrotem po tamtej stronie nigdy
+nie zostanie. Skan takiej etykiety nie trafiał więc w nic, a „Poszukaj
+w Allegro" prowadziło donikąd — bo szukać nie było czego.
+
+Pieniądze klientowi i tak trzeba oddać. Karton leżał dotąd poza panelem,
+z kartką przy monitorze.
+
+### Druga droga wyjścia z nieznanego kodu
+
+Ekran nietrafionego skanu dostaje obok „Poszukaj w Allegro" przycisk „To
+nieodebrana paczka". Pytanie do Allegro zostaje pierwsze, bo paczka bywa
+u nas szybciej niż synchronizacja i większość nietrafionych skanów to zwykły
+wyścig, nie nowy byt.
+
+Rejestracja pyta o numer zamówienia i notatkę. Numer jest OPCJONALNY, ale za
+niego są pozycje: podany przepisuje pozycje zamówienia do zwrotu, więc jest co
+ocenić i co wycenić. Ekran mówi to wprost przy polu, zamiast zostawiać wybór
+bez skutku. Bez numeru zostaje pusty uchwyt na paczkę — dalej lepszy niż
+kartka.
+
+### Oznaczenie jest jawne i widać je wszędzie
+
+Kolumna `zwrot_klienta.zrodlo` przyjmuje `allegro` albo `nieodebrana`. Plakietka
+stoi w kolejce, w nagłówku zwrotu i w nowej kolumnie eksportu CSV, a pod
+nagłówkiem stoi zdanie „Klient nie zgłosił zwrotu — przesyłka wróciła
+nieodebrana".
+
+Bez tego biuro liczyłoby świadome odstąpienia razem z nieodebranymi i nie
+miałoby jak ich rozdzielić. To dwie różne rozmowy z klientem i dwa różne
+wnioski o tym, co się dzieje ze sprzedażą.
+
+Odnośnika do panelu sprzedawcy taki wiersz nie dostaje. Prowadziłby na stronę
+zwrotu, którego po tamtej stronie nie ma.
+
+### Numer listu stoi w modelu pracy — świadomy wyjątek
+
+Polityka z 0.163.0 mówi, że numeru listu nie zapisujemy: przy zwrocie z Allegro
+szuka się go w kopii odpowiedzi w lądowisku. Paczka nieodebrana żadnej kopii
+nie ma i mieć nie będzie, więc numer jest jedynym uchwytem, po którym operator
+zeskanuje ten sam karton drugi raz.
+
+Wyjątek jest wąski: kolumna wypełnia się tylko dla `zrodlo='nieodebrana'`,
+wpisuje ją człowiek ze skanu, a eksport CSV jej nie niesie. Zapisano go
+w `docs/obsluga-klienta.md` i w `docs/allegro-ksztalt.md`, żeby następne
+czytanie tamtych zdań nie wyglądało na złamaną obietnicę.
+
+### Reszta
+
+Skan szuka teraz także po kolumnie `waybill` — inaczej zarejestrowana paczka
+nie otwierałaby się z tej samej etykiety, z której powstała. Trasa
+`POST /api/obsluga/zwroty/nieodebrana` podnosi umowę tras zapisujących do
+dwunastu; rejestracja pisze `zwrot_nieodebrana` do dziennika, jak każda mutacja.
+Duplikat numeru listu jest odmawiany, bo dwa wiersze na jedną paczkę znaczą
+dwa zwroty pieniędzy.
+
 ## 0.171.0 — 2 września 2026
 
 **Sygnatura wiąże kartotekę sama, a ekran ustawień mówi, ile wiąże.** Dwie

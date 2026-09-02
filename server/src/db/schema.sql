@@ -934,6 +934,19 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- jeszcze niepobrane — dlatego stoi tu, a nie tylko przy zamówieniu. To
   -- jedyna dana osobowa dopuszczona przez politykę danych zwrotów wprost;
   -- imienia i nazwiska Allegro przy zwrocie nie podaje w ogóle.
+  -- ── Skąd wziął się ten wiersz (0.172.0) ────────────────────────────────────
+  -- `allegro` to zwrot ZGŁOSZONY przez klienta. `nieodebrana` to paczka, która
+  -- wróciła sama, bo nikt jej nie odebrał — Allegro takiego bytu nie zna wcale
+  -- (`CustomerReturn` powstaje z deklaracji klienta), a pieniądze i tak trzeba
+  -- oddać. Bez tej kolumny obie rzeczy wyglądałyby na ekranie identycznie.
+  zrodlo TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','nieodebrana')),
+  -- Numer listu przewozowego — WYŁĄCZNIE dla paczek nieodebranych i to jest
+  -- świadomy wyjątek od polityki z 0.163.0. Tam numeru nie zapisujemy, bo leży
+  -- w kopii odpowiedzi Allegro i tam go szukamy. Tu takiej kopii NIE MA:
+  -- paczka nie ma zwrotu w Allegro, więc numer z etykiety jest jedynym
+  -- uchwytem, po którym da się ją potem znaleźć skanem.
+  waybill TEXT,
+  notatka TEXT,
   kupujacy_login TEXT,
   -- Przewoźnik z pierwszej paczki. Bez `CHECK`: Allegro nie publikuje
   -- zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.

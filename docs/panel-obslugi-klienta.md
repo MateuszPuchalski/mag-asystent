@@ -1026,6 +1026,38 @@ Eksport CSV ma separator `;`, jeden wiersz na POZYCJĘ i nie niesie numeru listu
 przewozowego. Zostawia ślad w dzienniku, bo wynosi loginy kupujących — ta sama
 zasada co przy analizie i audycie.
 
+### 25a.13. Paczka nieodebrana (0.172.0)
+
+Karton wraca, a zwrotu nie ma i nie będzie. Klient nie odebrał przesyłki,
+kurier odesłał ją po dwóch awizach — Allegro takiego zdarzenia nie zna,
+bo `CustomerReturn` powstaje wyłącznie ze zgłoszenia klienta. Pieniądze
+i tak trzeba oddać, więc paczka musi wejść do kolejki.
+
+**Rejestruje ją operator, drugim wyjściem z nieznanego kodu.** Skan nie
+trafia, ekran pokazuje „Poszukaj w Allegro" i obok „To nieodebrana paczka".
+Pytanie do Allegro zostaje pierwsze, bo paczka bywa u nas szybciej niż
+synchronizacja i większość nietrafionych skanów to zwykły wyścig.
+
+**Wiersz jest JAWNIE oznaczony**, kolumną `zrodlo`. Panel pisze przy nim
+„Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana", a plakietka
+stoi i w kolejce, i w nagłówku, i w kolumnie eksportu CSV. Bez tego biuro
+liczyłoby świadome odstąpienia razem z nieodebranymi i nie miało jak ich
+rozdzielić — a to dwie różne rozmowy z klientem i dwa różne wnioski.
+
+**Numer zamówienia jest opcjonalny, ale za niego są pozycje.** Podany
+przepisuje pozycje zamówienia do zwrotu, więc jest co ocenić i co wycenić.
+Bez niego wiersz zostaje pustym uchwytem na paczkę — lepszym niż kartka
+przy monitorze, ale pieniędzy z niego nie policzy.
+
+**Numer listu przewozowego stoi TU w modelu pracy** — świadomy wyjątek od
+polityki 0.163.0. Przy zwrocie z Allegro numer szuka się w kopii odpowiedzi,
+a paczka nieodebrana żadnej kopii nie ma: to jedyny uchwyt, po którym da się
+ją drugi raz zeskanować. Wyjątek trzyma się `zrodlo='nieodebrana'` i nie
+wychodzi w eksporcie. Politykę opisuje `docs/obsluga-klienta.md`.
+
+Odnośnika do Allegro taki wiersz nie dostaje. Prowadziłby na stronę zwrotu,
+którego po tamtej stronie nie ma.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -1111,6 +1143,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx` |
 | Nazwa towaru przy ofercie w rozmowie | **z zamówienia** od 0.167.0 | `nazwaOferty` — ofert nadal nie pobieramy |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
+| Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
