@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Rabat } from "./Rabat";
 import {
   CalendarClock, Check, Copy, ExternalLink, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
   X as Krzyzyk,
@@ -160,7 +161,12 @@ function DociagnijZamowienia() {
   </div>;
 }
 
-export function Dowody({ zwrot }: { zwrot: Zwrot }) {
+export function Dowody({ zwrot, trwaRabat = false, bladRabatu = "", onZglosRabat }: {
+  zwrot: Zwrot;
+  trwaRabat?: boolean;
+  bladRabatu?: string;
+  onZglosRabat?: (pozycjaId: number) => void;
+}) {
   const [powiekszony, setPowiekszony] = useState<PozycjaZwrotu | null>(null);
   const zam = zwrot.zamowienie;
 
@@ -270,6 +276,11 @@ export function Dowody({ zwrot }: { zwrot: Zwrot }) {
                 {p.powodKomentarz && <p className="mt-1 text-xs italic text-slate-600">
                   „{p.powodKomentarz}"</p>}
                 <Kartoteka p={p} />
+                {/* Rabat stoi przy POZYCJI, nie przy zwrocie: wniosek składa się
+                    na pozycję zamówienia, więc zwrot z dwiema pozycjami ma dwa
+                    osobne rabaty i dwa osobne przyciski. */}
+                <Rabat rabat={p.rabat} trwa={trwaRabat} blad={bladRabatu}
+                  onZglos={() => onZglosRabat?.(p.id)} />
               </div>
             </li>)}
           </ul>}

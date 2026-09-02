@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { config, envFile } from "./config.js";
 import { powodBrakuKonta, stanPolaczenia } from "./services/allegro-token.js";
-import { opiszKsztalt, raportKoncowki } from "./services/ksztalt.js";
+import { listaZOdpowiedzi, opiszKsztalt, raportKoncowki } from "./services/ksztalt.js";
 import {
   urlDyskusji,
   urlListyZwrotow,
@@ -45,14 +45,11 @@ const ROZMOW = 10;
 
 /* Klucz listy podajemy WSZYSTKIMI znanymi nazwami: `/sale/user-ratings`
    oddaje raz `ratings`, raz `userRatings` (patrz `mapujOpinie`), a sonda ma
-   opisać kształt, nie wywrócić się na wariancie nazwy. */
-const tablica = (json: unknown, ...klucze: string[]): unknown[] => {
-  const root = (json ?? {}) as Record<string, unknown>;
-  for (const k of klucze) {
-    if (Array.isArray(root[k])) return (root[k] as unknown[]).slice(0, PROBKA);
-  }
-  return [];
-};
+   opisać kształt, nie wywrócić się na wariancie nazwy. Sama funkcja siedzi
+   w `services/ksztalt.ts`, bo tam ma test — jej cisza kosztowała już całą
+   sekcję raportu. */
+const tablica = (json: unknown, ...klucze: string[]): unknown[] =>
+  listaZOdpowiedzi(json, klucze, PROBKA);
 
 const idy = (rekordy: unknown[], ile: number): string[] =>
   rekordy
@@ -128,11 +125,15 @@ async function main(): Promise<void> {
 
   sekcje.push(
     (
-      await sekcja("`/sale/issues/{id}/messages` — rozmowa dyskusji", async () => {
+      await sekcja("`/sale/issues/{id}/chat` — rozmowa dyskusji", async () => {
         const zebrane: unknown[] = [];
         for (const id of idy(dyskusje.rekordy, ROZMOW)) {
           zebrane.push(
-            ...tablica(await zapytajAllegro(urlWiadomosciDyskusji(api, id)), "messages")
+            /* `chat` PIERWSZY, bo tak nazywa listę schemat `PostPurchaseIssueChatResponse`.
+                 `messages` zostaje za nim jako zapas — to po nim sonda pytała do 0.164.0
+                 i dlatego ta sekcja raportu była pusta przy stu sprawach z niezerowym
+                 `chat.messagesCount`. */
+              ...tablica(await zapytajAllegro(urlWiadomosciDyskusji(api, id)), "chat", "messages")
           );
         }
         return zebrane;

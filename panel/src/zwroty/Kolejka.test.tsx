@@ -16,6 +16,8 @@ const POZYCJA: PozycjaZwrotu = {
   id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
   url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+      rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null },
 };
 
 const ZAMOWIENIE: Zamowienie = {
@@ -39,7 +41,9 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   rejectionCode: null, wersja: 1,
   pozycje: [{ id: 1, offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
-    url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null }],
+    url: null, twId: null, twSymbol: null, twZrodlo: null, propozycja: null,
+      rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null } }],
   ...n,
 });
 

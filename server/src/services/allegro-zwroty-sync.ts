@@ -45,6 +45,10 @@ type Zwrot = {
   items?: Pozycja[];
   parcels?: Paczka[];
   rejection?: { code?: string; reason?: string; createdAt?: string } | null;
+  /* Oś czasu zwrotu po stronie Allegro (0.164.0). Zwykły `string`, bo schemat
+     wymienia jedenaście wartości słownie i nie zamyka ich enumem — nieznana
+     wartość ma przejść dalej, a nie wywrócić przebieg. */
+  status?: string;
 };
 
 /* Kod bierze się z KLASY błędu, nie z jego zdania — ta sama poprawka co
@@ -238,16 +242,18 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
 
   database.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,reference_number,order_id,created_at,paczka_at,
-     rejection_code,rejection_reason,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?)
+     rejection_code,rejection_reason,status_allegro,synced_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
       created_at=excluded.created_at, paczka_at=excluded.paczka_at,
       rejection_code=excluded.rejection_code, rejection_reason=excluded.rejection_reason,
+      status_allegro=excluded.status_allegro,
       synced_at=excluded.synced_at`).run(
     konto, zwrot.id, zwrot.referenceNumber ?? null, zwrot.orderId ?? null,
     utworzono, pierwszaPaczka(zwrot.parcels),
-    zwrot.rejection?.code ?? null, zwrot.rejection?.reason ?? null, at);
+    zwrot.rejection?.code ?? null, zwrot.rejection?.reason ?? null,
+    zwrot.status ?? null, at);
 
   const id = Number((database.prepare(
     "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?",

@@ -50,6 +50,7 @@ import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js
 import { stanObslugiHealth } from "./services/skrzynka.js";
 import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
+import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { allegroTryb } from "./adapters/allegro.js";
@@ -333,6 +334,10 @@ async function main() {
        to ta sygnatura maszyny, która w sierpniu 2026 skończyła się blokadą
        (patrz nagłówek `services/takt.ts`). */
     uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, synchronizujAllegroZwroty);
+    /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
+       końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
+       (blizna 0.149.2 — jeden zepsuty wątek zatrzymywał całą synchronizację). */
+    uruchomTakt("allegro-rabaty", config.allegro.rabatySyncMs, synchronizujAllegroRabaty);
     /* Trzeci ticker, najrzadszy z całej trójki. Uzupełnia zamówienia do
        zwrotów, które już mamy, więc po kilku przebiegach nie ma czego
        pobierać i milczy — a gdy zwrot dojdzie, dociągnie mu kontekst

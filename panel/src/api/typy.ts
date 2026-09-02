@@ -179,6 +179,21 @@ export interface Dopasowanie {
   poKolumnie: "offer_id" | "external_id" | null;
 }
 
+/* Rabat transakcyjny przy pozycji zwrotu (0.164.0). Stan LICZY SERWER —
+   panel go nie wyprowadza, bo wiąże wniosek z pozycją zamówienia, a to
+   złączenie ma jedno miejsce. */
+export type StanRabatu = {
+  stan: "brak" | "zlozony" | "przyznany" | "odrzucony" | "nie_wiadomo";
+  lineItemId: string | null;
+  ilosc: number;
+  wniosekId: string | null;
+  prowizjaGrosze: number | null;
+  waluta: string | null;
+  typ: string | null;
+  /** Dlaczego nie da się złożyć wniosku. Zdanie pisze serwer. */
+  powod: string | null;
+};
+
 export interface PozycjaZwrotu {
   id: number;
   offerId: string | null;
@@ -194,6 +209,7 @@ export interface PozycjaZwrotu {
   twSymbol: string | null;
   twZrodlo: string | null;
   propozycja: Dopasowanie | null;
+  rabat: StanRabatu;
 }
 
 export interface PozycjaZamowienia {

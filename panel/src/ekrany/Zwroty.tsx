@@ -4,7 +4,9 @@ import { Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
 import type { BilansKartotek, Kubelek } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
-import { useCofnijKorekte, useKorekta, useKwota, useOcena, useWerdykt } from "../api/zwroty";
+import {
+  useCofnijKorekte, useKorekta, useKwota, useOcena, useWerdykt, useZglosRabat,
+} from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -71,6 +73,8 @@ export function Zwroty() {
   const kwota = useKwota();
   const korekta = useKorekta();
   const cofnijKorekte = useCofnijKorekte();
+  const rabat = useZglosRabat();
+  const [bladRabatu, setBladRabatu] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
@@ -212,7 +216,12 @@ export function Zwroty() {
 
     <Karta className="overflow-hidden">
       {zwrot
-        ? <Dowody zwrot={zwrot} />
+        ? <Dowody zwrot={zwrot} trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
+            onZglosRabat={(pozycjaId) => {
+              setBladRabatu("");
+              rabat.mutate({ pozycjaId },
+                { onError: (e) => setBladRabatu((e as Error).message) });
+            }} />
         : <p className="p-6 text-center text-sm text-slate-500">
             Dowody pokażą się po wybraniu zwrotu.</p>}
     </Karta>

@@ -1,7 +1,11 @@
 # Kształt Centrum wiadomości Allegro
 
 Kontrakt mapowania skrzynki. **Pochodzi ze specyfikacji OpenAPI Allegro**,
-nie z żywego konta — `npm run sonda` na koncie firmy jeszcze nie biegła.
+a od 0.164.0 stoi obok niego obserwacja z żywego konta:
+[`allegro-sonda.md`](allegro-sonda.md), zdjęta 2 września 2026. Ten plik mówi,
+co WOLNO czytać kodowi; tamten mówi, co konto firmy naprawdę oddało danego dnia.
+Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia — i tak powstały
+poprawki opisane niżej.
 
 Specyfikacja leży w repo: `docs/allegro/swagger.yaml`, razem z notatką
 o pochodzeniu i sposobie odświeżania w `docs/allegro/README.md`. Nie trzeba
@@ -38,9 +42,13 @@ z 1 września wyniósł numery listów przewozowych i nie może trafić do repo
 jest KONTRAKTEM, czyli mówi, co wolno czytać kodowi; raport będzie OBSERWACJĄ
 z datą. Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia.
 
-Znaczniki weryfikacji niżej dotyczą wyłącznie końcówek ZAPISU. Sonda ich nie
-tknie, bo jest z założenia GET-em — więc licznik nie zejdzie od niej ani
-o jeden.
+Znaczniki weryfikacji niżej dotyczą **w większości** końcówek ZAPISU i tych
+sonda nie tknie, bo jest z założenia GET-em. Do 0.164.0 stało tu twardsze
+zdanie — „wyłącznie zapisu, licznik nie zejdzie ani o jeden" — i było
+nieprawdziwe: trzy z siedmiu znaczników w tym pliku mówiły o czym innym,
+a jeden z nich (`status` zwrotu) dało się zdjąć samą lekturą `swagger.yaml`
+leżącego w tym repo. Zdanie przeczyło zresztą innemu, kilkadziesiąt linii
+niżej, w sekcji o zwrotach.
 
 ### `commission.amount` jest LICZBĄ
 
@@ -181,9 +189,9 @@ To spełnia regułę §8.2 projektu panelu: mapowanie wynika z dokumentacji
 Allegro. Nie zastępuje jednak sondy. Kopia ma dwa lata, a Allegro w tym
 czasie dokładało pola — dlatego rzeczy młodsze od niej noszą znacznik.
 
-`npm run sonda` zdejmuje dziś także zwroty i ich szczegół. Po pierwszym
-przebiegu na żywym koncie znaczniki z tej sekcji schodzą, a liczba
-w preambule `docs/subiekt-gt-struktura.md` maleje.
+`npm run sonda` zdejmuje dziś także zwroty i ich szczegół — przebieg
+z 2 września potwierdził tę sekcję pole po polu i zdjął z niej jeden znacznik
+(`status`). Reszta znaczników dotyczy ZAPISÓW, których GET nie dosięgnie.
 
 ### `GET /order/customer-returns`
 
@@ -192,7 +200,26 @@ Negocjuje to `zapytajAllegro` i zapamiętuje wynik osobno dla tej rodziny.
 
 Obiekt ma liczbę `count` i tablicę `customerReturns`. Zwrot ma pola `id`,
 `createdAt`, `referenceNumber`, `orderId`, `items`, `refund`, `parcels`,
-`rejection` oraz `marketplaceId`.
+`rejection`, `marketplaceId` oraz — dopisane w 0.164.0 — `status`, `buyer`
+i `isFulfillment`.
+
+`status` to OŚ CZASU ZWROTU po stronie Allegro, nie nasza decyzja. Jedenaście
+wartości ze schematu: `CREATED`, `DISPATCHED`, `IN_TRANSIT`, `DELIVERED`,
+`FINISHED`, `FINISHED_APT`, `REJECTED`, `COMMISSION_REFUND_CLAIMED`,
+`COMMISSION_REFUNDED`, `WAREHOUSE_DELIVERED`, `WAREHOUSE_VERIFICATION`. Pole
+jest zwykłym `string` z opisem, **bez `enum`** — zbiór nie jest zamknięty, więc
+kod nie może na nim stawiać `CHECK` ani wyczerpującego `switch`.
+
+Dwie z tych wartości mówią o PROWIZJI dla sprzedawcy, nie o pieniądzach
+oddanych klientowi: `COMMISSION_REFUND_CLAIMED` znaczy „wniosek o rabat
+transakcyjny złożony", a `COMMISSION_REFUNDED` — „prowizja zwrócona".
+Pieniądze klienta opisuje dopiero `FINISHED`. Obserwacja z 2 września ma
+`COMMISSION_REFUNDED` ×95, więc mylne odczytanie tego pola zamknęłoby prawie
+całą kolejkę.
+
+`buyer` niesie `login` ORAZ `email` — patrz „Czego NIE mapujemy".
+`isFulfillment` mówi, że zwrotem zajmuje się One Fulfillment; u tej firmy
+było `false` w stu rekordach na sto.
 
 Pozycja (`items[]`) ma `offerId`, `quantity`, `name`, `price`, `url` oraz
 `reason` z polami `type` i `userComment`. Zaobserwowane wartości `reason.type`:
@@ -204,7 +231,11 @@ Kwota (`price`) ma `amount` i `currency`. Specyfikacja mówi wprost, że
 `naGrosze` liczy na tekście, a nie przez liczbę zmiennoprzecinkową.
 
 Paczka (`parcels[]`) ma `createdAt`, `waybill`, `carrierId` oraz `sender`.
-Odrzucenie (`rejection`) ma `code`, `reason` i `createdAt`.
+Odrzucenie (`rejection`) ma `code`, `reason` i `createdAt`. Kodów jest
+SIEDEM, nie cztery: `REFUND_REJECTED`, `NEW_ITEM_SENT`, `ITEM_FIXED`,
+`MISSING_PART_SENT`, `ITEM_MISMATCH`, `BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`.
+Do 0.164.0 stała tu lista czterech, przepisana z ogłoszenia zamiast ze
+schematu.
 
 Filtry listy: `customerReturnId`, `orderId`, `items.offerId`, `items.name`,
 `parcels.waybill`, `parcels.carrierId`, `parcels.senderPhoneNumber`,
@@ -221,12 +252,31 @@ ostatnio widzianego zwrotu, a odpowiedź niesie zwroty utworzone po nim.
 Synchronizator idzie kursorem, bo offset gubi rekord przy wstawce w środku
 strony — i to jest blizna 0.127.0 zdjęta u źródła.
 
+### `GET /order/customer-returns/{id}`
+
+Szczegół zwrotu ma TEN SAM kształt co element listy — obie ścieżki oddają
+`CustomerReturn`. Sekcji tu nie było do 0.164.0, choć sonda mierzy szczegół od
+0.154.0; obserwacja z 2 września potwierdza zgodność pole po polu na dziesięciu
+zwrotach.
+
+Synchronizator dlatego czyta LISTĘ i po szczegół nie sięga: dokłada jedno
+wywołanie na zwrot, a nie dokłada ani jednego pola. Wyjątek jest jeden —
+`parcels[].waybill` bywa `null` na liście (88 z 94), a w szczególe było
+niepuste w dziesięciu na dziesięć. Numeru listu i tak nie zapisujemy, więc
+różnica nie zmienia dziś niczego; gdyby kiedyś zaczęła, to jest miejsce,
+w którym szczegół daje więcej.
+
 ### Czego NIE mapujemy i dlaczego
 
 Trzy rzeczy z tej odpowiedzi nie mają u nas kolumny.
 
 `refund.bankAccount` niesie `owner`, `accountNumber`, `iban`, `swift`
 i `address`. `parcels[].sender.phoneNumber` niesie telefon nadawcy.
+`buyer.email` niesie adres e-mail kupującego — dopisany do tej listy
+w 0.164.0, bo `buyer` wszedł wtedy do kontraktu i bez tego zdania wyglądałby
+na pole do wzięcia w całości. W obserwacji z 2 września `buyer.email` było
+puste w stu rekordach na sto, ale schemat je przewiduje i to schemat
+rozstrzyga, czego nie wolno zapisać.
 
 Zwrot da się rozstrzygnąć bez nich, a raz pobrane dane osobowe zostają
 w kopii zapasowej na lata. Kolumn na nie po prostu nie ma, więc nieuważne
@@ -243,11 +293,11 @@ opisuje `docs/obsluga-klienta.md`, rozdział o danych zwrotów.
 
 ### Pola młodsze od kopii specyfikacji
 
-`[WERYFIKUJ]` Pole `status` na zwrocie. Ogłoszenie Allegro „Zwroty klienckie
-— dodaliśmy informacje o statusie zwrotu" opisuje wartości `COMMISSION_REFUNDED`
-i `WAREHOUSE_DELIVERED`, ale kopia specyfikacji z 2024 roku go nie zawiera.
-Synchronizator go nie czyta, a kubełek liczy z naszych własnych faktów, więc
-brak tego pola niczego dziś nie psuje.
+Znacznik przy `status` zwrotu ZDJĘTY w 0.164.0. Twierdził, że „kopia
+specyfikacji z 2024 roku go nie zawiera" — a `docs/allegro/swagger.yaml`
+opisuje to pole razem z jedenastoma wartościami. Znacznik przeżył wymianę
+źródła z 0.151.0: sekcja o zwrotach dalej była pisana z dwuletniej kopii, choć
+schemat leżał już w repo. Kształt czyta się z pliku, nie z pamięci o pliku.
 
 ### Zapisy — kształt NIEPOTWIERDZONY
 
@@ -272,10 +322,48 @@ ma. `commandId` to identyfikator UUID zapewniający idempotencję — czyli
 gotowe miejsce na klucz z kolejki `outbox`. Do sprawdzenia przed pierwszym
 zwrotem pieniędzy.
 
-`[WERYFIKUJ]` `POST /order/refund-claims` tworzy roszczenie o zwrot prowizji.
-Odczyt (`GET`) oddaje `id`, `status`, `quantity`, `commission`, `buyer`,
-`createdAt`, `lineItem` i `type`. Kształt ŻĄDANIA jest tu najsłabiej
-udokumentowany z całej trójki.
+`[WERYFIKUJ]` `POST /order/refund-claims` — kształt ŻĄDANIA jest znany
+ze schematu (`RefundClaimRequest`, patrz sekcja niżej), ale nie przeszedł
+jeszcze przez żywe konto. Znacznik schodzi po PIERWSZYM udanym wniosku
+złożonym z panelu, nie wcześniej. Do 0.164.0 stało tu, że kształt jest
+„najsłabiej udokumentowany z całej trójki" — nieprawda, bo schemat leży
+w repo; nieznana jest wyłącznie odpowiedź konta.
+
+### Rabat transakcyjny — `/order/refund-claims`
+
+Zwrot prowizji od sprzedaży, po polsku „rabat transakcyjny". Do 0.164.0 firma
+klikała po niego ręcznie przy każdym zwrocie w panelu Allegro; obserwacja
+z 2 września pokazuje, dlaczego to była praca: `type` to `MANUAL` ×60
+i `AUTOMATIC` ×40, czyli Allegro część wniosków zakłada samo, a resztę trzeba
+złożyć.
+
+**Odczyt** — `GET /order/refund-claims`, nagłówek
+`application/vnd.allegro.public.v1+json`, uprawnienie `allegro:api:orders:read`.
+Odpowiedź ma `count` i `refundClaims[]`, a wniosek: `id`, `status`, `quantity`,
+`commission`, `buyer`, `createdAt`, `lineItem` i `type`. Statusy z filtra:
+`IN_PROGRESS`, `WAITING_FOR_PAYMENT_REFUND`, `GRANTED`, `REJECTED`,
+`REJECTED_AFTER_APPEAL`, `CANCELLED`, `APPEALED`. Domyślny `limit` to 25,
+maksymalny 100.
+
+**Zapis** — `POST /order/refund-claims`, uprawnienie
+**`allegro:api:orders:write`**. Ciało (`RefundClaimRequest`) to dosłownie dwie
+rzeczy: `{ "lineItem": { "id": … }, "quantity": … }`, gdzie `quantity` musi być
+większe od zera. Odpowiedź 201 niesie samo `{ id }` utworzonego wniosku.
+
+`lineItem.id` to identyfikator POZYCJI ZAMÓWIENIA (`lineItems[].id`
+z `/order/checkout-forms`), nie oferty i nie pozycji zwrotu. Trzymamy go
+w `zamowienie_klienta_pozycja.external_id`.
+
+**TA KOŃCÓWKA NIE MA IDEMPOTENCJI.** Pole `commandId` jest przy zwrocie
+pieniędzy, nie tutaj — więc powtórzone żądanie zakłada DRUGI wniosek, a nie
+ten sam. Strażnik przed dubletem musi stać po naszej stronie i dlatego stoi
+potrójny (`services/rabaty.ts`).
+
+**Anulowanie** — `DELETE /order/refund-claims/{claimId}`, odpowiedź 204, to samo
+uprawnienie do zapisu. Specyfikacja pisze przy nim „this cannot be undone":
+anulowania nie da się cofnąć, ale sam wniosek anulować można. Dlatego złożenie
+wniosku dostaje w panelu COFNIĘCIE, a nie potwierdzenie — §25a.5 rezerwuje
+potwierdzenie dla rzeczy nieodwracalnych.
 
 ### Co się stanie, jeśli kształt jest inny
 
@@ -312,6 +400,13 @@ jest powodem, dla którego w ogóle pobieramy zamówienia.
 Schemat `ExternalId` opisuje je jako „The ID of the offer in the external
 system": identyfikator, który sprzedawca sam wpisał przy ofercie. U tej firmy
 to symbol z Subiekta.
+
+**Pole jest OPCJONALNE w schemacie** — `OfferReference` wymaga tylko `id`
+i `name` — więc do 0.164.0 cały mostek do kartoteki stał na nieznanym
+pokryciu. Obserwacja z 2 września odpowiada: `lineItems[].offer.external.id`
+było niepuste w **165 na 165** pozycji. Grunt jest pewny, ale nie z definicji:
+to liczba z jednego dnia i jednego konta, a kod ma dalej znosić brak SKU
+(„oferta bez SKU" jest jednym z sześciu powodów w łańcuchu kartotek).
 
 Bez tego mostka pozycja zwrotu nie ma zdjęcia, bo `zdjecie_cache`
 i `zdjecie_wlasne` są kluczowane po `tw_id`. Projekt panelu §28 nazywał to

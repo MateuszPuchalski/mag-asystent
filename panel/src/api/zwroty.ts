@@ -141,6 +141,24 @@ export function useCofnijKorekte() {
   });
 }
 
+/**
+ * Złożenie wniosku o rabat transakcyjny — jedyna mutacja panelu, która
+ * WYCHODZI do Allegro.
+ *
+ * Bez `wersja` i to jest wybór: wniosek nie zmienia stanu zwrotu u nas, a przed
+ * dubletem broni strażnik serwera (końcówka Allegro nie ma idempotencji).
+ * Blokada optymistyczna na cudzym zasobie dawałaby złudzenie kontroli.
+ */
+export function useZglosRabat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number }) =>
+      api<{ wniosekId: string; lineItemId: string }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/rabat`, { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
 /* ── Skan etykiety zwrotnej (0.163.0) ────────────────────────────────────────
    Kod jedzie CIAŁEM ŻĄDANIA, nie adresem, i to jest ta sama ostrożność co przy
    szynie zdarzeń: numer listu przewozowego w adresie wylądowałby w logu żądań
@@ -180,4 +198,3 @@ export function useDociagnijPoSkanie() {
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
-

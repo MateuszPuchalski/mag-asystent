@@ -69,6 +69,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/ocena" },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta/cofnij` },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/rabat" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan/dociagnij" },
 ];
@@ -129,7 +130,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają dziewięć tras POST, a zapisuje osiem z nich", async () => {
+test("zwroty mają dziesięć tras POST, a jedna z nich wychodzi do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -140,17 +141,24 @@ test("zwroty mają dziewięć tras POST, a zapisuje osiem z nich", async () => {
 
      ÓSMA i DZIEWIĄTA to skan etykiety zwrotnej (0.163.0), i tylko jedna z nich
      zapisuje. Samo szukanie zwrotu pod kodem jest POST-em wyłącznie po to,
-     żeby numer listu przewozowego nie wylądował w logu żądań serwera. */
+     żeby numer listu przewozowego nie wylądował w logu żądań serwera.
+
+     DZIESIĄTA to wniosek o rabat transakcyjny (0.164.0) i różni się od
+     wszystkich poprzednich: jako jedyna WYCHODZI DO ALLEGRO. Reszta zapisuje
+     wyłącznie u nas. Uzasadnienie: firma odzyskiwała prowizję klikając ręcznie
+     przy każdym zwrocie w panelu Allegro, bo znikąd nie było widać, przy
+     którym wniosek już jest. Końcówka Allegro nie ma idempotencji, więc
+     strażnik przed dubletem stoi w serwisie, PRZED siecią. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 9, `tras POST jest ${posty.length}, a umowa mówi o dziewięciu`);
+  assert.equal(posty.length, 10, `tras POST jest ${posty.length}, a umowa mówi o dziesięciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
-    "korekta", "cofnij", "skan", "dociagnij"]) {
+    "korekta", "cofnij", "skan", "dociagnij", "rabat"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
@@ -342,6 +350,26 @@ test("korekta domyka zwrot przez HTTP, a cofnięcie otwiera go z powrotem", asyn
   assert.equal(r.json().zwrot.kubelek, "korekta", "wraca do kubełka, nie na początek kolejki");
 });
 
+test("wniosek o rabat: bez dopasowanej pozycji zamówienia trasa mówi POWÓD", async () => {
+  /* Jedyna trasa tego pliku, która WYCHODZI do Allegro. Tu sprawdzamy, że nie
+     wychodzi wtedy, gdy nie ma czego wysłać — identyfikator pozycji zamówienia
+     jest jedynym wymaganym polem żądania i bez niego nie ma wniosku.
+
+     Zwrot z tego stanowiska nie ma pobranego zamówienia, więc łańcuch pęka na
+     pierwszym ogniwie i ekran ma to powiedzieć zdaniem, nie ciszą. */
+  const { naglowki } = login("biuro", "Ala z biura");
+  const pozycja = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+
+  const r = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/pozycje/${pozycja}/rabat`, headers: naglowki });
+  assert.equal(r.statusCode, 400, r.body);
+  assert.match(r.json().error, /zamówieni/i);
+
+  /* I nie zostawia po sobie wniosku-widma. */
+  assert.equal((db().prepare("SELECT count(*) n FROM allegro_rabat").get() as { n: number }).n, 0);
+});
+
 /* ── Skan etykiety zwrotnej (0.163.0) ─────────────────────────────────────── */
 
 const ETYKIETA = "600000367616070023174201";
@@ -406,4 +434,3 @@ test("dociągnięcie po skanie wymaga sparowanego konta", async () => {
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /nie jest sparowane/);
 });
-

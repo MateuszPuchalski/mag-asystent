@@ -121,6 +121,18 @@ export function urlRoszczenProwizji(apiUrl: string, offset: number): string {
   return `${apiUrl}/order/refund-claims?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
 }
 
+/**
+ * Jeden wniosek o rabat (`/order/refund-claims/{claimId}`).
+ *
+ * Używane WYŁĄCZNIE do anulowania (`DELETE`). Specyfikacja pisze przy nim
+ * „this cannot be undone" — anulowania nie da się cofnąć, ale sam wniosek
+ * anulować można, i to dlatego złożenie dostaje w panelu cofnięcie zamiast
+ * dialogu potwierdzenia (§25a.5).
+ */
+export function urlWnioskuORabat(apiUrl: string, claimId: string): string {
+  return `${apiUrl}/order/refund-claims/${encodeURIComponent(claimId)}`;
+}
+
 /** URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1). */
 export function urlDyskusji(apiUrl: string, offset: number): string {
   return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
@@ -148,7 +160,10 @@ export function urlOpinii(apiUrl: string, offset: number): string {
  * identifier". Zgadnięte było co innego — sam adres.
  */
 export function urlWiadomosciDyskusji(apiUrl: string, id: string): string {
-  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/chat`;
+  /* `limit` JAWNIE, bo specyfikacja daje przy tej końcówce domyślne 10 — a nie
+     100 jak przy listach obok. Bez tego próbka sondy była cicho przycięta
+     i nikt by się nie dowiedział, że rozmowa ma dalszy ciąg. */
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/chat?limit=100`;
 }
 
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
@@ -189,7 +204,14 @@ const dzialajacyAccept = new Map<string, string>();
  * zacząć naprawę; gołe 403 nie prowadzi donikąd, a rodzin końcówek mamy
  * już cztery.
  */
-export function scopeDlaUrl(url: string): string {
+export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
+  /* ZAPIS na zamówieniach żąda OSOBNEGO uprawnienia — `orders:write`, nie
+     `orders:read`. Do 0.164.0 ta funkcja patrzyła na sam adres, więc odmowa
+     przy składaniu wniosku o rabat kazałaby dodać uprawnienie, które konto
+     już ma. Dokładnie ta pomyłka kosztowała wydanie przy opiniach (0.155.0):
+     zła instrukcja jest gorsza niż jej brak, bo wysyła człowieka po coś,
+     co ma, i każe sparować konto ponownie bez skutku. */
+  if (metoda !== "GET" && url.includes("/order/")) return "allegro:api:orders:write";
   if (url.includes("/messaging/")) return "allegro:api:messaging";
   /* `product-offers` PRZED `offers`: pierwszy wzorzec zawiera drugi jako
      podciąg tylko przy odwrotnej kolejności sprawdzania, ale oba i tak
@@ -225,7 +247,7 @@ export function scopeDlaUrl(url: string): string {
  */
 export async function zapytajAllegro(
   url: string,
-  opcje: { metoda?: "POST" | "PUT"; body?: unknown } = {}
+  opcje: { metoda?: "POST" | "PUT" | "DELETE"; body?: unknown } = {}
 ): Promise<unknown | null> {
   const bearer = await wazneBearer();
   const rodzina = rodzinaKoncowki(url);
@@ -279,7 +301,8 @@ export async function zapytajAllegro(
     if (odp.status === 403) {
       throw new BladOdpowiedziAllegro(
         `Brak uprawnienia (403) — aplikacja na developer.allegro.pl musi mieć scope ` +
-          `${scopeDlaUrl(url)}. Po dodaniu uprawnienia sparuj konto ponownie: ` +
+          `${scopeDlaUrl(url, opcje.metoda ?? "GET")}. Po dodaniu uprawnienia ` +
+          `sparuj konto ponownie: ` +
           "token wydany pod stary zakres sam się nie rozszerzy.",
         403
       );
@@ -365,4 +388,24 @@ export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
       `Allegro nie oddało załącznika (${odp.status}).`, odp.status);
   }
   return odp.arrayBuffer();
+}
+
+/**
+ * Złożenie wniosku o rabat transakcyjny — PIERWSZY ZAPIS na zamówieniach.
+ *
+ * Ciało jest dosłownie takie, jak `RefundClaimRequest` w specyfikacji:
+ * pozycja zamówienia i ilość, nic więcej. `lineItemId` to identyfikator
+ * POZYCJI ZAMÓWIENIA (`lineItems[].id`), nie oferty — szuka go
+ * `services/rabaty.ts` i tylko stamtąd ma prawo tu trafić.
+ *
+ * Uprawnienie to `allegro:api:orders:write`, inne niż przy odczycie; pilnuje
+ * tego `scopeDlaUrl` z metodą, żeby odmowa 403 nazwała właściwe.
+ */
+export async function zglosRabat(
+  apiUrl: string, lineItemId: string, ilosc: number,
+): Promise<{ id?: string } | null> {
+  return await zapytajAllegro(`${apiUrl}/order/refund-claims`, {
+    metoda: "POST",
+    body: { lineItem: { id: lineItemId }, quantity: Math.max(1, Math.round(ilosc)) },
+  }) as { id?: string } | null;
 }

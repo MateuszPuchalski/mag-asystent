@@ -775,6 +775,27 @@ Numer przepisuje się ręką, więc literówka jest zdarzeniem normalnym.
 Cofnięcie korekty jest JEDYNĄ operacją dozwoloną na zwrocie zamkniętym
 i przywraca go do DO KOREKTY — werdykt, oceny i kwota zostają.
 
+### 25a.4b. Rabat transakcyjny (0.164.0)
+
+Zwrot prowizji od sprzedaży. Do tego wydania firma odzyskiwała go klikając
+ręcznie przy KAŻDYM zwrocie w panelu Allegro — nie z konieczności, tylko
+dlatego, że znikąd nie było widać, przy którym wniosek już jest.
+
+Panel pokazuje stan przy KAŻDEJ pozycji zwrotu, bo wniosek składa się na
+pozycję zamówienia, nie na zwrot. Stany są cztery i każdy każe co innego
+zrobić: brak wniosku (jest przycisk), złożony (czekać), przyznany (nic),
+odrzucony (odwołanie idzie przez panel Allegro). Piąty stan mówi, że nie
+wiadomo — i wtedy podaje POWÓD, bo milczenie wygląda jak usterka.
+
+Identyfikator do żądania bierze się z pozycji ZAMÓWIENIA, nigdy z `offerId`
+zwrotu. To pierwszy zapis tego systemu do Allegro, a końcówka nie ma
+idempotencji: powtórzone żądanie zakłada drugi wniosek. Dlatego strażnik przed
+dubletem jest nasz, potrójny, i stoi PRZED wyjściem do sieci.
+
+Automatu nie ma i nie planujemy. Obserwacja z 2 września pokazuje, że Allegro
+zakłada 40 wniosków na 100 samo — automat po naszej stronie dublowałby ich
+pracę bez niczyjej wiedzy. Zapis wychodzi na jawne kliknięcie człowieka.
+
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
 Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
@@ -965,3 +986,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
 | Zwrot pieniędzy i odmowa w Allegro | **projekt** | `outbox`, `commandId` — 0.151.0 |
 | Automat korekty przez Sferę | **poza zasięgiem** | brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ |
+| Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
+| Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
+| Anulowanie wniosku o rabat | **projekt** | `DELETE` istnieje w specyfikacji, przycisku jeszcze nie ma |
+| Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

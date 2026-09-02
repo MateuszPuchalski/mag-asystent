@@ -42,7 +42,12 @@ siedem rodzin końcówek, raport o KSZTAŁCIE: nazwy pól, typy, w ilu rekordach
 pole było obecne i w ilu niepuste. Treści, loginów, nazwisk i numerów nie
 wypisuje — pilnują tego reguły w
 [`services/ksztalt.ts`](../server/src/services/ksztalt.ts) i testy obok.
-Wynik zapisujemy obok tego pliku jako `allegro-ksztalt.md`.
+Wynik zapisujemy obok tego pliku jako `allegro-sonda.md` — z datą, bo to
+OBSERWACJA. `allegro-ksztalt.md` to co innego: KONTRAKT mapowania, pisany ze
+specyfikacji. Do 0.164.0 stało tu, że raport zapisujemy właśnie jako
+`allegro-ksztalt.md`, czyli zdanie kazało nadpisać kontrakt raportem — tak
+powstała blizna 0.151.0, gdy plik wymyślony razem z kodem nosił etykietę
+„raport z produkcji".
 
 Pierwsze pytanie do sondy: **gdzie siedzi numer oferty i czy siedzi tam
 zawsze.** Kolumna „niepuste" odpowie też na pytanie ogólniejsze — które pola
