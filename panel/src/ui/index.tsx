@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { Copy } from "lucide-react";
 
 /* Prymitywy stoją na warstwie `@layer components` z `index.css` (`.card`,
    `.btn-primary`, `.field`). Druga, równoległa konwencja klas kosztowałaby
@@ -43,3 +44,27 @@ export const Blad = ({ children }: { children: React.ReactNode }) =>
 /** Czas w formacie, który czyta biuro — jedna funkcja na cały panel. */
 export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl") : "—";
+
+/**
+ * Kopiowanie tekstu, którego nikt nie przepisuje z ekranu ręcznie:
+ * identyfikatora zamówienia (UUID) i numeru dokumentu z Subiekta.
+ *
+ * Stało to od 0.166.0 w `zwroty/Dowody.tsx`. Od 0.176.0 numer paragonu też ma
+ * ten przycisk — dopóki kliknięcie nie otwiera dokumentu w Subiekcie (byłby
+ * do tego potrzebny program na stanowisku, patrz `docs/architektura.md` §4),
+ * schowek jest najkrótszą drogą do okna „Znajdź dokument".
+ */
+export function Skopiuj({ tekst, tytul = "Kopiuj" }: { tekst: string; tytul?: string }) {
+  const [zrobione, setZrobione] = useState(false);
+  return <button type="button" title={tytul}
+    onClick={() => {
+      void navigator.clipboard?.writeText(tekst).then(() => {
+        setZrobione(true);
+        setTimeout(() => setZrobione(false), 1500);
+      }).catch(() => {});
+    }}
+    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+    <Copy size={13} />
+    <span className="sr-only">{zrobione ? "Skopiowano" : "Kopiuj"}</span>
+  </button>;
+}

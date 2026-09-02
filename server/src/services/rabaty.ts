@@ -27,6 +27,12 @@ export type StanRabatu = {
   typ: string | null;
   /** Dlaczego nie da się nic złożyć. Zdanie pisze SERWER, panel go nie układa. */
   powod: string | null;
+  /**
+   * Skąd wiadomo o wniosku: z naszego lustra `allegro_rabat` czy ze statusu
+   * samego zwrotu. Panel MUSI to rozróżniać — patrz komentarz przy odczycie
+   * statusu zwrotu niżej.
+   */
+  zrodlo: "lustro" | "zwrot" | null;
 };
 
 /* Wniosek anulowany NIE liczy się jak istniejący. `DELETE` zostawia go ze
@@ -35,6 +41,23 @@ export type StanRabatu = {
 const MARTWE = new Set(["CANCELLED"]);
 const PRZYZNANE = new Set(["GRANTED"]);
 const ODRZUCONE = new Set(["REJECTED", "REJECTED_AFTER_APPEAL"]);
+
+/* ── Wniosek złożony POZA panelem (0.176.0) ──────────────────────────────────
+   Statusy zwrotu, przy których Allegro samo mówi, że prowizja jest już objęta
+   wnioskiem. `zlozWniosekORabat` PILNOWAŁO ich od 0.164.0 jako drugi strażnik,
+   ale `stanRabatu` ich nie czytał — i to jest cała usterka, którą zgłosił
+   właściciel. Wniosek złożony w panelu Allegro nie ma prawa trafić do naszego
+   lustra, dopóki nie przewinie się przez `GET /order/refund-claims`; ekran
+   pisał wtedy „brak wniosku" i podstawiał przycisk, który po kliknięciu
+   ZAWSZE kończył się konfliktem. Panel obiecywał pracę, której serwer nie
+   przyjmował — a to gorsze niż milczenie.
+
+   Zdanie ekranu ma więc dwa źródła, a nie jedno, i mówi wprost, z którego
+   pochodzi (zasada 4.3 projektu panelu: wynik automatu nie udaje faktu).   */
+const STATUS_ZWROTU: Record<string, StanRabatu["stan"]> = {
+  COMMISSION_REFUND_CLAIMED: "zlozony",
+  COMMISSION_REFUNDED: "przyznany",
+};
 
 type Wiersz = {
   zwrot_id: number; offer_id: string | null; nazwa: string; ilosc: number;
@@ -69,17 +92,36 @@ export function stanRabatu(
 ): StanRabatu {
   const pusty = (powod: string | null): StanRabatu => ({
     stan: "nie_wiadomo", lineItemId: null, ilosc: 0, wniosekId: null,
-    prowizjaGrosze: null, waluta: null, typ: null, powod,
+    prowizjaGrosze: null, waluta: null, typ: null, powod, zrodlo: null,
   });
 
-  const w = database.prepare(`SELECT z.order_id FROM zwrot_klienta_pozycja p
+  const w = database.prepare(`SELECT z.order_id, z.status_allegro
+    FROM zwrot_klienta_pozycja p
     JOIN zwrot_klienta z ON z.id = p.zwrot_id WHERE p.id = ?`)
-    .get(pozycjaZwrotuId) as { order_id: string | null } | undefined;
+    .get(pozycjaZwrotuId) as
+      { order_id: string | null; status_allegro: string | null } | undefined;
   if (!w) return pusty("Nie znaleziono pozycji zwrotu");
-  if (!w.order_id) return pusty("Allegro nie podało numeru zamówienia dla tego zwrotu");
+
+  /* Status zwrotu czytamy PRZED dopasowaniem pozycji zamówienia, bo mówi
+     prawdę także wtedy, gdy dopasowanie pęka: „wniosek już jest" nie zależy
+     od tego, czy MY umiemy wskazać pozycję, do której go złożono. */
+  const zeZwrotu = STATUS_ZWROTU[String(w.status_allegro ?? "")] ?? null;
+  const wgZwrotu = (lineItemId: string | null, ilosc: number): StanRabatu => ({
+    stan: zeZwrotu!, lineItemId, ilosc, wniosekId: null, prowizjaGrosze: null,
+    waluta: null, typ: null, zrodlo: "zwrot",
+    /* Powód niesie DOSŁOWNY status Allegro, bo to jedyne, co o tym wniosku
+       wiemy — kwoty ani numeru zwrot nie podaje. */
+    powod: `Allegro podaje przy tym zwrocie status ${w.status_allegro}.`,
+  });
+
+  if (!w.order_id) {
+    return zeZwrotu ? wgZwrotu(null, 0)
+      : pusty("Allegro nie podało numeru zamówienia dla tego zwrotu");
+  }
 
   const cel = pozycjaDoWniosku(database, pozycjaZwrotuId);
   if (!cel) {
+    if (zeZwrotu) return wgZwrotu(null, 0);
     /* Ten sam łańcuch, co przy kartotekach: powód mówi, KTÓRE ogniwo pękło,
        bo wszystkie zerwane wyglądają na ekranie identycznie. */
     return pusty("Nie dopasowano pozycji zamówienia — bez niej Allegro nie wie, czego dotyczy wniosek");
@@ -94,8 +136,12 @@ export function stanRabatu(
 
   const wspolne = { lineItemId: cel.lineItemId, ilosc: cel.ilosc, powod: null };
   if (!zywy) {
+    /* Lustro milczy, a zwrot mówi — pierwszeństwo ma ten, który coś wie.
+       Odwrotna kolejność dawała „brak wniosku" przy wniosku złożonym ręcznie
+       w panelu Allegro. */
+    if (zeZwrotu) return wgZwrotu(cel.lineItemId, cel.ilosc);
     return { ...wspolne, stan: "brak", wniosekId: null, prowizjaGrosze: null,
-      waluta: null, typ: null };
+      waluta: null, typ: null, zrodlo: null };
   }
   const status = String(zywy.status ?? "");
   return {
@@ -105,6 +151,7 @@ export function stanRabatu(
     prowizjaGrosze: zywy.prowizja_grosze == null ? null : Number(zywy.prowizja_grosze),
     waluta: zywy.waluta == null ? null : String(zywy.waluta),
     typ: zywy.typ == null ? null : String(zywy.typ),
+    zrodlo: "lustro",
   };
 }
 
@@ -122,9 +169,6 @@ export function stanRabatu(
 
 export class RabatConflict extends Error {}
 
-/** Statusy zwrotu, przy których Allegro samo mówi, że wniosek już był. */
-const JUZ_W_ALLEGRO = new Set(["COMMISSION_REFUND_CLAIMED", "COMMISSION_REFUNDED"]);
-
 /** Wysyłka do Allegro. Wstrzykiwana, żeby test nie potrzebował sieci. */
 export type NadawcaWniosku = (
   lineItemId: string, ilosc: number,
@@ -138,23 +182,30 @@ export async function zlozWniosekORabat(
   if (stan.stan === "nie_wiadomo" || !stan.lineItemId) {
     throw new Error(stan.powod ?? "Nie ma czego złożyć dla tej pozycji");
   }
-  /* STRAŻNIK PIERWSZY: nasze lustro wniosków. */
+  /* STRAŻNIK PIERWSZY: stan wniosku — obojgiem oczu naraz.
+
+     Do 0.175.0 stały tu DWA strażniki po kolei: lustro wniosków, a pod nim
+     status zwrotu. Od 0.176.0 `stanRabatu` czyta oba źródła, więc drugi
+     strażnik przeniósł się TAM, gdzie i tak trzeba było go postawić — do
+     zdania, które czyta panel. Tu zostaje jedno rozgałęzienie, bo powód
+     odmowy MA WYMIENIĆ ŹRÓDŁO: numer wniosku z lustra albo status zwrotu.
+     „Wniosek już istnieje (null)" byłoby gorsze niż milczenie. */
   if (stan.stan !== "brak") {
+    /* Wniosek spoza panelu: w panelu Allegro albo ich własnym automatem
+       (`type: AUTOMATIC` w 40 rekordach na 100). Numeru takiego wniosku
+       jeszcze nie znamy — zwrot go nie niesie. */
+    if (stan.zrodlo === "zwrot") {
+      throw new RabatConflict(
+        `${stan.powod} Prowizja jest już objęta wnioskiem, ` +
+        "a drugi byłby osobnym zgłoszeniem.");
+    }
     throw new RabatConflict(
       `Wniosek o rabat już istnieje (${stan.wniosekId}), status: ${stan.stan}.`);
   }
 
-  const z = database.prepare(`SELECT z.id, z.status_allegro FROM zwrot_klienta_pozycja p
+  const z = database.prepare(`SELECT z.id FROM zwrot_klienta_pozycja p
     JOIN zwrot_klienta z ON z.id = p.zwrot_id WHERE p.id = ?`)
-    .get(pozycjaZwrotuId) as { id: number; status_allegro: string | null };
-  /* STRAŻNIK DRUGI: wniosek mógł powstać poza panelem — w panelu Allegro albo
-     ich własnym automatem (`type: AUTOMATIC` w 40 rekordach na 100). Nasze
-     lustro wtedy o nim nie wie, ale zwrot niesie status. */
-  if (JUZ_W_ALLEGRO.has(String(z.status_allegro ?? ""))) {
-    throw new RabatConflict(
-      `Allegro podaje przy tym zwrocie status ${z.status_allegro} — prowizja jest ` +
-      "już objęta wnioskiem. Drugi wniosek byłby osobnym zgłoszeniem.");
-  }
+    .get(pozycjaZwrotuId) as { id: number };
 
   const odp = await nadaj(stan.lineItemId, stan.ilosc);
   const wniosekId = typeof odp?.id === "string" ? odp.id : null;

@@ -75,12 +75,18 @@ function dodaj(d: Db, utworzono: string, pola: Record<string, unknown> = {},
     (pola.zamkniety_at as string) ?? null, (pola.rejection_code as string) ?? null,
     (pola.kupujacy_login as string) ?? null, (pola.przewoznik as string) ?? null);
   const id = Number((d.prepare("SELECT id FROM zwrot_klienta WHERE external_id=?").get(ext) as { id: number }).id);
+  /* Numer wystąpienia jak w `allegro-zwroty-sync.ts`: ta sama oferta bywa
+     w zwrocie dwa razy, a `klucz` jest unikalny w obrębie zwrotu. */
+  const licznik = new Map<string, number>();
   for (const p of pozycje) {
+    const para = `${p.offerId ?? ""}|${p.nazwa ?? "Sekator"}`;
+    const n = (licznik.get(para) ?? 0) + 1;
+    licznik.set(para, n);
     d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,ocena,url,tw_id,tw_symbol,tw_zrodlo,klucz)
       VALUES (?,?,?,?,?,'PLN',?,?,?,?,?,?)`).run(
       id, p.offerId ?? null, p.nazwa ?? "Sekator", p.ilosc, p.cena, p.ocena ?? null,
       p.url ?? null, p.twId ?? null, p.twSymbol ?? null, p.twZrodlo ?? null,
-      `${p.offerId ?? ""}|${p.nazwa ?? "Sekator"}`);
+      n === 1 ? para : `${para}|#${n}`);
   }
   return id;
 }
@@ -223,6 +229,38 @@ test("panel pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
   assert.deepEqual(zam.pozycje.map((p) => p.zwracana), [true, false, false]);
   assert.equal(zam.dostawaMetoda, "Kurier InPost");
   assert.equal(zam.kupujacyLogin, null);
+});
+
+/* ── Ile sztuk wraca (0.176.0) ───────────────────────────────────────────────
+   Zgłoszenie właściciela: „wraca dwie sztuki jest mylące, bo w tym zamówieniu
+   wracała jedna". Plakietka niosła sam FAKT powrotu, a stała obok liczby
+   KUPIONYCH sztuk — więc czytało się ją jako liczbę wracających.           */
+
+test("pozycja zamówienia niesie osobno sztuki kupione i wracające", () => {
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 1899, offerId: "111" }]);
+  zamowienie(d, "ord-1", [
+    { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", cena: 1899, ilosc: 2 },
+    { offerId: "222", nazwa: "Zraszacz", sku: null, cena: 3490 },
+  ]);
+  const zam = listaZwrotow(d, TERAZ)[0].zamowienie!;
+  assert.equal(zam.pozycje[0].ilosc, 2, "kupione");
+  assert.equal(zam.pozycje[0].wracaIlosc, 1, "wracające");
+  assert.equal(zam.pozycje[1].wracaIlosc, 0, "pozycja spoza zwrotu");
+});
+
+test("ta sama oferta w dwóch wierszach zwrotu SUMUJE sztuki", () => {
+  /* Zwrot potrafi wymienić tę samą ofertę dwa razy — `klucz` z przyrostkiem
+     w `allegro-zwroty-sync.ts`. Wtedy „wraca 1" byłoby nieprawdą. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 1899, offerId: "111" }, { ilosc: 1, cena: 1899, offerId: "111" }]);
+  zamowienie(d, "ord-1", [
+    { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", cena: 1899, ilosc: 3 },
+  ]);
+  const zam = listaZwrotow(d, TERAZ)[0].zamowienie!;
+  assert.equal(zam.pozycje[0].wracaIlosc, 2);
 });
 
 test("propozycja kartoteki liczy się z SKU zamówienia i niesie źródło", () => {

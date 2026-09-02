@@ -50,6 +50,16 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
     {rabat.stan === "nie_wiadomo" && rabat.powod &&
       <p className="mt-0.5 text-slate-400">{rabat.powod}</p>}
 
+    {/* WNIOSEK SPOZA PANELU (0.176.0). Złożony ręcznie w panelu Allegro albo
+        przez ich automat nie ma prawa być w naszym lustrze, dopóki nie
+        przewinie się przez listę wniosków. Zwrot niesie wtedy własny status
+        i to on tu mówi — a ekran przyznaje się, ile z tego wie: numeru
+        wniosku ani kwoty prowizji zwrot nie podaje. */}
+    {rabat.zrodlo === "zwrot" && rabat.powod &&
+      <p className="mt-0.5 text-slate-400">
+        {rabat.powod} Samego wniosku jeszcze nie pobraliśmy, więc numeru
+        i kwoty prowizji nie znamy.</p>}
+
     {blad && <p className="mt-0.5 font-semibold text-ranga-zle">{blad}</p>}
   </div>;
 }

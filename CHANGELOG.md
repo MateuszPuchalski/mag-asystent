@@ -34,6 +34,59 @@ historii nie przepisujemy.
 ---
 
 
+## 0.176.0 — 2 września 2026
+
+**Cztery rzeczy z jednego ekranu zwrotu.** Właściciel przeszedł po nim palcem
+i pokazał, co kłamie albo stoi nie tam, gdzie się go szuka.
+
+### Wniosek o rabat złożony w panelu Allegro był niewidoczny
+
+Zgłoszenie brzmiało: „rabat transakcyjny został zlecony przez panel allegro,
+do tego zwrotu w appce nie widać". Ekran pisał **„brak wniosku"** i stawiał
+obok przycisk ZGŁOŚ RABAT.
+
+Przyczyna była w rozjeździe między odczytem a zapisem. Zapis
+(`zlozWniosekORabat`) od 0.164.0 miał drugiego strażnika: gdy zwrot niesie
+status `COMMISSION_REFUND_CLAIMED` albo `COMMISSION_REFUNDED`, Allegro samo
+mówi, że prowizja jest już objęta wnioskiem. Odczyt (`stanRabatu`) tego
+statusu **nie czytał wcale** — patrzył wyłącznie w nasze lustro
+`allegro_rabat`, do którego wniosek z panelu Allegro trafia dopiero po
+przewinięciu przez listę wniosków.
+
+Panel obiecywał więc pracę, której serwer nie przyjmował: kliknięcie kończyło
+się konfliktem, zawsze. Teraz oba źródła czyta jedno zdanie, a ekran mówi,
+z którego wie. Ze statusu zwrotu nie znamy numeru wniosku ani kwoty prowizji
+i ekran się do tego przyznaje. Lustro ma pierwszeństwo, bo wie więcej.
+
+### Plakietka „wraca" niosła liczbę kupionych sztuk
+
+„Wraca dwie sztuki jest mylące, bo w tym zamówieniu wracała jedna". Plakietka
+mówiła sam FAKT powrotu, a stała obok liczby sztuk KUPIONYCH — więc czytało
+się ją jako liczbę wracających. Teraz niesie sztuki wracające, a przy zwrocie
+części zakupu dopisuje, ile z ilu: **wraca 1 z 2**. Przy zwrocie całości
+dopisku nie ma, bo nic u klienta nie zostaje.
+
+### Dokument sprzedaży wrócił do zamówienia
+
+„Dokument sprzedaży powinien być w zamówieniu". Stał osobną sekcją na dnie
+kolumny, pod wiadomościami, a w sekcji zamówienia stał wiersz **Dokument**
+mówiący o czym innym — o tym, czy klient chciał faktury. Dwa razy to samo
+słowo, dwa razy o czym innym, i „Dokument: nie wiadomo" tuż nad znalezionym
+paragonem. Numer paragonu stoi teraz w zamówieniu, a wiersz nazywa się
+**Klient chciał**.
+
+### Kliknięcie w paragon a okno Subiekta
+
+Pytanie właściciela: czy kliknięcie może otworzyć ten paragon w Subiekcie.
+Nie z samego panelu — okno wystawia program na stanowisku, a przeglądarka nie
+sięga do COM Subiekta. Wywołanie Sfery po stronie serwera otworzyłoby okno na
+maszynie, której nikt nie ogląda. Co byłoby potrzebne, opisuje
+`docs/architektura.md` §4: własny protokół w rejestrze Windows, mały program
+lokalny i licencja Sfery na każdym biurku.
+
+Do tego czasu numer dokumentu ma przycisk kopiowania. Wklejony w „Znajdź
+dokument" Subiekta prowadzi do tego samego okna.
+
 ## 0.175.0 — 2 września 2026
 
 **Dokument sprzedaży wiąże się sam, bo numer zamówienia czyta się z uwag.**

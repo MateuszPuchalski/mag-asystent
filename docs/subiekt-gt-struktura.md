@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzynaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało czternaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -668,6 +668,14 @@ w `sfera.sql.ts`.
 
 `[WERYFIKUJ]` **czy trzeba dotknąć `tw_Zmiana.zt_ZmianaZdjecie`**. Kolumna
 istnieje i niesie datę zmiany zdjęcia, ale nikt jej dotąd nie zapisywał.
+
+`[WERYFIKUJ]` **czy Sfera umie POKAZAĆ okno istniejącego dokumentu**. Znane
+nam wywołania zakładają dokumenty nowe (`DokumentyMagazynoweManager.DodajMM`,
+`DokumentyHandloweManager.DodajKorekte` w `sfera-worker/`). Otwarcie okna
+dokumentu, który już jest — po `dok_Id` — nie zostało sprawdzone na żywej
+Sferze. Pytanie postawił właściciel: czy kliknięcie w numer paragonu w panelu
+może otworzyć ten paragon w Subiekcie. Dlaczego samo panelu to nie załatwi,
+tłumaczy `docs/architektura.md` §4.
 
 ## Zasada nadrzędna
 

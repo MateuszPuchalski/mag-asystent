@@ -25,7 +25,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
     url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
-      prowizjaGrosze: null, waluta: null, typ: null, powod: null } }],
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null } }],
 });
 
 const ZWROTY = [

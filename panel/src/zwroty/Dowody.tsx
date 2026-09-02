@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import {
-  CalendarClock, Copy, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
+  CalendarClock, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
 } from "lucide-react";
 import type { KandydatFaktury, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
-import { czas, Plakietka } from "../ui";
+import { czas, Plakietka, Skopiuj } from "../ui";
 import { Link } from "./Link";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
@@ -44,22 +44,6 @@ const Sekcja = ({ ikona, tytul, children }: {
     {ikona}{tytul}</h3>
   {children}
 </section>;
-
-/** Identyfikator zamówienia to UUID — nikt go nie przepisuje z ekranu ręcznie. */
-function Skopiuj({ tekst }: { tekst: string }) {
-  const [zrobione, setZrobione] = useState(false);
-  return <button type="button" title="Kopiuj identyfikator"
-    onClick={() => {
-      void navigator.clipboard?.writeText(tekst).then(() => {
-        setZrobione(true);
-        setTimeout(() => setZrobione(false), 1500);
-      }).catch(() => {});
-    }}
-    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-    <Copy size={13} />
-    <span className="sr-only">{zrobione ? "Skopiowano" : "Kopiuj"}</span>
-  </button>;
-}
 
 /**
  * Ręczne dociągnięcie zamówień.
@@ -162,12 +146,18 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                   nie ma karty, na którą oddać pieniądze. */}
               {zam.platnoscTyp && <><dt className="text-slate-500">Płatność</dt>
                 <dd>{PLATNOSCI[zam.platnoscTyp] ?? zam.platnoscTyp}</dd></>}
-              {/* `null` znaczy „nie wiadomo" i tak się pokazuje — paragon
+              {/* NAZWA WIERSZA, nie treść (0.176.0). Stało tu „Dokument" i to
+                  samo słowo tytułowało sekcję z numerem paragonu z Subiekta —
+                  więc „Dokument: nie wiadomo" czytało się jako „nie znaleziono
+                  dokumentu sprzedaży", stojąc obok znalezionego. To zdanie
+                  mówi o ŻYCZENIU KLIENTA i tylko o nim.
+
+                  `null` znaczy „nie wiadomo" i tak się pokazuje — paragon
                   wpisany na ślepo kazałby wystawić niewłaściwą korektę. */}
-              <dt className="text-slate-500">Dokument</dt>
+              <dt className="text-slate-500">Klient chciał</dt>
               <dd>{zam.fakturaZadana == null
                 ? <span className="text-slate-400">nie wiadomo</span>
-                : zam.fakturaZadana ? "faktura" : "paragon"}</dd>
+                : zam.fakturaZadana ? "faktury" : "paragonu"}</dd>
             </dl>
             {/* CAŁE zamówienie, nie tylko zwracane pozycje: „kupił trzy,
                 oddaje jedną" jest kontekstem decyzji, a nie ciekawostką. */}
@@ -178,11 +168,35 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 <span className="truncate">{p.nazwa}</span>
                 <span className="ml-auto shrink-0 tabular-nums">
                   {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+                {/* PLAKIETKA NIESIE SZTUKI (0.176.0). Samo „wraca" stało obok
+                    liczby KUPIONYCH sztuk, więc „2 × 18,99 wraca" czytało się
+                    jako „wracają dwie" przy zwrocie jednej. Przy zwrocie
+                    całości „z 2" byłoby szumem — dlatego pada tylko wtedy,
+                    gdy część zakupu zostaje u klienta. */}
                 {p.zwracana && <span className="shrink-0 rounded bg-amber-200 px-1 text-[10px] uppercase">
-                  wraca</span>}
+                  wraca {p.wracaIlosc}{p.wracaIlosc < p.ilosc ? ` z ${p.ilosc}` : ""}</span>}
               </li>)}
             </ul>
           </>}
+
+      {/* ── Dokument sprzedaży (0.174.0, wciągnięty do zamówienia w 0.176.0) ──
+          Do 0.175.0 stał osobną sekcją NA DNIE kolumny, pod wiadomościami —
+          czyli daleko od zamówienia, którego dotyczy, i pod wierszem
+          „Dokument", który mówił o czym innym. Właściciel powiedział wprost:
+          „dokument sprzedaży powinien być w zamówieniu". To jego druga strona:
+          zamówienie mówi, co klient kupił w Allegro, dokument — pod jakim
+          numerem ta sprzedaż stoi w Subiekcie. Po tym numerze biuro wystawia
+          korektę.
+
+          Stoi POZA rozgałęzieniem `zam`, bo wiąże go numer zamówienia, a nie
+          jego pobrana treść: dokument bywa znany, zanim ticker dociągnie
+          pozycje. */}
+      {onFaktura && <div className="mt-3 border-t border-slate-200 pt-2">
+        <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {ikonaDokumentu} Dokument sprzedaży</p>
+        <Dokument faktura={zwrot.faktura} kandydaci={kandydaciFaktury}
+          trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura} />
+      </div>}
     </Sekcja>
 
     <Sekcja ikona={<Package size={14} />} tytul="Paczka zwrotna">
@@ -226,15 +240,6 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
             </li>)}
           </ul>}
     </Sekcja>
-
-    {/* ── Dokument sprzedaży (0.174.0) ───────────────────────────────────────
-        Stoi POD zamówieniem, bo to jego druga strona: zamówienie mówi, co
-        klient kupił w Allegro, dokument — pod jakim numerem ta sprzedaż stoi
-        w Subiekcie. Po tym numerze biuro wystawia korektę. */}
-    {onFaktura && <Sekcja ikona={ikonaDokumentu} tytul="Dokument sprzedaży">
-      <Dokument faktura={zwrot.faktura} kandydaci={kandydaciFaktury}
-        trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura} />
-    </Sekcja>}
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
       <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>

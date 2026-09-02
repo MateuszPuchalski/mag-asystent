@@ -11,7 +11,7 @@ import type { StanRabatu } from "../api/typy";
 
 const stan = (n: Partial<StanRabatu> = {}): StanRabatu => ({
   stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
-  prowizjaGrosze: null, waluta: null, typ: null, powod: null, ...n,
+  prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null, ...n,
 });
 
 const pasek = (r: StanRabatu, h: Partial<Parameters<typeof Rabat>[0]> = {}) =>

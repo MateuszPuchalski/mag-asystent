@@ -29,7 +29,7 @@ describe("Zamówienie przy rozmowie", () => {
       kupujacyLogin: null, dostawaGrosze: 1499, dostawaMetoda: "Kurier InPost", platnoscTyp: null, platnoscAt: null, fakturaZadana: null,
       sumaGrosze: 6098, waluta: "PLN", kupionoAt: "2026-08-30T11:00:00Z", link: null,
       pozycje: [{ offerId: "17235726715", nazwa: "Szarpak do NAC LS 46-450", sku: "SZR-NAC-46",
-        ilosc: 1, cenaGrosze: 4599, waluta: "PLN", zwracana: false }],
+        ilosc: 1, cenaGrosze: 4599, waluta: "PLN", zwracana: false, wracaIlosc: 0 }],
     } })} />);
     expect(screen.getByText("Szarpak do NAC LS 46-450")).toBeInTheDocument();
     expect(screen.getByText("SZR-NAC-46")).toBeInTheDocument();
