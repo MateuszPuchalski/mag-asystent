@@ -196,6 +196,71 @@ export function wskazOferte(conversationId: number, ofertaId: string, autorId: n
   return wynik;
 }
 
+/**
+ * Ręczne wskazanie KARTOTEKI dla oferty z rozmowy (0.179.0).
+ *
+ * Zapis idzie do `oferta_kartoteka` — tej samej pamięci, z której korzystają
+ * zwroty. To celowe: para oferta–kartoteka jest jedna, niezależnie od tego,
+ * przy którym ekranie człowiek ją wskazał, a druga tabela znaczyłaby dwie
+ * prawdy o tym samym.
+ *
+ * `twId: null` ZDEJMUJE powiązanie razem z pamięcią. Bez tego następny odczyt
+ * zaproponowałby je z powrotem i zdjęcie wyglądałoby na nieskuteczne — ta
+ * sama pułapka, którą `potwierdzKartoteke` przy zwrotach obchodzi tak samo.
+ *
+ * Kolumna `sku` zostaje PUSTA: wypełniona znaczy „człowiek zatwierdził
+ * propozycję automatu", a tu wskazuje sam. Ekran czyta z tego, czy za
+ * powiązaniem stoi SKU, czy decyzja.
+ */
+export function wskazKartoteke(conversationId: number, ofertaId: string, twId: number | null,
+  autorId: number, database: DatabaseSync = db()) {
+  const numer = (ofertaId ?? "").trim();
+  if (!numer) throw new Error("Rozmowa bez numeru oferty — nie ma czego powiązać");
+  const autor = imieAutora(database, autorId);
+
+  const wynik = transaction(database, () => {
+    const rozmowa = database.prepare("SELECT channel_account_id FROM conversation WHERE id=?")
+      .get(conversationId) as { channel_account_id: number } | undefined;
+    if (!rozmowa) throw new Error("Nie znaleziono rozmowy");
+    const konto = Number(rozmowa.channel_account_id);
+
+    if (twId === null) {
+      database.prepare("DELETE FROM oferta_kartoteka WHERE channel_account_id=? AND offer_id=?")
+        .run(konto, numer);
+      database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
+        VALUES (?, NULL, 'product_unlinked', json_object('ofertaId', ?, 'autor', ?))`)
+        .run(conversationId, numer, autor);
+      logEvent("rozmowa_kartoteka_zdjeta", autor, null, { conversationId, ofertaId: numer },
+        undefined, database);
+      return { conversationId, ofertaId: numer, twId: null, symbol: null, autor };
+    }
+
+    const towar = database.prepare("SELECT tw_id, symbol FROM sgt_towar WHERE tw_id=?")
+      .get(twId) as { tw_id: number; symbol: string } | undefined;
+    if (!towar) throw new Error("Nie znaleziono kartoteki o tym numerze");
+
+    database.prepare(`INSERT INTO oferta_kartoteka
+      (channel_account_id, offer_id, tw_id, tw_symbol, sku, wskazano_at, wskazano_przez)
+      VALUES (?,?,?,?,NULL,strftime('%Y-%m-%dT%H:%M:%fZ','now'),?)
+      ON CONFLICT(channel_account_id, offer_id) DO UPDATE SET
+        tw_id=excluded.tw_id, tw_symbol=excluded.tw_symbol, sku=NULL,
+        wskazano_at=excluded.wskazano_at, wskazano_przez=excluded.wskazano_przez`)
+      .run(konto, numer, towar.tw_id, towar.symbol, autor);
+
+    database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
+      VALUES (?, NULL, 'product_linked_manually',
+              json_object('ofertaId', ?, 'twId', ?, 'symbol', ?, 'autor', ?))`)
+      .run(conversationId, numer, towar.tw_id, towar.symbol, autor);
+    logEvent("rozmowa_kartoteka_wskazana", autor, null,
+      { conversationId, ofertaId: numer, twId: towar.tw_id, symbol: towar.symbol },
+      undefined, database);
+    return { conversationId, ofertaId: numer, twId: towar.tw_id, symbol: towar.symbol, autor };
+  })();
+
+  publishConversationEvent("assignment.changed", conversationId, { twId: wynik.twId });
+  return wynik;
+}
+
 export function zapiszSzkic(conversationId: number, userId: number, body: string,
   expectedLastMessageId: number | null, expectedVersion: number | null, database: DatabaseSync = db()) {
   return transaction(database, () => {

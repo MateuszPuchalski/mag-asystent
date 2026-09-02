@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  OsRozmowy, PokrycieSygnatur, Rozmowa, SprawaRozmowy, StanSkrzynki, StatusRozmowy, WierszSprawy,
-  WpisWzmianki, WynikWysylki, Zadanie, Zdrowie,
+  KartaTowaru, OsRozmowy, PokrycieSygnatur, Rozmowa, SprawaRozmowy, StanSkrzynki, StatusRozmowy,
+  WierszSprawy, WpisWzmianki, WynikWysylki, Zadanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -18,6 +18,7 @@ export const klucze = {
   wzmianki: ["wzmianki"] as const,
   sprawy: ["sprawy"] as const,
   sygnatury: ["sygnatury"] as const,
+  towar: (twId: number) => ["towar", twId] as const,
 };
 
 export function useJa() {
@@ -245,6 +246,34 @@ export function usePrzekaz() {
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
     },
+  });
+}
+
+/**
+ * Karta towaru z Subiekta — OSOBNO od rozmowy (0.179.0).
+ *
+ * Nie doklejamy jej do `useRozmowa`, bo tamten odczyt odświeża się przy każdym
+ * zdarzeniu szyny, a karta ciągnie kolejkę MM, zamienniki i wszystkie
+ * magazyny. Pobiera się dopiero wtedy, gdy jest czym: bez kartoteki nie ma
+ * czego pytać.
+ */
+export function useKartaTowaru(twId: number | null) {
+  return useQuery({
+    queryKey: klucze.towar(twId ?? 0),
+    queryFn: () => api<KartaTowaru>(`/api/products/${twId}`),
+    enabled: twId !== null,
+  });
+}
+
+/** Ręczne wskazanie kartoteki dla oferty z rozmowy; `twId: null` je zdejmuje. */
+export function useWskazKartoteke() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; ofertaId: string; twId: number | null }) =>
+      api(`/api/conversations/${v.id}/kartoteka`, {
+        method: "POST", body: JSON.stringify({ ofertaId: v.ofertaId, twId: v.twId }),
+      }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) }),
   });
 }
 

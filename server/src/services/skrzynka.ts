@@ -6,6 +6,7 @@ import type { StatusRozmowy } from "./conversations.js";
 import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
+import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -73,6 +74,12 @@ export interface OfertaRozmowy {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
   } | null;
+  /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). To PROPOZYCJA
+     z powodem, nie fakt — §4.3 nie pozwala, żeby wybór automatu udawał daną
+     z Allegro. Ciężkich danych towaru tu NIE MA: stan, półki i zamienniki
+     panel bierze z `GET /api/products/:twId`, bo `osRozmowy` odświeża się
+     przy każdym zdarzeniu szyny, a karta towaru ciągnie kolejkę MM. */
+  kartoteka: Dopasowanie;
 }
 
 const SKRZYNKA = "skrzynka";
@@ -322,11 +329,20 @@ export function osRozmowy(id: number): {
   const zrodloOferty = zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null
       && String(m.direction) === "incoming")
     ?? zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null);
-  const oferta: OfertaRozmowy | null = zrodloOferty ? {
-    externalId: String(zrodloOferty.oferta),
-    link: linkOferty(String(zrodloOferty.oferta)),
-    pobrana: snapshotOferty(Number(zrodloOferty.konto), String(zrodloOferty.oferta)),
-  } : null;
+  const oferta: OfertaRozmowy | null = zrodloOferty ? (() => {
+    const konto = Number(zrodloOferty.konto);
+    const ofertaId = String(zrodloOferty.oferta);
+    const pobrana = snapshotOferty(konto, ofertaId);
+    return {
+      externalId: ofertaId,
+      link: linkOferty(ofertaId),
+      pobrana,
+      /* `undefined` zamiast `null`, gdy snapshotu nie ma wcale: mostek odróżnia
+         „oferty jeszcze nie pobrano" od „oferta nie ma sygnatury", a to dwa
+         różne zdania na ekranie i dwie różne rzeczy do zrobienia. */
+      kartoteka: kartotekaOferty(db(), konto, ofertaId, pobrana ? pobrana.sku : undefined),
+    };
+  })() : null;
 
   /* Wynik z hali jest osobnym wpisem osi, nigdy podmianą treści klienta —
      to zasada z docs/obsluga-klienta.md i ona decyduje o tym kształcie. */

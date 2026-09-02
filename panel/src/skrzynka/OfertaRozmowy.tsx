@@ -16,9 +16,11 @@ import { zlote } from "../api/zwroty";
  * dociągnął snapshot) albo zdanie, że tytuł dopiero przyjedzie. Milczenie
  * w drugim stanie wyglądałoby jak usterka.
  *
- * ZDJĘCIA NIE MA świadomie: obrazek z serwera Allegro znaczyłby wyjście
+ * ZDJĘCIA Z ALLEGRO NIE MA świadomie: obrazek z ich serwera znaczyłby wyjście
  * przeglądarki biura poza własną sieć przy każdym otwarciu skrzynki — ta sama
- * decyzja, co przy awatarze rozmówcy (`docs/allegro-ksztalt.md`).
+ * decyzja, co przy awatarze rozmówcy (`docs/allegro-ksztalt.md`). Zdjęcie
+ * z NASZEJ trasy `/api/products/:twId/zdjecie` tego zastrzeżenia nie łamie
+ * i stoi w bloku towaru obok (0.179.0).
  */
 export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
   const o = oferta.pobrana;

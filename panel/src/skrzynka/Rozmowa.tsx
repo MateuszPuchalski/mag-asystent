@@ -11,6 +11,7 @@ import { Status } from "./Status";
 import { Sprawa } from "./Sprawa";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { OfertaRozmowy } from "./OfertaRozmowy";
+import { TowarRozmowy } from "./TowarRozmowy";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -114,6 +115,13 @@ export function Rozmowa(p: {
         odpowiada na późniejsze pytanie i stoi niżej. Oba bloki naraz zdarzają
         się rzadko: sonda liczy ofertę w 5, a zamówienie w 7 z 33 wiadomości. */}
     {p.dane.oferta && <OfertaRozmowy oferta={p.dane.oferta} />}
+
+    {/* Towar POD ofertą (0.179.0): najpierw „o czym mowa", potem „co mamy na
+        półce". Blok stoi tylko przy ofercie, bo bez jej numeru nie ma z czego
+        wywieść kartoteki — a zgadywanie po treści kosztowało już wydanie. */}
+    {p.dane.oferta && <section className="border-b" aria-label="Towar">
+      <TowarRozmowy oferta={p.dane.oferta} rozmowaId={rozmowa.id} />
+    </section>}
 
     {/* Zamówienie POD sprawą, NAD wiadomościami (0.166.0): „czego dotyczy"
         czyta się przed „co napisał". Blok stoi tylko, gdy wiadomość niesie

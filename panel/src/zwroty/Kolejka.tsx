@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { AlertTriangle, PackageX, Ban } from "lucide-react";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { Zdjecie } from "./Zdjecie";
+import { Zdjecie } from "../towar/Zdjecie";
 
 /* ── Kolejka zwrotów ─────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej

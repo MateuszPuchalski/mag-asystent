@@ -99,6 +99,29 @@ export type OfertaRozmowy = {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
   } | null;
+  /** Kartoteka wywiedziona z SKU oferty (0.179.0) — PROPOZYCJA z powodem. */
+  kartoteka: DopasowanieKartoteki;
+};
+
+/* Ten sam kształt, co przy pozycji zwrotu: `zrodlo` jest gotowym ZDANIEM
+   z serwera, a nie kodem do przetłumaczenia w panelu. Druga kopia tej reguły
+   po tej stronie rozjechałaby się przy pierwszej poprawce jednej z nich. */
+export type DopasowanieKartoteki = {
+  pewnosc: "brak" | "sku" | "pamiec" | "jedyna_pozycja" | "nazwa_w_zamowieniu" | "niejednoznaczne";
+  twId: number | null;
+  symbol: string | null;
+  zrodlo: string;
+  powod: string | null;
+};
+
+/* Karta towaru z Subiekta — podzbiór `ProductCard` z serwera, opisany tu tak
+   samo jak `Towar` w `wyszukiwarka.tsx`. Bierzemy to, co odpowiada na pytanie
+   agenta przy rozmowie: czy jest, ile jest i gdzie leży. */
+export type KartaTowaru = {
+  id: number; sym: string; name: string; ean: string | null; unit: string | null;
+  locs: string[];
+  mag: { stan: number; rez: number; avail: number };
+  magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
 };
 
 export type OsRozmowy = {

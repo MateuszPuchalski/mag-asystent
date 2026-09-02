@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { kartotekaPoSku, zaproponujKartoteke } from "./dopasowanie-sku.js";
+import { kartotekaOferty, kartotekaPoSku, zaproponujKartoteke } from "./dopasowanie-sku.js";
 
 /* Mostek oferta → kartoteka jest jedyną drogą do zdjęcia, ale nie ma prawa
    zgadywać: złe dopasowanie wysyła na halę zadanie o cudzym towarze. Te testy
@@ -160,4 +160,67 @@ test("propozycja NICZEGO nie zapisuje", () => {
   propozycja(d);
   propozycja(d, { offerId: "nic" });
   assert.equal(licz(), przed);
+});
+
+/* ── Mostek dla SKRZYNKI: oferta → kartoteka BEZ zamówienia (0.179.0) ────────
+   Pytanie pada zwykle PRZED zakupem, więc zamówienia nie ma i mieć nie
+   będzie. Zostają dwa ogniwa: pamięć wskazań i SKU ze snapshotu oferty.   */
+
+const zeSkrzynki = (d: Db, sku: string | null | undefined) =>
+  kartotekaOferty(d, 1, NUMER_OFERTY, sku);
+
+test("skrzynka: SKU oferty trafia w jedną kartotekę", () => {
+  const d = stanowisko();
+  const w = zeSkrzynki(d, "SEK-46");
+  assert.equal(w.pewnosc, "sku");
+  assert.equal(w.twId, 10);
+  assert.equal(w.symbol, "SEK-46");
+  assert.equal(w.powod, null);
+  assert.match(w.zrodlo, /SKU oferty/);
+});
+
+test("skrzynka: brak snapshotu to co innego niż oferta bez sygnatury", () => {
+  const d = stanowisko();
+  /* Pierwsze naprawi się samo w kilka minut, drugie wymaga człowieka —
+     ekran nie ma prawa pokazać na to jednego zdania. */
+  const niepobrana = zeSkrzynki(d, undefined);
+  assert.equal(niepobrana.powod, "oferta_niepobrana");
+  assert.match(niepobrana.zrodlo, /jeszcze nie pobrano/);
+
+  const bezSku = zeSkrzynki(d, "");
+  assert.equal(bezSku.powod, "oferta_bez_sku");
+  assert.notEqual(bezSku.zrodlo, niepobrana.zrodlo);
+});
+
+test("skrzynka: symbol zdublowany oddaje decyzję człowiekowi", () => {
+  const d = stanowisko();
+  const w = zeSkrzynki(d, "DUBEL");
+  assert.equal(w.pewnosc, "niejednoznaczne");
+  assert.equal(w.powod, "symbol_zdublowany");
+  assert.equal(w.twId, null, "dwa trafienia to NIE powód do wybrania pierwszego");
+});
+
+test("skrzynka: SKU nietrafiające w kartotekę niesie powód", () => {
+  const d = stanowisko();
+  const w = zeSkrzynki(d, "NIE-MA-TAKIEGO");
+  assert.equal(w.pewnosc, "brak");
+  assert.equal(w.powod, "sku_nie_trafia");
+});
+
+test("skrzynka: pamięć wskazań BIJE automat", () => {
+  const d = stanowisko();
+  d.prepare(`INSERT INTO oferta_kartoteka
+    (channel_account_id,offer_id,tw_id,tw_symbol,sku,wskazano_at,wskazano_przez)
+    VALUES (1,?,11,'ZRA-01',NULL,'2026-09-02T10:00:00Z','A. Lewandowska')`).run(NUMER_OFERTY);
+  /* SKU wskazuje na SEK-46, człowiek wskazał ZRA-01 — wygrywa człowiek. */
+  const w = zeSkrzynki(d, "SEK-46");
+  assert.equal(w.pewnosc, "pamiec");
+  assert.equal(w.twId, 11);
+  assert.match(w.zrodlo, /A\. Lewandowska/);
+});
+
+test("skrzynka: bez numeru oferty pamięci nie ma czego szukać", () => {
+  const d = stanowisko();
+  const w = kartotekaOferty(d, 1, null, "SEK-46");
+  assert.equal(w.twId, 10, "sam SKU dalej działa");
 });

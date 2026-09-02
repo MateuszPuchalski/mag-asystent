@@ -34,6 +34,50 @@ historii nie przepisujemy.
 ---
 
 
+## 0.179.0 — 2 września 2026
+
+**Rozmowa pokazuje towar z Subiekta, nie tylko ofertę z Allegro.**
+
+### Co było źle
+
+SKU sprzedawcy leżało w `offer_snapshot` od 0.178.0 i nie prowadziło donikąd.
+Agent widział tytuł i cenę oferty, a żeby powiedzieć „jest, leży na R12-B3",
+otwierał Subiekta. To ten sam koszt, który §25 obiecuje zdjąć przy panelu
+Allegro — tylko po drugiej stronie.
+
+Mostek oferta→kartoteka istniał od 0.152.0, ale wymagał ZAMÓWIENIA. Pytanie
+pod ofertą pada zwykle przed zakupem, więc zamówienia nie ma i mieć nie będzie.
+
+### Co się zmienia
+
+`kartotekaOferty` łączy dwa ogniwa, które działają bez zamówienia: pamięć
+wcześniejszych wskazań i SKU ze snapshotu oferty. Kolejność jest kolejnością
+pewności — za pamięcią stoi decyzja człowieka, więc bije automat.
+
+Blok towaru przy rozmowie pokazuje stan, rezerwacje, stan DOSTĘPNY, półkę,
+EAN i zdjęcie. Dostępny stoi osobno od stanu, bo to on odpowiada na pytanie
+klienta: stan bez odjętych rezerwacji obiecuje towar, który jest już czyjś.
+
+**Brak kartoteki niesie POWÓD.** „Oferty jeszcze nie pobrano" naprawi się samo
+w kilka minut, a „oferta bez SKU" nigdy — i to są dwa różne zdania na ekranie.
+Do tego wydania oba wyglądałyby identycznie.
+
+**Propozycja nie udaje faktu.** Automat proponuje kartotekę i czeka na jedno
+kliknięcie; dopiero potwierdzenie zapisuje parę oferta–kartoteka do pamięci
+wspólnej ze zwrotami. Wskazanie ręczne podpisuje się imieniem człowieka, a nie
+udaje danej z Allegro (§4.3).
+
+**Zdjęcie idzie z NASZEJ trasy**, nie z serwera Allegro. Zastrzeżenie z 0.178.0
+dotyczyło obrazka z ich serwera — ten pochodzi z `/api/products/:twId/zdjecie`
+i nie wyprowadza przeglądarki biura poza sieć firmy.
+
+### Czego to jeszcze nie robi
+
+Kartoteka nie wchodzi do zadania terenowego automatycznie — agent dalej wskazuje
+towar wyszukiwarką przy zlecaniu pomiaru. To osobna zmiana.
+
+---
+
 ## 0.178.0 — 2 września 2026
 
 **Rozmowa pokazuje ofertę, pod którą padło pytanie — tytuł, cenę i SKU, nie

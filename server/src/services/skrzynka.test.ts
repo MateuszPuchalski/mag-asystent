@@ -14,6 +14,7 @@ let zlecPomiar: typeof import("./skrzynka.js").zlecPomiar;
 let stanSkrzynki: typeof import("./skrzynka.js").stanSkrzynki;
 let stanKolejkiWysylek: typeof import("./skrzynka.js").stanKolejkiWysylek;
 let przejmijRozmowe: typeof import("./conversations.js").przejmijRozmowe;
+let wskazKartoteke: typeof import("./conversations.js").wskazKartoteke;
 let wezZadanie: typeof import("./zadania-terenowe.js").wezZadanie;
 let wykonajZadanie: typeof import("./zadania-terenowe.js").wykonajZadanie;
 
@@ -25,7 +26,7 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ listaRozmow, osRozmowy, zlecPomiar, stanSkrzynki, stanKolejkiWysylek } =
     await import("./skrzynka.js"));
-  ({ przejmijRozmowe } = await import("./conversations.js"));
+  ({ przejmijRozmowe, wskazKartoteke } = await import("./conversations.js"));
   ({ wezZadanie, wykonajZadanie } = await import("./zadania-terenowe.js"));
   const d = db();
   BIURO.id = Number(d.prepare(
@@ -201,6 +202,78 @@ test("snapshot oferty WYGRYWA z nazwą z pozycji zamówienia", () => {
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
   d.prepare("DELETE FROM zamowienie_klienta WHERE id=?").run(zam);
   d.prepare("DELETE FROM offer_snapshot WHERE channel_account_id=?").run(konto);
+});
+
+test("kartoteka przy rozmowie: SKU oferty prowadzi do towaru, a powód mówi o braku", () => {
+  /* SKU sprzedawcy leżało w `offer_snapshot` od 0.178.0 i nie prowadziło
+     donikąd — agent szedł po stan i półkę do Subiekta. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-kart','hemnryk','2026-09-02T14:42:58.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_object_type,related_object_id,sent_at)
+    VALUES (?,?,'m-kart-1','incoming','Nóż 43cm będzie pasował?','OFFER','12096815384',
+            '2026-09-02T14:42:58.000Z')`).run(r, konto);
+
+  /* Zanim ticker dociągnie snapshot: powód mówi, że oferty NIE POBRANO —
+     to stan przejściowy i naprawi się sam. */
+  assert.equal(osRozmowy(r).oferta?.kartoteka.powod, "oferta_niepobrana");
+
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at)
+    VALUES (?,'12096815384','NÓŻ DO KOSIARKI STIGA 43cm','NOZ-STIGA-43',
+            '2026-09-02T14:50:00.000Z')`).run(konto);
+  /* Snapshot jest, ale kartoteki o tym symbolu nie ma — inny powód, inne zdanie. */
+  assert.equal(osRozmowy(r).oferta?.kartoteka.powod, "sku_nie_trafia");
+
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (7701,'NOZ-STIGA-43','Nóż 43 cm')").run();
+  const k = osRozmowy(r).oferta?.kartoteka;
+  assert.equal(k?.twId, 7701);
+  assert.equal(k?.pewnosc, "sku");
+  assert.match(String(k?.zrodlo), /SKU oferty/);
+
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+  d.prepare("DELETE FROM offer_snapshot WHERE channel_account_id=?").run(konto);
+  d.prepare("DELETE FROM sgt_towar WHERE tw_id=7701").run();
+});
+
+test("ręczne wskazanie kartoteki zapisuje pamięć, oś i audyt, a zdjęcie ją kasuje", () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-wsk','kupujacy_5','2026-09-02T15:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (7702,'REC-01','Wskazany ręcznie')").run();
+
+  const w = wskazKartoteke(r, "12096815384", 7702, BIURO.id, d);
+  assert.equal(w.twId, 7702);
+  assert.equal(w.symbol, "REC-01");
+
+  const pamiec = d.prepare(`SELECT tw_id, sku, wskazano_przez FROM oferta_kartoteka
+    WHERE channel_account_id=? AND offer_id='12096815384'`).get(konto) as
+    { tw_id: number; sku: string | null; wskazano_przez: string };
+  assert.equal(pamiec.tw_id, 7702);
+  /* Puste `sku` znaczy „wskazał człowiek", wypełnione — „zatwierdził
+     propozycję automatu". Ekran czyta z tego, co podpisać przy kartotece. */
+  assert.equal(pamiec.sku, null);
+  assert.equal(pamiec.wskazano_przez, "Biuro");
+
+  const naOsi = d.prepare(`SELECT event_type FROM conversation_event
+    WHERE conversation_id=? ORDER BY id DESC LIMIT 1`).get(r) as { event_type: string };
+  assert.equal(naOsi.event_type, "product_linked_manually");
+  assert.equal((d.prepare(`SELECT count(*) n FROM events WHERE type='rozmowa_kartoteka_wskazana'`)
+    .get() as { n: number }).n, 1);
+
+  /* Zdjęcie musi skasować PAMIĘĆ, inaczej następny odczyt zaproponuje ją
+     z powrotem i zdjęcie wyglądałoby na nieskuteczne. */
+  wskazKartoteke(r, "12096815384", null, BIURO.id, d);
+  const zostalo = (d.prepare(`SELECT count(*) n FROM oferta_kartoteka
+    WHERE channel_account_id=? AND offer_id='12096815384'`).get(konto) as { n: number }).n;
+  assert.equal(zostalo, 0);
+
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+  d.prepare("DELETE FROM sgt_towar WHERE tw_id=7702").run();
 });
 
 /* Data ostatniej synchronizacji jest częścią odpowiedzi, bo pusta lista bez niej

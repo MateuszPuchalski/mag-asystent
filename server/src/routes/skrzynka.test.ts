@@ -79,6 +79,8 @@ const TRASY = () => [
     payload: { doUserId: null, powod: "urlop", expectedVersion: 1 } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/oferta`,
     payload: { ofertaId: "14892374512" } },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/kartoteka`,
+    payload: { ofertaId: "14892374512", twId: null } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
