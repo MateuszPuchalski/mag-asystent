@@ -165,6 +165,65 @@ CREATE TABLE IF NOT EXISTS sprawa_klienta_rozmowa (
 );
 CREATE INDEX IF NOT EXISTS ix_sprawa_klienta_rozmowa_sprawa ON sprawa_klienta_rozmowa(sprawa_id);
 
+-- ── Dobór części przy rozmowie (§11, etap E1) ──────────────────────────────
+-- Nazwa z sufiksem tym samym ruchem co `sprawa_klienta` i `zwrot_klienta`:
+-- `dopasowanie` stoi na liście nakładek, które `migrate()` KASUJE przy każdym
+-- starcie. Tabela o tamtej nazwie powstałaby stąd i znikała sekundę później.
+--
+-- Jedna rozmowa = jeden dobór, więc `conversation_id` jest kluczem głównym,
+-- a nie kolumną z indeksem. Pilnuje tego kształt tabeli, nie serwis — wzorzec
+-- `sprawa_klienta_rozmowa`. Sprawa widzi dobory PRZEZ swoje rozmowy.
+--
+-- Brak wiersza znaczy `not_started` i liczy się przy odczycie: otwarcie
+-- zakładki niczego nie wstawia („zero zapisu przy patrzeniu").
+--
+-- `wersja` jest WŁASNA, nie `conversation.version`. Tamta pilnuje przejęcia
+-- i szkicu; edycja chipów doboru podnosząca ją wywracałaby cudzy szkic na 409.
+--
+-- Dane wejściowe §11.1 jako KOLUMNY, nie jeden JSON: etapy E2/E3 filtrują po
+-- marce i modelu, a `json_extract` w każdym takim zapytaniu to skan tabeli.
+-- Parametry i wymiary zostają w `parametry_json`, bo ich lista jest otwarta.
+--
+-- Bez klucza obcego do `sgt_towar`: import z Subiekta kasuje i odtwarza
+-- read-model co `MSSQL_SYNC_MS` (blizna 0.154.0). Goły `wybrany_tw_id` plus
+-- snapshot `wybrany_symbol`, jak w `oferta_kartoteka` i `ean_alias`.
+CREATE TABLE IF NOT EXISTS dobor_rozmowy (
+  conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
+  -- DZIEWIĘĆ wartości z §7. `CHECK` jest strażnikiem dokumentu, tak jak przy
+  -- `conversation.status` (0.158.0). `extracting_data` nie ma w etapie E
+  -- nadawcy: serwis go odrzuca, nada mu go dopiero Copilot (etap F).
+  status          TEXT NOT NULL DEFAULT 'not_started' CHECK (status IN (
+                    'not_started','extracting_data','missing_information','searching',
+                    'candidates_found','requires_expert','confirmed','rejected',
+                    'not_applicable')),
+  wersja          INTEGER NOT NULL DEFAULT 1,
+  marka           TEXT,
+  model           TEXT,
+  wariant         TEXT,
+  rocznik         TEXT,
+  nr_seryjny      TEXT,
+  silnik          TEXT,
+  oem             TEXT,
+  nazwa_czesci    TEXT,
+  parametry_json  TEXT,
+  -- Czego jeszcze dopytać klienta; zdanie agenta, nie lista kodów.
+  brakuje         TEXT,
+  wybrany_tw_id   INTEGER,
+  wybrany_symbol  TEXT,
+  -- OSIEM dróg z §11.2. `zastosowanie`, `oem` i `pelnotekst` czekają na E2/E3
+  -- bez nadawcy — z tego samego powodu, dla którego lista statusów jest pełna:
+  -- panel ma jedną listę, a nie trzy rosnące osobno.
+  wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
+                    'oferta','zamiennik','symbol','ean','wyszukiwarka',
+                    'zastosowanie','oem','pelnotekst')),
+  wybrano_przez   TEXT,
+  wybrano_user_id INTEGER REFERENCES app_user(user_id),
+  wybrano_at      TEXT,
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_by      TEXT,
+  updated_user_id INTEGER REFERENCES app_user(user_id)
+);
+
 CREATE TABLE IF NOT EXISTS conversation_event (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,

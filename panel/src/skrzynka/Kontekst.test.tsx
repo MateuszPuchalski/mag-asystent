@@ -13,6 +13,9 @@ vi.mock("./OfertaRozmowy", () => ({
 vi.mock("./ZamowienieRozmowy", () => ({
   ZamowienieRozmowy: () => <div data-testid="zamowienie">blok zamówienia</div>,
 }));
+vi.mock("./Dobor", () => ({
+  Dobor: () => <div data-testid="dobor">blok doboru</div>,
+}));
 
 const { Kontekst } = await import("./Kontekst");
 
@@ -21,9 +24,12 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     id: 4821, klient: "Kupujący 44300444", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "",
     ostatniaOdKlienta: true, nieprzeczytana: false, wlascicielId: null, wlasciciel: null,
     wersja: 1, status: "open", odlozoneDo: null, poTerminie: false, oglada: null,
-    priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false,
+    priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
   },
   os: [], szkic: null, ofertaWskazana: null, sprawa: null, zamowienie: null,
+  dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
+    dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
+      oem: null, nazwaCzesci: null, parametry: {} } },
   oferta: { externalId: "12096815384", link: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   ...n,
@@ -31,7 +37,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
 
 describe("kolumna kontekstu", () => {
   it("otwiera się na ofercie i przełącza na towar", async () => {
-    render(<Kontekst dane={dane()} />);
+    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
     expect(screen.getByTestId("oferta")).toBeInTheDocument();
     expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
 
@@ -45,13 +51,13 @@ describe("kolumna kontekstu", () => {
   it("zamówienie jedzie razem z ofertą, nie osobną zakładką", () => {
     render(<Kontekst dane={dane({
       zamowienie: { externalId: "zam-77", link: null, pobrane: null },
-    })} />);
+    })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
     expect(screen.getByTestId("zamowienie")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Zamówienie" })).not.toBeInTheDocument();
   });
 
   it("bez oferty obie zakładki mówią, czego brakuje, zamiast milczeć", async () => {
-    render(<Kontekst dane={dane({ oferta: null })} />);
+    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
     expect(screen.getByText(/nie jest powiązana z ofertą/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Towar" }));
@@ -59,14 +65,19 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
   });
 
-  /* Pięciu zakładek z makiety NIE ma: „Dobór", „Klient" i „Wiedza" nie mają
-     dziś skąd wziąć danych, a zakładka mówiąca zawsze „wkrótce" uczy nie klikać. */
-  it("ma dokładnie dwie zakładki", () => {
-    render(<Kontekst dane={dane()} />);
-    for (const nazwa of ["Dobór", "Klient", "Wiedza"]) {
+  /* Pięciu zakładek z makiety NIE ma: „Klient" i „Wiedza" nie mają dziś skąd
+     wziąć danych, a zakładka mówiąca zawsze „wkrótce" uczy nie klikać. „Dobór"
+     doszła w E1 razem ze swoim bytem — i dopiero wtedy. */
+  it("ma dokładnie trzy zakładki, a dobór działa nawet bez oferty", async () => {
+    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    for (const nazwa of ["Klient", "Wiedza"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
     expect(screen.getByRole("button", { name: "Oferta" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Towar" })).toBeInTheDocument();
+    /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę
+       i część wpisuje agent. */
+    await userEvent.click(screen.getByRole("button", { name: "Dobór" }));
+    expect(screen.getByTestId("dobor")).toBeInTheDocument();
   });
 });

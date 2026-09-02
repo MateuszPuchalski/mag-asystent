@@ -2,8 +2,9 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  KartaTowaru, OsRozmowy, PokrycieSygnatur, Rozmowa, SprawaRozmowy, StanSkrzynki, StatusRozmowy,
-  WierszSprawy, WpisWzmianki, WynikWysylki, Zadanie, Zdrowie,
+  DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, Rozmowa,
+  SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WierszSprawy, WpisWzmianki, WynikWysylki,
+  Zadanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -19,6 +20,7 @@ export const klucze = {
   sprawy: ["sprawy"] as const,
   sygnatury: ["sygnatury"] as const,
   towar: (twId: number) => ["towar", twId] as const,
+  kandydaci: (id: number) => ["kandydaci", id] as const,
 };
 
 export function useJa() {
@@ -337,12 +339,17 @@ export function useWyslij() {
  *
  * Do tego wydania `conversation_comment` miała w kodzie serwera jeden INSERT
  * i zero odczytów — notatka agenta przepadała. Trasa istniała, ekranu nie było.
+ *
+ * Od 0.157.0 do 0.181.0 hook wołał `/api/obsluga/rozmowy/:id/komentarz`,
+ * którego serwer nigdy nie wystawił — komentarz ze skrzynki dostawał 404.
+ * Testy tras pilnowały tras, które istnieją, a nie tego, że panel woła te same
+ * adresy; od 0.181.1 pilnuje tego strażnik w `routes/skrzynka.test.ts`.
  */
 export function useDodajKomentarz() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { rozmowaId: number; body: string; mentionedUserIds: number[] }) =>
-      api<{ id: number }>(`/api/obsluga/rozmowy/${v.rozmowaId}/komentarz`,
+      api<{ id: number }>(`/api/conversations/${v.rozmowaId}/comments`,
         { method: "POST", body: JSON.stringify({
           body: v.body, mentionedUserIds: v.mentionedUserIds }) }),
     onSettled: (_d, _e, v) => {
@@ -415,5 +422,65 @@ export function usePokrycieSygnatur() {
     queryKey: klucze.sygnatury,
     queryFn: () => api<PokrycieSygnatur>("/api/obsluga/sygnatury"),
     staleTime: 60_000,
+  });
+}
+
+/* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────
+   Sam dobór jedzie w `useRozmowa` (jeden wiersz). KANDYDACI mają własne
+   zapytanie: to wyszukiwarka i parser opisu, a rozmowa odświeża się na każde
+   zdarzenie szyny, także `presence`. Każda mutacja unieważnia rozmowę, listę
+   (plakietka statusu w kolejce) i kandydatów (dane wejściowe zmieniają, co
+   automat ma sprawdzać). */
+export function useKandydaci(id: number | null) {
+  return useQuery({
+    queryKey: klucze.kandydaci(id ?? 0),
+    queryFn: () => api<KandydaciDoboru>(`/api/obsluga/rozmowy/${id}/dobor/kandydaci`),
+    enabled: id !== null,
+  });
+}
+
+function poDoborze(qc: ReturnType<typeof useQueryClient>, id: number) {
+  qc.invalidateQueries({ queryKey: klucze.rozmowa(id) });
+  qc.invalidateQueries({ queryKey: klucze.rozmowy });
+  qc.invalidateQueries({ queryKey: klucze.kandydaci(id) });
+}
+
+/**
+ * Dane wejściowe niosą WERSJĘ doboru. Konflikt (409) NIE jest tu łapany:
+ * `Konflikt` leci do zakładki, bo to ona ma powiedzieć „ktoś zmienił dane —
+ * odśwież" i ZOSTAWIĆ wpisane wartości, zamiast zamienić je w komunikat.
+ */
+export function useZapiszDaneDoboru() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; dane: Partial<DaneDoboru>; expectedVersion: number }) =>
+      api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/dane`, {
+        method: "PUT", body: JSON.stringify({ dane: v.dane, expectedVersion: v.expectedVersion }),
+      }),
+    onSettled: (_d, _e, v) => poDoborze(qc, v.id),
+  });
+}
+
+export function useStatusDoboru() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; status: StatusDoboru; brakuje?: string | null }) =>
+      api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/status`, {
+        method: "POST", body: JSON.stringify({ status: v.status, brakuje: v.brakuje ?? null }),
+      }),
+    onSettled: (_d, _e, v) => poDoborze(qc, v.id),
+  });
+}
+
+/** Wybór kandydata; `twId: null` zdejmuje. Symbol bierze SERWER z bazy. */
+export function useWybierzKandydata() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; twId: number | null; droga: DrogaDoboru; expectedVersion: number }) =>
+      api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/wybor`, {
+        method: "POST",
+        body: JSON.stringify({ twId: v.twId, droga: v.droga, expectedVersion: v.expectedVersion }),
+      }),
+    onSettled: (_d, _e, v) => poDoborze(qc, v.id),
   });
 }

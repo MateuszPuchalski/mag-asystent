@@ -33,7 +33,12 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["conversation_mention", "conversation_comment", "conversation_draft",
+  /* Sprawy PRZED użytkownikami: `sprawa_klienta.utworzyl` wskazuje na
+     `app_user` bez kaskady. Do 0.181.0 test spraw był ostatni w pliku, więc
+     brak tych dwóch nazw nie wywracał niczego — każdy test dopisany po nim
+     padał w `beforeEach` na kluczu obcym. */
+  for (const t of ["sprawa_klienta_rozmowa", "sprawa_klienta",
+    "conversation_mention", "conversation_comment", "conversation_draft",
     "conversation_assignment", "conversation_event", "message", "conversation",
     "channel_account", "zadanie_terenowe", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -94,6 +99,13 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/sprawy/1/rozmowy", payload: { rozmowaId: rozmowa } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/odlacz` },
   { method: "POST" as const, url: "/api/obsluga/wzmianki/1/odhacz" },
+  { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/kandydaci` },
+  { method: "PUT" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
+    payload: { dane: { marka: "NAC" }, expectedVersion: 1 } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/status`,
+    payload: { status: "searching" } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wybor`,
+    payload: { twId: null, droga: "oferta", expectedVersion: 1 } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -488,4 +500,88 @@ test("sprawa skleja rozmowy, a rozmowa mówi wprost, do której już należy", a
   assert.equal(odlacz.statusCode, 200, odlacz.body);
   r = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${druga}`, headers: b.naglowki });
   assert.equal(r.json().sprawa, null);
+});
+
+/* ── Strażnik adresów panelu (0.181.1) ──────────────────────────────────────
+   `TRASY()` wyżej pilnuje tras, które ISTNIEJĄ. Nie pilnuje tego, że panel
+   woła te same adresy — i dokładnie tędy przeszło 404 komentarza: od 0.157.0
+   do 0.181.0 hook wołał `/api/obsluga/rozmowy/:id/komentarz`, a serwer miał
+   tylko `/api/conversations/:id/comments`. Oba zestawy testów były zielone.
+
+   Ten test czyta źródło hooków panelu — tak samo jak `biuro.test.ts` czyta
+   `biuro.html` — i pyta Fastify o KAŻDY adres, który tam stoi. Adres bez trasy
+   wywraca test z nazwą hooka, zanim wywróci ekran u agenta.                 */
+test("każdy adres wołany z panel/src/api/rozmowy.ts ma trasę na serwerze", async () => {
+  const zrodlo = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/api/rozmowy.ts"), "utf8");
+  /* Para: `api(...)` z literałem adresu i — opcjonalnie — `method` w tym samym
+     wywołaniu. Brak `method` to GET. `${...}` w adresie zastępujemy jedynką
+     i puszczamy PRAWDZIWE żądanie przez router: `hasRoute` porównuje wzorzec
+     `:id` z tekstem, więc każdy adres z parametrem wychodziłby jako brak.
+     Brak TRASY poznajemy po domyślnym 404 Fastify („Route … not found");
+     404 z treścią aplikacji („nie znaleziono rozmowy") to trasa, która jest. */
+  const wywolania = [...zrodlo.matchAll(/api(?:<[^>]*>)?\(\s*`([^`]+)`(?:\s*,\s*\{[^}]*?method:\s*"(GET|POST|PUT|DELETE)")?/gs)];
+  assert.ok(wywolania.length >= 15, `spodziewałem się kilkunastu wywołań api(), jest ${wywolania.length}`);
+  const b = await login("biuro", "Biuro");
+  const bledne: string[] = [];
+  for (const [, adres, metoda] of wywolania) {
+    const url = adres.replace(/\$\{[^}]+\}/g, "1").replace(/\?.*$/, "");
+    const method = (metoda ?? "GET") as "GET" | "POST" | "PUT" | "DELETE";
+    const r = await app.inject({ method, url, headers: b.naglowki,
+      ...(method === "GET" ? {} : { payload: {} }) });
+    const tresc = r.json<{ message?: string }>();
+    if (r.statusCode === 404 && /^Route /.test(tresc.message ?? "")) bledne.push(`${method} ${adres}`);
+  }
+  assert.deepEqual(bledne, [], "panel woła adresy bez trasy na serwerze");
+});
+
+test("komentarz wewnętrzny ze skrzynki zapisuje się pod adresem, który panel woła", async () => {
+  const b = await login("biuro", "Biuro");
+  const r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/comments`,
+    headers: b.naglowki, payload: { body: "to ten sam klient co wczoraj", mentionedUserIds: [] } });
+  assert.equal(r.statusCode, 200, r.body);
+  /* Stary adres NIE istnieje — nikt nie ma „naprawić" tego dublując trasę. */
+  assert.equal(app.hasRoute({ method: "POST", url: "/api/obsluga/rozmowy/1/komentarz" }), false);
+});
+
+/* ── Dobór części (§11, etap E1) ──────────────────────────────────────────── */
+
+test("patrzenie na dobór niczego nie zapisuje — ani wiersza, ani zdarzenia", async () => {
+  const b = login("biuro", "Anna");
+  const przed = liczbaZdarzen();
+  for (const url of [`/api/obsluga/rozmowy/${rozmowa}`, `/api/obsluga/rozmowy/${rozmowa}/dobor/kandydaci`]) {
+    const r = await app.inject({ method: "GET", url, headers: b.naglowki });
+    assert.equal(r.statusCode, 200, r.body);
+  }
+  const os = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}`, headers: b.naglowki });
+  assert.equal(os.json<{ dobor: { status: string } }>().dobor.status, "not_started");
+  assert.equal(os.json<{ rozmowa: { dobor: string } }>().rozmowa.dobor, "not_started");
+  assert.equal(liczbaZdarzen(), przed, "odczyt dopisał zdarzenie");
+  assert.equal((db().prepare("SELECT count(*) n FROM dobor_rozmowy").get() as { n: number }).n, 0);
+});
+
+test("nieaktualna wersja doboru dostaje 409 z bieżącym stanem, zły status 400", async () => {
+  const b = login("biuro", "Anna");
+  let r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
+    headers: b.naglowki, payload: { dane: { marka: "NAC", model: "LS 46-450" }, expectedVersion: 1 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ wersja: number; status: string }>().wersja, 2);
+  assert.equal(r.json<{ status: string }>().status, "searching");
+
+  r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
+    headers: b.naglowki, payload: { dane: { model: "inny" }, expectedVersion: 1 } });
+  assert.equal(r.statusCode, 409, r.body);
+  assert.equal(r.json<{ wersja: number }>().wersja, 2);
+  assert.equal(r.json<{ updatedBy: string }>().updatedBy, "Anna");
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/status`,
+    headers: b.naglowki, payload: { status: "extracting_data" } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json<{ error: string }>().error, /Copilot/);
+
+  /* Zatwierdzenie bez wyboru — 400 ze zdaniem, nie milczący sukces. */
+  r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/status`,
+    headers: b.naglowki, payload: { status: "confirmed" } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json<{ error: string }>().error, /wybranej kartoteki/);
 });

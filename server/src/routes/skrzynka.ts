@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { sesjaZadania } from "../context.js";
+import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
 import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
@@ -15,6 +15,8 @@ import { wyslijOdpowiedz } from "../services/wysylka.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../services/sprawy.js";
+import { ustawStatusDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
+import { kandydaciDoboru } from "../services/kandydaci.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -200,6 +202,45 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         odlaczRozmowe(Number(req.params.id), sesjaZadania()!.user.userId);
         return { sprawa: null };
       } catch (e) { return blad(reply, e); }
+    });
+
+  /* DOBÓR CZĘŚCI (§11, etap E1). Sam dobór jedzie w `GET …/rozmowy/:id`;
+     kandydaci mają OSOBNĄ trasę, bo to wyszukiwarka i parser opisu, a tamten
+     odczyt odświeża się na każde zdarzenie szyny. Odczyt niczego nie zapisuje.
+     Bramka to zwykłe `odmowa()`: dobór to codzienna praca biura, a zatwierdza
+     go każdy z biura — decyzja właściciela, roli „ekspert" nie ma. */
+  app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dobor/kandydaci",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return kandydaciDoboru(Number(req.params.id), subiekt); }
+      catch (e) { return blad(reply, e); }
+    });
+
+  app.put<{ Params: { id: string }; Body: { dane?: Partial<DaneDoboru>; expectedVersion?: number } }>(
+    "/api/obsluga/rozmowy/:id/dobor/dane", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return zapiszDane(Number(req.params.id), req.body?.dane ?? {},
+          Number(req.body?.expectedVersion), sesjaZadania()!.user.userId);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { status?: string; brakuje?: string | null } }>(
+    "/api/obsluga/rozmowy/:id/dobor/status", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return ustawStatusDoboru(Number(req.params.id), req.body?.status ?? "",
+          req.body?.brakuje ?? null, sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { twId?: number | null; droga?: string; expectedVersion?: number } }>(
+    "/api/obsluga/rozmowy/:id/dobor/wybor", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return wybierzKandydata(Number(req.params.id), req.body?.twId ?? null, req.body?.droga ?? "",
+          Number(req.body?.expectedVersion), sesjaZadania()!.user.userId);
+      } catch (e) { return konflikt(reply, e); }
     });
 
   /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy

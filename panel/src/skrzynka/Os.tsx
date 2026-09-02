@@ -45,9 +45,9 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
   return <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-    {wpisy.map((w) => w.rodzaj === "status" || w.rodzaj === "sprawa"
-      /* Zmiana statusu (§10.3, 0.158.0) i sklejenie sprawy (0.161.0) są
-         KRESKĄ, nie kafelkiem: to nie czyjaś wypowiedź, tylko znak, że sprawa
+    {wpisy.map((w) => w.rodzaj === "status" || w.rodzaj === "sprawa" || w.rodzaj === "dobor"
+      /* Zmiana statusu (§10.3, 0.158.0), sklejenie sprawy (0.161.0) i krok
+         doboru (E1) są KRESKĄ, nie kafelkiem: to nie czyjaś wypowiedź, tylko znak, że sprawa
          przeszła dalej. Kafelek w rzędzie wiadomości przerwałby czytanie
          rozmowy w biegu. */
       ? <p key={w.id} className="flex items-center justify-center gap-2 text-xs text-slate-400">
