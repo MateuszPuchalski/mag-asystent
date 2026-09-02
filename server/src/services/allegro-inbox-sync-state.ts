@@ -15,17 +15,27 @@ export interface AllegroInboxSyncState {
   errorCount: number;
   errorThreadCount: number;
   nextAttemptAt: string | null;
+  /**
+   * Data najstarszego wątku przebiegu, który zszedł DO DNA listy — do granicy
+   * czasu albo do końca historii. `null` znaczy „jeszcze nigdy".
+   *
+   * Jedyny czytelnik to sufit stron w `allegro-inbox-sync.ts`: dopóki dna nie
+   * ma, sufit nie obowiązuje. Data, a nie flaga, bo przy diagnozie liczy się
+   * nie tylko CZY zeszliśmy, ale DOKĄD.
+   */
+  dnoAt: string | null;
 }
 
 const PUSTY: AllegroInboxSyncState = {
   cursorAt: null, cursorId: null, lastSuccessAt: null, lastAttemptAt: null,
   lastErrorCode: null, lastErrorText: null, errorCount: 0, errorThreadCount: 0, nextAttemptAt: null,
+  dnoAt: null,
 };
 
 export function stanSynchronizacji(db: Db): AllegroInboxSyncState {
   const row = db.prepare(`SELECT cursor_at, cursor_id, last_success_at, last_attempt_at,
-    last_error_code, last_error_text, error_count, error_thread_count, next_attempt_at
-    FROM allegro_inbox_sync_state WHERE id=1`).get() as Record<string, unknown> | undefined;
+    last_error_code, last_error_text, error_count, error_thread_count, next_attempt_at,
+    dno_at FROM allegro_inbox_sync_state WHERE id=1`).get() as Record<string, unknown> | undefined;
   if (!row) return PUSTY;
   return {
     cursorAt: (row.cursor_at as string) ?? null,
@@ -37,6 +47,7 @@ export function stanSynchronizacji(db: Db): AllegroInboxSyncState {
     errorCount: Number(row.error_count ?? 0),
     errorThreadCount: Number(row.error_thread_count ?? 0),
     nextAttemptAt: (row.next_attempt_at as string) ?? null,
+    dnoAt: (row.dno_at as string) ?? null,
   };
 }
 

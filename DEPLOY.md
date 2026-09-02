@@ -1614,6 +1614,16 @@ w `wertis.env`. Pusta wartość wyłącza odnośnik i zostawia sam tekst.
 
 **Zdjęcia w panelu obsługi działają tylko przy włączonym `ZDJECIA_ZRODLO`.**
 Bez niego kafle pokazują „bez zdjęcia" i nic więcej się nie psuje.
+**Ile skrzynka kosztuje żądań do Allegro (od 0.164.1).** Przebieg w normalnym
+rytmie to jedno żądanie o stronę listy plus po jednym na każdy zmieniony wątek.
+Przy takcie 60 s daje to rząd 2000 żądań na dobę. Gdy kursor nie trafi,
+przebieg schodzi listą w dół, ale nie dalej niż 25 stron — sufit ogranicza
+najgorszy przypadek do 25 żądań.
+
+Wyjątkiem jest PIERWSZE zejście po sparowaniu konta. Idzie bez sufitu aż do
+progu `ALLEGRO_INBOX_OD`, bo zaległość musi się raz nadrobić. Statystyki
+aplikacji w portalu dla programistów pokazują ten ruch z dobowym opóźnieniem.
+
 **Aktualizacja do 0.152.0 wymaga JEDNEJ zmiany w `wertis.env`: usuń
 `ALLEGRO_ZWROTY_DNI_WSTECZ`.** Okno względne zastąpił próg bezwzględny
 `ALLEGRO_ZWROTY_OD`. Zostawiony wpis zatrzyma start z komunikatem — celowo,

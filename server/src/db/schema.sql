@@ -855,7 +855,12 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   -- zatrzymują skrzynkę na dłużej.
   last_error_text  TEXT,
   error_thread_count INTEGER NOT NULL DEFAULT 0,
-  next_attempt_at TEXT
+  next_attempt_at TEXT,
+  -- Data najstarszego wątku przebiegu, który ZSZEDŁ DO DNA listy: do granicy
+  -- czasu albo do końca historii. NULL znaczy „jeszcze nigdy", a to jedyny
+  -- stan, w którym sufit stron nie obowiązuje — inaczej instalacja
+  -- z zaległością większą niż sufit nigdy by jej nie nadrobiła.
+  dno_at TEXT
 );
 
 -- ── Zwroty klienckie z Allegro (0.150.0) ────────────────────────────────────
