@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  OsRozmowy, Rozmowa, SprawaRozmowy, StanSkrzynki, StatusRozmowy, WierszSprawy, WpisWzmianki,
-  WynikWysylki, Zadanie, Zdrowie,
+  OsRozmowy, PokrycieSygnatur, Rozmowa, SprawaRozmowy, StanSkrzynki, StatusRozmowy, WierszSprawy,
+  WpisWzmianki, WynikWysylki, Zadanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -17,6 +17,7 @@ export const klucze = {
   zdrowie: ["zdrowie"] as const,
   wzmianki: ["wzmianki"] as const,
   sprawy: ["sprawy"] as const,
+  sygnatury: ["sygnatury"] as const,
 };
 
 export function useJa() {
@@ -356,4 +357,19 @@ export function useUchwytRozmowy(id: number | null) {
       void melduj(false);
     };
   }, [id]);
+}
+
+/**
+ * Pokrycie sygnatur — ile ofert wiąże się z kartoteką Subiekta.
+ *
+ * Bez `refetchInterval`: to jest obraz KATALOGU, nie ruchu. Zmienia się, gdy
+ * ktoś wypełni sygnaturę w Allegro albo doda kartotekę — czyli w rytmie
+ * godzin, nie sekund. Odświeżenie przy powrocie do okna wystarczy.
+ */
+export function usePokrycieSygnatur() {
+  return useQuery({
+    queryKey: klucze.sygnatury,
+    queryFn: () => api<PokrycieSygnatur>("/api/obsluga/sygnatury"),
+    staleTime: 60_000,
+  });
 }

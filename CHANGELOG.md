@@ -34,6 +34,61 @@ historii nie przepisujemy.
 ---
 
 
+## 0.171.0 — 2 września 2026
+
+**Sygnatura wiąże kartotekę sama, a ekran ustawień mówi, ile wiąże.** Dwie
+decyzje właściciela: „wiąż zamówienia z Allegro z Subiektem po sygnaturze"
+i „zrób, abym nie musiał zatwierdzać kartotek".
+
+### Wiązanie działało od 0.152.0 — brakowało dwóch rzeczy
+
+Sygnatura oferty (`offer.external.id`, pole „Sygnatura" w edycji przedmiotu)
+ląduje w `zamowienie_klienta_pozycja.sku` od 0.152.0, a `kartotekaPoSku` szuka
+po niej symbolu w kartotece Subiekta. Brakowało czego innego. Po pierwsze,
+wynik był **propozycją do kliknięcia** — nawet gdy sygnatura wskazywała
+dokładnie jedną kartotekę i nie było czego rozstrzygać. Po drugie, **nikt nie
+widział skuteczności**: wynik pokazywał się przy pojedynczej pozycji zwrotu
+i tylko wtedy, gdy kartoteki jeszcze nie było.
+
+### Pewne trafienie wiąże się samo
+
+Pozycja zwrotu, której sygnatura wskazuje **dokładnie jedną** kartotekę,
+wiąże się bez kliknięcia. W `tw_zrodlo` zostaje `sku`, więc dalej widać, że
+zrobił to automat, a nie człowiek; w audycie podpisuje się jako
+`automat (sygnatura)`.
+
+Wiąże się WYŁĄCZNIE ta jedna pewność i to nie jest ostrożność na zapas.
+Dopasowanie po jedynej pozycji zamówienia albo po nazwie jest ZGADYWANIEM,
+a powiązanie prowadzi do korekty stanu w Subiekcie — pomyłka wraca towarem na
+złej półce, nie czerwonym napisem na ekranie. Symbol zdublowany nie wiąże się
+nigdy, bo dwie kartoteki o tym samym symbolu to spór, nie trafienie.
+
+Pamięć wcześniejszych wskazań (`oferta_kartoteka`) zostaje nietknięta: znaczy
+„wskazał to człowiek" i jest przy dopasowaniu mocniejsza od automatu. Wpis od
+automatu podszyłby się pod tamtą decyzję i nadpisał cudze imię.
+
+Wiązanie idzie z TAKTU synchronizacji i z przycisku „dociągnij zamówienia",
+nigdy z otwarcia ekranu — „zero zapisu przy patrzeniu" obowiązuje też tutaj.
+Dwa takty, bo zamówienie dochodzi zwykle PO zwrocie i dopiero ono niesie
+sygnaturę. Człowiek zachowuje ostatnie słowo: wskazanie ręczne nadpisuje
+automat, a zdjęcie powiązania kasuje je razem z pamięcią.
+
+### Ekran ustawień pokazuje pokrycie
+
+Nowa karta „Sygnatura → kartoteka Subiekta" na `/obsluga/ustawienia`: ile jest
+pozycji zamówień, ile ma sygnaturę, ile wiąże się samo, ile jest różnych
+sygnatur. Pod spodem dwie listy, osobno, bo to dwie różne naprawy — sygnatury
+bez kartoteki (literówka w Allegro albo brak kartoteki) i symbole zdublowane
+w Subiekcie (porządek w kartotekach).
+
+Raport liczy DOKŁADNIE to, co wiąże automat: symbol zdublowany nie jest
+trafieniem. Pilnuje tego test porównujący wynik wiersz po wierszu
+z `kartotekaPoSku` — raport obiecujący pokrycie, którego nie ma, byłby gorszy
+od braku raportu.
+
+Wdrożenie: nic ręką. Pozycje zwrotów czekające dziś na zatwierdzenie powiążą
+się przy najbliższym przebiegu synchronizacji.
+
 ## 0.170.0 — 2 września 2026
 
 **Za towar, który wrócił używany, da się oddać mniej.**

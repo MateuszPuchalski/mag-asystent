@@ -497,14 +497,24 @@ export function osZwrotu(database: Db, zwrotId: number) {
  *
  * `twId === null` ZDEJMUJE powiązanie — to jest droga wyjścia z błędnego
  * potwierdzenia, a nie brak funkcji.
+ *
+ * `zapamietaj: false` wiąże pozycję BEZ dopisania do `oferta_kartoteka`.
+ * Używa tego automat sygnatur (0.169.0): pamięć niesie zdanie „wskazał to
+ * człowiek" i jest w `zaproponujKartoteke` mocniejsza od automatu. Wpisanie
+ * tam wyniku automatu podszywałoby go pod decyzję biura, a przy okazji
+ * nadpisywało cudze imię w `wskazano_przez`.
  */
 export function potwierdzKartoteke(
   database: Db,
   pozycjaId: number,
   twId: number | null,
   zrodlo: "sku" | "reczne",
-  kto: { id: number; name: string },
+  /* `id: null` = zrobił to automat, nie człowiek. `zwrot_zdarzenie.kto_user_id`
+     ma klucz obcy do `app_user`, więc udawane zero wywróciłoby zapis na
+     kluczu — a wpisanie tam cudzego konta byłoby kłamstwem w audycie. */
+  kto: { id: number | null; name: string },
   teraz = new Date(),
+  zapamietaj = true,
 ): { twId: number | null; twSymbol: string | null; twZrodlo: string | null } {
   const pozycja = database.prepare(
     `SELECT p.id, p.zwrot_id, p.offer_id, z.channel_account_id
@@ -554,7 +564,7 @@ export function potwierdzKartoteke(
      panel zwrotów miał zdejmować.
 
      Pamięć trzyma się OFERTY, nie pozycji: pozycja żyje jednym zwrotem. */
-  if (pozycja.offer_id) {
+  if (pozycja.offer_id && zapamietaj) {
     database.prepare(`INSERT INTO oferta_kartoteka
       (channel_account_id,offer_id,tw_id,tw_symbol,sku,wskazano_at,wskazano_przez)
       VALUES (?,?,?,?,?,?,?)

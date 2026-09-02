@@ -1614,6 +1614,18 @@ w `wertis.env`. Pusta wartość wyłącza odnośnik i zostawia sam tekst.
 
 **Zdjęcia w panelu obsługi działają tylko przy włączonym `ZDJECIA_ZRODLO`.**
 Bez niego kafle pokazują „bez zdjęcia" i nic więcej się nie psuje.
+**Kartoteka wiąże się sama po sygnaturze (od 0.169.0).** Pozycja zwrotu,
+której sygnatura z Allegro wskazuje dokładnie jedną kartotekę Subiekta, nie
+czeka już na zatwierdzenie. Automat podpisuje się w audycie jako
+`automat (sygnatura)`, a w panelu widać źródło `sku`. Zgadywanie się nie wiąże:
+ani dopasowanie po jedynej pozycji zamówienia, ani po nazwie, ani symbol
+zdublowany w Subiekcie.
+
+Ile z tego wychodzi, pokazuje karta „Sygnatura → kartoteka Subiekta"
+w `/obsluga/ustawienia`. Dwie listy pod liczbami to dwie różne naprawy:
+sygnatura bez kartoteki poprawia się w Allegro albo założeniem kartoteki,
+symbol zdublowany — porządkiem w Subiekcie.
+
 **Ile skrzynka kosztuje żądań do Allegro (od 0.164.1).** Przebieg w normalnym
 rytmie to jedno żądanie o stronę listy plus po jednym na każdy zmieniony wątek.
 Przy takcie 60 s daje to rząd 2000 żądań na dobę. Gdy kursor nie trafi,
