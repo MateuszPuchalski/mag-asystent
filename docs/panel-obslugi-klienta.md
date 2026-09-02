@@ -365,6 +365,12 @@ Wiersz pokazuje kanał, klienta, fragment ostatniej wiadomości, czas
 oczekiwania, ofertę lub produkt, właściciela, priorytet, termin, liczbę nowych
 wiadomości, status doboru i oczekujące zadanie terenowe.
 
+**Fragment to ostatnia wiadomość KLIENTA, z jej datą (0.166.0).** Do 0.165.0
+wiersz brał ostatnią wiadomość jakąkolwiek, więc autoodpowiedź konta Allegro
+zasłaniała pytanie, a data pod nią była datą wątku. Gdy klient nic nie napisał,
+stoi nasza wiadomość z podpisem „Biuro". Kolejność listy dalej niesie datę
+wątku — tę samą, którą właściciel widzi w panelu sprzedawcy.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany
@@ -999,6 +1005,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
+| Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.166.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
+| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.166.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx` |
+| Nazwa towaru przy ofercie w rozmowie | **z zamówienia** od 0.166.0 | `nazwaOferty` — ofert nadal nie pobieramy |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |

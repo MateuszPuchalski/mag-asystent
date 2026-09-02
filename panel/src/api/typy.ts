@@ -13,6 +13,8 @@ export type Rozmowa = {
   klient: string;
   ostatniaWiadomosc: string;
   ostatniaWiadomoscAt: string;
+  /** Czy podgląd to słowa klienta (0.166.0). Fałsz = ostatnia NASZA, bo klient nic nie napisał. */
+  ostatniaOdKlienta: boolean;
   nieprzeczytana: boolean;
   wlascicielId: number | null;
   wlasciciel: string | null;
@@ -40,6 +42,10 @@ export type WpisOsi = {
   tresc: string;
   at: string;
   ofertaId: string | null;
+  /** Nazwa towaru Z ZAMÓWIENIA, nie z oferty — §4.3, źródło w nazwie pola. */
+  nazwaOferty?: string | null;
+  /** Zamówienie, którego dotyczy wiadomość (`relatesTo.order`, 0.166.0). */
+  zamowienieId?: string | null;
   zadanieId?: number;
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
@@ -78,12 +84,19 @@ export type StanSkrzynki = { ostatniaSynchronizacja: string | null; bledy: numbe
 
 export type OfertaWskazana = { ofertaId: string; autor: string };
 
+/* Zamówienie przy rozmowie (0.166.0). `pobrane` jest `null`, dopóki ticker
+   nie dociągnie treści — numer i odnośnik do panelu Allegro są od razu. */
+export type ZamowienieRozmowy = {
+  externalId: string; link: string | null; pobrane: Zamowienie | null;
+};
+
 export type OsRozmowy = {
   rozmowa: Rozmowa;
   os: WpisOsi[];
   szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null;
   sprawa: SprawaRozmowy | null;
+  zamowienie: ZamowienieRozmowy | null;
 };
 
 export type Zadanie = {

@@ -108,6 +108,12 @@ CREATE TABLE IF NOT EXISTS message (
   -- surowego lądowiska — a wtedy `conversation`/`message` nie byłyby modelem.
   related_object_type TEXT,
   related_object_id   TEXT,
+  -- Zamówienie, którego dotyczy wiadomość (0.166.0). Allegro daje `relatesTo`
+  -- z DWIEMA niezależnymi gałęziami, `offer` i `order`, i wiadomość może
+  -- nieść obie naraz — dlatego osobna kolumna, a nie trzecia wartość
+  -- `related_object_type`. Do 0.165.0 gałąź `order` była wyrzucana przy
+  -- mapowaniu, choć sonda pokazuje ją częściej niż ofertę (7 z 33 wobec 5).
+  related_order_id    TEXT,
   sent_at             TEXT NOT NULL,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   -- Ponowne pobranie tej samej strony kanału ma skończyć się konfliktem,

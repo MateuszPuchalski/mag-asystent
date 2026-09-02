@@ -2,7 +2,8 @@ import { config } from "../config.js";
 import { db as defaultDb, type Db, transaction } from "../db/db.js";
 import { zaproponujKartoteke, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanRabatu, type StanRabatu } from "./rabaty.js";
-import { linkZamowienia, linkZwrotu } from "./allegro-linki.js";
+import { linkZwrotu } from "./allegro-linki.js";
+import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
@@ -46,29 +47,9 @@ export interface PozycjaZwrotu {
   rabat: StanRabatu;
 }
 
-/** Pozycja zamówienia; `zwracana` mówi, które z nich wracają do nas. */
-export interface PozycjaZamowienia {
-  offerId: string | null;
-  nazwa: string;
-  sku: string | null;
-  ilosc: number;
-  cenaGrosze: number;
-  waluta: string;
-  zwracana: boolean;
-}
-
-export interface Zamowienie {
-  externalId: string;
-  status: string | null;
-  kupujacyLogin: string | null;
-  dostawaGrosze: number | null;
-  dostawaMetoda: string | null;
-  sumaGrosze: number | null;
-  waluta: string;
-  kupionoAt: string | null;
-  link: string | null;
-  pozycje: PozycjaZamowienia[];
-}
+/* `Zamowienie` i `PozycjaZamowienia` mieszkają od 0.166.0 w `zamowienia.ts`,
+   bo to samo zamówienie pokazuje też rozmowa. Re-eksport trzyma stare importy. */
+export type { PozycjaZamowienia, Zamowienie } from "./zamowienia.js";
 
 export interface WierszZwrotu {
   id: number;
@@ -307,35 +288,17 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
         };
       });
 
-      const zamowienie: Zamowienie | null = zam ? {
-        externalId: String(zam.external_id),
-        status: (zam.status as string) ?? null,
-        kupujacyLogin: (zam.kupujacy_login as string) ?? null,
-        dostawaGrosze: zam.dostawa_grosze == null ? null : Number(zam.dostawa_grosze),
-        dostawaMetoda: (zam.dostawa_metoda as string) ?? null,
-        sumaGrosze: zam.suma_grosze == null ? null : Number(zam.suma_grosze),
-        waluta: String(zam.waluta ?? "PLN"),
-        kupionoAt: (zam.kupiono_at as string) ?? null,
-        link: linkZamowienia(String(zam.external_id)),
-        pozycje: pozZamowienia.map((p) => ({
-          offerId: (p.offer_id as string) ?? null,
-          nazwa: String(p.nazwa),
-          sku: (p.sku as string) ?? null,
-          ilosc: Number(p.ilosc),
-          cenaGrosze: Number(p.cena_grosze),
-          waluta: String(p.waluta),
-          /* Które pozycje wracają — to jest cały powód, dla którego panel
-             pokazuje CAŁE zamówienie, a nie same zwracane sztuki.
+      /* Które pozycje wracają — to jest cały powód, dla którego panel
+         pokazuje CAŁE zamówienie, a nie same zwracane sztuki.
 
-             Sprawdzamy OBIE kolumny z tego samego powodu co złączenie
-             w `dopasowanie-sku.ts`: nie wiadomo, czy `offerId` ze zwrotu to
-             numer oferty, czy identyfikator pozycji zamówienia. Do 0.153.1
-             porównanie szło po jednej i przy rozjeździe ŻADNA pozycja nie
-             dostawała plakietki WRACA — co samo w sobie było objawem. */
-          zwracana: wracajace.has((p.offer_id as string) ?? "")
-            || wracajace.has((p.external_id as string) ?? ""),
-        })),
-      } : null;
+         Sprawdzamy OBIE kolumny z tego samego powodu co złączenie
+         w `dopasowanie-sku.ts`: nie wiadomo, czy `offerId` ze zwrotu to
+         numer oferty, czy identyfikator pozycji zamówienia. Do 0.153.1
+         porównanie szło po jednej i przy rozjeździe ŻADNA pozycja nie
+         dostawała plakietki WRACA — co samo w sobie było objawem. */
+      const zamowienie = zam ? naZamowienie(zam, pozZamowienia, (p) =>
+        wracajace.has((p.offer_id as string) ?? "")
+          || wracajace.has((p.external_id as string) ?? "")) : null;
 
       return zloz(z, zlozone, zamowienie, teraz);
     })

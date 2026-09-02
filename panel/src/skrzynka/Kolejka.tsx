@@ -95,7 +95,13 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
             <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[11px] font-bold">NOWE</span>}
           <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>
         </div>
-        <p className="mt-1 line-clamp-2 text-sm text-slate-600">{r.ostatniaWiadomosc}</p>
+        {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
+            nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
+            pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku. */}
+        <p className="mt-1 line-clamp-2 text-sm text-slate-600">
+          {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
+            <span className="font-semibold text-slate-400">Biuro: </span>}
+          {r.ostatniaWiadomosc}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
           <span>{czas(r.ostatniaWiadomoscAt)}</span>
           {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">

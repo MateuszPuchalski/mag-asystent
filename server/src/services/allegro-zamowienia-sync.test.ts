@@ -65,6 +65,38 @@ test("to samo zamówienie przy dwóch zwrotach pobiera się raz", () => {
   assert.deepEqual(brakujaceZamowienia(d, 10), ["ord-1"]);
 });
 
+/* Numer zamówienia prowadzi tu także z WIADOMOŚCI (0.166.0, gałąź
+   `relatesTo.order`). Bez tego rozmowa pokazywałaby goły numer na zawsze —
+   ticker nie miałby powodu, żeby po treść sięgnąć. */
+function wiadomosc(d: Db, ext: string, orderId: string | null, sentAt = "2026-08-30T09:00:00Z") {
+  d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,updated_at)
+    VALUES (1,?,?)`).run(`w-${ext}`, sentAt);
+  const rozmowa = Number((d.prepare("SELECT id FROM conversation WHERE external_conversation_id=?")
+    .get(`w-${ext}`) as { id: number }).id);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,
+    body,related_order_id,sent_at) VALUES (?,1,?,'incoming','Kiedy wysyłka?',?,?)`)
+    .run(rozmowa, ext, orderId, sentAt);
+}
+
+test("zamówienie wskazane w wiadomości klienta też idzie do pobrania", () => {
+  const d = stanowisko();
+  wiadomosc(d, "m1", "ord-7");
+  wiadomosc(d, "m2", null);
+  zwrot(d, "z1", "ord-1");
+  assert.deepEqual(brakujaceZamowienia(d, 10).sort(), ["ord-1", "ord-7"],
+    "wiadomość bez numeru zamówienia nie generuje żądania");
+});
+
+test("zamówienie z wiadomości, które już mamy, nie wraca na listę", () => {
+  const d = stanowisko();
+  wiadomosc(d, "m1", "ord-7");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (1,'ord-7','2026-09-01T09:00:00Z')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (1,'111','Sekator NAC','SEK-NAC-46',1,8999,'PLN')`).run();
+  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), []);
+});
+
 test("bezpiecznik ogranicza liczbę żądań w jednym przebiegu", async () => {
   /* Świeża baza ma po pierwszej synchronizacji dziewięćdziesiąt dni zwrotów.
      Tyle żądań w jednym ciągu z jednego adresu to sygnatura, po której

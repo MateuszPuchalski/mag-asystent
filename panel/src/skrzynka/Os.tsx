@@ -79,7 +79,13 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
       : <article key={w.id} className={`rounded-lg border p-3 ${w.odKlienta
           ? "border-os-klient-ramka bg-os-klient" : "border-os-firma-ramka bg-os-firma"}`}>
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <b>{w.autor}</b>{w.ofertaId && <span>· oferta {w.ofertaId}</span>}
+            <b>{w.autor}</b>
+            {/* Nazwa przy ofercie jest Z ZAMÓWIENIA (§4.3) — mail Allegro
+                „Wiadomość dotyczy" pokazuje tytuł, goły numer kazał agentowi
+                szukać towaru drugi raz. Zamówienie skracamy: UUID w całości
+                nikomu nic nie mówi, a całość niesie blok nad osią. */}
+            {w.ofertaId && <span>· oferta {w.ofertaId}{w.nazwaOferty && ` — ${w.nazwaOferty}`}</span>}
+            {w.zamowienieId && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}

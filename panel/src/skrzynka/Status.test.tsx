@@ -7,7 +7,7 @@ import type { Rozmowa } from "../api/typy";
 const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
-  ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z",
+  ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null, ...n,
 });

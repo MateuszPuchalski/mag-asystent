@@ -1470,6 +1470,16 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.166.0 nie wymaga niczego ręką, ale ma opóźnienie.**
+
+Kolejka skrzynki pokazuje od tej wersji ostatnią wiadomość KLIENTA, a rozmowa
+mówi, którego zamówienia dotyczy. Numery zamówień dla starych wiadomości
+migracja dosypuje sama z lądowiska przy pierwszym starcie. Treść tych zamówień
+dociąga ticker, po dwadzieścia na przebieg co dziesięć minut. Przez pierwsze
+kilkadziesiąt minut część rozmów pokaże więc sam numer z odnośnikiem i zdanie,
+że treść dopiero przyjedzie. To nie jest usterka. **Panel trzeba
+przebudować** (`npm run build`).
+
 **Aktualizacja do 0.164.0 wymaga JEDNEJ rzeczy ręką: nowego uprawnienia.**
 
 Panel zaczyna pokazywać przy każdej pozycji zwrotu, czy wniosek o rabat
