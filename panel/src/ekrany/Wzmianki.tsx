@@ -25,7 +25,8 @@ export function Wzmianki() {
   const wszystkie = dane.data?.wzmianki ?? [];
   const widoczne = zHistoria ? wszystkie : wszystkie.filter((w) => !w.odhaczona);
 
-  return <div className="space-y-4">
+  /* Własny scroller — patrz `Zadania`; rama panelu nie przewija za ekrany. */
+  return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
       <AtSign size={18} /><b className="mr-auto">Wspomniano o mnie</b>
       <span className="text-sm text-slate-500">

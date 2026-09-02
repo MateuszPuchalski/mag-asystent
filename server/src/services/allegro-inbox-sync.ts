@@ -310,7 +310,7 @@ function oferta(message: Message): [string | null, string | null] {
   return id == null ? [null, null] : ["OFFER", String(id)];
 }
 
-/* Gałąź `order` idzie do OSOBNEJ kolumny (0.165.0). Do 0.164.0 była
+/* Gałąź `order` idzie do OSOBNEJ kolumny (0.166.0). Do 0.165.0 była
    wyrzucana z uzasadnieniem „numer zamówienia zostaje w `surowe_json` do
    czasu, aż będzie miał ekran" — a sonda z 2 września pokazała, że to
    zamówienie, nie oferta, jest częstszym powiązaniem (7 z 33 wobec 5 z 33).

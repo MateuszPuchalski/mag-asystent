@@ -50,7 +50,7 @@ export interface WpisOsi {
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
      kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
   nazwaOferty?: string | null;
-  /* Zamówienie, którego dotyczy wiadomość — gałąź `relatesTo.order` (0.165.0). */
+  /* Zamówienie, którego dotyczy wiadomość — gałąź `relatesTo.order` (0.166.0). */
   zamowienieId?: string | null;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Wzmianka[];
@@ -65,7 +65,7 @@ export interface ZamowienieRozmowy {
 
 const SKRZYNKA = "skrzynka";
 
-/* PODGLĄD W KOLEJCE TO OSTATNIA WIADOMOŚĆ KLIENTA (0.165.0). Do 0.164.0
+/* PODGLĄD W KOLEJCE TO OSTATNIA WIADOMOŚĆ KLIENTA (0.166.0). Do 0.165.0
    podzapytanie brało ostatnią wiadomość JAKĄKOLWIEK, więc po autoodpowiedzi
    konta Allegro („Dziękujemy za kontakt…" wjeżdża synchronizacją jako zwykłe
    `outgoing`) w kolejce stało nasze zdanie zamiast pytania. W `message` nie

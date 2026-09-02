@@ -47,7 +47,7 @@ export interface PozycjaZwrotu {
   rabat: StanRabatu;
 }
 
-/* `Zamowienie` i `PozycjaZamowienia` mieszkają od 0.165.0 w `zamowienia.ts`,
+/* `Zamowienie` i `PozycjaZamowienia` mieszkają od 0.166.0 w `zamowienia.ts`,
    bo to samo zamówienie pokazuje też rozmowa. Re-eksport trzyma stare importy. */
 export type { PozycjaZamowienia, Zamowienie } from "./zamowienia.js";
 

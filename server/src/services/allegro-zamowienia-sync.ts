@@ -75,7 +75,7 @@ export interface ZamowieniaSyncDeps {
  * Zamówienie, którego sprzedawca po prostu nie opisał SKU, nie ma się
  * odpytywać w kółko co dziesięć minut do końca świata.
  *
- * Od 0.165.0 numer prowadzi tu także z WIADOMOŚCI (`message.related_order_id`,
+ * Od 0.166.0 numer prowadzi tu także z WIADOMOŚCI (`message.related_order_id`,
  * gałąź `relatesTo.order` z Allegro): rozmowa pokazuje zamówienie, którego
  * dotyczy, i bez tej unii pokazywałaby wyłącznie numer. Ten sam limit
  * i takt — zamówienia z rozmów są tak samo nieliczne jak te ze zwrotów.

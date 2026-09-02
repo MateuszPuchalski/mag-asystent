@@ -5,7 +5,7 @@ import { zlote } from "../api/zwroty";
 import { czas } from "../ui";
 
 /**
- * Zamówienie, którego dotyczy rozmowa (0.165.0).
+ * Zamówienie, którego dotyczy rozmowa (0.166.0).
  *
  * Mail Allegro „Wiadomość dotyczy" pokazywał towar, a panel — nic: gałąź
  * `relatesTo.order` była wyrzucana przy mapowaniu. Blok ma trzy stany i każdy

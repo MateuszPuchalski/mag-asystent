@@ -49,7 +49,7 @@ test("lista bierze rozmowy z modelu kanonicznego, a podgląd to słowa klienta",
   assert.equal(r.length, 1);
   assert.equal(r[0].klient, "zielony_ogrod");
   assert.equal(r[0].nieprzeczytana, true);
-  /* Do 0.164.0 ta asercja oczekiwała „Sprawdzimy na hali." — czyli utrwalała
+  /* Do 0.165.0 ta asercja oczekiwała „Sprawdzimy na hali." — czyli utrwalała
      usterkę: podgląd brał ostatnią wiadomość JAKĄKOLWIEK, więc autoodpowiedź
      konta Allegro zasłaniała pytanie. Data idzie z tej samej wiadomości,
      nie z daty wątku (09:00). */
@@ -90,7 +90,7 @@ test("rozmowa bez wiadomości klienta pokazuje ostatnią naszą i mówi, że to 
 });
 
 test("oś niesie zamówienie z relatesTo.order i nazwę towaru z zamówienia", () => {
-  /* Mail Allegro „Wiadomość dotyczy" pokazuje towar; panel do 0.164.0 pokazywał
+  /* Mail Allegro „Wiadomość dotyczy" pokazuje towar; panel do 0.165.0 pokazywał
      goły numer oferty, a numer zamówienia wyrzucał przy mapowaniu. */
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);

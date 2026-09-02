@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { AlertTriangle, PackageX, Ban } from "lucide-react";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
@@ -50,14 +50,34 @@ function Termin({ dni }: { dni: number }) {
     title={`Termin ustawowy: ${dni < 0 ? "przekroczony" : "za " + dniSlowo(dni)}`}>{tekst}</span>;
 }
 
-export function Kolejka({ zwroty, wybrany, onWybierz }: {
+export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
   zwroty: Zwrot[];
   wybrany: number | null;
+  /** Przy szukaniu lista miesza kubełki, więc wiersz musi powiedzieć swój. */
+  zKubelkiem?: boolean;
   onWybierz: (id: number) => void;
 }) {
+  const aktywnyWiersz = useRef<HTMLButtonElement | null>(null);
+
+  /* Od 0.165.0 kolejka jest zamknięta we własnym scrollerze, więc wybór trzeba
+     DOGONIĆ widokiem — inaczej `j` przesuwa zaznaczenie poza dolną krawędź
+     i operator steruje czymś, czego nie widzi.
+
+     `block: "nearest"` załatwia przy okazji mysz: wiersz widoczny w całości
+     nie jest przewijany wcale, a klikniętego nie da się kliknąć, nie widząc
+     go. Flaga „skąd przyszła zmiana" byłaby drugim stanem do utrzymania po to,
+     żeby wyłączyć operację, która i tak jest pusta.
+
+     Efekt biegnie po zmianie `wybrany`, a nie przy każdym renderze: inaczej
+     odświeżenie zapytania szarpałoby listę z powrotem do zaznaczenia, gdy
+     operator przewinął ją ręcznie. */
+  useEffect(() => { aktywnyWiersz.current?.scrollIntoView({ block: "nearest" }); }, [wybrany]);
+
   if (!zwroty.length) {
     return <p className="p-6 text-center text-sm text-slate-500">
-      Ten kubełek jest pusty — nic tu nie czeka na ruch.</p>;
+      {zKubelkiem
+        ? "Żaden zwrot nie pasuje do tego, czego szukasz."
+        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</p>;
   }
   return <ul className="divide-y divide-slate-200">
     {zwroty.map((z) => {
@@ -68,6 +88,7 @@ export function Kolejka({ zwroty, wybrany, onWybierz }: {
           /* `aria-current` zamiast samego koloru: wiersz wybrany klawiaturą
              ma być wybrany także dla czytnika ekranu. */
           aria-current={aktywny ? "true" : undefined}
+          ref={aktywny ? aktywnyWiersz : null}
           onClick={() => onWybierz(z.id)}
           className={`flex w-full gap-3 px-4 py-3 text-left ${aktywny ? "bg-amber-50" : "hover:bg-slate-50"}`}>
           {/* Miniatura PIERWSZEJ pozycji. Zwrot wielopozycyjny i tak
@@ -79,6 +100,10 @@ export function Kolejka({ zwroty, wybrany, onWybierz }: {
           <div className="flex items-center gap-2">
             <span className="truncate font-bold">{z.numer ?? z.externalId}</span>
             <span className="ml-auto" />
+            {/* Wynik szukania bywa z kubełka, którego nikt nie ogląda —
+                bez tej etykiety zwrot ZAMKNIĘTY wyglądałby jak praca. */}
+            {zKubelkiem && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
+              {KUBELKI.find((k) => k.id === z.kubelek)?.etykieta}</span>}
             <Termin dni={z.dniDoTerminu} />
           </div>
           <div className="mt-0.5 truncate text-sm text-slate-600">

@@ -70,7 +70,7 @@ function PigulkaSynchronizacji() {
 
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
-  return <header className="sticky top-0 z-20 border-b border-slate-200 bg-wertis-ink text-white">
+  return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
     <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-5 py-3">
       <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
       <div className="mr-auto"><b>WERTIS</b>
@@ -95,9 +95,35 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
 function App() {
   const [zalogowany, setZalogowany] = useState(Boolean(token()));
   if (!zalogowany) return <Logowanie zalogowano={() => setZalogowany(true)} />;
-  return <div className="min-h-screen">
+  /* ── Rama trzyma OKNO (0.165.0) ────────────────────────────────────────────
+     Do 0.164.0 przewijał się dokument, czyli wszystkie kolumny naraz: żeby
+     zobaczyć dół dowodów przy zwrocie, operator zjeżdżał z oczu kolejce
+     i paskowi decyzji. Teraz okno jest zamknięte tutaj, a przewijają się
+     kolumny u siebie — dokładnie jak w makiecie panelu
+     (`docs/projekt-widokow/Main.dc.html`), do której front nigdy nie doszedł.
+
+     `<main>` jest `overflow-hidden`, nie `overflow-y-auto`: ekran, który sam
+     zarządza swoimi scrollerami, nie ma dostać drugiego, zewnętrznego. Dwa
+     paski przewijania jeden w drugim byłyby gorsze niż jeden dzisiejszy.
+     Ceną jest to, że KAŻDY ekran ma mieć własny scroller.
+
+     Blokada zaczyna się dopiero od `lg`. Niżej grid i tak jest jednokolumnowy,
+     a trzy scrollery po dwieście pikseli czytałoby się gorzej niż przewijaną
+     stronę; widok wąski jest osobnym ekranem (projekt §10.5), nie tym samym
+     w miniaturze. Nagłówek zostaje `sticky` właśnie dla tego widoku — powyżej
+     `lg` nic pod nim nie przewija strony, więc `sticky` jest tam bezczynne.
+
+     `lg:` w tym pliku znaczy zawsze i tylko WYSOKOŚĆ. Cała mechanika flexa
+     stoi bezwarunkowo, bo bez związanej wysokości jest bezczynna: `flex-1`
+     rozciąga do treści, a `overflow-hidden` nie ma czego przycinać.
+
+     `h-dvh`, nie `h-screen`, i `lg:min-h-0` kasujące `min-h-screen`: na
+     tablecie w poziomie `100vh` bywa większe niż widoczne okno i strona
+     przewijałaby się o te kilkadziesiąt pikseli — czyli akurat o tyle, żeby
+     blokada wyglądała na zepsutą. */
+  return <div className="min-h-screen lg:flex lg:h-dvh lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={() => { wyczyscToken(); klient.clear(); setZalogowany(false); }} />
-    <main className="mx-auto max-w-[1500px] p-5">
+    <main className="mx-auto w-full max-w-[1500px] p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <Routes>
         <Route path="/obsluga/" element={<Zadania />} />
         {/* Rozmowa ma własny adres, więc odświeżenie strony jej nie gubi,

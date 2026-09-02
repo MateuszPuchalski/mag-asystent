@@ -53,6 +53,8 @@ const pokaz = (adres = "/obsluga/zwroty") =>
     </Routes>
   </MemoryRouter></QueryClientProvider>);
 
+const szukajka = () => screen.getByPlaceholderText(/Zeskanuj etykietę/);
+
 describe("Ekran zwrotów", () => {
   it("kubełek niesie pytanie, a nie samą etykietę", () => {
     pokaz();
@@ -90,6 +92,42 @@ describe("Ekran zwrotów", () => {
     pokaz("/obsluga/zwroty/1");
     expect(screen.queryByText(/To wydanie tylko czyta/)).toBeNull();
     expect(screen.getByRole("button", { name: /Przyjmij/ })).toBeEnabled();
+  });
+
+  it("fragment kodu zawęża kolejkę i sięga POZA wybrany kubełek", async () => {
+    /* Bez przebicia kubełka operator wpisuje numer, widzi „ten kubełek jest
+       pusty" i nie ma jak się dowiedzieć, że zwrot stoi gdzie indziej. */
+    pokaz();
+    await userEvent.type(szukajka(), "ZW-");
+    /* Oba zwroty pasują, choć kursor stoi w kubełku, w którym leży jeden. */
+    expect(screen.getByText(/2 pasujących zwrotów — szukam po wszystkich kubełkach/))
+      .toBeInTheDocument();
+  });
+
+  it("fragment pokazuje zwrot z CUDZEGO kubełka razem z jego etykietą", async () => {
+    pokaz();
+    /* Kursor stoi w kubełku DO DECYZJI, a `ZW-2` leży w DO ZWROTU. */
+    await userEvent.type(szukajka(), "ZW-2");
+    expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
+  });
+
+  it("CAŁY numer otwiera zwrot, sam fragment nigdy", async () => {
+    /* Ekran sam otwiera przy jednym wyniku, więc dopasowanie przybliżone
+       prowadziłoby do cudzej sprawy — cudzego klienta i cudzych pieniędzy. */
+    pokaz();
+    await userEvent.type(szukajka(), "ZW-");
+    expect(screen.queryByRole("heading", { name: "ZW-2" })).toBeNull();
+    await userEvent.type(szukajka(), "2");
+    expect(await screen.findByRole("heading", { name: "ZW-2" })).toBeInTheDocument();
+  });
+
+  it("kliknięcie w kubełek zdejmuje filtr, bo jest prośbą o TEN kubełek", async () => {
+    pokaz();
+    await userEvent.type(szukajka(), "ZW-2");
+    await userEvent.click(screen.getByRole("button", { name: /Do decyzji/ }));
+    expect(screen.queryByText(/szukam po wszystkich kubełkach/)).toBeNull();
+    expect(screen.getAllByText("Przyjąć czy odrzucić?").length).toBeGreaterThan(0);
   });
 
   it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", () => {

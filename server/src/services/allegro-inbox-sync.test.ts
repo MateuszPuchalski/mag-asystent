@@ -139,7 +139,7 @@ test("kierunek bierze się z isInterlocutor, a oferta z relatesTo", async () => 
           text: "Zmierzycie?", relatesTo: { offer: { id: "oferta-9" } } }),
         message("m-2", { author: { login: "wertis", isInterlocutor: false },
           text: "Sprawdzimy.", relatesTo: undefined }),
-        /* Gałęzie `offer` i `order` są NIEZALEŻNE (0.165.0): sama druga,
+        /* Gałęzie `offer` i `order` są NIEZALEŻNE (0.166.0): sama druga,
            obie naraz. Do 0.164.0 `order` ginął przy mapowaniu w każdym z tych
            przypadków — a sonda liczy go częściej niż ofertę. */
         message("m-3", { text: "Kiedy wysyłka?", relatesTo: { order: { id: "zam-3" } } }),

@@ -43,7 +43,7 @@ describe("Kolejka", () => {
   });
 
   it("podgląd naszej wiadomości jest podpisany, podgląd klienta — nie", () => {
-    /* Kolejka pokazuje słowa KLIENTA (0.165.0). Gdy klient nic nie napisał,
+    /* Kolejka pokazuje słowa KLIENTA (0.166.0). Gdy klient nic nie napisał,
        stoi nasze zdanie z podpisem „Biuro" — bez niego autoodpowiedź konta
        Allegro czytała się jak pytanie. */
     const { rerender } = render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null}

@@ -167,7 +167,7 @@ export function migrate(database: DatabaseSync) {
      dalej musiałaby czytać surowe lądowisko Allegro. */
   addColumn("message", "related_object_type", "TEXT");
   addColumn("message", "related_object_id", "TEXT");
-  /* Zamówienie przy wiadomości (0.165.0). Kolumna dochodzi do tabeli, która
+  /* Zamówienie przy wiadomości (0.166.0). Kolumna dochodzi do tabeli, która
      stoi u klienta od 0.144.0, a jej treść dla starych wiadomości bierze się
      z lądowiska — patrz `dosypZamowienieWiadomosci` niżej. */
   addColumn("message", "related_order_id", "TEXT");
@@ -885,9 +885,9 @@ function dosypIdZMaski(database: DatabaseSync) {
 }
 
 /**
- * Uzupełnia `message.related_order_id` z lądowiska (0.165.0).
+ * Uzupełnia `message.related_order_id` z lądowiska (0.166.0).
  *
- * Do 0.164.0 synchronizator mapował z `relatesTo` wyłącznie gałąź `offer`,
+ * Do 0.165.0 synchronizator mapował z `relatesTo` wyłącznie gałąź `offer`,
  * a `order.id` „zostawał w `surowe_json` do czasu, aż będzie miał ekran".
  * Ekran jest, a wiadomości sprzed tego wydania nie przyjadą drugi raz —
  * `INSERT … DO NOTHING` w synchronizatorze celowo ich nie nadpisuje. Numer

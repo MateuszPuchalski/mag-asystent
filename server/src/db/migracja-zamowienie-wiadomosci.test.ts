@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* Dosypka `message.related_order_id` z lądowiska (0.165.0).
+/* Dosypka `message.related_order_id` z lądowiska (0.166.0).
 
    Do 0.164.0 synchronizator wyrzucał gałąź `relatesTo.order`, a wiadomości
    nie wjeżdżają drugi raz (`INSERT … DO NOTHING`). Numer został jednak

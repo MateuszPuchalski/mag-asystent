@@ -65,7 +65,7 @@ test("to samo zamówienie przy dwóch zwrotach pobiera się raz", () => {
   assert.deepEqual(brakujaceZamowienia(d, 10), ["ord-1"]);
 });
 
-/* Numer zamówienia prowadzi tu także z WIADOMOŚCI (0.165.0, gałąź
+/* Numer zamówienia prowadzi tu także z WIADOMOŚCI (0.166.0, gałąź
    `relatesTo.order`). Bez tego rozmowa pokazywałaby goły numer na zawsze —
    ticker nie miałby powodu, żeby po treść sięgnąć. */
 function wiadomosc(d: Db, ext: string, orderId: string | null, sentAt = "2026-08-30T09:00:00Z") {

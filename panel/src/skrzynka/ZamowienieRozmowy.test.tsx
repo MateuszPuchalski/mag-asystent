@@ -4,7 +4,7 @@ import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { brakPowiazania } from "./Rozmowa";
 import type { WpisOsi, ZamowienieRozmowy as Dane } from "../api/typy";
 
-/* Blok zamówienia nad osią (0.165.0). Trzy stany i każdy mówi co innego:
+/* Blok zamówienia nad osią (0.166.0). Trzy stany i każdy mówi co innego:
    numer z odnośnikiem, treść z pozycjami, albo zdanie, że treść dopiero
    przyjedzie — milczenie w tym miejscu wyglądałoby jak usterka. */
 const dane = (n: Partial<Dane> = {}): Dane => ({

@@ -14,7 +14,7 @@ import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
  *
- * Do 0.164.0 liczyła się sama oferta. Zamówienie nazywa towar DOKŁADNIEJ niż
+ * Do 0.165.0 liczyła się sama oferta. Zamówienie nazywa towar DOKŁADNIEJ niż
  * oferta (pozycje z nazwą i SKU), więc rozmowa z numerem zamówienia nie
  * dostaje bloku „brak powiązania z ofertą" — dostaje blok zamówienia.
  * Ekran dalej nie podstawia oferty zgadniętej z treści — tak wygrywały
@@ -74,7 +74,7 @@ export function Rozmowa(p: {
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
   if (!p.dane) {
-    return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
+    return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
       <Pusto ikona={<Inbox size={38} />}>Wybierz rozmowę z listy</Pusto>
     </section>;
   }
@@ -84,7 +84,7 @@ export function Rozmowa(p: {
   const bezOferty = brakPowiazania(os);
   const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
-  return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
+  return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
     <header className="flex flex-wrap items-center gap-3 border-b p-4">
       <b className="mr-auto">{rozmowa.klient}</b>
       {rozmowa.wlasciciel
@@ -108,7 +108,7 @@ export function Rozmowa(p: {
       onZaloz={p.onZalozSprawe} onDolacz={p.onDolaczDoSprawy} onOdlacz={p.onOdlaczOdSprawy}
       onOtworz={p.onOtworzRozmowe} />
 
-    {/* Zamówienie POD sprawą, NAD wiadomościami (0.165.0): „czego dotyczy"
+    {/* Zamówienie POD sprawą, NAD wiadomościami (0.166.0): „czego dotyczy"
         czyta się przed „co napisał". Blok stoi tylko, gdy wiadomość niesie
         numer — rozmowa bez zamówienia nie udaje, że jakieś ma. */}
     {p.dane.zamowienie && <ZamowienieRozmowy zamowienie={p.dane.zamowienie} />}

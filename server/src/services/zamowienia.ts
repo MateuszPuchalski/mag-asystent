@@ -1,9 +1,9 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { linkZamowienia } from "./allegro-linki.js";
 
-/* ── Zamówienie klienta jako DTO (0.165.0) ──────────────────────────────────
-   Do 0.164.0 mapowanie wiersza `zamowienie_klienta` na kształt dla panelu
-   stało inline w `zwroty.ts`. Rozmowa od 0.165.0 pokazuje to samo zamówienie
+/* ── Zamówienie klienta jako DTO (0.166.0) ──────────────────────────────────
+   Do 0.165.0 mapowanie wiersza `zamowienie_klienta` na kształt dla panelu
+   stało inline w `zwroty.ts`. Rozmowa od 0.166.0 pokazuje to samo zamówienie
    (z `message.related_order_id`), a dwa mapowania jednego wiersza
    rozjechałyby się przy pierwszym nowym polu — dlatego jedno, tutaj.        */
 

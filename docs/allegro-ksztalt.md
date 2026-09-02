@@ -124,10 +124,10 @@ Trzy pola z tej listy zmieniają działanie synchronizatora:
   ani `type` — `OFFER` w kolumnie `related_object_type` to NASZE słowo,
   nazwane tak w modelu kanonicznym, a nie cytat z Allegro.
 - **`relatesTo.order.id`** daje zamówienie i idzie do OSOBNEJ kolumny
-  `message.related_order_id` (0.165.0). Obie gałęzie są od siebie niezależne:
+  `message.related_order_id` (0.166.0). Obie gałęzie są od siebie niezależne:
   wiadomość niesie jedną, obie albo żadną. Raport z 2 września liczy
   `order` w 7 z 33 wiadomości, `offer` w 5 z 33 — zamówienie jest częstszym
-  powiązaniem, a do 0.164.0 było wyrzucane przy mapowaniu.
+  powiązaniem, a do 0.165.0 było wyrzucane przy mapowaniu.
 
 ### Czego nie mapujemy i dlaczego
 
@@ -137,8 +137,8 @@ więc kolumn na nie nie ma. `type` (`MESSAGE_CENTER`) rozróżnia kanały, któr
 mamy jeden. `additionalInformation` niesie dane właściwe branży (w przykładzie
 `vin`) i nie ma u nas ekranu.
 
-Do 0.164.0 stało tu zdanie, że `relatesTo.order.id` „czeka na ekran
-zamówienia". Ekran jest od 0.165.0: numer trafia do modelu, ticker
+Do 0.165.0 stało tu zdanie, że `relatesTo.order.id` „czeka na ekran
+zamówienia". Ekran jest od 0.166.0: numer trafia do modelu, ticker
 `uzupelnijZamowienia` dociąga treść tą samą drogą co przy zwrotach, a stare
 wiadomości dostają numer dosypką z `surowe_json` lądowiska.
 

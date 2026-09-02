@@ -1470,7 +1470,7 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
-**Aktualizacja do 0.165.0 nie wymaga niczego ręką, ale ma opóźnienie.**
+**Aktualizacja do 0.166.0 nie wymaga niczego ręką, ale ma opóźnienie.**
 
 Kolejka skrzynki pokazuje od tej wersji ostatnią wiadomość KLIENTA, a rozmowa
 mówi, którego zamówienia dotyczy. Numery zamówień dla starych wiadomości

@@ -3,8 +3,8 @@ import { render, screen } from "@testing-library/react";
 import { Os } from "./Os";
 import type { WpisOsi } from "../api/typy";
 
-/* Powiązanie wiadomości z towarem (0.165.0). Mail Allegro „Wiadomość dotyczy"
-   pokazuje tytuł i zamówienie; panel do 0.164.0 pokazywał goły numer oferty,
+/* Powiązanie wiadomości z towarem (0.166.0). Mail Allegro „Wiadomość dotyczy"
+   pokazuje tytuł i zamówienie; panel do 0.165.0 pokazywał goły numer oferty,
    a numer zamówienia wyrzucał przy mapowaniu. */
 describe("Powiązanie wiadomości na osi", () => {
   const wpis = (n: Partial<WpisOsi> = {}): WpisOsi => ({

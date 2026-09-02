@@ -44,7 +44,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onZrodlo: (messageId: number | null) => void;
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
-  return <div className="flex-1 space-y-3 overflow-y-auto p-4">
+  return <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
     {wpisy.map((w) => w.rodzaj === "status" || w.rodzaj === "sprawa"
       /* Zmiana statusu (§10.3, 0.158.0) i sklejenie sprawy (0.161.0) są
          KRESKĄ, nie kafelkiem: to nie czyjaś wypowiedź, tylko znak, że sprawa
