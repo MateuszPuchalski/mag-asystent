@@ -34,23 +34,94 @@ before(async () => {
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
     .run().lastInsertRowid);
   rozmowaId = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
-    subject,unread,updated_at) VALUES (?,'w-1','zielony_ogrod',1,'2026-08-31T08:42:00.000Z')`)
+    subject,unread,updated_at) VALUES (?,'w-1','zielony_ogrod',1,'2026-08-31T09:00:00.000Z')`)
     .run(konto).lastInsertRowid);
   wiadomoscKlienta = Number(d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
     external_message_id,direction,body,related_object_type,related_object_id,sent_at)
     VALUES (?,?,'m-1','incoming','Czy zmierzycie rozstaw otworów?','OFFER','oferta-9','2026-08-31T08:42:00.000Z')`)
     .run(rozmowaId, konto).lastInsertRowid);
   d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
-    VALUES (?,?,'m-2','outgoing','Sprawdzimy na hali.','2026-08-31T08:42:00.000Z')`).run(rozmowaId, konto);
+    VALUES (?,?,'m-2','outgoing','Sprawdzimy na hali.','2026-08-31T09:00:00.000Z')`).run(rozmowaId, konto);
 });
 
-test("lista bierze rozmowy z modelu kanonicznego", () => {
+test("lista bierze rozmowy z modelu kanonicznego, a podgląd to słowa klienta", () => {
   const r = listaRozmow();
   assert.equal(r.length, 1);
   assert.equal(r[0].klient, "zielony_ogrod");
   assert.equal(r[0].nieprzeczytana, true);
-  assert.equal(r[0].ostatniaWiadomosc, "Sprawdzimy na hali.");
+  /* Do 0.164.0 ta asercja oczekiwała „Sprawdzimy na hali." — czyli utrwalała
+     usterkę: podgląd brał ostatnią wiadomość JAKĄKOLWIEK, więc autoodpowiedź
+     konta Allegro zasłaniała pytanie. Data idzie z tej samej wiadomości,
+     nie z daty wątku (09:00). */
+  assert.equal(r[0].ostatniaWiadomosc, "Czy zmierzycie rozstaw otworów?");
+  assert.equal(r[0].ostatniaWiadomoscAt, "2026-08-31T08:42:00.000Z");
+  assert.equal(r[0].ostatniaOdKlienta, true);
   assert.equal(r[0].wlasciciel, null);
+});
+
+test("rozmowa bez wiadomości klienta pokazuje ostatnią naszą i mówi, że to biuro", () => {
+  /* Wątek, który zaczęliśmy my. Pusty podgląd wyglądałby jak usterka, a podgląd
+     bez podpisu — jak pytanie klienta. Osobna rozmowa, żeby nie ruszać
+     stanu, na którym stoją pozostałe testy. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const nasza = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-nasza','ogrod_pl',0,'2026-08-30T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-nasza','outgoing','Przesyłka wyszła dziś.','2026-08-30T10:00:00.000Z')`).run(nasza, konto);
+  const pusta = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-pusta','nowy_wątek',1,'2026-08-29T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+
+  const lista = listaRozmow();
+  const wNasza = lista.find((r) => r.id === nasza)!;
+  assert.equal(wNasza.ostatniaWiadomosc, "Przesyłka wyszła dziś.");
+  assert.equal(wNasza.ostatniaOdKlienta, false);
+  /* Wątek świeżo założony, bez wiadomości (Allegro takie oddaje): data
+     z wątku, podgląd pusty i bez podpisu „Biuro" — nie ma czego podpisywać. */
+  const wPusta = lista.find((r) => r.id === pusta)!;
+  assert.equal(wPusta.ostatniaWiadomosc, "");
+  assert.equal(wPusta.ostatniaWiadomoscAt, "2026-08-29T10:00:00.000Z");
+  assert.equal(wPusta.ostatniaOdKlienta, true);
+  /* Kolejność dalej niesie datę wątku: 09:00 > 08-30 > 08-29. */
+  assert.deepEqual(lista.map((r) => r.id), [rozmowaId, nasza, pusta]);
+  d.prepare("DELETE FROM conversation WHERE id IN (?,?)").run(nasza, pusta);
+});
+
+test("oś niesie zamówienie z relatesTo.order i nazwę towaru z zamówienia", () => {
+  /* Mail Allegro „Wiadomość dotyczy" pokazuje towar; panel do 0.164.0 pokazywał
+     goły numer oferty, a numer zamówienia wyrzucał przy mapowaniu. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-zam','kupujacy_7',1,'2026-08-30T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_object_type,related_object_id,related_order_id,sent_at)
+    VALUES (?,?,'m-zam-1','incoming','Ta sztuka pasuje?','OFFER','oferta-9','zam-77','2026-08-30T10:00:00.000Z')`)
+    .run(r, konto);
+
+  /* Zanim ticker dociągnie zamówienie: numer i odnośnik są, treści nie ma. */
+  let os = osRozmowy(r);
+  assert.equal(os.os[0].zamowienieId, "zam-77");
+  assert.equal(os.os[0].nazwaOferty, null, "nazwy nie znamy, dopóki oferta nie przeszła przez zamówienie");
+  assert.equal(os.zamowienie?.externalId, "zam-77");
+  assert.equal(os.zamowienie?.pobrane, null);
+
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (?,'zam-77','2026-08-30T10:10:00.000Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,ilosc,cena_grosze,waluta)
+    VALUES (?,'oferta-9','Szarpak do NAC LS 46-450',1,4599,'PLN')`).run(zam);
+
+  os = osRozmowy(r);
+  assert.equal(os.os[0].nazwaOferty, "Szarpak do NAC LS 46-450");
+  assert.equal(os.zamowienie?.pobrane?.pozycje[0].nazwa, "Szarpak do NAC LS 46-450");
+  assert.equal(os.zamowienie?.pobrane?.pozycje[0].zwracana, false);
+  /* Rozmowa bez numeru zamówienia nie udaje, że jakieś ma. */
+  assert.equal(osRozmowy(rozmowaId).zamowienie, null);
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+  d.prepare("DELETE FROM zamowienie_klienta WHERE id=?").run(zam);
 });
 
 /* Data ostatniej synchronizacji jest częścią odpowiedzi, bo pusta lista bez niej

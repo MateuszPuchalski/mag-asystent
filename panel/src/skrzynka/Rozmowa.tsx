@@ -1,7 +1,7 @@
 import React from "react";
 import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import type { OsRozmowy, StatusRozmowy, SzczegolyKonfliktu } from "../api/typy";
+import type { OsRozmowy, StatusRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import { Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
 import { Edytor } from "./Edytor";
@@ -9,6 +9,21 @@ import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { Sprawa } from "./Sprawa";
+import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
+
+/**
+ * Pytanie bez żadnego powiązania z towarem (§4.3).
+ *
+ * Do 0.164.0 liczyła się sama oferta. Zamówienie nazywa towar DOKŁADNIEJ niż
+ * oferta (pozycje z nazwą i SKU), więc rozmowa z numerem zamówienia nie
+ * dostaje bloku „brak powiązania z ofertą" — dostaje blok zamówienia.
+ * Ekran dalej nie podstawia oferty zgadniętej z treści — tak wygrywały
+ * kiedyś „zdemontowanym" i „Pozdrawiam".
+ */
+export function brakPowiazania(os: WpisOsi[]): boolean {
+  return os.some((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.ofertaId && !w.zamowienieId)
+    && !os.some((w) => w.ofertaId || w.zamowienieId);
+}
 
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
@@ -66,10 +81,7 @@ export function Rozmowa(p: {
   const { rozmowa, os } = p.dane;
   const moja = rozmowa.wlascicielId !== null && rozmowa.wlascicielId === p.mojeId;
   const cudza = rozmowa.wlascicielId != null && rozmowa.wlascicielId !== p.mojeId;
-  /* Pytanie bez numeru oferty mówi o tym wprost. Ekran nie podstawia oferty
-     zgadniętej z treści — tak wygrywały kiedyś „zdemontowanym" i „Pozdrawiam". */
-  const bezOferty = os.some((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.ofertaId)
-    && !os.some((w) => w.ofertaId);
+  const bezOferty = brakPowiazania(os);
   const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
   return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
@@ -95,6 +107,11 @@ export function Rozmowa(p: {
       trwa={p.trwaSprawa} blad={p.bladSprawy}
       onZaloz={p.onZalozSprawe} onDolacz={p.onDolaczDoSprawy} onOdlacz={p.onOdlaczOdSprawy}
       onOtworz={p.onOtworzRozmowe} />
+
+    {/* Zamówienie POD sprawą, NAD wiadomościami (0.165.0): „czego dotyczy"
+        czyta się przed „co napisał". Blok stoi tylko, gdy wiadomość niesie
+        numer — rozmowa bez zamówienia nie udaje, że jakieś ma. */}
+    {p.dane.zamowienie && <ZamowienieRozmowy zamowienie={p.dane.zamowienie} />}
 
     {p.nowaWiadomosc && <p className="flex items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
       <Bell size={16} />Klient dopisał nową wiadomość.

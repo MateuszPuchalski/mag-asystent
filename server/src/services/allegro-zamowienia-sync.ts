@@ -74,14 +74,23 @@ export interface ZamowieniaSyncDeps {
  * Drugi warunek ma bezpiecznik czasowy: odświeżamy najwyżej raz na dobę.
  * Zamówienie, którego sprzedawca po prostu nie opisał SKU, nie ma się
  * odpytywać w kółko co dziesięć minut do końca świata.
+ *
+ * Od 0.165.0 numer prowadzi tu także z WIADOMOŚCI (`message.related_order_id`,
+ * gałąź `relatesTo.order` z Allegro): rozmowa pokazuje zamówienie, którego
+ * dotyczy, i bez tej unii pokazywałaby wyłącznie numer. Ten sam limit
+ * i takt — zamówienia z rozmów są tak samo nieliczne jak te ze zwrotów.
  */
 export function brakujaceZamowienia(database: Db, ile: number, teraz = new Date()): string[] {
   const doba = new Date(teraz.getTime() - 86_400_000).toISOString();
-  return (database.prepare(`SELECT DISTINCT z.order_id AS id
-    FROM zwrot_klienta z
+  return (database.prepare(`SELECT DISTINCT z.id
+    FROM (
+      SELECT order_id AS id, channel_account_id, created_at AS at FROM zwrot_klienta
+      UNION ALL
+      SELECT related_order_id, channel_account_id, sent_at FROM message
+    ) z
     LEFT JOIN zamowienie_klienta k
-      ON k.channel_account_id = z.channel_account_id AND k.external_id = z.order_id
-    WHERE z.order_id IS NOT NULL AND z.order_id <> ''
+      ON k.channel_account_id = z.channel_account_id AND k.external_id = z.id
+    WHERE z.id IS NOT NULL AND z.id <> ''
       AND (
         k.id IS NULL
         OR (k.synced_at < ? AND NOT EXISTS (
@@ -89,7 +98,7 @@ export function brakujaceZamowienia(database: Db, ile: number, teraz = new Date(
               WHERE p.zamowienie_id = k.id AND p.sku IS NOT NULL AND TRIM(p.sku) <> ''
             ))
       )
-    ORDER BY z.created_at DESC
+    ORDER BY z.at DESC
     LIMIT ?`).all(doba, ile) as Array<{ id: string }>).map((r) => r.id);
 }
 

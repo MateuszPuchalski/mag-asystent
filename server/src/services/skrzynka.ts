@@ -4,6 +4,8 @@ import { uchwyty } from "./conversation-realtime.js";
 import { ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
+import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
+import { linkZamowienia } from "./allegro-linki.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -16,6 +18,9 @@ import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 
 export interface RozmowaSkrzynki {
   id: number; klient: string; ostatniaWiadomosc: string; ostatniaWiadomoscAt: string;
+  /* Czy podgląd to słowa klienta. Fałsz tylko wtedy, gdy rozmowa nie ma ani
+     jednej wiadomości przychodzącej — wtedy panel podpisuje podgląd „Biuro". */
+  ostatniaOdKlienta: boolean;
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
   /** Status WYLICZONY (§7) — odłożenie po terminie wraca tu już jako `open`. */
   status: StatusRozmowy;
@@ -41,20 +46,51 @@ export interface WpisOsi {
   id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
+  /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
+     niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
+     kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
+  nazwaOferty?: string | null;
+  /* Zamówienie, którego dotyczy wiadomość — gałąź `relatesTo.order` (0.165.0). */
+  zamowienieId?: string | null;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Wzmianka[];
 }
 export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
 
+/* Zamówienie przy rozmowie. `pobrane` jest `null`, dopóki ticker
+   `uzupelnijZamowienia` go nie dociągnie — numer i odnośnik są od razu. */
+export interface ZamowienieRozmowy {
+  externalId: string; link: string | null; pobrane: Zamowienie | null;
+}
+
 const SKRZYNKA = "skrzynka";
 
+/* PODGLĄD W KOLEJCE TO OSTATNIA WIADOMOŚĆ KLIENTA (0.165.0). Do 0.164.0
+   podzapytanie brało ostatnią wiadomość JAKĄKOLWIEK, więc po autoodpowiedzi
+   konta Allegro („Dziękujemy za kontakt…" wjeżdża synchronizacją jako zwykłe
+   `outgoing`) w kolejce stało nasze zdanie zamiast pytania. W `message` nie
+   ma flagi automatu — autoresponder i odpowiedź agenta wyglądają identycznie
+   — więc jedynym pewnym filtrem jest kierunek. Rozmowa bez ani jednej
+   wiadomości przychodzącej (wątek, który zaczęliśmy my) schodzi na ostatnią
+   dowolną, a `ostatniKierunek` mówi panelowi, żeby podpisał ją „Biuro".
+
+   Data idzie Z TEJ SAMEJ wiadomości, nie z `conversation.updated_at`: tamto
+   jest datą WĄTKU z Allegro i po autoodpowiedzi mówiło o godzinie naszego
+   zdania, nie pytania. `COALESCE` zostaje dla wątku świeżo założonego, bez
+   wiadomości — Allegro takie oddaje. Kolejność LISTY dalej niesie
+   `updated_at`, czyli tę samą, którą właściciel widzi w panelu sprzedawcy. */
 const LISTA = `
-  SELECT c.id, c.subject AS klient, c.updated_at AS ostatniaWiadomoscAt, c.unread,
+  SELECT c.id, c.subject AS klient, c.unread,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
          c.status, c.snoozed_until AS odlozoneDo,
-         (SELECT m.body FROM message m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1)
-           AS ostatniaWiadomosc
-    FROM conversation c LEFT JOIN app_user u ON u.user_id=c.assigned_user_id`;
+         o.body AS ostatniaWiadomosc,
+         COALESCE(o.sent_at, c.updated_at) AS ostatniaWiadomoscAt,
+         o.direction AS ostatniKierunek
+    FROM conversation c
+    LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
+    LEFT JOIN message o ON o.id = (
+      SELECT m.id FROM message m WHERE m.conversation_id=c.id
+       ORDER BY (m.direction='incoming') DESC, m.id DESC LIMIT 1)`;
 
 const naRozmowe = (
   w: Record<string, unknown>,
@@ -67,6 +103,8 @@ const naRozmowe = (
     id: Number(w.id), klient: String(w.klient ?? "Klient"),
     ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
     ostatniaWiadomoscAt: String(w.ostatniaWiadomoscAt),
+    /* Pusta rozmowa nie dostaje podpisu „Biuro" — nie ma czego podpisywać. */
+    ostatniaOdKlienta: String(w.ostatniKierunek ?? "incoming") === "incoming",
     nieprzeczytana: Boolean(Number(w.unread)),
     wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
     wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
@@ -116,7 +154,9 @@ export function listaRozmow(): RozmowaSkrzynki[] {
   /* Uchwyty bierzemy RAZ na całą listę, nie po jednym na wiersz: kolejka
      odświeża się przy każdym zdarzeniu, a mapa i tak stoi w pamięci. */
   const trzymane = uchwyty();
-  return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC`).all() as Array<Record<string, unknown>>)
+  /* Tie-breaker po `id`: dwie rozmowy z tą samą datą wątku stały dotąd
+     w kolejności, jaką dał planer zapytań, czyli w żadnej. */
+  return (db().prepare(`${LISTA} ORDER BY c.updated_at DESC, c.id DESC`).all() as Array<Record<string, unknown>>)
     .map((w) => naRozmowe(w, Date.now(), trzymane));
 }
 
@@ -124,14 +164,26 @@ export function listaRozmow(): RozmowaSkrzynki[] {
 export function osRozmowy(id: number): {
   rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null; sprawa: SprawaRozmowy | null;
+  zamowienie: ZamowienieRozmowy | null;
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
   const rozmowa = naRozmowe(wiersz, Date.now(), uchwyty());
 
+  /* Nazwa towaru przy ofercie bierze się z OSTATNIEJ pozycji zamówienia o tym
+     numerze oferty — jedynego miejsca, gdzie mamy tytuły, bo ofert nie
+     pobieramy. To nazwa z zamówienia, nie z oferty, i tak ją podpisuje typ.
+     Mail Allegro „Wiadomość dotyczy" pokazuje tytuł i zdjęcie; goły numer
+     w panelu kazał agentowi szukać towaru drugi raz. */
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,
-           m.related_object_id AS oferta, c.subject AS klient
+           m.related_object_id AS oferta, m.related_order_id AS zamowienie,
+           m.channel_account_id AS konto, c.subject AS klient,
+           (SELECT p.nazwa FROM zamowienie_klienta_pozycja p
+              JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
+             WHERE k.channel_account_id = m.channel_account_id
+               AND m.related_object_type = 'OFFER' AND p.offer_id = m.related_object_id
+             ORDER BY p.id DESC LIMIT 1) AS nazwaOferty
       FROM message m JOIN conversation c ON c.id=m.conversation_id
      WHERE m.conversation_id=? ORDER BY m.id
   `).all(id) as Array<Record<string, unknown>>;
@@ -169,8 +221,23 @@ export function osRozmowy(id: number): {
     odKlienta: String(m.direction) === "incoming",
     tresc: String(m.body), at: String(m.sent_at),
     ofertaId: String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null,
+    nazwaOferty: m.nazwaOferty == null ? null : String(m.nazwaOferty),
+    zamowienieId: m.zamowienie == null ? null : String(m.zamowienie),
     ...(zalaczniki.has(Number(m.id)) ? { zalaczniki: zalaczniki.get(Number(m.id)) } : {}),
   }));
+
+  /* JEDNO zamówienie na rozmowę: numer z najnowszej wiadomości KLIENTA, która
+     go niesie (wątek dotyczy jednego zakupu), a gdy klient go nie podał —
+     z najnowszej naszej. Treść jest, gdy ticker już dociągnął; odczyt niczego
+     nie pobiera („zero zapisu przy patrzeniu"). */
+  const zNumerem = [...wiadomosci].reverse();
+  const zrodloZamowienia = zNumerem.find((m) => m.zamowienie != null && String(m.direction) === "incoming")
+    ?? zNumerem.find((m) => m.zamowienie != null);
+  const zamowienie: ZamowienieRozmowy | null = zrodloZamowienia ? {
+    externalId: String(zrodloZamowienia.zamowienie),
+    link: linkZamowienia(String(zrodloZamowienia.zamowienie)),
+    pobrane: zamowienieRozmowy(Number(zrodloZamowienia.konto), String(zrodloZamowienia.zamowienie)),
+  } : null;
 
   /* Wynik z hali jest osobnym wpisem osi, nigdy podmianą treści klienta —
      to zasada z docs/obsluga-klienta.md i ona decyduje o tym kształcie. */
@@ -270,6 +337,7 @@ export function osRozmowy(id: number): {
        zacznie pisać: druga rozmowa o tym samym problemie bywa tą, w której
        padła już odpowiedź. */
     sprawa: sprawaRozmowy(id),
+    zamowienie,
   };
 }
 

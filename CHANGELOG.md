@@ -34,6 +34,54 @@ historii nie przepisujemy.
 ---
 
 
+## 0.165.0 — 2 września 2026
+
+**Kolejka pokazuje pytanie klienta, a rozmowa wie, którego zamówienia dotyczy.**
+
+Dwa zgłoszenia właściciela z jednego ekranu, oba ze zrzutów.
+
+### W kolejce stała nasza autoodpowiedź zamiast pytania
+
+Podgląd wiersza brał ostatnią wiadomość JAKĄKOLWIEK. Autoodpowiedź konta
+Allegro („Dziękujemy za kontakt…") nie powstaje u nas — wjeżdża synchronizacją
+jako zwykła wiadomość wychodząca i zasłaniała pytanie. W bazie nie ma flagi
+automatu: autoresponder i odpowiedź agenta wyglądają identycznie, więc jedynym
+pewnym filtrem jest kierunek. Podgląd to od dziś ostatnia wiadomość klienta,
+a data pod nim — data TEJ wiadomości, nie data wątku z Allegro.
+
+Gdy klient nic nie napisał, stoi nasza wiadomość z podpisem „Biuro". Kolejność
+listy dalej niesie datę wątku, czyli tę samą, co panel sprzedawcy.
+
+Test serwisu asertował dotąd wiadomość wychodzącą jako podgląd — utrwalał
+usterkę. Dostał nowe oczekiwanie i komentarz, dlaczego stare było złe.
+
+### Zamówienie z `relatesTo.order` wjeżdża do modelu
+
+Mail Allegro „Wiadomość dotyczy" pokazuje towar; panel nie mówił o zamówieniu
+wcale. Allegro daje `relatesTo` z dwiema niezależnymi gałęziami, `offer`
+i `order`, a synchronizator mapował tylko pierwszą. Sonda z 2 września liczy
+zamówienie w 7 z 33 wiadomości, ofertę w 5 z 33 — częstsze powiązanie było
+wyrzucane.
+
+Numer idzie do osobnej kolumny `message.related_order_id`, bo wiadomość może
+nieść obie gałęzie naraz. Stare wiadomości nie przyjadą drugi raz, ale numer
+został w surowym lądowisku — migracja dosypuje go stamtąd raz, bez nadpisywania
+i bez zatrzymywania startu.
+
+Treść zamówienia dociąga istniejący ticker zamówień: do kandydatów ze zwrotów
+dochodzą numery z wiadomości, ten sam limit i takt. Otwarcie ekranu niczego nie
+pobiera — „zero zapisu przy patrzeniu" obowiązuje, a liczniki tras skrzynki
+stoją bez zmian. Rozmowa dostaje blok zamówienia pod sprawą: numer z odnośnikiem
+od razu, pozycje z nazwą i ceną po dociągnięciu, a przed nim zdanie, że treść
+dopiero przyjedzie.
+
+Oferta przy wiadomości dostaje nazwę towaru — z zamówienia, nie z oferty, bo
+ofert nadal nie pobieramy. Rozmowa z numerem zamówienia nie pokazuje już bloku
+„brak powiązania z ofertą": zamówienie nazywa towar dokładniej.
+
+Mapowanie wiersza zamówienia na kształt dla panelu wyjechało ze zwrotów do
+`services/zamowienia.ts`, bo to samo zamówienie pokazują teraz dwa ekrany.
+
 ## 0.164.0 — 2 września 2026
 
 **Rabat transakcyjny widać przy zwrocie i składa się jednym kliknięciem.**

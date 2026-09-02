@@ -7,7 +7,7 @@ import type { Rozmowa } from "../api/typy";
 const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
-  ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z",
+  ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null, ...n,
 });
@@ -40,6 +40,20 @@ describe("Kolejka", () => {
     expect(screen.getByText(/szarpak pasuje/)).toBeInTheDocument();
     expect(screen.getByText("M. Wójcik")).toBeInTheDocument();
     expect(screen.getByText("NOWE")).toBeInTheDocument();
+  });
+
+  it("podgląd naszej wiadomości jest podpisany, podgląd klienta — nie", () => {
+    /* Kolejka pokazuje słowa KLIENTA (0.165.0). Gdy klient nic nie napisał,
+       stoi nasze zdanie z podpisem „Biuro" — bez niego autoodpowiedź konta
+       Allegro czytała się jak pytanie. */
+    const { rerender } = render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null}
+      laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.queryByText(/Biuro:/)).not.toBeInTheDocument();
+    rerender(<Kolejka rozmowy={[rozmowa({ ostatniaOdKlienta: false,
+      ostatniaWiadomosc: "Przesyłka wyszła dziś." })]} stan={STAN} wybranaId={null}
+      laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText(/Biuro:/)).toBeInTheDocument();
+    expect(screen.getByText(/Przesyłka wyszła dziś/)).toBeInTheDocument();
   });
 
   it("kliknięcie wiersza oddaje identyfikator rozmowy", async () => {

@@ -161,6 +161,11 @@ export function migrate(database: DatabaseSync) {
      dalej musiałaby czytać surowe lądowisko Allegro. */
   addColumn("message", "related_object_type", "TEXT");
   addColumn("message", "related_object_id", "TEXT");
+  /* Zamówienie przy wiadomości (0.165.0). Kolumna dochodzi do tabeli, która
+     stoi u klienta od 0.144.0, a jej treść dla starych wiadomości bierze się
+     z lądowiska — patrz `dosypZamowienieWiadomosci` niżej. */
+  addColumn("message", "related_order_id", "TEXT");
+  dosypZamowienieWiadomosci(database);
   addColumn("conversation", "unread", "INTEGER NOT NULL DEFAULT 0");
   addColumn("conversation", "assigned_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("conversation", "version", "INTEGER NOT NULL DEFAULT 1");
@@ -870,6 +875,39 @@ function dosypIdZMaski(database: DatabaseSync) {
     );
   } catch {
     /* Pytanie bez identyfikatora dalej łączy się najwyżej po loginie. */
+  }
+}
+
+/**
+ * Uzupełnia `message.related_order_id` z lądowiska (0.165.0).
+ *
+ * Do 0.164.0 synchronizator mapował z `relatesTo` wyłącznie gałąź `offer`,
+ * a `order.id` „zostawał w `surowe_json` do czasu, aż będzie miał ekran".
+ * Ekran jest, a wiadomości sprzed tego wydania nie przyjadą drugi raz —
+ * `INSERT … DO NOTHING` w synchronizatorze celowo ich nie nadpisuje. Numer
+ * siedzi jednak w `allegro_inbox_message.surowe_json`, złączonym po
+ * identyfikatorze Allegro, więc dosypujemy go stamtąd raz.
+ *
+ * Wzorzec `dosypIdKupujacego`: idempotentny UPDATE z warunkiem, `try/catch`,
+ * start serwera ważniejszy niż dosypka. Wiadomość bez gałęzi `order` zostaje
+ * przy NULL — `json_extract` oddaje wtedy NULL i warunek ją omija.
+ */
+function dosypZamowienieWiadomosci(database: DatabaseSync) {
+  try {
+    database.exec(
+      `UPDATE message
+          SET related_order_id = (
+            SELECT json_extract(l.surowe_json, '$.relatesTo.order.id')
+              FROM allegro_inbox_message l
+             WHERE l.id = message.external_message_id)
+        WHERE related_order_id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM allegro_inbox_message l
+             WHERE l.id = message.external_message_id
+               AND json_extract(l.surowe_json, '$.relatesTo.order.id') IS NOT NULL)`
+    );
+  } catch {
+    /* Pusto — rozmowa bez numeru zamówienia dalej pokazuje samą ofertę. */
   }
 }
 

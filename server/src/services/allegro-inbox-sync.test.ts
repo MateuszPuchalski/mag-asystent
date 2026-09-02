@@ -139,18 +139,27 @@ test("kierunek bierze się z isInterlocutor, a oferta z relatesTo", async () => 
           text: "Zmierzycie?", relatesTo: { offer: { id: "oferta-9" } } }),
         message("m-2", { author: { login: "wertis", isInterlocutor: false },
           text: "Sprawdzimy.", relatesTo: undefined }),
+        /* Gałęzie `offer` i `order` są NIEZALEŻNE (0.165.0): sama druga,
+           obie naraz. Do 0.164.0 `order` ginął przy mapowaniu w każdym z tych
+           przypadków — a sonda liczy go częściej niż ofertę. */
+        message("m-3", { text: "Kiedy wysyłka?", relatesTo: { order: { id: "zam-3" } } }),
+        message("m-4", { text: "Ta sztuka z tego zamówienia?",
+          relatesTo: { offer: { id: "oferta-9" }, order: { id: "zam-4" } } }),
       ], offset: 0, limit: 20 }
     : { threads: Number(new URL(url).searchParams.get("offset")) ? [] : [thread(1)],
         offset: 0, limit: 20 };
   await synchronizujAllegroInbox({ database, query, apiUrl: "https://api.test" });
 
   const wiersze = database.prepare(
-    "SELECT external_message_id x, direction, related_object_type t, related_object_id o FROM message ORDER BY id",
-  ).all() as Array<{ x: string; direction: string; t: string | null; o: string | null }>;
+    `SELECT external_message_id x, direction, related_object_type t, related_object_id o,
+            related_order_id z FROM message ORDER BY id`,
+  ).all() as Array<{ x: string; direction: string; t: string | null; o: string | null; z: string | null }>;
   // node:sqlite zwraca wiersze bez prototypu — rozpakowanie robi z nich zwykłe obiekty
   assert.deepEqual(wiersze.map((w) => ({ ...w })), [
-    { x: "m-1", direction: "incoming", t: "OFFER", o: "oferta-9" },
-    { x: "m-2", direction: "outgoing", t: null, o: null },
+    { x: "m-1", direction: "incoming", t: "OFFER", o: "oferta-9", z: null },
+    { x: "m-2", direction: "outgoing", t: null, o: null, z: null },
+    { x: "m-3", direction: "incoming", t: null, o: null, z: "zam-3" },
+    { x: "m-4", direction: "incoming", t: "OFFER", o: "oferta-9", z: "zam-4" },
   ]);
 });
 

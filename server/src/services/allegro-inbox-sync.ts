@@ -231,13 +231,23 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
    rozmowy, której nic nie tworzyło. Ten zapis jest tym brakującym ogniwem. */
 
 /* Powiązanie wiadomości z ofertą. Allegro daje `relatesTo` z osobnymi gałęziami
-   `offer` i `order`; nas interesuje oferta, bo to ona nazywa TOWAR, o który
-   pyta klient. Numer zamówienia zostaje w `surowe_json` do czasu, aż będzie
-   miał ekran. Typ zapisujemy jako `OFFER`, bo tak nazywa go model kanoniczny —
-   to nasze słowo, nie cytat z Allegro. */
+   `offer` i `order`, niezależnymi od siebie — wiadomość może nieść obie
+   naraz albo żadnej. Typ zapisujemy jako `OFFER`, bo tak nazywa go model
+   kanoniczny — to nasze słowo, nie cytat z Allegro. */
 function oferta(message: Message): [string | null, string | null] {
   const id = message.relatesTo?.offer?.id;
   return id == null ? [null, null] : ["OFFER", String(id)];
+}
+
+/* Gałąź `order` idzie do OSOBNEJ kolumny (0.165.0). Do 0.164.0 była
+   wyrzucana z uzasadnieniem „numer zamówienia zostaje w `surowe_json` do
+   czasu, aż będzie miał ekran" — a sonda z 2 września pokazała, że to
+   zamówienie, nie oferta, jest częstszym powiązaniem (7 z 33 wobec 5 z 33).
+   Mail Allegro „Wiadomość dotyczy" bierze towar właśnie stąd; panel bez tej
+   kolumny nie miał czego pokazać. */
+function zamowienie(message: Message): string | null {
+  const id = message.relatesTo?.order?.id;
+  return id == null ? null : String(id);
 }
 
 /* Najpóźniejsze `createdAt` z wątku. `Message.createdAt` jest w schemacie
@@ -290,15 +300,16 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
        wiszą na nich szkic (`expected_last_message_id`) i zadania terenowe.
        Konflikt na unikalnym kluczu jest tu poprawnym końcem pracy. */
     const wynik = database.prepare(`INSERT INTO message(conversation_id, channel_account_id,
-      external_message_id, direction, body, related_object_type, related_object_id, sent_at)
-      VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
+      external_message_id, direction, body, related_object_type, related_object_id,
+      related_order_id, sent_at)
+      VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
       rozmowa, konto, message.id,
       /* KIERUNEK Z `isInterlocutor`. Rozmówca to ten, który nie jest nami,
          więc jego wiadomość jest przychodząca. Do 0.151.0 stało tu porównanie
          z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej
          odpowiedzi rzucało `TypeError`. */
       flaga(message.author.isInterlocutor, "author.isInterlocutor") ? "incoming" : "outgoing",
-      odkodujEncje(message.text), oferta(message)[0], oferta(message)[1],
+      odkodujEncje(message.text), oferta(message)[0], oferta(message)[1], zamowienie(message),
       /* Data POJEDYNCZEJ wiadomości. Do 0.151.0 wszystkie wiadomości wątku
          dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
          daty wiadomości nie podaje. Podaje: `createdAt`. */
