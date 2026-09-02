@@ -61,16 +61,21 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
 Nad tym repo pracuje kilka sesji naraz — zdalnych gałęzi jest ponad trzydzieści.
 Kosztowało to już dwa razy, na dwa różne sposoby. Statusy rozmowy powstały
 DWA RAZY (0.157.0 i 0.158.0) i jedną implementację trzeba było wyrzucić
-w całości przy scalaniu. Numer 0.159.0 nazwały dwie gałęzie naraz, każda co
-innego — same wydania były w porządku, ale rozplątanie zajęło osobne scalenie.
+w całości przy scalaniu. Numery zderzały się jeszcze częściej: 0.159.0, potem
+0.166.0, 0.168.0, 0.171.0 i 0.173.0 — cztery ostatnie jednego dnia.
 
 ```bash
 sh tools/co_w_toku.sh    # hak SessionStart robi to sam; to jest droga ręczna
 ```
 
-Skrypt pokazuje gałęzie z commitami spoza `main` i wersję, na której stoi
-`main`. **Otwartych PR-ów nie widzi** — te sprawdź narzędziami GitHuba, bo to
-one najmocniej mówią „ktoś już to robi".
+Skrypt pokazuje gałęzie z commitami spoza `main`, wersję `main` obok lokalnej
+oraz **otwarte PR-y wraz z numerami, które już zajmują**. Numer nazwany
+w cudzym otwartym PR-ze podnosi głośne ostrzeżenie. Lista PR-ów wymaga `gh`
+w PATH; bez niego skrypt mówi, czego nie wie, i pracuje dalej.
+
+**Numer wydania wybieraj przy COMMICIE, nie przy pisaniu kodu.** Wpisany
+wcześniej do komentarzy kosztuje przenumerowanie kilkunastu plików, gdy
+w międzyczasie zajmie go ktoś inny. Zdarzyło się to cztery razy w jeden dzień.
 
 Gdy ktoś buduje TO SAMO: powiedz właścicielowi i **czekaj na decyzję, zanim
 napiszesz linijkę kodu**. Jedna wymiana zdań kosztuje mniej niż wydanie do

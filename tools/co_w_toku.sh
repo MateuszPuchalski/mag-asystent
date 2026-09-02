@@ -52,4 +52,64 @@ wersja() { sed -n 's/.*"version": "\([^"]*\)".*/\1/p' | head -1; }
 zdalna=$(git show origin/main:package.json 2>/dev/null | wersja)
 lokalna=$([ -f package.json ] && wersja < package.json)
 echo "Wersja: main ${zdalna:-?}, lokalnie ${lokalna:-?}"
-echo "Otwarte PR-y sprawdź narzędziami GitHuba — ten skrypt ich nie widzi."
+
+# ── Otwarte PR-y (0.174.1) ───────────────────────────────────────────────────
+# Gałąź z commitami spoza `main` mówi „ktoś tu pracuje". Otwarty PR mówi więcej:
+# ktoś to ZAMYKA i zaraz zajmie numer wydania. Do 0.174.0 skrypt kończył się
+# zdaniem „sprawdź narzędziami GitHuba" — i właśnie dlatego nikt nie sprawdzał.
+# Numer zderzył się z cudzą gałęzią cztery razy w jednym dniu (0.166.0, 0.168.0,
+# 0.171.0, 0.173.0), za każdym razem kosztując przenumerowanie kilkunastu plików.
+#
+# `gh` jest OPCJONALNE. Bez niego skrypt mówi, czego nie wie, i kończy się
+# zerem — tak samo jak przy braku sieci. Sprawdzenie informacyjne nie ma prawa
+# położyć startu sesji ani zależeć od cudzego narzędzia.
+ghc() {
+  # Limit czasu, bo `gh` przy zerwanej sieci albo wygasłym tokenie potrafi
+  # wisieć — a to jest hak SessionStart, nie zadanie w tle. `timeout` bywa
+  # nieobecny (macOS bez coreutils), więc jego brak nie blokuje wywołania.
+  if command -v timeout >/dev/null 2>&1; then timeout 10 gh "$@"; else gh "$@"; fi
+}
+
+echo
+if ! command -v gh >/dev/null 2>&1; then
+  echo "Otwarte PR-y: nie wiem — brak gh w PATH (cli.github.com)."
+elif ! pry=$(ghc pr list --state open --limit 30 \
+       --json number,title,headRefName,isDraft \
+       --jq '.[] | "\(.number)\t\(.title)\t\(.headRefName)\t\(if .isDraft then "szkic" else "gotowy" end)"' \
+       2>/dev/null); then
+  # Nierozróżnialne bez dopytywania: brak sieci, wygasły token, repo bez
+  # uprawnień. Wszystkie trzy naprawia to samo zdanie.
+  echo "Otwarte PR-y: nie wiem — gh nie odpowiedział (sieć albo gh auth login)."
+elif [ -z "$pry" ]; then
+  echo "Otwarte PR-y: żadnego."
+else
+  echo "Otwarte PR-y:"
+  echo "$pry" | while IFS="$(printf '\t')" read -r nr tytul galaz stan; do
+    echo "── #$nr  $tytul"
+    echo "     ${galaz}  ·  ${stan}"
+  done
+
+  # Numer wydania z TYTUŁU PR-a: konwencja repo mówi „tytuł z numerem wersji",
+  # więc to jedyne miejsce, gdzie numer widać bez pobierania gałęzi. Jednym
+  # przebiegiem po całej liście, a nie pętlą — pętla w potoku chodzi
+  # w podpowłoce i zmienna wróciłaby stąd pusta, po cichu.
+  numery() {
+    cut -f2 | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sort -u | tr '\n' ' '
+  }
+  zajete=$(echo "$pry" | numery)
+  [ -n "$zajete" ] && echo "Numery zajęte przez otwarte PR-y: ${zajete% }"
+
+  # Do ostrzeżenia liczą się WYŁĄCZNIE cudze gałęzie. Własny PR nazywa ten sam
+  # numer co lokalne `package.json` z definicji — ostrzeganie przed samym sobą
+  # nauczyłoby ignorować to zdanie, a ma być głośne.
+  tu=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  obce=$(echo "$pry" | awk -F'\t' -v tu="$tu" '$3 != tu' | numery)
+  # Najgłośniejszy sygnał kolizji: numer, który właśnie wpisałeś, nazywa już
+  # cudze wydanie. Złapany tutaj kosztuje jeden plik, a nie kilkanaście.
+  # Równość z `main` to nie kolizja, tylko gałąź jeszcze przed podbiciem.
+  for n in $obce; do
+    if [ "$n" = "${lokalna:-}" ] && [ "$n" != "${zdalna:-}" ]; then
+      echo "UWAGA: lokalne $n nazywa już cudzy PR — wybierz inny numer."
+    fi
+  done
+fi
