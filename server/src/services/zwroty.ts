@@ -632,3 +632,105 @@ export function zapiszKwote(
     return { kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant, wersja: wersja + 1 };
   })();
 }
+
+/* ── Korekta i zamknięcie (0.162.0) ──────────────────────────────────────────
+   Piąty kubełek był ślepym zaułkiem: `kubelekZwrotu` routuje po
+   `korekta_numer`, a tej kolumny nic nie zapisywało. Zwrot z ustaloną kwotą
+   stał w DO KOREKTY na zawsze, a ekran pisał przy nim „czeka na własne
+   wydanie".
+
+   KOREKTĘ WYSTAWIA CZŁOWIEK W SUBIEKCIE, a panel zapisuje jej numer. To nie
+   jest półśrodek w drodze do automatu, tylko jedyna droga, jaką dziś widać:
+   `korekta_zwrot` w kolejce Sfery potrzebuje `dok_Id` dokumentu SPRZEDAŻY,
+   a read-model `sgt_dokument` trzyma wyłącznie FZ i PZ — zakupy. Bez tego
+   identyfikatora automat musiałby go zgadywać, a zgadywanie kształtu cudzej
+   bazy kosztowało już w tym repo trzy wydania.
+
+   PIENIĄDZE NADAL ODDAJE CZŁOWIEK w panelu Allegro. Zamknięcie znaczy tu
+   „nasza część jest zrobiona", nie „klient dostał przelew" — i tak samo mówi
+   o tym ekran.                                                              */
+
+/**
+ * Numer korekty wystawionej w Subiekcie. Zamyka zwrot.
+ *
+ * Zamknięcie zapisujemy WPROST w `zamkniety_at`, choć `kubelekZwrotu`
+ * wywiódłby je z samego numeru. Godzina zejścia sprawy z biurka jest faktem,
+ * którego z obecności napisu nie da się odtworzyć.
+ */
+export function zapiszKorekte(
+  database: Db, zwrotId: number, numer: string, wersja: number,
+  kto: { id: number; name: string }, teraz = new Date(),
+): { korektaNumer: string; zamknietyAt: string; wersja: number } {
+  const dokument = (numer ?? "").trim();
+  if (!dokument) {
+    throw new Error("Korekta wymaga numeru dokumentu z Subiekta — bez niego nic nie domyka.");
+  }
+  return transaction(database, () => {
+    podKlucz(database, zwrotId, wersja);
+    /* Kolejność bramek jest UMOWĄ kolejki. Numer zapisany przed kwotą
+       przeskoczyłby zwrot z DO ZWROTU wprost do zamkniętych — czyli zamknąłby
+       sprawę pieniędzy, o których nikt nie zdecydował. */
+    const stan = database.prepare(
+      "SELECT werdykt, kwota_grosze FROM zwrot_klienta WHERE id=?")
+      .get(zwrotId) as { werdykt: string | null; kwota_grosze: number | null };
+    if (stan.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+    if (stan.kwota_grosze === null) throw new Error("Najpierw ustal kwotę do oddania");
+
+    const kiedy = teraz.toISOString();
+    database.prepare(`UPDATE zwrot_klienta
+      SET korekta_numer=?, zamkniety_at=? WHERE id=?`).run(dokument, kiedy, zwrotId);
+    podnies(database, zwrotId);
+    zdarzenie(database, zwrotId, "korekta", `Korekta ${dokument}`, { numer: dokument }, kto, kiedy);
+    logEvent("zwrot_korekta", kto.name, null, { zwrotId, numer: dokument }, kto.id, database);
+    return { korektaNumer: dokument, zamknietyAt: kiedy, wersja: wersja + 1 };
+  })();
+}
+
+/**
+ * Cofnięcie korekty — JEDYNA operacja dozwolona na zamkniętym zwrocie.
+ *
+ * §25a.5: potwierdzenie dostają dwie rzeczy nieodwracalne (oddanie pieniędzy
+ * i odmowa), reszta ma cofnięcie. Numer dokumentu jest tu przepisywany
+ * z Subiekta ręką, więc literówka jest zdarzeniem normalnym, nie awarią.
+ *
+ * Cofamy KOREKTĘ, nie pracę nad zwrotem: werdykt, oceny i kwota zostają, więc
+ * zwrot wraca do DO KOREKTY, a nie na początek kolejki.
+ */
+export function cofnijKorekte(
+  database: Db, zwrotId: number, wersja: number, kto: { id: number; name: string },
+  teraz = new Date(),
+): { wersja: number } {
+  return transaction(database, () => {
+    /* Z pominięciem `podKlucz`: ta bramka odrzuca zwrot zamknięty, a tu
+       zamknięcie jest właśnie tym, co cofamy. Wersji pilnujemy tak samo. */
+    const z = database.prepare(
+      "SELECT wersja, korekta_numer FROM zwrot_klienta WHERE id=?")
+      .get(zwrotId) as { wersja: number; korekta_numer: string | null } | undefined;
+    if (!z) throw new Error("Nie znaleziono zwrotu");
+    if (Number(z.wersja) !== wersja) {
+      throw new ZwrotConflict(
+        "Zwrot zmienił się w międzyczasie — odśwież i sprawdź, co zrobił inny agent.",
+        { wersja: Number(z.wersja), przyslana: wersja });
+    }
+    if (!z.korekta_numer) throw new Error("Ten zwrot nie ma zapisanej korekty");
+
+    const kiedy = teraz.toISOString();
+    database.prepare(
+      "UPDATE zwrot_klienta SET korekta_numer=NULL, zamkniety_at=NULL WHERE id=?").run(zwrotId);
+    podnies(database, zwrotId);
+    zdarzenie(database, zwrotId, "korekta_cofnieta", `Cofnięto korektę ${z.korekta_numer}`,
+      { numer: z.korekta_numer }, kto, kiedy);
+    logEvent("zwrot_korekta_cofnieta", kto.name, null,
+      { zwrotId, numer: z.korekta_numer }, kto.id, database);
+    return { wersja: wersja + 1 };
+  })();
+}
+
+function zdarzenie(
+  database: Db, zwrotId: number, rodzaj: string, tresc: string,
+  dane: Record<string, unknown>, kto: { id: number; name: string }, kiedy: string,
+): void {
+  database.prepare(`INSERT INTO zwrot_zdarzenie
+    (zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto,kto_user_id) VALUES (?,?,?,?,?,?,?)`)
+    .run(zwrotId, rodzaj, tresc, JSON.stringify(dane), kiedy, kto.name, kto.id);
+}

@@ -32,7 +32,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
 
 const pasek = (z: Zwrot, h: Partial<Parameters<typeof Decyzje>[0]> = {}) =>
   render(<Decyzje zwrot={z} onWerdykt={vi.fn()} onOcena={vi.fn()} onKwota={vi.fn()}
-    trwa={false} blad="" {...h} />);
+    onKorekta={vi.fn()} onCofnijKorekte={vi.fn()} trwa={false} blad="" {...h} />);
 
 describe("Decyzje zwrotu", () => {
   it("przyjęcie idzie jednym kliknięciem, bez pytania o nic", () => {
@@ -98,5 +98,51 @@ describe("Decyzje zwrotu", () => {
   it("stan końcowy nie proponuje decyzji", () => {
     pasek(zwrot({ kubelek: "zamkniety" }));
     expect(screen.queryByRole("button", { name: /Przyjmij|Zapisz kwotę/ })).toBeNull();
+  });
+});
+
+describe("Korekta zwrotu (0.162.0)", () => {
+  const doKorekty = (n: Partial<Zwrot> = {}) => zwrot({
+    kubelek: "korekta", werdykt: "przyjety", kwotaGrosze: 9998, kwotaWariant: "pelna", ...n });
+
+  it("mówi wprost, że korekty nie wystawia panel, tylko człowiek w Subiekcie", () => {
+    /* Przycisk bez tego zdania obiecywałby, że coś wychodzi do Subiekta —
+       a stamtąd wraca tylko numer, przepisany ręką. */
+    pasek(doKorekty());
+    expect(screen.getByText(/wystawiasz w Subiekcie/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pieniądze oddajesz w panelu Allegro/i)).toBeInTheDocument();
+  });
+
+  it("pusty numer nie domyka zwrotu", async () => {
+    const onKorekta = vi.fn();
+    pasek(doKorekty(), { onKorekta });
+    expect(screen.getByRole("button", { name: /Zapisz korektę/ })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText(/Numer korekty/), "KFS 12/2026");
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz korektę/ }));
+    expect(onKorekta).toHaveBeenCalledWith("KFS 12/2026");
+  });
+
+  it("Enter w polu zapisuje — klawisz z §25a.2, nie sama myszka", async () => {
+    const onKorekta = vi.fn();
+    pasek(doKorekty(), { onKorekta });
+    await userEvent.type(screen.getByLabelText(/Numer korekty/), "KFS 13/2026{Enter}");
+    expect(onKorekta).toHaveBeenCalledWith("KFS 13/2026");
+  });
+
+  it("zamknięty zwrot pokazuje numer i daje go cofnąć", async () => {
+    /* §25a.5: cofnięcie zamiast potwierdzenia. Numer przepisany z Subiekta
+       bywa literówką i to jest normalne zdarzenie, nie awaria. */
+    const onCofnijKorekte = vi.fn();
+    pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "KFS 12/2026" }), { onCofnijKorekte });
+    expect(screen.getByText("KFS 12/2026")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Cofnij korektę/ }));
+    expect(onCofnijKorekte).toHaveBeenCalled();
+  });
+
+  it("zwrot odrzucony nie ma czego cofać — to stan końcowy bez korekty", () => {
+    pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony" }));
+    expect(screen.getByText(/Stan końcowy/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cofnij korektę/ })).toBeNull();
   });
 });

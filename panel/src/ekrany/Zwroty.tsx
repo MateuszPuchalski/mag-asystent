@@ -4,7 +4,7 @@ import { Undo2 } from "lucide-react";
 import { useZwroty } from "../api/zwroty";
 import type { BilansKartotek, Kubelek } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
-import { useKwota, useOcena, useWerdykt } from "../api/zwroty";
+import { useCofnijKorekte, useKorekta, useKwota, useOcena, useWerdykt } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -13,11 +13,11 @@ import { Dowody } from "../zwroty/Dowody";
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
    nie dwa.
 
-   TO WYDANIE TYLKO CZYTA. Werdykt, kwota, ocena i korekta wchodzą w 0.151.0.
-   Pasek werdyktu jest tu mimo to widoczny, ale wyłączony i podpisany: agent
-   ma od pierwszego dnia wiedzieć, gdzie ta decyzja stanie i jaki klawisz ją
-   wywoła. Przycisk, który wygląda na działający i nie działa, byłby gorszy
-   od jego braku — stąd jawne zdanie zamiast wyszarzenia bez wyjaśnienia.
+   PIĘĆ KUBEŁKÓW MA DZIAŁANIE: werdykt, ocena i kwota od 0.156.0, korekta od
+   0.162.0. Ekran nie wystawia korekty ani nie oddaje pieniędzy — jedno robi
+   człowiek w Subiekcie, drugie w panelu Allegro — więc mówi to wprost przy
+   przycisku. Zdanie o tym, czego panel nie robi, jest tu tak samo potrzebne
+   jak sam przycisk: bez niego zamknięcie zwrotu obiecywałoby przelew.
 
    Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
    strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się
@@ -67,13 +67,15 @@ export function Zwroty() {
   const werdykt = useWerdykt();
   const ocena2 = useOcena();
   const kwota = useKwota();
-  const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending;
+  const korekta = useKorekta();
+  const cofnijKorekte = useCofnijKorekte();
+  const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
+    || korekta.isPending || cofnijKorekte.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
      gotowe przy 409 — panel go nie układa od nowa. */
-  const bladDecyzji = [werdykt.error, ocena2.error, kwota.error]
-    .find(Boolean) instanceof Error
-    ? String(([werdykt.error, ocena2.error, kwota.error].find(Boolean) as Error).message)
-    : "";
+  const bledy = [werdykt.error, ocena2.error, kwota.error, korekta.error, cofnijKorekte.error];
+  const bladDecyzji = bledy.find(Boolean) instanceof Error
+    ? String((bledy.find(Boolean) as Error).message) : "";
   const { data, isLoading, error } = useZwroty();
 
   const wKubelku = useMemo(
@@ -173,7 +175,11 @@ export function Zwroty() {
               onOcena={(pozycjaId, ocena) =>
                 ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}
               onKwota={(pozycjeIds, dostawa) =>
-                kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })} />
+                kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })}
+              onKorekta={(numer) =>
+                korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja })}
+              onCofnijKorekte={() =>
+                cofnijKorekte.mutate({ id: zwrot.id, wersja: zwrot.wersja })} />
           </>}
     </Karta>
 

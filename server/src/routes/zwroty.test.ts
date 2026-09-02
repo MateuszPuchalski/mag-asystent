@@ -67,6 +67,8 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/werdykt` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/kwota` },
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/ocena" },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta` },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta/cofnij` },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -293,4 +295,50 @@ test("kwota bierze się z zaznaczenia — liczba przysłana przez panel jest ign
 
   assert.equal(odp.statusCode, 200);
   assert.equal(odp.json().kwotaGrosze, 4999, "jedna sztuka po 49,99 z fixture'u");
+});
+
+test("korekta domyka zwrot przez HTTP, a cofnięcie otwiera go z powrotem", async () => {
+  /* Cała droga jednym ciągiem, bo to jedyny test, w którym widać, że kubełki
+     naprawdę się przesuwają: werdykt → ocena → kwota → korekta → zamknięty. */
+  const { naglowki } = login("biuro", "Ala z biura");
+  const wersja = () => (db().prepare("SELECT wersja FROM zwrot_klienta WHERE id=?")
+    .get(zwrot) as { wersja: number }).wersja;
+  const pozycja = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+
+  let r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${pozycja}/ocena`,
+    headers: naglowki, payload: { ocena: "stan", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota`,
+    headers: naglowki, payload: { pozycjeIds: [pozycja], dostawa: false, wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  const pusty = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/korekta`,
+    headers: naglowki, payload: { numer: "  ", wersja: wersja() } });
+  assert.equal(pusty.statusCode, 400);
+  assert.match(pusty.json().error, /numer/i);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/korekta`,
+    headers: naglowki, payload: { numer: "KFS 12/2026", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  r = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(r.json().zwrot.kubelek, "zamkniety");
+  assert.equal(r.json().zwrot.korektaNumer, "KFS 12/2026");
+
+  /* Stara wersja dostaje 409, nie ciche nadpisanie — dwóch agentów nie zamyka
+     jednego zwrotu dwoma numerami. */
+  const stara = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/korekta/cofnij`,
+    headers: naglowki, payload: { wersja: wersja() - 1 } });
+  assert.equal(stara.statusCode, 409, stara.body);
+
+  const cofnij = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/korekta/cofnij`,
+    headers: naglowki, payload: { wersja: wersja() } });
+  assert.equal(cofnij.statusCode, 200, cofnij.body);
+  r = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(r.json().zwrot.kubelek, "korekta", "wraca do kubełka, nie na początek kolejki");
 });

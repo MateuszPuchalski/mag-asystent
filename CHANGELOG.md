@@ -34,6 +34,49 @@ historii nie przepisujemy.
 ---
 
 
+## 0.162.0 — 2 września 2026
+
+**Piąty kubełek kolejki zwrotów był ślepym zaułkiem.**
+
+`kubelekZwrotu` routuje po `korekta_numer`, a tej kolumny nic nie zapisywało —
+tak samo jak przed 0.156.0 nic nie zapisywało werdyktu i kwoty. Zwrot z ustaloną
+kwotą stał w DO KOREKTY na zawsze, a ekran pisał przy nim „czeka na własne
+wydanie".
+
+### Korektę wystawia człowiek, panel zapisuje jej numer
+
+To nie jest półśrodek w drodze do automatu. Zadanie `korekta_zwrot` w kolejce
+Sfery potrzebuje `dok_Id` dokumentu SPRZEDAŻY, a read-model `sgt_dokument`
+trzyma wyłącznie zakupy — FZ i PZ. Bez tego identyfikatora automat musiałby go
+zgadywać, a zgadywanie kształtu cudzej bazy kosztowało w tym repo trzy wydania.
+§28 nazywa to teraz wprost: automat korekty jest POZA ZASIĘGIEM, nie „w planie".
+
+Zapisany numer zamyka zwrot i zdejmuje go z kolejki pracy. Zamknięcie zapisujemy
+wprost w `zamkniety_at`, choć kubełek wywiódłby je z samego numeru: godzina
+zejścia sprawy z biurka jest faktem, którego z obecności napisu nie da się
+odtworzyć.
+
+### Pieniądze nadal oddaje człowiek
+
+Zamknięcie znaczy „nasza część jest zrobiona", nie „klient dostał przelew" —
+i ekran mówi to wprost przy przycisku. Bez tego zdania zamknięcie zwrotu
+obiecywałoby przelew, którego panel nie robi.
+
+### Cofnięcie, bo numer przepisuje się ręką
+
+§25a.5 daje potwierdzenie dwóm rzeczom nieodwracalnym, a reszcie cofnięcie.
+Literówka w numerze przepisanym z Subiekta jest zdarzeniem normalnym, więc
+cofnięcie korekty jest JEDYNĄ operacją dozwoloną na zwrocie zamkniętym.
+Przywraca go do DO KOREKTY: werdykt, oceny i kwota zostają, bo cofamy korektę,
+a nie całą pracę nad zwrotem.
+
+Kolejność bramek jest umową kolejki i pilnuje jej serwer: numer zapisany przed
+kwotą przeskoczyłby zwrot z DO ZWROTU wprost do zamkniętych, czyli domknąłby
+sprawę pieniędzy, o których nikt nie zdecydował.
+
+**[wymaga działania]** Bez migracji — kolumny stoją w schemacie od 0.150.0.
+Panel trzeba przebudować (`npm run build`), bo pole numeru żyje po jego stronie.
+
 ## 0.161.0 — 1 września 2026
 
 **Sprawa istniała w projekcie od §6.1 i nie miała tabeli.**

@@ -1444,6 +1444,20 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.162.0 nie wymaga niczego ręcznego** — kolumny stoją
+w bazie od 0.150.0, migracji nie ma. Zmienia się nawyk biura.
+
+Zwrot z ustaloną kwotą trafia do kubełka DO KOREKTY i czeka na numer dokumentu.
+Korektę wystawiasz w Subiekcie jak dotąd, a w panelu przepisujesz jej numer —
+to zamyka zwrot i zdejmuje go z kolejki. Pieniądze oddajesz w panelu Allegro;
+panel ich nie przelewa.
+
+Pomyłkę w numerze cofa przycisk przy zwrocie zamkniętym. Zwrot wraca wtedy do
+DO KOREKTY, a werdykt, oceny i kwota zostają.
+
+**Panel obsługi trzeba przebudować** (`npm run build`) — pole numeru żyje po
+jego stronie.
+
 **Aktualizacja do 0.160.0 nie wymaga niczego ręcznego** — kolumna `seen_at`
 i indeks wzmianek dochodzą przy pierwszym starcie usługi.
 

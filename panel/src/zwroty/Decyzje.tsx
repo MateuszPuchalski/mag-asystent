@@ -8,14 +8,18 @@ import { zlote } from "../api/zwroty";
    routował po `werdykt`, ocenie pozycji i `kwota_grosze`, a żadnej z tych
    kolumn nic nie zapisywało. Kolejka bramek była maszyną bez paliwa.
 
-   Trzy kubełki dostają działanie. Korekta zostaje podpisem, bo wychodzi do
-   Subiekta i ma własny kontrakt.                                            */
+   Trzy kubełki dostały działanie w 0.156.0, czwarty — korekta — w 0.162.0.
+   Korekty NIE wystawia panel: robi to człowiek w Subiekcie, a tutaj przepisuje
+   jej numer. Stąd pole tekstowe zamiast przycisku „zleć" i stąd cofnięcie
+   (§25a.5): literówka w przepisanym numerze jest zdarzeniem normalnym.      */
 
 type Props = {
   zwrot: Zwrot;
   onWerdykt: (decyzja: "przyjety" | "odrzucony", powod: string | null) => void;
   onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja") => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
+  onKorekta: (numer: string) => void;
+  onCofnijKorekte: () => void;
   trwa: boolean;
   blad: string;
 };
@@ -26,7 +30,8 @@ const OCENY: Array<["stan" | "przecena" | "utylizacja", string, string]> = [
   ["utylizacja", "U", "Utylizacja"],
 ];
 
-export function Decyzje({ zwrot, onWerdykt, onOcena, onKwota, trwa, blad }: Props) {
+export function Decyzje({ zwrot, onWerdykt, onOcena, onKwota, onKorekta, onCofnijKorekte,
+  trwa, blad }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
@@ -34,6 +39,9 @@ export function Decyzje({ zwrot, onWerdykt, onOcena, onKwota, trwa, blad }: Prop
      całego zamówienia, czy oddaje jedną rzecz z pięciu. */
   const [wybrane, setWybrane] = useState<number[]>(() => zwrot.pozycje.map((p) => p.id));
   const [dostawa, setDostawa] = useState(false);
+  /* Numer korekty PRZEPISUJE człowiek z Subiekta — panel go nie wywiedzie
+     z niczego, bo read-model zna tylko dokumenty zakupu (FZ, PZ). */
+  const [numer, setNumer] = useState("");
 
   const dostawaGrosze = zwrot.zamowienie?.dostawaGrosze ?? null;
   const suma = useMemo(() => {
@@ -143,11 +151,41 @@ export function Decyzje({ zwrot, onWerdykt, onOcena, onKwota, trwa, blad }: Prop
     </div>;
   }
 
+  if (zwrot.kubelek === "korekta") {
+    return <div className={ramka}>
+      <p className="mb-2 text-xs text-slate-500">
+        {/* Wprost, bo inaczej ekran obiecywałby, że zrobi to sam. */}
+        Korektę wystawiasz w Subiekcie. Tu przepisz jej numer — to zamyka zwrot.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Pole className="w-56" value={numer} aria-label="Numer korekty"
+          placeholder="Np. KFS 12/2026" onChange={(e) => setNumer(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && numer.trim()) onKorekta(numer.trim()); }} />
+        <Przycisk wariant="glowny" disabled={trwa || !numer.trim()}
+          onClick={() => onKorekta(numer.trim())}>
+          <kbd className="rounded border border-black/20 px-1 text-xs">Enter</kbd> Zapisz korektę
+        </Przycisk>
+      </div>
+      {/* Pieniądze oddaje człowiek w panelu Allegro — zamknięcie znaczy
+          „nasza część zrobiona", nie „klient dostał przelew". */}
+      <p className="mt-1 text-xs text-slate-500">
+        Pieniądze oddajesz w panelu Allegro; panel ich nie przelewa.
+      </p>
+      {blad && <Blad>{blad}</Blad>}
+    </div>;
+  }
+
   return <div className={ramka}>
-    <p className="text-xs text-slate-500">
-      {zwrot.kubelek === "korekta"
-        ? "Korekta idzie do Subiekta i czeka na własne wydanie."
-        : "Stan końcowy — nie ma tu decyzji do podjęcia."}
-    </p>
+    {zwrot.korektaNumer
+      ? <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-500">Korekta</span>
+          <b className="mr-auto">{zwrot.korektaNumer}</b>
+          {/* §25a.5: cofnięcie zamiast potwierdzenia — numer przepisano ręką. */}
+          <Przycisk disabled={trwa} onClick={onCofnijKorekte}>
+            <kbd className="rounded border border-slate-300 px-1 text-xs">R</kbd> Cofnij korektę
+          </Przycisk>
+        </div>
+      : <p className="text-xs text-slate-500">Stan końcowy — nie ma tu decyzji do podjęcia.</p>}
+    {blad && <Blad>{blad}</Blad>}
   </div>;
 }
