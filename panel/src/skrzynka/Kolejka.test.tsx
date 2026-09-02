@@ -9,7 +9,8 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
-  status: "new", odlozoneDo: null, poTerminie: false, oglada: null, ...n,
+  status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
+  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, ...n,
 });
 
 const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
@@ -153,5 +154,45 @@ describe("Kolejka", () => {
     rerender(<Kolejka rozmowy={[rozmowa({ oglada: { userId: 7, name: "Ja" } })]} stan={STAN}
       wybranaId={null} laduje={false} mojeId={7} onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.queryByText("Ja")).not.toBeInTheDocument();
+  });
+});
+
+/* ── Wiersz z §10.2 (0.181.0) ────────────────────────────────────────────── */
+
+const pokaz = (rozmowy: Rozmowa[]) =>
+  render(<Kolejka rozmowy={rozmowy} stan={STAN} wybranaId={null} laduje={false}
+    onWybierz={() => {}} onOdswiez={() => {}} />);
+
+describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
+  it("czas oczekiwania czyta się bez liczenia w głowie", () => {
+    pokaz([rozmowa({ czekaOdMs: 2 * 3600_000 + 14 * 60_000 })]);
+    expect(screen.getByText(/czeka 2 g 14 min/)).toBeInTheDocument();
+  });
+
+  it("rozmowa bez pytania klienta nie pokazuje zegara", () => {
+    pokaz([rozmowa({ czekaOdMs: null })]);
+    expect(screen.queryByText(/czeka/)).not.toBeInTheDocument();
+  });
+
+  it("PILNE widać w wierszu", () => {
+    pokaz([rozmowa({ priorytet: "pilny" })]);
+    expect(screen.getByText("PILNE")).toBeInTheDocument();
+  });
+
+  /* Nazwa mówi, co ta liczba MIERZY. „Nieprzeczytanych przez agenta" nie
+     policzymy — Allegro daje samą flagę wątku — więc ekran tak ich nie nazywa. */
+  it("licznik dopisków podpisuje się tym, co liczy", () => {
+    pokaz([rozmowa({ nowychOdOdpowiedzi: 3 })]);
+    expect(screen.getByText("3 dopiski klienta")).toBeInTheDocument();
+  });
+
+  it("pojedynczy dopisek nie zaśmieca wiersza licznikiem", () => {
+    pokaz([rozmowa({ nowychOdOdpowiedzi: 1 })]);
+    expect(screen.queryByText(/dopiski/)).not.toBeInTheDocument();
+  });
+
+  it("oczekujące zadanie terenowe widać przy rozmowie", () => {
+    pokaz([rozmowa({ zadanieWToku: true })]);
+    expect(screen.getByText(/zadanie w toku/)).toBeInTheDocument();
   });
 });

@@ -45,7 +45,7 @@ export function Edytor({
   const przelacz = (id: number) => onWzmianki(
     wzmianki.includes(id) ? wzmianki.filter((x) => x !== id) : [...wzmianki, id]);
 
-  return <div className={`border-t p-4 ${wKomentarzu ? "bg-amber-50" : ""}`}>
+  return <div className={`shrink-0 border-t p-4 ${wKomentarzu ? "bg-amber-50" : ""}`}>
     {/* Przełącznik trybu stoi NAD polem, żeby było widać, gdzie się pisze,
         zanim się zacznie pisać. */}
     <div className="mb-2 flex gap-1 text-xs font-bold">

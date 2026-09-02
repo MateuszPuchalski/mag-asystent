@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawStatus, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
@@ -242,6 +242,21 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return blad(reply, e); }
     });
 
+  /* Priorytet rozmowy (§10.2, 0.181.0). Ręczna flaga — automat nie ma z czego
+     jej wyliczyć, dopóki §26 nie rozstrzygnie terminu odpowiedzi. */
+  app.post<{ Params: { id: string }; Body: { priorytet?: string } }>(
+    "/api/obsluga/rozmowy/:id/priorytet", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const p = req.body?.priorytet ?? "";
+      if (p !== "normalny" && p !== "pilny") {
+        return reply.code(400).send({ error: `Priorytet to „normalny" albo „pilny".` });
+      }
+      try {
+        return ustawPriorytet(db(), Number(req.params.id), p, sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
   /* Wymuszone przekazanie — odebranie rozmowy komuś z rąk. Rola i powód
      stoją tutaj, bo to trasa decyduje o uprawnieniu (wzorzec z domknięcia
      dostawy), a serwis pilnuje wersji i kompletu zapisu. */
@@ -268,7 +283,19 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return blad(reply, e); }
     });
 
-  /* Wysyłka odpowiedzi (§8.5). Warunki „zalogowany agent" i „uprawnienie"
+  /* Ręczne wskazanie KARTOTEKI dla oferty z rozmowy (0.179.0). SKU sprzedawcy
+     bywa puste albo trafia w dwie kartoteki naraz — wtedy rozstrzyga człowiek,
+     a wybór podpisuje się jego imieniem. `twId: null` zdejmuje powiązanie. */
+  app.post<{ Params: { id: string }; Body: { ofertaId?: string; twId?: number | null } }>(
+    "/api/conversations/:id/kartoteka", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return wskazKartoteke(Number(req.params.id), req.body?.ofertaId ?? "",
+          req.body?.twId ?? null, sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* Wysyłka odpowiedzi (§8.5). Warunki „zalogowany agent" i „uprawnienie""
      domyka `odmowa()`; resztą — przypisaniem, wersją, świeżością, kluczem
      idempotencji i audytem — zajmuje się serwis. */
   app.post<{ Params: { id: string }; Body: {

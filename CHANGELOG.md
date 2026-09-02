@@ -34,6 +34,131 @@ historii nie przepisujemy.
 ---
 
 
+## 0.181.0 — 2 września 2026
+
+**Wiersz kolejki mówi, za co wziąć się najpierw.**
+
+### Co było źle
+
+§10.2 wymienia jedenaście rzeczy, które ma nieść wiersz. Panel niósł sześć.
+Brakowało priorytetu, czasu oczekiwania, liczby nowych wiadomości i znaku
+oczekującego zadania — czyli wszystkiego, co odpowiada na pytanie „za co się
+teraz wziąć". Data ostatniej wiadomości sama tego nie mówi: trzeba ją odjąć
+w głowie od dzisiaj.
+
+### Co się zmienia
+
+Wiersz niesie **PILNE**, **czas oczekiwania** („czeka 2 g 14 min"), **licznik
+dopisków klienta** i **znak zadania w toku**. Kolejność listy bierze najpierw
+flagę, potem najdłużej czekające pytanie.
+
+**Zegar liczy się od PYTANIA klienta**, nie od ostatniej wiadomości w wątku.
+Rozmowa, w której klient nic nie napisał, nie dostaje zegara wcale — nie ma
+tam nikogo, kto czeka, a licznik od naszej wiadomości kłamałby o cudzej
+cierpliwości.
+
+**Licznik mówi to, co mierzy.** To dopiski klienta od NASZEJ ostatniej
+odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się nie da:
+Allegro oddaje samą flagę wątku (`thread.read`), a `message` nie ma znacznika
+odczytu. Ekran nie obiecuje pomiaru, którego nie robi.
+
+**Flaga „pilne" jest RĘCZNA** i zostawia ślad na osi oraz w dzienniku. Automat
+nie ma z czego jej wyliczyć, dopóki §26 nie rozstrzygnie terminu odpowiedzi —
+bez terminu „pilne" znaczyłoby tylko „stare".
+
+### Czego dalej nie ma
+
+**Termin odpowiedzi** czeka na decyzję z §26; bez niej byłby zmyślony, a kubełek
+„po terminie" zostaje przy dzisiejszym znaczeniu, czyli wygasłym odłożeniu.
+**Status doboru** czeka na etap E — dobór nie ma jeszcze własnego bytu.
+
+---
+
+## 0.180.0 — 2 września 2026
+
+**Skrzynka dostaje trzecią kolumnę — kontekst przestaje spychać pytanie
+klienta poniżej krawędzi okna.**
+
+### Co było źle
+
+Układ z trzema kolumnami stoi w §10.1 od początku, a makieta narysowała go
+poprawnie. Front miał dwie: kolejkę i rozmowę. Kontekst — sprawa, oferta,
+towar, zamówienie — leżał w środkowej kolumnie, nad osią. Cztery bloki jeden
+pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
+po co agent w ogóle otwiera rozmowę.
+
+### Co się zmienia
+
+Oferta, towar i zamówienie przenoszą się do kolumny kontekstu z DWIEMA
+zakładkami. Środkowa kolumna niesie odtąd rozmowę i nic poza nią.
+
+Zakładek jest dwie, nie pięć jak w makiecie. „Dobór", „Klient" i „Wiedza" nie
+mają dziś skąd wziąć danych — tabel `part`, `fitment`, `customer`
+i `customer_machine` nie ma wcale. Zakładka, która zawsze mówi „wkrótce", uczy
+nie klikać.
+
+**Zakładki przy rozmowie, sekcje przy zwrocie.** Kolumna dowodów zwrotu to
+jedna lista faktów o jednej sprawie. Kontekst rozmowy niesie dwa równorzędne
+tematy, a sekcje kazałyby przewijać obok tego, którego akurat nie czytasz.
+§25a.4 niesie to rozstrzygnięcie.
+
+### Dług spłacony przy okazji
+
+Środkowa kolumna zwęziła się o 340 px i to obnażyło brak, który czekał
+w kodzie: `Os` była jedynym blokiem z bazą 0, więc kurczyłaby się pierwsza —
+do zera. Nagłówek, sprawa, banery i edytor dostają `shrink-0`, a lista kolejki
+`min-h-0`. Wzorzec pochodzi z ekranu zwrotów, gdzie stoi od 0.165.0.
+
+Testy tego nie złapią: jsdom nie liczy układu. Sprawdzone okiem w przeglądarce
+przy 1280 i 1920 — dokument się nie przewija, nic nie wychodzi poza okno,
+a kolumna kontekstu ma swoje 340 px.
+
+---
+
+## 0.179.0 — 2 września 2026
+
+**Rozmowa pokazuje towar z Subiekta, nie tylko ofertę z Allegro.**
+
+### Co było źle
+
+SKU sprzedawcy leżało w `offer_snapshot` od 0.178.0 i nie prowadziło donikąd.
+Agent widział tytuł i cenę oferty, a żeby powiedzieć „jest, leży na R12-B3",
+otwierał Subiekta. To ten sam koszt, który §25 obiecuje zdjąć przy panelu
+Allegro — tylko po drugiej stronie.
+
+Mostek oferta→kartoteka istniał od 0.152.0, ale wymagał ZAMÓWIENIA. Pytanie
+pod ofertą pada zwykle przed zakupem, więc zamówienia nie ma i mieć nie będzie.
+
+### Co się zmienia
+
+`kartotekaOferty` łączy dwa ogniwa, które działają bez zamówienia: pamięć
+wcześniejszych wskazań i SKU ze snapshotu oferty. Kolejność jest kolejnością
+pewności — za pamięcią stoi decyzja człowieka, więc bije automat.
+
+Blok towaru przy rozmowie pokazuje stan, rezerwacje, stan DOSTĘPNY, półkę,
+EAN i zdjęcie. Dostępny stoi osobno od stanu, bo to on odpowiada na pytanie
+klienta: stan bez odjętych rezerwacji obiecuje towar, który jest już czyjś.
+
+**Brak kartoteki niesie POWÓD.** „Oferty jeszcze nie pobrano" naprawi się samo
+w kilka minut, a „oferta bez SKU" nigdy — i to są dwa różne zdania na ekranie.
+Do tego wydania oba wyglądałyby identycznie.
+
+**Propozycja nie udaje faktu.** Automat proponuje kartotekę i czeka na jedno
+kliknięcie; dopiero potwierdzenie zapisuje parę oferta–kartoteka do pamięci
+wspólnej ze zwrotami. Wskazanie ręczne podpisuje się imieniem człowieka, a nie
+udaje danej z Allegro (§4.3).
+
+**Zdjęcie idzie z NASZEJ trasy**, nie z serwera Allegro. Zastrzeżenie z 0.178.0
+dotyczyło obrazka z ich serwera — ten pochodzi z `/api/products/:twId/zdjecie`
+i nie wyprowadza przeglądarki biura poza sieć firmy.
+
+### Czego to jeszcze nie robi
+
+Kartoteka nie wchodzi do zadania terenowego automatycznie — agent dalej wskazuje
+towar wyszukiwarką przy zlecaniu pomiaru. To osobna zmiana.
+
+---
+
 ## 0.178.0 — 2 września 2026
 
 **Rozmowa pokazuje ofertę, pod którą padło pytanie — tytuł, cenę i SKU, nie

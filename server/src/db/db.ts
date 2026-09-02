@@ -196,6 +196,11 @@ export function migrate(database: DatabaseSync) {
   /* Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
      stanem, z którego nic nie wyprowadza — a §7 nie zna „odłożona na zawsze". */
   addColumn("conversation", "snoozed_until", "TEXT");
+  /* Priorytet rozmowy (§10.2, 0.181.0). `CHECK` powtarza listę ze `schema.sql`
+     z tego samego powodu co przy statusie: baza sprzed tego wydania dostaje
+     kolumnę TĘDY i inaczej stałaby bez strażnika. */
+  addColumn("conversation", "priorytet",
+    "TEXT NOT NULL DEFAULT 'normalny' CHECK(priorytet IN ('normalny','pilny'))");
   /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
      po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */

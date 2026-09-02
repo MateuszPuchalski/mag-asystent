@@ -93,6 +93,12 @@ CREATE TABLE IF NOT EXISTS conversation (
   -- Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
   -- stanem, z którego nic nie wyprowadza — §7 nie zna „odłożonej na zawsze".
   snoozed_until            TEXT,
+  -- Priorytet rozmowy (§10.2, 0.181.0). Dwie wartości, jak przy zadaniach
+  -- terenowych — trzecia („niski") nie ma pytania, na które odpowiada, bo
+  -- kolejność i tak niesie czas oczekiwania. Flaga jest RĘCZNA: automat nie
+  -- ma z czego jej wyliczyć, dopóki nie ma terminu odpowiedzi (§26).
+  priorytet                TEXT NOT NULL DEFAULT 'normalny'
+                           CHECK(priorytet IN ('normalny','pilny')),
   UNIQUE(channel_account_id, external_conversation_id)
 );
 

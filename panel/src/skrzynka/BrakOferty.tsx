@@ -18,7 +18,7 @@ export function BrakOferty({ zapisuje, blad, onWskaz, onDopytaj }: {
   const [otwarte, setOtwarte] = useState(false);
   const [numer, setNumer] = useState("");
 
-  return <div className="border-b bg-amber-50 px-4 py-3">
+  return <div className="shrink-0 border-b bg-amber-50 px-4 py-3">
     <p className="flex items-center gap-2 text-sm text-amber-800">
       <AlertTriangle size={16} />
       <b>Brak powiązania z ofertą.</b>

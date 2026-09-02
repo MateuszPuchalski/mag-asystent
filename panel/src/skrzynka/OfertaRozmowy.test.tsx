@@ -4,10 +4,16 @@ import { render, screen } from "@testing-library/react";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import type { OfertaRozmowy as Dane } from "../api/typy";
 
-const dane = (pobrana: Dane["pobrana"]): Dane => ({
+const BEZ_KARTOTEKI: Dane["kartoteka"] = {
+  pewnosc: "brak", twId: null, symbol: null,
+  zrodlo: "Oferty jeszcze nie pobrano z Allegro", powod: "oferta_niepobrana",
+};
+
+const dane = (pobrana: Dane["pobrana"], kartoteka = BEZ_KARTOTEKI): Dane => ({
   externalId: "12096815384",
   link: "https://allegro.pl/oferta/12096815384",
   pobrana,
+  kartoteka,
 });
 
 describe("blok oferty przy rozmowie", () => {

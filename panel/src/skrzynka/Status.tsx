@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlarmClock, Clock } from "lucide-react";
+import { AlarmClock, Clock, Flame } from "lucide-react";
 import type { Rozmowa, StatusRozmowy } from "../api/typy";
 import { Plakietka, Przycisk, czas } from "../ui";
 import { DO_WYBORU, NAZWA } from "./statusy";
@@ -12,11 +12,13 @@ import { DO_WYBORU, NAZWA } from "./statusy";
    rozmowy odłożonej na zawsze), więc ekran pyta o datę PRZED wysłaniem, a nie
    pokazuje potem błędu z serwera — agent nie ma się dowiadywać o regule
    z komunikatu odmowy. */
-export function Status({ rozmowa, zapisuje, blad, onZmien }: {
+export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisujePriorytet }: {
   rozmowa: Rozmowa;
   zapisuje: boolean;
   blad: string;
   onZmien: (status: StatusRozmowy, doKiedy: string | null) => void;
+  onPriorytet: (priorytet: "normalny" | "pilny") => void;
+  zapisujePriorytet: boolean;
 }) {
   const [odkladanie, setOdkladanie] = useState(false);
   const [termin, setTermin] = useState("");
@@ -32,7 +34,20 @@ export function Status({ rozmowa, zapisuje, blad, onZmien }: {
       <span className="flex items-center gap-1 text-xs text-slate-500">
         <Clock size={13} />do {czas(rozmowa.odlozoneDo)}</span>}
 
-    <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+    {/* Priorytet stoi PRZY statusie, nie w kolejce: „to się pali" mówi się
+        o rozmowie, którą się właśnie czyta. Przełącznik jest jeden i widać po
+        nim stan — flaga podniesiona wygląda inaczej niż opuszczona. */}
+    <button type="button" disabled={zapisujePriorytet}
+      aria-pressed={rozmowa.priorytet === "pilny"}
+      onClick={() => onPriorytet(rozmowa.priorytet === "pilny" ? "normalny" : "pilny")}
+      className={`ml-auto inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold disabled:opacity-50 ${
+        rozmowa.priorytet === "pilny"
+          ? "bg-red-100 text-ranga-zle hover:bg-red-200"
+          : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+      <Flame size={13} />{rozmowa.priorytet === "pilny" ? "PILNE" : "Oznacz jako pilne"}
+    </button>
+
+    <label className="flex items-center gap-2 text-xs text-slate-500">
       Status
       <select className="field w-auto py-1 text-sm" aria-label="Status rozmowy"
         value={rozmowa.status} disabled={zapisuje}

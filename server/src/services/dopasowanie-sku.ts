@@ -36,6 +36,11 @@ export type PowodBraku =
   | "oferta_bez_sku"
   | "sku_nie_trafia"
   | "symbol_zdublowany"
+  /* Skrzynka (0.179.0): snapshotu oferty jeszcze nie ma, więc SKU nie ma
+     skąd wziąć. To stan PRZEJŚCIOWY — takt `allegro-oferty` dociągnie go
+     w kilka minut — i ekran ma powiedzieć to, zamiast milczeć jak przy
+     ofercie bez SKU, która nie naprawi się sama. */
+  | "oferta_niepobrana"
   | null;
 
 export interface Dopasowanie {
@@ -213,5 +218,57 @@ export function zaproponujKartoteke(
   return {
     pewnosc: t.pewnosc, twId: k.twId, symbol: k.symbol,
     zrodlo: jak, powod: null, poKolumnie: t.poKolumnie,
+  };
+}
+
+/**
+ * Kartoteka dla oferty ze SKRZYNKI — bez zamówienia.
+ *
+ * `zaproponujKartoteke` obok wymaga numeru zamówienia i przy jego braku mówi
+ * „Zwrot bez numeru zamówienia". W skrzynce to zdanie byłoby nieprawdziwe
+ * dwa razy: nie ma tam zwrotu, a pytanie pada zwykle PRZED zakupem, więc
+ * zamówienia nie ma i mieć nie będzie. Zostają dwa ogniwa łańcucha, które
+ * pytania sprzed zakupu dotyczą: pamięć wskazań i SKU ze snapshotu oferty.
+ *
+ * Kolejność jest ta sama i z tego samego powodu: za pamięcią stoi decyzja
+ * człowieka, więc bije automat.
+ */
+export function kartotekaOferty(
+  database: Db,
+  channelAccountId: number,
+  offerId: string | null,
+  sku: string | null | undefined,
+): Dopasowanie {
+  const pamiec = zPamieci(database, channelAccountId, offerId);
+  if (pamiec) {
+    return {
+      pewnosc: "pamiec", twId: pamiec.tw_id, symbol: pamiec.tw_symbol,
+      zrodlo: `Wskazane wcześniej przez: ${pamiec.wskazano_przez}`,
+      powod: null, poKolumnie: null,
+    };
+  }
+
+  /* `undefined` znaczy „nie mamy snapshotu", a `""` — „mamy snapshot, ale
+     sprzedawca nie wypełnił sygnatury". Pierwsze naprawi się samo, drugie
+     wymaga człowieka, więc ekran nie ma prawa pokazać tego samego zdania. */
+  if (sku === undefined || sku === null) {
+    return brak("oferta_niepobrana", "Oferty jeszcze nie pobrano z Allegro");
+  }
+
+  const szukane = sku.trim();
+  if (!szukane) return brak("oferta_bez_sku", "Oferta bez SKU w Allegro (pole „sygnatura”)");
+
+  const k = kartotekaPoSku(database, szukane);
+  if (k.stan === "brak") return brak("sku_nie_trafia", `Kartoteki o symbolu „${szukane}" nie ma`);
+  if (k.stan === "wiele") {
+    return {
+      pewnosc: "niejednoznaczne", twId: null, symbol: null,
+      zrodlo: `Symbol „${szukane}" ma więcej niż jedną kartotekę — wskaż ją`,
+      powod: "symbol_zdublowany", poKolumnie: null,
+    };
+  }
+  return {
+    pewnosc: "sku", twId: k.twId, symbol: k.symbol,
+    zrodlo: `SKU oferty „${szukane}"`, powod: null, poKolumnie: null,
   };
 }
