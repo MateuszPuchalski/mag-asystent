@@ -34,6 +34,60 @@ historii nie przepisujemy.
 ---
 
 
+## 0.173.0 — 2 września 2026
+
+**Odpowiadanie w wiadomościach Allegro nie było wyłączone — było opisane
+nieprawdą i wysyłane niezadeklarowanym typem treści.**
+
+Prośba właściciela brzmiała „aktywuj odpowiadanie w wiadomości Allegro".
+Włączać nie było czego: wysyłka działa od 0.148.0 i jest podpięta na całej
+drodze — przycisk w panelu, `POST /api/conversations/:id/send`, kolejka
+`outbox` z kluczem idempotencji, `POST /messaging/threads/{id}/messages`.
+Znalazły się za to dwie rzeczy, które kazałyby każdemu myśleć inaczej.
+
+### Ekran twierdził, że wysyłka jest wyłączona
+
+`/api/health` oddawał stałą `"wysyłka wyłączona"` wpisaną na sztywno. Zdanie
+było prawdziwe, gdy powstawało — mechanizmu wtedy nie było. Od 0.148.0 mówiło
+coś przeciwnego do tego, co robi kod, a od 0.168.0 stało na ekranie ustawień,
+w karcie stanu integracji.
+
+To gorszy rodzaj błędu niż brak wskaźnika. Brak każe szukać; napis
+„wyłączona" każe NIE szukać i prowadzi wprost do wniosku „trzeba to włączyć".
+
+Teraz pole opisuje stan kolejki: ile poszło, ile jest w toku, ile nieudanych
+i niepewnych. Osobna liczba `wysylkiDoSprawdzenia` mówi, ile z tego czeka na
+człowieka — nieudana wysyłka znaczy, że odpowiedź NIE dotarła do klienta,
+a niepewna, że nie wiadomo. Wiersz w panelu zmienia wtedy rangę na uwagę,
+bo zasada 10 projektu żąda, żeby awaria integracji była widoczna.
+
+### Ciało żądania szło typem, którego specyfikacja nie wymienia
+
+`zapytajAllegro` deklarował `content-type: application/json`. Specyfikacja
+wymienia przy `POST /messaging/threads/{id}/messages` dwa typy —
+`application/vnd.allegro.public.v1+json` i `…beta.v1+json` — a przy wniosku
+o rabat tylko pierwszy. Gołego `application/json` nie ma tam ani razu;
+odpowiedzią na niezadeklarowany typ treści bywa 415.
+
+Klient wysyła teraz w `content-type` tę samą wersję zasobu, którą negocjuje
+w `accept`, a 415 traktuje jak 406: próbuje następnej. To jest ta sama klasa
+pomyłki, która przy mapowaniu ODCZYTU kosztowała trzy wydania — kształt wzięty
+z pamięci zamiast z pliku, który leży w repo.
+
+Pilnuje tego pierwszy test tej funkcji z podstawionym `fetch`. Do 0.172.0
+sprawdzaliśmy budowę adresów i obsługę błędów, ale nigdy tego, CO NAPRAWDĘ
+wychodzi na sieć.
+
+### Przy okazji, ze specyfikacji
+
+Uprawnienie do pisania jest to samo co do czytania (`allegro:api:messaging`),
+więc konto czytające wiadomości ma czym odpisywać i nie wymaga ponownego
+parowania. Sama końcówka ma natomiast limit **jednego żądania na sekundę dla
+użytkownika**. Odpowiedzi pisze człowiek, więc limit nie dotyka pracy biura —
+ale to pierwsza liczba do sprawdzenia przy każdym pomyśle na wysyłkę masową.
+
+Wdrożenie: nic ręką.
+
 ## 0.172.0 — 2 września 2026
 
 **Paczka, której klient nie odebrał, wchodzi do kolejki jawnie oznaczona.**

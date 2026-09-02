@@ -161,6 +161,23 @@ Adres jest ten sam co przy odczycie (`urlWiadomosci`). Nagłówki, negocjacja
 wersji zasobu po 406 oraz obsługa 401, 403, 404 i 429 robi `zapytajAllegro`,
 ta sama funkcja co przy pobieraniu.
 
+**Ciało deklaruje WERSJĘ ZASOBU, nie `application/json`** (od 0.173.0).
+Specyfikacja wymienia przy tym zapisie dwa typy treści:
+`application/vnd.allegro.public.v1+json` i `…beta.v1+json`. Gołego
+`application/json` nie wymienia ani tutaj, ani przy wniosku o rabat —
+odpowiedzią na niezadeklarowany typ bywa 415. Klient wysyła teraz w
+`content-type` tę samą wersję, którą negocjuje w `accept`, a 415 traktuje jak
+406: próbuje następnej.
+
+**Uprawnienie jest to samo co przy odczycie** — `allegro:api:messaging`.
+Konto, które czyta wiadomości, ma czym odpisywać; ponowne parowanie nie jest
+do tego potrzebne.
+
+**Ta końcówka ma limit jednego żądania na sekundę dla użytkownika** i mówi to
+wprost jej opis w specyfikacji. Odpowiedzi pisze człowiek, więc limit nie
+dotyka pracy biura — ale przy każdym pomyśle na wysyłkę masową to jest
+pierwsza liczba do sprawdzenia.
+
 Do 0.151.0 ta sekcja nosiła nagłówek „kształt NIEPOTWIERDZONY" i dwa znaczniki:
 ciało powstało z pamięci, wbrew §8.2 projektu panelu, na polecenie właściciela.
 **Specyfikacja potwierdziła je co do znaku.** Warto to zapisać obok zdania

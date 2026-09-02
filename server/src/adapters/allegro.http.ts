@@ -254,7 +254,8 @@ export async function zapytajAllegro(
   const znany = dzialajacyAccept.get(rodzina);
   const doProbowania = znany ? [znany] : [...AKCEPTY];
 
-  let ostatnia406 = "";
+  /* Treść ostatniej odmowy wersji — 406 przy odczycie, 415 przy zapisie. */
+  let ostatniaOdmowaWersji = "";
   for (const accept of doProbowania) {
     let odp: Response;
     try {
@@ -266,9 +267,19 @@ export async function zapytajAllegro(
           /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
              zablokowaniem klucza API (ekran po rejestracji aplikacji). */
           "user-agent": allegroUserAgent(),
-          /* Tylko przy ciele — pusty `content-type` przy GET-cie bywa
-             powodem odrzucenia u ostrożnych bramek. */
-          ...(opcje.body === undefined ? {} : { "content-type": "application/json" }),
+          /* CIAŁO IDZIE TĄ SAMĄ WERSJĄ ZASOBU, którą negocjujemy w `accept`
+             (0.173.0). Do 0.172.0 stało tu `application/json` — typ, którego
+             specyfikacja NIE WYMIENIA przy żadnym z naszych dwóch zapisów:
+             `POST /messaging/threads/{id}/messages` deklaruje wyłącznie
+             `application/vnd.allegro.public.v1+json` i `…beta.v1+json`,
+             a `POST /order/refund-claims` — tylko pierwszy z nich.
+
+             To jest dokładnie ta klasa zgadnięcia, która kosztowała ten
+             projekt trzy wydania przy mapowaniu odczytu: kształt wzięty
+             z pamięci zamiast z pliku. Odpowiedzią na niezadeklarowany typ
+             treści jest 415, czyli odmowa BEZ objawu w panelu poza „nie
+             udało się wysłać". */
+          ...(opcje.body === undefined ? {} : { "content-type": accept }),
         },
         body: opcje.body === undefined ? undefined : JSON.stringify(opcje.body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -282,10 +293,11 @@ export async function zapytajAllegro(
       );
     }
 
-    /* 406 = zła WERSJA zasobu, nie zły token ani brak danych. Próbujemy
-       kolejnego nagłówka zamiast pokazywać biuru surowy błąd Allegro. */
-    if (odp.status === 406) {
-      ostatnia406 = await odp.text().catch(() => "");
+    /* 406 = zła WERSJA zasobu w `accept`, 415 = w `content-type`. Jedno i
+       drugie znaczy „nie ta wersja", więc obie odpowiedzi prowadzą do próby
+       z następnym nagłówkiem — a nie do surowego błędu na ekranie biura. */
+    if (odp.status === 406 || odp.status === 415) {
+      ostatniaOdmowaWersji = await odp.text().catch(() => "");
       dzialajacyAccept.delete(rodzina);
       continue;
     }
@@ -340,8 +352,8 @@ export async function zapytajAllegro(
      zdezaktualizować (Allegro wypromowało zasób), więc kasujemy go wyżej
      i mówimy wprost, czego spróbowaliśmy. */
   throw new Error(
-    `Allegro nie akceptuje żadnej znanej wersji zasobu (406) dla ${rodzina}. ` +
-      `Próbowano: ${doProbowania.join(", ")}. ${ostatnia406.slice(0, 200)}`
+    `Allegro nie akceptuje żadnej znanej wersji zasobu (406/415) dla ${rodzina}. ` +
+      `Próbowano: ${doProbowania.join(", ")}. ${ostatniaOdmowaWersji.slice(0, 200)}`
   );
 }
 

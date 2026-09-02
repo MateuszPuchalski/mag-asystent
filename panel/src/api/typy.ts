@@ -136,6 +136,8 @@ export type Zdrowie = {
     zadaniaTerenowe: number;
     najstarszeZadanieMs: number | null;
     kolejkaWysylek: string;
+    /** Wysyłki czekające na człowieka: nieudane, niepewne i te w toku. */
+    wysylkiDoSprawdzenia: number;
   };
   worker?: { zyje: boolean; mode: string; widziany: string | null };
 };

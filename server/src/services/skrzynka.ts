@@ -144,9 +144,49 @@ export function stanObslugiHealth(teraz = Date.now()) {
     zadaniaTerenowe: zadania.n,
     najstarszeZadanieMs: zadania.najstarsze
       ? Math.max(0, teraz - Date.parse(zadania.najstarsze)) : null,
-    /* Kolejka wysyłek melduje się nawet wyłączona: brak pozycji i brak
-       mechanizmu wyglądają na ekranie tak samo, a znaczą co innego. */
-    kolejkaWysylek: "wysyłka wyłączona" as const,
+    ...stanKolejkiWysylek(),
+  };
+}
+
+/* ── Kolejka wysyłek melduje PRAWDĘ (0.173.0) ────────────────────────────────
+   Do 0.172.0 stała tu stała `"wysyłka wyłączona"`. Zdanie było prawdziwe,
+   gdy powstawało — mechanizmu nie było. Wysyłka weszła w 0.148.0 i od tamtej
+   pory ekran twierdził coś przeciwnego do tego, co robi kod: agent odpisywał
+   klientom, a `/api/health` mówił, że wysyłka jest wyłączona.
+
+   To jest gorszy rodzaj błędu niż brak wskaźnika. Brak każe szukać; napis
+   „wyłączona" każe NIE szukać i prowadzi wprost do wniosku „trzeba to
+   włączyć", choć włączać nie ma czego.
+
+   `doSprawdzenia` liczy stany, które czekają na człowieka: nieudana wysyłka
+   znaczy, że odpowiedź NIE poszła do klienta, a niepewna — że nie wiadomo,
+   czy poszła. Oba wołają o ruch, a §21 żąda, żeby awaria integracji była
+   widoczna. `sending` bez końca to ta sama sprawa widziana wcześniej:
+   proces padł w połowie strzału i nikt tego wiersza już nie domknie.        */
+export function stanKolejkiWysylek(database = db()) {
+  const w = database.prepare(`SELECT
+      SUM(CASE WHEN status='sending' THEN 1 ELSE 0 END)        AS wToku,
+      SUM(CASE WHEN status='send_failed' THEN 1 ELSE 0 END)    AS nieudane,
+      SUM(CASE WHEN status='send_uncertain' THEN 1 ELSE 0 END) AS niepewne,
+      SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END)           AS wyslane
+    FROM outbox`).get() as Record<string, number | null>;
+  const n = (k: string) => Number(w[k] ?? 0);
+  const doSprawdzenia = n("nieudane") + n("niepewne") + n("wToku");
+
+  /* Zdanie składamy z tego, co NIEZEROWE. „0 nieudanych, 0 niepewnych"
+     czyta się gorzej niż „12 wysłanych", a mówi dokładnie tyle samo. */
+  const czesci = [
+    n("wyslane") ? `${n("wyslane")} wysłanych` : "",
+    n("wToku") ? `${n("wToku")} w toku` : "",
+    n("nieudane") ? `${n("nieudane")} nieudanych` : "",
+    n("niepewne") ? `${n("niepewne")} niepewnych` : "",
+  ].filter(Boolean);
+
+  return {
+    kolejkaWysylek: czesci.length ? czesci.join(" · ") : "pusta — nic jeszcze nie poszło",
+    /* Osobna LICZBA, nie kolor w zdaniu: barwę wybiera ekran, a serwer ma
+       oddać fakt. Ten sam podział co przy rangach w `StanIntegracji`. */
+    wysylkiDoSprawdzenia: doSprawdzenia,
   };
 }
 
