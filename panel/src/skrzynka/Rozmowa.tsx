@@ -10,6 +10,7 @@ import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { Sprawa } from "./Sprawa";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
+import { OfertaRozmowy } from "./OfertaRozmowy";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -107,6 +108,12 @@ export function Rozmowa(p: {
       trwa={p.trwaSprawa} blad={p.bladSprawy}
       onZaloz={p.onZalozSprawe} onDolacz={p.onDolaczDoSprawy} onOdlacz={p.onOdlaczOdSprawy}
       onOtworz={p.onOtworzRozmowe} />
+
+    {/* Oferta NAD zamówieniem (0.178.0): pytanie padło pod ofertą, więc to
+        ona jest tematem rozmowy. Zamówienie, gdy jest, opisuje zakup — czyli
+        odpowiada na późniejsze pytanie i stoi niżej. Oba bloki naraz zdarzają
+        się rzadko: sonda liczy ofertę w 5, a zamówienie w 7 z 33 wiadomości. */}
+    {p.dane.oferta && <OfertaRozmowy oferta={p.dane.oferta} />}
 
     {/* Zamówienie POD sprawą, NAD wiadomościami (0.166.0): „czego dotyczy"
         czyta się przed „co napisał". Blok stoi tylko, gdy wiadomość niesie

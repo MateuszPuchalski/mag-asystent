@@ -56,6 +56,7 @@ import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
 import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
+import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { zwiazPewne } from "./services/sygnatury.js";
 import { zwiazFakturyPewne } from "./services/faktury.js";
@@ -372,6 +373,11 @@ async function main() {
        powiązanie do następnego przebiegu zwrotów. */
     uruchomTakt("allegro-zamowienia", config.allegro.zamowieniaSyncMs,
       async () => { await uzupelnijZamowienia(); zwiazPewne(db()); zwiazFakturyPewne(db()); });
+    /* Czwarty ticker: tytuły ofert do rozmów (0.178.0). Osobno od zamówień,
+       bo dotyczy pytań SPRZED zakupu — tam zamówienia nie ma i nigdy nie
+       będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia
+       mieści się w jednym żądaniu, więc ten takt to jedno wywołanie na cykl. */
+    uruchomTakt("allegro-oferty", config.allegro.ofertySyncMs, async () => { await uzupelnijOferty(); });
   }
 
   const app = await buildApp();

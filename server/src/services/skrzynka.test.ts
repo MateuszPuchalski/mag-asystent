@@ -126,6 +126,83 @@ test("oś niesie zamówienie z relatesTo.order i nazwę towaru z zamówienia", (
   d.prepare("DELETE FROM zamowienie_klienta WHERE id=?").run(zam);
 });
 
+test("pytanie pod ofertą niesie blok oferty: numer od razu, tytuł ze snapshotu", () => {
+  /* Skarga z 2 września 2026: „klient zadał pytanie pod ofertą, a nie wyświetla
+     mi się, pod jaką". Mail powiadamiający ma tytuł, cenę i zdjęcie; panel do
+     0.177.1 miał sam numer, bo tytuł znaliśmy WYŁĄCZNIE z pozycji zamówienia —
+     a pytanie sprzed zakupu zamówienia nie ma i mieć nie będzie. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-of','hemnryk',1,'2026-09-02T14:42:58.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_object_type,related_object_id,sent_at)
+    VALUES (?,?,'m-of-1','incoming','nóż 43cm SV 40 150cc będzie pasował?','OFFER','12096815384',
+            '2026-09-02T14:42:58.000Z')`).run(r, konto);
+
+  /* Zanim ticker dociągnie snapshot: numer i odnośnik są, tytułu nie ma.
+     `null` znaczy „jeszcze nie pobrano", a panel mówi to zdaniem — cisza
+     w tym miejscu wyglądałaby jak usterka. */
+  let os = osRozmowy(r);
+  assert.equal(os.oferta?.externalId, "12096815384");
+  assert.match(String(os.oferta?.link), /12096815384/);
+  assert.equal(os.oferta?.pobrana, null);
+  assert.equal(os.os[0].nazwaOferty, null);
+
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,cena_grosze,
+    waluta,status,synced_at) VALUES (?,'12096815384',
+    'NÓŻ DO KOSIARKI STIGA 43cm 46S CASTELGARDEN NG464','NOZ-STIGA-43',4890,'PLN','ACTIVE',
+    '2026-09-02T14:50:00.000Z')`).run(konto);
+
+  os = osRozmowy(r);
+  assert.match(String(os.oferta?.pobrana?.nazwa), /NÓŻ DO KOSIARKI STIGA 43cm/);
+  assert.equal(os.oferta?.pobrana?.cenaGrosze, 4890);
+  assert.equal(os.oferta?.pobrana?.sku, "NOZ-STIGA-43");
+  assert.equal(os.oferta?.pobrana?.status, "ACTIVE");
+  /* Ten sam tytuł wchodzi na oś, przy wiadomości. */
+  assert.match(String(os.os[0].nazwaOferty), /NÓŻ DO KOSIARKI STIGA 43cm/);
+  /* Rozmowa bez numeru oferty nie udaje, że jakąś ma — blok znika, a nie
+     pokazuje pustego numeru. */
+  const bez = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-bez','kupujacy_0','2026-08-20T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    sent_at) VALUES (?,?,'m-bez-1','incoming','Dzień dobry','2026-08-20T10:00:00.000Z')`)
+    .run(bez, konto);
+  assert.equal(osRozmowy(bez).oferta, null);
+
+  d.prepare("DELETE FROM conversation WHERE id IN (?,?)").run(r, bez);
+  d.prepare("DELETE FROM offer_snapshot WHERE channel_account_id=?").run(konto);
+});
+
+test("snapshot oferty WYGRYWA z nazwą z pozycji zamówienia", () => {
+  /* Kolejność nie jest obojętna: snapshot to tytuł SAMEJ oferty, a pozycja
+     zamówienia opisuje towar tak, jak nazywał się w chwili zakupu. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-of2','kupujacy_9',1,'2026-09-02T15:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_object_type,related_object_id,related_order_id,sent_at)
+    VALUES (?,?,'m-of-2','incoming','Pasuje?','OFFER','oferta-9','zam-78','2026-09-02T15:00:00.000Z')`)
+    .run(r, konto);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (?,'zam-78','2026-09-02T15:10:00.000Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,ilosc,cena_grosze,waluta)
+    VALUES (?,'oferta-9','Nazwa z zamówienia',1,4599,'PLN')`).run(zam);
+  assert.equal(osRozmowy(r).os[0].nazwaOferty, "Nazwa z zamówienia");
+
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,synced_at)
+    VALUES (?,'oferta-9','Tytuł z oferty','2026-09-02T15:20:00.000Z')`).run(konto);
+  assert.equal(osRozmowy(r).os[0].nazwaOferty, "Tytuł z oferty");
+
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+  d.prepare("DELETE FROM zamowienie_klienta WHERE id=?").run(zam);
+  d.prepare("DELETE FROM offer_snapshot WHERE channel_account_id=?").run(konto);
+});
+
 /* Data ostatniej synchronizacji jest częścią odpowiedzi, bo pusta lista bez niej
    nie odróżnia „nic nie przyszło" od „synchronizator stoi". */
 test("stan skrzynki niesie moment ostatniej synchronizacji", () => {

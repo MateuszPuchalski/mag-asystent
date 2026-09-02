@@ -42,7 +42,7 @@ export type WpisOsi = {
   tresc: string;
   at: string;
   ofertaId: string | null;
-  /** Nazwa towaru Z ZAMÓWIENIA, nie z oferty — §4.3, źródło w nazwie pola. */
+  /** Tytuł oferty ze snapshotu, a gdy go nie ma — nazwa z pozycji zamówienia. */
   nazwaOferty?: string | null;
   /** Zamówienie, którego dotyczy wiadomość (`relatesTo.order`, 0.166.0). */
   zamowienieId?: string | null;
@@ -90,6 +90,17 @@ export type ZamowienieRozmowy = {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
 };
 
+/* Oferta przy rozmowie (0.178.0). `pobrana` jest `null`, dopóki ticker nie
+   dociągnie snapshotu — numer i odnośnik są od razu. Cena opisuje CHWILĘ
+   pytania (§15.2), nie dzisiejszy cennik. */
+export type OfertaRozmowy = {
+  externalId: string; link: string | null;
+  pobrana: {
+    nazwa: string; sku: string | null; cenaGrosze: number | null;
+    waluta: string | null; status: string | null; syncedAt: string;
+  } | null;
+};
+
 export type OsRozmowy = {
   rozmowa: Rozmowa;
   os: WpisOsi[];
@@ -97,6 +108,7 @@ export type OsRozmowy = {
   ofertaWskazana: OfertaWskazana | null;
   sprawa: SprawaRozmowy | null;
   zamowienie: ZamowienieRozmowy | null;
+  oferta: OfertaRozmowy | null;
 };
 
 export type Zadanie = {

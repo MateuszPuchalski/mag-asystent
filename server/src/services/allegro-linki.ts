@@ -30,3 +30,8 @@ export const linkZwrotu = (id: string | null | undefined) =>
 
 export const linkZamowienia = (id: string | null | undefined) =>
   zWzorca(config.allegro.panelZamowienie, id);
+
+/* Oferta prowadzi na stronę PUBLICZNĄ, nie do panelu sprzedawcy: agent chce
+   zobaczyć to, co widzi klient — zdjęcia, parametry, opis. */
+export const linkOferty = (id: string | null | undefined) =>
+  zWzorca(config.allegro.panelOferta, id);

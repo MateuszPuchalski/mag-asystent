@@ -379,6 +379,15 @@ export const config = {
      * drogą do 429 przy starcie usługi.
      */
     zwrotyOd: data(process.env.ALLEGRO_ZWROTY_OD, "2026-08-19T22:00:00Z", "ALLEGRO_ZWROTY_OD"),
+    /**
+     * Takt uzupełniania OFERT do rozmów; 0 wyłącza ticker.
+     *
+     * Rzadszy niż skrzynka i gęstszy niż zamówienia: tytuł oferty jest
+     * potrzebny do PIERWSZEJ odpowiedzi, a pytanie klienta czeka na nią
+     * w godzinach, nie w dniach. Rytm inny niż u sąsiadów, bo wszystkie trzy
+     * takty wychodzą z tego samego adresu IP (nagłówek `services/takt.ts`).
+     */
+    ofertySyncMs: num(process.env.ALLEGRO_OFERTY_SYNC_MS, 420_000, "ALLEGRO_OFERTY_SYNC_MS"),
     /** Takt uzupełniania zamówień do zwrotów; 0 wyłącza ticker. */
     zamowieniaSyncMs: num(
       process.env.ALLEGRO_ZAMOWIENIA_SYNC_MS, 600_000, "ALLEGRO_ZAMOWIENIA_SYNC_MS"
@@ -404,6 +413,18 @@ export const config = {
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zamowienia/{id}"
         : "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}"),
+    /**
+     * Oferta — adres PUBLICZNY, nie panel sprzedawcy (0.178.0).
+     *
+     * Agent klikający ofertę z rozmowy chce zobaczyć to, co widzi klient:
+     * zdjęcia, parametry i opis. Panel sprzedawcy pokazałby formularz edycji,
+     * czyli nie to pytanie.
+     */
+    panelOferta:
+      process.env.ALLEGRO_PANEL_OFERTA ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/oferta/{id}"
+        : "https://allegro.pl/oferta/{id}"),
   },
 
   /**
