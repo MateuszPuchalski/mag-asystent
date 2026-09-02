@@ -56,6 +56,26 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
   działanie przy wdrożeniu, PATCH = reszta), często akapit w `DEPLOY.md`.
 - Commity po polsku, tytuł z numerem wersji.
 
+## Zanim zaczniesz
+
+Nad tym repo pracuje kilka sesji naraz — zdalnych gałęzi jest ponad trzydzieści.
+Kosztowało to już dwa razy, na dwa różne sposoby. Statusy rozmowy powstały
+DWA RAZY (0.157.0 i 0.158.0) i jedną implementację trzeba było wyrzucić
+w całości przy scalaniu. Numer 0.159.0 nazwały dwie gałęzie naraz, każda co
+innego — same wydania były w porządku, ale rozplątanie zajęło osobne scalenie.
+
+```bash
+sh tools/co_w_toku.sh    # hak SessionStart robi to sam; to jest droga ręczna
+```
+
+Skrypt pokazuje gałęzie z commitami spoza `main` i wersję, na której stoi
+`main`. **Otwartych PR-ów nie widzi** — te sprawdź narzędziami GitHuba, bo to
+one najmocniej mówią „ktoś już to robi".
+
+Gdy ktoś buduje TO SAMO: powiedz właścicielowi i **czekaj na decyzję, zanim
+napiszesz linijkę kodu**. Jedna wymiana zdań kosztuje mniej niż wydanie do
+wyrzucenia.
+
 ## Zanim wypchniesz
 
 ```bash

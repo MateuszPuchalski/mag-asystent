@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh tools/co_w_toku.sh" }
+        ]
+      }
+    ]
+  }
+}
