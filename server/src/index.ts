@@ -34,6 +34,7 @@ import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuFaktur,
   brakKolumnyNrOryg,
+  brakKolumnyUwag,
   bladImportuMm,
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
@@ -177,6 +178,10 @@ export async function buildApp() {
          osierociały w 0.140.0 razem z read-modelem i wracają tu z nim
          w 0.174.0. */
       brakKolumnyNrOryg,
+      /* Uwagi dokumentu niedostępne — a to w nich Sellasist wpisuje numer
+         zamówienia (0.175.0). Bez nich automat nie zwiąże ani jednego zwrotu,
+         choć wszystko inne działa; ktoś ma się o tym dowiedzieć. */
+      brakKolumnyUwag,
       /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty pokazują
          dokument z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
       bladImportuFaktur,

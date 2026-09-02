@@ -1306,7 +1306,16 @@ Każdy z tych punktów ma degradację, nie awarię — ale warto je domknąć:
    wejdzie, więc dopasowanie uznaje też początek ucięty do trzydziestu znaków.
    Pomyłka daje pustą listę pewnych trafień, a nie złe dane — zwrot czeka wtedy
    na wskazanie człowieka. Sprawdzisz zapytaniem:
-   `SELECT TOP 20 dok_NrPelny, dok_NrPelnyOryg FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC;`
+
+   ```sql
+   SELECT TOP 20 dok_NrPelny, dok_NrPelnyOryg, dok_Uwagi
+   FROM dok__Dokument WHERE dok_Typ IN (2,21) ORDER BY dok_Id DESC;
+   ```
+
+   Od 0.175.0 numer wchodzi też z **uwag** dokumentu: Sellasist wpisuje tam
+   UUID zamówienia, a kolumnę numeru obcego zostawia pustą. Z uwag wycinany
+   jest w SQL sam UUID, nic więcej. Gdy konto aplikacji nie ma prawa czytać
+   `dok_Uwagi`, `/api/health` mówi to zdaniem, a automat nie wiąże nic.
 4. **Scope tokena**: parowanie żąda `allegro:api:orders:read`. Sonda kształtu
    czyta szerzej i przy braku uprawnienia zapisze w raporcie odmowę zamiast
    kształtu — to informacja, nie awaria.

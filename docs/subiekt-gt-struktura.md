@@ -80,9 +80,12 @@ uznajemy — „1234" pasowałoby do co drugiego dokumentu w oknie.
 Pomyłka daje pustą listę pewnych trafień, a nie złe dane: zwrot czeka wtedy na
 wskazanie człowieka, a nie wiąże się z cudzą sprzedażą.
 
-Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie czytamy**. Zmieściłby
-się w nim cały UUID, ale mieści się też adres i telefon — a read-model kopiuje
-to, co przeczyta, razem do kopii zapasowych.
+Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie kopiujemy**. Mieści
+się w nim adres i telefon, a read-model kopiuje to, co przeczyta, razem do
+kopii zapasowych. Od 0.175.0 wycinamy z niego w SQL wyłącznie ciąg o kształcie
+UUID-a — bo tam Sellasist wpisuje numer zamówienia Allegro. Przez `PATINDEX`
+przechodzi 36 znaków szesnastkowych z myślnikami i nic więcej; wolny tekst
+nie opuszcza serwera Subiekta. Uzasadnienie stoi w `server/src/adapters/subiekt.uuid.ts`.
 
 ## Lokalizacja: pola własne, nie `tw_Lokalizacja`
 

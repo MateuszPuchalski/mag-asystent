@@ -2,6 +2,7 @@ import sql from "mssql";
 import { db, nowIso, transaction } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
+import { WZORZEC_UUID_TSQL, uuidZTekstu, wyrazenieUuid } from "./subiekt.uuid.js";
 import { numerKosza } from "../services/przyjecia.js";
 import { symbolTypu } from "./typy-dokumentow.js";
 
@@ -140,6 +141,8 @@ interface FakturaRow {
   dok_Typ: number;
   dok_NrPelny: string;
   nr_oryg: string | null;
+  /** UUID wycięty z `dok_Uwagi` po stronie SQL — patrz `subiekt.uuid.ts`. */
+  zamowienie_z_uwag: string | null;
   data_wyst: string;
 }
 
@@ -214,6 +217,8 @@ export let bladImportuFaktur: string | null = null;
  * komunikat i DRUGIE ciężkie zapytanie do bazy, która właśnie nie wyrabia.
  */
 export let brakKolumnyNrOryg: string | null = null;
+/** Uwagi dokumentu (`dok_Uwagi`) niedostępne — numer zamówienia z nich nie wyjdzie. */
+export let brakKolumnyUwag: string | null = null;
 
 /**
  * Dokumenty MM weszły, pozycji nie ma ani jednej.
@@ -498,33 +503,66 @@ async function pobierzFaktury(
     .slice(0, 10);
   const req = () => pool.request().input("cutoff", sql.VarChar, cutoff);
 
-  const zapytanie = (nrOryg: string) =>
-    req().query<FakturaRow>(
-      `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
-              ${nrOryg} AS nr_oryg,
-              CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst
-       FROM dok__Dokument d WITH (NOLOCK)
-       WHERE ${gdzie}`
-    );
+  /* Numer zamówienia wchodzi DWIEMA drogami (0.175.0): kolumną numeru obcego
+     i UUID-em wyciętym z uwag. Zrzut z Subiekta firmy pokazał, że Sellasist
+     pisze go w `dok_Uwagi`, a `dok_NrPelnyOryg` zostawia pusty — więc do tego
+     wydania mocny sygnał nie miał prawa zadziałać ani razu. Uwag NIE kopiujemy:
+     przez SQL przechodzi wyłącznie ciąg o kształcie UUID-a (`subiekt.uuid.ts`). */
+  const zapytanie = (nrOryg: string, zUwag: string) =>
+    req()
+      .input("uuid", sql.VarChar, WZORZEC_UUID_TSQL)
+      .query<FakturaRow>(
+        `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
+                ${nrOryg} AS nr_oryg,
+                ${zUwag} AS zamowienie_z_uwag,
+                CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst
+         FROM dok__Dokument d WITH (NOLOCK)
+         WHERE ${gdzie}`
+      );
 
   const kolumna = c.fakturyNrOrygColumn
     ? `d.${assertSafeColumn(c.fakturyNrOrygColumn)}`
     : "NULL";
+  const uwagi = wyrazenieUuid("d.dok_Uwagi");
 
-  let faktury: FakturaRow[];
-  try {
-    faktury = (await zapytanie(kolumna)).recordset;
-    brakKolumnyNrOryg = null;
-  } catch (e) {
-    if (kolumna === "NULL") throw e; // to już nie jest kolumna opcjonalna
-    if ((e as { number?: unknown }).number !== 207) throw e;
-    brakKolumnyNrOryg =
-      `Kolumna ${kolumna} nie istnieje w dok__Dokument — zwroty dopasują ` +
+  /* Drabinka degradacji. Każda z dwóch kolumn jest opcjonalna z OSOBNA:
+     brak jednej nie ma prawa zabrać drugiej, a zdanie w /api/health ma nazwać
+     tę, której brakuje. Próby idą od pełnej do pustej; dalej schodzi się
+     wyłącznie po błędzie „nie ma takiej kolumny" (207) albo „brak uprawnienia
+     do kolumny" (230) — każdy inny błąd jest awarią odczytu i leci wyżej. */
+  const proby: Array<[string, string]> = [
+    [kolumna, uwagi], [kolumna, "NULL"], ["NULL", uwagi], ["NULL", "NULL"],
+  ].filter(([a, b], i, wszystkie) =>
+    wszystkie.findIndex(([x, y]) => x === a && y === b) === i) as Array<[string, string]>;
+
+  let faktury: FakturaRow[] | null = null;
+  let uzyte: [string, string] = proby[0];
+  for (const proba of proby) {
+    try {
+      faktury = (await zapytanie(proba[0], proba[1])).recordset;
+      uzyte = proba;
+      break;
+    } catch (e) {
+      const kod = (e as { number?: unknown }).number;
+      const ostatnia = proba === proby[proby.length - 1];
+      if (ostatnia || (kod !== 207 && kod !== 230)) throw e;
+    }
+  }
+  if (faktury === null) throw new Error("odczyt dokumentów sprzedaży nie dał wyniku");
+
+  brakKolumnyNrOryg = kolumna !== "NULL" && uzyte[0] === "NULL"
+    ? `Kolumna ${kolumna} nie istnieje w dok__Dokument — zwroty dopasują ` +
       "dokument sprzedaży po pozycjach, a numer wskaże człowiek. Sprawdź nazwę " +
       "na własnej bazie i ustaw MSSQL_SPRZEDAZ_NR_ORYG_COLUMN (DEPLOY §6); " +
-      "puste = świadoma rezygnacja.";
-    console.warn(`[mssql] ${brakKolumnyNrOryg}`);
-    faktury = (await zapytanie("NULL")).recordset;
+      "puste = świadoma rezygnacja."
+    : null;
+  brakKolumnyUwag = uzyte[1] === "NULL"
+    ? "Kolumna dok_Uwagi jest niedostępna dla konta aplikacji — numer zamówienia " +
+      "z uwag dokumentu nie wchodzi i automat nie zwiąże żadnego zwrotu. Sprawdź " +
+      "GRANT SELECT na dok__Dokument dla konta wertis (DEPLOY §6)."
+    : null;
+  for (const zdanie of [brakKolumnyNrOryg, brakKolumnyUwag]) {
+    if (zdanie) console.warn(`[mssql] ${zdanie}`);
   }
 
   if (faktury.length === 0) return { faktury, fakturyPozycje: [] };
@@ -686,8 +724,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa) VALUES (?,?,?,?,?)"
   );
   const insFaktura = d.prepare(
-    `INSERT INTO sgt_faktura(dok_id, typ, nr_pelny, nr_oryg, data_wyst)
-     VALUES (?,?,?,?,?)`
+    `INSERT INTO sgt_faktura(dok_id, typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst)
+     VALUES (?,?,?,?,?,?)`
   );
   const insFakturaPoz = d.prepare(
     "INSERT INTO sgt_faktura_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
@@ -789,6 +827,8 @@ export async function importFromMssql(): Promise<ImportStats> {
         symbolTypu(f.dok_Typ),
         f.dok_NrPelny,
         (f.nr_oryg ?? "").trim() || null,
+        /* Druga zapora: SQL wyciął 36 znaków, JS sprawdza, że to UUID. */
+        uuidZTekstu(f.zamowienie_z_uwag),
         f.data_wyst
       );
     }

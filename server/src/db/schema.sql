@@ -1322,6 +1322,13 @@ CREATE TABLE IF NOT EXISTS sgt_faktura (
   -- zamówienia Allegro jest UUID-em o 36 znakach, więc CAŁY tam nie wejdzie —
   -- kolumna zostaje, bo integracja bywa ustawiona na własny, krótszy numer.
   nr_oryg   TEXT,
+  -- Identyfikator zamówienia Allegro WYCIĘTY z `dok_Uwagi` po stronie SQL
+  -- (0.175.0). Samej kolumny uwag nie kopiujemy — przechodzi wyłącznie ciąg
+  -- o kształcie UUID-a; uzasadnienie w `adapters/subiekt.uuid.ts`.
+  -- Bez indeksu, i to celowo: kolumna dochodzi migracją, a indeks w tym pliku
+  -- wywracałby start na bazie sprzed 0.175.0 (ta sama mina co przy
+  -- `ix_conversation_mention_user`). Dopasowanie i tak czyta okno dat.
+  zamowienie_z_uwag TEXT,
   data_wyst TEXT NOT NULL            -- ISO date
 );
 CREATE INDEX IF NOT EXISTS ix_faktura_data ON sgt_faktura(data_wyst);

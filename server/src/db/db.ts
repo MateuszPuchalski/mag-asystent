@@ -211,6 +211,11 @@ export function migrate(database: DatabaseSync) {
      resztę. NULL na bazie zastanej jest poprawny: znaczy „zejdź raz do dna
      bez sufitu", czyli dokładnie to, co robił kod do 0.164.0. */
   addColumn("allegro_inbox_sync_state", "dno_at", "TEXT");
+  /* Numer zamówienia wycięty z uwag dokumentu sprzedaży (0.175.0). Read-model
+     `sgt_faktura` czyści się przy imporcie, ale jego SCHEMAT zostaje — bez
+     dostawki `INSERT` z nową kolumną wywracałby pierwszą synchronizację po
+     aktualizacji. */
+  addColumn("sgt_faktura", "zamowienie_z_uwag", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
