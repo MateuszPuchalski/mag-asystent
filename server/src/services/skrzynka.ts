@@ -5,7 +5,7 @@ import { ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
-import { linkZamowienia } from "./allegro-linki.js";
+import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -61,6 +61,18 @@ export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: nu
    `uzupelnijZamowienia` go nie dociągnie — numer i odnośnik są od razu. */
 export interface ZamowienieRozmowy {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
+}
+
+/* Oferta, pod którą padło pytanie (0.178.0). `pobrana` jest `null`, dopóki
+   ticker nie dociągnie snapshotu — numer i odnośnik są od razu, jak przy
+   zamówieniu. Cena jest ze snapshotu, więc opisuje CHWILĘ pytania (§15.2),
+   a nie dzisiejszy cennik. */
+export interface OfertaRozmowy {
+  externalId: string; link: string | null;
+  pobrana: {
+    nazwa: string; sku: string | null; cenaGrosze: number | null;
+    waluta: string | null; status: string | null; syncedAt: string;
+  } | null;
 }
 
 const SKRZYNKA = "skrzynka";
@@ -200,30 +212,55 @@ export function listaRozmow(): RozmowaSkrzynki[] {
     .map((w) => naRozmowe(w, Date.now(), trzymane));
 }
 
+/**
+ * Snapshot oferty dla rozmowy. `null` znaczy „ticker jeszcze nie dociągnął”,
+ * a nie „oferta nie istnieje” — panel ma powiedzieć różnicę, bo cisza w tym
+ * miejscu wygląda jak usterka.
+ */
+function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana"] {
+  const w = db().prepare(`SELECT nazwa, sku, cena_grosze, waluta, status, synced_at
+      FROM offer_snapshot WHERE channel_account_id=? AND external_id=?`)
+    .get(konto, ofertaId) as Record<string, unknown> | undefined;
+  if (!w) return null;
+  return {
+    nazwa: String(w.nazwa),
+    sku: w.sku == null ? null : String(w.sku),
+    cenaGrosze: w.cena_grosze == null ? null : Number(w.cena_grosze),
+    waluta: w.waluta == null ? null : String(w.waluta),
+    status: w.status == null ? null : String(w.status),
+    syncedAt: String(w.synced_at),
+  };
+}
+
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
 export function osRozmowy(id: number): {
   rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null; sprawa: SprawaRozmowy | null;
-  zamowienie: ZamowienieRozmowy | null;
+  zamowienie: ZamowienieRozmowy | null; oferta: OfertaRozmowy | null;
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
   const rozmowa = naRozmowe(wiersz, Date.now(), uchwyty());
 
-  /* Nazwa towaru przy ofercie bierze się z OSTATNIEJ pozycji zamówienia o tym
-     numerze oferty — jedynego miejsca, gdzie mamy tytuły, bo ofert nie
-     pobieramy. To nazwa z zamówienia, nie z oferty, i tak ją podpisuje typ.
-     Mail Allegro „Wiadomość dotyczy" pokazuje tytuł i zdjęcie; goły numer
-     w panelu kazał agentowi szukać towaru drugi raz. */
+  /* Nazwa towaru przy ofercie: NAJPIERW snapshot oferty (0.178.0), a gdy go
+     jeszcze nie ma — ostatnia pozycja zamówienia o tym numerze oferty.
+     Kolejność nie jest obojętna: snapshot to tytuł SAMEJ oferty, a pozycja
+     zamówienia opisuje ten towar tak, jak nazywał się w chwili zakupu.
+     Do 0.177.1 stała tu wyłącznie druga droga, więc pytanie SPRZED zakupu —
+     czyli każde zadane pod ofertą — zostawało z gołym numerem. */
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,
            m.related_object_id AS oferta, m.related_order_id AS zamowienie,
            m.channel_account_id AS konto, c.subject AS klient,
-           (SELECT p.nazwa FROM zamowienie_klienta_pozycja p
-              JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
-             WHERE k.channel_account_id = m.channel_account_id
-               AND m.related_object_type = 'OFFER' AND p.offer_id = m.related_object_id
-             ORDER BY p.id DESC LIMIT 1) AS nazwaOferty
+           COALESCE(
+             (SELECT o.nazwa FROM offer_snapshot o
+               WHERE o.channel_account_id = m.channel_account_id
+                 AND m.related_object_type = 'OFFER' AND o.external_id = m.related_object_id),
+             (SELECT p.nazwa FROM zamowienie_klienta_pozycja p
+                JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
+               WHERE k.channel_account_id = m.channel_account_id
+                 AND m.related_object_type = 'OFFER' AND p.offer_id = m.related_object_id
+               ORDER BY p.id DESC LIMIT 1)) AS nazwaOferty
       FROM message m JOIN conversation c ON c.id=m.conversation_id
      WHERE m.conversation_id=? ORDER BY m.id
   `).all(id) as Array<Record<string, unknown>>;
@@ -277,6 +314,18 @@ export function osRozmowy(id: number): {
     externalId: String(zrodloZamowienia.zamowienie),
     link: linkZamowienia(String(zrodloZamowienia.zamowienie)),
     pobrane: zamowienieRozmowy(Number(zrodloZamowienia.konto), String(zrodloZamowienia.zamowienie)),
+  } : null;
+
+  /* JEDNA oferta na rozmowę, tą samą regułą co zamówienie: numer z najnowszej
+     wiadomości KLIENTA, która go niesie. Snapshot doczytujemy, gdy ticker już
+     go zapisał — odczyt niczego nie pobiera („zero zapisu przy patrzeniu”). */
+  const zrodloOferty = zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null
+      && String(m.direction) === "incoming")
+    ?? zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null);
+  const oferta: OfertaRozmowy | null = zrodloOferty ? {
+    externalId: String(zrodloOferty.oferta),
+    link: linkOferty(String(zrodloOferty.oferta)),
+    pobrana: snapshotOferty(Number(zrodloOferty.konto), String(zrodloOferty.oferta)),
   } : null;
 
   /* Wynik z hali jest osobnym wpisem osi, nigdy podmianą treści klienta —
@@ -377,7 +426,7 @@ export function osRozmowy(id: number): {
        zacznie pisać: druga rozmowa o tym samym problemie bywa tą, w której
        padła już odpowiedź. */
     sprawa: sprawaRozmowy(id),
-    zamowienie,
+    zamowienie, oferta,
   };
 }
 

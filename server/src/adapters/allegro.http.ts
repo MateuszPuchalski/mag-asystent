@@ -101,6 +101,24 @@ export function urlOferty(apiUrl: string, offerId: string): string {
 }
 
 /**
+ * Oferty SPRZEDAWCY po numerach (`/sale/offers?offer.id=…`) — po tytuł, cenę
+ * i SKU. Parametr `offer.id` jest w specyfikacji TABLICĄ, więc dwadzieścia
+ * ofert kosztuje jedno żądanie, a nie dwadzieścia.
+ *
+ * To nie jest to samo, co `urlOferty` obok: tamta końcówka oddaje JEDNĄ ofertę
+ * ze zdjęciami i kosztuje wywołanie na sztukę. Tytuł do rozmowy bierzemy stąd,
+ * bo pytań pod ofertami przychodzi kilka naraz i każde niesie inny numer.
+ *
+ * `limit` ustawiamy na długość listy, nie na domyślne dwadzieścia: gdy kiedyś
+ * podniesiemy partię, cicha domyślna dwudziestka obcięłaby odpowiedź w połowie
+ * i część ofert zostałaby bez tytułu bez jednego słowa w logu.
+ */
+export function urlOfertSprzedawcy(apiUrl: string, ids: readonly string[]): string {
+  const filtr = ids.map((id) => `offer.id=${encodeURIComponent(id)}`).join("&");
+  return `${apiUrl}/sale/offers?${filtr}&limit=${Math.max(1, ids.length)}`;
+}
+
+/**
  * Szczegół jednego zwrotu (`/order/customer-returns/{id}`, Accept beta.v1).
  *
  * Lista oddaje już komplet pól zwrotu, więc ta końcówka NIE jest potrzebna

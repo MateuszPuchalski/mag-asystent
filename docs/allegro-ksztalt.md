@@ -552,6 +552,31 @@ kontrakt czyta się ze specyfikacji w repo, nie z kopii cudzych danych.
 Lista pól idzie po NAZWIE, nie po ścieżce — tak, żeby pole, które Allegro
 doda w przyszłości pod tą samą nazwą, odpadło samo.
 
+## `GET /sale/offers` — oferty sprzedawcy po numerach
+
+Końcówka oddaje `offers`, `count` i `totalCount` (schemat
+`OffersSearchResultDto`). Oferta ma `id`, `name`, `sellingMode.price`
+z `amount` i `currency`, `external.id` oraz `publication.status`
+(schemat `OfferListingDto`).
+
+Parametr **`offer.id` jest TABLICĄ**, więc dwadzieścia numerów kosztuje jedno
+żądanie. `limit` ma domyślną wartość 20 i maksimum 1000; ustawiamy go na
+długość partii, bo cicha domyślna dwudziestka obcięłaby większą partię
+w połowie.
+
+`external.id` to SKU sprzedawcy — u tej firmy symbol z Subiekta. To ten sam
+identyfikator, co `lineItems[].offer.external.id` w zamówieniu, i tak samo jest
+mostkiem do kartoteki. Różnica jest w momencie: zamówienie mamy po zakupie,
+a ofertę już przy pytaniu.
+
+Uprawnienie to `allegro:api:sale:offers:read`, inne niż przy skrzynce.
+Konto bez niego dostanie 403, a odmowa nazwie brakujący scope po imieniu —
+`scopeDlaUrl` w `adapters/allegro.http.ts` ma dla tego adresu własną gałąź.
+
+Zdjęcia z `primaryImage` NIE POBIERAMY. To ta sama decyzja, co przy awatarze
+rozmówcy: obrazek z serwera Allegro znaczyłby wyjście przeglądarki biura poza
+własną sieć przy każdym otwarciu skrzynki.
+
 ## Odnośniki do panelu sprzedawcy
 
 Adres oferty przy pozycji zwrotu (`CustomerReturnItem.url`, przykład
@@ -563,7 +588,11 @@ specyfikacja, ani żadna inna.
 
 `[WERYFIKUJ]` Zwrot otwiera się pod
 `https://allegro.pl/moje-allegro/sprzedaz/zwroty/{id}`, a zamówienie pod
-`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}`. Oba wzorce stoją
-w konfiguracji (`ALLEGRO_PANEL_ZWROT`, `ALLEGRO_PANEL_ZAMOWIENIE`), bo link
-trafiający w 404 kosztuje kliknięcie i zaufanie do ekranu — a poprawka ma być
-wpisem w `wertis.env`, nie nowym wydaniem.
+`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}`. Oferta z rozmowy
+prowadzi pod `https://allegro.pl/oferta/{id}`, czyli na stronę PUBLICZNĄ:
+agent chce zobaczyć to, co widzi klient, a nie formularz edycji. Wszystkie trzy
+wzorce stoją w konfiguracji (`ALLEGRO_PANEL_ZWROT`, `ALLEGRO_PANEL_ZAMOWIENIE`,
+`ALLEGRO_PANEL_OFERTA`), bo link trafiający w 404 kosztuje kliknięcie
+i zaufanie do ekranu — a poprawka ma być wpisem w `wertis.env`, nie nowym
+wydaniem. Udokumentowany przykład `CustomerReturnItem.url` niesie w adresie
+także slug tytułu; czy sam numer wystarczy, sprawdza się kliknięciem.

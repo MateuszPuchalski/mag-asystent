@@ -1219,6 +1219,37 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta_pozycja (
 CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_pozycja_zam
   ON zamowienie_klienta_pozycja(zamowienie_id);
 
+-- Snapshot OFERTY kanału (0.178.0). Wiadomość niesie sam numer oferty
+-- (`relatesTo.offer.id`), a mail powiadamiający z Allegro pokazuje obok niego
+-- tytuł, cenę i zdjęcie. Panel pokazywał do 0.177.1 goły numer, więc agent
+-- szukał towaru drugi raz — w panelu Allegro, czyli dokładnie tam, gdzie
+-- `panel-obslugi-klienta.md` §25 obiecuje nie zaglądać.
+--
+-- SNAPSHOT, nie odczyt na żywo (§15.2): tytuł i cena mają opisywać ofertę
+-- z chwili, w której klient pytał. Oferta bywa poprawiana i kończona, a
+-- rozmowa sprzed tygodnia ma zostać czytelna.
+--
+-- Zdjęcia NIE MA i to jest ta sama decyzja, co przy awatarze rozmówcy
+-- (`docs/allegro-ksztalt.md`): obrazek z serwera Allegro znaczyłby wyjście
+-- przeglądarki biura poza własną sieć przy każdym otwarciu skrzynki.
+CREATE TABLE IF NOT EXISTS offer_snapshot (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  nazwa TEXT NOT NULL,
+  -- SKU sprzedawcy z `external.id` OFERTY — surowo, bez normalizacji, jak
+  -- w `zamowienie_klienta_pozycja`. To jest mostek do kartoteki dla pytania
+  -- SPRZED zakupu, czyli tam, gdzie zamówienia jeszcze nie ma.
+  sku TEXT,
+  cena_grosze INTEGER,
+  waluta TEXT,
+  -- `publication.status` z Allegro. Bez `CHECK`: lista wartości jest po ich
+  -- stronie i rośnie, a zablokowany zapis byłby gorszy niż nieznana wartość.
+  status TEXT,
+  synced_at TEXT NOT NULL,
+  UNIQUE (channel_account_id, external_id)
+);
+
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
 -- Kosz zastępuje papierową kartkę wożoną z towarem: biuro przypina zwroty do
 -- kosza skanem jego kodu, zamyka go, a magazynier na kolektorze rozkłada

@@ -34,6 +34,57 @@ historii nie przepisujemy.
 ---
 
 
+## 0.178.0 — 2 września 2026
+
+**Rozmowa pokazuje ofertę, pod którą padło pytanie — tytuł, cenę i SKU, nie
+sam numer.**
+
+### Co było źle
+
+Klient pyta pod ofertą, Allegro przysyła `relatesTo.offer.id`, a panel
+pokazywał ten numer i na tym kończył. Mail powiadamiający z Allegro ma w bloku
+„Wiadomość dotyczy" tytuł, zdjęcie i cenę — panel miał więc MNIEJ niż
+powiadomienie, od którego zaczyna się cała ta skrzynka. Agent szedł po tytuł do
+panelu Allegro, czyli tam, gdzie `panel-obslugi-klienta.md` §25 obiecuje nie
+zaglądać.
+
+Tytuł znaliśmy dotąd wyłącznie z pozycji zamówienia o tym numerze oferty. To
+działa po zakupie i nie działa nigdy przy pytaniu SPRZED zakupu — a takie
+właśnie przychodzi pod ofertą.
+
+### Co się zmienia
+
+Nowy takt `allegro-oferty` dociąga oferty, na które wskazują wiadomości, i
+zapisuje je jako `offer_snapshot`: tytuł, cena w groszach, SKU sprzedawcy
+(`external.id`) i status publikacji. Rozmowa dostaje nad osią blok oferty —
+bliźniaczy do bloku zamówienia z 0.167.0 — a tytuł wchodzi też na oś, przy
+wiadomości.
+
+`GET /sale/offers` przyjmuje `offer.id` TABLICĄ, więc cała partia kosztuje
+JEDNO żądanie, a nie jedno na ofertę. Rytm taktu jest inny niż u trzech
+sąsiadów, bo wszystkie wychodzą z tego samego adresu IP.
+
+To SNAPSHOT, nie odczyt na żywo: cena opisuje chwilę pytania, a nie dzisiejszy
+cennik. Odświeża się po dobie — rozmowa sprzed tygodnia ma zostać czytelna,
+ale ekran nie ma też kłamać ceną w nieskończoność.
+
+**Zdjęcia nie pobieramy.** Ta sama decyzja, co przy awatarze rozmówcy: obrazek
+z serwera Allegro znaczyłby wyjście przeglądarki biura poza własną sieć przy
+każdym otwarciu skrzynki.
+
+### Czego to jeszcze nie robi
+
+SKU z oferty leży w bazie i NIE jest jeszcze wiązane z kartoteką. Mostek
+`services/dopasowanie-sku.ts` istnieje od 0.152.0 i chodzi po pozycjach
+zamówień; podłączenie go do ofert to osobna zmiana.
+
+**[wymaga działania]** Konto Allegro musi mieć uprawnienie
+`allegro:api:sale:offers:read`. Bez niego takt dostanie 403, zapisze ostrzeżenie
+w logu i nic więcej — panel zostanie przy gołym numerze, czyli przy stanie
+sprzed tego wydania. Odmowa nazywa brakujący scope po imieniu.
+
+---
+
 ## 0.177.1 — 2 września 2026
 
 **Schemat bazy ma odtąd jednego właściciela: serwer API.** Domknięcie awarii
