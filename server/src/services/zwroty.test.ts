@@ -937,3 +937,36 @@ test("zestawienie CSV odróżnia paczkę nieodebraną od zgłoszenia", () => {
   zarejestrujNieodebrana(d, { waybill: "PX5" }, KTO);
   assert.match(csvZwrotow(listaZwrotow(d, TERAZ)), /nieodebrana paczka;/);
 });
+
+/* ── Login kupującego (0.177.0) ──────────────────────────────────────────────
+   Zgłoszenie właściciela: „nie widzę nigdzie w otwartym zwrocie loginu
+   klienta". Login niesie Allegro w DWÓCH odpowiedziach — przy zwrocie i przy
+   zamówieniu — a ekran czytał wyłącznie pierwszą.                           */
+
+test("login kupującego spada z zamówienia, gdy zwrot go nie niesie", () => {
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" }, [{ ilosc: 1, cena: 4999 }]);
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator", sku: "SEK-46", cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login='mirek352810' WHERE external_id='ord-1'")
+    .run();
+
+  assert.equal(listaZwrotow(d, TERAZ)[0].kupujacyLogin, "mirek352810");
+});
+
+test("login ze zwrotu ma pierwszeństwo nad loginem z zamówienia", () => {
+  /* Zwrot jest bliżej sprawy: to jego kupujący zgłosił zwrot. */
+  const d = stanowisko();
+  const id = dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" }, [{ ilosc: 1, cena: 4999 }]);
+  d.prepare("UPDATE zwrot_klienta SET kupujacy_login='ze_zwrotu' WHERE id=?").run(id);
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator", sku: "SEK-46", cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login='z_zamowienia' WHERE external_id='ord-1'")
+    .run();
+
+  assert.equal(listaZwrotow(d, TERAZ)[0].kupujacyLogin, "ze_zwrotu");
+});
+
+test("bez obu źródeł login zostaje pusty — zgadywania nie ma", () => {
+  const d = stanowisko();
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" }, [{ ilosc: 1, cena: 4999 }]);
+  assert.equal(listaZwrotow(d, TERAZ)[0].kupujacyLogin, null);
+});

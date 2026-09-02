@@ -102,10 +102,18 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         <dd><Link href={zwrot.linkZwrotu}>{zwrot.numer ?? zwrot.externalId}</Link></dd>
         {/* Login stoi PRZY ZWROCIE, więc widać go także wtedy, gdy zamówienia
             jeszcze nie pobrano. To jedyna dana osobowa, którą polityka danych
-            zwrotów dopuszcza wprost — imienia Allegro tu nie podaje wcale. */}
-        {zwrot.kupujacyLogin && <>
-          <dt className="text-slate-500">Kupujący</dt>
-          <dd className="break-all">{zwrot.kupujacyLogin}</dd></>}
+            zwrotów dopuszcza wprost — imienia Allegro tu nie podaje wcale.
+
+            WIERSZ STOI ZAWSZE (0.177.0). Do 0.176.0 znikał przy pustym polu,
+            więc na ekranie nie było ani loginu, ani śladu po nim — a właściciel
+            szukał go i nie znalazł. Puste pole ma powiedzieć, że to Allegro go
+            nie podało, a nie zostawiać ekran, który o kupującym milczy. */}
+        <dt className="text-slate-500">Kupujący</dt>
+        <dd className="flex items-center gap-1 break-all">
+          {zwrot.kupujacyLogin
+            ? <>{zwrot.kupujacyLogin}
+                <Skopiuj tekst={zwrot.kupujacyLogin} tytul="Kopiuj login kupującego" /></>
+            : <span className="text-slate-400">Allegro nie podało</span>}</dd>
         {zwrot.przewoznik && <>
           <dt className="text-slate-500">Przewoźnik</dt>
           <dd>{PRZEWOZNICY[zwrot.przewoznik] ?? zwrot.przewoznik}</dd></>}

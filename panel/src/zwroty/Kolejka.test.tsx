@@ -258,6 +258,15 @@ describe("Dowody", () => {
     expect(screen.getByText("InPost")).toBeInTheDocument();
   });
 
+  /* ZGŁOSZENIE WŁAŚCICIELA (0.177.0): „nie widzę nigdzie w otwartym zwrocie
+     loginu klienta". Wiersz znikał przy pustym polu, więc ekran o kupującym
+     MILCZAŁ — a milczenie wygląda jak usterka panelu, nie jak brak danych. */
+  it("pusty login mówi, że nie podało go Allegro — wiersz nie znika", () => {
+    render(zKlientem(<Dowody zwrot={zwrot({ kupujacyLogin: null })} />));
+    expect(screen.getByText("Kupujący")).toBeInTheDocument();
+    expect(screen.getByText("Allegro nie podało")).toBeInTheDocument();
+  });
+
   it("nieznany przewoźnik pokazuje się surowy, bo Allegro nie zamyka listy", () => {
     /* Sonda złapała `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
     render(zKlientem(<Dowody zwrot={zwrot({ przewoznik: "JAKAS_FIRMA" })} />));
