@@ -28,6 +28,61 @@ export type Db = DatabaseSync;
 
 let _db: DatabaseSync | null = null;
 
+/* ── Kto jest właścicielem schematu (0.177.1) ────────────────────────────────
+   Do tego wydania migrację wykonywał KAŻDY proces otwierający bazę, bo siedzi
+   ona w `db()`. Skutek zobaczyliśmy 2 września: wyjątek w `migrate()` położył
+   API i workera naraz, a `AppExit Default Restart` bez opóźnienia zamienił to
+   w pętlę. W logu workera zostawało „database is locked" — objaw prowadzący
+   diagnozę w złe miejsce, bo baza była zablokowana przez API mielące migrację
+   w kółko.
+
+   Odtąd schemat zakłada i migruje WYŁĄCZNIE serwer API. Nie jest to pomysł
+   nowy w tym repo: worker Sfery w C# pracuje tak od początku i mówi to wprost
+   w `sfera-worker/src/Db.cs` — otwiera bazę w trybie, który jej nie utworzy,
+   sprawdza obecność tabel i odmawia startu, gdy ich nie ma. Worker w Node był
+   jedynym procesem piszącym, który tej zasady nie dostał.
+
+   Jedna różnica wobec C# jest świadoma: tamten ODMAWIA startu, a worker Node
+   CZEKA (decyzja właściciela). Proces, który pada, NSSM restartuje — a to jest
+   pętla restartów z wyboru, dokładnie ten stan, z którego wychodzimy.        */
+let migrowac = true;
+
+/**
+ * Deklaracja: ten proces NIE jest właścicielem schematu.
+ *
+ * Woła się PRZED pierwszym `db()` — i tylko wtedy, bo zmiana zachowania po
+ * otwarciu połączenia nie cofnęłaby migracji, która już przeszła. Cicha
+ * nieskuteczność byłaby gorsza niż brak tej funkcji, więc to jest wyjątek.
+ */
+export function bezMigracji(): void {
+  if (_db) {
+    throw new Error(
+      "bezMigracji() po otwarciu bazy — migracja już przeszła. " +
+      "Wywołanie musi stać przed pierwszym db() w tym procesie.");
+  }
+  migrowac = false;
+}
+
+/** Tabele, bez których worker nie ma czego robić — lustro `sfera-worker/src/Db.cs`. */
+const TABELE_WORKERA = ["sfera_queue", "process_state", "sgt_dokument", "events"];
+
+/**
+ * Nazwa pierwszej brakującej tabeli albo `null`, gdy schemat jest gotowy.
+ *
+ * Sprawdzamy SAME TABELE, nie kolumny. Lista kolumn byłaby drugą definicją
+ * schematu, a dwie definicje rozjeżdżają się przy pierwszej zmianie, której
+ * ktoś nie przepisze w obie strony.
+ */
+export function brakujacaTabela(database: DatabaseSync = db()): string | null {
+  for (const tabela of TABELE_WORKERA) {
+    const jest = database
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
+      .get(tabela);
+    if (!jest) return tabela;
+  }
+  return null;
+}
+
 export function db(): DatabaseSync {
   if (_db) return _db;
   fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
@@ -45,9 +100,15 @@ export function db(): DatabaseSync {
      INSERT-ów) — czekanie tyle znaczyłoby, że drugi proces wisi, i wtedy
      błąd jest poprawną odpowiedzią.                                        */
   database.exec("PRAGMA busy_timeout = 5000");
-  const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
-  database.exec(schema);
-  migrate(database);
+  /* Proces bez migracji nie wykonuje TAKŻE `schema.sql`. Sam plik to `CREATE
+     TABLE IF NOT EXISTS`, więc na gotowej bazie byłby niby-nieszkodliwy — ale
+     na PUSTEJ założyłby połowę schematu bez migracji, czyli dokładnie ten stan
+     pośredni, którego ta zmiana ma nie dopuścić. */
+  if (migrowac) {
+    const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
+    database.exec(schema);
+    migrate(database);
+  }
   _db = database;
   return database;
 }
@@ -481,6 +542,15 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
   database.exec("PRAGMA foreign_keys = OFF");
   try {
     transaction(database, () => {
+      /* Warunek sprawdzany PONOWNIE, już pod blokadą zapisu — tak samo jak przy
+         `zadanie_terenowe` i wiadomości skrzynki. Od 0.177.1 migruje wyłącznie
+         API, więc równoległych przebiegów jest mniej, ale nie zero: `npm run
+         seed` potrafi chodzić przy żywym serwerze. Bez tego sprawdzenia drugi
+         przebieg przeliczałby klucze policzone przez pierwszy. */
+      const obceTeraz = database.prepare("PRAGMA foreign_key_list(zwrot_klienta_pozycja)")
+        .all() as Array<{ table: string }>;
+      if (!obceTeraz.some((f) => f.table === "sgt_towar")
+          && kolumny("zwrot_klienta_pozycja").includes("klucz")) return;
       const stare = kolumny("zwrot_klienta_pozycja");
       database.exec(`
         CREATE TABLE zwrot_klienta_pozycja_nowa (

@@ -161,6 +161,27 @@ Rozdzielenie daje trzy rzeczy naraz:
 - worker można zatrzymać (aktualizacja Subiekta, restart) i praca w magazynie
   toczy się dalej — zadania czekają w kolejce.
 
+### Schemat bazy ma JEDNEGO właściciela: API (0.177.1)
+
+Osobne procesy dzielą jeden plik SQLite, więc trzeba powiedzieć wprost, kto ten
+plik kształtuje. **Migruje wyłącznie serwer API, przy starcie.** Worker, sonda,
+inwentarz i rekoncyliacja bazę otwierają, ale schematu nie dotykają; zakłada go
+ten, kto bazę tworzy (API i `seed`).
+
+To nie jest ostrożność na zapas, tylko blizna z 2 września. Migracja siedziała
+w `db()`, czyli wykonywał ją każdy proces otwierający bazę — jeden wyjątek
+w niej położył API i workera naraz, a NSSM zamienił to w pętlę restartów.
+W logu workera zostawało „database is locked", czyli objaw prowadzący diagnozę
+w złe miejsce.
+
+Worker Sfery w C# pracował tak od początku i mówił to wprost
+(`sfera-worker/src/Db.cs`). Worker w Node był jedynym procesem piszącym, który
+tej zasady nie dostał.
+
+Worker, który zastanie stary schemat, **czeka i próbuje dalej** — nie kończy
+się. Proces, który pada, NSSM podnosi z powrotem, więc odmowa startu byłaby
+pętlą restartów z wyboru.
+
 Cena: **stan w Subiekcie jest opóźniony o sekundy**. Dlatego karta towaru
 pokazuje stany **skorygowane o kolejkę** (`services/stock.ts`) i chipy
 lokalizacji „w drodze" — inaczej człowiek widziałby stan sprzed własnego skanu

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { config, envFile } from "./config.js";
+import { bezMigracji } from "./db/db.js";
 import { powodBrakuKonta, stanPolaczenia } from "./services/allegro-token.js";
 import { listaZOdpowiedzi, opiszKsztalt, raportKoncowki } from "./services/ksztalt.js";
 import {
@@ -28,14 +29,21 @@ import {
    danych osobowych. Pilnują tego reguły w `services/ksztalt.ts` i testy obok.
 
    BAZY DOTYKA, i to bardziej, niż mówiło zdanie stojące tu do 0.162.1
-   („nie dotyka bazy poza odczytem tokenu"). Odczyt tokenu idzie przez `db()`,
-   a `db()` wykonuje `schema.sql` i CAŁĄ migrację; przy wygasłym tokenie
-   dochodzi jeszcze zapis odświeżonego. Ta nieścisłość kosztowała czas przy
-   awarii 0.162.1: `npm run sonda` padał na migracji pozycji zwrotu, a szukało
-   się przyczyny w sondzie — choć tak samo padały wtedy API i worker.
+   („nie dotyka bazy poza odczytem tokenu"). Odczyt tokenu idzie przez `db()`;
+   przy wygasłym tokenie dochodzi jeszcze zapis odświeżonego. Ta nieścisłość
+   kosztowała czas przy awarii 0.162.1: `npm run sonda` padał na migracji
+   pozycji zwrotu, a szukało się przyczyny w sondzie — choć tak samo padały
+   wtedy API i worker.
+
+   MIGRACJI JUŻ NIE ROBI (0.177.1). Schemat zakłada wyłącznie serwer API, więc
+   sonda puszczona przy żywej usłudze nie ma jak wywrócić się na cudzej pracy
+   ani jej powtórzyć. Na bazie bez schematu powie o tym wprost — zamiast go
+   zakładać po drodze.
 
    Uruchomienie:  npm run sonda            (raport na ekran)
                   npm run sonda -- plik.md (raport do pliku)                 */
+
+bezMigracji();
 
 /** Ile rekordów wystarczy, żeby zobaczyć kształt. Sonda nie jest eksportem. */
 const PROBKA = 100;

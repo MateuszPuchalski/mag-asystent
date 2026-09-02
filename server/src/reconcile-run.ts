@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
+import { bezMigracji } from "./db/db.js";
 import { reconcile, reconcileCsv } from "./services/reconcile.js";
 
 /* ── Uruchomienie rekoncyliacji raz na dobę (plan §9) ───────────────────────
@@ -12,6 +13,11 @@ import { reconcile, reconcileCsv } from "./services/reconcile.js";
    ZEROWY WYNIK NIE TWORZY PLIKU. Raport, który przychodzi codziennie, przestaje
    być czytany po tygodniu — a wtedy nie chroni już przed niczym. Kod wyjścia
    też o tym mówi: 0 = czysto, 2 = są rozjazdy (do podpięcia pod alert).       */
+
+/* Migracji NIE robimy (0.177.1) — schemat zakłada wyłącznie serwer API. Ten
+   skrypt bywa uruchamiany przy żywej usłudze, a migracja z dwóch procesów
+   naraz to blizna z 2 września. */
+bezMigracji();
 
 const r = reconcile();
 const { kartotek, zadan } = r.sprawdzono;
