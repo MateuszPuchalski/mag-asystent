@@ -34,6 +34,61 @@ historii nie przepisujemy.
 ---
 
 
+## 0.174.2 — 2 września 2026
+
+**Awaria produkcyjna: instalacja nie wstawała wcale.** API i worker padały
+w kółko, restartowane przez NSSM. W logu workera zostawało „database is
+locked" — objaw, nie przyczyna. Przyczyna stała w logu API:
+
+```
+Error: UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id, …klucz
+    at migrate (dist/db/db.js) → at db() → at main()
+```
+
+`db()` woła `migrate()` w KAŻDYM procesie, więc wyjątek w migracji kładł
+oba naraz. Worker nie mógł się dobić do bazy, bo API właśnie ją przemielało
+w pętli restartów.
+
+### Ta sama rodzina błędu co 0.162.1, o oczko dalej
+
+0.162.1 dołożyło powtórzonej parze `offer_id|nazwa` przyrostek `|#n`
+i to załatwiło duplikaty WPROST. Nie załatwiło ZDERZENIA: pozycja, której
+NAZWA niesie już tekst `|#2`, dostaje klucz identyczny z drugim wystąpieniem
+sąsiada. Indeks UNIQUE odrzucał go po przemianowaniu tabeli, transakcja się
+wycofywała, a start padał — przy każdym uruchomieniu, bez wyjścia.
+
+**Klucza nie liczymy odtąd „mądrzej".** Wyliczenie zostaje takie samo, bo do
+klucza przywiązana jest praca człowieka: ocena hali, kartoteka, zaznaczenie
+kwoty. Przeliczenie wszystkiego zerwałoby ją w bazach już zmigrowanych.
+
+Zamiast tego indeks UNIQUE zakłada się DOPIERO po rozplątaniu duplikatów.
+Duplikat, który mimo wszystko powstał, dostaje przyrostek z `id` — a `id`
+jest unikalne z definicji, więc druga taka kolizja nie ma z czego powstać.
+Rozplatanie chodzi w pętli, bo naprawiony klucz teoretycznie może trafić
+w kolejny zastany, i melduje się w logu: to zmiana danych, której nikt nie
+zlecił.
+
+Ta sama ochrona stoi też na ścieżce SAMEGO indeksu, nie tylko w przebudowie.
+Baza z przebudową za sobą wchodzi tamtędy, a duplikat mógł do niej trafić
+zapisem aplikacji, zanim indeks w ogóle powstał.
+
+### Skąd brały się takie nazwy — błąd z 0.172.0
+
+Rejestracja paczki nieodebranej liczyła przyrostek klucza po NUMERZE WIERSZA
+z pętli, nie po powtórzeniu. Druga pozycja zamówienia dostawała więc `|#2`,
+choć niczego nie powtarzała. Taki napis w kluczu jest dokładnie tym, co
+zderza się w migracji z prawdziwym duplikatem sąsiada. Poprawione: przyrostek
+liczy powtórzenia pary `offer_id|nazwa`.
+
+### Testy
+
+Dwa nowe testy migracji i jeden serwisu. Wszystkie trzy **padają bez
+poprawki** — sprawdzone, bo test regresji, który przechodzi na zepsutym
+kodzie, jest gorszy niż jego brak.
+
+**[wymaga działania]** Zatrzymaj usługi, zrób kopię bazy, zaktualizuj,
+uruchom API RĘCZNIE i przeczytaj log. Krok po kroku w DEPLOY §7.
+
 ## 0.174.1 — 2 września 2026
 
 **`tools/co_w_toku.sh` widzi otwarte PR-y i numery, które już zajmują.**

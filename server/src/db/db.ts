@@ -408,6 +408,50 @@ export function migrate(database: DatabaseSync) {
  * kolumn WSPÓLNYCH, podmiana nazwy. Klucze obce schodzą PRZED transakcją, bo
  * w transakcji `PRAGMA foreign_keys` jest ignorowane po cichu.
  */
+/**
+ * Rozplata duplikaty `klucz` w obrębie zwrotu — PRZED założeniem indeksu.
+ *
+ * Blizna 0.174.2, druga z tej samej rodziny. 0.162.1 dołożyło przyrostek
+ * `|#n` dla powtórzonej pary `offer_id|nazwa` i to załatwiło duplikaty
+ * WPROST. Nie załatwiło zderzenia: pozycja, której NAZWA niesie już tekst
+ * `|#2`, dostaje klucz identyczny z drugim wystąpieniem sąsiada. Indeks
+ * UNIQUE odrzucał go po przemianowaniu tabeli, `migrate()` rzucał wyjątkiem,
+ * a `db()` woła migrację w KAŻDYM procesie — API i worker wpadały w pętlę
+ * restartów NSSM, a w logu zostawało „database is locked" jako jedyny objaw.
+ *
+ * Dlatego klucza nie liczymy odtąd „mądrzej". Wyliczenie zostaje takie samo,
+ * bo do klucza przywiązana jest praca człowieka (ocena, kartoteka, zaznaczenie
+ * kwoty) i przeliczenie wszystkiego zerwałoby ją w zmigrowanych bazach.
+ * Zamiast tego duplikat, który mimo wszystko powstał, dostaje przyrostek
+ * z `id` — a `id` jest unikalne z definicji, więc druga taka kolizja nie ma
+ * z czego powstać.
+ *
+ * Pętla, bo naprawiony klucz teoretycznie może trafić w kolejny zastany.
+ * Bez niej zostałaby ta sama mina, tyle że o oczko dalej.
+ */
+function rozplacDuplikatyKluczy(database: DatabaseSync): number {
+  let naprawionych = 0;
+  for (let proba = 0; proba < 5; proba++) {
+    const wynik = database.prepare(`UPDATE zwrot_klienta_pozycja
+      SET klucz = klucz || '|#id' || id
+      WHERE id IN (SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY zwrot_id, klucz ORDER BY id) AS n
+        FROM zwrot_klienta_pozycja) WHERE n > 1)`).run();
+    const ile = Number(wynik.changes ?? 0);
+    naprawionych += ile;
+    if (ile === 0) break;
+  }
+  /* Głośno, bo to zmiana danych, której nikt nie zlecił. Cisza tutaj znaczyłaby,
+     że klucz pozycji zmienił się pod otwartym panelem bez śladu. */
+  if (naprawionych) {
+    console.warn(
+      `[migracja] rozplotłem ${naprawionych} zduplikowanych kluczy pozycji zwrotu ` +
+      "— przyrostek |#id<id>. Bez tego indeks UNIQUE kładł start aplikacji.");
+  }
+  return naprawionych;
+}
+
 function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
   const kolumny = (tabela: string) =>
     (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>)
@@ -488,9 +532,13 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
         ALTER TABLE zwrot_klienta_pozycja_nowa RENAME TO zwrot_klienta_pozycja;
         CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
           ON zwrot_klienta_pozycja(zwrot_id);
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
-          ON zwrot_klienta_pozycja(zwrot_id, klucz);
       `);
+      /* Indeks UNIQUE zakłada się DOPIERO po rozplątaniu, i to jest cała
+         poprawka 0.174.2. Wcześniej stał w tym samym `exec` co przepisanie,
+         więc jeden zderzony klucz wycofywał transakcję i kładł start. */
+      rozplacDuplikatyKluczy(database);
+      database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
+        ON zwrot_klienta_pozycja(zwrot_id, klucz)`);
     })();
   } finally {
     database.exec("PRAGMA foreign_keys = ON");
@@ -509,6 +557,10 @@ function indeksKluczaPozycji(database: DatabaseSync) {
   const ma = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
     .all() as Array<{ name: string }>).some((c) => c.name === "klucz");
   if (!ma) return;
+  /* Także tutaj, nie tylko w przebudowie (0.174.2). Baza, która przebudowę ma
+     już za sobą, wchodzi w tę ścieżkę — a duplikat mógł do niej trafić
+     zapisem aplikacji, zanim indeks w ogóle powstał. */
+  rozplacDuplikatyKluczy(database);
   database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
     ON zwrot_klienta_pozycja(zwrot_id, klucz)`);
 }

@@ -270,3 +270,71 @@ test("przebudowa przeżywa DUPLIKAT klucza naturalnego z zastanej bazy", () => {
   d.close();
 });
 
+
+test("przebudowa przeżywa nazwę, która NIESIE JUŻ przyrostek duplikatu", () => {
+  /* Awaria produkcyjna 0.174.2 — druga z tej samej rodziny co 0.162.1 i z tym
+     samym objawem: `UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id,
+     …klucz` przy starcie, w kółko, bo `db()` woła migrację w KAŻDYM procesie.
+     API i worker wpadały w pętlę restartów NSSM, a w logu workera zostawało
+     „database is locked" — objaw, nie przyczyna.
+
+     0.162.1 dołożyło duplikatowi przyrostek `|#n` i to załatwiło duplikaty
+     wprost. Nie załatwiło ZDERZENIA: pozycja, której nazwa niesie już tekst
+     `|#2`, dostaje klucz identyczny z drugim wystąpieniem sąsiada. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  d.exec("DROP TABLE zwrot_klienta_pozycja");
+  d.exec(`CREATE TABLE zwrot_klienta_pozycja (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+    offer_id TEXT, nazwa TEXT NOT NULL, ilosc REAL NOT NULL,
+    cena_grosze INTEGER NOT NULL, waluta TEXT NOT NULL,
+    tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL)`);
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-1','2026-08-25T09:00:00Z','2026-09-01T09:00:00Z')`).run();
+  const ins = d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta) VALUES (1,?,?,1,4999,'PLN')`);
+  ins.run("111", "Sekator");
+  ins.run("111", "Sekator");        // duplikat wprost — dostanie |#2
+  ins.run("111", "Sekator|#2");     // nazwa Z przyrostkiem — zderza się z tamtym
+
+  migrate(d);
+
+  /* Ani jeden wiersz nie ginie: rozplatanie zmienia klucz, nie kasuje pracy. */
+  const ile = d.prepare("SELECT COUNT(*) n FROM zwrot_klienta_pozycja").get() as { n: number };
+  assert.equal(Number(ile.n), 3, "wszystkie trzy pozycje przeżywają");
+  const roznych = d.prepare(
+    "SELECT COUNT(DISTINCT klucz) n FROM zwrot_klienta_pozycja").get() as { n: number };
+  assert.equal(Number(roznych.n), 3, "i każda ma własny klucz");
+  /* Pierwsze wystąpienie zostaje NIETKNIĘTE — do klucza przywiązana jest praca
+     człowieka, więc bazy już zmigrowane nie przekluczają się bez potrzeby. */
+  const pierwszy = d.prepare("SELECT klucz FROM zwrot_klienta_pozycja WHERE id=1")
+    .get() as { klucz: string };
+  assert.equal(pierwszy.klucz, "111|Sekator");
+  d.close();
+});
+
+test("duplikat zastany BEZ przebudowy też nie kładzie startu", () => {
+  /* Baza, która przebudowę ma już za sobą, wchodzi ścieżką samego indeksu.
+     Duplikat mógł do niej trafić zapisem aplikacji, zanim indeks powstał —
+     i wtedy `CREATE UNIQUE INDEX` wywracał start tak samo. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  d.exec("DROP INDEX IF EXISTS ux_zwrot_klienta_pozycja_klucz");
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-1','2026-08-25T09:00:00Z','2026-09-01T09:00:00Z')`).run();
+  const ins = d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz)
+    VALUES (1,?,?,1,4999,'PLN',?)`);
+  ins.run("111", "Sekator", "111|Sekator");
+  ins.run("111", "Sekator", "111|Sekator");
+
+  migrate(d);
+
+  const roznych = d.prepare(
+    "SELECT COUNT(DISTINCT klucz) n FROM zwrot_klienta_pozycja").get() as { n: number };
+  assert.equal(Number(roznych.n), 2);
+  d.close();
+});
