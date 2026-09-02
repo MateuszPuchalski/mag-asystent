@@ -1848,6 +1848,47 @@ sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
   **zainstalowaną** jako osobne okno odinstaluj w przeglądarce
   (Chrome → Ustawienia → Aplikacje).
 
+### Aplikacja nie wstaje: pętla restartów NSSM (0.174.2)
+
+Objaw jest mylący. W logu workera stoi „database is locked", w kółko, więc
+pierwsze podejrzenie pada na bazę albo na dwa procesy naraz. To NIE jest
+przyczyna: worker nie może się dobić do bazy, bo API właśnie ją przemiela
+w pętli restartów.
+
+Przyczyna stoi w logu API (`C:\wertis\logs\wertis-api.err.log`) i wygląda
+tak:
+
+```
+Error: UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id, …klucz
+    at migrate (dist/db/db.js) → at db() → at main()
+```
+
+`db()` woła migrację w KAŻDYM procesie, więc wyjątek w niej kładzie oba naraz.
+
+Kolejność wychodzenia z tego:
+
+```bash
+nssm stop wertis-worker
+nssm stop wertis-api
+cp 'C:\wertis\data\wertis.db' 'C:\wertis\data\wertis-przed-naprawa.db'
+git pull && npm ci && npm -w server run build
+node 'C:\wertis\server\dist\index.js'      # RĘCZNIE, żeby zobaczyć log
+```
+
+Ręczne uruchomienie jest tu istotne: usługa chowa wyjście do pliku, a migracja
+melduje, ile kluczy rozplotła. Zdanie zaczyna się od `[migracja]`. Gdy API
+wstanie i odpowie na `/api/health`, zatrzymaj je Ctrl-C i wróć do usług:
+
+```bash
+nssm start wertis-api
+nssm start wertis-worker
+curl http://localhost:3000/api/health
+```
+
+Kopia bazy nie jest ostrożnością na zapas. Rozplatanie ZMIENIA klucze pozycji
+zwrotu — nie kasuje ani jednego wiersza, ale zmienia dane, więc stan sprzed
+naprawy musi zostać do wglądu.
+
 ## 8. Odinstalowanie
 
 Jedno polecenie, uruchomione **jako administrator**:
