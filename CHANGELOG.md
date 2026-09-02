@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.168.0 — 2 września 2026
+
+**Stan integracji schodzi ze Skrzynki za zębatkę.** Decyzja właściciela.
+Panel obsługi dostaje pierwszy ekran ustawień — `/obsluga/ustawienia` — i tam
+przenosi się trzynastowierszowa tabela z `/api/health`.
+
+Skrzynka jest ekranem PRACY: kolejka rozmów po lewej, odpowiedź po prawej.
+Tabela opisuje TŁO tej pracy i czyta się ją raz na tydzień, a pion pod kolejką
+zabierała na każdym otwarciu ekranu. To ten sam podział, który biuro ma
+od 0.76.0: praca na pasku, konfiguracja za zębatką.
+
+### Co zostaje na wierzchu
+
+Pigułka synchronizacji w nagłówku, widoczna z każdej zakładki, oraz trwały
+alarm nad kolejką rozmów. Zasada 10 projektu panelu brzmi „awaria integracji
+musi być widoczna", a §21 żąda trwałego alarmu — za zębatkę schodzi TABELA,
+nie ostrzeżenie. Skrzynka stała już raz 62 przebiegi (0.152.0), bo powodu nie
+było gdzie zobaczyć, i drugi raz tego nie kupujemy.
+
+Zębatka stoi POZA paskiem zakładek, tak samo jak w biurze. Pasek niesie cztery
+kolejki pracy, do których agent wraca w kółko; ustawienia otwiera się razy
+kilka w miesiącu i piąta pastylka ważyłaby w rzędzie tyle samo co Skrzynka.
+
+Ekran ma dziś jedną kartę i to jest w porządku — USTAWIENIA w biurze zaczynały
+tak samo. Miejsce już jest, więc następne ustawienie obsługi trafi tam, zamiast
+dokładać się do ekranu pracy.
+
+### Skąd numer
+
+`0.167.0` nazwała wcześniej otwarta gałąź zwrotów. Numery przydzielamy raz —
+dwa wydania o tym samym numerze kosztowały już osobne scalenie (0.159.0).
+
+Wdrożenie: nic ręką. Nowy ekran wchodzi razem z buildem panelu.
+
 ## 0.166.0 — 2 września 2026
 
 **Kolejka pokazuje pytanie klienta, a rozmowa wie, którego zamówienia dotyczy.**

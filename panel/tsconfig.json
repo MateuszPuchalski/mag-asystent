@@ -3,7 +3,11 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    // `vite/client` daje typy importów z sufiksem — `./Plik.tsx?raw` jako string.
+  // Czyta je test-strażnik struktury panelu; `node:fs` odpada, bo panel jest
+  // aplikacją przeglądarki i typy Node'a otwierałyby drogę do API, którego
+  // w kodzie ekranu być nie może.
+  "types": ["vitest/globals", "@testing-library/jest-dom", "vite/client"],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,

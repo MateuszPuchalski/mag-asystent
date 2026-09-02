@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, ClipboardList, Inbox, LogOut, Undo2, Warehouse } from "lucide-react";
+import { AtSign, ClipboardList, Inbox, LogOut, Settings, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { czas } from "./ui";
@@ -11,6 +11,7 @@ import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
 import { Zadania } from "./ekrany/Zadania";
 import { Wzmianki } from "./ekrany/Wzmianki";
+import { Ustawienia } from "./ekrany/Ustawienia";
 import "./index.css";
 
 /* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
@@ -32,6 +33,9 @@ const klient = new QueryClient({
    po równości. Do 0.149.0 aktywną zakładkę wybierało wyrażenie
    `endsWith("skrzynka") ? naSkrzynce : !naSkrzynce` — działało dla DWÓCH
    zakładek i przy trzeciej podświetlałoby Zadania na ekranie zwrotów. */
+/** Adres ustawień w JEDNYM miejscu: czyta go zębatka i trasa niżej. */
+const USTAWIENIA = "/obsluga/ustawienia";
+
 const ZAKLADKI = [
   { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: true },
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
@@ -86,6 +90,15 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
         })}
       </nav>
       <PigulkaSynchronizacji />
+      {/* ZĘBATKA STOI POZA `ZAKLADKI` i to jest wybór, nie niedopatrzenie.
+          Pasek niesie PRACĘ — cztery kolejki, do których agent wraca w kółko.
+          Ustawienia otwiera się razy kilka w miesiącu i piąta pastylka ważyłaby
+          w rzędzie tyle samo co Skrzynka. Biuro ma ten sam podział od 0.76.0. */}
+      <Link to={USTAWIENIA} title="Ustawienia" aria-label="Ustawienia"
+        aria-current={pathname.startsWith(USTAWIENIA) ? "page" : undefined}
+        className={`rounded-lg p-2 hover:bg-white/10 ${
+          pathname.startsWith(USTAWIENIA) ? "bg-white/10 text-white" : "text-slate-400"}`}>
+        <Settings size={20} /></Link>
       <button className="rounded-lg p-2 text-slate-400 hover:bg-white/10" onClick={wyloguj}
         title="Wyloguj" aria-label="Wyloguj"><LogOut size={20} /></button>
     </div>
@@ -135,6 +148,9 @@ function App() {
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
         <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
+        {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
+            koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}
+        <Route path={USTAWIENIA} element={<Ustawienia />} />
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>
