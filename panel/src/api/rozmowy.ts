@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  OsRozmowy, Rozmowa, StanSkrzynki, StatusRozmowy, WpisWzmianki, WynikWysylki, Zadanie, Zdrowie,
+  OsRozmowy, Rozmowa, SprawaRozmowy, StanSkrzynki, StatusRozmowy, WierszSprawy, WpisWzmianki,
+  WynikWysylki, Zadanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -15,6 +16,7 @@ export const klucze = {
   ja: ["ja"] as const,
   zdrowie: ["zdrowie"] as const,
   wzmianki: ["wzmianki"] as const,
+  sprawy: ["sprawy"] as const,
 };
 
 export function useJa() {
@@ -62,6 +64,55 @@ export function useOdhaczWzmianke() {
     mutationFn: (v: { commentId: number }) =>
       api(`/api/obsluga/wzmianki/${v.commentId}/odhacz`, { method: "POST" }),
     onSettled: () => qc.invalidateQueries({ queryKey: klucze.wzmianki }),
+  });
+}
+
+/* ── Sprawa (§6.1) ───────────────────────────────────────────────────────────
+   Trzy mutacje i ani jednej więcej: założenie klamry, dołączenie rozmowy
+   i odklejenie. Każda unieważnia rozmowę ORAZ listę spraw, bo sklejenie
+   zmienia obie strony naraz. */
+export function useSprawy() {
+  return useQuery({
+    queryKey: klucze.sprawy,
+    queryFn: () => api<{ sprawy: WierszSprawy[] }>("/api/obsluga/sprawy"),
+  });
+}
+
+export function useZalozSprawe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { tytul: string; rozmowaId: number }) =>
+      api<{ id: number; tytul: string }>("/api/obsluga/sprawy",
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.sprawy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+    },
+  });
+}
+
+export function useDolaczDoSprawy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { sprawaId: number; rozmowaId: number }) =>
+      api<SprawaRozmowy>(`/api/obsluga/sprawy/${v.sprawaId}/rozmowy`,
+        { method: "POST", body: JSON.stringify({ rozmowaId: v.rozmowaId }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.sprawy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+    },
+  });
+}
+
+export function useOdlaczOdSprawy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number }) =>
+      api(`/api/obsluga/rozmowy/${v.rozmowaId}/odlacz`, { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.sprawy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+    },
   });
 }
 

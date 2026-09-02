@@ -125,6 +125,23 @@ technicznej) i **szkic** (niewysłaną treść).
 
 Nie zastępujemy tych pojęć jedną tabelą ze wspólnym statusem.
 
+#### 6.1.1. Sprawa w kodzie (0.161.0)
+
+Sprawa jest KLAMRĄ: ma tytuł i listę rozmów, nic więcej. Nie ma statusu, bo §7
+go dla niej nie zna, i nie ma własnej osi, bo zdarzenia wiszą przy ŹRÓDLE —
+blizna z 0.130.0 mówi, że historia sprawy ginęła przy scalaniu.
+
+Rozmowa należy do CO NAJWYŻEJ JEDNEJ sprawy i pilnuje tego klucz główny, nie
+dyscyplina serwisu. Odmowa przy drugiej sprawie niesie tytuł tej pierwszej,
+żeby agent wiedział, co odkleić. Sklejenie to jeden wiersz, rozklejenie to jego
+skasowanie — poprzednia odpowiedź o tym samym kształcie kosztowała cztery
+tabele nakładki plus ręczne SCAL i ROZKLEJ (`docs/obsluga-klienta.md`,
+pytanie 1).
+
+Sklejenie i rozklejenie widać na osi każdej rozmowy, której dotyczyło. Ekranu
+sprawy nie ma: pasek nad rozmową pokazuje tytuł i rodzeństwo, bo to jedyne
+pytanie, na które sprawa dziś odpowiada.
+
 ### 6.2. Przypisanie
 
 Rozmowa jest nieprzypisana, przypisana do agenta, przypisana do zespołu,
@@ -485,7 +502,7 @@ Tabele docelowe, nazwami z kodu:
 
 ```
 channel_account          conversation            message
-case                     case_conversation       conversation_event
+sprawa_klienta           sprawa_klienta_rozmowa  conversation_event
 conversation_assignment  conversation_comment    conversation_mention
 conversation_draft       offer_snapshot          customer
 customer_machine         order_snapshot          product_link
@@ -498,6 +515,14 @@ outbox                   events
 ```
 
 Obecności agentów nie ma na tej liście świadomie — patrz §6.3.
+
+**Sprawa nazywa się `sprawa_klienta`, nie `case` (0.161.0)** i ma to dwa
+powody. `case` jest słowem kluczowym SQLite, więc każde zapytanie musiałoby ją
+cytować. Samo `sprawa` jest nazwą SPALONĄ: `migrate()` kasuje tę tabelę przy
+każdym starcie, bo stoi na liście nakładek po starej implementacji, którą bazy
+klientów muszą stracić. Tabela nazwana tak samo powstałaby ze `schema.sql`
+i znikała sekundę później, bez błędu. Ten sam powód dał wcześniej
+`zwrot_klienta` zamiast `zwrot`; pilnuje tego `db/migracja-sprawy.test.ts`.
 
 ### 15.1. Identyfikatory zewnętrzne
 
@@ -863,7 +888,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Statusy doboru (§7) | **projekt** | dobór części nie ma jeszcze własnego stanu |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
-| Sprawa (`case`) | **projekt** | decyzja zapadła, tabeli nie ma |
+| Sprawa nad rozmowami (§6.1) | **działa** od 0.161.0 | `sprawa_klienta`, `services/sprawy.ts`, pasek w rozmowie |
+| Ekran sprawy z własną osią | **poza zakresem** | zdarzenia wiszą przy źródle — blizna 0.130.0 |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
 | Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |

@@ -116,6 +116,43 @@ CREATE TABLE IF NOT EXISTS message (
 );
 CREATE INDEX IF NOT EXISTS ix_message_conversation ON message(conversation_id, sent_at);
 
+-- ── Sprawa: jeden problem klienta ponad rozmowami (§6.1, 0.161.0) ──────────
+-- Nazwa ma DWA powody i oba są blizną.
+--
+-- Nie `case`, choć tak nazywa ją §15 projektu: `case` jest słowem kluczowym
+-- SQLite i każde zapytanie musiałoby ją cytować. Dokument dostaje nazwę
+-- z kodu, nie odwrotnie — tak samo rozstrzyga to jego własna preambuła.
+--
+-- Nie samo `sprawa`, bo tę tabelę `migrate()` KASUJE: stoi na liście nakładek
+-- po starej implementacji, którą każda baza klienta musi stracić. Tabela
+-- nazwana tak samo powstałaby ze `schema.sql` i znikała sekundę później,
+-- po cichu i bez błędu, bo `migrate()` chodzi PO schemacie. Ten sam powód
+-- dał w 0.150.0 `zwrot_klienta` zamiast `zwrot`.
+--
+-- Sprawa NIE MA własnego statusu ani osi. §7 nie zna statusów sprawy, a blizna
+-- z 0.130.0 mówi wprost: zdarzenia wiszą przy ŹRÓDLE, nie przy sprawie —
+-- historia sklejona z rozmów ginęła przy pierwszym rozklejeniu. Sprawa jest
+-- tu WYŁĄCZNIE klamrą: tytułem i listą rozmów.
+CREATE TABLE IF NOT EXISTS sprawa_klienta (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  tytul        TEXT NOT NULL,
+  utworzyl     INTEGER REFERENCES app_user(user_id),
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Rozmowa należy do CO NAJWYŻEJ JEDNEJ sprawy — stąd `conversation_id` jako
+-- klucz główny, a nie para. Poprzednia odpowiedź o tym samym kształcie
+-- kosztowała cztery tabele nakładki oraz ręczne SCAL i ROZKLEJ
+-- (`docs/obsluga-klienta.md`, pytanie 1). Jedna kolumna z kluczem obcym
+-- zamyka tę drogę: sklejenie to jeden wiersz, rozklejenie to jego skasowanie.
+CREATE TABLE IF NOT EXISTS sprawa_klienta_rozmowa (
+  conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
+  sprawa_id       INTEGER NOT NULL REFERENCES sprawa_klienta(id) ON DELETE CASCADE,
+  dolaczyl        INTEGER REFERENCES app_user(user_id),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_sprawa_klienta_rozmowa_sprawa ON sprawa_klienta_rozmowa(sprawa_id);
+
 CREATE TABLE IF NOT EXISTS conversation_event (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
