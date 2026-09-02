@@ -59,7 +59,7 @@ export function Rozmowa(p: {
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
   if (!p.dane) {
-    return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
+    return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
       <Pusto ikona={<Inbox size={38} />}>Wybierz rozmowę z listy</Pusto>
     </section>;
   }
@@ -72,7 +72,7 @@ export function Rozmowa(p: {
     && !os.some((w) => w.ofertaId);
   const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
-  return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
+  return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
     <header className="flex flex-wrap items-center gap-3 border-b p-4">
       <b className="mr-auto">{rozmowa.klient}</b>
       {rozmowa.wlasciciel

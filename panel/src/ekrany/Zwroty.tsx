@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
-import type { BilansKartotek, Kubelek } from "../api/typy";
+import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import {
   useCofnijKorekte, useKorekta, useKwota, useOcena, useWerdykt, useZglosRabat,
@@ -10,7 +10,7 @@ import {
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
-import { Skan } from "../zwroty/Skan";
+import { Szukanie } from "../zwroty/Szukanie";
 import { useSkaner } from "../skaner";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
@@ -56,13 +56,25 @@ const POWODY_SKROT: Record<string, string> = {
 function PasekKartotek({ bilans }: { bilans: BilansKartotek }) {
   if (!bilans.bez) return null;
   const powody = Object.entries(bilans.powody).sort((a, b) => b[1] - a[1]);
-  return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:col-span-3">
+  return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
     <b>Bez kartoteki: {bilans.bez} z {bilans.wszystkie} pozycji w pracy</b>
     {powody.map(([kod, ile]) => <span key={kod} className="text-amber-800">
       {POWODY_SKROT[kod] ?? kod} <b className="tabular-nums">{ile}</b>
     </span>)}
   </div>;
 }
+
+/**
+ * Kody, po których człowiek szuka zwrotu — wszystkie, jakie zwrot niesie.
+ *
+ * Numer zwrotu bywa doklejony na paczce, identyfikator z Allegro wpada
+ * z odnośnika, numer zamówienia z rozmowy z klientem, numer korekty z Subiekta.
+ * Numeru listu przewozowego tu NIE MA i nie będzie: nie zapisujemy go
+ * w modelu pracy (polityka danych zwrotów), więc szuka go dopiero serwer
+ * w kopii odpowiedzi Allegro.
+ */
+const kody = (z: Zwrot) => [z.numer, z.externalId, z.orderId, z.korektaNumer]
+  .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Zwroty() {
   const { id } = useParams();
@@ -91,8 +103,28 @@ export function Zwroty() {
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
   const [kod, setKod] = useState("");
+  const [fraza, setFraza] = useState("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
   const [bladSkanu, setBladSkanu] = useState("");
+
+  /* Filtr liczy się TUTAJ, w pamięci ekranu — tą samą drogą co filtr kubełka
+     i z tego samego powodu: lista przyjeżdża w całości, bo zwrotów w pracy są
+     dziesiątki, nie tysiące. Szukanie po fragmencie na serwerze musiałoby albo
+     rozluźnić `znajdzZwrotPoKodzie` (a ono ma być DOKŁADNE, bo samo otwiera
+     zwrot), albo dołożyć trasę z dziennikiem — czyli zapisać, czego ktoś
+     szukał. Numeru listu ten filtr nie widzi: nie ma go w modelu pracy. Od
+     niego jest Enter i `POST /skan`, który szuka w kopii odpowiedzi Allegro. */
+  const pasujace = useMemo(() => {
+    const f = fraza.trim().toLowerCase();
+    if (!f) return null;
+    return (data?.zwroty ?? []).filter((z) => kody(z).some((k) => k.includes(f)));
+  }, [data, fraza]);
+
+  /* Szukanie PRZEBIJA kubełek. Bez tego operator wpisuje numer, widzi „ten
+     kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
+     ZAMKNIĘTYCH. Kod jest mocniejszy niż zakładka, na którą ktoś przed chwilą
+     kliknął — tak samo jak adres w pasku przeglądarki. */
+  const widoczne = pasujace ?? wKubelku;
 
   /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
      źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
@@ -104,6 +136,7 @@ export function Zwroty() {
   };
   const szukaj = (v: string) => {
     setKod(v);
+    setFraza(v);
     skan.mutate(v, { onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) });
   };
 
@@ -117,6 +150,27 @@ export function Zwroty() {
   }, [zwrot?.id]);
 
   /**
+   * CAŁY kod otwiera zwrot, fragment tylko zawęża listę.
+   *
+   * Ekran sam otwiera przy jednym wyniku, więc dopasowanie przybliżone
+   * prowadziłoby do CUDZEJ sprawy — a przy zwrocie znaczy to cudzego klienta
+   * i cudze pieniądze. Ta sama zasada stoi przy skanie od 0.163.0.
+   *
+   * Otwarcie w pół pisania nie jest wpadką: otwarty zwrot niczego nie mutuje
+   * (zero zapisu przy patrzeniu), pole zostaje z tekstem, a dopisanie znaku
+   * przenosi ekran dalej. Dwa zwroty o tym samym kodzie — na przykład dwa
+   * zwroty z jednego zamówienia — nie otwierają żadnego; wybiera człowiek.
+   */
+  useEffect(() => {
+    const f = fraza.trim().toLowerCase();
+    if (!f) return;
+    const trafienia = (data?.zwroty ?? []).filter((z) => kody(z).includes(f));
+    if (trafienia.length === 1 && trafienia[0].id !== wybrany) {
+      nawiguj(`/obsluga/zwroty/${trafienia[0].id}`);
+    }
+  }, [fraza, data]);
+
+  /**
    * Przełączenie kubełka PRZESTAWIA TEŻ KURSOR.
    *
    * Bez tego jeden klawisz zmieniał listę, a zaznaczenie zostawało na zwrocie
@@ -126,14 +180,20 @@ export function Zwroty() {
    */
   const przelacz = (k: Kubelek) => {
     setKubelek(k);
+    /* Kliknięcie w kubełek jest prośbą o TEN kubełek, więc zdejmuje filtr.
+       Inaczej przełącznik wyglądałby na zepsuty: lista zostawałaby ta sama. */
+    setFraza("");
+    setWynikSkanu(null);
     const pierwszy = (data?.zwroty ?? []).find((z) => z.kubelek === k);
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
 
+  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy włączonym filtrze
+     `j` ma iść do następnego wyniku, a nie do zwrotu schowanego przed oczami. */
   const idz = (o: number) => {
-    if (!wKubelku.length) return;
-    const i = wKubelku.findIndex((z) => z.id === wybrany);
-    const nast = wKubelku[Math.min(wKubelku.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
+    if (!widoczne.length) return;
+    const i = widoczne.findIndex((z) => z.id === wybrany);
+    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
     if (nast) nawiguj(`/obsluga/zwroty/${nast.id}`);
   };
 
@@ -153,10 +213,25 @@ export function Zwroty() {
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
 
-  return <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
+  /* Ekran trzyma się okna, a przewijają się KOLUMNY (0.165.0). Pion strony był
+     tu drogą do zgubienia kolejki: żeby dojść do dołu dowodów, operator
+     zjeżdżał z oczu liście, po której chodzi klawiszami.
+
+     Pasek kartotek stoi POZA gridem, w zewnętrznej kolumnie. Jako warunkowy
+     wiersz `auto` byłby pułapką: bez paska pierwsza karta wpadałaby w ten
+     wiersz i cała blokada znikała. Kolumna flexa nie ma tego problemu — nie
+     ma dziecka, nie ma wiersza, nie ma odstępu.
+
+     `lg:grid-rows-[minmax(0,1fr)]` nie jest ozdobą: pojedynczy wiersz `auto`
+     mierzy się do `max-content`, więc przy treści wyższej niż okno grid
+     wylewałby się poza kontener zamiast przyciąć ścieżkę. */
+  return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} />}
-    <Karta className="overflow-hidden">
-      <nav className="flex flex-wrap gap-1 border-b border-slate-200 p-2">
+    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[320px_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
+    <Karta className="flex min-h-0 flex-col overflow-hidden">
+      {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
+          więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}
+      <nav className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 p-2">
         {KUBELKI.map((k, i) => {
           const ile = data?.liczniki?.[k.id] ?? 0;
           const aktywny = k.id === kubelek;
@@ -168,26 +243,30 @@ export function Zwroty() {
           </button>;
         })}
       </nav>
-      <Skan
-        wynik={wynikSkanu} kod={kod} szuka={skan.isPending} dociaga={dociagnij.isPending}
-        blad={bladSkanu}
-        onKod={setKod}
+      <Szukanie
+        wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
+        szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
+        onFraza={(v) => { setFraza(v); if (!v) setWynikSkanu(null); }}
         onSzukaj={szukaj}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }} />
 
-      {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji. */}
-      <p className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
+      {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.
+          Przy włączonym filtrze milknie: lista nie jest wtedy kubełkiem,
+          więc jego pytanie mówiłoby nieprawdę o tym, co widać. */}
+      {!pasujace && <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
         {opis?.pytanie}
-      </p>
-      {isLoading
-        ? <p className="p-6 text-center text-sm text-slate-500">Wczytuję kolejkę…</p>
-        : <Kolejka zwroty={wKubelku} wybrany={wybrany}
-            onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
+      </p>}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isLoading
+          ? <p className="p-6 text-center text-sm text-slate-500">Wczytuję kolejkę…</p>
+          : <Kolejka zwroty={widoczne} wybrany={wybrany} zKubelkiem={Boolean(pasujace)}
+              onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
+      </div>
     </Karta>
 
-    <Karta className="overflow-hidden">
+    <Karta className="flex min-h-0 flex-col overflow-hidden">
       {!zwrot
         ? <Pusto ikona={<Undo2 size={40} className="text-slate-300" />}>
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
@@ -195,11 +274,12 @@ export function Zwroty() {
             {/* Pytanie bierze się z kubełka WYBRANEGO zwrotu, nie z zakładki
                 listy. Te dwie rzeczy rozjeżdżają się przy wejściu z paska
                 adresu, a wtedy nagłówek pytałby o co innego niż klawisze. */}
-            <header className="border-b border-slate-200 p-4">
+            <header className="shrink-0 border-b border-slate-200 p-4">
               <h2 className="text-lg font-bold">{zwrot.numer ?? zwrot.externalId}</h2>
               <p className="text-sm text-slate-500">
                 {KUBELKI.find((k) => k.id === zwrot.kubelek)?.pytanie}</p>
             </header>
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
               onWerdykt={(decyzja, powod) =>
                 werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja })}
@@ -211,10 +291,14 @@ export function Zwroty() {
                 korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja })}
               onCofnijKorekte={() =>
                 cofnijKorekte.mutate({ id: zwrot.id, wersja: zwrot.wersja })} />
+            </div>
           </>}
     </Karta>
 
-    <Karta className="overflow-hidden">
+    {/* Cała ta kolumna jest do czytania, więc cała jedzie do scrollera —
+        `Dowody` nie muszą o tym wiedzieć. */}
+    <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
             onZglosRabat={(pozycjaId) => {
@@ -224,6 +308,8 @@ export function Zwroty() {
             }} />
         : <p className="p-6 text-center text-sm text-slate-500">
             Dowody pokażą się po wybraniu zwrotu.</p>}
+      </div>
     </Karta>
+    </div>
   </div>;
 }

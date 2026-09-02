@@ -46,7 +46,7 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
   const bezPolaczenia = zdrowie?.allegro?.stan === "niepolaczone"
     || zdrowie?.allegro?.stan === "zle_srodowisko";
 
-  return <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
+  return <div className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-4">
     <div className="flex flex-wrap items-center gap-3">
       <AlertTriangle className="text-ranga-zle" size={20} />
       <div className="mr-auto">

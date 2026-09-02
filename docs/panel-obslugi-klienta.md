@@ -349,6 +349,16 @@ do ośmiu. Decyzja właściciela, świadoma; §7 niesie nową wycenę.
 └─────────────────┴───────────────────────────┴──────────────────────┘
 ```
 
+**Ekran mieści się w OKNIE, a przewijają się kolumny (0.165.0).** Do 0.164.0
+przewijał się dokument, czyli wszystkie kolumny naraz: żeby dojść do dołu
+dowodów przy zwrocie, operator zjeżdżał z oczu kolejce i paskowi decyzji.
+Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku —
+front po prostu do niej nie doszedł.
+
+Blokada zaczyna się od szerokości `lg`. Niżej grid jest jednokolumnowy, a trzy
+scrollery po dwieście pikseli czytałoby się gorzej niż jedną przewijaną stronę;
+widok wąski jest osobnym ekranem (§10.5), nie tym samym w miniaturze.
+
 ### 10.2. Lista rozmów
 
 Wiersz pokazuje kanał, klienta, fragment ostatniej wiadomości, czas
@@ -891,6 +901,26 @@ trafi do skrótów. Człowiek nie wciska dwóch klawiszy w takim czasie.
 
 Numeru listu ekran nie zapisuje. Politykę opisuje `docs/obsluga-klienta.md`.
 
+**To samo pole SZUKA (0.165.0).** Każdy wpisany znak zawęża kolejkę po
+fragmencie numeru zwrotu, identyfikatora z Allegro, numeru zamówienia albo
+numeru korekty. Dwa pola na jeden kod byłyby dwoma nawykami do wyuczenia.
+
+Filtr liczy się w panelu, w pamięci ekranu — tą samą drogą co filtr kubełka
+i z tego samego powodu: lista przyjeżdża w całości. Serwer nie dostał ani
+jednej nowej trasy, więc nigdzie nie zapisuje się, czego ktoś szukał.
+
+**Szukanie przebija kubełek.** Lista pokazuje wtedy wyniki ze wszystkich
+kubełków, a wiersz niesie etykietę swojego. Bez tego operator wpisuje numer,
+widzi „ten kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi
+w ZAMKNIĘTYCH. Kliknięcie w kubełek zdejmuje filtr, bo jest prośbą o ten
+kubełek.
+
+**Fragment zawęża, otwiera dopiero CAŁY kod.** Ekran sam otwiera zwrot przy
+jednym wyniku, więc dopasowanie przybliżone prowadziłoby do cudzej sprawy —
+a przy zwrocie znaczy to cudzego klienta i cudze pieniądze. Numeru listu ten
+filtr nie widzi, bo nie ma go w modelu pracy; od niego jest Enter, który pyta
+serwer.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -978,6 +1008,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |
 | Korekta i zamknięcie zwrotu | **działa** od 0.162.0 | `zapiszKorekte`, `cofnijKorekte` — numer z Subiekta |
 | Skan etykiety zwrotnej otwiera zwrot | **działa** od 0.163.0 | `znajdzZwrotPoKodzie`, `panel/src/skaner.ts` |
+| Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
+| Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
 | Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |

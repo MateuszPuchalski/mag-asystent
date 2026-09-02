@@ -74,7 +74,10 @@ export function Zadania() {
   const widoczne = (zadania.data?.zadania ?? []).filter((t) =>
     filtr === "wszystkie" || (filtr === "otwarte" ? ["nowe", "w_toku"].includes(t.status) : t.status === filtr));
 
-  return <>
+  /* Ekran ma własny scroller, bo rama panelu trzyma się okna (0.165.0)
+     i celowo nie przewija za ekrany. Poniżej `lg` klasa jest bezczynna:
+     bez związanej wysokości nie ma czego przewijać. */
+  return <div className="lg:h-full lg:overflow-y-auto">
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold">Zadania terenowe</h1>
@@ -127,5 +130,5 @@ export function Zadania() {
     {!widoczne.length && <Karta className="grid place-items-center p-16">
       <Pusto ikona={<ClipboardList size={38} />}>Brak zadań w tym widoku</Pusto></Karta>}
     {modal && <NoweZadanie zamknij={() => setModal(false)} />}
-  </>;
+  </div>;
 }

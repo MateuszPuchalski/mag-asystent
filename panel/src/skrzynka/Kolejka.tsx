@@ -56,7 +56,7 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("wszystkie");
   const widoczne = rozmowy.filter((r) => wKubelku(r, kubelek, mojeId));
-  return <section className="card flex max-h-[75vh] flex-col overflow-hidden">
+  return <section className="card flex min-h-0 flex-col overflow-hidden">
     <header className="flex items-center gap-2 border-b p-4">
       <Inbox size={18} /><b className="mr-auto">Rozmowy</b>
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">

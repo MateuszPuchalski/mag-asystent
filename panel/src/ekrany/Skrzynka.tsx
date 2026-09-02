@@ -128,14 +128,19 @@ export function Skrzynka() {
   const jestemAdminem = ja.data?.user.role === "admin";
   const alarm = Boolean(zdrowie.data?.allegroInbox.alarm);
 
-  return <div className="grid gap-4 lg:grid-cols-[22rem_1fr]">
-    <div className="lg:col-span-2">
-      <AlarmSynchronizacji zdrowie={zdrowie.data} trwa={synchronizuj.isPending}
-        blad={bladSynchronizacji}
-        synchronizuj={() => { setBladSynchronizacji(""); synchronizuj.mutate(undefined,
-          { onError: (e) => setBladSynchronizacji((e as Error).message) }); }} />
-    </div>
+  /* Ekran trzyma się okna, a przewijają się kolumny (0.165.0) — ten sam nawyk
+     co w zwrotach, bo dwa ekrany obsługi mają mieć jeden, nie dwa.
 
+     Alarm i stan integracji stoją POZA gridem: jako wiersze `col-span-2`
+     byłyby wierszami warunkowymi, a wtedy kolumny wpadałyby w nie przy pustym
+     alarmie i blokada by znikała. */
+  return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+    <AlarmSynchronizacji zdrowie={zdrowie.data} trwa={synchronizuj.isPending}
+      blad={bladSynchronizacji}
+      synchronizuj={() => { setBladSynchronizacji(""); synchronizuj.mutate(undefined,
+        { onError: (e) => setBladSynchronizacji((e as Error).message) }); }} />
+
+    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_1fr] lg:grid-rows-[minmax(0,1fr)]">
     <Kolejka
       nieswieza={alarm}
       rozmowy={lista.data?.rozmowy ?? []}
@@ -146,10 +151,10 @@ export function Skrzynka() {
       onOdswiez={() => lista.refetch()}
       onWybierz={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />
 
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-col gap-4">
     {/* Uchwyt kolegi zatrzymuje wysyłkę, ale nigdy po cichu: zgoda jest jawna,
         tak samo jak przy dopisku klienta z 0.110.0. */}
-    {przyRozmowie && <div className="card flex flex-wrap items-center gap-3 border-violet-300 bg-violet-50 p-3 text-sm">
+    {przyRozmowie && <div className="card flex shrink-0 flex-wrap items-center gap-3 border-violet-300 bg-violet-50 p-3 text-sm">
       <span><b>{przyRozmowie}</b> siedzi teraz przy tej rozmowie.</span>
       <span className="text-slate-600">Dwie odpowiedzi na jedno pytanie to dwie różne prawdy u klienta.</span>
       <div className="ml-auto flex gap-2">
@@ -270,13 +275,16 @@ export function Skrzynka() {
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
     />
     </div>
+    </div>
 
+    {/* Dialog jest `fixed`, ale jako dziecko gridu założyłby niejawny wiersz —
+        a wtedy kolumny przestałyby się mieścić w oknie. */}
     {konfliktWysylki && <DialogKonfliktu
       szczegoly={konfliktWysylki} szkic={szkic} wysyla={wyslij.isPending} blad={bladWysylki}
       onWyslijMimoTo={() => wyslijOdpowiedz(true)}
       onPopraw={() => { setKonfliktWysylki(null); rozmowa.refetch(); }} />}
 
-    <div className="lg:col-span-2 space-y-4">
+    <div className="shrink-0 space-y-4">
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
       <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
     </div>
