@@ -1159,6 +1159,8 @@ private fun LineRow(
                w którym człowiek trzyma wzrok. Powtórny tap w pasek działa jak
                działał — to jest droga druga, nie zamiennik. */
             if (rozwiniety) {
+                // ergonomia: cel 36 dp świadomie — ten sam skutek daje powtórny
+                // tap w cały pasek, więc krzyżyk jest drogą DRUGĄ, nie jedyną
                 Box(
                     Modifier
                         .size(36.dp)

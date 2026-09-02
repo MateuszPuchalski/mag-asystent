@@ -37,6 +37,10 @@ DOCS = [
     "docs/analiza-rozkladanie.md",
     "docs/subiekt-gt-edu-setup.md",
     "docs/subiekt-gt-struktura.md",
+    # Dekalog ergonomii: czyta go człowiek przed zmianą ekranu i po niej.
+    # Dokument o dyscyplinie, który sam łamie limit zdania, przekonuje tyle,
+    # co komentarz „zgodnie z wersją monorepo".
+    "docs/ergonomia-magazynu.md",
     # Katalog scenariuszy testowych: 66 pozycji, każdą czyta się osobno i pod
     # ekranem. Długie zdanie kosztuje tu tyle samo, co w instrukcji wdrożenia.
     "docs/scenariusze-testowe.md",

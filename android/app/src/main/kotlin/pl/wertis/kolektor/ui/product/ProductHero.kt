@@ -166,6 +166,8 @@ fun ProductHero(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AmberInk,
+                            // ergonomia: cel 40 dp świadomie — pełne 48 rozpycha
+                            // nagłówek karty, a wejście w przesunięcie jest rzadkie
                             modifier = if (onPrzesunZMgp == null) Modifier
                             else Modifier
                                 .heightIn(min = 40.dp)
