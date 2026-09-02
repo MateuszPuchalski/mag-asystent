@@ -1,11 +1,16 @@
 import React, { useState } from "react";
-import { AlertTriangle, Check, FileText, Pencil, Ruler, Search, X as Krzyzyk } from "lucide-react";
-import type { DaneDoboru, Dobor as DoborTyp, DrogaDoboru, KandydatDoboru, StatusDoboru, SzczebelDoboru } from "../api/typy";
+import { AlertTriangle, BookMarked, Check, FileText, Pencil, Ruler, Search, X as Krzyzyk } from "lucide-react";
+import type {
+  DaneDoboru, Dobor as DoborTyp, DrogaDoboru, KandydatDoboru, NegatywDoboru, PomiarRozmowy, PowodNegatywny,
+  StatusDoboru, SzczebelDoboru, Zastosowanie,
+} from "../api/typy";
 import { Konflikt } from "../api/klient";
-import { useKandydaci, useStatusDoboru, useWybierzKandydata, useZapiszDaneDoboru } from "../api/rozmowy";
-import { Przycisk } from "../ui";
+import {
+  useKandydaci, usePomiarDoWiedzy, useStatusDoboru, useWiedzaDoboru, useWybierzKandydata, useZapiszDaneDoboru,
+} from "../api/rozmowy";
+import { Przycisk, czas } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
-import { DO_WYBORU_DOBORU, NAZWA_DOBORU } from "./statusy";
+import { DO_WYBORU_DOBORU, NAZWA_DOBORU, NAZWA_POWODU } from "./statusy";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1) — trzecia zakładka kolumny
@@ -86,6 +91,8 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
   const zapisz = useZapiszDaneDoboru();
   const status = useStatusDoboru();
   const wybierz = useWybierzKandydata();
+  const wiedza = useWiedzaDoboru(rozmowaId);
+  const pomiarDoWiedzy = usePomiarDoWiedzy();
 
   const [edycja, setEdycja] = useState(false);
   const [formularz, setFormularz] = useState<Formularz>(() => naFormularz(dobor.dane));
@@ -94,7 +101,9 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
   const [pytamOBrak, setPytamOBrak] = useState(false);
   const [szukam, setSzukam] = useState(false);
 
-  const blad = [zapisz.error, status.error, wybierz.error].find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
+  const blad = [zapisz.error, status.error, wybierz.error, pomiarDoWiedzy.error]
+    .find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
+  const maMaszyne = Boolean(dobor.dane.marka && dobor.dane.model);
 
   const zapiszDane = () => {
     const dane: Partial<DaneDoboru> = { parametry: tekstNaParametry(formularz.parametry) };
@@ -231,6 +240,8 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
           </li>;
         })}
       </ul>
+      {kandydaci.data && kandydaci.data.negatywne.length > 0 &&
+        <Negatywne lista={kandydaci.data.negatywne} />}
       {/* Wyszukiwarka klikana ręcznie NIE jest kandydatem — to od razu wybór
           z drogą `wyszukiwarka`, podpisany agentem. */}
       {szukam
@@ -253,6 +264,7 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
                 <Krzyzyk size={12} /></button></p>
             <p className="mt-1 rounded border border-slate-200 bg-slate-50 p-2 text-xs italic text-slate-700">
               {dobor.wybrany.zdanieDoSzkicu}</p>
+            <Dowody zastosowanie={wiedza.data?.zastosowanie ?? null} wczytuje={wiedza.isLoading} />
             <div className="mt-2 flex flex-wrap gap-2">
               <Przycisk className="text-xs" onClick={() => onZlecPomiar({
                 id: dobor.wybrany!.twId, sym: dobor.wybrany!.symbol, name: dobor.wybrany!.symbol, locs: [] })}>
@@ -268,7 +280,103 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
             wybranej kartoteki.</p>}
       {blad && <p className="mt-2 text-xs text-red-700">{blad.message}</p>}
     </section>
+
+    {/* ── Pomiary z tej rozmowy (§13.4) ─────────────────────────────────── */}
+    {wiedza.data && wiedza.data.pomiary.length > 0 &&
+      <section className="border-t p-3" aria-label="Pomiary z tej rozmowy">
+        <b className="text-xs uppercase tracking-wide text-slate-500">Pomiary z tej rozmowy</b>
+        <p className="mt-1 text-[11px] text-slate-500">Wynik z hali nie staje się wiedzą sam. Zaproponowany
+          trafia do kolejki jako dowód „pomiar własny” i czeka na zatwierdzenie.</p>
+        <ul className="mt-2 space-y-2">
+          {wiedza.data.pomiary.map((p) => <Pomiar key={p.zadanieId} pomiar={p} maMaszyne={maMaszyne}
+            trwa={pomiarDoWiedzy.isPending}
+            onZaproponuj={(polaryzacja, powodNegatywny) => pomiarDoWiedzy.mutate({
+              id: rozmowaId, zadanieId: p.zadanieId, twId: p.twId ?? dobor.wybrany?.twId ?? null,
+              polaryzacja, powodNegatywny })} />)}
+        </ul>
+      </section>}
   </div>;
+}
+
+/**
+ * Negatywne dopasowania (§11.4). Sekcja OSOBNA od kandydatów, bo negatyw
+ * dotyczy także kartoteki, której na liście nie ma — to ostrzeżenie, nie
+ * brak danych, i nie usuwa go automat (§14.2).
+ */
+function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
+  return <div className="mt-3 rounded-lg border border-red-200" aria-label="Negatywne dopasowania">
+    <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-900">
+      <AlertTriangle size={12} />Nie pasuje do tej maszyny
+      <span className="font-normal text-red-800">· ostrzeżenie, nie brak danych</span></p>
+    <ul className="divide-y divide-red-100">
+      {lista.map((n) => <li key={n.twId} className="px-2 py-1.5 text-xs">
+        <b className="font-mono">{n.symbol}</b>{n.nazwa && <span className="text-slate-600"> · {n.nazwa}</span>}
+        <p className="text-red-900">{n.powod}</p>
+        <p className="text-[11px] text-slate-500">{n.zrodlo}</p>
+      </li>)}
+    </ul>
+  </div>;
+}
+
+/**
+ * Dowody wybranej kartoteki (makieta: ranga, data, treść, źródło). Bez wpisu
+ * w bazie wiedzy dobór jest przypuszczeniem — i ekran ma to powiedzieć,
+ * zamiast pokazywać pustą sekcję.
+ */
+function Dowody({ zastosowanie, wczytuje }: { zastosowanie: Zastosowanie | null; wczytuje: boolean }) {
+  if (wczytuje) return <p className="mt-2 text-[11px] text-slate-500">Sprawdzam bazę wiedzy…</p>;
+  if (!zastosowanie) {
+    return <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-500">
+      <BookMarked size={12} />Brak wpisu w bazie wiedzy dla tej pary — dobór to przypuszczenie,
+      dopóki nikt nie zatwierdzi zastosowania.</p>;
+  }
+  return <div className="mt-2" aria-label="Dowody zastosowania">
+    <p className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+      <BookMarked size={12} />Dowody: {zastosowanie.model.etykieta}
+      <span className={`ml-1 rounded px-1 py-0.5 font-bold ${zastosowanie.pewnosc === "potwierdzone"
+        ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{zastosowanie.pewnosc}</span>
+      <span className="font-normal text-slate-500">· zatwierdził {zastosowanie.rozstrzygnal}</span></p>
+    <ul className="mt-1 space-y-1">
+      {zastosowanie.dowody.map((d) => <li key={d.id} className="rounded border border-slate-200 p-1.5 text-[11px]">
+        <span className="rounded bg-slate-100 px-1 font-semibold text-slate-700">{d.nazwaRodzaju}</span>
+        <span className="ml-1 text-slate-400">{czas(d.at)}</span>
+        <p className="mt-0.5 text-slate-800">{d.tresc}</p>
+        <p className="text-slate-500">{d.autor}{d.link && <> · <a className="underline" href={d.link} target="_blank" rel="noreferrer">źródło</a></>}</p>
+      </li>)}
+    </ul>
+  </div>;
+}
+
+function Pomiar({ pomiar, maMaszyne, trwa, onZaproponuj }: {
+  pomiar: PomiarRozmowy; maMaszyne: boolean; trwa: boolean;
+  onZaproponuj: (polaryzacja: "pasuje" | "nie_pasuje", powodNegatywny: PowodNegatywny | null) => void;
+}) {
+  const [polaryzacja, setPolaryzacja] = useState<"pasuje" | "nie_pasuje">("pasuje");
+  const [powod, setPowod] = useState<PowodNegatywny>("niewlasciwy_rozstaw");
+  const gotowe = maMaszyne;
+  return <li className="rounded border border-slate-200 p-2 text-xs">
+    <p><b>{pomiar.tytul}</b> <span className="text-slate-500">· {pomiar.wykonanoPrzez}, {czas(pomiar.wykonanoAt)}
+      {pomiar.symbol && <> · <span className="font-mono">{pomiar.symbol}</span></>}</span></p>
+    <p className="mt-0.5 whitespace-pre-wrap text-slate-800">{pomiar.wynik}</p>
+    {pomiar.zaproponowano
+      ? <p className="mt-1 text-[11px] font-semibold text-emerald-700">w kolejce wiedzy jako dowód</p>
+      : <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <select className="field w-auto py-0.5 text-[11px]" aria-label={`Wynik pomiaru: ${pomiar.tytul}`}
+            value={polaryzacja} onChange={(e) => setPolaryzacja(e.target.value as "pasuje" | "nie_pasuje")}>
+            <option value="pasuje">pasuje</option><option value="nie_pasuje">nie pasuje</option>
+          </select>
+          {polaryzacja === "nie_pasuje" && <select className="field w-auto py-0.5 text-[11px]" aria-label="Powód"
+            value={powod} onChange={(e) => setPowod(e.target.value as PowodNegatywny)}>
+            {(Object.keys(NAZWA_POWODU) as PowodNegatywny[]).map((k) => <option key={k} value={k}>{NAZWA_POWODU[k]}</option>)}
+          </select>}
+          <Przycisk className="text-[11px]" disabled={!gotowe || trwa}
+            title={maMaszyne ? undefined : "Wpisz markę i model w danych wejściowych"}
+            onClick={() => onZaproponuj(polaryzacja, polaryzacja === "nie_pasuje" ? powod : null)}>
+            <BookMarked size={12} />Zaproponuj jako dowód</Przycisk>
+          {/* Bez maszyny pomiar nie ma do czego pasować — przycisk mówi dlaczego. */}
+          {!maMaszyne && <span className="text-[11px] text-slate-500">najpierw marka i model maszyny</span>}
+        </div>}
+  </li>;
 }
 
 /**

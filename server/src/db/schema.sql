@@ -224,6 +224,99 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   updated_user_id INTEGER REFERENCES app_user(user_id)
 );
 
+-- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
+-- Trzy tabele zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
+-- `Measurement`, `KnowledgeRevision`…): każda z tamtych byłaby dziś tabelą bez
+-- czytelnika — blizna 0.157.0. Nazwy polskie, jak `sprawa_klienta`; żadna nie
+-- stoi na liście spalonych w `bezObslugiKlienta()` (tam jest `dopasowanie`).
+--
+-- Model maszyny i silnika w JEDNEJ tabeli z `rodzaj`: kosiarka i jej silnik
+-- to dwa wiersze, a nie dwie tabele o tym samym kształcie. `klucz` liczy
+-- `kluczModelu()` z `services/wiedza.ts` przez `zwin()` z `tekst.ts`, więc
+-- „NAC LS 46-450", „nac ls46450" i „Nac LS 46 450" to jedna kosiarka.
+CREATE TABLE IF NOT EXISTS model_urzadzenia (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj            TEXT NOT NULL CHECK (rodzaj IN ('maszyna','silnik')),
+  marka             TEXT NOT NULL,
+  nazwa             TEXT NOT NULL,
+  wariant           TEXT,
+  lata              TEXT,
+  klucz             TEXT NOT NULL UNIQUE,
+  utworzono_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  utworzono_przez   TEXT NOT NULL,
+  utworzono_user_id INTEGER REFERENCES app_user(user_id)
+);
+
+-- Zastosowanie: część pasuje ALBO nie pasuje do modelu. Pozytywne i negatywne
+-- w jednym wierszu z `polaryzacja`, bo kandydaci i ostrzeżenia to wtedy jedno
+-- zapytanie po parze (towar, model), a sprzeczność „pasuje" kontra „nie
+-- pasuje" wykrywa się w jednym miejscu. Negatyw ZAWSZE niesie powód z
+-- zamkniętej listy §11.4 — pilnuje tego CHECK sprzęgający obie kolumny,
+-- bo „nie pasuje" bez powodu jest ostrzeżeniem, którego nie da się sprawdzić.
+--
+-- Cykl życia: propozycja → zatwierdzone | odrzucone | wycofane. Propozycję
+-- może złożyć automat (dobór, pomiar, w E3 opis, w F Copilot); rozstrzyga
+-- WYŁĄCZNIE człowiek z biura — pilnuje tego serwis, nie baza. `opis`
+-- i `copilot` stoją na liście bez nadawcy, bo CHECK nie da się rozszerzyć bez
+-- przebudowy tabeli (blizna 0.135.0) — jak `extracting_data` w doborze.
+--
+-- Historia wersji bez `KnowledgeRevision`: wiersz jest niezmienny poza
+-- stanem, poprawka to NOWY wiersz z `zastepuje_id`, a stary schodzi na
+-- `wycofane`. `events` niesie pełny wiersz przy każdej zmianie.
+--
+-- Bez klucza obcego do `sgt_towar`: import odtwarza read-model (blizna
+-- 0.154.0). `ON DELETE RESTRICT` na modelu: model z wiedzą nie znika po cichu.
+-- Rozmowa może zniknąć — wiedza zostaje, bo nie jest jej własnością.
+CREATE TABLE IF NOT EXISTS zastosowanie (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  tw_id                 INTEGER NOT NULL,
+  tw_symbol             TEXT NOT NULL,
+  model_id              INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
+  polaryzacja           TEXT NOT NULL CHECK (polaryzacja IN ('pasuje','nie_pasuje')),
+  powod_negatywny       TEXT CHECK (powod_negatywny IS NULL OR powod_negatywny IN (
+                          'nie_pasuje','tylko_inny_wariant','niewlasciwy_rozstaw',
+                          'srednica_ok_inne_mocowanie','mylace_oznaczenie','wymaga_pomiaru')),
+  stan                  TEXT NOT NULL DEFAULT 'propozycja'
+                          CHECK (stan IN ('propozycja','zatwierdzone','odrzucone','wycofane')),
+  zrodlo_propozycji     TEXT NOT NULL
+                          CHECK (zrodlo_propozycji IN ('dobor','pomiar','reczne','opis','copilot')),
+  komentarz             TEXT,
+  conversation_id       INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  zastepuje_id          INTEGER REFERENCES zastosowanie(id),
+  zaproponowal          TEXT NOT NULL,
+  zaproponowal_user_id  INTEGER REFERENCES app_user(user_id),
+  zaproponowano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  rozstrzygnal          TEXT,
+  rozstrzygnal_user_id  INTEGER REFERENCES app_user(user_id),
+  rozstrzygnieto_at     TEXT,
+  powod_rozstrzygniecia TEXT,
+  -- Ograniczenie tabelowe MUSI stać po kolumnach — SQLite inaczej nie parsuje.
+  CHECK ((polaryzacja = 'nie_pasuje') = (powod_negatywny IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS ix_zastosowanie_towar ON zastosowanie(tw_id, stan);
+CREATE INDEX IF NOT EXISTS ix_zastosowanie_model ON zastosowanie(model_id, stan);
+CREATE INDEX IF NOT EXISTS ix_zastosowanie_stan  ON zastosowanie(stan, zaproponowano_at);
+
+-- Dowód zastosowania (§11.3) — APPEND-ONLY: kod nie ma na tę tabelę ani
+-- UPDATE, ani DELETE. Dowód, który da się poprawić po cichu, przestaje być
+-- dowodem. Rodzaj `decyzja_biura` stoi tam, gdzie projekt pisał „ekspert":
+-- roli eksperta nie ma decyzją właściciela. `rozmowa` to ślad, nie dowód
+-- techniczny — pewność liczy `pewnoscZastosowania()` w serwisie.
+CREATE TABLE IF NOT EXISTS dowod_zastosowania (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  zastosowanie_id INTEGER NOT NULL REFERENCES zastosowanie(id) ON DELETE CASCADE,
+  rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('producent','katalog_dostawcy','pomiar_wlasny',
+                    'decyzja_biura','sprzedaz_weryfikacja','rozmowa')),
+  tresc           TEXT NOT NULL,
+  link            TEXT,
+  zadanie_id      INTEGER REFERENCES zadanie_terenowe(id) ON DELETE SET NULL,
+  conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  autor           TEXT NOT NULL,
+  autor_user_id   INTEGER REFERENCES app_user(user_id),
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_dowod_zastosowania ON dowod_zastosowania(zastosowanie_id);
+
 CREATE TABLE IF NOT EXISTS conversation_event (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,

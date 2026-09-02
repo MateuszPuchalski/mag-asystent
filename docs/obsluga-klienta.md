@@ -157,6 +157,13 @@ zapisana świadomie, a nie odziedziczona.
 >
 > Do tego §14.3: każde twierdzenie techniczne w szkicu wskazuje źródło, a treść
 > bez źródła jest oznaczona jako przypuszczenie.
+>
+> **Uzupełnienie z etapu E2 — kto zatwierdza wiedzę.** Projekt przewidywał
+> rolę eksperta. Właściciel rozstrzygnął: zatwierdza każdy z biura, także autor
+> propozycji, bo w biurze bywa jedna osoba i zasada dwóch par oczu zatrzymałaby
+> wiedzę na zawsze. Autor i zatwierdzający są zapisani osobno. Automat składa
+> propozycje (z doboru, z pomiaru), ale nie rozstrzyga — pilnuje tego serwis,
+> nie dyscyplina. Bazę zaczynamy od zera, bez importu.
 
 ### 6. Czym jest zwrot?
 

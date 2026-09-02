@@ -3,6 +3,10 @@ import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { ConversationConflict } from "./conversations.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import {
+  kluczModelu, propozycjaZPomiaru, wycofajPropozycjeDoboru, zaproponujZastosowanie, zastosowaniaModelu,
+  type Polaryzacja, type PowodNegatywny, type Zastosowanie,
+} from "./wiedza.js";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1).
@@ -40,7 +44,8 @@ export const DROGI_DOBORU = [
   "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "oem", "pelnotekst",
 ] as const;
 export type DrogaDoboru = (typeof DROGI_DOBORU)[number];
-const DROGI_Z_NADAWCA: DrogaDoboru[] = ["oferta", "zamiennik", "symbol", "ean", "wyszukiwarka"];
+/* `zastosowanie` doszło w E2 razem z bazą wiedzy; `oem` i `pelnotekst` czekają na E3. */
+const DROGI_Z_NADAWCA: DrogaDoboru[] = ["oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie"];
 
 /* Zdanie źródła dla szkicu (§14.3): panel go nie układa, bo druga kopia tej
    listy rozjechałaby się przy pierwszej nowej drodze. */
@@ -126,19 +131,37 @@ function urzadzenie(dane: DaneDoboru): string {
 /**
  * Zdanie do szkicu (§14.3). Bez marki i modelu dobór nie ma do czego pasować,
  * więc zdanie mówi to wprost — ekran nie ma prawa dopisać maszyny sam.
- * Zatwierdzony dobór to wciąż dobór AGENTA, nie potwierdzone zastosowanie
- * (to E2): stąd „prawdopodobnie", dopóki wiedza nie stoi za wyborem.
+ *
+ * Gdy za wyborem stoi ZATWIERDZONE zastosowanie z bazy wiedzy (E2), zdanie
+ * cytuje jego dowód — to jest „rekomendacja techniczna pokazuje źródło"
+ * z §25. Bez niego zatwierdzony dobór to wciąż dobór AGENTA: stąd
+ * „prawdopodobnie" i „bez potwierdzonego zastosowania".
  */
-function zdanieDoSzkicu(dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru): string {
+function zdanieDoSzkicu(
+  dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru, zastosowanie: Zastosowanie | null,
+): string {
   const maszyna = urzadzenie(dane);
   const zrodlo = `źródło: ${ZRODLO_DROGI[droga]}`;
   if (!maszyna) return `${symbol} — ${zrodlo}; dobór bez wskazanej maszyny — to przypuszczenie.`;
+  /* Zastosowanie zatwierdzone na samym śladzie rozmowy to nadal „prawdopodobnie":
+     zdanie źródła mówi wprost, że dowodu technicznego nie ma. */
+  if (zastosowanie) {
+    const orzeczenie = zastosowanie.pewnosc === "potwierdzone" ? "pasuje" : "prawdopodobnie pasuje";
+    return `Do ${maszyna} ${orzeczenie} ${symbol} — źródło: ${zastosowanie.zdanieZrodla}.`;
+  }
   return status === "confirmed"
     ? `Do ${maszyna} pasuje ${symbol} — ${zrodlo}.`
     : `Do ${maszyna} prawdopodobnie pasuje ${symbol} — ${zrodlo}; dobór bez potwierdzonego zastosowania.`;
 }
 
-function naDobor(w: Record<string, unknown> | undefined): Dobor {
+/** Zatwierdzone POZYTYWNE zastosowanie wybranej kartoteki do wpisanej maszyny — albo nic. */
+function zastosowanieWyboru(database: DatabaseSync, dane: DaneDoboru, twId: number): Zastosowanie | null {
+  if (!dane.marka || !dane.model) return null;
+  return zastosowaniaModelu(kluczModelu("maszyna", dane.marka, dane.model, dane.wariant), database)
+    .find((z) => z.twId === twId && z.polaryzacja === "pasuje") ?? null;
+}
+
+function naDobor(w: Record<string, unknown> | undefined, database: DatabaseSync): Dobor {
   if (!w) {
     return { status: "not_started", wersja: 1, dane: PUSTE, brakuje: null, wybrany: null,
       updatedBy: null, updatedAt: null };
@@ -156,7 +179,8 @@ function naDobor(w: Record<string, unknown> | undefined): Dobor {
     wybrany: w.wybrany_tw_id == null || droga === null ? null : {
       twId: Number(w.wybrany_tw_id), symbol: String(w.wybrany_symbol), droga,
       przez: String(w.wybrano_przez ?? "?"), at: String(w.wybrano_at ?? ""),
-      zdanieDoSzkicu: zdanieDoSzkicu(dane, String(w.wybrany_symbol), droga, status),
+      zdanieDoSzkicu: zdanieDoSzkicu(dane, String(w.wybrany_symbol), droga, status,
+        zastosowanieWyboru(database, dane, Number(w.wybrany_tw_id))),
     },
     updatedBy: w.updated_by == null ? null : String(w.updated_by),
     updatedAt: w.updated_at == null ? null : String(w.updated_at),
@@ -166,14 +190,14 @@ function naDobor(w: Record<string, unknown> | undefined): Dobor {
 /** Dobór rozmowy. Bez wiersza — `not_started`, i NIC nie zapisuje. */
 export function doborRozmowy(conversationId: number, database: DatabaseSync = db()): Dobor {
   istniejeRozmowa(database, conversationId);
-  return naDobor(wiersz(database, conversationId));
+  return naDobor(wiersz(database, conversationId), database);
 }
 
 /* Wersja pilnuje DANYCH i WYBORU, nie statusu. Dwóch agentów przy jednym
    doborze to ten sam wyścig, co przy szkicu: cichy zapis gubi cudze chipy.
    Odmowa niesie bieżący stan, żeby ekran pokazał, co się zmieniło. */
 function sprawdzWersje(database: DatabaseSync, conversationId: number, expectedVersion: number): Dobor {
-  const biezacy = naDobor(wiersz(database, conversationId));
+  const biezacy = naDobor(wiersz(database, conversationId), database);
   if (!Number.isInteger(expectedVersion)) throw new Error("Zapis doboru wymaga oczekiwanej wersji");
   if (biezacy.wersja !== expectedVersion) {
     throw new ConversationConflict("Ktoś zmienił dobór, zanim doszedł zapis — odśwież",
@@ -265,7 +289,7 @@ export function zapiszDane(
     if (przed.status === "not_started") {
       zmienStatus(database, conversationId, "not_started", "searching", null, autor, userId);
     }
-    return naDobor(wiersz(database, conversationId));
+    return naDobor(wiersz(database, conversationId), database);
   })();
   publishConversationEvent("assignment.changed", conversationId, { dobor: true });
   return wynik;
@@ -291,7 +315,7 @@ export function ustawStatusDoboru(
   const po = status as StatusDoboru;
   const autor = imie(database, userId);
   const wynik = transaction(database, () => {
-    const przed = naDobor(wiersz(database, conversationId));
+    const przed = naDobor(wiersz(database, conversationId), database);
     if (po === "confirmed" && !przed.wybrany) {
       throw new Error("Zatwierdzenie doboru wymaga wybranej kartoteki");
     }
@@ -299,8 +323,21 @@ export function ustawStatusDoboru(
     if (przed.status === po && przed.brakuje === notatka) return przed;
     upewnijWiersz(database, conversationId);
     zmienStatus(database, conversationId, przed.status, po, notatka, autor, userId);
+    /* WIEDZA ROŚNIE Z PRACY (E2): zatwierdzony dobór z marką i modelem
+       staje się PROPOZYCJĄ zastosowania — z dowodem „rozmowa", do kolejki,
+       nigdy faktem. Bez marki albo modelu nie ma do czego pasować, więc nic
+       nie powstaje. W tej samej transakcji: dobór bez propozycji albo
+       propozycja bez doboru byłyby stanem w połowie. */
+    if (po === "confirmed" && przed.wybrany && przed.dane.marka && przed.dane.model) {
+      zaproponujZastosowanie({
+        twId: przed.wybrany.twId,
+        model: { rodzaj: "maszyna", marka: przed.dane.marka, nazwa: przed.dane.model, wariant: przed.dane.wariant },
+        polaryzacja: "pasuje", zrodlo: "dobor", conversationId,
+        dowod: { rodzaj: "rozmowa", tresc: `dobór zatwierdzony w rozmowie #${conversationId} przez ${autor}` },
+      }, { userId, name: autor }, database);
+    }
     podpisz(database, conversationId, autor, userId);
-    return naDobor(wiersz(database, conversationId));
+    return naDobor(wiersz(database, conversationId), database);
   })();
   publishConversationEvent("assignment.changed", conversationId, { dobor: true });
   return wynik;
@@ -335,9 +372,12 @@ export function wybierzKandydata(
         { twId: przed.wybrany.twId, symbol: przed.wybrany.symbol }, autor, userId);
       if (przed.status === "confirmed") {
         zmienStatus(database, conversationId, "confirmed", "candidates_found", null, autor, userId);
+        /* Automat sprząta po sobie: własna, NIEROZSTRZYGNIĘTA propozycja
+           z tej rozmowy schodzi. Zatwierdzonej nie dotyka (§14.2). */
+        wycofajPropozycjeDoboru(conversationId, przed.wybrany.twId, { userId, name: autor }, database);
       }
       podpisz(database, conversationId, autor, userId);
-      return naDobor(wiersz(database, conversationId));
+      return naDobor(wiersz(database, conversationId), database);
     }
 
     if (!DROGI_Z_NADAWCA.includes(droga as DrogaDoboru)) {
@@ -354,10 +394,70 @@ export function wybierzKandydata(
       { twId, symbol: t.symbol, droga }, autor, userId);
     if (przed.status !== "candidates_found") {
       zmienStatus(database, conversationId, przed.status, "candidates_found", null, autor, userId);
+      if (przed.status === "confirmed" && przed.wybrany) {
+        wycofajPropozycjeDoboru(conversationId, przed.wybrany.twId, { userId, name: autor }, database);
+      }
     }
     podpisz(database, conversationId, autor, userId);
-    return naDobor(wiersz(database, conversationId));
+    return naDobor(wiersz(database, conversationId), database);
   })();
   publishConversationEvent("assignment.changed", conversationId, { dobor: true });
   return wynik;
+}
+
+/* ── Wiedza przy doborze (E2) ─────────────────────────────────────────────── */
+
+export interface PomiarRozmowy {
+  zadanieId: number; tytul: string; wynik: string; wykonanoAt: string; wykonanoPrzez: string;
+  twId: number | null; symbol: string | null;
+  /** Ten pomiar już stoi jako dowód w bazie wiedzy — drugi raz nie proponujemy. */
+  zaproponowano: boolean;
+}
+
+/**
+ * Co baza wiedzy mówi o WYBRANEJ kartotece i jakie pomiary z tej rozmowy
+ * mogą stać się dowodem. Osobna trasa, nie `osRozmowy`: tamten odczyt
+ * odświeża się na każde zdarzenie szyny, a to są dwa dodatkowe zapytania.
+ */
+export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db()): {
+  zastosowanie: Zastosowanie | null; pomiary: PomiarRozmowy[];
+} {
+  const dobor = doborRozmowy(conversationId, database);
+  const zastosowanie = dobor.wybrany ? zastosowanieWyboru(database, dobor.dane, dobor.wybrany.twId) : null;
+  const pomiary = (database.prepare(`
+    SELECT z.id, z.tytul, z.wynik, z.wykonano_at, z.wykonano_przez, z.tw_id, t.symbol,
+           EXISTS(SELECT 1 FROM dowod_zastosowania d WHERE d.zadanie_id = z.id) AS zaproponowano
+      FROM zadanie_terenowe z LEFT JOIN sgt_towar t ON t.tw_id = z.tw_id
+     WHERE z.conversation_id=? AND z.status='wykonane' AND z.wynik IS NOT NULL ORDER BY z.wykonano_at`)
+    .all(conversationId) as Array<Record<string, unknown>>).map((z) => ({
+      zadanieId: Number(z.id), tytul: String(z.tytul), wynik: String(z.wynik),
+      wykonanoAt: String(z.wykonano_at), wykonanoPrzez: String(z.wykonano_przez ?? "hala"),
+      twId: z.tw_id == null ? null : Number(z.tw_id), symbol: z.symbol == null ? null : String(z.symbol),
+      zaproponowano: Boolean(Number(z.zaproponowano ?? 0)),
+    }));
+  return { zastosowanie, pomiary };
+}
+
+/**
+ * Wynik pomiaru z tej rozmowy jako propozycja wiedzy (§13.4). Model bierze
+ * się z DANYCH DOBORU — bez marki i modelu nie ma do czego pasować, więc
+ * odmowa mówi, co wpisać, zamiast wstawiać wiedzę bez maszyny.
+ */
+export function pomiarDoWiedzy(
+  conversationId: number,
+  p: { zadanieId: number; twId?: number | null; polaryzacja: Polaryzacja; powodNegatywny?: PowodNegatywny | null },
+  userId: number, database: DatabaseSync = db(),
+): Zastosowanie {
+  const dobor = doborRozmowy(conversationId, database);
+  if (!dobor.dane.marka || !dobor.dane.model) {
+    throw new Error("Wpisz markę i model maszyny w danych doboru — pomiar musi wiedzieć, do czego pasuje");
+  }
+  const nalezy = database.prepare("SELECT 1 FROM zadanie_terenowe WHERE id=? AND conversation_id=?")
+    .get(p.zadanieId, conversationId);
+  if (!nalezy) throw new Error("To zadanie nie należy do tej rozmowy");
+  return propozycjaZPomiaru(p.zadanieId, {
+    twId: p.twId ?? dobor.wybrany?.twId ?? null,
+    model: { rodzaj: "maszyna", marka: dobor.dane.marka, nazwa: dobor.dane.model, wariant: dobor.dane.wariant },
+    polaryzacja: p.polaryzacja, powodNegatywny: p.powodNegatywny ?? null,
+  }, userId, database);
 }

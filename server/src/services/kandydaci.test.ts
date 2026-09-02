@@ -17,6 +17,7 @@ process.env.SGT_MODE = "seeded";
 let db: typeof import("../db/db.js").db;
 let kandydaciDoboru: typeof import("./kandydaci.js").kandydaciDoboru;
 let zapiszDane: typeof import("./dobor.js").zapiszDane;
+let W: typeof import("./wiedza.js");
 let config: typeof import("../config.js").config;
 let subiekt: typeof import("../context.js").subiekt;
 
@@ -34,6 +35,7 @@ before(async () => {
   ({ subiekt } = await import("../context.js"));
   ({ kandydaciDoboru } = await import("./kandydaci.js"));
   ({ zapiszDane } = await import("./dobor.js"));
+  W = await import("./wiedza.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length} pozycji`);
@@ -50,8 +52,10 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dobor_rozmowy", "offer_snapshot", "oferta_kartoteka", "conversation_event", "message",
-    "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
+  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "dobor_rozmowy", "offer_snapshot",
+    "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
+    d.prepare(`DELETE FROM ${t}`).run();
+  }
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")
     .run().lastInsertRowid);
   konto = Number(d.prepare(
@@ -82,7 +86,8 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
     assert.ok(d.powod, `${d.droga} pominięty bez powodu`);
   }
   assert.match(szczebel(drogi, "oferta").powod!, /nie jest powiązana z ofertą/);
-  assert.match(szczebel(drogi, "zastosowanie").powod!, /E2/);
+  assert.match(szczebel(drogi, "zastosowanie").powod!, /marki i modelu/);
+  assert.match(szczebel(drogi, "oem").powod!, /E3/);
   /* Patrzenie na kandydatów niczego nie zapisuje — ani wiersza doboru, ani zdarzenia. */
   assert.equal((db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n, przed);
   assert.equal((db().prepare("SELECT count(*) n FROM dobor_rozmowy").get() as { n: number }).n, 0);
@@ -144,4 +149,50 @@ test("nazwa części słowami nie uruchamia szczebla symbolu", () => {
   zapiszDane(rozmowa, { nazwaCzesci: "podkładka przekładni" }, 1, biuro);
   const { drogi } = kandydaciDoboru(rozmowa, subiekt);
   assert.equal(szczebel(drogi, "symbol").sprawdzona, false);
+});
+
+/* ── Szczebel „zastosowanie" i negatywy z bazy wiedzy (E2) ───────────────── */
+
+const STIHL = { rodzaj: "maszyna" as const, marka: "STIHL", nazwa: "FS 250" };
+const zaproponuj = (twId: number, n: Partial<Parameters<typeof W.zaproponujZastosowanie>[0]> = {}) =>
+  W.zaproponujZastosowanie({ twId, model: STIHL, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024" }, ...n }, { userId: biuro, name: "A. Lewandowska" })!;
+
+test("zatwierdzone zastosowanie daje kandydata przed ofertą, z pewnością i źródłem z dowodu", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { marka: "stihl", model: "fs250" }, 1, biuro);
+  const zatwierdzone = zaproponuj(ZAMIENNIK_FTC272);
+  W.rozstrzygnijZastosowanie(zatwierdzone.id, "zatwierdz", null, biuro);
+  /* Propozycja, której nikt nie rozstrzygnął, NIE jest wiedzą. */
+  zaproponuj(FTC272, { dowod: { rodzaj: "rozmowa", tresc: "dobór" } });
+
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "zastosowanie").sprawdzona, true);
+  assert.equal(szczebel(drogi, "zastosowanie").wynikow, 1);
+  assert.equal(kandydaci[0].twId, ZAMIENNIK_FTC272, "zastosowanie ma rangę przed ofertą");
+  assert.equal(kandydaci[0].droga, "zastosowanie");
+  assert.equal(kandydaci[0].pewnosc, "potwierdzone");
+  assert.match(kandydaci[0].zrodlo, /^potwierdzone zastosowanie do STIHL FS 250 — katalog dostawcy, /);
+  assert.equal(kandydaci.find((k) => k.twId === FTC272)?.droga, "oferta", "propozycja nie podniosła oferty do zastosowania");
+});
+
+test("negatyw jest widoczny osobno i jako ostrzeżenie przy kandydacie z innej drogi", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  const neg = zaproponuj(FTC272, { polaryzacja: "nie_pasuje", powodNegatywny: "tylko_inny_wariant",
+    dowod: { rodzaj: "decyzja_biura", tresc: "pasuje do FS 250 tylko z przekładnią nową" } });
+  W.rozstrzygnijZastosowanie(neg.id, "zatwierdz", null, biuro);
+  /* Negatyw dla kartoteki, której NIE MA wśród kandydatów, też ma być widoczny. */
+  const obcy = zaproponuj(1, { polaryzacja: "nie_pasuje", powodNegatywny: "niewlasciwy_rozstaw",
+    dowod: { rodzaj: "pomiar_wlasny", tresc: "rozstaw 140 mm" } });
+  W.rozstrzygnijZastosowanie(obcy.id, "zatwierdz", null, biuro);
+
+  const { kandydaci, negatywne } = kandydaciDoboru(rozmowa, subiekt);
+  assert.deepEqual(negatywne.map((n) => n.twId).sort(), [1, FTC272]);
+  assert.match(negatywne.find((n) => n.twId === FTC272)!.powod, /tylko do innego wariantu/);
+  const oferta = kandydaci.find((k) => k.twId === FTC272)!;
+  assert.equal(oferta.droga, "oferta", "negatyw nie wyrzuca kandydata — ostrzega przy nim");
+  assert.equal(oferta.ostrzezenia.length, 1);
+  assert.match(oferta.ostrzezenia[0], /innego wariantu — nie pasuje do STIHL FS 250/);
+  assert.equal(kandydaci.some((k) => k.twId === 1), false);
 });

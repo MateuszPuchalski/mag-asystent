@@ -99,9 +99,11 @@ wskazanej ręcznie przez agenta: jest jego wyborem, nie faktem z Allegro.
 odpowiedzi, dodaje komentarze wewnętrzne, wysyła zadania do magazynu, wyszukuje
 części, proponuje dopasowanie, oznacza rozmowę jako oczekującą lub zakończoną.
 
-**Ekspert techniczny** ma uprawnienia agenta oraz zatwierdza zastosowania
-części, odrzuca błędne dopasowania, zatwierdza negatywne dopasowania, redaguje
-dane techniczne i rozstrzyga konflikty między źródłami.
+**Roli eksperta technicznego NIE MA** — decyzja właściciela z etapów E1 i E2.
+Projekt przewidywał osobną rolę do zatwierdzania zastosowań, odrzucania błędnych
+dopasowań i rozstrzygania konfliktów między źródłami. Robi to każdy z biura,
+także autor propozycji. Autor i zatwierdzający są zapisani osobno, więc widać,
+gdy to ta sama osoba. Automat nie zatwierdza nigdy.
 
 **Magazynier** pracuje w istniejącej aplikacji kolektora. Widzi zadania
 skierowane do magazynu, przejmuje je, otwiera kartę towaru, widzi lokalizację,
@@ -145,7 +147,7 @@ pytanie, na które sprawa dziś odpowiada.
 ### 6.2. Przypisanie
 
 Rozmowa jest nieprzypisana, przypisana do agenta, przypisana do zespołu,
-przekazana ekspertowi, odłożona albo zakończona.
+przekazana koledze z biura, odłożona albo zakończona.
 
 **Przejęcie jest atomowe.** Gdy dwóch agentów spróbuje przejąć tę samą rozmowę,
 uda się jeden zapis. Drugi dostaje konflikt z aktualnym właścicielem, czasem
@@ -488,9 +490,22 @@ agenta to wciąż dobór, nie potwierdzone zastosowanie — wiedza idzie w E2.
 ### 11.3. Poziomy pewności
 
 Dopasowanie bywa potwierdzone przez producenta, katalogiem dostawcy, pomiarem
-własnym, przez eksperta, wcześniejszą sprzedażą i weryfikacją; albo jest
+własnym, decyzją biura, wcześniejszą sprzedażą i weryfikacją; albo jest
 prawdopodobne, wymagające danych lub odrzucone. Interfejs pokazuje źródło
 i poziom pewności.
+
+**Rodzaje dowodu w kodzie (E2):** `producent`, `katalog_dostawcy`,
+`pomiar_wlasny`, `sprzedaz_weryfikacja`, `decyzja_biura`, `rozmowa`. Lista
+stoi w `RODZAJE_DOWODU` (`services/wiedza.ts`), w `CHECK` na kolumnie
+`dowod_zastosowania.rodzaj` i w typie panelu. `decyzja_biura` stoi tam, gdzie
+projekt pisał „ekspert" (§5). `rozmowa` to ślad — „dobór zatwierdzony
+w rozmowie" — nie dowód techniczny.
+
+**Pewność zastosowania** jest `potwierdzone`, gdy stoi za nim choć jeden dowód
+techniczny; same ślady rozmów dają `prawdopodobne`. Liczba śladów rozmów
+pewności nie podnosi. Makieta mówiła „z najsłabszego dowodu" — brane dosłownie
+karałoby za dopisanie śladu rozmowy do katalogu producenta, więc reguła jest
+inna i zapisana tu świadomie.
 
 ### 11.4. Negatywne dopasowania
 
@@ -500,16 +515,38 @@ mocowania, występuje pod mylącym oznaczeniem albo wymaga dodatkowego pomiaru.
 
 Negatywne dopasowanie jest istotnym ostrzeżeniem, nie brakiem danych.
 
+**Powody w kodzie (E2):** `nie_pasuje`, `tylko_inny_wariant`,
+`niewlasciwy_rozstaw`, `srednica_ok_inne_mocowanie`, `mylace_oznaczenie`,
+`wymaga_pomiaru`. Negatyw bez powodu nie istnieje — pilnuje tego `CHECK`
+sprzęgający obie kolumny. Negatyw pokazuje się przy kandydacie jako
+ostrzeżenie i osobno, bo dotyczy także kartoteki, której nie ma na liście.
+Wycofać go może tylko człowiek i tylko z powodem (§14.2).
+
 ## 12. Baza wiedzy
 
-Byty: `Manufacturer`, `MachineModel`, `EngineModel`, `Part`, `PartIdentifier`,
-`Fitment`, `FitmentEvidence`, `Measurement`, `KnowledgeDocument`,
-`KnowledgeRevision`.
+Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
+`EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod od etapu E2 ma
+TRZY tabele, nazwami z kodu: `model_urzadzenia`, `zastosowanie`,
+`dowod_zastosowania`. Każda z pozostałych byłaby dziś tabelą bez czytelnika —
+blizna 0.157.0. Nazwa `dopasowanie` jest spalona (§15) i nie wraca.
 
-Dowód zastosowania przechowuje część, urządzenie lub silnik, typ relacji,
-zakres numerów seryjnych, parametry, źródło, autora zatwierdzenia, datę, poziom
-wiarygodności, komentarz i link do źródła. Każda zmiana wiedzy ma historię
-wersji.
+**Model** trzyma maszynę i silnik w jednej tabeli z `rodzaj`. Klucz liczy
+`zwin()` z marki, nazwy i wariantu, więc jedna kosiarka to jeden wiersz.
+
+**Zastosowanie** wiąże kartotekę z modelem i mówi, czy część pasuje, czy nie.
+Cykl życia: `propozycja` → `zatwierdzone` | `odrzucone` | `wycofane`.
+Propozycję składa dobór (automatycznie, przy zatwierdzeniu z marką i modelem),
+pomiar z hali (na kliknięcie) albo biuro ręcznie. Źródła `opis` i `copilot`
+stoją na liście bez nadawcy do E3 i F. Rozstrzyga wyłącznie człowiek z biura,
+także autor propozycji. Zatwierdzenie wymaga choć jednego dowodu.
+
+**Dowód** przechowuje rodzaj (§11.3), treść, odnośnik, zadanie i rozmowę,
+autora i datę. Tabela jest append-only: dowodu nie da się poprawić po cichu.
+
+**Historia wersji** bez `KnowledgeRevision`: poprawka to nowy wiersz
+z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
+Dziennik `events` niesie pełny wiersz przy każdej zmianie.
 
 ## 13. Zadania terenowe
 
@@ -545,7 +582,10 @@ Wynik wraca na oś rozmowy, do listy zadań, do autora, do szkicu i opcjonalnie
 do propozycji wpisu w bazie wiedzy.
 
 **Wynik nie staje się automatycznie potwierdzonym faktem technicznym.**
-Utrwalenie go jako wiedzy wymaga zatwierdzenia.
+Utrwalenie go jako wiedzy wymaga zatwierdzenia. Od E2 robi to przycisk
+w zakładce Dobór: wynik idzie do kolejki jako dowód `pomiar_wlasny` wskazujący
+zadanie. Gdy para kartoteka–model już czeka albo stoi, pomiar dopisuje się do
+niej jako kolejny dowód.
 
 ## 14. Copilot
 
@@ -567,7 +607,7 @@ technicznego.
 
 Każde twierdzenie techniczne w szkicu wskazuje źródło: ofertę, kartotekę,
 dokumentację, dowód zastosowania, pomiar magazyniera, wcześniejszą rozmowę albo
-ręczną decyzję eksperta. Brak źródła oznacza treść jako przypuszczenie.
+decyzję biura. Brak źródła oznacza treść jako przypuszczenie.
 
 ### 14.4. Prywatność
 
@@ -586,9 +626,8 @@ sprawa_klienta           sprawa_klienta_rozmowa  conversation_event
 conversation_assignment  conversation_comment    conversation_mention
 conversation_draft       offer_snapshot          customer
 customer_machine         order_snapshot          product_link
-part                     part_identifier         machine_model
-engine_model             fitment                 fitment_evidence
-measurement              knowledge_document      knowledge_revision
+dobor_rozmowy            model_urzadzenia        zastosowanie
+dowod_zastosowania       part_identifier         knowledge_document
 zadanie_terenowe         zadanie_zalacznik       allegro_inbox_thread
 allegro_inbox_message    allegro_inbox_sync_state
 outbox                   events
@@ -646,17 +685,24 @@ GET    /api/zadania-terenowe
 POST   /api/zadania-terenowe/:id/wez
 POST   /api/zadania-terenowe/:id/wykonaj
 GET    /api/products/search
-GET    /api/obsluga/dopasowania/szukaj
-POST   /api/obsluga/dopasowania/propozycje
-POST   /api/obsluga/dopasowania/:id/zatwierdz
 GET    /api/obsluga/rozmowy/:id/dobor/kandydaci
 PUT    /api/obsluga/rozmowy/:id/dobor/dane
 POST   /api/obsluga/rozmowy/:id/dobor/status
 POST   /api/obsluga/rozmowy/:id/dobor/wybor
+GET    /api/obsluga/rozmowy/:id/dobor/wiedza
+POST   /api/obsluga/rozmowy/:id/dobor/pomiar-do-wiedzy
+GET    /api/obsluga/wiedza/kolejka
+GET    /api/obsluga/wiedza/modele
+GET    /api/obsluga/wiedza/towar/:twId
+POST   /api/obsluga/wiedza/propozycje
+POST   /api/obsluga/wiedza/:id/rozstrzygnij
+POST   /api/obsluga/wiedza/:id/wycofaj
+POST   /api/obsluga/wiedza/:id/dowody
 ```
 
-Cztery trasy doboru działają od etapu E1 pod prefiksem skrzynki. Trzy trasy
-`dopasowania/*` z projektu właściciela zostają zapisem zamiaru na E2.
+Trasy doboru działają od E1, trasy wiedzy od E2. Projekt właściciela pisał
+`dopasowania/*` — adres zmienił się razem z nazwą tabeli: `dopasowanie` jest
+spalone i nie wraca nawet w URL-u.
 
 Każda mutacja przyjmuje oczekiwaną wersję rekordu. Konflikt wersji zwraca 409.
 
@@ -795,6 +841,10 @@ tworzy dwóch odpowiedzi; automat nie wysyła bez człowieka; rekomendacja
 techniczna pokazuje źródło; negatywne dopasowania są widoczne; awaria
 synchronizacji jest jawna; każda mutacja ma autora i czas; system działa bez
 Teamsa i Slacka; agent obsłuży typowe pytanie bez otwierania panelu Allegro.
+
+Dwa kryteria o wiedzy stoją od E2. Rekomendacja pokazuje źródło: kandydat
+drogą `zastosowanie` i zdanie do szkicu cytują dowód z bazy wiedzy. Negatywne
+dopasowania widać w zakładce Dobór osobno i jako ostrzeżenie przy kandydacie.
 
 ## 25a. Zwroty klienckie
 
@@ -1184,19 +1234,22 @@ to wprost, zamiast pokazywać sumę pozycji jako całość.
 
 Ile kont Allegro podłączymy? Ilu agentów pracuje jednocześnie? Jak długo
 przechowujemy treść rozmów? Czy obsługujemy też dyskusje? Czy wynik magazyniera
-może zawierać zdjęcia? Kto zatwierdza nowe zastosowania części? Czy komentarze
+może zawierać zdjęcia? Czy komentarze
 wymagają wzmianek? Jaki jest wymagany czas odpowiedzi? Kiedy zamykamy rozmowę
 automatycznie? Czy do pierwszego wydania wchodzi AI? Które katalogi producentów
 są dostępne? Czy istnieje firmowa baza dopasowań? Czy panel zostaje
 on-premise? Czy przewidujemy dostęp spoza sieci firmy? Czy Subiekt zostaje
 jedynym ERP?
 
+Pytanie „kto zatwierdza nowe zastosowania części" zeszło z tej listy w E2:
+każdy z biura, także autor propozycji (§5, §12).
+
 ## 27. Zasady nadrzędne
 
 1. Najpierw dane i dowody, potem automatyzacja.
 2. Człowiek wysyła odpowiedź do klienta.
 3. Automat nie jest źródłem kompatybilności.
-4. Rozmowa, sprawa, dobór i zadanie są osobnymi bytami.
+4. Rozmowa, sprawa, dobór, zadanie i dowód są osobnymi bytami.
 5. Każda mutacja ma autora.
 6. Praca kilku agentów musi być bezpieczna.
 7. Magazynier pracuje w aplikacji kolektora.
@@ -1236,7 +1289,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
-| Kandydaci doboru (§11.2) | **częściowo** od E1 | `services/kandydaci.ts`: symbol, EAN, oferta, zamiennik; OEM, zastosowanie i pełny tekst w E2/E3 |
+| Kandydaci doboru (§11.2) | **częściowo** od E1 | `services/kandydaci.ts`: symbol, EAN, zastosowanie (E2), oferta, zamiennik; OEM i pełny tekst w E3 |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Sprawa nad rozmowami (§6.1) | **działa** od 0.161.0 | `sprawa_klienta`, `services/sprawy.ts`, pasek w rozmowie |
 | Ekran sprawy z własną osią | **poza zakresem** | zdarzenia wiszą przy źródle — blizna 0.130.0 |
@@ -1244,7 +1297,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
 | Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
-| Baza wiedzy (§12) | **projekt** | etap E2 — zastosowania, dowody, negatywne dopasowania |
+| Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
+| Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
+| Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot (§14) | **projekt** | etap F |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |

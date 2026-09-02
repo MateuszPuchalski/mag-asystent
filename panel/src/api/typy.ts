@@ -199,7 +199,62 @@ export type KandydatDoboru = {
 /** Szczebel §11.2: sprawdzony z liczbą wyników albo pominięty Z POWODEM. */
 export type SzczebelDoboru = { droga: DrogaDoboru; sprawdzona: boolean; wynikow: number; powod?: string };
 
-export type KandydaciDoboru = { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[] };
+/* Negatyw jest widoczny także dla kartoteki, której NIE MA wśród kandydatów (§11.4). */
+export type NegatywDoboru = {
+  twId: number; symbol: string; nazwa: string | null; powod: string; zrodlo: string; at: string;
+};
+
+export type KandydaciDoboru = { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[] };
+
+/* ── Baza wiedzy (§11.3, §11.4, §12, etap E2) ────────────────────────────────
+   Listy ZAMKNIĘTE — trzecia kopia obok `services/wiedza.ts` i `CHECK`. */
+export type PowodNegatywny =
+  | "nie_pasuje" | "tylko_inny_wariant" | "niewlasciwy_rozstaw"
+  | "srednica_ok_inne_mocowanie" | "mylace_oznaczenie" | "wymaga_pomiaru";
+export type RodzajDowodu =
+  | "producent" | "katalog_dostawcy" | "pomiar_wlasny" | "sprzedaz_weryfikacja" | "decyzja_biura" | "rozmowa";
+export type StanZastosowania = "propozycja" | "zatwierdzone" | "odrzucone" | "wycofane";
+export type ZrodloPropozycji = "dobor" | "pomiar" | "reczne" | "opis" | "copilot";
+
+export type ModelUrzadzenia = {
+  id: number; rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string;
+  wariant: string | null; lata: string | null; klucz: string; etykieta: string;
+};
+
+export type DowodZastosowania = {
+  id: number; rodzaj: RodzajDowodu; nazwaRodzaju: string; tresc: string; link: string | null;
+  zadanieId: number | null; conversationId: number | null; autor: string; at: string;
+};
+
+export type Zastosowanie = {
+  id: number; twId: number; symbol: string; model: ModelUrzadzenia;
+  polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny: PowodNegatywny | null; zdaniePowodu: string | null;
+  stan: StanZastosowania; zrodlo: ZrodloPropozycji; komentarz: string | null;
+  conversationId: number | null; zastepujeId: number | null;
+  zaproponowal: string; zaproponowanoAt: string;
+  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
+  dowody: DowodZastosowania[];
+  pewnosc: "potwierdzone" | "prawdopodobne";
+  /** Zdanie źródła pisze SERWER (§14.3). */
+  zdanieZrodla: string;
+};
+
+export type NowaPropozycja = {
+  twId: number;
+  model: { rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
+  polaryzacja: "pasuje" | "nie_pasuje";
+  powodNegatywny?: PowodNegatywny | null;
+  komentarz?: string | null;
+  dowod: { rodzaj: RodzajDowodu; tresc: string; link?: string | null };
+  zastepujeId?: number | null;
+};
+
+export type PomiarRozmowy = {
+  zadanieId: number; tytul: string; wynik: string; wykonanoAt: string; wykonanoPrzez: string;
+  twId: number | null; symbol: string | null; zaproponowano: boolean;
+};
+
+export type WiedzaDoboru = { zastosowanie: Zastosowanie | null; pomiary: PomiarRozmowy[] };
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
