@@ -151,11 +151,11 @@ describe("Kolejka zwrotów", () => {
 });
 
 describe("Dowody", () => {
-  it("mówi wprost, czego nie wie i czego nie pobiera", () => {
-    /* Dwa zdania, które muszą być na ekranie, a nie tylko w kodzie: bez
-       zamówienia nie znamy kwoty pełnej, a danych nadawcy nie pobieramy. */
+  it("mówi wprost, czego nie pobiera", () => {
+    /* Zdanie, które musi być na ekranie, a nie tylko w kodzie. Bliźniacze —
+       o nieznanej kwocie pełnej — przeniosło się w 0.167.0 razem z pozycjami
+       do środkowej kolumny (`Pozycje.test.tsx`). */
     render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.getByText(/Kwoty pełnej nie znamy bez zamówienia/)).toBeInTheDocument();
     expect(screen.getByText(/Danych nadawcy i konta bankowego nie pobieramy/)).toBeInTheDocument();
   });
 
@@ -164,31 +164,18 @@ describe("Dowody", () => {
     expect(screen.getByText(/Towar jeszcze nie wrócił/)).toBeInTheDocument();
   });
 
-  it("powód zwrotu tłumaczy się na polski, a komentarz klienta zostaje w cudzysłowie", () => {
-    render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.getByText(/nie spodobał się/)).toBeInTheDocument();
-    expect(screen.getByText(/za ciężki/)).toBeInTheDocument();
-  });
-
-  it("zwrot bez pozycji mówi, że nie ma czego wycenić", () => {
-    render(zKlientem(<Dowody zwrot={zwrot({ pozycje: [], sumaPozycjiGrosze: 0 })} />));
-    expect(screen.getByText(/nie ma czego wycenić/)).toBeInTheDocument();
-  });
-
-  it("z zamówieniem pokazuje kwotę pełną zamiast zdania o jej braku", () => {
+  it("zamówienie niesie metodę dostawy, bo to ona kosztuje", () => {
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE, kwotaPelnaGrosze: 6498 })} />));
-    expect(screen.queryByText(/Kwoty pełnej nie znamy/)).not.toBeInTheDocument();
-    expect(screen.getByText("64,98 PLN")).toBeInTheDocument();
     expect(screen.getByText(/Kurier InPost/)).toBeInTheDocument();
   });
 
   it("pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
     /* „Kupił trzy, oddaje jedną" jest kontekstem decyzji, nie ciekawostką. */
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
-    /* Sekator jest dwa razy: raz na liście zamówienia, raz wśród zwracanych
-       pozycji — i to jest właśnie ten kontekst, o który chodzi. Zraszacz
-       tylko raz, bo nie wraca. */
-    expect(screen.getAllByText("Sekator NAC")).toHaveLength(2);
+    /* Od 0.167.0 zwracane pozycje stoją w środkowej kolumnie, więc TUTAJ
+       Sekator jest raz — na liście zamówienia. Kontekst „kupił trzy, oddaje
+       jedną" niesie znacznik „wraca" przy jego wierszu. */
+    expect(screen.getAllByText("Sekator NAC")).toHaveLength(1);
     expect(screen.getByText("Zraszacz obrotowy")).toBeInTheDocument();
     expect(screen.getAllByText("wraca")).toHaveLength(1);
   });
@@ -213,63 +200,6 @@ describe("Dowody", () => {
     render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.queryByRole("link", { name: /REF-1/ })).not.toBeInTheDocument();
     expect(screen.getByText("REF-1")).toBeInTheDocument();
-  });
-
-  it("kartoteka zawsze niesie źródło: zatwierdzona, proponowana albo żadna", () => {
-    /* §11.3 żąda widocznego źródła i pewności, a §4.3 nie pozwala, żeby wybór
-       automatu udawał fakt z Allegro. */
-    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.getByText(/Bez kartoteki/)).toBeInTheDocument();
-
-    rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
-      propozycja: { pewnosc: "sku", twId: 10, symbol: "SEK-46", zrodlo: 'SKU oferty „SEK-46"',
-        powod: null, poKolumnie: "offer_id" } }] })} />));
-    /* Propozycja czeka na JEDNO kliknięcie i mówi, skąd się wzięła. */
-    expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
-    expect(screen.getByText("SEK-46")).toBeInTheDocument();
-    expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
-
-    rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
-      twId: 10, twSymbol: "SEK-46", twZrodlo: "reczne" }] })} />));
-    expect(screen.getByText(/wskazana ręcznie/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Zatwierdź/ })).not.toBeInTheDocument();
-  });
-
-  it("propozycja z pamięci wskazań też czeka na JEDNO kliknięcie", () => {
-    /* Warunek przycisku stoi na `twId`, nie na jednej wartości pewności.
-       Propozycja z pamięci jest tą najpewniejszą — stoi za nią człowiek —
-       a do 0.153.1 jako jedyna nie dostawała przycisku i kazała wskazywać
-       kartotekę po raz drugi. */
-    render(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA, propozycja: {
-      pewnosc: "pamiec", twId: 10, symbol: "SEK-46",
-      zrodlo: "Wskazane wcześniej przez: Ala", powod: null, poKolumnie: null } }] })} />));
-    expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
-    expect(screen.getByText(/Wskazane wcześniej przez/)).toBeInTheDocument();
-  });
-
-  it("brak kartoteki niesie POWÓD, a nie samo »Bez kartoteki«", () => {
-    /* Sześć różnych zerwań łańcucha wyglądało do 0.153.1 identycznie
-       i operator nie miał jak odróżnić braku danych od usterki kodu. */
-    render(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA, propozycja: {
-      pewnosc: "brak", twId: null, symbol: null,
-      zrodlo: "Oferta bez SKU w Allegro (pole „sygnatura”)",
-      powod: "oferta_bez_sku", poKolumnie: null } }] })} />));
-    expect(screen.getByText(/Oferta bez SKU w Allegro/)).toBeInTheDocument();
-  });
-
-  it("odnośnik do oferty jest podpisany, a jego brak — powiedziany wprost", () => {
-    /* Podkreślona nazwa towaru BYŁA odnośnikiem od 0.153.0 i nikt jej tak nie
-       czytał: podkreślenie nie mówi, dokąd prowadzi. Milczenie przy pustym
-       adresie wygląda z kolei na usterkę panelu, a jest brakiem danych
-       po stronie Allegro. */
-    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.getByText(/Allegro nie podało adresu oferty/)).toBeInTheDocument();
-
-    rerender(zKlientem(<Dowody zwrot={zwrot({ pozycje: [{ ...POZYCJA,
-      url: "https://allegro.pl/oferta/sekator-111" }] })} />));
-    const link = screen.getByRole("link", { name: /Zobacz ofertę/ });
-    expect(link).toHaveAttribute("href", "https://allegro.pl/oferta/sekator-111");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("bez pobranego zamówienia ekran daje drogę wyjścia, nie samo czekanie", () => {

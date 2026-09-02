@@ -4,6 +4,7 @@ import { Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
 import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
+import { Pozycje } from "../zwroty/Pozycje";
 import {
   useCofnijKorekte, useKorekta, useKwota, useOcena, useWerdykt, useZglosRabat,
 } from "../api/zwroty";
@@ -279,18 +280,28 @@ export function Zwroty() {
               <p className="text-sm text-slate-500">
                 {KUBELKI.find((k) => k.id === zwrot.kubelek)?.pytanie}</p>
             </header>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
+                decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
+                operator zjechał na dziewiątą pozycję. */}
             <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
               onWerdykt={(decyzja, powod) =>
                 werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja })}
-              onOcena={(pozycjaId, ocena) =>
-                ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}
-              onKwota={(pozycjeIds, dostawa) =>
-                kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })}
               onKorekta={(numer) =>
                 korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja })}
               onCofnijKorekte={() =>
                 cofnijKorekte.mutate({ id: zwrot.id, wersja: zwrot.wersja })} />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <Pozycje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+                trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
+                onOcena={(pozycjaId, ocena) =>
+                  ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}
+                onKwota={(pozycjeIds, dostawa) =>
+                  kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })}
+                onZglosRabat={(pozycjaId) => {
+                  setBladRabatu("");
+                  rabat.mutate({ pozycjaId },
+                    { onError: (e) => setBladRabatu((e as Error).message) });
+                }} />
             </div>
           </>}
     </Karta>
@@ -300,12 +311,7 @@ export function Zwroty() {
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
-        ? <Dowody zwrot={zwrot} trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
-            onZglosRabat={(pozycjaId) => {
-              setBladRabatu("");
-              rabat.mutate({ pozycjaId },
-                { onError: (e) => setBladRabatu((e as Error).message) });
-            }} />
+        ? <Dowody zwrot={zwrot} />
         : <p className="p-6 text-center text-sm text-slate-500">
             Dowody pokażą się po wybraniu zwrotu.</p>}
       </div>

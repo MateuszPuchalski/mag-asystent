@@ -365,7 +365,7 @@ Wiersz pokazuje kanał, klienta, fragment ostatniej wiadomości, czas
 oczekiwania, ofertę lub produkt, właściciela, priorytet, termin, liczbę nowych
 wiadomości, status doboru i oczekujące zadanie terenowe.
 
-**Fragment to ostatnia wiadomość KLIENTA, z jej datą (0.166.0).** Do 0.165.0
+**Fragment to ostatnia wiadomość KLIENTA, z jej datą (0.167.0).** Do 0.165.0
 wiersz brał ostatnią wiadomość jakąkolwiek, więc autoodpowiedź konta Allegro
 zasłaniała pytanie, a data pod nią była datą wątku. Gdy klient nic nie napisał,
 stoi nasza wiadomość z podpisem „Biuro". Kolejność listy dalej niesie datę
@@ -773,8 +773,20 @@ Kolejność bierze się z terminu ustawowego, nie z daty wpływu.
 
 ### 25a.4. Układ
 
-Trzy kolumny, jak §10.1: kolejka, pasek werdyktu z osią, dowody. Dwa ekrany
+Trzy kolumny, jak §10.1: kolejka, produkty ze zwrotu, dowody. Dwa ekrany
 obsługi mają mieć jeden nawyk, nie dwa.
+
+**Produkty stoją w GŁÓWNYM oknie (0.167.0).** Do 0.165.0 leżały w prawej
+kolumnie, szerokiej na 340 px: nazwy ucinały się w połowie, zdjęcia miały
+56 px, a najszersza kolumna świeciła pustką pod paskiem decyzji. Teraz środek
+niesie towar, a prawa kolumna została kolumną dowodów o ZWROCIE: zegar
+ustawowy, numery, zamówienie klienta, fakt powrotu paczki.
+
+**Akcja stoi na wierszu produktu.** Kubełki DO OCENY i DO ZWROTU wypisywały
+wcześniej te same pozycje drugi raz, jako gołe nazwy z przyciskami — bez
+zdjęcia, bez powodu zwrotu, bez kartoteki. Operator oceniał towar, patrząc
+na listę, która towaru nie pokazywała. Pasek decyzji zostaje przy tym, co
+dotyczy CAŁEGO zwrotu: werdykt, korekta, cofnięcie.
 
 ### 25a.4a. Korekta i zamknięcie (0.162.0)
 
@@ -1005,9 +1017,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
-| Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.166.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
-| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.166.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx` |
-| Nazwa towaru przy ofercie w rozmowie | **z zamówienia** od 0.166.0 | `nazwaOferty` — ofert nadal nie pobieramy |
+| Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.167.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
+| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx` |
+| Nazwa towaru przy ofercie w rozmowie | **z zamówienia** od 0.167.0 | `nazwaOferty` — ofert nadal nie pobieramy |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
@@ -1019,6 +1031,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Skan etykiety zwrotnej otwiera zwrot | **działa** od 0.163.0 | `znajdzZwrotPoKodzie`, `panel/src/skaner.ts` |
 | Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
 | Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
+| Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
 | Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |

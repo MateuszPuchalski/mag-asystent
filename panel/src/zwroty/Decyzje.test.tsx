@@ -35,7 +35,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
 });
 
 const pasek = (z: Zwrot, h: Partial<Parameters<typeof Decyzje>[0]> = {}) =>
-  render(<Decyzje zwrot={z} onWerdykt={vi.fn()} onOcena={vi.fn()} onKwota={vi.fn()}
+  render(<Decyzje zwrot={z} onWerdykt={vi.fn()}
     onKorekta={vi.fn()} onCofnijKorekte={vi.fn()} trwa={false} blad="" {...h} />);
 
 describe("Decyzje zwrotu", () => {
@@ -63,45 +63,19 @@ describe("Decyzje zwrotu", () => {
     expect(onWerdykt).toHaveBeenCalledWith("odrzucony", "Towar użyty");
   });
 
-  it("kwota: zaznaczone pozycje i dostawa SUMUJĄ SIĘ na podglądzie", async () => {
-    const onKwota = vi.fn();
-    pasek(zwrot({ kubelek: "zwrot" }), { onKwota });
-
-    /* Pozycje startują zaznaczone — to one wracają. Dostawa nie, bo o niej
-       decyduje człowiek. */
-    expect(screen.getByTestId("suma")).toHaveTextContent("99,98");
-
-    await userEvent.click(screen.getByLabelText(/Koszt dostawy/));
-    expect(screen.getByTestId("suma")).toHaveTextContent("114,98");
-
-    await userEvent.click(screen.getByLabelText(/Filtr/));
-    expect(screen.getByTestId("suma")).toHaveTextContent("64,99");
-
-    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
-    expect(onKwota).toHaveBeenCalledWith([11], true);
-  });
-
-  it("podgląd sumy nie jest tym, co się zapisuje — panel wysyła ZAZNACZENIE", async () => {
-    /* §25a.3: liczy serwer. Gdyby panel wysyłał liczbę, dałoby się zapisać
-       dowolną kwotę z pominięciem ekranu. */
-    const onKwota = vi.fn();
-    pasek(zwrot({ kubelek: "zwrot" }), { onKwota });
-    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
-
-    const [pozycje, dostawa] = onKwota.mock.calls[0];
-    expect(pozycje).toEqual([11, 12]);
-    expect(dostawa).toBe(false);
-    expect(onKwota.mock.calls[0]).toHaveLength(2);
-  });
-
-  it("bez zamówienia nie ma czego oddać za dostawę", () => {
-    pasek(zwrot({ kubelek: "zwrot", zamowienie: null }));
-    expect(screen.queryByLabelText(/Koszt dostawy/)).toBeNull();
-  });
-
   it("stan końcowy nie proponuje decyzji", () => {
     pasek(zwrot({ kubelek: "zamkniety" }));
     expect(screen.queryByRole("button", { name: /Przyjmij|Zapisz kwotę/ })).toBeNull();
+  });
+
+  it("ocena i wycena nie mają paska — ich pytanie zadaje wiersz produktu", () => {
+    /* Od 0.167.0 pasek dotyczy CAŁEGO zwrotu. Gdyby został przy pozycjach,
+       te same nazwy stałyby na ekranie dwa razy: raz jako kontrolka, raz
+       jako produkt ze zdjęciem. */
+    const { container } = pasek(zwrot({ kubelek: "ocena" }));
+    expect(container).toBeEmptyDOMElement();
+    const drugi = pasek(zwrot({ kubelek: "zwrot" }));
+    expect(drugi.container).toBeEmptyDOMElement();
   });
 });
 

@@ -34,6 +34,51 @@ historii nie przepisujemy.
 ---
 
 
+## 0.167.0 — 2 września 2026
+
+**Produkty ze zwrotu przenoszą się do głównego okna, razem z decyzją o nich.**
+
+Prośba właściciela: „produkty ze zwrotu powinny być w środkowym głównym oknie".
+
+### 340 px to za mało na nazwę towaru
+
+Pozycje stały w prawej kolumnie, szerokiej na 340 px. Nazwy ucinały się
+w połowie — „Podkaszarka elektry…", „Nożyce do żywopłotu…" — zdjęcia miały
+56 px, a środek ekranu, najszerszy z trzech, świecił pustką pod paskiem
+decyzji. Teraz środek niesie towar: pełne nazwy, zdjęcia 72 px, powód zwrotu,
+kartoteka i rabat.
+
+Prawa kolumna została kolumną dowodów o ZWROCIE, nie o towarze: zegar
+ustawowy, numery i odnośniki, zamówienie klienta, fakt powrotu paczki.
+
+### Ocena i wycena zeszły na wiersz produktu
+
+To jest właściwa treść tej zmiany. Kubełki DO OCENY i DO ZWROTU wypisywały
+te same pozycje DRUGI RAZ, jako gołe nazwy z przyciskami — bez zdjęcia, bez
+powodu zwrotu, bez kartoteki. Operator oceniał towar, patrząc na listę, która
+towaru nie pokazywała, a właściwy widok miał w drugiej kolumnie.
+
+Teraz jest jeden wiersz produktu, a na nim przycisk oceny albo pole
+zaznaczenia. Pasek decyzji zostaje przy tym, co dotyczy CAŁEGO zwrotu:
+werdykt, numer korekty, cofnięcie. W kubełkach pozycyjnych paska nie ma wcale.
+
+Pasek nie przewija się razem z listą: decyzja o zwrocie ma być pod ręką także
+wtedy, gdy operator zjechał na dziewiątą pozycję.
+
+### Dwie liczby o pieniądzach nie stają jedna nad drugą
+
+Przy wycenie znika „Suma pozycji" — zostaje sama kwota do oddania, ta, która
+idzie do klienta. Dwie liczby jedna nad drugą czytają się jak jedna, a mylenie
+ich kosztuje cudze pieniądze. W pozostałych kubełkach jest odwrotnie: suma
+pozycji i kwota z dostawą, bo nie ma tam czego zaznaczać.
+
+### Przy wdrożeniu
+
+Nic. Zmiana jest w samym panelu obsługi.
+
+---
+
+
 ## 0.166.0 — 2 września 2026
 
 **Kolejka pokazuje pytanie klienta, a rozmowa wie, którego zamówienia dotyczy.**
