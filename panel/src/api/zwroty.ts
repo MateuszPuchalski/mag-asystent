@@ -140,3 +140,44 @@ export function useCofnijKorekte() {
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
+
+/* ── Skan etykiety zwrotnej (0.163.0) ────────────────────────────────────────
+   Kod jedzie CIAŁEM ŻĄDANIA, nie adresem, i to jest ta sama ostrożność co przy
+   szynie zdarzeń: numer listu przewozowego w adresie wylądowałby w logu żądań
+   serwera. */
+
+export type TrafienieSkanu = "numer" | "external" | "waybill" | "wiele" | null;
+
+export interface WynikSkanu {
+  trafienie: TrafienieSkanu;
+  zwrotId: number | null;
+  zwroty: Array<{ id: number; numer: string | null; externalId: string }>;
+  /** Tylko z dociągnięcia: ile zwrotów przyjechało z Allegro. */
+  pobrano?: number;
+}
+
+export function useSkanZwrotu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kod: string) =>
+      api<WynikSkanu>("/api/obsluga/zwroty/skan", {
+        method: "POST", body: JSON.stringify({ kod }),
+      }),
+    /* Trafienie bywa świeże po dociągnięciu, więc kolejka ma się odświeżyć —
+       ale samo szukanie niczego nie zapisuje. */
+    onSuccess: (w) => { if (w.trafienie) qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }); },
+  });
+}
+
+/** Skan, który nie trafił u nas: pytamy Allegro o ten jeden numer listu. */
+export function useDociagnijPoSkanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kod: string) =>
+      api<WynikSkanu>("/api/obsluga/zwroty/skan/dociagnij", {
+        method: "POST", body: JSON.stringify({ kod }),
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+

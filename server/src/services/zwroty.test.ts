@@ -6,7 +6,7 @@ import { migrate, type Db } from "../db/db.js";
 import {
   dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
-  cofnijKorekte,
+  cofnijKorekte, znajdzZwrotPoKodzie,
 } from "./zwroty.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
@@ -494,4 +494,100 @@ test("dwóch agentów nie zamyka jednego zwrotu dwoma numerami", () => {
 
   assert.throws(() => zapiszKorekte(d, id, "KFS 13/2026", wersja, KTO), /zmienił się|zamkni/i);
   assert.equal(listaZwrotow(d).find((z) => z.id === id)?.korektaNumer, "KFS 12/2026");
+});
+
+/* ── Skan etykiety zwrotnej (0.163.0) ────────────────────────────────────────
+   Kod z prawdziwej etykiety InPostu, podany przez właściciela. Fikstura używa
+   go dosłownie, bo test na wymyślonym „PX1" nie powiedziałby nic o tym, że
+   dwadzieścia cztery cyfry przechodzą przez całą drogę. */
+
+const ETYKIETA = "600000367616070023174201";
+
+/** Zwrot z lądowiskiem — numer listu leży TYLKO tam, kolumny na niego nie ma. */
+function zwrotZPaczka(d: Db, ext: string, numer: string | null, waybille: string[]) {
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
+    created_at,synced_at) VALUES (1,?,?,?,?)`)
+    .run(ext, numer, "2026-09-01T08:00:00Z", "2026-09-01T08:00:00Z");
+  const id = Number((d.prepare("SELECT id FROM zwrot_klienta WHERE external_id=?")
+    .get(ext) as { id: number }).id);
+  d.prepare(`INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at)
+    VALUES (?,?,?,?)`).run(ext, "2026-09-01T08:00:00Z",
+      JSON.stringify({ id: ext, parcels: waybille.map((w) => ({ createdAt: "2026-09-02T07:00:00Z", waybill: w })) }),
+      "2026-09-01T08:00:00Z");
+  return id;
+}
+
+test("skan etykiety trafia w zwrot trzema drogami i mówi którą", () => {
+  const d = stanowisko();
+  const id = zwrotZPaczka(d, "3e895572-1111-4c0a-9f4e-000000000001", "1234/Z04A", [ETYKIETA]);
+  zwrotZPaczka(d, "3e895572-2222-4c0a-9f4e-000000000002", "9999/Z04A", ["AD00R28X72"]);
+
+  /* Numer listu — najczęstszy przypadek, bo to on jest na naklejce kuriera. */
+  assert.deepEqual(znajdzZwrotPoKodzie(ETYKIETA, d),
+    { trafienie: "waybill", zwrotId: id, zwroty: [] });
+  /* Numer zwrotu bywa doklejony przez klienta. */
+  assert.deepEqual(znajdzZwrotPoKodzie("1234/Z04A", d),
+    { trafienie: "numer", zwrotId: id, zwroty: [] });
+  /* Identyfikator z panelu Allegro. */
+  assert.deepEqual(znajdzZwrotPoKodzie("3e895572-1111-4c0a-9f4e-000000000001", d),
+    { trafienie: "external", zwrotId: id, zwroty: [] });
+});
+
+test("numer listu drugiego kuriera też otwiera zwrot", () => {
+  /* `transportingWaybill` niesie numer przewoźnika, który fizycznie wiezie
+     paczkę — przy dwóch kurierach na naklejce bywa właśnie ten. */
+  const d = stanowisko();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-t','2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`).run();
+  const id = Number((d.prepare("SELECT id FROM zwrot_klienta WHERE external_id='zw-t'")
+    .get() as { id: number }).id);
+  d.prepare(`INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at)
+    VALUES ('zw-t','2026-09-01T08:00:00Z',?,'2026-09-01T08:00:00Z')`).run(
+      JSON.stringify({ id: "zw-t", parcels: [{ waybill: "PIERWSZY", transportingWaybill: "DRUGI" }] }));
+
+  assert.equal(znajdzZwrotPoKodzie("DRUGI", d).zwrotId, id);
+});
+
+test("dwa trafienia to brak trafienia — rozstrzyga człowiek", () => {
+  /* Wzorzec `ktoMaTenKod` z `ean-alias.ts`: każde dodatkowe trafienie jest
+     powodem odmowy, a nie zachętą do wzięcia pierwszego z brzegu. Przy zwrocie
+     pomyłka znaczy cudzego klienta i cudze pieniądze. */
+  const d = stanowisko();
+  const a = zwrotZPaczka(d, "zw-a", "1111/Z04A", [ETYKIETA]);
+  const b = zwrotZPaczka(d, "zw-b", "2222/Z04A", [ETYKIETA]);
+
+  const wynik = znajdzZwrotPoKodzie(ETYKIETA, d);
+  assert.equal(wynik.trafienie, "wiele");
+  assert.equal(wynik.zwrotId, null, "żaden zwrot nie otwiera się sam");
+  assert.deepEqual(wynik.zwroty.map((z) => z.id), [a, b]);
+  assert.deepEqual(wynik.zwroty.map((z) => z.numer), ["1111/Z04A", "2222/Z04A"]);
+});
+
+test("nieznany kod to nie błąd, tylko brak", () => {
+  const d = stanowisko();
+  zwrotZPaczka(d, "zw-1", "1234/Z04A", [ETYKIETA]);
+  assert.deepEqual(znajdzZwrotPoKodzie("600000000000000000000000", d),
+    { trafienie: null, zwrotId: null, zwroty: [] });
+  /* Pusty kod nie ma prawa oddać przypadkowego zwrotu. */
+  assert.equal(znajdzZwrotPoKodzie("   ", d).trafienie, null);
+});
+
+test("dopasowanie jest DOKŁADNE, nigdy po fragmencie", () => {
+  /* Fragment numeru listu wskazałby cudzą przesyłkę przy pierwszym kurierze,
+     który numeruje po kolei. */
+  const d = stanowisko();
+  zwrotZPaczka(d, "zw-1", "1234/Z04A", [ETYKIETA]);
+  assert.equal(znajdzZwrotPoKodzie(ETYKIETA.slice(0, 20), d).trafienie, null);
+  assert.equal(znajdzZwrotPoKodzie("1234", d).trafienie, null);
+});
+
+test("zwrot bez lądowiska nie wywraca szukania", () => {
+  /* Lądowisko bywa skasowane ręcznie (DEPLOY §0.153.0 każe to zrobić przy
+     aktualizacji), a kolejka ma wtedy działać dalej. */
+  const d = stanowisko();
+  d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
+    created_at,synced_at) VALUES (1,'zw-1','1234/Z04A','2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`)
+    .run();
+  assert.equal(znajdzZwrotPoKodzie(ETYKIETA, d).trafienie, null);
+  assert.ok(znajdzZwrotPoKodzie("1234/Z04A", d).zwrotId, "numer zwrotu dalej działa");
 });

@@ -190,6 +190,45 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
  * odbiciem Allegro; ocena hali wisi jednak na pozycji, więc wraca po
  * kluczu naturalnym zamiast zginąć razem z wierszem.
  */
+/**
+ * Jeden zwrot spod numeru listu przewozowego (0.163.0).
+ *
+ * Wołane WYŁĄCZNIE ze skanu etykiety, gdy lokalne szukanie nic nie znalazło:
+ * paczka bywa u nas szybciej, niż zwrot doleci synchronizacją. Pytamy Allegro
+ * o ten jeden numer filtrem `parcels.waybill`.
+ *
+ * KURSORA I STANU SYNCHRONIZACJI NIE RUSZA. To jest zapytanie punktowe, a nie
+ * przebieg: przesunięcie kursora na podstawie zwrotu wyłowionego ze środka
+ * historii kazałoby synchronizatorowi przeskoczyć wszystko, czego jeszcze nie
+ * widział. Blizna 0.127.0 mówi o tym samym gatunku cichej straty.
+ *
+ * Próg `zwrotyOd` obowiązuje tak samo jak w przebiegu — firma nie chce widzieć
+ * zwrotów sprzed granicy, choćby przyjechały punktowo.
+ */
+export async function dociagnijZwrotPoLiscie(
+  waybill: string, deps: ZwrotySyncDeps = {},
+): Promise<number> {
+  const database = deps.database ?? defaultDb();
+  const query = deps.query ?? zapytajAllegro;
+  const now = deps.now ?? (() => new Date());
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+  const od = deps.zwrotyOd !== undefined ? deps.zwrotyOd : config.allegro.zwrotyOd;
+  const kod = (waybill ?? "").trim();
+  if (!kod) return 0;
+
+  const body = await query(urlListyZwrotow(apiUrl, null, 0, null, kod));
+  const partia = tablica<Zwrot>(body, "customerReturns")
+    .filter((z) => typeof z?.id === "string" && !(od && z.createdAt && z.createdAt < od));
+  if (!partia.length) return 0;
+
+  const at = now().toISOString();
+  return transaction(database, () => {
+    const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
+    for (const zwrot of partia) zapisz(database, zwrot, konto, at);
+    return partia.length;
+  })();
+}
+
 function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   const utworzono = zwrot.createdAt ?? at;
   database.prepare(`INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at)

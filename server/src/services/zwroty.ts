@@ -726,6 +726,85 @@ export function cofnijKorekte(
   })();
 }
 
+/* ── Otwarcie zwrotu skanem etykiety zwrotnej (0.163.0) ──────────────────────
+   Paczka wraca do biura wcześniej niż wiedza o tym, który to zwrot. Do tego
+   wydania operator szukał go oczami; teraz odpowiada za to czytnik.
+
+   TRZY KSZTAŁTY, bo etykiety bywają różne: numer zwrotu doklejony przez
+   klienta, identyfikator z panelu i — najczęściej — numer listu kuriera
+   (`600000367616070023174201` u InPostu, `AD00R28X72` u DPD).
+
+   DOPASOWANIE WYŁĄCZNIE DOKŁADNE. `routes/products.ts` opisuje, dlaczego
+   furtka na literówki jest tam wyłączona: trasa sama otwiera kartę przy jednym
+   wyniku, więc przybliżenie prowadzi do CUDZEJ kartoteki. Przy zwrocie
+   znaczyłoby to cudzego klienta i cudze pieniądze.
+
+   DWA TRAFIENIA TO BRAK TRAFIENIA — wzorzec `ktoMaTenKod` z `ean-alias.ts`,
+   gdzie każde dodatkowe trafienie jest powodem odmowy, nie zachętą do wzięcia
+   pierwszego z brzegu. Rozstrzyga człowiek, patrząc na oba.                 */
+
+export type TrafienieSkanu = "numer" | "external" | "waybill";
+
+export interface WynikSkanu {
+  trafienie: TrafienieSkanu | "wiele" | null;
+  zwrotId: number | null;
+  /** Przy „wiele": tyle, ile ekran potrzebuje, żeby dać wybrać. */
+  zwroty: Array<{ id: number; numer: string | null; externalId: string }>;
+}
+
+const PUSTY: WynikSkanu = { trafienie: null, zwrotId: null, zwroty: [] };
+
+/**
+ * Zwrot spod zeskanowanego kodu.
+ *
+ * NUMER LISTU CZYTAMY Z LĄDOWISKA, nie z modelu pracy — tam go nie ma i nie
+ * dokładamy mu kolumny. `ksztalt.ts` nazywa numer listu „daną osobową okrężną
+ * drogą" (prowadzi w systemie kuriera do adresu odbiorcy), więc jest tu
+ * UŻYTY, a nie ZAPAMIĘTANY: w bazie zostaje dokładnie to, co i tak leży
+ * w kopii odpowiedzi Allegro.
+ *
+ * `transportingWaybill` szukamy razem z `waybill`, bo przy dwóch kurierach na
+ * jednej przesyłce na naklejce bywa ten drugi (schemat `CustomerReturnReturnParcel`).
+ */
+export function znajdzZwrotPoKodzie(kod: string, database: Db = defaultDb()): WynikSkanu {
+  const szukane = (kod ?? "").trim();
+  if (!szukane) return PUSTY;
+
+  const poKolumnie = (kolumna: "reference_number" | "external_id"): number[] =>
+    (database.prepare(`SELECT id FROM zwrot_klienta WHERE ${kolumna} = ?`)
+      .all(szukane) as Array<{ id: number }>).map((w) => Number(w.id));
+
+  const kandydaci: Array<[TrafienieSkanu, number[]]> = [
+    ["numer", poKolumnie("reference_number")],
+    ["external", poKolumnie("external_id")],
+    ["waybill", (database.prepare(`
+      SELECT z.id FROM zwrot_klienta z
+        JOIN allegro_zwrot a ON a.id = z.external_id,
+        json_each(json_extract(a.surowe_json, '$.parcels')) p
+       WHERE json_extract(p.value, '$.waybill') = ?
+          OR json_extract(p.value, '$.transportingWaybill') = ?`)
+      .all(szukane, szukane) as Array<{ id: number }>).map((w) => Number(w.id))],
+  ];
+
+  for (const [trafienie, idy] of kandydaci) {
+    const jedyne = [...new Set(idy)];
+    if (jedyne.length === 1) return { trafienie, zwrotId: jedyne[0], zwroty: [] };
+    if (jedyne.length > 1) return { trafienie: "wiele", zwrotId: null, zwroty: opisz(database, jedyne) };
+  }
+  return { ...PUSTY, zwroty: [] };
+}
+
+function opisz(database: Db, idy: number[]) {
+  const miejsca = idy.map(() => "?").join(",");
+  return (database.prepare(
+    `SELECT id, reference_number, external_id FROM zwrot_klienta WHERE id IN (${miejsca}) ORDER BY id`
+  ).all(...idy) as Wiersz[]).map((w) => ({
+    id: Number(w.id),
+    numer: (w.reference_number as string) ?? null,
+    externalId: String(w.external_id),
+  }));
+}
+
 function zdarzenie(
   database: Db, zwrotId: number, rodzaj: string, tresc: string,
   dane: Record<string, unknown>, kto: { id: number; name: string }, kiedy: string,

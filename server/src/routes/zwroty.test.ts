@@ -69,6 +69,8 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/ocena" },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/korekta/cofnij` },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/skan" },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/skan/dociagnij" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -127,33 +129,30 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają dokładnie pięć tras zapisu", async () => {
+test("zwroty mają dziewięć tras POST, a zapisuje osiem z nich", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
-     Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa. Dziś jest
-     pięć — trzy doszły w 0.156.0, gdy kolejka bramek przestała być dekoracją:
+     Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
+     w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
 
-     1. POTWIERDZENIE KARTOTEKI dla pozycji — bez `tw_id` pozycja nie ma czym
-        pokazać zdjęcia, bo cache obrazów jest kluczowany po tym polu.
-     2. RĘCZNE DOCIĄGNIĘCIE ZAMÓWIEŃ — bez niego diagnoza na produkcji
-        wymagała czekania dziesięciu minut na najrzadszy ticker.
-     3. WERDYKT biura — przyjęcie albo odmowa. Do 0.156.0 `kubelekZwrotu`
-        routował po tej kolumnie, a nic jej nie zapisywało: każdy zwrot stał
-        w DO DECYZJI na zawsze.
-     4. OCENA POZYCJI — na stan, na przecenę albo do utylizacji. Bez niej nic
-        nie przechodzi z DO OCENY do DO ZWROTU.
-     5. KWOTA — z ZAZNACZENIA pozycji i dostawy, liczona po stronie serwera.
+     Komentarz mówił jeszcze o pięciu i twierdził, że „korekta nie ma tu
+     trasy" — nieprawda od 0.162.0. Asercja `>=` to przepuściła; teraz liczba
+     jest dokładna, więc następny rozjazd wyjdzie od razu.
 
-     Korekta i oddanie pieniędzy NADAL nie mają tu trasy: pierwsze idzie do
-     Subiekta, drugie po końcówki zapisu Allegro, których sonda nie potwierdzi.
-     Kto dokłada kolejny zapis, podnosi tę liczbę i dopisuje zdanie. */
-  const zapisy = app.printRoutes({ commonPrefix: false })
-    .split("\n")
-    .filter((l) => /POST|PUT|DELETE|PATCH/.test(l));
-  const nasze = app.printRoutes({ commonPrefix: false });
-  for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia"]) {
-    assert.equal(nasze.includes(slowo), true, `brak trasy ${slowo}`);
+     ÓSMA i DZIEWIĄTA to skan etykiety zwrotnej (0.163.0), i tylko jedna z nich
+     zapisuje. Samo szukanie zwrotu pod kodem jest POST-em wyłącznie po to,
+     żeby numer listu przewozowego nie wylądował w logu żądań serwera. */
+  /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
+     oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
+     mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
+     `method:` po źródle `biuro.html`. */
+  const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
+  const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
+  assert.equal(posty.length, 9, `tras POST jest ${posty.length}, a umowa mówi o dziewięciu`);
+
+  for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
+    "korekta", "cofnij", "skan", "dociagnij"]) {
+    assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
-  assert.ok(zapisy.length >= 5, `tras zapisu jest ${zapisy.length}, a umowa mówi o pięciu`);
 });
 
 test("bilans kartotek jedzie razem z kolejką", async () => {
@@ -342,3 +341,69 @@ test("korekta domyka zwrot przez HTTP, a cofnięcie otwiera go z powrotem", asyn
   r = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
   assert.equal(r.json().zwrot.kubelek, "korekta", "wraca do kubełka, nie na początek kolejki");
 });
+
+/* ── Skan etykiety zwrotnej (0.163.0) ─────────────────────────────────────── */
+
+const ETYKIETA = "600000367616070023174201";
+
+/** Numer listu leży TYLKO w lądowisku — kolumny na niego nie ma i nie będzie. */
+function dopiszPaczke(externalId: string, waybill: string) {
+  db().prepare(`INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at)
+    VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET surowe_json=excluded.surowe_json`).run(
+      externalId, "2026-09-01T08:00:00Z",
+      JSON.stringify({ id: externalId, parcels: [{ waybill }] }), "2026-09-01T08:00:00Z");
+}
+
+test("skan otwiera zwrot i mówi, którą drogą trafił", async () => {
+  const { naglowki } = login("biuro", "Ala skanuje");
+  const ext = (db().prepare("SELECT external_id FROM zwrot_klienta WHERE id=?")
+    .get(zwrot) as { external_id: string }).external_id;
+  dopiszPaczke(ext, ETYKIETA);
+
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/skan",
+    headers: naglowki, payload: { kod: ETYKIETA } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().trafienie, "waybill");
+  assert.equal(r.json().zwrotId, zwrot);
+});
+
+test("skan NICZEGO nie zapisuje, choć jest POST-em", async () => {
+  /* Cała treść tej trasy: kod nie ma prawa wylądować ani w bazie, ani
+     w dzienniku, ani w adresie żądania — numer listu prowadzi w systemie
+     kuriera do adresu odbiorcy. POST jest tu formą, nie zapisem. */
+  const { naglowki } = login("biuro", "Ala liczy skany");
+  const licz = () => {
+    const d = db();
+    return ["events", "zwrot_klienta", "zwrot_zdarzenie", "allegro_zwrot"]
+      .map((t) => (d.prepare(`SELECT count(*) n FROM ${t}`).get() as { n: number }).n).join("/");
+  };
+  const przed = licz();
+  for (const kod of [ETYKIETA, "nie-ma-takiego", "1234/Z04A"]) {
+    await app.inject({ method: "POST", url: "/api/obsluga/zwroty/skan",
+      headers: naglowki, payload: { kod } });
+  }
+  assert.equal(licz(), przed, "skan dopisał wiersz");
+});
+
+test("nieznany kod oddaje brak, a pusty — odmowę", async () => {
+  const { naglowki } = login("biuro", "Ala pyta");
+  const brak = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/skan",
+    headers: naglowki, payload: { kod: "600000000000000000000000" } });
+  assert.equal(brak.statusCode, 200, "nieznany kod to nie awaria");
+  assert.equal(brak.json().trafienie, null);
+
+  const pusty = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/skan",
+    headers: naglowki, payload: { kod: "  " } });
+  assert.equal(pusty.statusCode, 400, pusty.body);
+});
+
+test("dociągnięcie po skanie wymaga sparowanego konta", async () => {
+  /* Bez konta trasa mówi, czego brakuje, zamiast strzelać w Allegro bez tokenu
+     i oddawać 401 z obcego systemu — tak samo jak dociąganie zamówień. */
+  const { naglowki } = login("biuro", "Ala dociąga skan");
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/skan/dociagnij",
+    headers: naglowki, payload: { kod: ETYKIETA } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /nie jest sparowane/);
+});
+
