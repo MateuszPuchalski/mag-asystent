@@ -4,7 +4,8 @@ import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
-  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, znajdzZwrotPoKodzie,
+  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
+  znajdzZwrotPoKodzie,
   ZwrotConflict,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
@@ -141,6 +142,24 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return ocenPozycje(db(), Number(req.params.id), o as never,
           Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Potrącenie za utratę wartości (0.170.0). To JEDYNA liczba o pieniądzach,
+     jaką panel wolno mu przysłać — i dlatego jest walidowana w widełkach
+     `0…wartość pozycji`, wymaga powodu i wisi przy POZYCJI, a nie przy sumie.
+     Sumę dalej składa serwer z zaznaczenia. */
+  app.post<{ Params: { id: string }; Body: { grosze?: number | null; powod?: string; wersja?: number } }>(
+    "/api/obsluga/zwroty/pozycje/:id/potracenie", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const g = req.body?.grosze;
+      if (g !== null && g !== undefined && typeof g !== "number") {
+        return reply.code(400).send({ error: "Potrącenie to liczba groszy albo brak." });
+      }
+      try {
+        return zapiszPotracenie(db(), Number(req.params.id), g ?? null,
+          String(req.body?.powod ?? ""), Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

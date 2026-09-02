@@ -830,6 +830,30 @@ Automatu nie ma i nie planujemy. Obserwacja z 2 września pokazuje, że Allegro
 zakłada 40 wniosków na 100 samo — automat po naszej stronie dublowałby ich
 pracę bez niczyjej wiedzy. Zapis wychodzi na jawne kliknięcie człowieka.
 
+### 25a.4b. Potrącenie za utratę wartości (0.170.0)
+
+Do tego wydania kwota była BINARNA per pozycja: cała cena albo nic. Towar
+wracający używany nie miał jak zjechać w dół, a to codzienność biura zwrotów.
+
+**Kwota, nie procent.** Decyzja właściciela: klient widzi złotówki, a procent
+przy każdej pozycji zostawiałby końcówki, których nikt nie umie wytłumaczyć.
+
+**Powód jest obowiązkowy** i pilnuje go najpierw pole, potem serwer. To jego
+treść tłumaczy klientowi, czemu dostał mniej — bez niego potrącenie byłoby
+liczbą bez uzasadnienia.
+
+**§25a.3 zostaje nienaruszone.** Panel dalej NIE przysyła kwoty do oddania:
+przysyła zaznaczenie, a sumę składa serwer. Potrącenie jest osobnym zapisem
+przy POZYCJI, walidowanym w widełkach `0…cena × ilość` — potrącenie większe
+niż wartość pozycji znaczyłoby, że klient dopłaca nam za własny zwrot.
+
+Formularz otwiera się dopiero na żądanie, jak ręczne wskazanie kartoteki:
+typowy zwrot wraca w porządku, a pole pod każdą pozycją byłoby ścianą pytań
+o wyjątek. Zapisane potrącenie widać w KAŻDYM kubełku, bo to fakt o pozycji —
+po zamknięciu zwrotu trzeba umieć powiedzieć, czemu klient dostał mniej.
+
+Cofnięcie zdejmuje kwotę razem z powodem (§25a.5).
+
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
 Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
@@ -1097,6 +1121,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
 | Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
 | Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
+| Potrącenie za utratę wartości pozycji | **działa** od 0.170.0 | `zapiszPotracenie`, `panel/src/zwroty/Potracenie.tsx` |
 | EAN i SKU na wierszu produktu | **działa** od 0.169.0 | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |
 | Wiadomości o tym zakupie przy zwrocie | **działa** od 0.169.0 | złączenie po `message.related_order_id` |
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |

@@ -223,6 +223,9 @@ export interface PozycjaZwrotu {
   twZrodlo: string | null;
   sku: string | null;
   ean: string | null;
+  /** Ile MNIEJ oddajemy za tę pozycję i dlaczego (0.170.0). */
+  potracenieGrosze: number | null;
+  potraceniePowod: string | null;
   propozycja: Dopasowanie | null;
   rabat: StanRabatu;
 }

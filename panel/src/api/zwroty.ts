@@ -94,6 +94,24 @@ export function useOcena() {
 }
 
 /**
+ * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
+ *
+ * To JEDYNA liczba o pieniądzach, jaką panel wolno mu wysłać — i dlatego
+ * serwer trzyma ją w widełkach `0…wartość pozycji` i żąda powodu. Kwotę do
+ * oddania dalej składa on sam z zaznaczenia; potrącenie tylko ją obniża.
+ */
+export function usePotracenie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; grosze: number | null; powod: string; wersja: number }) =>
+      api<{ wersja: number; potracenieGrosze: number | null }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/potracenie`,
+        { method: "POST", body: JSON.stringify({ grosze: v.grosze, powod: v.powod, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
  * Zapis kwoty — wysyła ZAZNACZENIE, nigdy liczby.
  *
  * §25a.3: „Liczy ją serwer, panel niczego nie zgaduje". Suma na ekranie jest

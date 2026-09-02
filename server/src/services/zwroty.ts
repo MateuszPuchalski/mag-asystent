@@ -46,6 +46,9 @@ export interface PozycjaZwrotu {
   sku: string | null;
   /** EAN z kartoteki Subiekta. Allegro EAN-u nie podaje przy zwrocie wcale. */
   ean: string | null;
+  /** Ile MNIEJ oddajemy za tę pozycję i DLACZEGO (0.170.0). */
+  potracenieGrosze: number | null;
+  potraceniePowod: string | null;
   /** Propozycja automatu — pokazywana obok, nigdy zamiast potwierdzonej. */
   propozycja: Dopasowanie | null;
   /** Rabat transakcyjny: czy wniosek o zwrot prowizji już jest (0.164.0). */
@@ -260,7 +263,7 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
     "Numer zwrotu", "Identyfikator", "Zamowienie", "Kupujacy", "Zgloszony",
     "Termin", "Dni do terminu", "Kubelek", "Przewoznik", "Platnosc", "Faktura",
     "Towar", "Symbol", "EAN", "SKU", "Sztuk", "Cena", "Waluta", "Powod",
-    "Ocena", "Werdykt", "Kwota oddana", "Numer korekty",
+    "Ocena", "Potracenie", "Powod potracenia", "Werdykt", "Kwota oddana", "Numer korekty",
   ].join(";");
 
   const wiersze = zwroty.flatMap((z) => {
@@ -278,12 +281,14 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
     /* Zwrot bez pozycji też dostaje wiersz — inaczej zniknąłby z zestawienia
        i nikt by się nie dowiedział, że w ogóle jest. */
     if (!z.pozycje.length) {
-      return [wierszCsv([...wspolne, "", "", "", "", "", "", "", "", "", ...ogon], ";")];
+      return [wierszCsv([...wspolne, "", "", "", "", "", "", "", "", "", "", "", ...ogon], ";")];
     }
     return z.pozycje.map((p) => wierszCsv([
       ...wspolne, p.nazwa, p.twSymbol ?? "", p.ean ?? "", p.sku ?? "", p.ilosc,
       (p.cenaGrosze / 100).toFixed(2).replace(".", ","), p.waluta,
-      p.powod ?? "", p.ocena ?? "", ...ogon,
+      p.powod ?? "", p.ocena ?? "",
+      p.potracenieGrosze == null ? "" : (p.potracenieGrosze / 100).toFixed(2).replace(".", ","),
+      p.potraceniePowod ?? "", ...ogon,
     ], ";"));
   });
 
@@ -398,6 +403,8 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           twZrodlo: (p.tw_zrodlo as string) ?? null,
           sku: skuWgOferty.get(String(p.offer_id ?? "")) ?? null,
           ean: twId === null ? null : eanWgTw.get(twId) ?? null,
+          potracenieGrosze: p.potracenie_grosze == null ? null : Number(p.potracenie_grosze),
+          potraceniePowod: (p.potracenie_powod as string) ?? null,
           /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
              Podpowiadanie obok potwierdzonego wyboru byłoby podważaniem
              decyzji człowieka, a §4.3 stawia ją wyżej niż wynik automatu. */
@@ -664,6 +671,67 @@ export function ocenPozycje(
 }
 
 /**
+ * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
+ *
+ * Do tego wydania kwota była BINARNA per pozycja: cała cena albo nic. Towar
+ * wracający używany nie miał jak zjechać w dół, a to codzienność biura.
+ *
+ * §25a.3 zostaje nienaruszone: panel nadal NIE przysyła kwoty do oddania —
+ * przysyła zaznaczenie, a sumę składa `zapiszKwote`. Potrącenie jest osobnym,
+ * WALIDOWANYM zapisem przy pozycji, a nie liczbą doklejaną do sumy. Widełki
+ * `0…cena × ilość` pilnuje serwer: potrącenie większe niż wartość pozycji
+ * znaczyłoby, że klient nam dopłaca.
+ *
+ * Powód jest OBOWIĄZKOWY, bo to jego treść tłumaczy klientowi, czemu dostał
+ * mniej. `null` w kwocie cofa potrącenie razem z powodem — to samo cofnięcie
+ * co przy ocenie i korekcie (§25a.5).
+ */
+export function zapiszPotracenie(
+  database: Db, pozycjaId: number, grosze: number | null, powod: string,
+  wersja: number, kto: { id: number; name: string }, teraz = new Date(),
+): { wersja: number; potracenieGrosze: number | null } {
+  const p = database.prepare(
+    "SELECT id, zwrot_id, cena_grosze, ilosc FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as { id: number; zwrot_id: number; cena_grosze: number; ilosc: number } | undefined;
+  if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+
+  const uzasadnienie = (powod ?? "").trim();
+  if (grosze !== null) {
+    if (!Number.isInteger(grosze) || grosze < 0) {
+      throw new Error("Potrącenie to pełne grosze, nie mniej niż zero.");
+    }
+    const wartosc = Math.round(Number(p.cena_grosze) * Number(p.ilosc));
+    if (grosze > wartosc) {
+      throw new Error(
+        `Potrącenie nie może przekroczyć wartości pozycji (${(wartosc / 100).toFixed(2)}).`);
+    }
+    if (uzasadnienie === "") {
+      throw new Error("Potrącenie wymaga powodu — to jego treść zobaczy klient.");
+    }
+  }
+
+  return transaction(database, () => {
+    const z = podKlucz(database, Number(p.zwrot_id), wersja);
+    /* Tak samo jak ocena: potrącenie ma sens dopiero po przyjęciu zwrotu.
+       Obniżanie kwoty przy zwrocie, którego nie przyjmujemy, zostawiałoby
+       w bazie decyzję o pieniądzach, które i tak nie wyjdą. */
+    if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+    database.prepare(`UPDATE zwrot_klienta_pozycja
+      SET potracenie_grosze=?, potracenie_powod=?, potracenie_at=?, potracenie_przez=?
+      WHERE id=?`).run(
+      grosze, grosze === null ? null : uzasadnienie,
+      grosze === null ? null : teraz.toISOString(),
+      grosze === null ? null : kto.name, pozycjaId);
+    podnies(database, Number(p.zwrot_id));
+    logEvent(grosze === null ? "zwrot_potracenie_cofniete" : "zwrot_potracenie",
+      kto.name, null,
+      { zwrotId: Number(p.zwrot_id), pozycjaId, grosze, powod: uzasadnienie || null },
+      kto.id, database);
+    return { wersja: wersja + 1, potracenieGrosze: grosze };
+  })();
+}
+
+/**
  * Kwota do oddania — z ZAZNACZENIA, nie z liczby przysłanej przez panel.
  *
  * §25a.3 mówi wprost: „Liczy ją serwer, panel niczego nie zgaduje". Panel
@@ -684,8 +752,10 @@ export function zapiszKwote(
     if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
 
     const wszystkie = database.prepare(
-      "SELECT id, cena_grosze, ilosc FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
-      .all(zwrotId) as Array<{ id: number; cena_grosze: number; ilosc: number }>;
+      `SELECT id, cena_grosze, ilosc, potracenie_grosze
+         FROM zwrot_klienta_pozycja WHERE zwrot_id=?`)
+      .all(zwrotId) as Array<{ id: number; cena_grosze: number; ilosc: number;
+        potracenie_grosze: number | null }>;
     const znane = new Set(wszystkie.map((p) => Number(p.id)));
     /* Obca pozycja ODPADA GŁOŚNO. Ciche pominięcie zapisałoby kwotę niższą,
        niż operator widział na ekranie — a on kliknął to, co widział. */
@@ -694,9 +764,13 @@ export function zapiszKwote(
       throw new Error(`Pozycje ${obce.join(", ")} nie należą do tego zwrotu.`);
     }
     const wybrane = new Set(wybor.pozycjeIds.map(Number));
+    /* Potrącenie odejmuje SERWER, z tego, co zapisano przy pozycji — panel
+       nadal nie przysyła ani jednej liczby o pieniądzach. Widełki sprawdziło
+       `zapiszPotracenie`, więc suma nie ma prawa zejść poniżej zera. */
     const suma = wszystkie
       .filter((p) => wybrane.has(Number(p.id)))
-      .reduce((s, p) => s + Math.round(Number(p.cena_grosze) * Number(p.ilosc)), 0);
+      .reduce((s, p) => s + Math.round(Number(p.cena_grosze) * Number(p.ilosc))
+        - Number(p.potracenie_grosze ?? 0), 0);
 
     /* Koszt dostawy bierze się z ZAMÓWIENIA, nie ze zwrotu: Allegro nie
        przysyła go przy zwrocie. Dociągamy zamówienia od 0.152.0 i dopiero to

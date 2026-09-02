@@ -972,6 +972,18 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   url TEXT,
   ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
   ocena_at TEXT, ocena_przez TEXT,
+  -- ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────────
+  -- Ile MNIEJ oddajemy za tę pozycję, bo wróciła używana albo uszkodzona.
+  -- Kwota, nie procent: klient widzi złotówki, a zaokrąglanie procentu przy
+  -- każdej pozycji dawałoby końcówki, których nikt nie umie wytłumaczyć.
+  --
+  -- Powód jest OBOWIĄZKOWY i to nie pedanteria — jego treść trzeba pokazać
+  -- klientowi, gdy zapyta, czemu dostał mniej. Bez powodu potrącenie byłoby
+  -- liczbą bez uzasadnienia, czyli dokładnie tym, czego zabrania §25a.3.
+  potracenie_grosze INTEGER,
+  potracenie_powod TEXT,
+  potracenie_at TEXT,
+  potracenie_przez TEXT,
   -- Czy ta pozycja weszła do zwracanej kwoty. Zaznaczenie trzeba zapamiętać,
   -- bo sama suma nie mówi, KTÓRE pozycje operator oddał — a przy sporze
   -- z klientem to jest właśnie pytanie.
