@@ -240,7 +240,11 @@ Pieniądze klienta opisuje dopiero `FINISHED`. Obserwacja z 2 września ma
 `COMMISSION_REFUNDED` ×95, więc mylne odczytanie tego pola zamknęłoby prawie
 całą kolejkę.
 
-`buyer` niesie `login` ORAZ `email` — patrz „Czego NIE mapujemy".
+`buyer` niesie `login` ORAZ `email` — patrz „Czego NIE mapujemy". Login stoi
+TAKŻE przy zamówieniu (`checkout-forms.buyer.login`), więc od 0.177.0 ekran
+zwrotu bierze go z zamówienia, gdy sam zwrot go nie niesie. To ten sam
+człowiek, a dwa źródła jednego pola nie są tu nadmiarem: `buyer` wszedł do
+mapowania zwrotów dopiero w 0.164.0.
 `isFulfillment` mówi, że zwrotem zajmuje się One Fulfillment; u tej firmy
 było `false` w stu rekordach na sto.
 

@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.177.0 — 2 września 2026
+
+**Login kupującego widać przy każdym zwrocie.** Zgłoszenie właściciela: „nie
+widzę nigdzie w otwartym zwrocie loginu klienta".
+
+Wiersz **Kupujący** rysował się tylko wtedy, gdy pole nie było puste. Przy
+pustym znikał bez śladu — ekran nie mówił ani loginu, ani tego, że go nie ma.
+Szuka się wtedy czegoś, czego nie widać, i nie wiadomo, czy to brak danych,
+czy usterka panelu.
+
+Puste pole miało zresztą swój własny powód. Allegro podaje login w DWÓCH
+odpowiedziach: przy zwrocie (`CustomerReturn.buyer.login`) i przy zamówieniu
+(`checkout-forms.buyer.login`). Oba synchronizatory go mapują, ale ekran
+czytał wyłącznie pierwszy. Zwrot bez `buyer` — albo zaciągnięty przed
+0.164.0, gdy tamtego mapowania jeszcze nie było — zostawał więc bez
+kupującego, choć jego zamówienie leżało obok z wypełnioną kolumną.
+
+Teraz login spada z zamówienia, gdy zwrot go nie niesie. Pierwszeństwo ma
+zwrot, bo jest bliżej sprawy. Gdy nie ma go w żadnym z dwóch miejsc, ekran
+mówi wprost „Allegro nie podało" — zgadywania nie ma. Login ma też przycisk
+kopiowania, bo wkleja się go w wyszukiwanie Allegro.
+
+Zysk nie kończy się na ekranie: po tym samym polu idzie kolumna „Kupujacy"
+w eksporcie CSV zwrotów.
+
 ## 0.176.0 — 2 września 2026
 
 **Cztery rzeczy z jednego ekranu zwrotu.** Właściciel przeszedł po nim palcem

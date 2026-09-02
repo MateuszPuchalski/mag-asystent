@@ -251,7 +251,17 @@ function zloz(
     rejectionCode,
     zrodlo: String(z.zrodlo ?? "allegro"),
     notatka: (z.notatka as string) ?? null,
-    kupujacyLogin: (z.kupujacy_login as string) ?? null,
+    /* ZWROT ALBO JEGO ZAMÓWIENIE (0.177.0). Login siedzi w OBU odpowiedziach
+       Allegro — `CustomerReturn.buyer.login` i `checkout-forms.buyer.login` —
+       i oba synchronizatory go mapują. Ekran czytał wyłącznie pierwszy, więc
+       zwrot bez `buyer` (albo zaciągnięty przed 0.164.0, gdy mapowania tam
+       jeszcze nie było) nie pokazywał kupującego wcale, choć jego zamówienie
+       leżało obok z wypełnioną kolumną. To ten sam człowiek: zamówienie jest
+       tym, którego zwrot dotyczy.
+
+       Zysk nie kończy się na ekranie — po tym polu idzie też kolumna
+       „Kupujacy" w eksporcie CSV. */
+    kupujacyLogin: (z.kupujacy_login as string) ?? zamowienie?.kupujacyLogin ?? null,
     przewoznik: (z.przewoznik as string) ?? null,
     rozmowy,
     /* Snapshot z kolumn zwrotu, a nie złączenie z `sgt_faktura`: read-model
