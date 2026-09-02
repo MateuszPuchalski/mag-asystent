@@ -12,10 +12,17 @@ export interface PozycjaZamowienia {
   offerId: string | null;
   nazwa: string;
   sku: string | null;
+  /** Ile sztuk KUPIONO. Nie mylić z `wracaIlosc` — to była cała pomyłka niżej. */
   ilosc: number;
   cenaGrosze: number;
   waluta: string;
   zwracana: boolean;
+  /**
+   * Ile sztuk WRACA (0.176.0). Plakietka „wraca" stała dotąd obok liczby
+   * kupionych sztuk i czytało się to jako „wracają dwie" przy zwrocie jednej.
+   * Zgłosił to właściciel: „w tym zamówieniu wracała jedna sztuka".
+   */
+  wracaIlosc: number;
 }
 
 export interface Zamowienie {
@@ -41,11 +48,12 @@ type Wiersz = Record<string, unknown>;
 /**
  * Wiersz `zamowienie_klienta` + jego pozycje → `Zamowienie`.
  *
- * `zwracana` liczy WOŁAJĄCY: tylko zwrot wie, które pozycje wracają, a rozmowa
- * nie wie tego wcale i zostaje przy domyślnym „żadna".
+ * ILE WRACA liczy WOŁAJĄCY: tylko zwrot zna sztuki, a rozmowa nie wie tego
+ * wcale i zostaje przy domyślnym zerze. Funkcja oddaje LICZBĘ, nie „tak/nie" —
+ * `zwracana` da się z liczby wyprowadzić, odwrotnie nie.
  */
 export function naZamowienie(
-  zam: Wiersz, pozycje: Wiersz[], zwracana: (p: Wiersz) => boolean = () => false,
+  zam: Wiersz, pozycje: Wiersz[], wraca: (p: Wiersz) => number = () => 0,
 ): Zamowienie {
   return {
     externalId: String(zam.external_id),
@@ -67,7 +75,8 @@ export function naZamowienie(
       ilosc: Number(p.ilosc),
       cenaGrosze: Number(p.cena_grosze),
       waluta: String(p.waluta),
-      zwracana: zwracana(p),
+      zwracana: wraca(p) > 0,
+      wracaIlosc: wraca(p),
     })),
   };
 }

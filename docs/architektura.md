@@ -212,6 +212,32 @@ zapisu nie jest osobną decyzją — wynika ze źródła danych (`config.sferaMo
 Node czy worker Sfery) — i wymaga `SGT_MODE=mssql`, czego pilnuje walidacja
 w `config.ts` (sprzeczne ustawienie nie przechodzi startu).
 
+### Czego ta granica NIE przepuszcza: okna Subiekta
+
+Właściciel zapytał (2 września 2026), czy kliknięcie w numer paragonu może
+otworzyć ten dokument w Subiekcie. Odpowiedź brzmi „nie z samego panelu" i to
+wynika wprost z rysunku wyżej, a nie z braku chęci.
+
+Okno dokumentu wystawia **program na stanowisku**, nie serwer. Panel jest
+stroną w przeglądarce; przeglądarka nie ma jak sięgnąć do COM Subiekta ani na
+serwerze, ani na cudzym komputerze. Serwer też nie: gdyby wywołał Sferę u
+siebie, okno otworzyłoby się na maszynie serwera, której nikt nie ogląda.
+
+Zrobić się to daje, ale kosztem trzeciego elementu na KAŻDYM stanowisku biura:
+
+1. własny protokół (`wertis://dokument/<dok_id>`) wpisany do rejestru Windows,
+2. mały program lokalny, który ten protokół obsługuje i woła Sferę,
+3. licencja Sfery na tym stanowisku — bez niej COM nie wystartuje.
+
+Punkt 3 jest twardy: dziś Sfery wymaga tylko `sfera-worker/`, czyli jedna
+maszyna. Rozłożenie tego na biurka jest decyzją zakupową, nie techniczną.
+Czy Sfera w ogóle umie POKAZAĆ okno istniejącego dokumentu, zamiast wystawić
+nowy — pytanie otwarte, oznaczone w `docs/subiekt-gt-struktura.md`.
+
+Do tego czasu ekran robi rzecz, która działa wszędzie i od razu: numer
+dokumentu ma przycisk kopiowania (0.176.0), a numer wklejony w „Znajdź
+dokument" Subiekta prowadzi do tego samego okna dwoma klawiszami.
+
 <!-- docs_check: historia -->
 Był kiedyś drugi przełącznik, `SFERA_MODE`. Usunięto go, bo dawało się ustawić
 oba sprzecznie: czytać z demo i pisać do produkcji. Jeśli natrafisz na niego

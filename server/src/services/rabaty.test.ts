@@ -238,3 +238,75 @@ test("odmowa Allegro NIE zostawia u nas wniosku, którego tam nie ma", async () 
   assert.equal((d.prepare("SELECT count(*) n FROM allegro_rabat").get() as { n: number }).n, 0);
   assert.equal(stanRabatu(d, pozycja).stan, "brak", "pozycja zostaje do spróbowania jeszcze raz");
 });
+
+/* ── Wniosek złożony w panelu Allegro (0.176.0) ──────────────────────────────
+   Zgłoszenie właściciela: „rabat transakcyjny został zlecony przez panel
+   allegro, do tego zwrotu w appce nie widać". Nasze lustro poznaje taki
+   wniosek dopiero, gdy przewinie się przez `GET /order/refund-claims`; do
+   tego czasu ekran pisał „brak wniosku" i podstawiał przycisk, który po
+   kliknięciu ZAWSZE kończył się konfliktem — bo zapis czytał status zwrotu,
+   a odczyt nie.                                                            */
+
+test("status zwrotu mówi o wniosku, którego nie ma jeszcze w lustrze", () => {
+  const d = stanowisko();
+  const { zwrot, pozycja } = zwrotZZamowieniem(d);
+  d.prepare("UPDATE zwrot_klienta SET status_allegro='COMMISSION_REFUND_CLAIMED' WHERE id=?")
+    .run(zwrot);
+
+  const s = stanRabatu(d, pozycja);
+  assert.equal(s.stan, "zlozony", "wniosek jest, choć nie nasz");
+  assert.equal(s.zrodlo, "zwrot", "ekran ma powiedzieć, SKĄD to wie");
+  assert.equal(s.wniosekId, null, "numeru wniosku zwrot nie niesie");
+  assert.equal(s.prowizjaGrosze, null, "kwoty prowizji zwrot nie niesie");
+  assert.match(s.powod ?? "", /COMMISSION_REFUND_CLAIMED/);
+});
+
+test("prowizja zwrócona przez Allegro czyta się jako przyznana", () => {
+  const d = stanowisko();
+  const { zwrot, pozycja } = zwrotZZamowieniem(d);
+  d.prepare("UPDATE zwrot_klienta SET status_allegro='COMMISSION_REFUNDED' WHERE id=?").run(zwrot);
+  assert.equal(stanRabatu(d, pozycja).stan, "przyznany");
+});
+
+test("lustro ma pierwszeństwo przed statusem zwrotu — zna numer i kwotę", () => {
+  /* Oba źródła mówią to samo, ale jedno mówi WIĘCEJ. */
+  const d = stanowisko();
+  const { zwrot, pozycja } = zwrotZZamowieniem(d);
+  d.prepare("UPDATE zwrot_klienta SET status_allegro='COMMISSION_REFUNDED' WHERE id=?").run(zwrot);
+  wniosek(d, { id: "rc-7", status: "GRANTED", grosze: 615 });
+
+  const s = stanRabatu(d, pozycja);
+  assert.equal(s.zrodlo, "lustro");
+  assert.equal(s.wniosekId, "rc-7");
+  assert.equal(s.prowizjaGrosze, 615);
+});
+
+test("status zwrotu mówi swoje także przy zwrocie bez numeru zamówienia", () => {
+  /* Zerwane ogniwo nie ma prawa ukryć wniosku: „czy wniosek jest" nie zależy
+     od tego, czy MY umiemy wskazać pozycję, do której go złożono. Bez numeru
+     zamówienia nie ma czego złożyć — a wniosek i tak już jest. */
+  const d = stanowisko();
+  const zwrot = Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id,external_id,created_at,synced_at,status_allegro)
+    VALUES (1,'zw-2','2026-09-01T08:00:00Z','2026-09-02T08:00:00Z','COMMISSION_REFUND_CLAIMED')`)
+    .run().lastInsertRowid);
+  const pozycja = Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,klucz,offer_id,nazwa,ilosc,cena_grosze,waluta)
+    VALUES (?,'of-9|Sekator','of-9','Sekator',1,4999,'PLN')`)
+    .run(zwrot).lastInsertRowid);
+
+  const s = stanRabatu(d, pozycja);
+  assert.equal(s.stan, "zlozony");
+  assert.equal(s.lineItemId, null, "nie ma czego złożyć, ale wniosek już jest");
+  assert.equal(s.zrodlo, "zwrot");
+});
+
+test("anulowany wniosek w lustrze nie chowa się za statusem zwrotu", () => {
+  /* CANCELLED nie liczy się jak istniejący, a zwrot bez statusu prowizji nie
+     ma nic do dodania — pozycja wraca do stanu BRAK i przycisk ma sens. */
+  const d = stanowisko();
+  const { pozycja } = zwrotZZamowieniem(d);
+  wniosek(d, { id: "rc-9", status: "CANCELLED" });
+  assert.equal(stanRabatu(d, pozycja).stan, "brak");
+  assert.equal(stanRabatu(d, pozycja).zrodlo, null);
+});

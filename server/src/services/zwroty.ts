@@ -397,8 +397,15 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
       const surowe = wgZwrotu.get(Number(z.id)) ?? [];
       const zam = zamWgKlucza.get(`${z.channel_account_id}|${z.order_id}`) ?? null;
       const pozZamowienia = zam ? pozWgZam.get(Number(zam.id)) ?? [] : [];
-      const wracajace = new Set(
-        surowe.map((p) => (p.offer_id as string) ?? "").filter((v) => v !== ""));
+      /* SZTUKI, nie sam fakt (0.176.0). Ta sama oferta bywa w zwrocie w kilku
+         wierszach (`klucz` z przyrostkiem), więc sztuki się SUMUJĄ — inaczej
+         „wraca 1" przy dwóch wierszach po jednej sztuce byłoby nieprawdą. */
+      const wracajace = new Map<string, number>();
+      for (const p of surowe) {
+        const k = (p.offer_id as string) ?? "";
+        if (!k) continue;
+        wracajace.set(k, (wracajace.get(k) ?? 0) + Number(p.ilosc ?? 0));
+      }
 
       /* SKU sprzedawcy niesie POZYCJA ZAMÓWIENIA — pozycja zwrotu ma w
          specyfikacji samo `offerId`, bez zagnieżdżonej oferty. Dopasowanie
@@ -457,8 +464,9 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
          porównanie szło po jednej i przy rozjeździe ŻADNA pozycja nie
          dostawała plakietki WRACA — co samo w sobie było objawem. */
       const zamowienie = zam ? naZamowienie(zam, pozZamowienia, (p) =>
-        wracajace.has((p.offer_id as string) ?? "")
-          || wracajace.has((p.external_id as string) ?? "")) : null;
+        wracajace.get((p.offer_id as string) ?? "")
+          ?? wracajace.get((p.external_id as string) ?? "")
+          ?? 0) : null;
 
       return zloz(z, zlozone, zamowienie, teraz,
         rozmowyWgZam.get(String(z.order_id ?? "")) ?? []);

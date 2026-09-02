@@ -207,6 +207,8 @@ export type StanRabatu = {
   typ: string | null;
   /** Dlaczego nie da się złożyć wniosku. Zdanie pisze serwer. */
   powod: string | null;
+  /** Skąd wiadomo o wniosku: nasze lustro wniosków czy status samego zwrotu. */
+  zrodlo: "lustro" | "zwrot" | null;
 };
 
 export interface PozycjaZwrotu {
@@ -236,10 +238,13 @@ export interface PozycjaZamowienia {
   offerId: string | null;
   nazwa: string;
   sku: string | null;
+  /** Ile sztuk KUPIONO. */
   ilosc: number;
   cenaGrosze: number;
   waluta: string;
   zwracana: boolean;
+  /** Ile sztuk WRACA — mniej niż `ilosc`, gdy klient oddaje część zakupu. */
+  wracaIlosc: number;
 }
 
 export interface Zamowienie {

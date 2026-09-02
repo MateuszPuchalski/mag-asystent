@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka, dniSlowo } from "./Kolejka";
 import { Dowody } from "./Dowody";
@@ -17,7 +17,7 @@ const POZYCJA: PozycjaZwrotu = {
   waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
   url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
-      prowizjaGrosze: null, waluta: null, typ: null, powod: null },
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null },
 };
 
 const ZAMOWIENIE: Zamowienie = {
@@ -26,8 +26,8 @@ const ZAMOWIENIE: Zamowienie = {
   waluta: "PLN", kupionoAt: "2026-08-20T11:00:00.000Z",
   link: "https://allegro.pl/moje-allegro/zam/ord-1",
   pozycje: [
-    { offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", ilosc: 1, cenaGrosze: 4999, waluta: "PLN", zwracana: true },
-    { offerId: "222", nazwa: "Zraszacz obrotowy", sku: null, ilosc: 1, cenaGrosze: 3490, waluta: "PLN", zwracana: false },
+    { offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", ilosc: 1, cenaGrosze: 4999, waluta: "PLN", zwracana: true, wracaIlosc: 1 },
+    { offerId: "222", nazwa: "Zraszacz obrotowy", sku: null, ilosc: 1, cenaGrosze: 3490, waluta: "PLN", zwracana: false, wracaIlosc: 0 },
   ],
 };
 
@@ -45,7 +45,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
     waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
     url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
-      prowizjaGrosze: null, waluta: null, typ: null, powod: null } }],
+      prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null } }],
   ...n,
 });
 
@@ -191,7 +191,40 @@ describe("Dowody", () => {
        jedną" niesie znacznik „wraca" przy jego wierszu. */
     expect(screen.getAllByText("Sekator NAC")).toHaveLength(1);
     expect(screen.getByText("Zraszacz obrotowy")).toBeInTheDocument();
-    expect(screen.getAllByText("wraca")).toHaveLength(1);
+    expect(screen.getAllByText("wraca 1")).toHaveLength(1);
+  });
+
+  /* ZGŁOSZENIE WŁAŚCICIELA (0.176.0): „wraca dwie sztuki jest mylące, bo w tym
+     zamówieniu wracała jedna". Plakietka stała obok liczby KUPIONYCH sztuk,
+     więc „2 × 18,99 wraca" czytało się jako liczbę wracających. */
+  it("przy zwrocie części zakupu plakietka mówi ile z ilu", () => {
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: { ...ZAMOWIENIE, pozycje: [
+      { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", ilosc: 2,
+        cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 1 },
+    ] } })} />));
+    expect(screen.getByText("wraca 1 z 2")).toBeInTheDocument();
+    /* Liczba kupionych sztuk NIE znika — to ona mówi, ile klient ma u siebie. */
+    expect(screen.getByText("2 × 18,99 PLN")).toBeInTheDocument();
+  });
+
+  /* ZGŁOSZENIE WŁAŚCICIELA (0.176.0): „dokument sprzedaży powinien być
+     w zamówieniu". Stał osobną sekcją na DNIE kolumny, pod wiadomościami. */
+  it("numer dokumentu sprzedaży stoi w sekcji zamówienia", () => {
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE, faktura: {
+      dokId: 7, numer: "PA 11945/MAG/08/2026", typ: "PA", zrodlo: "numer",
+      at: "2026-09-01T10:00:00Z", przez: null } })} onFaktura={vi.fn()} />));
+    const sekcja = screen.getByRole("heading", { name: /Zamówienie/i })
+      .closest("section")!;
+    expect(within(sekcja).getByText("PA 11945/MAG/08/2026")).toBeInTheDocument();
+  });
+
+  it("przy zwrocie całości plakietka nie dopisuje »z ilu«", () => {
+    /* „wraca 2 z 2" byłoby szumem: nic u klienta nie zostaje. */
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: { ...ZAMOWIENIE, pozycje: [
+      { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", ilosc: 2,
+        cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 2 },
+    ] } })} />));
+    expect(screen.getByText("wraca 2")).toBeInTheDocument();
   });
 
   it("bez pobranego zamówienia pokazuje identyfikator i mówi, że treść dojdzie", () => {
@@ -237,7 +270,10 @@ describe("Dowody", () => {
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: { ...ZAMOWIENIE,
       platnoscTyp: "CASH_ON_DELIVERY", fakturaZadana: true } })} />));
     expect(screen.getByText("za pobraniem")).toBeInTheDocument();
-    expect(screen.getByText("faktura")).toBeInTheDocument();
+    /* „Klient chciał faktury", nie „Dokument: faktura" — to samo słowo
+       tytułowało niżej numer paragonu z Subiekta i wiersze się myliły. */
+    expect(screen.getByText("Klient chciał")).toBeInTheDocument();
+    expect(screen.getByText("faktury")).toBeInTheDocument();
   });
 
   it("brak informacji o fakturze mówi »nie wiadomo«, a nie »paragon«", () => {

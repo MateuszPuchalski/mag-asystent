@@ -415,6 +415,14 @@ większe od zera. Odpowiedź 201 niesie samo `{ id }` utworzonego wniosku.
 z `/order/checkout-forms`), nie oferty i nie pozycji zwrotu. Trzymamy go
 w `zamowienie_klienta_pozycja.external_id`.
 
+**LISTA WNIOSKÓW TO NIE JEDYNE ŹRÓDŁO.** Wniosek złożony w panelu Allegro
+trafia do niej dopiero z opóźnieniem, a my czytamy ją taktem co kwadrans.
+Drugim źródłem jest sam zwrot: `COMMISSION_REFUND_CLAIMED` i
+`COMMISSION_REFUNDED` mówią, że prowizja jest już objęta wnioskiem — bez jego
+numeru i bez kwoty. Od 0.176.0 `stanRabatu` czyta OBA i mówi, z którego wie,
+bo do 0.175.0 ekran pisał przy takim zwrocie „brak wniosku" i podstawiał
+przycisk, który zawsze kończył się konfliktem.
+
 **TA KOŃCÓWKA NIE MA IDEMPOTENCJI.** Pole `commandId` jest przy zwrocie
 pieniędzy, nie tutaj — więc powtórzone żądanie zakłada DRUGI wniosek, a nie
 ten sam. Strażnik przed dubletem musi stać po naszej stronie i dlatego stoi

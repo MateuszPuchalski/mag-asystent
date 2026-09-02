@@ -1,6 +1,7 @@
 import React from "react";
 import { FileText } from "lucide-react";
 import type { FakturaZwrotu, KandydatFaktury } from "../api/typy";
+import { Skopiuj } from "../ui";
 
 /* ── Dokument sprzedaży z Subiekta (0.174.0) ─────────────────────────────────
    Ostatnia pozycja z listy biura zwrotów: „widoczny numer paragonu". Bez niego
@@ -27,7 +28,15 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz }: {
 }) {
   if (faktura.dokId !== null) {
     return <div className="text-xs">
-      <p className="text-base font-bold">{faktura.numer}</p>
+      {/* Numer do SCHOWKA (0.176.0). Kliknięcie nie otwiera dokumentu
+          w Subiekcie i nie otworzy go z przeglądarki: okno wystawia program
+          na stanowisku, nie serwer. Do czasu, aż taki program stanie
+          (`docs/architektura.md` §4), schowek jest najkrótszą drogą — numer
+          wkleja się w „Znajdź dokument" Subiekta. */}
+      <p className="flex items-center gap-1 text-base font-bold">
+        {faktura.numer}
+        {faktura.numer && <Skopiuj tekst={faktura.numer}
+          tytul="Kopiuj numer dokumentu — wklej w wyszukiwanie Subiekta" />}</p>
       {/* Skąd się wziął, jest częścią informacji: wybór człowieka nie ma
           udawać faktu z danych (projekt panelu §4.3). */}
       <p className="mt-0.5 text-slate-500">
