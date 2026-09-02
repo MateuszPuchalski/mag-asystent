@@ -509,3 +509,90 @@ test("nowa wiadomość klienta otwiera rozmowę uznaną za rozwiązaną", async 
   assert.equal(statusRozmowy(database, rozmowa), "open",
     "rozmowa została rozwiązana mimo nowego pytania klienta");
 });
+
+/* ── Sufit stron i zapis po stronie (0.164.1) ────────────────────────────────
+   BLIZNA Z PRODUKCJI: 315 986 żądań do Allegro w ciągu jednej doby, przy 0%
+   błędów po ich stronie. Skrzynka była jedyną z czterech pętli bez
+   ogranicznika, a zapis czekał do ostatniej strony — więc przebieg przerwany
+   w połowie nie zostawiał NICZEGO i następny pytał o to samo od nowa.       */
+
+/** Pełna strona listy — 20 wątków o tej samej dacie, różnych identyfikatorach. */
+const strona = (od: number) =>
+  Array.from({ length: 20 }, (_, i) => ({
+    id: `p-${od + i}`, read: false, lastMessageDateTime: "2026-09-15T12:00:00.000Z",
+    interlocutor: { login: `anon-${od + i}` },
+  }));
+
+test("PIERWSZE zejście do dna idzie bez sufitu — zaległość musi się nadrobić", async () => {
+  /* Gdyby sufit obowiązywał od pierwszego przebiegu, instalacja z zaległością
+     większą niż 25 stron czytałaby w kółko te same 500 wątków i nigdy nie
+     zobaczyła reszty. Sufit włącza się dopiero, gdy `dno_at` już stoi. */
+  const database = mkDb();
+  const api = fake(Array.from({ length: 30 }, (_, s) => strona(s * 20)));
+
+  await synchronizujAllegroInbox({ database, query: api.query, apiUrl: "https://api.test" });
+
+  assert.ok(api.urls.some((u) => u.includes("offset=500")),
+    "przebieg stanął na sufcie, choć dna jeszcze nie było");
+  const dno = database.prepare("SELECT dno_at d FROM allegro_inbox_sync_state").get() as { d: string };
+  assert.ok(dno.d, "zejście do dna musi zostawić ślad — inaczej sufit nigdy się nie włączy");
+});
+
+test("po zejściu do dna SUFIT ucina przebieg, a kursor i tak idzie do przodu", async () => {
+  const database = mkDb();
+  // przebieg pierwszy: krótka lista, czyli zejście do dna i zapis `dno_at`
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test", query: fake([[thread(1)]]).query,
+  });
+
+  /* Przebieg drugi: 30 pełnych stron samych NOWYCH wątków, więc kursor
+     z pierwszego przebiegu nie trafi nigdzie. Dokładnie ten stan zjadł dobę
+     żądań: pętla szła do końca historii, bo nie miała się o co zatrzymać. */
+  const api = fake(Array.from({ length: 30 }, (_, s) => strona(s * 20)));
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: api.query });
+
+  const strony = api.urls.filter((u) => u.includes("/threads?"));
+  assert.equal(strony.length, 25, "sufit ma uciąć przebieg na 25 stronach");
+  assert.ok(!api.urls.some((u) => u.includes("offset=500")), "szósta setka wątków to już nadmiar");
+
+  /* KURSOR PRZESUWA SIĘ MIMO OBCIĘCIA i to jest sedno: bez tego następny
+     przebieg czytałby te same 25 stron w kółko, co minutę. Wolno, bo `dno_at`
+     mówi, że niżej wszystko już przez nas przeszło, a wątek, w którym coś się
+     dzieje, wraca na GÓRĘ listy — nie zostaje pod sufitem. */
+  const kursor = database.prepare("SELECT cursor_id id FROM allegro_inbox_sync_state")
+    .get() as { id: string };
+  assert.equal(kursor.id, "p-0", "kursor stoi na najnowszym wątku obciętego przebiegu");
+});
+
+test("strona, która przeszła, ZOSTAJE w bazie mimo awarii następnej", async () => {
+  /* Do 0.164.0 wszystko czekało w pamięci do ostatniej strony. Awaria na
+     stronie trzechsetnej kasowała dorobek dwustu dziewięćdziesięciu dziewięciu
+     i następny przebieg pytał Allegro o te same wiadomości raz jeszcze. */
+  const database = mkDb();
+  const pierwsza = strona(0);
+  await assert.rejects(synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: async (url: string) => {
+      if (url.includes("/messages")) {
+        // identyfikator BIERZE SIĘ ZE ŚCIEŻKI, nie z `includes`: „p-2" siedzi
+        // też w „p-20", więc dopasowanie po fragmencie wywracałoby pierwszą
+        // stronę zamiast drugiej i test mierzyłby co innego, niż opisuje
+        const id = decodeURIComponent(url.split("/").at(-2)!);
+        if (id === "p-25") throw new Error("awaria drugiej strony");
+        // identyfikator wiadomości MUSI zależeć od wątku: `allegro_inbox_message.id`
+        // jest kluczem, więc wspólne „m-1" wywracałoby zapis 19 z 20 wątków
+        // i test pokazywałby awarię fixture'u zamiast zachowania kodu
+        return { messages: [message(`m-${id}`)] };
+      }
+      return { threads: Number(new URL(url).searchParams.get("offset")) === 0
+        ? pierwsza : strona(20) };
+    },
+  }));
+
+  const n = (database.prepare("SELECT count(*) n FROM allegro_inbox_thread").get() as { n: number }).n;
+  assert.equal(n, 20, "pierwsza strona miała zostać zapisana przed pobraniem drugiej");
+  const stan = database.prepare("SELECT cursor_id c, dno_at d FROM allegro_inbox_sync_state")
+    .get() as { c: string | null; d: string | null };
+  assert.equal(stan.c, null, "przebieg się nie udał, więc kursor stoi");
+  assert.equal(stan.d, null, "do dna nie zeszliśmy, więc sufit dalej nie obowiązuje");
+});
