@@ -61,6 +61,41 @@ describe("Kolejka zwrotów", () => {
     expect(screen.getByText(/Ten kubełek jest pusty/)).toBeInTheDocument();
   });
 
+  it("kursor gonimy widokiem, bo kolejka siedzi we własnym scrollerze", () => {
+    /* Od 0.165.0 lista przewija się u siebie, a `j`/`k` przesuwają zaznaczenie
+       bez fokusu. Bez tego wywołania operator po trzech naciśnięciach steruje
+       czymś, czego nie widzi. jsdom nie liczy układu — atrapa stoi w
+       `src/test/setup.ts` — więc sprawdzamy sam fakt dogonienia. */
+    const gonienie = Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>;
+    gonienie.mockClear();
+    const { rerender } = render(
+      <Kolejka zwroty={[zwrot(), zwrot({ id: 2, numer: "REF-2" })]} wybrany={1}
+        onWybierz={() => {}} />);
+    gonienie.mockClear();
+
+    rerender(<Kolejka zwroty={[zwrot(), zwrot({ id: 2, numer: "REF-2" })]} wybrany={2}
+      onWybierz={() => {}} />);
+    expect(gonienie).toHaveBeenCalledWith({ block: "nearest" });
+  });
+
+  it("przy szukaniu wiersz mówi, z którego kubełka jest", () => {
+    /* Wynik z kubełka ZAMKNIĘTE bez etykiety wyglądałby jak praca do zrobienia. */
+    const { rerender } = render(
+      <Kolejka zwroty={[zwrot({ kubelek: "zamkniety" })]} wybrany={null} onWybierz={() => {}} />);
+    expect(screen.queryByText("Zamknięte")).toBeNull();
+
+    rerender(<Kolejka zwroty={[zwrot({ kubelek: "zamkniety" })]} wybrany={null}
+      zKubelkiem onWybierz={() => {}} />);
+    expect(screen.getByText("Zamknięte")).toBeInTheDocument();
+  });
+
+  it("brak wyników szukania mówi co innego niż pusty kubełek", () => {
+    /* „Ten kubełek jest pusty" przy włączonym filtrze byłoby nieprawdą:
+       kubełek bywa pełen, tylko nic w nim nie pasuje. */
+    render(<Kolejka zwroty={[]} wybrany={null} zKubelkiem onWybierz={() => {}} />);
+    expect(screen.getByText(/Żaden zwrot nie pasuje/)).toBeInTheDocument();
+  });
+
   it("wiersz niesie numer, towar, sztuki i kwotę — i ani jednej rzeczy więcej", () => {
     render(<Kolejka zwroty={[zwrot()]} wybrany={null} onWybierz={() => {}} />);
     expect(screen.getByText("REF-1")).toBeInTheDocument();

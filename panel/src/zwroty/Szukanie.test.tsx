@@ -2,25 +2,25 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Skan } from "./Skan";
+import { Szukanie } from "./Szukanie";
 import type { WynikSkanu } from "../api/zwroty";
 
-/* Pole skanu mówi, CZEGO szukało. Przy czytniku „nie znalazłem" bez tej
-   informacji wygląda identycznie jak zepsuty czytnik — a operator stoi wtedy
-   z paczką i nie wie, czy skanować jeszcze raz, czy szukać ręcznie. */
+/* Pole mówi, CZEGO szukało. Przy czytniku „nie znalazłem" bez tej informacji
+   wygląda identycznie jak zepsuty czytnik — a operator stoi wtedy z paczką
+   i nie wie, czy skanować jeszcze raz, czy szukać ręcznie. */
 
 const ETYKIETA = "600000367616070023174201";
 
-const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof Skan>> = {}) => {
+const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof Szukanie>> = {}) => {
   const p = {
-    wynik, kod: ETYKIETA, szuka: false, dociaga: false, blad: "",
-    onKod: vi.fn(), onSzukaj: vi.fn(), onDociagnij: vi.fn(), onWybierz: vi.fn(), ...n,
+    wynik, kod: ETYKIETA, fraza: "", ile: null, szuka: false, dociaga: false, blad: "",
+    onFraza: vi.fn(), onSzukaj: vi.fn(), onDociagnij: vi.fn(), onWybierz: vi.fn(), ...n,
   };
-  render(<Skan {...p} />);
+  render(<Szukanie {...p} />);
   return p;
 };
 
-describe("Pole skanu etykiety", () => {
+describe("Pole szukania zwrotu", () => {
   it("nieznany kod pokazuje SIEBIE i drogę wyjścia", async () => {
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     /* Kod na ekranie, bo naklejka bywa pomięta i skan urwany w połowie. */
@@ -53,16 +53,49 @@ describe("Pole skanu etykiety", () => {
   });
 
   it("bez czytnika da się wpisać numer i zatwierdzić Enterem", async () => {
-    const p = pokaz(null);
-    const pole = screen.getByPlaceholderText(/Zeskanuj etykietę/);
-    await userEvent.type(pole, "1234/Z04A{Enter}");
+    const p = pokaz(null, { fraza: "1234/Z04A" });
+    await userEvent.type(screen.getByPlaceholderText(/Zeskanuj etykietę/), "{Enter}");
     expect(p.onSzukaj).toHaveBeenCalledWith("1234/Z04A");
   });
 
   it("puste pole nie strzela do serwera", async () => {
-    const p = pokaz(null);
-    await userEvent.type(screen.getByPlaceholderText(/Zeskanuj etykietę/), "   {Enter}");
+    const p = pokaz(null, { fraza: "   " });
+    await userEvent.type(screen.getByPlaceholderText(/Zeskanuj etykietę/), "{Enter}");
     expect(p.onSzukaj).not.toHaveBeenCalled();
+  });
+
+  it("każdy znak idzie do filtru, bez czekania na Enter", async () => {
+    /* Filtr liczy się w pamięci ekranu, więc opóźnianie go byłoby opóźnianiem
+       tego, co i tak jest natychmiastowe. */
+    const p = pokaz(null);
+    await userEvent.type(screen.getByPlaceholderText(/Zeskanuj etykietę/), "56");
+    expect(p.onFraza).toHaveBeenCalledTimes(2);
+    expect(p.onSzukaj).not.toHaveBeenCalled();
+  });
+
+  it("mówi, ile pasuje i że szuka poza kubełkiem", () => {
+    /* Bez tego zdania wynik z kubełka ZAMKNIĘTE wyglądałby jak praca. */
+    pokaz(null, { fraza: "567", ile: 3 });
+    expect(screen.getByText(/3 pasujących zwrotów — szukam po wszystkich kubełkach/))
+      .toBeInTheDocument();
+  });
+
+  it("brak pasujących odsyła do Enter, bo numeru listu filtr nie widzi", () => {
+    pokaz(null, { fraza: "600000", ile: 0 });
+    expect(screen.getByText(/Enter zapyta jeszcze o numer listu/)).toBeInTheDocument();
+  });
+
+  it("krzyżyk czyści pole jednym kliknięciem", async () => {
+    /* Kasowanie dwudziestu czterech znaków po jednym to osobna czynność. */
+    const p = pokaz(null, { fraza: ETYKIETA });
+    await userEvent.click(screen.getByRole("button", { name: "Wyczyść szukanie" }));
+    expect(p.onFraza).toHaveBeenCalledWith("");
+  });
+
+  it("puste pole nie pokazuje ani licznika, ani krzyżyka", () => {
+    pokaz(null);
+    expect(screen.queryByRole("button", { name: "Wyczyść szukanie" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/kubełkach/)).not.toBeInTheDocument();
   });
 
   it("odmowa serwera ląduje przy polu, a nie w konsoli", () => {

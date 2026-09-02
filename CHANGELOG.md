@@ -34,6 +34,71 @@ historii nie przepisujemy.
 ---
 
 
+## 0.165.0 — 2 września 2026
+
+**Panel trzyma się okna, a zwrot da się znaleźć po kawałku numeru.**
+
+Dwie prośby właściciela o tym samym: o zwrotach, których zrobiło się za dużo
+na jeden ekran.
+
+### Przewijają się kolumny, nie strona
+
+Ekran zwrotów rósł do wysokości najwyższej kolumny — a najwyższa jest zawsze
+kolumna dowodów. Przewijał się więc dokument, czyli wszystkie trzy kolumny
+naraz: żeby dojść do dołu dowodów, operator zjeżdżał z oczu kolejce i paskowi
+decyzji. Karty miały `overflow-hidden`, ale to samo przycięcie rogów — bez
+limitu wysokości nie tworzy obszaru przewijania.
+
+Wzorca nie trzeba było wymyślać: leżał gotowy w makiecie własnego panelu
+(`docs/projekt-widokow/Main.dc.html`), do której front nigdy nie doszedł.
+Rama zamyka okno, kolumny przewijają się u siebie. Skrzynka traci przy okazji
+`max-h-[75vh]` — obejście z czasów, gdy nic nie ograniczało wysokości z góry,
+które pod zablokowaną ramą zostawiałoby ćwierć okna pustą.
+
+Blokada zaczyna się od szerokości `lg`. Niżej grid jest jednokolumnowy, a trzy
+scrollery po dwieście pikseli czytałoby się gorzej niż przewijaną stronę.
+Poniżej tej granicy wszystko zostaje jak było, razem z `sticky` nagłówkiem.
+
+**Kursor musi teraz gonić widok.** Klawisze `j`/`k` przesuwały zaznaczenie bez
+fokusu, a dopóki przewijała się strona, wiersz i tak bywał widoczny. Zamknięty
+w scrollerze kolejki wyjeżdżałby poza widok przy trzecim naciśnięciu, więc
+kolejka dogania go `scrollIntoView({ block: "nearest" })`. `nearest` załatwia
+przy okazji mysz: wiersz widoczny w całości nie jest przewijany wcale.
+
+### Jedno pole szuka i skanuje
+
+Kolejkę dało się dotąd zawęzić WYŁĄCZNIE kubełkiem. Gdy operator pamiętał
+„coś z 5678", nie miał czego użyć: pole skanu z 0.163.0 owszem, otwierało
+zwrot po wpisanym numerze, ale dopasowanie miało dokładne i nazywało się
+„Zeskanuj etykietę".
+
+Teraz każdy wpisany znak zawęża listę po fragmencie numeru zwrotu,
+identyfikatora z Allegro, numeru zamówienia albo numeru korekty. Pole zmieniło
+nazwę na `Szukanie.tsx`, żeby następny agent znalazł je po tym, czego szuka.
+
+**Serwer nie dostał ani jednej nowej trasy.** Lista zwrotów przyjeżdża
+w całości od 0.150.0, więc filtr liczy się w pamięci ekranu — tą samą drogą co
+filtr kubełka. Szukanie po fragmencie na serwerze musiałoby albo rozluźnić
+`znajdzZwrotPoKodzie`, które ma być dokładne, bo samo otwiera zwrot, albo
+dołożyć trasę z dziennikiem — czyli zapisać, czego ktoś szukał.
+
+**Szukanie przebija kubełek**, a wiersz wyniku niesie etykietę swojego. Bez
+tego operator wpisuje numer, widzi „ten kubełek jest pusty" i nie ma jak się
+dowiedzieć, że zwrot stoi w ZAMKNIĘTYCH. Kliknięcie w kubełek zdejmuje filtr.
+
+**Fragment zawęża, otwiera dopiero CAŁY kod.** Ekran sam otwiera przy jednym
+wyniku, więc przybliżenie prowadziłoby do cudzej sprawy — przy zwrocie znaczy
+to cudzego klienta i cudze pieniądze. Numeru listu przewozowego filtr nie
+widzi, bo nie ma go w modelu pracy; od niego jest Enter i skan z 0.163.0.
+
+### Przy wdrożeniu
+
+Nic. Zmiana jest w samym panelu obsługi, bez migracji i bez wpisu
+w `wertis.env`.
+
+---
+
+
 ## 0.164.0 — 2 września 2026
 
 **Rabat transakcyjny widać przy zwrocie i składa się jednym kliknięciem.**
